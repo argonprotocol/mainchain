@@ -9,3 +9,5 @@
 # direnv files
 .envrc
 .direnv
+.idea
+rustc-ice*

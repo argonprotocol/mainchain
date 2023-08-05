@@ -1,13 +1,13 @@
 [package]
 name = "pallet-template"
-version = "4.0.0-dev"
+version = "0.0.1"
 description = "FRAME pallet template for defining custom runtime logic."
-authors = ["Substrate DevHub <https://github.com/substrate-developer-hub>"]
-homepage = "https://substrate.io"
+authors = ["Ulixee <https://github.com/ulixee>"]
+homepage = "https://ulixee.org"
 edition = "2021"
 license = "MIT-0"
 publish = false
-repository = "https://github.com/substrate-developer-hub/substrate-node-template/"
+repository = "https://github.com/ulixee/mainchain"
 
 [package.metadata.docs.rs]
 targets = ["x86_64-unknown-linux-gnu"]
