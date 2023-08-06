@@ -2,8 +2,8 @@ use sc_service::ChainType;
 use sp_core::{sr25519, Pair, Public};
 use sp_runtime::traits::{IdentifyAccount, Verify};
 use ulx_node_runtime::{
-	AccountId, BalancesConfig, RuntimeGenesisConfig, Signature, SudoConfig, SystemConfig,
-	WASM_BINARY,
+	AccountId, ArgonBalancesConfig, RuntimeGenesisConfig, Signature, SudoConfig, SystemConfig,
+	UlixeeBalancesConfig, WASM_BINARY,
 };
 
 // The URL for the telemetry server.
@@ -131,7 +131,11 @@ fn testnet_genesis(
 			code: wasm_binary.to_vec(),
 			..Default::default()
 		},
-		balances: BalancesConfig {
+		argon_balances: ArgonBalancesConfig {
+			// Configure endowed accounts with initial balance of 1 << 60.
+			balances: endowed_accounts.iter().cloned().map(|k| (k, 1 << 60)).collect(),
+		},
+		ulixee_balances: UlixeeBalancesConfig {
 			// Configure endowed accounts with initial balance of 1 << 60.
 			balances: endowed_accounts.iter().cloned().map(|k| (k, 1 << 60)).collect(),
 		},

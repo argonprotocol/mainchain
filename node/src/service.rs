@@ -263,7 +263,7 @@ pub fn new_full(config: Configuration) -> Result<TaskManager, ServiceError> {
 		);
 
 		// Start Mining
-		let mut nonce = U256::from(rand::random::<u64>());
+		let mut nonce = U256::from(rand::random::<u128>());
 		let mut seal: [u8; 32] = [0; 32];
 
 		thread::spawn(move || loop {
@@ -273,7 +273,7 @@ pub fn new_full(config: Configuration) -> Result<TaskManager, ServiceError> {
 				let mut verifier = NonceVerifier::new(&metadata.pre_hash, metadata.difficulty);
 				nonce.to_big_endian(seal.as_mut_slice());
 				if verifier.is_nonce_valid(&seal) {
-					nonce = U256::from(rand::random::<u64>());
+					nonce = U256::from(rand::random::<u128>());
 					let _ = futures::executor::block_on(worker.submit(seal.into()));
 				} else {
 					nonce = nonce.saturating_add(U256::from(1));

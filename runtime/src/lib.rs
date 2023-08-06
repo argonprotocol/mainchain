@@ -6,7 +6,7 @@
 #[macro_use]
 extern crate frame_benchmarking;
 
-use frame_support::traits::OnTimestampSet;
+use frame_support::traits::{OnTimestampSet, StorageMapShim};
 pub use frame_support::{
 	construct_runtime, parameter_types,
 	traits::{
@@ -22,7 +22,7 @@ pub use frame_support::{
 	StorageValue,
 };
 pub use frame_system::Call as SystemCall;
-pub use pallet_balances::Call as BalancesCall;
+pub type ArgonBalancesCall = pallet_balances::Call<Runtime, ArgonToken>;
 pub use pallet_timestamp::Call as TimestampCall;
 use pallet_transaction_payment::{ConstFeeMultiplier, CurrencyAdapter, Multiplier};
 use sp_api::impl_runtime_apis;
@@ -211,7 +211,8 @@ impl OnTimestampSet<Moment> for StoreTimestampInDigest {
 /// Existential deposit.
 pub const EXISTENTIAL_DEPOSIT: u128 = 500;
 
-impl pallet_balances::Config for Runtime {
+type ArgonToken = pallet_balances::Instance1;
+impl pallet_balances::Config<ArgonToken> for Runtime {
 	type MaxLocks = ConstU32<50>;
 	type MaxReserves = ();
 	type ReserveIdentifier = [u8; 8];
@@ -229,13 +230,36 @@ impl pallet_balances::Config for Runtime {
 	type MaxHolds = ();
 }
 
+type UlixeeToken = pallet_balances::Instance2;
+impl pallet_balances::Config<UlixeeToken> for Runtime {
+	type MaxLocks = ConstU32<50>;
+	type MaxReserves = ();
+	type ReserveIdentifier = [u8; 8];
+	/// The type for recording an account's balance.
+	type Balance = Balance;
+	/// The ubiquitous event type.
+	type RuntimeEvent = RuntimeEvent;
+	type DustRemoval = ();
+	type ExistentialDeposit = ConstU128<EXISTENTIAL_DEPOSIT>;
+	type AccountStore = StorageMapShim<
+		pallet_balances::Account<Runtime, UlixeeToken>,
+		AccountId,
+		pallet_balances::AccountData<Balance>,
+	>;
+	type WeightInfo = pallet_balances::weights::SubstrateWeight<Runtime>;
+	type FreezeIdentifier = ();
+	type MaxFreezes = ();
+	type RuntimeHoldReason = ();
+	type MaxHolds = ();
+}
+
 parameter_types! {
 	pub FeeMultiplier: Multiplier = Multiplier::one();
 }
 
 impl pallet_transaction_payment::Config for Runtime {
 	type RuntimeEvent = RuntimeEvent;
-	type OnChargeTransaction = CurrencyAdapter<Balances, ()>;
+	type OnChargeTransaction = CurrencyAdapter<ArgonBalances, ()>;
 	type OperationalFeeMultiplier = ConstU8<5>;
 	type WeightToFee = WageProtectorFee<Balance>;
 	type LengthToFee = WageProtectorFee<Balance>;
@@ -259,7 +283,8 @@ construct_runtime!(
 	pub struct Runtime {
 		System: frame_system,
 		Timestamp: pallet_timestamp,
-		Balances: pallet_balances,
+		ArgonBalances: pallet_balances::<Instance1>::{Pallet, Call, Storage, Config<T>, Event<T>},
+		UlixeeBalances: pallet_balances::<Instance2>::{Pallet, Call, Storage, Config<T>, Event<T>},
 		TransactionPayment: pallet_transaction_payment,
 		Sudo: pallet_sudo,
 		// Include the custom logic from the pallet-template in the runtime.
@@ -304,7 +329,8 @@ mod benches {
 	define_benchmarks!(
 		[frame_benchmarking, BaselineBench::<Runtime>]
 		[frame_system, SystemBench::<Runtime>]
-		[pallet_balances, Balances]
+		[pallet_balances, ArgonTokens]
+		[pallet_balances, UlixeeTokens]
 		[pallet_timestamp, Timestamp]
 		[pallet_sudo, Sudo]
 		[pallet_template, TemplateModule]
