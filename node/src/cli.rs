@@ -1,4 +1,5 @@
 use sc_cli::RunCmd;
+use ulx_node_runtime::AccountId;
 
 #[derive(Debug, clap::Parser)]
 pub struct Cli {
@@ -7,6 +8,26 @@ pub struct Cli {
 
 	#[clap(flatten)]
 	pub run: RunCmd,
+
+	/// Enable mining and credit rewards to the given account.
+	///
+	/// The account address must be given in SS58 format.
+	#[arg(long, value_name = "SS58_ADDRESS", value_parser = parse_ss58_account_id)]
+	pub mine: Option<AccountId>,
+}
+
+impl Cli {
+	pub fn block_author(&self) -> Option<AccountId> {
+		if let Some(block_author) = &self.mine {
+			Some(block_author.clone())
+		} else if self.run.shared_params.dev {
+			use sp_core::crypto::Pair;
+			let block_author = sp_core::ed25519::Pair::from_string("//Mine", None).unwrap();
+			Some(AccountId::from(block_author.public()))
+		} else {
+			None
+		}
+	}
 }
 
 #[derive(Debug, clap::Subcommand)]
@@ -51,4 +72,8 @@ pub enum Subcommand {
 
 	/// Db meta columns information.
 	ChainInfo(sc_cli::ChainInfoCmd),
+}
+
+fn parse_ss58_account_id(data: &str) -> Result<AccountId, String> {
+	sp_core::crypto::Ss58Codec::from_ss58check(data).map_err(|err| format!("{:?}", err))
 }

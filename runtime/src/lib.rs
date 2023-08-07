@@ -6,7 +6,8 @@
 #[macro_use]
 extern crate frame_benchmarking;
 
-use frame_support::traits::{OnTimestampSet, StorageMapShim};
+use codec::Decode;
+use frame_support::traits::{Currency, FindAuthor, OnTimestampSet, OnUnbalanced, StorageMapShim};
 pub use frame_support::{
 	construct_runtime, parameter_types,
 	traits::{
@@ -22,10 +23,10 @@ pub use frame_support::{
 	StorageValue,
 };
 pub use frame_system::Call as SystemCall;
-pub type ArgonBalancesCall = pallet_balances::Call<Runtime, ArgonToken>;
 pub use pallet_timestamp::Call as TimestampCall;
 use pallet_transaction_payment::{ConstFeeMultiplier, CurrencyAdapter, Multiplier};
 use sp_api::impl_runtime_apis;
+use sp_consensus_pow::POW_ENGINE_ID;
 use sp_core::{crypto::KeyTypeId, OpaqueMetadata};
 #[cfg(any(feature = "std", test))]
 pub use sp_runtime::BuildStorage;
@@ -33,7 +34,7 @@ use sp_runtime::{
 	create_runtime_str, generic,
 	traits::{AccountIdLookup, BlakeTwo256, Block as BlockT, IdentifyAccount, One, Verify},
 	transaction_validity::{TransactionSource, TransactionValidity},
-	ApplyExtrinsicResult, MultiSignature,
+	ApplyExtrinsicResult, ConsensusEngineId, MultiSignature,
 };
 pub use sp_runtime::{Perbill, Permill};
 use sp_std::prelude::*;
@@ -46,6 +47,8 @@ pub use pallet_template;
 
 // A few exports that help ease life for downstream crates.
 use crate::wage_protector::WageProtectorFee;
+
+pub type ArgonBalancesCall = pallet_balances::Call<Runtime, ArgonToken>;
 
 pub mod digest_timestamp;
 pub mod wage_protector;
@@ -208,9 +211,54 @@ impl OnTimestampSet<Moment> for StoreTimestampInDigest {
 	}
 }
 
+pub struct PreRuntimeAuthor;
+impl FindAuthor<AccountId> for PreRuntimeAuthor {
+	fn find_author<'a, I>(digests: I) -> Option<AccountId>
+	where
+		I: 'a + IntoIterator<Item = (ConsensusEngineId, &'a [u8])>,
+	{
+		digests
+			.into_iter()
+			.filter_map(|(id, mut data)| {
+				if id == POW_ENGINE_ID {
+					<Runtime as frame_system::Config>::AccountId::decode(&mut data).ok()
+				} else {
+					None
+				}
+			})
+			.next()
+	}
+}
+
+impl pallet_authorship::Config for Runtime {
+	type FindAuthor = PreRuntimeAuthor;
+	type EventHandler = ();
+}
+
 /// Existential deposit.
 pub const EXISTENTIAL_DEPOSIT: u128 = 500;
 
+pub struct Author;
+impl OnUnbalanced<NegativeImbalance> for Author {
+	fn on_nonzero_unbalanced(amount: NegativeImbalance) {
+		if let Some(author) = Authorship::author() {
+			ArgonBalances::resolve_creating(&author, amount);
+		}
+	}
+}
+
+pub struct DealWithFees;
+type NegativeImbalance = <ArgonBalances as Currency<AccountId>>::NegativeImbalance;
+impl OnUnbalanced<NegativeImbalance> for DealWithFees {
+	fn on_unbalanceds<B>(mut fees_then_tips: impl Iterator<Item = NegativeImbalance>) {
+		if let Some(fees) = fees_then_tips.next() {
+			Author::on_unbalanced(fees);
+			if let Some(tips) = fees_then_tips.next() {
+				Author::on_unbalanced(tips);
+			}
+		}
+	}
+}
 type ArgonToken = pallet_balances::Instance1;
 impl pallet_balances::Config<ArgonToken> for Runtime {
 	type MaxLocks = ConstU32<50>;
@@ -259,7 +307,7 @@ parameter_types! {
 
 impl pallet_transaction_payment::Config for Runtime {
 	type RuntimeEvent = RuntimeEvent;
-	type OnChargeTransaction = CurrencyAdapter<ArgonBalances, ()>;
+	type OnChargeTransaction = CurrencyAdapter<ArgonBalances, DealWithFees>;
 	type OperationalFeeMultiplier = ConstU8<5>;
 	type WeightToFee = WageProtectorFee<Balance>;
 	type LengthToFee = WageProtectorFee<Balance>;
@@ -283,6 +331,7 @@ construct_runtime!(
 	pub struct Runtime {
 		System: frame_system,
 		Timestamp: pallet_timestamp,
+		Authorship: pallet_authorship,
 		ArgonBalances: pallet_balances::<Instance1>::{Pallet, Call, Storage, Config<T>, Event<T>},
 		UlixeeBalances: pallet_balances::<Instance2>::{Pallet, Call, Storage, Config<T>, Event<T>},
 		TransactionPayment: pallet_transaction_payment,
@@ -332,6 +381,7 @@ mod benches {
 		[pallet_balances, ArgonTokens]
 		[pallet_balances, UlixeeTokens]
 		[pallet_timestamp, Timestamp]
+		[pallet_authorship, Authorship]
 		[pallet_sudo, Sudo]
 		[pallet_template, TemplateModule]
 	);

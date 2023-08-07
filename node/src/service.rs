@@ -1,16 +1,17 @@
 //! Service and ServiceFactory implementation. Specialized wrapper over substrate service.
 
+use codec::Encode;
 use std::{sync::Arc, thread, time::Duration};
 
 use futures::FutureExt;
 use sc_client_api::Backend;
 pub use sc_executor::NativeElseWasmExecutor;
 use sc_service::{error::Error as ServiceError, Configuration, TaskManager};
-use sc_telemetry::{Telemetry, TelemetryWorker};
+use sc_telemetry::{log, Telemetry, TelemetryWorker};
 use sc_transaction_pool_api::OffchainTransactionPoolFactory;
 use sp_core::U256;
 
-use ulx_node_runtime::{self, opaque::Block, RuntimeApi};
+use ulx_node_runtime::{self, opaque::Block, AccountId, RuntimeApi};
 
 use crate::pow::{NonceVerifier, UlixeePowAlgorithm};
 
@@ -145,7 +146,10 @@ pub fn new_partial(
 }
 
 /// Builds a new service for a full client.
-pub fn new_full(config: Configuration) -> Result<TaskManager, ServiceError> {
+pub fn new_full(
+	config: Configuration,
+	opt_block_author: Option<AccountId>,
+) -> Result<TaskManager, ServiceError> {
 	let sc_service::PartialComponents {
 		client,
 		backend,
@@ -223,68 +227,71 @@ pub fn new_full(config: Configuration) -> Result<TaskManager, ServiceError> {
 	})?;
 
 	if role.is_authority() {
-		let proposer_factory = sc_basic_authorship::ProposerFactory::new(
-			task_manager.spawn_handle(),
-			client.clone(),
-			transaction_pool.clone(),
-			prometheus_registry.as_ref(),
-			telemetry.as_ref().map(|x| x.handle()),
-		);
+		if let Some(block_author) = opt_block_author {
+			let proposer_factory = sc_basic_authorship::ProposerFactory::new(
+				task_manager.spawn_handle(),
+				client.clone(),
+				transaction_pool.clone(),
+				prometheus_registry.as_ref(),
+				telemetry.as_ref().map(|x| x.handle()),
+			);
 
-		let algorithm = UlixeePowAlgorithm::new(client.clone());
-		// Parameter details:
-		//   https://substrate.dev/rustdocs/v3.0.0/sc_consensus_pow/fn.start_mining_worker.html
-		// Also refer to kulupu config:
-		//   https://github.com/kulupu/kulupu/blob/master/src/service.rs
-		let (_worker, worker_task) = sc_consensus_pow::start_mining_worker(
-			Box::new(pow_block_import),
-			client.clone(),
-			select_chain,
-			algorithm,
-			proposer_factory,
-			sync_service.clone(),
-			sync_service.clone(),
-			// TODO: we probably want to add some randomness here.
-			None,
-			move |_, ()| async move {
-				let provider = sp_timestamp::InherentDataProvider::from_system_time();
-				Ok(provider)
-			},
-			// time to wait for a new block before starting to mine a new one
-			Duration::from_secs(10),
-			// how long to take to actually build the block (i.e. executing extrinsics)
-			Duration::from_secs(10),
-		);
+			let algorithm = UlixeePowAlgorithm::new(client.clone());
+			// Parameter details:
+			//   https://substrate.dev/rustdocs/v3.0.0/sc_consensus_pow/fn.start_mining_worker.html
+			// Also refer to kulupu config:
+			//   https://github.com/kulupu/kulupu/blob/master/src/service.rs
+			let (_worker, worker_task) = sc_consensus_pow::start_mining_worker(
+				Box::new(pow_block_import),
+				client.clone(),
+				select_chain,
+				algorithm,
+				proposer_factory,
+				sync_service.clone(),
+				sync_service.clone(),
+				Some(block_author.encode()),
+				move |_, ()| async move {
+					let provider = sp_timestamp::InherentDataProvider::from_system_time();
+					Ok(provider)
+				},
+				// time to wait for a new block before starting to mine a new one
+				Duration::from_secs(10),
+				// how long to take to actually build the block (i.e. executing extrinsics)
+				Duration::from_secs(10),
+			);
 
-		task_manager.spawn_essential_handle().spawn_blocking(
-			"pow",
-			Some("block-authoring"),
-			worker_task,
-		);
+			task_manager.spawn_essential_handle().spawn_blocking(
+				"pow",
+				Some("block-authoring"),
+				worker_task,
+			);
 
-		// Start Mining
-		let mut nonce = U256::from(rand::random::<u128>());
-		let mut seal: [u8; 32] = [0; 32];
+			// Start Mining
+			let mut nonce = U256::from(rand::random::<u128>());
+			let mut seal: [u8; 32] = [0; 32];
 
-		thread::spawn(move || loop {
-			let worker = _worker.clone();
-			let metadata = worker.metadata();
-			if let Some(metadata) = metadata {
-				let mut verifier = NonceVerifier::new(&metadata.pre_hash, metadata.difficulty);
-				nonce.to_big_endian(seal.as_mut_slice());
-				if verifier.is_nonce_valid(&seal) {
-					nonce = U256::from(rand::random::<u128>());
-					let _ = futures::executor::block_on(worker.submit(seal.into()));
-				} else {
-					nonce = nonce.saturating_add(U256::from(1));
-					if nonce == U256::MAX {
-						nonce = U256::from(0);
+			thread::spawn(move || loop {
+				let worker = _worker.clone();
+				let metadata = worker.metadata();
+				if let Some(metadata) = metadata {
+					let mut verifier = NonceVerifier::new(&metadata.pre_hash, metadata.difficulty);
+					nonce.to_big_endian(seal.as_mut_slice());
+					if verifier.is_nonce_valid(&seal) {
+						nonce = U256::from(rand::random::<u128>());
+						let _ = futures::executor::block_on(worker.submit(seal.into()));
+					} else {
+						nonce = nonce.saturating_add(U256::from(1));
+						if nonce == U256::MAX {
+							nonce = U256::from(0);
+						}
 					}
+				} else {
+					thread::sleep(Duration::new(1, 0));
 				}
-			} else {
-				thread::sleep(Duration::new(1, 0));
-			}
-		});
+			});
+		} else {
+			log::info!("Mining is disabled");
+		}
 	}
 
 	network_starter.start_network();

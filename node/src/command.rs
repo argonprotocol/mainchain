@@ -1,17 +1,18 @@
+use frame_benchmarking_cli::{BenchmarkCmd, ExtrinsicFactory, SUBSTRATE_REFERENCE_HARDWARE};
+use sc_cli::SubstrateCli;
+use sc_service::PartialComponents;
+use sp_keyring::Sr25519Keyring;
+#[cfg(feature = "try-runtime")]
+use try_runtime_cli::block_building_info::timestamp_with_aura_info;
+
+use ulx_node_runtime::{Block, EXISTENTIAL_DEPOSIT};
+
 use crate::{
 	benchmarking::{inherent_benchmark_data, RemarkBuilder, TransferKeepAliveBuilder},
 	chain_spec,
 	cli::{Cli, Subcommand},
 	service,
 };
-use frame_benchmarking_cli::{BenchmarkCmd, ExtrinsicFactory, SUBSTRATE_REFERENCE_HARDWARE};
-use sc_cli::SubstrateCli;
-use sc_service::PartialComponents;
-use sp_keyring::Sr25519Keyring;
-use ulx_node_runtime::{Block, EXISTENTIAL_DEPOSIT};
-
-#[cfg(feature = "try-runtime")]
-use try_runtime_cli::block_building_info::timestamp_with_aura_info;
 
 impl SubstrateCli for Cli {
 	fn impl_name() -> String {
@@ -205,7 +206,7 @@ pub fn run() -> sc_cli::Result<()> {
 		None => {
 			let runner = cli.create_runner(&cli.run)?;
 			runner.run_node_until_exit(|config| async move {
-				service::new_full(config).map_err(sc_cli::Error::Service)
+				service::new_full(config, cli.block_author()).map_err(sc_cli::Error::Service)
 			})
 		},
 	}
