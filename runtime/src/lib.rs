@@ -6,8 +6,7 @@
 #[macro_use]
 extern crate frame_benchmarking;
 
-use codec::Decode;
-use frame_support::traits::{Currency, FindAuthor, OnTimestampSet, OnUnbalanced, StorageMapShim};
+use frame_support::traits::{Currency, OnUnbalanced, StorageMapShim};
 pub use frame_support::{
 	construct_runtime, parameter_types,
 	traits::{
@@ -26,31 +25,34 @@ pub use frame_system::Call as SystemCall;
 pub use pallet_timestamp::Call as TimestampCall;
 use pallet_transaction_payment::{ConstFeeMultiplier, CurrencyAdapter, Multiplier};
 use sp_api::impl_runtime_apis;
-use sp_consensus_pow::POW_ENGINE_ID;
-use sp_core::{crypto::KeyTypeId, OpaqueMetadata};
+use sp_arithmetic::traits::UniqueSaturatedInto;
+use sp_core::{crypto::KeyTypeId, OpaqueMetadata, U256};
 #[cfg(any(feature = "std", test))]
 pub use sp_runtime::BuildStorage;
 use sp_runtime::{
 	create_runtime_str, generic,
-	traits::{AccountIdLookup, BlakeTwo256, Block as BlockT, IdentifyAccount, One, Verify},
+	traits::{
+		AccountIdLookup, BlakeTwo256, Block as BlockT, IdentifyAccount, One, OpaqueKeys, Verify,
+	},
 	transaction_validity::{TransactionSource, TransactionValidity},
-	ApplyExtrinsicResult, ConsensusEngineId, MultiSignature,
+	ApplyExtrinsicResult, MultiSignature,
 };
 pub use sp_runtime::{Perbill, Permill};
-use sp_std::prelude::*;
+use sp_std::{collections::btree_map::BTreeMap, prelude::*, vec::Vec};
 #[cfg(feature = "std")]
 use sp_version::NativeVersion;
 use sp_version::RuntimeVersion;
 
-/// Import the template pallet.
-pub use pallet_template;
+use crate::opaque::SessionKeys;
+use ulx_primitives::{
+	AuthorityDistance, AuthorityProvider, BlockSealAuthorityId, NextWork, ValidatorRegistration,
+};
 
 // A few exports that help ease life for downstream crates.
 use crate::wage_protector::WageProtectorFee;
 
 pub type ArgonBalancesCall = pallet_balances::Call<Runtime, ArgonToken>;
 
-pub mod digest_timestamp;
 pub mod wage_protector;
 
 // Make the WASM binary available.
@@ -79,6 +81,10 @@ pub type Hash = sp_core::H256;
 /// A timestamp: milliseconds since the unix epoch.
 pub type Moment = u64;
 
+pub type AccountData = pallet_balances::AccountData<Balance>;
+
+pub type BlockHash = BlakeTwo256;
+
 /// Opaque types. These are used by the CLI to instantiate machinery that don't need to know
 /// the specifics of the runtime. They can then be made to be agnostic over specific formats
 /// of data like extrinsics, allowing for them to continue syncing the network through upgrades
@@ -90,7 +96,7 @@ pub mod opaque {
 	use super::*;
 
 	/// Opaque block header type.
-	pub type Header = generic::Header<BlockNumber, BlakeTwo256>;
+	pub type Header = generic::Header<BlockNumber, BlockHash>;
 	/// Opaque block type.
 	pub type Block = generic::Block<Header, UncheckedExtrinsic>;
 	/// Opaque block identifier type.
@@ -98,6 +104,7 @@ pub mod opaque {
 
 	impl_opaque_keys! {
 		pub struct SessionKeys {
+			pub block_seal_authority: ValidatorCohorts,
 		}
 	}
 }
@@ -106,8 +113,8 @@ pub mod opaque {
 // https://docs.substrate.io/main-docs/build/upgrade#runtime-versioning
 #[sp_version::runtime_version]
 pub const VERSION: RuntimeVersion = RuntimeVersion {
-	spec_name: create_runtime_str!("node-template"),
-	impl_name: create_runtime_str!("node-template"),
+	spec_name: create_runtime_str!("ulixee"),
+	impl_name: create_runtime_str!("ulixee"),
 	authoring_version: 1,
 	// The version of the runtime specification. A full node will not attempt to use its native
 	//   runtime in substitute for the on-chain Wasm runtime unless all of `spec_name`,
@@ -147,6 +154,7 @@ parameter_types! {
 
 impl frame_system::Config for Runtime {
 	/// The basic call filter to use in dispatchable.
+	/// example filter: https://github.com/AcalaNetwork/Acala/blob/f4b80d7200c19b78d3777e8a4a87bc6893740d23/runtime/karura/src/lib.rs#L198
 	type BaseCallFilter = frame_support::traits::Everything;
 	/// The block type for the runtime.
 	type Block = Block;
@@ -195,44 +203,63 @@ impl frame_system::Config for Runtime {
 	type MaxConsumers = frame_support::traits::ConstU32<16>;
 }
 
+parameter_types! {
+	pub const TargetBlockTime: u32 = 60_000;
+	pub const DifficultyBlockChangePeriod: u32 = 60 * 24; // change difficulty once a day
+}
+
+impl pallet_difficulty::Config for Runtime {
+	type RuntimeEvent = RuntimeEvent;
+	type WeightInfo = pallet_difficulty::weights::SubstrateWeight<Runtime>;
+	type TargetBlockTime = TargetBlockTime;
+	type BlockChangePeriod = DifficultyBlockChangePeriod;
+}
+
 impl pallet_timestamp::Config for Runtime {
 	/// A timestamp: milliseconds since the unix epoch.
 	type Moment = Moment;
-	type OnTimestampSet = StoreTimestampInDigest;
-	type MinimumPeriod = ConstU64<30_000>;
+	type OnTimestampSet = Difficulty;
+	type MinimumPeriod = ConstU64<500>;
 	type WeightInfo = ();
 }
 
-pub struct StoreTimestampInDigest;
-impl OnTimestampSet<Moment> for StoreTimestampInDigest {
-	fn on_timestamp_set(timestamp: Moment) {
-		let item = digest_timestamp::digest_item(timestamp);
-		frame_system::Pallet::<Runtime>::deposit_log(item);
-	}
+parameter_types! {
+	pub const AuthorityCountInitiatingTaxProof: u32 = 100;
+	pub const MaxCohortSize: u32 = 250; // this means cohorts last 40 days
+	pub const MaxPendingCohorts: u32 = 30; // 30 days of cohorts
+	pub const BlocksBetweenCohorts: u32 = 1440; // going to add a cohort every day
+	pub const MaxValidators: u32 = 10_000; // must multiply cleanly by MaxCohortSize
+	pub const SessionRotationPeriod: u32 = 120; // must be cleanly divisible by BlocksBetweenCohorts
+	pub const Offset: u32 = 0;
 }
 
-pub struct PreRuntimeAuthor;
-impl FindAuthor<AccountId> for PreRuntimeAuthor {
-	fn find_author<'a, I>(digests: I) -> Option<AccountId>
-	where
-		I: 'a + IntoIterator<Item = (ConsensusEngineId, &'a [u8])>,
-	{
-		digests
-			.into_iter()
-			.filter_map(|(id, mut data)| {
-				if id == POW_ENGINE_ID {
-					<Runtime as frame_system::Config>::AccountId::decode(&mut data).ok()
-				} else {
-					None
-				}
-			})
-			.next()
-	}
+impl pallet_validator_cohorts::Config for Runtime {
+	type RuntimeEvent = RuntimeEvent;
+	type WeightInfo = pallet_validator_cohorts::weights::SubstrateWeight<Runtime>;
+	type MaxValidators = MaxValidators;
+	type MaxPendingCohorts = MaxPendingCohorts;
+	type MaxCohortSize = MaxCohortSize;
+	type BlocksBetweenCohorts = BlocksBetweenCohorts;
 }
 
-impl pallet_authorship::Config for Runtime {
-	type FindAuthor = PreRuntimeAuthor;
-	type EventHandler = ();
+impl pallet_block_seal::Config for Runtime {
+	type RuntimeEvent = RuntimeEvent;
+	type WeightInfo = pallet_block_seal::weights::SubstrateWeight<Runtime>;
+	type AuthorityProvider = ValidatorCohorts;
+	type AuthorityCountInitiatingTaxProof = AuthorityCountInitiatingTaxProof;
+	type AuthorityId = BlockSealAuthorityId;
+}
+
+impl pallet_session::Config for Runtime {
+	type RuntimeEvent = RuntimeEvent;
+	type ValidatorId = <Self as frame_system::Config>::AccountId;
+	type ValidatorIdOf = pallet_validator_cohorts::StashOf<Self>;
+	type ShouldEndSession = pallet_session::PeriodicSessions<SessionRotationPeriod, Offset>;
+	type NextSessionRotation = pallet_session::PeriodicSessions<SessionRotationPeriod, Offset>;
+	type SessionManager = ValidatorCohorts;
+	type SessionHandler = <SessionKeys as OpaqueKeys>::KeyTypeIdProviders;
+	type Keys = SessionKeys;
+	type WeightInfo = pallet_session::weights::SubstrateWeight<Runtime>;
 }
 
 /// Existential deposit.
@@ -241,8 +268,10 @@ pub const EXISTENTIAL_DEPOSIT: u128 = 500;
 pub struct Author;
 impl OnUnbalanced<NegativeImbalance> for Author {
 	fn on_nonzero_unbalanced(amount: NegativeImbalance) {
-		if let Some(author) = Authorship::author() {
+		if let Some(author) = BlockSeal::author() {
 			ArgonBalances::resolve_creating(&author, amount);
+		} else {
+			drop(amount);
 		}
 	}
 }
@@ -309,8 +338,8 @@ impl pallet_transaction_payment::Config for Runtime {
 	type RuntimeEvent = RuntimeEvent;
 	type OnChargeTransaction = CurrencyAdapter<ArgonBalances, DealWithFees>;
 	type OperationalFeeMultiplier = ConstU8<5>;
-	type WeightToFee = WageProtectorFee<Balance>;
-	type LengthToFee = WageProtectorFee<Balance>;
+	type WeightToFee = WageProtectorFee;
+	type LengthToFee = WageProtectorFee;
 	type FeeMultiplierUpdate = ConstFeeMultiplier<FeeMultiplier>;
 }
 
@@ -320,31 +349,26 @@ impl pallet_sudo::Config for Runtime {
 	type WeightInfo = pallet_sudo::weights::SubstrateWeight<Runtime>;
 }
 
-/// Configure the pallet-template in pallets/template.
-impl pallet_template::Config for Runtime {
-	type RuntimeEvent = RuntimeEvent;
-	type WeightInfo = pallet_template::weights::SubstrateWeight<Runtime>;
-}
-
 // Create the runtime by composing the FRAME pallets that were previously configured.
 construct_runtime!(
 	pub struct Runtime {
 		System: frame_system,
 		Timestamp: pallet_timestamp,
-		Authorship: pallet_authorship,
+		ValidatorCohorts: pallet_validator_cohorts,
+		Session: pallet_session,
+		Difficulty: pallet_difficulty,
+		BlockSeal: pallet_block_seal,
 		ArgonBalances: pallet_balances::<Instance1>::{Pallet, Call, Storage, Config<T>, Event<T>},
 		UlixeeBalances: pallet_balances::<Instance2>::{Pallet, Call, Storage, Config<T>, Event<T>},
 		TransactionPayment: pallet_transaction_payment,
 		Sudo: pallet_sudo,
-		// Include the custom logic from the pallet-template in the runtime.
-		TemplateModule: pallet_template,
 	}
 );
 
 /// The address format for describing accounts.
 pub type Address = sp_runtime::MultiAddress<AccountId, ()>;
 /// Block header type as expected by this runtime.
-pub type Header = generic::Header<BlockNumber, BlakeTwo256>;
+pub type Header = generic::Header<BlockNumber, BlockHash>;
 /// Block type as expected by this runtime.
 pub type Block = generic::Block<Header, UncheckedExtrinsic>;
 /// The SignedExtension to the basic transaction logic.
@@ -381,6 +405,10 @@ mod benches {
 		[pallet_balances, ArgonTokens]
 		[pallet_balances, UlixeeTokens]
 		[pallet_timestamp, Timestamp]
+		[pallet_difficulty, Difficulty]
+		[pallet_validator_cohort, ValidatorCohort]
+		[pallet_session, Session]
+		[pallet_block_seal, BlockSeal]
 		[pallet_authorship, Authorship]
 		[pallet_sudo, Sudo]
 		[pallet_template, TemplateModule]
@@ -459,11 +487,6 @@ impl_runtime_apis! {
 		}
 	}
 
-	impl sp_consensus_pow::TimestampApi<Block, u64> for Runtime {
-		fn timestamp() -> u64 {
-			pallet_timestamp::Pallet::<Runtime>::get()
-		}
-	}
 
 	impl sp_session::SessionKeys<Block> for Runtime {
 		fn generate_session_keys(seed: Option<Vec<u8>>) -> Vec<u8> {
@@ -518,6 +541,46 @@ impl_runtime_apis! {
 		}
 		fn query_length_to_fee(length: u32) -> Balance {
 			TransactionPayment::length_to_fee(length)
+		}
+	}
+
+	impl ulx_primitives::UlxConsensusApi<Block> for Runtime {
+		fn next_work() -> NextWork {
+			NextWork {
+				work_type: BlockSeal::work_type(),
+				difficulty: Difficulty::difficulty(),
+				min_seal_signers: BlockSeal::min_seal_signers(),
+				closest_x_authorities_required: BlockSeal::closest_x_authorities_required(),
+			}
+		}
+
+		fn calculate_easing(tax_amount: u128, validators: u8) -> u128 {
+			 Difficulty::calculate_easing(tax_amount, validators)
+		}
+	}
+
+	impl ulx_primitives::AuthorityApis<Block> for Runtime {
+		fn authorities() -> Vec<BlockSealAuthorityId> {
+			ValidatorCohorts::authorities()
+		}
+		fn authorities_by_index() -> BTreeMap<u16, BlockSealAuthorityId> {
+			ValidatorCohorts::authorities_by_index()
+		}
+		fn xor_closest_validators(hash: Vec<u8>) -> Vec<AuthorityDistance<BlockSealAuthorityId>> {
+			let number_to_find: u8 = UniqueSaturatedInto::<u8>::unique_saturated_into(BlockSeal::closest_x_authorities_required());
+			ValidatorCohorts::find_xor_closest_authorities(U256::from(&hash[..]), number_to_find)
+		}
+		fn active_authorities() -> u16 {
+			ValidatorCohorts::authority_count().into()
+		}
+	}
+
+	impl pallet_validator_cohorts::ValidatorCohortsApi<Block, BlockNumber, AccountId> for Runtime {
+		fn get_cohort(at: u32) ->  Vec<ValidatorRegistration<AccountId>> {
+			ValidatorCohorts::queued_cohorts(at).to_vec()
+		}
+		fn upcoming_cohort_blocks() -> Vec<BlockNumber> {
+			ValidatorCohorts::upcoming_cohort_blocks()
 		}
 	}
 

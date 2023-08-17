@@ -1,19 +1,19 @@
 //! Service and ServiceFactory implementation. Specialized wrapper over substrate service.
 
-use codec::Encode;
-use std::{sync::Arc, thread, time::Duration};
+use std::{cmp::max, sync::Arc, time::Duration};
 
 use futures::FutureExt;
 use sc_client_api::Backend;
 pub use sc_executor::NativeElseWasmExecutor;
-use sc_service::{error::Error as ServiceError, Configuration, TaskManager};
+use sc_service::{config::Configuration, error::Error as ServiceError, TaskManager};
 use sc_telemetry::{log, Telemetry, TelemetryWorker};
 use sc_transaction_pool_api::OffchainTransactionPoolFactory;
-use sp_core::U256;
 
+use ulx_node_consensus::{
+	compute_worker::run_miner_thread, inherents::UlxCreateInherentDataProviders,
+	nonce_verify::UlxNonce,
+};
 use ulx_node_runtime::{self, opaque::Block, AccountId, RuntimeApi};
-
-use crate::pow::{NonceVerifier, UlixeePowAlgorithm};
 
 // Our native executor instance.
 pub struct ExecutorDispatch;
@@ -41,19 +41,13 @@ type FullBackend = sc_service::TFullBackend<Block>;
 type FullSelectChain = sc_consensus::LongestChain<FullBackend, Block>;
 pub type Executor = NativeElseWasmExecutor<ExecutorDispatch>;
 
-type POWBlockImport = sc_consensus_pow::PowBlockImport<
+type UlxBlockImport = ulx_node_consensus::import_queue::UlxBlockImport<
 	Block,
 	Arc<FullClient>,
 	FullClient,
 	FullSelectChain,
-	UlixeePowAlgorithm<Block, FullClient>,
-	Box<
-		dyn sp_inherents::CreateInherentDataProviders<
-			Block,
-			(),
-			InherentDataProviders = sp_timestamp::InherentDataProvider,
-		>,
-	>,
+	UlxNonce<Block, FullClient>,
+	UlxCreateInherentDataProviders<Block>,
 >;
 
 #[allow(clippy::type_complexity)]
@@ -64,9 +58,9 @@ pub fn new_partial(
 		FullClient,
 		FullBackend,
 		FullSelectChain,
-		sc_consensus::DefaultImportQueue<Block, FullClient>,
+		sc_consensus::DefaultImportQueue<Block>,
 		sc_transaction_pool::FullPool<Block, FullClient>,
-		(POWBlockImport, Option<Telemetry>),
+		(UlxBlockImport, Option<Telemetry>),
 	>,
 	ServiceError,
 > {
@@ -82,6 +76,7 @@ pub fn new_partial(
 		.transpose()?;
 
 	let executor = sc_service::new_native_or_wasm_executor(config);
+
 	let (client, backend, keystore_container, task_manager) =
 		sc_service::new_full_parts::<Block, RuntimeApi, Executor>(
 			config,
@@ -105,30 +100,20 @@ pub fn new_partial(
 		client.clone(),
 	);
 
-	let algorithm = UlixeePowAlgorithm::new(client.clone());
-	let pow_block_import = sc_consensus_pow::PowBlockImport::new(
+	let algorithm = UlxNonce::new(client.clone());
+
+	let ulx_block_import = UlxBlockImport::new(
 		client.clone(),
 		client.clone(),
 		algorithm.clone(),
-		0, // check inherents starting at block 0
 		select_chain.clone(),
-		Box::new(move |_, ()| async move {
-			let provider = sp_timestamp::InherentDataProvider::from_system_time();
-			Ok(provider)
-		})
-			as Box<
-				dyn sp_inherents::CreateInherentDataProviders<
-					Block,
-					(),
-					InherentDataProviders = sp_timestamp::InherentDataProvider,
-				>,
-			>,
+		UlxCreateInherentDataProviders::new(),
 	);
 
-	let import_queue = sc_consensus_pow::import_queue(
-		Box::new(pow_block_import.clone()),
+	let import_queue = ulx_node_consensus::import_queue::new(
+		Box::new(ulx_block_import.clone()),
 		None,
-		algorithm,
+		algorithm.clone(),
 		&task_manager.spawn_essential_handle(),
 		config.prometheus_registry(),
 	)?;
@@ -141,7 +126,7 @@ pub fn new_partial(
 		keystore_container,
 		select_chain,
 		transaction_pool,
-		other: (pow_block_import, telemetry),
+		other: (ulx_block_import, telemetry),
 	})
 }
 
@@ -152,12 +137,12 @@ pub fn new_full(
 ) -> Result<TaskManager, ServiceError> {
 	let sc_service::PartialComponents {
 		client,
+		transaction_pool,
 		backend,
 		mut task_manager,
 		import_queue,
 		keystore_container,
 		select_chain,
-		transaction_pool,
 		other: (pow_block_import, mut telemetry),
 	} = new_partial(&config)?;
 
@@ -199,14 +184,20 @@ pub fn new_full(
 
 	let role = config.role.clone();
 	let prometheus_registry = config.prometheus_registry().cloned();
+	// Channel for the rpc handler to communicate with the authorship task.
+	let (block_proof_sink, block_proof_stream) = futures::channel::mpsc::channel(1000);
 
 	let rpc_extensions_builder = {
 		let client = client.clone();
 		let pool = transaction_pool.clone();
 
 		Box::new(move |deny_unsafe, _| {
-			let deps =
-				crate::rpc::FullDeps { client: client.clone(), pool: pool.clone(), deny_unsafe };
+			let deps = crate::rpc::FullDeps {
+				client: client.clone(),
+				pool: pool.clone(),
+				deny_unsafe,
+				block_proof_sink: block_proof_sink.clone(),
+			};
 			crate::rpc::create_full(deps).map_err(Into::into)
 		})
 	};
@@ -236,59 +227,63 @@ pub fn new_full(
 				telemetry.as_ref().map(|x| x.handle()),
 			);
 
-			let algorithm = UlixeePowAlgorithm::new(client.clone());
-			// Parameter details:
-			//   https://substrate.dev/rustdocs/v3.0.0/sc_consensus_pow/fn.start_mining_worker.html
-			// Also refer to kulupu config:
-			//   https://github.com/kulupu/kulupu/blob/master/src/service.rs
-			let (_worker, worker_task) = sc_consensus_pow::start_mining_worker(
-				Box::new(pow_block_import),
+			let algorithm = UlxNonce::new(client.clone());
+			let (worker, worker_task) = ulx_node_consensus::create_compute_miner(
+				Box::new(pow_block_import.clone()),
 				client.clone(),
-				select_chain,
-				algorithm,
+				select_chain.clone(),
+				algorithm.clone(),
 				proposer_factory,
 				sync_service.clone(),
 				sync_service.clone(),
-				Some(block_author.encode()),
-				move |_, ()| async move {
-					let provider = sp_timestamp::InherentDataProvider::from_system_time();
-					Ok(provider)
-				},
+				block_author.clone(),
+				UlxCreateInherentDataProviders::new(),
 				// time to wait for a new block before starting to mine a new one
-				Duration::from_secs(10),
+				Duration::from_secs(5),
 				// how long to take to actually build the block (i.e. executing extrinsics)
 				Duration::from_secs(10),
 			);
 
 			task_manager.spawn_essential_handle().spawn_blocking(
-				"pow",
+				"ulx-pow",
 				Some("block-authoring"),
 				worker_task,
 			);
 
-			// Start Mining
-			let mut nonce = U256::from(rand::random::<u128>());
-			let mut seal: [u8; 32] = [0; 32];
+			let proposer_factory_seal = sc_basic_authorship::ProposerFactory::new(
+				task_manager.spawn_handle(),
+				client.clone(),
+				transaction_pool.clone(),
+				prometheus_registry.as_ref(),
+				telemetry.as_ref().map(|x| x.handle()),
+			);
+			let block_seal_task = ulx_node_consensus::listen_for_block_seal(
+				Box::new(pow_block_import),
+				client.clone(),
+				select_chain,
+				algorithm,
+				proposer_factory_seal,
+				sync_service.clone(),
+				sync_service.clone(),
+				block_author,
+				UlxCreateInherentDataProviders::new(),
+				// how long to take to actually build the block (i.e. executing extrinsics)
+				Duration::from_secs(10),
+				block_proof_stream,
+				keystore_container.keystore(),
+			);
+			task_manager.spawn_essential_handle().spawn_blocking(
+				"ulx-pow-tx",
+				Some("block-authoring2"),
+				block_seal_task,
+			);
 
-			thread::spawn(move || loop {
-				let worker = _worker.clone();
-				let metadata = worker.metadata();
-				if let Some(metadata) = metadata {
-					let mut verifier = NonceVerifier::new(&metadata.pre_hash, metadata.difficulty);
-					nonce.to_big_endian(seal.as_mut_slice());
-					if verifier.is_nonce_valid(&seal) {
-						nonce = U256::from(rand::random::<u128>());
-						let _ = futures::executor::block_on(worker.submit(seal.into()));
-					} else {
-						nonce = nonce.saturating_add(U256::from(1));
-						if nonce == U256::MAX {
-							nonce = U256::from(0);
-						}
-					}
-				} else {
-					thread::sleep(Duration::new(1, 0));
-				}
-			});
+			let mining_threads = max(num_cpus::get() - 1, 1);
+			log::info!("Mining is enabled, {} threads", mining_threads);
+			// now do actual compute mining
+			for _ in 0..mining_threads {
+				run_miner_thread(worker.clone());
+			}
 		} else {
 			log::info!("Mining is disabled");
 		}
