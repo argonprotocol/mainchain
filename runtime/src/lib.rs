@@ -44,9 +44,7 @@ use sp_version::NativeVersion;
 use sp_version::RuntimeVersion;
 
 use crate::opaque::SessionKeys;
-use ulx_primitives::{
-	AuthorityDistance, AuthorityProvider, BlockSealAuthorityId, NextWork, ValidatorRegistration,
-};
+use ulx_primitives::{AuthorityDistance, AuthorityProvider, BlockSealAuthorityId, NextWork};
 
 // A few exports that help ease life for downstream crates.
 use crate::wage_protector::WageProtectorFee;
@@ -104,7 +102,7 @@ pub mod opaque {
 
 	impl_opaque_keys! {
 		pub struct SessionKeys {
-			pub block_seal_authority: ValidatorCohorts,
+			pub block_seal_authority: Cohorts,
 		}
 	}
 }
@@ -226,26 +224,55 @@ impl pallet_timestamp::Config for Runtime {
 parameter_types! {
 	pub const AuthorityCountInitiatingTaxProof: u32 = 100;
 	pub const MaxCohortSize: u32 = 250; // this means cohorts last 40 days
-	pub const MaxPendingCohorts: u32 = 30; // 30 days of cohorts
 	pub const BlocksBetweenCohorts: u32 = 1440; // going to add a cohort every day
 	pub const MaxValidators: u32 = 10_000; // must multiply cleanly by MaxCohortSize
 	pub const SessionRotationPeriod: u32 = 120; // must be cleanly divisible by BlocksBetweenCohorts
 	pub const Offset: u32 = 0;
+	pub const OwnershipPercentDamper: u32 = 80;
+
+	pub const NextCohortBufferToStopAcceptingBids: u32 = 10;
+	pub const MaxConcurrentlyExpiringBondFunds: u32 = 1000;
+	pub const MaxConcurrentlyExpiringBonds: u32 = 1000;
+	pub const MinimumBondAmount:u128 = 1_000;
+	pub const BlocksPerYear:u32 = 1440 * 365;
 }
 
-impl pallet_validator_cohorts::Config for Runtime {
+pub type BondId = u64;
+pub type BondFundId = u32;
+
+impl pallet_bonds::Config for Runtime {
 	type RuntimeEvent = RuntimeEvent;
-	type WeightInfo = pallet_validator_cohorts::weights::SubstrateWeight<Runtime>;
+	type WeightInfo = pallet_bonds::weights::SubstrateWeight<Runtime>;
+	type Currency = ArgonBalances;
+	type RuntimeHoldReason = RuntimeHoldReason;
+	type BondFundId = BondFundId;
+	type BondId = BondId;
+	type MinimumBondAmount = MinimumBondAmount;
+	type MaxConcurrentlyExpiringBonds = MaxConcurrentlyExpiringBonds;
+	type MaxConcurrentlyExpiringBondFunds = MaxConcurrentlyExpiringBondFunds;
+	type Balance = Balance;
+	type BlocksPerYear = BlocksPerYear;
+}
+
+impl pallet_cohorts::Config for Runtime {
+	type RuntimeEvent = RuntimeEvent;
+	type WeightInfo = pallet_cohorts::weights::SubstrateWeight<Runtime>;
 	type MaxValidators = MaxValidators;
-	type MaxPendingCohorts = MaxPendingCohorts;
+	type OwnershipCurrency = UlixeeBalances;
+	type OwnershipPercentDamper = OwnershipPercentDamper;
+	type NextCohortBufferToStopAcceptingBids = NextCohortBufferToStopAcceptingBids;
+	type RuntimeHoldReason = RuntimeHoldReason;
 	type MaxCohortSize = MaxCohortSize;
 	type BlocksBetweenCohorts = BlocksBetweenCohorts;
+	type Balance = Balance;
+	type BondId = BondId;
+	type BondProvider = Bonds;
 }
 
 impl pallet_block_seal::Config for Runtime {
 	type RuntimeEvent = RuntimeEvent;
 	type WeightInfo = pallet_block_seal::weights::SubstrateWeight<Runtime>;
-	type AuthorityProvider = ValidatorCohorts;
+	type AuthorityProvider = Cohorts;
 	type AuthorityCountInitiatingTaxProof = AuthorityCountInitiatingTaxProof;
 	type AuthorityId = BlockSealAuthorityId;
 }
@@ -253,10 +280,10 @@ impl pallet_block_seal::Config for Runtime {
 impl pallet_session::Config for Runtime {
 	type RuntimeEvent = RuntimeEvent;
 	type ValidatorId = <Self as frame_system::Config>::AccountId;
-	type ValidatorIdOf = pallet_validator_cohorts::StashOf<Self>;
+	type ValidatorIdOf = pallet_cohorts::StashOf<Self>;
 	type ShouldEndSession = pallet_session::PeriodicSessions<SessionRotationPeriod, Offset>;
 	type NextSessionRotation = pallet_session::PeriodicSessions<SessionRotationPeriod, Offset>;
-	type SessionManager = ValidatorCohorts;
+	type SessionManager = Cohorts;
 	type SessionHandler = <SessionKeys as OpaqueKeys>::KeyTypeIdProviders;
 	type Keys = SessionKeys;
 	type WeightInfo = pallet_session::weights::SubstrateWeight<Runtime>;
@@ -303,8 +330,8 @@ impl pallet_balances::Config<ArgonToken> for Runtime {
 	type WeightInfo = pallet_balances::weights::SubstrateWeight<Runtime>;
 	type FreezeIdentifier = ();
 	type MaxFreezes = ();
-	type RuntimeHoldReason = ();
-	type MaxHolds = ();
+	type RuntimeHoldReason = RuntimeHoldReason;
+	type MaxHolds = ConstU32<100>;
 }
 
 type UlixeeToken = pallet_balances::Instance2;
@@ -326,8 +353,8 @@ impl pallet_balances::Config<UlixeeToken> for Runtime {
 	type WeightInfo = pallet_balances::weights::SubstrateWeight<Runtime>;
 	type FreezeIdentifier = ();
 	type MaxFreezes = ();
-	type RuntimeHoldReason = ();
-	type MaxHolds = ();
+	type RuntimeHoldReason = RuntimeHoldReason;
+	type MaxHolds = ConstU32<50>;
 }
 
 parameter_types! {
@@ -354,7 +381,8 @@ construct_runtime!(
 	pub struct Runtime {
 		System: frame_system,
 		Timestamp: pallet_timestamp,
-		ValidatorCohorts: pallet_validator_cohorts,
+		Cohorts: pallet_cohorts,
+		Bonds: pallet_bonds,
 		Session: pallet_session,
 		Difficulty: pallet_difficulty,
 		BlockSeal: pallet_block_seal,
@@ -406,7 +434,8 @@ mod benches {
 		[pallet_balances, UlixeeTokens]
 		[pallet_timestamp, Timestamp]
 		[pallet_difficulty, Difficulty]
-		[pallet_validator_cohort, ValidatorCohort]
+		[pallet_cohorts, Cohorts]
+		[pallet_bonds, Bonds]
 		[pallet_session, Session]
 		[pallet_block_seal, BlockSeal]
 		[pallet_authorship, Authorship]
@@ -561,26 +590,24 @@ impl_runtime_apis! {
 
 	impl ulx_primitives::AuthorityApis<Block> for Runtime {
 		fn authorities() -> Vec<BlockSealAuthorityId> {
-			ValidatorCohorts::authorities()
+			Cohorts::authorities()
 		}
 		fn authorities_by_index() -> BTreeMap<u16, BlockSealAuthorityId> {
-			ValidatorCohorts::authorities_by_index()
+			Cohorts::authorities_by_index()
 		}
 		fn xor_closest_validators(hash: Vec<u8>) -> Vec<AuthorityDistance<BlockSealAuthorityId>> {
 			let number_to_find: u8 = UniqueSaturatedInto::<u8>::unique_saturated_into(BlockSeal::closest_x_authorities_required());
-			ValidatorCohorts::find_xor_closest_authorities(U256::from(&hash[..]), number_to_find)
+			Cohorts::find_xor_closest_authorities(U256::from(&hash[..]), number_to_find)
 		}
 		fn active_authorities() -> u16 {
-			ValidatorCohorts::authority_count().into()
+			Cohorts::authority_count().into()
 		}
 	}
 
-	impl pallet_validator_cohorts::ValidatorCohortsApi<Block, BlockNumber, AccountId> for Runtime {
-		fn get_cohort(at: u32) ->  Vec<ValidatorRegistration<AccountId>> {
-			ValidatorCohorts::queued_cohorts(at).to_vec()
-		}
-		fn upcoming_cohort_blocks() -> Vec<BlockNumber> {
-			ValidatorCohorts::upcoming_cohort_blocks()
+	impl pallet_cohorts::CohortsApi<Block, BlockNumber> for Runtime {
+
+		fn next_cohort_block_period() -> (BlockNumber, BlockNumber) {
+			Cohorts::get_next_cohort_period()
 		}
 	}
 

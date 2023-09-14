@@ -1,15 +1,17 @@
-use crate as pallet_validator_cohorts;
 use env_logger::{Builder, Env};
 use frame_support::{
 	parameter_types,
-	traits::{ConstU16, ConstU64},
+	traits::{ConstU16, ConstU64, Currency},
 };
-use sp_core::H256;
+use sp_core::{ConstU32, H256};
 use sp_runtime::{
 	traits::{BlakeTwo256, IdentityLookup},
 	BuildStorage,
 };
 
+use crate as pallet_bonds;
+
+pub type Balance = u128;
 type Block = frame_system::mocking::MockBlock<Test>;
 
 // Configure a mock runtime to test the pallet.
@@ -17,7 +19,8 @@ frame_support::construct_runtime!(
 	pub enum Test
 	{
 		System: frame_system,
-		ValidatorCohorts: pallet_validator_cohorts,
+		Balances: pallet_balances,
+		Bonds: pallet_bonds
 	}
 );
 
@@ -38,29 +41,55 @@ impl frame_system::Config for Test {
 	type BlockHashCount = ConstU64<250>;
 	type Version = ();
 	type PalletInfo = PalletInfo;
-	type AccountData = ();
+	type AccountData = pallet_balances::AccountData<Balance>;
 	type OnNewAccount = ();
 	type OnKilledAccount = ();
 	type SystemWeightInfo = ();
 	type SS58Prefix = ConstU16<42>;
 	type OnSetCode = ();
-	type MaxConsumers = frame_support::traits::ConstU32<16>;
+	type MaxConsumers = ConstU32<16>;
 }
 
 parameter_types! {
-	pub static BlocksBetweenCohorts: u32 = 1;
-	pub static MaxCohortSize: u32 = 5;
-	pub static MaxValidators: u32 = 10;
-	pub static MaxPendingCohorts: u32 = 2;
+
+	pub static ExistentialDeposit: Balance = 10;
+	pub const MinimumBondAmount:u128 = 1_000;
+	pub const BlocksPerYear:u32 = 1440*365;
 }
 
-impl pallet_validator_cohorts::Config for Test {
+impl pallet_balances::Config for Test {
+	type MaxLocks = ConstU32<0>;
+	type MaxReserves = ConstU32<0>;
+	type ReserveIdentifier = ();
+	type Balance = Balance;
+	type RuntimeEvent = RuntimeEvent;
+	type DustRemoval = ();
+	type ExistentialDeposit = ExistentialDeposit;
+	type AccountStore = System;
+	type WeightInfo = ();
+	type FreezeIdentifier = ();
+	type MaxFreezes = ();
+	type RuntimeHoldReason = RuntimeHoldReason;
+	type MaxHolds = ConstU32<100>;
+}
+
+pub fn set_argons(account_id: u64, amount: Balance) {
+	let _ = Balances::make_free_balance_be(&account_id, amount);
+	drop(Balances::issue(amount));
+}
+
+impl pallet_bonds::Config for Test {
 	type RuntimeEvent = RuntimeEvent;
 	type WeightInfo = ();
-	type BlocksBetweenCohorts = BlocksBetweenCohorts;
-	type MaxCohortSize = MaxCohortSize;
-	type MaxPendingCohorts = MaxPendingCohorts;
-	type MaxValidators = MaxValidators;
+	type Currency = Balances;
+	type RuntimeHoldReason = RuntimeHoldReason;
+	type Balance = Balance;
+	type BondFundId = u32;
+	type BondId = u64;
+	type BlocksPerYear = BlocksPerYear;
+	type MinimumBondAmount = MinimumBondAmount;
+	type MaxConcurrentlyExpiringBonds = ConstU32<10>;
+	type MaxConcurrentlyExpiringBondFunds = ConstU32<10>;
 }
 
 // Build genesis storage according to the mock runtime.

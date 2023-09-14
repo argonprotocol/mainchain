@@ -13,6 +13,7 @@ use sp_std::{collections::btree_map::BTreeMap, vec::Vec};
 
 pub use digests::{Difficulty, ProofOfWorkType, UlxPreDigest, UlxSeal, AUTHOR_ID, ULX_ENGINE_ID};
 
+pub mod bond;
 pub mod digests;
 pub mod inherents;
 
@@ -88,9 +89,29 @@ pub struct NextWork {
 }
 
 #[derive(PartialEq, Eq, Clone, Encode, Decode, RuntimeDebug, TypeInfo, MaxEncodedLen)]
-pub struct ValidatorRegistration<AccountId> {
+pub struct ValidatorRegistration<AccountId, BondId, Balance: MaxEncodedLen> {
 	pub account_id: AccountId,
 	pub peer_id: PeerId,
+	pub reward_destination: RewardDestination<AccountId>,
+	pub bond_id: Option<BondId>,
+	#[codec(compact)]
+	pub bond_amount: Balance,
+	#[codec(compact)]
+	pub ownership_tokens: Balance,
+}
+
+/// A destination account for validator rewards
+#[derive(PartialEq, Eq, Copy, Clone, Encode, Decode, RuntimeDebug, TypeInfo, MaxEncodedLen)]
+pub enum RewardDestination<AccountId> {
+	Owner,
+	/// Pay into a specified account.
+	Account(AccountId),
+}
+
+impl<AccountId> Default for RewardDestination<AccountId> {
+	fn default() -> Self {
+		RewardDestination::Owner
+	}
 }
 
 #[derive(PartialEq, Eq, Clone, Encode, Decode, RuntimeDebug, TypeInfo)]

@@ -25,7 +25,7 @@ use sp_runtime::{traits::Block as BlockT, ApplyExtrinsicResult, Digest};
 use substrate_test_runtime::{AccountId, BlockNumber, Executive, Hash, Header};
 use substrate_test_runtime_client::Backend;
 
-use pallet_validator_cohorts::find_xor_closest;
+use pallet_cohorts::find_xor_closest;
 use ulx_primitives::{AuthorityDistance, BlockSealAuthorityId, NextWork, PeerId, ProofOfWorkType};
 
 use crate::{import_queue, inherents::UlxCreateInherentDataProviders, nonce_verify::UlxNonce};
