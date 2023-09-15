@@ -7,14 +7,16 @@
 
 use std::sync::Arc;
 
+use futures::channel::mpsc::Sender;
 use jsonrpsee::RpcModule;
+pub use sc_rpc_api::DenyUnsafe;
 use sc_transaction_pool_api::TransactionPool;
 use sp_api::ProvideRuntimeApi;
 use sp_block_builder::BlockBuilder;
 use sp_blockchain::{Error as BlockChainError, HeaderBackend, HeaderMetadata};
-use ulx_node_runtime::{opaque::Block, AccountId, Balance, Nonce};
+use ulx_node_consensus::rpc::{BlockSealApiServer, BlockSealRpc, SealNewBlock};
 
-pub use sc_rpc_api::DenyUnsafe;
+use ulx_node_runtime::{opaque::Block, AccountId, Balance, Hash, Nonce};
 
 /// Full client dependencies.
 pub struct FullDeps<C, P> {
@@ -24,6 +26,8 @@ pub struct FullDeps<C, P> {
 	pub pool: Arc<P>,
 	/// Whether to deny unsafe calls
 	pub deny_unsafe: DenyUnsafe,
+	/// A sink for proof of tax submissions
+	pub block_proof_sink: Sender<SealNewBlock<Hash>>,
 }
 
 /// Instantiate all full RPC extensions.
@@ -36,6 +40,7 @@ where
 	C: Send + Sync + 'static,
 	C::Api: substrate_frame_rpc_system::AccountNonceApi<Block, AccountId, Nonce>,
 	C::Api: pallet_transaction_payment_rpc::TransactionPaymentRuntimeApi<Block, Balance>,
+	C::Api: ulx_primitives::UlxConsensusApi<Block>,
 	C::Api: BlockBuilder<Block>,
 	P: TransactionPool + 'static,
 {
@@ -43,15 +48,12 @@ where
 	use substrate_frame_rpc_system::{System, SystemApiServer};
 
 	let mut module = RpcModule::new(());
-	let FullDeps { client, pool, deny_unsafe } = deps;
+	let FullDeps { client, pool, deny_unsafe, block_proof_sink } = deps;
 
 	module.merge(System::new(client.clone(), pool, deny_unsafe).into_rpc())?;
 	module.merge(TransactionPayment::new(client).into_rpc())?;
 
-	// Extend this RPC with a custom API by using the following syntax.
-	// `YourRpcStruct` should have a reference to a client, which is needed
-	// to call into the runtime.
-	// `module.merge(YourRpcTrait::into_rpc(YourRpcStruct::new(ReferenceToClient, ...)))?;`
+	module.merge(BlockSealRpc::<Block, Hash>::new(block_proof_sink).into_rpc())?;
 
 	Ok(module)
 }

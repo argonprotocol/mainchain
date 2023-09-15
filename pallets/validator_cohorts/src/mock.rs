@@ -1,5 +1,9 @@
-use crate as pallet_template;
-use frame_support::traits::{ConstU16, ConstU64};
+use crate as pallet_validator_cohorts;
+use env_logger::{Builder, Env};
+use frame_support::{
+	parameter_types,
+	traits::{ConstU16, ConstU64},
+};
 use sp_core::H256;
 use sp_runtime::{
 	traits::{BlakeTwo256, IdentityLookup},
@@ -13,7 +17,7 @@ frame_support::construct_runtime!(
 	pub enum Test
 	{
 		System: frame_system,
-		TemplateModule: pallet_template,
+		ValidatorCohorts: pallet_validator_cohorts,
 	}
 );
 
@@ -43,12 +47,25 @@ impl frame_system::Config for Test {
 	type MaxConsumers = frame_support::traits::ConstU32<16>;
 }
 
-impl pallet_template::Config for Test {
+parameter_types! {
+	pub static BlocksBetweenCohorts: u32 = 1;
+	pub static MaxCohortSize: u32 = 5;
+	pub static MaxValidators: u32 = 10;
+	pub static MaxPendingCohorts: u32 = 2;
+}
+
+impl pallet_validator_cohorts::Config for Test {
 	type RuntimeEvent = RuntimeEvent;
 	type WeightInfo = ();
+	type BlocksBetweenCohorts = BlocksBetweenCohorts;
+	type MaxCohortSize = MaxCohortSize;
+	type MaxPendingCohorts = MaxPendingCohorts;
+	type MaxValidators = MaxValidators;
 }
 
 // Build genesis storage according to the mock runtime.
 pub fn new_test_ext() -> sp_io::TestExternalities {
+	let env = Env::new().default_filter_or("debug");
+	let _ = Builder::from_env(env).is_test(true).try_init();
 	frame_system::GenesisConfig::<Test>::default().build_storage().unwrap().into()
 }

@@ -1,7 +1,11 @@
 [workspace]
 members = [
     "node",
-    "pallets/template",
+	"node/consensus",
+	"pallets/block_seal",
+	"pallets/validator_cohorts",
+	"pallets/difficulty",
+	"primitives",
     "runtime",
 ]
 resolver = "2"

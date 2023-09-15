@@ -1,4 +1,5 @@
-use frame_support::weights::WeightToFee;
+use crate::Perbill;
+use frame_support::weights::{WeightToFeeCoefficient, WeightToFeeCoefficients};
 pub use frame_support::{
 	construct_runtime, parameter_types,
 	traits::{
@@ -14,18 +15,25 @@ pub use frame_support::{
 	StorageValue,
 };
 pub use frame_system::Call as SystemCall;
-use sp_arithmetic::traits::{BaseArithmetic, SaturatedConversion, Unsigned};
 
-pub struct WageProtectorFee<T>(sp_std::marker::PhantomData<T>);
+use smallvec::smallvec;
 
-impl<T> WeightToFee for WageProtectorFee<T>
-where
-	T: BaseArithmetic + From<u32> + Copy + Unsigned,
-{
-	type Balance = T;
+use crate::Balance;
 
-	fn weight_to_fee(weight: &Weight) -> Self::Balance {
+pub struct WageProtectorFee;
+
+impl WeightToFeePolynomial for WageProtectorFee {
+	type Balance = Balance;
+
+	fn polynomial() -> WeightToFeeCoefficients<Self::Balance> {
 		// TODO: lookup current cpi to multiply!
-		Self::Balance::saturated_from::<u64>(weight.ref_time())
+		let p = 1_000; // milligons
+		let q = 10 * Self::Balance::from(ExtrinsicBaseWeight::get().ref_time());
+		smallvec![WeightToFeeCoefficient::<Self::Balance> {
+			degree: 1,
+			negative: false,
+			coeff_frac: Perbill::from_rational(p % q, q),
+			coeff_integer: p / q,
+		}]
 	}
 }

@@ -2,8 +2,6 @@
 #![warn(missing_docs)]
 
 mod chain_spec;
-mod harmonic_mean;
-mod pow;
 #[macro_use]
 mod service;
 mod benchmarking;

@@ -22,7 +22,7 @@ impl Cli {
 			Some(block_author.clone())
 		} else if self.run.shared_params.dev {
 			use sp_core::crypto::Pair;
-			let block_author = sp_core::ed25519::Pair::from_string("//Mine", None).unwrap();
+			let block_author = sp_core::sr25519::Pair::from_string("//Alice", None).unwrap();
 			Some(AccountId::from(block_author.public()))
 		} else {
 			None

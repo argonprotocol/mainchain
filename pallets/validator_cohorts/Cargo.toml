@@ -1,0 +1,53 @@
+[package]
+name = "pallet-validator-cohorts"
+version = "0.0.1"
+authors = ["Ulixee <https://github.com/ulixee>"]
+homepage = "https://ulixee.org"
+edition = "2021"
+license = "MIT-0"
+publish = false
+repository = "https://github.com/ulixee/mainchain"
+
+[package.metadata.docs.rs]
+targets = ["x86_64-unknown-linux-gnu"]
+
+[dependencies]
+codec = { package = "parity-scale-codec", version = "3.6.1", default-features = false, features = [
+	"derive",
+] }
+scale-info = { version = "2.9.0", default-features = false, features = ["derive"] }
+frame-benchmarking = { version = "4.0.0-dev", default-features = false, optional = true, git = "https://github.com/paritytech/polkadot-sdk.git", branch = "release-polkadot-v1.0.1" }
+frame-support = { version = "4.0.0-dev", default-features = false, git = "https://github.com/paritytech/polkadot-sdk.git", branch = "release-polkadot-v1.0.1" }
+frame-system = { version = "4.0.0-dev", default-features = false, git = "https://github.com/paritytech/polkadot-sdk.git", branch = "release-polkadot-v1.0.1" }
+pallet-session = { version = "4.0.0-dev", default-features = false, git = "https://github.com/paritytech/polkadot-sdk.git", branch = "release-polkadot-v1.0.1" }
+sp-runtime = { version = "24.0.0", default-features = false,  git = "https://github.com/paritytech/polkadot-sdk.git", branch = "release-polkadot-v1.0.1" }
+sp-core = { version = "21.0.0", default-features = false, git = "https://github.com/paritytech/polkadot-sdk.git", branch = "release-polkadot-v1.0.1" }
+sp-std = { version = "8.0.0", default-features = false, git = "https://github.com/paritytech/polkadot-sdk.git", branch = "release-polkadot-v1.0.1" }
+sp-io = { version = "23.0.0", default-features = false, git = "https://github.com/paritytech/polkadot-sdk.git", branch = "release-polkadot-v1.0.1" }
+sp-api = { version = "4.0.0-dev", default-features = false, git = "https://github.com/paritytech/polkadot-sdk.git", branch = "release-polkadot-v1.0.1" }
+ulx-primitives = { path = "../../primitives", default-features = false }
+log = { version = "0.4.19", default-features = false }
+
+[dev-dependencies]
+sp-io = { version = "23.0.0", default-features = false, git = "https://github.com/paritytech/polkadot-sdk.git", branch = "release-polkadot-v1.0.1" }
+env_logger = "0.10.0"
+
+[features]
+default = ["std"]
+std = [
+	"codec/std",
+	"scale-info/std",
+	"frame-benchmarking?/std",
+	"frame-support/std",
+	"frame-system/std",
+	"pallet-session/std",
+	"sp-runtime/std",
+	"sp-core/std",
+	"log/std",
+	"sp-api/std",
+	"sp-std/std",
+	"sp-io/std",
+	"ulx-primitives/std",
+]
+runtime-benchmarks = ["frame-benchmarking/runtime-benchmarks"]
+try-runtime = ["frame-support/try-runtime"]
