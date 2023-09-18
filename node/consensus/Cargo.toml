@@ -96,4 +96,4 @@ parking_lot = "0.12.1"
 tempfile = "3.1.0"
 env_logger = "0.10.0"
 
-libp2p = "0.51.3"
+libp2p = "0.52.3"
