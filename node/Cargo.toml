@@ -20,7 +20,7 @@ name = "ulx-node"
 clap = { version = "4.2.5", features = ["derive"] }
 futures = { version = "0.3.21", features = ["thread-pool"]}
 codec = { package = "parity-scale-codec", version = "3.6.4", default-features = false, features = ["derive"] }
-async-trait = "0.1.57"
+async-trait = "0.1.73"
 futures-timer = "3.0.1"
 thiserror = "1.0"
 num_cpus = "1.16.0"
