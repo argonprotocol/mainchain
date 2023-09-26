@@ -15,14 +15,15 @@ use pallet_session::SessionManager;
 use sp_core::{Get, U256};
 use sp_io::hashing::blake2_256;
 use sp_runtime::{
-	traits::{Convert, IsMember, UniqueSaturatedInto},
+	traits::{Convert, UniqueSaturatedInto},
 	BoundedBTreeMap,
 };
 use sp_std::{cmp::Ordering, collections::btree_map::BTreeMap, marker::PhantomData, vec::Vec};
 
 pub use pallet::*;
 use ulx_primitives::{
-	bond::BondProvider, AuthorityDistance, AuthorityProvider, BlockSealAuthorityId,
+	block_seal::{AuthorityDistance, AuthorityProvider, BlockSealAuthorityId},
+	bond::BondProvider,
 };
 pub use weights::*;
 
@@ -84,8 +85,8 @@ pub mod pallet {
 	use sp_std::cmp::max;
 
 	use ulx_primitives::{
+		block_seal::{PeerId, RewardDestination, ValidatorRegistration},
 		bond::{BondError, BondProvider},
-		PeerId, RewardDestination, ValidatorRegistration,
 	};
 
 	use super::*;
@@ -115,6 +116,9 @@ pub mod pallet {
 		/// How many blocks transpire between cohorts
 		#[pallet::constant]
 		type BlocksBetweenCohorts: Get<u32>;
+		/// How many session indexes to keep session history
+		#[pallet::constant]
+		type SessionIndicesToKeepInHistory: Get<u32>;
 
 		/// How many blocks buffer shall we use to stop accepting bids for the next period
 		#[pallet::constant]
@@ -190,7 +194,7 @@ pub mod pallet {
 	#[pallet::storage]
 	#[pallet::getter(fn account_indices)]
 	pub(super) type AccountIndexLookup<T: Config> =
-		StorageMap<_, Twox64Concat, T::AccountId, u32, OptionQuery>;
+		StorageMap<_, Blake2_128Concat, T::AccountId, u32, OptionQuery>;
 
 	/// The cohort set to go into effect at the next changeover block. The Vec has all
 	/// registrants with their bid amount
@@ -391,6 +395,8 @@ pub mod pallet {
 		pub fn bid(
 			origin: OriginFor<T>,
 			peer_id: OpaquePeerId,
+			#[pallet::compact] rpc_ip: u32,
+			#[pallet::compact] rpc_port: u16,
 			bond_id: Option<T::BondId>,
 			reward_destination: RewardDestination<T::AccountId>,
 		) -> DispatchResult {
@@ -483,6 +489,8 @@ pub mod pallet {
 							bond_id: bond_id.clone(),
 							bond_amount: bid.clone(),
 							ownership_tokens,
+							rpc_ip,
+							rpc_port,
 						},
 					)
 					.map_err(|_| Error::<T>::TooManyBlockRegistrants)?;
@@ -501,14 +509,6 @@ pub mod pallet {
 	}
 }
 
-impl<T: Config> IsMember<T::AccountId> for Pallet<T> {
-	fn is_member(account_id: &T::AccountId) -> bool {
-		<ActiveValidatorsByIndex<T>>::get()
-			.iter()
-			.any(|(_, a)| a.account_id == *account_id)
-	}
-}
-
 impl<T: Config> AuthorityProvider<BlockSealAuthorityId, T::AccountId> for Pallet<T> {
 	fn authorities() -> Vec<BlockSealAuthorityId> {
 		Self::authorities_by_index()
@@ -522,6 +522,10 @@ impl<T: Config> AuthorityProvider<BlockSealAuthorityId, T::AccountId> for Pallet
 			.iter()
 			.map(|(i, a)| (i.clone().unique_saturated_into(), a.0.clone()))
 			.collect()
+	}
+
+	fn is_active(authority_id: &BlockSealAuthorityId) -> bool {
+		Self::authorities_by_index().iter().any(|(_, a)| a == authority_id)
 	}
 
 	fn authority_count() -> u16 {
@@ -549,6 +553,8 @@ impl<T: Config> AuthorityProvider<BlockSealAuthorityId, T::AccountId> for Pallet
 					authority_index: index.unique_saturated_into(),
 					peer_id: registration.peer_id.clone(),
 					distance,
+					rpc_ip: registration.rpc_ip,
+					rpc_port: registration.rpc_port,
 				}
 			})
 			.collect()
@@ -744,15 +750,41 @@ where
 	authority_xor_distances
 }
 
-pub struct StashOf<T>(PhantomData<T>);
+pub struct ValidatorOf<T>(PhantomData<T>);
 
-impl<T: Config> Convert<T::AccountId, Option<T::AccountId>> for StashOf<T> {
-	fn convert(controller: T::AccountId) -> Option<T::AccountId> {
-		if <AccountIndexLookup<T>>::contains_key(&controller) {
-			Some(controller)
+impl<T: Config> Convert<T::AccountId, Option<T::AccountId>> for ValidatorOf<T> {
+	fn convert(account_id: T::AccountId) -> Option<T::AccountId> {
+		if <AccountIndexLookup<T>>::contains_key(&account_id) {
+			Some(account_id)
 		} else {
 			None
 		}
+	}
+}
+
+#[derive(Clone, Encode, Decode, Eq, PartialEq, RuntimeDebug, TypeInfo)]
+#[scale_info(skip_type_params(T))]
+pub struct MinerHistory {
+	pub block_seal_authority_id: BlockSealAuthorityId,
+	pub authority_index: u32,
+}
+
+/// What to track in history
+pub struct FullIdentificationOf<T>(PhantomData<T>);
+
+impl<T: Config> Convert<T::AccountId, Option<MinerHistory>> for FullIdentificationOf<T> {
+	fn convert(validator: T::AccountId) -> Option<MinerHistory> {
+		if let Some(index) = <AccountIndexLookup<T>>::get(&validator) {
+			if let Some(authority_id) =
+				<AuthoritiesByIndex<T>>::get().get(&index).map(|x| x.0.clone())
+			{
+				return Some(MinerHistory {
+					block_seal_authority_id: authority_id.clone(),
+					authority_index: index.clone(),
+				})
+			}
+		}
+		None
 	}
 }
 
@@ -761,9 +793,6 @@ impl<T: Config> sp_runtime::BoundToRuntimeAppPublic for Pallet<T> {
 }
 
 impl<T: Config> SessionManager<T::AccountId> for Pallet<T> {
-	fn new_session_genesis(_: u32) -> Option<Vec<T::AccountId>> {
-		None
-	}
 	fn new_session(_: u32) -> Option<Vec<T::AccountId>> {
 		let block_number_u32: u32 = UniqueSaturatedInto::<u32>::unique_saturated_into(
 			<frame_system::Pallet<T>>::block_number(),
@@ -780,8 +809,41 @@ impl<T: Config> SessionManager<T::AccountId> for Pallet<T> {
 				.collect(),
 		)
 	}
-	fn start_session(_: u32) {}
+	fn new_session_genesis(_: u32) -> Option<Vec<T::AccountId>> {
+		None
+	}
 	fn end_session(_: u32) {}
+	fn start_session(_: u32) {}
+}
+
+impl<T: Config> pallet_session::historical::SessionManager<T::AccountId, MinerHistory> for Pallet<T>
+where
+	T: pallet_session::historical::Config<
+		FullIdentification = MinerHistory,
+		FullIdentificationOf = FullIdentificationOf<T>,
+	>,
+{
+	fn new_session(new_index: u32) -> Option<Vec<(T::AccountId, MinerHistory)>> {
+		<Self as SessionManager<_>>::new_session(new_index).map(|validators| {
+			validators
+				.into_iter()
+				.map(|v| {
+					let miner = FullIdentificationOf::<T>::convert(v.clone());
+					(v, miner.unwrap())
+				})
+				.collect()
+		})
+	}
+
+	fn new_session_genesis(_: u32) -> Option<Vec<(T::AccountId, MinerHistory)>> {
+		None
+	}
+
+	fn start_session(_: u32) {}
+	fn end_session(index: u32) {
+		let first_session = index - T::SessionIndicesToKeepInHistory::get();
+		<pallet_session::historical::Pallet<T>>::prune_up_to(first_session);
+	}
 }
 
 impl<T: Config> OneSessionHandler<T::AccountId> for Pallet<T> {

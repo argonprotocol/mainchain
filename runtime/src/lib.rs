@@ -5,8 +5,6 @@
 #[cfg(feature = "runtime-benchmarks")]
 #[macro_use]
 extern crate frame_benchmarking;
-
-use frame_support::traits::{Currency, OnUnbalanced, StorageMapShim};
 pub use frame_support::{
 	construct_runtime, parameter_types,
 	traits::{
@@ -21,18 +19,25 @@ pub use frame_support::{
 	},
 	StorageValue,
 };
+use frame_support::{
+	traits::{Currency, OnUnbalanced, StorageMapShim},
+	PalletId,
+};
 pub use frame_system::Call as SystemCall;
+use pallet_session::historical as pallet_session_historical;
 pub use pallet_timestamp::Call as TimestampCall;
 use pallet_transaction_payment::{ConstFeeMultiplier, CurrencyAdapter, Multiplier};
 use sp_api::impl_runtime_apis;
 use sp_arithmetic::traits::UniqueSaturatedInto;
+use sp_consensus_grandpa::AuthorityId as GrandpaId;
 use sp_core::{crypto::KeyTypeId, OpaqueMetadata, U256};
 #[cfg(any(feature = "std", test))]
 pub use sp_runtime::BuildStorage;
 use sp_runtime::{
 	create_runtime_str, generic,
 	traits::{
-		AccountIdLookup, BlakeTwo256, Block as BlockT, IdentifyAccount, One, OpaqueKeys, Verify,
+		AccountIdLookup, BlakeTwo256, Block as BlockT, IdentifyAccount, NumberFor, One, OpaqueKeys,
+		Verify,
 	},
 	transaction_validity::{TransactionSource, TransactionValidity},
 	ApplyExtrinsicResult, MultiSignature,
@@ -44,7 +49,10 @@ use sp_version::NativeVersion;
 use sp_version::RuntimeVersion;
 
 use crate::opaque::SessionKeys;
-use ulx_primitives::{AuthorityDistance, AuthorityProvider, BlockSealAuthorityId, NextWork};
+use ulx_primitives::{
+	block_seal::{AuthorityDistance, AuthorityProvider},
+	BlockSealAuthorityId, NextWork,
+};
 
 // A few exports that help ease life for downstream crates.
 use crate::wage_protector::WageProtectorFee;
@@ -83,6 +91,9 @@ pub type AccountData = pallet_balances::AccountData<Balance>;
 
 pub type BlockHash = BlakeTwo256;
 
+pub type BondId = u64;
+pub type BondFundId = u32;
+
 /// Opaque types. These are used by the CLI to instantiate machinery that don't need to know
 /// the specifics of the runtime. They can then be made to be agnostic over specific formats
 /// of data like extrinsics, allowing for them to continue syncing the network through upgrades
@@ -102,6 +113,7 @@ pub mod opaque {
 
 	impl_opaque_keys! {
 		pub struct SessionKeys {
+			pub grandpa: Grandpa,
 			pub block_seal_authority: Cohorts,
 		}
 	}
@@ -213,6 +225,11 @@ impl pallet_difficulty::Config for Runtime {
 	type BlockChangePeriod = DifficultyBlockChangePeriod;
 }
 
+impl pallet_authorship::Config for Runtime {
+	type FindAuthor = BlockSeal;
+	type EventHandler = ();
+}
+
 impl pallet_timestamp::Config for Runtime {
 	/// A timestamp: milliseconds since the unix epoch.
 	type Moment = Moment;
@@ -235,10 +252,18 @@ parameter_types! {
 	pub const MaxConcurrentlyExpiringBonds: u32 = 1000;
 	pub const MinimumBondAmount:u128 = 1_000;
 	pub const BlocksPerYear:u32 = 1440 * 365;
-}
 
-pub type BondId = u64;
-pub type BondFundId = u32;
+	const ValidatorWindow: u32 = (MaxValidators::get() / MaxCohortSize::get()) * BlocksBetweenCohorts::get();
+	const SessionsPerWindow: u32 = ValidatorWindow::get() / SessionRotationPeriod::get();
+	// Arbitrarily chosen. We keep these around for equivocation reporting in grandpa, and for
+	// notary auditing using validators of finalized blocks.
+	pub const SessionIndicesToKeepInHistory: u32 = SessionsPerWindow::get() * 10;
+
+	// How long to keep grandpa set ids around for equivocations
+	pub const MaxSetIdSessionEntries: u32 = SessionsPerWindow::get() * 2u32;
+	pub const ReportLongevity: u64 = ValidatorWindow::get() as u64 * 2;
+	pub const HistoricalBlockSealersToKeep: u32 = BlocksBetweenCohorts::get();
+}
 
 impl pallet_bonds::Config for Runtime {
 	type RuntimeEvent = RuntimeEvent;
@@ -263,6 +288,7 @@ impl pallet_cohorts::Config for Runtime {
 	type NextCohortBufferToStopAcceptingBids = NextCohortBufferToStopAcceptingBids;
 	type RuntimeHoldReason = RuntimeHoldReason;
 	type MaxCohortSize = MaxCohortSize;
+	type SessionIndicesToKeepInHistory = SessionIndicesToKeepInHistory;
 	type BlocksBetweenCohorts = BlocksBetweenCohorts;
 	type Balance = Balance;
 	type BondId = BondId;
@@ -275,18 +301,107 @@ impl pallet_block_seal::Config for Runtime {
 	type AuthorityProvider = Cohorts;
 	type AuthorityCountInitiatingTaxProof = AuthorityCountInitiatingTaxProof;
 	type AuthorityId = BlockSealAuthorityId;
+	type HistoricalBlockSealersToKeep = HistoricalBlockSealersToKeep;
 }
 
 impl pallet_session::Config for Runtime {
 	type RuntimeEvent = RuntimeEvent;
 	type ValidatorId = <Self as frame_system::Config>::AccountId;
-	type ValidatorIdOf = pallet_cohorts::StashOf<Self>;
+	type ValidatorIdOf = pallet_cohorts::ValidatorOf<Self>;
 	type ShouldEndSession = pallet_session::PeriodicSessions<SessionRotationPeriod, Offset>;
 	type NextSessionRotation = pallet_session::PeriodicSessions<SessionRotationPeriod, Offset>;
-	type SessionManager = Cohorts;
+	type SessionManager = pallet_session_historical::NoteHistoricalRoot<Self, Cohorts>;
 	type SessionHandler = <SessionKeys as OpaqueKeys>::KeyTypeIdProviders;
 	type Keys = SessionKeys;
 	type WeightInfo = pallet_session::weights::SubstrateWeight<Runtime>;
+}
+
+impl pallet_session_historical::Config for Runtime {
+	type FullIdentification = pallet_cohorts::MinerHistory;
+	type FullIdentificationOf = pallet_cohorts::FullIdentificationOf<Runtime>;
+}
+
+impl pallet_offences::Config for Runtime {
+	type RuntimeEvent = RuntimeEvent;
+	type IdentificationTuple = pallet_session_historical::IdentificationTuple<Self>;
+	// TODO: cohorts should deal with offenses
+	type OnOffenceHandler = ();
+}
+
+impl pallet_grandpa::Config for Runtime {
+	type RuntimeEvent = RuntimeEvent;
+	type WeightInfo = ();
+	type MaxAuthorities = MaxValidators;
+	type MaxNominators = ConstU32<0>;
+	type MaxSetIdSessionEntries = MaxSetIdSessionEntries;
+	type KeyOwnerProof = <Historical as KeyOwnerProofSystem<(KeyTypeId, GrandpaId)>>::Proof;
+	type EquivocationReportSystem =
+		pallet_grandpa::EquivocationReportSystem<Self, Offences, Historical, ReportLongevity>;
+}
+
+impl frame_system::offchain::SigningTypes for Runtime {
+	type Public = <Signature as sp_runtime::traits::Verify>::Signer;
+	type Signature = Signature;
+}
+
+impl<C> frame_system::offchain::SendTransactionTypes<C> for Runtime
+where
+	RuntimeCall: From<C>,
+{
+	type OverarchingCall = RuntimeCall;
+	type Extrinsic = UncheckedExtrinsic;
+}
+
+parameter_types! {
+	pub const LocalchainPalletId: PalletId = PalletId(*b"locrelay");
+
+	/// How long a transfer should remain in storage before returning.
+	pub const TransferExpirationBlocks: u32 = 1400 * 10;
+
+	/// How many transfers out can be queued per block
+	pub const MaxPendingTransfersOutPerBlock: u32 = 1000;
+
+	/// How many transfers can be in a single notebook
+	pub const MaxNotebookTransfers: u32 = 10_000;
+
+	/// How many auditors are expected to sign a notary block.
+	pub const RequiredNotebookAuditors: u32 = 5; // half of seal signers
+
+	/// Number of blocks to keep around for preventing notebook double-submit
+	pub const MaxNotebookBlocksToRemember: u32 = 10;
+}
+
+impl pallet_localchain_relay::Config for Runtime {
+	type RuntimeEvent = RuntimeEvent;
+	type WeightInfo = pallet_localchain_relay::weights::SubstrateWeight<Runtime>;
+	type HistoricalBlockSealersLookup = BlockSeal;
+	type Balance = Balance;
+	type Currency = ArgonBalances;
+
+	type NotaryProvider = NotaryAdmin;
+	type PalletId = LocalchainPalletId;
+	type LocalchainAccountId = AccountId;
+	type TransferExpirationBlocks = TransferExpirationBlocks;
+	type MaxPendingTransfersOutPerBlock = MaxPendingTransfersOutPerBlock;
+	type MaxNotebookTransfers = MaxNotebookTransfers;
+	type RequiredNotebookAuditors = RequiredNotebookAuditors;
+	type MaxNotebookBlocksToRemember = MaxNotebookBlocksToRemember;
+}
+
+parameter_types! {
+	pub const MaxActiveNotaries: u32 = 25; // arbitrarily set
+	pub const MaxProposalHoldBlocks: u32 = 1440 * 14; // 2 weeks to approve
+	pub const MaxProposalsPerBlock: u32 = 10;
+	pub const MetaChangesBlockDelay: u32 = 1;
+}
+
+impl pallet_notary_admin::Config for Runtime {
+	type RuntimeEvent = RuntimeEvent;
+	type WeightInfo = pallet_notary_admin::weights::SubstrateWeight<Runtime>;
+	type MaxActiveNotaries = MaxActiveNotaries;
+	type MaxProposalHoldBlocks = MaxProposalHoldBlocks;
+	type MaxProposalsPerBlock = MaxProposalsPerBlock;
+	type MetaChangesBlockDelay = MetaChangesBlockDelay;
 }
 
 /// Existential deposit.
@@ -383,9 +498,17 @@ construct_runtime!(
 		Timestamp: pallet_timestamp,
 		Cohorts: pallet_cohorts,
 		Bonds: pallet_bonds,
+		NotaryAdmin: pallet_notary_admin,
+		LocalchainRelay: pallet_localchain_relay,
+		Difficulty: pallet_difficulty,// Consensus support.
+		// Authorship must be before session in order to note author in the correct session and era
+		// for im-online.
+		Authorship: pallet_authorship,
+		Historical: pallet_session_historical,
 		Session: pallet_session,
-		Difficulty: pallet_difficulty,
 		BlockSeal: pallet_block_seal,
+		Grandpa: pallet_grandpa,
+		Offences: pallet_offences,
 		ArgonBalances: pallet_balances::<Instance1>::{Pallet, Call, Storage, Config<T>, Event<T>},
 		UlixeeBalances: pallet_balances::<Instance2>::{Pallet, Call, Storage, Config<T>, Event<T>},
 		TransactionPayment: pallet_transaction_payment,
@@ -405,7 +528,7 @@ pub type SignedExtra = (
 	frame_system::CheckSpecVersion<Runtime>,
 	frame_system::CheckTxVersion<Runtime>,
 	frame_system::CheckGenesis<Runtime>,
-	frame_system::CheckEra<Runtime>,
+	frame_system::CheckMortality<Runtime>,
 	frame_system::CheckNonce<Runtime>,
 	frame_system::CheckWeight<Runtime>,
 	pallet_transaction_payment::ChargeTransactionPayment<Runtime>,
@@ -440,7 +563,10 @@ mod benches {
 		[pallet_block_seal, BlockSeal]
 		[pallet_authorship, Authorship]
 		[pallet_sudo, Sudo]
-		[pallet_template, TemplateModule]
+		[pallet_grandpa, Grandpa]
+		[pallet_offences, Offences],
+		[pallet_notary_admin, NotaryAdmin],
+		[pallet_localchain_relay, LocalchainRelay],
 	);
 }
 
@@ -588,7 +714,7 @@ impl_runtime_apis! {
 		}
 	}
 
-	impl ulx_primitives::AuthorityApis<Block> for Runtime {
+	impl ulx_primitives::block_seal::AuthorityApis<Block> for Runtime {
 		fn authorities() -> Vec<BlockSealAuthorityId> {
 			Cohorts::authorities()
 		}
@@ -610,6 +736,44 @@ impl_runtime_apis! {
 			Cohorts::get_next_cohort_period()
 		}
 	}
+
+
+	impl sp_consensus_grandpa::GrandpaApi<Block> for Runtime {
+		fn grandpa_authorities() -> sp_consensus_grandpa::AuthorityList {
+			Grandpa::grandpa_authorities()
+		}
+
+		fn current_set_id() -> sp_consensus_grandpa::SetId {
+			Grandpa::current_set_id()
+		}
+
+		fn submit_report_equivocation_unsigned_extrinsic(
+			equivocation_proof: sp_consensus_grandpa::EquivocationProof<
+				<Block as BlockT>::Hash,
+				NumberFor<Block>,
+			>,
+			key_owner_proof: sp_consensus_grandpa::OpaqueKeyOwnershipProof,
+		) -> Option<()> {
+			let key_owner_proof = key_owner_proof.decode()?;
+
+			Grandpa::submit_unsigned_equivocation_report(
+				equivocation_proof,
+				key_owner_proof,
+			)
+		}
+
+		fn generate_key_ownership_proof(
+			_set_id: sp_consensus_grandpa::SetId,
+			authority_id: GrandpaId,
+		) -> Option<sp_consensus_grandpa::OpaqueKeyOwnershipProof> {
+			use codec::Encode;
+
+			Historical::prove((sp_consensus_grandpa::KEY_TYPE, authority_id))
+				.map(|p| p.encode())
+				.map(sp_consensus_grandpa::OpaqueKeyOwnershipProof::new)
+		}
+	}
+
 
 	#[cfg(feature = "runtime-benchmarks")]
 	impl frame_benchmarking::Benchmark<Block> for Runtime {

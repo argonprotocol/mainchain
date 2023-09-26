@@ -9,7 +9,10 @@ use sp_core::ByteArray;
 use sp_keystore::KeystorePtr;
 use sp_runtime::{app_crypto::AppCrypto, generic::DigestItem, traits::Block as BlockT};
 
-use ulx_primitives::{AuthorityApis, BlockProof, BlockSealAuthorityId, UlxSeal, ULX_ENGINE_ID};
+use ulx_primitives::{
+	block_seal::{AuthorityApis, BlockProof},
+	BlockSealAuthorityId, UlxSeal, ULX_ENGINE_ID,
+};
 
 use crate::error::Error;
 
@@ -34,10 +37,10 @@ where
 
 	pub(crate) fn check_if_can_seal(
 		&mut self,
-		best_hash: &Block::Hash,
+		block_hash: &Block::Hash,
 		block_proof: &BlockProof,
 	) -> Result<(), Error<Block>> {
-		let authorities = match self.client.runtime_api().authorities_by_index(*best_hash) {
+		let authorities = match self.client.runtime_api().authorities_by_index(*block_hash) {
 			Ok(x) => x,
 			Err(err) =>
 				return Err(Error::BlockProposingError(format!(
@@ -175,7 +178,7 @@ mod tests {
 	use sp_keystore::{testing::MemoryKeystore, Keystore};
 
 	use ulx_node_runtime::AccountId;
-	use ulx_primitives::{AuthorityDistance, SealStamper, BLOCK_SEAL_KEY_TYPE};
+	use ulx_primitives::block_seal::{AuthorityDistance, SealStamper, BLOCK_SEAL_KEY_TYPE};
 
 	use crate::tests::setup_logs;
 

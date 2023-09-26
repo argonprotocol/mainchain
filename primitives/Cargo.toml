@@ -8,7 +8,7 @@ targets = ["x86_64-unknown-linux-gnu"]
 
 [dependencies]
 async-trait = { version = "0.1.73", optional = true }
-codec = { package = "parity-scale-codec", version = "3.6.1", default-features = false, features = ["derive"] }
+codec = { package = "parity-scale-codec", version = "3.6.4", default-features = false, features = ["derive","max-encoded-len"] }
 serde = { version = "1.0", features = ["derive"], default-features = false, optional = true }
 scale-info = { version = "2.9.0", default-features = false, features = ["derive"] }
 sp-runtime = { version = "24.0.0", default-features = false, git = "https://github.com/paritytech/polkadot-sdk.git", branch = "release-polkadot-v1.1.0" }
@@ -25,7 +25,9 @@ default = ["std"]
 std = [
   "async-trait",
   "codec/std",
+  "codec/derive",
   "scale-info/std",
+  "scale-info/derive",
   "serde/std",
   "sp-api/std",
   "sp-application-crypto/std",

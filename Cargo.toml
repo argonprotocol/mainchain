@@ -6,6 +6,8 @@ members = [
 	"pallets/cohorts",
 	"pallets/bonds",
 	"pallets/difficulty",
+	"pallets/notary_admin",
+	"pallets/localchain_relay",
 	"primitives",
     "runtime",
 ]

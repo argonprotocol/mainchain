@@ -1,13 +1,17 @@
 use codec::{Decode, Encode};
 use scale_info::TypeInfo;
+use sp_api::BlockT;
 use sp_core::{MaxEncodedLen, RuntimeDebug};
-use sp_runtime::ConsensusEngineId;
+use sp_runtime::{traits::NumberFor, ConsensusEngineId};
 
-use crate::BlockSealAuthoritySignature;
+use crate::block_seal::BlockSealAuthoritySignature;
 
 pub const ULX_ENGINE_ID: ConsensusEngineId = [b'u', b'l', b'x', b'_'];
 // matches POW so that we can use the built-in front end decoding
 pub const AUTHOR_ID: ConsensusEngineId = [b'p', b'o', b'w', b'_'];
+
+pub const FINALIZED_BLOCK_DIGEST_ID: ConsensusEngineId = [b'f', b'i', b'n', b'_'];
+
 pub type Difficulty = u128;
 
 #[derive(Clone, Copy, PartialEq, Eq, Encode, Decode, RuntimeDebug, TypeInfo, MaxEncodedLen)]
@@ -20,6 +24,13 @@ impl Default for ProofOfWorkType {
 	fn default() -> Self {
 		ProofOfWorkType::Compute
 	}
+}
+
+#[derive(Clone, PartialEq, Eq, Encode, Decode, RuntimeDebug, TypeInfo)]
+pub struct FinalizedBlockNeededDigest<B: BlockT> {
+	#[codec(compact)]
+	pub number: NumberFor<B>,
+	pub hash: B::Hash,
 }
 
 #[derive(Clone, PartialEq, Eq, Encode, Decode, RuntimeDebug, TypeInfo)]

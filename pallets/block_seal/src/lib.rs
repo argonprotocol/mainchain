@@ -18,16 +18,22 @@ pub mod weights;
 
 #[frame_support::pallet(dev_mode)]
 pub mod pallet {
-	use frame_support::pallet_prelude::*;
+	use frame_support::{pallet_prelude::*, traits::FindAuthor};
 	use frame_system::pallet_prelude::*;
 	use sp_core::{crypto::AccountId32, U256};
 	use sp_io::hashing::blake2_256;
-	use sp_runtime::{traits::UniqueSaturatedInto, RuntimeAppPublic};
+	use sp_runtime::{
+		traits::UniqueSaturatedInto, ConsensusEngineId, RuntimeAppPublic, Saturating,
+	};
 
 	use ulx_primitives::{
+		block_seal::{
+			AuthorityDistance, AuthorityProvider, BlockProof, HistoricalBlockSealersLookup,
+			SealNonceHashMessage, SealStamper, SealerSignatureMessage, SEALER_SIGNATURE_PREFIX,
+			SEAL_NONCE_PREFIX,
+		},
 		inherents::{InherentError, UlxBlockSealInherent, UlxBlockSealInherentData},
-		AuthorityDistance, AuthorityProvider, BlockProof, ProofOfWorkType, SealNonceHashMessage,
-		SealStamper, SealerSignatureMessage, AUTHOR_ID,
+		ProofOfWorkType, AUTHOR_ID,
 	};
 
 	use super::*;
@@ -53,7 +59,20 @@ pub mod pallet {
 		/// How many authorities must be registered in total before proof of tax begins
 		#[pallet::constant]
 		type AuthorityCountInitiatingTaxProof: Get<u32>;
+		/// How many historical block sealers to keep in storage
+		#[pallet::constant]
+		type HistoricalBlockSealersToKeep: Get<u32>;
 	}
+
+	/// Pruned with the max block seal history parameter
+	#[pallet::storage]
+	pub(super) type HistoricalBlockSealAuthorities<T: Config> = StorageMap<
+		_,
+		Twox64Concat,
+		BlockNumberFor<T>,
+		BoundedVec<T::AuthorityId, T::HistoricalBlockSealersToKeep>,
+		ValueQuery,
+	>;
 
 	#[pallet::storage]
 	#[pallet::getter(fn min_seal_signers)]
@@ -139,9 +158,13 @@ pub mod pallet {
 			T::DbWeight::get().reads_writes(2, 1)
 		}
 
-		fn on_finalize(_: BlockNumberFor<T>) {
+		fn on_finalize(n: BlockNumberFor<T>) {
 			// ensure we never go to trie with these values.
 			<Author<T>>::kill();
+
+			<HistoricalBlockSealAuthorities<T>>::take(
+				n.saturating_sub(T::HistoricalBlockSealersToKeep::get().into()),
+			);
 			if CurrentWorkType::<T>::get() == ProofOfWorkType::Tax {
 				assert!(
 					DidSeal::<T>::take(),
@@ -184,7 +207,6 @@ pub mod pallet {
 			}
 
 			// 3. Did they get enough signatures?
-			// TODO: this should be a percentage of the rolling average
 			let signers = proof.seal_stampers.iter().filter(|x| x.signature.is_some()).count();
 			if signers < min_signatures {
 				return Err(Error::<T>::InsufficientSealSigners.into())
@@ -221,6 +243,12 @@ pub mod pallet {
 			Self::check_seal_signatures(&seal_validators, &proof, parent_hash, tax_author_id)?;
 
 			DidSeal::<T>::put(true);
+			let block_number = <frame_system::Pallet<T>>::block_number();
+			let sealers = seal_validators.iter().map(|v| v.0.clone()).collect::<Vec<_>>();
+			<HistoricalBlockSealAuthorities<T>>::insert(
+				block_number,
+				BoundedVec::truncate_from(sealers),
+			);
 
 			Ok(())
 		}
@@ -258,6 +286,7 @@ pub mod pallet {
 		) -> DispatchResult {
 			let peer_signature_message = blake2_256(
 				SealerSignatureMessage {
+					prefix: SEALER_SIGNATURE_PREFIX,
 					tax_proof_id: proof.tax_proof_id,
 					parent_hash,
 					author_id,
@@ -280,6 +309,7 @@ pub mod pallet {
 
 		fn check_nonce(nonce: U256, proof: &BlockProof, parent_hash: T::Hash) -> DispatchResult {
 			let calculated_nonce = SealNonceHashMessage::<T::Hash> {
+				prefix: SEAL_NONCE_PREFIX,
 				tax_proof_id: proof.tax_proof_id,
 				tax_amount: proof.tax_amount,
 				parent_hash,
@@ -366,6 +396,40 @@ pub mod pallet {
 			}
 
 			return Ok(None)
+		}
+	}
+
+	impl<T: Config> HistoricalBlockSealersLookup<BlockNumberFor<T>, T::AuthorityId> for Pallet<T> {
+		fn get_active_block_sealers_of(block_number: BlockNumberFor<T>) -> Vec<T::AuthorityId> {
+			let block_sealers = <HistoricalBlockSealAuthorities<T>>::get(block_number);
+			block_sealers
+				.into_inner()
+				.into_iter()
+				.filter(|a| T::AuthorityProvider::is_active(a))
+				.collect::<Vec<_>>()
+		}
+	}
+
+	impl<T: Config> FindAuthor<T::AccountId> for Pallet<T> {
+		fn find_author<'a, I>(digests: I) -> Option<T::AccountId>
+		where
+			I: 'a + IntoIterator<Item = (ConsensusEngineId, &'a [u8])>,
+		{
+			if let Some(account_id) = <Author<T>>::get() {
+				return Some(account_id)
+			}
+
+			for (id, mut data) in digests.into_iter() {
+				if id == AUTHOR_ID {
+					let decoded = T::AccountId::decode(&mut data);
+					if let Some(account_id) = decoded.ok() {
+						<Author<T>>::put(&account_id);
+						return Some(account_id)
+					}
+				}
+			}
+
+			None
 		}
 	}
 }

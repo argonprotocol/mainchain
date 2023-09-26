@@ -132,6 +132,7 @@ impl pallet_bonds::Config for Test {
 impl pallet_cohorts::Config for Test {
 	type RuntimeEvent = RuntimeEvent;
 	type WeightInfo = ();
+	type SessionIndicesToKeepInHistory = ConstU32<10>;
 	type BlocksBetweenCohorts = BlocksBetweenCohorts;
 	type MaxCohortSize = MaxCohortSize;
 	type MaxValidators = MaxValidators;

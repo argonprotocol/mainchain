@@ -26,9 +26,13 @@ use substrate_test_runtime::{AccountId, BlockNumber, Executive, Hash, Header};
 use substrate_test_runtime_client::Backend;
 
 use pallet_cohorts::find_xor_closest;
-use ulx_primitives::{AuthorityDistance, BlockSealAuthorityId, NextWork, PeerId, ProofOfWorkType};
+use ulx_primitives::{
+	block_seal::{AuthorityDistance, BlockSealAuthorityId, PeerId},
+	NextWork, ProofOfWorkType,
+};
 
 use crate::{import_queue, inherents::UlxCreateInherentDataProviders, nonce_verify::UlxNonce};
+
 type Error = sp_blockchain::Error;
 
 pub(crate) struct DummyFactory(pub Arc<PeersFullClient>);
@@ -207,7 +211,8 @@ sp_api::mock_impl_runtime_apis! {
 		}
 	}
 
-	impl ulx_primitives::AuthorityApis<Block> for RuntimeApi {
+	impl ulx_primitives::block_seal::AuthorityApis<Block> for RuntimeApi {
+
 		fn authorities() -> Vec<BlockSealAuthorityId> {
 			self.inner.authorities.iter().map(|(_,_, id)| id.clone()).collect()
 		}
@@ -226,6 +231,8 @@ sp_api::mock_impl_runtime_apis! {
 					authority_index: index.unique_saturated_into(),
 					peer_id: PeerId(OpaquePeerId::default()),
 					distance,
+					rpc_ip: 0,
+					rpc_port: 1
 				}
 			})
 			.collect::<Vec<_>>()

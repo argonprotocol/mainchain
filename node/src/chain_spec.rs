@@ -1,11 +1,12 @@
 use sc_service::{ChainType, Properties};
+use sp_consensus_grandpa::AuthorityId as GrandpaId;
 use sp_core::{crypto::AccountId32, sr25519, ByteArray, Pair, Public};
 use sp_runtime::traits::{IdentifyAccount, Verify};
 
 use ulx_node_runtime::{
 	opaque::SessionKeys, AccountId, ArgonBalancesConfig, BlockSealConfig, DifficultyConfig,
-	RuntimeGenesisConfig, SessionConfig, Signature, SudoConfig, SystemConfig, UlixeeBalancesConfig,
-	WASM_BINARY,
+	GrandpaConfig, RuntimeGenesisConfig, SessionConfig, Signature, SudoConfig, SystemConfig,
+	UlixeeBalancesConfig, WASM_BINARY,
 };
 use ulx_primitives::BlockSealAuthorityId;
 
@@ -24,12 +25,12 @@ pub fn get_from_seed<TPublic: Public>(seed: &str) -> <TPublic::Pair as Pair>::Pu
 
 type AccountPublic = <Signature as Verify>::Signer;
 
-fn session_keys(block_seal_authority: BlockSealAuthorityId) -> SessionKeys {
-	SessionKeys { block_seal_authority }
+fn session_keys(block_seal_authority: BlockSealAuthorityId, grandpa: GrandpaId) -> SessionKeys {
+	SessionKeys { block_seal_authority, grandpa }
 }
 /// Generate a BlockSeal authority key.
-pub fn authority_keys_from_seed(s: &str) -> (BlockSealAuthorityId,) {
-	(get_from_seed::<BlockSealAuthorityId>(s),)
+pub fn authority_keys_from_seed(s: &str) -> (BlockSealAuthorityId, GrandpaId) {
+	(get_from_seed::<BlockSealAuthorityId>(s), get_from_seed::<GrandpaId>(s))
 }
 /// Generate an account ID from seed.
 pub fn get_account_id_from_seed<TPublic: Public>(seed: &str) -> AccountId
@@ -39,10 +40,11 @@ where
 	AccountPublic::from(get_from_seed::<TPublic>(seed)).into_account()
 }
 
-pub fn get_genesis_dummy_validator() -> (AccountId, BlockSealAuthorityId) {
+pub fn get_genesis_dummy_validator() -> (AccountId, BlockSealAuthorityId, GrandpaId) {
 	let account_id: AccountId = AccountId32::from([1u8; 32]).into();
 	let validator_id = BlockSealAuthorityId::from_slice(&[1; 32]).unwrap();
-	(account_id, validator_id)
+	let grandpa_id = GrandpaId::from_slice(&[1; 32]).unwrap();
+	(account_id, validator_id, grandpa_id)
 }
 
 pub fn development_config() -> Result<ChainSpec, String> {
@@ -151,13 +153,13 @@ pub fn local_testnet_config() -> Result<ChainSpec, String> {
 /// Configure initial storage state for FRAME modules.
 fn testnet_genesis(
 	wasm_binary: &[u8],
-	mut initial_authorities: Vec<(AccountId, (BlockSealAuthorityId,))>,
+	mut initial_authorities: Vec<(AccountId, (BlockSealAuthorityId, GrandpaId))>,
 	root_key: AccountId,
 	endowed_accounts: Vec<AccountId>,
 	_enable_println: bool,
 ) -> RuntimeGenesisConfig {
-	let (dummy_validator_account, dummy_validator_keys) = get_genesis_dummy_validator();
-	initial_authorities.push((dummy_validator_account, (dummy_validator_keys,)));
+	let (dummy_validator_account, block_seal_id, grandpa_id) = get_genesis_dummy_validator();
+	initial_authorities.push((dummy_validator_account, (block_seal_id, grandpa_id)));
 
 	RuntimeGenesisConfig {
 		system: SystemConfig {
@@ -171,6 +173,7 @@ fn testnet_genesis(
 		ulixee_balances: UlixeeBalancesConfig {
 			balances: endowed_accounts.iter().cloned().map(|k| (k, 1 << 10)).collect(),
 		},
+		grandpa: GrandpaConfig { authorities: vec![], ..Default::default() },
 		sudo: SudoConfig {
 			// Assign network admin rights.
 			key: Some(root_key),
@@ -178,7 +181,7 @@ fn testnet_genesis(
 		session: SessionConfig {
 			keys: initial_authorities
 				.iter()
-				.map(|x| (x.0.clone(), x.0.clone(), session_keys(x.1 .0.clone())))
+				.map(|x| (x.0.clone(), x.0.clone(), session_keys(x.1 .0.clone(), x.1 .1.clone())))
 				.collect(),
 		},
 		block_seal: BlockSealConfig {

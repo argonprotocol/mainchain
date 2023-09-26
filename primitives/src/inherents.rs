@@ -4,7 +4,7 @@ use sp_core::U256;
 use sp_inherents::{InherentData, InherentIdentifier, IsFatalError};
 use sp_runtime::RuntimeDebug;
 
-use crate::{BlockProof, ProofOfWorkType};
+use crate::{block_seal::BlockProof, ProofOfWorkType};
 
 pub const INHERENT_IDENTIFIER: InherentIdentifier = *b"ulx_seal";
 
