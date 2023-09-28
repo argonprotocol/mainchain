@@ -1,30 +1,37 @@
 use std::{cmp::Ordering, marker::PhantomData, sync::Arc};
 
 use codec::Decode;
-use log::{info, trace};
+use log::{debug, info, trace};
 use prometheus_endpoint::Registry;
-use sc_client_api::{self, backend::AuxStore, BlockOf};
+use sc_client_api::{self, backend::AuxStore, BlockOf, BlockchainEvents};
 use sc_consensus::{
-	BasicQueue, BlockCheckParams, BlockImport, BlockImportParams, BoxBlockImport,
-	BoxJustificationImport, ForkChoiceStrategy, ImportResult, Verifier,
+	BlockCheckParams, BlockImport, BlockImportError, BlockImportParams, BlockImportStatus,
+	BoxBlockImport, BoxJustificationImport, ForkChoiceStrategy, ImportResult, IncomingBlock,
+	StateAction, Verifier,
 };
 use sp_api::ProvideRuntimeApi;
 use sp_block_builder::BlockBuilder as BlockBuilderApi;
 use sp_blockchain::HeaderBackend;
-use sp_consensus::{Error as ConsensusError, SelectChain};
+use sp_consensus::{BlockOrigin, Error as ConsensusError, SelectChain};
 use sp_core::{crypto::AccountId32, U256};
 use sp_inherents::{CreateInherentDataProviders, InherentDataProvider};
 use sp_runtime::{
 	generic::DigestItem,
-	traits::{Block as BlockT, Header as HeaderT},
+	traits::{Block as BlockT, Header as HeaderT, NumberFor},
 };
 
 use ulx_primitives::{
-	inherents::UlxBlockSealInherent, AuthorityApis, ProofOfWorkType, UlxPreDigest, ULX_ENGINE_ID,
+	block_seal::AuthorityApis,
+	digests::{FinalizedBlockNeededDigest, FINALIZED_BLOCK_DIGEST_ID},
+	inherents::UlxBlockSealInherent,
+	ProofOfWorkType, UlxPreDigest, ULX_ENGINE_ID,
 };
 
 pub use crate::compute_worker::{MiningBuild, MiningHandle, MiningMetadata};
-use crate::{authority::AuthoritySealer, aux::UlxAux, error::Error, NonceAlgorithm};
+use crate::{
+	authority::AuthoritySealer, aux::UlxAux, basic_queue::BasicQueue, error::Error,
+	metrics::Metrics, NonceAlgorithm,
+};
 
 const LOG_TARGET: &str = "node::consensus::import_queue";
 /// A block importer for Ulx.
@@ -132,6 +139,26 @@ pub fn find_pre_digest<B: BlockT>(header: &B::Header) -> Result<Option<UlxPreDig
 	Ok(pre_digest)
 }
 
+pub fn find_finalize_digest<B: BlockT>(
+	header: &B::Header,
+) -> Result<Option<FinalizedBlockNeededDigest<B>>, Error<B>> {
+	let mut pre_digest: Option<FinalizedBlockNeededDigest<B>> = None;
+	for log in header.digest().logs() {
+		match (log, pre_digest.is_some()) {
+			(DigestItem::Consensus(FINALIZED_BLOCK_DIGEST_ID, _), true) =>
+				return Err(Error::MultiplePreRuntimeDigests),
+			(DigestItem::PreRuntime(FINALIZED_BLOCK_DIGEST_ID, v), false) => {
+				let block = FinalizedBlockNeededDigest::<B>::decode(&mut &v[..])
+					.map_err(|e| Error::<B>::Codec(e.clone()))?;
+				pre_digest = Some(block);
+			},
+			(_, _) => trace!(target: LOG_TARGET, "Ignoring digest not meant for us"),
+		}
+	}
+
+	Ok(pre_digest)
+}
+
 #[async_trait::async_trait]
 impl<B, I, C, S, Algorithm, CIDP> BlockImport<B> for UlxBlockImport<B, I, C, S, Algorithm, CIDP>
 where
@@ -139,7 +166,13 @@ where
 	I: BlockImport<B> + Send + Sync,
 	I::Error: Into<ConsensusError>,
 	S: SelectChain<B>,
-	C: ProvideRuntimeApi<B> + Send + Sync + HeaderBackend<B> + AuxStore + BlockOf,
+	C: ProvideRuntimeApi<B>
+		+ Send
+		+ Sync
+		+ HeaderBackend<B>
+		+ BlockchainEvents<B>
+		+ AuxStore
+		+ BlockOf,
 	C::Api: BlockBuilderApi<B>,
 	C::Api: AuthorityApis<B>,
 	Algorithm: NonceAlgorithm<B> + Send + Sync,
@@ -174,6 +207,25 @@ where
 
 		if calculated_digest.difficulty != pre_digest.difficulty {
 			return Err(Error::<B>::InvalidPredigestDifficulty.into())
+		}
+
+		let finalized_digest = match find_finalize_digest::<B>(&block.header) {
+			Ok(Some(x)) => x,
+			Ok(None) => return Err(Error::<B>::MissingFinalizedHeightDigest.into()),
+			Err(x) => return Err(x.into()),
+		};
+
+		if &finalized_digest.number > block.header.number() {
+			return Err(Error::<B>::InvalidFinalizedBlockDigest.into())
+		}
+
+		let latest_verified_finalized = self.client.info().finalized_number;
+		if finalized_digest.number > latest_verified_finalized {
+			return Err(Error::<B>::PendingFinalizedBlockDigest(
+				finalized_digest.hash,
+				finalized_digest.number,
+			)
+			.into())
 		}
 
 		let parent_hash = *block.header.parent_hash();
@@ -298,9 +350,10 @@ where
 pub type UlxImportQueue<B> = BasicQueue<B>;
 
 /// Import queue for Ulx engine.
-pub fn new<B, Algorithm>(
+pub fn new<B, Algorithm, C>(
 	block_import: BoxBlockImport<B>,
 	justification_import: Option<BoxJustificationImport<B>>,
+	client: Arc<C>,
 	algorithm: Algorithm,
 	spawner: &impl sp_core::traits::SpawnEssentialNamed,
 	registry: Option<&Registry>,
@@ -309,8 +362,154 @@ where
 	B: BlockT,
 	Algorithm: NonceAlgorithm<B> + Clone + Send + Sync + 'static,
 	Algorithm::Difficulty: Send,
+	C: BlockchainEvents<B> + Send + Sync + 'static,
 {
 	let verifier = UlxVerifier::new(algorithm);
 
-	Ok(BasicQueue::new(verifier, block_import, justification_import, spawner, registry))
+	Ok(BasicQueue::new(verifier, block_import, client, justification_import, spawner, registry))
+}
+
+pub(crate) enum ImportOrFinalizeError<B: BlockT> {
+	BlockImportError(BlockImportError),
+	FinalizedBlockNeeded(B::Hash, NumberFor<B>),
+}
+
+impl<B: BlockT> From<BlockImportError> for ImportOrFinalizeError<B> {
+	fn from(value: BlockImportError) -> Self {
+		ImportOrFinalizeError::BlockImportError(value)
+	}
+}
+
+/// Single block import function with metering.
+pub(crate) async fn import_single_block_metered<B: BlockT, V: Verifier<B>>(
+	import_handle: &mut impl BlockImport<B, Error = ConsensusError>,
+	block_origin: BlockOrigin,
+	block: IncomingBlock<B>,
+	verifier: &mut V,
+	metrics: Option<Metrics>,
+) -> Result<BlockImportStatus<NumberFor<B>>, ImportOrFinalizeError<B>> {
+	let peer = block.origin;
+
+	let (header, justifications) = match (block.header, block.justifications) {
+		(Some(header), justifications) => (header, justifications),
+		(None, _) => {
+			if let Some(ref peer) = peer {
+				debug!(target: LOG_TARGET, "Header {} was not provided by {} ", block.hash, peer);
+			} else {
+				debug!(target: LOG_TARGET, "Header {} was not provided ", block.hash);
+			}
+			return Err(BlockImportError::IncompleteHeader(peer).into())
+		},
+	};
+
+	trace!(target: LOG_TARGET, "Header {} has {:?} logs", block.hash, header.digest().logs().len());
+
+	let number = *header.number();
+	let hash = block.hash;
+	let parent_hash = *header.parent_hash();
+
+	let import_handler = |import| match import {
+		Ok(ImportResult::AlreadyInChain) => {
+			trace!(target: LOG_TARGET, "Block already in chain {}: {:?}", number, hash);
+			Ok(BlockImportStatus::ImportedKnown(number, peer))
+		},
+		Ok(ImportResult::Imported(aux)) =>
+			Ok(BlockImportStatus::ImportedUnknown(number, aux, peer)),
+		Ok(ImportResult::MissingState) => {
+			debug!(
+				target: LOG_TARGET,
+				"Parent state is missing for {}: {:?}, parent: {:?}", number, hash, parent_hash
+			);
+			Err(BlockImportError::MissingState.into())
+		},
+		Ok(ImportResult::UnknownParent) => {
+			debug!(
+				target: LOG_TARGET,
+				"Block with unknown parent {}: {:?}, parent: {:?}", number, hash, parent_hash
+			);
+			Err(BlockImportError::UnknownParent.into())
+		},
+		Ok(ImportResult::KnownBad) => {
+			debug!(target: LOG_TARGET, "Peer gave us a bad block {}: {:?}", number, hash);
+			Err(BlockImportError::BadBlock(peer).into())
+		},
+		Err(e) => {
+			debug!(target: LOG_TARGET, "Error importing block {}: {:?}: {}", number, hash, e);
+			Err(BlockImportError::Other(e).into())
+		},
+	};
+
+	match import_handler(
+		import_handle
+			.check_block(BlockCheckParams {
+				hash,
+				number,
+				parent_hash,
+				allow_missing_state: block.allow_missing_state,
+				import_existing: block.import_existing,
+				allow_missing_parent: block.state.is_some(),
+			})
+			.await,
+	)? {
+		BlockImportStatus::ImportedUnknown { .. } => (),
+		r => return Ok(r), // Any other successful result means that the block is already imported.
+	}
+
+	let started = std::time::Instant::now();
+
+	let mut import_block = BlockImportParams::new(block_origin, header);
+	import_block.body = block.body;
+	import_block.justifications = justifications;
+	import_block.post_hash = Some(hash);
+	import_block.import_existing = block.import_existing;
+	import_block.indexed_body = block.indexed_body;
+
+	if let Some(state) = block.state {
+		let changes = sc_consensus::block_import::StorageChanges::Import(state);
+		import_block.state_action = StateAction::ApplyChanges(changes);
+	} else if block.skip_execution {
+		import_block.state_action = StateAction::Skip;
+	} else if block.allow_missing_state {
+		import_block.state_action = StateAction::ExecuteIfPossible;
+	}
+
+	let import_block = verifier.verify(import_block).await.map_err(|msg| {
+		if let Some(ref peer) = peer {
+			trace!(
+				target: LOG_TARGET,
+				"Verifying {}({}) from {} failed: {}",
+				number,
+				hash,
+				peer,
+				msg
+			);
+		} else {
+			trace!(target: LOG_TARGET, "Verifying {}({}) failed: {}", number, hash, msg);
+		}
+		if let Some(metrics) = metrics.as_ref() {
+			metrics.report_verification(false, started.elapsed());
+		}
+
+		BlockImportError::VerificationFailed(peer, msg)
+	})?;
+
+	if let Some(metrics) = metrics.as_ref() {
+		metrics.report_verification(true, started.elapsed());
+	}
+
+	let imported = import_handle.import_block(import_block).await;
+	if let Some(metrics) = metrics.as_ref() {
+		metrics.report_verification_and_import(started.elapsed());
+	}
+
+	// ULIXEE MODIFICATION
+	if let Err(ConsensusError::Other(o)) = &imported {
+		if let Some(Error::<B>::PendingFinalizedBlockDigest(hash, num)) =
+			o.downcast_ref::<Error<B>>()
+		{
+			return Err(ImportOrFinalizeError::<B>::FinalizedBlockNeeded(*hash, *num))
+		}
+	}
+
+	import_handler(imported)
 }

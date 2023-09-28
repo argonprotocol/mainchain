@@ -3,7 +3,10 @@ use sc_consensus::ImportResult;
 use sp_blockchain::Error as BlockchainError;
 use sp_consensus::Error as ConsensusError;
 use sp_inherents::Error as InherentsError;
-use sp_runtime::{traits::Block as BlockT, RuntimeString};
+use sp_runtime::{
+	traits::{Block as BlockT, NumberFor},
+	RuntimeString,
+};
 
 #[derive(thiserror::Error, std::fmt::Debug)]
 pub enum Error<B: BlockT> {
@@ -23,6 +26,10 @@ pub enum Error<B: BlockT> {
 	FailedPreliminaryVerify,
 	#[error("Rejecting block too far in future")]
 	TooFarInFuture,
+	#[error("Invalid finalized block in predigests")]
+	InvalidFinalizedBlockDigest,
+	#[error("Pending download of finalized block in predigests")]
+	PendingFinalizedBlockDigest(B::Hash, NumberFor<B>),
 	#[error("Fetching best header failed using select chain: {0}")]
 	BestHeaderSelectChain(ConsensusError),
 	#[error("Fetching best header failed: {0}")]
@@ -54,6 +61,8 @@ pub enum Error<B: BlockT> {
 	MultiplePreRuntimeDigests,
 	#[error("Missing pre-runtime digest")]
 	MissingPreRuntimeDigest,
+	#[error("Missing pre-runtime finalized block digest")]
+	MissingFinalizedHeightDigest,
 	#[error("Invalid work type proposed")]
 	InvalidPredigestWorkType,
 	#[error("Invalid difficulty proposed")]
@@ -132,6 +141,7 @@ impl<B: BlockT> PartialEq for Error<B> {
 			(Error::BlockNotFound(s1), Error::BlockNotFound(s2)) => s1 == s2,
 			(Error::StringError(s1), Error::StringError(s2)) => s1 == s2,
 			(Error::Canceled(_), Error::Canceled(_)) => true,
+
 			_ => false,
 		}
 	}
@@ -196,6 +206,9 @@ impl<B: BlockT> From<Error<B>> for String {
 
 impl<B: BlockT> From<Error<B>> for ConsensusError {
 	fn from(error: Error<B>) -> ConsensusError {
-		ConsensusError::ClientImport(error.to_string())
+		match error {
+			Error::PendingFinalizedBlockDigest(_, _) => ConsensusError::Other(Box::new(error)),
+			_ => ConsensusError::ClientImport(error.to_string()),
+		}
 	}
 }

@@ -16,7 +16,7 @@
 // You should have received a copy of the GNU General Public License
 // along with this program. If not, see <https://www.gnu.org/licenses/>.
 
-use std::{ops::Sub, sync::Arc, time::Duration};
+use std::{sync::Arc, time::Duration};
 
 use codec::{Decode, Encode};
 use futures::prelude::*;
@@ -31,13 +31,15 @@ use sp_inherents::{CreateInherentDataProviders, InherentDataProvider};
 use sp_keystore::KeystorePtr;
 use sp_runtime::{
 	generic::{Digest, DigestItem},
-	traits::{Block as BlockT, Header as HeaderT, Header},
+	traits::{Block as BlockT, Header as HeaderT, Header, NumberFor},
 };
 
 use rpc::{CreatedBlock, Error as RpcError, SealNewBlock};
 use ulx_primitives::{
-	inherents::UlxBlockSealInherent, AuthorityApis, BlockProof, ProofOfWorkType, UlxConsensusApi,
-	UlxPreDigest, UlxSeal, AUTHOR_ID, ULX_ENGINE_ID,
+	block_seal::{AuthorityApis, BlockProof},
+	digests::{FinalizedBlockNeededDigest, FINALIZED_BLOCK_DIGEST_ID},
+	inherents::UlxBlockSealInherent,
+	ProofOfWorkType, UlxConsensusApi, UlxPreDigest, UlxSeal, AUTHOR_ID, ULX_ENGINE_ID,
 };
 
 pub use crate::compute_worker::{MiningBuild, MiningHandle, MiningMetadata};
@@ -56,10 +58,12 @@ mod tests;
 
 mod authority;
 mod aux;
+pub mod basic_queue;
 pub mod compute_worker;
-mod error;
+pub mod error;
 pub mod import_queue;
 pub mod inherents;
+mod metrics;
 pub mod nonce_verify;
 pub mod rpc;
 
@@ -124,26 +128,31 @@ pub async fn listen_for_block_seal<Block, C, S, Algorithm, E, SO, L, CIDP, CS>(
 	while let Some(command) = block_seal_stream.next().await {
 		match command {
 			SealNewBlock::Submit { block_proof, nonce, parent_hash, mut sender } => {
-				info!(target: LOG_TARGET, "Inbound BlockProof seal received {:?}", block_proof);
+				info!(target: LOG_TARGET, "Inbound BlockProof seal received (id={:?}, author={})", block_proof.tax_proof_id, block_proof.author_id);
 				let future = async {
+					// this finds the longest current chain off finalized path
 					let mut best_header = select_chain.best_chain().await?;
 
 					if parent_hash != best_header.hash() {
-						let header = match client.header(parent_hash) {
-							Ok(Some(x)) => x,
-							Ok(None) =>
-								return Err(
-									BlockNotFound(parent_hash.to_string()).into()
-								),
-							Err(err) => return Err(err.into()),
+						match select_chain.finality_target(parent_hash, None).await {
+							Ok(_) => (),
+							Err(err) => {
+								warn!(
+									target: LOG_TARGET,
+									"Unable to propose new block for authoring on the given parent hash {:?}. \
+									 Select best chain error: {}",
+									parent_hash,
+									err
+								);
+								return Err(err.into())
+							},
 						};
 
-						/*
-						// TODO: reject if block can't be finalized anymore.. this current strategy is a bit harsh
-						 */
-						if header.number() < best_header.number() && best_header.number().sub(10_u32.into()) > *header.number() {
-							return Err(Error::BlockProposingError(format!("Parent hash too old {:?}",header.number())))
-						}
+						let header = match client.header(parent_hash) {
+							Ok(Some(x)) => x,
+							Ok(None) => return Err(BlockNotFound(parent_hash.to_string()).into()),
+							Err(err) => return Err(err.into()),
+						};
 
 						best_header = header;
 					}
@@ -162,7 +171,10 @@ pub async fn listen_for_block_seal<Block, C, S, Algorithm, E, SO, L, CIDP, CS>(
 						},
 					};
 
-					let mut authority_sealer = AuthoritySealer::<Block, C, AccountId32>::new(client.clone(), keystore.clone());
+					let mut authority_sealer = AuthoritySealer::<Block, C, AccountId32>::new(
+						client.clone(),
+						keystore.clone(),
+					);
 
 					match authority_sealer.check_if_can_seal(&best_hash, &block_proof) {
 						Err(err) => {
@@ -174,7 +186,7 @@ pub async fn listen_for_block_seal<Block, C, S, Algorithm, E, SO, L, CIDP, CS>(
 							);
 							return Err(err.into())
 						},
-						_ => ()
+						_ => (),
 					};
 
 					let mut seal = UlxSeal {
@@ -183,7 +195,6 @@ pub async fn listen_for_block_seal<Block, C, S, Algorithm, E, SO, L, CIDP, CS>(
 						// we will fill this after proposing a block
 						authority: None,
 					};
-
 
 					match algorithm.verify(
 						&best_hash,
@@ -213,6 +224,7 @@ pub async fn listen_for_block_seal<Block, C, S, Algorithm, E, SO, L, CIDP, CS>(
 						build_time,
 						&best_header,
 						best_hash,
+						(&client.info().finalized_hash, client.info().finalized_number),
 						&pre_digest,
 						Some(nonce),
 						Some(block_proof.clone()),
@@ -223,12 +235,11 @@ pub async fn listen_for_block_seal<Block, C, S, Algorithm, E, SO, L, CIDP, CS>(
 						None => return Err(Error::BlockProposingError("No proposal".into())),
 					};
 
-
 					let (header, body) = proposal.block.deconstruct();
 					let block_number = header.number().clone();
 
 					// NOTE: we will sign the pre-hash
-					let seal = match authority_sealer.sign_seal(&header.hash(),  &mut seal) {
+					let seal = match authority_sealer.sign_seal(&header.hash(), &mut seal) {
 						Ok(x) => x,
 						Err(error) => {
 							warn!(target: LOG_TARGET, "Unable to sign seal: {}", error);
@@ -239,9 +250,9 @@ pub async fn listen_for_block_seal<Block, C, S, Algorithm, E, SO, L, CIDP, CS>(
 					let mut import_block = BlockImportParams::new(BlockOrigin::Own, header);
 					import_block.post_digests.push(seal);
 					import_block.body = Some(body);
-					import_block.state_action =
-						StateAction::ApplyChanges(StorageChanges::Changes(proposal.storage_changes));
-
+					import_block.state_action = StateAction::ApplyChanges(StorageChanges::Changes(
+						proposal.storage_changes,
+					));
 
 					let post_hash = import_block.post_hash();
 					warn!(target: LOG_TARGET, "Importing block: {:?}", &post_hash);
@@ -301,7 +312,7 @@ pub fn create_compute_miner<Block, C, S, Algorithm, E, SO, L, CIDP>(
 ) -> (MiningHandle<Block, L, <E::Proposer as Proposer<Block>>::Proof>, impl Future<Output = ()>)
 where
 	Block: BlockT,
-	C: ProvideRuntimeApi<Block> + BlockchainEvents<Block> + 'static,
+	C: ProvideRuntimeApi<Block> + BlockchainEvents<Block> + HeaderBackend<Block> + 'static,
 	S: SelectChain<Block> + 'static,
 	Algorithm: NonceAlgorithm<Block> + Send + Clone + Sync + 'static,
 	Algorithm::Difficulty: Send + 'static,
@@ -371,6 +382,7 @@ where
 				build_time,
 				&best_header,
 				best_hash,
+				(&client.info().finalized_hash, client.info().finalized_number),
 				&pre_digest,
 				None,
 				None,
@@ -397,6 +409,7 @@ async fn propose<Block, E, CIDP>(
 	build_time: Duration,
 	best_header: &<Block>::Header,
 	best_hash: <<Block>::Header as Header>::Hash,
+	finalized_block_needed: (&<Block>::Hash, NumberFor<Block>),
 	pre_digest: &UlxPreDigest,
 	tax_nonce: Option<U256>,
 	tax_block_proof: Option<BlockProof>,
@@ -464,16 +477,20 @@ where
 		// add author in pow standard field (for client)
 		inherent_digest.push(DigestItem::PreRuntime(AUTHOR_ID, author.encode().to_vec()));
 		inherent_digest.push(DigestItem::PreRuntime(ULX_ENGINE_ID, pre_digest.encode().to_vec()));
+		inherent_digest.push(DigestItem::PreRuntime(
+			FINALIZED_BLOCK_DIGEST_ID,
+			FinalizedBlockNeededDigest::<Block> {
+				hash: *finalized_block_needed.0,
+				number: finalized_block_needed.1,
+			}
+			.encode()
+			.to_vec(),
+		));
 
 		let block = match proposer.propose(inherent_data, inherent_digest, build_time, None).await {
 			Ok(x) => x,
 			Err(err) => {
-				warn!(
-					target: LOG_TARGET,
-					"Unable to propse. \
-					 Creating proposer failed: {:?}",
-					err,
-				);
+				warn!(target: LOG_TARGET, "Unable to propose. Creating proposer failed: {:?}", err);
 				return None
 			},
 		};

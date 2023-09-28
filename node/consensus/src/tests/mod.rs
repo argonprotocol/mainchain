@@ -14,8 +14,11 @@ use sp_keystore::{testing::MemoryKeystore, Keystore, KeystorePtr};
 use sp_runtime::{traits::Header as HeaderT, BoundedVec};
 use std::{collections::BTreeMap, sync::Arc, time::Duration};
 use ulx_primitives::{
-	AuthorityApis, BlockProof, BlockSealAuthorityId, ProofOfWorkType, SealNonceHashMessage,
-	SealStamper, SealerSignatureMessage, BLOCK_SEAL_KEY_TYPE,
+	block_seal::{
+		AuthorityApis, BlockProof, BlockSealAuthorityId, SealNonceHashMessage, SealStamper,
+		SealerSignatureMessage, BLOCK_SEAL_KEY_TYPE, SEAL_NONCE_PREFIX,
+	},
+	ProofOfWorkType,
 };
 
 use crate::{
@@ -29,7 +32,7 @@ use super::{
 	create_compute_miner, inherents::UlxCreateInherentDataProviders, nonce_verify::UlxNonce,
 };
 
-mod mock;
+pub(crate) mod mock;
 
 fn create_keystore(authority: Keyring) -> KeystorePtr {
 	let keystore = MemoryKeystore::new();
@@ -271,6 +274,7 @@ async fn can_run_proof_of_tax() {
 				author_id,
 				tax_amount: block_proof.tax_amount,
 				seal_stampers: xor_closest_authority_ids.clone(),
+				prefix: SEAL_NONCE_PREFIX,
 			}
 			.encode()
 			.as_slice(),
@@ -294,6 +298,7 @@ async fn can_run_proof_of_tax() {
 		}
 
 		let nonce = SealNonceHashMessage {
+			prefix: SEAL_NONCE_PREFIX,
 			tax_proof_id: block_proof.tax_proof_id,
 			tax_amount: block_proof.tax_amount,
 			parent_hash,

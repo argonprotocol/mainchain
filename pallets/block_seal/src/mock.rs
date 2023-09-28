@@ -1,18 +1,20 @@
-use std::collections::BTreeMap;
+use std::{collections::BTreeMap, net::Ipv4Addr};
 
 use env_logger::{Builder, Env};
 use frame_support::{
 	parameter_types,
 	traits::{ConstU16, ConstU64},
 };
-use sp_core::{OpaquePeerId, H256, U256};
+use sp_core::{ConstU32, OpaquePeerId, H256, U256};
 use sp_runtime::{
 	testing::UintAuthorityId,
 	traits::{BlakeTwo256, IdentityLookup, UniqueSaturatedInto},
 	BuildStorage,
 };
 
-use ulx_primitives::{AuthorityDistance, AuthorityProvider, BlockSealAuthorityId, PeerId};
+use ulx_primitives::block_seal::{
+	AuthorityDistance, AuthorityProvider, BlockSealAuthorityId, PeerId,
+};
 
 use crate as pallet_block_seal;
 
@@ -61,6 +63,9 @@ parameter_types! {
 
 pub struct StaticAuthorityProvider;
 impl AuthorityProvider<BlockSealAuthorityId, u64> for StaticAuthorityProvider {
+	fn is_active(authority_id: &BlockSealAuthorityId) -> bool {
+		Self::authorities().contains(authority_id)
+	}
 	fn authorities() -> Vec<BlockSealAuthorityId> {
 		AuthorityList::get().iter().map(|(_account, id)| id.clone()).collect()
 	}
@@ -94,6 +99,7 @@ impl AuthorityProvider<BlockSealAuthorityId, u64> for StaticAuthorityProvider {
 impl pallet_block_seal::Config for Test {
 	type RuntimeEvent = RuntimeEvent;
 	type WeightInfo = ();
+	type HistoricalBlockSealersToKeep = ConstU32<10>;
 	type AuthorityCountInitiatingTaxProof = AuthorityCountInitiatingTaxProof;
 	type AuthorityId = BlockSealAuthorityId;
 	type AuthorityProvider = StaticAuthorityProvider;
@@ -121,6 +127,8 @@ pub fn set_authorities(authorities: Vec<u64>, xor_closest_accounts: Vec<u64>) {
 					authority_index: index.unique_saturated_into(),
 					authority_id: id.clone(),
 					peer_id: PeerId(OpaquePeerId::default()),
+					rpc_ip: Ipv4Addr::new(127, 0, 0, 1).into(),
+					rpc_port: 3000,
 					distance,
 				}
 			})

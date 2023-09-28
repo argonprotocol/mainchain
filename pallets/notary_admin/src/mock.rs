@@ -1,14 +1,15 @@
-use crate as pallet_validator_cohorts;
 use env_logger::{Builder, Env};
 use frame_support::{
 	parameter_types,
 	traits::{ConstU16, ConstU64},
 };
-use sp_core::H256;
+use sp_core::{ConstU32, H256};
 use sp_runtime::{
 	traits::{BlakeTwo256, IdentityLookup},
 	BuildStorage,
 };
+
+use crate as pallet_notary_admin;
 
 type Block = frame_system::mocking::MockBlock<Test>;
 
@@ -17,7 +18,7 @@ frame_support::construct_runtime!(
 	pub enum Test
 	{
 		System: frame_system,
-		ValidatorCohorts: pallet_validator_cohorts,
+		NotaryAdmin: pallet_notary_admin
 	}
 );
 
@@ -44,23 +45,22 @@ impl frame_system::Config for Test {
 	type SystemWeightInfo = ();
 	type SS58Prefix = ConstU16<42>;
 	type OnSetCode = ();
-	type MaxConsumers = frame_support::traits::ConstU32<16>;
+	type MaxConsumers = ConstU32<16>;
 }
 
 parameter_types! {
-	pub static BlocksBetweenCohorts: u32 = 1;
-	pub static MaxCohortSize: u32 = 5;
-	pub static MaxValidators: u32 = 10;
-	pub static MaxPendingCohorts: u32 = 2;
+	pub static MaxProposalHoldBlocks: u32 = 10;
+	pub static MaxActiveNotaries: u32 = 2;
+	pub static MaxProposalsPerBlock:u32 = 1;
 }
 
-impl pallet_validator_cohorts::Config for Test {
+impl pallet_notary_admin::Config for Test {
 	type RuntimeEvent = RuntimeEvent;
 	type WeightInfo = ();
-	type BlocksBetweenCohorts = BlocksBetweenCohorts;
-	type MaxCohortSize = MaxCohortSize;
-	type MaxPendingCohorts = MaxPendingCohorts;
-	type MaxValidators = MaxValidators;
+	type MaxProposalHoldBlocks = MaxProposalHoldBlocks;
+	type MaxActiveNotaries = MaxActiveNotaries;
+	type MaxProposalsPerBlock = MaxProposalsPerBlock;
+	type MetaChangesBlockDelay = ConstU32<1>;
 }
 
 // Build genesis storage according to the mock runtime.

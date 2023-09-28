@@ -4,13 +4,17 @@ use sp_core::{blake2_256, crypto::AccountId32, H256, U256};
 use sp_runtime::{testing::UintAuthorityId, BoundedVec, Digest, DigestItem, RuntimeAppPublic};
 
 use ulx_primitives::{
-	inherents::UlxBlockSealInherent, ProofOfWorkType, SealNonceHashMessage, SealStamper,
-	SealerSignatureMessage, AUTHOR_ID,
+	block_seal::{
+		SealNonceHashMessage, SealStamper, SealerSignatureMessage, SEALER_SIGNATURE_PREFIX,
+		SEAL_NONCE_PREFIX,
+	},
+	inherents::UlxBlockSealInherent,
+	BlockSealAuthorityId, ProofOfWorkType, AUTHOR_ID,
 };
 
 use crate::{
 	mock::*,
-	pallet::{Author, CurrentWorkType, DidSeal},
+	pallet::{Author, CurrentWorkType, DidSeal, HistoricalBlockSealAuthorities},
 };
 
 #[test]
@@ -95,8 +99,8 @@ fn it_should_be_able_to_submit_a_seal() {
 		BlockSeal::on_initialize(2);
 
 		let inherent = create_seal(
-			authorities,
-			closest_validators,
+			authorities.clone(),
+			closest_validators.clone(),
 			AccountId32::from([1u8; 32]),
 			50,
 			1,
@@ -108,6 +112,14 @@ fn it_should_be_able_to_submit_a_seal() {
 
 		assert_eq!(DidSeal::<Test>::get(), true);
 		BlockSeal::on_finalize(2);
+		assert_eq!(
+			HistoricalBlockSealAuthorities::<Test>::get(2).into_inner(),
+			closest_validators
+				.clone()
+				.iter()
+				.map(|x| UintAuthorityId(*x).to_public_key::<BlockSealAuthorityId>())
+				.collect::<Vec<_>>()
+		);
 	});
 }
 #[test]
@@ -242,6 +254,7 @@ fn it_should_detect_invalid_signatures() {
 
 		// create new nonce, but don't assign it yet
 		let nonce = SealNonceHashMessage {
+			prefix: SEAL_NONCE_PREFIX,
 			tax_proof_id: proof.tax_proof_id,
 			tax_amount: proof.tax_amount,
 			parent_hash: System::parent_hash(),
@@ -287,6 +300,7 @@ fn create_seal(
 	stampers_in_order.append(&mut extra_stampers);
 
 	let signature_message = SealerSignatureMessage {
+		prefix: SEALER_SIGNATURE_PREFIX,
 		tax_proof_id,
 		tax_amount,
 		parent_hash,
@@ -320,6 +334,7 @@ fn create_seal(
 		.collect::<Vec<_>>();
 
 	let nonce = SealNonceHashMessage {
+		prefix: SEAL_NONCE_PREFIX,
 		tax_proof_id,
 		tax_amount,
 		parent_hash,
@@ -329,7 +344,7 @@ fn create_seal(
 	let inherent = UlxBlockSealInherent {
 		work_type: ProofOfWorkType::Tax,
 		tax_nonce: Some(U256::from(nonce)),
-		tax_block_proof: Some(ulx_primitives::BlockProof {
+		tax_block_proof: Some(ulx_primitives::block_seal::BlockProof {
 			tax_amount,
 			tax_proof_id,
 			author_id,

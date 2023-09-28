@@ -1,19 +1,20 @@
 [package]
-name = "pallet-block-seal"
+name = "pallet-notary-admin"
 version = "0.0.1"
+edition = "2021"
 authors = ["Ulixee <https://github.com/ulixee>"]
 homepage = "https://ulixee.org"
-edition = "2021"
 license = "MIT-0"
 publish = false
 repository = "https://github.com/ulixee/mainchain"
+
 
 [package.metadata.docs.rs]
 targets = ["x86_64-unknown-linux-gnu"]
 
 [dependencies]
 codec = { package = "parity-scale-codec", version = "3.6.4", default-features = false, features = [
-	"derive",
+	"derive", "max-encoded-len"
 ] }
 log = { version = "0.4.19", default-features = false }
 scale-info = { version = "2.9.0", default-features = false, features = ["derive"] }
@@ -29,6 +30,7 @@ ulx-primitives = { path = "../../primitives", default-features = false }
 [dev-dependencies]
 sp-io = { version = "23.0.0", default-features = false, git = "https://github.com/paritytech/polkadot-sdk.git", branch = "release-polkadot-v1.1.0" }
 env_logger = "0.10.0"
+sp-keyring = { version = "24.0.0", git = "https://github.com/paritytech/polkadot-sdk.git", branch = "release-polkadot-v1.1.0" }
 
 [features]
 default = ["std"]

@@ -6,7 +6,8 @@ use sp_core::{blake2_256, U256};
 use sp_runtime::traits::Block as BlockT;
 
 use ulx_primitives::{
-	BlockProof, Difficulty, NextWork, ProofOfWorkType, UlxConsensusApi, UlxPreDigest, UlxSeal,
+	block_seal::BlockProof, Difficulty, NextWork, ProofOfWorkType, UlxConsensusApi, UlxPreDigest,
+	UlxSeal,
 };
 
 use crate::{Error, NonceAlgorithm};

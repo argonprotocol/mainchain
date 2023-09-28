@@ -3,17 +3,23 @@
 use std::{cmp::max, sync::Arc, time::Duration};
 
 use futures::FutureExt;
-use sc_client_api::Backend;
+use sc_client_api::{Backend, BlockBackend};
+use sc_consensus_grandpa::{FinalityProofProvider, GrandpaBlockImport, SharedVoterState};
 pub use sc_executor::NativeElseWasmExecutor;
-use sc_service::{config::Configuration, error::Error as ServiceError, TaskManager};
+use sc_service::{
+	config::Configuration, error::Error as ServiceError, TaskManager, WarpSyncParams,
+};
 use sc_telemetry::{log, Telemetry, TelemetryWorker};
 use sc_transaction_pool_api::OffchainTransactionPoolFactory;
+use ulx_node_consensus::basic_queue::BasicQueue;
 
 use ulx_node_consensus::{
 	compute_worker::run_miner_thread, inherents::UlxCreateInherentDataProviders,
 	nonce_verify::UlxNonce,
 };
 use ulx_node_runtime::{self, opaque::Block, AccountId, RuntimeApi};
+
+use crate::rpc;
 
 // Our native executor instance.
 pub struct ExecutorDispatch;
@@ -39,11 +45,15 @@ pub(crate) type FullClient =
 	sc_service::TFullClient<Block, RuntimeApi, NativeElseWasmExecutor<ExecutorDispatch>>;
 type FullBackend = sc_service::TFullBackend<Block>;
 type FullSelectChain = sc_consensus::LongestChain<FullBackend, Block>;
+/// The minimum period of blocks on which justifications will be
+/// imported and generated.
+const GRANDPA_JUSTIFICATION_PERIOD: u32 = 512;
+
 pub type Executor = NativeElseWasmExecutor<ExecutorDispatch>;
 
 type UlxBlockImport = ulx_node_consensus::import_queue::UlxBlockImport<
 	Block,
-	Arc<FullClient>,
+	GrandpaBlockImport<FullBackend, Block, FullClient, FullSelectChain>,
 	FullClient,
 	FullSelectChain,
 	UlxNonce<Block, FullClient>,
@@ -58,9 +68,13 @@ pub fn new_partial(
 		FullClient,
 		FullBackend,
 		FullSelectChain,
-		sc_consensus::DefaultImportQueue<Block>,
+		BasicQueue<Block>,
 		sc_transaction_pool::FullPool<Block, FullClient>,
-		(UlxBlockImport, Option<Telemetry>),
+		(
+			UlxBlockImport,
+			sc_consensus_grandpa::LinkHalf<Block, FullClient, FullSelectChain>,
+			Option<Telemetry>,
+		),
 	>,
 	ServiceError,
 > {
@@ -99,11 +113,17 @@ pub fn new_partial(
 		task_manager.spawn_essential_handle(),
 		client.clone(),
 	);
-
+	let (grandpa_block_import, grandpa_link) = sc_consensus_grandpa::block_import(
+		client.clone(),
+		GRANDPA_JUSTIFICATION_PERIOD,
+		&client,
+		select_chain.clone(),
+		telemetry.as_ref().map(|x| x.handle()),
+	)?;
 	let algorithm = UlxNonce::new(client.clone());
 
 	let ulx_block_import = UlxBlockImport::new(
-		client.clone(),
+		grandpa_block_import.clone(),
 		client.clone(),
 		algorithm.clone(),
 		select_chain.clone(),
@@ -112,7 +132,8 @@ pub fn new_partial(
 
 	let import_queue = ulx_node_consensus::import_queue::new(
 		Box::new(ulx_block_import.clone()),
-		None,
+		Some(Box::new(grandpa_block_import.clone())),
+		client.clone(),
 		algorithm.clone(),
 		&task_manager.spawn_essential_handle(),
 		config.prometheus_registry(),
@@ -126,7 +147,7 @@ pub fn new_partial(
 		keystore_container,
 		select_chain,
 		transaction_pool,
-		other: (ulx_block_import, telemetry),
+		other: (ulx_block_import, grandpa_link, telemetry),
 	})
 }
 
@@ -143,11 +164,23 @@ pub fn new_full(
 		import_queue,
 		keystore_container,
 		select_chain,
-		other: (pow_block_import, mut telemetry),
+		other: (ulx_block_import, grandpa_link, mut telemetry),
 	} = new_partial(&config)?;
 
-	let net_config = sc_network::config::FullNetworkConfiguration::new(&config.network);
+	let mut net_config = sc_network::config::FullNetworkConfiguration::new(&config.network);
+	let grandpa_protocol_name = sc_consensus_grandpa::protocol_standard_name(
+		&client.block_hash(0).ok().flatten().expect("Genesis block exists; qed"),
+		&config.chain_spec,
+	);
+	net_config.add_notification_protocol(sc_consensus_grandpa::grandpa_peers_set_config(
+		grandpa_protocol_name.clone(),
+	));
 
+	let warp_sync = Arc::new(sc_consensus_grandpa::warp_proof::NetworkProvider::new(
+		backend.clone(),
+		grandpa_link.shared_authority_set().clone(),
+		Vec::default(),
+	));
 	let (network, system_rpc_tx, tx_handler_controller, network_starter, sync_service) =
 		sc_service::build_network(sc_service::BuildNetworkParams {
 			config: &config,
@@ -157,8 +190,7 @@ pub fn new_full(
 			spawn_handle: task_manager.spawn_handle(),
 			import_queue,
 			block_announce_validator_builder: None,
-			// TODO: add back with a finalizer
-			warp_sync_params: None,
+			warp_sync_params: Some(WarpSyncParams::WithProvider(warp_sync)),
 		})?;
 
 	if config.offchain_worker.enabled {
@@ -183,23 +215,42 @@ pub fn new_full(
 	}
 
 	let role = config.role.clone();
+	let name = config.network.node_name.clone();
 	let prometheus_registry = config.prometheus_registry().cloned();
 	// Channel for the rpc handler to communicate with the authorship task.
 	let (block_proof_sink, block_proof_stream) = futures::channel::mpsc::channel(1000);
 
-	let rpc_extensions_builder = {
+	let (rpc_extensions_builder, shared_voter_state) = {
 		let client = client.clone();
 		let pool = transaction_pool.clone();
+		let rpc_backend = backend.clone();
+		let justification_stream = grandpa_link.justification_stream();
+		let shared_authority_set = grandpa_link.shared_authority_set().clone();
+		let shared_voter_state = SharedVoterState::empty();
+		let shared_voter_state2 = shared_voter_state.clone();
+		let finality_proof_provider = FinalityProofProvider::new_for_service(
+			backend.clone(),
+			Some(shared_authority_set.clone()),
+		);
 
-		Box::new(move |deny_unsafe, _| {
+		let rpc_extensions_builder = Box::new(move |deny_unsafe, subscription_executor| {
 			let deps = crate::rpc::FullDeps {
 				client: client.clone(),
 				pool: pool.clone(),
 				deny_unsafe,
 				block_proof_sink: block_proof_sink.clone(),
+				grandpa: rpc::GrandpaDeps {
+					shared_voter_state: shared_voter_state.clone(),
+					shared_authority_set: shared_authority_set.clone(),
+					justification_stream: justification_stream.clone(),
+					subscription_executor,
+					finality_provider: finality_proof_provider.clone(),
+				},
+				backend: rpc_backend.clone(),
 			};
 			crate::rpc::create_full(deps).map_err(Into::into)
-		})
+		});
+		(rpc_extensions_builder, shared_voter_state2)
 	};
 
 	let _rpc_handlers = sc_service::spawn_tasks(sc_service::SpawnTasksParams {
@@ -229,7 +280,7 @@ pub fn new_full(
 
 			let algorithm = UlxNonce::new(client.clone());
 			let (worker, worker_task) = ulx_node_consensus::create_compute_miner(
-				Box::new(pow_block_import.clone()),
+				Box::new(ulx_block_import.clone()),
 				client.clone(),
 				select_chain.clone(),
 				algorithm.clone(),
@@ -258,7 +309,7 @@ pub fn new_full(
 				telemetry.as_ref().map(|x| x.handle()),
 			);
 			let block_seal_task = ulx_node_consensus::listen_for_block_seal(
-				Box::new(pow_block_import),
+				Box::new(ulx_block_import),
 				client.clone(),
 				select_chain,
 				algorithm,
@@ -276,6 +327,44 @@ pub fn new_full(
 				"ulx-pow-tx",
 				Some("block-authoring2"),
 				block_seal_task,
+			);
+
+			let grandpa_config = sc_consensus_grandpa::Config {
+				// FIXME #1578 make this available through chainspec
+				gossip_duration: Duration::from_millis(333),
+				justification_generation_period: GRANDPA_JUSTIFICATION_PERIOD,
+				name: Some(name),
+				observer_enabled: false,
+				keystore: Some(keystore_container.keystore()),
+				local_role: role,
+				telemetry: telemetry.as_ref().map(|x| x.handle()),
+				protocol_name: grandpa_protocol_name,
+			};
+
+			// start the full GRANDPA voter
+			// NOTE: non-authorities could run the GRANDPA observer protocol, but at
+			// this point the full voter should provide better guarantees of block
+			// and vote data availability than the observer. The observer has not
+			// been tested extensively yet and having most nodes in a network run it
+			// could lead to finality stalls.
+			let grandpa_config = sc_consensus_grandpa::GrandpaParams {
+				config: grandpa_config,
+				link: grandpa_link,
+				network,
+				sync: Arc::new(sync_service),
+				voting_rule: sc_consensus_grandpa::VotingRulesBuilder::default().build(),
+				prometheus_registry,
+				shared_voter_state,
+				telemetry: telemetry.as_ref().map(|x| x.handle()),
+				offchain_tx_pool_factory: OffchainTransactionPoolFactory::new(transaction_pool),
+			};
+
+			// the GRANDPA voter task is considered infallible, i.e.
+			// if it fails we take down the service with it.
+			task_manager.spawn_essential_handle().spawn_blocking(
+				"grandpa-voter",
+				None,
+				sc_consensus_grandpa::run_grandpa_voter(grandpa_config)?,
 			);
 
 			let mining_threads = max(num_cpus::get() - 1, 1);

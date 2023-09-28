@@ -17,7 +17,7 @@ use sp_core::U256;
 use sp_inherents::Error as InherentsError;
 use sp_runtime::traits::Block as BlockT;
 
-use ulx_primitives::BlockProof;
+use ulx_primitives::block_seal::BlockProof;
 
 /// Sender passed to the authorship task to report errors or successes.
 pub type Sender<T> = Option<oneshot::Sender<std::result::Result<T, Error>>>;

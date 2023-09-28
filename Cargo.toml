@@ -3,8 +3,11 @@ members = [
     "node",
 	"node/consensus",
 	"pallets/block_seal",
-	"pallets/validator_cohorts",
+	"pallets/cohorts",
+	"pallets/bonds",
 	"pallets/difficulty",
+	"pallets/notary_admin",
+	"pallets/localchain_relay",
 	"primitives",
     "runtime",
 ]
