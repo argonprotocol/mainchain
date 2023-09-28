@@ -43,7 +43,7 @@ sp-keystore = {version = "0.27.0", git = "https://github.com/paritytech/polkadot
 sp-application-crypto = { version = "23.0.0", default-features = false, git = "https://github.com/paritytech/polkadot-sdk.git", branch = "release-polkadot-v1.1.0" }
 
 # Not sure I need any of these
-clap = { version = "4.4.3", features = ["derive"] }
+clap = { version = "4.4.6", features = ["derive"] }
 serde = { version = "1.0", features = ["derive"] }
 sc-cli = { version = "0.10.0-dev", git = "https://github.com/paritytech/polkadot-sdk.git", branch = "release-polkadot-v1.1.0" }
 sc-utils = { version = "4.0.0-dev", git = "https://github.com/paritytech/polkadot-sdk.git", branch = "release-polkadot-v1.1.0" }
