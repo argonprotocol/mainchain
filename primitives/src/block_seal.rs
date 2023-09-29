@@ -1,4 +1,5 @@
 use codec::{Decode, Encode};
+use frame_support::{CloneNoBound, EqNoBound, Parameter, PartialEqNoBound};
 use scale_info::TypeInfo;
 #[cfg(feature = "serde")]
 use serde::{Deserialize, Serialize};
@@ -24,6 +25,8 @@ sp_application_crypto::with_pair! {
 }
 pub type BlockSealAuthoritySignature = app::Signature;
 pub type BlockSealAuthorityId = app::Public;
+
+pub type MaxValidatorRpcHosts = ConstU32<4>;
 
 #[derive(Clone, PartialEq, Eq, Encode, Decode, RuntimeDebug, TypeInfo)]
 #[cfg_attr(feature = "serde", derive(Deserialize, Serialize))]
@@ -73,14 +76,18 @@ sp_api::decl_runtime_apis! {
 	}
 }
 
-#[derive(PartialEq, Eq, Clone, Encode, Decode, RuntimeDebug, TypeInfo, MaxEncodedLen)]
-pub struct ValidatorRegistration<AccountId, BondId, Balance: MaxEncodedLen> {
+#[derive(
+	PartialEqNoBound, EqNoBound, CloneNoBound, Encode, Decode, RuntimeDebug, TypeInfo, MaxEncodedLen,
+)]
+#[scale_info(skip_type_params(MaxHosts))]
+pub struct ValidatorRegistration<
+	AccountId: Parameter,
+	BondId: Parameter,
+	Balance: Parameter + MaxEncodedLen,
+> {
 	pub account_id: AccountId,
 	pub peer_id: PeerId,
-	#[codec(compact)]
-	pub rpc_ip: u32,
-	#[codec(compact)]
-	pub rpc_port: u16,
+	pub rpc_hosts: BoundedVec<Host, MaxValidatorRpcHosts>,
 	pub reward_destination: RewardDestination<AccountId>,
 	pub bond_id: Option<BondId>,
 	#[codec(compact)]
@@ -134,8 +141,15 @@ pub struct AuthorityDistance<AuthorityId> {
 	pub authority_id: AuthorityId,
 	pub peer_id: PeerId,
 	pub distance: U256,
+	pub rpc_hosts: BoundedVec<Host, MaxValidatorRpcHosts>,
+}
+
+#[derive(PartialEq, Eq, Clone, Encode, Decode, RuntimeDebug, TypeInfo, MaxEncodedLen)]
+pub struct Host {
 	#[codec(compact)]
-	pub rpc_ip: u32,
+	/// ip encoded as u32 big endian (eg, from octets)
+	pub ip: u32,
 	#[codec(compact)]
-	pub rpc_port: u16,
+	pub port: u16,
+	pub is_secure: bool,
 }

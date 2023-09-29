@@ -1,7 +1,9 @@
+use crate::block_seal::Host;
 use codec::{Codec, Decode, Encode, MaxEncodedLen};
 use frame_support::{CloneNoBound, PartialEqNoBound, RuntimeDebugNoBound};
 use scale_info::TypeInfo;
-use sp_core::{ed25519, RuntimeDebug, H256};
+use sp_core::{ed25519, Get, H256};
+use sp_runtime::BoundedVec;
 use sp_std::fmt::Debug;
 
 pub type NotaryId = u32;
@@ -13,22 +15,23 @@ pub trait NotaryProvider {
 	fn verify_signature(notary_id: NotaryId, message: &H256, signature: &NotarySignature) -> bool;
 }
 
-#[derive(Clone, PartialEq, Eq, Encode, Decode, RuntimeDebug, TypeInfo, MaxEncodedLen)]
-pub struct NotaryMeta {
+#[derive(
+	CloneNoBound, PartialEqNoBound, Eq, Encode, Decode, RuntimeDebugNoBound, TypeInfo, MaxEncodedLen,
+)]
+#[scale_info(skip_type_params(MaxHosts))]
+pub struct NotaryMeta<MaxHosts: Get<u32>> {
 	pub public: NotaryPublic,
-	/// Notary ip encoded as u32 big endian (eg, from octets)
-	#[codec(compact)]
-	pub ip: u32,
-	#[codec(compact)]
-	pub port: u16,
+	pub hosts: BoundedVec<Host, MaxHosts>,
 }
 
 #[derive(
 	CloneNoBound, PartialEqNoBound, Eq, Encode, Decode, RuntimeDebugNoBound, TypeInfo, MaxEncodedLen,
 )]
+#[scale_info(skip_type_params(MaxHosts))]
 pub struct NotaryRecord<
 	AccountId: Codec + MaxEncodedLen + Clone + PartialEq + Eq + Debug,
 	BlockNumber: Codec + MaxEncodedLen + Clone + PartialEq + Eq + Debug,
+	MaxHosts: Get<u32>,
 > {
 	#[codec(compact)]
 	pub notary_id: NotaryId,
@@ -38,5 +41,5 @@ pub struct NotaryRecord<
 
 	#[codec(compact)]
 	pub meta_updated_block: BlockNumber,
-	pub meta: NotaryMeta,
+	pub meta: NotaryMeta<MaxHosts>,
 }

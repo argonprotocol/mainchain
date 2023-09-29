@@ -85,7 +85,9 @@ pub mod pallet {
 	use sp_std::cmp::max;
 
 	use ulx_primitives::{
-		block_seal::{PeerId, RewardDestination, ValidatorRegistration},
+		block_seal::{
+			Host, MaxValidatorRpcHosts, PeerId, RewardDestination, ValidatorRegistration,
+		},
 		bond::{BondError, BondProvider},
 	};
 
@@ -395,8 +397,7 @@ pub mod pallet {
 		pub fn bid(
 			origin: OriginFor<T>,
 			peer_id: OpaquePeerId,
-			#[pallet::compact] rpc_ip: u32,
-			#[pallet::compact] rpc_port: u16,
+			rpc_hosts: BoundedVec<Host, MaxValidatorRpcHosts>,
 			bond_id: Option<T::BondId>,
 			reward_destination: RewardDestination<T::AccountId>,
 		) -> DispatchResult {
@@ -489,8 +490,7 @@ pub mod pallet {
 							bond_id: bond_id.clone(),
 							bond_amount: bid.clone(),
 							ownership_tokens,
-							rpc_ip,
-							rpc_port,
+							rpc_hosts,
 						},
 					)
 					.map_err(|_| Error::<T>::TooManyBlockRegistrants)?;
@@ -553,8 +553,7 @@ impl<T: Config> AuthorityProvider<BlockSealAuthorityId, T::AccountId> for Pallet
 					authority_index: index.unique_saturated_into(),
 					peer_id: registration.peer_id.clone(),
 					distance,
-					rpc_ip: registration.rpc_ip,
-					rpc_port: registration.rpc_port,
+					rpc_hosts: registration.rpc_hosts.clone(),
 				}
 			})
 			.collect()

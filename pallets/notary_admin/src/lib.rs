@@ -30,8 +30,12 @@ pub mod pallet {
 	#[pallet::pallet]
 	pub struct Pallet<T>(_);
 
-	type NotaryRecordOf<T> =
-		NotaryRecord<<T as frame_system::Config>::AccountId, BlockNumberFor<T>>;
+	type NotaryRecordOf<T> = NotaryRecord<
+		<T as frame_system::Config>::AccountId,
+		BlockNumberFor<T>,
+		<T as Config>::MaxNotaryHosts,
+	>;
+	type NotaryMetaOf<T> = NotaryMeta<<T as Config>::MaxNotaryHosts>;
 
 	#[pallet::config]
 	pub trait Config: frame_system::Config {
@@ -52,14 +56,23 @@ pub mod pallet {
 		/// Number of blocks to delay changing a notaries' meta
 		#[pallet::constant]
 		type MetaChangesBlockDelay: Get<u32>;
+
+		/// Maximum hosts a notary can supply
+		#[pallet::constant]
+		type MaxNotaryHosts: Get<u32>;
 	}
 
 	#[pallet::storage]
 	pub(super) type NextNotaryId<T: Config> = StorageValue<_, u32, OptionQuery>;
 
 	#[pallet::storage]
-	pub(super) type ProposedNotaries<T: Config> =
-		StorageMap<_, Blake2_128Concat, T::AccountId, (NotaryMeta, BlockNumberFor<T>), OptionQuery>;
+	pub(super) type ProposedNotaries<T: Config> = StorageMap<
+		_,
+		Blake2_128Concat,
+		T::AccountId,
+		(NotaryMetaOf<T>, BlockNumberFor<T>),
+		OptionQuery,
+	>;
 
 	#[pallet::storage]
 	pub(super) type ExpiringProposals<T: Config> = StorageMap<
@@ -79,7 +92,7 @@ pub mod pallet {
 		_,
 		Twox64Concat,
 		BlockNumberFor<T>,
-		BoundedBTreeMap<NotaryId, NotaryMeta, T::MaxActiveNotaries>,
+		BoundedBTreeMap<NotaryId, NotaryMetaOf<T>, T::MaxActiveNotaries>,
 		ValueQuery,
 	>;
 
@@ -88,7 +101,7 @@ pub mod pallet {
 	pub enum Event<T: Config> {
 		NotaryProposed {
 			operator_account: T::AccountId,
-			meta: NotaryMeta,
+			meta: NotaryMetaOf<T>,
 			expires: BlockNumberFor<T>,
 		},
 		NotaryActivated {
@@ -96,12 +109,12 @@ pub mod pallet {
 		},
 		NotaryMetaUpdateQueued {
 			notary_id: u32,
-			meta: NotaryMeta,
+			meta: NotaryMetaOf<T>,
 			effective_block: BlockNumberFor<T>,
 		},
 		NotaryMetaUpdated {
 			notary_id: u32,
-			meta: NotaryMeta,
+			meta: NotaryMetaOf<T>,
 		},
 	}
 
@@ -150,7 +163,7 @@ pub mod pallet {
 	impl<T: Config> Pallet<T> {
 		#[pallet::call_index(0)]
 		#[pallet::weight(0)]
-		pub fn propose(origin: OriginFor<T>, meta: NotaryMeta) -> DispatchResult {
+		pub fn propose(origin: OriginFor<T>, meta: NotaryMetaOf<T>) -> DispatchResult {
 			let who = ensure_signed(origin)?;
 
 			let already_exists = <ProposedNotaries<T>>::take(&who);
@@ -215,7 +228,7 @@ pub mod pallet {
 		pub fn update(
 			origin: OriginFor<T>,
 			#[pallet::compact] notary_id: u32,
-			meta: NotaryMeta,
+			meta: NotaryMetaOf<T>,
 		) -> DispatchResult {
 			let who = ensure_signed(origin)?;
 

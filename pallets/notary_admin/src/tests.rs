@@ -1,11 +1,14 @@
+use crate::{Error, Event};
 use frame_support::{
 	assert_noop, assert_ok,
 	traits::{Len, OnFinalize, OnInitialize},
 };
-
-use crate::{Error, Event};
 use sp_keyring::Ed25519Keyring;
-use ulx_primitives::notary::{NotaryMeta, NotaryRecord};
+use sp_runtime::BoundedVec;
+use ulx_primitives::{
+	block_seal::Host,
+	notary::{NotaryMeta, NotaryRecord},
+};
 
 use crate::{
 	mock::*,
@@ -18,13 +21,19 @@ fn it_can_propose_a_notary() {
 		System::set_block_number(1);
 		assert_ok!(NotaryAdmin::propose(
 			RuntimeOrigin::signed(1),
-			NotaryMeta { public: Ed25519Keyring::Alice.public().into(), ip: 0, port: 0 }
+			NotaryMeta::<MaxNotaryHosts> {
+				public: Ed25519Keyring::Alice.public().into(),
+				hosts: rpc_hosts(0, 0),
+			}
 		));
 
 		System::assert_last_event(
 			Event::NotaryProposed {
 				operator_account: 1,
-				meta: NotaryMeta { public: Ed25519Keyring::Alice.public().into(), ip: 0, port: 0 },
+				meta: NotaryMeta::<MaxNotaryHosts> {
+					public: Ed25519Keyring::Alice.public().into(),
+					hosts: rpc_hosts(0, 0),
+				},
 				expires: (1u32 + MaxProposalHoldBlocks::get()).into(),
 			}
 			.into(),
@@ -41,7 +50,10 @@ fn it_cleans_up_proposals() {
 		System::set_block_number(1);
 		assert_ok!(NotaryAdmin::propose(
 			RuntimeOrigin::signed(1),
-			NotaryMeta { public: Ed25519Keyring::Alice.public().into(), ip: 0, port: 0 }
+			NotaryMeta::<MaxNotaryHosts> {
+				public: Ed25519Keyring::Alice.public().into(),
+				hosts: rpc_hosts(0, 0),
+			}
 		));
 		assert_eq!(ProposedNotaries::<Test>::get(1).len(), 1);
 
@@ -58,12 +70,18 @@ fn it_only_allows_one_proposal_per_account_at_a_time() {
 		System::set_block_number(1);
 		assert_ok!(NotaryAdmin::propose(
 			RuntimeOrigin::signed(1),
-			NotaryMeta { public: Ed25519Keyring::Alice.public().into(), ip: 0, port: 0 }
+			NotaryMeta::<MaxNotaryHosts> {
+				public: Ed25519Keyring::Alice.public().into(),
+				hosts: rpc_hosts(0, 0),
+			}
 		));
 		System::set_block_number(2);
 		assert_ok!(NotaryAdmin::propose(
 			RuntimeOrigin::signed(1),
-			NotaryMeta { public: Ed25519Keyring::Alice.public().into(), ip: 1, port: 0 }
+			NotaryMeta::<MaxNotaryHosts> {
+				public: Ed25519Keyring::Alice.public().into(),
+				hosts: rpc_hosts(1, 0),
+			}
 		));
 		assert_eq!(ProposedNotaries::<Test>::get(1).len(), 1);
 	});
@@ -75,7 +93,10 @@ fn it_allows_proposal_elevation() {
 		System::set_block_number(1);
 		assert_ok!(NotaryAdmin::propose(
 			RuntimeOrigin::signed(1),
-			NotaryMeta { public: Ed25519Keyring::Alice.public().into(), ip: 0, port: 0 }
+			NotaryMeta::<MaxNotaryHosts> {
+				public: Ed25519Keyring::Alice.public().into(),
+				hosts: rpc_hosts(0, 0),
+			}
 		));
 		System::set_block_number(2);
 		assert_ok!(NotaryAdmin::activate(RuntimeOrigin::root(), 1,));
@@ -86,7 +107,10 @@ fn it_allows_proposal_elevation() {
 				notary_id: 1,
 				operator_account_id: 1,
 				meta: {
-					NotaryMeta { public: Ed25519Keyring::Alice.public().into(), ip: 0, port: 0 }
+					NotaryMeta::<MaxNotaryHosts> {
+						public: Ed25519Keyring::Alice.public().into(),
+						hosts: rpc_hosts(0, 0),
+					}
 				},
 				activated_block: 2,
 				meta_updated_block: 2,
@@ -111,7 +135,10 @@ fn it_allows_a_notary_to_update_meta() {
 		System::set_block_number(1);
 		assert_ok!(NotaryAdmin::propose(
 			RuntimeOrigin::signed(1),
-			NotaryMeta { public: Ed25519Keyring::Alice.public().into(), ip: 0, port: 0 }
+			NotaryMeta::<MaxNotaryHosts> {
+				public: Ed25519Keyring::Alice.public().into(),
+				hosts: rpc_hosts(0, 0),
+			}
 		));
 		System::set_block_number(2);
 		NotaryAdmin::on_initialize(2);
@@ -124,24 +151,33 @@ fn it_allows_a_notary_to_update_meta() {
 			NotaryAdmin::update(
 				RuntimeOrigin::signed(2),
 				1,
-				NotaryMeta { public: Ed25519Keyring::Alice.public().into(), ip: 2, port: 2 }
+				NotaryMeta::<MaxNotaryHosts> {
+					public: Ed25519Keyring::Alice.public().into(),
+					hosts: rpc_hosts(2, 2),
+				}
 			),
 			Error::<Test>::InvalidNotaryOperator
 		);
 		assert_ok!(NotaryAdmin::update(
 			RuntimeOrigin::signed(1),
 			1,
-			NotaryMeta { public: Ed25519Keyring::Bob.public().into(), ip: 2, port: 2 }
+			NotaryMeta::<MaxNotaryHosts> {
+				public: Ed25519Keyring::Bob.public().into(),
+				hosts: rpc_hosts(2, 2),
+			}
 		),);
 		NotaryAdmin::on_finalize(3);
 
 		// should not take effect yet!
-		assert_eq!(ActiveNotaries::<Test>::get()[0].meta.ip, 0);
+		assert_eq!(ActiveNotaries::<Test>::get()[0].meta.hosts[0].ip, 0);
 		assert_eq!(ActiveNotaries::<Test>::get()[0].meta_updated_block, 2);
 		System::assert_last_event(
 			Event::NotaryMetaUpdateQueued {
 				notary_id: 1,
-				meta: NotaryMeta { public: Ed25519Keyring::Bob.public().into(), ip: 2, port: 2 },
+				meta: NotaryMeta::<MaxNotaryHosts> {
+					public: Ed25519Keyring::Bob.public().into(),
+					hosts: rpc_hosts(2, 2),
+				},
 				effective_block: 4,
 			}
 			.into(),
@@ -150,14 +186,24 @@ fn it_allows_a_notary_to_update_meta() {
 
 		System::set_block_number(4);
 		NotaryAdmin::on_initialize(4);
-		assert_eq!(ActiveNotaries::<Test>::get()[0].meta.ip, 2);
+		assert_eq!(ActiveNotaries::<Test>::get()[0].meta.hosts[0].ip, 2);
 		assert_eq!(ActiveNotaries::<Test>::get()[0].meta_updated_block, 4);
 		System::assert_last_event(
 			Event::NotaryMetaUpdated {
 				notary_id: 1,
-				meta: NotaryMeta { public: Ed25519Keyring::Bob.public().into(), ip: 2, port: 2 },
+				meta: NotaryMeta::<MaxNotaryHosts> {
+					public: Ed25519Keyring::Bob.public().into(),
+					hosts: rpc_hosts(2, 2),
+				},
 			}
 			.into(),
 		);
 	});
+}
+
+fn rpc_hosts<S>(ip: u32, port: u16) -> BoundedVec<Host, S>
+where
+	S: sp_core::Get<u32>,
+{
+	BoundedVec::<Host, S>::truncate_from(vec![Host { ip, port, is_secure: false }])
 }

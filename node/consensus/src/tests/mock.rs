@@ -21,13 +21,13 @@ use sp_blockchain::{BlockStatus, HeaderBackend, Info};
 use sp_consensus::{DisableProofRecording, Environment, Proposal, Proposer};
 use sp_core::{blake2_256, ByteArray, OpaquePeerId, U256};
 use sp_inherents::{CheckInherentsResult, InherentData};
-use sp_runtime::{traits::Block as BlockT, ApplyExtrinsicResult, Digest};
+use sp_runtime::{traits::Block as BlockT, ApplyExtrinsicResult, BoundedVec, Digest};
 use substrate_test_runtime::{AccountId, BlockNumber, Executive, Hash, Header};
 use substrate_test_runtime_client::Backend;
 
 use pallet_cohorts::find_xor_closest;
 use ulx_primitives::{
-	block_seal::{AuthorityDistance, BlockSealAuthorityId, PeerId},
+	block_seal::{AuthorityDistance, BlockSealAuthorityId, Host, PeerId},
 	NextWork, ProofOfWorkType,
 };
 
@@ -231,8 +231,7 @@ sp_api::mock_impl_runtime_apis! {
 					authority_index: index.unique_saturated_into(),
 					peer_id: PeerId(OpaquePeerId::default()),
 					distance,
-					rpc_ip: 0,
-					rpc_port: 1
+					rpc_hosts: BoundedVec::truncate_from(vec![Host{ ip:0, port: 1, is_secure:false}]),
 				}
 			})
 			.collect::<Vec<_>>()

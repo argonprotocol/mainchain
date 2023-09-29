@@ -45,14 +45,16 @@ fn it_doesnt_add_cohorts_until_time() {
 			ownership_tokens: 0,
 			bond_amount: 0,
 			reward_destination: RewardDestination::Owner,
-			rpc_ip: ip_to_u32(Ipv4Addr::new(127, 0, 0, 1)),
-			rpc_port: 3000,
+			rpc_hosts: rpc_hosts(Ipv4Addr::new(127, 0, 0, 1), 3000),
 		}]));
 
 		Cohorts::on_initialize(1);
 
 		assert_eq!(NextCohort::<Test>::get().len(), 1);
-		assert_eq!(ip_from_u32(NextCohort::<Test>::get()[0].rpc_ip).to_string(), "127.0.0.1");
+		assert_eq!(
+			ip_from_u32(NextCohort::<Test>::get()[0].rpc_hosts[0].ip).to_string(),
+			"127.0.0.1"
+		);
 	});
 }
 
@@ -178,8 +180,7 @@ fn it_adds_new_cohorts_on_block() {
 						ownership_tokens: 0,
 						bond_amount: 0,
 						reward_destination: RewardDestination::Owner,
-						rpc_ip: ip_to_u32(Ipv4Addr::new(127, 0, 0, 1)),
-						rpc_port: 3000 + i as u16,
+						rpc_hosts: rpc_hosts(Ipv4Addr::new(127, 0, 0, 1), 3000 + i as u16),
 					},
 				);
 				AccountIndexLookup::<Test>::insert(account_id, i);
@@ -195,8 +196,7 @@ fn it_adds_new_cohorts_on_block() {
 			ownership_tokens: 0,
 			bond_amount: 0,
 			reward_destination: RewardDestination::Owner,
-			rpc_ip: ip_to_u32(Ipv4Addr::new(127, 0, 0, 1)),
-			rpc_port: 3001,
+			rpc_hosts: rpc_hosts(Ipv4Addr::new(127, 0, 0, 1), 3001),
 		}]);
 
 		NextCohort::<Test>::set(cohort.clone());
@@ -240,6 +240,7 @@ fn it_adds_new_cohorts_on_block() {
 }
 
 use pallet_balances::Event as UlixeeBalancesEvent;
+use ulx_primitives::block_seal::Host;
 
 #[test]
 fn it_unbonds_accounts_when_a_window_closes() {
@@ -281,8 +282,7 @@ fn it_unbonds_accounts_when_a_window_closes() {
 					ValidatorRegistration {
 						account_id,
 						peer_id: empty_peer(),
-						rpc_ip: ip_to_u32(Ipv4Addr::new(127, 0, 0, 1)),
-						rpc_port: 3000,
+						rpc_hosts: rpc_hosts(Ipv4Addr::new(127, 0, 0, 1), 3000),
 						bond_id: Some(bond_id),
 						ownership_tokens,
 						bond_amount,
@@ -302,8 +302,7 @@ fn it_unbonds_accounts_when_a_window_closes() {
 		assert_ok!(Cohorts::bid(
 			RuntimeOrigin::signed(2),
 			OpaquePeerId::default(),
-			ip_to_u32(Ipv4Addr::new(127, 0, 0, 1)),
-			3000,
+			rpc_hosts(Ipv4Addr::new(127, 0, 0, 1), 3000),
 			Some(bond_2),
 			RewardDestination::Owner
 		));
@@ -322,8 +321,7 @@ fn it_unbonds_accounts_when_a_window_closes() {
 					bond_amount: 1010,
 					reward_destination: RewardDestination::Owner,
 					peer_id: PeerId(OpaquePeerId::default()),
-					rpc_ip: ip_to_u32(Ipv4Addr::new(127, 0, 0, 1)),
-					rpc_port: 3000,
+					rpc_hosts: rpc_hosts(Ipv4Addr::new(127, 0, 0, 1), 3000),
 				}]),
 			}
 			.into(),
@@ -386,8 +384,7 @@ fn it_can_take_cohort_bids() {
 			Cohorts::bid(
 				RuntimeOrigin::signed(2),
 				OpaquePeerId::default(),
-				ip_to_u32(Ipv4Addr::new(127, 0, 0, 1)),
-				3000,
+				rpc_hosts(Ipv4Addr::new(127, 0, 0, 1), 3000),
 				None,
 				RewardDestination::Owner
 			),
@@ -404,8 +401,7 @@ fn it_can_take_cohort_bids() {
 			Cohorts::bid(
 				RuntimeOrigin::signed(1),
 				OpaquePeerId::default(),
-				ip_to_u32(Ipv4Addr::new(127, 0, 0, 1)),
-				3000,
+				rpc_hosts(Ipv4Addr::new(127, 0, 0, 1), 3000),
 				None,
 				RewardDestination::Owner
 			),
@@ -417,8 +413,7 @@ fn it_can_take_cohort_bids() {
 		assert_ok!(Cohorts::bid(
 			RuntimeOrigin::signed(1),
 			OpaquePeerId::default(),
-			ip_to_u32(Ipv4Addr::new(127, 0, 0, 1)),
-			3000,
+			rpc_hosts(Ipv4Addr::new(127, 0, 0, 1), 3000),
 			None,
 			RewardDestination::Owner
 		));
@@ -432,8 +427,7 @@ fn it_can_take_cohort_bids() {
 		assert_ok!(Cohorts::bid(
 			RuntimeOrigin::signed(1),
 			OpaquePeerId::default(),
-			ip_to_u32(Ipv4Addr::new(127, 0, 0, 1)),
-			3000,
+			rpc_hosts(Ipv4Addr::new(127, 0, 0, 1), 3000),
 			None,
 			RewardDestination::Owner
 		));
@@ -469,8 +463,7 @@ fn it_wont_let_you_use_ownership_shares_for_two_bids() {
 		assert_ok!(Cohorts::bid(
 			RuntimeOrigin::signed(1),
 			OpaquePeerId::default(),
-			ip_to_u32(Ipv4Addr::new(192, 255, 255, 255)),
-			15555,
+			rpc_hosts(Ipv4Addr::new(192, 255, 255, 255), 15555),
 			None,
 			RewardDestination::Owner
 		));
@@ -487,8 +480,7 @@ fn it_wont_let_you_use_ownership_shares_for_two_bids() {
 					ownership_tokens: 26u32.into(),
 					bond_amount: 0,
 					reward_destination: RewardDestination::Owner,
-					rpc_ip: ip_to_u32(Ipv4Addr::new(192, 255, 255, 255)),
-					rpc_port: 15555,
+					rpc_hosts: rpc_hosts(Ipv4Addr::new(192, 255, 255, 255), 15555),
 				}]),
 			}
 			.into(),
@@ -506,8 +498,7 @@ fn it_wont_let_you_use_ownership_shares_for_two_bids() {
 			Cohorts::bid(
 				RuntimeOrigin::signed(1),
 				OpaquePeerId::default(),
-				ip_to_u32(Ipv4Addr::new(127, 0, 0, 1)),
-				3000,
+				rpc_hosts(Ipv4Addr::new(127, 0, 0, 1), 3000),
 				None,
 				RewardDestination::Owner
 			),
@@ -532,8 +523,7 @@ fn it_will_order_bids_with_argon_bonds() {
 			Cohorts::bid(
 				RuntimeOrigin::signed(2),
 				OpaquePeerId::default(),
-				ip_to_u32(Ipv4Addr::new(127, 0, 0, 1)),
-				3000,
+				rpc_hosts(Ipv4Addr::new(127, 0, 0, 1), 3000),
 				None,
 				RewardDestination::Owner
 			),
@@ -563,8 +553,7 @@ fn it_will_order_bids_with_argon_bonds() {
 		assert_ok!(Cohorts::bid(
 			RuntimeOrigin::signed(1),
 			OpaquePeerId::default(),
-			ip_to_u32(Ipv4Addr::new(127, 0, 0, 1)),
-			3000,
+			rpc_hosts(Ipv4Addr::new(127, 0, 0, 1), 3000),
 			Some(acc_1_bond_id),
 			RewardDestination::Owner
 		));
@@ -585,8 +574,7 @@ fn it_will_order_bids_with_argon_bonds() {
 		assert_ok!(Cohorts::bid(
 			RuntimeOrigin::signed(2),
 			OpaquePeerId::default(),
-			ip_to_u32(Ipv4Addr::new(127, 0, 0, 1)),
-			3000,
+			rpc_hosts(Ipv4Addr::new(127, 0, 0, 1), 3000),
 			acc_2_bond_id,
 			RewardDestination::Owner
 		));
@@ -608,8 +596,7 @@ fn it_will_order_bids_with_argon_bonds() {
 		assert_ok!(Cohorts::bid(
 			RuntimeOrigin::signed(3),
 			OpaquePeerId::default(),
-			ip_to_u32(Ipv4Addr::new(127, 0, 0, 1)),
-			3000,
+			rpc_hosts(Ipv4Addr::new(127, 0, 0, 1), 3000),
 			acc_3_bond_id,
 			RewardDestination::Owner
 		));
@@ -634,8 +621,7 @@ fn it_will_order_bids_with_argon_bonds() {
 		assert_ok!(Cohorts::bid(
 			RuntimeOrigin::signed(1),
 			OpaquePeerId::default(),
-			ip_to_u32(Ipv4Addr::new(127, 0, 0, 1)),
-			3000,
+			rpc_hosts(Ipv4Addr::new(127, 0, 0, 1), 3000),
 			Some(acc_1_bond_id),
 			RewardDestination::Owner
 		));
@@ -687,8 +673,7 @@ fn handles_a_max_of_bids_per_block() {
 		assert_ok!(Cohorts::bid(
 			RuntimeOrigin::signed(1),
 			OpaquePeerId::default(),
-			ip_to_u32(Ipv4Addr::new(127, 0, 0, 1)),
-			3000,
+			rpc_hosts(Ipv4Addr::new(127, 0, 0, 1), 3000),
 			None,
 			RewardDestination::Owner
 		));
@@ -699,8 +684,7 @@ fn handles_a_max_of_bids_per_block() {
 		assert_ok!(Cohorts::bid(
 			RuntimeOrigin::signed(2),
 			OpaquePeerId::default(),
-			ip_to_u32(Ipv4Addr::new(127, 0, 0, 1)),
-			3000,
+			rpc_hosts(Ipv4Addr::new(127, 0, 0, 1), 3000),
 			None,
 			RewardDestination::Owner
 		));
@@ -712,8 +696,7 @@ fn handles_a_max_of_bids_per_block() {
 			Cohorts::bid(
 				RuntimeOrigin::signed(3),
 				OpaquePeerId::default(),
-				ip_to_u32(Ipv4Addr::new(127, 0, 0, 1)),
-				3000,
+				rpc_hosts(Ipv4Addr::new(127, 0, 0, 1), 3000),
 				None,
 				RewardDestination::Owner
 			),
@@ -756,8 +739,7 @@ fn it_can_find_xor_closest() {
 						ownership_tokens: 0,
 						bond_amount: 0,
 						reward_destination: RewardDestination::Owner,
-						rpc_ip: ip_to_u32(Ipv4Addr::new(127, 0, 0, 1)),
-						rpc_port: 15550,
+						rpc_hosts: rpc_hosts(Ipv4Addr::new(127, 0, 0, 1), 15550),
 					},
 				);
 				AccountIndexLookup::<Test>::insert(account_id, i);
@@ -813,8 +795,7 @@ fn it_can_replace_authority_keys() {
 						ownership_tokens: 0,
 						bond_amount: 0,
 						reward_destination: RewardDestination::Owner,
-						rpc_ip: ip_to_u32(Ipv4Addr::new(127, 0, 0, 1)),
-						rpc_port: 3000,
+						rpc_hosts: rpc_hosts(Ipv4Addr::new(127, 0, 0, 1), 3000),
 					},
 				);
 				AccountIndexLookup::<Test>::insert(account_id, i);
@@ -860,4 +841,10 @@ fn it_can_replace_authority_keys() {
 
 fn empty_peer() -> PeerId {
 	PeerId(OpaquePeerId::default())
+}
+fn rpc_hosts<S>(ip: Ipv4Addr, port: u16) -> BoundedVec<Host, S>
+where
+	S: sp_core::Get<u32>,
+{
+	BoundedVec::<Host, S>::truncate_from(vec![Host { ip: ip_to_u32(ip), port, is_secure: false }])
 }

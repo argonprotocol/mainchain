@@ -115,6 +115,10 @@ pub fn local_testnet_config() -> Result<ChainSpec, String> {
 						get_account_id_from_seed::<sr25519::Public>("Bob"),
 						authority_keys_from_seed("Bob"),
 					),
+					(
+						get_account_id_from_seed::<sr25519::Public>("Dave"),
+						authority_keys_from_seed("Dave"),
+					),
 				],
 				// Sudo account
 				get_account_id_from_seed::<sr25519::Public>("Alice"),
@@ -153,13 +157,12 @@ pub fn local_testnet_config() -> Result<ChainSpec, String> {
 /// Configure initial storage state for FRAME modules.
 fn testnet_genesis(
 	wasm_binary: &[u8],
-	mut initial_authorities: Vec<(AccountId, (BlockSealAuthorityId, GrandpaId))>,
+	initial_authorities: Vec<(AccountId, (BlockSealAuthorityId, GrandpaId))>,
 	root_key: AccountId,
 	endowed_accounts: Vec<AccountId>,
 	_enable_println: bool,
 ) -> RuntimeGenesisConfig {
-	let (dummy_validator_account, block_seal_id, grandpa_id) = get_genesis_dummy_validator();
-	initial_authorities.push((dummy_validator_account, (block_seal_id, grandpa_id)));
+	let initial_difficulty = 1_000_000_000;
 
 	RuntimeGenesisConfig {
 		system: SystemConfig {
@@ -168,10 +171,10 @@ fn testnet_genesis(
 			..Default::default()
 		},
 		argon_balances: ArgonBalancesConfig {
-			balances: endowed_accounts.iter().cloned().map(|k| (k, 1 << 10)).collect(),
+			balances: endowed_accounts.iter().cloned().map(|k| (k, 10_000)).collect(),
 		},
 		ulixee_balances: UlixeeBalancesConfig {
-			balances: endowed_accounts.iter().cloned().map(|k| (k, 1 << 10)).collect(),
+			balances: endowed_accounts.iter().cloned().map(|k| (k, 10_000)).collect(),
 		},
 		grandpa: GrandpaConfig { authorities: vec![], ..Default::default() },
 		sudo: SudoConfig {
@@ -181,7 +184,13 @@ fn testnet_genesis(
 		session: SessionConfig {
 			keys: initial_authorities
 				.iter()
-				.map(|x| (x.0.clone(), x.0.clone(), session_keys(x.1 .0.clone(), x.1 .1.clone())))
+				.map(|(id, (block_seal_id, grandpa_id))| {
+					(
+						id.clone(),
+						id.clone(),
+						session_keys(block_seal_id.clone(), grandpa_id.clone()),
+					)
+				})
 				.collect(),
 		},
 		block_seal: BlockSealConfig {
@@ -189,7 +198,7 @@ fn testnet_genesis(
 			closest_xor_authorities_required: 10,
 			..Default::default()
 		},
-		difficulty: DifficultyConfig { initial_difficulty: 10_000, ..Default::default() },
+		difficulty: DifficultyConfig { initial_difficulty, ..Default::default() },
 		transaction_payment: Default::default(),
 	}
 }

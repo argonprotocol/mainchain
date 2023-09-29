@@ -54,7 +54,7 @@ pub mod pallet {
 		type RuntimeEvent: From<Event<Self>> + IsType<<Self as frame_system::Config>::RuntimeEvent>;
 		/// Type representing the weight of this pallet
 		type WeightInfo: WeightInfo;
-		/// Type the provides authorities
+		/// Type that provides authorities
 		type AuthorityProvider: AuthorityProvider<Self::AuthorityId, Self::AccountId>;
 		/// How many authorities must be registered in total before proof of tax begins
 		#[pallet::constant]

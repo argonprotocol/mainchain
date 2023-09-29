@@ -9,11 +9,11 @@ use sp_core::{ConstU32, OpaquePeerId, H256, U256};
 use sp_runtime::{
 	testing::UintAuthorityId,
 	traits::{BlakeTwo256, IdentityLookup, UniqueSaturatedInto},
-	BuildStorage,
+	BoundedVec, BuildStorage,
 };
 
 use ulx_primitives::block_seal::{
-	AuthorityDistance, AuthorityProvider, BlockSealAuthorityId, PeerId,
+	AuthorityDistance, AuthorityProvider, BlockSealAuthorityId, Host, PeerId,
 };
 
 use crate as pallet_block_seal;
@@ -127,8 +127,11 @@ pub fn set_authorities(authorities: Vec<u64>, xor_closest_accounts: Vec<u64>) {
 					authority_index: index.unique_saturated_into(),
 					authority_id: id.clone(),
 					peer_id: PeerId(OpaquePeerId::default()),
-					rpc_ip: Ipv4Addr::new(127, 0, 0, 1).into(),
-					rpc_port: 3000,
+					rpc_hosts: BoundedVec::truncate_from(vec![Host {
+						ip: Ipv4Addr::new(127, 0, 0, 1).into(),
+						port: 3000,
+						is_secure: false,
+					}]),
 					distance,
 				}
 			})

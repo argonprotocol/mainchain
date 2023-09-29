@@ -52,6 +52,7 @@ parameter_types! {
 	pub static MaxProposalHoldBlocks: u32 = 10;
 	pub static MaxActiveNotaries: u32 = 2;
 	pub static MaxProposalsPerBlock:u32 = 1;
+	pub static MaxNotaryHosts:u32 = 1;
 }
 
 impl pallet_notary_admin::Config for Test {
@@ -61,6 +62,7 @@ impl pallet_notary_admin::Config for Test {
 	type MaxActiveNotaries = MaxActiveNotaries;
 	type MaxProposalsPerBlock = MaxProposalsPerBlock;
 	type MetaChangesBlockDelay = ConstU32<1>;
+	type MaxNotaryHosts = MaxNotaryHosts;
 }
 
 // Build genesis storage according to the mock runtime.
