@@ -93,7 +93,7 @@ pallet-balances = {  version = "4.0.0-dev", git = "https://github.com/paritytech
 pallet-cohorts = { version = "0.0.1", path = "../../pallets/cohorts" }
 pallet-timestamp = { version = "4.0.0-dev", git = "https://github.com/paritytech/polkadot-sdk.git", branch = "release-polkadot-v1.1.0" }
 pallet-session = { version = "4.0.0-dev", git = "https://github.com/paritytech/polkadot-sdk.git", branch = "release-polkadot-v1.1.0" }
-tokio = "1.29.1"
+tokio = "1.32.0"
 parking_lot = "0.12.1"
 env_logger = "0.10.0"
 
