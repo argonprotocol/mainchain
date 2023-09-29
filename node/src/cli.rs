@@ -9,17 +9,23 @@ pub struct Cli {
 	#[clap(flatten)]
 	pub run: RunCmd,
 
-	/// Enable mining and credit rewards to the given account.
+	/// How many mining threads to run
+	#[arg(long)]
+	pub miners: Option<u32>,
+
+	/// Enable an account to author blocks
 	///
 	/// The account address must be given in SS58 format.
 	#[arg(long, value_name = "SS58_ADDRESS", value_parser = parse_ss58_account_id)]
-	pub mine: Option<AccountId>,
+	pub author: Option<AccountId>,
 }
 
 impl Cli {
 	pub fn block_author(&self) -> Option<AccountId> {
-		if let Some(block_author) = &self.mine {
+		if let Some(block_author) = &self.author {
 			Some(block_author.clone())
+		} else if let Some(account) = self.run.get_keyring() {
+			Some(account.to_account_id())
 		} else if self.run.shared_params.dev {
 			use sp_core::crypto::Pair;
 			let block_author = sp_core::sr25519::Pair::from_string("//Alice", None).unwrap();

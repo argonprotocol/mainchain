@@ -192,7 +192,7 @@ where
 		&mut self,
 		mut block: BlockImportParams<B>,
 	) -> Result<ImportResult, Self::Error> {
-		info!("Importing block with hash {:?} {}", block.post_hash(), block.header.number());
+		info!("Importing block with hash {:?} ({})", block.post_hash(), block.header.number());
 		let pre_digest = match find_pre_digest::<B>(&block.header) {
 			Ok(Some(x)) => x,
 			Ok(None) => return Err(Error::<B>::MissingPreRuntimeDigest.into()),
@@ -294,10 +294,6 @@ where
 				},
 			));
 		}
-		info!(
-			"Imported block {:?} {} {}",
-			block.post_hash, aux.total_difficulty, &best_aux.total_difficulty
-		);
 
 		self.inner.import_block(block).await.map_err(Into::into)
 	}

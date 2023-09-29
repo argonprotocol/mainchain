@@ -155,6 +155,7 @@ pub fn new_partial(
 pub fn new_full(
 	config: Configuration,
 	opt_block_author: Option<AccountId>,
+	mining_threads: Option<u32>,
 ) -> Result<TaskManager, ServiceError> {
 	let sc_service::PartialComponents {
 		client,
@@ -367,7 +368,11 @@ pub fn new_full(
 				sc_consensus_grandpa::run_grandpa_voter(grandpa_config)?,
 			);
 
-			let mining_threads = max(num_cpus::get() - 1, 1);
+			let mining_threads = if let Some(mining_threads) = mining_threads {
+				mining_threads as usize
+			} else {
+				max(num_cpus::get() - 1, 1)
+			};
 			log::info!("Mining is enabled, {} threads", mining_threads);
 			// now do actual compute mining
 			for _ in 0..mining_threads {

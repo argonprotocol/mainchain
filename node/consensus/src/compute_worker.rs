@@ -204,7 +204,7 @@ where
 		} {
 			Some(x) => x,
 			_ => {
-				warn!(target: LOG_TARGET, "Unable to submit mined block in compute worker: internal build does not exist",);
+				trace!(target: LOG_TARGET, "Unable to submit mined block in compute worker: internal build does not exist",);
 				return Ok(None)
 			},
 		};
