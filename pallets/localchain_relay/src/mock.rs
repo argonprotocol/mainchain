@@ -7,7 +7,7 @@ use frame_support::{
 use frame_system::pallet_prelude::BlockNumberFor;
 use sp_core::{ConstU32, H256};
 use sp_runtime::{
-	traits::{BlakeTwo256, IdentityLookup},
+	traits::{BlakeTwo256, IdentityLookup, NumberFor},
 	BuildStorage,
 };
 use sp_std::collections::btree_map::BTreeMap;
@@ -87,8 +87,8 @@ impl HistoricalBlockSealersLookup<BlockNumber, BlockSealAuthorityId>
 }
 
 pub struct NotaryProviderImpl;
-impl NotaryProvider for NotaryProviderImpl {
-	fn verify_signature(_: NotaryId, _: &H256, _: &NotarySignature) -> bool {
+impl NotaryProvider<Block> for NotaryProviderImpl {
+	fn verify_signature(_: NotaryId, _: NumberFor<Block>, _: &H256, _: &NotarySignature) -> bool {
 		true
 	}
 }

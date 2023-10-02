@@ -62,8 +62,11 @@ pub fn development_config() -> Result<ChainSpec, String> {
 		move || {
 			testnet_genesis(
 				wasm_binary,
-				// Initial PoA authorities
-				vec![],
+				// You have to have an authority to start the chain
+				vec![(
+					get_account_id_from_seed::<sr25519::Public>("Alice"),
+					authority_keys_from_seed("Alice"),
+				)],
 				// Sudo account
 				get_account_id_from_seed::<sr25519::Public>("Alice"),
 				// Pre-funded accounts
@@ -162,7 +165,7 @@ fn testnet_genesis(
 	endowed_accounts: Vec<AccountId>,
 	_enable_println: bool,
 ) -> RuntimeGenesisConfig {
-	let initial_difficulty = 1_000_000_000;
+	let initial_difficulty = 100_000_000;
 
 	RuntimeGenesisConfig {
 		system: SystemConfig {

@@ -45,6 +45,7 @@ pub struct SealNonceHashMessage<Hash> {
 	pub tax_proof_id: u32,
 	pub tax_amount: u128,
 	pub parent_hash: Hash,
+	pub author_id: AccountId32,
 	pub seal_stampers: Vec<SealStamper>,
 }
 

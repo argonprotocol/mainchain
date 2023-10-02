@@ -370,8 +370,6 @@ parameter_types! {
 	/// Number of blocks to keep around for preventing notebook double-submit
 	pub const MaxNotebookBlocksToRemember: u32 = 10;
 
-	/// Max host ips a notary can provide
-	pub const MaxNotaryHosts: u32 = 4;
 }
 
 impl pallet_localchain_relay::Config for Runtime {
@@ -396,6 +394,9 @@ parameter_types! {
 	pub const MaxProposalHoldBlocks: u32 = 1440 * 14; // 2 weeks to approve
 	pub const MaxProposalsPerBlock: u32 = 10;
 	pub const MetaChangesBlockDelay: u32 = 1;
+	/// Max host ips a notary can provide
+	pub const MaxNotaryHosts: u32 = 4;
+	pub const MaxBlocksForKeyHistory: u32 = 1440 * 2; // keep for 2 days.. only used for notebook submission
 }
 
 impl pallet_notary_admin::Config for Runtime {
@@ -406,6 +407,7 @@ impl pallet_notary_admin::Config for Runtime {
 	type MaxProposalsPerBlock = MaxProposalsPerBlock;
 	type MetaChangesBlockDelay = MetaChangesBlockDelay;
 	type MaxNotaryHosts = MaxNotaryHosts;
+	type MaxBlocksForKeyHistory = MaxBlocksForKeyHistory;
 }
 
 /// Existential deposit.

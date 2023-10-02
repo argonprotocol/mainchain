@@ -2,7 +2,7 @@ use frame_support::{
 	assert_err, assert_noop, assert_ok,
 	traits::{Currency, OnInitialize, OneSessionHandler},
 };
-use sp_core::{OpaquePeerId, U256};
+use sp_core::{bounded_vec, OpaquePeerId, U256};
 use sp_runtime::{testing::UintAuthorityId, BoundedVec};
 use std::net::Ipv4Addr;
 
@@ -38,7 +38,7 @@ fn it_doesnt_add_cohorts_until_time() {
 		// Go past genesis block so events get deposited
 		System::set_block_number(1);
 
-		NextCohort::<Test>::set(BoundedVec::truncate_from(vec![ValidatorRegistration {
+		NextCohort::<Test>::set(bounded_vec![ValidatorRegistration {
 			account_id: 1,
 			peer_id: PeerId(OpaquePeerId::default()),
 			bond_id: None,
@@ -46,7 +46,7 @@ fn it_doesnt_add_cohorts_until_time() {
 			bond_amount: 0,
 			reward_destination: RewardDestination::Owner,
 			rpc_hosts: rpc_hosts(Ipv4Addr::new(127, 0, 0, 1), 3000),
-		}]));
+		}]);
 
 		Cohorts::on_initialize(1);
 
@@ -846,5 +846,5 @@ fn rpc_hosts<S>(ip: Ipv4Addr, port: u16) -> BoundedVec<Host, S>
 where
 	S: sp_core::Get<u32>,
 {
-	BoundedVec::<Host, S>::truncate_from(vec![Host { ip: ip_to_u32(ip), port, is_secure: false }])
+	bounded_vec![Host { ip: ip_to_u32(ip), port, is_secure: false }]
 }

@@ -1,8 +1,5 @@
 use env_logger::{Builder, Env};
-use frame_support::{
-	parameter_types,
-	traits::{ConstU16, ConstU64},
-};
+use frame_support::{parameter_types, traits::ConstU16};
 use sp_core::{ConstU32, H256};
 use sp_runtime::{
 	traits::{BlakeTwo256, IdentityLookup},
@@ -11,7 +8,7 @@ use sp_runtime::{
 
 use crate as pallet_notary_admin;
 
-type Block = frame_system::mocking::MockBlock<Test>;
+pub(crate) type Block = frame_system::mocking::MockBlockU32<Test>;
 
 // Configure a mock runtime to test the pallet.
 frame_support::construct_runtime!(
@@ -36,7 +33,7 @@ impl frame_system::Config for Test {
 	type Lookup = IdentityLookup<Self::AccountId>;
 	type Block = Block;
 	type RuntimeEvent = RuntimeEvent;
-	type BlockHashCount = ConstU64<250>;
+	type BlockHashCount = ConstU32<250>;
 	type Version = ();
 	type PalletInfo = PalletInfo;
 	type AccountData = ();
@@ -53,6 +50,7 @@ parameter_types! {
 	pub static MaxActiveNotaries: u32 = 2;
 	pub static MaxProposalsPerBlock:u32 = 1;
 	pub static MaxNotaryHosts:u32 = 1;
+	pub static MaxBlocksForKeyHistory:u32 = 10;
 }
 
 impl pallet_notary_admin::Config for Test {
@@ -63,6 +61,7 @@ impl pallet_notary_admin::Config for Test {
 	type MaxProposalsPerBlock = MaxProposalsPerBlock;
 	type MetaChangesBlockDelay = ConstU32<1>;
 	type MaxNotaryHosts = MaxNotaryHosts;
+	type MaxBlocksForKeyHistory = MaxBlocksForKeyHistory;
 }
 
 // Build genesis storage according to the mock runtime.

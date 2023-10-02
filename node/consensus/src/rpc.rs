@@ -24,7 +24,7 @@ pub type Sender<T> = Option<oneshot::Sender<std::result::Result<T, Error>>>;
 
 #[rpc(client, server)]
 pub trait BlockSealApi<Hash> {
-	#[method(name = "proofOfTax_submit")]
+	#[method(name = "blockSeal_submit")]
 	async fn submit(
 		&self,
 		parent_hash: Hash,

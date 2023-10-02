@@ -65,9 +65,8 @@ const LOG_TARGET: &str = "runtime::cohorts";
 /// AuthorityIds are created by watching the Session pallet for new sessions and recording the
 /// authorityIds matching registered "controller" accounts.
 ///
-/// TODO 1: add rpc host to registration
-/// TODO 2: add VRF to pick block end for bid registrations
-/// TODO 3: add bid_and_bond, bid_and_lease_bond calls (or make bid::bond_id an enum of bond
+/// TODO: add VRF to pick block end for bid registrations
+/// TODO: add bid_and_bond, bid_and_lease_bond calls (or make bid::bond_id an enum of bond
 /// 	creation options)
 #[frame_support::pallet(dev_mode)]
 pub mod pallet {

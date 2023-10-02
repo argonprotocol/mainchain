@@ -271,7 +271,7 @@ async fn can_run_proof_of_tax() {
 			SealerSignatureMessage {
 				tax_proof_id: block_proof.tax_proof_id,
 				parent_hash,
-				author_id,
+				author_id: author_id.clone(),
 				tax_amount: block_proof.tax_amount,
 				seal_stampers: xor_closest_authority_ids.clone(),
 				prefix: SEAL_NONCE_PREFIX,
@@ -302,6 +302,7 @@ async fn can_run_proof_of_tax() {
 			tax_proof_id: block_proof.tax_proof_id,
 			tax_amount: block_proof.tax_amount,
 			parent_hash,
+			author_id,
 			seal_stampers: block_proof.seal_stampers.clone(),
 		}
 		.using_encoded(blake2_256);

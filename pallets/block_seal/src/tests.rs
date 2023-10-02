@@ -239,10 +239,11 @@ fn it_should_detect_invalid_signatures() {
 		System::initialize(&2, &System::parent_hash(), &pre_digest);
 		BlockSeal::on_initialize(2);
 
+		let author_id = AccountId32::from([1u8; 32]);
 		let mut inherent = create_seal(
 			authorities,
 			closest_validators,
-			AccountId32::from([1u8; 32]),
+			author_id.clone(),
 			50,
 			1,
 			System::parent_hash(),
@@ -257,6 +258,7 @@ fn it_should_detect_invalid_signatures() {
 			prefix: SEAL_NONCE_PREFIX,
 			tax_proof_id: proof.tax_proof_id,
 			tax_amount: proof.tax_amount,
+			author_id,
 			parent_hash: System::parent_hash(),
 			seal_stampers: proof.seal_stampers.clone(),
 		}
@@ -305,7 +307,7 @@ fn create_seal(
 		tax_amount,
 		parent_hash,
 		author_id: author_id.clone(),
-		seal_stampers: stampers_in_order.clone(),
+		seal_stampers: stampers_in_order.iter().map(|a| a.0.clone()).collect::<Vec<_>>(),
 	}
 	.using_encoded(blake2_256);
 
@@ -337,6 +339,7 @@ fn create_seal(
 		prefix: SEAL_NONCE_PREFIX,
 		tax_proof_id,
 		tax_amount,
+		author_id: author_id.clone(),
 		parent_hash,
 		seal_stampers: seal_stampers.clone(),
 	}

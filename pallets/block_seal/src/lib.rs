@@ -313,6 +313,7 @@ pub mod pallet {
 				tax_proof_id: proof.tax_proof_id,
 				tax_amount: proof.tax_amount,
 				parent_hash,
+				author_id: proof.author_id.clone(),
 				seal_stampers: proof.seal_stampers.clone(),
 			}
 			.using_encoded(blake2_256);

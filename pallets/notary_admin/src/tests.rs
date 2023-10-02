@@ -3,16 +3,21 @@ use frame_support::{
 	assert_noop, assert_ok,
 	traits::{Len, OnFinalize, OnInitialize},
 };
+use frame_system::pallet_prelude::BlockNumberFor;
+use sp_core::H256;
 use sp_keyring::Ed25519Keyring;
 use sp_runtime::BoundedVec;
 use ulx_primitives::{
 	block_seal::Host,
-	notary::{NotaryMeta, NotaryRecord},
+	notary::{NotaryMeta, NotaryProvider, NotaryPublic, NotaryRecord},
 };
 
 use crate::{
 	mock::*,
-	pallet::{ActiveNotaries, ExpiringProposals, ProposedNotaries, QueuedNotaryMetaChanges},
+	pallet::{
+		ActiveNotaries, ExpiringProposals, NotaryKeyHistory, ProposedNotaries,
+		QueuedNotaryMetaChanges,
+	},
 };
 
 #[test]
@@ -88,7 +93,7 @@ fn it_only_allows_one_proposal_per_account_at_a_time() {
 }
 
 #[test]
-fn it_allows_proposal_elevation() {
+fn it_allows_proposal_activation() {
 	new_test_ext().execute_with(|| {
 		System::set_block_number(1);
 		assert_ok!(NotaryAdmin::propose(
@@ -126,6 +131,10 @@ fn it_allows_proposal_elevation() {
 		NotaryAdmin::on_initialize(11);
 		NotaryAdmin::on_finalize(11);
 		assert_eq!(ProposedNotaries::<Test>::get(1).len(), 0);
+		assert_eq!(
+			NotaryKeyHistory::<Test>::get(1),
+			BoundedVec::<(BlockNumberFor<Test>, NotaryPublic), MaxBlocksForKeyHistory>::truncate_from(vec![(2u32, Ed25519Keyring::Alice.public())])
+		);
 	});
 }
 
@@ -197,6 +206,75 @@ fn it_allows_a_notary_to_update_meta() {
 				},
 			}
 			.into(),
+		);
+		assert_eq!(
+			NotaryKeyHistory::<Test>::get(1),
+			BoundedVec::<(BlockNumberFor<Test>, NotaryPublic), MaxBlocksForKeyHistory>::truncate_from(vec![
+				(2u32, Ed25519Keyring::Alice.public()),
+				(4u32, Ed25519Keyring::Bob.public())
+			])
+		);
+	});
+}
+
+#[test]
+fn it_verifies_notary_signatures_matching_block_heights() {
+	new_test_ext().execute_with(|| {
+		System::set_block_number(1);
+		assert_ok!(NotaryAdmin::propose(
+			RuntimeOrigin::signed(1),
+			NotaryMeta::<MaxNotaryHosts> {
+				public: Ed25519Keyring::Alice.public().into(),
+				hosts: rpc_hosts(0, 0),
+			}
+		));
+		System::set_block_number(2);
+		NotaryAdmin::on_initialize(2);
+		assert_ok!(NotaryAdmin::activate(RuntimeOrigin::root(), 1,));
+		NotaryAdmin::on_finalize(2);
+
+		System::set_block_number(3);
+		NotaryAdmin::on_initialize(3);
+		assert_ok!(NotaryAdmin::update(
+			RuntimeOrigin::signed(1),
+			1,
+			NotaryMeta::<MaxNotaryHosts> {
+				public: Ed25519Keyring::Bob.public().into(),
+				hosts: rpc_hosts(2, 2),
+			}
+		),);
+		NotaryAdmin::on_finalize(3);
+		System::set_block_number(4);
+		NotaryAdmin::on_initialize(4);
+		NotaryAdmin::on_initialize(4);
+		let hash: H256 = [1u8; 32].into();
+
+		assert_eq!(
+			<NotaryAdmin as NotaryProvider<Block>>::verify_signature(
+				1,
+				4,
+				&hash,
+				&Ed25519Keyring::Alice.sign(&hash[..]),
+			),
+			false
+		);
+		assert_eq!(
+			<NotaryAdmin as NotaryProvider<Block>>::verify_signature(
+				1,
+				2,
+				&hash,
+				&Ed25519Keyring::Alice.sign(&hash[..]),
+			),
+			true
+		);
+		assert_eq!(
+			<NotaryAdmin as NotaryProvider<Block>>::verify_signature(
+				1,
+				4,
+				&hash,
+				&Ed25519Keyring::Bob.sign(&hash[..]),
+			),
+			true
 		);
 	});
 }

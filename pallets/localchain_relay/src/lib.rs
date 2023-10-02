@@ -41,14 +41,14 @@ pub mod pallet {
 		Saturating,
 	};
 	use sp_std::cmp::min;
+
 	use ulx_primitives::{
 		block_seal::HistoricalBlockSealersLookup,
 		digests::{FinalizedBlockNeededDigest, FINALIZED_BLOCK_DIGEST_ID},
 		notary::{NotaryId, NotarySignature},
-	};
-
-	use ulx_primitives::notebook::{
-		to_notebook_audit_signature_message, to_notebook_post_hash, ChainTransfer, Notebook,
+		notebook::{
+			to_notebook_audit_signature_message, to_notebook_post_hash, ChainTransfer, Notebook,
+		},
 	};
 
 	use super::*;
@@ -83,7 +83,7 @@ pub mod pallet {
 			BlockSealAuthorityId,
 		>;
 
-		type NotaryProvider: NotaryProvider;
+		type NotaryProvider: NotaryProvider<<Self as frame_system::Config>::Block>;
 
 		#[pallet::constant]
 		type PalletId: Get<PalletId>;
@@ -267,6 +267,9 @@ pub mod pallet {
 		#[pallet::weight(0)]
 		pub fn submit_notebook(
 			origin: OriginFor<T>,
+			// This has already been checked at this point. It's provided as a spam reduction
+			// feature to the unsigned transaction pool
+			_notebook_hash: H256,
 			notebook: NotebookOf<T>,
 			// since signature verification is done in `validate_unsigned`
 			// we can skip doing it here again.
@@ -274,7 +277,8 @@ pub mod pallet {
 		) -> DispatchResult {
 			ensure_none(origin)?;
 
-			// already checked signature and validity of notary index in validate_unsigned
+			// already checked signature, notebook hash and validity of notary index in
+			// validate_unsigned
 			let allowed_auditors = T::HistoricalBlockSealersLookup::get_active_block_sealers_of(
 				notebook.pinned_to_block_number.into(),
 			);
@@ -413,33 +417,43 @@ pub mod pallet {
 		type Call = Call<T>;
 
 		fn validate_unsigned(_source: TransactionSource, call: &Self::Call) -> TransactionValidity {
-			if let Call::submit_notebook { notebook, signature } = call {
+			if let Call::submit_notebook { notebook_hash, notebook, signature } = call {
 				let current_finalized_block: u32 =
 					<FinalizedBlockNumber<T>>::get().unique_saturated_into();
 
 				// if the block is not finalized, we can't validate the notebook
 				ensure!(
-					notebook.pinned_to_block_number < current_finalized_block,
+					notebook.pinned_to_block_number <= current_finalized_block,
 					InvalidTransaction::Future
 				);
 
-				let block_hash = to_notebook_post_hash(notebook).using_encoded(blake2_256).into();
-
+				// make the sender provide the hash. We'll just reject it if it's bad
 				ensure!(
 					T::NotaryProvider::verify_signature(
 						notebook.notary_id,
-						&block_hash,
+						notebook.pinned_to_block_number.into(),
+						&notebook_hash,
 						&signature
 					),
 					InvalidTransaction::BadProof
 				);
 
+				// verify the hash is valid
+				let block_hash: H256 =
+					to_notebook_post_hash(&notebook).using_encoded(blake2_256).into();
+				ensure!(block_hash == *notebook_hash, InvalidTransaction::BadProof);
+				log::info!(
+					target: LOG_TARGET,
+					"Notebook from notary {} pinned to block={:?}, current_finalized_block={current_finalized_block}",
+					notebook.notary_id,
+					notebook.pinned_to_block_number
+				);
 				let blocks_until_finalized: u32 =
-					1u32 + notebook.pinned_to_block_number - current_finalized_block;
+					100u32 + notebook.pinned_to_block_number - current_finalized_block;
 
 				ValidTransaction::with_tag_prefix("Notebook")
 					.priority(TransactionPriority::MAX)
-					.and_provides((notebook.pinned_to_block_number, notebook.notary_id))
+					.and_provides((notebook.notary_id, notebook.pinned_to_block_number))
 					.longevity(blocks_until_finalized.into())
 					.propagate(true)
 					.build()

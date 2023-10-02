@@ -1,18 +1,25 @@
-use crate::block_seal::Host;
 use codec::{Codec, Decode, Encode, MaxEncodedLen};
 use frame_support::{CloneNoBound, PartialEqNoBound, RuntimeDebugNoBound};
 use scale_info::TypeInfo;
+use sp_api::BlockT;
 use sp_core::{ed25519, Get, H256};
-use sp_runtime::BoundedVec;
+use sp_runtime::{traits::NumberFor, BoundedVec};
 use sp_std::fmt::Debug;
+
+use crate::block_seal::Host;
 
 pub type NotaryId = u32;
 
 pub type NotaryPublic = ed25519::Public;
 pub type NotarySignature = ed25519::Signature;
 
-pub trait NotaryProvider {
-	fn verify_signature(notary_id: NotaryId, message: &H256, signature: &NotarySignature) -> bool;
+pub trait NotaryProvider<B: BlockT> {
+	fn verify_signature(
+		notary_id: NotaryId,
+		at_block_height: NumberFor<B>,
+		message: &H256,
+		signature: &NotarySignature,
+	) -> bool;
 }
 
 #[derive(

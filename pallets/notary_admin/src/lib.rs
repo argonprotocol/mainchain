@@ -19,10 +19,10 @@ pub mod pallet {
 	use frame_system::pallet_prelude::*;
 	use log::warn;
 	use sp_core::H256;
-	use sp_runtime::{app_crypto::RuntimePublic, BoundedBTreeMap};
+	use sp_runtime::{app_crypto::RuntimePublic, BoundedBTreeMap, Saturating};
 
 	use ulx_primitives::notary::{
-		NotaryId, NotaryMeta, NotaryProvider, NotaryRecord, NotarySignature,
+		NotaryId, NotaryMeta, NotaryProvider, NotaryPublic, NotaryRecord, NotarySignature,
 	};
 
 	use super::*;
@@ -57,6 +57,11 @@ pub mod pallet {
 		#[pallet::constant]
 		type MetaChangesBlockDelay: Get<u32>;
 
+		/// Number of blocks to maintain key history for each notary
+		/// NOTE: only pruned when new keys are added
+		#[pallet::constant]
+		type MaxBlocksForKeyHistory: Get<u32>;
+
 		/// Maximum hosts a notary can supply
 		#[pallet::constant]
 		type MaxNotaryHosts: Get<u32>;
@@ -88,6 +93,15 @@ pub mod pallet {
 		StorageValue<_, BoundedVec<NotaryRecordOf<T>, T::MaxActiveNotaries>, ValueQuery>;
 
 	#[pallet::storage]
+	pub(super) type NotaryKeyHistory<T: Config> = StorageMap<
+		_,
+		Twox64Concat,
+		NotaryId,
+		BoundedVec<(BlockNumberFor<T>, NotaryPublic), T::MaxBlocksForKeyHistory>,
+		ValueQuery,
+	>;
+
+	#[pallet::storage]
 	pub(super) type QueuedNotaryMetaChanges<T: Config> = StorageMap<
 		_,
 		Twox64Concat,
@@ -99,23 +113,22 @@ pub mod pallet {
 	#[pallet::event]
 	#[pallet::generate_deposit(pub(super) fn deposit_event)]
 	pub enum Event<T: Config> {
+		/// A user has proposed operating as a notary
 		NotaryProposed {
 			operator_account: T::AccountId,
 			meta: NotaryMetaOf<T>,
 			expires: BlockNumberFor<T>,
 		},
-		NotaryActivated {
-			notary: NotaryRecordOf<T>,
-		},
+		/// A notary proposal has been accepted
+		NotaryActivated { notary: NotaryRecordOf<T> },
+		/// Notary metadata queued for update
 		NotaryMetaUpdateQueued {
 			notary_id: u32,
 			meta: NotaryMetaOf<T>,
 			effective_block: BlockNumberFor<T>,
 		},
-		NotaryMetaUpdated {
-			notary_id: u32,
-			meta: NotaryMetaOf<T>,
-		},
+		/// Notary metadata updated
+		NotaryMetaUpdated { notary_id: u32, meta: NotaryMetaOf<T> },
 	}
 
 	#[pallet::error]
@@ -133,15 +146,26 @@ pub mod pallet {
 		fn on_initialize(n: BlockNumberFor<T>) -> Weight {
 			let meta_changes = QueuedNotaryMetaChanges::<T>::take(n);
 			if meta_changes.len() > 0 {
+				let old_block_to_preserve =
+					n.saturating_sub(T::MaxBlocksForKeyHistory::get().into());
 				let _ = <ActiveNotaries<T>>::try_mutate(|active| -> DispatchResult {
 					for (notary_id, meta) in meta_changes.into_iter() {
 						if let Some(pos) = active.iter().position(|n| n.notary_id == notary_id) {
 							active[pos].meta = meta.clone();
-							active[pos].meta_updated_block =
-								frame_system::Pallet::<T>::block_number();
+							active[pos].meta_updated_block = n;
+							if let Err(e) =
+								<NotaryKeyHistory<T>>::try_mutate(notary_id, |history| {
+									history.retain(|(block, _)| *block >= old_block_to_preserve);
+									history.try_push((n, meta.public.clone()))
+								}) {
+								warn!("Failed to update notary key history: {:?} {notary_id:?}", e);
+							}
 							Self::deposit_event(Event::NotaryMetaUpdated { notary_id, meta });
 						} else {
-							warn!("Invalid notary meta queued {:?} at block {:?}", notary_id, n);
+							warn!(
+								"Invalid notary meta queued (id={:?}) at block {:?}",
+								notary_id, n
+							);
 						}
 					}
 					Ok(())
@@ -215,7 +239,11 @@ pub mod pallet {
 				activated_block: block_number,
 				operator_account_id: operator_account.clone(),
 			};
+
 			<ActiveNotaries<T>>::try_mutate(|x| x.try_push(notary.clone()))
+				.map_err(|_| Error::<T>::MaxNotariesExceeded)?;
+
+			<NotaryKeyHistory<T>>::try_append(notary_id, (block_number, proposal.public.clone()))
 				.map_err(|_| Error::<T>::MaxNotariesExceeded)?;
 
 			Self::deposit_event(Event::NotaryActivated { notary });
@@ -267,17 +295,22 @@ pub mod pallet {
 		}
 	}
 
-	impl<T: Config> NotaryProvider for Pallet<T> {
+	impl<T: Config> NotaryProvider<T::Block> for Pallet<T> {
 		fn verify_signature(
 			notary_id: NotaryId,
+			at_block_height: BlockNumberFor<T>,
 			message: &H256,
 			signature: &NotarySignature,
 		) -> bool {
-			if let Some(public) = <ActiveNotaries<T>>::get()
+			let key_history = <NotaryKeyHistory<T>>::get(notary_id);
+
+			// find the first key that is valid at the given block height
+			let public = key_history
 				.iter()
-				.find(|n| n.notary_id == notary_id)
-				.map(|n| n.meta.public)
-			{
+				.find(|(block, _)| *block >= at_block_height)
+				.map(|(_, public)| public);
+
+			if let Some(public) = public {
 				return public.verify(message, &signature)
 			}
 			false

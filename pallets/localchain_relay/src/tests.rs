@@ -5,11 +5,12 @@ use frame_support::{assert_err, assert_noop, assert_ok, traits::OnInitialize};
 use frame_system::pallet_prelude::BlockNumberFor;
 use sp_core::{blake2_256, ed25519, Pair};
 use sp_runtime::{
-	testing::UintAuthorityId,
+	testing::{UintAuthorityId, H256},
 	traits::ValidateUnsigned,
 	transaction_validity::{InvalidTransaction, TransactionSource},
 	BoundedVec, DigestItem,
 };
+type Hash = H256;
 
 use ulx_primitives::{
 	block_seal::BlockSealAuthorityPair,
@@ -131,6 +132,7 @@ fn it_can_handle_transfers_in() {
 		LocalchainRelay::on_initialize(2);
 		assert_ok!(LocalchainRelay::submit_notebook(
 			RuntimeOrigin::none(),
+			Hash::random(),
 			Notebook {
 				notary_id: 1,
 				auditors: bound(vec![]),
@@ -149,6 +151,7 @@ fn it_can_handle_transfers_in() {
 
 		assert_ok!(LocalchainRelay::submit_notebook(
 			RuntimeOrigin::none(),
+			Hash::random(),
 			Notebook {
 				notary_id: 1,
 				auditors: bound(vec![]),
@@ -162,6 +165,7 @@ fn it_can_handle_transfers_in() {
 
 		assert_ok!(LocalchainRelay::submit_notebook(
 			RuntimeOrigin::none(),
+			Hash::random(),
 			Notebook {
 				notary_id: 1,
 				auditors: bound(vec![]),
@@ -183,6 +187,7 @@ fn it_doesnt_allow_a_notary_balance_to_go_negative() {
 		assert_noop!(
 			LocalchainRelay::submit_notebook(
 				RuntimeOrigin::none(),
+				Hash::random(),
 				Notebook {
 					notary_id: 1,
 					auditors: bound(vec![]),
@@ -216,6 +221,7 @@ fn it_requires_minimum_audits() {
 		assert_noop!(
 			LocalchainRelay::submit_notebook(
 				RuntimeOrigin::none(),
+				Hash::random(),
 				Notebook {
 					notary_id: 1,
 					auditors: bound(
@@ -275,6 +281,7 @@ fn it_requires_valid_auditors() {
 		assert_noop!(
 			LocalchainRelay::submit_notebook(
 				RuntimeOrigin::none(),
+				Hash::random(),
 				notebook.clone(),
 				ed25519::Signature([0u8; 64]),
 			),
@@ -286,6 +293,7 @@ fn it_requires_valid_auditors() {
 		assert_noop!(
 			LocalchainRelay::submit_notebook(
 				RuntimeOrigin::none(),
+				Hash::from([0u8; 32]),
 				notebook.clone(),
 				ed25519::Signature([0u8; 64]),
 			),
@@ -295,6 +303,7 @@ fn it_requires_valid_auditors() {
 		notebook.auditors = bound(create_signatures(vec![0, 1, 2, 3]));
 		assert_ok!(LocalchainRelay::submit_notebook(
 			RuntimeOrigin::none(),
+			Hash::random(),
 			notebook.clone(),
 			ed25519::Signature([0u8; 64]),
 		),);
@@ -324,6 +333,7 @@ fn it_expires_transfers_if_not_committed() {
 		assert_err!(
 			LocalchainRelay::submit_notebook(
 				RuntimeOrigin::none(),
+				H256::random(),
 				Notebook {
 					notary_id: 1,
 					auditors: bound(vec![]),
@@ -343,11 +353,12 @@ fn it_delays_for_finalization() {
 	new_test_ext().execute_with(|| {
 		// Go past genesis block so events get deposited
 		System::set_block_number(2);
-		FinalizedBlockNumber::<Test>::set(1);
+		FinalizedBlockNumber::<Test>::set(0);
 		assert_noop!(
 			LocalchainRelay::validate_unsigned(
 				TransactionSource::Local,
 				&crate::Call::submit_notebook {
+					notebook_hash: Hash::default(),
 					notebook: Notebook {
 						notary_id: 1,
 						auditors: bound(vec![]),
