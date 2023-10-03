@@ -24,6 +24,7 @@ pallet-timestamp = { version = "4.0.0-dev", default-features = false, git = "htt
 pallet-session = { version = "4.0.0-dev", default-features = false, git = "https://github.com/paritytech/polkadot-sdk.git", branch = "release-polkadot-v1.1.0", features = ["historical"] }
 pallet-grandpa = { version = "4.0.0-dev", default-features = false, git = "https://github.com/paritytech/polkadot-sdk.git", branch = "release-polkadot-v1.1.0" }
 pallet-offences = { version = "4.0.0-dev", default-features = false, git = "https://github.com/paritytech/polkadot-sdk.git", branch = "release-polkadot-v1.1.0" }
+pallet-tx-pause = { version = "4.0.0-dev", default-features = false, git = "https://github.com/paritytech/polkadot-sdk.git", branch = "release-polkadot-v1.1.0" }
 pallet-transaction-payment = { version = "4.0.0-dev", default-features = false, git = "https://github.com/paritytech/polkadot-sdk.git", branch = "release-polkadot-v1.1.0" }
 frame-support = { version = "4.0.0-dev", default-features = false, git = "https://github.com/paritytech/polkadot-sdk.git", branch = "release-polkadot-v1.1.0" }
 frame-system = { version = "4.0.0-dev", default-features = false, git = "https://github.com/paritytech/polkadot-sdk.git", branch = "release-polkadot-v1.1.0" }
@@ -84,6 +85,7 @@ std = [
 	"pallet-bonds/std",
 	"pallet-difficulty/std",
 	"pallet-block-seal/std",
+	"pallet-tx-pause/std",
 	"frame-support/std",
 	"frame-system/std",
 	"frame-system-rpc-runtime-api/std",
@@ -118,6 +120,7 @@ runtime-benchmarks = [
 	"pallet-block-seal/runtime-benchmarks",
 	"pallet-timestamp/runtime-benchmarks",
 	"sp-runtime/runtime-benchmarks",
+	"pallet-tx-pause/runtime-benchmarks",
 ]
 try-runtime = [
 	"pallet-notary-admin/try-runtime",
@@ -136,6 +139,7 @@ try-runtime = [
 	"pallet-timestamp/try-runtime",
 	"pallet-transaction-payment/try-runtime",
 	"pallet-session/try-runtime",
+	"pallet-tx-pause/try-runtime",
 ]
 
 # Set timing constants (e.g. session period) to faster versions to speed up testing.

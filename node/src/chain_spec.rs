@@ -219,5 +219,6 @@ fn testnet_genesis(
 		},
 		difficulty: DifficultyConfig { initial_difficulty, ..Default::default() },
 		transaction_payment: Default::default(),
+		tx_pause: Default::default(),
 	}
 }

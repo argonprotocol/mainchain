@@ -22,10 +22,13 @@ pub use frame_support::{
 	StorageValue,
 };
 use frame_support::{
-	traits::{Currency, OnUnbalanced, StorageMapShim},
+	traits::{Contains, Currency, InsideBoth, OnUnbalanced, StorageMapShim},
 	PalletId,
 };
+// Configure FRAME pallets to include in runtime.
+use frame_support::traits::Everything;
 pub use frame_system::Call as SystemCall;
+use frame_system::EnsureRoot;
 use pallet_session::historical as pallet_session_historical;
 pub use pallet_timestamp::Call as TimestampCall;
 use pallet_transaction_payment::{ConstFeeMultiplier, CurrencyAdapter, Multiplier};
@@ -49,6 +52,7 @@ use sp_std::{collections::btree_map::BTreeMap, prelude::*, vec::Vec};
 use sp_version::NativeVersion;
 use sp_version::RuntimeVersion;
 
+use pallet_tx_pause::RuntimeCallNameOf;
 use ulx_primitives::{
 	block_seal::{AuthorityDistance, AuthorityProvider},
 	BlockSealAuthorityId, NextWork,
@@ -161,13 +165,33 @@ parameter_types! {
 		::max_with_normal_ratio(5 * 1024 * 1024, NORMAL_DISPATCH_RATIO);
 	pub const SS58Prefix: u8 = 42;
 }
+/// Calls that cannot be paused by the tx-pause pallet.
+pub struct TxPauseWhitelistedCalls;
+/// All calls are pausable.
+impl Contains<RuntimeCallNameOf<Runtime>> for TxPauseWhitelistedCalls {
+	fn contains(full_name: &RuntimeCallNameOf<Runtime>) -> bool {
+		match (full_name.0.as_slice(), full_name.1.as_slice()) {
+			// (b"Balances", b"transfer_keep_alive") => true,
+			_ => false,
+		}
+	}
+}
 
-// Configure FRAME pallets to include in runtime.
+/// This pallet is intended to be used as a shortterm security measure.
+impl pallet_tx_pause::Config for Runtime {
+	type RuntimeEvent = RuntimeEvent;
+	type RuntimeCall = RuntimeCall;
+	type PauseOrigin = EnsureRoot<AccountId>;
+	type UnpauseOrigin = EnsureRoot<AccountId>;
+	type WhitelistedCalls = TxPauseWhitelistedCalls;
+	type MaxNameLen = ConstU32<256>;
+	type WeightInfo = pallet_tx_pause::weights::SubstrateWeight<Runtime>;
+}
 
 impl frame_system::Config for Runtime {
 	/// The basic call filter to use in dispatchable.
 	/// example filter: https://github.com/AcalaNetwork/Acala/blob/f4b80d7200c19b78d3777e8a4a87bc6893740d23/runtime/karura/src/lib.rs#L198
-	type BaseCallFilter = frame_support::traits::Everything;
+	type BaseCallFilter = InsideBoth<Everything, TxPause>;
 	/// The block type for the runtime.
 	type Block = Block;
 	/// Block & extrinsics weights: base values and limits.
@@ -450,7 +474,7 @@ impl pallet_balances::Config<ArgonToken> for Runtime {
 	type AccountStore = System;
 	type WeightInfo = pallet_balances::weights::SubstrateWeight<Runtime>;
 	type FreezeIdentifier = ();
-	type MaxFreezes = ();
+	type MaxFreezes = ConstU32<1>;
 	type RuntimeHoldReason = RuntimeHoldReason;
 	type MaxHolds = ConstU32<100>;
 }
@@ -473,7 +497,7 @@ impl pallet_balances::Config<UlixeeToken> for Runtime {
 	>;
 	type WeightInfo = pallet_balances::weights::SubstrateWeight<Runtime>;
 	type FreezeIdentifier = ();
-	type MaxFreezes = ();
+	type MaxFreezes = ConstU32<1>;
 	type RuntimeHoldReason = RuntimeHoldReason;
 	type MaxHolds = ConstU32<50>;
 }
@@ -517,6 +541,7 @@ construct_runtime!(
 		Offences: pallet_offences,
 		ArgonBalances: pallet_balances::<Instance1>::{Pallet, Call, Storage, Config<T>, Event<T>},
 		UlixeeBalances: pallet_balances::<Instance2>::{Pallet, Call, Storage, Config<T>, Event<T>},
+		TxPause: pallet_tx_pause,
 		TransactionPayment: pallet_transaction_payment,
 		Sudo: pallet_sudo,
 	}
