@@ -5272,7 +5272,7 @@ dependencies = [
 ]
 
 [[package]]
-name = "pallet-notary-admin"
+name = "pallet-notaries"
 version = "0.0.1"
 dependencies = [
  "env_logger",
@@ -9870,7 +9870,7 @@ dependencies = [
  "pallet-grandpa",
  "pallet-localchain-relay",
  "pallet-mining-slots",
- "pallet-notary-admin",
+ "pallet-notaries",
  "pallet-offences",
  "pallet-session",
  "pallet-sudo",

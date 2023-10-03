@@ -6,7 +6,7 @@ members = [
     "pallets/mining_slots",
 	"pallets/bonds",
 	"pallets/difficulty",
-	"pallets/notary_admin",
+    "pallets/notaries",
 	"pallets/localchain_relay",
 	"primitives",
     "runtime",

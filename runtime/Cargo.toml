@@ -55,7 +55,7 @@ pallet-block-seal = { version = "0.0.1", default-features = false, path = "../pa
 pallet-bonds = { version = "0.0.1", default-features = false, path = "../pallets/bonds" }
 pallet-difficulty = { version = "0.0.1", default-features = false, path = "../pallets/difficulty" }
 pallet-localchain-relay = { version = "0.0.1", default-features = false, path = "../pallets/localchain_relay" }
-pallet-notary-admin = { version = "0.0.1", default-features = false, path = "../pallets/notary_admin" }
+pallet-notaries = { version = "0.0.1", default-features = false, path = "../pallets/notaries" }
 pallet-mining-slots = { version = "0.0.1", default-features = false, path = "../pallets/mining_slots" }
 ulx-primitives = { version = "0.0.1", default-features = false, path = "../primitives" }
 
@@ -77,7 +77,7 @@ std = [
 	"pallet-offences/std",
 	"pallet-grandpa/std",
 	"pallet-localchain-relay/std",
-	"pallet-notary-admin/std",
+	"pallet-notaries/std",
 	"pallet-transaction-payment/std",
 	"pallet-authorship/std",
 	"pallet-transaction-payment-rpc-runtime-api/std",
@@ -113,7 +113,7 @@ runtime-benchmarks = [
 	"pallet-balances/runtime-benchmarks",
 	"pallet-sudo/runtime-benchmarks",
 	"pallet-bonds/runtime-benchmarks",
-	"pallet-notary-admin/runtime-benchmarks",
+	"pallet-notaries/runtime-benchmarks",
 	"pallet-localchain-relay/runtime-benchmarks",
 	"pallet-offences/runtime-benchmarks",
 	"pallet-grandpa/runtime-benchmarks",
@@ -123,7 +123,7 @@ runtime-benchmarks = [
 	"pallet-tx-pause/runtime-benchmarks",
 ]
 try-runtime = [
-	"pallet-notary-admin/try-runtime",
+	"pallet-notaries/try-runtime",
 	"pallet-localchain-relay/try-runtime",
 	"pallet-offences/try-runtime",
 	"pallet-authorship/try-runtime",

@@ -24,7 +24,7 @@ use crate::{
 fn it_can_propose_a_notary() {
 	new_test_ext().execute_with(|| {
 		System::set_block_number(1);
-		assert_ok!(NotaryAdmin::propose(
+		assert_ok!(Notaries::propose(
 			RuntimeOrigin::signed(1),
 			NotaryMeta::<MaxNotaryHosts> {
 				public: Ed25519Keyring::Alice.public().into(),
@@ -53,7 +53,7 @@ fn it_can_propose_a_notary() {
 fn it_cleans_up_proposals() {
 	new_test_ext().execute_with(|| {
 		System::set_block_number(1);
-		assert_ok!(NotaryAdmin::propose(
+		assert_ok!(Notaries::propose(
 			RuntimeOrigin::signed(1),
 			NotaryMeta::<MaxNotaryHosts> {
 				public: Ed25519Keyring::Alice.public().into(),
@@ -63,8 +63,8 @@ fn it_cleans_up_proposals() {
 		assert_eq!(ProposedNotaries::<Test>::get(1).len(), 1);
 
 		System::set_block_number(11);
-		NotaryAdmin::on_initialize(11);
-		NotaryAdmin::on_finalize(11);
+		Notaries::on_initialize(11);
+		Notaries::on_finalize(11);
 		assert_eq!(ProposedNotaries::<Test>::get(1).len(), 0);
 	});
 }
@@ -73,7 +73,7 @@ fn it_cleans_up_proposals() {
 fn it_only_allows_one_proposal_per_account_at_a_time() {
 	new_test_ext().execute_with(|| {
 		System::set_block_number(1);
-		assert_ok!(NotaryAdmin::propose(
+		assert_ok!(Notaries::propose(
 			RuntimeOrigin::signed(1),
 			NotaryMeta::<MaxNotaryHosts> {
 				public: Ed25519Keyring::Alice.public().into(),
@@ -81,7 +81,7 @@ fn it_only_allows_one_proposal_per_account_at_a_time() {
 			}
 		));
 		System::set_block_number(2);
-		assert_ok!(NotaryAdmin::propose(
+		assert_ok!(Notaries::propose(
 			RuntimeOrigin::signed(1),
 			NotaryMeta::<MaxNotaryHosts> {
 				public: Ed25519Keyring::Alice.public().into(),
@@ -96,7 +96,7 @@ fn it_only_allows_one_proposal_per_account_at_a_time() {
 fn it_allows_proposal_activation() {
 	new_test_ext().execute_with(|| {
 		System::set_block_number(1);
-		assert_ok!(NotaryAdmin::propose(
+		assert_ok!(Notaries::propose(
 			RuntimeOrigin::signed(1),
 			NotaryMeta::<MaxNotaryHosts> {
 				public: Ed25519Keyring::Alice.public().into(),
@@ -104,7 +104,7 @@ fn it_allows_proposal_activation() {
 			}
 		));
 		System::set_block_number(2);
-		assert_ok!(NotaryAdmin::activate(RuntimeOrigin::root(), 1,));
+		assert_ok!(Notaries::activate(RuntimeOrigin::root(), 1,));
 		assert_eq!(ProposedNotaries::<Test>::get(1).len(), 0);
 		assert_eq!(
 			ActiveNotaries::<Test>::get().into_inner(),
@@ -128,8 +128,8 @@ fn it_allows_proposal_activation() {
 
 		assert_eq!(ExpiringProposals::<Test>::get(11).len(), 0);
 		System::set_block_number(11);
-		NotaryAdmin::on_initialize(11);
-		NotaryAdmin::on_finalize(11);
+		Notaries::on_initialize(11);
+		Notaries::on_finalize(11);
 		assert_eq!(ProposedNotaries::<Test>::get(1).len(), 0);
 		assert_eq!(
 			NotaryKeyHistory::<Test>::get(1),
@@ -142,7 +142,7 @@ fn it_allows_proposal_activation() {
 fn it_allows_a_notary_to_update_meta() {
 	new_test_ext().execute_with(|| {
 		System::set_block_number(1);
-		assert_ok!(NotaryAdmin::propose(
+		assert_ok!(Notaries::propose(
 			RuntimeOrigin::signed(1),
 			NotaryMeta::<MaxNotaryHosts> {
 				public: Ed25519Keyring::Alice.public().into(),
@@ -150,14 +150,14 @@ fn it_allows_a_notary_to_update_meta() {
 			}
 		));
 		System::set_block_number(2);
-		NotaryAdmin::on_initialize(2);
-		assert_ok!(NotaryAdmin::activate(RuntimeOrigin::root(), 1,));
-		NotaryAdmin::on_finalize(2);
+		Notaries::on_initialize(2);
+		assert_ok!(Notaries::activate(RuntimeOrigin::root(), 1,));
+		Notaries::on_finalize(2);
 
 		System::set_block_number(3);
-		NotaryAdmin::on_initialize(3);
+		Notaries::on_initialize(3);
 		assert_noop!(
-			NotaryAdmin::update(
+			Notaries::update(
 				RuntimeOrigin::signed(2),
 				1,
 				NotaryMeta::<MaxNotaryHosts> {
@@ -167,7 +167,7 @@ fn it_allows_a_notary_to_update_meta() {
 			),
 			Error::<Test>::InvalidNotaryOperator
 		);
-		assert_ok!(NotaryAdmin::update(
+		assert_ok!(Notaries::update(
 			RuntimeOrigin::signed(1),
 			1,
 			NotaryMeta::<MaxNotaryHosts> {
@@ -175,7 +175,7 @@ fn it_allows_a_notary_to_update_meta() {
 				hosts: rpc_hosts(2, 2),
 			}
 		),);
-		NotaryAdmin::on_finalize(3);
+		Notaries::on_finalize(3);
 
 		// should not take effect yet!
 		assert_eq!(ActiveNotaries::<Test>::get()[0].meta.hosts[0].ip, 0);
@@ -194,7 +194,7 @@ fn it_allows_a_notary_to_update_meta() {
 		assert_eq!(QueuedNotaryMetaChanges::<Test>::get(4).len(), 1);
 
 		System::set_block_number(4);
-		NotaryAdmin::on_initialize(4);
+		Notaries::on_initialize(4);
 		assert_eq!(ActiveNotaries::<Test>::get()[0].meta.hosts[0].ip, 2);
 		assert_eq!(ActiveNotaries::<Test>::get()[0].meta_updated_block, 4);
 		System::assert_last_event(
@@ -221,7 +221,7 @@ fn it_allows_a_notary_to_update_meta() {
 fn it_verifies_notary_signatures_matching_block_heights() {
 	new_test_ext().execute_with(|| {
 		System::set_block_number(1);
-		assert_ok!(NotaryAdmin::propose(
+		assert_ok!(Notaries::propose(
 			RuntimeOrigin::signed(1),
 			NotaryMeta::<MaxNotaryHosts> {
 				public: Ed25519Keyring::Alice.public().into(),
@@ -229,13 +229,13 @@ fn it_verifies_notary_signatures_matching_block_heights() {
 			}
 		));
 		System::set_block_number(2);
-		NotaryAdmin::on_initialize(2);
-		assert_ok!(NotaryAdmin::activate(RuntimeOrigin::root(), 1,));
-		NotaryAdmin::on_finalize(2);
+		Notaries::on_initialize(2);
+		assert_ok!(Notaries::activate(RuntimeOrigin::root(), 1,));
+		Notaries::on_finalize(2);
 
 		System::set_block_number(3);
-		NotaryAdmin::on_initialize(3);
-		assert_ok!(NotaryAdmin::update(
+		Notaries::on_initialize(3);
+		assert_ok!(Notaries::update(
 			RuntimeOrigin::signed(1),
 			1,
 			NotaryMeta::<MaxNotaryHosts> {
@@ -243,14 +243,14 @@ fn it_verifies_notary_signatures_matching_block_heights() {
 				hosts: rpc_hosts(2, 2),
 			}
 		),);
-		NotaryAdmin::on_finalize(3);
+		Notaries::on_finalize(3);
 		System::set_block_number(4);
-		NotaryAdmin::on_initialize(4);
-		NotaryAdmin::on_initialize(4);
+		Notaries::on_initialize(4);
+		Notaries::on_initialize(4);
 		let hash: H256 = [1u8; 32].into();
 
 		assert_eq!(
-			<NotaryAdmin as NotaryProvider<Block>>::verify_signature(
+			<Notaries as NotaryProvider<Block>>::verify_signature(
 				1,
 				4,
 				&hash,
@@ -259,7 +259,7 @@ fn it_verifies_notary_signatures_matching_block_heights() {
 			false
 		);
 		assert_eq!(
-			<NotaryAdmin as NotaryProvider<Block>>::verify_signature(
+			<Notaries as NotaryProvider<Block>>::verify_signature(
 				1,
 				2,
 				&hash,
@@ -268,7 +268,7 @@ fn it_verifies_notary_signatures_matching_block_heights() {
 			true
 		);
 		assert_eq!(
-			<NotaryAdmin as NotaryProvider<Block>>::verify_signature(
+			<Notaries as NotaryProvider<Block>>::verify_signature(
 				1,
 				4,
 				&hash,

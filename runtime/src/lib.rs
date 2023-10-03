@@ -403,7 +403,7 @@ impl pallet_localchain_relay::Config for Runtime {
 	type Balance = Balance;
 	type Currency = ArgonBalances;
 
-	type NotaryProvider = NotaryAdmin;
+	type NotaryProvider = Notaries;
 	type PalletId = LocalchainPalletId;
 	type LocalchainAccountId = AccountId;
 	type TransferExpirationBlocks = TransferExpirationBlocks;
@@ -423,9 +423,9 @@ parameter_types! {
 	pub const MaxBlocksForKeyHistory: u32 = 1440 * 2; // keep for 2 days.. only used for notebook submission
 }
 
-impl pallet_notary_admin::Config for Runtime {
+impl pallet_notaries::Config for Runtime {
 	type RuntimeEvent = RuntimeEvent;
-	type WeightInfo = pallet_notary_admin::weights::SubstrateWeight<Runtime>;
+	type WeightInfo = pallet_notaries::weights::SubstrateWeight<Runtime>;
 	type MaxActiveNotaries = MaxActiveNotaries;
 	type MaxProposalHoldBlocks = MaxProposalHoldBlocks;
 	type MaxProposalsPerBlock = MaxProposalsPerBlock;
@@ -528,7 +528,7 @@ construct_runtime!(
 		Timestamp: pallet_timestamp,
 		MiningSlots: pallet_mining_slots,
 		Bonds: pallet_bonds,
-		NotaryAdmin: pallet_notary_admin,
+		Notaries: pallet_notaries,
 		LocalchainRelay: pallet_localchain_relay,
 		Difficulty: pallet_difficulty,// Consensus support.
 		// Authorship must be before session in order to note author in the correct session and era
@@ -596,7 +596,7 @@ mod benches {
 		[pallet_sudo, Sudo]
 		[pallet_grandpa, Grandpa]
 		[pallet_offences, Offences],
-		[pallet_notary_admin, NotaryAdmin],
+		[pallet_notaries, Notaries],
 		[pallet_localchain_relay, LocalchainRelay],
 	);
 }

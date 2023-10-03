@@ -6,7 +6,7 @@ use sp_runtime::{
 	BuildStorage,
 };
 
-use crate as pallet_notary_admin;
+use crate as pallet_notaries;
 
 pub(crate) type Block = frame_system::mocking::MockBlockU32<Test>;
 
@@ -15,7 +15,7 @@ frame_support::construct_runtime!(
 	pub enum Test
 	{
 		System: frame_system,
-		NotaryAdmin: pallet_notary_admin
+		Notaries: pallet_notaries
 	}
 );
 
@@ -53,7 +53,7 @@ parameter_types! {
 	pub static MaxBlocksForKeyHistory:u32 = 10;
 }
 
-impl pallet_notary_admin::Config for Test {
+impl pallet_notaries::Config for Test {
 	type RuntimeEvent = RuntimeEvent;
 	type WeightInfo = ();
 	type MaxProposalHoldBlocks = MaxProposalHoldBlocks;

@@ -10,7 +10,7 @@ mod mock;
 mod tests;
 
 pub mod weights;
-// const LOG_TARGET: &str = "runtime::notary-admin";
+// const LOG_TARGET: &str = "runtime::notaries";
 
 #[frame_support::pallet(dev_mode)]
 pub mod pallet {

@@ -1,5 +1,5 @@
 [package]
-name = "pallet-notary-admin"
+name = "pallet-notaries"
 version = "0.0.1"
 edition = "2021"
 authors = ["Ulixee <https://github.com/ulixee>"]
