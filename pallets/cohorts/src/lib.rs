@@ -209,6 +209,28 @@ pub mod pallet {
 	#[pallet::getter(fn is_cohort_accepted_bids)]
 	pub(super) type IsCohortAcceptingBids<T: Config> = StorageValue<_, bool, ValueQuery>;
 
+	/// The configuration for a miner to supply if there are no registered miners
+	#[pallet::storage]
+	#[pallet::getter(fn rescue_miner)]
+	pub(super) type MinerZero<T: Config> = StorageValue<_, Registration<T>, OptionQuery>;
+
+	#[pallet::genesis_config]
+	#[derive(frame_support::DefaultNoBound)]
+	pub struct GenesisConfig<T: Config> {
+		pub miner_zero: Option<Registration<T>>,
+		pub _phantom: PhantomData<T>,
+	}
+
+	#[pallet::genesis_build]
+	impl<T: Config> BuildGenesisConfig for GenesisConfig<T> {
+		fn build(&self) {
+			if let Some(miner) = &self.miner_zero {
+				<MinerZero<T>>::put(miner);
+				Pallet::<T>::on_initialize(0u32.into());
+			}
+		}
+	}
+
 	#[pallet::event]
 	#[pallet::generate_deposit(pub(super) fn deposit_event)]
 	pub enum Event<T: Config> {
@@ -337,8 +359,14 @@ pub mod pallet {
 				cohort_size,
 			);
 
-			let cohort = NextCohort::<T>::take();
+			let mut cohort = NextCohort::<T>::take();
 			IsCohortAcceptingBids::<T>::put(true);
+
+			if cohort.is_empty() && ActiveValidatorsByIndex::<T>::get().is_empty() {
+				if let Some(miner) = MinerZero::<T>::get() {
+					let _ = cohort.try_push(miner.clone());
+				}
+			}
 
 			let _ = ActiveValidatorsByIndex::<T>::try_mutate(|validators| {
 				for i in 0..cohort_size {
@@ -350,7 +378,12 @@ pub mod pallet {
 						let next = cohort.iter().find(|x| x.account_id == account_id).cloned();
 						match Self::unbond_account(entry, next) {
 							Err(err) => {
-								panic!("Failed to unbond account {:?}. {:?}", account_id, err);
+								log::error!(
+									target: LOG_TARGET,
+									"Failed to unbond account {:?}. {:?}",
+									account_id,
+									err,
+								);
 							},
 							_ => (),
 						}
@@ -360,7 +393,8 @@ pub mod pallet {
 						AccountIndexLookup::<T>::insert(&registration.account_id, &index);
 						match validators.try_insert(index, registration.clone()) {
 							Err(err) => {
-								panic!(
+								log::error!(
+									target: LOG_TARGET,
 									"Error rotating new authorities starting at {:?} at index {}. {:?}",
 									start_index_to_replace_validators, i, err
 								);
@@ -371,6 +405,7 @@ pub mod pallet {
 				}
 				Ok::<(), Error<T>>(())
 			});
+
 			Pallet::<T>::deposit_event(Event::<T>::NewValidators {
 				start_index: start_index_to_replace_validators,
 				new_validators: cohort,
@@ -613,11 +648,57 @@ impl<T: Config> Pallet<T> {
 		None
 	}
 
+	pub(crate) fn get_validator_accounts() -> Vec<T::AccountId> {
+		<ActiveValidatorsByIndex<T>>::get()
+			.into_iter()
+			.map(|(_, a)| a.account_id)
+			.collect()
+	}
+
 	pub(crate) fn get_next_registration(account_id: &T::AccountId) -> Option<Registration<T>> {
 		NextCohort::<T>::get()
-			.iter()
+			.into_iter()
 			.find(|x| x.account_id == *account_id)
 			.map(|x| x.clone())
+	}
+
+	pub(crate) fn load_session_keys<'a>(
+		validators_with_keys: impl Iterator<Item = (&'a T::AccountId, BlockSealAuthorityId)>,
+	) {
+		let mut next_authorities =
+			BoundedBTreeMap::<u32, (BlockSealAuthorityId, U256), T::MaxValidators>::new();
+		for (account_id, authority_id) in validators_with_keys {
+			if let Some(account_index) = <AccountIndexLookup<T>>::get(&account_id) {
+				let hash = blake2_256(&authority_id.into_inner().0);
+				// this should not be possible to fail. The bounds equal the source lookup
+				next_authorities
+					.try_insert(account_index, (authority_id, U256::from(hash)))
+					.expect("should not be possible to fail next_authorities insert");
+			}
+		}
+
+		let active_validators = <ActiveValidatorsByIndex<T>>::get();
+		if next_authorities.len() != active_validators.len() {
+			let no_key_validators = active_validators
+				.into_iter()
+				.filter(|(index, _)| !next_authorities.contains_key(index))
+				.map(|a| a.1.account_id)
+				.collect::<Vec<_>>();
+			if !no_key_validators.is_empty() {
+				// TODO: should we burn bonds when this happens? Aka, user taken a slot, but
+				//	 no registered keys
+				log::warn!(
+					target: LOG_TARGET,
+					"The following registered validator accounts do not have session keys: {:?}",
+					no_key_validators
+				);
+			}
+		}
+
+		let last_authorities = <AuthoritiesByIndex<T>>::get();
+		if last_authorities != next_authorities {
+			<AuthoritiesByIndex<T>>::put(next_authorities);
+		}
 	}
 
 	pub(crate) fn hold_ownership_bond(
@@ -761,9 +842,7 @@ impl<T: Config> Convert<T::AccountId, Option<T::AccountId>> for ValidatorOf<T> {
 }
 
 #[derive(Clone, Encode, Decode, Eq, PartialEq, RuntimeDebug, TypeInfo)]
-#[scale_info(skip_type_params(T))]
 pub struct MinerHistory {
-	pub block_seal_authority_id: BlockSealAuthorityId,
 	pub authority_index: u32,
 }
 
@@ -773,14 +852,7 @@ pub struct FullIdentificationOf<T>(PhantomData<T>);
 impl<T: Config> Convert<T::AccountId, Option<MinerHistory>> for FullIdentificationOf<T> {
 	fn convert(validator: T::AccountId) -> Option<MinerHistory> {
 		if let Some(index) = <AccountIndexLookup<T>>::get(&validator) {
-			if let Some(authority_id) =
-				<AuthoritiesByIndex<T>>::get().get(&index).map(|x| x.0.clone())
-			{
-				return Some(MinerHistory {
-					block_seal_authority_id: authority_id.clone(),
-					authority_index: index.clone(),
-				})
-			}
+			return Some(MinerHistory { authority_index: index.clone() })
 		}
 		None
 	}
@@ -800,15 +872,10 @@ impl<T: Config> SessionManager<T::AccountId> for Pallet<T> {
 		if block_number_u32 % T::BlocksBetweenCohorts::get() != 0 {
 			return None
 		}
-		Some(
-			<ActiveValidatorsByIndex<T>>::get()
-				.into_iter()
-				.filter_map(|(_, a)| a.account_id.try_into().ok())
-				.collect(),
-		)
+		Some(Self::get_validator_accounts())
 	}
 	fn new_session_genesis(_: u32) -> Option<Vec<T::AccountId>> {
-		None
+		Some(Self::get_validator_accounts())
 	}
 	fn end_session(_: u32) {}
 	fn start_session(_: u32) {}
@@ -825,21 +892,23 @@ where
 		<Self as SessionManager<_>>::new_session(new_index).map(|validators| {
 			validators
 				.into_iter()
-				.map(|v| {
-					let miner = FullIdentificationOf::<T>::convert(v.clone());
-					(v, miner.unwrap())
+				.filter_map(|v| {
+					if let Some(miner) = FullIdentificationOf::<T>::convert(v.clone()) {
+						return Some((v, miner))
+					}
+					None
 				})
-				.collect()
+				.collect::<Vec<_>>()
 		})
 	}
 
 	fn new_session_genesis(_: u32) -> Option<Vec<(T::AccountId, MinerHistory)>> {
-		None
+		<Self as pallet_session::historical::SessionManager<_, _>>::new_session(0)
 	}
 
 	fn start_session(_: u32) {}
 	fn end_session(index: u32) {
-		let first_session = index - T::SessionIndicesToKeepInHistory::get();
+		let first_session = index.saturating_sub(T::SessionIndicesToKeepInHistory::get());
 		<pallet_session::historical::Pallet<T>>::prune_up_to(first_session);
 	}
 }
@@ -847,11 +916,12 @@ where
 impl<T: Config> OneSessionHandler<T::AccountId> for Pallet<T> {
 	type Key = BlockSealAuthorityId;
 
-	fn on_genesis_session<'a, I: 'a>(_validators: I)
+	fn on_genesis_session<'a, I: 'a>(validators: I)
 	where
 		I: Iterator<Item = (&'a T::AccountId, Self::Key)>,
 		T::AccountId: 'a,
 	{
+		Self::load_session_keys(validators);
 	}
 
 	fn on_new_session<'a, I: 'a>(changed: bool, validators_with_keys: I, _queued_validators: I)
@@ -859,46 +929,7 @@ impl<T: Config> OneSessionHandler<T::AccountId> for Pallet<T> {
 		I: Iterator<Item = (&'a T::AccountId, BlockSealAuthorityId)>,
 	{
 		if changed {
-			let mut next_authorities =
-				BoundedBTreeMap::<u32, (BlockSealAuthorityId, U256), T::MaxValidators>::new();
-			for (account_id, authority_id) in validators_with_keys {
-				if let Some(account_index) = <AccountIndexLookup<T>>::get(&account_id) {
-					let hash = blake2_256(&sp_runtime::RuntimeAppPublic::to_raw_vec(&authority_id));
-					if let None = next_authorities
-						.try_insert(account_index, (authority_id, U256::from(hash)))
-						.ok()
-					{
-						// TODO: should we burn bonds when this happens? Aka, user taken a slot, but
-						// not registered keys
-						log::warn!(
-							target: LOG_TARGET,
-							"Could not insert authority {:?} at index {:?} into next_authorities",
-							account_id,
-							account_index
-						);
-					}
-				}
-			}
-
-			let active_validators = <ActiveValidatorsByIndex<T>>::get();
-			if next_authorities.len() != active_validators.len() {
-				let no_key_validators = active_validators
-					.into_iter()
-					.filter(|(index, _)| !next_authorities.contains_key(&index))
-					.map(|a| a.1.account_id)
-					.collect::<Vec<_>>();
-
-				log::warn!(
-					target: LOG_TARGET,
-					"The following registered validator accounts do not have session keys: {:?}",
-					no_key_validators
-				);
-			}
-
-			let last_authorities = <AuthoritiesByIndex<T>>::get();
-			if last_authorities != next_authorities {
-				<AuthoritiesByIndex<T>>::put(next_authorities);
-			}
+			Self::load_session_keys(validators_with_keys);
 		}
 	}
 

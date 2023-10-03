@@ -1,7 +1,6 @@
 use codec::{Decode, Encode};
 use frame_support::{CloneNoBound, EqNoBound, Parameter, PartialEqNoBound};
 use scale_info::TypeInfo;
-#[cfg(feature = "serde")]
 use serde::{Deserialize, Serialize};
 use sp_core::{
 	crypto::{AccountId32, KeyTypeId},
@@ -28,8 +27,7 @@ pub type BlockSealAuthorityId = app::Public;
 
 pub type MaxValidatorRpcHosts = ConstU32<4>;
 
-#[derive(Clone, PartialEq, Eq, Encode, Decode, RuntimeDebug, TypeInfo)]
-#[cfg_attr(feature = "serde", derive(Deserialize, Serialize))]
+#[derive(Clone, PartialEq, Eq, Encode, Decode, RuntimeDebug, TypeInfo, Deserialize, Serialize)]
 pub struct BlockProof {
 	pub tax_proof_id: u32,
 	pub tax_amount: u128,
@@ -61,8 +59,7 @@ pub struct SealerSignatureMessage<Hash, AuthorityId> {
 	pub seal_stampers: Vec<AuthorityId>,
 }
 
-#[derive(Clone, PartialEq, Eq, Encode, Decode, RuntimeDebug, TypeInfo)]
-#[cfg_attr(feature = "serde", derive(Deserialize, Serialize))]
+#[derive(Clone, PartialEq, Eq, Encode, Decode, RuntimeDebug, TypeInfo, Deserialize, Serialize)]
 pub struct SealStamper {
 	pub authority_idx: u16,
 	pub signature: Option<BoundedVec<u8, ConstU32<64>>>,
@@ -81,6 +78,7 @@ sp_api::decl_runtime_apis! {
 	PartialEqNoBound, EqNoBound, CloneNoBound, Encode, Decode, RuntimeDebug, TypeInfo, MaxEncodedLen,
 )]
 #[scale_info(skip_type_params(MaxHosts))]
+#[derive(Deserialize, Serialize)]
 pub struct ValidatorRegistration<
 	AccountId: Parameter,
 	BondId: Parameter,
@@ -98,7 +96,19 @@ pub struct ValidatorRegistration<
 }
 
 /// A destination account for validator rewards
-#[derive(PartialEq, Eq, Copy, Clone, Encode, Decode, RuntimeDebug, TypeInfo, MaxEncodedLen)]
+#[derive(
+	PartialEq,
+	Eq,
+	Copy,
+	Clone,
+	Encode,
+	Decode,
+	RuntimeDebug,
+	TypeInfo,
+	MaxEncodedLen,
+	Deserialize,
+	Serialize,
+)]
 pub enum RewardDestination<AccountId> {
 	Owner,
 	/// Pay into a specified account.
@@ -111,7 +121,7 @@ impl<AccountId> Default for RewardDestination<AccountId> {
 	}
 }
 
-#[derive(PartialEq, Eq, Clone, Encode, Decode, RuntimeDebug, TypeInfo)]
+#[derive(PartialEq, Eq, Clone, Encode, Decode, RuntimeDebug, TypeInfo, Serialize, Deserialize)]
 pub struct PeerId(pub OpaquePeerId);
 
 impl MaxEncodedLen for PeerId {
@@ -145,7 +155,18 @@ pub struct AuthorityDistance<AuthorityId> {
 	pub rpc_hosts: BoundedVec<Host, MaxValidatorRpcHosts>,
 }
 
-#[derive(PartialEq, Eq, Clone, Encode, Decode, RuntimeDebug, TypeInfo, MaxEncodedLen)]
+#[derive(
+	PartialEq,
+	Eq,
+	Clone,
+	Encode,
+	Decode,
+	RuntimeDebug,
+	TypeInfo,
+	MaxEncodedLen,
+	Deserialize,
+	Serialize,
+)]
 pub struct Host {
 	#[codec(compact)]
 	/// ip encoded as u32 big endian (eg, from octets)

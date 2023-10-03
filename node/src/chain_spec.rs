@@ -1,14 +1,19 @@
+use std::net::Ipv4Addr;
+
 use sc_service::{ChainType, Properties};
 use sp_consensus_grandpa::AuthorityId as GrandpaId;
-use sp_core::{crypto::AccountId32, sr25519, ByteArray, Pair, Public};
+use sp_core::{bounded_vec, sr25519, OpaquePeerId, Pair, Public};
 use sp_runtime::traits::{IdentifyAccount, Verify};
 
 use ulx_node_runtime::{
-	opaque::SessionKeys, AccountId, ArgonBalancesConfig, BlockSealConfig, DifficultyConfig,
-	GrandpaConfig, RuntimeGenesisConfig, SessionConfig, Signature, SudoConfig, SystemConfig,
-	UlixeeBalancesConfig, WASM_BINARY,
+	opaque::SessionKeys, AccountId, ArgonBalancesConfig, BlockSealConfig, CohortsConfig,
+	DifficultyConfig, GrandpaConfig, RuntimeGenesisConfig, SessionConfig, Signature, SudoConfig,
+	SystemConfig, UlixeeBalancesConfig, WASM_BINARY,
 };
-use ulx_primitives::BlockSealAuthorityId;
+use ulx_primitives::{
+	block_seal::{Host, PeerId, RewardDestination, ValidatorRegistration},
+	BlockSealAuthorityId,
+};
 
 // The URL for the telemetry server.
 // const STAGING_TELEMETRY_URL: &str = "wss://telemetry.polkadot.io/submit/";
@@ -38,13 +43,6 @@ where
 	AccountPublic: From<<TPublic::Pair as Pair>::Public>,
 {
 	AccountPublic::from(get_from_seed::<TPublic>(seed)).into_account()
-}
-
-pub fn get_genesis_dummy_validator() -> (AccountId, BlockSealAuthorityId, GrandpaId) {
-	let account_id: AccountId = AccountId32::from([1u8; 32]).into();
-	let validator_id = BlockSealAuthorityId::from_slice(&[1; 32]).unwrap();
-	let grandpa_id = GrandpaId::from_slice(&[1; 32]).unwrap();
-	(account_id, validator_id, grandpa_id)
 }
 
 pub fn development_config() -> Result<ChainSpec, String> {
@@ -114,14 +112,14 @@ pub fn local_testnet_config() -> Result<ChainSpec, String> {
 						get_account_id_from_seed::<sr25519::Public>("Alice"),
 						authority_keys_from_seed("Alice"),
 					),
-					(
-						get_account_id_from_seed::<sr25519::Public>("Bob"),
-						authority_keys_from_seed("Bob"),
-					),
-					(
-						get_account_id_from_seed::<sr25519::Public>("Dave"),
-						authority_keys_from_seed("Dave"),
-					),
+					// (
+					// 	get_account_id_from_seed::<sr25519::Public>("Bob"),
+					// 	authority_keys_from_seed("Bob"),
+					// ),
+					// (
+					// 	get_account_id_from_seed::<sr25519::Public>("Dave"),
+					// 	authority_keys_from_seed("Dave"),
+					// ),
 				],
 				// Sudo account
 				get_account_id_from_seed::<sr25519::Public>("Alice"),
@@ -166,6 +164,7 @@ fn testnet_genesis(
 	_enable_println: bool,
 ) -> RuntimeGenesisConfig {
 	let initial_difficulty = 100_000_000;
+	let authority_zero = initial_authorities[0].clone();
 
 	RuntimeGenesisConfig {
 		system: SystemConfig {
@@ -178,6 +177,22 @@ fn testnet_genesis(
 		},
 		ulixee_balances: UlixeeBalancesConfig {
 			balances: endowed_accounts.iter().cloned().map(|k| (k, 10_000)).collect(),
+		},
+		cohorts: CohortsConfig {
+			miner_zero: Some(ValidatorRegistration {
+				account_id: authority_zero.0.clone(),
+				rpc_hosts: bounded_vec![Host {
+					ip: Ipv4Addr::new(127, 0, 0, 1).into(),
+					port: 9944,
+					is_secure: false
+				},],
+				bond_id: None,
+				reward_destination: RewardDestination::Owner,
+				bond_amount: 0u32.into(),
+				ownership_tokens: 0u32.into(),
+				peer_id: PeerId(OpaquePeerId::new([0u8; 64].to_vec())),
+			}),
+			..Default::default()
 		},
 		grandpa: GrandpaConfig { authorities: vec![], ..Default::default() },
 		sudo: SudoConfig {
@@ -197,8 +212,9 @@ fn testnet_genesis(
 				.collect(),
 		},
 		block_seal: BlockSealConfig {
-			min_seal_signers: 8,
-			closest_xor_authorities_required: 10,
+			min_seal_signers: 1,
+			closest_xor_authorities_required: 5,
+			authority_count_starting_tax_seal: 2,
 			..Default::default()
 		},
 		difficulty: DifficultyConfig { initial_difficulty, ..Default::default() },
