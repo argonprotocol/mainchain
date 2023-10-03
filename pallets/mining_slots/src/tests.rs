@@ -7,16 +7,16 @@ use sp_runtime::{testing::UintAuthorityId, BoundedVec};
 use std::net::Ipv4Addr;
 
 use ulx_primitives::{
-	block_seal::{AuthorityProvider, PeerId, RewardDestination, ValidatorRegistration},
+	block_seal::{AuthorityProvider, MiningRegistration, PeerId, RewardDestination},
 	bond::BondProvider,
 	BlockSealAuthorityId,
 };
 
 use crate::{
-	mock::{Cohorts, UlixeeBalances, *},
+	mock::{MiningSlots, UlixeeBalances, *},
 	pallet::{
-		AccountIndexLookup, ActiveValidatorsByIndex, AuthoritiesByIndex, IsCohortAcceptingBids,
-		NextCohort, OwnershipBondAmount,
+		AccountIndexLookup, ActiveMinersByIndex, AuthoritiesByIndex, IsNextSlotBiddingOpen,
+		NextSlotCohort, OwnershipBondAmount,
 	},
 	Error, Event,
 };
@@ -32,13 +32,13 @@ pub fn ip_from_u32(ip: u32) -> Ipv4Addr {
 
 #[test]
 fn it_doesnt_add_cohorts_until_time() {
-	BlocksBetweenCohorts::set(2);
+	BlocksBetweenSlots::set(2);
 
 	new_test_ext().execute_with(|| {
 		// Go past genesis block so events get deposited
 		System::set_block_number(1);
 
-		NextCohort::<Test>::set(bounded_vec![ValidatorRegistration {
+		NextSlotCohort::<Test>::set(bounded_vec![MiningRegistration {
 			account_id: 1,
 			peer_id: PeerId(OpaquePeerId::default()),
 			bond_id: None,
@@ -48,11 +48,11 @@ fn it_doesnt_add_cohorts_until_time() {
 			rpc_hosts: rpc_hosts(Ipv4Addr::new(127, 0, 0, 1), 3000),
 		}]);
 
-		Cohorts::on_initialize(1);
+		MiningSlots::on_initialize(1);
 
-		assert_eq!(NextCohort::<Test>::get().len(), 1);
+		assert_eq!(NextSlotCohort::<Test>::get().len(), 1);
 		assert_eq!(
-			ip_from_u32(NextCohort::<Test>::get()[0].rpc_hosts[0].ip).to_string(),
+			ip_from_u32(NextSlotCohort::<Test>::get()[0].rpc_hosts[0].ip).to_string(),
 			"127.0.0.1"
 		);
 	});
@@ -61,56 +61,56 @@ fn it_doesnt_add_cohorts_until_time() {
 #[test]
 fn get_validation_window_blocks() {
 	MaxCohortSize::set(2);
-	MaxValidators::set(10);
-	BlocksBetweenCohorts::set(1);
+	MaxMiners::set(10);
+	BlocksBetweenSlots::set(1);
 
-	assert_eq!(Cohorts::get_validation_window_blocks(), 5);
+	assert_eq!(MiningSlots::get_validation_window_blocks(), 5);
 
 	MaxCohortSize::set(5);
-	MaxValidators::set(10);
-	BlocksBetweenCohorts::set(10);
+	MaxMiners::set(10);
+	BlocksBetweenSlots::set(10);
 
-	assert_eq!(Cohorts::get_validation_window_blocks(), 2 * 10);
+	assert_eq!(MiningSlots::get_validation_window_blocks(), 2 * 10);
 }
 
 #[test]
-fn get_next_cohort_period() {
+fn get_slot_era() {
 	new_test_ext().execute_with(|| {
 		// Go past genesis block so events get deposited
 		System::set_block_number(8);
 
 		MaxCohortSize::set(2);
-		MaxValidators::set(10);
-		BlocksBetweenCohorts::set(140);
+		MaxMiners::set(10);
+		BlocksBetweenSlots::set(140);
 		let window = 140 * 5;
 
-		assert_eq!(Cohorts::get_next_cohort_period(), (140, 140 + window));
+		assert_eq!(MiningSlots::get_slot_era(), (140, 140 + window));
 
 		MaxCohortSize::set(5);
-		MaxValidators::set(10);
-		BlocksBetweenCohorts::set(10);
+		MaxMiners::set(10);
+		BlocksBetweenSlots::set(10);
 
-		assert_eq!(Cohorts::get_next_cohort_period(), (10, 10 + (10 * 2)));
+		assert_eq!(MiningSlots::get_slot_era(), (10, 10 + (10 * 2)));
 
 		// on block, should start showing next period
 		System::set_block_number(10);
-		assert_eq!(Cohorts::get_next_cohort_period(), (20, 20 + (10 * 2)));
+		assert_eq!(MiningSlots::get_slot_era(), (20, 20 + (10 * 2)));
 
 		System::set_block_number(18);
-		assert_eq!(Cohorts::get_next_cohort_period(), (20, 20 + (10 * 2)));
+		assert_eq!(MiningSlots::get_slot_era(), (20, 20 + (10 * 2)));
 
 		System::set_block_number(20);
-		assert_eq!(Cohorts::get_next_cohort_period(), (30, 30 + (10 * 2)));
+		assert_eq!(MiningSlots::get_slot_era(), (30, 30 + (10 * 2)));
 
-		BlocksBetweenCohorts::set(4);
-		MaxValidators::set(6);
+		BlocksBetweenSlots::set(4);
+		MaxMiners::set(6);
 		MaxCohortSize::set(2);
 		System::set_block_number(3);
-		assert_eq!(Cohorts::get_next_cohort_period(), (4, 4 + (4 * 3)));
+		assert_eq!(MiningSlots::get_slot_era(), (4, 4 + (4 * 3)));
 		System::set_block_number(4);
-		assert_eq!(Cohorts::get_next_cohort_period(), (8, 8 + (4 * 3)));
+		assert_eq!(MiningSlots::get_slot_era(), (8, 8 + (4 * 3)));
 		System::set_block_number(6);
-		assert_eq!(Cohorts::get_next_cohort_period(), (8, 8 + (4 * 3)));
+		assert_eq!(MiningSlots::get_slot_era(), (8, 8 + (4 * 3)));
 	})
 }
 
@@ -118,29 +118,39 @@ fn get_next_cohort_period() {
 fn starting_cohort_index() {
 	let max_cohort_size = 3;
 	let max_validators = 12;
-	let blocks_between_cohorts = 5;
+	let blocks_between_slots = 5;
 
 	assert_eq!(
-		Cohorts::get_start_cohort_index(0, blocks_between_cohorts, max_validators, max_cohort_size),
+		MiningSlots::get_slot_starting_index(
+			0,
+			blocks_between_slots,
+			max_validators,
+			max_cohort_size
+		),
 		0
 	);
 	assert_eq!(
-		Cohorts::get_start_cohort_index(5, blocks_between_cohorts, max_validators, max_cohort_size),
+		MiningSlots::get_slot_starting_index(
+			5,
+			blocks_between_slots,
+			max_validators,
+			max_cohort_size
+		),
 		3
 	);
 	assert_eq!(
-		Cohorts::get_start_cohort_index(
+		MiningSlots::get_slot_starting_index(
 			10,
-			blocks_between_cohorts,
+			blocks_between_slots,
 			max_validators,
 			max_cohort_size
 		),
 		6
 	);
 	assert_eq!(
-		Cohorts::get_start_cohort_index(
+		MiningSlots::get_slot_starting_index(
 			15,
-			blocks_between_cohorts,
+			blocks_between_slots,
 			max_validators,
 			max_cohort_size
 		),
@@ -148,9 +158,9 @@ fn starting_cohort_index() {
 	);
 
 	assert_eq!(
-		Cohorts::get_start_cohort_index(
+		MiningSlots::get_slot_starting_index(
 			20,
-			blocks_between_cohorts,
+			blocks_between_slots,
 			max_validators,
 			max_cohort_size
 		),
@@ -160,20 +170,20 @@ fn starting_cohort_index() {
 
 #[test]
 fn it_adds_new_cohorts_on_block() {
-	BlocksBetweenCohorts::set(2);
-	MaxValidators::set(6);
+	BlocksBetweenSlots::set(2);
+	MaxMiners::set(6);
 	MaxCohortSize::set(2);
 
 	new_test_ext().execute_with(|| {
 		// Go past genesis block so events get deposited
 		System::set_block_number(8);
 
-		ActiveValidatorsByIndex::<Test>::try_mutate(|validators| {
+		ActiveMinersByIndex::<Test>::try_mutate(|validators| {
 			for i in 0..4u32 {
 				let account_id: u64 = (i + 4).into();
 				let _ = validators.try_insert(
 					i,
-					ValidatorRegistration {
+					MiningRegistration {
 						account_id,
 						peer_id: empty_peer(),
 						bond_id: None,
@@ -189,7 +199,7 @@ fn it_adds_new_cohorts_on_block() {
 		})
 		.expect("Didn't insert validators");
 
-		let cohort = BoundedVec::truncate_from(vec![ValidatorRegistration {
+		let cohort = BoundedVec::truncate_from(vec![MiningRegistration {
 			account_id: 1,
 			peer_id: empty_peer(),
 			bond_id: None,
@@ -199,16 +209,16 @@ fn it_adds_new_cohorts_on_block() {
 			rpc_hosts: rpc_hosts(Ipv4Addr::new(127, 0, 0, 1), 3001),
 		}]);
 
-		NextCohort::<Test>::set(cohort.clone());
+		NextSlotCohort::<Test>::set(cohort.clone());
 
-		Cohorts::on_initialize(8);
+		MiningSlots::on_initialize(8);
 
 		// re-fetch
-		let validators = ActiveValidatorsByIndex::<Test>::get();
+		let validators = ActiveMinersByIndex::<Test>::get();
 		assert_eq!(
-			NextCohort::<Test>::get().len(),
+			NextSlotCohort::<Test>::get().len(),
 			0,
-			"Queued cohorts for block 8 should be removed"
+			"Queued mining_slots for block 8 should be removed"
 		);
 		assert_eq!(validators.len(), 3, "Should have 3 validators still after insertion");
 		assert_eq!(validators.contains_key(&2), true, "Should insert validator at index 2");
@@ -233,9 +243,7 @@ fn it_adds_new_cohorts_on_block() {
 			"Should no longer have account 7 registered"
 		);
 
-		System::assert_last_event(
-			Event::NewValidators { start_index: 2, new_validators: cohort }.into(),
-		)
+		System::assert_last_event(Event::NewMiners { start_index: 2, new_miners: cohort }.into())
 	});
 }
 
@@ -244,8 +252,8 @@ use ulx_primitives::block_seal::Host;
 
 #[test]
 fn it_unbonds_accounts_when_a_window_closes() {
-	BlocksBetweenCohorts::set(2);
-	MaxValidators::set(6);
+	BlocksBetweenSlots::set(2);
+	MaxMiners::set(6);
 	MaxCohortSize::set(2);
 
 	new_test_ext().execute_with(|| {
@@ -255,7 +263,7 @@ fn it_unbonds_accounts_when_a_window_closes() {
 
 		let mut bond_2: BondId = 0;
 		let mut bond_3: BondId = 0;
-		ActiveValidatorsByIndex::<Test>::try_mutate(|validators| {
+		ActiveMinersByIndex::<Test>::try_mutate(|validators| {
 			for i in 0..4u32 {
 				let account_id: u64 = (i).into();
 				set_ownership(account_id, 1000u32.into());
@@ -275,11 +283,11 @@ fn it_unbonds_accounts_when_a_window_closes() {
 				}
 				<Bonds as BondProvider>::lock_bond(bond_id).expect("bond should lock");
 				let ownership_tokens =
-					Cohorts::hold_ownership_bond(&account_id, None).ok().unwrap();
+					MiningSlots::hold_ownership_bond(&account_id, None).ok().unwrap();
 
 				let _ = validators.try_insert(
 					i,
-					ValidatorRegistration {
+					MiningRegistration {
 						account_id,
 						peer_id: empty_peer(),
 						rpc_hosts: rpc_hosts(Ipv4Addr::new(127, 0, 0, 1), 3000),
@@ -295,11 +303,11 @@ fn it_unbonds_accounts_when_a_window_closes() {
 		})
 		.expect("Didn't insert validators");
 
-		IsCohortAcceptingBids::<Test>::set(true);
-		assert_eq!(Cohorts::get_next_cohort_period(), (8, 8 + (2 * 3)));
+		IsNextSlotBiddingOpen::<Test>::set(true);
+		assert_eq!(MiningSlots::get_slot_era(), (8, 8 + (2 * 3)));
 
 		<Bonds as BondProvider>::extend_bond(bond_2, 2, 1010, 16).expect("can increase bond");
-		assert_ok!(Cohorts::bid(
+		assert_ok!(MiningSlots::bid(
 			RuntimeOrigin::signed(2),
 			OpaquePeerId::default(),
 			rpc_hosts(Ipv4Addr::new(127, 0, 0, 1), 3000),
@@ -309,12 +317,12 @@ fn it_unbonds_accounts_when_a_window_closes() {
 
 		System::set_block_number(8);
 
-		Cohorts::on_initialize(8);
+		MiningSlots::on_initialize(8);
 
 		System::assert_last_event(
-			Event::NewValidators {
+			Event::NewMiners {
 				start_index: 2,
-				new_validators: BoundedVec::truncate_from(vec![ValidatorRegistration {
+				new_miners: BoundedVec::truncate_from(vec![MiningRegistration {
 					bond_id: Some(bond_2),
 					account_id: 2,
 					ownership_tokens: 1000u32.into(),
@@ -344,7 +352,7 @@ fn it_unbonds_accounts_when_a_window_closes() {
 
 		assert_eq!(
 			events[2],
-			Event::<Test>::UnbondedValidator {
+			Event::<Test>::UnbondedMiner {
 				account_id: 3,
 				bond_id: Some(bond_3),
 				kept_ownership_bond: false
@@ -372,8 +380,8 @@ fn it_unbonds_accounts_when_a_window_closes() {
 
 #[test]
 fn it_can_take_cohort_bids() {
-	BlocksBetweenCohorts::set(3);
-	MaxValidators::set(6);
+	BlocksBetweenSlots::set(3);
+	MaxMiners::set(6);
 	MaxCohortSize::set(2);
 
 	new_test_ext().execute_with(|| {
@@ -381,24 +389,24 @@ fn it_can_take_cohort_bids() {
 		System::set_block_number(3);
 
 		assert_err!(
-			Cohorts::bid(
+			MiningSlots::bid(
 				RuntimeOrigin::signed(2),
 				OpaquePeerId::default(),
 				rpc_hosts(Ipv4Addr::new(127, 0, 0, 1), 3000),
 				None,
 				RewardDestination::Owner
 			),
-			Error::<Test>::CohortNotTakingBids
+			Error::<Test>::SlotNotTakingBids
 		);
 
-		IsCohortAcceptingBids::<Test>::set(true);
+		IsNextSlotBiddingOpen::<Test>::set(true);
 
 		set_ownership(3, 5000u32.into());
-		Cohorts::on_initialize(3);
+		MiningSlots::on_initialize(3);
 		assert_eq!(OwnershipBondAmount::<Test>::get(), 666);
 
 		assert_err!(
-			Cohorts::bid(
+			MiningSlots::bid(
 				RuntimeOrigin::signed(1),
 				OpaquePeerId::default(),
 				rpc_hosts(Ipv4Addr::new(127, 0, 0, 1), 3000),
@@ -410,7 +418,7 @@ fn it_can_take_cohort_bids() {
 
 		set_ownership(1, 1000u32.into());
 
-		assert_ok!(Cohorts::bid(
+		assert_ok!(MiningSlots::bid(
 			RuntimeOrigin::signed(1),
 			OpaquePeerId::default(),
 			rpc_hosts(Ipv4Addr::new(127, 0, 0, 1), 3000),
@@ -418,13 +426,12 @@ fn it_can_take_cohort_bids() {
 			RewardDestination::Owner
 		));
 		System::assert_last_event(
-			Event::CohortRegistrantAdded { account_id: 1, bid_amount: 0u32.into(), index: 0 }
-				.into(),
+			Event::SlotBidderAdded { account_id: 1, bid_amount: 0u32.into(), index: 0 }.into(),
 		);
 		assert_eq!(UlixeeBalances::free_balance(&1), 334);
 
 		// should be able to re-register
-		assert_ok!(Cohorts::bid(
+		assert_ok!(MiningSlots::bid(
 			RuntimeOrigin::signed(1),
 			OpaquePeerId::default(),
 			rpc_hosts(Ipv4Addr::new(127, 0, 0, 1), 3000),
@@ -432,7 +439,7 @@ fn it_can_take_cohort_bids() {
 			RewardDestination::Owner
 		));
 		assert_eq!(
-			NextCohort::<Test>::get().iter().map(|a| a.account_id).collect::<Vec<_>>(),
+			NextSlotCohort::<Test>::get().iter().map(|a| a.account_id).collect::<Vec<_>>(),
 			vec![1]
 		);
 		assert_eq!(UlixeeBalances::free_balance(&1), 334, "should not alter reserved balance");
@@ -445,22 +452,22 @@ fn it_can_take_cohort_bids() {
 
 #[test]
 fn it_wont_let_you_use_ownership_shares_for_two_bids() {
-	BlocksBetweenCohorts::set(4);
-	MaxValidators::set(6);
+	BlocksBetweenSlots::set(4);
+	MaxMiners::set(6);
 	MaxCohortSize::set(2);
 
 	new_test_ext().execute_with(|| {
 		System::set_block_number(3);
 
-		IsCohortAcceptingBids::<Test>::set(true);
+		IsNextSlotBiddingOpen::<Test>::set(true);
 
-		assert_eq!(Cohorts::get_next_cohort_period(), (4, 4 + (4 * 3)));
-		assert_eq!(Cohorts::get_next_start_cohort_index(), 2);
+		assert_eq!(MiningSlots::get_slot_era(), (4, 4 + (4 * 3)));
+		assert_eq!(MiningSlots::get_next_slot_starting_index(), 2);
 		set_ownership(2, 100u32.into());
 		set_ownership(1, 100u32.into());
-		Cohorts::on_initialize(3);
+		MiningSlots::on_initialize(3);
 
-		assert_ok!(Cohorts::bid(
+		assert_ok!(MiningSlots::bid(
 			RuntimeOrigin::signed(1),
 			OpaquePeerId::default(),
 			rpc_hosts(Ipv4Addr::new(192, 255, 255, 255), 15555),
@@ -468,12 +475,12 @@ fn it_wont_let_you_use_ownership_shares_for_two_bids() {
 			RewardDestination::Owner
 		));
 		System::set_block_number(4);
-		Cohorts::on_initialize(4);
+		MiningSlots::on_initialize(4);
 
 		System::assert_last_event(
-			Event::NewValidators {
+			Event::NewMiners {
 				start_index: 2,
-				new_validators: BoundedVec::truncate_from(vec![ValidatorRegistration {
+				new_miners: BoundedVec::truncate_from(vec![MiningRegistration {
 					account_id: 1,
 					peer_id: PeerId(OpaquePeerId::default()),
 					bond_id: None,
@@ -486,16 +493,16 @@ fn it_wont_let_you_use_ownership_shares_for_two_bids() {
 			.into(),
 		);
 		assert_eq!(OwnershipBondAmount::<Test>::get(), 26);
-		assert_eq!(Cohorts::get_next_cohort_period(), (8, 8 + (4 * 3)));
-		assert_eq!(Cohorts::get_next_start_cohort_index(), 4);
+		assert_eq!(MiningSlots::get_slot_era(), (8, 8 + (4 * 3)));
+		assert_eq!(MiningSlots::get_next_slot_starting_index(), 4);
 
 		System::set_block_number(6);
-		Cohorts::on_initialize(6);
-		assert_eq!(Cohorts::get_next_cohort_period(), (8, 8 + (4 * 3)));
-		assert_eq!(Cohorts::get_next_start_cohort_index(), 4);
+		MiningSlots::on_initialize(6);
+		assert_eq!(MiningSlots::get_slot_era(), (8, 8 + (4 * 3)));
+		assert_eq!(MiningSlots::get_next_slot_starting_index(), 4);
 
 		assert_err!(
-			Cohorts::bid(
+			MiningSlots::bid(
 				RuntimeOrigin::signed(1),
 				OpaquePeerId::default(),
 				rpc_hosts(Ipv4Addr::new(127, 0, 0, 1), 3000),
@@ -511,8 +518,8 @@ fn it_wont_let_you_use_ownership_shares_for_two_bids() {
 
 #[test]
 fn it_will_order_bids_with_argon_bonds() {
-	BlocksBetweenCohorts::set(3);
-	MaxValidators::set(6);
+	BlocksBetweenSlots::set(3);
+	MaxMiners::set(6);
 	MaxCohortSize::set(2);
 
 	new_test_ext().execute_with(|| {
@@ -520,17 +527,17 @@ fn it_will_order_bids_with_argon_bonds() {
 		System::set_block_number(3);
 
 		assert_err!(
-			Cohorts::bid(
+			MiningSlots::bid(
 				RuntimeOrigin::signed(2),
 				OpaquePeerId::default(),
 				rpc_hosts(Ipv4Addr::new(127, 0, 0, 1), 3000),
 				None,
 				RewardDestination::Owner
 			),
-			Error::<Test>::CohortNotTakingBids
+			Error::<Test>::SlotNotTakingBids
 		);
 
-		IsCohortAcceptingBids::<Test>::set(true);
+		IsNextSlotBiddingOpen::<Test>::set(true);
 
 		set_ownership(1, 1000u32.into());
 		set_argons(1, 10_000u32.into());
@@ -539,18 +546,18 @@ fn it_will_order_bids_with_argon_bonds() {
 		set_ownership(3, 1000u32.into());
 		set_argons(3, 10_000u32.into());
 
-		Cohorts::on_initialize(3);
+		MiningSlots::on_initialize(3);
 		assert_eq!(OwnershipBondAmount::<Test>::get(), 400);
 
 		// 1. Account 1 bids
-		let bond_until_block = Cohorts::get_next_cohort_period().1;
+		let bond_until_block = MiningSlots::get_slot_era().1;
 		let acc_1_bond_id =
 			match <Bonds as BondProvider>::bond_self(1, 1000u32.into(), bond_until_block) {
 				Ok(id) => id,
 				Err(_) => panic!("bond should exist"),
 			};
 
-		assert_ok!(Cohorts::bid(
+		assert_ok!(MiningSlots::bid(
 			RuntimeOrigin::signed(1),
 			OpaquePeerId::default(),
 			rpc_hosts(Ipv4Addr::new(127, 0, 0, 1), 3000),
@@ -558,8 +565,7 @@ fn it_will_order_bids_with_argon_bonds() {
 			RewardDestination::Owner
 		));
 		System::assert_last_event(
-			Event::CohortRegistrantAdded { account_id: 1, bid_amount: 1000u32.into(), index: 0 }
-				.into(),
+			Event::SlotBidderAdded { account_id: 1, bid_amount: 1000u32.into(), index: 0 }.into(),
 		);
 		assert_eq!(UlixeeBalances::free_balance(&1), 600);
 
@@ -571,7 +577,7 @@ fn it_will_order_bids_with_argon_bonds() {
 			<Bonds as BondProvider>::bond_self(2, 1_001_u32.into(), bond_until_block).ok();
 
 		// should be able to re-register
-		assert_ok!(Cohorts::bid(
+		assert_ok!(MiningSlots::bid(
 			RuntimeOrigin::signed(2),
 			OpaquePeerId::default(),
 			rpc_hosts(Ipv4Addr::new(127, 0, 0, 1), 3000),
@@ -579,12 +585,11 @@ fn it_will_order_bids_with_argon_bonds() {
 			RewardDestination::Owner
 		));
 		System::assert_last_event(
-			Event::CohortRegistrantAdded { account_id: 2, bid_amount: 1001u32.into(), index: 0 }
-				.into(),
+			Event::SlotBidderAdded { account_id: 2, bid_amount: 1001u32.into(), index: 0 }.into(),
 		);
 
 		assert_eq!(
-			NextCohort::<Test>::get().iter().map(|a| a.account_id).collect::<Vec<_>>(),
+			NextSlotCohort::<Test>::get().iter().map(|a| a.account_id).collect::<Vec<_>>(),
 			vec![2, 1]
 		);
 
@@ -593,7 +598,7 @@ fn it_will_order_bids_with_argon_bonds() {
 			<Bonds as BondProvider>::bond_self(3, 1_001_u32.into(), bond_until_block).ok();
 
 		// should be able to re-register
-		assert_ok!(Cohorts::bid(
+		assert_ok!(MiningSlots::bid(
 			RuntimeOrigin::signed(3),
 			OpaquePeerId::default(),
 			rpc_hosts(Ipv4Addr::new(127, 0, 0, 1), 3000),
@@ -601,12 +606,11 @@ fn it_will_order_bids_with_argon_bonds() {
 			RewardDestination::Owner
 		));
 		System::assert_last_event(
-			Event::CohortRegistrantAdded { account_id: 3, bid_amount: 1001u32.into(), index: 1 }
-				.into(),
+			Event::SlotBidderAdded { account_id: 3, bid_amount: 1001u32.into(), index: 1 }.into(),
 		);
 
 		assert_eq!(
-			NextCohort::<Test>::get().iter().map(|a| a.account_id).collect::<Vec<_>>(),
+			NextSlotCohort::<Test>::get().iter().map(|a| a.account_id).collect::<Vec<_>>(),
 			vec![2, 3]
 		);
 
@@ -618,7 +622,7 @@ fn it_will_order_bids_with_argon_bonds() {
 		// 4. Account 1 increases bid and resubmits
 		<Bonds as BondProvider>::extend_bond(acc_1_bond_id, 1, 1002, bond_until_block)
 			.expect("can increse bond");
-		assert_ok!(Cohorts::bid(
+		assert_ok!(MiningSlots::bid(
 			RuntimeOrigin::signed(1),
 			OpaquePeerId::default(),
 			rpc_hosts(Ipv4Addr::new(127, 0, 0, 1), 3000),
@@ -632,7 +636,7 @@ fn it_will_order_bids_with_argon_bonds() {
 		assert_eq!(
 			event,
 			&<Test as frame_system::Config>::RuntimeEvent::from(
-				Event::<Test>::CohortRegistrantReplaced {
+				Event::<Test>::SlotBidderReplaced {
 					bond_id: acc_3_bond_id,
 					account_id: 3u64,
 					kept_ownership_bond: false
@@ -642,13 +646,12 @@ fn it_will_order_bids_with_argon_bonds() {
 		assert_eq!(ArgonBalances::free_balance(&1), 8998); // should still be locked up
 
 		System::assert_last_event(
-			Event::CohortRegistrantAdded { account_id: 1, bid_amount: 1002u32.into(), index: 0 }
-				.into(),
+			Event::SlotBidderAdded { account_id: 1, bid_amount: 1002u32.into(), index: 0 }.into(),
 		);
 		assert_eq!(UlixeeBalances::free_balance(&3), 1000);
 
 		assert_eq!(
-			NextCohort::<Test>::get().iter().map(|a| a.account_id).collect::<Vec<_>>(),
+			NextSlotCohort::<Test>::get().iter().map(|a| a.account_id).collect::<Vec<_>>(),
 			vec![1, 2]
 		);
 		assert!(System::account_exists(&1));
@@ -658,19 +661,19 @@ fn it_will_order_bids_with_argon_bonds() {
 }
 #[test]
 fn handles_a_max_of_bids_per_block() {
-	BlocksBetweenCohorts::set(1440);
-	MaxValidators::set(50);
+	BlocksBetweenSlots::set(1440);
+	MaxMiners::set(50);
 	MaxCohortSize::set(2);
 
 	new_test_ext().execute_with(|| {
 		System::set_block_number(1);
-		IsCohortAcceptingBids::<Test>::set(true);
+		IsNextSlotBiddingOpen::<Test>::set(true);
 
 		for i in 1..5 {
 			set_ownership(i, 1000u32.into());
 		}
 
-		assert_ok!(Cohorts::bid(
+		assert_ok!(MiningSlots::bid(
 			RuntimeOrigin::signed(1),
 			OpaquePeerId::default(),
 			rpc_hosts(Ipv4Addr::new(127, 0, 0, 1), 3000),
@@ -678,10 +681,9 @@ fn handles_a_max_of_bids_per_block() {
 			RewardDestination::Owner
 		));
 		System::assert_last_event(
-			Event::CohortRegistrantAdded { account_id: 1, bid_amount: 0u32.into(), index: 0 }
-				.into(),
+			Event::SlotBidderAdded { account_id: 1, bid_amount: 0u32.into(), index: 0 }.into(),
 		);
-		assert_ok!(Cohorts::bid(
+		assert_ok!(MiningSlots::bid(
 			RuntimeOrigin::signed(2),
 			OpaquePeerId::default(),
 			rpc_hosts(Ipv4Addr::new(127, 0, 0, 1), 3000),
@@ -689,11 +691,10 @@ fn handles_a_max_of_bids_per_block() {
 			RewardDestination::Owner
 		));
 		System::assert_last_event(
-			Event::CohortRegistrantAdded { account_id: 2, bid_amount: 0u32.into(), index: 1 }
-				.into(),
+			Event::SlotBidderAdded { account_id: 2, bid_amount: 0u32.into(), index: 1 }.into(),
 		);
 		assert_noop!(
-			Cohorts::bid(
+			MiningSlots::bid(
 				RuntimeOrigin::signed(3),
 				OpaquePeerId::default(),
 				rpc_hosts(Ipv4Addr::new(127, 0, 0, 1), 3000),
@@ -704,8 +705,7 @@ fn handles_a_max_of_bids_per_block() {
 		);
 		// should not have changed
 		System::assert_last_event(
-			Event::CohortRegistrantAdded { account_id: 2, bid_amount: 0u32.into(), index: 1 }
-				.into(),
+			Event::SlotBidderAdded { account_id: 2, bid_amount: 0u32.into(), index: 1 }.into(),
 		);
 		for i in 1..5 {
 			assert!(System::account_exists(&i));
@@ -716,23 +716,23 @@ fn handles_a_max_of_bids_per_block() {
 #[test]
 fn it_handles_null_authority() {
 	new_test_ext().execute_with(|| {
-		assert_eq!(Cohorts::get_authority(1), None);
+		assert_eq!(MiningSlots::get_authority(1), None);
 	});
 }
 
 #[test]
 fn it_can_find_xor_closest() {
-	MaxValidators::set(100);
+	MaxMiners::set(100);
 	new_test_ext().execute_with(|| {
 		// Go past genesis block so events get deposited
 		System::set_block_number(8);
 
-		ActiveValidatorsByIndex::<Test>::try_mutate(|validators| {
+		ActiveMinersByIndex::<Test>::try_mutate(|validators| {
 			for i in 0..100u32 {
 				let account_id: u64 = i.into();
 				let _ = validators.try_insert(
 					i,
-					ValidatorRegistration {
+					MiningRegistration {
 						account_id,
 						peer_id: empty_peer(),
 						bond_id: None,
@@ -760,14 +760,14 @@ fn it_can_find_xor_closest() {
 		.expect("Didn't insert authorities");
 
 		assert_eq!(
-			Cohorts::find_xor_closest_authorities(U256::from(10), 5)
+			MiningSlots::find_xor_closest_authorities(U256::from(10), 5)
 				.into_iter()
 				.map(|a| a.authority_index)
 				.collect::<Vec<_>>(),
 			vec![10, 11, 8, 9, 14]
 		);
 		assert_eq!(
-			Cohorts::find_xor_closest_authorities(U256::from(99), 5)
+			MiningSlots::find_xor_closest_authorities(U256::from(99), 5)
 				.into_iter()
 				.map(|a| a.authority_index)
 				.collect::<Vec<_>>(),
@@ -778,17 +778,17 @@ fn it_can_find_xor_closest() {
 
 #[test]
 fn it_can_replace_authority_keys() {
-	MaxValidators::set(10);
+	MaxMiners::set(10);
 	new_test_ext().execute_with(|| {
 		// Go past genesis block so events get deposited
 		System::set_block_number(8);
 
-		ActiveValidatorsByIndex::<Test>::try_mutate(|validators| {
+		ActiveMinersByIndex::<Test>::try_mutate(|validators| {
 			for i in 0..10u32 {
 				let account_id: u64 = i.into();
 				let _ = validators.try_insert(
 					i,
-					ValidatorRegistration {
+					MiningRegistration {
 						account_id,
 						peer_id: empty_peer(),
 						bond_id: None,
@@ -824,7 +824,7 @@ fn it_can_replace_authority_keys() {
 			Box::new(account_keys.iter().filter_map(|k| Some((&k.0, k.clone().1))));
 
 		assert_eq!(AuthoritiesByIndex::<Test>::get().len(), 1);
-		Cohorts::on_new_session(true, with_keys, queued_keys);
+		MiningSlots::on_new_session(true, with_keys, queued_keys);
 		assert_eq!(AuthoritiesByIndex::<Test>::get().len(), 8, "should register only 8 keys");
 		assert_eq!(
 			AuthoritiesByIndex::<Test>::get().contains_key(&0u32),

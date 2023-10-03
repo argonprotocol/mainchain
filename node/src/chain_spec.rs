@@ -6,12 +6,12 @@ use sp_core::{bounded_vec, sr25519, OpaquePeerId, Pair, Public};
 use sp_runtime::traits::{IdentifyAccount, Verify};
 
 use ulx_node_runtime::{
-	opaque::SessionKeys, AccountId, ArgonBalancesConfig, BlockSealConfig, CohortsConfig,
-	DifficultyConfig, GrandpaConfig, RuntimeGenesisConfig, SessionConfig, Signature, SudoConfig,
+	opaque::SessionKeys, AccountId, ArgonBalancesConfig, BlockSealConfig, DifficultyConfig,
+	GrandpaConfig, MiningSlotsConfig, RuntimeGenesisConfig, SessionConfig, Signature, SudoConfig,
 	SystemConfig, UlixeeBalancesConfig, WASM_BINARY,
 };
 use ulx_primitives::{
-	block_seal::{Host, PeerId, RewardDestination, ValidatorRegistration},
+	block_seal::{Host, MiningRegistration, PeerId, RewardDestination},
 	BlockSealAuthorityId,
 };
 
@@ -178,8 +178,8 @@ fn testnet_genesis(
 		ulixee_balances: UlixeeBalancesConfig {
 			balances: endowed_accounts.iter().cloned().map(|k| (k, 10_000)).collect(),
 		},
-		cohorts: CohortsConfig {
-			miner_zero: Some(ValidatorRegistration {
+		mining_slots: MiningSlotsConfig {
+			miner_zero: Some(MiningRegistration {
 				account_id: authority_zero.0.clone(),
 				rpc_hosts: bounded_vec![Host {
 					ip: Ipv4Addr::new(127, 0, 0, 1).into(),

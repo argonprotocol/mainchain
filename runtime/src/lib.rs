@@ -120,7 +120,7 @@ pub mod opaque {
 	impl_opaque_keys! {
 		pub struct SessionKeys {
 			pub grandpa: Grandpa,
-			pub block_seal_authority: Cohorts,
+			pub block_seal_authority: MiningSlots,
 		}
 	}
 }
@@ -265,20 +265,20 @@ impl pallet_timestamp::Config for Runtime {
 }
 
 parameter_types! {
-	pub const MaxCohortSize: u32 = 250; // this means cohorts last 40 days
-	pub const BlocksBetweenCohorts: u32 = prod_or_fast!(1440, 4); // going to add a cohort every day
-	pub const MaxValidators: u32 = 10_000; // must multiply cleanly by MaxCohortSize
-	pub const SessionRotationPeriod: u32 = prod_or_fast!(120, 2); // must be cleanly divisible by BlocksBetweenCohorts
+	pub const MaxCohortSize: u32 = 250; // this means mining_slots last 40 days
+	pub const BlocksBetweenSlots: u32 = prod_or_fast!(1440, 4); // going to add a cohort every day
+	pub const MaxMiners: u32 = 10_000; // must multiply cleanly by MaxCohortSize
+	pub const SessionRotationPeriod: u32 = prod_or_fast!(120, 2); // must be cleanly divisible by BlocksBetweenSlots
 	pub const Offset: u32 = 0;
 	pub const OwnershipPercentDamper: u32 = 80;
 
-	pub const NextCohortBufferToStopAcceptingBids: u32 = prod_or_fast!(10, 1);
+	pub const BlocksBufferToStopAcceptingBids: u32 = prod_or_fast!(10, 1);
 	pub const MaxConcurrentlyExpiringBondFunds: u32 = 1000;
 	pub const MaxConcurrentlyExpiringBonds: u32 = 1000;
 	pub const MinimumBondAmount:u128 = 1_000;
 	pub const BlocksPerYear:u32 = 1440 * 365;
 
-	const ValidatorWindow: u32 = (MaxValidators::get() / MaxCohortSize::get()) * BlocksBetweenCohorts::get();
+	const ValidatorWindow: u32 = (MaxMiners::get() / MaxCohortSize::get()) * BlocksBetweenSlots::get();
 	const SessionsPerWindow: u32 = ValidatorWindow::get() / SessionRotationPeriod::get();
 	// Arbitrarily chosen. We keep these around for equivocation reporting in grandpa, and for
 	// notary auditing using validators of finalized blocks.
@@ -287,7 +287,7 @@ parameter_types! {
 	// How long to keep grandpa set ids around for equivocations
 	pub const MaxSetIdSessionEntries: u32 = SessionsPerWindow::get() * 2u32;
 	pub const ReportLongevity: u64 = ValidatorWindow::get() as u64 * 2;
-	pub const HistoricalBlockSealersToKeep: u32 = BlocksBetweenCohorts::get();
+	pub const HistoricalBlockSealersToKeep: u32 = BlocksBetweenSlots::get();
 }
 
 impl pallet_bonds::Config for Runtime {
@@ -304,17 +304,17 @@ impl pallet_bonds::Config for Runtime {
 	type BlocksPerYear = BlocksPerYear;
 }
 
-impl pallet_cohorts::Config for Runtime {
+impl pallet_mining_slots::Config for Runtime {
 	type RuntimeEvent = RuntimeEvent;
-	type WeightInfo = pallet_cohorts::weights::SubstrateWeight<Runtime>;
-	type MaxValidators = MaxValidators;
+	type WeightInfo = pallet_mining_slots::weights::SubstrateWeight<Runtime>;
+	type MaxMiners = MaxMiners;
 	type OwnershipCurrency = UlixeeBalances;
 	type OwnershipPercentDamper = OwnershipPercentDamper;
-	type NextCohortBufferToStopAcceptingBids = NextCohortBufferToStopAcceptingBids;
+	type BlocksBufferToStopAcceptingBids = BlocksBufferToStopAcceptingBids;
 	type RuntimeHoldReason = RuntimeHoldReason;
 	type MaxCohortSize = MaxCohortSize;
 	type SessionIndicesToKeepInHistory = SessionIndicesToKeepInHistory;
-	type BlocksBetweenCohorts = BlocksBetweenCohorts;
+	type BlocksBetweenSlots = BlocksBetweenSlots;
 	type Balance = Balance;
 	type BondId = BondId;
 	type BondProvider = Bonds;
@@ -323,7 +323,7 @@ impl pallet_cohorts::Config for Runtime {
 impl pallet_block_seal::Config for Runtime {
 	type RuntimeEvent = RuntimeEvent;
 	type WeightInfo = pallet_block_seal::weights::SubstrateWeight<Runtime>;
-	type AuthorityProvider = Cohorts;
+	type AuthorityProvider = MiningSlots;
 	type AuthorityId = BlockSealAuthorityId;
 	type HistoricalBlockSealersToKeep = HistoricalBlockSealersToKeep;
 }
@@ -331,31 +331,31 @@ impl pallet_block_seal::Config for Runtime {
 impl pallet_session::Config for Runtime {
 	type RuntimeEvent = RuntimeEvent;
 	type ValidatorId = <Self as frame_system::Config>::AccountId;
-	type ValidatorIdOf = pallet_cohorts::ValidatorOf<Self>;
+	type ValidatorIdOf = pallet_mining_slots::ValidatorIdOf<Self>;
 	type ShouldEndSession = pallet_session::PeriodicSessions<SessionRotationPeriod, Offset>;
 	type NextSessionRotation = pallet_session::PeriodicSessions<SessionRotationPeriod, Offset>;
-	type SessionManager = pallet_session_historical::NoteHistoricalRoot<Self, Cohorts>;
+	type SessionManager = pallet_session_historical::NoteHistoricalRoot<Self, MiningSlots>;
 	type SessionHandler = <SessionKeys as OpaqueKeys>::KeyTypeIdProviders;
 	type Keys = SessionKeys;
 	type WeightInfo = pallet_session::weights::SubstrateWeight<Runtime>;
 }
 
 impl pallet_session_historical::Config for Runtime {
-	type FullIdentification = pallet_cohorts::MinerHistory;
-	type FullIdentificationOf = pallet_cohorts::FullIdentificationOf<Runtime>;
+	type FullIdentification = pallet_mining_slots::MinerHistory;
+	type FullIdentificationOf = pallet_mining_slots::FullIdentificationOf<Runtime>;
 }
 
 impl pallet_offences::Config for Runtime {
 	type RuntimeEvent = RuntimeEvent;
 	type IdentificationTuple = pallet_session_historical::IdentificationTuple<Self>;
-	// TODO: cohorts should deal with offenses
+	// TODO: mining_slots should deal with offenses
 	type OnOffenceHandler = ();
 }
 
 impl pallet_grandpa::Config for Runtime {
 	type RuntimeEvent = RuntimeEvent;
 	type WeightInfo = ();
-	type MaxAuthorities = MaxValidators;
+	type MaxAuthorities = MaxMiners;
 	type MaxNominators = ConstU32<0>;
 	type MaxSetIdSessionEntries = MaxSetIdSessionEntries;
 	type KeyOwnerProof = <Historical as KeyOwnerProofSystem<(KeyTypeId, GrandpaId)>>::Proof;
@@ -526,7 +526,7 @@ construct_runtime!(
 	pub struct Runtime {
 		System: frame_system,
 		Timestamp: pallet_timestamp,
-		Cohorts: pallet_cohorts,
+		MiningSlots: pallet_mining_slots,
 		Bonds: pallet_bonds,
 		NotaryAdmin: pallet_notary_admin,
 		LocalchainRelay: pallet_localchain_relay,
@@ -588,7 +588,7 @@ mod benches {
 		[pallet_balances, UlixeeTokens]
 		[pallet_timestamp, Timestamp]
 		[pallet_difficulty, Difficulty]
-		[pallet_cohorts, Cohorts]
+		[pallet_mining_slots, MiningSlots]
 		[pallet_bonds, Bonds]
 		[pallet_session, Session]
 		[pallet_block_seal, BlockSeal]
@@ -745,12 +745,12 @@ impl_runtime_apis! {
 		}
 	}
 
-	impl ulx_primitives::block_seal::AuthorityApis<Block> for Runtime {
+	impl ulx_primitives::block_seal::MiningAuthorityApis<Block> for Runtime {
 		fn authorities() -> Vec<BlockSealAuthorityId> {
-			Cohorts::authorities()
+			MiningSlots::authorities()
 		}
 		fn authorities_by_index() -> BTreeMap<u16, BlockSealAuthorityId> {
-			Cohorts::authorities_by_index()
+			MiningSlots::authorities_by_index()
 		}
 		fn block_peers(account_id: AccountId32) -> Vec<AuthorityDistance<BlockSealAuthorityId>> {
 			let block_number = System::block_number();
@@ -758,14 +758,13 @@ impl_runtime_apis! {
 			BlockSeal::block_peers(current_block_hash, account_id)
 		}
 		fn active_authorities() -> u16 {
-			Cohorts::authority_count().into()
+			MiningSlots::authority_count().into()
 		}
 	}
 
-	impl pallet_cohorts::CohortsApi<Block, BlockNumber> for Runtime {
-
-		fn next_cohort_block_period() -> (BlockNumber, BlockNumber) {
-			Cohorts::get_next_cohort_period()
+	impl pallet_mining_slots::MiningSlotsApi<Block, BlockNumber> for Runtime {
+		fn next_slot_era() -> (BlockNumber, BlockNumber) {
+			MiningSlots::get_slot_era()
 		}
 	}
 

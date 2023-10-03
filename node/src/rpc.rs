@@ -26,7 +26,7 @@ use ulx_node_consensus::{
 	rpc::{BlockSealApiServer, BlockSealRpc, SealNewBlock},
 };
 use ulx_node_runtime::{opaque::Block, AccountId, Balance, BlockNumber, Hash, Nonce};
-use ulx_primitives::block_seal::AuthorityApis;
+use ulx_primitives::block_seal::MiningAuthorityApis;
 
 /// Extra dependencies for GRANDPA
 pub struct GrandpaDeps<B> {
@@ -72,7 +72,7 @@ where
 	C::Api: pallet_transaction_payment_rpc::TransactionPaymentRuntimeApi<Block, Balance>,
 	C::Api: ulx_primitives::UlxConsensusApi<Block>,
 	C::Api: BlockBuilder<Block>,
-	C::Api: AuthorityApis<Block>,
+	C::Api: MiningAuthorityApis<Block>,
 	P: TransactionPool + 'static,
 	B: sc_client_api::Backend<Block> + Send + Sync + 'static,
 	B::State: sc_client_api::backend::StateBackend<sp_runtime::traits::HashingFor<Block>>,

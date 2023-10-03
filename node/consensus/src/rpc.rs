@@ -20,7 +20,7 @@ use sp_inherents::Error as InherentsError;
 use sp_runtime::traits::Block as BlockT;
 
 use ulx_primitives::block_seal::{
-	AuthorityApis, BlockProof, SealerSignatureMessage, SEALER_SIGNATURE_PREFIX,
+	BlockProof, MiningAuthorityApis, SealerSignatureMessage, SEALER_SIGNATURE_PREFIX,
 };
 
 use crate::{authority::AuthoritySealer, rpc::Error::StringError};
@@ -89,7 +89,7 @@ where
 	Block: BlockT,
 	Block::Hash: Send + Sync + 'static,
 	C: ProvideRuntimeApi<Block> + Send + Sync + 'static,
-	C::Api: AuthorityApis<Block>,
+	C::Api: MiningAuthorityApis<Block>,
 {
 	async fn submit(
 		&self,

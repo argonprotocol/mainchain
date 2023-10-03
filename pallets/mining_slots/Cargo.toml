@@ -1,5 +1,5 @@
 [package]
-name = "pallet-cohorts"
+name = "pallet-mining-slots"
 version = "0.0.1"
 authors = ["Ulixee <https://github.com/ulixee>"]
 homepage = "https://ulixee.org"

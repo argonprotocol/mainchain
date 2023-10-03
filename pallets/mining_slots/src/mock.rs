@@ -9,7 +9,7 @@ use sp_runtime::{
 	BuildStorage,
 };
 
-use crate as pallet_cohorts;
+use crate as pallet_mining_slots;
 
 type Block = frame_system::mocking::MockBlock<Test>;
 
@@ -18,7 +18,7 @@ frame_support::construct_runtime!(
 	pub enum Test
 	{
 		System: frame_system,
-		Cohorts: pallet_cohorts,
+		MiningSlots: pallet_mining_slots,
 		ArgonBalances: pallet_balances::<Instance1>,
 		UlixeeBalances: pallet_balances::<Instance2>,
 		Bonds: pallet_bonds
@@ -52,10 +52,10 @@ impl frame_system::Config for Test {
 }
 
 parameter_types! {
-	pub static BlocksBetweenCohorts: u32 = 1;
+	pub static BlocksBetweenSlots: u32 = 1;
 	pub static MaxCohortSize: u32 = 5;
-	pub static MaxValidators: u32 = 10;
-	pub static NextCohortBufferToStopAcceptingBids: u32 = 0;
+	pub static MaxMiners: u32 = 10;
+	pub static BlocksBufferToStopAcceptingBids: u32 = 0;
 	pub const OwnershipPercentDamper: u32 = 80;
 
 	pub static ExistentialDeposit: Balance = 1;
@@ -129,17 +129,17 @@ impl pallet_bonds::Config for Test {
 	type Balance = u128;
 }
 
-impl pallet_cohorts::Config for Test {
+impl pallet_mining_slots::Config for Test {
 	type RuntimeEvent = RuntimeEvent;
 	type WeightInfo = ();
 	type SessionIndicesToKeepInHistory = ConstU32<10>;
-	type BlocksBetweenCohorts = BlocksBetweenCohorts;
+	type BlocksBetweenSlots = BlocksBetweenSlots;
 	type MaxCohortSize = MaxCohortSize;
-	type MaxValidators = MaxValidators;
+	type MaxMiners = MaxMiners;
 	type OwnershipCurrency = UlixeeBalances;
 	type RuntimeHoldReason = RuntimeHoldReason;
 	type OwnershipPercentDamper = OwnershipPercentDamper;
-	type NextCohortBufferToStopAcceptingBids = NextCohortBufferToStopAcceptingBids;
+	type BlocksBufferToStopAcceptingBids = BlocksBufferToStopAcceptingBids;
 	type Balance = Balance;
 	type BondId = BondId;
 	type BondProvider = Bonds;

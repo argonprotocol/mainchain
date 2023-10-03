@@ -39,7 +39,7 @@ const LOG_TARGET: &str = "runtime::bonds";
 /// -----
 ///
 /// Bonds are available via the BondProvider trait for use in other pallets. It's used in the
-/// cohorts pallet and expected to also be used in the vaults pallet in the future.
+/// mining_slots pallet and expected to also be used in the vaults pallet in the future.
 #[frame_support::pallet(dev_mode)]
 pub mod pallet {
 	use frame_support::{

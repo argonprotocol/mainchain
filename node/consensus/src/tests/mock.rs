@@ -25,7 +25,7 @@ use sp_runtime::{traits::Block as BlockT, AccountId32, ApplyExtrinsicResult, Bou
 use substrate_test_runtime::{AccountId, BlockNumber, Executive, Hash, Header};
 use substrate_test_runtime_client::Backend;
 
-use pallet_cohorts::find_xor_closest;
+use pallet_mining_slots::find_xor_closest;
 use ulx_primitives::{
 	block_seal::{AuthorityDistance, BlockSealAuthorityId, Host, PeerId},
 	NextWork, ProofOfWorkType,
@@ -211,7 +211,7 @@ sp_api::mock_impl_runtime_apis! {
 		}
 	}
 
-	impl ulx_primitives::block_seal::AuthorityApis<Block> for RuntimeApi {
+	impl ulx_primitives::block_seal::MiningAuthorityApis<Block> for RuntimeApi {
 
 		fn authorities() -> Vec<BlockSealAuthorityId> {
 			self.inner.authorities.iter().map(|(_,_, id)| id.clone()).collect()

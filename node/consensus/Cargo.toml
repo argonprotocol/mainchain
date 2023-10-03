@@ -89,7 +89,7 @@ frame-executive = { version = "4.0.0-dev" , git = "https://github.com/paritytech
 pallet-block-seal = { version = "0.0.1", path = "../../pallets/block_seal" }
 pallet-difficulty = { version = "0.0.1", path = "../../pallets/difficulty" }
 pallet-balances = {  version = "4.0.0-dev", git = "https://github.com/paritytech/polkadot-sdk.git", branch = "release-polkadot-v1.1.0" }
-pallet-cohorts = { version = "0.0.1", path = "../../pallets/cohorts" }
+pallet-mining-slots = { version = "0.0.1", path = "../../pallets/mining_slots" }
 pallet-timestamp = { version = "4.0.0-dev", git = "https://github.com/paritytech/polkadot-sdk.git", branch = "release-polkadot-v1.1.0" }
 pallet-session = { version = "4.0.0-dev", git = "https://github.com/paritytech/polkadot-sdk.git", branch = "release-polkadot-v1.1.0" }
 tokio = "1.29.1"

@@ -36,7 +36,7 @@ use sp_runtime::{
 
 use rpc::{CreatedBlock, Error as RpcError, SealNewBlock};
 use ulx_primitives::{
-	block_seal::{AuthorityApis, BlockProof},
+	block_seal::{BlockProof, MiningAuthorityApis},
 	digests::{FinalizedBlockNeededDigest, FINALIZED_BLOCK_DIGEST_ID},
 	inherents::UlxBlockSealInherent,
 	ProofOfWorkType, UlxConsensusApi, UlxPreDigest, UlxSeal, AUTHOR_ID, ULX_ENGINE_ID,
@@ -49,10 +49,7 @@ use crate::{
 	compute_worker::UntilImportedOrTimeout,
 	error::{
 		Error,
-		Error::{
-			BlockNotFound, InvalidNonceDifficulty, InvalidPredigestWorkType,
-			InvalidProofOfWorkTypeUsed,
-		},
+		Error::{BlockNotFound, InvalidNonceDifficulty, InvalidProofOfWorkTypeUsed},
 	},
 };
 
@@ -116,7 +113,7 @@ pub async fn listen_for_block_seal<Block, C, S, Algorithm, E, SO, L, CIDP, CS>(
 	Block::Hash: Send + 'static,
 	C: ProvideRuntimeApi<Block> + BlockchainEvents<Block> + HeaderBackend<Block> + 'static,
 	C::Api: UlxConsensusApi<Block>,
-	C::Api: AuthorityApis<Block>,
+	C::Api: MiningAuthorityApis<Block>,
 	S: SelectChain<Block> + 'static,
 	CS: Stream<Item = SealNewBlock<Block::Hash>> + Unpin + 'static,
 	Algorithm: NonceAlgorithm<Block> + Send + Clone + Sync + 'static,

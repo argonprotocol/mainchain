@@ -19,7 +19,7 @@ use sp_runtime::{
 	traits::{Convert, UniqueSaturatedInto},
 	BoundedBTreeMap,
 };
-use sp_std::{cmp::Ordering, collections::btree_map::BTreeMap, marker::PhantomData, vec::Vec};
+use sp_std::{collections::btree_map::BTreeMap, marker::PhantomData, vec::Vec};
 
 pub use pallet::*;
 use ulx_primitives::{
@@ -38,30 +38,35 @@ mod tests;
 mod benchmarking;
 pub mod weights;
 
-const LOG_TARGET: &str = "runtime::cohorts";
+const LOG_TARGET: &str = "runtime::mining_slots";
 
-/// Defines cohort groups that are allowed to validate Ulixee Block Proof.
+/// To register as a Proof of Block miner, operators must `Bid` on a `Slot`. Each `Slot` allows a
+/// `Cohort` of miners to operate for a given number of blocks (an `Era`).
 ///
-/// New cohorts will enter every `BlocksBetweenCohorts` blocks. Each cohort will have
-/// `MaxCohortSize`. A maximum of `MaxValidators` will be active at any given time.
+/// New miner slots are rotated in every `BlocksBetweenSlots` blocks. Each cohort will have
+/// `MaxCohortSize` members. A maximum of `MaxMiners` will be active at any given time.
 ///
-/// When a new cohort begins, the validators with the corresponding indices will be replaced with
+/// When a new Slot begins, the Miners with the corresponding Slot indices will be replaced with
 /// the new cohort members (or emptied out).
 ///
-/// To be eligible for a cohort, you must bond a percent of the total supply of Ulixee tokens
-/// that have been mined, and then submit a Bond of locked Argons will determine who is selected.
-/// The percent is configured with `OwnershipPercentDamper`. We might want to make this percent
+/// To be eligible for mining, you must bond a percent of the total supply of Ulixee tokens. A
+/// `Bond` of locked Argons will allow operators to out-bid others for cohort membership. The
+/// percent is configured with `OwnershipPercentDamper`. We might want to make this percent
 /// adjustable via governance in the future.
 ///
 /// Options are provided to lease a bond from a fund (see the bond pallet).
 ///
 /// ### Registration
-/// To register for a cohort, you must submit a transaction with the block number of the upcoming
-/// cohort, along with your peerId and (TODO: rpc host).
+/// To register for a Slot, you must submit a transaction with your RPC hosts and PeerId, which must
+/// be known in advance. At any given time, only the next Slot is being bid on.
 ///
-/// NOTE: to be an active validator, you must have also submitted "set_keys" to the network using
-/// the Session pallet. This is what creates "AuthorityIds", and used for finding XOR closest peers
-/// to a CloudNode wishing to prove they can close a block.
+/// Your RPC IP:Port must be open and accepting calls to sign and accept BlockSeals. It is
+/// acceptable to reverse proxy these calls from an Rpc node, but the node must send them to a
+/// miner node.
+///
+/// NOTE: to be an active miner, you must have also submitted "Session.set_keys" to the network
+/// using the Session pallet. This is what creates "AuthorityIds", and used for finding XOR closest
+/// peers to a CloudNode wishing to prove they can close a block.
 ///
 /// AuthorityIds are created by watching the Session pallet for new sessions and recording the
 /// authorityIds matching registered "controller" accounts.
@@ -82,12 +87,9 @@ pub mod pallet {
 		traits::{AtLeast32BitUnsigned, UniqueSaturatedInto},
 		BoundedBTreeMap, SaturatedConversion,
 	};
-	use sp_std::cmp::max;
-
+	use sp_std::cmp::{max, Ordering};
 	use ulx_primitives::{
-		block_seal::{
-			Host, MaxValidatorRpcHosts, PeerId, RewardDestination, ValidatorRegistration,
-		},
+		block_seal::{Host, MaxMinerRpcHosts, MiningRegistration, PeerId, RewardDestination},
 		bond::{BondError, BondProvider},
 	};
 
@@ -96,7 +98,7 @@ pub mod pallet {
 	#[pallet::pallet]
 	pub struct Pallet<T>(_);
 
-	pub type Registration<T> = ValidatorRegistration<
+	pub type Registration<T> = MiningRegistration<
 		<T as frame_system::Config>::AccountId,
 		<T as Config>::BondId,
 		<T as Config>::Balance,
@@ -109,22 +111,22 @@ pub mod pallet {
 		type RuntimeEvent: From<Event<Self>> + IsType<<Self as frame_system::Config>::RuntimeEvent>;
 		/// Type representing the weight of this pallet
 		type WeightInfo: WeightInfo;
-		/// The maximum number of validators that the pallet can hold.
+		/// The maximum number of Miners that the pallet can hold.
 		#[pallet::constant]
-		type MaxValidators: Get<u32>;
-		/// How many new validators can be in each cohort
+		type MaxMiners: Get<u32>;
+		/// How many new miners can be in the cohort for each slot
 		#[pallet::constant]
 		type MaxCohortSize: Get<u32>;
-		/// How many blocks transpire between cohorts
+		/// How many blocks transpire between slots
 		#[pallet::constant]
-		type BlocksBetweenCohorts: Get<u32>;
+		type BlocksBetweenSlots: Get<u32>;
 		/// How many session indexes to keep session history
 		#[pallet::constant]
 		type SessionIndicesToKeepInHistory: Get<u32>;
 
 		/// How many blocks buffer shall we use to stop accepting bids for the next period
 		#[pallet::constant]
-		type NextCohortBufferToStopAcceptingBids: Get<u32>;
+		type BlocksBufferToStopAcceptingBids: Get<u32>;
 
 		/// The reduction in percent of ownership currency required to secure a slot
 		#[pallet::constant]
@@ -172,43 +174,41 @@ pub mod pallet {
 		RegisterAsMiner,
 	}
 
-	/// Active validators that are active in the current block (post initialize)
+	/// Miners that are active in the current block (post initialize)
 	#[pallet::storage]
-	#[pallet::getter(fn active_validators_by_index)]
-	pub(super) type ActiveValidatorsByIndex<T: Config> =
-		StorageValue<_, BoundedBTreeMap<u32, Registration<T>, T::MaxValidators>, ValueQuery>;
+	#[pallet::getter(fn active_miners_by_index)]
+	pub(super) type ActiveMinersByIndex<T: Config> =
+		StorageValue<_, BoundedBTreeMap<u32, Registration<T>, T::MaxMiners>, ValueQuery>;
 
 	/// Authorities are the session keys that are actively participating in the network.
 	/// The tuple is the authority, and the blake2 256 hash of the authority used for xor lookups
 	#[pallet::storage]
 	pub(super) type AuthoritiesByIndex<T: Config> = StorageValue<
 		_,
-		BoundedBTreeMap<u32, (BlockSealAuthorityId, U256), T::MaxValidators>,
+		BoundedBTreeMap<u32, (BlockSealAuthorityId, U256), T::MaxMiners>,
 		ValueQuery,
 	>;
 
-	/// Tokens that must be bonded to take a validator role
+	/// Tokens that must be bonded to take a Miner role
 	#[pallet::storage]
 	#[pallet::getter(fn ownership_bond_amount)]
 	pub(super) type OwnershipBondAmount<T: Config> = StorageValue<_, T::Balance, ValueQuery>;
 
-	/// Lookup by account id to the corresponding index in ActiveValidatorsByIndex and Authorities
+	/// Lookup by account id to the corresponding index in ActiveMinersByIndex and Authorities
 	#[pallet::storage]
 	#[pallet::getter(fn account_indices)]
 	pub(super) type AccountIndexLookup<T: Config> =
 		StorageMap<_, Blake2_128Concat, T::AccountId, u32, OptionQuery>;
 
-	/// The cohort set to go into effect at the next changeover block. The Vec has all
+	/// The cohort set to go into effect in the next slot. The Vec has all
 	/// registrants with their bid amount
 	#[pallet::storage]
-	#[pallet::getter(fn next_cohort)]
-	pub(super) type NextCohort<T: Config> =
+	pub(super) type NextSlotCohort<T: Config> =
 		StorageValue<_, BoundedVec<Registration<T>, T::MaxCohortSize>, ValueQuery>;
 
-	/// Is the queued cohort open for bids
+	/// Is the next slot still open for bids
 	#[pallet::storage]
-	#[pallet::getter(fn is_cohort_accepted_bids)]
-	pub(super) type IsCohortAcceptingBids<T: Config> = StorageValue<_, bool, ValueQuery>;
+	pub(super) type IsNextSlotBiddingOpen<T: Config> = StorageValue<_, bool, ValueQuery>;
 
 	/// The configuration for a miner to supply if there are no registered miners
 	#[pallet::storage]
@@ -235,21 +235,21 @@ pub mod pallet {
 	#[pallet::event]
 	#[pallet::generate_deposit(pub(super) fn deposit_event)]
 	pub enum Event<T: Config> {
-		NewValidators {
+		NewMiners {
 			start_index: u32,
-			new_validators: BoundedVec<Registration<T>, T::MaxCohortSize>,
+			new_miners: BoundedVec<Registration<T>, T::MaxCohortSize>,
 		},
-		CohortRegistrantAdded {
+		SlotBidderAdded {
 			account_id: T::AccountId,
 			bid_amount: T::Balance,
 			index: u32,
 		},
-		CohortRegistrantReplaced {
+		SlotBidderReplaced {
 			account_id: T::AccountId,
 			bond_id: Option<T::BondId>,
 			kept_ownership_bond: bool,
 		},
-		UnbondedValidator {
+		UnbondedMiner {
 			account_id: T::AccountId,
 			bond_id: Option<T::BondId>,
 			kept_ownership_bond: bool,
@@ -258,7 +258,7 @@ pub mod pallet {
 
 	#[pallet::error]
 	pub enum Error<T> {
-		CohortNotTakingBids,
+		SlotNotTakingBids,
 		TooManyBlockRegistrants,
 		UnableToRotateAuthority,
 		InsufficientOwnershipTokens,
@@ -327,14 +327,14 @@ pub mod pallet {
 	#[pallet::hooks]
 	impl<T: Config> Hooks<BlockNumberFor<T>> for Pallet<T> {
 		fn on_initialize(block_number: BlockNumberFor<T>) -> Weight {
-			let max_validators = T::MaxValidators::get();
+			let max_miners = T::MaxMiners::get();
 			let cohort_size = T::MaxCohortSize::get();
 
 			let ownership_circulation: u128 =
 				T::OwnershipCurrency::total_issuance().saturated_into();
 
 			let ownership_needed: u128 = ownership_circulation
-				.checked_div(T::MaxValidators::get().into())
+				.checked_div(T::MaxMiners::get().into())
 				.unwrap_or(0u128)
 				.saturating_mul(T::OwnershipPercentDamper::get().into())
 				.checked_div(100u128)
@@ -348,35 +348,49 @@ pub mod pallet {
 			// Translating the current block number to number and submit it on-chain
 			let block_number_u32: u32 =
 				UniqueSaturatedInto::<u32>::unique_saturated_into(block_number);
-			let blocks_between_cohorts = T::BlocksBetweenCohorts::get();
-			if block_number_u32 % blocks_between_cohorts != 0 {
+			let blocks_between_slots = T::BlocksBetweenSlots::get();
+			if block_number_u32 % blocks_between_slots != 0 {
 				return T::DbWeight::get().reads_writes(0, 0)
 			}
 
-			let start_index_to_replace_validators = Self::get_start_cohort_index(
+			let start_index_to_replace_miners = Self::get_slot_starting_index(
 				block_number_u32,
-				blocks_between_cohorts,
-				max_validators,
+				blocks_between_slots,
+				max_miners,
 				cohort_size,
 			);
 
-			let mut cohort = NextCohort::<T>::take();
-			IsCohortAcceptingBids::<T>::put(true);
+			let mut slot_cohort = NextSlotCohort::<T>::take();
+			IsNextSlotBiddingOpen::<T>::put(true);
+			let active_miners = ActiveMinersByIndex::<T>::get();
+			let mut future_active_miners = active_miners.len() as u32;
 
-			if cohort.is_empty() && ActiveValidatorsByIndex::<T>::get().is_empty() {
-				if let Some(miner) = MinerZero::<T>::get() {
-					let _ = cohort.try_push(miner.clone());
+			// check if all the future miners are in the slot being replaced, but only bother if
+			// we're under the threshold
+			if future_active_miners <= cohort_size {
+				for index in active_miners.keys() {
+					if index >= &start_index_to_replace_miners &&
+						index < &(start_index_to_replace_miners + cohort_size)
+					{
+						future_active_miners -= 1
+					}
 				}
 			}
 
-			let _ = ActiveValidatorsByIndex::<T>::try_mutate(|validators| {
-				for i in 0..cohort_size {
-					let index = i + start_index_to_replace_validators;
+			if future_active_miners as usize + slot_cohort.len() == 0 {
+				if let Some(miner) = MinerZero::<T>::get() {
+					let _ = slot_cohort.try_push(miner.clone());
+				}
+			}
 
-					if let Some(entry) = validators.remove(&index) {
+			let _ = ActiveMinersByIndex::<T>::try_mutate(|miners| {
+				for i in 0..cohort_size {
+					let index = i + start_index_to_replace_miners;
+
+					if let Some(entry) = miners.remove(&index) {
 						let account_id = entry.account_id.clone();
 						AccountIndexLookup::<T>::remove(&account_id);
-						let next = cohort.iter().find(|x| x.account_id == account_id).cloned();
+						let next = slot_cohort.iter().find(|x| x.account_id == account_id).cloned();
 						match Self::unbond_account(entry, next) {
 							Err(err) => {
 								log::error!(
@@ -390,14 +404,14 @@ pub mod pallet {
 						}
 					}
 
-					if let Some(registration) = cohort.get(i as usize) {
+					if let Some(registration) = slot_cohort.get(i as usize) {
 						AccountIndexLookup::<T>::insert(&registration.account_id, &index);
-						match validators.try_insert(index, registration.clone()) {
+						match miners.try_insert(index, registration.clone()) {
 							Err(err) => {
 								log::error!(
 									target: LOG_TARGET,
 									"Error rotating new authorities starting at {:?} at index {}. {:?}",
-									start_index_to_replace_validators, i, err
+									start_index_to_replace_miners, i, err
 								);
 							},
 							_ => (),
@@ -407,9 +421,9 @@ pub mod pallet {
 				Ok::<(), Error<T>>(())
 			});
 
-			Pallet::<T>::deposit_event(Event::<T>::NewValidators {
-				start_index: start_index_to_replace_validators,
-				new_validators: cohort,
+			Pallet::<T>::deposit_event(Event::<T>::NewMiners {
+				start_index: start_index_to_replace_miners,
+				new_miners: slot_cohort,
 			});
 
 			T::DbWeight::get().reads_writes(0, 2)
@@ -417,10 +431,10 @@ pub mod pallet {
 
 		fn on_finalize(block_number: BlockNumberFor<T>) {
 			// TODO: vrf for closing bids
-			if Self::get_next_cohort_block_number() - block_number <
-				T::NextCohortBufferToStopAcceptingBids::get().into()
+			if Self::get_next_slot_block_number() - block_number <
+				T::BlocksBufferToStopAcceptingBids::get().into()
 			{
-				IsCohortAcceptingBids::<T>::put(false);
+				IsNextSlotBiddingOpen::<T>::put(false);
 			}
 		}
 	}
@@ -432,23 +446,23 @@ pub mod pallet {
 		pub fn bid(
 			origin: OriginFor<T>,
 			peer_id: OpaquePeerId,
-			rpc_hosts: BoundedVec<Host, MaxValidatorRpcHosts>,
+			rpc_hosts: BoundedVec<Host, MaxMinerRpcHosts>,
 			bond_id: Option<T::BondId>,
 			reward_destination: RewardDestination<T::AccountId>,
 		) -> DispatchResult {
 			let who = ensure_signed(origin)?;
 
-			if IsCohortAcceptingBids::<T>::get() == false {
-				return Err(Error::<T>::CohortNotTakingBids.into())
+			if IsNextSlotBiddingOpen::<T>::get() == false {
+				return Err(Error::<T>::SlotNotTakingBids.into())
 			}
 
-			let next_cohort_block_number = Self::get_next_cohort_block_number();
+			let next_cohort_block_number = Self::get_next_slot_block_number();
 			if let Some(current_index) = <AccountIndexLookup<T>>::get(&who) {
-				let cohort_start_index = Self::get_next_start_cohort_index();
+				let cohort_start_index = Self::get_next_slot_starting_index();
 				let is_in_next_cohort = current_index >= cohort_start_index &&
 					current_index < (cohort_start_index + T::MaxCohortSize::get());
 
-				// current_index must be in the set of validators being replaced
+				// current_index must be in the set of miners being replaced
 				if is_in_next_cohort == false {
 					return Err(Error::<T>::CannotRegisteredOverlappingSessions.into())
 				}
@@ -485,7 +499,7 @@ pub mod pallet {
 
 			let ownership_tokens = Self::hold_ownership_bond(&who, current_registration)?;
 
-			<NextCohort<T>>::try_mutate(|cohort| -> DispatchResult {
+			<NextSlotCohort<T>>::try_mutate(|cohort| -> DispatchResult {
 				if let Some(existing_position) = cohort.iter().position(|x| x.account_id == who) {
 					cohort.remove(existing_position);
 				}
@@ -518,7 +532,7 @@ pub mod pallet {
 				cohort
 					.try_insert(
 						pos,
-						ValidatorRegistration {
+						MiningRegistration {
 							account_id: who.clone(),
 							peer_id: PeerId(peer_id),
 							reward_destination,
@@ -530,7 +544,7 @@ pub mod pallet {
 					)
 					.map_err(|_| Error::<T>::TooManyBlockRegistrants)?;
 
-				Self::deposit_event(Event::<T>::CohortRegistrantAdded {
+				Self::deposit_event(Event::<T>::SlotBidderAdded {
 					account_id: who.clone(),
 					bid_amount: bid.clone(),
 					index: UniqueSaturatedInto::<u32>::unique_saturated_into(pos),
@@ -589,11 +603,11 @@ impl<T: Config> Pallet<T> {
 		hash: U256,
 		closest: u8,
 	) -> Vec<AuthorityDistance<BlockSealAuthorityId>> {
-		let validators = Self::active_validators_by_index();
+		let miners = Self::active_miners_by_index();
 		find_xor_closest(<AuthoritiesByIndex<T>>::get(), hash, closest)
 			.into_iter()
 			.map(|(a, distance, index)| {
-				let registration = validators.get(&index.into()).unwrap();
+				let registration = miners.get(&index.into()).unwrap();
 				AuthorityDistance::<_> {
 					authority_id: a.clone(),
 					authority_index: index.unique_saturated_into(),
@@ -605,79 +619,76 @@ impl<T: Config> Pallet<T> {
 			.collect()
 	}
 
-	pub(crate) fn get_next_cohort_block_number() -> BlockNumberFor<T> {
+	pub(crate) fn get_next_slot_block_number() -> BlockNumberFor<T> {
 		let current_block_number = UniqueSaturatedInto::<u32>::unique_saturated_into(
 			<frame_system::Pallet<T>>::block_number(),
 		);
-		let offset_blocks = current_block_number % T::BlocksBetweenCohorts::get();
-		(current_block_number + (T::BlocksBetweenCohorts::get() - offset_blocks)).into()
+		let offset_blocks = current_block_number % T::BlocksBetweenSlots::get();
+		(current_block_number + (T::BlocksBetweenSlots::get() - offset_blocks)).into()
 	}
 
-	pub fn get_next_cohort_period() -> (BlockNumberFor<T>, BlockNumberFor<T>) {
-		let next_block = Self::get_next_cohort_block_number();
+	pub fn get_slot_era() -> (BlockNumberFor<T>, BlockNumberFor<T>) {
+		let next_block = Self::get_next_slot_block_number();
 		(next_block, next_block + Self::get_validation_window_blocks())
 	}
 
-	pub(crate) fn get_start_cohort_index(
+	pub(crate) fn get_slot_starting_index(
 		block_number: u32,
-		blocks_between_cohorts: u32,
-		max_validators: u32,
+		blocks_between_slots: u32,
+		max_miners: u32,
 		cohort_size: u32,
 	) -> u32 {
-		let cohort = block_number / blocks_between_cohorts;
-		(cohort * cohort_size) % max_validators
+		let cohort = block_number / blocks_between_slots;
+		(cohort * cohort_size) % max_miners
 	}
 
-	pub(crate) fn get_next_start_cohort_index() -> u32 {
+	pub(crate) fn get_next_slot_starting_index() -> u32 {
 		let block_number = UniqueSaturatedInto::<u32>::unique_saturated_into(
 			<frame_system::Pallet<T>>::block_number(),
 		);
 		let cohort_size = T::MaxCohortSize::get();
 		cohort_size +
-			Self::get_start_cohort_index(
+			Self::get_slot_starting_index(
 				block_number,
-				T::BlocksBetweenCohorts::get(),
-				T::MaxValidators::get(),
+				T::BlocksBetweenSlots::get(),
+				T::MaxMiners::get(),
 				cohort_size,
 			)
 	}
 
 	pub(crate) fn get_validation_window_blocks() -> BlockNumberFor<T> {
-		let validators = T::MaxValidators::get();
-		let blocks_between_cohorts = T::BlocksBetweenCohorts::get();
+		let miners = T::MaxMiners::get();
+		let blocks_between_slots = T::BlocksBetweenSlots::get();
 		let cohort_size = T::MaxCohortSize::get();
 
-		let blocks_per_validator = validators.saturating_mul(blocks_between_cohorts) / cohort_size;
-		blocks_per_validator.into()
+		let blocks_per_miner = miners.saturating_mul(blocks_between_slots) / cohort_size;
+		blocks_per_miner.into()
 	}
 
 	pub(crate) fn get_active_registration(account_id: &T::AccountId) -> Option<Registration<T>> {
 		if let Some(index) = AccountIndexLookup::<T>::get(account_id) {
-			return ActiveValidatorsByIndex::<T>::get().get(&(index).into()).cloned()
+			return ActiveMinersByIndex::<T>::get().get(&(index).into()).cloned()
 		}
 		None
 	}
 
-	pub(crate) fn get_validator_accounts() -> Vec<T::AccountId> {
-		<ActiveValidatorsByIndex<T>>::get()
-			.into_iter()
-			.map(|(_, a)| a.account_id)
-			.collect()
+	pub(crate) fn get_miner_accounts() -> Vec<T::AccountId> {
+		<ActiveMinersByIndex<T>>::get().into_iter().map(|(_, a)| a.account_id).collect()
 	}
 
 	pub(crate) fn get_next_registration(account_id: &T::AccountId) -> Option<Registration<T>> {
-		NextCohort::<T>::get()
+		NextSlotCohort::<T>::get()
 			.into_iter()
 			.find(|x| x.account_id == *account_id)
 			.map(|x| x.clone())
 	}
 
 	pub(crate) fn load_session_keys<'a>(
-		validators_with_keys: impl Iterator<Item = (&'a T::AccountId, BlockSealAuthorityId)>,
+		miners_with_keys: impl Iterator<Item = (&'a T::AccountId, BlockSealAuthorityId)>,
 	) {
 		let mut next_authorities =
-			BoundedBTreeMap::<u32, (BlockSealAuthorityId, U256), T::MaxValidators>::new();
-		for (account_id, authority_id) in validators_with_keys {
+			BoundedBTreeMap::<u32, (BlockSealAuthorityId, U256), T::MaxMiners>::new();
+		for (account_id, authority_id) in miners_with_keys {
 			if let Some(account_index) = <AccountIndexLookup<T>>::get(&account_id) {
 				let hash = blake2_256(&authority_id.clone().into_inner().0);
 				// this should not be possible to fail. The bounds equal the source lookup
@@ -687,20 +698,20 @@ impl<T: Config> Pallet<T> {
 			}
 		}
 
-		let active_validators = <ActiveValidatorsByIndex<T>>::get();
-		if next_authorities.len() != active_validators.len() {
-			let no_key_validators = active_validators
+		let active_miners = <ActiveMinersByIndex<T>>::get();
+		if next_authorities.len() != active_miners.len() {
+			let no_key_miners = active_miners
 				.into_iter()
 				.filter(|(index, _)| !next_authorities.contains_key(index))
 				.map(|a| a.1.account_id)
 				.collect::<Vec<_>>();
-			if !no_key_validators.is_empty() {
+			if !no_key_miners.is_empty() {
 				// TODO: should we burn bonds when this happens? Aka, user taken a slot, but
 				//	 no registered keys
 				log::warn!(
 					target: LOG_TARGET,
-					"The following registered validator accounts do not have session keys: {:?}",
-					no_key_validators
+					"The following registered miner accounts do not have session keys: {:?}",
+					no_key_miners
 				);
 			}
 		}
@@ -755,7 +766,7 @@ impl<T: Config> Pallet<T> {
 
 		Self::release_ownership_hold(&account_id, amount_to_unhold)?;
 
-		Self::deposit_event(Event::<T>::CohortRegistrantReplaced {
+		Self::deposit_event(Event::<T>::SlotBidderReplaced {
 			account_id: account_id.clone(),
 			bond_id: registration.bond_id,
 			kept_ownership_bond,
@@ -794,7 +805,7 @@ impl<T: Config> Pallet<T> {
 					T::BondProvider::unlock_bond(bond_id).map_err(|e| Error::<T>::from(e))?;
 				}
 
-				Self::deposit_event(Event::<T>::UnbondedValidator {
+				Self::deposit_event(Event::<T>::UnbondedMiner {
 					account_id: account_id.clone(),
 					bond_id: active_bond_id,
 					kept_ownership_bond: false,
@@ -805,7 +816,7 @@ impl<T: Config> Pallet<T> {
 					T::BondProvider::unlock_bond(active_bond_id.unwrap())
 						.map_err(|e| Error::<T>::from(e))?;
 
-					Self::deposit_event(Event::<T>::UnbondedValidator {
+					Self::deposit_event(Event::<T>::UnbondedMiner {
 						account_id: account_id.clone(),
 						bond_id: active_bond_id,
 						kept_ownership_bond: true,
@@ -839,9 +850,10 @@ where
 	authority_xor_distances
 }
 
-pub struct ValidatorOf<T>(PhantomData<T>);
+// Lookup needed for pallet_session
+pub struct ValidatorIdOf<T>(PhantomData<T>);
 
-impl<T: Config> Convert<T::AccountId, Option<T::AccountId>> for ValidatorOf<T> {
+impl<T: Config> Convert<T::AccountId, Option<T::AccountId>> for ValidatorIdOf<T> {
 	fn convert(account_id: T::AccountId) -> Option<T::AccountId> {
 		if <AccountIndexLookup<T>>::contains_key(&account_id) {
 			Some(account_id)
@@ -860,8 +872,8 @@ pub struct MinerHistory {
 pub struct FullIdentificationOf<T>(PhantomData<T>);
 
 impl<T: Config> Convert<T::AccountId, Option<MinerHistory>> for FullIdentificationOf<T> {
-	fn convert(validator: T::AccountId) -> Option<MinerHistory> {
-		if let Some(index) = <AccountIndexLookup<T>>::get(&validator) {
+	fn convert(miner: T::AccountId) -> Option<MinerHistory> {
+		if let Some(index) = <AccountIndexLookup<T>>::get(&miner) {
 			return Some(MinerHistory { authority_index: index.clone() })
 		}
 		None
@@ -877,15 +889,15 @@ impl<T: Config> SessionManager<T::AccountId> for Pallet<T> {
 		let block_number_u32: u32 = UniqueSaturatedInto::<u32>::unique_saturated_into(
 			<frame_system::Pallet<T>>::block_number(),
 		);
-		// only rotate validators on cohort changeover. The keys representing the authority ids will
+		// only rotate miners on cohort changeover. The keys representing the authority ids will
 		// auto-change
-		if block_number_u32 % T::BlocksBetweenCohorts::get() != 0 {
+		if block_number_u32 % T::BlocksBetweenSlots::get() != 0 {
 			return None
 		}
-		Some(Self::get_validator_accounts())
+		Some(Self::get_miner_accounts())
 	}
 	fn new_session_genesis(_: u32) -> Option<Vec<T::AccountId>> {
-		Some(Self::get_validator_accounts())
+		Some(Self::get_miner_accounts())
 	}
 	fn end_session(_: u32) {}
 	fn start_session(_: u32) {}
@@ -899,8 +911,8 @@ where
 	>,
 {
 	fn new_session(new_index: u32) -> Option<Vec<(T::AccountId, MinerHistory)>> {
-		<Self as SessionManager<_>>::new_session(new_index).map(|validators| {
-			validators
+		<Self as SessionManager<_>>::new_session(new_index).map(|miners| {
+			miners
 				.into_iter()
 				.filter_map(|v| {
 					if let Some(miner) = FullIdentificationOf::<T>::convert(v.clone()) {
@@ -926,30 +938,30 @@ where
 impl<T: Config> OneSessionHandler<T::AccountId> for Pallet<T> {
 	type Key = BlockSealAuthorityId;
 
-	fn on_genesis_session<'a, I: 'a>(validators: I)
+	fn on_genesis_session<'a, I: 'a>(miners: I)
 	where
 		I: Iterator<Item = (&'a T::AccountId, Self::Key)>,
 		T::AccountId: 'a,
 	{
-		Self::load_session_keys(validators);
+		Self::load_session_keys(miners);
 	}
 
-	fn on_new_session<'a, I: 'a>(changed: bool, validators_with_keys: I, _queued_validators: I)
+	fn on_new_session<'a, I: 'a>(changed: bool, miners_with_keys: I, _queued_miners: I)
 	where
 		I: Iterator<Item = (&'a T::AccountId, BlockSealAuthorityId)>,
 	{
 		if changed {
-			Self::load_session_keys(validators_with_keys);
+			Self::load_session_keys(miners_with_keys);
 		}
 	}
 
-	fn on_disabled(_validator_index: u32) {}
+	fn on_disabled(_miner_index: u32) {}
 }
 
 sp_api::decl_runtime_apis! {
-	/// This runtime api allows people to query the upcoming cohorts
-	pub trait CohortsApi<BlockNumber> where
+	/// This runtime api allows people to query the upcoming mining_slots
+	pub trait MiningSlotsApi<BlockNumber> where
 		BlockNumber: Codec {
-		fn next_cohort_block_period() -> (BlockNumber, BlockNumber);
+		fn next_slot_era() -> (BlockNumber, BlockNumber);
 	}
 }

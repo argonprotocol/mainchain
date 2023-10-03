@@ -21,7 +21,7 @@ use sp_runtime::{
 };
 
 use ulx_primitives::{
-	block_seal::AuthorityApis,
+	block_seal::MiningAuthorityApis,
 	digests::{FinalizedBlockNeededDigest, FINALIZED_BLOCK_DIGEST_ID},
 	inherents::UlxBlockSealInherent,
 	ProofOfWorkType, UlxPreDigest, ULX_ENGINE_ID,
@@ -66,7 +66,7 @@ where
 	I::Error: Into<ConsensusError>,
 	C: ProvideRuntimeApi<B> + Send + Sync + HeaderBackend<B> + AuxStore + BlockOf,
 	C::Api: BlockBuilderApi<B>,
-	C::Api: AuthorityApis<B>,
+	C::Api: MiningAuthorityApis<B>,
 	Algorithm: NonceAlgorithm<B>,
 	CIDP: CreateInherentDataProviders<B, UlxBlockSealInherent> + Clone,
 {
@@ -174,7 +174,7 @@ where
 		+ AuxStore
 		+ BlockOf,
 	C::Api: BlockBuilderApi<B>,
-	C::Api: AuthorityApis<B>,
+	C::Api: MiningAuthorityApis<B>,
 	Algorithm: NonceAlgorithm<B> + Send + Sync,
 	Algorithm::Difficulty: 'static + Send + From<u128>,
 	CIDP: CreateInherentDataProviders<B, UlxBlockSealInherent> + Clone + Send + Sync,

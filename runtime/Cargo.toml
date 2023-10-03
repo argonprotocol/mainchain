@@ -56,7 +56,7 @@ pallet-bonds = { version = "0.0.1", default-features = false, path = "../pallets
 pallet-difficulty = { version = "0.0.1", default-features = false, path = "../pallets/difficulty" }
 pallet-localchain-relay = { version = "0.0.1", default-features = false, path = "../pallets/localchain_relay" }
 pallet-notary-admin = { version = "0.0.1", default-features = false, path = "../pallets/notary_admin" }
-pallet-cohorts = { version = "0.0.1", default-features = false, path = "../pallets/cohorts" }
+pallet-mining-slots = { version = "0.0.1", default-features = false, path = "../pallets/mining_slots" }
 ulx-primitives = { version = "0.0.1", default-features = false, path = "../primitives" }
 
 [build-dependencies]
@@ -81,7 +81,7 @@ std = [
 	"pallet-transaction-payment/std",
 	"pallet-authorship/std",
 	"pallet-transaction-payment-rpc-runtime-api/std",
-	"pallet-cohorts/std",
+	"pallet-mining-slots/std",
 	"pallet-bonds/std",
 	"pallet-difficulty/std",
 	"pallet-block-seal/std",

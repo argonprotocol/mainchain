@@ -26,7 +26,7 @@ sp_application_crypto::with_pair! {
 pub type BlockSealAuthoritySignature = app::Signature;
 pub type BlockSealAuthorityId = app::Public;
 
-pub type MaxValidatorRpcHosts = ConstU32<4>;
+pub type MaxMinerRpcHosts = ConstU32<4>;
 
 #[derive(Clone, PartialEq, Eq, Encode, Decode, RuntimeDebug, TypeInfo, Deserialize, Serialize)]
 pub struct BlockProof {
@@ -67,7 +67,7 @@ pub struct SealStamper {
 }
 
 sp_api::decl_runtime_apis! {
-	pub trait AuthorityApis {
+	pub trait MiningAuthorityApis {
 		fn authorities() -> Vec<BlockSealAuthorityId>;
 		fn authorities_by_index() -> BTreeMap<u16, BlockSealAuthorityId>;
 		fn active_authorities() -> u16;
@@ -80,14 +80,14 @@ sp_api::decl_runtime_apis! {
 )]
 #[scale_info(skip_type_params(MaxHosts))]
 #[derive(Deserialize, Serialize)]
-pub struct ValidatorRegistration<
+pub struct MiningRegistration<
 	AccountId: Parameter,
 	BondId: Parameter,
 	Balance: Parameter + MaxEncodedLen,
 > {
 	pub account_id: AccountId,
 	pub peer_id: PeerId,
-	pub rpc_hosts: BoundedVec<Host, MaxValidatorRpcHosts>,
+	pub rpc_hosts: BoundedVec<Host, MaxMinerRpcHosts>,
 	pub reward_destination: RewardDestination<AccountId>,
 	pub bond_id: Option<BondId>,
 	#[codec(compact)]
@@ -159,7 +159,7 @@ pub struct AuthorityDistance<AuthorityId> {
 	pub authority_id: AuthorityId,
 	pub peer_id: PeerId,
 	pub distance: U256,
-	pub rpc_hosts: BoundedVec<Host, MaxValidatorRpcHosts>,
+	pub rpc_hosts: BoundedVec<Host, MaxMinerRpcHosts>,
 }
 
 #[derive(

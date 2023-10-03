@@ -15,7 +15,7 @@ use sp_runtime::{traits::Header as HeaderT, BoundedVec};
 use std::{collections::BTreeMap, sync::Arc, time::Duration};
 use ulx_primitives::{
 	block_seal::{
-		AuthorityApis, BlockProof, BlockSealAuthorityId, SealNonceHashMessage, SealStamper,
+		BlockProof, BlockSealAuthorityId, MiningAuthorityApis, SealNonceHashMessage, SealStamper,
 		SealerSignatureMessage, BLOCK_SEAL_KEY_TYPE, SEAL_NONCE_PREFIX,
 	},
 	ProofOfWorkType,

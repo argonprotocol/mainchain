@@ -10,7 +10,7 @@ use sp_keystore::KeystorePtr;
 use sp_runtime::{app_crypto::AppCrypto, generic::DigestItem, traits::Block as BlockT};
 
 use ulx_primitives::{
-	block_seal::{AuthorityApis, BlockProof},
+	block_seal::{BlockProof, MiningAuthorityApis},
 	BlockSealAuthorityId, BlockSealAuthoritySignature, UlxSeal, ULX_ENGINE_ID,
 };
 
@@ -27,7 +27,7 @@ pub struct AuthoritySealer<Block, C> {
 impl<Block: BlockT, C> AuthoritySealer<Block, C>
 where
 	C: ProvideRuntimeApi<Block>,
-	C::Api: AuthorityApis<Block>,
+	C::Api: MiningAuthorityApis<Block>,
 {
 	pub fn new(client: Arc<C>, keystore: KeystorePtr) -> Self {
 		Self { client, keystore, _phantom: PhantomData }
@@ -219,7 +219,7 @@ mod tests {
 	}
 
 	sp_api::mock_impl_runtime_apis! {
-		impl AuthorityApis<Block> for RuntimeApi {
+		impl MiningAuthorityApis<Block> for RuntimeApi {
 			fn authorities() -> Vec<BlockSealAuthorityId>{
 				self.inner.authorities_by_index.iter().map(|(_, id)| id.clone()).collect::<Vec<_>>()
 			}

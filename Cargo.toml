@@ -3,7 +3,7 @@ members = [
     "node",
 	"node/consensus",
 	"pallets/block_seal",
-	"pallets/cohorts",
+    "pallets/mining_slots",
 	"pallets/bonds",
 	"pallets/difficulty",
 	"pallets/notary_admin",

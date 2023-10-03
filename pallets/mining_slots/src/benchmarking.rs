@@ -3,7 +3,7 @@
 use super::*;
 
 #[allow(unused)]
-use crate::Pallet as Cohorts;
+use crate::Pallet as MiningSlots;
 use frame_benchmarking::v2::*;
 use frame_system::RawOrigin;
 
@@ -26,5 +26,5 @@ mod benchmarks {
 		assert!(Ledger::<T>::contains_key(stash));
 	}
 
-	impl_benchmark_test_suite!(Cohorts, crate::mock::new_test_ext(), crate::mock::Test);
+	impl_benchmark_test_suite!(MiningSlots, crate::mock::new_test_ext(), crate::mock::Test);
 }
