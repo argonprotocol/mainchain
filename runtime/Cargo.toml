@@ -137,3 +137,6 @@ try-runtime = [
 	"pallet-transaction-payment/try-runtime",
 	"pallet-session/try-runtime",
 ]
+
+# Set timing constants (e.g. session period) to faster versions to speed up testing.
+fast-runtime = []

@@ -5,6 +5,8 @@
 #[cfg(feature = "runtime-benchmarks")]
 #[macro_use]
 extern crate frame_benchmarking;
+extern crate alloc;
+
 pub use frame_support::{
 	construct_runtime, parameter_types,
 	traits::{
@@ -59,6 +61,7 @@ use crate::wage_protector::WageProtectorFee;
 
 pub type ArgonBalancesCall = pallet_balances::Call<Runtime, ArgonToken>;
 
+mod macros;
 pub mod wage_protector;
 
 // Make the WASM binary available.
@@ -239,15 +242,14 @@ impl pallet_timestamp::Config for Runtime {
 }
 
 parameter_types! {
-	pub const AuthorityCountInitiatingTaxProof: u32 = 100;
 	pub const MaxCohortSize: u32 = 250; // this means cohorts last 40 days
-	pub const BlocksBetweenCohorts: u32 = 1440; // going to add a cohort every day
+	pub const BlocksBetweenCohorts: u32 = prod_or_fast!(1440, 4); // going to add a cohort every day
 	pub const MaxValidators: u32 = 10_000; // must multiply cleanly by MaxCohortSize
-	pub const SessionRotationPeriod: u32 = 120; // must be cleanly divisible by BlocksBetweenCohorts
+	pub const SessionRotationPeriod: u32 = prod_or_fast!(120, 2); // must be cleanly divisible by BlocksBetweenCohorts
 	pub const Offset: u32 = 0;
 	pub const OwnershipPercentDamper: u32 = 80;
 
-	pub const NextCohortBufferToStopAcceptingBids: u32 = 10;
+	pub const NextCohortBufferToStopAcceptingBids: u32 = prod_or_fast!(10, 1);
 	pub const MaxConcurrentlyExpiringBondFunds: u32 = 1000;
 	pub const MaxConcurrentlyExpiringBonds: u32 = 1000;
 	pub const MinimumBondAmount:u128 = 1_000;
@@ -299,7 +301,6 @@ impl pallet_block_seal::Config for Runtime {
 	type RuntimeEvent = RuntimeEvent;
 	type WeightInfo = pallet_block_seal::weights::SubstrateWeight<Runtime>;
 	type AuthorityProvider = Cohorts;
-	type AuthorityCountInitiatingTaxProof = AuthorityCountInitiatingTaxProof;
 	type AuthorityId = BlockSealAuthorityId;
 	type HistoricalBlockSealersToKeep = HistoricalBlockSealersToKeep;
 }
