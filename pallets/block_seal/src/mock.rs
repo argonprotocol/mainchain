@@ -100,7 +100,6 @@ impl pallet_block_seal::Config for Test {
 	type RuntimeEvent = RuntimeEvent;
 	type WeightInfo = ();
 	type HistoricalBlockSealersToKeep = ConstU32<10>;
-	type AuthorityCountInitiatingTaxProof = AuthorityCountInitiatingTaxProof;
 	type AuthorityId = BlockSealAuthorityId;
 	type AuthorityProvider = StaticAuthorityProvider;
 }
@@ -157,6 +156,7 @@ pub fn new_test_ext(
 	pallet_block_seal::GenesisConfig::<Test> {
 		min_seal_signers,
 		closest_xor_authorities_required,
+		authority_count_starting_tax_seal: AuthorityCountInitiatingTaxProof::get(),
 		_phantom: Default::default(),
 	}
 	.assimilate_storage(&mut t)

@@ -25,6 +25,7 @@ pub mod pallet {
 	use sp_runtime::{
 		traits::UniqueSaturatedInto, ConsensusEngineId, RuntimeAppPublic, Saturating,
 	};
+	use sp_std::cmp::min;
 
 	use ulx_primitives::{
 		block_seal::{
@@ -56,9 +57,6 @@ pub mod pallet {
 		type WeightInfo: WeightInfo;
 		/// Type that provides authorities
 		type AuthorityProvider: AuthorityProvider<Self::AuthorityId, Self::AccountId>;
-		/// How many authorities must be registered in total before proof of tax begins
-		#[pallet::constant]
-		type AuthorityCountInitiatingTaxProof: Get<u32>;
 		/// How many historical block sealers to keep in storage
 		#[pallet::constant]
 		type HistoricalBlockSealersToKeep: Get<u32>;
@@ -74,17 +72,23 @@ pub mod pallet {
 		ValueQuery,
 	>;
 
+	/// How many of the xor authorities must sign a block seal to be valid
 	#[pallet::storage]
 	#[pallet::getter(fn min_seal_signers)]
 	pub(super) type MinSealSigners<T: Config> = StorageValue<_, u32, ValueQuery>;
 
+	/// How many closest xor authorities must be included in a block seal to be accepted
 	#[pallet::storage]
 	#[pallet::getter(fn closest_x_authorities_required)]
 	pub(super) type ClosestXAuthoritiesRequired<T: Config> = StorageValue<_, u32, ValueQuery>;
 
+	/// How many authorities need to be registered before we activate the Proof of Tax era.
+	#[pallet::storage]
+	pub(super) type AuthorityCountInitiatingTaxProof<T: Config> = StorageValue<_, u32, ValueQuery>;
+
+	/// Author of current block (temporary storage).
 	#[pallet::storage]
 	#[pallet::getter(fn author)]
-	/// Author of current block (temporary storage).
 	pub(super) type Author<T: Config> = StorageValue<_, T::AccountId, OptionQuery>;
 
 	/// Did the seal run exactly once (temporary storage)
@@ -102,6 +106,7 @@ pub mod pallet {
 	pub struct GenesisConfig<T: Config> {
 		pub min_seal_signers: u32,
 		pub closest_xor_authorities_required: u32,
+		pub authority_count_starting_tax_seal: u32,
 		pub _phantom: PhantomData<T>,
 	}
 
@@ -110,6 +115,7 @@ pub mod pallet {
 		fn build(&self) {
 			<MinSealSigners<T>>::put(self.min_seal_signers);
 			<ClosestXAuthoritiesRequired<T>>::put(self.closest_xor_authorities_required);
+			<AuthorityCountInitiatingTaxProof<T>>::put(self.authority_count_starting_tax_seal);
 		}
 	}
 
@@ -145,7 +151,8 @@ pub mod pallet {
 			let current_work_type = <CurrentWorkType<T>>::get();
 			if current_work_type == ProofOfWorkType::Compute {
 				let validators = T::AuthorityProvider::authority_count();
-				if validators >= T::AuthorityCountInitiatingTaxProof::get().unique_saturated_into()
+				if validators >=
+					<AuthorityCountInitiatingTaxProof<T>>::get().unique_saturated_into()
 				{
 					<CurrentWorkType<T>>::put(ProofOfWorkType::Tax);
 				}
@@ -183,8 +190,10 @@ pub mod pallet {
 			assert!(!DidSeal::<T>::exists(), "A Seal must be updated only once in the block");
 
 			let authorities = T::AuthorityProvider::authorities_by_index();
-			let min_signatures = <MinSealSigners<T>>::get() as usize;
-			let required_validators = <ClosestXAuthoritiesRequired<T>>::get() as usize;
+			let authority_count = authorities.len();
+			let min_signatures = min(<MinSealSigners<T>>::get() as usize, authority_count);
+			let required_validators =
+				min(<ClosestXAuthoritiesRequired<T>>::get() as usize, authority_count);
 
 			let proof = match seal.tax_block_proof {
 				Some(proof) => proof,
@@ -250,6 +259,27 @@ pub mod pallet {
 				BoundedVec::truncate_from(sealers),
 			);
 
+			Ok(())
+		}
+
+		#[pallet::call_index(1)]
+		#[pallet::weight(0)]
+		pub fn configure(
+			origin: OriginFor<T>,
+			min_seal_signers: Option<u32>,
+			required_xor_closest_validators: Option<u32>,
+			authority_count_starting_tax_seal: Option<u32>,
+		) -> DispatchResult {
+			ensure_root(origin)?;
+			if let Some(min_seal_signers) = min_seal_signers {
+				<MinSealSigners<T>>::put(min_seal_signers);
+			}
+			if let Some(required_xor_closest_validators) = required_xor_closest_validators {
+				<ClosestXAuthoritiesRequired<T>>::put(required_xor_closest_validators);
+			}
+			if let Some(authority_count_starting_tax_seal) = authority_count_starting_tax_seal {
+				<AuthorityCountInitiatingTaxProof<T>>::put(authority_count_starting_tax_seal);
+			}
 			Ok(())
 		}
 	}
