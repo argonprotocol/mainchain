@@ -49,7 +49,10 @@ use crate::{
 	compute_worker::UntilImportedOrTimeout,
 	error::{
 		Error,
-		Error::{BlockNotFound, InvalidNonceDifficulty},
+		Error::{
+			BlockNotFound, InvalidNonceDifficulty, InvalidPredigestWorkType,
+			InvalidProofOfWorkTypeUsed,
+		},
 	},
 };
 
@@ -169,6 +172,10 @@ pub async fn listen_for_block_seal<Block, C, S, Algorithm, E, SO, L, CIDP, CS>(
 							return Err(err.into())
 						},
 					};
+
+					if pre_digest.work_type != ProofOfWorkType::Tax {
+						return Err(InvalidProofOfWorkTypeUsed.into())
+					}
 
 					let sealer = match authority_sealer.check_if_can_seal(
 						&parent_hash,

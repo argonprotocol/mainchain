@@ -65,6 +65,8 @@ pub enum Error<B: BlockT> {
 	MissingFinalizedHeightDigest,
 	#[error("Invalid work type proposed")]
 	InvalidPredigestWorkType,
+	#[error("Invalid proof of work used")]
+	InvalidProofOfWorkTypeUsed,
 	#[error("Invalid difficulty proposed")]
 	InvalidPredigestDifficulty,
 	#[error(transparent)]
