@@ -27,7 +27,7 @@ sp-api = { version = "4.0.0-dev", default-features = false, git = "https://githu
 ulx-primitives = { path = "../../primitives", default-features = false }
 pallet-timestamp = { version = "4.0.0-dev", default-features = false, git = "https://github.com/paritytech/polkadot-sdk.git", branch = "release-polkadot-v1.1.0" }
 
-log = "0.4.19"
+log = "0.4.20"
 
 [dev-dependencies]
 sp-io = { version = "23.0.0", default-features = false, git = "https://github.com/paritytech/polkadot-sdk.git", branch = "release-polkadot-v1.1.0" }

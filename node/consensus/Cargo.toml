@@ -19,7 +19,7 @@ async-trait = "0.1.73"
 codec = { package = "parity-scale-codec", version = "3.6.4", default-features = false, features = ["derive"] }
 futures = { version = "0.3.21", features = ["thread-pool"]}
 futures-timer = "3.0.1"
-log = "0.4.17"
+log = "0.4.20"
 parking_lot = "0.12.1"
 thiserror = "1.0"
 rand = {version = "0.8.5"}
