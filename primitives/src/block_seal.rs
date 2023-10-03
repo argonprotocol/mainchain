@@ -2,6 +2,7 @@ use codec::{Decode, Encode};
 use frame_support::{CloneNoBound, EqNoBound, Parameter, PartialEqNoBound};
 use scale_info::TypeInfo;
 use serde::{Deserialize, Serialize};
+use sp_api::BlockT;
 use sp_core::{
 	crypto::{AccountId32, KeyTypeId},
 	ConstU32, MaxEncodedLen, OpaquePeerId, U256,
@@ -70,7 +71,7 @@ sp_api::decl_runtime_apis! {
 		fn authorities() -> Vec<BlockSealAuthorityId>;
 		fn authorities_by_index() -> BTreeMap<u16, BlockSealAuthorityId>;
 		fn active_authorities() -> u16;
-		fn xor_closest_validators(hash: Vec<u8>) -> Vec<AuthorityDistance<BlockSealAuthorityId>>;
+		fn block_peers(account_id: AccountId32) -> Vec<AuthorityDistance<BlockSealAuthorityId>>;
 	}
 }
 
@@ -130,14 +131,20 @@ impl MaxEncodedLen for PeerId {
 	}
 }
 
-pub trait AuthorityProvider<AuthorityId, AccountId> {
+pub trait AuthorityProvider<AuthorityId, Block, AccountId>
+where
+	Block: BlockT,
+{
 	fn authorities() -> Vec<AuthorityId>;
 	fn authorities_by_index() -> BTreeMap<u16, AuthorityId>;
 	fn authority_count() -> u16;
 	fn is_active(authority_id: &AuthorityId) -> bool;
 	fn get_authority(author: AccountId) -> Option<AuthorityId>;
-	fn find_xor_closest_authorities(hash: U256, closest: u8)
-		-> Vec<AuthorityDistance<AuthorityId>>;
+	fn block_peers(
+		block_hash: &Block::Hash,
+		account_id: AccountId32,
+		closest: u8,
+	) -> Vec<AuthorityDistance<AuthorityId>>;
 }
 
 pub trait HistoricalBlockSealersLookup<BlockNumber, AuthorityId> {

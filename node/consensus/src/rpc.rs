@@ -1,5 +1,6 @@
 use std::marker::PhantomData;
 
+use codec::Encode;
 use futures::{
 	channel::{mpsc, mpsc::SendError, oneshot},
 	SinkExt,
@@ -11,13 +12,18 @@ use jsonrpsee::{
 };
 use sc_consensus::ImportResult;
 use serde::{Deserialize, Serialize};
+use sp_api::ProvideRuntimeApi;
 use sp_blockchain::Error as BlockchainError;
 use sp_consensus::Error as ConsensusError;
-use sp_core::U256;
+use sp_core::{blake2_256, bytes::to_hex, U256};
 use sp_inherents::Error as InherentsError;
 use sp_runtime::traits::Block as BlockT;
 
-use ulx_primitives::block_seal::BlockProof;
+use ulx_primitives::block_seal::{
+	AuthorityApis, BlockProof, SealerSignatureMessage, SEALER_SIGNATURE_PREFIX,
+};
+
+use crate::{authority::AuthoritySealer, rpc::Error::StringError};
 
 /// Sender passed to the authorship task to report errors or successes.
 pub type Sender<T> = Option<oneshot::Sender<std::result::Result<T, Error>>>;
@@ -31,6 +37,17 @@ pub trait BlockSealApi<Hash> {
 		nonce: U256,
 		block_proof: BlockProof,
 	) -> RpcResult<CreatedBlock<Hash>>;
+	#[method(name = "blockSeal_seekApproval")]
+	async fn seek_approval(
+		&self,
+		parent_hash: Hash,
+		block_proof: BlockProof,
+	) -> RpcResult<ApprovalResponse>;
+}
+
+#[derive(Debug, Deserialize, Serialize, PartialEq, Eq)]
+pub struct ApprovalResponse {
+	pub signature: String,
 }
 
 #[derive(Debug, Deserialize, Serialize, PartialEq, Eq)]
@@ -50,23 +67,29 @@ pub enum SealNewBlock<Hash> {
 }
 
 /// A struct that implements the `ProofOfTaxApi`.
-pub struct BlockSealRpc<Block, Hash> {
+pub struct BlockSealRpc<Block, Hash, C> {
 	seal_channel: mpsc::Sender<SealNewBlock<Hash>>,
+	authority_sealer: AuthoritySealer<Block, C>,
 	_block: PhantomData<Block>,
 }
 
-impl<Block, Hash> BlockSealRpc<Block, Hash> {
+impl<Block, Hash, C> BlockSealRpc<Block, Hash, C> {
 	/// Create new `ProofOfTax` instance with the given reference to the client.
-	pub fn new(seal_channel: mpsc::Sender<SealNewBlock<Hash>>) -> Self {
-		Self { seal_channel, _block: PhantomData }
+	pub fn new(
+		seal_channel: mpsc::Sender<SealNewBlock<Hash>>,
+		authority_sealer: AuthoritySealer<Block, C>,
+	) -> Self {
+		Self { seal_channel, authority_sealer, _block: PhantomData }
 	}
 }
 
 #[async_trait]
-impl<Block> BlockSealApiServer<<Block as BlockT>::Hash> for BlockSealRpc<Block, Block::Hash>
+impl<Block, C> BlockSealApiServer<<Block as BlockT>::Hash> for BlockSealRpc<Block, Block::Hash, C>
 where
 	Block: BlockT,
 	Block::Hash: Send + Sync + 'static,
+	C: ProvideRuntimeApi<Block> + Send + Sync + 'static,
+	C::Api: AuthorityApis<Block>,
 {
 	async fn submit(
 		&self,
@@ -88,6 +111,46 @@ where
 			Ok(Err(e)) => Err(e.into()),
 			Err(e) => Err(JsonRpseeError::to_call_error(e)),
 		}
+	}
+
+	async fn seek_approval(
+		&self,
+		parent_hash: Block::Hash,
+		block_proof: BlockProof,
+	) -> RpcResult<ApprovalResponse> {
+		let (authority_idx, authority_id, authorities) =
+			match self.authority_sealer.check_if_can_seal(&parent_hash, &block_proof, false) {
+				Ok(x) => x,
+				Err(e) => return Err(StringError(e.to_string()).into()),
+			};
+
+		if !block_proof.seal_stampers.iter().any(|a| a.authority_idx == authority_idx) {
+			return Err(StringError("Cannot sign as one of these block sealers.".into()).into())
+		}
+
+		if authorities.iter().map(|a| a.0).collect::<Vec<_>>() !=
+			block_proof.seal_stampers.iter().map(|a| a.authority_idx).collect::<Vec<_>>()
+		{
+			return Err(StringError("Invalid block sealers proposed.".into()).into())
+		}
+
+		// TODO: do we seek charge for this?
+		let signature_message = SealerSignatureMessage {
+			prefix: SEALER_SIGNATURE_PREFIX,
+			parent_hash,
+			author_id: block_proof.author_id,
+			tax_proof_id: block_proof.tax_proof_id,
+			tax_amount: block_proof.tax_amount,
+			seal_stampers: authorities.iter().map(|a| a.1.clone()).collect(),
+		}
+		.using_encoded(blake2_256);
+
+		let signature = self
+			.authority_sealer
+			.sign_message(&authority_id, &signature_message[..])
+			.map_err(|e| Error::StringError(e.to_string()))?;
+
+		Ok(ApprovalResponse { signature: to_hex(&signature[..], true) })
 	}
 }
 

@@ -12,7 +12,8 @@ use frame_support::{
 };
 use frame_system::pallet_prelude::BlockNumberFor;
 use pallet_session::SessionManager;
-use sp_core::{Get, U256};
+use sp_api::BlockT;
+use sp_core::{crypto::AccountId32, Get, U256};
 use sp_io::hashing::blake2_256;
 use sp_runtime::{
 	traits::{Convert, UniqueSaturatedInto},
@@ -543,7 +544,7 @@ pub mod pallet {
 	}
 }
 
-impl<T: Config> AuthorityProvider<BlockSealAuthorityId, T::AccountId> for Pallet<T> {
+impl<T: Config> AuthorityProvider<BlockSealAuthorityId, T::Block, T::AccountId> for Pallet<T> {
 	fn authorities() -> Vec<BlockSealAuthorityId> {
 		Self::authorities_by_index()
 			.into_iter()
@@ -573,7 +574,18 @@ impl<T: Config> AuthorityProvider<BlockSealAuthorityId, T::AccountId> for Pallet
 				.map(|a| a.clone())
 		})
 	}
-	fn find_xor_closest_authorities(
+	fn block_peers(
+		block_hash: &<T::Block as BlockT>::Hash,
+		account_id: AccountId32,
+		closest: u8,
+	) -> Vec<AuthorityDistance<BlockSealAuthorityId>> {
+		let hash = U256::from(blake2_256(&[block_hash.as_ref(), &account_id.as_ref()].concat()));
+		Self::find_xor_closest_authorities(hash, closest)
+	}
+}
+
+impl<T: Config> Pallet<T> {
+	pub fn find_xor_closest_authorities(
 		hash: U256,
 		closest: u8,
 	) -> Vec<AuthorityDistance<BlockSealAuthorityId>> {
@@ -592,9 +604,7 @@ impl<T: Config> AuthorityProvider<BlockSealAuthorityId, T::AccountId> for Pallet
 			})
 			.collect()
 	}
-}
 
-impl<T: Config> Pallet<T> {
 	pub(crate) fn get_next_cohort_block_number() -> BlockNumberFor<T> {
 		let current_block_number = UniqueSaturatedInto::<u32>::unique_saturated_into(
 			<frame_system::Pallet<T>>::block_number(),
@@ -669,7 +679,7 @@ impl<T: Config> Pallet<T> {
 			BoundedBTreeMap::<u32, (BlockSealAuthorityId, U256), T::MaxValidators>::new();
 		for (account_id, authority_id) in validators_with_keys {
 			if let Some(account_index) = <AccountIndexLookup<T>>::get(&account_id) {
-				let hash = blake2_256(&authority_id.into_inner().0);
+				let hash = blake2_256(&authority_id.clone().into_inner().0);
 				// this should not be possible to fail. The bounds equal the source lookup
 				next_authorities
 					.try_insert(account_index, (authority_id, U256::from(hash)))

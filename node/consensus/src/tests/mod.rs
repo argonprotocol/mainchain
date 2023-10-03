@@ -8,7 +8,7 @@ use sc_network_test::TestNetFactory;
 use sp_api::ProvideRuntimeApi;
 use sp_application_crypto::AppCrypto;
 use sp_consensus::{BlockOrigin, NoNetwork as DummyOracle};
-use sp_core::{blake2_256, ByteArray, U256};
+use sp_core::{blake2_256, crypto::AccountId32, ByteArray, U256};
 use sp_keyring::sr25519::Keyring;
 use sp_keystore::{testing::MemoryKeystore, Keystore, KeystorePtr};
 use sp_runtime::{traits::Header as HeaderT, BoundedVec};
@@ -237,9 +237,7 @@ async fn can_run_proof_of_tax() {
 
 		let parent_hash = client.info().best_hash;
 
-		let author_id = Keyring::Dave.to_account_id();
-		let author_bytes = author_id.as_slice();
-		let block_peer_hash = blake2_256(&[parent_hash.as_ref(), &author_bytes].concat()).to_vec();
+		let author_id: AccountId32 = Keyring::Dave.public().into();
 
 		let xor_closest_peers = peer
 			.data
@@ -247,7 +245,7 @@ async fn can_run_proof_of_tax() {
 			.unwrap()
 			.api
 			.runtime_api()
-			.xor_closest_validators(parent_hash, block_peer_hash)
+			.block_peers(parent_hash, author_id.clone())
 			.expect("Got closest");
 
 		let xor_closest_authority_ids = xor_closest_peers

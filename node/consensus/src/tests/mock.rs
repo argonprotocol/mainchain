@@ -21,7 +21,7 @@ use sp_blockchain::{BlockStatus, HeaderBackend, Info};
 use sp_consensus::{DisableProofRecording, Environment, Proposal, Proposer};
 use sp_core::{blake2_256, ByteArray, OpaquePeerId, U256};
 use sp_inherents::{CheckInherentsResult, InherentData};
-use sp_runtime::{traits::Block as BlockT, ApplyExtrinsicResult, BoundedVec, Digest};
+use sp_runtime::{traits::Block as BlockT, AccountId32, ApplyExtrinsicResult, BoundedVec, Digest};
 use substrate_test_runtime::{AccountId, BlockNumber, Executive, Hash, Header};
 use substrate_test_runtime_client::Backend;
 
@@ -219,7 +219,9 @@ sp_api::mock_impl_runtime_apis! {
 		fn authorities_by_index() -> BTreeMap<u16, BlockSealAuthorityId> {
 			self.inner.authorities.iter().map(|(i,_, id)| (*i, id.clone())).collect()
 		}
-		fn xor_closest_validators(hash: Vec<u8>) -> Vec<AuthorityDistance<BlockSealAuthorityId>> {
+		fn block_peers(account_id: AccountId32) -> Vec<AuthorityDistance<BlockSealAuthorityId>> {
+			let block_hash = self.inner.client.as_ref().unwrap().info().best_hash;
+			let hash = blake2_256(&[block_hash.as_ref(), account_id.as_ref()].concat());
 			let closest = find_xor_closest(self.inner.authorities.iter().map(|(index, _, id)| {
 				((*index).unique_saturated_into(), ( id.clone(), U256::from( blake2_256(&id.to_raw_vec()[..]))))
 			}).collect::<Vec<_>>(), U256::from(&hash[..]), self.inner.config.closest_xor.unique_saturated_into());
@@ -259,7 +261,6 @@ sp_api::mock_impl_runtime_apis! {
 		}
 	}
 }
-
 #[derive(Clone)]
 pub struct PanickingBlockImport<B>(B);
 

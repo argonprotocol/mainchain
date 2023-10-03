@@ -13,7 +13,7 @@ use sp_api::ProvideRuntimeApi;
 use sp_block_builder::BlockBuilder as BlockBuilderApi;
 use sp_blockchain::HeaderBackend;
 use sp_consensus::{BlockOrigin, Error as ConsensusError, SelectChain};
-use sp_core::{crypto::AccountId32, U256};
+use sp_core::U256;
 use sp_inherents::{CreateInherentDataProviders, InherentDataProvider};
 use sp_runtime::{
 	generic::DigestItem,
@@ -229,7 +229,7 @@ where
 		}
 
 		let parent_hash = *block.header.parent_hash();
-		let seal = AuthoritySealer::<B, C, AccountId32>::fetch_ulx_seal(
+		let seal = AuthoritySealer::<B, C>::fetch_ulx_seal(
 			block.post_digests.last(),
 			block.header.hash(),
 		)?;
@@ -263,7 +263,7 @@ where
 		let pre_hash = block.header.hash();
 
 		if pre_digest.work_type == ProofOfWorkType::Tax {
-			AuthoritySealer::<B, C, AccountId32>::verify_seal_signature(
+			AuthoritySealer::<B, C>::verify_seal_signature(
 				self.client.clone(),
 				&seal,
 				&parent_hash,

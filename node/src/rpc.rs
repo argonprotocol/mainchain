@@ -12,16 +12,21 @@ use jsonrpsee::RpcModule;
 use sc_consensus_grandpa::{
 	FinalityProofProvider, GrandpaJustificationStream, SharedAuthoritySet, SharedVoterState,
 };
+use sc_consensus_grandpa_rpc::{Grandpa, GrandpaApiServer};
+use sc_rpc::SubscriptionTaskExecutor;
 pub use sc_rpc_api::DenyUnsafe;
 use sc_transaction_pool_api::TransactionPool;
 use sp_api::ProvideRuntimeApi;
 use sp_block_builder::BlockBuilder;
 use sp_blockchain::{Error as BlockChainError, HeaderBackend, HeaderMetadata};
 
-use sc_consensus_grandpa_rpc::{Grandpa, GrandpaApiServer};
-use sc_rpc::SubscriptionTaskExecutor;
-use ulx_node_consensus::rpc::{BlockSealApiServer, BlockSealRpc, SealNewBlock};
+use sp_keystore::KeystorePtr;
+use ulx_node_consensus::{
+	authority::AuthoritySealer,
+	rpc::{BlockSealApiServer, BlockSealRpc, SealNewBlock},
+};
 use ulx_node_runtime::{opaque::Block, AccountId, Balance, BlockNumber, Hash, Nonce};
+use ulx_primitives::block_seal::AuthorityApis;
 
 /// Extra dependencies for GRANDPA
 pub struct GrandpaDeps<B> {
@@ -49,6 +54,8 @@ pub struct FullDeps<C, P, B> {
 	pub block_proof_sink: Sender<SealNewBlock<Hash>>,
 	/// GRANDPA specific dependencies.
 	pub grandpa: GrandpaDeps<B>,
+	/// KeystorePtr instance.
+	pub keystore: KeystorePtr,
 	/// The backend used by the node.
 	pub backend: Arc<B>,
 }
@@ -65,6 +72,7 @@ where
 	C::Api: pallet_transaction_payment_rpc::TransactionPaymentRuntimeApi<Block, Balance>,
 	C::Api: ulx_primitives::UlxConsensusApi<Block>,
 	C::Api: BlockBuilder<Block>,
+	C::Api: AuthorityApis<Block>,
 	P: TransactionPool + 'static,
 	B: sc_client_api::Backend<Block> + Send + Sync + 'static,
 	B::State: sc_client_api::backend::StateBackend<sp_runtime::traits::HashingFor<Block>>,
@@ -73,7 +81,8 @@ where
 	use substrate_frame_rpc_system::{System, SystemApiServer};
 
 	let mut module = RpcModule::new(());
-	let FullDeps { client, pool, deny_unsafe, block_proof_sink, grandpa, backend: _ } = deps;
+	let FullDeps { client, keystore, pool, deny_unsafe, block_proof_sink, grandpa, backend: _ } =
+		deps;
 	let GrandpaDeps {
 		shared_voter_state,
 		shared_authority_set,
@@ -83,7 +92,7 @@ where
 	} = grandpa;
 
 	module.merge(System::new(client.clone(), pool, deny_unsafe).into_rpc())?;
-	module.merge(TransactionPayment::new(client).into_rpc())?;
+	module.merge(TransactionPayment::new(client.clone()).into_rpc())?;
 
 	module.merge(
 		Grandpa::new(
@@ -95,7 +104,11 @@ where
 		)
 		.into_rpc(),
 	)?;
-	module.merge(BlockSealRpc::<Block, Hash>::new(block_proof_sink).into_rpc())?;
+
+	let authority_sealer = AuthoritySealer::new(client.clone(), keystore.clone());
+	module.merge(
+		BlockSealRpc::<Block, Hash, C>::new(block_proof_sink, authority_sealer).into_rpc(),
+	)?;
 
 	Ok(module)
 }

@@ -56,7 +56,7 @@ use crate::{
 #[cfg(test)]
 mod tests;
 
-mod authority;
+pub mod authority;
 mod aux;
 pub mod basic_queue;
 pub mod compute_worker;
@@ -125,15 +125,17 @@ pub async fn listen_for_block_seal<Block, C, S, Algorithm, E, SO, L, CIDP, CS>(
 	CIDP: CreateInherentDataProviders<Block, UlxBlockSealInherent> + Clone,
 	L: sc_consensus::JustificationSyncLink<Block> + 'static,
 {
+	let authority_sealer = AuthoritySealer::<Block, C>::new(client.clone(), keystore.clone());
+
 	while let Some(command) = block_seal_stream.next().await {
 		match command {
 			SealNewBlock::Submit { block_proof, nonce, parent_hash, mut sender } => {
 				info!(target: LOG_TARGET, "Inbound BlockProof seal received (id={:?}, author={})", block_proof.tax_proof_id, block_proof.author_id);
 				let future = async {
 					// this finds the longest current chain off finalized path
-					let mut best_header = select_chain.best_chain().await?;
+					let mut parent_header = select_chain.best_chain().await?;
 
-					if parent_hash != best_header.hash() {
+					if parent_hash != parent_header.hash() {
 						match select_chain.finality_target(parent_hash, None).await {
 							Ok(_) => (),
 							Err(err) => {
@@ -148,17 +150,14 @@ pub async fn listen_for_block_seal<Block, C, S, Algorithm, E, SO, L, CIDP, CS>(
 							},
 						};
 
-						let header = match client.header(parent_hash) {
+						parent_header = match client.header(parent_hash) {
 							Ok(Some(x)) => x,
 							Ok(None) => return Err(BlockNotFound(parent_hash.to_string()).into()),
 							Err(err) => return Err(err.into()),
 						};
-
-						best_header = header;
 					}
 
-					let best_hash = best_header.hash();
-					let pre_digest = match algorithm.next_digest(&best_hash) {
+					let pre_digest = match algorithm.next_digest(&parent_hash) {
 						Ok(x) => x,
 						Err(err) => {
 							warn!(
@@ -171,12 +170,11 @@ pub async fn listen_for_block_seal<Block, C, S, Algorithm, E, SO, L, CIDP, CS>(
 						},
 					};
 
-					let mut authority_sealer = AuthoritySealer::<Block, C, AccountId32>::new(
-						client.clone(),
-						keystore.clone(),
-					);
-
-					match authority_sealer.check_if_can_seal(&best_hash, &block_proof) {
+					let sealer = match authority_sealer.check_if_can_seal(
+						&parent_hash,
+						&block_proof,
+						true,
+					) {
 						Err(err) => {
 							warn!(
 								target: LOG_TARGET,
@@ -186,21 +184,21 @@ pub async fn listen_for_block_seal<Block, C, S, Algorithm, E, SO, L, CIDP, CS>(
 							);
 							return Err(err.into())
 						},
-						_ => (),
+						Ok(x) => x,
 					};
 
 					let mut seal = UlxSeal {
-						easing: algorithm.easing(&best_hash, &block_proof)?,
+						easing: algorithm.easing(&parent_hash, &block_proof)?,
 						nonce: nonce.into(),
 						// we will fill this after proposing a block
 						authority: None,
 					};
 
 					match algorithm.verify(
-						&best_hash,
+						&parent_hash,
 						// NOTE: this is on purpose! we are going to validate against the parent
 						// hash here, so what gets passed in doesn't matter
-						&best_hash,
+						&parent_hash,
 						&pre_digest,
 						&seal,
 					) {
@@ -222,8 +220,8 @@ pub async fn listen_for_block_seal<Block, C, S, Algorithm, E, SO, L, CIDP, CS>(
 						author.clone(),
 						create_inherent_data_providers.clone(),
 						build_time,
-						&best_header,
-						best_hash,
+						&parent_header,
+						parent_hash,
 						(&client.info().finalized_hash, client.info().finalized_number),
 						&pre_digest,
 						Some(nonce),
@@ -239,7 +237,12 @@ pub async fn listen_for_block_seal<Block, C, S, Algorithm, E, SO, L, CIDP, CS>(
 					let block_number = header.number().clone();
 
 					// NOTE: we will sign the pre-hash
-					let seal = match authority_sealer.sign_seal(&header.hash(), &mut seal) {
+					let seal = match authority_sealer.sign_seal(
+						sealer.0,
+						&sealer.1,
+						&header.hash(),
+						&mut seal,
+					) {
 						Ok(x) => x,
 						Err(error) => {
 							warn!(target: LOG_TARGET, "Unable to sign seal: {}", error);
@@ -268,7 +271,7 @@ pub async fn listen_for_block_seal<Block, C, S, Algorithm, E, SO, L, CIDP, CS>(
 
 								info!(
 									target: LOG_TARGET,
-									"✅ Successfully mined 'tax seal' block on top of: {} -> {}", best_hash, post_hash
+									"✅ Successfully mined 'tax' block on top of: {} -> {}", parent_hash, post_hash
 								);
 								Ok(CreatedBlock { hash: post_hash })
 							},

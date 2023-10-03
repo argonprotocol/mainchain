@@ -5,7 +5,7 @@ use frame_support::{
 	parameter_types,
 	traits::{ConstU16, ConstU64},
 };
-use sp_core::{ConstU32, OpaquePeerId, H256, U256};
+use sp_core::{crypto::AccountId32, ConstU32, OpaquePeerId, H256, U256};
 use sp_runtime::{
 	testing::UintAuthorityId,
 	traits::{BlakeTwo256, IdentityLookup, UniqueSaturatedInto},
@@ -62,7 +62,7 @@ parameter_types! {
 }
 
 pub struct StaticAuthorityProvider;
-impl AuthorityProvider<BlockSealAuthorityId, u64> for StaticAuthorityProvider {
+impl AuthorityProvider<BlockSealAuthorityId, Block, u64> for StaticAuthorityProvider {
 	fn is_active(authority_id: &BlockSealAuthorityId) -> bool {
 		Self::authorities().contains(authority_id)
 	}
@@ -88,8 +88,9 @@ impl AuthorityProvider<BlockSealAuthorityId, u64> for StaticAuthorityProvider {
 			}
 		})
 	}
-	fn find_xor_closest_authorities(
-		_hash: U256,
+	fn block_peers(
+		_block_hash: &<Block as sp_runtime::traits::Block>::Hash,
+		_account_id: AccountId32,
 		_closest: u8,
 	) -> Vec<AuthorityDistance<BlockSealAuthorityId>> {
 		XorClosest::get().clone()

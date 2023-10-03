@@ -2,10 +2,10 @@
 // `construct_runtime!` does a lot of recursion and requires us to increase the limit to 256.
 #![recursion_limit = "256"]
 
+extern crate alloc;
 #[cfg(feature = "runtime-benchmarks")]
 #[macro_use]
 extern crate frame_benchmarking;
-extern crate alloc;
 
 pub use frame_support::{
 	construct_runtime, parameter_types,
@@ -30,9 +30,8 @@ use pallet_session::historical as pallet_session_historical;
 pub use pallet_timestamp::Call as TimestampCall;
 use pallet_transaction_payment::{ConstFeeMultiplier, CurrencyAdapter, Multiplier};
 use sp_api::impl_runtime_apis;
-use sp_arithmetic::traits::UniqueSaturatedInto;
 use sp_consensus_grandpa::AuthorityId as GrandpaId;
-use sp_core::{crypto::KeyTypeId, OpaqueMetadata, U256};
+use sp_core::{crypto::KeyTypeId, OpaqueMetadata};
 #[cfg(any(feature = "std", test))]
 pub use sp_runtime::BuildStorage;
 use sp_runtime::{
@@ -42,7 +41,7 @@ use sp_runtime::{
 		Verify,
 	},
 	transaction_validity::{TransactionSource, TransactionValidity},
-	ApplyExtrinsicResult, MultiSignature,
+	AccountId32, ApplyExtrinsicResult, MultiSignature,
 };
 pub use sp_runtime::{Perbill, Permill};
 use sp_std::{collections::btree_map::BTreeMap, prelude::*, vec::Vec};
@@ -50,12 +49,12 @@ use sp_std::{collections::btree_map::BTreeMap, prelude::*, vec::Vec};
 use sp_version::NativeVersion;
 use sp_version::RuntimeVersion;
 
-use crate::opaque::SessionKeys;
 use ulx_primitives::{
 	block_seal::{AuthorityDistance, AuthorityProvider},
 	BlockSealAuthorityId, NextWork,
 };
 
+use crate::opaque::SessionKeys;
 // A few exports that help ease life for downstream crates.
 use crate::wage_protector::WageProtectorFee;
 
@@ -728,9 +727,10 @@ impl_runtime_apis! {
 		fn authorities_by_index() -> BTreeMap<u16, BlockSealAuthorityId> {
 			Cohorts::authorities_by_index()
 		}
-		fn xor_closest_validators(hash: Vec<u8>) -> Vec<AuthorityDistance<BlockSealAuthorityId>> {
-			let number_to_find: u8 = UniqueSaturatedInto::<u8>::unique_saturated_into(BlockSeal::closest_x_authorities_required());
-			Cohorts::find_xor_closest_authorities(U256::from(&hash[..]), number_to_find)
+		fn block_peers(account_id: AccountId32) -> Vec<AuthorityDistance<BlockSealAuthorityId>> {
+			let block_number = System::block_number();
+			let current_block_hash = System::block_hash(block_number);
+			BlockSeal::block_peers(current_block_hash, account_id)
 		}
 		fn active_authorities() -> u16 {
 			Cohorts::authority_count().into()

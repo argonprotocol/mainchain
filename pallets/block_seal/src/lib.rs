@@ -23,7 +23,8 @@ pub mod pallet {
 	use sp_core::{crypto::AccountId32, U256};
 	use sp_io::hashing::blake2_256;
 	use sp_runtime::{
-		traits::UniqueSaturatedInto, ConsensusEngineId, RuntimeAppPublic, Saturating,
+		traits::{Block, UniqueSaturatedInto},
+		ConsensusEngineId, RuntimeAppPublic, Saturating,
 	};
 	use sp_std::cmp::min;
 
@@ -56,7 +57,7 @@ pub mod pallet {
 		/// Type representing the weight of this pallet
 		type WeightInfo: WeightInfo;
 		/// Type that provides authorities
-		type AuthorityProvider: AuthorityProvider<Self::AuthorityId, Self::AccountId>;
+		type AuthorityProvider: AuthorityProvider<Self::AuthorityId, Self::Block, Self::AccountId>;
 		/// How many historical block sealers to keep in storage
 		#[pallet::constant]
 		type HistoricalBlockSealersToKeep: Get<u32>;
@@ -236,17 +237,14 @@ pub mod pallet {
 			Self::check_nonce(nonce, &proof, parent_hash)?;
 
 			let tax_author_id = proof.author_id.clone();
-			let author_bytes = tax_author_id.encode();
-			let block_peer_hash =
-				U256::from(blake2_256(&[parent_hash.as_ref(), &author_bytes].concat()));
 
-			let authority_xor_distances = T::AuthorityProvider::find_xor_closest_authorities(
-				block_peer_hash,
-				required_validators.unique_saturated_into(),
-			);
+			let authority_xor_distances = Self::block_peers(parent_hash, tax_author_id.clone());
 
 			// 6. Check that these are the closest validators to block author hash with block hash
-			Self::check_xor_closest_authorities_chosen(&seal_validators, authority_xor_distances)?;
+			Self::check_xor_closest_authorities_chosen(
+				&proof.seal_stampers,
+				authority_xor_distances,
+			)?;
 
 			// 7. Check signatures of all validators
 			Self::check_seal_signatures(&seal_validators, &proof, parent_hash, tax_author_id)?;
@@ -285,6 +283,15 @@ pub mod pallet {
 	}
 
 	impl<T: Config> Pallet<T> {
+		pub fn block_peers(
+			block_hash: <T::Block as Block>::Hash,
+			block_author: AccountId32,
+		) -> Vec<AuthorityDistance<T::AuthorityId>> {
+			let required_validators =
+				<ClosestXAuthoritiesRequired<T>>::get().unique_saturated_into();
+			T::AuthorityProvider::block_peers(&block_hash, block_author, required_validators)
+		}
+
 		fn load_seal_authorities(
 			seal_stampers: Vec<SealStamper>,
 			authorities_by_index: &BTreeMap<u16, T::AuthorityId>,
@@ -355,17 +362,16 @@ pub mod pallet {
 		}
 
 		fn check_xor_closest_authorities_chosen(
-			seal_validators: &Vec<(T::AuthorityId, Option<AuthoritySignature<T>>)>,
+			seal_validators: &Vec<SealStamper>,
 			calculated_block_peers: Vec<AuthorityDistance<T::AuthorityId>>,
 		) -> DispatchResult {
-			let seal_authorities = seal_validators.iter().map(|v| v.0.clone()).collect::<Vec<_>>();
-			let required_authorities = calculated_block_peers
-				.iter()
-				.map(|v| v.authority_id.clone())
-				.collect::<Vec<_>>();
-			if required_authorities != seal_authorities {
-				return Err(Error::<T>::InvalidXorClosestAuthoritiesOrder.into())
+			for (i, sealer) in seal_validators.iter().enumerate() {
+				let calculated_sealer = calculated_block_peers.get(i).map(|a| a.authority_index);
+				if calculated_sealer != Some(sealer.authority_idx) {
+					return Err(Error::<T>::InvalidXorClosestAuthoritiesOrder.into())
+				}
 			}
+
 			Ok(())
 		}
 	}

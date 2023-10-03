@@ -218,6 +218,7 @@ pub fn new_full(
 	let role = config.role.clone();
 	let name = config.network.node_name.clone();
 	let prometheus_registry = config.prometheus_registry().cloned();
+	let keystore = keystore_container.keystore();
 	// Channel for the rpc handler to communicate with the authorship task.
 	let (block_proof_sink, block_proof_stream) = futures::channel::mpsc::channel(1000);
 
@@ -233,6 +234,7 @@ pub fn new_full(
 			backend.clone(),
 			Some(shared_authority_set.clone()),
 		);
+		let keystore_clone = keystore.clone();
 
 		let rpc_extensions_builder = Box::new(move |deny_unsafe, subscription_executor| {
 			let deps = crate::rpc::FullDeps {
@@ -240,6 +242,7 @@ pub fn new_full(
 				pool: pool.clone(),
 				deny_unsafe,
 				block_proof_sink: block_proof_sink.clone(),
+				keystore: keystore_clone.clone(),
 				grandpa: rpc::GrandpaDeps {
 					shared_voter_state: shared_voter_state.clone(),
 					shared_authority_set: shared_authority_set.clone(),
@@ -257,7 +260,7 @@ pub fn new_full(
 	let _rpc_handlers = sc_service::spawn_tasks(sc_service::SpawnTasksParams {
 		network: network.clone(),
 		client: client.clone(),
-		keystore: keystore_container.keystore(),
+		keystore,
 		task_manager: &mut task_manager,
 		transaction_pool: transaction_pool.clone(),
 		rpc_builder: rpc_extensions_builder,
