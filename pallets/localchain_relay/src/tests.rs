@@ -135,6 +135,7 @@ fn it_can_handle_transfers_in() {
 			Hash::random(),
 			Notebook {
 				notary_id: 1,
+				notebook_number: 1,
 				auditors: bound(vec![]),
 				pinned_to_block_number: 1,
 				transfers: bound(vec![ChainTransfer::ToLocalchain { account_id: 1, nonce }]),
@@ -154,6 +155,7 @@ fn it_can_handle_transfers_in() {
 			Hash::random(),
 			Notebook {
 				notary_id: 1,
+				notebook_number: 2,
 				auditors: bound(vec![]),
 				pinned_to_block_number: 2,
 				transfers: bound(vec![ChainTransfer::ToMainchain { account_id: 1, amount: 5000 }]),
@@ -168,6 +170,7 @@ fn it_can_handle_transfers_in() {
 			Hash::random(),
 			Notebook {
 				notary_id: 1,
+				notebook_number: 3,
 				auditors: bound(vec![]),
 				pinned_to_block_number: 3,
 				transfers: bound(vec![]),
@@ -190,6 +193,7 @@ fn it_doesnt_allow_a_notary_balance_to_go_negative() {
 				Hash::random(),
 				Notebook {
 					notary_id: 1,
+					notebook_number: 1,
 					auditors: bound(vec![]),
 					pinned_to_block_number: 0,
 					transfers: bound(vec![ChainTransfer::ToMainchain {
@@ -224,6 +228,7 @@ fn it_requires_minimum_audits() {
 				Hash::random(),
 				Notebook {
 					notary_id: 1,
+					notebook_number: 1,
 					auditors: bound(
 						authorities
 							.iter()
@@ -258,6 +263,7 @@ fn it_requires_valid_auditors() {
 
 		let mut notebook = Notebook {
 			notary_id: 1,
+			notebook_number: 1,
 			auditors: bound(vec![]),
 			pinned_to_block_number: 2,
 			transfers: bound(vec![]),
@@ -336,6 +342,7 @@ fn it_expires_transfers_if_not_committed() {
 				H256::random(),
 				Notebook {
 					notary_id: 1,
+					notebook_number: 1,
 					auditors: bound(vec![]),
 					pinned_to_block_number: 0,
 					transfers: bound(vec![ChainTransfer::ToLocalchain { account_id: 1, nonce }]),
@@ -361,6 +368,7 @@ fn it_delays_for_finalization() {
 					notebook_hash: Hash::default(),
 					notebook: Notebook {
 						notary_id: 1,
+						notebook_number: 1,
 						auditors: bound(vec![]),
 						pinned_to_block_number: 1,
 						transfers: bound(vec![]),

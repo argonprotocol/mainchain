@@ -153,11 +153,15 @@ pub mod pallet {
 	#[pallet::storage]
 	pub(super) type SubmittedNotebookBlocksByNotaryId<T: Config> = StorageMap<
 		_,
-		Twox64Concat,
+		Blake2_128Concat,
 		NotaryId,
 		BoundedVec<BlockNumberFor<T>, T::MaxNotebookBlocksToRemember>,
 		ValueQuery,
 	>;
+
+	#[pallet::storage]
+	pub(super) type LastNotebookNumberByNotary<T: Config> =
+		StorageMap<_, Blake2_128Concat, NotaryId, u32, OptionQuery>;
 
 	#[pallet::event]
 	#[pallet::generate_deposit(pub(super) fn deposit_event)]
@@ -177,9 +181,11 @@ pub mod pallet {
 		TransferIn {
 			account_id: T::AccountId,
 			amount: T::Balance,
+			notary_id: NotaryId,
 		},
 		NotebookSubmitted {
 			notary_id: NotaryId,
+			notebook_number: u32,
 			pinned_to_block_number: BlockNumberFor<T>,
 		},
 	}
@@ -191,6 +197,7 @@ pub mod pallet {
 		InsufficientFunds,
 		InvalidAccountNonce,
 		UnapprovedNotary,
+		MissingNotebookNumber,
 		InvalidNotebookSubmissionSignature,
 		/// Auditor of a notary block was not a member of the validator set at the time the pinned
 		/// finalized block was sealed.
@@ -313,7 +320,7 @@ pub mod pallet {
 							amount,
 							Preservation::Expendable,
 						)?;
-						Self::deposit_event(Event::TransferIn { account_id, amount });
+						Self::deposit_event(Event::TransferIn { notary_id, account_id, amount });
 					},
 					ChainTransfer::ToLocalchain { account_id, nonce } => {
 						let transfer = <PendingTransfersOut<T>>::take(&account_id, nonce)
@@ -339,6 +346,14 @@ pub mod pallet {
 				}
 			}
 
+			if let Some(last_notebook_number) = LastNotebookNumberByNotary::<T>::get(notary_id) {
+				ensure!(
+					notebook.notebook_number == last_notebook_number + 1,
+					Error::<T>::MissingNotebookNumber
+				);
+			}
+			LastNotebookNumberByNotary::<T>::insert(notary_id, notebook.notebook_number);
+
 			let pin: BlockNumberFor<T> = pinned_to_block_number.into();
 			<SubmittedNotebookBlocksByNotaryId<T>>::try_mutate(notary_id, |blocks| {
 				if blocks.len() >= T::MaxNotebookBlocksToRemember::get() as usize {
@@ -355,6 +370,7 @@ pub mod pallet {
 
 			Self::deposit_event(Event::NotebookSubmitted {
 				notary_id,
+				notebook_number: notebook.notebook_number,
 				pinned_to_block_number: pin,
 			});
 
@@ -474,7 +490,7 @@ pub mod pallet {
 				T::RequiredNotebookAuditors,
 			>,
 			signature_message: &H256,
-			allowed_auditors: &Vec<BlockSealAuthorityId>,
+			allowed_auditors: &Vec<(u16, BlockSealAuthorityId)>,
 		) -> DispatchResult {
 			let required_auditors =
 				min(T::RequiredNotebookAuditors::get() as usize, allowed_auditors.len());
@@ -489,7 +505,7 @@ pub mod pallet {
 			for (auditor, signature) in auditors.iter() {
 				let authority_index = allowed_auditors
 					.iter()
-					.position(|a| a == auditor)
+					.position(|a| a.1 == *auditor)
 					.ok_or(Error::<T>::InvalidNotebookAuditor)?;
 
 				// must be in first X

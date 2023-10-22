@@ -8,8 +8,12 @@ members = [
 	"pallets/difficulty",
     "pallets/notaries",
 	"pallets/localchain_relay",
+	"client",
 	"primitives",
     "runtime",
+	"notary",
+	"notary/audit",
+	"notary/primitives"
 ]
 resolver = "2"
 [profile.release]

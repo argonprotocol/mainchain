@@ -1,0 +1,11 @@
+DROP TABLE IF EXISTS blocks;
+DROP TABLE IF EXISTS block_meta;
+DROP TABLE IF EXISTS balance_tips;
+DROP TABLE IF EXISTS balance_changes;
+DROP TABLE IF EXISTS chain_transfers;
+DROP TABLE IF EXISTS notebook_origins;
+DROP TABLE IF EXISTS notebook_status;
+DROP TABLE IF EXISTS notebooks;
+DROP TABLE IF EXISTS notebook_auditors;
+DROP TABLE IF EXISTS notebook_headers;
+DROP TABLE IF EXISTS registered_keys;

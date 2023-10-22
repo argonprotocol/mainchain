@@ -113,6 +113,8 @@ where
 	RequiredNotebookAuditors: Get<u32>,
 {
 	#[codec(compact)]
+	pub notebook_number: u32,
+	#[codec(compact)]
 	pub pinned_to_block_number: u32,
 	#[codec(compact)]
 	pub notary_id: NotaryId,

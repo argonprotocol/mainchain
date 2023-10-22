@@ -81,8 +81,15 @@ pub struct HistoricalBlockSealersLookupImpl;
 impl HistoricalBlockSealersLookup<BlockNumber, BlockSealAuthorityId>
 	for HistoricalBlockSealersLookupImpl
 {
-	fn get_active_block_sealers_of(n: BlockNumber) -> Vec<BlockSealAuthorityId> {
-		BlockSealers::get().get(&n).unwrap_or(&Vec::new()).clone()
+	fn get_active_block_sealers_of(n: BlockNumber) -> Vec<(u16, BlockSealAuthorityId)> {
+		BlockSealers::get()
+			.get(&n)
+			.unwrap_or(&Vec::new())
+			.clone()
+			.iter()
+			.enumerate()
+			.map(|(idx, a)| (idx as u16, a.clone()))
+			.collect::<Vec<_>>()
 	}
 }
 

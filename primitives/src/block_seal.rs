@@ -149,7 +149,7 @@ where
 
 pub trait HistoricalBlockSealersLookup<BlockNumber, AuthorityId> {
 	/// Returns block seal validators for the given block number that are still active.
-	fn get_active_block_sealers_of(block_number: BlockNumber) -> Vec<AuthorityId>;
+	fn get_active_block_sealers_of(block_number: BlockNumber) -> Vec<(u16, AuthorityId)>;
 }
 
 #[derive(PartialEq, Eq, Clone, Encode, Decode, RuntimeDebug, TypeInfo, MaxEncodedLen)]
