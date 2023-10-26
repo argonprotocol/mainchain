@@ -13,6 +13,7 @@ use notary::{
 	notary::{Notary, NOTARY_KEYID},
 	run_server,
 };
+use ulx_notary_primitives::NotaryId;
 
 #[derive(Parser, Debug)]
 #[clap(version = crate_version!())]
@@ -47,7 +48,7 @@ enum Commands {
 
 		/// Required notary id you are running
 		#[clap(short, long, env = "ULX_NOTARY_ID", default_value = "1")]
-		notary_id: u32,
+		notary_id: NotaryId,
 
 		#[clap(short, long, env = "DATABASE_URL")]
 		db_url: String,

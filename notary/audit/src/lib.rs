@@ -6,7 +6,7 @@ use sp_std::collections::{btree_map::BTreeMap, btree_set::BTreeSet};
 
 use ulx_notary_primitives::{
 	ensure, AccountOrigin, BalanceChange, BalanceProof, BalanceTip, Chain, ChainTransfer,
-	ChainTransferDestination, NotaryId, NoteType, NotebookHeader,
+	ChainTransferDestination, NotaryId, NoteType, NotebookHeader, NotebookNumber,
 };
 
 #[derive(Debug, PartialEq, Clone, thiserror::Error)]
@@ -83,19 +83,19 @@ pub enum AccountHistoryLookupError {
 pub trait NotebookHistoryLookup {
 	fn get_account_changes_root(
 		&self,
-		notary_id: u32,
-		notebook_number: u32,
+		notary_id: NotaryId,
+		notebook_number: NotebookNumber,
 	) -> Result<H256, AccountHistoryLookupError>;
 	fn get_last_changed_notebook(
 		&self,
-		notary_id: u32,
+		notary_id: NotaryId,
 		account_id: AccountId32,
 		chain: Chain,
 	) -> Result<u32, AccountHistoryLookupError>;
 
 	fn is_valid_transfer_to_localchain(
 		&self,
-		notary_id: u32,
+		notary_id: NotaryId,
 		account_id: &AccountId32,
 		nonce: u32,
 	) -> Result<bool, AccountHistoryLookupError>;
@@ -407,7 +407,7 @@ mod tests {
 	use ulx_notary_primitives::{
 		balance_change::{AccountOrigin, BalanceChange, BalanceProof},
 		note::{Chain, ChainTransferDestination, Note, NoteType},
-		BalanceTip, ChainTransfer, NotebookHeader,
+		BalanceTip, ChainTransfer, NotebookHeader, NotebookNumber,
 	};
 
 	#[test]
@@ -742,7 +742,7 @@ mod tests {
 		fn get_account_changes_root(
 			&self,
 			_notary_id: u32,
-			notebook_number: u32,
+			notebook_number: NotebookNumber,
 		) -> Result<H256, AccountHistoryLookupError> {
 			NotebookRoots::get()
 				.get(&notebook_number)

@@ -19,15 +19,15 @@ use sp_runtime::{
 use ulx_primitives::{
 	block_seal::BlockSealAuthorityPair,
 	digests::{FinalizedBlockNeededDigest, FINALIZED_BLOCK_DIGEST_ID},
-	notebook::{AuditedNotebook, ChainTransfer, NotebookHeader},
+	notebook::{AccountOrigin, AuditedNotebook, ChainTransfer, NotebookHeader},
 	BlockSealAuthorityId,
 };
 
 use crate::{
 	mock::{LocalchainRelay, *},
 	pallet::{
-		ExpiringTransfersOut, FinalizedBlockNumber, PendingTransfersOut,
-		SubmittedNotebookBlocksByNotaryId,
+		AccountOriginLastChangedNotebook, ExpiringTransfersOut, FinalizedBlockNumber,
+		LastNotebookNumberByNotary, NotebookChangedAccountsRootByNotary, PendingTransfersOut,
 	},
 	Error, QueuedTransferOut,
 };
@@ -171,6 +171,7 @@ fn it_can_handle_transfers_in() {
 		System::set_block_number(2);
 		System::on_initialize(2);
 		LocalchainRelay::on_initialize(2);
+		let changed_accounts_root = H256::random();
 		assert_ok!(LocalchainRelay::submit_notebook(
 			RuntimeOrigin::none(),
 			Hash::random(),
@@ -184,8 +185,11 @@ fn it_can_handle_transfers_in() {
 						account_id: Bob.to_account_id(),
 						nonce: nonce.unique_saturated_into()
 					}],
-					changed_accounts_root: H256::random(),
-					changed_account_origins: bounded_vec![],
+					changed_accounts_root: changed_accounts_root.clone(),
+					changed_account_origins: bounded_vec![AccountOrigin {
+						notebook_number: 1,
+						account_uid: 1
+					}],
 					version: 1,
 					finalized_block_number: 1,
 					start_time: 0,
@@ -195,7 +199,11 @@ fn it_can_handle_transfers_in() {
 			},
 			ed25519::Signature([0u8; 64]),
 		),);
-		assert_eq!(SubmittedNotebookBlocksByNotaryId::<Test>::get(1).len(), 1);
+		assert_eq!(
+			NotebookChangedAccountsRootByNotary::<Test>::get(1, 1),
+			Some(changed_accounts_root)
+		);
+		assert_eq!(AccountOriginLastChangedNotebook::<Test>::get((1, 1, 1)), Some(1));
 
 		System::set_block_number(3);
 		System::on_initialize(3);
@@ -203,6 +211,7 @@ fn it_can_handle_transfers_in() {
 		assert_eq!(ExpiringTransfersOut::<Test>::get(expires_block).len(), 0);
 		assert_eq!(Balances::free_balance(&who), 0);
 
+		let change_root_2 = H256::random();
 		assert_ok!(LocalchainRelay::submit_notebook(
 			RuntimeOrigin::none(),
 			Hash::random(),
@@ -216,8 +225,11 @@ fn it_can_handle_transfers_in() {
 						account_id: who.clone(),
 						amount: 5000
 					}],
-					changed_accounts_root: H256::random(),
-					changed_account_origins: bounded_vec![],
+					changed_accounts_root: change_root_2.clone(),
+					changed_account_origins: bounded_vec![AccountOrigin {
+						notebook_number: 1,
+						account_uid: 1
+					}],
 					version: 1,
 					finalized_block_number: 1,
 					start_time: 0,
@@ -228,7 +240,13 @@ fn it_can_handle_transfers_in() {
 			ed25519::Signature([0u8; 64]),
 		),);
 		assert_eq!(Balances::free_balance(&who), 5000);
-		assert_eq!(SubmittedNotebookBlocksByNotaryId::<Test>::get(1), vec![1, 2]);
+		assert_eq!(
+			NotebookChangedAccountsRootByNotary::<Test>::get(1, 1),
+			Some(changed_accounts_root)
+		);
+		assert_eq!(AccountOriginLastChangedNotebook::<Test>::get((1, 1, 1)), Some(2));
+		assert_eq!(NotebookChangedAccountsRootByNotary::<Test>::get(1, 2), Some(change_root_2));
+		assert_eq!(LastNotebookNumberByNotary::<Test>::get(1), Some((2, 2)));
 
 		assert_ok!(LocalchainRelay::submit_notebook(
 			RuntimeOrigin::none(),
@@ -238,7 +256,7 @@ fn it_can_handle_transfers_in() {
 				header: NotebookHeader {
 					notary_id: 1,
 					notebook_number: 3,
-					pinned_to_block_number: 3,
+					pinned_to_block_number: 2,
 					chain_transfers: bounded_vec![],
 					changed_accounts_root: H256::random(),
 					changed_account_origins: bounded_vec![],
@@ -251,7 +269,8 @@ fn it_can_handle_transfers_in() {
 			},
 			ed25519::Signature([0u8; 64]),
 		),);
-		assert_eq!(SubmittedNotebookBlocksByNotaryId::<Test>::get(1), vec![2, 3]);
+		assert_eq!(LastNotebookNumberByNotary::<Test>::get(1), Some((3, 2)));
+		assert_eq!(AccountOriginLastChangedNotebook::<Test>::get((1, 1, 1)), Some(2));
 	});
 }
 

@@ -1,5 +1,6 @@
 use chrono::{DateTime, Utc};
 use sqlx::{query_scalar, FromRow, PgConnection};
+use ulx_notary_primitives::NotebookNumber;
 
 use crate::{ensure, error::Error};
 
@@ -17,7 +18,7 @@ pub enum NotebookFinalizationStep {
 }
 #[derive(FromRow)]
 pub struct NotebookStatusRow {
-	pub notebook_number: u32,
+	pub notebook_number: NotebookNumber,
 	pub chain_transfers: i32,
 	pub step: NotebookFinalizationStep,
 	pub open_time: DateTime<Utc>,
@@ -32,7 +33,7 @@ pub struct NotebookStatusRow {
 impl NotebookStatusStore {
 	pub async fn lock_to_stop_appends<'a>(
 		db: impl sqlx::PgExecutor<'a> + 'a,
-		notebook_number: u32,
+		notebook_number: NotebookNumber,
 	) -> anyhow::Result<(), Error> {
 		sqlx::query!(
 			r#"
@@ -83,7 +84,7 @@ impl NotebookStatusStore {
 
 	pub async fn create<'a>(
 		db: impl sqlx::PgExecutor<'a> + 'a,
-		notebook_number: u32,
+		notebook_number: NotebookNumber,
 	) -> anyhow::Result<(), Error> {
 		let res = sqlx::query!(
 			r#"
@@ -102,7 +103,7 @@ impl NotebookStatusStore {
 	}
 	pub async fn increment_chain_transfers<'a>(
 		db: &mut PgConnection,
-		notebook_number: u32,
+		notebook_number: NotebookNumber,
 		max_transfer_per_notebook: u32,
 	) -> anyhow::Result<(), Error> {
 		let result = sqlx::query!(
@@ -146,7 +147,7 @@ impl NotebookStatusStore {
 
 	pub async fn next_step<'a>(
 		db: impl sqlx::PgExecutor<'a> + 'a,
-		notebook_number: u32,
+		notebook_number: NotebookNumber,
 		current_step: NotebookFinalizationStep,
 	) -> anyhow::Result<(), Error> {
 		let (next_step, time_field) = match current_step {

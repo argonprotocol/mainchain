@@ -3,7 +3,7 @@ use std::default::Default;
 use sp_core::H256;
 use sqlx::PgConnection;
 
-use ulx_notary_primitives::{ensure, AccountId, AccountOrigin, BalanceTip, Chain};
+use ulx_notary_primitives::{ensure, AccountId, AccountOrigin, BalanceTip, Chain, NotebookNumber};
 
 use crate::{stores::BoxFutureResult, Error};
 
@@ -78,7 +78,7 @@ impl BalanceTipStore {
 		chain: Chain,
 		nonce: u32,
 		balance: u128,
-		notebook_number: u32,
+		notebook_number: NotebookNumber,
 		account_origin: AccountOrigin,
 		prev_balance: u128,
 	) -> BoxFutureResult<'a, ()> {

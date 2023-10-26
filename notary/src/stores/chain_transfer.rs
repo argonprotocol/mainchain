@@ -1,7 +1,7 @@
 use sp_core::ByteArray;
 use sqlx::{query, FromRow, PgConnection};
 
-use ulx_notary_primitives::{ensure, AccountId, ChainTransfer};
+use ulx_notary_primitives::{ensure, AccountId, ChainTransfer, NotebookNumber};
 
 use crate::{stores::notebook_status::NotebookStatusStore, Error};
 
@@ -52,7 +52,7 @@ impl ChainTransferStore {
 	/// Records a mainchain transfer that was included in a balance change + notebook.
 	pub async fn record_transfer_to_mainchain(
 		db: &mut PgConnection,
-		notebook_number: u32,
+		notebook_number: NotebookNumber,
 		account_id: &AccountId,
 		milligons: u128,
 		max_transfer_per_notebook: u32,
@@ -82,7 +82,7 @@ impl ChainTransferStore {
 
 	pub async fn take_and_record_transfer_local(
 		db: &mut PgConnection,
-		notebook_number: u32,
+		notebook_number: NotebookNumber,
 		account_id: &AccountId,
 		nonce: u32,
 		proposed_amount: u128,
@@ -128,7 +128,7 @@ impl ChainTransferStore {
 	}
 	pub async fn take_for_notebook<'a>(
 		db: impl sqlx::PgExecutor<'a> + 'a,
-		notebook_number: u32,
+		notebook_number: NotebookNumber,
 	) -> anyhow::Result<Vec<ChainTransfer>, Error> {
 		let rows = sqlx::query_as!(
 			ChainTransferRow,

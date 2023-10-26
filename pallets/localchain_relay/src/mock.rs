@@ -128,7 +128,6 @@ impl pallet_localchain_relay::Config for Test {
 	type Balance = Balance;
 	type HistoricalBlockSealersLookup = HistoricalBlockSealersLookupImpl;
 	type MaxNotebookBlocksToRemember = MaxNotebookBlocksToRemember;
-	type MaxNotebookTransfers = MaxNotebookTransfers;
 	type MaxPendingTransfersOutPerBlock = MaxPendingTransfersOutPerBlock;
 	type NotaryProvider = NotaryProviderImpl;
 	type PalletId = LocalchainPalletId;

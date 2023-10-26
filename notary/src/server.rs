@@ -11,7 +11,9 @@ use serde::Serialize;
 use sp_core::{bounded::BoundedVec, ConstU32};
 use tokio::net::ToSocketAddrs;
 
-use ulx_notary_primitives::{BalanceChange, BalanceProof, BalanceTip, MAX_BALANCESET_CHANGES};
+use ulx_notary_primitives::{
+	BalanceChange, BalanceProof, BalanceTip, NotebookNumber, MAX_BALANCESET_CHANGES,
+};
 
 use crate::{
 	apis::{
@@ -35,7 +37,7 @@ fn from_crate_error(e: crate::Error) -> ErrorObjectOwned {
 impl NotebookRpcServer for NotebookRpcServerImpl {
 	async fn get_balance_proof(
 		&self,
-		notebook_number: u32,
+		notebook_number: NotebookNumber,
 		balance_tip: BalanceTip,
 	) -> Result<BalanceProof, ErrorObjectOwned> {
 		let pool = &self.notary.pool;

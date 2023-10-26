@@ -123,12 +123,12 @@ pub mod pallet {
 		NotaryActivated { notary: NotaryRecordOf<T> },
 		/// Notary metadata queued for update
 		NotaryMetaUpdateQueued {
-			notary_id: u32,
+			notary_id: NotaryId,
 			meta: NotaryMetaOf<T>,
 			effective_block: BlockNumberFor<T>,
 		},
 		/// Notary metadata updated
-		NotaryMetaUpdated { notary_id: u32, meta: NotaryMetaOf<T> },
+		NotaryMetaUpdated { notary_id: NotaryId, meta: NotaryMetaOf<T> },
 	}
 
 	#[pallet::error]
@@ -255,7 +255,7 @@ pub mod pallet {
 		#[pallet::weight(0)]
 		pub fn update(
 			origin: OriginFor<T>,
-			#[pallet::compact] notary_id: u32,
+			#[pallet::compact] notary_id: NotaryId,
 			meta: NotaryMetaOf<T>,
 		) -> DispatchResult {
 			let who = ensure_signed(origin)?;

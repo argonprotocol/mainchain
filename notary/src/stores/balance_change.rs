@@ -1,7 +1,7 @@
 use serde_json::{from_value, json};
 use sqlx::{query, query_scalar, types::Json, FromRow};
 
-use ulx_notary_primitives::{ensure, BalanceChange};
+use ulx_notary_primitives::{ensure, BalanceChange, NotebookNumber};
 
 use crate::error::Error;
 
@@ -17,7 +17,7 @@ struct BalanceChangeRow {
 impl BalanceChangeStore {
 	pub async fn append_notebook_changeset<'a>(
 		db: impl sqlx::PgExecutor<'a> + 'a,
-		notebook_number: u32,
+		notebook_number: NotebookNumber,
 		changeset: Vec<BalanceChange>,
 	) -> anyhow::Result<(), Error> {
 		let data = json!(changeset);
@@ -41,7 +41,7 @@ impl BalanceChangeStore {
 
 	pub async fn get_for_notebook<'a>(
 		db: impl sqlx::PgExecutor<'a> + 'a,
-		notebook_number: u32,
+		notebook_number: NotebookNumber,
 	) -> anyhow::Result<Vec<Vec<BalanceChange>>, Error> {
 		let rows = query_scalar!(
 			r#"

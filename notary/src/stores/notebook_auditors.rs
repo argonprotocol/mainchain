@@ -4,6 +4,7 @@ use chrono::Utc;
 use sqlx::{query, FromRow, PgConnection};
 
 use ulixee_client::api::runtime_types::ulx_primitives::block_seal::Host;
+use ulx_notary_primitives::NotebookNumber;
 
 use crate::{ensure, Error};
 
@@ -54,7 +55,7 @@ impl TryInto<NotebookAuditor> for NotebookAuditorRow {
 impl NotebookAuditorStore {
 	pub async fn insert<'a>(
 		db: &'a mut PgConnection,
-		notebook_number: u32,
+		notebook_number: NotebookNumber,
 		auditor_public: &'a [u8; 32],
 		auditor_order: u16,
 		hosts: &'a Vec<Host>,
@@ -88,7 +89,7 @@ impl NotebookAuditorStore {
 	}
 	pub async fn increment_attempts<'a>(
 		db: &'a mut PgConnection,
-		notebook_number: u32,
+		notebook_number: NotebookNumber,
 		auditor_public: &'a [u8; 32],
 	) -> anyhow::Result<(), Error> {
 		let res = query!(
@@ -108,7 +109,7 @@ impl NotebookAuditorStore {
 	}
 	pub async fn update_signature<'a>(
 		db: &'a mut PgConnection,
-		notebook_number: u32,
+		notebook_number: NotebookNumber,
 		auditor_public: &'a [u8; 32],
 		signature: &'a [u8; 64],
 	) -> anyhow::Result<(), Error> {
@@ -131,7 +132,7 @@ impl NotebookAuditorStore {
 
 	pub async fn get_auditors(
 		db: &mut PgConnection,
-		notebook_number: u32,
+		notebook_number: NotebookNumber,
 	) -> anyhow::Result<Vec<NotebookAuditor>, Error> {
 		let rows = sqlx::query_as!(
 			NotebookAuditorRow,

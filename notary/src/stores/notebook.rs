@@ -9,7 +9,7 @@ use sp_core::{bounded::BoundedVec, Blake2Hasher, RuntimeDebug};
 
 use ulx_notary_primitives::{
 	ensure, note::Chain, AccountId, AccountOrigin, BalanceProof, BalanceTip, MaxBalanceChanges,
-	NotaryId, NotebookAccountOrigin, PINNED_BLOCKS_OFFSET,
+	NotaryId, NotebookAccountOrigin, NotebookNumber, PINNED_BLOCKS_OFFSET,
 };
 
 use crate::{
@@ -28,7 +28,7 @@ impl NotebookStore {
 	pub fn get_balance_proof<'a>(
 		pool: &'a sqlx::PgPool,
 		notary_id: NotaryId,
-		notebook_number: u32,
+		notebook_number: NotebookNumber,
 		balance_tip: &'a BalanceTip,
 	) -> BoxFutureResult<'a, BalanceProof> {
 		Box::pin(async move {
@@ -65,7 +65,7 @@ impl NotebookStore {
 
 	pub fn get_account_origins(
 		pool: &sqlx::PgPool,
-		notebook_number: u32,
+		notebook_number: NotebookNumber,
 	) -> BoxFutureResult<BoundedVec<NotebookAccountOrigin, MaxBalanceChanges>> {
 		Box::pin(async move {
 			let rows = sqlx::query!(
@@ -104,7 +104,7 @@ impl NotebookStore {
 
 	pub async fn close_notebook(
 		db: &mut sqlx::PgConnection,
-		notebook_number: u32,
+		notebook_number: NotebookNumber,
 	) -> anyhow::Result<(), Error> {
 		let meta = BlockMetaStore::load(&mut *db).await?;
 		let mut pinned_to_block_number =

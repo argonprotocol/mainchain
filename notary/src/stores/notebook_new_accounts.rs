@@ -5,7 +5,7 @@ use sp_core::{ByteArray, RuntimeDebug};
 use sp_runtime::RuntimeString;
 use sqlx::FromRow;
 
-use ulx_notary_primitives::{AccountId, AccountOrigin, Chain};
+use ulx_notary_primitives::{AccountId, AccountOrigin, Chain, NotebookNumber};
 
 use crate::Error;
 
@@ -52,7 +52,7 @@ impl TryInto<NotebookNewAccountsStore> for NotebookOriginsRow {
 impl NotebookNewAccountsStore {
 	pub async fn insert_origin<'a>(
 		db: impl sqlx::PgExecutor<'a> + 'a,
-		notebook_number: u32,
+		notebook_number: NotebookNumber,
 		account_id: &AccountId,
 		chain: &Chain,
 	) -> anyhow::Result<AccountOrigin, Error> {
@@ -73,7 +73,7 @@ impl NotebookNewAccountsStore {
 	}
 	pub async fn take_notebook_origins<'a>(
 		db: impl sqlx::PgExecutor<'a> + 'a,
-		notebook_number: u32,
+		notebook_number: NotebookNumber,
 	) -> anyhow::Result<Vec<NotebookNewAccountsStore>, Error> {
 		let rows = sqlx::query_as!(
 			NotebookOriginsRow,
@@ -92,7 +92,7 @@ impl NotebookNewAccountsStore {
 	}
 	pub async fn reset_seq<'a>(
 		db: impl sqlx::PgExecutor<'a> + 'a,
-		notebook_number: u32,
+		notebook_number: NotebookNumber,
 	) -> anyhow::Result<(), Error> {
 		sqlx::query!(
 			r#"

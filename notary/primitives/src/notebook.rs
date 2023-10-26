@@ -6,11 +6,12 @@ use sp_core_hashing::blake2_256;
 use sp_runtime::scale_info::TypeInfo;
 
 pub const PINNED_BLOCKS_OFFSET: u32 = 100u32;
-pub const MAX_TRANSFERS: u32 = 1000;
+pub const MAX_TRANSFERS: u32 = 10_000;
 pub type MaxTransfers = ConstU32<MAX_TRANSFERS>;
-pub type MaxBalanceChanges = ConstU32<10_000>;
+pub type MaxBalanceChanges = ConstU32<100_000>;
 pub type NotaryId = u32;
 pub type AccountOriginUid = u32;
+pub type NotebookNumber = u32;
 
 pub type NotebookAccountOrigin = (AccountId32, Chain, AccountOriginUid);
 pub type RequiredNotebookAuditors = ConstU32<10>;
@@ -51,7 +52,7 @@ pub struct NotebookHeader {
 	#[codec(compact)]
 	pub version: u16,
 	#[codec(compact)]
-	pub notebook_number: u32,
+	pub notebook_number: NotebookNumber,
 	#[codec(compact)]
 	pub finalized_block_number: u32,
 	#[codec(compact)]

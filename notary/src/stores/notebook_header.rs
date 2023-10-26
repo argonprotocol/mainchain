@@ -4,7 +4,8 @@ use sp_core::{bounded::BoundedVec, H256};
 use sqlx::{query, query_scalar, types::JsonValue, FromRow, PgConnection};
 
 use ulx_notary_primitives::{
-	ensure, AccountOrigin, ChainTransfer, NotaryId, NotebookHeader, NOTEBOOK_VERSION,
+	ensure, AccountOrigin, ChainTransfer, NotaryId, NotebookHeader, NotebookNumber,
+	NOTEBOOK_VERSION,
 };
 
 use crate::{
@@ -62,7 +63,7 @@ impl NotebookHeaderStore {
 	async fn create_header<'a>(
 		db: impl sqlx::PgExecutor<'a> + 'a,
 		notary_id: NotaryId,
-		notebook_number: u32,
+		notebook_number: NotebookNumber,
 		best_block_number: u32,
 	) -> anyhow::Result<(), Error> {
 		let version = NOTEBOOK_VERSION;
@@ -91,7 +92,7 @@ impl NotebookHeaderStore {
 	}
 	pub async fn get_pinned_block_number<'a>(
 		db: impl sqlx::PgExecutor<'a> + 'a,
-		notebook_number: u32,
+		notebook_number: NotebookNumber,
 	) -> anyhow::Result<u32, Error> {
 		let result = query_scalar!(
 			r#"
@@ -119,7 +120,7 @@ impl NotebookHeaderStore {
 	pub fn create(
 		db: &mut PgConnection,
 		notary_id: NotaryId,
-		notebook_number: u32,
+		notebook_number: NotebookNumber,
 		best_block_number: u32,
 	) -> BoxFutureResult<()> {
 		Box::pin(async move {
@@ -132,7 +133,7 @@ impl NotebookHeaderStore {
 
 	pub async fn load<'a>(
 		db: impl sqlx::PgExecutor<'a> + 'a,
-		notebook_number: u32,
+		notebook_number: NotebookNumber,
 	) -> anyhow::Result<NotebookHeader, Error> {
 		let record = sqlx::query_as!(
 			NotebookHeaderRow,
@@ -152,7 +153,7 @@ impl NotebookHeaderStore {
 
 	pub async fn get_changed_accounts_root<'a>(
 		db: impl sqlx::PgExecutor<'a> + 'a,
-		notebook_number: u32,
+		notebook_number: NotebookNumber,
 	) -> anyhow::Result<H256, Error> {
 		let record = sqlx::query_scalar!(
 			r#"
@@ -175,7 +176,7 @@ impl NotebookHeaderStore {
 
 	pub fn complete_notebook(
 		db: &mut PgConnection,
-		notebook_number: u32,
+		notebook_number: NotebookNumber,
 		transfers: Vec<ChainTransfer>,
 		pinned_to_block_number: u32,
 		changed_accounts_root: H256,

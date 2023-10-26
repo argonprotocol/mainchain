@@ -385,9 +385,6 @@ parameter_types! {
 	/// How many transfers out can be queued per block
 	pub const MaxPendingTransfersOutPerBlock: u32 = 1000;
 
-	/// How many transfers can be in a single notebook
-	pub const MaxNotebookTransfers: u32 = 10_000;
-
 	/// How many auditors are expected to sign a notary block.
 	pub const RequiredNotebookAuditors: u32 = 5; // half of seal signers
 
@@ -407,7 +404,6 @@ impl pallet_localchain_relay::Config for Runtime {
 	type PalletId = LocalchainPalletId;
 	type TransferExpirationBlocks = TransferExpirationBlocks;
 	type MaxPendingTransfersOutPerBlock = MaxPendingTransfersOutPerBlock;
-	type MaxNotebookTransfers = MaxNotebookTransfers;
 	type RequiredNotebookAuditors = RequiredNotebookAuditors;
 	type MaxNotebookBlocksToRemember = MaxNotebookBlocksToRemember;
 }

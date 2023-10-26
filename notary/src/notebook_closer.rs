@@ -1,8 +1,7 @@
 use std::future::Future;
 
-use codec::Encode;
 use sc_utils::notification::NotificationSender;
-use sp_core::{blake2_256, bytes::from_hex, H256};
+use sp_core::bytes::from_hex;
 use sp_keystore::KeystorePtr;
 use sqlx::{Executor, PgPool};
 use subxt::{
@@ -21,10 +20,9 @@ use ulixee_client::{
 			ulx_primitives::block_seal,
 		},
 	},
-	signature_messages::to_notebook_post_hash,
 	try_until_connected,
 };
-use ulx_notary_primitives::{ChainTransfer, NotaryId, NotebookHeader};
+use ulx_notary_primitives::{ChainTransfer, NotaryId, NotebookHeader, NotebookNumber};
 
 use crate::{
 	error::Error,
@@ -231,7 +229,7 @@ fn try_get_audit_signatures(pool: &PgPool) -> BoxFutureResult<()> {
 fn get_audit_signature(
 	pool: &PgPool,
 	public: [u8; 32],
-	notebook_number: u32,
+	notebook_number: NotebookNumber,
 	existing_signature: Option<[u8; 64]>,
 	rpc_urls: Vec<String>,
 	params: RpcParams,
@@ -336,7 +334,7 @@ fn try_submit_notebook<'a>(
 			),
 		};
 
-		let notebook_hash = H256(to_notebook_post_hash(&notebook).using_encoded(blake2_256));
+		let notebook_hash = header.hash();
 		let signature = keystore
 			.ed25519_sign(NOTARY_KEYID, &public, &notebook_hash[..])
 			.map_err(|e| {

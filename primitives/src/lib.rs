@@ -12,7 +12,13 @@ pub mod bond;
 pub mod digests;
 pub mod inherents;
 pub mod notary;
-pub mod notebook;
+
+pub mod notebook {
+	pub use ulx_notary_primitives::{
+		AccountOrigin, AccountOriginUid, AuditedNotebook, ChainTransfer, NotebookHeader,
+		NotebookNumber,
+	};
+}
 
 sp_api::decl_runtime_apis! {
 	/// This runtime api allows people to query the current authority set

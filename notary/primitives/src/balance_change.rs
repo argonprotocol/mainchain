@@ -4,7 +4,7 @@ use sp_core::{bounded::BoundedVec, ConstU32, RuntimeDebug, H256};
 use sp_core_hashing::blake2_256;
 use sp_runtime::scale_info::TypeInfo;
 
-use crate::{AccountId, AccountOriginUid, Chain, Note};
+use crate::{AccountId, AccountOriginUid, Chain, NotaryId, Note, NotebookNumber};
 
 pub const MAX_BALANCESET_CHANGES: u32 = 25;
 
@@ -57,10 +57,10 @@ pub struct BalanceChange {
 pub struct BalanceProof {
 	/// The notebook where this proof can be verified
 	#[codec(compact)]
-	pub notebook_number: u32,
+	pub notebook_number: NotebookNumber,
 	/// The notary where this proof can be verified
 	#[codec(compact)]
-	pub notary_id: u32,
+	pub notary_id: NotaryId,
 	/// The first recording of the given account
 	pub account_origin: AccountOrigin,
 	/// Proof items (does not contain the leaf hash, nor the root obviously).
@@ -124,7 +124,7 @@ struct BalanceTipValue {
 pub struct AccountOrigin {
 	/// The notebook where this account was first seen
 	#[codec(compact)]
-	pub notebook_number: u32,
+	pub notebook_number: NotebookNumber,
 	/// A unique identifier for an account
 	#[codec(compact)]
 	pub account_uid: AccountOriginUid,
