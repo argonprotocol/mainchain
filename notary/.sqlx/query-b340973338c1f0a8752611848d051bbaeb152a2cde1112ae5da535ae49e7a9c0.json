@@ -1,0 +1,25 @@
+{
+  "db_name": "PostgreSQL",
+  "query": "\n\t\t\t\tINSERT INTO notebook_origins (notebook_number, uid, account_id, chain) VALUES ($1, nextval('uid_seq_' || $2::TEXT), $3, $4) RETURNING uid\n\t\t\t\t",
+  "describe": {
+    "columns": [
+      {
+        "ordinal": 0,
+        "name": "uid",
+        "type_info": "Int4"
+      }
+    ],
+    "parameters": {
+      "Left": [
+        "Int4",
+        "Text",
+        "Bytea",
+        "Int4"
+      ]
+    },
+    "nullable": [
+      false
+    ]
+  },
+  "hash": "b340973338c1f0a8752611848d051bbaeb152a2cde1112ae5da535ae49e7a9c0"
+}

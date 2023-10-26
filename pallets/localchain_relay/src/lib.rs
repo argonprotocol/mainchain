@@ -2,14 +2,13 @@
 
 use codec::{Decode, Encode};
 use scale_info::TypeInfo;
-use sp_core::H256;
-use sp_runtime::{RuntimeAppPublic, RuntimeDebug};
+use sp_runtime::RuntimeDebug;
 use sp_std::{fmt::Debug, prelude::*};
 
 pub use pallet::*;
 use ulx_primitives::{
 	notary::{NotaryId, NotaryProvider},
-	BlockSealAuthorityId, BlockSealAuthoritySignature,
+	BlockSealAuthorityId,
 };
 pub use weights::*;
 
@@ -33,12 +32,16 @@ pub mod pallet {
 		PalletId,
 	};
 	use frame_system::pallet_prelude::*;
-	use sp_io::hashing::blake2_256;
+	use sp_core::{
+		crypto::AccountId32,
+		ed25519::{Public, Signature},
+		H256,
+	};
+
 	use sp_runtime::{
-		traits::{
-			AccountIdConversion, AtLeast32BitUnsigned, MaybeDisplay, One, UniqueSaturatedInto,
-		},
-		Saturating,
+		app_crypto::ed25519,
+		traits::{AccountIdConversion, AtLeast32BitUnsigned, One, UniqueSaturatedInto},
+		RuntimeAppPublic, Saturating,
 	};
 	use sp_std::cmp::min;
 
@@ -46,9 +49,7 @@ pub mod pallet {
 		block_seal::HistoricalBlockSealersLookup,
 		digests::{FinalizedBlockNeededDigest, FINALIZED_BLOCK_DIGEST_ID},
 		notary::{NotaryId, NotarySignature},
-		notebook::{
-			to_notebook_audit_signature_message, to_notebook_post_hash, ChainTransfer, Notebook,
-		},
+		notebook::{AuditedNotebook, ChainTransfer},
 	};
 
 	use super::*;
@@ -58,7 +59,7 @@ pub mod pallet {
 
 	/// Configure the pallet by specifying the parameters and types on which it depends.
 	#[pallet::config]
-	pub trait Config: frame_system::Config {
+	pub trait Config: frame_system::Config<AccountId = AccountId32> {
 		/// Because this pallet emits events, it depends on the runtime's definition of an event.
 		type RuntimeEvent: From<Event<Self>> + IsType<<Self as frame_system::Config>::RuntimeEvent>;
 		/// Type representing the weight of this pallet
@@ -88,15 +89,6 @@ pub mod pallet {
 		#[pallet::constant]
 		type PalletId: Get<PalletId>;
 
-		/// An account id on the localchain
-		type LocalchainAccountId: Parameter
-			+ Member
-			+ MaybeSerializeDeserialize
-			+ Debug
-			+ MaybeDisplay
-			+ Ord
-			+ MaxEncodedLen;
-
 		/// How long a transfer should remain in storage before returning.
 		#[pallet::constant]
 		type TransferExpirationBlocks: Get<u32>;
@@ -117,14 +109,6 @@ pub mod pallet {
 		#[pallet::constant]
 		type MaxNotebookBlocksToRemember: Get<u32>;
 	}
-
-	type NotebookOf<T> = Notebook<
-		<T as frame_system::Config>::AccountId,
-		<T as Config>::Balance,
-		<T as frame_system::Config>::Nonce,
-		<T as Config>::MaxNotebookTransfers,
-		<T as Config>::RequiredNotebookAuditors,
-	>;
 
 	#[pallet::storage]
 	pub(super) type PendingTransfersOut<T: Config> = StorageDoubleMap<
@@ -277,7 +261,7 @@ pub mod pallet {
 			// This has already been checked at this point. It's provided as a spam reduction
 			// feature to the unsigned transaction pool
 			_notebook_hash: H256,
-			notebook: NotebookOf<T>,
+			notebook: AuditedNotebook,
 			// since signature verification is done in `validate_unsigned`
 			// we can skip doing it here again.
 			_signature: NotarySignature,
@@ -287,11 +271,10 @@ pub mod pallet {
 			// already checked signature, notebook hash and validity of notary index in
 			// validate_unsigned
 			let allowed_auditors = T::HistoricalBlockSealersLookup::get_active_block_sealers_of(
-				notebook.pinned_to_block_number.into(),
+				notebook.header.pinned_to_block_number.into(),
 			);
 
-			let audit_signature_message =
-				to_notebook_audit_signature_message(&notebook).using_encoded(blake2_256).into();
+			let audit_signature_message = notebook.header.hash();
 
 			Self::verify_notebook_audit_signatures(
 				&notebook.auditors,
@@ -299,13 +282,16 @@ pub mod pallet {
 				&allowed_auditors,
 			)?;
 
-			let notary_id = notebook.notary_id;
-			let pinned_to_block_number = notebook.pinned_to_block_number;
+			let notebook_number = notebook.header.notebook_number;
+			let notary_id = notebook.header.notary_id;
+			let pinned_to_block_number = notebook.header.pinned_to_block_number;
 			// un-spendable notary account
 			let notary_pallet_account_id = Self::notary_account_id(notary_id);
-			for transfer in notebook.transfers.into_iter() {
+			for transfer in notebook.header.chain_transfers.into_iter() {
 				match transfer {
 					ChainTransfer::ToMainchain { account_id, amount } => {
+						let amount = amount.into();
+
 						ensure!(
 							T::Currency::reducible_balance(
 								&notary_pallet_account_id,
@@ -317,12 +303,14 @@ pub mod pallet {
 						T::Currency::transfer(
 							&notary_pallet_account_id,
 							&account_id,
-							amount,
+							amount.clone(),
 							Preservation::Expendable,
 						)?;
 						Self::deposit_event(Event::TransferIn { notary_id, account_id, amount });
 					},
 					ChainTransfer::ToLocalchain { account_id, nonce } => {
+						let nonce = nonce.into();
+						let account_id = account_id;
 						let transfer = <PendingTransfersOut<T>>::take(&account_id, nonce)
 							.ok_or(Error::<T>::InvalidOrDuplicatedLocalchainTransfer)?;
 						ensure!(
@@ -348,11 +336,11 @@ pub mod pallet {
 
 			if let Some(last_notebook_number) = LastNotebookNumberByNotary::<T>::get(notary_id) {
 				ensure!(
-					notebook.notebook_number == last_notebook_number + 1,
+					notebook_number == last_notebook_number + 1,
 					Error::<T>::MissingNotebookNumber
 				);
 			}
-			LastNotebookNumberByNotary::<T>::insert(notary_id, notebook.notebook_number);
+			LastNotebookNumberByNotary::<T>::insert(notary_id, notebook_number);
 
 			let pin: BlockNumberFor<T> = pinned_to_block_number.into();
 			<SubmittedNotebookBlocksByNotaryId<T>>::try_mutate(notary_id, |blocks| {
@@ -370,7 +358,7 @@ pub mod pallet {
 
 			Self::deposit_event(Event::NotebookSubmitted {
 				notary_id,
-				notebook_number: notebook.notebook_number,
+				notebook_number: notebook.header.notebook_number,
 				pinned_to_block_number: pin,
 			});
 
@@ -439,15 +427,15 @@ pub mod pallet {
 
 				// if the block is not finalized, we can't validate the notebook
 				ensure!(
-					notebook.pinned_to_block_number <= current_finalized_block,
+					notebook.header.pinned_to_block_number <= current_finalized_block,
 					InvalidTransaction::Future
 				);
 
 				// make the sender provide the hash. We'll just reject it if it's bad
 				ensure!(
 					T::NotaryProvider::verify_signature(
-						notebook.notary_id,
-						notebook.pinned_to_block_number.into(),
+						notebook.header.notary_id,
+						notebook.header.pinned_to_block_number.into(),
 						&notebook_hash,
 						&signature
 					),
@@ -455,21 +443,22 @@ pub mod pallet {
 				);
 
 				// verify the hash is valid
-				let block_hash: H256 =
-					to_notebook_post_hash(&notebook).using_encoded(blake2_256).into();
+				let block_hash = notebook.hash();
 				ensure!(block_hash == *notebook_hash, InvalidTransaction::BadProof);
 				log::info!(
 					target: LOG_TARGET,
 					"Notebook from notary {} pinned to block={:?}, current_finalized_block={current_finalized_block}",
-					notebook.notary_id,
-					notebook.pinned_to_block_number
+					notebook.header.notary_id,
+					notebook.header.pinned_to_block_number
 				);
-				let blocks_until_finalized: u32 =
-					100u32 + notebook.pinned_to_block_number - current_finalized_block;
+				let blocks_until_finalized: u32 = 100u32 + current_finalized_block;
 
 				ValidTransaction::with_tag_prefix("Notebook")
 					.priority(TransactionPriority::MAX)
-					.and_provides((notebook.notary_id, notebook.pinned_to_block_number))
+					.and_provides((
+						notebook.header.notary_id,
+						notebook.header.pinned_to_block_number,
+					))
 					.longevity(blocks_until_finalized.into())
 					.propagate(true)
 					.build()
@@ -485,10 +474,7 @@ pub mod pallet {
 		}
 
 		pub fn verify_notebook_audit_signatures(
-			auditors: &BoundedVec<
-				(BlockSealAuthorityId, BlockSealAuthoritySignature),
-				T::RequiredNotebookAuditors,
-			>,
+			auditors: &Vec<(Public, Signature)>,
 			signature_message: &H256,
 			allowed_auditors: &Vec<(u16, BlockSealAuthorityId)>,
 		) -> DispatchResult {
@@ -502,10 +488,10 @@ pub mod pallet {
 			);
 
 			let mut signatures = 0usize;
-			for (auditor, signature) in auditors.iter() {
+			for (auditor, signature) in auditors.into_iter() {
 				let authority_index = allowed_auditors
 					.iter()
-					.position(|a| a.1 == *auditor)
+					.position(|a| a.1.clone().into_inner() == *auditor)
 					.ok_or(Error::<T>::InvalidNotebookAuditor)?;
 
 				// must be in first X
@@ -514,8 +500,11 @@ pub mod pallet {
 					Error::<T>::InvalidNotebookAuditorIndex
 				);
 
+				let auditor = ed25519::AppPublic::from(*auditor);
+				let signature = ed25519::AppSignature::from(signature.clone());
+
 				ensure!(
-					auditor.verify(&signature_message.as_ref(), signature),
+					auditor.verify(&signature_message.as_ref(), &signature),
 					Error::<T>::InvalidNotebookAuditorSignature
 				);
 

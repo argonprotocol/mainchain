@@ -1,0 +1,15 @@
+{
+  "db_name": "PostgreSQL",
+  "query": "\n\t\t\t\tUPDATE notebook_status SET chain_transfers = chain_transfers + 1 \n\t\t\t\tWHERE notebook_number = $1 AND chain_transfers < $2\n\t\t\t",
+  "describe": {
+    "columns": [],
+    "parameters": {
+      "Left": [
+        "Int4",
+        "Int4"
+      ]
+    },
+    "nullable": []
+  },
+  "hash": "b22225bcd626e830caafbf854d82e937265d2c24534797204b64e6558125abb0"
+}

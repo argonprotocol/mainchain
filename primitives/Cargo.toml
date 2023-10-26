@@ -20,6 +20,8 @@ sp-std = { version = "8.0.0", default-features = false, git = "https://github.co
 frame-support = { version = "4.0.0-dev", default-features = false,  git = "https://github.com/paritytech/polkadot-sdk.git", branch = "release-polkadot-v1.1.0" }
 thiserror = { version ="1.0", optional = true }
 
+ulx-notary-primitives = { path = "../notary/primitives", default-features = false }
+
 [features]
 default = ["std"]
 std = [
@@ -37,4 +39,5 @@ std = [
   "sp-std/std",
   "thiserror",
   "frame-support/std",
+  "ulx-notary-primitives/std",
 ]

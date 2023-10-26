@@ -1,0 +1,22 @@
+{
+  "db_name": "PostgreSQL",
+  "query": "\n\t\t\t\tSELECT changed_accounts_root\n\t\t\t\tFROM notebook_headers WHERE notebook_number = $1 LIMIT 1\n\t\t\t\t",
+  "describe": {
+    "columns": [
+      {
+        "ordinal": 0,
+        "name": "changed_accounts_root",
+        "type_info": "Bytea"
+      }
+    ],
+    "parameters": {
+      "Left": [
+        "Int4"
+      ]
+    },
+    "nullable": [
+      false
+    ]
+  },
+  "hash": "90aaf2958250956968084a59058acf4efe305b790c59e892526cb602e597dca3"
+}

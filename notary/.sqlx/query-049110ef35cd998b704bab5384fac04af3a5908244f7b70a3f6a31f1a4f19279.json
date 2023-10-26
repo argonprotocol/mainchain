@@ -1,0 +1,22 @@
+{
+  "db_name": "PostgreSQL",
+  "query": "\n\t\t\t\tSELECT notebook_number FROM notebook_status WHERE step=$1 FOR UPDATE NOWAIT LIMIT 1\n\t\t\t",
+  "describe": {
+    "columns": [
+      {
+        "ordinal": 0,
+        "name": "notebook_number",
+        "type_info": "Int4"
+      }
+    ],
+    "parameters": {
+      "Left": [
+        "Int4"
+      ]
+    },
+    "nullable": [
+      false
+    ]
+  },
+  "hash": "049110ef35cd998b704bab5384fac04af3a5908244f7b70a3f6a31f1a4f19279"
+}

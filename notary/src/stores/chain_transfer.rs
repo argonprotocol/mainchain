@@ -1,7 +1,7 @@
-use sp_core::{crypto::AccountId32, ByteArray};
+use sp_core::ByteArray;
 use sqlx::{query, FromRow, PgConnection};
 
-use ulx_notary_primitives::{ensure, ChainTransfer};
+use ulx_notary_primitives::{ensure, AccountId, ChainTransfer};
 
 use crate::{stores::notebook_status::NotebookStatusStore, Error};
 
@@ -23,7 +23,7 @@ impl TryInto<ChainTransfer> for ChainTransferRow {
 	fn try_into(self) -> Result<ChainTransfer, Self::Error> {
 		if self.to_localchain {
 			Ok(ChainTransfer::ToLocalchain {
-				account_id: AccountId32::from_slice(&self.account_id.as_slice()).map_err(|_| {
+				account_id: AccountId::from_slice(&self.account_id.as_slice()).map_err(|_| {
 					Error::InternalError(format!(
 						"Unable to read account id from db {:?}",
 						self.account_id
@@ -33,7 +33,7 @@ impl TryInto<ChainTransfer> for ChainTransferRow {
 			})
 		} else {
 			Ok(ChainTransfer::ToMainchain {
-				account_id: AccountId32::from_slice(&self.account_id.as_slice()).map_err(|_| {
+				account_id: AccountId::from_slice(&self.account_id.as_slice()).map_err(|_| {
 					Error::InternalError(format!(
 						"Unable to read account id from db {:?}",
 						self.account_id
@@ -53,7 +53,7 @@ impl ChainTransferStore {
 	pub async fn record_transfer_to_mainchain(
 		db: &mut PgConnection,
 		notebook_number: u32,
-		account_id: &AccountId32,
+		account_id: &AccountId,
 		milligons: u128,
 		max_transfer_per_notebook: u32,
 	) -> anyhow::Result<(), Error> {
@@ -83,7 +83,7 @@ impl ChainTransferStore {
 	pub async fn take_and_record_transfer_local(
 		db: &mut PgConnection,
 		notebook_number: u32,
-		account_id: &AccountId32,
+		account_id: &AccountId,
 		nonce: u32,
 		proposed_amount: u128,
 		change_index: usize,
@@ -146,7 +146,7 @@ impl ChainTransferStore {
 	pub async fn record_transfer_to_local_from_block<'a>(
 		db: impl sqlx::PgExecutor<'a> + 'a,
 		finalized_block_number: u32,
-		account_id: &AccountId32,
+		account_id: &AccountId,
 		nonce: u32,
 		milligons: u128,
 	) -> anyhow::Result<()> {

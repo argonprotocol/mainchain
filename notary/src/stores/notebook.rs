@@ -5,11 +5,11 @@ use codec::{Decode, Encode};
 use scale_info::TypeInfo;
 use serde::{Deserialize, Serialize};
 use serde_json::{from_value, json};
-use sp_core::{bounded::BoundedVec, crypto::AccountId32, Blake2Hasher, RuntimeDebug};
+use sp_core::{bounded::BoundedVec, Blake2Hasher, RuntimeDebug};
 
 use ulx_notary_primitives::{
-	ensure, note::Chain, AccountOrigin, BalanceProof, BalanceTip, MaxBalanceChanges, NotaryId,
-	NotebookAccountOrigin, PINNED_BLOCKS_OFFSET,
+	ensure, note::Chain, AccountId, AccountOrigin, BalanceProof, BalanceTip, MaxBalanceChanges,
+	NotaryId, NotebookAccountOrigin, PINNED_BLOCKS_OFFSET,
 };
 
 use crate::{
@@ -123,7 +123,7 @@ impl NotebookStore {
 		let changesets = BalanceChangeStore::get_for_notebook(&mut *db, notebook_number).await?;
 
 		let mut changed_accounts =
-			BTreeMap::<(AccountId32, Chain), (u32, u128, AccountOrigin)>::new();
+			BTreeMap::<(AccountId, Chain), (u32, u128, AccountOrigin)>::new();
 		let new_account_origins =
 			NotebookNewAccountsStore::take_notebook_origins(&mut *db, notebook_number).await?;
 

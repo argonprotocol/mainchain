@@ -5,7 +5,7 @@ use frame_support::{
 	PalletId,
 };
 use frame_system::pallet_prelude::BlockNumberFor;
-use sp_core::{ConstU32, H256};
+use sp_core::{crypto::AccountId32, ConstU32, H256};
 use sp_runtime::{
 	traits::{BlakeTwo256, IdentityLookup, NumberFor},
 	BuildStorage,
@@ -44,7 +44,7 @@ impl frame_system::Config for Test {
 	type Nonce = u64;
 	type Hash = H256;
 	type Hashing = BlakeTwo256;
-	type AccountId = u64;
+	type AccountId = AccountId32;
 	type Lookup = IdentityLookup<Self::AccountId>;
 	type Block = Block;
 	type RuntimeEvent = RuntimeEvent;
@@ -116,7 +116,7 @@ impl pallet_balances::Config for Test {
 	type MaxHolds = ConstU32<100>;
 }
 
-pub fn set_argons(account_id: u64, amount: Balance) {
+pub fn set_argons(account_id: &AccountId32, amount: Balance) {
 	let _ = Balances::make_free_balance_be(&account_id, amount);
 	drop(Balances::issue(amount));
 }
@@ -127,7 +127,6 @@ impl pallet_localchain_relay::Config for Test {
 	type Currency = Balances;
 	type Balance = Balance;
 	type HistoricalBlockSealersLookup = HistoricalBlockSealersLookupImpl;
-	type LocalchainAccountId = u64;
 	type MaxNotebookBlocksToRemember = MaxNotebookBlocksToRemember;
 	type MaxNotebookTransfers = MaxNotebookTransfers;
 	type MaxPendingTransfersOutPerBlock = MaxPendingTransfersOutPerBlock;

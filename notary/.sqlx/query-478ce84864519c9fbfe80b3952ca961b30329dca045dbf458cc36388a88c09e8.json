@@ -1,0 +1,18 @@
+{
+  "db_name": "PostgreSQL",
+  "query": "\n\t\t\t\tINSERT INTO block_meta (key, best_block_number, best_block_hash, finalized_block_number, finalized_block_hash)\n\t\t\t\tVALUES ($1, $2, $3, $4, $5)\n\t\t\t",
+  "describe": {
+    "columns": [],
+    "parameters": {
+      "Left": [
+        "Int4",
+        "Int4",
+        "Bytea",
+        "Int4",
+        "Bytea"
+      ]
+    },
+    "nullable": []
+  },
+  "hash": "478ce84864519c9fbfe80b3952ca961b30329dca045dbf458cc36388a88c09e8"
+}

@@ -1,0 +1,20 @@
+{
+  "db_name": "PostgreSQL",
+  "query": "\n\t\t\t\tUPDATE notebook_headers \n\t\t\t\tSET hash = $1, changed_accounts_root = $2, changed_account_origins = $3, \n\t\t\t\t\tchain_transfers = $4, end_time = $5, pinned_to_block_number = $6 \n\t\t\t\tWHERE notebook_number = $7\n\t\t\t",
+  "describe": {
+    "columns": [],
+    "parameters": {
+      "Left": [
+        "Bytea",
+        "Bytea",
+        "Jsonb",
+        "Jsonb",
+        "Timestamptz",
+        "Int4",
+        "Int4"
+      ]
+    },
+    "nullable": []
+  },
+  "hash": "9b3d75432793dcab7accad9500d2b819996829d7448866310b59c1444db94529"
+}

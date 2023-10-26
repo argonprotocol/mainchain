@@ -1,10 +1,11 @@
 use codec::{Decode, Encode};
 use scale_info::TypeInfo;
 use serde::{Deserialize, Serialize};
-use sp_core::{crypto::AccountId32, ByteArray, RuntimeDebug};
+use sp_core::{ByteArray, RuntimeDebug};
+use sp_runtime::RuntimeString;
 use sqlx::FromRow;
 
-use ulx_notary_primitives::{AccountOrigin, Chain};
+use ulx_notary_primitives::{AccountId, AccountOrigin, Chain};
 
 use crate::Error;
 
@@ -12,7 +13,7 @@ pub type AccountOriginUid = u32;
 #[derive(Clone, PartialEq, Eq, Encode, Decode, RuntimeDebug, TypeInfo, Serialize, Deserialize)]
 pub struct NotebookNewAccountsStore {
 	pub origin: AccountOrigin,
-	pub account_id: AccountId32,
+	pub account_id: AccountId,
 	pub chain: Chain,
 }
 
@@ -34,13 +35,16 @@ impl TryInto<NotebookNewAccountsStore> for NotebookOriginsRow {
 				notebook_number: self.notebook_number as u32,
 				account_uid: self.uid as u32,
 			},
-			account_id: AccountId32::from_slice(&self.account_id.as_slice()).map_err(|_| {
+			account_id: AccountId::from_slice(&self.account_id.as_slice()).map_err(|_| {
 				Error::InternalError(format!(
 					"Unable to read account id from db {:?}",
 					self.account_id
 				))
 			})?,
-			chain: self.chain.try_into().map_err(Error::InternalError)?,
+			chain: self
+				.chain
+				.try_into()
+				.map_err(|e: RuntimeString| Error::InternalError(e.to_string()))?,
 		})
 	}
 }
@@ -49,7 +53,7 @@ impl NotebookNewAccountsStore {
 	pub async fn insert_origin<'a>(
 		db: impl sqlx::PgExecutor<'a> + 'a,
 		notebook_number: u32,
-		account_id: &AccountId32,
+		account_id: &AccountId,
 		chain: &Chain,
 	) -> anyhow::Result<AccountOrigin, Error> {
 		let next = sqlx::query_scalar!(

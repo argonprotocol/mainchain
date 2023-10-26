@@ -405,7 +405,6 @@ impl pallet_localchain_relay::Config for Runtime {
 
 	type NotaryProvider = Notaries;
 	type PalletId = LocalchainPalletId;
-	type LocalchainAccountId = AccountId;
 	type TransferExpirationBlocks = TransferExpirationBlocks;
 	type MaxPendingTransfersOutPerBlock = MaxPendingTransfersOutPerBlock;
 	type MaxNotebookTransfers = MaxNotebookTransfers;

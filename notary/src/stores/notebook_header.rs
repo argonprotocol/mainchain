@@ -41,7 +41,7 @@ impl TryInto<NotebookHeader> for NotebookHeaderRow {
 			finalized_block_number: self.finalized_block_number.unwrap_or(0i32) as u32,
 			pinned_to_block_number: self.pinned_to_block_number.unwrap_or(0i32) as u32,
 			start_time: self.start_time.timestamp_millis() as u64,
-			end_time: self.end_time.map(|e| e.timestamp_millis() as u64),
+			end_time: self.end_time.map(|e| e.timestamp_millis() as u64).unwrap_or_default(),
 			notary_id: self.notary_id as u32,
 			chain_transfers: BoundedVec::truncate_from(from_value::<Vec<ChainTransfer>>(
 				self.chain_transfers,
@@ -52,7 +52,6 @@ impl TryInto<NotebookHeader> for NotebookHeaderRow {
 			changed_account_origins: BoundedVec::truncate_from(from_value::<Vec<AccountOrigin>>(
 				self.changed_account_origins,
 			)?),
-			auditors: BoundedVec::new(),
 		})
 	}
 }
@@ -243,13 +242,11 @@ mod tests {
 			let _ = NotebookHeaderStore::create(&mut *tx, 1, notebook_number, 101).await?;
 
 			let loaded = NotebookHeaderStore::load(&mut *tx, notebook_number).await?;
-			assert_eq!(loaded.auditors.len(), 0);
 			assert_eq!(loaded.notebook_number, notebook_number);
 			assert_eq!(loaded.version, NOTEBOOK_VERSION);
 			assert_eq!(loaded.finalized_block_number, 0);
 			assert_eq!(loaded.pinned_to_block_number, 0);
 			assert!(loaded.start_time as i64 >= Utc::now().timestamp_millis() - 1000);
-			assert_eq!(loaded.end_time, None);
 			assert_eq!(loaded.notary_id, 1);
 			assert_eq!(loaded.chain_transfers.len(), 0);
 

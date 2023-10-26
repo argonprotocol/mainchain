@@ -11702,6 +11702,7 @@ dependencies = [
  "scale-info",
  "serde",
  "sp-core 21.0.0 (git+https://github.com/paritytech/polkadot-sdk.git?branch=release-polkadot-v1.1.0)",
+ "sp-core-hashing 9.0.0 (git+https://github.com/paritytech/polkadot-sdk.git?branch=release-polkadot-v1.1.0)",
  "sp-keyring",
  "sp-runtime 24.0.0 (git+https://github.com/paritytech/polkadot-sdk.git?branch=release-polkadot-v1.1.0)",
  "sp-std 8.0.0 (git+https://github.com/paritytech/polkadot-sdk.git?branch=release-polkadot-v1.1.0)",
@@ -11725,6 +11726,7 @@ dependencies = [
  "sp-runtime 24.0.0 (git+https://github.com/paritytech/polkadot-sdk.git?branch=release-polkadot-v1.1.0)",
  "sp-std 8.0.0 (git+https://github.com/paritytech/polkadot-sdk.git?branch=release-polkadot-v1.1.0)",
  "thiserror",
+ "ulx-notary-primitives",
 ]
 
 [[package]]

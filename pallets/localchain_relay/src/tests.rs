@@ -3,20 +3,24 @@ use std::collections::BTreeMap;
 use codec::Encode;
 use frame_support::{assert_err, assert_noop, assert_ok, traits::OnInitialize};
 use frame_system::pallet_prelude::BlockNumberFor;
-use sp_core::{blake2_256, ed25519, Pair};
+use sp_core::{
+	bounded_vec, ed25519,
+	ed25519::{Public, Signature},
+	Pair,
+};
+use sp_keyring::AccountKeyring::Bob;
 use sp_runtime::{
 	testing::{UintAuthorityId, H256},
-	traits::ValidateUnsigned,
+	traits::{UniqueSaturatedInto, ValidateUnsigned},
 	transaction_validity::{InvalidTransaction, TransactionSource},
 	BoundedVec, DigestItem,
 };
-type Hash = H256;
 
 use ulx_primitives::{
 	block_seal::BlockSealAuthorityPair,
 	digests::{FinalizedBlockNeededDigest, FINALIZED_BLOCK_DIGEST_ID},
-	notebook::{to_notebook_audit_signature_message, ChainTransfer, Notebook},
-	BlockSealAuthorityId, BlockSealAuthoritySignature,
+	notebook::{AuditedNotebook, ChainTransfer, NotebookHeader},
+	BlockSealAuthorityId,
 };
 
 use crate::{
@@ -28,87 +32,118 @@ use crate::{
 	Error, QueuedTransferOut,
 };
 
+type Hash = H256;
+
 #[test]
 fn it_can_send_funds_to_localchain() {
 	new_test_ext().execute_with(|| {
+		let who = Bob.to_account_id();
 		// Go past genesis block so events get deposited
 		System::set_block_number(1);
-		let nonce = System::account_nonce(1);
-		System::inc_account_nonce(1);
-		set_argons(1, 5000);
-		assert_ok!(LocalchainRelay::send_to_localchain(RuntimeOrigin::signed(1), 1000, 1, nonce));
-		assert_eq!(Balances::free_balance(1), 4000);
+		let nonce = System::account_nonce(&who);
+		System::inc_account_nonce(&who);
+		set_argons(&who, 5000);
+		assert_ok!(LocalchainRelay::send_to_localchain(
+			RuntimeOrigin::signed(who.clone()),
+			1000,
+			1,
+			nonce
+		));
+		assert_eq!(Balances::free_balance(&who), 4000);
 		let expires_block: BlockNumberFor<Test> = (1u32 + TransferExpirationBlocks::get()).into();
-		assert_eq!(ExpiringTransfersOut::<Test>::get(expires_block)[0], (1, nonce));
+		assert_eq!(ExpiringTransfersOut::<Test>::get(expires_block)[0], (who.clone(), nonce));
 	});
 }
 
 #[test]
 fn it_allows_you_to_transfer_full_balance() {
 	new_test_ext().execute_with(|| {
+		let who = Bob.to_account_id();
 		// Go past genesis block so events get deposited
 		System::set_block_number(1);
-		let nonce = System::account_nonce(1);
-		System::inc_account_nonce(1);
-		set_argons(1, 5000);
-		assert_ok!(LocalchainRelay::send_to_localchain(RuntimeOrigin::signed(1), 5000, 1, nonce));
-		assert_eq!(Balances::free_balance(1), 0);
-		assert_eq!(System::account_exists(&1), false);
+		let nonce = System::account_nonce(&who);
+		System::inc_account_nonce(&who);
+		set_argons(&who, 5000);
+		assert_ok!(LocalchainRelay::send_to_localchain(
+			RuntimeOrigin::signed(who.clone()),
+			5000,
+			1,
+			nonce
+		));
+		assert_eq!(Balances::free_balance(&who), 0);
+		assert_eq!(System::account_exists(&who), false);
 	});
 }
 
 #[test]
 fn it_can_recreate_a_killed_account() {
 	new_test_ext().execute_with(|| {
+		let who = Bob.to_account_id();
 		// Go past genesis block so events get deposited
 		System::set_block_number(1);
-		let nonce = System::account_nonce(1);
-		System::inc_account_nonce(1);
-		set_argons(1, 2000);
-		assert_ok!(LocalchainRelay::send_to_localchain(RuntimeOrigin::signed(1), 2000, 1, nonce));
-		assert_eq!(Balances::free_balance(1), 0);
-		assert_eq!(System::account_exists(&1), false);
+		let nonce = System::account_nonce(&who);
+		System::inc_account_nonce(&who);
+		set_argons(&who, 2000);
+		assert_ok!(LocalchainRelay::send_to_localchain(
+			RuntimeOrigin::signed(who.clone()),
+			2000,
+			1,
+			nonce
+		));
+		assert_eq!(Balances::free_balance(&who), 0);
+		assert_eq!(System::account_exists(&who), false);
 		let expires_block: BlockNumberFor<Test> = (1u32 + TransferExpirationBlocks::get()).into();
-		assert_eq!(ExpiringTransfersOut::<Test>::get(expires_block)[0], (1, nonce));
+		assert_eq!(ExpiringTransfersOut::<Test>::get(expires_block)[0], (who.clone(), nonce));
 		System::set_block_number(expires_block);
 		LocalchainRelay::on_initialize(expires_block);
-		assert_eq!(System::account_exists(&1), true);
-		assert_eq!(Balances::free_balance(1), 2000);
+		assert_eq!(System::account_exists(&who), true);
+		assert_eq!(Balances::free_balance(&who), 2000);
 	});
 }
 
 #[test]
 fn it_can_handle_multiple_transfer() {
 	new_test_ext().execute_with(|| {
+		let who = Bob.to_account_id();
 		// Go past genesis block so events get deposited
 		MaxPendingTransfersOutPerBlock::set(2);
 		System::set_block_number(1);
-		let nonce = System::account_nonce(1);
-		System::inc_account_nonce(1);
-		set_argons(1, 5000);
-		assert_ok!(LocalchainRelay::send_to_localchain(RuntimeOrigin::signed(1), 1000, 1, nonce));
-		System::inc_account_nonce(1);
+		let nonce = System::account_nonce(&who);
+		System::inc_account_nonce(&who);
+		set_argons(&who, 5000);
+		assert_ok!(LocalchainRelay::send_to_localchain(
+			RuntimeOrigin::signed(who.clone()),
+			1000,
+			1,
+			nonce
+		));
+		System::inc_account_nonce(&who);
 		assert_noop!(
-			LocalchainRelay::send_to_localchain(RuntimeOrigin::signed(1), 700, 1, nonce),
+			LocalchainRelay::send_to_localchain(RuntimeOrigin::signed(who.clone()), 700, 1, nonce),
 			Error::<Test>::InvalidAccountNonce
 		);
 		assert_ok!(LocalchainRelay::send_to_localchain(
-			RuntimeOrigin::signed(1),
+			RuntimeOrigin::signed(who.clone()),
 			700,
 			1,
 			nonce + 1
 		),);
-		assert_eq!(Balances::free_balance(1), 3300);
+		assert_eq!(Balances::free_balance(&who), 3300);
 		let expires_block: BlockNumberFor<Test> = (1u32 + TransferExpirationBlocks::get()).into();
 		assert_eq!(
 			ExpiringTransfersOut::<Test>::get(expires_block),
-			vec![(1, nonce), (1, nonce + 1)]
+			vec![(who.clone(), nonce), (who.clone(), nonce + 1)]
 		);
 
-		System::inc_account_nonce(1);
+		System::inc_account_nonce(&who);
 		// We have a max number of transfers out per block
 		assert_noop!(
-			LocalchainRelay::send_to_localchain(RuntimeOrigin::signed(1), 1200, 1, nonce + 2),
+			LocalchainRelay::send_to_localchain(
+				RuntimeOrigin::signed(who.clone()),
+				1200,
+				1,
+				nonce + 2
+			),
 			Error::<Test>::MaxBlockTransfersExceeded
 		);
 	});
@@ -121,11 +156,17 @@ fn it_can_handle_transfers_in() {
 	new_test_ext().execute_with(|| {
 		// Go past genesis block so events get deposited
 		System::set_block_number(1);
-		let nonce = System::account_nonce(1);
-		set_argons(1, 5000);
-		assert_ok!(LocalchainRelay::send_to_localchain(RuntimeOrigin::signed(1), 5000, 1, nonce));
+		let who = Bob.to_account_id();
+		let nonce = System::account_nonce(&who).into();
+		set_argons(&who, 5000);
+		assert_ok!(LocalchainRelay::send_to_localchain(
+			RuntimeOrigin::signed(who.clone()),
+			5000,
+			1,
+			nonce
+		));
 		let expires_block: BlockNumberFor<Test> = (1u32 + TransferExpirationBlocks::get()).into();
-		assert_eq!(ExpiringTransfersOut::<Test>::get(expires_block)[0], (1, nonce));
+		assert_eq!(ExpiringTransfersOut::<Test>::get(expires_block)[0], (who.clone(), nonce));
 
 		System::set_block_number(2);
 		System::on_initialize(2);
@@ -133,12 +174,24 @@ fn it_can_handle_transfers_in() {
 		assert_ok!(LocalchainRelay::submit_notebook(
 			RuntimeOrigin::none(),
 			Hash::random(),
-			Notebook {
-				notary_id: 1,
-				notebook_number: 1,
-				auditors: bound(vec![]),
-				pinned_to_block_number: 1,
-				transfers: bound(vec![ChainTransfer::ToLocalchain { account_id: 1, nonce }]),
+			AuditedNotebook {
+				header_hash: Hash::random(),
+				header: NotebookHeader {
+					notary_id: 1,
+					notebook_number: 1,
+					pinned_to_block_number: 1,
+					chain_transfers: bounded_vec![ChainTransfer::ToLocalchain {
+						account_id: Bob.to_account_id(),
+						nonce: nonce.unique_saturated_into()
+					}],
+					changed_accounts_root: H256::random(),
+					changed_account_origins: bounded_vec![],
+					version: 1,
+					finalized_block_number: 1,
+					start_time: 0,
+					end_time: 0,
+				},
+				auditors: bounded_vec![],
 			},
 			ed25519::Signature([0u8; 64]),
 		),);
@@ -148,32 +201,53 @@ fn it_can_handle_transfers_in() {
 		System::on_initialize(3);
 		LocalchainRelay::on_initialize(3);
 		assert_eq!(ExpiringTransfersOut::<Test>::get(expires_block).len(), 0);
-		assert_eq!(Balances::free_balance(1), 0);
+		assert_eq!(Balances::free_balance(&who), 0);
 
 		assert_ok!(LocalchainRelay::submit_notebook(
 			RuntimeOrigin::none(),
 			Hash::random(),
-			Notebook {
-				notary_id: 1,
-				notebook_number: 2,
-				auditors: bound(vec![]),
-				pinned_to_block_number: 2,
-				transfers: bound(vec![ChainTransfer::ToMainchain { account_id: 1, amount: 5000 }]),
+			AuditedNotebook {
+				header_hash: Hash::random(),
+				header: NotebookHeader {
+					notary_id: 1,
+					notebook_number: 2,
+					pinned_to_block_number: 2,
+					chain_transfers: bounded_vec![ChainTransfer::ToMainchain {
+						account_id: who.clone(),
+						amount: 5000
+					}],
+					changed_accounts_root: H256::random(),
+					changed_account_origins: bounded_vec![],
+					version: 1,
+					finalized_block_number: 1,
+					start_time: 0,
+					end_time: 0,
+				},
+				auditors: bounded_vec![],
 			},
 			ed25519::Signature([0u8; 64]),
 		),);
-		assert_eq!(Balances::free_balance(1), 5000);
+		assert_eq!(Balances::free_balance(&who), 5000);
 		assert_eq!(SubmittedNotebookBlocksByNotaryId::<Test>::get(1), vec![1, 2]);
 
 		assert_ok!(LocalchainRelay::submit_notebook(
 			RuntimeOrigin::none(),
 			Hash::random(),
-			Notebook {
-				notary_id: 1,
-				notebook_number: 3,
-				auditors: bound(vec![]),
-				pinned_to_block_number: 3,
-				transfers: bound(vec![]),
+			AuditedNotebook {
+				header_hash: Hash::random(),
+				header: NotebookHeader {
+					notary_id: 1,
+					notebook_number: 3,
+					pinned_to_block_number: 3,
+					chain_transfers: bounded_vec![],
+					changed_accounts_root: H256::random(),
+					changed_account_origins: bounded_vec![],
+					version: 1,
+					finalized_block_number: 1,
+					start_time: 0,
+					end_time: 0,
+				},
+				auditors: bounded_vec![],
 			},
 			ed25519::Signature([0u8; 64]),
 		),);
@@ -191,15 +265,24 @@ fn it_doesnt_allow_a_notary_balance_to_go_negative() {
 			LocalchainRelay::submit_notebook(
 				RuntimeOrigin::none(),
 				Hash::random(),
-				Notebook {
-					notary_id: 1,
-					notebook_number: 1,
-					auditors: bound(vec![]),
-					pinned_to_block_number: 0,
-					transfers: bound(vec![ChainTransfer::ToMainchain {
-						account_id: 1,
-						amount: 5000
-					}]),
+				AuditedNotebook {
+					header_hash: Hash::random(),
+					header: NotebookHeader {
+						notary_id: 1,
+						notebook_number: 1,
+						pinned_to_block_number: 0,
+						chain_transfers: bounded_vec![ChainTransfer::ToMainchain {
+							account_id: Bob.to_account_id(),
+							amount: 5000
+						}],
+						changed_accounts_root: H256::random(),
+						changed_account_origins: bounded_vec![],
+						version: 1,
+						finalized_block_number: 1,
+						start_time: 0,
+						end_time: 0,
+					},
+					auditors: bounded_vec![],
 				},
 				ed25519::Signature([0u8; 64]),
 			),
@@ -226,20 +309,26 @@ fn it_requires_minimum_audits() {
 			LocalchainRelay::submit_notebook(
 				RuntimeOrigin::none(),
 				Hash::random(),
-				Notebook {
-					notary_id: 1,
-					notebook_number: 1,
+				AuditedNotebook {
+					header: NotebookHeader {
+						notary_id: 1,
+						notebook_number: 1,
+						pinned_to_block_number: 1,
+						chain_transfers: bounded_vec![],
+						changed_accounts_root: H256::random(),
+						changed_account_origins: bounded_vec![],
+						version: 1,
+						finalized_block_number: 1,
+						start_time: 0,
+						end_time: 0,
+					},
+					header_hash: Hash::random(),
 					auditors: bound(
 						authorities
 							.iter()
-							.map(|a| (
-								a.to_public_key(),
-								BlockSealAuthoritySignature::from(ed25519::Signature([0u8; 64]))
-							))
-							.collect::<Vec<(BlockSealAuthorityId, BlockSealAuthoritySignature)>>()
+							.map(|a| (a.to_public_key(), ed25519::Signature([0u8; 64])))
+							.collect::<Vec<_>>()
 					),
-					pinned_to_block_number: 1,
-					transfers: bound(vec![]),
 				},
 				ed25519::Signature([0u8; 64]),
 			),
@@ -261,56 +350,63 @@ fn it_requires_valid_auditors() {
 		sealers.insert(2, ids[0..7].to_vec());
 		BlockSealers::set(sealers);
 
-		let mut notebook = Notebook {
+		let notebook = NotebookHeader {
 			notary_id: 1,
 			notebook_number: 1,
-			auditors: bound(vec![]),
 			pinned_to_block_number: 2,
-			transfers: bound(vec![]),
+			chain_transfers: bounded_vec![],
+			changed_accounts_root: H256::random(),
+			changed_account_origins: bounded_vec![],
+			version: 1,
+			finalized_block_number: 1,
+			start_time: 0,
+			end_time: 0,
 		};
 
-		let signature_message =
-			to_notebook_audit_signature_message(&notebook).using_encoded(blake2_256);
+		let header_hash = notebook.hash();
 
-		let create_signatures =
-			|list: Vec<usize>| -> Vec<(BlockSealAuthorityId, BlockSealAuthoritySignature)> {
-				list.into_iter()
-					.map(|e| {
-						let signature = authorities[e].sign(&signature_message);
-						(ids[e].clone(), signature)
-					})
-					.collect::<Vec<_>>()
-			};
+		let create_signatures = |list: Vec<usize>| -> Vec<(Public, Signature)> {
+			list.into_iter()
+				.map(|e| {
+					let signature = authorities[e].sign(&header_hash.0);
+					(ids[e].clone().into_inner(), signature.into_inner())
+				})
+				.collect::<Vec<_>>()
+		};
 
-		notebook.auditors = bound(create_signatures(vec![0, 1, 2, 8]));
+		let mut audited_notebook = AuditedNotebook {
+			header_hash,
+			header: notebook.clone(),
+			auditors: bound(create_signatures(vec![0, 1, 2, 8])),
+		};
 
 		assert_noop!(
 			LocalchainRelay::submit_notebook(
 				RuntimeOrigin::none(),
 				Hash::random(),
-				notebook.clone(),
+				audited_notebook.clone(),
 				ed25519::Signature([0u8; 64]),
 			),
 			Error::<Test>::InvalidNotebookAuditor
 		);
 
-		notebook.auditors = bound(create_signatures(vec![0, 3, 4, 8]));
+		audited_notebook.auditors = bound(create_signatures(vec![0, 3, 4, 8]));
 
 		assert_noop!(
 			LocalchainRelay::submit_notebook(
 				RuntimeOrigin::none(),
 				Hash::from([0u8; 32]),
-				notebook.clone(),
+				audited_notebook.clone(),
 				ed25519::Signature([0u8; 64]),
 			),
 			Error::<Test>::InvalidNotebookAuditorIndex
 		);
 
-		notebook.auditors = bound(create_signatures(vec![0, 1, 2, 3]));
+		audited_notebook.auditors = bound(create_signatures(vec![0, 1, 2, 3]));
 		assert_ok!(LocalchainRelay::submit_notebook(
 			RuntimeOrigin::none(),
 			Hash::random(),
-			notebook.clone(),
+			audited_notebook.clone(),
 			ed25519::Signature([0u8; 64]),
 		),);
 	});
@@ -320,14 +416,20 @@ fn it_requires_valid_auditors() {
 fn it_expires_transfers_if_not_committed() {
 	RequiredNotebookAuditors::set(0);
 	new_test_ext().execute_with(|| {
+		let who = Bob.to_account_id();
 		// Go past genesis block so events get deposited
 		System::set_block_number(1);
-		let nonce = System::account_nonce(1);
-		System::inc_account_nonce(1);
-		set_argons(1, 5000);
-		assert_ok!(LocalchainRelay::send_to_localchain(RuntimeOrigin::signed(1), 1000, 1, nonce));
+		let nonce = System::account_nonce(&who);
+		System::inc_account_nonce(&who);
+		set_argons(&who, 5000);
+		assert_ok!(LocalchainRelay::send_to_localchain(
+			RuntimeOrigin::signed(who.clone()),
+			1000,
+			1,
+			nonce
+		));
 		assert_eq!(
-			PendingTransfersOut::<Test>::get(1u64, nonce).unwrap(),
+			PendingTransfersOut::<Test>::get(&who, nonce).unwrap(),
 			QueuedTransferOut {
 				amount: 1000u128,
 				notary_id: 1u32,
@@ -340,12 +442,24 @@ fn it_expires_transfers_if_not_committed() {
 			LocalchainRelay::submit_notebook(
 				RuntimeOrigin::none(),
 				H256::random(),
-				Notebook {
-					notary_id: 1,
-					notebook_number: 1,
-					auditors: bound(vec![]),
-					pinned_to_block_number: 0,
-					transfers: bound(vec![ChainTransfer::ToLocalchain { account_id: 1, nonce }]),
+				AuditedNotebook {
+					header: NotebookHeader {
+						notary_id: 1,
+						notebook_number: 1,
+						pinned_to_block_number: 0,
+						chain_transfers: bounded_vec![ChainTransfer::ToLocalchain {
+							account_id: who.clone(),
+							nonce: nonce.unique_saturated_into()
+						}],
+						changed_accounts_root: H256::random(),
+						changed_account_origins: bounded_vec![],
+						version: 1,
+						finalized_block_number: 1,
+						start_time: 0,
+						end_time: 0,
+					},
+					header_hash: H256::random(),
+					auditors: bounded_vec![],
 				},
 				ed25519::Signature([0u8; 64]),
 			),
@@ -366,12 +480,22 @@ fn it_delays_for_finalization() {
 				TransactionSource::Local,
 				&crate::Call::submit_notebook {
 					notebook_hash: Hash::default(),
-					notebook: Notebook {
-						notary_id: 1,
-						notebook_number: 1,
-						auditors: bound(vec![]),
-						pinned_to_block_number: 1,
-						transfers: bound(vec![]),
+
+					notebook: AuditedNotebook {
+						header: NotebookHeader {
+							notary_id: 1,
+							notebook_number: 1,
+							pinned_to_block_number: 1,
+							chain_transfers: bounded_vec![],
+							changed_accounts_root: H256::random(),
+							changed_account_origins: bounded_vec![],
+							version: 1,
+							finalized_block_number: 1,
+							start_time: 0,
+							end_time: 0,
+						},
+						header_hash: H256::random(),
+						auditors: bounded_vec![],
 					},
 					signature: ed25519::Signature([0u8; 64]),
 				},

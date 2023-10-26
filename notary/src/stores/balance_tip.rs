@@ -1,9 +1,9 @@
 use std::default::Default;
 
-use sp_core::{crypto::AccountId32, H256};
+use sp_core::H256;
 use sqlx::PgConnection;
 
-use ulx_notary_primitives::{ensure, AccountOrigin, BalanceTip, Chain};
+use ulx_notary_primitives::{ensure, AccountId, AccountOrigin, BalanceTip, Chain};
 
 use crate::{stores::BoxFutureResult, Error};
 
@@ -22,7 +22,7 @@ pub struct BalanceTipStore;
 impl BalanceTipStore {
 	pub fn lock<'a>(
 		db: &'a mut PgConnection,
-		account_id: &AccountId32,
+		account_id: &AccountId,
 		chain: Chain,
 		proposed_nonce: u32,
 		previous_balance: u128,
@@ -74,7 +74,7 @@ impl BalanceTipStore {
 
 	pub fn update<'a>(
 		db: &'a mut PgConnection,
-		account_id: &AccountId32,
+		account_id: &AccountId,
 		chain: Chain,
 		nonce: u32,
 		balance: u128,

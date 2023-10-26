@@ -57,6 +57,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
 
 	println!("Creating notebook for notary_id {notary_id} at block {finalized_height})",);
 	let notebook = Notebook {
+		notebook_number: 1,
 		notary_id,
 		auditors: BoundedVec(vec![].into()),
 		transfers: BoundedVec(vec![].into()),

@@ -1,8 +1,5 @@
 use sc_utils::notification::{NotificationStream, TracingKeyStr};
-use sp_core::{
-	crypto::{AccountId32, KeyTypeId},
-	H256,
-};
+use sp_core::{crypto::KeyTypeId, H256};
 use sp_keystore::KeystorePtr;
 use sqlx::PgPool;
 use std::collections::btree_map::BTreeMap;
@@ -11,7 +8,7 @@ use ulx_notary_audit::{verify_balance_changeset_allocation, verify_changeset_sig
 use ulx_notary_primitives::{
 	ensure,
 	note::{Chain, ChainTransferDestination, NoteType},
-	AccountOrigin, BalanceChange, BalanceTip, NotaryId, NotebookHeader, MAX_TRANSFERS,
+	AccountId, AccountOrigin, BalanceChange, BalanceTip, NotaryId, NotebookHeader, MAX_TRANSFERS,
 };
 
 use crate::{
@@ -124,7 +121,7 @@ impl Notary {
 		let current_notebook_number =
 			NotebookStatusStore::lock_latest_for_appending(&mut *tx).await?;
 
-		let mut new_account_origins = BTreeMap::<(AccountId32, Chain), AccountOrigin>::new();
+		let mut new_account_origins = BTreeMap::<(AccountId, Chain), AccountOrigin>::new();
 
 		let to_add = changes.clone();
 		for (change_index, change) in changes.into_iter().enumerate() {

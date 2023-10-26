@@ -1,10 +1,12 @@
-use std::fmt::Debug;
-
 use codec::{Codec, Decode, Encode, MaxEncodedLen};
 use scale_info::TypeInfo;
 use serde::{Deserialize, Serialize};
-use sp_core::{blake2_256, crypto::AccountId32, ed25519::Signature, ByteArray, RuntimeDebug, H256};
-use sp_runtime::MultiSignature;
+use sp_core::{ed25519::Signature, RuntimeDebug, H256};
+use sp_core_hashing::blake2_256;
+use sp_runtime::{format_runtime_string, MultiSignature, RuntimeString};
+use sp_std::fmt::Debug;
+
+use crate::AccountId;
 
 pub type NoteId = H256;
 #[derive(
@@ -34,7 +36,7 @@ pub struct Note {
 
 impl Note {
 	pub fn create_unsigned(
-		account_id: &AccountId32,
+		account_id: &AccountId,
 		chain: &Chain,
 		balance_change_nonce: u32,
 		milligons: u128,
@@ -55,13 +57,13 @@ impl Note {
 	}
 	pub fn get_note_id(
 		&self,
-		account_id: &AccountId32,
+		account_id: &AccountId,
 		chain: &Chain,
 		balance_change_nonce: u32,
 	) -> NoteId {
 		blake2_256(
 			&[
-				&account_id.as_slice()[..],
+				&account_id.as_ref(),
 				&chain.encode()[..],
 				&balance_change_nonce.to_le_bytes()[..],
 				&self.milligons.to_le_bytes()[..],
@@ -73,7 +75,7 @@ impl Note {
 	}
 
 	pub fn compute_note_id(
-		account_id: &AccountId32,
+		account_id: &AccountId,
 		chain: &Chain,
 		balance_change_nonce: u32,
 		milligons: u128,
@@ -81,7 +83,7 @@ impl Note {
 	) -> NoteId {
 		blake2_256(
 			&[
-				&account_id.as_slice()[..],
+				&account_id.as_ref(),
 				&chain.encode()[..],
 				&balance_change_nonce.to_le_bytes()[..],
 				&milligons.to_le_bytes()[..],
@@ -114,13 +116,13 @@ pub enum Chain {
 }
 
 impl TryFrom<i32> for Chain {
-	type Error = String;
+	type Error = RuntimeString;
 
 	fn try_from(value: i32) -> Result<Self, Self::Error> {
 		match value {
 			0 => Ok(Chain::Tax),
 			1 => Ok(Chain::Argon),
-			_ => Err(format!("Invalid chain value {}", value)),
+			_ => Err(format_runtime_string!("Invalid chain value {}", value)),
 		}
 	}
 }
@@ -147,7 +149,7 @@ pub enum NoteType {
 	Send {
 		/// Recipient address  (address of recipient party) - If this is a tax note, it must be a
 		/// proof of tax address (or it won’t be able to be used).
-		recipient: Option<AccountId32>,
+		recipient: Option<AccountId>,
 	},
 	/// Pay a fee to a notary or mainchain service
 	Fee,

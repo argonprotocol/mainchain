@@ -1,0 +1,22 @@
+{
+  "db_name": "PostgreSQL",
+  "query": "\n\t\t\tSELECT changeset FROM balance_changes WHERE notebook_number = $1\n\t\t",
+  "describe": {
+    "columns": [
+      {
+        "ordinal": 0,
+        "name": "changeset",
+        "type_info": "Jsonb"
+      }
+    ],
+    "parameters": {
+      "Left": [
+        "Int4"
+      ]
+    },
+    "nullable": [
+      false
+    ]
+  },
+  "hash": "83b43192dbade10925236b36a01fe7307db9cf27f56d5c44de6618a960a20f57"
+}

@@ -1,4 +1,4 @@
-use sp_core::{crypto::AccountId32, ed25519};
+use sp_core::ed25519;
 use sqlx::{PgConnection, PgPool};
 use subxt::{
 	blocks::{Block, BlockRef},
@@ -10,7 +10,7 @@ use ulixee_client::{
 	api, api::runtime_types::bounded_collections::bounded_vec::BoundedVec, try_until_connected,
 	UlxClient, UlxConfig,
 };
-use ulx_notary_primitives::NotaryId;
+use ulx_notary_primitives::{AccountId, NotaryId};
 
 use crate::stores::{
 	block_meta::BlockMetaStore,
@@ -144,7 +144,7 @@ async fn process_block(
 				ChainTransferStore::record_transfer_to_local_from_block(
 					&mut *db,
 					block_height,
-					&AccountId32::from(to_localchain.account_id.0),
+					&AccountId::from(to_localchain.account_id.0),
 					to_localchain.nonce,
 					to_localchain.amount,
 				)

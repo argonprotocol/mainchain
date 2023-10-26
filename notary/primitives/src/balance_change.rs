@@ -1,10 +1,10 @@
-use crate::{AccountOriginUid, Chain, Note};
 use codec::{Decode, Encode, MaxEncodedLen};
 use serde::{Deserialize, Serialize};
-use sp_core::{
-	blake2_256, bounded::BoundedVec, crypto::AccountId32, ByteArray, ConstU32, RuntimeDebug, H256,
-};
+use sp_core::{bounded::BoundedVec, ConstU32, RuntimeDebug, H256};
+use sp_core_hashing::blake2_256;
 use sp_runtime::scale_info::TypeInfo;
+
+use crate::{AccountId, AccountOriginUid, Chain, Note};
 
 pub const MAX_BALANCESET_CHANGES: u32 = 25;
 
@@ -23,7 +23,7 @@ pub const MAX_BALANCESET_CHANGES: u32 = 25;
 #[serde(rename_all = "camelCase")]
 pub struct BalanceChange {
 	/// Localchain account
-	pub account_id: AccountId32,
+	pub account_id: AccountId,
 	/// Which chain (tax or argon)
 	pub chain: Chain,
 	/// Nonce that must increment for each change for an account
@@ -81,7 +81,7 @@ pub struct BalanceProof {
 
 #[derive(Encode, Decode, RuntimeDebug, TypeInfo, Serialize, Deserialize)]
 pub struct BalanceTip {
-	pub account_id: AccountId32,
+	pub account_id: AccountId,
 	pub chain: Chain,
 	pub nonce: u32,
 	pub balance: u128,
@@ -93,8 +93,8 @@ impl BalanceTip {
 		BalanceTipValue { nonce, balance, account_origin }.using_encoded(blake2_256)
 	}
 
-	pub fn create_key(account_id: &AccountId32, chain: &Chain) -> [u8; 32] {
-		blake2_256(&[&account_id.to_raw_vec()[..], &chain.encode()[..]].concat())
+	pub fn create_key(account_id: &AccountId, chain: &Chain) -> [u8; 32] {
+		blake2_256(&[&account_id.as_ref(), &chain.encode()[..]].concat())
 	}
 }
 

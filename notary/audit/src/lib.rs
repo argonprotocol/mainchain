@@ -917,8 +917,7 @@ mod tests {
 				notebook_number: 1,
 				account_uid: 1
 			}],
-			end_time: Some(Utc::now().timestamp_millis() as u64),
-			auditors: Default::default(),
+			end_time: Utc::now().timestamp_millis() as u64,
 		};
 
 		ValidLocalchainTransfers::mutate(|a| a.insert((Alice.to_account_id(), 1)));
@@ -1021,8 +1020,7 @@ mod tests {
 				notebook_number: 1,
 				account_uid: 1
 			}],
-			end_time: Some(Utc::now().timestamp_millis() as u64),
-			auditors: Default::default(),
+			end_time: Utc::now().timestamp_millis() as u64,
 		};
 
 		ValidLocalchainTransfers::mutate(|a| a.insert((Alice.to_account_id(), 1)));
