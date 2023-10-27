@@ -9,6 +9,7 @@ use sp_std::{fmt::Debug, prelude::*};
 pub use pallet::*;
 pub use ulx_notary_audit::VerifyError as NotebookVerifyError;
 use ulx_primitives::{
+	block_seal::Host,
 	notary::{NotaryId, NotaryProvider, NotarySignature},
 	notebook::NotebookNumber,
 	BlockSealAuthorityId,
@@ -51,7 +52,7 @@ pub mod pallet {
 		notebook_verify, AccountHistoryLookupError, NotebookHistoryLookup, VerifyError,
 	};
 	use ulx_primitives::{
-		block_seal::HistoricalBlockSealersLookup,
+		block_seal::{AuthorityProvider, BlockSealersProvider, Host},
 		digests::{FinalizedBlockNeededDigest, FINALIZED_BLOCK_DIGEST_ID},
 		notary::{NotaryId, NotarySignature},
 		notebook::{AccountOrigin, AuditedNotebook, ChainTransfer, Notebook},
@@ -84,12 +85,19 @@ pub mod pallet {
 			+ TypeInfo
 			+ MaxEncodedLen;
 
-		type HistoricalBlockSealersLookup: HistoricalBlockSealersLookup<
+		type HistoricalBlockSealersLookup: BlockSealersProvider<
 			BlockNumberFor<Self>,
 			BlockSealAuthorityId,
 		>;
 
 		type NotaryProvider: NotaryProvider<<Self as frame_system::Config>::Block>;
+
+		/// Type that provides authorities
+		type AuthorityProvider: AuthorityProvider<
+			BlockSealAuthorityId,
+			Self::Block,
+			Self::AccountId,
+		>;
 
 		#[pallet::constant]
 		type PalletId: Get<PalletId>;
@@ -317,9 +325,11 @@ pub mod pallet {
 
 			// already checked signature, notebook hash and validity of notary index in
 			// validate_unsigned
-			let allowed_auditors = T::HistoricalBlockSealersLookup::get_active_block_sealers_of(
-				notebook.header.pinned_to_block_number.into(),
-			);
+
+			// At launch, we will ensure miner zero audits the notebooks. We need to transition this
+			// to use the block sealers
+			let allowed_auditors =
+				Self::get_auditors(notary_id, notebook_number, pinned_to_block_number);
 
 			let audit_signature_message = notebook.header.hash();
 
@@ -555,6 +565,24 @@ pub mod pallet {
 	}
 
 	impl<T: Config> Pallet<T> {
+		pub fn get_auditors(
+			_notary_id: NotaryId,
+			_notebook_number: NotebookNumber,
+			pinned_to_block_number: BlockNumberFor<T>,
+		) -> Vec<(u16, BlockSealAuthorityId, Vec<Host>)> {
+			let mut auditors = T::HistoricalBlockSealersLookup::get_active_block_sealers_of(
+				pinned_to_block_number,
+			);
+
+			if T::HistoricalBlockSealersLookup::is_using_proof_of_compute() {
+				if let Some(miner_zero) = T::AuthorityProvider::miner_zero() {
+					auditors.push(miner_zero);
+				}
+			}
+
+			auditors
+		}
+
 		pub fn audit_notebook(
 			_version: u32,
 			notary_id: NotaryId,
@@ -595,7 +623,7 @@ pub mod pallet {
 		pub fn verify_notebook_audit_signatures(
 			auditors: &Vec<(Public, Signature)>,
 			signature_message: &H256,
-			allowed_auditors: &Vec<(u16, BlockSealAuthorityId)>,
+			allowed_auditors: &Vec<(u16, BlockSealAuthorityId, Vec<Host>)>,
 		) -> DispatchResult {
 			let required_auditors =
 				min(T::RequiredNotebookAuditors::get() as usize, allowed_auditors.len());
@@ -638,7 +666,7 @@ pub mod pallet {
 }
 
 sp_api::decl_runtime_apis! {
-	pub trait LocalchainRelayApis {
+	pub trait LocalchainRelayApis<BlockNumber> where BlockNumber:Encode {
 		fn audit_notebook(
 			version: u32,
 			notary_id: NotaryId,
@@ -647,6 +675,12 @@ sp_api::decl_runtime_apis! {
 			header_hash: H256,
 			bytes: Vec<u8>,
 		) -> Result<bool, NotebookVerifyError>;
+
+		fn get_auditors(
+			notary_id: NotaryId,
+			notebook_number: NotebookNumber,
+			pinned_to_block_number: BlockNumber,
+		) -> Vec<(u16, BlockSealAuthorityId, Vec<Host>)>;
 	}
 }
 

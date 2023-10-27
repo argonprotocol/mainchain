@@ -60,7 +60,7 @@ use sp_version::RuntimeVersion;
 
 use pallet_tx_pause::RuntimeCallNameOf;
 use ulx_primitives::{
-	block_seal::{AuthorityDistance, AuthorityProvider},
+	block_seal::{AuthorityDistance, AuthorityProvider, Host},
 	BlockSealAuthorityId, NextWork,
 };
 
@@ -405,7 +405,7 @@ impl pallet_localchain_relay::Config for Runtime {
 	type HistoricalBlockSealersLookup = BlockSeal;
 	type Balance = Balance;
 	type Currency = ArgonBalances;
-
+	type AuthorityProvider = MiningSlots;
 	type NotaryProvider = Notaries;
 	type PalletId = LocalchainPalletId;
 	type TransferExpirationBlocks = TransferExpirationBlocks;
@@ -763,7 +763,7 @@ impl_runtime_apis! {
 		}
 	}
 
-	impl pallet_localchain_relay::LocalchainRelayApis<Block> for Runtime {
+	impl pallet_localchain_relay::LocalchainRelayApis<Block, BlockNumber> for Runtime {
 		fn audit_notebook(
 			version: u32,
 			notary_id: NotaryId,
@@ -773,6 +773,14 @@ impl_runtime_apis! {
 			bytes: Vec<u8>,
 		) -> Result<bool, NotebookVerifyError> {
 			LocalchainRelay::audit_notebook(version, notary_id, notebook_number, notary_signature, header_hash, bytes)
+		}
+
+		fn get_auditors(
+			notary_id: NotaryId,
+			notebook_number: NotebookNumber,
+			pinned_to_block_number: BlockNumber,
+		) -> Vec<(u16, BlockSealAuthorityId, Vec<Host>)> {
+			LocalchainRelay::get_auditors(notary_id, notebook_number, pinned_to_block_number)
 		}
 	}
 

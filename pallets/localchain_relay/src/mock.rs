@@ -13,7 +13,7 @@ use sp_runtime::{
 use sp_std::collections::btree_map::BTreeMap;
 
 use ulx_primitives::{
-	block_seal::HistoricalBlockSealersLookup,
+	block_seal::{AuthorityDistance, AuthorityProvider, BlockSealersProvider, Host},
 	notary::{NotaryId, NotaryProvider, NotarySignature},
 	BlockSealAuthorityId,
 };
@@ -76,20 +76,65 @@ parameter_types! {
 	pub const LocalchainPalletId: PalletId = PalletId(*b"loclchai");
 
 	pub static BlockSealers: BTreeMap<BlockNumber, Vec<BlockSealAuthorityId>> = BTreeMap::new();
+
+	pub static IsProofOfCompute: bool = false;
 }
 pub struct HistoricalBlockSealersLookupImpl;
-impl HistoricalBlockSealersLookup<BlockNumber, BlockSealAuthorityId>
-	for HistoricalBlockSealersLookupImpl
-{
-	fn get_active_block_sealers_of(n: BlockNumber) -> Vec<(u16, BlockSealAuthorityId)> {
+impl BlockSealersProvider<BlockNumber, BlockSealAuthorityId> for HistoricalBlockSealersLookupImpl {
+	fn get_active_block_sealers_of(n: BlockNumber) -> Vec<(u16, BlockSealAuthorityId, Vec<Host>)> {
 		BlockSealers::get()
 			.get(&n)
 			.unwrap_or(&Vec::new())
 			.clone()
 			.iter()
 			.enumerate()
-			.map(|(idx, a)| (idx as u16, a.clone()))
+			.map(|(idx, a)| (idx as u16, a.clone(), vec![]))
 			.collect::<Vec<_>>()
+	}
+	fn is_using_proof_of_compute() -> bool {
+		IsProofOfCompute::get()
+	}
+}
+parameter_types! {
+	pub static AuthorityList: Vec<(AccountId32, BlockSealAuthorityId)> = vec![];
+	pub static XorClosest: Vec<AuthorityDistance<BlockSealAuthorityId>> = vec![];
+}
+pub struct StaticAuthorityProvider;
+impl AuthorityProvider<BlockSealAuthorityId, Block, AccountId32> for StaticAuthorityProvider {
+	fn miner_zero() -> Option<(u16, BlockSealAuthorityId, Vec<Host>)> {
+		None
+	}
+	fn is_active(authority_id: &BlockSealAuthorityId) -> bool {
+		Self::authorities().contains(authority_id)
+	}
+	fn authorities() -> Vec<BlockSealAuthorityId> {
+		AuthorityList::get().iter().map(|(_account, id)| id.clone()).collect()
+	}
+	fn authorities_by_index() -> BTreeMap<u16, BlockSealAuthorityId> {
+		let mut map = BTreeMap::new();
+		for (i, id) in AuthorityList::get().into_iter().enumerate() {
+			map.insert(i as u16, id.1);
+		}
+		map
+	}
+	fn authority_count() -> u16 {
+		AuthorityList::get().len() as u16
+	}
+	fn get_authority(author: AccountId32) -> Option<BlockSealAuthorityId> {
+		AuthorityList::get().iter().find_map(|(account, id)| {
+			if *account == author {
+				Some(id.clone())
+			} else {
+				None
+			}
+		})
+	}
+	fn block_peers(
+		_block_hash: &<Block as sp_runtime::traits::Block>::Hash,
+		_account_id: AccountId32,
+		_closest: u8,
+	) -> Vec<AuthorityDistance<BlockSealAuthorityId>> {
+		XorClosest::get().clone()
 	}
 }
 
@@ -131,6 +176,7 @@ impl pallet_localchain_relay::Config for Test {
 	type MaxPendingTransfersOutPerBlock = MaxPendingTransfersOutPerBlock;
 	type NotaryProvider = NotaryProviderImpl;
 	type PalletId = LocalchainPalletId;
+	type AuthorityProvider = StaticAuthorityProvider;
 	type RequiredNotebookAuditors = RequiredNotebookAuditors;
 	type TransferExpirationBlocks = TransferExpirationBlocks;
 }

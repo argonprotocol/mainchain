@@ -34,8 +34,7 @@ pub fn ip_from_u32(ip: u32) -> Ipv4Addr {
 fn it_doesnt_add_cohorts_until_time() {
 	BlocksBetweenSlots::set(2);
 
-	new_test_ext().execute_with(|| {
-		// Go past genesis block so events get deposited
+	new_test_ext(None).execute_with(|| {
 		System::set_block_number(1);
 
 		NextSlotCohort::<Test>::set(bounded_vec![MiningRegistration {
@@ -75,8 +74,7 @@ fn get_validation_window_blocks() {
 
 #[test]
 fn get_slot_era() {
-	new_test_ext().execute_with(|| {
-		// Go past genesis block so events get deposited
+	new_test_ext(None).execute_with(|| {
 		System::set_block_number(8);
 
 		MaxCohortSize::set(2);
@@ -169,13 +167,71 @@ fn starting_cohort_index() {
 }
 
 #[test]
+fn it_activates_miner_zero_if_no_miners() {
+	BlocksBetweenSlots::set(2);
+	MaxMiners::set(6);
+	MaxCohortSize::set(2);
+
+	new_test_ext(Some(MiningRegistration {
+		account_id: 1,
+		peer_id: empty_peer(),
+		bond_id: None,
+		ownership_tokens: 0,
+		bond_amount: 0,
+		reward_destination: RewardDestination::Owner,
+		rpc_hosts: rpc_hosts(Ipv4Addr::new(127, 0, 0, 1), 3000),
+	}))
+	.execute_with(|| {
+		MiningSlots::on_initialize(1);
+
+		assert_eq!(ActiveMinersByIndex::<Test>::get(0).unwrap().account_id, 1);
+	});
+}
+
+#[test]
+fn it_activates_miner_zero_if_upcoming_miners_will_empty() {
+	BlocksBetweenSlots::set(2);
+	MaxMiners::set(6);
+	MaxCohortSize::set(2);
+
+	new_test_ext(Some(MiningRegistration {
+		account_id: 1,
+		peer_id: empty_peer(),
+		bond_id: None,
+		ownership_tokens: 0,
+		bond_amount: 0,
+		reward_destination: RewardDestination::Owner,
+		rpc_hosts: rpc_hosts(Ipv4Addr::new(127, 0, 0, 1), 3000),
+	}))
+	.execute_with(|| {
+		ActiveMinersByIndex::<Test>::insert(
+			5,
+			MiningRegistration {
+				account_id: 10,
+				peer_id: empty_peer(),
+				bond_id: None,
+				ownership_tokens: 0,
+				bond_amount: 0,
+				reward_destination: RewardDestination::Owner,
+				rpc_hosts: rpc_hosts(Ipv4Addr::new(127, 0, 0, 1), 3000),
+			},
+		);
+		AccountIndexLookup::<Test>::insert(10, 5);
+		ActiveMinersCount::<Test>::put(1);
+		MiningSlots::on_initialize(2);
+
+		assert_eq!(ActiveMinersByIndex::<Test>::get(0).unwrap().account_id, 1);
+		assert_eq!(ActiveMinersCount::<Test>::get(), 1);
+	});
+}
+
+#[test]
 fn it_adds_new_cohorts_on_block() {
 	BlocksBetweenSlots::set(2);
 	MaxMiners::set(6);
 	MaxCohortSize::set(2);
 
-	new_test_ext().execute_with(|| {
-		// Go past genesis block so events get deposited
+	new_test_ext(None).execute_with(|| {
 		System::set_block_number(8);
 
 		for i in 0..4u32 {
@@ -259,9 +315,9 @@ fn it_unbonds_accounts_when_a_window_closes() {
 	MaxMiners::set(6);
 	MaxCohortSize::set(2);
 
-	new_test_ext().execute_with(|| {
+	new_test_ext(None).execute_with(|| {
 		OwnershipBondAmount::<Test>::set(1000);
-		// Go past genesis block so events get deposited
+
 		System::set_block_number(7);
 
 		let mut bond_2: BondId = 0;
@@ -382,8 +438,7 @@ fn it_can_take_cohort_bids() {
 	MaxMiners::set(6);
 	MaxCohortSize::set(2);
 
-	new_test_ext().execute_with(|| {
-		// Go past genesis block so events get deposited
+	new_test_ext(None).execute_with(|| {
 		System::set_block_number(3);
 
 		assert_err!(
@@ -454,7 +509,7 @@ fn it_wont_let_you_use_ownership_shares_for_two_bids() {
 	MaxMiners::set(6);
 	MaxCohortSize::set(2);
 
-	new_test_ext().execute_with(|| {
+	new_test_ext(None).execute_with(|| {
 		System::set_block_number(3);
 
 		IsNextSlotBiddingOpen::<Test>::set(true);
@@ -520,8 +575,7 @@ fn it_will_order_bids_with_argon_bonds() {
 	MaxMiners::set(6);
 	MaxCohortSize::set(2);
 
-	new_test_ext().execute_with(|| {
-		// Go past genesis block so events get deposited
+	new_test_ext(None).execute_with(|| {
 		System::set_block_number(3);
 
 		assert_err!(
@@ -663,7 +717,7 @@ fn handles_a_max_of_bids_per_block() {
 	MaxMiners::set(50);
 	MaxCohortSize::set(2);
 
-	new_test_ext().execute_with(|| {
+	new_test_ext(None).execute_with(|| {
 		System::set_block_number(1);
 		IsNextSlotBiddingOpen::<Test>::set(true);
 
@@ -713,7 +767,7 @@ fn handles_a_max_of_bids_per_block() {
 
 #[test]
 fn it_handles_null_authority() {
-	new_test_ext().execute_with(|| {
+	new_test_ext(None).execute_with(|| {
 		assert_eq!(MiningSlots::get_authority(1), None);
 	});
 }
@@ -721,8 +775,7 @@ fn it_handles_null_authority() {
 #[test]
 fn it_can_find_xor_closest() {
 	MaxMiners::set(100);
-	new_test_ext().execute_with(|| {
-		// Go past genesis block so events get deposited
+	new_test_ext(None).execute_with(|| {
 		System::set_block_number(8);
 
 		for i in 0..100u32 {
@@ -773,8 +826,7 @@ fn it_can_find_xor_closest() {
 #[test]
 fn it_can_replace_authority_keys() {
 	MaxMiners::set(10);
-	new_test_ext().execute_with(|| {
-		// Go past genesis block so events get deposited
+	new_test_ext(None).execute_with(|| {
 		System::set_block_number(8);
 
 		for i in 0..10u32 {

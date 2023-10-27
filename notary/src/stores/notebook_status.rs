@@ -37,18 +37,15 @@ impl NotebookStatusStore {
 	) -> anyhow::Result<(), Error> {
 		sqlx::query!(
 			r#"
-			SELECT 1 as exists FROM notebook_status WHERE notebook_number = $1 AND step = $2 FOR UPDATE NOWAIT LIMIT 1
+			SELECT 1 as exists FROM notebook_status WHERE notebook_number = $1 FOR UPDATE NOWAIT LIMIT 1
 			"#,
 			notebook_number as i32,
-			NotebookFinalizationStep::Open as i32
 		)
-			.fetch_one(db)
-			.await?;
+		.fetch_one(db)
+		.await?;
 		Ok(())
 	}
-	pub async fn lock_latest_for_appending<'a>(
-		db: &mut PgConnection,
-	) -> anyhow::Result<u32, Error> {
+	pub async fn lock_open_for_appending<'a>(db: &mut PgConnection) -> anyhow::Result<u32, Error> {
 		for _ in 0..3 {
 			let row = query_scalar!(
 				r#"SELECT notebook_number FROM notebook_status WHERE step=$1 FOR SHARE LIMIT 1"#,
@@ -152,17 +149,17 @@ impl NotebookStatusStore {
 	) -> anyhow::Result<(), Error> {
 		let (next_step, time_field) = match current_step {
 			NotebookFinalizationStep::Open =>
-				(NotebookFinalizationStep::ReadyForClose, "open_time"),
+				(NotebookFinalizationStep::ReadyForClose, "ready_for_close_time"),
 			NotebookFinalizationStep::ReadyForClose =>
-				(NotebookFinalizationStep::Closed, "ready_for_close_time"),
+				(NotebookFinalizationStep::Closed, "closed_time"),
 			NotebookFinalizationStep::Closed =>
-				(NotebookFinalizationStep::GetAuditors, "closed_time"),
+				(NotebookFinalizationStep::GetAuditors, "get_auditors_time"),
 			NotebookFinalizationStep::GetAuditors =>
-				(NotebookFinalizationStep::Audited, "get_auditors_time"),
+				(NotebookFinalizationStep::Audited, "audited_time"),
 			NotebookFinalizationStep::Audited =>
-				(NotebookFinalizationStep::Submitted, "audited_time"),
+				(NotebookFinalizationStep::Submitted, "submitted_time"),
 			NotebookFinalizationStep::Submitted =>
-				(NotebookFinalizationStep::Finalized, "submitted_time"),
+				(NotebookFinalizationStep::Finalized, "finalized_time"),
 			NotebookFinalizationStep::Finalized => return Ok(()),
 		};
 
@@ -211,11 +208,11 @@ mod tests {
 			let mut tx1 = pool.begin().await?;
 			let mut tx2 = pool.begin().await?;
 			assert_eq!(
-				NotebookStatusStore::lock_latest_for_appending(&mut *tx1).await?,
+				NotebookStatusStore::lock_open_for_appending(&mut *tx1).await?,
 				notebook_number
 			);
 			assert_eq!(
-				NotebookStatusStore::lock_latest_for_appending(&mut *tx2).await?,
+				NotebookStatusStore::lock_open_for_appending(&mut *tx2).await?,
 				notebook_number
 			);
 
@@ -254,8 +251,7 @@ mod tests {
 			let task2 = tokio::spawn(async move {
 				let mut tx = cloned2.begin().await?;
 				let _ = txer.await;
-				let next_notebook =
-					NotebookStatusStore::lock_latest_for_appending(&mut *tx).await?;
+				let next_notebook = NotebookStatusStore::lock_open_for_appending(&mut *tx).await?;
 				tx.commit().await?;
 				Result::<u32, Error>::Ok(next_notebook)
 			});

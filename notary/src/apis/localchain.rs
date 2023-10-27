@@ -3,10 +3,9 @@ use jsonrpsee::{proc_macros::rpc, types::ErrorObjectOwned};
 use scale_info::TypeInfo;
 use serde::{Deserialize, Serialize};
 use sp_core::{bounded::BoundedVec, ConstU32, RuntimeDebug};
-use ulx_notary_primitives::note::Chain;
 
 use ulx_notary_primitives::{
-	AccountId, AccountOrigin, BalanceChange, NotebookNumber, MAX_BALANCESET_CHANGES,
+	note::Chain, AccountId, AccountOriginUid, BalanceChange, NotebookNumber, MAX_BALANCESET_CHANGES,
 };
 
 #[rpc(server, client, namespace = "localchain")]
@@ -21,5 +20,5 @@ pub trait LocalchainRpc {
 pub struct BalanceChangeResult {
 	pub notebook_number: NotebookNumber,
 	pub finalized_block_number: u32,
-	pub new_account_origins: Vec<(AccountId, Chain, AccountOrigin)>,
+	pub new_account_origins: Vec<(AccountId, Chain, AccountOriginUid)>,
 }

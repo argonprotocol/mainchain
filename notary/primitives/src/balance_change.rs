@@ -79,7 +79,7 @@ pub struct BalanceProof {
 	pub leaf_index: u32,
 }
 
-#[derive(Encode, Decode, RuntimeDebug, TypeInfo, Serialize, Deserialize)]
+#[derive(Clone, Encode, Decode, RuntimeDebug, TypeInfo, Serialize, Deserialize)]
 pub struct BalanceTip {
 	pub account_id: AccountId,
 	pub chain: Chain,

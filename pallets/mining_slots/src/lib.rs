@@ -23,7 +23,7 @@ use sp_std::{collections::btree_map::BTreeMap, marker::PhantomData, vec::Vec};
 
 pub use pallet::*;
 use ulx_primitives::{
-	block_seal::{AuthorityDistance, AuthorityProvider, BlockSealAuthorityId},
+	block_seal::{AuthorityDistance, AuthorityProvider, BlockSealAuthorityId, Host},
 	bond::BondProvider,
 };
 pub use weights::*;
@@ -268,6 +268,9 @@ pub mod pallet {
 		BidTooLow,
 		/// Internal state has become somehow corrupted and the operation cannot continue.
 		BadInternalState,
+		/// You must register with rpc hosts so that your miner can be reached for block seal
+		/// auditing
+		RpcHostsAreRequired,
 		BidBondDurationTooShort,
 		CannotRegisteredOverlappingSessions,
 		// copied from bond
@@ -436,9 +439,8 @@ pub mod pallet {
 		) -> DispatchResult {
 			let who = ensure_signed(origin)?;
 
-			if IsNextSlotBiddingOpen::<T>::get() == false {
-				return Err(Error::<T>::SlotNotTakingBids.into())
-			}
+			ensure!(IsNextSlotBiddingOpen::<T>::get(), Error::<T>::SlotNotTakingBids);
+			ensure!(rpc_hosts.len() > 0, Error::<T>::RpcHostsAreRequired);
 
 			let next_cohort_block_number = Self::get_next_slot_block_number();
 			if let Some(current_index) = <AccountIndexLookup<T>>::get(&who) {
@@ -447,9 +449,7 @@ pub mod pallet {
 					current_index < (cohort_start_index + T::MaxCohortSize::get());
 
 				// current_index must be in the set of miners being replaced
-				if is_in_next_cohort == false {
-					return Err(Error::<T>::CannotRegisteredOverlappingSessions.into())
-				}
+				ensure!(is_in_next_cohort, Error::<T>::CannotRegisteredOverlappingSessions);
 			}
 
 			let current_registration = Self::get_active_registration(&who);
@@ -459,16 +459,15 @@ pub mod pallet {
 				let bond = T::BondProvider::get_bond(bond_id.clone())
 					.map_err(|err| Error::<T>::from(err))?;
 
-				if bond.bonded_account_id != who {
-					return Err(Error::<T>::NoPermissions.into())
-				}
+				ensure!(bond.bonded_account_id == who, Error::<T>::NoPermissions);
 
 				let bond_end_block =
 					next_cohort_block_number + Self::get_validation_window_blocks();
 
-				if bond.completion_block < bond_end_block {
-					return Err(Error::<T>::BidBondDurationTooShort.into())
-				}
+				ensure!(
+					bond.completion_block >= bond_end_block,
+					Error::<T>::BidBondDurationTooShort
+				);
 
 				bid = bond.amount;
 				let is_same_bond = current_registration
@@ -501,9 +500,7 @@ pub mod pallet {
 					Err(pos) => pos,
 				};
 
-				if pos >= T::MaxCohortSize::get() as usize {
-					return Err(Error::<T>::BidTooLow.into())
-				}
+				ensure!(pos < T::MaxCohortSize::get() as usize, Error::<T>::BidTooLow);
 
 				if UniqueSaturatedInto::<u32>::unique_saturated_into(cohort.len()) >=
 					T::MaxCohortSize::get()
@@ -543,6 +540,23 @@ pub mod pallet {
 }
 
 impl<T: Config> AuthorityProvider<BlockSealAuthorityId, T::Block, T::AccountId> for Pallet<T> {
+	fn miner_zero() -> Option<(u16, BlockSealAuthorityId, Vec<Host>)> {
+		if let Some(miner_zero) = <MinerZero<T>>::get() {
+			let index = <AccountIndexLookup<T>>::get(&miner_zero.account_id);
+			let authority_id = Self::get_authority(miner_zero.account_id.clone());
+			match (index, authority_id) {
+				(Some(index), Some(authority_id)) =>
+					return Some((
+						index.unique_saturated_into(),
+						authority_id,
+						miner_zero.rpc_hosts.into_inner(),
+					)),
+				_ => (),
+			}
+		}
+		None
+	}
+
 	fn authorities() -> Vec<BlockSealAuthorityId> {
 		Self::authorities_by_index()
 			.into_iter()
@@ -557,12 +571,12 @@ impl<T: Config> AuthorityProvider<BlockSealAuthorityId, T::Block, T::AccountId> 
 			.collect()
 	}
 
-	fn is_active(authority_id: &BlockSealAuthorityId) -> bool {
-		Self::authorities_by_index().iter().any(|(_, a)| a == authority_id)
-	}
-
 	fn authority_count() -> u16 {
 		Self::authorities().len().unique_saturated_into()
+	}
+
+	fn is_active(authority_id: &BlockSealAuthorityId) -> bool {
+		Self::authorities_by_index().iter().any(|(_, a)| a == authority_id)
 	}
 
 	fn get_authority(author: T::AccountId) -> Option<BlockSealAuthorityId> {

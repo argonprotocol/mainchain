@@ -10,8 +10,9 @@ use sp_keystore::{testing::MemoryKeystore, Keystore, KeystorePtr};
 use sqlx::postgres::PgPoolOptions;
 
 use notary::{
-	notary::{Notary, NOTARY_KEYID},
-	run_server,
+	block_watch::spawn_block_sync,
+	notebook_closer::{NotebookCloser, NOTARY_KEYID},
+	NotaryServer,
 };
 use ulx_notary_primitives::NotaryId;
 
@@ -53,7 +54,7 @@ enum Commands {
 		#[clap(short, long, env = "DATABASE_URL")]
 		db_url: String,
 
-		/// Should this node sync blocks? Multiple nodes should not sync blocks.
+		/// Should this node sync blocks? Multiple nodes should NOT sync blocks.
 		#[clap(short, long, env, default_value = "false")]
 		sync_blocks: bool,
 
@@ -140,20 +141,23 @@ async fn main() -> anyhow::Result<()> {
 
 			let genesis: H256 = H256::from_slice(from_hex(genesis_block.as_str())?.as_slice());
 
-			let notary = Notary::start(
-				trusted_rpc_url.as_str(),
-				notary_id,
-				genesis,
-				keystore.into(),
-				pool,
-				finalize_notebooks,
-				sync_blocks,
-			)
-			.await?;
-			let server_addr = run_server(&notary, bind_addr).await?;
-			let url = format!("ws://{}", server_addr);
+			let server = NotaryServer::start(notary_id, genesis, pool.clone(), bind_addr).await?;
 
-			println!("Listening on {}", url);
+			if sync_blocks {
+				spawn_block_sync(trusted_rpc_url.clone(), notary_id, &pool).await?;
+			}
+			if finalize_notebooks {
+				let notebook_closer = NotebookCloser {
+					pool: pool.clone(),
+					notary_id,
+					rpc_url: trusted_rpc_url,
+					keystore,
+					completed_notebook_sender: server.completed_notebook_sender.clone(),
+				};
+				let _ = notebook_closer.spawn_task().await?;
+			}
+
+			println!("Listening on ws://{}", server.addr);
 		},
 		Commands::InsertKey { suri } => {
 			let suri = utils::read_uri(suri.as_ref())?;

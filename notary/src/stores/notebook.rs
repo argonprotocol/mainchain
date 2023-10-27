@@ -9,7 +9,7 @@ use sp_core::{bounded::BoundedVec, Blake2Hasher, RuntimeDebug};
 
 use ulx_notary_primitives::{
 	ensure, note::Chain, AccountId, AccountOrigin, BalanceProof, BalanceTip, MaxBalanceChanges,
-	NotaryId, NotebookAccountOrigin, NotebookNumber, PINNED_BLOCKS_OFFSET,
+	NotaryId, Notebook, NotebookAccountOrigin, NotebookNumber, PINNED_BLOCKS_OFFSET,
 };
 
 use crate::{
@@ -100,6 +100,24 @@ impl NotebookStore {
 		);
 
 		Ok(is_valid)
+	}
+
+	pub async fn load(
+		db: &mut sqlx::PgConnection,
+		notebook_number: NotebookNumber,
+	) -> anyhow::Result<Notebook, Error> {
+		let header = NotebookHeaderStore::load(&mut *db, notebook_number).await?;
+		let changes = BalanceChangeStore::get_for_notebook(&mut *db, notebook_number).await?;
+		let new_account_origins =
+			NotebookStore::get_account_origins(&mut *db, notebook_number).await?;
+
+		Ok(Notebook {
+			header,
+			balance_changes: BoundedVec::truncate_from(
+				changes.into_iter().map(BoundedVec::truncate_from).collect(),
+			),
+			new_account_origins,
+		})
 	}
 
 	pub async fn close_notebook(
@@ -297,7 +315,7 @@ mod tests {
 		tx.commit().await?;
 
 		let mut tx = pool.begin().await?;
-		NotebookStore::close_notebook(&mut *tx, 1, 1).await?;
+		NotebookStore::close_notebook(&mut *tx, 1).await?;
 		tx.commit().await?;
 
 		let balance_tip = BalanceTip {

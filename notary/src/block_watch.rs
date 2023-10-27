@@ -5,6 +5,7 @@ use subxt::{
 	config::Header,
 };
 
+use crate::Error;
 pub use ulixee_client;
 use ulixee_client::{
 	api, api::runtime_types::bounded_collections::bounded_vec::BoundedVec, try_until_connected,
@@ -21,7 +22,20 @@ use crate::stores::{
 	registered_key::RegisteredKeyStore,
 };
 
-pub fn track_blocks(rpc_url: String, notary_id: NotaryId, pool: &PgPool) {
+pub async fn spawn_block_sync(
+	rpc_url: String,
+	notary_id: NotaryId,
+	pool: &PgPool,
+) -> anyhow::Result<(), Error> {
+	sync_blocks(rpc_url.clone(), notary_id, pool)
+		.await
+		.map_err(|e| Error::BlockSyncError(e.to_string()))?;
+	track_blocks(rpc_url.clone(), notary_id, pool);
+
+	Ok(())
+}
+
+fn track_blocks(rpc_url: String, notary_id: NotaryId, pool: &PgPool) {
 	let pool = pool.clone();
 	tokio::task::spawn(async move {
 		loop {
@@ -33,7 +47,7 @@ pub fn track_blocks(rpc_url: String, notary_id: NotaryId, pool: &PgPool) {
 	});
 }
 
-pub async fn sync_blocks(url: String, notary_id: NotaryId, pool: &PgPool) -> anyhow::Result<()> {
+async fn sync_blocks(url: String, notary_id: NotaryId, pool: &PgPool) -> anyhow::Result<()> {
 	let client = try_until_connected(url, 2500).await?;
 	let notaries_query = api::storage().notaries().active_notaries();
 

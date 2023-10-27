@@ -1,10 +1,10 @@
+use std::future::Future;
+
 use codec::Encode;
 use sc_utils::notification::NotificationSender;
 use sp_core::{bytes::from_hex, ed25519, H256};
 use sp_keystore::KeystorePtr;
-use sp_runtime::BoundedVec;
 use sqlx::{Executor, PgPool};
-use std::future::Future;
 use subxt::{
 	backend::rpc::{RpcClient, RpcParams},
 	rpc_params,
@@ -22,13 +22,11 @@ use ulixee_client::{
 	},
 	try_until_connected,
 };
-use ulx_notary_primitives::{ChainTransfer, NotaryId, Notebook, NotebookHeader, NotebookNumber};
+use ulx_notary_primitives::{ChainTransfer, NotaryId, NotebookHeader, NotebookNumber};
 
 use crate::{
 	error::Error,
-	notary::NOTARY_KEYID,
 	stores::{
-		balance_change::BalanceChangeStore,
 		block_meta::BlockMetaStore,
 		notebook::NotebookStore,
 		notebook_auditors::NotebookAuditorStore,
@@ -39,6 +37,7 @@ use crate::{
 	},
 };
 
+pub const NOTARY_KEYID: sp_core::crypto::KeyTypeId = sp_core::crypto::KeyTypeId(*b"unot");
 pub const MIN_NOTEBOOK_AUDITORS_PCT: f32 = 0.8f32;
 
 #[derive(Clone)]
@@ -52,7 +51,11 @@ pub struct NotebookCloser {
 }
 
 impl NotebookCloser {
-	pub fn create_task(&self) -> impl Future<Output = anyhow::Result<(), Error>> + Send + 'static {
+	pub fn spawn_task(&self) -> tokio::task::JoinHandle<anyhow::Result<(), Error>> {
+		tokio::spawn(self.create_task())
+	}
+
+	fn create_task(&self) -> impl Future<Output = anyhow::Result<(), Error>> + Send + 'static {
 		let pool = self.pool.clone();
 		let notary_id = self.notary_id;
 		let url = self.rpc_url.clone();
@@ -64,12 +67,12 @@ impl NotebookCloser {
 					tracing::error!("Error rotating notebooks: {:?}", e);
 					e
 				});
-				let _ = try_close_notebook(&pool).await.map_err(|e| {
+				let _ = try_close_notebook(&pool, &notification_sender).await.map_err(|e| {
 					tracing::error!("Error closing open notebook: {:?}", e);
 					e
 				});
 
-				let _ = try_get_auditors(&pool, &url).await.map_err(|e| {
+				let _ = try_get_auditors(&pool, notary_id, &url).await.map_err(|e| {
 					tracing::error!("Error getting notebook auditors. {:?}", e);
 					e
 				});
@@ -79,20 +82,10 @@ impl NotebookCloser {
 					e
 				});
 
-				let header = try_submit_notebook(&pool, &keystore, &url).await.map_err(|e| {
+				let _ = try_submit_notebook(&pool, &keystore, &url).await.map_err(|e| {
 					tracing::error!("Error getting audit signatures: {:?}", e);
 					e
 				});
-
-				if let Ok(Some(header)) = header {
-					let _ =
-						notification_sender.notify(|| Ok(header)).map_err(|e: anyhow::Error| {
-							tracing::error!(
-								"Error sending completed notebook notification {:?}",
-								e
-							);
-						});
-				}
 
 				// wait before resuming
 				tokio::time::sleep(tokio::time::Duration::from_secs(2)).await;
@@ -101,9 +94,11 @@ impl NotebookCloser {
 	}
 }
 
-fn try_rotate_notebook(pool: &PgPool, notary_id: NotaryId) -> BoxFutureResult<()> {
+pub(crate) fn try_rotate_notebook(pool: &PgPool, notary_id: NotaryId) -> BoxFutureResult<()> {
 	Box::pin(async move {
 		let mut tx = pool.begin().await?;
+		// NOTE: must rotate existing first. The db has a constraint to only allow a single open
+		// notebook at a time.
 		let notebook_number = match NotebookStatusStore::step_up_expired_open(&mut *tx).await? {
 			Some(notebook_number) => notebook_number,
 			None => return Ok(()),
@@ -117,7 +112,10 @@ fn try_rotate_notebook(pool: &PgPool, notary_id: NotaryId) -> BoxFutureResult<()
 		Ok(())
 	})
 }
-fn try_close_notebook(pool: &PgPool) -> BoxFutureResult<()> {
+pub(crate) fn try_close_notebook<'a>(
+	pool: &'a PgPool,
+	notification_sender: &'a NotificationSender<NotebookHeader>,
+) -> BoxFutureResult<'a, ()> {
 	Box::pin(async move {
 		let mut tx = pool.begin().await?;
 		let step = NotebookFinalizationStep::ReadyForClose;
@@ -133,11 +131,22 @@ fn try_close_notebook(pool: &PgPool) -> BoxFutureResult<()> {
 
 		NotebookStatusStore::next_step(&mut *tx, notebook_number, step).await?;
 		tx.commit().await?;
+
+		let header = NotebookHeaderStore::load(pool, notebook_number).await?;
+
+		let _ = notification_sender.notify(|| Ok(header)).map_err(|e: anyhow::Error| {
+			tracing::error!("Error sending completed notebook notification {:?}", e);
+		});
+
 		Ok(())
 	})
 }
 
-fn try_get_auditors<'a>(pool: &'a PgPool, url: &'a str) -> BoxFutureResult<'a, ()> {
+fn try_get_auditors<'a>(
+	pool: &'a PgPool,
+	notary_id: NotaryId,
+	url: &'a str,
+) -> BoxFutureResult<'a, ()> {
 	Box::pin(async move {
 		let mut tx = pool.begin().await?;
 		let step = NotebookFinalizationStep::Closed;
@@ -150,36 +159,18 @@ fn try_get_auditors<'a>(pool: &'a PgPool, url: &'a str) -> BoxFutureResult<'a, (
 			NotebookHeaderStore::get_pinned_block_number(&mut *tx, notebook_number).await?;
 
 		let client = try_until_connected(url.to_string(), 2500).await?;
-		let query = api::storage().system().block_hash(pinned_block_number);
-		let block_hash = client.storage().at_latest().await?.fetch(&query).await?.ok_or(
-			Error::BlockSyncError(format!(
-				"Block at height {pinned_block_number} could not be retrieved",
-			)),
-		)?;
+		let auditors_query = api::runtime_apis::localchain_relay_apis::LocalchainRelayApis
+			.get_auditors(notary_id, notebook_number, pinned_block_number);
 
-		let block_sealers = api::storage()
-			.block_seal()
-			.historical_block_seal_authorities(pinned_block_number);
+		let auditors = client.runtime_api().at_latest().await?.call(auditors_query).await?;
 
-		let sealers = client.storage().at_latest().await?.fetch(&block_sealers).await?.ok_or(
-			Error::MainchainApiError(format!(
-				"Unable to retrieve the block sealers for block {pinned_block_number}",
-			)),
-		)?;
-
-		for (idx, (index, public)) in sealers.0.iter().enumerate() {
-			let miner_query = api::storage().mining_slots().active_miners_by_index(*index as u32);
-			let miner = client.storage().at(block_hash).fetch(&miner_query).await?.ok_or(
-				Error::MainchainApiError(format!(
-					"Unable to retrieve the miners for block {pinned_block_number}",
-				)),
-			)?;
+		for (idx, (_, public, hosts)) in auditors.iter().enumerate() {
 			NotebookAuditorStore::insert(
 				&mut *tx,
 				notebook_number,
 				&public.0 .0,
 				idx as u16,
-				&miner.rpc_hosts.0,
+				hosts,
 			)
 			.await?;
 		}
@@ -203,24 +194,15 @@ fn try_get_audit_signatures<'a>(
 		};
 
 		let auditors = NotebookAuditorStore::get_auditors(&mut *tx, notebook_number).await?;
-		let header = NotebookHeaderStore::load(&mut *tx, notebook_number).await?;
 		let meta = BlockMetaStore::load(&mut *tx).await?;
-		let changes = BalanceChangeStore::get_for_notebook(&mut *tx, notebook_number).await?;
-		let header_hash = header.hash();
-		let notary_id = header.notary_id;
-		let version = header.version;
-		let new_account_origins =
-			NotebookStore::get_account_origins(&mut *tx, notebook_number).await?;
+		let notebook = NotebookStore::load(&mut *tx, notebook_number).await?;
 		let notary_public =
-			RegisteredKeyStore::get_valid_public(&mut *tx, header.finalized_block_number).await?;
-		let notebook = Notebook {
-			header,
-			balance_changes: BoundedVec::truncate_from(
-				changes.into_iter().map(BoundedVec::truncate_from).collect(),
-			),
-			new_account_origins,
-		}
-		.encode();
+			RegisteredKeyStore::get_valid_public(&mut *tx, notebook.header.finalized_block_number)
+				.await?;
+		let header_hash = notebook.header.hash();
+		let version = notebook.header.version;
+		let notary_id = notebook.header.notary_id;
+		let notebook = notebook.encode();
 		let notary_signature = notary_sign(keystore, &notary_public, &header_hash)?;
 
 		let params = rpc_params![

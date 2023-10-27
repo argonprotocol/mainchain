@@ -57,6 +57,9 @@ pub enum Error {
 
 	#[error("The current notebook has reached the maximum number of transfers it can include. Please wait for the next notebook.")]
 	MaxNotebookChainTransfersReached,
+
+	#[error("Cross-notary proofs are not implemented yet!!!")]
+	CrossNotaryProofsNotImplemented,
 }
 
 impl From<Error> for i32 {
@@ -78,6 +81,7 @@ impl From<Error> for i32 {
 			Error::BalanceChangeVerifyError(_) => 13,
 			Error::EncodingError(_) => 14,
 			Error::MaxNotebookChainTransfersReached => 15,
+			Error::CrossNotaryProofsNotImplemented => 16,
 		}
 	}
 }

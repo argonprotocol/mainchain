@@ -135,6 +135,7 @@ pub trait AuthorityProvider<AuthorityId, Block, AccountId>
 where
 	Block: BlockT,
 {
+	fn miner_zero() -> Option<(u16, AuthorityId, Vec<Host>)>;
 	fn authorities() -> Vec<AuthorityId>;
 	fn authorities_by_index() -> BTreeMap<u16, AuthorityId>;
 	fn authority_count() -> u16;
@@ -147,9 +148,12 @@ where
 	) -> Vec<AuthorityDistance<AuthorityId>>;
 }
 
-pub trait HistoricalBlockSealersLookup<BlockNumber, AuthorityId> {
+pub trait BlockSealersProvider<BlockNumber, AuthorityId> {
 	/// Returns block seal validators for the given block number that are still active.
-	fn get_active_block_sealers_of(block_number: BlockNumber) -> Vec<(u16, AuthorityId)>;
+	fn get_active_block_sealers_of(block_number: BlockNumber)
+		-> Vec<(u16, AuthorityId, Vec<Host>)>;
+
+	fn is_using_proof_of_compute() -> bool;
 }
 
 #[derive(PartialEq, Eq, Clone, Encode, Decode, RuntimeDebug, TypeInfo, MaxEncodedLen)]

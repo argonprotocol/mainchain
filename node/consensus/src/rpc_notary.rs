@@ -11,6 +11,7 @@ use sp_api::{BlockT, ProvideRuntimeApi};
 use sp_application_crypto::AppCrypto;
 use sp_core::{bytes::to_hex, ByteArray, H256};
 use sp_keystore::KeystorePtr;
+use sp_runtime::traits::Header;
 
 use pallet_localchain_relay::LocalchainRelayApis;
 use ulx_primitives::{
@@ -59,7 +60,7 @@ impl<Block, C> NotaryApisServer<Block::Hash> for NotaryRpc<Block, C>
 where
 	Block: BlockT,
 	C: ProvideRuntimeApi<Block> + Send + Sync + 'static,
-	C::Api: LocalchainRelayApis<Block>,
+	C::Api: LocalchainRelayApis<Block, <Block::Header as Header>::Number>,
 {
 	async fn notebook_audit(
 		&self,

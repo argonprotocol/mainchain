@@ -30,7 +30,7 @@ pub mod pallet {
 
 	use ulx_primitives::{
 		block_seal::{
-			AuthorityDistance, AuthorityProvider, BlockProof, HistoricalBlockSealersLookup,
+			AuthorityDistance, AuthorityProvider, BlockProof, BlockSealersProvider, Host,
 			SealNonceHashMessage, SealStamper, SealerSignatureMessage, SEALER_SIGNATURE_PREFIX,
 			SEAL_NONCE_PREFIX,
 		},
@@ -443,24 +443,29 @@ pub mod pallet {
 		}
 	}
 
-	impl<T: Config> HistoricalBlockSealersLookup<BlockNumberFor<T>, T::AuthorityId> for Pallet<T> {
+	impl<T: Config> BlockSealersProvider<BlockNumberFor<T>, T::AuthorityId> for Pallet<T> {
 		fn get_active_block_sealers_of(
 			block_number: BlockNumberFor<T>,
-		) -> Vec<(u16, T::AuthorityId)> {
+		) -> Vec<(u16, T::AuthorityId, Vec<Host>)> {
 			let block_sealers = <HistoricalBlockSealAuthorities<T>>::get(block_number);
 			block_sealers
 				.into_inner()
 				.into_iter()
-				.filter(|a| {
+				.filter_map(|a| {
 					let authorities = T::AuthorityProvider::authorities_by_index();
 					let registration = authorities.get(&a.0);
 					if let Some(authority_id) = registration {
-						return a.1 == *authority_id
-					} else {
-						false
+						if a.1 == *authority_id {
+							return Some((a.0, a.1, Vec::new()))
+						}
 					}
+					None
 				})
 				.collect::<Vec<_>>()
+		}
+
+		fn is_using_proof_of_compute() -> bool {
+			Self::work_type() == ProofOfWorkType::Compute
 		}
 	}
 

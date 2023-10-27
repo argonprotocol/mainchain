@@ -1223,6 +1223,31 @@ pub mod api {
 						],
 					)
 				}
+				pub fn get_auditors(
+					&self,
+					notary_id: ::core::primitive::u32,
+					notebook_number: ::core::primitive::u32,
+					pinned_to_block_number: ::core::primitive::u32,
+				) -> ::subxt::runtime_api::Payload<
+					types::GetAuditors,
+					::std::vec::Vec<(
+						::core::primitive::u16,
+						runtime_types::ulx_primitives::block_seal::app::Public,
+						::std::vec::Vec<runtime_types::ulx_primitives::block_seal::Host>,
+					)>,
+				> {
+					::subxt::runtime_api::Payload::new_static(
+						"LocalchainRelayApis",
+						"get_auditors",
+						types::GetAuditors { notary_id, notebook_number, pinned_to_block_number },
+						[
+							160u8, 174u8, 146u8, 11u8, 102u8, 255u8, 253u8, 86u8, 246u8, 79u8,
+							150u8, 179u8, 78u8, 152u8, 161u8, 186u8, 138u8, 178u8, 37u8, 198u8,
+							211u8, 177u8, 161u8, 44u8, 2u8, 227u8, 102u8, 236u8, 224u8, 48u8, 58u8,
+							108u8,
+						],
+					)
+				}
 			}
 			pub mod types {
 				use super::runtime_types;
@@ -1244,6 +1269,22 @@ pub mod api {
 					pub notary_signature: runtime_types::sp_core::ed25519::Signature,
 					pub header_hash: ::subxt::utils::H256,
 					pub bytes: ::std::vec::Vec<::core::primitive::u8>,
+				}
+				#[derive(
+					:: subxt :: ext :: codec :: Decode,
+					:: subxt :: ext :: codec :: Encode,
+					:: subxt :: ext :: scale_decode :: DecodeAsType,
+					:: subxt :: ext :: scale_encode :: EncodeAsType,
+					Clone,
+					Debug,
+				)]
+				# [codec (crate = :: subxt :: ext :: codec)]
+				#[decode_as_type(crate_path = ":: subxt :: ext :: scale_decode")]
+				#[encode_as_type(crate_path = ":: subxt :: ext :: scale_encode")]
+				pub struct GetAuditors {
+					pub notary_id: ::core::primitive::u32,
+					pub notebook_number: ::core::primitive::u32,
+					pub pinned_to_block_number: ::core::primitive::u32,
 				}
 			}
 		}
@@ -1627,9 +1668,9 @@ pub mod api {
 			.hash();
 		runtime_metadata_hash ==
 			[
-				127u8, 250u8, 237u8, 161u8, 42u8, 255u8, 97u8, 85u8, 58u8, 2u8, 212u8, 67u8, 80u8,
-				157u8, 155u8, 196u8, 19u8, 125u8, 36u8, 191u8, 180u8, 180u8, 190u8, 28u8, 241u8,
-				4u8, 30u8, 145u8, 137u8, 47u8, 181u8, 102u8,
+				58u8, 228u8, 246u8, 78u8, 92u8, 253u8, 21u8, 110u8, 27u8, 6u8, 240u8, 140u8, 76u8,
+				33u8, 244u8, 242u8, 48u8, 92u8, 244u8, 55u8, 80u8, 70u8, 222u8, 90u8, 175u8, 53u8,
+				129u8, 253u8, 187u8, 135u8, 22u8, 32u8,
 			]
 	}
 	pub mod system {
@@ -11468,54 +11509,58 @@ pub mod api {
 					#[doc = "Internal state has become somehow corrupted and the operation cannot continue."]
 					BadInternalState,
 					#[codec(index = 7)]
-					BidBondDurationTooShort,
+					#[doc = "You must register with rpc hosts so that your miner can be reached for block seal"]
+					#[doc = "auditing"]
+					RpcHostsAreRequired,
 					#[codec(index = 8)]
-					CannotRegisteredOverlappingSessions,
+					BidBondDurationTooShort,
 					#[codec(index = 9)]
-					BadState,
+					CannotRegisteredOverlappingSessions,
 					#[codec(index = 10)]
-					BondNotFound,
+					BadState,
 					#[codec(index = 11)]
-					NoMoreBondIds,
+					BondNotFound,
 					#[codec(index = 12)]
-					BondFundClosed,
+					NoMoreBondIds,
 					#[codec(index = 13)]
-					MinimumBondAmountNotMet,
+					BondFundClosed,
 					#[codec(index = 14)]
-					LeaseUntilBlockTooSoon,
+					MinimumBondAmountNotMet,
 					#[codec(index = 15)]
-					LeaseUntilPastFundExpiration,
+					LeaseUntilBlockTooSoon,
 					#[codec(index = 16)]
+					LeaseUntilPastFundExpiration,
+					#[codec(index = 17)]
 					#[doc = "There are too many bonds or bond funds expiring in the given expiration block"]
 					ExpirationAtBlockOverflow,
-					#[codec(index = 17)]
-					InsufficientFunds,
 					#[codec(index = 18)]
-					InsufficientBondFunds,
+					InsufficientFunds,
 					#[codec(index = 19)]
-					ExpirationTooSoon,
+					InsufficientBondFunds,
 					#[codec(index = 20)]
-					NoPermissions,
+					ExpirationTooSoon,
 					#[codec(index = 21)]
-					NoBondFundFound,
+					NoPermissions,
 					#[codec(index = 22)]
-					HoldUnexpectedlyModified,
+					NoBondFundFound,
 					#[codec(index = 23)]
-					BondFundMaximumBondsExceeded,
+					HoldUnexpectedlyModified,
 					#[codec(index = 24)]
-					UnrecoverableHold,
+					BondFundMaximumBondsExceeded,
 					#[codec(index = 25)]
-					BondFundNotFound,
+					UnrecoverableHold,
 					#[codec(index = 26)]
-					BondAlreadyClosed,
+					BondFundNotFound,
 					#[codec(index = 27)]
-					BondAlreadyLocked,
+					BondAlreadyClosed,
 					#[codec(index = 28)]
-					BondLockedCannotModify,
+					BondAlreadyLocked,
 					#[codec(index = 29)]
+					BondLockedCannotModify,
+					#[codec(index = 30)]
 					#[doc = "The fee for this bond exceeds the amount of the bond, which is unsafe"]
 					FeeExceedsBondAmount,
-					#[codec(index = 30)]
+					#[codec(index = 31)]
 					AccountWouldBeBelowMinimum,
 				}
 				#[derive(
