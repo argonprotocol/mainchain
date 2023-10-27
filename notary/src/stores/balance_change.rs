@@ -65,9 +65,7 @@ mod tests {
 	use sp_keyring::Sr25519Keyring::Bob;
 	use sqlx::PgPool;
 
-	use ulx_notary_primitives::{
-		BalanceChange, Chain::Argon, ChainTransferDestination, Note, NoteType,
-	};
+	use ulx_notary_primitives::{BalanceChange, Chain::Argon, Note, NoteType};
 
 	use crate::stores::balance_change::BalanceChangeStore;
 
@@ -86,10 +84,7 @@ mod tests {
 				&Argon,
 				1,
 				1000,
-				NoteType::ChainTransfer {
-					destination: ChainTransferDestination::ToLocalchain { nonce: 1 },
-					finalized_at_block: 1
-				}
+				NoteType::ClaimFromMainchain { nonce: 1 }
 			)],
 		}];
 

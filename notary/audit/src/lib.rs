@@ -1,100 +1,127 @@
-use binary_merkle_tree::{merkle_root, verify_proof, Leaf};
-use codec::Encode;
-use sp_core::{crypto::AccountId32, Blake2Hasher, H256};
-use sp_runtime::traits::Verify;
-use sp_std::collections::{btree_map::BTreeMap, btree_set::BTreeSet};
+#![cfg_attr(not(feature = "std"), no_std)]
 
-use ulx_notary_primitives::{
-	ensure, AccountOrigin, BalanceChange, BalanceProof, BalanceTip, Chain, ChainTransfer,
-	ChainTransferDestination, NotaryId, NoteType, NotebookHeader, NotebookNumber,
+use binary_merkle_tree::{merkle_root, verify_proof, Leaf};
+use codec::{Decode, Encode};
+use serde::{Deserialize, Serialize};
+use snafu::Snafu;
+use sp_core::{crypto::AccountId32, H256};
+use sp_runtime::{
+	scale_info::TypeInfo,
+	traits::{BlakeTwo256, Verify},
+	RuntimeString,
+};
+use sp_std::{
+	collections::{btree_map::BTreeMap, btree_set::BTreeSet},
+	vec::Vec,
 };
 
-#[derive(Debug, PartialEq, Clone, thiserror::Error)]
+use ulx_notary_primitives::{
+	ensure, AccountOrigin, AccountOriginUid, BalanceChange, BalanceProof, BalanceTip, Chain,
+	ChainTransfer, NotaryId, NoteType, Notebook, NotebookNumber,
+};
+
+#[derive(Debug, PartialEq, Clone, Snafu, TypeInfo, Encode, Decode, Serialize, Deserialize)]
 pub enum VerifyError {
-	#[error("Missing account origin {0:?}")]
-	MissingAccountOrigin((AccountId32, Chain)),
-	#[error("Account history lookup error {0}")]
-	HistoryLookupError(#[from] AccountHistoryLookupError),
-	#[error("Invalid account changelist")]
+	#[snafu(display("Missing account origin {account_id:?}, {chain:?}"))]
+	MissingAccountOrigin { account_id: AccountId32, chain: Chain },
+	#[snafu(display("Account history lookup error {source}"))]
+	HistoryLookupError {
+		#[snafu(source(from(AccountHistoryLookupError, AccountHistoryLookupError::from)))]
+		source: AccountHistoryLookupError,
+	},
+	#[snafu(display("Invalid account changelist"))]
 	InvalidAccountChangelist,
-	#[error("Invalid chain transfers list")]
+	#[snafu(display("Invalid chain transfers list"))]
 	InvalidChainTransfersList,
-	#[error("Invalid balance change root")]
+	#[snafu(display("Invalid balance change root"))]
 	InvalidBalanceChangeRoot,
 
-	#[error("Invalid previous nonce")]
+	#[snafu(display("Invalid previous nonce"))]
 	InvalidPreviousNonce,
-	#[error("Invalid previous balance")]
+	#[snafu(display("Invalid previous balance"))]
 	InvalidPreviousBalance,
-	#[error("Invalid previous account origin")]
+	#[snafu(display("Invalid previous account origin"))]
 	InvalidPreviousAccountOrigin,
 
-	#[error("Invalid previous balance change notebook")]
+	#[snafu(display("Invalid previous balance change notebook"))]
 	InvalidPreviousBalanceChangeNotebook,
 
-	#[error("Invalid net balance change calculated")]
+	#[snafu(display("Invalid net balance change calculated"))]
 	InvalidBalanceChange,
 
-	#[error("Invalid note signature")]
+	#[snafu(display("Invalid note signature"))]
 	InvalidNoteSignature,
-	#[error("Invalid note id calculated")]
+	#[snafu(display("Invalid note id calculated"))]
 	InvalidNoteIdCalculated,
-	#[error("An invalid balance change was submitted ({change_index}.{note_index}): {message}")]
-	BalanceChangeError { change_index: usize, note_index: usize, message: String },
+	#[snafu(display(
+		"An invalid balance change was submitted ({change_index}.{note_index}): {message:?}"
+	))]
+	BalanceChangeError { change_index: u16, note_index: u16, message: RuntimeString },
 
-	#[error("Invalid net balance changeset. Must account for all funds.")]
+	#[snafu(display("Invalid net balance changeset. Must account for all funds."))]
 	InvalidNetBalanceChangeset,
 
-	#[error("Insufficient balance for account  (balance: {balance}, amount: {amount}) (change: {change_index}.{note_index})")]
-	InsufficientBalance { balance: u128, amount: u128, note_index: usize, change_index: usize },
+	#[snafu(display("Insufficient balance for account  (balance: {balance}, amount: {amount}) (change: {change_index}.{note_index})"))]
+	InsufficientBalance { balance: u128, amount: u128, note_index: u16, change_index: u16 },
 
-	#[error("Exceeded max balance for account (pre-balance: {balance}, amount: {amount}), (change: {change_index}.{note_index})")]
-	ExceededMaxBalance { balance: u128, amount: u128, note_index: usize, change_index: usize },
-	#[error("Balance change mismatch (provided_balance: {provided_balance}, calculated_balance: {calculated_balance}) (#{change_index})")]
-	BalanceChangeMismatch { change_index: usize, provided_balance: u128, calculated_balance: i128 },
+	#[snafu(display("Exceeded max balance for account (pre-balance: {balance}, amount: {amount}), (change: {change_index}.{note_index})"))]
+	ExceededMaxBalance { balance: u128, amount: u128, note_index: u16, change_index: u16 },
+	#[snafu(display("Balance change mismatch (provided_balance: {provided_balance}, calculated_balance: {calculated_balance}) (#{change_index})"))]
+	BalanceChangeMismatch { change_index: u16, provided_balance: u128, calculated_balance: i128 },
 
-	#[error("Balance change not net zero (unaccounted: {unaccounted})")]
+	#[snafu(display("Balance change not net zero (unaccounted: {unaccounted})"))]
 	BalanceChangeNotNetZero { unaccounted: i128 },
 
-	#[error("Must include proof of previous balance")]
+	#[snafu(display("Must include proof of previous balance"))]
 	MissingBalanceProof,
-	#[error("Invalid previous balance proof")]
+	#[snafu(display("Invalid previous balance proof"))]
 	InvalidPreviousBalanceProof,
-	#[error("Invalid notebook hash")]
+	#[snafu(display("Invalid notebook hash"))]
 	InvalidNotebookHash,
 
-	#[error("Duplicate chain transfer")]
+	#[snafu(display("Duplicate chain transfer"))]
 	DuplicateChainTransfer,
 
-	#[error("Duplicated account origin uid")]
+	#[snafu(display("Duplicated account origin uid"))]
 	DuplicatedAccountOriginUid,
+
+	#[snafu(display("Invalid notary signature"))]
+	InvalidNotarySignature,
+
+	#[snafu(display("Submitted notebook older than most recent in storage"))]
+	NotebookTooOld,
+
+	#[snafu(display("Error decoding notebook"))]
+	DecodeError,
 }
 
-#[derive(Debug, Clone, PartialEq, thiserror::Error)]
+impl From<AccountHistoryLookupError> for VerifyError {
+	fn from(e: AccountHistoryLookupError) -> Self {
+		VerifyError::HistoryLookupError { source: e }
+	}
+}
+
+#[derive(Debug, Clone, PartialEq, TypeInfo, Encode, Decode, Serialize, Deserialize, Snafu)]
 pub enum AccountHistoryLookupError {
-	#[error("Notebook root not found")]
+	#[snafu(display("Notebook root not found"))]
 	RootNotFound,
-	#[error("Last change not found")]
+	#[snafu(display("Last change not found"))]
 	LastChangeNotFound,
-	#[error("Invalid transfer to localchain")]
+	#[snafu(display("Invalid transfer to localchain"))]
 	InvalidTransferToLocalchain,
 }
 
 pub trait NotebookHistoryLookup {
 	fn get_account_changes_root(
-		&self,
 		notary_id: NotaryId,
 		notebook_number: NotebookNumber,
 	) -> Result<H256, AccountHistoryLookupError>;
 	fn get_last_changed_notebook(
-		&self,
 		notary_id: NotaryId,
-		account_id: AccountId32,
-		chain: Chain,
-	) -> Result<u32, AccountHistoryLookupError>;
+		account_origin: AccountOrigin,
+	) -> Result<NotebookNumber, AccountHistoryLookupError>;
 
 	fn is_valid_transfer_to_localchain(
-		&self,
 		notary_id: NotaryId,
 		account_id: &AccountId32,
 		nonce: u32,
@@ -102,60 +129,60 @@ pub trait NotebookHistoryLookup {
 }
 
 pub fn notebook_verify<'a, T: NotebookHistoryLookup>(
-	hash: &'a H256,
-	header: &'a NotebookHeader,
-	changesets: &'a Vec<Vec<BalanceChange>>,
-	new_account_origins: &'a BTreeMap<(AccountId32, Chain), u32>,
-	lookup: &'a T,
+	header_hash: &'a H256,
+	notebook: &'a Notebook,
 ) -> anyhow::Result<bool, VerifyError> {
 	let mut account_changelist = BTreeSet::<AccountOrigin>::new();
 	let mut final_balances = BTreeMap::<(AccountId32, Chain), BalanceTip>::new();
 	let mut chain_transfers = Vec::<ChainTransfer>::new();
 	let mut seen_transfers_in = BTreeSet::<(NotaryId, AccountId32, u32)>::new();
 
-	ensure!(
-		BTreeSet::from_iter(new_account_origins.iter().map(|a| a.1)).len() ==
-			new_account_origins.len(),
-		VerifyError::DuplicatedAccountOriginUid
-	);
+	let mut all_new_account_uids = BTreeSet::new();
 
-	for changeset in changesets {
-		verify_balance_changeset_allocation(changeset)?;
-		verify_changeset_signatures(changeset)?;
+	let Notebook { header, balance_changes, new_account_origins: flat_account_origins } = notebook;
+
+	let mut new_account_origins = BTreeMap::<(AccountId32, Chain), AccountOriginUid>::new();
+	for (account_id, chain, uid) in flat_account_origins {
+		new_account_origins.insert((account_id.clone(), chain.clone()), *uid);
+		ensure!(all_new_account_uids.insert(*uid), VerifyError::DuplicatedAccountOriginUid);
+	}
+
+	for changeset in balance_changes.iter() {
+		verify_balance_changeset_allocation(&changeset)?;
+		verify_changeset_signatures(&changeset)?;
 
 		for change in changeset.into_iter() {
 			for note in &change.notes {
 				// if this note is a chain transfer, track it in chain_transfers
-				if let NoteType::ChainTransfer { destination, .. } = &note.note_type {
-					match destination {
-						ChainTransferDestination::ToLocalchain { nonce } => {
-							lookup.is_valid_transfer_to_localchain(
+				match &note.note_type {
+					NoteType::SendToMainchain => {
+						chain_transfers.push(ChainTransfer::ToMainchain {
+							amount: note.milligons,
+							account_id: change.account_id.clone(),
+						});
+					},
+					NoteType::ClaimFromMainchain { nonce } => {
+						T::is_valid_transfer_to_localchain(
+							header.notary_id,
+							&change.account_id,
+							*nonce,
+						)?;
+
+						ensure!(
+							seen_transfers_in.insert((
 								header.notary_id,
-								&change.account_id,
+								change.account_id.clone(),
 								*nonce,
-							)?;
+							)),
+							VerifyError::DuplicateChainTransfer
+						);
 
-							ensure!(
-								seen_transfers_in.insert((
-									header.notary_id,
-									change.account_id.clone(),
-									*nonce,
-								)),
-								VerifyError::DuplicateChainTransfer
-							);
-
-							chain_transfers.push(ChainTransfer::ToLocalchain {
-								account_id: change.account_id.clone(),
-								nonce: nonce.clone(),
-							});
-						},
-						ChainTransferDestination::ToMainchain => {
-							chain_transfers.push(ChainTransfer::ToMainchain {
-								amount: note.milligons,
-								account_id: change.account_id.clone(),
-							});
-						},
-					};
+						chain_transfers.push(ChainTransfer::ToLocalchain {
+							account_id: change.account_id.clone(),
+							nonce: nonce.clone(),
+						});
+					},
+					_ => {},
 				}
 			}
 
@@ -180,14 +207,17 @@ pub fn notebook_verify<'a, T: NotebookHistoryLookup>(
 						},
 					);
 				} else {
-					return Err(VerifyError::MissingAccountOrigin(key))
+					return Err(VerifyError::MissingAccountOrigin {
+						account_id: change.account_id.clone(),
+						chain: change.chain.clone(),
+					})
 				}
 			} else {
 				let proof = change
 					.previous_balance_proof
 					.as_ref()
 					.expect("Should have been unwrapped in verify_balance_changeset_allocation");
-				verify_previous_balance_proof(proof, lookup, &mut final_balances, change, &key)?;
+				verify_previous_balance_proof::<T>(proof, &mut final_balances, &change, &key)?;
 
 				account_changelist.insert(proof.account_origin.clone());
 
@@ -196,8 +226,8 @@ pub fn notebook_verify<'a, T: NotebookHistoryLookup>(
 					BalanceTip {
 						account_id: change.account_id.clone(),
 						chain: change.chain.clone(),
-						balance: change.balance,
-						nonce: change.nonce,
+						balance: change.balance.clone(),
+						nonce: change.nonce.clone(),
 						account_origin: proof.account_origin.clone(),
 					},
 				);
@@ -217,18 +247,17 @@ pub fn notebook_verify<'a, T: NotebookHistoryLookup>(
 
 	let merkle_leafs = final_balances.into_iter().map(|(_, v)| v.encode()).collect::<Vec<_>>();
 
-	let merkle_root = merkle_root::<Blake2Hasher, _>(merkle_leafs);
+	let merkle_root = merkle_root::<BlakeTwo256, _>(merkle_leafs);
 
 	ensure!(merkle_root == header.changed_accounts_root, VerifyError::InvalidBalanceChangeRoot);
 
-	ensure!(*hash == header.hash(), VerifyError::InvalidNotebookHash);
+	ensure!(*header_hash == header.hash(), VerifyError::InvalidNotebookHash);
 
 	Ok(true)
 }
 
 fn verify_previous_balance_proof<'a, T: NotebookHistoryLookup>(
 	proof: &BalanceProof,
-	lookup: &T,
 	final_balances: &mut BTreeMap<(AccountId32, Chain), BalanceTip>,
 	change: &BalanceChange,
 	key: &(AccountId32, Chain),
@@ -247,17 +276,14 @@ fn verify_previous_balance_proof<'a, T: NotebookHistoryLookup>(
 			VerifyError::InvalidPreviousAccountOrigin
 		);
 	} else {
-		let last_notebook_change = lookup.get_last_changed_notebook(
-			proof.notary_id,
-			change.account_id.clone(),
-			change.chain.clone(),
-		)?;
+		let last_notebook_change =
+			T::get_last_changed_notebook(proof.notary_id, proof.account_origin.clone())?;
 		ensure!(
 			last_notebook_change == proof.notebook_number,
 			VerifyError::InvalidPreviousBalanceChangeNotebook
 		);
 
-		let root = lookup.get_account_changes_root(proof.notary_id, proof.notebook_number)?;
+		let root = T::get_account_changes_root(proof.notary_id, proof.notebook_number)?;
 		let leaf = BalanceTip {
 			account_id: change.account_id.clone(),
 			chain: change.chain.clone(),
@@ -267,7 +293,7 @@ fn verify_previous_balance_proof<'a, T: NotebookHistoryLookup>(
 		};
 
 		ensure!(
-			verify_proof::<'_, Blake2Hasher, _, _>(
+			verify_proof::<'_, BlakeTwo256, _, _>(
 				&root,
 				proof.proof.clone().into_inner(),
 				proof.number_of_leaves as usize,
@@ -340,11 +366,7 @@ pub fn verify_balance_changeset_allocation(
 			}
 
 			match note.note_type {
-				NoteType::ChainTransfer {
-					destination: ChainTransferDestination::ToLocalchain { .. },
-					..
-				} |
-				NoteType::Claim =>
+				NoteType::ClaimFromMainchain { .. } | NoteType::Claim =>
 					if let Some(new_balance) = balance.checked_add(note.milligons as i128) {
 						balance = new_balance;
 					} else {
@@ -355,11 +377,8 @@ pub fn verify_balance_changeset_allocation(
 							change_index,
 						})
 					},
-				NoteType::ChainTransfer {
-					destination: ChainTransferDestination::ToMainchain,
-					..
-				} |
-				NoteType::Send { .. } => balance -= note.milligons as i128,
+				NoteType::SendToMainchain | NoteType::Send { .. } =>
+					balance -= note.milligons as i128,
 				_ => {},
 			};
 			note_index += 1;
@@ -384,6 +403,8 @@ pub fn verify_balance_changeset_allocation(
 }
 #[cfg(test)]
 mod tests {
+	use std::collections::{BTreeMap, BTreeSet};
+
 	use binary_merkle_tree::{merkle_proof, merkle_root};
 	use chrono::Utc;
 	use codec::Encode;
@@ -398,16 +419,16 @@ mod tests {
 		Ed25519Keyring::Dave,
 	};
 	use sp_runtime::MultiSignature;
-	use std::collections::{BTreeMap, BTreeSet};
+
+	use ulx_notary_primitives::{
+		balance_change::{AccountOrigin, BalanceChange, BalanceProof},
+		note::{Chain, Note, NoteType},
+		BalanceTip, ChainTransfer, Notebook, NotebookHeader, NotebookNumber,
+	};
 
 	use crate::{
 		verify_previous_balance_proof, AccountHistoryLookupError, NotebookHistoryLookup,
 		VerifyError,
-	};
-	use ulx_notary_primitives::{
-		balance_change::{AccountOrigin, BalanceChange, BalanceProof},
-		note::{Chain, ChainTransferDestination, Note, NoteType},
-		BalanceTip, ChainTransfer, NotebookHeader, NotebookNumber,
 	};
 
 	#[test]
@@ -602,10 +623,7 @@ mod tests {
 			previous_balance_proof: None,
 			notes: bounded_vec![Note {
 				milligons: 250,
-				note_type: NoteType::ChainTransfer {
-					destination: ChainTransferDestination::ToLocalchain { nonce: 1 },
-					finalized_at_block: 0,
-				},
+				note_type: NoteType::ClaimFromMainchain { nonce: 1 },
 				signature: MultiSignature::Sr25519(Signature::from_slice(&[0u8; 64]).unwrap()),
 				note_id: Default::default(),
 			}],
@@ -637,10 +655,7 @@ mod tests {
 				notes: bounded_vec![
 					Note {
 						milligons: 250,
-						note_type: NoteType::ChainTransfer {
-							destination: ChainTransferDestination::ToLocalchain { nonce: 15 },
-							finalized_at_block: 0,
-						},
+						note_type: NoteType::ClaimFromMainchain { nonce: 15 },
 						signature: MultiSignature::Sr25519(
 							Signature::from_slice(&[0u8; 64]).unwrap()
 						),
@@ -674,10 +689,7 @@ mod tests {
 					},
 					Note {
 						milligons: 150,
-						note_type: NoteType::ChainTransfer {
-							destination: ChainTransferDestination::ToMainchain,
-							finalized_at_block: 0,
-						},
+						note_type: NoteType::SendToMainchain,
 						signature: MultiSignature::Sr25519(
 							Signature::from_slice(&[0u8; 64]).unwrap()
 						),
@@ -702,10 +714,7 @@ mod tests {
 			previous_balance_proof: None,
 			notes: bounded_vec![Note {
 				milligons: 250,
-				note_type: NoteType::ChainTransfer {
-					destination: ChainTransferDestination::ToLocalchain { nonce: 1 },
-					finalized_at_block: 0,
-				},
+				note_type: NoteType::ClaimFromMainchain { nonce: 1 },
 				signature: MultiSignature::Sr25519(Signature::from_slice(&[0u8; 64]).unwrap()),
 				note_id: Default::default(),
 			}],
@@ -735,12 +744,11 @@ mod tests {
 
 	parameter_types! {
 		pub static NotebookRoots: BTreeMap<u32, H256> = BTreeMap::new();
-		pub static LastChangedNotebook: BTreeMap<(AccountId32, Chain), u32> = BTreeMap::new();
+		pub static LastChangedNotebook: BTreeMap<AccountOrigin, u32> = BTreeMap::new();
 		pub static ValidLocalchainTransfers: BTreeSet<(AccountId32, u32)> = BTreeSet::new();
 	}
 	impl NotebookHistoryLookup for TestLookup {
 		fn get_account_changes_root(
-			&self,
 			_notary_id: u32,
 			notebook_number: NotebookNumber,
 		) -> Result<H256, AccountHistoryLookupError> {
@@ -750,24 +758,15 @@ mod tests {
 				.cloned()
 		}
 		fn get_last_changed_notebook(
-			&self,
 			_notary_id: u32,
-			account_id: AccountId32,
-			chain: Chain,
+			account_origin: AccountOrigin,
 		) -> Result<u32, AccountHistoryLookupError> {
-			println!(
-				"get_last_changed_notebook: {:?} {:?}, {:?}",
-				account_id,
-				chain,
-				LastChangedNotebook::get()
-			);
 			LastChangedNotebook::get()
-				.get(&(account_id, chain))
+				.get(&account_origin)
 				.cloned()
 				.ok_or(AccountHistoryLookupError::LastChangeNotFound)
 		}
 		fn is_valid_transfer_to_localchain(
-			&self,
 			_notary_id: u32,
 			account_id: &AccountId32,
 			nonce: u32,
@@ -826,7 +825,8 @@ mod tests {
 		NotebookRoots::mutate(|a| {
 			a.insert(7, H256::from_slice([&[0u8], &merkle_root[0..31]].concat().as_ref()))
 		});
-		LastChangedNotebook::mutate(|c| c.insert(key.clone(), 10));
+		let origin = AccountOrigin { notebook_number: 1, account_uid: 1 };
+		LastChangedNotebook::mutate(|c| c.insert(origin.clone(), 10));
 
 		let proof = merkle_proof::<Blake2Hasher, _, _>(leaves, 2);
 		change.previous_balance_proof = Some(BalanceProof {
@@ -835,13 +835,12 @@ mod tests {
 			proof: BoundedVec::truncate_from(proof.proof),
 			leaf_index: proof.leaf_index as u32,
 			number_of_leaves: proof.number_of_leaves as u32,
-			account_origin: AccountOrigin { notebook_number: 1, account_uid: 1 },
+			account_origin: origin.clone(),
 		});
 
 		assert_err!(
-			verify_previous_balance_proof(
+			verify_previous_balance_proof::<TestLookup>(
 				&change.previous_balance_proof.clone().unwrap(),
-				&TestLookup,
 				&mut final_balances,
 				&change,
 				&key,
@@ -849,11 +848,10 @@ mod tests {
 			VerifyError::InvalidPreviousBalanceChangeNotebook
 		);
 
-		LastChangedNotebook::mutate(|c| c.insert(key.clone(), 7));
+		LastChangedNotebook::mutate(|c| c.insert(origin, 7));
 		assert_err!(
-			verify_previous_balance_proof(
+			verify_previous_balance_proof::<TestLookup>(
 				&change.previous_balance_proof.clone().unwrap(),
-				&TestLookup,
 				&mut final_balances,
 				&change,
 				&key,
@@ -862,9 +860,8 @@ mod tests {
 		);
 
 		NotebookRoots::mutate(|a| a.insert(7, merkle_root));
-		assert_ok!(verify_previous_balance_proof(
+		assert_ok!(verify_previous_balance_proof::<TestLookup>(
 			&change.previous_balance_proof.clone().unwrap(),
-			&TestLookup,
 			&mut final_balances,
 			&change,
 			&key,
@@ -878,10 +875,7 @@ mod tests {
 			&Chain::Argon,
 			1,
 			1000,
-			NoteType::ChainTransfer {
-				destination: ChainTransferDestination::ToLocalchain { nonce: 1 },
-				finalized_at_block: 100,
-			},
+			NoteType::ClaimFromMainchain { nonce: 1 },
 		);
 		note.signature = Alice.sign(&note.note_id[..]).into();
 
@@ -894,7 +888,7 @@ mod tests {
 			previous_balance_proof: None,
 			notes: bounded_vec![note],
 		}];
-		let notebook1 = NotebookHeader {
+		let notebook_header1 = NotebookHeader {
 			version: 1,
 			notary_id: 1,
 			notebook_number: 1,
@@ -921,55 +915,39 @@ mod tests {
 		};
 
 		ValidLocalchainTransfers::mutate(|a| a.insert((Alice.to_account_id(), 1)));
-		let hash = notebook1.hash();
-		let new_accounts = BTreeMap::from_iter(vec![((Alice.to_account_id(), Chain::Argon), 1)]);
-		assert_ok!(super::notebook_verify(
-			&hash,
-			&notebook1,
-			&vec![alice_balance_changeset.clone()],
-			&new_accounts,
-			&TestLookup
-		));
+		let hash = notebook_header1.hash();
+
+		let notebook1 = Notebook {
+			header: notebook_header1.clone(),
+			balance_changes: bounded_vec![BoundedVec::truncate_from(
+				alice_balance_changeset.clone()
+			)],
+			new_account_origins: bounded_vec![(Alice.to_account_id(), Chain::Argon, 1)],
+		};
+
+		assert_ok!(super::notebook_verify::<TestLookup>(&hash, &notebook1));
 
 		let mut bad_hash = hash.clone();
 		bad_hash.0[0] = 1;
 		assert_err!(
-			super::notebook_verify(
-				&bad_hash,
-				&notebook1,
-				&vec![alice_balance_changeset.clone()],
-				&new_accounts,
-				&TestLookup
-			),
+			super::notebook_verify::<TestLookup>(&bad_hash, &notebook1),
 			VerifyError::InvalidNotebookHash
 		);
 
 		let mut bad_notebook1 = notebook1.clone();
-		let _ = bad_notebook1.chain_transfers.try_insert(
+		let _ = bad_notebook1.header.chain_transfers.try_insert(
 			0,
 			ChainTransfer::ToLocalchain { account_id: Bob.to_account_id(), nonce: 2 },
 		);
 		assert_err!(
-			super::notebook_verify(
-				&hash,
-				&bad_notebook1,
-				&vec![alice_balance_changeset.clone()],
-				&new_accounts,
-				&TestLookup
-			),
+			super::notebook_verify::<TestLookup>(&hash, &bad_notebook1),
 			VerifyError::InvalidChainTransfersList
 		);
 
 		let mut bad_notebook = notebook1.clone();
-		bad_notebook.changed_accounts_root.0[0] = 1;
+		bad_notebook.header.changed_accounts_root.0[0] = 1;
 		assert_err!(
-			super::notebook_verify(
-				&hash,
-				&bad_notebook,
-				&vec![alice_balance_changeset.clone()],
-				&new_accounts,
-				&TestLookup
-			),
+			super::notebook_verify::<TestLookup>(&hash, &bad_notebook),
 			VerifyError::InvalidBalanceChangeRoot
 		);
 	}
@@ -981,10 +959,7 @@ mod tests {
 			&Chain::Argon,
 			1,
 			1000,
-			NoteType::ChainTransfer {
-				destination: ChainTransferDestination::ToLocalchain { nonce: 1 },
-				finalized_at_block: 100,
-			},
+			NoteType::ClaimFromMainchain { nonce: 1 },
 		);
 		note.signature = Alice.sign(&note.note_id[..]).into();
 
@@ -997,7 +972,7 @@ mod tests {
 			previous_balance_proof: None,
 			notes: bounded_vec![note.clone(), note],
 		}];
-		let notebook1 = NotebookHeader {
+		let notebook_header1 = NotebookHeader {
 			version: 1,
 			notary_id: 1,
 			notebook_number: 1,
@@ -1024,17 +999,17 @@ mod tests {
 		};
 
 		ValidLocalchainTransfers::mutate(|a| a.insert((Alice.to_account_id(), 1)));
-		let hash = notebook1.hash();
-		let new_accounts = BTreeMap::from_iter(vec![((Alice.to_account_id(), Chain::Argon), 1)]);
+		let notebook1 = Notebook {
+			header: notebook_header1.clone(),
+			balance_changes: bounded_vec![BoundedVec::truncate_from(
+				alice_balance_changeset.clone()
+			)],
+			new_account_origins: bounded_vec![(Alice.to_account_id(), Chain::Argon, 1)],
+		};
+		let hash = notebook_header1.hash();
 
 		assert_err!(
-			super::notebook_verify(
-				&hash,
-				&notebook1,
-				&vec![alice_balance_changeset.clone()],
-				&new_accounts,
-				&TestLookup
-			),
+			super::notebook_verify::<TestLookup>(&hash, &notebook1),
 			VerifyError::DuplicateChainTransfer
 		);
 	}

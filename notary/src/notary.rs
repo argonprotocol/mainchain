@@ -7,7 +7,7 @@ use tokio::task::JoinHandle;
 use ulx_notary_audit::{verify_balance_changeset_allocation, verify_changeset_signatures};
 use ulx_notary_primitives::{
 	ensure,
-	note::{Chain, ChainTransferDestination, NoteType},
+	note::{Chain, NoteType},
 	AccountId, AccountOrigin, BalanceChange, BalanceTip, NotaryId, NotebookHeader, MAX_TRANSFERS,
 };
 
@@ -141,13 +141,16 @@ impl Notary {
 						return Err(Error::MissingAccountOrigin)
 					}
 
-					let origin = NotebookNewAccountsStore::insert_origin(
+					let account_uid = NotebookNewAccountsStore::insert_origin(
 						&mut *tx,
 						current_notebook_number,
 						&account_id,
 						&chain,
 					)
 					.await?;
+
+					let origin =
+						AccountOrigin { notebook_number: current_notebook_number, account_uid };
 
 					new_account_origins.insert(key.clone(), origin.clone());
 					origin
@@ -182,10 +185,7 @@ impl Notary {
 
 			for (note_index, note) in change.notes.into_iter().enumerate() {
 				let _ = match note.note_type {
-					NoteType::ChainTransfer {
-						destination: ChainTransferDestination::ToLocalchain { nonce },
-						..
-					} => {
+					NoteType::ClaimFromMainchain { nonce, .. } => {
 						// NOTE: transfers can expire. We need to ensure this can still get into a
 						// notebook
 						ChainTransferStore::take_and_record_transfer_local(
@@ -200,10 +200,7 @@ impl Notary {
 						)
 						.await
 					},
-					NoteType::ChainTransfer {
-						destination: ChainTransferDestination::ToMainchain,
-						..
-					} => ChainTransferStore::record_transfer_to_mainchain(
+					NoteType::SendToMainchain => ChainTransferStore::record_transfer_to_mainchain(
 						&mut *tx,
 						current_notebook_number,
 						&account_id,

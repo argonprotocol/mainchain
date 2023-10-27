@@ -118,11 +118,7 @@ async fn get_seal_approval(
 		.await
 		.map_err(|e| format!("Error getting seal approval: {}", e))?
 	{
-		let signature = if signature.signature.starts_with("0x") {
-			&signature.signature[2..]
-		} else {
-			&signature.signature
-		};
+		let signature = signature.signature.trim_start_matches("0x");
 		println!("Response from seal approval ({idx}) {:?}", signature);
 		let signature =
 			hex::decode(signature).map_err(|e| format!("Error decoding seal signature: {}", e))?;

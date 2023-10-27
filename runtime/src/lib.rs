@@ -25,6 +25,12 @@ use frame_support::{
 	traits::{Contains, Currency, InsideBoth, OnUnbalanced, StorageMapShim},
 	PalletId,
 };
+use pallet_localchain_relay::NotebookVerifyError;
+use sp_core::H256;
+use ulx_primitives::{
+	notary::{NotaryId, NotarySignature},
+	notebook::NotebookNumber,
+};
 // Configure FRAME pallets to include in runtime.
 use frame_support::traits::Everything;
 pub use frame_system::Call as SystemCall;
@@ -754,6 +760,19 @@ impl_runtime_apis! {
 		}
 		fn active_authorities() -> u16 {
 			MiningSlots::authority_count().into()
+		}
+	}
+
+	impl pallet_localchain_relay::LocalchainRelayApis<Block> for Runtime {
+		fn audit_notebook(
+			version: u32,
+			notary_id: NotaryId,
+			notebook_number: NotebookNumber,
+			notary_signature: NotarySignature,
+			header_hash: H256,
+			bytes: Vec<u8>,
+		) -> Result<bool, NotebookVerifyError> {
+			LocalchainRelay::audit_notebook(version, notary_id, notebook_number, notary_signature, header_hash, bytes)
 		}
 	}
 

@@ -63,16 +63,16 @@ impl NotebookStore {
 		})
 	}
 
-	pub fn get_account_origins(
-		pool: &sqlx::PgPool,
+	pub fn get_account_origins<'a>(
+		db: impl sqlx::PgExecutor<'a> + 'a,
 		notebook_number: NotebookNumber,
-	) -> BoxFutureResult<BoundedVec<NotebookAccountOrigin, MaxBalanceChanges>> {
+	) -> BoxFutureResult<'a, BoundedVec<NotebookAccountOrigin, MaxBalanceChanges>> {
 		Box::pin(async move {
 			let rows = sqlx::query!(
 				"SELECT new_account_origins FROM notebooks WHERE notebook_number = $1 LIMIT 1",
 				notebook_number as i32
 			)
-			.fetch_one(pool)
+			.fetch_one(db)
 			.await?;
 
 			let new_account_origins: Vec<NotebookAccountOrigin> =
@@ -129,7 +129,10 @@ impl NotebookStore {
 
 		let new_account_origin_map =
 			BTreeMap::from_iter(new_account_origins.iter().map(|origin| {
-				((origin.account_id.clone(), origin.chain.clone()), origin.origin.clone())
+				(
+					(origin.account_id.clone(), origin.chain.clone()),
+					AccountOrigin { notebook_number, account_uid: origin.account_uid },
+				)
 			}));
 
 		for change in changesets {
@@ -179,7 +182,7 @@ impl NotebookStore {
 
 		let notebook_origins = new_account_origins
 			.iter()
-			.map(|a| (a.account_id.clone(), a.chain.clone(), a.origin.account_uid.clone()))
+			.map(|a| (a.account_id.clone(), a.chain.clone(), a.account_uid.clone()))
 			.collect::<Vec<_>>();
 
 		let origins_json = json!(notebook_origins);
@@ -294,7 +297,7 @@ mod tests {
 		tx.commit().await?;
 
 		let mut tx = pool.begin().await?;
-		NotebookStore::close_notebook(&mut *tx, 1).await?;
+		NotebookStore::close_notebook(&mut *tx, 1, 1).await?;
 		tx.commit().await?;
 
 		let balance_tip = BalanceTip {

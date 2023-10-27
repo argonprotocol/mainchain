@@ -1,10 +1,9 @@
-use codec::{Codec, Decode, Encode, MaxEncodedLen};
+use codec::{Decode, Encode, MaxEncodedLen};
 use scale_info::TypeInfo;
 use serde::{Deserialize, Serialize};
 use sp_core::{ed25519::Signature, RuntimeDebug, H256};
 use sp_core_hashing::blake2_256;
 use sp_runtime::{format_runtime_string, MultiSignature, RuntimeString};
-use sp_std::fmt::Debug;
 
 use crate::AccountId;
 
@@ -141,8 +140,11 @@ impl TryFrom<i32> for Chain {
 )]
 #[serde(rename_all = "camelCase")]
 pub enum NoteType {
-	/// Transfer between local and mainchain
-	ChainTransfer { destination: ChainTransferDestination, finalized_at_block: u32 },
+	SendToMainchain,
+	ClaimFromMainchain {
+		#[codec(compact)]
+		nonce: u32,
+	},
 	/// Claim funds from a note
 	Claim,
 	/// Transfer funds to another address
@@ -163,25 +165,3 @@ pub enum NoteType {
 		source_note_id: NoteId,
 	},
 }
-
-#[derive(
-	Clone,
-	PartialEq,
-	Eq,
-	Encode,
-	Decode,
-	RuntimeDebug,
-	TypeInfo,
-	MaxEncodedLen,
-	Serialize,
-	Deserialize,
-)]
-#[serde(rename_all = "camelCase")]
-pub enum ChainTransferDestination {
-	ToMainchain,
-	ToLocalchain {
-		#[codec(compact)]
-		nonce: u32,
-	},
-}
-pub trait MemberEncode: MaxEncodedLen + Codec + Debug + Clone + PartialEq + Eq {}

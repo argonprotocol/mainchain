@@ -34,7 +34,7 @@ use sp_runtime::{
 	traits::{Block as BlockT, Header as HeaderT, Header, NumberFor},
 };
 
-use rpc::{CreatedBlock, Error as RpcError, SealNewBlock};
+use rpc_seal::{CreatedBlock, Error as RpcError, SealNewBlock};
 use ulx_primitives::{
 	block_seal::{BlockProof, MiningAuthorityApis},
 	digests::{FinalizedBlockNeededDigest, FINALIZED_BLOCK_DIGEST_ID},
@@ -65,7 +65,8 @@ pub mod import_queue;
 pub mod inherents;
 mod metrics;
 pub mod nonce_verify;
-pub mod rpc;
+pub mod rpc_notary;
+pub mod rpc_seal;
 
 const LOG_TARGET: &str = "node::consensus";
 

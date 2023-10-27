@@ -1,9 +1,10 @@
-use std::future::Future;
-
+use codec::Encode;
 use sc_utils::notification::NotificationSender;
-use sp_core::bytes::from_hex;
+use sp_core::{bytes::from_hex, ed25519, H256};
 use sp_keystore::KeystorePtr;
+use sp_runtime::BoundedVec;
 use sqlx::{Executor, PgPool};
+use std::future::Future;
 use subxt::{
 	backend::rpc::{RpcClient, RpcParams},
 	rpc_params,
@@ -15,14 +16,13 @@ use ulixee_client::{
 	api::{
 		runtime_types,
 		runtime_types::{
-			bounded_collections::bounded_vec::BoundedVec,
+			bounded_collections::bounded_vec::BoundedVec as SubxtBoundedVec,
 			sp_core::ed25519::{Public, Signature},
-			ulx_primitives::block_seal,
 		},
 	},
 	try_until_connected,
 };
-use ulx_notary_primitives::{ChainTransfer, NotaryId, NotebookHeader, NotebookNumber};
+use ulx_notary_primitives::{ChainTransfer, NotaryId, Notebook, NotebookHeader, NotebookNumber};
 
 use crate::{
 	error::Error,
@@ -74,7 +74,7 @@ impl NotebookCloser {
 					e
 				});
 
-				let _ = try_get_audit_signatures(&pool).await.map_err(|e| {
+				let _ = try_get_audit_signatures(&pool, &keystore).await.map_err(|e| {
 					tracing::error!("Error getting audit signatures: {:?}", e);
 					e
 				});
@@ -190,7 +190,10 @@ fn try_get_auditors<'a>(pool: &'a PgPool, url: &'a str) -> BoxFutureResult<'a, (
 	})
 }
 
-fn try_get_audit_signatures(pool: &PgPool) -> BoxFutureResult<()> {
+fn try_get_audit_signatures<'a>(
+	pool: &'a PgPool,
+	keystore: &'a KeystorePtr,
+) -> BoxFutureResult<'a, ()> {
 	Box::pin(async move {
 		let mut tx = pool.begin().await?;
 		let step = NotebookFinalizationStep::GetAuditors;
@@ -201,8 +204,34 @@ fn try_get_audit_signatures(pool: &PgPool) -> BoxFutureResult<()> {
 
 		let auditors = NotebookAuditorStore::get_auditors(&mut *tx, notebook_number).await?;
 		let header = NotebookHeaderStore::load(&mut *tx, notebook_number).await?;
+		let meta = BlockMetaStore::load(&mut *tx).await?;
 		let changes = BalanceChangeStore::get_for_notebook(&mut *tx, notebook_number).await?;
-		let params = rpc_params![header.clone(), changes.clone()];
+		let header_hash = header.hash();
+		let notary_id = header.notary_id;
+		let version = header.version;
+		let new_account_origins =
+			NotebookStore::get_account_origins(&mut *tx, notebook_number).await?;
+		let notary_public =
+			RegisteredKeyStore::get_valid_public(&mut *tx, header.finalized_block_number).await?;
+		let notebook = Notebook {
+			header,
+			balance_changes: BoundedVec::truncate_from(
+				changes.into_iter().map(BoundedVec::truncate_from).collect(),
+			),
+			new_account_origins,
+		}
+		.encode();
+		let notary_signature = notary_sign(keystore, &notary_public, &header_hash)?;
+
+		let params = rpc_params![
+			meta.finalized_block_hash,
+			version,
+			notary_id,
+			notebook_number.clone(),
+			notary_signature.clone(),
+			header_hash,
+			notebook.encode()
+		];
 
 		let results = futures::future::join_all(auditors.iter().map(|auditor| {
 			get_audit_signature(
@@ -258,12 +287,7 @@ fn get_audit_signature(
 				Error::InternalError(format!("Error getting audit signature: {}", e))
 			})?;
 
-		let signature = if signature.signature.starts_with("0x") {
-			&signature.signature[2..]
-		} else {
-			&signature.signature
-		};
-		let signature = from_hex(signature)
+		let signature = from_hex(signature.signature.trim_start_matches("0x"))
 			.map_err(|e| Error::InternalError(format!("Error decoding seal signature: {}", e)))?;
 
 		let signature: [u8; 64] = signature
@@ -295,10 +319,7 @@ fn try_submit_notebook<'a>(
 			.into_iter()
 			.filter_map(|a| {
 				if let Some(sig) = a.signature {
-					return Some((
-						block_seal::app::Public(Public(a.public)),
-						block_seal::app::Signature(Signature(sig)),
-					))
+					return Some((Public(a.public), Signature(sig)))
 				}
 				None
 			})
@@ -307,46 +328,59 @@ fn try_submit_notebook<'a>(
 		let header = NotebookHeaderStore::load(&mut *tx, notebook_number).await?;
 		let public =
 			RegisteredKeyStore::get_valid_public(&mut *tx, header.finalized_block_number).await?;
+		let header_hash = header.hash();
 
-		let notebook = runtime_types::ulx_primitives::notebook::Notebook {
-			notebook_number: header.notebook_number,
-			pinned_to_block_number: header.pinned_to_block_number,
-			notary_id: header.notary_id,
-			auditors: BoundedVec(auditors),
-			transfers: BoundedVec(
-				header
-					.chain_transfers
-					.clone()
-					.into_iter()
-					.map(|t| match t {
-						ChainTransfer::ToMainchain { account_id, amount } =>
-							runtime_types::ulx_primitives::notebook::ChainTransfer::ToMainchain {
-								account_id: AccountId32::from(Into::<[u8; 32]>::into(account_id)),
-								amount,
-							},
-						ChainTransfer::ToLocalchain { account_id, nonce } =>
-							runtime_types::ulx_primitives::notebook::ChainTransfer::ToLocalchain {
-								account_id: AccountId32::from(Into::<[u8; 32]>::into(account_id)),
-								nonce,
-							},
-					})
-					.collect(),
-			),
+		let notebook = runtime_types::ulx_notary_primitives::notebook::AuditedNotebook {
+			header: runtime_types::ulx_notary_primitives::notebook::NotebookHeader {
+				version: header.version,
+				finalized_block_number: header.finalized_block_number,
+				notebook_number: header.notebook_number,
+				pinned_to_block_number: header.pinned_to_block_number,
+				notary_id: header.notary_id,
+				start_time: header.start_time,
+				end_time: header.end_time,
+				changed_accounts_root: header.changed_accounts_root,
+				changed_account_origins: SubxtBoundedVec(
+					header
+						.changed_account_origins
+						.iter()
+						.map(|a| {
+							runtime_types::ulx_notary_primitives::balance_change::AccountOrigin {
+								notebook_number: a.notebook_number,
+								account_uid: a.account_uid,
+							}
+						})
+						.collect(),
+				),
+				chain_transfers: SubxtBoundedVec(
+					header
+						.chain_transfers
+						.iter()
+						.map(|t| {
+							match t {
+							ChainTransfer::ToMainchain { account_id, amount } =>
+								runtime_types::ulx_notary_primitives::notebook::ChainTransfer::ToMainchain {
+									account_id: AccountId32::from(Into::<[u8; 32]>::into(account_id.clone())),
+									amount: amount.clone(),
+								},
+							ChainTransfer::ToLocalchain { account_id, nonce } =>
+								runtime_types::ulx_notary_primitives::notebook::ChainTransfer::ToLocalchain {
+									account_id: AccountId32::from(Into::<[u8; 32]>::into(account_id.clone())),
+									nonce: nonce.clone(),
+								},
+						}
+						})
+						.collect(),
+				),
+			},
+			header_hash,
+			auditors: SubxtBoundedVec(auditors),
 		};
 
-		let notebook_hash = header.hash();
-		let signature = keystore
-			.ed25519_sign(NOTARY_KEYID, &public, &notebook_hash[..])
-			.map_err(|e| {
-				Error::InternalError(format!(
-					"Unable to sign notebook header for submission to mainchain {}",
-					e
-				))
-			})?
-			.unwrap();
+		let signature = notary_sign(keystore, &public, &header_hash)?;
 
 		let ext = api::tx().localchain_relay().submit_notebook(
-			notebook_hash.clone(),
+			header_hash,
 			notebook.clone(),
 			Signature(signature.0),
 		);
@@ -359,6 +393,23 @@ fn try_submit_notebook<'a>(
 
 		Ok(Some(header))
 	})
+}
+
+fn notary_sign(
+	keystore: &KeystorePtr,
+	public: &ed25519::Public,
+	hash: &H256,
+) -> anyhow::Result<ed25519::Signature, Error> {
+	let sig = keystore
+		.ed25519_sign(NOTARY_KEYID, &public, &hash[..])
+		.map_err(|e| {
+			Error::InternalError(format!(
+				"Unable to sign notebook header for submission to mainchain {}",
+				e
+			))
+		})?
+		.unwrap();
+	Ok(sig)
 }
 
 #[derive(serde::Serialize, serde::Deserialize)]

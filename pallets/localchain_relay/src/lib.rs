@@ -2,13 +2,15 @@
 
 use codec::{Decode, Encode};
 use scale_info::TypeInfo;
+use sp_core::H256;
 use sp_runtime::RuntimeDebug;
 use sp_std::{fmt::Debug, prelude::*};
 
 pub use pallet::*;
+pub use ulx_notary_audit::VerifyError as NotebookVerifyError;
 use ulx_primitives::{
-	notary::{NotaryId, NotaryProvider},
-	notebook::{AccountOriginUid, NotebookNumber},
+	notary::{NotaryId, NotaryProvider, NotarySignature},
+	notebook::NotebookNumber,
 	BlockSealAuthorityId,
 };
 pub use weights::*;
@@ -22,7 +24,6 @@ mod tests;
 pub mod weights;
 const LOG_TARGET: &str = "runtime::localchain::relay";
 
-type CrossNotaryAccountOrigin = (NotaryId, NotebookNumber, AccountOriginUid);
 #[frame_support::pallet(dev_mode)]
 pub mod pallet {
 	use frame_support::{
@@ -39,7 +40,6 @@ pub mod pallet {
 		ed25519::{Public, Signature},
 		H256,
 	};
-
 	use sp_runtime::{
 		app_crypto::ed25519,
 		traits::{AccountIdConversion, AtLeast32BitUnsigned, One, UniqueSaturatedInto},
@@ -47,11 +47,14 @@ pub mod pallet {
 	};
 	use sp_std::cmp::min;
 
+	use ulx_notary_audit::{
+		notebook_verify, AccountHistoryLookupError, NotebookHistoryLookup, VerifyError,
+	};
 	use ulx_primitives::{
 		block_seal::HistoricalBlockSealersLookup,
 		digests::{FinalizedBlockNeededDigest, FINALIZED_BLOCK_DIGEST_ID},
 		notary::{NotaryId, NotarySignature},
-		notebook::{AuditedNotebook, ChainTransfer},
+		notebook::{AccountOrigin, AuditedNotebook, ChainTransfer, Notebook},
 	};
 
 	use super::*;
@@ -136,19 +139,25 @@ pub mod pallet {
 	#[pallet::storage]
 	pub(super) type NotebookChangedAccountsRootByNotary<T: Config> = StorageDoubleMap<
 		Hasher1 = Blake2_128Concat,
-		Hasher2 = Blake2_128Concat,
+		Hasher2 = Twox64Concat,
 		Key1 = NotaryId,
 		Key2 = NotebookNumber,
 		Value = H256,
 		QueryKind = OptionQuery,
 	>;
 
-	/// Storage map of cross-notary account origin (notary_id, notebook, account_uid) to the last
+	/// Storage map of account origin (notary_id, notebook, account_uid) to the last
 	/// notebook containing this account in the changed accounts merkle root
 	/// (NotebookChangedAccountsRootByNotary)
 	#[pallet::storage]
-	pub(super) type AccountOriginLastChangedNotebook<T: Config> =
-		StorageMap<_, Blake2_128Concat, CrossNotaryAccountOrigin, NotebookNumber, OptionQuery>;
+	pub(super) type AccountOriginLastChangedNotebookByNotary<T: Config> = StorageDoubleMap<
+		Hasher1 = Blake2_128Concat,
+		Hasher2 = Blake2_128Concat,
+		Key1 = NotaryId,
+		Key2 = AccountOrigin,
+		Value = NotebookNumber,
+		QueryKind = OptionQuery,
+	>;
 
 	#[pallet::storage]
 	pub(super) type LastNotebookNumberByNotary<T: Config> =
@@ -204,9 +213,25 @@ pub mod pallet {
 		TransferNotEligibleForCancellation,
 		/// The transfer was already submitted in a previous block
 		InvalidOrDuplicatedLocalchainTransfer,
-		// A transfer was submitted in a previous block but the expiration block has passed
+		/// A transfer was submitted in a previous block but the expiration block has passed
 		NotebookIncludesExpiredLocalchainTransfer,
+		/// The notary id is not registered
 		InvalidNotaryUsedForTransfer,
+		/// Could not decode the notebook
+		InvalidNotebookBytes,
+		/// A notebook was submitted older than the one in storage
+		NotebookToAuditTooOld,
+
+		/// This notebook failed audit
+		NotebookAuditFailed,
+	}
+
+	impl<T: Config> From<VerifyError> for Error<T> {
+		fn from(value: VerifyError) -> Self {
+			match value {
+				_ => Error::NotebookAuditFailed,
+			}
+		}
 	}
 
 	#[pallet::hooks]
@@ -365,8 +390,9 @@ pub mod pallet {
 			);
 
 			for account_origin in notebook.header.changed_account_origins.into_iter() {
-				<AccountOriginLastChangedNotebook<T>>::insert(
-					(notary_id, account_origin.notebook_number, account_origin.account_uid),
+				<AccountOriginLastChangedNotebookByNotary<T>>::insert(
+					notary_id,
+					account_origin,
 					notebook_number,
 				);
 			}
@@ -492,7 +518,76 @@ pub mod pallet {
 		}
 	}
 
+	impl<T: Config> NotebookHistoryLookup for Pallet<T> {
+		fn get_account_changes_root(
+			notary_id: NotaryId,
+			notebook_number: NotebookNumber,
+		) -> Result<H256, AccountHistoryLookupError> {
+			<NotebookChangedAccountsRootByNotary<T>>::get(notary_id, notebook_number)
+				.ok_or(AccountHistoryLookupError::RootNotFound)
+		}
+		fn get_last_changed_notebook(
+			notary_id: NotaryId,
+			account_origin: AccountOrigin,
+		) -> Result<NotebookNumber, AccountHistoryLookupError> {
+			<AccountOriginLastChangedNotebookByNotary<T>>::get(notary_id, account_origin)
+				.ok_or(AccountHistoryLookupError::LastChangeNotFound)
+		}
+
+		fn is_valid_transfer_to_localchain(
+			notary_id: NotaryId,
+			account_id: &AccountId32,
+			nonce: u32,
+		) -> Result<bool, AccountHistoryLookupError> {
+			let nonce: T::Nonce = nonce.into();
+			<PendingTransfersOut<T>>::get(account_id, nonce)
+				.and_then(
+					|transfer| {
+						if transfer.notary_id == notary_id {
+							Some(true)
+						} else {
+							None
+						}
+					},
+				)
+				.ok_or(AccountHistoryLookupError::InvalidTransferToLocalchain)
+		}
+	}
+
 	impl<T: Config> Pallet<T> {
+		pub fn audit_notebook(
+			_version: u32,
+			notary_id: NotaryId,
+			notebook_number: NotebookNumber,
+			notary_signature: NotarySignature,
+			header_hash: H256,
+			bytes: Vec<u8>,
+		) -> Result<bool, NotebookVerifyError> {
+			if let Some((last_notebook, _)) = <LastNotebookNumberByNotary<T>>::get(notary_id) {
+				ensure!(notebook_number > last_notebook, NotebookVerifyError::NotebookTooOld);
+			}
+			ensure!(
+				T::NotaryProvider::verify_signature(
+					notary_id,
+					notebook_number.into(),
+					&header_hash,
+					&notary_signature
+				),
+				NotebookVerifyError::InvalidNotarySignature
+			);
+
+			let notebook = Notebook::decode(&mut bytes.as_ref())
+				.map_err(|_| NotebookVerifyError::DecodeError)?;
+			let is_valid = notebook_verify::<Self>(&header_hash, &notebook).map_err(|e| {
+				log::info!(
+					target: LOG_TARGET,
+					"Notebook audit failed for notary {notary_id}, notebook {notebook_number}: {e:?}",
+				);
+				e
+			})?;
+			Ok(is_valid)
+		}
+
 		pub fn notary_account_id(notary_id: NotaryId) -> T::AccountId {
 			T::PalletId::get().into_sub_account_truncating(notary_id)
 		}
@@ -539,6 +634,19 @@ pub mod pallet {
 
 			Ok(())
 		}
+	}
+}
+
+sp_api::decl_runtime_apis! {
+	pub trait LocalchainRelayApis {
+		fn audit_notebook(
+			version: u32,
+			notary_id: NotaryId,
+			notebook_number: NotebookNumber,
+			notary_signature: NotarySignature,
+			header_hash: H256,
+			bytes: Vec<u8>,
+		) -> Result<bool, NotebookVerifyError>;
 	}
 }
 

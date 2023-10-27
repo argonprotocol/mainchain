@@ -6,7 +6,7 @@ use frame_system::pallet_prelude::BlockNumberFor;
 use sp_core::{
 	bounded_vec, ed25519,
 	ed25519::{Public, Signature},
-	Pair,
+	Blake2Hasher, Pair,
 };
 use sp_keyring::AccountKeyring::Bob;
 use sp_runtime::{
@@ -16,17 +16,21 @@ use sp_runtime::{
 	BoundedVec, DigestItem,
 };
 
+use binary_merkle_tree::merkle_root;
 use ulx_primitives::{
 	block_seal::BlockSealAuthorityPair,
 	digests::{FinalizedBlockNeededDigest, FINALIZED_BLOCK_DIGEST_ID},
-	notebook::{AccountOrigin, AuditedNotebook, ChainTransfer, NotebookHeader},
+	localchain::{BalanceChange, Chain, Note, NoteType},
+	notebook::{
+		AccountOrigin, AuditedNotebook, BalanceTip, ChainTransfer, Notebook, NotebookHeader,
+	},
 	BlockSealAuthorityId,
 };
 
 use crate::{
 	mock::{LocalchainRelay, *},
 	pallet::{
-		AccountOriginLastChangedNotebook, ExpiringTransfersOut, FinalizedBlockNumber,
+		AccountOriginLastChangedNotebookByNotary, ExpiringTransfersOut, FinalizedBlockNumber,
 		LastNotebookNumberByNotary, NotebookChangedAccountsRootByNotary, PendingTransfersOut,
 	},
 	Error, QueuedTransferOut,
@@ -203,7 +207,13 @@ fn it_can_handle_transfers_in() {
 			NotebookChangedAccountsRootByNotary::<Test>::get(1, 1),
 			Some(changed_accounts_root)
 		);
-		assert_eq!(AccountOriginLastChangedNotebook::<Test>::get((1, 1, 1)), Some(1));
+		assert_eq!(
+			AccountOriginLastChangedNotebookByNotary::<Test>::get(
+				1,
+				AccountOrigin { notebook_number: 1, account_uid: 1 }
+			),
+			Some(1)
+		);
 
 		System::set_block_number(3);
 		System::on_initialize(3);
@@ -244,7 +254,13 @@ fn it_can_handle_transfers_in() {
 			NotebookChangedAccountsRootByNotary::<Test>::get(1, 1),
 			Some(changed_accounts_root)
 		);
-		assert_eq!(AccountOriginLastChangedNotebook::<Test>::get((1, 1, 1)), Some(2));
+		assert_eq!(
+			AccountOriginLastChangedNotebookByNotary::<Test>::get(
+				1,
+				AccountOrigin { notebook_number: 1, account_uid: 1 }
+			),
+			Some(2)
+		);
 		assert_eq!(NotebookChangedAccountsRootByNotary::<Test>::get(1, 2), Some(change_root_2));
 		assert_eq!(LastNotebookNumberByNotary::<Test>::get(1), Some((2, 2)));
 
@@ -270,7 +286,13 @@ fn it_can_handle_transfers_in() {
 			ed25519::Signature([0u8; 64]),
 		),);
 		assert_eq!(LastNotebookNumberByNotary::<Test>::get(1), Some((3, 2)));
-		assert_eq!(AccountOriginLastChangedNotebook::<Test>::get((1, 1, 1)), Some(2));
+		assert_eq!(
+			AccountOriginLastChangedNotebookByNotary::<Test>::get(
+				1,
+				AccountOrigin { notebook_number: 1, account_uid: 1 }
+			),
+			Some(2)
+		);
 	});
 }
 
@@ -541,6 +563,87 @@ fn it_processes_the_latest_finalized_block() {
 	});
 }
 
+#[test]
+fn it_can_audit_notebooks() {
+	new_test_ext().execute_with(|| {
+		// Go past genesis block so events get deposited
+		System::set_block_number(1);
+		FinalizedBlockNumber::<Test>::set(0);
+		let who = Bob.to_account_id();
+		let nonce = System::account_nonce(&who);
+		let notary_id = 1;
+		System::inc_account_nonce(&who);
+		set_argons(&who, 2000);
+		assert_ok!(LocalchainRelay::send_to_localchain(
+			RuntimeOrigin::signed(who.clone()),
+			2000,
+			notary_id,
+			nonce
+		));
+
+		System::set_block_number(2);
+		LocalchainRelay::on_initialize(2);
+
+		let header = NotebookHeader {
+			notary_id,
+			notebook_number: 1,
+			pinned_to_block_number: 1,
+			chain_transfers: bounded_vec![ChainTransfer::ToLocalchain {
+				account_id: who.clone(),
+				nonce: nonce.unique_saturated_into()
+			}],
+			changed_accounts_root: merkle_root::<Blake2Hasher, _>(vec![BalanceTip {
+				account_id: who.clone(),
+				chain: Chain::Argon,
+				nonce: 1,
+				balance: 2000,
+				account_origin: AccountOrigin { notebook_number: 1, account_uid: 1 },
+			}
+			.encode()]),
+			changed_account_origins: bounded_vec![AccountOrigin {
+				notebook_number: 1,
+				account_uid: 1
+			}],
+			version: 1,
+			finalized_block_number: 1,
+			start_time: 0,
+			end_time: 0,
+		};
+		let header_hash = header.hash();
+		let signature = ed25519::Signature([0u8; 64]);
+		let mut note = Note::create_unsigned(
+			&who.clone(),
+			&Chain::Argon,
+			1,
+			2000,
+			NoteType::ClaimFromMainchain { nonce: nonce.unique_saturated_into() },
+		);
+		note.signature = Bob.sign(&note.note_id[..]).into();
+
+		let notebook = Notebook {
+			header,
+			new_account_origins: bounded_vec![(who.clone(), Chain::Argon, 1)],
+			balance_changes: bounded_vec![bounded_vec![BalanceChange {
+				account_id: who.clone(),
+				chain: Chain::Argon,
+				previous_balance: 0,
+				balance: 2000,
+				previous_balance_proof: None,
+				nonce: 1,
+				notes: bounded_vec![note],
+			}]],
+		};
+
+		assert_ok!(LocalchainRelay::audit_notebook(
+			1,
+			notary_id,
+			notary_id,
+			signature,
+			header_hash,
+			notebook.encode(),
+		));
+	});
+}
 fn bound<T, S>(list: Vec<T>) -> BoundedVec<T, S>
 where
 	S: sp_core::Get<u32>,

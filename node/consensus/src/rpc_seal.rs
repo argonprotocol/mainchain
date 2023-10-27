@@ -23,7 +23,7 @@ use ulx_primitives::block_seal::{
 	BlockProof, MiningAuthorityApis, SealerSignatureMessage, SEALER_SIGNATURE_PREFIX,
 };
 
-use crate::{authority::AuthoritySealer, rpc::Error::StringError};
+use crate::{authority::AuthoritySealer, rpc_seal::Error::StringError};
 
 /// Sender passed to the authorship task to report errors or successes.
 pub type Sender<T> = Option<oneshot::Sender<std::result::Result<T, Error>>>;
@@ -134,7 +134,7 @@ where
 			return Err(StringError("Invalid block sealers proposed.".into()).into())
 		}
 
-		// TODO: do we seek charge for this?
+		// TODO: do we charge for this?
 		let signature_message = SealerSignatureMessage {
 			prefix: SEALER_SIGNATURE_PREFIX,
 			parent_hash,
