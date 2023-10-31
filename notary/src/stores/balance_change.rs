@@ -5,8 +5,8 @@ use ulx_notary_audit::{verify_balance_changeset_allocation, verify_changeset_sig
 
 use crate::apis::localchain::BalanceChangeResult;
 use ulx_notary_primitives::{
-	ensure, AccountId, AccountOrigin, BalanceChange, BalanceTip, Chain, NotaryId, NoteType,
-	NotebookNumber, MAX_TRANSFERS,
+	ensure, AccountId, AccountOrigin, AccountType, BalanceChange, BalanceTip, NewAccountOrigin,
+	NotaryId, NoteType, NotebookNumber, MAX_TRANSFERS,
 };
 
 use crate::{
@@ -89,7 +89,8 @@ impl BalanceChangeStore {
 	/// 3. Bob notarizes BalanceChange to his wallet and Alice's wallet in a single transaction.
 	///    Transaction must allocate all funds.
 	/// 4. This transaction is included in a Notebook on a block with a merkle root containing Alice
-	///    and Bob's transfer Key(account, chain), value: H256(balance, nonce, account origin).
+	///    and Bob's transfer Key(account, account_typechain), value: H256(balance, nonce, account
+	///    origin).
 	/// 5. Each user can retrieve proof that their balances can be proven in the recorded merkle
 	///    root. They can also obtain their account origin, which must be included in all future
 	///    changes. The account origin can be used to prove their balance has not changed in any
@@ -112,14 +113,19 @@ impl BalanceChangeStore {
 		let current_notebook_number =
 			NotebookStatusStore::lock_open_for_appending(&mut *tx).await?;
 
-		let mut new_account_origins = BTreeMap::<(AccountId, Chain), AccountOrigin>::new();
+		let mut new_account_origins = BTreeMap::<(AccountId, AccountType), AccountOrigin>::new();
 
 		let to_add = changes.clone();
 		for (change_index, change) in changes.into_iter().enumerate() {
 			let BalanceChange {
-				account_id, chain, change_number, previous_balance, balance, ..
+				account_id,
+				account_type,
+				change_number,
+				previous_balance,
+				balance,
+				..
 			} = change;
-			let key = (account_id.clone(), chain.clone());
+			let key = (account_id.clone(), account_type.clone());
 
 			let account_origin = change
 				.previous_balance_proof
@@ -138,7 +144,7 @@ impl BalanceChangeStore {
 						&mut *tx,
 						current_notebook_number,
 						&account_id,
-						&chain,
+						&account_type,
 					)
 					.await?;
 
@@ -153,7 +159,7 @@ impl BalanceChangeStore {
 			BalanceTipStore::lock(
 				&mut *tx,
 				&account_id,
-				chain.clone(),
+				account_type.clone(),
 				change_number,
 				previous_balance,
 				&account_origin,
@@ -165,7 +171,7 @@ impl BalanceChangeStore {
 			if let Some(proof) = change.previous_balance_proof {
 				let tip = BalanceTip {
 					account_id: account_id.clone(),
-					chain: chain.clone(),
+					account_type: account_type.clone(),
 					change_number,
 					balance,
 					account_origin: account_origin.clone(),
@@ -218,7 +224,7 @@ impl BalanceChangeStore {
 			BalanceTipStore::update(
 				&mut *tx,
 				&account_id,
-				chain,
+				account_type,
 				change_number,
 				balance,
 				current_notebook_number,
@@ -237,7 +243,9 @@ impl BalanceChangeStore {
 			finalized_block_number: meta.finalized_block_number,
 			new_account_origins: new_account_origins
 				.into_iter()
-				.map(|((account_id, chain), origin)| (account_id, chain, origin.account_uid))
+				.map(|((account_id, account_type), origin)| {
+					NewAccountOrigin::new(account_id, account_type, origin.account_uid)
+				})
 				.collect(),
 		})
 	}
@@ -249,7 +257,7 @@ mod tests {
 	use sp_keyring::Sr25519Keyring::Bob;
 	use sqlx::PgPool;
 
-	use ulx_notary_primitives::{BalanceChange, Chain::Argon, Note, NoteType};
+	use ulx_notary_primitives::{AccountType::Deposit, BalanceChange, Note, NoteType};
 
 	use crate::stores::balance_change::BalanceChangeStore;
 
@@ -258,14 +266,14 @@ mod tests {
 		let notebook_number = 1;
 		let changeset = vec![BalanceChange {
 			account_id: Bob.to_account_id(),
-			chain: Argon,
+			account_type: Deposit,
 			change_number: 0,
 			balance: 1000,
 			previous_balance: 0,
 			previous_balance_proof: None,
 			notes: bounded_vec![Note::create_unsigned(
 				&Bob.to_account_id(),
-				&Argon,
+				&Deposit,
 				1,
 				0,
 				1000,

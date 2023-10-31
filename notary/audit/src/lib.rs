@@ -16,14 +16,15 @@ use sp_std::{
 };
 
 use ulx_notary_primitives::{
-	ensure, AccountId, AccountOrigin, AccountOriginUid, BalanceChange, BalanceProof, BalanceTip,
-	Chain, ChainTransfer, NewAccountOrigin, NotaryId, NoteId, NoteType, Notebook, NotebookNumber,
+	ensure, AccountId, AccountOrigin, AccountOriginUid, AccountType, BalanceChange, BalanceProof,
+	BalanceTip, ChainTransfer, NewAccountOrigin, NotaryId, NoteId, NoteType, Notebook,
+	NotebookNumber,
 };
 
 #[derive(Debug, PartialEq, Clone, Snafu, TypeInfo, Encode, Decode, Serialize, Deserialize)]
 pub enum VerifyError {
-	#[snafu(display("Missing account origin {account_id:?}, {chain:?}"))]
-	MissingAccountOrigin { account_id: AccountId32, chain: Chain },
+	#[snafu(display("Missing account origin {account_id:?}, {account_type:?}"))]
+	MissingAccountOrigin { account_id: AccountId32, account_type: AccountType },
 	#[snafu(display("Account history lookup error {source}"))]
 	HistoryLookupError {
 		#[snafu(source(from(AccountHistoryLookupError, AccountHistoryLookupError::from)))]
@@ -143,7 +144,7 @@ pub fn notebook_verify<'a, T: NotebookHistoryLookup>(
 	notebook: &'a Notebook,
 ) -> anyhow::Result<bool, VerifyError> {
 	let mut account_changelist = BTreeSet::<AccountOrigin>::new();
-	let mut final_balances = BTreeMap::<(AccountId32, Chain), BalanceTip>::new();
+	let mut final_balances = BTreeMap::<(AccountId32, AccountType), BalanceTip>::new();
 	let mut chain_transfers = Vec::<ChainTransfer>::new();
 	let mut seen_transfers_in = BTreeSet::<(NotaryId, AccountId32, u32)>::new();
 
@@ -151,9 +152,9 @@ pub fn notebook_verify<'a, T: NotebookHistoryLookup>(
 
 	let Notebook { header, balance_changes, new_account_origins: flat_account_origins } = notebook;
 
-	let mut new_account_origins = BTreeMap::<(AccountId32, Chain), AccountOriginUid>::new();
-	for NewAccountOrigin { account_id, chain, account_uid: uid } in flat_account_origins {
-		new_account_origins.insert((account_id.clone(), chain.clone()), *uid);
+	let mut new_account_origins = BTreeMap::<(AccountId32, AccountType), AccountOriginUid>::new();
+	for NewAccountOrigin { account_id, account_type, account_uid: uid } in flat_account_origins {
+		new_account_origins.insert((account_id.clone(), account_type.clone()), *uid);
 		ensure!(all_new_account_uids.insert(*uid), VerifyError::DuplicatedAccountOriginUid);
 	}
 
@@ -196,7 +197,7 @@ pub fn notebook_verify<'a, T: NotebookHistoryLookup>(
 				}
 			}
 
-			let key = (change.account_id.clone(), change.chain.clone());
+			let key = (change.account_id.clone(), change.account_type.clone());
 
 			if change.change_number == 1 {
 				if let Some(account_uid) = new_account_origins.get(&key) {
@@ -210,7 +211,7 @@ pub fn notebook_verify<'a, T: NotebookHistoryLookup>(
 						key.clone(),
 						BalanceTip {
 							account_id: change.account_id.clone(),
-							chain: change.chain.clone(),
+							account_type: change.account_type.clone(),
 							balance: change.balance,
 							change_number: change.change_number,
 							account_origin,
@@ -219,7 +220,7 @@ pub fn notebook_verify<'a, T: NotebookHistoryLookup>(
 				} else {
 					return Err(VerifyError::MissingAccountOrigin {
 						account_id: change.account_id.clone(),
-						chain: change.chain.clone(),
+						account_type: change.account_type.clone(),
 					})
 				}
 			} else {
@@ -235,7 +236,7 @@ pub fn notebook_verify<'a, T: NotebookHistoryLookup>(
 					key.clone(),
 					BalanceTip {
 						account_id: change.account_id.clone(),
-						chain: change.chain.clone(),
+						account_type: change.account_type.clone(),
 						balance: change.balance.clone(),
 						change_number: change.change_number.clone(),
 						account_origin: proof.account_origin.clone(),
@@ -268,9 +269,9 @@ pub fn notebook_verify<'a, T: NotebookHistoryLookup>(
 
 fn verify_previous_balance_proof<'a, T: NotebookHistoryLookup>(
 	proof: &BalanceProof,
-	final_balances: &mut BTreeMap<(AccountId32, Chain), BalanceTip>,
+	final_balances: &mut BTreeMap<(AccountId32, AccountType), BalanceTip>,
 	change: &BalanceChange,
-	key: &(AccountId32, Chain),
+	key: &(AccountId32, AccountType),
 ) -> anyhow::Result<bool, VerifyError> {
 	// if we've changed balance in this notebook before, it must match the previous
 	// entry
@@ -299,7 +300,7 @@ fn verify_previous_balance_proof<'a, T: NotebookHistoryLookup>(
 		let root = T::get_account_changes_root(proof.notary_id, proof.notebook_number)?;
 		let leaf = BalanceTip {
 			account_id: change.account_id.clone(),
-			chain: change.chain.clone(),
+			account_type: change.account_type.clone(),
 			balance: change.previous_balance,
 			change_number: change.change_number - 1,
 			account_origin: proof.account_origin.clone(),
@@ -327,8 +328,12 @@ pub fn verify_changeset_signatures(
 		let mut index = 0;
 		for note in &change.notes {
 			ensure!(
-				note.get_note_id(&change.account_id, &change.chain, change.change_number, index) ==
-					note.note_id,
+				note.get_note_id(
+					&change.account_id,
+					&change.account_type,
+					change.change_number,
+					index
+				) == note.note_id,
 				VerifyError::InvalidNoteIdCalculated
 			);
 			ensure!(
@@ -350,7 +355,7 @@ pub fn verify_balance_changeset_allocation(
 ) -> anyhow::Result<(), VerifyError> {
 	let mut transferred_balances: i128 = 0i128;
 	let mut change_index = 0;
-	let mut new_accounts = BTreeSet::<(AccountId32, Chain)>::new();
+	let mut new_accounts = BTreeSet::<(AccountId32, AccountType)>::new();
 
 	let mut used_note_ids = BTreeSet::<NoteId>::new();
 	let mut restricted_balance = BTreeMap::<AccountId, i128>::new();
@@ -358,7 +363,7 @@ pub fn verify_balance_changeset_allocation(
 	for change in changes {
 		ensure!(change.change_number > 0, VerifyError::InvalidBalanceChange);
 		if change.change_number == 1 {
-			new_accounts.insert((change.account_id.clone(), change.chain.clone()));
+			new_accounts.insert((change.account_id.clone(), change.account_type.clone()));
 
 			ensure!(
 				change.previous_balance_proof.is_none(),
@@ -367,7 +372,7 @@ pub fn verify_balance_changeset_allocation(
 			ensure!(change.previous_balance == 0, VerifyError::InvalidPreviousBalance);
 		}
 		if change.change_number > 1 &&
-			!new_accounts.contains(&(change.account_id.clone(), change.chain.clone()))
+			!new_accounts.contains(&(change.account_id.clone(), change.account_type.clone()))
 		{
 			ensure!(change.previous_balance_proof.is_some(), VerifyError::MissingBalanceProof);
 		}
@@ -462,7 +467,7 @@ mod tests {
 
 	use ulx_notary_primitives::{
 		balance_change::{AccountOrigin, BalanceChange, BalanceProof},
-		note::{Chain, Note, NoteType},
+		note::{AccountType, Note, NoteType},
 		BalanceTip, ChainTransfer, NewAccountOrigin, Notebook, NotebookHeader, NotebookNumber,
 	};
 
@@ -475,7 +480,7 @@ mod tests {
 	fn test_balance_change_allocation_errs_non_zero() {
 		let balance_change = vec![BalanceChange {
 			account_id: AccountKeyring::Alice.to_account_id(),
-			chain: Chain::Argon,
+			account_type: AccountType::Deposit,
 			change_number: 1,
 			previous_balance: 0,
 			balance: 100,
@@ -499,7 +504,7 @@ mod tests {
 		let mut balance_change = vec![
 			BalanceChange {
 				account_id: AccountKeyring::Bob.to_account_id(),
-				chain: Chain::Argon,
+				account_type: AccountType::Deposit,
 				change_number: 1,
 				previous_balance: 100, // should flag as invalid since nonce is 1
 				balance: 0,
@@ -513,7 +518,7 @@ mod tests {
 			},
 			BalanceChange {
 				account_id: AccountKeyring::Alice.to_account_id(),
-				chain: Chain::Argon,
+				account_type: AccountType::Deposit,
 				change_number: 1,
 				previous_balance: 0,
 				balance: 100,
@@ -545,7 +550,7 @@ mod tests {
 		let balance_change = vec![
 			BalanceChange {
 				account_id: AccountKeyring::Bob.to_account_id(),
-				chain: Chain::Argon,
+				account_type: AccountType::Deposit,
 				change_number: 2,
 				previous_balance: 100,
 				balance: 0,
@@ -568,7 +573,7 @@ mod tests {
 			},
 			BalanceChange {
 				account_id: AccountKeyring::Alice.to_account_id(),
-				chain: Chain::Argon,
+				account_type: AccountType::Deposit,
 				change_number: 1,
 				previous_balance: 0,
 				balance: 100,
@@ -590,7 +595,7 @@ mod tests {
 		let balance_change = vec![
 			BalanceChange {
 				account_id: AccountKeyring::Bob.to_account_id(),
-				chain: Chain::Argon,
+				account_type: AccountType::Deposit,
 				change_number: 2,
 				previous_balance: 200,
 				balance: 0,
@@ -624,7 +629,7 @@ mod tests {
 			},
 			BalanceChange {
 				account_id: AccountKeyring::Alice.to_account_id(),
-				chain: Chain::Argon,
+				account_type: AccountType::Deposit,
 				change_number: 1,
 				previous_balance: 0,
 				balance: 100,
@@ -647,7 +652,7 @@ mod tests {
 		let mut balance_change = vec![
 			BalanceChange {
 				account_id: AccountKeyring::Bob.to_account_id(),
-				chain: Chain::Argon,
+				account_type: AccountType::Deposit,
 				change_number: 2,
 				previous_balance: 250,
 				balance: 0,
@@ -668,7 +673,7 @@ mod tests {
 			},
 			BalanceChange {
 				account_id: AccountKeyring::Alice.to_account_id(),
-				chain: Chain::Argon,
+				account_type: AccountType::Deposit,
 				change_number: 1,
 				previous_balance: 0,
 				balance: 100,
@@ -682,7 +687,7 @@ mod tests {
 			},
 			BalanceChange {
 				account_id: AccountKeyring::Dave.to_account_id(),
-				chain: Chain::Argon,
+				account_type: AccountType::Deposit,
 				change_number: 1,
 				previous_balance: 0,
 				balance: 100, // WRONG BALANCE - should be 150
@@ -713,7 +718,7 @@ mod tests {
 		let mut balance_change = vec![
 			BalanceChange {
 				account_id: AccountKeyring::Bob.to_account_id(),
-				chain: Chain::Argon,
+				account_type: AccountType::Deposit,
 				change_number: 2,
 				previous_balance: 250,
 				balance: 0,
@@ -734,7 +739,7 @@ mod tests {
 			},
 			BalanceChange {
 				account_id: AccountKeyring::Alice.to_account_id(),
-				chain: Chain::Argon,
+				account_type: AccountType::Deposit,
 				change_number: 1,
 				previous_balance: 0,
 				balance: 200,
@@ -748,7 +753,7 @@ mod tests {
 			},
 			BalanceChange {
 				account_id: AccountKeyring::Dave.to_account_id(),
-				chain: Chain::Argon,
+				account_type: AccountType::Deposit,
 				change_number: 1,
 				previous_balance: 0,
 				balance: 50,
@@ -776,7 +781,7 @@ mod tests {
 		let balance_change = vec![BalanceChange {
 			// We look for an transfer to localchain using this id
 			account_id: AccountKeyring::Bob.to_account_id(),
-			chain: Chain::Argon,
+			account_type: AccountType::Deposit,
 			change_number: 1,
 			previous_balance: 0,
 			balance: 250,
@@ -800,7 +805,7 @@ mod tests {
 			BalanceChange {
 				// We look for an transfer to localchain using this id
 				account_id: AccountKeyring::Bob.to_account_id(),
-				chain: Chain::Argon,
+				account_type: AccountType::Deposit,
 				change_number: 2,
 				previous_balance: 50,
 				balance: 100,
@@ -833,7 +838,7 @@ mod tests {
 			},
 			BalanceChange {
 				account_id: AccountKeyring::Alice.to_account_id(),
-				chain: Chain::Argon,
+				account_type: AccountType::Deposit,
 				change_number: 1,
 				previous_balance: 0,
 				balance: 50,
@@ -867,7 +872,7 @@ mod tests {
 		let mut balance_change = vec![BalanceChange {
 			// We look for an transfer to localchain using this id
 			account_id: AccountKeyring::Bob.to_account_id(),
-			chain: Chain::Argon,
+			account_type: AccountType::Deposit,
 			change_number: 1,
 			previous_balance: 0,
 			balance: 250,
@@ -887,7 +892,7 @@ mod tests {
 
 		balance_change[0].notes[0].note_id = balance_change[0].notes[0].get_note_id(
 			&balance_change[0].account_id,
-			&balance_change[0].chain,
+			&balance_change[0].account_type,
 			balance_change[0].change_number,
 			0,
 		);
@@ -942,14 +947,14 @@ mod tests {
 
 	#[test]
 	fn test_verify_previous_balance() {
-		let mut final_balances = BTreeMap::<(AccountId32, Chain), BalanceTip>::new();
+		let mut final_balances = BTreeMap::<(AccountId32, AccountType), BalanceTip>::new();
 		let account_id = AccountKeyring::Alice.to_account_id();
-		let chain = Chain::Argon;
-		let key = (account_id.clone(), chain.clone());
+		let account_type = AccountType::Deposit;
+		let key = (account_id.clone(), account_type.clone());
 
 		let mut change = BalanceChange {
 			account_id,
-			chain,
+			account_type,
 			change_number: 500,
 			previous_balance: 100,
 			balance: 0,
@@ -959,7 +964,7 @@ mod tests {
 		let leaves = vec![
 			BalanceTip {
 				account_id: Dave.to_account_id(),
-				chain: Chain::Argon,
+				account_type: AccountType::Deposit,
 				balance: 20,
 				change_number: 3,
 				account_origin: AccountOrigin { notebook_number: 5, account_uid: 2 },
@@ -967,7 +972,7 @@ mod tests {
 			.encode(),
 			BalanceTip {
 				account_id: Bob.to_account_id(),
-				chain: Chain::Argon,
+				account_type: AccountType::Deposit,
 				balance: 100,
 				change_number: 1,
 				account_origin: AccountOrigin { notebook_number: 6, account_uid: 1 },
@@ -975,7 +980,7 @@ mod tests {
 			.encode(),
 			BalanceTip {
 				account_id: change.account_id.clone(),
-				chain: change.chain.clone(),
+				account_type: change.account_type.clone(),
 				balance: change.previous_balance,
 				change_number: change.change_number - 1,
 				account_origin: AccountOrigin { notebook_number: 1, account_uid: 1 },
@@ -1033,7 +1038,7 @@ mod tests {
 	async fn test_verify_notebook() {
 		let mut note = Note::create_unsigned(
 			&Alice.to_account_id(),
-			&Chain::Argon,
+			&AccountType::Deposit,
 			1,
 			0,
 			1000,
@@ -1045,7 +1050,7 @@ mod tests {
 			balance: 1000,
 			change_number: 1,
 			account_id: Alice.to_account_id(),
-			chain: Chain::Argon,
+			account_type: AccountType::Deposit,
 			previous_balance: 0,
 			previous_balance_proof: None,
 			notes: bounded_vec![note],
@@ -1059,7 +1064,7 @@ mod tests {
 			start_time: Utc::now().timestamp_millis() as u64 - 60_000,
 			changed_accounts_root: merkle_root::<Blake2Hasher, _>(vec![BalanceTip {
 				account_id: Alice.to_account_id(),
-				chain: Chain::Argon,
+				account_type: AccountType::Deposit,
 				balance: 1000,
 				change_number: 1,
 				account_origin: AccountOrigin { notebook_number: 1, account_uid: 1 },
@@ -1086,7 +1091,7 @@ mod tests {
 			)],
 			new_account_origins: bounded_vec![NewAccountOrigin::new(
 				Alice.to_account_id(),
-				Chain::Argon,
+				AccountType::Deposit,
 				1
 			)],
 		};
@@ -1122,7 +1127,7 @@ mod tests {
 	async fn test_disallows_double_claim() {
 		let mut note1 = Note::create_unsigned(
 			&Alice.to_account_id(),
-			&Chain::Argon,
+			&AccountType::Deposit,
 			1,
 			0,
 			1000,
@@ -1131,7 +1136,7 @@ mod tests {
 		note1.signature = Alice.sign(&note1.note_id[..]).into();
 		let mut note2 = Note::create_unsigned(
 			&Alice.to_account_id(),
-			&Chain::Argon,
+			&AccountType::Deposit,
 			1,
 			1,
 			1000,
@@ -1143,7 +1148,7 @@ mod tests {
 			balance: 2000,
 			change_number: 1,
 			account_id: Alice.to_account_id(),
-			chain: Chain::Argon,
+			account_type: AccountType::Deposit,
 			previous_balance: 0,
 			previous_balance_proof: None,
 			notes: bounded_vec![note1, note2],
@@ -1157,7 +1162,7 @@ mod tests {
 			start_time: Utc::now().timestamp_millis() as u64 - 60_000,
 			changed_accounts_root: merkle_root::<Blake2Hasher, _>(vec![BalanceTip {
 				account_id: Alice.to_account_id(),
-				chain: Chain::Argon,
+				account_type: AccountType::Deposit,
 				balance: 2000,
 				change_number: 1,
 				account_origin: AccountOrigin { notebook_number: 1, account_uid: 1 },
@@ -1182,7 +1187,7 @@ mod tests {
 			)],
 			new_account_origins: bounded_vec![NewAccountOrigin::new(
 				Alice.to_account_id(),
-				Chain::Argon,
+				AccountType::Deposit,
 				1
 			)],
 		};

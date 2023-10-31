@@ -1216,9 +1216,9 @@ pub mod api {
 							bytes,
 						},
 						[
-							39u8, 49u8, 243u8, 90u8, 34u8, 70u8, 130u8, 211u8, 159u8, 66u8, 251u8,
-							75u8, 23u8, 50u8, 168u8, 215u8, 150u8, 26u8, 170u8, 249u8, 152u8, 76u8,
-							124u8, 219u8, 146u8, 28u8, 200u8, 53u8, 7u8, 235u8, 161u8, 117u8,
+							72u8, 89u8, 67u8, 243u8, 227u8, 175u8, 36u8, 41u8, 173u8, 150u8, 40u8,
+							186u8, 111u8, 191u8, 17u8, 81u8, 62u8, 122u8, 249u8, 227u8, 192u8,
+							205u8, 77u8, 50u8, 82u8, 246u8, 16u8, 192u8, 114u8, 243u8, 11u8, 180u8,
 						],
 					)
 				}
@@ -13611,7 +13611,7 @@ pub mod api {
 				#[codec(index = 0)]
 				MissingAccountOrigin {
 					account_id: ::subxt::utils::AccountId32,
-					chain: runtime_types::ulx_notary_primitives::note::Chain,
+					account_type: runtime_types::ulx_notary_primitives::note::AccountType,
 				},
 				#[codec(index = 1)]
 				HistoryLookupError {
@@ -13726,11 +13726,11 @@ pub mod api {
 				# [codec (crate = :: subxt :: ext :: codec)]
 				#[decode_as_type(crate_path = ":: subxt :: ext :: scale_decode")]
 				#[encode_as_type(crate_path = ":: subxt :: ext :: scale_encode")]
-				pub enum Chain {
+				pub enum AccountType {
 					#[codec(index = 0)]
 					Tax,
 					#[codec(index = 1)]
-					Argon,
+					Deposit,
 				}
 			}
 			pub mod notebook {

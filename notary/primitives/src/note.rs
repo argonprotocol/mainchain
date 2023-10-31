@@ -22,7 +22,8 @@ pub type NoteId = H256;
 )]
 #[serde(rename_all = "camelCase")]
 pub struct Note {
-	/// Hash of Scale encoded (balance_change_number, account_id, chain, milligons, note_type)
+	/// Hash of Scale encoded (balance_change_number, account_id, account_type, milligons,
+	/// note_type)
 	pub note_id: NoteId,
 	/// Number of milligons transferred
 	#[codec(compact)]
@@ -36,7 +37,7 @@ pub struct Note {
 impl Note {
 	pub fn create_unsigned(
 		account_id: &AccountId,
-		chain: &Chain,
+		account_type: &AccountType,
 		balance_change_number: u32,
 		note_index: u16,
 		milligons: u128,
@@ -45,7 +46,7 @@ impl Note {
 		Self {
 			note_id: Self::compute_note_id(
 				account_id,
-				chain,
+				account_type,
 				balance_change_number,
 				note_index,
 				milligons,
@@ -59,13 +60,13 @@ impl Note {
 	pub fn get_note_id(
 		&self,
 		account_id: &AccountId,
-		chain: &Chain,
+		account_type: &AccountType,
 		balance_change_number: u32,
 		note_index: u16,
 	) -> NoteId {
 		Self::compute_note_id(
 			account_id,
-			chain,
+			account_type,
 			balance_change_number,
 			note_index,
 			self.milligons,
@@ -75,7 +76,7 @@ impl Note {
 
 	pub fn compute_note_id(
 		account_id: &AccountId,
-		chain: &Chain,
+		account_type: &AccountType,
 		balance_change_number: u32,
 		note_index: u16,
 		milligons: u128,
@@ -84,7 +85,7 @@ impl Note {
 		blake2_256(
 			&[
 				&account_id.as_ref(),
-				&chain.encode()[..],
+				&account_type.encode()[..],
 				&balance_change_number.to_le_bytes()[..],
 				&note_index.to_le_bytes()[..],
 				&milligons.to_le_bytes()[..],
@@ -111,19 +112,19 @@ impl Note {
 	Deserialize,
 )]
 #[serde(rename_all = "camelCase")]
-pub enum Chain {
+pub enum AccountType {
 	Tax = 0,
-	Argon = 1,
+	Deposit = 1,
 }
 
-impl TryFrom<i32> for Chain {
+impl TryFrom<i32> for AccountType {
 	type Error = RuntimeString;
 
 	fn try_from(value: i32) -> Result<Self, Self::Error> {
 		match value {
-			0 => Ok(Chain::Tax),
-			1 => Ok(Chain::Argon),
-			_ => Err(format_runtime_string!("Invalid chain value {}", value)),
+			0 => Ok(AccountType::Tax),
+			1 => Ok(AccountType::Deposit),
+			_ => Err(format_runtime_string!("Invalid account_type value {}", value)),
 		}
 	}
 }

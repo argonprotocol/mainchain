@@ -4,7 +4,7 @@ use sp_core::{bounded::BoundedVec, ConstU32, RuntimeDebug, H256};
 use sp_core_hashing::blake2_256;
 use sp_runtime::scale_info::TypeInfo;
 
-use crate::{AccountId, AccountOriginUid, Chain, NotaryId, Note, NotebookNumber};
+use crate::{AccountId, AccountOriginUid, AccountType, NotaryId, Note, NotebookNumber};
 
 pub const MAX_BALANCESET_CHANGES: u32 = 25;
 
@@ -24,8 +24,8 @@ pub const MAX_BALANCESET_CHANGES: u32 = 25;
 pub struct BalanceChange {
 	/// Localchain account
 	pub account_id: AccountId,
-	/// Which chain (tax or argon)
-	pub chain: Chain,
+	/// Which type (tax or deposit)
+	pub account_type: AccountType,
 	#[codec(compact)]
 	pub change_number: u32,
 	/// New balance after change
@@ -81,7 +81,7 @@ pub struct BalanceProof {
 #[derive(Clone, Encode, Decode, RuntimeDebug, TypeInfo, Serialize, Deserialize)]
 pub struct BalanceTip {
 	pub account_id: AccountId,
-	pub chain: Chain,
+	pub account_type: AccountType,
 	pub change_number: u32,
 	pub balance: u128,
 	pub account_origin: AccountOrigin,
@@ -92,8 +92,8 @@ impl BalanceTip {
 		BalanceTipValue { nonce, balance, account_origin }.using_encoded(blake2_256)
 	}
 
-	pub fn create_key(account_id: &AccountId, chain: &Chain) -> [u8; 32] {
-		blake2_256(&[&account_id.as_ref(), &chain.encode()[..]].concat())
+	pub fn create_key(account_id: &AccountId, account_type: &AccountType) -> [u8; 32] {
+		blake2_256(&[&account_id.as_ref(), &account_type.encode()[..]].concat())
 	}
 }
 

@@ -1,6 +1,6 @@
 {
   "db_name": "PostgreSQL",
-  "query": "\n\t\t\t\tINSERT INTO notebook_origins (notebook_number, uid, account_id, chain) VALUES ($1, nextval('uid_seq_' || $2::TEXT), $3, $4) RETURNING uid\n\t\t\t\t",
+  "query": "\n\t\t\t\tINSERT INTO notebook_origins (notebook_number, uid, account_id, account_type) VALUES ($1, nextval('uid_seq_' || $2::TEXT), $3, $4) RETURNING uid\n\t\t\t\t",
   "describe": {
     "columns": [
       {
@@ -21,5 +21,5 @@
       false
     ]
   },
-  "hash": "b340973338c1f0a8752611848d051bbaeb152a2cde1112ae5da535ae49e7a9c0"
+  "hash": "132ff0fe97713de71b4241274e0c9746455d9d03d73a7cbf5967b3854deac735"
 }

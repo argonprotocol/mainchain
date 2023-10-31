@@ -153,7 +153,8 @@ mod tests {
 	use sqlx::PgPool;
 
 	use ulx_notary_primitives::{
-		AccountOrigin, BalanceChange, BalanceTip, Chain::Argon, ChainTransfer, Note, NoteType,
+		AccountOrigin, AccountType::Deposit, BalanceChange, BalanceTip, ChainTransfer,
+		NewAccountOrigin, Note, NoteType,
 	};
 
 	use crate::{
@@ -188,7 +189,7 @@ mod tests {
 		let client = WsClientBuilder::default().build(format!("ws://{}", notary.addr)).await?;
 		let mut transfer_note = Note::create_unsigned(
 			&Bob.to_account_id(),
-			&Argon,
+			&Deposit,
 			1,
 			0,
 			1000,
@@ -198,7 +199,7 @@ mod tests {
 		transfer_note.signature = Bob.sign(&transfer_note.note_id.as_ref()).into();
 		let balance_change = BalanceChange {
 			account_id: Bob.to_account_id(),
-			chain: Argon,
+			account_type: Deposit,
 			change_number: 1,
 			balance: 1000,
 			previous_balance: 0,
@@ -211,7 +212,7 @@ mod tests {
 			BalanceChangeResult {
 				notebook_number: 1,
 				finalized_block_number: 0,
-				new_account_origins: vec![(Bob.to_account_id(), Argon, 1)],
+				new_account_origins: vec![NewAccountOrigin::new(Bob.to_account_id(), Deposit, 1)],
 			}
 		);
 
@@ -244,7 +245,7 @@ mod tests {
 
 		let tip = BalanceTip {
 			account_id: Bob.to_account_id(),
-			chain: Argon,
+			account_type: Deposit,
 			change_number: 1,
 			balance: 1000,
 			account_origin: AccountOrigin { notebook_number: 1, account_uid: 1 },

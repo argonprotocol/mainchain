@@ -20,7 +20,7 @@ use sp_runtime::{
 use ulx_primitives::{
 	block_seal::BlockSealAuthorityPair,
 	digests::{FinalizedBlockNeededDigest, FINALIZED_BLOCK_DIGEST_ID},
-	localchain::{BalanceChange, Chain, Note, NoteType},
+	localchain::{AccountType, BalanceChange, Note, NoteType},
 	notebook::{
 		AccountOrigin, AuditedNotebook, BalanceTip, ChainTransfer, NewAccountOrigin, Notebook,
 		NotebookHeader,
@@ -584,7 +584,7 @@ fn it_can_audit_notebooks() {
 			}],
 			changed_accounts_root: merkle_root::<Blake2Hasher, _>(vec![BalanceTip {
 				account_id: who.clone(),
-				chain: Chain::Argon,
+				account_type: AccountType::Deposit,
 				change_number: 1,
 				balance: 2000,
 				account_origin: AccountOrigin { notebook_number: 1, account_uid: 1 },
@@ -603,7 +603,7 @@ fn it_can_audit_notebooks() {
 		let signature = ed25519::Signature([0u8; 64]);
 		let mut note = Note::create_unsigned(
 			&who.clone(),
-			&Chain::Argon,
+			&AccountType::Deposit,
 			1,
 			0,
 			2000,
@@ -613,10 +613,14 @@ fn it_can_audit_notebooks() {
 
 		let notebook = Notebook {
 			header,
-			new_account_origins: bounded_vec![NewAccountOrigin::new(who.clone(), Chain::Argon, 1)],
+			new_account_origins: bounded_vec![NewAccountOrigin::new(
+				who.clone(),
+				AccountType::Deposit,
+				1
+			)],
 			balance_changes: bounded_vec![bounded_vec![BalanceChange {
 				account_id: who.clone(),
-				chain: Chain::Argon,
+				account_type: AccountType::Deposit,
 				previous_balance: 0,
 				balance: 2000,
 				previous_balance_proof: None,

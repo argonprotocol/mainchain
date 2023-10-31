@@ -4,7 +4,7 @@ use sp_core::{bounded::BoundedVec, crypto::AccountId32, ed25519, ConstU32, Runti
 use sp_core_hashing::blake2_256;
 use sp_runtime::scale_info::TypeInfo;
 
-use crate::{AccountOrigin, BalanceChange, Chain};
+use crate::{AccountOrigin, AccountType, BalanceChange};
 
 pub const PINNED_BLOCKS_OFFSET: u32 = 100u32;
 pub const MAX_TRANSFERS: u32 = 10_000;
@@ -51,13 +51,17 @@ pub struct Notebook {
 #[serde(rename_all = "camelCase")]
 pub struct NewAccountOrigin {
 	pub account_id: AccountId32,
-	pub chain: Chain,
+	pub account_type: AccountType,
 	#[codec(compact)]
 	pub account_uid: AccountOriginUid,
 }
 impl NewAccountOrigin {
-	pub fn new(account_id: AccountId32, chain: Chain, account_uid: AccountOriginUid) -> Self {
-		Self { account_id, chain, account_uid }
+	pub fn new(
+		account_id: AccountId32,
+		account_type: AccountType,
+		account_uid: AccountOriginUid,
+	) -> Self {
+		Self { account_id, account_type, account_uid }
 	}
 }
 
@@ -91,7 +95,7 @@ pub struct NotebookHeader {
 	pub chain_transfers: BoundedVec<ChainTransfer, MaxTransfers>,
 	/// A merkle root for all account balances changed in this notebook.
 	/// Nodes are in the order of when each account is seen in the notebook.
-	/// Nodes contain the account id, chain, nonce, balance and account origin.
+	/// Nodes contain the account id, account_type, nonce, balance and account origin.
 	/// If a node is in the balance changes twice, only the last entry will be used.
 	/// Nodes are encoded as Scale and hashed with Blake2 256  
 	pub changed_accounts_root: H256,

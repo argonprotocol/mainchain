@@ -22,7 +22,7 @@ pub mod notebook {
 }
 
 pub mod localchain {
-	pub use ulx_notary_primitives::{BalanceChange, Chain, Note, NoteType};
+	pub use ulx_notary_primitives::{AccountType, BalanceChange, Note, NoteType};
 }
 
 sp_api::decl_runtime_apis! {

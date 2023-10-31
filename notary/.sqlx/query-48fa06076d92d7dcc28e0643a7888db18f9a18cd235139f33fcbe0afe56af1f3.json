@@ -1,6 +1,6 @@
 {
   "db_name": "PostgreSQL",
-  "query": "\n\t\t\tSELECT 1 as exists FROM notebook_status WHERE notebook_number = $1 AND step = $2 FOR UPDATE NOWAIT LIMIT 1\n\t\t\t",
+  "query": "\n\t\t\tSELECT 1 as exists FROM notebook_status WHERE notebook_number = $1 FOR UPDATE NOWAIT LIMIT 1\n\t\t\t",
   "describe": {
     "columns": [
       {
@@ -11,7 +11,6 @@
     ],
     "parameters": {
       "Left": [
-        "Int4",
         "Int4"
       ]
     },
@@ -19,5 +18,5 @@
       null
     ]
   },
-  "hash": "3b7178942863dd84db4d93389647934638ac4bb2d9811960dd825c96e4466f1c"
+  "hash": "48fa06076d92d7dcc28e0643a7888db18f9a18cd235139f33fcbe0afe56af1f3"
 }

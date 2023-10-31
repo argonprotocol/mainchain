@@ -5,7 +5,7 @@ use sp_core::{ByteArray, RuntimeDebug};
 use sp_runtime::RuntimeString;
 use sqlx::FromRow;
 
-use ulx_notary_primitives::{AccountId, AccountOriginUid, Chain, NotebookNumber};
+use ulx_notary_primitives::{AccountId, AccountOriginUid, AccountType, NotebookNumber};
 
 use crate::Error;
 
@@ -15,7 +15,7 @@ pub struct NotebookNewAccount {
 	pub notebook_number: NotebookNumber,
 	pub account_uid: AccountOriginUid,
 	pub account_id: AccountId,
-	pub chain: Chain,
+	pub account_type: AccountType,
 }
 
 #[derive(FromRow)]
@@ -24,7 +24,7 @@ struct NotebookOriginsRow {
 	pub notebook_number: i32,
 	pub uid: i32,
 	pub account_id: Vec<u8>,
-	pub chain: i32,
+	pub account_type: i32,
 }
 
 impl TryInto<NotebookNewAccount> for NotebookOriginsRow {
@@ -40,8 +40,8 @@ impl TryInto<NotebookNewAccount> for NotebookOriginsRow {
 					self.account_id
 				))
 			})?,
-			chain: self
-				.chain
+			account_type: self
+				.account_type
 				.try_into()
 				.map_err(|e: RuntimeString| Error::InternalError(e.to_string()))?,
 		})
@@ -53,16 +53,16 @@ impl NotebookNewAccountsStore {
 		db: impl sqlx::PgExecutor<'a> + 'a,
 		notebook_number: NotebookNumber,
 		account_id: &AccountId,
-		chain: &Chain,
+		account_type: &AccountType,
 	) -> anyhow::Result<AccountOriginUid, Error> {
 		let next = sqlx::query_scalar!(
 				r#"
-				INSERT INTO notebook_origins (notebook_number, uid, account_id, chain) VALUES ($1, nextval('uid_seq_' || $2::TEXT), $3, $4) RETURNING uid
+				INSERT INTO notebook_origins (notebook_number, uid, account_id, account_type) VALUES ($1, nextval('uid_seq_' || $2::TEXT), $3, $4) RETURNING uid
 				"#,
 				notebook_number as i32,
 				(notebook_number % 5u32) as i32,
 				account_id.as_slice(),
-				chain.clone() as i32,
+				account_type.clone() as i32,
 			)
 			.fetch_one(db)
 			.await?;
@@ -110,7 +110,7 @@ mod tests {
 	use sp_keyring::AccountKeyring::{Alice, Bob, Dave};
 	use sqlx::PgPool;
 
-	use ulx_notary_primitives::Chain::Argon;
+	use ulx_notary_primitives::AccountType::Deposit;
 
 	use crate::stores::notebook_new_accounts::NotebookNewAccountsStore;
 
@@ -123,22 +123,30 @@ mod tests {
 				&mut *tx,
 				1,
 				&Alice.to_account_id(),
-				&Argon,
+				&Deposit,
 			)
 			.await?;
 
 			assert_eq!(uid, 1);
 
-			let origin2 =
-				NotebookNewAccountsStore::insert_origin(&mut *tx, 1, &Bob.to_account_id(), &Argon)
-					.await?;
+			let origin2 = NotebookNewAccountsStore::insert_origin(
+				&mut *tx,
+				1,
+				&Bob.to_account_id(),
+				&Deposit,
+			)
+			.await?;
 
 			assert_eq!(origin2, 2);
 
 			// should restart at 1
-			let origin =
-				NotebookNewAccountsStore::insert_origin(&mut *tx, 2, &Dave.to_account_id(), &Argon)
-					.await?;
+			let origin = NotebookNewAccountsStore::insert_origin(
+				&mut *tx,
+				2,
+				&Dave.to_account_id(),
+				&Deposit,
+			)
+			.await?;
 
 			assert_eq!(origin, 1);
 			tx.commit().await?;
@@ -147,8 +155,13 @@ mod tests {
 			let mut tx = pool.begin().await?;
 
 			assert!(matches!(
-				NotebookNewAccountsStore::insert_origin(&mut *tx, 1, &Bob.to_account_id(), &Argon)
-					.await,
+				NotebookNewAccountsStore::insert_origin(
+					&mut *tx,
+					1,
+					&Bob.to_account_id(),
+					&Deposit
+				)
+				.await,
 				Err(crate::Error::Database(_))
 			));
 
@@ -163,7 +176,7 @@ mod tests {
 		let mut tx = pool.begin().await?;
 
 		let origin =
-			NotebookNewAccountsStore::insert_origin(&mut *tx, 1, &Alice.to_account_id(), &Argon)
+			NotebookNewAccountsStore::insert_origin(&mut *tx, 1, &Alice.to_account_id(), &Deposit)
 				.await?;
 
 		assert_eq!(origin, 1);
@@ -171,7 +184,7 @@ mod tests {
 		// should reset 1
 		NotebookNewAccountsStore::reset_seq(&mut *tx, 6).await?;
 		let origin =
-			NotebookNewAccountsStore::insert_origin(&mut *tx, 6, &Bob.to_account_id(), &Argon)
+			NotebookNewAccountsStore::insert_origin(&mut *tx, 6, &Bob.to_account_id(), &Deposit)
 				.await?;
 
 		assert_eq!(origin, 1);

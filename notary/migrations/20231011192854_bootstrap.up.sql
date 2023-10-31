@@ -42,10 +42,10 @@ CREATE INDEX IF NOT EXISTS chain_transfers_included_in_notebook_number ON chain_
 
 CREATE TABLE IF NOT EXISTS notebook_origins (
     account_id bytea NOT NULL,
-    chain INTEGER NOT NULL,
+    account_type INTEGER NOT NULL,
     uid INTEGER NOT NULL,
     notebook_number INTEGER NOT NULL,
-    PRIMARY KEY (account_id, chain)
+    PRIMARY KEY (account_id, account_type)
 );
 
 CREATE UNIQUE INDEX IF NOT EXISTS notebook_origins_uid_notebook_number ON notebook_origins (uid, notebook_number);

@@ -8,8 +8,8 @@ use serde_json::{from_value, json};
 use sp_core::{bounded::BoundedVec, Blake2Hasher, RuntimeDebug};
 
 use ulx_notary_primitives::{
-	ensure, note::Chain, AccountId, AccountOrigin, BalanceProof, BalanceTip, MaxBalanceChanges,
-	NewAccountOrigin, NotaryId, Notebook, NotebookNumber, PINNED_BLOCKS_OFFSET,
+	ensure, note::AccountType, AccountId, AccountOrigin, BalanceProof, BalanceTip,
+	MaxBalanceChanges, NewAccountOrigin, NotaryId, Notebook, NotebookNumber, PINNED_BLOCKS_OFFSET,
 };
 
 use crate::{
@@ -140,21 +140,21 @@ impl NotebookStore {
 		let changesets = BalanceChangeStore::get_for_notebook(&mut *db, notebook_number).await?;
 
 		let mut changed_accounts =
-			BTreeMap::<(AccountId, Chain), (u32, u128, AccountOrigin)>::new();
+			BTreeMap::<(AccountId, AccountType), (u32, u128, AccountOrigin)>::new();
 		let new_account_origins =
 			NotebookNewAccountsStore::take_notebook_origins(&mut *db, notebook_number).await?;
 
 		let new_account_origin_map =
 			BTreeMap::from_iter(new_account_origins.iter().map(|origin| {
 				(
-					(origin.account_id.clone(), origin.chain.clone()),
+					(origin.account_id.clone(), origin.account_type.clone()),
 					AccountOrigin { notebook_number, account_uid: origin.account_uid },
 				)
 			}));
 
 		for change in changesets {
 			for change in change {
-				let key = (change.account_id, change.chain);
+				let key = (change.account_id, change.account_type);
 				let origin = change
 					.previous_balance_proof
 					.map(|a| a.account_origin)
@@ -179,10 +179,16 @@ impl NotebookStore {
 		let mut account_changelist = vec![];
 		let merkle_leafs = changed_accounts
 			.into_iter()
-			.map(|((account_id, chain), (nonce, balance, account_origin))| {
+			.map(|((account_id, account_type), (nonce, balance, account_origin))| {
 				account_changelist.push(account_origin.clone());
-				BalanceTip { account_id, chain, change_number: nonce, balance, account_origin }
-					.encode()
+				BalanceTip {
+					account_id,
+					account_type,
+					change_number: nonce,
+					balance,
+					account_origin,
+				}
+				.encode()
 			})
 			.collect::<Vec<_>>();
 
@@ -202,7 +208,7 @@ impl NotebookStore {
 
 		let notebook_origins = new_account_origins
 			.iter()
-			.map(|a| (a.account_id.clone(), a.chain.clone(), a.account_uid.clone()))
+			.map(|a| (a.account_id.clone(), a.account_type.clone(), a.account_uid.clone()))
 			.collect::<Vec<_>>();
 
 		let origins_json = json!(notebook_origins);
@@ -240,7 +246,7 @@ mod tests {
 	use sqlx::PgPool;
 
 	use ulx_notary_primitives::{
-		AccountOrigin, BalanceChange, BalanceTip, Chain::Argon, NewAccountOrigin,
+		AccountOrigin, AccountType::Deposit, BalanceChange, BalanceTip, NewAccountOrigin,
 	};
 
 	use crate::stores::{
@@ -284,7 +290,7 @@ mod tests {
 			vec![
 				BalanceChange {
 					account_id: Bob.to_account_id(),
-					chain: Argon,
+					account_type: Deposit,
 					change_number: 1,
 					balance: 1000,
 					previous_balance_proof: None,
@@ -293,7 +299,7 @@ mod tests {
 				},
 				BalanceChange {
 					account_id: Alice.to_account_id(),
-					chain: Argon,
+					account_type: Deposit,
 					change_number: 1,
 					balance: 2500,
 					previous_balance_proof: None,
@@ -302,7 +308,7 @@ mod tests {
 				},
 				BalanceChange {
 					account_id: Dave.to_account_id(),
-					chain: Argon,
+					account_type: Deposit,
 					change_number: 1,
 					balance: 500,
 					previous_balance_proof: None,
@@ -312,10 +318,12 @@ mod tests {
 			],
 		)
 		.await?;
-		NotebookNewAccountsStore::insert_origin(&mut *tx, 1, &Bob.to_account_id(), &Argon).await?;
-		NotebookNewAccountsStore::insert_origin(&mut *tx, 1, &Alice.to_account_id(), &Argon)
+		NotebookNewAccountsStore::insert_origin(&mut *tx, 1, &Bob.to_account_id(), &Deposit)
 			.await?;
-		NotebookNewAccountsStore::insert_origin(&mut *tx, 1, &Dave.to_account_id(), &Argon).await?;
+		NotebookNewAccountsStore::insert_origin(&mut *tx, 1, &Alice.to_account_id(), &Deposit)
+			.await?;
+		NotebookNewAccountsStore::insert_origin(&mut *tx, 1, &Dave.to_account_id(), &Deposit)
+			.await?;
 		tx.commit().await?;
 
 		let mut tx = pool.begin().await?;
@@ -324,7 +332,7 @@ mod tests {
 
 		let balance_tip = BalanceTip {
 			account_id: Bob.to_account_id(),
-			chain: Argon,
+			account_type: Deposit,
 			change_number: 1,
 			balance: 1000,
 			account_origin: AccountOrigin { notebook_number: 1, account_uid: 1 },
@@ -340,9 +348,9 @@ mod tests {
 		assert_eq!(
 			NotebookStore::get_account_origins(&pool, 1).await?.into_inner(),
 			vec![
-				NewAccountOrigin::new(Bob.to_account_id(), Argon, 1),
-				NewAccountOrigin::new(Alice.to_account_id(), Argon, 2),
-				NewAccountOrigin::new(Dave.to_account_id(), Argon, 3),
+				NewAccountOrigin::new(Bob.to_account_id(), Deposit, 1),
+				NewAccountOrigin::new(Alice.to_account_id(), Deposit, 2),
+				NewAccountOrigin::new(Dave.to_account_id(), Deposit, 3),
 			]
 		);
 

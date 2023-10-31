@@ -561,7 +561,7 @@ mod tests {
 		},
 		UlxClient,
 	};
-	use ulx_notary_primitives::{BalanceChange, Chain::Argon, Note, Notebook};
+	use ulx_notary_primitives::{AccountType::Deposit, BalanceChange, Note, Notebook};
 	use ulx_testing::{test_context, test_context_from_url};
 
 	use crate::{
@@ -808,7 +808,7 @@ mod tests {
 	async fn submit_balance_change_to_notary(pool: &PgPool, bob_nonce: u32) -> anyhow::Result<()> {
 		let mut transfer_in_note = Note::create_unsigned(
 			&Bob.to_account_id(),
-			&Argon,
+			&Deposit,
 			1,
 			0,
 			1000,
@@ -821,7 +821,7 @@ mod tests {
 			1,
 			vec![BalanceChange {
 				account_id: Bob.to_account_id(),
-				chain: Argon,
+				account_type: Deposit,
 				change_number: 1,
 				previous_balance: 0,
 				balance: 1000,

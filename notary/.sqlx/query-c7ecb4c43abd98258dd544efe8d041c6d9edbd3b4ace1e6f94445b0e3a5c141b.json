@@ -10,7 +10,7 @@
       },
       {
         "ordinal": 1,
-        "name": "chain",
+        "name": "account_type",
         "type_info": "Int4"
       },
       {

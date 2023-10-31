@@ -15,7 +15,7 @@
       },
       {
         "ordinal": 2,
-        "name": "nonce",
+        "name": "account_nonce",
         "type_info": "Int4"
       },
       {

@@ -5,7 +5,7 @@ use serde::{Deserialize, Serialize};
 use sp_core::{bounded::BoundedVec, ConstU32, RuntimeDebug};
 
 use ulx_notary_primitives::{
-	note::Chain, AccountId, AccountOriginUid, BalanceChange, NotebookNumber, MAX_BALANCESET_CHANGES,
+	BalanceChange, NewAccountOrigin, NotebookNumber, MAX_BALANCESET_CHANGES,
 };
 
 #[rpc(server, client, namespace = "localchain")]
@@ -20,5 +20,5 @@ pub trait LocalchainRpc {
 pub struct BalanceChangeResult {
 	pub notebook_number: NotebookNumber,
 	pub finalized_block_number: u32,
-	pub new_account_origins: Vec<(AccountId, Chain, AccountOriginUid)>,
+	pub new_account_origins: Vec<NewAccountOrigin>,
 }

@@ -3,7 +3,9 @@ use std::default::Default;
 use sp_core::H256;
 use sqlx::PgConnection;
 
-use ulx_notary_primitives::{ensure, AccountId, AccountOrigin, BalanceTip, Chain, NotebookNumber};
+use ulx_notary_primitives::{
+	ensure, AccountId, AccountOrigin, AccountType, BalanceTip, NotebookNumber,
+};
 
 use crate::{stores::BoxFutureResult, Error};
 
@@ -23,14 +25,14 @@ impl BalanceTipStore {
 	pub fn lock<'a>(
 		db: &'a mut PgConnection,
 		account_id: &AccountId,
-		chain: Chain,
+		account_type: AccountType,
 		proposed_change_number: u32,
 		previous_balance: u128,
 		account_origin: &AccountOrigin,
 		change_index: usize,
 		timeout_millis: u32,
 	) -> BoxFutureResult<'a, Option<H256>> {
-		let key = BalanceTip::create_key(account_id, &chain);
+		let key = BalanceTip::create_key(account_id, &account_type);
 
 		let mut provided_tip: Option<H256> = None;
 		if proposed_change_number > 1u32 {
@@ -75,14 +77,14 @@ impl BalanceTipStore {
 	pub fn update<'a>(
 		db: &'a mut PgConnection,
 		account_id: &AccountId,
-		chain: Chain,
+		account_type: AccountType,
 		change_number: u32,
 		balance: u128,
 		notebook_number: NotebookNumber,
 		account_origin: AccountOrigin,
 		prev_balance: u128,
 	) -> BoxFutureResult<'a, ()> {
-		let key = BalanceTip::create_key(account_id, &chain);
+		let key = BalanceTip::create_key(account_id, &account_type);
 		let tip = BalanceTip::compute_tip(change_number, balance, account_origin.clone());
 		let prev = BalanceTip::compute_tip(change_number - 1, prev_balance, account_origin);
 		Box::pin(async move {
@@ -116,7 +118,7 @@ mod tests {
 	use sp_keyring::Sr25519Keyring::Bob;
 	use sqlx::PgPool;
 
-	use ulx_notary_primitives::{note::Chain::Argon, AccountOrigin, BalanceTip};
+	use ulx_notary_primitives::{note::AccountType::Deposit, AccountOrigin, BalanceTip};
 
 	use crate::stores::balance_tip::BalanceTipStore;
 
@@ -131,7 +133,7 @@ mod tests {
 				BalanceTipStore::lock(
 					&mut tx1,
 					&Bob.to_account_id(),
-					Argon,
+					Deposit,
 					1,
 					0,
 					&AccountOrigin { notebook_number: 1, account_uid: 1 },
@@ -144,7 +146,7 @@ mod tests {
 			BalanceTipStore::update(
 				&mut *tx1,
 				&Bob.to_account_id(),
-				Argon,
+				Deposit,
 				1,
 				1000,
 				1,
@@ -160,7 +162,7 @@ mod tests {
 			BalanceTipStore::lock(
 				&mut tx2,
 				&Bob.to_account_id(),
-				Argon,
+				Deposit,
 				2,
 				1000,
 				&AccountOrigin { notebook_number: 1, account_uid: 1 },
@@ -182,7 +184,7 @@ mod tests {
 		assert!(BalanceTipStore::lock(
 			&mut *tx3,
 			&Bob.to_account_id(),
-			Argon,
+			Deposit,
 			2,
 			1000,
 			&AccountOrigin { notebook_number: 1, account_uid: 1 },
@@ -198,7 +200,7 @@ mod tests {
 			BalanceTipStore::update(
 				&mut *tx2,
 				&Bob.to_account_id(),
-				Argon,
+				Deposit,
 				2,
 				1001,
 				1,
