@@ -1,5 +1,6 @@
 use std::collections::BTreeMap;
 
+use binary_merkle_tree::merkle_root;
 use codec::Encode;
 use frame_support::{assert_err, assert_noop, assert_ok, traits::OnInitialize};
 use frame_system::pallet_prelude::BlockNumberFor;
@@ -16,13 +17,13 @@ use sp_runtime::{
 	BoundedVec, DigestItem,
 };
 
-use binary_merkle_tree::merkle_root;
 use ulx_primitives::{
 	block_seal::BlockSealAuthorityPair,
 	digests::{FinalizedBlockNeededDigest, FINALIZED_BLOCK_DIGEST_ID},
 	localchain::{BalanceChange, Chain, Note, NoteType},
 	notebook::{
-		AccountOrigin, AuditedNotebook, BalanceTip, ChainTransfer, Notebook, NotebookHeader,
+		AccountOrigin, AuditedNotebook, BalanceTip, ChainTransfer, NewAccountOrigin, Notebook,
+		NotebookHeader,
 	},
 	BlockSealAuthorityId,
 };
@@ -178,7 +179,6 @@ fn it_can_handle_transfers_in() {
 		let changed_accounts_root = H256::random();
 		assert_ok!(LocalchainRelay::submit_notebook(
 			RuntimeOrigin::none(),
-			Hash::random(),
 			AuditedNotebook {
 				header_hash: Hash::random(),
 				header: NotebookHeader {
@@ -187,7 +187,7 @@ fn it_can_handle_transfers_in() {
 					pinned_to_block_number: 1,
 					chain_transfers: bounded_vec![ChainTransfer::ToLocalchain {
 						account_id: Bob.to_account_id(),
-						nonce: nonce.unique_saturated_into()
+						account_nonce: nonce.unique_saturated_into()
 					}],
 					changed_accounts_root: changed_accounts_root.clone(),
 					changed_account_origins: bounded_vec![AccountOrigin {
@@ -224,7 +224,6 @@ fn it_can_handle_transfers_in() {
 		let change_root_2 = H256::random();
 		assert_ok!(LocalchainRelay::submit_notebook(
 			RuntimeOrigin::none(),
-			Hash::random(),
 			AuditedNotebook {
 				header_hash: Hash::random(),
 				header: NotebookHeader {
@@ -266,7 +265,6 @@ fn it_can_handle_transfers_in() {
 
 		assert_ok!(LocalchainRelay::submit_notebook(
 			RuntimeOrigin::none(),
-			Hash::random(),
 			AuditedNotebook {
 				header_hash: Hash::random(),
 				header: NotebookHeader {
@@ -305,7 +303,6 @@ fn it_doesnt_allow_a_notary_balance_to_go_negative() {
 		assert_noop!(
 			LocalchainRelay::submit_notebook(
 				RuntimeOrigin::none(),
-				Hash::random(),
 				AuditedNotebook {
 					header_hash: Hash::random(),
 					header: NotebookHeader {
@@ -349,7 +346,6 @@ fn it_requires_minimum_audits() {
 		assert_noop!(
 			LocalchainRelay::submit_notebook(
 				RuntimeOrigin::none(),
-				Hash::random(),
 				AuditedNotebook {
 					header: NotebookHeader {
 						notary_id: 1,
@@ -424,7 +420,6 @@ fn it_requires_valid_auditors() {
 		assert_noop!(
 			LocalchainRelay::submit_notebook(
 				RuntimeOrigin::none(),
-				Hash::random(),
 				audited_notebook.clone(),
 				ed25519::Signature([0u8; 64]),
 			),
@@ -436,7 +431,6 @@ fn it_requires_valid_auditors() {
 		assert_noop!(
 			LocalchainRelay::submit_notebook(
 				RuntimeOrigin::none(),
-				Hash::from([0u8; 32]),
 				audited_notebook.clone(),
 				ed25519::Signature([0u8; 64]),
 			),
@@ -446,7 +440,6 @@ fn it_requires_valid_auditors() {
 		audited_notebook.auditors = bound(create_signatures(vec![0, 1, 2, 3]));
 		assert_ok!(LocalchainRelay::submit_notebook(
 			RuntimeOrigin::none(),
-			Hash::random(),
 			audited_notebook.clone(),
 			ed25519::Signature([0u8; 64]),
 		),);
@@ -482,7 +475,6 @@ fn it_expires_transfers_if_not_committed() {
 		assert_err!(
 			LocalchainRelay::submit_notebook(
 				RuntimeOrigin::none(),
-				H256::random(),
 				AuditedNotebook {
 					header: NotebookHeader {
 						notary_id: 1,
@@ -490,7 +482,7 @@ fn it_expires_transfers_if_not_committed() {
 						pinned_to_block_number: 0,
 						chain_transfers: bounded_vec![ChainTransfer::ToLocalchain {
 							account_id: who.clone(),
-							nonce: nonce.unique_saturated_into()
+							account_nonce: nonce.unique_saturated_into()
 						}],
 						changed_accounts_root: H256::random(),
 						changed_account_origins: bounded_vec![],
@@ -520,8 +512,6 @@ fn it_delays_for_finalization() {
 			LocalchainRelay::validate_unsigned(
 				TransactionSource::Local,
 				&crate::Call::submit_notebook {
-					notebook_hash: Hash::default(),
-
 					notebook: AuditedNotebook {
 						header: NotebookHeader {
 							notary_id: 1,
@@ -590,12 +580,12 @@ fn it_can_audit_notebooks() {
 			pinned_to_block_number: 1,
 			chain_transfers: bounded_vec![ChainTransfer::ToLocalchain {
 				account_id: who.clone(),
-				nonce: nonce.unique_saturated_into()
+				account_nonce: nonce.unique_saturated_into()
 			}],
 			changed_accounts_root: merkle_root::<Blake2Hasher, _>(vec![BalanceTip {
 				account_id: who.clone(),
 				chain: Chain::Argon,
-				nonce: 1,
+				change_number: 1,
 				balance: 2000,
 				account_origin: AccountOrigin { notebook_number: 1, account_uid: 1 },
 			}
@@ -615,21 +605,22 @@ fn it_can_audit_notebooks() {
 			&who.clone(),
 			&Chain::Argon,
 			1,
+			0,
 			2000,
-			NoteType::ClaimFromMainchain { nonce: nonce.unique_saturated_into() },
+			NoteType::ClaimFromMainchain { account_nonce: nonce.unique_saturated_into() },
 		);
 		note.signature = Bob.sign(&note.note_id[..]).into();
 
 		let notebook = Notebook {
 			header,
-			new_account_origins: bounded_vec![(who.clone(), Chain::Argon, 1)],
+			new_account_origins: bounded_vec![NewAccountOrigin::new(who.clone(), Chain::Argon, 1)],
 			balance_changes: bounded_vec![bounded_vec![BalanceChange {
 				account_id: who.clone(),
 				chain: Chain::Argon,
 				previous_balance: 0,
 				balance: 2000,
 				previous_balance_proof: None,
-				nonce: 1,
+				change_number: 1,
 				notes: bounded_vec![note],
 			}]],
 		};

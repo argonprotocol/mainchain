@@ -9,7 +9,7 @@ use sp_core::{bounded::BoundedVec, Blake2Hasher, RuntimeDebug};
 
 use ulx_notary_primitives::{
 	ensure, note::Chain, AccountId, AccountOrigin, BalanceProof, BalanceTip, MaxBalanceChanges,
-	NotaryId, Notebook, NotebookAccountOrigin, NotebookNumber, PINNED_BLOCKS_OFFSET,
+	NewAccountOrigin, NotaryId, Notebook, NotebookNumber, PINNED_BLOCKS_OFFSET,
 };
 
 use crate::{
@@ -66,7 +66,7 @@ impl NotebookStore {
 	pub fn get_account_origins<'a>(
 		db: impl sqlx::PgExecutor<'a> + 'a,
 		notebook_number: NotebookNumber,
-	) -> BoxFutureResult<'a, BoundedVec<NotebookAccountOrigin, MaxBalanceChanges>> {
+	) -> BoxFutureResult<'a, BoundedVec<NewAccountOrigin, MaxBalanceChanges>> {
 		Box::pin(async move {
 			let rows = sqlx::query!(
 				"SELECT new_account_origins FROM notebooks WHERE notebook_number = $1 LIMIT 1",
@@ -75,8 +75,7 @@ impl NotebookStore {
 			.fetch_one(db)
 			.await?;
 
-			let new_account_origins: Vec<NotebookAccountOrigin> =
-				from_value(rows.new_account_origins)?;
+			let new_account_origins: Vec<NewAccountOrigin> = from_value(rows.new_account_origins)?;
 
 			Ok(BoundedVec::truncate_from(new_account_origins))
 		})
@@ -169,9 +168,10 @@ impl NotebookStore {
 					.map_err(|e| Error::InternalError(e().to_string()))?;
 
 				if !changed_accounts.contains_key(&key) ||
-					changed_accounts.get(&key).is_some_and(|a| a.0 < change.nonce)
+					changed_accounts.get(&key).is_some_and(|a| a.0 < change.change_number)
 				{
-					changed_accounts.insert(key.clone(), (change.nonce, change.balance, origin));
+					changed_accounts
+						.insert(key.clone(), (change.change_number, change.balance, origin));
 				}
 			}
 		}
@@ -181,7 +181,8 @@ impl NotebookStore {
 			.into_iter()
 			.map(|((account_id, chain), (nonce, balance, account_origin))| {
 				account_changelist.push(account_origin.clone());
-				BalanceTip { account_id, chain, nonce, balance, account_origin }.encode()
+				BalanceTip { account_id, chain, change_number: nonce, balance, account_origin }
+					.encode()
 			})
 			.collect::<Vec<_>>();
 
@@ -193,6 +194,7 @@ impl NotebookStore {
 			notebook_number,
 			transfers,
 			pinned_to_block_number,
+			meta.finalized_block_number,
 			changes_root,
 			account_changelist,
 		)
@@ -237,7 +239,9 @@ mod tests {
 	};
 	use sqlx::PgPool;
 
-	use ulx_notary_primitives::{AccountOrigin, BalanceChange, BalanceTip, Chain::Argon};
+	use ulx_notary_primitives::{
+		AccountOrigin, BalanceChange, BalanceTip, Chain::Argon, NewAccountOrigin,
+	};
 
 	use crate::stores::{
 		balance_change::BalanceChangeStore, block_meta::BlockMetaStore,
@@ -281,7 +285,7 @@ mod tests {
 				BalanceChange {
 					account_id: Bob.to_account_id(),
 					chain: Argon,
-					nonce: 1,
+					change_number: 1,
 					balance: 1000,
 					previous_balance_proof: None,
 					previous_balance: 0,
@@ -290,7 +294,7 @@ mod tests {
 				BalanceChange {
 					account_id: Alice.to_account_id(),
 					chain: Argon,
-					nonce: 1,
+					change_number: 1,
 					balance: 2500,
 					previous_balance_proof: None,
 					previous_balance: 0,
@@ -299,7 +303,7 @@ mod tests {
 				BalanceChange {
 					account_id: Dave.to_account_id(),
 					chain: Argon,
-					nonce: 1,
+					change_number: 1,
 					balance: 500,
 					previous_balance_proof: None,
 					previous_balance: 0,
@@ -321,7 +325,7 @@ mod tests {
 		let balance_tip = BalanceTip {
 			account_id: Bob.to_account_id(),
 			chain: Argon,
-			nonce: 1,
+			change_number: 1,
 			balance: 1000,
 			account_origin: AccountOrigin { notebook_number: 1, account_uid: 1 },
 		};
@@ -336,9 +340,9 @@ mod tests {
 		assert_eq!(
 			NotebookStore::get_account_origins(&pool, 1).await?.into_inner(),
 			vec![
-				(Bob.to_account_id(), Argon, 1),
-				(Alice.to_account_id(), Argon, 2),
-				(Dave.to_account_id(), Argon, 3),
+				NewAccountOrigin::new(Bob.to_account_id(), Argon, 1),
+				NewAccountOrigin::new(Alice.to_account_id(), Argon, 2),
+				NewAccountOrigin::new(Dave.to_account_id(), Argon, 3),
 			]
 		);
 

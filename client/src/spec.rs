@@ -852,9 +852,9 @@ pub mod api {
 						"query_call_info",
 						types::QueryCallInfo { call, len },
 						[
-							246u8, 52u8, 53u8, 219u8, 121u8, 126u8, 49u8, 220u8, 20u8, 72u8, 41u8,
-							4u8, 134u8, 2u8, 9u8, 103u8, 183u8, 246u8, 11u8, 246u8, 118u8, 161u8,
-							221u8, 85u8, 207u8, 183u8, 246u8, 154u8, 16u8, 243u8, 53u8, 7u8,
+							28u8, 79u8, 169u8, 250u8, 63u8, 238u8, 77u8, 118u8, 29u8, 172u8, 29u8,
+							114u8, 154u8, 76u8, 60u8, 9u8, 149u8, 159u8, 77u8, 173u8, 79u8, 52u8,
+							178u8, 207u8, 225u8, 171u8, 192u8, 23u8, 192u8, 116u8, 133u8, 189u8,
 						],
 					)
 				}
@@ -874,10 +874,9 @@ pub mod api {
 						"query_call_fee_details",
 						types::QueryCallFeeDetails { call, len },
 						[
-							32u8, 120u8, 151u8, 102u8, 107u8, 173u8, 110u8, 21u8, 133u8, 122u8,
-							108u8, 71u8, 10u8, 13u8, 160u8, 16u8, 245u8, 154u8, 69u8, 162u8, 104u8,
-							203u8, 126u8, 25u8, 221u8, 182u8, 110u8, 34u8, 212u8, 215u8, 134u8,
-							35u8,
+							179u8, 249u8, 0u8, 178u8, 27u8, 17u8, 228u8, 6u8, 201u8, 175u8, 156u8,
+							38u8, 189u8, 61u8, 209u8, 144u8, 28u8, 61u8, 101u8, 137u8, 224u8, 95u8,
+							29u8, 9u8, 251u8, 218u8, 31u8, 172u8, 199u8, 27u8, 53u8, 201u8,
 						],
 					)
 				}
@@ -1217,9 +1216,9 @@ pub mod api {
 							bytes,
 						},
 						[
-							22u8, 79u8, 100u8, 48u8, 20u8, 41u8, 224u8, 234u8, 209u8, 85u8, 71u8,
-							93u8, 47u8, 150u8, 150u8, 206u8, 154u8, 209u8, 7u8, 192u8, 105u8, 24u8,
-							74u8, 247u8, 55u8, 232u8, 109u8, 61u8, 9u8, 138u8, 69u8, 121u8,
+							39u8, 49u8, 243u8, 90u8, 34u8, 70u8, 130u8, 211u8, 159u8, 66u8, 251u8,
+							75u8, 23u8, 50u8, 168u8, 215u8, 150u8, 26u8, 170u8, 249u8, 152u8, 76u8,
+							124u8, 219u8, 146u8, 28u8, 200u8, 53u8, 7u8, 235u8, 161u8, 117u8,
 						],
 					)
 				}
@@ -1668,9 +1667,9 @@ pub mod api {
 			.hash();
 		runtime_metadata_hash ==
 			[
-				58u8, 228u8, 246u8, 78u8, 92u8, 253u8, 21u8, 110u8, 27u8, 6u8, 240u8, 140u8, 76u8,
-				33u8, 244u8, 242u8, 48u8, 92u8, 244u8, 55u8, 80u8, 70u8, 222u8, 90u8, 175u8, 53u8,
-				129u8, 253u8, 187u8, 135u8, 22u8, 32u8,
+				46u8, 61u8, 22u8, 53u8, 40u8, 15u8, 176u8, 146u8, 47u8, 79u8, 220u8, 108u8, 235u8,
+				254u8, 26u8, 116u8, 22u8, 13u8, 82u8, 31u8, 232u8, 152u8, 182u8, 195u8, 206u8,
+				208u8, 130u8, 104u8, 218u8, 165u8, 220u8, 204u8,
 			]
 	}
 	pub mod system {
@@ -2392,9 +2391,10 @@ pub mod api {
 						"Events",
 						vec![],
 						[
-							146u8, 91u8, 218u8, 232u8, 30u8, 102u8, 136u8, 61u8, 38u8, 49u8, 237u8,
-							57u8, 88u8, 224u8, 44u8, 147u8, 9u8, 12u8, 156u8, 144u8, 198u8, 70u8,
-							85u8, 253u8, 80u8, 167u8, 216u8, 137u8, 36u8, 197u8, 60u8, 170u8,
+							20u8, 164u8, 238u8, 220u8, 98u8, 140u8, 192u8, 81u8, 192u8, 67u8,
+							200u8, 12u8, 159u8, 250u8, 158u8, 136u8, 24u8, 239u8, 84u8, 106u8,
+							18u8, 146u8, 177u8, 112u8, 121u8, 99u8, 78u8, 69u8, 115u8, 134u8,
+							213u8, 193u8,
 						],
 					)
 				}
@@ -4683,7 +4683,6 @@ pub mod api {
 				#[decode_as_type(crate_path = ":: subxt :: ext :: scale_decode")]
 				#[encode_as_type(crate_path = ":: subxt :: ext :: scale_encode")]
 				pub struct SubmitNotebook {
-					pub notebook_hash: ::subxt::utils::H256,
 					pub notebook: runtime_types::ulx_notary_primitives::notebook::AuditedNotebook,
 					pub signature: runtime_types::sp_core::ed25519::Signature,
 				}
@@ -4707,7 +4706,7 @@ pub mod api {
 					pub amount: ::core::primitive::u128,
 					pub notary_id: ::core::primitive::u32,
 					#[codec(compact)]
-					pub nonce: ::core::primitive::u32,
+					pub account_nonce: ::core::primitive::u32,
 				}
 				impl ::subxt::blocks::StaticExtrinsic for SendToLocalchain {
 					const PALLET: &'static str = "LocalchainRelay";
@@ -4719,19 +4718,17 @@ pub mod api {
 				#[doc = "See `Pallet::submit_notebook`."]
 				pub fn submit_notebook(
 					&self,
-					notebook_hash: ::subxt::utils::H256,
 					notebook: runtime_types::ulx_notary_primitives::notebook::AuditedNotebook,
 					signature: runtime_types::sp_core::ed25519::Signature,
 				) -> ::subxt::tx::Payload<types::SubmitNotebook> {
 					::subxt::tx::Payload::new_static(
 						"LocalchainRelay",
 						"submit_notebook",
-						types::SubmitNotebook { notebook_hash, notebook, signature },
+						types::SubmitNotebook { notebook, signature },
 						[
-							236u8, 254u8, 241u8, 179u8, 13u8, 18u8, 110u8, 254u8, 136u8, 53u8,
-							233u8, 255u8, 98u8, 205u8, 193u8, 151u8, 57u8, 211u8, 33u8, 89u8, 49u8,
-							206u8, 141u8, 238u8, 22u8, 76u8, 10u8, 179u8, 214u8, 51u8, 228u8,
-							198u8,
+							31u8, 69u8, 13u8, 50u8, 67u8, 185u8, 177u8, 200u8, 192u8, 113u8, 18u8,
+							115u8, 50u8, 16u8, 82u8, 196u8, 90u8, 153u8, 46u8, 187u8, 187u8, 219u8,
+							155u8, 5u8, 168u8, 55u8, 56u8, 171u8, 86u8, 109u8, 91u8, 4u8,
 						],
 					)
 				}
@@ -4740,16 +4737,17 @@ pub mod api {
 					&self,
 					amount: ::core::primitive::u128,
 					notary_id: ::core::primitive::u32,
-					nonce: ::core::primitive::u32,
+					account_nonce: ::core::primitive::u32,
 				) -> ::subxt::tx::Payload<types::SendToLocalchain> {
 					::subxt::tx::Payload::new_static(
 						"LocalchainRelay",
 						"send_to_localchain",
-						types::SendToLocalchain { amount, notary_id, nonce },
+						types::SendToLocalchain { amount, notary_id, account_nonce },
 						[
-							219u8, 57u8, 221u8, 109u8, 59u8, 136u8, 84u8, 62u8, 43u8, 179u8, 194u8,
-							198u8, 145u8, 192u8, 197u8, 43u8, 129u8, 217u8, 20u8, 120u8, 41u8,
-							191u8, 1u8, 96u8, 241u8, 84u8, 214u8, 83u8, 169u8, 117u8, 108u8, 243u8,
+							235u8, 60u8, 252u8, 71u8, 57u8, 103u8, 83u8, 70u8, 168u8, 14u8, 138u8,
+							217u8, 144u8, 173u8, 93u8, 242u8, 97u8, 193u8, 176u8, 163u8, 124u8,
+							162u8, 173u8, 250u8, 52u8, 242u8, 168u8, 25u8, 247u8, 208u8, 159u8,
+							117u8,
 						],
 					)
 				}
@@ -4773,7 +4771,7 @@ pub mod api {
 			pub struct TransferToLocalchain {
 				pub account_id: ::subxt::utils::AccountId32,
 				pub amount: ::core::primitive::u128,
-				pub nonce: ::core::primitive::u32,
+				pub account_nonce: ::core::primitive::u32,
 				pub notary_id: ::core::primitive::u32,
 				pub expiration_block: ::core::primitive::u32,
 			}
@@ -4794,7 +4792,7 @@ pub mod api {
 			#[encode_as_type(crate_path = ":: subxt :: ext :: scale_encode")]
 			pub struct TransferToLocalchainExpired {
 				pub account_id: ::subxt::utils::AccountId32,
-				pub nonce: ::core::primitive::u32,
+				pub account_nonce: ::core::primitive::u32,
 				pub notary_id: ::core::primitive::u32,
 			}
 			impl ::subxt::events::StaticEvent for TransferToLocalchainExpired {
@@ -9520,9 +9518,9 @@ pub mod api {
 						"sudo",
 						types::Sudo { call: ::std::boxed::Box::new(call) },
 						[
-							107u8, 123u8, 124u8, 57u8, 108u8, 177u8, 245u8, 238u8, 232u8, 13u8,
-							205u8, 60u8, 69u8, 151u8, 79u8, 196u8, 35u8, 63u8, 249u8, 80u8, 236u8,
-							73u8, 201u8, 208u8, 239u8, 82u8, 122u8, 111u8, 223u8, 48u8, 88u8, 80u8,
+							32u8, 153u8, 38u8, 20u8, 26u8, 186u8, 64u8, 45u8, 147u8, 215u8, 164u8,
+							232u8, 116u8, 212u8, 9u8, 82u8, 15u8, 87u8, 200u8, 136u8, 194u8, 241u8,
+							195u8, 9u8, 105u8, 204u8, 175u8, 210u8, 248u8, 141u8, 25u8, 37u8,
 						],
 					)
 				}
@@ -9537,10 +9535,9 @@ pub mod api {
 						"sudo_unchecked_weight",
 						types::SudoUncheckedWeight { call: ::std::boxed::Box::new(call), weight },
 						[
-							6u8, 1u8, 89u8, 97u8, 138u8, 240u8, 164u8, 74u8, 153u8, 160u8, 244u8,
-							215u8, 126u8, 254u8, 77u8, 198u8, 170u8, 211u8, 226u8, 163u8, 226u8,
-							192u8, 125u8, 104u8, 152u8, 115u8, 102u8, 160u8, 190u8, 52u8, 42u8,
-							88u8,
+							135u8, 150u8, 0u8, 89u8, 186u8, 162u8, 20u8, 48u8, 154u8, 2u8, 83u8,
+							120u8, 190u8, 165u8, 51u8, 38u8, 1u8, 45u8, 180u8, 155u8, 5u8, 158u8,
+							4u8, 229u8, 123u8, 47u8, 189u8, 229u8, 20u8, 194u8, 219u8, 218u8,
 						],
 					)
 				}
@@ -9571,10 +9568,9 @@ pub mod api {
 						"sudo_as",
 						types::SudoAs { who, call: ::std::boxed::Box::new(call) },
 						[
-							82u8, 107u8, 227u8, 180u8, 128u8, 228u8, 17u8, 255u8, 11u8, 163u8, 4u8,
-							64u8, 167u8, 168u8, 61u8, 173u8, 110u8, 191u8, 153u8, 197u8, 74u8,
-							200u8, 82u8, 174u8, 221u8, 226u8, 114u8, 135u8, 210u8, 28u8, 209u8,
-							16u8,
+							69u8, 29u8, 83u8, 221u8, 136u8, 67u8, 235u8, 214u8, 89u8, 28u8, 25u8,
+							133u8, 13u8, 88u8, 46u8, 170u8, 76u8, 167u8, 82u8, 236u8, 134u8, 153u8,
+							102u8, 53u8, 16u8, 166u8, 157u8, 243u8, 131u8, 244u8, 3u8, 127u8,
 						],
 					)
 				}
@@ -11310,7 +11306,6 @@ pub mod api {
 					#[codec(index = 0)]
 					#[doc = "See `Pallet::submit_notebook`."]
 					submit_notebook {
-						notebook_hash: ::subxt::utils::H256,
 						notebook: runtime_types::ulx_notary_primitives::notebook::AuditedNotebook,
 						signature: runtime_types::sp_core::ed25519::Signature,
 					},
@@ -11321,7 +11316,7 @@ pub mod api {
 						amount: ::core::primitive::u128,
 						notary_id: ::core::primitive::u32,
 						#[codec(compact)]
-						nonce: ::core::primitive::u32,
+						account_nonce: ::core::primitive::u32,
 					},
 				}
 				#[derive(
@@ -11408,14 +11403,14 @@ pub mod api {
 					TransferToLocalchain {
 						account_id: ::subxt::utils::AccountId32,
 						amount: ::core::primitive::u128,
-						nonce: ::core::primitive::u32,
+						account_nonce: ::core::primitive::u32,
 						notary_id: ::core::primitive::u32,
 						expiration_block: ::core::primitive::u32,
 					},
 					#[codec(index = 1)]
 					TransferToLocalchainExpired {
 						account_id: ::subxt::utils::AccountId32,
-						nonce: ::core::primitive::u32,
+						account_nonce: ::core::primitive::u32,
 						notary_id: ::core::primitive::u32,
 					},
 					#[codec(index = 2)]
@@ -13643,50 +13638,56 @@ pub mod api {
 				#[codec(index = 11)]
 				InvalidNoteIdCalculated,
 				#[codec(index = 12)]
+				NoteIdNotInBalanceChanges { note_id: ::subxt::utils::H256 },
+				#[codec(index = 13)]
+				InvalidNoteRecipient,
+				#[codec(index = 14)]
+				NoteIdAlreadyUsed,
+				#[codec(index = 15)]
 				BalanceChangeError {
 					change_index: ::core::primitive::u16,
 					note_index: ::core::primitive::u16,
 					message: ::std::string::String,
 				},
-				#[codec(index = 13)]
+				#[codec(index = 16)]
 				InvalidNetBalanceChangeset,
-				#[codec(index = 14)]
+				#[codec(index = 17)]
 				InsufficientBalance {
 					balance: ::core::primitive::u128,
 					amount: ::core::primitive::u128,
 					note_index: ::core::primitive::u16,
 					change_index: ::core::primitive::u16,
 				},
-				#[codec(index = 15)]
+				#[codec(index = 18)]
 				ExceededMaxBalance {
 					balance: ::core::primitive::u128,
 					amount: ::core::primitive::u128,
 					note_index: ::core::primitive::u16,
 					change_index: ::core::primitive::u16,
 				},
-				#[codec(index = 16)]
+				#[codec(index = 19)]
 				BalanceChangeMismatch {
 					change_index: ::core::primitive::u16,
 					provided_balance: ::core::primitive::u128,
 					calculated_balance: ::core::primitive::i128,
 				},
-				#[codec(index = 17)]
-				BalanceChangeNotNetZero { unaccounted: ::core::primitive::i128 },
-				#[codec(index = 18)]
-				MissingBalanceProof,
-				#[codec(index = 19)]
-				InvalidPreviousBalanceProof,
 				#[codec(index = 20)]
-				InvalidNotebookHash,
+				BalanceChangeNotNetZero { unaccounted: ::core::primitive::i128 },
 				#[codec(index = 21)]
-				DuplicateChainTransfer,
+				MissingBalanceProof,
 				#[codec(index = 22)]
-				DuplicatedAccountOriginUid,
+				InvalidPreviousBalanceProof,
 				#[codec(index = 23)]
-				InvalidNotarySignature,
+				InvalidNotebookHash,
 				#[codec(index = 24)]
-				NotebookTooOld,
+				DuplicateChainTransfer,
 				#[codec(index = 25)]
+				DuplicatedAccountOriginUid,
+				#[codec(index = 26)]
+				InvalidNotarySignature,
+				#[codec(index = 27)]
+				NotebookTooOld,
+				#[codec(index = 28)]
 				DecodeError,
 			}
 		}
@@ -13775,7 +13776,7 @@ pub mod api {
 					ToLocalchain {
 						account_id: ::subxt::utils::AccountId32,
 						#[codec(compact)]
-						nonce: ::core::primitive::u32,
+						account_nonce: ::core::primitive::u32,
 					},
 				}
 				#[derive(

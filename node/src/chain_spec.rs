@@ -71,10 +71,8 @@ pub fn development_config() -> Result<ChainSpec, String> {
 				vec![
 					get_account_id_from_seed::<sr25519::Public>("Alice"),
 					get_account_id_from_seed::<sr25519::Public>("Bob"),
-					get_account_id_from_seed::<sr25519::Public>("Alice//stash"),
-					get_account_id_from_seed::<sr25519::Public>("Bob//stash"),
 				],
-				true,
+				10_000,
 			)
 		},
 		// Bootnodes
@@ -131,14 +129,8 @@ pub fn local_testnet_config() -> Result<ChainSpec, String> {
 					get_account_id_from_seed::<sr25519::Public>("Dave"),
 					get_account_id_from_seed::<sr25519::Public>("Eve"),
 					get_account_id_from_seed::<sr25519::Public>("Ferdie"),
-					get_account_id_from_seed::<sr25519::Public>("Alice//stash"),
-					get_account_id_from_seed::<sr25519::Public>("Bob//stash"),
-					get_account_id_from_seed::<sr25519::Public>("Charlie//stash"),
-					get_account_id_from_seed::<sr25519::Public>("Dave//stash"),
-					get_account_id_from_seed::<sr25519::Public>("Eve//stash"),
-					get_account_id_from_seed::<sr25519::Public>("Ferdie//stash"),
 				],
-				true,
+				100_000_000,
 			)
 		},
 		// Bootnodes
@@ -161,9 +153,8 @@ fn testnet_genesis(
 	initial_authorities: Vec<(AccountId, (BlockSealAuthorityId, GrandpaId))>,
 	root_key: AccountId,
 	endowed_accounts: Vec<AccountId>,
-	_enable_println: bool,
+	initial_difficulty: u128,
 ) -> RuntimeGenesisConfig {
-	let initial_difficulty = 100_000_000;
 	let authority_zero = initial_authorities[0].clone();
 
 	RuntimeGenesisConfig {

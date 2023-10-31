@@ -16,7 +16,8 @@ pub mod notary;
 pub mod notebook {
 	pub use ulx_notary_primitives::{
 		AccountOrigin, AccountOriginUid, AuditedNotebook, BalanceTip, ChainTransfer,
-		MaxBalanceChanges, Notebook, NotebookHeader, NotebookNumber, RequiredNotebookAuditors,
+		MaxBalanceChanges, NewAccountOrigin, Notebook, NotebookHeader, NotebookNumber,
+		RequiredNotebookAuditors,
 	};
 }
 

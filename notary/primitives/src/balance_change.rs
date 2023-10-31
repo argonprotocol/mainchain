@@ -26,16 +26,15 @@ pub struct BalanceChange {
 	pub account_id: AccountId,
 	/// Which chain (tax or argon)
 	pub chain: Chain,
-	/// Nonce that must increment for each change for an account
 	#[codec(compact)]
-	pub nonce: u32,
+	pub change_number: u32,
 	/// New balance after change
 	#[codec(compact)]
 	pub balance: u128,
 	/// A balance change must include the previous balance
 	#[codec(compact)]
 	pub previous_balance: u128,
-	/// A balance change must provide proof of a previous balance if the nonce is non-zero
+	/// A balance change must provide proof of a previous balance if the change_number is non-zero
 	pub previous_balance_proof: Option<BalanceProof>,
 	/// Sources of the changes
 	pub notes: BoundedVec<Note, ConstU32<100>>,
@@ -83,7 +82,7 @@ pub struct BalanceProof {
 pub struct BalanceTip {
 	pub account_id: AccountId,
 	pub chain: Chain,
-	pub nonce: u32,
+	pub change_number: u32,
 	pub balance: u128,
 	pub account_origin: AccountOrigin,
 }

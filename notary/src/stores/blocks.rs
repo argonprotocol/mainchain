@@ -15,6 +15,22 @@ pub struct BlockRow {
 }
 
 impl BlocksStore {
+	pub(crate) async fn get_hash(
+		db: &mut PgConnection,
+		block_number: u32,
+	) -> anyhow::Result<Option<BlockRow>, crate::Error> {
+		let row = sqlx::query_as!(
+			BlockRow,
+			r#"
+		SELECT * FROM blocks where block_number=$1 LIMIT 1;
+		"#,
+			block_number as i32,
+		)
+		.fetch_optional(db)
+		.await?;
+		Ok(row)
+	}
+
 	pub async fn get_latest_finalized(
 		db: &mut PgConnection,
 	) -> anyhow::Result<Option<BlockRow>, crate::Error> {

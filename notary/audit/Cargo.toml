@@ -1,7 +1,13 @@
 [package]
 name = "ulx-notary-audit"
-version = "0.0.1"
-edition = "2021"
+version.workspace = true
+authors.workspace = true
+edition.workspace = true
+rust-version.workspace = true
+license.workspace = true
+repository.workspace = true
+documentation.workspace = true
+homepage.workspace = true
 
 [dependencies]
 anyhow = { version = "1.0", default-features = false }

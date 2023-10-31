@@ -146,8 +146,6 @@ impl NotebookHeaderStore {
 		.fetch_one(db)
 		.await?;
 
-		println!("record: {:?}", record.chain_transfers);
-
 		Ok(record.try_into()?)
 	}
 
@@ -179,6 +177,7 @@ impl NotebookHeaderStore {
 		notebook_number: NotebookNumber,
 		transfers: Vec<ChainTransfer>,
 		pinned_to_block_number: u32,
+		finalized_block_number: u32,
 		changed_accounts_root: H256,
 		account_changelist: Vec<AccountOrigin>,
 	) -> BoxFutureResult<()> {
@@ -199,8 +198,8 @@ impl NotebookHeaderStore {
 				r#"
 				UPDATE notebook_headers 
 				SET hash = $1, changed_accounts_root = $2, changed_account_origins = $3, 
-					chain_transfers = $4, end_time = $5, pinned_to_block_number = $6 
-				WHERE notebook_number = $7
+					chain_transfers = $4, end_time = $5, pinned_to_block_number = $6, finalized_block_number = $7
+				WHERE notebook_number = $8
 			"#,
 				&hash,
 				changed_accounts_root.as_bytes(),
@@ -208,6 +207,7 @@ impl NotebookHeaderStore {
 				json!(header.chain_transfers.to_vec()),
 				Utc::now(),
 				pinned_to_block_number as i32,
+				finalized_block_number as i32,
 				notebook_number as i32,
 			)
 			.execute(db)
@@ -228,7 +228,7 @@ mod tests {
 	use chrono::Utc;
 	use sp_keyring::AccountKeyring::{Alice, Bob};
 	use sqlx::PgPool;
-	use tracing::debug;
+	use tracing::{debug, info};
 
 	use ulx_notary_primitives::{AccountOrigin, ChainTransfer, NOTEBOOK_VERSION};
 
@@ -283,9 +283,13 @@ mod tests {
 				&mut *tx,
 				notebook_number,
 				vec![
-					ChainTransfer::ToLocalchain { account_id: Bob.to_account_id(), nonce: 1 },
+					ChainTransfer::ToLocalchain {
+						account_id: Bob.to_account_id(),
+						account_nonce: 1,
+					},
 					ChainTransfer::ToMainchain { account_id: Alice.to_account_id(), amount: 100 },
 				],
+				100,
 				100,
 				[1u8; 32].into(),
 				vec![
@@ -299,12 +303,13 @@ mod tests {
 		{
 			let mut tx = pool.begin().await?;
 			let header = NotebookHeaderStore::load(&mut *tx, notebook_number).await?;
-			tx.commit().await?;
+
+			info!("step 2");
 			debug!("header: {:?}", header);
 			assert_eq!(header.chain_transfers.len(), 2);
 			assert_eq!(
 				header.chain_transfers[0],
-				ChainTransfer::ToLocalchain { account_id: Bob.to_account_id(), nonce: 1 }
+				ChainTransfer::ToLocalchain { account_id: Bob.to_account_id(), account_nonce: 1 }
 			);
 			assert_eq!(
 				header.chain_transfers[1],

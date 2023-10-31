@@ -259,9 +259,9 @@ dependencies = [
 
 [[package]]
 name = "anyhow"
-version = "1.0.72"
+version = "1.0.75"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "3b13c32d80ecc7ab747b80c3784bce54ee8a7a0cc4fbda9bf4cda2cf6fe90854"
+checksum = "a4668cab20f66d8d020e1fbc0ebe47217433c1b6c8f2040faf858554e394ace6"
 
 [[package]]
 name = "approx"
@@ -5574,6 +5574,7 @@ dependencies = [
  "ulixee-client",
  "ulx-notary-audit",
  "ulx-notary-primitives",
+ "ulx-testing",
 ]
 
 [[package]]
@@ -10550,6 +10551,11 @@ dependencies = [
 ]
 
 [[package]]
+name = "substrate-runner"
+version = "0.32.1"
+source = "git+https://github.com/paritytech/subxt.git?branch=master#2b21f8dc8cdec34a122794a0b590f5c0303e2e62"
+
+[[package]]
 name = "substrate-test-client"
 version = "2.0.1"
 source = "git+https://github.com/paritytech/polkadot-sdk.git?branch=release-polkadot-v1.1.0#f60318f68687e601c47de5ad5ca88e2c3f8139a7"
@@ -11738,7 +11744,7 @@ dependencies = [
 
 [[package]]
 name = "ulx-notary-primitives"
-version = "0.1.0"
+version = "0.0.1"
 dependencies = [
  "anyhow",
  "frame-support",
@@ -11770,6 +11776,20 @@ dependencies = [
  "sp-std 8.0.0 (git+https://github.com/paritytech/polkadot-sdk.git?branch=release-polkadot-v1.1.0)",
  "thiserror",
  "ulx-notary-primitives",
+]
+
+[[package]]
+name = "ulx-testing"
+version = "0.0.1"
+dependencies = [
+ "anyhow",
+ "frame-support",
+ "sp-keyring",
+ "substrate-runner",
+ "subxt",
+ "tracing",
+ "tracing-subscriber 0.3.17",
+ "ulixee-client",
 ]
 
 [[package]]

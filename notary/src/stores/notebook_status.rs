@@ -1,8 +1,15 @@
 use chrono::{DateTime, Utc};
 use sqlx::{query_scalar, FromRow, PgConnection};
+
 use ulx_notary_primitives::NotebookNumber;
 
 use crate::{ensure, error::Error};
+
+#[cfg(not(test))]
+pub const NOTEBOOK_DURATION_MS: i64 = 60_000;
+
+#[cfg(test)]
+pub const NOTEBOOK_DURATION_MS: i64 = 10_000;
 
 pub struct NotebookStatusStore;
 
@@ -16,9 +23,25 @@ pub enum NotebookFinalizationStep {
 	Submitted = 6,
 	Finalized = 7,
 }
+
+impl From<i32> for NotebookFinalizationStep {
+	fn from(i: i32) -> Self {
+		match i {
+			1 => NotebookFinalizationStep::Open,
+			2 => NotebookFinalizationStep::ReadyForClose,
+			3 => NotebookFinalizationStep::Closed,
+			4 => NotebookFinalizationStep::GetAuditors,
+			5 => NotebookFinalizationStep::Audited,
+			6 => NotebookFinalizationStep::Submitted,
+			7 => NotebookFinalizationStep::Finalized,
+			_ => panic!("Invalid notebook finalization step"),
+		}
+	}
+}
+
 #[derive(FromRow)]
 pub struct NotebookStatusRow {
-	pub notebook_number: NotebookNumber,
+	pub notebook_number: i32,
 	pub chain_transfers: i32,
 	pub step: NotebookFinalizationStep,
 	pub open_time: DateTime<Utc>,
@@ -31,6 +54,22 @@ pub struct NotebookStatusRow {
 }
 
 impl NotebookStatusStore {
+	pub async fn get<'a>(
+		db: impl sqlx::PgExecutor<'a> + 'a,
+		notebook_number: NotebookNumber,
+	) -> anyhow::Result<NotebookStatusRow, Error> {
+		let row = sqlx::query_as!(
+			NotebookStatusRow,
+			r#"
+			SELECT * FROM notebook_status WHERE notebook_number = $1 LIMIT 1
+			"#,
+			notebook_number as i32,
+		)
+		.fetch_one(db)
+		.await?;
+		Ok(row)
+	}
+
 	pub async fn lock_to_stop_appends<'a>(
 		db: impl sqlx::PgExecutor<'a> + 'a,
 		notebook_number: NotebookNumber,
@@ -67,7 +106,11 @@ impl NotebookStatusStore {
 	) -> anyhow::Result<Option<u32>, Error> {
 		let result = sqlx::query!(
 			r#"
-				SELECT notebook_number FROM notebook_status WHERE step=$1 FOR UPDATE NOWAIT LIMIT 1
+				SELECT notebook_number FROM notebook_status 
+				WHERE step=$1  
+				ORDER BY notebook_number ASC
+				FOR UPDATE NOWAIT 
+				LIMIT 1
 			"#,
 			step as i32
 		)
@@ -129,7 +172,7 @@ impl NotebookStatusStore {
 				LIMIT 1
 			"#,
 			NotebookFinalizationStep::Open as i32,
-			Utc::now() - chrono::Duration::minutes(1),
+			Utc::now() - chrono::Duration::milliseconds(NOTEBOOK_DURATION_MS),
 		)
 		.fetch_optional(&mut *db)
 		.await?;

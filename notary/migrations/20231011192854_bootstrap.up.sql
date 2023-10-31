@@ -32,7 +32,7 @@ CREATE TABLE IF NOT EXISTS chain_transfers
 (
     to_localchain boolean NOT NULL,
     account_id bytea NOT NULL,
-    nonce integer NULL,
+    account_nonce integer NULL,
     amount varchar NOT NULL,
     finalized_block integer NULL,
     included_in_notebook_number integer NULL

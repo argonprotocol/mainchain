@@ -11,7 +11,7 @@ use sqlx::postgres::PgPoolOptions;
 
 use notary::{
 	block_watch::spawn_block_sync,
-	notebook_closer::{NotebookCloser, NOTARY_KEYID},
+	notebook_closer::{spawn_notebook_closer, MainchainClient, NOTARY_KEYID},
 	NotaryServer,
 };
 use ulx_notary_primitives::NotaryId;
@@ -143,18 +143,19 @@ async fn main() -> anyhow::Result<()> {
 
 			let server = NotaryServer::start(notary_id, genesis, pool.clone(), bind_addr).await?;
 
+			let mainchain_client = MainchainClient::new(vec![trusted_rpc_url.clone()]);
+
 			if sync_blocks {
 				spawn_block_sync(trusted_rpc_url.clone(), notary_id, &pool).await?;
 			}
 			if finalize_notebooks {
-				let notebook_closer = NotebookCloser {
-					pool: pool.clone(),
+				spawn_notebook_closer(
+					pool.clone(),
 					notary_id,
-					rpc_url: trusted_rpc_url,
-					keystore,
-					completed_notebook_sender: server.completed_notebook_sender.clone(),
-				};
-				let _ = notebook_closer.spawn_task().await?;
+					mainchain_client.clone(),
+					keystore.clone(),
+					server.completed_notebook_sender,
+				);
 			}
 
 			println!("Listening on ws://{}", server.addr);

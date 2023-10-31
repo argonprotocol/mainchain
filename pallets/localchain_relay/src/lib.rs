@@ -27,6 +27,7 @@ const LOG_TARGET: &str = "runtime::localchain::relay";
 
 #[frame_support::pallet(dev_mode)]
 pub mod pallet {
+	use codec::alloc::string::ToString;
 	use frame_support::{
 		pallet_prelude::*,
 		traits::{
@@ -177,13 +178,13 @@ pub mod pallet {
 		TransferToLocalchain {
 			account_id: T::AccountId,
 			amount: T::Balance,
-			nonce: T::Nonce,
+			account_nonce: T::Nonce,
 			notary_id: NotaryId,
 			expiration_block: BlockNumberFor<T>,
 		},
 		TransferToLocalchainExpired {
 			account_id: T::AccountId,
-			nonce: T::Nonce,
+			account_nonce: T::Nonce,
 			notary_id: NotaryId,
 		},
 		TransferIn {
@@ -264,8 +265,10 @@ pub mod pallet {
 			}
 
 			let expiring = <ExpiringTransfersOut<T>>::take(block_number);
-			for (account_id, nonce) in expiring.into_iter() {
-				if let Some(transfer) = <PendingTransfersOut<T>>::take(account_id.clone(), nonce) {
+			for (account_id, account_nonce) in expiring.into_iter() {
+				if let Some(transfer) =
+					<PendingTransfersOut<T>>::take(account_id.clone(), account_nonce)
+				{
 					let _ = T::Currency::transfer(
 						&Self::notary_account_id(transfer.notary_id),
 						&account_id,
@@ -284,7 +287,7 @@ pub mod pallet {
 					});
 					Self::deposit_event(Event::TransferToLocalchainExpired {
 						account_id,
-						nonce,
+						account_nonce,
 						notary_id: transfer.notary_id,
 					});
 				}
@@ -299,9 +302,6 @@ pub mod pallet {
 		#[pallet::weight(0)]
 		pub fn submit_notebook(
 			origin: OriginFor<T>,
-			// This has already been checked at this point. It's provided as a spam reduction
-			// feature to the unsigned transaction pool
-			_notebook_hash: H256,
 			notebook: AuditedNotebook,
 			// since signature verification is done in `validate_unsigned`
 			// we can skip doing it here again.
@@ -362,7 +362,7 @@ pub mod pallet {
 						)?;
 						Self::deposit_event(Event::TransferIn { notary_id, account_id, amount });
 					},
-					ChainTransfer::ToLocalchain { account_id, nonce } => {
+					ChainTransfer::ToLocalchain { account_id, account_nonce: nonce } => {
 						let nonce = nonce.into();
 						let account_id = account_id;
 						let transfer = <PendingTransfersOut<T>>::take(&account_id, nonce)
@@ -422,7 +422,7 @@ pub mod pallet {
 			origin: OriginFor<T>,
 			#[pallet::compact] amount: T::Balance,
 			notary_id: NotaryId,
-			#[pallet::compact] nonce: T::Nonce,
+			#[pallet::compact] account_nonce: T::Nonce,
 		) -> DispatchResult {
 			let who = ensure_signed(origin)?;
 
@@ -432,7 +432,7 @@ pub mod pallet {
 				Error::<T>::InsufficientFunds,
 			);
 			ensure!(
-				nonce ==
+				account_nonce ==
 					<frame_system::Pallet<T>>::account_nonce(&who)
 						.saturating_sub(T::Nonce::one()),
 				Error::<T>::InvalidAccountNonce
@@ -450,16 +450,16 @@ pub mod pallet {
 
 			PendingTransfersOut::<T>::insert(
 				&who,
-				nonce,
+				account_nonce,
 				QueuedTransferOut { amount, expiration_block, notary_id },
 			);
-			ExpiringTransfersOut::<T>::try_append(expiration_block, (&who, nonce))
+			ExpiringTransfersOut::<T>::try_append(expiration_block, (&who, account_nonce))
 				.map_err(|_| Error::<T>::MaxBlockTransfersExceeded)?;
 
 			Self::deposit_event(Event::TransferToLocalchain {
 				account_id: who,
 				amount,
-				nonce,
+				account_nonce,
 				notary_id,
 				expiration_block,
 			});
@@ -472,11 +472,17 @@ pub mod pallet {
 		type Call = Call<T>;
 
 		fn validate_unsigned(_source: TransactionSource, call: &Self::Call) -> TransactionValidity {
-			if let Call::submit_notebook { notebook_hash, notebook, signature } = call {
+			if let Call::submit_notebook { notebook, signature } = call {
 				let current_finalized_block: u32 =
 					<FinalizedBlockNumber<T>>::get().unique_saturated_into();
 
 				// if the block is not finalized, we can't validate the notebook
+				ensure!(
+					notebook.header.finalized_block_number <= current_finalized_block,
+					InvalidTransaction::Future
+				);
+
+				// the pinned block also needs to be finalized
 				ensure!(
 					notebook.header.pinned_to_block_number <= current_finalized_block,
 					InvalidTransaction::Future
@@ -495,23 +501,24 @@ pub mod pallet {
 				ensure!(
 					T::NotaryProvider::verify_signature(
 						notebook.header.notary_id,
-						notebook.header.pinned_to_block_number.into(),
-						&notebook_hash,
+						// allow the signature to come from the latest finalized block
+						notebook.header.finalized_block_number.into(),
+						&notebook.header_hash,
 						&signature
 					),
 					InvalidTransaction::BadProof
 				);
 
 				// verify the hash is valid
-				let block_hash = notebook.hash();
-				ensure!(block_hash == *notebook_hash, InvalidTransaction::BadProof);
+				let block_hash = notebook.header.hash();
+				ensure!(block_hash == notebook.header_hash, InvalidTransaction::BadProof);
 				log::info!(
 					target: LOG_TARGET,
 					"Notebook from notary {} pinned to block={:?}, current_finalized_block={current_finalized_block}",
 					notebook.header.notary_id,
 					notebook.header.pinned_to_block_number
 				);
-				let blocks_until_finalized: u32 = 100u32 + current_finalized_block;
+				let blocks_until_finalized: u32 = 100u32;
 
 				ValidTransaction::with_tag_prefix("Notebook")
 					.priority(TransactionPriority::MAX)
@@ -604,12 +611,17 @@ pub mod pallet {
 				NotebookVerifyError::InvalidNotarySignature
 			);
 
-			let notebook = Notebook::decode(&mut bytes.as_ref())
-				.map_err(|_| NotebookVerifyError::DecodeError)?;
+			let notebook = Notebook::decode(&mut bytes.as_ref()).map_err(|e| {
+				log::warn!(
+					target: LOG_TARGET,
+					"Notebook audit failed to decode for notary {notary_id}, notebook {notebook_number}: {:?}", e.to_string()
+				);
+				NotebookVerifyError::DecodeError
+			})?;
 			let is_valid = notebook_verify::<Self>(&header_hash, &notebook).map_err(|e| {
 				log::info!(
 					target: LOG_TARGET,
-					"Notebook audit failed for notary {notary_id}, notebook {notebook_number}: {e:?}",
+					"Notebook audit failed for notary {notary_id}, notebook {notebook_number}: {:?}", e.to_string()
 				);
 				e
 			})?;

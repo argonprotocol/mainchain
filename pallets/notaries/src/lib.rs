@@ -305,10 +305,15 @@ pub mod pallet {
 			let key_history = <NotaryKeyHistory<T>>::get(notary_id);
 
 			// find the first key that is valid at the given block height
-			let public = key_history
+			let mut public = key_history
 				.iter()
 				.find(|(block, _)| *block >= at_block_height)
 				.map(|(_, public)| public);
+			if public.is_none() && key_history.len() > 0 {
+				if key_history[0].0 < at_block_height {
+					public = key_history.first().map(|(_, public)| public);
+				}
+			}
 
 			if let Some(public) = public {
 				return public.verify(message, &signature)

@@ -14,7 +14,6 @@ pub type NotaryId = u32;
 pub type AccountOriginUid = u32;
 pub type NotebookNumber = u32;
 
-pub type NotebookAccountOrigin = (AccountId32, Chain, AccountOriginUid);
 pub type RequiredNotebookAuditors = ConstU32<10>;
 pub const NOTEBOOK_VERSION: u16 = 1;
 
@@ -30,11 +29,36 @@ pub const NOTEBOOK_VERSION: u16 = 1;
 	Serialize,
 	Deserialize,
 )]
+#[serde(rename_all = "camelCase")]
 pub struct Notebook {
 	pub header: NotebookHeader,
 	pub balance_changes:
 		BoundedVec<BoundedVec<BalanceChange, MaxBalanceChanges>, MaxBalanceChanges>,
-	pub new_account_origins: BoundedVec<NotebookAccountOrigin, MaxBalanceChanges>,
+	pub new_account_origins: BoundedVec<NewAccountOrigin, MaxBalanceChanges>,
+}
+#[derive(
+	Clone,
+	PartialEq,
+	Eq,
+	Encode,
+	Decode,
+	RuntimeDebug,
+	TypeInfo,
+	MaxEncodedLen,
+	Serialize,
+	Deserialize,
+)]
+#[serde(rename_all = "camelCase")]
+pub struct NewAccountOrigin {
+	pub account_id: AccountId32,
+	pub chain: Chain,
+	#[codec(compact)]
+	pub account_uid: AccountOriginUid,
+}
+impl NewAccountOrigin {
+	pub fn new(account_id: AccountId32, chain: Chain, account_uid: AccountOriginUid) -> Self {
+		Self { account_id, chain, account_uid }
+	}
 }
 
 #[derive(
@@ -49,6 +73,7 @@ pub struct Notebook {
 	Serialize,
 	Deserialize,
 )]
+#[serde(rename_all = "camelCase")]
 pub struct NotebookHeader {
 	#[codec(compact)]
 	pub version: u16,
@@ -124,15 +149,40 @@ impl AuditedNotebook {
 	Deserialize,
 )]
 #[serde(rename_all = "camelCase")]
+#[serde(tag = "type")]
 pub enum ChainTransfer {
+	#[serde(rename_all = "camelCase")]
 	ToMainchain {
 		account_id: AccountId32,
 		#[codec(compact)]
+		#[cfg_attr(feature = "std", serde(with = "serialize_u128_as_string"))]
 		amount: u128,
 	},
+	#[serde(rename_all = "camelCase")]
 	ToLocalchain {
 		account_id: AccountId32,
 		#[codec(compact)]
-		nonce: u32,
+		account_nonce: u32,
 	},
+}
+
+#[cfg(feature = "std")]
+mod serialize_u128_as_string {
+	use serde::{Deserialize, Deserializer, Serializer};
+
+	pub fn serialize<S>(value: &u128, serializer: S) -> Result<S::Ok, S::Error>
+	where
+		S: Serializer,
+	{
+		let s = (*value).to_string();
+		serializer.serialize_str(&s)
+	}
+
+	pub fn deserialize<'de, D>(deserializer: D) -> Result<u128, D::Error>
+	where
+		D: Deserializer<'de>,
+	{
+		let s = String::deserialize(deserializer)?;
+		s.parse::<u128>().map_err(serde::de::Error::custom)
+	}
 }

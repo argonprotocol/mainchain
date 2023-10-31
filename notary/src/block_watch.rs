@@ -4,6 +4,7 @@ use subxt::{
 	blocks::{Block, BlockRef},
 	config::Header,
 };
+use tracing::info;
 
 use crate::Error;
 pub use ulixee_client;
@@ -35,7 +36,7 @@ pub async fn spawn_block_sync(
 	Ok(())
 }
 
-fn track_blocks(rpc_url: String, notary_id: NotaryId, pool: &PgPool) {
+pub(crate) fn track_blocks(rpc_url: String, notary_id: NotaryId, pool: &PgPool) {
 	let pool = pool.clone();
 	tokio::task::spawn(async move {
 		loop {
@@ -108,61 +109,74 @@ async fn process_block(
 	BlockMetaStore::store_finalized_block(&mut *db, block_height, block_hash.into()).await?;
 
 	let events = block.events().await?;
-	for meta_change in events.find::<api::notaries::events::NotaryMetaUpdated>() {
-		if let Ok(meta_change) = meta_change {
-			if meta_change.notary_id == notary_id {
-				RegisteredKeyStore::store_public(
-					&mut *db,
-					ed25519::Public(meta_change.meta.public.0),
-					block_height,
-				)
-				.await?;
-			}
-		}
-	}
-
-	for notebook in events.find::<api::notaries::events::NotaryActivated>() {
-		if let Ok(notebook) = notebook {
-			if notebook.notary.notary_id == notary_id {
-				if NotebookHeaderStore::create(
-					&mut *db,
-					notary_id,
-					1,
-					notebook.notary.activated_block,
-				)
-				.await
-				.is_err()
-				{
-					continue
+	for event in events.iter() {
+		if let Ok(event) = event {
+			if let Some(Ok(meta_change)) =
+				event.as_event::<api::notaries::events::NotaryMetaUpdated>().transpose()
+			{
+				if meta_change.notary_id == notary_id {
+					RegisteredKeyStore::store_public(
+						&mut *db,
+						ed25519::Public(meta_change.meta.public.0),
+						block_height,
+					)
+					.await?;
 				}
+				continue
 			}
-		}
-	}
-
-	for notebook in events.find::<api::localchain_relay::events::NotebookSubmitted>() {
-		if let Ok(notebook) = notebook {
-			if notebook.notary_id == notary_id {
-				NotebookStatusStore::next_step(
-					&mut *db,
-					notebook.notebook_number,
-					NotebookFinalizationStep::Submitted,
-				)
-				.await?;
+			if let Some(Ok(activated_event)) =
+				event.as_event::<api::notaries::events::NotaryActivated>().transpose()
+			{
+				info!("Notary activated: {:?}", activated_event);
+				if activated_event.notary.notary_id == notary_id {
+					RegisteredKeyStore::store_public(
+						&mut *db,
+						ed25519::Public(activated_event.notary.meta.public.0),
+						block_height,
+					)
+					.await?;
+					NotebookHeaderStore::create(
+						&mut *db,
+						notary_id,
+						1,
+						activated_event.notary.activated_block,
+					)
+					.await?;
+				}
+				continue
 			}
-		}
-	}
 
-	for to_localchain in events.find::<api::localchain_relay::events::TransferToLocalchain>() {
-		if let Ok(to_localchain) = to_localchain {
-			if to_localchain.notary_id == notary_id {
-				ChainTransferStore::record_transfer_to_local_from_block(
-					&mut *db,
-					block_height,
-					&AccountId::from(to_localchain.account_id.0),
-					to_localchain.nonce,
-					to_localchain.amount,
-				)
-				.await?;
+			if let Some(Ok(notebook)) =
+				event.as_event::<api::localchain_relay::events::NotebookSubmitted>().transpose()
+			{
+				if notebook.notary_id == notary_id {
+					info!("Notebook finalized: {:?}", notebook);
+					NotebookStatusStore::next_step(
+						&mut *db,
+						notebook.notebook_number,
+						NotebookFinalizationStep::Submitted,
+					)
+					.await?;
+				}
+				continue
+			}
+
+			if let Some(Ok(to_localchain)) = event
+				.as_event::<api::localchain_relay::events::TransferToLocalchain>()
+				.transpose()
+			{
+				if to_localchain.notary_id == notary_id {
+					info!("Transfer to localchain: {:?}", to_localchain);
+					ChainTransferStore::record_transfer_to_local_from_block(
+						&mut *db,
+						block_height,
+						&AccountId::from(to_localchain.account_id.0),
+						to_localchain.account_nonce,
+						to_localchain.amount,
+					)
+					.await?;
+				}
+				continue
 			}
 		}
 	}
@@ -199,8 +213,9 @@ async fn subscribe_to_blocks(
 			block_next = finalized_sub.next() => {
 				match block_next {
 					Some(Ok(block)) => {
-						let mut db = pool.acquire().await?;
-						process_block(&mut *db, block, notary_id).await?;
+						let mut tx = pool.begin().await?;
+						process_block(&mut *tx, block, notary_id).await?;
+						tx.commit().await?;
 					},
 					Some(Err(e)) => {
 						tracing::error!("Error polling finalized blocks: {:?}", e);

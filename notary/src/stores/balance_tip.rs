@@ -24,7 +24,7 @@ impl BalanceTipStore {
 		db: &'a mut PgConnection,
 		account_id: &AccountId,
 		chain: Chain,
-		proposed_nonce: u32,
+		proposed_change_number: u32,
 		previous_balance: u128,
 		account_origin: &AccountOrigin,
 		change_index: usize,
@@ -33,10 +33,10 @@ impl BalanceTipStore {
 		let key = BalanceTip::create_key(account_id, &chain);
 
 		let mut provided_tip: Option<H256> = None;
-		if proposed_nonce > 1u32 {
+		if proposed_change_number > 1u32 {
 			provided_tip = Some(
 				BalanceTip::compute_tip(
-					proposed_nonce - 1u32,
+					proposed_change_number - 1u32,
 					previous_balance,
 					account_origin.clone(),
 				)
@@ -76,15 +76,15 @@ impl BalanceTipStore {
 		db: &'a mut PgConnection,
 		account_id: &AccountId,
 		chain: Chain,
-		nonce: u32,
+		change_number: u32,
 		balance: u128,
 		notebook_number: NotebookNumber,
 		account_origin: AccountOrigin,
 		prev_balance: u128,
 	) -> BoxFutureResult<'a, ()> {
 		let key = BalanceTip::create_key(account_id, &chain);
-		let tip = BalanceTip::compute_tip(nonce, balance, account_origin.clone());
-		let prev = BalanceTip::compute_tip(nonce - 1, prev_balance, account_origin);
+		let tip = BalanceTip::compute_tip(change_number, balance, account_origin.clone());
+		let prev = BalanceTip::compute_tip(change_number - 1, prev_balance, account_origin);
 		Box::pin(async move {
 			let res = sqlx::query!(
 				r#"

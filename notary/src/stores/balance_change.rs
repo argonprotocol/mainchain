@@ -116,7 +116,9 @@ impl BalanceChangeStore {
 
 		let to_add = changes.clone();
 		for (change_index, change) in changes.into_iter().enumerate() {
-			let BalanceChange { account_id, chain, nonce, previous_balance, balance, .. } = change;
+			let BalanceChange {
+				account_id, chain, change_number, previous_balance, balance, ..
+			} = change;
 			let key = (account_id.clone(), chain.clone());
 
 			let account_origin = change
@@ -128,7 +130,7 @@ impl BalanceChangeStore {
 			let account_origin = match account_origin {
 				Some(account_origin) => account_origin,
 				None => {
-					if change.nonce != 1 {
+					if change.change_number != 1 {
 						return Err(Error::MissingAccountOrigin)
 					}
 
@@ -152,7 +154,7 @@ impl BalanceChangeStore {
 				&mut *tx,
 				&account_id,
 				chain.clone(),
-				nonce,
+				change_number,
 				previous_balance,
 				&account_origin,
 				change_index,
@@ -164,7 +166,7 @@ impl BalanceChangeStore {
 				let tip = BalanceTip {
 					account_id: account_id.clone(),
 					chain: chain.clone(),
-					nonce,
+					change_number,
 					balance,
 					account_origin: account_origin.clone(),
 				};
@@ -180,7 +182,7 @@ impl BalanceChangeStore {
 
 			for (note_index, note) in change.notes.into_iter().enumerate() {
 				let _ = match note.note_type {
-					NoteType::ClaimFromMainchain { nonce, .. } => {
+					NoteType::ClaimFromMainchain { account_nonce: nonce, .. } => {
 						// NOTE: transfers can expire. We need to ensure this can still get into a
 						// notebook
 						ChainTransferStore::take_and_record_transfer_local(
@@ -217,7 +219,7 @@ impl BalanceChangeStore {
 				&mut *tx,
 				&account_id,
 				chain,
-				nonce,
+				change_number,
 				balance,
 				current_notebook_number,
 				account_origin,
@@ -257,7 +259,7 @@ mod tests {
 		let changeset = vec![BalanceChange {
 			account_id: Bob.to_account_id(),
 			chain: Argon,
-			nonce: 0,
+			change_number: 0,
 			balance: 1000,
 			previous_balance: 0,
 			previous_balance_proof: None,
@@ -265,8 +267,9 @@ mod tests {
 				&Bob.to_account_id(),
 				&Argon,
 				1,
+				0,
 				1000,
-				NoteType::ClaimFromMainchain { nonce: 1 }
+				NoteType::ClaimFromMainchain { account_nonce: 1 }
 			)],
 		}];
 

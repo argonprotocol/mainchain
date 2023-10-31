@@ -22,7 +22,7 @@ pub type NoteId = H256;
 )]
 #[serde(rename_all = "camelCase")]
 pub struct Note {
-	/// Hash of Scale encoded (milligons, note_type)
+	/// Hash of Scale encoded (balance_change_number, account_id, chain, milligons, note_type)
 	pub note_id: NoteId,
 	/// Number of milligons transferred
 	#[codec(compact)]
@@ -37,7 +37,8 @@ impl Note {
 	pub fn create_unsigned(
 		account_id: &AccountId,
 		chain: &Chain,
-		balance_change_nonce: u32,
+		balance_change_number: u32,
+		note_index: u16,
 		milligons: u128,
 		note_type: NoteType,
 	) -> Self {
@@ -45,7 +46,8 @@ impl Note {
 			note_id: Self::compute_note_id(
 				account_id,
 				chain,
-				balance_change_nonce,
+				balance_change_number,
+				note_index,
 				milligons,
 				&note_type,
 			),
@@ -58,25 +60,24 @@ impl Note {
 		&self,
 		account_id: &AccountId,
 		chain: &Chain,
-		balance_change_nonce: u32,
+		balance_change_number: u32,
+		note_index: u16,
 	) -> NoteId {
-		blake2_256(
-			&[
-				&account_id.as_ref(),
-				&chain.encode()[..],
-				&balance_change_nonce.to_le_bytes()[..],
-				&self.milligons.to_le_bytes()[..],
-				&self.note_type.encode()[..],
-			]
-			.concat(),
+		Self::compute_note_id(
+			account_id,
+			chain,
+			balance_change_number,
+			note_index,
+			self.milligons,
+			&self.note_type,
 		)
-		.into()
 	}
 
 	pub fn compute_note_id(
 		account_id: &AccountId,
 		chain: &Chain,
-		balance_change_nonce: u32,
+		balance_change_number: u32,
+		note_index: u16,
 		milligons: u128,
 		note_type: &NoteType,
 	) -> NoteId {
@@ -84,7 +85,8 @@ impl Note {
 			&[
 				&account_id.as_ref(),
 				&chain.encode()[..],
-				&balance_change_nonce.to_le_bytes()[..],
+				&balance_change_number.to_le_bytes()[..],
+				&note_index.to_le_bytes()[..],
 				&milligons.to_le_bytes()[..],
 				&note_type.encode()[..],
 			]
@@ -138,19 +140,21 @@ impl TryFrom<i32> for Chain {
 	Serialize,
 	Deserialize,
 )]
+#[serde(tag = "op")]
 #[serde(rename_all = "camelCase")]
 pub enum NoteType {
 	SendToMainchain,
+	#[serde(rename_all = "camelCase")]
 	ClaimFromMainchain {
 		#[codec(compact)]
-		nonce: u32,
+		account_nonce: u32,
 	},
-	/// Claim funds from a note
+	/// Claim funds from a note (must be in the series of balance changes)
 	Claim,
 	/// Transfer funds to another address
+	#[serde(rename_all = "camelCase")]
 	Send {
-		/// Recipient address  (address of recipient party) - If this is a tax note, it must be a
-		/// proof of tax address (or it won’t be able to be used).
+		/// Recipient address  (address of recipient party)
 		recipient: Option<AccountId>,
 	},
 	/// Pay a fee to a notary or mainchain service
@@ -160,6 +164,7 @@ pub enum NoteType {
 	/// Channel notes
 	Channel,
 	/// Channel settlement note
+	#[serde(rename_all = "camelCase")]
 	ChannelSettle {
 		/// Source channel note
 		source_note_id: NoteId,

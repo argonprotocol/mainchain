@@ -28,7 +28,7 @@ use crate::{
 	},
 };
 
-type NotebookHeaderStream = NotificationStream<NotebookHeader, NotebookHeaderTracingKey>;
+pub type NotebookHeaderStream = NotificationStream<NotebookHeader, NotebookHeaderTracingKey>;
 
 #[derive(Clone)]
 pub struct NotebookHeaderTracingKey;
@@ -149,6 +149,7 @@ mod tests {
 	use jsonrpsee::ws_client::WsClientBuilder;
 	use sp_core::{bounded_vec, Blake2Hasher};
 	use sp_keyring::Ed25519Keyring::Bob;
+	use sp_keystore::{testing::MemoryKeystore, KeystoreExt};
 	use sqlx::PgPool;
 
 	use ulx_notary_primitives::{
@@ -160,7 +161,7 @@ mod tests {
 			localchain::{BalanceChangeResult, LocalchainRpcClient},
 			notebook::NotebookRpcClient,
 		},
-		notebook_closer,
+		notebook_closer::{MainchainClient, NotebookCloser},
 		stores::{chain_transfer::ChainTransferStore, notebook_header::NotebookHeaderStore},
 	};
 
@@ -189,15 +190,16 @@ mod tests {
 			&Bob.to_account_id(),
 			&Argon,
 			1,
+			0,
 			1000,
-			NoteType::ClaimFromMainchain { nonce: 1 },
+			NoteType::ClaimFromMainchain { account_nonce: 1 },
 		);
 
 		transfer_note.signature = Bob.sign(&transfer_note.note_id.as_ref()).into();
 		let balance_change = BalanceChange {
 			account_id: Bob.to_account_id(),
 			chain: Argon,
-			nonce: 1,
+			change_number: 1,
 			balance: 1000,
 			previous_balance: 0,
 			previous_balance_proof: None,
@@ -214,12 +216,22 @@ mod tests {
 		);
 
 		let subscription = client.subscribe_headers().await?;
+		let keystore = MemoryKeystore::new();
+		let keystore = KeystoreExt::new(keystore);
+
+		let mut closer = NotebookCloser {
+			pool: pool.clone(),
+			notary_id: notary.notary_id,
+			completed_notebook_sender: notary.completed_notebook_sender.clone(),
+			keystore: keystore.clone(),
+			client: MainchainClient::new(vec![format!("ws://{}", notary.addr)]),
+		};
 		sqlx::query("update notebook_status set open_time = now() - interval '2 minutes' where notebook_number = 1")
 			.execute(&mut *db)
 			.await?;
 
-		notebook_closer::try_rotate_notebook(&pool, notary.notary_id).await?;
-		notebook_closer::try_close_notebook(&pool, &notary.completed_notebook_sender).await?;
+		closer.try_rotate_notebook().await?;
+		closer.try_close_notebook().await?;
 
 		let mut stream = subscription.into_stream();
 		let header = stream.next().await.unwrap()?;
@@ -227,13 +239,13 @@ mod tests {
 		assert_eq!(header.notebook_number, 1);
 		assert_eq!(
 			header.chain_transfers[0],
-			ChainTransfer::ToLocalchain { account_id: Bob.to_account_id(), nonce: 1 }
+			ChainTransfer::ToLocalchain { account_id: Bob.to_account_id(), account_nonce: 1 }
 		);
 
 		let tip = BalanceTip {
 			account_id: Bob.to_account_id(),
 			chain: Argon,
-			nonce: 1,
+			change_number: 1,
 			balance: 1000,
 			account_origin: AccountOrigin { notebook_number: 1, account_uid: 1 },
 		};

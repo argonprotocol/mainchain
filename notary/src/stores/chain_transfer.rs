@@ -13,7 +13,7 @@ struct ChainTransferRow {
 	pub to_localchain: bool,
 	pub amount: String,
 	pub account_id: Vec<u8>,
-	pub nonce: Option<i32>,
+	pub account_nonce: Option<i32>,
 	pub finalized_block: Option<i32>,
 	pub included_in_notebook_number: Option<i32>,
 }
@@ -29,7 +29,10 @@ impl TryInto<ChainTransfer> for ChainTransferRow {
 						self.account_id
 					))
 				})?,
-				nonce: self.nonce.map(|a| a as u32).expect("nonce is required"),
+				account_nonce: self
+					.account_nonce
+					.map(|a| a as u32)
+					.expect("account_nonce is required"),
 			})
 		} else {
 			Ok(ChainTransfer::ToMainchain {
@@ -84,7 +87,7 @@ impl ChainTransferStore {
 		db: &mut PgConnection,
 		notebook_number: NotebookNumber,
 		account_id: &AccountId,
-		nonce: u32,
+		account_nonce: u32,
 		proposed_amount: u128,
 		change_index: usize,
 		note_index: usize,
@@ -99,13 +102,13 @@ impl ChainTransferStore {
 		let stored_amount = query!(
 			r#"
 				UPDATE chain_transfers SET included_in_notebook_number = $1
-				WHERE account_id = $2 AND nonce = $3
+				WHERE account_id = $2 AND account_nonce = $3
 				AND included_in_notebook_number IS NULL
 				RETURNING amount
 				"#,
 			notebook_number as i32,
 			account_id.as_slice(),
-			nonce as i32,
+			account_nonce as i32,
 		)
 		.fetch_one(db)
 		.await
@@ -147,17 +150,17 @@ impl ChainTransferStore {
 		db: impl sqlx::PgExecutor<'a> + 'a,
 		finalized_block_number: u32,
 		account_id: &AccountId,
-		nonce: u32,
+		account_nonce: u32,
 		milligons: u128,
 	) -> anyhow::Result<()> {
 		let res = query!(
 			r#"
-			INSERT INTO chain_transfers (to_localchain, amount, account_id, nonce, finalized_block) VALUES ($1, $2, $3, $4, $5)
+			INSERT INTO chain_transfers (to_localchain, amount, account_id, account_nonce, finalized_block) VALUES ($1, $2, $3, $4, $5)
 			"#,
 			true,
 			milligons.to_string(),
 			account_id.as_slice(),
-			nonce as i32,
+			account_nonce as i32,
 			finalized_block_number as i32,
 		)
 		.execute(db)
@@ -192,7 +195,7 @@ mod tests {
 		logger();
 		let notebook_number = 1;
 		let account_id = Bob.to_account_id();
-		let nonce = 1;
+		let account_nonce = 1;
 		let milligons = 1000;
 		let max_transfer_per_notebook = 10;
 		let change_index = 0;
@@ -204,7 +207,7 @@ mod tests {
 					&mut *tx,
 					100,
 					&account_id,
-					nonce,
+					account_nonce,
 					milligons
 				)
 				.await
@@ -218,7 +221,7 @@ mod tests {
 					&mut *tx,
 					notebook_number,
 					&account_id,
-					nonce,
+					account_nonce,
 					milligons,
 					change_index,
 					note_index,
@@ -232,11 +235,13 @@ mod tests {
 			let mut tx = pool.begin().await?;
 			let result = ChainTransferStore::take_for_notebook(&mut *tx, notebook_number).await?;
 			assert_eq!(result.len(), 1);
-			if let Some(ChainTransfer::ToLocalchain { account_id: t_account_id, nonce: t_nonce }) =
-				result.get(0)
+			if let Some(ChainTransfer::ToLocalchain {
+				account_id: t_account_id,
+				account_nonce: t_nonce,
+			}) = result.get(0)
 			{
 				assert_eq!(*t_account_id, account_id);
-				assert_eq!(*t_nonce, nonce);
+				assert_eq!(*t_nonce, account_nonce);
 			} else {
 				panic!("Expected to find a to localchain transfer");
 			}
@@ -251,7 +256,7 @@ mod tests {
 		NotebookStatusStore::create(&pool, 1).await?;
 		let notebook_number = 1;
 		let account_id = Bob.to_account_id();
-		let nonce = 1;
+		let account_nonce = 1;
 		let milligons = 1000;
 		let max_transfer_per_notebook = 10;
 		let change_index = 0;
@@ -263,7 +268,7 @@ mod tests {
 				&mut *tx,
 				100,
 				&account_id,
-				nonce,
+				account_nonce,
 				milligons
 			)
 			.await
@@ -273,7 +278,7 @@ mod tests {
 				&mut *tx,
 				notebook_number,
 				&account_id,
-				nonce,
+				account_nonce,
 				milligons,
 				change_index,
 				note_index,
@@ -286,7 +291,7 @@ mod tests {
 			&mut *tx,
 			notebook_number,
 			&account_id,
-			nonce,
+			account_nonce,
 			milligons,
 			change_index,
 			note_index,
