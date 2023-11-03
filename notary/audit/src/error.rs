@@ -123,6 +123,9 @@ pub enum VerifyError {
 
 	#[snafu(display("Invalid tax account operation"))]
 	InvalidTaxOperation,
+
+	#[snafu(display("Invalid tax amount included (sent: {tax_sent}, owed: {tax_owed}) for account {account_id:?}"))]
+	InsufficientTaxIncluded { tax_sent: u128, tax_owed: u128, account_id: AccountId32 },
 }
 
 impl From<AccountHistoryLookupError> for VerifyError {

@@ -588,6 +588,7 @@ fn it_can_audit_notebooks() {
 				change_number: 1,
 				balance: 2000,
 				account_origin: AccountOrigin { notebook_number: 1, account_uid: 1 },
+				channel_hold_note: None,
 			}
 			.encode()]),
 			changed_account_origins: bounded_vec![AccountOrigin {
@@ -601,15 +602,6 @@ fn it_can_audit_notebooks() {
 		};
 		let header_hash = header.hash();
 		let signature = ed25519::Signature([0u8; 64]);
-		let mut note = Note::create(
-			&who.clone(),
-			&AccountType::Deposit,
-			1,
-			0,
-			2000,
-			NoteType::ClaimFromMainchain { account_nonce: nonce.unique_saturated_into() },
-		);
-		note.signature = Bob.sign(&note.id[..]).into();
 
 		let notebook = Notebook {
 			header,
@@ -621,12 +613,18 @@ fn it_can_audit_notebooks() {
 			balance_changes: bounded_vec![bounded_vec![BalanceChange {
 				account_id: who.clone(),
 				account_type: AccountType::Deposit,
-				previous_balance: 0,
 				balance: 2000,
 				previous_balance_proof: None,
 				change_number: 1,
-				notes: bounded_vec![note],
-			}]],
+				notes: bounded_vec![Note::create(
+					2000,
+					NoteType::ClaimFromMainchain { account_nonce: nonce.unique_saturated_into() },
+				)],
+				channel_hold_note: None,
+				signature: signature.clone().into(),
+			}
+			.sign(Bob.pair())
+			.clone()]],
 		};
 
 		assert_ok!(LocalchainRelay::audit_notebook(
