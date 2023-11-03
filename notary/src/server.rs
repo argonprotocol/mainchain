@@ -14,7 +14,7 @@ use sqlx::PgPool;
 use tokio::net::ToSocketAddrs;
 
 use ulx_notary_primitives::{
-	BalanceChange, BalanceProof, BalanceTip, NotaryId, NotebookHeader, NotebookNumber,
+	BalanceChange, BalanceProof, BalanceTip, NotaryId, Notebook, NotebookHeader, NotebookNumber,
 	MAX_BALANCESET_CHANGES,
 };
 
@@ -25,7 +25,9 @@ use crate::{
 	},
 	stores::{
 		balance_change::BalanceChangeStore, block_meta::BlockMetaStore, notebook::NotebookStore,
+		notebook_header::NotebookHeaderStore,
 	},
+	Error,
 };
 
 pub type NotebookHeaderStream = NotificationStream<NotebookHeader, NotebookHeaderTracingKey>;
@@ -85,11 +87,37 @@ impl NotebookRpcServer for NotaryServer {
 		NotebookStore::get_balance_proof(&self.pool, self.notary_id, notebook_number, &balance_tip)
 			.await
 			.map_err(from_crate_error)
+			.map(|a| BalanceProof {
+				notebook_number,
+				notary_id: self.notary_id,
+				notebook_proof: a.into(),
+				account_origin: balance_tip.account_origin,
+				balance: balance_tip.balance,
+			})
 	}
 	async fn subscribe_headers(&self, pending: PendingSubscriptionSink) -> SubscriptionResult {
 		let stream = self.completed_notebook_stream.subscribe(1_000);
 
 		pipe_from_stream_and_drop(pending, stream).await.map_err(Into::into)
+	}
+
+	async fn get(&self, notebook_number: NotebookNumber) -> Result<Notebook, ErrorObjectOwned> {
+		let mut db = self
+			.pool
+			.acquire()
+			.await
+			.map_err(|e| from_crate_error(Error::Database(e.to_string())))?;
+
+		Ok(NotebookStore::load(&mut *db, notebook_number).await.map_err(from_crate_error)?)
+	}
+
+	async fn get_header(
+		&self,
+		notebook_number: NotebookNumber,
+	) -> Result<NotebookHeader, ErrorObjectOwned> {
+		NotebookHeaderStore::load(&self.pool, notebook_number)
+			.await
+			.map_err(from_crate_error)
 	}
 }
 
@@ -147,7 +175,7 @@ mod tests {
 	use codec::Encode;
 	use futures::{StreamExt, TryStreamExt};
 	use jsonrpsee::ws_client::WsClientBuilder;
-	use sp_core::{bounded_vec, Blake2Hasher};
+	use sp_core::{bounded_vec, ed25519::Signature, Blake2Hasher};
 	use sp_keyring::Ed25519Keyring::Bob;
 	use sp_keystore::{testing::MemoryKeystore, KeystoreExt};
 	use sqlx::PgPool;
@@ -187,25 +215,22 @@ mod tests {
 		.await?;
 
 		let client = WsClientBuilder::default().build(format!("ws://{}", notary.addr)).await?;
-		let mut transfer_note = Note::create_unsigned(
-			&Bob.to_account_id(),
-			&Deposit,
-			1,
-			0,
-			1000,
-			NoteType::ClaimFromMainchain { account_nonce: 1 },
-		);
 
-		transfer_note.signature = Bob.sign(&transfer_note.note_id.as_ref()).into();
 		let balance_change = BalanceChange {
 			account_id: Bob.to_account_id(),
 			account_type: Deposit,
 			change_number: 1,
 			balance: 1000,
-			previous_balance: 0,
 			previous_balance_proof: None,
-			notes: bounded_vec![transfer_note],
-		};
+			notes: bounded_vec![Note::create(
+				1000,
+				NoteType::ClaimFromMainchain { account_nonce: 1 }
+			)],
+			channel_hold_note: None,
+			signature: Signature([0; 64]).into(),
+		}
+		.sign(Bob.pair())
+		.clone();
 
 		assert_eq!(
 			client.notarize(bounded_vec![balance_change]).await?,
@@ -249,15 +274,17 @@ mod tests {
 			change_number: 1,
 			balance: 1000,
 			account_origin: AccountOrigin { notebook_number: 1, account_uid: 1 },
+			channel_hold_note: None,
 		};
 
 		let proof = client.get_balance_proof(header.notebook_number, tip.clone()).await?;
 
+		let notebook_proof = proof.notebook_proof.expect("Should have notebook proof");
 		assert!(verify_proof::<Blake2Hasher, _, _>(
 			&header.changed_accounts_root,
-			proof.proof,
-			proof.number_of_leaves as usize,
-			proof.leaf_index as usize,
+			notebook_proof.proof,
+			notebook_proof.number_of_leaves as usize,
+			notebook_proof.leaf_index as usize,
 			&tip.encode(),
 		));
 

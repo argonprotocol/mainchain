@@ -2,6 +2,7 @@ use chrono::Utc;
 use serde_json::{from_value, json};
 use sp_core::{bounded::BoundedVec, H256};
 use sqlx::{query, query_scalar, types::JsonValue, FromRow, PgConnection};
+use std::collections::BTreeSet;
 
 use ulx_notary_primitives::{
 	ensure, AccountOrigin, ChainTransfer, NotaryId, NotebookHeader, NotebookNumber,
@@ -190,7 +191,10 @@ impl NotebookHeaderStore {
 			})?;
 			header.pinned_to_block_number = pinned_to_block_number;
 			header.changed_accounts_root = changed_accounts_root;
-			header.changed_account_origins = BoundedVec::truncate_from(account_changelist.clone());
+			// need to sort the changelist
+			let account_changelist = BTreeSet::from_iter(account_changelist);
+			header.changed_account_origins =
+				BoundedVec::truncate_from(account_changelist.into_iter().collect::<Vec<_>>());
 
 			let hash = header.hash().0;
 

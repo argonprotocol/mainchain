@@ -5,8 +5,8 @@ use ulx_notary_audit::{verify_balance_changeset_allocation, verify_changeset_sig
 
 use crate::apis::localchain::BalanceChangeResult;
 use ulx_notary_primitives::{
-	ensure, AccountId, AccountOrigin, AccountType, BalanceChange, BalanceTip, NewAccountOrigin,
-	NotaryId, NoteType, NotebookNumber, MAX_TRANSFERS,
+	ensure, AccountId, AccountOrigin, AccountType, BalanceChange, BalanceProof, BalanceTip,
+	NewAccountOrigin, NotaryId, NoteType, NotebookNumber, MAX_TRANSFERS,
 };
 
 use crate::{
@@ -103,7 +103,7 @@ impl BalanceChangeStore {
 		changes: Vec<BalanceChange>,
 	) -> anyhow::Result<BalanceChangeResult, Error> {
 		// Before we use db resources, let's confirm these are valid transactions
-		verify_balance_changeset_allocation(&changes)?;
+		let initial_allocation_result = verify_balance_changeset_allocation(&changes, None)?;
 		verify_changeset_signatures(&changes)?;
 
 		// Begin database transaction
@@ -113,18 +113,15 @@ impl BalanceChangeStore {
 		let current_notebook_number =
 			NotebookStatusStore::lock_open_for_appending(&mut *tx).await?;
 
+		if initial_allocation_result.needs_channel_settle_followup {
+			verify_balance_changeset_allocation(&changes, Some(current_notebook_number))?;
+		}
+
 		let mut new_account_origins = BTreeMap::<(AccountId, AccountType), AccountOrigin>::new();
 
-		let to_add = changes.clone();
+		let mut final_changes = changes.clone();
 		for (change_index, change) in changes.into_iter().enumerate() {
-			let BalanceChange {
-				account_id,
-				account_type,
-				change_number,
-				previous_balance,
-				balance,
-				..
-			} = change;
+			let BalanceChange { account_id, account_type, change_number, balance, .. } = change;
 			let key = (account_id.clone(), account_type.clone());
 
 			let account_origin = change
@@ -155,15 +152,19 @@ impl BalanceChangeStore {
 					origin
 				},
 			};
+			let previous_balance =
+				change.previous_balance_proof.as_ref().map(|p| p.balance.clone()).unwrap_or(0);
 
+			let channel_hold_note = change.channel_hold_note;
 			BalanceTipStore::lock(
 				&mut *tx,
 				&account_id,
 				account_type.clone(),
 				change_number,
-				previous_balance,
+				previous_balance.clone(),
 				&account_origin,
 				change_index,
+				channel_hold_note.clone(),
 				5000,
 			)
 			.await?;
@@ -175,17 +176,49 @@ impl BalanceChangeStore {
 					change_number,
 					balance,
 					account_origin: account_origin.clone(),
+					channel_hold_note,
 				};
 
 				// TODO: handle notary switching
 				ensure!(proof.notary_id == notary_id, Error::CrossNotaryProofsNotImplemented);
 
-				ensure!(
-					NotebookStore::is_valid_proof(&mut *tx, &tip, &proof).await?,
-					Error::InvalidBalanceProof
-				);
+				// We fill this in when not provided as convenience.
+				// TODO: We should add a fee for this though.
+				if proof.notebook_number < current_notebook_number && proof.notebook_proof.is_none()
+				{
+					let notebook_proof = NotebookStore::get_balance_proof(
+						&mut *tx,
+						notary_id,
+						proof.notebook_number,
+						&tip,
+					)
+					.await?;
+
+					// record into the final changeset
+					final_changes[change_index].previous_balance_proof = Some(BalanceProof {
+						balance: proof.balance,
+						notary_id: proof.notary_id,
+						notebook_number: proof.notebook_number,
+						account_origin: proof.account_origin.clone(),
+						notebook_proof: Some(notebook_proof),
+					});
+				}
+
+				if let Some(notebook_proof) = &proof.notebook_proof {
+					ensure!(
+						NotebookStore::is_valid_proof(
+							&mut *tx,
+							&tip,
+							proof.notebook_number,
+							&notebook_proof
+						)
+						.await?,
+						Error::InvalidBalanceProof
+					);
+				}
 			}
 
+			let mut channel_hold_note = None;
 			for (note_index, note) in change.notes.into_iter().enumerate() {
 				let _ = match note.note_type {
 					NoteType::ClaimFromMainchain { account_nonce: nonce, .. } => {
@@ -212,6 +245,14 @@ impl BalanceChangeStore {
 					)
 					.await
 					.map(|_| ()),
+					NoteType::ChannelHold { .. } => {
+						channel_hold_note = Some(note.clone());
+						Ok(())
+					},
+					NoteType::ChannelSettle => {
+						channel_hold_note = None;
+						Ok(())
+					},
 					_ => Ok(()),
 				}
 				.map_err(|e| Error::BalanceChangeError {
@@ -229,13 +270,18 @@ impl BalanceChangeStore {
 				balance,
 				current_notebook_number,
 				account_origin,
-				previous_balance,
+				channel_hold_note,
+				previous_balance.clone(),
 			)
 			.await?;
 		}
 
-		BalanceChangeStore::append_notebook_changeset(&mut *tx, current_notebook_number, to_add)
-			.await?;
+		BalanceChangeStore::append_notebook_changeset(
+			&mut *tx,
+			current_notebook_number,
+			final_changes,
+		)
+		.await?;
 
 		tx.commit().await?;
 		Ok(BalanceChangeResult {
@@ -253,7 +299,7 @@ impl BalanceChangeStore {
 
 #[cfg(test)]
 mod tests {
-	use sp_core::bounded_vec;
+	use sp_core::{bounded_vec, ed25519::Signature};
 	use sp_keyring::Sr25519Keyring::Bob;
 	use sqlx::PgPool;
 
@@ -269,16 +315,13 @@ mod tests {
 			account_type: Deposit,
 			change_number: 0,
 			balance: 1000,
-			previous_balance: 0,
 			previous_balance_proof: None,
-			notes: bounded_vec![Note::create_unsigned(
-				&Bob.to_account_id(),
-				&Deposit,
-				1,
-				0,
+			channel_hold_note: None,
+			notes: bounded_vec![Note::create(
 				1000,
 				NoteType::ClaimFromMainchain { account_nonce: 1 }
 			)],
+			signature: Signature([0u8; 64]).into(),
 		}];
 
 		{

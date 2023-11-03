@@ -1201,7 +1201,7 @@ pub mod api {
 					types::AuditNotebook,
 					::core::result::Result<
 						::core::primitive::bool,
-						runtime_types::ulx_notary_audit::VerifyError,
+						runtime_types::ulx_notary_audit::error::VerifyError,
 					>,
 				> {
 					::subxt::runtime_api::Payload::new_static(
@@ -1216,9 +1216,10 @@ pub mod api {
 							bytes,
 						},
 						[
-							72u8, 89u8, 67u8, 243u8, 227u8, 175u8, 36u8, 41u8, 173u8, 150u8, 40u8,
-							186u8, 111u8, 191u8, 17u8, 81u8, 62u8, 122u8, 249u8, 227u8, 192u8,
-							205u8, 77u8, 50u8, 82u8, 246u8, 16u8, 192u8, 114u8, 243u8, 11u8, 180u8,
+							3u8, 40u8, 140u8, 207u8, 166u8, 241u8, 207u8, 209u8, 79u8, 158u8, 43u8,
+							103u8, 62u8, 243u8, 198u8, 216u8, 139u8, 25u8, 92u8, 228u8, 126u8,
+							169u8, 119u8, 253u8, 179u8, 218u8, 131u8, 43u8, 230u8, 11u8, 242u8,
+							13u8,
 						],
 					)
 				}
@@ -13577,6 +13578,129 @@ pub mod api {
 		}
 		pub mod ulx_notary_audit {
 			use super::runtime_types;
+			pub mod error {
+				use super::runtime_types;
+				#[derive(
+					:: subxt :: ext :: codec :: Decode,
+					:: subxt :: ext :: codec :: Encode,
+					:: subxt :: ext :: scale_decode :: DecodeAsType,
+					:: subxt :: ext :: scale_encode :: EncodeAsType,
+					Clone,
+					Debug,
+				)]
+				# [codec (crate = :: subxt :: ext :: codec)]
+				#[decode_as_type(crate_path = ":: subxt :: ext :: scale_decode")]
+				#[encode_as_type(crate_path = ":: subxt :: ext :: scale_encode")]
+				pub enum VerifyError {
+					#[codec(index = 0)]
+					MissingAccountOrigin {
+						account_id: ::subxt::utils::AccountId32,
+						account_type: runtime_types::ulx_notary_primitives::note::AccountType,
+					},
+					#[codec(index = 1)]
+					HistoryLookupError {
+						source: runtime_types::ulx_notary_audit::AccountHistoryLookupError,
+					},
+					#[codec(index = 2)]
+					InvalidAccountChangelist,
+					#[codec(index = 3)]
+					InvalidChainTransfersList,
+					#[codec(index = 4)]
+					InvalidBalanceChangeRoot,
+					#[codec(index = 5)]
+					InvalidPreviousNonce,
+					#[codec(index = 6)]
+					InvalidPreviousBalance,
+					#[codec(index = 7)]
+					InvalidPreviousAccountOrigin,
+					#[codec(index = 8)]
+					InvalidPreviousBalanceChangeNotebook,
+					#[codec(index = 9)]
+					InvalidBalanceChange,
+					#[codec(index = 10)]
+					InvalidBalanceChangeSignature { change_index: ::core::primitive::u16 },
+					#[codec(index = 11)]
+					InvalidNoteRecipients,
+					#[codec(index = 12)]
+					BalanceChangeError {
+						change_index: ::core::primitive::u16,
+						note_index: ::core::primitive::u16,
+						message: ::std::string::String,
+					},
+					#[codec(index = 13)]
+					InvalidNetBalanceChangeset,
+					#[codec(index = 14)]
+					InsufficientBalance {
+						balance: ::core::primitive::u128,
+						amount: ::core::primitive::u128,
+						note_index: ::core::primitive::u16,
+						change_index: ::core::primitive::u16,
+					},
+					#[codec(index = 15)]
+					ExceededMaxBalance {
+						balance: ::core::primitive::u128,
+						amount: ::core::primitive::u128,
+						note_index: ::core::primitive::u16,
+						change_index: ::core::primitive::u16,
+					},
+					#[codec(index = 16)]
+					BalanceChangeMismatch {
+						change_index: ::core::primitive::u16,
+						provided_balance: ::core::primitive::u128,
+						calculated_balance: ::core::primitive::i128,
+					},
+					#[codec(index = 17)]
+					BalanceChangeNotNetZero {
+						sent: ::core::primitive::u128,
+						claimed: ::core::primitive::u128,
+					},
+					#[codec(index = 18)]
+					TaxBalanceChangeNotNetZero {
+						sent: ::core::primitive::u128,
+						claimed: ::core::primitive::u128,
+					},
+					#[codec(index = 19)]
+					MissingBalanceProof,
+					#[codec(index = 20)]
+					InvalidPreviousBalanceProof,
+					#[codec(index = 21)]
+					InvalidNotebookHash,
+					#[codec(index = 22)]
+					DuplicateChainTransfer,
+					#[codec(index = 23)]
+					DuplicatedAccountOriginUid,
+					#[codec(index = 24)]
+					InvalidNotarySignature,
+					#[codec(index = 25)]
+					NotebookTooOld,
+					#[codec(index = 26)]
+					DecodeError,
+					#[codec(index = 27)]
+					AccountChannelHoldDoesntExist,
+					#[codec(index = 28)]
+					AccountAlreadyHasChannelHold,
+					#[codec(index = 29)]
+					ChannelHoldNotReadyForClaim,
+					#[codec(index = 30)]
+					ChannelHoldAlreadyClaimed,
+					#[codec(index = 31)]
+					ChannelHoldNotReadyForSettle,
+					#[codec(index = 32)]
+					AccountLocked,
+					#[codec(index = 33)]
+					MissingChannelHoldNote,
+					#[codec(index = 34)]
+					InvalidChannelHoldNote,
+					#[codec(index = 35)]
+					InvalidChannelClaimers,
+					#[codec(index = 36)]
+					ChannelNoteBelowMinimum,
+					#[codec(index = 37)]
+					InvalidTaxNoteAccount,
+					#[codec(index = 38)]
+					InvalidTaxOperation,
+				}
+			}
 			#[derive(
 				:: subxt :: ext :: codec :: Decode,
 				:: subxt :: ext :: codec :: Encode,
@@ -13595,100 +13719,6 @@ pub mod api {
 				LastChangeNotFound,
 				#[codec(index = 2)]
 				InvalidTransferToLocalchain,
-			}
-			#[derive(
-				:: subxt :: ext :: codec :: Decode,
-				:: subxt :: ext :: codec :: Encode,
-				:: subxt :: ext :: scale_decode :: DecodeAsType,
-				:: subxt :: ext :: scale_encode :: EncodeAsType,
-				Clone,
-				Debug,
-			)]
-			# [codec (crate = :: subxt :: ext :: codec)]
-			#[decode_as_type(crate_path = ":: subxt :: ext :: scale_decode")]
-			#[encode_as_type(crate_path = ":: subxt :: ext :: scale_encode")]
-			pub enum VerifyError {
-				#[codec(index = 0)]
-				MissingAccountOrigin {
-					account_id: ::subxt::utils::AccountId32,
-					account_type: runtime_types::ulx_notary_primitives::note::AccountType,
-				},
-				#[codec(index = 1)]
-				HistoryLookupError {
-					source: runtime_types::ulx_notary_audit::AccountHistoryLookupError,
-				},
-				#[codec(index = 2)]
-				InvalidAccountChangelist,
-				#[codec(index = 3)]
-				InvalidChainTransfersList,
-				#[codec(index = 4)]
-				InvalidBalanceChangeRoot,
-				#[codec(index = 5)]
-				InvalidPreviousNonce,
-				#[codec(index = 6)]
-				InvalidPreviousBalance,
-				#[codec(index = 7)]
-				InvalidPreviousAccountOrigin,
-				#[codec(index = 8)]
-				InvalidPreviousBalanceChangeNotebook,
-				#[codec(index = 9)]
-				InvalidBalanceChange,
-				#[codec(index = 10)]
-				InvalidNoteSignature,
-				#[codec(index = 11)]
-				InvalidNoteIdCalculated,
-				#[codec(index = 12)]
-				NoteIdNotInBalanceChanges { note_id: ::subxt::utils::H256 },
-				#[codec(index = 13)]
-				InvalidNoteRecipient,
-				#[codec(index = 14)]
-				NoteIdAlreadyUsed,
-				#[codec(index = 15)]
-				BalanceChangeError {
-					change_index: ::core::primitive::u16,
-					note_index: ::core::primitive::u16,
-					message: ::std::string::String,
-				},
-				#[codec(index = 16)]
-				InvalidNetBalanceChangeset,
-				#[codec(index = 17)]
-				InsufficientBalance {
-					balance: ::core::primitive::u128,
-					amount: ::core::primitive::u128,
-					note_index: ::core::primitive::u16,
-					change_index: ::core::primitive::u16,
-				},
-				#[codec(index = 18)]
-				ExceededMaxBalance {
-					balance: ::core::primitive::u128,
-					amount: ::core::primitive::u128,
-					note_index: ::core::primitive::u16,
-					change_index: ::core::primitive::u16,
-				},
-				#[codec(index = 19)]
-				BalanceChangeMismatch {
-					change_index: ::core::primitive::u16,
-					provided_balance: ::core::primitive::u128,
-					calculated_balance: ::core::primitive::i128,
-				},
-				#[codec(index = 20)]
-				BalanceChangeNotNetZero { unaccounted: ::core::primitive::i128 },
-				#[codec(index = 21)]
-				MissingBalanceProof,
-				#[codec(index = 22)]
-				InvalidPreviousBalanceProof,
-				#[codec(index = 23)]
-				InvalidNotebookHash,
-				#[codec(index = 24)]
-				DuplicateChainTransfer,
-				#[codec(index = 25)]
-				DuplicatedAccountOriginUid,
-				#[codec(index = 26)]
-				InvalidNotarySignature,
-				#[codec(index = 27)]
-				NotebookTooOld,
-				#[codec(index = 28)]
-				DecodeError,
 			}
 		}
 		pub mod ulx_notary_primitives {

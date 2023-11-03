@@ -4,7 +4,7 @@ use sp_core::H256;
 use sqlx::PgConnection;
 
 use ulx_notary_primitives::{
-	ensure, AccountId, AccountOrigin, AccountType, BalanceTip, NotebookNumber,
+	ensure, AccountId, AccountOrigin, AccountType, BalanceTip, Note, NotebookNumber,
 };
 
 use crate::{stores::BoxFutureResult, Error};
@@ -30,6 +30,7 @@ impl BalanceTipStore {
 		previous_balance: u128,
 		account_origin: &AccountOrigin,
 		change_index: usize,
+		channel_hold_note: Option<Note>,
 		timeout_millis: u32,
 	) -> BoxFutureResult<'a, Option<H256>> {
 		let key = BalanceTip::create_key(account_id, &account_type);
@@ -41,6 +42,7 @@ impl BalanceTipStore {
 					proposed_change_number - 1u32,
 					previous_balance,
 					account_origin.clone(),
+					channel_hold_note,
 				)
 				.into(),
 			);
@@ -82,11 +84,22 @@ impl BalanceTipStore {
 		balance: u128,
 		notebook_number: NotebookNumber,
 		account_origin: AccountOrigin,
+		channel_hold_note: Option<Note>,
 		prev_balance: u128,
 	) -> BoxFutureResult<'a, ()> {
 		let key = BalanceTip::create_key(account_id, &account_type);
-		let tip = BalanceTip::compute_tip(change_number, balance, account_origin.clone());
-		let prev = BalanceTip::compute_tip(change_number - 1, prev_balance, account_origin);
+		let tip = BalanceTip::compute_tip(
+			change_number,
+			balance,
+			account_origin.clone(),
+			channel_hold_note.clone(),
+		);
+		let prev = BalanceTip::compute_tip(
+			change_number - 1,
+			prev_balance,
+			account_origin,
+			channel_hold_note,
+		);
 		Box::pin(async move {
 			let res = sqlx::query!(
 				r#"
@@ -138,6 +151,7 @@ mod tests {
 					0,
 					&AccountOrigin { notebook_number: 1, account_uid: 1 },
 					0,
+					None,
 					10
 				)
 				.await?,
@@ -151,6 +165,7 @@ mod tests {
 				1000,
 				1,
 				AccountOrigin { notebook_number: 1, account_uid: 1 },
+				None,
 				0,
 			)
 			.await?;
@@ -167,6 +182,7 @@ mod tests {
 				1000,
 				&AccountOrigin { notebook_number: 1, account_uid: 1 },
 				0,
+				None,
 				10
 			)
 			.await?,
@@ -175,6 +191,7 @@ mod tests {
 					1,
 					1000,
 					AccountOrigin { notebook_number: 1, account_uid: 1 },
+					None
 				)
 				.into()
 			)
@@ -189,6 +206,7 @@ mod tests {
 			1000,
 			&AccountOrigin { notebook_number: 1, account_uid: 1 },
 			0,
+			None,
 			10
 		)
 		.await
@@ -205,6 +223,7 @@ mod tests {
 				1001,
 				1,
 				AccountOrigin { notebook_number: 1, account_uid: 1 },
+				None,
 				1000
 			)
 			.await

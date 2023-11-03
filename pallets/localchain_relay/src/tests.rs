@@ -601,7 +601,7 @@ fn it_can_audit_notebooks() {
 		};
 		let header_hash = header.hash();
 		let signature = ed25519::Signature([0u8; 64]);
-		let mut note = Note::create_unsigned(
+		let mut note = Note::create(
 			&who.clone(),
 			&AccountType::Deposit,
 			1,
@@ -609,7 +609,7 @@ fn it_can_audit_notebooks() {
 			2000,
 			NoteType::ClaimFromMainchain { account_nonce: nonce.unique_saturated_into() },
 		);
-		note.signature = Bob.sign(&note.note_id[..]).into();
+		note.signature = Bob.sign(&note.id[..]).into();
 
 		let notebook = Notebook {
 			header,

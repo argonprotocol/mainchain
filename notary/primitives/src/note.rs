@@ -1,13 +1,11 @@
 use codec::{Decode, Encode, MaxEncodedLen};
 use scale_info::TypeInfo;
 use serde::{Deserialize, Serialize};
-use sp_core::{ed25519::Signature, RuntimeDebug, H256};
-use sp_core_hashing::blake2_256;
-use sp_runtime::{format_runtime_string, MultiSignature, RuntimeString};
+use sp_core::{ConstU32, RuntimeDebug};
+use sp_runtime::{format_runtime_string, BoundedVec, RuntimeString};
 
 use crate::AccountId;
 
-pub type NoteId = H256;
 #[derive(
 	Clone,
 	PartialEq,
@@ -22,78 +20,16 @@ pub type NoteId = H256;
 )]
 #[serde(rename_all = "camelCase")]
 pub struct Note {
-	/// Hash of Scale encoded (balance_change_number, account_id, account_type, milligons,
-	/// note_type)
-	pub note_id: NoteId,
 	/// Number of milligons transferred
 	#[codec(compact)]
 	pub milligons: u128,
 	/// Type
 	pub note_type: NoteType,
-	/// Hash signed by sender address
-	pub signature: MultiSignature,
 }
 
 impl Note {
-	pub fn create_unsigned(
-		account_id: &AccountId,
-		account_type: &AccountType,
-		balance_change_number: u32,
-		note_index: u16,
-		milligons: u128,
-		note_type: NoteType,
-	) -> Self {
-		Self {
-			note_id: Self::compute_note_id(
-				account_id,
-				account_type,
-				balance_change_number,
-				note_index,
-				milligons,
-				&note_type,
-			),
-			milligons,
-			note_type,
-			signature: Signature([0u8; 64]).into(),
-		}
-	}
-	pub fn get_note_id(
-		&self,
-		account_id: &AccountId,
-		account_type: &AccountType,
-		balance_change_number: u32,
-		note_index: u16,
-	) -> NoteId {
-		Self::compute_note_id(
-			account_id,
-			account_type,
-			balance_change_number,
-			note_index,
-			self.milligons,
-			&self.note_type,
-		)
-	}
-
-	pub fn compute_note_id(
-		account_id: &AccountId,
-		account_type: &AccountType,
-		balance_change_number: u32,
-		note_index: u16,
-		milligons: u128,
-		note_type: &NoteType,
-	) -> NoteId {
-		blake2_256(
-			&[
-				&account_id.as_ref(),
-				&account_type.encode()[..],
-				&balance_change_number.to_le_bytes()[..],
-				&note_index.to_le_bytes()[..],
-				&milligons.to_le_bytes()[..],
-				&note_type.encode()[..],
-			]
-			.concat(),
-		)
-		.into()
+	pub fn create(milligons: u128, note_type: NoteType) -> Self {
+		Self { milligons, note_type }
 	}
 }
 
@@ -129,6 +65,11 @@ impl TryFrom<i32> for AccountType {
 	}
 }
 
+pub const CHANNEL_EXPIRATION_NOTEBOOKS: u32 = 60;
+pub const CHANNEL_CLAWBACK_NOTEBOOKS: u32 = 10; // 10 after expiration
+pub const MIN_CHANNEL_NOTE_MILLIGONS: u128 = 5;
+pub type MaxNoteRecipients = ConstU32<10>;
+
 #[derive(
 	Clone,
 	PartialEq,
@@ -155,19 +96,20 @@ pub enum NoteType {
 	/// Transfer funds to another address
 	#[serde(rename_all = "camelCase")]
 	Send {
-		/// Recipient address  (address of recipient party)
-		recipient: Option<AccountId>,
+		/// Recipient addresses (address of recipient party)
+		to: Option<BoundedVec<AccountId, MaxNoteRecipients>>,
 	},
 	/// Pay a fee to a notary or mainchain service
 	Fee,
 	/// This note is a tax note
 	Tax,
-	/// Channel notes
-	Channel,
-	/// Channel settlement note
-	#[serde(rename_all = "camelCase")]
-	ChannelSettle {
-		/// Source channel note
-		source_note_id: NoteId,
+	/// Channel hold notes
+	ChannelHold {
+		/// The account id of the recipient
+		recipient: AccountId,
 	},
+	/// Channel settlement note - sent to recipient of the original hold
+	ChannelSettle,
+	/// Claim funds from one or more channels - must be the recipient of the hold
+	ChannelClaim,
 }
