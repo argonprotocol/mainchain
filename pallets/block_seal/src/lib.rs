@@ -30,7 +30,7 @@ pub mod pallet {
 
 	use ulx_primitives::{
 		block_seal::{
-			AuthorityDistance, AuthorityProvider, BlockProof, HistoricalBlockSealersLookup,
+			AuthorityDistance, AuthorityProvider, BlockProof, BlockSealersProvider, Host,
 			SealNonceHashMessage, SealStamper, SealerSignatureMessage, SEALER_SIGNATURE_PREFIX,
 			SEAL_NONCE_PREFIX,
 		},
@@ -69,7 +69,7 @@ pub mod pallet {
 		_,
 		Twox64Concat,
 		BlockNumberFor<T>,
-		BoundedVec<T::AuthorityId, T::HistoricalBlockSealersToKeep>,
+		BoundedVec<(u16, T::AuthorityId), T::HistoricalBlockSealersToKeep>,
 		ValueQuery,
 	>;
 
@@ -251,7 +251,14 @@ pub mod pallet {
 
 			DidSeal::<T>::put(true);
 			let block_number = <frame_system::Pallet<T>>::block_number();
-			let sealers = seal_validators.iter().map(|v| v.0.clone()).collect::<Vec<_>>();
+			let sealers = seal_validators
+				.iter()
+				.enumerate()
+				.map(|(i, v)| {
+					let index = &proof.seal_stampers[i].authority_idx;
+					(*index, v.0.clone())
+				})
+				.collect::<Vec<_>>();
 			<HistoricalBlockSealAuthorities<T>>::insert(
 				block_number,
 				BoundedVec::truncate_from(sealers),
@@ -436,14 +443,29 @@ pub mod pallet {
 		}
 	}
 
-	impl<T: Config> HistoricalBlockSealersLookup<BlockNumberFor<T>, T::AuthorityId> for Pallet<T> {
-		fn get_active_block_sealers_of(block_number: BlockNumberFor<T>) -> Vec<T::AuthorityId> {
+	impl<T: Config> BlockSealersProvider<BlockNumberFor<T>, T::AuthorityId> for Pallet<T> {
+		fn get_active_block_sealers_of(
+			block_number: BlockNumberFor<T>,
+		) -> Vec<(u16, T::AuthorityId, Vec<Host>)> {
 			let block_sealers = <HistoricalBlockSealAuthorities<T>>::get(block_number);
 			block_sealers
 				.into_inner()
 				.into_iter()
-				.filter(|a| T::AuthorityProvider::is_active(a))
+				.filter_map(|a| {
+					let authorities = T::AuthorityProvider::authorities_by_index();
+					let registration = authorities.get(&a.0);
+					if let Some(authority_id) = registration {
+						if a.1 == *authority_id {
+							return Some((a.0, a.1, Vec::new()))
+						}
+					}
+					None
+				})
 				.collect::<Vec<_>>()
+		}
+
+		fn is_using_proof_of_compute() -> bool {
+			Self::work_type() == ProofOfWorkType::Compute
 		}
 	}
 

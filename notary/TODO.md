@@ -1,0 +1,4 @@
+- [ ] What to do if a notebook is never committed to a finalized block
+  - This might just mean that a notary will be shut down. Can it recover?
+  - The mainchain should not accept out-of-order notebooks. Every notebook must be accounted for in order.
+  - This might be a reason to have a localchain wallet check the last mainchain notebook to ensure a notary is legit before continuing to use it.

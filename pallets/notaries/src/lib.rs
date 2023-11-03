@@ -123,12 +123,12 @@ pub mod pallet {
 		NotaryActivated { notary: NotaryRecordOf<T> },
 		/// Notary metadata queued for update
 		NotaryMetaUpdateQueued {
-			notary_id: u32,
+			notary_id: NotaryId,
 			meta: NotaryMetaOf<T>,
 			effective_block: BlockNumberFor<T>,
 		},
 		/// Notary metadata updated
-		NotaryMetaUpdated { notary_id: u32, meta: NotaryMetaOf<T> },
+		NotaryMetaUpdated { notary_id: NotaryId, meta: NotaryMetaOf<T> },
 	}
 
 	#[pallet::error]
@@ -255,7 +255,7 @@ pub mod pallet {
 		#[pallet::weight(0)]
 		pub fn update(
 			origin: OriginFor<T>,
-			#[pallet::compact] notary_id: u32,
+			#[pallet::compact] notary_id: NotaryId,
 			meta: NotaryMetaOf<T>,
 		) -> DispatchResult {
 			let who = ensure_signed(origin)?;
@@ -305,10 +305,15 @@ pub mod pallet {
 			let key_history = <NotaryKeyHistory<T>>::get(notary_id);
 
 			// find the first key that is valid at the given block height
-			let public = key_history
+			let mut public = key_history
 				.iter()
 				.find(|(block, _)| *block >= at_block_height)
 				.map(|(_, public)| public);
+			if public.is_none() && key_history.len() > 0 {
+				if key_history[0].0 < at_block_height {
+					public = key_history.first().map(|(_, public)| public);
+				}
+			}
 
 			if let Some(public) = public {
 				return public.verify(message, &signature)

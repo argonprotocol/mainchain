@@ -10,6 +10,7 @@ use sp_runtime::{
 };
 
 use crate as pallet_mining_slots;
+use crate::Registration;
 
 type Block = frame_system::mocking::MockBlock<Test>;
 
@@ -146,8 +147,14 @@ impl pallet_mining_slots::Config for Test {
 }
 
 // Build genesis storage according to the mock runtime.
-pub fn new_test_ext() -> sp_io::TestExternalities {
+pub fn new_test_ext(miner_zero: Option<Registration<Test>>) -> sp_io::TestExternalities {
 	let env = Env::new().default_filter_or("debug");
 	let _ = Builder::from_env(env).is_test(true).try_init();
-	frame_system::GenesisConfig::<Test>::default().build_storage().unwrap().into()
+
+	let mut t = frame_system::GenesisConfig::<Test>::default().build_storage().unwrap().into();
+	pallet_mining_slots::GenesisConfig::<Test> { miner_zero, _phantom: Default::default() }
+		.assimilate_storage(&mut t)
+		.unwrap();
+
+	sp_io::TestExternalities::new(t)
 }

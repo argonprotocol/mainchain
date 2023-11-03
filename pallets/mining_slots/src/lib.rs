@@ -23,7 +23,7 @@ use sp_std::{collections::btree_map::BTreeMap, marker::PhantomData, vec::Vec};
 
 pub use pallet::*;
 use ulx_primitives::{
-	block_seal::{AuthorityDistance, AuthorityProvider, BlockSealAuthorityId},
+	block_seal::{AuthorityDistance, AuthorityProvider, BlockSealAuthorityId, Host},
 	bond::BondProvider,
 };
 pub use weights::*;
@@ -178,7 +178,9 @@ pub mod pallet {
 	#[pallet::storage]
 	#[pallet::getter(fn active_miners_by_index)]
 	pub(super) type ActiveMinersByIndex<T: Config> =
-		StorageValue<_, BoundedBTreeMap<u32, Registration<T>, T::MaxMiners>, ValueQuery>;
+		StorageMap<_, Blake2_128Concat, u32, Registration<T>, OptionQuery>;
+	#[pallet::storage]
+	pub(super) type ActiveMinersCount<T: Config> = StorageValue<_, u16, ValueQuery>;
 
 	/// Authorities are the session keys that are actively participating in the network.
 	/// The tuple is the authority, and the blake2 256 hash of the authority used for xor lookups
@@ -266,6 +268,9 @@ pub mod pallet {
 		BidTooLow,
 		/// Internal state has become somehow corrupted and the operation cannot continue.
 		BadInternalState,
+		/// You must register with rpc hosts so that your miner can be reached for block seal
+		/// auditing
+		RpcHostsAreRequired,
 		BidBondDurationTooShort,
 		CannotRegisteredOverlappingSessions,
 		// copied from bond
@@ -360,66 +365,48 @@ pub mod pallet {
 				cohort_size,
 			);
 
-			let mut slot_cohort = NextSlotCohort::<T>::take();
+			let slot_cohort = NextSlotCohort::<T>::take();
 			IsNextSlotBiddingOpen::<T>::put(true);
-			let active_miners = ActiveMinersByIndex::<T>::get();
-			let mut future_active_miners = active_miners.len() as u32;
+			let mut active_miners = ActiveMinersCount::<T>::get();
 
-			// check if all the future miners are in the slot being replaced, but only bother if
-			// we're under the threshold
-			if future_active_miners <= cohort_size {
-				for index in active_miners.keys() {
-					if index >= &start_index_to_replace_miners &&
-						index < &(start_index_to_replace_miners + cohort_size)
-					{
-						future_active_miners -= 1
+			for i in 0..cohort_size {
+				let index = i + start_index_to_replace_miners;
+
+				if let Some(entry) = ActiveMinersByIndex::<T>::take(&index) {
+					let account_id = entry.account_id.clone();
+					AccountIndexLookup::<T>::remove(&account_id);
+					active_miners -= 1;
+					let next = slot_cohort.iter().find(|x| x.account_id == account_id).cloned();
+					match Self::unbond_account(entry, next) {
+						Err(err) => {
+							log::error!(
+								target: LOG_TARGET,
+								"Failed to unbond account {:?}. {:?}",
+								account_id,
+								err,
+							);
+						},
+						_ => (),
 					}
+				}
+
+				if let Some(registration) = slot_cohort.get(i as usize) {
+					AccountIndexLookup::<T>::insert(&registration.account_id, &index);
+					active_miners += 1;
+					ActiveMinersByIndex::<T>::insert(&index, registration.clone());
 				}
 			}
 
-			if future_active_miners as usize + slot_cohort.len() == 0 {
+			if active_miners == 0 {
 				if let Some(miner) = MinerZero::<T>::get() {
-					let _ = slot_cohort.try_push(miner.clone());
+					let index = start_index_to_replace_miners;
+					AccountIndexLookup::<T>::insert(&miner.account_id, &index);
+					active_miners = 1;
+					ActiveMinersByIndex::<T>::insert(&index, miner.clone());
 				}
 			}
 
-			let _ = ActiveMinersByIndex::<T>::try_mutate(|miners| {
-				for i in 0..cohort_size {
-					let index = i + start_index_to_replace_miners;
-
-					if let Some(entry) = miners.remove(&index) {
-						let account_id = entry.account_id.clone();
-						AccountIndexLookup::<T>::remove(&account_id);
-						let next = slot_cohort.iter().find(|x| x.account_id == account_id).cloned();
-						match Self::unbond_account(entry, next) {
-							Err(err) => {
-								log::error!(
-									target: LOG_TARGET,
-									"Failed to unbond account {:?}. {:?}",
-									account_id,
-									err,
-								);
-							},
-							_ => (),
-						}
-					}
-
-					if let Some(registration) = slot_cohort.get(i as usize) {
-						AccountIndexLookup::<T>::insert(&registration.account_id, &index);
-						match miners.try_insert(index, registration.clone()) {
-							Err(err) => {
-								log::error!(
-									target: LOG_TARGET,
-									"Error rotating new authorities starting at {:?} at index {}. {:?}",
-									start_index_to_replace_miners, i, err
-								);
-							},
-							_ => (),
-						};
-					}
-				}
-				Ok::<(), Error<T>>(())
-			});
+			ActiveMinersCount::<T>::put(active_miners);
 
 			Pallet::<T>::deposit_event(Event::<T>::NewMiners {
 				start_index: start_index_to_replace_miners,
@@ -452,9 +439,8 @@ pub mod pallet {
 		) -> DispatchResult {
 			let who = ensure_signed(origin)?;
 
-			if IsNextSlotBiddingOpen::<T>::get() == false {
-				return Err(Error::<T>::SlotNotTakingBids.into())
-			}
+			ensure!(IsNextSlotBiddingOpen::<T>::get(), Error::<T>::SlotNotTakingBids);
+			ensure!(rpc_hosts.len() > 0, Error::<T>::RpcHostsAreRequired);
 
 			let next_cohort_block_number = Self::get_next_slot_block_number();
 			if let Some(current_index) = <AccountIndexLookup<T>>::get(&who) {
@@ -463,9 +449,7 @@ pub mod pallet {
 					current_index < (cohort_start_index + T::MaxCohortSize::get());
 
 				// current_index must be in the set of miners being replaced
-				if is_in_next_cohort == false {
-					return Err(Error::<T>::CannotRegisteredOverlappingSessions.into())
-				}
+				ensure!(is_in_next_cohort, Error::<T>::CannotRegisteredOverlappingSessions);
 			}
 
 			let current_registration = Self::get_active_registration(&who);
@@ -475,16 +459,15 @@ pub mod pallet {
 				let bond = T::BondProvider::get_bond(bond_id.clone())
 					.map_err(|err| Error::<T>::from(err))?;
 
-				if bond.bonded_account_id != who {
-					return Err(Error::<T>::NoPermissions.into())
-				}
+				ensure!(bond.bonded_account_id == who, Error::<T>::NoPermissions);
 
 				let bond_end_block =
 					next_cohort_block_number + Self::get_validation_window_blocks();
 
-				if bond.completion_block < bond_end_block {
-					return Err(Error::<T>::BidBondDurationTooShort.into())
-				}
+				ensure!(
+					bond.completion_block >= bond_end_block,
+					Error::<T>::BidBondDurationTooShort
+				);
 
 				bid = bond.amount;
 				let is_same_bond = current_registration
@@ -517,9 +500,7 @@ pub mod pallet {
 					Err(pos) => pos,
 				};
 
-				if pos >= T::MaxCohortSize::get() as usize {
-					return Err(Error::<T>::BidTooLow.into())
-				}
+				ensure!(pos < T::MaxCohortSize::get() as usize, Error::<T>::BidTooLow);
 
 				if UniqueSaturatedInto::<u32>::unique_saturated_into(cohort.len()) >=
 					T::MaxCohortSize::get()
@@ -559,6 +540,23 @@ pub mod pallet {
 }
 
 impl<T: Config> AuthorityProvider<BlockSealAuthorityId, T::Block, T::AccountId> for Pallet<T> {
+	fn miner_zero() -> Option<(u16, BlockSealAuthorityId, Vec<Host>)> {
+		if let Some(miner_zero) = <MinerZero<T>>::get() {
+			let index = <AccountIndexLookup<T>>::get(&miner_zero.account_id);
+			let authority_id = Self::get_authority(miner_zero.account_id.clone());
+			match (index, authority_id) {
+				(Some(index), Some(authority_id)) =>
+					return Some((
+						index.unique_saturated_into(),
+						authority_id,
+						miner_zero.rpc_hosts.into_inner(),
+					)),
+				_ => (),
+			}
+		}
+		None
+	}
+
 	fn authorities() -> Vec<BlockSealAuthorityId> {
 		Self::authorities_by_index()
 			.into_iter()
@@ -573,12 +571,12 @@ impl<T: Config> AuthorityProvider<BlockSealAuthorityId, T::Block, T::AccountId> 
 			.collect()
 	}
 
-	fn is_active(authority_id: &BlockSealAuthorityId) -> bool {
-		Self::authorities_by_index().iter().any(|(_, a)| a == authority_id)
-	}
-
 	fn authority_count() -> u16 {
 		Self::authorities().len().unique_saturated_into()
+	}
+
+	fn is_active(authority_id: &BlockSealAuthorityId) -> bool {
+		Self::authorities_by_index().iter().any(|(_, a)| a == authority_id)
 	}
 
 	fn get_authority(author: T::AccountId) -> Option<BlockSealAuthorityId> {
@@ -603,11 +601,10 @@ impl<T: Config> Pallet<T> {
 		hash: U256,
 		closest: u8,
 	) -> Vec<AuthorityDistance<BlockSealAuthorityId>> {
-		let miners = Self::active_miners_by_index();
 		find_xor_closest(<AuthoritiesByIndex<T>>::get(), hash, closest)
 			.into_iter()
 			.map(|(a, distance, index)| {
-				let registration = miners.get(&index.into()).unwrap();
+				let registration = Self::active_miners_by_index(&index).unwrap();
 				AuthorityDistance::<_> {
 					authority_id: a.clone(),
 					authority_index: index.unique_saturated_into(),
@@ -667,13 +664,13 @@ impl<T: Config> Pallet<T> {
 
 	pub(crate) fn get_active_registration(account_id: &T::AccountId) -> Option<Registration<T>> {
 		if let Some(index) = AccountIndexLookup::<T>::get(account_id) {
-			return ActiveMinersByIndex::<T>::get().get(&(index).into()).cloned()
+			return ActiveMinersByIndex::<T>::get(index)
 		}
 		None
 	}
 
 	pub(crate) fn get_miner_accounts() -> Vec<T::AccountId> {
-		<ActiveMinersByIndex<T>>::get().into_iter().map(|(_, a)| a.account_id).collect()
+		<ActiveMinersByIndex<T>>::iter().map(|(_, a)| a.account_id).collect()
 	}
 
 	pub(crate) fn get_next_registration(account_id: &T::AccountId) -> Option<Registration<T>> {
@@ -698,10 +695,8 @@ impl<T: Config> Pallet<T> {
 			}
 		}
 
-		let active_miners = <ActiveMinersByIndex<T>>::get();
-		if next_authorities.len() != active_miners.len() {
-			let no_key_miners = active_miners
-				.into_iter()
+		if next_authorities.len() != <ActiveMinersCount<T>>::get() as usize {
+			let no_key_miners = ActiveMinersByIndex::<T>::iter()
 				.filter(|(index, _)| !next_authorities.contains_key(index))
 				.map(|a| a.1.account_id)
 				.collect::<Vec<_>>();

@@ -1,0 +1,16 @@
+{
+  "db_name": "PostgreSQL",
+  "query": "\n\t\t\tUPDATE notebook_auditors SET signature = $3 WHERE notebook_number = $1 AND public = $2\n\t\t\t",
+  "describe": {
+    "columns": [],
+    "parameters": {
+      "Left": [
+        "Int4",
+        "Bytea",
+        "Bytea"
+      ]
+    },
+    "nullable": []
+  },
+  "hash": "68e9b2a4b0e3c22b159f827a4907cf459dd197d5b4b8897ba8c202288a0db113"
+}

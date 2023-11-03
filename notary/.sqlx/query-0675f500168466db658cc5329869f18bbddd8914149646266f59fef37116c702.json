@@ -1,0 +1,22 @@
+{
+  "db_name": "PostgreSQL",
+  "query": "\n\t\t\t\tSELECT public FROM registered_keys\n\t\t\t\tWHERE finalized_block_number <= $1\n\t\t\t\tORDER BY finalized_block_number DESC\n\t\t\t\tLIMIT 1\n            ",
+  "describe": {
+    "columns": [
+      {
+        "ordinal": 0,
+        "name": "public",
+        "type_info": "Bytea"
+      }
+    ],
+    "parameters": {
+      "Left": [
+        "Int4"
+      ]
+    },
+    "nullable": [
+      false
+    ]
+  },
+  "hash": "0675f500168466db658cc5329869f18bbddd8914149646266f59fef37116c702"
+}

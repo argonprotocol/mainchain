@@ -35,8 +35,8 @@ impl frame_system::Config for Test {
 	type BlockLength = ();
 	type DbWeight = ();
 	type RuntimeOrigin = RuntimeOrigin;
-	type RuntimeCall = RuntimeCall;
 	type Nonce = u64;
+	type RuntimeCall = RuntimeCall;
 	type Hash = H256;
 	type Hashing = BlakeTwo256;
 	type AccountId = u64;
@@ -63,6 +63,9 @@ parameter_types! {
 
 pub struct StaticAuthorityProvider;
 impl AuthorityProvider<BlockSealAuthorityId, Block, u64> for StaticAuthorityProvider {
+	fn miner_zero() -> Option<(u16, BlockSealAuthorityId, Vec<Host>)> {
+		None
+	}
 	fn is_active(authority_id: &BlockSealAuthorityId) -> bool {
 		Self::authorities().contains(authority_id)
 	}

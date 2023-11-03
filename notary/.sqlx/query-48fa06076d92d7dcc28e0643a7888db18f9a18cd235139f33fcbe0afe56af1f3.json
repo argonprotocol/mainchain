@@ -1,0 +1,22 @@
+{
+  "db_name": "PostgreSQL",
+  "query": "\n\t\t\tSELECT 1 as exists FROM notebook_status WHERE notebook_number = $1 FOR UPDATE NOWAIT LIMIT 1\n\t\t\t",
+  "describe": {
+    "columns": [
+      {
+        "ordinal": 0,
+        "name": "exists",
+        "type_info": "Int4"
+      }
+    ],
+    "parameters": {
+      "Left": [
+        "Int4"
+      ]
+    },
+    "nullable": [
+      null
+    ]
+  },
+  "hash": "48fa06076d92d7dcc28e0643a7888db18f9a18cd235139f33fcbe0afe56af1f3"
+}

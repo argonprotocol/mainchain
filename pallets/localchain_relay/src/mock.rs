@@ -5,7 +5,7 @@ use frame_support::{
 	PalletId,
 };
 use frame_system::pallet_prelude::BlockNumberFor;
-use sp_core::{ConstU32, H256};
+use sp_core::{crypto::AccountId32, ConstU32, H256};
 use sp_runtime::{
 	traits::{BlakeTwo256, IdentityLookup, NumberFor},
 	BuildStorage,
@@ -13,7 +13,7 @@ use sp_runtime::{
 use sp_std::collections::btree_map::BTreeMap;
 
 use ulx_primitives::{
-	block_seal::HistoricalBlockSealersLookup,
+	block_seal::{AuthorityDistance, AuthorityProvider, BlockSealersProvider, Host},
 	notary::{NotaryId, NotaryProvider, NotarySignature},
 	BlockSealAuthorityId,
 };
@@ -44,7 +44,7 @@ impl frame_system::Config for Test {
 	type Nonce = u64;
 	type Hash = H256;
 	type Hashing = BlakeTwo256;
-	type AccountId = u64;
+	type AccountId = AccountId32;
 	type Lookup = IdentityLookup<Self::AccountId>;
 	type Block = Block;
 	type RuntimeEvent = RuntimeEvent;
@@ -76,13 +76,65 @@ parameter_types! {
 	pub const LocalchainPalletId: PalletId = PalletId(*b"loclchai");
 
 	pub static BlockSealers: BTreeMap<BlockNumber, Vec<BlockSealAuthorityId>> = BTreeMap::new();
+
+	pub static IsProofOfCompute: bool = false;
 }
 pub struct HistoricalBlockSealersLookupImpl;
-impl HistoricalBlockSealersLookup<BlockNumber, BlockSealAuthorityId>
-	for HistoricalBlockSealersLookupImpl
-{
-	fn get_active_block_sealers_of(n: BlockNumber) -> Vec<BlockSealAuthorityId> {
-		BlockSealers::get().get(&n).unwrap_or(&Vec::new()).clone()
+impl BlockSealersProvider<BlockNumber, BlockSealAuthorityId> for HistoricalBlockSealersLookupImpl {
+	fn get_active_block_sealers_of(n: BlockNumber) -> Vec<(u16, BlockSealAuthorityId, Vec<Host>)> {
+		BlockSealers::get()
+			.get(&n)
+			.unwrap_or(&Vec::new())
+			.clone()
+			.iter()
+			.enumerate()
+			.map(|(idx, a)| (idx as u16, a.clone(), vec![]))
+			.collect::<Vec<_>>()
+	}
+	fn is_using_proof_of_compute() -> bool {
+		IsProofOfCompute::get()
+	}
+}
+parameter_types! {
+	pub static AuthorityList: Vec<(AccountId32, BlockSealAuthorityId)> = vec![];
+	pub static XorClosest: Vec<AuthorityDistance<BlockSealAuthorityId>> = vec![];
+}
+pub struct StaticAuthorityProvider;
+impl AuthorityProvider<BlockSealAuthorityId, Block, AccountId32> for StaticAuthorityProvider {
+	fn miner_zero() -> Option<(u16, BlockSealAuthorityId, Vec<Host>)> {
+		None
+	}
+	fn is_active(authority_id: &BlockSealAuthorityId) -> bool {
+		Self::authorities().contains(authority_id)
+	}
+	fn authorities() -> Vec<BlockSealAuthorityId> {
+		AuthorityList::get().iter().map(|(_account, id)| id.clone()).collect()
+	}
+	fn authorities_by_index() -> BTreeMap<u16, BlockSealAuthorityId> {
+		let mut map = BTreeMap::new();
+		for (i, id) in AuthorityList::get().into_iter().enumerate() {
+			map.insert(i as u16, id.1);
+		}
+		map
+	}
+	fn authority_count() -> u16 {
+		AuthorityList::get().len() as u16
+	}
+	fn get_authority(author: AccountId32) -> Option<BlockSealAuthorityId> {
+		AuthorityList::get().iter().find_map(|(account, id)| {
+			if *account == author {
+				Some(id.clone())
+			} else {
+				None
+			}
+		})
+	}
+	fn block_peers(
+		_block_hash: &<Block as sp_runtime::traits::Block>::Hash,
+		_account_id: AccountId32,
+		_closest: u8,
+	) -> Vec<AuthorityDistance<BlockSealAuthorityId>> {
+		XorClosest::get().clone()
 	}
 }
 
@@ -109,7 +161,7 @@ impl pallet_balances::Config for Test {
 	type MaxHolds = ConstU32<100>;
 }
 
-pub fn set_argons(account_id: u64, amount: Balance) {
+pub fn set_argons(account_id: &AccountId32, amount: Balance) {
 	let _ = Balances::make_free_balance_be(&account_id, amount);
 	drop(Balances::issue(amount));
 }
@@ -120,12 +172,11 @@ impl pallet_localchain_relay::Config for Test {
 	type Currency = Balances;
 	type Balance = Balance;
 	type HistoricalBlockSealersLookup = HistoricalBlockSealersLookupImpl;
-	type LocalchainAccountId = u64;
 	type MaxNotebookBlocksToRemember = MaxNotebookBlocksToRemember;
-	type MaxNotebookTransfers = MaxNotebookTransfers;
 	type MaxPendingTransfersOutPerBlock = MaxPendingTransfersOutPerBlock;
 	type NotaryProvider = NotaryProviderImpl;
 	type PalletId = LocalchainPalletId;
+	type AuthorityProvider = StaticAuthorityProvider;
 	type RequiredNotebookAuditors = RequiredNotebookAuditors;
 	type TransferExpirationBlocks = TransferExpirationBlocks;
 }

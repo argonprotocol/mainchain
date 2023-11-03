@@ -19,11 +19,13 @@ use sc_transaction_pool_api::TransactionPool;
 use sp_api::ProvideRuntimeApi;
 use sp_block_builder::BlockBuilder;
 use sp_blockchain::{Error as BlockChainError, HeaderBackend, HeaderMetadata};
-
 use sp_keystore::KeystorePtr;
+
+use pallet_localchain_relay::LocalchainRelayApis;
 use ulx_node_consensus::{
 	authority::AuthoritySealer,
-	rpc::{BlockSealApiServer, BlockSealRpc, SealNewBlock},
+	rpc_notary::{NotaryApisServer, NotaryRpc},
+	rpc_seal::{BlockSealApiServer, BlockSealRpc, SealNewBlock},
 };
 use ulx_node_runtime::{opaque::Block, AccountId, Balance, BlockNumber, Hash, Nonce};
 use ulx_primitives::block_seal::MiningAuthorityApis;
@@ -73,6 +75,7 @@ where
 	C::Api: ulx_primitives::UlxConsensusApi<Block>,
 	C::Api: BlockBuilder<Block>,
 	C::Api: MiningAuthorityApis<Block>,
+	C::Api: LocalchainRelayApis<Block, BlockNumber>,
 	P: TransactionPool + 'static,
 	B: sc_client_api::Backend<Block> + Send + Sync + 'static,
 	B::State: sc_client_api::backend::StateBackend<sp_runtime::traits::HashingFor<Block>>,
@@ -93,6 +96,7 @@ where
 
 	module.merge(System::new(client.clone(), pool, deny_unsafe).into_rpc())?;
 	module.merge(TransactionPayment::new(client.clone()).into_rpc())?;
+	module.merge(NotaryRpc::new(client.clone(), keystore.clone()).into_rpc())?;
 
 	module.merge(
 		Grandpa::new(

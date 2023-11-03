@@ -113,7 +113,11 @@ fn it_should_be_able_to_submit_a_seal() {
 		assert_eq!(DidSeal::<Test>::get(), true);
 		BlockSeal::on_finalize(2);
 		assert_eq!(
-			HistoricalBlockSealAuthorities::<Test>::get(2).into_inner(),
+			HistoricalBlockSealAuthorities::<Test>::get(2)
+				.into_inner()
+				.iter()
+				.map(|a| a.1.clone())
+				.collect::<Vec<_>>(),
 			closest_validators
 				.clone()
 				.iter()

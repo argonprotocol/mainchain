@@ -8,9 +8,26 @@ members = [
 	"pallets/difficulty",
     "pallets/notaries",
 	"pallets/localchain_relay",
+	"client",
 	"primitives",
     "runtime",
+	"notary",
+	"notary/audit",
+	"notary/primitives",
+	"testing"
 ]
 resolver = "2"
+
 [profile.release]
 panic = "unwind"
+
+[workspace.package]
+version = "0.0.1"
+edition = "2021"
+authors = ["Ulixee <https://github.com/ulixee>"]
+description = "A Ulixee miner node using the substrate platform."
+homepage = "https://ulixee.org"
+license = "MIT-0"
+rust-version = "1.70.0"
+repository = "https://github.com/ulixee/mainchain"
+documentation = "https://ulixee.org/docs"

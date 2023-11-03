@@ -1,0 +1,22 @@
+{
+  "db_name": "PostgreSQL",
+  "query": "\n\t\t\t\tSELECT notebook_number FROM notebook_status \n\t\t\t\tWHERE step=$1  \n\t\t\t\tORDER BY notebook_number ASC\n\t\t\t\tFOR UPDATE NOWAIT \n\t\t\t\tLIMIT 1\n\t\t\t",
+  "describe": {
+    "columns": [
+      {
+        "ordinal": 0,
+        "name": "notebook_number",
+        "type_info": "Int4"
+      }
+    ],
+    "parameters": {
+      "Left": [
+        "Int4"
+      ]
+    },
+    "nullable": [
+      false
+    ]
+  },
+  "hash": "75d83c7316ae91628e9e8d3e4669598f3beeb65316f1fabed0d3c262ada1f2db"
+}

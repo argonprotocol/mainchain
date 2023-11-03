@@ -1,0 +1,40 @@
+{
+  "db_name": "PostgreSQL",
+  "query": "\n\t\t\t\tDELETE from notebook_origins WHERE notebook_number = $1 RETURNING *\n\t\t\t\t",
+  "describe": {
+    "columns": [
+      {
+        "ordinal": 0,
+        "name": "account_id",
+        "type_info": "Bytea"
+      },
+      {
+        "ordinal": 1,
+        "name": "account_type",
+        "type_info": "Int4"
+      },
+      {
+        "ordinal": 2,
+        "name": "uid",
+        "type_info": "Int4"
+      },
+      {
+        "ordinal": 3,
+        "name": "notebook_number",
+        "type_info": "Int4"
+      }
+    ],
+    "parameters": {
+      "Left": [
+        "Int4"
+      ]
+    },
+    "nullable": [
+      false,
+      false,
+      false,
+      false
+    ]
+  },
+  "hash": "c7ecb4c43abd98258dd544efe8d041c6d9edbd3b4ace1e6f94445b0e3a5c141b"
+}

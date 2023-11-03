@@ -3,13 +3,16 @@
 use codec::{Decode, Encode};
 use scale_info::TypeInfo;
 use sp_core::H256;
-use sp_runtime::{RuntimeAppPublic, RuntimeDebug};
+use sp_runtime::RuntimeDebug;
 use sp_std::{fmt::Debug, prelude::*};
 
 pub use pallet::*;
+pub use ulx_notary_audit::VerifyError as NotebookVerifyError;
 use ulx_primitives::{
-	notary::{NotaryId, NotaryProvider},
-	BlockSealAuthorityId, BlockSealAuthoritySignature,
+	block_seal::Host,
+	notary::{NotaryId, NotaryProvider, NotarySignature},
+	notebook::NotebookNumber,
+	BlockSealAuthorityId,
 };
 pub use weights::*;
 
@@ -24,6 +27,7 @@ const LOG_TARGET: &str = "runtime::localchain::relay";
 
 #[frame_support::pallet(dev_mode)]
 pub mod pallet {
+	use codec::alloc::string::ToString;
 	use frame_support::{
 		pallet_prelude::*,
 		traits::{
@@ -33,22 +37,26 @@ pub mod pallet {
 		PalletId,
 	};
 	use frame_system::pallet_prelude::*;
-	use sp_io::hashing::blake2_256;
+	use sp_core::{
+		crypto::AccountId32,
+		ed25519::{Public, Signature},
+		H256,
+	};
 	use sp_runtime::{
-		traits::{
-			AccountIdConversion, AtLeast32BitUnsigned, MaybeDisplay, One, UniqueSaturatedInto,
-		},
-		Saturating,
+		app_crypto::ed25519,
+		traits::{AccountIdConversion, AtLeast32BitUnsigned, One, UniqueSaturatedInto},
+		RuntimeAppPublic, Saturating,
 	};
 	use sp_std::cmp::min;
 
+	use ulx_notary_audit::{
+		notebook_verify, AccountHistoryLookupError, NotebookHistoryLookup, VerifyError,
+	};
 	use ulx_primitives::{
-		block_seal::HistoricalBlockSealersLookup,
+		block_seal::{AuthorityProvider, BlockSealersProvider, Host},
 		digests::{FinalizedBlockNeededDigest, FINALIZED_BLOCK_DIGEST_ID},
 		notary::{NotaryId, NotarySignature},
-		notebook::{
-			to_notebook_audit_signature_message, to_notebook_post_hash, ChainTransfer, Notebook,
-		},
+		notebook::{AccountOrigin, AuditedNotebook, ChainTransfer, Notebook},
 	};
 
 	use super::*;
@@ -58,7 +66,7 @@ pub mod pallet {
 
 	/// Configure the pallet by specifying the parameters and types on which it depends.
 	#[pallet::config]
-	pub trait Config: frame_system::Config {
+	pub trait Config: frame_system::Config<AccountId = AccountId32> {
 		/// Because this pallet emits events, it depends on the runtime's definition of an event.
 		type RuntimeEvent: From<Event<Self>> + IsType<<Self as frame_system::Config>::RuntimeEvent>;
 		/// Type representing the weight of this pallet
@@ -78,24 +86,22 @@ pub mod pallet {
 			+ TypeInfo
 			+ MaxEncodedLen;
 
-		type HistoricalBlockSealersLookup: HistoricalBlockSealersLookup<
+		type HistoricalBlockSealersLookup: BlockSealersProvider<
 			BlockNumberFor<Self>,
 			BlockSealAuthorityId,
 		>;
 
 		type NotaryProvider: NotaryProvider<<Self as frame_system::Config>::Block>;
 
+		/// Type that provides authorities
+		type AuthorityProvider: AuthorityProvider<
+			BlockSealAuthorityId,
+			Self::Block,
+			Self::AccountId,
+		>;
+
 		#[pallet::constant]
 		type PalletId: Get<PalletId>;
-
-		/// An account id on the localchain
-		type LocalchainAccountId: Parameter
-			+ Member
-			+ MaybeSerializeDeserialize
-			+ Debug
-			+ MaybeDisplay
-			+ Ord
-			+ MaxEncodedLen;
 
 		/// How long a transfer should remain in storage before returning.
 		#[pallet::constant]
@@ -105,10 +111,6 @@ pub mod pallet {
 		#[pallet::constant]
 		type MaxPendingTransfersOutPerBlock: Get<u32>;
 
-		/// How many transfers can be in a single notebook
-		#[pallet::constant]
-		type MaxNotebookTransfers: Get<u32>;
-
 		/// How many auditors are expected to sign a notary block.
 		#[pallet::constant]
 		type RequiredNotebookAuditors: Get<u32>;
@@ -117,14 +119,6 @@ pub mod pallet {
 		#[pallet::constant]
 		type MaxNotebookBlocksToRemember: Get<u32>;
 	}
-
-	type NotebookOf<T> = Notebook<
-		<T as frame_system::Config>::AccountId,
-		<T as Config>::Balance,
-		<T as frame_system::Config>::Nonce,
-		<T as Config>::MaxNotebookTransfers,
-		<T as Config>::RequiredNotebookAuditors,
-	>;
 
 	#[pallet::storage]
 	pub(super) type PendingTransfersOut<T: Config> = StorageDoubleMap<
@@ -150,14 +144,33 @@ pub mod pallet {
 	pub(super) type FinalizedBlockNumber<T: Config> =
 		StorageValue<_, BlockNumberFor<T>, ValueQuery>;
 
+	/// Double storage map of notary id to
 	#[pallet::storage]
-	pub(super) type SubmittedNotebookBlocksByNotaryId<T: Config> = StorageMap<
-		_,
-		Twox64Concat,
-		NotaryId,
-		BoundedVec<BlockNumberFor<T>, T::MaxNotebookBlocksToRemember>,
-		ValueQuery,
+	pub(super) type NotebookChangedAccountsRootByNotary<T: Config> = StorageDoubleMap<
+		Hasher1 = Blake2_128Concat,
+		Hasher2 = Twox64Concat,
+		Key1 = NotaryId,
+		Key2 = NotebookNumber,
+		Value = H256,
+		QueryKind = OptionQuery,
 	>;
+
+	/// Storage map of account origin (notary_id, notebook, account_uid) to the last
+	/// notebook containing this account in the changed accounts merkle root
+	/// (NotebookChangedAccountsRootByNotary)
+	#[pallet::storage]
+	pub(super) type AccountOriginLastChangedNotebookByNotary<T: Config> = StorageDoubleMap<
+		Hasher1 = Blake2_128Concat,
+		Hasher2 = Blake2_128Concat,
+		Key1 = NotaryId,
+		Key2 = AccountOrigin,
+		Value = NotebookNumber,
+		QueryKind = OptionQuery,
+	>;
+
+	#[pallet::storage]
+	pub(super) type LastNotebookNumberByNotary<T: Config> =
+		StorageMap<_, Blake2_128Concat, NotaryId, (NotebookNumber, BlockNumberFor<T>), OptionQuery>;
 
 	#[pallet::event]
 	#[pallet::generate_deposit(pub(super) fn deposit_event)]
@@ -165,21 +178,23 @@ pub mod pallet {
 		TransferToLocalchain {
 			account_id: T::AccountId,
 			amount: T::Balance,
-			nonce: T::Nonce,
+			account_nonce: T::Nonce,
 			notary_id: NotaryId,
 			expiration_block: BlockNumberFor<T>,
 		},
 		TransferToLocalchainExpired {
 			account_id: T::AccountId,
-			nonce: T::Nonce,
+			account_nonce: T::Nonce,
 			notary_id: NotaryId,
 		},
 		TransferIn {
 			account_id: T::AccountId,
 			amount: T::Balance,
+			notary_id: NotaryId,
 		},
 		NotebookSubmitted {
 			notary_id: NotaryId,
+			notebook_number: NotebookNumber,
 			pinned_to_block_number: BlockNumberFor<T>,
 		},
 	}
@@ -191,6 +206,8 @@ pub mod pallet {
 		InsufficientFunds,
 		InvalidAccountNonce,
 		UnapprovedNotary,
+		MissingNotebookNumber,
+		InvalidPinnedBlockNumber,
 		InvalidNotebookSubmissionSignature,
 		/// Auditor of a notary block was not a member of the validator set at the time the pinned
 		/// finalized block was sealed.
@@ -205,9 +222,25 @@ pub mod pallet {
 		TransferNotEligibleForCancellation,
 		/// The transfer was already submitted in a previous block
 		InvalidOrDuplicatedLocalchainTransfer,
-		// A transfer was submitted in a previous block but the expiration block has passed
+		/// A transfer was submitted in a previous block but the expiration block has passed
 		NotebookIncludesExpiredLocalchainTransfer,
+		/// The notary id is not registered
 		InvalidNotaryUsedForTransfer,
+		/// Could not decode the notebook
+		InvalidNotebookBytes,
+		/// A notebook was submitted older than the one in storage
+		NotebookToAuditTooOld,
+
+		/// This notebook failed audit
+		NotebookAuditFailed,
+	}
+
+	impl<T: Config> From<VerifyError> for Error<T> {
+		fn from(value: VerifyError) -> Self {
+			match value {
+				_ => Error::NotebookAuditFailed,
+			}
+		}
 	}
 
 	#[pallet::hooks]
@@ -232,8 +265,10 @@ pub mod pallet {
 			}
 
 			let expiring = <ExpiringTransfersOut<T>>::take(block_number);
-			for (account_id, nonce) in expiring.into_iter() {
-				if let Some(transfer) = <PendingTransfersOut<T>>::take(account_id.clone(), nonce) {
+			for (account_id, account_nonce) in expiring.into_iter() {
+				if let Some(transfer) =
+					<PendingTransfersOut<T>>::take(account_id.clone(), account_nonce)
+				{
 					let _ = T::Currency::transfer(
 						&Self::notary_account_id(transfer.notary_id),
 						&account_id,
@@ -252,7 +287,7 @@ pub mod pallet {
 					});
 					Self::deposit_event(Event::TransferToLocalchainExpired {
 						account_id,
-						nonce,
+						account_nonce,
 						notary_id: transfer.notary_id,
 					});
 				}
@@ -267,24 +302,36 @@ pub mod pallet {
 		#[pallet::weight(0)]
 		pub fn submit_notebook(
 			origin: OriginFor<T>,
-			// This has already been checked at this point. It's provided as a spam reduction
-			// feature to the unsigned transaction pool
-			_notebook_hash: H256,
-			notebook: NotebookOf<T>,
+			notebook: AuditedNotebook,
 			// since signature verification is done in `validate_unsigned`
 			// we can skip doing it here again.
 			_signature: NotarySignature,
 		) -> DispatchResult {
 			ensure_none(origin)?;
+			let notebook_number = notebook.header.notebook_number;
+			let notary_id = notebook.header.notary_id;
+			let pinned_to_block_number: BlockNumberFor<T> =
+				notebook.header.pinned_to_block_number.into();
+
+			if let Some((last_notebook_number, last_block)) =
+				LastNotebookNumberByNotary::<T>::get(notary_id)
+			{
+				ensure!(
+					notebook_number == last_notebook_number + 1,
+					Error::<T>::MissingNotebookNumber
+				);
+				ensure!(pinned_to_block_number >= last_block, Error::<T>::InvalidPinnedBlockNumber);
+			}
 
 			// already checked signature, notebook hash and validity of notary index in
 			// validate_unsigned
-			let allowed_auditors = T::HistoricalBlockSealersLookup::get_active_block_sealers_of(
-				notebook.pinned_to_block_number.into(),
-			);
 
-			let audit_signature_message =
-				to_notebook_audit_signature_message(&notebook).using_encoded(blake2_256).into();
+			// At launch, we will ensure miner zero audits the notebooks. We need to transition this
+			// to use the block sealers
+			let allowed_auditors =
+				Self::get_auditors(notary_id, notebook_number, pinned_to_block_number);
+
+			let audit_signature_message = notebook.header.hash();
 
 			Self::verify_notebook_audit_signatures(
 				&notebook.auditors,
@@ -292,13 +339,13 @@ pub mod pallet {
 				&allowed_auditors,
 			)?;
 
-			let notary_id = notebook.notary_id;
-			let pinned_to_block_number = notebook.pinned_to_block_number;
 			// un-spendable notary account
 			let notary_pallet_account_id = Self::notary_account_id(notary_id);
-			for transfer in notebook.transfers.into_iter() {
+			for transfer in notebook.header.chain_transfers.into_iter() {
 				match transfer {
 					ChainTransfer::ToMainchain { account_id, amount } => {
+						let amount = amount.into();
+
 						ensure!(
 							T::Currency::reducible_balance(
 								&notary_pallet_account_id,
@@ -310,12 +357,14 @@ pub mod pallet {
 						T::Currency::transfer(
 							&notary_pallet_account_id,
 							&account_id,
-							amount,
+							amount.clone(),
 							Preservation::Expendable,
 						)?;
-						Self::deposit_event(Event::TransferIn { account_id, amount });
+						Self::deposit_event(Event::TransferIn { notary_id, account_id, amount });
 					},
-					ChainTransfer::ToLocalchain { account_id, nonce } => {
+					ChainTransfer::ToLocalchain { account_id, account_nonce: nonce } => {
+						let nonce = nonce.into();
+						let account_id = account_id;
 						let transfer = <PendingTransfersOut<T>>::take(&account_id, nonce)
 							.ok_or(Error::<T>::InvalidOrDuplicatedLocalchainTransfer)?;
 						ensure!(
@@ -339,23 +388,29 @@ pub mod pallet {
 				}
 			}
 
-			let pin: BlockNumberFor<T> = pinned_to_block_number.into();
-			<SubmittedNotebookBlocksByNotaryId<T>>::try_mutate(notary_id, |blocks| {
-				if blocks.len() >= T::MaxNotebookBlocksToRemember::get() as usize {
-					blocks.remove(0);
-				}
-				// keep them sorted
-				let pos = match blocks.binary_search(&pin) {
-					Ok(pos) => pos,
-					Err(pos) => pos,
-				};
-				blocks.try_insert(pos, pin).map_err(|_| Error::<T>::BadState)?;
-				Ok::<_, Error<T>>(())
-			})?;
+			<LastNotebookNumberByNotary<T>>::insert(
+				notary_id,
+				(notebook_number, pinned_to_block_number),
+			);
+
+			<NotebookChangedAccountsRootByNotary<T>>::insert(
+				notary_id,
+				notebook_number,
+				notebook.header.changed_accounts_root,
+			);
+
+			for account_origin in notebook.header.changed_account_origins.into_iter() {
+				<AccountOriginLastChangedNotebookByNotary<T>>::insert(
+					notary_id,
+					account_origin,
+					notebook_number,
+				);
+			}
 
 			Self::deposit_event(Event::NotebookSubmitted {
 				notary_id,
-				pinned_to_block_number: pin,
+				notebook_number: notebook.header.notebook_number,
+				pinned_to_block_number: pinned_to_block_number.into(),
 			});
 
 			Ok(())
@@ -367,7 +422,7 @@ pub mod pallet {
 			origin: OriginFor<T>,
 			#[pallet::compact] amount: T::Balance,
 			notary_id: NotaryId,
-			#[pallet::compact] nonce: T::Nonce,
+			#[pallet::compact] account_nonce: T::Nonce,
 		) -> DispatchResult {
 			let who = ensure_signed(origin)?;
 
@@ -377,7 +432,7 @@ pub mod pallet {
 				Error::<T>::InsufficientFunds,
 			);
 			ensure!(
-				nonce ==
+				account_nonce ==
 					<frame_system::Pallet<T>>::account_nonce(&who)
 						.saturating_sub(T::Nonce::one()),
 				Error::<T>::InvalidAccountNonce
@@ -395,16 +450,16 @@ pub mod pallet {
 
 			PendingTransfersOut::<T>::insert(
 				&who,
-				nonce,
+				account_nonce,
 				QueuedTransferOut { amount, expiration_block, notary_id },
 			);
-			ExpiringTransfersOut::<T>::try_append(expiration_block, (&who, nonce))
+			ExpiringTransfersOut::<T>::try_append(expiration_block, (&who, account_nonce))
 				.map_err(|_| Error::<T>::MaxBlockTransfersExceeded)?;
 
 			Self::deposit_event(Event::TransferToLocalchain {
 				account_id: who,
 				amount,
-				nonce,
+				account_nonce,
 				notary_id,
 				expiration_block,
 			});
@@ -417,43 +472,60 @@ pub mod pallet {
 		type Call = Call<T>;
 
 		fn validate_unsigned(_source: TransactionSource, call: &Self::Call) -> TransactionValidity {
-			if let Call::submit_notebook { notebook_hash, notebook, signature } = call {
+			if let Call::submit_notebook { notebook, signature } = call {
 				let current_finalized_block: u32 =
 					<FinalizedBlockNumber<T>>::get().unique_saturated_into();
 
 				// if the block is not finalized, we can't validate the notebook
 				ensure!(
-					notebook.pinned_to_block_number <= current_finalized_block,
+					notebook.header.finalized_block_number <= current_finalized_block,
 					InvalidTransaction::Future
 				);
+
+				// the pinned block also needs to be finalized
+				ensure!(
+					notebook.header.pinned_to_block_number <= current_finalized_block,
+					InvalidTransaction::Future
+				);
+
+				if let Some((last_notebook, _)) =
+					<LastNotebookNumberByNotary<T>>::get(notebook.header.notary_id)
+				{
+					ensure!(
+						notebook.header.notebook_number > last_notebook,
+						InvalidTransaction::Stale
+					);
+				}
 
 				// make the sender provide the hash. We'll just reject it if it's bad
 				ensure!(
 					T::NotaryProvider::verify_signature(
-						notebook.notary_id,
-						notebook.pinned_to_block_number.into(),
-						&notebook_hash,
+						notebook.header.notary_id,
+						// allow the signature to come from the latest finalized block
+						notebook.header.finalized_block_number.into(),
+						&notebook.header_hash,
 						&signature
 					),
 					InvalidTransaction::BadProof
 				);
 
 				// verify the hash is valid
-				let block_hash: H256 =
-					to_notebook_post_hash(&notebook).using_encoded(blake2_256).into();
-				ensure!(block_hash == *notebook_hash, InvalidTransaction::BadProof);
+				let block_hash = notebook.header.hash();
+				ensure!(block_hash == notebook.header_hash, InvalidTransaction::BadProof);
 				log::info!(
 					target: LOG_TARGET,
 					"Notebook from notary {} pinned to block={:?}, current_finalized_block={current_finalized_block}",
-					notebook.notary_id,
-					notebook.pinned_to_block_number
+					notebook.header.notary_id,
+					notebook.header.pinned_to_block_number
 				);
-				let blocks_until_finalized: u32 =
-					100u32 + notebook.pinned_to_block_number - current_finalized_block;
+				let blocks_until_finalized: u32 = 100u32;
 
 				ValidTransaction::with_tag_prefix("Notebook")
 					.priority(TransactionPriority::MAX)
-					.and_provides((notebook.notary_id, notebook.pinned_to_block_number))
+					.and_provides((
+						notebook.header.notary_id,
+						notebook.header.pinned_to_block_number,
+					))
 					.longevity(blocks_until_finalized.into())
 					.propagate(true)
 					.build()
@@ -463,18 +535,107 @@ pub mod pallet {
 		}
 	}
 
+	impl<T: Config> NotebookHistoryLookup for Pallet<T> {
+		fn get_account_changes_root(
+			notary_id: NotaryId,
+			notebook_number: NotebookNumber,
+		) -> Result<H256, AccountHistoryLookupError> {
+			<NotebookChangedAccountsRootByNotary<T>>::get(notary_id, notebook_number)
+				.ok_or(AccountHistoryLookupError::RootNotFound)
+		}
+		fn get_last_changed_notebook(
+			notary_id: NotaryId,
+			account_origin: AccountOrigin,
+		) -> Result<NotebookNumber, AccountHistoryLookupError> {
+			<AccountOriginLastChangedNotebookByNotary<T>>::get(notary_id, account_origin)
+				.ok_or(AccountHistoryLookupError::LastChangeNotFound)
+		}
+
+		fn is_valid_transfer_to_localchain(
+			notary_id: NotaryId,
+			account_id: &AccountId32,
+			nonce: u32,
+		) -> Result<bool, AccountHistoryLookupError> {
+			let nonce: T::Nonce = nonce.into();
+			<PendingTransfersOut<T>>::get(account_id, nonce)
+				.and_then(
+					|transfer| {
+						if transfer.notary_id == notary_id {
+							Some(true)
+						} else {
+							None
+						}
+					},
+				)
+				.ok_or(AccountHistoryLookupError::InvalidTransferToLocalchain)
+		}
+	}
+
 	impl<T: Config> Pallet<T> {
+		pub fn get_auditors(
+			_notary_id: NotaryId,
+			_notebook_number: NotebookNumber,
+			pinned_to_block_number: BlockNumberFor<T>,
+		) -> Vec<(u16, BlockSealAuthorityId, Vec<Host>)> {
+			let mut auditors = T::HistoricalBlockSealersLookup::get_active_block_sealers_of(
+				pinned_to_block_number,
+			);
+
+			if T::HistoricalBlockSealersLookup::is_using_proof_of_compute() {
+				if let Some(miner_zero) = T::AuthorityProvider::miner_zero() {
+					auditors.push(miner_zero);
+				}
+			}
+
+			auditors
+		}
+
+		pub fn audit_notebook(
+			_version: u32,
+			notary_id: NotaryId,
+			notebook_number: NotebookNumber,
+			notary_signature: NotarySignature,
+			header_hash: H256,
+			bytes: Vec<u8>,
+		) -> Result<bool, NotebookVerifyError> {
+			if let Some((last_notebook, _)) = <LastNotebookNumberByNotary<T>>::get(notary_id) {
+				ensure!(notebook_number > last_notebook, NotebookVerifyError::NotebookTooOld);
+			}
+			ensure!(
+				T::NotaryProvider::verify_signature(
+					notary_id,
+					notebook_number.into(),
+					&header_hash,
+					&notary_signature
+				),
+				NotebookVerifyError::InvalidNotarySignature
+			);
+
+			let notebook = Notebook::decode(&mut bytes.as_ref()).map_err(|e| {
+				log::warn!(
+					target: LOG_TARGET,
+					"Notebook audit failed to decode for notary {notary_id}, notebook {notebook_number}: {:?}", e.to_string()
+				);
+				NotebookVerifyError::DecodeError
+			})?;
+			let is_valid = notebook_verify::<Self>(&header_hash, &notebook).map_err(|e| {
+				log::info!(
+					target: LOG_TARGET,
+					"Notebook audit failed for notary {notary_id}, notebook {notebook_number}: {:?}", e.to_string()
+				);
+				e
+			})?;
+			Ok(is_valid)
+		}
+
 		pub fn notary_account_id(notary_id: NotaryId) -> T::AccountId {
 			T::PalletId::get().into_sub_account_truncating(notary_id)
 		}
 
 		pub fn verify_notebook_audit_signatures(
-			auditors: &BoundedVec<
-				(BlockSealAuthorityId, BlockSealAuthoritySignature),
-				T::RequiredNotebookAuditors,
-			>,
+			auditors: &Vec<(Public, Signature)>,
 			signature_message: &H256,
-			allowed_auditors: &Vec<BlockSealAuthorityId>,
+			allowed_auditors: &Vec<(u16, BlockSealAuthorityId, Vec<Host>)>,
 		) -> DispatchResult {
 			let required_auditors =
 				min(T::RequiredNotebookAuditors::get() as usize, allowed_auditors.len());
@@ -486,10 +647,10 @@ pub mod pallet {
 			);
 
 			let mut signatures = 0usize;
-			for (auditor, signature) in auditors.iter() {
+			for (auditor, signature) in auditors.into_iter() {
 				let authority_index = allowed_auditors
 					.iter()
-					.position(|a| a == auditor)
+					.position(|a| a.1.clone().into_inner() == *auditor)
 					.ok_or(Error::<T>::InvalidNotebookAuditor)?;
 
 				// must be in first X
@@ -498,8 +659,11 @@ pub mod pallet {
 					Error::<T>::InvalidNotebookAuditorIndex
 				);
 
+				let auditor = ed25519::AppPublic::from(*auditor);
+				let signature = ed25519::AppSignature::from(signature.clone());
+
 				ensure!(
-					auditor.verify(&signature_message.as_ref(), signature),
+					auditor.verify(&signature_message.as_ref(), &signature),
 					Error::<T>::InvalidNotebookAuditorSignature
 				);
 
@@ -510,6 +674,25 @@ pub mod pallet {
 
 			Ok(())
 		}
+	}
+}
+
+sp_api::decl_runtime_apis! {
+	pub trait LocalchainRelayApis<BlockNumber> where BlockNumber:Encode {
+		fn audit_notebook(
+			version: u32,
+			notary_id: NotaryId,
+			notebook_number: NotebookNumber,
+			notary_signature: NotarySignature,
+			header_hash: H256,
+			bytes: Vec<u8>,
+		) -> Result<bool, NotebookVerifyError>;
+
+		fn get_auditors(
+			notary_id: NotaryId,
+			notebook_number: NotebookNumber,
+			pinned_to_block_number: BlockNumber,
+		) -> Vec<(u16, BlockSealAuthorityId, Vec<Host>)>;
 	}
 }
 

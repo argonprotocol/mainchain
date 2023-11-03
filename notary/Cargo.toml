@@ -1,0 +1,53 @@
+[package]
+name = "notary"
+version.workspace = true
+authors.workspace = true
+edition.workspace = true
+rust-version.workspace = true
+license.workspace = true
+repository.workspace = true
+documentation.workspace = true
+homepage.workspace = true
+
+[package.metadata.docs.rs]
+targets = ["x86_64-unknown-linux-gnu"]
+
+[dependencies]
+anyhow = "1"
+futures = "0.3"
+parking_lot = "0.12"
+async-trait = { version = "0.1" }
+codec = { package = "parity-scale-codec", version = "3.6", features = ["derive", "max-encoded-len"] }
+serde = { version = "1.0", features = ["derive"] }
+serde_json = { version = "1.0", features = ["raw_value", "arbitrary_precision"] }
+scale-info = { version = "2.9" }
+thiserror = { version ="1.0" }
+subxt = { version = "0.32", features = ["substrate-compat"] }
+subxt-signer = { version = "0.32", features = ["default"] }
+tokio = { version =  "1.32", features = ["full"] }
+tokio-stream = { version =  "0.1", features = ["sync"] }
+hex = "0.4"
+sc-keystore = { version = "4.0.0-dev", git = "https://github.com/paritytech/polkadot-sdk.git", branch = "release-polkadot-v1.1.0" }
+sc-service = { version = "0.10.0-dev", git = "https://github.com/paritytech/polkadot-sdk.git", branch = "release-polkadot-v1.1.0" }
+sp-keystore = { version = "0.27", git = "https://github.com/paritytech/polkadot-sdk.git", branch = "release-polkadot-v1.1.0" }
+jsonrpsee = { version = "0.20", features = ["server", "http-client", "ws-client", "macros", "client-ws-transport-native-tls"] }
+tracing = "0.1"
+tracing-subscriber = { version = "0.3.3", features = ["env-filter"] }
+sc-utils = { version = "4.0.0-dev", git = "https://github.com/paritytech/polkadot-sdk.git", branch = "release-polkadot-v1.1.0" }
+sp-runtime = { version = "24.0.0", git = "https://github.com/paritytech/polkadot-sdk.git", branch = "release-polkadot-v1.1.0" }
+sp-core = { version = "21.0.0", git = "https://github.com/paritytech/polkadot-sdk.git", branch = "release-polkadot-v1.1.0", features = ["std", "serde"] }
+sc-cli =  { version = "0.10.0-dev", git = "https://github.com/paritytech/polkadot-sdk.git", branch = "release-polkadot-v1.1.0" }
+binary-merkle-tree = { version = "4.0.0-dev", git = "https://github.com/paritytech/polkadot-sdk.git", branch = "release-polkadot-v1.1.0" }
+sqlx =  { version = "0.7", features = [ "runtime-tokio-native-tls", "postgres", "macros","chrono" ] }
+chrono = { version = "0.4", features = ["serde"] }
+clap = { version = "4.4", features = ["derive", "cargo","env"] }
+
+
+ulixee-client = { path= "../client" }
+ulx-notary-audit = {path = "audit" }
+ulx-notary-primitives = { path = "primitives"  }
+
+[dev-dependencies]
+frame-support = { version = "4.0.0-dev", git = "https://github.com/paritytech/polkadot-sdk.git", branch = "release-polkadot-v1.1.0" }
+sp-keyring = { version = "24.0.0", git = "https://github.com/paritytech/polkadot-sdk.git", branch = "release-polkadot-v1.1.0" }
+ulx-testing = {  path= "../testing" }

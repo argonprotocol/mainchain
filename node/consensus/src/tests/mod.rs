@@ -24,7 +24,7 @@ use ulx_primitives::{
 use crate::{
 	compute_worker::{run_miner_thread, UntilImportedOrTimeout},
 	listen_for_block_seal,
-	rpc::SealNewBlock,
+	rpc_seal::SealNewBlock,
 	tests::mock::{Config, DummyFactory, UlxTestNet},
 };
 

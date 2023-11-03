@@ -25,6 +25,12 @@ use frame_support::{
 	traits::{Contains, Currency, InsideBoth, OnUnbalanced, StorageMapShim},
 	PalletId,
 };
+use pallet_localchain_relay::NotebookVerifyError;
+use sp_core::H256;
+use ulx_primitives::{
+	notary::{NotaryId, NotarySignature},
+	notebook::NotebookNumber,
+};
 // Configure FRAME pallets to include in runtime.
 use frame_support::traits::Everything;
 pub use frame_system::Call as SystemCall;
@@ -54,7 +60,7 @@ use sp_version::RuntimeVersion;
 
 use pallet_tx_pause::RuntimeCallNameOf;
 use ulx_primitives::{
-	block_seal::{AuthorityDistance, AuthorityProvider},
+	block_seal::{AuthorityDistance, AuthorityProvider, Host},
 	BlockSealAuthorityId, NextWork,
 };
 
@@ -385,9 +391,6 @@ parameter_types! {
 	/// How many transfers out can be queued per block
 	pub const MaxPendingTransfersOutPerBlock: u32 = 1000;
 
-	/// How many transfers can be in a single notebook
-	pub const MaxNotebookTransfers: u32 = 10_000;
-
 	/// How many auditors are expected to sign a notary block.
 	pub const RequiredNotebookAuditors: u32 = 5; // half of seal signers
 
@@ -402,13 +405,11 @@ impl pallet_localchain_relay::Config for Runtime {
 	type HistoricalBlockSealersLookup = BlockSeal;
 	type Balance = Balance;
 	type Currency = ArgonBalances;
-
+	type AuthorityProvider = MiningSlots;
 	type NotaryProvider = Notaries;
 	type PalletId = LocalchainPalletId;
-	type LocalchainAccountId = AccountId;
 	type TransferExpirationBlocks = TransferExpirationBlocks;
 	type MaxPendingTransfersOutPerBlock = MaxPendingTransfersOutPerBlock;
-	type MaxNotebookTransfers = MaxNotebookTransfers;
 	type RequiredNotebookAuditors = RequiredNotebookAuditors;
 	type MaxNotebookBlocksToRemember = MaxNotebookBlocksToRemember;
 }
@@ -759,6 +760,27 @@ impl_runtime_apis! {
 		}
 		fn active_authorities() -> u16 {
 			MiningSlots::authority_count().into()
+		}
+	}
+
+	impl pallet_localchain_relay::LocalchainRelayApis<Block, BlockNumber> for Runtime {
+		fn audit_notebook(
+			version: u32,
+			notary_id: NotaryId,
+			notebook_number: NotebookNumber,
+			notary_signature: NotarySignature,
+			header_hash: H256,
+			bytes: Vec<u8>,
+		) -> Result<bool, NotebookVerifyError> {
+			LocalchainRelay::audit_notebook(version, notary_id, notebook_number, notary_signature, header_hash, bytes)
+		}
+
+		fn get_auditors(
+			notary_id: NotaryId,
+			notebook_number: NotebookNumber,
+			pinned_to_block_number: BlockNumber,
+		) -> Vec<(u16, BlockSealAuthorityId, Vec<Host>)> {
+			LocalchainRelay::get_auditors(notary_id, notebook_number, pinned_to_block_number)
 		}
 	}
 

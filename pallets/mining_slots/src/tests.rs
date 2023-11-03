@@ -4,7 +4,7 @@ use frame_support::{
 };
 use sp_core::{bounded_vec, OpaquePeerId, U256};
 use sp_runtime::{testing::UintAuthorityId, BoundedVec};
-use std::net::Ipv4Addr;
+use std::{collections::HashMap, net::Ipv4Addr};
 
 use ulx_primitives::{
 	block_seal::{AuthorityProvider, MiningRegistration, PeerId, RewardDestination},
@@ -34,8 +34,7 @@ pub fn ip_from_u32(ip: u32) -> Ipv4Addr {
 fn it_doesnt_add_cohorts_until_time() {
 	BlocksBetweenSlots::set(2);
 
-	new_test_ext().execute_with(|| {
-		// Go past genesis block so events get deposited
+	new_test_ext(None).execute_with(|| {
 		System::set_block_number(1);
 
 		NextSlotCohort::<Test>::set(bounded_vec![MiningRegistration {
@@ -75,8 +74,7 @@ fn get_validation_window_blocks() {
 
 #[test]
 fn get_slot_era() {
-	new_test_ext().execute_with(|| {
-		// Go past genesis block so events get deposited
+	new_test_ext(None).execute_with(|| {
 		System::set_block_number(8);
 
 		MaxCohortSize::set(2);
@@ -169,35 +167,90 @@ fn starting_cohort_index() {
 }
 
 #[test]
+fn it_activates_miner_zero_if_no_miners() {
+	BlocksBetweenSlots::set(2);
+	MaxMiners::set(6);
+	MaxCohortSize::set(2);
+
+	new_test_ext(Some(MiningRegistration {
+		account_id: 1,
+		peer_id: empty_peer(),
+		bond_id: None,
+		ownership_tokens: 0,
+		bond_amount: 0,
+		reward_destination: RewardDestination::Owner,
+		rpc_hosts: rpc_hosts(Ipv4Addr::new(127, 0, 0, 1), 3000),
+	}))
+	.execute_with(|| {
+		MiningSlots::on_initialize(1);
+
+		assert_eq!(ActiveMinersByIndex::<Test>::get(0).unwrap().account_id, 1);
+	});
+}
+
+#[test]
+fn it_activates_miner_zero_if_upcoming_miners_will_empty() {
+	BlocksBetweenSlots::set(2);
+	MaxMiners::set(6);
+	MaxCohortSize::set(2);
+
+	new_test_ext(Some(MiningRegistration {
+		account_id: 1,
+		peer_id: empty_peer(),
+		bond_id: None,
+		ownership_tokens: 0,
+		bond_amount: 0,
+		reward_destination: RewardDestination::Owner,
+		rpc_hosts: rpc_hosts(Ipv4Addr::new(127, 0, 0, 1), 3000),
+	}))
+	.execute_with(|| {
+		ActiveMinersByIndex::<Test>::insert(
+			5,
+			MiningRegistration {
+				account_id: 10,
+				peer_id: empty_peer(),
+				bond_id: None,
+				ownership_tokens: 0,
+				bond_amount: 0,
+				reward_destination: RewardDestination::Owner,
+				rpc_hosts: rpc_hosts(Ipv4Addr::new(127, 0, 0, 1), 3000),
+			},
+		);
+		AccountIndexLookup::<Test>::insert(10, 5);
+		ActiveMinersCount::<Test>::put(1);
+		MiningSlots::on_initialize(2);
+
+		assert_eq!(ActiveMinersByIndex::<Test>::get(0).unwrap().account_id, 1);
+		assert_eq!(ActiveMinersCount::<Test>::get(), 1);
+	});
+}
+
+#[test]
 fn it_adds_new_cohorts_on_block() {
 	BlocksBetweenSlots::set(2);
 	MaxMiners::set(6);
 	MaxCohortSize::set(2);
 
-	new_test_ext().execute_with(|| {
-		// Go past genesis block so events get deposited
+	new_test_ext(None).execute_with(|| {
 		System::set_block_number(8);
 
-		ActiveMinersByIndex::<Test>::try_mutate(|validators| {
-			for i in 0..4u32 {
-				let account_id: u64 = (i + 4).into();
-				let _ = validators.try_insert(
-					i,
-					MiningRegistration {
-						account_id,
-						peer_id: empty_peer(),
-						bond_id: None,
-						ownership_tokens: 0,
-						bond_amount: 0,
-						reward_destination: RewardDestination::Owner,
-						rpc_hosts: rpc_hosts(Ipv4Addr::new(127, 0, 0, 1), 3000 + i as u16),
-					},
-				);
-				AccountIndexLookup::<Test>::insert(account_id, i);
-			}
-			Ok::<(), Error<Test>>(())
-		})
-		.expect("Didn't insert validators");
+		for i in 0..4u32 {
+			let account_id: u64 = (i + 4).into();
+			ActiveMinersByIndex::<Test>::insert(
+				i,
+				MiningRegistration {
+					account_id,
+					peer_id: empty_peer(),
+					bond_id: None,
+					ownership_tokens: 0,
+					bond_amount: 0,
+					reward_destination: RewardDestination::Owner,
+					rpc_hosts: rpc_hosts(Ipv4Addr::new(127, 0, 0, 1), 3000 + i as u16),
+				},
+			);
+			AccountIndexLookup::<Test>::insert(account_id, i);
+		}
+		ActiveMinersCount::<Test>::put(4);
 
 		let cohort = BoundedVec::truncate_from(vec![MiningRegistration {
 			account_id: 1,
@@ -214,13 +267,18 @@ fn it_adds_new_cohorts_on_block() {
 		MiningSlots::on_initialize(8);
 
 		// re-fetch
-		let validators = ActiveMinersByIndex::<Test>::get();
+		let validators = ActiveMinersByIndex::<Test>::iter().collect::<HashMap<_, _>>();
 		assert_eq!(
 			NextSlotCohort::<Test>::get().len(),
 			0,
 			"Queued mining_slots for block 8 should be removed"
 		);
 		assert_eq!(validators.len(), 3, "Should have 3 validators still after insertion");
+		assert_eq!(
+			ActiveMinersCount::<Test>::get(),
+			3,
+			"Should have 3 validators still after insertion"
+		);
 		assert_eq!(validators.contains_key(&2), true, "Should insert validator at index 2");
 		assert_eq!(
 			validators.contains_key(&3),
@@ -247,6 +305,7 @@ fn it_adds_new_cohorts_on_block() {
 	});
 }
 
+use crate::pallet::ActiveMinersCount;
 use pallet_balances::Event as UlixeeBalancesEvent;
 use ulx_primitives::block_seal::Host;
 
@@ -256,53 +315,48 @@ fn it_unbonds_accounts_when_a_window_closes() {
 	MaxMiners::set(6);
 	MaxCohortSize::set(2);
 
-	new_test_ext().execute_with(|| {
+	new_test_ext(None).execute_with(|| {
 		OwnershipBondAmount::<Test>::set(1000);
-		// Go past genesis block so events get deposited
+
 		System::set_block_number(7);
 
 		let mut bond_2: BondId = 0;
 		let mut bond_3: BondId = 0;
-		ActiveMinersByIndex::<Test>::try_mutate(|validators| {
-			for i in 0..4u32 {
-				let account_id: u64 = (i).into();
-				set_ownership(account_id, 1000u32.into());
-				set_argons(account_id, 10_000u32.into());
+		for i in 0..4u32 {
+			let account_id: u64 = (i).into();
+			set_ownership(account_id, 1000u32.into());
+			set_argons(account_id, 10_000u32.into());
 
-				let bond_amount = (1000u32 + i).into();
-				let bond_id = match <Bonds as BondProvider>::bond_self(account_id, bond_amount, 10)
-				{
-					Ok(id) => id,
-					Err(_) => panic!("bond should exist"),
-				};
-				if account_id == 2u64 {
-					bond_2 = bond_id
-				}
-				if account_id == 3u64 {
-					bond_3 = bond_id
-				}
-				<Bonds as BondProvider>::lock_bond(bond_id).expect("bond should lock");
-				let ownership_tokens =
-					MiningSlots::hold_ownership_bond(&account_id, None).ok().unwrap();
-
-				let _ = validators.try_insert(
-					i,
-					MiningRegistration {
-						account_id,
-						peer_id: empty_peer(),
-						rpc_hosts: rpc_hosts(Ipv4Addr::new(127, 0, 0, 1), 3000),
-						bond_id: Some(bond_id),
-						ownership_tokens,
-						bond_amount,
-						reward_destination: RewardDestination::Owner,
-					},
-				);
-				AccountIndexLookup::<Test>::insert(account_id, i);
+			let bond_amount = (1000u32 + i).into();
+			let bond_id = match <Bonds as BondProvider>::bond_self(account_id, bond_amount, 10) {
+				Ok(id) => id,
+				Err(_) => panic!("bond should exist"),
+			};
+			if account_id == 2u64 {
+				bond_2 = bond_id
 			}
-			Ok::<(), Error<Test>>(())
-		})
-		.expect("Didn't insert validators");
+			if account_id == 3u64 {
+				bond_3 = bond_id
+			}
+			<Bonds as BondProvider>::lock_bond(bond_id).expect("bond should lock");
+			let ownership_tokens =
+				MiningSlots::hold_ownership_bond(&account_id, None).ok().unwrap();
 
+			ActiveMinersByIndex::<Test>::insert(
+				i,
+				MiningRegistration {
+					account_id,
+					peer_id: empty_peer(),
+					rpc_hosts: rpc_hosts(Ipv4Addr::new(127, 0, 0, 1), 3000),
+					bond_id: Some(bond_id),
+					ownership_tokens,
+					bond_amount,
+					reward_destination: RewardDestination::Owner,
+				},
+			);
+			AccountIndexLookup::<Test>::insert(account_id, i);
+		}
+		ActiveMinersCount::<Test>::put(4);
 		IsNextSlotBiddingOpen::<Test>::set(true);
 		assert_eq!(MiningSlots::get_slot_era(), (8, 8 + (2 * 3)));
 
@@ -384,8 +438,7 @@ fn it_can_take_cohort_bids() {
 	MaxMiners::set(6);
 	MaxCohortSize::set(2);
 
-	new_test_ext().execute_with(|| {
-		// Go past genesis block so events get deposited
+	new_test_ext(None).execute_with(|| {
 		System::set_block_number(3);
 
 		assert_err!(
@@ -456,7 +509,7 @@ fn it_wont_let_you_use_ownership_shares_for_two_bids() {
 	MaxMiners::set(6);
 	MaxCohortSize::set(2);
 
-	new_test_ext().execute_with(|| {
+	new_test_ext(None).execute_with(|| {
 		System::set_block_number(3);
 
 		IsNextSlotBiddingOpen::<Test>::set(true);
@@ -522,8 +575,7 @@ fn it_will_order_bids_with_argon_bonds() {
 	MaxMiners::set(6);
 	MaxCohortSize::set(2);
 
-	new_test_ext().execute_with(|| {
-		// Go past genesis block so events get deposited
+	new_test_ext(None).execute_with(|| {
 		System::set_block_number(3);
 
 		assert_err!(
@@ -665,7 +717,7 @@ fn handles_a_max_of_bids_per_block() {
 	MaxMiners::set(50);
 	MaxCohortSize::set(2);
 
-	new_test_ext().execute_with(|| {
+	new_test_ext(None).execute_with(|| {
 		System::set_block_number(1);
 		IsNextSlotBiddingOpen::<Test>::set(true);
 
@@ -715,7 +767,7 @@ fn handles_a_max_of_bids_per_block() {
 
 #[test]
 fn it_handles_null_authority() {
-	new_test_ext().execute_with(|| {
+	new_test_ext(None).execute_with(|| {
 		assert_eq!(MiningSlots::get_authority(1), None);
 	});
 }
@@ -723,30 +775,25 @@ fn it_handles_null_authority() {
 #[test]
 fn it_can_find_xor_closest() {
 	MaxMiners::set(100);
-	new_test_ext().execute_with(|| {
-		// Go past genesis block so events get deposited
+	new_test_ext(None).execute_with(|| {
 		System::set_block_number(8);
 
-		ActiveMinersByIndex::<Test>::try_mutate(|validators| {
-			for i in 0..100u32 {
-				let account_id: u64 = i.into();
-				let _ = validators.try_insert(
-					i,
-					MiningRegistration {
-						account_id,
-						peer_id: empty_peer(),
-						bond_id: None,
-						ownership_tokens: 0,
-						bond_amount: 0,
-						reward_destination: RewardDestination::Owner,
-						rpc_hosts: rpc_hosts(Ipv4Addr::new(127, 0, 0, 1), 15550),
-					},
-				);
-				AccountIndexLookup::<Test>::insert(account_id, i);
-			}
-			Ok::<(), Error<Test>>(())
-		})
-		.expect("Didn't insert validators");
+		for i in 0..100u32 {
+			let account_id: u64 = i.into();
+			ActiveMinersByIndex::<Test>::insert(
+				i,
+				MiningRegistration {
+					account_id,
+					peer_id: empty_peer(),
+					bond_id: None,
+					ownership_tokens: 0,
+					bond_amount: 0,
+					reward_destination: RewardDestination::Owner,
+					rpc_hosts: rpc_hosts(Ipv4Addr::new(127, 0, 0, 1), 15550),
+				},
+			);
+			AccountIndexLookup::<Test>::insert(account_id, i);
+		}
 		AuthoritiesByIndex::<Test>::try_mutate(|a| {
 			for i in 0..100u32 {
 				let account_id: u64 = i.into();
@@ -779,30 +826,25 @@ fn it_can_find_xor_closest() {
 #[test]
 fn it_can_replace_authority_keys() {
 	MaxMiners::set(10);
-	new_test_ext().execute_with(|| {
-		// Go past genesis block so events get deposited
+	new_test_ext(None).execute_with(|| {
 		System::set_block_number(8);
 
-		ActiveMinersByIndex::<Test>::try_mutate(|validators| {
-			for i in 0..10u32 {
-				let account_id: u64 = i.into();
-				let _ = validators.try_insert(
-					i,
-					MiningRegistration {
-						account_id,
-						peer_id: empty_peer(),
-						bond_id: None,
-						ownership_tokens: 0,
-						bond_amount: 0,
-						reward_destination: RewardDestination::Owner,
-						rpc_hosts: rpc_hosts(Ipv4Addr::new(127, 0, 0, 1), 3000),
-					},
-				);
-				AccountIndexLookup::<Test>::insert(account_id, i);
-			}
-			Ok::<(), Error<Test>>(())
-		})
-		.expect("Validators failed to insert");
+		for i in 0..10u32 {
+			let account_id: u64 = i.into();
+			ActiveMinersByIndex::<Test>::insert(
+				i,
+				MiningRegistration {
+					account_id,
+					peer_id: empty_peer(),
+					bond_id: None,
+					ownership_tokens: 0,
+					bond_amount: 0,
+					reward_destination: RewardDestination::Owner,
+					rpc_hosts: rpc_hosts(Ipv4Addr::new(127, 0, 0, 1), 3000),
+				},
+			);
+			AccountIndexLookup::<Test>::insert(account_id, i);
+		}
 
 		AuthoritiesByIndex::<Test>::try_mutate(|a| {
 			a.try_insert(0u32, (UintAuthorityId(0u64).to_public_key(), U256::from(0)))

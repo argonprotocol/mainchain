@@ -1,12 +1,14 @@
 [package]
 name = "pallet-block-seal"
-version = "0.0.1"
-authors = ["Ulixee <https://github.com/ulixee>"]
-homepage = "https://ulixee.org"
-edition = "2021"
-license = "MIT-0"
+version.workspace = true
+authors.workspace = true
+edition.workspace = true
+rust-version.workspace = true
+license.workspace = true
+repository.workspace = true
+documentation.workspace = true
+homepage.workspace = true
 publish = false
-repository = "https://github.com/ulixee/mainchain"
 
 [package.metadata.docs.rs]
 targets = ["x86_64-unknown-linux-gnu"]

@@ -5,10 +5,9 @@ use sp_api::BlockT;
 use sp_core::{ed25519, Get, H256};
 use sp_runtime::{traits::NumberFor, BoundedVec};
 use sp_std::fmt::Debug;
+pub use ulx_notary_primitives::NotaryId;
 
 use crate::block_seal::Host;
-
-pub type NotaryId = u32;
 
 pub type NotaryPublic = ed25519::Public;
 pub type NotarySignature = ed25519::Signature;

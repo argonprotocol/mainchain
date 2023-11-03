@@ -1,13 +1,14 @@
 [package]
 name = "ulx-node"
-version = "0.0.1"
-description = "A Ulixee miner node using the substrate platform."
-authors = ["Ulixee <https://github.com/ulixee>"]
-homepage = "https://ulixee.org"
-edition = "2021"
-license = "MIT-0"
+version.workspace = true
+authors.workspace = true
+edition.workspace = true
+rust-version.workspace = true
+license.workspace = true
+repository.workspace = true
+documentation.workspace = true
+homepage.workspace = true
 publish = false
-repository = "https://github.com/ulixee/mainchain"
 build = "build.rs"
 
 [package.metadata.docs.rs]
@@ -74,6 +75,7 @@ rand = {version = "0.8.5"}
 ulx-node-consensus = { version = "0.0.1", path = "./consensus"}
 ulx-node-runtime = { version = "0.0.1", path = "../runtime" }
 ulx-primitives = { version = "0.0.1", path = "../primitives" }
+pallet-localchain-relay = { version = "0.0.1", path = "../pallets/localchain_relay" }
 
 # CLI-specific dependencies
 try-runtime-cli = { version = "0.10.0-dev", optional = true, git = "https://github.com/paritytech/polkadot-sdk.git", branch = "release-polkadot-v1.1.0" }

@@ -57,6 +57,7 @@ sp-io = { version = "23.0.0", git = "https://github.com/paritytech/polkadot-sdk.
 
 # Local Dependencies
 ulx-primitives = { path = "../../primitives" }
+pallet-localchain-relay = { path = "../../pallets/localchain_relay"}
 
 [build-dependencies]
 substrate-build-script-utils = { version = "3.0.0", git = "https://github.com/paritytech/polkadot-sdk.git", branch = "release-polkadot-v1.1.0" }
