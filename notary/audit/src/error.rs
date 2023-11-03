@@ -24,6 +24,9 @@ pub enum VerifyError {
 	#[snafu(display("Invalid balance change root"))]
 	InvalidBalanceChangeRoot,
 
+	#[snafu(display("Invalid notebook tax recorded"))]
+	InvalidHeaderTaxRecorded,
+
 	#[snafu(display("Invalid previous nonce"))]
 	InvalidPreviousNonce,
 	#[snafu(display("Invalid previous balance"))]

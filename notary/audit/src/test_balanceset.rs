@@ -609,7 +609,7 @@ fn verify_taxes() {
 			tax_owed: 20
 		}
 	);
-	set.tax_sent_per_account.insert(Alice.to_account_id(), 22);
+	set.tax_created_per_account.insert(Alice.to_account_id(), 22);
 	assert_ok!(set.verify_taxes());
 
 	set.claimed_channel_deposits_per_account.insert(Alice.to_account_id(), 1000);

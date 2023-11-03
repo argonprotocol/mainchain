@@ -78,6 +78,7 @@ CREATE TABLE IF NOT EXISTS notebook_headers (
     start_time timestamptz NOT NULL,
     end_time timestamptz NULL,
     notary_id INTEGER NOT NULL,
+    tax varchar,
     chain_transfers jsonb NOT NULL,
     changed_accounts_root BYTEA NOT NULL,
     changed_account_origins jsonb NOT NULL

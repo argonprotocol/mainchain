@@ -50,16 +50,21 @@
       },
       {
         "ordinal": 9,
+        "name": "tax",
+        "type_info": "Varchar"
+      },
+      {
+        "ordinal": 10,
         "name": "chain_transfers",
         "type_info": "Jsonb"
       },
       {
-        "ordinal": 10,
+        "ordinal": 11,
         "name": "changed_accounts_root",
         "type_info": "Bytea"
       },
       {
-        "ordinal": 11,
+        "ordinal": 12,
         "name": "changed_account_origins",
         "type_info": "Jsonb"
       }
@@ -79,6 +84,7 @@
       false,
       true,
       false,
+      true,
       false,
       false,
       false

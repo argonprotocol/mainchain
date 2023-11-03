@@ -32,7 +32,7 @@ pub mod pallet {
 		pallet_prelude::*,
 		traits::{
 			fungible::{Inspect, Mutate},
-			tokens::{Fortitude, Preservation},
+			tokens::{Fortitude, Precision, Preservation},
 		},
 		PalletId,
 	};
@@ -386,6 +386,15 @@ pub mod pallet {
 							});
 					},
 				}
+			}
+
+			if notebook.header.tax > 0 {
+				T::Currency::burn_from(
+					&notary_pallet_account_id,
+					notebook.header.tax.into(),
+					Precision::Exact,
+					Fortitude::Force,
+				)?;
 			}
 
 			<LastNotebookNumberByNotary<T>>::insert(

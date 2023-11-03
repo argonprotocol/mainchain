@@ -204,6 +204,7 @@ fn test_verify_notebook() {
 			account_id: Alice.to_account_id(),
 			account_nonce: 1,
 		}],
+		tax: 0,
 		changed_account_origins: bounded_vec![AccountOrigin { notebook_number: 1, account_uid: 1 }],
 		end_time: Utc::now().timestamp_millis() as u64,
 	};
@@ -285,6 +286,7 @@ fn test_disallows_double_claim() {
 			account_id: Alice.to_account_id(),
 			account_nonce: 1,
 		}],
+		tax: 0,
 		changed_account_origins: bounded_vec![AccountOrigin { notebook_number: 1, account_uid: 1 }],
 		end_time: Utc::now().timestamp_millis() as u64,
 	};
@@ -400,6 +402,7 @@ fn test_multiple_changesets_in_a_notebook() {
 			finalized_block_number: 100,
 			pinned_to_block_number: 0,
 			start_time: Utc::now().timestamp_millis() as u64 - 60_000,
+			tax: 200,
 			changed_accounts_root: merkle_root::<Blake2Hasher, _>(
 				balance_tips.iter().map(|(_, v)| v.encode()).collect::<Vec<_>>(),
 			),
@@ -523,6 +526,7 @@ fn test_multiple_changesets_in_a_notebook() {
 		account_origin: AccountOrigin { notebook_number: 1, account_uid: 1 },
 		balance: 0,
 	});
+	notebook.header.tax = 400;
 	assert_err!(
 		notebook_verify::<TestLookup>(&notebook.header.hash(), &notebook),
 		VerifyError::InvalidPreviousBalanceProof
@@ -599,6 +603,7 @@ fn test_cannot_remove_lock_between_changesets_in_a_notebook() {
 				notebook_number: 1,
 				account_uid: 1
 			}],
+			tax: 0,
 			end_time: Utc::now().timestamp_millis() as u64,
 		},
 		balance_changes: bounded_vec![

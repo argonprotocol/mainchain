@@ -459,6 +459,7 @@ impl NotebookCloser {
 							})
 							.collect(),
 					),
+					tax: header.tax,
 					chain_transfers: SubxtBoundedVec(
 						header
 							.chain_transfers

@@ -9,7 +9,8 @@ use sp_core::{bounded::BoundedVec, Blake2Hasher, RuntimeDebug};
 
 use ulx_notary_primitives::{
 	ensure, note::AccountType, AccountId, AccountOrigin, BalanceTip, MaxBalanceChanges,
-	MerkleProof, NewAccountOrigin, NotaryId, Notebook, NotebookNumber, PINNED_BLOCKS_OFFSET,
+	MerkleProof, NewAccountOrigin, NotaryId, NoteType, Notebook, NotebookNumber,
+	PINNED_BLOCKS_OFFSET,
 };
 
 use crate::{
@@ -148,6 +149,7 @@ impl NotebookStore {
 				)
 			}));
 
+		let mut tax = 0u128;
 		for change in changesets {
 			for change in change {
 				let key = (change.account_id, change.account_type);
@@ -168,6 +170,11 @@ impl NotebookStore {
 				{
 					changed_accounts
 						.insert(key.clone(), (change.change_number, change.balance, origin));
+				}
+				for note in change.notes {
+					if matches!(note.note_type, NoteType::Tax) {
+						tax += note.milligons;
+					}
 				}
 			}
 		}
@@ -198,6 +205,7 @@ impl NotebookStore {
 			transfers,
 			pinned_to_block_number,
 			meta.finalized_block_number,
+			tax,
 			changes_root,
 			account_changelist,
 		)

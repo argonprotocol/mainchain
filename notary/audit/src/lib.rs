@@ -62,7 +62,10 @@ pub fn notebook_verify<'a, T: NotebookHistoryLookup>(
 	let header = &notebook.header;
 
 	for changeset in notebook.balance_changes.iter() {
-		verify_balance_changeset_allocation(&changeset, Some(notebook.header.notebook_number))?;
+		let result =
+			verify_balance_changeset_allocation(&changeset, Some(notebook.header.notebook_number))?;
+		result.verify_taxes()?;
+		state.record_tax(result)?;
 		verify_changeset_signatures(&changeset)?;
 		verify_balance_sources::<T>(&mut state, header, changeset)?;
 	}
@@ -75,7 +78,7 @@ pub fn notebook_verify<'a, T: NotebookHistoryLookup>(
 		BTreeSet::from_iter(header.changed_account_origins.to_vec()) == state.account_changelist,
 		VerifyError::InvalidAccountChangelist
 	);
-
+	ensure!(state.tax == header.tax, VerifyError::InvalidHeaderTaxRecorded);
 	ensure!(
 		state.get_merkle_root() == header.changed_accounts_root,
 		VerifyError::InvalidBalanceChangeRoot
@@ -93,6 +96,7 @@ struct NotebookVerifyState {
 	chain_transfers: Vec<ChainTransfer>,
 	seen_transfers_in: BTreeSet<(AccountId32, u32)>,
 	new_account_origins: BTreeMap<(AccountId, AccountType), AccountOriginUid>,
+	tax: u128,
 }
 
 impl NotebookVerifyState {
@@ -114,6 +118,16 @@ impl NotebookVerifyState {
 			channel_hold_note,
 		};
 		self.final_balances.insert(key.clone(), tip);
+		Ok(())
+	}
+	
+	pub fn record_tax(
+		&mut self,
+		change_state: BalanceChangesetState,
+	) -> anyhow::Result<(), VerifyError> {
+		for (_, amount) in change_state.tax_created_per_account {
+			self.tax += amount;
+		}
 		Ok(())
 	}
 	pub fn load_new_origins(
@@ -344,7 +358,7 @@ pub struct BalanceChangesetState {
 	/// How much in channel funds was claimed by each account id
 	pub claimed_channel_deposits_per_account: BTreeMap<AccountId, u128>,
 	/// How much tax was sent per account
-	pub tax_sent_per_account: BTreeMap<AccountId, u128>,
+	pub tax_created_per_account: BTreeMap<AccountId, u128>,
 	/// How much was deposited per account
 	pub claimed_deposits_per_account: BTreeMap<AccountId, u128>,
 
@@ -373,7 +387,7 @@ impl BalanceChangesetState {
 			*tax_owed_per_account.entry(account_id).or_insert(0) += tax;
 		}
 		for (account_id, tax) in tax_owed_per_account {
-			let tax_sent = self.tax_sent_per_account.get(&account_id).unwrap_or(&0);
+			let tax_sent = self.tax_created_per_account.get(&account_id).unwrap_or(&0);
 			ensure!(
 				*tax_sent >= tax,
 				VerifyError::InsufficientTaxIncluded {
@@ -433,7 +447,7 @@ impl BalanceChangesetState {
 		claimer: &AccountId,
 	) -> anyhow::Result<(), VerifyError> {
 		self.sent_tax += milligons;
-		*self.tax_sent_per_account.entry(claimer.clone()).or_insert(0) += milligons;
+		*self.tax_created_per_account.entry(claimer.clone()).or_insert(0) += milligons;
 
 		Ok(())
 	}
