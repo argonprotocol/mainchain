@@ -15,41 +15,46 @@
       },
       {
         "ordinal": 2,
-        "name": "step",
+        "name": "block_votes",
         "type_info": "Int4"
       },
       {
         "ordinal": 3,
+        "name": "balance_changes",
+        "type_info": "Int4"
+      },
+      {
+        "ordinal": 4,
+        "name": "notarizations",
+        "type_info": "Int4"
+      },
+      {
+        "ordinal": 5,
+        "name": "step",
+        "type_info": "Int4"
+      },
+      {
+        "ordinal": 6,
         "name": "open_time",
         "type_info": "Timestamptz"
       },
       {
-        "ordinal": 4,
+        "ordinal": 7,
         "name": "ready_for_close_time",
         "type_info": "Timestamptz"
       },
       {
-        "ordinal": 5,
+        "ordinal": 8,
         "name": "closed_time",
         "type_info": "Timestamptz"
       },
       {
-        "ordinal": 6,
-        "name": "get_auditors_time",
-        "type_info": "Timestamptz"
-      },
-      {
-        "ordinal": 7,
-        "name": "audited_time",
-        "type_info": "Timestamptz"
-      },
-      {
-        "ordinal": 8,
+        "ordinal": 9,
         "name": "submitted_time",
         "type_info": "Timestamptz"
       },
       {
-        "ordinal": 9,
+        "ordinal": 10,
         "name": "finalized_time",
         "type_info": "Timestamptz"
       }
@@ -65,8 +70,9 @@
       false,
       false,
       false,
-      true,
-      true,
+      false,
+      false,
+      false,
       true,
       true,
       true,

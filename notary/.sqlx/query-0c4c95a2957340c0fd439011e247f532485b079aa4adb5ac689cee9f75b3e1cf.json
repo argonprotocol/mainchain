@@ -1,0 +1,28 @@
+{
+  "db_name": "PostgreSQL",
+  "query": "\n\t\t\tINSERT INTO notebook_headers (version, notary_id, block_number, notebook_number, start_time, chain_transfers, \n\t\t\t\tchanged_account_origins, changed_accounts_root, secret_hash, parent_secret, block_votes_root, \n\t\t\t\tblock_voting_power, block_votes_count, best_nonces, blocks_with_votes)\n\t\t\tVALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15)\n\t\t\t",
+  "describe": {
+    "columns": [],
+    "parameters": {
+      "Left": [
+        "Int4",
+        "Int4",
+        "Int4",
+        "Int4",
+        "Timestamptz",
+        "Jsonb",
+        "Jsonb",
+        "Bytea",
+        "Bytea",
+        "Bytea",
+        "Bytea",
+        "Varchar",
+        "Int4",
+        "Jsonb",
+        "ByteaArray"
+      ]
+    },
+    "nullable": []
+  },
+  "hash": "0c4c95a2957340c0fd439011e247f532485b079aa4adb5ac689cee9f75b3e1cf"
+}

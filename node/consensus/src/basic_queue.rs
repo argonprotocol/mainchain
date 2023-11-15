@@ -1,3 +1,7 @@
+///
+///
+/// NOTE - BAB: This file is copied only to modify a few functions because it is all crate
+/// private. Please mark changes as they are made!!
 use std::{
 	pin::Pin,
 	sync::Arc,
@@ -29,7 +33,7 @@ use sp_runtime::{
 
 use crate::{
 	basic_queue::worker_messages::ImportBlocks,
-	import_queue::{import_single_block_metered, ImportOrFinalizeError},
+	basic_queue_import::{import_single_block_metered, ImportOrFinalizeError},
 	metrics::Metrics,
 };
 
@@ -47,8 +51,6 @@ use crate::{
 // but WITHOUT ANY WARRANTY; without even the implied warranty of
 // MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE. See the
 // GNU General Public License for more details.
-/// NOTE - BAB: This file is copied only to modify a few functions because it is all crate
-/// private. Please mark changes as they are made!!
 
 const LOG_TARGET: &str = "sync::import-queue";
 
@@ -236,7 +238,7 @@ mod worker_messages {
 /// ULIXEE MODIFICATION
 /// We are going to add a stream to listen for finality notifications. This will allow us to
 /// hold onto blocks that need processing dependent on finalization receipt, which can come from
-/// notaries submitting notebooks.
+/// notaries submitting notebook.
 async fn block_import_process<B: BlockT, S: 'static + Send + BlockchainEvents<B>>(
 	mut block_import: BoxBlockImport<B>,
 	mut verifier: impl Verifier<B>,

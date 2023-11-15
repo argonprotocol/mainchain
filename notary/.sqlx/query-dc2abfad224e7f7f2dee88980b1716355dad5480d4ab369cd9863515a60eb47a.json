@@ -1,0 +1,15 @@
+{
+  "db_name": "PostgreSQL",
+  "query": "\n\t\t\tUPDATE blocks SET finalized_time=$1, is_finalized=true\n\t\t\tWHERE block_hash = $2\n\t\t",
+  "describe": {
+    "columns": [],
+    "parameters": {
+      "Left": [
+        "Timestamptz",
+        "Bytea"
+      ]
+    },
+    "nullable": []
+  },
+  "hash": "dc2abfad224e7f7f2dee88980b1716355dad5480d4ab369cd9863515a60eb47a"
+}

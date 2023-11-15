@@ -1,57 +1,32 @@
-// This file is part of Substrate.
-
-// Copyright (C) Parity Technologies (UK) Ltd.
-// SPDX-License-Identifier: GPL-3.0-or-later WITH Classpath-exception-2.0
-
-// This program is free software: you can redistribute it and/or modify
-// it under the terms of the GNU General Public License as published by
-// the Free Software Foundation, either version 3 of the License, or
-// (at your option) any later version.
-
-// This program is distributed in the hope that it will be useful,
-// but WITHOUT ANY WARRANTY; without even the implied warranty of
-// MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE. See the
-// GNU General Public License for more details.
-
-// You should have received a copy of the GNU General Public License
-// along with this program. If not, see <https://www.gnu.org/licenses/>.
-
 use std::{sync::Arc, time::Duration};
 
-use codec::{Decode, Encode};
+use codec::Encode;
 use futures::prelude::*;
 use log::*;
-use sc_client_api::{self, BlockchainEvents};
 use sc_consensus::{BlockImportParams, BoxBlockImport, ImportResult, StateAction, StorageChanges};
 use sp_api::ProvideRuntimeApi;
 use sp_blockchain::HeaderBackend;
-use sp_consensus::{BlockOrigin, Environment, Proposal, Proposer, SelectChain, SyncOracle};
+use sp_consensus::{BlockOrigin, Environment, Proposer};
 use sp_core::{crypto::AccountId32, U256};
-use sp_inherents::{CreateInherentDataProviders, InherentDataProvider};
+use sp_inherents::InherentDataProvider;
 use sp_keystore::KeystorePtr;
 use sp_runtime::{
 	generic::{Digest, DigestItem},
-	traits::{Block as BlockT, Header as HeaderT, Header, NumberFor},
+	traits::{Block as BlockT, Header as HeaderT, UniqueSaturatedInto},
 };
 
-use rpc_seal::{CreatedBlock, Error as RpcError, SealNewBlock};
+pub use notebook_state::create_notebook_watch;
 use ulx_primitives::{
-	block_seal::{BlockProof, MiningAuthorityApis},
-	digests::{FinalizedBlockNeededDigest, FINALIZED_BLOCK_DIGEST_ID},
-	inherents::UlxBlockSealInherent,
-	ProofOfWorkType, UlxConsensusApi, UlxPreDigest, UlxSeal, AUTHOR_ID, ULX_ENGINE_ID,
+	digests::{
+		BlockVoteDigest, FinalizedBlockNeededDigest, BLOCK_VOTES_DIGEST_ID,
+		COMPUTE_AUTHORITY_DIGEST_ID, FINALIZED_BLOCK_DIGEST_ID, SIGNATURE_DIGEST_ID,
+	},
+	inherents::{BlockSealInherent, BlockSealInherentDataProvider},
+	BlockSealAuthorityId, BlockSealDigest, MiningAuthorityApis, AUTHOR_DIGEST_ID,
+	BLOCK_SEAL_DIGEST_ID,
 };
 
-pub use crate::compute_worker::{MiningBuild, MiningHandle, MiningMetadata};
-use crate::{
-	authority::AuthoritySealer,
-	aux::TotalDifficulty,
-	compute_worker::UntilImportedOrTimeout,
-	error::{
-		Error,
-		Error::{BlockNotFound, InvalidNonceDifficulty, InvalidProofOfWorkTypeUsed},
-	},
-};
+use crate::{authority::AuthoritySealer, error::Error, notebook_state::CreateBlockEvent};
 
 #[cfg(test)]
 mod tests;
@@ -59,450 +34,206 @@ mod tests;
 pub mod authority;
 mod aux;
 pub mod basic_queue;
-pub mod compute_worker;
+mod basic_queue_import;
+mod digests;
 pub mod error;
 pub mod import_queue;
-pub mod inherents;
 mod metrics;
-pub mod nonce_verify;
-pub mod rpc_notary;
-pub mod rpc_seal;
+pub mod notebook_state;
+pub mod rpc_block_votes;
 
 const LOG_TARGET: &str = "node::consensus";
 
-/// Algorithm used for proof of work.
-pub trait NonceAlgorithm<B: BlockT> {
-	/// Difficulty for the algorithm.
-	type Difficulty: TotalDifficulty
-		+ Default
-		+ Encode
-		+ Decode
-		+ Ord
-		+ Clone
-		+ Copy
-		+ Into<U256>
-		+ TryFrom<U256>;
-
-	fn next_digest(&self, parent: &B::Hash) -> Result<UlxPreDigest, Error<B>>;
-	fn easing(&self, parent: &B::Hash, block_proof: &BlockProof) -> Result<u128, Error<B>>;
-
-	/// Verify that the difficulty is valid against given seal.
-	fn verify(
-		&self,
-		parent: &B::Hash,
-		pre_hash: &B::Hash,
-		pre_digest: &UlxPreDigest,
-		seal: &UlxSeal,
-	) -> Result<bool, Error<B>>;
-}
-
-pub async fn listen_for_block_seal<Block, C, S, Algorithm, E, SO, L, CIDP, CS>(
+pub async fn block_creator<Block, C, E, L, CS>(
 	mut block_import: BoxBlockImport<Block>,
 	client: Arc<C>,
-	select_chain: S,
-	algorithm: Algorithm,
 	mut env: E,
-	_sync_oracle: SO,
 	justification_sync_link: L,
 	author: AccountId32,
-	create_inherent_data_providers: CIDP,
 	build_time: Duration,
-	mut block_seal_stream: CS,
+	mut block_create_stream: CS,
 	keystore: KeystorePtr,
 ) where
 	Block: BlockT + 'static,
 	Block::Hash: Send + 'static,
-	C: ProvideRuntimeApi<Block> + BlockchainEvents<Block> + HeaderBackend<Block> + 'static,
-	C::Api: UlxConsensusApi<Block>,
+	C: ProvideRuntimeApi<Block> + HeaderBackend<Block> + 'static,
 	C::Api: MiningAuthorityApis<Block>,
-	S: SelectChain<Block> + 'static,
-	CS: Stream<Item = SealNewBlock<Block::Hash>> + Unpin + 'static,
-	Algorithm: NonceAlgorithm<Block> + Send + Clone + Sync + 'static,
-	Algorithm::Difficulty: Send + 'static,
 	E: Environment<Block> + Send + Sync + 'static,
 	E::Error: std::fmt::Debug,
 	E::Proposer: Proposer<Block>,
-	SO: SyncOracle + Clone + Send + Sync + 'static,
-	CIDP: CreateInherentDataProviders<Block, UlxBlockSealInherent> + Clone,
 	L: sc_consensus::JustificationSyncLink<Block> + 'static,
+	CS: Stream<Item = CreateBlockEvent<Block>> + Unpin + 'static,
 {
 	let authority_sealer = AuthoritySealer::<Block, C>::new(client.clone(), keystore.clone());
+	while let Some(command) = block_create_stream.next().await {
+		let CreateBlockEvent {
+			is_compute_seal,
+			block_vote_digest,
+			parent_block_number,
+			parent_hash,
+			seal_inherent,
+			block_seal_authority,
+			latest_finalized_block_needed,
+		} = command;
 
-	while let Some(command) = block_seal_stream.next().await {
-		match command {
-			SealNewBlock::Submit { block_proof, nonce, parent_hash, mut sender } => {
-				info!(target: LOG_TARGET, "Inbound BlockProof seal received (id={:?}, author={})", block_proof.tax_proof_id, block_proof.author_id);
-				let future = async {
-					// this finds the longest current chain off finalized path
-					let mut parent_header = select_chain.best_chain().await?;
+		info!(target: LOG_TARGET, "Building next block (at={}, parent={:?})", parent_block_number + 1, parent_hash);
+		let Some(import_block) = build_block(
+			client.clone(),
+			&mut env,
+			&author,
+			parent_hash,
+			block_vote_digest,
+			is_compute_seal,
+			latest_finalized_block_needed.into(),
+			seal_inherent,
+			block_seal_authority,
+			&authority_sealer,
+			build_time,
+		)
+		.map_err(|err| {
+			warn!(target: LOG_TARGET, "Unable to build block: {:?}", err);
+		})
+		.await
+		.ok() else {
+			continue
+		};
 
-					if parent_hash != parent_header.hash() {
-						match select_chain.finality_target(parent_hash, None).await {
-							Ok(_) => (),
-							Err(err) => {
-								warn!(
-									target: LOG_TARGET,
-									"Unable to propose new block for authoring on the given parent hash {:?}. \
-									 Select best chain error: {}",
-									parent_hash,
-									err
-								);
-								return Err(err.into())
-							},
-						};
+		let post_hash = import_block.post_hash();
+		let block_number = import_block.header.number().clone();
+		warn!(target: LOG_TARGET, "Importing generated block: {:?}", &post_hash);
+		match block_import.import_block(import_block).await {
+			Ok(res) => match res {
+				ImportResult::Imported(_) => {
+					res.handle_justification(&post_hash, block_number, &justification_sync_link);
 
-						parent_header = match client.header(parent_hash) {
-							Ok(Some(x)) => x,
-							Ok(None) => return Err(BlockNotFound(parent_hash.to_string()).into()),
-							Err(err) => return Err(err.into()),
-						};
-					}
-
-					let pre_digest = match algorithm.next_digest(&parent_hash) {
-						Ok(x) => x,
-						Err(err) => {
-							warn!(
-								target: LOG_TARGET,
-								"Unable to propose new block for authoring. \
-								 Fetch next digest failed: {}",
-								err,
-							);
-							return Err(err.into())
-						},
-					};
-
-					if pre_digest.work_type != ProofOfWorkType::Tax {
-						return Err(InvalidProofOfWorkTypeUsed.into())
-					}
-
-					let sealer = match authority_sealer.check_if_can_seal(
-						&parent_hash,
-						&block_proof,
-						true,
-					) {
-						Err(err) => {
-							warn!(
-								target: LOG_TARGET,
-								"Unable to propose new block for authoring. \
-								 Fetch authorities failed: {}",
-								err,
-							);
-							return Err(err.into())
-						},
-						Ok(x) => x,
-					};
-
-					let mut seal = UlxSeal {
-						easing: algorithm.easing(&parent_hash, &block_proof)?,
-						nonce: nonce.into(),
-						// we will fill this after proposing a block
-						authority: None,
-					};
-
-					match algorithm.verify(
-						&parent_hash,
-						// NOTE: this is on purpose! we are going to validate against the parent
-						// hash here, so what gets passed in doesn't matter
-						&parent_hash,
-						&pre_digest,
-						&seal,
-					) {
-						Ok(true) => true,
-						Ok(false) => return Err(InvalidNonceDifficulty),
-						Err(err) => {
-							warn!(
-								target: LOG_TARGET,
-								"Unable to propose new block for authoring. \
-								 Fetch next digest failed: {}",
-								err,
-							);
-							return Err(err.into())
-						},
-					};
-
-					let proposal = match propose(
-						&mut env,
-						author.clone(),
-						create_inherent_data_providers.clone(),
-						build_time,
-						&parent_header,
-						parent_hash,
-						(&client.info().finalized_hash, client.info().finalized_number),
-						&pre_digest,
-						Some(nonce),
-						Some(block_proof.clone()),
-					)
-					.await
-					{
-						Some(x) => x,
-						None => return Err(Error::BlockProposingError("No proposal".into())),
-					};
-
-					let (header, body) = proposal.block.deconstruct();
-					let block_number = header.number().clone();
-
-					// NOTE: we will sign the pre-hash
-					let seal = match authority_sealer.sign_seal(
-						sealer.0,
-						&sealer.1,
-						&header.hash(),
-						&mut seal,
-					) {
-						Ok(x) => x,
-						Err(error) => {
-							warn!(target: LOG_TARGET, "Unable to sign seal: {}", error);
-							return Err(Error::ConsensusError(error.into()))
-						},
-					};
-
-					let mut import_block = BlockImportParams::new(BlockOrigin::Own, header);
-					import_block.post_digests.push(seal);
-					import_block.body = Some(body);
-					import_block.state_action = StateAction::ApplyChanges(StorageChanges::Changes(
-						proposal.storage_changes,
-					));
-
-					let post_hash = import_block.post_hash();
-					warn!(target: LOG_TARGET, "Importing block: {:?}", &post_hash);
-
-					match block_import.import_block(import_block).await {
-						Ok(res) => match res {
-							ImportResult::Imported(_) => {
-								res.handle_justification(
-									&post_hash,
-									block_number,
-									&justification_sync_link,
-								);
-
-								info!(
-									target: LOG_TARGET,
-									"✅ Successfully mined 'tax' block on top of: {} -> {}", parent_hash, post_hash
-								);
-								Ok(CreatedBlock { hash: post_hash })
-							},
-							other => Err(other.into()),
-						},
-						Err(err) => {
-							warn!(target: LOG_TARGET, "Unable to import 'tax seal' block: {}", err,);
-							Err(err.into())
-						},
-					}
-				}
-				.map_err(|e| {
-					warn!(
+					info!(
 						target: LOG_TARGET,
-						"Error using imported tax seal: {}",
-						e
+						"✅ Successfully mined block on top of: {} -> {}", parent_hash, post_hash
 					);
-					RpcError::from(e.to_string())
-				});
-
-				if let Some(sender) = sender.take() {
-					let _ = sender.send(future.await);
-				}
+				},
+				other => {
+					warn!(target: LOG_TARGET, "Import result not success: {:?}", other);
+				},
+			},
+			Err(err) => {
+				warn!(target: LOG_TARGET, "Unable to import block: {:?}", err);
 			},
 		}
 	}
 }
 
-pub fn create_compute_miner<Block, C, S, Algorithm, E, SO, L, CIDP>(
-	block_import: BoxBlockImport<Block>,
+async fn build_block<Block, C, E>(
 	client: Arc<C>,
-	select_chain: S,
-	algorithm: Algorithm,
-	mut env: E,
-	sync_oracle: SO,
-	justification_sync_link: L,
-	author: AccountId32,
-	create_inherent_data_providers: CIDP,
-	timeout: Duration,
+	env: &mut E,
+	author: &AccountId32,
+	parent_hash: Block::Hash,
+	block_vote_digest: BlockVoteDigest,
+	is_compute_seal: bool,
+	latest_finalized_block_needed: <Block::Header as HeaderT>::Number,
+	seal_inherent: BlockSealInherent,
+	block_seal_authority: BlockSealAuthorityId,
+	authority_sealer: &AuthoritySealer<Block, C>,
 	build_time: Duration,
-) -> (MiningHandle<Block, L, <E::Proposer as Proposer<Block>>::Proof>, impl Future<Output = ()>)
+) -> Result<BlockImportParams<Block>, Error<Block>>
 where
-	Block: BlockT,
-	C: ProvideRuntimeApi<Block> + BlockchainEvents<Block> + HeaderBackend<Block> + 'static,
-	S: SelectChain<Block> + 'static,
-	Algorithm: NonceAlgorithm<Block> + Send + Clone + Sync + 'static,
-	Algorithm::Difficulty: Send + 'static,
+	Block: BlockT + 'static,
+	Block::Hash: Send + 'static,
+	C: ProvideRuntimeApi<Block> + HeaderBackend<Block> + 'static,
+	C::Api: MiningAuthorityApis<Block>,
 	E: Environment<Block> + Send + Sync + 'static,
 	E::Error: std::fmt::Debug,
 	E::Proposer: Proposer<Block>,
-	SO: SyncOracle + Clone + Send + Sync + 'static,
-	L: sc_consensus::JustificationSyncLink<Block> + 'static,
-	CIDP: CreateInherentDataProviders<Block, UlxBlockSealInherent> + Clone,
 {
-	let mut timer = UntilImportedOrTimeout::new(client.import_notification_stream(), timeout);
-	let worker = MiningHandle::new(block_import, justification_sync_link);
-
-	let worker_ret = worker.clone();
-
-	let task = async move {
-		loop {
-			if timer.next().await.is_none() {
-				// this should occur if the block import notifications completely stop... indicating
-				// we should exit
-				break
-			}
-
-			if sync_oracle.is_major_syncing() {
-				debug!(target: LOG_TARGET, "Skipping proposal due to sync.");
-				worker.on_major_syncing();
-				continue
-			}
-
-			let best_header = match select_chain.best_chain().await {
-				Ok(x) => x,
-				Err(err) => {
-					warn!(
-						target: LOG_TARGET,
-						"Unable to pull new block for authoring. \
-						 Select best chain error: {}",
-						err
-					);
-					continue
-				},
-			};
-			let best_hash = best_header.hash();
-
-			if worker.best_hash() == Some(best_hash) {
-				continue
-			}
-
-			// The worker is locked for the duration of the whole proposing period. Within this
-			// period, the mining target is outdated and useless anyway.
-			let pre_digest = match algorithm.next_digest(&best_hash) {
-				Ok(x) => x,
-				Err(err) => {
-					warn!(
-						target: LOG_TARGET,
-						"Unable to propose new block for authoring. \
-						 Fetch difficulty failed: {}",
-						err,
-					);
-					continue
-				},
-			};
-
-			let proposal = propose(
-				&mut env,
-				author.clone(),
-				create_inherent_data_providers.clone(),
-				build_time,
-				&best_header,
-				best_hash,
-				(&client.info().finalized_hash, client.info().finalized_number),
-				&pre_digest,
-				None,
-				None,
-			)
-			.await;
-
-			let proposal = match proposal {
-				Some(x) => x,
-				None => continue,
-			};
-			let pre_hash = proposal.block.header().hash();
-
-			worker.on_build(proposal, best_hash, pre_hash, pre_digest);
-		}
+	let best_header = match client.header(parent_hash) {
+		Ok(Some(x)) => x,
+		Ok(None) => return Err(Error::BlockNotFound(parent_hash.to_string())),
+		Err(err) => return Err(err.into()),
 	};
 
-	(worker_ret, task)
+	let nonce = match &seal_inherent {
+		BlockSealInherent::BestVote { nonce, .. } => nonce.clone(),
+		BlockSealInherent::Continuation => U256::MAX,
+	};
+	let timestamp = sp_timestamp::InherentDataProvider::from_system_time();
+	let seal = BlockSealInherentDataProvider::new(seal_inherent);
+	let inherent_data = match (timestamp, seal).create_inherent_data().await {
+		Ok(r) => r,
+		Err(err) => {
+			warn!(
+				target: LOG_TARGET,
+				"Unable to propose new block for authoring. \
+				 Creating inherent data failed: {:?}",
+				err,
+			);
+			return Err(err.into())
+		},
+	};
+
+	let proposer: E::Proposer = match env.init(&best_header).await {
+		Ok(x) => x,
+		Err(err) => {
+			let msg = format!(
+				"Unable to propose new block for authoring. \
+						Initializing proposer failed: {:?}",
+				err
+			);
+			return Err(Error::StringError(msg))
+		},
+	};
+
+	let finalized_hash_needed = match client.hash(latest_finalized_block_needed) {
+		Ok(Some(x)) => x,
+		Ok(None) => return Err(Error::InvalidFinalizedBlockNeeded),
+		Err(err) => return Err(err.into()),
+	};
+
+	let mut inherent_digest = Digest::default();
+	if is_compute_seal {
+		inherent_digest.push(DigestItem::PreRuntime(
+			COMPUTE_AUTHORITY_DIGEST_ID,
+			block_seal_authority.encode(),
+		));
+	}
+	// add author in pow standard field (for client)
+	inherent_digest.push(DigestItem::PreRuntime(AUTHOR_DIGEST_ID, author.encode()));
+	inherent_digest.push(DigestItem::PreRuntime(
+		FINALIZED_BLOCK_DIGEST_ID,
+		FinalizedBlockNeededDigest::<Block> {
+			hash: finalized_hash_needed,
+			number: latest_finalized_block_needed,
+		}
+		.encode(),
+	));
+	inherent_digest
+		.push(DigestItem::PreRuntime(BLOCK_SEAL_DIGEST_ID, BlockSealDigest { nonce }.encode()));
+	inherent_digest.push(DigestItem::PreRuntime(BLOCK_VOTES_DIGEST_ID, block_vote_digest.encode()));
+
+	let proposal = match proposer.propose(inherent_data, inherent_digest, build_time, None).await {
+		Ok(x) => x,
+		Err(err) => {
+			let msg = format!("Unable to propose. Creating proposer failed: {:?}", err);
+			return Err(Error::StringError(msg))
+		},
+	};
+
+	let (header, body) = proposal.block.deconstruct();
+	let pre_hash = &header.hash();
+
+	let mut import_block = BlockImportParams::new(BlockOrigin::Own, header);
+
+	let signature = authority_sealer.sign_message(&block_seal_authority, &pre_hash.as_ref())?;
+
+	import_block
+		.post_digests
+		.push(DigestItem::Seal(SIGNATURE_DIGEST_ID, signature.encode()));
+
+	import_block.body = Some(body);
+	import_block.state_action =
+		StateAction::ApplyChanges(StorageChanges::Changes(proposal.storage_changes));
+
+	Ok(import_block)
 }
 
-async fn propose<Block, E, CIDP>(
-	env: &mut E,
-	author: AccountId32,
-	create_inherent_data_providers: CIDP,
-	build_time: Duration,
-	best_header: &<Block>::Header,
-	best_hash: <<Block>::Header as Header>::Hash,
-	finalized_block_needed: (&<Block>::Hash, NumberFor<Block>),
-	pre_digest: &UlxPreDigest,
-	tax_nonce: Option<U256>,
-	tax_block_proof: Option<BlockProof>,
-) -> Option<Proposal<Block, <E::Proposer as Proposer<Block>>::Proof>>
-where
-	Block: BlockT,
-	E: Environment<Block> + Send + Sync + 'static,
-	E::Error: std::fmt::Debug,
-	E::Proposer: Proposer<Block>,
-	CIDP: CreateInherentDataProviders<Block, UlxBlockSealInherent>,
-{
-	let future = async {
-		let seal = UlxBlockSealInherent {
-			work_type: match tax_block_proof {
-				Some(_) => ProofOfWorkType::Tax,
-				None => ProofOfWorkType::Compute,
-			},
-			tax_nonce,
-			tax_block_proof,
-		};
-
-		let inherent_data_providers = match create_inherent_data_providers
-			.create_inherent_data_providers(best_hash, seal)
-			.await
-		{
-			Ok(x) => x,
-			Err(err) => {
-				warn!(
-					target: LOG_TARGET,
-					"Unable to propose new block for authoring. \
-					 Creating inherent data providers failed: {:?}",
-					err,
-				);
-				return None
-			},
-		};
-
-		let inherent_data = match inherent_data_providers.create_inherent_data().await {
-			Ok(r) => r,
-			Err(err) => {
-				warn!(
-					target: LOG_TARGET,
-					"Unable to propose new block for authoring. \
-					 Creating inherent data failed: {:?}",
-					err,
-				);
-				return None
-			},
-		};
-
-		let proposer: E::Proposer = match env.init(&best_header).await {
-			Ok(x) => x,
-			Err(err) => {
-				warn!(
-					target: LOG_TARGET,
-					"Unable to propose new block for authoring. \
-					 Creating proposer failed: {:?}",
-					err,
-				);
-				return None
-			},
-		};
-
-		let mut inherent_digest = Digest::default();
-		// add author in pow standard field (for client)
-		inherent_digest.push(DigestItem::PreRuntime(AUTHOR_ID, author.encode().to_vec()));
-		inherent_digest.push(DigestItem::PreRuntime(ULX_ENGINE_ID, pre_digest.encode().to_vec()));
-		inherent_digest.push(DigestItem::PreRuntime(
-			FINALIZED_BLOCK_DIGEST_ID,
-			FinalizedBlockNeededDigest::<Block> {
-				hash: *finalized_block_needed.0,
-				number: finalized_block_needed.1,
-			}
-			.encode()
-			.to_vec(),
-		));
-
-		let block = match proposer.propose(inherent_data, inherent_digest, build_time, None).await {
-			Ok(x) => x,
-			Err(err) => {
-				warn!(target: LOG_TARGET, "Unable to propose. Creating proposer failed: {:?}", err);
-				return None
-			},
-		};
-		Some(block)
-	};
-	future.await
+pub(crate) fn convert_u32<Block: BlockT>(number: &<Block::Header as HeaderT>::Number) -> u32 {
+	UniqueSaturatedInto::<u32>::unique_saturated_into(number.clone())
 }

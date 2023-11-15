@@ -74,6 +74,9 @@ pub enum VerifyError {
 	#[snafu(display("Invalid notebook hash"))]
 	InvalidNotebookHash,
 
+	#[snafu(display("Invalid notebook header hash"))]
+	InvalidNotebookHeaderHash,
+
 	#[snafu(display("Duplicate chain transfer"))]
 	DuplicateChainTransfer,
 
@@ -129,6 +132,45 @@ pub enum VerifyError {
 
 	#[snafu(display("Invalid tax amount included (sent: {tax_sent}, owed: {tax_owed}) for account {account_id:?}"))]
 	InsufficientTaxIncluded { tax_sent: u128, tax_owed: u128, account_id: AccountId32 },
+
+	#[snafu(display("Insufficient tax allocated for the given block votes"))]
+	InsufficientBlockVoteTax,
+
+	#[snafu(display("Invalid block vote channel pass signature"))]
+	InvalidChannelPassSignature,
+
+	#[snafu(display("Duplicate channel pass recorded"))]
+	DuplicateChannelPassSettled,
+
+	#[snafu(display("Invalid block vote allocation"))]
+	InvalidBlockVoteAllocation,
+
+	#[snafu(display("Invalid block votes root"))]
+	InvalidBlockVoteRoot,
+
+	#[snafu(display("Invalid block votes count"))]
+	InvalidBlockVotesCount,
+
+	#[snafu(display("Invalid block voting power"))]
+	InvalidBlockVotingPower,
+
+	#[snafu(display("Invalid block vote list"))]
+	InvalidBlockVoteList,
+
+	#[snafu(display("Invalid block vote compute nonce provided"))]
+	InvalidComputeProof,
+
+	#[snafu(display("Invalid block vote"))]
+	InvalidBlockVoteSource,
+
+	#[snafu(display("Minimums were not met for a block vote"))]
+	InsufficientBlockVoteMinimum,
+
+	#[snafu(display("Invalid block vote channel pass"))]
+	InvalidBlockVoteChannelPass,
+
+	#[snafu(display("Invalid block vote power"))]
+	InvalidBlockVotePower,
 }
 
 impl From<AccountHistoryLookupError> for VerifyError {

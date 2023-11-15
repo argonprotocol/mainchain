@@ -14,7 +14,7 @@ struct ChainTransferRow {
 	pub amount: String,
 	pub account_id: Vec<u8>,
 	pub account_nonce: Option<i32>,
-	pub finalized_block: Option<i32>,
+	pub finalized_block_number: Option<i32>,
 	pub included_in_notebook_number: Option<i32>,
 }
 impl TryInto<ChainTransfer> for ChainTransferRow {
@@ -155,7 +155,7 @@ impl ChainTransferStore {
 	) -> anyhow::Result<()> {
 		let res = query!(
 			r#"
-			INSERT INTO chain_transfers (to_localchain, amount, account_id, account_nonce, finalized_block) VALUES ($1, $2, $3, $4, $5)
+			INSERT INTO chain_transfers (to_localchain, amount, account_id, account_nonce, finalized_block_number) VALUES ($1, $2, $3, $4, $5)
 			"#,
 			true,
 			milligons.to_string(),

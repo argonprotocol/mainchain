@@ -25,9 +25,9 @@ use sp_runtime::{traits::Block as BlockT, AccountId32, ApplyExtrinsicResult, Bou
 use substrate_test_runtime::{AccountId, BlockNumber, Executive, Hash, Header};
 use substrate_test_runtime_client::Backend;
 
-use pallet_mining_slots::find_xor_closest;
+use pallet_mining_slot::find_xor_closest;
 use ulx_primitives::{
-	block_seal::{AuthorityDistance, BlockSealAuthorityId, Host, PeerId},
+	block_seal::{BlockSealAuthorityId, Host, MiningAuthority, PeerId},
 	NextWork, ProofOfWorkType,
 };
 
@@ -216,10 +216,10 @@ sp_api::mock_impl_runtime_apis! {
 		fn authorities() -> Vec<BlockSealAuthorityId> {
 			self.inner.authorities.iter().map(|(_,_, id)| id.clone()).collect()
 		}
-		fn authorities_by_index() -> BTreeMap<u16, BlockSealAuthorityId> {
+		fn authority_id_by_index() -> BTreeMap<u16, BlockSealAuthorityId> {
 			self.inner.authorities.iter().map(|(i,_, id)| (*i, id.clone())).collect()
 		}
-		fn block_peers(account_id: AccountId32) -> Vec<AuthorityDistance<BlockSealAuthorityId>> {
+		fn block_peers(account_id: AccountId32) -> Vec<MiningAuthority<BlockSealAuthorityId>> {
 			let block_hash = self.inner.client.as_ref().unwrap().info().best_hash;
 			let hash = blake2_256(&[block_hash.as_ref(), account_id.as_ref()].concat());
 			let closest = find_xor_closest(self.inner.authorities.iter().map(|(index, _, id)| {
@@ -228,7 +228,7 @@ sp_api::mock_impl_runtime_apis! {
 
 
 			closest.into_iter().map(|(a, distance, index)| {
-				AuthorityDistance::<_> {
+				MiningAuthority::<_> {
 					authority_id: a.clone(),
 					authority_index: index.unique_saturated_into(),
 					peer_id: PeerId(OpaquePeerId::default()),

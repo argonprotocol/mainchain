@@ -21,7 +21,13 @@ pub trait NotebookRpc {
 	#[method(name = "get")]
 	async fn get(&self, notebook_number: NotebookNumber) -> Result<Notebook, ErrorObjectOwned>;
 
-	/// Subscription to notebooks completed
+	#[method(name = "get_raw_body")]
+	async fn get_raw_body(
+		&self,
+		notebook_number: NotebookNumber,
+	) -> Result<Vec<u8>, ErrorObjectOwned>;
+
+	/// Subscription to notebook completed
 	#[subscription(name = "subscribeHeaders" => "notebookHeader", item = NotebookHeader)]
 	async fn subscribe_headers(&self) -> SubscriptionResult;
 }

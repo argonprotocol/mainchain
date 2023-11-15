@@ -23,6 +23,7 @@ log = "0.4.20"
 parking_lot = "0.12.1"
 thiserror = "1.0"
 rand = {version = "0.8.5"}
+lazy_static = "1.4.0"
 prometheus-endpoint = { package = "substrate-prometheus-endpoint", version = "0.10.0-dev",  git = "https://github.com/paritytech/polkadot-sdk.git", branch = "release-polkadot-v1.1.0" }
 sp-consensus = { version = "0.10.0-dev", git = "https://github.com/paritytech/polkadot-sdk.git", branch = "release-polkadot-v1.1.0" }
 sc-consensus = { version = "0.10.0-dev", git = "https://github.com/paritytech/polkadot-sdk.git", branch = "release-polkadot-v1.1.0" }
@@ -57,7 +58,8 @@ sp-io = { version = "23.0.0", git = "https://github.com/paritytech/polkadot-sdk.
 
 # Local Dependencies
 ulx-primitives = { path = "../../primitives" }
-pallet-localchain-relay = { path = "../../pallets/localchain_relay"}
+ulx-node-runtime = { path = "../../runtime" }
+ulx-notary = { path = "../../notary" }
 
 [build-dependencies]
 substrate-build-script-utils = { version = "3.0.0", git = "https://github.com/paritytech/polkadot-sdk.git", branch = "release-polkadot-v1.1.0" }
@@ -88,9 +90,9 @@ frame-system-rpc-runtime-api = { version = "4.0.0-dev", git = "https://github.co
 sp-offchain = { version = "4.0.0-dev", git = "https://github.com/paritytech/polkadot-sdk.git", branch = "release-polkadot-v1.1.0" }
 frame-executive = { version = "4.0.0-dev" , git = "https://github.com/paritytech/polkadot-sdk.git", branch = "release-polkadot-v1.1.0" }
 pallet-block-seal = { version = "0.0.1", path = "../../pallets/block_seal" }
-pallet-difficulty = { version = "0.0.1", path = "../../pallets/difficulty" }
+pallet-vote-eligibility = { version = "0.0.1", path = "../../pallets/vote_eligibility" }
 pallet-balances = {  version = "4.0.0-dev", git = "https://github.com/paritytech/polkadot-sdk.git", branch = "release-polkadot-v1.1.0" }
-pallet-mining-slots = { version = "0.0.1", path = "../../pallets/mining_slots" }
+pallet-mining-slot = { version = "0.0.1", path = "../../pallets/mining_slot" }
 pallet-timestamp = { version = "4.0.0-dev", git = "https://github.com/paritytech/polkadot-sdk.git", branch = "release-polkadot-v1.1.0" }
 pallet-session = { version = "4.0.0-dev", git = "https://github.com/paritytech/polkadot-sdk.git", branch = "release-polkadot-v1.1.0" }
 tokio = "1.29.1"

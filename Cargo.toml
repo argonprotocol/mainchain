@@ -2,18 +2,21 @@
 members = [
     "node",
 	"node/consensus",
+	"pallets/block_rewards",
 	"pallets/block_seal",
-    "pallets/mining_slots",
-	"pallets/bonds",
-	"pallets/difficulty",
-    "pallets/notaries",
-	"pallets/localchain_relay",
+	"pallets/vote_eligibility",
+	"pallets/bond",
+	"pallets/chain_transfer",
+	"pallets/mining_slot",
+	"pallets/notaries",
+	"pallets/notebook",
 	"client",
 	"primitives",
     "runtime",
 	"notary",
 	"notary/audit",
 	"notary/primitives",
+	"notary/voter",
 	"testing"
 ]
 resolver = "2"

@@ -1,30 +1,33 @@
 use codec::{Decode, Encode};
 use scale_info::TypeInfo;
 use sp_api::BlockT;
-use sp_core::{MaxEncodedLen, RuntimeDebug};
+use sp_core::{RuntimeDebug, U256};
 use sp_runtime::{traits::NumberFor, ConsensusEngineId};
+
+pub use ulx_notary_primitives::{
+	digests::{
+		BlockVoteDigest, NotaryNotebookDigest, BLOCK_VOTES_DIGEST_ID,
+		NEXT_VOTE_ELIGIBILITY_DIGEST_ID,
+	},
+	BlockVoteSource,
+};
 
 use crate::block_seal::BlockSealAuthoritySignature;
 
-pub const ULX_ENGINE_ID: ConsensusEngineId = [b'u', b'l', b'x', b'_'];
-// matches POW so that we can use the built-in front end decoding
-pub const AUTHOR_ID: ConsensusEngineId = [b'p', b'o', b'w', b'_'];
+/// The block creator account_id - matches POW so that we can use the built-in front end decoding
+pub const AUTHOR_DIGEST_ID: ConsensusEngineId = [b'p', b'o', b'w', b'_'];
 
+/// Pre-runtime Digest ID for the high level block seal details - used to quickly check the seal
+/// details in the node.
+pub const BLOCK_SEAL_DIGEST_ID: ConsensusEngineId = [b's', b'e', b'a', b'l'];
+
+/// The finalized block needed to sync (FinalizedBlockNeededDigest)
 pub const FINALIZED_BLOCK_DIGEST_ID: ConsensusEngineId = [b'f', b'i', b'n', b'_'];
 
-pub type Difficulty = u128;
-
-#[derive(Clone, Copy, PartialEq, Eq, Encode, Decode, RuntimeDebug, TypeInfo, MaxEncodedLen)]
-pub enum ProofOfWorkType {
-	Tax,
-	Compute,
-}
-
-impl Default for ProofOfWorkType {
-	fn default() -> Self {
-		ProofOfWorkType::Compute
-	}
-}
+/// A Seal digest item that contains the signature of the block by the author id
+pub const SIGNATURE_DIGEST_ID: ConsensusEngineId = [b's', b'i', b'g', b'n'];
+/// Stores a temporary authority during compute phase
+pub const COMPUTE_AUTHORITY_DIGEST_ID: ConsensusEngineId = [b'a', b'u', b't', b'h'];
 
 #[derive(Clone, PartialEq, Eq, Encode, Decode, RuntimeDebug, TypeInfo)]
 pub struct FinalizedBlockNeededDigest<B: BlockT> {
@@ -34,18 +37,11 @@ pub struct FinalizedBlockNeededDigest<B: BlockT> {
 }
 
 #[derive(Clone, PartialEq, Eq, Encode, Decode, RuntimeDebug, TypeInfo)]
-pub struct UlxSeal {
-	/// How much did we ease difficulty due to tax provided
-	#[codec(compact)]
-	pub easing: Difficulty,
-	pub nonce: [u8; 32],
-	/// authority index and signature of miner sealing the block
-	pub authority: Option<(u16, BlockSealAuthoritySignature)>,
+pub struct BlockSealDigest {
+	pub nonce: U256,
 }
 
 #[derive(Clone, PartialEq, Eq, Encode, Decode, RuntimeDebug, TypeInfo)]
-pub struct UlxPreDigest {
-	pub work_type: ProofOfWorkType,
-	#[codec(compact)]
-	pub difficulty: Difficulty,
+pub struct BlockSealSignatureDigest {
+	pub signature: BlockSealAuthoritySignature,
 }

@@ -24,7 +24,6 @@ codec = { package = "parity-scale-codec", version = "3.6.4", default-features = 
 async-trait = "0.1.73"
 futures-timer = "3.0.1"
 thiserror = "1.0"
-num_cpus = "1.16.0"
 serde = { version = "1.0.188", features = ["derive"] }
 prometheus-endpoint = { package = "substrate-prometheus-endpoint", version = "0.10.0-dev",  git = "https://github.com/paritytech/polkadot-sdk.git", branch = "release-polkadot-v1.1.0" }
 sc-cli = { version = "0.10.0-dev", git = "https://github.com/paritytech/polkadot-sdk.git", branch = "release-polkadot-v1.1.0" }
@@ -75,7 +74,7 @@ rand = {version = "0.8.5"}
 ulx-node-consensus = { version = "0.0.1", path = "./consensus"}
 ulx-node-runtime = { version = "0.0.1", path = "../runtime" }
 ulx-primitives = { version = "0.0.1", path = "../primitives" }
-pallet-localchain-relay = { version = "0.0.1", path = "../pallets/localchain_relay" }
+pallet-chain-transfer = { version = "0.0.1", path = "../pallets/chain_transfer" }
 
 # CLI-specific dependencies
 try-runtime-cli = { version = "0.10.0-dev", optional = true, git = "https://github.com/paritytech/polkadot-sdk.git", branch = "release-polkadot-v1.1.0" }

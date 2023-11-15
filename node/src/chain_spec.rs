@@ -6,9 +6,9 @@ use sp_core::{bounded_vec, sr25519, OpaquePeerId, Pair, Public};
 use sp_runtime::traits::{IdentifyAccount, Verify};
 
 use ulx_node_runtime::{
-	opaque::SessionKeys, AccountId, ArgonBalancesConfig, BlockSealConfig, DifficultyConfig,
-	GrandpaConfig, MiningSlotsConfig, RuntimeGenesisConfig, SessionConfig, Signature, SudoConfig,
-	SystemConfig, UlixeeBalancesConfig, WASM_BINARY,
+	opaque::SessionKeys, AccountId, ArgonBalancesConfig, GrandpaConfig, MiningSlotConfig,
+	RuntimeGenesisConfig, SessionConfig, Signature, SudoConfig, SystemConfig, UlixeeBalancesConfig,
+	VoteEligibilityConfig, WASM_BINARY,
 };
 use ulx_primitives::{
 	block_seal::{Host, MiningRegistration, PeerId, RewardDestination},
@@ -169,7 +169,7 @@ fn testnet_genesis(
 		ulixee_balances: UlixeeBalancesConfig {
 			balances: endowed_accounts.iter().cloned().map(|k| (k, 10_000)).collect(),
 		},
-		mining_slots: MiningSlotsConfig {
+		mining_slot: MiningSlotConfig {
 			miner_zero: Some(MiningRegistration {
 				account_id: authority_zero.0.clone(),
 				rpc_hosts: bounded_vec![Host {
@@ -202,13 +202,11 @@ fn testnet_genesis(
 				})
 				.collect(),
 		},
-		block_seal: BlockSealConfig {
-			min_seal_signers: 1,
-			closest_xor_authorities_required: 5,
-			authority_count_starting_tax_seal: 2,
+		vote_eligibility: VoteEligibilityConfig {
+			initial_voting_minimum: initial_difficulty,
+			mining_slot_count_starting_tax_proof: 2,
 			..Default::default()
 		},
-		difficulty: DifficultyConfig { initial_difficulty, ..Default::default() },
 		transaction_payment: Default::default(),
 		tx_pause: Default::default(),
 	}

@@ -1,0 +1,22 @@
+{
+  "db_name": "PostgreSQL",
+  "query": "\n\t\t\tSELECT 1 as true FROM blocks WHERE block_hash=$1 LIMIT 1;\n\t\t\t",
+  "describe": {
+    "columns": [
+      {
+        "ordinal": 0,
+        "name": "true",
+        "type_info": "Int4"
+      }
+    ],
+    "parameters": {
+      "Left": [
+        "Bytea"
+      ]
+    },
+    "nullable": [
+      null
+    ]
+  },
+  "hash": "7d5a36b242d93c33b3d6bf0f24d743bee2d2c6d2820aed7c175a7fc97e9286d9"
+}

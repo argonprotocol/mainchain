@@ -18,8 +18,6 @@ pub enum NotebookFinalizationStep {
 	Open = 1,
 	ReadyForClose = 2,
 	Closed = 3,
-	GetAuditors = 4,
-	Audited = 5,
 	Submitted = 6,
 	Finalized = 7,
 }
@@ -30,10 +28,8 @@ impl From<i32> for NotebookFinalizationStep {
 			1 => NotebookFinalizationStep::Open,
 			2 => NotebookFinalizationStep::ReadyForClose,
 			3 => NotebookFinalizationStep::Closed,
-			4 => NotebookFinalizationStep::GetAuditors,
-			5 => NotebookFinalizationStep::Audited,
-			6 => NotebookFinalizationStep::Submitted,
-			7 => NotebookFinalizationStep::Finalized,
+			4 => NotebookFinalizationStep::Submitted,
+			5 => NotebookFinalizationStep::Finalized,
 			_ => panic!("Invalid notebook finalization step"),
 		}
 	}
@@ -43,12 +39,13 @@ impl From<i32> for NotebookFinalizationStep {
 pub struct NotebookStatusRow {
 	pub notebook_number: i32,
 	pub chain_transfers: i32,
+	pub block_votes: i32,
+	pub notarizations: i32,
+	pub balance_changes: i32,
 	pub step: NotebookFinalizationStep,
 	pub open_time: DateTime<Utc>,
 	pub ready_for_close_time: Option<DateTime<Utc>>,
 	pub closed_time: Option<DateTime<Utc>>,
-	pub get_auditors_time: Option<DateTime<Utc>>,
-	pub audited_time: Option<DateTime<Utc>>,
 	pub submitted_time: Option<DateTime<Utc>>,
 	pub finalized_time: Option<DateTime<Utc>>,
 }
@@ -196,10 +193,6 @@ impl NotebookStatusStore {
 			NotebookFinalizationStep::ReadyForClose =>
 				(NotebookFinalizationStep::Closed, "closed_time"),
 			NotebookFinalizationStep::Closed =>
-				(NotebookFinalizationStep::GetAuditors, "get_auditors_time"),
-			NotebookFinalizationStep::GetAuditors =>
-				(NotebookFinalizationStep::Audited, "audited_time"),
-			NotebookFinalizationStep::Audited =>
 				(NotebookFinalizationStep::Submitted, "submitted_time"),
 			NotebookFinalizationStep::Submitted =>
 				(NotebookFinalizationStep::Finalized, "finalized_time"),

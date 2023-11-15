@@ -6,7 +6,6 @@ use subxt::{
 
 pub use spec::api;
 
-pub mod signature_messages;
 mod spec;
 
 pub enum UlxConfig {}

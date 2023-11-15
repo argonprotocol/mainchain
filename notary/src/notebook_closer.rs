@@ -1,43 +1,32 @@
 use std::{future::Future, sync::Arc};
 
-use codec::Encode;
 use futures::FutureExt;
 use sc_utils::notification::NotificationSender;
-use sp_core::{
-	bytes::{from_hex, to_hex},
-	crypto::Ss58Codec,
-	ed25519, H256,
-};
+use sp_core::{ed25519, H256};
 use sp_keystore::KeystorePtr;
-use sqlx::{Executor, PgConnection, PgPool};
-use subxt::{
-	backend::rpc::{RpcClient, RpcParams},
-	rpc_params,
-	utils::AccountId32,
-};
+use sqlx::{Executor, PgPool};
+use subxt::utils::AccountId32;
 use tokio::sync::RwLock;
-use tracing::{info, warn};
+use tracing::info;
 
 use ulixee_client::{
 	api,
 	api::{
 		runtime_types,
 		runtime_types::{
-			bounded_collections::bounded_vec::BoundedVec as SubxtBoundedVec,
-			sp_core::ed25519::{Public, Signature},
+			bounded_collections::bounded_vec::BoundedVec as SubxtBoundedVec, primitive_types::U256,
+			sp_core::ed25519::Signature,
 		},
 	},
 	UlxClient,
 };
-use ulx_notary_primitives::{ensure, ChainTransfer, NotaryId, NotebookHeader, NotebookNumber};
+use ulx_notary_primitives::{ChainTransfer, NotaryId, NotebookHeader, VoteSource};
 
 use crate::{
 	error::Error,
 	stores::{
-		block_meta::BlockMetaStore,
 		blocks::BlocksStore,
 		notebook::NotebookStore,
-		notebook_auditors::NotebookAuditorStore,
 		notebook_header::NotebookHeaderStore,
 		notebook_status::{NotebookFinalizationStep, NotebookStatusStore},
 		registered_key::RegisteredKeyStore,
@@ -46,7 +35,6 @@ use crate::{
 };
 
 pub const NOTARY_KEYID: sp_core::crypto::KeyTypeId = sp_core::crypto::KeyTypeId(*b"unot");
-pub const MIN_NOTEBOOK_AUDITORS_PCT: f32 = 0.8f32;
 
 #[derive(Clone)]
 pub struct NotebookCloser {
@@ -130,24 +118,13 @@ impl NotebookCloser {
 
 	pub(super) async fn iterate_notebook_close_loop(&mut self) {
 		let _ = &self.try_rotate_notebook().await.map_err(|e| {
-			tracing::error!("Error rotating notebooks: {:?}", e);
+			tracing::error!("Error rotating notebook: {:?}", e);
 			e
 		});
 		let _ = &self.try_close_notebook().await.map_err(|e| {
 			tracing::error!("Error closing open notebook: {:?}", e);
 			e
 		});
-
-		let _ = &self.try_get_auditors().await.map_err(|e| {
-			tracing::error!("Error getting notebook auditors. {:?}", e);
-			e
-		});
-
-		let _ = &self.try_get_audit_signatures().await.map_err(|e| {
-			tracing::error!("Error getting audit signatures: {:?}", e);
-			e
-		});
-
 		let _ = &self.try_submit_notebook().await.map_err(|e| {
 			tracing::error!("Error submitting notebook: {:?}", e);
 			e
@@ -163,22 +140,23 @@ impl NotebookCloser {
 				Some(notebook_number) => notebook_number,
 				None => return Ok(()),
 			};
-			let meta = BlockMetaStore::load(&mut *tx).await?;
 			let next_notebook = notebook_number + 1u32;
-			NotebookHeaderStore::create(
-				&mut *tx,
-				self.notary_id,
-				next_notebook,
-				meta.best_block_number,
-			)
-			.await?;
+			let mut block_number = BlocksStore::get_latest_block_number(&mut *tx).await?;
+			let last_notebook_block =
+				NotebookHeaderStore::get_block_number(&mut *tx, notebook_number).await?;
+
+			if block_number <= last_notebook_block {
+				block_number = last_notebook_block + 1;
+			}
+			NotebookHeaderStore::create(&mut *tx, self.notary_id, next_notebook, block_number)
+				.await?;
 
 			tx.commit().await?;
 			Ok(())
 		}
 		.boxed()
 	}
-	pub(super) fn try_close_notebook<'a>(&'a mut self) -> BoxFutureResult<'a, ()> {
+	pub(super) fn try_close_notebook(&mut self) -> BoxFutureResult<()> {
 		async move {
 			let mut tx = self.pool.begin().await?;
 			let step = NotebookFinalizationStep::ReadyForClose;
@@ -190,7 +168,20 @@ impl NotebookCloser {
 			tx.execute("SET statement_timeout = 5000").await?;
 			NotebookStatusStore::lock_to_stop_appends(&mut *tx, notebook_number).await?;
 
-			NotebookStore::close_notebook(&mut *tx, notebook_number).await?;
+			// TODO: we can potentially improve mainchain intake speed by only referencing the
+			// 	latest finalized block needed by the chain transfers/keys
+			let finalized_block = BlocksStore::get_latest_finalized_block_number(&mut *tx).await?;
+			let public = RegisteredKeyStore::get_valid_public(&mut *tx, finalized_block).await?;
+
+			NotebookStore::close_notebook(
+				&mut *tx,
+				notebook_number,
+				finalized_block,
+				self.notary_id,
+				public,
+				&self.keystore,
+			)
+			.await?;
 
 			NotebookStatusStore::next_step(&mut *tx, notebook_number, step).await?;
 			tx.commit().await?;
@@ -209,263 +200,49 @@ impl NotebookCloser {
 		.boxed()
 	}
 
-	async fn get_runtime_finalized_block(client: &UlxClient) -> anyhow::Result<u32, Error> {
-		let finalized_block_number = client
-			.storage()
-			.at_latest()
-			.await?
-			.fetch(&api::storage().localchain_relay().finalized_block_number())
-			.await?
-			.unwrap_or(0);
-		Ok(finalized_block_number)
-	}
-
-	fn try_get_auditors<'a>(&'a mut self) -> BoxFutureResult<'a, ()> {
+	fn try_submit_notebook(&mut self) -> BoxFutureResult<Option<NotebookHeader>> {
 		async move {
-			let notary_id = self.notary_id;
-			let mut tx = self.pool.begin().await?;
+			let pool = &self.pool;
+			let mut tx = pool.begin().await?;
 			let step = NotebookFinalizationStep::Closed;
-
-			let notebook_number = match NotebookStatusStore::lock_with_step(&mut *tx, step).await? {
-				Some(notebook_number) => notebook_number,
-				None => return Ok(()),
-			};
-			let pinned_block_number =
-				NotebookHeaderStore::get_pinned_block_number(&mut *tx, notebook_number).await?;
-			let client = self.client.get().await?;
-
-			let auditors_query = api::runtime_apis::localchain_relay_apis::LocalchainRelayApis
-				.get_auditors(notary_id, notebook_number, pinned_block_number);
-
-			let auditors = client
-				.runtime_api()
-				.at_latest()
-				.await
-				.map_err(|e| {
-					self.client.on_rpc_error();
-					e
-				})?
-				.call(auditors_query)
-				.await?;
-
-			for (idx, (_, public, hosts)) in auditors.iter().enumerate() {
-				NotebookAuditorStore::insert(
-					&mut *tx,
-					notebook_number,
-					&public.0 .0,
-					idx as u16,
-					hosts,
-				)
-				.await?;
-			}
-
-			NotebookStatusStore::next_step(&mut *tx, notebook_number, step).await?;
-			tx.commit().await?;
-			Ok(())
-		}
-		.boxed()
-	}
-
-	fn get_audit_params<'a>(
-		tx: &'a mut PgConnection,
-		keystore: &'a KeystorePtr,
-		notebook_number: NotebookNumber,
-	) -> BoxFutureResult<'a, (RpcParams, u32)> {
-		async move {
-			let notebook = NotebookStore::load(&mut *tx, notebook_number).await?;
-			let notary_public = RegisteredKeyStore::get_valid_public(
-				&mut *tx,
-				notebook.header.finalized_block_number,
-			)
-			.await?;
-
-			let header_hash = notebook.header.hash();
-			let version = notebook.header.version;
-			let notary_id = notebook.header.notary_id;
-			let encoded_notebook = notebook.encode();
-			let notary_signature = notary_sign(keystore, &notary_public, &header_hash)?;
-			let block = BlocksStore::get_hash(&mut *tx, notebook.header.finalized_block_number)
-				.await?
-				.ok_or(Error::InternalError("Unable to find block for notebook".to_string()))?;
-
-			let block_hash_hex = to_hex(&block.block_hash, false);
-
-			let params = rpc_params![
-				block_hash_hex,
-				version,
-				notary_id,
-				notebook_number.clone(),
-				notary_signature.clone(),
-				&header_hash,
-				&encoded_notebook
-			];
-			Ok((params, notebook.header.finalized_block_number))
-		}
-		.boxed()
-	}
-
-	fn try_get_audit_signatures<'a>(&'a self) -> BoxFutureResult<'a, ()> {
-		async move {
-			let pool = &self.pool;
-			let keystore = self.keystore.clone();
-			let mut tx = pool.begin().await?;
-			let step = NotebookFinalizationStep::GetAuditors;
-			let notebook_number = match NotebookStatusStore::lock_with_step(&mut *tx, step).await? {
-				Some(notebook_number) => notebook_number,
-				None => return Ok(()),
-			};
-
-			let auditors = NotebookAuditorStore::get_auditors(&mut *tx, notebook_number).await?;
-			let (params, finalized_block_needed) =
-				Self::get_audit_params(&mut *tx, &keystore, notebook_number).await?;
-
-			let results = futures::future::join_all(auditors.iter().map(|auditor| {
-				Self::get_audit_signature(
-					&pool,
-					auditor.public,
-					notebook_number,
-					auditor.signature.clone(),
-					auditor.rpc_urls.clone(),
-					finalized_block_needed,
-					params.clone(),
-				)
-			}))
-			.await;
-
-			let count_successful = results.iter().filter(|r| r.is_ok()).count();
-			if count_successful as f32 >= auditors.len() as f32 * MIN_NOTEBOOK_AUDITORS_PCT {
-				NotebookStatusStore::next_step(&mut *tx, notebook_number, step).await?;
-			}
-
-			tx.commit().await?;
-			Ok(())
-		}
-		.boxed()
-	}
-
-	pub(super) fn get_audit_signature(
-		pool: &PgPool,
-		public: [u8; 32],
-		notebook_number: NotebookNumber,
-		existing_signature: Option<[u8; 64]>,
-		rpc_urls: Vec<String>,
-		runtime_finalized_block_needed: u32,
-		params: RpcParams,
-	) -> BoxFutureResult<([u8; 32], [u8; 64])> {
-		async move {
-			if existing_signature.is_some() {
-				return Ok((public, existing_signature.unwrap()))
-			}
-
-			let mut db = pool.acquire().await?;
-			NotebookAuditorStore::increment_attempts(&mut *db, notebook_number, &public).await?;
-
-			let mut params = params.clone();
-			params.push(ed25519::Public(public).to_ss58check())?;
-
-			let peer_client = RpcClient::from_url(rpc_urls[0].clone()).await?;
-			let ulx_client = UlxClient::from_rpc_client(peer_client.clone()).await?;
-			let auditor_finalized_block = Self::get_runtime_finalized_block(&ulx_client).await?;
-
-			ensure!( runtime_finalized_block_needed <= auditor_finalized_block, Error::InternalError(format!(
-				"Peer runtime {} is not up to date yet. Need block {} vs auditor runtime finalized {}",
-				rpc_urls[0].clone(),
-				runtime_finalized_block_needed,
-				auditor_finalized_block
-			)));
-
-			let signature = peer_client
-				.request::<NotebookAuditResponse>(
-					&*"notebook_audit",
-					params,
-				)
-				.await
-				.map_err(|e| {
-					if e.to_string().contains("Invalid") {
-						panic!("This notebook was rejected by an auditor. Need to shutdown until we can fix whatever is wrong.");
-					}
-					warn!("Error getting audit signature for notebook {} from (url={}): {}", notebook_number, rpc_urls[0].clone(), e);
-					Error::InternalError(format!("Error getting audit signature: {}", e))
-				})?;
-
-			info!(
-				"Got signature from auditor {:0x?} at {:?}: {:?}",
-				&public,
-				rpc_urls[0].clone(),
-				&signature
-			);
-
-			let signature =
-				from_hex(signature.signature.trim_start_matches("0x")).map_err(|e| {
-					Error::InternalError(format!("Error decoding seal signature: {}", e))
-				})?;
-
-			let signature: [u8; 64] = signature.try_into().map_err(|e| {
-				Error::InternalError(format!("Error decoding seal signature: {:?}", e))
-			})?;
-
-			NotebookAuditorStore::update_signature(&mut *db, notebook_number, &public, &signature)
-				.await?;
-
-			Ok((public, signature))
-		}.boxed()
-	}
-
-	fn try_submit_notebook<'a>(&'a mut self) -> BoxFutureResult<'a, Option<NotebookHeader>> {
-		async move {
-			let pool = &self.pool;
-			let mut tx = pool.begin().await?;
-			let step = NotebookFinalizationStep::Audited;
 			let notebook_number = match NotebookStatusStore::lock_with_step(&mut *tx, step).await? {
 				Some(notebook_number) => notebook_number,
 				None => return Ok(None),
 			};
 
-			let auditors = NotebookAuditorStore::get_auditors(&mut *tx, notebook_number).await?;
-			let auditors = auditors
-				.into_iter()
-				.filter_map(|a| {
-					if let Some(sig) = a.signature {
-						return Some((Public(a.public), Signature(sig)))
-					}
-					None
-				})
-				.collect();
 			let header = NotebookHeaderStore::load(&mut *tx, notebook_number).await?;
 			let public =
-				RegisteredKeyStore::get_valid_public(&mut *tx, header.finalized_block_number)
-					.await?;
+				RegisteredKeyStore::get_valid_public(&mut *tx, header.block_number).await?;
 			let header_hash = header.hash();
 
-			let notebook = runtime_types::ulx_notary_primitives::notebook::AuditedNotebook {
-				header: runtime_types::ulx_notary_primitives::notebook::NotebookHeader {
-					version: header.version,
-					finalized_block_number: header.finalized_block_number,
-					notebook_number: header.notebook_number,
-					pinned_to_block_number: header.pinned_to_block_number,
-					notary_id: header.notary_id,
-					start_time: header.start_time,
-					end_time: header.end_time,
-					changed_accounts_root: header.changed_accounts_root,
-					changed_account_origins: SubxtBoundedVec(
-						header
-							.changed_account_origins
-							.iter()
-							.map(|a| {
-								runtime_types::ulx_notary_primitives::balance_change::AccountOrigin {
-									notebook_number: a.notebook_number,
-									account_uid: a.account_uid,
-								}
-							})
-							.collect(),
-					),
-					tax: header.tax,
-					chain_transfers: SubxtBoundedVec(
-						header
-							.chain_transfers
-							.iter()
-							.map(|t| {
-								match t {
+			let notebook = runtime_types::ulx_notary_primitives::notebook::NotebookHeader {
+				version: header.version,
+				block_number: header.block_number,
+				finalized_block_number: header.finalized_block_number,
+				notebook_number: header.notebook_number,
+				notary_id: header.notary_id,
+				start_time: header.start_time,
+				end_time: header.end_time,
+				changed_accounts_root: header.changed_accounts_root,
+				changed_account_origins: SubxtBoundedVec(
+					header
+						.changed_account_origins
+						.iter()
+						.map(|a| {
+							runtime_types::ulx_notary_primitives::balance_change::AccountOrigin {
+								notebook_number: a.notebook_number,
+								account_uid: a.account_uid,
+							}
+						})
+						.collect(),
+				),
+				tax: header.tax,
+				chain_transfers: SubxtBoundedVec(
+					header
+						.chain_transfers
+						.iter()
+						.map(|t| {
+							match t {
 									ChainTransfer::ToMainchain { account_id, amount } =>
 										runtime_types::ulx_notary_primitives::notebook::ChainTransfer::ToMainchain {
 											account_id: AccountId32::from(Into::<[u8; 32]>::into(account_id.clone())),
@@ -477,19 +254,65 @@ impl NotebookCloser {
 											account_nonce: account_nonce.clone(),
 										},
 								}
-							})
-							.collect(),
-					),
-				},
-				header_hash,
-				auditors: SubxtBoundedVec(auditors),
+						})
+						.collect(),
+				),
+				block_voting_power: header.block_voting_power,
+				block_votes_count: header.block_votes_count,
+				block_votes_root: header.block_votes_root,
+				secret_hash: header.secret_hash,
+				parent_secret: header.parent_secret,
+				best_block_nonces: SubxtBoundedVec(
+					header
+						.best_block_nonces
+						.iter()
+						.map(|(voting_root, block_nonce)| {
+							let vote = block_nonce.block_vote.clone();
+							let api_best_nonce = runtime_types::ulx_notary_primitives::block_vote::BestBlockNonceT {
+								nonce: U256(block_nonce.nonce.0),
+								proof: runtime_types::ulx_notary_primitives::balance_change::MerkleProof {
+									proof: SubxtBoundedVec(
+										block_nonce.proof.proof.iter().map(|p| p.clone()).collect(),
+									),
+									leaf_index: block_nonce.proof.leaf_index,
+									number_of_leaves: block_nonce.proof.number_of_leaves,
+								},
+								block_vote: runtime_types::ulx_notary_primitives::block_vote::BlockVoteT {
+									account_id: AccountId32(vote.account_id.into()),
+									block_hash: vote.block_hash,
+									power: vote.power,
+									index: vote.index,
+									vote_source: match vote.vote_source {
+										VoteSource::Tax { channel_pass } => {
+											runtime_types::ulx_notary_primitives::block_vote::VoteSource::Tax {
+												channel_pass: runtime_types::ulx_notary_primitives::note::ChannelPass {
+													at_block_height: channel_pass.at_block_height,
+													id: channel_pass.id,
+													miner_index: channel_pass.miner_index,
+													zone_record_hash: channel_pass.zone_record_hash,
+												},
+											}
+										}
+										VoteSource::Compute { puzzle_proof} => {
+											runtime_types::ulx_notary_primitives::block_vote::VoteSource::Compute {
+												puzzle_proof: U256(puzzle_proof.0),
+											}
+										}
+									}
+								},
+							};
+							(voting_root.clone(), api_best_nonce)
+						})
+						.collect::<Vec<_>>(),
+				),
 			};
 
 			let signature = notary_sign(&self.keystore, &public, &header_hash)?;
 
-			let ext = api::tx()
-				.localchain_relay()
-				.submit_notebook(notebook.clone(), Signature(signature.0));
+			let ext =
+				api::tx()
+					.notebook()
+					.submit(notebook.clone(), header_hash, Signature(signature.0));
 
 			let client = self.client.get().await?;
 			let ext = client.tx().create_unsigned(&ext)?;
@@ -511,7 +334,7 @@ impl NotebookCloser {
 	}
 }
 
-fn notary_sign(
+pub fn notary_sign(
 	keystore: &KeystorePtr,
 	public: &ed25519::Public,
 	hash: &H256,
@@ -537,7 +360,6 @@ struct NotebookAuditResponse {
 mod tests {
 	use std::{env, net::Ipv4Addr};
 
-	use codec::Decode;
 	use frame_support::assert_ok;
 	use futures::StreamExt;
 	use sp_core::{bounded_vec, ed25519::Public};
@@ -562,112 +384,17 @@ mod tests {
 		},
 		UlxClient,
 	};
-	use ulx_notary_primitives::{AccountType::Deposit, BalanceChange, Note, Notebook};
+	use ulx_notary_primitives::{AccountType::Deposit, BalanceChange, Note};
 	use ulx_testing::{test_context, test_context_from_url};
 
 	use crate::{
 		block_watch::track_blocks,
 		notebook_closer::NOTARY_KEYID,
 		server::NotebookHeaderStream,
-		stores::{
-			balance_change::BalanceChangeStore, block_meta::BlockMetaStore,
-			chain_transfer::ChainTransferStore, notebook_status::NotebookStatusStore,
-		},
+		stores::{notarizations::NotarizationsStore, notebook_status::NotebookStatusStore},
 	};
 
 	use super::*;
-
-	#[sqlx::test]
-	#[should_panic]
-	async fn test_bad_notebook_audit(pool: PgPool) {
-		let _ = tracing_subscriber::fmt::try_init();
-		let ctx = test_context().await;
-		let genesis = ctx.client.backend().genesis_hash().await.expect("Get genesis hash");
-		let keystore = MemoryKeystore::new();
-		let keystore = KeystoreExt::new(keystore);
-		let notary_key =
-			keystore.ed25519_generate_new(NOTARY_KEYID, None).expect("should have a key");
-
-		BlockMetaStore::start(&pool, genesis).await.expect("Start block meta");
-
-		{
-			let mut tx = pool.begin().await.expect("Begin tx");
-			RegisteredKeyStore::store_public(&mut *tx, notary_key, 0)
-				.await
-				.expect("Store key");
-			NotebookHeaderStore::create(&mut *tx, 1, 1, 0).await.expect("Create notebook");
-			tx.commit().await.expect("Commit");
-		}
-		ChainTransferStore::record_transfer_to_local_from_block(
-			&pool,
-			0,
-			&Bob.to_account_id(),
-			1,
-			1000,
-		)
-		.await
-		.expect("Record transfer");
-		ChainTransferStore::take_and_record_transfer_local(
-			&mut *pool.acquire().await.expect("should get db"),
-			1,
-			&Bob.to_account_id(),
-			1,
-			1000,
-			1,
-			0,
-			100,
-		)
-		.await
-		.expect("Take transfer");
-
-		sqlx::query("update notebook_status set open_time = now() - interval '2 minutes' where notebook_number = 1")
-			.execute(&pool)
-			.await.expect("Update notebook status");
-
-		let notary_id = 1;
-		let (completed_notebook_sender, _) = NotebookHeaderStream::channel();
-
-		let mut closer = NotebookCloser {
-			pool: pool.clone(),
-			keystore: keystore.clone(),
-			notary_id,
-			client: MainchainClient::new(vec![ctx.ws_url.clone()]),
-			completed_notebook_sender,
-		};
-		assert_ok!(&closer.try_rotate_notebook().await);
-
-		assert_ok!(&closer.try_close_notebook().await);
-
-		assert_ok!(&closer.try_get_auditors().await);
-		let mut db = pool.acquire().await.expect("should get db");
-		let auditors = NotebookAuditorStore::get_auditors(&mut *db, 1)
-			.await
-			.expect("should get auditors");
-
-		let notebook = NotebookStore::load(&mut *db, 1).await.expect("should load notebook");
-		assert_eq!(notebook.header.chain_transfers.len(), 1);
-		let bytes = notebook.encode();
-		assert_eq!(Notebook::decode(&mut bytes.as_slice()).expect("should decode"), notebook);
-
-		let (params, finalized_block_needed) =
-			NotebookCloser::get_audit_params(&mut *db, &closer.keystore, 1)
-				.await
-				.expect("should get params");
-
-		assert!(NotebookCloser::get_audit_signature(
-			&pool,
-			auditors[0].public,
-			1,
-			None,
-			vec![ctx.ws_url.clone()],
-			finalized_block_needed,
-			params
-		)
-		.await
-		.unwrap_err()
-		.to_string()
-		.contains("InvalidNotarySignature"));
-	}
 
 	#[sqlx::test]
 	async fn test_notebook_cycle(pool: PgPool) -> anyhow::Result<()> {
@@ -678,8 +405,6 @@ mod tests {
 		} else {
 			test_context().await
 		};
-		let genesis = ctx.client.backend().genesis_hash().await.expect("Get genesis hash");
-		BlockMetaStore::start(&pool, genesis).await?;
 		let bob_id = dev::bob().public_key().to_account_id();
 
 		let ws_url = ctx.ws_url.clone();
@@ -747,12 +472,10 @@ mod tests {
 				.storage()
 				.at_latest()
 				.await?
-				.fetch(
-					&storage().localchain_relay().account_origin_last_changed_notebook_by_notary(
-						1,
-						AccountOrigin { notebook_number: 1, account_uid: 1 }
-					)
-				)
+				.fetch(&storage().notebook().account_origin_last_changed_notebook_by_notary(
+					1,
+					AccountOrigin { notebook_number: 1, account_uid: 1 }
+				))
 				.await?,
 			Some(1),
 			"Should have updated Bob's last change notebook"
@@ -763,20 +486,28 @@ mod tests {
 				.storage()
 				.at_latest()
 				.await?
-				.fetch(&storage().localchain_relay().notebook_changed_accounts_root_by_notary(1, 1))
+				.fetch(&storage().notebook().notebook_changed_accounts_root_by_notary(1, 1))
 				.await?,
 			next_header.changed_accounts_root.into(),
 			"Should have updated Bob's last change notebook"
 		);
 
+		let last_notary_details = ctx
+			.client
+			.storage()
+			.at_latest()
+			.await?
+			.fetch(&storage().notebook().last_notebook_details_by_notary(1))
+			.await?
+			.expect("should get details")
+			.0;
+
 		assert_eq!(
-			ctx.client
-				.storage()
-				.at_latest()
-				.await?
-				.fetch(&storage().localchain_relay().last_notebook_number_by_notary(1,))
-				.await?,
-			Some((1, next_header.pinned_to_block_number)),
+			last_notary_details[0].block_number, next_header.block_number,
+			"Should have updated the last block number"
+		);
+		assert_eq!(
+			last_notary_details[0].notebook_number, 1,
 			"Should have updated the last notebook number"
 		);
 
@@ -807,7 +538,7 @@ mod tests {
 	}
 
 	async fn submit_balance_change_to_notary(pool: &PgPool, bob_nonce: u32) -> anyhow::Result<()> {
-		let result = BalanceChangeStore::apply_balance_changes(
+		let result = NotarizationsStore::apply(
 			&pool,
 			1,
 			vec![BalanceChange {
@@ -827,6 +558,7 @@ mod tests {
 			}
 			.sign(Bob.pair())
 			.clone()],
+			vec![],
 		)
 		.await?;
 		assert_eq!(result.notebook_number, 1);
@@ -852,7 +584,7 @@ mod tests {
 		client
 			.tx()
 			.sign_and_submit_then_watch_default(
-				&tx().localchain_relay().send_to_localchain(1000u32.into(), 1, bob_nonce),
+				&tx().chain_transfer().send_to_localchain(1000u32.into(), 1, bob_nonce),
 				&dev::bob(),
 			)
 			.await?

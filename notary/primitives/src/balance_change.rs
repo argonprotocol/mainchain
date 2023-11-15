@@ -10,8 +10,6 @@ use sp_core::crypto::Pair;
 
 use crate::{AccountId, AccountOriginUid, AccountType, NotaryId, Note, NoteType, NotebookNumber};
 
-pub const MAX_BALANCESET_CHANGES: u32 = 25;
-
 #[derive(
 	Clone,
 	PartialEq,

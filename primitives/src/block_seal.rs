@@ -2,22 +2,20 @@ use codec::{Decode, Encode};
 use frame_support::{CloneNoBound, EqNoBound, Parameter, PartialEqNoBound};
 use scale_info::TypeInfo;
 use serde::{Deserialize, Serialize};
-use sp_api::BlockT;
-use sp_core::{
-	crypto::{AccountId32, KeyTypeId},
-	ConstU32, MaxEncodedLen, OpaquePeerId, U256,
-};
+use sp_core::{crypto::KeyTypeId, ConstU32, MaxEncodedLen, OpaquePeerId};
 use sp_runtime::{BoundedVec, RuntimeDebug};
-use sp_std::{collections::btree_map::BTreeMap, vec::Vec};
 
-pub const BLOCK_SEAL_KEY_TYPE: KeyTypeId = KeyTypeId(*b"ulx_");
+pub use ulx_notary_primitives::{
+	BlockVoteEligibility, BlockVoteSource, BlockVotingPower, VoteSource, VotingMinimum,
+};
+pub const BLOCK_SEAL_KEY_TYPE: KeyTypeId = KeyTypeId(*b"seal");
 
 // sr25519 signatures are non deterministic, so we use ed25519 for deterministic signatures since
 // these are part of the nonce hash
 pub mod app {
 	use sp_application_crypto::{app_crypto, ed25519};
 
-	app_crypto!(ed25519, sp_core::crypto::KeyTypeId(*b"ulx_"));
+	app_crypto!(ed25519, sp_core::crypto::KeyTypeId(*b"seal"));
 }
 
 sp_application_crypto::with_pair! {
@@ -27,53 +25,6 @@ pub type BlockSealAuthoritySignature = app::Signature;
 pub type BlockSealAuthorityId = app::Public;
 
 pub type MaxMinerRpcHosts = ConstU32<4>;
-
-#[derive(Clone, PartialEq, Eq, Encode, Decode, RuntimeDebug, TypeInfo, Deserialize, Serialize)]
-pub struct BlockProof {
-	pub tax_proof_id: u32,
-	pub tax_amount: u128,
-	pub seal_stampers: Vec<SealStamper>,
-	pub author_id: AccountId32,
-}
-
-pub const SEAL_NONCE_PREFIX: [u8; 14] = *b"ulx_block_seal";
-
-#[derive(Clone, PartialEq, Eq, Encode, Decode, RuntimeDebug, TypeInfo)]
-pub struct SealNonceHashMessage<Hash> {
-	pub prefix: [u8; 14],
-	pub tax_proof_id: u32,
-	pub tax_amount: u128,
-	pub parent_hash: Hash,
-	pub author_id: AccountId32,
-	pub seal_stampers: Vec<SealStamper>,
-}
-
-pub const SEALER_SIGNATURE_PREFIX: [u8; 14] = *b"ulx_sealer_sig";
-
-#[derive(Clone, PartialEq, Eq, Encode, Decode, RuntimeDebug, TypeInfo)]
-pub struct SealerSignatureMessage<Hash, AuthorityId> {
-	pub prefix: [u8; 14],
-	pub tax_proof_id: u32,
-	pub tax_amount: u128,
-	pub parent_hash: Hash,
-	pub author_id: AccountId32,
-	pub seal_stampers: Vec<AuthorityId>,
-}
-
-#[derive(Clone, PartialEq, Eq, Encode, Decode, RuntimeDebug, TypeInfo, Deserialize, Serialize)]
-pub struct SealStamper {
-	pub authority_idx: u16,
-	pub signature: Option<BoundedVec<u8, ConstU32<64>>>,
-}
-
-sp_api::decl_runtime_apis! {
-	pub trait MiningAuthorityApis {
-		fn authorities() -> Vec<BlockSealAuthorityId>;
-		fn authorities_by_index() -> BTreeMap<u16, BlockSealAuthorityId>;
-		fn active_authorities() -> u16;
-		fn block_peers(account_id: AccountId32) -> Vec<AuthorityDistance<BlockSealAuthorityId>>;
-	}
-}
 
 #[derive(
 	PartialEqNoBound, EqNoBound, CloneNoBound, Encode, Decode, RuntimeDebug, TypeInfo, MaxEncodedLen,
@@ -131,38 +82,14 @@ impl MaxEncodedLen for PeerId {
 	}
 }
 
-pub trait AuthorityProvider<AuthorityId, Block, AccountId>
-where
-	Block: BlockT,
-{
-	fn miner_zero() -> Option<(u16, AuthorityId, Vec<Host>)>;
-	fn authorities() -> Vec<AuthorityId>;
-	fn authorities_by_index() -> BTreeMap<u16, AuthorityId>;
-	fn authority_count() -> u16;
-	fn is_active(authority_id: &AuthorityId) -> bool;
-	fn get_authority(author: AccountId) -> Option<AuthorityId>;
-	fn block_peers(
-		block_hash: &Block::Hash,
-		account_id: AccountId32,
-		closest: u8,
-	) -> Vec<AuthorityDistance<AuthorityId>>;
-}
-
-pub trait BlockSealersProvider<BlockNumber, AuthorityId> {
-	/// Returns block seal validators for the given block number that are still active.
-	fn get_active_block_sealers_of(block_number: BlockNumber)
-		-> Vec<(u16, AuthorityId, Vec<Host>)>;
-
-	fn is_using_proof_of_compute() -> bool;
-}
+pub type AuthorityIndex = u16;
 
 #[derive(PartialEq, Eq, Clone, Encode, Decode, RuntimeDebug, TypeInfo, MaxEncodedLen)]
-pub struct AuthorityDistance<AuthorityId> {
+pub struct MiningAuthority<AuthorityId> {
 	#[codec(compact)]
-	pub authority_index: u16,
+	pub authority_index: AuthorityIndex,
 	pub authority_id: AuthorityId,
 	pub peer_id: PeerId,
-	pub distance: U256,
 	pub rpc_hosts: BoundedVec<Host, MaxMinerRpcHosts>,
 }
 
@@ -185,4 +112,16 @@ pub struct Host {
 	#[codec(compact)]
 	pub port: u16,
 	pub is_secure: bool,
+}
+
+impl Host {
+	#[cfg(feature = "std")]
+	pub fn get_url(&self) -> String {
+		format!(
+			"{}://{}:{}",
+			if self.is_secure { "wss" } else { "ws" },
+			std::net::Ipv4Addr::from(self.ip),
+			self.port
+		)
+	}
 }

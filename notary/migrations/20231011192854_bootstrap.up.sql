@@ -5,27 +5,24 @@ CREATE TABLE IF NOT EXISTS balance_tips
     last_changed_notebook integer NOT NULL
 );
 
-CREATE TABLE IF NOT EXISTS balance_changes (
-    notebook_number integer NOT NULL,
-    changeset jsonb NOT NULL
+
+CREATE TABLE IF NOT EXISTS block_sync_lock (
+    key integer PRIMARY KEY
 );
 
-CREATE INDEX IF NOT EXISTS balance_changes_notebook_number ON balance_changes (notebook_number);
+INSERT INTO block_sync_lock (key) VALUES (1);
 
 CREATE TABLE  IF NOT EXISTS blocks (
-    block_number integer PRIMARY KEY ,
-    block_hash bytea NOT NULL,
+    block_hash bytea NOT NULL PRIMARY KEY,
     parent_hash bytea NOT NULL,
+    block_number integer NOT NULL,
+    block_vote_minimum varchar NOT NULL,
+    block_vote_source integer NOT NULL,
+    this_notary_notebook_number integer,
+    parent_voting_key bytea NOT NULL,
+    is_finalized boolean NOT NULL,
+    finalized_time timestamptz,
     received_time timestamptz NOT NULL
-);
-
-CREATE TABLE IF NOT EXISTS block_meta
-(
-    key integer PRIMARY KEY,
-    finalized_block_number integer NOT NULL,
-    finalized_block_hash bytea NOT NULL,
-    best_block_number integer NOT NULL,
-    best_block_hash bytea NOT NULL
 );
 
 CREATE TABLE IF NOT EXISTS chain_transfers
@@ -34,11 +31,24 @@ CREATE TABLE IF NOT EXISTS chain_transfers
     account_id bytea NOT NULL,
     account_nonce integer NULL,
     amount varchar NOT NULL,
-    finalized_block integer NULL,
+    finalized_block_number integer NULL,
     included_in_notebook_number integer NULL
 );
 
 CREATE INDEX IF NOT EXISTS chain_transfers_included_in_notebook_number ON chain_transfers (included_in_notebook_number);
+
+
+CREATE TABLE  IF NOT EXISTS registered_keys (
+    public bytea PRIMARY KEY,
+    finalized_block_number integer NOT NULL
+);
+CREATE TABLE IF NOT EXISTS notarizations (
+     notebook_number integer NOT NULL,
+     balance_changes jsonb NOT NULL,
+     block_votes jsonb NOT NULL
+);
+
+CREATE INDEX IF NOT EXISTS notarizations_notebook_number ON notarizations (notebook_number);
 
 CREATE TABLE IF NOT EXISTS notebook_origins (
     account_id bytea NOT NULL,
@@ -54,45 +64,56 @@ CREATE UNIQUE INDEX IF NOT EXISTS notebook_origins_uid_notebook_number ON notebo
 CREATE TABLE IF NOT EXISTS notebooks (
     notebook_number INTEGER PRIMARY KEY NOT NULL,
     new_account_origins jsonb NOT NULL,
-    change_merkle_leafs BYTEA[] NOT NULL
+    change_merkle_leafs BYTEA[] NOT NULL,
+    block_votes jsonb NOT NULL,
+    hash BYTEA NOT NULL,
+    signature BYTEA NOT NULL,
+    last_updated timestamptz NOT NULL default now()
 );
 
-CREATE TABLE IF NOT EXISTS notebook_auditors (
-    notebook_number INTEGER NOT NULL,
-    public  bytea NOT NULL,
-	rpc_urls varchar[] NOT NULL,
-	signature bytea NULL,
-	auditor_order integer not null,
-	attempts integer NOT NULL default 0,
-	last_attempt timestamptz NULL,
-    PRIMARY KEY (notebook_number, public)
+CREATE TABLE IF NOT EXISTS notebooks_raw (
+     notebook_number INTEGER PRIMARY KEY NOT NULL,
+     encoded BYTEA NOT NULL
+);
+
+CREATE TABLE IF NOT EXISTS notebook_secrets (
+    notebook_number integer NOT NULL PRIMARY KEY,
+    secret bytea NOT NULL
 );
 
 CREATE TABLE IF NOT EXISTS notebook_headers (
     notebook_number INTEGER PRIMARY KEY NOT NULL,
     version INTEGER NOT NULL,
     hash BYTEA,
+    block_number INTEGER NOT NULL,
     finalized_block_number INTEGER,
-    pinned_to_block_number INTEGER,
-    starting_best_block_number INTEGER NOT NULL,
     start_time timestamptz NOT NULL,
     end_time timestamptz NULL,
     notary_id INTEGER NOT NULL,
     tax varchar,
     chain_transfers jsonb NOT NULL,
     changed_accounts_root BYTEA NOT NULL,
-    changed_account_origins jsonb NOT NULL
+    changed_account_origins jsonb NOT NULL,
+    block_votes_root BYTEA NOT NULL,
+    block_votes_count integer NOT NULL,
+    block_voting_power varchar NOT NULL,
+    blocks_with_votes bytea[] NOT NULL,
+    secret_hash BYTEA NOT NULL,
+    parent_secret BYTEA NULL,
+    best_nonces jsonb NOT NULL,
+    last_updated timestamptz NOT NULL default now()
 );
 
 CREATE TABLE IF NOT EXISTS notebook_status (
     notebook_number INTEGER NOT NULL,
     chain_transfers INTEGER NOT NULL default 0,
+    block_votes INTEGER NOT NULL default 0,
+    balance_changes INTEGER NOT NULL default 0,
+    notarizations INTEGER NOT NULL default 0,
     step INTEGER NOT NULL,
     open_time timestamptz NOT NULL,
     ready_for_close_time timestamptz NULL,
     closed_time timestamptz NULL,
-    get_auditors_time timestamptz NULL,
-    audited_time timestamptz NULL,
     submitted_time timestamptz NULL,
     finalized_time timestamptz NULL
 );
@@ -111,16 +132,29 @@ BEGIN
     RETURN NEW;
 END;
 $$ LANGUAGE plpgsql;
+CREATE OR REPLACE FUNCTION update_last_modified()
+    RETURNS TRIGGER AS $$
+BEGIN
+    NEW.last_updated := NOW();
+    RETURN NEW;
+END;
+$$ LANGUAGE plpgsql;
 
 CREATE TRIGGER immutable_finalized_notebook
     BEFORE UPDATE ON notebook_headers
     FOR EACH ROW
 EXECUTE PROCEDURE check_notebook_finalized();
 
-CREATE TABLE  IF NOT EXISTS registered_keys (
-    public bytea PRIMARY KEY,
-    finalized_block_number integer NOT NULL
-);
+CREATE TRIGGER update_header_last_modified
+    BEFORE UPDATE ON notebook_headers
+    FOR EACH ROW
+EXECUTE PROCEDURE update_last_modified();
+
+CREATE TRIGGER update_notebook_last_modified
+    BEFORE UPDATE ON notebooks
+    FOR EACH ROW
+EXECUTE PROCEDURE update_last_modified();
+
 
 -- Create 5 sequences so that we can safely close a notebook without any overlap
 -- The sequence in use at any given moment is notebook_number % 5

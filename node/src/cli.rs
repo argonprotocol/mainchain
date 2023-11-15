@@ -9,10 +9,6 @@ pub struct Cli {
 	#[clap(flatten)]
 	pub run: RunCmd,
 
-	/// How many mining threads to run
-	#[arg(long)]
-	pub miners: Option<u32>,
-
 	/// Enable an account to author blocks
 	///
 	/// The account address must be given in SS58 format.

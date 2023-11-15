@@ -25,7 +25,7 @@
       },
       {
         "ordinal": 4,
-        "name": "finalized_block",
+        "name": "finalized_block_number",
         "type_info": "Int4"
       },
       {

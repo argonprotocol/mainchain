@@ -5538,46 +5538,6 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "61807f77802ff30975e01f4f071c8ba10c022052f98b3294119f3e615d13e5be"
 
 [[package]]
-name = "notary"
-version = "0.0.1"
-dependencies = [
- "anyhow",
- "async-trait",
- "binary-merkle-tree 4.0.0-dev",
- "chrono",
- "clap",
- "frame-support",
- "futures",
- "hex",
- "jsonrpsee 0.20.1",
- "parity-scale-codec",
- "parking_lot 0.12.1",
- "sc-cli",
- "sc-keystore",
- "sc-service",
- "sc-utils",
- "scale-info",
- "serde",
- "serde_json",
- "sp-core 21.0.0 (git+https://github.com/paritytech/polkadot-sdk.git?branch=release-polkadot-v1.1.0)",
- "sp-keyring",
- "sp-keystore 0.27.0 (git+https://github.com/paritytech/polkadot-sdk.git?branch=release-polkadot-v1.1.0)",
- "sp-runtime 24.0.0 (git+https://github.com/paritytech/polkadot-sdk.git?branch=release-polkadot-v1.1.0)",
- "sqlx",
- "subxt",
- "subxt-signer",
- "thiserror",
- "tokio",
- "tokio-stream",
- "tracing",
- "tracing-subscriber 0.3.17",
- "ulixee-client",
- "ulx-notary-audit",
- "ulx-notary-primitives",
- "ulx-testing",
-]
-
-[[package]]
 name = "nu-ansi-term"
 version = "0.46.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -5876,14 +5836,16 @@ dependencies = [
 ]
 
 [[package]]
-name = "pallet-block-seal"
+name = "pallet-block-rewards"
 version = "0.0.1"
 dependencies = [
+ "binary-merkle-tree 4.0.0-dev",
  "env_logger",
  "frame-benchmarking",
  "frame-support",
  "frame-system",
  "log",
+ "pallet-balances",
  "parity-scale-codec",
  "scale-info",
  "sp-core 21.0.0 (git+https://github.com/paritytech/polkadot-sdk.git?branch=release-polkadot-v1.1.0)",
@@ -5894,7 +5856,27 @@ dependencies = [
 ]
 
 [[package]]
-name = "pallet-bonds"
+name = "pallet-block-seal"
+version = "0.0.1"
+dependencies = [
+ "binary-merkle-tree 4.0.0-dev",
+ "env_logger",
+ "frame-benchmarking",
+ "frame-support",
+ "frame-system",
+ "log",
+ "parity-scale-codec",
+ "scale-info",
+ "sp-core 21.0.0 (git+https://github.com/paritytech/polkadot-sdk.git?branch=release-polkadot-v1.1.0)",
+ "sp-io 23.0.0 (git+https://github.com/paritytech/polkadot-sdk.git?branch=release-polkadot-v1.1.0)",
+ "sp-keyring",
+ "sp-runtime 24.0.0 (git+https://github.com/paritytech/polkadot-sdk.git?branch=release-polkadot-v1.1.0)",
+ "sp-std 8.0.0 (git+https://github.com/paritytech/polkadot-sdk.git?branch=release-polkadot-v1.1.0)",
+ "ulx-primitives",
+]
+
+[[package]]
+name = "pallet-bond"
 version = "0.0.1"
 dependencies = [
  "env_logger",
@@ -5913,22 +5895,25 @@ dependencies = [
 ]
 
 [[package]]
-name = "pallet-difficulty"
+name = "pallet-chain-transfer"
 version = "0.0.1"
 dependencies = [
+ "binary-merkle-tree 9.0.0",
  "env_logger",
  "frame-benchmarking",
  "frame-support",
  "frame-system",
  "log",
- "pallet-timestamp",
+ "pallet-balances",
  "parity-scale-codec",
  "scale-info",
  "sp-api",
  "sp-core 21.0.0 (git+https://github.com/paritytech/polkadot-sdk.git?branch=release-polkadot-v1.1.0)",
  "sp-io 23.0.0 (git+https://github.com/paritytech/polkadot-sdk.git?branch=release-polkadot-v1.1.0)",
+ "sp-keyring",
  "sp-runtime 24.0.0 (git+https://github.com/paritytech/polkadot-sdk.git?branch=release-polkadot-v1.1.0)",
  "sp-std 8.0.0 (git+https://github.com/paritytech/polkadot-sdk.git?branch=release-polkadot-v1.1.0)",
+ "ulx-notary-audit",
  "ulx-primitives",
 ]
 
@@ -5956,30 +5941,7 @@ dependencies = [
 ]
 
 [[package]]
-name = "pallet-localchain-relay"
-version = "0.0.1"
-dependencies = [
- "binary-merkle-tree 9.0.0",
- "env_logger",
- "frame-benchmarking",
- "frame-support",
- "frame-system",
- "log",
- "pallet-balances",
- "parity-scale-codec",
- "scale-info",
- "sp-api",
- "sp-core 21.0.0 (git+https://github.com/paritytech/polkadot-sdk.git?branch=release-polkadot-v1.1.0)",
- "sp-io 23.0.0 (git+https://github.com/paritytech/polkadot-sdk.git?branch=release-polkadot-v1.1.0)",
- "sp-keyring",
- "sp-runtime 24.0.0 (git+https://github.com/paritytech/polkadot-sdk.git?branch=release-polkadot-v1.1.0)",
- "sp-std 8.0.0 (git+https://github.com/paritytech/polkadot-sdk.git?branch=release-polkadot-v1.1.0)",
- "ulx-notary-audit",
- "ulx-primitives",
-]
-
-[[package]]
-name = "pallet-mining-slots"
+name = "pallet-mining-slot"
 version = "0.0.1"
 dependencies = [
  "env_logger",
@@ -5988,7 +5950,7 @@ dependencies = [
  "frame-system",
  "log",
  "pallet-balances",
- "pallet-bonds",
+ "pallet-bond",
  "pallet-session",
  "parity-scale-codec",
  "scale-info",
@@ -6016,6 +5978,29 @@ dependencies = [
  "sp-keyring",
  "sp-runtime 24.0.0 (git+https://github.com/paritytech/polkadot-sdk.git?branch=release-polkadot-v1.1.0)",
  "sp-std 8.0.0 (git+https://github.com/paritytech/polkadot-sdk.git?branch=release-polkadot-v1.1.0)",
+ "ulx-primitives",
+]
+
+[[package]]
+name = "pallet-notebook"
+version = "0.0.1"
+dependencies = [
+ "binary-merkle-tree 9.0.0",
+ "env_logger",
+ "frame-benchmarking",
+ "frame-support",
+ "frame-system",
+ "log",
+ "pallet-balances",
+ "parity-scale-codec",
+ "scale-info",
+ "sp-api",
+ "sp-core 21.0.0 (git+https://github.com/paritytech/polkadot-sdk.git?branch=release-polkadot-v1.1.0)",
+ "sp-io 23.0.0 (git+https://github.com/paritytech/polkadot-sdk.git?branch=release-polkadot-v1.1.0)",
+ "sp-keyring",
+ "sp-runtime 24.0.0 (git+https://github.com/paritytech/polkadot-sdk.git?branch=release-polkadot-v1.1.0)",
+ "sp-std 8.0.0 (git+https://github.com/paritytech/polkadot-sdk.git?branch=release-polkadot-v1.1.0)",
+ "ulx-notary-audit",
  "ulx-primitives",
 ]
 
@@ -6182,6 +6167,25 @@ dependencies = [
  "sp-io 23.0.0 (git+https://github.com/paritytech/polkadot-sdk.git?branch=release-polkadot-v1.1.0)",
  "sp-runtime 24.0.0 (git+https://github.com/paritytech/polkadot-sdk.git?branch=release-polkadot-v1.1.0)",
  "sp-std 8.0.0 (git+https://github.com/paritytech/polkadot-sdk.git?branch=release-polkadot-v1.1.0)",
+]
+
+[[package]]
+name = "pallet-vote-eligibility"
+version = "0.0.1"
+dependencies = [
+ "env_logger",
+ "frame-benchmarking",
+ "frame-support",
+ "frame-system",
+ "log",
+ "parity-scale-codec",
+ "scale-info",
+ "sp-api",
+ "sp-core 21.0.0 (git+https://github.com/paritytech/polkadot-sdk.git?branch=release-polkadot-v1.1.0)",
+ "sp-io 23.0.0 (git+https://github.com/paritytech/polkadot-sdk.git?branch=release-polkadot-v1.1.0)",
+ "sp-runtime 24.0.0 (git+https://github.com/paritytech/polkadot-sdk.git?branch=release-polkadot-v1.1.0)",
+ "sp-std 8.0.0 (git+https://github.com/paritytech/polkadot-sdk.git?branch=release-polkadot-v1.1.0)",
+ "ulx-primitives",
 ]
 
 [[package]]
@@ -10683,9 +10687,9 @@ checksum = "734676eb262c623cec13c3155096e08d1f8f29adce39ba17948b18dad1e54142"
 
 [[package]]
 name = "subxt"
-version = "0.32.0"
+version = "0.32.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "86ad149b178bedc983532ed795e0024dcdcb802a7f93377172c8aa6a3429590f"
+checksum = "588b8ce92699eeb06290f4fb02dad4f7e426c4e6db4d53889c6bcbc808cf24ac"
 dependencies = [
  "async-trait",
  "base58",
@@ -10718,9 +10722,9 @@ dependencies = [
 
 [[package]]
 name = "subxt-codegen"
-version = "0.32.0"
+version = "0.32.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "b82d423038ed4e49b1b337b174c6c2a0a01d1f7d60d8094bfa2c1bce29ac41aa"
+checksum = "98f5a534c8d475919e9c845d51fc2316da4fcadd04fe17552d932d2106de930e"
 dependencies = [
  "frame-metadata 16.0.0",
  "heck",
@@ -10738,9 +10742,9 @@ dependencies = [
 
 [[package]]
 name = "subxt-lightclient"
-version = "0.32.0"
+version = "0.32.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "5d3aba25e5309150ae74dd75badac9780814292332cfdd79827aff56b354f763"
+checksum = "10fd0ac9b091211f962b6ae19e26cd08e0b86efa064dfb7fac69c8f79f122329"
 dependencies = [
  "futures",
  "futures-util",
@@ -10755,9 +10759,9 @@ dependencies = [
 
 [[package]]
 name = "subxt-macro"
-version = "0.32.0"
+version = "0.32.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "5a32cb896b742c5cc269a3a4da7f090f61e2b8552c7337f5e038e63a9301ea44"
+checksum = "12e8be9ab6fe88b8c13edbe15911e148482cfb905a8b8d5b8d766a64c54be0bd"
 dependencies = [
  "darling 0.20.3",
  "proc-macro-error",
@@ -10767,9 +10771,9 @@ dependencies = [
 
 [[package]]
 name = "subxt-metadata"
-version = "0.32.0"
+version = "0.32.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "9928f1b9679351800285f4acab6980d2b8e04b7a6decfbf71e258ee6e74a2dc8"
+checksum = "b6898275765d36a37e5ef564358e0341cf41b5f3a91683d7d8b859381b65ac8a"
 dependencies = [
  "frame-metadata 16.0.0",
  "parity-scale-codec",
@@ -11552,8 +11556,7 @@ dependencies = [
  "futures",
  "futures-timer",
  "jsonrpsee 0.16.2",
- "num_cpus",
- "pallet-localchain-relay",
+ "pallet-chain-transfer",
  "pallet-transaction-payment",
  "pallet-transaction-payment-rpc",
  "parity-scale-codec",
@@ -11611,16 +11614,16 @@ dependencies = [
  "futures",
  "futures-timer",
  "jsonrpsee 0.16.2",
+ "lazy_static",
  "libp2p 0.52.3",
  "libp2p-identity 0.1.3",
  "log",
  "pallet-balances",
  "pallet-block-seal",
- "pallet-difficulty",
- "pallet-localchain-relay",
- "pallet-mining-slots",
+ "pallet-mining-slot",
  "pallet-session",
  "pallet-timestamp",
+ "pallet-vote-eligibility",
  "parity-scale-codec",
  "parking_lot 0.12.1",
  "rand 0.8.5",
@@ -11673,6 +11676,7 @@ dependencies = [
  "thiserror",
  "tokio",
  "ulx-node-runtime",
+ "ulx-notary",
  "ulx-primitives",
 ]
 
@@ -11689,13 +11693,14 @@ dependencies = [
  "frame-try-runtime",
  "pallet-authorship",
  "pallet-balances",
+ "pallet-block-rewards",
  "pallet-block-seal",
- "pallet-bonds",
- "pallet-difficulty",
+ "pallet-bond",
+ "pallet-chain-transfer",
  "pallet-grandpa",
- "pallet-localchain-relay",
- "pallet-mining-slots",
+ "pallet-mining-slot",
  "pallet-notaries",
+ "pallet-notebook",
  "pallet-offences",
  "pallet-session",
  "pallet-sudo",
@@ -11703,6 +11708,7 @@ dependencies = [
  "pallet-transaction-payment",
  "pallet-transaction-payment-rpc-runtime-api",
  "pallet-tx-pause",
+ "pallet-vote-eligibility",
  "parity-scale-codec",
  "scale-info",
  "smallvec",
@@ -11720,6 +11726,47 @@ dependencies = [
  "sp-version",
  "substrate-wasm-builder",
  "ulx-primitives",
+]
+
+[[package]]
+name = "ulx-notary"
+version = "0.0.1"
+dependencies = [
+ "anyhow",
+ "async-trait",
+ "binary-merkle-tree 4.0.0-dev",
+ "chrono",
+ "clap",
+ "frame-support",
+ "futures",
+ "getrandom 0.2.10",
+ "hex",
+ "jsonrpsee 0.20.1",
+ "parity-scale-codec",
+ "parking_lot 0.12.1",
+ "sc-cli",
+ "sc-keystore",
+ "sc-service",
+ "sc-utils",
+ "scale-info",
+ "serde",
+ "serde_json",
+ "sp-core 21.0.0 (git+https://github.com/paritytech/polkadot-sdk.git?branch=release-polkadot-v1.1.0)",
+ "sp-keyring",
+ "sp-keystore 0.27.0 (git+https://github.com/paritytech/polkadot-sdk.git?branch=release-polkadot-v1.1.0)",
+ "sp-runtime 24.0.0 (git+https://github.com/paritytech/polkadot-sdk.git?branch=release-polkadot-v1.1.0)",
+ "sqlx",
+ "subxt",
+ "subxt-signer",
+ "thiserror",
+ "tokio",
+ "tokio-stream",
+ "tracing",
+ "tracing-subscriber 0.3.17",
+ "ulixee-client",
+ "ulx-notary-audit",
+ "ulx-notary-primitives",
+ "ulx-testing",
 ]
 
 [[package]]
@@ -11765,6 +11812,7 @@ version = "0.0.1"
 dependencies = [
  "async-trait",
  "frame-support",
+ "impl-trait-for-tuples",
  "parity-scale-codec",
  "scale-info",
  "serde",
@@ -11775,6 +11823,7 @@ dependencies = [
  "sp-runtime 24.0.0 (git+https://github.com/paritytech/polkadot-sdk.git?branch=release-polkadot-v1.1.0)",
  "sp-std 8.0.0 (git+https://github.com/paritytech/polkadot-sdk.git?branch=release-polkadot-v1.1.0)",
  "thiserror",
+ "ulx-notary-audit",
  "ulx-notary-primitives",
 ]
 
@@ -11790,6 +11839,47 @@ dependencies = [
  "tracing",
  "tracing-subscriber 0.3.17",
  "ulixee-client",
+]
+
+[[package]]
+name = "ulx-voter"
+version = "0.0.1"
+dependencies = [
+ "anyhow",
+ "async-trait",
+ "clap",
+ "frame-support",
+ "futures",
+ "futures-timer",
+ "getrandom 0.2.10",
+ "jsonrpsee 0.20.1",
+ "log",
+ "num_cpus",
+ "parity-scale-codec",
+ "parking_lot 0.12.1",
+ "rand 0.8.5",
+ "sc-cli",
+ "sc-keystore",
+ "sc-service",
+ "sc-utils",
+ "scale-info",
+ "serde",
+ "serde_json",
+ "sp-core 21.0.0 (git+https://github.com/paritytech/polkadot-sdk.git?branch=release-polkadot-v1.1.0)",
+ "sp-keyring",
+ "sp-keystore 0.27.0 (git+https://github.com/paritytech/polkadot-sdk.git?branch=release-polkadot-v1.1.0)",
+ "sp-runtime 24.0.0 (git+https://github.com/paritytech/polkadot-sdk.git?branch=release-polkadot-v1.1.0)",
+ "subxt",
+ "thiserror",
+ "tokio",
+ "tokio-stream",
+ "tracing",
+ "tracing-subscriber 0.3.17",
+ "ulixee-client",
+ "ulx-notary",
+ "ulx-notary-primitives",
+ "ulx-testing",
+ "url",
 ]
 
 [[package]]

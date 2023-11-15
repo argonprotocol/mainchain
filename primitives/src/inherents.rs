@@ -4,24 +4,29 @@ use sp_core::U256;
 use sp_inherents::{InherentData, InherentIdentifier, IsFatalError};
 use sp_runtime::RuntimeDebug;
 
-use crate::{block_seal::BlockProof, ProofOfWorkType};
+use ulx_notary_primitives::{BlockVote, MerkleProof, NotaryId, NotebookNumber};
 
 pub const INHERENT_IDENTIFIER: InherentIdentifier = *b"ulx_seal";
 
-type InherentType = UlxBlockSealInherent;
+type InherentType = BlockSealInherent;
 
 #[derive(Clone, PartialEq, Eq, Encode, Decode, RuntimeDebug, TypeInfo)]
-pub struct UlxBlockSealInherent {
-	pub work_type: ProofOfWorkType,
-	pub tax_nonce: Option<U256>,
-	pub tax_block_proof: Option<BlockProof>,
+pub enum BlockSealInherent {
+	ClosestNonce {
+		nonce: U256,
+		notary_id: NotaryId,
+		block_vote: BlockVote,
+		source_notebook_number: NotebookNumber,
+		source_notebook_proof: MerkleProof,
+	},
+	Continuation,
 }
 
-pub trait UlxBlockSealInherentData {
+pub trait BlockSealInherentData {
 	fn block_seal(&self) -> Result<Option<InherentType>, sp_inherents::Error>;
 }
 
-impl UlxBlockSealInherentData for InherentData {
+impl BlockSealInherentData for InherentData {
 	fn block_seal(&self) -> Result<Option<InherentType>, sp_inherents::Error> {
 		self.get_data(&INHERENT_IDENTIFIER)
 	}
@@ -38,18 +43,18 @@ pub enum InherentError {
 	WrongNonce,
 	/// The proof of work is wrong
 	#[cfg_attr(feature = "std", error("The wrong proof of work was used."))]
-	WrongProofOfWork,
-	/// The inherent wasn't included
-	#[cfg_attr(feature = "std", error("The proof of tax inherent is required and missing."))]
-	MissingProofOfTaxInherent,
+	WrongSource,
+	/// The proof of work is wrong
+	#[cfg_attr(feature = "std", error("The block seal is missing."))]
+	MissingSeal,
 }
 
 impl IsFatalError for InherentError {
 	fn is_fatal_error(&self) -> bool {
 		match self {
 			InherentError::WrongNonce => true,
-			InherentError::WrongProofOfWork => true,
-			InherentError::MissingProofOfTaxInherent => true,
+			InherentError::WrongSource => true,
+			InherentError::MissingSeal => true,
 		}
 	}
 }
@@ -66,19 +71,19 @@ impl InherentError {
 	}
 }
 #[cfg(feature = "std")]
-pub struct InherentDataProvider {
+pub struct BlockSealInherentDataProvider {
 	seal: InherentType,
 }
 
 #[cfg(feature = "std")]
-impl InherentDataProvider {
+impl BlockSealInherentDataProvider {
 	pub fn new(block_seal: InherentType) -> Self {
 		Self { seal: block_seal }
 	}
 }
 
 #[cfg(feature = "std")]
-impl sp_std::ops::Deref for InherentDataProvider {
+impl sp_std::ops::Deref for BlockSealInherentDataProvider {
 	type Target = InherentType;
 
 	fn deref(&self) -> &Self::Target {
@@ -88,7 +93,7 @@ impl sp_std::ops::Deref for InherentDataProvider {
 
 #[cfg(feature = "std")]
 #[async_trait::async_trait]
-impl sp_inherents::InherentDataProvider for InherentDataProvider {
+impl sp_inherents::InherentDataProvider for BlockSealInherentDataProvider {
 	async fn provide_inherent_data(
 		&self,
 		inherent_data: &mut InherentData,

@@ -20,7 +20,7 @@ pub mod pallet {
 	use log::warn;
 	use sp_core::H256;
 	use sp_runtime::{app_crypto::RuntimePublic, BoundedBTreeMap, Saturating};
-
+	use sp_std::vec::Vec;
 	use ulx_primitives::notary::{
 		NotaryId, NotaryMeta, NotaryProvider, NotaryPublic, NotaryRecord, NotarySignature,
 	};
@@ -89,6 +89,7 @@ pub mod pallet {
 	>;
 
 	#[pallet::storage]
+	#[pallet::getter(fn notaries)]
 	pub(super) type ActiveNotaries<T: Config> =
 		StorageValue<_, BoundedVec<NotaryRecordOf<T>, T::MaxActiveNotaries>, ValueQuery>;
 
@@ -271,7 +272,7 @@ pub mod pallet {
 
 			let effective_block = meta_change + frame_system::Pallet::<T>::block_number();
 
-			<QueuedNotaryMetaChanges<T>>::try_mutate(effective_block, |changes| {
+			<QueuedNotaryMetaChanges<T>>::try_mutate(effective_block.clone(), |changes| {
 				changes
 					.try_insert(notary_id, meta.clone())
 					// shouldn't be possible.
@@ -319,6 +320,10 @@ pub mod pallet {
 				return public.verify(message, &signature)
 			}
 			false
+		}
+
+		fn active_notaries() -> Vec<NotaryId> {
+			<ActiveNotaries<T>>::get().into_iter().map(|n| n.notary_id).collect()
 		}
 	}
 }

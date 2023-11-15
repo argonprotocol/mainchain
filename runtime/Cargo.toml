@@ -53,11 +53,13 @@ frame-system-benchmarking = { version = "4.0.0-dev", default-features = false, g
 
 # Local Dependencies
 pallet-block-seal = { version = "0.0.1", default-features = false, path = "../pallets/block_seal" }
-pallet-bonds = { version = "0.0.1", default-features = false, path = "../pallets/bonds" }
-pallet-difficulty = { version = "0.0.1", default-features = false, path = "../pallets/difficulty" }
-pallet-localchain-relay = { version = "0.0.1", default-features = false, path = "../pallets/localchain_relay" }
+pallet-vote-eligibility = { version = "0.0.1", default-features = false, path = "../pallets/vote_eligibility" }
+pallet-block-rewards = { version = "0.0.1", default-features = false, path = "../pallets/block_rewards" }
+pallet-bond = { version = "0.0.1", default-features = false, path = "../pallets/bond" }
+pallet-chain-transfer = { version = "0.0.1", default-features = false, path = "../pallets/chain_transfer" }
+pallet-notebook = { version = "0.0.1", default-features = false, path = "../pallets/notebook" }
 pallet-notaries = { version = "0.0.1", default-features = false, path = "../pallets/notaries" }
-pallet-mining-slots = { version = "0.0.1", default-features = false, path = "../pallets/mining_slots" }
+pallet-mining-slot = { version = "0.0.1", default-features = false, path = "../pallets/mining_slot" }
 ulx-primitives = { version = "0.0.1", default-features = false, path = "../primitives" }
 
 [build-dependencies]
@@ -77,14 +79,16 @@ std = [
 	"pallet-session/std",
 	"pallet-offences/std",
 	"pallet-grandpa/std",
-	"pallet-localchain-relay/std",
+	"pallet-chain-transfer/std",
 	"pallet-notaries/std",
 	"pallet-transaction-payment/std",
 	"pallet-authorship/std",
 	"pallet-transaction-payment-rpc-runtime-api/std",
-	"pallet-mining-slots/std",
-	"pallet-bonds/std",
-	"pallet-difficulty/std",
+	"pallet-mining-slot/std",
+	"pallet-notebook/std",
+	"pallet-bond/std",
+	"pallet-vote-eligibility/std",
+	"pallet-block-rewards/std",
 	"pallet-block-seal/std",
 	"pallet-tx-pause/std",
 	"frame-support/std",
@@ -113,9 +117,10 @@ runtime-benchmarks = [
 	"frame-system/runtime-benchmarks",
 	"pallet-balances/runtime-benchmarks",
 	"pallet-sudo/runtime-benchmarks",
-	"pallet-bonds/runtime-benchmarks",
+	"pallet-bond/runtime-benchmarks",
+	"pallet-block-rewards/runtime-benchmarks",
 	"pallet-notaries/runtime-benchmarks",
-	"pallet-localchain-relay/runtime-benchmarks",
+	"pallet-chain-transfer/runtime-benchmarks",
 	"pallet-offences/runtime-benchmarks",
 	"pallet-grandpa/runtime-benchmarks",
 	"pallet-block-seal/runtime-benchmarks",
@@ -125,7 +130,7 @@ runtime-benchmarks = [
 ]
 try-runtime = [
 	"pallet-notaries/try-runtime",
-	"pallet-localchain-relay/try-runtime",
+	"pallet-chain-transfer/try-runtime",
 	"pallet-offences/try-runtime",
 	"pallet-authorship/try-runtime",
 	"frame-try-runtime/try-runtime",
@@ -134,9 +139,10 @@ try-runtime = [
 	"frame-support/try-runtime",
 	"pallet-balances/try-runtime",
 	"pallet-sudo/try-runtime",
-	"pallet-bonds/try-runtime",
+	"pallet-bond/try-runtime",
 	"pallet-grandpa/try-runtime",
 	"pallet-block-seal/try-runtime",
+	"pallet-block-rewards/try-runtime",
 	"pallet-timestamp/try-runtime",
 	"pallet-transaction-payment/try-runtime",
 	"pallet-session/try-runtime",

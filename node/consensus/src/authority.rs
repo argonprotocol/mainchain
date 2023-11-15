@@ -1,17 +1,17 @@
 use std::{marker::PhantomData, sync::Arc};
 
-use codec::{Decode, Encode};
 use log::warn;
 use sp_api::ProvideRuntimeApi;
 use sp_application_crypto::RuntimeAppPublic;
 use sp_consensus::Error as ConsensusError;
 use sp_core::{crypto::AccountId32, ByteArray};
-use sp_keystore::KeystorePtr;
-use sp_runtime::{app_crypto::AppCrypto, generic::DigestItem, traits::Block as BlockT};
+use sp_keystore::{Keystore, KeystorePtr};
+use sp_runtime::{app_crypto::AppCrypto, traits::Block as BlockT};
 
+use ulx_node_runtime::AccountId;
 use ulx_primitives::{
-	block_seal::{BlockProof, MiningAuthorityApis},
-	BlockSealAuthorityId, BlockSealAuthoritySignature, UlxSeal, ULX_ENGINE_ID,
+	block_seal::MiningAuthority, digests::BlockSealSignatureDigest, BlockSealAuthorityId,
+	BlockSealAuthoritySignature, MiningAuthorityApis,
 };
 
 use crate::error::Error;
@@ -33,29 +33,45 @@ where
 		Self { client, keystore, _phantom: PhantomData }
 	}
 
-	pub fn block_peers(
+	pub fn block_peer(
 		&self,
 		block_hash: &Block::Hash,
 		account_id: AccountId32,
-	) -> Result<Vec<(u16, BlockSealAuthorityId)>, Error<Block>> {
-		let peers = self
+	) -> Result<Option<MiningAuthority<BlockSealAuthorityId>>, Error<Block>> {
+		let peer = self
 			.client
 			.runtime_api()
-			.block_peers(*block_hash, account_id)
+			.block_peer(*block_hash, account_id)
 			.map_err(|e| Error::StringError(e.to_string()))?;
-		Ok(peers
-			.into_iter()
-			.map(|a| (a.authority_index, a.authority_id))
-			.collect::<Vec<_>>())
+		Ok(peer)
+	}
+
+	pub fn is_block_peer(
+		&self,
+		block_hash: &Block::Hash,
+		account_id: AccountId32,
+	) -> Result<bool, Error<Block>> {
+		let Some(authority) = self.block_peer(block_hash, account_id)? else { return Ok(false) };
+
+		Ok(self.keystore.has_keys(&[(
+			RuntimeAppPublic::to_raw_vec(&authority.authority_id),
+			ulx_primitives::BLOCK_SEAL_KEY_TYPE,
+		)]))
+	}
+
+	pub fn get_compute_authority(&self) -> Option<BlockSealAuthorityId> {
+		self.keystore
+			.ed25519_public_keys(ulx_primitives::BLOCK_SEAL_KEY_TYPE)
+			.get(0)
+			.map(|a| a.clone().into())
 	}
 
 	pub(crate) fn check_if_can_seal(
 		&self,
 		block_hash: &Block::Hash,
-		block_proof: &BlockProof,
-		is_final: bool,
-	) -> Result<(u16, BlockSealAuthorityId, Vec<(u16, BlockSealAuthorityId)>), Error<Block>> {
-		let authorities = match self.block_peers(block_hash, block_proof.author_id.clone()) {
+		account_id: &AccountId32,
+	) -> Result<BlockSealAuthorityId, Error<Block>> {
+		let authority = match self.block_peer(block_hash, account_id.clone()) {
 			Ok(x) => x,
 			Err(err) =>
 				return Err(Error::BlockProposingError(format!(
@@ -64,25 +80,15 @@ where
 				))),
 		};
 
-		if block_proof.seal_stampers.len() < 1 {
-			return Err(Error::InvalidBlockSubmitter.into())
-		}
-
-		let seal_submitter_authority_index = block_proof.seal_stampers[0].authority_idx;
-
-		for (authority_index, authority_id) in authorities.clone() {
+		if let Some(authority) = authority {
 			if !self.keystore.has_keys(&[(
-				RuntimeAppPublic::to_raw_vec(&authority_id),
+				RuntimeAppPublic::to_raw_vec(&authority.authority_id),
 				ulx_primitives::BLOCK_SEAL_KEY_TYPE,
 			)]) {
-				continue
+				return Err(Error::NoActiveAuthorityInKeystore)
 			}
 
-			if is_final && authority_index != seal_submitter_authority_index {
-				return Err(Error::InvalidBlockSubmitter.into())
-			}
-
-			return Ok((authority_index, authority_id.clone(), authorities))
+			return Ok(authority.authority_id)
 		}
 
 		warn!( target: LOG_TARGET,
@@ -120,61 +126,26 @@ where
 		Ok(signature)
 	}
 
-	pub(crate) fn sign_seal(
-		&self,
-		authority_index: u16,
-		authority_id: &BlockSealAuthorityId,
-		header_hash: &Block::Hash,
-		seal: &mut UlxSeal,
-	) -> Result<DigestItem, Error<Block>> {
-		let signature = self.sign_message(authority_id, header_hash.as_ref())?;
-		seal.authority = Some((authority_index, signature));
-
-		Ok(DigestItem::Seal(ULX_ENGINE_ID, seal.encode()))
-	}
-
-	pub fn fetch_ulx_seal(
-		digest: Option<&DigestItem>,
-		hash: Block::Hash,
-	) -> Result<UlxSeal, Error<Block>> {
-		match digest {
-			Some(DigestItem::Seal(id, seal)) =>
-				if id == &ULX_ENGINE_ID {
-					match UlxSeal::decode(&mut &seal[..]) {
-						Ok(seal) => Ok(seal),
-						Err(_) => Err(Error::<Block>::InvalidSeal),
-					}
-				} else {
-					Err(Error::<Block>::WrongEngine(*id))
-				},
-			_ => Err(Error::<Block>::HeaderUnsealed(hash)),
-		}
-	}
-
 	pub(crate) fn verify_seal_signature(
 		client: Arc<C>,
-		seal: &UlxSeal,
+		signature: &BlockSealSignatureDigest,
+		author: &AccountId,
 		parent_hash: &Block::Hash,
 		pre_hash: &Block::Hash,
+		compute_authority: &Option<BlockSealAuthorityId>,
 	) -> Result<(), Error<Block>> {
-		let (authority_index, signature) = match &seal.authority {
-			Some((a, s)) => (a, s),
-			None => return Err(Error::<Block>::InvalidSealSignature.into()),
+		let signature = signature.signature.clone();
+		let mut authority_id = compute_authority.clone();
+		if authority_id.is_none() {
+			authority_id = client
+				.runtime_api()
+				.authority_id_for_account(parent_hash.clone(), author.clone())
+				.map_err(|e| {
+					Error::<Block>::StringError(format!("Error loading authority_id {:?}", e))
+				})?;
 		};
 
-		let authority_id = client
-			.runtime_api()
-			.authorities_by_index(*parent_hash)
-			.map_err(|e| Error::<Block>::StringError(format!("Error loading authorities {:?}", e)))?
-			.into_iter()
-			.find_map(|(index, authority)| {
-				if index == *authority_index {
-					return Some(authority)
-				}
-				None
-			})
-			.ok_or(Error::<Block>::InvalidSealSignerAuthority)?;
-
+		let authority_id = authority_id.ok_or_else(|| Error::<Block>::InvalidBlockSubmitter)?;
 		if !authority_id.verify(&pre_hash.as_ref(), &signature) {
 			return Err(Error::<Block>::InvalidSealSignature.into())
 		}
@@ -194,7 +165,7 @@ mod tests {
 	use sp_keyring::Ed25519Keyring;
 	use sp_keystore::{testing::MemoryKeystore, Keystore};
 
-	use ulx_primitives::block_seal::{AuthorityDistance, PeerId, SealStamper, BLOCK_SEAL_KEY_TYPE};
+	use ulx_primitives::block_seal::{MiningAuthority, PeerId, BLOCK_SEAL_KEY_TYPE};
 
 	use crate::tests::setup_logs;
 
@@ -202,7 +173,7 @@ mod tests {
 
 	#[derive(Default, Clone)]
 	struct TestApi {
-		pub authorities_by_index: BTreeMap<u16, BlockSealAuthorityId>,
+		pub authority_id_by_index: BTreeMap<u16, BlockSealAuthorityId>,
 		pub block_peer_order: Vec<u16>,
 	}
 
@@ -221,18 +192,18 @@ mod tests {
 	sp_api::mock_impl_runtime_apis! {
 		impl MiningAuthorityApis<Block> for RuntimeApi {
 			fn authorities() -> Vec<BlockSealAuthorityId>{
-				self.inner.authorities_by_index.iter().map(|(_, id)| id.clone()).collect::<Vec<_>>()
+				self.inner.authority_id_by_index.iter().map(|(_, id)| id.clone()).collect::<Vec<_>>()
 			}
-			fn authorities_by_index() -> BTreeMap<u16, BlockSealAuthorityId>{
-				self.inner.authorities_by_index.clone()
+			fn authority_id_by_index() -> BTreeMap<u16, BlockSealAuthorityId>{
+				self.inner.authority_id_by_index.clone()
 			}
 			fn active_authorities() -> u16{
-				self.inner.authorities_by_index.len() as u16
+				self.inner.authority_id_by_index.len() as u16
 			}
-			fn block_peers(_: AccountId32) -> Vec<AuthorityDistance<BlockSealAuthorityId>> {
+			fn block_peers(_: AccountId32) -> Vec<MiningAuthority<BlockSealAuthorityId>> {
 				self.inner.block_peer_order.clone().into_iter().map(|a| {
-					let id= self.inner.authorities_by_index.get(&a).unwrap();
-					AuthorityDistance {
+					let id= self.inner.authority_id_by_index.get(&a).unwrap();
+					MiningAuthority {
 						authority_id: id.clone(),
 						distance: 0u32.into(),
 						authority_index: a,
@@ -257,7 +228,7 @@ mod tests {
 		setup_logs();
 		let keystore = create_keystore(Ed25519Keyring::Alice);
 		let api = TestApi {
-			authorities_by_index: vec![(0, Ed25519Keyring::Alice.public().into())]
+			authority_id_by_index: vec![(0, Ed25519Keyring::Alice.public().into())]
 				.into_iter()
 				.collect(),
 			block_peer_order: vec![0],
@@ -280,7 +251,7 @@ mod tests {
 		setup_logs();
 		let [bob_keystore] = [create_keystore(Ed25519Keyring::Bob)];
 		let api = TestApi {
-			authorities_by_index: vec![
+			authority_id_by_index: vec![
 				(0, Ed25519Keyring::Alice.public().into()),
 				(1, Ed25519Keyring::Bob.public().into()),
 			]
@@ -309,7 +280,7 @@ mod tests {
 		setup_logs();
 		let keystore = create_keystore(Ed25519Keyring::Alice);
 		let api = TestApi {
-			authorities_by_index: vec![
+			authority_id_by_index: vec![
 				(2, Ed25519Keyring::Bob.public().into()),
 				(15, Ed25519Keyring::Alice.public().into()),
 			]
@@ -330,8 +301,8 @@ mod tests {
 		assert_eq!(auth_idx, 15);
 		assert_eq!(auth_id, Ed25519Keyring::Alice.public().into());
 
-		let mut seal = UlxSeal { easing: 0, nonce: [1; 32], authority: None };
-		assert_ok!(sealer.sign_seal(auth_idx, &auth_id, &block_hash, &mut seal));
+		let mut seal = BlockSealDigest { easing: 0, nonce: [1; 32], authority: None };
+		assert_ok!(sealer.create_signature_digest(auth_idx, &auth_id, &block_hash, &mut seal));
 		assert_eq!(&seal.authority.clone().map(|a| a.0), &Some(15u16));
 
 		assert_ok!(AuthoritySealer::<Block, _>::verify_seal_signature(

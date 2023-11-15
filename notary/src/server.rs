@@ -9,13 +9,12 @@ use jsonrpsee::{
 };
 use sc_utils::notification::{NotificationSender, NotificationStream, TracingKeyStr};
 use serde::Serialize;
-use sp_core::{bounded::BoundedVec, ConstU32, H256};
 use sqlx::PgPool;
 use tokio::net::ToSocketAddrs;
 
 use ulx_notary_primitives::{
-	BalanceChange, BalanceProof, BalanceTip, NotaryId, Notebook, NotebookHeader, NotebookNumber,
-	MAX_BALANCESET_CHANGES,
+	BalanceProof, BalanceTip, NotarizationBalanceChangeset, NotarizationBlockVotes, NotaryId,
+	Notebook, NotebookHeader, NotebookNumber,
 };
 
 use crate::{
@@ -24,7 +23,7 @@ use crate::{
 		notebook::NotebookRpcServer,
 	},
 	stores::{
-		balance_change::BalanceChangeStore, block_meta::BlockMetaStore, notebook::NotebookStore,
+		notarizations::NotarizationsStore, notebook::NotebookStore,
 		notebook_header::NotebookHeaderStore,
 	},
 	Error,
@@ -50,14 +49,11 @@ pub struct NotaryServer {
 impl NotaryServer {
 	pub async fn start(
 		notary_id: NotaryId,
-		genesis_block_hash: H256,
 		pool: PgPool,
 		addrs: impl ToSocketAddrs,
 	) -> anyhow::Result<Self> {
 		let (completed_notebook_sender, completed_notebook_stream) =
 			NotebookHeaderStream::channel();
-
-		BlockMetaStore::start(&pool, genesis_block_hash).await?;
 
 		let server = Server::builder().build(addrs).await?;
 
@@ -95,10 +91,13 @@ impl NotebookRpcServer for NotaryServer {
 				balance: balance_tip.balance,
 			})
 	}
-	async fn subscribe_headers(&self, pending: PendingSubscriptionSink) -> SubscriptionResult {
-		let stream = self.completed_notebook_stream.subscribe(1_000);
-
-		pipe_from_stream_and_drop(pending, stream).await.map_err(Into::into)
+	async fn get_header(
+		&self,
+		notebook_number: NotebookNumber,
+	) -> Result<NotebookHeader, ErrorObjectOwned> {
+		NotebookHeaderStore::load(&self.pool, notebook_number)
+			.await
+			.map_err(from_crate_error)
 	}
 
 	async fn get(&self, notebook_number: NotebookNumber) -> Result<Notebook, ErrorObjectOwned> {
@@ -111,13 +110,25 @@ impl NotebookRpcServer for NotaryServer {
 		Ok(NotebookStore::load(&mut *db, notebook_number).await.map_err(from_crate_error)?)
 	}
 
-	async fn get_header(
+	async fn get_raw_body(
 		&self,
 		notebook_number: NotebookNumber,
-	) -> Result<NotebookHeader, ErrorObjectOwned> {
-		NotebookHeaderStore::load(&self.pool, notebook_number)
+	) -> Result<Vec<u8>, ErrorObjectOwned> {
+		let mut db = self
+			.pool
+			.acquire()
 			.await
-			.map_err(from_crate_error)
+			.map_err(|e| from_crate_error(Error::Database(e.to_string())))?;
+
+		Ok(NotebookStore::load_raw(&mut *db, notebook_number)
+			.await
+			.map_err(from_crate_error)?)
+	}
+
+	async fn subscribe_headers(&self, pending: PendingSubscriptionSink) -> SubscriptionResult {
+		let stream = self.completed_notebook_stream.subscribe(1_000);
+
+		pipe_from_stream_and_drop(pending, stream).await.map_err(Into::into)
 	}
 }
 
@@ -125,12 +136,14 @@ impl NotebookRpcServer for NotaryServer {
 impl LocalchainRpcServer for NotaryServer {
 	async fn notarize(
 		&self,
-		balance_changeset: BoundedVec<BalanceChange, ConstU32<MAX_BALANCESET_CHANGES>>,
+		balance_changeset: NotarizationBalanceChangeset,
+		block_votes: NotarizationBlockVotes,
 	) -> Result<BalanceChangeResult, ErrorObjectOwned> {
-		BalanceChangeStore::apply_balance_changes(
+		NotarizationsStore::apply(
 			&self.pool,
 			self.notary_id,
 			balance_changeset.into_inner(),
+			block_votes.into_inner(),
 		)
 		.await
 		.map_err(from_crate_error)
@@ -177,12 +190,12 @@ mod tests {
 	use jsonrpsee::ws_client::WsClientBuilder;
 	use sp_core::{bounded_vec, ed25519::Signature, Blake2Hasher};
 	use sp_keyring::Ed25519Keyring::Bob;
-	use sp_keystore::{testing::MemoryKeystore, KeystoreExt};
+	use sp_keystore::{testing::MemoryKeystore, Keystore, KeystoreExt};
 	use sqlx::PgPool;
 
 	use ulx_notary_primitives::{
-		AccountOrigin, AccountType::Deposit, BalanceChange, BalanceTip, ChainTransfer,
-		NewAccountOrigin, Note, NoteType,
+		AccountOrigin, AccountType::Deposit, BalanceChange, BalanceTip, BlockVoteEligibility,
+		ChainTransfer, NewAccountOrigin, Note, NoteType,
 	};
 
 	use crate::{
@@ -190,8 +203,11 @@ mod tests {
 			localchain::{BalanceChangeResult, LocalchainRpcClient},
 			notebook::NotebookRpcClient,
 		},
-		notebook_closer::{MainchainClient, NotebookCloser},
-		stores::{chain_transfer::ChainTransferStore, notebook_header::NotebookHeaderStore},
+		notebook_closer::{MainchainClient, NotebookCloser, NOTARY_KEYID},
+		stores::{
+			blocks::BlocksStore, chain_transfer::ChainTransferStore,
+			notebook_header::NotebookHeaderStore, registered_key::RegisteredKeyStore,
+		},
 	};
 
 	use super::NotaryServer;
@@ -199,11 +215,21 @@ mod tests {
 	#[sqlx::test]
 	async fn test_balance_change_and_get_proof(pool: PgPool) -> anyhow::Result<()> {
 		let _ = tracing_subscriber::fmt::try_init();
-		let notary =
-			NotaryServer::start(1, Default::default(), pool.clone(), "127.0.0.1:0").await?;
+		let notary = NotaryServer::start(1, pool.clone(), "127.0.0.1:0").await?;
 		assert!(notary.addr.port() > 0);
 
 		let mut db = notary.pool.acquire().await?;
+		BlocksStore::record(
+			&mut *db,
+			0,
+			[1u8; 32].into(),
+			[0u8; 32].into(),
+			BlockVoteEligibility::new(100, Default::default()),
+			[1u8; 32].into(),
+			None,
+		)
+		.await?;
+		BlocksStore::record_finalized(&mut *db, [1u8; 32].into()).await?;
 		NotebookHeaderStore::create(&mut *db, notary.notary_id, 1, 0).await?;
 		ChainTransferStore::record_transfer_to_local_from_block(
 			&mut *db,
@@ -233,10 +259,9 @@ mod tests {
 		.clone();
 
 		assert_eq!(
-			client.notarize(bounded_vec![balance_change]).await?,
+			client.notarize(bounded_vec![balance_change], bounded_vec![]).await?,
 			BalanceChangeResult {
 				notebook_number: 1,
-				finalized_block_number: 0,
 				new_account_origins: vec![NewAccountOrigin::new(Bob.to_account_id(), Deposit, 1)],
 			}
 		);
@@ -244,6 +269,10 @@ mod tests {
 		let subscription = client.subscribe_headers().await?;
 		let keystore = MemoryKeystore::new();
 		let keystore = KeystoreExt::new(keystore);
+		let key = keystore
+			.ed25519_generate_new(NOTARY_KEYID, None)
+			.expect("Should be able to create a key");
+		RegisteredKeyStore::store_public(&mut *db, key, 0).await?;
 
 		let mut closer = NotebookCloser {
 			pool: pool.clone(),

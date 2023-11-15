@@ -6,14 +6,15 @@ pub mod api {
 	mod root_mod {
 		pub use super::*;
 	}
-	pub static PALLETS: [&str; 18usize] = [
+	pub static PALLETS: [&str; 19usize] = [
 		"System",
 		"Timestamp",
-		"MiningSlots",
-		"Bonds",
+		"MiningSlot",
+		"Bond",
 		"Notaries",
-		"LocalchainRelay",
-		"Difficulty",
+		"Notebook",
+		"ChainTransfer",
+		"BlockVoting",
 		"Authorship",
 		"Historical",
 		"Session",
@@ -26,7 +27,7 @@ pub mod api {
 		"TransactionPayment",
 		"Sudo",
 	];
-	pub static RUNTIME_APIS: [&str; 14usize] = [
+	pub static RUNTIME_APIS: [&str; 15usize] = [
 		"Core",
 		"Metadata",
 		"BlockBuilder",
@@ -36,10 +37,11 @@ pub mod api {
 		"SessionKeys",
 		"TransactionPaymentApi",
 		"TransactionPaymentCallApi",
-		"UlxConsensusApi",
+		"BlockVotingApis",
+		"NotaryApis",
 		"MiningAuthorityApis",
-		"LocalchainRelayApis",
-		"MiningSlotsApi",
+		"MiningSlotApi",
+		"NotebookApis",
 		"GrandpaApi",
 	];
 	#[doc = r" The error type returned when there is a runtime issue."]
@@ -100,17 +102,20 @@ pub mod api {
 			) -> transaction_payment_call_api::TransactionPaymentCallApi {
 				transaction_payment_call_api::TransactionPaymentCallApi
 			}
-			pub fn ulx_consensus_api(&self) -> ulx_consensus_api::UlxConsensusApi {
-				ulx_consensus_api::UlxConsensusApi
+			pub fn block_voting_apis(&self) -> block_voting_apis::BlockVotingApis {
+				block_voting_apis::BlockVotingApis
+			}
+			pub fn notary_apis(&self) -> notary_apis::NotaryApis {
+				notary_apis::NotaryApis
 			}
 			pub fn mining_authority_apis(&self) -> mining_authority_apis::MiningAuthorityApis {
 				mining_authority_apis::MiningAuthorityApis
 			}
-			pub fn localchain_relay_apis(&self) -> localchain_relay_apis::LocalchainRelayApis {
-				localchain_relay_apis::LocalchainRelayApis
+			pub fn mining_slot_api(&self) -> mining_slot_api::MiningSlotApi {
+				mining_slot_api::MiningSlotApi
 			}
-			pub fn mining_slots_api(&self) -> mining_slots_api::MiningSlotsApi {
-				mining_slots_api::MiningSlotsApi
+			pub fn notebook_apis(&self) -> notebook_apis::NotebookApis {
+				notebook_apis::NotebookApis
 			}
 			pub fn grandpa_api(&self) -> grandpa_api::GrandpaApi {
 				grandpa_api::GrandpaApi
@@ -852,9 +857,9 @@ pub mod api {
 						"query_call_info",
 						types::QueryCallInfo { call, len },
 						[
-							143u8, 135u8, 6u8, 115u8, 56u8, 247u8, 247u8, 187u8, 8u8, 17u8, 3u8,
-							139u8, 135u8, 23u8, 127u8, 193u8, 24u8, 118u8, 26u8, 10u8, 57u8, 48u8,
-							148u8, 237u8, 107u8, 61u8, 192u8, 158u8, 126u8, 84u8, 192u8, 48u8,
+							125u8, 66u8, 56u8, 39u8, 254u8, 164u8, 215u8, 25u8, 11u8, 77u8, 208u8,
+							40u8, 73u8, 238u8, 198u8, 45u8, 184u8, 184u8, 59u8, 52u8, 165u8, 20u8,
+							200u8, 240u8, 43u8, 220u8, 57u8, 222u8, 104u8, 14u8, 238u8, 66u8,
 						],
 					)
 				}
@@ -874,10 +879,10 @@ pub mod api {
 						"query_call_fee_details",
 						types::QueryCallFeeDetails { call, len },
 						[
-							6u8, 163u8, 145u8, 219u8, 125u8, 22u8, 141u8, 57u8, 109u8, 16u8, 151u8,
-							131u8, 157u8, 180u8, 133u8, 196u8, 253u8, 54u8, 206u8, 93u8, 145u8,
-							121u8, 154u8, 92u8, 144u8, 41u8, 164u8, 162u8, 251u8, 198u8, 83u8,
-							90u8,
+							156u8, 169u8, 84u8, 38u8, 93u8, 118u8, 13u8, 160u8, 40u8, 144u8, 169u8,
+							187u8, 198u8, 144u8, 98u8, 131u8, 39u8, 144u8, 76u8, 217u8, 149u8,
+							180u8, 227u8, 167u8, 177u8, 150u8, 11u8, 142u8, 215u8, 222u8, 46u8,
+							25u8,
 						],
 					)
 				}
@@ -978,43 +983,43 @@ pub mod api {
 				}
 			}
 		}
-		pub mod ulx_consensus_api {
+		pub mod block_voting_apis {
 			use super::{root_mod, runtime_types};
-			#[doc = " This runtime api allows people to query the current authority set"]
-			pub struct UlxConsensusApi;
-			impl UlxConsensusApi {
-				pub fn next_work(
+			pub struct BlockVotingApis;
+			impl BlockVotingApis {
+				pub fn vote_eligibility(
 					&self,
 				) -> ::subxt::runtime_api::Payload<
-					types::NextWork,
-					runtime_types::ulx_primitives::NextWork,
+					types::VoteEligibility,
+					runtime_types::ulx_notary_primitives::block_vote::BlockVoteEligibility,
 				> {
 					::subxt::runtime_api::Payload::new_static(
-						"UlxConsensusApi",
-						"next_work",
-						types::NextWork {},
+						"BlockVotingApis",
+						"vote_eligibility",
+						types::VoteEligibility {},
 						[
-							122u8, 221u8, 9u8, 10u8, 72u8, 14u8, 141u8, 184u8, 124u8, 240u8, 146u8,
-							58u8, 135u8, 67u8, 138u8, 11u8, 155u8, 150u8, 205u8, 154u8, 29u8, 77u8,
-							156u8, 178u8, 17u8, 73u8, 47u8, 20u8, 253u8, 16u8, 57u8, 67u8,
+							86u8, 192u8, 245u8, 64u8, 191u8, 41u8, 82u8, 35u8, 162u8, 149u8, 200u8,
+							122u8, 161u8, 180u8, 140u8, 41u8, 215u8, 85u8, 135u8, 164u8, 160u8,
+							170u8, 187u8, 68u8, 236u8, 123u8, 211u8, 143u8, 45u8, 125u8, 192u8,
+							202u8,
 						],
 					)
 				}
-				pub fn calculate_easing(
+				pub fn parent_voting_key(
 					&self,
-					tax_amount: ::core::primitive::u128,
-					validators: ::core::primitive::u8,
-				) -> ::subxt::runtime_api::Payload<types::CalculateEasing, ::core::primitive::u128>
-				{
+				) -> ::subxt::runtime_api::Payload<
+					types::ParentVotingKey,
+					::core::option::Option<::subxt::utils::H256>,
+				> {
 					::subxt::runtime_api::Payload::new_static(
-						"UlxConsensusApi",
-						"calculate_easing",
-						types::CalculateEasing { tax_amount, validators },
+						"BlockVotingApis",
+						"parent_voting_key",
+						types::ParentVotingKey {},
 						[
-							29u8, 167u8, 112u8, 95u8, 149u8, 105u8, 121u8, 123u8, 254u8, 240u8,
-							156u8, 23u8, 181u8, 180u8, 4u8, 6u8, 137u8, 45u8, 57u8, 64u8, 244u8,
-							43u8, 185u8, 163u8, 50u8, 86u8, 213u8, 247u8, 165u8, 121u8, 46u8,
-							203u8,
+							206u8, 248u8, 99u8, 196u8, 250u8, 208u8, 190u8, 78u8, 82u8, 74u8, 85u8,
+							84u8, 38u8, 156u8, 100u8, 192u8, 178u8, 187u8, 72u8, 116u8, 58u8,
+							167u8, 231u8, 186u8, 67u8, 89u8, 156u8, 15u8, 190u8, 183u8, 248u8,
+							117u8,
 						],
 					)
 				}
@@ -1032,7 +1037,7 @@ pub mod api {
 				# [codec (crate = :: subxt :: ext :: codec)]
 				#[decode_as_type(crate_path = ":: subxt :: ext :: scale_decode")]
 				#[encode_as_type(crate_path = ":: subxt :: ext :: scale_encode")]
-				pub struct NextWork {}
+				pub struct VoteEligibility {}
 				#[derive(
 					:: subxt :: ext :: codec :: Decode,
 					:: subxt :: ext :: codec :: Encode,
@@ -1044,38 +1049,90 @@ pub mod api {
 				# [codec (crate = :: subxt :: ext :: codec)]
 				#[decode_as_type(crate_path = ":: subxt :: ext :: scale_decode")]
 				#[encode_as_type(crate_path = ":: subxt :: ext :: scale_encode")]
-				pub struct CalculateEasing {
-					pub tax_amount: ::core::primitive::u128,
-					pub validators: ::core::primitive::u8,
+				pub struct ParentVotingKey {}
+			}
+		}
+		pub mod notary_apis {
+			use super::{root_mod, runtime_types};
+			pub struct NotaryApis;
+			impl NotaryApis {
+				pub fn notary_by_id(
+					&self,
+					notary_id: ::core::primitive::u32,
+				) -> ::subxt::runtime_api::Payload<
+					types::NotaryById,
+					::core::option::Option<
+						runtime_types::ulx_primitives::notary::NotaryRecord<
+							::subxt::utils::AccountId32,
+							::core::primitive::u32,
+						>,
+					>,
+				> {
+					::subxt::runtime_api::Payload::new_static(
+						"NotaryApis",
+						"notary_by_id",
+						types::NotaryById { notary_id },
+						[
+							9u8, 208u8, 40u8, 114u8, 57u8, 225u8, 169u8, 220u8, 8u8, 57u8, 24u8,
+							124u8, 230u8, 220u8, 160u8, 115u8, 252u8, 103u8, 50u8, 105u8, 212u8,
+							242u8, 118u8, 14u8, 88u8, 240u8, 247u8, 153u8, 188u8, 244u8, 58u8,
+							63u8,
+						],
+					)
 				}
+				pub fn active_notaries(
+					&self,
+				) -> ::subxt::runtime_api::Payload<types::ActiveNotaries, ::core::primitive::u16> {
+					::subxt::runtime_api::Payload::new_static(
+						"NotaryApis",
+						"active_notaries",
+						types::ActiveNotaries {},
+						[
+							125u8, 231u8, 84u8, 45u8, 84u8, 189u8, 185u8, 56u8, 81u8, 123u8, 196u8,
+							210u8, 81u8, 69u8, 202u8, 39u8, 246u8, 233u8, 194u8, 25u8, 77u8, 1u8,
+							78u8, 157u8, 58u8, 13u8, 227u8, 0u8, 255u8, 188u8, 19u8, 12u8,
+						],
+					)
+				}
+			}
+			pub mod types {
+				use super::runtime_types;
+				#[derive(
+					:: subxt :: ext :: codec :: Decode,
+					:: subxt :: ext :: codec :: Encode,
+					:: subxt :: ext :: scale_decode :: DecodeAsType,
+					:: subxt :: ext :: scale_encode :: EncodeAsType,
+					Clone,
+					Debug,
+				)]
+				# [codec (crate = :: subxt :: ext :: codec)]
+				#[decode_as_type(crate_path = ":: subxt :: ext :: scale_decode")]
+				#[encode_as_type(crate_path = ":: subxt :: ext :: scale_encode")]
+				pub struct NotaryById {
+					pub notary_id: ::core::primitive::u32,
+				}
+				#[derive(
+					:: subxt :: ext :: codec :: Decode,
+					:: subxt :: ext :: codec :: Encode,
+					:: subxt :: ext :: scale_decode :: DecodeAsType,
+					:: subxt :: ext :: scale_encode :: EncodeAsType,
+					Clone,
+					Debug,
+				)]
+				# [codec (crate = :: subxt :: ext :: codec)]
+				#[decode_as_type(crate_path = ":: subxt :: ext :: scale_decode")]
+				#[encode_as_type(crate_path = ":: subxt :: ext :: scale_encode")]
+				pub struct ActiveNotaries {}
 			}
 		}
 		pub mod mining_authority_apis {
 			use super::{root_mod, runtime_types};
 			pub struct MiningAuthorityApis;
 			impl MiningAuthorityApis {
-				pub fn authorities(
+				pub fn authority_id_by_index(
 					&self,
 				) -> ::subxt::runtime_api::Payload<
-					types::Authorities,
-					::std::vec::Vec<runtime_types::ulx_primitives::block_seal::app::Public>,
-				> {
-					::subxt::runtime_api::Payload::new_static(
-						"MiningAuthorityApis",
-						"authorities",
-						types::Authorities {},
-						[
-							34u8, 84u8, 136u8, 234u8, 232u8, 145u8, 167u8, 82u8, 207u8, 195u8,
-							159u8, 100u8, 68u8, 93u8, 115u8, 230u8, 210u8, 145u8, 166u8, 144u8,
-							27u8, 222u8, 212u8, 192u8, 209u8, 237u8, 241u8, 90u8, 73u8, 146u8, 9u8,
-							106u8,
-						],
-					)
-				}
-				pub fn authorities_by_index(
-					&self,
-				) -> ::subxt::runtime_api::Payload<
-					types::AuthoritiesByIndex,
+					types::AuthorityIdByIndex,
 					::subxt::utils::KeyedVec<
 						::core::primitive::u16,
 						runtime_types::ulx_primitives::block_seal::app::Public,
@@ -1083,12 +1140,13 @@ pub mod api {
 				> {
 					::subxt::runtime_api::Payload::new_static(
 						"MiningAuthorityApis",
-						"authorities_by_index",
-						types::AuthoritiesByIndex {},
+						"authority_id_by_index",
+						types::AuthorityIdByIndex {},
 						[
-							254u8, 2u8, 16u8, 210u8, 12u8, 56u8, 250u8, 106u8, 8u8, 161u8, 64u8,
-							230u8, 83u8, 235u8, 149u8, 92u8, 46u8, 142u8, 21u8, 250u8, 242u8, 10u8,
-							113u8, 96u8, 161u8, 17u8, 236u8, 127u8, 130u8, 27u8, 158u8, 23u8,
+							156u8, 140u8, 247u8, 74u8, 148u8, 252u8, 174u8, 89u8, 160u8, 155u8,
+							211u8, 220u8, 84u8, 71u8, 239u8, 67u8, 251u8, 99u8, 30u8, 52u8, 109u8,
+							84u8, 30u8, 37u8, 152u8, 240u8, 162u8, 91u8, 162u8, 138u8, 102u8,
+							156u8,
 						],
 					)
 				}
@@ -1108,26 +1166,59 @@ pub mod api {
 						],
 					)
 				}
-				pub fn block_peers(
+				pub fn is_valid_authority(
+					&self,
+					authority_id: runtime_types::ulx_primitives::block_seal::app::Public,
+				) -> ::subxt::runtime_api::Payload<types::IsValidAuthority, ::core::primitive::bool>
+				{
+					::subxt::runtime_api::Payload::new_static(
+						"MiningAuthorityApis",
+						"is_valid_authority",
+						types::IsValidAuthority { authority_id },
+						[
+							84u8, 160u8, 13u8, 233u8, 24u8, 94u8, 226u8, 160u8, 11u8, 72u8, 198u8,
+							113u8, 181u8, 128u8, 13u8, 83u8, 244u8, 254u8, 42u8, 134u8, 146u8,
+							12u8, 181u8, 106u8, 223u8, 117u8, 20u8, 13u8, 122u8, 24u8, 59u8, 5u8,
+						],
+					)
+				}
+				pub fn authority_id_for_account(
 					&self,
 					account_id: ::subxt::utils::AccountId32,
 				) -> ::subxt::runtime_api::Payload<
-					types::BlockPeers,
-					::std::vec::Vec<
-						runtime_types::ulx_primitives::block_seal::AuthorityDistance<
+					types::AuthorityIdForAccount,
+					::core::option::Option<runtime_types::ulx_primitives::block_seal::app::Public>,
+				> {
+					::subxt::runtime_api::Payload::new_static(
+						"MiningAuthorityApis",
+						"authority_id_for_account",
+						types::AuthorityIdForAccount { account_id },
+						[
+							158u8, 17u8, 214u8, 80u8, 28u8, 59u8, 168u8, 84u8, 218u8, 239u8, 250u8,
+							238u8, 32u8, 23u8, 120u8, 52u8, 189u8, 213u8, 36u8, 166u8, 22u8, 161u8,
+							128u8, 13u8, 114u8, 27u8, 76u8, 76u8, 124u8, 191u8, 236u8, 237u8,
+						],
+					)
+				}
+				pub fn block_peer(
+					&self,
+					account_id: ::subxt::utils::AccountId32,
+				) -> ::subxt::runtime_api::Payload<
+					types::BlockPeer,
+					::core::option::Option<
+						runtime_types::ulx_primitives::block_seal::MiningAuthority<
 							runtime_types::ulx_primitives::block_seal::app::Public,
 						>,
 					>,
 				> {
 					::subxt::runtime_api::Payload::new_static(
 						"MiningAuthorityApis",
-						"block_peers",
-						types::BlockPeers { account_id },
+						"block_peer",
+						types::BlockPeer { account_id },
 						[
-							95u8, 61u8, 254u8, 68u8, 247u8, 67u8, 74u8, 180u8, 60u8, 66u8, 196u8,
-							124u8, 70u8, 210u8, 247u8, 90u8, 230u8, 162u8, 179u8, 117u8, 52u8,
-							202u8, 111u8, 117u8, 136u8, 79u8, 69u8, 230u8, 186u8, 133u8, 168u8,
-							53u8,
+							33u8, 223u8, 105u8, 221u8, 237u8, 218u8, 124u8, 222u8, 8u8, 72u8,
+							127u8, 216u8, 93u8, 6u8, 32u8, 101u8, 146u8, 70u8, 95u8, 51u8, 142u8,
+							10u8, 200u8, 130u8, 237u8, 62u8, 225u8, 108u8, 46u8, 20u8, 209u8, 72u8,
 						],
 					)
 				}
@@ -1145,19 +1236,7 @@ pub mod api {
 				# [codec (crate = :: subxt :: ext :: codec)]
 				#[decode_as_type(crate_path = ":: subxt :: ext :: scale_decode")]
 				#[encode_as_type(crate_path = ":: subxt :: ext :: scale_encode")]
-				pub struct Authorities {}
-				#[derive(
-					:: subxt :: ext :: codec :: Decode,
-					:: subxt :: ext :: codec :: Encode,
-					:: subxt :: ext :: scale_decode :: DecodeAsType,
-					:: subxt :: ext :: scale_encode :: EncodeAsType,
-					Clone,
-					Debug,
-				)]
-				# [codec (crate = :: subxt :: ext :: codec)]
-				#[decode_as_type(crate_path = ":: subxt :: ext :: scale_decode")]
-				#[encode_as_type(crate_path = ":: subxt :: ext :: scale_encode")]
-				pub struct AuthoritiesByIndex {}
+				pub struct AuthorityIdByIndex {}
 				#[derive(
 					:: subxt :: ext :: codec :: Decode,
 					:: subxt :: ext :: codec :: Encode,
@@ -1181,21 +1260,87 @@ pub mod api {
 				# [codec (crate = :: subxt :: ext :: codec)]
 				#[decode_as_type(crate_path = ":: subxt :: ext :: scale_decode")]
 				#[encode_as_type(crate_path = ":: subxt :: ext :: scale_encode")]
-				pub struct BlockPeers {
+				pub struct IsValidAuthority {
+					pub authority_id: runtime_types::ulx_primitives::block_seal::app::Public,
+				}
+				#[derive(
+					:: subxt :: ext :: codec :: Decode,
+					:: subxt :: ext :: codec :: Encode,
+					:: subxt :: ext :: scale_decode :: DecodeAsType,
+					:: subxt :: ext :: scale_encode :: EncodeAsType,
+					Clone,
+					Debug,
+				)]
+				# [codec (crate = :: subxt :: ext :: codec)]
+				#[decode_as_type(crate_path = ":: subxt :: ext :: scale_decode")]
+				#[encode_as_type(crate_path = ":: subxt :: ext :: scale_encode")]
+				pub struct AuthorityIdForAccount {
+					pub account_id: ::subxt::utils::AccountId32,
+				}
+				#[derive(
+					:: subxt :: ext :: codec :: Decode,
+					:: subxt :: ext :: codec :: Encode,
+					:: subxt :: ext :: scale_decode :: DecodeAsType,
+					:: subxt :: ext :: scale_encode :: EncodeAsType,
+					Clone,
+					Debug,
+				)]
+				# [codec (crate = :: subxt :: ext :: codec)]
+				#[decode_as_type(crate_path = ":: subxt :: ext :: scale_decode")]
+				#[encode_as_type(crate_path = ":: subxt :: ext :: scale_encode")]
+				pub struct BlockPeer {
 					pub account_id: ::subxt::utils::AccountId32,
 				}
 			}
 		}
-		pub mod localchain_relay_apis {
+		pub mod mining_slot_api {
 			use super::{root_mod, runtime_types};
-			pub struct LocalchainRelayApis;
-			impl LocalchainRelayApis {
+			#[doc = " This runtime api allows people to query the upcoming mining_slot"]
+			pub struct MiningSlotApi;
+			impl MiningSlotApi {
+				pub fn next_slot_era(
+					&self,
+				) -> ::subxt::runtime_api::Payload<
+					types::NextSlotEra,
+					(::core::primitive::u32, ::core::primitive::u32),
+				> {
+					::subxt::runtime_api::Payload::new_static(
+						"MiningSlotApi",
+						"next_slot_era",
+						types::NextSlotEra {},
+						[
+							101u8, 27u8, 62u8, 52u8, 219u8, 204u8, 173u8, 178u8, 17u8, 87u8, 198u8,
+							186u8, 162u8, 215u8, 162u8, 64u8, 214u8, 87u8, 101u8, 112u8, 128u8,
+							160u8, 134u8, 183u8, 46u8, 141u8, 167u8, 2u8, 15u8, 77u8, 5u8, 224u8,
+						],
+					)
+				}
+			}
+			pub mod types {
+				use super::runtime_types;
+				#[derive(
+					:: subxt :: ext :: codec :: Decode,
+					:: subxt :: ext :: codec :: Encode,
+					:: subxt :: ext :: scale_decode :: DecodeAsType,
+					:: subxt :: ext :: scale_encode :: EncodeAsType,
+					Clone,
+					Debug,
+				)]
+				# [codec (crate = :: subxt :: ext :: codec)]
+				#[decode_as_type(crate_path = ":: subxt :: ext :: scale_decode")]
+				#[encode_as_type(crate_path = ":: subxt :: ext :: scale_encode")]
+				pub struct NextSlotEra {}
+			}
+		}
+		pub mod notebook_apis {
+			use super::{root_mod, runtime_types};
+			pub struct NotebookApis;
+			impl NotebookApis {
 				pub fn audit_notebook(
 					&self,
 					version: ::core::primitive::u32,
 					notary_id: ::core::primitive::u32,
 					notebook_number: ::core::primitive::u32,
-					notary_signature: runtime_types::sp_core::ed25519::Signature,
 					header_hash: ::subxt::utils::H256,
 					bytes: ::std::vec::Vec<::core::primitive::u8>,
 				) -> ::subxt::runtime_api::Payload<
@@ -1206,46 +1351,42 @@ pub mod api {
 					>,
 				> {
 					::subxt::runtime_api::Payload::new_static(
-						"LocalchainRelayApis",
+						"NotebookApis",
 						"audit_notebook",
 						types::AuditNotebook {
 							version,
 							notary_id,
 							notebook_number,
-							notary_signature,
 							header_hash,
 							bytes,
 						},
 						[
-							82u8, 191u8, 222u8, 25u8, 175u8, 126u8, 144u8, 60u8, 173u8, 82u8,
-							179u8, 243u8, 235u8, 146u8, 18u8, 212u8, 83u8, 217u8, 62u8, 177u8,
-							62u8, 73u8, 4u8, 237u8, 23u8, 66u8, 90u8, 164u8, 40u8, 219u8, 36u8,
-							105u8,
+							157u8, 88u8, 41u8, 108u8, 85u8, 34u8, 146u8, 105u8, 109u8, 183u8,
+							115u8, 106u8, 229u8, 138u8, 110u8, 150u8, 133u8, 152u8, 5u8, 107u8,
+							8u8, 7u8, 89u8, 232u8, 42u8, 236u8, 243u8, 215u8, 15u8, 252u8, 3u8,
+							110u8,
 						],
 					)
 				}
-				pub fn get_auditors(
+				pub fn decode_notebook_vote_details(
 					&self,
-					notary_id: ::core::primitive::u32,
-					notebook_number: ::core::primitive::u32,
-					pinned_to_block_number: ::core::primitive::u32,
+					extrinsic : :: subxt :: utils :: UncheckedExtrinsic < :: subxt :: utils :: MultiAddress < :: subxt :: utils :: AccountId32 , () > , runtime_types :: ulx_node_runtime :: RuntimeCall , runtime_types :: sp_runtime :: MultiSignature , (runtime_types :: frame_system :: extensions :: check_non_zero_sender :: CheckNonZeroSender , runtime_types :: frame_system :: extensions :: check_spec_version :: CheckSpecVersion , runtime_types :: frame_system :: extensions :: check_tx_version :: CheckTxVersion , runtime_types :: frame_system :: extensions :: check_genesis :: CheckGenesis , runtime_types :: frame_system :: extensions :: check_mortality :: CheckMortality , runtime_types :: frame_system :: extensions :: check_nonce :: CheckNonce , runtime_types :: frame_system :: extensions :: check_weight :: CheckWeight , runtime_types :: pallet_transaction_payment :: ChargeTransactionPayment ,) >,
 				) -> ::subxt::runtime_api::Payload<
-					types::GetAuditors,
-					::std::vec::Vec<(
-						::core::primitive::u16,
-						runtime_types::ulx_primitives::block_seal::app::Public,
-						::std::vec::Vec<runtime_types::ulx_primitives::block_seal::Host>,
-					)>,
+					types::DecodeNotebookVoteDetails,
+					::core::option::Option<
+						runtime_types::ulx_primitives::notary::NotaryNotebookVoteDetails<
+							::subxt::utils::H256,
+						>,
+					>,
 				> {
 					::subxt::runtime_api::Payload::new_static(
-						"LocalchainRelayApis",
-						"get_auditors",
-						types::GetAuditors { notary_id, notebook_number, pinned_to_block_number },
+						"NotebookApis",
+						"decode_notebook_vote_details",
+						types::DecodeNotebookVoteDetails { extrinsic },
 						[
-							160u8, 174u8, 146u8, 11u8, 102u8, 255u8, 253u8, 86u8, 246u8, 79u8,
-							150u8, 179u8, 78u8, 152u8, 161u8, 186u8, 138u8, 178u8, 37u8, 198u8,
-							211u8, 177u8, 161u8, 44u8, 2u8, 227u8, 102u8, 236u8, 224u8, 48u8, 58u8,
-							108u8,
+							242u8, 65u8, 79u8, 10u8, 138u8, 173u8, 78u8, 27u8, 166u8, 64u8, 34u8,
+							201u8, 34u8, 32u8, 105u8, 88u8, 207u8, 204u8, 78u8, 95u8, 75u8, 60u8,
+							106u8, 207u8, 148u8, 167u8, 36u8, 211u8, 222u8, 72u8, 197u8, 254u8,
 						],
 					)
 				}
@@ -1267,7 +1408,6 @@ pub mod api {
 					pub version: ::core::primitive::u32,
 					pub notary_id: ::core::primitive::u32,
 					pub notebook_number: ::core::primitive::u32,
-					pub notary_signature: runtime_types::sp_core::ed25519::Signature,
 					pub header_hash: ::subxt::utils::H256,
 					pub bytes: ::std::vec::Vec<::core::primitive::u8>,
 				}
@@ -1282,51 +1422,7 @@ pub mod api {
 				# [codec (crate = :: subxt :: ext :: codec)]
 				#[decode_as_type(crate_path = ":: subxt :: ext :: scale_decode")]
 				#[encode_as_type(crate_path = ":: subxt :: ext :: scale_encode")]
-				pub struct GetAuditors {
-					pub notary_id: ::core::primitive::u32,
-					pub notebook_number: ::core::primitive::u32,
-					pub pinned_to_block_number: ::core::primitive::u32,
-				}
-			}
-		}
-		pub mod mining_slots_api {
-			use super::{root_mod, runtime_types};
-			#[doc = " This runtime api allows people to query the upcoming mining_slots"]
-			pub struct MiningSlotsApi;
-			impl MiningSlotsApi {
-				pub fn next_slot_era(
-					&self,
-				) -> ::subxt::runtime_api::Payload<
-					types::NextSlotEra,
-					(::core::primitive::u32, ::core::primitive::u32),
-				> {
-					::subxt::runtime_api::Payload::new_static(
-						"MiningSlotsApi",
-						"next_slot_era",
-						types::NextSlotEra {},
-						[
-							115u8, 227u8, 193u8, 143u8, 40u8, 161u8, 201u8, 87u8, 113u8, 251u8,
-							194u8, 228u8, 83u8, 255u8, 207u8, 130u8, 154u8, 193u8, 186u8, 242u8,
-							204u8, 122u8, 230u8, 162u8, 85u8, 128u8, 111u8, 214u8, 93u8, 60u8,
-							251u8, 240u8,
-						],
-					)
-				}
-			}
-			pub mod types {
-				use super::runtime_types;
-				#[derive(
-					:: subxt :: ext :: codec :: Decode,
-					:: subxt :: ext :: codec :: Encode,
-					:: subxt :: ext :: scale_decode :: DecodeAsType,
-					:: subxt :: ext :: scale_encode :: EncodeAsType,
-					Clone,
-					Debug,
-				)]
-				# [codec (crate = :: subxt :: ext :: codec)]
-				#[decode_as_type(crate_path = ":: subxt :: ext :: scale_decode")]
-				#[encode_as_type(crate_path = ":: subxt :: ext :: scale_encode")]
-				pub struct NextSlotEra {}
+				pub struct DecodeNotebookVoteDetails { pub extrinsic : :: subxt :: utils :: UncheckedExtrinsic < :: subxt :: utils :: MultiAddress < :: subxt :: utils :: AccountId32 , () > , runtime_types :: ulx_node_runtime :: RuntimeCall , runtime_types :: sp_runtime :: MultiSignature , (runtime_types :: frame_system :: extensions :: check_non_zero_sender :: CheckNonZeroSender , runtime_types :: frame_system :: extensions :: check_spec_version :: CheckSpecVersion , runtime_types :: frame_system :: extensions :: check_tx_version :: CheckTxVersion , runtime_types :: frame_system :: extensions :: check_genesis :: CheckGenesis , runtime_types :: frame_system :: extensions :: check_mortality :: CheckMortality , runtime_types :: frame_system :: extensions :: check_nonce :: CheckNonce , runtime_types :: frame_system :: extensions :: check_weight :: CheckWeight , runtime_types :: pallet_transaction_payment :: ChargeTransactionPayment ,) > , }
 			}
 		}
 		pub mod grandpa_api {
@@ -1524,23 +1620,20 @@ pub mod api {
 		pub fn timestamp(&self) -> timestamp::constants::ConstantsApi {
 			timestamp::constants::ConstantsApi
 		}
-		pub fn mining_slots(&self) -> mining_slots::constants::ConstantsApi {
-			mining_slots::constants::ConstantsApi
+		pub fn mining_slot(&self) -> mining_slot::constants::ConstantsApi {
+			mining_slot::constants::ConstantsApi
 		}
-		pub fn bonds(&self) -> bonds::constants::ConstantsApi {
-			bonds::constants::ConstantsApi
+		pub fn bond(&self) -> bond::constants::ConstantsApi {
+			bond::constants::ConstantsApi
 		}
 		pub fn notaries(&self) -> notaries::constants::ConstantsApi {
 			notaries::constants::ConstantsApi
 		}
-		pub fn localchain_relay(&self) -> localchain_relay::constants::ConstantsApi {
-			localchain_relay::constants::ConstantsApi
+		pub fn chain_transfer(&self) -> chain_transfer::constants::ConstantsApi {
+			chain_transfer::constants::ConstantsApi
 		}
-		pub fn difficulty(&self) -> difficulty::constants::ConstantsApi {
-			difficulty::constants::ConstantsApi
-		}
-		pub fn block_seal(&self) -> block_seal::constants::ConstantsApi {
-			block_seal::constants::ConstantsApi
+		pub fn block_voting(&self) -> block_voting::constants::ConstantsApi {
+			block_voting::constants::ConstantsApi
 		}
 		pub fn grandpa(&self) -> grandpa::constants::ConstantsApi {
 			grandpa::constants::ConstantsApi
@@ -1566,20 +1659,23 @@ pub mod api {
 		pub fn timestamp(&self) -> timestamp::storage::StorageApi {
 			timestamp::storage::StorageApi
 		}
-		pub fn mining_slots(&self) -> mining_slots::storage::StorageApi {
-			mining_slots::storage::StorageApi
+		pub fn mining_slot(&self) -> mining_slot::storage::StorageApi {
+			mining_slot::storage::StorageApi
 		}
-		pub fn bonds(&self) -> bonds::storage::StorageApi {
-			bonds::storage::StorageApi
+		pub fn bond(&self) -> bond::storage::StorageApi {
+			bond::storage::StorageApi
 		}
 		pub fn notaries(&self) -> notaries::storage::StorageApi {
 			notaries::storage::StorageApi
 		}
-		pub fn localchain_relay(&self) -> localchain_relay::storage::StorageApi {
-			localchain_relay::storage::StorageApi
+		pub fn notebook(&self) -> notebook::storage::StorageApi {
+			notebook::storage::StorageApi
 		}
-		pub fn difficulty(&self) -> difficulty::storage::StorageApi {
-			difficulty::storage::StorageApi
+		pub fn chain_transfer(&self) -> chain_transfer::storage::StorageApi {
+			chain_transfer::storage::StorageApi
+		}
+		pub fn block_voting(&self) -> block_voting::storage::StorageApi {
+			block_voting::storage::StorageApi
 		}
 		pub fn authorship(&self) -> authorship::storage::StorageApi {
 			authorship::storage::StorageApi
@@ -1623,20 +1719,23 @@ pub mod api {
 		pub fn timestamp(&self) -> timestamp::calls::TransactionApi {
 			timestamp::calls::TransactionApi
 		}
-		pub fn mining_slots(&self) -> mining_slots::calls::TransactionApi {
-			mining_slots::calls::TransactionApi
+		pub fn mining_slot(&self) -> mining_slot::calls::TransactionApi {
+			mining_slot::calls::TransactionApi
 		}
-		pub fn bonds(&self) -> bonds::calls::TransactionApi {
-			bonds::calls::TransactionApi
+		pub fn bond(&self) -> bond::calls::TransactionApi {
+			bond::calls::TransactionApi
 		}
 		pub fn notaries(&self) -> notaries::calls::TransactionApi {
 			notaries::calls::TransactionApi
 		}
-		pub fn localchain_relay(&self) -> localchain_relay::calls::TransactionApi {
-			localchain_relay::calls::TransactionApi
+		pub fn notebook(&self) -> notebook::calls::TransactionApi {
+			notebook::calls::TransactionApi
 		}
-		pub fn difficulty(&self) -> difficulty::calls::TransactionApi {
-			difficulty::calls::TransactionApi
+		pub fn chain_transfer(&self) -> chain_transfer::calls::TransactionApi {
+			chain_transfer::calls::TransactionApi
+		}
+		pub fn block_voting(&self) -> block_voting::calls::TransactionApi {
+			block_voting::calls::TransactionApi
 		}
 		pub fn session(&self) -> session::calls::TransactionApi {
 			session::calls::TransactionApi
@@ -1669,9 +1768,9 @@ pub mod api {
 			.hash();
 		runtime_metadata_hash ==
 			[
-				162u8, 26u8, 212u8, 39u8, 127u8, 210u8, 246u8, 80u8, 98u8, 180u8, 208u8, 131u8,
-				114u8, 75u8, 162u8, 227u8, 226u8, 223u8, 232u8, 90u8, 161u8, 140u8, 29u8, 150u8,
-				152u8, 172u8, 246u8, 225u8, 209u8, 4u8, 240u8, 56u8,
+				86u8, 234u8, 14u8, 93u8, 158u8, 86u8, 248u8, 116u8, 127u8, 102u8, 103u8, 147u8,
+				134u8, 181u8, 201u8, 9u8, 21u8, 75u8, 147u8, 109u8, 186u8, 210u8, 172u8, 20u8,
+				61u8, 82u8, 82u8, 176u8, 65u8, 174u8, 241u8, 159u8,
 			]
 	}
 	pub mod system {
@@ -2393,10 +2492,10 @@ pub mod api {
 						"Events",
 						vec![],
 						[
-							20u8, 164u8, 238u8, 220u8, 98u8, 140u8, 192u8, 81u8, 192u8, 67u8,
-							200u8, 12u8, 159u8, 250u8, 158u8, 136u8, 24u8, 239u8, 84u8, 106u8,
-							18u8, 146u8, 177u8, 112u8, 121u8, 99u8, 78u8, 69u8, 115u8, 134u8,
-							213u8, 193u8,
+							71u8, 48u8, 128u8, 238u8, 2u8, 61u8, 112u8, 181u8, 191u8, 10u8, 36u8,
+							167u8, 149u8, 3u8, 60u8, 162u8, 125u8, 190u8, 203u8, 150u8, 27u8,
+							128u8, 31u8, 171u8, 104u8, 128u8, 171u8, 110u8, 210u8, 123u8, 100u8,
+							101u8,
 						],
 					)
 				}
@@ -2788,12 +2887,12 @@ pub mod api {
 			}
 		}
 	}
-	pub mod mining_slots {
+	pub mod mining_slot {
 		use super::{root_mod, runtime_types};
 		#[doc = "The `Error` enum of this pallet."]
-		pub type Error = runtime_types::pallet_mining_slots::pallet::Error;
+		pub type Error = runtime_types::pallet_mining_slot::pallet::Error;
 		#[doc = "Contains a variant per dispatchable extrinsic that this pallet has."]
-		pub type Call = runtime_types::pallet_mining_slots::pallet::Call;
+		pub type Call = runtime_types::pallet_mining_slot::pallet::Call;
 		pub mod calls {
 			use super::{root_mod, runtime_types};
 			type DispatchError = runtime_types::sp_runtime::DispatchError;
@@ -2822,7 +2921,7 @@ pub mod api {
 						>,
 				}
 				impl ::subxt::blocks::StaticExtrinsic for Bid {
-					const PALLET: &'static str = "MiningSlots";
+					const PALLET: &'static str = "MiningSlot";
 					const CALL: &'static str = "bid";
 				}
 			}
@@ -2839,7 +2938,7 @@ pub mod api {
 					reward_destination : runtime_types :: ulx_primitives :: block_seal :: RewardDestination < :: subxt :: utils :: AccountId32 >,
 				) -> ::subxt::tx::Payload<types::Bid> {
 					::subxt::tx::Payload::new_static(
-						"MiningSlots",
+						"MiningSlot",
 						"bid",
 						types::Bid { peer_id, rpc_hosts, bond_id, reward_destination },
 						[
@@ -2853,7 +2952,7 @@ pub mod api {
 			}
 		}
 		#[doc = "The `Event` enum of this pallet"]
-		pub type Event = runtime_types::pallet_mining_slots::pallet::Event;
+		pub type Event = runtime_types::pallet_mining_slot::pallet::Event;
 		pub mod events {
 			use super::runtime_types;
 			#[derive(
@@ -2878,7 +2977,7 @@ pub mod api {
 				>,
 			}
 			impl ::subxt::events::StaticEvent for NewMiners {
-				const PALLET: &'static str = "MiningSlots";
+				const PALLET: &'static str = "MiningSlot";
 				const EVENT: &'static str = "NewMiners";
 			}
 			#[derive(
@@ -2898,7 +2997,7 @@ pub mod api {
 				pub index: ::core::primitive::u32,
 			}
 			impl ::subxt::events::StaticEvent for SlotBidderAdded {
-				const PALLET: &'static str = "MiningSlots";
+				const PALLET: &'static str = "MiningSlot";
 				const EVENT: &'static str = "SlotBidderAdded";
 			}
 			#[derive(
@@ -2918,7 +3017,7 @@ pub mod api {
 				pub kept_ownership_bond: ::core::primitive::bool,
 			}
 			impl ::subxt::events::StaticEvent for SlotBidderReplaced {
-				const PALLET: &'static str = "MiningSlots";
+				const PALLET: &'static str = "MiningSlot";
 				const EVENT: &'static str = "SlotBidderReplaced";
 			}
 			#[derive(
@@ -2938,7 +3037,7 @@ pub mod api {
 				pub kept_ownership_bond: ::core::primitive::bool,
 			}
 			impl ::subxt::events::StaticEvent for UnbondedMiner {
-				const PALLET: &'static str = "MiningSlots";
+				const PALLET: &'static str = "MiningSlot";
 				const EVENT: &'static str = "UnbondedMiner";
 			}
 		}
@@ -2962,7 +3061,7 @@ pub mod api {
 					::subxt::storage::address::Yes,
 				> {
 					::subxt::storage::address::Address::new_static(
-						"MiningSlots",
+						"MiningSlot",
 						"ActiveMinersByIndex",
 						vec![::subxt::storage::address::make_static_storage_map_key(_0.borrow())],
 						[
@@ -2987,7 +3086,7 @@ pub mod api {
 					::subxt::storage::address::Yes,
 				> {
 					::subxt::storage::address::Address::new_static(
-						"MiningSlots",
+						"MiningSlot",
 						"ActiveMinersByIndex",
 						Vec::new(),
 						[
@@ -3007,7 +3106,7 @@ pub mod api {
 					(),
 				> {
 					::subxt::storage::address::Address::new_static(
-						"MiningSlots",
+						"MiningSlot",
 						"ActiveMinersCount",
 						vec![],
 						[
@@ -3035,7 +3134,7 @@ pub mod api {
 					(),
 				> {
 					::subxt::storage::address::Address::new_static(
-						"MiningSlots",
+						"MiningSlot",
 						"AuthoritiesByIndex",
 						vec![],
 						[
@@ -3056,7 +3155,7 @@ pub mod api {
 					(),
 				> {
 					::subxt::storage::address::Address::new_static(
-						"MiningSlots",
+						"MiningSlot",
 						"OwnershipBondAmount",
 						vec![],
 						[
@@ -3079,7 +3178,7 @@ pub mod api {
 					::subxt::storage::address::Yes,
 				> {
 					::subxt::storage::address::Address::new_static(
-						"MiningSlots",
+						"MiningSlot",
 						"AccountIndexLookup",
 						vec![::subxt::storage::address::make_static_storage_map_key(_0.borrow())],
 						[
@@ -3101,7 +3200,7 @@ pub mod api {
 					::subxt::storage::address::Yes,
 				> {
 					::subxt::storage::address::Address::new_static(
-						"MiningSlots",
+						"MiningSlot",
 						"AccountIndexLookup",
 						Vec::new(),
 						[
@@ -3130,7 +3229,7 @@ pub mod api {
 					(),
 				> {
 					::subxt::storage::address::Address::new_static(
-						"MiningSlots",
+						"MiningSlot",
 						"NextSlotCohort",
 						vec![],
 						[
@@ -3151,7 +3250,7 @@ pub mod api {
 					(),
 				> {
 					::subxt::storage::address::Address::new_static(
-						"MiningSlots",
+						"MiningSlot",
 						"IsNextSlotBiddingOpen",
 						vec![],
 						[
@@ -3176,7 +3275,7 @@ pub mod api {
 					(),
 				> {
 					::subxt::storage::address::Address::new_static(
-						"MiningSlots",
+						"MiningSlot",
 						"MinerZero",
 						vec![],
 						[
@@ -3196,7 +3295,7 @@ pub mod api {
 				#[doc = " The maximum number of Miners that the pallet can hold."]
 				pub fn max_miners(&self) -> ::subxt::constants::Address<::core::primitive::u32> {
 					::subxt::constants::Address::new_static(
-						"MiningSlots",
+						"MiningSlot",
 						"MaxMiners",
 						[
 							98u8, 252u8, 116u8, 72u8, 26u8, 180u8, 225u8, 83u8, 200u8, 157u8,
@@ -3211,7 +3310,7 @@ pub mod api {
 					&self,
 				) -> ::subxt::constants::Address<::core::primitive::u32> {
 					::subxt::constants::Address::new_static(
-						"MiningSlots",
+						"MiningSlot",
 						"MaxCohortSize",
 						[
 							98u8, 252u8, 116u8, 72u8, 26u8, 180u8, 225u8, 83u8, 200u8, 157u8,
@@ -3226,7 +3325,7 @@ pub mod api {
 					&self,
 				) -> ::subxt::constants::Address<::core::primitive::u32> {
 					::subxt::constants::Address::new_static(
-						"MiningSlots",
+						"MiningSlot",
 						"BlocksBetweenSlots",
 						[
 							98u8, 252u8, 116u8, 72u8, 26u8, 180u8, 225u8, 83u8, 200u8, 157u8,
@@ -3241,7 +3340,7 @@ pub mod api {
 					&self,
 				) -> ::subxt::constants::Address<::core::primitive::u32> {
 					::subxt::constants::Address::new_static(
-						"MiningSlots",
+						"MiningSlot",
 						"SessionIndicesToKeepInHistory",
 						[
 							98u8, 252u8, 116u8, 72u8, 26u8, 180u8, 225u8, 83u8, 200u8, 157u8,
@@ -3256,7 +3355,7 @@ pub mod api {
 					&self,
 				) -> ::subxt::constants::Address<::core::primitive::u32> {
 					::subxt::constants::Address::new_static(
-						"MiningSlots",
+						"MiningSlot",
 						"BlocksBufferToStopAcceptingBids",
 						[
 							98u8, 252u8, 116u8, 72u8, 26u8, 180u8, 225u8, 83u8, 200u8, 157u8,
@@ -3271,7 +3370,7 @@ pub mod api {
 					&self,
 				) -> ::subxt::constants::Address<::core::primitive::u32> {
 					::subxt::constants::Address::new_static(
-						"MiningSlots",
+						"MiningSlot",
 						"OwnershipPercentDamper",
 						[
 							98u8, 252u8, 116u8, 72u8, 26u8, 180u8, 225u8, 83u8, 200u8, 157u8,
@@ -3284,12 +3383,12 @@ pub mod api {
 			}
 		}
 	}
-	pub mod bonds {
+	pub mod bond {
 		use super::{root_mod, runtime_types};
 		#[doc = "The `Error` enum of this pallet."]
-		pub type Error = runtime_types::pallet_bonds::pallet::Error;
+		pub type Error = runtime_types::pallet_bond::pallet::Error;
 		#[doc = "Contains a variant per dispatchable extrinsic that this pallet has."]
-		pub type Call = runtime_types::pallet_bonds::pallet::Call;
+		pub type Call = runtime_types::pallet_bond::pallet::Call;
 		pub mod calls {
 			use super::{root_mod, runtime_types};
 			type DispatchError = runtime_types::sp_runtime::DispatchError;
@@ -3316,7 +3415,7 @@ pub mod api {
 					pub expiration_block: ::core::primitive::u32,
 				}
 				impl ::subxt::blocks::StaticExtrinsic for OfferFund {
-					const PALLET: &'static str = "Bonds";
+					const PALLET: &'static str = "Bond";
 					const CALL: &'static str = "offer_fund";
 				}
 				#[derive(
@@ -3335,7 +3434,7 @@ pub mod api {
 					pub bond_fund_id: ::core::primitive::u32,
 				}
 				impl ::subxt::blocks::StaticExtrinsic for EndFund {
-					const PALLET: &'static str = "Bonds";
+					const PALLET: &'static str = "Bond";
 					const CALL: &'static str = "end_fund";
 				}
 				#[derive(
@@ -3355,7 +3454,7 @@ pub mod api {
 					pub expiration_block: ::core::primitive::u32,
 				}
 				impl ::subxt::blocks::StaticExtrinsic for ExtendFund {
-					const PALLET: &'static str = "Bonds";
+					const PALLET: &'static str = "Bond";
 					const CALL: &'static str = "extend_fund";
 				}
 				#[derive(
@@ -3374,7 +3473,7 @@ pub mod api {
 					pub bond_until_block: ::core::primitive::u32,
 				}
 				impl ::subxt::blocks::StaticExtrinsic for BondSelf {
-					const PALLET: &'static str = "Bonds";
+					const PALLET: &'static str = "Bond";
 					const CALL: &'static str = "bond_self";
 				}
 				#[derive(
@@ -3394,7 +3493,7 @@ pub mod api {
 					pub lease_until_block: ::core::primitive::u32,
 				}
 				impl ::subxt::blocks::StaticExtrinsic for Lease {
-					const PALLET: &'static str = "Bonds";
+					const PALLET: &'static str = "Bond";
 					const CALL: &'static str = "lease";
 				}
 				#[derive(
@@ -3413,7 +3512,7 @@ pub mod api {
 					pub bond_id: ::core::primitive::u64,
 				}
 				impl ::subxt::blocks::StaticExtrinsic for ReturnBond {
-					const PALLET: &'static str = "Bonds";
+					const PALLET: &'static str = "Bond";
 					const CALL: &'static str = "return_bond";
 				}
 				#[derive(
@@ -3433,7 +3532,7 @@ pub mod api {
 					pub bond_until_block: ::core::primitive::u32,
 				}
 				impl ::subxt::blocks::StaticExtrinsic for ExtendBond {
-					const PALLET: &'static str = "Bonds";
+					const PALLET: &'static str = "Bond";
 					const CALL: &'static str = "extend_bond";
 				}
 			}
@@ -3448,7 +3547,7 @@ pub mod api {
 					expiration_block: ::core::primitive::u32,
 				) -> ::subxt::tx::Payload<types::OfferFund> {
 					::subxt::tx::Payload::new_static(
-						"Bonds",
+						"Bond",
 						"offer_fund",
 						types::OfferFund {
 							lease_annual_percent_rate,
@@ -3470,7 +3569,7 @@ pub mod api {
 					bond_fund_id: ::core::primitive::u32,
 				) -> ::subxt::tx::Payload<types::EndFund> {
 					::subxt::tx::Payload::new_static(
-						"Bonds",
+						"Bond",
 						"end_fund",
 						types::EndFund { bond_fund_id },
 						[
@@ -3488,7 +3587,7 @@ pub mod api {
 					expiration_block: ::core::primitive::u32,
 				) -> ::subxt::tx::Payload<types::ExtendFund> {
 					::subxt::tx::Payload::new_static(
-						"Bonds",
+						"Bond",
 						"extend_fund",
 						types::ExtendFund { bond_fund_id, total_amount_offered, expiration_block },
 						[
@@ -3505,7 +3604,7 @@ pub mod api {
 					bond_until_block: ::core::primitive::u32,
 				) -> ::subxt::tx::Payload<types::BondSelf> {
 					::subxt::tx::Payload::new_static(
-						"Bonds",
+						"Bond",
 						"bond_self",
 						types::BondSelf { amount, bond_until_block },
 						[
@@ -3524,7 +3623,7 @@ pub mod api {
 					lease_until_block: ::core::primitive::u32,
 				) -> ::subxt::tx::Payload<types::Lease> {
 					::subxt::tx::Payload::new_static(
-						"Bonds",
+						"Bond",
 						"lease",
 						types::Lease { bond_fund_id, amount, lease_until_block },
 						[
@@ -3540,7 +3639,7 @@ pub mod api {
 					bond_id: ::core::primitive::u64,
 				) -> ::subxt::tx::Payload<types::ReturnBond> {
 					::subxt::tx::Payload::new_static(
-						"Bonds",
+						"Bond",
 						"return_bond",
 						types::ReturnBond { bond_id },
 						[
@@ -3559,7 +3658,7 @@ pub mod api {
 					bond_until_block: ::core::primitive::u32,
 				) -> ::subxt::tx::Payload<types::ExtendBond> {
 					::subxt::tx::Payload::new_static(
-						"Bonds",
+						"Bond",
 						"extend_bond",
 						types::ExtendBond { bond_id, total_amount, bond_until_block },
 						[
@@ -3572,7 +3671,7 @@ pub mod api {
 			}
 		}
 		#[doc = "The `Event` enum of this pallet"]
-		pub type Event = runtime_types::pallet_bonds::pallet::Event;
+		pub type Event = runtime_types::pallet_bond::pallet::Event;
 		pub mod events {
 			use super::runtime_types;
 			#[derive(
@@ -3593,7 +3692,7 @@ pub mod api {
 				pub offer_account_id: ::subxt::utils::AccountId32,
 			}
 			impl ::subxt::events::StaticEvent for BondFundOffered {
-				const PALLET: &'static str = "Bonds";
+				const PALLET: &'static str = "Bond";
 				const EVENT: &'static str = "BondFundOffered";
 			}
 			#[derive(
@@ -3613,7 +3712,7 @@ pub mod api {
 				pub expiration_block: ::core::primitive::u32,
 			}
 			impl ::subxt::events::StaticEvent for BondFundExtended {
-				const PALLET: &'static str = "Bonds";
+				const PALLET: &'static str = "Bond";
 				const EVENT: &'static str = "BondFundExtended";
 			}
 			#[derive(
@@ -3632,7 +3731,7 @@ pub mod api {
 				pub amount_still_bonded: ::core::primitive::u128,
 			}
 			impl ::subxt::events::StaticEvent for BondFundEnded {
-				const PALLET: &'static str = "Bonds";
+				const PALLET: &'static str = "Bond";
 				const EVENT: &'static str = "BondFundEnded";
 			}
 			#[derive(
@@ -3651,7 +3750,7 @@ pub mod api {
 				pub offer_account_id: ::subxt::utils::AccountId32,
 			}
 			impl ::subxt::events::StaticEvent for BondFundExpired {
-				const PALLET: &'static str = "Bonds";
+				const PALLET: &'static str = "Bond";
 				const EVENT: &'static str = "BondFundExpired";
 			}
 			#[derive(
@@ -3672,7 +3771,7 @@ pub mod api {
 				pub completion_block: ::core::primitive::u32,
 			}
 			impl ::subxt::events::StaticEvent for BondedSelf {
-				const PALLET: &'static str = "Bonds";
+				const PALLET: &'static str = "Bond";
 				const EVENT: &'static str = "BondedSelf";
 			}
 			#[derive(
@@ -3696,7 +3795,7 @@ pub mod api {
 				pub completion_block: ::core::primitive::u32,
 			}
 			impl ::subxt::events::StaticEvent for BondLeased {
-				const PALLET: &'static str = "Bonds";
+				const PALLET: &'static str = "Bond";
 				const EVENT: &'static str = "BondLeased";
 			}
 			#[derive(
@@ -3719,7 +3818,7 @@ pub mod api {
 				pub annual_percent_rate: ::core::primitive::u32,
 			}
 			impl ::subxt::events::StaticEvent for BondExtended {
-				const PALLET: &'static str = "Bonds";
+				const PALLET: &'static str = "Bond";
 				const EVENT: &'static str = "BondExtended";
 			}
 			#[derive(
@@ -3738,7 +3837,7 @@ pub mod api {
 				pub bond_id: ::core::primitive::u64,
 			}
 			impl ::subxt::events::StaticEvent for BondCompleted {
-				const PALLET: &'static str = "Bonds";
+				const PALLET: &'static str = "Bond";
 				const EVENT: &'static str = "BondCompleted";
 			}
 			#[derive(
@@ -3761,7 +3860,7 @@ pub mod api {
 				pub refund_amount: ::core::primitive::u128,
 			}
 			impl ::subxt::events::StaticEvent for BondFeeRefund {
-				const PALLET: &'static str = "Bonds";
+				const PALLET: &'static str = "Bond";
 				const EVENT: &'static str = "BondFeeRefund";
 			}
 			#[derive(
@@ -3780,7 +3879,7 @@ pub mod api {
 				pub bonded_account_id: ::subxt::utils::AccountId32,
 			}
 			impl ::subxt::events::StaticEvent for BondLocked {
-				const PALLET: &'static str = "Bonds";
+				const PALLET: &'static str = "Bond";
 				const EVENT: &'static str = "BondLocked";
 			}
 			#[derive(
@@ -3799,7 +3898,7 @@ pub mod api {
 				pub bonded_account_id: ::subxt::utils::AccountId32,
 			}
 			impl ::subxt::events::StaticEvent for BondUnlocked {
-				const PALLET: &'static str = "Bonds";
+				const PALLET: &'static str = "Bond";
 				const EVENT: &'static str = "BondUnlocked";
 			}
 		}
@@ -3817,7 +3916,7 @@ pub mod api {
 					(),
 				> {
 					::subxt::storage::address::Address::new_static(
-						"Bonds",
+						"Bond",
 						"NextBondId",
 						vec![],
 						[
@@ -3838,7 +3937,7 @@ pub mod api {
 					(),
 				> {
 					::subxt::storage::address::Address::new_static(
-						"Bonds",
+						"Bond",
 						"NextBondFundId",
 						vec![],
 						[
@@ -3864,7 +3963,7 @@ pub mod api {
 					::subxt::storage::address::Yes,
 				> {
 					::subxt::storage::address::Address::new_static(
-						"Bonds",
+						"Bond",
 						"BondFunds",
 						vec![::subxt::storage::address::make_static_storage_map_key(_0.borrow())],
 						[
@@ -3889,7 +3988,7 @@ pub mod api {
 					::subxt::storage::address::Yes,
 				> {
 					::subxt::storage::address::Address::new_static(
-						"Bonds",
+						"Bond",
 						"BondFunds",
 						Vec::new(),
 						[
@@ -3913,7 +4012,7 @@ pub mod api {
 					::subxt::storage::address::Yes,
 				> {
 					::subxt::storage::address::Address::new_static(
-						"Bonds",
+						"Bond",
 						"BondFundExpirations",
 						vec![::subxt::storage::address::make_static_storage_map_key(_0.borrow())],
 						[
@@ -3936,7 +4035,7 @@ pub mod api {
 					::subxt::storage::address::Yes,
 				> {
 					::subxt::storage::address::Address::new_static(
-						"Bonds",
+						"Bond",
 						"BondFundExpirations",
 						Vec::new(),
 						[
@@ -3963,7 +4062,7 @@ pub mod api {
 					::subxt::storage::address::Yes,
 				> {
 					::subxt::storage::address::Address::new_static(
-						"Bonds",
+						"Bond",
 						"Bonds",
 						vec![::subxt::storage::address::make_static_storage_map_key(_0.borrow())],
 						[
@@ -3989,7 +4088,7 @@ pub mod api {
 					::subxt::storage::address::Yes,
 				> {
 					::subxt::storage::address::Address::new_static(
-						"Bonds",
+						"Bond",
 						"Bonds",
 						Vec::new(),
 						[
@@ -4013,7 +4112,7 @@ pub mod api {
 					::subxt::storage::address::Yes,
 				> {
 					::subxt::storage::address::Address::new_static(
-						"Bonds",
+						"Bond",
 						"BondCompletions",
 						vec![::subxt::storage::address::make_static_storage_map_key(_0.borrow())],
 						[
@@ -4037,7 +4136,7 @@ pub mod api {
 					::subxt::storage::address::Yes,
 				> {
 					::subxt::storage::address::Address::new_static(
-						"Bonds",
+						"Bond",
 						"BondCompletions",
 						Vec::new(),
 						[
@@ -4059,7 +4158,7 @@ pub mod api {
 					&self,
 				) -> ::subxt::constants::Address<::core::primitive::u128> {
 					::subxt::constants::Address::new_static(
-						"Bonds",
+						"Bond",
 						"MinimumBondAmount",
 						[
 							84u8, 157u8, 140u8, 4u8, 93u8, 57u8, 29u8, 133u8, 105u8, 200u8, 214u8,
@@ -4073,7 +4172,7 @@ pub mod api {
 					&self,
 				) -> ::subxt::constants::Address<::core::primitive::u32> {
 					::subxt::constants::Address::new_static(
-						"Bonds",
+						"Bond",
 						"BlocksPerYear",
 						[
 							98u8, 252u8, 116u8, 72u8, 26u8, 180u8, 225u8, 83u8, 200u8, 157u8,
@@ -4089,7 +4188,7 @@ pub mod api {
 					&self,
 				) -> ::subxt::constants::Address<::core::primitive::u32> {
 					::subxt::constants::Address::new_static(
-						"Bonds",
+						"Bond",
 						"MaxConcurrentlyExpiringBondFunds",
 						[
 							98u8, 252u8, 116u8, 72u8, 26u8, 180u8, 225u8, 83u8, 200u8, 157u8,
@@ -4105,7 +4204,7 @@ pub mod api {
 					&self,
 				) -> ::subxt::constants::Address<::core::primitive::u32> {
 					::subxt::constants::Address::new_static(
-						"Bonds",
+						"Bond",
 						"MaxConcurrentlyExpiringBonds",
 						[
 							98u8, 252u8, 116u8, 72u8, 26u8, 180u8, 225u8, 83u8, 200u8, 157u8,
@@ -4662,12 +4761,12 @@ pub mod api {
 			}
 		}
 	}
-	pub mod localchain_relay {
+	pub mod notebook {
 		use super::{root_mod, runtime_types};
 		#[doc = "The `Error` enum of this pallet."]
-		pub type Error = runtime_types::pallet_localchain_relay::pallet::Error;
+		pub type Error = runtime_types::pallet_notebook::pallet::Error;
 		#[doc = "Contains a variant per dispatchable extrinsic that this pallet has."]
-		pub type Call = runtime_types::pallet_localchain_relay::pallet::Call;
+		pub type Call = runtime_types::pallet_notebook::pallet::Call;
 		pub mod calls {
 			use super::{root_mod, runtime_types};
 			type DispatchError = runtime_types::sp_runtime::DispatchError;
@@ -4684,143 +4783,42 @@ pub mod api {
 				# [codec (crate = :: subxt :: ext :: codec)]
 				#[decode_as_type(crate_path = ":: subxt :: ext :: scale_decode")]
 				#[encode_as_type(crate_path = ":: subxt :: ext :: scale_encode")]
-				pub struct SubmitNotebook {
-					pub notebook: runtime_types::ulx_notary_primitives::notebook::AuditedNotebook,
+				pub struct Submit {
+					pub header: runtime_types::ulx_notary_primitives::notebook::NotebookHeader,
+					pub hash: ::subxt::utils::H256,
 					pub signature: runtime_types::sp_core::ed25519::Signature,
 				}
-				impl ::subxt::blocks::StaticExtrinsic for SubmitNotebook {
-					const PALLET: &'static str = "LocalchainRelay";
-					const CALL: &'static str = "submit_notebook";
-				}
-				#[derive(
-					:: subxt :: ext :: codec :: Decode,
-					:: subxt :: ext :: codec :: Encode,
-					:: subxt :: ext :: scale_decode :: DecodeAsType,
-					:: subxt :: ext :: scale_encode :: EncodeAsType,
-					Clone,
-					Debug,
-				)]
-				# [codec (crate = :: subxt :: ext :: codec)]
-				#[decode_as_type(crate_path = ":: subxt :: ext :: scale_decode")]
-				#[encode_as_type(crate_path = ":: subxt :: ext :: scale_encode")]
-				pub struct SendToLocalchain {
-					#[codec(compact)]
-					pub amount: ::core::primitive::u128,
-					pub notary_id: ::core::primitive::u32,
-					#[codec(compact)]
-					pub account_nonce: ::core::primitive::u32,
-				}
-				impl ::subxt::blocks::StaticExtrinsic for SendToLocalchain {
-					const PALLET: &'static str = "LocalchainRelay";
-					const CALL: &'static str = "send_to_localchain";
+				impl ::subxt::blocks::StaticExtrinsic for Submit {
+					const PALLET: &'static str = "Notebook";
+					const CALL: &'static str = "submit";
 				}
 			}
 			pub struct TransactionApi;
 			impl TransactionApi {
-				#[doc = "See `Pallet::submit_notebook`."]
-				pub fn submit_notebook(
+				#[doc = "See `Pallet::submit`."]
+				pub fn submit(
 					&self,
-					notebook: runtime_types::ulx_notary_primitives::notebook::AuditedNotebook,
+					header: runtime_types::ulx_notary_primitives::notebook::NotebookHeader,
+					hash: ::subxt::utils::H256,
 					signature: runtime_types::sp_core::ed25519::Signature,
-				) -> ::subxt::tx::Payload<types::SubmitNotebook> {
+				) -> ::subxt::tx::Payload<types::Submit> {
 					::subxt::tx::Payload::new_static(
-						"LocalchainRelay",
-						"submit_notebook",
-						types::SubmitNotebook { notebook, signature },
+						"Notebook",
+						"submit",
+						types::Submit { header, hash, signature },
 						[
-							192u8, 203u8, 50u8, 160u8, 13u8, 213u8, 31u8, 212u8, 167u8, 223u8, 6u8,
-							92u8, 192u8, 131u8, 116u8, 8u8, 3u8, 244u8, 148u8, 177u8, 193u8, 246u8,
-							121u8, 226u8, 231u8, 204u8, 224u8, 51u8, 191u8, 82u8, 113u8, 160u8,
-						],
-					)
-				}
-				#[doc = "See `Pallet::send_to_localchain`."]
-				pub fn send_to_localchain(
-					&self,
-					amount: ::core::primitive::u128,
-					notary_id: ::core::primitive::u32,
-					account_nonce: ::core::primitive::u32,
-				) -> ::subxt::tx::Payload<types::SendToLocalchain> {
-					::subxt::tx::Payload::new_static(
-						"LocalchainRelay",
-						"send_to_localchain",
-						types::SendToLocalchain { amount, notary_id, account_nonce },
-						[
-							235u8, 60u8, 252u8, 71u8, 57u8, 103u8, 83u8, 70u8, 168u8, 14u8, 138u8,
-							217u8, 144u8, 173u8, 93u8, 242u8, 97u8, 193u8, 176u8, 163u8, 124u8,
-							162u8, 173u8, 250u8, 52u8, 242u8, 168u8, 25u8, 247u8, 208u8, 159u8,
-							117u8,
+							232u8, 27u8, 80u8, 60u8, 181u8, 182u8, 89u8, 4u8, 50u8, 165u8, 56u8,
+							129u8, 184u8, 38u8, 199u8, 42u8, 47u8, 87u8, 96u8, 164u8, 232u8, 138u8,
+							1u8, 105u8, 187u8, 247u8, 175u8, 102u8, 179u8, 59u8, 207u8, 14u8,
 						],
 					)
 				}
 			}
 		}
 		#[doc = "The `Event` enum of this pallet"]
-		pub type Event = runtime_types::pallet_localchain_relay::pallet::Event;
+		pub type Event = runtime_types::pallet_notebook::pallet::Event;
 		pub mod events {
 			use super::runtime_types;
-			#[derive(
-				:: subxt :: ext :: codec :: Decode,
-				:: subxt :: ext :: codec :: Encode,
-				:: subxt :: ext :: scale_decode :: DecodeAsType,
-				:: subxt :: ext :: scale_encode :: EncodeAsType,
-				Clone,
-				Debug,
-			)]
-			# [codec (crate = :: subxt :: ext :: codec)]
-			#[decode_as_type(crate_path = ":: subxt :: ext :: scale_decode")]
-			#[encode_as_type(crate_path = ":: subxt :: ext :: scale_encode")]
-			pub struct TransferToLocalchain {
-				pub account_id: ::subxt::utils::AccountId32,
-				pub amount: ::core::primitive::u128,
-				pub account_nonce: ::core::primitive::u32,
-				pub notary_id: ::core::primitive::u32,
-				pub expiration_block: ::core::primitive::u32,
-			}
-			impl ::subxt::events::StaticEvent for TransferToLocalchain {
-				const PALLET: &'static str = "LocalchainRelay";
-				const EVENT: &'static str = "TransferToLocalchain";
-			}
-			#[derive(
-				:: subxt :: ext :: codec :: Decode,
-				:: subxt :: ext :: codec :: Encode,
-				:: subxt :: ext :: scale_decode :: DecodeAsType,
-				:: subxt :: ext :: scale_encode :: EncodeAsType,
-				Clone,
-				Debug,
-			)]
-			# [codec (crate = :: subxt :: ext :: codec)]
-			#[decode_as_type(crate_path = ":: subxt :: ext :: scale_decode")]
-			#[encode_as_type(crate_path = ":: subxt :: ext :: scale_encode")]
-			pub struct TransferToLocalchainExpired {
-				pub account_id: ::subxt::utils::AccountId32,
-				pub account_nonce: ::core::primitive::u32,
-				pub notary_id: ::core::primitive::u32,
-			}
-			impl ::subxt::events::StaticEvent for TransferToLocalchainExpired {
-				const PALLET: &'static str = "LocalchainRelay";
-				const EVENT: &'static str = "TransferToLocalchainExpired";
-			}
-			#[derive(
-				:: subxt :: ext :: codec :: Decode,
-				:: subxt :: ext :: codec :: Encode,
-				:: subxt :: ext :: scale_decode :: DecodeAsType,
-				:: subxt :: ext :: scale_encode :: EncodeAsType,
-				Clone,
-				Debug,
-			)]
-			# [codec (crate = :: subxt :: ext :: codec)]
-			#[decode_as_type(crate_path = ":: subxt :: ext :: scale_decode")]
-			#[encode_as_type(crate_path = ":: subxt :: ext :: scale_encode")]
-			pub struct TransferIn {
-				pub account_id: ::subxt::utils::AccountId32,
-				pub amount: ::core::primitive::u128,
-				pub notary_id: ::core::primitive::u32,
-			}
-			impl ::subxt::events::StaticEvent for TransferIn {
-				const PALLET: &'static str = "LocalchainRelay";
-				const EVENT: &'static str = "TransferIn";
-			}
 			#[derive(
 				:: subxt :: ext :: codec :: Decode,
 				:: subxt :: ext :: codec :: Encode,
@@ -4835,10 +4833,9 @@ pub mod api {
 			pub struct NotebookSubmitted {
 				pub notary_id: ::core::primitive::u32,
 				pub notebook_number: ::core::primitive::u32,
-				pub pinned_to_block_number: ::core::primitive::u32,
 			}
 			impl ::subxt::events::StaticEvent for NotebookSubmitted {
-				const PALLET: &'static str = "LocalchainRelay";
+				const PALLET: &'static str = "Notebook";
 				const EVENT: &'static str = "NotebookSubmitted";
 			}
 		}
@@ -4846,106 +4843,6 @@ pub mod api {
 			use super::runtime_types;
 			pub struct StorageApi;
 			impl StorageApi {
-				pub fn pending_transfers_out(
-					&self,
-					_0: impl ::std::borrow::Borrow<::subxt::utils::AccountId32>,
-					_1: impl ::std::borrow::Borrow<::core::primitive::u32>,
-				) -> ::subxt::storage::address::Address<
-					::subxt::storage::address::StaticStorageMapKey,
-					runtime_types::pallet_localchain_relay::QueuedTransferOut<
-						::core::primitive::u128,
-						::core::primitive::u32,
-					>,
-					::subxt::storage::address::Yes,
-					(),
-					::subxt::storage::address::Yes,
-				> {
-					::subxt::storage::address::Address::new_static(
-						"LocalchainRelay",
-						"PendingTransfersOut",
-						vec![
-							::subxt::storage::address::make_static_storage_map_key(_0.borrow()),
-							::subxt::storage::address::make_static_storage_map_key(_1.borrow()),
-						],
-						[
-							199u8, 145u8, 42u8, 111u8, 78u8, 179u8, 9u8, 117u8, 229u8, 120u8, 33u8,
-							244u8, 159u8, 127u8, 196u8, 193u8, 210u8, 158u8, 252u8, 190u8, 79u8,
-							111u8, 40u8, 234u8, 159u8, 59u8, 230u8, 96u8, 88u8, 91u8, 221u8, 251u8,
-						],
-					)
-				}
-				pub fn pending_transfers_out_root(
-					&self,
-				) -> ::subxt::storage::address::Address<
-					::subxt::storage::address::StaticStorageMapKey,
-					runtime_types::pallet_localchain_relay::QueuedTransferOut<
-						::core::primitive::u128,
-						::core::primitive::u32,
-					>,
-					(),
-					(),
-					::subxt::storage::address::Yes,
-				> {
-					::subxt::storage::address::Address::new_static(
-						"LocalchainRelay",
-						"PendingTransfersOut",
-						Vec::new(),
-						[
-							199u8, 145u8, 42u8, 111u8, 78u8, 179u8, 9u8, 117u8, 229u8, 120u8, 33u8,
-							244u8, 159u8, 127u8, 196u8, 193u8, 210u8, 158u8, 252u8, 190u8, 79u8,
-							111u8, 40u8, 234u8, 159u8, 59u8, 230u8, 96u8, 88u8, 91u8, 221u8, 251u8,
-						],
-					)
-				}
-				pub fn expiring_transfers_out(
-					&self,
-					_0: impl ::std::borrow::Borrow<::core::primitive::u32>,
-				) -> ::subxt::storage::address::Address<
-					::subxt::storage::address::StaticStorageMapKey,
-					runtime_types::bounded_collections::bounded_vec::BoundedVec<(
-						::subxt::utils::AccountId32,
-						::core::primitive::u32,
-					)>,
-					::subxt::storage::address::Yes,
-					::subxt::storage::address::Yes,
-					::subxt::storage::address::Yes,
-				> {
-					::subxt::storage::address::Address::new_static(
-						"LocalchainRelay",
-						"ExpiringTransfersOut",
-						vec![::subxt::storage::address::make_static_storage_map_key(_0.borrow())],
-						[
-							2u8, 14u8, 179u8, 191u8, 84u8, 44u8, 30u8, 129u8, 244u8, 166u8, 193u8,
-							61u8, 114u8, 176u8, 242u8, 179u8, 153u8, 198u8, 242u8, 204u8, 198u8,
-							123u8, 156u8, 26u8, 65u8, 181u8, 236u8, 222u8, 226u8, 29u8, 179u8,
-							99u8,
-						],
-					)
-				}
-				pub fn expiring_transfers_out_root(
-					&self,
-				) -> ::subxt::storage::address::Address<
-					::subxt::storage::address::StaticStorageMapKey,
-					runtime_types::bounded_collections::bounded_vec::BoundedVec<(
-						::subxt::utils::AccountId32,
-						::core::primitive::u32,
-					)>,
-					(),
-					::subxt::storage::address::Yes,
-					::subxt::storage::address::Yes,
-				> {
-					::subxt::storage::address::Address::new_static(
-						"LocalchainRelay",
-						"ExpiringTransfersOut",
-						Vec::new(),
-						[
-							2u8, 14u8, 179u8, 191u8, 84u8, 44u8, 30u8, 129u8, 244u8, 166u8, 193u8,
-							61u8, 114u8, 176u8, 242u8, 179u8, 153u8, 198u8, 242u8, 204u8, 198u8,
-							123u8, 156u8, 26u8, 65u8, 181u8, 236u8, 222u8, 226u8, 29u8, 179u8,
-							99u8,
-						],
-					)
-				}
 				pub fn finalized_block_number(
 					&self,
 				) -> ::subxt::storage::address::Address<
@@ -4956,7 +4853,7 @@ pub mod api {
 					(),
 				> {
 					::subxt::storage::address::Address::new_static(
-						"LocalchainRelay",
+						"Notebook",
 						"FinalizedBlockNumber",
 						vec![],
 						[
@@ -4967,7 +4864,7 @@ pub mod api {
 						],
 					)
 				}
-				#[doc = " Double storage map of notary id to"]
+				#[doc = " Double storage map of notary id + notebook # to the change root"]
 				pub fn notebook_changed_accounts_root_by_notary(
 					&self,
 					_0: impl ::std::borrow::Borrow<::core::primitive::u32>,
@@ -4980,7 +4877,7 @@ pub mod api {
 					::subxt::storage::address::Yes,
 				> {
 					::subxt::storage::address::Address::new_static(
-						"LocalchainRelay",
+						"Notebook",
 						"NotebookChangedAccountsRootByNotary",
 						vec![
 							::subxt::storage::address::make_static_storage_map_key(_0.borrow()),
@@ -4994,7 +4891,7 @@ pub mod api {
 						],
 					)
 				}
-				#[doc = " Double storage map of notary id to"]
+				#[doc = " Double storage map of notary id + notebook # to the change root"]
 				pub fn notebook_changed_accounts_root_by_notary_root(
 					&self,
 				) -> ::subxt::storage::address::Address<
@@ -5005,7 +4902,7 @@ pub mod api {
 					::subxt::storage::address::Yes,
 				> {
 					::subxt::storage::address::Address::new_static(
-						"LocalchainRelay",
+						"Notebook",
 						"NotebookChangedAccountsRootByNotary",
 						Vec::new(),
 						[
@@ -5033,7 +4930,7 @@ pub mod api {
 					::subxt::storage::address::Yes,
 				> {
 					::subxt::storage::address::Address::new_static(
-						"LocalchainRelay",
+						"Notebook",
 						"AccountOriginLastChangedNotebookByNotary",
 						vec![
 							::subxt::storage::address::make_static_storage_map_key(_0.borrow()),
@@ -5060,7 +4957,7 @@ pub mod api {
 					::subxt::storage::address::Yes,
 				> {
 					::subxt::storage::address::Address::new_static(
-						"LocalchainRelay",
+						"Notebook",
 						"AccountOriginLastChangedNotebookByNotary",
 						Vec::new(),
 						[
@@ -5071,46 +4968,281 @@ pub mod api {
 						],
 					)
 				}
-				pub fn last_notebook_number_by_notary(
+				pub fn last_notebook_details_by_notary(
 					&self,
 					_0: impl ::std::borrow::Borrow<::core::primitive::u32>,
 				) -> ::subxt::storage::address::Address<
 					::subxt::storage::address::StaticStorageMapKey,
-					(::core::primitive::u32, ::core::primitive::u32),
+					runtime_types::bounded_collections::bounded_vec::BoundedVec<
+						runtime_types::ulx_primitives::notary::NotaryNotebookKeyDetails,
+					>,
 					::subxt::storage::address::Yes,
-					(),
+					::subxt::storage::address::Yes,
 					::subxt::storage::address::Yes,
 				> {
 					::subxt::storage::address::Address::new_static(
-						"LocalchainRelay",
-						"LastNotebookNumberByNotary",
+						"Notebook",
+						"LastNotebookDetailsByNotary",
 						vec![::subxt::storage::address::make_static_storage_map_key(_0.borrow())],
 						[
-							36u8, 113u8, 131u8, 229u8, 208u8, 19u8, 183u8, 205u8, 224u8, 176u8,
-							239u8, 251u8, 242u8, 70u8, 215u8, 16u8, 240u8, 119u8, 205u8, 85u8,
-							236u8, 105u8, 42u8, 255u8, 151u8, 55u8, 180u8, 238u8, 243u8, 148u8,
-							121u8, 3u8,
+							95u8, 56u8, 245u8, 125u8, 108u8, 22u8, 248u8, 199u8, 176u8, 27u8, 50u8,
+							109u8, 230u8, 119u8, 184u8, 163u8, 31u8, 199u8, 52u8, 152u8, 160u8,
+							242u8, 126u8, 186u8, 41u8, 159u8, 178u8, 106u8, 150u8, 174u8, 197u8,
+							236u8,
 						],
 					)
 				}
-				pub fn last_notebook_number_by_notary_root(
+				pub fn last_notebook_details_by_notary_root(
 					&self,
 				) -> ::subxt::storage::address::Address<
 					::subxt::storage::address::StaticStorageMapKey,
-					(::core::primitive::u32, ::core::primitive::u32),
+					runtime_types::bounded_collections::bounded_vec::BoundedVec<
+						runtime_types::ulx_primitives::notary::NotaryNotebookKeyDetails,
+					>,
+					(),
+					::subxt::storage::address::Yes,
+					::subxt::storage::address::Yes,
+				> {
+					::subxt::storage::address::Address::new_static(
+						"Notebook",
+						"LastNotebookDetailsByNotary",
+						Vec::new(),
+						[
+							95u8, 56u8, 245u8, 125u8, 108u8, 22u8, 248u8, 199u8, 176u8, 27u8, 50u8,
+							109u8, 230u8, 119u8, 184u8, 163u8, 31u8, 199u8, 52u8, 152u8, 160u8,
+							242u8, 126u8, 186u8, 41u8, 159u8, 178u8, 106u8, 150u8, 174u8, 197u8,
+							236u8,
+						],
+					)
+				}
+			}
+		}
+	}
+	pub mod chain_transfer {
+		use super::{root_mod, runtime_types};
+		#[doc = "The `Error` enum of this pallet."]
+		pub type Error = runtime_types::pallet_chain_transfer::pallet::Error;
+		#[doc = "Contains a variant per dispatchable extrinsic that this pallet has."]
+		pub type Call = runtime_types::pallet_chain_transfer::pallet::Call;
+		pub mod calls {
+			use super::{root_mod, runtime_types};
+			type DispatchError = runtime_types::sp_runtime::DispatchError;
+			pub mod types {
+				use super::runtime_types;
+				#[derive(
+					:: subxt :: ext :: codec :: Decode,
+					:: subxt :: ext :: codec :: Encode,
+					:: subxt :: ext :: scale_decode :: DecodeAsType,
+					:: subxt :: ext :: scale_encode :: EncodeAsType,
+					Clone,
+					Debug,
+				)]
+				# [codec (crate = :: subxt :: ext :: codec)]
+				#[decode_as_type(crate_path = ":: subxt :: ext :: scale_decode")]
+				#[encode_as_type(crate_path = ":: subxt :: ext :: scale_encode")]
+				pub struct SendToLocalchain {
+					#[codec(compact)]
+					pub amount: ::core::primitive::u128,
+					pub notary_id: ::core::primitive::u32,
+					#[codec(compact)]
+					pub account_nonce: ::core::primitive::u32,
+				}
+				impl ::subxt::blocks::StaticExtrinsic for SendToLocalchain {
+					const PALLET: &'static str = "ChainTransfer";
+					const CALL: &'static str = "send_to_localchain";
+				}
+			}
+			pub struct TransactionApi;
+			impl TransactionApi {
+				#[doc = "See `Pallet::send_to_localchain`."]
+				pub fn send_to_localchain(
+					&self,
+					amount: ::core::primitive::u128,
+					notary_id: ::core::primitive::u32,
+					account_nonce: ::core::primitive::u32,
+				) -> ::subxt::tx::Payload<types::SendToLocalchain> {
+					::subxt::tx::Payload::new_static(
+						"ChainTransfer",
+						"send_to_localchain",
+						types::SendToLocalchain { amount, notary_id, account_nonce },
+						[
+							235u8, 60u8, 252u8, 71u8, 57u8, 103u8, 83u8, 70u8, 168u8, 14u8, 138u8,
+							217u8, 144u8, 173u8, 93u8, 242u8, 97u8, 193u8, 176u8, 163u8, 124u8,
+							162u8, 173u8, 250u8, 52u8, 242u8, 168u8, 25u8, 247u8, 208u8, 159u8,
+							117u8,
+						],
+					)
+				}
+			}
+		}
+		#[doc = "The `Event` enum of this pallet"]
+		pub type Event = runtime_types::pallet_chain_transfer::pallet::Event;
+		pub mod events {
+			use super::runtime_types;
+			#[derive(
+				:: subxt :: ext :: codec :: Decode,
+				:: subxt :: ext :: codec :: Encode,
+				:: subxt :: ext :: scale_decode :: DecodeAsType,
+				:: subxt :: ext :: scale_encode :: EncodeAsType,
+				Clone,
+				Debug,
+			)]
+			# [codec (crate = :: subxt :: ext :: codec)]
+			#[decode_as_type(crate_path = ":: subxt :: ext :: scale_decode")]
+			#[encode_as_type(crate_path = ":: subxt :: ext :: scale_encode")]
+			pub struct TransferToLocalchain {
+				pub account_id: ::subxt::utils::AccountId32,
+				pub amount: ::core::primitive::u128,
+				pub account_nonce: ::core::primitive::u32,
+				pub notary_id: ::core::primitive::u32,
+				pub expiration_block: ::core::primitive::u32,
+			}
+			impl ::subxt::events::StaticEvent for TransferToLocalchain {
+				const PALLET: &'static str = "ChainTransfer";
+				const EVENT: &'static str = "TransferToLocalchain";
+			}
+			#[derive(
+				:: subxt :: ext :: codec :: Decode,
+				:: subxt :: ext :: codec :: Encode,
+				:: subxt :: ext :: scale_decode :: DecodeAsType,
+				:: subxt :: ext :: scale_encode :: EncodeAsType,
+				Clone,
+				Debug,
+			)]
+			# [codec (crate = :: subxt :: ext :: codec)]
+			#[decode_as_type(crate_path = ":: subxt :: ext :: scale_decode")]
+			#[encode_as_type(crate_path = ":: subxt :: ext :: scale_encode")]
+			pub struct TransferToLocalchainExpired {
+				pub account_id: ::subxt::utils::AccountId32,
+				pub account_nonce: ::core::primitive::u32,
+				pub notary_id: ::core::primitive::u32,
+			}
+			impl ::subxt::events::StaticEvent for TransferToLocalchainExpired {
+				const PALLET: &'static str = "ChainTransfer";
+				const EVENT: &'static str = "TransferToLocalchainExpired";
+			}
+			#[derive(
+				:: subxt :: ext :: codec :: Decode,
+				:: subxt :: ext :: codec :: Encode,
+				:: subxt :: ext :: scale_decode :: DecodeAsType,
+				:: subxt :: ext :: scale_encode :: EncodeAsType,
+				Clone,
+				Debug,
+			)]
+			# [codec (crate = :: subxt :: ext :: codec)]
+			#[decode_as_type(crate_path = ":: subxt :: ext :: scale_decode")]
+			#[encode_as_type(crate_path = ":: subxt :: ext :: scale_encode")]
+			pub struct TransferIn {
+				pub account_id: ::subxt::utils::AccountId32,
+				pub amount: ::core::primitive::u128,
+				pub notary_id: ::core::primitive::u32,
+			}
+			impl ::subxt::events::StaticEvent for TransferIn {
+				const PALLET: &'static str = "ChainTransfer";
+				const EVENT: &'static str = "TransferIn";
+			}
+		}
+		pub mod storage {
+			use super::runtime_types;
+			pub struct StorageApi;
+			impl StorageApi {
+				pub fn pending_transfers_out(
+					&self,
+					_0: impl ::std::borrow::Borrow<::subxt::utils::AccountId32>,
+					_1: impl ::std::borrow::Borrow<::core::primitive::u32>,
+				) -> ::subxt::storage::address::Address<
+					::subxt::storage::address::StaticStorageMapKey,
+					runtime_types::pallet_chain_transfer::QueuedTransferOut<
+						::core::primitive::u128,
+						::core::primitive::u32,
+					>,
+					::subxt::storage::address::Yes,
+					(),
+					::subxt::storage::address::Yes,
+				> {
+					::subxt::storage::address::Address::new_static(
+						"ChainTransfer",
+						"PendingTransfersOut",
+						vec![
+							::subxt::storage::address::make_static_storage_map_key(_0.borrow()),
+							::subxt::storage::address::make_static_storage_map_key(_1.borrow()),
+						],
+						[
+							199u8, 145u8, 42u8, 111u8, 78u8, 179u8, 9u8, 117u8, 229u8, 120u8, 33u8,
+							244u8, 159u8, 127u8, 196u8, 193u8, 210u8, 158u8, 252u8, 190u8, 79u8,
+							111u8, 40u8, 234u8, 159u8, 59u8, 230u8, 96u8, 88u8, 91u8, 221u8, 251u8,
+						],
+					)
+				}
+				pub fn pending_transfers_out_root(
+					&self,
+				) -> ::subxt::storage::address::Address<
+					::subxt::storage::address::StaticStorageMapKey,
+					runtime_types::pallet_chain_transfer::QueuedTransferOut<
+						::core::primitive::u128,
+						::core::primitive::u32,
+					>,
 					(),
 					(),
 					::subxt::storage::address::Yes,
 				> {
 					::subxt::storage::address::Address::new_static(
-						"LocalchainRelay",
-						"LastNotebookNumberByNotary",
+						"ChainTransfer",
+						"PendingTransfersOut",
 						Vec::new(),
 						[
-							36u8, 113u8, 131u8, 229u8, 208u8, 19u8, 183u8, 205u8, 224u8, 176u8,
-							239u8, 251u8, 242u8, 70u8, 215u8, 16u8, 240u8, 119u8, 205u8, 85u8,
-							236u8, 105u8, 42u8, 255u8, 151u8, 55u8, 180u8, 238u8, 243u8, 148u8,
-							121u8, 3u8,
+							199u8, 145u8, 42u8, 111u8, 78u8, 179u8, 9u8, 117u8, 229u8, 120u8, 33u8,
+							244u8, 159u8, 127u8, 196u8, 193u8, 210u8, 158u8, 252u8, 190u8, 79u8,
+							111u8, 40u8, 234u8, 159u8, 59u8, 230u8, 96u8, 88u8, 91u8, 221u8, 251u8,
+						],
+					)
+				}
+				pub fn expiring_transfers_out(
+					&self,
+					_0: impl ::std::borrow::Borrow<::core::primitive::u32>,
+				) -> ::subxt::storage::address::Address<
+					::subxt::storage::address::StaticStorageMapKey,
+					runtime_types::bounded_collections::bounded_vec::BoundedVec<(
+						::subxt::utils::AccountId32,
+						::core::primitive::u32,
+					)>,
+					::subxt::storage::address::Yes,
+					::subxt::storage::address::Yes,
+					::subxt::storage::address::Yes,
+				> {
+					::subxt::storage::address::Address::new_static(
+						"ChainTransfer",
+						"ExpiringTransfersOut",
+						vec![::subxt::storage::address::make_static_storage_map_key(_0.borrow())],
+						[
+							2u8, 14u8, 179u8, 191u8, 84u8, 44u8, 30u8, 129u8, 244u8, 166u8, 193u8,
+							61u8, 114u8, 176u8, 242u8, 179u8, 153u8, 198u8, 242u8, 204u8, 198u8,
+							123u8, 156u8, 26u8, 65u8, 181u8, 236u8, 222u8, 226u8, 29u8, 179u8,
+							99u8,
+						],
+					)
+				}
+				pub fn expiring_transfers_out_root(
+					&self,
+				) -> ::subxt::storage::address::Address<
+					::subxt::storage::address::StaticStorageMapKey,
+					runtime_types::bounded_collections::bounded_vec::BoundedVec<(
+						::subxt::utils::AccountId32,
+						::core::primitive::u32,
+					)>,
+					(),
+					::subxt::storage::address::Yes,
+					::subxt::storage::address::Yes,
+				> {
+					::subxt::storage::address::Address::new_static(
+						"ChainTransfer",
+						"ExpiringTransfersOut",
+						Vec::new(),
+						[
+							2u8, 14u8, 179u8, 191u8, 84u8, 44u8, 30u8, 129u8, 244u8, 166u8, 193u8,
+							61u8, 114u8, 176u8, 242u8, 179u8, 153u8, 198u8, 242u8, 204u8, 198u8,
+							123u8, 156u8, 26u8, 65u8, 181u8, 236u8, 222u8, 226u8, 29u8, 179u8,
+							99u8,
 						],
 					)
 				}
@@ -5124,7 +5256,7 @@ pub mod api {
 					&self,
 				) -> ::subxt::constants::Address<runtime_types::frame_support::PalletId> {
 					::subxt::constants::Address::new_static(
-						"LocalchainRelay",
+						"ChainTransfer",
 						"PalletId",
 						[
 							56u8, 243u8, 53u8, 83u8, 154u8, 179u8, 170u8, 80u8, 133u8, 173u8, 61u8,
@@ -5138,7 +5270,7 @@ pub mod api {
 					&self,
 				) -> ::subxt::constants::Address<::core::primitive::u32> {
 					::subxt::constants::Address::new_static(
-						"LocalchainRelay",
+						"ChainTransfer",
 						"TransferExpirationBlocks",
 						[
 							98u8, 252u8, 116u8, 72u8, 26u8, 180u8, 225u8, 83u8, 200u8, 157u8,
@@ -5153,38 +5285,8 @@ pub mod api {
 					&self,
 				) -> ::subxt::constants::Address<::core::primitive::u32> {
 					::subxt::constants::Address::new_static(
-						"LocalchainRelay",
+						"ChainTransfer",
 						"MaxPendingTransfersOutPerBlock",
-						[
-							98u8, 252u8, 116u8, 72u8, 26u8, 180u8, 225u8, 83u8, 200u8, 157u8,
-							125u8, 151u8, 53u8, 76u8, 168u8, 26u8, 10u8, 9u8, 98u8, 68u8, 9u8,
-							178u8, 197u8, 113u8, 31u8, 79u8, 200u8, 90u8, 203u8, 100u8, 41u8,
-							145u8,
-						],
-					)
-				}
-				#[doc = " How many auditors are expected to sign a notary block."]
-				pub fn required_notebook_auditors(
-					&self,
-				) -> ::subxt::constants::Address<::core::primitive::u32> {
-					::subxt::constants::Address::new_static(
-						"LocalchainRelay",
-						"RequiredNotebookAuditors",
-						[
-							98u8, 252u8, 116u8, 72u8, 26u8, 180u8, 225u8, 83u8, 200u8, 157u8,
-							125u8, 151u8, 53u8, 76u8, 168u8, 26u8, 10u8, 9u8, 98u8, 68u8, 9u8,
-							178u8, 197u8, 113u8, 31u8, 79u8, 200u8, 90u8, 203u8, 100u8, 41u8,
-							145u8,
-						],
-					)
-				}
-				#[doc = " Number of blocks to keep around for preventing notebook double-submit"]
-				pub fn max_notebook_blocks_to_remember(
-					&self,
-				) -> ::subxt::constants::Address<::core::primitive::u32> {
-					::subxt::constants::Address::new_static(
-						"LocalchainRelay",
-						"MaxNotebookBlocksToRemember",
 						[
 							98u8, 252u8, 116u8, 72u8, 26u8, 180u8, 225u8, 83u8, 200u8, 157u8,
 							125u8, 151u8, 53u8, 76u8, 168u8, 26u8, 10u8, 9u8, 98u8, 68u8, 9u8,
@@ -5196,23 +5298,63 @@ pub mod api {
 			}
 		}
 	}
-	pub mod difficulty {
+	pub mod block_voting {
 		use super::{root_mod, runtime_types};
 		#[doc = "The `Error` enum of this pallet."]
-		pub type Error = runtime_types::pallet_difficulty::pallet::Error;
+		pub type Error = runtime_types::pallet_block_voting::pallet::Error;
 		#[doc = "Contains a variant per dispatchable extrinsic that this pallet has."]
-		pub type Call = runtime_types::pallet_difficulty::pallet::Call;
+		pub type Call = runtime_types::pallet_block_voting::pallet::Call;
 		pub mod calls {
 			use super::{root_mod, runtime_types};
 			type DispatchError = runtime_types::sp_runtime::DispatchError;
 			pub mod types {
 				use super::runtime_types;
+				#[derive(
+					:: subxt :: ext :: codec :: Decode,
+					:: subxt :: ext :: codec :: Encode,
+					:: subxt :: ext :: scale_decode :: DecodeAsType,
+					:: subxt :: ext :: scale_encode :: EncodeAsType,
+					Clone,
+					Debug,
+				)]
+				# [codec (crate = :: subxt :: ext :: codec)]
+				#[decode_as_type(crate_path = ":: subxt :: ext :: scale_decode")]
+				#[encode_as_type(crate_path = ":: subxt :: ext :: scale_encode")]
+				pub struct Configure {
+					pub mining_slot_count_starting_tax_proof:
+						::core::option::Option<::core::primitive::u32>,
+					pub voting_minimum: ::core::option::Option<::core::primitive::u128>,
+				}
+				impl ::subxt::blocks::StaticExtrinsic for Configure {
+					const PALLET: &'static str = "BlockVoting";
+					const CALL: &'static str = "configure";
+				}
 			}
 			pub struct TransactionApi;
-			impl TransactionApi {}
+			impl TransactionApi {
+				#[doc = "See `Pallet::configure`."]
+				pub fn configure(
+					&self,
+					mining_slot_count_starting_tax_proof: ::core::option::Option<
+						::core::primitive::u32,
+					>,
+					voting_minimum: ::core::option::Option<::core::primitive::u128>,
+				) -> ::subxt::tx::Payload<types::Configure> {
+					::subxt::tx::Payload::new_static(
+						"BlockVoting",
+						"configure",
+						types::Configure { mining_slot_count_starting_tax_proof, voting_minimum },
+						[
+							67u8, 208u8, 1u8, 112u8, 61u8, 153u8, 36u8, 136u8, 129u8, 119u8, 245u8,
+							26u8, 16u8, 247u8, 143u8, 211u8, 96u8, 123u8, 41u8, 15u8, 18u8, 9u8,
+							177u8, 24u8, 148u8, 210u8, 0u8, 22u8, 197u8, 14u8, 90u8, 67u8,
+						],
+					)
+				}
+			}
 		}
 		#[doc = "The `Event` enum of this pallet"]
-		pub type Event = runtime_types::pallet_difficulty::pallet::Event;
+		pub type Event = runtime_types::pallet_block_voting::pallet::Event;
 		pub mod events {
 			use super::runtime_types;
 			#[derive(
@@ -5226,46 +5368,67 @@ pub mod api {
 			# [codec (crate = :: subxt :: ext :: codec)]
 			#[decode_as_type(crate_path = ":: subxt :: ext :: scale_decode")]
 			#[encode_as_type(crate_path = ":: subxt :: ext :: scale_encode")]
-			pub struct DifficultyAdjusted {
-				pub observed_millis: ::core::primitive::u128,
-				pub expected_millis: ::core::primitive::u128,
-				pub start_difficulty: ::core::primitive::u128,
-				pub new_difficulty: ::core::primitive::u128,
+			pub struct VotingMinimumAdjusted {
+				pub expected_block_votes: ::core::primitive::u128,
+				pub actual_block_votes: ::core::primitive::u128,
+				pub start_voting_minimum: ::core::primitive::u128,
+				pub new_voting_minimum: ::core::primitive::u128,
 			}
-			impl ::subxt::events::StaticEvent for DifficultyAdjusted {
-				const PALLET: &'static str = "Difficulty";
-				const EVENT: &'static str = "DifficultyAdjusted";
+			impl ::subxt::events::StaticEvent for VotingMinimumAdjusted {
+				const PALLET: &'static str = "BlockVoting";
+				const EVENT: &'static str = "VotingMinimumAdjusted";
 			}
 		}
 		pub mod storage {
 			use super::runtime_types;
 			pub struct StorageApi;
 			impl StorageApi {
-				pub fn past_block_timestamps(
+				#[doc = " How many authorities need to be registered before we activate the Proof of Tax era."]
+				pub fn mining_slot_count_initiating_tax_proof(
 					&self,
 				) -> ::subxt::storage::address::Address<
 					::subxt::storage::address::StaticStorageMapKey,
-					runtime_types::bounded_collections::bounded_vec::BoundedVec<
-						::core::primitive::u64,
-					>,
+					::core::primitive::u32,
 					::subxt::storage::address::Yes,
 					::subxt::storage::address::Yes,
 					(),
 				> {
 					::subxt::storage::address::Address::new_static(
-						"Difficulty",
-						"PastBlockTimestamps",
+						"BlockVoting",
+						"MiningSlotCountInitiatingTaxProof",
 						vec![],
 						[
-							156u8, 153u8, 173u8, 248u8, 208u8, 186u8, 92u8, 9u8, 2u8, 169u8, 18u8,
-							134u8, 92u8, 230u8, 60u8, 4u8, 49u8, 222u8, 163u8, 6u8, 53u8, 141u8,
-							144u8, 75u8, 252u8, 88u8, 74u8, 154u8, 69u8, 70u8, 60u8, 66u8,
+							43u8, 29u8, 26u8, 101u8, 3u8, 143u8, 199u8, 218u8, 223u8, 11u8, 125u8,
+							60u8, 106u8, 157u8, 210u8, 58u8, 105u8, 22u8, 255u8, 209u8, 172u8,
+							192u8, 207u8, 20u8, 85u8, 54u8, 175u8, 248u8, 7u8, 91u8, 15u8, 22u8,
 						],
 					)
 				}
-				#[doc = " The current difficulty of the chain. A nonce must hash to less than U256::Max -"]
-				#[doc = " current difficulty. The larger the value, the harder to solve."]
-				pub fn current_difficulty(
+				pub fn allowed_vote_source(
+					&self,
+				) -> ::subxt::storage::address::Address<
+					::subxt::storage::address::StaticStorageMapKey,
+					runtime_types::ulx_notary_primitives::block_vote::BlockVoteSource,
+					::subxt::storage::address::Yes,
+					::subxt::storage::address::Yes,
+					(),
+				> {
+					::subxt::storage::address::Address::new_static(
+						"BlockVoting",
+						"AllowedVoteSource",
+						vec![],
+						[
+							239u8, 225u8, 151u8, 43u8, 217u8, 78u8, 141u8, 249u8, 216u8, 149u8,
+							126u8, 49u8, 244u8, 33u8, 148u8, 76u8, 83u8, 98u8, 102u8, 60u8, 83u8,
+							243u8, 225u8, 164u8, 189u8, 80u8, 203u8, 88u8, 124u8, 92u8, 49u8,
+							229u8,
+						],
+					)
+				}
+				#[doc = " The current vote minimum of the chain. Block votes use this minimum to determine the"]
+				#[doc = " minimum amount of tax or compute needed to create a vote. It is adjusted up or down to"]
+				#[doc = " target a max number of votes"]
+				pub fn current_voting_minimum(
 					&self,
 				) -> ::subxt::storage::address::Address<
 					::subxt::storage::address::StaticStorageMapKey,
@@ -5275,14 +5438,129 @@ pub mod api {
 					(),
 				> {
 					::subxt::storage::address::Address::new_static(
-						"Difficulty",
-						"CurrentDifficulty",
+						"BlockVoting",
+						"CurrentVotingMinimum",
 						vec![],
 						[
-							41u8, 192u8, 185u8, 75u8, 128u8, 26u8, 1u8, 171u8, 10u8, 78u8, 190u8,
-							222u8, 101u8, 240u8, 89u8, 189u8, 220u8, 35u8, 103u8, 169u8, 145u8,
-							192u8, 111u8, 174u8, 223u8, 108u8, 12u8, 236u8, 62u8, 172u8, 11u8,
-							164u8,
+							168u8, 78u8, 119u8, 74u8, 222u8, 104u8, 1u8, 211u8, 115u8, 161u8,
+							167u8, 238u8, 240u8, 241u8, 201u8, 61u8, 165u8, 11u8, 27u8, 19u8,
+							123u8, 230u8, 195u8, 174u8, 210u8, 212u8, 128u8, 170u8, 48u8, 143u8,
+							50u8, 196u8,
+						],
+					)
+				}
+				#[doc = " The calculated parent voting key for a block. Refers to the Notebook BlockVote Revealed"]
+				#[doc = " Secret + VotesMerkleRoot of the parent block notebooks."]
+				pub fn parent_voting_key(
+					&self,
+				) -> ::subxt::storage::address::Address<
+					::subxt::storage::address::StaticStorageMapKey,
+					::core::option::Option<::subxt::utils::H256>,
+					::subxt::storage::address::Yes,
+					::subxt::storage::address::Yes,
+					(),
+				> {
+					::subxt::storage::address::Address::new_static(
+						"BlockVoting",
+						"ParentVotingKey",
+						vec![],
+						[
+							12u8, 73u8, 52u8, 154u8, 15u8, 127u8, 150u8, 214u8, 178u8, 186u8,
+							231u8, 204u8, 104u8, 196u8, 141u8, 55u8, 198u8, 11u8, 23u8, 252u8,
+							108u8, 65u8, 42u8, 124u8, 77u8, 77u8, 88u8, 35u8, 154u8, 241u8, 50u8,
+							216u8,
+						],
+					)
+				}
+				#[doc = " Keeps the last 3 seal specifications. The first one applies to the current block."]
+				pub fn vote_eligibility_history(
+					&self,
+				) -> ::subxt::storage::address::Address<
+					::subxt::storage::address::StaticStorageMapKey,
+					runtime_types::bounded_collections::bounded_vec::BoundedVec<
+						runtime_types::ulx_notary_primitives::block_vote::BlockVoteEligibility,
+					>,
+					::subxt::storage::address::Yes,
+					::subxt::storage::address::Yes,
+					(),
+				> {
+					::subxt::storage::address::Address::new_static(
+						"BlockVoting",
+						"VoteEligibilityHistory",
+						vec![],
+						[
+							196u8, 159u8, 130u8, 132u8, 77u8, 26u8, 126u8, 167u8, 209u8, 196u8,
+							167u8, 17u8, 195u8, 86u8, 87u8, 50u8, 151u8, 227u8, 45u8, 183u8, 126u8,
+							2u8, 70u8, 58u8, 161u8, 122u8, 45u8, 65u8, 47u8, 32u8, 1u8, 91u8,
+						],
+					)
+				}
+				#[doc = " Temporary store of the number of votes in the current block."]
+				pub fn temp_notebooks_by_notary(
+					&self,
+				) -> ::subxt::storage::address::Address<
+					::subxt::storage::address::StaticStorageMapKey,
+					runtime_types::bounded_collections::bounded_btree_map::BoundedBTreeMap<
+						::core::primitive::u32,
+						runtime_types::ulx_notary_primitives::notebook::NotebookHeader,
+					>,
+					::subxt::storage::address::Yes,
+					::subxt::storage::address::Yes,
+					(),
+				> {
+					::subxt::storage::address::Address::new_static(
+						"BlockVoting",
+						"TempNotebooksByNotary",
+						vec![],
+						[
+							100u8, 160u8, 7u8, 124u8, 146u8, 220u8, 59u8, 75u8, 197u8, 50u8, 221u8,
+							99u8, 129u8, 123u8, 219u8, 114u8, 109u8, 88u8, 109u8, 160u8, 127u8,
+							34u8, 117u8, 128u8, 228u8, 133u8, 88u8, 23u8, 96u8, 97u8, 216u8, 47u8,
+						],
+					)
+				}
+				#[doc = " Temporary store the vote digest"]
+				pub fn temp_block_vote_digest(
+					&self,
+				) -> ::subxt::storage::address::Address<
+					::subxt::storage::address::StaticStorageMapKey,
+					runtime_types::ulx_notary_primitives::digests::BlockVoteDigest,
+					::subxt::storage::address::Yes,
+					(),
+					(),
+				> {
+					::subxt::storage::address::Address::new_static(
+						"BlockVoting",
+						"TempBlockVoteDigest",
+						vec![],
+						[
+							168u8, 94u8, 202u8, 162u8, 110u8, 185u8, 192u8, 167u8, 180u8, 242u8,
+							183u8, 199u8, 28u8, 82u8, 238u8, 10u8, 65u8, 104u8, 3u8, 203u8, 179u8,
+							56u8, 101u8, 138u8, 74u8, 118u8, 17u8, 160u8, 252u8, 21u8, 157u8,
+							205u8,
+						],
+					)
+				}
+				pub fn past_block_votes(
+					&self,
+				) -> ::subxt::storage::address::Address<
+					::subxt::storage::address::StaticStorageMapKey,
+					runtime_types::bounded_collections::bounded_vec::BoundedVec<(
+						::core::primitive::u32,
+						::core::primitive::u128,
+					)>,
+					::subxt::storage::address::Yes,
+					::subxt::storage::address::Yes,
+					(),
+				> {
+					::subxt::storage::address::Address::new_static(
+						"BlockVoting",
+						"PastBlockVotes",
+						vec![],
+						[
+							107u8, 45u8, 128u8, 167u8, 36u8, 64u8, 144u8, 19u8, 220u8, 71u8, 170u8,
+							170u8, 116u8, 34u8, 17u8, 75u8, 111u8, 68u8, 152u8, 121u8, 139u8, 99u8,
+							180u8, 73u8, 219u8, 28u8, 15u8, 98u8, 57u8, 94u8, 115u8, 88u8,
 						],
 					)
 				}
@@ -5292,13 +5570,27 @@ pub mod api {
 			use super::runtime_types;
 			pub struct ConstantsApi;
 			impl ConstantsApi {
-				#[doc = " The frequency for changing difficulty"]
-				pub fn block_change_period(
+				#[doc = " The desired votes per block"]
+				pub fn target_block_votes(
+					&self,
+				) -> ::subxt::constants::Address<::core::primitive::u128> {
+					::subxt::constants::Address::new_static(
+						"BlockVoting",
+						"TargetBlockVotes",
+						[
+							84u8, 157u8, 140u8, 4u8, 93u8, 57u8, 29u8, 133u8, 105u8, 200u8, 214u8,
+							27u8, 144u8, 208u8, 218u8, 160u8, 130u8, 109u8, 101u8, 54u8, 210u8,
+							136u8, 71u8, 63u8, 49u8, 237u8, 234u8, 15u8, 178u8, 98u8, 148u8, 156u8,
+						],
+					)
+				}
+				#[doc = " The frequency for changing the minimum"]
+				pub fn voting_minimum_change_period(
 					&self,
 				) -> ::subxt::constants::Address<::core::primitive::u32> {
 					::subxt::constants::Address::new_static(
-						"Difficulty",
-						"BlockChangePeriod",
+						"BlockVoting",
+						"VotingMinimumChangePeriod",
 						[
 							98u8, 252u8, 116u8, 72u8, 26u8, 180u8, 225u8, 83u8, 200u8, 157u8,
 							125u8, 151u8, 53u8, 76u8, 168u8, 26u8, 10u8, 9u8, 98u8, 68u8, 9u8,
@@ -5764,76 +6056,29 @@ pub mod api {
 				# [codec (crate = :: subxt :: ext :: codec)]
 				#[decode_as_type(crate_path = ":: subxt :: ext :: scale_decode")]
 				#[encode_as_type(crate_path = ":: subxt :: ext :: scale_encode")]
-				pub struct Create {
-					pub seal: runtime_types::ulx_primitives::inherents::UlxBlockSealInherent,
+				pub struct Apply {
+					pub seal: runtime_types::ulx_primitives::inherents::BlockSealInherent,
 				}
-				impl ::subxt::blocks::StaticExtrinsic for Create {
+				impl ::subxt::blocks::StaticExtrinsic for Apply {
 					const PALLET: &'static str = "BlockSeal";
-					const CALL: &'static str = "create";
-				}
-				#[derive(
-					:: subxt :: ext :: codec :: Decode,
-					:: subxt :: ext :: codec :: Encode,
-					:: subxt :: ext :: scale_decode :: DecodeAsType,
-					:: subxt :: ext :: scale_encode :: EncodeAsType,
-					Clone,
-					Debug,
-				)]
-				# [codec (crate = :: subxt :: ext :: codec)]
-				#[decode_as_type(crate_path = ":: subxt :: ext :: scale_decode")]
-				#[encode_as_type(crate_path = ":: subxt :: ext :: scale_encode")]
-				pub struct Configure {
-					pub min_seal_signers: ::core::option::Option<::core::primitive::u32>,
-					pub required_xor_closest_validators:
-						::core::option::Option<::core::primitive::u32>,
-					pub authority_count_starting_tax_seal:
-						::core::option::Option<::core::primitive::u32>,
-				}
-				impl ::subxt::blocks::StaticExtrinsic for Configure {
-					const PALLET: &'static str = "BlockSeal";
-					const CALL: &'static str = "configure";
+					const CALL: &'static str = "apply";
 				}
 			}
 			pub struct TransactionApi;
 			impl TransactionApi {
-				#[doc = "See `Pallet::create`."]
-				pub fn create(
+				#[doc = "See `Pallet::apply`."]
+				pub fn apply(
 					&self,
-					seal: runtime_types::ulx_primitives::inherents::UlxBlockSealInherent,
-				) -> ::subxt::tx::Payload<types::Create> {
+					seal: runtime_types::ulx_primitives::inherents::BlockSealInherent,
+				) -> ::subxt::tx::Payload<types::Apply> {
 					::subxt::tx::Payload::new_static(
 						"BlockSeal",
-						"create",
-						types::Create { seal },
+						"apply",
+						types::Apply { seal },
 						[
-							117u8, 118u8, 239u8, 125u8, 218u8, 89u8, 174u8, 229u8, 207u8, 70u8,
-							252u8, 135u8, 12u8, 234u8, 166u8, 69u8, 186u8, 81u8, 237u8, 0u8, 156u8,
-							31u8, 201u8, 108u8, 168u8, 60u8, 155u8, 151u8, 150u8, 96u8, 130u8,
-							44u8,
-						],
-					)
-				}
-				#[doc = "See `Pallet::configure`."]
-				pub fn configure(
-					&self,
-					min_seal_signers: ::core::option::Option<::core::primitive::u32>,
-					required_xor_closest_validators: ::core::option::Option<::core::primitive::u32>,
-					authority_count_starting_tax_seal: ::core::option::Option<
-						::core::primitive::u32,
-					>,
-				) -> ::subxt::tx::Payload<types::Configure> {
-					::subxt::tx::Payload::new_static(
-						"BlockSeal",
-						"configure",
-						types::Configure {
-							min_seal_signers,
-							required_xor_closest_validators,
-							authority_count_starting_tax_seal,
-						},
-						[
-							251u8, 58u8, 171u8, 27u8, 160u8, 5u8, 238u8, 252u8, 127u8, 107u8, 1u8,
-							89u8, 8u8, 129u8, 68u8, 0u8, 98u8, 197u8, 51u8, 34u8, 108u8, 148u8,
-							189u8, 225u8, 229u8, 207u8, 181u8, 142u8, 91u8, 165u8, 50u8, 23u8,
+							172u8, 96u8, 76u8, 226u8, 66u8, 215u8, 41u8, 91u8, 162u8, 88u8, 182u8,
+							147u8, 20u8, 137u8, 116u8, 31u8, 211u8, 236u8, 159u8, 66u8, 161u8,
+							129u8, 220u8, 67u8, 159u8, 89u8, 114u8, 146u8, 7u8, 21u8, 135u8, 23u8,
 						],
 					)
 				}
@@ -5848,124 +6093,8 @@ pub mod api {
 			use super::runtime_types;
 			pub struct StorageApi;
 			impl StorageApi {
-				#[doc = " Pruned with the max block seal history parameter"]
-				pub fn historical_block_seal_authorities(
-					&self,
-					_0: impl ::std::borrow::Borrow<::core::primitive::u32>,
-				) -> ::subxt::storage::address::Address<
-					::subxt::storage::address::StaticStorageMapKey,
-					runtime_types::bounded_collections::bounded_vec::BoundedVec<(
-						::core::primitive::u16,
-						runtime_types::ulx_primitives::block_seal::app::Public,
-					)>,
-					::subxt::storage::address::Yes,
-					::subxt::storage::address::Yes,
-					::subxt::storage::address::Yes,
-				> {
-					::subxt::storage::address::Address::new_static(
-						"BlockSeal",
-						"HistoricalBlockSealAuthorities",
-						vec![::subxt::storage::address::make_static_storage_map_key(_0.borrow())],
-						[
-							67u8, 226u8, 10u8, 157u8, 62u8, 200u8, 219u8, 169u8, 207u8, 228u8,
-							204u8, 175u8, 171u8, 32u8, 111u8, 7u8, 147u8, 151u8, 89u8, 82u8, 183u8,
-							204u8, 170u8, 145u8, 165u8, 42u8, 22u8, 89u8, 223u8, 26u8, 205u8,
-							129u8,
-						],
-					)
-				}
-				#[doc = " Pruned with the max block seal history parameter"]
-				pub fn historical_block_seal_authorities_root(
-					&self,
-				) -> ::subxt::storage::address::Address<
-					::subxt::storage::address::StaticStorageMapKey,
-					runtime_types::bounded_collections::bounded_vec::BoundedVec<(
-						::core::primitive::u16,
-						runtime_types::ulx_primitives::block_seal::app::Public,
-					)>,
-					(),
-					::subxt::storage::address::Yes,
-					::subxt::storage::address::Yes,
-				> {
-					::subxt::storage::address::Address::new_static(
-						"BlockSeal",
-						"HistoricalBlockSealAuthorities",
-						Vec::new(),
-						[
-							67u8, 226u8, 10u8, 157u8, 62u8, 200u8, 219u8, 169u8, 207u8, 228u8,
-							204u8, 175u8, 171u8, 32u8, 111u8, 7u8, 147u8, 151u8, 89u8, 82u8, 183u8,
-							204u8, 170u8, 145u8, 165u8, 42u8, 22u8, 89u8, 223u8, 26u8, 205u8,
-							129u8,
-						],
-					)
-				}
-				#[doc = " How many of the xor authorities must sign a block seal to be valid"]
-				pub fn min_seal_signers(
-					&self,
-				) -> ::subxt::storage::address::Address<
-					::subxt::storage::address::StaticStorageMapKey,
-					::core::primitive::u32,
-					::subxt::storage::address::Yes,
-					::subxt::storage::address::Yes,
-					(),
-				> {
-					::subxt::storage::address::Address::new_static(
-						"BlockSeal",
-						"MinSealSigners",
-						vec![],
-						[
-							33u8, 11u8, 251u8, 29u8, 55u8, 104u8, 58u8, 220u8, 196u8, 86u8, 40u8,
-							141u8, 190u8, 164u8, 128u8, 79u8, 149u8, 62u8, 160u8, 70u8, 121u8,
-							206u8, 112u8, 134u8, 47u8, 249u8, 221u8, 30u8, 112u8, 233u8, 219u8,
-							134u8,
-						],
-					)
-				}
-				#[doc = " How many closest xor authorities must be included in a block seal to be accepted"]
-				pub fn closest_x_authorities_required(
-					&self,
-				) -> ::subxt::storage::address::Address<
-					::subxt::storage::address::StaticStorageMapKey,
-					::core::primitive::u32,
-					::subxt::storage::address::Yes,
-					::subxt::storage::address::Yes,
-					(),
-				> {
-					::subxt::storage::address::Address::new_static(
-						"BlockSeal",
-						"ClosestXAuthoritiesRequired",
-						vec![],
-						[
-							24u8, 182u8, 85u8, 247u8, 170u8, 28u8, 217u8, 183u8, 14u8, 155u8, 66u8,
-							32u8, 229u8, 12u8, 129u8, 37u8, 241u8, 159u8, 205u8, 93u8, 228u8,
-							250u8, 126u8, 238u8, 193u8, 126u8, 25u8, 30u8, 102u8, 33u8, 13u8,
-							248u8,
-						],
-					)
-				}
-				#[doc = " How many authorities need to be registered before we activate the Proof of Tax era."]
-				pub fn authority_count_initiating_tax_proof(
-					&self,
-				) -> ::subxt::storage::address::Address<
-					::subxt::storage::address::StaticStorageMapKey,
-					::core::primitive::u32,
-					::subxt::storage::address::Yes,
-					::subxt::storage::address::Yes,
-					(),
-				> {
-					::subxt::storage::address::Address::new_static(
-						"BlockSeal",
-						"AuthorityCountInitiatingTaxProof",
-						vec![],
-						[
-							160u8, 252u8, 182u8, 198u8, 254u8, 60u8, 3u8, 158u8, 220u8, 156u8,
-							104u8, 119u8, 92u8, 226u8, 31u8, 103u8, 57u8, 50u8, 40u8, 121u8, 208u8,
-							57u8, 47u8, 224u8, 85u8, 38u8, 136u8, 228u8, 215u8, 211u8, 67u8, 179u8,
-						],
-					)
-				}
 				#[doc = " Author of current block (temporary storage)."]
-				pub fn author(
+				pub fn temp_author(
 					&self,
 				) -> ::subxt::storage::address::Address<
 					::subxt::storage::address::StaticStorageMapKey,
@@ -5976,18 +6105,82 @@ pub mod api {
 				> {
 					::subxt::storage::address::Address::new_static(
 						"BlockSeal",
-						"Author",
+						"TempAuthor",
 						vec![],
 						[
-							247u8, 192u8, 118u8, 227u8, 47u8, 20u8, 203u8, 199u8, 216u8, 87u8,
-							220u8, 50u8, 166u8, 61u8, 168u8, 213u8, 253u8, 62u8, 202u8, 199u8,
-							61u8, 192u8, 237u8, 53u8, 22u8, 148u8, 164u8, 245u8, 99u8, 24u8, 146u8,
-							18u8,
+							29u8, 149u8, 234u8, 74u8, 206u8, 138u8, 152u8, 92u8, 28u8, 103u8, 4u8,
+							236u8, 161u8, 51u8, 52u8, 196u8, 28u8, 242u8, 250u8, 210u8, 187u8,
+							78u8, 217u8, 251u8, 157u8, 143u8, 91u8, 60u8, 246u8, 218u8, 227u8,
+							114u8,
 						],
 					)
 				}
-				#[doc = " Did the seal run exactly once (temporary storage)"]
-				pub fn did_seal(
+				#[doc = " Author of previous block"]
+				pub fn last_block_author(
+					&self,
+				) -> ::subxt::storage::address::Address<
+					::subxt::storage::address::StaticStorageMapKey,
+					::subxt::utils::AccountId32,
+					::subxt::storage::address::Yes,
+					(),
+					(),
+				> {
+					::subxt::storage::address::Address::new_static(
+						"BlockSeal",
+						"LastBlockAuthor",
+						vec![],
+						[
+							4u8, 217u8, 33u8, 90u8, 53u8, 208u8, 197u8, 246u8, 101u8, 44u8, 252u8,
+							115u8, 243u8, 230u8, 184u8, 73u8, 135u8, 204u8, 135u8, 248u8, 237u8,
+							216u8, 46u8, 102u8, 160u8, 147u8, 152u8, 130u8, 141u8, 140u8, 79u8,
+							61u8,
+						],
+					)
+				}
+				#[doc = " Decodes the block seal from the digest."]
+				pub fn temp_seal_digest(
+					&self,
+				) -> ::subxt::storage::address::Address<
+					::subxt::storage::address::StaticStorageMapKey,
+					runtime_types::ulx_primitives::digests::BlockSealDigest,
+					::subxt::storage::address::Yes,
+					(),
+					(),
+				> {
+					::subxt::storage::address::Address::new_static(
+						"BlockSeal",
+						"TempSealDigest",
+						vec![],
+						[
+							177u8, 8u8, 11u8, 33u8, 252u8, 205u8, 142u8, 200u8, 228u8, 255u8, 76u8,
+							57u8, 122u8, 61u8, 146u8, 132u8, 167u8, 81u8, 92u8, 187u8, 219u8, 18u8,
+							218u8, 134u8, 116u8, 152u8, 251u8, 186u8, 61u8, 174u8, 124u8, 121u8,
+						],
+					)
+				}
+				pub fn temp_block_vote_digest(
+					&self,
+				) -> ::subxt::storage::address::Address<
+					::subxt::storage::address::StaticStorageMapKey,
+					runtime_types::ulx_notary_primitives::digests::BlockVoteDigest,
+					::subxt::storage::address::Yes,
+					(),
+					(),
+				> {
+					::subxt::storage::address::Address::new_static(
+						"BlockSeal",
+						"TempBlockVoteDigest",
+						vec![],
+						[
+							168u8, 94u8, 202u8, 162u8, 110u8, 185u8, 192u8, 167u8, 180u8, 242u8,
+							183u8, 199u8, 28u8, 82u8, 238u8, 10u8, 65u8, 104u8, 3u8, 203u8, 179u8,
+							56u8, 101u8, 138u8, 74u8, 118u8, 17u8, 160u8, 252u8, 21u8, 157u8,
+							205u8,
+						],
+					)
+				}
+				#[doc = " Ensures only a single inherent is applied"]
+				pub fn has_seal_inherent(
 					&self,
 				) -> ::subxt::storage::address::Address<
 					::subxt::storage::address::StaticStorageMapKey,
@@ -5998,55 +6191,13 @@ pub mod api {
 				> {
 					::subxt::storage::address::Address::new_static(
 						"BlockSeal",
-						"DidSeal",
+						"HasSealInherent",
 						vec![],
 						[
-							197u8, 140u8, 220u8, 230u8, 210u8, 118u8, 147u8, 167u8, 233u8, 37u8,
-							105u8, 146u8, 10u8, 225u8, 170u8, 87u8, 63u8, 213u8, 41u8, 122u8,
-							102u8, 181u8, 225u8, 252u8, 69u8, 2u8, 18u8, 137u8, 163u8, 39u8, 199u8,
-							80u8,
-						],
-					)
-				}
-				pub fn current_work_type(
-					&self,
-				) -> ::subxt::storage::address::Address<
-					::subxt::storage::address::StaticStorageMapKey,
-					runtime_types::ulx_primitives::digests::ProofOfWorkType,
-					::subxt::storage::address::Yes,
-					::subxt::storage::address::Yes,
-					(),
-				> {
-					::subxt::storage::address::Address::new_static(
-						"BlockSeal",
-						"CurrentWorkType",
-						vec![],
-						[
-							93u8, 137u8, 44u8, 239u8, 207u8, 136u8, 125u8, 48u8, 10u8, 226u8,
-							158u8, 249u8, 117u8, 54u8, 157u8, 173u8, 26u8, 58u8, 171u8, 112u8,
-							92u8, 29u8, 88u8, 30u8, 83u8, 10u8, 251u8, 141u8, 163u8, 77u8, 6u8,
-							41u8,
-						],
-					)
-				}
-			}
-		}
-		pub mod constants {
-			use super::runtime_types;
-			pub struct ConstantsApi;
-			impl ConstantsApi {
-				#[doc = " How many historical block sealers to keep in storage"]
-				pub fn historical_block_sealers_to_keep(
-					&self,
-				) -> ::subxt::constants::Address<::core::primitive::u32> {
-					::subxt::constants::Address::new_static(
-						"BlockSeal",
-						"HistoricalBlockSealersToKeep",
-						[
-							98u8, 252u8, 116u8, 72u8, 26u8, 180u8, 225u8, 83u8, 200u8, 157u8,
-							125u8, 151u8, 53u8, 76u8, 168u8, 26u8, 10u8, 9u8, 98u8, 68u8, 9u8,
-							178u8, 197u8, 113u8, 31u8, 79u8, 200u8, 90u8, 203u8, 100u8, 41u8,
-							145u8,
+							243u8, 188u8, 77u8, 34u8, 197u8, 99u8, 226u8, 21u8, 201u8, 123u8, 75u8,
+							189u8, 23u8, 132u8, 176u8, 112u8, 122u8, 6u8, 189u8, 159u8, 39u8,
+							246u8, 122u8, 219u8, 95u8, 250u8, 175u8, 235u8, 224u8, 18u8, 11u8,
+							238u8,
 						],
 					)
 				}
@@ -6535,7 +6686,7 @@ pub mod api {
 						::subxt::utils::AccountId32,
 						(
 							::subxt::utils::AccountId32,
-							runtime_types::pallet_mining_slots::MinerHistory,
+							runtime_types::pallet_mining_slot::MinerHistory,
 						),
 					>,
 					::subxt::storage::address::Yes,
@@ -6562,7 +6713,7 @@ pub mod api {
 						::subxt::utils::AccountId32,
 						(
 							::subxt::utils::AccountId32,
-							runtime_types::pallet_mining_slots::MinerHistory,
+							runtime_types::pallet_mining_slot::MinerHistory,
 						),
 					>,
 					(),
@@ -7673,9 +7824,9 @@ pub mod api {
 						"Holds",
 						vec![::subxt::storage::address::make_static_storage_map_key(_0.borrow())],
 						[
-							75u8, 136u8, 19u8, 39u8, 39u8, 90u8, 250u8, 120u8, 128u8, 199u8, 53u8,
-							120u8, 167u8, 149u8, 171u8, 47u8, 137u8, 41u8, 217u8, 206u8, 143u8,
-							82u8, 139u8, 148u8, 127u8, 25u8, 127u8, 39u8, 31u8, 57u8, 106u8, 184u8,
+							84u8, 191u8, 226u8, 103u8, 50u8, 224u8, 96u8, 56u8, 2u8, 58u8, 140u8,
+							22u8, 227u8, 169u8, 173u8, 59u8, 20u8, 4u8, 130u8, 11u8, 41u8, 106u8,
+							66u8, 117u8, 27u8, 220u8, 164u8, 14u8, 151u8, 140u8, 218u8, 99u8,
 						],
 					)
 				}
@@ -7699,9 +7850,9 @@ pub mod api {
 						"Holds",
 						Vec::new(),
 						[
-							75u8, 136u8, 19u8, 39u8, 39u8, 90u8, 250u8, 120u8, 128u8, 199u8, 53u8,
-							120u8, 167u8, 149u8, 171u8, 47u8, 137u8, 41u8, 217u8, 206u8, 143u8,
-							82u8, 139u8, 148u8, 127u8, 25u8, 127u8, 39u8, 31u8, 57u8, 106u8, 184u8,
+							84u8, 191u8, 226u8, 103u8, 50u8, 224u8, 96u8, 56u8, 2u8, 58u8, 140u8,
+							22u8, 227u8, 169u8, 173u8, 59u8, 20u8, 4u8, 130u8, 11u8, 41u8, 106u8,
+							66u8, 117u8, 27u8, 220u8, 164u8, 14u8, 151u8, 140u8, 218u8, 99u8,
 						],
 					)
 				}
@@ -8882,9 +9033,9 @@ pub mod api {
 						"Holds",
 						vec![::subxt::storage::address::make_static_storage_map_key(_0.borrow())],
 						[
-							75u8, 136u8, 19u8, 39u8, 39u8, 90u8, 250u8, 120u8, 128u8, 199u8, 53u8,
-							120u8, 167u8, 149u8, 171u8, 47u8, 137u8, 41u8, 217u8, 206u8, 143u8,
-							82u8, 139u8, 148u8, 127u8, 25u8, 127u8, 39u8, 31u8, 57u8, 106u8, 184u8,
+							84u8, 191u8, 226u8, 103u8, 50u8, 224u8, 96u8, 56u8, 2u8, 58u8, 140u8,
+							22u8, 227u8, 169u8, 173u8, 59u8, 20u8, 4u8, 130u8, 11u8, 41u8, 106u8,
+							66u8, 117u8, 27u8, 220u8, 164u8, 14u8, 151u8, 140u8, 218u8, 99u8,
 						],
 					)
 				}
@@ -8908,9 +9059,9 @@ pub mod api {
 						"Holds",
 						Vec::new(),
 						[
-							75u8, 136u8, 19u8, 39u8, 39u8, 90u8, 250u8, 120u8, 128u8, 199u8, 53u8,
-							120u8, 167u8, 149u8, 171u8, 47u8, 137u8, 41u8, 217u8, 206u8, 143u8,
-							82u8, 139u8, 148u8, 127u8, 25u8, 127u8, 39u8, 31u8, 57u8, 106u8, 184u8,
+							84u8, 191u8, 226u8, 103u8, 50u8, 224u8, 96u8, 56u8, 2u8, 58u8, 140u8,
+							22u8, 227u8, 169u8, 173u8, 59u8, 20u8, 4u8, 130u8, 11u8, 41u8, 106u8,
+							66u8, 117u8, 27u8, 220u8, 164u8, 14u8, 151u8, 140u8, 218u8, 99u8,
 						],
 					)
 				}
@@ -9520,9 +9671,10 @@ pub mod api {
 						"sudo",
 						types::Sudo { call: ::std::boxed::Box::new(call) },
 						[
-							17u8, 92u8, 88u8, 213u8, 91u8, 228u8, 204u8, 77u8, 185u8, 162u8, 165u8,
-							172u8, 63u8, 18u8, 74u8, 89u8, 182u8, 16u8, 202u8, 115u8, 117u8, 253u8,
-							33u8, 65u8, 90u8, 65u8, 229u8, 198u8, 243u8, 156u8, 190u8, 31u8,
+							251u8, 238u8, 155u8, 139u8, 124u8, 126u8, 116u8, 251u8, 43u8, 193u8,
+							217u8, 24u8, 120u8, 106u8, 44u8, 239u8, 74u8, 31u8, 187u8, 141u8, 17u8,
+							158u8, 44u8, 140u8, 190u8, 21u8, 205u8, 165u8, 252u8, 62u8, 240u8,
+							255u8,
 						],
 					)
 				}
@@ -9537,9 +9689,10 @@ pub mod api {
 						"sudo_unchecked_weight",
 						types::SudoUncheckedWeight { call: ::std::boxed::Box::new(call), weight },
 						[
-							225u8, 200u8, 65u8, 221u8, 143u8, 245u8, 3u8, 61u8, 30u8, 44u8, 187u8,
-							209u8, 116u8, 5u8, 0u8, 132u8, 26u8, 240u8, 215u8, 23u8, 244u8, 150u8,
-							213u8, 97u8, 153u8, 238u8, 86u8, 115u8, 234u8, 73u8, 27u8, 2u8,
+							138u8, 191u8, 135u8, 43u8, 80u8, 113u8, 35u8, 225u8, 230u8, 91u8, 31u8,
+							107u8, 89u8, 247u8, 137u8, 226u8, 161u8, 23u8, 183u8, 78u8, 149u8,
+							50u8, 116u8, 91u8, 117u8, 85u8, 190u8, 157u8, 251u8, 231u8, 228u8,
+							205u8,
 						],
 					)
 				}
@@ -9570,10 +9723,9 @@ pub mod api {
 						"sudo_as",
 						types::SudoAs { who, call: ::std::boxed::Box::new(call) },
 						[
-							135u8, 253u8, 151u8, 132u8, 87u8, 42u8, 55u8, 130u8, 27u8, 245u8,
-							187u8, 96u8, 173u8, 126u8, 46u8, 72u8, 133u8, 222u8, 119u8, 141u8,
-							48u8, 70u8, 41u8, 229u8, 100u8, 63u8, 42u8, 128u8, 29u8, 128u8, 128u8,
-							109u8,
+							32u8, 17u8, 109u8, 220u8, 18u8, 7u8, 227u8, 15u8, 223u8, 117u8, 224u8,
+							170u8, 168u8, 11u8, 213u8, 79u8, 2u8, 212u8, 67u8, 237u8, 126u8, 204u8,
+							172u8, 61u8, 131u8, 195u8, 83u8, 203u8, 127u8, 248u8, 109u8, 76u8,
 						],
 					)
 				}
@@ -10792,17 +10944,8 @@ pub mod api {
 				#[doc = "Contains a variant per dispatchable extrinsic that this pallet has."]
 				pub enum Call {
 					#[codec(index = 0)]
-					#[doc = "See `Pallet::create`."]
-					create { seal: runtime_types::ulx_primitives::inherents::UlxBlockSealInherent },
-					#[codec(index = 1)]
-					#[doc = "See `Pallet::configure`."]
-					configure {
-						min_seal_signers: ::core::option::Option<::core::primitive::u32>,
-						required_xor_closest_validators:
-							::core::option::Option<::core::primitive::u32>,
-						authority_count_starting_tax_seal:
-							::core::option::Option<::core::primitive::u32>,
-					},
+					#[doc = "See `Pallet::apply`."]
+					apply { seal: runtime_types::ulx_primitives::inherents::BlockSealInherent },
 				}
 				#[derive(
 					:: subxt :: ext :: codec :: Decode,
@@ -10818,21 +10961,37 @@ pub mod api {
 				#[doc = "The `Error` enum of this pallet."]
 				pub enum Error {
 					#[codec(index = 0)]
-					InvalidBlockSealType,
+					InvalidBlockVoteSource,
 					#[codec(index = 1)]
-					InvalidBlockSealNonce,
+					InvalidNonce,
 					#[codec(index = 2)]
-					InvalidSealValidatorsProvided,
+					InvalidComputePuzzleNonce,
 					#[codec(index = 3)]
-					InsufficientValidatorsIncluded,
+					InvalidSubmitter,
 					#[codec(index = 4)]
-					InvalidSealSignature,
-					#[codec(index = 5)]
-					InsufficientSealSigners,
-					#[codec(index = 6)]
-					InvalidXorClosestAuthoritiesOrder,
-					#[codec(index = 7)]
 					UnregisteredBlockAuthor,
+					#[codec(index = 5)]
+					InvalidBlockVoteProof,
+					#[codec(index = 6)]
+					NoHistoricalVoteEligibility,
+					#[codec(index = 7)]
+					DuplicateSealSpecification,
+					#[codec(index = 8)]
+					InvalidPower,
+					#[codec(index = 9)]
+					InvalidParentVotingKey,
+					#[codec(index = 10)]
+					BlockSealDigestMismatch,
+					#[codec(index = 11)]
+					BlockVoteDigestMissing,
+					#[codec(index = 12)]
+					InvalidContinuationAuthor,
+					#[codec(index = 13)]
+					InvalidContinuation,
+					#[codec(index = 14)]
+					IneligibleNotebookUsed,
+					#[codec(index = 15)]
+					NoEligibleVotingRoot,
 				}
 				#[derive(
 					:: subxt :: ext :: codec :: Decode,
@@ -10849,7 +11008,68 @@ pub mod api {
 				pub enum Event {}
 			}
 		}
-		pub mod pallet_bonds {
+		pub mod pallet_block_voting {
+			use super::runtime_types;
+			pub mod pallet {
+				use super::runtime_types;
+				#[derive(
+					:: subxt :: ext :: codec :: Decode,
+					:: subxt :: ext :: codec :: Encode,
+					:: subxt :: ext :: scale_decode :: DecodeAsType,
+					:: subxt :: ext :: scale_encode :: EncodeAsType,
+					Clone,
+					Debug,
+				)]
+				# [codec (crate = :: subxt :: ext :: codec)]
+				#[decode_as_type(crate_path = ":: subxt :: ext :: scale_decode")]
+				#[encode_as_type(crate_path = ":: subxt :: ext :: scale_encode")]
+				#[doc = "Contains a variant per dispatchable extrinsic that this pallet has."]
+				pub enum Call {
+					#[codec(index = 0)]
+					#[doc = "See `Pallet::configure`."]
+					configure {
+						mining_slot_count_starting_tax_proof:
+							::core::option::Option<::core::primitive::u32>,
+						voting_minimum: ::core::option::Option<::core::primitive::u128>,
+					},
+				}
+				#[derive(
+					:: subxt :: ext :: codec :: Decode,
+					:: subxt :: ext :: codec :: Encode,
+					:: subxt :: ext :: scale_decode :: DecodeAsType,
+					:: subxt :: ext :: scale_encode :: EncodeAsType,
+					Clone,
+					Debug,
+				)]
+				# [codec (crate = :: subxt :: ext :: codec)]
+				#[decode_as_type(crate_path = ":: subxt :: ext :: scale_decode")]
+				#[encode_as_type(crate_path = ":: subxt :: ext :: scale_encode")]
+				#[doc = "The `Error` enum of this pallet."]
+				pub enum Error {}
+				#[derive(
+					:: subxt :: ext :: codec :: Decode,
+					:: subxt :: ext :: codec :: Encode,
+					:: subxt :: ext :: scale_decode :: DecodeAsType,
+					:: subxt :: ext :: scale_encode :: EncodeAsType,
+					Clone,
+					Debug,
+				)]
+				# [codec (crate = :: subxt :: ext :: codec)]
+				#[decode_as_type(crate_path = ":: subxt :: ext :: scale_decode")]
+				#[encode_as_type(crate_path = ":: subxt :: ext :: scale_encode")]
+				#[doc = "The `Event` enum of this pallet"]
+				pub enum Event {
+					#[codec(index = 0)]
+					VotingMinimumAdjusted {
+						expected_block_votes: ::core::primitive::u128,
+						actual_block_votes: ::core::primitive::u128,
+						start_voting_minimum: ::core::primitive::u128,
+						new_voting_minimum: ::core::primitive::u128,
+					},
+				}
+			}
+		}
+		pub mod pallet_bond {
 			use super::runtime_types;
 			pub mod pallet {
 				use super::runtime_types;
@@ -10935,7 +11155,7 @@ pub mod api {
 					#[codec(index = 4)]
 					MinimumBondAmountNotMet,
 					#[codec(index = 5)]
-					#[doc = "There are too many bonds or bond funds expiring in the given expiration block"]
+					#[doc = "There are too many bond or bond funds expiring in the given expiration block"]
 					ExpirationAtBlockOverflow,
 					#[codec(index = 6)]
 					InsufficientFunds,
@@ -10947,7 +11167,7 @@ pub mod api {
 					BondFundClosed,
 					#[codec(index = 10)]
 					#[doc = "This reduction in bond funds offered goes below the amount that is already committed to"]
-					#[doc = "bonds"]
+					#[doc = "bond"]
 					BondFundReductionExceedsAllocatedFunds,
 					#[codec(index = 11)]
 					ExpirationTooSoon,
@@ -11081,7 +11301,7 @@ pub mod api {
 				}
 			}
 		}
-		pub mod pallet_difficulty {
+		pub mod pallet_chain_transfer {
 			use super::runtime_types;
 			pub mod pallet {
 				use super::runtime_types;
@@ -11097,7 +11317,17 @@ pub mod api {
 				#[decode_as_type(crate_path = ":: subxt :: ext :: scale_decode")]
 				#[encode_as_type(crate_path = ":: subxt :: ext :: scale_encode")]
 				#[doc = "Contains a variant per dispatchable extrinsic that this pallet has."]
-				pub enum Call {}
+				pub enum Call {
+					#[codec(index = 0)]
+					#[doc = "See `Pallet::send_to_localchain`."]
+					send_to_localchain {
+						#[codec(compact)]
+						amount: ::core::primitive::u128,
+						notary_id: ::core::primitive::u32,
+						#[codec(compact)]
+						account_nonce: ::core::primitive::u32,
+					},
+				}
 				#[derive(
 					:: subxt :: ext :: codec :: Decode,
 					:: subxt :: ext :: codec :: Encode,
@@ -11110,7 +11340,28 @@ pub mod api {
 				#[decode_as_type(crate_path = ":: subxt :: ext :: scale_decode")]
 				#[encode_as_type(crate_path = ":: subxt :: ext :: scale_encode")]
 				#[doc = "The `Error` enum of this pallet."]
-				pub enum Error {}
+				pub enum Error {
+					#[codec(index = 0)]
+					MaxBlockTransfersExceeded,
+					#[codec(index = 1)]
+					#[doc = "Insufficient balance to create this transfer"]
+					InsufficientFunds,
+					#[codec(index = 2)]
+					#[doc = "The account nonce used for this transfer is no longer valid"]
+					InvalidAccountNonce,
+					#[codec(index = 3)]
+					#[doc = "Insufficient balance to fulfill a mainchain transfer"]
+					InsufficientNotarizedFunds,
+					#[codec(index = 4)]
+					#[doc = "The transfer was already submitted in a previous block"]
+					InvalidOrDuplicatedLocalchainTransfer,
+					#[codec(index = 5)]
+					#[doc = "A transfer was submitted in a previous block but the expiration block has passed"]
+					NotebookIncludesExpiredLocalchainTransfer,
+					#[codec(index = 6)]
+					#[doc = "The notary id is not registered"]
+					InvalidNotaryUsedForTransfer,
+				}
 				#[derive(
 					:: subxt :: ext :: codec :: Decode,
 					:: subxt :: ext :: codec :: Encode,
@@ -11125,13 +11376,42 @@ pub mod api {
 				#[doc = "The `Event` enum of this pallet"]
 				pub enum Event {
 					#[codec(index = 0)]
-					DifficultyAdjusted {
-						observed_millis: ::core::primitive::u128,
-						expected_millis: ::core::primitive::u128,
-						start_difficulty: ::core::primitive::u128,
-						new_difficulty: ::core::primitive::u128,
+					TransferToLocalchain {
+						account_id: ::subxt::utils::AccountId32,
+						amount: ::core::primitive::u128,
+						account_nonce: ::core::primitive::u32,
+						notary_id: ::core::primitive::u32,
+						expiration_block: ::core::primitive::u32,
+					},
+					#[codec(index = 1)]
+					TransferToLocalchainExpired {
+						account_id: ::subxt::utils::AccountId32,
+						account_nonce: ::core::primitive::u32,
+						notary_id: ::core::primitive::u32,
+					},
+					#[codec(index = 2)]
+					TransferIn {
+						account_id: ::subxt::utils::AccountId32,
+						amount: ::core::primitive::u128,
+						notary_id: ::core::primitive::u32,
 					},
 				}
+			}
+			#[derive(
+				:: subxt :: ext :: codec :: Decode,
+				:: subxt :: ext :: codec :: Encode,
+				:: subxt :: ext :: scale_decode :: DecodeAsType,
+				:: subxt :: ext :: scale_encode :: EncodeAsType,
+				Clone,
+				Debug,
+			)]
+			# [codec (crate = :: subxt :: ext :: codec)]
+			#[decode_as_type(crate_path = ":: subxt :: ext :: scale_decode")]
+			#[encode_as_type(crate_path = ":: subxt :: ext :: scale_encode")]
+			pub struct QueuedTransferOut<_0, _1> {
+				pub amount: _0,
+				pub expiration_block: _1,
+				pub notary_id: ::core::primitive::u32,
 			}
 		}
 		pub mod pallet_grandpa {
@@ -11289,165 +11569,7 @@ pub mod api {
 				PendingResume { scheduled_at: _0, delay: _0 },
 			}
 		}
-		pub mod pallet_localchain_relay {
-			use super::runtime_types;
-			pub mod pallet {
-				use super::runtime_types;
-				#[derive(
-					:: subxt :: ext :: codec :: Decode,
-					:: subxt :: ext :: codec :: Encode,
-					:: subxt :: ext :: scale_decode :: DecodeAsType,
-					:: subxt :: ext :: scale_encode :: EncodeAsType,
-					Clone,
-					Debug,
-				)]
-				# [codec (crate = :: subxt :: ext :: codec)]
-				#[decode_as_type(crate_path = ":: subxt :: ext :: scale_decode")]
-				#[encode_as_type(crate_path = ":: subxt :: ext :: scale_encode")]
-				#[doc = "Contains a variant per dispatchable extrinsic that this pallet has."]
-				pub enum Call {
-					#[codec(index = 0)]
-					#[doc = "See `Pallet::submit_notebook`."]
-					submit_notebook {
-						notebook: runtime_types::ulx_notary_primitives::notebook::AuditedNotebook,
-						signature: runtime_types::sp_core::ed25519::Signature,
-					},
-					#[codec(index = 1)]
-					#[doc = "See `Pallet::send_to_localchain`."]
-					send_to_localchain {
-						#[codec(compact)]
-						amount: ::core::primitive::u128,
-						notary_id: ::core::primitive::u32,
-						#[codec(compact)]
-						account_nonce: ::core::primitive::u32,
-					},
-				}
-				#[derive(
-					:: subxt :: ext :: codec :: Decode,
-					:: subxt :: ext :: codec :: Encode,
-					:: subxt :: ext :: scale_decode :: DecodeAsType,
-					:: subxt :: ext :: scale_encode :: EncodeAsType,
-					Clone,
-					Debug,
-				)]
-				# [codec (crate = :: subxt :: ext :: codec)]
-				#[decode_as_type(crate_path = ":: subxt :: ext :: scale_decode")]
-				#[encode_as_type(crate_path = ":: subxt :: ext :: scale_encode")]
-				#[doc = "The `Error` enum of this pallet."]
-				pub enum Error {
-					#[codec(index = 0)]
-					BadState,
-					#[codec(index = 1)]
-					MaxBlockTransfersExceeded,
-					#[codec(index = 2)]
-					InsufficientFunds,
-					#[codec(index = 3)]
-					InvalidAccountNonce,
-					#[codec(index = 4)]
-					UnapprovedNotary,
-					#[codec(index = 5)]
-					MissingNotebookNumber,
-					#[codec(index = 6)]
-					InvalidPinnedBlockNumber,
-					#[codec(index = 7)]
-					InvalidNotebookSubmissionSignature,
-					#[codec(index = 8)]
-					#[doc = "Auditor of a notary block was not a member of the validator set at the time the pinned"]
-					#[doc = "finalized block was sealed."]
-					InvalidNotebookAuditor,
-					#[codec(index = 9)]
-					#[doc = "The auditor was not in the first X authorities of the finalized block."]
-					InvalidNotebookAuditorIndex,
-					#[codec(index = 10)]
-					InvalidNotebookAuditorSignature,
-					#[codec(index = 11)]
-					InvalidNotebookHash,
-					#[codec(index = 12)]
-					InsufficientNotebookSignatures,
-					#[codec(index = 13)]
-					UnfinalizedBlock,
-					#[codec(index = 14)]
-					InsufficientNotarizedFunds,
-					#[codec(index = 15)]
-					TransferNotEligibleForCancellation,
-					#[codec(index = 16)]
-					#[doc = "The transfer was already submitted in a previous block"]
-					InvalidOrDuplicatedLocalchainTransfer,
-					#[codec(index = 17)]
-					#[doc = "A transfer was submitted in a previous block but the expiration block has passed"]
-					NotebookIncludesExpiredLocalchainTransfer,
-					#[codec(index = 18)]
-					#[doc = "The notary id is not registered"]
-					InvalidNotaryUsedForTransfer,
-					#[codec(index = 19)]
-					#[doc = "Could not decode the notebook"]
-					InvalidNotebookBytes,
-					#[codec(index = 20)]
-					#[doc = "A notebook was submitted older than the one in storage"]
-					NotebookToAuditTooOld,
-					#[codec(index = 21)]
-					#[doc = "This notebook failed audit"]
-					NotebookAuditFailed,
-				}
-				#[derive(
-					:: subxt :: ext :: codec :: Decode,
-					:: subxt :: ext :: codec :: Encode,
-					:: subxt :: ext :: scale_decode :: DecodeAsType,
-					:: subxt :: ext :: scale_encode :: EncodeAsType,
-					Clone,
-					Debug,
-				)]
-				# [codec (crate = :: subxt :: ext :: codec)]
-				#[decode_as_type(crate_path = ":: subxt :: ext :: scale_decode")]
-				#[encode_as_type(crate_path = ":: subxt :: ext :: scale_encode")]
-				#[doc = "The `Event` enum of this pallet"]
-				pub enum Event {
-					#[codec(index = 0)]
-					TransferToLocalchain {
-						account_id: ::subxt::utils::AccountId32,
-						amount: ::core::primitive::u128,
-						account_nonce: ::core::primitive::u32,
-						notary_id: ::core::primitive::u32,
-						expiration_block: ::core::primitive::u32,
-					},
-					#[codec(index = 1)]
-					TransferToLocalchainExpired {
-						account_id: ::subxt::utils::AccountId32,
-						account_nonce: ::core::primitive::u32,
-						notary_id: ::core::primitive::u32,
-					},
-					#[codec(index = 2)]
-					TransferIn {
-						account_id: ::subxt::utils::AccountId32,
-						amount: ::core::primitive::u128,
-						notary_id: ::core::primitive::u32,
-					},
-					#[codec(index = 3)]
-					NotebookSubmitted {
-						notary_id: ::core::primitive::u32,
-						notebook_number: ::core::primitive::u32,
-						pinned_to_block_number: ::core::primitive::u32,
-					},
-				}
-			}
-			#[derive(
-				:: subxt :: ext :: codec :: Decode,
-				:: subxt :: ext :: codec :: Encode,
-				:: subxt :: ext :: scale_decode :: DecodeAsType,
-				:: subxt :: ext :: scale_encode :: EncodeAsType,
-				Clone,
-				Debug,
-			)]
-			# [codec (crate = :: subxt :: ext :: codec)]
-			#[decode_as_type(crate_path = ":: subxt :: ext :: scale_decode")]
-			#[encode_as_type(crate_path = ":: subxt :: ext :: scale_encode")]
-			pub struct QueuedTransferOut<_0, _1> {
-				pub amount: _0,
-				pub expiration_block: _1,
-				pub notary_id: ::core::primitive::u32,
-			}
-		}
-		pub mod pallet_mining_slots {
+		pub mod pallet_mining_slot {
 			use super::runtime_types;
 			pub mod pallet {
 				use super::runtime_types;
@@ -11529,7 +11651,7 @@ pub mod api {
 					#[codec(index = 16)]
 					LeaseUntilPastFundExpiration,
 					#[codec(index = 17)]
-					#[doc = "There are too many bonds or bond funds expiring in the given expiration block"]
+					#[doc = "There are too many bond or bond funds expiring in the given expiration block"]
 					ExpirationAtBlockOverflow,
 					#[codec(index = 18)]
 					InsufficientFunds,
@@ -11733,6 +11855,77 @@ pub mod api {
 					NotaryMetaUpdated {
 						notary_id: ::core::primitive::u32,
 						meta: runtime_types::ulx_primitives::notary::NotaryMeta,
+					},
+				}
+			}
+		}
+		pub mod pallet_notebook {
+			use super::runtime_types;
+			pub mod pallet {
+				use super::runtime_types;
+				#[derive(
+					:: subxt :: ext :: codec :: Decode,
+					:: subxt :: ext :: codec :: Encode,
+					:: subxt :: ext :: scale_decode :: DecodeAsType,
+					:: subxt :: ext :: scale_encode :: EncodeAsType,
+					Clone,
+					Debug,
+				)]
+				# [codec (crate = :: subxt :: ext :: codec)]
+				#[decode_as_type(crate_path = ":: subxt :: ext :: scale_decode")]
+				#[encode_as_type(crate_path = ":: subxt :: ext :: scale_encode")]
+				#[doc = "Contains a variant per dispatchable extrinsic that this pallet has."]
+				pub enum Call {
+					#[codec(index = 0)]
+					#[doc = "See `Pallet::submit`."]
+					submit {
+						header: runtime_types::ulx_notary_primitives::notebook::NotebookHeader,
+						hash: ::subxt::utils::H256,
+						signature: runtime_types::sp_core::ed25519::Signature,
+					},
+				}
+				#[derive(
+					:: subxt :: ext :: codec :: Decode,
+					:: subxt :: ext :: codec :: Encode,
+					:: subxt :: ext :: scale_decode :: DecodeAsType,
+					:: subxt :: ext :: scale_encode :: EncodeAsType,
+					Clone,
+					Debug,
+				)]
+				# [codec (crate = :: subxt :: ext :: codec)]
+				#[decode_as_type(crate_path = ":: subxt :: ext :: scale_decode")]
+				#[encode_as_type(crate_path = ":: subxt :: ext :: scale_encode")]
+				#[doc = "The `Error` enum of this pallet."]
+				pub enum Error {
+					#[codec(index = 0)]
+					UnapprovedNotary,
+					#[codec(index = 1)]
+					MissingNotebookNumber,
+					#[codec(index = 2)]
+					IncorrectBlockHeight,
+					#[codec(index = 3)]
+					UnfinalizedBlock,
+					#[codec(index = 4)]
+					#[doc = "The secret or secret hash of the parent notebook do not match"]
+					InvalidSecretProvided,
+				}
+				#[derive(
+					:: subxt :: ext :: codec :: Decode,
+					:: subxt :: ext :: codec :: Encode,
+					:: subxt :: ext :: scale_decode :: DecodeAsType,
+					:: subxt :: ext :: scale_encode :: EncodeAsType,
+					Clone,
+					Debug,
+				)]
+				# [codec (crate = :: subxt :: ext :: codec)]
+				#[decode_as_type(crate_path = ":: subxt :: ext :: scale_decode")]
+				#[encode_as_type(crate_path = ":: subxt :: ext :: scale_encode")]
+				#[doc = "The `Event` enum of this pallet"]
+				pub enum Event {
+					#[codec(index = 0)]
+					NotebookSubmitted {
+						notary_id: ::core::primitive::u32,
+						notebook_number: ::core::primitive::u32,
 					},
 				}
 			}
@@ -13454,28 +13647,30 @@ pub mod api {
 				#[codec(index = 1)]
 				Timestamp(runtime_types::pallet_timestamp::pallet::Call),
 				#[codec(index = 2)]
-				MiningSlots(runtime_types::pallet_mining_slots::pallet::Call),
+				MiningSlot(runtime_types::pallet_mining_slot::pallet::Call),
 				#[codec(index = 3)]
-				Bonds(runtime_types::pallet_bonds::pallet::Call),
+				Bond(runtime_types::pallet_bond::pallet::Call),
 				#[codec(index = 4)]
 				Notaries(runtime_types::pallet_notaries::pallet::Call),
 				#[codec(index = 5)]
-				LocalchainRelay(runtime_types::pallet_localchain_relay::pallet::Call),
+				Notebook(runtime_types::pallet_notebook::pallet::Call),
 				#[codec(index = 6)]
-				Difficulty(runtime_types::pallet_difficulty::pallet::Call),
-				#[codec(index = 9)]
-				Session(runtime_types::pallet_session::pallet::Call),
+				ChainTransfer(runtime_types::pallet_chain_transfer::pallet::Call),
+				#[codec(index = 7)]
+				BlockVoting(runtime_types::pallet_block_voting::pallet::Call),
 				#[codec(index = 10)]
-				BlockSeal(runtime_types::pallet_block_seal::pallet::Call),
+				Session(runtime_types::pallet_session::pallet::Call),
 				#[codec(index = 11)]
+				BlockSeal(runtime_types::pallet_block_seal::pallet::Call),
+				#[codec(index = 12)]
 				Grandpa(runtime_types::pallet_grandpa::pallet::Call),
-				#[codec(index = 13)]
-				ArgonBalances(runtime_types::pallet_balances::pallet::Call),
 				#[codec(index = 14)]
-				UlixeeBalances(runtime_types::pallet_balances::pallet::Call2),
+				ArgonBalances(runtime_types::pallet_balances::pallet::Call),
 				#[codec(index = 15)]
+				UlixeeBalances(runtime_types::pallet_balances::pallet::Call2),
+				#[codec(index = 16)]
 				TxPause(runtime_types::pallet_tx_pause::pallet::Call),
-				#[codec(index = 17)]
+				#[codec(index = 18)]
 				Sudo(runtime_types::pallet_sudo::pallet::Call),
 			}
 			#[derive(
@@ -13493,28 +13688,30 @@ pub mod api {
 				#[codec(index = 0)]
 				System(runtime_types::frame_system::pallet::Error),
 				#[codec(index = 2)]
-				MiningSlots(runtime_types::pallet_mining_slots::pallet::Error),
+				MiningSlot(runtime_types::pallet_mining_slot::pallet::Error),
 				#[codec(index = 3)]
-				Bonds(runtime_types::pallet_bonds::pallet::Error),
+				Bond(runtime_types::pallet_bond::pallet::Error),
 				#[codec(index = 4)]
 				Notaries(runtime_types::pallet_notaries::pallet::Error),
 				#[codec(index = 5)]
-				LocalchainRelay(runtime_types::pallet_localchain_relay::pallet::Error),
+				Notebook(runtime_types::pallet_notebook::pallet::Error),
 				#[codec(index = 6)]
-				Difficulty(runtime_types::pallet_difficulty::pallet::Error),
-				#[codec(index = 9)]
-				Session(runtime_types::pallet_session::pallet::Error),
+				ChainTransfer(runtime_types::pallet_chain_transfer::pallet::Error),
+				#[codec(index = 7)]
+				BlockVoting(runtime_types::pallet_block_voting::pallet::Error),
 				#[codec(index = 10)]
-				BlockSeal(runtime_types::pallet_block_seal::pallet::Error),
+				Session(runtime_types::pallet_session::pallet::Error),
 				#[codec(index = 11)]
+				BlockSeal(runtime_types::pallet_block_seal::pallet::Error),
+				#[codec(index = 12)]
 				Grandpa(runtime_types::pallet_grandpa::pallet::Error),
-				#[codec(index = 13)]
-				ArgonBalances(runtime_types::pallet_balances::pallet::Error),
 				#[codec(index = 14)]
-				UlixeeBalances(runtime_types::pallet_balances::pallet::Error2),
+				ArgonBalances(runtime_types::pallet_balances::pallet::Error),
 				#[codec(index = 15)]
+				UlixeeBalances(runtime_types::pallet_balances::pallet::Error2),
+				#[codec(index = 16)]
 				TxPause(runtime_types::pallet_tx_pause::pallet::Error),
-				#[codec(index = 17)]
+				#[codec(index = 18)]
 				Sudo(runtime_types::pallet_sudo::pallet::Error),
 			}
 			#[derive(
@@ -13532,32 +13729,34 @@ pub mod api {
 				#[codec(index = 0)]
 				System(runtime_types::frame_system::pallet::Event),
 				#[codec(index = 2)]
-				MiningSlots(runtime_types::pallet_mining_slots::pallet::Event),
+				MiningSlot(runtime_types::pallet_mining_slot::pallet::Event),
 				#[codec(index = 3)]
-				Bonds(runtime_types::pallet_bonds::pallet::Event),
+				Bond(runtime_types::pallet_bond::pallet::Event),
 				#[codec(index = 4)]
 				Notaries(runtime_types::pallet_notaries::pallet::Event),
 				#[codec(index = 5)]
-				LocalchainRelay(runtime_types::pallet_localchain_relay::pallet::Event),
+				Notebook(runtime_types::pallet_notebook::pallet::Event),
 				#[codec(index = 6)]
-				Difficulty(runtime_types::pallet_difficulty::pallet::Event),
-				#[codec(index = 9)]
-				Session(runtime_types::pallet_session::pallet::Event),
+				ChainTransfer(runtime_types::pallet_chain_transfer::pallet::Event),
+				#[codec(index = 7)]
+				BlockVoting(runtime_types::pallet_block_voting::pallet::Event),
 				#[codec(index = 10)]
-				BlockSeal(runtime_types::pallet_block_seal::pallet::Event),
+				Session(runtime_types::pallet_session::pallet::Event),
 				#[codec(index = 11)]
-				Grandpa(runtime_types::pallet_grandpa::pallet::Event),
+				BlockSeal(runtime_types::pallet_block_seal::pallet::Event),
 				#[codec(index = 12)]
-				Offences(runtime_types::pallet_offences::pallet::Event),
+				Grandpa(runtime_types::pallet_grandpa::pallet::Event),
 				#[codec(index = 13)]
-				ArgonBalances(runtime_types::pallet_balances::pallet::Event),
+				Offences(runtime_types::pallet_offences::pallet::Event),
 				#[codec(index = 14)]
-				UlixeeBalances(runtime_types::pallet_balances::pallet::Event2),
+				ArgonBalances(runtime_types::pallet_balances::pallet::Event),
 				#[codec(index = 15)]
-				TxPause(runtime_types::pallet_tx_pause::pallet::Event),
+				UlixeeBalances(runtime_types::pallet_balances::pallet::Event2),
 				#[codec(index = 16)]
-				TransactionPayment(runtime_types::pallet_transaction_payment::pallet::Event),
+				TxPause(runtime_types::pallet_tx_pause::pallet::Event),
 				#[codec(index = 17)]
+				TransactionPayment(runtime_types::pallet_transaction_payment::pallet::Event),
+				#[codec(index = 18)]
 				Sudo(runtime_types::pallet_sudo::pallet::Event),
 			}
 			#[derive(
@@ -13573,9 +13772,9 @@ pub mod api {
 			#[encode_as_type(crate_path = ":: subxt :: ext :: scale_encode")]
 			pub enum RuntimeHoldReason {
 				#[codec(index = 2)]
-				MiningSlots(runtime_types::pallet_mining_slots::pallet::HoldReason),
+				MiningSlot(runtime_types::pallet_mining_slot::pallet::HoldReason),
 				#[codec(index = 3)]
-				Bonds(runtime_types::pallet_bonds::pallet::HoldReason),
+				Bond(runtime_types::pallet_bond::pallet::HoldReason),
 			}
 		}
 		pub mod ulx_notary_audit {
@@ -13670,45 +13869,69 @@ pub mod api {
 					#[codec(index = 22)]
 					InvalidNotebookHash,
 					#[codec(index = 23)]
-					DuplicateChainTransfer,
+					InvalidNotebookHeaderHash,
 					#[codec(index = 24)]
-					DuplicatedAccountOriginUid,
+					DuplicateChainTransfer,
 					#[codec(index = 25)]
-					InvalidNotarySignature,
+					DuplicatedAccountOriginUid,
 					#[codec(index = 26)]
-					NotebookTooOld,
+					InvalidNotarySignature,
 					#[codec(index = 27)]
-					DecodeError,
+					NotebookTooOld,
 					#[codec(index = 28)]
-					AccountChannelHoldDoesntExist,
+					DecodeError,
 					#[codec(index = 29)]
-					AccountAlreadyHasChannelHold,
+					AccountChannelHoldDoesntExist,
 					#[codec(index = 30)]
-					ChannelHoldNotReadyForClaim,
+					AccountAlreadyHasChannelHold,
 					#[codec(index = 31)]
-					ChannelHoldAlreadyClaimed,
+					ChannelHoldNotReadyForClaim,
 					#[codec(index = 32)]
-					ChannelHoldNotReadyForSettle,
+					ChannelHoldAlreadyClaimed,
 					#[codec(index = 33)]
-					AccountLocked,
+					ChannelHoldNotReadyForSettle,
 					#[codec(index = 34)]
-					MissingChannelHoldNote,
+					AccountLocked,
 					#[codec(index = 35)]
-					InvalidChannelHoldNote,
+					MissingChannelHoldNote,
 					#[codec(index = 36)]
-					InvalidChannelClaimers,
+					InvalidChannelHoldNote,
 					#[codec(index = 37)]
-					ChannelNoteBelowMinimum,
+					InvalidChannelClaimers,
 					#[codec(index = 38)]
-					InvalidTaxNoteAccount,
+					ChannelNoteBelowMinimum,
 					#[codec(index = 39)]
-					InvalidTaxOperation,
+					InvalidTaxNoteAccount,
 					#[codec(index = 40)]
+					InvalidTaxOperation,
+					#[codec(index = 41)]
 					InsufficientTaxIncluded {
 						tax_sent: ::core::primitive::u128,
 						tax_owed: ::core::primitive::u128,
 						account_id: ::subxt::utils::AccountId32,
 					},
+					#[codec(index = 42)]
+					InsufficientBlockVoteTax,
+					#[codec(index = 43)]
+					InvalidChannelPassSignature,
+					#[codec(index = 44)]
+					DuplicateChannelPassSettled,
+					#[codec(index = 45)]
+					InvalidBlockVoteAllocation,
+					#[codec(index = 46)]
+					InvalidBlockVoteRoot,
+					#[codec(index = 47)]
+					InvalidBlockVotesCount,
+					#[codec(index = 48)]
+					InvalidComputeProof,
+					#[codec(index = 49)]
+					InvalidBlockVoteSource,
+					#[codec(index = 50)]
+					InsufficientBlockVoteMinimum,
+					#[codec(index = 51)]
+					InvalidBlockVoteChannelPass,
+					#[codec(index = 52)]
+					InvalidBlockVotePower,
 				}
 			}
 			#[derive(
@@ -13729,6 +13952,8 @@ pub mod api {
 				LastChangeNotFound,
 				#[codec(index = 2)]
 				InvalidTransferToLocalchain,
+				#[codec(index = 3)]
+				BlockSpecificationNotFound,
 			}
 		}
 		pub mod ulx_notary_primitives {
@@ -13752,6 +13977,155 @@ pub mod api {
 					#[codec(compact)]
 					pub account_uid: ::core::primitive::u32,
 				}
+				#[derive(
+					:: subxt :: ext :: codec :: Decode,
+					:: subxt :: ext :: codec :: Encode,
+					:: subxt :: ext :: scale_decode :: DecodeAsType,
+					:: subxt :: ext :: scale_encode :: EncodeAsType,
+					Clone,
+					Debug,
+				)]
+				# [codec (crate = :: subxt :: ext :: codec)]
+				#[decode_as_type(crate_path = ":: subxt :: ext :: scale_decode")]
+				#[encode_as_type(crate_path = ":: subxt :: ext :: scale_encode")]
+				pub struct MerkleProof {
+					pub proof: runtime_types::bounded_collections::bounded_vec::BoundedVec<
+						::subxt::utils::H256,
+					>,
+					#[codec(compact)]
+					pub number_of_leaves: ::core::primitive::u32,
+					#[codec(compact)]
+					pub leaf_index: ::core::primitive::u32,
+				}
+			}
+			pub mod block_vote {
+				use super::runtime_types;
+				#[derive(
+					:: subxt :: ext :: codec :: Decode,
+					:: subxt :: ext :: codec :: Encode,
+					:: subxt :: ext :: scale_decode :: DecodeAsType,
+					:: subxt :: ext :: scale_encode :: EncodeAsType,
+					Clone,
+					Debug,
+				)]
+				# [codec (crate = :: subxt :: ext :: codec)]
+				#[decode_as_type(crate_path = ":: subxt :: ext :: scale_decode")]
+				#[encode_as_type(crate_path = ":: subxt :: ext :: scale_encode")]
+				pub struct BestBlockNonceT<_0> {
+					pub nonce: runtime_types::primitive_types::U256,
+					pub block_vote:
+						runtime_types::ulx_notary_primitives::block_vote::BlockVoteT<_0>,
+					pub proof: runtime_types::ulx_notary_primitives::balance_change::MerkleProof,
+				}
+				#[derive(
+					:: subxt :: ext :: codec :: Decode,
+					:: subxt :: ext :: codec :: Encode,
+					:: subxt :: ext :: scale_decode :: DecodeAsType,
+					:: subxt :: ext :: scale_encode :: EncodeAsType,
+					Clone,
+					Debug,
+				)]
+				# [codec (crate = :: subxt :: ext :: codec)]
+				#[decode_as_type(crate_path = ":: subxt :: ext :: scale_decode")]
+				#[encode_as_type(crate_path = ":: subxt :: ext :: scale_encode")]
+				pub struct BlockVoteEligibility {
+					#[codec(compact)]
+					pub minimum: ::core::primitive::u128,
+					pub allowed_sources:
+						runtime_types::ulx_notary_primitives::block_vote::BlockVoteSource,
+				}
+				#[derive(
+					:: subxt :: ext :: codec :: Decode,
+					:: subxt :: ext :: codec :: Encode,
+					:: subxt :: ext :: scale_decode :: DecodeAsType,
+					:: subxt :: ext :: scale_encode :: EncodeAsType,
+					Clone,
+					Debug,
+				)]
+				# [codec (crate = :: subxt :: ext :: codec)]
+				#[decode_as_type(crate_path = ":: subxt :: ext :: scale_decode")]
+				#[encode_as_type(crate_path = ":: subxt :: ext :: scale_encode")]
+				pub enum BlockVoteSource {
+					#[codec(index = 0)]
+					Tax,
+					#[codec(index = 1)]
+					Compute,
+				}
+				#[derive(
+					:: subxt :: ext :: codec :: Decode,
+					:: subxt :: ext :: codec :: Encode,
+					:: subxt :: ext :: scale_decode :: DecodeAsType,
+					:: subxt :: ext :: scale_encode :: EncodeAsType,
+					Clone,
+					Debug,
+				)]
+				# [codec (crate = :: subxt :: ext :: codec)]
+				#[decode_as_type(crate_path = ":: subxt :: ext :: scale_decode")]
+				#[encode_as_type(crate_path = ":: subxt :: ext :: scale_encode")]
+				pub struct BlockVoteT<_0> {
+					pub account_id: ::subxt::utils::AccountId32,
+					pub block_hash: _0,
+					#[codec(compact)]
+					pub index: ::core::primitive::u32,
+					#[codec(compact)]
+					pub power: ::core::primitive::u128,
+					pub vote_source: runtime_types::ulx_notary_primitives::block_vote::VoteSource,
+				}
+				#[derive(
+					:: subxt :: ext :: codec :: Decode,
+					:: subxt :: ext :: codec :: Encode,
+					:: subxt :: ext :: scale_decode :: DecodeAsType,
+					:: subxt :: ext :: scale_encode :: EncodeAsType,
+					Clone,
+					Debug,
+				)]
+				# [codec (crate = :: subxt :: ext :: codec)]
+				#[decode_as_type(crate_path = ":: subxt :: ext :: scale_decode")]
+				#[encode_as_type(crate_path = ":: subxt :: ext :: scale_encode")]
+				pub enum VoteSource {
+					#[codec(index = 0)]
+					Tax { channel_pass: runtime_types::ulx_notary_primitives::note::ChannelPass },
+					#[codec(index = 1)]
+					Compute { puzzle_proof: runtime_types::primitive_types::U256 },
+				}
+			}
+			pub mod digests {
+				use super::runtime_types;
+				#[derive(
+					:: subxt :: ext :: codec :: Decode,
+					:: subxt :: ext :: codec :: Encode,
+					:: subxt :: ext :: scale_decode :: DecodeAsType,
+					:: subxt :: ext :: scale_encode :: EncodeAsType,
+					Clone,
+					Debug,
+				)]
+				# [codec (crate = :: subxt :: ext :: codec)]
+				#[decode_as_type(crate_path = ":: subxt :: ext :: scale_decode")]
+				#[encode_as_type(crate_path = ":: subxt :: ext :: scale_encode")]
+				pub struct BlockVoteDigest {
+					pub parent_voting_key: ::core::option::Option<::subxt::utils::H256>,
+					pub notebook_numbers:
+						runtime_types::bounded_collections::bounded_vec::BoundedVec<
+							runtime_types::ulx_notary_primitives::digests::NotaryNotebookDigest,
+						>,
+					pub voting_power: ::core::primitive::u128,
+					pub votes_count: ::core::primitive::u32,
+				}
+				#[derive(
+					:: subxt :: ext :: codec :: Decode,
+					:: subxt :: ext :: codec :: Encode,
+					:: subxt :: ext :: scale_decode :: DecodeAsType,
+					:: subxt :: ext :: scale_encode :: EncodeAsType,
+					Clone,
+					Debug,
+				)]
+				# [codec (crate = :: subxt :: ext :: codec)]
+				#[decode_as_type(crate_path = ":: subxt :: ext :: scale_decode")]
+				#[encode_as_type(crate_path = ":: subxt :: ext :: scale_encode")]
+				pub struct NotaryNotebookDigest {
+					pub notary_id: ::core::primitive::u32,
+					pub notebook_number: ::core::primitive::u32,
+				}
 			}
 			pub mod note {
 				use super::runtime_types;
@@ -13772,9 +14146,6 @@ pub mod api {
 					#[codec(index = 1)]
 					Deposit,
 				}
-			}
-			pub mod notebook {
-				use super::runtime_types;
 				#[derive(
 					:: subxt :: ext :: codec :: Decode,
 					:: subxt :: ext :: codec :: Encode,
@@ -13786,14 +14157,17 @@ pub mod api {
 				# [codec (crate = :: subxt :: ext :: codec)]
 				#[decode_as_type(crate_path = ":: subxt :: ext :: scale_decode")]
 				#[encode_as_type(crate_path = ":: subxt :: ext :: scale_encode")]
-				pub struct AuditedNotebook {
-					pub header_hash: ::subxt::utils::H256,
-					pub header: runtime_types::ulx_notary_primitives::notebook::NotebookHeader,
-					pub auditors: runtime_types::bounded_collections::bounded_vec::BoundedVec<(
-						runtime_types::sp_core::ed25519::Public,
-						runtime_types::sp_core::ed25519::Signature,
-					)>,
+				pub struct ChannelPass {
+					#[codec(compact)]
+					pub id: ::core::primitive::u64,
+					#[codec(compact)]
+					pub miner_index: ::core::primitive::u16,
+					pub at_block_height: ::core::primitive::u32,
+					pub zone_record_hash: ::subxt::utils::H256,
 				}
+			}
+			pub mod notebook {
+				use super::runtime_types;
 				#[derive(
 					:: subxt :: ext :: codec :: Decode,
 					:: subxt :: ext :: codec :: Encode,
@@ -13836,9 +14210,9 @@ pub mod api {
 					#[codec(compact)]
 					pub notebook_number: ::core::primitive::u32,
 					#[codec(compact)]
-					pub finalized_block_number: ::core::primitive::u32,
+					pub block_number: ::core::primitive::u32,
 					#[codec(compact)]
-					pub pinned_to_block_number: ::core::primitive::u32,
+					pub finalized_block_number: ::core::primitive::u32,
 					#[codec(compact)]
 					pub tax: ::core::primitive::u128,
 					pub start_time: ::core::primitive::u64,
@@ -13854,6 +14228,20 @@ pub mod api {
 						runtime_types::bounded_collections::bounded_vec::BoundedVec<
 							runtime_types::ulx_notary_primitives::balance_change::AccountOrigin,
 						>,
+					pub block_votes_root: ::subxt::utils::H256,
+					#[codec(compact)]
+					pub block_votes_count: ::core::primitive::u32,
+					#[codec(compact)]
+					pub block_voting_power: ::core::primitive::u128,
+					pub secret_hash: ::subxt::utils::H256,
+					pub parent_secret: ::core::option::Option<::subxt::utils::H256>,
+					pub best_block_nonces:
+						runtime_types::bounded_collections::bounded_vec::BoundedVec<(
+							::subxt::utils::H256,
+							runtime_types::ulx_notary_primitives::block_vote::BestBlockNonceT<
+								::subxt::utils::H256,
+							>,
+						)>,
 				}
 			}
 		}
@@ -13887,52 +14275,32 @@ pub mod api {
 				# [codec (crate = :: subxt :: ext :: codec)]
 				#[decode_as_type(crate_path = ":: subxt :: ext :: scale_decode")]
 				#[encode_as_type(crate_path = ":: subxt :: ext :: scale_encode")]
-				pub struct AuthorityDistance<_0> {
-					#[codec(compact)]
-					pub authority_index: ::core::primitive::u16,
-					pub authority_id: _0,
-					pub peer_id: runtime_types::ulx_primitives::block_seal::PeerId,
-					pub distance: runtime_types::primitive_types::U256,
-					pub rpc_hosts: runtime_types::bounded_collections::bounded_vec::BoundedVec<
-						runtime_types::ulx_primitives::block_seal::Host,
-					>,
-				}
-				#[derive(
-					:: subxt :: ext :: codec :: Decode,
-					:: subxt :: ext :: codec :: Encode,
-					:: subxt :: ext :: scale_decode :: DecodeAsType,
-					:: subxt :: ext :: scale_encode :: EncodeAsType,
-					Clone,
-					Debug,
-					serde :: Serialize,
-				)]
-				# [codec (crate = :: subxt :: ext :: codec)]
-				#[decode_as_type(crate_path = ":: subxt :: ext :: scale_decode")]
-				#[encode_as_type(crate_path = ":: subxt :: ext :: scale_encode")]
-				pub struct BlockProof {
-					pub tax_proof_id: ::core::primitive::u32,
-					pub tax_amount: ::core::primitive::u128,
-					pub seal_stampers:
-						::std::vec::Vec<runtime_types::ulx_primitives::block_seal::SealStamper>,
-					pub author_id: ::subxt::utils::AccountId32,
-				}
-				#[derive(
-					:: subxt :: ext :: codec :: Decode,
-					:: subxt :: ext :: codec :: Encode,
-					:: subxt :: ext :: scale_decode :: DecodeAsType,
-					:: subxt :: ext :: scale_encode :: EncodeAsType,
-					Clone,
-					Debug,
-				)]
-				# [codec (crate = :: subxt :: ext :: codec)]
-				#[decode_as_type(crate_path = ":: subxt :: ext :: scale_decode")]
-				#[encode_as_type(crate_path = ":: subxt :: ext :: scale_encode")]
 				pub struct Host {
 					#[codec(compact)]
 					pub ip: ::core::primitive::u32,
 					#[codec(compact)]
 					pub port: ::core::primitive::u16,
 					pub is_secure: ::core::primitive::bool,
+				}
+				#[derive(
+					:: subxt :: ext :: codec :: Decode,
+					:: subxt :: ext :: codec :: Encode,
+					:: subxt :: ext :: scale_decode :: DecodeAsType,
+					:: subxt :: ext :: scale_encode :: EncodeAsType,
+					Clone,
+					Debug,
+				)]
+				# [codec (crate = :: subxt :: ext :: codec)]
+				#[decode_as_type(crate_path = ":: subxt :: ext :: scale_decode")]
+				#[encode_as_type(crate_path = ":: subxt :: ext :: scale_encode")]
+				pub struct MiningAuthority<_0> {
+					#[codec(compact)]
+					pub authority_index: ::core::primitive::u16,
+					pub authority_id: _0,
+					pub peer_id: runtime_types::ulx_primitives::block_seal::PeerId,
+					pub rpc_hosts: runtime_types::bounded_collections::bounded_vec::BoundedVec<
+						runtime_types::ulx_primitives::block_seal::Host,
+					>,
 				}
 				#[derive(
 					:: subxt :: ext :: codec :: Decode,
@@ -13987,26 +14355,6 @@ pub mod api {
 					Owner,
 					#[codec(index = 1)]
 					Account(_0),
-				}
-				#[derive(
-					:: subxt :: ext :: codec :: Decode,
-					:: subxt :: ext :: codec :: Encode,
-					:: subxt :: ext :: scale_decode :: DecodeAsType,
-					:: subxt :: ext :: scale_encode :: EncodeAsType,
-					Clone,
-					Debug,
-					serde :: Serialize,
-				)]
-				# [codec (crate = :: subxt :: ext :: codec)]
-				#[decode_as_type(crate_path = ":: subxt :: ext :: scale_decode")]
-				#[encode_as_type(crate_path = ":: subxt :: ext :: scale_encode")]
-				pub struct SealStamper {
-					pub authority_idx: ::core::primitive::u16,
-					pub signature: ::core::option::Option<
-						runtime_types::bounded_collections::bounded_vec::BoundedVec<
-							::core::primitive::u8,
-						>,
-					>,
 				}
 			}
 			pub mod bond {
@@ -14079,11 +14427,8 @@ pub mod api {
 				# [codec (crate = :: subxt :: ext :: codec)]
 				#[decode_as_type(crate_path = ":: subxt :: ext :: scale_decode")]
 				#[encode_as_type(crate_path = ":: subxt :: ext :: scale_encode")]
-				pub enum ProofOfWorkType {
-					#[codec(index = 0)]
-					Tax,
-					#[codec(index = 1)]
-					Compute,
+				pub struct BlockSealDigest {
+					pub nonce: runtime_types::primitive_types::U256,
 				}
 			}
 			pub mod inherents {
@@ -14099,12 +14444,20 @@ pub mod api {
 				# [codec (crate = :: subxt :: ext :: codec)]
 				#[decode_as_type(crate_path = ":: subxt :: ext :: scale_decode")]
 				#[encode_as_type(crate_path = ":: subxt :: ext :: scale_encode")]
-				pub struct UlxBlockSealInherent {
-					pub work_type: runtime_types::ulx_primitives::digests::ProofOfWorkType,
-					pub tax_nonce: ::core::option::Option<runtime_types::primitive_types::U256>,
-					pub tax_block_proof: ::core::option::Option<
-						runtime_types::ulx_primitives::block_seal::BlockProof,
-					>,
+				pub enum BlockSealInherent {
+					#[codec(index = 0)]
+					ClosestNonce {
+						nonce: runtime_types::primitive_types::U256,
+						notary_id: ::core::primitive::u32,
+						block_vote: runtime_types::ulx_notary_primitives::block_vote::BlockVoteT<
+							::subxt::utils::H256,
+						>,
+						source_notebook_number: ::core::primitive::u32,
+						source_notebook_proof:
+							runtime_types::ulx_notary_primitives::balance_change::MerkleProof,
+					},
+					#[codec(index = 1)]
+					Continuation,
 				}
 			}
 			pub mod notary {
@@ -14137,6 +14490,49 @@ pub mod api {
 				# [codec (crate = :: subxt :: ext :: codec)]
 				#[decode_as_type(crate_path = ":: subxt :: ext :: scale_decode")]
 				#[encode_as_type(crate_path = ":: subxt :: ext :: scale_encode")]
+				pub struct NotaryNotebookKeyDetails {
+					pub notebook_number: ::core::primitive::u32,
+					pub block_votes_root: ::subxt::utils::H256,
+					pub block_number: ::core::primitive::u32,
+					pub secret_hash: ::subxt::utils::H256,
+				}
+				#[derive(
+					:: subxt :: ext :: codec :: Decode,
+					:: subxt :: ext :: codec :: Encode,
+					:: subxt :: ext :: scale_decode :: DecodeAsType,
+					:: subxt :: ext :: scale_encode :: EncodeAsType,
+					Clone,
+					Debug,
+				)]
+				# [codec (crate = :: subxt :: ext :: codec)]
+				#[decode_as_type(crate_path = ":: subxt :: ext :: scale_decode")]
+				#[encode_as_type(crate_path = ":: subxt :: ext :: scale_encode")]
+				pub struct NotaryNotebookVoteDetails<_0> {
+					pub notary_id: ::core::primitive::u32,
+					pub version: ::core::primitive::u32,
+					pub notebook_number: ::core::primitive::u32,
+					pub header_hash: ::subxt::utils::H256,
+					pub key_details:
+						runtime_types::ulx_primitives::notary::NotaryNotebookKeyDetails,
+					pub block_votes: ::core::primitive::u32,
+					pub block_voting_power: ::core::primitive::u128,
+					pub best_nonces: ::std::vec::Vec<(
+						_0,
+						::core::primitive::u32,
+						runtime_types::ulx_notary_primitives::block_vote::BestBlockNonceT<_0>,
+					)>,
+				}
+				#[derive(
+					:: subxt :: ext :: codec :: Decode,
+					:: subxt :: ext :: codec :: Encode,
+					:: subxt :: ext :: scale_decode :: DecodeAsType,
+					:: subxt :: ext :: scale_encode :: EncodeAsType,
+					Clone,
+					Debug,
+				)]
+				# [codec (crate = :: subxt :: ext :: codec)]
+				#[decode_as_type(crate_path = ":: subxt :: ext :: scale_decode")]
+				#[encode_as_type(crate_path = ":: subxt :: ext :: scale_encode")]
 				pub struct NotaryRecord<_0, _1> {
 					#[codec(compact)]
 					pub notary_id: _1,
@@ -14147,26 +14543,6 @@ pub mod api {
 					pub meta_updated_block: _1,
 					pub meta: runtime_types::ulx_primitives::notary::NotaryMeta,
 				}
-			}
-			#[derive(
-				:: subxt :: ext :: codec :: Decode,
-				:: subxt :: ext :: codec :: Encode,
-				:: subxt :: ext :: scale_decode :: DecodeAsType,
-				:: subxt :: ext :: scale_encode :: EncodeAsType,
-				Clone,
-				Debug,
-			)]
-			# [codec (crate = :: subxt :: ext :: codec)]
-			#[decode_as_type(crate_path = ":: subxt :: ext :: scale_decode")]
-			#[encode_as_type(crate_path = ":: subxt :: ext :: scale_encode")]
-			pub struct NextWork {
-				pub work_type: runtime_types::ulx_primitives::digests::ProofOfWorkType,
-				#[codec(compact)]
-				pub difficulty: ::core::primitive::u128,
-				#[codec(compact)]
-				pub closest_x_authorities_required: ::core::primitive::u32,
-				#[codec(compact)]
-				pub min_seal_signers: ::core::primitive::u32,
 			}
 		}
 	}

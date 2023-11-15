@@ -1,0 +1,28 @@
+{
+  "db_name": "PostgreSQL",
+  "query": "\n\t\t\tSELECT balance_changes, block_votes FROM notarizations WHERE notebook_number = $1\n\t\t",
+  "describe": {
+    "columns": [
+      {
+        "ordinal": 0,
+        "name": "balance_changes",
+        "type_info": "Jsonb"
+      },
+      {
+        "ordinal": 1,
+        "name": "block_votes",
+        "type_info": "Jsonb"
+      }
+    ],
+    "parameters": {
+      "Left": [
+        "Int4"
+      ]
+    },
+    "nullable": [
+      false,
+      false
+    ]
+  },
+  "hash": "99c0aaa5c8b1e193a317fed15ce109683c9da1fd866961d97e0453b626ed3d52"
+}
