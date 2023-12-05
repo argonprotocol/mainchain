@@ -53,7 +53,7 @@ frame-system-benchmarking = { version = "4.0.0-dev", default-features = false, g
 
 # Local Dependencies
 pallet-block-seal = { version = "0.0.1", default-features = false, path = "../pallets/block_seal" }
-pallet-vote-eligibility = { version = "0.0.1", default-features = false, path = "../pallets/vote_eligibility" }
+pallet-seal-minimums = { version = "0.0.1", default-features = false, path = "../pallets/seal_minimums" }
 pallet-block-rewards = { version = "0.0.1", default-features = false, path = "../pallets/block_rewards" }
 pallet-bond = { version = "0.0.1", default-features = false, path = "../pallets/bond" }
 pallet-chain-transfer = { version = "0.0.1", default-features = false, path = "../pallets/chain_transfer" }
@@ -87,7 +87,7 @@ std = [
 	"pallet-mining-slot/std",
 	"pallet-notebook/std",
 	"pallet-bond/std",
-	"pallet-vote-eligibility/std",
+	"pallet-seal-minimums/std",
 	"pallet-block-rewards/std",
 	"pallet-block-seal/std",
 	"pallet-tx-pause/std",

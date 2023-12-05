@@ -121,13 +121,44 @@ pub mod pallet {
 	}
 
 	#[pallet::error]
-	pub enum Error<T> {
-		InvalidBlockVoteSource,
-	}
+	pub enum Error<T> {}
 
 	#[pallet::hooks]
 	impl<T: Config> Hooks<BlockNumberFor<T>> for Pallet<T> {
 		fn on_initialize(n: BlockNumberFor<T>) -> Weight {
+			let freeze_id = BalanceFreezeId::MaturationPeriod;
+			// Unlock any rewards
+			let unlocks = <PayoutsByBlock<T>>::take(n);
+			for reward in unlocks.iter() {
+				let argons_frozen =
+					T::ArgonCurrency::balance_frozen(&freeze_id, &reward.account_id);
+				let _ = T::ArgonCurrency::set_freeze(
+					&freeze_id,
+					&reward.account_id,
+					argons_frozen.saturating_sub(reward.argons),
+				)
+				.map_err(|e| {
+					log::error!(target: LOG_TARGET, "Failed to unfreeze argons for reward: {:?}, {:?}", reward, e);
+				});
+
+				let ulixees_frozen =
+					T::ArgonCurrency::balance_frozen(&freeze_id, &reward.account_id);
+				let _ = T::UlixeeCurrency::set_freeze(
+					&freeze_id,
+					&reward.account_id,
+					ulixees_frozen.saturating_sub(reward.ulixees),
+				)
+				.map_err(|e| {
+					log::error!(target: LOG_TARGET, "Failed to unfreeze ulixees for reward: {:?}, {:?}", reward, e);
+				});
+			}
+			if unlocks.len() > 0 {
+				Self::deposit_event(Event::RewardUnlocked { rewards: unlocks.to_vec() });
+			}
+			T::DbWeight::get().reads_writes(0, 0)
+		}
+
+		fn on_finalize(n: BlockNumberFor<T>) {
 			let authors = T::BlockSealerProvider::get_sealer_info();
 
 			let block_number = UniqueSaturatedInto::<u32>::unique_saturated_into(n);
@@ -139,7 +170,7 @@ pub mod pallet {
 				TryInto::<u128>::try_into(T::StartingUlixeesPerBlock::get()).ok()
 			else {
 				log::error!(target: LOG_TARGET, "Failed to convert ulixees per block to u128");
-				return T::DbWeight::get().reads_writes(0, 0)
+				return
 			};
 
 			let mut block_ulixees = block_ulixees.saturating_div(halvings + 1u128);
@@ -217,37 +248,6 @@ pub mod pallet {
 				rewards: rewards.clone(),
 			});
 			<PayoutsByBlock<T>>::insert(reward_height, BoundedVec::truncate_from(rewards));
-
-			// Unlock any rewards
-			let unlocks = <PayoutsByBlock<T>>::take(n);
-			for reward in unlocks.iter() {
-				let argons_frozen =
-					T::ArgonCurrency::balance_frozen(&freeze_id, &reward.account_id);
-				let _ = T::ArgonCurrency::set_freeze(
-					&freeze_id,
-					&reward.account_id,
-					argons_frozen.saturating_sub(reward.argons),
-				)
-				.map_err(|e| {
-					log::error!(target: LOG_TARGET, "Failed to unfreeze argons for reward: {:?}, {:?}", reward, e);
-				});
-
-				let ulixees_frozen =
-					T::ArgonCurrency::balance_frozen(&freeze_id, &reward.account_id);
-				let _ = T::UlixeeCurrency::set_freeze(
-					&freeze_id,
-					&reward.account_id,
-					ulixees_frozen.saturating_sub(reward.ulixees),
-				)
-				.map_err(|e| {
-					log::error!(target: LOG_TARGET, "Failed to unfreeze ulixees for reward: {:?}, {:?}", reward, e);
-				});
-			}
-			if unlocks.len() > 0 {
-				Self::deposit_event(Event::RewardUnlocked { rewards: unlocks.to_vec() });
-			}
-
-			T::DbWeight::get().reads_writes(2, 2)
 		}
 	}
 

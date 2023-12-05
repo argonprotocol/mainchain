@@ -12,7 +12,7 @@ use sp_runtime::{
 };
 
 use ulx_primitives::{
-	block_seal::{BlockSealAuthorityId, BlockVoteEligibility, Host, MiningAuthority},
+	block_seal::{BlockSealAuthorityId, Host, MiningAuthority, VoteMinimum},
 	notebook::NotebookNumber,
 	AuthorityProvider, BlockVotingProvider, NotaryId, NotebookProvider,
 };
@@ -61,7 +61,7 @@ parameter_types! {
 	pub static XorClosest: Option<MiningAuthority<BlockSealAuthorityId>> = None;
 	pub static VotingRoots: BTreeMap<(NotaryId, u32), (H256, NotebookNumber)> = BTreeMap::new();
 	pub static ParentVotingKey: Option<H256> = None;
-	pub static GrandpaVoteEligibility: Option<BlockVoteEligibility> = None;
+	pub static GrandpaVoteMinimum: Option<VoteMinimum> = None;
 	pub static MinerZero: Option<(u64, MiningAuthority<BlockSealAuthorityId>)> = None;
 }
 
@@ -120,8 +120,8 @@ impl NotebookProvider for StaticNotebookProvider {
 
 pub struct StaticBlockVotingProvider;
 impl BlockVotingProvider<Block> for StaticBlockVotingProvider {
-	fn grandpa_vote_eligibility() -> Option<BlockVoteEligibility> {
-		GrandpaVoteEligibility::get()
+	fn grandparent_vote_minimum() -> Option<VoteMinimum> {
+		GrandpaVoteMinimum::get()
 	}
 	fn parent_voting_key() -> Option<H256> {
 		ParentVotingKey::get()

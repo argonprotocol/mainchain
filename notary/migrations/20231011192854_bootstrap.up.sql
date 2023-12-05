@@ -17,9 +17,8 @@ CREATE TABLE  IF NOT EXISTS blocks (
     parent_hash bytea NOT NULL,
     block_number integer NOT NULL,
     block_vote_minimum varchar NOT NULL,
-    block_vote_source integer NOT NULL,
     this_notary_notebook_number integer,
-    parent_voting_key bytea NOT NULL,
+    parent_voting_key bytea NULL,
     is_finalized boolean NOT NULL,
     finalized_time timestamptz,
     received_time timestamptz NOT NULL

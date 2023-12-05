@@ -194,8 +194,8 @@ mod tests {
 	use sqlx::PgPool;
 
 	use ulx_notary_primitives::{
-		AccountOrigin, AccountType::Deposit, BalanceChange, BalanceTip, BlockVoteEligibility,
-		ChainTransfer, NewAccountOrigin, Note, NoteType,
+		AccountOrigin, AccountType::Deposit, BalanceChange, BalanceTip, ChainTransfer,
+		NewAccountOrigin, Note, NoteType,
 	};
 
 	use crate::{
@@ -219,16 +219,8 @@ mod tests {
 		assert!(notary.addr.port() > 0);
 
 		let mut db = notary.pool.acquire().await?;
-		BlocksStore::record(
-			&mut *db,
-			0,
-			[1u8; 32].into(),
-			[0u8; 32].into(),
-			BlockVoteEligibility::new(100, Default::default()),
-			[1u8; 32].into(),
-			None,
-		)
-		.await?;
+		BlocksStore::record(&mut *db, 0, [1u8; 32].into(), [0u8; 32].into(), 100, None, None)
+			.await?;
 		BlocksStore::record_finalized(&mut *db, [1u8; 32].into()).await?;
 		NotebookHeaderStore::create(&mut *db, notary.notary_id, 1, 0).await?;
 		ChainTransferStore::record_transfer_to_local_from_block(

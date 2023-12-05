@@ -2,13 +2,13 @@ use codec::{Decode, Encode};
 use frame_support::{CloneNoBound, EqNoBound, Parameter, PartialEqNoBound};
 use scale_info::TypeInfo;
 use serde::{Deserialize, Serialize};
-use sp_core::{crypto::KeyTypeId, ConstU32, MaxEncodedLen, OpaquePeerId};
+use sp_application_crypto::ByteArray;
+use sp_core::{crypto::KeyTypeId, ConstU32, MaxEncodedLen, OpaquePeerId, U256};
 use sp_runtime::{BoundedVec, RuntimeDebug};
 
-pub use ulx_notary_primitives::{
-	BlockVoteEligibility, BlockVoteSource, BlockVotingPower, VoteSource, VotingMinimum,
-};
 pub const BLOCK_SEAL_KEY_TYPE: KeyTypeId = KeyTypeId(*b"seal");
+
+pub use ulx_notary_primitives::{BlockVotingPower, VoteMinimum};
 
 // sr25519 signatures are non deterministic, so we use ed25519 for deterministic signatures since
 // these are part of the nonce hash
@@ -23,6 +23,14 @@ sp_application_crypto::with_pair! {
 }
 pub type BlockSealAuthoritySignature = app::Signature;
 pub type BlockSealAuthorityId = app::Public;
+
+impl BlockSealAuthorityId {
+	pub fn to_u256(&self) -> U256 {
+		let mut bytes = [0u8; 32];
+		bytes.copy_from_slice(&self.as_slice());
+		U256::from_big_endian(&bytes)
+	}
+}
 
 pub type MaxMinerRpcHosts = ConstU32<4>;
 

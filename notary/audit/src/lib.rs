@@ -14,9 +14,9 @@ use sp_std::{
 pub use error::VerifyError;
 use ulx_notary_primitives::{
 	ensure, AccountId, AccountOrigin, AccountOriginUid, AccountType, BalanceChange, BalanceProof,
-	BalanceTip, BlockVote, BlockVoteEligibility, BlockVoteSource, ChainTransfer, NewAccountOrigin,
-	NotaryId, Note, NoteType, Notebook, NotebookHeader, NotebookNumber, VoteSource,
-	CHANNEL_CLAWBACK_NOTEBOOKS, CHANNEL_EXPIRATION_NOTEBOOKS, MIN_CHANNEL_NOTE_MILLIGONS,
+	BalanceTip, BlockVote, ChainTransfer, NewAccountOrigin, NotaryId, Note, NoteType, Notebook,
+	NotebookHeader, NotebookNumber, VoteMinimum, CHANNEL_CLAWBACK_NOTEBOOKS,
+	CHANNEL_EXPIRATION_NOTEBOOKS, MIN_CHANNEL_NOTE_MILLIGONS,
 };
 
 pub mod error;
@@ -60,7 +60,7 @@ pub trait NotebookHistoryLookup {
 pub fn notebook_verify<T: NotebookHistoryLookup>(
 	lookup: &T,
 	notebook: &Notebook,
-	block_eligibility: &BTreeMap<H256, BlockVoteEligibility>,
+	vote_minimums: &BTreeMap<H256, VoteMinimum>,
 ) -> anyhow::Result<bool, VerifyError> {
 	let mut state = NotebookVerifyState::default();
 
@@ -81,7 +81,7 @@ pub fn notebook_verify<T: NotebookHistoryLookup>(
 		verify_changeset_signatures(&changeset)?;
 		verify_balance_sources(lookup, &mut state, header, changeset)?;
 		track_block_votes(&mut state, block_votes)?;
-		verify_voting_sources(&state.unused_channel_passes, block_votes, &block_eligibility)?;
+		verify_voting_sources(&state.unused_channel_passes, block_votes, &vote_minimums)?;
 	}
 
 	ensure!(
@@ -223,7 +223,7 @@ fn track_block_votes(
 	block_votes: &Vec<BlockVote>,
 ) -> anyhow::Result<(), VerifyError> {
 	for block_vote in block_votes {
-		state.blocks_voted_on.insert(block_vote.block_hash.clone());
+		state.blocks_voted_on.insert(block_vote.grandparent_block_hash.clone());
 		state
 			.block_votes
 			.insert((block_vote.account_id.clone(), block_vote.index), block_vote.clone());
@@ -319,48 +319,19 @@ fn verify_balance_sources<'a, T: NotebookHistoryLookup>(
 pub fn verify_voting_sources(
 	channel_passes: &BTreeSet<H256>,
 	block_votes: &Vec<BlockVote>,
-	vote_eligibility: &BTreeMap<H256, BlockVoteEligibility>,
+	vote_minimums: &BTreeMap<H256, VoteMinimum>,
 ) -> anyhow::Result<(), VerifyError> {
 	let mut unused_channel_passes = channel_passes.clone();
 	for block_vote in block_votes {
-		let eligibility = vote_eligibility
-			.get(&block_vote.block_hash)
+		let minimum = vote_minimums
+			.get(&block_vote.grandparent_block_hash)
 			.ok_or(VerifyError::InvalidBlockVoteSource)?;
 
-		match &block_vote.vote_source {
-			VoteSource::Tax { channel_pass } => {
-				ensure!(
-					eligibility.allowed_sources == BlockVoteSource::Tax,
-					VerifyError::InvalidBlockVoteSource
-				);
-				ensure!(
-					block_vote.power >= eligibility.minimum,
-					VerifyError::InsufficientBlockVoteMinimum
-				);
-				let hash = channel_pass.hash();
+		ensure!(block_vote.power >= *minimum, VerifyError::InsufficientBlockVoteMinimum);
+		let hash = block_vote.channel_pass.hash();
 
-				// a channel pass can only be used once
-				ensure!(
-					unused_channel_passes.remove(&hash),
-					VerifyError::InvalidBlockVoteChannelPass
-				);
-			},
-			VoteSource::Compute { .. } => {
-				ensure!(
-					eligibility.allowed_sources == BlockVoteSource::Compute,
-					VerifyError::InvalidBlockVoteSource
-				);
-				let puzzle_nonce = block_vote.calculate_puzzle_nonce();
-				ensure!(
-					BlockVote::calculate_compute_power(&puzzle_nonce) == block_vote.power,
-					VerifyError::InvalidBlockVotePower
-				);
-				ensure!(
-					block_vote.power >= eligibility.minimum,
-					VerifyError::InsufficientBlockVoteMinimum
-				);
-			},
-		}
+		// a channel pass can only be used once
+		ensure!(unused_channel_passes.remove(&hash), VerifyError::InvalidBlockVoteChannelPass);
 	}
 	Ok(())
 }
@@ -860,12 +831,7 @@ pub fn verify_notarization_allocation(
 	ensure!(state.unclaimed_channel_balances.is_empty(), VerifyError::InvalidChannelClaimers);
 
 	for block_vote in block_votes {
-		match &block_vote.vote_source {
-			VoteSource::Tax { .. } => {
-				state.used_tax_vote_amount(block_vote.power, &block_vote.account_id)?;
-			},
-			_ => {},
-		}
+		state.used_tax_vote_amount(block_vote.power, &block_vote.account_id)?;
 	}
 	ensure!(
 		state.unclaimed_block_vote_tax_per_account.is_empty(),

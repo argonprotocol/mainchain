@@ -8,7 +8,7 @@ use std::{
 use codec::{Decode, Encode};
 use sc_client_api::{self, backend::AuxStore};
 use sc_consensus::BlockImportParams;
-use sp_core::{H256, U256};
+use sp_core::{H256, U256, U512};
 use sp_runtime::traits::{Block as BlockT, Header};
 
 use ulx_node_runtime::{AccountId, BlockNumber};
@@ -41,6 +41,7 @@ impl<C: AuxStore, B: BlockT> UlxAux<C, B> {
 		notaries: u32,
 		block_voting_power: BlockVotingPower,
 		nonce: U256,
+		is_tax_vote: bool,
 	) -> Result<(ForkPower, ForkPower), Error<B>> {
 		let block_number = convert_u32::<B>(&block.header.number());
 		let strongest_at_height = Self::strongest_vote_at_height(client.as_ref(), block_number)?;
@@ -60,10 +61,18 @@ impl<C: AuxStore, B: BlockT> UlxAux<C, B> {
 
 		let parent_hash = block.header.parent_hash();
 		let fork_voting_power = Self::get_fork_voting_power(client.as_ref(), &parent_hash)?;
-		let voting_power = fork_voting_power.voting_power + U256::from(block_voting_power);
+		let voting_power =
+			fork_voting_power.voting_power.saturating_add(U256::from(block_voting_power));
 
-		let fork_power = ForkPower { voting_power, notaries, nonce };
-		if voting_power >= strongest_at_height.voting_power && nonce < strongest_at_height.nonce {
+		let aggregate_nonce = fork_voting_power.aggregate_nonce.saturating_add(nonce.into());
+		let mut tax_blocks = fork_voting_power.tax_blocks;
+		if is_tax_vote {
+			tax_blocks = tax_blocks.saturating_add(1);
+		}
+		let fork_power = ForkPower { voting_power, notaries, nonce, aggregate_nonce, tax_blocks };
+		if voting_power >= strongest_at_height.voting_power &&
+			aggregate_nonce < strongest_at_height.aggregate_nonce
+		{
 			let key = get_strongest_vote_at_height_key(block_number);
 			block.auxiliary.push((key, Some(fork_power.encode())));
 		}
@@ -167,14 +176,22 @@ fn get_strongest_vote_at_height_key(block_number: BlockNumber) -> Vec<u8> {
 
 #[derive(Clone, Encode, Decode, Debug, Eq, PartialEq)]
 pub struct ForkPower {
-	pub voting_power: U256,
 	pub notaries: u32,
+	pub voting_power: U256,
 	pub nonce: U256,
+	pub aggregate_nonce: U512,
+	pub tax_blocks: u128,
 }
 
 impl Default for ForkPower {
 	fn default() -> Self {
-		Self { voting_power: U256::zero(), notaries: 0, nonce: U256::MAX }
+		Self {
+			voting_power: U256::zero(),
+			notaries: 0,
+			nonce: U256::MAX,
+			aggregate_nonce: U512::MAX,
+			tax_blocks: 0,
+		}
 	}
 }
 
@@ -185,7 +202,12 @@ impl PartialOrd for ForkPower {
 			cmp = other.voting_power.cmp(&self.voting_power);
 		}
 		if cmp == Ordering::Equal {
-			cmp = self.nonce.cmp(&other.nonce)
+			// count forks with tax votes over compute
+			cmp = other.tax_blocks.cmp(&self.tax_blocks);
+		}
+		if cmp == Ordering::Equal {
+			// NOTE: Smallest first!
+			cmp = self.aggregate_nonce.cmp(&other.aggregate_nonce)
 		}
 		Some(cmp)
 	}

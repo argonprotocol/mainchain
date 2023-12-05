@@ -1,6 +1,6 @@
 //! Service and ServiceFactory implementation. Specialized wrapper over substrate service.
 
-use std::{sync::Arc, time::Duration};
+use std::{cmp::max, sync::Arc, time::Duration};
 
 use futures::FutureExt;
 use sc_client_api::{Backend, BlockBackend};
@@ -11,10 +11,13 @@ use sc_service::{
 };
 use sc_telemetry::{log, Telemetry, TelemetryWorker};
 use sc_transaction_pool_api::OffchainTransactionPoolFactory;
-use ulx_node_consensus::basic_queue::BasicQueue;
 
-use ulx_node_consensus::import_queue::{UlxImportQueue, UlxVerifier};
-use ulx_node_runtime::{self, opaque::Block, AccountId, RuntimeApi};
+use ulx_node_consensus::{
+	basic_queue::BasicQueue,
+	compute_worker::run_compute_solver_threads,
+	import_queue::{UlxImportQueue, UlxVerifier},
+};
+use ulx_node_runtime::{self, opaque::Block, prod_or_fast, AccountId, RuntimeApi};
 
 use crate::rpc;
 
@@ -144,6 +147,7 @@ pub fn new_partial(
 pub fn new_full(
 	config: Configuration,
 	opt_block_author: Option<AccountId>,
+	mining_threads: Option<u32>,
 ) -> Result<TaskManager, ServiceError> {
 	let sc_service::PartialComponents {
 		client,
@@ -234,6 +238,7 @@ pub fn new_full(
 					finality_provider: finality_proof_provider.clone(),
 				},
 				backend: rpc_backend.clone(),
+				keystore: keystore.clone(),
 			};
 			rpc::create_full(deps).map_err(Into::into)
 		});
@@ -257,7 +262,7 @@ pub fn new_full(
 
 	if role.is_authority() {
 		if let Some(block_author) = opt_block_author {
-			let proposer_factory = sc_basic_authorship::ProposerFactory::new(
+			let proposer_factory_compute = sc_basic_authorship::ProposerFactory::new(
 				task_manager.spawn_handle(),
 				client.clone(),
 				transaction_pool.clone(),
@@ -265,18 +270,47 @@ pub fn new_full(
 				telemetry.as_ref().map(|x| x.handle()),
 			);
 
-			let (notebook_task, create_block_stream) = ulx_node_consensus::create_notebook_watch(
+			let tax_block_window = prod_or_fast!(Duration::from_secs(60), Duration::from_secs(5));
+			let (compute_miner, compute_task) =
+				ulx_node_consensus::compute_worker::create_compute_miner(
+					Box::new(ulx_block_import.clone()),
+					client.clone(),
+					select_chain.clone(),
+					proposer_factory_compute,
+					sync_service.clone(),
+					block_author.clone(),
+					keystore_container.keystore(),
+					sync_service.clone(),
+					// time to wait for a tax block before starting to mine a new one (if there are
+					// votes possible)
+					tax_block_window,
+					// how long to take to actually build the block (i.e. executing extrinsics)
+					Duration::from_secs(10),
+				);
+
+			task_manager.spawn_essential_handle().spawn_blocking(
+				"ulx-compute-miner",
+				Some("block-authoring"),
+				compute_task,
+			);
+
+			let (block_watch_task, create_block_stream) = ulx_node_consensus::create_block_watch(
 				transaction_pool.clone(),
 				client.clone(),
 				select_chain,
-				block_author.clone(),
 				keystore_container.keystore(),
 			);
-
-			let block_create_task = ulx_node_consensus::block_creator(
+			let proposer_factory_tax = sc_basic_authorship::ProposerFactory::new(
+				task_manager.spawn_handle(),
+				client.clone(),
+				transaction_pool.clone(),
+				prometheus_registry.as_ref(),
+				telemetry.as_ref().map(|x| x.handle()),
+			);
+			let block_create_task = ulx_node_consensus::tax_block_creator(
 				Box::new(ulx_block_import),
 				client.clone(),
-				proposer_factory,
+				proposer_factory_tax,
 				sync_service.clone(),
 				block_author,
 				// how long to take to actually build the block (i.e. executing extrinsics)
@@ -286,13 +320,13 @@ pub fn new_full(
 			);
 
 			task_manager.spawn_essential_handle().spawn_blocking(
-				"ulx-notebook-watch",
-				Some("block-authoring2"),
-				notebook_task,
+				"ulx-block-watch",
+				Some("block-authoring"),
+				block_watch_task,
 			);
 			task_manager.spawn_essential_handle().spawn_blocking(
 				"ulx-blocks",
-				Some("block-authoring2"),
+				Some("block-authoring"),
 				block_create_task,
 			);
 
@@ -333,6 +367,14 @@ pub fn new_full(
 				None,
 				sc_consensus_grandpa::run_grandpa_voter(grandpa_config)?,
 			);
+
+			let mining_threads = if let Some(mining_threads) = mining_threads {
+				mining_threads as usize
+			} else {
+				max(num_cpus::get() - 1, 1)
+			};
+			log::info!("Mining is enabled, {} threads", mining_threads);
+			run_compute_solver_threads(&mut task_manager, compute_miner, mining_threads);
 		} else {
 			log::info!("Mining is disabled");
 		}

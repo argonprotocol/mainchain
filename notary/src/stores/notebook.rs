@@ -102,7 +102,9 @@ impl NotebookStore {
 				if !best_nonces_by_voting_key.contains_key(&key) {
 					best_nonces_by_voting_key.insert(key, vec![]);
 				}
-				if let Some(best_nonces) = best_nonces_by_voting_key.get_mut(&vote.block_hash) {
+				if let Some(best_nonces) =
+					best_nonces_by_voting_key.get_mut(&vote.grandparent_block_hash)
+				{
 					let nonce = vote.calculate_block_nonce(notary_id, key);
 					best_nonces.push((nonce, vote.clone(), index));
 				}
@@ -309,7 +311,7 @@ impl NotebookStore {
 				}
 			}
 			for vote in change.block_votes {
-				let block_hash = vote.block_hash.clone();
+				let block_hash = vote.grandparent_block_hash.clone();
 				let key = (vote.account_id.clone(), vote.index.clone());
 				voting_power += vote.power;
 				block_votes.insert(key, vote);

@@ -47,6 +47,7 @@ clap = { version = "4.4", features = ["derive", "cargo","env"] }
 ulixee-client = { path= "../client" }
 ulx-notary-audit = {path = "audit" }
 ulx-notary-primitives = { path = "primitives"  }
+ulx-primitives = { path = "../primitives" }
 
 [dev-dependencies]
 frame-support = { version = "4.0.0-dev", git = "https://github.com/paritytech/polkadot-sdk.git", branch = "release-polkadot-v1.1.0" }

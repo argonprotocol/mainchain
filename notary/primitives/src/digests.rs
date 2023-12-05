@@ -4,8 +4,6 @@ use serde::{Deserialize, Serialize};
 use sp_core::{bounded::BoundedVec, ConstU32, RuntimeDebug, H256};
 use sp_runtime::{scale_info::TypeInfo, ConsensusEngineId};
 
-pub const NEXT_VOTE_ELIGIBILITY_DIGEST_ID: ConsensusEngineId = [b'n', b'e', b'x', b't'];
-
 /// Key for the block vote digest in a block header
 pub const BLOCK_VOTES_DIGEST_ID: ConsensusEngineId = [b'v', b'o', b't', b'e'];
 

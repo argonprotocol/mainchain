@@ -1,4 +1,4 @@
-use crate as pallet_vote_eligibility;
+use crate as pallet_seal_minimums;
 use env_logger::{Builder, Env};
 use frame_support::{
 	parameter_types,
@@ -11,10 +11,12 @@ use sp_runtime::{
 };
 use std::collections::BTreeMap;
 use ulx_primitives::{
-	block_seal::{BlockVoteEligibility, Host, MiningAuthority},
+	block_seal::{Host, MiningAuthority, VoteMinimum},
+	digests::SealSource,
 	notebook::NotebookNumber,
 	AuthorityProvider, BlockSealAuthorityId, BlockVotingProvider, NotaryId, NotebookProvider,
 };
+
 type Block = frame_system::mocking::MockBlock<Test>;
 
 // Configure a mock runtime to test the pallet.
@@ -22,10 +24,17 @@ frame_support::construct_runtime!(
 	pub enum Test
 	{
 		System: frame_system,
-		VoteEligibility: pallet_vote_eligibility,
+		SealMinimums: pallet_seal_minimums,
+		Timestamp: pallet_timestamp,
 	}
 );
 
+impl pallet_timestamp::Config for Test {
+	type Moment = u64;
+	type OnTimestampSet = ();
+	type MinimumPeriod = ConstU64<1>;
+	type WeightInfo = ();
+}
 impl frame_system::Config for Test {
 	type BaseCallFilter = frame_support::traits::Everything;
 	type BlockWeights = ();
@@ -54,14 +63,16 @@ impl frame_system::Config for Test {
 
 parameter_types! {
 	pub const TargetBlockVotes: u64 = 100;
-	pub const VotingMinimumChangePeriod: u32 = 10;
+	pub const ChangePeriod: u32 = 10;
 	pub static AuthorityList: Vec<(u64, BlockSealAuthorityId)> = vec![];
 	pub static XorClosest: Option<MiningAuthority<BlockSealAuthorityId>> = None;
 	pub static VotingRoots: BTreeMap<(NotaryId, u32), (H256, NotebookNumber)> = BTreeMap::new();
 	pub static ParentVotingKey: Option<H256> = None;
-	pub static GrandpaVoteEligibility: Option<BlockVoteEligibility> = None;
+	pub static GrandpaVoteMinimum: Option<VoteMinimum> = None;
 	pub static MinerZero: Option<(u64, MiningAuthority<BlockSealAuthorityId>)> = None;
 	pub static MiningSlotsInitiatingTaxProof: u32 = 10;
+	pub static CurrentSealType: SealSource = SealSource::Compute;
+	pub static TargetComputeBlockTime: u64 = 100;
 }
 
 pub struct StaticAuthorityProvider;
@@ -109,8 +120,8 @@ impl AuthorityProvider<BlockSealAuthorityId, Block, u64> for StaticAuthorityProv
 
 pub struct StaticBlockVotingProvider;
 impl BlockVotingProvider<Block> for StaticBlockVotingProvider {
-	fn grandpa_vote_eligibility() -> Option<BlockVoteEligibility> {
-		GrandpaVoteEligibility::get()
+	fn grandparent_vote_minimum() -> Option<VoteMinimum> {
+		GrandpaVoteMinimum::get()
 	}
 	fn parent_voting_key() -> Option<H256> {
 		ParentVotingKey::get()
@@ -126,24 +137,29 @@ impl NotebookProvider for StaticNotebookProvider {
 	}
 }
 
-impl pallet_vote_eligibility::Config for Test {
+impl pallet_seal_minimums::Config for Test {
 	type RuntimeEvent = RuntimeEvent;
 	type WeightInfo = ();
 	type TargetBlockVotes = TargetBlockVotes;
-	type VotingMinimumChangePeriod = VotingMinimumChangePeriod;
+	type ChangePeriod = ChangePeriod;
 	type AuthorityProvider = StaticAuthorityProvider;
 	type NotebookProvider = StaticNotebookProvider;
+	type SealType = CurrentSealType;
+	type TargetComputeBlockTime = TargetComputeBlockTime;
 }
 
 // Build genesis storage according to the mock runtime.
-pub fn new_test_ext(initial_voting_minimum: u128) -> sp_io::TestExternalities {
+pub fn new_test_ext(
+	initial_vote_minimum: u128,
+	initial_compute_difficulty: u128,
+) -> sp_io::TestExternalities {
 	let env = Env::new().default_filter_or("debug");
 	let _ = Builder::from_env(env).is_test(true).try_init();
 	let mut t = frame_system::GenesisConfig::<Test>::default().build_storage().unwrap().into();
 
-	pallet_vote_eligibility::GenesisConfig::<Test> {
-		initial_voting_minimum,
-		mining_slot_count_starting_tax_proof: MiningSlotsInitiatingTaxProof::get(),
+	pallet_seal_minimums::GenesisConfig::<Test> {
+		initial_vote_minimum,
+		initial_compute_difficulty,
 		_phantom: Default::default(),
 	}
 	.assimilate_storage(&mut t)

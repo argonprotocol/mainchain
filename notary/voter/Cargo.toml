@@ -44,6 +44,7 @@ rand = {version = "0.8.5"}
 
 ulixee-client = { path= "../../client" }
 ulx-notary-primitives = { path = "../primitives"  }
+ulx-primitives = { path = "../../primitives" }
 ulx-notary = { path= ".."  }
 url = "2.4.0"
 

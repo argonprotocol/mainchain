@@ -1,11 +1,11 @@
 {
   "db_name": "PostgreSQL",
-  "query": "SELECT finalized_block_number FROM notebook_headers WHERE notebook_number = $1 LIMIT 1",
+  "query": "SELECT block_number FROM notebook_headers WHERE notebook_number = $1 LIMIT 1",
   "describe": {
     "columns": [
       {
         "ordinal": 0,
-        "name": "finalized_block_number",
+        "name": "block_number",
         "type_info": "Int4"
       }
     ],
@@ -15,8 +15,8 @@
       ]
     },
     "nullable": [
-      true
+      false
     ]
   },
-  "hash": "38f90257bc10ef4e1b75be5f7cfe2bf209cc605883c80e73eca7fd2ed29dfec1"
+  "hash": "9cb65cd5994609435ba449c0ba78bdfc98d1ecdb9312c675e63b7b57d6d22c86"
 }

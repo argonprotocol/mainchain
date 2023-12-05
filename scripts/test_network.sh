@@ -13,7 +13,7 @@ trap 'kill $(jobs -p)' SIGHUP SIGINT SIGTERM
 # start a temporary node with alice and bob funded
 for i in {0..2} ; do
   echo "(\"$BASEDIR/target/release/ulx-node\" --tmp --${validators[$i]} --chain local --rpc-port=994$((i+4))  --port 3033$((i+4)) --miners 1 &)"
-  "$BASEDIR/target/release/ulx-node" --tmp --${validators[$i]} --chain local --rpc-port=994$((i+4))  --port 3033$((i+4)) &
+  "$BASEDIR/target/release/ulx-node" --tmp --${validators[$i]} --chain local --rpc-port=994$((i+4))  --port 3033$((i+4)) --miners 1 &
 done
 
 wait

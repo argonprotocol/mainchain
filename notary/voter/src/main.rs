@@ -1,20 +1,14 @@
 use std::{
-	cmp::max,
 	collections::BTreeMap,
 	env,
 	mem::take,
 	path::PathBuf,
-	sync::{
-		atomic::{AtomicU32, Ordering},
-		Arc,
-	},
+	sync::Arc,
 	time::{Duration, Instant},
 };
 
 use anyhow::anyhow;
 use clap::{crate_version, Parser};
-use codec::Decode;
-use futures::StreamExt;
 use sc_cli::KeystoreParams;
 use sc_keystore::LocalKeystore;
 use sc_service::config::KeystoreConfig;
@@ -22,9 +16,7 @@ use serde::{Deserialize, Serialize};
 use sp_core::{bounded_vec, crypto::Ss58Codec, H256};
 use sp_keystore::KeystorePtr;
 use sp_runtime::BoundedVec;
-use subxt::{
-	backend::rpc::RpcClient, config::substrate::DigestItem, rpc_params, utils::AccountId32,
-};
+use subxt::{backend::rpc::RpcClient, rpc_params, utils::AccountId32};
 use tokio::time;
 
 use ulixee_client::{
@@ -32,14 +24,10 @@ use ulixee_client::{
 		apis,
 		runtime_types::ulx_primitives::block_seal::{app::Public, Host, MiningAuthority},
 	},
-	try_until_connected, UlxClient, UlxConfig,
+	try_until_connected, UlxClient,
 };
 use ulx_notary::apis::LocalchainRpcClient;
 use ulx_notary_primitives::{AccountId, BlockVote, NotaryId, MAX_BLOCK_VOTES_PER_NOTARIZATION};
-
-use crate::worker::{run_compute_miner_thread, ComputeVoteStream};
-
-pub mod worker;
 
 #[derive(Parser, Debug)]
 #[clap(version = crate_version!())]
@@ -66,10 +54,6 @@ struct Cli {
 	#[clap(short, long, env, default_value = "1")]
 	notary_id: NotaryId,
 
-	/// How many mining threads to run
-	#[clap(long)]
-	miners: Option<u32>,
-
 	/// What account id will be used to create votes
 	#[clap(long, value_name = "SS58_ADDRESS")]
 	account_id: String,
@@ -90,41 +74,25 @@ async fn main() -> anyhow::Result<()> {
 
 	let account_id: AccountId = Ss58Codec::from_ss58check(&cli.account_id)?;
 	let account_id_32: [u8; 32] = account_id.clone().into();
-	let mining_threads = if let Some(mining_threads) = cli.miners {
-		mining_threads as usize
-	} else {
-		max(num_cpus::get() - 1, 1)
-	};
-	log::info!("Mining is enabled, {} threads", mining_threads);
 
-	let (vote_sender, vote_stream) = ComputeVoteStream::channel();
-
-	let account_index = Arc::new(AtomicU32::new(0));
-	let worker = worker::MiningHandle::new(account_id.clone(), account_index.clone());
-	for _ in 0..mining_threads {
-		run_compute_miner_thread(worker.clone(), vote_sender.clone());
-	}
 	let notary_id = cli.notary_id;
 	let mut vote_publisher =
 		VotePublisher::new(AccountId32::from(account_id_32), mainchain_client.clone());
 
-	let mut vote_receiver = vote_stream.subscribe(100);
 	let mut blocks_sub = mainchain_client.blocks().subscribe_best().await?;
 	let mut interval = time::interval(Duration::from_secs(1));
 	loop {
 		tokio::select! {biased;
 			block_next = blocks_sub.next() => {
 				match block_next {
-					Some(Ok(block)) => {
-						if let Some(next_eligibility) = get_eligibility_digest(&block).ok() {
-							worker.on_build(block.hash(), next_eligibility);
-							account_index.store(0, Ordering::SeqCst);
-							let _ = vote_publisher.on_block(block.hash()).await.map_err(|e| {
-								tracing::error!("Error processing block: {:?}", e);
-							});
-						}
+					Some(Ok(ref block)) => {
+						// if let Some(next_eligibility) = get_eligibility_digest(&block).ok() {
+						// 	worker.on_build(block.hash(), next_eligibility);
+						let _ = vote_publisher.on_block(block.hash().clone()).await.map_err(|e| {
+							tracing::error!("Error processing block: {:?}", e);
+						});
 					},
-					Some(Err(e)) => {
+					Some(Err(ref e)) => {
 						tracing::error!("Error polling best blocks: {:?}", e);
 						if let Some(client) = try_until_connected(cli.trusted_rpc_url.clone(), 2500).await.ok() {
 							tracing::error!("Reconnected to mainchain block polling");
@@ -135,14 +103,14 @@ async fn main() -> anyhow::Result<()> {
 					None => break,
 				}
 			},
-			voter = vote_receiver.next() => {
-				match voter {
-					Some(puzzle) => {
-						vote_publisher.append_vote(puzzle.into());
-					},
-					None => continue,
-				}
-			},
+			// voter = vote_receiver.next() => {
+			// 	match voter {
+			// 		Some(puzzle) => {
+			// 			vote_publisher.append_vote(puzzle.into());
+			// 		},
+			// 		None => continue,
+			// 	}
+			// },
 			_ = interval.tick() => {
 				let mut pending_votes = Vec::new();
 				vote_publisher.votes_by_block_hash.retain(|_, meta|  {
@@ -250,7 +218,7 @@ impl VotePublisher {
 	}
 
 	pub fn append_vote(&mut self, vote: BlockVote) -> usize {
-		let block_hash = vote.block_hash;
+		let block_hash = vote.grandparent_block_hash;
 		if let Some(votes) = self.votes_by_block_hash.get_mut(&block_hash) {
 			votes.votes.push(vote);
 			return votes.votes.len()
@@ -271,7 +239,7 @@ impl VotePublisher {
 		tracing::info!(
 			"Publishing {} votes for {} to {}",
 			votes.len(),
-			votes[0].block_hash,
+			votes[0].grandparent_block_hash,
 			rpc_url
 		);
 
@@ -315,24 +283,22 @@ fn get_rpc_url(host: &Host) -> String {
 	)
 }
 
-fn get_eligibility_digest(
-	block: &subxt::blocks::Block<UlxConfig, UlxClient>,
-) -> anyhow::Result<ulx_notary_primitives::BlockVoteEligibility> {
-	let next = block
-		.header()
-		.digest
-		.logs
-		.iter()
-		.find_map(|log| {
-			if let DigestItem::PreRuntime(
-				ulx_notary_primitives::NEXT_VOTE_ELIGIBILITY_DIGEST_ID,
-				v,
-			) = log
-			{
-				return ulx_notary_primitives::BlockVoteEligibility::decode(&mut &v[..]).ok()
-			}
-			None
-		})
-		.ok_or(anyhow!("Could not local the next block eligibility!!"))?;
-	Ok(next)
-}
+// fn get_eligibility_digest(
+// 	block: &subxt::blocks::Block<UlxConfig, UlxClient>,
+// ) -> anyhow::Result<ulx_primi::BlockS> {
+// 	let next = block
+// 		.header()
+// 		.digest
+// 		.logs
+// 		.iter()
+// 		.find_map(|log| {
+// 			if let DigestItem::PreRuntime(ulx_notary_primitives::NEXT_SEAL_MINIMUMS_DIGEST_ID, v) =
+// 				log
+// 			{
+// 				return ulx_notary_primitives::BlockVoteEligibility::decode(&mut &v[..]).ok()
+// 			}
+// 			None
+// 		})
+// 		.ok_or(anyhow!("Could not local the next block eligibility!!"))?;
+// 	Ok(next)
+// }

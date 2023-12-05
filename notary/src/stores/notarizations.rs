@@ -122,7 +122,7 @@ impl NotarizationsStore {
 
 		let mut voted_blocks = BTreeSet::new();
 		for vote in &block_votes {
-			voted_blocks.insert(vote.block_hash);
+			voted_blocks.insert(vote.grandparent_block_hash);
 		}
 
 		// Begin database transaction
@@ -136,7 +136,7 @@ impl NotarizationsStore {
 		}
 
 		let block_vote_specifications =
-			BlocksStore.get_specifications(&mut tx, &voted_blocks).await?;
+			BlocksStore.get_vote_minimums(&mut tx, &voted_blocks).await?;
 
 		let mut new_account_origins = BTreeMap::<(AccountId, AccountType), AccountOrigin>::new();
 
@@ -332,7 +332,7 @@ mod tests {
 	use sqlx::PgPool;
 
 	use ulx_notary_primitives::{
-		AccountType::Deposit, BalanceChange, BlockVote, Notarization, Note, NoteType, VoteSource,
+		AccountType::Deposit, BalanceChange, BlockVote, ChannelPass, Notarization, Note, NoteType,
 	};
 
 	use crate::stores::notarizations::NotarizationsStore;
@@ -355,11 +355,16 @@ mod tests {
 		}];
 
 		let block_votes = vec![BlockVote {
-			block_hash: [0u8; 32].into(),
+			grandparent_block_hash: [0u8; 32].into(),
 			power: 1222,
 			account_id: Bob.to_account_id(),
 			index: 0,
-			vote_source: VoteSource::Compute { puzzle_proof: 523.into() },
+			channel_pass: ChannelPass {
+				id: 1,
+				zone_record_hash: [0u8; 32].into(),
+				miner_index: 0,
+				at_block_height: 0,
+			},
 		}];
 
 		{

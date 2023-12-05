@@ -55,7 +55,7 @@ use sp_version::RuntimeVersion;
 
 use pallet_chain_transfer::NotebookVerifyError;
 use ulx_primitives::{
-	block_seal::{BlockVoteEligibility, MiningAuthority},
+	block_seal::{MiningAuthority, VoteMinimum},
 	notary::{NotaryId, NotaryNotebookVoteDetails, NotaryRecord},
 	notebook::NotebookNumber,
 	AuthorityProvider, BalanceFreezeId, BlockSealAuthorityId,
@@ -243,8 +243,9 @@ impl frame_system::Config for Runtime {
 }
 
 parameter_types! {
+	pub const TargetComputeBlockTime: u32 = prod_or_fast!(30_000, 1_00); // aim for compute to take half of vote time
 	pub const TargetBlockVotes: u32 = 50_000;
-	pub const VotingMinimumChangePeriod: u32 = 60 * 24; // change vote_eligibility once a day
+	pub const MinimumsChangePeriod: u32 = 60 * 24; // change seal_minimums once a day
 
 
 	pub const ArgonsPerBlock: u32 = 5_000;
@@ -254,13 +255,15 @@ parameter_types! {
 	pub const MinerPayoutPercent: u32 = 75;
 }
 
-impl pallet_vote_eligibility::Config for Runtime {
+impl pallet_seal_minimums::Config for Runtime {
 	type RuntimeEvent = RuntimeEvent;
-	type WeightInfo = pallet_vote_eligibility::weights::SubstrateWeight<Runtime>;
+	type WeightInfo = pallet_seal_minimums::weights::SubstrateWeight<Runtime>;
 	type TargetBlockVotes = TargetBlockVotes;
-	type VotingMinimumChangePeriod = VotingMinimumChangePeriod;
+	type ChangePeriod = MinimumsChangePeriod;
 	type AuthorityProvider = MiningSlot;
 	type NotebookProvider = Notebook;
+	type TargetComputeBlockTime = TargetComputeBlockTime;
+	type SealType = BlockSeal;
 }
 
 impl pallet_block_rewards::Config for Runtime {
@@ -286,7 +289,7 @@ impl pallet_authorship::Config for Runtime {
 impl pallet_timestamp::Config for Runtime {
 	/// A timestamp: milliseconds since the unix epoch.
 	type Moment = Moment;
-	type OnTimestampSet = ();
+	type OnTimestampSet = SealMinimums;
 	type MinimumPeriod = ConstU64<500>;
 	type WeightInfo = ();
 }
@@ -353,7 +356,7 @@ impl pallet_block_seal::Config for Runtime {
 	type WeightInfo = pallet_block_seal::weights::SubstrateWeight<Runtime>;
 	type AuthorityProvider = MiningSlot;
 	type NotebookProvider = Notebook;
-	type BlockVotingProvider = VoteEligibility;
+	type BlockVotingProvider = SealMinimums;
 }
 
 impl pallet_session::Config for Runtime {
@@ -432,7 +435,7 @@ impl pallet_chain_transfer::Config for Runtime {
 impl pallet_notebook::Config for Runtime {
 	type RuntimeEvent = RuntimeEvent;
 	type WeightInfo = pallet_notebook::weights::SubstrateWeight<Runtime>;
-	type EventHandler = (ChainTransfer, VoteEligibility);
+	type EventHandler = (ChainTransfer, SealMinimums);
 	type NotaryProvider = Notaries;
 	type ChainTransferLookup = ChainTransfer;
 }
@@ -557,7 +560,7 @@ construct_runtime!(
 		Notaries: pallet_notaries,
 		Notebook: pallet_notebook,
 		ChainTransfer: pallet_chain_transfer,
-		VoteEligibility: pallet_vote_eligibility,
+		SealMinimums: pallet_seal_minimums,
 		// Authorship must be before session
 		Authorship: pallet_authorship,
 		Historical: pallet_session_historical,
@@ -736,12 +739,15 @@ impl_runtime_apis! {
 		}
 	}
 
-	impl ulx_primitives::BlockVotingApis<Block> for Runtime {
-		fn vote_eligibility() -> BlockVoteEligibility {
-			VoteEligibility::vote_eligibility()
+	impl ulx_primitives::BlockSealMinimumApis<Block> for Runtime {
+		fn vote_minimum() -> VoteMinimum {
+			SealMinimums::vote_minimum()
+		}
+		fn compute_difficulty() -> u128 {
+			SealMinimums::compute_difficulty()
 		}
 		fn parent_voting_key() -> Option<H256> {
-			VoteEligibility::parent_voting_key()
+			SealMinimums::parent_voting_key()
 		}
 	}
 
@@ -787,10 +793,10 @@ impl_runtime_apis! {
 			notary_id: NotaryId,
 			notebook_number: NotebookNumber,
 			header_hash: H256,
-			block_vote_eligibility: &BTreeMap<<Block as BlockT>::Hash, BlockVoteEligibility>,
+			block_vote_minimums: &BTreeMap<<Block as BlockT>::Hash, VoteMinimum>,
 			bytes: &Vec<u8>,
 		) -> Result<bool, NotebookVerifyError> {
-			Notebook::audit_notebook(version, notary_id, notebook_number, header_hash, block_vote_eligibility, bytes)
+			Notebook::audit_notebook(version, notary_id, notebook_number, header_hash, block_vote_minimums, bytes)
 		}
 
 		fn decode_notebook_vote_details(extrinsic: &UncheckedExtrinsic) -> Option<NotaryNotebookVoteDetails<<Block as BlockT>::Hash>> {
@@ -911,7 +917,7 @@ mod benches {
 		[pallet_balances, ArgonTokens]
 		[pallet_balances, UlixeeTokens]
 		[pallet_timestamp, Timestamp]
-		[pallet_vote_eligibility, VoteEligibility]
+		[pallet_seal_minimums, VoteEligibility]
 		[pallet_block_rewards, BlockRewards]
 		[pallet_mining_slot, MiningSlot]
 		[pallet_bond, Bond]

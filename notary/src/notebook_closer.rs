@@ -20,7 +20,7 @@ use ulixee_client::{
 	},
 	UlxClient,
 };
-use ulx_notary_primitives::{ChainTransfer, NotaryId, NotebookHeader, VoteSource};
+use ulx_notary_primitives::{ChainTransfer, NotaryId, NotebookHeader};
 
 use crate::{
 	error::Error,
@@ -260,6 +260,7 @@ impl NotebookCloser {
 				block_voting_power: header.block_voting_power,
 				block_votes_count: header.block_votes_count,
 				block_votes_root: header.block_votes_root,
+				blocks_with_votes: SubxtBoundedVec(header.blocks_with_votes.to_vec().clone()),
 				secret_hash: header.secret_hash,
 				parent_secret: header.parent_secret,
 				best_block_nonces: SubxtBoundedVec(
@@ -267,6 +268,7 @@ impl NotebookCloser {
 						.best_block_nonces
 						.iter()
 						.map(|(voting_root, block_nonce)| {
+							let channel_pass = block_nonce.block_vote.channel_pass.clone();
 							let vote = block_nonce.block_vote.clone();
 							let api_best_nonce = runtime_types::ulx_notary_primitives::block_vote::BestBlockNonceT {
 								nonce: U256(block_nonce.nonce.0),
@@ -279,25 +281,14 @@ impl NotebookCloser {
 								},
 								block_vote: runtime_types::ulx_notary_primitives::block_vote::BlockVoteT {
 									account_id: AccountId32(vote.account_id.into()),
-									block_hash: vote.block_hash,
+									grandparent_block_hash: vote.grandparent_block_hash,
 									power: vote.power,
 									index: vote.index,
-									vote_source: match vote.vote_source {
-										VoteSource::Tax { channel_pass } => {
-											runtime_types::ulx_notary_primitives::block_vote::VoteSource::Tax {
-												channel_pass: runtime_types::ulx_notary_primitives::note::ChannelPass {
-													at_block_height: channel_pass.at_block_height,
-													id: channel_pass.id,
-													miner_index: channel_pass.miner_index,
-													zone_record_hash: channel_pass.zone_record_hash,
-												},
-											}
-										}
-										VoteSource::Compute { puzzle_proof} => {
-											runtime_types::ulx_notary_primitives::block_vote::VoteSource::Compute {
-												puzzle_proof: U256(puzzle_proof.0),
-											}
-										}
+									channel_pass: runtime_types::ulx_notary_primitives::note::ChannelPass {
+										at_block_height: channel_pass.at_block_height,
+										id: channel_pass.id,
+										miner_index: channel_pass.miner_index,
+										zone_record_hash: channel_pass.zone_record_hash,
 									}
 								},
 							};

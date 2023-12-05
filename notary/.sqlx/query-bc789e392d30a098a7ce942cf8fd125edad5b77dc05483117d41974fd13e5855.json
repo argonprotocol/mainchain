@@ -1,6 +1,6 @@
 {
   "db_name": "PostgreSQL",
-  "query": "\n\t\tSELECT block_hash, block_vote_minimum, block_vote_source FROM blocks where block_hash = ANY($1)\n\t\t",
+  "query": "\n\t\tSELECT block_hash, block_vote_minimum FROM blocks where block_hash = ANY($1)\n\t\t",
   "describe": {
     "columns": [
       {
@@ -12,11 +12,6 @@
         "ordinal": 1,
         "name": "block_vote_minimum",
         "type_info": "Varchar"
-      },
-      {
-        "ordinal": 2,
-        "name": "block_vote_source",
-        "type_info": "Int4"
       }
     ],
     "parameters": {
@@ -26,9 +21,8 @@
     },
     "nullable": [
       false,
-      false,
       false
     ]
   },
-  "hash": "4b8fda16252fc134cbb744361fde0a7e73bd7e9094ee56dedf8164ca031492b3"
+  "hash": "bc789e392d30a098a7ce942cf8fd125edad5b77dc05483117d41974fd13e5855"
 }

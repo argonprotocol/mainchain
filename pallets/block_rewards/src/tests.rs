@@ -3,7 +3,7 @@ use frame_support::{
 	traits::{
 		fungible::{Inspect, Mutate},
 		tokens::{Fortitude, Preservation},
-		OnInitialize,
+		OnFinalize, OnInitialize,
 	},
 };
 use sp_runtime::{DispatchError, TokenError};
@@ -25,6 +25,7 @@ fn it_should_only_allow_a_single_seal() {
 		// Go past genesis block so events get deposited
 		System::set_block_number(1);
 		BlockRewards::on_initialize(1);
+		BlockRewards::on_finalize(1);
 		System::assert_last_event(
 			Event::RewardCreated {
 				maturation_block: (1 + MaturationBlocks::get()).into(),
@@ -88,6 +89,7 @@ fn it_should_unlock_rewards() {
 		// Go past genesis block so events get deposited
 		System::set_block_number(1);
 		BlockRewards::on_initialize(1);
+		BlockRewards::on_finalize(1);
 		let maturation_block = (1 + MaturationBlocks::get()).into();
 		System::assert_last_event(
 			Event::RewardCreated {
@@ -128,6 +130,7 @@ fn it_should_halve_rewards() {
 		let halving = HalvingBlocks::get() + 1;
 		System::set_block_number(halving.into());
 		BlockRewards::on_initialize(halving.into());
+		BlockRewards::on_finalize(halving.into());
 		let maturation_block = (halving + MaturationBlocks::get()).into();
 		System::assert_last_event(
 			Event::RewardCreated {
@@ -153,6 +156,7 @@ fn it_should_scale_rewards_based_on_notaries() {
 	new_test_ext().execute_with(|| {
 		System::set_block_number(1);
 		BlockRewards::on_initialize(1);
+		BlockRewards::on_finalize(1);
 		let maturation_block = (1 + MaturationBlocks::get()).into();
 		System::assert_last_event(
 			Event::RewardCreated {
@@ -178,6 +182,7 @@ fn it_should_not_fail_with_no_notaries() {
 	new_test_ext().execute_with(|| {
 		System::set_block_number(1);
 		BlockRewards::on_initialize(1);
+		BlockRewards::on_finalize(1);
 		let maturation_block = (1 + MaturationBlocks::get()).into();
 		System::assert_last_event(
 			Event::RewardCreated {

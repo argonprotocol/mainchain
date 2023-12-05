@@ -1,6 +1,10 @@
-use codec::Codec;
-use std::{collections::BTreeMap, marker::PhantomData, sync::Arc};
+use std::{
+	collections::{BTreeMap, BTreeSet},
+	marker::PhantomData,
+	sync::Arc,
+};
 
+use codec::Codec;
 use jsonrpsee::{
 	core::{async_trait, Error as JsonRpseeError, RpcResult},
 	proc_macros::rpc,
@@ -10,11 +14,14 @@ use sc_client_api::AuxStore;
 use serde::{Deserialize, Serialize};
 use sp_api::ProvideRuntimeApi;
 use sp_blockchain::HeaderBackend;
+use sp_keystore::KeystorePtr;
 use sp_runtime::traits::{Block as BlockT, Header};
 
 use ulx_primitives::{localchain::BlockVoteT, MiningAuthorityApis, NotaryId};
 
-use crate::{aux::UlxAux, convert_u32, rpc_block_votes::Error::StringError};
+use crate::{
+	authority::AuthorityClient, aux::UlxAux, convert_u32, rpc_block_votes::Error::StringError,
+};
 
 #[rpc(client, server)]
 pub trait BlockVoteApi<Hash: Codec> {
@@ -34,13 +41,14 @@ pub struct Response {
 
 pub struct BlockVoteRpc<Block, C> {
 	client: Arc<C>,
+	keystore: KeystorePtr,
 	_block: PhantomData<Block>,
 }
 
 impl<Block, C> BlockVoteRpc<Block, C> {
 	/// Create new `ProofOfTax` instance with the given reference to the client.
-	pub fn new(client: Arc<C>) -> Self {
-		Self { client, _block: PhantomData }
+	pub fn new(client: Arc<C>, keystore: KeystorePtr) -> Self {
+		Self { client, keystore, _block: PhantomData }
 	}
 }
 
@@ -58,14 +66,37 @@ where
 		block_votes: Vec<BlockVoteT<B::Hash>>,
 	) -> RpcResult<Response> {
 		let mut block_numbers = BTreeMap::new();
+		let mut account_ids = BTreeSet::new();
+		let current = convert_u32::<B>(&self.client.info().best_number);
+		if current < 2 {
+			return Err(StringError(format!("BlockVoteRpc: Not accepting votes yet")).into())
+		}
 		for block_vote in block_votes {
-			if !block_numbers.contains_key(&block_vote.block_hash) {
-				let block_number = self.get_block_number(block_vote.block_hash).await?;
-				block_numbers.insert(block_vote.block_hash, block_number);
+			let block_hash = block_vote.grandparent_block_hash;
+			if !block_numbers.contains_key(&block_hash) {
+				let block_number = self.get_block_number(block_vote.grandparent_block_hash).await?;
+				block_numbers.insert(block_hash, block_number);
 			}
-			let current = convert_u32::<B>(&self.client.info().best_number);
-			let block_number = block_numbers.get(&block_vote.block_hash).unwrap_or(&0u32).clone();
-			if block_number < current - 1u32 {
+			let needs_lookup = account_ids.insert(block_vote.account_id.clone());
+
+			if needs_lookup &&
+				!AuthorityClient::can_seal_tax_vote(
+					&self.client,
+					&self.keystore,
+					&block_hash,
+					&block_vote.account_id,
+				)
+				.is_ok()
+			{
+				return Err(StringError(format!(
+					"BlockVoteRpc: Cannot server as block peer for this account: {:?}",
+					block_vote.account_id
+				))
+				.into())
+			}
+
+			let block_number = block_numbers.get(&block_hash).unwrap_or(&0u32).clone();
+			if block_number < current - 2u32 {
 				return Err(StringError(format!(
 					"BlockVoteRpc: Not accepting votes for previous blocks: {:?} < {:?}",
 					block_numbers, current

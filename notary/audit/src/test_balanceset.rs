@@ -1,5 +1,5 @@
 use frame_support::{assert_err, assert_ok};
-use sp_core::{bounded_vec, sr25519::Signature, H256, U256};
+use sp_core::{bounded_vec, sr25519::Signature, H256};
 use sp_keyring::{
 	Ed25519Keyring::{Dave, Ferdie},
 	Sr25519Keyring::{Alice, Bob},
@@ -10,7 +10,7 @@ use std::collections::{BTreeMap, BTreeSet};
 use ulx_notary_primitives::{
 	balance_change::{AccountOrigin, BalanceChange, BalanceProof},
 	note::{AccountType, Note, NoteType},
-	BlockVote, BlockVoteEligibility, BlockVoteSource, ChannelPass, VoteSource,
+	BlockVote, ChannelPass,
 };
 
 use crate::{
@@ -654,16 +654,15 @@ fn verify_tax_votes() {
 
 	let votes = vec![BlockVote {
 		account_id: Bob.to_account_id(),
-		block_hash: H256::zero(),
+		grandparent_block_hash: H256::zero(),
 		index: 0,
 		power: 20_000,
-		vote_source: VoteSource::Tax {
-			channel_pass: ChannelPass {
-				id: 1,
-				zone_record_hash: H256::zero(),
-				miner_index: 0,
-				at_block_height: 100,
-			},
+
+		channel_pass: ChannelPass {
+			id: 1,
+			zone_record_hash: H256::zero(),
+			miner_index: 0,
+			at_block_height: 100,
 		},
 	}];
 
@@ -675,7 +674,7 @@ fn verify_tax_votes() {
 
 #[test]
 fn test_vote_sources() {
-	let block_hash = H256::from([1u8; 32]);
+	let grandparent_block_hash = H256::from([1u8; 32]);
 	let channel_pass_1 = ChannelPass {
 		id: 1,
 		zone_record_hash: H256::from([3u8; 32]),
@@ -686,49 +685,36 @@ fn test_vote_sources() {
 	let mut votes = vec![
 		BlockVote {
 			account_id: Bob.to_account_id(),
-			block_hash,
+			grandparent_block_hash,
 			index: 0,
 			power: 20_000,
-			vote_source: VoteSource::Tax { channel_pass: channel_pass_1.clone() },
+			channel_pass: channel_pass_1.clone(),
 		},
 		BlockVote {
 			account_id: Bob.to_account_id(),
-			block_hash,
+			grandparent_block_hash,
 			index: 1,
 			power: 400,
-			vote_source: VoteSource::Tax { channel_pass: channel_pass_1.clone() },
+			channel_pass: channel_pass_1.clone(),
 		},
 	];
 
-	let eligibility = BTreeMap::from([(
-		block_hash,
-		BlockVoteEligibility { allowed_sources: BlockVoteSource::Compute, minimum: 5 },
-	)]);
+	let vote_minimums = BTreeMap::from([(grandparent_block_hash, 500)]);
 
 	assert_err!(
-		verify_voting_sources(&BTreeSet::new(), &votes, &eligibility),
-		VerifyError::InvalidBlockVoteSource
-	);
-
-	let eligibility = BTreeMap::from([(
-		block_hash,
-		BlockVoteEligibility { allowed_sources: BlockVoteSource::Tax, minimum: 500 },
-	)]);
-
-	assert_err!(
-		verify_voting_sources(&BTreeSet::new(), &votes, &eligibility),
+		verify_voting_sources(&BTreeSet::new(), &votes, &vote_minimums),
 		VerifyError::InvalidBlockVoteChannelPass
 	);
 
 	assert_err!(
-		verify_voting_sources(&BTreeSet::from([channel_pass_1.hash()]), &votes, &eligibility),
+		verify_voting_sources(&BTreeSet::from([channel_pass_1.hash()]), &votes, &vote_minimums),
 		VerifyError::InsufficientBlockVoteMinimum
 	);
 
 	votes[1].power = 500;
 
 	assert_err!(
-		verify_voting_sources(&BTreeSet::new(), &votes, &eligibility),
+		verify_voting_sources(&BTreeSet::new(), &votes, &vote_minimums),
 		VerifyError::InvalidBlockVoteChannelPass
 	);
 
@@ -737,19 +723,6 @@ fn test_vote_sources() {
 	assert_ok!(verify_voting_sources(
 		&BTreeSet::from([channel_pass_1.hash()]),
 		&votes,
-		&eligibility
+		&vote_minimums
 	),);
-}
-
-#[test]
-fn test_puzzle_nonce_power() {
-	assert_eq!(BlockVote::calculate_compute_power(&U256::from_big_endian(&[0u8, 0u8])), u128::MAX);
-	assert_eq!(
-		BlockVote::calculate_compute_power(&(U256::MAX - U256::from(2).pow(U256::from(255)))),
-		2
-	);
-	assert_eq!(
-		BlockVote::calculate_compute_power(&(U256::from(2).pow(U256::from(250)))),
-		2u128.pow(5)
-	);
 }

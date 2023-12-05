@@ -19,6 +19,7 @@ use sc_transaction_pool_api::TransactionPool;
 use sp_api::ProvideRuntimeApi;
 use sp_block_builder::BlockBuilder;
 use sp_blockchain::{Error as BlockChainError, HeaderBackend, HeaderMetadata};
+use sp_keystore::KeystorePtr;
 
 use ulx_node_consensus::rpc_block_votes::{BlockVoteApiServer, BlockVoteRpc};
 use ulx_node_runtime::{opaque::Block, AccountId, Balance, BlockNumber, Hash, Nonce};
@@ -50,6 +51,8 @@ pub struct FullDeps<C, P, B> {
 	pub grandpa: GrandpaDeps<B>,
 	/// The backend used by the node.
 	pub backend: Arc<B>,
+	/// A keystore used to lookup valid authority ids
+	pub keystore: KeystorePtr,
 }
 
 /// Instantiate all full RPC extensions.
@@ -72,7 +75,7 @@ where
 	use substrate_frame_rpc_system::{System, SystemApiServer};
 
 	let mut module = RpcModule::new(());
-	let FullDeps { client, pool, deny_unsafe, grandpa, backend: _ } = deps;
+	let FullDeps { client, pool, deny_unsafe, grandpa, keystore, backend: _ } = deps;
 	let GrandpaDeps {
 		shared_voter_state,
 		shared_authority_set,
@@ -83,7 +86,7 @@ where
 
 	module.merge(System::new(client.clone(), pool, deny_unsafe).into_rpc())?;
 	module.merge(TransactionPayment::new(client.clone()).into_rpc())?;
-	module.merge(BlockVoteRpc::new(client.clone()).into_rpc())?;
+	module.merge(BlockVoteRpc::new(client.clone(), keystore).into_rpc())?;
 
 	module.merge(
 		Grandpa::new(

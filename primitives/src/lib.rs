@@ -7,11 +7,10 @@ use sp_core::{crypto::AccountId32, RuntimeDebug, H256};
 use sp_runtime::DispatchResult;
 use sp_std::{collections::btree_map::BTreeMap, vec::Vec};
 
-use block_seal::BlockVoteEligibility;
 pub use block_seal::{BlockSealAuthorityId, BlockSealAuthoritySignature, BLOCK_SEAL_KEY_TYPE};
 pub use digests::{BlockSealDigest, AUTHOR_DIGEST_ID, BLOCK_SEAL_DIGEST_ID};
 pub use ulx_notary_primitives::{MerkleProof, NotaryId};
-use ulx_notary_primitives::{NotebookHeader, NotebookNumber};
+use ulx_notary_primitives::{NotebookHeader, NotebookNumber, VoteMinimum};
 
 use crate::{
 	block_seal::{AuthorityIndex, Host, MiningAuthority},
@@ -32,9 +31,11 @@ pub mod notebook {
 	};
 }
 
+pub type ComputeDifficulty = u128;
+
 pub mod localchain {
 	pub use ulx_notary_primitives::{
-		AccountType, BalanceChange, BlockVote, BlockVoteT, ChannelPass, Note, NoteType,
+		AccountType, BalanceChange, BlockVote, BlockVoteT, ChannelPass, Note, NoteType, VoteMinimum,
 	};
 }
 
@@ -55,7 +56,7 @@ pub trait ChainTransferLookup<Nonce, AccountId> {
 }
 
 pub trait BlockVotingProvider<Block: BlockT> {
-	fn grandpa_vote_eligibility() -> Option<BlockVoteEligibility>;
+	fn grandparent_vote_minimum() -> Option<VoteMinimum>;
 	fn parent_voting_key() -> Option<H256>;
 }
 
@@ -111,8 +112,9 @@ sp_api::decl_runtime_apis! {
 }
 
 sp_api::decl_runtime_apis! {
-	pub trait BlockVotingApis {
-		fn vote_eligibility() -> BlockVoteEligibility;
+	pub trait BlockSealMinimumApis {
+		fn vote_minimum() -> VoteMinimum;
+		fn compute_difficulty() -> u128;
 		fn parent_voting_key() -> Option<H256>;
 	}
 }
@@ -131,7 +133,7 @@ sp_api::decl_runtime_apis! {
 			notary_id: NotaryId,
 			notebook_number: NotebookNumber,
 			header_hash: H256,
-			block_eligibility: &BTreeMap<Block::Hash, BlockVoteEligibility>,
+			vote_minimums: &BTreeMap<Block::Hash, VoteMinimum>,
 			bytes: &Vec<u8>,
 		) -> Result<bool, ulx_notary_audit::VerifyError>;
 

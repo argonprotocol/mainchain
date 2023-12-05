@@ -15,10 +15,17 @@ use sp_runtime::{
 	traits::{Block as BlockT, Header as HeaderT},
 };
 
-use ulx_primitives::{digests::SIGNATURE_DIGEST_ID, MiningAuthorityApis};
+use ulx_notary::ensure;
+use ulx_primitives::{
+	digests::SealSource, BlockSealMinimumApis, MiningAuthorityApis, BLOCK_SEAL_DIGEST_ID,
+};
 
 use crate::{
-	authority::AuthoritySealer, aux::UlxAux, basic_queue::BasicQueue, digests::load_digests,
+	authority::verify_seal_signature,
+	aux::UlxAux,
+	basic_queue::BasicQueue,
+	compute_worker::BlockComputeNonce,
+	digests::{load_digests, read_seal_digest},
 	error::Error,
 };
 
@@ -76,8 +83,7 @@ where
 		+ BlockchainEvents<B>
 		+ AuxStore
 		+ BlockOf,
-	C::Api: BlockBuilderApi<B>,
-	C::Api: MiningAuthorityApis<B>,
+	C::Api: BlockBuilderApi<B> + MiningAuthorityApis<B> + BlockSealMinimumApis<B>,
 {
 	type Error = ConsensusError;
 
@@ -107,7 +113,9 @@ where
 			)
 			.into())
 		}
-
+		let Some(Some(seal)) = block.post_digests.last().map(read_seal_digest) else {
+			return Err(Error::<B>::MissingBlockSealDigest.into())
+		};
 		let parent_hash = *block.header.parent_hash();
 
 		if let Some(inner_body) = block.body.take() {
@@ -115,7 +123,6 @@ where
 
 			if !block.state_action.skip_execution_checks() {
 				let timestamp = sp_timestamp::InherentDataProvider::from_system_time();
-				// Check inherents - mostly to check the timestamp inherent
 				let inherent_data_providers = timestamp;
 
 				let inherent_data = inherent_data_providers
@@ -146,14 +153,21 @@ where
 
 		let pre_hash = block.header.hash();
 
-		AuthoritySealer::<B, C>::verify_seal_signature(
-			self.client.clone(),
-			&digests.signature,
-			&digests.author,
-			&parent_hash,
-			&pre_hash,
-			&digests.compute_authority,
-		)?;
+		verify_seal_signature::<B>(&seal, &pre_hash, &digests.authority)?;
+		if seal.seal_source == SealSource::Compute {
+			// verify compute effort
+			let difficulty =
+				self.client.runtime_api().compute_difficulty(parent_hash).map_err(|e| {
+					Error::<B>::MissingRuntimeData(
+						format!("Failed to get difficulty from runtime: {}", e).to_string(),
+					)
+				})?;
+			ensure!(
+				BlockComputeNonce { nonce: seal.nonce, pre_hash: pre_hash.as_ref().to_vec() }
+					.is_valid(difficulty),
+				Error::<B>::InvalidComputeNonce
+			);
+		}
 
 		let best_header = self
 			.select_chain
@@ -170,7 +184,8 @@ where
 			digests.block_vote.parent_voting_key,
 			digests.block_vote.notebook_numbers.len() as u32,
 			digests.block_vote.voting_power,
-			digests.block_seal.nonce,
+			seal.nonce,
+			seal.is_tax(),
 		)?;
 
 		if block.fork_choice.is_none() {
@@ -200,18 +215,18 @@ impl<B: BlockT> Verifier<B> for UlxVerifier<B> {
 		let mut header = block.header;
 		let hash = header.hash();
 
-		let signature_digest = match header.digest_mut().pop() {
+		let seal_digest = match header.digest_mut().pop() {
 			Some(DigestItem::Seal(id, signature_digest)) =>
-				if id == SIGNATURE_DIGEST_ID {
+				if id == BLOCK_SEAL_DIGEST_ID {
 					Ok(DigestItem::Seal(id, signature_digest.clone()))
 				} else {
 					Err(Error::<B>::WrongEngine(id))
 				},
-			_ => Err(Error::<B>::MissingSignatureDigest),
+			_ => Err(Error::<B>::MissingBlockSealDigest),
 		}?;
 
 		block.header = header;
-		block.post_digests.push(signature_digest);
+		block.post_digests.push(seal_digest);
 		block.post_hash = Some(hash);
 
 		Ok(block)

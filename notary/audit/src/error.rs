@@ -168,9 +168,6 @@ pub enum VerifyError {
 
 	#[snafu(display("Invalid block vote channel pass"))]
 	InvalidBlockVoteChannelPass,
-
-	#[snafu(display("Invalid block vote power"))]
-	InvalidBlockVotePower,
 }
 
 impl From<AccountHistoryLookupError> for VerifyError {

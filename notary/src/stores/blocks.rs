@@ -4,7 +4,7 @@ use chrono::Utc;
 use sp_core::H256;
 use sqlx::{FromRow, PgConnection};
 
-use ulx_notary_primitives::{ensure, BlockVoteEligibility, BlockVoteSource};
+use ulx_notary_primitives::{ensure, VoteMinimum};
 
 use crate::Error;
 
@@ -16,25 +16,24 @@ pub struct BlockRow {
 	pub parent_hash: Vec<u8>,
 	pub block_number: i32,
 	pub block_vote_minimum: String,
-	pub block_vote_source: BlockVoteSource,
 	pub this_notary_notebook_number: Option<i32>,
-	pub parent_voting_key: Vec<u8>,
+	pub parent_voting_key: Option<Vec<u8>>,
 	pub is_finalized: bool,
 	pub finalized_time: Option<chrono::DateTime<Utc>>,
 	pub received_time: chrono::DateTime<Utc>,
 }
 
 impl BlocksStore {
-	pub(crate) async fn get_specifications(
+	pub(crate) async fn get_vote_minimums(
 		&self,
 		db: &mut PgConnection,
 		block_hashes: &BTreeSet<H256>,
-	) -> anyhow::Result<BTreeMap<H256, BlockVoteEligibility>, crate::Error> {
+	) -> anyhow::Result<BTreeMap<H256, VoteMinimum>, crate::Error> {
 		let mut map = BTreeMap::new();
 		let block_hashes_vec = block_hashes.iter().map(|h| h.0.to_vec()).collect::<Vec<_>>();
 		let rows = sqlx::query!(
 			r#"
-		SELECT block_hash, block_vote_minimum, block_vote_source FROM blocks where block_hash = ANY($1)
+		SELECT block_hash, block_vote_minimum FROM blocks where block_hash = ANY($1)
 		"#,
 			&block_hashes_vec
 		)
@@ -44,12 +43,9 @@ impl BlocksStore {
 		for row in rows {
 			map.insert(
 				H256::from_slice(&row.block_hash[..]),
-				BlockVoteEligibility {
-					allowed_sources: row.block_vote_source.into(),
-					minimum: row.block_vote_minimum.parse::<u128>().map_err(|e| {
-						Error::InternalError(format!("Unable to parse minimum: {:?}", e))
-					})?,
-				},
+				row.block_vote_minimum.parse::<u128>().map_err(|e| {
+					Error::InternalError(format!("Unable to parse minimum: {:?}", e))
+				})?,
 			);
 		}
 		Ok(map)
@@ -132,7 +128,15 @@ impl BlocksStore {
 		)
 		.fetch_all(db)
 		.await?;
-		let rows = rows.iter().map(|a| H256::from_slice(&a[..])).collect::<Vec<_>>();
+		let rows = rows
+			.iter()
+			.filter_map(|a| {
+				if let Some(a) = a {
+					return Some(H256::from_slice(&a[..]))
+				}
+				None
+			})
+			.collect::<Vec<_>>();
 		Ok(rows)
 	}
 
@@ -168,7 +172,7 @@ impl BlocksStore {
 
 		ensure!(
 			res.rows_affected() == 1,
-			Error::InternalError("Unable to insert block".to_string())
+			Error::InternalError("Unable to mark block finalized".to_string())
 		);
 		Ok(())
 	}
@@ -178,24 +182,23 @@ impl BlocksStore {
 		block_number: u32,
 		block_hash: H256,
 		parent_hash: H256,
-		vote_eligibility: BlockVoteEligibility,
-		parent_voting_key: H256,
+		vote_minimum: VoteMinimum,
+		parent_voting_key: Option<H256>,
 		this_notary_notebook_number: Option<u32>,
 	) -> anyhow::Result<(), Error> {
 		let res = sqlx::query!(
 			r#"
-			INSERT INTO blocks (block_hash, block_number, parent_hash, block_vote_minimum, block_vote_source, received_time, is_finalized,
+			INSERT INTO blocks (block_hash, block_number, parent_hash, block_vote_minimum, received_time, is_finalized,
 				parent_voting_key, this_notary_notebook_number)
-			VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9)
+			VALUES ($1, $2, $3, $4, $5, $6, $7, $8)
 		"#,
 			block_hash.0.to_vec(),
 			block_number as i32,
 			parent_hash.0.to_vec(),
-			vote_eligibility.minimum.to_string(),
-			vote_eligibility.allowed_sources as i32,
+			vote_minimum.to_string(),
 			Utc::now(),
 			false,
-			parent_voting_key.0.to_vec(),
+			parent_voting_key.map(|x| x.0.to_vec()),
 			this_notary_notebook_number.map(|n| n as i32),
 		)
 		.execute(db)
@@ -214,8 +217,6 @@ mod tests {
 	use sp_core::H256;
 	use sqlx::PgPool;
 
-	use ulx_notary_primitives::{BlockVoteEligibility, BlockVoteSource};
-
 	use crate::stores::blocks::BlocksStore;
 
 	#[sqlx::test]
@@ -227,8 +228,8 @@ mod tests {
 				0,
 				H256::from_slice(&[1u8; 32]),
 				H256::zero(),
-				BlockVoteEligibility::new(100, BlockVoteSource::Tax),
-				H256::from_slice(&[1u8; 32]),
+				100,
+				Some(H256::from_slice(&[1u8; 32])),
 				None,
 			)
 			.await?;
@@ -237,8 +238,8 @@ mod tests {
 				1,
 				H256::from_slice(&[2u8; 32]),
 				H256::from_slice(&[1u8; 32]),
-				BlockVoteEligibility::new(100, BlockVoteSource::Tax),
-				H256::from_slice(&[1u8; 32]),
+				100,
+				Some(H256::from_slice(&[1u8; 32])),
 				None,
 			)
 			.await?;
@@ -247,8 +248,8 @@ mod tests {
 				2,
 				H256::from_slice(&[3u8; 32]),
 				H256::from_slice(&[2u8; 32]),
-				BlockVoteEligibility::new(100, BlockVoteSource::Tax),
-				H256::from_slice(&[1u8; 32]),
+				100,
+				Some(H256::from_slice(&[1u8; 32])),
 				None,
 			)
 			.await?;
@@ -272,8 +273,8 @@ mod tests {
 			1,
 			H256::from_slice(&[1u8; 32]),
 			H256::zero(),
-			BlockVoteEligibility::new(100, BlockVoteSource::Tax),
-			H256::from_slice(&[1u8; 32]),
+			100,
+			Some(H256::from_slice(&[1u8; 32])),
 			None,
 		)
 		.await?;
@@ -282,8 +283,8 @@ mod tests {
 			1,
 			H256::from_slice(&[1u8; 32]),
 			H256::from_slice(&[1u8; 32]),
-			BlockVoteEligibility::new(100, BlockVoteSource::Tax),
-			H256::from_slice(&[1u8; 32]),
+			100,
+			Some(H256::from_slice(&[1u8; 32])),
 			None
 		)
 		.await

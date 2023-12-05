@@ -7,12 +7,12 @@ use sp_runtime::traits::{IdentifyAccount, Verify};
 
 use ulx_node_runtime::{
 	opaque::SessionKeys, AccountId, ArgonBalancesConfig, GrandpaConfig, MiningSlotConfig,
-	RuntimeGenesisConfig, SessionConfig, Signature, SudoConfig, SystemConfig, UlixeeBalancesConfig,
-	VoteEligibilityConfig, WASM_BINARY,
+	RuntimeGenesisConfig, SealMinimumsConfig, SessionConfig, Signature, SudoConfig, SystemConfig,
+	UlixeeBalancesConfig, WASM_BINARY,
 };
 use ulx_primitives::{
-	block_seal::{Host, MiningRegistration, PeerId, RewardDestination},
-	BlockSealAuthorityId,
+	block_seal::{Host, MiningRegistration, PeerId, RewardDestination, VoteMinimum},
+	BlockSealAuthorityId, ComputeDifficulty,
 };
 
 // The URL for the telemetry server.
@@ -72,6 +72,7 @@ pub fn development_config() -> Result<ChainSpec, String> {
 					get_account_id_from_seed::<sr25519::Public>("Alice"),
 					get_account_id_from_seed::<sr25519::Public>("Bob"),
 				],
+				500,
 				10_000,
 			)
 		},
@@ -130,6 +131,7 @@ pub fn local_testnet_config() -> Result<ChainSpec, String> {
 					get_account_id_from_seed::<sr25519::Public>("Eve"),
 					get_account_id_from_seed::<sr25519::Public>("Ferdie"),
 				],
+				500,
 				100_000_000,
 			)
 		},
@@ -153,7 +155,8 @@ fn testnet_genesis(
 	initial_authorities: Vec<(AccountId, (BlockSealAuthorityId, GrandpaId))>,
 	root_key: AccountId,
 	endowed_accounts: Vec<AccountId>,
-	initial_difficulty: u128,
+	initial_vote_minimum: VoteMinimum,
+	initial_difficulty: ComputeDifficulty,
 ) -> RuntimeGenesisConfig {
 	let authority_zero = initial_authorities[0].clone();
 
@@ -202,9 +205,9 @@ fn testnet_genesis(
 				})
 				.collect(),
 		},
-		vote_eligibility: VoteEligibilityConfig {
-			initial_voting_minimum: initial_difficulty,
-			mining_slot_count_starting_tax_proof: 2,
+		seal_minimums: SealMinimumsConfig {
+			initial_vote_minimum,
+			initial_compute_difficulty: initial_difficulty,
 			..Default::default()
 		},
 		transaction_payment: Default::default(),

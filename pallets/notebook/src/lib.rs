@@ -30,7 +30,7 @@ pub mod pallet {
 
 	use ulx_notary_audit::{notebook_verify, AccountHistoryLookupError, NotebookHistoryLookup};
 	use ulx_primitives::{
-		block_seal::BlockVoteEligibility,
+		block_seal::VoteMinimum,
 		notary::{NotaryId, NotaryNotebookKeyDetails, NotaryNotebookVoteDetails, NotarySignature},
 		notebook::{AccountOrigin, Notebook, NotebookHeader},
 		ChainTransferLookup, NotebookEventHandler, NotebookProvider,
@@ -297,7 +297,7 @@ pub mod pallet {
 			notary_id: NotaryId,
 			notebook_number: NotebookNumber,
 			header_hash: H256,
-			block_vote_eligibility: &BTreeMap<<T::Block as BlockT>::Hash, BlockVoteEligibility>,
+			block_vote_minimums: &BTreeMap<<T::Block as BlockT>::Hash, VoteMinimum>,
 			bytes: &Vec<u8>,
 		) -> Result<bool, NotebookVerifyError> {
 			if let Some(notebook) = <LastNotebookDetailsByNotary<T>>::get(notary_id).first() {
@@ -333,7 +333,7 @@ pub mod pallet {
 			let is_valid = notebook_verify(
 				&LocalchainHistoryLookup::<T>::new(),
 				&notebook,
-				block_vote_eligibility,
+				block_vote_minimums,
 			)
 			.map_err(|e| {
 				log::info!(

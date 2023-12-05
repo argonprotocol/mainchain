@@ -6,20 +6,31 @@ use sp_runtime::RuntimeDebug;
 
 use ulx_notary_primitives::{BlockVote, MerkleProof, NotaryId, NotebookNumber};
 
+use crate::digests::SealSource;
+
 pub const INHERENT_IDENTIFIER: InherentIdentifier = *b"ulx_seal";
 
 type InherentType = BlockSealInherent;
 
 #[derive(Clone, PartialEq, Eq, Encode, Decode, RuntimeDebug, TypeInfo)]
 pub enum BlockSealInherent {
-	ClosestNonce {
+	Vote {
 		nonce: U256,
 		notary_id: NotaryId,
 		block_vote: BlockVote,
 		source_notebook_number: NotebookNumber,
 		source_notebook_proof: MerkleProof,
 	},
-	Continuation,
+	Compute,
+}
+
+impl BlockSealInherent {
+	pub fn to_seal_source(&self) -> SealSource {
+		match self {
+			Self::Vote { .. } => SealSource::Vote,
+			Self::Compute => SealSource::Compute,
+		}
+	}
 }
 
 pub trait BlockSealInherentData {
@@ -35,27 +46,14 @@ impl BlockSealInherentData for InherentData {
 #[derive(Encode, RuntimeDebug)]
 #[cfg_attr(feature = "std", derive(Decode, thiserror::Error))]
 pub enum InherentError {
-	/// The nonce doesn't match the seal.
-	#[cfg_attr(
-		feature = "std",
-		error("The nonce used in the inherent does not match the block seal nonce.")
-	)]
-	WrongNonce,
-	/// The proof of work is wrong
-	#[cfg_attr(feature = "std", error("The wrong proof of work was used."))]
-	WrongSource,
-	/// The proof of work is wrong
+	/// The block seal is missing
 	#[cfg_attr(feature = "std", error("The block seal is missing."))]
 	MissingSeal,
 }
 
 impl IsFatalError for InherentError {
 	fn is_fatal_error(&self) -> bool {
-		match self {
-			InherentError::WrongNonce => true,
-			InherentError::WrongSource => true,
-			InherentError::MissingSeal => true,
-		}
+		true
 	}
 }
 

@@ -13,9 +13,9 @@ use ulixee_client::{
 	UlxClient, UlxConfig,
 };
 use ulx_notary_primitives::{
-	AccountId, BlockVoteDigest, BlockVoteEligibility, NotaryId, NotebookNumber,
-	BLOCK_VOTES_DIGEST_ID, NEXT_VOTE_ELIGIBILITY_DIGEST_ID,
+	AccountId, BlockVoteDigest, NotaryId, NotebookNumber, VoteMinimum, BLOCK_VOTES_DIGEST_ID,
 };
+use ulx_primitives::digests::{BlockSealMinimumsDigest, NEXT_SEAL_MINIMUMS_DIGEST_ID};
 
 use crate::{
 	stores::{
@@ -107,7 +107,20 @@ async fn process_block(
 	block: &Block<UlxConfig, UlxClient>,
 	notary_id: NotaryId,
 ) -> anyhow::Result<()> {
-	let mut next_vote_eligibility: Option<BlockVoteEligibility> = None;
+	if block.header().number == 0 {
+		BlocksStore::record(
+			db,
+			block.number(),
+			block.hash(),
+			block.header().parent_hash,
+			0,
+			None,
+			None,
+		)
+		.await?;
+		return Ok(())
+	}
+	let mut next_vote_minimum: Option<VoteMinimum> = None;
 	let mut included_notebook_number: Option<NotebookNumber> = None;
 	let mut parent_voting_key: Option<H256> = None;
 
@@ -124,11 +137,12 @@ async fn process_block(
 					}
 				}
 			},
-			Consensus(NEXT_VOTE_ELIGIBILITY_DIGEST_ID, data) => {
-				let Some(votes_digest) = BlockVoteEligibility::decode(&mut &data[..]).ok() else {
+			Consensus(NEXT_SEAL_MINIMUMS_DIGEST_ID, data) => {
+				let Some(votes_digest) = BlockSealMinimumsDigest::decode(&mut &data[..]).ok()
+				else {
 					return Err(anyhow::anyhow!("Unable to decode votes eligibility"))
 				};
-				next_vote_eligibility = Some(votes_digest);
+				next_vote_minimum = Some(votes_digest.vote_minimum);
 			},
 
 			_ => (),
@@ -141,8 +155,8 @@ async fn process_block(
 		block.number(),
 		block.hash(),
 		parent_hash.clone(),
-		next_vote_eligibility.ok_or_else(|| anyhow::anyhow!("Missing next work digest"))?,
-		parent_voting_key.expect("Missing parent voting key"),
+		next_vote_minimum.ok_or_else(|| anyhow::anyhow!("Missing next seal minimums"))?,
+		parent_voting_key,
 		included_notebook_number,
 	)
 	.await?;
@@ -181,7 +195,6 @@ async fn process_fork(
 	for missing_block in missing_blocks {
 		process_block(db, &missing_block, notary_id).await?;
 	}
-	process_block(db, &block, notary_id).await?;
 	Ok(())
 }
 

@@ -2,109 +2,63 @@ use std::{collections::BTreeMap, convert::Into, default::Default, marker::Phanto
 
 use codec::{Codec, Decode, Encode};
 use futures::{channel::mpsc::*, prelude::*};
-use lazy_static::lazy_static;
 use log::*;
 use sc_client_api::{AuxStore, BlockOf, BlockchainEvents};
-use sc_transaction_pool_api::{InPoolTransaction, TransactionFor, TransactionPool};
+use sc_transaction_pool_api::{TransactionFor, TransactionPool};
 use sp_api::ProvideRuntimeApi;
 use sp_blockchain::HeaderBackend;
 use sp_consensus::SelectChain;
 use sp_core::{H256, U256};
-use sp_keystore::KeystorePtr;
 use sp_runtime::{
 	traits::{Block as BlockT, Header as HeaderT},
-	transaction_validity::TransactionTag,
-	BoundedVec, DigestItem,
+	BoundedVec,
 };
 
-use ulx_node_runtime::{AccountId, BlockNumber, NotaryRecordT};
+use ulx_node_runtime::{BlockNumber, NotaryRecordT};
 use ulx_notary::apis::notebook::NotebookRpcClient;
 use ulx_primitives::{
-	block_seal::{BlockVotingPower, VoteSource},
-	digests::{BlockVoteDigest, NotaryNotebookDigest, COMPUTE_AUTHORITY_DIGEST_ID},
+	block_seal::BlockVotingPower,
+	digests::{BlockVoteDigest, NotaryNotebookDigest, BLOCK_VOTES_DIGEST_ID},
 	inherents::BlockSealInherent,
 	localchain::BlockVote,
 	notary::{NotaryNotebookSubmissionState, NotaryNotebookVoteDetails},
 	notebook::BlockVotingKey,
-	BlockSealAuthorityId, BlockVotingApis, MiningAuthorityApis, NotaryApis, NotaryId, NotebookApis,
-	AUTHOR_DIGEST_ID,
+	BlockSealMinimumApis, MiningAuthorityApis, NotaryApis, NotaryId, NotebookApis,
 };
 
 use crate::{
-	authority::AuthoritySealer,
+	authority::AuthorityClient,
 	aux::{ForkPower, UlxAux},
+	block_creator::CreateBlockEvent,
 	convert_u32,
 	error::Error,
 	LOG_TARGET,
 };
 
-lazy_static! {
-	static ref TX_NOTEBOOK_PROVIDE_PREFIX: Vec<u8> = ("Notebook").encode();
-}
-
-pub fn create_notebook_watch<B, TP, C, SC>(
-	pool: Arc<TP>,
-	client: Arc<C>,
-	select_chain: SC,
-	miner_account_id: AccountId,
-	keystore: KeystorePtr,
-) -> (impl Future<Output = ()>, Receiver<CreateBlockEvent<B>>)
-where
-	B: BlockT,
-	C: ProvideRuntimeApi<B> + BlockchainEvents<B> + HeaderBackend<B> + AuxStore + BlockOf + 'static,
-	C::Api: NotebookApis<B>
-		+ BlockVotingApis<B>
-		+ NotaryApis<B, NotaryRecordT>
-		+ MiningAuthorityApis<B>,
-	TP: TransactionPool<Block = B>,
-	SC: SelectChain<B>,
-{
-	let (sender, receiver) = channel(1000);
-	let authority_sealer = AuthoritySealer::<B, C>::new(client.clone(), keystore);
-	let state =
-		NotebookState::new(pool, client, select_chain, miner_account_id, authority_sealer, sender);
-	let task = async move {
-		let pool = state.pool.clone();
-		let mut state = state;
-		let mut tx_stream = Box::pin(pool.import_notification_stream());
-		while let Some(tx_hash) = tx_stream.next().await {
-			if let Some(tx) = pool.ready_transaction(&tx_hash) {
-				let tag: TransactionTag = TX_NOTEBOOK_PROVIDE_PREFIX.to_vec();
-				if tx.provides().len() > 0 && tx.provides()[0].starts_with(&tag) {
-					info!("Got inbound Notebook. {:?}", tx_hash);
-					let _ = state.try_process_notebook(tx.data()).await.map_err(|e| {
-						warn!(
-							target: LOG_TARGET,
-							"Unable to process notebook. Error: {}",
-							e.to_string()
-						);
-					});
-				}
-			}
-		}
-	};
-	(task, receiver)
-}
-
 pub struct NotebookState<Block: BlockT, TP, C, SC> {
-	pool: Arc<TP>,
+	pub pool: Arc<TP>,
 	client: Arc<C>,
 	select_chain: SC,
-	miner_account_id: AccountId,
-	authority_sealer: AuthoritySealer<Block, C>,
+	authority_sealer: AuthorityClient<Block, C>,
 	notary_client_by_id: BTreeMap<NotaryId, Arc<ulx_notary::Client>>,
 	sender: Sender<CreateBlockEvent<Block>>,
 	_phantom: PhantomData<Block>,
 }
 
-pub struct CreateBlockEvent<Block: BlockT> {
-	pub parent_block_number: BlockNumber,
-	pub parent_hash: Block::Hash,
-	pub block_vote_digest: BlockVoteDigest,
-	pub seal_inherent: BlockSealInherent,
-	pub is_compute_seal: bool,
-	pub block_seal_authority: BlockSealAuthorityId,
-	pub latest_finalized_block_needed: BlockNumber,
+pub fn get_notary_state<B: BlockT, C: AuxStore>(
+	client: &Arc<C>,
+	block_number: BlockNumber,
+) -> Result<NotaryNotebookSubmissionState<B::Hash>, Error<B>> {
+	let state_key = notary_state_key(block_number);
+	let notary_state = match client.get_aux(&state_key)? {
+		Some(bytes) => NotaryNotebookSubmissionState::decode(&mut &bytes[..]).unwrap_or_default(),
+		None => Default::default(),
+	};
+	Ok(notary_state)
+}
+
+fn notary_state_key(block_number: BlockNumber) -> Vec<u8> {
+	("NotaryStateAtHeight", block_number).encode()
 }
 
 impl<B, TP, C, SC> NotebookState<B, TP, C, SC>
@@ -112,7 +66,7 @@ where
 	B: BlockT,
 	C: ProvideRuntimeApi<B> + BlockchainEvents<B> + HeaderBackend<B> + AuxStore + BlockOf + 'static,
 	C::Api: NotebookApis<B>
-		+ BlockVotingApis<B>
+		+ BlockSealMinimumApis<B>
 		+ NotaryApis<B, NotaryRecordT>
 		+ MiningAuthorityApis<B>,
 	TP: TransactionPool<Block = B>,
@@ -122,8 +76,7 @@ where
 		pool: Arc<TP>,
 		client: Arc<C>,
 		select_chain: SC,
-		miner_account_id: AccountId,
-		authority_sealer: AuthoritySealer<B, C>,
+		authority_sealer: AuthorityClient<B, C>,
 		sender: Sender<CreateBlockEvent<B>>,
 	) -> Self {
 		Self {
@@ -131,14 +84,16 @@ where
 			client,
 			select_chain,
 			authority_sealer,
-			miner_account_id,
 			notary_client_by_id: Default::default(),
 			sender,
 			_phantom: PhantomData,
 		}
 	}
 
-	async fn try_process_notebook(&mut self, tx_data: &TransactionFor<TP>) -> Result<(), Error<B>> {
+	pub async fn try_process_notebook(
+		&mut self,
+		tx_data: &TransactionFor<TP>,
+	) -> Result<(), Error<B>> {
 		// Use the latest hash to check the state of the notebooks. The API should NOT
 		// use the block hash for state.
 		let best_header = self.get_best_block_header().await.ok_or_else(|| {
@@ -180,78 +135,26 @@ where
 		let mut best_hash_at_notebook_block = best_hash;
 		if best_header_number > block_number.into() {
 			best_hash_at_notebook_block =
-				self.get_parent(best_hash, best_header_number - block_number);
+				get_block_descendent(&self.client, best_hash, best_header_number - block_number)
+					.ok_or(Error::BlockNotFound(format!(
+						"Unknown block vote parent requested = {} parents {}",
+						best_hash,
+						best_header_number - block_number
+					)))?;
 		}
 
 		self.try_audit_notebook(&best_hash_at_notebook_block, &notary_details, &vote_details)
 			.await?;
+
+		if block_number < 4 || notary_state.block_votes == 0 {
+			return Ok(())
+		}
+
 		let strongest_fork_at_height =
 			UlxAux::strongest_vote_at_height(self.client.as_ref(), block_number + 1)?;
 
-		if block_number < 3 || notary_state.block_votes < 5 {
-			let Some(build_on_header) = self.client.header(best_hash_at_notebook_block)? else {
-				return Err(Error::NoBestHeader(
-					"Unable to get best header for notebook processing".to_string(),
-				))
-			};
-
-			let mut account_id = None;
-			let mut is_compute_seal = false;
-			for digest in build_on_header.digest().logs() {
-				match digest {
-					DigestItem::PreRuntime(AUTHOR_DIGEST_ID, data) => {
-						account_id = AccountId::decode(&mut &data[..]).ok();
-					},
-					DigestItem::PreRuntime(COMPUTE_AUTHORITY_DIGEST_ID, _) => {
-						is_compute_seal = true;
-					},
-					_ => (),
-				}
-			}
-
-			let Some(account_id) = account_id else {
-				return Err(Error::MissingPreRuntimeDigest("Author Digest".to_string()))
-			};
-
-			if account_id == self.miner_account_id {
-				let can_make_strongest = self.can_build_strongest_fork(
-					best_hash_at_notebook_block,
-					notary_state.block_voting_power,
-					strongest_fork_at_height.voting_power,
-				);
-
-				if can_make_strongest {
-					let block_seal_authority = if is_compute_seal {
-						self.authority_sealer.get_compute_authority()
-					} else {
-						self.authority_sealer
-							.check_if_can_seal(&build_on_header.hash(), &account_id)
-							.ok()
-					}
-					.ok_or(Error::NoActiveAuthorityInKeystore)?;
-
-					self.sender
-						.send(CreateBlockEvent {
-							parent_block_number: convert_u32::<B>(build_on_header.number()),
-							parent_hash: best_hash_at_notebook_block,
-							seal_inherent: BlockSealInherent::Continuation,
-							block_vote_digest: notary_state_to_vote_digest(&notary_state),
-							block_seal_authority,
-							is_compute_seal,
-							latest_finalized_block_needed: notary_state
-								.latest_finalized_block_needed,
-						})
-						.await?;
-				}
-			}
-
-			// don't try to also find a closest nonce
-			if block_number < 3 {
-				return Ok(())
-			}
-		}
-
-		let active_forks_by_great_grandparent = self.get_active_fork_weight(block_number).await?;
+		let active_forks_by_great_great_grandparent =
+			self.get_active_fork_weight(block_number).await?;
 
 		let block_votes = if block_number >= 2 {
 			UlxAux::get_block_votes(self.client.as_ref(), block_number - 2)?
@@ -270,19 +173,19 @@ where
 			if !can_close {
 				can_close = self
 					.authority_sealer
-					.is_block_peer(&vote.block_hash, account_id.clone())
-					.unwrap_or_default();
+					.block_peer(&vote.grandparent_block_hash, account_id.clone())
+					.is_ok();
 			}
 			if !can_close {
 				continue
 			}
 
 			// 1. was the vote for an active fork?
-			let voted_great_grandparent = vote.block_hash;
+			let voted_great_great_grandparent = vote.grandparent_block_hash;
 			let Some(active_forks) =
-				active_forks_by_great_grandparent.get(&voted_great_grandparent.into())
+				active_forks_by_great_great_grandparent.get(&voted_great_great_grandparent.into())
 			else {
-				info!("Best hash not found for fork. Skipping vote. Great Grandparent {voted_great_grandparent}");
+				info!("Best hash not found for fork. Skipping vote. Great Grandparent {voted_great_great_grandparent}");
 				continue
 			};
 
@@ -312,6 +215,7 @@ where
 				);
 				continue
 			};
+
 			if best_nonce.nonce > strongest_fork_at_height.nonce {
 				info!(
 					"Nonce not smaller than current best. Skipping vote. Nonce {}, Best nonce {}",
@@ -320,18 +224,12 @@ where
 				continue
 			}
 
-			let (block_seal_authority, is_compute_seal) = match &vote.vote_source {
-				VoteSource::Compute { .. } => (self.authority_sealer.get_compute_authority(), true),
-				VoteSource::Tax { .. } => (
-					self.authority_sealer
-						.check_if_can_seal(&vote.block_hash, &account_id)
-						.ok()
-						.map(|a| a),
-					false,
-				),
-			};
-
-			let Some(block_seal_authority) = block_seal_authority else {
+			let Some(block_seal_authority) = self
+				.authority_sealer
+				.check_if_can_seal_tax_vote(&vote.grandparent_block_hash, &account_id)
+				.ok()
+				.map(|a| a)
+			else {
 				info!(
 					"Unable to find block seal authority. Skipping vote. Notary {}, notebook {}, account_id {}",
 					notary_id, notebook_number, account_id
@@ -341,22 +239,24 @@ where
 
 			self.sender
 				.send(CreateBlockEvent {
-					is_compute_seal,
+					nonce: best_nonce.nonce,
 					parent_block_number: block_number,
 					parent_hash: best_fork.block_hash,
 					latest_finalized_block_needed: notary_state.latest_finalized_block_needed,
 					block_vote_digest: block_vote_digest.clone(),
-					seal_inherent: BlockSealInherent::ClosestNonce {
+					seal_inherent: BlockSealInherent::Vote {
+						nonce: best_nonce.nonce,
 						notary_id,
 						source_notebook_number: notebook_number,
-						nonce: best_nonce.nonce,
 						source_notebook_proof: best_nonce.proof.clone(),
 						block_vote: BlockVote {
-							account_id: account_id.clone(),
-							block_hash: H256::from_slice(vote.block_hash.as_ref()),
-							index: vote.index,
+							account_id,
 							power: vote.power,
-							vote_source: vote.vote_source,
+							channel_pass: vote.channel_pass,
+							index: vote.index,
+							grandparent_block_hash: H256::from_slice(
+								vote.grandparent_block_hash.as_ref(),
+							),
 						},
 					},
 					block_seal_authority,
@@ -457,13 +357,9 @@ where
 		block_number: BlockNumber,
 		vote_details: &NotaryNotebookVoteDetails<B::Hash>,
 	) -> Result<NotaryNotebookSubmissionState<B::Hash>, Error<B>> {
-		let state_key = ("NotaryStateAtHeight", block_number).encode();
-		let mut notary_state = match self.client.get_aux(&state_key)? {
-			Some(bytes) =>
-				NotaryNotebookSubmissionState::decode(&mut &bytes[..]).unwrap_or_default(),
-			None => Default::default(),
-		};
+		let mut notary_state = get_notary_state(&self.client, block_number)?;
 		if self.update_block_height_state(&mut notary_state, &vote_details) {
+			let state_key = notary_state_key(block_number);
 			self.client
 				.insert_aux(&[(state_key.as_slice(), notary_state.encode().as_slice())], &[])?;
 		}
@@ -525,11 +421,11 @@ where
 		vote_details: &NotaryNotebookVoteDetails<B::Hash>,
 	) -> Result<(), Error<B>> {
 		let full_notebook = self.download_notebook(&notary_details, &vote_details).await?;
-		let mut vote_eligibility = BTreeMap::new();
+		let mut vote_minimums = BTreeMap::new();
 		for block_hash in &vote_details.blocks_with_votes {
-			vote_eligibility.insert(
+			vote_minimums.insert(
 				block_hash.clone(),
-				self.client.runtime_api().vote_eligibility(block_hash.clone()).map_err(|e| {
+				self.client.runtime_api().vote_minimum(block_hash.clone()).map_err(|e| {
 					let message = format!(
 							"Notebook failed audit. Skipping continuation. Notary {}, notebook {}. {:?}",
 							vote_details.notary_id, vote_details.notebook_number, e
@@ -548,7 +444,7 @@ where
 				vote_details.notary_id.clone(),
 				vote_details.notebook_number.clone(),
 				vote_details.header_hash.clone(),
-				&vote_eligibility,
+				&vote_minimums,
 				&full_notebook,
 			)
 			.map_err(|e| {
@@ -587,7 +483,48 @@ where
 	}
 }
 
-fn notary_state_to_vote_digest<Hash: Codec>(
+/// Checks if the applicable parent height has tax votes. This would be the parent block of the
+/// given header
+pub fn has_applicable_tax_votes<C, B>(client: &Arc<C>, solve_header: &B::Header) -> bool
+where
+	B: BlockT,
+	C: HeaderBackend<B>,
+{
+	let parent_header = match client.header(solve_header.parent_hash().clone()) {
+		Ok(Some(x)) => x,
+		_ => return false,
+	};
+
+	for log in &parent_header.digest().logs {
+		if let Some(votes) = log.pre_runtime_try_to::<BlockVoteDigest>(&BLOCK_VOTES_DIGEST_ID) {
+			return votes.votes_count > 0
+		}
+	}
+
+	false
+}
+
+pub fn get_block_descendent<B: BlockT, C: HeaderBackend<B>>(
+	client: &Arc<C>,
+	hash: B::Hash,
+	descendents: u32,
+) -> Option<B::Hash> {
+	let mut parent = hash;
+	for _ in 0..descendents {
+		match client.header(parent) {
+			Ok(Some(header)) => {
+				if convert_u32::<B>(header.number()) == 0u32 {
+					return None
+				}
+				parent = header.parent_hash().clone();
+			},
+			_ => return None,
+		}
+	}
+	Some(parent)
+}
+
+pub(crate) fn notary_state_to_vote_digest<Hash: Codec>(
 	notary_state: &NotaryNotebookSubmissionState<Hash>,
 ) -> BlockVoteDigest {
 	BlockVoteDigest {

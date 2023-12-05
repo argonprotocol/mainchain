@@ -14,6 +14,10 @@ pub struct Cli {
 	/// The account address must be given in SS58 format.
 	#[arg(long, value_name = "SS58_ADDRESS", value_parser = parse_ss58_account_id)]
 	pub author: Option<AccountId>,
+
+	/// How many mining threads to run
+	#[arg(long)]
+	pub miners: Option<u32>,
 }
 
 impl Cli {

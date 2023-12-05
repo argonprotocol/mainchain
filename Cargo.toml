@@ -4,7 +4,7 @@ members = [
 	"node/consensus",
 	"pallets/block_rewards",
 	"pallets/block_seal",
-	"pallets/vote_eligibility",
+	"pallets/seal_minimums",
 	"pallets/bond",
 	"pallets/chain_transfer",
 	"pallets/mining_slot",

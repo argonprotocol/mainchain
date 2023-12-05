@@ -46,6 +46,8 @@ pub enum Error<B: BlockT> {
 	CreateInherents(sp_inherents::Error),
 	#[error("Checking inherents failed: {0}")]
 	CheckInherents(sp_inherents::Error),
+	#[error("Invalid compute nonce used")]
+	InvalidComputeNonce,
 	#[error(
 	"Checking inherents unknown error for identifier: {}",
 	String::from_utf8_lossy(.0)
@@ -57,9 +59,9 @@ pub enum Error<B: BlockT> {
 	MissingPreRuntimeDigest(String),
 
 	#[error("Duplicate seal signature digests")]
-	DuplicateSignatureDigest,
-	#[error("Missing seal signature digest")]
-	MissingSignatureDigest,
+	DuplicateBlockSealDigest,
+	#[error("Missing block seal digest")]
+	MissingBlockSealDigest,
 
 	#[error("Duplicate consensus digest")]
 	DuplicateConsensusDigest,
@@ -76,6 +78,8 @@ pub enum Error<B: BlockT> {
 	Environment(String),
 	#[error("{0}")]
 	Runtime(RuntimeString),
+	#[error("Missing runtime data {0}")]
+	MissingRuntimeData(String),
 	/// An error occurred while importing the block
 	#[error("Block import failed: {0:?}")]
 	BlockImportError(ImportResult),
