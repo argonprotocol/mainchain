@@ -1,4 +1,4 @@
-use std::{collections::BTreeMap, sync::Arc, time::Duration};
+use std::{sync::Arc, time::Duration};
 
 use futures::future;
 use log::trace;
@@ -22,6 +22,7 @@ use sp_inherents::{CheckInherentsResult, InherentData};
 use sp_runtime::{traits::Block as BlockT, ApplyExtrinsicResult, BoundedVec, Digest};
 use substrate_test_runtime::{AccountId, BlockNumber, Executive, Hash, Header};
 use substrate_test_runtime_client::Backend;
+use ulx_primitives::notary::NotaryNotebookVoteDigestDetails;
 
 use pallet_mining_slot::find_xor_closest;
 use ulx_primitives::{
@@ -31,6 +32,10 @@ use ulx_primitives::{
 
 use crate::import_queue;
 use sp_runtime::traits::UniqueSaturatedInto;
+use ulx_primitives::{
+	digests::BlockVoteDigest,
+	tick::{Tick, Ticker},
+};
 
 type Error = sp_blockchain::Error;
 
@@ -92,10 +97,30 @@ pub(crate) struct UlxTestNet {
 	pub config: Config,
 	pub authorities: Vec<(u16, AccountId, BlockSealAuthorityId)>,
 }
+
+impl UlxTestNet {
+	pub(crate) fn new(
+		n_authority: usize,
+		config: Config,
+		authorities: Vec<(u16, AccountId, BlockSealAuthorityId)>,
+	) -> Self {
+		trace!("Creating test network");
+		let mut net = UlxTestNet { peers: Vec::with_capacity(n_authority), config, authorities };
+
+		for i in 0..n_authority {
+			trace!("Adding peer {}", i);
+			net.add_full_peer();
+		}
+		net
+	}
+}
+
 #[derive(Clone, Default)]
 pub(crate) struct Config {
 	pub difficulty: ComputeDifficulty,
 	pub tax_minimum: VoteMinimum,
+	pub tick_duration: Duration,
+	pub genesis_utc_time: u64,
 }
 
 #[derive(Clone, Default)]
@@ -103,6 +128,7 @@ pub(crate) struct TestApi {
 	config: Config,
 	authorities: Vec<(u16, AccountId, BlockSealAuthorityId)>,
 	client: Option<Arc<PeersFullClient>>,
+	pub current_tick: Tick,
 }
 
 // compiler gets confused and warns us about unused inner
@@ -189,7 +215,7 @@ impl BlockchainEvents<Block> for TestApi {
 }
 
 sp_api::mock_impl_runtime_apis! {
-	impl ulx_primitives::BlockSealMinimumApis<Block> for RuntimeApi {
+	impl ulx_primitives::BlockSealSpecApis<Block> for RuntimeApi {
 		fn vote_minimum() -> VoteMinimum {
 			self.inner.config.tax_minimum
 		}
@@ -199,35 +225,37 @@ sp_api::mock_impl_runtime_apis! {
 		fn parent_voting_key() -> Option<H256> {
 			None
 		}
+		fn create_vote_digest(_tick_notebooks: Vec<NotaryNotebookVoteDigestDetails>) -> BlockVoteDigest {
+			BlockVoteDigest {
+				tick_notebooks: 0,
+				voting_power: 0,
+				parent_voting_key: None,
+				votes_count: 0
+			}
+		}
+	}
+
+	impl ulx_primitives::TickApis<Block> for RuntimeApi {
+		fn current_tick() -> Tick {
+			self.inner.current_tick
+		}
+		fn ticker() -> Ticker {
+			Ticker::new(self.inner.config.tick_duration.as_millis() as u64, self.inner.config.genesis_utc_time)
+		}
 	}
 
 	impl ulx_primitives::MiningAuthorityApis<Block> for RuntimeApi {
-		fn authority_id_by_index() -> BTreeMap<u16, BlockSealAuthorityId> {
-			self.inner.authorities.iter().map(|(i,_, id)| (*i, id.clone())).collect()
-		}
 
-		fn active_authorities() -> u16 {
-			self.inner.authorities.len() as u16
-		}
-
-		fn is_valid_authority(authority_id: BlockSealAuthorityId) -> bool {
-			self.inner.authorities.iter().any(|(_,_, id)| id == &authority_id)
-		}
-
-		fn authority_id_for_account(account_id: AccountId32) -> Option<BlockSealAuthorityId> {
-			self.inner.authorities.iter().find(|(_, id, _)| id.as_slice() == account_id.as_slice()).map(|a|a.2.clone())
-		}
-
-		fn block_peer(account_id: AccountId32) -> Option<MiningAuthority<BlockSealAuthorityId>> {
-			let block_hash = self.inner.client.as_ref().unwrap().info().best_hash;
-			let hash = blake2_256(&[block_hash.as_ref(), account_id.as_ref()].concat());
+		fn xor_closest_authority(nonce: U256) -> Option<MiningAuthority<BlockSealAuthorityId, AccountId32>> {
 			let closest = find_xor_closest(self.inner.authorities.iter().map(|(index, _, id)| {
 				((*index).unique_saturated_into(), ( id.clone(), U256::from( blake2_256(&id.as_slice()[..]))))
-			}).collect::<Vec<_>>(), U256::from(&hash[..]));
+			}).collect::<Vec<_>>(), nonce);
 
 
-			closest.map(|(a,  index)| {
-				MiningAuthority::<_> {
+			closest.map(|(a, index)| {
+				let account_id: AccountId32 = self.inner.authorities.iter().find(|(i, _, _)| *i as u32 == index).unwrap().1.clone().into();
+				MiningAuthority::<_, _> {
+					account_id,
 					authority_id: a.clone(),
 					authority_index: index.unique_saturated_into(),
 					peer_id: PeerId(OpaquePeerId::default()),
@@ -319,6 +347,7 @@ impl TestNetFactory for UlxTestNet {
 			client: Some(client.as_client().clone()),
 			config: self.config.clone(),
 			authorities: self.authorities.clone(),
+			current_tick: 0,
 		};
 		let api = Arc::new(api);
 		let block_import = PanickingBlockImport(import_queue::UlxBlockImport::new(
@@ -328,22 +357,5 @@ impl TestNetFactory for UlxTestNet {
 		));
 
 		(BlockImportAdapter::new(block_import.clone()), None, Some(PeerData { block_import, api }))
-	}
-}
-
-impl UlxTestNet {
-	pub(crate) fn new(
-		n_authority: usize,
-		config: Config,
-		authorities: Vec<(u16, AccountId, BlockSealAuthorityId)>,
-	) -> Self {
-		trace!("Creating test network");
-		let mut net = UlxTestNet { peers: Vec::with_capacity(n_authority), config, authorities };
-
-		for i in 0..n_authority {
-			trace!("Adding peer {}", i);
-			net.add_full_peer();
-		}
-		net
 	}
 }

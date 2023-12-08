@@ -1,5 +1,5 @@
 [package]
-name = "pallet-seal-minimums"
+name = "pallet-ticks"
 version.workspace = true
 authors.workspace = true
 edition.workspace = true
@@ -15,7 +15,7 @@ targets = ["x86_64-unknown-linux-gnu"]
 
 [dependencies]
 codec = { package = "parity-scale-codec", version = "3.6.1", default-features = false, features = [
-	"derive",
+    "derive",
 ] }
 scale-info = { version = "2.9.0", default-features = false, features = ["derive"] }
 frame-benchmarking = { version = "4.0.0-dev", default-features = false, optional = true, git = "https://github.com/paritytech/polkadot-sdk.git", branch = "release-polkadot-v1.1.0" }
@@ -38,17 +38,17 @@ env_logger = "0.10.0"
 [features]
 default = ["std"]
 std = [
-	"codec/std",
-	"scale-info/std",
-	"frame-benchmarking?/std",
-	"frame-support/std",
-	"frame-system/std",
-	"pallet-timestamp/std",
-	"sp-runtime/std",
-	"sp-core/std",
-	"sp-std/std",
-	"sp-io/std",
-	"ulx-primitives/std",
+    "codec/std",
+    "scale-info/std",
+    "frame-benchmarking?/std",
+    "frame-support/std",
+    "frame-system/std",
+    "pallet-timestamp/std",
+    "sp-runtime/std",
+    "sp-core/std",
+    "sp-std/std",
+    "sp-io/std",
+    "ulx-primitives/std",
 ]
 runtime-benchmarks = ["frame-benchmarking/runtime-benchmarks"]
 try-runtime = ["frame-support/try-runtime"]

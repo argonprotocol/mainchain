@@ -13,7 +13,6 @@ use sp_runtime::{
 use sp_std::collections::btree_map::BTreeMap;
 
 use ulx_primitives::{
-	block_seal::MiningAuthority,
 	notary::{NotaryId, NotaryProvider, NotarySignature},
 	BlockSealAuthorityId,
 };
@@ -78,11 +77,6 @@ parameter_types! {
 	pub static BlockSealers: BTreeMap<BlockNumber, Vec<BlockSealAuthorityId>> = BTreeMap::new();
 
 	pub static IsProofOfCompute: bool = false;
-}
-
-parameter_types! {
-	pub static AuthorityList: Vec<(AccountId32, BlockSealAuthorityId)> = vec![];
-	pub static XorClosest: Option<MiningAuthority<BlockSealAuthorityId>> = None;
 }
 
 pub struct NotaryProviderImpl;

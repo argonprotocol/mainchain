@@ -23,34 +23,31 @@ const MIN_COMPUTE_DIFFICULTY: u128 = 4;
 const MAX_TAX_MINIMUM: u128 = u128::MAX;
 const MIN_TAX_MINIMUM: u128 = 500;
 
-/// This pallet adjusts the BlockVote Eligibility after every block.
+/// This pallet adjusts the BlockSeal Specification after every block for both voting and compute.
 ///
 /// The VoteMinimum is the Minimum power of a BlockVote the network will accept in a Notebook. For
 /// Compute, this means the number of leading zeros. For Tax, it's the milligons of Tax. Minimums
 /// are only adjusted based on the votes in the last `BlockChangePeriod` blocks. The seal minimum is
 /// adjusted up or down by a maximum of 4x or 1/4x respectively.
 ///
-/// Seal_Minimum is an average number of hashes that need to be checked in order mine a block.
-///
-/// To pass the seal_minimums test: `big endian(hash with nonce) <= U256::max_value /
-/// seal_minimums`.
+/// ComputeDifficulty is an average number of hashes that need to be checked in order mine a block.
+/// - To pass the difficulty test: `big endian(hash with nonce) <= U256::max_value / difficulty`.
 #[frame_support::pallet(dev_mode)]
 pub mod pallet {
 	use frame_support::pallet_prelude::*;
 	use frame_system::pallet_prelude::*;
 	use sp_core::{H256, U256};
 	use sp_runtime::{traits::UniqueSaturatedInto, BoundedBTreeMap, DigestItem};
-	use sp_std::vec;
+	use sp_std::{collections::btree_map::BTreeMap, vec, vec::Vec};
 
 	use ulx_primitives::{
 		block_seal::{BlockVotingPower, VoteMinimum},
-		digests::{
-			BlockSealMinimumsDigest, BlockVoteDigest, NotaryNotebookDigest, SealSource,
-			BLOCK_VOTES_DIGEST_ID, NEXT_SEAL_MINIMUMS_DIGEST_ID,
-		},
+		digests::{BlockVoteDigest, BLOCK_VOTES_DIGEST_ID},
+		inherents::BlockSealInherent,
+		notary::NotaryNotebookVoteDigestDetails,
 		notebook::{BlockVotingKey, NotebookHeader},
 		AuthorityProvider, BlockSealAuthorityId, BlockVotingProvider, ComputeDifficulty, NotaryId,
-		NotebookEventHandler, NotebookProvider,
+		NotebookEventHandler, NotebookProvider, TickProvider,
 	};
 
 	use super::*;
@@ -84,7 +81,9 @@ pub mod pallet {
 		#[pallet::constant]
 		type ChangePeriod: Get<u32>;
 
-		type SealType: Get<SealSource>;
+		type SealInherent: Get<BlockSealInherent>;
+
+		type TickProvider: TickProvider;
 	}
 
 	#[pallet::storage]
@@ -117,7 +116,7 @@ pub mod pallet {
 	pub(super) type ParentVotingKey<T: Config> = StorageValue<_, Option<H256>, ValueQuery>;
 
 	const VOTE_MINIMUM_HISTORY_LEN: u32 = 3;
-	/// Keeps the last 3 vote eligibilities. The first one applies to the current block.
+	/// Keeps the last 3 vote minimums. The first one applies to the current block.
 	#[pallet::storage]
 	pub(super) type VoteMinimumHistory<T: Config> =
 		StorageValue<_, BoundedVec<VoteMinimum, ConstU32<VOTE_MINIMUM_HISTORY_LEN>>, ValueQuery>;
@@ -130,10 +129,6 @@ pub mod pallet {
 	/// Temporary store the vote digest
 	#[pallet::storage]
 	pub(super) type TempBlockVoteDigest<T: Config> = StorageValue<_, BlockVoteDigest, OptionQuery>;
-
-	#[pallet::storage]
-	pub(super) type TempSealMinimumsDigest<T: Config> =
-		StorageValue<_, BlockSealMinimumsDigest, OptionQuery>;
 
 	#[pallet::storage]
 	pub(super) type PastBlockVotes<T: Config> =
@@ -212,17 +207,6 @@ pub mod pallet {
 							<TempBlockVoteDigest<T>>::put(votes_digest.clone());
 						}
 					},
-					DigestItem::Consensus(NEXT_SEAL_MINIMUMS_DIGEST_ID, data) => {
-						assert!(
-							!<TempSealMinimumsDigest<T>>::exists(),
-							"Block seal minimums digest can only be provided once!"
-						);
-
-						let decoded = BlockSealMinimumsDigest::decode(&mut data.as_ref());
-						if let Some(vote_eligibility) = decoded.ok() {
-							<TempSealMinimumsDigest<T>>::put(vote_eligibility.clone());
-						}
-					},
 					_ => {},
 				};
 			}
@@ -232,7 +216,19 @@ pub mod pallet {
 
 		fn on_finalize(_: BlockNumberFor<T>) {
 			let notebooks_by_notary = <TempNotebooksByNotary<T>>::take();
-			let block_votes = Self::create_block_vote_digest(notebooks_by_notary);
+			let tick = T::TickProvider::current_tick();
+
+			let mut notebook_at_tick = BTreeMap::new();
+			for (notary_id, header) in notebooks_by_notary.into_iter() {
+				if header.tick != tick {
+					continue
+				}
+
+				notebook_at_tick.insert(notary_id, header.into());
+			}
+			let block_votes = Self::create_block_vote_digest(
+				notebook_at_tick.into_iter().map(|(_, a)| a).collect::<Vec<_>>(),
+			);
 
 			if let Some(included_digest) = <TempBlockVoteDigest<T>>::take() {
 				assert_eq!(
@@ -246,32 +242,15 @@ pub mod pallet {
 
 			Self::update_vote_minimum(block_votes.votes_count, block_votes.voting_power);
 
-			let next_seal_minimums = BlockSealMinimumsDigest {
-				vote_minimum: Self::vote_minimum(),
-				compute_difficulty: Self::compute_difficulty(),
-			};
 			<VoteMinimumHistory<T>>::mutate(|specs| {
 				if specs.len() >= VOTE_MINIMUM_HISTORY_LEN as usize {
 					specs.pop();
 				}
-				specs.try_insert(0, next_seal_minimums.vote_minimum)
+				specs.try_insert(0, Self::vote_minimum())
 			})
 			.expect("VoteMinimumHistory is bounded");
 
 			<ParentVotingKey<T>>::put(block_votes.parent_voting_key);
-
-			if TempSealMinimumsDigest::<T>::exists() {
-				let included_digest = <TempSealMinimumsDigest<T>>::take().unwrap();
-				assert_eq!(
-					included_digest, next_seal_minimums,
-					"Calculated seal minimums do not match included digest"
-				);
-			} else {
-				<frame_system::Pallet<T>>::deposit_log(DigestItem::Consensus(
-					NEXT_SEAL_MINIMUMS_DIGEST_ID,
-					next_seal_minimums.encode(),
-				));
-			}
 		}
 	}
 
@@ -322,7 +301,7 @@ pub mod pallet {
 			let previous_timestamp = <PreviousBlockTimestamp<T>>::take();
 			<PreviousBlockTimestamp<T>>::put(now);
 
-			if T::SealType::get() != SealSource::Compute {
+			if T::SealInherent::get() != BlockSealInherent::Compute {
 				return
 			}
 
@@ -373,36 +352,37 @@ pub mod pallet {
 		}
 
 		pub fn create_block_vote_digest(
-			notebooks_by_notary: BoundedBTreeMap<NotaryId, NotebookHeader, ConstU32<50>>,
+			tick_notebooks: Vec<NotaryNotebookVoteDigestDetails>,
 		) -> BlockVoteDigest {
 			let mut block_votes = BlockVoteDigest {
 				parent_voting_key: None,
-				notebook_numbers: Default::default(),
+				tick_notebooks: 0,
 				voting_power: 0,
 				votes_count: 0,
 			};
 
-			let current_block_number: u32 =
-				<frame_system::Pallet<T>>::block_number().unique_saturated_into();
-			let parent_block_number = current_block_number - 1;
+			if tick_notebooks.is_empty() {
+				return block_votes
+			}
+			let tick = tick_notebooks[0].tick;
 			let mut parent_voting_keys = vec![];
-			for (notary_id, header) in notebooks_by_notary.into_iter() {
+			for header in tick_notebooks {
+				if header.tick != tick {
+					continue
+				}
+				block_votes.tick_notebooks += 1;
 				block_votes.votes_count += header.block_votes_count;
 				block_votes.voting_power += header.block_voting_power;
 				if let Some(parent_secret) = header.parent_secret {
 					// NOTE: secret is verified in the notebook pallet
 					if let Some((parent_vote_root, _)) =
-						T::NotebookProvider::get_eligible_block_votes_root(
-							notary_id,
-							parent_block_number,
+						T::NotebookProvider::get_eligible_tick_votes_root(
+							header.notary_id,
+							header.tick.saturating_sub(1),
 						) {
 						parent_voting_keys.push(BlockVotingKey { parent_vote_root, parent_secret });
 					}
 				}
-				let _ = block_votes.notebook_numbers.try_push(NotaryNotebookDigest {
-					notary_id,
-					notebook_number: header.notebook_number,
-				});
 			}
 			if !parent_voting_keys.is_empty() {
 				block_votes.parent_voting_key =
@@ -430,8 +410,8 @@ pub mod pallet {
 				adjusted_votes = 1;
 			}
 
-			// Compute the next seal_minimums based on the current
-			// seal_minimums and the ratio of target votes to adjusted votes.
+			// Compute the next block_seal_spec based on the current
+			// block_seal_spec and the ratio of target votes to adjusted votes.
 			let mut next_vote_minimum: u128 = U256::from(current_vote_minimum)
 				.saturating_mul(adjusted_votes.into())
 				.checked_div(target_period_votes.into())

@@ -26,7 +26,6 @@ ulx-notary-primitives = { path = "../primitives", default-features = false }
 frame-support = { version = "4.0.0-dev", git = "https://github.com/paritytech/polkadot-sdk.git", branch = "release-polkadot-v1.1.0" }
 sp-keyring = { version = "24.0.0", git = "https://github.com/paritytech/polkadot-sdk.git", branch = "release-polkadot-v1.1.0" }
 chrono = "0.4"
-tokio = { version = "1.33", features = ["test-util", "macros"] }
 
 [features]
 default = ["std"]

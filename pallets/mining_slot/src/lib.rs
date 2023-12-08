@@ -12,18 +12,17 @@ use frame_support::{
 };
 use frame_system::pallet_prelude::BlockNumberFor;
 use pallet_session::SessionManager;
-use sp_api::BlockT;
-use sp_core::{crypto::AccountId32, Get, U256};
+use sp_core::{Get, U256};
 use sp_io::hashing::blake2_256;
 use sp_runtime::{
 	traits::{Convert, UniqueSaturatedInto},
 	BoundedBTreeMap,
 };
-use sp_std::{collections::btree_map::BTreeMap, marker::PhantomData, vec::Vec};
+use sp_std::{marker::PhantomData, vec::Vec};
 
 pub use pallet::*;
 use ulx_primitives::{
-	block_seal::{BlockSealAuthorityId, Host, MiningAuthority, RewardDestination},
+	block_seal::{BlockSealAuthorityId, MiningAuthority, RewardDestination},
 	bond::BondProvider,
 	AuthorityProvider,
 };
@@ -89,6 +88,7 @@ pub mod pallet {
 		BoundedBTreeMap, SaturatedConversion,
 	};
 	use sp_std::cmp::{max, Ordering};
+
 	use ulx_primitives::{
 		block_seal::{Host, MaxMinerRpcHosts, MiningRegistration, PeerId, RewardDestination},
 		bond::{BondError, BondProvider},
@@ -541,22 +541,9 @@ pub mod pallet {
 }
 
 impl<T: Config> AuthorityProvider<BlockSealAuthorityId, T::Block, T::AccountId> for Pallet<T> {
-	fn miner_zero() -> Option<(u16, BlockSealAuthorityId, Vec<Host>, T::AccountId)> {
-		if let Some(miner_zero) = <MinerZero<T>>::get() {
-			let index = <AccountIndexLookup<T>>::get(&miner_zero.account_id);
-			let authority_id = Self::get_authority(miner_zero.account_id.clone());
-			match (index, authority_id) {
-				(Some(index), Some(authority_id)) =>
-					return Some((
-						index.unique_saturated_into(),
-						authority_id,
-						miner_zero.rpc_hosts.into_inner(),
-						miner_zero.account_id.clone(),
-					)),
-				_ => (),
-			}
-		}
-		None
+	fn get_authority(author: T::AccountId) -> Option<BlockSealAuthorityId> {
+		<AccountIndexLookup<T>>::get(&author)
+			.and_then(|index| AuthoritiesByIndex::<T>::get().get(&index).map(|x| x.0.clone()))
 	}
 
 	fn get_rewards_account(author: T::AccountId) -> Option<T::AccountId> {
@@ -566,45 +553,16 @@ impl<T: Config> AuthorityProvider<BlockSealAuthorityId, T::Block, T::AccountId> 
 		})
 	}
 
-	fn authorities() -> Vec<BlockSealAuthorityId> {
-		Self::authority_id_by_index()
-			.into_iter()
-			.map(|(_, a)| a.clone())
-			.collect::<Vec<_>>()
-	}
+	fn xor_closest_authority(
+		nonce: U256,
+	) -> Option<MiningAuthority<BlockSealAuthorityId, T::AccountId>> {
+		let closest = find_xor_closest(<AuthoritiesByIndex<T>>::get(), nonce);
 
-	fn authority_id_by_index() -> BTreeMap<u16, BlockSealAuthorityId> {
-		<AuthoritiesByIndex<T>>::get()
-			.iter()
-			.map(|(i, a)| (i.clone().unique_saturated_into(), a.0.clone()))
-			.collect()
-	}
-
-	fn authority_count() -> u16 {
-		Self::authorities().len().unique_saturated_into()
-	}
-
-	fn is_active(authority_id: &BlockSealAuthorityId) -> bool {
-		Self::authority_id_by_index().iter().any(|(_, a)| a == authority_id)
-	}
-
-	fn get_authority(author: T::AccountId) -> Option<BlockSealAuthorityId> {
-		<AccountIndexLookup<T>>::get(&author).and_then(|index| {
-			Self::authority_id_by_index()
-				.get(&index.unique_saturated_into())
-				.map(|a| a.clone())
-		})
-	}
-	fn block_peer(
-		block_hash: &<T::Block as BlockT>::Hash,
-		account_id: &AccountId32,
-	) -> Option<MiningAuthority<BlockSealAuthorityId>> {
-		let hash = U256::from(blake2_256(&[block_hash.as_ref(), account_id.as_ref()].concat()));
-
-		find_xor_closest(<AuthoritiesByIndex<T>>::get(), hash).map(|(authority_id, index)| {
+		closest.map(|(authority_id, index)| {
 			let registration = Self::active_miners_by_index(&index).unwrap();
 			MiningAuthority {
 				authority_id,
+				account_id: registration.account_id.clone(),
 				authority_index: index.unique_saturated_into(),
 				peer_id: registration.peer_id.clone(),
 				rpc_hosts: registration.rpc_hosts.clone(),

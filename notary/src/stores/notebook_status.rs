@@ -2,6 +2,7 @@ use chrono::{DateTime, Utc};
 use sqlx::{query_scalar, FromRow, PgConnection};
 
 use ulx_notary_primitives::NotebookNumber;
+use ulx_primitives::tick::Tick;
 
 use crate::{ensure, error::Error};
 
@@ -38,12 +39,14 @@ impl From<i32> for NotebookFinalizationStep {
 #[derive(FromRow)]
 pub struct NotebookStatusRow {
 	pub notebook_number: i32,
+	pub tick: i32,
 	pub chain_transfers: i32,
 	pub block_votes: i32,
 	pub notarizations: i32,
 	pub balance_changes: i32,
 	pub step: NotebookFinalizationStep,
 	pub open_time: DateTime<Utc>,
+	pub end_time: DateTime<Utc>,
 	pub ready_for_close_time: Option<DateTime<Utc>>,
 	pub closed_time: Option<DateTime<Utc>>,
 	pub submitted_time: Option<DateTime<Utc>>,
@@ -122,12 +125,16 @@ impl NotebookStatusStore {
 	pub async fn create<'a>(
 		db: impl sqlx::PgExecutor<'a> + 'a,
 		notebook_number: NotebookNumber,
+		tick: Tick,
+		next_tick_end: DateTime<Utc>,
 	) -> anyhow::Result<(), Error> {
 		let res = sqlx::query!(
 			r#"
-				INSERT INTO notebook_status (notebook_number, open_time, step) VALUES ($1, now(), $2)
+				INSERT INTO notebook_status (notebook_number, open_time, end_time, tick, step) VALUES ($1, now(), $2, $3, $4)
 			"#,
 			notebook_number as i32,
+			next_tick_end,
+			tick as i32,
 			NotebookFinalizationStep::Open as i32,
 		)
 		.execute(db)
@@ -164,12 +171,12 @@ impl NotebookStatusStore {
 		let result = sqlx::query!(
 			r#"
 				SELECT * FROM notebook_status 
-				WHERE step = $1 AND open_time < $2
+				WHERE step = $1 AND end_time <= $2
 				ORDER BY open_time ASC 
 				LIMIT 1
 			"#,
 			NotebookFinalizationStep::Open as i32,
-			Utc::now() - chrono::Duration::milliseconds(NOTEBOOK_DURATION_MS),
+			Utc::now()
 		)
 		.fetch_optional(&mut *db)
 		.await?;
@@ -220,9 +227,11 @@ impl NotebookStatusStore {
 
 #[cfg(test)]
 mod tests {
+	use chrono::{Duration, Utc};
 	use frame_support::assert_ok;
 	use futures::future::try_join;
 	use sqlx::PgPool;
+	use std::ops::Add;
 
 	use crate::{
 		error::Error,
@@ -236,7 +245,9 @@ mod tests {
 		{
 			let mut tx = pool.begin().await?;
 
-			let _ = NotebookStatusStore::create(&mut *tx, 1).await?;
+			let _ =
+				NotebookStatusStore::create(&mut *tx, 1, 1, Utc::now().add(Duration::minutes(1)))
+					.await?;
 
 			tx.commit().await?;
 		}
@@ -278,7 +289,8 @@ mod tests {
 					NotebookFinalizationStep::Open,
 				)
 				.await?;
-				NotebookStatusStore::create(&mut *tx, 2).await?;
+				NotebookStatusStore::create(&mut *tx, 2, 2, Utc::now().add(Duration::minutes(2)))
+					.await?;
 				tx.commit().await?;
 				Result::<(), Error>::Ok(())
 			});
@@ -302,7 +314,8 @@ mod tests {
 	async fn test_max_chain_transfers(pool: PgPool) -> anyhow::Result<()> {
 		let mut tx = pool.begin().await?;
 
-		let _ = NotebookStatusStore::create(&mut *tx, 1).await?;
+		let _ = NotebookStatusStore::create(&mut *tx, 1, 1, Utc::now().add(Duration::minutes(1)))
+			.await?;
 		assert_ok!(NotebookStatusStore::increment_chain_transfers(&mut *tx, 1, 3).await);
 		tx.commit().await?;
 		let mut tx = pool.begin().await?;
@@ -328,7 +341,9 @@ mod tests {
 		{
 			let mut tx = pool.begin().await?;
 
-			let _ = NotebookStatusStore::create(&mut *tx, 1).await?;
+			let _ =
+				NotebookStatusStore::create(&mut *tx, 1, 1, Utc::now().add(Duration::minutes(1)))
+					.await?;
 			assert_eq!(
 				NotebookStatusStore::lock_with_step(&mut *tx, NotebookFinalizationStep::Open)
 					.await?,
@@ -364,11 +379,12 @@ mod tests {
 	async fn test_expire_open(pool: PgPool) -> anyhow::Result<()> {
 		let mut tx = pool.begin().await?;
 
-		let _ = NotebookStatusStore::create(&mut *tx, 1).await?;
+		let _ = NotebookStatusStore::create(&mut *tx, 1, 1, Utc::now().add(Duration::minutes(1)))
+			.await?;
 		assert_eq!(NotebookStatusStore::step_up_expired_open(&mut *tx).await?, None);
 		tx.commit().await?;
 
-		sqlx::query("update notebook_status set open_time = now() - interval '2 minutes' where notebook_number = 1")
+		sqlx::query("update notebook_status set end_time = now() where notebook_number = 1")
 			.execute(&pool)
 			.await?;
 

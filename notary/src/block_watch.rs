@@ -1,10 +1,6 @@
-use codec::Decode;
 use sp_core::{ed25519, H256};
 use sqlx::{PgConnection, PgPool};
-use subxt::{
-	blocks::{Block, BlockRef},
-	config::substrate::DigestItem::{Consensus, PreRuntime},
-};
+use subxt::blocks::{Block, BlockRef};
 use tracing::info;
 
 pub use ulixee_client;
@@ -12,10 +8,8 @@ use ulixee_client::{
 	api, api::runtime_types::bounded_collections::bounded_vec::BoundedVec, try_until_connected,
 	UlxClient, UlxConfig,
 };
-use ulx_notary_primitives::{
-	AccountId, BlockVoteDigest, NotaryId, NotebookNumber, VoteMinimum, BLOCK_VOTES_DIGEST_ID,
-};
-use ulx_primitives::digests::{BlockSealMinimumsDigest, NEXT_SEAL_MINIMUMS_DIGEST_ID};
+use ulx_notary_primitives::{AccountId, NotaryId, NotebookNumber};
+use ulx_primitives::tick::Ticker;
 
 use crate::{
 	stores::{
@@ -32,20 +26,24 @@ pub async fn spawn_block_sync(
 	rpc_url: String,
 	notary_id: NotaryId,
 	pool: &PgPool,
+	ticker: Ticker,
 ) -> anyhow::Result<(), Error> {
-	sync_finalized_blocks(rpc_url.clone(), notary_id, pool)
+	sync_finalized_blocks(rpc_url.clone(), notary_id, pool, ticker.clone())
 		.await
 		.map_err(|e| Error::BlockSyncError(e.to_string()))?;
-	track_blocks(rpc_url.clone(), notary_id, pool);
+	track_blocks(rpc_url.clone(), notary_id, pool, ticker.clone());
 
 	Ok(())
 }
 
-pub(crate) fn track_blocks(rpc_url: String, notary_id: NotaryId, pool: &PgPool) {
+pub(crate) fn track_blocks(rpc_url: String, notary_id: NotaryId, pool: &PgPool, ticker: Ticker) {
 	let pool = pool.clone();
 	tokio::task::spawn(async move {
+		let ticker = ticker.clone();
 		loop {
-			match subscribe_to_blocks(rpc_url.clone(), notary_id.clone(), &pool.clone()).await {
+			match subscribe_to_blocks(rpc_url.clone(), notary_id.clone(), &pool.clone(), &ticker)
+				.await
+			{
 				Ok(_) => break,
 				Err(e) => tracing::error!("Error polling mainchain blocks: {:?}", e),
 			}
@@ -57,6 +55,7 @@ async fn sync_finalized_blocks(
 	url: String,
 	notary_id: NotaryId,
 	pool: &PgPool,
+	ticker: Ticker,
 ) -> anyhow::Result<()> {
 	let client = try_until_connected(url, 2500).await?;
 	let notaries_query = api::storage().notaries().active_notaries();
@@ -94,9 +93,15 @@ async fn sync_finalized_blocks(
 		missing_blocks.insert(0, block);
 	}
 
+	info!(
+		"Current synched finalized block: {}. Missing {}",
+		last_synched_block,
+		missing_blocks.len()
+	);
+
 	for block in missing_blocks.into_iter() {
-		process_block(&mut *tx, &block, notary_id).await?;
-		process_finalized_block(&mut *tx, block, notary_id).await?;
+		process_block(&mut *tx, &client, &block, notary_id).await?;
+		process_finalized_block(&mut *tx, block, notary_id, &ticker).await?;
 	}
 	tx.commit().await?;
 	Ok(())
@@ -104,48 +109,26 @@ async fn sync_finalized_blocks(
 
 async fn process_block(
 	db: &mut PgConnection,
+	client: &UlxClient,
 	block: &Block<UlxConfig, UlxClient>,
 	notary_id: NotaryId,
 ) -> anyhow::Result<()> {
-	if block.header().number == 0 {
-		BlocksStore::record(
-			db,
-			block.number(),
-			block.hash(),
-			block.header().parent_hash,
-			0,
-			None,
-			None,
-		)
+	let next_vote_minimum = client
+		.storage()
+		.at(block.hash())
+		.fetch(&api::storage().block_seal_spec().current_vote_minimum())
+		.await?
+		.unwrap_or_default();
+
+	let mut latest_notebook_number: Option<NotebookNumber> = None;
+	let last_notebook_details = client
+		.storage()
+		.at(block.hash())
+		.fetch(&api::storage().notebook().last_notebook_details_by_notary(notary_id))
 		.await?;
-		return Ok(())
-	}
-	let mut next_vote_minimum: Option<VoteMinimum> = None;
-	let mut included_notebook_number: Option<NotebookNumber> = None;
-	let mut parent_voting_key: Option<H256> = None;
-
-	for log in block.header().digest.logs.iter() {
-		match log {
-			PreRuntime(BLOCK_VOTES_DIGEST_ID, data) => {
-				let Some(votes_digest) = BlockVoteDigest::decode(&mut &data[..]).ok() else {
-					return Err(anyhow::anyhow!("Unable to decode votes digest"))
-				};
-				parent_voting_key = votes_digest.parent_voting_key;
-				for notebook in votes_digest.notebook_numbers.iter() {
-					if notebook.notary_id == notary_id {
-						included_notebook_number = Some(notebook.notebook_number);
-					}
-				}
-			},
-			Consensus(NEXT_SEAL_MINIMUMS_DIGEST_ID, data) => {
-				let Some(votes_digest) = BlockSealMinimumsDigest::decode(&mut &data[..]).ok()
-				else {
-					return Err(anyhow::anyhow!("Unable to decode votes eligibility"))
-				};
-				next_vote_minimum = Some(votes_digest.vote_minimum);
-			},
-
-			_ => (),
+	if let Some(last_notebook_details) = last_notebook_details {
+		if let Some((entry, _)) = last_notebook_details.0.get(0) {
+			latest_notebook_number = Some(entry.notebook_number);
 		}
 	}
 
@@ -155,9 +138,8 @@ async fn process_block(
 		block.number(),
 		block.hash(),
 		parent_hash.clone(),
-		next_vote_minimum.ok_or_else(|| anyhow::anyhow!("Missing next seal minimums"))?,
-		parent_voting_key,
-		included_notebook_number,
+		next_vote_minimum,
+		latest_notebook_number,
 	)
 	.await?;
 
@@ -191,9 +173,11 @@ async fn process_fork(
 	block: &Block<UlxConfig, UlxClient>,
 	notary_id: NotaryId,
 ) -> anyhow::Result<()> {
+	info!("Processing fork {} ({})", block.hash(), block.number());
+
 	let missing_blocks = find_missing_blocks(db, client, block.hash()).await?;
 	for missing_block in missing_blocks {
-		process_block(db, &missing_block, notary_id).await?;
+		process_block(db, &client, &missing_block, notary_id).await?;
 	}
 	Ok(())
 }
@@ -202,7 +186,9 @@ async fn process_finalized_block(
 	db: &mut PgConnection,
 	block: Block<UlxConfig, UlxClient>,
 	notary_id: NotaryId,
+	ticker: &Ticker,
 ) -> anyhow::Result<()> {
+	info!("Processing finalized {} ({})", block.hash(), block.number());
 	BlocksStore::record_finalized(db, block.hash()).await?;
 
 	let block_height = block.number();
@@ -234,11 +220,13 @@ async fn process_finalized_block(
 						block_height,
 					)
 					.await?;
+					let tick = ticker.current();
 					NotebookHeaderStore::create(
 						&mut *db,
 						notary_id,
 						1,
-						activated_event.notary.activated_block,
+						tick,
+						ticker.time_for_tick(tick + 1),
 					)
 					.await?;
 				}
@@ -288,6 +276,7 @@ async fn subscribe_to_blocks(
 	url: String,
 	notary_id: NotaryId,
 	pool: &PgPool,
+	ticker: &Ticker,
 ) -> anyhow::Result<bool> {
 	let client = try_until_connected(url, 2500).await?;
 	let mut blocks_sub = client.blocks().subscribe_all().await?;
@@ -314,7 +303,10 @@ async fn subscribe_to_blocks(
 				match block_next {
 					Some(Ok(block)) => {
 						let mut tx = pool.begin().await?;
-						process_finalized_block(&mut *tx, block, notary_id).await?;
+						if !BlocksStore::has_block(&mut *tx, block.hash()).await? {
+							process_block(&mut *tx, &client, &block, notary_id).await?;
+						}
+						process_finalized_block(&mut *tx, block, notary_id, &ticker).await?;
 						tx.commit().await?;
 					},
 					Some(Err(e)) => {

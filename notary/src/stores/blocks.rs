@@ -16,8 +16,7 @@ pub struct BlockRow {
 	pub parent_hash: Vec<u8>,
 	pub block_number: i32,
 	pub block_vote_minimum: String,
-	pub this_notary_notebook_number: Option<i32>,
-	pub parent_voting_key: Option<Vec<u8>>,
+	pub latest_notebook_number: Option<i32>,
 	pub is_finalized: bool,
 	pub finalized_time: Option<chrono::DateTime<Utc>>,
 	pub received_time: chrono::DateTime<Utc>,
@@ -116,30 +115,6 @@ impl BlocksStore {
 		Ok(row.is_some())
 	}
 
-	pub async fn get_all_voting_keys(
-		db: &mut PgConnection,
-		notebook_number: u32,
-	) -> anyhow::Result<Vec<H256>, Error> {
-		let rows = sqlx::query_scalar!(
-			r#"
-		SELECT parent_voting_key FROM blocks WHERE this_notary_notebook_number=$1 AND parent_voting_key IS NOT NULL;
-		"#,
-			notebook_number as i32
-		)
-		.fetch_all(db)
-		.await?;
-		let rows = rows
-			.iter()
-			.filter_map(|a| {
-				if let Some(a) = a {
-					return Some(H256::from_slice(&a[..]))
-				}
-				None
-			})
-			.collect::<Vec<_>>();
-		Ok(rows)
-	}
-
 	pub async fn get_parent_hash(
 		db: &mut PgConnection,
 		block_hash: H256,
@@ -183,14 +158,13 @@ impl BlocksStore {
 		block_hash: H256,
 		parent_hash: H256,
 		vote_minimum: VoteMinimum,
-		parent_voting_key: Option<H256>,
-		this_notary_notebook_number: Option<u32>,
+		latest_notebook_number: Option<u32>,
 	) -> anyhow::Result<(), Error> {
 		let res = sqlx::query!(
 			r#"
 			INSERT INTO blocks (block_hash, block_number, parent_hash, block_vote_minimum, received_time, is_finalized,
-				parent_voting_key, this_notary_notebook_number)
-			VALUES ($1, $2, $3, $4, $5, $6, $7, $8)
+				latest_notebook_number)
+			VALUES ($1, $2, $3, $4, $5, $6, $7)
 		"#,
 			block_hash.0.to_vec(),
 			block_number as i32,
@@ -198,8 +172,7 @@ impl BlocksStore {
 			vote_minimum.to_string(),
 			Utc::now(),
 			false,
-			parent_voting_key.map(|x| x.0.to_vec()),
-			this_notary_notebook_number.map(|n| n as i32),
+			latest_notebook_number.map(|n| n as i32),
 		)
 		.execute(db)
 		.await?;
@@ -223,23 +196,14 @@ mod tests {
 	async fn test_storage(pool: PgPool) -> anyhow::Result<()> {
 		{
 			let mut tx = pool.begin().await?;
-			BlocksStore::record(
-				&mut *tx,
-				0,
-				H256::from_slice(&[1u8; 32]),
-				H256::zero(),
-				100,
-				Some(H256::from_slice(&[1u8; 32])),
-				None,
-			)
-			.await?;
+			BlocksStore::record(&mut *tx, 0, H256::from_slice(&[1u8; 32]), H256::zero(), 100, None)
+				.await?;
 			BlocksStore::record(
 				&mut *tx,
 				1,
 				H256::from_slice(&[2u8; 32]),
 				H256::from_slice(&[1u8; 32]),
 				100,
-				Some(H256::from_slice(&[1u8; 32])),
 				None,
 			)
 			.await?;
@@ -249,7 +213,6 @@ mod tests {
 				H256::from_slice(&[3u8; 32]),
 				H256::from_slice(&[2u8; 32]),
 				100,
-				Some(H256::from_slice(&[1u8; 32])),
 				None,
 			)
 			.await?;
@@ -268,23 +231,14 @@ mod tests {
 	#[sqlx::test]
 	async fn test_cant_overwrite(pool: PgPool) -> anyhow::Result<()> {
 		let mut tx = pool.begin().await?;
-		BlocksStore::record(
-			&mut *tx,
-			1,
-			H256::from_slice(&[1u8; 32]),
-			H256::zero(),
-			100,
-			Some(H256::from_slice(&[1u8; 32])),
-			None,
-		)
-		.await?;
+		BlocksStore::record(&mut *tx, 1, H256::from_slice(&[1u8; 32]), H256::zero(), 100, None)
+			.await?;
 		assert!(BlocksStore::record(
 			&mut *tx,
 			1,
 			H256::from_slice(&[1u8; 32]),
 			H256::from_slice(&[1u8; 32]),
 			100,
-			Some(H256::from_slice(&[1u8; 32])),
 			None
 		)
 		.await

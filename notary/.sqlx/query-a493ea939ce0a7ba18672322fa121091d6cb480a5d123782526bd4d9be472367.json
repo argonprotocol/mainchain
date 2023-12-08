@@ -1,11 +1,11 @@
 {
   "db_name": "PostgreSQL",
-  "query": "SELECT block_number FROM notebook_headers WHERE notebook_number = $1 LIMIT 1",
+  "query": "SELECT tick FROM notebook_headers WHERE notebook_number = $1 LIMIT 1",
   "describe": {
     "columns": [
       {
         "ordinal": 0,
-        "name": "block_number",
+        "name": "tick",
         "type_info": "Int4"
       }
     ],
@@ -18,5 +18,5 @@
       false
     ]
   },
-  "hash": "9cb65cd5994609435ba449c0ba78bdfc98d1ecdb9312c675e63b7b57d6d22c86"
+  "hash": "a493ea939ce0a7ba18672322fa121091d6cb480a5d123782526bd4d9be472367"
 }

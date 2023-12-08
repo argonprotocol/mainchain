@@ -38,7 +38,6 @@ sc-telemetry = { version = "4.0.0-dev", git = "https://github.com/paritytech/pol
 sc-transaction-pool = { version = "4.0.0-dev", git = "https://github.com/paritytech/polkadot-sdk.git", branch = "release-polkadot-v1.1.0" }
 sc-transaction-pool-api = { version = "4.0.0-dev", git = "https://github.com/paritytech/polkadot-sdk.git", branch = "release-polkadot-v1.1.0" }
 sc-offchain = { version = "4.0.0-dev", git = "https://github.com/paritytech/polkadot-sdk.git", branch = "release-polkadot-v1.1.0" }
-sc-statement-store = { version = "4.0.0-dev", git = "https://github.com/paritytech/polkadot-sdk.git", branch = "release-polkadot-v1.1.0" }
 sc-consensus = { version = "0.10.0-dev", git = "https://github.com/paritytech/polkadot-sdk.git", branch = "release-polkadot-v1.1.0" }
 sp-consensus = { version = "0.10.0-dev", git = "https://github.com/paritytech/polkadot-sdk.git", branch = "release-polkadot-v1.1.0" }
 sc-client-api = { version = "4.0.0-dev", git = "https://github.com/paritytech/polkadot-sdk.git", branch = "release-polkadot-v1.1.0" }
@@ -72,10 +71,9 @@ frame-benchmarking-cli = { version = "4.0.0-dev", git = "https://github.com/pari
 rand = {version = "0.8.5"}
 
 # Local Dependencies
-ulx-node-consensus = { version = "0.0.1", path = "./consensus"}
-ulx-node-runtime = { version = "0.0.1", path = "../runtime" }
-ulx-primitives = { version = "0.0.1", path = "../primitives" }
-pallet-chain-transfer = { version = "0.0.1", path = "../pallets/chain_transfer" }
+ulx-node-consensus = {  path = "./consensus"}
+ulx-node-runtime = {path = "../runtime" }
+ulx-primitives = {  path = "../primitives" }
 
 # CLI-specific dependencies
 try-runtime-cli = { version = "0.10.0-dev", optional = true, git = "https://github.com/paritytech/polkadot-sdk.git", branch = "release-polkadot-v1.1.0" }

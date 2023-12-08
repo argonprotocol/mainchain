@@ -3,17 +3,18 @@ use frame_support::{
 	parameter_types,
 	traits::{ConstU16, ConstU64, Currency},
 };
-use sp_core::{crypto::AccountId32, ConstU32, H256};
+use sp_core::{crypto::AccountId32, ConstU32, H256, U256};
 use sp_runtime::{
 	traits::{BlakeTwo256, IdentityLookup, NumberFor},
 	BuildStorage,
 };
-use sp_std::collections::btree_map::BTreeMap;
 
 use ulx_primitives::{
-	block_seal::{Host, MiningAuthority},
+	block_seal::{MiningAuthority, VoteMinimum},
 	notary::{NotaryId, NotaryProvider, NotarySignature},
-	AuthorityProvider, BlockSealAuthorityId, ChainTransferLookup,
+	tick::{Tick, Ticker},
+	AuthorityProvider, BlockSealAuthorityId, BlockVotingProvider, ChainTransferLookup,
+	TickProvider,
 };
 
 use crate as pallet_notebook;
@@ -65,29 +66,10 @@ parameter_types! {
 
 parameter_types! {
 	pub static AuthorityList: Vec<(AccountId32, BlockSealAuthorityId)> = vec![];
-	pub static XorClosest: Option<MiningAuthority<BlockSealAuthorityId>> = None;
+	pub static XorClosest: Option<MiningAuthority<BlockSealAuthorityId, AccountId32>> = None;
 }
 pub struct StaticAuthorityProvider;
 impl AuthorityProvider<BlockSealAuthorityId, Block, AccountId32> for StaticAuthorityProvider {
-	fn miner_zero() -> Option<(u16, BlockSealAuthorityId, Vec<Host>, AccountId32)> {
-		None
-	}
-	fn is_active(authority_id: &BlockSealAuthorityId) -> bool {
-		Self::authorities().contains(authority_id)
-	}
-	fn authorities() -> Vec<BlockSealAuthorityId> {
-		AuthorityList::get().iter().map(|(_account, id)| id.clone()).collect()
-	}
-	fn authority_id_by_index() -> BTreeMap<u16, BlockSealAuthorityId> {
-		let mut map = BTreeMap::new();
-		for (i, id) in AuthorityList::get().into_iter().enumerate() {
-			map.insert(i as u16, id.1);
-		}
-		map
-	}
-	fn authority_count() -> u16 {
-		AuthorityList::get().len() as u16
-	}
 	fn get_authority(author: AccountId32) -> Option<BlockSealAuthorityId> {
 		AuthorityList::get().iter().find_map(|(account, id)| {
 			if *account == author {
@@ -97,10 +79,9 @@ impl AuthorityProvider<BlockSealAuthorityId, Block, AccountId32> for StaticAutho
 			}
 		})
 	}
-	fn block_peer(
-		_block_hash: &<Block as sp_runtime::traits::Block>::Hash,
-		_account_id: &AccountId32,
-	) -> Option<MiningAuthority<BlockSealAuthorityId>> {
+	fn xor_closest_authority(
+		_: U256,
+	) -> Option<MiningAuthority<BlockSealAuthorityId, AccountId32>> {
 		XorClosest::get().clone()
 	}
 	fn get_rewards_account(_author: AccountId32) -> Option<AccountId32> {
@@ -120,6 +101,9 @@ impl NotaryProvider<Block> for NotaryProviderImpl {
 
 parameter_types! {
 	pub static ChainTransfers: Vec<(NotaryId, AccountId32, u64)> = vec![];
+	pub static ParentVotingKey: Option<H256> = None;
+	pub static GrandpaVoteMinimum: Option<VoteMinimum> = None;
+	pub static CurrentTick: Tick = 0;
 }
 pub struct ChainTransferLookupImpl;
 impl ChainTransferLookup<u64, AccountId32> for ChainTransferLookupImpl {
@@ -156,6 +140,25 @@ pub fn set_argons(account_id: &AccountId32, amount: Balance) {
 	drop(Balances::issue(amount));
 }
 
+pub struct StaticBlockVotingProvider;
+impl BlockVotingProvider<Block> for StaticBlockVotingProvider {
+	fn grandparent_vote_minimum() -> Option<VoteMinimum> {
+		GrandpaVoteMinimum::get()
+	}
+	fn parent_voting_key() -> Option<H256> {
+		ParentVotingKey::get()
+	}
+}
+
+pub struct StaticTickProvider;
+impl TickProvider for StaticTickProvider {
+	fn current_tick() -> Tick {
+		CurrentTick::get()
+	}
+	fn ticker() -> Ticker {
+		Ticker::new(1, 1)
+	}
+}
 impl pallet_notebook::Config for Test {
 	type RuntimeEvent = RuntimeEvent;
 	type WeightInfo = ();
@@ -164,6 +167,8 @@ impl pallet_notebook::Config for Test {
 	type EventHandler = ();
 
 	type ChainTransferLookup = ChainTransferLookupImpl;
+	type BlockVotingProvider = StaticBlockVotingProvider;
+	type TickProvider = StaticTickProvider;
 }
 
 // Build genesis storage according to the mock runtime.

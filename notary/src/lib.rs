@@ -3,6 +3,7 @@ pub use error::Error;
 pub use server::NotaryServer;
 pub use ulx_notary_primitives::ensure;
 
+#[cfg(feature = "api")]
 pub mod apis;
 pub mod error;
 pub mod stores;

@@ -34,6 +34,7 @@ ulx-primitives = { path = "../../primitives", default-features = false }
 sp-io = { version = "23.0.0", default-features = false, git = "https://github.com/paritytech/polkadot-sdk.git", branch = "release-polkadot-v1.1.0" }
 env_logger = "0.10.0"
 sp-keyring = { version = "24.0.0", git = "https://github.com/paritytech/polkadot-sdk.git", branch = "release-polkadot-v1.1.0" }
+futures = "0.3"
 
 [features]
 default = ["std"]

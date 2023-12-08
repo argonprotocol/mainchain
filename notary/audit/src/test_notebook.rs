@@ -1,7 +1,6 @@
 use std::collections::{BTreeMap, BTreeSet};
 
 use binary_merkle_tree::{merkle_proof, merkle_root};
-use chrono::Utc;
 use codec::Encode;
 use frame_support::{assert_err, assert_ok, parameter_types};
 use sp_core::{
@@ -198,8 +197,7 @@ fn test_verify_notebook() {
 		notary_id: 1,
 		notebook_number: 1,
 		finalized_block_number: 100,
-		block_number: 0,
-		start_time: Utc::now().timestamp_millis() as u64 - 60_000,
+		tick: 1,
 		changed_accounts_root: merkle_root::<Blake2Hasher, _>(vec![BalanceTip {
 			account_id: Alice.to_account_id(),
 			account_type: AccountType::Deposit,
@@ -215,14 +213,12 @@ fn test_verify_notebook() {
 		}],
 		tax: 0,
 		changed_account_origins: bounded_vec![AccountOrigin { notebook_number: 1, account_uid: 1 }],
-		end_time: Utc::now().timestamp_millis() as u64,
 		// Block Votes
 		parent_secret: None,
 		secret_hash: H256::from_slice(&[0u8; 32]),
 		block_voting_power: 0,
 		block_votes_root: H256::from_slice(&[0u8; 32]),
 		block_votes_count: 0,
-		best_block_nonces: bounded_vec![],
 		blocks_with_votes: bounded_vec![],
 	};
 
@@ -296,8 +292,7 @@ fn test_disallows_double_claim() {
 		notary_id: 1,
 		notebook_number: 1,
 		finalized_block_number: 100,
-		block_number: 0,
-		start_time: Utc::now().timestamp_millis() as u64 - 60_000,
+		tick: 0,
 		changed_accounts_root: merkle_root::<Blake2Hasher, _>(vec![BalanceTip {
 			account_id: Alice.to_account_id(),
 			account_type: AccountType::Deposit,
@@ -313,14 +308,12 @@ fn test_disallows_double_claim() {
 		}],
 		tax: 0,
 		changed_account_origins: bounded_vec![AccountOrigin { notebook_number: 1, account_uid: 1 }],
-		end_time: Utc::now().timestamp_millis() as u64,
 		// Block Votes
 		parent_secret: None,
 		secret_hash: H256::from_slice(&[0u8; 32]),
 		block_voting_power: 0,
 		block_votes_root: H256::from_slice(&[0u8; 32]),
 		block_votes_count: 0,
-		best_block_nonces: bounded_vec![],
 		blocks_with_votes: bounded_vec![],
 	};
 
@@ -436,8 +429,7 @@ fn test_multiple_changesets_in_a_notebook() {
 			notary_id: 1,
 			notebook_number: 1,
 			finalized_block_number: 100,
-			block_number: 0,
-			start_time: Utc::now().timestamp_millis() as u64 - 60_000,
+			tick: 0,
 			tax: 200,
 			changed_accounts_root: merkle_root::<Blake2Hasher, _>(
 				balance_tips.iter().map(|(_, v)| v.encode()).collect::<Vec<_>>(),
@@ -451,14 +443,12 @@ fn test_multiple_changesets_in_a_notebook() {
 				AccountOrigin { notebook_number: 1, account_uid: 2 },
 				AccountOrigin { notebook_number: 1, account_uid: 3 }
 			],
-			end_time: Utc::now().timestamp_millis() as u64,
 			// Block Votes
 			parent_secret: None,
 			secret_hash: H256::from_slice(&[0u8; 32]),
 			block_voting_power: 0,
 			block_votes_root: H256::from_slice(&[0u8; 32]),
 			block_votes_count: 0,
-			best_block_nonces: bounded_vec![],
 			blocks_with_votes: bounded_vec![],
 		},
 		notarizations: bounded_vec![Notarization::new(alice_balance_changeset.clone(), vec![],)],
@@ -634,8 +624,7 @@ fn test_cannot_remove_lock_between_changesets_in_a_notebook() {
 			notary_id: 1,
 			notebook_number: 1,
 			finalized_block_number: 100,
-			block_number: 0,
-			start_time: Utc::now().timestamp_millis() as u64 - 60_000,
+			tick: 0,
 			changed_accounts_root: merkle_root::<Blake2Hasher, _>(vec![BalanceTip {
 				account_id: Alice.to_account_id(),
 				account_type: AccountType::Deposit,
@@ -654,14 +643,12 @@ fn test_cannot_remove_lock_between_changesets_in_a_notebook() {
 				account_uid: 1
 			}],
 			tax: 0,
-			end_time: Utc::now().timestamp_millis() as u64,
 			// Block Votes
 			parent_secret: None,
 			secret_hash: H256::from_slice(&[0u8; 32]),
 			block_voting_power: 0,
 			block_votes_root: H256::from_slice(&[0u8; 32]),
 			block_votes_count: 0,
-			best_block_nonces: bounded_vec![],
 			blocks_with_votes: bounded_vec![],
 		},
 		notarizations: bounded_vec![
@@ -838,20 +825,17 @@ fn test_votes_must_add_up() {
 			notary_id: 1,
 			notebook_number: 62,
 			finalized_block_number: 100,
-			block_number: 0,
-			start_time: Utc::now().timestamp_millis() as u64 - 60_000,
+			tick: 0,
 			changed_accounts_root: Default::default(),
 			chain_transfers: Default::default(),
 			changed_account_origins: Default::default(),
 			tax: 0,
-			end_time: Utc::now().timestamp_millis() as u64,
 			// Block Votes
 			parent_secret: None,
 			secret_hash: H256::from_slice(&[0u8; 32]),
 			block_voting_power: 10_000,
 			block_votes_root: H256::from_slice(&[0u8; 32]),
 			block_votes_count: 3,
-			best_block_nonces: bounded_vec![],
 			blocks_with_votes: bounded_vec![],
 		},
 		notarizations: bounded_vec![Notarization::new(

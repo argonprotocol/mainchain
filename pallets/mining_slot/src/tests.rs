@@ -5,7 +5,7 @@ use frame_support::{
 	traits::{Currency, OnInitialize, OneSessionHandler},
 };
 use pallet_balances::Event as UlixeeBalancesEvent;
-use sp_core::{bounded_vec, crypto::AccountId32, OpaquePeerId, H256, U256};
+use sp_core::{bounded_vec, OpaquePeerId, U256};
 use sp_runtime::{testing::UintAuthorityId, BoundedVec};
 
 use ulx_primitives::{
@@ -771,7 +771,7 @@ fn it_handles_null_authority() {
 }
 
 #[test]
-fn it_can_get_block_peer() {
+fn it_can_get_closest_authority() {
 	MaxMiners::set(100);
 	new_test_ext(None).execute_with(|| {
 		System::set_block_number(8);
@@ -805,12 +805,13 @@ fn it_can_get_block_peer() {
 		.expect("Didn't insert authorities");
 
 		assert_eq!(
-			MiningSlots::block_peer(&H256::from([0u8; 32]), &AccountId32::from([1u8; 32])),
+			MiningSlots::xor_closest_authority(U256::from(100)),
 			Some(MiningAuthority {
+				account_id: 96,
 				peer_id: empty_peer(),
 				rpc_hosts: rpc_hosts(Ipv4Addr::new(127, 0, 0, 1), 15550),
-				authority_id: UintAuthorityId(3).to_public_key(),
-				authority_index: 3,
+				authority_id: UintAuthorityId(96).to_public_key(),
+				authority_index: 96,
 			})
 		);
 	});

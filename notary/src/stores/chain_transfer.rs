@@ -175,9 +175,11 @@ impl ChainTransferStore {
 
 #[cfg(test)]
 mod tests {
+	use chrono::{Duration, Utc};
 	use frame_support::{assert_err, assert_ok};
 	use sp_keyring::{AccountKeyring::Alice, Sr25519Keyring::Bob};
 	use sqlx::PgPool;
+	use std::ops::Add;
 	use tracing_subscriber::EnvFilter;
 
 	use crate::stores::{chain_transfer::*, notebook_status::NotebookFinalizationStep};
@@ -191,7 +193,7 @@ mod tests {
 
 	#[sqlx::test]
 	async fn test_transfer_to_localchain_flow(pool: PgPool) -> anyhow::Result<()> {
-		NotebookStatusStore::create(&pool, 1).await?;
+		NotebookStatusStore::create(&pool, 1, 1, Utc::now().add(Duration::minutes(1))).await?;
 		logger();
 		let notebook_number = 1;
 		let account_id = Bob.to_account_id();
@@ -253,7 +255,7 @@ mod tests {
 	#[sqlx::test]
 	async fn test_transfer_can_only_be_in_one_notebook(pool: PgPool) -> anyhow::Result<()> {
 		logger();
-		NotebookStatusStore::create(&pool, 1).await?;
+		NotebookStatusStore::create(&pool, 1, 1, Utc::now().add(Duration::minutes(1))).await?;
 		let notebook_number = 1;
 		let account_id = Bob.to_account_id();
 		let account_nonce = 1;
@@ -309,7 +311,7 @@ mod tests {
 	#[sqlx::test]
 	async fn test_fails_after_max_transfers(pool: PgPool) -> anyhow::Result<()> {
 		logger();
-		NotebookStatusStore::create(&pool, 1).await?;
+		NotebookStatusStore::create(&pool, 1, 1, Utc::now().add(Duration::minutes(1))).await?;
 		{
 			let mut tx = pool.begin().await?;
 			assert_ok!(
@@ -352,7 +354,7 @@ mod tests {
 		{
 			let mut tx = pool.begin().await?;
 			NotebookStatusStore::next_step(&mut *tx, 1, NotebookFinalizationStep::Open).await?;
-			NotebookStatusStore::create(&mut *tx, 2).await?;
+			NotebookStatusStore::create(&pool, 1, 2, Utc::now().add(Duration::minutes(2))).await?;
 			tx.commit().await?;
 
 			let mut tx = pool.begin().await?;

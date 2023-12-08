@@ -3,12 +3,15 @@ use frame_support::{CloneNoBound, EqNoBound, Parameter, PartialEqNoBound};
 use scale_info::TypeInfo;
 use serde::{Deserialize, Serialize};
 use sp_application_crypto::ByteArray;
-use sp_core::{crypto::KeyTypeId, ConstU32, MaxEncodedLen, OpaquePeerId, U256};
+use sp_core::{
+	ConstU32,
+	crypto::KeyTypeId, MaxEncodedLen, OpaquePeerId, U256,
+};
 use sp_runtime::{BoundedVec, RuntimeDebug};
 
-pub const BLOCK_SEAL_KEY_TYPE: KeyTypeId = KeyTypeId(*b"seal");
-
 pub use ulx_notary_primitives::{BlockVotingPower, VoteMinimum};
+
+pub const BLOCK_SEAL_KEY_TYPE: KeyTypeId = KeyTypeId(*b"seal");
 
 // sr25519 signatures are non deterministic, so we use ed25519 for deterministic signatures since
 // these are part of the nonce hash
@@ -93,10 +96,11 @@ impl MaxEncodedLen for PeerId {
 pub type AuthorityIndex = u16;
 
 #[derive(PartialEq, Eq, Clone, Encode, Decode, RuntimeDebug, TypeInfo, MaxEncodedLen)]
-pub struct MiningAuthority<AuthorityId> {
+pub struct MiningAuthority<AuthorityId, AccountId> {
 	#[codec(compact)]
 	pub authority_index: AuthorityIndex,
 	pub authority_id: AuthorityId,
+	pub account_id: AccountId,
 	pub peer_id: PeerId,
 	pub rpc_hosts: BoundedVec<Host, MaxMinerRpcHosts>,
 }

@@ -20,7 +20,7 @@
       },
       {
         "ordinal": 3,
-        "name": "block_number",
+        "name": "tick",
         "type_info": "Int4"
       },
       {
@@ -30,76 +30,61 @@
       },
       {
         "ordinal": 5,
-        "name": "start_time",
-        "type_info": "Timestamptz"
-      },
-      {
-        "ordinal": 6,
-        "name": "end_time",
-        "type_info": "Timestamptz"
-      },
-      {
-        "ordinal": 7,
         "name": "notary_id",
         "type_info": "Int4"
       },
       {
-        "ordinal": 8,
+        "ordinal": 6,
         "name": "tax",
         "type_info": "Varchar"
       },
       {
-        "ordinal": 9,
+        "ordinal": 7,
         "name": "chain_transfers",
         "type_info": "Jsonb"
       },
       {
-        "ordinal": 10,
+        "ordinal": 8,
         "name": "changed_accounts_root",
         "type_info": "Bytea"
       },
       {
-        "ordinal": 11,
+        "ordinal": 9,
         "name": "changed_account_origins",
         "type_info": "Jsonb"
       },
       {
-        "ordinal": 12,
+        "ordinal": 10,
         "name": "block_votes_root",
         "type_info": "Bytea"
       },
       {
-        "ordinal": 13,
+        "ordinal": 11,
         "name": "block_votes_count",
         "type_info": "Int4"
       },
       {
-        "ordinal": 14,
+        "ordinal": 12,
         "name": "block_voting_power",
         "type_info": "Varchar"
       },
       {
-        "ordinal": 15,
+        "ordinal": 13,
         "name": "blocks_with_votes",
         "type_info": "ByteaArray"
       },
       {
-        "ordinal": 16,
+        "ordinal": 14,
         "name": "secret_hash",
         "type_info": "Bytea"
       },
       {
-        "ordinal": 17,
+        "ordinal": 15,
         "name": "parent_secret",
         "type_info": "Bytea"
       },
       {
-        "ordinal": 18,
-        "name": "best_nonces",
-        "type_info": "Jsonb"
-      },
-      {
-        "ordinal": 19,
+        "ordinal": 16,
         "name": "last_updated",
         "type_info": "Timestamptz"
       }
@@ -118,8 +103,6 @@
       false,
       true,
       false,
-      true,
-      false,
       false,
       false,
       false,
@@ -128,7 +111,6 @@
       false,
       false,
       true,
-      false,
       false
     ]
   },

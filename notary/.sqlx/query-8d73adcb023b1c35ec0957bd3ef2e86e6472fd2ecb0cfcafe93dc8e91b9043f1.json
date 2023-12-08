@@ -1,0 +1,20 @@
+{
+  "db_name": "PostgreSQL",
+  "query": "\n\t\t\tINSERT INTO blocks (block_hash, block_number, parent_hash, block_vote_minimum, received_time, is_finalized,\n\t\t\t\tlatest_notebook_number)\n\t\t\tVALUES ($1, $2, $3, $4, $5, $6, $7)\n\t\t",
+  "describe": {
+    "columns": [],
+    "parameters": {
+      "Left": [
+        "Bytea",
+        "Int4",
+        "Bytea",
+        "Varchar",
+        "Timestamptz",
+        "Bool",
+        "Int4"
+      ]
+    },
+    "nullable": []
+  },
+  "hash": "8d73adcb023b1c35ec0957bd3ef2e86e6472fd2ecb0cfcafe93dc8e91b9043f1"
+}

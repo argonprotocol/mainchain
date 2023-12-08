@@ -17,7 +17,7 @@ use ulx_node_consensus::{
 	compute_worker::run_compute_solver_threads,
 	import_queue::{UlxImportQueue, UlxVerifier},
 };
-use ulx_node_runtime::{self, opaque::Block, prod_or_fast, AccountId, RuntimeApi};
+use ulx_node_runtime::{self, opaque::Block, AccountId, RuntimeApi};
 
 use crate::rpc;
 
@@ -238,7 +238,6 @@ pub fn new_full(
 					finality_provider: finality_proof_provider.clone(),
 				},
 				backend: rpc_backend.clone(),
-				keystore: keystore.clone(),
 			};
 			rpc::create_full(deps).map_err(Into::into)
 		});
@@ -270,7 +269,9 @@ pub fn new_full(
 				telemetry.as_ref().map(|x| x.handle()),
 			);
 
-			let tax_block_window = prod_or_fast!(Duration::from_secs(60), Duration::from_secs(5));
+			// how long to take to actually build the block (i.e. executing extrinsics)
+			let block_seconds = Duration::from_secs(10);
+
 			let (compute_miner, compute_task) =
 				ulx_node_consensus::compute_worker::create_compute_miner(
 					Box::new(ulx_block_import.clone()),
@@ -279,13 +280,8 @@ pub fn new_full(
 					proposer_factory_compute,
 					sync_service.clone(),
 					block_author.clone(),
-					keystore_container.keystore(),
 					sync_service.clone(),
-					// time to wait for a tax block before starting to mine a new one (if there are
-					// votes possible)
-					tax_block_window,
-					// how long to take to actually build the block (i.e. executing extrinsics)
-					Duration::from_secs(10),
+					block_seconds.clone(),
 				);
 
 			task_manager.spawn_essential_handle().spawn_blocking(
@@ -294,41 +290,38 @@ pub fn new_full(
 				compute_task,
 			);
 
-			let (block_watch_task, create_block_stream) = ulx_node_consensus::create_block_watch(
-				transaction_pool.clone(),
-				client.clone(),
-				select_chain,
-				keystore_container.keystore(),
-			);
-			let proposer_factory_tax = sc_basic_authorship::ProposerFactory::new(
-				task_manager.spawn_handle(),
-				client.clone(),
-				transaction_pool.clone(),
-				prometheus_registry.as_ref(),
-				telemetry.as_ref().map(|x| x.handle()),
-			);
-			let block_create_task = ulx_node_consensus::tax_block_creator(
-				Box::new(ulx_block_import),
-				client.clone(),
-				proposer_factory_tax,
-				sync_service.clone(),
-				block_author,
-				// how long to take to actually build the block (i.e. executing extrinsics)
-				Duration::from_secs(10),
-				create_block_stream,
-				keystore_container.keystore(),
-			);
+			// let (block_watch_task, create_block_stream) = ulx_node_consensus::create_block_watch(
+			// 	transaction_pool.clone(),
+			// 	client.clone(),
+			// 	select_chain,
+			// 	keystore_container.keystore(),
+			// );
+			// let proposer_factory_tax = sc_basic_authorship::ProposerFactory::new(
+			// 	task_manager.spawn_handle(),
+			// 	client.clone(),
+			// 	transaction_pool.clone(),
+			// 	prometheus_registry.as_ref(),
+			// 	telemetry.as_ref().map(|x| x.handle()),
+			// );
+			// let block_create_task = ulx_node_consensus::tax_block_creator(
+			// 	Box::new(ulx_block_import),
+			// 	client.clone(),
+			// 	proposer_factory_tax,
+			// 	sync_service.clone(),
+			// 	block_secs,
+			// 	create_block_stream,
+			// );
 
-			task_manager.spawn_essential_handle().spawn_blocking(
-				"ulx-block-watch",
-				Some("block-authoring"),
-				block_watch_task,
-			);
-			task_manager.spawn_essential_handle().spawn_blocking(
-				"ulx-blocks",
-				Some("block-authoring"),
-				block_create_task,
-			);
+			// task_manager.spawn_essential_handle().spawn_blocking(
+			// 	"ulx-block-watch",
+			// 	Some("block-authoring"),
+			// 	block_watch_task,
+			// );
+			// task_manager.spawn_essential_handle().spawn_blocking(
+			// 	"ulx-blocks",
+			// 	Some("block-authoring"),
+			// 	block_create_task,
+			// );
 
 			let grandpa_config = sc_consensus_grandpa::Config {
 				// FIXME #1578 make this available through chainspec

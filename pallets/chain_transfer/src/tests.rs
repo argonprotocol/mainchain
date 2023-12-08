@@ -161,7 +161,7 @@ fn it_can_handle_transfers_in() {
 		assert_ok!(ChainTransferPallet::notebook_submitted(&NotebookHeader {
 			notary_id: 1,
 			notebook_number: 1,
-			block_number: 1,
+			tick: 1,
 			chain_transfers: bounded_vec![ChainTransfer::ToLocalchain {
 				account_id: Bob.to_account_id(),
 				account_nonce: nonce.unique_saturated_into()
@@ -173,14 +173,12 @@ fn it_can_handle_transfers_in() {
 			}],
 			version: 1,
 			finalized_block_number: 1,
-			start_time: 0,
-			end_time: 0,
 			tax: 0,
 			block_voting_power: 0,
 			blocks_with_votes: Default::default(),
 			block_votes_root: H256::random(),
 			secret_hash: H256::random(),
-			best_block_nonces: Default::default(),
+
 			parent_secret: None,
 			block_votes_count: 0,
 		},),);
@@ -195,7 +193,7 @@ fn it_can_handle_transfers_in() {
 		assert_ok!(ChainTransferPallet::notebook_submitted(&NotebookHeader {
 			notary_id: 1,
 			notebook_number: 2,
-			block_number: 2,
+			tick: 2,
 			chain_transfers: bounded_vec![ChainTransfer::ToMainchain {
 				account_id: who.clone(),
 				amount: 5000
@@ -207,14 +205,12 @@ fn it_can_handle_transfers_in() {
 			}],
 			version: 1,
 			finalized_block_number: 1,
-			start_time: 0,
-			end_time: 0,
 			tax: 0,
 			block_voting_power: 0,
 			blocks_with_votes: Default::default(),
 			block_votes_root: H256::random(),
 			secret_hash: H256::random(),
-			best_block_nonces: Default::default(),
+
 			parent_secret: None,
 			block_votes_count: 0,
 		}));
@@ -237,20 +233,18 @@ fn it_reduces_circulation_on_tax() {
 		assert_ok!(ChainTransferPallet::notebook_submitted(&NotebookHeader {
 			notary_id: 1,
 			notebook_number: 1,
-			block_number: 1,
+			tick: 1,
 			chain_transfers: bounded_vec![],
 			changed_accounts_root: H256::random(),
 			changed_account_origins: bounded_vec![],
 			version: 1,
 			finalized_block_number: 1,
-			start_time: 0,
-			end_time: 0,
 			tax: 2000,
 			block_voting_power: 0,
 			blocks_with_votes: Default::default(),
 			block_votes_root: H256::random(),
 			secret_hash: H256::random(),
-			best_block_nonces: Default::default(),
+
 			parent_secret: None,
 			block_votes_count: 0,
 		}),);
@@ -269,7 +263,7 @@ fn it_doesnt_allow_a_notary_balance_to_go_negative() {
 			ChainTransferPallet::notebook_submitted(&NotebookHeader {
 				notary_id: 1,
 				notebook_number: 1,
-				block_number: 0,
+				tick: 0,
 				chain_transfers: bounded_vec![ChainTransfer::ToMainchain {
 					account_id: Bob.to_account_id(),
 					amount: 5000
@@ -278,14 +272,12 @@ fn it_doesnt_allow_a_notary_balance_to_go_negative() {
 				changed_account_origins: bounded_vec![],
 				version: 1,
 				finalized_block_number: 1,
-				start_time: 0,
-				end_time: 0,
 				tax: 0,
 				block_voting_power: 0,
 				blocks_with_votes: Default::default(),
 				block_votes_root: H256::random(),
 				secret_hash: H256::random(),
-				best_block_nonces: Default::default(),
+
 				parent_secret: None,
 				block_votes_count: 0,
 			}),
@@ -324,7 +316,7 @@ fn it_expires_transfers_if_not_committed() {
 			ChainTransferPallet::notebook_submitted(&NotebookHeader {
 				notary_id: 1,
 				notebook_number: 1,
-				block_number: 0,
+				tick: 0,
 				chain_transfers: bounded_vec![ChainTransfer::ToLocalchain {
 					account_id: who.clone(),
 					account_nonce: nonce.unique_saturated_into()
@@ -333,14 +325,12 @@ fn it_expires_transfers_if_not_committed() {
 				changed_account_origins: bounded_vec![],
 				version: 1,
 				finalized_block_number: 1,
-				start_time: 0,
-				end_time: 0,
 				tax: 0,
 				block_voting_power: 0,
 				blocks_with_votes: Default::default(),
 				block_votes_root: H256::random(),
 				secret_hash: H256::random(),
-				best_block_nonces: Default::default(),
+
 				parent_secret: None,
 				block_votes_count: 0,
 			}),

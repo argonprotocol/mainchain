@@ -7,7 +7,6 @@ use std::{
 	time::{Duration, Instant},
 };
 
-use codec::Encode;
 use futures::{
 	executor::block_on,
 	future::BoxFuture,
@@ -23,77 +22,20 @@ use sc_service::TaskManager;
 use sp_api::ProvideRuntimeApi;
 use sp_blockchain::HeaderBackend;
 use sp_consensus::{Environment, Proposal, Proposer, SelectChain, SyncOracle};
-use sp_core::{blake2_256, crypto::AccountId32, RuntimeDebug, U256};
-use sp_keystore::KeystorePtr;
+use sp_core::{crypto::AccountId32, RuntimeDebug, U256};
 use sp_runtime::traits::{Block as BlockT, Header as HeaderT};
+use sp_timestamp::Timestamp;
 
-use ulx_primitives::{digests::SealSource, inherents::BlockSealInherent, *};
+use ulx_primitives::{inherents::BlockSealInherent, tick::Tick, *};
 
 use crate::{
-	authority::AuthorityClient,
 	block_creator,
 	block_creator::propose,
-	convert_u32,
+	compute_solver::ComputeSolver,
+	digests::get_tick_digest,
 	error::Error,
-	notebook_watch::{get_notary_state, has_applicable_tax_votes, notary_state_to_vote_digest},
+	notebook_watch::{get_notary_state, has_applicable_tax_votes},
 };
-
-#[derive(Clone, Eq, PartialEq, Encode)]
-pub struct BlockComputeNonce {
-	pub pre_hash: Vec<u8>,
-	pub nonce: U256,
-}
-
-impl BlockComputeNonce {
-	pub fn increment(&mut self) {
-		self.nonce = self.nonce.checked_add(U256::one()).unwrap_or_default();
-	}
-
-	pub fn check_output_hash(&self, payload: &mut Vec<u8>) -> U256 {
-		let nonce = self.nonce.encode();
-		payload.splice(payload.len() - nonce.len().., nonce);
-		let hash = blake2_256(&payload);
-		U256::from_big_endian(&hash)
-	}
-
-	pub fn is_valid(&self, difficulty: ComputeDifficulty) -> bool {
-		let hash = self.using_encoded(blake2_256);
-		let threshold = U256::MAX / U256::from(difficulty).max(U256::one());
-		U256::from_big_endian(&hash) <= threshold
-	}
-}
-
-#[derive(Clone)]
-pub struct ComputeSolver {
-	pub version: Version,
-	pub wip_nonce: BlockComputeNonce,
-	pub wip_nonce_hash: Vec<u8>,
-	pub threshold: U256,
-}
-
-impl ComputeSolver {
-	pub fn new(version: Version, pre_hash: Vec<u8>, difficulty: ComputeDifficulty) -> Self {
-		let mut solver = ComputeSolver {
-			version,
-			threshold: U256::MAX / U256::from(difficulty).max(U256::one()),
-			wip_nonce_hash: vec![],
-			wip_nonce: BlockComputeNonce { nonce: U256::from(rand::random::<u64>()), pre_hash },
-		};
-		solver.wip_nonce_hash = solver.wip_nonce.encode().to_vec();
-		solver
-	}
-
-	/// Synchronous step to look at the next nonce
-	pub fn check_next(&mut self) -> Option<BlockComputeNonce> {
-		self.wip_nonce.increment();
-
-		let hash = self.wip_nonce.check_output_hash(&mut self.wip_nonce_hash);
-		if hash <= self.threshold {
-			return Some(self.wip_nonce.clone())
-		}
-		None
-	}
-}
 
 /// Version of the mining worker.
 #[derive(Eq, PartialEq, Clone, Copy, RuntimeDebug)]
@@ -106,12 +48,11 @@ pub struct MiningMetadata<H> {
 	pub best_hash: H,
 	pub import_time: Instant,
 	pub has_tax_votes: bool,
+	pub tick: Tick,
 }
 
 struct MiningBuild<Block: BlockT, Proof> {
-	proposal: Proposal<Block, Proof>,
-	/// The block seal authority id
-	block_seal_authority_id: BlockSealAuthorityId,
+	pub proposal: Proposal<Block, Proof>,
 	/// Mining pre-hash.
 	pub pre_hash: Block::Hash,
 	/// Pre-runtime digest item.
@@ -122,7 +63,6 @@ struct MiningBuild<Block: BlockT, Proof> {
 pub struct MiningHandle<Block: BlockT, L: sc_consensus::JustificationSyncLink<Block>, Proof> {
 	version: Arc<AtomicUsize>,
 	justification_sync_link: Arc<L>,
-	keystore: KeystorePtr,
 	metadata: Arc<Mutex<Option<MiningMetadata<Block::Hash>>>>,
 	build: Arc<Mutex<Option<MiningBuild<Block, Proof>>>>,
 	block_import: Arc<Mutex<BoxBlockImport<Block>>>,
@@ -138,18 +78,13 @@ where
 		self.version.fetch_add(1, Ordering::SeqCst);
 	}
 
-	pub fn new(
-		block_import: BoxBlockImport<Block>,
-		justification_sync_link: L,
-		keystore: KeystorePtr,
-	) -> Self {
+	pub fn new(block_import: BoxBlockImport<Block>, justification_sync_link: L) -> Self {
 		Self {
 			version: Arc::new(AtomicUsize::new(0)),
 			justification_sync_link: Arc::new(justification_sync_link),
 			build: Arc::new(Mutex::new(None)),
 			block_import: Arc::new(Mutex::new(block_import)),
 			metadata: Arc::new(Mutex::new(None)),
-			keystore,
 		}
 	}
 
@@ -161,10 +96,11 @@ where
 		self.increment_version();
 	}
 
-	pub(crate) fn on_block(&self, best_hash: Block::Hash, has_tax_votes: bool) {
+	pub(crate) fn on_block(&self, best_hash: Block::Hash, has_tax_votes: bool, tick: Tick) {
 		self.stop_solving_current();
 		let mut metadata = self.metadata.lock();
-		*metadata = Some(MiningMetadata { best_hash, has_tax_votes, import_time: Instant::now() });
+		*metadata =
+			Some(MiningMetadata { best_hash, has_tax_votes, import_time: Instant::now(), tick });
 	}
 	pub(crate) fn start_solving(
 		&self,
@@ -172,7 +108,6 @@ where
 		pre_hash: Block::Hash,
 		difficulty: ComputeDifficulty,
 		proposal: Proposal<Block, Proof>,
-		block_seal_authority_id: BlockSealAuthorityId,
 	) {
 		if self.best_hash() != Some(best_hash) {
 			self.stop_solving_current();
@@ -180,12 +115,7 @@ where
 		}
 
 		let mut build = self.build.lock();
-		*build = Some(MiningBuild {
-			pre_hash: pre_hash.clone(),
-			difficulty,
-			proposal,
-			block_seal_authority_id,
-		});
+		*build = Some(MiningBuild { pre_hash: pre_hash.clone(), difficulty, proposal });
 	}
 	/// Get the version of the mining worker.
 	///
@@ -199,6 +129,14 @@ where
 	/// major syncing.
 	pub fn best_hash(&self) -> Option<Block::Hash> {
 		self.metadata.lock().as_ref().map(|b| b.best_hash)
+	}
+
+	pub fn build_hash(&self) -> Option<Block::Hash> {
+		self.build
+			.lock()
+			.as_ref()
+			.map(|b| b.proposal.block.header().parent_hash())
+			.cloned()
 	}
 
 	/// Get a copy of the current mining metadata, if available.
@@ -221,19 +159,19 @@ where
 		solver.as_ref().map(|a| a.version) == Some(self.version())
 	}
 
-	pub fn ready_to_solve(&self, time_to_wait_for_tax_block: Duration) -> bool {
+	pub fn ready_to_solve(&self, current_tick: Tick) -> bool {
 		match self.metadata.lock().as_ref() {
 			Some(x) => {
 				if !x.has_tax_votes {
 					return true
 				}
-				x.import_time.elapsed() >= time_to_wait_for_tax_block
+				x.tick <= current_tick.saturating_sub(2)
 			},
 			_ => false,
 		}
 	}
 
-	pub async fn submit(&mut self, nonce: BlockComputeNonce) -> Result<(), Error<Block>> {
+	pub async fn submit(&mut self, nonce: U256) -> Result<(), Error<Block>> {
 		let build = match {
 			let mut build = self.build.lock();
 			// try to take out of option. if not exists, we've moved on
@@ -252,10 +190,7 @@ where
 			&mut block_import,
 			build.proposal,
 			&self.justification_sync_link,
-			&self.keystore,
-			&nonce.nonce,
-			SealSource::Compute,
-			&build.block_seal_authority_id,
+			BlockSealDigest::Compute { nonce },
 		)
 		.await;
 		Ok(())
@@ -274,7 +209,6 @@ where
 			build: self.build.clone(),
 			metadata: self.metadata.clone(),
 			block_import: self.block_import.clone(),
-			keystore: self.keystore.clone(),
 		}
 	}
 }
@@ -297,10 +231,10 @@ where
 
 			if let Some(solver) = solver.as_mut() {
 				if let Some(nonce) = solver.check_next() {
-					let _ = block_on(worker.submit(nonce));
+					let _ = block_on(worker.submit(nonce.nonce));
 				}
 			} else {
-				tokio::time::sleep(Duration::from_millis(50)).await;
+				tokio::time::sleep(Duration::from_millis(500)).await;
 			}
 		}
 	}
@@ -333,9 +267,7 @@ pub fn create_compute_miner<Block, C, S, E, SO, L>(
 	mut env: E,
 	sync_oracle: SO,
 	account_id: AccountId32,
-	keystore: KeystorePtr,
 	justification_sync_link: L,
-	time_to_wait_for_tax_block: Duration,
 	max_time_to_build_block: Duration,
 ) -> (
 	MiningHandle<Block, L, <E::Proposer as Proposer<Block>>::Proof>,
@@ -348,7 +280,7 @@ where
 		+ HeaderBackend<Block>
 		+ AuxStore
 		+ 'static,
-	C::Api: MiningAuthorityApis<Block> + BlockSealMinimumApis<Block>,
+	C::Api: BlockSealSpecApis<Block> + TickApis<Block>,
 	S: SelectChain<Block> + 'static,
 	E: Environment<Block> + Send + Sync + 'static,
 	E::Error: std::fmt::Debug,
@@ -361,10 +293,16 @@ where
 		client.import_notification_stream(),
 		Duration::from_millis(1000),
 	);
-	let authority_client = AuthorityClient::new(client.clone(), keystore.clone());
-	let mining_handle = MiningHandle::new(block_import, justification_sync_link, keystore);
+	let mining_handle = MiningHandle::new(block_import, justification_sync_link);
 
 	let handle_to_return = mining_handle.clone();
+
+	let ticker = match client.runtime_api().ticker(client.info().genesis_hash) {
+		Ok(x) => x,
+		Err(err) => {
+			panic!("Unable to pull ticker from runtime api: {}", err)
+		},
+	};
 
 	let task = async move {
 		loop {
@@ -393,83 +331,68 @@ where
 			let best_hash = best_header.hash();
 
 			if mining_handle.best_hash() != Some(best_hash) {
-				let has_tax_votes = has_applicable_tax_votes(&client, &best_header);
-				mining_handle.on_block(best_hash, has_tax_votes);
+				let block_tick = get_tick_digest(best_header.digest()).unwrap_or_default();
+				let has_tax_votes = has_applicable_tax_votes(&client, &best_header, block_tick);
+				mining_handle.on_block(best_hash, has_tax_votes, block_tick);
 			}
 
-			if !mining_handle.ready_to_solve(time_to_wait_for_tax_block) {
+			let time = Timestamp::current();
+			let tick = ticker.tick_for_time(time.as_millis());
+			if !mining_handle.ready_to_solve(tick) {
 				continue
 			}
 
-			let difficulty = match client.runtime_api().compute_difficulty(best_hash) {
-				Ok(x) => x,
-				Err(err) => {
-					warn!(
-						target: LOG_TARGET,
-						"Unable to pull new block for compute miner. No difficulty found!! {}", err
-					);
-					continue
-				},
-			};
-			let block_seal_authority_id = match authority_client.get_preferred_authority(&best_hash)
-			{
-				Some(x) => x,
-				None => {
-					warn!(
-						target: LOG_TARGET,
-						"No authority installed for compute block creation!!"
-					);
-					continue
-				},
-			};
+			if mining_handle.build_hash() != Some(best_hash) {
+				let difficulty = match client.runtime_api().compute_difficulty(best_hash) {
+					Ok(x) => x,
+					Err(err) => {
+						warn!(
+							target: LOG_TARGET,
+							"Unable to pull new block for compute miner. No difficulty found!! {}", err
+						);
+						continue
+					},
+				};
 
-			let block_number = convert_u32::<Block>(best_header.number());
-			let notary_state = match get_notary_state::<Block, C>(&client, block_number) {
-				Ok(x) => x,
-				Err(err) => {
-					warn!(
-						target: LOG_TARGET,
-						"Unable to pull new block for compute miner. No notary state found!! {}", err
-					);
-					continue
-				},
-			};
+				let notary_state = match get_notary_state::<Block, C>(&client, tick) {
+					Ok(x) => x,
+					Err(err) => {
+						warn!(
+							target: LOG_TARGET,
+							"Unable to pull new block for compute miner. No notary state found!! {}", err
+						);
+						continue
+					},
+				};
 
-			let latest_finalized_block_needed = notary_state.latest_finalized_block_needed;
+				let proposal = match propose(
+					client.clone(),
+					&mut env,
+					account_id.clone(),
+					tick,
+					time.as_millis(),
+					notary_state.block_vote_digest,
+					best_hash,
+					BlockSealInherent::Compute,
+					notary_state.latest_finalized_block_needed,
+					max_time_to_build_block,
+				)
+				.await
+				{
+					Ok(x) => x,
+					Err(err) => {
+						warn!(
+							target: LOG_TARGET,
+							"Unable to propose a new block {}", err
+						);
+						continue
+					},
+				};
 
-			let proposal = match propose(
-				client.clone(),
-				&mut env,
-				&account_id,
-				notary_state_to_vote_digest(&notary_state),
-				block_number,
-				best_hash,
-				BlockSealInherent::Compute,
-				block_seal_authority_id.clone(),
-				latest_finalized_block_needed,
-				max_time_to_build_block,
-			)
-			.await
-			{
-				Ok(x) => x,
-				Err(err) => {
-					warn!(
-						target: LOG_TARGET,
-						"Unable to propose a new block {}", err
-					);
-					continue
-				},
-			};
+				let pre_hash = proposal.block.header().hash();
 
-			let pre_hash = proposal.block.header().hash();
-
-			mining_handle.start_solving(
-				best_hash,
-				pre_hash,
-				difficulty,
-				proposal,
-				block_seal_authority_id,
-			);
+				mining_handle.start_solving(best_hash, pre_hash, difficulty, proposal);
+			}
 		}
 	};
 

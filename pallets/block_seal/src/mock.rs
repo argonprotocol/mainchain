@@ -5,15 +5,16 @@ use frame_support::{
 	parameter_types,
 	traits::{ConstU16, ConstU64},
 };
-use sp_core::{crypto::AccountId32, H256};
+use sp_core::{H256, U256};
 use sp_runtime::{
 	traits::{BlakeTwo256, IdentityLookup},
 	BuildStorage,
 };
 
 use ulx_primitives::{
-	block_seal::{BlockSealAuthorityId, Host, MiningAuthority, VoteMinimum},
+	block_seal::{BlockSealAuthorityId, MiningAuthority, VoteMinimum},
 	notebook::NotebookNumber,
+	tick::Tick,
 	AuthorityProvider, BlockVotingProvider, NotaryId, NotebookProvider,
 };
 
@@ -58,36 +59,15 @@ impl frame_system::Config for Test {
 
 parameter_types! {
 	pub static AuthorityList: Vec<(u64, BlockSealAuthorityId)> = vec![];
-	pub static XorClosest: Option<MiningAuthority<BlockSealAuthorityId>> = None;
-	pub static VotingRoots: BTreeMap<(NotaryId, u32), (H256, NotebookNumber)> = BTreeMap::new();
+	pub static XorClosest: Option<MiningAuthority<BlockSealAuthorityId, u64>> = None;
+	pub static VotingRoots: BTreeMap<(NotaryId, Tick), (H256, NotebookNumber)> = BTreeMap::new();
 	pub static ParentVotingKey: Option<H256> = None;
 	pub static GrandpaVoteMinimum: Option<VoteMinimum> = None;
-	pub static MinerZero: Option<(u64, MiningAuthority<BlockSealAuthorityId>)> = None;
+	pub static MinerZero: Option<(u64, MiningAuthority<BlockSealAuthorityId, u64>)> = None;
 }
 
 pub struct StaticAuthorityProvider;
 impl AuthorityProvider<BlockSealAuthorityId, Block, u64> for StaticAuthorityProvider {
-	fn miner_zero() -> Option<(u16, BlockSealAuthorityId, Vec<Host>, u64)> {
-		MinerZero::get().map(|(account_id, auth)| {
-			(auth.authority_index, auth.authority_id, auth.rpc_hosts.into_inner(), account_id)
-		})
-	}
-	fn authorities() -> Vec<BlockSealAuthorityId> {
-		AuthorityList::get().iter().map(|(_account, id)| id.clone()).collect()
-	}
-	fn authority_id_by_index() -> BTreeMap<u16, BlockSealAuthorityId> {
-		let mut map = BTreeMap::new();
-		for (i, id) in AuthorityList::get().into_iter().enumerate() {
-			map.insert(i as u16, id.1);
-		}
-		map
-	}
-	fn authority_count() -> u16 {
-		AuthorityList::get().len() as u16
-	}
-	fn is_active(authority_id: &BlockSealAuthorityId) -> bool {
-		Self::authorities().contains(authority_id)
-	}
 	fn get_authority(author: u64) -> Option<BlockSealAuthorityId> {
 		AuthorityList::get().iter().find_map(|(account, id)| {
 			if *account == author {
@@ -100,21 +80,18 @@ impl AuthorityProvider<BlockSealAuthorityId, Block, u64> for StaticAuthorityProv
 	fn get_rewards_account(author: u64) -> Option<u64> {
 		Some(author)
 	}
-	fn block_peer(
-		_block_hash: &<Block as sp_runtime::traits::Block>::Hash,
-		_account_id: &AccountId32,
-	) -> Option<MiningAuthority<BlockSealAuthorityId>> {
+	fn xor_closest_authority(_: U256) -> Option<MiningAuthority<BlockSealAuthorityId, u64>> {
 		XorClosest::get().clone()
 	}
 }
 
 pub struct StaticNotebookProvider;
 impl NotebookProvider for StaticNotebookProvider {
-	fn get_eligible_block_votes_root(
+	fn get_eligible_tick_votes_root(
 		notary_id: NotaryId,
-		block_number: u32,
+		tick: Tick,
 	) -> Option<(H256, NotebookNumber)> {
-		VotingRoots::get().get(&(notary_id, block_number)).cloned()
+		VotingRoots::get().get(&(notary_id, tick)).cloned()
 	}
 }
 
@@ -129,7 +106,6 @@ impl BlockVotingProvider<Block> for StaticBlockVotingProvider {
 }
 
 impl pallet_block_seal::Config for Test {
-	type RuntimeEvent = RuntimeEvent;
 	type WeightInfo = ();
 	type AuthorityId = BlockSealAuthorityId;
 	type AuthorityProvider = StaticAuthorityProvider;

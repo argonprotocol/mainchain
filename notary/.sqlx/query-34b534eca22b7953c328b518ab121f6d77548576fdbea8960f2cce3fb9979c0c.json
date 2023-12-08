@@ -10,51 +10,61 @@
       },
       {
         "ordinal": 1,
-        "name": "chain_transfers",
+        "name": "tick",
         "type_info": "Int4"
       },
       {
         "ordinal": 2,
-        "name": "block_votes",
+        "name": "chain_transfers",
         "type_info": "Int4"
       },
       {
         "ordinal": 3,
-        "name": "balance_changes",
+        "name": "block_votes",
         "type_info": "Int4"
       },
       {
         "ordinal": 4,
-        "name": "notarizations",
+        "name": "balance_changes",
         "type_info": "Int4"
       },
       {
         "ordinal": 5,
-        "name": "step",
+        "name": "notarizations",
         "type_info": "Int4"
       },
       {
         "ordinal": 6,
+        "name": "step",
+        "type_info": "Int4"
+      },
+      {
+        "ordinal": 7,
         "name": "open_time",
         "type_info": "Timestamptz"
       },
       {
-        "ordinal": 7,
-        "name": "ready_for_close_time",
-        "type_info": "Timestamptz"
-      },
-      {
         "ordinal": 8,
-        "name": "closed_time",
+        "name": "end_time",
         "type_info": "Timestamptz"
       },
       {
         "ordinal": 9,
-        "name": "submitted_time",
+        "name": "ready_for_close_time",
         "type_info": "Timestamptz"
       },
       {
         "ordinal": 10,
+        "name": "closed_time",
+        "type_info": "Timestamptz"
+      },
+      {
+        "ordinal": 11,
+        "name": "submitted_time",
+        "type_info": "Timestamptz"
+      },
+      {
+        "ordinal": 12,
         "name": "finalized_time",
         "type_info": "Timestamptz"
       }
@@ -65,6 +75,8 @@
       ]
     },
     "nullable": [
+      false,
+      false,
       false,
       false,
       false,

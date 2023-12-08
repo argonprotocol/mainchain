@@ -19,21 +19,24 @@ const LOG_TARGET: &str = "runtime::notebook";
 
 #[frame_support::pallet(dev_mode)]
 pub mod pallet {
+	use binary_merkle_tree::merkle_proof;
 	use codec::alloc::string::ToString;
 	use frame_support::pallet_prelude::*;
 	use frame_system::pallet_prelude::*;
 	use sp_api::BlockT;
 	use sp_core::{crypto::AccountId32, H256};
-	use sp_io::hashing::blake2_256;
-	use sp_runtime::traits::UniqueSaturatedInto;
-	use sp_std::collections::btree_map::BTreeMap;
+	use sp_runtime::traits::BlakeTwo256;
+	use sp_std::{collections::btree_map::BTreeMap, vec::Vec};
 
 	use ulx_notary_audit::{notebook_verify, AccountHistoryLookupError, NotebookHistoryLookup};
 	use ulx_primitives::{
 		block_seal::VoteMinimum,
+		localchain::{BestBlockVoteProofT, BlockVote, BlockVoteT},
 		notary::{NotaryId, NotaryNotebookKeyDetails, NotaryNotebookVoteDetails, NotarySignature},
 		notebook::{AccountOrigin, Notebook, NotebookHeader},
-		ChainTransferLookup, NotebookEventHandler, NotebookProvider,
+		tick::Tick,
+		BlockVotingProvider, ChainTransferLookup, MerkleProof, NotebookEventHandler,
+		NotebookProvider, NotebookVotes, TickProvider,
 	};
 
 	use super::*;
@@ -54,6 +57,9 @@ pub mod pallet {
 		type NotaryProvider: NotaryProvider<<Self as frame_system::Config>::Block>;
 
 		type ChainTransferLookup: ChainTransferLookup<Self::Nonce, Self::AccountId>;
+
+		type BlockVotingProvider: BlockVotingProvider<Self::Block>;
+		type TickProvider: TickProvider;
 	}
 
 	const MAX_NOTEBOOK_DETAILS_PER_NOTARY: u32 = 3;
@@ -82,12 +88,14 @@ pub mod pallet {
 		QueryKind = OptionQuery,
 	>;
 
+	/// List of last few notebook details by notary. The bool is whether the notebook was received
+	/// in the appropriate "tick"
 	#[pallet::storage]
 	pub(super) type LastNotebookDetailsByNotary<T: Config> = StorageMap<
 		_,
 		Blake2_128Concat,
 		NotaryId,
-		BoundedVec<NotaryNotebookKeyDetails, ConstU32<MAX_NOTEBOOK_DETAILS_PER_NOTARY>>,
+		BoundedVec<(NotaryNotebookKeyDetails, bool), ConstU32<MAX_NOTEBOOK_DETAILS_PER_NOTARY>>,
 		ValueQuery,
 	>;
 
@@ -101,9 +109,12 @@ pub mod pallet {
 	pub enum Error<T> {
 		UnapprovedNotary,
 		MissingNotebookNumber,
+		NotebookTickAlreadyUsed,
 		IncorrectBlockHeight,
+		NoTickDigestFound,
 		/// The secret or secret hash of the parent notebook do not match
 		InvalidSecretProvided,
+		CouldNotDecodeVote,
 	}
 
 	#[pallet::call]
@@ -121,26 +132,24 @@ pub mod pallet {
 			ensure_none(origin)?;
 			let notebook_number = header.notebook_number;
 			let notary_id = header.notary_id;
-			let current_block_number = frame_system::Pallet::<T>::block_number();
-			let block_u32: u32 =
-				UniqueSaturatedInto::<u32>::unique_saturated_into(current_block_number);
-
-			ensure!(header.block_number == (block_u32 - 1u32), Error::<T>::IncorrectBlockHeight);
 
 			let mut notary_notebook_details = <LastNotebookDetailsByNotary<T>>::get(notary_id);
 
-			if let Some(notebook) = notary_notebook_details.first() {
+			if let Some((parent, _)) = notary_notebook_details.first() {
 				ensure!(
-					notebook_number == notebook.notebook_number + 1,
+					notebook_number == parent.notebook_number + 1,
 					Error::<T>::MissingNotebookNumber
 				);
+				ensure!(parent.tick < header.tick, Error::<T>::NotebookTickAlreadyUsed);
 
 				// check secret
 				if let Some(secret) = header.parent_secret {
-					ensure!(
-						blake2_256(&secret[..]) == notebook.secret_hash.as_bytes(),
-						Error::<T>::InvalidSecretProvided
+					let secret_hash = NotebookHeader::create_secret_hash(
+						secret,
+						parent.block_votes_root,
+						parent.notebook_number,
 					);
+					ensure!(secret_hash == parent.secret_hash, Error::<T>::InvalidSecretProvided);
 				}
 			}
 
@@ -152,12 +161,15 @@ pub mod pallet {
 
 			let _ = notary_notebook_details.try_insert(
 				0,
-				NotaryNotebookKeyDetails {
-					block_votes_root: header.block_votes_root,
-					secret_hash: header.secret_hash,
-					notebook_number,
-					block_number: block_u32,
-				},
+				(
+					NotaryNotebookKeyDetails {
+						block_votes_root: header.block_votes_root,
+						secret_hash: header.secret_hash,
+						notebook_number,
+						tick: header.tick,
+					},
+					T::TickProvider::current_tick() == header.tick,
+				),
 			);
 			<LastNotebookDetailsByNotary<T>>::insert(notary_id, notary_notebook_details);
 
@@ -190,26 +202,15 @@ pub mod pallet {
 
 		fn validate_unsigned(_source: TransactionSource, call: &Self::Call) -> TransactionValidity {
 			if let Call::submit { header, hash, signature } = call {
-				let current_block_number: u32 =
-					frame_system::Pallet::<T>::block_number().unique_saturated_into();
-
-				// if the block is in the future, we can't include it yet in this fork
-				if header.block_number > current_block_number {
-					return Err(InvalidTransaction::Future.into())
-				}
-
-				// if older than 1 block mark it stale to remove from the pool
-				if header.block_number < current_block_number - 1 {
-					return Err(InvalidTransaction::Stale.into())
-				}
-
-				if let Some(notebook) =
+				let mut last_notebook_number = None;
+				if let Some((notebook, _)) =
 					<LastNotebookDetailsByNotary<T>>::get(header.notary_id).first()
 				{
 					ensure!(
 						header.notebook_number > notebook.notebook_number,
 						InvalidTransaction::Stale
 					);
+					last_notebook_number = Some(notebook.notebook_number);
 				}
 
 				// make the sender provide the hash. We'll just reject it if it's bad
@@ -231,10 +232,10 @@ pub mod pallet {
 				let mut tx_builder = ValidTransaction::with_tag_prefix("Notebook")
 					.priority(TransactionPriority::MAX)
 					.and_provides((header.notary_id, header.notebook_number))
-					.longevity(1u32.into())
+					.longevity(500u32.into())
 					.propagate(true);
 
-				if header.notebook_number > 1 {
+				if header.notebook_number > 1 && last_notebook_number.is_some() {
 					tx_builder =
 						tx_builder.and_requires((header.notary_id, header.notebook_number - 1));
 				}
@@ -264,6 +265,7 @@ pub mod pallet {
 			<NotebookChangedAccountsRootByNotary<T>>::get(notary_id, notebook_number)
 				.ok_or(AccountHistoryLookupError::RootNotFound)
 		}
+
 		fn get_last_changed_notebook(
 			&self,
 			notary_id: NotaryId,
@@ -299,8 +301,8 @@ pub mod pallet {
 			header_hash: H256,
 			block_vote_minimums: &BTreeMap<<T::Block as BlockT>::Hash, VoteMinimum>,
 			bytes: &Vec<u8>,
-		) -> Result<bool, NotebookVerifyError> {
-			if let Some(notebook) = <LastNotebookDetailsByNotary<T>>::get(notary_id).first() {
+		) -> Result<NotebookVotes, NotebookVerifyError> {
+			if let Some((notebook, _)) = <LastNotebookDetailsByNotary<T>>::get(notary_id).first() {
 				ensure!(
 					notebook_number > notebook.notebook_number,
 					NotebookVerifyError::NotebookTooOld
@@ -330,19 +332,26 @@ pub mod pallet {
 				NotebookVerifyError::InvalidNotarySignature
 			);
 
-			let is_valid = notebook_verify(
-				&LocalchainHistoryLookup::<T>::new(),
-				&notebook,
-				block_vote_minimums,
-			)
-			.map_err(|e| {
+			notebook_verify(&LocalchainHistoryLookup::<T>::new(), &notebook, block_vote_minimums)
+				.map_err(|e| {
 				log::info!(
 					target: LOG_TARGET,
 					"Notebook audit failed for notary {notary_id}, notebook {notebook_number}: {:?}", e.to_string()
 				);
 				e
 			})?;
-			Ok(is_valid)
+
+			let notebook_votes = NotebookVotes {
+				raw_votes: notebook
+					.notarizations
+					.iter()
+					.map(|notarization| {
+						notarization.block_votes.iter().map(|vote| (vote.encode(), vote.power))
+					})
+					.flatten()
+					.collect::<Vec<_>>(),
+			};
+			Ok(notebook_votes)
 		}
 
 		/// Decode the notebook submission into high level details
@@ -350,44 +359,102 @@ pub mod pallet {
 			call: &Call<T>,
 		) -> Option<NotaryNotebookVoteDetails<<T::Block as BlockT>::Hash>> {
 			if let Call::submit { header, hash, .. } = call {
-				let key_details = NotaryNotebookKeyDetails {
-					notebook_number: header.notebook_number,
-					block_votes_root: header.block_votes_root,
-					block_number: header.block_number,
-					secret_hash: header.secret_hash,
-				};
 				return Some(NotaryNotebookVoteDetails {
 					notary_id: header.notary_id,
 					notebook_number: header.notebook_number,
 					version: header.version as u32,
 					finalized_block_number: header.finalized_block_number,
-					key_details,
+					block_votes_root: header.block_votes_root,
+					tick: header.tick,
+					secret_hash: header.secret_hash,
+					parent_secret: header.parent_secret,
 					header_hash: hash.clone(),
-					block_votes: header.block_votes_count,
+					block_votes_count: header.block_votes_count,
 					block_voting_power: header.block_voting_power,
 					blocks_with_votes: header.blocks_with_votes.to_vec().clone(),
-					best_nonces: header
-						.best_block_nonces
-						.iter()
-						.map(|(voting_key, best_nonce)| {
-							(voting_key.clone(), header.notary_id, best_nonce.clone())
-						})
-						.collect::<Vec<_>>(),
 				})
 			} else {
 				None
 			}
 		}
+
+		pub fn best_vote_proofs(
+			notebook_votes: &BTreeMap<NotaryId, NotebookVotes>,
+		) -> Result<
+			BoundedVec<BestBlockVoteProofT<<T::Block as BlockT>::Hash>, ConstU32<2>>,
+			Error<T>,
+		> {
+			let Some(parent_key) = T::BlockVotingProvider::parent_voting_key() else {
+				return Ok(BoundedVec::new())
+			};
+
+			let block_number = <frame_system::Pallet<T>>::block_number();
+			if block_number <= 3u32.into() {
+				return Ok(BoundedVec::new())
+			}
+
+			let grandparent_vote_block_hash =
+				<frame_system::Pallet<T>>::block_hash(block_number - 3u32.into());
+
+			let mut best_votes = vec![];
+
+			for (notary_id, votes) in notebook_votes {
+				for (index, (vote_bytes, power)) in votes.raw_votes.iter().enumerate() {
+					let nonce = BlockVote::calculate_vote_proof(
+						power.clone(),
+						vote_bytes.clone(),
+						*notary_id,
+						parent_key,
+					);
+					best_votes.push((nonce, notary_id, vote_bytes, index));
+				}
+			}
+			best_votes.sort_by(|a, b| a.0.cmp(&b.0));
+
+			let mut result = BoundedVec::new();
+			for (vote_proof, notary_id, vote_bytes, index) in best_votes {
+				let leafs = notebook_votes
+					.get(notary_id)
+					.expect("just came from iterating over this map")
+					.raw_votes
+					.iter()
+					.map(|(vote_bytes, _)| vote_bytes)
+					.collect::<Vec<_>>();
+
+				let proof = merkle_proof::<BlakeTwo256, _, _>(&leafs, index);
+				let vote = BlockVoteT::decode(&mut vote_bytes.as_ref())
+					.map_err(|_| Error::<T>::CouldNotDecodeVote)?;
+
+				if vote.grandparent_block_hash != grandparent_vote_block_hash {
+					continue
+				}
+
+				let best_nonce = BestBlockVoteProofT {
+					notary_id: *notary_id,
+					vote_proof,
+					block_vote: vote.clone(),
+					source_notebook_proof: MerkleProof {
+						proof: BoundedVec::truncate_from(proof.proof),
+						leaf_index: proof.leaf_index as u32,
+						number_of_leaves: proof.number_of_leaves as u32,
+					},
+				};
+				if result.try_push(best_nonce).is_err() {
+					break
+				}
+			}
+			Ok(result)
+		}
 	}
 
 	impl<T: Config> NotebookProvider for Pallet<T> {
-		fn get_eligible_block_votes_root(
+		fn get_eligible_tick_votes_root(
 			notary_id: NotaryId,
-			block_number: u32,
+			tick: Tick,
 		) -> Option<(H256, NotebookNumber)> {
 			let history = LastNotebookDetailsByNotary::<T>::get(notary_id);
-			for entry in history {
-				if entry.block_number == block_number {
+			for (entry, is_eligible) in history {
+				if entry.tick == tick && is_eligible {
 					return Some((entry.block_votes_root, entry.notebook_number))
 				}
 			}

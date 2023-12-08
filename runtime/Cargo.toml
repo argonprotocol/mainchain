@@ -52,15 +52,16 @@ frame-benchmarking = { version = "4.0.0-dev", default-features = false, git = "h
 frame-system-benchmarking = { version = "4.0.0-dev", default-features = false, git = "https://github.com/paritytech/polkadot-sdk.git", optional = true , branch = "release-polkadot-v1.1.0" }
 
 # Local Dependencies
-pallet-block-seal = { version = "0.0.1", default-features = false, path = "../pallets/block_seal" }
-pallet-seal-minimums = { version = "0.0.1", default-features = false, path = "../pallets/seal_minimums" }
-pallet-block-rewards = { version = "0.0.1", default-features = false, path = "../pallets/block_rewards" }
-pallet-bond = { version = "0.0.1", default-features = false, path = "../pallets/bond" }
-pallet-chain-transfer = { version = "0.0.1", default-features = false, path = "../pallets/chain_transfer" }
-pallet-notebook = { version = "0.0.1", default-features = false, path = "../pallets/notebook" }
-pallet-notaries = { version = "0.0.1", default-features = false, path = "../pallets/notaries" }
-pallet-mining-slot = { version = "0.0.1", default-features = false, path = "../pallets/mining_slot" }
-ulx-primitives = { version = "0.0.1", default-features = false, path = "../primitives" }
+pallet-block-seal = {  default-features = false, path = "../pallets/block_seal" }
+pallet-block-seal-spec = {  default-features = false, path = "../pallets/block_seal_spec" }
+pallet-block-rewards = {  default-features = false, path = "../pallets/block_rewards" }
+pallet-bond = {  default-features = false, path = "../pallets/bond" }
+pallet-chain-transfer = {  default-features = false, path = "../pallets/chain_transfer" }
+pallet-notebook = {  default-features = false, path = "../pallets/notebook" }
+pallet-notaries = {  default-features = false, path = "../pallets/notaries" }
+pallet-mining-slot = {  default-features = false, path = "../pallets/mining_slot" }
+pallet-ticks = {  default-features = false, path = "../pallets/ticks" }
+ulx-primitives = {  default-features = false, path = "../primitives" }
 
 [build-dependencies]
 substrate-wasm-builder = { version = "5.0.0-dev", git = "https://github.com/paritytech/polkadot-sdk.git", optional = true , branch = "release-polkadot-v1.1.0" }
@@ -87,7 +88,7 @@ std = [
 	"pallet-mining-slot/std",
 	"pallet-notebook/std",
 	"pallet-bond/std",
-	"pallet-seal-minimums/std",
+	"pallet-block-seal-spec/std",
 	"pallet-block-rewards/std",
 	"pallet-block-seal/std",
 	"pallet-tx-pause/std",

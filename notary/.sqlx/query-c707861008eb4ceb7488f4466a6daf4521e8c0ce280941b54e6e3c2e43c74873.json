@@ -25,26 +25,21 @@
       },
       {
         "ordinal": 4,
-        "name": "this_notary_notebook_number",
+        "name": "latest_notebook_number",
         "type_info": "Int4"
       },
       {
         "ordinal": 5,
-        "name": "parent_voting_key",
-        "type_info": "Bytea"
-      },
-      {
-        "ordinal": 6,
         "name": "is_finalized",
         "type_info": "Bool"
       },
       {
-        "ordinal": 7,
+        "ordinal": 6,
         "name": "finalized_time",
         "type_info": "Timestamptz"
       },
       {
-        "ordinal": 8,
+        "ordinal": 7,
         "name": "received_time",
         "type_info": "Timestamptz"
       }
@@ -59,7 +54,6 @@
       false,
       false,
       false,
-      true,
       true,
       false,
       true,

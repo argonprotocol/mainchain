@@ -12,20 +12,13 @@ use clap::{crate_version, Parser};
 use sc_cli::KeystoreParams;
 use sc_keystore::LocalKeystore;
 use sc_service::config::KeystoreConfig;
-use serde::{Deserialize, Serialize};
 use sp_core::{bounded_vec, crypto::Ss58Codec, H256};
 use sp_keystore::KeystorePtr;
 use sp_runtime::BoundedVec;
-use subxt::{backend::rpc::RpcClient, rpc_params, utils::AccountId32};
+use subxt::utils::AccountId32;
 use tokio::time;
 
-use ulixee_client::{
-	api::{
-		apis,
-		runtime_types::ulx_primitives::block_seal::{app::Public, Host, MiningAuthority},
-	},
-	try_until_connected, UlxClient,
-};
+use ulixee_client::{try_until_connected, UlxClient};
 use ulx_notary::apis::LocalchainRpcClient;
 use ulx_notary_primitives::{AccountId, BlockVote, NotaryId, MAX_BLOCK_VOTES_PER_NOTARIZATION};
 
@@ -75,7 +68,6 @@ async fn main() -> anyhow::Result<()> {
 	let account_id: AccountId = Ss58Codec::from_ss58check(&cli.account_id)?;
 	let account_id_32: [u8; 32] = account_id.clone().into();
 
-	let notary_id = cli.notary_id;
 	let mut vote_publisher =
 		VotePublisher::new(AccountId32::from(account_id_32), mainchain_client.clone());
 
@@ -86,8 +78,6 @@ async fn main() -> anyhow::Result<()> {
 			block_next = blocks_sub.next() => {
 				match block_next {
 					Some(Ok(ref block)) => {
-						// if let Some(next_eligibility) = get_eligibility_digest(&block).ok() {
-						// 	worker.on_build(block.hash(), next_eligibility);
 						let _ = vote_publisher.on_block(block.hash().clone()).await.map_err(|e| {
 							tracing::error!("Error processing block: {:?}", e);
 						});
@@ -103,14 +93,6 @@ async fn main() -> anyhow::Result<()> {
 					None => break,
 				}
 			},
-			// voter = vote_receiver.next() => {
-			// 	match voter {
-			// 		Some(puzzle) => {
-			// 			vote_publisher.append_vote(puzzle.into());
-			// 		},
-			// 		None => continue,
-			// 	}
-			// },
 			_ = interval.tick() => {
 				let mut pending_votes = Vec::new();
 				vote_publisher.votes_by_block_hash.retain(|_, meta|  {
@@ -136,18 +118,16 @@ async fn main() -> anyhow::Result<()> {
 
 					meta.last_publish_time = Instant::now();
 
-					let host = meta.peer.rpc_hosts.0.first().expect("Must have at least one host");
-					let rpc_url = get_rpc_url(&host);
 					let votes = take(&mut meta.votes);
 					let (publish, retain) = votes.split_at(MAX_BLOCK_VOTES_PER_NOTARIZATION as usize);
 					meta.votes.append(&mut retain.to_vec());
-					pending_votes.push(( publish.to_vec(), rpc_url));
+					pending_votes.push( publish.to_vec());
 
 					true
 				});
 
-				for (votes, rpc_url) in pending_votes {
-					let task = VotePublisher::publish_pending_votes(votes, rpc_url, notary_id, notary_client.clone());
+				for votes in pending_votes {
+					let task = VotePublisher::publish_pending_votes(votes, notary_client.clone());
 					tokio::spawn(task);
 				}
 			},
@@ -176,7 +156,7 @@ fn read_keystore(
 	.map_err(|e| anyhow!("Error reading keystore details {:?}", e))?;
 	Ok(keystore)
 }
-
+#[allow(dead_code)]
 pub struct VotePublisher {
 	account_id: AccountId32,
 	mainchain_client: UlxClient,
@@ -185,7 +165,6 @@ pub struct VotePublisher {
 
 pub struct BlockVoteMeta {
 	votes: Vec<BlockVote>,
-	peer: MiningAuthority<Public>,
 	expiration_time: Instant,
 	last_publish_time: Instant,
 }
@@ -196,19 +175,10 @@ impl VotePublisher {
 	}
 
 	pub async fn on_block(&mut self, block_hash: H256) -> anyhow::Result<()> {
-		let peer = self
-			.mainchain_client
-			.runtime_api()
-			.at(block_hash.clone())
-			.call(apis().mining_authority_apis().block_peer(self.account_id.clone()))
-			.await?
-			.ok_or(anyhow!("Could not find block peer for block {:?}", block_hash))?;
-
 		self.votes_by_block_hash.insert(
 			block_hash.clone(),
 			BlockVoteMeta {
 				votes: Vec::new(),
-				peer,
 				expiration_time: Instant::now() + Duration::from_secs(55),
 				last_publish_time: Instant::now() - Duration::from_secs(5),
 			},
@@ -228,77 +198,17 @@ impl VotePublisher {
 
 	pub async fn publish_pending_votes(
 		votes: Vec<BlockVote>,
-		rpc_url: String,
-		notary_id: NotaryId,
 		notary_client: Arc<ulx_notary::Client>,
 	) -> anyhow::Result<()> {
 		if votes.is_empty() {
 			return Ok(())
 		}
 
-		tracing::info!(
-			"Publishing {} votes for {} to {}",
-			votes.len(),
-			votes[0].grandparent_block_hash,
-			rpc_url
-		);
+		tracing::info!("Publishing {} votes for {}", votes.len(), votes[0].grandparent_block_hash,);
 
-		let _ = {
-			notary_client
-				.notarize(bounded_vec!(), BoundedVec::truncate_from(votes.clone()))
-				.await?;
-			let peer_client = RpcClient::from_url(rpc_url).await?;
-			// must submit to first client
-			let response = peer_client
-				.request::<Response>("blockVotes_submit", rpc_params![notary_id, votes])
-				.await?;
-
-			if response.accepted {
-				Ok(())
-			} else {
-				Err(anyhow!("Peer did not accept votes"))
-			}
-		}
-		.map_err(|e| {
-			tracing::error!("Error publishing votes: {:?}", e);
-			e
-		});
-
+		notary_client
+			.notarize(bounded_vec!(), BoundedVec::truncate_from(votes.clone()))
+			.await?;
 		Ok(())
 	}
 }
-
-#[derive(Debug, Deserialize, Serialize, PartialEq, Eq)]
-pub struct Response {
-	/// hash of the created block.
-	pub accepted: bool,
-}
-
-fn get_rpc_url(host: &Host) -> String {
-	format!(
-		"{}://{}:{}",
-		if host.is_secure { "wss" } else { "ws" },
-		std::net::Ipv4Addr::from(host.ip),
-		host.port
-	)
-}
-
-// fn get_eligibility_digest(
-// 	block: &subxt::blocks::Block<UlxConfig, UlxClient>,
-// ) -> anyhow::Result<ulx_primi::BlockS> {
-// 	let next = block
-// 		.header()
-// 		.digest
-// 		.logs
-// 		.iter()
-// 		.find_map(|log| {
-// 			if let DigestItem::PreRuntime(ulx_notary_primitives::NEXT_SEAL_MINIMUMS_DIGEST_ID, v) =
-// 				log
-// 			{
-// 				return ulx_notary_primitives::BlockVoteEligibility::decode(&mut &v[..]).ok()
-// 			}
-// 			None
-// 		})
-// 		.ok_or(anyhow!("Could not local the next block eligibility!!"))?;
-// 	Ok(next)
-// }

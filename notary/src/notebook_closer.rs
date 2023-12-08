@@ -14,13 +14,14 @@ use ulixee_client::{
 	api::{
 		runtime_types,
 		runtime_types::{
-			bounded_collections::bounded_vec::BoundedVec as SubxtBoundedVec, primitive_types::U256,
+			bounded_collections::bounded_vec::BoundedVec as SubxtBoundedVec,
 			sp_core::ed25519::Signature,
 		},
 	},
 	UlxClient,
 };
 use ulx_notary_primitives::{ChainTransfer, NotaryId, NotebookHeader};
+use ulx_primitives::tick::Ticker;
 
 use crate::{
 	error::Error,
@@ -42,6 +43,7 @@ pub struct NotebookCloser {
 	pub keystore: KeystorePtr,
 	pub notary_id: NotaryId,
 	pub client: MainchainClient,
+	pub ticker: Ticker,
 
 	pub completed_notebook_sender: NotificationSender<NotebookHeader>,
 }
@@ -56,6 +58,17 @@ pub struct MainchainClient {
 impl MainchainClient {
 	pub fn new(urls: Vec<String>) -> Self {
 		Self { urls, client: Arc::new(RwLock::new(None)), current_index: 0 }
+	}
+
+	pub async fn lookup_ticker(&mut self) -> anyhow::Result<Ticker> {
+		let client = self.get().await?;
+		let ticker_data = client
+			.runtime_api()
+			.at(client.genesis_hash())
+			.call(api::runtime_apis::tick_apis::TickApis.ticker())
+			.await?;
+		let ticker = Ticker::new(ticker_data.tick_duration_millis, ticker_data.genesis_utc_time);
+		Ok(ticker)
 	}
 
 	pub fn get(&mut self) -> BoxFutureResult<UlxClient> {
@@ -94,11 +107,12 @@ pub fn spawn_notebook_closer(
 	notary_id: NotaryId,
 	client: MainchainClient,
 	keystore: KeystorePtr,
+	ticker: Ticker,
 	completed_notebook_sender: NotificationSender<NotebookHeader>,
 ) {
 	tokio::spawn(async move {
 		let mut notebook_closer =
-			NotebookCloser { pool, notary_id, client, keystore, completed_notebook_sender };
+			NotebookCloser { pool, notary_id, client, keystore, ticker, completed_notebook_sender };
 		let _ = notebook_closer.create_task().await;
 	});
 }
@@ -141,14 +155,10 @@ impl NotebookCloser {
 				None => return Ok(()),
 			};
 			let next_notebook = notebook_number + 1u32;
-			let mut block_number = BlocksStore::get_latest_block_number(&mut *tx).await?;
-			let last_notebook_block =
-				NotebookHeaderStore::get_block_number(&mut *tx, notebook_number).await?;
+			let tick = self.ticker.current();
+			let end_time = self.ticker.time_for_tick(tick + 1);
 
-			if block_number <= last_notebook_block {
-				block_number = last_notebook_block + 1;
-			}
-			NotebookHeaderStore::create(&mut *tx, self.notary_id, next_notebook, block_number)
+			NotebookHeaderStore::create(&mut *tx, self.notary_id, next_notebook, tick, end_time)
 				.await?;
 
 			tx.commit().await?;
@@ -177,7 +187,6 @@ impl NotebookCloser {
 				&mut *tx,
 				notebook_number,
 				finalized_block,
-				self.notary_id,
 				public,
 				&self.keystore,
 			)
@@ -212,17 +221,16 @@ impl NotebookCloser {
 
 			let header = NotebookHeaderStore::load(&mut *tx, notebook_number).await?;
 			let public =
-				RegisteredKeyStore::get_valid_public(&mut *tx, header.block_number).await?;
+				RegisteredKeyStore::get_valid_public(&mut *tx, header.finalized_block_number)
+					.await?;
 			let header_hash = header.hash();
 
 			let notebook = runtime_types::ulx_notary_primitives::notebook::NotebookHeader {
 				version: header.version,
-				block_number: header.block_number,
 				finalized_block_number: header.finalized_block_number,
 				notebook_number: header.notebook_number,
 				notary_id: header.notary_id,
-				start_time: header.start_time,
-				end_time: header.end_time,
+				tick: header.tick,
 				changed_accounts_root: header.changed_accounts_root,
 				changed_account_origins: SubxtBoundedVec(
 					header
@@ -263,39 +271,6 @@ impl NotebookCloser {
 				blocks_with_votes: SubxtBoundedVec(header.blocks_with_votes.to_vec().clone()),
 				secret_hash: header.secret_hash,
 				parent_secret: header.parent_secret,
-				best_block_nonces: SubxtBoundedVec(
-					header
-						.best_block_nonces
-						.iter()
-						.map(|(voting_root, block_nonce)| {
-							let channel_pass = block_nonce.block_vote.channel_pass.clone();
-							let vote = block_nonce.block_vote.clone();
-							let api_best_nonce = runtime_types::ulx_notary_primitives::block_vote::BestBlockNonceT {
-								nonce: U256(block_nonce.nonce.0),
-								proof: runtime_types::ulx_notary_primitives::balance_change::MerkleProof {
-									proof: SubxtBoundedVec(
-										block_nonce.proof.proof.iter().map(|p| p.clone()).collect(),
-									),
-									leaf_index: block_nonce.proof.leaf_index,
-									number_of_leaves: block_nonce.proof.number_of_leaves,
-								},
-								block_vote: runtime_types::ulx_notary_primitives::block_vote::BlockVoteT {
-									account_id: AccountId32(vote.account_id.into()),
-									grandparent_block_hash: vote.grandparent_block_hash,
-									power: vote.power,
-									index: vote.index,
-									channel_pass: runtime_types::ulx_notary_primitives::note::ChannelPass {
-										at_block_height: channel_pass.at_block_height,
-										id: channel_pass.id,
-										miner_index: channel_pass.miner_index,
-										zone_record_hash: channel_pass.zone_record_hash,
-									}
-								},
-							};
-							(voting_root.clone(), api_best_nonce)
-						})
-						.collect::<Vec<_>>(),
-				),
 			};
 
 			let signature = notary_sign(&self.keystore, &public, &header_hash)?;
@@ -404,7 +379,9 @@ mod tests {
 		let notary_key =
 			keystore.ed25519_generate_new(NOTARY_KEYID, None).expect("should have a key");
 
-		track_blocks(ctx.ws_url, 1, &pool.clone());
+		let mut client = MainchainClient::new(vec![ws_url.clone()]);
+		let ticker = client.lookup_ticker().await?;
+		track_blocks(ctx.ws_url, 1, &pool.clone(), ticker.clone());
 
 		propose_bob_as_notary(&ctx.client, notary_key).await?;
 
@@ -438,8 +415,9 @@ mod tests {
 			pool: pool.clone(),
 			keystore: keystore.clone(),
 			notary_id: 1,
-			client: MainchainClient::new(vec![ws_url.clone()]),
+			client,
 			completed_notebook_sender,
+			ticker: ticker.clone(),
 		};
 
 		let mut subscription = completed_notebook_stream.subscribe(100);
@@ -494,11 +472,12 @@ mod tests {
 			.0;
 
 		assert_eq!(
-			last_notary_details[0].block_number, next_header.block_number,
-			"Should have updated the last block number"
+			last_notary_details[0].0.tick, 1,
+			"Should have updated the latest submitted tick"
 		);
+
 		assert_eq!(
-			last_notary_details[0].notebook_number, 1,
+			last_notary_details[0].0.notebook_number, 1,
 			"Should have updated the last notebook number"
 		);
 
@@ -514,7 +493,7 @@ mod tests {
 			}]),
 			public: ed25519::Public(notary_key.0),
 		});
-
+		println!("notary proposal {:?}", notary_proposal);
 		let result = client
 			.tx()
 			.sign_and_submit_then_watch_default(&notary_proposal, &dev::bob())
@@ -523,6 +502,8 @@ mod tests {
 			.await?
 			.wait_for_success()
 			.await;
+
+		println!("notary result {:?}", result);
 
 		assert_ok!(result);
 		Ok(())

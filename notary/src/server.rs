@@ -16,6 +16,7 @@ use ulx_notary_primitives::{
 	BalanceProof, BalanceTip, NotarizationBalanceChangeset, NotarizationBlockVotes, NotaryId,
 	Notebook, NotebookHeader, NotebookNumber,
 };
+use ulx_primitives::tick::Ticker;
 
 use crate::{
 	apis::{
@@ -43,6 +44,7 @@ pub struct NotaryServer {
 	notary_id: NotaryId,
 	pool: PgPool,
 	completed_notebook_stream: NotebookHeaderStream,
+	ticker: Ticker,
 	pub completed_notebook_sender: NotificationSender<NotebookHeader>,
 }
 
@@ -50,6 +52,7 @@ impl NotaryServer {
 	pub async fn start(
 		notary_id: NotaryId,
 		pool: PgPool,
+		ticker: Ticker,
 		addrs: impl ToSocketAddrs,
 	) -> anyhow::Result<Self> {
 		let (completed_notebook_sender, completed_notebook_stream) =
@@ -58,8 +61,14 @@ impl NotaryServer {
 		let server = Server::builder().build(addrs).await?;
 
 		let addr = server.local_addr()?;
-		let notary_server =
-			Self { notary_id, completed_notebook_sender, completed_notebook_stream, pool, addr };
+		let notary_server = Self {
+			notary_id,
+			completed_notebook_sender,
+			completed_notebook_stream,
+			pool,
+			addr,
+			ticker,
+		};
 
 		let mut module = RpcModule::new(());
 		module.merge(NotebookRpcServer::into_rpc(notary_server.clone()))?;
@@ -107,7 +116,9 @@ impl NotebookRpcServer for NotaryServer {
 			.await
 			.map_err(|e| from_crate_error(Error::Database(e.to_string())))?;
 
-		Ok(NotebookStore::load(&mut *db, notebook_number).await.map_err(from_crate_error)?)
+		Ok(NotebookStore::load(&mut *db, notebook_number, self.ticker)
+			.await
+			.map_err(from_crate_error)?)
 	}
 
 	async fn get_raw_body(
@@ -185,6 +196,7 @@ fn from_crate_error(e: crate::Error) -> ErrorObjectOwned {
 #[cfg(test)]
 mod tests {
 	use binary_merkle_tree::verify_proof;
+	use chrono::Utc;
 	use codec::Encode;
 	use futures::{StreamExt, TryStreamExt};
 	use jsonrpsee::ws_client::WsClientBuilder;
@@ -197,6 +209,7 @@ mod tests {
 		AccountOrigin, AccountType::Deposit, BalanceChange, BalanceTip, ChainTransfer,
 		NewAccountOrigin, Note, NoteType,
 	};
+	use ulx_primitives::tick::Ticker;
 
 	use crate::{
 		apis::{
@@ -215,14 +228,15 @@ mod tests {
 	#[sqlx::test]
 	async fn test_balance_change_and_get_proof(pool: PgPool) -> anyhow::Result<()> {
 		let _ = tracing_subscriber::fmt::try_init();
-		let notary = NotaryServer::start(1, pool.clone(), "127.0.0.1:0").await?;
+		let ticker = Ticker::new(60_000, Utc::now().timestamp_millis() as u64);
+		let notary = NotaryServer::start(1, pool.clone(), ticker, "127.0.0.1:0").await?;
 		assert!(notary.addr.port() > 0);
 
 		let mut db = notary.pool.acquire().await?;
-		BlocksStore::record(&mut *db, 0, [1u8; 32].into(), [0u8; 32].into(), 100, None, None)
-			.await?;
+		BlocksStore::record(&mut *db, 0, [1u8; 32].into(), [0u8; 32].into(), 100, None).await?;
 		BlocksStore::record_finalized(&mut *db, [1u8; 32].into()).await?;
-		NotebookHeaderStore::create(&mut *db, notary.notary_id, 1, 0).await?;
+		NotebookHeaderStore::create(&mut *db, notary.notary_id, 1, 1, ticker.time_for_tick(1))
+			.await?;
 		ChainTransferStore::record_transfer_to_local_from_block(
 			&mut *db,
 			0,
@@ -272,6 +286,7 @@ mod tests {
 			completed_notebook_sender: notary.completed_notebook_sender.clone(),
 			keystore: keystore.clone(),
 			client: MainchainClient::new(vec![format!("ws://{}", notary.addr)]),
+			ticker: ticker.clone(),
 		};
 		sqlx::query("update notebook_status set open_time = now() - interval '2 minutes' where notebook_number = 1")
 			.execute(&mut *db)

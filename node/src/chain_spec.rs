@@ -1,4 +1,4 @@
-use std::net::Ipv4Addr;
+use std::{net::Ipv4Addr, time::Duration};
 
 use sc_service::{ChainType, Properties};
 use sp_consensus_grandpa::AuthorityId as GrandpaId;
@@ -6,12 +6,13 @@ use sp_core::{bounded_vec, sr25519, OpaquePeerId, Pair, Public};
 use sp_runtime::traits::{IdentifyAccount, Verify};
 
 use ulx_node_runtime::{
-	opaque::SessionKeys, AccountId, ArgonBalancesConfig, GrandpaConfig, MiningSlotConfig,
-	RuntimeGenesisConfig, SealMinimumsConfig, SessionConfig, Signature, SudoConfig, SystemConfig,
-	UlixeeBalancesConfig, WASM_BINARY,
+	opaque::SessionKeys, AccountId, ArgonBalancesConfig, BlockSealSpecConfig, GrandpaConfig,
+	MiningSlotConfig, RuntimeGenesisConfig, SessionConfig, Signature, SudoConfig, SystemConfig,
+	TicksConfig, UlixeeBalancesConfig, WASM_BINARY,
 };
 use ulx_primitives::{
 	block_seal::{Host, MiningRegistration, PeerId, RewardDestination, VoteMinimum},
+	tick::Ticker,
 	BlockSealAuthorityId, ComputeDifficulty,
 };
 
@@ -74,6 +75,7 @@ pub fn development_config() -> Result<ChainSpec, String> {
 				],
 				500,
 				10_000,
+				1_000,
 			)
 		},
 		// Bootnodes
@@ -133,6 +135,7 @@ pub fn local_testnet_config() -> Result<ChainSpec, String> {
 				],
 				500,
 				100_000_000,
+				60_000,
 			)
 		},
 		// Bootnodes
@@ -157,8 +160,10 @@ fn testnet_genesis(
 	endowed_accounts: Vec<AccountId>,
 	initial_vote_minimum: VoteMinimum,
 	initial_difficulty: ComputeDifficulty,
+	tick_millis: u64,
 ) -> RuntimeGenesisConfig {
 	let authority_zero = initial_authorities[0].clone();
+	let ticker = Ticker::start(Duration::from_millis(tick_millis));
 
 	RuntimeGenesisConfig {
 		system: SystemConfig {
@@ -193,6 +198,16 @@ fn testnet_genesis(
 			// Assign network admin rights.
 			key: Some(root_key),
 		},
+		ticks: TicksConfig {
+			tick_duration_millis: tick_millis,
+			genesis_utc_time: ticker.genesis_utc_time,
+			..Default::default()
+		},
+		block_seal_spec: BlockSealSpecConfig {
+			initial_vote_minimum,
+			initial_compute_difficulty: initial_difficulty,
+			..Default::default()
+		},
 		session: SessionConfig {
 			keys: initial_authorities
 				.iter()
@@ -204,11 +219,6 @@ fn testnet_genesis(
 					)
 				})
 				.collect(),
-		},
-		seal_minimums: SealMinimumsConfig {
-			initial_vote_minimum,
-			initial_compute_difficulty: initial_difficulty,
-			..Default::default()
 		},
 		transaction_payment: Default::default(),
 		tx_pause: Default::default(),

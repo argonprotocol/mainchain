@@ -17,8 +17,7 @@ CREATE TABLE  IF NOT EXISTS blocks (
     parent_hash bytea NOT NULL,
     block_number integer NOT NULL,
     block_vote_minimum varchar NOT NULL,
-    this_notary_notebook_number integer,
-    parent_voting_key bytea NULL,
+    latest_notebook_number integer,
     is_finalized boolean NOT NULL,
     finalized_time timestamptz,
     received_time timestamptz NOT NULL
@@ -84,10 +83,8 @@ CREATE TABLE IF NOT EXISTS notebook_headers (
     notebook_number INTEGER PRIMARY KEY NOT NULL,
     version INTEGER NOT NULL,
     hash BYTEA,
-    block_number INTEGER NOT NULL,
+    tick INTEGER NOT NULL,
     finalized_block_number INTEGER,
-    start_time timestamptz NOT NULL,
-    end_time timestamptz NULL,
     notary_id INTEGER NOT NULL,
     tax varchar,
     chain_transfers jsonb NOT NULL,
@@ -99,18 +96,19 @@ CREATE TABLE IF NOT EXISTS notebook_headers (
     blocks_with_votes bytea[] NOT NULL,
     secret_hash BYTEA NOT NULL,
     parent_secret BYTEA NULL,
-    best_nonces jsonb NOT NULL,
     last_updated timestamptz NOT NULL default now()
 );
 
 CREATE TABLE IF NOT EXISTS notebook_status (
     notebook_number INTEGER NOT NULL,
+    tick INTEGER NOT NULL,
     chain_transfers INTEGER NOT NULL default 0,
     block_votes INTEGER NOT NULL default 0,
     balance_changes INTEGER NOT NULL default 0,
     notarizations INTEGER NOT NULL default 0,
     step INTEGER NOT NULL,
     open_time timestamptz NOT NULL,
+    end_time timestamptz NOT NULL,
     ready_for_close_time timestamptz NULL,
     closed_time timestamptz NULL,
     submitted_time timestamptz NULL,
@@ -125,7 +123,7 @@ CREATE UNIQUE INDEX idx_one_open_notebook
 CREATE OR REPLACE FUNCTION check_notebook_finalized()
     RETURNS TRIGGER AS $$
 BEGIN
-    IF OLD.end_time IS NOT NULL THEN
+    IF OLD.hash IS NOT NULL THEN
         RAISE EXCEPTION 'This notebook header is finalized and immutable';
     END IF;
     RETURN NEW;

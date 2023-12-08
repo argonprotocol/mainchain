@@ -1,6 +1,8 @@
 #![feature(slice_take)]
 #![cfg_attr(not(feature = "std"), no_std)]
 
+extern crate core;
+
 pub use pallet::*;
 pub use weights::*;
 
@@ -19,21 +21,23 @@ pub mod pallet {
 	use binary_merkle_tree::verify_proof;
 	use frame_support::{pallet_prelude::*, traits::FindAuthor};
 	use frame_system::pallet_prelude::*;
+	use sp_core::U256;
 	use sp_runtime::{
 		traits::{BlakeTwo256, UniqueSaturatedInto},
 		ConsensusEngineId, RuntimeAppPublic,
 	};
 	use sp_std::vec::Vec;
 
-	use super::*;
 	use ulx_primitives::{
-		digests::{BlockVoteDigest, SealSource, AUTHORITY_DIGEST_ID, BLOCK_VOTES_DIGEST_ID},
+		digests::{BlockVoteDigest, BLOCK_VOTES_DIGEST_ID},
 		inherents::{BlockSealInherent, BlockSealInherentData, InherentError},
 		localchain::BlockVote,
 		notebook::NotebookNumber,
-		AuthorityProvider, BlockSealerInfo, BlockSealerProvider, BlockVotingProvider, MerkleProof,
-		NotaryId, NotebookProvider, AUTHOR_DIGEST_ID,
+		AuthorityProvider, BlockSealAuthoritySignature, BlockSealerInfo, BlockSealerProvider,
+		BlockVotingProvider, MerkleProof, NotaryId, NotebookProvider, AUTHOR_DIGEST_ID,
 	};
+
+	use super::*;
 
 	#[pallet::pallet]
 	pub struct Pallet<T>(_);
@@ -47,8 +51,6 @@ pub mod pallet {
 			+ RuntimeAppPublic
 			+ MaybeSerializeDeserialize
 			+ MaxEncodedLen;
-		/// Because this pallet emits events, it depends on the runtime's definition of an event.
-		type RuntimeEvent: From<Event<Self>> + IsType<<Self as frame_system::Config>::RuntimeEvent>;
 		/// Type representing the weight of this pallet
 		type WeightInfo: WeightInfo;
 		/// Type that provides authorities
@@ -61,16 +63,13 @@ pub mod pallet {
 	}
 
 	#[pallet::storage]
-	pub(super) type TempBlockSealerInfo<T: Config> =
+	pub(super) type LastBlockSealerInfo<T: Config> =
 		StorageValue<_, BlockSealerInfo<T::AccountId>, OptionQuery>;
 
 	/// Author of current block (temporary storage).
 	#[pallet::storage]
 	#[pallet::getter(fn author)]
 	pub(super) type TempAuthor<T: Config> = StorageValue<_, T::AccountId, OptionQuery>;
-	#[pallet::storage]
-	pub(super) type TempBlockSealAuthority<T: Config> =
-		StorageValue<_, T::AuthorityId, OptionQuery>;
 
 	#[pallet::storage]
 	pub(super) type TempBlockVoteDigest<T: Config> = StorageValue<_, BlockVoteDigest, OptionQuery>;
@@ -79,12 +78,9 @@ pub mod pallet {
 	#[pallet::storage]
 	pub(super) type TempSealInherent<T: Config> = StorageValue<_, BlockSealInherent, OptionQuery>;
 
-	#[pallet::event]
-	pub enum Event<T: Config> {}
-
 	#[pallet::error]
 	pub enum Error<T> {
-		InvalidNonce,
+		InvalidVoteProof,
 		InvalidSubmitter,
 		UnableToDecodeVoteAccount,
 		UnregisteredBlockAuthor,
@@ -98,6 +94,7 @@ pub mod pallet {
 		IneligibleNotebookUsed,
 		NoEligibleVotingRoot,
 		InvalidAuthoritySupplied,
+		InvalidAuthoritySignature,
 	}
 
 	#[pallet::hooks]
@@ -114,16 +111,6 @@ pub mod pallet {
 						<TempAuthor<T>>::put(&account_id);
 					}
 				}
-				if id == AUTHORITY_DIGEST_ID && <TempBlockSealAuthority<T>>::get() == None {
-					assert!(
-						!<TempBlockSealAuthority<T>>::exists(),
-						"Authority digest can only be provided once!"
-					);
-					let decoded = T::AuthorityId::decode(&mut data);
-					if let Some(authority_id) = decoded.ok() {
-						<TempBlockSealAuthority<T>>::put(&authority_id);
-					}
-				}
 				if id == BLOCK_VOTES_DIGEST_ID {
 					// Duplicated logic with block_vote pallet, so we don't do extra validation
 					if let Some(digest) = BlockVoteDigest::decode(&mut data).ok() {
@@ -136,11 +123,6 @@ pub mod pallet {
 				<TempAuthor<T>>::get(),
 				None,
 				"No valid account id provided for block author."
-			);
-			assert_ne!(
-				<TempBlockSealAuthority<T>>::get(),
-				None,
-				"No valid block seal authority id provided for block author."
 			);
 			assert_ne!(
 				<TempBlockVoteDigest<T>>::get(),
@@ -158,8 +140,6 @@ pub mod pallet {
 			);
 			// ensure we never go to trie with these values.
 			TempAuthor::<T>::kill();
-			TempBlockSealerInfo::<T>::kill();
-			TempBlockSealAuthority::<T>::kill();
 			TempBlockVoteDigest::<T>::kill();
 		}
 	}
@@ -179,25 +159,30 @@ pub mod pallet {
 			let block_author =
 				<TempAuthor<T>>::get().expect("already unwrapped, should not be possible");
 
-			let miner_rewards_account =
-				T::AuthorityProvider::get_rewards_account(block_author.clone()).expect(
-					"Block author must have a rewards account configured in the authority provider",
-				);
+			let mut miner_rewards_account = block_author.clone();
+
+			if let Some(rewards_account) =
+				T::AuthorityProvider::get_rewards_account(block_author.clone())
+			{
+				miner_rewards_account = rewards_account;
+			}
 
 			match seal {
 				BlockSealInherent::Compute => {
-					<TempBlockSealerInfo<T>>::put(BlockSealerInfo {
+					// NOTE: the compute nonce is checked in the node
+					<LastBlockSealerInfo<T>>::put(BlockSealerInfo {
 						block_vote_rewards_account: miner_rewards_account.clone(),
 						miner_rewards_account,
-						notaries_included: block_vote_digest.notebook_numbers.len() as u32,
+						notaries_included: block_vote_digest.tick_notebooks,
 					});
 				},
 				BlockSealInherent::Vote {
-					nonce,
+					vote_proof,
 					block_vote,
 					notary_id,
 					source_notebook_proof,
 					source_notebook_number,
+					miner_signature,
 				} => {
 					let current_block_number = <frame_system::Pallet<T>>::block_number();
 
@@ -208,21 +193,20 @@ pub mod pallet {
 					let parent_voting_key = T::BlockVotingProvider::parent_voting_key()
 						.ok_or(Error::<T>::ParentVotingKeyNotFound)?;
 					ensure!(
-						nonce == block_vote.calculate_block_nonce(notary_id, parent_voting_key),
-						Error::<T>::InvalidNonce
+						vote_proof == block_vote.vote_proof(notary_id, parent_voting_key),
+						Error::<T>::InvalidVoteProof
 					);
 
-					let block_seal_authority = <TempBlockSealAuthority<T>>::get()
-						.expect("BlockSealAuthority must be set at this point");
 					let grandparent_block_number = current_block_number - 2u32.into();
 					let block_vote_account_id =
 						T::AccountId::decode(&mut block_vote.account_id.encode().as_slice())
 							.map_err(|_| Error::<T>::UnableToDecodeVoteAccount)?;
 					Self::verify_block_vote(
+						vote_proof,
 						&block_vote,
 						&block_author,
-						&block_seal_authority,
 						grandparent_block_number,
+						miner_signature,
 					)?;
 					Self::verify_vote_source(
 						notary_id,
@@ -231,10 +215,10 @@ pub mod pallet {
 						source_notebook_proof,
 						source_notebook_number,
 					)?;
-					<TempBlockSealerInfo<T>>::put(BlockSealerInfo {
+					<LastBlockSealerInfo<T>>::put(BlockSealerInfo {
 						miner_rewards_account,
 						block_vote_rewards_account: block_vote_account_id.clone(),
-						notaries_included: block_vote_digest.notebook_numbers.len() as u32,
+						notaries_included: block_vote_digest.tick_notebooks,
 					});
 				},
 			}
@@ -252,7 +236,7 @@ pub mod pallet {
 			source_notebook_number: NotebookNumber,
 		) -> DispatchResult {
 			let (notebook_votes_root, notebook_number) =
-				T::NotebookProvider::get_eligible_block_votes_root(notary_id, block_number)
+				T::NotebookProvider::get_eligible_tick_votes_root(notary_id, block_number)
 					.ok_or(Error::<T>::NoEligibleVotingRoot)?;
 			ensure!(notebook_number == source_notebook_number, Error::<T>::IneligibleNotebookUsed);
 			ensure!(
@@ -269,10 +253,11 @@ pub mod pallet {
 		}
 
 		pub fn verify_block_vote(
+			vote_proof: U256,
 			block_vote: &BlockVote,
 			block_author: &T::AccountId,
-			block_seal_authority: &T::AuthorityId,
 			grandparent_block_number: BlockNumberFor<T>,
+			signature: BlockSealAuthoritySignature,
 		) -> DispatchResult {
 			let grandpa_vote_minimum = T::BlockVotingProvider::grandparent_vote_minimum()
 				.ok_or(Error::<T>::NoGrandparentVoteMinimum)?;
@@ -290,14 +275,20 @@ pub mod pallet {
 			let authority_id = T::AuthorityProvider::get_authority(block_author.clone())
 				.ok_or(Error::<T>::UnregisteredBlockAuthor)?;
 
-			ensure!(authority_id == *block_seal_authority, Error::<T>::InvalidSubmitter);
-
 			// ensure this miner is eligible to submit this tax proof
-			let block_peer =
-				T::AuthorityProvider::block_peer(&eligible_vote_block_hash, &block_vote.account_id)
-					.ok_or(Error::<T>::InvalidSubmitter)?;
+			let block_peer = T::AuthorityProvider::xor_closest_authority(vote_proof)
+				.ok_or(Error::<T>::InvalidSubmitter)?;
 
 			ensure!(block_peer.authority_id == authority_id, Error::<T>::InvalidSubmitter);
+
+			let message = BlockVote::vote_proof_signature_message(vote_proof);
+			let Ok(signature) = AuthoritySignature::<T>::decode(&mut signature.as_ref()) else {
+				return Err(Error::<T>::InvalidAuthoritySignature.into())
+			};
+			ensure!(
+				authority_id.verify(&message, &signature),
+				Error::<T>::InvalidAuthoritySignature
+			);
 
 			// TODO: verify channel pass authority
 			// let channel_pass_hash = channel_pass.hash();
@@ -306,6 +297,8 @@ pub mod pallet {
 		}
 	}
 
+	pub type AuthoritySignature<T> =
+		<<T as crate::pallet::Config>::AuthorityId as RuntimeAppPublic>::Signature;
 	#[pallet::inherent]
 	impl<T: Config> ProvideInherent for Pallet<T> {
 		type Call = Call<T>;
@@ -323,6 +316,20 @@ pub mod pallet {
 				.expect("Block seal inherent data must be provided");
 
 			Some(Call::apply { seal })
+		}
+
+		fn check_inherent(call: &Self::Call, data: &InherentData) -> Result<(), Self::Error> {
+			let seal = match call {
+				Call::apply { seal } => seal,
+				_ => return Err(InherentError::MissingSeal),
+			};
+			let digest = data
+				.digest()
+				.expect("Could not decode Block seal digest data")
+				.expect("Block seal digest data must be provided");
+
+			ensure!(seal.matches(digest), InherentError::InvalidSeal);
+			Ok(())
 		}
 
 		fn is_inherent_required(_: &InherentData) -> Result<Option<Self::Error>, Self::Error> {
@@ -360,15 +367,13 @@ pub mod pallet {
 
 	impl<T: Config> BlockSealerProvider<T::AccountId> for Pallet<T> {
 		fn get_sealer_info() -> BlockSealerInfo<T::AccountId> {
-			<TempBlockSealerInfo<T>>::get().expect("BlockSealer must be set")
+			<LastBlockSealerInfo<T>>::get().expect("BlockSealer must be set")
 		}
 	}
 
-	impl<T: Config> Get<SealSource> for Pallet<T> {
-		fn get() -> SealSource {
-			<TempSealInherent<T>>::get()
-				.expect("Seal inherent must be set")
-				.to_seal_source()
+	impl<T: Config> Get<BlockSealInherent> for Pallet<T> {
+		fn get() -> BlockSealInherent {
+			<TempSealInherent<T>>::get().expect("Seal inherent must be set")
 		}
 	}
 }

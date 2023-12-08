@@ -1,4 +1,4 @@
-use std::collections::{BTreeMap, BTreeSet, HashMap};
+use std::collections::{BTreeMap, BTreeSet};
 
 use binary_merkle_tree::{merkle_proof, merkle_root, verify_proof, Leaf};
 use codec::{Decode, Encode};
@@ -8,21 +8,22 @@ use serde_json::{from_value, json};
 use sp_core::{
 	bounded::BoundedVec,
 	ed25519::{Public, Signature},
-	Blake2Hasher, RuntimeDebug, H256, U256,
+	Blake2Hasher, RuntimeDebug, H256,
 };
 use sp_keystore::KeystorePtr;
 use sqlx::PgConnection;
 
 use ulx_notary_primitives::{
-	ensure, note::AccountType, AccountId, AccountOrigin, BalanceTip, BestBlockNonce, BlockVote,
+	ensure, note::AccountType, AccountId, AccountOrigin, BalanceTip, BlockVote,
 	MaxNotebookNotarizations, MerkleProof, NewAccountOrigin, NotaryId, NoteType, Notebook,
 	NotebookNumber,
 };
+use ulx_primitives::tick::Ticker;
 
 use crate::{
 	notebook_closer::notary_sign,
 	stores::{
-		blocks::BlocksStore, chain_transfer::ChainTransferStore, notarizations::NotarizationsStore,
+		chain_transfer::ChainTransferStore, notarizations::NotarizationsStore,
 		notebook_header::NotebookHeaderStore, notebook_new_accounts::NotebookNewAccountsStore,
 		BoxFutureResult,
 	},
@@ -66,76 +67,6 @@ impl NotebookStore {
 				number_of_leaves: merkle_leafs.len() as u32,
 			})
 		})
-	}
-
-	/// Gets the best nonces for a series of notebook.
-	///
-	/// 1. While block 10 is "open", users vote for best block to build on (aka, block 10 parent,
-	///    aka block 9a)
-	/// 2. Block 10a..z is closed and published with all votes and merkles
-	/// 3. Notebooks in Block 11a..z expose "secrets" for Block 10a..z.
-	/// 4. Block 11a publishes the block_voting_key - the concatenation of the secrets + nonces of
-	///    10a..z included in 11a
-	/// 5. Block 12a..z use voting key from 11a with votes in 10a that voted for 9a as parent
-	pub async fn get_best_nonces(
-		db: &mut PgConnection,
-		notebook_number: NotebookNumber,
-		notary_id: NotaryId,
-	) -> anyhow::Result<HashMap<H256, Vec<BestBlockNonce>>, Error> {
-		let mut best_nonces = HashMap::<H256, Vec<BestBlockNonce>>::new();
-		if notebook_number <= 2 {
-			return Ok(best_nonces)
-		}
-		// This only applies to 2 notebook ago.. we don't check if it aligns to the right block
-		// height
-		let grandpa_notebook_number = notebook_number - 2;
-		let all_voting_keys = BlocksStore::get_all_voting_keys(db, notebook_number - 1).await?;
-
-		let mut best_nonces_by_voting_key = HashMap::<H256, Vec<(U256, BlockVote, usize)>>::new();
-		let block_votes = NotebookStore::get_block_votes(db, grandpa_notebook_number).await?;
-		let mut leafs = vec![];
-
-		for key in all_voting_keys {
-			for (index, vote) in block_votes.iter().enumerate() {
-				leafs.push(vote.encode());
-
-				if !best_nonces_by_voting_key.contains_key(&key) {
-					best_nonces_by_voting_key.insert(key, vec![]);
-				}
-				if let Some(best_nonces) =
-					best_nonces_by_voting_key.get_mut(&vote.grandparent_block_hash)
-				{
-					let nonce = vote.calculate_block_nonce(notary_id, key);
-					best_nonces.push((nonce, vote.clone(), index));
-				}
-			}
-		}
-		for (_, best_nonces) in best_nonces_by_voting_key.iter_mut() {
-			best_nonces.sort_by(|a, b| a.0.cmp(&b.0));
-			best_nonces.truncate(3);
-		}
-
-		for (voting_key, best_votes) in best_nonces_by_voting_key.iter() {
-			let block_nonces = best_votes
-				.into_iter()
-				.map(|(nonce, vote, index)| {
-					let proof = merkle_proof::<Blake2Hasher, _, _>(&leafs, *index);
-					BestBlockNonce {
-						nonce: nonce.clone(),
-						block_vote: vote.clone(),
-						proof: MerkleProof {
-							proof: BoundedVec::truncate_from(proof.proof),
-							leaf_index: proof.leaf_index as u32,
-							number_of_leaves: proof.number_of_leaves as u32,
-						},
-					}
-				})
-				.collect::<Vec<_>>();
-
-			best_nonces.insert(voting_key.clone(), block_nonces);
-		}
-
-		Ok(best_nonces)
 	}
 
 	pub async fn get_block_votes(
@@ -194,10 +125,11 @@ impl NotebookStore {
 	pub async fn load(
 		db: &mut PgConnection,
 		notebook_number: NotebookNumber,
+		ticker: Ticker,
 	) -> anyhow::Result<Notebook, Error> {
 		let header = NotebookHeaderStore::load(&mut *db, notebook_number).await?;
 		// end time hasn't been set yet
-		if header.end_time < header.start_time {
+		if header.tick == ticker.current() {
 			return Err(Error::NotebookNotFinalized)
 		}
 		let notarizations = NotarizationsStore::get_for_notebook(&mut *db, notebook_number).await?;
@@ -260,7 +192,6 @@ impl NotebookStore {
 		db: &mut PgConnection,
 		notebook_number: NotebookNumber,
 		finalized_block: u32,
-		notary_id: NotaryId,
 		public: Public,
 		keystore: &KeystorePtr,
 	) -> anyhow::Result<(), Error> {
@@ -345,7 +276,6 @@ impl NotebookStore {
 		let votes_root = merkle_root::<Blake2Hasher, _>(&votes_merkle_leafs);
 
 		let transfers = ChainTransferStore::take_for_notebook(&mut *db, notebook_number).await?;
-		let best_nonces = NotebookStore::get_best_nonces(db, notebook_number, notary_id).await?;
 
 		NotebookHeaderStore::complete_notebook(
 			&mut *db,
@@ -359,7 +289,6 @@ impl NotebookStore {
 			votes_merkle_leafs.len() as u32,
 			blocks_with_votes,
 			voting_power,
-			best_nonces,
 		)
 		.await?;
 
@@ -412,6 +341,7 @@ struct AccountIdAndOrigin {
 }
 #[cfg(test)]
 mod tests {
+	use chrono::{Duration, Utc};
 	use sp_core::{bounded_vec, ed25519::Signature};
 	use sp_keyring::{
 		AccountKeyring::{Alice, Dave},
@@ -419,6 +349,7 @@ mod tests {
 	};
 	use sp_keystore::{testing::MemoryKeystore, Keystore};
 	use sqlx::PgPool;
+	use std::ops::Add;
 
 	use ulx_notary_primitives::{
 		AccountOrigin, AccountType::Deposit, BalanceChange, BalanceTip, NewAccountOrigin,
@@ -442,7 +373,14 @@ mod tests {
 
 		let mut tx = pool.begin().await?;
 		RegisteredKeyStore::store_public(&mut *tx, public, 1).await?;
-		NotebookHeaderStore::create(&mut *tx, 1, 1, 101).await?;
+		NotebookHeaderStore::create(
+			&mut *tx,
+			1,
+			1,
+			1,
+			Utc::now().add(Duration::minutes(1)).timestamp_millis() as u64,
+		)
+		.await?;
 		ChainTransferStore::record_transfer_to_local_from_block(
 			&mut *tx,
 			100,
@@ -509,7 +447,7 @@ mod tests {
 		tx.commit().await?;
 
 		let mut tx = pool.begin().await?;
-		NotebookStore::close_notebook(&mut *tx, 1, 1, 1, public, &keystore.into()).await?;
+		NotebookStore::close_notebook(&mut *tx, 1, 1, public, &keystore.into()).await?;
 		tx.commit().await?;
 
 		let balance_tip = BalanceTip {

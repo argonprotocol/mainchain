@@ -1,0 +1,17 @@
+{
+  "db_name": "PostgreSQL",
+  "query": "\n\t\t\t\tINSERT INTO notebook_status (notebook_number, open_time, end_time, tick, step) VALUES ($1, now(), $2, $3, $4)\n\t\t\t",
+  "describe": {
+    "columns": [],
+    "parameters": {
+      "Left": [
+        "Int4",
+        "Timestamptz",
+        "Int4",
+        "Int4"
+      ]
+    },
+    "nullable": []
+  },
+  "hash": "857c2a9ff098370eeb1f23fc772e0235deb69fad61a0b2e9603ec29f4d35ee31"
+}

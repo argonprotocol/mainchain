@@ -29,6 +29,9 @@ impl-trait-for-tuples = "0.2.2"
 ulx-notary-primitives = { path = "../notary/primitives", default-features = false }
 ulx-notary-audit = { path = "../notary/audit", default-features = false }
 
+[dev-dependencies]
+chrono = "0.4"
+
 [features]
 default = ["std"]
 std = [

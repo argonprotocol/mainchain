@@ -15,16 +15,15 @@ use sp_runtime::{
 	traits::{Block as BlockT, Header as HeaderT},
 };
 
-use ulx_notary::ensure;
 use ulx_primitives::{
-	digests::SealSource, BlockSealMinimumApis, MiningAuthorityApis, BLOCK_SEAL_DIGEST_ID,
+	inherents::BlockSealInherentDataProvider, BlockSealDigest, BlockSealSpecApis,
+	MiningAuthorityApis, BLOCK_SEAL_DIGEST_ID,
 };
 
 use crate::{
-	authority::verify_seal_signature,
 	aux::UlxAux,
 	basic_queue::BasicQueue,
-	compute_worker::BlockComputeNonce,
+	compute_solver::BlockComputeNonce,
 	digests::{load_digests, read_seal_digest},
 	error::Error,
 };
@@ -83,7 +82,7 @@ where
 		+ BlockchainEvents<B>
 		+ AuxStore
 		+ BlockOf,
-	C::Api: BlockBuilderApi<B> + MiningAuthorityApis<B> + BlockSealMinimumApis<B>,
+	C::Api: BlockBuilderApi<B> + MiningAuthorityApis<B> + BlockSealSpecApis<B>,
 {
 	type Error = ConsensusError;
 
@@ -113,7 +112,7 @@ where
 			)
 			.into())
 		}
-		let Some(Some(seal)) = block.post_digests.last().map(read_seal_digest) else {
+		let Some(Some(seal_digest)) = block.post_digests.last().map(read_seal_digest) else {
 			return Err(Error::<B>::MissingBlockSealDigest.into())
 		};
 		let parent_hash = *block.header.parent_hash();
@@ -123,7 +122,9 @@ where
 
 			if !block.state_action.skip_execution_checks() {
 				let timestamp = sp_timestamp::InherentDataProvider::from_system_time();
-				let inherent_data_providers = timestamp;
+				let seal =
+					BlockSealInherentDataProvider { seal: None, digest: Some(seal_digest.clone()) };
+				let inherent_data_providers = (timestamp, seal);
 
 				let inherent_data = inherent_data_providers
 					.create_inherent_data()
@@ -152,21 +153,25 @@ where
 		}
 
 		let pre_hash = block.header.hash();
+		let mut compute_difficulty = None;
 
-		verify_seal_signature::<B>(&seal, &pre_hash, &digests.authority)?;
-		if seal.seal_source == SealSource::Compute {
-			// verify compute effort
-			let difficulty =
-				self.client.runtime_api().compute_difficulty(parent_hash).map_err(|e| {
-					Error::<B>::MissingRuntimeData(
-						format!("Failed to get difficulty from runtime: {}", e).to_string(),
-					)
-				})?;
-			ensure!(
-				BlockComputeNonce { nonce: seal.nonce, pre_hash: pre_hash.as_ref().to_vec() }
-					.is_valid(difficulty),
-				Error::<B>::InvalidComputeNonce
-			);
+		// NOTE: we verify compute nonce in import queue because we use the pre-hash, which we'd
+		// have to inject into the runtime
+		match &seal_digest {
+			BlockSealDigest::Compute { nonce } => {
+				// verify compute effort
+				let difficulty =
+					self.client.runtime_api().compute_difficulty(parent_hash).map_err(|e| {
+						Error::<B>::MissingRuntimeData(
+							format!("Failed to get difficulty from runtime: {}", e).to_string(),
+						)
+					})?;
+				if !BlockComputeNonce::is_valid(nonce, pre_hash.as_ref().to_vec(), difficulty) {
+					return Err(Error::<B>::InvalidComputeNonce.into())
+				}
+				compute_difficulty = Some(difficulty);
+			},
+			_ => {},
 		}
 
 		let best_header = self
@@ -182,10 +187,11 @@ where
 			&mut block,
 			digests.author,
 			digests.block_vote.parent_voting_key,
-			digests.block_vote.notebook_numbers.len() as u32,
+			digests.block_vote.tick_notebooks,
+			digests.tick,
 			digests.block_vote.voting_power,
-			seal.nonce,
-			seal.is_tax(),
+			seal_digest,
+			compute_difficulty,
 		)?;
 
 		if block.fork_choice.is_none() {

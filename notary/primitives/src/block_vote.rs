@@ -3,8 +3,9 @@ use serde::{Deserialize, Serialize};
 use sp_core::{RuntimeDebug, H256, U256};
 use sp_core_hashing::blake2_256;
 use sp_runtime::scale_info::TypeInfo;
+use sp_std::vec::Vec;
 
-use crate::{AccountId, ChannelPass, MerkleProof, NotaryId};
+use crate::{AccountId, BlockVotingPower, ChannelPass, MerkleProof, NotaryId};
 
 pub type VoteMinimum = u128;
 
@@ -31,7 +32,7 @@ pub struct BlockVoteT<Hash: Codec = H256> {
 	pub index: u32,
 	/// The voting power of this vote, determined from the amount of tax
 	#[codec(compact)]
-	pub power: u128,
+	pub power: BlockVotingPower,
 	/// Proof of the tax channel
 	pub channel_pass: ChannelPass,
 }
@@ -43,27 +44,33 @@ impl<Hash: Codec + Clone> BlockVoteT<Hash> {
 		self.using_encoded(blake2_256).into()
 	}
 
-	pub fn calculate_block_nonce(&self, notary_id: NotaryId, voting_key: H256) -> U256 {
-		let hash = BlockVoteNonceHashMessage {
-			notary_id,
-			account_id: self.account_id.clone(),
-			index: self.index,
-			voting_key,
-		}
-		.using_encoded(blake2_256);
+	pub fn vote_proof(&self, notary_id: NotaryId, voting_key: H256) -> U256 {
+		Self::calculate_vote_proof(self.power, self.encode(), notary_id, voting_key)
+	}
+
+	pub fn calculate_vote_proof(
+		power: BlockVotingPower,
+		vote_bytes: Vec<u8>,
+		notary_id: NotaryId,
+		voting_key: H256,
+	) -> U256 {
+		let hash = BlockVoteProofHashMessage { notary_id, vote_bytes, voting_key }
+			.using_encoded(blake2_256);
 		U256::from_big_endian(&hash[..])
-			.checked_div(U256::from(self.power))
+			.checked_div(U256::from(power))
 			.unwrap_or(U256::zero())
+	}
+
+	pub fn vote_proof_signature_message(vote_proof: U256) -> [u8; 32] {
+		vote_proof.using_encoded(blake2_256)
 	}
 }
 
 #[derive(Encode)]
-struct BlockVoteNonceHashMessage {
+struct BlockVoteProofHashMessage {
 	#[codec(compact)]
 	pub notary_id: NotaryId,
-	pub account_id: AccountId,
-	#[codec(compact)]
-	pub index: u32,
+	pub vote_bytes: Vec<u8>,
 	pub voting_key: H256,
 }
 
@@ -80,10 +87,13 @@ struct BlockVoteNonceHashMessage {
 	Deserialize,
 )]
 #[serde(rename_all = "camelCase")]
-pub struct BestBlockNonceT<Hash: Codec = H256> {
-	pub nonce: U256,
+pub struct BestBlockVoteProofT<Hash: Codec = H256> {
+	/// The vote proof (a smallest u256)
+	pub vote_proof: U256,
+	pub notary_id: NotaryId,
 	pub block_vote: BlockVoteT<Hash>,
-	pub proof: MerkleProof,
+	/// Proof the vote was included in the block vote root of a notary header
+	pub source_notebook_proof: MerkleProof,
 }
 
-pub type BestBlockNonce = BestBlockNonceT<H256>;
+pub type BestBlockNonce = BestBlockVoteProofT<H256>;

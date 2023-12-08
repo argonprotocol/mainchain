@@ -134,12 +134,13 @@ async fn main() -> anyhow::Result<()> {
 				.await
 				.context("failed to connect to db")?;
 
-			let server = NotaryServer::start(notary_id, pool.clone(), bind_addr).await?;
-
-			let mainchain_client = MainchainClient::new(vec![trusted_rpc_url.clone()]);
+			let mut mainchain_client = MainchainClient::new(vec![trusted_rpc_url.clone()]);
+			let ticker = mainchain_client.lookup_ticker().await?;
+			let server =
+				NotaryServer::start(notary_id, pool.clone(), ticker.clone(), bind_addr).await?;
 
 			if sync_blocks {
-				spawn_block_sync(trusted_rpc_url.clone(), notary_id, &pool).await?;
+				spawn_block_sync(trusted_rpc_url.clone(), notary_id, &pool, ticker.clone()).await?;
 			}
 			if finalize_notebooks {
 				spawn_notebook_closer(
@@ -147,6 +148,7 @@ async fn main() -> anyhow::Result<()> {
 					notary_id,
 					mainchain_client.clone(),
 					keystore.clone(),
+					ticker,
 					server.completed_notebook_sender,
 				);
 			}
