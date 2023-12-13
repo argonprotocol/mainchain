@@ -1,7 +1,8 @@
 use frame_support::{
 	assert_noop, assert_ok,
 	traits::{
-		fungible::{Inspect, InspectHold},
+		fungible::{Inspect, InspectHold, Mutate},
+		tokens::Preservation,
 		OnInitialize,
 	},
 };
@@ -279,7 +280,7 @@ fn it_can_recoup_funds_from_a_bond_fund_if_spent() {
 		assert_eq!(Balances::free_balance(2), 2_000 - fee);
 		assert_eq!(Balances::free_balance(1), fee + 100);
 
-		assert_ok!(Balances::transfer(RuntimeOrigin::signed(1), 10, 100 + fee));
+		assert_ok!(Balances::transfer(&1, &10, 100 + fee, Preservation::Expendable));
 		assert_eq!(Balances::free_balance(1), 0);
 		assert!(System::account_exists(&1));
 
@@ -369,10 +370,10 @@ fn it_can_calculate_apr() {
 fn it_can_send_minimum_balance_transfers() {
 	new_test_ext().execute_with(|| {
 		set_argons(1, 1060);
-		assert_ok!(Balances::transfer(RuntimeOrigin::signed(1), 2, 1000));
-		assert_ok!(Balances::transfer(RuntimeOrigin::signed(1), 2, 50));
+		assert_ok!(Balances::transfer(&1, &2, 1000, Preservation::Preserve));
+		assert_ok!(Balances::transfer(&1, &2, 50, Preservation::Preserve));
 		assert_eq!(Balances::free_balance(&1), 10);
-		assert_ok!(Balances::transfer(RuntimeOrigin::signed(1), 2, 4));
+		assert_ok!(Balances::transfer(&1, &2, 4, Preservation::Expendable));
 		// dusted! will remove anything below ED
 		assert_eq!(Balances::free_balance(&1), 0);
 	})
@@ -407,13 +408,13 @@ fn it_can_extend_a_bond_from_lease() {
 		assert_eq!(BondCompletions::<Test>::get(1440).into_inner(), Vec::<u64>::new());
 		assert_eq!(BondCompletions::<Test>::get(2880).into_inner(), vec![1]);
 
-		Balances::transfer(RuntimeOrigin::signed(2), 10, 2800).unwrap();
+		Balances::transfer(&2, &10, 2800, Preservation::Preserve).unwrap();
 
 		assert_noop!(
 			Bonds::extend_bond(RuntimeOrigin::signed(2), 1, 400_000u128, 2880),
 			Error::<Test>::InsufficientFunds
 		);
-		Balances::transfer(RuntimeOrigin::signed(10), 2, 2800).unwrap();
+		Balances::transfer(&10, &2, 2800, Preservation::Expendable).unwrap();
 		assert_ok!(Bonds::extend_bond(RuntimeOrigin::signed(2), 1, 200_000u128, 3000));
 		let fee = BASE_FEE + u128::from(3000 * 200_000u128 / 10u128 / 365 / 1440);
 		assert_eq!(Balances::free_balance(2), 3000 - fee);

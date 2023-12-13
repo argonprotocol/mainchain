@@ -103,6 +103,7 @@ impl pallet_balances::Config for Test {
 	type MaxFreezes = ();
 	type RuntimeHoldReason = RuntimeHoldReason;
 	type MaxHolds = ConstU32<100>;
+	type RuntimeFreezeReason = RuntimeFreezeReason;
 }
 
 pub fn set_argons(account_id: &AccountId32, amount: Balance) {

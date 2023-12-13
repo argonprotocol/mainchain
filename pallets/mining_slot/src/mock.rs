@@ -82,6 +82,7 @@ impl pallet_balances::Config<ArgonToken> for Test {
 	type FreezeIdentifier = ();
 	type MaxFreezes = ();
 	type RuntimeHoldReason = RuntimeHoldReason;
+	type RuntimeFreezeReason = RuntimeFreezeReason;
 	type MaxHolds = ConstU32<100>;
 }
 
@@ -113,6 +114,7 @@ impl pallet_balances::Config<UlixeeToken> for Test {
 	type FreezeIdentifier = ();
 	type MaxFreezes = ();
 	type RuntimeHoldReason = RuntimeHoldReason;
+	type RuntimeFreezeReason = RuntimeFreezeReason;
 	type MaxHolds = ConstU32<100>;
 }
 

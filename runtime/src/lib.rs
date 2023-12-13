@@ -22,6 +22,7 @@ pub use frame_support::{
 	StorageValue,
 };
 use frame_support::{
+	genesis_builder_helper::{build_config, create_default_config},
 	traits::{Contains, Currency, InsideBoth, OnUnbalanced, StorageMapShim},
 	PalletId,
 };
@@ -61,7 +62,7 @@ use ulx_primitives::{
 	notary::{NotaryId, NotaryNotebookVoteDetails, NotaryNotebookVoteDigestDetails, NotaryRecord},
 	notebook::NotebookNumber,
 	tick::{Tick, Ticker},
-	AuthorityProvider, BalanceFreezeId, BlockSealAuthorityId, NotebookVotes, TickProvider,
+	AuthorityProvider, BlockSealAuthorityId, NotebookVotes, TickProvider,
 };
 
 use crate::opaque::SessionKeys;
@@ -158,10 +159,10 @@ const NORMAL_DISPATCH_RATIO: Perbill = Perbill::from_percent(75);
 parameter_types! {
 	pub const BlockHashCount: BlockNumber = 2400;
 	pub const Version: RuntimeVersion = VERSION;
-	/// We allow for 2 seconds of compute with a 6 second average block time.
+	/// We allow for 60 seconds of compute with a 6 second average block time.
 	pub BlockWeights: frame_system::limits::BlockWeights =
 		frame_system::limits::BlockWeights::with_sensible_defaults(
-			Weight::from_parts(2u64 * WEIGHT_REF_TIME_PER_SECOND, u64::MAX),
+			Weight::from_parts(60u64 * WEIGHT_REF_TIME_PER_SECOND, u64::MAX),
 			NORMAL_DISPATCH_RATIO,
 		);
 	pub BlockLength: frame_system::limits::BlockLength = frame_system::limits::BlockLength
@@ -280,6 +281,7 @@ impl pallet_block_rewards::Config for Runtime {
 	type MinerPayoutPercent = MinerPayoutPercent;
 	type BlockSealerProvider = BlockSeal;
 	type NotaryProvider = Notaries;
+	type RuntimeFreezeReason = RuntimeFreezeReason;
 }
 
 impl pallet_authorship::Config for Runtime {
@@ -508,9 +510,10 @@ impl pallet_balances::Config<ArgonToken> for Runtime {
 	type ExistentialDeposit = ConstU128<EXISTENTIAL_DEPOSIT>;
 	type AccountStore = System;
 	type WeightInfo = pallet_balances::weights::SubstrateWeight<Runtime>;
-	type FreezeIdentifier = BalanceFreezeId;
+	type FreezeIdentifier = RuntimeFreezeReason;
 	type MaxFreezes = ConstU32<2>;
 	type RuntimeHoldReason = RuntimeHoldReason;
+	type RuntimeFreezeReason = RuntimeFreezeReason;
 	type MaxHolds = ConstU32<100>;
 }
 
@@ -531,9 +534,10 @@ impl pallet_balances::Config<UlixeeToken> for Runtime {
 		pallet_balances::AccountData<Balance>,
 	>;
 	type WeightInfo = pallet_balances::weights::SubstrateWeight<Runtime>;
-	type FreezeIdentifier = BalanceFreezeId;
+	type FreezeIdentifier = RuntimeFreezeReason;
 	type MaxFreezes = ConstU32<2>;
 	type RuntimeHoldReason = RuntimeHoldReason;
+	type RuntimeFreezeReason = RuntimeFreezeReason;
 	type MaxHolds = ConstU32<50>;
 }
 
@@ -914,6 +918,16 @@ impl_runtime_apis! {
 			// NOTE: intentional unwrap: we don't want to propagate the error backwards, and want to
 			// have a backtrace here.
 			Executive::try_execute_block(block, state_root_check, signature_check, select).expect("execute-block failed")
+		}
+	}
+
+	impl sp_genesis_builder::GenesisBuilder<Block> for Runtime {
+		fn create_default_config() -> Vec<u8> {
+			create_default_config::<RuntimeGenesisConfig>()
+		}
+
+		fn build_config(config: Vec<u8>) -> sp_genesis_builder::Result {
+			build_config::<RuntimeGenesisConfig>(config)
 		}
 	}
 }

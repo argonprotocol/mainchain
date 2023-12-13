@@ -4,7 +4,7 @@ use sp_api::BlockT;
 use sp_core::{RuntimeDebug, H256, U256};
 use sp_runtime::DispatchResult;
 
-pub use ulx_notary_primitives::{MerkleProof, NotaryId};
+pub use ulx_notary_primitives::NotaryId;
 use ulx_notary_primitives::{NotebookHeader, NotebookNumber, VoteMinimum};
 
 use crate::{

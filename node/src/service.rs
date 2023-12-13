@@ -184,6 +184,7 @@ pub fn new_full(
 			import_queue,
 			block_announce_validator_builder: None,
 			warp_sync_params: Some(WarpSyncParams::WithProvider(warp_sync)),
+			block_relay: None,
 		})?;
 
 	if config.offchain_worker.enabled {
@@ -290,38 +291,38 @@ pub fn new_full(
 				compute_task,
 			);
 
-			// let (block_watch_task, create_block_stream) = ulx_node_consensus::create_block_watch(
-			// 	transaction_pool.clone(),
-			// 	client.clone(),
-			// 	select_chain,
-			// 	keystore_container.keystore(),
-			// );
-			// let proposer_factory_tax = sc_basic_authorship::ProposerFactory::new(
-			// 	task_manager.spawn_handle(),
-			// 	client.clone(),
-			// 	transaction_pool.clone(),
-			// 	prometheus_registry.as_ref(),
-			// 	telemetry.as_ref().map(|x| x.handle()),
-			// );
-			// let block_create_task = ulx_node_consensus::tax_block_creator(
-			// 	Box::new(ulx_block_import),
-			// 	client.clone(),
-			// 	proposer_factory_tax,
-			// 	sync_service.clone(),
-			// 	block_secs,
-			// 	create_block_stream,
-			// );
+			let (block_watch_task, create_block_stream) = ulx_node_consensus::create_block_watch(
+				transaction_pool.clone(),
+				client.clone(),
+				select_chain,
+				keystore_container.keystore(),
+			);
+			let proposer_factory_tax = sc_basic_authorship::ProposerFactory::new(
+				task_manager.spawn_handle(),
+				client.clone(),
+				transaction_pool.clone(),
+				prometheus_registry.as_ref(),
+				telemetry.as_ref().map(|x| x.handle()),
+			);
+			let block_create_task = ulx_node_consensus::tax_block_creator(
+				Box::new(ulx_block_import),
+				client.clone(),
+				proposer_factory_tax,
+				sync_service.clone(),
+				block_seconds,
+				create_block_stream,
+			);
 
-			// task_manager.spawn_essential_handle().spawn_blocking(
-			// 	"ulx-block-watch",
-			// 	Some("block-authoring"),
-			// 	block_watch_task,
-			// );
-			// task_manager.spawn_essential_handle().spawn_blocking(
-			// 	"ulx-blocks",
-			// 	Some("block-authoring"),
-			// 	block_create_task,
-			// );
+			task_manager.spawn_essential_handle().spawn_blocking(
+				"ulx-block-watch",
+				Some("block-authoring"),
+				block_watch_task,
+			);
+			task_manager.spawn_essential_handle().spawn_blocking(
+				"ulx-blocks",
+				Some("block-authoring"),
+				block_create_task,
+			);
 
 			let grandpa_config = sc_consensus_grandpa::Config {
 				// FIXME #1578 make this available through chainspec

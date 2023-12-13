@@ -20,6 +20,7 @@ impl Config for UlxConfig {
 	type Hasher = subxt::config::substrate::BlakeTwo256;
 	type Header = subxt::config::substrate::SubstrateHeader<u32, Self::Hasher>;
 	type ExtrinsicParams = UlxExtrinsicParams<Self>;
+	type AssetId = ();
 }
 
 /// A struct representing the signed extra and additional parameters required

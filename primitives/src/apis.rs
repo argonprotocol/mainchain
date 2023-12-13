@@ -65,23 +65,6 @@ sp_api::decl_runtime_apis! {
 	}
 }
 
-#[derive(
-	Encode,
-	Decode,
-	Copy,
-	Clone,
-	Eq,
-	PartialEq,
-	TypeInfo,
-	MaxEncodedLen,
-	Ord,
-	PartialOrd,
-	RuntimeDebug,
-)]
-pub enum BalanceFreezeId {
-	MaturationPeriod,
-}
-
 #[derive(Encode, Decode, Clone, PartialEq, Eq, TypeInfo, RuntimeDebug)]
 pub struct NotebookVotes {
 	pub raw_votes: Vec<(Vec<u8>, BlockVotingPower)>,

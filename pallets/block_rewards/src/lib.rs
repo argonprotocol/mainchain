@@ -29,7 +29,7 @@ pub mod pallet {
 	};
 	use sp_std::{vec, vec::Vec};
 
-	use ulx_primitives::{notary::NotaryProvider, BalanceFreezeId, BlockSealerProvider};
+	use ulx_primitives::{notary::NotaryProvider, BlockSealerProvider};
 
 	use super::*;
 
@@ -59,10 +59,10 @@ pub mod pallet {
 
 		type ArgonCurrency: MutateFreeze<Self::AccountId, Balance = Self::Balance>
 			+ Mutate<Self::AccountId, Balance = Self::Balance>
-			+ InspectFreeze<Self::AccountId, Balance = Self::Balance, Id = BalanceFreezeId>;
+			+ InspectFreeze<Self::AccountId, Balance = Self::Balance, Id = Self::RuntimeFreezeReason>;
 		type UlixeeCurrency: MutateFreeze<Self::AccountId, Balance = Self::Balance>
 			+ Mutate<Self::AccountId, Balance = Self::Balance>
-			+ InspectFreeze<Self::AccountId, Balance = Self::Balance, Id = BalanceFreezeId>;
+			+ InspectFreeze<Self::AccountId, Balance = Self::Balance, Id = Self::RuntimeFreezeReason>;
 
 		/// The balance of an account.
 		type Balance: AtLeast32BitUnsigned
@@ -97,6 +97,8 @@ pub mod pallet {
 		/// Blocks until a block reward is mature
 		#[pallet::constant]
 		type MaturationBlocks: Get<u32>;
+		/// The overarching freeze reason.
+		type RuntimeFreezeReason: From<FreezeReason>;
 	}
 
 	#[pallet::storage]
@@ -120,13 +122,21 @@ pub mod pallet {
 		},
 	}
 
+	/// A reason for freezing funds.
+	#[pallet::composite_enum]
+	pub enum FreezeReason {
+		/// Pending reward maturation
+		#[codec(index = 0)]
+		MaturationPeriod,
+	}
+
 	#[pallet::error]
 	pub enum Error<T> {}
 
 	#[pallet::hooks]
 	impl<T: Config> Hooks<BlockNumberFor<T>> for Pallet<T> {
 		fn on_initialize(n: BlockNumberFor<T>) -> Weight {
-			let freeze_id = BalanceFreezeId::MaturationPeriod;
+			let freeze_id = FreezeReason::MaturationPeriod.into();
 			// Unlock any rewards
 			let unlocks = <PayoutsByBlock<T>>::take(n);
 			for reward in unlocks.iter() {
@@ -202,7 +212,7 @@ pub mod pallet {
 				argons: (block_argons - miner_argons).into(),
 			};
 			let mut rewards = vec![miner_reward, block_vote_reward];
-			let freeze_id = BalanceFreezeId::MaturationPeriod;
+			let freeze_id = FreezeReason::MaturationPeriod.into();
 			let reward_height = n.saturating_add(T::MaturationBlocks::get().into());
 			for reward in rewards.iter_mut() {
 				if T::ArgonCurrency::mint_into(&reward.account_id, reward.argons)

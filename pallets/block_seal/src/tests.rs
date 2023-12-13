@@ -1,16 +1,16 @@
 use binary_merkle_tree::{merkle_proof, merkle_root};
 use codec::Encode;
 use frame_support::{
-	_private::sp_inherents::InherentDataProvider,
 	assert_err, assert_ok,
 	inherent::{InherentData, ProvideInherent},
-	pallet_prelude::{Get, Hooks},
+	pallet_prelude::*,
 };
 use sp_core::{
 	bounded_vec,
 	ed25519::{Public, Signature},
 	OpaquePeerId, H256, U256,
 };
+use sp_inherents::InherentDataProvider;
 use sp_keyring::{ed25519::Keyring, Ed25519Keyring::Alice};
 use sp_runtime::{
 	traits::{BlakeTwo256, Header},

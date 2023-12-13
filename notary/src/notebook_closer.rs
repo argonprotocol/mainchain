@@ -5,7 +5,11 @@ use sc_utils::notification::NotificationSender;
 use sp_core::{ed25519, H256};
 use sp_keystore::KeystorePtr;
 use sqlx::{Executor, PgPool};
-use subxt::utils::AccountId32;
+use subxt::{
+	tx::{TxInBlock, TxProgress, TxStatus},
+	utils::AccountId32,
+	OnlineClient,
+};
 use tokio::sync::RwLock;
 use tracing::info;
 
@@ -18,7 +22,7 @@ use ulixee_client::{
 			sp_core::ed25519::Signature,
 		},
 	},
-	UlxClient,
+	UlxClient, UlxConfig,
 };
 use ulx_notary_primitives::{ChainTransfer, NotaryId, NotebookHeader};
 use ulx_primitives::tick::Ticker;
@@ -290,10 +294,12 @@ impl NotebookCloser {
 			NotebookStatusStore::next_step(&mut *tx, notebook_number, step).await?;
 			tx.commit().await?;
 
-			let included_in_block =
-				submission.wait_for_in_block().await?.wait_for_success().await?;
-			info!("Submitted notebook {}. In block {:?}", notebook_number, included_in_block);
-
+			let tx_in_block = wait_for_in_block(submission).await?;
+			info!(
+				"Submitted notebook {}. In block {:?}",
+				notebook_number,
+				tx_in_block.block_hash()
+			);
 			Ok(Some(header))
 		}
 		.boxed()
@@ -315,6 +321,31 @@ pub fn notary_sign(
 		})?
 		.unwrap();
 	Ok(sig)
+}
+
+async fn wait_for_in_block(
+	mut tx_progress: TxProgress<UlxConfig, OnlineClient<UlxConfig>>,
+) -> anyhow::Result<TxInBlock<UlxConfig, OnlineClient<UlxConfig>>, Error> {
+	while let Some(status) = tx_progress.next().await {
+		match status? {
+			TxStatus::InBestBlock(tx_in_block) | TxStatus::InFinalizedBlock(tx_in_block) => {
+				// now, we can attempt to work with the block, eg:
+				tx_in_block.wait_for_success().await?;
+				return Ok(tx_in_block)
+			},
+			TxStatus::Error { message } |
+			TxStatus::Invalid { message } |
+			TxStatus::Dropped { message } => {
+				// Handle any errors:
+				return Err(Error::InternalError(format!(
+					"Error submitting notebook to block: {message}"
+				)));
+			},
+			// Continue otherwise:
+			_ => continue,
+		}
+	}
+	Err(Error::InternalError(format!("No valid status encountered for notebook")))
 }
 
 #[derive(Debug, serde::Serialize, serde::Deserialize)]
@@ -494,18 +525,15 @@ mod tests {
 			public: ed25519::Public(notary_key.0),
 		});
 		println!("notary proposal {:?}", notary_proposal);
-		let result = client
+		let tx_progress = client
 			.tx()
 			.sign_and_submit_then_watch_default(&notary_proposal, &dev::bob())
-			.await?
-			.wait_for_in_block()
-			.await?
-			.wait_for_success()
-			.await;
+			.await?;
+		let result = wait_for_in_block(tx_progress).await;
 
-		println!("notary result {:?}", result);
+		assert_ok!(&result);
 
-		assert_ok!(result);
+		println!("notary result {:?}", result?);
 		Ok(())
 	}
 

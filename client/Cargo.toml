@@ -18,20 +18,20 @@ async-trait = { version = "0.1" }
 codec = { package = "parity-scale-codec", version = "3.6", features = ["derive", "max-encoded-len"] }
 serde = { version = "1.0", features = ["derive"] }
 serde_json = { version = "1.0", features = ["raw_value"] }
-scale-info = { version = "2.9" }
+scale-info = { version = "2.10" }
 thiserror = { version ="1.0" }
-subxt = { version = "0.32", features = ["substrate-compat"] }
-subxt-signer = { version = "0.32", features = ["subxt"] }
+subxt = { version = "0.33", features = ["substrate-compat"] }
+subxt-signer = { version = "0.33", features = ["subxt"] }
 hex = "0.4"
 jsonrpsee = { version = "0.20", features = ["server", "http-client", "ws-client", "macros", "client-ws-transport-native-tls"] }
 tracing = "0.1"
-tracing-subscriber = { version = "0.3.3", features = ["env-filter"] }
-sp-keystore = { version = "0.27", git = "https://github.com/paritytech/polkadot-sdk.git", branch = "release-polkadot-v1.1.0" }
-sp-runtime = { version = "24.0.0", git = "https://github.com/paritytech/polkadot-sdk.git", branch = "release-polkadot-v1.1.0" }
-sp-core = { version = "21.0.0", git = "https://github.com/paritytech/polkadot-sdk.git", branch = "release-polkadot-v1.1.0" }
-anyhow = "1.0.72"
-tokio = { version =  "1.32"}
+tracing-subscriber = { version = "0.3", features = ["env-filter"] }
+sp-keystore = { version = "0.27", git = "https://github.com/paritytech/polkadot-sdk.git", branch = "release-polkadot-v1.4.0" }
+sp-runtime = { version = "24.0.0", git = "https://github.com/paritytech/polkadot-sdk.git", branch = "release-polkadot-v1.4.0" }
+sp-core = { version = "21.0.0", git = "https://github.com/paritytech/polkadot-sdk.git", branch = "release-polkadot-v1.4.0" }
+anyhow = "1.0"
+tokio = { version =  "1.35"}
 
 [dev-dependencies]
-sp-keyring = { version = "24.0.0", git = "https://github.com/paritytech/polkadot-sdk.git", branch = "release-polkadot-v1.1.0" }
-tokio = { version =  "1.32", features = ["full"] }
+sp-keyring = { version = "24.0.0", git = "https://github.com/paritytech/polkadot-sdk.git", branch = "release-polkadot-v1.4.0" }
+tokio = { version =  "1.35", features = ["full"] }

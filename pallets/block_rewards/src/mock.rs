@@ -11,7 +11,7 @@ use sp_runtime::{
 
 use ulx_primitives::{
 	notary::{NotaryProvider, NotarySignature},
-	BalanceFreezeId, BlockSealerInfo, BlockSealerProvider, NotaryId,
+	BlockSealerInfo, BlockSealerProvider, NotaryId,
 };
 
 use crate as pallet_block_rewards;
@@ -73,9 +73,10 @@ impl pallet_balances::Config<ArgonToken> for Test {
 	type ExistentialDeposit = ExistentialDeposit;
 	type AccountStore = System;
 	type WeightInfo = ();
-	type FreezeIdentifier = BalanceFreezeId;
+	type FreezeIdentifier = RuntimeFreezeReason;
 	type MaxFreezes = ConstU32<1>;
 	type RuntimeHoldReason = RuntimeHoldReason;
+	type RuntimeFreezeReason = RuntimeFreezeReason;
 	type MaxHolds = ConstU32<100>;
 }
 
@@ -94,7 +95,8 @@ impl pallet_balances::Config<UlixeeToken> for Test {
 		pallet_balances::AccountData<Balance>,
 	>;
 	type WeightInfo = ();
-	type FreezeIdentifier = BalanceFreezeId;
+	type FreezeIdentifier = RuntimeFreezeReason;
+	type RuntimeFreezeReason = RuntimeFreezeReason;
 	type MaxFreezes = ConstU32<1>;
 	type RuntimeHoldReason = RuntimeHoldReason;
 	type MaxHolds = ConstU32<100>;
@@ -145,6 +147,7 @@ impl pallet_block_rewards::Config for Test {
 	type MinerPayoutPercent = MinerPayoutPercent;
 	type BlockSealerProvider = StaticBlockSealerProvider;
 	type NotaryProvider = StaticNotaryProvider;
+	type RuntimeFreezeReason = RuntimeFreezeReason;
 }
 
 // Build genesis storage according to the mock runtime.
