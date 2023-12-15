@@ -1,6 +1,6 @@
 use sp_runtime::traits::{Block as BlockT, Header as HeaderT, UniqueSaturatedInto};
 
-pub use block_creator::{create_block_watch, tax_block_creator};
+pub use block_creator::{create_tax_vote_block_watch, tax_block_creator};
 
 #[cfg(test)]
 mod tests;
@@ -17,8 +17,6 @@ pub mod import_queue;
 mod metrics;
 mod notebook_auditor;
 pub mod notebook_watch;
-pub mod sign_vote;
-
 const LOG_TARGET: &str = "node::consensus";
 
 pub(crate) fn convert_u32<Block: BlockT>(number: &<Block::Header as HeaderT>::Number) -> u32 {

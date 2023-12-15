@@ -1,27 +1,22 @@
 use std::{convert::Into, sync::Arc, time::Duration};
 
-use codec::Encode;
 use futures::{channel::mpsc::*, prelude::*};
-use lazy_static::lazy_static;
 use log::*;
 use sc_client_api::{AuxStore, BlockOf, BlockchainEvents};
 use sc_consensus::{
 	BlockImport, BlockImportParams, BoxBlockImport, ImportResult, StateAction, StorageChanges,
 };
-use sc_transaction_pool_api::{InPoolTransaction, TransactionPool};
+use sc_transaction_pool_api::TransactionPool;
 use sp_api::ProvideRuntimeApi;
 use sp_blockchain::HeaderBackend;
 use sp_consensus::{BlockOrigin, Environment, Proposal, Proposer, SelectChain};
 use sp_core::{crypto::AccountId32, H256, U256};
 use sp_inherents::InherentDataProvider;
 use sp_keystore::KeystorePtr;
-use sp_runtime::{
-	traits::{Block as BlockT, Header as HeaderT},
-	transaction_validity::TransactionTag,
-};
+use sp_runtime::traits::{Block as BlockT, Header as HeaderT};
 use sp_timestamp::Timestamp;
 
-use ulx_node_runtime::{BlockNumber, NotaryRecordT};
+use ulx_node_runtime::{BlockNumber, NotaryRecordT, NotebookVerifyError};
 use ulx_primitives::{
 	digests::{BlockVoteDigest, FinalizedBlockNeededDigest},
 	inherents::{BlockSealInherent, BlockSealInherentDataProvider},
@@ -33,14 +28,10 @@ use crate::{
 	digests::{create_digests, create_seal_digest},
 	error::Error,
 	notebook_auditor::NotebookAuditor,
-	notebook_watch::NotebookState,
+	notebook_watch::NotebookWatch,
 };
 
 const LOG_TARGET: &str = "node::consensus::block_creator";
-
-lazy_static! {
-	static ref TX_NOTEBOOK_PROVIDE_PREFIX: Vec<u8> = ("Notebook").encode();
-}
 
 pub struct CreateTaxVoteBlock<Block: BlockT> {
 	pub tick: Tick,
@@ -53,7 +44,7 @@ pub struct CreateTaxVoteBlock<Block: BlockT> {
 	pub latest_finalized_block_needed: BlockNumber,
 }
 
-pub fn create_block_watch<B, TP, C, SC>(
+pub fn create_tax_vote_block_watch<B, TP, C, SC>(
 	pool: Arc<TP>,
 	client: Arc<C>,
 	select_chain: SC,
@@ -62,7 +53,7 @@ pub fn create_block_watch<B, TP, C, SC>(
 where
 	B: BlockT<Hash = H256>,
 	C: ProvideRuntimeApi<B> + BlockchainEvents<B> + HeaderBackend<B> + AuxStore + BlockOf + 'static,
-	C::Api: NotebookApis<B>
+	C::Api: NotebookApis<B, NotebookVerifyError>
 		+ BlockSealSpecApis<B>
 		+ NotaryApis<B, NotaryRecordT>
 		+ MiningAuthorityApis<B>,
@@ -71,30 +62,21 @@ where
 {
 	let (sender, receiver) = channel(1000);
 	let auditor = NotebookAuditor::new(client.clone());
-	let state = NotebookState::new(pool, client.clone(), select_chain, keystore, sender.clone());
+	let state = NotebookWatch::new(pool, client.clone(), select_chain, keystore, sender.clone());
 	let task = async move {
 		let pool = state.pool.clone();
 		let mut state = state;
 		let mut auditor = auditor;
 		let mut tx_stream = Box::pin(pool.import_notification_stream());
 		while let Some(tx_hash) = tx_stream.next().await {
-			let Some(tx) = pool.ready_transaction(&tx_hash) else { continue };
-
-			let tag: TransactionTag = TX_NOTEBOOK_PROVIDE_PREFIX.to_vec();
-			if tx.provides().len() > 0 && tx.provides()[0].starts_with(&tag) {
-				info!("Got inbound Notebook. {:?}", tx_hash);
-				let _ = state.try_process_notebook(tx.data(), &mut auditor).await.map_err(|e| {
-					warn!(
-						target: LOG_TARGET,
-						"Unable to process notebook. Error: {}",
-						e.to_string()
-					);
-				});
+			if let Some(tx) = pool.ready_transaction(&tx_hash) {
+				state.check_tx(&tx, &mut auditor).await;
 			}
 		}
 	};
 	(task, receiver)
 }
+
 pub async fn tax_block_creator<Block, C, E, L, CS>(
 	mut block_import: BoxBlockImport<Block>,
 	client: Arc<C>,
@@ -230,7 +212,6 @@ where
 			return Err(Error::StringError(msg))
 		},
 	};
-	info!(target: LOG_TARGET, "Building next block (tick={}, parent={:?} ({})). Pre-hash {:?}", tick, parent_hash, parent_header.number(), proposal.block.header().hash());
 	Ok(proposal)
 }
 

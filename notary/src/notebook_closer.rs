@@ -24,8 +24,7 @@ use ulixee_client::{
 	},
 	UlxClient, UlxConfig,
 };
-use ulx_notary_primitives::{ChainTransfer, NotaryId, NotebookHeader};
-use ulx_primitives::tick::Ticker;
+use ulx_primitives::{tick::Ticker, ChainTransfer, NotaryId, NotebookHeader};
 
 use crate::{
 	error::Error,
@@ -229,7 +228,7 @@ impl NotebookCloser {
 					.await?;
 			let header_hash = header.hash();
 
-			let notebook = runtime_types::ulx_notary_primitives::notebook::NotebookHeader {
+			let notebook = runtime_types::ulx_primitives::notebook::NotebookHeader {
 				version: header.version,
 				finalized_block_number: header.finalized_block_number,
 				notebook_number: header.notebook_number,
@@ -240,11 +239,9 @@ impl NotebookCloser {
 					header
 						.changed_account_origins
 						.iter()
-						.map(|a| {
-							runtime_types::ulx_notary_primitives::balance_change::AccountOrigin {
-								notebook_number: a.notebook_number,
-								account_uid: a.account_uid,
-							}
+						.map(|a| runtime_types::ulx_primitives::balance_change::AccountOrigin {
+							notebook_number: a.notebook_number,
+							account_uid: a.account_uid,
 						})
 						.collect(),
 				),
@@ -256,12 +253,12 @@ impl NotebookCloser {
 						.map(|t| {
 							match t {
 									ChainTransfer::ToMainchain { account_id, amount } =>
-										runtime_types::ulx_notary_primitives::notebook::ChainTransfer::ToMainchain {
+										runtime_types::ulx_primitives::notebook::ChainTransfer::ToMainchain {
 											account_id: AccountId32::from(Into::<[u8; 32]>::into(account_id.clone())),
 											amount: amount.clone(),
 										},
 									ChainTransfer::ToLocalchain { account_id, account_nonce } =>
-										runtime_types::ulx_notary_primitives::notebook::ChainTransfer::ToLocalchain {
+										runtime_types::ulx_primitives::notebook::ChainTransfer::ToLocalchain {
 											account_id: AccountId32::from(Into::<[u8; 32]>::into(account_id.clone())),
 											account_nonce: account_nonce.clone(),
 										},
@@ -355,8 +352,12 @@ struct NotebookAuditResponse {
 
 #[cfg(test)]
 mod tests {
-	use std::{env, net::Ipv4Addr};
+	use std::{
+		env,
+		net::{IpAddr, SocketAddr},
+	};
 
+	use chrono::Utc;
 	use frame_support::assert_ok;
 	use futures::StreamExt;
 	use sp_core::{bounded_vec, ed25519::Public};
@@ -374,21 +375,22 @@ mod tests {
 				pallet_notaries::pallet::Call as NotaryCall,
 				sp_core::ed25519,
 				ulx_node_runtime::RuntimeCall,
-				ulx_notary_primitives::balance_change::AccountOrigin,
-				ulx_primitives::{block_seal::Host, notary::NotaryMeta},
+				ulx_primitives::{
+					balance_change::AccountOrigin, block_seal::Host, notary::NotaryMeta,
+				},
 			},
 			storage, tx,
 		},
 		UlxClient,
 	};
-	use ulx_notary_primitives::{AccountType::Deposit, BalanceChange, Note};
+	use ulx_primitives::{AccountType::Deposit, BalanceChange, Note};
 	use ulx_testing::{test_context, test_context_from_url};
 
 	use crate::{
 		block_watch::track_blocks,
 		notebook_closer::NOTARY_KEYID,
-		server::NotebookHeaderStream,
 		stores::{notarizations::NotarizationsStore, notebook_status::NotebookStatusStore},
+		NotaryServer,
 	};
 
 	use super::*;
@@ -412,9 +414,13 @@ mod tests {
 
 		let mut client = MainchainClient::new(vec![ws_url.clone()]);
 		let ticker = client.lookup_ticker().await?;
+		let server = NotaryServer::create_http_server("127.0.0.1:0").await?;
 		track_blocks(ctx.ws_url, 1, &pool.clone(), ticker.clone());
 
-		propose_bob_as_notary(&ctx.client, notary_key).await?;
+		propose_bob_as_notary(&ctx.client, notary_key, server.local_addr()?).await?;
+
+		let notary_server =
+			NotaryServer::start_with(server, 1, pool.clone(), ticker.clone()).await?;
 
 		activate_notary(&pool, &ctx.client, &bob_id).await?;
 
@@ -435,23 +441,21 @@ mod tests {
 		// Record the balance change
 		submit_balance_change_to_notary(&pool, bob_nonce).await?;
 
-		sqlx::query("update notebook_status set open_time = now() - interval '2 minutes' where notebook_number = 1")
+		sqlx::query("update notebook_status set end_time = $1 where notebook_number = 1")
+			.bind(Utc::now())
 			.execute(&pool)
 			.await?;
-
-		let (completed_notebook_sender, completed_notebook_stream) =
-			NotebookHeaderStream::channel();
 
 		let mut closer = NotebookCloser {
 			pool: pool.clone(),
 			keystore: keystore.clone(),
 			notary_id: 1,
 			client,
-			completed_notebook_sender,
+			completed_notebook_sender: notary_server.completed_notebook_sender.clone(),
 			ticker: ticker.clone(),
 		};
 
-		let mut subscription = completed_notebook_stream.subscribe(100);
+		let mut subscription = notary_server.completed_notebook_stream.subscribe(100);
 
 		loop {
 			let _ = &closer.iterate_notebook_close_loop().await;
@@ -491,40 +495,130 @@ mod tests {
 			next_header.changed_accounts_root.into(),
 			"Should have updated Bob's last change notebook"
 		);
-
-		let last_notary_details = ctx
-			.client
-			.storage()
-			.at_latest()
-			.await?
-			.fetch(&storage().notebook().last_notebook_details_by_notary(1))
-			.await?
-			.expect("should get details")
-			.0;
-
-		assert_eq!(
-			last_notary_details[0].0.tick, 1,
-			"Should have updated the latest submitted tick"
-		);
-
-		assert_eq!(
-			last_notary_details[0].0.notebook_number, 1,
-			"Should have updated the last notebook number"
-		);
-
 		Ok(())
 	}
 
-	async fn propose_bob_as_notary(client: &UlxClient, notary_key: Public) -> anyhow::Result<()> {
+	#[sqlx::test]
+	async fn test_submitting_votes(pool: PgPool) -> anyhow::Result<()> {
+		let _ = tracing_subscriber::fmt::try_init();
+		let use_live = env::var("USE_LIVE").unwrap_or(String::from("false")).parse::<bool>()?;
+		let ctx = if use_live {
+			test_context_from_url("ws://localhost:9944").await
+		} else {
+			test_context().await
+		};
+		let bob_id = dev::bob().public_key().to_account_id();
+
+		let ws_url = ctx.ws_url.clone();
+		let keystore = MemoryKeystore::new();
+		let keystore = KeystoreExt::new(keystore);
+		let notary_key =
+			keystore.ed25519_generate_new(NOTARY_KEYID, None).expect("should have a key");
+
+		let mut client = MainchainClient::new(vec![ws_url.clone()]);
+		let ticker = client.lookup_ticker().await?;
+		let server = NotaryServer::create_http_server("127.0.0.1:0").await?;
+		track_blocks(ctx.ws_url, 1, &pool.clone(), ticker.clone());
+
+		propose_bob_as_notary(&ctx.client, notary_key, server.local_addr()?).await?;
+
+		let notary_server =
+			NotaryServer::start_with(server, 1, pool.clone(), ticker.clone()).await?;
+
+		activate_notary(&pool, &ctx.client, &bob_id).await?;
+
+		{
+			let mut tx = pool.begin().await?;
+			assert_eq!(
+				NotebookStatusStore::lock_open_for_appending(&mut *tx).await?,
+				1,
+				"There should be a notebook active now"
+			);
+		}
+
+		let bob_nonce = get_bob_nonce(&ctx.client, bob_id).await?;
+
+		// Submit a transfer to localchain and wait for result
+		create_localchain_transfer(&pool, &ctx.client, bob_nonce).await?;
+
+		// Record the balance change
+		submit_balance_change_to_notary(&pool, bob_nonce).await?;
+
+		sqlx::query("update notebook_status set end_time = $1 where notebook_number = 1")
+			.bind(Utc::now())
+			.execute(&pool)
+			.await?;
+
+		let mut closer = NotebookCloser {
+			pool: pool.clone(),
+			keystore: keystore.clone(),
+			notary_id: 1,
+			client,
+			completed_notebook_sender: notary_server.completed_notebook_sender.clone(),
+			ticker: ticker.clone(),
+		};
+
+		let mut subscription = notary_server.completed_notebook_stream.subscribe(100);
+
+		loop {
+			let _ = &closer.iterate_notebook_close_loop().await;
+			let status = NotebookStatusStore::get(&pool, 1).await?;
+			if status.finalized_time.is_some() {
+				break
+			}
+			// yield
+			tokio::time::sleep(tokio::time::Duration::from_millis(50)).await;
+		}
+
+		let next_header = subscription.next().await;
+		assert_eq!(next_header.is_some(), true);
+		let next_header = next_header.expect("Should have a header");
+
+		assert_eq!(
+			ctx.client
+				.storage()
+				.at_latest()
+				.await?
+				.fetch(&storage().notebook().account_origin_last_changed_notebook_by_notary(
+					1,
+					AccountOrigin { notebook_number: 1, account_uid: 1 }
+				))
+				.await?,
+			Some(1),
+			"Should have updated Bob's last change notebook"
+		);
+
+		assert_eq!(
+			ctx.client
+				.storage()
+				.at_latest()
+				.await?
+				.fetch(&storage().notebook().notebook_changed_accounts_root_by_notary(1, 1))
+				.await?,
+			next_header.changed_accounts_root.into(),
+			"Should have updated Bob's last change notebook"
+		);
+		Ok(())
+	}
+
+	async fn propose_bob_as_notary(
+		client: &UlxClient,
+		notary_key: Public,
+		addr: SocketAddr,
+	) -> anyhow::Result<()> {
+		let ip = match addr.ip() {
+			IpAddr::V4(ip) => ip,
+			IpAddr::V6(_) => panic!("Should be ipv4"),
+		};
 		let notary_proposal = tx().notaries().propose(NotaryMeta {
 			hosts: BoundedVec(vec![Host {
 				is_secure: false,
-				ip: Ipv4Addr::LOCALHOST.into(),
-				port: 0u16,
+				ip: ip.into(),
+				port: addr.port().into(),
 			}]),
 			public: ed25519::Public(notary_key.0),
 		});
-		println!("notary proposal {:?}", notary_proposal);
+		println!("notary proposal {:?}", notary_proposal.call_data());
 		let tx_progress = client
 			.tx()
 			.sign_and_submit_then_watch_default(&notary_proposal, &dev::bob())
@@ -533,7 +627,7 @@ mod tests {
 
 		assert_ok!(&result);
 
-		println!("notary result {:?}", result?);
+		println!("notary in block {:?}", result?.block_hash());
 		Ok(())
 	}
 
@@ -549,9 +643,7 @@ mod tests {
 				previous_balance_proof: None,
 				notes: bounded_vec![Note::create(
 					1000,
-					ulx_notary_primitives::NoteType::ClaimFromMainchain {
-						account_nonce: bob_nonce
-					},
+					ulx_primitives::NoteType::ClaimFromMainchain { account_nonce: bob_nonce },
 				)],
 				channel_hold_note: None,
 				signature: sp_core::ed25519::Signature([0u8; 64]).into(),
@@ -623,6 +715,7 @@ mod tests {
 			.wait_for_finalized_success()
 			.await;
 
+		println!("notary activated {:?}", notary_activated_finalized_block);
 		assert_ok!(&notary_activated_finalized_block);
 		let notary_activated_finalized_block = notary_activated_finalized_block.unwrap();
 

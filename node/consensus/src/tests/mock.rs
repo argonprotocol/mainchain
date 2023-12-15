@@ -1,4 +1,8 @@
-use std::{sync::Arc, time::Duration};
+use std::{
+	sync::Arc,
+	task::{Context, Poll},
+	time::Duration,
+};
 
 use futures::future;
 use log::trace;
@@ -26,8 +30,8 @@ use ulx_primitives::notary::NotaryNotebookVoteDigestDetails;
 
 use pallet_mining_slot::find_xor_closest;
 use ulx_primitives::{
-	block_seal::{BlockSealAuthorityId, Host, MiningAuthority, PeerId, VoteMinimum},
-	ComputeDifficulty,
+	block_seal::{BlockSealAuthorityId, Host, MiningAuthority, PeerId},
+	ComputeDifficulty, VoteMinimum,
 };
 
 use crate::import_queue;
@@ -120,6 +124,16 @@ impl UlxTestNet {
 		}
 		net
 	}
+
+	pub(crate) fn check_errors(&mut self, cx: &mut Context) -> Poll<()> {
+		self.poll(cx);
+		for p in self.peers() {
+			for (h, e) in p.failed_verifications() {
+				panic!("Verification failed for {:?}: {}", h, e);
+			}
+		}
+		Poll::<()>::Pending
+	}
 }
 
 #[derive(Clone, Default)]
@@ -128,6 +142,8 @@ pub(crate) struct Config {
 	pub tax_minimum: VoteMinimum,
 	pub tick_duration: Duration,
 	pub genesis_utc_time: u64,
+
+	pub voting_key: Option<H256>,
 }
 
 #[derive(Clone, Default)]
@@ -135,7 +151,6 @@ pub(crate) struct TestApi {
 	config: Config,
 	authorities: Vec<(u16, AccountId, BlockSealAuthorityId)>,
 	client: Option<Arc<PeersFullClient>>,
-	pub current_tick: Tick,
 }
 
 // compiler gets confused and warns us about unused inner
@@ -230,7 +245,7 @@ sp_api::mock_impl_runtime_apis! {
 			self.inner.config.difficulty
 		}
 		fn parent_voting_key() -> Option<H256> {
-			None
+			self.inner.config.voting_key
 		}
 		fn create_vote_digest(_tick_notebooks: Vec<NotaryNotebookVoteDigestDetails>) -> BlockVoteDigest {
 			BlockVoteDigest {
@@ -244,7 +259,7 @@ sp_api::mock_impl_runtime_apis! {
 
 	impl ulx_primitives::TickApis<Block> for RuntimeApi {
 		fn current_tick() -> Tick {
-			self.inner.current_tick
+			Ticker::new(self.inner.config.tick_duration.as_millis() as u64, self.inner.config.genesis_utc_time).current() -1
 		}
 		fn ticker() -> Ticker {
 			Ticker::new(self.inner.config.tick_duration.as_millis() as u64, self.inner.config.genesis_utc_time)
@@ -354,7 +369,6 @@ impl TestNetFactory for UlxTestNet {
 			client: Some(client.as_client().clone()),
 			config: self.config.clone(),
 			authorities: self.authorities.clone(),
-			current_tick: 0,
 		};
 		let api = Arc::new(api);
 		let block_import = PanickingBlockImport(import_queue::UlxBlockImport::new(

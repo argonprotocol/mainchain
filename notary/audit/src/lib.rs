@@ -11,8 +11,8 @@ use sp_std::{
 	vec::Vec,
 };
 
-pub use error::VerifyError;
-use ulx_notary_primitives::{
+pub use crate::error::VerifyError;
+use ulx_primitives::{
 	ensure, AccountId, AccountOrigin, AccountOriginUid, AccountType, BalanceChange, BalanceProof,
 	BalanceTip, BlockVote, ChainTransfer, NewAccountOrigin, NotaryId, Note, NoteType, Notebook,
 	NotebookHeader, NotebookNumber, VoteMinimum, CHANNEL_CLAWBACK_NOTEBOOKS,

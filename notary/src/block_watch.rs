@@ -8,8 +8,7 @@ use ulixee_client::{
 	api, api::runtime_types::bounded_collections::bounded_vec::BoundedVec, try_until_connected,
 	UlxClient, UlxConfig,
 };
-use ulx_notary_primitives::{AccountId, NotaryId, NotebookNumber};
-use ulx_primitives::tick::Ticker;
+use ulx_primitives::{tick::Ticker, AccountId, NotaryId, NotebookNumber};
 
 use crate::{
 	stores::{

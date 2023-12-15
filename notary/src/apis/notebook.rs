@@ -1,5 +1,5 @@
 use jsonrpsee::{core::SubscriptionResult, proc_macros::rpc, types::ErrorObjectOwned};
-use ulx_notary_primitives::{BalanceProof, BalanceTip, Notebook, NotebookHeader, NotebookNumber};
+use ulx_primitives::{BalanceProof, BalanceTip, Notebook, NotebookHeader, NotebookNumber};
 
 #[rpc(server, client, namespace = "notebook")]
 pub trait NotebookRpc {

@@ -7,7 +7,7 @@ use sp_keyring::{
 use sp_runtime::MultiSignature;
 use std::collections::{BTreeMap, BTreeSet};
 
-use ulx_notary_primitives::{
+use ulx_primitives::{
 	balance_change::{AccountOrigin, BalanceChange, BalanceProof},
 	note::{AccountType, Note, NoteType},
 	BlockVote, ChannelPass,

@@ -1,20 +1,21 @@
-use std::time::Duration;
+use std::{net::Ipv4Addr, time::Duration};
 
 use sc_service::{ChainType, Properties};
 use sp_consensus_grandpa::AuthorityId as GrandpaId;
-use sp_core::{sr25519, Pair, Public};
-use sp_runtime::traits::{IdentifyAccount, Verify};
+use sp_core::{sr25519, OpaquePeerId, Pair, Public};
+use sp_runtime::{
+	bounded_vec,
+	traits::{IdentifyAccount, Verify},
+};
 
-use sp_core::OpaquePeerId;
-use sp_runtime::bounded_vec;
-use std::net::Ipv4Addr;
 use ulx_node_runtime::{
-	opaque::SessionKeys, AccountId, Balance, BondId, RuntimeGenesisConfig, Signature, WASM_BINARY,
+	opaque::SessionKeys, AccountId, Balance, RuntimeGenesisConfig, Signature, WASM_BINARY,
 };
 use ulx_primitives::{
-	block_seal::{Host, MiningRegistration, PeerId, RewardDestination, VoteMinimum},
+	block_seal::{Host, MiningRegistration, PeerId, RewardDestination},
+	block_vote::VoteMinimum,
 	tick::Ticker,
-	BlockSealAuthorityId, ComputeDifficulty,
+	BlockSealAuthorityId, BondId, ComputeDifficulty,
 };
 
 // The URL for the telemetry server.

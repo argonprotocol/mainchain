@@ -5,7 +5,7 @@ use sp_core::{ConstU32, RuntimeDebug, H256};
 use sp_core_hashing::blake2_256;
 use sp_runtime::{format_runtime_string, BoundedVec, RuntimeString};
 
-use crate::AccountId;
+use crate::{prod_or_fast, AccountId};
 
 #[derive(
 	Clone,
@@ -66,7 +66,8 @@ impl TryFrom<i32> for AccountType {
 	}
 }
 
-pub const CHANNEL_EXPIRATION_NOTEBOOKS: u32 = 60;
+pub const CHANNEL_EXPIRATION_NOTEBOOKS: u32 = prod_or_fast!(60, 2);
+#[cfg(not(feature = "fast-runtime"))]
 pub const CHANNEL_CLAWBACK_NOTEBOOKS: u32 = 10; // 10 after expiration
 pub const MIN_CHANNEL_NOTE_MILLIGONS: u128 = 5;
 pub type MaxNoteRecipients = ConstU32<10>;

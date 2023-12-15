@@ -4,7 +4,7 @@ use scale_info::TypeInfo;
 use serde::{Deserialize, Serialize};
 use sp_core::RuntimeDebug;
 
-use ulx_notary_primitives::{
+use ulx_primitives::{
 	NewAccountOrigin, NotarizationBalanceChangeset, NotarizationBlockVotes, NotebookNumber,
 };
 

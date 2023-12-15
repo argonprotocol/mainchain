@@ -3,7 +3,7 @@ use std::default::Default;
 use sp_core::H256;
 use sqlx::PgConnection;
 
-use ulx_notary_primitives::{
+use ulx_primitives::{
 	ensure, AccountId, AccountOrigin, AccountType, BalanceTip, Note, NotebookNumber,
 };
 
@@ -131,7 +131,7 @@ mod tests {
 	use sp_keyring::Sr25519Keyring::Bob;
 	use sqlx::PgPool;
 
-	use ulx_notary_primitives::{note::AccountType::Deposit, AccountOrigin, BalanceTip};
+	use ulx_primitives::{note::AccountType::Deposit, AccountOrigin, BalanceTip};
 
 	use crate::stores::balance_tip::BalanceTipStore;
 

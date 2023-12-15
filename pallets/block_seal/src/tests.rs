@@ -243,7 +243,7 @@ fn it_should_be_able_to_submit_a_seal() {
 			},
 			source_notebook_number: 1,
 			miner_signature: Alice
-				.sign(&BlockVote::vote_proof_signature_message(vote_proof))
+				.sign(&BlockVote::vote_proof_signature_message(&System::parent_hash(), vote_proof))
 				.into(),
 		};
 
@@ -361,7 +361,8 @@ fn it_checks_tax_votes() {
 			Error::<Test>::InvalidAuthoritySignature
 		);
 
-		let signature = Alice.sign(&BlockVote::vote_proof_signature_message(vote_proof));
+		let signature = Alice
+			.sign(&BlockVote::vote_proof_signature_message(&System::parent_hash(), vote_proof));
 		assert_ok!(BlockSeal::verify_block_vote(vote_proof, &vote, author, 2, signature.into()),);
 	});
 }

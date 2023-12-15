@@ -41,11 +41,11 @@ pub mod pallet {
 	use sp_std::{collections::btree_map::BTreeMap, vec, vec::Vec};
 
 	use ulx_primitives::{
-		block_seal::{BlockVotingPower, VoteMinimum},
+		block_vote::VoteMinimum,
 		digests::{BlockVoteDigest, BLOCK_VOTES_DIGEST_ID},
 		inherents::BlockSealInherent,
 		notary::NotaryNotebookVoteDigestDetails,
-		notebook::{BlockVotingKey, NotebookHeader},
+		notebook::{BlockVotingKey, BlockVotingPower, NotebookHeader},
 		AuthorityProvider, BlockSealAuthorityId, BlockVotingProvider, ComputeDifficulty, NotaryId,
 		NotebookEventHandler, NotebookProvider, TickProvider,
 	};

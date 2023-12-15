@@ -1,19 +1,19 @@
 use codec::{Codec, Decode, Encode, MaxEncodedLen};
 use frame_support::{CloneNoBound, PartialEqNoBound, RuntimeDebugNoBound};
 use scale_info::TypeInfo;
-use sp_api::BlockT;
 use sp_core::{ed25519, Get, RuntimeDebug, H256};
-use sp_runtime::{traits::NumberFor, BoundedVec};
+use sp_runtime::{
+	traits::{Block as BlockT, NumberFor},
+	BoundedVec,
+};
 use sp_std::{collections::btree_map::BTreeMap, fmt::Debug, vec::Vec};
 
-pub use ulx_notary_primitives::NotaryId;
-use ulx_notary_primitives::{
-	BlockVoteDigest, BlockVotingPower, NotebookHeader, NotebookNumber, NotebookSecret,
-	NotebookSecretHash,
+use crate::{
+	block_seal::Host, tick::Tick, BlockVoteDigest, BlockVotingPower, NotebookHeader,
+	NotebookNumber, NotebookSecret, NotebookSecretHash,
 };
 
-use crate::{block_seal::Host, tick::Tick};
-
+pub type NotaryId = u32;
 pub type NotaryPublic = ed25519::Public;
 pub type NotarySignature = ed25519::Signature;
 

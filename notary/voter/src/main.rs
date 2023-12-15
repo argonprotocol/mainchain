@@ -20,7 +20,7 @@ use tokio::time;
 
 use ulixee_client::{try_until_connected, UlxClient};
 use ulx_notary::apis::LocalchainRpcClient;
-use ulx_notary_primitives::{AccountId, BlockVote, NotaryId, MAX_BLOCK_VOTES_PER_NOTARIZATION};
+use ulx_primitives::{AccountId, BlockVote, NotaryId, MAX_BLOCK_VOTES_PER_NOTARIZATION};
 
 #[derive(Parser, Debug)]
 #[clap(version = crate_version!())]

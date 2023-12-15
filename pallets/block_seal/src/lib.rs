@@ -281,7 +281,9 @@ pub mod pallet {
 
 			ensure!(block_peer.authority_id == authority_id, Error::<T>::InvalidSubmitter);
 
-			let message = BlockVote::vote_proof_signature_message(vote_proof);
+			let parent_hash = <frame_system::Pallet<T>>::parent_hash();
+
+			let message = BlockVote::vote_proof_signature_message(&parent_hash, vote_proof);
 			let Ok(signature) = AuthoritySignature::<T>::decode(&mut signature.as_ref()) else {
 				return Err(Error::<T>::InvalidAuthoritySignature.into())
 			};

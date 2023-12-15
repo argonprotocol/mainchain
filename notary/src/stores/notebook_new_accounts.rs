@@ -5,7 +5,7 @@ use sp_core::{ByteArray, RuntimeDebug};
 use sp_runtime::RuntimeString;
 use sqlx::FromRow;
 
-use ulx_notary_primitives::{AccountId, AccountOriginUid, AccountType, NotebookNumber};
+use ulx_primitives::{AccountId, AccountOriginUid, AccountType, NotebookNumber};
 
 use crate::Error;
 
@@ -110,7 +110,7 @@ mod tests {
 	use sp_keyring::AccountKeyring::{Alice, Bob, Dave};
 	use sqlx::PgPool;
 
-	use ulx_notary_primitives::AccountType::Deposit;
+	use ulx_primitives::AccountType::Deposit;
 
 	use crate::stores::notebook_new_accounts::NotebookNewAccountsStore;
 

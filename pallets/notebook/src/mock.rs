@@ -10,7 +10,8 @@ use sp_runtime::{
 };
 
 use ulx_primitives::{
-	block_seal::{MiningAuthority, VoteMinimum},
+	block_seal::MiningAuthority,
+	block_vote::VoteMinimum,
 	notary::{NotaryId, NotaryProvider, NotarySignature},
 	tick::{Tick, Ticker},
 	AuthorityProvider, BlockSealAuthorityId, BlockVotingProvider, ChainTransferLookup,

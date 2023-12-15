@@ -14,7 +14,7 @@ use ulx_notary::{
 	notebook_closer::{spawn_notebook_closer, MainchainClient, NOTARY_KEYID},
 	NotaryServer,
 };
-use ulx_notary_primitives::NotaryId;
+use ulx_primitives::NotaryId;
 
 #[derive(Parser, Debug)]
 #[clap(version = crate_version!())]

@@ -1,13 +1,14 @@
+use crate::{AccountId, AccountType, NotaryId};
 use codec::{Decode, Encode, MaxEncodedLen};
 use serde::{Deserialize, Serialize};
-use sp_core::{
-	bounded::BoundedVec, crypto::AccountId32, ed25519::Signature, ConstU32, RuntimeDebug, H256,
-};
-use sp_core_hashing::blake2_256;
+use sp_core::{bounded::BoundedVec, ed25519::Signature, ConstU32, RuntimeDebug, H256};
 use sp_runtime::scale_info::TypeInfo;
 use sp_std::vec::Vec;
 
-use crate::{block_vote::BlockVote, AccountOrigin, AccountType, BalanceChange};
+use sp_core_hashing::blake2_256;
+
+use crate::{balance_change::BalanceChange, block_vote::BlockVote};
+pub use crate::{AccountOrigin, BalanceTip};
 
 pub const MAX_BALANCE_CHANGES_PER_NOTARIZATION: u32 = 25;
 pub const MAX_BLOCK_VOTES_PER_NOTARIZATION: u32 = 100;
@@ -21,7 +22,6 @@ pub const MAX_NOTEBOOK_TRANSFERS: u32 = 10_000;
 pub type MaxNotebookTransfers = ConstU32<MAX_NOTEBOOK_TRANSFERS>;
 pub type MaxNotebookNotarizations = ConstU32<100_000>;
 pub type MaxNotebookBlockVotes = ConstU32<100_000>;
-pub type NotaryId = u32;
 pub type AccountOriginUid = u32;
 pub type NotebookNumber = u32;
 
@@ -149,14 +149,14 @@ impl Notarization {
 )]
 #[serde(rename_all = "camelCase")]
 pub struct NewAccountOrigin {
-	pub account_id: AccountId32,
+	pub account_id: AccountId,
 	pub account_type: AccountType,
 	#[codec(compact)]
 	pub account_uid: AccountOriginUid,
 }
 impl NewAccountOrigin {
 	pub fn new(
-		account_id: AccountId32,
+		account_id: AccountId,
 		account_type: AccountType,
 		account_uid: AccountOriginUid,
 	) -> Self {
@@ -282,14 +282,14 @@ pub type NotebookSecretHash = H256;
 pub enum ChainTransfer {
 	#[serde(rename_all = "camelCase")]
 	ToMainchain {
-		account_id: AccountId32,
+		account_id: AccountId,
 		#[codec(compact)]
 		#[cfg_attr(feature = "std", serde(with = "serialize_u128_as_string"))]
 		amount: u128,
 	},
 	#[serde(rename_all = "camelCase")]
 	ToLocalchain {
-		account_id: AccountId32,
+		account_id: AccountId,
 		#[codec(compact)]
 		account_nonce: u32,
 	},

@@ -1,20 +1,15 @@
 use codec::{Codec, Decode, Encode, MaxEncodedLen};
 use scale_info::TypeInfo;
-use sp_api::BlockT;
 use sp_core::{ConstU32, RuntimeDebug, H256, U256};
-use sp_runtime::{BoundedVec, DispatchError};
+use sp_runtime::{traits::Block as BlockT, BoundedVec, DispatchError};
 use sp_std::{collections::btree_map::BTreeMap, vec::Vec};
-
-use ulx_notary_primitives::{
-	AccountId, BestBlockVoteProofT, BlockVoteDigest, BlockVotingPower, NotebookNumber, VoteMinimum,
-};
-pub use ulx_notary_primitives::{MerkleProof, NotaryId};
 
 use crate::{
 	block_seal::MiningAuthority,
-	notary::{NotaryNotebookVoteDetails, NotaryNotebookVoteDigestDetails},
+	notary::{NotaryId, NotaryNotebookVoteDetails, NotaryNotebookVoteDigestDetails},
 	tick::{Tick, Ticker},
-	BlockSealAuthorityId,
+	AccountId, BestBlockVoteProofT, BlockSealAuthorityId, BlockVoteDigest, BlockVotingPower,
+	NotebookNumber, VoteMinimum,
 };
 
 sp_api::decl_runtime_apis! {
@@ -47,7 +42,7 @@ sp_api::decl_runtime_apis! {
 }
 
 sp_api::decl_runtime_apis! {
-	pub trait NotebookApis {
+	pub trait NotebookApis<VerifyError: Codec> {
 		fn audit_notebook_and_get_votes(
 			version: u32,
 			notary_id: NotaryId,
@@ -55,7 +50,7 @@ sp_api::decl_runtime_apis! {
 			header_hash: H256,
 			vote_minimums: &BTreeMap<Block::Hash, VoteMinimum>,
 			bytes: &Vec<u8>,
-		) -> Result<NotebookVotes, ulx_notary_audit::VerifyError>;
+		) -> Result<NotebookVotes, VerifyError>;
 
 		fn get_best_vote_proofs(
 			votes: &BTreeMap<NotaryId, NotebookVotes>,

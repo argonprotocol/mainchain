@@ -1,11 +1,12 @@
-use codec::{Decode, Encode};
+use codec::{Codec, Decode, Encode};
 use scale_info::TypeInfo;
-use sp_core::U256;
+use sp_core::{H256, U256};
 use sp_inherents::{InherentData, InherentIdentifier, IsFatalError};
 use sp_runtime::RuntimeDebug;
 
+use crate::{BestBlockVoteProofT, BlockVote, MerkleProof, NotaryId, NotebookNumber};
+
 use crate::{BlockSealAuthoritySignature, BlockSealDigest};
-use ulx_notary_primitives::{BlockVote, MerkleProof, NotaryId, NotebookNumber};
 
 pub const INHERENT_IDENTIFIER: InherentIdentifier = *b"ulx_seal";
 pub const INHERENT_SEAL_DIGEST_IDENTIFIER: InherentIdentifier = *b"seal_dig";
@@ -37,6 +38,29 @@ impl BlockSealInherent {
 				BlockSealDigest::Compute { .. } => true,
 				_ => false,
 			},
+		}
+	}
+
+	pub fn from_vote<H: Codec + AsRef<[u8]>>(
+		notary_id: NotaryId,
+		notebook_number: NotebookNumber,
+		best_vote: BestBlockVoteProofT<H>,
+		miner_signature: BlockSealAuthoritySignature,
+	) -> Self {
+		let vote = best_vote.block_vote;
+		Self::Vote {
+			vote_proof: best_vote.vote_proof,
+			notary_id,
+			source_notebook_number: notebook_number,
+			source_notebook_proof: best_vote.source_notebook_proof,
+			block_vote: BlockVote {
+				account_id: vote.account_id,
+				power: vote.power,
+				channel_pass: vote.channel_pass,
+				index: vote.index,
+				grandparent_block_hash: H256::from_slice(vote.grandparent_block_hash.as_ref()),
+			},
+			miner_signature,
 		}
 	}
 }

@@ -5,11 +5,10 @@ use serde_json::{from_value, json};
 use sp_core::{bounded::BoundedVec, H256};
 use sqlx::{query, types::JsonValue, FromRow, PgConnection};
 
-use ulx_notary_primitives::{
-	ensure, AccountOrigin, BlockVotingPower, ChainTransfer, NotaryId, NotebookHeader,
+use ulx_primitives::{
+	ensure, tick::Tick, AccountOrigin, BlockVotingPower, ChainTransfer, NotaryId, NotebookHeader,
 	NotebookNumber, NOTEBOOK_VERSION,
 };
-use ulx_primitives::tick::Tick;
 
 use crate::{
 	stores::{
@@ -344,7 +343,7 @@ mod tests {
 	use std::ops::Add;
 	use tracing::{debug, info};
 
-	use ulx_notary_primitives::{AccountOrigin, ChainTransfer, NOTEBOOK_VERSION};
+	use ulx_primitives::{AccountOrigin, ChainTransfer, NOTEBOOK_VERSION};
 
 	use crate::stores::notebook_header::NotebookHeaderStore;
 

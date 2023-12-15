@@ -14,7 +14,7 @@ use sp_keyring::{
 };
 use sp_runtime::{traits::BlakeTwo256, MultiSignature};
 
-use ulx_notary_primitives::{
+use ulx_primitives::{
 	balance_change::{AccountOrigin, BalanceChange, BalanceProof},
 	note::{AccountType, Note, NoteType},
 	BalanceTip, BlockVote, ChainTransfer, ChannelPass, MerkleProof, NewAccountOrigin, Notarization,

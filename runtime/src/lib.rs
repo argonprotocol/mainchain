@@ -41,12 +41,9 @@ use sp_core::{crypto::KeyTypeId, OpaqueMetadata, H256, U256};
 pub use sp_runtime::BuildStorage;
 use sp_runtime::{
 	create_runtime_str, generic,
-	traits::{
-		AccountIdLookup, BlakeTwo256, Block as BlockT, IdentifyAccount, NumberFor, One, OpaqueKeys,
-		Verify,
-	},
+	traits::{AccountIdLookup, BlakeTwo256, Block as BlockT, NumberFor, One, OpaqueKeys},
 	transaction_validity::{TransactionSource, TransactionValidity},
-	ApplyExtrinsicResult, BoundedVec, DispatchError, MultiSignature,
+	ApplyExtrinsicResult, BoundedVec, DispatchError,
 };
 pub use sp_runtime::{Perbill, Permill};
 use sp_std::{collections::btree_map::BTreeMap, prelude::*, vec::Vec};
@@ -54,22 +51,26 @@ use sp_std::{collections::btree_map::BTreeMap, prelude::*, vec::Vec};
 use sp_version::NativeVersion;
 use sp_version::RuntimeVersion;
 
-use pallet_notebook::NotebookVerifyError;
+pub use pallet_notebook::NotebookVerifyError;
 use ulx_primitives::{
-	block_seal::{MiningAuthority, VoteMinimum},
+	block_seal::MiningAuthority,
+	block_vote::VoteMinimum,
 	digests::BlockVoteDigest,
 	localchain::BestBlockVoteProofT,
 	notary::{NotaryId, NotaryNotebookVoteDetails, NotaryNotebookVoteDigestDetails, NotaryRecord},
 	notebook::NotebookNumber,
+	prod_or_fast,
 	tick::{Tick, Ticker},
-	AuthorityProvider, BlockSealAuthorityId, NotebookVotes, TickProvider,
+	AuthorityProvider, BlockSealAuthorityId, BondFundId, BondId, NotebookVotes, TickProvider,
+};
+pub use ulx_primitives::{
+	AccountId, Balance, BlockHash, BlockNumber, HashOutput, Moment, Nonce, Signature,
 };
 
 use crate::opaque::SessionKeys;
 // A few exports that help ease life for downstream crates.
 use crate::wage_protector::WageProtectorFee;
 
-mod macros;
 pub mod wage_protector;
 
 // Make the WASM binary available.
@@ -102,32 +103,7 @@ pub mod opaque {
 	}
 }
 
-/// An index to a block.
-pub type BlockNumber = u32;
-
-/// Alias to 512-bit hash when used in the context of a transaction signature on the chain.
-pub type Signature = MultiSignature;
-
-/// Some way of identifying an account on the chain. We intentionally make it equivalent
-/// to the public key of our transaction signing scheme.
-pub type AccountId = <<Signature as Verify>::Signer as IdentifyAccount>::AccountId;
-
-/// Balance of an account.
-pub type Balance = u128;
-
-/// Index of a transaction in the chain.
-pub type Nonce = u32;
-
-/// A timestamp: milliseconds since the unix epoch.
-pub type Moment = u64;
-
-pub type BondId = u64;
-pub type BondFundId = u32;
-
 pub type ArgonBalancesCall = pallet_balances::Call<Runtime, ArgonToken>;
-/// A hash of some data used by the chain.
-pub type HashOutput = H256;
-pub type BlockHash = BlakeTwo256;
 
 // To learn more about runtime versioning, see:
 // https://docs.substrate.io/main-docs/build/upgrade#runtime-versioning
@@ -783,7 +759,9 @@ impl_runtime_apis! {
 		}
 	}
 
-	impl ulx_primitives::NotebookApis<Block> for Runtime {
+
+
+	impl ulx_primitives::NotebookApis<Block, NotebookVerifyError> for Runtime {
 		fn audit_notebook_and_get_votes(
 			version: u32,
 			notary_id: NotaryId,

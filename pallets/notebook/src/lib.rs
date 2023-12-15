@@ -23,14 +23,13 @@ pub mod pallet {
 	use codec::alloc::string::ToString;
 	use frame_support::pallet_prelude::*;
 	use frame_system::pallet_prelude::*;
-	use sp_api::BlockT;
 	use sp_core::{crypto::AccountId32, H256};
-	use sp_runtime::traits::BlakeTwo256;
+	use sp_runtime::traits::{BlakeTwo256, Block as BlockT};
 	use sp_std::{collections::btree_map::BTreeMap, vec::Vec};
 
 	use ulx_notary_audit::{notebook_verify, AccountHistoryLookupError, NotebookHistoryLookup};
 	use ulx_primitives::{
-		block_seal::VoteMinimum,
+		block_vote::VoteMinimum,
 		localchain::{BestBlockVoteProofT, BlockVote, BlockVoteT},
 		notary::{NotaryId, NotaryNotebookKeyDetails, NotaryNotebookVoteDetails, NotarySignature},
 		notebook::{AccountOrigin, Notebook, NotebookHeader},

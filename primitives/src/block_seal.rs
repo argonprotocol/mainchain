@@ -3,13 +3,8 @@ use frame_support::{CloneNoBound, EqNoBound, Parameter, PartialEqNoBound};
 use scale_info::TypeInfo;
 use serde::{Deserialize, Serialize};
 use sp_application_crypto::ByteArray;
-use sp_core::{
-	ConstU32,
-	crypto::KeyTypeId, MaxEncodedLen, OpaquePeerId, U256,
-};
+use sp_core::{crypto::KeyTypeId, ConstU32, MaxEncodedLen, OpaquePeerId, U256};
 use sp_runtime::{BoundedVec, RuntimeDebug};
-
-pub use ulx_notary_primitives::{BlockVotingPower, VoteMinimum};
 
 pub const BLOCK_SEAL_KEY_TYPE: KeyTypeId = KeyTypeId(*b"seal");
 

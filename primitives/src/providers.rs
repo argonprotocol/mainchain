@@ -1,11 +1,9 @@
 use codec::{Decode, Encode, FullCodec, MaxEncodedLen};
 use scale_info::TypeInfo;
-use sp_api::BlockT;
 use sp_core::{RuntimeDebug, H256, U256};
-use sp_runtime::DispatchResult;
+use sp_runtime::{traits::Block as BlockT, DispatchResult};
 
-pub use ulx_notary_primitives::NotaryId;
-use ulx_notary_primitives::{NotebookHeader, NotebookNumber, VoteMinimum};
+use crate::{NotaryId, NotebookHeader, NotebookNumber, VoteMinimum};
 
 use crate::{
 	block_seal::MiningAuthority,

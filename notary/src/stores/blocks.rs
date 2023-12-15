@@ -4,7 +4,7 @@ use chrono::Utc;
 use sp_core::H256;
 use sqlx::{FromRow, PgConnection};
 
-use ulx_notary_primitives::{ensure, VoteMinimum};
+use ulx_primitives::{ensure, VoteMinimum};
 
 use crate::Error;
 

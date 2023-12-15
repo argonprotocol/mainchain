@@ -1,10 +1,13 @@
-use codec::{Decode, Encode};
+use codec::{Decode, Encode, MaxEncodedLen};
 use scale_info::TypeInfo;
-use sp_api::BlockT;
-use sp_core::{RuntimeDebug, U256};
-use sp_runtime::{traits::NumberFor, ConsensusEngineId};
+use serde::{Deserialize, Serialize};
+use sp_core::{RuntimeDebug, H256, U256};
+use sp_runtime::{
+	traits::{Block as BlockT, NumberFor},
+	ConsensusEngineId,
+};
 
-pub use ulx_notary_primitives::digests::{BlockVoteDigest, BLOCK_VOTES_DIGEST_ID};
+use crate::BlockVotingPower;
 
 /// The block creator account_id - matches POW so that we can use the built-in front end decoding
 pub const AUTHOR_DIGEST_ID: ConsensusEngineId = [b'p', b'o', b'w', b'_'];
@@ -18,6 +21,9 @@ pub const FINALIZED_BLOCK_DIGEST_ID: ConsensusEngineId = [b'f', b'i', b'n', b'_'
 
 /// The tick of the given block
 pub const TICK_DIGEST_ID: ConsensusEngineId = [b't', b'i', b'c', b'k'];
+
+/// Key for the block vote digest in a block header
+pub const BLOCK_VOTES_DIGEST_ID: ConsensusEngineId = [b'v', b'o', b't', b'e'];
 
 #[derive(Clone, PartialEq, Eq, Encode, Decode, RuntimeDebug, TypeInfo)]
 pub struct FinalizedBlockNeededDigest<B: BlockT> {
@@ -39,4 +45,25 @@ impl BlockSealDigest {
 			_ => false,
 		}
 	}
+}
+
+#[derive(
+	Clone,
+	PartialEq,
+	Eq,
+	Encode,
+	Decode,
+	RuntimeDebug,
+	TypeInfo,
+	MaxEncodedLen,
+	Serialize,
+	Deserialize,
+	Default,
+)]
+pub struct BlockVoteDigest {
+	/// The aggregate key of the notebooks parent keys and the parent notebooks' block vote roots
+	pub parent_voting_key: Option<H256>,
+	pub voting_power: BlockVotingPower,
+	pub votes_count: u32,
+	pub tick_notebooks: u32,
 }

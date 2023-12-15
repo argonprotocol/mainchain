@@ -22,19 +22,15 @@ use sc_service::TaskManager;
 use sp_api::ProvideRuntimeApi;
 use sp_blockchain::HeaderBackend;
 use sp_consensus::{Environment, Proposal, Proposer, SelectChain, SyncOracle};
-use sp_core::{crypto::AccountId32, RuntimeDebug, U256};
+use sp_core::{crypto::AccountId32, traits::SpawnEssentialNamed, RuntimeDebug, U256};
 use sp_runtime::traits::{Block as BlockT, Header as HeaderT};
 use sp_timestamp::Timestamp;
 
 use ulx_primitives::{inherents::BlockSealInherent, tick::Tick, *};
 
 use crate::{
-	block_creator,
-	block_creator::propose,
-	compute_solver::ComputeSolver,
-	digests::get_tick_digest,
-	error::Error,
-	notebook_watch::{get_notary_state, has_applicable_tax_votes},
+	aux::UlxAux, block_creator, block_creator::propose, compute_solver::ComputeSolver,
+	digests::get_tick_digest, error::Error, notebook_watch::has_applicable_tax_votes,
 };
 
 /// Version of the mining worker.
@@ -102,6 +98,7 @@ where
 		*metadata =
 			Some(MiningMetadata { best_hash, has_tax_votes, import_time: Instant::now(), tick });
 	}
+
 	pub(crate) fn start_solving(
 		&self,
 		best_hash: Block::Hash,
@@ -184,6 +181,8 @@ where
 			},
 		};
 
+		self.increment_version();
+
 		let mut block_import = self.block_import.lock();
 
 		block_creator::submit_block::<Block, L, Proof>(
@@ -252,7 +251,7 @@ pub fn run_compute_solver_threads<B, L, Proof>(
 {
 	for _ in 0..threads {
 		let worker = worker.clone();
-		task_handle.spawn_essential_handle().spawn_blocking(
+		task_handle.spawn_essential_handle().spawn_essential_blocking(
 			"mining-voter",
 			Some("block-authoring"),
 			create_compute_solver_task(worker),
@@ -333,6 +332,7 @@ where
 			if mining_handle.best_hash() != Some(best_hash) {
 				let block_tick = get_tick_digest(best_header.digest()).unwrap_or_default();
 				let has_tax_votes = has_applicable_tax_votes(&client, &best_header, block_tick);
+
 				mining_handle.on_block(best_hash, has_tax_votes, block_tick);
 			}
 
@@ -354,16 +354,17 @@ where
 					},
 				};
 
-				let notary_state = match get_notary_state::<Block, C>(&client, tick) {
-					Ok(x) => x,
-					Err(err) => {
-						warn!(
-							target: LOG_TARGET,
-							"Unable to pull new block for compute miner. No notary state found!! {}", err
-						);
-						continue
-					},
-				};
+				let notary_state =
+					match UlxAux::<C, Block>::get_notebook_tick_state(client.as_ref(), tick) {
+						Ok(x) => x,
+						Err(err) => {
+							warn!(
+								target: LOG_TARGET,
+								"Unable to pull new block for compute miner. No notary state found!! {}", err
+							);
+							continue
+						},
+					};
 
 				let proposal = match propose(
 					client.clone(),

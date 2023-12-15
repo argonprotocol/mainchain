@@ -61,8 +61,9 @@ impl<Hash: Codec + Clone> BlockVoteT<Hash> {
 			.unwrap_or(U256::zero())
 	}
 
-	pub fn vote_proof_signature_message(vote_proof: U256) -> [u8; 32] {
-		vote_proof.using_encoded(blake2_256)
+	pub fn vote_proof_signature_message<H: Codec>(block_hash: &H, vote_proof: U256) -> [u8; 32] {
+		let message = &[&block_hash.encode()[..], &vote_proof.encode()[..]].concat();
+		message.using_encoded(blake2_256)
 	}
 }
 

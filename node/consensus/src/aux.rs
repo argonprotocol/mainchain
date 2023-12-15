@@ -13,8 +13,8 @@ use sp_runtime::traits::{Block as BlockT, Header};
 
 use ulx_node_runtime::{AccountId, BlockNumber};
 use ulx_primitives::{
-	block_seal::BlockVotingPower, tick::Tick, BlockSealDigest, ComputeDifficulty, NotaryId,
-	NotebookVotes,
+	notary::NotaryNotebookTickState, tick::Tick, BlockSealDigest, BlockVotingPower,
+	ComputeDifficulty, NotaryId, NotebookVotes,
 };
 
 use crate::{convert_u32, error::Error};
@@ -50,10 +50,10 @@ impl<C: AuxStore, B: BlockT> UlxAux<C, B> {
 		let block_number = convert_u32::<B>(&block.header.number());
 		let strongest_at_height = Self::strongest_fork_at_tick(client.as_ref(), tick)?;
 
-		let mut authors_at_height =
-			Self::authors_by_voting_key_at_height(client.as_ref(), block_number)?;
 		// add author to voting key
 		if let Some(voting_key) = voting_key {
+			let mut authors_at_height =
+				Self::authors_by_voting_key_at_height(client.as_ref(), block_number)?;
 			let is_new_entry = authors_at_height
 				.entry(voting_key)
 				.or_insert_with(BTreeSet::new)
@@ -81,11 +81,14 @@ impl<C: AuxStore, B: BlockT> UlxAux<C, B> {
 		));
 
 		// cleanup old votes (None deletes)
-		if block_number > 5 {
-			let cleanup_height = block_number - 5;
+		if tick > 5 {
+			let cleanup_height = tick - 5;
 			block.auxiliary.push((get_votes_key(cleanup_height), None));
 			block.auxiliary.push((get_strongest_fork_at_tick_key(cleanup_height), None));
-			block.auxiliary.push((get_authors_at_height_key(cleanup_height), None));
+			block.auxiliary.push((notary_state_key(cleanup_height), None));
+			block
+				.auxiliary
+				.push((get_authors_at_height_key(block_number.saturating_sub(5)), None));
 		}
 
 		Ok((fork_power, best_header_fork_power))
@@ -146,6 +149,32 @@ impl<C: AuxStore, B: BlockT> UlxAux<C, B> {
 		};
 		Ok(aux)
 	}
+
+	pub fn get_notebook_tick_state(
+		client: &C,
+		tick: Tick,
+	) -> Result<NotaryNotebookTickState, Error<B>> {
+		let state_key = notary_state_key(tick);
+		let notary_state = match client.get_aux(&state_key)? {
+			Some(bytes) => NotaryNotebookTickState::decode(&mut &bytes[..]).unwrap_or_default(),
+			None => Default::default(),
+		};
+		Ok(notary_state)
+	}
+
+	pub fn update_notebook_tick_state(
+		client: &C,
+		tick: Tick,
+		notary_state: NotaryNotebookTickState,
+	) -> Result<(), Error<B>> {
+		let state_key = notary_state_key(tick);
+		client.insert_aux(&[(state_key.as_slice(), notary_state.encode().as_slice())], &[])?;
+		Ok(())
+	}
+}
+
+fn notary_state_key(tich: Tick) -> Vec<u8> {
+	("NotaryStateAtTick", tich).encode()
 }
 
 fn get_authors_at_height_key(block_number: BlockNumber) -> Vec<u8> {
@@ -231,21 +260,51 @@ impl Default for ForkPower {
 
 impl PartialOrd for ForkPower {
 	fn partial_cmp(&self, other: &Self) -> Option<Ordering> {
-		let mut cmp = other.notebooks.cmp(&self.notebooks);
+		let mut cmp = self.notebooks.cmp(&other.notebooks);
 		if cmp == Ordering::Equal {
-			cmp = other.voting_power.cmp(&self.voting_power);
+			cmp = self.voting_power.cmp(&other.voting_power);
 		}
 		if cmp == Ordering::Equal {
 			// count forks with tax votes over compute
-			cmp = other.vote_created_blocks.cmp(&self.vote_created_blocks);
+			cmp = self.vote_created_blocks.cmp(&other.vote_created_blocks);
 		}
 		if cmp == Ordering::Equal {
 			// smaller vote proof is better
-			cmp = self.vote_proof.cmp(&other.vote_proof)
+			cmp = other.vote_proof.cmp(&self.vote_proof)
 		}
 		if cmp == Ordering::Equal {
-			cmp = other.total_compute_difficulty.cmp(&self.total_compute_difficulty)
+			cmp = self.total_compute_difficulty.cmp(&other.total_compute_difficulty)
 		}
 		Some(cmp)
+	}
+}
+
+#[cfg(test)]
+mod test {
+	use crate::aux::ForkPower;
+
+	#[test]
+	fn it_should_compare_fork_power() {
+		assert_eq!(ForkPower::default(), ForkPower::default());
+
+		assert!(
+			ForkPower { voting_power: 1.into(), ..Default::default() } >
+				ForkPower { voting_power: 0.into(), ..Default::default() }
+		);
+
+		assert!(
+			ForkPower { notebooks: 1, ..Default::default() } >
+				ForkPower { notebooks: 0, ..Default::default() }
+		);
+
+		assert!(
+			ForkPower { vote_proof: 200.into(), ..Default::default() } >
+				ForkPower { vote_proof: 201.into(), ..Default::default() }
+		);
+
+		assert!(
+			ForkPower { total_compute_difficulty: 1000.into(), ..Default::default() } >
+				ForkPower { total_compute_difficulty: 999.into(), ..Default::default() }
+		);
 	}
 }

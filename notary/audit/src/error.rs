@@ -3,11 +3,11 @@ use serde::{Deserialize, Serialize};
 use snafu::Snafu;
 use sp_core::crypto::AccountId32;
 use sp_runtime::{scale_info::TypeInfo, RuntimeString};
+use ulx_primitives::AccountType;
 
 use crate::AccountHistoryLookupError;
-use ulx_notary_primitives::AccountType;
 
-const MIN_CHANNEL_NOTE_MILLIGONS: u128 = ulx_notary_primitives::MIN_CHANNEL_NOTE_MILLIGONS;
+const MIN_CHANNEL_NOTE_MILLIGONS: u128 = ulx_primitives::MIN_CHANNEL_NOTE_MILLIGONS;
 #[derive(Debug, PartialEq, Clone, Snafu, TypeInfo, Encode, Decode, Serialize, Deserialize)]
 pub enum VerifyError {
 	#[snafu(display("Missing account origin {account_id:?}, {account_type:?}"))]
@@ -100,12 +100,6 @@ pub enum VerifyError {
 
 	#[snafu(display("Channel hold not ready for claim"))]
 	ChannelHoldNotReadyForClaim,
-
-	#[snafu(display("Channel hold already claimed"))]
-	ChannelHoldAlreadyClaimed,
-
-	#[snafu(display("Channel hold not ready for settle"))]
-	ChannelHoldNotReadyForSettle,
 
 	#[snafu(display("This account is locked with a channel hold"))]
 	AccountLocked,

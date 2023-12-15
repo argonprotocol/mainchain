@@ -12,11 +12,10 @@ use serde::Serialize;
 use sqlx::PgPool;
 use tokio::net::ToSocketAddrs;
 
-use ulx_notary_primitives::{
-	BalanceProof, BalanceTip, NotarizationBalanceChangeset, NotarizationBlockVotes, NotaryId,
-	Notebook, NotebookHeader, NotebookNumber,
+use ulx_primitives::{
+	tick::Ticker, BalanceProof, BalanceTip, NotarizationBalanceChangeset, NotarizationBlockVotes,
+	NotaryId, Notebook, NotebookHeader, NotebookNumber,
 };
-use ulx_primitives::tick::Ticker;
 
 use crate::{
 	apis::{
@@ -43,22 +42,25 @@ pub struct NotaryServer {
 	pub addr: SocketAddr,
 	notary_id: NotaryId,
 	pool: PgPool,
-	completed_notebook_stream: NotebookHeaderStream,
+	pub(crate) completed_notebook_stream: NotebookHeaderStream,
 	ticker: Ticker,
 	pub completed_notebook_sender: NotificationSender<NotebookHeader>,
 }
 
 impl NotaryServer {
-	pub async fn start(
+	pub async fn create_http_server(addrs: impl ToSocketAddrs) -> anyhow::Result<Server> {
+		let server = Server::builder().build(addrs).await?;
+		Ok(server)
+	}
+
+	pub async fn start_with(
+		server: Server,
 		notary_id: NotaryId,
 		pool: PgPool,
 		ticker: Ticker,
-		addrs: impl ToSocketAddrs,
 	) -> anyhow::Result<Self> {
 		let (completed_notebook_sender, completed_notebook_stream) =
 			NotebookHeaderStream::channel();
-
-		let server = Server::builder().build(addrs).await?;
 
 		let addr = server.local_addr()?;
 		let notary_server = Self {
@@ -79,6 +81,16 @@ impl NotaryServer {
 		tokio::spawn(handle.stopped());
 
 		Ok(notary_server)
+	}
+
+	pub async fn start(
+		notary_id: NotaryId,
+		pool: PgPool,
+		ticker: Ticker,
+		addrs: impl ToSocketAddrs,
+	) -> anyhow::Result<Self> {
+		let server = Self::create_http_server(addrs).await?;
+		Self::start_with(server, notary_id, pool, ticker).await
 	}
 }
 
@@ -205,11 +217,10 @@ mod tests {
 	use sp_keystore::{testing::MemoryKeystore, Keystore, KeystoreExt};
 	use sqlx::PgPool;
 
-	use ulx_notary_primitives::{
-		AccountOrigin, AccountType::Deposit, BalanceChange, BalanceTip, ChainTransfer,
-		NewAccountOrigin, Note, NoteType,
+	use ulx_primitives::{
+		tick::Ticker, AccountOrigin, AccountType::Deposit, BalanceChange, BalanceTip,
+		ChainTransfer, NewAccountOrigin, Note, NoteType,
 	};
-	use ulx_primitives::tick::Ticker;
 
 	use crate::{
 		apis::{

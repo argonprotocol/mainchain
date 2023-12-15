@@ -1,10 +1,11 @@
+use log::trace;
 use std::{collections::BTreeMap, default::Default, marker::PhantomData, sync::Arc};
 
 use sc_client_api::AuxStore;
 use sp_api::ProvideRuntimeApi;
 use sp_runtime::traits::Block as BlockT;
 
-use ulx_node_runtime::NotaryRecordT;
+use ulx_node_runtime::{NotaryRecordT, NotebookVerifyError};
 use ulx_notary::apis::notebook::NotebookRpcClient;
 use ulx_primitives::{
 	block_seal::Host, notary::NotaryNotebookVoteDetails, notebook::NotebookNumber,
@@ -19,11 +20,40 @@ pub struct NotebookAuditor<B: BlockT, C> {
 	_block: PhantomData<B>,
 }
 
+const LOG_TARGET: &str = "node::notebook_auditor";
+
+#[async_trait::async_trait]
+pub trait NotebookAuditorProvider<B: BlockT> {
+	async fn audit_notebook(
+		&mut self,
+		block_hash: &B::Hash,
+		vote_details: &NotaryNotebookVoteDetails<B::Hash>,
+	) -> Result<(), Error<B>>;
+}
+
+#[async_trait::async_trait]
+impl<B, C> NotebookAuditorProvider<B> for NotebookAuditor<B, C>
+where
+	B: BlockT,
+	C: ProvideRuntimeApi<B> + AuxStore + Send + Sync + 'static,
+	C::Api:
+		NotaryApis<B, NotaryRecordT> + NotebookApis<B, NotebookVerifyError> + BlockSealSpecApis<B>,
+{
+	async fn audit_notebook(
+		&mut self,
+		block_hash: &B::Hash,
+		vote_details: &NotaryNotebookVoteDetails<B::Hash>,
+	) -> Result<(), Error<B>> {
+		self.try_audit_notebook(block_hash, vote_details).await
+	}
+}
+
 impl<B, C> NotebookAuditor<B, C>
 where
 	B: BlockT,
 	C: ProvideRuntimeApi<B> + AuxStore,
-	C::Api: NotaryApis<B, NotaryRecordT> + NotebookApis<B> + BlockSealSpecApis<B>,
+	C::Api:
+		NotaryApis<B, NotaryRecordT> + NotebookApis<B, NotebookVerifyError> + BlockSealSpecApis<B>,
 {
 	pub fn new(client: Arc<C>) -> Self {
 		Self { client, notary_client_by_id: Default::default(), _block: PhantomData }
@@ -81,6 +111,14 @@ where
 				);
 				Error::<B>::StringError(message)
 			})?;
+
+		trace!(
+			target: LOG_TARGET,
+			"Notebook audit successful. Notary {}, #{}. {} block vote(s).",
+			notary_id,
+			notebook_number,
+			votes.raw_votes.len()
+		);
 
 		UlxAux::store_votes(self.client.as_ref(), vote_details.tick, notary_id, votes)?;
 		Ok(())

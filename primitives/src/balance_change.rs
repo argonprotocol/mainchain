@@ -8,7 +8,9 @@ use sp_std::vec::Vec;
 #[cfg(feature = "std")]
 use sp_core::crypto::Pair;
 
-use crate::{AccountId, AccountOriginUid, AccountType, NotaryId, Note, NoteType, NotebookNumber};
+use crate::{
+	notary::NotaryId, AccountId, AccountOriginUid, AccountType, Note, NoteType, NotebookNumber,
+};
 
 #[derive(
 	Clone,

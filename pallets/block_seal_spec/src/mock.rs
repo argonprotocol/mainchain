@@ -12,7 +12,8 @@ use sp_runtime::{
 };
 
 use ulx_primitives::{
-	block_seal::{MiningAuthority, VoteMinimum},
+	block_seal::MiningAuthority,
+	block_vote::VoteMinimum,
 	inherents::BlockSealInherent,
 	notebook::NotebookNumber,
 	tick::{Tick, Ticker},

@@ -13,12 +13,11 @@ use sp_core::{
 use sp_keystore::KeystorePtr;
 use sqlx::PgConnection;
 
-use ulx_notary_primitives::{
-	ensure, note::AccountType, AccountId, AccountOrigin, BalanceTip, BlockVote,
+use ulx_primitives::{
+	ensure, note::AccountType, tick::Ticker, AccountId, AccountOrigin, BalanceTip, BlockVote,
 	MaxNotebookNotarizations, MerkleProof, NewAccountOrigin, NotaryId, NoteType, Notebook,
 	NotebookNumber,
 };
-use ulx_primitives::tick::Ticker;
 
 use crate::{
 	notebook_closer::notary_sign,
@@ -351,7 +350,7 @@ mod tests {
 	use sqlx::PgPool;
 	use std::ops::Add;
 
-	use ulx_notary_primitives::{
+	use ulx_primitives::{
 		AccountOrigin, AccountType::Deposit, BalanceChange, BalanceTip, NewAccountOrigin,
 	};
 

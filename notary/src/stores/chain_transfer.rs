@@ -1,7 +1,7 @@
 use sp_core::ByteArray;
 use sqlx::{query, FromRow, PgConnection};
 
-use ulx_notary_primitives::{ensure, AccountId, ChainTransfer, NotebookNumber};
+use ulx_primitives::{ensure, AccountId, ChainTransfer, NotebookNumber};
 
 use crate::{stores::notebook_status::NotebookStatusStore, Error};
 

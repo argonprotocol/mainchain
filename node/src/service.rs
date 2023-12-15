@@ -5,7 +5,6 @@ use std::{cmp::max, sync::Arc, time::Duration};
 use futures::FutureExt;
 use sc_client_api::{Backend, BlockBackend};
 use sc_consensus_grandpa::{FinalityProofProvider, GrandpaBlockImport, SharedVoterState};
-pub use sc_executor::NativeElseWasmExecutor;
 use sc_service::{
 	config::Configuration, error::Error as ServiceError, TaskManager, WarpSyncParams,
 };
@@ -21,35 +20,16 @@ use ulx_node_runtime::{self, opaque::Block, AccountId, RuntimeApi};
 
 use crate::rpc;
 
-// Our native executor instance.
-pub struct ExecutorDispatch;
-
-impl sc_executor::NativeExecutionDispatch for ExecutorDispatch {
-	/// Only enable the benchmarking host functions when we actually want to benchmark.
-	#[cfg(feature = "runtime-benchmarks")]
-	type ExtendHostFunctions = frame_benchmarking::benchmarking::HostFunctions;
-	/// Otherwise we only use the default Substrate host functions.
-	#[cfg(not(feature = "runtime-benchmarks"))]
-	type ExtendHostFunctions = ();
-
-	fn dispatch(method: &str, data: &[u8]) -> Option<Vec<u8>> {
-		ulx_node_runtime::api::dispatch(method, data)
-	}
-
-	fn native_version() -> sc_executor::NativeVersion {
-		ulx_node_runtime::native_version()
-	}
-}
-
-pub(crate) type FullClient =
-	sc_service::TFullClient<Block, RuntimeApi, NativeElseWasmExecutor<ExecutorDispatch>>;
+pub(crate) type FullClient = sc_service::TFullClient<
+	Block,
+	RuntimeApi,
+	sc_executor::WasmExecutor<sp_io::SubstrateHostFunctions>,
+>;
 type FullBackend = sc_service::TFullBackend<Block>;
 type FullSelectChain = sc_consensus::LongestChain<FullBackend, Block>;
 /// The minimum period of blocks on which justifications will be
 /// imported and generated.
 const GRANDPA_JUSTIFICATION_PERIOD: u32 = 512;
-
-pub type Executor = NativeElseWasmExecutor<ExecutorDispatch>;
 
 type UlxBlockImport = ulx_node_consensus::import_queue::UlxBlockImport<
 	Block,
@@ -87,10 +67,10 @@ pub fn new_partial(
 		})
 		.transpose()?;
 
-	let executor = sc_service::new_native_or_wasm_executor(config);
+	let executor = sc_service::new_wasm_executor::<sp_io::SubstrateHostFunctions>(config);
 
 	let (client, backend, keystore_container, task_manager) =
-		sc_service::new_full_parts::<Block, RuntimeApi, Executor>(
+		sc_service::new_full_parts::<Block, RuntimeApi, _>(
 			config,
 			telemetry.as_ref().map(|(_, telemetry)| telemetry.handle()),
 			executor,
@@ -165,9 +145,9 @@ pub fn new_full(
 		&client.block_hash(0).ok().flatten().expect("Genesis block exists; qed"),
 		&config.chain_spec,
 	);
-	net_config.add_notification_protocol(sc_consensus_grandpa::grandpa_peers_set_config(
-		grandpa_protocol_name.clone(),
-	));
+	let (grandpa_protocol_config, grandpa_notification_service) =
+		sc_consensus_grandpa::grandpa_peers_set_config(grandpa_protocol_name.clone());
+	net_config.add_notification_protocol(grandpa_protocol_config);
 
 	let warp_sync = Arc::new(sc_consensus_grandpa::warp_proof::NetworkProvider::new(
 		backend.clone(),
@@ -291,12 +271,13 @@ pub fn new_full(
 				compute_task,
 			);
 
-			let (block_watch_task, create_block_stream) = ulx_node_consensus::create_block_watch(
-				transaction_pool.clone(),
-				client.clone(),
-				select_chain,
-				keystore_container.keystore(),
-			);
+			let (block_watch_task, create_block_stream) =
+				ulx_node_consensus::create_tax_vote_block_watch(
+					transaction_pool.clone(),
+					client.clone(),
+					select_chain,
+					keystore_container.keystore(),
+				);
 			let proposer_factory_tax = sc_basic_authorship::ProposerFactory::new(
 				task_manager.spawn_handle(),
 				client.clone(),
@@ -347,6 +328,7 @@ pub fn new_full(
 				link: grandpa_link,
 				network,
 				sync: Arc::new(sync_service),
+				notification_service: grandpa_notification_service,
 				voting_rule: sc_consensus_grandpa::VotingRulesBuilder::default().build(),
 				prometheus_registry,
 				shared_voter_state,

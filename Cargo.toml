@@ -16,7 +16,6 @@ members = [
     "runtime",
 	"notary",
 	"notary/audit",
-	"notary/primitives",
 	"notary/voter",
 	"testing"
 ]

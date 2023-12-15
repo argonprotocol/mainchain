@@ -6,7 +6,7 @@ use sqlx::{query, types::Json, FromRow, PgPool};
 use ulx_notary_audit::{
 	verify_changeset_signatures, verify_notarization_allocation, verify_voting_sources, VerifyError,
 };
-use ulx_notary_primitives::{
+use ulx_primitives::{
 	ensure, AccountId, AccountOrigin, AccountType, BalanceChange, BalanceProof, BalanceTip,
 	BlockVote, NewAccountOrigin, Notarization, NotaryId, NoteType, NotebookNumber,
 	MAX_NOTEBOOK_TRANSFERS,
@@ -331,7 +331,7 @@ mod tests {
 	use sp_keyring::Sr25519Keyring::Bob;
 	use sqlx::PgPool;
 
-	use ulx_notary_primitives::{
+	use ulx_primitives::{
 		AccountType::Deposit, BalanceChange, BlockVote, ChannelPass, Notarization, Note, NoteType,
 	};
 

@@ -1,8 +1,7 @@
 use chrono::{DateTime, Utc};
 use sqlx::{query_scalar, FromRow, PgConnection};
 
-use ulx_notary_primitives::NotebookNumber;
-use ulx_primitives::tick::Tick;
+use ulx_primitives::{tick::Tick, NotebookNumber};
 
 use crate::{ensure, error::Error};
 
@@ -19,8 +18,8 @@ pub enum NotebookFinalizationStep {
 	Open = 1,
 	ReadyForClose = 2,
 	Closed = 3,
-	Submitted = 6,
-	Finalized = 7,
+	Submitted = 4,
+	Finalized = 5,
 }
 
 impl From<i32> for NotebookFinalizationStep {
