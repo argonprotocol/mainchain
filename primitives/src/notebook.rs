@@ -1,13 +1,14 @@
-use crate::{AccountId, AccountType, NotaryId};
 use codec::{Decode, Encode, MaxEncodedLen};
 use serde::{Deserialize, Serialize};
 use sp_core::{bounded::BoundedVec, ed25519::Signature, ConstU32, RuntimeDebug, H256};
+use sp_core_hashing::blake2_256;
 use sp_runtime::scale_info::TypeInfo;
 use sp_std::vec::Vec;
 
-use sp_core_hashing::blake2_256;
-
-use crate::{balance_change::BalanceChange, block_vote::BlockVote};
+use crate::{
+	balance_change::BalanceChange, block_vote::BlockVote, notary::NotarySignature, AccountId,
+	AccountType, NotaryId,
+};
 pub use crate::{AccountOrigin, BalanceTip};
 
 pub const MAX_BALANCE_CHANGES_PER_NOTARIZATION: u32 = 25;
@@ -221,6 +222,25 @@ pub struct NotebookHeader {
 	/// The revealed secret of the parent notebook. Only optional in first notebook.
 	pub parent_secret: Option<NotebookSecret>,
 }
+#[derive(
+	Clone,
+	PartialEq,
+	Eq,
+	Encode,
+	Decode,
+	RuntimeDebug,
+	TypeInfo,
+	MaxEncodedLen,
+	Serialize,
+	Deserialize,
+)]
+#[serde(rename_all = "camelCase")]
+pub struct SignedNotebookHeader {
+	/// The header details
+	pub header: NotebookHeader,
+	/// A signature of the hash by the notary public key
+	pub signature: NotarySignature,
+}
 
 impl NotebookHeader {
 	pub fn hash(&self) -> H256 {
@@ -240,6 +260,23 @@ impl NotebookHeader {
 			&[&secret[..], &block_votes_root[..], &notebook_number.to_be_bytes()].concat(),
 		))
 	}
+}
+#[derive(
+	Clone,
+	PartialEq,
+	Eq,
+	Encode,
+	Decode,
+	RuntimeDebug,
+	TypeInfo,
+	MaxEncodedLen,
+	Serialize,
+	Deserialize,
+)]
+#[serde(rename_all = "camelCase")]
+pub struct NotebookMeta {
+	pub latest_notebook_number: NotebookNumber,
+	pub latest_tick: u32,
 }
 
 #[derive(Encode, TypeInfo, MaxEncodedLen)]

@@ -5,7 +5,7 @@ use sp_core_hashing::blake2_256;
 use sp_runtime::scale_info::TypeInfo;
 use sp_std::vec::Vec;
 
-use crate::{AccountId, BlockVotingPower, ChannelPass, MerkleProof, NotaryId};
+use crate::{AccountId, BlockVotingPower, ChannelPass, MerkleProof, NotaryId, NotebookNumber};
 
 pub type VoteMinimum = u128;
 
@@ -25,8 +25,8 @@ pub type VoteMinimum = u128;
 pub struct BlockVoteT<Hash: Codec = H256> {
 	/// The creator of the seal
 	pub account_id: AccountId,
-	/// The grandparent block hash you wish to vote for
-	pub grandparent_block_hash: Hash,
+	/// The block hash being voted on. Must be in last 2 ticks.
+	pub block_hash: Hash,
 	/// A unique index per account for this notebook
 	#[codec(compact)]
 	pub index: u32,
@@ -38,17 +38,18 @@ pub struct BlockVoteT<Hash: Codec = H256> {
 }
 
 pub type BlockVote = BlockVoteT<H256>;
+pub type VotingKey = H256;
 
 impl<Hash: Codec + Clone> BlockVoteT<Hash> {
 	pub fn hash(&self) -> H256 {
 		self.using_encoded(blake2_256).into()
 	}
 
-	pub fn vote_proof(&self, notary_id: NotaryId, voting_key: H256) -> U256 {
-		Self::calculate_vote_proof(self.power, self.encode(), notary_id, voting_key)
+	pub fn get_seal_strength(&self, notary_id: NotaryId, voting_key: H256) -> U256 {
+		Self::calculate_seal_strength(self.power, self.encode(), notary_id, voting_key)
 	}
 
-	pub fn calculate_vote_proof(
+	pub fn calculate_seal_strength(
 		power: BlockVotingPower,
 		vote_bytes: Vec<u8>,
 		notary_id: NotaryId,
@@ -61,8 +62,8 @@ impl<Hash: Codec + Clone> BlockVoteT<Hash> {
 			.unwrap_or(U256::zero())
 	}
 
-	pub fn vote_proof_signature_message<H: Codec>(block_hash: &H, vote_proof: U256) -> [u8; 32] {
-		let message = &[&block_hash.encode()[..], &vote_proof.encode()[..]].concat();
+	pub fn seal_signature_message<H: Codec>(block_hash: &H, seal_strength: U256) -> [u8; 32] {
+		let message = &[&block_hash.encode()[..], &seal_strength.encode()[..]].concat();
 		message.using_encoded(blake2_256)
 	}
 }
@@ -75,26 +76,17 @@ struct BlockVoteProofHashMessage {
 	pub voting_key: H256,
 }
 
-#[derive(
-	Clone,
-	PartialEq,
-	Eq,
-	Encode,
-	Decode,
-	RuntimeDebug,
-	TypeInfo,
-	MaxEncodedLen,
-	Serialize,
-	Deserialize,
-)]
+#[derive(Clone, PartialEq, Eq, Encode, Decode, RuntimeDebug, TypeInfo, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
-pub struct BestBlockVoteProofT<Hash: Codec = H256> {
-	/// The vote proof (a smallest u256)
-	pub vote_proof: U256,
+pub struct BestBlockVoteSeal<AccountId: Codec, Authority: Codec> {
+	/// The seal strength (a smallest u256)
+	pub seal_strength: U256,
+	#[codec(compact)]
 	pub notary_id: NotaryId,
-	pub block_vote: BlockVoteT<Hash>,
+	pub block_vote_bytes: Vec<u8>,
+	#[codec(compact)]
+	pub source_notebook_number: NotebookNumber,
 	/// Proof the vote was included in the block vote root of a notary header
 	pub source_notebook_proof: MerkleProof,
+	pub closest_miner: (AccountId, Authority),
 }
-
-pub type BestBlockNonce = BestBlockVoteProofT<H256>;

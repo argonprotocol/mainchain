@@ -15,8 +15,9 @@ use ulx_primitives::{
 	block_seal::{BlockSealAuthorityId, MiningAuthority},
 	block_vote::VoteMinimum,
 	notebook::NotebookNumber,
-	tick::Tick,
-	AuthorityProvider, BlockVotingProvider, NotaryId, NotebookProvider,
+	tick::{Tick, Ticker},
+	AuthorityProvider, BlockVotingProvider, HashOutput, NotaryId, NotebookProvider, NotebookSecret,
+	TickProvider,
 };
 
 use crate as pallet_block_seal;
@@ -62,9 +63,11 @@ parameter_types! {
 	pub static AuthorityList: Vec<(u64, BlockSealAuthorityId)> = vec![];
 	pub static XorClosest: Option<MiningAuthority<BlockSealAuthorityId, u64>> = None;
 	pub static VotingRoots: BTreeMap<(NotaryId, Tick), (H256, NotebookNumber)> = BTreeMap::new();
-	pub static ParentVotingKey: Option<H256> = None;
 	pub static GrandpaVoteMinimum: Option<VoteMinimum> = None;
 	pub static MinerZero: Option<(u64, MiningAuthority<BlockSealAuthorityId, u64>)> = None;
+	pub static NotebooksAtTick: BTreeMap<Tick, Vec<(NotaryId, NotebookNumber, Option<NotebookSecret>)>> = BTreeMap::new();
+	pub static CurrentTick: Tick = 0;
+	pub static BlocksAtTick: BTreeMap<Tick, Vec<HashOutput>> = BTreeMap::new();
 }
 
 pub struct StaticAuthorityProvider;
@@ -94,15 +97,34 @@ impl NotebookProvider for StaticNotebookProvider {
 	) -> Option<(H256, NotebookNumber)> {
 		VotingRoots::get().get(&(notary_id, tick)).cloned()
 	}
+	fn notebooks_in_block() -> Vec<(NotaryId, NotebookNumber, Tick)> {
+		todo!()
+	}
+	fn notebooks_at_tick(tick: Tick) -> Vec<(NotaryId, NotebookNumber, Option<NotebookSecret>)> {
+		NotebooksAtTick::get().get(&tick).cloned().unwrap_or_default()
+	}
+	fn is_notary_locked_at_tick(_: NotaryId, _: Tick) -> bool {
+		false
+	}
+}
+
+pub struct StaticTickProvider;
+impl TickProvider<Block> for StaticTickProvider {
+	fn current_tick() -> Tick {
+		CurrentTick::get()
+	}
+	fn ticker() -> Ticker {
+		Ticker::new(1, 1)
+	}
+	fn blocks_at_tick(tick: Tick) -> Vec<HashOutput> {
+		BlocksAtTick::get().get(&tick).cloned().unwrap_or_default()
+	}
 }
 
 pub struct StaticBlockVotingProvider;
 impl BlockVotingProvider<Block> for StaticBlockVotingProvider {
 	fn grandparent_vote_minimum() -> Option<VoteMinimum> {
 		GrandpaVoteMinimum::get()
-	}
-	fn parent_voting_key() -> Option<H256> {
-		ParentVotingKey::get()
 	}
 }
 
@@ -112,6 +134,7 @@ impl pallet_block_seal::Config for Test {
 	type AuthorityProvider = StaticAuthorityProvider;
 	type NotebookProvider = StaticNotebookProvider;
 	type BlockVotingProvider = StaticBlockVotingProvider;
+	type TickProvider = StaticTickProvider;
 }
 
 // Build genesis storage according to the mock runtime.

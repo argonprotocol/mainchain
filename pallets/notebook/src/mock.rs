@@ -101,21 +101,24 @@ impl NotaryProvider<Block> for NotaryProviderImpl {
 }
 
 parameter_types! {
-	pub static ChainTransfers: Vec<(NotaryId, AccountId32, u64)> = vec![];
+	pub static ChainTransfers: Vec<(NotaryId, AccountId32, u64, Balance)> = vec![];
 	pub static ParentVotingKey: Option<H256> = None;
 	pub static GrandpaVoteMinimum: Option<VoteMinimum> = None;
 	pub static CurrentTick: Tick = 0;
 }
 pub struct ChainTransferLookupImpl;
-impl ChainTransferLookup<u64, AccountId32> for ChainTransferLookupImpl {
+impl ChainTransferLookup<u64, AccountId32, Balance> for ChainTransferLookupImpl {
 	fn is_valid_transfer_to_localchain(
 		notary_id: NotaryId,
 		account_id: &AccountId32,
 		nonce: u64,
+		milligons: Balance,
 	) -> bool {
 		ChainTransfers::get()
 			.iter()
-			.find(|(id, acc, n)| *id == notary_id && *acc == *account_id && *n == nonce)
+			.find(|(id, acc, n, t_mill)| {
+				*id == notary_id && *acc == *account_id && *n == nonce && *t_mill == milligons
+			})
 			.is_some()
 	}
 }
@@ -147,18 +150,18 @@ impl BlockVotingProvider<Block> for StaticBlockVotingProvider {
 	fn grandparent_vote_minimum() -> Option<VoteMinimum> {
 		GrandpaVoteMinimum::get()
 	}
-	fn parent_voting_key() -> Option<H256> {
-		ParentVotingKey::get()
-	}
 }
 
 pub struct StaticTickProvider;
-impl TickProvider for StaticTickProvider {
+impl TickProvider<Block> for StaticTickProvider {
 	fn current_tick() -> Tick {
 		CurrentTick::get()
 	}
 	fn ticker() -> Ticker {
 		Ticker::new(1, 1)
+	}
+	fn blocks_at_tick(_: Tick) -> Vec<H256> {
+		todo!()
 	}
 }
 impl pallet_notebook::Config for Test {

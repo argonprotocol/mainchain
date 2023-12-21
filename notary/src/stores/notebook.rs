@@ -14,8 +14,8 @@ use sp_keystore::KeystorePtr;
 use sqlx::PgConnection;
 
 use ulx_primitives::{
-	ensure, note::AccountType, tick::Ticker, AccountId, AccountOrigin, BalanceTip, BlockVote,
-	MaxNotebookNotarizations, MerkleProof, NewAccountOrigin, NotaryId, NoteType, Notebook,
+	ensure, note::AccountType, AccountId, AccountOrigin, Balance, BalanceTip, BlockVote,
+	MaxNotebookNotarizations, MerkleProof, NewAccountOrigin, NotaryId, Note, NoteType, Notebook,
 	NotebookNumber,
 };
 
@@ -121,16 +121,12 @@ impl NotebookStore {
 		Ok(is_valid)
 	}
 
-	pub async fn load(
+	pub async fn load_finalized(
 		db: &mut PgConnection,
 		notebook_number: NotebookNumber,
-		ticker: Ticker,
 	) -> anyhow::Result<Notebook, Error> {
-		let header = NotebookHeaderStore::load(&mut *db, notebook_number).await?;
-		// end time hasn't been set yet
-		if header.tick == ticker.current() {
-			return Err(Error::NotebookNotFinalized)
-		}
+		let header = NotebookHeaderStore::load_with_signature(&mut *db, notebook_number).await?;
+
 		let notarizations = NotarizationsStore::get_for_notebook(&mut *db, notebook_number).await?;
 
 		let rows = sqlx::query!(
@@ -142,7 +138,7 @@ impl NotebookStore {
 		let new_account_origins = from_value(rows.new_account_origins)?;
 
 		Ok(Notebook {
-			header,
+			header: header.header,
 			hash: H256::from_slice(&rows.hash),
 			signature: Signature::try_from(&rows.signature[..])
 				.map_err(|e| Error::InternalError(format!("Unable to read signature: {:?}", e)))?,
@@ -197,7 +193,8 @@ impl NotebookStore {
 		let notarizations = NotarizationsStore::get_for_notebook(&mut *db, notebook_number).await?;
 
 		let mut changed_accounts =
-			BTreeMap::<(AccountId, AccountType), (u32, u128, AccountOrigin)>::new();
+			BTreeMap::<(AccountId, AccountType), (u32, Balance, AccountOrigin, Option<Note>)>::new(
+			);
 		let mut block_votes = BTreeMap::<(AccountId, u32), BlockVote>::new();
 		let new_account_origins =
 			NotebookNewAccountsStore::take_notebook_origins(&mut *db, notebook_number).await?;
@@ -228,20 +225,27 @@ impl NotebookStore {
 					})
 					.map_err(|e| Error::InternalError(e().to_string()))?;
 
+				let mut change_note = None;
+				for note in change.notes {
+					match note.note_type {
+						NoteType::Tax => tax += note.milligons,
+						NoteType::ChannelHold { .. } => change_note = Some(note.clone()),
+						NoteType::ChannelSettle { .. } => change_note = None,
+						_ => {},
+					}
+				}
+
 				if !changed_accounts.contains_key(&key) ||
 					changed_accounts.get(&key).is_some_and(|a| a.0 < change.change_number)
 				{
-					changed_accounts
-						.insert(key.clone(), (change.change_number, change.balance, origin));
-				}
-				for note in change.notes {
-					if matches!(note.note_type, NoteType::Tax) {
-						tax += note.milligons;
-					}
+					changed_accounts.insert(
+						key.clone(),
+						(change.change_number, change.balance, origin, change_note),
+					);
 				}
 			}
 			for vote in change.block_votes {
-				let block_hash = vote.grandparent_block_hash.clone();
+				let block_hash = vote.block_hash.clone();
 				let key = (vote.account_id.clone(), vote.index.clone());
 				voting_power += vote.power;
 				block_votes.insert(key, vote);
@@ -252,18 +256,23 @@ impl NotebookStore {
 		let mut account_changelist = vec![];
 		let merkle_leafs = changed_accounts
 			.into_iter()
-			.map(|((account_id, account_type), (nonce, balance, account_origin))| {
-				account_changelist.push(account_origin.clone());
-				BalanceTip {
-					account_id,
-					account_type,
-					change_number: nonce,
-					balance,
-					account_origin,
-					channel_hold_note: None,
-				}
-				.encode()
-			})
+			.map(
+				|(
+					(account_id, account_type),
+					(nonce, balance, account_origin, channel_hold_note),
+				)| {
+					account_changelist.push(account_origin.clone());
+					BalanceTip {
+						account_id,
+						account_type,
+						change_number: nonce,
+						balance,
+						account_origin,
+						channel_hold_note,
+					}
+					.encode()
+				},
+			)
 			.collect::<Vec<_>>();
 
 		let changes_root = merkle_root::<Blake2Hasher, _>(&merkle_leafs);
@@ -288,6 +297,10 @@ impl NotebookStore {
 			votes_merkle_leafs.len() as u32,
 			blocks_with_votes,
 			voting_power,
+			|hash| {
+				notary_sign(&keystore, &public, &hash)
+					.map_err(|e| Error::InternalError(format!("Unable to sign notebook: {:?}", e)))
+			},
 		)
 		.await?;
 
@@ -309,6 +322,7 @@ impl NotebookStore {
 
 		let raw_body = full_notebook.encode();
 		Self::save_raw(db, notebook_number, raw_body).await?;
+		let votes_json = json!(final_votes.values().into_iter().collect::<Vec<_>>());
 
 		let res = sqlx::query!(
 			r#"
@@ -318,7 +332,7 @@ impl NotebookStore {
 			notebook_number as i32,
 			merkle_leafs.as_slice(),
 			origins_json,
-			json!(final_votes),
+			votes_json,
 			hash.as_bytes(),
 			&full_notebook.signature.0[..]
 		)
@@ -340,6 +354,8 @@ struct AccountIdAndOrigin {
 }
 #[cfg(test)]
 mod tests {
+	use std::ops::Add;
+
 	use chrono::{Duration, Utc};
 	use sp_core::{bounded_vec, ed25519::Signature};
 	use sp_keyring::{
@@ -348,7 +364,6 @@ mod tests {
 	};
 	use sp_keystore::{testing::MemoryKeystore, Keystore};
 	use sqlx::PgPool;
-	use std::ops::Add;
 
 	use ulx_primitives::{
 		AccountOrigin, AccountType::Deposit, BalanceChange, BalanceTip, NewAccountOrigin,

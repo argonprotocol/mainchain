@@ -18,7 +18,7 @@ use ulx_primitives::{
 	notebook::NotebookNumber,
 	tick::{Tick, Ticker},
 	AuthorityProvider, BlockSealAuthorityId, BlockVotingProvider, NotaryId, NotebookProvider,
-	TickProvider,
+	NotebookSecret, TickProvider,
 };
 
 use crate as pallet_block_seal_spec;
@@ -79,6 +79,8 @@ parameter_types! {
 	pub static MiningSlotsInitiatingTaxProof: u32 = 10;
 	pub static CurrentSeal: BlockSealInherent = BlockSealInherent::Compute;
 	pub static TargetComputeBlockTime: u64 = 100;
+	pub const MaxNotaries: u32 = 100;
+	pub static LockedNotaries: Vec<(NotaryId, Tick)> = vec![];
 
 	pub static CurrentTick: Tick = 0;
 }
@@ -107,11 +109,9 @@ impl BlockVotingProvider<Block> for StaticBlockVotingProvider {
 	fn grandparent_vote_minimum() -> Option<VoteMinimum> {
 		GrandpaVoteMinimum::get()
 	}
-	fn parent_voting_key() -> Option<H256> {
-		ParentVotingKey::get()
-	}
 }
 pub struct StaticNotebookProvider;
+
 impl NotebookProvider for StaticNotebookProvider {
 	fn get_eligible_tick_votes_root(
 		notary_id: NotaryId,
@@ -119,15 +119,27 @@ impl NotebookProvider for StaticNotebookProvider {
 	) -> Option<(H256, NotebookNumber)> {
 		VotingRoots::get().get(&(notary_id, tick)).cloned()
 	}
+	fn notebooks_in_block() -> Vec<(NotaryId, NotebookNumber, Tick)> {
+		todo!()
+	}
+	fn notebooks_at_tick(_tick: Tick) -> Vec<(NotaryId, NotebookNumber, Option<NotebookSecret>)> {
+		todo!()
+	}
+	fn is_notary_locked_at_tick(notary_id: NotaryId, tick: Tick) -> bool {
+		LockedNotaries::get().contains(&(notary_id, tick))
+	}
 }
 
 pub struct StaticTickProvider;
-impl TickProvider for StaticTickProvider {
+impl TickProvider<Block> for StaticTickProvider {
 	fn current_tick() -> Tick {
 		CurrentTick::get()
 	}
 	fn ticker() -> Ticker {
 		Ticker::new(1, 1)
+	}
+	fn blocks_at_tick(_: Tick) -> Vec<H256> {
+		vec![]
 	}
 }
 
@@ -141,6 +153,7 @@ impl pallet_block_seal_spec::Config for Test {
 	type SealInherent = CurrentSeal;
 	type TargetComputeBlockTime = TargetComputeBlockTime;
 	type TickProvider = StaticTickProvider;
+	type MaxActiveNotaries = MaxNotaries;
 }
 
 // Build genesis storage according to the mock runtime.

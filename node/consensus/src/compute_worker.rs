@@ -7,6 +7,7 @@ use std::{
 	time::{Duration, Instant},
 };
 
+use codec::Codec;
 use futures::{
 	executor::block_on,
 	future::BoxFuture,
@@ -22,15 +23,16 @@ use sc_service::TaskManager;
 use sp_api::ProvideRuntimeApi;
 use sp_blockchain::HeaderBackend;
 use sp_consensus::{Environment, Proposal, Proposer, SelectChain, SyncOracle};
-use sp_core::{crypto::AccountId32, traits::SpawnEssentialNamed, RuntimeDebug, U256};
+use sp_core::{traits::SpawnEssentialNamed, RuntimeDebug, U256};
 use sp_runtime::traits::{Block as BlockT, Header as HeaderT};
 use sp_timestamp::Timestamp;
 
-use ulx_primitives::{inherents::BlockSealInherent, tick::Tick, *};
+use ulx_node_runtime::{NotaryRecordT, NotebookVerifyError};
+use ulx_primitives::{inherents::BlockSealInherentNodeSide, tick::Tick, *};
 
 use crate::{
 	aux::UlxAux, block_creator, block_creator::propose, compute_solver::ComputeSolver,
-	digests::get_tick_digest, error::Error, notebook_watch::has_applicable_tax_votes,
+	digests::get_tick_digest, error::Error, notebook_watch::has_votes_at_tick,
 };
 
 /// Version of the mining worker.
@@ -44,13 +46,13 @@ pub struct MiningMetadata<H> {
 	pub best_hash: H,
 	pub import_time: Instant,
 	pub has_tax_votes: bool,
-	pub tick: Tick,
+	pub parent_tick: Tick,
 }
 
-struct MiningBuild<Block: BlockT, Proof> {
-	pub proposal: Proposal<Block, Proof>,
+struct MiningBuild<B: BlockT, Proof> {
+	pub proposal: Proposal<B, Proof>,
 	/// Mining pre-hash.
-	pub pre_hash: Block::Hash,
+	pub pre_hash: B::Hash,
 	/// Pre-runtime digest item.
 	pub difficulty: ComputeDifficulty,
 }
@@ -64,17 +66,17 @@ pub struct MiningHandle<Block: BlockT, L: sc_consensus::JustificationSyncLink<Bl
 	block_import: Arc<Mutex<BoxBlockImport<Block>>>,
 }
 
-impl<Block, L, Proof> MiningHandle<Block, L, Proof>
+impl<B, L, Proof> MiningHandle<B, L, Proof>
 where
-	Block: BlockT,
-	L: sc_consensus::JustificationSyncLink<Block>,
+	B: BlockT,
+	L: sc_consensus::JustificationSyncLink<B>,
 	Proof: Send,
 {
 	fn increment_version(&self) {
 		self.version.fetch_add(1, Ordering::SeqCst);
 	}
 
-	pub fn new(block_import: BoxBlockImport<Block>, justification_sync_link: L) -> Self {
+	pub fn new(block_import: BoxBlockImport<B>, justification_sync_link: L) -> Self {
 		Self {
 			version: Arc::new(AtomicUsize::new(0)),
 			justification_sync_link: Arc::new(justification_sync_link),
@@ -92,19 +94,23 @@ where
 		self.increment_version();
 	}
 
-	pub(crate) fn on_block(&self, best_hash: Block::Hash, has_tax_votes: bool, tick: Tick) {
+	pub(crate) fn on_block(&self, best_hash: B::Hash, has_tax_votes: bool, parent_tick: Tick) {
 		self.stop_solving_current();
 		let mut metadata = self.metadata.lock();
-		*metadata =
-			Some(MiningMetadata { best_hash, has_tax_votes, import_time: Instant::now(), tick });
+		*metadata = Some(MiningMetadata {
+			best_hash,
+			has_tax_votes,
+			import_time: Instant::now(),
+			parent_tick,
+		});
 	}
 
 	pub(crate) fn start_solving(
 		&self,
-		best_hash: Block::Hash,
-		pre_hash: Block::Hash,
+		best_hash: B::Hash,
+		pre_hash: B::Hash,
 		difficulty: ComputeDifficulty,
-		proposal: Proposal<Block, Proof>,
+		proposal: Proposal<B, Proof>,
 	) {
 		if self.best_hash() != Some(best_hash) {
 			self.stop_solving_current();
@@ -124,11 +130,11 @@ where
 
 	/// Get the current best hash. `None` if the worker has just started or the client is doing
 	/// major syncing.
-	pub fn best_hash(&self) -> Option<Block::Hash> {
+	pub fn best_hash(&self) -> Option<B::Hash> {
 		self.metadata.lock().as_ref().map(|b| b.best_hash)
 	}
 
-	pub fn build_hash(&self) -> Option<Block::Hash> {
+	pub fn build_hash(&self) -> Option<B::Hash> {
 		self.build
 			.lock()
 			.as_ref()
@@ -137,7 +143,7 @@ where
 	}
 
 	/// Get a copy of the current mining metadata, if available.
-	pub fn metadata(&self) -> Option<MiningMetadata<Block::Hash>> {
+	pub fn metadata(&self) -> Option<MiningMetadata<B::Hash>> {
 		self.metadata.lock().as_ref().cloned()
 	}
 
@@ -162,13 +168,13 @@ where
 				if !x.has_tax_votes {
 					return true
 				}
-				x.tick <= current_tick.saturating_sub(2)
+				x.parent_tick <= current_tick.saturating_sub(2)
 			},
 			_ => false,
 		}
 	}
 
-	pub async fn submit(&mut self, nonce: U256) -> Result<(), Error<Block>> {
+	pub async fn submit(&mut self, nonce: U256) -> Result<(), Error<B>> {
 		let build = match {
 			let mut build = self.build.lock();
 			// try to take out of option. if not exists, we've moved on
@@ -185,7 +191,7 @@ where
 
 		let mut block_import = self.block_import.lock();
 
-		block_creator::submit_block::<Block, L, Proof>(
+		block_creator::submit_block::<B, L, Proof>(
 			&mut block_import,
 			build.proposal,
 			&self.justification_sync_link,
@@ -196,10 +202,10 @@ where
 	}
 }
 
-impl<Block, L, Proof> Clone for MiningHandle<Block, L, Proof>
+impl<B, L, Proof> Clone for MiningHandle<B, L, Proof>
 where
-	Block: BlockT,
-	L: sc_consensus::JustificationSyncLink<Block>,
+	B: BlockT,
+	L: sc_consensus::JustificationSyncLink<B>,
 {
 	fn clone(&self) -> Self {
 		Self {
@@ -259,33 +265,31 @@ pub fn run_compute_solver_threads<B, L, Proof>(
 	}
 }
 
-pub fn create_compute_miner<Block, C, S, E, SO, L>(
-	block_import: BoxBlockImport<Block>,
+pub fn create_compute_miner<B, C, S, E, SO, L, AccountId>(
+	block_import: BoxBlockImport<B>,
 	client: Arc<C>,
+	aux_client: UlxAux<B, C>,
 	select_chain: S,
 	mut env: E,
 	sync_oracle: SO,
-	account_id: AccountId32,
+	account_id: AccountId,
 	justification_sync_link: L,
 	max_time_to_build_block: Duration,
-) -> (
-	MiningHandle<Block, L, <E::Proposer as Proposer<Block>>::Proof>,
-	impl Future<Output = ()> + 'static,
-)
+) -> (MiningHandle<B, L, <E::Proposer as Proposer<B>>::Proof>, impl Future<Output = ()> + 'static)
 where
-	Block: BlockT,
-	C: ProvideRuntimeApi<Block>
-		+ BlockchainEvents<Block>
-		+ HeaderBackend<Block>
-		+ AuxStore
-		+ 'static,
-	C::Api: BlockSealSpecApis<Block> + TickApis<Block>,
-	S: SelectChain<Block> + 'static,
-	E: Environment<Block> + Send + Sync + 'static,
+	B: BlockT,
+	C: ProvideRuntimeApi<B> + BlockchainEvents<B> + HeaderBackend<B> + AuxStore + 'static,
+	C::Api: BlockSealApis<B, AccountId, BlockSealAuthorityId>
+		+ TickApis<B>
+		+ NotebookApis<B, NotebookVerifyError>
+		+ NotaryApis<B, NotaryRecordT>,
+	S: SelectChain<B> + 'static,
+	E: Environment<B> + Send + Sync + 'static,
 	E::Error: std::fmt::Debug,
-	E::Proposer: Proposer<Block>,
+	E::Proposer: Proposer<B>,
 	SO: SyncOracle + Clone + Send + Sync + 'static,
-	L: sc_consensus::JustificationSyncLink<Block> + 'static,
+	L: sc_consensus::JustificationSyncLink<B> + 'static,
+	AccountId: Codec + Clone + 'static,
 {
 	// create a timer that fires whenever there are new blocks, or 500 ms go by
 	let mut timer = UntilImportedOrTimeout::new(
@@ -330,10 +334,11 @@ where
 			let best_hash = best_header.hash();
 
 			if mining_handle.best_hash() != Some(best_hash) {
-				let block_tick = get_tick_digest(best_header.digest()).unwrap_or_default();
-				let has_tax_votes = has_applicable_tax_votes(&client, &best_header, block_tick);
+				let parent_tick = get_tick_digest(best_header.digest()).unwrap_or_default();
+				let votes_tick = parent_tick.saturating_sub(1);
+				let has_tax_votes = has_votes_at_tick(&client, &best_header, votes_tick);
 
-				mining_handle.on_block(best_hash, has_tax_votes, block_tick);
+				mining_handle.on_block(best_hash, has_tax_votes, parent_tick);
 			}
 
 			let time = Timestamp::current();
@@ -343,6 +348,8 @@ where
 			}
 
 			if mining_handle.build_hash() != Some(best_hash) {
+				let notebooks_tick = tick.saturating_sub(1);
+
 				let difficulty = match client.runtime_api().compute_difficulty(best_hash) {
 					Ok(x) => x,
 					Err(err) => {
@@ -354,28 +361,15 @@ where
 					},
 				};
 
-				let notary_state =
-					match UlxAux::<C, Block>::get_notebook_tick_state(client.as_ref(), tick) {
-						Ok(x) => x,
-						Err(err) => {
-							warn!(
-								target: LOG_TARGET,
-								"Unable to pull new block for compute miner. No notary state found!! {}", err
-							);
-							continue
-						},
-					};
-
 				let proposal = match propose(
 					client.clone(),
+					aux_client.clone(),
 					&mut env,
 					account_id.clone(),
-					tick,
+					notebooks_tick,
 					time.as_millis(),
-					notary_state.block_vote_digest,
 					best_hash,
-					BlockSealInherent::Compute,
-					notary_state.latest_finalized_block_needed,
+					BlockSealInherentNodeSide::Compute,
 					max_time_to_build_block,
 				)
 				.await

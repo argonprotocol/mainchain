@@ -1,10 +1,12 @@
 use std::collections::{BTreeMap, BTreeSet};
 
 use chrono::Utc;
+use serde_json::json;
 use sp_core::H256;
 use sqlx::{FromRow, PgConnection};
+use ulx_notary_audit::VerifyError;
 
-use ulx_primitives::{ensure, VoteMinimum};
+use ulx_primitives::{ensure, NotebookDigestRecord, VoteMinimum};
 
 use crate::Error;
 
@@ -18,6 +20,7 @@ pub struct BlockRow {
 	pub block_vote_minimum: String,
 	pub latest_notebook_number: Option<i32>,
 	pub is_finalized: bool,
+	pub notebook_digests: Option<serde_json::Value>,
 	pub finalized_time: Option<chrono::DateTime<Utc>>,
 	pub received_time: chrono::DateTime<Utc>,
 }
@@ -158,13 +161,17 @@ impl BlocksStore {
 		block_hash: H256,
 		parent_hash: H256,
 		vote_minimum: VoteMinimum,
-		latest_notebook_number: Option<u32>,
+		notebook_digests: Vec<NotebookDigestRecord<VerifyError>>,
 	) -> anyhow::Result<(), Error> {
+		let latest_notebook_number =
+			notebook_digests.iter().map(|x| x.notebook_number as i32).max();
+
+		let digests = json!(notebook_digests);
 		let res = sqlx::query!(
 			r#"
 			INSERT INTO blocks (block_hash, block_number, parent_hash, block_vote_minimum, received_time, is_finalized,
-				latest_notebook_number)
-			VALUES ($1, $2, $3, $4, $5, $6, $7)
+				latest_notebook_number, notebook_digests)
+			VALUES ($1, $2, $3, $4, $5, $6, $7, $8)
 		"#,
 			block_hash.0.to_vec(),
 			block_number as i32,
@@ -172,7 +179,8 @@ impl BlocksStore {
 			vote_minimum.to_string(),
 			Utc::now(),
 			false,
-			latest_notebook_number.map(|n| n as i32),
+			latest_notebook_number,
+			digests,
 		)
 		.execute(db)
 		.await?;
@@ -189,6 +197,8 @@ impl BlocksStore {
 mod tests {
 	use sp_core::H256;
 	use sqlx::PgPool;
+	use ulx_notary_audit::VerifyError;
+	use ulx_primitives::NotebookDigestRecord;
 
 	use crate::stores::blocks::BlocksStore;
 
@@ -196,15 +206,27 @@ mod tests {
 	async fn test_storage(pool: PgPool) -> anyhow::Result<()> {
 		{
 			let mut tx = pool.begin().await?;
-			BlocksStore::record(&mut *tx, 0, H256::from_slice(&[1u8; 32]), H256::zero(), 100, None)
-				.await?;
+			BlocksStore::record(
+				&mut *tx,
+				0,
+				H256::from_slice(&[1u8; 32]),
+				H256::zero(),
+				100,
+				vec![],
+			)
+			.await?;
 			BlocksStore::record(
 				&mut *tx,
 				1,
 				H256::from_slice(&[2u8; 32]),
 				H256::from_slice(&[1u8; 32]),
 				100,
-				None,
+				vec![NotebookDigestRecord {
+					notebook_number: 1,
+					notary_id: 1,
+					audit_first_failure: Some(VerifyError::AccountAlreadyHasChannelHold),
+					tick: 1,
+				}],
 			)
 			.await?;
 			BlocksStore::record(
@@ -213,7 +235,7 @@ mod tests {
 				H256::from_slice(&[3u8; 32]),
 				H256::from_slice(&[2u8; 32]),
 				100,
-				None,
+				vec![],
 			)
 			.await?;
 			BlocksStore::record_finalized(&mut *tx, H256::from_slice(&[3u8; 32])).await?;
@@ -229,9 +251,9 @@ mod tests {
 		Ok(())
 	}
 	#[sqlx::test]
-	async fn test_cant_overwrite(pool: PgPool) -> anyhow::Result<()> {
+	async fn test_cannot_overwrite(pool: PgPool) -> anyhow::Result<()> {
 		let mut tx = pool.begin().await?;
-		BlocksStore::record(&mut *tx, 1, H256::from_slice(&[1u8; 32]), H256::zero(), 100, None)
+		BlocksStore::record(&mut *tx, 1, H256::from_slice(&[1u8; 32]), H256::zero(), 100, vec![])
 			.await?;
 		assert!(BlocksStore::record(
 			&mut *tx,
@@ -239,7 +261,7 @@ mod tests {
 			H256::from_slice(&[1u8; 32]),
 			H256::from_slice(&[1u8; 32]),
 			100,
-			None
+			vec![]
 		)
 		.await
 		.unwrap_err()

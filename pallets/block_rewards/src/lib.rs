@@ -29,7 +29,9 @@ pub mod pallet {
 	};
 	use sp_std::{vec, vec::Vec};
 
-	use ulx_primitives::{notary::NotaryProvider, BlockSealerProvider};
+	use ulx_primitives::{
+		notary::NotaryProvider, tick::Tick, BlockSealerProvider, NotebookProvider,
+	};
 
 	use super::*;
 
@@ -78,6 +80,8 @@ pub mod pallet {
 
 		type BlockSealerProvider: BlockSealerProvider<Self::AccountId>;
 		type NotaryProvider: NotaryProvider<Self::Block>;
+		type NotebookProvider: NotebookProvider;
+		type CurrentTick: Get<Tick>;
 		/// Number of argons minted per block
 		#[pallet::constant]
 		type ArgonsPerBlock: Get<Self::Balance>;
@@ -185,15 +189,23 @@ pub mod pallet {
 
 			let mut block_ulixees = block_ulixees.saturating_div(halvings + 1u128);
 			let active_notaries = T::NotaryProvider::active_notaries().len() as u128;
-			if active_notaries > authors.notaries_included.into() {
-				if authors.notaries_included == 0 {
+			let block_notebooks = T::NotebookProvider::notebooks_in_block();
+			let current_tick = T::CurrentTick::get();
+			let tick_notebooks = block_notebooks.iter().fold(0u128, |acc, (_, _, tick)| {
+				if *tick == current_tick {
+					acc + 1u128
+				} else {
+					acc
+				}
+			});
+
+			if active_notaries > tick_notebooks {
+				if tick_notebooks == 0 {
 					block_ulixees = 1u128;
 					block_argons = 1u128;
 				} else {
-					block_ulixees = block_ulixees.saturating_mul(authors.notaries_included.into()) /
-						active_notaries;
-					block_argons = block_argons.saturating_mul(authors.notaries_included.into()) /
-						active_notaries;
+					block_ulixees = block_ulixees.saturating_mul(tick_notebooks) / active_notaries;
+					block_argons = block_argons.saturating_mul(tick_notebooks) / active_notaries;
 				}
 			}
 

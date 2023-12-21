@@ -86,6 +86,7 @@ impl BalanceTipStore {
 		account_origin: AccountOrigin,
 		channel_hold_note: Option<Note>,
 		prev_balance: u128,
+		prev_channel_hold_note: Option<Note>,
 	) -> BoxFutureResult<'a, ()> {
 		let key = BalanceTip::create_key(account_id, &account_type);
 		let tip = BalanceTip::compute_tip(
@@ -98,7 +99,7 @@ impl BalanceTipStore {
 			change_number - 1,
 			prev_balance,
 			account_origin,
-			channel_hold_note,
+			prev_channel_hold_note,
 		);
 		Box::pin(async move {
 			let res = sqlx::query!(
@@ -167,6 +168,7 @@ mod tests {
 				AccountOrigin { notebook_number: 1, account_uid: 1 },
 				None,
 				0,
+				None,
 			)
 			.await?;
 			tx1.commit().await?;
@@ -224,7 +226,8 @@ mod tests {
 				1,
 				AccountOrigin { notebook_number: 1, account_uid: 1 },
 				None,
-				1000
+				1000,
+				None
 			)
 			.await
 		);

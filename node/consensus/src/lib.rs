@@ -1,11 +1,11 @@
 use sp_runtime::traits::{Block as BlockT, Header as HeaderT, UniqueSaturatedInto};
 
-pub use block_creator::{create_tax_vote_block_watch, tax_block_creator};
+pub use block_creator::{notary_client_task, tax_block_creator};
 
 #[cfg(test)]
 mod tests;
 
-mod aux;
+pub mod aux;
 pub mod basic_queue;
 mod basic_queue_import;
 mod block_creator;
@@ -15,7 +15,7 @@ mod digests;
 pub mod error;
 pub mod import_queue;
 mod metrics;
-mod notebook_auditor;
+mod notary_client;
 pub mod notebook_watch;
 const LOG_TARGET: &str = "node::consensus";
 

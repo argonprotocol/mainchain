@@ -137,7 +137,6 @@ fn it_can_handle_multiple_transfer() {
 
 #[test]
 fn it_can_handle_transfers_in() {
-	RequiredNotebookAuditors::set(0);
 	MaxNotebookBlocksToRemember::set(2);
 	new_test_ext().execute_with(|| {
 		// Go past genesis block so events get deposited
@@ -220,7 +219,6 @@ fn it_can_handle_transfers_in() {
 
 #[test]
 fn it_reduces_circulation_on_tax() {
-	RequiredNotebookAuditors::set(0);
 	MaxNotebookBlocksToRemember::set(2);
 	new_test_ext().execute_with(|| {
 		// Go past genesis block so events get deposited
@@ -253,9 +251,46 @@ fn it_reduces_circulation_on_tax() {
 		assert_eq!(Balances::free_balance(&who), 23_000);
 	})
 }
+
+#[test]
+fn it_does_not_alter_tax_if_notary_locked() {
+	MaxNotebookBlocksToRemember::set(2);
+	new_test_ext().execute_with(|| {
+		// Go past genesis block so events get deposited
+		System::set_block_number(1);
+		let who = ChainTransferPallet::notary_account_id(1);
+		set_argons(&who, 25000);
+		assert_eq!(Balances::total_issuance(), 25_000);
+		LockedNotaries::mutate(|locks| locks.insert(1, 2));
+
+		ChainTransferPallet::on_initialize(2);
+		assert_ok!(ChainTransferPallet::notebook_submitted(&NotebookHeader {
+			notary_id: 1,
+			notebook_number: 1,
+			tick: 2,
+			chain_transfers: bounded_vec![],
+			changed_accounts_root: H256::random(),
+			changed_account_origins: bounded_vec![],
+			version: 1,
+			finalized_block_number: 1,
+			tax: 3000,
+			block_voting_power: 0,
+			blocks_with_votes: Default::default(),
+			block_votes_root: H256::random(),
+			secret_hash: H256::random(),
+
+			parent_secret: None,
+			block_votes_count: 0,
+		}),);
+
+		// does not change!
+		assert_eq!(Balances::total_issuance(), 25_000);
+		assert_eq!(Balances::free_balance(&who), 25_000);
+	})
+}
+
 #[test]
 fn it_doesnt_allow_a_notary_balance_to_go_negative() {
-	RequiredNotebookAuditors::set(0);
 	new_test_ext().execute_with(|| {
 		// Go past genesis block so events get deposited
 		System::set_block_number(2);
@@ -287,8 +322,44 @@ fn it_doesnt_allow_a_notary_balance_to_go_negative() {
 }
 
 #[test]
+fn it_skips_transfers_to_mainchain_if_notary_locked() {
+	LockedNotaries::mutate(|locks| locks.insert(1, 2));
+	new_test_ext().execute_with(|| {
+		let who = Bob.to_account_id();
+		set_argons(&who, 5000);
+		let pallet_balance = ChainTransferPallet::notary_account_id(1);
+		set_argons(&pallet_balance, 25000);
+		assert_eq!(Balances::total_issuance(), 30_000);
+		System::set_block_number(2);
+		assert_ok!(ChainTransferPallet::notebook_submitted(&NotebookHeader {
+			notary_id: 1,
+			notebook_number: 1,
+			tick: 2,
+			chain_transfers: bounded_vec![ChainTransfer::ToMainchain {
+				account_id: Bob.to_account_id(),
+				amount: 5000
+			}],
+			changed_accounts_root: H256::random(),
+			changed_account_origins: bounded_vec![],
+			version: 1,
+			finalized_block_number: 1,
+			tax: 0,
+			block_voting_power: 0,
+			blocks_with_votes: Default::default(),
+			block_votes_root: H256::random(),
+			secret_hash: H256::random(),
+
+			parent_secret: None,
+			block_votes_count: 0,
+		}),);
+
+		assert_eq!(Balances::total_issuance(), 30_000);
+		assert_eq!(Balances::free_balance(&who), 5_000);
+	});
+}
+
+#[test]
 fn it_expires_transfers_if_not_committed() {
-	RequiredNotebookAuditors::set(0);
 	new_test_ext().execute_with(|| {
 		let who = Bob.to_account_id();
 		// Go past genesis block so events get deposited

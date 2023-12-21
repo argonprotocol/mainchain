@@ -349,12 +349,14 @@ mod tests {
 				.await,
 				Error::MaxNotebookChainTransfersReached
 			);
+			tx.rollback().await?;
 		}
 
 		{
 			let mut tx = pool.begin().await?;
 			NotebookStatusStore::next_step(&mut *tx, 1, NotebookFinalizationStep::Open).await?;
-			NotebookStatusStore::create(&pool, 1, 2, Utc::now().add(Duration::minutes(2))).await?;
+			NotebookStatusStore::create(&mut *tx, 2, 2, Utc::now().add(Duration::minutes(2)))
+				.await?;
 			tx.commit().await?;
 
 			let mut tx = pool.begin().await?;

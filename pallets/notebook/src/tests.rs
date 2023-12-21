@@ -1,25 +1,23 @@
 use std::collections::BTreeMap;
 
 use binary_merkle_tree::merkle_root;
-use codec::{Decode, Encode};
+use codec::Encode;
 use frame_support::{assert_err, assert_noop, assert_ok, traits::OnInitialize};
 use sp_core::{bounded_vec, ed25519, Blake2Hasher, Pair};
 use sp_keyring::{AccountKeyring::Bob, Ed25519Keyring};
-use sp_runtime::{
-	testing::H256,
-	traits::{Header, UniqueSaturatedInto, ValidateUnsigned},
-	transaction_validity::{InvalidTransaction, TransactionSource},
-};
+use sp_runtime::{testing::H256, traits::UniqueSaturatedInto, Digest, DigestItem};
 
+use ulx_notary_audit::VerifyError;
 use ulx_primitives::{
-	localchain::{AccountType, BalanceChange, BlockVoteT, ChannelPass, Note, NoteType},
+	localchain::{AccountType, BalanceChange, Note, NoteType},
 	notary::NotaryNotebookKeyDetails,
 	notebook::{
 		AccountOrigin, BalanceTip, ChainTransfer, NewAccountOrigin, Notarization, NotebookHeader,
 		NotebookNumber,
 	},
 	tick::Tick,
-	NotebookVotes,
+	NotaryId, NotebookDigest, NotebookDigestRecord, NotebookProvider, SignedNotebookHeader,
+	NOTEBOOKS_DIGEST_ID,
 };
 
 use crate::{
@@ -31,67 +29,191 @@ use crate::{
 	Error,
 };
 
-#[test]
-fn it_validates_unsigned_signature() {
-	new_test_ext().execute_with(|| {
-		// Go past genesis block so events get deposited
-		System::set_block_number(2);
-		let mut header = make_header(1, 3);
+fn notebook_digest(books: Vec<(NotaryId, NotebookNumber, Tick, bool)>) -> DigestItem {
+	DigestItem::PreRuntime(
+		NOTEBOOKS_DIGEST_ID,
+		NotebookDigest {
+			notebooks: books
+				.into_iter()
+				.map(|(notary_id, notebook_number, tick, has_error)| NotebookDigestRecord {
+					notebook_number,
+					notary_id,
+					tick,
+					audit_first_failure: if has_error {
+						Some(VerifyError::InvalidBlockVoteRoot)
+					} else {
+						None
+					},
+				})
+				.collect(),
+		}
+		.encode(),
+	)
+}
 
-		System::set_block_number(3);
-		// should have a bad hash now
-		header.tick = 2;
-		assert_noop!(
-			Notebook::validate_unsigned(
-				TransactionSource::Local,
-				&crate::Call::submit {
-					header: header.clone(),
-					hash: H256::random(),
-					signature: ed25519::Signature([0u8; 64]),
+#[test]
+#[should_panic]
+fn it_should_panic_if_no_notebook_digest() {
+	new_test_ext().execute_with(|| Notebook::on_initialize(1));
+}
+
+#[test]
+fn it_ensures_only_a_single_inherent_is_submitted() {
+	new_test_ext().execute_with(|| {
+		let digest = notebook_digest(vec![]);
+		System::initialize(&1, &System::parent_hash(), &Digest { logs: vec![digest.clone()] });
+		Notebook::on_initialize(1);
+		assert_ok!(Notebook::submit(RuntimeOrigin::none(), vec![]));
+		assert_err!(
+			Notebook::submit(RuntimeOrigin::none(), vec![]),
+			Error::<Test>::MultipleNotebookInherentsProvided
+		);
+	});
+}
+
+#[test]
+fn it_locks_notaries_on_audit_failure() {
+	new_test_ext().execute_with(|| {
+		let digest = notebook_digest(vec![(1, 1, 1, false), (2, 1, 1, true)]);
+		System::initialize(&1, &System::parent_hash(), &Digest { logs: vec![digest.clone()] });
+		Notebook::on_initialize(1);
+		CurrentTick::set(1);
+		assert_err!(
+			Notebook::submit(RuntimeOrigin::none(), vec![]),
+			Error::<Test>::InvalidNotebookDigest
+		);
+		let header1 = make_header(1, 1);
+		let mut header2 = make_header(1, 1);
+		header2.notary_id = 2;
+
+		assert_ok!(Notebook::submit(
+			RuntimeOrigin::none(),
+			vec![
+				SignedNotebookHeader {
+					header: header1.clone(),
+					signature: Ed25519Keyring::Bob.pair().sign(header1.hash().as_ref())
 				},
-			),
-			InvalidTransaction::BadProof
+				SignedNotebookHeader {
+					header: header2.clone(),
+					signature: Ed25519Keyring::Bob.pair().sign(header2.hash().as_ref())
+				}
+			]
+		));
+		// should store that it's no longer valid
+		assert_eq!(LastNotebookDetailsByNotary::<Test>::get(2)[0].1, false);
+		// this is the default verify error
+		assert_eq!(Notebook::notary_failed_audit_by_id(1), None);
+		assert_eq!(
+			Notebook::notary_failed_audit_by_id(2),
+			Some((1, 1, VerifyError::InvalidBlockVoteRoot))
+		);
+		assert_eq!(Notebook::is_notary_locked_at_tick(2, 1), true);
+		assert_eq!(Notebook::is_notary_locked_at_tick(2, 2), true);
+		assert_eq!(Notebook::is_notary_locked_at_tick(2, 0), false);
+	});
+}
+
+#[test]
+fn it_supports_multiple_notebooks() {
+	new_test_ext().execute_with(|| {
+		let digest = notebook_digest(vec![(1, 1, 1, false), (2, 1, 1, false)]);
+		System::initialize(&1, &System::parent_hash(), &Digest { logs: vec![digest.clone()] });
+		Notebook::on_initialize(1);
+		CurrentTick::set(1);
+		let header1 = make_header(1, 1);
+		let mut header2 = make_header(1, 1);
+		header2.notary_id = 2;
+		assert_ok!(Notebook::submit(
+			RuntimeOrigin::none(),
+			vec![
+				SignedNotebookHeader {
+					header: header1.clone(),
+					signature: Ed25519Keyring::Bob.pair().sign(header1.hash().as_ref())
+				},
+				SignedNotebookHeader {
+					header: header2.clone(),
+					signature: Ed25519Keyring::Bob.pair().sign(header2.hash().as_ref())
+				}
+			]
+		));
+
+		assert_eq!(LastNotebookDetailsByNotary::<Test>::get(1).len(), 1);
+		assert_eq!(LastNotebookDetailsByNotary::<Test>::get(2).len(), 1);
+		assert_eq!(LastNotebookDetailsByNotary::<Test>::get(1)[0].1, true);
+		assert_eq!(LastNotebookDetailsByNotary::<Test>::get(2)[0].1, true);
+		assert_eq!(Notebook::notebooks_at_tick(1), vec![(2, 1, None), (1, 1, None),]);
+		assert_eq!(Notebook::notebooks_in_block(), vec![(1, 1, 1), (2, 1, 1),]);
+		assert_eq!(
+			Notebook::get_eligible_tick_votes_root(1, 1),
+			Some((header1.block_votes_root, 1))
+		);
+	});
+}
+
+#[test]
+fn it_tracks_notebooks_at_tick() {
+	new_test_ext().execute_with(|| {
+		CurrentTick::set(1);
+		let header1 = make_header(1, 1);
+		assert_ok!(Notebook::process_notebook(header1, true),);
+
+		let mut header2 = make_header(1, 1);
+		header2.notary_id = 2;
+		assert_ok!(Notebook::process_notebook(header2, true),);
+
+		assert_eq!(Notebook::notebooks_at_tick(1), vec![(2, 1, None), (1, 1, None),]);
+
+		System::initialize(
+			&2,
+			&System::parent_hash(),
+			&Digest { logs: vec![notebook_digest(vec![])] },
 		);
 
-		assert_ok!(Notebook::validate_unsigned(
-			TransactionSource::Local,
-			&crate::Call::submit {
-				header: header.clone(),
-				hash: header.hash(),
-				signature: ed25519::Signature([0u8; 64]),
-			},
-		));
+		let mut header3 = make_header(2, 4);
+		header3.notary_id = 2;
+		assert_ok!(Notebook::process_notebook(header3, true),);
+		assert_eq!(Notebook::notebooks_at_tick(4), vec![(2, 2, None)]);
 	});
 }
 
 #[test]
 fn it_requires_notebooks_in_order() {
 	new_test_ext().execute_with(|| {
-		// Go past genesis block so events get deposited
-		System::set_block_number(2);
+		let header = make_header(2, 1);
+		assert_noop!(
+			Notebook::verify_notebook_order(&header),
+			Error::<Test>::MissingNotebookNumber
+		);
+
 		LastNotebookDetailsByNotary::<Test>::mutate(1, |v| {
 			*v = bounded_vec!((
 				NotaryNotebookKeyDetails {
 					tick: 1,
+					parent_secret: None,
 					secret_hash: H256::random(),
 					block_votes_root: H256::random(),
-					notebook_number: 10,
+					notebook_number: 1,
 				},
 				true
 			))
 		});
-		let header = make_header(8, 2);
+
+		// only 1 notebook per tick per notary
+		let header = make_header(2, 1);
 		assert_noop!(
-			Notebook::validate_unsigned(
-				TransactionSource::Local,
-				&crate::Call::submit {
-					header: header.clone(),
-					hash: header.hash(),
-					signature: ed25519::Signature([0u8; 64]),
-				},
-			),
-			InvalidTransaction::Stale
+			Notebook::verify_notebook_order(&header),
+			Error::<Test>::NotebookTickAlreadyUsed
 		);
+
+		// only 1 notebook per tick per notary
+		let header = make_header(3, 1);
+		assert_noop!(
+			Notebook::verify_notebook_order(&header),
+			Error::<Test>::MissingNotebookNumber
+		);
+
+		let header = make_header(2, 2);
+		assert_ok!(Notebook::verify_notebook_order(&header),);
 	});
 }
 
@@ -103,7 +225,7 @@ fn it_tracks_changed_accounts() {
 		let who = Bob.to_account_id();
 		let nonce = System::account_nonce(&who).into();
 		set_argons(&who, 5000);
-		ChainTransfers::mutate(|v| v.push((1, who.clone(), nonce)));
+		ChainTransfers::mutate(|v| v.push((1, who.clone(), nonce, 5000)));
 
 		System::set_block_number(3);
 		System::on_initialize(3);
@@ -124,12 +246,7 @@ fn it_tracks_changed_accounts() {
 		secret_hashes.push(header.secret_hash);
 		let first_votes = header.block_votes_root;
 		CurrentTick::set(2);
-		assert_ok!(Notebook::submit(
-			RuntimeOrigin::none(),
-			header.clone(),
-			header.hash(),
-			ed25519::Signature([0u8; 64]),
-		));
+		assert_ok!(Notebook::process_notebook(header.clone(), true));
 
 		assert_eq!(
 			NotebookChangedAccountsRootByNotary::<Test>::get(1, 1),
@@ -160,24 +277,12 @@ fn it_tracks_changed_accounts() {
 		// wrong secret hash
 		header.parent_secret = Some(secrets[1]);
 
-		assert_err!(
-			Notebook::submit(
-				RuntimeOrigin::none(),
-				header.clone(),
-				header.hash(),
-				ed25519::Signature([0u8; 64]),
-			),
-			Error::<Test>::InvalidSecretProvided
-		);
+		assert_err!(Notebook::verify_notebook_order(&header), Error::<Test>::InvalidSecretProvided);
 		header.parent_secret = Some(secrets[0]);
 		let second_votes = header.block_votes_root;
 		CurrentTick::set(3);
-		assert_ok!(Notebook::submit(
-			RuntimeOrigin::none(),
-			header.clone(),
-			header.hash(),
-			ed25519::Signature([0u8; 64]),
-		));
+		assert_ok!(Notebook::verify_notebook_order(&header),);
+		assert_ok!(Notebook::process_notebook(header, true),);
 		assert_eq!(Balances::free_balance(&who), 5000);
 		assert_eq!(
 			NotebookChangedAccountsRootByNotary::<Test>::get(1, 1),
@@ -196,6 +301,7 @@ fn it_tracks_changed_accounts() {
 			vec![
 				(
 					NotaryNotebookKeyDetails {
+						parent_secret: Some(secrets[0]),
 						notebook_number: 2,
 						tick: 3,
 						secret_hash: secret_hashes[1],
@@ -205,6 +311,7 @@ fn it_tracks_changed_accounts() {
 				),
 				(
 					NotaryNotebookKeyDetails {
+						parent_secret: None,
 						notebook_number: 1,
 						tick: 2,
 						secret_hash: secret_hashes[0],
@@ -224,17 +331,13 @@ fn it_tracks_changed_accounts() {
 		secret_hashes.push(header.secret_hash);
 
 		CurrentTick::set(4);
-		assert_ok!(Notebook::submit(
-			RuntimeOrigin::none(),
-			header.clone(),
-			header.hash(),
-			ed25519::Signature([0u8; 64]),
-		));
+		assert_ok!(Notebook::process_notebook(header.clone(), true),);
 		assert_eq!(
 			LastNotebookDetailsByNotary::<Test>::get(1),
 			vec![
 				(
 					NotaryNotebookKeyDetails {
+						parent_secret: Some(secrets[1]),
 						notebook_number: 3,
 						tick: 4,
 						secret_hash: secret_hashes[2],
@@ -244,6 +347,7 @@ fn it_tracks_changed_accounts() {
 				),
 				(
 					NotaryNotebookKeyDetails {
+						parent_secret: Some(secrets[0]),
 						notebook_number: 2,
 						tick: 3,
 						secret_hash: secret_hashes[1],
@@ -253,6 +357,7 @@ fn it_tracks_changed_accounts() {
 				),
 				(
 					NotaryNotebookKeyDetails {
+						parent_secret: None,
 						notebook_number: 1,
 						tick: 2,
 						secret_hash: secret_hashes[0],
@@ -274,7 +379,7 @@ fn it_tracks_changed_accounts() {
 }
 
 #[test]
-fn it_doesnt_include_notebooks_for_wrong_tick() {
+fn it_tracks_notebooks_received_out_of_tick() {
 	new_test_ext().execute_with(|| {
 		System::set_block_number(3);
 		System::on_initialize(3);
@@ -286,49 +391,29 @@ fn it_doesnt_include_notebooks_for_wrong_tick() {
 			NotebookHeader::create_secret_hash(secrets[0], header1.block_votes_root, 1);
 		secret_hashes.push(header1.secret_hash);
 		CurrentTick::set(3);
-		assert_ok!(Notebook::submit(
-			RuntimeOrigin::none(),
-			header1.clone(),
-			header1.hash(),
-			ed25519::Signature([0u8; 64]),
-		));
+		assert_ok!(Notebook::process_notebook(header1.clone(), true),);
 		let mut header2 = make_header(2, 3);
 		header2.parent_secret = Some(secrets[0]);
 		header2.secret_hash =
 			NotebookHeader::create_secret_hash(secrets[1], header2.block_votes_root, 2);
 		secret_hashes.push(header2.secret_hash);
-		assert_ok!(Notebook::submit(
-			RuntimeOrigin::none(),
-			header2.clone(),
-			header2.hash(),
-			ed25519::Signature([0u8; 64]),
-		));
+		assert_ok!(Notebook::process_notebook(header2.clone(), true),);
 
+		let last_details = LastNotebookDetailsByNotary::<Test>::get(1);
+
+		let (details_2, at_tick_2) = last_details.get(0).unwrap();
+		assert_eq!(details_2.tick, header2.tick);
+		assert_eq!(at_tick_2, &true);
+
+		let (details_1, at_tick_1) = last_details.get(1).unwrap();
+		assert_eq!(details_1.tick, header1.tick);
+		assert_eq!(at_tick_1, &false);
+
+		assert_eq!(Notebook::get_eligible_tick_votes_root(1, header1.tick), None);
 		assert_eq!(
-			LastNotebookDetailsByNotary::<Test>::get(1).into_inner(),
-			vec![
-				(
-					NotaryNotebookKeyDetails {
-						notebook_number: 2,
-						tick: 3,
-						secret_hash: secret_hashes[1],
-						block_votes_root: header2.block_votes_root
-					},
-					true
-				),
-				(
-					NotaryNotebookKeyDetails {
-						notebook_number: 1,
-						tick: 2,
-						secret_hash: secret_hashes[0],
-						block_votes_root: header1.block_votes_root
-					},
-					false
-				),
-			]
+			Notebook::get_eligible_tick_votes_root(1, header2.tick),
+			Some((header2.block_votes_root, header2.notebook_number))
 		);
-
-		System::set_block_number(4);
 	})
 }
 
@@ -342,10 +427,9 @@ fn it_can_audit_notebooks() {
 		let notary_id = 1;
 		System::inc_account_nonce(&who);
 		set_argons(&who, 2000);
-		ChainTransfers::mutate(|v| v.push((notary_id, who.clone(), nonce)));
+		ChainTransfers::mutate(|v| v.push((notary_id, who.clone(), nonce, 2000)));
 
 		System::set_block_number(2);
-		Notebook::on_initialize(2);
 
 		let header = NotebookHeader {
 			notary_id,
@@ -423,70 +507,6 @@ fn it_can_audit_notebooks() {
 			&notebook.encode(),
 		));
 	});
-}
-
-#[test]
-fn it_can_find_best_vote_proofs() {
-	new_test_ext().execute_with(|| {
-		// Go past genesis block so events get deposited
-		let mut parent_hash = System::parent_hash();
-
-		assert_eq!(Notebook::best_vote_proofs(&BTreeMap::new()).unwrap().into_inner(), vec![]);
-		let mut first_vote = BlockVoteT {
-			account_id: Bob.public().into(),
-			index: 0,
-			grandparent_block_hash: parent_hash,
-			power: 500,
-			channel_pass: ChannelPass {
-				zone_record_hash: H256::random(),
-				id: 1,
-				at_block_height: 1,
-				miner_index: 0,
-			},
-		};
-
-		let mut votes = BTreeMap::new();
-		votes.insert(1, NotebookVotes { raw_votes: vec![(first_vote.encode(), 500)] });
-		assert_eq!(Notebook::best_vote_proofs(&BTreeMap::new()).unwrap().into_inner(), vec![]);
-
-		for i in 1..5 {
-			System::reset_events();
-			System::initialize(&i, &parent_hash, &Default::default());
-
-			let header = System::finalize();
-			parent_hash = header.hash();
-			System::set_block_number(*header.number());
-		}
-		first_vote.grandparent_block_hash = System::block_hash(2);
-		votes.insert(1, NotebookVotes { raw_votes: vec![(first_vote.encode(), 500)] });
-
-		ParentVotingKey::set(Some(H256::random()));
-		// vote is for grandparent, not great grandparent
-		assert_eq!(Notebook::best_vote_proofs(&BTreeMap::new()).unwrap().into_inner(), vec![]);
-
-		first_vote.grandparent_block_hash = System::block_hash(1);
-		votes.insert(1, NotebookVotes { raw_votes: vec![(first_vote.encode(), 500)] });
-		let best = Notebook::best_vote_proofs(&votes).expect("should return");
-		assert_eq!(best.len(), 1);
-		assert_eq!(best[0].block_vote, first_vote);
-
-		// insert 200 votes
-		for i in 2..200 {
-			let mut vote = first_vote.clone();
-			vote.index = i;
-			votes.insert(i, NotebookVotes { raw_votes: vec![(vote.encode(), 500)] });
-		}
-		let best = Notebook::best_vote_proofs(&votes).expect("should return");
-		assert_eq!(best.len(), 2);
-		let best_proof = best[0].vote_proof;
-		let voting_key = ParentVotingKey::get().unwrap();
-		for (notary_id, vote) in votes {
-			for (vote, _) in vote.raw_votes {
-				let block_vote = BlockVoteT::<H256>::decode(&mut vote.as_slice()).unwrap();
-				assert!(block_vote.vote_proof(notary_id, voting_key) >= best_proof);
-			}
-		}
-	})
 }
 
 fn make_header(notebook_number: NotebookNumber, tick: Tick) -> NotebookHeader {

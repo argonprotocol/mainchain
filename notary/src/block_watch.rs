@@ -1,6 +1,10 @@
+use codec::Decode;
 use sp_core::{ed25519, H256};
 use sqlx::{PgConnection, PgPool};
-use subxt::blocks::{Block, BlockRef};
+use subxt::{
+	blocks::{Block, BlockRef},
+	config::substrate::DigestItem,
+};
 use tracing::info;
 
 pub use ulixee_client;
@@ -8,7 +12,7 @@ use ulixee_client::{
 	api, api::runtime_types::bounded_collections::bounded_vec::BoundedVec, try_until_connected,
 	UlxClient, UlxConfig,
 };
-use ulx_primitives::{tick::Ticker, AccountId, NotaryId, NotebookNumber};
+use ulx_primitives::{tick::Ticker, AccountId, NotaryId, NotebookDigest};
 
 use crate::{
 	stores::{
@@ -119,17 +123,21 @@ async fn process_block(
 		.await?
 		.unwrap_or_default();
 
-	let mut latest_notebook_number: Option<NotebookNumber> = None;
-	let last_notebook_details = client
-		.storage()
-		.at(block.hash())
-		.fetch(&api::storage().notebook().last_notebook_details_by_notary(notary_id))
-		.await?;
-	if let Some(last_notebook_details) = last_notebook_details {
-		if let Some((entry, _)) = last_notebook_details.0.get(0) {
-			latest_notebook_number = Some(entry.notebook_number);
-		}
-	}
+	let notebooks_header = block.header().digest.logs.iter().find_map(|log| match log {
+		DigestItem::PreRuntime(ulx_primitives::NOTEBOOKS_DIGEST_ID, data) =>
+			NotebookDigest::decode(&mut &data[..]).ok(),
+		_ => None,
+	});
+
+	let notebooks = notebooks_header
+		.map(|digest| {
+			digest
+				.notebooks
+				.into_iter()
+				.filter(|notebook| notebook.notary_id == notary_id)
+				.collect::<Vec<_>>()
+		})
+		.unwrap_or_default();
 
 	let parent_hash = block.header().parent_hash;
 	BlocksStore::record(
@@ -138,7 +146,7 @@ async fn process_block(
 		block.hash(),
 		parent_hash.clone(),
 		next_vote_minimum,
-		latest_notebook_number,
+		notebooks,
 	)
 	.await?;
 
@@ -240,9 +248,18 @@ async fn process_finalized_block(
 					NotebookStatusStore::next_step(
 						&mut *db,
 						notebook.notebook_number,
-						NotebookFinalizationStep::Submitted,
+						NotebookFinalizationStep::Closed,
 					)
 					.await?;
+				}
+				continue
+			}
+
+			if let Some(Ok(notebook)) =
+				event.as_event::<api::notebook::events::NotebookAuditFailure>().transpose()
+			{
+				if notebook.notary_id == notary_id {
+					panic!("Notebook audit failed! Need to shut down {:?}", notebook);
 				}
 				continue
 			}

@@ -6,7 +6,6 @@ extern crate alloc;
 #[cfg(feature = "runtime-benchmarks")]
 #[macro_use]
 extern crate frame_benchmarking;
-
 pub use frame_support::{
 	construct_runtime, parameter_types,
 	traits::{
@@ -53,15 +52,14 @@ use sp_version::RuntimeVersion;
 
 pub use pallet_notebook::NotebookVerifyError;
 use ulx_primitives::{
-	block_seal::MiningAuthority,
 	block_vote::VoteMinimum,
 	digests::BlockVoteDigest,
-	localchain::BestBlockVoteProofT,
+	localchain::BestBlockVoteSeal,
 	notary::{NotaryId, NotaryNotebookVoteDetails, NotaryNotebookVoteDigestDetails, NotaryRecord},
 	notebook::NotebookNumber,
 	prod_or_fast,
-	tick::{Tick, Ticker},
-	AuthorityProvider, BlockSealAuthorityId, BondFundId, BondId, NotebookVotes, TickProvider,
+	tick::{Tick, Ticker, TICK_MILLIS},
+	BlockSealAuthorityId, BondFundId, BondId, NotaryNotebookVotes, TickProvider,
 };
 pub use ulx_primitives::{
 	AccountId, Balance, BlockHash, BlockNumber, HashOutput, Moment, Nonce, Signature,
@@ -220,7 +218,7 @@ impl frame_system::Config for Runtime {
 }
 
 parameter_types! {
-	pub const TargetComputeBlockTime: u32 = prod_or_fast!(30_000, 1_00); // aim for compute to take half of vote time
+	pub const TargetComputeBlockTime: u64 = TICK_MILLIS / 2u64; // aim for compute to take half of vote time
 	pub const TargetBlockVotes: u32 = 50_000;
 	pub const MinimumsChangePeriod: u32 = 60 * 24; // change block_seal_spec once a day
 
@@ -234,14 +232,15 @@ parameter_types! {
 
 impl pallet_block_seal_spec::Config for Runtime {
 	type RuntimeEvent = RuntimeEvent;
+	type TargetComputeBlockTime = TargetComputeBlockTime;
+	type AuthorityProvider = MiningSlot;
+	type NotebookProvider = Notebook;
 	type WeightInfo = pallet_block_seal_spec::weights::SubstrateWeight<Runtime>;
 	type TargetBlockVotes = TargetBlockVotes;
 	type ChangePeriod = MinimumsChangePeriod;
-	type AuthorityProvider = MiningSlot;
-	type NotebookProvider = Notebook;
-	type TargetComputeBlockTime = TargetComputeBlockTime;
 	type SealInherent = BlockSeal;
 	type TickProvider = Ticks;
+	type MaxActiveNotaries = MaxActiveNotaries;
 }
 
 impl pallet_block_rewards::Config for Runtime {
@@ -249,14 +248,16 @@ impl pallet_block_rewards::Config for Runtime {
 	type WeightInfo = pallet_block_rewards::weights::SubstrateWeight<Runtime>;
 	type ArgonCurrency = ArgonBalances;
 	type UlixeeCurrency = UlixeeBalances;
-	type ArgonsPerBlock = ArgonsPerBlock;
-	type StartingUlixeesPerBlock = StartingUlixeesPerBlock;
-	type MaturationBlocks = MaturationBlocks;
 	type Balance = Balance;
-	type HalvingBlocks = HalvingBlocks;
-	type MinerPayoutPercent = MinerPayoutPercent;
 	type BlockSealerProvider = BlockSeal;
 	type NotaryProvider = Notaries;
+	type NotebookProvider = Notebook;
+	type CurrentTick = Ticks;
+	type ArgonsPerBlock = ArgonsPerBlock;
+	type StartingUlixeesPerBlock = StartingUlixeesPerBlock;
+	type HalvingBlocks = HalvingBlocks;
+	type MinerPayoutPercent = MinerPayoutPercent;
+	type MaturationBlocks = MaturationBlocks;
 	type RuntimeFreezeReason = RuntimeFreezeReason;
 }
 
@@ -339,6 +340,7 @@ impl pallet_block_seal::Config for Runtime {
 	type AuthorityProvider = MiningSlot;
 	type NotebookProvider = Notebook;
 	type BlockVotingProvider = BlockSealSpec;
+	type TickProvider = Ticks;
 }
 
 impl pallet_session::Config for Runtime {
@@ -398,8 +400,6 @@ parameter_types! {
 	/// How many transfers out can be queued per block
 	pub const MaxPendingTransfersOutPerBlock: u32 = 1000;
 
-	/// How many auditors are expected to sign a notary block.
-	pub const RequiredNotebookAuditors: u32 = 5; // half of seal signers
 
 }
 
@@ -412,6 +412,7 @@ impl pallet_chain_transfer::Config for Runtime {
 	type PalletId = ChainTransferPalletId;
 	type TransferExpirationBlocks = TransferExpirationBlocks;
 	type MaxPendingTransfersOutPerBlock = MaxPendingTransfersOutPerBlock;
+	type NotebookProvider = Notebook;
 }
 
 impl pallet_notebook::Config for Runtime {
@@ -669,7 +670,6 @@ impl_runtime_apis! {
 		}
 	}
 
-
 	impl sp_session::SessionKeys<Block> for Runtime {
 		fn generate_session_keys(seed: Option<Vec<u8>>) -> Vec<u8> {
 			opaque::SessionKeys::generate(seed)
@@ -726,30 +726,34 @@ impl_runtime_apis! {
 		}
 	}
 
-	impl ulx_primitives::BlockSealSpecApis<Block> for Runtime {
+	impl ulx_primitives::BlockSealApis<Block, AccountId, BlockSealAuthorityId> for Runtime {
 		fn vote_minimum() -> VoteMinimum {
 			BlockSealSpec::vote_minimum()
 		}
+
 		fn compute_difficulty() -> u128 {
 			BlockSealSpec::compute_difficulty()
 		}
-		fn parent_voting_key() -> Option<H256> {
-			BlockSealSpec::parent_voting_key()
+
+		fn create_vote_digest(tick: Tick, included_notebooks: Vec<NotaryNotebookVoteDigestDetails>) -> BlockVoteDigest {
+			BlockSealSpec::create_block_vote_digest(tick, included_notebooks)
 		}
-		fn create_vote_digest(tick_notebooks: Vec<NotaryNotebookVoteDigestDetails>) -> BlockVoteDigest {
-			BlockSealSpec::create_block_vote_digest(tick_notebooks)
+
+		fn find_vote_block_seals(
+			votes: Vec<NotaryNotebookVotes>,
+			with_better_strength: U256,
+		) -> Result<BoundedVec<BestBlockVoteSeal<AccountId, BlockSealAuthorityId>, ConstU32<2>>, DispatchError>{
+			Ok(BlockSeal::find_vote_block_seals(votes,with_better_strength)?)
 		}
+
 	}
 
 	impl ulx_primitives::NotaryApis<Block, NotaryRecordT> for Runtime {
 		fn notary_by_id(notary_id: NotaryId) -> Option<NotaryRecordT> {
 			Notaries::notaries().iter().find(|a| a.notary_id == notary_id).cloned()
 		}
-	}
-
-	impl ulx_primitives::MiningAuthorityApis<Block> for Runtime {
-		fn xor_closest_authority(nonce: U256) -> Option<MiningAuthority<BlockSealAuthorityId, AccountId>> {
-			MiningSlot::xor_closest_authority(nonce)
+		fn notaries() -> Vec<NotaryRecordT> {
+			Notaries::notaries().iter().cloned().collect()
 		}
 	}
 
@@ -759,8 +763,6 @@ impl_runtime_apis! {
 		}
 	}
 
-
-
 	impl ulx_primitives::NotebookApis<Block, NotebookVerifyError> for Runtime {
 		fn audit_notebook_and_get_votes(
 			version: u32,
@@ -769,24 +771,17 @@ impl_runtime_apis! {
 			header_hash: H256,
 			vote_minimums: &BTreeMap<<Block as BlockT>::Hash, VoteMinimum>,
 			bytes: &Vec<u8>,
-		) -> Result<NotebookVotes, NotebookVerifyError> {
+		) -> Result<NotaryNotebookVotes, NotebookVerifyError> {
 			Notebook::audit_notebook(version, notary_id, notebook_number, header_hash, vote_minimums, bytes)
 		}
 
-		fn get_best_vote_proofs(
-			votes: &BTreeMap<NotaryId, NotebookVotes>,
-		) -> Result<BoundedVec<BestBlockVoteProofT <<Block as BlockT>::Hash>, ConstU32<2>>, DispatchError>{
-			Ok(Notebook::best_vote_proofs(votes)?)
+		fn decode_signed_raw_notebook_header(raw_header: Vec<u8>) -> Result<NotaryNotebookVoteDetails<<Block as BlockT>::Hash>, DispatchError> {
+			Notebook::decode_signed_raw_notebook_header(raw_header)
 		}
 
-
-		fn decode_notebook_vote_details(extrinsic: &UncheckedExtrinsic) -> Option<NotaryNotebookVoteDetails<<Block as BlockT>::Hash>> {
-			match &extrinsic.function {
-				RuntimeCall::Notebook(notebook_call) => Notebook::decode_notebook_vote_details(notebook_call),
-				_ => None
-			}
+		fn latest_notebook_by_notary() -> BTreeMap<NotaryId, (NotebookNumber, Tick)> {
+			Notebook::latest_notebook_by_notary()
 		}
-
 	}
 
 	impl ulx_primitives::TickApis<Block> for Runtime {
@@ -796,8 +791,10 @@ impl_runtime_apis! {
 		fn ticker() -> Ticker {
 			Ticks::ticker()
 		}
+		fn blocks_at_tick(tick: Tick) -> Vec<<Block as BlockT>::Hash> {
+			Ticks::blocks_at_tick(tick)
+		}
 	}
-
 
 	impl sp_consensus_grandpa::GrandpaApi<Block> for Runtime {
 		fn grandpa_authorities() -> sp_consensus_grandpa::AuthorityList {

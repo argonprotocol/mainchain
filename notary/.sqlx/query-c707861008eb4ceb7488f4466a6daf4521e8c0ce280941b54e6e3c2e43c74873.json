@@ -30,16 +30,21 @@
       },
       {
         "ordinal": 5,
+        "name": "notebook_digests",
+        "type_info": "Jsonb"
+      },
+      {
+        "ordinal": 6,
         "name": "is_finalized",
         "type_info": "Bool"
       },
       {
-        "ordinal": 6,
+        "ordinal": 7,
         "name": "finalized_time",
         "type_info": "Timestamptz"
       },
       {
-        "ordinal": 7,
+        "ordinal": 8,
         "name": "received_time",
         "type_info": "Timestamptz"
       }
@@ -54,6 +59,7 @@
       false,
       false,
       false,
+      true,
       true,
       false,
       true,

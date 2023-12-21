@@ -12,6 +12,7 @@ use sc_telemetry::{log, Telemetry, TelemetryWorker};
 use sc_transaction_pool_api::OffchainTransactionPoolFactory;
 
 use ulx_node_consensus::{
+	aux::UlxAux,
 	basic_queue::BasicQueue,
 	compute_worker::run_compute_solver_threads,
 	import_queue::{UlxImportQueue, UlxVerifier},
@@ -36,6 +37,7 @@ type UlxBlockImport = ulx_node_consensus::import_queue::UlxBlockImport<
 	GrandpaBlockImport<FullBackend, Block, FullClient, FullSelectChain>,
 	FullClient,
 	FullSelectChain,
+	AccountId,
 >;
 
 #[allow(clippy::type_complexity)]
@@ -50,6 +52,7 @@ pub fn new_partial(
 		sc_transaction_pool::FullPool<Block, FullClient>,
 		(
 			UlxBlockImport,
+			UlxAux<Block, FullClient>,
 			sc_consensus_grandpa::LinkHalf<Block, FullClient, FullSelectChain>,
 			Option<Telemetry>,
 		),
@@ -99,8 +102,13 @@ pub fn new_partial(
 		telemetry.as_ref().map(|x| x.handle()),
 	)?;
 
-	let ulx_block_import =
-		UlxBlockImport::new(grandpa_block_import.clone(), client.clone(), select_chain.clone());
+	let aux_client = UlxAux::<Block, _>::new(client.clone());
+	let ulx_block_import = UlxBlockImport::new(
+		grandpa_block_import.clone(),
+		client.clone(),
+		aux_client.clone(),
+		select_chain.clone(),
+	);
 
 	let import_queue = UlxImportQueue::<Block>::new(
 		UlxVerifier::new(),
@@ -119,7 +127,7 @@ pub fn new_partial(
 		keystore_container,
 		select_chain,
 		transaction_pool,
-		other: (ulx_block_import, grandpa_link, telemetry),
+		other: (ulx_block_import, aux_client, grandpa_link, telemetry),
 	})
 }
 
@@ -137,7 +145,7 @@ pub fn new_full(
 		import_queue,
 		keystore_container,
 		select_chain,
-		other: (ulx_block_import, grandpa_link, mut telemetry),
+		other: (ulx_block_import, aux_client, grandpa_link, mut telemetry),
 	} = new_partial(&config)?;
 
 	let mut net_config = sc_network::config::FullNetworkConfiguration::new(&config.network);
@@ -257,6 +265,7 @@ pub fn new_full(
 				ulx_node_consensus::compute_worker::create_compute_miner(
 					Box::new(ulx_block_import.clone()),
 					client.clone(),
+					aux_client.clone(),
 					select_chain.clone(),
 					proposer_factory_compute,
 					sync_service.clone(),
@@ -271,13 +280,12 @@ pub fn new_full(
 				compute_task,
 			);
 
-			let (block_watch_task, create_block_stream) =
-				ulx_node_consensus::create_tax_vote_block_watch(
-					transaction_pool.clone(),
-					client.clone(),
-					select_chain,
-					keystore_container.keystore(),
-				);
+			let (vote_watch_task, create_block_stream) = ulx_node_consensus::notary_client_task(
+				client.clone(),
+				select_chain,
+				aux_client.clone(),
+				keystore_container.keystore(),
+			);
 			let proposer_factory_tax = sc_basic_authorship::ProposerFactory::new(
 				task_manager.spawn_handle(),
 				client.clone(),
@@ -288,6 +296,7 @@ pub fn new_full(
 			let block_create_task = ulx_node_consensus::tax_block_creator(
 				Box::new(ulx_block_import),
 				client.clone(),
+				aux_client.clone(),
 				proposer_factory_tax,
 				sync_service.clone(),
 				block_seconds,
@@ -295,9 +304,9 @@ pub fn new_full(
 			);
 
 			task_manager.spawn_essential_handle().spawn_blocking(
-				"ulx-block-watch",
+				"ulx-vote-blocks-watch",
 				Some("block-authoring"),
-				block_watch_task,
+				vote_watch_task,
 			);
 			task_manager.spawn_essential_handle().spawn_blocking(
 				"ulx-blocks",

@@ -1,37 +1,73 @@
 use codec::{Codec, Decode, Encode};
 use scale_info::TypeInfo;
-use sp_core::{H256, U256};
+use sp_core::U256;
 use sp_inherents::{InherentData, InherentIdentifier, IsFatalError};
 use sp_runtime::RuntimeDebug;
+use sp_std::vec::Vec;
 
-use crate::{BestBlockVoteProofT, BlockVote, MerkleProof, NotaryId, NotebookNumber};
+use crate::{
+	BestBlockVoteSeal, BlockSealAuthoritySignature, BlockSealDigest, BlockVote, MerkleProof,
+	NotaryId, NotebookNumber, SignedNotebookHeader,
+};
 
-use crate::{BlockSealAuthoritySignature, BlockSealDigest};
-
-pub const INHERENT_IDENTIFIER: InherentIdentifier = *b"ulx_seal";
-pub const INHERENT_SEAL_DIGEST_IDENTIFIER: InherentIdentifier = *b"seal_dig";
-
-type InherentType = BlockSealInherent;
+pub const SEAL_INHERENT_IDENTIFIER: InherentIdentifier = *b"ulx_seal";
+pub const SEAL_INHERENT_VOTE_IDENTIFIER: InherentIdentifier = *b"seal_vot";
+pub const SEAL_INHERENT_DIGEST_IDENTIFIER: InherentIdentifier = *b"seal_dig";
+pub const NOTEBOOKS_INHERENT_IDENTIFIER: InherentIdentifier = *b"notebook";
 
 #[derive(Clone, PartialEq, Eq, Encode, Decode, RuntimeDebug, TypeInfo)]
 pub enum BlockSealInherent {
 	Vote {
-		vote_proof: U256,
+		seal_strength: U256,
+		#[codec(compact)]
 		notary_id: NotaryId,
-		block_vote: BlockVote,
+		#[codec(compact)]
 		source_notebook_number: NotebookNumber,
 		source_notebook_proof: MerkleProof,
+		block_vote: BlockVote,
 		miner_signature: BlockSealAuthoritySignature,
 	},
 	Compute,
 }
 
+#[derive(Clone, PartialEq, Eq, Encode, Decode, RuntimeDebug, TypeInfo)]
+pub enum BlockSealInherentNodeSide {
+	Vote {
+		seal_strength: U256,
+		#[codec(compact)]
+		notary_id: NotaryId,
+		#[codec(compact)]
+		source_notebook_number: NotebookNumber,
+		source_notebook_proof: MerkleProof,
+		miner_signature: BlockSealAuthoritySignature,
+		block_vote_bytes: Vec<u8>,
+	},
+	Compute,
+}
+
+impl BlockSealInherentNodeSide {
+	#[cfg(feature = "std")]
+	pub fn from_vote<A: Codec, Auth: Codec>(
+		best_vote: BestBlockVoteSeal<A, Auth>,
+		miner_signature: BlockSealAuthoritySignature,
+	) -> Self {
+		Self::Vote {
+			notary_id: best_vote.notary_id,
+			seal_strength: best_vote.seal_strength,
+			source_notebook_number: best_vote.source_notebook_number,
+			source_notebook_proof: best_vote.source_notebook_proof,
+			block_vote_bytes: best_vote.block_vote_bytes,
+			miner_signature,
+		}
+	}
+}
+
 impl BlockSealInherent {
 	pub fn matches(&self, seal_digest: BlockSealDigest) -> bool {
 		match self {
-			Self::Vote { vote_proof, .. } => match seal_digest {
-				BlockSealDigest::Vote { vote_proof: seal_vote_proof } =>
-					vote_proof == &seal_vote_proof,
+			Self::Vote { seal_strength, .. } => match seal_digest {
+				BlockSealDigest::Vote { seal_strength: included_seal_strength } =>
+					seal_strength == &included_seal_strength,
 				_ => false,
 			},
 			Self::Compute => match seal_digest {
@@ -40,48 +76,56 @@ impl BlockSealInherent {
 			},
 		}
 	}
+}
 
-	pub fn from_vote<H: Codec + AsRef<[u8]>>(
-		notary_id: NotaryId,
-		notebook_number: NotebookNumber,
-		best_vote: BestBlockVoteProofT<H>,
-		miner_signature: BlockSealAuthoritySignature,
-	) -> Self {
-		let vote = best_vote.block_vote;
-		Self::Vote {
-			vote_proof: best_vote.vote_proof,
-			notary_id,
-			source_notebook_number: notebook_number,
-			source_notebook_proof: best_vote.source_notebook_proof,
-			block_vote: BlockVote {
-				account_id: vote.account_id,
-				power: vote.power,
-				channel_pass: vote.channel_pass,
-				index: vote.index,
-				grandparent_block_hash: H256::from_slice(vote.grandparent_block_hash.as_ref()),
+impl TryInto<BlockSealInherent> for BlockSealInherentNodeSide {
+	type Error = sp_inherents::Error;
+	fn try_into(self) -> Result<BlockSealInherent, Self::Error> {
+		Ok(match self {
+			BlockSealInherentNodeSide::Vote {
+				seal_strength,
+				notary_id,
+				block_vote_bytes,
+				source_notebook_number,
+				source_notebook_proof,
+				miner_signature,
+			} => BlockSealInherent::Vote {
+				seal_strength,
+				notary_id,
+				block_vote: BlockVote::decode(&mut block_vote_bytes.as_slice()).map_err(|e| {
+					sp_inherents::Error::DecodingFailed(e, SEAL_INHERENT_VOTE_IDENTIFIER)
+				})?,
+				source_notebook_number,
+				source_notebook_proof,
+				miner_signature,
 			},
-			miner_signature,
-		}
+			BlockSealInherentNodeSide::Compute => BlockSealInherent::Compute,
+		})
 	}
 }
 
 pub trait BlockSealInherentData {
-	fn block_seal(&self) -> Result<Option<InherentType>, sp_inherents::Error>;
+	fn block_seal(&self) -> Result<Option<BlockSealInherent>, sp_inherents::Error>;
 	fn digest(&self) -> Result<Option<BlockSealDigest>, sp_inherents::Error>;
 }
 
 impl BlockSealInherentData for InherentData {
-	fn block_seal(&self) -> Result<Option<InherentType>, sp_inherents::Error> {
-		self.get_data(&INHERENT_IDENTIFIER)
+	fn block_seal(&self) -> Result<Option<BlockSealInherent>, sp_inherents::Error> {
+		if let Some(x) = self.get_data::<BlockSealInherentNodeSide>(&SEAL_INHERENT_IDENTIFIER)? {
+			let result = x.try_into()?;
+			return Ok(Some(result))
+		}
+		Ok(None)
 	}
 	fn digest(&self) -> Result<Option<BlockSealDigest>, sp_inherents::Error> {
-		self.get_data(&INHERENT_SEAL_DIGEST_IDENTIFIER)
+		self.get_data(&SEAL_INHERENT_DIGEST_IDENTIFIER)
 	}
 }
+
 /// Errors that can occur while checking the timestamp inherent.
 #[derive(Encode, RuntimeDebug)]
 #[cfg_attr(feature = "std", derive(Decode, thiserror::Error))]
-pub enum InherentError {
+pub enum SealInherentError {
 	/// The block seal is missing
 	#[cfg_attr(feature = "std", error("The block seal is missing."))]
 	MissingSeal,
@@ -90,18 +134,17 @@ pub enum InherentError {
 	InvalidSeal,
 }
 
-impl IsFatalError for InherentError {
+impl IsFatalError for SealInherentError {
 	fn is_fatal_error(&self) -> bool {
 		true
 	}
 }
-
-impl InherentError {
+impl SealInherentError {
 	/// Try to create an instance ouf of the given identifier and data.
 	#[cfg(feature = "std")]
 	pub fn try_from(id: &InherentIdentifier, mut data: &[u8]) -> Option<Self> {
-		if id == &INHERENT_IDENTIFIER {
-			<InherentError as codec::Decode>::decode(&mut data).ok()
+		if id == &SEAL_INHERENT_IDENTIFIER {
+			<SealInherentError as codec::Decode>::decode(&mut data).ok()
 		} else {
 			None
 		}
@@ -109,7 +152,7 @@ impl InherentError {
 }
 #[cfg(feature = "std")]
 pub struct BlockSealInherentDataProvider {
-	pub seal: Option<InherentType>,
+	pub seal: Option<BlockSealInherentNodeSide>,
 	pub digest: Option<BlockSealDigest>,
 }
 
@@ -121,10 +164,10 @@ impl sp_inherents::InherentDataProvider for BlockSealInherentDataProvider {
 		inherent_data: &mut InherentData,
 	) -> Result<(), sp_inherents::Error> {
 		if let Some(seal) = &self.seal {
-			inherent_data.put_data(INHERENT_IDENTIFIER, seal)?;
+			inherent_data.put_data(SEAL_INHERENT_IDENTIFIER, seal)?;
 		}
 		if let Some(digest) = &self.digest {
-			inherent_data.put_data(INHERENT_SEAL_DIGEST_IDENTIFIER, digest)?;
+			inherent_data.put_data(SEAL_INHERENT_DIGEST_IDENTIFIER, digest)?;
 		}
 		Ok(())
 	}
@@ -134,8 +177,84 @@ impl sp_inherents::InherentDataProvider for BlockSealInherentDataProvider {
 		identifier: &InherentIdentifier,
 		error: &[u8],
 	) -> Option<Result<(), sp_inherents::Error>> {
-		Some(Err(sp_inherents::Error::Application(Box::from(InherentError::try_from(
+		Some(Err(sp_inherents::Error::Application(Box::from(SealInherentError::try_from(
 			identifier, error,
 		)?))))
+	}
+}
+
+/////// NOTEBOOK INHERENT ///////
+
+pub trait NotebookInherentData {
+	fn notebooks(&self) -> Result<Option<Vec<SignedNotebookHeader>>, sp_inherents::Error>;
+}
+
+impl NotebookInherentData for InherentData {
+	fn notebooks(&self) -> Result<Option<Vec<SignedNotebookHeader>>, sp_inherents::Error> {
+		let raw = self.get_data::<Vec<Vec<u8>>>(&NOTEBOOKS_INHERENT_IDENTIFIER)?;
+		if let Some(raw) = raw {
+			let mut result: Vec<SignedNotebookHeader> = Vec::new();
+			for data in raw {
+				let entry = SignedNotebookHeader::decode(&mut data.as_slice()).map_err(|e| {
+					sp_inherents::Error::DecodingFailed(e, NOTEBOOKS_INHERENT_IDENTIFIER)
+				})?;
+				result.push(entry);
+			}
+			return Ok(Some(result))
+		}
+		Ok(None)
+	}
+}
+#[cfg(feature = "std")]
+pub struct NotebooksInherentDataProvider {
+	pub raw_notebooks: Vec<Vec<u8>>,
+}
+#[cfg(feature = "std")]
+#[async_trait::async_trait]
+impl sp_inherents::InherentDataProvider for NotebooksInherentDataProvider {
+	async fn provide_inherent_data(
+		&self,
+		inherent_data: &mut InherentData,
+	) -> Result<(), sp_inherents::Error> {
+		inherent_data.put_data(NOTEBOOKS_INHERENT_IDENTIFIER, &self.raw_notebooks)?;
+		Ok(())
+	}
+
+	async fn try_handle_error(
+		&self,
+		identifier: &InherentIdentifier,
+		error: &[u8],
+	) -> Option<Result<(), sp_inherents::Error>> {
+		Some(Err(sp_inherents::Error::Application(Box::from(NotebookInherentError::try_from(
+			identifier, error,
+		)?))))
+	}
+}
+
+#[derive(Encode, RuntimeDebug)]
+#[cfg_attr(feature = "std", derive(Decode, thiserror::Error))]
+pub enum NotebookInherentError {
+	/// The block seal is missing
+	#[cfg_attr(feature = "std", error("The notebook inherent is missing."))]
+	MissingInherent,
+	/// The inherent has a mismatch with the details included in the block
+	#[cfg_attr(feature = "std", error("The notebook inherent does not match the block."))]
+	InherentMismatch,
+}
+
+impl NotebookInherentError {
+	/// Try to create an instance ouf of the given identifier and data.
+	#[cfg(feature = "std")]
+	pub fn try_from(id: &InherentIdentifier, mut data: &[u8]) -> Option<Self> {
+		if id == &NOTEBOOKS_INHERENT_IDENTIFIER {
+			<NotebookInherentError as codec::Decode>::decode(&mut data).ok()
+		} else {
+			None
+		}
+	}
+}
+impl IsFatalError for NotebookInherentError {
+	fn is_fatal_error(&self) -> bool {
+		true
 	}
 }

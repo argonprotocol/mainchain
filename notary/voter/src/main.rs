@@ -188,7 +188,7 @@ impl VotePublisher {
 	}
 
 	pub fn append_vote(&mut self, vote: BlockVote) -> usize {
-		let block_hash = vote.grandparent_block_hash;
+		let block_hash = vote.block_hash;
 		if let Some(votes) = self.votes_by_block_hash.get_mut(&block_hash) {
 			votes.votes.push(vote);
 			return votes.votes.len()
@@ -204,7 +204,7 @@ impl VotePublisher {
 			return Ok(())
 		}
 
-		tracing::info!("Publishing {} votes for {}", votes.len(), votes[0].grandparent_block_hash,);
+		tracing::info!("Publishing {} votes for {}", votes.len(), votes[0].block_hash,);
 
 		notary_client
 			.notarize(bounded_vec!(), BoundedVec::truncate_from(votes.clone()))

@@ -38,7 +38,7 @@ pub mod pallet {
 
 	use ulx_primitives::{
 		notebook::{ChainTransfer, NotebookHeader},
-		ChainTransferLookup, NotebookEventHandler,
+		ChainTransferLookup, NotebookEventHandler, NotebookProvider,
 	};
 
 	use super::*;
@@ -70,6 +70,7 @@ pub mod pallet {
 
 		type NotaryProvider: NotaryProvider<<Self as frame_system::Config>::Block>;
 
+		type NotebookProvider: NotebookProvider;
 		#[pallet::constant]
 		type PalletId: Get<PalletId>;
 
@@ -95,6 +96,15 @@ pub mod pallet {
 
 	#[pallet::storage]
 	pub(super) type ExpiringTransfersOut<T: Config> = StorageMap<
+		_,
+		Twox64Concat,
+		BlockNumberFor<T>,
+		BoundedVec<(T::AccountId, T::Nonce), T::MaxPendingTransfersOutPerBlock>,
+		ValueQuery,
+	>;
+
+	#[pallet::storage]
+	pub(super) type TransfersUsedInBlockNotebooks<T: Config> = StorageMap<
 		_,
 		Twox64Concat,
 		BlockNumberFor<T>,
@@ -174,6 +184,10 @@ pub mod pallet {
 			}
 			T::DbWeight::get().reads_writes(2, 1)
 		}
+
+		fn on_finalize(_: BlockNumberFor<T>) {
+			// nothing to do
+		}
 	}
 
 	#[pallet::call]
@@ -233,11 +247,16 @@ pub mod pallet {
 		fn notebook_submitted(header: &NotebookHeader) -> sp_runtime::DispatchResult {
 			let notary_id = header.notary_id;
 
+			let is_locked = T::NotebookProvider::is_notary_locked_at_tick(notary_id, header.tick);
+
 			// un-spendable notary account
 			let notary_pallet_account_id = Self::notary_account_id(notary_id);
 			for transfer in header.chain_transfers.iter() {
 				match transfer {
 					ChainTransfer::ToMainchain { account_id, amount } => {
+						if is_locked {
+							continue;
+						}
 						let amount = amount.clone().into();
 						ensure!(
 							T::Currency::reducible_balance(
@@ -285,7 +304,7 @@ pub mod pallet {
 				}
 			}
 
-			if header.tax > 0 {
+			if header.tax > 0 && !is_locked {
 				T::Currency::burn_from(
 					&notary_pallet_account_id,
 					header.tax.into(),
@@ -298,15 +317,16 @@ pub mod pallet {
 		}
 	}
 
-	impl<T: Config> ChainTransferLookup<T::Nonce, T::AccountId> for Pallet<T> {
+	impl<T: Config> ChainTransferLookup<T::Nonce, T::AccountId, T::Balance> for Pallet<T> {
 		fn is_valid_transfer_to_localchain(
 			notary_id: NotaryId,
 			account_id: &T::AccountId,
 			nonce: T::Nonce,
+			milligons: T::Balance,
 		) -> bool {
 			let result = <PendingTransfersOut<T>>::get(account_id, nonce);
 			if let Some(transfer) = result {
-				return transfer.notary_id == notary_id
+				return transfer.notary_id == notary_id && transfer.amount == milligons;
 			}
 
 			false

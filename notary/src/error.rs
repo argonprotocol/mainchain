@@ -60,6 +60,9 @@ pub enum Error {
 
 	#[error("Cross-notary proofs are not implemented yet!!!")]
 	CrossNotaryProofsNotImplemented,
+
+	#[error("Unsigned notebook header")]
+	UnsignedNotebookHeader,
 }
 
 impl From<Error> for i32 {
@@ -82,6 +85,7 @@ impl From<Error> for i32 {
 			Error::EncodingError(_) => 14,
 			Error::MaxNotebookChainTransfersReached => 15,
 			Error::CrossNotaryProofsNotImplemented => 16,
+			Error::UnsignedNotebookHeader => 17,
 		}
 	}
 }

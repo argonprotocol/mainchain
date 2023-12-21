@@ -1,13 +1,14 @@
 use std::collections::BTreeSet;
 
 use chrono::{NaiveDateTime, TimeZone, Utc};
+use codec::Encode;
 use serde_json::{from_value, json};
 use sp_core::{bounded::BoundedVec, H256};
 use sqlx::{query, types::JsonValue, FromRow, PgConnection};
 
 use ulx_primitives::{
-	ensure, tick::Tick, AccountOrigin, BlockVotingPower, ChainTransfer, NotaryId, NotebookHeader,
-	NotebookNumber, NOTEBOOK_VERSION,
+	ensure, notary::NotarySignature, tick::Tick, AccountOrigin, BlockVotingPower, ChainTransfer,
+	NotaryId, NotebookHeader, NotebookMeta, NotebookNumber, SignedNotebookHeader, NOTEBOOK_VERSION,
 };
 
 use crate::{
@@ -24,6 +25,7 @@ struct NotebookHeaderRow {
 	pub version: i32,
 	pub notebook_number: i32,
 	pub hash: Option<Vec<u8>>,
+	pub signature: Option<Vec<u8>>,
 	pub tick: i32,
 	pub finalized_block_number: Option<i32>,
 	pub notary_id: i32,
@@ -170,7 +172,26 @@ impl NotebookHeaderStore {
 			Ok(())
 		})
 	}
+	pub async fn latest<'a>(
+		db: impl sqlx::PgExecutor<'a> + 'a,
+	) -> anyhow::Result<NotebookMeta, Error> {
+		let record = sqlx::query!(
+			r#"
+				SELECT notebook_number, tick
+				FROM notebook_headers ORDER BY notebook_number DESC LIMIT 1
+				"#,
+		)
+		.fetch_optional(db)
+		.await?;
+		let Some(record) = record else {
+			return Ok(NotebookMeta { latest_notebook_number: 0, latest_tick: 0 });
+		};
 
+		Ok(NotebookMeta {
+			latest_tick: record.tick as u32,
+			latest_notebook_number: record.notebook_number as u32,
+		})
+	}
 	pub async fn load<'a>(
 		db: impl sqlx::PgExecutor<'a> + 'a,
 		notebook_number: NotebookNumber,
@@ -189,7 +210,64 @@ impl NotebookHeaderStore {
 		Ok(record.try_into()?)
 	}
 
-	pub async fn get_last_tick(
+	pub async fn load_raw_signed_headers<'a>(
+		db: impl sqlx::PgExecutor<'a> + 'a,
+		since_notebook: NotebookNumber,
+	) -> anyhow::Result<Vec<(NotebookNumber, Vec<u8>)>, Error> {
+		let records = sqlx::query_as!(
+			NotebookHeaderRow,
+			r#"
+				SELECT *
+				FROM notebook_headers
+				WHERE notebook_number > $1
+				AND signature IS NOT NULL
+				ORDER BY notebook_number ASC
+				"#,
+			since_notebook as i32
+		)
+		.fetch_all(db)
+		.await?;
+
+		let mut headers = Vec::new();
+		for record in records {
+			let notebook_number = record.notebook_number as u32;
+			let signature =
+				NotarySignature::from_slice(&record.signature.clone().unwrap_or_default()[..])
+					.ok_or(Error::UnsignedNotebookHeader)?;
+			let header: NotebookHeader = record.try_into()?;
+			let signed_header = SignedNotebookHeader { header, signature };
+			headers.push((notebook_number, signed_header.encode()));
+		}
+
+		Ok(headers)
+	}
+
+	pub async fn load_with_signature<'a>(
+		db: impl sqlx::PgExecutor<'a> + 'a,
+		notebook_number: NotebookNumber,
+	) -> anyhow::Result<SignedNotebookHeader, Error> {
+		let record = sqlx::query_as!(
+			NotebookHeaderRow,
+			r#"
+				SELECT *
+				FROM notebook_headers WHERE notebook_number = $1
+				AND signature IS NOT NULL
+				 LIMIT 1
+				"#,
+			notebook_number as i32
+		)
+		.fetch_one(db)
+		.await?;
+		let signature =
+			NotarySignature::from_slice(&record.signature.clone().unwrap_or_default()[..])
+				.ok_or(Error::UnsignedNotebookHeader)?;
+		let header: NotebookHeader = record.try_into()?;
+		let signed_header = SignedNotebookHeader { header, signature };
+
+		Ok(signed_header)
+	}
+
+	pub async fn get_notebook_tick(
 		db: &mut PgConnection,
 		notebook_number: NotebookNumber,
 	) -> anyhow::Result<u32, Error> {
@@ -247,8 +325,8 @@ impl NotebookHeaderStore {
 		Ok(())
 	}
 
-	pub fn complete_notebook(
-		db: &mut PgConnection,
+	pub fn complete_notebook<'a>(
+		db: &'a mut PgConnection,
 		notebook_number: NotebookNumber,
 		finalized_block_number: u32,
 		transfers: Vec<ChainTransfer>,
@@ -259,7 +337,8 @@ impl NotebookHeaderStore {
 		block_votes_count: u32,
 		blocks_with_votes: BTreeSet<H256>,
 		block_voting_power: BlockVotingPower,
-	) -> BoxFutureResult<()> {
+		sign_fn: impl FnOnce(&H256) -> Result<NotarySignature, Error> + Send + 'a,
+	) -> BoxFutureResult<'a, ()> {
 		Box::pin(async move {
 			let mut header = Self::load(&mut *db, notebook_number).await?;
 			header.chain_transfers = BoundedVec::try_from(transfers).map_err(|_| {
@@ -283,6 +362,7 @@ impl NotebookHeaderStore {
 			Self::add_secrets(db, &mut header).await?;
 
 			let hash = header.hash().0;
+			let signature = sign_fn(&H256::from_slice(&hash[..]))?;
 
 			let res = sqlx::query!(
 				r#"
@@ -298,8 +378,9 @@ impl NotebookHeaderStore {
 					finalized_block_number=$9,
 					blocks_with_votes=$10,
 					secret_hash=$11,
-					parent_secret=$12
-				WHERE notebook_number = $13
+					parent_secret=$12,
+					signature=$13
+				WHERE notebook_number = $14
 			"#,
 				&hash,
 				header.changed_accounts_root.as_bytes(),
@@ -320,6 +401,7 @@ impl NotebookHeaderStore {
 					let data = a.clone();
 					data.as_bytes().to_vec()
 				}),
+				&signature.0.as_ref()[..],
 				header.notebook_number as i32,
 			)
 			.execute(db)
@@ -337,15 +419,20 @@ impl NotebookHeaderStore {
 
 #[cfg(test)]
 mod tests {
+	use std::ops::Add;
+
 	use chrono::{Duration, Utc};
 	use sp_keyring::AccountKeyring::{Alice, Bob};
+	use sp_keystore::{testing::MemoryKeystore, KeystoreExt};
+	use sp_runtime::traits::Verify;
 	use sqlx::PgPool;
-	use std::ops::Add;
-	use tracing::{debug, info};
 
 	use ulx_primitives::{AccountOrigin, ChainTransfer, NOTEBOOK_VERSION};
 
-	use crate::stores::notebook_header::NotebookHeaderStore;
+	use crate::{
+		notebook_closer::{notary_sign, NOTARY_KEYID},
+		stores::notebook_header::NotebookHeaderStore,
+	};
 
 	#[sqlx::test]
 	async fn test_storage(pool: PgPool) -> anyhow::Result<()> {
@@ -379,9 +466,8 @@ mod tests {
 
 		Ok(())
 	}
-
 	#[sqlx::test]
-	async fn test_close(pool: PgPool) -> anyhow::Result<()> {
+	async fn test_cannot_load_before_close(pool: PgPool) -> anyhow::Result<()> {
 		let _ = tracing_subscriber::fmt::try_init();
 		let notebook_number = 1;
 		{
@@ -398,6 +484,33 @@ mod tests {
 
 			tx.commit().await?;
 		}
+		assert!(NotebookHeaderStore::load_with_signature(&pool, notebook_number).await.is_err());
+		Ok(())
+	}
+
+	#[sqlx::test]
+	async fn test_close(pool: PgPool) -> anyhow::Result<()> {
+		let _ = tracing_subscriber::fmt::try_init();
+		let keystore = MemoryKeystore::new();
+		let keystore = KeystoreExt::new(keystore);
+		let notary_key =
+			keystore.ed25519_generate_new(NOTARY_KEYID, None).expect("should have a key");
+		let notebook_number = 1;
+		{
+			let mut tx = pool.begin().await?;
+
+			let _ = NotebookHeaderStore::create(
+				&mut *tx,
+				1,
+				notebook_number,
+				1,
+				Utc::now().add(Duration::minutes(1)).timestamp_millis() as u64,
+			)
+			.await?;
+
+			tx.commit().await?;
+		}
+
 		{
 			let mut tx = pool.begin().await?;
 			NotebookHeaderStore::complete_notebook(
@@ -421,6 +534,7 @@ mod tests {
 				0,
 				Default::default(),
 				0,
+				|h| notary_sign(&keystore, &notary_key, h),
 			)
 			.await?;
 			tx.commit().await?;
@@ -429,8 +543,6 @@ mod tests {
 			let mut tx = pool.begin().await?;
 			let header = NotebookHeaderStore::load(&mut *tx, notebook_number).await?;
 
-			info!("step 2");
-			debug!("header: {:?}", header);
 			assert_eq!(header.chain_transfers.len(), 2);
 			assert_eq!(
 				header.chain_transfers[0],
@@ -446,6 +558,13 @@ mod tests {
 			assert_eq!(header.changed_account_origins.len(), 2);
 			assert_eq!(header.changed_account_origins[0].account_uid, 1);
 			assert_eq!(header.changed_account_origins[1].account_uid, 2);
+		}
+		{
+			let mut tx = pool.begin().await?;
+			let header =
+				NotebookHeaderStore::load_with_signature(&mut *tx, notebook_number).await?;
+
+			assert!(header.signature.verify(&header.header.hash()[..], &notary_key));
 		}
 		Ok(())
 	}

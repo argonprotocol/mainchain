@@ -10,6 +10,8 @@ documentation.workspace = true
 homepage.workspace = true
 
 [dependencies]
+
+log = { version = "0.4.20", default-features = false }
 anyhow = { version = "1.0", default-features = false }
 codec = { package = "parity-scale-codec", version = "3.6", default-features = false, features = ["derive", "max-encoded-len"] }
 serde = { version = "1.0", default-features = false, features = ["derive"] }

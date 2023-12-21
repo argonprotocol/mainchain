@@ -67,7 +67,6 @@ impl TryFrom<i32> for AccountType {
 }
 
 pub const CHANNEL_EXPIRATION_NOTEBOOKS: u32 = prod_or_fast!(60, 2);
-#[cfg(not(feature = "fast-runtime"))]
 pub const CHANNEL_CLAWBACK_NOTEBOOKS: u32 = 10; // 10 after expiration
 pub const MIN_CHANNEL_NOTE_MILLIGONS: u128 = 5;
 pub type MaxNoteRecipients = ConstU32<10>;

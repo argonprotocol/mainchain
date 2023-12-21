@@ -14,7 +14,7 @@ use ulx_node_runtime::{
 use ulx_primitives::{
 	block_seal::{Host, MiningRegistration, PeerId, RewardDestination},
 	block_vote::VoteMinimum,
-	tick::Ticker,
+	tick::{Ticker, TICK_MILLIS},
 	BlockSealAuthorityId, BondId, ComputeDifficulty,
 };
 
@@ -52,6 +52,8 @@ pub fn development_config() -> Result<ChainSpec, String> {
 	let mut properties = Properties::new();
 	properties.insert("tokenDecimals".into(), 3.into());
 
+	const HASHES_PER_SECOND: u64 = 1_000_000;
+
 	Ok(ChainSpec::builder(
 		WASM_BINARY.ok_or_else(|| "Development wasm not available".to_string())?,
 		None,
@@ -74,8 +76,8 @@ pub fn development_config() -> Result<ChainSpec, String> {
 			get_account_id_from_seed::<sr25519::Public>("Bob"),
 		],
 		500,
-		10_000,
-		1_000,
+		(TICK_MILLIS * HASHES_PER_SECOND / 1_000) as ComputeDifficulty,
+		TICK_MILLIS,
 	))
 	.build())
 }
@@ -121,7 +123,7 @@ pub fn local_testnet_config() -> Result<ChainSpec, String> {
 		],
 		500,
 		100_000_000,
-		60_000,
+		TICK_MILLIS,
 	))
 	.build())
 }

@@ -5,7 +5,8 @@ use serde::{Deserialize, Serialize};
 use sp_core::RuntimeDebug;
 
 use ulx_primitives::{
-	NewAccountOrigin, NotarizationBalanceChangeset, NotarizationBlockVotes, NotebookNumber,
+	tick::Tick, NewAccountOrigin, NotarizationBalanceChangeset, NotarizationBlockVotes,
+	NotebookNumber,
 };
 
 #[rpc(server, client, namespace = "localchain")]
@@ -20,5 +21,6 @@ pub trait LocalchainRpc {
 #[derive(Clone, PartialEq, Eq, Encode, Decode, RuntimeDebug, TypeInfo, Serialize, Deserialize)]
 pub struct BalanceChangeResult {
 	pub notebook_number: NotebookNumber,
+	pub tick: Tick,
 	pub new_account_origins: Vec<NewAccountOrigin>,
 }

@@ -11,7 +11,9 @@ use sp_runtime::{
 
 use ulx_primitives::{
 	notary::{NotaryProvider, NotarySignature},
-	BlockSealerInfo, BlockSealerProvider, NotaryId,
+	tick::Tick,
+	BlockSealerInfo, BlockSealerProvider, NotaryId, NotebookNumber, NotebookProvider,
+	NotebookSecret,
 };
 
 use crate as pallet_block_rewards;
@@ -109,11 +111,13 @@ parameter_types! {
 	pub static MaturationBlocks :u32 = 5;
 	pub static MinerPayoutPercent :u32 = 75;
 	pub static ActiveNotaries: Vec<NotaryId> = vec![1];
+	pub static CurrentTick: Tick = 0;
+
+	pub static NotebooksInBlock: Vec<(NotaryId, NotebookNumber, Tick)> = vec![];
 
 	pub static BlockSealer:BlockSealerInfo<u64> = BlockSealerInfo {
 		block_vote_rewards_account: 1,
 		miner_rewards_account: 1,
-		notaries_included: 1
 	};
 }
 
@@ -124,13 +128,30 @@ impl BlockSealerProvider<u64> for StaticBlockSealerProvider {
 	}
 }
 
-pub struct StaticNotaryProvider;
-impl NotaryProvider<Block> for StaticNotaryProvider {
+pub struct TestProvider;
+impl NotaryProvider<Block> for TestProvider {
 	fn verify_signature(_: NotaryId, _: NumberFor<Block>, _: &H256, _: &NotarySignature) -> bool {
 		true
 	}
 	fn active_notaries() -> Vec<NotaryId> {
 		ActiveNotaries::get()
+	}
+}
+impl NotebookProvider for TestProvider {
+	fn get_eligible_tick_votes_root(
+		_notary_id: NotaryId,
+		_tick: Tick,
+	) -> Option<(H256, NotebookNumber)> {
+		todo!()
+	}
+	fn notebooks_in_block() -> Vec<(NotaryId, NotebookNumber, Tick)> {
+		NotebooksInBlock::get()
+	}
+	fn notebooks_at_tick(_tick: Tick) -> Vec<(NotaryId, NotebookNumber, Option<NotebookSecret>)> {
+		todo!()
+	}
+	fn is_notary_locked_at_tick(_notary_id: NotaryId, _tick: Tick) -> bool {
+		todo!()
 	}
 }
 
@@ -146,8 +167,10 @@ impl pallet_block_rewards::Config for Test {
 	type HalvingBlocks = HalvingBlocks;
 	type MinerPayoutPercent = MinerPayoutPercent;
 	type BlockSealerProvider = StaticBlockSealerProvider;
-	type NotaryProvider = StaticNotaryProvider;
+	type NotaryProvider = TestProvider;
 	type RuntimeFreezeReason = RuntimeFreezeReason;
+	type CurrentTick = CurrentTick;
+	type NotebookProvider = TestProvider;
 }
 
 // Build genesis storage according to the mock runtime.

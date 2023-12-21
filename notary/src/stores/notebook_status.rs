@@ -1,5 +1,5 @@
 use chrono::{DateTime, Utc};
-use sqlx::{query_scalar, FromRow, PgConnection};
+use sqlx::{query, Executor, FromRow, PgConnection};
 
 use ulx_primitives::{tick::Tick, NotebookNumber};
 
@@ -18,8 +18,7 @@ pub enum NotebookFinalizationStep {
 	Open = 1,
 	ReadyForClose = 2,
 	Closed = 3,
-	Submitted = 4,
-	Finalized = 5,
+	Finalized = 4,
 }
 
 impl From<i32> for NotebookFinalizationStep {
@@ -28,8 +27,7 @@ impl From<i32> for NotebookFinalizationStep {
 			1 => NotebookFinalizationStep::Open,
 			2 => NotebookFinalizationStep::ReadyForClose,
 			3 => NotebookFinalizationStep::Closed,
-			4 => NotebookFinalizationStep::Submitted,
-			5 => NotebookFinalizationStep::Finalized,
+			4 => NotebookFinalizationStep::Finalized,
 			_ => panic!("Invalid notebook finalization step"),
 		}
 	}
@@ -48,7 +46,6 @@ pub struct NotebookStatusRow {
 	pub end_time: DateTime<Utc>,
 	pub ready_for_close_time: Option<DateTime<Utc>>,
 	pub closed_time: Option<DateTime<Utc>>,
-	pub submitted_time: Option<DateTime<Utc>>,
 	pub finalized_time: Option<DateTime<Utc>>,
 }
 
@@ -69,54 +66,59 @@ impl NotebookStatusStore {
 		Ok(row)
 	}
 
-	pub async fn lock_to_stop_appends<'a>(
-		db: impl sqlx::PgExecutor<'a> + 'a,
-		notebook_number: NotebookNumber,
-	) -> anyhow::Result<(), Error> {
-		sqlx::query!(
-			r#"
-			SELECT 1 as exists FROM notebook_status WHERE notebook_number = $1 FOR UPDATE NOWAIT LIMIT 1
-			"#,
-			notebook_number as i32,
-		)
-		.fetch_one(db)
-		.await?;
-		Ok(())
-	}
-	pub async fn lock_open_for_appending<'a>(db: &mut PgConnection) -> anyhow::Result<u32, Error> {
+	pub async fn lock_open_for_appending<'a>(
+		db: &mut PgConnection,
+	) -> anyhow::Result<(NotebookNumber, Tick), Error> {
 		for _ in 0..3 {
-			let row = query_scalar!(
-				r#"SELECT notebook_number FROM notebook_status WHERE step=$1 FOR SHARE LIMIT 1"#,
+			let row = query!(
+				r#"SELECT notebook_number, tick FROM notebook_status WHERE step=$1 FOR SHARE LIMIT 1"#,
 				NotebookFinalizationStep::Open as i32
 			)
 			.fetch_optional(&mut *db)
 			.await?;
 			if let Some(row) = row {
-				return Ok(row as u32)
+				return Ok((row.notebook_number as NotebookNumber, row.tick as Tick))
 			}
 			tokio::time::sleep(tokio::time::Duration::from_millis(100)).await;
 		}
 		Err(Error::InternalError("Unable to lock notebook for write".to_string()))
 	}
 
-	pub async fn lock_with_step<'a>(
-		db: impl sqlx::PgExecutor<'a> + 'a,
-		step: NotebookFinalizationStep,
+	async fn lock_to_stop_appends(
+		db: &mut PgConnection,
+		notebook_number: NotebookNumber,
+	) -> anyhow::Result<(), Error> {
+		db.execute("SET statement_timeout = 5000").await?;
+		sqlx::query!(
+			r#"
+			SELECT 1 as exists FROM notebook_status WHERE notebook_number = $1 FOR UPDATE NOWAIT LIMIT 1
+			"#,
+			notebook_number as i32,
+		)
+		.fetch_one(&mut *db)
+		.await?;
+		Ok(())
+	}
+
+	pub async fn find_and_lock_ready_for_close(
+		db: &mut PgConnection,
 	) -> anyhow::Result<Option<u32>, Error> {
 		let result = sqlx::query!(
 			r#"
 				SELECT notebook_number FROM notebook_status 
 				WHERE step=$1  
 				ORDER BY notebook_number ASC
-				FOR UPDATE NOWAIT 
 				LIMIT 1
 			"#,
-			step as i32
+			NotebookFinalizationStep::ReadyForClose as i32,
 		)
-		.fetch_optional(db)
+		.fetch_optional(&mut *db)
 		.await?;
+
 		if let Some(row) = result {
-			return Ok(Some(row.notebook_number as u32))
+			let notebook_number = row.notebook_number as u32;
+			Self::lock_to_stop_appends(&mut *db, notebook_number).await?;
+			return Ok(Some(notebook_number));
 		}
 		Ok(None)
 	}
@@ -199,19 +201,17 @@ impl NotebookStatusStore {
 			NotebookFinalizationStep::ReadyForClose =>
 				(NotebookFinalizationStep::Closed, "closed_time"),
 			NotebookFinalizationStep::Closed =>
-				(NotebookFinalizationStep::Submitted, "submitted_time"),
-			NotebookFinalizationStep::Submitted =>
 				(NotebookFinalizationStep::Finalized, "finalized_time"),
 			NotebookFinalizationStep::Finalized => return Ok(()),
 		};
 
 		let res = sqlx::query(&*format!(
 			r#"
-				UPDATE notebook_status SET step=$1, {}=now() WHERE notebook_number=$2 AND step=$3
+				UPDATE notebook_status SET step=$1, {time_field}=$2 WHERE notebook_number=$3 AND step=$4
 			"#,
-			&*time_field
 		))
 		.bind(next_step as i32)
+		.bind(Utc::now())
 		.bind(notebook_number as i32)
 		.bind(current_step as i32)
 		.execute(db)
@@ -226,11 +226,12 @@ impl NotebookStatusStore {
 
 #[cfg(test)]
 mod tests {
+	use std::ops::Add;
+
 	use chrono::{Duration, Utc};
 	use frame_support::assert_ok;
 	use futures::future::try_join;
 	use sqlx::PgPool;
-	use std::ops::Add;
 
 	use crate::{
 		error::Error,
@@ -254,11 +255,11 @@ mod tests {
 			let mut tx1 = pool.begin().await?;
 			let mut tx2 = pool.begin().await?;
 			assert_eq!(
-				NotebookStatusStore::lock_open_for_appending(&mut *tx1).await?,
+				NotebookStatusStore::lock_open_for_appending(&mut *tx1).await?.0,
 				notebook_number
 			);
 			assert_eq!(
-				NotebookStatusStore::lock_open_for_appending(&mut *tx2).await?,
+				NotebookStatusStore::lock_open_for_appending(&mut *tx2).await?.0,
 				notebook_number
 			);
 
@@ -300,7 +301,7 @@ mod tests {
 				let _ = txer.await;
 				let next_notebook = NotebookStatusStore::lock_open_for_appending(&mut *tx).await?;
 				tx.commit().await?;
-				Result::<u32, Error>::Ok(next_notebook)
+				Result::<u32, Error>::Ok(next_notebook.0)
 			});
 
 			let results = try_join(task1, task2).await?;
@@ -340,12 +341,10 @@ mod tests {
 		{
 			let mut tx = pool.begin().await?;
 
-			let _ =
-				NotebookStatusStore::create(&mut *tx, 1, 1, Utc::now().add(Duration::minutes(1)))
-					.await?;
+			let _ = NotebookStatusStore::create(&mut *tx, 1, 1, Utc::now()).await?;
+			let _ = NotebookStatusStore::step_up_expired_open(&mut *tx).await?;
 			assert_eq!(
-				NotebookStatusStore::lock_with_step(&mut *tx, NotebookFinalizationStep::Open)
-					.await?,
+				NotebookStatusStore::find_and_lock_ready_for_close(&mut *tx,).await?,
 				Some(1)
 			);
 
@@ -353,22 +352,19 @@ mod tests {
 		}
 
 		let mut tx = pool.begin().await?;
-		assert_eq!(
-			NotebookStatusStore::lock_with_step(&mut *tx, NotebookFinalizationStep::Open).await?,
-			Some(1)
-		);
+		assert_eq!(NotebookStatusStore::find_and_lock_ready_for_close(&mut *tx).await?, Some(1));
 		{
 			let mut tx2 = pool.begin().await?;
 			assert!(matches!(
-				NotebookStatusStore::lock_with_step(&mut *tx2, NotebookFinalizationStep::Open)
-					.await,
+				NotebookStatusStore::find_and_lock_ready_for_close(&mut *tx2).await,
 				Err(_)
 			));
 			tx2.rollback().await?;
 		}
 
 		assert_ok!(
-			NotebookStatusStore::next_step(&mut *tx, 1, NotebookFinalizationStep::Open).await
+			NotebookStatusStore::next_step(&mut *tx, 1, NotebookFinalizationStep::ReadyForClose)
+				.await
 		);
 		tx.commit().await?;
 		Ok(())

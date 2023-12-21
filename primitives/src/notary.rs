@@ -9,8 +9,8 @@ use sp_runtime::{
 use sp_std::{collections::btree_map::BTreeMap, fmt::Debug, vec::Vec};
 
 use crate::{
-	block_seal::Host, tick::Tick, BlockVoteDigest, BlockVotingPower, NotebookHeader,
-	NotebookNumber, NotebookSecret, NotebookSecretHash,
+	block_seal::Host, tick::Tick, BlockVotingPower, NotebookHeader, NotebookNumber, NotebookSecret,
+	NotebookSecretHash,
 };
 
 pub type NotaryId = u32;
@@ -55,85 +55,80 @@ pub struct NotaryRecord<
 	pub meta_updated_block: BlockNumber,
 	pub meta: NotaryMeta<MaxHosts>,
 }
-
-pub type VotingKey = H256;
 #[derive(Clone, PartialEq, Eq, Encode, Decode, RuntimeDebug, TypeInfo, Default)]
 pub struct NotaryNotebookTickState {
+	#[codec(compact)]
 	pub notaries: u16,
 	pub notebook_key_details_by_notary: BTreeMap<NotaryId, NotaryNotebookVoteDigestDetails>,
+	pub raw_headers_by_notary: BTreeMap<NotaryId, Vec<u8>>,
+	#[codec(compact)]
 	pub latest_finalized_block_needed: u32,
-	pub block_vote_digest: BlockVoteDigest,
 }
 
 #[derive(Clone, PartialEq, Eq, Encode, Decode, RuntimeDebug, TypeInfo)]
 pub struct NotaryNotebookVoteDetails<Hash: Codec> {
+	#[codec(compact)]
 	pub notary_id: NotaryId,
+	#[codec(compact)]
 	pub version: u32,
+	#[codec(compact)]
 	pub notebook_number: NotebookNumber,
+	#[codec(compact)]
 	pub tick: Tick,
-	pub secret_hash: NotebookSecretHash,
-	pub parent_secret: Option<NotebookSecret>,
+	#[codec(compact)]
 	pub finalized_block_number: u32,
 	pub header_hash: H256,
+	#[codec(compact)]
 	pub block_votes_count: u32,
-	pub block_votes_root: H256,
+	#[codec(compact)]
 	pub block_voting_power: BlockVotingPower,
 	pub blocks_with_votes: Vec<Hash>,
 }
 
 #[derive(Clone, PartialEq, Eq, Encode, Decode, RuntimeDebug, TypeInfo)]
 pub struct NotaryNotebookVoteDigestDetails {
+	#[codec(compact)]
 	pub notary_id: NotaryId,
+	#[codec(compact)]
 	pub notebook_number: NotebookNumber,
+	#[codec(compact)]
 	pub tick: Tick,
-	pub parent_secret: Option<NotebookSecret>,
+	#[codec(compact)]
 	pub block_votes_count: u32,
-	pub block_votes_root: H256,
+	#[codec(compact)]
 	pub block_voting_power: BlockVotingPower,
 }
 
-impl From<NotebookHeader> for NotaryNotebookVoteDigestDetails {
-	fn from(header: NotebookHeader) -> Self {
+impl From<&NotebookHeader> for NotaryNotebookVoteDigestDetails {
+	fn from(header: &NotebookHeader) -> Self {
 		Self {
 			notary_id: header.notary_id,
 			notebook_number: header.notebook_number,
 			tick: header.tick,
-			parent_secret: header.parent_secret,
 			block_votes_count: header.block_votes_count,
-			block_votes_root: header.block_votes_root,
 			block_voting_power: header.block_voting_power,
 		}
 	}
 }
-
 impl<H: Codec> From<&NotaryNotebookVoteDetails<H>> for NotaryNotebookVoteDigestDetails {
 	fn from(header: &NotaryNotebookVoteDetails<H>) -> Self {
 		Self {
 			notary_id: header.notary_id,
 			notebook_number: header.notebook_number,
 			tick: header.tick,
-			parent_secret: header.parent_secret,
 			block_votes_count: header.block_votes_count,
-			block_votes_root: header.block_votes_root,
 			block_voting_power: header.block_voting_power,
-		}
-	}
-}
-impl<Hash: Codec> Into<NotaryNotebookKeyDetails> for NotaryNotebookVoteDetails<Hash> {
-	fn into(self) -> NotaryNotebookKeyDetails {
-		NotaryNotebookKeyDetails {
-			notebook_number: self.notebook_number,
-			block_votes_root: self.block_votes_root,
-			tick: self.tick,
-			secret_hash: self.secret_hash,
 		}
 	}
 }
 
 #[derive(Clone, PartialEq, Eq, Encode, Decode, RuntimeDebug, TypeInfo)]
 pub struct NotaryNotebookKeyDetails {
+	#[codec(compact)]
 	pub notebook_number: NotebookNumber,
-	pub block_votes_root: H256,
+	#[codec(compact)]
 	pub tick: Tick,
+	pub block_votes_root: H256,
 	pub secret_hash: NotebookSecretHash,
+	pub parent_secret: Option<NotebookSecret>,
 }

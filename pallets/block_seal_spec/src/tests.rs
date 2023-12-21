@@ -10,7 +10,8 @@ use ulx_primitives::{
 	digests::{BlockVoteDigest, BLOCK_VOTES_DIGEST_ID},
 	inherents::BlockSealInherent,
 	localchain::{BlockVote, ChannelPass},
-	notebook::{BlockVotingKey, NotebookHeader, NotebookNumber},
+	notary::NotaryNotebookVoteDigestDetails,
+	notebook::{NotebookHeader, NotebookNumber},
 	tick::Tick,
 	MerkleProof, NotaryId, NotebookEventHandler,
 };
@@ -29,26 +30,26 @@ fn it_will_adjust_minimum() {
 
 		assert_ok!(PastBlockVotes::<Test>::try_mutate(|a| {
 			a.try_append(&mut vec![
-				(100, 0u128),
-				(100, 0u128),
-				(100, 0u128),
-				(100, 0u128),
-				(100, 0u128),
-				(100, 0u128),
-				(100, 0u128),
-				(100, 0u128),
-				(100, 0u128),
-				(1, 0u128),
+				(1, 100, 0u128),
+				(2, 100, 0u128),
+				(3, 100, 0u128),
+				(4, 100, 0u128),
+				(5, 100, 0u128),
+				(6, 100, 0u128),
+				(7, 100, 0u128),
+				(8, 100, 0u128),
+				(9, 100, 0u128),
+				(10, 1, 0u128),
 			])
 		}));
 		System::set_block_number(2);
 
 		let start_vote_minimum = SealMinimums::vote_minimum();
 
-		SealMinimums::update_vote_minimum(2, 0);
+		SealMinimums::update_vote_minimum(11, 2, 0);
 
 		assert_eq!(SealMinimums::vote_minimum(), 901);
-		assert_eq!(PastBlockVotes::<Test>::get(), vec![(2, 0)]);
+		assert_eq!(PastBlockVotes::<Test>::get(), vec![(11, 2, 0)]);
 		System::assert_last_event(
 			Event::VoteMinimumAdjusted {
 				start_vote_minimum,
@@ -62,26 +63,76 @@ fn it_will_adjust_minimum() {
 }
 
 #[test]
+fn it_updates_tick_votes_if_not_changed() {
+	new_test_ext(1000, 100).execute_with(|| {
+		// Go past genesis block so events get deposited
+		System::set_block_number(1);
+
+		assert_ok!(PastBlockVotes::<Test>::try_mutate(|a| {
+			a.try_append(&mut vec![
+				(1, 100, 0u128),
+				(2, 100, 0u128),
+				(3, 100, 0u128),
+				(4, 100, 0u128),
+				(5, 100, 0u128),
+				(6, 100, 0u128),
+				(7, 100, 0u128),
+				(8, 100, 0u128),
+				(9, 100, 0u128),
+				(10, 1, 0u128),
+			])
+		}));
+		System::set_block_number(2);
+
+		let start_vote_minimum = SealMinimums::vote_minimum();
+
+		SealMinimums::update_vote_minimum(10, 2, 0);
+
+		assert_eq!(SealMinimums::vote_minimum(), start_vote_minimum);
+		assert_eq!(
+			PastBlockVotes::<Test>::get(),
+			vec![
+				(1, 100, 0u128),
+				(2, 100, 0u128),
+				(3, 100, 0u128),
+				(4, 100, 0u128),
+				(5, 100, 0u128),
+				(6, 100, 0u128),
+				(7, 100, 0u128),
+				(8, 100, 0u128),
+				(9, 100, 0u128),
+				(10, 3, 0u128),
+			]
+		);
+	});
+}
+
+#[test]
 fn it_creates_a_block_digest() {
 	new_test_ext(500, 100).execute_with(|| {
 		System::set_block_number(1);
 		CurrentTick::set(2);
-		let mut book1 = create_default_notebook(1, 1, 2);
-		book1.block_votes_count = 1;
-		book1.block_voting_power = 20_000;
-		let mut book2 = create_default_notebook(2, 1, 2);
-		book2.block_votes_count = 3;
-		book2.block_voting_power = 10_000;
-		let digest = SealMinimums::create_block_vote_digest(vec![book1.into(), book2.into()]);
-		assert_eq!(
-			digest,
-			BlockVoteDigest {
-				parent_voting_key: None,
-				tick_notebooks: 2,
-				voting_power: 30_000,
-				votes_count: 4,
-			}
-		);
+		let book1 = NotaryNotebookVoteDigestDetails {
+			notary_id: 1,
+			notebook_number: 1,
+			tick: 2,
+			block_votes_count: 1,
+			block_voting_power: 20_000,
+		};
+		let book2 = NotaryNotebookVoteDigestDetails {
+			notary_id: 2,
+			notebook_number: 1,
+			tick: 2,
+			block_votes_count: 3,
+			block_voting_power: 10_000,
+		};
+		let digest = SealMinimums::create_block_vote_digest(2, vec![book1.clone(), book2.clone()]);
+		assert_eq!(digest, BlockVoteDigest { voting_power: 30_000, votes_count: 4 });
+		// if locked, should not include!!
+
+		LockedNotaries::set(vec![(2, 2)]);
+		let digest = SealMinimums::create_block_vote_digest(2, vec![book1, book2]);
+		assert_eq!(digest, BlockVoteDigest { voting_power: 20_000, votes_count: 1 });
 	});
 }
 
@@ -96,10 +147,11 @@ fn it_checks_the_vote_digest() {
 		book2.block_votes_count = 3;
 		book2.block_voting_power = 10_000;
 		System::set_block_number(2);
-		let digest = SealMinimums::create_block_vote_digest(vec![
-			book1.clone().into(),
-			book2.clone().into(),
-		]);
+		let digest_details = vec![
+			NotaryNotebookVoteDigestDetails::from(&book1),
+			NotaryNotebookVoteDigestDetails::from(&book2),
+		];
+		let digest = SealMinimums::create_block_vote_digest(2, digest_details);
 		System::initialize(
 			&2,
 			&System::parent_hash(),
@@ -120,7 +172,7 @@ fn it_checks_the_vote_digest() {
 			&Digest {
 				logs: vec![DigestItem::PreRuntime(
 					BLOCK_VOTES_DIGEST_ID,
-					SealMinimums::create_block_vote_digest(Default::default()).encode(),
+					SealMinimums::create_block_vote_digest(2, Default::default()).encode(),
 				)],
 			},
 		);
@@ -128,57 +180,6 @@ fn it_checks_the_vote_digest() {
 		SealMinimums::on_timestamp_set(3);
 		SealMinimums::on_initialize(3);
 		SealMinimums::on_finalize(3);
-	});
-}
-
-#[test]
-fn it_creates_the_next_parent_key() {
-	new_test_ext(500, 100).execute_with(|| {
-		System::set_block_number(3);
-		CurrentTick::set(3);
-		let mut book1 = create_default_notebook(1, 3, 3);
-		let book1_secret = H256::from_slice(&[1u8; 32]);
-		book1.parent_secret = Some(book1_secret.clone());
-		let old_root1 = H256::random();
-
-		let mut book2 = create_default_notebook(2, 3, 3);
-		let book2_secret = H256::from_slice(&[2u8; 32]);
-		book2.parent_secret = Some(book2_secret.clone());
-		let old_root2 = H256::random();
-
-		VotingRoots::mutate(|a| {
-			a.insert((1, 2), (old_root1, 1));
-			a.insert((2, 2), (old_root2, 1));
-		});
-
-		let digest = SealMinimums::create_block_vote_digest(vec![
-			book1.clone().into(),
-			book2.clone().into(),
-		]);
-
-		let parent_key = BlockVotingKey::create_key(vec![
-			BlockVotingKey { parent_secret: book1_secret.clone(), parent_vote_root: old_root1 },
-			BlockVotingKey { parent_secret: book2_secret.clone(), parent_vote_root: old_root2 },
-		]);
-		let mut expected_digest = BlockVoteDigest {
-			parent_voting_key: Some(parent_key),
-			tick_notebooks: 2,
-			voting_power: 2,
-			votes_count: 2,
-		};
-		assert_eq!(digest, expected_digest);
-
-		// if a parent root is not available, a key will be ignored
-		VotingRoots::mutate(|a| {
-			a.remove(&(1, 2));
-		});
-		let digest = SealMinimums::create_block_vote_digest(vec![book1.into(), book2.into()]);
-		expected_digest.parent_voting_key =
-			Some(BlockVotingKey::create_key(vec![BlockVotingKey {
-				parent_secret: book2_secret,
-				parent_vote_root: old_root2,
-			}]));
-		assert_eq!(digest, expected_digest);
 	});
 }
 
@@ -272,9 +273,7 @@ fn it_doesnt_adjust_difficulty_if_tax_block() {
 		CurrentSeal::set(BlockSealInherent::Vote {
 			notary_id: 1,
 			block_vote: BlockVote {
-				grandparent_block_hash: System::block_hash(
-					System::block_number().saturating_sub(4),
-				),
+				block_hash: System::block_hash(System::block_number().saturating_sub(4)),
 				channel_pass: ChannelPass {
 					miner_index: 0,
 					zone_record_hash: H256::zero(),
@@ -285,7 +284,7 @@ fn it_doesnt_adjust_difficulty_if_tax_block() {
 				index: 1,
 				power: 500,
 			},
-			vote_proof: 1.into(),
+			seal_strength: 1.into(),
 			source_notebook_proof: MerkleProof {
 				proof: Default::default(),
 				number_of_leaves: 1,

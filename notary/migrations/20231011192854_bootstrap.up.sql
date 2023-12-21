@@ -18,6 +18,7 @@ CREATE TABLE  IF NOT EXISTS blocks (
     block_number integer NOT NULL,
     block_vote_minimum varchar NOT NULL,
     latest_notebook_number integer,
+    notebook_digests jsonb NULL,
     is_finalized boolean NOT NULL,
     finalized_time timestamptz,
     received_time timestamptz NOT NULL
@@ -83,6 +84,7 @@ CREATE TABLE IF NOT EXISTS notebook_headers (
     notebook_number INTEGER PRIMARY KEY NOT NULL,
     version INTEGER NOT NULL,
     hash BYTEA,
+    signature BYTEA,
     tick INTEGER NOT NULL,
     finalized_block_number INTEGER,
     notary_id INTEGER NOT NULL,
@@ -111,7 +113,6 @@ CREATE TABLE IF NOT EXISTS notebook_status (
     end_time timestamptz NOT NULL,
     ready_for_close_time timestamptz NULL,
     closed_time timestamptz NULL,
-    submitted_time timestamptz NULL,
     finalized_time timestamptz NULL
 );
 

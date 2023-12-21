@@ -3,6 +3,7 @@ use scale_info::TypeInfo;
 use serde::{Deserialize, Serialize};
 use sp_core::RuntimeDebug;
 
+use crate::prod_or_fast;
 #[cfg(feature = "std")]
 use sp_std::time::Duration;
 
@@ -15,6 +16,8 @@ pub struct Ticker {
 	pub tick_duration_millis: u64,
 	pub genesis_utc_time: u64,
 }
+
+pub const TICK_MILLIS: u64 = prod_or_fast!(60_000, 2_000);
 
 impl Ticker {
 	#[cfg(feature = "std")]

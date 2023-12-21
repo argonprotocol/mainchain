@@ -10,7 +10,7 @@ use std::collections::{BTreeMap, BTreeSet};
 use ulx_primitives::{
 	balance_change::{AccountOrigin, BalanceChange, BalanceProof},
 	note::{AccountType, Note, NoteType},
-	BlockVote, ChannelPass,
+	BlockVote, ChannelPass, CHANNEL_EXPIRATION_NOTEBOOKS,
 };
 
 use crate::{
@@ -324,7 +324,11 @@ fn test_can_lock_with_a_channel_note() -> anyhow::Result<()> {
 
 	// it won't let you claim your own note back
 	assert_err!(
-		verify_notarization_allocation(&vec![channel_settle.clone()], &vec![], Some(61)),
+		verify_notarization_allocation(
+			&vec![channel_settle.clone()],
+			&vec![],
+			Some(CHANNEL_EXPIRATION_NOTEBOOKS + 1)
+		),
 		VerifyError::InvalidChannelClaimers
 	);
 
@@ -654,7 +658,7 @@ fn verify_tax_votes() {
 
 	let votes = vec![BlockVote {
 		account_id: Bob.to_account_id(),
-		grandparent_block_hash: H256::zero(),
+		block_hash: H256::zero(),
 		index: 0,
 		power: 20_000,
 
@@ -674,7 +678,7 @@ fn verify_tax_votes() {
 
 #[test]
 fn test_vote_sources() {
-	let grandparent_block_hash = H256::from([1u8; 32]);
+	let vote_block_hash = H256::from([1u8; 32]);
 	let channel_pass_1 = ChannelPass {
 		id: 1,
 		zone_record_hash: H256::from([3u8; 32]),
@@ -685,21 +689,21 @@ fn test_vote_sources() {
 	let mut votes = vec![
 		BlockVote {
 			account_id: Bob.to_account_id(),
-			grandparent_block_hash,
+			block_hash: vote_block_hash,
 			index: 0,
 			power: 20_000,
 			channel_pass: channel_pass_1.clone(),
 		},
 		BlockVote {
 			account_id: Bob.to_account_id(),
-			grandparent_block_hash,
+			block_hash: vote_block_hash,
 			index: 1,
 			power: 400,
 			channel_pass: channel_pass_1.clone(),
 		},
 	];
 
-	let vote_minimums = BTreeMap::from([(grandparent_block_hash, 500)]);
+	let vote_minimums = BTreeMap::from([(vote_block_hash, 500)]);
 
 	assert_err!(
 		verify_voting_sources(&BTreeSet::new(), &votes, &vote_minimums),

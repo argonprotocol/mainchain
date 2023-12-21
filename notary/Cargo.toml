@@ -81,3 +81,4 @@ std =[
     "api"
 ]
 api = ["jsonrpsee/http-client", "jsonrpsee/ws-client", "jsonrpsee/macros", "jsonrpsee/client-ws-transport-native-tls"]
+fast-runtime= ["ulx-primitives/fast-runtime"]

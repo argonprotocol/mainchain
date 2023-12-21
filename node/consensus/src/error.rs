@@ -9,6 +9,7 @@ use sp_runtime::{
 	RuntimeString,
 };
 use ulx_node_runtime::AccountId;
+use ulx_primitives::{tick::Tick, NotaryId, NotebookNumber};
 
 #[derive(thiserror::Error, std::fmt::Debug)]
 pub enum Error<B: BlockT> {
@@ -16,6 +17,8 @@ pub enum Error<B: BlockT> {
 	WrongEngine([u8; 4]),
 	#[error("Block seal signature missing or invalid")]
 	InvalidSealSignature,
+	#[error("The notebook digest record is invalid {0}")]
+	InvalidNotebookDigest(String),
 	#[error("Rejecting block too far in future")]
 	TooFarInFuture,
 	#[error("Invalid finalized block in predigests")]
@@ -110,6 +113,12 @@ pub enum Error<B: BlockT> {
 
 	#[error("A duplicate block was created by this author {0} for the given voting key")]
 	DuplicateAuthoredBlock(AccountId),
+
+	#[error("Notebook error while building block: {0}")]
+	NotebookHeaderBuildError(String),
+
+	#[error("Duplicate notebook at tick {0}. Notary {1}, notebook {2}")]
+	DuplicateNotebookAtTick(Tick, NotaryId, NotebookNumber),
 }
 
 #[cfg(test)]
@@ -138,6 +147,12 @@ impl<B: BlockT> PartialEq for Error<B> {
 			(Error::StringError(s1), Error::StringError(s2)) => s1 == s2,
 			(Error::Canceled(_), Error::Canceled(_)) => true,
 			(Error::NotaryError(s1), Error::NotaryError(s2)) => s1 == s2,
+			(Error::DuplicateAuthoredBlock(s1), Error::DuplicateAuthoredBlock(s2)) => s1 == s2,
+			(Error::NotebookHeaderBuildError(s1), Error::NotebookHeaderBuildError(s2)) => s1 == s2,
+			(
+				Error::DuplicateNotebookAtTick(t1, n1, nb1),
+				Error::DuplicateNotebookAtTick(t2, n2, nb2),
+			) => t1 == t2 && n1 == n2 && nb1 == nb2,
 
 			_ => false,
 		}

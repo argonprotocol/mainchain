@@ -122,13 +122,13 @@ impl NotarizationsStore {
 
 		let mut voted_blocks = BTreeSet::new();
 		for vote in &block_votes {
-			voted_blocks.insert(vote.grandparent_block_hash);
+			voted_blocks.insert(vote.block_hash);
 		}
 
 		// Begin database transaction
 		let mut tx = pool.begin().await?;
 
-		let current_notebook_number =
+		let (current_notebook_number, tick) =
 			NotebookStatusStore::lock_open_for_appending(&mut *tx).await?;
 
 		if initial_allocation_result.needs_channel_settle_followup {
@@ -177,7 +177,7 @@ impl NotarizationsStore {
 			let previous_balance =
 				change.previous_balance_proof.as_ref().map(|p| p.balance.clone()).unwrap_or(0);
 
-			let channel_hold_note = change.channel_hold_note;
+			let prev_channel_hold_note = change.channel_hold_note;
 			BalanceTipStore::lock(
 				&mut *tx,
 				&account_id,
@@ -186,19 +186,19 @@ impl NotarizationsStore {
 				previous_balance.clone(),
 				&account_origin,
 				change_index,
-				channel_hold_note.clone(),
+				prev_channel_hold_note.clone(),
 				5000,
 			)
 			.await?;
 
 			if let Some(proof) = change.previous_balance_proof {
-				let tip = BalanceTip {
+				let proof_tip = BalanceTip {
 					account_id: account_id.clone(),
 					account_type: account_type.clone(),
-					change_number,
-					balance,
+					change_number: change_number - 1,
+					balance: previous_balance,
 					account_origin: account_origin.clone(),
-					channel_hold_note,
+					channel_hold_note: prev_channel_hold_note.clone(),
 				};
 
 				// TODO: handle notary switching
@@ -212,7 +212,7 @@ impl NotarizationsStore {
 						&mut *tx,
 						notary_id,
 						proof.notebook_number,
-						&tip,
+						&proof_tip,
 					)
 					.await?;
 
@@ -230,7 +230,7 @@ impl NotarizationsStore {
 					ensure!(
 						NotebookStore::is_valid_proof(
 							&mut *tx,
-							&tip,
+							&proof_tip,
 							proof.notebook_number,
 							&notebook_proof
 						)
@@ -298,6 +298,7 @@ impl NotarizationsStore {
 				account_origin,
 				channel_hold_note,
 				previous_balance.clone(),
+				prev_channel_hold_note,
 			)
 			.await?;
 		}
@@ -315,6 +316,7 @@ impl NotarizationsStore {
 		tx.commit().await?;
 		Ok(BalanceChangeResult {
 			notebook_number: current_notebook_number,
+			tick,
 			new_account_origins: new_account_origins
 				.into_iter()
 				.map(|((account_id, account_type), origin)| {
@@ -355,7 +357,7 @@ mod tests {
 		}];
 
 		let block_votes = vec![BlockVote {
-			grandparent_block_hash: [0u8; 32].into(),
+			block_hash: [0u8; 32].into(),
 			power: 1222,
 			account_id: Bob.to_account_id(),
 			index: 0,

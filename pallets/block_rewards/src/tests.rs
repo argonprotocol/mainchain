@@ -16,11 +16,9 @@ use ulx_primitives::BlockSealerInfo;
 
 #[test]
 fn it_should_only_allow_a_single_seal() {
-	BlockSealer::set(BlockSealerInfo {
-		notaries_included: 1,
-		miner_rewards_account: 1,
-		block_vote_rewards_account: 2,
-	});
+	BlockSealer::set(BlockSealerInfo { miner_rewards_account: 1, block_vote_rewards_account: 2 });
+	NotebooksInBlock::set(vec![(1, 1, 1)]);
+	CurrentTick::set(1);
 	new_test_ext().execute_with(|| {
 		// Go past genesis block so events get deposited
 		System::set_block_number(1);
@@ -80,14 +78,12 @@ fn it_should_only_allow_a_single_seal() {
 
 #[test]
 fn it_should_unlock_rewards() {
-	BlockSealer::set(BlockSealerInfo {
-		notaries_included: 1,
-		miner_rewards_account: 1,
-		block_vote_rewards_account: 2,
-	});
+	BlockSealer::set(BlockSealerInfo { miner_rewards_account: 1, block_vote_rewards_account: 2 });
 	new_test_ext().execute_with(|| {
 		// Go past genesis block so events get deposited
 		System::set_block_number(1);
+		NotebooksInBlock::set(vec![(1, 1, 1)]);
+		CurrentTick::set(1);
 		BlockRewards::on_initialize(1);
 		BlockRewards::on_finalize(1);
 		let maturation_block = (1 + MaturationBlocks::get()).into();
@@ -121,14 +117,12 @@ fn it_should_unlock_rewards() {
 }
 #[test]
 fn it_should_halve_rewards() {
-	BlockSealer::set(BlockSealerInfo {
-		notaries_included: 1,
-		miner_rewards_account: 1,
-		block_vote_rewards_account: 2,
-	});
+	BlockSealer::set(BlockSealerInfo { miner_rewards_account: 1, block_vote_rewards_account: 2 });
 	new_test_ext().execute_with(|| {
 		let halving = HalvingBlocks::get() + 1;
 		System::set_block_number(halving.into());
+		NotebooksInBlock::set(vec![(1, 1, 1)]);
+		CurrentTick::set(1);
 		BlockRewards::on_initialize(halving.into());
 		BlockRewards::on_finalize(halving.into());
 		let maturation_block = (halving + MaturationBlocks::get()).into();
@@ -148,11 +142,9 @@ fn it_should_halve_rewards() {
 #[test]
 fn it_should_scale_rewards_based_on_notaries() {
 	ActiveNotaries::set(vec![1, 2]);
-	BlockSealer::set(BlockSealerInfo {
-		notaries_included: 1,
-		miner_rewards_account: 1,
-		block_vote_rewards_account: 2,
-	});
+	BlockSealer::set(BlockSealerInfo { miner_rewards_account: 1, block_vote_rewards_account: 2 });
+	NotebooksInBlock::set(vec![(1, 1, 1)]);
+	CurrentTick::set(1);
 	new_test_ext().execute_with(|| {
 		System::set_block_number(1);
 		BlockRewards::on_initialize(1);
@@ -172,13 +164,11 @@ fn it_should_scale_rewards_based_on_notaries() {
 }
 
 #[test]
-fn it_should_not_fail_with_no_notaries() {
+fn it_should_not_fail_with_no_notebooks() {
 	ActiveNotaries::set(vec![1, 2]);
-	BlockSealer::set(BlockSealerInfo {
-		notaries_included: 0,
-		miner_rewards_account: 1,
-		block_vote_rewards_account: 2,
-	});
+	BlockSealer::set(BlockSealerInfo { miner_rewards_account: 1, block_vote_rewards_account: 2 });
+	NotebooksInBlock::set(vec![]);
+	CurrentTick::set(1);
 	new_test_ext().execute_with(|| {
 		System::set_block_number(1);
 		BlockRewards::on_initialize(1);
@@ -197,6 +187,29 @@ fn it_should_not_fail_with_no_notaries() {
 		assert_eq!(
 			ArgonBalances::reducible_balance(&1, Preservation::Expendable, Fortitude::Polite),
 			0
+		);
+	});
+}
+#[test]
+fn it_should_not_fail_with_no_notaries() {
+	ActiveNotaries::set(vec![]);
+	BlockSealer::set(BlockSealerInfo { miner_rewards_account: 1, block_vote_rewards_account: 2 });
+	NotebooksInBlock::set(vec![]);
+	CurrentTick::set(1);
+	new_test_ext().execute_with(|| {
+		System::set_block_number(1);
+		BlockRewards::on_initialize(1);
+		BlockRewards::on_finalize(1);
+		let maturation_block = (1 + MaturationBlocks::get()).into();
+		System::assert_last_event(
+			Event::RewardCreated {
+				maturation_block,
+				rewards: vec![
+					BlockPayout { account_id: 1, ulixees: 3750, argons: 3750 },
+					BlockPayout { account_id: 2, ulixees: 1250, argons: 1250 },
+				],
+			}
+			.into(),
 		);
 	});
 }

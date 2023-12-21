@@ -36,22 +36,23 @@ const MIN_TAX_MINIMUM: u128 = 500;
 pub mod pallet {
 	use frame_support::pallet_prelude::*;
 	use frame_system::pallet_prelude::*;
-	use sp_core::{H256, U256};
-	use sp_runtime::{traits::UniqueSaturatedInto, BoundedBTreeMap, DigestItem};
-	use sp_std::{collections::btree_map::BTreeMap, vec, vec::Vec};
+	use sp_core::U256;
+	use sp_runtime::{traits::UniqueSaturatedInto, DigestItem};
+	use sp_std::{vec, vec::Vec};
 
 	use ulx_primitives::{
 		block_vote::VoteMinimum,
 		digests::{BlockVoteDigest, BLOCK_VOTES_DIGEST_ID},
 		inherents::BlockSealInherent,
 		notary::NotaryNotebookVoteDigestDetails,
-		notebook::{BlockVotingKey, BlockVotingPower, NotebookHeader},
-		AuthorityProvider, BlockSealAuthorityId, BlockVotingProvider, ComputeDifficulty, NotaryId,
-		NotebookEventHandler, NotebookProvider, TickProvider,
+		notebook::{BlockVotingPower, NotebookHeader},
+		tick::Tick,
+		AuthorityProvider, BlockSealAuthorityId, BlockVotingProvider, ComputeDifficulty,
+		NotebookEventHandler, NotebookProvider,
 	};
 
 	use super::*;
-
+	use ulx_primitives::TickProvider;
 	#[pallet::pallet]
 	pub struct Pallet<T>(_);
 
@@ -70,7 +71,12 @@ pub mod pallet {
 			Self::AccountId,
 		>;
 
+		/// The maximum active notaries allowed
+		#[pallet::constant]
+		type MaxActiveNotaries: Get<u32>;
+
 		type NotebookProvider: NotebookProvider;
+		type TickProvider: TickProvider<Self::Block>;
 
 		/// Type representing the weight of this pallet
 		type WeightInfo: WeightInfo;
@@ -82,8 +88,6 @@ pub mod pallet {
 		type ChangePeriod: Get<u32>;
 
 		type SealInherent: Get<BlockSealInherent>;
-
-		type TickProvider: TickProvider;
 	}
 
 	#[pallet::storage]
@@ -109,22 +113,19 @@ pub mod pallet {
 	#[pallet::storage]
 	pub(super) type TempBlockTimestamp<T: Config> = StorageValue<_, T::Moment, OptionQuery>;
 
-	/// The calculated parent voting key for a block. Refers to the Notebook BlockVote Revealed
-	/// Secret + VotesMerkleRoot of the parent block notebooks.
-	#[pallet::storage]
-	#[pallet::getter(fn parent_voting_key)]
-	pub(super) type ParentVotingKey<T: Config> = StorageValue<_, Option<H256>, ValueQuery>;
-
 	const VOTE_MINIMUM_HISTORY_LEN: u32 = 3;
 	/// Keeps the last 3 vote minimums. The first one applies to the current block.
 	#[pallet::storage]
 	pub(super) type VoteMinimumHistory<T: Config> =
 		StorageValue<_, BoundedVec<VoteMinimum, ConstU32<VOTE_MINIMUM_HISTORY_LEN>>, ValueQuery>;
 
-	/// Temporary store of the number of votes in the current block.
+	/// Temporary store of any current tick notebooks included in this block (vs tick)
 	#[pallet::storage]
-	pub(super) type TempNotebooksByNotary<T: Config> =
-		StorageValue<_, BoundedBTreeMap<NotaryId, NotebookHeader, ConstU32<50>>, ValueQuery>;
+	pub(super) type TempCurrentTickNotebooksInBlock<T: Config> = StorageValue<
+		_,
+		BoundedVec<NotaryNotebookVoteDigestDetails, T::MaxActiveNotaries>,
+		ValueQuery,
+	>;
 
 	/// Temporary store the vote digest
 	#[pallet::storage]
@@ -132,7 +133,7 @@ pub mod pallet {
 
 	#[pallet::storage]
 	pub(super) type PastBlockVotes<T: Config> =
-		StorageValue<_, BoundedVec<(u32, BlockVotingPower), T::ChangePeriod>, ValueQuery>;
+		StorageValue<_, BoundedVec<(Tick, u32, BlockVotingPower), T::ChangePeriod>, ValueQuery>;
 
 	#[pallet::genesis_config]
 	#[derive(frame_support::DefaultNoBound)]
@@ -168,7 +169,10 @@ pub mod pallet {
 	}
 
 	#[pallet::error]
-	pub enum Error<T> {}
+	pub enum Error<T> {
+		/// The maximum number of notebooks at the current tick has been exceeded
+		MaxNotebooksAtTickExceeded,
+	}
 
 	#[pallet::call]
 	impl<T: Config> Pallet<T> {
@@ -215,20 +219,10 @@ pub mod pallet {
 		}
 
 		fn on_finalize(_: BlockNumberFor<T>) {
-			let notebooks_by_notary = <TempNotebooksByNotary<T>>::take();
+			let block_notebooks = <TempCurrentTickNotebooksInBlock<T>>::take();
 			let tick = T::TickProvider::current_tick();
 
-			let mut notebook_at_tick = BTreeMap::new();
-			for (notary_id, header) in notebooks_by_notary.into_iter() {
-				if header.tick != tick {
-					continue
-				}
-
-				notebook_at_tick.insert(notary_id, header.into());
-			}
-			let block_votes = Self::create_block_vote_digest(
-				notebook_at_tick.into_iter().map(|(_, a)| a).collect::<Vec<_>>(),
-			);
+			let block_votes = Self::create_block_vote_digest(tick, block_notebooks.to_vec());
 
 			if let Some(included_digest) = <TempBlockVoteDigest<T>>::take() {
 				assert_eq!(
@@ -240,7 +234,7 @@ pub mod pallet {
 			let now = <TempBlockTimestamp<T>>::take().expect("Timestamp must be set");
 			Self::update_compute_difficulty(now);
 
-			Self::update_vote_minimum(block_votes.votes_count, block_votes.voting_power);
+			Self::update_vote_minimum(tick, block_votes.votes_count, block_votes.voting_power);
 
 			<VoteMinimumHistory<T>>::mutate(|specs| {
 				if specs.len() >= VOTE_MINIMUM_HISTORY_LEN as usize {
@@ -249,16 +243,22 @@ pub mod pallet {
 				specs.try_insert(0, Self::vote_minimum())
 			})
 			.expect("VoteMinimumHistory is bounded");
-
-			<ParentVotingKey<T>>::put(block_votes.parent_voting_key);
 		}
 	}
 
 	impl<T: Config> Pallet<T> {
-		pub(crate) fn update_vote_minimum(total_votes: u32, total_voting_power: u128) {
-			let did_append =
-				<PastBlockVotes<T>>::try_mutate(|x| x.try_push((total_votes, total_voting_power)))
-					.ok();
+		pub(crate) fn update_vote_minimum(tick: Tick, total_votes: u32, total_voting_power: u128) {
+			let did_append = <PastBlockVotes<T>>::try_mutate(|x| {
+				if let Some(entry) = x.last_mut() {
+					if entry.0 == tick {
+						entry.1 = entry.1.saturating_add(total_votes);
+						entry.2 = entry.2.saturating_add(total_voting_power);
+						return Ok(())
+					}
+				}
+				x.try_push((tick, total_votes, total_voting_power))
+			})
+			.ok();
 			if did_append.is_some() {
 				return
 			}
@@ -270,7 +270,7 @@ pub mod pallet {
 			let expected_block_votes = target_votes * period_votes.len() as u128;
 			let actual_block_votes = period_votes
 				.into_iter()
-				.fold(0u128, |votes, (v, _)| votes.saturating_add(v.into()));
+				.fold(0u128, |votes, (_, v, _)| votes.saturating_add(v.into()));
 
 			let start_vote_minimum = Self::vote_minimum();
 			let vote_minimum = Self::calculate_next_vote_minimum(
@@ -283,7 +283,7 @@ pub mod pallet {
 
 			let _ = <PastBlockVotes<T>>::try_mutate(|x| {
 				x.truncate(0);
-				x.try_insert(0, (total_votes, total_voting_power))
+				x.try_insert(0, (tick, total_votes, total_voting_power))
 			});
 			if start_vote_minimum != vote_minimum {
 				<CurrentVoteMinimum<T>>::put(vote_minimum);
@@ -352,42 +352,21 @@ pub mod pallet {
 		}
 
 		pub fn create_block_vote_digest(
-			tick_notebooks: Vec<NotaryNotebookVoteDigestDetails>,
+			tick: Tick,
+			included_notebooks: Vec<NotaryNotebookVoteDigestDetails>,
 		) -> BlockVoteDigest {
-			let mut block_votes = BlockVoteDigest {
-				parent_voting_key: None,
-				tick_notebooks: 0,
-				voting_power: 0,
-				votes_count: 0,
-			};
+			let mut block_votes = BlockVoteDigest { voting_power: 0, votes_count: 0 };
 
-			if tick_notebooks.is_empty() {
-				return block_votes
-			}
-			let tick = tick_notebooks[0].tick;
-			let mut parent_voting_keys = vec![];
-			for header in tick_notebooks {
+			for header in included_notebooks {
 				if header.tick != tick {
 					continue
 				}
-				block_votes.tick_notebooks += 1;
-				block_votes.votes_count += header.block_votes_count;
-				block_votes.voting_power += header.block_voting_power;
-				if let Some(parent_secret) = header.parent_secret {
-					// NOTE: secret is verified in the notebook pallet
-					if let Some((parent_vote_root, _)) =
-						T::NotebookProvider::get_eligible_tick_votes_root(
-							header.notary_id,
-							header.tick.saturating_sub(1),
-						) {
-						parent_voting_keys.push(BlockVotingKey { parent_vote_root, parent_secret });
-					}
+				if !T::NotebookProvider::is_notary_locked_at_tick(header.notary_id, header.tick) {
+					block_votes.votes_count += header.block_votes_count;
+					block_votes.voting_power += header.block_voting_power;
 				}
 			}
-			if !parent_voting_keys.is_empty() {
-				block_votes.parent_voting_key =
-					Some(BlockVotingKey::create_key(parent_voting_keys));
-			}
+
 			block_votes
 		}
 
@@ -456,12 +435,12 @@ pub mod pallet {
 
 	impl<T: Config> NotebookEventHandler for Pallet<T> {
 		fn notebook_submitted(header: &NotebookHeader) -> DispatchResult {
-			let notary_id = header.notary_id;
-			<TempNotebooksByNotary<T>>::try_mutate(|a| a.try_insert(notary_id, header.clone()))
-				.expect(
-				"TempNotebooksByNotary is bounded. This can't fail unless we have >50 notaries..",
-			);
-
+			let current_tick = T::TickProvider::current_tick();
+			if header.tick == current_tick {
+				let digest_details = header.into();
+				<TempCurrentTickNotebooksInBlock<T>>::try_mutate(|a| a.try_push(digest_details))
+					.map_err(|_| Error::<T>::MaxNotebooksAtTickExceeded)?;
+			}
 			Ok(())
 		}
 	}
@@ -469,10 +448,6 @@ pub mod pallet {
 	impl<T: Config> BlockVotingProvider<T::Block> for Pallet<T> {
 		fn grandparent_vote_minimum() -> Option<VoteMinimum> {
 			<VoteMinimumHistory<T>>::get().get(0).cloned()
-		}
-
-		fn parent_voting_key() -> Option<H256> {
-			<ParentVotingKey<T>>::get()
 		}
 	}
 }

@@ -1,3 +1,4 @@
+use codec::Codec;
 use std::{marker::PhantomData, sync::Arc};
 
 use log::info;
@@ -8,7 +9,7 @@ use sc_consensus::{
 use sp_api::ProvideRuntimeApi;
 use sp_block_builder::BlockBuilder as BlockBuilderApi;
 use sp_blockchain::HeaderBackend;
-use sp_consensus::{Error as ConsensusError, SelectChain};
+use sp_consensus::{BlockOrigin, Error as ConsensusError, SelectChain};
 use sp_inherents::InherentDataProvider;
 use sp_runtime::{
 	generic::DigestItem,
@@ -16,8 +17,8 @@ use sp_runtime::{
 };
 
 use ulx_primitives::{
-	inherents::BlockSealInherentDataProvider, BlockSealDigest, BlockSealSpecApis,
-	MiningAuthorityApis, BLOCK_SEAL_DIGEST_ID,
+	inherents::BlockSealInherentDataProvider, BlockSealApis, BlockSealAuthorityId, BlockSealDigest,
+	BLOCK_SEAL_DIGEST_ID,
 };
 
 use crate::{
@@ -26,28 +27,33 @@ use crate::{
 	compute_solver::BlockComputeNonce,
 	digests::{load_digests, read_seal_digest},
 	error::Error,
+	notary_client::verify_notebook_audits,
 };
 
 /// A block importer for Ulx.
-pub struct UlxBlockImport<B: BlockT, I, C, S> {
+pub struct UlxBlockImport<B: BlockT, I, C: AuxStore, S, AC> {
 	inner: I,
 	select_chain: S,
 	client: Arc<C>,
-	_block: PhantomData<B>,
+	aux_client: UlxAux<B, C>,
+	_block: PhantomData<AC>,
 }
 
-impl<B: BlockT, I: Clone, C, S: Clone> Clone for UlxBlockImport<B, I, C, S> {
+impl<B: BlockT, I: Clone, C: AuxStore, S: Clone, AC: Codec> Clone
+	for UlxBlockImport<B, I, C, S, AC>
+{
 	fn clone(&self) -> Self {
 		Self {
 			inner: self.inner.clone(),
 			select_chain: self.select_chain.clone(),
 			client: self.client.clone(),
+			aux_client: self.aux_client.clone(),
 			_block: PhantomData,
 		}
 	}
 }
 
-impl<B, I, C, S> UlxBlockImport<B, I, C, S>
+impl<B, I, C, S, AC> UlxBlockImport<B, I, C, S, AC>
 where
 	B: BlockT,
 	I: BlockImport<B> + Send + Sync,
@@ -60,16 +66,16 @@ where
 		+ AuxStore
 		+ BlockOf,
 	C::Api: BlockBuilderApi<B>,
-	C::Api: MiningAuthorityApis<B>,
+	AC: Codec,
 {
 	/// Create a new block import suitable to be used in Ulx
-	pub fn new(inner: I, client: Arc<C>, select_chain: S) -> Self {
-		Self { inner, client, select_chain, _block: PhantomData }
+	pub fn new(inner: I, client: Arc<C>, aux_client: UlxAux<B, C>, select_chain: S) -> Self {
+		Self { inner, client, select_chain, aux_client, _block: PhantomData }
 	}
 }
 
 #[async_trait::async_trait]
-impl<B, I, C, S> BlockImport<B> for UlxBlockImport<B, I, C, S>
+impl<B, I, C, S, AC> BlockImport<B> for UlxBlockImport<B, I, C, S, AC>
 where
 	B: BlockT,
 	I: BlockImport<B> + Send + Sync,
@@ -82,7 +88,8 @@ where
 		+ BlockchainEvents<B>
 		+ AuxStore
 		+ BlockOf,
-	C::Api: BlockBuilderApi<B> + MiningAuthorityApis<B> + BlockSealSpecApis<B>,
+	C::Api: BlockBuilderApi<B> + BlockSealApis<B, AC, BlockSealAuthorityId>,
+	AC: Codec + Send + Sync,
 {
 	type Error = ConsensusError;
 
@@ -112,6 +119,12 @@ where
 			)
 			.into())
 		}
+
+		// if we're importing a non-finalized block from someone else, verify the notebook audits
+		if block.origin != BlockOrigin::Own && block.header.number() > &latest_verified_finalized {
+			verify_notebook_audits(&self.aux_client, &digests.notebooks).await?;
+		}
+
 		let Some(Some(seal_digest)) = block.post_digests.last().map(read_seal_digest) else {
 			return Err(Error::<B>::MissingBlockSealDigest.into())
 		};
@@ -181,14 +194,20 @@ where
 			.map_err(|e| format!("Fetch best chain failed via select chain: {}", e))
 			.map_err(ConsensusError::ChainLookup)?;
 
-		let (fork_power, best_fork_power) = UlxAux::record_block(
-			&self.client,
+		let tick = digests.tick.tick;
+		let (fork_power, best_fork_power) = self.aux_client.record_block(
 			best_header,
 			&mut block,
 			digests.author,
-			digests.block_vote.parent_voting_key,
-			digests.block_vote.tick_notebooks,
-			digests.tick,
+			digests.voting_key.parent_voting_key,
+			digests.notebooks.notebooks.iter().fold(0u32, |acc, x| {
+				if tick == x.tick {
+					acc + 1
+				} else {
+					acc
+				}
+			}),
+			tick,
 			digests.block_vote.voting_power,
 			seal_digest,
 			compute_difficulty,

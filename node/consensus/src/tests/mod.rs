@@ -3,9 +3,10 @@ use std::{future::Future, sync::Arc, task::Context, time::Duration};
 use env_logger::{Builder, Env};
 use futures::{future, future::BoxFuture, task::Poll, FutureExt, SinkExt, StreamExt};
 use parking_lot::Mutex;
-use sc_client_api::{BlockchainEvents, HeaderBackend};
+use sc_client_api::BlockchainEvents;
 use sc_network_test::{PeersFullClient, TestNetFactory};
 use sp_api::ProvideRuntimeApi;
+use sp_blockchain::HeaderBackend;
 use sp_consensus::{BlockOrigin, NoNetwork as DummyOracle};
 use sp_core::{bounded_vec, crypto::AccountId32, H256};
 use sp_keyring::sr25519::Keyring;
@@ -15,11 +16,9 @@ use substrate_test_runtime::AccountId;
 
 use ulx_primitives::{
 	block_seal::{BlockSealAuthorityId, BLOCK_SEAL_KEY_TYPE},
-	digests::BlockVoteDigest,
-	inherents::BlockSealInherent,
 	localchain::{BlockVote, ChannelPass},
 	tick::Ticker,
-	BlockSealSpecApis, MerkleProof, MiningAuthorityApis, TickApis,
+	BestBlockVoteSeal, MerkleProof, TickApis,
 };
 
 use crate::{
@@ -67,9 +66,11 @@ impl Miner {
 		let ulx_block_import = data.block_import.clone();
 		let environ = DummyFactory(client.clone());
 		let api = data.api.clone();
+		let aux_client = data.aux_client.clone();
 		let (compute_handle, task) = create_compute_miner(
 			Box::new(ulx_block_import.clone()),
 			api.clone(),
+			aux_client.clone(),
 			select_chain.clone(),
 			environ,
 			DummyOracle,
@@ -162,44 +163,22 @@ struct NodeIdentity {
 	keystore: KeystorePtr,
 	authority_id: BlockSealAuthorityId,
 	account_id: AccountId,
-	authority_index: Option<u16>,
 }
 
 impl NodeIdentity {
-	fn new(keyring: Keyring, peer_id: usize, registered_authorities: bool) -> Self {
+	fn new(keyring: Keyring, peer_id: usize) -> Self {
 		let keystore = create_keystore(keyring.clone());
 		let authority_id: BlockSealAuthorityId =
 			keystore.ed25519_public_keys(BLOCK_SEAL_KEY_TYPE)[0].into();
-		NodeIdentity {
-			peer_id,
-			authority_index: if registered_authorities {
-				Some(peer_id as u16 * 2u16)
-			} else {
-				None
-			},
-			keystore,
-			authority_id,
-			account_id: keyring.public().into(),
-		}
-	}
-	fn as_authority(&self) -> (u16, AccountId, BlockSealAuthorityId) {
-		(
-			self.authority_index.unwrap_or_default(),
-			self.account_id.clone(),
-			self.authority_id.clone(),
-		)
+		NodeIdentity { peer_id, keystore, authority_id, account_id: keyring.public().into() }
 	}
 }
 
-fn authorities(peers: &Vec<NodeIdentity>) -> Vec<(u16, AccountId, BlockSealAuthorityId)> {
-	peers.into_iter().map(|p| p.as_authority()).collect()
-}
-
-fn create_node_identities(registered_authorities: bool) -> Vec<NodeIdentity> {
+fn create_node_identities() -> Vec<NodeIdentity> {
 	[(Keyring::Alice), (Keyring::Bob), (Keyring::Charlie)]
 		.iter()
 		.enumerate()
-		.map(|(i, keyring)| NodeIdentity::new(keyring.clone(), i, registered_authorities))
+		.map(|(i, keyring)| NodeIdentity::new(keyring.clone(), i))
 		.collect::<Vec<_>>()
 }
 
@@ -234,11 +213,13 @@ async fn wait_for_sync(
 	.await;
 }
 
+/// This test is only for testing that the compute engine can work cross-miner without any runtime
+/// engine involved.
 #[tokio::test]
 async fn can_build_compute_blocks() {
 	setup_logs();
 
-	let node_identities = create_node_identities(true);
+	let node_identities = create_node_identities();
 	let tick_duration = Duration::from_millis(1000);
 	let net = UlxTestNet::new(
 		3,
@@ -247,9 +228,7 @@ async fn can_build_compute_blocks() {
 			tax_minimum: 1,
 			tick_duration: tick_duration.clone(),
 			genesis_utc_time: Ticker::start(tick_duration).genesis_utc_time,
-			voting_key: None,
 		},
-		authorities(&node_identities),
 	);
 
 	let net = Arc::new(Mutex::new(net));
@@ -266,11 +245,13 @@ async fn can_build_compute_blocks() {
 	}
 }
 
+/// Tests that votes can be constructed with a proof of tax, but nothing about the votes themselves
+/// is verified
 #[tokio::test]
 async fn can_run_proof_of_tax() {
 	setup_logs();
 
-	let node_identities = create_node_identities(true);
+	let node_identities = create_node_identities();
 
 	let tick_duration = Duration::from_millis(1000);
 	let net = UlxTestNet::new(
@@ -280,9 +261,7 @@ async fn can_run_proof_of_tax() {
 			difficulty: 1,
 			tick_duration: tick_duration.clone(),
 			genesis_utc_time: Ticker::start(tick_duration).genesis_utc_time,
-			voting_key: Some(H256::random()),
 		},
-		authorities(&node_identities),
 	);
 
 	let net = Arc::new(Mutex::new(net));
@@ -306,6 +285,7 @@ async fn can_run_proof_of_tax() {
 		let mut net = net.lock();
 		let peer = net.peer(0);
 		let api = peer.data.as_ref().expect("required").api.clone();
+		let aux_client = peer.data.as_ref().expect("required").aux_client.clone();
 
 		let client = peer.client().as_client();
 
@@ -320,7 +300,7 @@ async fn can_run_proof_of_tax() {
 		let account_id: AccountId32 = Keyring::Dave.public().into();
 
 		let vote = BlockVote {
-			grandparent_block_hash: grandparent_hash,
+			block_hash: grandparent_hash,
 			account_id: account_id.clone(),
 			channel_pass: ChannelPass {
 				at_block_height: 1,
@@ -331,59 +311,38 @@ async fn can_run_proof_of_tax() {
 			power: 500,
 			index: 1,
 		};
-		let parent_voting_key = api
-			.runtime_api()
-			.parent_voting_key(parent_hash)
-			.expect("can call the api")
-			.unwrap();
-		let vote_proof = vote.vote_proof(1, parent_voting_key);
-		let closest_peer = api
-			.runtime_api()
-			.xor_closest_authority(parent_hash, vote_proof)
-			.expect("can call the api")
-			.unwrap();
+		let parent_voting_key = H256::random();
+		let seal_strength = vote.get_seal_strength(1, parent_voting_key);
+
 		let current_tick = api.runtime_api().current_tick(parent_hash).expect("can call the api");
 
-		let mut closest_miner_id: NodeIdentity = miner1.node_identity.clone();
-		if miner2.node_identity.authority_id == closest_peer.authority_id {
-			closest_miner_id = miner2.node_identity.clone();
-		} else if miner3.node_identity.authority_id == closest_peer.authority_id {
-			closest_miner_id = miner3.node_identity.clone();
-		}
+		let closest_miner_id: NodeIdentity = miner1.node_identity.clone();
 
-		let miner_signature = crate::notebook_watch::sign_vote(
+		let miner_signature = crate::notebook_watch::try_sign_vote(
 			&closest_miner_id.keystore,
-			&closest_miner_id.authority_id,
 			&parent_hash,
-			vote_proof,
+			&closest_miner_id.authority_id,
+			seal_strength,
 		)
 		.expect("should sign");
 
 		let create_block = CreateTaxVoteBlock {
 			timestamp_millis: Timestamp::current().as_millis(),
-			account_id: closest_peer.account_id,
 			parent_hash,
 			tick: current_tick + 1,
-			block_vote_digest: BlockVoteDigest {
-				votes_count: 0,
-				tick_notebooks: 0,
-				parent_voting_key: None,
-				voting_power: 0,
-			},
-			seal_inherent: BlockSealInherent::Vote {
-				vote_proof,
+			vote: BestBlockVoteSeal {
+				closest_miner: (closest_miner_id.account_id.clone(), closest_miner_id.authority_id),
+				seal_strength,
+				notary_id: 1,
+				block_vote_bytes: vec![],
+				source_notebook_number: 1,
 				source_notebook_proof: MerkleProof {
 					proof: bounded_vec![],
 					leaf_index: 0,
 					number_of_leaves: 0,
 				},
-				source_notebook_number: 1,
-				notary_id: 1,
-				block_vote: vote,
-				miner_signature,
 			},
-			vote_proof,
-			latest_finalized_block_needed: 0,
+			signature: miner_signature,
 		};
 		let miner = match closest_miner_id.peer_id {
 			0 => &miner1,
@@ -397,6 +356,7 @@ async fn can_run_proof_of_tax() {
 		let task = tax_block_creator(
 			Box::new(miner.block_import.clone()),
 			api,
+			aux_client,
 			environ,
 			(),
 			Duration::from_millis(100),

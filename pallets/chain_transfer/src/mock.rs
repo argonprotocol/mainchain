@@ -14,7 +14,8 @@ use sp_std::collections::btree_map::BTreeMap;
 
 use ulx_primitives::{
 	notary::{NotaryId, NotaryProvider, NotarySignature},
-	BlockSealAuthorityId,
+	tick::Tick,
+	BlockSealAuthorityId, NotebookNumber, NotebookProvider, NotebookSecret,
 };
 
 use crate as pallet_chain_transfer;
@@ -69,12 +70,13 @@ parameter_types! {
 	pub static MaxNotebookBlocksToRemember :u32 = 1;
 	pub const MaxNotebookTransfers :u32 = 1;
 	pub static MaxPendingTransfersOutPerBlock :u32 = 1;
-	pub static RequiredNotebookAuditors :u32 = 1;
 	pub static TransferExpirationBlocks :u32 = 2;
 
 	pub const LocalchainPalletId: PalletId = PalletId(*b"loclchai");
 
 	pub static BlockSealers: BTreeMap<BlockNumber, Vec<BlockSealAuthorityId>> = BTreeMap::new();
+
+	pub static LockedNotaries: BTreeMap<NotaryId, Tick> = BTreeMap::new();
 
 	pub static IsProofOfCompute: bool = false;
 }
@@ -111,6 +113,24 @@ pub fn set_argons(account_id: &AccountId32, amount: Balance) {
 	drop(Balances::issue(amount));
 }
 
+pub struct StaticNotebookProvider;
+impl NotebookProvider for StaticNotebookProvider {
+	fn get_eligible_tick_votes_root(_: NotaryId, _tick: Tick) -> Option<(H256, NotebookNumber)> {
+		None
+	}
+	fn notebooks_at_tick(_: Tick) -> Vec<(NotaryId, NotebookNumber, Option<NotebookSecret>)> {
+		todo!()
+	}
+	fn notebooks_in_block() -> Vec<(NotaryId, NotebookNumber, Tick)> {
+		todo!()
+	}
+	fn is_notary_locked_at_tick(notary_id: NotaryId, tick: Tick) -> bool {
+		if let Some(lock_tick) = LockedNotaries::get().get(&notary_id) {
+			return *lock_tick <= tick
+		}
+		false
+	}
+}
 impl pallet_chain_transfer::Config for Test {
 	type RuntimeEvent = RuntimeEvent;
 	type WeightInfo = ();
@@ -120,6 +140,7 @@ impl pallet_chain_transfer::Config for Test {
 	type NotaryProvider = NotaryProviderImpl;
 	type PalletId = LocalchainPalletId;
 	type TransferExpirationBlocks = TransferExpirationBlocks;
+	type NotebookProvider = StaticNotebookProvider;
 }
 
 // Build genesis storage according to the mock runtime.

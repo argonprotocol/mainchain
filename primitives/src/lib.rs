@@ -55,7 +55,7 @@ pub type BlockHash = BlakeTwo256;
 
 pub mod localchain {
 	pub use crate::{
-		AccountType, BalanceChange, BestBlockNonce, BestBlockVoteProofT, BlockVote, BlockVoteT,
-		ChannelPass, Note, NoteType, VoteMinimum,
+		AccountType, BalanceChange, BestBlockVoteSeal, BlockVote, BlockVoteT, ChannelPass, Note,
+		NoteType, VoteMinimum,
 	};
 }

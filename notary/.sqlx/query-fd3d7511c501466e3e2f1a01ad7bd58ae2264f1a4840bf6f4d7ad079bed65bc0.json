@@ -1,6 +1,6 @@
 {
   "db_name": "PostgreSQL",
-  "query": "\n\t\t\t\tSELECT *\n\t\t\t\tFROM notebook_headers WHERE notebook_number = $1 LIMIT 1\n\t\t\t\t",
+  "query": "\n\t\t\t\tSELECT *\n\t\t\t\tFROM notebook_headers WHERE notebook_number = $1\n\t\t\t\tAND signature IS NOT NULL\n\t\t\t\t LIMIT 1\n\t\t\t\t",
   "describe": {
     "columns": [
       {
@@ -120,5 +120,5 @@
       false
     ]
   },
-  "hash": "8bf77ad79942bf1878385b50e5197635c3b332d1935782c943f1d6c7abe7f31b"
+  "hash": "fd3d7511c501466e3e2f1a01ad7bd58ae2264f1a4840bf6f4d7ad079bed65bc0"
 }

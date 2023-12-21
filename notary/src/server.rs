@@ -1,9 +1,10 @@
 use std::net::SocketAddr;
 
+use codec::Encode;
 use futures::{Stream, StreamExt};
 use jsonrpsee::{
 	core::{async_trait, SubscriptionResult},
-	server::{PendingSubscriptionSink, Server, SubscriptionMessage},
+	server::{PendingSubscriptionSink, Server, ServerHandle, SubscriptionMessage},
 	types::ErrorObjectOwned,
 	RpcModule, TrySendError,
 };
@@ -13,8 +14,8 @@ use sqlx::PgPool;
 use tokio::net::ToSocketAddrs;
 
 use ulx_primitives::{
-	tick::Ticker, BalanceProof, BalanceTip, NotarizationBalanceChangeset, NotarizationBlockVotes,
-	NotaryId, Notebook, NotebookHeader, NotebookNumber,
+	BalanceProof, BalanceTip, NotarizationBalanceChangeset, NotarizationBlockVotes, NotaryId,
+	Notebook, NotebookMeta, NotebookNumber, SignedNotebookHeader,
 };
 
 use crate::{
@@ -29,7 +30,7 @@ use crate::{
 	Error,
 };
 
-pub type NotebookHeaderStream = NotificationStream<NotebookHeader, NotebookHeaderTracingKey>;
+pub type NotebookHeaderStream = NotificationStream<SignedNotebookHeader, NotebookHeaderTracingKey>;
 
 #[derive(Clone)]
 pub struct NotebookHeaderTracingKey;
@@ -43,8 +44,8 @@ pub struct NotaryServer {
 	notary_id: NotaryId,
 	pool: PgPool,
 	pub(crate) completed_notebook_stream: NotebookHeaderStream,
-	ticker: Ticker,
-	pub completed_notebook_sender: NotificationSender<NotebookHeader>,
+	pub completed_notebook_sender: NotificationSender<SignedNotebookHeader>,
+	server_handle: Option<ServerHandle>,
 }
 
 impl NotaryServer {
@@ -53,23 +54,29 @@ impl NotaryServer {
 		Ok(server)
 	}
 
+	pub async fn stop(&mut self) {
+		if let Some(server_handle) = self.server_handle.take() {
+			server_handle.stop().expect("Should be able to stop server");
+			server_handle.stopped().await;
+		}
+	}
+
 	pub async fn start_with(
 		server: Server,
 		notary_id: NotaryId,
 		pool: PgPool,
-		ticker: Ticker,
 	) -> anyhow::Result<Self> {
 		let (completed_notebook_sender, completed_notebook_stream) =
 			NotebookHeaderStream::channel();
 
 		let addr = server.local_addr()?;
-		let notary_server = Self {
+		let mut notary_server = Self {
 			notary_id,
 			completed_notebook_sender,
 			completed_notebook_stream,
 			pool,
 			addr,
-			ticker,
+			server_handle: None,
 		};
 
 		let mut module = RpcModule::new(());
@@ -77,7 +84,8 @@ impl NotaryServer {
 		module.merge(LocalchainRpcServer::into_rpc(notary_server.clone()))?;
 
 		let handle = server.start(module);
-
+		notary_server.server_handle = Some(handle.clone());
+		// handle in background
 		tokio::spawn(handle.stopped());
 
 		Ok(notary_server)
@@ -86,11 +94,10 @@ impl NotaryServer {
 	pub async fn start(
 		notary_id: NotaryId,
 		pool: PgPool,
-		ticker: Ticker,
 		addrs: impl ToSocketAddrs,
 	) -> anyhow::Result<Self> {
 		let server = Self::create_http_server(addrs).await?;
-		Self::start_with(server, notary_id, pool, ticker).await
+		Self::start_with(server, notary_id, pool).await
 	}
 }
 
@@ -112,13 +119,27 @@ impl NotebookRpcServer for NotaryServer {
 				balance: balance_tip.balance,
 			})
 	}
+
 	async fn get_header(
 		&self,
 		notebook_number: NotebookNumber,
-	) -> Result<NotebookHeader, ErrorObjectOwned> {
-		NotebookHeaderStore::load(&self.pool, notebook_number)
+	) -> Result<SignedNotebookHeader, ErrorObjectOwned> {
+		NotebookHeaderStore::load_with_signature(&self.pool, notebook_number)
 			.await
 			.map_err(from_crate_error)
+	}
+
+	async fn get_raw_headers(
+		&self,
+		since_notebook: NotebookNumber,
+	) -> Result<Vec<(NotebookNumber, Vec<u8>)>, ErrorObjectOwned> {
+		NotebookHeaderStore::load_raw_signed_headers(&self.pool, since_notebook)
+			.await
+			.map_err(from_crate_error)
+	}
+
+	async fn metadata(&self) -> Result<NotebookMeta, ErrorObjectOwned> {
+		NotebookHeaderStore::latest(&self.pool).await.map_err(from_crate_error)
 	}
 
 	async fn get(&self, notebook_number: NotebookNumber) -> Result<Notebook, ErrorObjectOwned> {
@@ -128,7 +149,7 @@ impl NotebookRpcServer for NotaryServer {
 			.await
 			.map_err(|e| from_crate_error(Error::Database(e.to_string())))?;
 
-		Ok(NotebookStore::load(&mut *db, notebook_number, self.ticker)
+		Ok(NotebookStore::load_finalized(&mut *db, notebook_number)
 			.await
 			.map_err(from_crate_error)?)
 	}
@@ -151,7 +172,22 @@ impl NotebookRpcServer for NotaryServer {
 	async fn subscribe_headers(&self, pending: PendingSubscriptionSink) -> SubscriptionResult {
 		let stream = self.completed_notebook_stream.subscribe(1_000);
 
-		pipe_from_stream_and_drop(pending, stream).await.map_err(Into::into)
+		pipe_from_stream_and_drop(pending, stream, |a| {
+			SubscriptionMessage::from_json(&a).map_err(Into::into)
+		})
+		.await
+		.map_err(Into::into)
+	}
+
+	async fn subscribe_raw_headers(&self, pending: PendingSubscriptionSink) -> SubscriptionResult {
+		let stream = self.completed_notebook_stream.subscribe(1_000);
+
+		pipe_from_stream_and_drop(pending, stream, |item| {
+			SubscriptionMessage::from_json(&(item.header.notebook_number, item.encode()))
+				.map_err(Into::into)
+		})
+		.await
+		.map_err(Into::into)
 	}
 }
 
@@ -176,6 +212,7 @@ impl LocalchainRpcServer for NotaryServer {
 async fn pipe_from_stream_and_drop<T: Serialize>(
 	pending: PendingSubscriptionSink,
 	mut stream: impl Stream<Item = T> + Unpin,
+	transform: impl Fn(T) -> Result<SubscriptionMessage, anyhow::Error>,
 ) -> Result<(), anyhow::Error> {
 	let mut sink = pending.accept().await?;
 
@@ -183,11 +220,10 @@ async fn pipe_from_stream_and_drop<T: Serialize>(
 		tokio::select! {
 			_ = sink.closed() => break Err(anyhow::anyhow!("Subscription was closed")),
 			maybe_item = stream.next() => {
-				let item = match maybe_item {
-					Some(item) => item,
+				let msg = match maybe_item {
+					Some(item) => transform(item)?,
 					None => break Err(anyhow::anyhow!("Subscription was closed")),
 				};
-				let msg = SubscriptionMessage::from_json(&item)?;
 				match sink.try_send(msg) {
 					Ok(_) => (),
 					Err(TrySendError::Closed(_)) => break Err(anyhow::anyhow!("Subscription was closed")),
@@ -240,11 +276,11 @@ mod tests {
 	async fn test_balance_change_and_get_proof(pool: PgPool) -> anyhow::Result<()> {
 		let _ = tracing_subscriber::fmt::try_init();
 		let ticker = Ticker::new(60_000, Utc::now().timestamp_millis() as u64);
-		let notary = NotaryServer::start(1, pool.clone(), ticker, "127.0.0.1:0").await?;
+		let notary = NotaryServer::start(1, pool.clone(), "127.0.0.1:0").await?;
 		assert!(notary.addr.port() > 0);
 
 		let mut db = notary.pool.acquire().await?;
-		BlocksStore::record(&mut *db, 0, [1u8; 32].into(), [0u8; 32].into(), 100, None).await?;
+		BlocksStore::record(&mut *db, 0, [1u8; 32].into(), [0u8; 32].into(), 100, vec![]).await?;
 		BlocksStore::record_finalized(&mut *db, [1u8; 32].into()).await?;
 		NotebookHeaderStore::create(&mut *db, notary.notary_id, 1, 1, ticker.time_for_tick(1))
 			.await?;
@@ -279,6 +315,7 @@ mod tests {
 			client.notarize(bounded_vec![balance_change], bounded_vec![]).await?,
 			BalanceChangeResult {
 				notebook_number: 1,
+				tick: 1,
 				new_account_origins: vec![NewAccountOrigin::new(Bob.to_account_id(), Deposit, 1)],
 			}
 		);
@@ -299,7 +336,8 @@ mod tests {
 			client: MainchainClient::new(vec![format!("ws://{}", notary.addr)]),
 			ticker: ticker.clone(),
 		};
-		sqlx::query("update notebook_status set open_time = now() - interval '2 minutes' where notebook_number = 1")
+		sqlx::query("update notebook_status set end_time = $1 where notebook_number = 1")
+			.bind(Utc::now())
 			.execute(&mut *db)
 			.await?;
 
@@ -307,7 +345,7 @@ mod tests {
 		closer.try_close_notebook().await?;
 
 		let mut stream = subscription.into_stream();
-		let header = stream.next().await.unwrap()?;
+		let header = stream.next().await.unwrap()?.header;
 
 		assert_eq!(header.notebook_number, 1);
 		assert_eq!(

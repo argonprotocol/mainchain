@@ -2,6 +2,8 @@
 
 use binary_merkle_tree::{merkle_root, verify_proof, Leaf};
 use codec::{Decode, Encode};
+
+use log::info;
 use serde::{Deserialize, Serialize};
 use snafu::Snafu;
 use sp_core::{crypto::AccountId32, H256};
@@ -13,9 +15,9 @@ use sp_std::{
 
 pub use crate::error::VerifyError;
 use ulx_primitives::{
-	ensure, AccountId, AccountOrigin, AccountOriginUid, AccountType, BalanceChange, BalanceProof,
-	BalanceTip, BlockVote, ChainTransfer, NewAccountOrigin, NotaryId, Note, NoteType, Notebook,
-	NotebookHeader, NotebookNumber, VoteMinimum, CHANNEL_CLAWBACK_NOTEBOOKS,
+	ensure, AccountId, AccountOrigin, AccountOriginUid, AccountType, Balance, BalanceChange,
+	BalanceProof, BalanceTip, BlockVote, ChainTransfer, NewAccountOrigin, NotaryId, Note, NoteType,
+	Notebook, NotebookHeader, NotebookNumber, VoteMinimum, CHANNEL_CLAWBACK_NOTEBOOKS,
 	CHANNEL_EXPIRATION_NOTEBOOKS, MIN_CHANNEL_NOTE_MILLIGONS,
 };
 
@@ -24,6 +26,8 @@ pub mod error;
 mod test_balanceset;
 #[cfg(test)]
 mod test_notebook;
+
+const LOG_TARGET: &str = "notary::audit";
 
 #[derive(Debug, Clone, PartialEq, TypeInfo, Encode, Decode, Serialize, Deserialize, Snafu)]
 pub enum AccountHistoryLookupError {
@@ -54,6 +58,7 @@ pub trait NotebookHistoryLookup {
 		notary_id: NotaryId,
 		account_id: &AccountId32,
 		nonce: u32,
+		milligons: Balance,
 	) -> Result<bool, AccountHistoryLookupError>;
 }
 
@@ -223,7 +228,7 @@ fn track_block_votes(
 	block_votes: &Vec<BlockVote>,
 ) -> anyhow::Result<(), VerifyError> {
 	for block_vote in block_votes {
-		state.blocks_voted_on.insert(block_vote.grandparent_block_hash.clone());
+		state.blocks_voted_on.insert(block_vote.block_hash.clone());
 		state
 			.block_votes
 			.insert((block_vote.account_id.clone(), block_vote.index), block_vote.clone());
@@ -256,6 +261,7 @@ fn verify_balance_sources<'a, T: NotebookHistoryLookup>(
 						notary_id,
 						account_id,
 						account_nonce.clone(),
+						note.milligons,
 					)?;
 					state.track_chain_transfer(account_id.clone(), note)?;
 				},
@@ -274,8 +280,10 @@ fn verify_balance_sources<'a, T: NotebookHistoryLookup>(
 			}
 		}
 
+		info!(target:LOG_TARGET, "Verifying balance change for {:?}, #{} {:?}", key.0, change.change_number, key.1);
 		if change.change_number == 1 {
 			if let Some(account_uid) = state.new_account_origins.get(&key) {
+				info!(target:LOG_TARGET,"track final balance for account_uid {account_uid}");
 				state.track_final_balance(
 					&key,
 					&change,
@@ -324,7 +332,7 @@ pub fn verify_voting_sources(
 	let mut unused_channel_passes = channel_passes.clone();
 	for block_vote in block_votes {
 		let minimum = vote_minimums
-			.get(&block_vote.grandparent_block_hash)
+			.get(&block_vote.block_hash)
 			.ok_or(VerifyError::InvalidBlockVoteSource)?;
 
 		ensure!(block_vote.power >= *minimum, VerifyError::InsufficientBlockVoteMinimum);
@@ -344,6 +352,11 @@ fn verify_previous_balance_proof<'a, T: NotebookHistoryLookup>(
 	change: &BalanceChange,
 	key: &(AccountId32, AccountType),
 ) -> anyhow::Result<bool, VerifyError> {
+	info!(target:LOG_TARGET,
+		"verify balance for uid={}. in final? {}",
+		proof.account_origin.account_uid,
+		final_balances.contains_key(&key)
+	);
 	// if we've changed balance in this notebook before, it must match the previous
 	// entry
 	if final_balances.contains_key(&key) {

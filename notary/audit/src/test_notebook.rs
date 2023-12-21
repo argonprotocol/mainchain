@@ -17,8 +17,8 @@ use sp_runtime::{traits::BlakeTwo256, MultiSignature};
 use ulx_primitives::{
 	balance_change::{AccountOrigin, BalanceChange, BalanceProof},
 	note::{AccountType, Note, NoteType},
-	BalanceTip, BlockVote, ChainTransfer, ChannelPass, MerkleProof, NewAccountOrigin, Notarization,
-	Notebook, NotebookHeader, NotebookNumber,
+	Balance, BalanceTip, BlockVote, ChainTransfer, ChannelPass, MerkleProof, NewAccountOrigin,
+	Notarization, Notebook, NotebookHeader, NotebookNumber,
 };
 
 use crate::{
@@ -65,6 +65,7 @@ impl NotebookHistoryLookup for TestLookup {
 		_notary_id: u32,
 		account_id: &AccountId32,
 		nonce: u32,
+		_milligons: Balance,
 	) -> Result<bool, AccountHistoryLookupError> {
 		ValidLocalchainTransfers::get()
 			.get(&(account_id.clone(), nonce))
@@ -818,7 +819,7 @@ fn test_votes_must_add_up() {
 	let channel_pass2 =
 		ChannelPass { miner_index: 1, zone_record_hash: H256::random(), id: 1, at_block_height: 2 };
 
-	let grandparent_block_hash = H256::random();
+	let vote_block_hash = H256::random();
 	let mut notebook = Notebook {
 		header: NotebookHeader {
 			version: 1,
@@ -929,14 +930,14 @@ fn test_votes_must_add_up() {
 				BlockVote {
 					index: 0,
 					power: 4,
-					grandparent_block_hash: grandparent_block_hash.clone(),
+					block_hash: vote_block_hash.clone(),
 					account_id: Alice.to_account_id(),
 					channel_pass: channel_pass1
 				},
 				BlockVote {
 					index: 1,
 					power: 30,
-					grandparent_block_hash: grandparent_block_hash.clone(),
+					block_hash: vote_block_hash.clone(),
 					account_id: Alice.to_account_id(),
 					channel_pass: channel_pass2
 				}
@@ -1025,12 +1026,12 @@ fn test_votes_must_add_up() {
 		)
 	});
 	// 1. Test a vote minimum > the votes
-	let minimums = BTreeMap::from([(grandparent_block_hash.clone(), 100)]);
+	let minimums = BTreeMap::from([(vote_block_hash.clone(), 100)]);
 	assert_err!(
 		notebook_verify(&TestLookup, &notebook, &minimums,),
 		VerifyError::InsufficientBlockVoteMinimum
 	);
-	let minimums = BTreeMap::from([(grandparent_block_hash.clone(), 2)]);
+	let minimums = BTreeMap::from([(vote_block_hash.clone(), 2)]);
 
 	// 2. Once vote minimums are allowed, the "vote root is wrong"
 	assert_err!(
@@ -1065,7 +1066,7 @@ fn test_votes_must_add_up() {
 		notebook_verify(&TestLookup, &notebook, &minimums,),
 		VerifyError::InvalidBlockVoteList
 	);
-	notebook.header.blocks_with_votes = bounded_vec![grandparent_block_hash.clone()];
+	notebook.header.blocks_with_votes = bounded_vec![vote_block_hash.clone()];
 
 	notebook.hash = notebook.calculate_hash();
 	assert_ok!(notebook_verify(&TestLookup, &notebook, &minimums,),);

@@ -21,6 +21,7 @@ sp-runtime = { version = "24.0.0", default-features = false, git = "https://gith
 sp-inherents = { version = "4.0.0-dev", default-features = false, git = "https://github.com/paritytech/polkadot-sdk.git", branch = "release-polkadot-v1.5.0" }
 sp-api = { version = "4.0.0-dev", default-features = false, git = "https://github.com/paritytech/polkadot-sdk.git", branch = "release-polkadot-v1.5.0" }
 sp-application-crypto = { version = "23.0.0", default-features = false, git = "https://github.com/paritytech/polkadot-sdk.git", branch = "release-polkadot-v1.5.0" }
+sp-debug-derive = { version = "8.0.0", default-features = false, git = "https://github.com/paritytech/polkadot-sdk.git", branch = "release-polkadot-v1.5.0" }
 sp-core = { version = "21.0.0", default-features = false, git = "https://github.com/paritytech/polkadot-sdk.git", branch = "release-polkadot-v1.5.0" }
 sp-std = { version = "8.0.0", default-features = false, git = "https://github.com/paritytech/polkadot-sdk.git", branch = "release-polkadot-v1.5.0" }
 sp-core-hashing = { version = "9.0", default-features = false, git = "https://github.com/paritytech/polkadot-sdk.git", branch = "release-polkadot-v1.5.0" }
@@ -42,6 +43,7 @@ std = [
   "serde/std",
   "sp-api/std",
   "sp-application-crypto/std",
+  "sp-debug-derive/std",
   "sp-core/std",
   "sp-core-hashing/std",
   "sp-inherents/std",
@@ -49,4 +51,7 @@ std = [
   "sp-std/std",
   "thiserror",
   "frame-support/std",
+]
+fast-runtime=[
+  "sp-debug-derive/force-debug",
 ]
