@@ -1,7 +1,7 @@
 use sp_core::ByteArray;
 use sqlx::{query, FromRow, PgConnection};
 
-use ulx_notary_primitives::{ensure, AccountId, ChainTransfer, NotebookNumber};
+use ulx_primitives::{ensure, AccountId, ChainTransfer, NotebookNumber};
 
 use crate::{stores::notebook_status::NotebookStatusStore, Error};
 
@@ -14,7 +14,7 @@ struct ChainTransferRow {
 	pub amount: String,
 	pub account_id: Vec<u8>,
 	pub account_nonce: Option<i32>,
-	pub finalized_block: Option<i32>,
+	pub finalized_block_number: Option<i32>,
 	pub included_in_notebook_number: Option<i32>,
 }
 impl TryInto<ChainTransfer> for ChainTransferRow {
@@ -155,7 +155,7 @@ impl ChainTransferStore {
 	) -> anyhow::Result<()> {
 		let res = query!(
 			r#"
-			INSERT INTO chain_transfers (to_localchain, amount, account_id, account_nonce, finalized_block) VALUES ($1, $2, $3, $4, $5)
+			INSERT INTO chain_transfers (to_localchain, amount, account_id, account_nonce, finalized_block_number) VALUES ($1, $2, $3, $4, $5)
 			"#,
 			true,
 			milligons.to_string(),
@@ -175,9 +175,11 @@ impl ChainTransferStore {
 
 #[cfg(test)]
 mod tests {
+	use chrono::{Duration, Utc};
 	use frame_support::{assert_err, assert_ok};
 	use sp_keyring::{AccountKeyring::Alice, Sr25519Keyring::Bob};
 	use sqlx::PgPool;
+	use std::ops::Add;
 	use tracing_subscriber::EnvFilter;
 
 	use crate::stores::{chain_transfer::*, notebook_status::NotebookFinalizationStep};
@@ -191,7 +193,7 @@ mod tests {
 
 	#[sqlx::test]
 	async fn test_transfer_to_localchain_flow(pool: PgPool) -> anyhow::Result<()> {
-		NotebookStatusStore::create(&pool, 1).await?;
+		NotebookStatusStore::create(&pool, 1, 1, Utc::now().add(Duration::minutes(1))).await?;
 		logger();
 		let notebook_number = 1;
 		let account_id = Bob.to_account_id();
@@ -253,7 +255,7 @@ mod tests {
 	#[sqlx::test]
 	async fn test_transfer_can_only_be_in_one_notebook(pool: PgPool) -> anyhow::Result<()> {
 		logger();
-		NotebookStatusStore::create(&pool, 1).await?;
+		NotebookStatusStore::create(&pool, 1, 1, Utc::now().add(Duration::minutes(1))).await?;
 		let notebook_number = 1;
 		let account_id = Bob.to_account_id();
 		let account_nonce = 1;
@@ -309,7 +311,7 @@ mod tests {
 	#[sqlx::test]
 	async fn test_fails_after_max_transfers(pool: PgPool) -> anyhow::Result<()> {
 		logger();
-		NotebookStatusStore::create(&pool, 1).await?;
+		NotebookStatusStore::create(&pool, 1, 1, Utc::now().add(Duration::minutes(1))).await?;
 		{
 			let mut tx = pool.begin().await?;
 			assert_ok!(
@@ -347,12 +349,14 @@ mod tests {
 				.await,
 				Error::MaxNotebookChainTransfersReached
 			);
+			tx.rollback().await?;
 		}
 
 		{
 			let mut tx = pool.begin().await?;
 			NotebookStatusStore::next_step(&mut *tx, 1, NotebookFinalizationStep::Open).await?;
-			NotebookStatusStore::create(&mut *tx, 2).await?;
+			NotebookStatusStore::create(&mut *tx, 2, 2, Utc::now().add(Duration::minutes(2)))
+				.await?;
 			tx.commit().await?;
 
 			let mut tx = pool.begin().await?;

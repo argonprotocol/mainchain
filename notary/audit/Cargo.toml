@@ -10,23 +10,24 @@ documentation.workspace = true
 homepage.workspace = true
 
 [dependencies]
+
+log = { version = "0.4.20", default-features = false }
 anyhow = { version = "1.0", default-features = false }
 codec = { package = "parity-scale-codec", version = "3.6", default-features = false, features = ["derive", "max-encoded-len"] }
 serde = { version = "1.0", default-features = false, features = ["derive"] }
-scale-info = { version = "2.9.0", default-features = false, features = ["derive"] }
-sp-core = { version = "21.0.0",default-features = false, git = "https://github.com/paritytech/polkadot-sdk.git", branch = "release-polkadot-v1.1.0", features = [ "serde"] }
-sp-runtime = { version = "24.0.0", default-features = false,git = "https://github.com/paritytech/polkadot-sdk.git", branch = "release-polkadot-v1.1.0" }
-sp-std = { version = "8.0.0" , default-features = false, git = "https://github.com/paritytech/polkadot-sdk.git", branch = "release-polkadot-v1.1.0" }
+scale-info = { version = "2.10", default-features = false, features = ["derive"] }
+sp-core = { version = "21.0.0",default-features = false, git = "https://github.com/paritytech/polkadot-sdk.git", branch = "release-polkadot-v1.5.0", features = [ "serde"] }
+sp-runtime = { version = "24.0.0", default-features = false,git = "https://github.com/paritytech/polkadot-sdk.git", branch = "release-polkadot-v1.5.0" }
+sp-std = { version = "8.0.0" , default-features = false, git = "https://github.com/paritytech/polkadot-sdk.git", branch = "release-polkadot-v1.5.0" }
 snafu = { version = "0.6", default-features = false }
-binary-merkle-tree = { version = "4.0.0-dev", default-features = false, git = "https://github.com/paritytech/polkadot-sdk.git", branch = "release-polkadot-v1.1.0" }
+binary-merkle-tree = { version = "4.0.0-dev", default-features = false, git = "https://github.com/paritytech/polkadot-sdk.git", branch = "release-polkadot-v1.5.0" }
 
-ulx-notary-primitives = { path = "../primitives", default-features = false }
+ulx-primitives = { path = "../../primitives", default-features = false }
 
 [dev-dependencies]
-frame-support = { version = "4.0.0-dev", git = "https://github.com/paritytech/polkadot-sdk.git", branch = "release-polkadot-v1.1.0" }
-sp-keyring = { version = "24.0.0", git = "https://github.com/paritytech/polkadot-sdk.git", branch = "release-polkadot-v1.1.0" }
+frame-support = { version = "4.0.0-dev", git = "https://github.com/paritytech/polkadot-sdk.git", branch = "release-polkadot-v1.5.0" }
+sp-keyring = { version = "24.0.0", git = "https://github.com/paritytech/polkadot-sdk.git", branch = "release-polkadot-v1.5.0" }
 chrono = "0.4"
-tokio = { version = "1.33", features = ["test-util", "macros"] }
 
 [features]
 default = ["std"]
@@ -38,5 +39,5 @@ std = [
     "sp-std/std",
     "sp-runtime/std",
     "binary-merkle-tree/std",
-    "ulx-notary-primitives/std"
+    "ulx-primitives/std"
 ]

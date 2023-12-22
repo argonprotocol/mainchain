@@ -1,163 +1,124 @@
-// This file is part of Substrate.
-
-// Copyright (C) Parity Technologies (UK) Ltd.
-// SPDX-License-Identifier: GPL-3.0-or-later WITH Classpath-exception-2.0
-
-// This program is free software: you can redistribute it and/or modify
-// it under the terms of the GNU General Public License as published by
-// the Free Software Foundation, either version 3 of the License, or
-// (at your option) any later version.
-
-// This program is distributed in the hope that it will be useful,
-// but WITHOUT ANY WARRANTY; without even the implied warranty of
-// MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE. See the
-// GNU General Public License for more details.
-
-// You should have received a copy of the GNU General Public License
-// along with this program. If not, see <https://www.gnu.org/licenses/>.
-
 use std::{
 	pin::Pin,
 	sync::{
 		atomic::{AtomicUsize, Ordering},
 		Arc,
 	},
-	thread,
-	thread::JoinHandle,
-	time::Duration,
+	time::{Duration, Instant},
 };
 
-use codec::Encode;
+use codec::Codec;
 use futures::{
 	executor::block_on,
+	future::BoxFuture,
 	prelude::*,
 	task::{Context, Poll},
 };
 use futures_timer::Delay;
 use log::*;
 use parking_lot::Mutex;
-use sc_client_api::ImportNotifications;
-use sc_consensus::{BlockImportParams, BoxBlockImport, ImportResult, StateAction, StorageChanges};
-use sp_consensus::{BlockOrigin, Proposal};
-use sp_core::{RuntimeDebug, U256};
-use sp_runtime::{
-	traits::{Block as BlockT, Header as HeaderT},
-	DigestItem,
+use sc_client_api::{AuxStore, BlockchainEvents, ImportNotifications};
+use sc_consensus::BoxBlockImport;
+use sc_service::TaskManager;
+use sp_api::ProvideRuntimeApi;
+use sp_blockchain::HeaderBackend;
+use sp_consensus::{Environment, Proposal, Proposer, SelectChain, SyncOracle};
+use sp_core::{traits::SpawnEssentialNamed, RuntimeDebug, U256};
+use sp_runtime::traits::{Block as BlockT, Header as HeaderT};
+use sp_timestamp::Timestamp;
+
+use ulx_node_runtime::{NotaryRecordT, NotebookVerifyError};
+use ulx_primitives::{inherents::BlockSealInherentNodeSide, tick::Tick, *};
+
+use crate::{
+	aux::UlxAux, block_creator, block_creator::propose, compute_solver::ComputeSolver,
+	digests::get_tick_digest, error::Error, notebook_watch::has_votes_at_tick,
 };
 
-use ulx_primitives::*;
-
-use crate::{nonce_verify::NonceVerifier, LOG_TARGET, ULX_ENGINE_ID};
-
-pub enum NonceSolverResult {
-	Found { nonce: [u8; 32] },
-	MovedToTax,
-	NotFound,
-	Waiting,
-}
-
-pub struct NonceSolver<B: BlockT> {
-	pub version: Version,
-	pub nonce: [u8; 32],
-	counter: U256,
-	verifier: NonceVerifier<B>,
-}
-
-impl<B: BlockT> NonceSolver<B> {
-	pub fn new(version: Version, pre_hash: &B::Hash, pre_digest: &UlxPreDigest) -> Self {
-		NonceSolver {
-			version,
-			counter: U256::from(rand::random::<u64>()),
-			nonce: [0_u8; 32],
-			verifier: NonceVerifier::new(pre_hash, pre_digest),
-		}
-	}
-
-	pub fn check_next(&mut self) -> NonceSolverResult {
-		self.counter = self.counter.checked_add(U256::from(1)).unwrap_or(U256::from(0));
-
-		self.counter.to_big_endian(&mut self.nonce);
-		if self.verifier.is_nonce_valid(&self.nonce) {
-			NonceSolverResult::Found { nonce: self.nonce }
-		} else {
-			NonceSolverResult::NotFound
-		}
-	}
-}
+/// Version of the mining worker.
+#[derive(Eq, PartialEq, Clone, Copy, RuntimeDebug)]
+pub struct Version(pub usize);
 
 /// Mining metadata. This is the information needed to start an actual mining loop.
 #[derive(Clone, Eq, PartialEq)]
 pub struct MiningMetadata<H> {
 	/// Currently known best hash which the pre-hash is built on.
 	pub best_hash: H,
+	pub import_time: Instant,
+	pub has_tax_votes: bool,
+	pub parent_tick: Tick,
+}
+
+struct MiningBuild<B: BlockT, Proof> {
+	pub proposal: Proposal<B, Proof>,
 	/// Mining pre-hash.
-	pub pre_hash: H,
+	pub pre_hash: B::Hash,
 	/// Pre-runtime digest item.
-	pub pre_digest: UlxPreDigest,
+	pub difficulty: ComputeDifficulty,
 }
-
-/// A build of mining, containing the metadata and the block proposal.
-pub struct MiningBuild<Block: BlockT, Proof> {
-	/// Mining metadata.
-	pub metadata: MiningMetadata<Block::Hash>,
-	/// Mining proposal.
-	pub proposal: Proposal<Block, Proof>,
-}
-
-/// Version of the mining worker.
-#[derive(Eq, PartialEq, Clone, Copy, RuntimeDebug)]
-pub struct Version(pub usize);
 
 /// Mining worker that exposes structs to query the current mining build and submit mined blocks.
 pub struct MiningHandle<Block: BlockT, L: sc_consensus::JustificationSyncLink<Block>, Proof> {
 	version: Arc<AtomicUsize>,
 	justification_sync_link: Arc<L>,
+	metadata: Arc<Mutex<Option<MiningMetadata<Block::Hash>>>>,
 	build: Arc<Mutex<Option<MiningBuild<Block, Proof>>>>,
 	block_import: Arc<Mutex<BoxBlockImport<Block>>>,
 }
 
-impl<Block, L, Proof> MiningHandle<Block, L, Proof>
+impl<B, L, Proof> MiningHandle<B, L, Proof>
 where
-	Block: BlockT,
-	L: sc_consensus::JustificationSyncLink<Block>,
+	B: BlockT,
+	L: sc_consensus::JustificationSyncLink<B>,
 	Proof: Send,
 {
 	fn increment_version(&self) {
 		self.version.fetch_add(1, Ordering::SeqCst);
 	}
 
-	pub fn new(block_import: BoxBlockImport<Block>, justification_sync_link: L) -> Self {
+	pub fn new(block_import: BoxBlockImport<B>, justification_sync_link: L) -> Self {
 		Self {
 			version: Arc::new(AtomicUsize::new(0)),
 			justification_sync_link: Arc::new(justification_sync_link),
 			build: Arc::new(Mutex::new(None)),
 			block_import: Arc::new(Mutex::new(block_import)),
+			metadata: Arc::new(Mutex::new(None)),
 		}
 	}
 
-	pub(crate) fn on_major_syncing(&self) {
+	pub(crate) fn stop_solving_current(&self) {
 		let mut build = self.build.lock();
 		*build = None;
+		let mut metadata = self.metadata.lock();
+		*metadata = None;
 		self.increment_version();
 	}
 
-	pub(crate) fn on_build(
-		&self,
-		proposal: Proposal<Block, Proof>,
-		best_hash: Block::Hash,
-		pre_hash: Block::Hash,
-		pre_digest: UlxPreDigest,
-	) {
-		let mut build = self.build.lock();
-		*build = Some(MiningBuild::<Block, _> {
-			metadata: MiningMetadata {
-				best_hash,
-				pre_hash: pre_hash.clone(),
-				pre_digest: pre_digest.clone(),
-			},
-			proposal,
+	pub(crate) fn on_block(&self, best_hash: B::Hash, has_tax_votes: bool, parent_tick: Tick) {
+		self.stop_solving_current();
+		let mut metadata = self.metadata.lock();
+		*metadata = Some(MiningMetadata {
+			best_hash,
+			has_tax_votes,
+			import_time: Instant::now(),
+			parent_tick,
 		});
-		self.increment_version();
+	}
+
+	pub(crate) fn start_solving(
+		&self,
+		best_hash: B::Hash,
+		pre_hash: B::Hash,
+		difficulty: ComputeDifficulty,
+		proposal: Proposal<B, Proof>,
+	) {
+		if self.best_hash() != Some(best_hash) {
+			self.stop_solving_current();
+			return
+		}
+
+		let mut build = self.build.lock();
+		*build = Some(MiningBuild { pre_hash: pre_hash.clone(), difficulty, proposal });
 	}
 	/// Get the version of the mining worker.
 	///
@@ -169,34 +130,51 @@ where
 
 	/// Get the current best hash. `None` if the worker has just started or the client is doing
 	/// major syncing.
-	pub fn best_hash(&self) -> Option<Block::Hash> {
-		self.build.lock().as_ref().map(|b| b.metadata.best_hash)
+	pub fn best_hash(&self) -> Option<B::Hash> {
+		self.metadata.lock().as_ref().map(|b| b.best_hash)
+	}
+
+	pub fn build_hash(&self) -> Option<B::Hash> {
+		self.build
+			.lock()
+			.as_ref()
+			.map(|b| b.proposal.block.header().parent_hash())
+			.cloned()
 	}
 
 	/// Get a copy of the current mining metadata, if available.
-	pub fn metadata(&self) -> Option<MiningMetadata<Block::Hash>> {
-		self.build.lock().as_ref().map(|b| b.metadata.clone())
+	pub fn metadata(&self) -> Option<MiningMetadata<B::Hash>> {
+		self.metadata.lock().as_ref().cloned()
 	}
 
-	pub fn create_solver(&self) -> Option<NonceSolver<Block>> {
-		match self.metadata() {
+	pub fn create_solver(&self) -> Option<ComputeSolver> {
+		match self.build.lock().as_ref() {
 			Some(x) => {
 				let pre_hash = x.pre_hash;
-				let pre_digest = x.pre_digest;
-				Some(NonceSolver::new(self.version(), &pre_hash, &pre_digest))
+
+				Some(ComputeSolver::new(self.version(), pre_hash.as_ref().to_vec(), x.difficulty))
 			},
 			_ => None,
 		}
 	}
 
-	pub fn is_valid_solver(&self, solver: &Option<Box<NonceSolver<Block>>>) -> bool {
+	pub fn is_valid_solver(&self, solver: &Option<Box<ComputeSolver>>) -> bool {
 		solver.as_ref().map(|a| a.version) == Some(self.version())
 	}
 
-	pub async fn submit(
-		&self,
-		nonce: [u8; 32],
-	) -> Result<Option<ImportResult>, crate::Error<Block>> {
+	pub fn ready_to_solve(&self, current_tick: Tick) -> bool {
+		match self.metadata.lock().as_ref() {
+			Some(x) => {
+				if !x.has_tax_votes {
+					return true
+				}
+				x.parent_tick <= current_tick.saturating_sub(2)
+			},
+			_ => false,
+		}
+	}
+
+	pub async fn submit(&mut self, nonce: U256) -> Result<(), Error<B>> {
 		let build = match {
 			let mut build = self.build.lock();
 			// try to take out of option. if not exists, we've moved on
@@ -205,99 +183,215 @@ where
 			Some(x) => x,
 			_ => {
 				trace!(target: LOG_TARGET, "Unable to submit mined block in compute worker: internal build does not exist",);
-				return Ok(None)
+				return Ok(())
 			},
 		};
 
-		let seal =
-			DigestItem::Seal(ULX_ENGINE_ID, UlxSeal { nonce, authority: None, easing: 0 }.encode());
-		let storage_changes = build.proposal.storage_changes;
-		let (header, body) = build.proposal.block.deconstruct();
+		self.increment_version();
 
-		let mut import_block = BlockImportParams::new(BlockOrigin::Own, header);
-		import_block.post_digests.push(seal);
-		import_block.body = Some(body);
-		import_block.state_action =
-			StateAction::ApplyChanges(StorageChanges::Changes(storage_changes));
-
-		let header = import_block.post_header();
 		let mut block_import = self.block_import.lock();
 
-		match block_import.import_block(import_block).await {
-			Ok(res) => match res {
-				ImportResult::Imported(_) => {
-					res.handle_justification(
-						&header.hash(),
-						*header.number(),
-						&self.justification_sync_link,
-					);
-
-					info!(
-						target: LOG_TARGET,
-						"✅ Successfully mined block on top of: {}", build.metadata.best_hash
-					);
-					Ok(Some(res))
-				},
-				other => Err(other.into()),
-			},
-			Err(err) => {
-				warn!(target: LOG_TARGET, "Unable to import mined block: {}", err,);
-				Err(err.into())
-			},
-		}
+		block_creator::submit_block::<B, L, Proof>(
+			&mut block_import,
+			build.proposal,
+			&self.justification_sync_link,
+			BlockSealDigest::Compute { nonce },
+		)
+		.await;
+		Ok(())
 	}
 }
 
-pub fn run_miner_thread<Block, L, Proof>(worker: MiningHandle<Block, L, Proof>) -> JoinHandle<()>
+impl<B, L, Proof> Clone for MiningHandle<B, L, Proof>
 where
-	Block: BlockT,
-	L: sc_consensus::JustificationSyncLink<Block> + 'static,
-	Proof: Send + 'static,
-{
-	let mut solver: Option<Box<NonceSolver<Block>>> = None;
-	thread::spawn(move || loop {
-		if !worker.is_valid_solver(&solver) {
-			if let Some(finder) = worker.create_solver() {
-				solver = Some(Box::new(finder));
-			}
-		}
-
-		if let Some(mut_solver) = solver.as_mut() {
-			match mut_solver.check_next() {
-				NonceSolverResult::Found { nonce } => {
-					let _ = block_on(worker.submit(nonce));
-					solver = None;
-				},
-				NonceSolverResult::NotFound => continue,
-				NonceSolverResult::MovedToTax => {
-					log::info!(
-							target: LOG_TARGET,
-							"Proof of Tax is activated, leaving mining thread.");
-					return
-				},
-				NonceSolverResult::Waiting => {
-					thread::sleep(Duration::new(1, 0));
-				},
-			}
-		} else {
-			thread::sleep(Duration::from_millis(500));
-		}
-	})
-}
-
-impl<Block, L, Proof> Clone for MiningHandle<Block, L, Proof>
-where
-	Block: BlockT,
-	L: sc_consensus::JustificationSyncLink<Block>,
+	B: BlockT,
+	L: sc_consensus::JustificationSyncLink<B>,
 {
 	fn clone(&self) -> Self {
 		Self {
 			version: self.version.clone(),
 			justification_sync_link: self.justification_sync_link.clone(),
 			build: self.build.clone(),
+			metadata: self.metadata.clone(),
 			block_import: self.block_import.clone(),
 		}
 	}
+}
+
+const LOG_TARGET: &str = "voter::compute::miner";
+pub(crate) fn create_compute_solver_task<B, L, Proof>(
+	mut worker: MiningHandle<B, L, Proof>,
+) -> BoxFuture<'static, ()>
+where
+	B: BlockT,
+	L: sc_consensus::JustificationSyncLink<B> + 'static,
+	Proof: Send + 'static,
+{
+	async move {
+		let mut solver: Option<Box<ComputeSolver>> = None;
+		loop {
+			if !worker.is_valid_solver(&solver) {
+				solver = worker.create_solver().map(Box::new);
+			}
+
+			if let Some(solver) = solver.as_mut() {
+				if let Some(nonce) = solver.check_next() {
+					let _ = block_on(worker.submit(nonce.nonce));
+				}
+			} else {
+				tokio::time::sleep(Duration::from_millis(500)).await;
+			}
+		}
+	}
+	.boxed()
+}
+
+pub fn run_compute_solver_threads<B, L, Proof>(
+	task_handle: &TaskManager,
+	worker: MiningHandle<B, L, Proof>,
+	threads: usize,
+) where
+	B: BlockT,
+	L: sc_consensus::JustificationSyncLink<B> + 'static,
+	Proof: Send + 'static,
+{
+	for _ in 0..threads {
+		let worker = worker.clone();
+		task_handle.spawn_essential_handle().spawn_essential_blocking(
+			"mining-voter",
+			Some("block-authoring"),
+			create_compute_solver_task(worker),
+		);
+	}
+}
+
+pub fn create_compute_miner<B, C, S, E, SO, L, AccountId>(
+	block_import: BoxBlockImport<B>,
+	client: Arc<C>,
+	aux_client: UlxAux<B, C>,
+	select_chain: S,
+	mut env: E,
+	sync_oracle: SO,
+	account_id: AccountId,
+	justification_sync_link: L,
+	max_time_to_build_block: Duration,
+) -> (MiningHandle<B, L, <E::Proposer as Proposer<B>>::Proof>, impl Future<Output = ()> + 'static)
+where
+	B: BlockT,
+	C: ProvideRuntimeApi<B> + BlockchainEvents<B> + HeaderBackend<B> + AuxStore + 'static,
+	C::Api: BlockSealApis<B, AccountId, BlockSealAuthorityId>
+		+ TickApis<B>
+		+ NotebookApis<B, NotebookVerifyError>
+		+ NotaryApis<B, NotaryRecordT>,
+	S: SelectChain<B> + 'static,
+	E: Environment<B> + Send + Sync + 'static,
+	E::Error: std::fmt::Debug,
+	E::Proposer: Proposer<B>,
+	SO: SyncOracle + Clone + Send + Sync + 'static,
+	L: sc_consensus::JustificationSyncLink<B> + 'static,
+	AccountId: Codec + Clone + 'static,
+{
+	// create a timer that fires whenever there are new blocks, or 500 ms go by
+	let mut timer = UntilImportedOrTimeout::new(
+		client.import_notification_stream(),
+		Duration::from_millis(1000),
+	);
+	let mining_handle = MiningHandle::new(block_import, justification_sync_link);
+
+	let handle_to_return = mining_handle.clone();
+
+	let ticker = match client.runtime_api().ticker(client.info().genesis_hash) {
+		Ok(x) => x,
+		Err(err) => {
+			panic!("Unable to pull ticker from runtime api: {}", err)
+		},
+	};
+
+	let task = async move {
+		loop {
+			if timer.next().await.is_none() {
+				// this should occur if the block import notifications completely stop... indicating
+				// we should exit
+				break
+			}
+			if sync_oracle.is_major_syncing() {
+				debug!(target: LOG_TARGET, "Skipping proposal due to sync.");
+				mining_handle.stop_solving_current();
+				continue
+			}
+
+			let best_header = match select_chain.best_chain().await {
+				Ok(x) => x,
+				Err(err) => {
+					warn!(
+						target: LOG_TARGET,
+						"Unable to pull new block for compute miner. Select best chain error: {}",
+						err
+					);
+					continue
+				},
+			};
+			let best_hash = best_header.hash();
+
+			if mining_handle.best_hash() != Some(best_hash) {
+				let parent_tick = get_tick_digest(best_header.digest()).unwrap_or_default();
+				let votes_tick = parent_tick.saturating_sub(1);
+				let has_tax_votes = has_votes_at_tick(&client, &best_header, votes_tick);
+
+				mining_handle.on_block(best_hash, has_tax_votes, parent_tick);
+			}
+
+			let time = Timestamp::current();
+			let tick = ticker.tick_for_time(time.as_millis());
+			if !mining_handle.ready_to_solve(tick) {
+				continue
+			}
+
+			if mining_handle.build_hash() != Some(best_hash) {
+				let notebooks_tick = tick.saturating_sub(1);
+
+				let difficulty = match client.runtime_api().compute_difficulty(best_hash) {
+					Ok(x) => x,
+					Err(err) => {
+						warn!(
+							target: LOG_TARGET,
+							"Unable to pull new block for compute miner. No difficulty found!! {}", err
+						);
+						continue
+					},
+				};
+
+				let proposal = match propose(
+					client.clone(),
+					aux_client.clone(),
+					&mut env,
+					account_id.clone(),
+					notebooks_tick,
+					time.as_millis(),
+					best_hash,
+					BlockSealInherentNodeSide::Compute,
+					max_time_to_build_block,
+				)
+				.await
+				{
+					Ok(x) => x,
+					Err(err) => {
+						warn!(
+							target: LOG_TARGET,
+							"Unable to propose a new block {}", err
+						);
+						continue
+					},
+				};
+
+				let pre_hash = proposal.block.header().hash();
+
+				mining_handle.start_solving(best_hash, pre_hash, difficulty, proposal);
+			}
+		}
+	};
+
+	(handle_to_return, task)
 }
 
 /// A stream that waits for a block import or timeout.

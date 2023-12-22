@@ -1,0 +1,28 @@
+{
+  "db_name": "PostgreSQL",
+  "query": "SELECT notebook_number, tick FROM notebook_status WHERE step=$1 FOR SHARE LIMIT 1",
+  "describe": {
+    "columns": [
+      {
+        "ordinal": 0,
+        "name": "notebook_number",
+        "type_info": "Int4"
+      },
+      {
+        "ordinal": 1,
+        "name": "tick",
+        "type_info": "Int4"
+      }
+    ],
+    "parameters": {
+      "Left": [
+        "Int4"
+      ]
+    },
+    "nullable": [
+      false,
+      false
+    ]
+  },
+  "hash": "17c98b32b1669461e1c633274ab7a4bcb49c5986baa17f505fb146c0278c6dd8"
+}

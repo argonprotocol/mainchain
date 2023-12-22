@@ -5,59 +5,39 @@ use std::{cmp::max, sync::Arc, time::Duration};
 use futures::FutureExt;
 use sc_client_api::{Backend, BlockBackend};
 use sc_consensus_grandpa::{FinalityProofProvider, GrandpaBlockImport, SharedVoterState};
-pub use sc_executor::NativeElseWasmExecutor;
 use sc_service::{
 	config::Configuration, error::Error as ServiceError, TaskManager, WarpSyncParams,
 };
 use sc_telemetry::{log, Telemetry, TelemetryWorker};
 use sc_transaction_pool_api::OffchainTransactionPoolFactory;
-use ulx_node_consensus::basic_queue::BasicQueue;
 
 use ulx_node_consensus::{
-	compute_worker::run_miner_thread, inherents::UlxCreateInherentDataProviders,
-	nonce_verify::UlxNonce,
+	aux::UlxAux,
+	basic_queue::BasicQueue,
+	compute_worker::run_compute_solver_threads,
+	import_queue::{UlxImportQueue, UlxVerifier},
 };
 use ulx_node_runtime::{self, opaque::Block, AccountId, RuntimeApi};
 
 use crate::rpc;
 
-// Our native executor instance.
-pub struct ExecutorDispatch;
-
-impl sc_executor::NativeExecutionDispatch for ExecutorDispatch {
-	/// Only enable the benchmarking host functions when we actually want to benchmark.
-	#[cfg(feature = "runtime-benchmarks")]
-	type ExtendHostFunctions = frame_benchmarking::benchmarking::HostFunctions;
-	/// Otherwise we only use the default Substrate host functions.
-	#[cfg(not(feature = "runtime-benchmarks"))]
-	type ExtendHostFunctions = ();
-
-	fn dispatch(method: &str, data: &[u8]) -> Option<Vec<u8>> {
-		ulx_node_runtime::api::dispatch(method, data)
-	}
-
-	fn native_version() -> sc_executor::NativeVersion {
-		ulx_node_runtime::native_version()
-	}
-}
-
-pub(crate) type FullClient =
-	sc_service::TFullClient<Block, RuntimeApi, NativeElseWasmExecutor<ExecutorDispatch>>;
+pub(crate) type FullClient = sc_service::TFullClient<
+	Block,
+	RuntimeApi,
+	sc_executor::WasmExecutor<sp_io::SubstrateHostFunctions>,
+>;
 type FullBackend = sc_service::TFullBackend<Block>;
 type FullSelectChain = sc_consensus::LongestChain<FullBackend, Block>;
 /// The minimum period of blocks on which justifications will be
 /// imported and generated.
 const GRANDPA_JUSTIFICATION_PERIOD: u32 = 512;
 
-pub type Executor = NativeElseWasmExecutor<ExecutorDispatch>;
-
 type UlxBlockImport = ulx_node_consensus::import_queue::UlxBlockImport<
 	Block,
 	GrandpaBlockImport<FullBackend, Block, FullClient, FullSelectChain>,
 	FullClient,
 	FullSelectChain,
-	UlxNonce<Block, FullClient>,
-	UlxCreateInherentDataProviders<Block>,
+	AccountId,
 >;
 
 #[allow(clippy::type_complexity)]
@@ -72,6 +52,7 @@ pub fn new_partial(
 		sc_transaction_pool::FullPool<Block, FullClient>,
 		(
 			UlxBlockImport,
+			UlxAux<Block, FullClient>,
 			sc_consensus_grandpa::LinkHalf<Block, FullClient, FullSelectChain>,
 			Option<Telemetry>,
 		),
@@ -89,10 +70,10 @@ pub fn new_partial(
 		})
 		.transpose()?;
 
-	let executor = sc_service::new_native_or_wasm_executor(config);
+	let executor = sc_service::new_wasm_executor::<sp_io::SubstrateHostFunctions>(config);
 
 	let (client, backend, keystore_container, task_manager) =
-		sc_service::new_full_parts::<Block, RuntimeApi, Executor>(
+		sc_service::new_full_parts::<Block, RuntimeApi, _>(
 			config,
 			telemetry.as_ref().map(|(_, telemetry)| telemetry.handle()),
 			executor,
@@ -120,24 +101,23 @@ pub fn new_partial(
 		select_chain.clone(),
 		telemetry.as_ref().map(|x| x.handle()),
 	)?;
-	let algorithm = UlxNonce::new(client.clone());
 
+	let aux_client = UlxAux::<Block, _>::new(client.clone());
 	let ulx_block_import = UlxBlockImport::new(
 		grandpa_block_import.clone(),
 		client.clone(),
-		algorithm.clone(),
+		aux_client.clone(),
 		select_chain.clone(),
-		UlxCreateInherentDataProviders::new(),
 	);
 
-	let import_queue = ulx_node_consensus::import_queue::new(
+	let import_queue = UlxImportQueue::<Block>::new(
+		UlxVerifier::new(),
 		Box::new(ulx_block_import.clone()),
-		Some(Box::new(grandpa_block_import.clone())),
 		client.clone(),
-		algorithm.clone(),
+		Some(Box::new(grandpa_block_import.clone())),
 		&task_manager.spawn_essential_handle(),
 		config.prometheus_registry(),
-	)?;
+	);
 
 	Ok(sc_service::PartialComponents {
 		client,
@@ -147,7 +127,7 @@ pub fn new_partial(
 		keystore_container,
 		select_chain,
 		transaction_pool,
-		other: (ulx_block_import, grandpa_link, telemetry),
+		other: (ulx_block_import, aux_client, grandpa_link, telemetry),
 	})
 }
 
@@ -165,7 +145,7 @@ pub fn new_full(
 		import_queue,
 		keystore_container,
 		select_chain,
-		other: (ulx_block_import, grandpa_link, mut telemetry),
+		other: (ulx_block_import, aux_client, grandpa_link, mut telemetry),
 	} = new_partial(&config)?;
 
 	let mut net_config = sc_network::config::FullNetworkConfiguration::new(&config.network);
@@ -173,9 +153,9 @@ pub fn new_full(
 		&client.block_hash(0).ok().flatten().expect("Genesis block exists; qed"),
 		&config.chain_spec,
 	);
-	net_config.add_notification_protocol(sc_consensus_grandpa::grandpa_peers_set_config(
-		grandpa_protocol_name.clone(),
-	));
+	let (grandpa_protocol_config, grandpa_notification_service) =
+		sc_consensus_grandpa::grandpa_peers_set_config(grandpa_protocol_name.clone());
+	net_config.add_notification_protocol(grandpa_protocol_config);
 
 	let warp_sync = Arc::new(sc_consensus_grandpa::warp_proof::NetworkProvider::new(
 		backend.clone(),
@@ -192,6 +172,7 @@ pub fn new_full(
 			import_queue,
 			block_announce_validator_builder: None,
 			warp_sync_params: Some(WarpSyncParams::WithProvider(warp_sync)),
+			block_relay: None,
 		})?;
 
 	if config.offchain_worker.enabled {
@@ -219,8 +200,6 @@ pub fn new_full(
 	let name = config.network.node_name.clone();
 	let prometheus_registry = config.prometheus_registry().cloned();
 	let keystore = keystore_container.keystore();
-	// Channel for the rpc handler to communicate with the authorship task.
-	let (block_proof_sink, block_proof_stream) = futures::channel::mpsc::channel(1000);
 
 	let (rpc_extensions_builder, shared_voter_state) = {
 		let client = client.clone();
@@ -234,15 +213,12 @@ pub fn new_full(
 			backend.clone(),
 			Some(shared_authority_set.clone()),
 		);
-		let keystore_clone = keystore.clone();
 
 		let rpc_extensions_builder = Box::new(move |deny_unsafe, subscription_executor| {
-			let deps = crate::rpc::FullDeps {
+			let deps = rpc::FullDeps {
 				client: client.clone(),
 				pool: pool.clone(),
 				deny_unsafe,
-				block_proof_sink: block_proof_sink.clone(),
-				keystore: keystore_clone.clone(),
 				grandpa: rpc::GrandpaDeps {
 					shared_voter_state: shared_voter_state.clone(),
 					shared_authority_set: shared_authority_set.clone(),
@@ -252,7 +228,7 @@ pub fn new_full(
 				},
 				backend: rpc_backend.clone(),
 			};
-			crate::rpc::create_full(deps).map_err(Into::into)
+			rpc::create_full(deps).map_err(Into::into)
 		});
 		(rpc_extensions_builder, shared_voter_state2)
 	};
@@ -274,7 +250,7 @@ pub fn new_full(
 
 	if role.is_authority() {
 		if let Some(block_author) = opt_block_author {
-			let proposer_factory = sc_basic_authorship::ProposerFactory::new(
+			let proposer_factory_compute = sc_basic_authorship::ProposerFactory::new(
 				task_manager.spawn_handle(),
 				client.clone(),
 				transaction_pool.clone(),
@@ -282,55 +258,60 @@ pub fn new_full(
 				telemetry.as_ref().map(|x| x.handle()),
 			);
 
-			let algorithm = UlxNonce::new(client.clone());
-			let (worker, worker_task) = ulx_node_consensus::create_compute_miner(
-				Box::new(ulx_block_import.clone()),
-				client.clone(),
-				select_chain.clone(),
-				algorithm.clone(),
-				proposer_factory,
-				sync_service.clone(),
-				sync_service.clone(),
-				block_author.clone(),
-				UlxCreateInherentDataProviders::new(),
-				// time to wait for a new block before starting to mine a new one
-				Duration::from_secs(5),
-				// how long to take to actually build the block (i.e. executing extrinsics)
-				Duration::from_secs(10),
-			);
+			// how long to take to actually build the block (i.e. executing extrinsics)
+			let block_seconds = Duration::from_secs(10);
+
+			let (compute_miner, compute_task) =
+				ulx_node_consensus::compute_worker::create_compute_miner(
+					Box::new(ulx_block_import.clone()),
+					client.clone(),
+					aux_client.clone(),
+					select_chain.clone(),
+					proposer_factory_compute,
+					sync_service.clone(),
+					block_author.clone(),
+					sync_service.clone(),
+					block_seconds.clone(),
+				);
 
 			task_manager.spawn_essential_handle().spawn_blocking(
-				"ulx-pow",
+				"ulx-compute-miner",
 				Some("block-authoring"),
-				worker_task,
+				compute_task,
 			);
 
-			let proposer_factory_seal = sc_basic_authorship::ProposerFactory::new(
-				task_manager.spawn_handle(),
-				client.clone(),
-				transaction_pool.clone(),
-				prometheus_registry.as_ref(),
-				telemetry.as_ref().map(|x| x.handle()),
-			);
-			let block_seal_task = ulx_node_consensus::listen_for_block_seal(
-				Box::new(ulx_block_import),
+			let (vote_watch_task, create_block_stream) = ulx_node_consensus::notary_client_task(
 				client.clone(),
 				select_chain,
-				algorithm,
-				proposer_factory_seal,
-				sync_service.clone(),
-				sync_service.clone(),
-				block_author,
-				UlxCreateInherentDataProviders::new(),
-				// how long to take to actually build the block (i.e. executing extrinsics)
-				Duration::from_secs(10),
-				block_proof_stream,
+				aux_client.clone(),
 				keystore_container.keystore(),
 			);
+			let proposer_factory_tax = sc_basic_authorship::ProposerFactory::new(
+				task_manager.spawn_handle(),
+				client.clone(),
+				transaction_pool.clone(),
+				prometheus_registry.as_ref(),
+				telemetry.as_ref().map(|x| x.handle()),
+			);
+			let block_create_task = ulx_node_consensus::tax_block_creator(
+				Box::new(ulx_block_import),
+				client.clone(),
+				aux_client.clone(),
+				proposer_factory_tax,
+				sync_service.clone(),
+				block_seconds,
+				create_block_stream,
+			);
+
 			task_manager.spawn_essential_handle().spawn_blocking(
-				"ulx-pow-tx",
-				Some("block-authoring2"),
-				block_seal_task,
+				"ulx-vote-blocks-watch",
+				Some("block-authoring"),
+				vote_watch_task,
+			);
+			task_manager.spawn_essential_handle().spawn_blocking(
+				"ulx-blocks",
+				Some("block-authoring"),
+				block_create_task,
 			);
 
 			let grandpa_config = sc_consensus_grandpa::Config {
@@ -356,6 +337,7 @@ pub fn new_full(
 				link: grandpa_link,
 				network,
 				sync: Arc::new(sync_service),
+				notification_service: grandpa_notification_service,
 				voting_rule: sc_consensus_grandpa::VotingRulesBuilder::default().build(),
 				prometheus_registry,
 				shared_voter_state,
@@ -377,10 +359,7 @@ pub fn new_full(
 				max(num_cpus::get() - 1, 1)
 			};
 			log::info!("Mining is enabled, {} threads", mining_threads);
-			// now do actual compute mining
-			for _ in 0..mining_threads {
-				run_miner_thread(worker.clone());
-			}
+			run_compute_solver_threads(&mut task_manager, compute_miner, mining_threads);
 		} else {
 			log::info!("Mining is disabled");
 		}

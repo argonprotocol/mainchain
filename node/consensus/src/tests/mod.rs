@@ -1,36 +1,33 @@
-use codec::Encode;
+use std::{future::Future, sync::Arc, task::Context, time::Duration};
+
 use env_logger::{Builder, Env};
-use futures::{channel::oneshot, future, task::Poll, SinkExt, StreamExt};
-use log::info;
+use futures::{future, future::BoxFuture, task::Poll, FutureExt, SinkExt, StreamExt};
 use parking_lot::Mutex;
-use sc_client_api::{BlockchainEvents, HeaderBackend};
-use sc_network_test::TestNetFactory;
+use sc_client_api::BlockchainEvents;
+use sc_network_test::{PeersFullClient, TestNetFactory};
 use sp_api::ProvideRuntimeApi;
-use sp_application_crypto::AppCrypto;
+use sp_blockchain::HeaderBackend;
 use sp_consensus::{BlockOrigin, NoNetwork as DummyOracle};
-use sp_core::{blake2_256, crypto::AccountId32, ByteArray, U256};
+use sp_core::{bounded_vec, crypto::AccountId32, H256};
 use sp_keyring::sr25519::Keyring;
 use sp_keystore::{testing::MemoryKeystore, Keystore, KeystorePtr};
-use sp_runtime::{traits::Header as HeaderT, BoundedVec};
-use std::{collections::BTreeMap, sync::Arc, time::Duration};
+use sp_timestamp::Timestamp;
+use substrate_test_runtime::AccountId;
+
 use ulx_primitives::{
-	block_seal::{
-		BlockProof, BlockSealAuthorityId, MiningAuthorityApis, SealNonceHashMessage, SealStamper,
-		SealerSignatureMessage, BLOCK_SEAL_KEY_TYPE, SEAL_NONCE_PREFIX,
-	},
-	ProofOfWorkType,
+	block_seal::{BlockSealAuthorityId, BLOCK_SEAL_KEY_TYPE},
+	localchain::{BlockVote, ChannelPass},
+	tick::Ticker,
+	BestBlockVoteSeal, MerkleProof, TickApis,
 };
 
 use crate::{
-	compute_worker::{run_miner_thread, UntilImportedOrTimeout},
-	listen_for_block_seal,
-	rpc_seal::SealNewBlock,
-	tests::mock::{Config, DummyFactory, UlxTestNet},
+	block_creator::CreateTaxVoteBlock,
+	compute_worker::{create_compute_miner, create_compute_solver_task, MiningHandle},
+	tests::mock::{Config, DummyFactory, UlxBlockImport, UlxTestNet},
 };
 
-use super::{
-	create_compute_miner, inherents::UlxCreateInherentDataProviders, nonce_verify::UlxNonce,
-};
+use super::tax_block_creator;
 
 pub(crate) mod mock;
 
@@ -48,317 +45,353 @@ pub fn setup_logs() {
 	sp_tracing::try_init_simple();
 }
 
-#[tokio::test]
-async fn can_run_proof_of_compute() {
-	setup_logs();
+type TestBlock = substrate_test_runtime::Block;
 
-	let net = UlxTestNet::new(
-		3,
-		Config {
-			closest_xor: 1,
-			difficulty: 16u128 ^ 30,
-			work_type: ProofOfWorkType::Compute,
-			easing: 0,
-			min_seal_signers: 0,
-		},
-		vec![],
-	);
-
-	let net = Arc::new(Mutex::new(net));
-	let mut import_notifications = Vec::new();
-	let mut ulx_futures = Vec::new();
-
-	let peers = &[(Keyring::Alice), (Keyring::Bob), (Keyring::Charlie)];
-
-	for (peer_id, key) in peers.iter().enumerate() {
+struct Miner {
+	node_identity: NodeIdentity,
+	compute_handle: MiningHandle<TestBlock, (), ()>,
+	compute_task: ReusableFuture,
+	block_import: UlxBlockImport,
+	client: Arc<PeersFullClient>,
+}
+#[allow(dead_code)]
+impl Miner {
+	fn new(node: NodeIdentity, net: Arc<Mutex<UlxTestNet>>) -> Self {
 		let mut net = net.lock();
-		let peer = net.peer(peer_id);
+
+		let peer = net.peer(node.peer_id);
 		let client = peer.client().as_client();
 		let select_chain = peer.select_chain().expect("full client has a select chain");
-		let mut got_own = false;
-		let mut got_other = false;
-
 		let data = peer.data.as_ref().expect("ulx test net data");
-		let ulx_block_import = data
-			.block_import
-			.lock()
-			.take()
-			.expect("block import set up during initialization");
+		let ulx_block_import = data.block_import.clone();
 		let environ = DummyFactory(client.clone());
-		import_notifications.push(
-			client
-				.import_notification_stream()
-				.take_while(move |n| {
-					future::ready(
-						n.header.number() < &5 || {
-							if n.origin == BlockOrigin::Own {
-								got_own = true;
-							} else {
-								got_other = true;
-							}
-
-							// continue until we have at least one block of our own
-							// and one of another peer.
-							!(got_own && got_other)
-						},
-					)
-				})
-				.for_each(move |_| future::ready(())),
-		);
-
 		let api = data.api.clone();
-		let algorithm = UlxNonce::new(api.clone());
-		let (handle, task) = create_compute_miner(
-			ulx_block_import,
+		let aux_client = data.aux_client.clone();
+		let (compute_handle, task) = create_compute_miner(
+			Box::new(ulx_block_import.clone()),
 			api.clone(),
+			aux_client.clone(),
 			select_chain.clone(),
-			algorithm.clone(),
 			environ,
 			DummyOracle,
+			node.account_id.clone().into(),
 			(),
-			key.to_account_id().clone(),
-			UlxCreateInherentDataProviders::new(),
-			// time to wait for a new block before starting to mine a new one
-			Duration::from_secs(10),
 			// how long to take to actually build the block (i.e. executing extrinsics)
-			Duration::from_millis(500),
+			Duration::from_millis(10),
 		);
-		ulx_futures.push(task);
-		run_miner_thread(handle);
+
+		let compute_task = ReusableFuture::new(task.boxed());
+
+		Self {
+			block_import: ulx_block_import,
+			node_identity: node,
+			compute_handle,
+			client,
+			compute_task,
+		}
 	}
 
-	future::select(
+	async fn mine_block(&mut self, net: &Arc<Mutex<UlxTestNet>>) {
+		let solver = create_compute_solver_task(self.compute_handle.clone());
+
+		println!("start mining for a block");
+		let import_notifications = self
+			.client
+			.import_notification_stream()
+			.take_while(move |n| future::ready(n.origin != BlockOrigin::Own))
+			.for_each(move |_| future::ready(()));
+
+		future::select(self.check_state(net), future::select(import_notifications, solver)).await;
+
+		println!("mined a block");
+	}
+
+	fn check_state<'a>(
+		&'a mut self,
+		net: &'a Arc<Mutex<UlxTestNet>>,
+	) -> impl Future<Output = ()> + '_ {
+		let compute_future = &mut self.compute_task;
 		futures::future::poll_fn(move |cx| {
 			let mut net = net.lock();
-			net.poll(cx);
-			for p in net.peers() {
-				for (h, e) in p.failed_verifications() {
-					panic!("Verification failed for {:?}: {}", h, e);
-				}
-			}
+			let _ = compute_future.poll_future(cx);
+			net.check_errors(cx)
+		})
+	}
 
-			Poll::<()>::Pending
-		}),
-		future::select(future::join_all(import_notifications), future::join_all(ulx_futures)),
-	)
+	async fn wait_for_external_block(&mut self, net: &Arc<Mutex<UlxTestNet>>) {
+		let id = self.node_identity.peer_id;
+		println!("waiting for external block. Id={}", id);
+		let stream = self
+			.client
+			.import_notification_stream()
+			.take_while(move |n| {
+				future::ready({
+					println!("got a block imported. own? {}", n.origin == BlockOrigin::Own);
+					n.origin == BlockOrigin::Own
+				})
+			})
+			.for_each(move |_| future::ready(()));
+		future::select(self.check_state(net), stream).await;
+		println!("waited for external block. Id={}", id);
+	}
+
+	async fn wait_for_block_number(&mut self, net: &Arc<Mutex<UlxTestNet>>, block_number: u64) {
+		let id = self.node_identity.peer_id;
+		println!("waiting for block #{}. id={}", block_number, id);
+		{
+			let mut net = net.lock();
+			let peer = net.peer(id);
+			let info = peer.client().as_client().info();
+			println!("current_block #{}. id={}", info.best_number, id);
+			if info.best_number >= block_number {
+				return
+			}
+		}
+		let stream = self
+			.client
+			.import_notification_stream()
+			.take_while(move |n| future::ready(n.header.number < block_number))
+			.for_each(move |_| future::ready(()));
+		future::select(self.check_state(net), stream).await;
+		println!("waited for a block #{}. id={}", block_number, id);
+	}
+}
+
+#[derive(Clone)]
+struct NodeIdentity {
+	peer_id: usize,
+	keystore: KeystorePtr,
+	authority_id: BlockSealAuthorityId,
+	account_id: AccountId,
+}
+
+impl NodeIdentity {
+	fn new(keyring: Keyring, peer_id: usize) -> Self {
+		let keystore = create_keystore(keyring.clone());
+		let authority_id: BlockSealAuthorityId =
+			keystore.ed25519_public_keys(BLOCK_SEAL_KEY_TYPE)[0].into();
+		NodeIdentity { peer_id, keystore, authority_id, account_id: keyring.public().into() }
+	}
+}
+
+fn create_node_identities() -> Vec<NodeIdentity> {
+	[(Keyring::Alice), (Keyring::Bob), (Keyring::Charlie)]
+		.iter()
+		.enumerate()
+		.map(|(i, keyring)| NodeIdentity::new(keyring.clone(), i))
+		.collect::<Vec<_>>()
+}
+
+async fn mine_one(
+	i: u64,
+	miner1: &mut Miner,
+	miner2: &mut Miner,
+	miner3: &mut Miner,
+	net: Arc<Mutex<UlxTestNet>>,
+) {
+	if i % 1 == 0 {
+		miner1.mine_block(&net).await;
+	} else if i % 2 == 0 {
+		miner2.mine_block(&net).await;
+	} else {
+		miner3.mine_block(&net).await;
+	}
+}
+
+async fn wait_for_sync(
+	block_number: u64,
+	miner1: &mut Miner,
+	miner2: &mut Miner,
+	miner3: &mut Miner,
+	net: Arc<Mutex<UlxTestNet>>,
+) {
+	future::join_all(vec![
+		miner1.wait_for_block_number(&net, block_number),
+		miner2.wait_for_block_number(&net, block_number),
+		miner3.wait_for_block_number(&net, block_number),
+	])
 	.await;
 }
 
+/// This test is only for testing that the compute engine can work cross-miner without any runtime
+/// engine involved.
+#[tokio::test]
+async fn can_build_compute_blocks() {
+	setup_logs();
+
+	let node_identities = create_node_identities();
+	let tick_duration = Duration::from_millis(1000);
+	let net = UlxTestNet::new(
+		3,
+		Config {
+			difficulty: 10_000,
+			tax_minimum: 1,
+			tick_duration: tick_duration.clone(),
+			genesis_utc_time: Ticker::start(tick_duration).genesis_utc_time,
+		},
+	);
+
+	let net = Arc::new(Mutex::new(net));
+	let mut miner1 = Miner::new(node_identities[0].clone(), net.clone());
+	let mut miner2 = Miner::new(node_identities[1].clone(), net.clone());
+	let mut miner3 = Miner::new(node_identities[2].clone(), net.clone());
+	{
+		let mut net = net.lock();
+		let _ = &net.run_until_connected().await;
+	}
+	for i in 0..5 {
+		mine_one(i, &mut miner1, &mut miner2, &mut miner3, net.clone()).await;
+		wait_for_sync(i + 1, &mut miner1, &mut miner2, &mut miner3, net.clone()).await;
+	}
+}
+
+/// Tests that votes can be constructed with a proof of tax, but nothing about the votes themselves
+/// is verified
 #[tokio::test]
 async fn can_run_proof_of_tax() {
 	setup_logs();
 
-	let peers = &[(Keyring::Alice), (Keyring::Bob), (Keyring::Charlie)]
-		.into_iter()
-		.map(|keyring| {
-			let keystore = create_keystore(keyring.clone());
-			let authority_id: BlockSealAuthorityId =
-				keystore.ed25519_public_keys(BLOCK_SEAL_KEY_TYPE)[0].into();
-			(keyring, keystore, authority_id)
-		})
-		.collect::<Vec<(Keyring, KeystorePtr, BlockSealAuthorityId)>>();
+	let node_identities = create_node_identities();
 
-	let mut counter = 0u16;
+	let tick_duration = Duration::from_millis(1000);
 	let net = UlxTestNet::new(
-		peers.len(),
+		node_identities.len(),
 		Config {
-			closest_xor: 2,
+			tax_minimum: 5,
 			difficulty: 1,
-			work_type: ProofOfWorkType::Tax,
-			easing: 0,
-			min_seal_signers: 2,
+			tick_duration: tick_duration.clone(),
+			genesis_utc_time: Ticker::start(tick_duration).genesis_utc_time,
 		},
-		peers
-			.iter()
-			.map(|(keyring, _, authority_id)| {
-				counter += 2;
-				(counter, keyring.public().into(), authority_id.clone())
-			})
-			.collect::<Vec<_>>(),
 	);
 
 	let net = Arc::new(Mutex::new(net));
-	let mut ulx_futures = Vec::new();
-	let mut sink_by_peer_id = BTreeMap::new();
-
-	for (peer_id, (key, keystore, _)) in peers.into_iter().enumerate() {
-		let mut net = net.lock();
-		let peer = net.peer(peer_id);
-		let client = peer.client().as_client();
-		let select_chain = peer.select_chain().expect("full client has a select chain");
-
-		let data = peer.data.as_ref().expect("peer data set up during initialization");
-		let ulx_block_import = data
-			.block_import
-			.lock()
-			.take()
-			.expect("block import set up during initialization");
-		let environ = DummyFactory(client.clone());
-
-		// Channel for the rpc handler to communicate with the authorship task.
-		let (block_proof_sink, block_proof_stream) = futures::channel::mpsc::channel(1000);
-		sink_by_peer_id.insert(peer_id, block_proof_sink);
-		let api = data.api.clone();
-		let algorithm = UlxNonce::new(api.clone());
-		let task = listen_for_block_seal(
-			ulx_block_import,
-			api.clone(),
-			select_chain.clone(),
-			algorithm.clone(),
-			environ,
-			DummyOracle,
-			(),
-			key.to_account_id().clone(),
-			UlxCreateInherentDataProviders::new(),
-			// time to wait for a new block before starting to mine a new one
-			Duration::from_secs(0),
-			// how long to take to actually build the block (i.e. executing extrinsics)
-			block_proof_stream,
-			keystore.clone(),
-		);
-		let future = tokio::spawn(async move {
-			task.await;
-		});
-		ulx_futures.push(future);
-	}
-
-	let (nonce, parent_hash, block_proof, closest_peer_id) = {
-		let mut net = net.lock();
-		let peer = &net.peer(0);
-
-		let client = peer.client().as_client();
-		let mut timer = UntilImportedOrTimeout::new(
-			client.import_notification_stream(),
-			Duration::from_secs(1),
-		);
-		if timer.next().await.is_none() {
-			panic!("No block imported in time")
-		}
-
-		let parent_hash = client.info().best_hash;
-
-		let author_id: AccountId32 = Keyring::Dave.public().into();
-
-		let xor_closest_peers = peer
-			.data
-			.as_ref()
-			.unwrap()
-			.api
-			.runtime_api()
-			.block_peers(parent_hash, author_id.clone())
-			.expect("Got closest");
-
-		let xor_closest_authority_ids = xor_closest_peers
-			.clone()
-			.into_iter()
-			.map(|a| a.authority_id)
-			.collect::<Vec<_>>();
-
-		let mut block_proof = BlockProof {
-			tax_proof_id: 22343,
-			author_id: author_id.clone(),
-			seal_stampers: xor_closest_peers
-				.clone()
-				.iter()
-				.map(|a| SealStamper { authority_idx: a.authority_index, signature: None })
-				.collect::<Vec<_>>(),
-			tax_amount: 1,
-		};
-
-		let peer_signature_message = blake2_256(
-			SealerSignatureMessage {
-				tax_proof_id: block_proof.tax_proof_id,
-				parent_hash,
-				author_id: author_id.clone(),
-				tax_amount: block_proof.tax_amount,
-				seal_stampers: xor_closest_authority_ids.clone(),
-				prefix: SEAL_NONCE_PREFIX,
-			}
-			.encode()
-			.as_slice(),
-		);
-
-		for (i, xor_peer) in xor_closest_peers.iter().enumerate() {
-			let (_, keystore, authority_id) =
-				peers.iter().find(|(_, _, id)| id == &xor_peer.authority_id).unwrap();
-			block_proof.seal_stampers[i].signature = Some(BoundedVec::truncate_from(
-				keystore
-					.sign_with(
-						<BlockSealAuthorityId as AppCrypto>::ID,
-						<BlockSealAuthorityId as AppCrypto>::CRYPTO_ID,
-						authority_id.as_slice(),
-						peer_signature_message.as_ref(),
-					)
-					.ok()
-					.unwrap()
-					.unwrap(),
-			));
-		}
-
-		let nonce = SealNonceHashMessage {
-			prefix: SEAL_NONCE_PREFIX,
-			tax_proof_id: block_proof.tax_proof_id,
-			tax_amount: block_proof.tax_amount,
-			parent_hash,
-			author_id,
-			seal_stampers: block_proof.seal_stampers.clone(),
-		}
-		.using_encoded(blake2_256);
-
-		let closest_peer_id = peers
-			.iter()
-			.position(|(_, _, authority_id)| xor_closest_peers[0].authority_id == *authority_id)
-			.expect("Should find the closest xor peer");
-
-		(nonce, parent_hash, block_proof, closest_peer_id)
-	};
-
-	let sink = sink_by_peer_id.get_mut(&closest_peer_id).unwrap();
-	let (sender, receiver) = oneshot::channel();
-	let command = SealNewBlock::Submit {
-		block_proof,
-		sender: Some(sender),
-		nonce: U256::from(nonce),
-		parent_hash,
-	};
+	let mut miner1 = Miner::new(node_identities[0].clone(), net.clone());
+	let mut miner2 = Miner::new(node_identities[1].clone(), net.clone());
+	let mut miner3 = Miner::new(node_identities[2].clone(), net.clone());
 
 	{
 		let mut net = net.lock();
 		let _ = &net.run_until_connected().await;
-
-		sink.send(command).await.expect("Submitted seal");
-		info!(
-			"Submitted proof of block to {:?} {}",
-			closest_peer_id,
-			net.peers[closest_peer_id].id()
-		);
 	}
-	let block_hash = match receiver.await {
-		Ok(Ok(rx)) => rx,
-		Ok(Err(e)) => panic!("Error receiving block hash: {}", e),
-		Err(e) => panic!("Error receiving block hash: {}", e),
+
+	miner1.mine_block(&net).await;
+	miner1.mine_block(&net).await;
+	miner1.mine_block(&net).await;
+	wait_for_sync(3, &mut miner1, &mut miner2, &mut miner3, net.clone()).await;
+
+	let raw_net = net.clone();
+	let task = {
+		// create a closer so the lock doesn't get stuck
+		let mut net = net.lock();
+		let peer = net.peer(0);
+		let api = peer.data.as_ref().expect("required").api.clone();
+		let aux_client = peer.data.as_ref().expect("required").aux_client.clone();
+
+		let client = peer.client().as_client();
+
+		let parent_number = client.info().best_number;
+		let parent_hash = client.info().best_hash;
+
+		let grandparent_hash = client
+			.hash(parent_number - 1)
+			.expect("should be able to get grandparent")
+			.expect("should be a hash");
+
+		let account_id: AccountId32 = Keyring::Dave.public().into();
+
+		let vote = BlockVote {
+			block_hash: grandparent_hash,
+			account_id: account_id.clone(),
+			channel_pass: ChannelPass {
+				at_block_height: 1,
+				id: 1,
+				zone_record_hash: H256::random(),
+				miner_index: 0,
+			},
+			power: 500,
+			index: 1,
+		};
+		let parent_voting_key = H256::random();
+		let seal_strength = vote.get_seal_strength(1, parent_voting_key);
+
+		let current_tick = api.runtime_api().current_tick(parent_hash).expect("can call the api");
+
+		let closest_miner_id: NodeIdentity = miner1.node_identity.clone();
+
+		let miner_signature = crate::notebook_watch::try_sign_vote(
+			&closest_miner_id.keystore,
+			&parent_hash,
+			&closest_miner_id.authority_id,
+			seal_strength,
+		)
+		.expect("should sign");
+
+		let create_block = CreateTaxVoteBlock {
+			timestamp_millis: Timestamp::current().as_millis(),
+			parent_hash,
+			tick: current_tick + 1,
+			vote: BestBlockVoteSeal {
+				closest_miner: (closest_miner_id.account_id.clone(), closest_miner_id.authority_id),
+				seal_strength,
+				notary_id: 1,
+				block_vote_bytes: vec![],
+				source_notebook_number: 1,
+				source_notebook_proof: MerkleProof {
+					proof: bounded_vec![],
+					leaf_index: 0,
+					number_of_leaves: 0,
+				},
+			},
+			signature: miner_signature,
+		};
+		let miner = match closest_miner_id.peer_id {
+			0 => &miner1,
+			1 => &miner2,
+			2 => &miner3,
+			_ => panic!("invalid peer id"),
+		};
+		let environ = DummyFactory(miner.client.clone());
+
+		let (mut block_create_sink, block_create_stream) = futures::channel::mpsc::channel(1000);
+		let task = tax_block_creator(
+			Box::new(miner.block_import.clone()),
+			api,
+			aux_client,
+			environ,
+			(),
+			Duration::from_millis(100),
+			block_create_stream,
+		);
+		block_create_sink.send(create_block).await.expect("Submitted block");
+
+		println!("Submitted proof of block to miner {}", closest_miner_id.peer_id);
+		task
 	};
 
-	future::select(
-		futures::future::poll_fn(move |cx| {
-			let mut net = net.lock();
-			net.poll(cx);
-			let mut unsynched = net.peers().len().clone();
-			for p in net.peers() {
-				if p.has_block(block_hash.hash.clone()) {
-					unsynched -= 1;
-				}
-				for (h, e) in p.failed_verifications() {
-					panic!("Verification failed for {:?}: {}", h, e);
-				}
-			}
-			if unsynched == 0 {
-				return Poll::<()>::Ready(())
-			}
-
-			Poll::<()>::Pending
-		}),
-		future::join_all(ulx_futures),
+	futures::future::select(
+		task.boxed(),
+		wait_for_sync(4, &mut miner1, &mut miner2, &mut miner3, raw_net).boxed(),
 	)
 	.await;
+}
+struct ReusableFuture {
+	future: Option<BoxFuture<'static, ()>>,
+}
+
+impl ReusableFuture {
+	fn new(future: BoxFuture<'static, ()>) -> Self {
+		Self { future: Some(future) }
+	}
+
+	fn poll_future(&mut self, cx: &mut Context<'_>) -> Poll<()> {
+		if let Some(future) = self.future.as_mut() {
+			let poll = future.as_mut().poll(cx);
+			if let Poll::Ready(_) = poll {
+				self.future.take();
+			}
+			poll
+		} else {
+			Poll::Pending
+		}
+	}
 }

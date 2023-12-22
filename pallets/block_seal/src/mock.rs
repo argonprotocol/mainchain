@@ -1,19 +1,23 @@
-use std::{collections::BTreeMap, net::Ipv4Addr};
+use std::collections::BTreeMap;
 
 use env_logger::{Builder, Env};
 use frame_support::{
 	parameter_types,
 	traits::{ConstU16, ConstU64},
 };
-use sp_core::{crypto::AccountId32, ConstU32, OpaquePeerId, H256, U256};
+use sp_core::{H256, U256};
 use sp_runtime::{
-	testing::UintAuthorityId,
-	traits::{BlakeTwo256, IdentityLookup, UniqueSaturatedInto},
-	BoundedVec, BuildStorage,
+	traits::{BlakeTwo256, IdentityLookup},
+	BuildStorage,
 };
 
-use ulx_primitives::block_seal::{
-	AuthorityDistance, AuthorityProvider, BlockSealAuthorityId, Host, PeerId,
+use ulx_primitives::{
+	block_seal::{BlockSealAuthorityId, MiningAuthority},
+	block_vote::VoteMinimum,
+	notebook::NotebookNumber,
+	tick::{Tick, Ticker},
+	AuthorityProvider, BlockVotingProvider, HashOutput, NotaryId, NotebookProvider, NotebookSecret,
+	TickProvider,
 };
 
 use crate as pallet_block_seal;
@@ -57,31 +61,17 @@ impl frame_system::Config for Test {
 
 parameter_types! {
 	pub static AuthorityList: Vec<(u64, BlockSealAuthorityId)> = vec![];
-	pub static XorClosest: Vec<AuthorityDistance<BlockSealAuthorityId>> = vec![];
-	pub static AuthorityCountInitiatingTaxProof: u32 = 1;
+	pub static XorClosest: Option<MiningAuthority<BlockSealAuthorityId, u64>> = None;
+	pub static VotingRoots: BTreeMap<(NotaryId, Tick), (H256, NotebookNumber)> = BTreeMap::new();
+	pub static GrandpaVoteMinimum: Option<VoteMinimum> = None;
+	pub static MinerZero: Option<(u64, MiningAuthority<BlockSealAuthorityId, u64>)> = None;
+	pub static NotebooksAtTick: BTreeMap<Tick, Vec<(NotaryId, NotebookNumber, Option<NotebookSecret>)>> = BTreeMap::new();
+	pub static CurrentTick: Tick = 0;
+	pub static BlocksAtTick: BTreeMap<Tick, Vec<HashOutput>> = BTreeMap::new();
 }
 
 pub struct StaticAuthorityProvider;
 impl AuthorityProvider<BlockSealAuthorityId, Block, u64> for StaticAuthorityProvider {
-	fn miner_zero() -> Option<(u16, BlockSealAuthorityId, Vec<Host>)> {
-		None
-	}
-	fn is_active(authority_id: &BlockSealAuthorityId) -> bool {
-		Self::authorities().contains(authority_id)
-	}
-	fn authorities() -> Vec<BlockSealAuthorityId> {
-		AuthorityList::get().iter().map(|(_account, id)| id.clone()).collect()
-	}
-	fn authorities_by_index() -> BTreeMap<u16, BlockSealAuthorityId> {
-		let mut map = BTreeMap::new();
-		for (i, id) in AuthorityList::get().into_iter().enumerate() {
-			map.insert(i as u16, id.1);
-		}
-		map
-	}
-	fn authority_count() -> u16 {
-		AuthorityList::get().len() as u16
-	}
 	fn get_authority(author: u64) -> Option<BlockSealAuthorityId> {
 		AuthorityList::get().iter().find_map(|(account, id)| {
 			if *account == author {
@@ -91,80 +81,68 @@ impl AuthorityProvider<BlockSealAuthorityId, Block, u64> for StaticAuthorityProv
 			}
 		})
 	}
-	fn block_peers(
-		_block_hash: &<Block as sp_runtime::traits::Block>::Hash,
-		_account_id: AccountId32,
-		_closest: u8,
-	) -> Vec<AuthorityDistance<BlockSealAuthorityId>> {
+	fn get_rewards_account(author: u64) -> Option<u64> {
+		Some(author)
+	}
+	fn xor_closest_authority(_: U256) -> Option<MiningAuthority<BlockSealAuthorityId, u64>> {
 		XorClosest::get().clone()
 	}
 }
 
-impl pallet_block_seal::Config for Test {
-	type RuntimeEvent = RuntimeEvent;
-	type WeightInfo = ();
-	type HistoricalBlockSealersToKeep = ConstU32<10>;
-	type AuthorityId = BlockSealAuthorityId;
-	type AuthorityProvider = StaticAuthorityProvider;
+pub struct StaticNotebookProvider;
+impl NotebookProvider for StaticNotebookProvider {
+	fn get_eligible_tick_votes_root(
+		notary_id: NotaryId,
+		tick: Tick,
+	) -> Option<(H256, NotebookNumber)> {
+		VotingRoots::get().get(&(notary_id, tick)).cloned()
+	}
+	fn notebooks_in_block() -> Vec<(NotaryId, NotebookNumber, Tick)> {
+		todo!()
+	}
+	fn notebooks_at_tick(tick: Tick) -> Vec<(NotaryId, NotebookNumber, Option<NotebookSecret>)> {
+		NotebooksAtTick::get().get(&tick).cloned().unwrap_or_default()
+	}
+	fn is_notary_locked_at_tick(_: NotaryId, _: Tick) -> bool {
+		false
+	}
 }
 
-pub fn set_authorities(authorities: Vec<u64>, xor_closest_accounts: Vec<u64>) {
-	let authorities: Vec<(u64, BlockSealAuthorityId)> = authorities
-		.into_iter()
-		.map(|a| (a, UintAuthorityId(a).to_public_key()))
-		.collect();
-	AuthorityList::mutate(|a| {
-		a.truncate(0);
-		a.extend(authorities.clone());
-	});
-	XorClosest::mutate(|a| {
-		a.truncate(0);
-		let xor_closest = xor_closest_accounts
-			.into_iter()
-			.map(|account_id| {
-				let index = authorities.iter().position(|x| x.0 == account_id).unwrap_or_default();
-				let id = authorities[index].1.clone();
-				// put in a nonsense distance for now
-				let distance = U256::from(index as u32);
-				AuthorityDistance {
-					authority_index: index.unique_saturated_into(),
-					authority_id: id.clone(),
-					peer_id: PeerId(OpaquePeerId::default()),
-					rpc_hosts: BoundedVec::truncate_from(vec![Host {
-						ip: Ipv4Addr::new(127, 0, 0, 1).into(),
-						port: 3000,
-						is_secure: false,
-					}]),
-					distance,
-				}
-			})
-			.collect::<Vec<_>>();
+pub struct StaticTickProvider;
+impl TickProvider<Block> for StaticTickProvider {
+	fn current_tick() -> Tick {
+		CurrentTick::get()
+	}
+	fn ticker() -> Ticker {
+		Ticker::new(1, 1)
+	}
+	fn blocks_at_tick(tick: Tick) -> Vec<HashOutput> {
+		BlocksAtTick::get().get(&tick).cloned().unwrap_or_default()
+	}
+}
 
-		a.extend(xor_closest);
-	});
+pub struct StaticBlockVotingProvider;
+impl BlockVotingProvider<Block> for StaticBlockVotingProvider {
+	fn grandparent_vote_minimum() -> Option<VoteMinimum> {
+		GrandpaVoteMinimum::get()
+	}
+}
+
+impl pallet_block_seal::Config for Test {
+	type WeightInfo = ();
+	type AuthorityId = BlockSealAuthorityId;
+	type AuthorityProvider = StaticAuthorityProvider;
+	type NotebookProvider = StaticNotebookProvider;
+	type BlockVotingProvider = StaticBlockVotingProvider;
+	type TickProvider = StaticTickProvider;
 }
 
 // Build genesis storage according to the mock runtime.
-pub fn new_test_ext(
-	authorities: Vec<u64>,
-	xor_closest_accounts: Vec<u64>,
-	min_seal_signers: u32,
-	closest_xor_authorities_required: u32,
-) -> sp_io::TestExternalities {
+pub fn new_test_ext() -> sp_io::TestExternalities {
 	let env = Env::new().default_filter_or("debug");
 	let _ = Builder::from_env(env).is_test(true).try_init();
 
-	set_authorities(authorities, xor_closest_accounts);
-
-	let mut t = frame_system::GenesisConfig::<Test>::default().build_storage().unwrap().into();
-	pallet_block_seal::GenesisConfig::<Test> {
-		min_seal_signers,
-		closest_xor_authorities_required,
-		authority_count_starting_tax_seal: AuthorityCountInitiatingTaxProof::get(),
-		_phantom: Default::default(),
-	}
-	.assimilate_storage(&mut t)
-	.unwrap();
+	let t = frame_system::GenesisConfig::<Test>::default().build_storage().unwrap().into();
 
 	sp_io::TestExternalities::new(t)
 }

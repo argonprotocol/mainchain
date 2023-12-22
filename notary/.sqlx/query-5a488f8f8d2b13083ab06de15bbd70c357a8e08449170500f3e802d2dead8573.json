@@ -1,0 +1,20 @@
+{
+  "db_name": "PostgreSQL",
+  "query": "\n\t\tSELECT COALESCE(MAX(block_number), 0) FROM blocks;\n\t\t",
+  "describe": {
+    "columns": [
+      {
+        "ordinal": 0,
+        "name": "coalesce",
+        "type_info": "Int4"
+      }
+    ],
+    "parameters": {
+      "Left": []
+    },
+    "nullable": [
+      null
+    ]
+  },
+  "hash": "5a488f8f8d2b13083ab06de15bbd70c357a8e08449170500f3e802d2dead8573"
+}

@@ -20,53 +20,78 @@
       },
       {
         "ordinal": 3,
-        "name": "finalized_block_number",
-        "type_info": "Int4"
+        "name": "signature",
+        "type_info": "Bytea"
       },
       {
         "ordinal": 4,
-        "name": "pinned_to_block_number",
+        "name": "tick",
         "type_info": "Int4"
       },
       {
         "ordinal": 5,
-        "name": "starting_best_block_number",
+        "name": "finalized_block_number",
         "type_info": "Int4"
       },
       {
         "ordinal": 6,
-        "name": "start_time",
-        "type_info": "Timestamptz"
-      },
-      {
-        "ordinal": 7,
-        "name": "end_time",
-        "type_info": "Timestamptz"
-      },
-      {
-        "ordinal": 8,
         "name": "notary_id",
         "type_info": "Int4"
       },
       {
-        "ordinal": 9,
+        "ordinal": 7,
         "name": "tax",
         "type_info": "Varchar"
       },
       {
-        "ordinal": 10,
+        "ordinal": 8,
         "name": "chain_transfers",
         "type_info": "Jsonb"
       },
       {
-        "ordinal": 11,
+        "ordinal": 9,
         "name": "changed_accounts_root",
         "type_info": "Bytea"
       },
       {
-        "ordinal": 12,
+        "ordinal": 10,
         "name": "changed_account_origins",
         "type_info": "Jsonb"
+      },
+      {
+        "ordinal": 11,
+        "name": "block_votes_root",
+        "type_info": "Bytea"
+      },
+      {
+        "ordinal": 12,
+        "name": "block_votes_count",
+        "type_info": "Int4"
+      },
+      {
+        "ordinal": 13,
+        "name": "block_voting_power",
+        "type_info": "Varchar"
+      },
+      {
+        "ordinal": 14,
+        "name": "blocks_with_votes",
+        "type_info": "ByteaArray"
+      },
+      {
+        "ordinal": 15,
+        "name": "secret_hash",
+        "type_info": "Bytea"
+      },
+      {
+        "ordinal": 16,
+        "name": "parent_secret",
+        "type_info": "Bytea"
+      },
+      {
+        "ordinal": 17,
+        "name": "last_updated",
+        "type_info": "Timestamptz"
       }
     ],
     "parameters": {
@@ -79,14 +104,19 @@
       false,
       true,
       true,
-      true,
-      false,
       false,
       true,
       false,
       true,
       false,
       false,
+      false,
+      false,
+      false,
+      false,
+      false,
+      false,
+      true,
       false
     ]
   },

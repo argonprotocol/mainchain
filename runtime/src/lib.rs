@@ -6,7 +6,6 @@ extern crate alloc;
 #[cfg(feature = "runtime-benchmarks")]
 #[macro_use]
 extern crate frame_benchmarking;
-
 pub use frame_support::{
 	construct_runtime, parameter_types,
 	traits::{
@@ -22,14 +21,9 @@ pub use frame_support::{
 	StorageValue,
 };
 use frame_support::{
+	genesis_builder_helper::{build_config, create_default_config},
 	traits::{Contains, Currency, InsideBoth, OnUnbalanced, StorageMapShim},
 	PalletId,
-};
-use pallet_localchain_relay::NotebookVerifyError;
-use sp_core::H256;
-use ulx_primitives::{
-	notary::{NotaryId, NotarySignature},
-	notebook::NotebookNumber,
 };
 // Configure FRAME pallets to include in runtime.
 use frame_support::traits::Everything;
@@ -38,19 +32,17 @@ use frame_system::EnsureRoot;
 use pallet_session::historical as pallet_session_historical;
 pub use pallet_timestamp::Call as TimestampCall;
 use pallet_transaction_payment::{ConstFeeMultiplier, CurrencyAdapter, Multiplier};
+use pallet_tx_pause::RuntimeCallNameOf;
 use sp_api::impl_runtime_apis;
 use sp_consensus_grandpa::AuthorityId as GrandpaId;
-use sp_core::{crypto::KeyTypeId, OpaqueMetadata};
+use sp_core::{crypto::KeyTypeId, OpaqueMetadata, H256, U256};
 #[cfg(any(feature = "std", test))]
 pub use sp_runtime::BuildStorage;
 use sp_runtime::{
 	create_runtime_str, generic,
-	traits::{
-		AccountIdLookup, BlakeTwo256, Block as BlockT, IdentifyAccount, NumberFor, One, OpaqueKeys,
-		Verify,
-	},
+	traits::{AccountIdLookup, BlakeTwo256, Block as BlockT, NumberFor, One, OpaqueKeys},
 	transaction_validity::{TransactionSource, TransactionValidity},
-	AccountId32, ApplyExtrinsicResult, MultiSignature,
+	ApplyExtrinsicResult, BoundedVec, DispatchError,
 };
 pub use sp_runtime::{Perbill, Permill};
 use sp_std::{collections::btree_map::BTreeMap, prelude::*, vec::Vec};
@@ -58,54 +50,32 @@ use sp_std::{collections::btree_map::BTreeMap, prelude::*, vec::Vec};
 use sp_version::NativeVersion;
 use sp_version::RuntimeVersion;
 
-use pallet_tx_pause::RuntimeCallNameOf;
+pub use pallet_notebook::NotebookVerifyError;
 use ulx_primitives::{
-	block_seal::{AuthorityDistance, AuthorityProvider, Host},
-	BlockSealAuthorityId, NextWork,
+	block_vote::VoteMinimum,
+	digests::BlockVoteDigest,
+	localchain::BestBlockVoteSeal,
+	notary::{NotaryId, NotaryNotebookVoteDetails, NotaryNotebookVoteDigestDetails, NotaryRecord},
+	notebook::NotebookNumber,
+	prod_or_fast,
+	tick::{Tick, Ticker, TICK_MILLIS},
+	BlockSealAuthorityId, BondFundId, BondId, NotaryNotebookVotes, TickProvider,
+};
+pub use ulx_primitives::{
+	AccountId, Balance, BlockHash, BlockNumber, HashOutput, Moment, Nonce, Signature,
 };
 
 use crate::opaque::SessionKeys;
 // A few exports that help ease life for downstream crates.
 use crate::wage_protector::WageProtectorFee;
 
-pub type ArgonBalancesCall = pallet_balances::Call<Runtime, ArgonToken>;
-
-mod macros;
 pub mod wage_protector;
 
 // Make the WASM binary available.
 #[cfg(feature = "std")]
 include!(concat!(env!("OUT_DIR"), "/wasm_binary.rs"));
 
-/// An index to a block.
-pub type BlockNumber = u32;
-
-/// Alias to 512-bit hash when used in the context of a transaction signature on the chain.
-pub type Signature = MultiSignature;
-
-/// Some way of identifying an account on the chain. We intentionally make it equivalent
-/// to the public key of our transaction signing scheme.
-pub type AccountId = <<Signature as Verify>::Signer as IdentifyAccount>::AccountId;
-
-/// Balance of an account.
-pub type Balance = u128;
-
-/// Index of a transaction in the chain.
-pub type Nonce = u32;
-
-/// A hash of some data used by the chain.
-pub type Hash = sp_core::H256;
-
-/// A timestamp: milliseconds since the unix epoch.
-pub type Moment = u64;
-
 pub type AccountData = pallet_balances::AccountData<Balance>;
-
-pub type BlockHash = BlakeTwo256;
-
-pub type BondId = u64;
-pub type BondFundId = u32;
-
 /// Opaque types. These are used by the CLI to instantiate machinery that don't need to know
 /// the specifics of the runtime. They can then be made to be agnostic over specific formats
 /// of data like extrinsics, allowing for them to continue syncing the network through upgrades
@@ -126,10 +96,12 @@ pub mod opaque {
 	impl_opaque_keys! {
 		pub struct SessionKeys {
 			pub grandpa: Grandpa,
-			pub block_seal_authority: MiningSlots,
+			pub block_seal_authority: MiningSlot,
 		}
 	}
 }
+
+pub type ArgonBalancesCall = pallet_balances::Call<Runtime, ArgonToken>;
 
 // To learn more about runtime versioning, see:
 // https://docs.substrate.io/main-docs/build/upgrade#runtime-versioning
@@ -161,10 +133,10 @@ const NORMAL_DISPATCH_RATIO: Perbill = Perbill::from_percent(75);
 parameter_types! {
 	pub const BlockHashCount: BlockNumber = 2400;
 	pub const Version: RuntimeVersion = VERSION;
-	/// We allow for 2 seconds of compute with a 6 second average block time.
+	/// We allow for 60 seconds of compute with a 6 second average block time.
 	pub BlockWeights: frame_system::limits::BlockWeights =
 		frame_system::limits::BlockWeights::with_sensible_defaults(
-			Weight::from_parts(2u64 * WEIGHT_REF_TIME_PER_SECOND, u64::MAX),
+			Weight::from_parts(60u64 * WEIGHT_REF_TIME_PER_SECOND, u64::MAX),
 			NORMAL_DISPATCH_RATIO,
 		);
 	pub BlockLength: frame_system::limits::BlockLength = frame_system::limits::BlockLength
@@ -213,7 +185,7 @@ impl frame_system::Config for Runtime {
 	/// The type for storing how many extrinsics an account has signed.
 	type Nonce = Nonce;
 	/// The type for hashing blocks and tries.
-	type Hash = Hash;
+	type Hash = HashOutput;
 	/// The hashing algorithm used.
 	type Hashing = BlakeTwo256;
 	/// The ubiquitous event type.
@@ -246,15 +218,47 @@ impl frame_system::Config for Runtime {
 }
 
 parameter_types! {
-	pub const TargetBlockTime: u32 = 60_000;
-	pub const DifficultyBlockChangePeriod: u32 = 60 * 24; // change difficulty once a day
+	pub const TargetComputeBlockTime: u64 = TICK_MILLIS / 2u64; // aim for compute to take half of vote time
+	pub const TargetBlockVotes: u32 = 50_000;
+	pub const MinimumsChangePeriod: u32 = 60 * 24; // change block_seal_spec once a day
+
+
+	pub const ArgonsPerBlock: u32 = 5_000;
+	pub const StartingUlixeesPerBlock: u32 = 5_000;
+	pub const HalvingBlocks: u32 = 2_100_000; // based on bitcoin, but 10x since we're block per minute
+	pub const MaturationBlocks: u32 = 5;
+	pub const MinerPayoutPercent: u32 = 75;
 }
 
-impl pallet_difficulty::Config for Runtime {
+impl pallet_block_seal_spec::Config for Runtime {
 	type RuntimeEvent = RuntimeEvent;
-	type WeightInfo = pallet_difficulty::weights::SubstrateWeight<Runtime>;
-	type TargetBlockTime = TargetBlockTime;
-	type BlockChangePeriod = DifficultyBlockChangePeriod;
+	type TargetComputeBlockTime = TargetComputeBlockTime;
+	type AuthorityProvider = MiningSlot;
+	type NotebookProvider = Notebook;
+	type WeightInfo = pallet_block_seal_spec::weights::SubstrateWeight<Runtime>;
+	type TargetBlockVotes = TargetBlockVotes;
+	type ChangePeriod = MinimumsChangePeriod;
+	type SealInherent = BlockSeal;
+	type TickProvider = Ticks;
+	type MaxActiveNotaries = MaxActiveNotaries;
+}
+
+impl pallet_block_rewards::Config for Runtime {
+	type RuntimeEvent = RuntimeEvent;
+	type WeightInfo = pallet_block_rewards::weights::SubstrateWeight<Runtime>;
+	type ArgonCurrency = ArgonBalances;
+	type UlixeeCurrency = UlixeeBalances;
+	type Balance = Balance;
+	type BlockSealerProvider = BlockSeal;
+	type NotaryProvider = Notaries;
+	type NotebookProvider = Notebook;
+	type CurrentTick = Ticks;
+	type ArgonsPerBlock = ArgonsPerBlock;
+	type StartingUlixeesPerBlock = StartingUlixeesPerBlock;
+	type HalvingBlocks = HalvingBlocks;
+	type MinerPayoutPercent = MinerPayoutPercent;
+	type MaturationBlocks = MaturationBlocks;
+	type RuntimeFreezeReason = RuntimeFreezeReason;
 }
 
 impl pallet_authorship::Config for Runtime {
@@ -265,13 +269,17 @@ impl pallet_authorship::Config for Runtime {
 impl pallet_timestamp::Config for Runtime {
 	/// A timestamp: milliseconds since the unix epoch.
 	type Moment = Moment;
-	type OnTimestampSet = Difficulty;
+	type OnTimestampSet = (BlockSealSpec, Ticks);
 	type MinimumPeriod = ConstU64<500>;
 	type WeightInfo = ();
 }
 
+impl pallet_ticks::Config for Runtime {
+	type WeightInfo = ();
+}
+
 parameter_types! {
-	pub const MaxCohortSize: u32 = 250; // this means mining_slots last 40 days
+	pub const MaxCohortSize: u32 = 250; // this means mining_slot last 40 days
 	pub const BlocksBetweenSlots: u32 = prod_or_fast!(1440, 4); // going to add a cohort every day
 	pub const MaxMiners: u32 = 10_000; // must multiply cleanly by MaxCohortSize
 	pub const SessionRotationPeriod: u32 = prod_or_fast!(120, 2); // must be cleanly divisible by BlocksBetweenSlots
@@ -296,9 +304,9 @@ parameter_types! {
 	pub const HistoricalBlockSealersToKeep: u32 = BlocksBetweenSlots::get();
 }
 
-impl pallet_bonds::Config for Runtime {
+impl pallet_bond::Config for Runtime {
 	type RuntimeEvent = RuntimeEvent;
-	type WeightInfo = pallet_bonds::weights::SubstrateWeight<Runtime>;
+	type WeightInfo = pallet_bond::weights::SubstrateWeight<Runtime>;
 	type Currency = ArgonBalances;
 	type RuntimeHoldReason = RuntimeHoldReason;
 	type BondFundId = BondFundId;
@@ -310,9 +318,9 @@ impl pallet_bonds::Config for Runtime {
 	type BlocksPerYear = BlocksPerYear;
 }
 
-impl pallet_mining_slots::Config for Runtime {
+impl pallet_mining_slot::Config for Runtime {
 	type RuntimeEvent = RuntimeEvent;
-	type WeightInfo = pallet_mining_slots::weights::SubstrateWeight<Runtime>;
+	type WeightInfo = pallet_mining_slot::weights::SubstrateWeight<Runtime>;
 	type MaxMiners = MaxMiners;
 	type OwnershipCurrency = UlixeeBalances;
 	type OwnershipPercentDamper = OwnershipPercentDamper;
@@ -323,38 +331,39 @@ impl pallet_mining_slots::Config for Runtime {
 	type BlocksBetweenSlots = BlocksBetweenSlots;
 	type Balance = Balance;
 	type BondId = BondId;
-	type BondProvider = Bonds;
+	type BondProvider = Bond;
 }
 
 impl pallet_block_seal::Config for Runtime {
-	type RuntimeEvent = RuntimeEvent;
-	type WeightInfo = pallet_block_seal::weights::SubstrateWeight<Runtime>;
-	type AuthorityProvider = MiningSlots;
 	type AuthorityId = BlockSealAuthorityId;
-	type HistoricalBlockSealersToKeep = HistoricalBlockSealersToKeep;
+	type WeightInfo = pallet_block_seal::weights::SubstrateWeight<Runtime>;
+	type AuthorityProvider = MiningSlot;
+	type NotebookProvider = Notebook;
+	type BlockVotingProvider = BlockSealSpec;
+	type TickProvider = Ticks;
 }
 
 impl pallet_session::Config for Runtime {
 	type RuntimeEvent = RuntimeEvent;
 	type ValidatorId = <Self as frame_system::Config>::AccountId;
-	type ValidatorIdOf = pallet_mining_slots::ValidatorIdOf<Self>;
+	type ValidatorIdOf = pallet_mining_slot::ValidatorIdOf<Self>;
 	type ShouldEndSession = pallet_session::PeriodicSessions<SessionRotationPeriod, Offset>;
 	type NextSessionRotation = pallet_session::PeriodicSessions<SessionRotationPeriod, Offset>;
-	type SessionManager = pallet_session_historical::NoteHistoricalRoot<Self, MiningSlots>;
+	type SessionManager = pallet_session_historical::NoteHistoricalRoot<Self, MiningSlot>;
 	type SessionHandler = <SessionKeys as OpaqueKeys>::KeyTypeIdProviders;
 	type Keys = SessionKeys;
 	type WeightInfo = pallet_session::weights::SubstrateWeight<Runtime>;
 }
 
 impl pallet_session_historical::Config for Runtime {
-	type FullIdentification = pallet_mining_slots::MinerHistory;
-	type FullIdentificationOf = pallet_mining_slots::FullIdentificationOf<Runtime>;
+	type FullIdentification = pallet_mining_slot::MinerHistory;
+	type FullIdentificationOf = pallet_mining_slot::FullIdentificationOf<Runtime>;
 }
 
 impl pallet_offences::Config for Runtime {
 	type RuntimeEvent = RuntimeEvent;
 	type IdentificationTuple = pallet_session_historical::IdentificationTuple<Self>;
-	// TODO: mining_slots should deal with offenses
+	// TODO: mining_slot should deal with offenses
 	type OnOffenceHandler = ();
 }
 
@@ -383,7 +392,7 @@ where
 }
 
 parameter_types! {
-	pub const LocalchainPalletId: PalletId = PalletId(*b"locrelay");
+	pub const ChainTransferPalletId: PalletId = PalletId(*b"transfer");
 
 	/// How long a transfer should remain in storage before returning.
 	pub const TransferExpirationBlocks: u32 = 1400 * 10;
@@ -391,27 +400,29 @@ parameter_types! {
 	/// How many transfers out can be queued per block
 	pub const MaxPendingTransfersOutPerBlock: u32 = 1000;
 
-	/// How many auditors are expected to sign a notary block.
-	pub const RequiredNotebookAuditors: u32 = 5; // half of seal signers
-
-	/// Number of blocks to keep around for preventing notebook double-submit
-	pub const MaxNotebookBlocksToRemember: u32 = 10;
 
 }
 
-impl pallet_localchain_relay::Config for Runtime {
+impl pallet_chain_transfer::Config for Runtime {
 	type RuntimeEvent = RuntimeEvent;
-	type WeightInfo = pallet_localchain_relay::weights::SubstrateWeight<Runtime>;
-	type HistoricalBlockSealersLookup = BlockSeal;
-	type Balance = Balance;
+	type WeightInfo = pallet_chain_transfer::weights::SubstrateWeight<Runtime>;
 	type Currency = ArgonBalances;
-	type AuthorityProvider = MiningSlots;
+	type Balance = Balance;
 	type NotaryProvider = Notaries;
-	type PalletId = LocalchainPalletId;
+	type PalletId = ChainTransferPalletId;
 	type TransferExpirationBlocks = TransferExpirationBlocks;
 	type MaxPendingTransfersOutPerBlock = MaxPendingTransfersOutPerBlock;
-	type RequiredNotebookAuditors = RequiredNotebookAuditors;
-	type MaxNotebookBlocksToRemember = MaxNotebookBlocksToRemember;
+	type NotebookProvider = Notebook;
+}
+
+impl pallet_notebook::Config for Runtime {
+	type RuntimeEvent = RuntimeEvent;
+	type WeightInfo = pallet_notebook::weights::SubstrateWeight<Runtime>;
+	type EventHandler = (ChainTransfer, BlockSealSpec);
+	type NotaryProvider = Notaries;
+	type ChainTransferLookup = ChainTransfer;
+	type BlockVotingProvider = BlockSealSpec;
+	type TickProvider = Ticks;
 }
 
 parameter_types! {
@@ -419,10 +430,12 @@ parameter_types! {
 	pub const MaxProposalHoldBlocks: u32 = 1440 * 14; // 2 weeks to approve
 	pub const MaxProposalsPerBlock: u32 = 10;
 	pub const MetaChangesBlockDelay: u32 = 1;
+	pub const MaxBlocksForKeyHistory: u32 = 1440 * 2; // keep for 2 days.. only used for notebook submission
 	/// Max host ips a notary can provide
 	pub const MaxNotaryHosts: u32 = 4;
-	pub const MaxBlocksForKeyHistory: u32 = 1440 * 2; // keep for 2 days.. only used for notebook submission
 }
+
+pub type NotaryRecordT = NotaryRecord<AccountId, BlockNumber, crate::MaxNotaryHosts>;
 
 impl pallet_notaries::Config for Runtime {
 	type RuntimeEvent = RuntimeEvent;
@@ -431,8 +444,8 @@ impl pallet_notaries::Config for Runtime {
 	type MaxProposalHoldBlocks = MaxProposalHoldBlocks;
 	type MaxProposalsPerBlock = MaxProposalsPerBlock;
 	type MetaChangesBlockDelay = MetaChangesBlockDelay;
-	type MaxNotaryHosts = MaxNotaryHosts;
 	type MaxBlocksForKeyHistory = MaxBlocksForKeyHistory;
+	type MaxNotaryHosts = MaxNotaryHosts;
 }
 
 /// Existential deposit.
@@ -474,9 +487,10 @@ impl pallet_balances::Config<ArgonToken> for Runtime {
 	type ExistentialDeposit = ConstU128<EXISTENTIAL_DEPOSIT>;
 	type AccountStore = System;
 	type WeightInfo = pallet_balances::weights::SubstrateWeight<Runtime>;
-	type FreezeIdentifier = ();
-	type MaxFreezes = ConstU32<1>;
+	type FreezeIdentifier = RuntimeFreezeReason;
+	type MaxFreezes = ConstU32<2>;
 	type RuntimeHoldReason = RuntimeHoldReason;
+	type RuntimeFreezeReason = RuntimeFreezeReason;
 	type MaxHolds = ConstU32<100>;
 }
 
@@ -497,9 +511,10 @@ impl pallet_balances::Config<UlixeeToken> for Runtime {
 		pallet_balances::AccountData<Balance>,
 	>;
 	type WeightInfo = pallet_balances::weights::SubstrateWeight<Runtime>;
-	type FreezeIdentifier = ();
-	type MaxFreezes = ConstU32<1>;
+	type FreezeIdentifier = RuntimeFreezeReason;
+	type MaxFreezes = ConstU32<2>;
 	type RuntimeHoldReason = RuntimeHoldReason;
+	type RuntimeFreezeReason = RuntimeFreezeReason;
 	type MaxHolds = ConstU32<50>;
 }
 
@@ -527,17 +542,20 @@ construct_runtime!(
 	pub struct Runtime {
 		System: frame_system,
 		Timestamp: pallet_timestamp,
-		MiningSlots: pallet_mining_slots,
-		Bonds: pallet_bonds,
+		Ticks: pallet_ticks,
+		MiningSlot: pallet_mining_slot,
+		Bond: pallet_bond,
 		Notaries: pallet_notaries,
-		LocalchainRelay: pallet_localchain_relay,
-		Difficulty: pallet_difficulty,// Consensus support.
-		// Authorship must be before session in order to note author in the correct session and era
-		// for im-online.
+		Notebook: pallet_notebook,
+		ChainTransfer: pallet_chain_transfer,
+		BlockSealSpec: pallet_block_seal_spec,
+		// Authorship must be before session
 		Authorship: pallet_authorship,
 		Historical: pallet_session_historical,
 		Session: pallet_session,
 		BlockSeal: pallet_block_seal,
+		// BlockRewards must come after seal
+		BlockRewards: pallet_block_rewards,
 		Grandpa: pallet_grandpa,
 		Offences: pallet_offences,
 		ArgonBalances: pallet_balances::<Instance1>::{Pallet, Call, Storage, Config<T>, Event<T>},
@@ -579,28 +597,6 @@ pub type Executive = frame_executive::Executive<
 	Runtime,
 	AllPalletsWithSystem,
 >;
-
-#[cfg(feature = "runtime-benchmarks")]
-mod benches {
-	define_benchmarks!(
-		[frame_benchmarking, BaselineBench::<Runtime>]
-		[frame_system, SystemBench::<Runtime>]
-		[pallet_balances, ArgonTokens]
-		[pallet_balances, UlixeeTokens]
-		[pallet_timestamp, Timestamp]
-		[pallet_difficulty, Difficulty]
-		[pallet_mining_slots, MiningSlots]
-		[pallet_bonds, Bonds]
-		[pallet_session, Session]
-		[pallet_block_seal, BlockSeal]
-		[pallet_authorship, Authorship]
-		[pallet_sudo, Sudo]
-		[pallet_grandpa, Grandpa]
-		[pallet_offences, Offences],
-		[pallet_notaries, Notaries],
-		[pallet_localchain_relay, LocalchainRelay],
-	);
-}
 
 impl_runtime_apis! {
 	impl sp_api::Core<Block> for Runtime {
@@ -674,7 +670,6 @@ impl_runtime_apis! {
 		}
 	}
 
-
 	impl sp_session::SessionKeys<Block> for Runtime {
 		fn generate_session_keys(seed: Option<Vec<u8>>) -> Vec<u8> {
 			opaque::SessionKeys::generate(seed)
@@ -731,65 +726,75 @@ impl_runtime_apis! {
 		}
 	}
 
-	impl ulx_primitives::UlxConsensusApi<Block> for Runtime {
-		fn next_work() -> NextWork {
-			NextWork {
-				work_type: BlockSeal::work_type(),
-				difficulty: Difficulty::difficulty(),
-				min_seal_signers: BlockSeal::min_seal_signers(),
-				closest_x_authorities_required: BlockSeal::closest_x_authorities_required(),
-			}
+	impl ulx_primitives::BlockSealApis<Block, AccountId, BlockSealAuthorityId> for Runtime {
+		fn vote_minimum() -> VoteMinimum {
+			BlockSealSpec::vote_minimum()
 		}
 
-		fn calculate_easing(tax_amount: u128, validators: u8) -> u128 {
-			 Difficulty::calculate_easing(tax_amount, validators)
+		fn compute_difficulty() -> u128 {
+			BlockSealSpec::compute_difficulty()
+		}
+
+		fn create_vote_digest(tick: Tick, included_notebooks: Vec<NotaryNotebookVoteDigestDetails>) -> BlockVoteDigest {
+			BlockSealSpec::create_block_vote_digest(tick, included_notebooks)
+		}
+
+		fn find_vote_block_seals(
+			votes: Vec<NotaryNotebookVotes>,
+			with_better_strength: U256,
+		) -> Result<BoundedVec<BestBlockVoteSeal<AccountId, BlockSealAuthorityId>, ConstU32<2>>, DispatchError>{
+			Ok(BlockSeal::find_vote_block_seals(votes,with_better_strength)?)
+		}
+
+	}
+
+	impl ulx_primitives::NotaryApis<Block, NotaryRecordT> for Runtime {
+		fn notary_by_id(notary_id: NotaryId) -> Option<NotaryRecordT> {
+			Notaries::notaries().iter().find(|a| a.notary_id == notary_id).cloned()
+		}
+		fn notaries() -> Vec<NotaryRecordT> {
+			Notaries::notaries().iter().cloned().collect()
 		}
 	}
 
-	impl ulx_primitives::block_seal::MiningAuthorityApis<Block> for Runtime {
-		fn authorities() -> Vec<BlockSealAuthorityId> {
-			MiningSlots::authorities()
-		}
-		fn authorities_by_index() -> BTreeMap<u16, BlockSealAuthorityId> {
-			MiningSlots::authorities_by_index()
-		}
-		fn block_peers(account_id: AccountId32) -> Vec<AuthorityDistance<BlockSealAuthorityId>> {
-			let block_number = System::block_number();
-			let current_block_hash = System::block_hash(block_number);
-			BlockSeal::block_peers(current_block_hash, account_id)
-		}
-		fn active_authorities() -> u16 {
-			MiningSlots::authority_count().into()
+	impl pallet_mining_slot::MiningSlotApi<Block, BlockNumber> for Runtime {
+		fn next_slot_era() -> (BlockNumber, BlockNumber) {
+			MiningSlot::get_slot_era()
 		}
 	}
 
-	impl pallet_localchain_relay::LocalchainRelayApis<Block, BlockNumber> for Runtime {
-		fn audit_notebook(
+	impl ulx_primitives::NotebookApis<Block, NotebookVerifyError> for Runtime {
+		fn audit_notebook_and_get_votes(
 			version: u32,
 			notary_id: NotaryId,
 			notebook_number: NotebookNumber,
-			notary_signature: NotarySignature,
 			header_hash: H256,
-			bytes: Vec<u8>,
-		) -> Result<bool, NotebookVerifyError> {
-			LocalchainRelay::audit_notebook(version, notary_id, notebook_number, notary_signature, header_hash, bytes)
+			vote_minimums: &BTreeMap<<Block as BlockT>::Hash, VoteMinimum>,
+			bytes: &Vec<u8>,
+		) -> Result<NotaryNotebookVotes, NotebookVerifyError> {
+			Notebook::audit_notebook(version, notary_id, notebook_number, header_hash, vote_minimums, bytes)
 		}
 
-		fn get_auditors(
-			notary_id: NotaryId,
-			notebook_number: NotebookNumber,
-			pinned_to_block_number: BlockNumber,
-		) -> Vec<(u16, BlockSealAuthorityId, Vec<Host>)> {
-			LocalchainRelay::get_auditors(notary_id, notebook_number, pinned_to_block_number)
+		fn decode_signed_raw_notebook_header(raw_header: Vec<u8>) -> Result<NotaryNotebookVoteDetails<<Block as BlockT>::Hash>, DispatchError> {
+			Notebook::decode_signed_raw_notebook_header(raw_header)
 		}
-	}
 
-	impl pallet_mining_slots::MiningSlotsApi<Block, BlockNumber> for Runtime {
-		fn next_slot_era() -> (BlockNumber, BlockNumber) {
-			MiningSlots::get_slot_era()
+		fn latest_notebook_by_notary() -> BTreeMap<NotaryId, (NotebookNumber, Tick)> {
+			Notebook::latest_notebook_by_notary()
 		}
 	}
 
+	impl ulx_primitives::TickApis<Block> for Runtime {
+		fn current_tick() -> Tick {
+			Ticks::current_tick()
+		}
+		fn ticker() -> Ticker {
+			Ticks::ticker()
+		}
+		fn blocks_at_tick(tick: Tick) -> Vec<<Block as BlockT>::Hash> {
+			Ticks::blocks_at_tick(tick)
+		}
+	}
 
 	impl sp_consensus_grandpa::GrandpaApi<Block> for Runtime {
 		fn grandpa_authorities() -> sp_consensus_grandpa::AuthorityList {
@@ -890,4 +895,37 @@ impl_runtime_apis! {
 			Executive::try_execute_block(block, state_root_check, signature_check, select).expect("execute-block failed")
 		}
 	}
+
+	impl sp_genesis_builder::GenesisBuilder<Block> for Runtime {
+		fn create_default_config() -> Vec<u8> {
+			create_default_config::<RuntimeGenesisConfig>()
+		}
+
+		fn build_config(config: Vec<u8>) -> sp_genesis_builder::Result {
+			build_config::<RuntimeGenesisConfig>(config)
+		}
+	}
+}
+#[cfg(feature = "runtime-benchmarks")]
+mod benches {
+	define_benchmarks!(
+		[frame_benchmarking, BaselineBench::<Runtime>]
+		[frame_system, SystemBench::<Runtime>]
+		[pallet_balances, ArgonTokens]
+		[pallet_balances, UlixeeTokens]
+		[pallet_timestamp, Timestamp]
+		[pallet_ticks, Ticks]
+		[pallet_block_seal_spec, VoteEligibility]
+		[pallet_block_rewards, BlockRewards]
+		[pallet_mining_slot, MiningSlot]
+		[pallet_bond, Bond]
+		[pallet_session, Session]
+		[pallet_block_seal, BlockSeal]
+		[pallet_authorship, Authorship]
+		[pallet_sudo, Sudo]
+		[pallet_grandpa, Grandpa]
+		[pallet_offences, Offences]
+		[pallet_notaries, Notaries]
+		[pallet_chain_transfer, ChainTransfer]
+	);
 }

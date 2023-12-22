@@ -2,6 +2,8 @@
 
 use binary_merkle_tree::{merkle_root, verify_proof, Leaf};
 use codec::{Decode, Encode};
+
+use log::info;
 use serde::{Deserialize, Serialize};
 use snafu::Snafu;
 use sp_core::{crypto::AccountId32, H256};
@@ -11,12 +13,12 @@ use sp_std::{
 	vec::Vec,
 };
 
-pub use error::VerifyError;
-use ulx_notary_primitives::{
-	ensure, AccountId, AccountOrigin, AccountOriginUid, AccountType, BalanceChange, BalanceProof,
-	BalanceTip, ChainTransfer, NewAccountOrigin, NotaryId, Note, NoteType, Notebook,
-	NotebookHeader, NotebookNumber, CHANNEL_CLAWBACK_NOTEBOOKS, CHANNEL_EXPIRATION_NOTEBOOKS,
-	MIN_CHANNEL_NOTE_MILLIGONS,
+pub use crate::error::VerifyError;
+use ulx_primitives::{
+	ensure, AccountId, AccountOrigin, AccountOriginUid, AccountType, Balance, BalanceChange,
+	BalanceProof, BalanceTip, BlockVote, ChainTransfer, NewAccountOrigin, NotaryId, Note, NoteType,
+	Notebook, NotebookHeader, NotebookNumber, VoteMinimum, CHANNEL_CLAWBACK_NOTEBOOKS,
+	CHANNEL_EXPIRATION_NOTEBOOKS, MIN_CHANNEL_NOTE_MILLIGONS,
 };
 
 pub mod error;
@@ -24,6 +26,8 @@ pub mod error;
 mod test_balanceset;
 #[cfg(test)]
 mod test_notebook;
+
+const LOG_TARGET: &str = "notary::audit";
 
 #[derive(Debug, Clone, PartialEq, TypeInfo, Encode, Decode, Serialize, Deserialize, Snafu)]
 pub enum AccountHistoryLookupError {
@@ -33,41 +37,56 @@ pub enum AccountHistoryLookupError {
 	LastChangeNotFound,
 	#[snafu(display("Invalid transfer to localchain"))]
 	InvalidTransferToLocalchain,
+	#[snafu(display("The block given block specification could not be found"))]
+	BlockSpecificationNotFound,
 }
 
 pub trait NotebookHistoryLookup {
 	fn get_account_changes_root(
+		&self,
 		notary_id: NotaryId,
 		notebook_number: NotebookNumber,
 	) -> Result<H256, AccountHistoryLookupError>;
 	fn get_last_changed_notebook(
+		&self,
 		notary_id: NotaryId,
 		account_origin: AccountOrigin,
 	) -> Result<NotebookNumber, AccountHistoryLookupError>;
 
 	fn is_valid_transfer_to_localchain(
+		&self,
 		notary_id: NotaryId,
 		account_id: &AccountId32,
 		nonce: u32,
+		milligons: Balance,
 	) -> Result<bool, AccountHistoryLookupError>;
 }
 
-pub fn notebook_verify<'a, T: NotebookHistoryLookup>(
-	header_hash: &'a H256,
-	notebook: &'a Notebook,
+pub fn notebook_verify<T: NotebookHistoryLookup>(
+	lookup: &T,
+	notebook: &Notebook,
+	vote_minimums: &BTreeMap<H256, VoteMinimum>,
 ) -> anyhow::Result<bool, VerifyError> {
 	let mut state = NotebookVerifyState::default();
 
 	state.load_new_origins(notebook.new_account_origins.to_vec())?;
 	let header = &notebook.header;
 
-	for changeset in notebook.balance_changes.iter() {
-		let result =
-			verify_balance_changeset_allocation(&changeset, Some(notebook.header.notebook_number))?;
+	for notarization in notebook.notarizations.iter() {
+		let changeset = &notarization.balance_changes;
+		let block_votes = &notarization.block_votes;
+
+		let result = verify_notarization_allocation(
+			changeset,
+			block_votes,
+			Some(notebook.header.notebook_number),
+		)?;
 		result.verify_taxes()?;
 		state.record_tax(result)?;
 		verify_changeset_signatures(&changeset)?;
-		verify_balance_sources::<T>(&mut state, header, changeset)?;
+		verify_balance_sources(lookup, &mut state, header, changeset)?;
+		track_block_votes(&mut state, block_votes)?;
+		verify_voting_sources(&state.unused_channel_passes, block_votes, &vote_minimums)?;
 	}
 
 	ensure!(
@@ -83,8 +102,21 @@ pub fn notebook_verify<'a, T: NotebookHistoryLookup>(
 		state.get_merkle_root() == header.changed_accounts_root,
 		VerifyError::InvalidBalanceChangeRoot
 	);
+	ensure!(
+		state.get_block_votes_root() == header.block_votes_root,
+		VerifyError::InvalidBlockVoteRoot
+	);
+	ensure!(
+		state.block_votes.len() == header.block_votes_count as usize,
+		VerifyError::InvalidBlockVotesCount
+	);
+	ensure!(state.block_power == header.block_voting_power, VerifyError::InvalidBlockVotingPower);
+	ensure!(
+		state.blocks_voted_on == BTreeSet::from_iter(header.blocks_with_votes.clone()),
+		VerifyError::InvalidBlockVoteList
+	);
 
-	ensure!(*header_hash == header.hash(), VerifyError::InvalidNotebookHash);
+	ensure!(notebook.verify_hash(), VerifyError::InvalidNotebookHash);
 
 	Ok(true)
 }
@@ -94,8 +126,14 @@ struct NotebookVerifyState {
 	account_changelist: BTreeSet<AccountOrigin>,
 	final_balances: BTreeMap<(AccountId32, AccountType), BalanceTip>,
 	chain_transfers: Vec<ChainTransfer>,
+	/// Block votes is keyed off of account id and the index supplied by the user. If index is
+	/// duplicated, only the last entry will be used.
+	block_votes: BTreeMap<(AccountId, u32), BlockVote>,
 	seen_transfers_in: BTreeSet<(AccountId32, u32)>,
 	new_account_origins: BTreeMap<(AccountId, AccountType), AccountOriginUid>,
+	unused_channel_passes: BTreeSet<H256>,
+	blocks_voted_on: BTreeSet<H256>,
+	block_power: u128,
 	tax: u128,
 }
 
@@ -120,7 +158,7 @@ impl NotebookVerifyState {
 		self.final_balances.insert(key.clone(), tip);
 		Ok(())
 	}
-	
+
 	pub fn record_tax(
 		&mut self,
 		change_state: BalanceChangesetState,
@@ -147,6 +185,12 @@ impl NotebookVerifyState {
 
 	pub fn get_merkle_root(&self) -> H256 {
 		let merkle_leafs = self.final_balances.iter().map(|(_, v)| v.encode()).collect::<Vec<_>>();
+
+		merkle_root::<BlakeTwo256, _>(merkle_leafs)
+	}
+
+	pub fn get_block_votes_root(&self) -> H256 {
+		let merkle_leafs = self.block_votes.iter().map(|(_, v)| v.encode()).collect::<Vec<_>>();
 
 		merkle_root::<BlakeTwo256, _>(merkle_leafs)
 	}
@@ -179,7 +223,23 @@ impl NotebookVerifyState {
 	}
 }
 
+fn track_block_votes(
+	state: &mut NotebookVerifyState,
+	block_votes: &Vec<BlockVote>,
+) -> anyhow::Result<(), VerifyError> {
+	for block_vote in block_votes {
+		state.blocks_voted_on.insert(block_vote.block_hash.clone());
+		state
+			.block_votes
+			.insert((block_vote.account_id.clone(), block_vote.index), block_vote.clone());
+		state.block_power = state.block_power.saturating_add(block_vote.power);
+	}
+
+	Ok(())
+}
+
 fn verify_balance_sources<'a, T: NotebookHistoryLookup>(
+	lookup: &T,
 	state: &mut NotebookVerifyState,
 	header: &NotebookHeader,
 	changeset: &Vec<BalanceChange>,
@@ -197,10 +257,11 @@ fn verify_balance_sources<'a, T: NotebookHistoryLookup>(
 					state.track_chain_transfer(account_id.clone(), note)?;
 				},
 				NoteType::ClaimFromMainchain { account_nonce } => {
-					T::is_valid_transfer_to_localchain(
+					lookup.is_valid_transfer_to_localchain(
 						notary_id,
 						account_id,
 						account_nonce.clone(),
+						note.milligons,
 					)?;
 					state.track_chain_transfer(account_id.clone(), note)?;
 				},
@@ -208,13 +269,21 @@ fn verify_balance_sources<'a, T: NotebookHistoryLookup>(
 					channel_hold_note = Some(note.clone());
 				},
 				// this condition is redundant, but leaving for clarity
-				NoteType::ChannelSettle { .. } => channel_hold_note = None,
+				NoteType::ChannelSettle { channel_pass_hash } => {
+					ensure!(
+						state.unused_channel_passes.insert(channel_pass_hash.clone()),
+						VerifyError::DuplicateChannelPassSettled
+					);
+					channel_hold_note = None;
+				},
 				_ => {},
 			}
 		}
 
+		info!(target:LOG_TARGET, "Verifying balance change for {:?}, #{} {:?}", key.0, change.change_number, key.1);
 		if change.change_number == 1 {
 			if let Some(account_uid) = state.new_account_origins.get(&key) {
+				info!(target:LOG_TARGET,"track final balance for account_uid {account_uid}");
 				state.track_final_balance(
 					&key,
 					&change,
@@ -235,7 +304,8 @@ fn verify_balance_sources<'a, T: NotebookHistoryLookup>(
 				.previous_balance_proof
 				.as_ref()
 				.expect("Should have been unwrapped in verify_balance_changeset_allocation");
-			verify_previous_balance_proof::<T>(
+			verify_previous_balance_proof(
+				lookup,
 				proof,
 				header.notebook_number,
 				&mut state.final_balances,
@@ -254,13 +324,39 @@ fn verify_balance_sources<'a, T: NotebookHistoryLookup>(
 	Ok(())
 }
 
+pub fn verify_voting_sources(
+	channel_passes: &BTreeSet<H256>,
+	block_votes: &Vec<BlockVote>,
+	vote_minimums: &BTreeMap<H256, VoteMinimum>,
+) -> anyhow::Result<(), VerifyError> {
+	let mut unused_channel_passes = channel_passes.clone();
+	for block_vote in block_votes {
+		let minimum = vote_minimums
+			.get(&block_vote.block_hash)
+			.ok_or(VerifyError::InvalidBlockVoteSource)?;
+
+		ensure!(block_vote.power >= *minimum, VerifyError::InsufficientBlockVoteMinimum);
+		let hash = block_vote.channel_pass.hash();
+
+		// a channel pass can only be used once
+		ensure!(unused_channel_passes.remove(&hash), VerifyError::InvalidBlockVoteChannelPass);
+	}
+	Ok(())
+}
+
 fn verify_previous_balance_proof<'a, T: NotebookHistoryLookup>(
+	lookup: &T,
 	proof: &BalanceProof,
 	notebook_number: NotebookNumber,
 	final_balances: &mut BTreeMap<(AccountId32, AccountType), BalanceTip>,
 	change: &BalanceChange,
 	key: &(AccountId32, AccountType),
 ) -> anyhow::Result<bool, VerifyError> {
+	info!(target:LOG_TARGET,
+		"verify balance for uid={}. in final? {}",
+		proof.account_origin.account_uid,
+		final_balances.contains_key(&key)
+	);
 	// if we've changed balance in this notebook before, it must match the previous
 	// entry
 	if final_balances.contains_key(&key) {
@@ -283,7 +379,7 @@ fn verify_previous_balance_proof<'a, T: NotebookHistoryLookup>(
 		);
 	} else {
 		let last_notebook_change =
-			T::get_last_changed_notebook(proof.notary_id, proof.account_origin.clone())?;
+			lookup.get_last_changed_notebook(proof.notary_id, proof.account_origin.clone())?;
 		ensure!(
 			last_notebook_change == proof.notebook_number,
 			VerifyError::InvalidPreviousBalanceChangeNotebook
@@ -292,7 +388,7 @@ fn verify_previous_balance_proof<'a, T: NotebookHistoryLookup>(
 			return Err(VerifyError::MissingBalanceProof)
 		};
 
-		let root = T::get_account_changes_root(proof.notary_id, proof.notebook_number)?;
+		let root = lookup.get_account_changes_root(proof.notary_id, proof.notebook_number)?;
 		let channel_hold_note = change.channel_hold_note.as_ref().cloned();
 
 		let leaf = BalanceTip {
@@ -362,6 +458,8 @@ pub struct BalanceChangesetState {
 	/// How much was deposited per account
 	pub claimed_deposits_per_account: BTreeMap<AccountId, u128>,
 
+	/// How much tax was sent per account to block seals
+	unclaimed_block_vote_tax_per_account: BTreeMap<AccountId, u128>,
 	unclaimed_restricted_balance: BTreeMap<BTreeSet<(AccountId, AccountType)>, i128>,
 	unclaimed_channel_balances: BTreeMap<BTreeSet<AccountId>, i128>,
 }
@@ -449,6 +547,35 @@ impl BalanceChangesetState {
 		self.sent_tax += milligons;
 		*self.tax_created_per_account.entry(claimer.clone()).or_insert(0) += milligons;
 
+		Ok(())
+	}
+
+	fn record_tax_sent_to_vote(
+		&mut self,
+		milligons: u128,
+		account_id: &AccountId,
+	) -> anyhow::Result<(), VerifyError> {
+		*self.unclaimed_block_vote_tax_per_account.entry(account_id.clone()).or_insert(0) +=
+			milligons;
+
+		Ok(())
+	}
+
+	fn used_tax_vote_amount(
+		&mut self,
+		milligons: u128,
+		account_id: &AccountId,
+	) -> anyhow::Result<(), VerifyError> {
+		let amount = self
+			.unclaimed_block_vote_tax_per_account
+			.get_mut(account_id)
+			.ok_or(VerifyError::InsufficientBlockVoteTax)?;
+
+		ensure!(*amount >= milligons, VerifyError::InsufficientBlockVoteTax);
+		*amount = amount.saturating_sub(milligons);
+		if *amount == 0 {
+			self.unclaimed_block_vote_tax_per_account.remove(account_id);
+		}
 		Ok(())
 	}
 
@@ -556,8 +683,9 @@ impl BalanceChangesetState {
 /// 2. Confirm the changes net out to 0 (no funds are left outside an account)
 ///
 /// Does NOT: lookup anything in storage, verify signatures, or confirm the merkle proofs
-pub fn verify_balance_changeset_allocation(
+pub fn verify_notarization_allocation(
 	changes: &Vec<BalanceChange>,
+	block_votes: &Vec<BlockVote>,
 	notebook_number: Option<NotebookNumber>,
 ) -> anyhow::Result<BalanceChangesetState, VerifyError> {
 	let mut state = BalanceChangesetState::default();
@@ -580,7 +708,7 @@ pub fn verify_balance_changeset_allocation(
 
 			if change.account_type == AccountType::Tax {
 				match note.note_type {
-					NoteType::Claim | NoteType::Send { .. } => {},
+					NoteType::Claim | NoteType::Send { .. } | NoteType::SendToVote => {},
 					_ => Err(VerifyError::InvalidTaxOperation)?,
 				}
 			}
@@ -624,7 +752,7 @@ pub fn verify_balance_changeset_allocation(
 				NoteType::ChannelClaim => {
 					state.claim_channel_balance(note.milligons, &change.account_id)?;
 				},
-				NoteType::ChannelSettle => {
+				NoteType::ChannelSettle { .. } => {
 					let Some(source_change_notebook) =
 						change.previous_balance_proof.as_ref().map(|a| a.notebook_number)
 					else {
@@ -651,6 +779,13 @@ pub fn verify_balance_changeset_allocation(
 					);
 					state.record_tax(note.milligons, &change.account_id)?;
 				},
+				NoteType::SendToVote { .. } => {
+					ensure!(
+						change.account_type == AccountType::Tax,
+						VerifyError::InvalidTaxOperation
+					);
+					state.record_tax_sent_to_vote(note.milligons, &change.account_id)?;
+				},
 				_ => {},
 			}
 
@@ -671,8 +806,9 @@ pub fn verify_balance_changeset_allocation(
 					},
 				NoteType::SendToMainchain |
 				NoteType::Send { .. } |
-				NoteType::ChannelSettle |
-				NoteType::Tax => balance -= note.milligons as i128,
+				NoteType::ChannelSettle { .. } |
+				NoteType::Tax |
+				NoteType::SendToVote => balance -= note.milligons as i128,
 				_ => {},
 			};
 			note_index += 1;
@@ -706,5 +842,14 @@ pub fn verify_balance_changeset_allocation(
 	// this works by removing all restricted balances as the approved users draw from them
 	ensure!(state.unclaimed_restricted_balance.is_empty(), VerifyError::InvalidNoteRecipients);
 	ensure!(state.unclaimed_channel_balances.is_empty(), VerifyError::InvalidChannelClaimers);
+
+	for block_vote in block_votes {
+		state.used_tax_vote_amount(block_vote.power, &block_vote.account_id)?;
+	}
+	ensure!(
+		state.unclaimed_block_vote_tax_per_account.is_empty(),
+		VerifyError::InvalidBlockVoteAllocation
+	);
+
 	Ok(state)
 }

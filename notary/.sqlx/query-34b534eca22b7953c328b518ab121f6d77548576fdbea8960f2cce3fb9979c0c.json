@@ -10,46 +10,56 @@
       },
       {
         "ordinal": 1,
-        "name": "chain_transfers",
+        "name": "tick",
         "type_info": "Int4"
       },
       {
         "ordinal": 2,
-        "name": "step",
+        "name": "chain_transfers",
         "type_info": "Int4"
       },
       {
         "ordinal": 3,
+        "name": "block_votes",
+        "type_info": "Int4"
+      },
+      {
+        "ordinal": 4,
+        "name": "balance_changes",
+        "type_info": "Int4"
+      },
+      {
+        "ordinal": 5,
+        "name": "notarizations",
+        "type_info": "Int4"
+      },
+      {
+        "ordinal": 6,
+        "name": "step",
+        "type_info": "Int4"
+      },
+      {
+        "ordinal": 7,
         "name": "open_time",
         "type_info": "Timestamptz"
       },
       {
-        "ordinal": 4,
-        "name": "ready_for_close_time",
-        "type_info": "Timestamptz"
-      },
-      {
-        "ordinal": 5,
-        "name": "closed_time",
-        "type_info": "Timestamptz"
-      },
-      {
-        "ordinal": 6,
-        "name": "get_auditors_time",
-        "type_info": "Timestamptz"
-      },
-      {
-        "ordinal": 7,
-        "name": "audited_time",
-        "type_info": "Timestamptz"
-      },
-      {
         "ordinal": 8,
-        "name": "submitted_time",
+        "name": "end_time",
         "type_info": "Timestamptz"
       },
       {
         "ordinal": 9,
+        "name": "ready_for_close_time",
+        "type_info": "Timestamptz"
+      },
+      {
+        "ordinal": 10,
+        "name": "closed_time",
+        "type_info": "Timestamptz"
+      },
+      {
+        "ordinal": 11,
         "name": "finalized_time",
         "type_info": "Timestamptz"
       }
@@ -64,9 +74,11 @@
       false,
       false,
       false,
-      true,
-      true,
-      true,
+      false,
+      false,
+      false,
+      false,
+      false,
       true,
       true,
       true

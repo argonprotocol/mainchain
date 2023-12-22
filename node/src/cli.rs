@@ -9,15 +9,15 @@ pub struct Cli {
 	#[clap(flatten)]
 	pub run: RunCmd,
 
-	/// How many mining threads to run
-	#[arg(long)]
-	pub miners: Option<u32>,
-
 	/// Enable an account to author blocks
 	///
 	/// The account address must be given in SS58 format.
 	#[arg(long, value_name = "SS58_ADDRESS", value_parser = parse_ss58_account_id)]
 	pub author: Option<AccountId>,
+
+	/// How many mining threads to run
+	#[arg(long)]
+	pub miners: Option<u32>,
 }
 
 impl Cli {

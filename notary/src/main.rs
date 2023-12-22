@@ -5,16 +5,16 @@ use clap::{crate_version, Parser, Subcommand};
 use sc_cli::{utils, with_crypto_scheme, CryptoScheme, KeystoreParams};
 use sc_keystore::LocalKeystore;
 use sc_service::config::KeystoreConfig;
-use sp_core::{bytes::from_hex, crypto::SecretString, H256};
+use sp_core::crypto::SecretString;
 use sp_keystore::{testing::MemoryKeystore, Keystore, KeystorePtr};
 use sqlx::postgres::PgPoolOptions;
 
-use notary::{
+use ulx_notary::{
 	block_watch::spawn_block_sync,
 	notebook_closer::{spawn_notebook_closer, MainchainClient, NOTARY_KEYID},
 	NotaryServer,
 };
-use ulx_notary_primitives::NotaryId;
+use ulx_primitives::NotaryId;
 
 #[derive(Parser, Debug)]
 #[clap(version = crate_version!())]
@@ -43,7 +43,7 @@ enum Commands {
 		bind_addr: String,
 
 		/// What mainchain RPC websocket url do you want to reach out use to sync blocks and submit
-		/// notebooks?
+		/// notebook?
 		#[clap(short, long, env, default_value = "ws://127.0.0.1:9944")]
 		trusted_rpc_url: String,
 
@@ -58,12 +58,9 @@ enum Commands {
 		#[clap(short, long, env, default_value = "false")]
 		sync_blocks: bool,
 
-		/// Should this node finalize notebooks?
+		/// Should this node finalize notebook?
 		#[clap(short, long, env, default_value = "false")]
 		finalize_notebooks: bool,
-
-		#[clap(short, long, env)]
-		genesis_block: String,
 	},
 	/// Inserts a Notary compatible key into the keystore. NOTE: you still need to register it
 	InsertKey {
@@ -130,23 +127,19 @@ async fn main() -> anyhow::Result<()> {
 			notary_id,
 			sync_blocks,
 			finalize_notebooks,
-			genesis_block,
 		} => {
-			MemoryKeystore::new();
 			let pool = PgPoolOptions::new()
 				.max_connections(100)
 				.connect(&db_url)
 				.await
 				.context("failed to connect to db")?;
 
-			let genesis: H256 = H256::from_slice(from_hex(genesis_block.as_str())?.as_slice());
-
-			let server = NotaryServer::start(notary_id, genesis, pool.clone(), bind_addr).await?;
-
-			let mainchain_client = MainchainClient::new(vec![trusted_rpc_url.clone()]);
+			let mut mainchain_client = MainchainClient::new(vec![trusted_rpc_url.clone()]);
+			let ticker = mainchain_client.lookup_ticker().await?;
+			let server = NotaryServer::start(notary_id, pool.clone(), bind_addr).await?;
 
 			if sync_blocks {
-				spawn_block_sync(trusted_rpc_url.clone(), notary_id, &pool).await?;
+				spawn_block_sync(trusted_rpc_url.clone(), notary_id, &pool, ticker.clone()).await?;
 			}
 			if finalize_notebooks {
 				spawn_notebook_closer(
@@ -154,6 +147,7 @@ async fn main() -> anyhow::Result<()> {
 					notary_id,
 					mainchain_client.clone(),
 					keystore.clone(),
+					ticker,
 					server.completed_notebook_sender,
 				);
 			}

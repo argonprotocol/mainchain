@@ -1,19 +1,21 @@
 use frame_support::{assert_err, assert_ok};
-use sp_core::{bounded_vec, sr25519::Signature};
+use sp_core::{bounded_vec, sr25519::Signature, H256};
 use sp_keyring::{
 	Ed25519Keyring::{Dave, Ferdie},
 	Sr25519Keyring::{Alice, Bob},
 };
 use sp_runtime::MultiSignature;
+use std::collections::{BTreeMap, BTreeSet};
 
-use ulx_notary_primitives::{
+use ulx_primitives::{
 	balance_change::{AccountOrigin, BalanceChange, BalanceProof},
 	note::{AccountType, Note, NoteType},
+	BlockVote, ChannelPass, CHANNEL_EXPIRATION_NOTEBOOKS,
 };
 
 use crate::{
-	verify_balance_changeset_allocation, verify_changeset_signatures, BalanceChangesetState,
-	VerifyError,
+	verify_changeset_signatures, verify_notarization_allocation, verify_voting_sources,
+	BalanceChangesetState, VerifyError,
 };
 
 fn empty_proof(balance: u128) -> Option<BalanceProof> {
@@ -33,7 +35,7 @@ fn empty_signature() -> MultiSignature {
 #[test]
 fn test_balance_change_allocation_errs_non_zero() {
 	assert_err!(
-		verify_balance_changeset_allocation(
+		verify_notarization_allocation(
 			&vec![BalanceChange {
 				account_id: Alice.to_account_id(),
 				account_type: AccountType::Deposit,
@@ -44,6 +46,7 @@ fn test_balance_change_allocation_errs_non_zero() {
 				notes: bounded_vec![Note::create(100, NoteType::Claim)],
 				signature: empty_signature(),
 			}],
+			&vec![],
 			None
 		),
 		VerifyError::BalanceChangeNotNetZero { sent: 0, claimed: 100 }
@@ -64,7 +67,7 @@ fn must_supply_zero_balance_on_first_nonce() {
 	}];
 
 	assert_err!(
-		verify_balance_changeset_allocation(&balance_change, None),
+		verify_notarization_allocation(&balance_change, &vec![], None),
 		VerifyError::MissingBalanceProof
 	);
 }
@@ -97,7 +100,7 @@ fn test_balance_change_allocation_must_be_zero() {
 		},
 	];
 
-	assert_ok!(verify_balance_changeset_allocation(&balance_change, None));
+	assert_ok!(verify_notarization_allocation(&balance_change, &vec![], None));
 }
 
 #[test]
@@ -135,7 +138,7 @@ fn test_notes_must_add_up() {
 		},
 	];
 	assert_err!(
-		verify_balance_changeset_allocation(&balance_change, None),
+		verify_notarization_allocation(&balance_change, &vec![], None),
 		VerifyError::BalanceChangeMismatch {
 			change_index: 2,
 			provided_balance: 100,
@@ -144,7 +147,7 @@ fn test_notes_must_add_up() {
 	);
 
 	balance_change[2].balance = 150;
-	assert_ok!(verify_balance_changeset_allocation(&balance_change, None));
+	assert_ok!(verify_notarization_allocation(&balance_change, &vec![], None));
 }
 
 #[test]
@@ -188,14 +191,14 @@ fn test_recipients() {
 		},
 	];
 	assert_err!(
-		verify_balance_changeset_allocation(&balance_change, None),
+		verify_notarization_allocation(&balance_change, &vec![], None),
 		VerifyError::InvalidNoteRecipients
 	);
 
 	balance_change[1].balance = 250;
 	balance_change[1].notes[0].milligons = 250;
 	balance_change.pop();
-	assert_ok!(verify_balance_changeset_allocation(&balance_change, None));
+	assert_ok!(verify_notarization_allocation(&balance_change, &vec![], None));
 }
 
 #[test]
@@ -215,7 +218,7 @@ fn test_sending_to_localchain() {
 		signature: empty_signature(),
 	}];
 
-	assert_ok!(verify_balance_changeset_allocation(&balance_change, None),);
+	assert_ok!(verify_notarization_allocation(&balance_change, &vec![], None),);
 }
 
 #[test]
@@ -252,7 +255,7 @@ fn test_sending_to_mainchain() {
 		},
 	];
 
-	assert_ok!(verify_balance_changeset_allocation(&balance_change, None));
+	assert_ok!(verify_notarization_allocation(&balance_change, &vec![], None));
 }
 
 #[test]
@@ -270,7 +273,7 @@ fn test_can_lock_with_a_channel_note() -> anyhow::Result<()> {
 		signature: empty_signature(),
 	};
 	{
-		let res = verify_balance_changeset_allocation(&vec![balance_change], Some(1))
+		let res = verify_notarization_allocation(&vec![balance_change], &vec![], Some(1))
 			.expect("should be ok");
 		assert_eq!(res.needs_channel_settle_followup, false);
 		assert_eq!(res.unclaimed_channel_balances.len(), 0);
@@ -279,7 +282,7 @@ fn test_can_lock_with_a_channel_note() -> anyhow::Result<()> {
 	}
 
 	assert_err!(
-		verify_balance_changeset_allocation(
+		verify_notarization_allocation(
 			&vec![BalanceChange {
 				account_id: Bob.to_account_id(),
 				account_type: AccountType::Deposit,
@@ -290,6 +293,7 @@ fn test_can_lock_with_a_channel_note() -> anyhow::Result<()> {
 				notes: bounded_vec![Note::create(250, NoteType::Send { to: None })],
 				signature: empty_signature(),
 			}],
+			&vec![],
 			Some(2)
 		),
 		VerifyError::AccountLocked
@@ -302,12 +306,15 @@ fn test_can_lock_with_a_channel_note() -> anyhow::Result<()> {
 		balance: 200,
 		previous_balance_proof: empty_proof(250),
 		channel_hold_note: Some(channel_note.clone()),
-		notes: bounded_vec![Note::create(50, NoteType::ChannelSettle)],
+		notes: bounded_vec![Note::create(
+			50,
+			NoteType::ChannelSettle { channel_pass_hash: H256::zero() }
+		)],
 		signature: empty_signature(),
 	};
 
 	assert_err!(
-		verify_balance_changeset_allocation(&vec![channel_settle.clone()], Some(2)),
+		verify_notarization_allocation(&vec![channel_settle.clone()], &vec![], Some(2)),
 		VerifyError::ChannelHoldNotReadyForClaim
 	);
 
@@ -317,13 +324,17 @@ fn test_can_lock_with_a_channel_note() -> anyhow::Result<()> {
 
 	// it won't let you claim your own note back
 	assert_err!(
-		verify_balance_changeset_allocation(&vec![channel_settle.clone()], Some(61)),
+		verify_notarization_allocation(
+			&vec![channel_settle.clone()],
+			&vec![],
+			Some(CHANNEL_EXPIRATION_NOTEBOOKS + 1)
+		),
 		VerifyError::InvalidChannelClaimers
 	);
 
 	// it WILL let you claim back your own note if it's past the grace period
 	{
-		let res = verify_balance_changeset_allocation(&vec![channel_settle.clone()], Some(71))
+		let res = verify_notarization_allocation(&vec![channel_settle.clone()], &vec![], Some(71))
 			.expect("should be ok");
 		assert_eq!(res.needs_channel_settle_followup, false);
 		assert_eq!(res.unclaimed_channel_balances.len(), 0);
@@ -339,7 +350,10 @@ fn test_can_lock_with_a_channel_note() -> anyhow::Result<()> {
 			balance: 200,
 			previous_balance_proof: empty_proof(250),
 			channel_hold_note: Some(channel_note.clone()),
-			notes: bounded_vec![Note::create(50, NoteType::ChannelSettle)],
+			notes: bounded_vec![Note::create(
+				50,
+				NoteType::ChannelSettle { channel_pass_hash: H256::zero() }
+			)],
 			signature: empty_signature(),
 		},
 		BalanceChange {
@@ -355,12 +369,13 @@ fn test_can_lock_with_a_channel_note() -> anyhow::Result<()> {
 	];
 
 	assert_eq!(
-		verify_balance_changeset_allocation(&changes, None)?.needs_channel_settle_followup,
+		verify_notarization_allocation(&changes, &vec![], None)?.needs_channel_settle_followup,
 		true
 	);
 	// a valid claim is also acceptable
 	{
-		let res = verify_balance_changeset_allocation(&changes, Some(61)).expect("should be ok");
+		let res =
+			verify_notarization_allocation(&changes, &vec![], Some(61)).expect("should be ok");
 		assert_eq!(res.needs_channel_settle_followup, false);
 		assert_eq!(res.unclaimed_channel_balances.len(), 0);
 		assert_eq!(res.claimed_channel_deposits_per_account.len(), 1);
@@ -427,7 +442,7 @@ fn test_with_note_claim_signatures() {
 		channel_hold_note: Some(balance_change.notes[0].clone()),
 		signature: empty_signature(),
 	};
-	balance_change2.push_note(50, NoteType::ChannelSettle);
+	balance_change2.push_note(50, NoteType::ChannelSettle { channel_pass_hash: H256::zero() });
 	balance_change2.sign(Bob.pair());
 	assert_ok!(verify_changeset_signatures(&vec![balance_change2.clone()]));
 
@@ -481,7 +496,7 @@ fn test_tax_must_be_claimed_on_tax_account() {
 	];
 
 	assert_err!(
-		verify_balance_changeset_allocation(&set, Some(1)),
+		verify_notarization_allocation(&set, &vec![], Some(1)),
 		VerifyError::TaxBalanceChangeNotNetZero { sent: 200, claimed: 0 }
 	);
 
@@ -501,7 +516,7 @@ fn test_tax_must_be_claimed_on_tax_account() {
 		.clone(),
 	);
 	assert_err!(
-		verify_balance_changeset_allocation(&claim_tax_on_deposit, Some(1)),
+		verify_notarization_allocation(&claim_tax_on_deposit, &vec![], Some(1)),
 		VerifyError::BalanceChangeNotNetZero { sent: 1000, claimed: 1200 }
 	);
 
@@ -521,8 +536,8 @@ fn test_tax_must_be_claimed_on_tax_account() {
 		.clone(),
 	);
 
-	let result =
-		verify_balance_changeset_allocation(&claim_tax_on_deposit, Some(1)).expect("should unwrap");
+	let result = verify_notarization_allocation(&claim_tax_on_deposit, &vec![], Some(1))
+		.expect("should unwrap");
 	assert_eq!(result.claimed_deposits, 1000);
 	assert_eq!(result.sent_tax, 200);
 	assert_eq!(result.claimed_tax, 200);
@@ -545,7 +560,7 @@ fn test_can_transfer_tax() {
 	}];
 
 	assert_err!(
-		verify_balance_changeset_allocation(&set, Some(1)),
+		verify_notarization_allocation(&set, &vec![], Some(1)),
 		VerifyError::InvalidTaxOperation
 	);
 
@@ -587,7 +602,7 @@ fn test_can_transfer_tax() {
 		},
 	];
 
-	let result = verify_balance_changeset_allocation(&set, Some(1)).expect("should unwrap");
+	let result = verify_notarization_allocation(&set, &vec![], Some(1)).expect("should unwrap");
 
 	assert_eq!(result.claimed_deposits, 0);
 	assert_eq!(result.claimed_tax, 20_000);
@@ -621,4 +636,97 @@ fn verify_taxes() {
 			tax_owed: 220
 		}
 	);
+}
+
+#[test]
+fn verify_tax_votes() {
+	let set = vec![BalanceChange {
+		balance: 0,
+		change_number: 2,
+		account_id: Bob.to_account_id(),
+		account_type: AccountType::Tax,
+		previous_balance_proof: empty_proof(20_000),
+		channel_hold_note: None,
+		notes: bounded_vec!(Note::create(20_000, NoteType::SendToVote)),
+		signature: empty_signature(),
+	}];
+
+	assert_err!(
+		verify_notarization_allocation(&set, &vec![], Some(1)),
+		VerifyError::InvalidBlockVoteAllocation
+	);
+
+	let votes = vec![BlockVote {
+		account_id: Bob.to_account_id(),
+		block_hash: H256::zero(),
+		index: 0,
+		power: 20_000,
+
+		channel_pass: ChannelPass {
+			id: 1,
+			zone_record_hash: H256::zero(),
+			miner_index: 0,
+			at_block_height: 100,
+		},
+	}];
+
+	let result = verify_notarization_allocation(&set, &votes, Some(1)).expect("should unwrap");
+
+	assert_eq!(result.claimed_deposits, 0);
+	assert_eq!(result.unclaimed_block_vote_tax_per_account.len(), 0);
+}
+
+#[test]
+fn test_vote_sources() {
+	let vote_block_hash = H256::from([1u8; 32]);
+	let channel_pass_1 = ChannelPass {
+		id: 1,
+		zone_record_hash: H256::from([3u8; 32]),
+		miner_index: 0,
+		at_block_height: 100,
+	};
+
+	let mut votes = vec![
+		BlockVote {
+			account_id: Bob.to_account_id(),
+			block_hash: vote_block_hash,
+			index: 0,
+			power: 20_000,
+			channel_pass: channel_pass_1.clone(),
+		},
+		BlockVote {
+			account_id: Bob.to_account_id(),
+			block_hash: vote_block_hash,
+			index: 1,
+			power: 400,
+			channel_pass: channel_pass_1.clone(),
+		},
+	];
+
+	let vote_minimums = BTreeMap::from([(vote_block_hash, 500)]);
+
+	assert_err!(
+		verify_voting_sources(&BTreeSet::new(), &votes, &vote_minimums),
+		VerifyError::InvalidBlockVoteChannelPass
+	);
+
+	assert_err!(
+		verify_voting_sources(&BTreeSet::from([channel_pass_1.hash()]), &votes, &vote_minimums),
+		VerifyError::InsufficientBlockVoteMinimum
+	);
+
+	votes[1].power = 500;
+
+	assert_err!(
+		verify_voting_sources(&BTreeSet::new(), &votes, &vote_minimums),
+		VerifyError::InvalidBlockVoteChannelPass
+	);
+
+	votes.truncate(1);
+
+	assert_ok!(verify_voting_sources(
+		&BTreeSet::from([channel_pass_1.hash()]),
+		&votes,
+		&vote_minimums
+	),);
 }

@@ -15,8 +15,9 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
 	let result = client.storage().at_latest().await?.fetch(&balance_query).await?;
 	println!("Bob has free balance: {:?}, {}", result.unwrap().data.free, account);
 
-	let transfer_query =
-		api::tx().argon_balances().transfer(dev::alice().public_key().into(), 1_000);
+	let transfer_query = api::tx()
+		.argon_balances()
+		.transfer_allow_death(dev::alice().public_key().into(), 1_000);
 
 	let latest_block = client.blocks().at_latest().await?;
 

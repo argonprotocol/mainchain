@@ -1,5 +1,8 @@
 use jsonrpsee::{core::SubscriptionResult, proc_macros::rpc, types::ErrorObjectOwned};
-use ulx_notary_primitives::{BalanceProof, BalanceTip, Notebook, NotebookHeader, NotebookNumber};
+
+use ulx_primitives::{
+	BalanceProof, BalanceTip, Notebook, NotebookMeta, NotebookNumber, SignedNotebookHeader,
+};
 
 #[rpc(server, client, namespace = "notebook")]
 pub trait NotebookRpc {
@@ -12,16 +15,35 @@ pub trait NotebookRpc {
 		balance_tip: BalanceTip,
 	) -> Result<BalanceProof, ErrorObjectOwned>;
 
+	#[method(name = "metadata")]
+	async fn metadata(&self) -> Result<NotebookMeta, ErrorObjectOwned>;
+
 	#[method(name = "getHeader")]
 	async fn get_header(
 		&self,
 		notebook_number: NotebookNumber,
-	) -> Result<NotebookHeader, ErrorObjectOwned>;
+	) -> Result<SignedNotebookHeader, ErrorObjectOwned>;
+
+	#[method(name = "getRawHeaders")]
+	async fn get_raw_headers(
+		&self,
+		since_notebook: NotebookNumber,
+	) -> Result<Vec<(NotebookNumber, Vec<u8>)>, ErrorObjectOwned>;
 
 	#[method(name = "get")]
 	async fn get(&self, notebook_number: NotebookNumber) -> Result<Notebook, ErrorObjectOwned>;
 
-	/// Subscription to notebooks completed
-	#[subscription(name = "subscribeHeaders" => "notebookHeader", item = NotebookHeader)]
+	#[method(name = "getRawBody")]
+	async fn get_raw_body(
+		&self,
+		notebook_number: NotebookNumber,
+	) -> Result<Vec<u8>, ErrorObjectOwned>;
+
+	/// Subscription to notebook completed
+	#[subscription(name = "subscribeHeaders" => "notebookHeader", item = SignedNotebookHeader)]
 	async fn subscribe_headers(&self) -> SubscriptionResult;
+	#[subscription(name = "subscribeRawHeaders" => "notebookRawHeader", item = (NotebookNumber, Vec<u8>))]
+	async fn subscribe_raw_headers(&self) -> SubscriptionResult;
 }
+
+pub type RawHeadersSubscription = jsonrpsee::core::client::Subscription<(NotebookNumber, Vec<u8>)>;

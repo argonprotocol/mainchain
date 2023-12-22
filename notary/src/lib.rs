@@ -1,9 +1,10 @@
-pub use apis::create_client;
+pub use apis::{create_client, Client};
 pub use error::Error;
 pub use server::NotaryServer;
-pub use ulx_notary_primitives::ensure;
+pub use ulx_primitives::ensure;
 
-mod apis;
+#[cfg(feature = "api")]
+pub mod apis;
 pub mod error;
 pub mod stores;
 

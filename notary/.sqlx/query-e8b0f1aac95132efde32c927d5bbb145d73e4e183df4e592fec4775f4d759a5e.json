@@ -1,0 +1,20 @@
+{
+  "db_name": "PostgreSQL",
+  "query": "SELECT key FROM block_sync_lock where key = 1 FOR UPDATE NOWAIT LIMIT 1",
+  "describe": {
+    "columns": [
+      {
+        "ordinal": 0,
+        "name": "key",
+        "type_info": "Int4"
+      }
+    ],
+    "parameters": {
+      "Left": []
+    },
+    "nullable": [
+      false
+    ]
+  },
+  "hash": "e8b0f1aac95132efde32c927d5bbb145d73e4e183df4e592fec4775f4d759a5e"
+}

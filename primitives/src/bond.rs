@@ -58,7 +58,7 @@ pub enum BondError {
 	LeaseUntilBlockTooSoon,
 	BondFundClosed,
 	LeaseUntilPastFundExpiration,
-	/// There are too many bonds or bond funds expiring in the given expiration block
+	/// There are too many bond or bond funds expiring in the given expiration block
 	ExpirationAtBlockOverflow,
 	AccountWouldBeBelowMinimum,
 	InsufficientFunds,

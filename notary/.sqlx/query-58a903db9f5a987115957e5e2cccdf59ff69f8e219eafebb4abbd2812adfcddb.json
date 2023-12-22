@@ -1,0 +1,26 @@
+{
+  "db_name": "PostgreSQL",
+  "query": "\n\t\t\t\tSELECT notebook_number, tick\n\t\t\t\tFROM notebook_headers ORDER BY notebook_number DESC LIMIT 1\n\t\t\t\t",
+  "describe": {
+    "columns": [
+      {
+        "ordinal": 0,
+        "name": "notebook_number",
+        "type_info": "Int4"
+      },
+      {
+        "ordinal": 1,
+        "name": "tick",
+        "type_info": "Int4"
+      }
+    ],
+    "parameters": {
+      "Left": []
+    },
+    "nullable": [
+      false,
+      false
+    ]
+  },
+  "hash": "58a903db9f5a987115957e5e2cccdf59ff69f8e219eafebb4abbd2812adfcddb"
+}

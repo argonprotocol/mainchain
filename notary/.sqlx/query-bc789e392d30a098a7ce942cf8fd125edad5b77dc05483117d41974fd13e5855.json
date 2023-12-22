@@ -1,0 +1,28 @@
+{
+  "db_name": "PostgreSQL",
+  "query": "\n\t\tSELECT block_hash, block_vote_minimum FROM blocks where block_hash = ANY($1)\n\t\t",
+  "describe": {
+    "columns": [
+      {
+        "ordinal": 0,
+        "name": "block_hash",
+        "type_info": "Bytea"
+      },
+      {
+        "ordinal": 1,
+        "name": "block_vote_minimum",
+        "type_info": "Varchar"
+      }
+    ],
+    "parameters": {
+      "Left": [
+        "ByteaArray"
+      ]
+    },
+    "nullable": [
+      false,
+      false
+    ]
+  },
+  "hash": "bc789e392d30a098a7ce942cf8fd125edad5b77dc05483117d41974fd13e5855"
+}
