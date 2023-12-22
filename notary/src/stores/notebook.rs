@@ -8,8 +8,9 @@ use serde_json::{from_value, json};
 use sp_core::{bounded::BoundedVec, Blake2Hasher, RuntimeDebug};
 
 use ulx_notary_primitives::{
-	ensure, note::AccountType, AccountId, AccountOrigin, BalanceProof, BalanceTip,
-	MaxBalanceChanges, NewAccountOrigin, NotaryId, Notebook, NotebookNumber, PINNED_BLOCKS_OFFSET,
+	ensure, note::AccountType, AccountId, AccountOrigin, BalanceTip, MaxBalanceChanges,
+	MerkleProof, NewAccountOrigin, NotaryId, NoteType, Notebook, NotebookNumber,
+	PINNED_BLOCKS_OFFSET,
 };
 
 use crate::{
@@ -26,17 +27,17 @@ impl NotebookStore {
 	/// Get proofs for a set of balance tips. This fn should retrieve from the database, not
 	/// calculate.
 	pub fn get_balance_proof<'a>(
-		pool: &'a sqlx::PgPool,
-		notary_id: NotaryId,
+		db: impl sqlx::PgExecutor<'a> + 'a,
+		_notary_id: NotaryId,
 		notebook_number: NotebookNumber,
 		balance_tip: &'a BalanceTip,
-	) -> BoxFutureResult<'a, BalanceProof> {
+	) -> BoxFutureResult<'a, MerkleProof> {
 		Box::pin(async move {
 			let rows = sqlx::query!(
 				"SELECT change_merkle_leafs FROM notebooks WHERE notebook_number = $1 LIMIT 1",
 				notebook_number as i32
 			)
-			.fetch_one(pool)
+			.fetch_one(db)
 			.await?;
 
 			let merkle_leafs = rows.change_merkle_leafs;
@@ -50,15 +51,12 @@ impl NotebookStore {
 
 			let proof = merkle_proof::<Blake2Hasher, _, _>(&merkle_leafs, index);
 
-			Ok(BalanceProof {
-				notary_id,
-				notebook_number,
-				account_origin: balance_tip.account_origin.clone(),
+			Ok(MerkleProof {
 				proof: BoundedVec::truncate_from(
 					proof.proof.into_iter().map(|p| p.into()).collect(),
 				),
-				leaf_index: proof.leaf_index as u32,
-				number_of_leaves: proof.number_of_leaves as u32,
+				leaf_index: index as u32,
+				number_of_leaves: merkle_leafs.len() as u32,
 			})
 		})
 	}
@@ -84,17 +82,16 @@ impl NotebookStore {
 	pub async fn is_valid_proof<'a>(
 		db: impl sqlx::PgExecutor<'a> + 'a,
 		balance_tip: &'a BalanceTip,
-		balance_proof: &'a BalanceProof,
+		notebook_number: NotebookNumber,
+		notebook_proof: &'a MerkleProof,
 	) -> anyhow::Result<bool, Error> {
-		let root =
-			NotebookHeaderStore::get_changed_accounts_root(db, balance_proof.notebook_number)
-				.await?;
+		let root = NotebookHeaderStore::get_changed_accounts_root(db, notebook_number).await?;
 
 		let is_valid = verify_proof::<Blake2Hasher, _, _>(
 			&root,
-			balance_proof.proof.clone().into_inner(),
-			balance_proof.number_of_leaves as usize,
-			balance_proof.leaf_index as usize,
+			notebook_proof.proof.clone().into_inner(),
+			notebook_proof.number_of_leaves as usize,
+			notebook_proof.leaf_index as usize,
 			Leaf::Value(&balance_tip.encode()),
 		);
 
@@ -152,6 +149,7 @@ impl NotebookStore {
 				)
 			}));
 
+		let mut tax = 0u128;
 		for change in changesets {
 			for change in change {
 				let key = (change.account_id, change.account_type);
@@ -173,6 +171,11 @@ impl NotebookStore {
 					changed_accounts
 						.insert(key.clone(), (change.change_number, change.balance, origin));
 				}
+				for note in change.notes {
+					if matches!(note.note_type, NoteType::Tax) {
+						tax += note.milligons;
+					}
+				}
 			}
 		}
 
@@ -187,6 +190,7 @@ impl NotebookStore {
 					change_number: nonce,
 					balance,
 					account_origin,
+					channel_hold_note: None,
 				}
 				.encode()
 			})
@@ -201,6 +205,7 @@ impl NotebookStore {
 			transfers,
 			pinned_to_block_number,
 			meta.finalized_block_number,
+			tax,
 			changes_root,
 			account_changelist,
 		)
@@ -238,7 +243,7 @@ struct AccountIdAndOrigin {
 }
 #[cfg(test)]
 mod tests {
-	use sp_core::{bounded_vec, H256};
+	use sp_core::{bounded_vec, ed25519::Signature, H256};
 	use sp_keyring::{
 		AccountKeyring::{Alice, Dave},
 		Sr25519Keyring::Bob,
@@ -294,8 +299,9 @@ mod tests {
 					change_number: 1,
 					balance: 1000,
 					previous_balance_proof: None,
-					previous_balance: 0,
 					notes: bounded_vec![],
+					channel_hold_note: None,
+					signature: Signature([0u8; 64]).into(),
 				},
 				BalanceChange {
 					account_id: Alice.to_account_id(),
@@ -303,8 +309,9 @@ mod tests {
 					change_number: 1,
 					balance: 2500,
 					previous_balance_proof: None,
-					previous_balance: 0,
 					notes: bounded_vec![],
+					channel_hold_note: None,
+					signature: Signature([0u8; 64]).into(),
 				},
 				BalanceChange {
 					account_id: Dave.to_account_id(),
@@ -312,8 +319,9 @@ mod tests {
 					change_number: 1,
 					balance: 500,
 					previous_balance_proof: None,
-					previous_balance: 0,
 					notes: bounded_vec![],
+					channel_hold_note: None,
+					signature: Signature([0u8; 64]).into(),
 				},
 			],
 		)
@@ -336,14 +344,13 @@ mod tests {
 			change_number: 1,
 			balance: 1000,
 			account_origin: AccountOrigin { notebook_number: 1, account_uid: 1 },
+			channel_hold_note: None,
 		};
 		let proof = NotebookStore::get_balance_proof(&pool, 1, 1, &balance_tip).await?;
 
-		assert_eq!(proof.notebook_number, 1);
-		assert_eq!(proof.notary_id, 1);
 		assert_eq!(proof.number_of_leaves, 3);
 
-		assert_eq!(NotebookStore::is_valid_proof(&pool, &balance_tip, &proof).await?, true);
+		assert_eq!(NotebookStore::is_valid_proof(&pool, &balance_tip, 1, &proof).await?, true);
 
 		assert_eq!(
 			NotebookStore::get_account_origins(&pool, 1).await?.into_inner(),

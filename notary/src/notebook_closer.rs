@@ -459,6 +459,7 @@ impl NotebookCloser {
 							})
 							.collect(),
 					),
+					tax: header.tax,
 					chain_transfers: SubxtBoundedVec(
 						header
 							.chain_transfers
@@ -806,16 +807,6 @@ mod tests {
 	}
 
 	async fn submit_balance_change_to_notary(pool: &PgPool, bob_nonce: u32) -> anyhow::Result<()> {
-		let mut transfer_in_note = Note::create_unsigned(
-			&Bob.to_account_id(),
-			&Deposit,
-			1,
-			0,
-			1000,
-			ulx_notary_primitives::NoteType::ClaimFromMainchain { account_nonce: bob_nonce },
-		);
-		transfer_in_note.signature = Bob.sign(&transfer_in_note.note_id.as_ref()).into();
-
 		let result = BalanceChangeStore::apply_balance_changes(
 			&pool,
 			1,
@@ -823,11 +814,19 @@ mod tests {
 				account_id: Bob.to_account_id(),
 				account_type: Deposit,
 				change_number: 1,
-				previous_balance: 0,
 				balance: 1000,
 				previous_balance_proof: None,
-				notes: bounded_vec![transfer_in_note],
-			}],
+				notes: bounded_vec![Note::create(
+					1000,
+					ulx_notary_primitives::NoteType::ClaimFromMainchain {
+						account_nonce: bob_nonce
+					},
+				)],
+				channel_hold_note: None,
+				signature: sp_core::ed25519::Signature([0u8; 64]).into(),
+			}
+			.sign(Bob.pair())
+			.clone()],
 		)
 		.await?;
 		assert_eq!(result.notebook_number, 1);

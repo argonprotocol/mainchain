@@ -5,112 +5,25 @@ use codec::{Decode, Encode};
 use serde::{Deserialize, Serialize};
 use snafu::Snafu;
 use sp_core::{crypto::AccountId32, H256};
-use sp_runtime::{
-	scale_info::TypeInfo,
-	traits::{BlakeTwo256, Verify},
-	RuntimeString,
-};
+use sp_runtime::{scale_info::TypeInfo, traits::BlakeTwo256};
 use sp_std::{
 	collections::{btree_map::BTreeMap, btree_set::BTreeSet},
 	vec::Vec,
 };
 
+pub use error::VerifyError;
 use ulx_notary_primitives::{
 	ensure, AccountId, AccountOrigin, AccountOriginUid, AccountType, BalanceChange, BalanceProof,
-	BalanceTip, ChainTransfer, NewAccountOrigin, NotaryId, NoteId, NoteType, Notebook,
-	NotebookNumber,
+	BalanceTip, ChainTransfer, NewAccountOrigin, NotaryId, Note, NoteType, Notebook,
+	NotebookHeader, NotebookNumber, CHANNEL_CLAWBACK_NOTEBOOKS, CHANNEL_EXPIRATION_NOTEBOOKS,
+	MIN_CHANNEL_NOTE_MILLIGONS,
 };
 
-#[derive(Debug, PartialEq, Clone, Snafu, TypeInfo, Encode, Decode, Serialize, Deserialize)]
-pub enum VerifyError {
-	#[snafu(display("Missing account origin {account_id:?}, {account_type:?}"))]
-	MissingAccountOrigin { account_id: AccountId32, account_type: AccountType },
-	#[snafu(display("Account history lookup error {source}"))]
-	HistoryLookupError {
-		#[snafu(source(from(AccountHistoryLookupError, AccountHistoryLookupError::from)))]
-		source: AccountHistoryLookupError,
-	},
-	#[snafu(display("Invalid account changelist"))]
-	InvalidAccountChangelist,
-	#[snafu(display("Invalid chain transfers list"))]
-	InvalidChainTransfersList,
-	#[snafu(display("Invalid balance change root"))]
-	InvalidBalanceChangeRoot,
-
-	#[snafu(display("Invalid previous nonce"))]
-	InvalidPreviousNonce,
-	#[snafu(display("Invalid previous balance"))]
-	InvalidPreviousBalance,
-	#[snafu(display("Invalid previous account origin"))]
-	InvalidPreviousAccountOrigin,
-
-	#[snafu(display("Invalid previous balance change notebook"))]
-	InvalidPreviousBalanceChangeNotebook,
-
-	#[snafu(display("Invalid net balance change calculated"))]
-	InvalidBalanceChange,
-
-	#[snafu(display("Invalid note signature"))]
-	InvalidNoteSignature,
-	#[snafu(display("Invalid note id calculated"))]
-	InvalidNoteIdCalculated,
-
-	#[snafu(display("A claimed note id is not in the balance changeset"))]
-	NoteIdNotInBalanceChanges { note_id: NoteId },
-
-	#[snafu(display("Invalid note recipient for a claimed note"))]
-	InvalidNoteRecipient,
-
-	#[snafu(display("The note id was already used"))]
-	NoteIdAlreadyUsed,
-
-	#[snafu(display(
-		"An invalid balance change was submitted ({change_index}.{note_index}): {message:?}"
-	))]
-	BalanceChangeError { change_index: u16, note_index: u16, message: RuntimeString },
-
-	#[snafu(display("Invalid net balance changeset. Must account for all funds."))]
-	InvalidNetBalanceChangeset,
-
-	#[snafu(display("Insufficient balance for account  (balance: {balance}, amount: {amount}) (change: {change_index}.{note_index})"))]
-	InsufficientBalance { balance: u128, amount: u128, note_index: u16, change_index: u16 },
-
-	#[snafu(display("Exceeded max balance for account (pre-balance: {balance}, amount: {amount}), (change: {change_index}.{note_index})"))]
-	ExceededMaxBalance { balance: u128, amount: u128, note_index: u16, change_index: u16 },
-	#[snafu(display("Balance change mismatch (provided_balance: {provided_balance}, calculated_balance: {calculated_balance}) (#{change_index})"))]
-	BalanceChangeMismatch { change_index: u16, provided_balance: u128, calculated_balance: i128 },
-
-	#[snafu(display("Balance change not net zero (unaccounted: {unaccounted})"))]
-	BalanceChangeNotNetZero { unaccounted: i128 },
-
-	#[snafu(display("Must include proof of previous balance"))]
-	MissingBalanceProof,
-	#[snafu(display("Invalid previous balance proof"))]
-	InvalidPreviousBalanceProof,
-	#[snafu(display("Invalid notebook hash"))]
-	InvalidNotebookHash,
-
-	#[snafu(display("Duplicate chain transfer"))]
-	DuplicateChainTransfer,
-
-	#[snafu(display("Duplicated account origin uid"))]
-	DuplicatedAccountOriginUid,
-
-	#[snafu(display("Invalid notary signature"))]
-	InvalidNotarySignature,
-
-	#[snafu(display("Submitted notebook older than most recent in storage"))]
-	NotebookTooOld,
-
-	#[snafu(display("Error decoding notebook"))]
-	DecodeError,
-}
-
-impl From<AccountHistoryLookupError> for VerifyError {
-	fn from(e: AccountHistoryLookupError) -> Self {
-		VerifyError::HistoryLookupError { source: e }
-	}
-}
+pub mod error;
+#[cfg(test)]
+mod test_balanceset;
+#[cfg(test)]
+mod test_notebook;
 
 #[derive(Debug, Clone, PartialEq, TypeInfo, Encode, Decode, Serialize, Deserialize, Snafu)]
 pub enum AccountHistoryLookupError {
@@ -143,132 +56,207 @@ pub fn notebook_verify<'a, T: NotebookHistoryLookup>(
 	header_hash: &'a H256,
 	notebook: &'a Notebook,
 ) -> anyhow::Result<bool, VerifyError> {
-	let mut account_changelist = BTreeSet::<AccountOrigin>::new();
-	let mut final_balances = BTreeMap::<(AccountId32, AccountType), BalanceTip>::new();
-	let mut chain_transfers = Vec::<ChainTransfer>::new();
-	let mut seen_transfers_in = BTreeSet::<(NotaryId, AccountId32, u32)>::new();
+	let mut state = NotebookVerifyState::default();
 
-	let mut all_new_account_uids = BTreeSet::new();
+	state.load_new_origins(notebook.new_account_origins.to_vec())?;
+	let header = &notebook.header;
 
-	let Notebook { header, balance_changes, new_account_origins: flat_account_origins } = notebook;
-
-	let mut new_account_origins = BTreeMap::<(AccountId32, AccountType), AccountOriginUid>::new();
-	for NewAccountOrigin { account_id, account_type, account_uid: uid } in flat_account_origins {
-		new_account_origins.insert((account_id.clone(), account_type.clone()), *uid);
-		ensure!(all_new_account_uids.insert(*uid), VerifyError::DuplicatedAccountOriginUid);
-	}
-
-	for changeset in balance_changes.iter() {
-		verify_balance_changeset_allocation(&changeset)?;
+	for changeset in notebook.balance_changes.iter() {
+		let result =
+			verify_balance_changeset_allocation(&changeset, Some(notebook.header.notebook_number))?;
+		result.verify_taxes()?;
+		state.record_tax(result)?;
 		verify_changeset_signatures(&changeset)?;
-
-		for change in changeset.into_iter() {
-			for note in &change.notes {
-				// if this note is a chain transfer, track it in chain_transfers
-				match &note.note_type {
-					NoteType::SendToMainchain => {
-						chain_transfers.push(ChainTransfer::ToMainchain {
-							amount: note.milligons,
-							account_id: change.account_id.clone(),
-						});
-					},
-					NoteType::ClaimFromMainchain { account_nonce: nonce } => {
-						T::is_valid_transfer_to_localchain(
-							header.notary_id,
-							&change.account_id,
-							*nonce,
-						)?;
-
-						ensure!(
-							seen_transfers_in.insert((
-								header.notary_id,
-								change.account_id.clone(),
-								*nonce,
-							)),
-							VerifyError::DuplicateChainTransfer
-						);
-
-						chain_transfers.push(ChainTransfer::ToLocalchain {
-							account_id: change.account_id.clone(),
-							account_nonce: nonce.clone(),
-						});
-					},
-					_ => {},
-				}
-			}
-
-			let key = (change.account_id.clone(), change.account_type.clone());
-
-			if change.change_number == 1 {
-				if let Some(account_uid) = new_account_origins.get(&key) {
-					let account_origin = AccountOrigin {
-						notebook_number: header.notebook_number,
-						account_uid: *account_uid,
-					};
-					account_changelist.insert(account_origin.clone());
-
-					final_balances.insert(
-						key.clone(),
-						BalanceTip {
-							account_id: change.account_id.clone(),
-							account_type: change.account_type.clone(),
-							balance: change.balance,
-							change_number: change.change_number,
-							account_origin,
-						},
-					);
-				} else {
-					return Err(VerifyError::MissingAccountOrigin {
-						account_id: change.account_id.clone(),
-						account_type: change.account_type.clone(),
-					})
-				}
-			} else {
-				let proof = change
-					.previous_balance_proof
-					.as_ref()
-					.expect("Should have been unwrapped in verify_balance_changeset_allocation");
-				verify_previous_balance_proof::<T>(proof, &mut final_balances, &change, &key)?;
-
-				account_changelist.insert(proof.account_origin.clone());
-
-				final_balances.insert(
-					key.clone(),
-					BalanceTip {
-						account_id: change.account_id.clone(),
-						account_type: change.account_type.clone(),
-						balance: change.balance.clone(),
-						change_number: change.change_number.clone(),
-						account_origin: proof.account_origin.clone(),
-					},
-				);
-			}
-		}
+		verify_balance_sources::<T>(&mut state, header, changeset)?;
 	}
 
 	ensure!(
-		chain_transfers == header.chain_transfers.clone().into_iter().collect::<Vec<_>>(),
+		state.chain_transfers == header.chain_transfers.to_vec(),
 		VerifyError::InvalidChainTransfersList
 	);
 	ensure!(
-		BTreeSet::from_iter(header.changed_account_origins.clone().into_iter()) ==
-			account_changelist,
+		BTreeSet::from_iter(header.changed_account_origins.to_vec()) == state.account_changelist,
 		VerifyError::InvalidAccountChangelist
 	);
-
-	let merkle_leafs = final_balances.into_iter().map(|(_, v)| v.encode()).collect::<Vec<_>>();
-
-	let merkle_root = merkle_root::<BlakeTwo256, _>(merkle_leafs);
-
-	ensure!(merkle_root == header.changed_accounts_root, VerifyError::InvalidBalanceChangeRoot);
+	ensure!(state.tax == header.tax, VerifyError::InvalidHeaderTaxRecorded);
+	ensure!(
+		state.get_merkle_root() == header.changed_accounts_root,
+		VerifyError::InvalidBalanceChangeRoot
+	);
 
 	ensure!(*header_hash == header.hash(), VerifyError::InvalidNotebookHash);
 
 	Ok(true)
 }
 
+#[derive(Clone, Default)]
+struct NotebookVerifyState {
+	account_changelist: BTreeSet<AccountOrigin>,
+	final_balances: BTreeMap<(AccountId32, AccountType), BalanceTip>,
+	chain_transfers: Vec<ChainTransfer>,
+	seen_transfers_in: BTreeSet<(AccountId32, u32)>,
+	new_account_origins: BTreeMap<(AccountId, AccountType), AccountOriginUid>,
+	tax: u128,
+}
+
+impl NotebookVerifyState {
+	pub fn track_final_balance(
+		&mut self,
+		key: &(AccountId, AccountType),
+		change: &BalanceChange,
+		account_origin: AccountOrigin,
+		channel_hold_note: Option<Note>,
+	) -> anyhow::Result<(), VerifyError> {
+		self.account_changelist.insert(account_origin.clone());
+
+		let tip = BalanceTip {
+			account_id: change.account_id.clone(),
+			account_type: change.account_type.clone(),
+			change_number: change.change_number,
+			balance: change.balance,
+			account_origin,
+			channel_hold_note,
+		};
+		self.final_balances.insert(key.clone(), tip);
+		Ok(())
+	}
+	
+	pub fn record_tax(
+		&mut self,
+		change_state: BalanceChangesetState,
+	) -> anyhow::Result<(), VerifyError> {
+		for (_, amount) in change_state.tax_created_per_account {
+			self.tax += amount;
+		}
+		Ok(())
+	}
+	pub fn load_new_origins(
+		&mut self,
+		origins: Vec<NewAccountOrigin>,
+	) -> anyhow::Result<(), VerifyError> {
+		let mut all_new_account_uids = BTreeSet::<AccountOriginUid>::new();
+		for NewAccountOrigin { account_id, account_type, account_uid } in origins {
+			self.new_account_origins.insert((account_id, account_type), account_uid);
+			ensure!(
+				all_new_account_uids.insert(account_uid),
+				VerifyError::DuplicatedAccountOriginUid
+			);
+		}
+		Ok(())
+	}
+
+	pub fn get_merkle_root(&self) -> H256 {
+		let merkle_leafs = self.final_balances.iter().map(|(_, v)| v.encode()).collect::<Vec<_>>();
+
+		merkle_root::<BlakeTwo256, _>(merkle_leafs)
+	}
+
+	pub fn track_chain_transfer(
+		&mut self,
+		account_id: AccountId,
+		note: &Note,
+	) -> anyhow::Result<(), VerifyError> {
+		match note.note_type {
+			NoteType::SendToMainchain => {
+				self.chain_transfers.push(ChainTransfer::ToMainchain {
+					amount: note.milligons,
+					account_id: account_id.clone(),
+				});
+			},
+			NoteType::ClaimFromMainchain { account_nonce } => {
+				ensure!(
+					self.seen_transfers_in.insert((account_id.clone(), account_nonce,)),
+					VerifyError::DuplicateChainTransfer
+				);
+				self.chain_transfers.push(ChainTransfer::ToLocalchain {
+					account_id: account_id.clone(),
+					account_nonce: account_nonce.clone(),
+				});
+			},
+			_ => {},
+		}
+		Ok(())
+	}
+}
+
+fn verify_balance_sources<'a, T: NotebookHistoryLookup>(
+	state: &mut NotebookVerifyState,
+	header: &NotebookHeader,
+	changeset: &Vec<BalanceChange>,
+) -> anyhow::Result<(), VerifyError> {
+	let notary_id = header.notary_id;
+	for change in changeset.into_iter() {
+		let account_id = &change.account_id;
+		let key = (account_id.clone(), change.account_type.clone());
+		let mut channel_hold_note = None;
+
+		for note in &change.notes {
+			// if this note is a chain transfer, track it in chain_transfers
+			match &note.note_type {
+				NoteType::SendToMainchain => {
+					state.track_chain_transfer(account_id.clone(), note)?;
+				},
+				NoteType::ClaimFromMainchain { account_nonce } => {
+					T::is_valid_transfer_to_localchain(
+						notary_id,
+						account_id,
+						account_nonce.clone(),
+					)?;
+					state.track_chain_transfer(account_id.clone(), note)?;
+				},
+				NoteType::ChannelHold { .. } => {
+					channel_hold_note = Some(note.clone());
+				},
+				// this condition is redundant, but leaving for clarity
+				NoteType::ChannelSettle { .. } => channel_hold_note = None,
+				_ => {},
+			}
+		}
+
+		if change.change_number == 1 {
+			if let Some(account_uid) = state.new_account_origins.get(&key) {
+				state.track_final_balance(
+					&key,
+					&change,
+					AccountOrigin {
+						notebook_number: header.notebook_number,
+						account_uid: *account_uid,
+					},
+					channel_hold_note,
+				)?;
+			} else {
+				return Err(VerifyError::MissingAccountOrigin {
+					account_id: change.account_id.clone(),
+					account_type: change.account_type.clone(),
+				})
+			}
+		} else {
+			let proof = change
+				.previous_balance_proof
+				.as_ref()
+				.expect("Should have been unwrapped in verify_balance_changeset_allocation");
+			verify_previous_balance_proof::<T>(
+				proof,
+				header.notebook_number,
+				&mut state.final_balances,
+				&change,
+				&key,
+			)?;
+
+			state.track_final_balance(
+				&key,
+				&change,
+				proof.account_origin.clone(),
+				channel_hold_note,
+			)?;
+		}
+	}
+	Ok(())
+}
+
 fn verify_previous_balance_proof<'a, T: NotebookHistoryLookup>(
 	proof: &BalanceProof,
+	notebook_number: NotebookNumber,
 	final_balances: &mut BTreeMap<(AccountId32, AccountType), BalanceTip>,
 	change: &BalanceChange,
 	key: &(AccountId32, AccountType),
@@ -277,10 +265,9 @@ fn verify_previous_balance_proof<'a, T: NotebookHistoryLookup>(
 	// entry
 	if final_balances.contains_key(&key) {
 		let previous_balance = final_balances.get(&key).unwrap();
-		ensure!(
-			previous_balance.balance == change.previous_balance,
-			VerifyError::InvalidPreviousBalance
-		);
+		ensure!(proof.notebook_number == notebook_number, VerifyError::InvalidPreviousBalanceProof);
+		let cited_balance = change.previous_balance_proof.as_ref().map(|a| a.balance).unwrap_or(0);
+		ensure!(previous_balance.balance == cited_balance, VerifyError::InvalidPreviousBalance);
 		ensure!(
 			previous_balance.change_number == change.change_number - 1,
 			VerifyError::InvalidPreviousNonce
@@ -289,6 +276,11 @@ fn verify_previous_balance_proof<'a, T: NotebookHistoryLookup>(
 			previous_balance.account_origin == proof.account_origin,
 			VerifyError::InvalidPreviousAccountOrigin
 		);
+		// if none, we can add changes.. if set, we can't do anything else
+		ensure!(
+			previous_balance.channel_hold_note == change.channel_hold_note,
+			VerifyError::InvalidChannelHoldNote
+		);
 	} else {
 		let last_notebook_change =
 			T::get_last_changed_notebook(proof.notary_id, proof.account_origin.clone())?;
@@ -296,22 +288,28 @@ fn verify_previous_balance_proof<'a, T: NotebookHistoryLookup>(
 			last_notebook_change == proof.notebook_number,
 			VerifyError::InvalidPreviousBalanceChangeNotebook
 		);
+		let Some(notebook_proof) = proof.notebook_proof.as_ref() else {
+			return Err(VerifyError::MissingBalanceProof)
+		};
 
 		let root = T::get_account_changes_root(proof.notary_id, proof.notebook_number)?;
+		let channel_hold_note = change.channel_hold_note.as_ref().cloned();
+
 		let leaf = BalanceTip {
 			account_id: change.account_id.clone(),
 			account_type: change.account_type.clone(),
-			balance: change.previous_balance,
+			balance: proof.balance,
 			change_number: change.change_number - 1,
 			account_origin: proof.account_origin.clone(),
+			channel_hold_note,
 		};
 
 		ensure!(
 			verify_proof::<'_, BlakeTwo256, _, _>(
 				&root,
-				proof.proof.clone().into_inner(),
-				proof.number_of_leaves as usize,
-				proof.leaf_index as usize,
+				notebook_proof.proof.clone().into_inner(),
+				notebook_proof.number_of_leaves as usize,
+				notebook_proof.leaf_index as usize,
 				Leaf::Value(&leaf.encode()),
 			),
 			VerifyError::InvalidPreviousBalanceProof
@@ -324,94 +322,343 @@ pub fn verify_changeset_signatures(
 	changeset: &Vec<BalanceChange>,
 ) -> anyhow::Result<(), VerifyError> {
 	// Since this is a little more expensive, confirm signatures in a second pass
-	for change in changeset {
-		let mut index = 0;
-		for note in &change.notes {
+	for (index, change) in changeset.iter().enumerate() {
+		// check that note id is valid for a hold note
+		if let Some(channel_note) = &change.channel_hold_note {
 			ensure!(
-				note.get_note_id(
-					&change.account_id,
-					&change.account_type,
-					change.change_number,
-					index
-				) == note.note_id,
-				VerifyError::InvalidNoteIdCalculated
+				matches!(channel_note.note_type, NoteType::ChannelHold { .. }),
+				VerifyError::InvalidChannelHoldNote
 			);
-			ensure!(
-				note.signature.verify(&note.note_id[..], &change.account_id),
-				VerifyError::InvalidNoteSignature
-			);
-			index += 1;
 		}
+
+		ensure!(
+			change.verify_signature(),
+			VerifyError::InvalidBalanceChangeSignature { change_index: index as u16 }
+		);
 	}
 	Ok(())
 }
 
-/// This function verifies the proposed balance changes prior to accessing storage or verifying
-/// proofs
-/// 1. Confirm each proposed balance change adds up properly
-/// 2. Confirm the changes net out to 0 (no funds are left outside an account)
-pub fn verify_balance_changeset_allocation(
-	changes: &Vec<BalanceChange>,
-) -> anyhow::Result<(), VerifyError> {
-	let mut transferred_balances: i128 = 0i128;
-	let mut change_index = 0;
-	let mut new_accounts = BTreeSet::<(AccountId32, AccountType)>::new();
+#[derive(Default, PartialEq, Eq, Clone, Debug)]
+pub struct BalanceChangesetState {
+	/// How much was sent
+	pub sent_deposits: u128,
+	/// How much was claimed
+	pub claimed_deposits: u128,
+	/// How much tax was sent
+	pub sent_tax: u128,
+	/// How much tax was claimed
+	pub claimed_tax: u128,
+	/// All new accounts that were created (change_number = 1)
+	pub new_accounts: BTreeSet<(AccountId, AccountType)>,
+	/// All channel hold notes created per account (each account can only create one)
+	pub accounts_with_new_holds: BTreeSet<AccountId>,
+	/// Whether or not the current notebook number is needed to confirm channel settles
+	pub needs_channel_settle_followup: bool,
+	/// How much in channel funds was claimed by each account id
+	pub claimed_channel_deposits_per_account: BTreeMap<AccountId, u128>,
+	/// How much tax was sent per account
+	pub tax_created_per_account: BTreeMap<AccountId, u128>,
+	/// How much was deposited per account
+	pub claimed_deposits_per_account: BTreeMap<AccountId, u128>,
 
-	let mut used_note_ids = BTreeSet::<NoteId>::new();
-	let mut restricted_balance = BTreeMap::<AccountId, i128>::new();
+	unclaimed_restricted_balance: BTreeMap<BTreeSet<(AccountId, AccountType)>, i128>,
+	unclaimed_channel_balances: BTreeMap<BTreeSet<AccountId>, i128>,
+}
 
-	for change in changes {
+fn round_up(value: u128, percentage: u128) -> u128 {
+	let numerator = value * percentage;
+
+	let round = if numerator % 100 == 0 { 0 } else { 1 };
+
+	numerator.saturating_div(100) + round
+}
+
+impl BalanceChangesetState {
+	pub fn verify_taxes(&self) -> anyhow::Result<(), VerifyError> {
+		let mut tax_owed_per_account = BTreeMap::new();
+		for (account_id, amount) in self.claimed_deposits_per_account.iter() {
+			let amount = *amount;
+			let tax = if amount < 1000 { round_up(amount, 20) } else { 200 };
+			*tax_owed_per_account.entry(account_id).or_insert(0) += tax;
+		}
+		for (account_id, amount) in self.claimed_channel_deposits_per_account.iter() {
+			let tax = round_up(*amount, 20);
+			*tax_owed_per_account.entry(account_id).or_insert(0) += tax;
+		}
+		for (account_id, tax) in tax_owed_per_account {
+			let tax_sent = self.tax_created_per_account.get(&account_id).unwrap_or(&0);
+			ensure!(
+				*tax_sent >= tax,
+				VerifyError::InsufficientTaxIncluded {
+					account_id: account_id.clone(),
+					tax_sent: *tax_sent,
+					tax_owed: tax,
+				}
+			);
+		}
+		Ok(())
+	}
+
+	fn verify_change_number(
+		&mut self,
+		change: &BalanceChange,
+		key: &(AccountId, AccountType),
+	) -> anyhow::Result<(), VerifyError> {
 		ensure!(change.change_number > 0, VerifyError::InvalidBalanceChange);
 		if change.change_number == 1 {
-			new_accounts.insert((change.account_id.clone(), change.account_type.clone()));
+			self.new_accounts.insert(key.clone());
 
 			ensure!(
 				change.previous_balance_proof.is_none(),
 				VerifyError::InvalidPreviousBalanceProof
 			);
-			ensure!(change.previous_balance == 0, VerifyError::InvalidPreviousBalance);
 		}
-		if change.change_number > 1 &&
-			!new_accounts.contains(&(change.account_id.clone(), change.account_type.clone()))
-		{
+		if change.change_number > 1 && !self.new_accounts.contains(&key) {
 			ensure!(change.previous_balance_proof.is_some(), VerifyError::MissingBalanceProof);
 		}
-		let mut balance = change.previous_balance as i128;
-		let mut note_index = 0;
-		for note in &change.notes {
-			if used_note_ids.contains(&note.note_id) {
-				return Err(VerifyError::NoteIdAlreadyUsed)
+		Ok(())
+	}
+
+	fn send_balance(
+		&mut self,
+		milligons: u128,
+		recipients: &Vec<AccountId>,
+		account_type: &AccountType,
+	) {
+		if account_type == &AccountType::Tax {
+			self.sent_tax += milligons;
+		} else {
+			self.sent_deposits += milligons;
+		}
+
+		if recipients.len() > 0 {
+			let mut set = BTreeSet::new();
+			for rec in recipients {
+				set.insert((rec.clone(), account_type.clone()));
 			}
-			used_note_ids.insert(note.note_id.clone());
+			self.unclaimed_restricted_balance.insert(set, milligons as i128);
+		}
+	}
+
+	fn record_tax(
+		&mut self,
+		milligons: u128,
+		claimer: &AccountId,
+	) -> anyhow::Result<(), VerifyError> {
+		self.sent_tax += milligons;
+		*self.tax_created_per_account.entry(claimer.clone()).or_insert(0) += milligons;
+
+		Ok(())
+	}
+
+	fn claim_balance(
+		&mut self,
+		milligons: u128,
+		claimer: &AccountId,
+		account_type: &AccountType,
+	) -> anyhow::Result<(), VerifyError> {
+		if account_type == &AccountType::Tax {
+			self.claimed_tax += milligons;
+		} else {
+			*self.claimed_deposits_per_account.entry(claimer.clone()).or_insert(0) += milligons;
+			self.claimed_deposits += milligons;
+		}
+
+		let key = (claimer.clone(), account_type.clone());
+		self.unclaimed_restricted_balance.retain(|accounts, amount| {
+			if accounts.contains(&key) {
+				let restricted_change = amount.saturating_sub(milligons as i128);
+				if restricted_change > 0 {
+					*amount = restricted_change;
+					return true
+				}
+				return false
+			}
+			return true
+		});
+
+		Ok(())
+	}
+
+	fn claim_channel_balance(
+		&mut self,
+		milligons: u128,
+		claimer: &AccountId,
+	) -> anyhow::Result<(), VerifyError> {
+		self.claimed_deposits += milligons;
+		*self.claimed_channel_deposits_per_account.entry(claimer.clone()).or_insert(0) += milligons;
+
+		self.unclaimed_channel_balances.retain(|accounts, amount| {
+			if accounts.contains(claimer) {
+				let restricted_change = amount.saturating_sub(milligons as i128);
+				if restricted_change > 0 {
+					*amount = restricted_change;
+					return true
+				}
+				return false
+			}
+			return true
+		});
+
+		Ok(())
+	}
+
+	/// Records the channel settles. If this is the second pass once we know a notebook number, it
+	/// will also check if the channel is ready to be claimed
+	fn record_channel_settle(
+		&mut self,
+		key: &(AccountId, AccountType),
+		milligons: i128,
+		channel_hold_note: &Note,
+		source_change_notebook: NotebookNumber,
+		notebook_number: Option<NotebookNumber>,
+	) -> anyhow::Result<(), VerifyError> {
+		let mut recipients = BTreeSet::new();
+
+		// only add the recipient restrictions once we know what notebook we're in
+		if let Some(notebook_number) = notebook_number {
+			let expiration_notebook = source_change_notebook + CHANNEL_EXPIRATION_NOTEBOOKS;
+			ensure!(
+				notebook_number >= expiration_notebook,
+				VerifyError::ChannelHoldNotReadyForClaim
+			);
+
+			let NoteType::ChannelHold { recipient, .. } = &channel_hold_note.note_type else {
+				return Err(VerifyError::InvalidChannelHoldNote)
+			};
+
+			recipients.insert(recipient.clone());
+			if notebook_number >= expiration_notebook + CHANNEL_CLAWBACK_NOTEBOOKS {
+				// no claim necessary for a 0 claim
+				if milligons == 0 {
+					recipients.clear();
+				} else {
+					recipients.insert(key.0.clone());
+				}
+			}
+		} else {
+			self.needs_channel_settle_followup = true;
+		}
+
+		self.sent_deposits += milligons as u128;
+		if !recipients.is_empty() {
+			self.unclaimed_channel_balances
+				.insert(BTreeSet::from_iter(recipients), milligons);
+		}
+		Ok(())
+	}
+}
+
+/// This function verifies the proposed balance changes PRIOR to accessing storage or verifying
+/// proofs
+/// 1. Confirm each proposed balance change adds up properly
+/// 2. Confirm the changes net out to 0 (no funds are left outside an account)
+///
+/// Does NOT: lookup anything in storage, verify signatures, or confirm the merkle proofs
+pub fn verify_balance_changeset_allocation(
+	changes: &Vec<BalanceChange>,
+	notebook_number: Option<NotebookNumber>,
+) -> anyhow::Result<BalanceChangesetState, VerifyError> {
+	let mut state = BalanceChangesetState::default();
+
+	let mut change_index = 0;
+	for change in changes {
+		let key = (change.account_id.clone(), change.account_type.clone());
+		state.verify_change_number(change, &key)?;
+
+		let mut balance =
+			change.previous_balance_proof.as_ref().map(|a| a.balance).unwrap_or_default() as i128;
+		let mut note_index = 0;
+
+		for note in &change.notes {
+			if change.channel_hold_note.is_some() &&
+				!matches!(note.note_type, NoteType::ChannelSettle { .. })
+			{
+				return Err(VerifyError::AccountLocked)
+			}
+
+			if change.account_type == AccountType::Tax {
+				match note.note_type {
+					NoteType::Claim | NoteType::Send { .. } => {},
+					_ => Err(VerifyError::InvalidTaxOperation)?,
+				}
+			}
 
 			match &note.note_type {
-				NoteType::Send { recipient } => {
-					transferred_balances += note.milligons as i128;
-					if let Some(recipient) = recipient {
-						restricted_balance.insert(recipient.clone(), note.milligons as i128);
-					}
+				NoteType::Send { to: recipients } => {
+					state.send_balance(
+						note.milligons,
+						&recipients.as_ref().map(|a| a.to_vec()).unwrap_or_default(),
+						&change.account_type,
+					);
 				},
 				NoteType::Claim => {
-					transferred_balances -= note.milligons as i128;
-					if restricted_balance.len() > 0 {
-						let restricted_amount = restricted_balance.remove(&change.account_id);
-						let restricted_amount = restricted_amount.unwrap_or_default();
-						ensure!(
-							restricted_amount >= note.milligons as i128,
-							VerifyError::InvalidNoteRecipient
-						);
-						let restricted_change =
-							restricted_amount.saturating_sub(note.milligons as i128);
-						if restricted_change > 0 {
-							restricted_balance.insert(change.account_id.clone(), restricted_change);
-						}
-					}
+					state.claim_balance(
+						note.milligons,
+						&change.account_id,
+						&change.account_type,
+					)?;
+				},
+				NoteType::ChannelHold { .. } => {
+					ensure!(
+						note.milligons >= MIN_CHANNEL_NOTE_MILLIGONS,
+						VerifyError::InvalidChannelHoldNote
+					);
+					// A channel doesn't change the source balance
+					ensure!(
+						change.balance ==
+							change
+								.previous_balance_proof
+								.as_ref()
+								.map(|a| a.balance)
+								.unwrap_or_default(),
+						VerifyError::InvalidPreviousBalanceProof
+					);
+					ensure!(
+						change.channel_hold_note.is_none() &&
+							state.accounts_with_new_holds.insert(key.0.clone()),
+						VerifyError::AccountAlreadyHasChannelHold
+					);
+				},
+				NoteType::ChannelClaim => {
+					state.claim_channel_balance(note.milligons, &change.account_id)?;
+				},
+				NoteType::ChannelSettle => {
+					let Some(source_change_notebook) =
+						change.previous_balance_proof.as_ref().map(|a| a.notebook_number)
+					else {
+						return Err(VerifyError::MissingBalanceProof)
+					};
+
+					let channel_hold_note = change
+						.channel_hold_note
+						.as_ref()
+						.ok_or(VerifyError::MissingChannelHoldNote)?;
+
+					state.record_channel_settle(
+						&key,
+						note.milligons as i128,
+						channel_hold_note,
+						source_change_notebook,
+						notebook_number,
+					)?;
+				},
+				NoteType::Tax => {
+					ensure!(
+						change.account_type == AccountType::Deposit,
+						VerifyError::InvalidTaxOperation
+					);
+					state.record_tax(note.milligons, &change.account_id)?;
 				},
 				_ => {},
 			}
 
+			// track the balances moved in this note
 			match note.note_type {
-				NoteType::ClaimFromMainchain { .. } | NoteType::Claim { .. } =>
+				NoteType::ClaimFromMainchain { .. } |
+				NoteType::Claim { .. } |
+				NoteType::ChannelClaim =>
 					if let Some(new_balance) = balance.checked_add(note.milligons as i128) {
 						balance = new_balance;
 					} else {
@@ -422,15 +669,17 @@ pub fn verify_balance_changeset_allocation(
 							change_index,
 						})
 					},
-				NoteType::SendToMainchain | NoteType::Send { .. } =>
-					balance -= note.milligons as i128,
+				NoteType::SendToMainchain |
+				NoteType::Send { .. } |
+				NoteType::ChannelSettle |
+				NoteType::Tax => balance -= note.milligons as i128,
 				_ => {},
 			};
 			note_index += 1;
 		}
 
 		ensure!(
-			balance as u128 == change.balance,
+			balance == change.balance as i128,
 			VerifyError::BalanceChangeMismatch {
 				change_index,
 				provided_balance: change.balance,
@@ -441,761 +690,21 @@ pub fn verify_balance_changeset_allocation(
 	}
 
 	ensure!(
-		transferred_balances == 0,
-		VerifyError::BalanceChangeNotNetZero { unaccounted: transferred_balances }
+		state.claimed_deposits == state.sent_deposits,
+		VerifyError::BalanceChangeNotNetZero {
+			sent: state.sent_deposits,
+			claimed: state.claimed_deposits
+		}
 	);
-	Ok(())
-}
-#[cfg(test)]
-mod tests {
-	use std::collections::{BTreeMap, BTreeSet};
-
-	use binary_merkle_tree::{merkle_proof, merkle_root};
-	use chrono::Utc;
-	use codec::Encode;
-	use frame_support::{assert_err, assert_ok, parameter_types};
-	use sp_core::{
-		bounded::BoundedVec, bounded_vec, crypto::AccountId32, sr25519::Signature, Blake2Hasher,
-		H256,
-	};
-	use sp_keyring::{
-		AccountKeyring,
-		AccountKeyring::{Alice, Bob},
-		Ed25519Keyring::Dave,
-	};
-	use sp_runtime::MultiSignature;
-
-	use ulx_notary_primitives::{
-		balance_change::{AccountOrigin, BalanceChange, BalanceProof},
-		note::{AccountType, Note, NoteType},
-		BalanceTip, ChainTransfer, NewAccountOrigin, Notebook, NotebookHeader, NotebookNumber,
-	};
-
-	use crate::{
-		verify_previous_balance_proof, AccountHistoryLookupError, NotebookHistoryLookup,
-		VerifyError,
-	};
-
-	#[test]
-	fn test_balance_change_allocation_errs_non_zero() {
-		let balance_change = vec![BalanceChange {
-			account_id: AccountKeyring::Alice.to_account_id(),
-			account_type: AccountType::Deposit,
-			change_number: 1,
-			previous_balance: 0,
-			balance: 100,
-			previous_balance_proof: None,
-			notes: bounded_vec![Note {
-				milligons: 100,
-				note_type: NoteType::Claim,
-				signature: MultiSignature::Sr25519(Signature::from_slice(&[0u8; 64]).unwrap()),
-				note_id: Default::default(),
-			}],
-		}];
-
-		assert_err!(
-			super::verify_balance_changeset_allocation(&balance_change),
-			VerifyError::BalanceChangeNotNetZero { unaccounted: -100 }
-		);
-	}
-
-	#[test]
-	fn must_supply_zero_balance_on_first_nonce() {
-		let mut balance_change = vec![
-			BalanceChange {
-				account_id: AccountKeyring::Bob.to_account_id(),
-				account_type: AccountType::Deposit,
-				change_number: 1,
-				previous_balance: 100, // should flag as invalid since nonce is 1
-				balance: 0,
-				previous_balance_proof: None,
-				notes: bounded_vec![Note {
-					milligons: 100,
-					note_type: NoteType::Send { recipient: None },
-					signature: MultiSignature::Sr25519(Signature::from_slice(&[0u8; 64]).unwrap()),
-					note_id: Default::default(),
-				}],
-			},
-			BalanceChange {
-				account_id: AccountKeyring::Alice.to_account_id(),
-				account_type: AccountType::Deposit,
-				change_number: 1,
-				previous_balance: 0,
-				balance: 100,
-				previous_balance_proof: None,
-				notes: bounded_vec![Note {
-					milligons: 100,
-					note_type: NoteType::Claim,
-					signature: MultiSignature::Sr25519(Signature::from_slice(&[0u8; 64]).unwrap()),
-					note_id: Default::default(),
-				}],
-			},
-		];
-
-		assert_err!(
-			super::verify_balance_changeset_allocation(&balance_change),
-			VerifyError::InvalidPreviousBalance
-		);
-
-		// now that we have history, you need to supply proof
-		balance_change[0].change_number = 2;
-		assert_err!(
-			super::verify_balance_changeset_allocation(&balance_change),
-			VerifyError::MissingBalanceProof
-		);
-	}
-
-	#[test]
-	fn test_balance_change_allocation_must_be_zero() {
-		let balance_change = vec![
-			BalanceChange {
-				account_id: AccountKeyring::Bob.to_account_id(),
-				account_type: AccountType::Deposit,
-				change_number: 2,
-				previous_balance: 100,
-				balance: 0,
-				previous_balance_proof: Some(BalanceProof {
-					notary_id: 0,
-					notebook_number: 0,
-					proof: bounded_vec![],
-					leaf_index: 0,
-					number_of_leaves: 0,
-					account_origin: AccountOrigin { notebook_number: 0, account_uid: 1 },
-				}),
-				notes: bounded_vec![Note {
-					milligons: 100,
-					note_type: NoteType::Send {
-						recipient: Some(AccountKeyring::Alice.to_account_id())
-					},
-					signature: MultiSignature::Sr25519(Signature::from_slice(&[0u8; 64]).unwrap()),
-					note_id: H256([0u8; 32]),
-				}],
-			},
-			BalanceChange {
-				account_id: AccountKeyring::Alice.to_account_id(),
-				account_type: AccountType::Deposit,
-				change_number: 1,
-				previous_balance: 0,
-				balance: 100,
-				previous_balance_proof: None,
-				notes: bounded_vec![Note {
-					milligons: 100,
-					note_type: NoteType::Claim,
-					signature: MultiSignature::Sr25519(Signature::from_slice(&[1u8; 64]).unwrap()),
-					note_id: H256([1u8; 32]),
-				}],
-			},
-		];
-
-		assert_ok!(super::verify_balance_changeset_allocation(&balance_change));
-	}
-
-	#[test]
-	fn test_notes_cannot_be_reused() {
-		let balance_change = vec![
-			BalanceChange {
-				account_id: AccountKeyring::Bob.to_account_id(),
-				account_type: AccountType::Deposit,
-				change_number: 2,
-				previous_balance: 200,
-				balance: 0,
-				previous_balance_proof: Some(BalanceProof {
-					notary_id: 0,
-					notebook_number: 0,
-					proof: bounded_vec![],
-					leaf_index: 0,
-					number_of_leaves: 0,
-					account_origin: AccountOrigin { notebook_number: 0, account_uid: 1 },
-				}),
-				notes: bounded_vec![
-					Note {
-						milligons: 100,
-						note_type: NoteType::Send { recipient: None },
-						signature: MultiSignature::Sr25519(
-							Signature::from_slice(&[0u8; 64]).unwrap()
-						),
-						note_id: H256([0u8; 32]),
-					},
-					// We sneak in a copy of the signed note.
-					Note {
-						milligons: 100,
-						note_type: NoteType::Send { recipient: None },
-						signature: MultiSignature::Sr25519(
-							Signature::from_slice(&[0u8; 64]).unwrap()
-						),
-						note_id: H256([0u8; 32]),
-					}
-				],
-			},
-			BalanceChange {
-				account_id: AccountKeyring::Alice.to_account_id(),
-				account_type: AccountType::Deposit,
-				change_number: 1,
-				previous_balance: 0,
-				balance: 100,
-				previous_balance_proof: None,
-				notes: bounded_vec![Note {
-					milligons: 200,
-					note_type: NoteType::Claim,
-					signature: MultiSignature::Sr25519(Signature::from_slice(&[0u8; 64]).unwrap()),
-					note_id: H256([1u8; 32]),
-				},],
-			},
-		];
-		assert_err!(
-			super::verify_balance_changeset_allocation(&balance_change),
-			VerifyError::NoteIdAlreadyUsed
-		);
-	}
-	#[test]
-	fn test_notes_must_add_up() {
-		let mut balance_change = vec![
-			BalanceChange {
-				account_id: AccountKeyring::Bob.to_account_id(),
-				account_type: AccountType::Deposit,
-				change_number: 2,
-				previous_balance: 250,
-				balance: 0,
-				previous_balance_proof: Some(BalanceProof {
-					notary_id: 0,
-					notebook_number: 0,
-					proof: bounded_vec![],
-					leaf_index: 0,
-					number_of_leaves: 0,
-					account_origin: AccountOrigin { notebook_number: 0, account_uid: 1 },
-				}),
-				notes: bounded_vec![Note {
-					milligons: 250,
-					note_type: NoteType::Send { recipient: None },
-					signature: MultiSignature::Sr25519(Signature::from_slice(&[0u8; 64]).unwrap()),
-					note_id: H256([0u8; 32]),
-				}],
-			},
-			BalanceChange {
-				account_id: AccountKeyring::Alice.to_account_id(),
-				account_type: AccountType::Deposit,
-				change_number: 1,
-				previous_balance: 0,
-				balance: 100,
-				previous_balance_proof: None,
-				notes: bounded_vec![Note {
-					milligons: 100,
-					note_type: NoteType::Claim,
-					signature: MultiSignature::Sr25519(Signature::from_slice(&[0u8; 64]).unwrap()),
-					note_id: H256([1u8; 32]),
-				}],
-			},
-			BalanceChange {
-				account_id: AccountKeyring::Dave.to_account_id(),
-				account_type: AccountType::Deposit,
-				change_number: 1,
-				previous_balance: 0,
-				balance: 100, // WRONG BALANCE - should be 150
-				previous_balance_proof: None,
-				notes: bounded_vec![Note {
-					milligons: 150,
-					note_type: NoteType::Claim,
-					signature: MultiSignature::Sr25519(Signature::from_slice(&[0u8; 64]).unwrap()),
-					note_id: H256([2u8; 32]),
-				}],
-			},
-		];
-		assert_err!(
-			super::verify_balance_changeset_allocation(&balance_change),
-			VerifyError::BalanceChangeMismatch {
-				change_index: 2,
-				provided_balance: 100,
-				calculated_balance: 150
-			}
-		);
-
-		balance_change[2].balance = 150;
-		assert_ok!(super::verify_balance_changeset_allocation(&balance_change));
-	}
-
-	#[test]
-	fn test_recipients() {
-		let mut balance_change = vec![
-			BalanceChange {
-				account_id: AccountKeyring::Bob.to_account_id(),
-				account_type: AccountType::Deposit,
-				change_number: 2,
-				previous_balance: 250,
-				balance: 0,
-				previous_balance_proof: Some(BalanceProof {
-					notary_id: 0,
-					notebook_number: 0,
-					proof: bounded_vec![],
-					leaf_index: 0,
-					number_of_leaves: 0,
-					account_origin: AccountOrigin { notebook_number: 0, account_uid: 1 },
-				}),
-				notes: bounded_vec![Note {
-					milligons: 250,
-					note_type: NoteType::Send { recipient: Some(Alice.to_account_id()) },
-					signature: MultiSignature::Sr25519(Signature::from_slice(&[0u8; 64]).unwrap()),
-					note_id: H256([0u8; 32]),
-				}],
-			},
-			BalanceChange {
-				account_id: AccountKeyring::Alice.to_account_id(),
-				account_type: AccountType::Deposit,
-				change_number: 1,
-				previous_balance: 0,
-				balance: 200,
-				previous_balance_proof: None,
-				notes: bounded_vec![Note {
-					milligons: 200,
-					note_type: NoteType::Claim,
-					signature: MultiSignature::Sr25519(Signature::from_slice(&[1u8; 64]).unwrap()),
-					note_id: H256([1u8; 32]),
-				}],
-			},
-			BalanceChange {
-				account_id: AccountKeyring::Dave.to_account_id(),
-				account_type: AccountType::Deposit,
-				change_number: 1,
-				previous_balance: 0,
-				balance: 50,
-				previous_balance_proof: None,
-				notes: bounded_vec![Note {
-					milligons: 50,
-					note_type: NoteType::Claim,
-					signature: MultiSignature::Sr25519(Signature::from_slice(&[2u8; 64]).unwrap()),
-					note_id: H256([2u8; 32]),
-				}],
-			},
-		];
-		assert_err!(
-			super::verify_balance_changeset_allocation(&balance_change),
-			VerifyError::InvalidNoteRecipient
-		);
-
-		balance_change[1].balance = 250;
-		balance_change[1].notes[0].milligons = 250;
-		balance_change.pop();
-		assert_ok!(super::verify_balance_changeset_allocation(&balance_change));
-	}
-	#[test]
-	fn test_sending_to_localchain() {
-		let balance_change = vec![BalanceChange {
-			// We look for an transfer to localchain using this id
-			account_id: AccountKeyring::Bob.to_account_id(),
-			account_type: AccountType::Deposit,
-			change_number: 1,
-			previous_balance: 0,
-			balance: 250,
-			previous_balance_proof: None,
-			notes: bounded_vec![Note {
-				milligons: 250,
-				note_type: NoteType::ClaimFromMainchain { account_nonce: 1 },
-				signature: MultiSignature::Sr25519(Signature::from_slice(&[0u8; 64]).unwrap()),
-				note_id: Default::default(),
-			}],
-		}];
-
-		assert_ok!(super::verify_balance_changeset_allocation(&balance_change),);
-	}
-
-	#[test]
-	fn test_sending_to_mainchain() {
-		// This probably never happens - but in this scenario, funds are sent to a localchain to
-		// transfer to a different mainchain account
-		let balance_change = vec![
-			BalanceChange {
-				// We look for an transfer to localchain using this id
-				account_id: AccountKeyring::Bob.to_account_id(),
-				account_type: AccountType::Deposit,
-				change_number: 2,
-				previous_balance: 50,
-				balance: 100,
-				previous_balance_proof: Some(BalanceProof {
-					notary_id: 0,
-					notebook_number: 0,
-					proof: bounded_vec![],
-					leaf_index: 0,
-					number_of_leaves: 0,
-					account_origin: AccountOrigin { notebook_number: 0, account_uid: 1 },
-				}),
-				notes: bounded_vec![
-					Note {
-						milligons: 250,
-						note_type: NoteType::ClaimFromMainchain { account_nonce: 15 },
-						signature: MultiSignature::Sr25519(
-							Signature::from_slice(&[0u8; 64]).unwrap()
-						),
-						note_id: H256([0u8; 32]),
-					},
-					Note {
-						milligons: 200,
-						note_type: NoteType::Send { recipient: None },
-						signature: MultiSignature::Sr25519(
-							Signature::from_slice(&[1u8; 64]).unwrap()
-						),
-						note_id: H256([1u8; 32]),
-					}
-				],
-			},
-			BalanceChange {
-				account_id: AccountKeyring::Alice.to_account_id(),
-				account_type: AccountType::Deposit,
-				change_number: 1,
-				previous_balance: 0,
-				balance: 50,
-				previous_balance_proof: None,
-				notes: bounded_vec![
-					Note {
-						milligons: 200,
-						note_type: NoteType::Claim,
-						signature: MultiSignature::Sr25519(
-							Signature::from_slice(&[2u8; 64]).unwrap()
-						),
-						note_id: H256([2u8; 32]),
-					},
-					Note {
-						milligons: 150,
-						note_type: NoteType::SendToMainchain,
-						signature: MultiSignature::Sr25519(
-							Signature::from_slice(&[3u8; 64]).unwrap()
-						),
-						note_id: H256([3u8; 32]),
-					}
-				],
-			},
-		];
-
-		assert_ok!(super::verify_balance_changeset_allocation(&balance_change));
-	}
-
-	#[test]
-	fn test_note_signatures() {
-		let mut balance_change = vec![BalanceChange {
-			// We look for an transfer to localchain using this id
-			account_id: AccountKeyring::Bob.to_account_id(),
-			account_type: AccountType::Deposit,
-			change_number: 1,
-			previous_balance: 0,
-			balance: 250,
-			previous_balance_proof: None,
-			notes: bounded_vec![Note {
-				milligons: 250,
-				note_type: NoteType::ClaimFromMainchain { account_nonce: 1 },
-				signature: MultiSignature::Sr25519(Signature::from_slice(&[0u8; 64]).unwrap()),
-				note_id: Default::default(),
-			}],
-		}];
-
-		assert_err!(
-			super::verify_changeset_signatures(&balance_change),
-			VerifyError::InvalidNoteIdCalculated
-		);
-
-		balance_change[0].notes[0].note_id = balance_change[0].notes[0].get_note_id(
-			&balance_change[0].account_id,
-			&balance_change[0].account_type,
-			balance_change[0].change_number,
-			0,
-		);
-		assert_err!(
-			super::verify_changeset_signatures(&balance_change),
-			VerifyError::InvalidNoteSignature
-		);
-
-		balance_change[0].notes[0].signature =
-			AccountKeyring::Bob.sign(&balance_change[0].notes[0].note_id[..]).into();
-		assert_ok!(super::verify_changeset_signatures(&balance_change));
-	}
-
-	struct TestLookup;
-
-	parameter_types! {
-		pub static NotebookRoots: BTreeMap<u32, H256> = BTreeMap::new();
-		pub static LastChangedNotebook: BTreeMap<AccountOrigin, u32> = BTreeMap::new();
-		pub static ValidLocalchainTransfers: BTreeSet<(AccountId32, u32)> = BTreeSet::new();
-	}
-	impl NotebookHistoryLookup for TestLookup {
-		fn get_account_changes_root(
-			_notary_id: u32,
-			notebook_number: NotebookNumber,
-		) -> Result<H256, AccountHistoryLookupError> {
-			NotebookRoots::get()
-				.get(&notebook_number)
-				.ok_or(AccountHistoryLookupError::RootNotFound)
-				.cloned()
+	ensure!(
+		state.claimed_tax == state.sent_tax,
+		VerifyError::TaxBalanceChangeNotNetZero {
+			sent: state.sent_tax,
+			claimed: state.claimed_tax
 		}
-		fn get_last_changed_notebook(
-			_notary_id: u32,
-			account_origin: AccountOrigin,
-		) -> Result<u32, AccountHistoryLookupError> {
-			LastChangedNotebook::get()
-				.get(&account_origin)
-				.cloned()
-				.ok_or(AccountHistoryLookupError::LastChangeNotFound)
-		}
-		fn is_valid_transfer_to_localchain(
-			_notary_id: u32,
-			account_id: &AccountId32,
-			nonce: u32,
-		) -> Result<bool, AccountHistoryLookupError> {
-			ValidLocalchainTransfers::get()
-				.get(&(account_id.clone(), nonce))
-				.cloned()
-				.ok_or(AccountHistoryLookupError::InvalidTransferToLocalchain)
-				.map(|_| true)
-		}
-	}
-
-	#[test]
-	fn test_verify_previous_balance() {
-		let mut final_balances = BTreeMap::<(AccountId32, AccountType), BalanceTip>::new();
-		let account_id = AccountKeyring::Alice.to_account_id();
-		let account_type = AccountType::Deposit;
-		let key = (account_id.clone(), account_type.clone());
-
-		let mut change = BalanceChange {
-			account_id,
-			account_type,
-			change_number: 500,
-			previous_balance: 100,
-			balance: 0,
-			previous_balance_proof: None,
-			notes: bounded_vec![],
-		};
-		let leaves = vec![
-			BalanceTip {
-				account_id: Dave.to_account_id(),
-				account_type: AccountType::Deposit,
-				balance: 20,
-				change_number: 3,
-				account_origin: AccountOrigin { notebook_number: 5, account_uid: 2 },
-			}
-			.encode(),
-			BalanceTip {
-				account_id: Bob.to_account_id(),
-				account_type: AccountType::Deposit,
-				balance: 100,
-				change_number: 1,
-				account_origin: AccountOrigin { notebook_number: 6, account_uid: 1 },
-			}
-			.encode(),
-			BalanceTip {
-				account_id: change.account_id.clone(),
-				account_type: change.account_type.clone(),
-				balance: change.previous_balance,
-				change_number: change.change_number - 1,
-				account_origin: AccountOrigin { notebook_number: 1, account_uid: 1 },
-			}
-			.encode(),
-		];
-		let merkle_root = merkle_root::<Blake2Hasher, _>(&leaves);
-		NotebookRoots::mutate(|a| {
-			a.insert(7, H256::from_slice([&[0u8], &merkle_root[0..31]].concat().as_ref()))
-		});
-		let origin = AccountOrigin { notebook_number: 1, account_uid: 1 };
-		LastChangedNotebook::mutate(|c| c.insert(origin.clone(), 10));
-
-		let proof = merkle_proof::<Blake2Hasher, _, _>(leaves, 2);
-		change.previous_balance_proof = Some(BalanceProof {
-			notary_id: 1,
-			notebook_number: 7,
-			proof: BoundedVec::truncate_from(proof.proof),
-			leaf_index: proof.leaf_index as u32,
-			number_of_leaves: proof.number_of_leaves as u32,
-			account_origin: origin.clone(),
-		});
-
-		assert_err!(
-			verify_previous_balance_proof::<TestLookup>(
-				&change.previous_balance_proof.clone().unwrap(),
-				&mut final_balances,
-				&change,
-				&key,
-			),
-			VerifyError::InvalidPreviousBalanceChangeNotebook
-		);
-
-		LastChangedNotebook::mutate(|c| c.insert(origin, 7));
-		assert_err!(
-			verify_previous_balance_proof::<TestLookup>(
-				&change.previous_balance_proof.clone().unwrap(),
-				&mut final_balances,
-				&change,
-				&key,
-			),
-			VerifyError::InvalidPreviousBalanceProof
-		);
-
-		NotebookRoots::mutate(|a| a.insert(7, merkle_root));
-		assert_ok!(verify_previous_balance_proof::<TestLookup>(
-			&change.previous_balance_proof.clone().unwrap(),
-			&mut final_balances,
-			&change,
-			&key,
-		));
-	}
-
-	#[tokio::test]
-	async fn test_verify_notebook() {
-		let mut note = Note::create_unsigned(
-			&Alice.to_account_id(),
-			&AccountType::Deposit,
-			1,
-			0,
-			1000,
-			NoteType::ClaimFromMainchain { account_nonce: 1 },
-		);
-		note.signature = Alice.sign(&note.note_id[..]).into();
-
-		let alice_balance_changeset = vec![BalanceChange {
-			balance: 1000,
-			change_number: 1,
-			account_id: Alice.to_account_id(),
-			account_type: AccountType::Deposit,
-			previous_balance: 0,
-			previous_balance_proof: None,
-			notes: bounded_vec![note],
-		}];
-		let notebook_header1 = NotebookHeader {
-			version: 1,
-			notary_id: 1,
-			notebook_number: 1,
-			finalized_block_number: 100,
-			pinned_to_block_number: 0,
-			start_time: Utc::now().timestamp_millis() as u64 - 60_000,
-			changed_accounts_root: merkle_root::<Blake2Hasher, _>(vec![BalanceTip {
-				account_id: Alice.to_account_id(),
-				account_type: AccountType::Deposit,
-				balance: 1000,
-				change_number: 1,
-				account_origin: AccountOrigin { notebook_number: 1, account_uid: 1 },
-			}
-			.encode()]),
-			chain_transfers: bounded_vec![ChainTransfer::ToLocalchain {
-				account_id: Alice.to_account_id(),
-				account_nonce: 1,
-			}],
-			changed_account_origins: bounded_vec![AccountOrigin {
-				notebook_number: 1,
-				account_uid: 1
-			}],
-			end_time: Utc::now().timestamp_millis() as u64,
-		};
-
-		ValidLocalchainTransfers::mutate(|a| a.insert((Alice.to_account_id(), 1)));
-		let hash = notebook_header1.hash();
-
-		let notebook1 = Notebook {
-			header: notebook_header1.clone(),
-			balance_changes: bounded_vec![BoundedVec::truncate_from(
-				alice_balance_changeset.clone()
-			)],
-			new_account_origins: bounded_vec![NewAccountOrigin::new(
-				Alice.to_account_id(),
-				AccountType::Deposit,
-				1
-			)],
-		};
-
-		assert_ok!(super::notebook_verify::<TestLookup>(&hash, &notebook1));
-
-		let mut bad_hash = hash.clone();
-		bad_hash.0[0] = 1;
-		assert_err!(
-			super::notebook_verify::<TestLookup>(&bad_hash, &notebook1),
-			VerifyError::InvalidNotebookHash
-		);
-
-		let mut bad_notebook1 = notebook1.clone();
-		let _ = bad_notebook1.header.chain_transfers.try_insert(
-			0,
-			ChainTransfer::ToLocalchain { account_id: Bob.to_account_id(), account_nonce: 2 },
-		);
-		assert_err!(
-			super::notebook_verify::<TestLookup>(&hash, &bad_notebook1),
-			VerifyError::InvalidChainTransfersList
-		);
-
-		let mut bad_notebook = notebook1.clone();
-		bad_notebook.header.changed_accounts_root.0[0] = 1;
-		assert_err!(
-			super::notebook_verify::<TestLookup>(&hash, &bad_notebook),
-			VerifyError::InvalidBalanceChangeRoot
-		);
-	}
-
-	#[tokio::test]
-	async fn test_disallows_double_claim() {
-		let mut note1 = Note::create_unsigned(
-			&Alice.to_account_id(),
-			&AccountType::Deposit,
-			1,
-			0,
-			1000,
-			NoteType::ClaimFromMainchain { account_nonce: 1 },
-		);
-		note1.signature = Alice.sign(&note1.note_id[..]).into();
-		let mut note2 = Note::create_unsigned(
-			&Alice.to_account_id(),
-			&AccountType::Deposit,
-			1,
-			1,
-			1000,
-			NoteType::ClaimFromMainchain { account_nonce: 1 },
-		);
-		note2.signature = Alice.sign(&note2.note_id[..]).into();
-
-		let alice_balance_changeset = vec![BalanceChange {
-			balance: 2000,
-			change_number: 1,
-			account_id: Alice.to_account_id(),
-			account_type: AccountType::Deposit,
-			previous_balance: 0,
-			previous_balance_proof: None,
-			notes: bounded_vec![note1, note2],
-		}];
-		let notebook_header1 = NotebookHeader {
-			version: 1,
-			notary_id: 1,
-			notebook_number: 1,
-			finalized_block_number: 100,
-			pinned_to_block_number: 0,
-			start_time: Utc::now().timestamp_millis() as u64 - 60_000,
-			changed_accounts_root: merkle_root::<Blake2Hasher, _>(vec![BalanceTip {
-				account_id: Alice.to_account_id(),
-				account_type: AccountType::Deposit,
-				balance: 2000,
-				change_number: 1,
-				account_origin: AccountOrigin { notebook_number: 1, account_uid: 1 },
-			}
-			.encode()]),
-			chain_transfers: bounded_vec![ChainTransfer::ToLocalchain {
-				account_id: Alice.to_account_id(),
-				account_nonce: 1,
-			}],
-			changed_account_origins: bounded_vec![AccountOrigin {
-				notebook_number: 1,
-				account_uid: 1
-			}],
-			end_time: Utc::now().timestamp_millis() as u64,
-		};
-
-		ValidLocalchainTransfers::mutate(|a| a.insert((Alice.to_account_id(), 1)));
-		let notebook1 = Notebook {
-			header: notebook_header1.clone(),
-			balance_changes: bounded_vec![BoundedVec::truncate_from(
-				alice_balance_changeset.clone()
-			)],
-			new_account_origins: bounded_vec![NewAccountOrigin::new(
-				Alice.to_account_id(),
-				AccountType::Deposit,
-				1
-			)],
-		};
-		let hash = notebook_header1.hash();
-
-		assert_err!(
-			super::notebook_verify::<TestLookup>(&hash, &notebook1),
-			VerifyError::DuplicateChainTransfer
-		);
-	}
+	);
+	// this works by removing all restricted balances as the approved users draw from them
+	ensure!(state.unclaimed_restricted_balance.is_empty(), VerifyError::InvalidNoteRecipients);
+	ensure!(state.unclaimed_channel_balances.is_empty(), VerifyError::InvalidChannelClaimers);
+	Ok(state)
 }

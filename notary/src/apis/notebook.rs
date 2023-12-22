@@ -1,5 +1,5 @@
 use jsonrpsee::{core::SubscriptionResult, proc_macros::rpc, types::ErrorObjectOwned};
-use ulx_notary_primitives::{BalanceProof, BalanceTip, NotebookHeader, NotebookNumber};
+use ulx_notary_primitives::{BalanceProof, BalanceTip, Notebook, NotebookHeader, NotebookNumber};
 
 #[rpc(server, client, namespace = "notebook")]
 pub trait NotebookRpc {
@@ -11,6 +11,16 @@ pub trait NotebookRpc {
 		notebook_number: NotebookNumber,
 		balance_tip: BalanceTip,
 	) -> Result<BalanceProof, ErrorObjectOwned>;
+
+	#[method(name = "getHeader")]
+	async fn get_header(
+		&self,
+		notebook_number: NotebookNumber,
+	) -> Result<NotebookHeader, ErrorObjectOwned>;
+
+	#[method(name = "get")]
+	async fn get(&self, notebook_number: NotebookNumber) -> Result<Notebook, ErrorObjectOwned>;
+
 	/// Subscription to notebooks completed
 	#[subscription(name = "subscribeHeaders" => "notebookHeader", item = NotebookHeader)]
 	async fn subscribe_headers(&self) -> SubscriptionResult;

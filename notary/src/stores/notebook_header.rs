@@ -2,6 +2,7 @@ use chrono::Utc;
 use serde_json::{from_value, json};
 use sp_core::{bounded::BoundedVec, H256};
 use sqlx::{query, query_scalar, types::JsonValue, FromRow, PgConnection};
+use std::collections::BTreeSet;
 
 use ulx_notary_primitives::{
 	ensure, AccountOrigin, ChainTransfer, NotaryId, NotebookHeader, NotebookNumber,
@@ -28,6 +29,7 @@ struct NotebookHeaderRow {
 	pub start_time: chrono::DateTime<Utc>,
 	pub end_time: Option<chrono::DateTime<Utc>>,
 	pub notary_id: i32,
+	pub tax: Option<String>,
 	pub chain_transfers: JsonValue,
 	pub changed_accounts_root: Option<Vec<u8>>,
 	pub changed_account_origins: JsonValue,
@@ -44,6 +46,11 @@ impl TryInto<NotebookHeader> for NotebookHeaderRow {
 			start_time: self.start_time.timestamp_millis() as u64,
 			end_time: self.end_time.map(|e| e.timestamp_millis() as u64).unwrap_or_default(),
 			notary_id: self.notary_id as u32,
+			tax: self
+				.tax
+				.unwrap_or("0".to_string())
+				.parse::<u128>()
+				.map_err(|e| Error::InternalError(e.to_string()))?,
 			chain_transfers: BoundedVec::truncate_from(from_value::<Vec<ChainTransfer>>(
 				self.chain_transfers,
 			)?),
@@ -178,6 +185,7 @@ impl NotebookHeaderStore {
 		transfers: Vec<ChainTransfer>,
 		pinned_to_block_number: u32,
 		finalized_block_number: u32,
+		tax: u128,
 		changed_accounts_root: H256,
 		account_changelist: Vec<AccountOrigin>,
 	) -> BoxFutureResult<()> {
@@ -190,7 +198,10 @@ impl NotebookHeaderStore {
 			})?;
 			header.pinned_to_block_number = pinned_to_block_number;
 			header.changed_accounts_root = changed_accounts_root;
-			header.changed_account_origins = BoundedVec::truncate_from(account_changelist.clone());
+			// need to sort the changelist
+			let account_changelist = BTreeSet::from_iter(account_changelist);
+			header.changed_account_origins =
+				BoundedVec::truncate_from(account_changelist.into_iter().collect::<Vec<_>>());
 
 			let hash = header.hash().0;
 
@@ -198,8 +209,9 @@ impl NotebookHeaderStore {
 				r#"
 				UPDATE notebook_headers 
 				SET hash = $1, changed_accounts_root = $2, changed_account_origins = $3, 
-					chain_transfers = $4, end_time = $5, pinned_to_block_number = $6, finalized_block_number = $7
-				WHERE notebook_number = $8
+					chain_transfers = $4, end_time = $5, pinned_to_block_number = $6, finalized_block_number = $7,
+					tax=$8
+				WHERE notebook_number = $9
 			"#,
 				&hash,
 				changed_accounts_root.as_bytes(),
@@ -208,6 +220,7 @@ impl NotebookHeaderStore {
 				Utc::now(),
 				pinned_to_block_number as i32,
 				finalized_block_number as i32,
+				tax as i64,
 				notebook_number as i32,
 			)
 			.execute(db)
@@ -291,6 +304,7 @@ mod tests {
 				],
 				100,
 				100,
+				0,
 				[1u8; 32].into(),
 				vec![
 					AccountOrigin { notebook_number: 1, account_uid: 1 },
