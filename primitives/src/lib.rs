@@ -4,6 +4,8 @@ pub use crate::{apis::*, notary::NotaryId, note::*, notebook::*, providers::*};
 pub use balance_change::*;
 pub use block_seal::{BlockSealAuthorityId, BlockSealAuthoritySignature, BLOCK_SEAL_KEY_TYPE};
 pub use block_vote::*;
+pub use data_domain::*;
+pub use data_tld::DataTLD;
 pub use digests::{BlockSealDigest, AUTHOR_DIGEST_ID, BLOCK_SEAL_DIGEST_ID, *};
 use sp_core::H256;
 use sp_runtime::{
@@ -18,7 +20,10 @@ pub mod balance_change;
 pub mod block_seal;
 pub mod block_vote;
 pub mod bond;
+mod data_domain;
+pub mod data_tld;
 pub mod digests;
+pub mod host;
 pub mod inherents;
 pub mod macros;
 pub mod notary;
@@ -55,7 +60,7 @@ pub type BlockHash = BlakeTwo256;
 
 pub mod localchain {
 	pub use crate::{
-		AccountType, BalanceChange, BestBlockVoteSeal, BlockVote, BlockVoteT, ChannelPass, Note,
-		NoteType, VoteMinimum,
+		AccountType, BalanceChange, BestBlockVoteSeal, BlockVote, BlockVoteT, Note, NoteType,
+		VoteMinimum,
 	};
 }

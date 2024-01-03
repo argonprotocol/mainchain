@@ -39,7 +39,12 @@ pub async fn spawn_block_sync(
 	Ok(())
 }
 
-pub(crate) fn track_blocks(rpc_url: String, notary_id: NotaryId, pool: &PgPool, ticker: Ticker) {
+pub(crate) fn track_blocks(
+	rpc_url: String,
+	notary_id: NotaryId,
+	pool: &PgPool,
+	ticker: Ticker,
+) -> tokio::task::JoinHandle<()> {
 	let pool = pool.clone();
 	tokio::task::spawn(async move {
 		let ticker = ticker.clone();
@@ -51,7 +56,7 @@ pub(crate) fn track_blocks(rpc_url: String, notary_id: NotaryId, pool: &PgPool, 
 				Err(e) => tracing::error!("Error polling mainchain blocks: {:?}", e),
 			}
 		}
-	});
+	})
 }
 
 async fn sync_finalized_blocks(

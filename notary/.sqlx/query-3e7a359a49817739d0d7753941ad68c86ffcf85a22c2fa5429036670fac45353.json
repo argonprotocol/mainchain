@@ -1,0 +1,21 @@
+{
+  "db_name": "PostgreSQL",
+  "query": "\n\t\t\t\tUPDATE notebook_status SET \n\t\t\t\t\tblock_votes = block_votes + $2, \n\t\t\t\t\tbalance_changes = balance_changes + $3, \n\t\t\t\t\tnotarizations = notarizations + 1,\n\t\t\t\t\tdata_domains = data_domains + $4\n\t\t\t\tWHERE notebook_number = $1 \n\t\t\t\t\tAND block_votes < $5 AND balance_changes < $6 AND data_domains < $7 AND notarizations < $8\n\t\t\t",
+  "describe": {
+    "columns": [],
+    "parameters": {
+      "Left": [
+        "Int4",
+        "Int4",
+        "Int4",
+        "Int4",
+        "Int4",
+        "Int4",
+        "Int4",
+        "Int4"
+      ]
+    },
+    "nullable": []
+  },
+  "hash": "3e7a359a49817739d0d7753941ad68c86ffcf85a22c2fa5429036670fac45353"
+}

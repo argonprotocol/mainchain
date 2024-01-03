@@ -8,8 +8,9 @@ use ulx_notary_audit::{
 };
 use ulx_primitives::{
 	ensure, AccountId, AccountOrigin, AccountType, BalanceChange, BalanceProof, BalanceTip,
-	BlockVote, NewAccountOrigin, Notarization, NotaryId, NoteType, NotebookNumber,
-	MAX_NOTEBOOK_TRANSFERS,
+	BlockVote, DataDomain, NewAccountOrigin, Notarization, NotaryId, NoteType, NotebookNumber,
+	MAX_BALANCE_CHANGES_PER_NOTARIZATION, MAX_BLOCK_VOTES_PER_NOTEBOOK, MAX_DOMAINS_PER_NOTEBOOK,
+	MAX_NOTARIZATIONS_PER_NOTEBOOK, MAX_NOTEBOOK_TRANSFERS,
 };
 
 use crate::{
@@ -30,6 +31,8 @@ struct NotarizationRow {
 	pub balance_changes: Json<Vec<BalanceChange>>,
 	/// Scale encoded set of BlockVotes submitted together
 	pub block_votes: Json<Vec<BlockVote>>,
+	/// Scale encoded set of DataDomains submitted together
+	pub data_domains: Json<Vec<(DataDomain, AccountId)>>,
 }
 pub struct NotarizationsStore;
 
@@ -39,15 +42,17 @@ impl NotarizationsStore {
 		notebook_number: NotebookNumber,
 		balance_changes: Vec<BalanceChange>,
 		block_votes: Vec<BlockVote>,
+		data_domains: Vec<(DataDomain, AccountId)>,
 	) -> anyhow::Result<(), Error> {
 		let balance_changes_json = json!(balance_changes);
 		let res = query!(
 			r#"
-			INSERT INTO notarizations (notebook_number, balance_changes, block_votes) VALUES ($1, $2, $3)
+			INSERT INTO notarizations (notebook_number, balance_changes, block_votes, data_domains) VALUES ($1, $2, $3, $4)
 		"#,
 			notebook_number as i32,
 			balance_changes_json,
 			json!(block_votes),
+			json!(data_domains),
 		)
 		.execute(db)
 		.await?;
@@ -66,7 +71,7 @@ impl NotarizationsStore {
 	) -> anyhow::Result<Vec<Notarization>, Error> {
 		let rows = query!(
 			r#"
-			SELECT balance_changes, block_votes FROM notarizations WHERE notebook_number = $1
+			SELECT balance_changes, block_votes, data_domains FROM notarizations WHERE notebook_number = $1
 		"#,
 			notebook_number as i32,
 		)
@@ -77,7 +82,8 @@ impl NotarizationsStore {
 		for row in rows {
 			let balance_changes = from_value::<Vec<BalanceChange>>(row.balance_changes)?;
 			let block_votes = from_value::<Vec<BlockVote>>(row.block_votes)?;
-			result.push(Notarization::new(balance_changes, block_votes));
+			let data_domains = from_value::<Vec<(DataDomain, AccountId)>>(row.data_domains)?;
+			result.push(Notarization::new(balance_changes, block_votes, data_domains));
 		}
 
 		Ok(result)
@@ -114,10 +120,11 @@ impl NotarizationsStore {
 		notary_id: NotaryId,
 		changes: Vec<BalanceChange>,
 		block_votes: Vec<BlockVote>,
+		data_domains: Vec<(DataDomain, AccountId)>,
 	) -> anyhow::Result<BalanceChangeResult, Error> {
 		// Before we use db resources, let's confirm these are valid transactions
 		let initial_allocation_result =
-			verify_notarization_allocation(&changes, &block_votes, None)?;
+			verify_notarization_allocation(&changes, &block_votes, &data_domains, None)?;
 		verify_changeset_signatures(&changes)?;
 
 		let mut voted_blocks = BTreeSet::new();
@@ -132,7 +139,12 @@ impl NotarizationsStore {
 			NotebookStatusStore::lock_open_for_appending(&mut *tx).await?;
 
 		if initial_allocation_result.needs_channel_settle_followup {
-			verify_notarization_allocation(&changes, &block_votes, Some(current_notebook_number))?;
+			verify_notarization_allocation(
+				&changes,
+				&block_votes,
+				&data_domains,
+				Some(current_notebook_number),
+			)?;
 		}
 
 		let block_vote_specifications =
@@ -141,7 +153,7 @@ impl NotarizationsStore {
 		let mut new_account_origins = BTreeMap::<(AccountId, AccountType), AccountOrigin>::new();
 
 		let mut changes_with_proofs = changes.clone();
-		let mut channel_passes = BTreeSet::new();
+		let mut channel_data_domains = BTreeMap::new();
 		for (change_index, change) in changes.into_iter().enumerate() {
 			let BalanceChange { account_id, account_type, change_number, balance, .. } = change;
 			let key = (account_id.clone(), account_type.clone());
@@ -271,12 +283,20 @@ impl NotarizationsStore {
 						channel_hold_note = Some(note.clone());
 						Ok(())
 					},
-					NoteType::ChannelSettle { channel_pass_hash } => {
+					NoteType::ChannelSettle => {
 						channel_hold_note = None;
-						ensure!(
-							channel_passes.insert(channel_pass_hash),
-							VerifyError::DuplicateChannelPassSettled
-						);
+						if let Some(hold_note) = &prev_channel_hold_note {
+							match &hold_note.note_type {
+								&NoteType::ChannelHold { ref data_domain, ref recipient } =>
+									if let Some(data_domain) = data_domain {
+										let count = channel_data_domains
+											.entry((data_domain.clone(), recipient.clone()))
+											.or_insert(0);
+										*count += 1;
+									},
+								_ => return Err(VerifyError::InvalidChannelHoldNote.into()),
+							}
+						}
 						Ok(())
 					},
 					_ => Ok(()),
@@ -303,13 +323,27 @@ impl NotarizationsStore {
 			.await?;
 		}
 
-		verify_voting_sources(&channel_passes, &block_votes, &block_vote_specifications)?;
+		verify_voting_sources(&channel_data_domains, &block_votes, &block_vote_specifications)?;
+
+		NotebookStatusStore::track_counts(
+			&mut *tx,
+			current_notebook_number,
+			changes_with_proofs.len() as u32,
+			block_votes.len() as u32,
+			data_domains.len() as u32,
+			MAX_NOTARIZATIONS_PER_NOTEBOOK,
+			MAX_BALANCE_CHANGES_PER_NOTARIZATION * MAX_NOTARIZATIONS_PER_NOTEBOOK,
+			MAX_BLOCK_VOTES_PER_NOTEBOOK,
+			MAX_DOMAINS_PER_NOTEBOOK,
+		)
+		.await?;
 
 		NotarizationsStore::append_to_notebook(
 			&mut *tx,
 			current_notebook_number,
 			changes_with_proofs,
 			block_votes,
+			data_domains,
 		)
 		.await?;
 
@@ -334,7 +368,8 @@ mod tests {
 	use sqlx::PgPool;
 
 	use ulx_primitives::{
-		AccountType::Deposit, BalanceChange, BlockVote, ChannelPass, Notarization, Note, NoteType,
+		AccountType::Deposit, BalanceChange, BlockVote, DataDomain, DataTLD, Notarization, Note,
+		NoteType,
 	};
 
 	use crate::stores::notarizations::NotarizationsStore;
@@ -361,13 +396,10 @@ mod tests {
 			power: 1222,
 			account_id: Bob.to_account_id(),
 			index: 0,
-			channel_pass: ChannelPass {
-				id: 1,
-				zone_record_hash: [0u8; 32].into(),
-				miner_index: 0,
-				at_block_height: 0,
-			},
+			data_domain: DataDomain::new("test", DataTLD::Analytics),
+			data_domain_account: Bob.to_account_id(),
 		}];
+		let domains = vec![(DataDomain::new("test", DataTLD::Analytics), Bob.to_account_id())];
 
 		{
 			let mut tx = pool.begin().await?;
@@ -376,6 +408,7 @@ mod tests {
 				notebook_number,
 				changeset.clone(),
 				block_votes.clone(),
+				domains.clone(),
 			)
 			.await
 			.unwrap();
@@ -385,7 +418,7 @@ mod tests {
 			let mut tx = pool.begin().await?;
 			let result =
 				NotarizationsStore::get_for_notebook(&mut *tx, notebook_number).await.unwrap();
-			assert_eq!(result, vec![Notarization::new(changeset, block_votes)]);
+			assert_eq!(result, vec![Notarization::new(changeset, block_votes, domains)]);
 			tx.commit().await?;
 		}
 

@@ -90,6 +90,11 @@
       },
       {
         "ordinal": 17,
+        "name": "data_domains",
+        "type_info": "Jsonb"
+      },
+      {
+        "ordinal": 18,
         "name": "last_updated",
         "type_info": "Timestamptz"
       }
@@ -117,6 +122,7 @@
       false,
       false,
       true,
+      false,
       false
     ]
   },

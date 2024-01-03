@@ -5,6 +5,7 @@ members = [
 	"pallets/block_rewards",
 	"pallets/block_seal",
     "pallets/block_seal_spec",
+	"pallets/data_domain",
 	"pallets/bond",
 	"pallets/chain_transfer",
 	"pallets/mining_slot",

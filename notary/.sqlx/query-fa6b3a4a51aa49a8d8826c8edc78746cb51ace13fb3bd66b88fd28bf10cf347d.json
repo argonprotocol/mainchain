@@ -1,0 +1,17 @@
+{
+  "db_name": "PostgreSQL",
+  "query": "\n\t\t\tINSERT INTO notarizations (notebook_number, balance_changes, block_votes, data_domains) VALUES ($1, $2, $3, $4)\n\t\t",
+  "describe": {
+    "columns": [],
+    "parameters": {
+      "Left": [
+        "Int4",
+        "Jsonb",
+        "Jsonb",
+        "Jsonb"
+      ]
+    },
+    "nullable": []
+  },
+  "hash": "fa6b3a4a51aa49a8d8826c8edc78746cb51ace13fb3bd66b88fd28bf10cf347d"
+}

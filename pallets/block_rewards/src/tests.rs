@@ -190,6 +190,7 @@ fn it_should_not_fail_with_no_notebooks() {
 		);
 	});
 }
+
 #[test]
 fn it_should_not_fail_with_no_notaries() {
 	ActiveNotaries::set(vec![]);

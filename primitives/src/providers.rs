@@ -7,8 +7,16 @@ use sp_std::vec::Vec;
 use crate::{
 	block_seal::MiningAuthority,
 	tick::{Tick, Ticker},
-	NotaryId, NotebookHeader, NotebookNumber, NotebookSecret, VoteMinimum,
+	DataDomain, NotaryId, NotebookHeader, NotebookNumber, NotebookSecret, VoteMinimum,
 };
+
+pub trait DataDomainProvider<AccountId> {
+	fn is_registered_payment_account(
+		data_domain: &DataDomain,
+		account_id: &AccountId,
+		tick_range: (Tick, Tick),
+	) -> bool;
+}
 
 pub trait NotebookProvider {
 	/// Returns a block voting root only if submitted in time for previous block

@@ -180,6 +180,7 @@ fn it_can_handle_transfers_in() {
 
 			parent_secret: None,
 			block_votes_count: 0,
+			data_domains: Default::default(),
 		},),);
 
 		System::set_block_number(3);
@@ -209,9 +210,9 @@ fn it_can_handle_transfers_in() {
 			blocks_with_votes: Default::default(),
 			block_votes_root: H256::random(),
 			secret_hash: H256::random(),
-
 			parent_secret: None,
 			block_votes_count: 0,
+			data_domains: Default::default(),
 		}));
 		assert_eq!(Balances::free_balance(&who), 5000);
 	});
@@ -242,9 +243,9 @@ fn it_reduces_circulation_on_tax() {
 			blocks_with_votes: Default::default(),
 			block_votes_root: H256::random(),
 			secret_hash: H256::random(),
-
 			parent_secret: None,
 			block_votes_count: 0,
+			data_domains: Default::default(),
 		}),);
 
 		assert_eq!(Balances::total_issuance(), 23_000);
@@ -278,9 +279,9 @@ fn it_does_not_alter_tax_if_notary_locked() {
 			blocks_with_votes: Default::default(),
 			block_votes_root: H256::random(),
 			secret_hash: H256::random(),
-
 			parent_secret: None,
 			block_votes_count: 0,
+			data_domains: Default::default(),
 		}),);
 
 		// does not change!
@@ -312,9 +313,9 @@ fn it_doesnt_allow_a_notary_balance_to_go_negative() {
 				blocks_with_votes: Default::default(),
 				block_votes_root: H256::random(),
 				secret_hash: H256::random(),
-
 				parent_secret: None,
 				block_votes_count: 0,
+				data_domains: Default::default(),
 			}),
 			Error::<Test>::InsufficientNotarizedFunds
 		);
@@ -348,9 +349,9 @@ fn it_skips_transfers_to_mainchain_if_notary_locked() {
 			blocks_with_votes: Default::default(),
 			block_votes_root: H256::random(),
 			secret_hash: H256::random(),
-
 			parent_secret: None,
 			block_votes_count: 0,
+			data_domains: Default::default(),
 		}),);
 
 		assert_eq!(Balances::total_issuance(), 30_000);
@@ -401,9 +402,9 @@ fn it_expires_transfers_if_not_committed() {
 				blocks_with_votes: Default::default(),
 				block_votes_root: H256::random(),
 				secret_hash: H256::random(),
-
 				parent_secret: None,
 				block_votes_count: 0,
+				data_domains: Default::default(),
 			}),
 			Error::<Test>::NotebookIncludesExpiredLocalchainTransfer
 		)

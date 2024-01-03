@@ -210,6 +210,7 @@ impl NotebookStore {
 		let mut voting_power = 0u128;
 		let mut tax = 0u128;
 		let mut blocks_with_votes = BTreeSet::new();
+		let mut data_domains = Vec::new();
 		for change in notarizations.clone() {
 			for change in change.balance_changes {
 				let key = (change.account_id, change.account_type);
@@ -228,7 +229,7 @@ impl NotebookStore {
 				let mut change_note = None;
 				for note in change.notes {
 					match note.note_type {
-						NoteType::Tax => tax += note.milligons,
+						NoteType::Tax | NoteType::LeaseDomain => tax += note.milligons,
 						NoteType::ChannelHold { .. } => change_note = Some(note.clone()),
 						NoteType::ChannelSettle { .. } => change_note = None,
 						_ => {},
@@ -250,6 +251,9 @@ impl NotebookStore {
 				voting_power += vote.power;
 				block_votes.insert(key, vote);
 				blocks_with_votes.insert(block_hash);
+			}
+			for domain in change.data_domains {
+				data_domains.push(domain);
 			}
 		}
 
@@ -290,6 +294,7 @@ impl NotebookStore {
 			notebook_number,
 			finalized_block,
 			transfers,
+			data_domains,
 			tax,
 			changes_root,
 			account_changelist,
@@ -449,6 +454,7 @@ mod tests {
 					signature: Signature([0u8; 64]).into(),
 				},
 			],
+			vec![],
 			vec![],
 		)
 		.await?;

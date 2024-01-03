@@ -60,6 +60,7 @@ use ulx_primitives::{
 	prod_or_fast,
 	tick::{Tick, Ticker, TICK_MILLIS},
 	BlockSealAuthorityId, BondFundId, BondId, NotaryNotebookVotes, TickProvider,
+	CHANNEL_CLAWBACK_NOTEBOOKS, CHANNEL_EXPIRATION_NOTEBOOKS,
 };
 pub use ulx_primitives::{
 	AccountId, Balance, BlockHash, BlockNumber, HashOutput, Moment, Nonce, Signature,
@@ -68,6 +69,7 @@ pub use ulx_primitives::{
 use crate::opaque::SessionKeys;
 // A few exports that help ease life for downstream crates.
 use crate::wage_protector::WageProtectorFee;
+use ulx_primitives::block_seal::MiningAuthority;
 
 pub mod wage_protector;
 
@@ -228,6 +230,8 @@ parameter_types! {
 	pub const HalvingBlocks: u32 = 2_100_000; // based on bitcoin, but 10x since we're block per minute
 	pub const MaturationBlocks: u32 = 5;
 	pub const MinerPayoutPercent: u32 = 75;
+	pub const DomainExpirationTicks: u32 = 60 * 24 * 365; // 1 year
+	pub const HistoricalPaymentAddressTicksToKeep: u32 = CHANNEL_EXPIRATION_NOTEBOOKS + CHANNEL_CLAWBACK_NOTEBOOKS + 10;
 }
 
 impl pallet_block_seal_spec::Config for Runtime {
@@ -259,6 +263,14 @@ impl pallet_block_rewards::Config for Runtime {
 	type MinerPayoutPercent = MinerPayoutPercent;
 	type MaturationBlocks = MaturationBlocks;
 	type RuntimeFreezeReason = RuntimeFreezeReason;
+}
+
+impl pallet_data_domain::Config for Runtime {
+	type RuntimeEvent = RuntimeEvent;
+	type WeightInfo = pallet_data_domain::weights::SubstrateWeight<Runtime>;
+	type TickProvider = Ticks;
+	type DomainExpirationTicks = DomainExpirationTicks;
+	type HistoricalPaymentAddressTicksToKeep = HistoricalPaymentAddressTicksToKeep;
 }
 
 impl pallet_authorship::Config for Runtime {
@@ -341,6 +353,7 @@ impl pallet_block_seal::Config for Runtime {
 	type NotebookProvider = Notebook;
 	type BlockVotingProvider = BlockSealSpec;
 	type TickProvider = Ticks;
+	type DataDomainProvider = DataDomain;
 }
 
 impl pallet_session::Config for Runtime {
@@ -418,7 +431,7 @@ impl pallet_chain_transfer::Config for Runtime {
 impl pallet_notebook::Config for Runtime {
 	type RuntimeEvent = RuntimeEvent;
 	type WeightInfo = pallet_notebook::weights::SubstrateWeight<Runtime>;
-	type EventHandler = (ChainTransfer, BlockSealSpec);
+	type EventHandler = (ChainTransfer, BlockSealSpec, DataDomain);
 	type NotaryProvider = Notaries;
 	type ChainTransferLookup = ChainTransfer;
 	type BlockVotingProvider = BlockSealSpec;
@@ -549,6 +562,7 @@ construct_runtime!(
 		Notebook: pallet_notebook,
 		ChainTransfer: pallet_chain_transfer,
 		BlockSealSpec: pallet_block_seal_spec,
+		DataDomain: pallet_data_domain,
 		// Authorship must be before session
 		Authorship: pallet_authorship,
 		Historical: pallet_session_historical,
@@ -723,6 +737,12 @@ impl_runtime_apis! {
 		}
 		fn query_length_to_fee(length: u32) -> Balance {
 			TransactionPayment::length_to_fee(length)
+		}
+	}
+
+	impl ulx_primitives::MiningApis<Block, AccountId, BlockSealAuthorityId> for Runtime {
+		fn get_authority_id(account_id: &AccountId) -> Option<MiningAuthority< BlockSealAuthorityId, AccountId>> {
+			MiningSlot::get_mining_authority(account_id)
 		}
 	}
 
@@ -915,6 +935,7 @@ mod benches {
 		[pallet_balances, UlixeeTokens]
 		[pallet_timestamp, Timestamp]
 		[pallet_ticks, Ticks]
+		[pallet_data_domain, DataDomain]
 		[pallet_block_seal_spec, VoteEligibility]
 		[pallet_block_rewards, BlockRewards]
 		[pallet_mining_slot, MiningSlot]

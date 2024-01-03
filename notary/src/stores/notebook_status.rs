@@ -41,6 +41,7 @@ pub struct NotebookStatusRow {
 	pub block_votes: i32,
 	pub notarizations: i32,
 	pub balance_changes: i32,
+	pub data_domains: i32,
 	pub step: NotebookFinalizationStep,
 	pub open_time: DateTime<Utc>,
 	pub end_time: DateTime<Utc>,
@@ -165,7 +166,42 @@ impl NotebookStatusStore {
 		ensure!(result.rows_affected() == 1, Error::MaxNotebookChainTransfersReached);
 		Ok(())
 	}
+	pub async fn track_counts<'a>(
+		db: &mut PgConnection,
+		notebook_number: NotebookNumber,
+		balance_changes: u32,
+		votes: u32,
+		data_domains: u32,
+		max_notebook_notarizations: u32,
+		max_balance_changes_per_notebook: u32,
+		max_votes_per_notebook: u32,
+		max_domains_per_notebook: u32,
+	) -> anyhow::Result<(), Error> {
+		let result = sqlx::query!(
+			r#"
+				UPDATE notebook_status SET 
+					block_votes = block_votes + $2, 
+					balance_changes = balance_changes + $3, 
+					notarizations = notarizations + 1,
+					data_domains = data_domains + $4
+				WHERE notebook_number = $1 
+					AND block_votes < $5 AND balance_changes < $6 AND data_domains < $7 AND notarizations < $8
+			"#,
+			notebook_number as i32,
+			votes as i32,
+			balance_changes as i32,
+			data_domains as i32,
+			max_votes_per_notebook as i32,
+			max_balance_changes_per_notebook as i32,
+			max_domains_per_notebook as i32,
+			max_notebook_notarizations as i32,
+		)
+		.execute(db)
+		.await?;
 
+		ensure!(result.rows_affected() == 1, Error::MaxNotebookChainTransfersReached);
+		Ok(())
+	}
 	pub async fn step_up_expired_open<'a>(
 		db: &mut PgConnection,
 	) -> anyhow::Result<Option<u32>, Error> {

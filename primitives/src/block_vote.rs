@@ -5,7 +5,7 @@ use sp_core_hashing::blake2_256;
 use sp_runtime::scale_info::TypeInfo;
 use sp_std::vec::Vec;
 
-use crate::{AccountId, BlockVotingPower, ChannelPass, MerkleProof, NotaryId, NotebookNumber};
+use crate::{AccountId, BlockVotingPower, DataDomain, MerkleProof, NotaryId, NotebookNumber};
 
 pub type VoteMinimum = u128;
 
@@ -33,8 +33,10 @@ pub struct BlockVoteT<Hash: Codec = H256> {
 	/// The voting power of this vote, determined from the amount of tax
 	#[codec(compact)]
 	pub power: BlockVotingPower,
-	/// Proof of the tax channel
-	pub channel_pass: ChannelPass,
+	/// The data domain used to create this vote
+	pub data_domain: DataDomain,
+	/// The data domain payment address used to create this vote
+	pub data_domain_account: AccountId,
 }
 
 pub type BlockVote = BlockVoteT<H256>;

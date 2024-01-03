@@ -6,9 +6,8 @@ use frame_support::{
 	pallet_prelude::*,
 };
 use sp_core::{
-	bounded_vec,
 	ed25519::{Public, Signature},
-	OpaquePeerId, H256, U256,
+	H256, U256,
 };
 use sp_inherents::InherentDataProvider;
 use sp_keyring::{ed25519::Keyring, AccountKeyring::Bob, Ed25519Keyring::Alice};
@@ -18,13 +17,13 @@ use sp_runtime::{
 };
 
 use ulx_primitives::{
-	block_seal::{MiningAuthority, PeerId},
+	block_seal::MiningAuthority,
 	digests::{BlockVoteDigest, BLOCK_VOTES_DIGEST_ID},
 	inherents::{BlockSealInherent, BlockSealInherentDataProvider, SealInherentError},
-	localchain::{BlockVote, ChannelPass},
+	localchain::BlockVote,
 	BlockSealAuthorityId, BlockSealAuthoritySignature, BlockSealDigest, BlockSealerInfo,
-	BlockVoteT, BlockVotingKey, MerkleProof, NotaryNotebookVotes, ParentVotingKeyDigest,
-	AUTHOR_DIGEST_ID, PARENT_VOTING_KEY_DIGEST,
+	BlockVoteT, BlockVotingKey, DataDomain, DataTLD, MerkleProof, NotaryNotebookVotes,
+	ParentVotingKeyDigest, AUTHOR_DIGEST_ID, PARENT_VOTING_KEY_DIGEST,
 };
 
 use crate::{
@@ -206,9 +205,7 @@ fn it_should_be_able_to_submit_a_seal() {
 		XorClosest::set(Some(MiningAuthority {
 			account_id: 1,
 			authority_id: default_authority(),
-			peer_id: empty_peer(),
 			authority_index: 0,
-			rpc_hosts: bounded_vec![],
 		}));
 
 		let parent_voting_key = H256::random();
@@ -217,6 +214,9 @@ fn it_should_be_able_to_submit_a_seal() {
 		CurrentTick::set(6);
 		BlocksAtTick::mutate(|a| {
 			a.insert(2, vec![System::block_hash(2)]);
+		});
+		RegisteredDataDomains::mutate(|a| {
+			a.insert(DataDomain::new("test", DataTLD::Bikes));
 		});
 
 		let block_vote = default_vote();
@@ -250,6 +250,9 @@ fn it_should_be_able_to_submit_a_seal() {
 
 		assert_ok!(BlockSeal::apply(RuntimeOrigin::none(), inherent.clone()));
 
+		assert_eq!(LastBlockSealerInfo::<Test>::get().unwrap().miner_rewards_account, 10);
+
+		// the vote sealer will be a u64 conversion of a an account32
 		assert_eq!(TempSealInherent::<Test>::get(), Some(inherent.clone()));
 		assert_eq!(BlockSeal::get(), inherent);
 		BlockSeal::on_finalize(4);
@@ -467,18 +470,12 @@ fn it_can_find_best_vote_seals() {
 			index: 0,
 			block_hash: parent_hash,
 			power: 500,
-			channel_pass: ChannelPass {
-				zone_record_hash: H256::random(),
-				id: 1,
-				at_block_height: 1,
-				miner_index: 0,
-			},
+			data_domain: DataDomain::new("test", DataTLD::Bikes),
+			data_domain_account: Alice.to_account_id(),
 		};
 		XorClosest::set(Some(MiningAuthority {
 			account_id: 1,
-			peer_id: empty_peer(),
 			authority_id: default_authority(),
-			rpc_hosts: Default::default(),
 			authority_index: 0,
 		}));
 
@@ -573,7 +570,15 @@ fn it_checks_tax_votes() {
 		// Go past genesis block so events get deposited
 		setup_blocks(2);
 		System::set_block_number(4);
-		let vote = default_vote();
+		let vote = BlockVote {
+			block_hash: System::block_hash(System::block_number().saturating_sub(4)),
+			data_domain: DataDomain::new("test", DataTLD::Bikes),
+			data_domain_account: Alice.to_account_id(),
+			account_id: Keyring::Alice.into(),
+			index: 1,
+			power: 500,
+		};
+
 		let default_authority = default_authority();
 		let author = &1;
 		let tick = 6;
@@ -620,9 +625,7 @@ fn it_checks_tax_votes() {
 		);
 		XorClosest::set(Some(MiningAuthority {
 			account_id: 1,
-			peer_id: empty_peer(),
 			authority_id: default_authority.clone(),
-			rpc_hosts: Default::default(),
 			authority_index: 0,
 		}));
 		assert_err!(
@@ -636,21 +639,35 @@ fn it_checks_tax_votes() {
 			Error::<Test>::InvalidAuthoritySignature
 		);
 
-		let signature =
-			Alice.sign(&BlockVote::seal_signature_message(&System::parent_hash(), seal_strength));
+		let signature: BlockSealAuthoritySignature = Alice
+			.sign(&BlockVote::seal_signature_message(&System::parent_hash(), seal_strength))
+			.into();
+
+		assert_err!(
+			BlockSeal::verify_block_vote(
+				seal_strength,
+				&vote,
+				author,
+				votes_from_tick,
+				signature.clone()
+			),
+			Error::<Test>::InvalidDataDomainAccount
+		);
+
+		RegisteredDataDomains::mutate(|a| {
+			a.insert(vote.data_domain.clone());
+		});
+
 		assert_ok!(BlockSeal::verify_block_vote(
 			seal_strength,
 			&vote,
 			author,
 			votes_from_tick,
-			signature.into()
+			signature.clone()
 		),);
 	});
 }
 
-fn empty_peer() -> PeerId {
-	PeerId(OpaquePeerId::default())
-}
 fn setup_blocks(blocks: u64) {
 	let mut parent_hash = System::parent_hash();
 
@@ -665,11 +682,11 @@ fn setup_blocks(blocks: u64) {
 }
 
 fn default_authority() -> BlockSealAuthorityId {
-	BlockSealAuthorityId::from(Keyring::Alice.public())
+	authority_of(Alice.public())
 }
 
-fn empty_channel_pass() -> ChannelPass {
-	ChannelPass { miner_index: 0, zone_record_hash: H256::zero(), id: 0, at_block_height: 0 }
+fn authority_of(author: Public) -> BlockSealAuthorityId {
+	BlockSealAuthorityId::from(author)
 }
 
 fn author_digest(author: u64) -> DigestItem {
@@ -687,7 +704,8 @@ fn get_block_vote_digest(votes: u32) -> BlockVoteDigest {
 fn default_vote() -> BlockVote {
 	BlockVote {
 		block_hash: System::block_hash(System::block_number().saturating_sub(4)),
-		channel_pass: empty_channel_pass(),
+		data_domain: DataDomain::new("test", DataTLD::Bikes),
+		data_domain_account: Alice.to_account_id(),
 		account_id: Keyring::Alice.into(),
 		index: 1,
 		power: 500,

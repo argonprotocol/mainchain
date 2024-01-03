@@ -217,37 +217,44 @@ struct NotebookAuditResponse {
 
 #[cfg(test)]
 mod tests {
-	use chrono::Utc;
-	use codec::Decode;
-	use frame_support::assert_ok;
-	use futures::StreamExt;
-	use sp_core::{bounded_vec, ed25519::Public};
-	use sp_keyring::Sr25519Keyring::{Alice, Bob};
-	use sp_keystore::{testing::MemoryKeystore, Keystore, KeystoreExt};
-	use sqlx::PgPool;
 	use std::{
 		env,
 		net::{IpAddr, SocketAddr},
+		pin::Pin,
+		task::{Context, Poll},
 	};
+
+	use anyhow::anyhow;
+	use chrono::Utc;
+	use codec::{Decode, Encode};
+	use frame_support::assert_ok;
+	use futures::{task::noop_waker_ref, StreamExt};
+	use sp_core::{bounded_vec, ed25519::Public, Pair};
+	use sp_keyring::Sr25519Keyring::{Alice, Bob, Ferdie};
+	use sp_keystore::{testing::MemoryKeystore, Keystore, KeystoreExt};
+	use sqlx::PgPool;
 	use subxt::{
 		blocks::Block,
 		config::substrate::DigestItem,
+		ext::sp_core::hexdisplay::AsBytesRef,
 		tx::{TxInBlock, TxProgress, TxStatus},
 		utils::AccountId32,
 		OnlineClient,
 	};
-	use subxt_signer::sr25519::dev;
+	use subxt_signer::sr25519::{dev, Keypair};
+	use tokio::sync::Mutex;
 
 	use ulixee_client::{
 		api::{
 			runtime_apis::account_nonce_api::AccountNonceApi,
+			runtime_types,
 			runtime_types::{
 				bounded_collections::bounded_vec::BoundedVec,
 				pallet_notaries::pallet::Call as NotaryCall,
 				sp_core::ed25519,
 				ulx_node_runtime::RuntimeCall,
 				ulx_primitives::{
-					balance_change::AccountOrigin as SubxtAccountOrigin, block_seal::Host,
+					balance_change::AccountOrigin as SubxtAccountOrigin, host::Host,
 					notary::NotaryMeta,
 				},
 			},
@@ -258,12 +265,13 @@ mod tests {
 	use ulx_notary_audit::VerifyError;
 	use ulx_primitives::{
 		tick::Tick,
-		AccountOrigin,
+		AccountId, AccountOrigin,
 		AccountType::{Deposit, Tax},
 		BalanceChange, BalanceProof, BalanceTip, BlockSealDigest, BlockVote, BlockVoteDigest,
-		ChannelPass, HashOutput, MerkleProof, Note, NoteType,
+		DataDomain, DataTLD, HashOutput, MerkleProof, Note, NoteType,
 		NoteType::{ChannelClaim, ChannelSettle},
 		NotebookDigest, ParentVotingKeyDigest, TickDigest, CHANNEL_EXPIRATION_NOTEBOOKS,
+		DATA_DOMAIN_LEASE_COST,
 	};
 	use ulx_testing::{test_context, test_context_from_url};
 
@@ -276,6 +284,8 @@ mod tests {
 	};
 
 	use super::*;
+
+	type Nonce = u32;
 
 	#[sqlx::test]
 	async fn test_chain_to_chain(pool: PgPool) -> anyhow::Result<()> {
@@ -297,7 +307,8 @@ mod tests {
 		let mut client = MainchainClient::new(vec![ws_url.clone()]);
 		let ticker = client.lookup_ticker().await?;
 		let server = NotaryServer::create_http_server("127.0.0.1:0").await?;
-		track_blocks(ctx.ws_url, 1, &pool.clone(), ticker.clone());
+		let block_tracker = track_blocks(ctx.ws_url, 1, &pool.clone(), ticker.clone());
+		let block_tracker = Arc::new(Mutex::new(Some(block_tracker)));
 
 		propose_bob_as_notary(&ctx.client, notary_key, server.local_addr()?).await?;
 
@@ -314,13 +325,12 @@ mod tests {
 			);
 		}
 
-		let bob_nonce = get_bob_nonce(&ctx.client, bob_id).await?;
-
 		// Submit a transfer to localchain and wait for result
-		create_localchain_transfer(&pool, &ctx.client, bob_nonce, 1000).await?;
+		let bob_transfer = create_localchain_transfer(&ctx.client, dev::bob(), 1000).await?;
+		wait_for_transfers(&pool, vec![bob_transfer.clone()]).await?;
 
 		// Record the balance change
-		submit_balance_change_to_notary(&pool, bob_nonce, 1000).await?;
+		submit_balance_change_to_notary(&pool, bob_transfer).await?;
 
 		sqlx::query("update notebook_status set end_time = $1 where notebook_number = 1")
 			.bind(Utc::now())
@@ -346,6 +356,7 @@ mod tests {
 			}
 			// yield
 			tokio::time::sleep(tokio::time::Duration::from_millis(50)).await;
+			check_block_watch_status(block_tracker.clone()).await?;
 		}
 
 		let next_header = subscription.next().await;
@@ -377,6 +388,10 @@ mod tests {
 			"Should have updated Bob's last change notebook"
 		);
 		notary_server.stop().await;
+		let mut block_tracker_lock = block_tracker.lock().await;
+		if let Some(tracker) = block_tracker_lock.take() {
+			tracker.abort();
+		}
 		Ok(())
 	}
 
@@ -402,7 +417,9 @@ mod tests {
 		let ticker = client.lookup_ticker().await?;
 		let server = NotaryServer::create_http_server("127.0.0.1:0").await?;
 		let addr = server.local_addr()?;
-		track_blocks(ctx.ws_url, 1, &pool.clone(), ticker.clone());
+		let block_tracker = track_blocks(ctx.ws_url, 1, &pool.clone(), ticker.clone());
+		let block_tracker = Arc::new(Mutex::new(Some(block_tracker)));
+
 		let mut notary_server = NotaryServer::start_with(server, notary_id, pool.clone()).await?;
 		spawn_notebook_closer(
 			pool.clone(),
@@ -416,17 +433,64 @@ mod tests {
 		propose_bob_as_notary(&ctx.client, notary_key, addr).await?;
 
 		activate_notary(&pool, &ctx.client, &bob_id).await?;
-		let bob_nonce = get_bob_nonce(&ctx.client, bob_id).await?;
 
 		let bob_balance = 8000;
 		// Submit a transfer to localchain and wait for result
-		create_localchain_transfer(&pool, &ctx.client, bob_nonce, bob_balance).await?;
+		let bob_transfer = create_localchain_transfer(&ctx.client, dev::bob(), bob_balance).await?;
+		let ferdie_transfer = create_localchain_transfer(&ctx.client, dev::ferdie(), 1000).await?;
+		println!("bob and ferdie transfers created");
+		wait_for_transfers(&pool, vec![bob_transfer.clone(), ferdie_transfer.clone()]).await?;
+		println!("bob and ferdie transfers confirmed");
+
+		let domain = DataDomain::new("HelloWorld", DataTLD::Entertainment);
+		let result = submit_balance_change_to_notary_and_create_domain(
+			&pool,
+			ferdie_transfer,
+			domain.clone(),
+			Alice.to_account_id(),
+		)
+		.await?;
+		// wait for domain finalized
+		loop {
+			let status = NotebookStatusStore::get(&pool, result.notebook_number).await?;
+			if status.finalized_time.is_some() {
+				break
+			}
+			// yield
+			tokio::time::sleep(tokio::time::Duration::from_millis(50)).await;
+			check_block_watch_status(block_tracker.clone()).await?;
+		}
+		let zone_block = set_zone_record(&ctx.client, domain.clone(), dev::alice()).await?;
+		println!("set zone record");
+		assert_eq!(
+			ctx.client
+				.storage()
+				.at(zone_block)
+				.fetch(
+					&storage()
+						.data_domain()
+						.zone_records_by_domain(translate_domain(domain.clone()))
+				)
+				.await?
+				.unwrap()
+				.payment_account,
+			dev::alice().public_key().into(),
+			"Should have stored alice as payment key"
+		);
 
 		// Record the balance change
-		let origin = submit_balance_change_to_notary(&pool, bob_nonce, bob_balance).await?;
+		let origin = submit_balance_change_to_notary(&pool, bob_transfer).await?;
 
-		let (hold_note, hold_result) =
-			create_channel_hold(&pool, bob_balance as u128, 5000, origin.clone()).await?;
+		let (hold_note, hold_result) = create_channel_hold(
+			&pool,
+			bob_balance as u128,
+			5000,
+			origin.clone(),
+			domain.clone(),
+			Alice.to_account_id(),
+		)
+		.await?;
+		println!("created channel hold. Waiting for notebook {}", hold_result.notebook_number);
 
 		let mut header_sub = notary_server.completed_notebook_stream.subscribe(100);
 		let mut notebook_proof: Option<MerkleProof> = None;
@@ -447,7 +511,7 @@ mod tests {
 				next_header = header_sub.next() => {
 					match next_header {
 						Some(SignedNotebookHeader{ header, ..}) => {
-							println!("notebook header {}", header.notebook_number);
+							println!("Header complete {}", header.notebook_number);
 							if header.notebook_number == hold_result.notebook_number {
 								notebook_proof = Some(
 									NotebookStore::get_balance_proof(
@@ -475,7 +539,8 @@ mod tests {
 						None => break
 					}
 				},
-			};
+			}
+			check_block_watch_status(block_tracker.clone()).await?;
 		}
 		assert!(notebook_proof.is_some(), "Should have a notebook proof");
 		println!(
@@ -549,6 +614,26 @@ mod tests {
 		Ok(())
 	}
 
+	async fn check_block_watch_status(
+		block_tracker: Arc<Mutex<Option<tokio::task::JoinHandle<()>>>>,
+	) -> anyhow::Result<()> {
+		let mut block_tracker_lock = block_tracker.lock().await;
+		if let Some(mut block_tracker_inner) = block_tracker_lock.take() {
+			let waker = noop_waker_ref();
+			let mut cx = Context::from_waker(&waker);
+			match Pin::new(&mut block_tracker_inner).poll(&mut cx) {
+				Poll::Ready(Err(e)) => {
+					tracing::error!("Error tracking blocks {:?}", e);
+					return Err(anyhow!(e.to_string()))
+				},
+				_ => {
+					*block_tracker_lock = Some(block_tracker_inner);
+				},
+			}
+		}
+		Ok(())
+	}
+
 	fn get_digests(
 		block: Block<UlxConfig, OnlineClient<UlxConfig>>,
 	) -> (Tick, BlockVoteDigest, BlockSealDigest, ParentVotingKeyDigest, NotebookDigest<VerifyError>)
@@ -614,30 +699,106 @@ mod tests {
 
 	async fn submit_balance_change_to_notary(
 		pool: &PgPool,
-		bob_nonce: u32,
-		amount: u32,
+		transfer: (Nonce, u32, Keypair),
 	) -> anyhow::Result<AccountOrigin> {
+		let (account_nonce, amount, keypair) = transfer;
+		let public = keypair.public_key();
+		let public = public.as_ref();
+
+		let keypair = if public == Bob.public().as_bytes_ref() {
+			Bob.pair()
+		} else if public == Alice.public().as_bytes_ref() {
+			Alice.pair()
+		} else {
+			Ferdie.pair()
+		};
 		let result = NotarizationsStore::apply(
 			&pool,
 			1,
 			vec![BalanceChange {
-				account_id: Bob.to_account_id(),
+				account_id: keypair.public().into(),
 				account_type: Deposit,
 				change_number: 1,
 				balance: amount as u128,
 				previous_balance_proof: None,
 				notes: bounded_vec![Note::create(
 					amount as u128,
-					ulx_primitives::NoteType::ClaimFromMainchain { account_nonce: bob_nonce },
+					NoteType::ClaimFromMainchain { account_nonce },
 				)],
 				channel_hold_note: None,
 				signature: sp_core::ed25519::Signature([0u8; 64]).into(),
 			}
-			.sign(Bob.pair())
+			.sign(keypair)
 			.clone()],
+			vec![],
 			vec![],
 		)
 		.await?;
+
+		println!("submitted chain transfer to notary");
+
+		Ok(AccountOrigin {
+			notebook_number: result.notebook_number,
+			account_uid: result.new_account_origins[0].account_uid,
+		})
+	}
+	async fn submit_balance_change_to_notary_and_create_domain(
+		pool: &PgPool,
+		transfer: (Nonce, u32, Keypair),
+		domain: DataDomain,
+		register_domain_to: AccountId,
+	) -> anyhow::Result<AccountOrigin> {
+		let (account_nonce, amount, keypair) = transfer;
+		let public = keypair.public_key();
+		let public = public.as_ref();
+
+		let keypair = if public == Bob.public().as_bytes_ref() {
+			Bob.pair()
+		} else if public == Alice.public().as_bytes_ref() {
+			Alice.pair()
+		} else {
+			Ferdie.pair()
+		};
+		let result = NotarizationsStore::apply(
+			&pool,
+			1,
+			vec![
+				BalanceChange {
+					account_id: keypair.public().into(),
+					account_type: Deposit,
+					change_number: 1,
+					balance: amount as u128 - DATA_DOMAIN_LEASE_COST,
+					previous_balance_proof: None,
+					notes: bounded_vec![
+						Note::create(
+							amount as u128,
+							NoteType::ClaimFromMainchain { account_nonce },
+						),
+						Note::create(DATA_DOMAIN_LEASE_COST, NoteType::LeaseDomain,)
+					],
+					channel_hold_note: None,
+					signature: sp_core::ed25519::Signature([0u8; 64]).into(),
+				}
+				.sign(keypair.clone())
+				.clone(),
+				BalanceChange {
+					account_id: keypair.public().into(),
+					account_type: Tax,
+					change_number: 1,
+					balance: DATA_DOMAIN_LEASE_COST,
+					previous_balance_proof: None,
+					notes: bounded_vec![Note::create(DATA_DOMAIN_LEASE_COST, NoteType::Claim,)],
+					channel_hold_note: None,
+					signature: sp_core::ed25519::Signature([0u8; 64]).into(),
+				}
+				.sign(keypair.clone())
+				.clone(),
+			],
+			vec![],
+			vec![(domain, register_domain_to)],
+		)
+		.await?;
+		println!("submitted chain transfer + data domain to notary");
 
 		Ok(AccountOrigin {
 			notebook_number: result.notebook_number,
@@ -645,14 +806,40 @@ mod tests {
 		})
 	}
 
-	async fn get_bob_nonce(client: &UlxClient, bob_id: AccountId32) -> anyhow::Result<u32> {
-		let bob_nonce = client
+	async fn get_account_nonce(
+		client: &UlxClient,
+		account_id: AccountId32,
+	) -> anyhow::Result<Nonce> {
+		let nonce = client
 			.runtime_api()
 			.at_latest()
 			.await?
-			.call(AccountNonceApi.account_nonce(bob_id.clone()))
+			.call(AccountNonceApi.account_nonce(account_id.clone()))
 			.await?;
-		Ok(bob_nonce)
+		Ok(nonce)
+	}
+
+	async fn set_zone_record(
+		client: &UlxClient,
+		data_domain: DataDomain,
+		account: Keypair,
+	) -> anyhow::Result<H256> {
+		let tx_progress = client
+			.tx()
+			.sign_and_submit_then_watch_default(
+				&tx().data_domain().set_zone_record(
+					translate_domain(data_domain),
+					runtime_types::ulx_primitives::data_domain::ZoneRecord {
+						payment_account: AccountId32::from(account.public_key()),
+						versions: subxt::utils::KeyedVec::new(),
+					},
+				),
+				&account,
+			)
+			.await?;
+		let result = wait_for_in_block(tx_progress).await;
+		assert_ok!(&result);
+		Ok(result.unwrap().block_hash())
 	}
 
 	async fn create_channel_hold(
@@ -660,10 +847,15 @@ mod tests {
 		balance: u128,
 		amount: u128,
 		account_origin: AccountOrigin,
+		domain: DataDomain,
+		domain_account: AccountId,
 	) -> anyhow::Result<(Note, BalanceChangeResult)> {
 		let hold_note = Note::create(
 			amount,
-			ulx_primitives::NoteType::ChannelHold { recipient: Alice.to_account_id() },
+			ulx_primitives::NoteType::ChannelHold {
+				recipient: domain_account,
+				data_domain: Some(domain),
+			},
 		);
 		let changes = vec![BalanceChange {
 			account_id: Bob.to_account_id(),
@@ -684,7 +876,7 @@ mod tests {
 		.sign(Bob.pair())
 		.clone()];
 
-		let result = NotarizationsStore::apply(&pool, 1, changes, vec![]).await?;
+		let result = NotarizationsStore::apply(&pool, 1, changes, vec![], vec![]).await?;
 		Ok((hold_note.clone(), result))
 	}
 
@@ -694,13 +886,10 @@ mod tests {
 		vote_block_hash: HashOutput,
 		bob_balance_proof: BalanceProof,
 	) -> anyhow::Result<BalanceChangeResult> {
-		let channel_pass = ChannelPass {
-			at_block_height: 1,
-			id: 1,
-			zone_record_hash: H256::zero(),
-			miner_index: 0,
+		let (data_domain, recipient) = match hold_note.note_type.clone() {
+			NoteType::ChannelHold { recipient, data_domain } => (data_domain, recipient),
+			_ => panic!("Should be a channel hold note"),
 		};
-
 		let tax = (hold_note.milligons as f64 * 0.2f64) as u128;
 		let changes = vec![
 			BalanceChange {
@@ -710,10 +899,7 @@ mod tests {
 				balance: bob_balance_proof.balance - hold_note.milligons,
 				previous_balance_proof: Some(bob_balance_proof),
 				channel_hold_note: Some(hold_note.clone()),
-				notes: bounded_vec![Note::create(
-					hold_note.milligons,
-					ChannelSettle { channel_pass_hash: channel_pass.hash() }
-				)],
+				notes: bounded_vec![Note::create(hold_note.milligons, ChannelSettle)],
 				signature: sp_core::sr25519::Signature([0u8; 64]).into(),
 			}
 			.sign(Bob.pair())
@@ -754,47 +940,75 @@ mod tests {
 			1,
 			changes,
 			vec![BlockVote {
-				channel_pass: channel_pass.clone(),
+				data_domain: data_domain.unwrap().clone(),
+				data_domain_account: recipient,
 				account_id: Alice.to_account_id(),
 				index: 1,
 				block_hash: vote_block_hash,
 				power: tax,
 			}],
+			vec![],
 		)
 		.await?;
 		Ok(result)
 	}
 
+	fn translate_domain(
+		data_domain: DataDomain,
+	) -> runtime_types::ulx_primitives::data_domain::DataDomain {
+		runtime_types::ulx_primitives::data_domain::DataDomain {
+			domain_name: BoundedVec(data_domain.domain_name.to_vec()),
+			top_level_domain: runtime_types::ulx_primitives::data_tld::DataTLD::decode(
+				&mut data_domain.top_level_domain.encode().as_slice(),
+			)
+			.unwrap(),
+		}
+	}
+
 	async fn create_localchain_transfer(
-		pool: &PgPool,
 		client: &UlxClient,
-		bob_nonce: u32,
+		account: Keypair,
 		amount: u32,
-	) -> anyhow::Result<()> {
+	) -> anyhow::Result<(Nonce, u32, Keypair)> {
+		let nonce = get_account_nonce(&client, account.public_key().into()).await?;
 		client
 			.tx()
 			.sign_and_submit_then_watch_default(
-				&tx().chain_transfer().send_to_localchain(amount.into(), 1, bob_nonce),
-				&dev::bob(),
+				&tx().chain_transfer().send_to_localchain(amount.into(), 1, nonce),
+				&account,
 			)
 			.await?
 			.wait_for_finalized_success()
 			.await?;
+		Ok((nonce, amount, account))
+	}
 
+	async fn wait_for_transfers(
+		pool: &PgPool,
+		transfers: Vec<(Nonce, u32, Keypair)>,
+	) -> anyhow::Result<()> {
 		let mut found = false;
 		for _ in 0..5 {
-			let row = sqlx::query!("select * from chain_transfers").fetch_optional(pool).await?;
-			if let Some(record) = row {
-				assert_eq!(
-					record.amount,
-					amount.to_string(),
-					"Should have recorded a chain transfer"
-				);
-				assert_eq!(
-					record.account_nonce,
-					Some(bob_nonce as i32),
-					"Should have recorded a chain transfer"
-				);
+			let rows = sqlx::query!("select * from chain_transfers").fetch_all(pool).await?;
+			let is_complete = transfers.iter().filter_map(|(nonce, amount, account)| {
+				if let Some(record) =
+					rows.iter().find(|r| r.account_id.as_slice() == account.public_key().as_ref())
+				{
+					assert_eq!(
+						record.amount,
+						amount.to_string(),
+						"Should have recorded a chain transfer"
+					);
+					assert_eq!(
+						record.account_nonce,
+						Some(*nonce as i32),
+						"Should have recorded a chain transfer"
+					);
+					return Some(())
+				}
+				None
+			});
+			if is_complete.count() == transfers.len() {
 				found = true;
 				break
 			}

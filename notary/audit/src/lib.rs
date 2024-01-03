@@ -16,9 +16,10 @@ use sp_std::{
 pub use crate::error::VerifyError;
 use ulx_primitives::{
 	ensure, AccountId, AccountOrigin, AccountOriginUid, AccountType, Balance, BalanceChange,
-	BalanceProof, BalanceTip, BlockVote, ChainTransfer, NewAccountOrigin, NotaryId, Note, NoteType,
-	Notebook, NotebookHeader, NotebookNumber, VoteMinimum, CHANNEL_CLAWBACK_NOTEBOOKS,
-	CHANNEL_EXPIRATION_NOTEBOOKS, MIN_CHANNEL_NOTE_MILLIGONS,
+	BalanceProof, BalanceTip, BlockVote, ChainTransfer, DataDomain, NewAccountOrigin, NotaryId,
+	Note, NoteType, Notebook, NotebookHeader, NotebookNumber, VoteMinimum,
+	CHANNEL_CLAWBACK_NOTEBOOKS, CHANNEL_EXPIRATION_NOTEBOOKS, DATA_DOMAIN_LEASE_COST,
+	MIN_CHANNEL_NOTE_MILLIGONS, MIN_DATA_DOMAIN_NAME_LENGTH,
 };
 
 pub mod error;
@@ -75,10 +76,12 @@ pub fn notebook_verify<T: NotebookHistoryLookup>(
 	for notarization in notebook.notarizations.iter() {
 		let changeset = &notarization.balance_changes;
 		let block_votes = &notarization.block_votes;
+		let data_domains = &notarization.data_domains;
 
 		let result = verify_notarization_allocation(
 			changeset,
 			block_votes,
+			data_domains,
 			Some(notebook.header.notebook_number),
 		)?;
 		result.verify_taxes()?;
@@ -86,7 +89,7 @@ pub fn notebook_verify<T: NotebookHistoryLookup>(
 		verify_changeset_signatures(&changeset)?;
 		verify_balance_sources(lookup, &mut state, header, changeset)?;
 		track_block_votes(&mut state, block_votes)?;
-		verify_voting_sources(&state.unused_channel_passes, block_votes, &vote_minimums)?;
+		verify_voting_sources(&state.channel_data_domains, block_votes, &vote_minimums)?;
 	}
 
 	ensure!(
@@ -131,7 +134,7 @@ struct NotebookVerifyState {
 	block_votes: BTreeMap<(AccountId, u32), BlockVote>,
 	seen_transfers_in: BTreeSet<(AccountId32, u32)>,
 	new_account_origins: BTreeMap<(AccountId, AccountType), AccountOriginUid>,
-	unused_channel_passes: BTreeSet<H256>,
+	channel_data_domains: BTreeMap<(DataDomain, AccountId), u32>,
 	blocks_voted_on: BTreeSet<H256>,
 	block_power: u128,
 	tax: u128,
@@ -269,21 +272,28 @@ fn verify_balance_sources<'a, T: NotebookHistoryLookup>(
 					channel_hold_note = Some(note.clone());
 				},
 				// this condition is redundant, but leaving for clarity
-				NoteType::ChannelSettle { channel_pass_hash } => {
-					ensure!(
-						state.unused_channel_passes.insert(channel_pass_hash.clone()),
-						VerifyError::DuplicateChannelPassSettled
-					);
+				NoteType::ChannelSettle => {
+					if let Some(hold_note) = &change.channel_hold_note {
+						match &hold_note.note_type {
+							&NoteType::ChannelHold { ref data_domain, ref recipient } =>
+								if let Some(data_domain) = data_domain {
+									let count = state
+										.channel_data_domains
+										.entry((data_domain.clone(), recipient.clone()))
+										.or_insert(0);
+									*count += 1u32;
+								},
+							_ => return Err(VerifyError::InvalidChannelHoldNote),
+						}
+					}
 					channel_hold_note = None;
 				},
 				_ => {},
 			}
 		}
 
-		info!(target:LOG_TARGET, "Verifying balance change for {:?}, #{} {:?}", key.0, change.change_number, key.1);
 		if change.change_number == 1 {
 			if let Some(account_uid) = state.new_account_origins.get(&key) {
-				info!(target:LOG_TARGET,"track final balance for account_uid {account_uid}");
 				state.track_final_balance(
 					&key,
 					&change,
@@ -325,21 +335,23 @@ fn verify_balance_sources<'a, T: NotebookHistoryLookup>(
 }
 
 pub fn verify_voting_sources(
-	channel_passes: &BTreeSet<H256>,
+	channel_data_domains: &BTreeMap<(DataDomain, AccountId), u32>,
 	block_votes: &Vec<BlockVote>,
 	vote_minimums: &BTreeMap<H256, VoteMinimum>,
 ) -> anyhow::Result<(), VerifyError> {
-	let mut unused_channel_passes = channel_passes.clone();
+	let mut data_domain_tracker = channel_data_domains.clone();
 	for block_vote in block_votes {
 		let minimum = vote_minimums
 			.get(&block_vote.block_hash)
 			.ok_or(VerifyError::InvalidBlockVoteSource)?;
 
 		ensure!(block_vote.power >= *minimum, VerifyError::InsufficientBlockVoteMinimum);
-		let hash = block_vote.channel_pass.hash();
 
-		// a channel pass can only be used once
-		ensure!(unused_channel_passes.remove(&hash), VerifyError::InvalidBlockVoteChannelPass);
+		let count = data_domain_tracker
+			.get_mut(&(block_vote.data_domain.clone(), block_vote.data_domain_account.clone()))
+			.ok_or(VerifyError::BlockVoteDataDomainMismatch)?;
+		ensure!(*count > 0, VerifyError::BlockVoteChannelReused);
+		*count -= 1;
 	}
 	Ok(())
 }
@@ -457,6 +469,9 @@ pub struct BalanceChangesetState {
 	pub tax_created_per_account: BTreeMap<AccountId, u128>,
 	/// How much was deposited per account
 	pub claimed_deposits_per_account: BTreeMap<AccountId, u128>,
+
+	/// How much was allocated to domains
+	pub allocated_to_domains: u128,
 
 	/// How much tax was sent per account to block seals
 	unclaimed_block_vote_tax_per_account: BTreeMap<AccountId, u128>,
@@ -686,6 +701,7 @@ impl BalanceChangesetState {
 pub fn verify_notarization_allocation(
 	changes: &Vec<BalanceChange>,
 	block_votes: &Vec<BlockVote>,
+	data_domains: &Vec<(DataDomain, AccountId)>,
 	notebook_number: Option<NotebookNumber>,
 ) -> anyhow::Result<BalanceChangesetState, VerifyError> {
 	let mut state = BalanceChangesetState::default();
@@ -701,7 +717,7 @@ pub fn verify_notarization_allocation(
 
 		for note in &change.notes {
 			if change.channel_hold_note.is_some() &&
-				!matches!(note.note_type, NoteType::ChannelSettle { .. })
+				!matches!(note.note_type, NoteType::ChannelSettle)
 			{
 				return Err(VerifyError::AccountLocked)
 			}
@@ -752,7 +768,7 @@ pub fn verify_notarization_allocation(
 				NoteType::ChannelClaim => {
 					state.claim_channel_balance(note.milligons, &change.account_id)?;
 				},
-				NoteType::ChannelSettle { .. } => {
+				NoteType::ChannelSettle => {
 					let Some(source_change_notebook) =
 						change.previous_balance_proof.as_ref().map(|a| a.notebook_number)
 					else {
@@ -778,6 +794,15 @@ pub fn verify_notarization_allocation(
 						VerifyError::InvalidTaxOperation
 					);
 					state.record_tax(note.milligons, &change.account_id)?;
+				},
+				NoteType::LeaseDomain => {
+					ensure!(
+						change.account_type == AccountType::Deposit,
+						VerifyError::InvalidTaxOperation
+					);
+					state.record_tax(note.milligons, &change.account_id)?;
+					state.allocated_to_domains =
+						state.allocated_to_domains.saturating_add(note.milligons);
 				},
 				NoteType::SendToVote { .. } => {
 					ensure!(
@@ -806,7 +831,8 @@ pub fn verify_notarization_allocation(
 					},
 				NoteType::SendToMainchain |
 				NoteType::Send { .. } |
-				NoteType::ChannelSettle { .. } |
+				NoteType::ChannelSettle |
+				NoteType::LeaseDomain |
 				NoteType::Tax |
 				NoteType::SendToVote => balance -= note.milligons as i128,
 				_ => {},
@@ -823,6 +849,17 @@ pub fn verify_notarization_allocation(
 			}
 		);
 		change_index += 1;
+	}
+
+	ensure!(
+		state.allocated_to_domains == DATA_DOMAIN_LEASE_COST * data_domains.len() as u128,
+		VerifyError::InvalidDomainLeaseAllocation
+	);
+	for (data_domain, _) in data_domains {
+		ensure!(
+			data_domain.domain_name.len() >= MIN_DATA_DOMAIN_NAME_LENGTH,
+			VerifyError::InvalidDomainName
+		);
 	}
 
 	ensure!(

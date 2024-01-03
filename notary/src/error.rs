@@ -10,7 +10,7 @@ pub enum Error {
 	#[error("An invalid balance change was submitted ({change_index}.{note_index}): {message}")]
 	BalanceChangeError { change_index: usize, note_index: usize, message: String },
 	#[error(
-    	"Account balance tip invalid (change: {change_index}, expected previous: {stored_tip:?} vs calculated: {provided_tip:?})",
+    	"Account balance tip invalid (change: {change_index}, expected previous: {stored_tip:?} vs provided: {provided_tip:?})",
 	)]
 	BalanceTipMismatch { change_index: usize, stored_tip: Option<H256>, provided_tip: Option<H256> },
 	#[error(

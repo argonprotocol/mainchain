@@ -42,9 +42,10 @@ CREATE TABLE  IF NOT EXISTS registered_keys (
     finalized_block_number integer NOT NULL
 );
 CREATE TABLE IF NOT EXISTS notarizations (
-     notebook_number integer NOT NULL,
-     balance_changes jsonb NOT NULL,
-     block_votes jsonb NOT NULL
+    notebook_number integer NOT NULL,
+    balance_changes jsonb NOT NULL,
+    block_votes jsonb NOT NULL,
+    data_domains jsonb NOT NULL
 );
 
 CREATE INDEX IF NOT EXISTS notarizations_notebook_number ON notarizations (notebook_number);
@@ -98,6 +99,7 @@ CREATE TABLE IF NOT EXISTS notebook_headers (
     blocks_with_votes bytea[] NOT NULL,
     secret_hash BYTEA NOT NULL,
     parent_secret BYTEA NULL,
+    data_domains jsonb NOT NULL,
     last_updated timestamptz NOT NULL default now()
 );
 
@@ -108,6 +110,7 @@ CREATE TABLE IF NOT EXISTS notebook_status (
     block_votes INTEGER NOT NULL default 0,
     balance_changes INTEGER NOT NULL default 0,
     notarizations INTEGER NOT NULL default 0,
+    data_domains INTEGER NOT NULL default 0,
     step INTEGER NOT NULL,
     open_time timestamptz NOT NULL,
     end_time timestamptz NOT NULL,

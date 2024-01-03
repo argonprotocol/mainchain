@@ -17,8 +17,8 @@ use sp_runtime::{traits::BlakeTwo256, MultiSignature};
 use ulx_primitives::{
 	balance_change::{AccountOrigin, BalanceChange, BalanceProof},
 	note::{AccountType, Note, NoteType},
-	Balance, BalanceTip, BlockVote, ChainTransfer, ChannelPass, MerkleProof, NewAccountOrigin,
-	Notarization, Notebook, NotebookHeader, NotebookNumber,
+	Balance, BalanceTip, BlockVote, ChainTransfer, DataDomain, DataTLD, MerkleProof,
+	NewAccountOrigin, Notarization, Notebook, NotebookHeader, NotebookNumber,
 };
 
 use crate::{
@@ -221,6 +221,7 @@ fn test_verify_notebook() {
 		block_votes_root: H256::from_slice(&[0u8; 32]),
 		block_votes_count: 0,
 		blocks_with_votes: bounded_vec![],
+		data_domains: bounded_vec![],
 	};
 
 	ValidLocalchainTransfers::mutate(|a| a.insert((Alice.to_account_id(), 1)));
@@ -228,7 +229,11 @@ fn test_verify_notebook() {
 
 	let mut notebook1 = Notebook {
 		header: notebook_header1.clone(),
-		notarizations: bounded_vec![Notarization::new(alice_balance_changeset.clone(), vec![],)],
+		notarizations: bounded_vec![Notarization::new(
+			alice_balance_changeset.clone(),
+			vec![],
+			vec![]
+		)],
 		new_account_origins: bounded_vec![NewAccountOrigin::new(
 			Alice.to_account_id(),
 			AccountType::Deposit,
@@ -316,12 +321,17 @@ fn test_disallows_double_claim() {
 		block_votes_root: H256::from_slice(&[0u8; 32]),
 		block_votes_count: 0,
 		blocks_with_votes: bounded_vec![],
+		data_domains: bounded_vec![],
 	};
 
 	ValidLocalchainTransfers::mutate(|a| a.insert((Alice.to_account_id(), 1)));
 	let mut notebook1 = Notebook {
 		header: notebook_header1.clone(),
-		notarizations: bounded_vec![Notarization::new(alice_balance_changeset.clone(), vec![],)],
+		notarizations: bounded_vec![Notarization::new(
+			alice_balance_changeset.clone(),
+			vec![],
+			vec![]
+		)],
 		new_account_origins: bounded_vec![NewAccountOrigin::new(
 			Alice.to_account_id(),
 			AccountType::Deposit,
@@ -451,8 +461,13 @@ fn test_multiple_changesets_in_a_notebook() {
 			block_votes_root: H256::from_slice(&[0u8; 32]),
 			block_votes_count: 0,
 			blocks_with_votes: bounded_vec![],
+			data_domains: bounded_vec![],
 		},
-		notarizations: bounded_vec![Notarization::new(alice_balance_changeset.clone(), vec![],)],
+		notarizations: bounded_vec![Notarization::new(
+			alice_balance_changeset.clone(),
+			vec![],
+			vec![]
+		)],
 		new_account_origins: bounded_vec![
 			NewAccountOrigin::new(Alice.to_account_id(), AccountType::Deposit, 1),
 			NewAccountOrigin::new(Bob.to_account_id(), AccountType::Deposit, 2),
@@ -511,7 +526,7 @@ fn test_multiple_changesets_in_a_notebook() {
 	);
 	notebook
 		.notarizations
-		.try_push(Notarization::new(changeset2.clone(), vec![]))
+		.try_push(Notarization::new(changeset2.clone(), vec![], vec![]))
 		.expect("should insert");
 	if let Some(tip) = balance_tips.get_mut(&(Bob.to_account_id(), AccountType::Deposit)) {
 		tip.change_number = 2;
@@ -611,7 +626,7 @@ fn test_cannot_remove_lock_between_changesets_in_a_notebook() {
 		channel_hold_note: None,
 		notes: bounded_vec![Note::create(
 			1000,
-			NoteType::ChannelHold { recipient: Bob.to_account_id() }
+			NoteType::ChannelHold { recipient: Bob.to_account_id(), data_domain: None }
 		)],
 		signature: empty_signature(),
 	}
@@ -651,10 +666,11 @@ fn test_cannot_remove_lock_between_changesets_in_a_notebook() {
 			block_votes_root: H256::from_slice(&[0u8; 32]),
 			block_votes_count: 0,
 			blocks_with_votes: bounded_vec![],
+			data_domains: bounded_vec![],
 		},
 		notarizations: bounded_vec![
-			Notarization::new(alice_balance_changeset.clone(), vec![]),
-			Notarization::new(alice_balance_changeset2.clone(), vec![]),
+			Notarization::new(alice_balance_changeset.clone(), vec![], vec![]),
+			Notarization::new(alice_balance_changeset2.clone(), vec![], vec![]),
 		],
 		new_account_origins: bounded_vec![NewAccountOrigin::new(
 			Alice.to_account_id(),
@@ -704,16 +720,18 @@ fn test_cannot_remove_lock_between_changesets_in_a_notebook() {
 			channel_hold_note: None,
 			notes: bounded_vec![Note::create(
 				1000,
-				NoteType::ChannelHold { recipient: Ferdie.to_account_id() }
+				NoteType::ChannelHold { recipient: Ferdie.to_account_id(), data_domain: None }
 			)],
 			signature: empty_signature(),
 		}
 		.sign(Alice.pair())
 		.clone()];
 		let mut notebook = notebook.clone();
-		let _ = notebook
-			.notarizations
-			.try_push(Notarization::new(alice_balance_changeset3, vec![]));
+		let _ = notebook.notarizations.try_push(Notarization::new(
+			alice_balance_changeset3,
+			vec![],
+			vec![],
+		));
 		let hold_note = notebook.notarizations[2].balance_changes[0].notes[0].clone();
 		notebook.header.changed_accounts_root = merkle_root::<Blake2Hasher, _>(vec![BalanceTip {
 			account_id: Alice.to_account_id(),
@@ -745,21 +763,20 @@ fn test_cannot_remove_lock_between_changesets_in_a_notebook() {
 			}),
 			channel_hold_note: Some(Note::create(
 				1000,
-				NoteType::ChannelHold { recipient: Bob.to_account_id() },
+				NoteType::ChannelHold { recipient: Bob.to_account_id(), data_domain: None },
 			)),
-			notes: bounded_vec![Note::create(
-				0,
-				NoteType::ChannelSettle { channel_pass_hash: H256::from_slice(&[0u8; 32]) }
-			)],
+			notes: bounded_vec![Note::create(0, NoteType::ChannelSettle)],
 			signature: empty_signature(),
 		}
 		.sign(Alice.pair())
 		.clone()];
 
 		let mut notebook = notebook.clone();
-		let _ = notebook
-			.notarizations
-			.try_push(Notarization::new(alice_balance_changeset3, vec![]));
+		let _ = notebook.notarizations.try_push(Notarization::new(
+			alice_balance_changeset3,
+			vec![],
+			vec![],
+		));
 		let hold_note = notebook.notarizations[2].balance_changes[0].notes[0].clone();
 
 		notebook.header.changed_accounts_root = merkle_root::<Blake2Hasher, _>(vec![BalanceTip {
@@ -780,6 +797,8 @@ fn test_cannot_remove_lock_between_changesets_in_a_notebook() {
 
 #[test]
 fn test_votes_must_add_up() {
+	let data_domain = DataDomain::new("test", DataTLD::Flights);
+
 	let notebook_1_tips = vec![
 		BalanceTip {
 			account_id: Alice.to_account_id(),
@@ -794,7 +813,10 @@ fn test_votes_must_add_up() {
 			account_type: AccountType::Deposit,
 			channel_hold_note: Some(Note::create(
 				500,
-				NoteType::ChannelHold { recipient: Alice.to_account_id() },
+				NoteType::ChannelHold {
+					recipient: Alice.to_account_id(),
+					data_domain: Some(data_domain.clone()),
+				},
 			)),
 			balance: 500,
 			change_number: 1,
@@ -805,19 +827,16 @@ fn test_votes_must_add_up() {
 			account_type: AccountType::Deposit,
 			channel_hold_note: Some(Note::create(
 				500,
-				NoteType::ChannelHold { recipient: Alice.to_account_id() },
+				NoteType::ChannelHold {
+					recipient: Alice.to_account_id(),
+					data_domain: Some(data_domain.clone()),
+				},
 			)),
 			balance: 500,
 			change_number: 1,
 			account_origin: AccountOrigin { notebook_number: 1, account_uid: 3 },
 		},
 	];
-
-	let channel_pass1 =
-		ChannelPass { miner_index: 0, zone_record_hash: H256::random(), id: 1, at_block_height: 2 };
-
-	let channel_pass2 =
-		ChannelPass { miner_index: 1, zone_record_hash: H256::random(), id: 1, at_block_height: 2 };
 
 	let vote_block_hash = H256::random();
 	let mut notebook = Notebook {
@@ -838,6 +857,7 @@ fn test_votes_must_add_up() {
 			block_votes_root: H256::from_slice(&[0u8; 32]),
 			block_votes_count: 3,
 			blocks_with_votes: bounded_vec![],
+			data_domains: bounded_vec![],
 		},
 		notarizations: bounded_vec![Notarization::new(
 			vec![
@@ -847,7 +867,10 @@ fn test_votes_must_add_up() {
 					account_id: Bob.to_account_id(),
 					channel_hold_note: Some(Note::create(
 						500,
-						NoteType::ChannelHold { recipient: Alice.to_account_id() }
+						NoteType::ChannelHold {
+							recipient: Alice.to_account_id(),
+							data_domain: Some(data_domain.clone())
+						}
 					)),
 					account_type: AccountType::Deposit,
 					previous_balance_proof: Some(BalanceProof {
@@ -858,10 +881,7 @@ fn test_votes_must_add_up() {
 						balance: 500,
 					}),
 					signature: empty_signature(),
-					notes: bounded_vec![Note::create(
-						500,
-						NoteType::ChannelSettle { channel_pass_hash: channel_pass1.hash() }
-					)],
+					notes: bounded_vec![Note::create(500, NoteType::ChannelSettle)],
 				}
 				.sign(Bob.pair())
 				.clone(),
@@ -871,7 +891,10 @@ fn test_votes_must_add_up() {
 					account_id: Ferdie.to_account_id(),
 					channel_hold_note: Some(Note::create(
 						500,
-						NoteType::ChannelHold { recipient: Alice.to_account_id() }
+						NoteType::ChannelHold {
+							recipient: Alice.to_account_id(),
+							data_domain: Some(data_domain.clone())
+						}
 					)),
 					account_type: AccountType::Deposit,
 					previous_balance_proof: Some(BalanceProof {
@@ -882,10 +905,7 @@ fn test_votes_must_add_up() {
 						balance: 500,
 					}),
 					signature: empty_signature(),
-					notes: bounded_vec![Note::create(
-						500,
-						NoteType::ChannelSettle { channel_pass_hash: channel_pass2.hash() }
-					)],
+					notes: bounded_vec![Note::create(500, NoteType::ChannelSettle)],
 				}
 				.sign(Ferdie.pair())
 				.clone(),
@@ -932,16 +952,19 @@ fn test_votes_must_add_up() {
 					power: 4,
 					block_hash: vote_block_hash.clone(),
 					account_id: Alice.to_account_id(),
-					channel_pass: channel_pass1
+					data_domain: data_domain.clone(),
+					data_domain_account: Ferdie.to_account_id(),
 				},
 				BlockVote {
 					index: 1,
 					power: 30,
 					block_hash: vote_block_hash.clone(),
 					account_id: Alice.to_account_id(),
-					channel_pass: channel_pass2
+					data_domain,
+					data_domain_account: Alice.to_account_id(),
 				}
-			]
+			],
+			vec![]
 		),],
 		new_account_origins: bounded_vec![NewAccountOrigin::new(
 			Alice.to_account_id(),
@@ -1033,7 +1056,14 @@ fn test_votes_must_add_up() {
 	);
 	let minimums = BTreeMap::from([(vote_block_hash.clone(), 2)]);
 
-	// 2. Once vote minimums are allowed, the "vote root is wrong"
+	// 2. One of the votes didn't match the payment account
+	assert_err!(
+		notebook_verify(&TestLookup, &notebook, &minimums,),
+		VerifyError::BlockVoteDataDomainMismatch
+	);
+	notebook.notarizations[0].block_votes[0].data_domain_account = Alice.to_account_id();
+
+	// 3. Once vote minimums are allowed, the "vote root is wrong"
 	assert_err!(
 		notebook_verify(&TestLookup, &notebook, &minimums,),
 		VerifyError::InvalidBlockVoteRoot
@@ -1046,7 +1076,7 @@ fn test_votes_must_add_up() {
 			.collect::<Vec<_>>(),
 	);
 
-	// 3. The votes must add up
+	// 4. The votes must add up
 	assert_err!(
 		notebook_verify(&TestLookup, &notebook, &minimums,),
 		VerifyError::InvalidBlockVotesCount

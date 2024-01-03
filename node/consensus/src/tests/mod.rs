@@ -16,9 +16,9 @@ use substrate_test_runtime::AccountId;
 
 use ulx_primitives::{
 	block_seal::{BlockSealAuthorityId, BLOCK_SEAL_KEY_TYPE},
-	localchain::{BlockVote, ChannelPass},
+	localchain::BlockVote,
 	tick::Ticker,
-	BestBlockVoteSeal, MerkleProof, TickApis,
+	BestBlockVoteSeal, DataDomain, DataTLD, MerkleProof, TickApis,
 };
 
 use crate::{
@@ -302,12 +302,8 @@ async fn can_run_proof_of_tax() {
 		let vote = BlockVote {
 			block_hash: grandparent_hash,
 			account_id: account_id.clone(),
-			channel_pass: ChannelPass {
-				at_block_height: 1,
-				id: 1,
-				zone_record_hash: H256::random(),
-				miner_index: 0,
-			},
+			data_domain: DataDomain::new("delta", DataTLD::Flights),
+			data_domain_account: Keyring::Alice.to_account_id(),
 			power: 500,
 			index: 1,
 		};

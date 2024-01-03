@@ -189,6 +189,10 @@ pub mod pallet {
 			notebooks: Vec<SignedNotebookHeader>,
 		) -> DispatchResult {
 			ensure_none(origin)?;
+			info!(
+				target: LOG_TARGET,
+				"Notebook inherent submitted with {} notebooks", notebooks.len()
+			);
 
 			// Take this value the first time. should reject a second time
 			let notebook_digest = <TempNotebookDigest<T>>::take()

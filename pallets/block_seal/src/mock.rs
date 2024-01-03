@@ -1,4 +1,4 @@
-use std::collections::BTreeMap;
+use std::collections::{BTreeMap, BTreeSet};
 
 use env_logger::{Builder, Env};
 use frame_support::{
@@ -16,8 +16,8 @@ use ulx_primitives::{
 	block_vote::VoteMinimum,
 	notebook::NotebookNumber,
 	tick::{Tick, Ticker},
-	AuthorityProvider, BlockVotingProvider, HashOutput, NotaryId, NotebookProvider, NotebookSecret,
-	TickProvider,
+	AuthorityProvider, BlockVotingProvider, DataDomain, DataDomainProvider, HashOutput, NotaryId,
+	NotebookProvider, NotebookSecret, TickProvider,
 };
 
 use crate as pallet_block_seal;
@@ -68,6 +68,7 @@ parameter_types! {
 	pub static NotebooksAtTick: BTreeMap<Tick, Vec<(NotaryId, NotebookNumber, Option<NotebookSecret>)>> = BTreeMap::new();
 	pub static CurrentTick: Tick = 0;
 	pub static BlocksAtTick: BTreeMap<Tick, Vec<HashOutput>> = BTreeMap::new();
+	pub static RegisteredDataDomains: BTreeSet<DataDomain> = BTreeSet::new();
 }
 
 pub struct StaticAuthorityProvider;
@@ -127,7 +128,16 @@ impl BlockVotingProvider<Block> for StaticBlockVotingProvider {
 		GrandpaVoteMinimum::get()
 	}
 }
-
+pub struct StaticDataDomainProvider;
+impl DataDomainProvider<u64> for StaticDataDomainProvider {
+	fn is_registered_payment_account(
+		data_domain: &DataDomain,
+		_account_id: &u64,
+		_tick_range: (Tick, Tick),
+	) -> bool {
+		RegisteredDataDomains::get().contains(&data_domain)
+	}
+}
 impl pallet_block_seal::Config for Test {
 	type WeightInfo = ();
 	type AuthorityId = BlockSealAuthorityId;
@@ -135,6 +145,7 @@ impl pallet_block_seal::Config for Test {
 	type NotebookProvider = StaticNotebookProvider;
 	type BlockVotingProvider = StaticBlockVotingProvider;
 	type TickProvider = StaticTickProvider;
+	type DataDomainProvider = StaticDataDomainProvider;
 }
 
 // Build genesis storage according to the mock runtime.

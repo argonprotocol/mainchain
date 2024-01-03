@@ -20,6 +20,7 @@ use sp_api::ProvideRuntimeApi;
 use sp_block_builder::BlockBuilder;
 use sp_blockchain::{Error as BlockChainError, HeaderBackend, HeaderMetadata};
 use ulx_node_runtime::{opaque::Block, AccountId, Balance, BlockNumber, HashOutput, Nonce};
+use ulx_primitives::{BlockSealAuthorityId, MiningApis};
 
 /// Extra dependencies for GRANDPA
 pub struct GrandpaDeps<B> {
@@ -60,6 +61,7 @@ where
 	C::Api: substrate_frame_rpc_system::AccountNonceApi<Block, AccountId, Nonce>,
 	C::Api: pallet_transaction_payment_rpc::TransactionPaymentRuntimeApi<Block, Balance>,
 	C::Api: BlockBuilder<Block>,
+	C::Api: MiningApis<Block, AccountId, BlockSealAuthorityId>,
 	P: TransactionPool + 'static,
 	B: sc_client_api::Backend<Block> + Send + Sync + 'static,
 	B::State: sc_client_api::backend::StateBackend<sp_runtime::traits::HashingFor<Block>>,
