@@ -1,15 +1,15 @@
-use std::{collections::HashMap, net::Ipv4Addr};
+use std::collections::HashMap;
 
 use frame_support::{
 	assert_err, assert_noop, assert_ok,
 	traits::{Currency, OnInitialize, OneSessionHandler},
 };
 use pallet_balances::Event as UlixeeBalancesEvent;
-use sp_core::{bounded_vec, OpaquePeerId, U256};
+use sp_core::{bounded_vec, U256};
 use sp_runtime::{testing::UintAuthorityId, BoundedVec};
 
 use ulx_primitives::{
-	block_seal::{Host, MiningAuthority, MiningRegistration, PeerId, RewardDestination},
+	block_seal::{MiningAuthority, MiningRegistration, RewardDestination},
 	bond::BondProvider,
 	AuthorityProvider, BlockSealAuthorityId,
 };
@@ -23,15 +23,6 @@ use crate::{
 	Error, Event,
 };
 
-pub fn ip_to_u32(ip: Ipv4Addr) -> u32 {
-	let octets = ip.octets();
-	u32::from_be_bytes(octets)
-}
-
-pub fn ip_from_u32(ip: u32) -> Ipv4Addr {
-	Ipv4Addr::from(ip.to_be_bytes())
-}
-
 #[test]
 fn it_doesnt_add_cohorts_until_time() {
 	BlocksBetweenSlots::set(2);
@@ -41,21 +32,16 @@ fn it_doesnt_add_cohorts_until_time() {
 
 		NextSlotCohort::<Test>::set(bounded_vec![MiningRegistration {
 			account_id: 1,
-			peer_id: PeerId(OpaquePeerId::default()),
 			bond_id: None,
 			ownership_tokens: 0,
 			bond_amount: 0,
 			reward_destination: RewardDestination::Owner,
-			rpc_hosts: rpc_hosts(Ipv4Addr::new(127, 0, 0, 1), 3000),
 		}]);
 
 		MiningSlots::on_initialize(1);
 
 		assert_eq!(NextSlotCohort::<Test>::get().len(), 1);
-		assert_eq!(
-			ip_from_u32(NextSlotCohort::<Test>::get()[0].rpc_hosts[0].ip).to_string(),
-			"127.0.0.1"
-		);
+		assert_eq!(NextSlotCohort::<Test>::get()[0].reward_destination, RewardDestination::Owner);
 	});
 }
 
@@ -65,13 +51,13 @@ fn get_validation_window_blocks() {
 	MaxMiners::set(10);
 	BlocksBetweenSlots::set(1);
 
-	assert_eq!(MiningSlots::get_validation_window_blocks(), 5);
+	assert_eq!(MiningSlots::get_mining_window_blocks(), 5);
 
 	MaxCohortSize::set(5);
 	MaxMiners::set(10);
 	BlocksBetweenSlots::set(10);
 
-	assert_eq!(MiningSlots::get_validation_window_blocks(), 2 * 10);
+	assert_eq!(MiningSlots::get_mining_window_blocks(), 2 * 10);
 }
 
 #[test]
@@ -176,12 +162,10 @@ fn it_activates_miner_zero_if_no_miners() {
 
 	new_test_ext(Some(MiningRegistration {
 		account_id: 1,
-		peer_id: empty_peer(),
 		bond_id: None,
 		ownership_tokens: 0,
 		bond_amount: 0,
 		reward_destination: RewardDestination::Owner,
-		rpc_hosts: rpc_hosts(Ipv4Addr::new(127, 0, 0, 1), 3000),
 	}))
 	.execute_with(|| {
 		MiningSlots::on_initialize(1);
@@ -198,24 +182,20 @@ fn it_activates_miner_zero_if_upcoming_miners_will_empty() {
 
 	new_test_ext(Some(MiningRegistration {
 		account_id: 1,
-		peer_id: empty_peer(),
 		bond_id: None,
 		ownership_tokens: 0,
 		bond_amount: 0,
 		reward_destination: RewardDestination::Owner,
-		rpc_hosts: rpc_hosts(Ipv4Addr::new(127, 0, 0, 1), 3000),
 	}))
 	.execute_with(|| {
 		ActiveMinersByIndex::<Test>::insert(
 			5,
 			MiningRegistration {
 				account_id: 10,
-				peer_id: empty_peer(),
 				bond_id: None,
 				ownership_tokens: 0,
 				bond_amount: 0,
 				reward_destination: RewardDestination::Owner,
-				rpc_hosts: rpc_hosts(Ipv4Addr::new(127, 0, 0, 1), 3000),
 			},
 		);
 		AccountIndexLookup::<Test>::insert(10, 5);
@@ -242,12 +222,10 @@ fn it_adds_new_cohorts_on_block() {
 				i,
 				MiningRegistration {
 					account_id,
-					peer_id: empty_peer(),
 					bond_id: None,
 					ownership_tokens: 0,
 					bond_amount: 0,
 					reward_destination: RewardDestination::Owner,
-					rpc_hosts: rpc_hosts(Ipv4Addr::new(127, 0, 0, 1), 3000 + i as u16),
 				},
 			);
 			AccountIndexLookup::<Test>::insert(account_id, i);
@@ -256,12 +234,10 @@ fn it_adds_new_cohorts_on_block() {
 
 		let cohort = BoundedVec::truncate_from(vec![MiningRegistration {
 			account_id: 1,
-			peer_id: empty_peer(),
 			bond_id: None,
 			ownership_tokens: 0,
 			bond_amount: 0,
 			reward_destination: RewardDestination::Owner,
-			rpc_hosts: rpc_hosts(Ipv4Addr::new(127, 0, 0, 1), 3001),
 		}]);
 
 		NextSlotCohort::<Test>::set(cohort.clone());
@@ -344,8 +320,7 @@ fn it_unbonds_accounts_when_a_window_closes() {
 				i,
 				MiningRegistration {
 					account_id,
-					peer_id: empty_peer(),
-					rpc_hosts: rpc_hosts(Ipv4Addr::new(127, 0, 0, 1), 3000),
+
 					bond_id: Some(bond_id),
 					ownership_tokens,
 					bond_amount,
@@ -361,8 +336,6 @@ fn it_unbonds_accounts_when_a_window_closes() {
 		<Bonds as BondProvider>::extend_bond(bond_2, 2, 1010, 16).expect("can increase bond");
 		assert_ok!(MiningSlots::bid(
 			RuntimeOrigin::signed(2),
-			OpaquePeerId::default(),
-			rpc_hosts(Ipv4Addr::new(127, 0, 0, 1), 3000),
 			Some(bond_2),
 			RewardDestination::Owner
 		));
@@ -380,8 +353,6 @@ fn it_unbonds_accounts_when_a_window_closes() {
 					ownership_tokens: 1000u32.into(),
 					bond_amount: 1010,
 					reward_destination: RewardDestination::Owner,
-					peer_id: PeerId(OpaquePeerId::default()),
-					rpc_hosts: rpc_hosts(Ipv4Addr::new(127, 0, 0, 1), 3000),
 				}]),
 			}
 			.into(),
@@ -440,13 +411,7 @@ fn it_can_take_cohort_bids() {
 		System::set_block_number(3);
 
 		assert_err!(
-			MiningSlots::bid(
-				RuntimeOrigin::signed(2),
-				OpaquePeerId::default(),
-				rpc_hosts(Ipv4Addr::new(127, 0, 0, 1), 3000),
-				None,
-				RewardDestination::Owner
-			),
+			MiningSlots::bid(RuntimeOrigin::signed(2), None, RewardDestination::Owner),
 			Error::<Test>::SlotNotTakingBids
 		);
 
@@ -457,38 +422,20 @@ fn it_can_take_cohort_bids() {
 		assert_eq!(OwnershipBondAmount::<Test>::get(), 666);
 
 		assert_err!(
-			MiningSlots::bid(
-				RuntimeOrigin::signed(1),
-				OpaquePeerId::default(),
-				rpc_hosts(Ipv4Addr::new(127, 0, 0, 1), 3000),
-				None,
-				RewardDestination::Owner
-			),
+			MiningSlots::bid(RuntimeOrigin::signed(1), None, RewardDestination::Owner),
 			Error::<Test>::InsufficientOwnershipTokens
 		);
 
 		set_ownership(1, 1000u32.into());
 
-		assert_ok!(MiningSlots::bid(
-			RuntimeOrigin::signed(1),
-			OpaquePeerId::default(),
-			rpc_hosts(Ipv4Addr::new(127, 0, 0, 1), 3000),
-			None,
-			RewardDestination::Owner
-		));
+		assert_ok!(MiningSlots::bid(RuntimeOrigin::signed(1), None, RewardDestination::Owner));
 		System::assert_last_event(
 			Event::SlotBidderAdded { account_id: 1, bid_amount: 0u32.into(), index: 0 }.into(),
 		);
 		assert_eq!(UlixeeBalances::free_balance(&1), 334);
 
 		// should be able to re-register
-		assert_ok!(MiningSlots::bid(
-			RuntimeOrigin::signed(1),
-			OpaquePeerId::default(),
-			rpc_hosts(Ipv4Addr::new(127, 0, 0, 1), 3000),
-			None,
-			RewardDestination::Owner
-		));
+		assert_ok!(MiningSlots::bid(RuntimeOrigin::signed(1), None, RewardDestination::Owner));
 		assert_eq!(
 			NextSlotCohort::<Test>::get().iter().map(|a| a.account_id).collect::<Vec<_>>(),
 			vec![1]
@@ -518,13 +465,7 @@ fn it_wont_let_you_use_ownership_shares_for_two_bids() {
 		set_ownership(1, 100u32.into());
 		MiningSlots::on_initialize(3);
 
-		assert_ok!(MiningSlots::bid(
-			RuntimeOrigin::signed(1),
-			OpaquePeerId::default(),
-			rpc_hosts(Ipv4Addr::new(192, 255, 255, 255), 15555),
-			None,
-			RewardDestination::Owner
-		));
+		assert_ok!(MiningSlots::bid(RuntimeOrigin::signed(1), None, RewardDestination::Owner));
 		System::set_block_number(4);
 		MiningSlots::on_initialize(4);
 
@@ -533,12 +474,10 @@ fn it_wont_let_you_use_ownership_shares_for_two_bids() {
 				start_index: 2,
 				new_miners: BoundedVec::truncate_from(vec![MiningRegistration {
 					account_id: 1,
-					peer_id: PeerId(OpaquePeerId::default()),
 					bond_id: None,
 					ownership_tokens: 26u32.into(),
 					bond_amount: 0,
 					reward_destination: RewardDestination::Owner,
-					rpc_hosts: rpc_hosts(Ipv4Addr::new(192, 255, 255, 255), 15555),
 				}]),
 			}
 			.into(),
@@ -553,13 +492,7 @@ fn it_wont_let_you_use_ownership_shares_for_two_bids() {
 		assert_eq!(MiningSlots::get_next_slot_starting_index(), 4);
 
 		assert_err!(
-			MiningSlots::bid(
-				RuntimeOrigin::signed(1),
-				OpaquePeerId::default(),
-				rpc_hosts(Ipv4Addr::new(127, 0, 0, 1), 3000),
-				None,
-				RewardDestination::Owner
-			),
+			MiningSlots::bid(RuntimeOrigin::signed(1), None, RewardDestination::Owner),
 			Error::<Test>::CannotRegisteredOverlappingSessions
 		);
 		assert!(System::account_exists(&1));
@@ -577,13 +510,7 @@ fn it_will_order_bids_with_argon_bonds() {
 		System::set_block_number(3);
 
 		assert_err!(
-			MiningSlots::bid(
-				RuntimeOrigin::signed(2),
-				OpaquePeerId::default(),
-				rpc_hosts(Ipv4Addr::new(127, 0, 0, 1), 3000),
-				None,
-				RewardDestination::Owner
-			),
+			MiningSlots::bid(RuntimeOrigin::signed(2), None, RewardDestination::Owner),
 			Error::<Test>::SlotNotTakingBids
 		);
 
@@ -609,8 +536,6 @@ fn it_will_order_bids_with_argon_bonds() {
 
 		assert_ok!(MiningSlots::bid(
 			RuntimeOrigin::signed(1),
-			OpaquePeerId::default(),
-			rpc_hosts(Ipv4Addr::new(127, 0, 0, 1), 3000),
 			Some(acc_1_bond_id),
 			RewardDestination::Owner
 		));
@@ -629,8 +554,6 @@ fn it_will_order_bids_with_argon_bonds() {
 		// should be able to re-register
 		assert_ok!(MiningSlots::bid(
 			RuntimeOrigin::signed(2),
-			OpaquePeerId::default(),
-			rpc_hosts(Ipv4Addr::new(127, 0, 0, 1), 3000),
 			acc_2_bond_id,
 			RewardDestination::Owner
 		));
@@ -650,8 +573,6 @@ fn it_will_order_bids_with_argon_bonds() {
 		// should be able to re-register
 		assert_ok!(MiningSlots::bid(
 			RuntimeOrigin::signed(3),
-			OpaquePeerId::default(),
-			rpc_hosts(Ipv4Addr::new(127, 0, 0, 1), 3000),
 			acc_3_bond_id,
 			RewardDestination::Owner
 		));
@@ -674,8 +595,6 @@ fn it_will_order_bids_with_argon_bonds() {
 			.expect("can increse bond");
 		assert_ok!(MiningSlots::bid(
 			RuntimeOrigin::signed(1),
-			OpaquePeerId::default(),
-			rpc_hosts(Ipv4Addr::new(127, 0, 0, 1), 3000),
 			Some(acc_1_bond_id),
 			RewardDestination::Owner
 		));
@@ -723,34 +642,16 @@ fn handles_a_max_of_bids_per_block() {
 			set_ownership(i, 1000u32.into());
 		}
 
-		assert_ok!(MiningSlots::bid(
-			RuntimeOrigin::signed(1),
-			OpaquePeerId::default(),
-			rpc_hosts(Ipv4Addr::new(127, 0, 0, 1), 3000),
-			None,
-			RewardDestination::Owner
-		));
+		assert_ok!(MiningSlots::bid(RuntimeOrigin::signed(1), None, RewardDestination::Owner));
 		System::assert_last_event(
 			Event::SlotBidderAdded { account_id: 1, bid_amount: 0u32.into(), index: 0 }.into(),
 		);
-		assert_ok!(MiningSlots::bid(
-			RuntimeOrigin::signed(2),
-			OpaquePeerId::default(),
-			rpc_hosts(Ipv4Addr::new(127, 0, 0, 1), 3000),
-			None,
-			RewardDestination::Owner
-		));
+		assert_ok!(MiningSlots::bid(RuntimeOrigin::signed(2), None, RewardDestination::Owner));
 		System::assert_last_event(
 			Event::SlotBidderAdded { account_id: 2, bid_amount: 0u32.into(), index: 1 }.into(),
 		);
 		assert_noop!(
-			MiningSlots::bid(
-				RuntimeOrigin::signed(3),
-				OpaquePeerId::default(),
-				rpc_hosts(Ipv4Addr::new(127, 0, 0, 1), 3000),
-				None,
-				RewardDestination::Owner
-			),
+			MiningSlots::bid(RuntimeOrigin::signed(3), None, RewardDestination::Owner),
 			Error::<Test>::BidTooLow,
 		);
 		// should not have changed
@@ -782,12 +683,10 @@ fn it_can_get_closest_authority() {
 				i,
 				MiningRegistration {
 					account_id,
-					peer_id: empty_peer(),
 					bond_id: None,
 					ownership_tokens: 0,
 					bond_amount: 0,
 					reward_destination: RewardDestination::Owner,
-					rpc_hosts: rpc_hosts(Ipv4Addr::new(127, 0, 0, 1), 15550),
 				},
 			);
 			AccountIndexLookup::<Test>::insert(account_id, i);
@@ -808,8 +707,6 @@ fn it_can_get_closest_authority() {
 			MiningSlots::xor_closest_authority(U256::from(100)),
 			Some(MiningAuthority {
 				account_id: 96,
-				peer_id: empty_peer(),
-				rpc_hosts: rpc_hosts(Ipv4Addr::new(127, 0, 0, 1), 15550),
 				authority_id: UintAuthorityId(96).to_public_key(),
 				authority_index: 96,
 			})
@@ -829,12 +726,10 @@ fn it_can_replace_authority_keys() {
 				i,
 				MiningRegistration {
 					account_id,
-					peer_id: empty_peer(),
 					bond_id: None,
 					ownership_tokens: 0,
 					bond_amount: 0,
 					reward_destination: RewardDestination::Owner,
-					rpc_hosts: rpc_hosts(Ipv4Addr::new(127, 0, 0, 1), 3000),
 				},
 			);
 			AccountIndexLookup::<Test>::insert(account_id, i);
@@ -873,14 +768,4 @@ fn it_can_replace_authority_keys() {
 			"should not have index 11"
 		);
 	});
-}
-
-fn empty_peer() -> PeerId {
-	PeerId(OpaquePeerId::default())
-}
-fn rpc_hosts<S>(ip: Ipv4Addr, port: u16) -> BoundedVec<Host, S>
-where
-	S: sp_core::Get<u32>,
-{
-	bounded_vec![Host { ip: ip_to_u32(ip), port, is_secure: false }]
 }

@@ -7,8 +7,9 @@ use sp_core::{bounded::BoundedVec, H256};
 use sqlx::{query, types::JsonValue, FromRow, PgConnection};
 
 use ulx_primitives::{
-	ensure, notary::NotarySignature, tick::Tick, AccountOrigin, BlockVotingPower, ChainTransfer,
-	NotaryId, NotebookHeader, NotebookMeta, NotebookNumber, SignedNotebookHeader, NOTEBOOK_VERSION,
+	ensure, notary::NotarySignature, tick::Tick, AccountId, AccountOrigin, BlockVotingPower,
+	ChainTransfer, DataDomain, NotaryId, NotebookHeader, NotebookMeta, NotebookNumber,
+	SignedNotebookHeader, NOTEBOOK_VERSION,
 };
 
 use crate::{
@@ -40,6 +41,7 @@ struct NotebookHeaderRow {
 	pub secret_hash: Vec<u8>,
 	pub parent_secret: Option<Vec<u8>>,
 	pub last_updated: chrono::DateTime<Utc>,
+	pub data_domains: JsonValue,
 }
 
 impl TryInto<NotebookHeader> for NotebookHeaderRow {
@@ -77,6 +79,7 @@ impl TryInto<NotebookHeader> for NotebookHeaderRow {
 			),
 			secret_hash: H256::from_slice(&self.secret_hash[..]),
 			parent_secret: self.parent_secret.map(|a| H256::from_slice(&a[..])),
+			data_domains: BoundedVec::truncate_from(from_value(self.data_domains)?),
 		})
 	}
 }
@@ -120,8 +123,8 @@ impl NotebookHeaderStore {
 			r#"
 			INSERT INTO notebook_headers (version, notary_id, tick, notebook_number, chain_transfers, 
 				changed_account_origins, changed_accounts_root, secret_hash, block_votes_root, 
-				block_voting_power, block_votes_count, blocks_with_votes)
-			VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12)
+				block_voting_power, block_votes_count, blocks_with_votes, data_domains)
+			VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13)
 			"#,
 			version as i16,
 			notary_id as i32,
@@ -134,7 +137,8 @@ impl NotebookHeaderStore {
 			[0u8; 32].as_ref(),
 			0.to_string(),
 			0,
-			&[]
+			&[],
+			empty.clone(),
 		)
 		.execute(db)
 		.await?;
@@ -330,6 +334,7 @@ impl NotebookHeaderStore {
 		notebook_number: NotebookNumber,
 		finalized_block_number: u32,
 		transfers: Vec<ChainTransfer>,
+		data_domains: Vec<(DataDomain, AccountId)>,
 		tax: u128,
 		changed_accounts_root: H256,
 		account_changelist: Vec<AccountOrigin>,
@@ -343,7 +348,12 @@ impl NotebookHeaderStore {
 			let mut header = Self::load(&mut *db, notebook_number).await?;
 			header.chain_transfers = BoundedVec::try_from(transfers).map_err(|_| {
 				Error::InternalError(
-					"Unable to decode chain transfers. Possibly exceeded max size.".to_string(),
+					"Unable to bound chain transfers. Possibly exceeded max size.".to_string(),
+				)
+			})?;
+			header.data_domains = BoundedVec::try_from(data_domains).map_err(|_| {
+				Error::InternalError(
+					"Unable to bound data domains. Possibly exceeded max size.".to_string(),
 				)
 			})?;
 			header.changed_accounts_root = changed_accounts_root;
@@ -379,8 +389,9 @@ impl NotebookHeaderStore {
 					blocks_with_votes=$10,
 					secret_hash=$11,
 					parent_secret=$12,
-					signature=$13
-				WHERE notebook_number = $14
+					signature=$13,
+					data_domains=$14
+				WHERE notebook_number = $15
 			"#,
 				&hash,
 				header.changed_accounts_root.as_bytes(),
@@ -402,6 +413,7 @@ impl NotebookHeaderStore {
 					data.as_bytes().to_vec()
 				}),
 				&signature.0.as_ref()[..],
+				json!(header.data_domains.to_vec()),
 				header.notebook_number as i32,
 			)
 			.execute(db)
@@ -524,6 +536,7 @@ mod tests {
 					},
 					ChainTransfer::ToMainchain { account_id: Alice.to_account_id(), amount: 100 },
 				],
+				vec![],
 				0,
 				[1u8; 32].into(),
 				vec![

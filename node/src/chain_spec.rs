@@ -1,18 +1,15 @@
-use std::{net::Ipv4Addr, time::Duration};
+use std::time::Duration;
 
 use sc_service::{ChainType, Properties};
 use sp_consensus_grandpa::AuthorityId as GrandpaId;
-use sp_core::{sr25519, OpaquePeerId, Pair, Public};
-use sp_runtime::{
-	bounded_vec,
-	traits::{IdentifyAccount, Verify},
-};
+use sp_core::{sr25519, Pair, Public};
+use sp_runtime::traits::{IdentifyAccount, Verify};
 
 use ulx_node_runtime::{
 	opaque::SessionKeys, AccountId, Balance, RuntimeGenesisConfig, Signature, WASM_BINARY,
 };
 use ulx_primitives::{
-	block_seal::{Host, MiningRegistration, PeerId, RewardDestination},
+	block_seal::{MiningRegistration, RewardDestination},
 	block_vote::VoteMinimum,
 	tick::{Ticker, TICK_MILLIS},
 	BlockSealAuthorityId, BondId, ComputeDifficulty,
@@ -74,6 +71,7 @@ pub fn development_config() -> Result<ChainSpec, String> {
 		vec![
 			get_account_id_from_seed::<sr25519::Public>("Alice"),
 			get_account_id_from_seed::<sr25519::Public>("Bob"),
+			get_account_id_from_seed::<sr25519::Public>("Ferdie"),
 		],
 		500,
 		(TICK_MILLIS * HASHES_PER_SECOND / 1_000) as ComputeDifficulty,
@@ -141,16 +139,10 @@ fn testnet_genesis(
 	let ticker = Ticker::start(Duration::from_millis(tick_millis));
 	let miner_zero = MiningRegistration::<AccountId, BondId, Balance> {
 		account_id: authority_zero.0.clone(),
-		rpc_hosts: bounded_vec![Host {
-			ip: Ipv4Addr::new(127, 0, 0, 1).into(),
-			port: 9944,
-			is_secure: false
-		},],
 		bond_id: None,
 		reward_destination: RewardDestination::Owner,
 		bond_amount: 0u32.into(),
 		ownership_tokens: 0u32.into(),
-		peer_id: PeerId(OpaquePeerId::new([0u8; 64].to_vec())),
 	};
 
 	serde_json::json!({

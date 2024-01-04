@@ -5,6 +5,7 @@ use sp_runtime::{BoundedVec, DispatchError};
 use sp_std::{collections::btree_map::BTreeMap, vec::Vec};
 
 use crate::{
+	block_seal::MiningAuthority,
 	notary::{NotaryId, NotaryNotebookVoteDetails, NotaryNotebookVoteDigestDetails},
 	tick::{Tick, Ticker},
 	BestBlockVoteSeal, BlockVoteDigest, BlockVotingPower, NotebookNumber, VoteMinimum,
@@ -35,6 +36,12 @@ sp_api::decl_runtime_apis! {
 		NotaryRecord: Codec + MaxEncodedLen{
 		fn notary_by_id(notary_id: NotaryId) -> Option<NotaryRecord>;
 		fn notaries() -> Vec<NotaryRecord>;
+	}
+}
+
+sp_api::decl_runtime_apis! {
+	pub trait MiningApis<AccountId:Codec, BlockSealAuthorityId:Codec>{
+		fn get_authority_id(account_id: &AccountId) -> Option<MiningAuthority<BlockSealAuthorityId,AccountId>>;
 	}
 }
 

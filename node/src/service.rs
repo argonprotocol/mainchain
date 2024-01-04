@@ -134,7 +134,7 @@ pub fn new_partial(
 /// Builds a new service for a full client.
 pub fn new_full(
 	config: Configuration,
-	opt_block_author: Option<AccountId>,
+	mining_account_id: Option<AccountId>,
 	mining_threads: Option<u32>,
 ) -> Result<TaskManager, ServiceError> {
 	let sc_service::PartialComponents {
@@ -249,7 +249,7 @@ pub fn new_full(
 	})?;
 
 	if role.is_authority() {
-		if let Some(block_author) = opt_block_author {
+		if let Some(block_author) = mining_account_id {
 			let proposer_factory_compute = sc_basic_authorship::ProposerFactory::new(
 				task_manager.spawn_handle(),
 				client.clone(),

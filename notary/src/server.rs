@@ -14,8 +14,9 @@ use sqlx::PgPool;
 use tokio::net::ToSocketAddrs;
 
 use ulx_primitives::{
-	BalanceProof, BalanceTip, NotarizationBalanceChangeset, NotarizationBlockVotes, NotaryId,
-	Notebook, NotebookMeta, NotebookNumber, SignedNotebookHeader,
+	BalanceProof, BalanceTip, NotarizationBalanceChangeset, NotarizationBlockVotes,
+	NotarizationDataDomains, NotaryId, Notebook, NotebookMeta, NotebookNumber,
+	SignedNotebookHeader,
 };
 
 use crate::{
@@ -197,12 +198,14 @@ impl LocalchainRpcServer for NotaryServer {
 		&self,
 		balance_changeset: NotarizationBalanceChangeset,
 		block_votes: NotarizationBlockVotes,
+		data_domains: NotarizationDataDomains,
 	) -> Result<BalanceChangeResult, ErrorObjectOwned> {
 		NotarizationsStore::apply(
 			&self.pool,
 			self.notary_id,
 			balance_changeset.into_inner(),
 			block_votes.into_inner(),
+			data_domains.into_inner(),
 		)
 		.await
 		.map_err(from_crate_error)
@@ -312,7 +315,9 @@ mod tests {
 		.clone();
 
 		assert_eq!(
-			client.notarize(bounded_vec![balance_change], bounded_vec![]).await?,
+			client
+				.notarize(bounded_vec![balance_change], bounded_vec![], bounded_vec![])
+				.await?,
 			BalanceChangeResult {
 				notebook_number: 1,
 				tick: 1,

@@ -2,9 +2,12 @@ use codec::{Decode, Encode};
 use frame_support::{CloneNoBound, EqNoBound, Parameter, PartialEqNoBound};
 use scale_info::TypeInfo;
 use serde::{Deserialize, Serialize};
-use sp_application_crypto::ByteArray;
-use sp_core::{crypto::KeyTypeId, ConstU32, MaxEncodedLen, OpaquePeerId, U256};
-use sp_runtime::{BoundedVec, RuntimeDebug};
+use sp_application_crypto::AppCrypto;
+use sp_core::{
+	crypto::{CryptoTypeId, KeyTypeId},
+	MaxEncodedLen, OpaquePeerId,
+};
+use sp_runtime::RuntimeDebug;
 
 pub const BLOCK_SEAL_KEY_TYPE: KeyTypeId = KeyTypeId(*b"seal");
 
@@ -21,16 +24,7 @@ sp_application_crypto::with_pair! {
 }
 pub type BlockSealAuthoritySignature = app::Signature;
 pub type BlockSealAuthorityId = app::Public;
-
-impl BlockSealAuthorityId {
-	pub fn to_u256(&self) -> U256 {
-		let mut bytes = [0u8; 32];
-		bytes.copy_from_slice(&self.as_slice());
-		U256::from_big_endian(&bytes)
-	}
-}
-
-pub type MaxMinerRpcHosts = ConstU32<4>;
+pub const BLOCK_SEAL_CRYPTO_ID: CryptoTypeId = <app::Public as AppCrypto>::CRYPTO_ID;
 
 #[derive(
 	PartialEqNoBound, EqNoBound, CloneNoBound, Encode, Decode, RuntimeDebug, TypeInfo, MaxEncodedLen,
@@ -43,8 +37,6 @@ pub struct MiningRegistration<
 	Balance: Parameter + MaxEncodedLen,
 > {
 	pub account_id: AccountId,
-	pub peer_id: PeerId,
-	pub rpc_hosts: BoundedVec<Host, MaxMinerRpcHosts>,
 	pub reward_destination: RewardDestination<AccountId>,
 	pub bond_id: Option<BondId>,
 	#[codec(compact)]
@@ -88,47 +80,12 @@ impl MaxEncodedLen for PeerId {
 	}
 }
 
-pub type AuthorityIndex = u16;
+pub type MinerIndex = u32;
 
 #[derive(PartialEq, Eq, Clone, Encode, Decode, RuntimeDebug, TypeInfo, MaxEncodedLen)]
 pub struct MiningAuthority<AuthorityId, AccountId> {
 	#[codec(compact)]
-	pub authority_index: AuthorityIndex,
+	pub authority_index: MinerIndex,
 	pub authority_id: AuthorityId,
 	pub account_id: AccountId,
-	pub peer_id: PeerId,
-	pub rpc_hosts: BoundedVec<Host, MaxMinerRpcHosts>,
-}
-
-#[derive(
-	PartialEq,
-	Eq,
-	Clone,
-	Encode,
-	Decode,
-	RuntimeDebug,
-	TypeInfo,
-	MaxEncodedLen,
-	Deserialize,
-	Serialize,
-)]
-pub struct Host {
-	#[codec(compact)]
-	/// ip encoded as u32 big endian (eg, from octets)
-	pub ip: u32,
-	#[codec(compact)]
-	pub port: u16,
-	pub is_secure: bool,
-}
-
-impl Host {
-	#[cfg(feature = "std")]
-	pub fn get_url(&self) -> String {
-		format!(
-			"{}://{}:{}",
-			if self.is_secure { "wss" } else { "ws" },
-			std::net::Ipv4Addr::from(self.ip),
-			self.port
-		)
-	}
 }

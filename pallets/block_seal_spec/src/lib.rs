@@ -1,6 +1,8 @@
 #![feature(slice_take)]
 #![cfg_attr(not(feature = "std"), no_std)]
 
+extern crate core;
+
 use frame_support::traits::OnTimestampSet;
 
 pub use pallet::*;

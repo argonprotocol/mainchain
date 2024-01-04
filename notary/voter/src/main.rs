@@ -207,7 +207,7 @@ impl VotePublisher {
 		tracing::info!("Publishing {} votes for {}", votes.len(), votes[0].block_hash,);
 
 		notary_client
-			.notarize(bounded_vec!(), BoundedVec::truncate_from(votes.clone()))
+			.notarize(bounded_vec!(), BoundedVec::truncate_from(votes.clone()), bounded_vec!())
 			.await?;
 		Ok(())
 	}

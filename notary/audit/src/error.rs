@@ -64,6 +64,13 @@ pub enum VerifyError {
 
 	#[snafu(display("Balance change not net zero (sent: {sent} vs claimed: {claimed})"))]
 	BalanceChangeNotNetZero { sent: u128, claimed: u128 },
+
+	#[snafu(display("Invalid domain lease allocation"))]
+	InvalidDomainLeaseAllocation,
+
+	#[snafu(display("Invalid domain name"))]
+	InvalidDomainName,
+
 	#[snafu(display("Tax balance changes not net zero (sent: {sent} vs claimed: {claimed})"))]
 	TaxBalanceChangeNotNetZero { sent: u128, claimed: u128 },
 
@@ -130,12 +137,6 @@ pub enum VerifyError {
 	#[snafu(display("Insufficient tax allocated for the given block votes"))]
 	InsufficientBlockVoteTax,
 
-	#[snafu(display("Invalid block vote channel pass signature"))]
-	InvalidChannelPassSignature,
-
-	#[snafu(display("Duplicate channel pass recorded"))]
-	DuplicateChannelPassSettled,
-
 	#[snafu(display("Invalid block vote allocation"))]
 	InvalidBlockVoteAllocation,
 
@@ -160,8 +161,11 @@ pub enum VerifyError {
 	#[snafu(display("Minimums were not met for a block vote"))]
 	InsufficientBlockVoteMinimum,
 
-	#[snafu(display("Invalid block vote channel pass"))]
-	InvalidBlockVoteChannelPass,
+	#[snafu(display("Invalid block vote data domain or account"))]
+	BlockVoteDataDomainMismatch,
+
+	#[snafu(display("Block vote channel reused"))]
+	BlockVoteChannelReused,
 }
 
 impl From<AccountHistoryLookupError> for VerifyError {

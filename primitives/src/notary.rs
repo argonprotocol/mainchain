@@ -9,7 +9,7 @@ use sp_runtime::{
 use sp_std::{collections::btree_map::BTreeMap, fmt::Debug, vec::Vec};
 
 use crate::{
-	block_seal::Host, tick::Tick, BlockVotingPower, NotebookHeader, NotebookNumber, NotebookSecret,
+	host::Host, tick::Tick, BlockVotingPower, NotebookHeader, NotebookNumber, NotebookSecret,
 	NotebookSecretHash,
 };
 

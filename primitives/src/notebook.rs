@@ -7,22 +7,31 @@ use sp_std::vec::Vec;
 
 use crate::{
 	balance_change::BalanceChange, block_vote::BlockVote, notary::NotarySignature, AccountId,
-	AccountType, NotaryId,
+	AccountType, DataDomain, NotaryId,
 };
 pub use crate::{AccountOrigin, BalanceTip};
 
 pub const MAX_BALANCE_CHANGES_PER_NOTARIZATION: u32 = 25;
 pub const MAX_BLOCK_VOTES_PER_NOTARIZATION: u32 = 100;
+pub const MAX_DOMAINS_PER_NOTARIZATION: u32 = 100;
 
 pub type NotarizationBalanceChangeset =
 	BoundedVec<BalanceChange, ConstU32<MAX_BALANCE_CHANGES_PER_NOTARIZATION>>;
 pub type NotarizationBlockVotes = BoundedVec<BlockVote, ConstU32<MAX_BLOCK_VOTES_PER_NOTARIZATION>>;
+pub type NotarizationDataDomains =
+	BoundedVec<(DataDomain, AccountId), ConstU32<MAX_DOMAINS_PER_NOTARIZATION>>;
 
 pub const PINNED_BLOCKS_OFFSET: u32 = 100u32;
 pub const MAX_NOTEBOOK_TRANSFERS: u32 = 10_000;
+pub const MAX_NOTARIZATIONS_PER_NOTEBOOK: u32 = 100_000;
+pub const MAX_BLOCK_VOTES_PER_NOTEBOOK: u32 =
+	MAX_BLOCK_VOTES_PER_NOTARIZATION * MAX_NOTARIZATIONS_PER_NOTEBOOK;
+pub const MAX_DOMAINS_PER_NOTEBOOK: u32 =
+	MAX_NOTARIZATIONS_PER_NOTEBOOK * MAX_DOMAINS_PER_NOTARIZATION;
 pub type MaxNotebookTransfers = ConstU32<MAX_NOTEBOOK_TRANSFERS>;
-pub type MaxNotebookNotarizations = ConstU32<100_000>;
-pub type MaxNotebookBlockVotes = ConstU32<100_000>;
+pub type MaxNotebookNotarizations = ConstU32<MAX_NOTARIZATIONS_PER_NOTEBOOK>;
+pub type MaxNotebookBlockVotes = ConstU32<MAX_BLOCK_VOTES_PER_NOTEBOOK>;
+pub type MaxDataDomainsPerNotebook = ConstU32<MAX_DOMAINS_PER_NOTEBOOK>;
 pub type AccountOriginUid = u32;
 pub type NotebookNumber = u32;
 
@@ -125,13 +134,19 @@ impl Notebook {
 pub struct Notarization {
 	pub balance_changes: NotarizationBalanceChangeset,
 	pub block_votes: NotarizationBlockVotes,
+	pub data_domains: NotarizationDataDomains,
 }
 
 impl Notarization {
-	pub fn new(balance_changes: Vec<BalanceChange>, block_votes: Vec<BlockVote>) -> Self {
+	pub fn new(
+		balance_changes: Vec<BalanceChange>,
+		block_votes: Vec<BlockVote>,
+		data_domains: Vec<(DataDomain, AccountId)>,
+	) -> Self {
 		Self {
 			balance_changes: BoundedVec::truncate_from(balance_changes),
 			block_votes: BoundedVec::truncate_from(block_votes),
+			data_domains: BoundedVec::truncate_from(data_domains),
 		}
 	}
 }
@@ -221,6 +236,8 @@ pub struct NotebookHeader {
 	pub secret_hash: NotebookSecretHash,
 	/// The revealed secret of the parent notebook. Only optional in first notebook.
 	pub parent_secret: Option<NotebookSecret>,
+	/// Registered data domains
+	pub data_domains: BoundedVec<(DataDomain, AccountId), MaxDataDomainsPerNotebook>,
 }
 #[derive(
 	Clone,

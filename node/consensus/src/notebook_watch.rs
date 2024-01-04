@@ -7,16 +7,14 @@ use sc_client_api::{AuxStore, BlockOf};
 use sp_api::ProvideRuntimeApi;
 use sp_blockchain::HeaderBackend;
 use sp_consensus::{Error as ConsensusError, SelectChain};
-use sp_core::{crypto::CryptoTypeId, ByteArray, U256};
+use sp_core::{ByteArray, U256};
 use sp_keystore::{Keystore, KeystorePtr};
-use sp_runtime::{
-	app_crypto::AppCrypto,
-	traits::{Block as BlockT, Header as HeaderT},
-};
+use sp_runtime::traits::{Block as BlockT, Header as HeaderT};
 use sp_timestamp::Timestamp;
 
 use ulx_node_runtime::{NotaryRecordT, NotebookVerifyError};
 use ulx_primitives::{
+	block_seal::BLOCK_SEAL_CRYPTO_ID,
 	digests::{BlockVoteDigest, BLOCK_VOTES_DIGEST_ID},
 	localchain::BlockVote,
 	notary::NotaryNotebookTickState,
@@ -32,8 +30,6 @@ use crate::{
 	notary_client::NotaryClient,
 	LOG_TARGET,
 };
-
-const SEAL_CRYPTO_ID: CryptoTypeId = <BlockSealAuthorityId as AppCrypto>::CRYPTO_ID;
 
 pub struct NotebookWatch<B: BlockT, C: AuxStore, SC, AC: Clone + Codec> {
 	client: Arc<C>,
@@ -317,7 +313,12 @@ pub(crate) fn try_sign_vote<Hash: Codec>(
 
 	let message = BlockVote::seal_signature_message(block_hash, seal_strength);
 	let signature = keystore
-		.sign_with(BLOCK_SEAL_KEY_TYPE, SEAL_CRYPTO_ID, seal_authority_id.as_slice(), &message)
+		.sign_with(
+			BLOCK_SEAL_KEY_TYPE,
+			BLOCK_SEAL_CRYPTO_ID,
+			seal_authority_id.as_slice(),
+			&message,
+		)
 		.map_err(|e| ConsensusError::CannotSign(format!("{}. Key: {:?}", e, seal_authority_id)))?
 		.ok_or_else(|| {
 			ConsensusError::CannotSign(format!(

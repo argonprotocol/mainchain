@@ -461,6 +461,7 @@ fn it_can_audit_notebooks() {
 			secret_hash: H256::random(),
 			parent_secret: None,
 			block_votes_count: 0,
+			data_domains: Default::default(),
 		};
 		let header_hash = header.hash();
 
@@ -488,6 +489,7 @@ fn it_can_audit_notebooks() {
 					channel_hold_note: None,
 					signature: ed25519::Signature([0u8; 64]).into(),
 				},],
+				vec![],
 				vec![]
 			)],
 			signature: ed25519::Signature([0u8; 64]),
@@ -526,5 +528,6 @@ fn make_header(notebook_number: NotebookNumber, tick: Tick) -> NotebookHeader {
 		secret_hash: H256::random(),
 		parent_secret: None,
 		block_votes_count: 0,
+		data_domains: Default::default(),
 	}
 }

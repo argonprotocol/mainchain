@@ -8,7 +8,7 @@ use sp_core::H256;
 use sp_keyring::Ed25519Keyring;
 use sp_runtime::BoundedVec;
 use ulx_primitives::{
-	block_seal::Host,
+	host::Host,
 	notary::{NotaryMeta, NotaryProvider, NotaryPublic, NotaryRecord},
 };
 

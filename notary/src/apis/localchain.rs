@@ -6,7 +6,7 @@ use sp_core::RuntimeDebug;
 
 use ulx_primitives::{
 	tick::Tick, NewAccountOrigin, NotarizationBalanceChangeset, NotarizationBlockVotes,
-	NotebookNumber,
+	NotarizationDataDomains, NotebookNumber,
 };
 
 #[rpc(server, client, namespace = "localchain")]
@@ -16,6 +16,7 @@ pub trait LocalchainRpc {
 		&self,
 		balance_changeset: NotarizationBalanceChangeset,
 		block_votes: NotarizationBlockVotes,
+		data_domains: NotarizationDataDomains,
 	) -> Result<BalanceChangeResult, ErrorObjectOwned>;
 }
 #[derive(Clone, PartialEq, Eq, Encode, Decode, RuntimeDebug, TypeInfo, Serialize, Deserialize)]

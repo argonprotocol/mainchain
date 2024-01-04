@@ -9,11 +9,11 @@ use sp_runtime::{Digest, DigestItem};
 use ulx_primitives::{
 	digests::{BlockVoteDigest, BLOCK_VOTES_DIGEST_ID},
 	inherents::BlockSealInherent,
-	localchain::{BlockVote, ChannelPass},
+	localchain::BlockVote,
 	notary::NotaryNotebookVoteDigestDetails,
 	notebook::{NotebookHeader, NotebookNumber},
 	tick::Tick,
-	MerkleProof, NotaryId, NotebookEventHandler,
+	DataDomain, DataTLD, MerkleProof, NotaryId, NotebookEventHandler,
 };
 
 use crate::{
@@ -243,6 +243,7 @@ fn create_default_notebook(
 		block_votes_root: H256::from_slice(&[0u8; 32]),
 		block_votes_count: 1,
 		blocks_with_votes: Default::default(),
+		data_domains: Default::default(),
 	}
 }
 
@@ -274,12 +275,8 @@ fn it_doesnt_adjust_difficulty_if_tax_block() {
 			notary_id: 1,
 			block_vote: BlockVote {
 				block_hash: System::block_hash(System::block_number().saturating_sub(4)),
-				channel_pass: ChannelPass {
-					miner_index: 0,
-					zone_record_hash: H256::zero(),
-					id: 0,
-					at_block_height: 0,
-				},
+				data_domain_account: AccountId32::new([0u8; 32]),
+				data_domain: DataDomain::new("test", DataTLD::Automotive),
 				account_id: AccountId32::new([0u8; 32]),
 				index: 1,
 				power: 500,

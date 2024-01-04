@@ -94,7 +94,8 @@ pub mod pallet {
 		#[pallet::constant]
 		type HalvingBlocks: Get<u32>;
 
-		/// Percent as a number out of 100 of the block reward that goes to the miner
+		/// Percent as a number out of 100 of the block reward that goes to the miner. 1% of this is
+		/// for the channel pass signer
 		#[pallet::constant]
 		type MinerPayoutPercent: Get<u32>;
 
@@ -209,7 +210,8 @@ pub mod pallet {
 				}
 			}
 
-			let miner_percent = T::MinerPayoutPercent::get().into();
+			let miner_percent: u128 = T::MinerPayoutPercent::get().into();
+
 			let miner_ulixees = round_up(block_ulixees, miner_percent);
 			let miner_argons = round_up(block_argons, miner_percent);
 
@@ -218,12 +220,14 @@ pub mod pallet {
 				ulixees: miner_ulixees.into(),
 				argons: miner_argons.into(),
 			};
+
 			let block_vote_reward = BlockPayout {
 				account_id: authors.block_vote_rewards_account.clone(),
-				ulixees: (block_ulixees - miner_ulixees).into(),
-				argons: (block_argons - miner_argons).into(),
+				ulixees: block_ulixees.saturating_sub(miner_ulixees).into(),
+				argons: block_argons.saturating_sub(miner_argons).into(),
 			};
 			let mut rewards = vec![miner_reward, block_vote_reward];
+
 			let freeze_id = FreezeReason::MaturationPeriod.into();
 			let reward_height = n.saturating_add(T::MaturationBlocks::get().into());
 			for reward in rewards.iter_mut() {

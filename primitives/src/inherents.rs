@@ -46,7 +46,6 @@ pub enum BlockSealInherentNodeSide {
 }
 
 impl BlockSealInherentNodeSide {
-	#[cfg(feature = "std")]
 	pub fn from_vote<A: Codec, Auth: Codec>(
 		best_vote: BestBlockVoteSeal<A, Auth>,
 		miner_signature: BlockSealAuthoritySignature,

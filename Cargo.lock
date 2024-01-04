@@ -5731,6 +5731,26 @@ dependencies = [
 ]
 
 [[package]]
+name = "pallet-data-domain"
+version = "0.0.1"
+dependencies = [
+ "env_logger",
+ "frame-benchmarking",
+ "frame-support",
+ "frame-system",
+ "log",
+ "parity-scale-codec",
+ "scale-info",
+ "sp-api",
+ "sp-core 21.0.0",
+ "sp-io 23.0.0",
+ "sp-keyring",
+ "sp-runtime 24.0.0",
+ "sp-std 8.0.0 (git+https://github.com/paritytech/polkadot-sdk.git?branch=release-polkadot-v1.5.0)",
+ "ulx-primitives",
+]
+
+[[package]]
 name = "pallet-grandpa"
 version = "4.0.0-dev"
 source = "git+https://github.com/paritytech/polkadot-sdk.git?branch=release-polkadot-v1.5.0#789ffb66dcfcf3b54a1e6786e928ac91c4fdb465"
@@ -11449,6 +11469,7 @@ dependencies = [
  "frame-support",
  "futures",
  "futures-timer",
+ "jsonrpsee 0.16.3",
  "lazy_static",
  "libp2p-identity",
  "log",
@@ -11513,6 +11534,7 @@ dependencies = [
  "pallet-block-seal-spec",
  "pallet-bond",
  "pallet-chain-transfer",
+ "pallet-data-domain",
  "pallet-grandpa",
  "pallet-mining-slot",
  "pallet-notaries",

@@ -35,31 +35,36 @@
       },
       {
         "ordinal": 6,
-        "name": "step",
+        "name": "data_domains",
         "type_info": "Int4"
       },
       {
         "ordinal": 7,
+        "name": "step",
+        "type_info": "Int4"
+      },
+      {
+        "ordinal": 8,
         "name": "open_time",
         "type_info": "Timestamptz"
       },
       {
-        "ordinal": 8,
+        "ordinal": 9,
         "name": "end_time",
         "type_info": "Timestamptz"
       },
       {
-        "ordinal": 9,
+        "ordinal": 10,
         "name": "ready_for_close_time",
         "type_info": "Timestamptz"
       },
       {
-        "ordinal": 10,
+        "ordinal": 11,
         "name": "closed_time",
         "type_info": "Timestamptz"
       },
       {
-        "ordinal": 11,
+        "ordinal": 12,
         "name": "finalized_time",
         "type_info": "Timestamptz"
       }
@@ -71,6 +76,7 @@
       ]
     },
     "nullable": [
+      false,
       false,
       false,
       false,

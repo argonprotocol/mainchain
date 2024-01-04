@@ -34,8 +34,9 @@ pub mod pallet {
 		notebook::NotebookNumber,
 		tick::Tick,
 		AuthorityProvider, BlockSealAuthoritySignature, BlockSealerInfo, BlockSealerProvider,
-		BlockVotingKey, BlockVotingProvider, MerkleProof, NotaryId, NotaryNotebookVotes,
-		NotebookProvider, ParentVotingKeyDigest, TickProvider, VotingKey, AUTHOR_DIGEST_ID,
+		BlockVotingKey, BlockVotingProvider, DataDomainProvider, MerkleProof, NotaryId,
+		NotaryNotebookVotes, NotebookProvider, ParentVotingKeyDigest, TickProvider, VotingKey,
+		AUTHOR_DIGEST_ID, CHANNEL_CLAWBACK_NOTEBOOKS, CHANNEL_EXPIRATION_NOTEBOOKS,
 		PARENT_VOTING_KEY_DIGEST,
 	};
 
@@ -64,6 +65,8 @@ pub mod pallet {
 		type BlockVotingProvider: BlockVotingProvider<Self::Block>;
 
 		type TickProvider: TickProvider<Self::Block>;
+
+		type DataDomainProvider: DataDomainProvider<Self::AccountId>;
 	}
 
 	#[pallet::storage]
@@ -103,6 +106,12 @@ pub mod pallet {
 		InvalidVoteGrandparentHash,
 		IneligibleNotebookUsed,
 		NoEligibleVotingRoot,
+
+		/// The data domain was not registered
+		UnregisteredDataDomain,
+		/// The data domain account is mismatched with the block reward seeker
+		InvalidDataDomainAccount,
+
 		InvalidAuthoritySupplied,
 		/// Message was not signed by a registered miner
 		InvalidAuthoritySignature,
@@ -208,7 +217,20 @@ pub mod pallet {
 		#[pallet::weight((0, DispatchClass::Mandatory))]
 		pub fn apply(origin: OriginFor<T>, seal: BlockSealInherent) -> DispatchResult {
 			ensure_none(origin)?;
+			info!(
+				target: LOG_TARGET,
+				"Block seal inherent submitted {:?}", seal
+			);
+			Self::apply_seal(seal).map_err(|e| {
+				log::error!(target: LOG_TARGET, "Error applying block seal: {:?}", e);
+				e
+			})?;
+			Ok(())
+		}
+	}
 
+	impl<T: Config> Pallet<T> {
+		pub fn apply_seal(seal: BlockSealInherent) -> DispatchResult {
 			ensure!(!TempSealInherent::<T>::exists(), Error::<T>::DuplicateBlockSealProvided);
 			TempSealInherent::<T>::put(seal.clone());
 
@@ -276,12 +298,8 @@ pub mod pallet {
 					});
 				},
 			}
-
 			Ok(())
 		}
-	}
-
-	impl<T: Config> Pallet<T> {
 		pub fn verify_vote_source(
 			notary_id: NotaryId,
 			votes_from_tick: Tick,
@@ -345,9 +363,19 @@ pub mod pallet {
 				authority_id.verify(&message, &signature),
 				Error::<T>::InvalidAuthoritySignature
 			);
-
-			// TODO: verify channel pass authority
-			// let channel_pass_hash = channel_pass.hash();
+			let data_domain = &block_vote.data_domain;
+			let data_domain_account =
+				T::AccountId::decode(&mut block_vote.data_domain_account.encode().as_slice())
+					.map_err(|_| Error::<T>::UnableToDecodeVoteAccount)?;
+			let last_tick = votes_from_tick.saturating_sub(CHANNEL_EXPIRATION_NOTEBOOKS);
+			ensure!(
+				T::DataDomainProvider::is_registered_payment_account(
+					data_domain,
+					&data_domain_account,
+					(last_tick.saturating_sub(CHANNEL_CLAWBACK_NOTEBOOKS), last_tick)
+				),
+				Error::<T>::InvalidDataDomainAccount
+			);
 
 			Ok(())
 		}
@@ -380,7 +408,7 @@ pub mod pallet {
 			// previous tick - aka, - 2 ticks from the current (parent) tick.
 			let grandparent_tick_blocks = T::TickProvider::blocks_at_tick(voted_for_blocks_at_tick);
 			info!(target: LOG_TARGET,
-				"eligible votes at tick {} - {:?} (runtime tick ={})",
+				"eligible votes at tick {} - {:?} (runtime tick={})",
 				voted_for_blocks_at_tick, grandparent_tick_blocks, runtime_tick
 			);
 
