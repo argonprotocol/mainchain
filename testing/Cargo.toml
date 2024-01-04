@@ -18,4 +18,4 @@ substrate-runner = { git="https://github.com/paritytech/subxt.git", branch="mast
 tracing = "0.1"
 tracing-subscriber = { version = "0.3", features = ["env-filter"] }
 subxt = { version = "0.33", features = ["substrate-compat"] }
-anyhow = "1.0.75"
+anyhow = "1.0.79"
