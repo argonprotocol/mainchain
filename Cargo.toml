@@ -9,6 +9,7 @@ members = [
 	"pallets/bond",
 	"pallets/chain_transfer",
 	"pallets/mining_slot",
+	"pallets/mint",
 	"pallets/notaries",
 	"pallets/notebook",
 	"pallets/ticks",

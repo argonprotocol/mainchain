@@ -22,7 +22,7 @@ pub use frame_support::{
 };
 use frame_support::{
 	genesis_builder_helper::{build_config, create_default_config},
-	traits::{Contains, Currency, InsideBoth, OnUnbalanced, StorageMapShim},
+	traits::{Contains, Currency, InsideBoth, OnUnbalanced},
 	PalletId,
 };
 // Configure FRAME pallets to include in runtime.
@@ -507,6 +507,15 @@ impl pallet_balances::Config<ArgonToken> for Runtime {
 	type MaxHolds = ConstU32<100>;
 }
 
+impl pallet_mint::Config for Runtime {
+	type RuntimeEvent = RuntimeEvent;
+	type WeightInfo = pallet_mint::weights::SubstrateWeight<Runtime>;
+	type Currency = ArgonBalances;
+	type RuntimeHoldReason = RuntimeHoldReason;
+	type Balance = Balance;
+	type UlixeeTokenStorage = pallet_balances::Account<Runtime, UlixeeToken>;
+}
+
 type UlixeeToken = pallet_balances::Instance2;
 impl pallet_balances::Config<UlixeeToken> for Runtime {
 	type MaxLocks = ConstU32<50>;
@@ -518,11 +527,8 @@ impl pallet_balances::Config<UlixeeToken> for Runtime {
 	type RuntimeEvent = RuntimeEvent;
 	type DustRemoval = ();
 	type ExistentialDeposit = ConstU128<EXISTENTIAL_DEPOSIT>;
-	type AccountStore = StorageMapShim<
-		pallet_balances::Account<Runtime, UlixeeToken>,
-		AccountId,
-		pallet_balances::AccountData<Balance>,
-	>;
+	/// redirect through mint
+	type AccountStore = Mint;
 	type WeightInfo = pallet_balances::weights::SubstrateWeight<Runtime>;
 	type FreezeIdentifier = RuntimeFreezeReason;
 	type MaxFreezes = ConstU32<2>;
@@ -573,6 +579,7 @@ construct_runtime!(
 		Grandpa: pallet_grandpa,
 		Offences: pallet_offences,
 		ArgonBalances: pallet_balances::<Instance1>::{Pallet, Call, Storage, Config<T>, Event<T>},
+		Mint: pallet_mint,
 		UlixeeBalances: pallet_balances::<Instance2>::{Pallet, Call, Storage, Config<T>, Event<T>},
 		TxPause: pallet_tx_pause,
 		TransactionPayment: pallet_transaction_payment,
@@ -940,6 +947,7 @@ mod benches {
 		[pallet_block_rewards, BlockRewards]
 		[pallet_mining_slot, MiningSlot]
 		[pallet_bond, Bond]
+		[pallet_mint, Mint]
 		[pallet_session, Session]
 		[pallet_block_seal, BlockSeal]
 		[pallet_authorship, Authorship]

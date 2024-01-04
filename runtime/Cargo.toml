@@ -62,6 +62,7 @@ pallet-block-rewards = {  default-features = false, path = "../pallets/block_rew
 pallet-bond = {  default-features = false, path = "../pallets/bond" }
 pallet-chain-transfer = {  default-features = false, path = "../pallets/chain_transfer" }
 pallet-data-domain = {  default-features = false, path = "../pallets/data_domain" }
+pallet-mint = {  default-features = false, path = "../pallets/mint" }
 pallet-notebook = {  default-features = false, path = "../pallets/notebook" }
 pallet-notaries = {  default-features = false, path = "../pallets/notaries" }
 pallet-mining-slot = {  default-features = false, path = "../pallets/mining_slot" }
@@ -98,6 +99,7 @@ std = [
 	"pallet-block-rewards/std",
 	"pallet-block-seal/std",
 	"pallet-data-domain/std",
+	"pallet-mint/std",
 	"pallet-tx-pause/std",
 	"frame-support/std",
 	"frame-system/std",
@@ -137,6 +139,7 @@ runtime-benchmarks = [
 	"pallet-grandpa/runtime-benchmarks",
 	"pallet-block-seal/runtime-benchmarks",
 	"pallet-data-domain/runtime-benchmarks",
+	"pallet-mint/runtime-benchmarks",
 	"pallet-timestamp/runtime-benchmarks",
 	"sp-runtime/runtime-benchmarks",
 	"pallet-tx-pause/runtime-benchmarks",
@@ -150,6 +153,7 @@ try-runtime = [
 	"frame-executive/try-runtime",
 	"frame-system/try-runtime",
 	"frame-support/try-runtime",
+	"pallet-mint/try-runtime",
 	"pallet-balances/try-runtime",
 	"pallet-sudo/try-runtime",
 	"pallet-bond/try-runtime",

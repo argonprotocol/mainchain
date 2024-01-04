@@ -5796,6 +5796,26 @@ dependencies = [
 ]
 
 [[package]]
+name = "pallet-mint"
+version = "0.0.1"
+dependencies = [
+ "env_logger",
+ "frame-benchmarking",
+ "frame-support",
+ "frame-system",
+ "log",
+ "pallet-balances",
+ "parity-scale-codec",
+ "scale-info",
+ "sp-api",
+ "sp-core 21.0.0",
+ "sp-io 23.0.0",
+ "sp-runtime 24.0.0",
+ "sp-std 8.0.0 (git+https://github.com/paritytech/polkadot-sdk.git?branch=release-polkadot-v1.5.0)",
+ "ulx-primitives",
+]
+
+[[package]]
 name = "pallet-notaries"
 version = "0.0.1"
 dependencies = [
@@ -11537,6 +11557,7 @@ dependencies = [
  "pallet-data-domain",
  "pallet-grandpa",
  "pallet-mining-slot",
+ "pallet-mint",
  "pallet-notaries",
  "pallet-notebook",
  "pallet-offences",
