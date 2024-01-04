@@ -14,7 +14,7 @@ publish = false
 targets = ["x86_64-unknown-linux-gnu"]
 
 [dependencies]
-async-trait = "0.1.73"
+async-trait = "0.1.76"
 codec = { package = "parity-scale-codec", version = "3.6.4", default-features = false, features = ["derive"] }
 futures = { version = "0.3.21", features = ["thread-pool"]}
 futures-timer = "3.0.1"
