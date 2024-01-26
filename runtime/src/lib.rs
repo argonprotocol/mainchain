@@ -60,7 +60,7 @@ use ulx_primitives::{
 	prod_or_fast,
 	tick::{Tick, Ticker, TICK_MILLIS},
 	BlockSealAuthorityId, BondFundId, BondId, NotaryNotebookVotes, TickProvider,
-	CHANNEL_CLAWBACK_NOTEBOOKS, CHANNEL_EXPIRATION_NOTEBOOKS,
+	CHANNEL_CLAWBACK_TICKS, CHANNEL_EXPIRATION_TICKS,
 };
 pub use ulx_primitives::{
 	AccountId, Balance, BlockHash, BlockNumber, HashOutput, Moment, Nonce, Signature,
@@ -231,7 +231,7 @@ parameter_types! {
 	pub const MaturationBlocks: u32 = 5;
 	pub const MinerPayoutPercent: u32 = 75;
 	pub const DomainExpirationTicks: u32 = 60 * 24 * 365; // 1 year
-	pub const HistoricalPaymentAddressTicksToKeep: u32 = CHANNEL_EXPIRATION_NOTEBOOKS + CHANNEL_CLAWBACK_NOTEBOOKS + 10;
+	pub const HistoricalPaymentAddressTicksToKeep: u32 = CHANNEL_EXPIRATION_TICKS + CHANNEL_CLAWBACK_TICKS + 10;
 }
 
 impl pallet_block_seal_spec::Config for Runtime {

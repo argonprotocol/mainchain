@@ -28,9 +28,13 @@ sp-core-hashing = { version = "9.0", default-features = false, git = "https://gi
 frame-support = { version = "4.0.0-dev", default-features = false,  git = "https://github.com/paritytech/polkadot-sdk.git", branch = "release-polkadot-v1.5.0" }
 thiserror = { version ="1.0", optional = true }
 impl-trait-for-tuples = "0.2.2"
+napi-derive = {version =  "2.14", optional = true}
+napi = {version =  "2.14", optional = true}
+rsntp = {version =  "3.0", optional = true}
 
 [dev-dependencies]
 chrono = "0.4"
+tokio = { version="1.35",features = ["full"] }
 
 [features]
 default = ["std"]
@@ -49,9 +53,15 @@ std = [
   "sp-inherents/std",
   "sp-runtime/std",
   "sp-std/std",
+  "rsntp",
   "thiserror",
   "frame-support/std",
 ]
 fast-runtime=[
   "sp-debug-derive/force-debug",
+]
+napi=[
+  "napi/napi9",
+  "napi/serde-json",
+  "napi-derive/type-def",
 ]

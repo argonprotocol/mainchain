@@ -11,3 +11,7 @@
 .direnv
 .idea
 rustc-ice*
+node_modules
+/localchain/test.db-wal
+/localchain/test.db
+/client/nodejs/lib

@@ -11,7 +11,7 @@ use sp_runtime::MultiSignature;
 use ulx_primitives::{
 	balance_change::{AccountOrigin, BalanceChange, BalanceProof},
 	note::{AccountType, Note, NoteType},
-	BlockVote, DataDomain, DataTLD, CHANNEL_EXPIRATION_NOTEBOOKS,
+	BlockVote, DataDomain, DataTLD, CHANNEL_CLAWBACK_TICKS, CHANNEL_EXPIRATION_TICKS,
 };
 
 use crate::{
@@ -23,6 +23,7 @@ fn empty_proof(balance: u128) -> Option<BalanceProof> {
 	Some(BalanceProof {
 		notary_id: 1,
 		notebook_number: 1,
+		tick: 1,
 		balance,
 		notebook_proof: Default::default(),
 		account_origin: AccountOrigin { notebook_number: 1, account_uid: 1 },
@@ -46,7 +47,9 @@ fn test_balance_change_allocation_errs_non_zero() {
 				channel_hold_note: None,
 				notes: bounded_vec![Note::create(100, NoteType::Claim)],
 				signature: empty_signature(),
-			}],
+			}
+			.sign(Alice.pair())
+			.clone()],
 			&vec![],
 			&vec![],
 			None
@@ -315,10 +318,10 @@ fn test_can_lock_with_a_channel_note() -> anyhow::Result<()> {
 		signature: empty_signature(),
 	};
 
-	assert_err!(
+	assert!(matches!(
 		verify_notarization_allocation(&vec![channel_settle.clone()], &vec![], &vec![], Some(2)),
-		VerifyError::ChannelHoldNotReadyForClaim
-	);
+		Err(VerifyError::ChannelHoldNotReadyForClaim { .. })
+	));
 
 	// try to clear out change
 	channel_settle.balance = 250;
@@ -330,7 +333,7 @@ fn test_can_lock_with_a_channel_note() -> anyhow::Result<()> {
 			&vec![channel_settle.clone()],
 			&vec![],
 			&vec![],
-			Some(CHANNEL_EXPIRATION_NOTEBOOKS + 1)
+			Some(CHANNEL_EXPIRATION_TICKS + 1)
 		),
 		VerifyError::InvalidChannelClaimers
 	);
@@ -341,7 +344,7 @@ fn test_can_lock_with_a_channel_note() -> anyhow::Result<()> {
 			&vec![channel_settle.clone()],
 			&vec![],
 			&vec![],
-			Some(71),
+			Some(1 + CHANNEL_CLAWBACK_TICKS + CHANNEL_EXPIRATION_TICKS),
 		)
 		.expect("should be ok");
 		assert_eq!(res.needs_channel_settle_followup, false);
@@ -713,7 +716,10 @@ fn verify_tax_votes() {
 		power: 20_000,
 		data_domain: DataDomain::new("Monster", DataTLD::Jobs),
 		data_domain_account: Alice.to_account_id(),
-	}];
+		signature: empty_signature(),
+	}
+	.sign(Bob.pair())
+	.clone()];
 
 	let result =
 		verify_notarization_allocation(&set, &votes, &vec![], Some(1)).expect("should unwrap");
@@ -736,7 +742,10 @@ fn test_vote_sources() {
 			power: 20_000,
 			data_domain: jobs_domain.clone(),
 			data_domain_account: jobs_domain_author.clone(),
-		},
+			signature: empty_signature(),
+		}
+		.sign(Bob.pair())
+		.clone(),
 		BlockVote {
 			account_id: Bob.to_account_id(),
 			block_hash: vote_block_hash,
@@ -744,7 +753,11 @@ fn test_vote_sources() {
 			power: 400,
 			data_domain: jobs_domain.clone(),
 			data_domain_account: jobs_domain_author.clone(),
-		},
+			signature: empty_signature(),
+		}
+		// wrong signature!
+		.sign(Alice.pair())
+		.clone(),
 	];
 
 	let vote_minimums = BTreeMap::from([(vote_block_hash, 500)]);
@@ -772,6 +785,18 @@ fn test_vote_sources() {
 		),
 		VerifyError::BlockVoteDataDomainMismatch
 	);
+
+	assert_err!(
+		verify_voting_sources(
+			&BTreeMap::from([((jobs_domain.clone(), jobs_domain_author.clone()), 2)]),
+			&votes,
+			&vote_minimums
+		),
+		VerifyError::BlockVoteInvalidSignature
+	);
+
+	votes[1].sign(Bob.pair());
+
 	assert_ok!(verify_voting_sources(
 		&BTreeMap::from([((jobs_domain.clone(), jobs_domain_author), 2)]),
 		&votes,

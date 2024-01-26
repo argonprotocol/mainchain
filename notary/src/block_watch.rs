@@ -76,11 +76,10 @@ async fn sync_finalized_blocks(
 		.await?
 		.unwrap_or(BoundedVec(vec![]));
 
-	let notary = active_notaries
-		.0
-		.iter()
-		.find(|notary| notary.notary_id == notary_id)
-		.ok_or(anyhow::anyhow!("Notary not found"))?;
+	let Some(notary) = active_notaries.0.iter().find(|notary| notary.notary_id == notary_id) else {
+		info!("NOTE: Notary {} is not active", notary_id);
+		return Ok(());
+	};
 	let oldest_block_to_sync = notary.activated_block;
 
 	let mut tx = pool.begin().await?;

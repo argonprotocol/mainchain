@@ -142,7 +142,7 @@ where
 				if let Err(e) = notary_client.update_notaries(&best_hash).await {
 					warn!(
 						target: LOG_TARGET,
-						"Could not update notaries with hash {} - {:?}",
+						"Could not update notaries at best hash {} - {:?}",
 						best_hash,
 						e
 					);

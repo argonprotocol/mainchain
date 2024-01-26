@@ -14,11 +14,11 @@ members = [
 	"pallets/notebook",
 	"pallets/ticks",
 	"client",
+	"localchain",
 	"primitives",
     "runtime",
 	"notary",
 	"notary/audit",
-	"notary/voter",
 	"testing"
 ]
 resolver = "2"

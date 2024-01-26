@@ -2,14 +2,15 @@ use std::path::PathBuf;
 
 use anyhow::anyhow;
 use substrate_runner::SubstrateNode;
-use subxt::backend::rpc;
+use subxt::backend::{legacy::LegacyRpcMethods, rpc};
 
-use ulixee_client::UlxClient;
+use ulixee_client::{UlxClient, UlxConfig};
 
 pub struct TestContext {
 	// Keep a handle to the node; once it's dropped the node is killed.
 	_proc: Option<SubstrateNode>,
 	pub rpc_client: rpc::RpcClient,
+	pub rpc_methods: LegacyRpcMethods<UlxConfig>,
 	pub client: UlxClient,
 	pub ws_url: String,
 }
@@ -36,25 +37,31 @@ impl TestContext {
 
 		let ws_url = format!("ws://127.0.0.1:{}", proc.ws_port());
 
-		let client = UlxClient::from_url(&ws_url)
-			.await
-			.map_err(|e| anyhow!("Failed to connect to node at {ws_url}: {e}"))?;
-
 		let rpc_client = rpc::RpcClient::from_url(ws_url.as_str())
 			.await
 			.expect("Unable to connect RPC client to test node");
 
-		Ok(Self { _proc: Some(proc), client, rpc_client, ws_url })
+		let client = UlxClient::from_rpc_client(rpc_client.clone())
+			.await
+			.map_err(|e| anyhow!("Failed to connect to node at {ws_url}: {e}"))?;
+
+		let methods = LegacyRpcMethods::new(rpc_client.clone());
+
+		Ok(Self { _proc: Some(proc), client, rpc_client, rpc_methods: methods, ws_url })
 	}
 }
 
 pub async fn test_context_from_url(url: &str) -> TestContext {
-	TestContext {
-		_proc: None,
-		client: UlxClient::from_url(url).await.unwrap(),
-		rpc_client: rpc::RpcClient::from_url(url).await.unwrap(),
-		ws_url: url.to_string(),
-	}
+	let rpc_client = rpc::RpcClient::from_url(url)
+		.await
+		.expect("Unable to connect RPC client to test node");
+
+	let client = UlxClient::from_rpc_client(rpc_client.clone())
+		.await
+		.expect("Failed to connect to node at {url}: {e}");
+
+	let rpc_methods = LegacyRpcMethods::new(rpc_client.clone());
+	TestContext { _proc: None, client, rpc_client, rpc_methods, ws_url: url.to_string() }
 }
 
 pub async fn test_context_with(authority: String) -> TestContext {

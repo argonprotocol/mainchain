@@ -111,16 +111,17 @@ where
 		for id in needs_connect {
 			match self.sync_notebooks(id).await {
 				Err(e) => {
-					self.disconnect(&id, Some(format!("Notary sync failed. {:?}", e))).await;
-					return Err(e)
+					self.disconnect(&id, Some(format!("Notary {} sync failed. {:?}", id, e))).await;
 				},
 				_ => {},
 			}
 			match self.subscribe_to_notebooks(id).await {
 				Err(e) => {
-					self.disconnect(&id, Some(format!("Notary subscription failed. {:?}", e)))
-						.await;
-					return Err(e)
+					self.disconnect(
+						&id,
+						Some(format!("Notary {} subscription failed. {:?}", id, e)),
+					)
+					.await;
 				},
 				_ => {},
 			}
@@ -136,7 +137,7 @@ where
 		})?;
 		let notary_notebooks = self.aux_client.get_notary_audit_history(id)?;
 		let latest_stored = notary_notebooks.last().map(|n| n.notebook_number).unwrap_or_default();
-		if latest_stored < notebook_meta.latest_notebook_number.saturating_sub(1) {
+		if latest_stored < notebook_meta.finalized_notebook_number.saturating_sub(1) {
 			let catchup = client.get_raw_headers(latest_stored).await.map_err(|e| {
 				Error::NotaryError(format!("Could not get notebooks from notary - {:?}", e))
 			})?;
@@ -152,10 +153,10 @@ where
 
 	pub async fn disconnect(&self, notary_id: &NotaryId, reason: Option<String>) {
 		let mut clients = self.notary_client_by_id.lock().await;
+		info!(target: LOG_TARGET, "Notary client disconnected from notary #{} (or could not connect). Reason? {:?}", notary_id, reason);
 		if !clients.contains_key(notary_id) {
 			return;
 		}
-		info!(target: LOG_TARGET, "Notary client disconnected for notary #{}. Reason? {:?}", notary_id, reason);
 		clients.remove(&notary_id);
 		let mut subs = self.subscriptions_by_id.lock().await;
 		drop(subs.remove(&notary_id));
@@ -262,7 +263,12 @@ where
 				Error::NotaryError("No rpc endpoint found for notary".to_string())
 			})?;
 			let c = ulx_notary::create_client(host.get_url().as_str()).await.map_err(|e| {
-				Error::NotaryError(format!("Could not connect to notary for audit - {:?}", e))
+				Error::NotaryError(format!(
+					"Could not connect to notary {} ({}) for audit - {:?}",
+					notary_id,
+					host.get_url(),
+					e
+				))
 			})?;
 			let c = Arc::new(c);
 			clients.insert(notary_id, c.clone());

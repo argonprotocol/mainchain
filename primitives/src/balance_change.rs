@@ -9,7 +9,8 @@ use sp_std::vec::Vec;
 use sp_core::crypto::Pair;
 
 use crate::{
-	notary::NotaryId, AccountId, AccountOriginUid, AccountType, Note, NoteType, NotebookNumber,
+	notary::NotaryId, tick::Tick, AccountId, AccountOriginUid, AccountType, Note, NoteType,
+	NotebookNumber,
 };
 
 #[derive(
@@ -57,6 +58,10 @@ struct BalanceChangeHashMessage {
 
 impl BalanceChange {
 	pub fn push_note(&mut self, milligons: u128, note_type: NoteType) -> &mut Self {
+		if let Some(existing) = self.notes.iter_mut().find(|n| n.note_type == note_type) {
+			existing.milligons += milligons;
+			return self;
+		}
 		let note = Note::create(milligons, note_type);
 		self.notes.try_push(note).expect("Should be able to push note");
 		self
@@ -112,6 +117,9 @@ pub struct BalanceProof {
 	/// The notebook where this proof can be verified
 	#[codec(compact)]
 	pub notebook_number: NotebookNumber,
+	/// The tick where this proof can be verified
+	#[codec(compact)]
+	pub tick: Tick,
 	/// The source balance being proven
 	#[codec(compact)]
 	pub balance: u128,
@@ -165,13 +173,22 @@ pub struct BalanceTip {
 }
 
 impl BalanceTip {
+	pub fn tip(&self) -> [u8; 32] {
+		Self::compute_tip(
+			self.change_number,
+			self.balance,
+			self.account_origin.clone(),
+			self.channel_hold_note.clone(),
+		)
+	}
+
 	pub fn compute_tip(
-		nonce: u32,
+		change_number: u32,
 		balance: u128,
 		account_origin: AccountOrigin,
 		channel_hold_note: Option<Note>,
 	) -> [u8; 32] {
-		BalanceTipValue { nonce, balance, account_origin, channel_hold_note }
+		BalanceTipValue { change_number, balance, account_origin, channel_hold_note }
 			.using_encoded(blake2_256)
 	}
 
@@ -182,7 +199,7 @@ impl BalanceTip {
 
 #[derive(Encode, Decode)]
 struct BalanceTipValue {
-	pub nonce: u32,
+	pub change_number: u32,
 	pub balance: u128,
 	pub account_origin: AccountOrigin,
 	pub channel_hold_note: Option<Note>,

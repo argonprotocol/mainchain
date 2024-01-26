@@ -1,0 +1,47 @@
+{
+  "db_name": "PostgreSQL",
+  "query": "SELECT * FROM notarizations WHERE notebook_number = $1 AND $2 = ANY (account_lookups) LIMIT 1",
+  "describe": {
+    "columns": [
+      {
+        "ordinal": 0,
+        "name": "notebook_number",
+        "type_info": "Int4"
+      },
+      {
+        "ordinal": 1,
+        "name": "balance_changes",
+        "type_info": "Jsonb"
+      },
+      {
+        "ordinal": 2,
+        "name": "block_votes",
+        "type_info": "Jsonb"
+      },
+      {
+        "ordinal": 3,
+        "name": "data_domains",
+        "type_info": "Jsonb"
+      },
+      {
+        "ordinal": 4,
+        "name": "account_lookups",
+        "type_info": "ByteaArray"
+      }
+    ],
+    "parameters": {
+      "Left": [
+        "Int4",
+        "Bytea"
+      ]
+    },
+    "nullable": [
+      false,
+      false,
+      false,
+      false,
+      false
+    ]
+  },
+  "hash": "3c87ff4bd750f568aff3eb4c8f4c4a502195b5ba8cc3f3c6bd6a8873adf92bc8"
+}

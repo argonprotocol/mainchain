@@ -280,6 +280,7 @@ fn it_doesnt_adjust_difficulty_if_tax_block() {
 				account_id: AccountId32::new([0u8; 32]),
 				index: 1,
 				power: 500,
+				signature: sp_core::sr25519::Signature([0u8; 64]).into(),
 			},
 			seal_strength: 1.into(),
 			source_notebook_proof: MerkleProof {

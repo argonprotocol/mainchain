@@ -6,6 +6,7 @@ pub mod blocks;
 pub mod chain_transfer;
 pub mod notarizations;
 pub mod notebook;
+pub mod notebook_constraints;
 pub mod notebook_header;
 pub mod notebook_new_accounts;
 pub mod notebook_status;

@@ -6,7 +6,7 @@ pub mod api {
 	mod root_mod {
 		pub use super::*;
 	}
-	pub static PALLETS: [&str; 22usize] = [
+	pub static PALLETS: [&str; 23usize] = [
 		"System",
 		"Timestamp",
 		"Ticks",
@@ -25,6 +25,7 @@ pub mod api {
 		"Grandpa",
 		"Offences",
 		"ArgonBalances",
+		"Mint",
 		"UlixeeBalances",
 		"TxPause",
 		"TransactionPayment",
@@ -868,9 +869,10 @@ pub mod api {
 						"query_call_info",
 						types::QueryCallInfo { call, len },
 						[
-							57u8, 240u8, 34u8, 20u8, 133u8, 193u8, 28u8, 212u8, 120u8, 155u8, 91u8,
-							49u8, 230u8, 187u8, 125u8, 212u8, 85u8, 10u8, 141u8, 234u8, 23u8, 49u8,
-							92u8, 238u8, 218u8, 50u8, 202u8, 236u8, 202u8, 228u8, 129u8, 87u8,
+							73u8, 252u8, 143u8, 101u8, 195u8, 6u8, 30u8, 120u8, 234u8, 177u8,
+							245u8, 162u8, 146u8, 179u8, 125u8, 224u8, 131u8, 198u8, 18u8, 9u8,
+							72u8, 186u8, 66u8, 65u8, 189u8, 48u8, 209u8, 174u8, 151u8, 97u8, 77u8,
+							143u8,
 						],
 					)
 				}
@@ -890,9 +892,9 @@ pub mod api {
 						"query_call_fee_details",
 						types::QueryCallFeeDetails { call, len },
 						[
-							36u8, 207u8, 53u8, 193u8, 225u8, 50u8, 115u8, 118u8, 12u8, 31u8, 175u8,
-							61u8, 2u8, 83u8, 80u8, 16u8, 45u8, 141u8, 94u8, 35u8, 19u8, 26u8,
-							100u8, 219u8, 169u8, 143u8, 102u8, 187u8, 143u8, 160u8, 65u8, 221u8,
+							103u8, 101u8, 2u8, 235u8, 61u8, 235u8, 22u8, 98u8, 93u8, 186u8, 187u8,
+							206u8, 7u8, 73u8, 189u8, 17u8, 209u8, 91u8, 170u8, 32u8, 186u8, 195u8,
+							5u8, 248u8, 222u8, 140u8, 236u8, 154u8, 222u8, 202u8, 64u8, 29u8,
 						],
 					)
 				}
@@ -1339,10 +1341,9 @@ pub mod api {
 							bytes,
 						},
 						[
-							99u8, 30u8, 122u8, 23u8, 41u8, 90u8, 46u8, 219u8, 169u8, 198u8, 123u8,
-							60u8, 22u8, 174u8, 247u8, 161u8, 101u8, 254u8, 36u8, 79u8, 115u8,
-							250u8, 201u8, 165u8, 126u8, 181u8, 214u8, 125u8, 2u8, 184u8, 228u8,
-							14u8,
+							152u8, 157u8, 150u8, 98u8, 218u8, 224u8, 199u8, 2u8, 169u8, 52u8,
+							253u8, 244u8, 62u8, 34u8, 23u8, 109u8, 197u8, 87u8, 123u8, 83u8, 23u8,
+							69u8, 89u8, 36u8, 188u8, 201u8, 75u8, 206u8, 198u8, 116u8, 34u8, 59u8,
 						],
 					)
 				}
@@ -1471,10 +1472,9 @@ pub mod api {
 						"ticker",
 						types::Ticker {},
 						[
-							184u8, 118u8, 210u8, 100u8, 79u8, 7u8, 156u8, 224u8, 30u8, 166u8, 97u8,
-							142u8, 164u8, 179u8, 42u8, 92u8, 38u8, 182u8, 105u8, 52u8, 126u8,
-							229u8, 95u8, 143u8, 255u8, 13u8, 107u8, 105u8, 245u8, 155u8, 69u8,
-							36u8,
+							242u8, 50u8, 78u8, 194u8, 192u8, 155u8, 42u8, 156u8, 182u8, 142u8, 8u8,
+							147u8, 11u8, 233u8, 105u8, 22u8, 191u8, 183u8, 38u8, 35u8, 161u8, 21u8,
+							187u8, 143u8, 253u8, 24u8, 219u8, 219u8, 215u8, 48u8, 217u8, 18u8,
 						],
 					)
 				}
@@ -1908,6 +1908,9 @@ pub mod api {
 		pub fn argon_balances(&self) -> argon_balances::storage::StorageApi {
 			argon_balances::storage::StorageApi
 		}
+		pub fn mint(&self) -> mint::storage::StorageApi {
+			mint::storage::StorageApi
+		}
 		pub fn ulixee_balances(&self) -> ulixee_balances::storage::StorageApi {
 			ulixee_balances::storage::StorageApi
 		}
@@ -1968,6 +1971,9 @@ pub mod api {
 		pub fn argon_balances(&self) -> argon_balances::calls::TransactionApi {
 			argon_balances::calls::TransactionApi
 		}
+		pub fn mint(&self) -> mint::calls::TransactionApi {
+			mint::calls::TransactionApi
+		}
 		pub fn ulixee_balances(&self) -> ulixee_balances::calls::TransactionApi {
 			ulixee_balances::calls::TransactionApi
 		}
@@ -1987,9 +1993,9 @@ pub mod api {
 			.hash();
 		runtime_metadata_hash ==
 			[
-				216u8, 105u8, 42u8, 180u8, 211u8, 172u8, 76u8, 139u8, 110u8, 42u8, 5u8, 0u8, 226u8,
-				28u8, 106u8, 151u8, 47u8, 106u8, 255u8, 176u8, 250u8, 171u8, 87u8, 152u8, 214u8,
-				135u8, 18u8, 102u8, 243u8, 81u8, 62u8, 209u8,
+				179u8, 7u8, 36u8, 155u8, 154u8, 132u8, 130u8, 65u8, 17u8, 225u8, 45u8, 101u8,
+				167u8, 25u8, 115u8, 210u8, 30u8, 64u8, 213u8, 248u8, 24u8, 123u8, 72u8, 14u8,
+				173u8, 142u8, 19u8, 64u8, 79u8, 41u8, 135u8, 154u8,
 			]
 	}
 	pub mod system {
@@ -2711,10 +2717,10 @@ pub mod api {
 						"Events",
 						vec![],
 						[
-							174u8, 116u8, 220u8, 250u8, 110u8, 191u8, 163u8, 11u8, 120u8, 104u8,
-							32u8, 199u8, 86u8, 220u8, 127u8, 105u8, 206u8, 206u8, 203u8, 207u8,
-							84u8, 241u8, 125u8, 140u8, 235u8, 58u8, 255u8, 153u8, 141u8, 62u8,
-							135u8, 131u8,
+							168u8, 59u8, 139u8, 240u8, 88u8, 156u8, 164u8, 137u8, 196u8, 21u8,
+							50u8, 69u8, 57u8, 212u8, 162u8, 135u8, 154u8, 142u8, 63u8, 178u8,
+							197u8, 112u8, 57u8, 175u8, 154u8, 86u8, 200u8, 70u8, 98u8, 168u8,
+							149u8, 27u8,
 						],
 					)
 				}
@@ -5386,9 +5392,10 @@ pub mod api {
 						"BlockNotebooks",
 						vec![],
 						[
-							209u8, 195u8, 124u8, 12u8, 228u8, 102u8, 197u8, 3u8, 254u8, 196u8,
-							78u8, 49u8, 54u8, 27u8, 24u8, 204u8, 25u8, 207u8, 206u8, 112u8, 31u8,
-							193u8, 227u8, 98u8, 20u8, 29u8, 69u8, 76u8, 239u8, 42u8, 44u8, 110u8,
+							138u8, 203u8, 202u8, 238u8, 105u8, 225u8, 109u8, 197u8, 176u8, 248u8,
+							71u8, 57u8, 226u8, 67u8, 140u8, 153u8, 7u8, 207u8, 112u8, 86u8, 239u8,
+							182u8, 229u8, 167u8, 114u8, 87u8, 230u8, 139u8, 181u8, 71u8, 96u8,
+							69u8,
 						],
 					)
 				}
@@ -5409,10 +5416,9 @@ pub mod api {
 						"TempNotebookDigest",
 						vec![],
 						[
-							247u8, 181u8, 190u8, 209u8, 136u8, 126u8, 40u8, 45u8, 203u8, 150u8,
-							162u8, 137u8, 98u8, 2u8, 64u8, 17u8, 252u8, 63u8, 11u8, 236u8, 94u8,
-							221u8, 145u8, 15u8, 44u8, 173u8, 186u8, 242u8, 201u8, 145u8, 54u8,
-							56u8,
+							219u8, 46u8, 243u8, 56u8, 97u8, 45u8, 79u8, 254u8, 73u8, 253u8, 210u8,
+							233u8, 12u8, 57u8, 232u8, 225u8, 60u8, 62u8, 158u8, 62u8, 96u8, 173u8,
+							46u8, 124u8, 76u8, 61u8, 122u8, 197u8, 104u8, 124u8, 122u8, 71u8,
 						],
 					)
 				}
@@ -5437,10 +5443,9 @@ pub mod api {
 						"NotariesLockedForFailedAudit",
 						vec![::subxt::storage::address::make_static_storage_map_key(_0.borrow())],
 						[
-							155u8, 11u8, 113u8, 47u8, 238u8, 112u8, 218u8, 169u8, 163u8, 157u8,
-							194u8, 205u8, 221u8, 4u8, 129u8, 206u8, 9u8, 92u8, 91u8, 216u8, 133u8,
-							176u8, 124u8, 72u8, 86u8, 162u8, 152u8, 254u8, 207u8, 10u8, 211u8,
-							21u8,
+							237u8, 90u8, 5u8, 229u8, 171u8, 56u8, 56u8, 69u8, 81u8, 72u8, 174u8,
+							128u8, 235u8, 198u8, 154u8, 178u8, 169u8, 239u8, 239u8, 43u8, 63u8,
+							23u8, 67u8, 242u8, 248u8, 39u8, 5u8, 167u8, 155u8, 189u8, 152u8, 186u8,
 						],
 					)
 				}
@@ -5464,10 +5469,9 @@ pub mod api {
 						"NotariesLockedForFailedAudit",
 						Vec::new(),
 						[
-							155u8, 11u8, 113u8, 47u8, 238u8, 112u8, 218u8, 169u8, 163u8, 157u8,
-							194u8, 205u8, 221u8, 4u8, 129u8, 206u8, 9u8, 92u8, 91u8, 216u8, 133u8,
-							176u8, 124u8, 72u8, 86u8, 162u8, 152u8, 254u8, 207u8, 10u8, 211u8,
-							21u8,
+							237u8, 90u8, 5u8, 229u8, 171u8, 56u8, 56u8, 69u8, 81u8, 72u8, 174u8,
+							128u8, 235u8, 198u8, 154u8, 178u8, 169u8, 239u8, 239u8, 43u8, 63u8,
+							23u8, 67u8, 242u8, 248u8, 39u8, 5u8, 167u8, 155u8, 189u8, 152u8, 186u8,
 						],
 					)
 				}
@@ -5500,8 +5504,6 @@ pub mod api {
 					#[codec(compact)]
 					pub amount: ::core::primitive::u128,
 					pub notary_id: ::core::primitive::u32,
-					#[codec(compact)]
-					pub account_nonce: ::core::primitive::u32,
 				}
 				impl ::subxt::blocks::StaticExtrinsic for SendToLocalchain {
 					const PALLET: &'static str = "ChainTransfer";
@@ -5515,17 +5517,15 @@ pub mod api {
 					&self,
 					amount: ::core::primitive::u128,
 					notary_id: ::core::primitive::u32,
-					account_nonce: ::core::primitive::u32,
 				) -> ::subxt::tx::Payload<types::SendToLocalchain> {
 					::subxt::tx::Payload::new_static(
 						"ChainTransfer",
 						"send_to_localchain",
-						types::SendToLocalchain { amount, notary_id, account_nonce },
+						types::SendToLocalchain { amount, notary_id },
 						[
-							235u8, 60u8, 252u8, 71u8, 57u8, 103u8, 83u8, 70u8, 168u8, 14u8, 138u8,
-							217u8, 144u8, 173u8, 93u8, 242u8, 97u8, 193u8, 176u8, 163u8, 124u8,
-							162u8, 173u8, 250u8, 52u8, 242u8, 168u8, 25u8, 247u8, 208u8, 159u8,
-							117u8,
+							83u8, 216u8, 66u8, 149u8, 234u8, 85u8, 61u8, 45u8, 152u8, 156u8, 153u8,
+							118u8, 179u8, 201u8, 255u8, 21u8, 5u8, 117u8, 53u8, 241u8, 173u8, 66u8,
+							32u8, 8u8, 26u8, 176u8, 221u8, 245u8, 212u8, 13u8, 86u8, 171u8,
 						],
 					)
 				}
@@ -6994,10 +6994,9 @@ pub mod api {
 						"apply",
 						types::Apply { seal },
 						[
-							241u8, 100u8, 208u8, 107u8, 226u8, 254u8, 184u8, 160u8, 99u8, 73u8,
-							126u8, 126u8, 73u8, 36u8, 7u8, 112u8, 112u8, 100u8, 224u8, 37u8, 209u8,
-							104u8, 53u8, 30u8, 166u8, 50u8, 175u8, 145u8, 151u8, 192u8, 89u8,
-							194u8,
+							70u8, 71u8, 125u8, 28u8, 93u8, 231u8, 59u8, 192u8, 214u8, 11u8, 165u8,
+							226u8, 120u8, 134u8, 235u8, 68u8, 155u8, 116u8, 18u8, 49u8, 98u8, 68u8,
+							111u8, 134u8, 227u8, 131u8, 117u8, 71u8, 187u8, 142u8, 178u8, 8u8,
 						],
 					)
 				}
@@ -7089,10 +7088,9 @@ pub mod api {
 						"TempSealInherent",
 						vec![],
 						[
-							234u8, 70u8, 169u8, 119u8, 241u8, 0u8, 19u8, 201u8, 167u8, 234u8,
-							235u8, 211u8, 29u8, 84u8, 53u8, 74u8, 166u8, 216u8, 136u8, 9u8, 20u8,
-							189u8, 58u8, 234u8, 212u8, 36u8, 185u8, 49u8, 156u8, 205u8, 124u8,
-							107u8,
+							137u8, 75u8, 47u8, 247u8, 54u8, 28u8, 160u8, 57u8, 46u8, 255u8, 10u8,
+							6u8, 134u8, 149u8, 12u8, 189u8, 32u8, 212u8, 126u8, 95u8, 83u8, 112u8,
+							98u8, 66u8, 122u8, 176u8, 169u8, 76u8, 101u8, 249u8, 210u8, 17u8,
 						],
 					)
 				}
@@ -8892,9 +8890,10 @@ pub mod api {
 						"Holds",
 						vec![::subxt::storage::address::make_static_storage_map_key(_0.borrow())],
 						[
-							186u8, 246u8, 216u8, 4u8, 148u8, 97u8, 53u8, 23u8, 148u8, 240u8, 105u8,
-							137u8, 57u8, 191u8, 145u8, 247u8, 11u8, 244u8, 53u8, 73u8, 87u8, 118u8,
-							242u8, 126u8, 250u8, 2u8, 154u8, 81u8, 206u8, 166u8, 103u8, 21u8,
+							85u8, 24u8, 200u8, 7u8, 154u8, 94u8, 116u8, 110u8, 33u8, 50u8, 143u8,
+							62u8, 93u8, 155u8, 53u8, 121u8, 132u8, 232u8, 173u8, 102u8, 117u8,
+							201u8, 165u8, 121u8, 184u8, 147u8, 237u8, 67u8, 74u8, 66u8, 206u8,
+							55u8,
 						],
 					)
 				}
@@ -8918,9 +8917,10 @@ pub mod api {
 						"Holds",
 						Vec::new(),
 						[
-							186u8, 246u8, 216u8, 4u8, 148u8, 97u8, 53u8, 23u8, 148u8, 240u8, 105u8,
-							137u8, 57u8, 191u8, 145u8, 247u8, 11u8, 244u8, 53u8, 73u8, 87u8, 118u8,
-							242u8, 126u8, 250u8, 2u8, 154u8, 81u8, 206u8, 166u8, 103u8, 21u8,
+							85u8, 24u8, 200u8, 7u8, 154u8, 94u8, 116u8, 110u8, 33u8, 50u8, 143u8,
+							62u8, 93u8, 155u8, 53u8, 121u8, 132u8, 232u8, 173u8, 102u8, 117u8,
+							201u8, 165u8, 121u8, 184u8, 147u8, 237u8, 67u8, 74u8, 66u8, 206u8,
+							55u8,
 						],
 					)
 				}
@@ -9056,6 +9056,76 @@ pub mod api {
 							125u8, 151u8, 53u8, 76u8, 168u8, 26u8, 10u8, 9u8, 98u8, 68u8, 9u8,
 							178u8, 197u8, 113u8, 31u8, 79u8, 200u8, 90u8, 203u8, 100u8, 41u8,
 							145u8,
+						],
+					)
+				}
+			}
+		}
+	}
+	pub mod mint {
+		use super::{root_mod, runtime_types};
+		#[doc = "The `Error` enum of this pallet."]
+		pub type Error = runtime_types::pallet_mint::pallet::Error;
+		#[doc = "Contains a variant per dispatchable extrinsic that this pallet has."]
+		pub type Call = runtime_types::pallet_mint::pallet::Call;
+		pub mod calls {
+			use super::{root_mod, runtime_types};
+			type DispatchError = runtime_types::sp_runtime::DispatchError;
+			pub mod types {
+				use super::runtime_types;
+			}
+			pub struct TransactionApi;
+			impl TransactionApi {}
+		}
+		#[doc = "The `Event` enum of this pallet"]
+		pub type Event = runtime_types::pallet_mint::pallet::Event;
+		pub mod events {
+			use super::runtime_types;
+		}
+		pub mod storage {
+			use super::runtime_types;
+			pub struct StorageApi;
+			impl StorageApi {
+				#[doc = " Last moved block of ulixee tokens"]
+				pub fn ulixee_account_last_transfer_block(
+					&self,
+					_0: impl ::std::borrow::Borrow<::subxt::utils::AccountId32>,
+				) -> ::subxt::storage::address::Address<
+					::subxt::storage::address::StaticStorageMapKey,
+					::core::primitive::u32,
+					::subxt::storage::address::Yes,
+					(),
+					::subxt::storage::address::Yes,
+				> {
+					::subxt::storage::address::Address::new_static(
+						"Mint",
+						"UlixeeAccountLastTransferBlock",
+						vec![::subxt::storage::address::make_static_storage_map_key(_0.borrow())],
+						[
+							232u8, 20u8, 173u8, 109u8, 248u8, 121u8, 166u8, 86u8, 210u8, 179u8,
+							221u8, 52u8, 245u8, 209u8, 218u8, 193u8, 1u8, 95u8, 84u8, 124u8, 97u8,
+							252u8, 90u8, 88u8, 125u8, 51u8, 91u8, 134u8, 239u8, 21u8, 124u8, 41u8,
+						],
+					)
+				}
+				#[doc = " Last moved block of ulixee tokens"]
+				pub fn ulixee_account_last_transfer_block_root(
+					&self,
+				) -> ::subxt::storage::address::Address<
+					::subxt::storage::address::StaticStorageMapKey,
+					::core::primitive::u32,
+					(),
+					(),
+					::subxt::storage::address::Yes,
+				> {
+					::subxt::storage::address::Address::new_static(
+						"Mint",
+						"UlixeeAccountLastTransferBlock",
+						Vec::new(),
+						[
+							232u8, 20u8, 173u8, 109u8, 248u8, 121u8, 166u8, 86u8, 210u8, 179u8,
+							221u8, 52u8, 245u8, 209u8, 218u8, 193u8, 1u8, 95u8, 84u8, 124u8, 97u8,
+							252u8, 90u8, 88u8, 125u8, 51u8, 91u8, 134u8, 239u8, 21u8, 124u8, 41u8,
 						],
 					)
 				}
@@ -10025,9 +10095,10 @@ pub mod api {
 						"Holds",
 						vec![::subxt::storage::address::make_static_storage_map_key(_0.borrow())],
 						[
-							186u8, 246u8, 216u8, 4u8, 148u8, 97u8, 53u8, 23u8, 148u8, 240u8, 105u8,
-							137u8, 57u8, 191u8, 145u8, 247u8, 11u8, 244u8, 53u8, 73u8, 87u8, 118u8,
-							242u8, 126u8, 250u8, 2u8, 154u8, 81u8, 206u8, 166u8, 103u8, 21u8,
+							85u8, 24u8, 200u8, 7u8, 154u8, 94u8, 116u8, 110u8, 33u8, 50u8, 143u8,
+							62u8, 93u8, 155u8, 53u8, 121u8, 132u8, 232u8, 173u8, 102u8, 117u8,
+							201u8, 165u8, 121u8, 184u8, 147u8, 237u8, 67u8, 74u8, 66u8, 206u8,
+							55u8,
 						],
 					)
 				}
@@ -10051,9 +10122,10 @@ pub mod api {
 						"Holds",
 						Vec::new(),
 						[
-							186u8, 246u8, 216u8, 4u8, 148u8, 97u8, 53u8, 23u8, 148u8, 240u8, 105u8,
-							137u8, 57u8, 191u8, 145u8, 247u8, 11u8, 244u8, 53u8, 73u8, 87u8, 118u8,
-							242u8, 126u8, 250u8, 2u8, 154u8, 81u8, 206u8, 166u8, 103u8, 21u8,
+							85u8, 24u8, 200u8, 7u8, 154u8, 94u8, 116u8, 110u8, 33u8, 50u8, 143u8,
+							62u8, 93u8, 155u8, 53u8, 121u8, 132u8, 232u8, 173u8, 102u8, 117u8,
+							201u8, 165u8, 121u8, 184u8, 147u8, 237u8, 67u8, 74u8, 66u8, 206u8,
+							55u8,
 						],
 					)
 				}
@@ -10681,9 +10753,10 @@ pub mod api {
 						"sudo",
 						types::Sudo { call: ::std::boxed::Box::new(call) },
 						[
-							128u8, 243u8, 204u8, 18u8, 49u8, 201u8, 71u8, 241u8, 228u8, 206u8,
-							212u8, 34u8, 145u8, 116u8, 32u8, 0u8, 128u8, 163u8, 144u8, 254u8, 96u8,
-							5u8, 14u8, 107u8, 76u8, 74u8, 89u8, 121u8, 152u8, 166u8, 132u8, 201u8,
+							224u8, 181u8, 218u8, 68u8, 195u8, 213u8, 203u8, 46u8, 84u8, 229u8,
+							13u8, 243u8, 242u8, 151u8, 191u8, 128u8, 22u8, 128u8, 169u8, 100u8,
+							95u8, 32u8, 18u8, 163u8, 69u8, 36u8, 76u8, 197u8, 163u8, 223u8, 239u8,
+							113u8,
 						],
 					)
 				}
@@ -10698,10 +10771,10 @@ pub mod api {
 						"sudo_unchecked_weight",
 						types::SudoUncheckedWeight { call: ::std::boxed::Box::new(call), weight },
 						[
-							0u8, 190u8, 129u8, 132u8, 35u8, 209u8, 95u8, 242u8, 209u8, 175u8,
-							141u8, 31u8, 114u8, 181u8, 198u8, 234u8, 14u8, 151u8, 245u8, 22u8,
-							227u8, 17u8, 77u8, 253u8, 117u8, 117u8, 26u8, 200u8, 112u8, 201u8, 7u8,
-							11u8,
+							228u8, 186u8, 6u8, 44u8, 239u8, 30u8, 163u8, 84u8, 141u8, 105u8, 159u8,
+							219u8, 164u8, 24u8, 159u8, 88u8, 161u8, 158u8, 152u8, 190u8, 205u8,
+							212u8, 210u8, 146u8, 143u8, 65u8, 209u8, 207u8, 16u8, 236u8, 217u8,
+							145u8,
 						],
 					)
 				}
@@ -10732,9 +10805,10 @@ pub mod api {
 						"sudo_as",
 						types::SudoAs { who, call: ::std::boxed::Box::new(call) },
 						[
-							17u8, 218u8, 51u8, 177u8, 252u8, 120u8, 4u8, 131u8, 47u8, 247u8, 231u8,
-							252u8, 234u8, 70u8, 234u8, 137u8, 59u8, 243u8, 215u8, 238u8, 103u8,
-							209u8, 69u8, 144u8, 173u8, 9u8, 58u8, 187u8, 19u8, 86u8, 43u8, 197u8,
+							78u8, 1u8, 209u8, 45u8, 53u8, 232u8, 209u8, 108u8, 137u8, 60u8, 46u8,
+							152u8, 100u8, 52u8, 140u8, 80u8, 109u8, 249u8, 188u8, 145u8, 195u8,
+							132u8, 239u8, 136u8, 35u8, 49u8, 233u8, 157u8, 38u8, 97u8, 159u8,
+							138u8,
 						],
 					)
 				}
@@ -12081,28 +12155,40 @@ pub mod api {
 				#[doc = "The `Error` enum of this pallet."]
 				pub enum Error {
 					#[codec(index = 0)]
-					InvalidVoteProof,
+					#[doc = "The strength of the given seal did not match calculations"]
+					InvalidVoteSealStrength,
 					#[codec(index = 1)]
+					#[doc = "Vote not submitted by the right miner"]
 					InvalidSubmitter,
 					#[codec(index = 2)]
+					#[doc = "Could not decode the vote bytes"]
 					UnableToDecodeVoteAccount,
 					#[codec(index = 3)]
+					#[doc = "The block author is not a registered miner"]
 					UnregisteredBlockAuthor,
 					#[codec(index = 4)]
+					#[doc = "The merkle proof of vote inclusion in the notebook is invalid"]
 					InvalidBlockVoteProof,
 					#[codec(index = 5)]
+					#[doc = "No vote minimum found at grandparent height"]
 					NoGrandparentVoteMinimum,
 					#[codec(index = 6)]
+					#[doc = "Too many block seals submitted"]
 					DuplicateBlockSealProvided,
 					#[codec(index = 7)]
+					#[doc = "The block vote did not reach the minimum voting power at time of the grandparent block"]
 					InsufficientVotingPower,
 					#[codec(index = 8)]
+					#[doc = "No registered voting key found for the parent block"]
 					ParentVotingKeyNotFound,
 					#[codec(index = 9)]
+					#[doc = "The block vote was not for a valid block"]
 					InvalidVoteGrandparentHash,
 					#[codec(index = 10)]
+					#[doc = "The notebook for this vote was not eligible to vote"]
 					IneligibleNotebookUsed,
 					#[codec(index = 11)]
+					#[doc = "The lookup to verify a vote's authenticity is not available for the given block"]
 					NoEligibleVotingRoot,
 					#[codec(index = 12)]
 					#[doc = "The data domain was not registered"]
@@ -12111,19 +12197,20 @@ pub mod api {
 					#[doc = "The data domain account is mismatched with the block reward seeker"]
 					InvalidDataDomainAccount,
 					#[codec(index = 14)]
-					InvalidAuthoritySupplied,
-					#[codec(index = 15)]
 					#[doc = "Message was not signed by a registered miner"]
 					InvalidAuthoritySignature,
-					#[codec(index = 16)]
+					#[codec(index = 15)]
 					#[doc = "Could not decode the scale bytes of the votes"]
 					CouldNotDecodeVote,
-					#[codec(index = 17)]
+					#[codec(index = 16)]
 					#[doc = "Too many notebooks were submitted for the current tick. Should not be possible"]
 					MaxNotebooksAtTickExceeded,
-					#[codec(index = 18)]
+					#[codec(index = 17)]
 					#[doc = "No closest miner found for vote"]
 					NoClosestMinerFoundForVote,
+					#[codec(index = 18)]
+					#[doc = "The vote signature was invalid"]
+					BlockVoteInvalidSignature,
 				}
 			}
 		}
@@ -12453,8 +12540,6 @@ pub mod api {
 						#[codec(compact)]
 						amount: ::core::primitive::u128,
 						notary_id: ::core::primitive::u32,
-						#[codec(compact)]
-						account_nonce: ::core::primitive::u32,
 					},
 				}
 				#[derive(
@@ -12993,6 +13078,63 @@ pub mod api {
 			#[encode_as_type(crate_path = ":: subxt :: ext :: scale_encode")]
 			pub struct MinerHistory {
 				pub authority_index: ::core::primitive::u32,
+			}
+		}
+		pub mod pallet_mint {
+			use super::runtime_types;
+			pub mod pallet {
+				use super::runtime_types;
+				#[derive(
+					:: subxt :: ext :: codec :: Decode,
+					:: subxt :: ext :: codec :: Encode,
+					:: subxt :: ext :: scale_decode :: DecodeAsType,
+					:: subxt :: ext :: scale_encode :: EncodeAsType,
+					Clone,
+					Debug,
+				)]
+				# [codec (crate = :: subxt :: ext :: codec)]
+				#[decode_as_type(crate_path = ":: subxt :: ext :: scale_decode")]
+				#[encode_as_type(crate_path = ":: subxt :: ext :: scale_encode")]
+				#[doc = "Contains a variant per dispatchable extrinsic that this pallet has."]
+				pub enum Call {}
+				#[derive(
+					:: subxt :: ext :: codec :: Decode,
+					:: subxt :: ext :: codec :: Encode,
+					:: subxt :: ext :: scale_decode :: DecodeAsType,
+					:: subxt :: ext :: scale_encode :: EncodeAsType,
+					Clone,
+					Debug,
+				)]
+				# [codec (crate = :: subxt :: ext :: codec)]
+				#[decode_as_type(crate_path = ":: subxt :: ext :: scale_decode")]
+				#[encode_as_type(crate_path = ":: subxt :: ext :: scale_encode")]
+				#[doc = "The `Error` enum of this pallet."]
+				pub enum Error {}
+				#[derive(
+					:: subxt :: ext :: codec :: Decode,
+					:: subxt :: ext :: codec :: Encode,
+					:: subxt :: ext :: scale_decode :: DecodeAsType,
+					:: subxt :: ext :: scale_encode :: EncodeAsType,
+					Clone,
+					Debug,
+				)]
+				# [codec (crate = :: subxt :: ext :: codec)]
+				#[decode_as_type(crate_path = ":: subxt :: ext :: scale_decode")]
+				#[encode_as_type(crate_path = ":: subxt :: ext :: scale_encode")]
+				#[doc = "The `Event` enum of this pallet"]
+				pub enum Event {}
+				#[derive(
+					:: subxt :: ext :: codec :: Decode,
+					:: subxt :: ext :: codec :: Encode,
+					:: subxt :: ext :: scale_decode :: DecodeAsType,
+					:: subxt :: ext :: scale_encode :: EncodeAsType,
+					Clone,
+					Debug,
+				)]
+				# [codec (crate = :: subxt :: ext :: codec)]
+				#[decode_as_type(crate_path = ":: subxt :: ext :: scale_decode")]
+				#[encode_as_type(crate_path = ":: subxt :: ext :: scale_encode")]
+				pub enum HoldReason {}
 			}
 		}
 		pub mod pallet_notaries {
@@ -14967,10 +15109,12 @@ pub mod api {
 				#[codec(index = 17)]
 				ArgonBalances(runtime_types::pallet_balances::pallet::Call),
 				#[codec(index = 18)]
-				UlixeeBalances(runtime_types::pallet_balances::pallet::Call2),
+				Mint(runtime_types::pallet_mint::pallet::Call),
 				#[codec(index = 19)]
+				UlixeeBalances(runtime_types::pallet_balances::pallet::Call2),
+				#[codec(index = 20)]
 				TxPause(runtime_types::pallet_tx_pause::pallet::Call),
-				#[codec(index = 21)]
+				#[codec(index = 22)]
 				Sudo(runtime_types::pallet_sudo::pallet::Call),
 			}
 			#[derive(
@@ -15014,10 +15158,12 @@ pub mod api {
 				#[codec(index = 17)]
 				ArgonBalances(runtime_types::pallet_balances::pallet::Error),
 				#[codec(index = 18)]
-				UlixeeBalances(runtime_types::pallet_balances::pallet::Error2),
+				Mint(runtime_types::pallet_mint::pallet::Error),
 				#[codec(index = 19)]
+				UlixeeBalances(runtime_types::pallet_balances::pallet::Error2),
+				#[codec(index = 20)]
 				TxPause(runtime_types::pallet_tx_pause::pallet::Error),
-				#[codec(index = 21)]
+				#[codec(index = 22)]
 				Sudo(runtime_types::pallet_sudo::pallet::Error),
 			}
 			#[derive(
@@ -15059,12 +15205,14 @@ pub mod api {
 				#[codec(index = 17)]
 				ArgonBalances(runtime_types::pallet_balances::pallet::Event),
 				#[codec(index = 18)]
-				UlixeeBalances(runtime_types::pallet_balances::pallet::Event2),
+				Mint(runtime_types::pallet_mint::pallet::Event),
 				#[codec(index = 19)]
-				TxPause(runtime_types::pallet_tx_pause::pallet::Event),
+				UlixeeBalances(runtime_types::pallet_balances::pallet::Event2),
 				#[codec(index = 20)]
-				TransactionPayment(runtime_types::pallet_transaction_payment::pallet::Event),
+				TxPause(runtime_types::pallet_tx_pause::pallet::Event),
 				#[codec(index = 21)]
+				TransactionPayment(runtime_types::pallet_transaction_payment::pallet::Event),
+				#[codec(index = 22)]
 				Sudo(runtime_types::pallet_sudo::pallet::Event),
 			}
 			#[derive(
@@ -15100,6 +15248,8 @@ pub mod api {
 				Bond(runtime_types::pallet_bond::pallet::HoldReason),
 				#[codec(index = 14)]
 				BlockRewards(runtime_types::pallet_block_rewards::pallet::HoldReason),
+				#[codec(index = 18)]
+				Mint(runtime_types::pallet_mint::pallet::HoldReason),
 			}
 		}
 		pub mod ulx_notary_audit {
@@ -15252,10 +15402,12 @@ pub mod api {
 					#[codec(index = 49)]
 					InvalidBlockVoteSource,
 					#[codec(index = 50)]
-					InsufficientBlockVoteMinimum,
+					BlockVoteInvalidSignature,
 					#[codec(index = 51)]
-					BlockVoteDataDomainMismatch,
+					InsufficientBlockVoteMinimum,
 					#[codec(index = 52)]
+					BlockVoteDataDomainMismatch,
+					#[codec(index = 53)]
 					BlockVoteChannelReused,
 				}
 			}
@@ -15476,6 +15628,7 @@ pub mod api {
 					pub power: ::core::primitive::u128,
 					pub data_domain: runtime_types::ulx_primitives::data_domain::DataDomain,
 					pub data_domain_account: ::subxt::utils::AccountId32,
+					pub signature: runtime_types::sp_runtime::MultiSignature,
 				}
 			}
 			pub mod bond {
@@ -16045,6 +16198,7 @@ pub mod api {
 				pub struct Ticker {
 					pub tick_duration_millis: ::core::primitive::u64,
 					pub genesis_utc_time: ::core::primitive::u64,
+					pub ntp_offset_millis: ::core::primitive::i64,
 				}
 			}
 		}

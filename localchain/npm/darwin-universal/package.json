@@ -1,0 +1,15 @@
+{
+  "name": "@ulixee/localchain-darwin-universal",
+  "version": "0.0.0",
+  "os": [
+    "darwin"
+  ],
+  "main": "localchain.darwin-universal.node",
+  "files": [
+    "localchain.darwin-universal.node"
+  ],
+  "license": "MIT",
+  "engines": {
+    "node": ">= 10"
+  }
+}

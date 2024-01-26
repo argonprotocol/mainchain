@@ -1,0 +1,14 @@
+{
+  "db_name": "PostgreSQL",
+  "query": "\n\t\t\t\tINSERT INTO notebook_constraints (notebook_number) VALUES ($1)\n\t\t\t",
+  "describe": {
+    "columns": [],
+    "parameters": {
+      "Left": [
+        "Int4"
+      ]
+    },
+    "nullable": []
+  },
+  "hash": "de9d8f79d1f2e08d31152b69c54a66c6b61ee8122ef89e64faa9b2014d52e68a"
+}

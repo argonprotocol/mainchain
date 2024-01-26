@@ -14,18 +14,18 @@ use sqlx::PgPool;
 use tokio::net::ToSocketAddrs;
 
 use ulx_primitives::{
-	BalanceProof, BalanceTip, NotarizationBalanceChangeset, NotarizationBlockVotes,
-	NotarizationDataDomains, NotaryId, Notebook, NotebookMeta, NotebookNumber,
-	SignedNotebookHeader,
+	AccountId, AccountType, BalanceProof, BalanceTip, Notarization, NotarizationBalanceChangeset,
+	NotarizationBlockVotes, NotarizationDataDomains, NotaryId, Notebook, NotebookMeta,
+	NotebookNumber, SignedNotebookHeader,
 };
 
 use crate::{
 	apis::{
-		localchain::{BalanceChangeResult, LocalchainRpcServer},
+		localchain::{BalanceChangeResult, BalanceTipResult, LocalchainRpcServer},
 		notebook::NotebookRpcServer,
 	},
 	stores::{
-		notarizations::NotarizationsStore, notebook::NotebookStore,
+		balance_tip::BalanceTipStore, notarizations::NotarizationsStore, notebook::NotebookStore,
 		notebook_header::NotebookHeaderStore,
 	},
 	Error,
@@ -86,10 +86,14 @@ impl NotaryServer {
 
 		let handle = server.start(module);
 		notary_server.server_handle = Some(handle.clone());
-		// handle in background
-		tokio::spawn(handle.stopped());
 
 		Ok(notary_server)
+	}
+
+	pub async fn wait_for_close(&self) {
+		if let Some(handle) = self.server_handle.clone() {
+			handle.stopped().await;
+		}
 	}
 
 	pub async fn start(
@@ -109,16 +113,56 @@ impl NotebookRpcServer for NotaryServer {
 		notebook_number: NotebookNumber,
 		balance_tip: BalanceTip,
 	) -> Result<BalanceProof, ErrorObjectOwned> {
-		NotebookStore::get_balance_proof(&self.pool, self.notary_id, notebook_number, &balance_tip)
+		let mut db = self
+			.pool
+			.acquire()
 			.await
-			.map_err(from_crate_error)
-			.map(|a| BalanceProof {
-				notebook_number,
-				notary_id: self.notary_id,
-				notebook_proof: a.into(),
-				account_origin: balance_tip.account_origin,
-				balance: balance_tip.balance,
-			})
+			.map_err(|e| from_crate_error(Error::Database(e.to_string())))?;
+
+		let merkle_proof = NotebookStore::get_balance_proof(
+			&mut *db,
+			self.notary_id,
+			notebook_number,
+			&balance_tip,
+		)
+		.await
+		.map_err(from_crate_error)?;
+
+		let tick = NotebookHeaderStore::get_notebook_tick(&mut *db, notebook_number)
+			.await
+			.map_err(from_crate_error)?;
+		Ok(BalanceProof {
+			notebook_number,
+			notary_id: self.notary_id,
+			notebook_proof: merkle_proof.into(),
+			account_origin: balance_tip.account_origin,
+			balance: balance_tip.balance,
+			tick,
+		})
+	}
+
+	async fn get_notarization(
+		&self,
+		account_id: AccountId,
+		account_type: AccountType,
+		notebook_number: NotebookNumber,
+		change_number: u32,
+	) -> Result<Notarization, ErrorObjectOwned> {
+		let mut db = self
+			.pool
+			.acquire()
+			.await
+			.map_err(|e| from_crate_error(Error::Database(e.to_string())))?;
+		let notarization = NotarizationsStore::get_account_change(
+			&mut *db,
+			notebook_number,
+			account_id,
+			account_type,
+			change_number,
+		)
+		.await
+		.map_err(from_crate_error)?;
+		Ok(notarization)
 	}
 
 	async fn get_header(
@@ -210,9 +254,24 @@ impl LocalchainRpcServer for NotaryServer {
 		.await
 		.map_err(from_crate_error)
 	}
+
+	async fn get_tip(
+		&self,
+		account_id: AccountId,
+		account_type: AccountType,
+	) -> Result<BalanceTipResult, ErrorObjectOwned> {
+		let mut db = self
+			.pool
+			.acquire()
+			.await
+			.map_err(|e| from_crate_error(Error::Database(e.to_string())))?;
+		Ok(BalanceTipStore::get_tip(&mut db, &account_id, account_type)
+			.await
+			.map_err(from_crate_error)?)
+	}
 }
 
-async fn pipe_from_stream_and_drop<T: Serialize>(
+pub async fn pipe_from_stream_and_drop<T: Serialize>(
 	pending: PendingSubscriptionSink,
 	mut stream: impl Stream<Item = T> + Unpin,
 	transform: impl Fn(T) -> Result<SubscriptionMessage, anyhow::Error>,
@@ -266,7 +325,7 @@ mod tests {
 			localchain::{BalanceChangeResult, LocalchainRpcClient},
 			notebook::NotebookRpcClient,
 		},
-		notebook_closer::{MainchainClient, NotebookCloser, NOTARY_KEYID},
+		notebook_closer::{FinalizedNotebookHeaderListener, NotebookCloser, NOTARY_KEYID},
 		stores::{
 			blocks::BlocksStore, chain_transfer::ChainTransferStore,
 			notebook_header::NotebookHeaderStore, registered_key::RegisteredKeyStore,
@@ -336,11 +395,15 @@ mod tests {
 		let mut closer = NotebookCloser {
 			pool: pool.clone(),
 			notary_id: notary.notary_id,
-			completed_notebook_sender: notary.completed_notebook_sender.clone(),
 			keystore: keystore.clone(),
-			client: MainchainClient::new(vec![format!("ws://{}", notary.addr)]),
 			ticker: ticker.clone(),
 		};
+		let mut header_listener = FinalizedNotebookHeaderListener::connect(
+			pool.clone(),
+			notary.completed_notebook_sender.clone(),
+		)
+		.await?;
+
 		sqlx::query("update notebook_status set end_time = $1 where notebook_number = 1")
 			.bind(Utc::now())
 			.execute(&mut *db)
@@ -348,6 +411,7 @@ mod tests {
 
 		closer.try_rotate_notebook().await?;
 		closer.try_close_notebook().await?;
+		let _ = header_listener.next().await;
 
 		let mut stream = subscription.into_stream();
 		let header = stream.next().await.unwrap()?.header;

@@ -23,7 +23,7 @@ pub mod pallet {
 	use log::info;
 	use sp_core::{H256, U256};
 	use sp_runtime::{
-		traits::{BlakeTwo256, Block as BlockT},
+		traits::{BlakeTwo256, Block as BlockT, Verify},
 		ConsensusEngineId, DigestItem, RuntimeAppPublic,
 	};
 	use sp_std::{collections::btree_map::BTreeMap, vec, vec::Vec};
@@ -36,7 +36,7 @@ pub mod pallet {
 		AuthorityProvider, BlockSealAuthoritySignature, BlockSealerInfo, BlockSealerProvider,
 		BlockVotingKey, BlockVotingProvider, DataDomainProvider, MerkleProof, NotaryId,
 		NotaryNotebookVotes, NotebookProvider, ParentVotingKeyDigest, TickProvider, VotingKey,
-		AUTHOR_DIGEST_ID, CHANNEL_CLAWBACK_NOTEBOOKS, CHANNEL_EXPIRATION_NOTEBOOKS,
+		AUTHOR_DIGEST_ID, CHANNEL_CLAWBACK_TICKS, CHANNEL_EXPIRATION_TICKS,
 		PARENT_VOTING_KEY_DIGEST,
 	};
 
@@ -94,25 +94,34 @@ pub mod pallet {
 
 	#[pallet::error]
 	pub enum Error<T> {
-		InvalidVoteProof,
+		/// The strength of the given seal did not match calculations
+		InvalidVoteSealStrength,
+		/// Vote not submitted by the right miner
 		InvalidSubmitter,
+		/// Could not decode the vote bytes
 		UnableToDecodeVoteAccount,
+		/// The block author is not a registered miner
 		UnregisteredBlockAuthor,
+		/// The merkle proof of vote inclusion in the notebook is invalid
 		InvalidBlockVoteProof,
+		/// No vote minimum found at grandparent height
 		NoGrandparentVoteMinimum,
+		/// Too many block seals submitted
 		DuplicateBlockSealProvided,
+		/// The block vote did not reach the minimum voting power at time of the grandparent block
 		InsufficientVotingPower,
+		/// No registered voting key found for the parent block
 		ParentVotingKeyNotFound,
+		/// The block vote was not for a valid block
 		InvalidVoteGrandparentHash,
+		/// The notebook for this vote was not eligible to vote
 		IneligibleNotebookUsed,
+		/// The lookup to verify a vote's authenticity is not available for the given block
 		NoEligibleVotingRoot,
-
 		/// The data domain was not registered
 		UnregisteredDataDomain,
 		/// The data domain account is mismatched with the block reward seeker
 		InvalidDataDomainAccount,
-
-		InvalidAuthoritySupplied,
 		/// Message was not signed by a registered miner
 		InvalidAuthoritySignature,
 		/// Could not decode the scale bytes of the votes
@@ -121,6 +130,8 @@ pub mod pallet {
 		MaxNotebooksAtTickExceeded,
 		/// No closest miner found for vote
 		NoClosestMinerFoundForVote,
+		/// The vote signature was invalid
+		BlockVoteInvalidSignature,
 	}
 
 	#[pallet::hooks]
@@ -271,7 +282,7 @@ pub mod pallet {
 						<ParentVotingKey<T>>::get().ok_or(Error::<T>::ParentVotingKeyNotFound)?;
 					ensure!(
 						seal_strength == block_vote.get_seal_strength(notary_id, parent_voting_key),
-						Error::<T>::InvalidVoteProof
+						Error::<T>::InvalidVoteSealStrength
 					);
 
 					let votes_from_tick = current_tick - 2u32;
@@ -367,14 +378,19 @@ pub mod pallet {
 			let data_domain_account =
 				T::AccountId::decode(&mut block_vote.data_domain_account.encode().as_slice())
 					.map_err(|_| Error::<T>::UnableToDecodeVoteAccount)?;
-			let last_tick = votes_from_tick.saturating_sub(CHANNEL_EXPIRATION_NOTEBOOKS);
+			let last_tick = votes_from_tick.saturating_sub(CHANNEL_EXPIRATION_TICKS);
 			ensure!(
 				T::DataDomainProvider::is_registered_payment_account(
 					data_domain,
 					&data_domain_account,
-					(last_tick.saturating_sub(CHANNEL_CLAWBACK_NOTEBOOKS), last_tick)
+					(last_tick.saturating_sub(CHANNEL_CLAWBACK_TICKS), last_tick)
 				),
 				Error::<T>::InvalidDataDomainAccount
+			);
+
+			ensure!(
+				block_vote.signature.verify(&block_vote.hash()[..], &block_vote.account_id),
+				Error::<T>::BlockVoteInvalidSignature
 			);
 
 			Ok(())
@@ -465,6 +481,7 @@ pub mod pallet {
 					notary_id,
 					seal_strength,
 					block_vote_bytes: leafs[index].clone(),
+
 					source_notebook_number,
 					source_notebook_proof: MerkleProof {
 						proof: BoundedVec::truncate_from(proof.proof),

@@ -1,0 +1,40 @@
+{
+  "db_name": "PostgreSQL",
+  "query": "\n\t\t\tSELECT * FROM balance_tips WHERE key = $1 LIMIT 1\n\t\t\t",
+  "describe": {
+    "columns": [
+      {
+        "ordinal": 0,
+        "name": "key",
+        "type_info": "Bytea"
+      },
+      {
+        "ordinal": 1,
+        "name": "value",
+        "type_info": "Bytea"
+      },
+      {
+        "ordinal": 2,
+        "name": "last_changed_notebook",
+        "type_info": "Int4"
+      },
+      {
+        "ordinal": 3,
+        "name": "last_changed_tick",
+        "type_info": "Int4"
+      }
+    ],
+    "parameters": {
+      "Left": [
+        "Bytea"
+      ]
+    },
+    "nullable": [
+      false,
+      false,
+      false,
+      false
+    ]
+  },
+  "hash": "2aaf0b7e06a561beb2ffd5ca56190cba6d8ff501c24571071424c3b89680b33e"
+}

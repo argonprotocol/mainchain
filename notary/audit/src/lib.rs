@@ -2,25 +2,28 @@
 
 use binary_merkle_tree::{merkle_root, verify_proof, Leaf};
 use codec::{Decode, Encode};
-
-use log::info;
+use log::trace;
 use serde::{Deserialize, Serialize};
 use snafu::Snafu;
 use sp_core::{crypto::AccountId32, H256};
-use sp_runtime::{scale_info::TypeInfo, traits::BlakeTwo256};
+use sp_runtime::{
+	scale_info::TypeInfo,
+	traits::{BlakeTwo256, Verify},
+};
 use sp_std::{
 	collections::{btree_map::BTreeMap, btree_set::BTreeSet},
 	vec::Vec,
 };
 
-pub use crate::error::VerifyError;
 use ulx_primitives::{
-	ensure, AccountId, AccountOrigin, AccountOriginUid, AccountType, Balance, BalanceChange,
-	BalanceProof, BalanceTip, BlockVote, ChainTransfer, DataDomain, NewAccountOrigin, NotaryId,
-	Note, NoteType, Notebook, NotebookHeader, NotebookNumber, VoteMinimum,
-	CHANNEL_CLAWBACK_NOTEBOOKS, CHANNEL_EXPIRATION_NOTEBOOKS, DATA_DOMAIN_LEASE_COST,
-	MIN_CHANNEL_NOTE_MILLIGONS, MIN_DATA_DOMAIN_NAME_LENGTH,
+	ensure, round_up, tick::Tick, AccountId, AccountOrigin, AccountOriginUid, AccountType, Balance,
+	BalanceChange, BalanceProof, BalanceTip, BlockVote, ChainTransfer, DataDomain,
+	NewAccountOrigin, NotaryId, Note, NoteType, Notebook, NotebookHeader, NotebookNumber,
+	VoteMinimum, CHANNEL_CLAWBACK_TICKS, CHANNEL_EXPIRATION_TICKS, DATA_DOMAIN_LEASE_COST,
+	MIN_CHANNEL_NOTE_MILLIGONS, MIN_DATA_DOMAIN_NAME_LENGTH, TAX_PERCENT_BASE,
 };
+
+pub use crate::error::VerifyError;
 
 pub mod error;
 #[cfg(test)]
@@ -82,7 +85,7 @@ pub fn notebook_verify<T: NotebookHistoryLookup>(
 			changeset,
 			block_votes,
 			data_domains,
-			Some(notebook.header.notebook_number),
+			Some(notebook.header.tick),
 		)?;
 		result.verify_taxes()?;
 		state.record_tax(result)?;
@@ -351,6 +354,10 @@ pub fn verify_voting_sources(
 			.get_mut(&(block_vote.data_domain.clone(), block_vote.data_domain_account.clone()))
 			.ok_or(VerifyError::BlockVoteDataDomainMismatch)?;
 		ensure!(*count > 0, VerifyError::BlockVoteChannelReused);
+		ensure!(
+			block_vote.signature.verify(&block_vote.hash()[..], &block_vote.account_id),
+			VerifyError::BlockVoteInvalidSignature
+		);
 		*count -= 1;
 	}
 	Ok(())
@@ -364,8 +371,11 @@ fn verify_previous_balance_proof<'a, T: NotebookHistoryLookup>(
 	change: &BalanceChange,
 	key: &(AccountId32, AccountType),
 ) -> anyhow::Result<bool, VerifyError> {
-	info!(target:LOG_TARGET,
-		"verify balance for uid={}. in final? {}",
+	// NOTE: something about adding logging is making lookups work for localchain transfers. if I
+	// comment out the logging, it fails with InvalidLocalchainTransfer in the notebook_closer
+	// test.
+	trace!(target:LOG_TARGET,
+		"Verify balance for uid={}. In current set of balance changes? {}",
 		proof.account_origin.account_uid,
 		final_balances.contains_key(&key)
 	);
@@ -381,7 +391,9 @@ fn verify_previous_balance_proof<'a, T: NotebookHistoryLookup>(
 			VerifyError::InvalidPreviousNonce
 		);
 		ensure!(
-			previous_balance.account_origin == proof.account_origin,
+			previous_balance.account_origin.account_uid == proof.account_origin.account_uid &&
+				previous_balance.account_origin.notebook_number ==
+					proof.account_origin.notebook_number,
 			VerifyError::InvalidPreviousAccountOrigin
 		);
 		// if none, we can add changes.. if set, we can't do anything else
@@ -479,24 +491,16 @@ pub struct BalanceChangesetState {
 	unclaimed_channel_balances: BTreeMap<BTreeSet<AccountId>, i128>,
 }
 
-fn round_up(value: u128, percentage: u128) -> u128 {
-	let numerator = value * percentage;
-
-	let round = if numerator % 100 == 0 { 0 } else { 1 };
-
-	numerator.saturating_div(100) + round
-}
-
 impl BalanceChangesetState {
 	pub fn verify_taxes(&self) -> anyhow::Result<(), VerifyError> {
 		let mut tax_owed_per_account = BTreeMap::new();
 		for (account_id, amount) in self.claimed_deposits_per_account.iter() {
 			let amount = *amount;
-			let tax = if amount < 1000 { round_up(amount, 20) } else { 200 };
+			let tax = Note::calculate_transfer_tax(amount);
 			*tax_owed_per_account.entry(account_id).or_insert(0) += tax;
 		}
 		for (account_id, amount) in self.claimed_channel_deposits_per_account.iter() {
-			let tax = round_up(*amount, 20);
+			let tax = round_up(*amount, TAX_PERCENT_BASE);
 			*tax_owed_per_account.entry(account_id).or_insert(0) += tax;
 		}
 		for (account_id, tax) in tax_owed_per_account {
@@ -653,17 +657,20 @@ impl BalanceChangesetState {
 		key: &(AccountId, AccountType),
 		milligons: i128,
 		channel_hold_note: &Note,
-		source_change_notebook: NotebookNumber,
-		notebook_number: Option<NotebookNumber>,
+		source_change_tick: Tick,
+		notebook_tick: Option<Tick>,
 	) -> anyhow::Result<(), VerifyError> {
 		let mut recipients = BTreeSet::new();
 
 		// only add the recipient restrictions once we know what notebook we're in
-		if let Some(notebook_number) = notebook_number {
-			let expiration_notebook = source_change_notebook + CHANNEL_EXPIRATION_NOTEBOOKS;
+		if let Some(tick) = notebook_tick {
+			let expiration_tick = source_change_tick + CHANNEL_EXPIRATION_TICKS;
 			ensure!(
-				notebook_number >= expiration_notebook,
-				VerifyError::ChannelHoldNotReadyForClaim
+				tick >= expiration_tick,
+				VerifyError::ChannelHoldNotReadyForClaim {
+					current_tick: tick,
+					claim_tick: expiration_tick
+				}
 			);
 
 			let NoteType::ChannelHold { recipient, .. } = &channel_hold_note.note_type else {
@@ -671,7 +678,7 @@ impl BalanceChangesetState {
 			};
 
 			recipients.insert(recipient.clone());
-			if notebook_number >= expiration_notebook + CHANNEL_CLAWBACK_NOTEBOOKS {
+			if tick >= expiration_tick + CHANNEL_CLAWBACK_TICKS {
 				// no claim necessary for a 0 claim
 				if milligons == 0 {
 					recipients.clear();
@@ -702,7 +709,7 @@ pub fn verify_notarization_allocation(
 	changes: &Vec<BalanceChange>,
 	block_votes: &Vec<BlockVote>,
 	data_domains: &Vec<(DataDomain, AccountId)>,
-	notebook_number: Option<NotebookNumber>,
+	notebook_tick: Option<Tick>,
 ) -> anyhow::Result<BalanceChangesetState, VerifyError> {
 	let mut state = BalanceChangesetState::default();
 
@@ -769,8 +776,8 @@ pub fn verify_notarization_allocation(
 					state.claim_channel_balance(note.milligons, &change.account_id)?;
 				},
 				NoteType::ChannelSettle => {
-					let Some(source_change_notebook) =
-						change.previous_balance_proof.as_ref().map(|a| a.notebook_number)
+					let Some(source_change_tick) =
+						change.previous_balance_proof.as_ref().map(|a| a.tick)
 					else {
 						return Err(VerifyError::MissingBalanceProof)
 					};
@@ -784,8 +791,8 @@ pub fn verify_notarization_allocation(
 						&key,
 						note.milligons as i128,
 						channel_hold_note,
-						source_change_notebook,
-						notebook_number,
+						source_change_tick,
+						notebook_tick,
 					)?;
 				},
 				NoteType::Tax => {

@@ -1,0 +1,51 @@
+{
+  "name": "@ulixee/localchain",
+  "version": "2.0.0-alpha.25",
+  "scripts": {
+    "artifacts": "napi artifacts",
+    "build": "napi build --platform --release",
+    "build:debug": "napi build --platform",
+    "prepublishOnly": "napi prepublish -t npm",
+    "test": "jest",
+    "universal": "napi universal",
+    "version": "napi version"
+  },
+  "license": "MIT",
+  "main": "index.js",
+  "types": "index.d.ts",
+  "napi": {
+    "name": "localchain",
+    "triples": {
+      "additional": [
+        "aarch64-apple-darwin",
+        "aarch64-linux-android",
+        "aarch64-unknown-linux-gnu",
+        "aarch64-unknown-linux-musl",
+        "aarch64-pc-windows-msvc",
+        "armv7-unknown-linux-gnueabihf",
+        "x86_64-unknown-linux-musl",
+        "x86_64-unknown-freebsd",
+        "i686-pc-windows-msvc",
+        "armv7-linux-androideabi",
+        "universal-apple-darwin",
+        "riscv64gc-unknown-linux-gnu"
+      ]
+    }
+  },
+  "devDependencies": {
+    "@napi-rs/cli": "^2.17.0",
+    "@types/jest": "^29.5.11",
+    "@types/node": "^18.19.6",
+    "@types/pg": "^8.10.9",
+    "@ulixee/mainchain": "link:../client/nodejs",
+    "jest": "^29.7.0",
+    "nanoid": "^3.3.7",
+    "pg": "^8.11.3",
+    "ts-jest": "^29.1.2",
+    "tslib": "^2.6.2",
+    "typescript": "^5.3.3"
+  },
+  "engines": {
+    "node": ">= 16"
+  }
+}
