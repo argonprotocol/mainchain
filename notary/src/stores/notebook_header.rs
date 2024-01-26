@@ -14,6 +14,7 @@ use ulx_primitives::{
 
 use crate::{
 	stores::{
+		notebook_constraints::NotebookConstraintsStore,
 		notebook_new_accounts::NotebookNewAccountsStore, notebook_status::NotebookStatusStore,
 		BoxFutureResult,
 	},
@@ -164,6 +165,7 @@ impl NotebookHeaderStore {
 		Box::pin(async move {
 			Self::create_header(&mut *db, notary_id, notebook_number, tick).await?;
 			NotebookNewAccountsStore::reset_seq(&mut *db, notebook_number).await?;
+			NotebookConstraintsStore::create(&mut *db, notebook_number).await?;
 			NotebookStatusStore::create(
 				&mut *db,
 				notebook_number,
@@ -182,18 +184,18 @@ impl NotebookHeaderStore {
 		let record = sqlx::query!(
 			r#"
 				SELECT notebook_number, tick
-				FROM notebook_headers ORDER BY notebook_number DESC LIMIT 1
+				FROM notebook_headers WHERE hash IS NOT NULL ORDER BY notebook_number DESC LIMIT 1
 				"#,
 		)
 		.fetch_optional(db)
 		.await?;
 		let Some(record) = record else {
-			return Ok(NotebookMeta { latest_notebook_number: 0, latest_tick: 0 });
+			return Ok(NotebookMeta { finalized_tick: 0, finalized_notebook_number: 0 });
 		};
 
 		Ok(NotebookMeta {
-			latest_tick: record.tick as u32,
-			latest_notebook_number: record.notebook_number as u32,
+			finalized_tick: record.tick as u32,
+			finalized_notebook_number: record.notebook_number as u32,
 		})
 	}
 	pub async fn load<'a>(

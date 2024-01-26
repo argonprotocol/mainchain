@@ -6,7 +6,7 @@ use sp_debug_derive::RuntimeDebug;
 use sp_runtime::{BoundedBTreeMap, BoundedVec};
 use sp_std::{cmp::Ordering, collections::btree_map::BTreeMap, str};
 
-use crate::{data_tld::DataTLD, host::Host};
+use crate::{data_tld::DataTLD, host::Host, NotaryId};
 
 pub const MAX_DATASTORE_VERSIONS: u32 = 25;
 pub const MAX_DOMAIN_NAME_LENGTH: u32 = 50;
@@ -62,6 +62,8 @@ impl DataDomain {
 /// ZoneRecords track versions of a data domain and the host addresses where they can be accessed.
 pub struct ZoneRecord<AccountId: Codec> {
 	pub payment_account: AccountId,
+	/// The notary that payments must be notarized through
+	pub notary_id: NotaryId,
 	/// A mapping of versions to host addresses.
 	pub versions: BTreeMap<Semver, VersionHost>,
 }

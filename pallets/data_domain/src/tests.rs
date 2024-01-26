@@ -133,6 +133,7 @@ fn it_registers_zone_records() {
 
 		let zone = ZoneRecord {
 			payment_account: Bob.to_account_id(),
+			notary_id: 1,
 			versions: BTreeMap::from([(
 				Semver::new(1, 0, 0),
 				VersionHost {
@@ -195,8 +196,11 @@ fn it_tracks_historical_payment() {
 			vec![(domain.clone(), Bob.to_account_id(),)]
 		)));
 
-		let mut zone =
-			ZoneRecord { payment_account: Bob.to_account_id(), versions: BTreeMap::new() };
+		let mut zone = ZoneRecord {
+			payment_account: Bob.to_account_id(),
+			notary_id: 1,
+			versions: BTreeMap::new(),
+		};
 
 		assert_ok!(DataDomainPallet::set_zone_record(
 			RuntimeOrigin::signed(Bob.to_account_id()),

@@ -3,7 +3,6 @@ use frame_support::{pallet_prelude::TypeInfo, Deserialize, Serialize};
 use sp_debug_derive::RuntimeDebug;
 
 #[derive(
-	Clone,
 	PartialEq,
 	Eq,
 	Ord,
@@ -17,6 +16,8 @@ use sp_debug_derive::RuntimeDebug;
 	Deserialize,
 )]
 #[serde(rename_all = "camelCase")]
+#[cfg_attr(not(feature = "napi"), derive(Clone))]
+#[cfg_attr(feature = "napi", napi_derive::napi)]
 pub enum DataTLD {
 	Analytics,
 	Automotive,

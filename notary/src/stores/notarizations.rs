@@ -1,7 +1,9 @@
 use std::collections::{BTreeMap, BTreeSet};
 
+use codec::Encode;
 use serde_json::{from_value, json};
-use sqlx::{query, types::Json, FromRow, PgPool};
+use sp_runtime::BoundedVec;
+use sqlx::{query, types::Json, FromRow, PgConnection, PgPool};
 
 use ulx_notary_audit::{
 	verify_changeset_signatures, verify_notarization_allocation, verify_voting_sources, VerifyError,
@@ -9,16 +11,18 @@ use ulx_notary_audit::{
 use ulx_primitives::{
 	ensure, AccountId, AccountOrigin, AccountType, BalanceChange, BalanceProof, BalanceTip,
 	BlockVote, DataDomain, NewAccountOrigin, Notarization, NotaryId, NoteType, NotebookNumber,
-	MAX_BALANCE_CHANGES_PER_NOTARIZATION, MAX_BLOCK_VOTES_PER_NOTEBOOK, MAX_DOMAINS_PER_NOTEBOOK,
-	MAX_NOTARIZATIONS_PER_NOTEBOOK, MAX_NOTEBOOK_TRANSFERS,
 };
 
 use crate::{
 	apis::localchain::BalanceChangeResult,
 	error::Error,
 	stores::{
-		balance_tip::BalanceTipStore, blocks::BlocksStore, chain_transfer::ChainTransferStore,
-		notebook::NotebookStore, notebook_new_accounts::NotebookNewAccountsStore,
+		balance_tip::BalanceTipStore,
+		blocks::BlocksStore,
+		chain_transfer::ChainTransferStore,
+		notebook::NotebookStore,
+		notebook_constraints::{MaxNotebookCounts, NotarizationCounts, NotebookConstraintsStore},
+		notebook_new_accounts::NotebookNewAccountsStore,
 		notebook_status::NotebookStatusStore,
 	},
 };
@@ -37,6 +41,14 @@ struct NotarizationRow {
 pub struct NotarizationsStore;
 
 impl NotarizationsStore {
+	pub fn create_account_lookup_key(
+		account_id: &AccountId,
+		account_type: &AccountType,
+		change_number: u32,
+	) -> Vec<u8> {
+		(account_id.clone(), account_type.clone(), change_number).encode()
+	}
+
 	pub async fn append_to_notebook<'a>(
 		db: impl sqlx::PgExecutor<'a> + 'a,
 		notebook_number: NotebookNumber,
@@ -45,14 +57,24 @@ impl NotarizationsStore {
 		data_domains: Vec<(DataDomain, AccountId)>,
 	) -> anyhow::Result<(), Error> {
 		let balance_changes_json = json!(balance_changes);
+		let mut account_lookups = BTreeSet::new();
+		for change in &balance_changes {
+			account_lookups.insert(Self::create_account_lookup_key(
+				&change.account_id,
+				&change.account_type,
+				change.change_number,
+			));
+		}
+
 		let res = query!(
 			r#"
-			INSERT INTO notarizations (notebook_number, balance_changes, block_votes, data_domains) VALUES ($1, $2, $3, $4)
+			INSERT INTO notarizations (notebook_number, balance_changes, block_votes, data_domains, account_lookups) VALUES ($1, $2, $3, $4, $5)
 		"#,
 			notebook_number as i32,
 			balance_changes_json,
 			json!(block_votes),
 			json!(data_domains),
+			&account_lookups.into_iter().collect::<Vec<_>>(),
 		)
 		.execute(db)
 		.await?;
@@ -63,6 +85,32 @@ impl NotarizationsStore {
 		);
 
 		Ok(())
+	}
+
+	pub async fn get_account_change(
+		db: &mut PgConnection,
+		notebook_number: NotebookNumber,
+		account_id: AccountId,
+		account_type: AccountType,
+		change_number: u32,
+	) -> anyhow::Result<Notarization, Error> {
+		let lookup_key = Self::create_account_lookup_key(&account_id, &account_type, change_number);
+		let row = sqlx::query!(
+			"SELECT * FROM notarizations WHERE notebook_number = $1 AND $2 = ANY (account_lookups) LIMIT 1",
+			notebook_number as i32,
+			lookup_key,
+		)
+		.fetch_one(db)
+		.await?;
+
+		let balance_changes = from_value::<Vec<BalanceChange>>(row.balance_changes)?;
+		let block_votes = from_value::<Vec<BlockVote>>(row.block_votes)?;
+		let data_domains = from_value::<Vec<(DataDomain, AccountId)>>(row.data_domains)?;
+		Ok(Notarization {
+			balance_changes: BoundedVec::truncate_from(balance_changes),
+			block_votes: BoundedVec::truncate_from(block_votes),
+			data_domains: BoundedVec::truncate_from(data_domains),
+		})
 	}
 
 	pub async fn get_for_notebook<'a>(
@@ -139,12 +187,7 @@ impl NotarizationsStore {
 			NotebookStatusStore::lock_open_for_appending(&mut *tx).await?;
 
 		if initial_allocation_result.needs_channel_settle_followup {
-			verify_notarization_allocation(
-				&changes,
-				&block_votes,
-				&data_domains,
-				Some(current_notebook_number),
-			)?;
+			verify_notarization_allocation(&changes, &block_votes, &data_domains, Some(tick))?;
 		}
 
 		let block_vote_specifications =
@@ -154,6 +197,7 @@ impl NotarizationsStore {
 
 		let mut changes_with_proofs = changes.clone();
 		let mut channel_data_domains = BTreeMap::new();
+		let mut chain_transfers: u32 = 0;
 		for (change_index, change) in changes.into_iter().enumerate() {
 			let BalanceChange { account_id, account_type, change_number, balance, .. } = change;
 			let key = (account_id.clone(), account_type.clone());
@@ -235,6 +279,7 @@ impl NotarizationsStore {
 						notebook_number: proof.notebook_number,
 						account_origin: proof.account_origin.clone(),
 						notebook_proof: Some(notebook_proof),
+						tick: proof.tick,
 					});
 				}
 
@@ -256,6 +301,7 @@ impl NotarizationsStore {
 			for (note_index, note) in change.notes.into_iter().enumerate() {
 				let _ = match note.note_type {
 					NoteType::ClaimFromMainchain { account_nonce: nonce, .. } => {
+						chain_transfers += 1;
 						// NOTE: transfers can expire. We need to ensure this can still get into a
 						// notebook
 						ChainTransferStore::take_and_record_transfer_local(
@@ -266,19 +312,20 @@ impl NotarizationsStore {
 							note.milligons,
 							change_index,
 							note_index,
-							MAX_NOTEBOOK_TRANSFERS,
 						)
 						.await
 					},
-					NoteType::SendToMainchain => ChainTransferStore::record_transfer_to_mainchain(
-						&mut *tx,
-						current_notebook_number,
-						&account_id,
-						note.milligons,
-						MAX_NOTEBOOK_TRANSFERS,
-					)
-					.await
-					.map(|_| ()),
+					NoteType::SendToMainchain => {
+						chain_transfers += 1;
+						ChainTransferStore::record_transfer_to_mainchain(
+							&mut *tx,
+							current_notebook_number,
+							&account_id,
+							note.milligons,
+						)
+						.await
+						.map(|_| ())
+					},
 					NoteType::ChannelHold { .. } => {
 						channel_hold_note = Some(note.clone());
 						Ok(())
@@ -315,6 +362,7 @@ impl NotarizationsStore {
 				change_number,
 				balance,
 				current_notebook_number,
+				tick,
 				account_origin,
 				channel_hold_note,
 				previous_balance.clone(),
@@ -325,16 +373,16 @@ impl NotarizationsStore {
 
 		verify_voting_sources(&channel_data_domains, &block_votes, &block_vote_specifications)?;
 
-		NotebookStatusStore::track_counts(
+		NotebookConstraintsStore::try_increment(
 			&mut *tx,
 			current_notebook_number,
-			changes_with_proofs.len() as u32,
-			block_votes.len() as u32,
-			data_domains.len() as u32,
-			MAX_NOTARIZATIONS_PER_NOTEBOOK,
-			MAX_BALANCE_CHANGES_PER_NOTARIZATION * MAX_NOTARIZATIONS_PER_NOTEBOOK,
-			MAX_BLOCK_VOTES_PER_NOTEBOOK,
-			MAX_DOMAINS_PER_NOTEBOOK,
+			NotarizationCounts {
+				balance_changes: changes_with_proofs.len() as u32,
+				block_votes: block_votes.len() as u32,
+				data_domains: data_domains.len() as u32,
+				chain_transfers,
+			},
+			MaxNotebookCounts::default(),
 		)
 		.await?;
 
@@ -364,32 +412,47 @@ impl NotarizationsStore {
 #[cfg(test)]
 mod tests {
 	use sp_core::{bounded_vec, ed25519::Signature};
-	use sp_keyring::Sr25519Keyring::Bob;
+	use sp_keyring::{AccountKeyring::Ferdie, Sr25519Keyring::Bob};
 	use sqlx::PgPool;
 
 	use ulx_primitives::{
-		AccountType::Deposit, BalanceChange, BlockVote, DataDomain, DataTLD, Notarization, Note,
-		NoteType,
+		AccountType, AccountType::Deposit, BalanceChange, BlockVote, DataDomain, DataTLD,
+		Notarization, Note, NoteType,
 	};
 
 	use crate::stores::notarizations::NotarizationsStore;
 
 	#[sqlx::test]
 	async fn test_storage(pool: PgPool) -> anyhow::Result<()> {
+		sqlx::query!("ALTER TABLE notarizations DROP CONSTRAINT IF EXISTS notarizations_notebook_number_fkey")
+			.execute(&pool)
+			.await?;
 		let notebook_number = 1;
-		let changeset = vec![BalanceChange {
-			account_id: Bob.to_account_id(),
-			account_type: Deposit,
-			change_number: 0,
-			balance: 1000,
-			previous_balance_proof: None,
-			channel_hold_note: None,
-			notes: bounded_vec![Note::create(
-				1000,
-				NoteType::ClaimFromMainchain { account_nonce: 1 }
-			)],
-			signature: Signature([0u8; 64]).into(),
-		}];
+		let changeset = vec![
+			BalanceChange {
+				account_id: Bob.to_account_id(),
+				account_type: Deposit,
+				change_number: 0,
+				balance: 1000,
+				previous_balance_proof: None,
+				channel_hold_note: None,
+				notes: bounded_vec![Note::create(
+					1000,
+					NoteType::ClaimFromMainchain { account_nonce: 1 }
+				)],
+				signature: Signature([0u8; 64]).into(),
+			},
+			BalanceChange {
+				account_id: Ferdie.to_account_id(),
+				account_type: Deposit,
+				change_number: 4,
+				balance: 1000,
+				previous_balance_proof: None,
+				channel_hold_note: None,
+				notes: bounded_vec![Note::create(1000, NoteType::Claim,)],
+				signature: Signature([0u8; 64]).into(),
+			},
+		];
 
 		let block_votes = vec![BlockVote {
 			block_hash: [0u8; 32].into(),
@@ -398,7 +461,10 @@ mod tests {
 			index: 0,
 			data_domain: DataDomain::new("test", DataTLD::Analytics),
 			data_domain_account: Bob.to_account_id(),
-		}];
+			signature: Signature([0u8; 64]).into(),
+		}
+		.sign(Bob.pair())
+		.clone()];
 		let domains = vec![(DataDomain::new("test", DataTLD::Analytics), Bob.to_account_id())];
 
 		{
@@ -414,11 +480,38 @@ mod tests {
 			.unwrap();
 			tx.commit().await?;
 		}
+
+		let notarization = Notarization::new(changeset, block_votes, domains);
 		{
 			let mut tx = pool.begin().await?;
 			let result =
 				NotarizationsStore::get_for_notebook(&mut *tx, notebook_number).await.unwrap();
-			assert_eq!(result, vec![Notarization::new(changeset, block_votes, domains)]);
+			assert_eq!(result, vec![notarization.clone()]);
+			tx.commit().await?;
+		}
+
+		{
+			let mut tx = pool.begin().await?;
+			let result = NotarizationsStore::get_account_change(
+				&mut *tx,
+				notebook_number,
+				Ferdie.to_account_id(),
+				AccountType::Deposit,
+				4,
+			)
+			.await
+			.unwrap();
+			assert_eq!(result, notarization.clone());
+
+			assert!(NotarizationsStore::get_account_change(
+				&mut *tx,
+				notebook_number,
+				Ferdie.to_account_id(),
+				AccountType::Deposit,
+				3,
+			)
+			.await
+			.is_err());
 			tx.commit().await?;
 		}
 

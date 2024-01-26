@@ -198,7 +198,6 @@ pub mod pallet {
 			origin: OriginFor<T>,
 			#[pallet::compact] amount: T::Balance,
 			notary_id: NotaryId,
-			#[pallet::compact] account_nonce: T::Nonce,
 		) -> DispatchResult {
 			let who = ensure_signed(origin)?;
 
@@ -207,12 +206,10 @@ pub mod pallet {
 					amount,
 				Error::<T>::InsufficientFunds,
 			);
-			ensure!(
-				account_nonce ==
-					<frame_system::Pallet<T>>::account_nonce(&who)
-						.saturating_sub(T::Nonce::one()),
-				Error::<T>::InvalidAccountNonce
-			);
+
+			// the nonce is incremented pre-dispatch. we want the nonce for the transaction
+			let account_nonce =
+				<frame_system::Pallet<T>>::account_nonce(&who).saturating_sub(T::Nonce::one());
 
 			T::Currency::transfer(
 				&who,

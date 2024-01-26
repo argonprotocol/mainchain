@@ -6,8 +6,8 @@ use sp_runtime::scale_info::TypeInfo;
 use sp_std::vec::Vec;
 
 use crate::{
-	balance_change::BalanceChange, block_vote::BlockVote, notary::NotarySignature, AccountId,
-	AccountType, DataDomain, NotaryId,
+	balance_change::BalanceChange, block_vote::BlockVote, notary::NotarySignature, tick::Tick,
+	AccountId, AccountType, DataDomain, NotaryId,
 };
 pub use crate::{AccountOrigin, BalanceTip};
 
@@ -21,7 +21,6 @@ pub type NotarizationBlockVotes = BoundedVec<BlockVote, ConstU32<MAX_BLOCK_VOTES
 pub type NotarizationDataDomains =
 	BoundedVec<(DataDomain, AccountId), ConstU32<MAX_DOMAINS_PER_NOTARIZATION>>;
 
-pub const PINNED_BLOCKS_OFFSET: u32 = 100u32;
 pub const MAX_NOTEBOOK_TRANSFERS: u32 = 10_000;
 pub const MAX_NOTARIZATIONS_PER_NOTEBOOK: u32 = 100_000;
 pub const MAX_BLOCK_VOTES_PER_NOTEBOOK: u32 =
@@ -292,8 +291,8 @@ impl NotebookHeader {
 )]
 #[serde(rename_all = "camelCase")]
 pub struct NotebookMeta {
-	pub latest_notebook_number: NotebookNumber,
-	pub latest_tick: u32,
+	pub finalized_notebook_number: NotebookNumber,
+	pub finalized_tick: Tick,
 }
 
 #[derive(Encode, TypeInfo, MaxEncodedLen)]

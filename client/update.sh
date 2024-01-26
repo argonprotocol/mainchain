@@ -10,3 +10,7 @@ subxt codegen  --derive Clone \
   --derive-for-type bounded_collections::bounded_vec::BoundedVec=serde::Serialize \
   --attributes-for-type bounded_collections::bounded_vec::BoundedVec="#[serde(transparent)]" \
    | rustfmt > "$BASEDIR/src/spec.rs"
+
+curl -H "Content-Type: application/json" -d '{"id":"1", "jsonrpc":"2.0", "method": "state_getMetadata", "params":[]}' http://localhost:9944 > "$BASEDIR/nodejs/metadata.json"
+
+cd "$BASEDIR/nodejs" && yarn build

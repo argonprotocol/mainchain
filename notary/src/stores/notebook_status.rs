@@ -37,11 +37,6 @@ impl From<i32> for NotebookFinalizationStep {
 pub struct NotebookStatusRow {
 	pub notebook_number: i32,
 	pub tick: i32,
-	pub chain_transfers: i32,
-	pub block_votes: i32,
-	pub notarizations: i32,
-	pub balance_changes: i32,
-	pub data_domains: i32,
 	pub step: NotebookFinalizationStep,
 	pub open_time: DateTime<Utc>,
 	pub end_time: DateTime<Utc>,
@@ -147,61 +142,7 @@ impl NotebookStatusStore {
 		);
 		Ok(())
 	}
-	pub async fn increment_chain_transfers<'a>(
-		db: &mut PgConnection,
-		notebook_number: NotebookNumber,
-		max_transfer_per_notebook: u32,
-	) -> anyhow::Result<(), Error> {
-		let result = sqlx::query!(
-			r#"
-				UPDATE notebook_status SET chain_transfers = chain_transfers + 1 
-				WHERE notebook_number = $1 AND chain_transfers < $2
-			"#,
-			notebook_number as i32,
-			max_transfer_per_notebook as i32,
-		)
-		.execute(db)
-		.await?;
 
-		ensure!(result.rows_affected() == 1, Error::MaxNotebookChainTransfersReached);
-		Ok(())
-	}
-	pub async fn track_counts<'a>(
-		db: &mut PgConnection,
-		notebook_number: NotebookNumber,
-		balance_changes: u32,
-		votes: u32,
-		data_domains: u32,
-		max_notebook_notarizations: u32,
-		max_balance_changes_per_notebook: u32,
-		max_votes_per_notebook: u32,
-		max_domains_per_notebook: u32,
-	) -> anyhow::Result<(), Error> {
-		let result = sqlx::query!(
-			r#"
-				UPDATE notebook_status SET 
-					block_votes = block_votes + $2, 
-					balance_changes = balance_changes + $3, 
-					notarizations = notarizations + 1,
-					data_domains = data_domains + $4
-				WHERE notebook_number = $1 
-					AND block_votes < $5 AND balance_changes < $6 AND data_domains < $7 AND notarizations < $8
-			"#,
-			notebook_number as i32,
-			votes as i32,
-			balance_changes as i32,
-			data_domains as i32,
-			max_votes_per_notebook as i32,
-			max_balance_changes_per_notebook as i32,
-			max_domains_per_notebook as i32,
-			max_notebook_notarizations as i32,
-		)
-		.execute(db)
-		.await?;
-
-		ensure!(result.rows_affected() == 1, Error::MaxNotebookChainTransfersReached);
-		Ok(())
-	}
 	pub async fn step_up_expired_open<'a>(
 		db: &mut PgConnection,
 	) -> anyhow::Result<Option<u32>, Error> {
@@ -276,6 +217,9 @@ mod tests {
 
 	#[sqlx::test]
 	async fn test_locks(pool: PgPool) -> anyhow::Result<()> {
+		sqlx::query!("ALTER TABLE notebook_status DROP CONSTRAINT IF EXISTS notebook_status_notebook_number_fkey")
+			.execute(&pool)
+			.await?;
 		let _ = tracing_subscriber::fmt::try_init();
 		let notebook_number = 1;
 		{
@@ -347,32 +291,10 @@ mod tests {
 	}
 
 	#[sqlx::test]
-	async fn test_max_chain_transfers(pool: PgPool) -> anyhow::Result<()> {
-		let mut tx = pool.begin().await?;
-
-		let _ = NotebookStatusStore::create(&mut *tx, 1, 1, Utc::now().add(Duration::minutes(1)))
-			.await?;
-		assert_ok!(NotebookStatusStore::increment_chain_transfers(&mut *tx, 1, 3).await);
-		tx.commit().await?;
-		let mut tx = pool.begin().await?;
-		assert_ok!(NotebookStatusStore::increment_chain_transfers(&mut *tx, 1, 3).await);
-		tx.commit().await?;
-		let mut tx = pool.begin().await?;
-		assert_ok!(NotebookStatusStore::increment_chain_transfers(&mut *tx, 1, 3).await);
-		tx.commit().await?;
-		let mut tx = pool.begin().await?;
-
-		assert!(matches!(
-			NotebookStatusStore::increment_chain_transfers(&mut *tx, 1, 3).await,
-			Err(Error::MaxNotebookChainTransfersReached)
-		));
-
-		tx.commit().await?;
-		Ok(())
-	}
-
-	#[sqlx::test]
 	async fn test_locks_step(pool: PgPool) -> anyhow::Result<()> {
+		sqlx::query!("ALTER TABLE notebook_status DROP CONSTRAINT IF EXISTS notebook_status_notebook_number_fkey")
+			.execute(&pool)
+			.await?;
 		let _ = tracing_subscriber::fmt::try_init();
 		{
 			let mut tx = pool.begin().await?;
@@ -408,6 +330,9 @@ mod tests {
 
 	#[sqlx::test]
 	async fn test_expire_open(pool: PgPool) -> anyhow::Result<()> {
+		sqlx::query!("ALTER TABLE notebook_status DROP CONSTRAINT IF EXISTS notebook_status_notebook_number_fkey")
+			.execute(&pool)
+			.await?;
 		let mut tx = pool.begin().await?;
 
 		let _ = NotebookStatusStore::create(&mut *tx, 1, 1, Utc::now().add(Duration::minutes(1)))

@@ -12,7 +12,6 @@ use sp_runtime::{
 	traits::{BlakeTwo256, IdentifyAccount, Verify},
 	MultiSignature,
 };
-
 pub type ComputeDifficulty = u128;
 
 mod apis;
@@ -27,6 +26,7 @@ pub mod host;
 pub mod inherents;
 pub mod macros;
 pub mod notary;
+
 pub mod note;
 pub mod notebook;
 mod providers;

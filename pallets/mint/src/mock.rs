@@ -19,7 +19,7 @@ frame_support::construct_runtime!(
 	pub enum Test
 	{
 		System: frame_system,
-		Balances: pallet_balances,
+		Balances: pallet_balances::<Instance1>::{Pallet, Call, Storage, Config<T>, Event<T>},
 		Mint: pallet_mint
 	}
 );
@@ -41,7 +41,7 @@ impl frame_system::Config for Test {
 	type BlockHashCount = ConstU64<250>;
 	type Version = ();
 	type PalletInfo = PalletInfo;
-	type AccountData = pallet_balances::AccountData<Balance>;
+	type AccountData = ();
 	type OnNewAccount = ();
 	type OnKilledAccount = ();
 	type SystemWeightInfo = ();
@@ -55,7 +55,8 @@ parameter_types! {
 	pub static ExistentialDeposit: Balance = 10;
 }
 
-impl pallet_balances::Config for Test {
+type UlixeeToken = pallet_balances::Instance1;
+impl pallet_balances::Config<UlixeeToken> for Test {
 	type MaxLocks = ConstU32<0>;
 	type MaxReserves = ConstU32<0>;
 	type ReserveIdentifier = ();
@@ -63,7 +64,7 @@ impl pallet_balances::Config for Test {
 	type RuntimeEvent = RuntimeEvent;
 	type DustRemoval = ();
 	type ExistentialDeposit = ExistentialDeposit;
-	type AccountStore = System;
+	type AccountStore = Mint;
 	type WeightInfo = ();
 	type FreezeIdentifier = ();
 	type MaxFreezes = ();
@@ -77,12 +78,13 @@ pub fn set_argons(account_id: u64, amount: Balance) {
 	drop(Balances::issue(amount));
 }
 
-impl palle_mint::Config for Test {
+impl pallet_mint::Config for Test {
 	type RuntimeEvent = RuntimeEvent;
 	type WeightInfo = ();
 	type Currency = Balances;
 	type RuntimeHoldReason = RuntimeHoldReason;
 	type Balance = Balance;
+	type UlixeeTokenStorage = pallet_balances::Account<Test, UlixeeToken>;
 }
 
 // Build genesis storage according to the mock runtime.

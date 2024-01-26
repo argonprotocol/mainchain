@@ -4,10 +4,10 @@ use sp_core::H256;
 use sqlx::PgConnection;
 
 use ulx_primitives::{
-	ensure, AccountId, AccountOrigin, AccountType, BalanceTip, Note, NotebookNumber,
+	ensure, tick::Tick, AccountId, AccountOrigin, AccountType, BalanceTip, Note, NotebookNumber,
 };
 
-use crate::{stores::BoxFutureResult, Error};
+use crate::{apis::localchain::BalanceTipResult, stores::BoxFutureResult, Error};
 
 /// This table is used as a quick verification of the last balance change. It is also the last valid
 /// entry in a notebook. Without this table, you must obtain proof that a balance has not changed
@@ -18,6 +18,7 @@ struct BalanceTipRow {
 	pub key: Vec<u8>,
 	pub value: Vec<u8>,
 	pub last_changed_notebook: i32,
+	pub last_changed_tick: i32,
 }
 pub struct BalanceTipStore;
 
@@ -75,6 +76,28 @@ impl BalanceTipStore {
 			Ok(tip)
 		})
 	}
+	pub async fn get_tip(
+		db: &mut PgConnection,
+		account_id: &AccountId,
+		account_type: AccountType,
+	) -> anyhow::Result<BalanceTipResult, Error> {
+		let key = BalanceTip::create_key(account_id, &account_type);
+		let row = sqlx::query_as!(
+			BalanceTipRow,
+			r#"
+			SELECT * FROM balance_tips WHERE key = $1 LIMIT 1
+			"#,
+			key.as_slice()
+		)
+		.fetch_one(db)
+		.await?;
+
+		Ok(BalanceTipResult {
+			balance_tip: H256::from_slice(row.value.as_slice()),
+			notebook_number: row.last_changed_notebook as NotebookNumber,
+			tick: Tick::from(row.last_changed_tick as Tick),
+		})
+	}
 
 	pub fn update<'a>(
 		db: &'a mut PgConnection,
@@ -83,6 +106,7 @@ impl BalanceTipStore {
 		change_number: u32,
 		balance: u128,
 		notebook_number: NotebookNumber,
+		tick: Tick,
 		account_origin: AccountOrigin,
 		channel_hold_note: Option<Note>,
 		prev_balance: u128,
@@ -104,14 +128,15 @@ impl BalanceTipStore {
 		Box::pin(async move {
 			let res = sqlx::query!(
 				r#"
-			INSERT INTO balance_tips (key, value, last_changed_notebook) VALUES ($1, $2, $3) 
+			INSERT INTO balance_tips (key, value, last_changed_notebook, last_changed_tick) VALUES ($1, $2, $3, $4) 
 			ON CONFLICT (key) 
-			DO UPDATE SET value = $2, last_changed_notebook = $3 
-				WHERE balance_tips.value = $4;
+			DO UPDATE SET value = $2, last_changed_notebook = $3, last_changed_tick = $4
+				WHERE balance_tips.value = $5;
 			"#,
 				key.as_slice(),
 				tip.as_slice(),
 				notebook_number as i32,
+				tick as i32,
 				prev.as_slice()
 			)
 			.execute(db)
@@ -164,6 +189,7 @@ mod tests {
 				Deposit,
 				1,
 				1000,
+				1,
 				1,
 				AccountOrigin { notebook_number: 1, account_uid: 1 },
 				None,
@@ -223,6 +249,7 @@ mod tests {
 				Deposit,
 				2,
 				1001,
+				1,
 				1,
 				AccountOrigin { notebook_number: 1, account_uid: 1 },
 				None,

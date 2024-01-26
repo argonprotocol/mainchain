@@ -26,11 +26,15 @@ pub struct Host {
 impl Host {
 	#[cfg(feature = "std")]
 	pub fn get_url(&self) -> String {
+		Self::format_url(self.is_secure, self.ip, self.port)
+	}
+	#[cfg(feature = "std")]
+	pub fn format_url(is_secure: bool, ip: u32, port: u16) -> String {
 		format!(
 			"{}://{}:{}",
-			if self.is_secure { "wss" } else { "ws" },
-			std::net::Ipv4Addr::from(self.ip),
-			self.port
+			if is_secure { "wss" } else { "ws" },
+			std::net::Ipv4Addr::from(ip),
+			port
 		)
 	}
 }

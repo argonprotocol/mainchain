@@ -19,6 +19,7 @@ use ulx_primitives::{
 	note::{AccountType, Note, NoteType},
 	Balance, BalanceTip, BlockVote, ChainTransfer, DataDomain, DataTLD, MerkleProof,
 	NewAccountOrigin, Notarization, Notebook, NotebookHeader, NotebookNumber,
+	CHANNEL_EXPIRATION_TICKS,
 };
 
 use crate::{
@@ -132,6 +133,7 @@ fn test_verify_previous_balance() {
 	change.previous_balance_proof = Some(BalanceProof {
 		notary_id: 1,
 		notebook_number: 7,
+		tick: 7,
 		notebook_proof: Some(MerkleProof {
 			proof: BoundedVec::truncate_from(proof.proof),
 			leaf_index: proof.leaf_index as u32,
@@ -562,6 +564,7 @@ fn test_multiple_changesets_in_a_notebook() {
 	notebook.notarizations[1].balance_changes[0].previous_balance_proof = Some(BalanceProof {
 		notary_id: 1,
 		notebook_number: 1,
+		tick: 1,
 		notebook_proof: None,
 		account_origin: AccountOrigin { notebook_number: 1, account_uid: 2 },
 		balance: 800,
@@ -569,6 +572,7 @@ fn test_multiple_changesets_in_a_notebook() {
 	notebook.notarizations[1].balance_changes[1].previous_balance_proof = Some(BalanceProof {
 		notary_id: 1,
 		notebook_number: 1,
+		tick: 1,
 		notebook_proof: None,
 		account_origin: AccountOrigin { notebook_number: 1, account_uid: 1 },
 		balance: 0,
@@ -576,6 +580,7 @@ fn test_multiple_changesets_in_a_notebook() {
 	notebook.notarizations[1].balance_changes[2].previous_balance_proof = Some(BalanceProof {
 		notary_id: 1,
 		notebook_number: 1,
+		tick: 1,
 		notebook_proof: None,
 		account_origin: AccountOrigin { notebook_number: 1, account_uid: 1 },
 		balance: 0,
@@ -619,6 +624,7 @@ fn test_cannot_remove_lock_between_changesets_in_a_notebook() {
 		previous_balance_proof: Some(BalanceProof {
 			notary_id: 1,
 			notebook_number: 1,
+			tick: 1,
 			notebook_proof: None,
 			account_origin: AccountOrigin { notebook_number: 1, account_uid: 1 },
 			balance: 1000,
@@ -713,6 +719,7 @@ fn test_cannot_remove_lock_between_changesets_in_a_notebook() {
 			previous_balance_proof: Some(BalanceProof {
 				notary_id: 1,
 				notebook_number: 1,
+				tick: 1,
 				notebook_proof: None,
 				account_origin: AccountOrigin { notebook_number: 1, account_uid: 1 },
 				balance: 1000,
@@ -757,6 +764,7 @@ fn test_cannot_remove_lock_between_changesets_in_a_notebook() {
 			previous_balance_proof: Some(BalanceProof {
 				notary_id: 1,
 				notebook_number: 1,
+				tick: 1,
 				notebook_proof: None,
 				account_origin: AccountOrigin { notebook_number: 1, account_uid: 1 },
 				balance: 1000,
@@ -788,10 +796,10 @@ fn test_cannot_remove_lock_between_changesets_in_a_notebook() {
 			channel_hold_note: Some(hold_note),
 		}
 		.encode()]);
-		assert_err!(
+		assert!(matches!(
 			notebook_verify(&TestLookup, &notebook, &BTreeMap::new()),
-			VerifyError::ChannelHoldNotReadyForClaim
-		);
+			Err(VerifyError::ChannelHoldNotReadyForClaim { .. })
+		),);
 	}
 }
 
@@ -845,7 +853,7 @@ fn test_votes_must_add_up() {
 			notary_id: 1,
 			notebook_number: 62,
 			finalized_block_number: 100,
-			tick: 0,
+			tick: CHANNEL_EXPIRATION_TICKS + 1,
 			changed_accounts_root: Default::default(),
 			chain_transfers: Default::default(),
 			changed_account_origins: Default::default(),
@@ -876,6 +884,7 @@ fn test_votes_must_add_up() {
 					previous_balance_proof: Some(BalanceProof {
 						notary_id: 1,
 						notebook_number: 1,
+						tick: 1,
 						notebook_proof: Some(proof(notebook_1_tips.clone(), 1),),
 						account_origin: AccountOrigin { notebook_number: 1, account_uid: 2 },
 						balance: 500,
@@ -900,6 +909,7 @@ fn test_votes_must_add_up() {
 					previous_balance_proof: Some(BalanceProof {
 						notary_id: 1,
 						notebook_number: 1,
+						tick: 1,
 						notebook_proof: Some(proof(notebook_1_tips.clone(), 2),),
 						account_origin: AccountOrigin { notebook_number: 1, account_uid: 3 },
 						balance: 500,
@@ -932,6 +942,7 @@ fn test_votes_must_add_up() {
 					previous_balance_proof: Some(BalanceProof {
 						notary_id: 1,
 						notebook_number: 1,
+						tick: 1,
 						notebook_proof: Some(proof(notebook_1_tips.clone(), 0),),
 						account_origin: AccountOrigin { notebook_number: 1, account_uid: 1 },
 						balance: 1000,
@@ -954,7 +965,10 @@ fn test_votes_must_add_up() {
 					account_id: Alice.to_account_id(),
 					data_domain: data_domain.clone(),
 					data_domain_account: Ferdie.to_account_id(),
-				},
+					signature: empty_signature(),
+				}
+				.sign(Alice.pair())
+				.clone(),
 				BlockVote {
 					index: 1,
 					power: 30,
@@ -962,7 +976,10 @@ fn test_votes_must_add_up() {
 					account_id: Alice.to_account_id(),
 					data_domain,
 					data_domain_account: Alice.to_account_id(),
+					signature: empty_signature(),
 				}
+				.sign(Alice.pair())
+				.clone(),
 			],
 			vec![]
 		),],
@@ -1062,6 +1079,7 @@ fn test_votes_must_add_up() {
 		VerifyError::BlockVoteDataDomainMismatch
 	);
 	notebook.notarizations[0].block_votes[0].data_domain_account = Alice.to_account_id();
+	notebook.notarizations[0].block_votes[0].sign(Alice.pair());
 
 	// 3. Once vote minimums are allowed, the "vote root is wrong"
 	assert_err!(

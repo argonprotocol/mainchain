@@ -3,7 +3,7 @@ use serde::{Deserialize, Serialize};
 use snafu::Snafu;
 use sp_core::crypto::AccountId32;
 use sp_runtime::{scale_info::TypeInfo, RuntimeString};
-use ulx_primitives::AccountType;
+use ulx_primitives::{tick::Tick, AccountType};
 
 use crate::AccountHistoryLookupError;
 
@@ -40,24 +40,24 @@ pub enum VerifyError {
 	#[snafu(display("Invalid net balance change calculated"))]
 	InvalidBalanceChange,
 
-	#[snafu(display("Invalid balance change signature {change_index}"))]
+	#[snafu(display("Invalid balance change signature #{change_index}"))]
 	InvalidBalanceChangeSignature { change_index: u16 },
 
 	#[snafu(display("Invalid note recipients for a claimed note"))]
 	InvalidNoteRecipients,
 
 	#[snafu(display(
-		"An invalid balance change was submitted ({change_index}.{note_index}): {message:?}"
+		"An invalid balance change was submitted (#{change_index}.{note_index}): {message:?}"
 	))]
 	BalanceChangeError { change_index: u16, note_index: u16, message: RuntimeString },
 
 	#[snafu(display("Invalid net balance changeset. Must account for all funds."))]
 	InvalidNetBalanceChangeset,
 
-	#[snafu(display("Insufficient balance for account  (balance: {balance}, amount: {amount}) (change: {change_index}.{note_index})"))]
+	#[snafu(display("Insufficient balance for account  (balance: {balance}, amount: {amount}) (change: #{change_index}.{note_index})"))]
 	InsufficientBalance { balance: u128, amount: u128, note_index: u16, change_index: u16 },
 
-	#[snafu(display("Exceeded max balance for account (pre-balance: {balance}, amount: {amount}), (change: {change_index}.{note_index})"))]
+	#[snafu(display("Exceeded max balance for account (pre-balance: {balance}, amount: {amount}), (change: #{change_index}.{note_index})"))]
 	ExceededMaxBalance { balance: u128, amount: u128, note_index: u16, change_index: u16 },
 	#[snafu(display("Balance change mismatch (provided_balance: {provided_balance}, calculated_balance: {calculated_balance}) (#{change_index})"))]
 	BalanceChangeMismatch { change_index: u16, provided_balance: u128, calculated_balance: i128 },
@@ -105,8 +105,10 @@ pub enum VerifyError {
 	#[snafu(display("Account already has a channel hold"))]
 	AccountAlreadyHasChannelHold,
 
-	#[snafu(display("Channel hold not ready for claim"))]
-	ChannelHoldNotReadyForClaim,
+	#[snafu(display(
+		"Channel hold not ready for claim. Current tick: {current_tick}, claim tick: {claim_tick}"
+	))]
+	ChannelHoldNotReadyForClaim { current_tick: Tick, claim_tick: Tick },
 
 	#[snafu(display("This account is locked with a channel hold"))]
 	AccountLocked,
@@ -157,6 +159,9 @@ pub enum VerifyError {
 
 	#[snafu(display("Invalid block vote"))]
 	InvalidBlockVoteSource,
+
+	#[snafu(display("Invalid block vote signature"))]
+	BlockVoteInvalidSignature,
 
 	#[snafu(display("Minimums were not met for a block vote"))]
 	InsufficientBlockVoteMinimum,

@@ -1,0 +1,57 @@
+{
+  "name": "@ulixee/mainchain",
+  "version": "2.0.0-alpha.25",
+  "description": "A client for accessing the Ulixee mainchain apis.",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/ulixee/mainchain.git"
+  },
+  "author": "",
+  "license": "MIT",
+  "bugs": {
+    "url": "https://github.com/ulixee/mainchain/issues"
+  },
+  "homepage": "https://github.com/ulixee/mainchain#readme",
+  "scripts": {
+    "build": "yarn generate:defs && yarn generate:meta && rm ./src/interfaces/index.ts && rm ./src/interfaces/types.ts && yarn tsc",
+    "generate:defs": "ts-node --esm node_modules/.bin/polkadot-types-from-defs --endpoint metadata.json --input ./src/interfaces --package @ulixee/mainchain-client/interfaces",
+    "generate:meta": "ts-node --esm  node_modules/.bin/polkadot-types-from-chain --endpoint metadata.json --output ./src/interfaces --strict",
+    "lint": "tsc --noEmit --pretty",
+    "tsc": "tsc -p tsconfig.json && tsc -p tsconfig-cjs.json && tsc -p tsconfig-types.json"
+  },
+  "type": "module",
+  "types": "./lib/types/index.d.ts",
+  "files": [
+    "lib/"
+  ],
+  "main": "./lib/cjs/index.js",
+  "module": "./lib/esm/index.js",
+  "exports": {
+    ".": {
+      "types": "./lib/types/index.d.ts",
+      "require": "./lib/cjs/index.js",
+      "import": "./lib/esm/index.js",
+      "default": "./lib/esm/index.js"
+    },
+    "./*": {
+      "types": "./lib/types/*.d.ts",
+      "require": "./lib/cjs/*.js",
+      "import": "./lib/esm/*.js",
+      "default": "./lib/esm/*.js"
+    },
+    "./interfaces/*": {
+      "types": "./lib/types/interfaces/*.d.ts",
+      "require": "./lib/cjs/interfaces/*.js",
+      "import": "./lib/esm/interfaces/*.js",
+      "default": "./lib/esm/interfaces/*.js"
+    }
+  },
+  "dependencies": {
+    "@polkadot/api": "^10.11.2"
+  },
+  "devDependencies": {
+    "@polkadot/typegen": "^10.11.2",
+    "ts-node": "^10.9.2",
+    "typescript": "^5.0.4"
+  }
+}

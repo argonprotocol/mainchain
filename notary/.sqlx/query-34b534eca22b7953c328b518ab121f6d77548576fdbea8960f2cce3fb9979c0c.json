@@ -15,56 +15,31 @@
       },
       {
         "ordinal": 2,
-        "name": "chain_transfers",
-        "type_info": "Int4"
-      },
-      {
-        "ordinal": 3,
-        "name": "block_votes",
-        "type_info": "Int4"
-      },
-      {
-        "ordinal": 4,
-        "name": "balance_changes",
-        "type_info": "Int4"
-      },
-      {
-        "ordinal": 5,
-        "name": "notarizations",
-        "type_info": "Int4"
-      },
-      {
-        "ordinal": 6,
-        "name": "data_domains",
-        "type_info": "Int4"
-      },
-      {
-        "ordinal": 7,
         "name": "step",
         "type_info": "Int4"
       },
       {
-        "ordinal": 8,
+        "ordinal": 3,
         "name": "open_time",
         "type_info": "Timestamptz"
       },
       {
-        "ordinal": 9,
+        "ordinal": 4,
         "name": "end_time",
         "type_info": "Timestamptz"
       },
       {
-        "ordinal": 10,
+        "ordinal": 5,
         "name": "ready_for_close_time",
         "type_info": "Timestamptz"
       },
       {
-        "ordinal": 11,
+        "ordinal": 6,
         "name": "closed_time",
         "type_info": "Timestamptz"
       },
       {
-        "ordinal": 12,
+        "ordinal": 7,
         "name": "finalized_time",
         "type_info": "Timestamptz"
       }
@@ -75,11 +50,6 @@
       ]
     },
     "nullable": [
-      false,
-      false,
-      false,
-      false,
-      false,
       false,
       false,
       false,

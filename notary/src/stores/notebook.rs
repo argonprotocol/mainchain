@@ -15,8 +15,8 @@ use sqlx::PgConnection;
 
 use ulx_primitives::{
 	ensure, note::AccountType, AccountId, AccountOrigin, Balance, BalanceTip, BlockVote,
-	MaxNotebookNotarizations, MerkleProof, NewAccountOrigin, NotaryId, Note, NoteType, Notebook,
-	NotebookNumber,
+	ChainTransfer, MaxNotebookNotarizations, MerkleProof, NewAccountOrigin, NotaryId, Note,
+	NoteType, Notebook, NotebookNumber,
 };
 
 use crate::{
@@ -211,9 +211,12 @@ impl NotebookStore {
 		let mut tax = 0u128;
 		let mut blocks_with_votes = BTreeSet::new();
 		let mut data_domains = Vec::new();
+		// NOTE: rebuild transfers list so it matches the final order
+		let mut transfers = vec![];
 		for change in notarizations.clone() {
 			for change in change.balance_changes {
-				let key = (change.account_id, change.account_type);
+				let account_id = change.account_id;
+				let key = (account_id.clone(), change.account_type);
 				let origin = change
 					.previous_balance_proof
 					.map(|a| a.account_origin)
@@ -232,6 +235,15 @@ impl NotebookStore {
 						NoteType::Tax | NoteType::LeaseDomain => tax += note.milligons,
 						NoteType::ChannelHold { .. } => change_note = Some(note.clone()),
 						NoteType::ChannelSettle { .. } => change_note = None,
+						NoteType::ClaimFromMainchain { account_nonce } =>
+							transfers.push(ChainTransfer::ToLocalchain {
+								account_nonce,
+								account_id: account_id.clone(),
+							}),
+						NoteType::SendToMainchain => transfers.push(ChainTransfer::ToMainchain {
+							account_id: account_id.clone(),
+							amount: note.milligons,
+						}),
 						_ => {},
 					}
 				}
@@ -287,7 +299,7 @@ impl NotebookStore {
 			block_votes.into_iter().map(|(_, vote)| vote.encode()).collect::<Vec<_>>();
 		let votes_root = merkle_root::<Blake2Hasher, _>(&votes_merkle_leafs);
 
-		let transfers = ChainTransferStore::take_for_notebook(&mut *db, notebook_number).await?;
+		let _ = ChainTransferStore::take_for_notebook(&mut *db, notebook_number).await?;
 
 		NotebookHeaderStore::complete_notebook(
 			&mut *db,
@@ -416,7 +428,6 @@ mod tests {
 			1000,
 			0,
 			0,
-			100,
 		)
 		.await?;
 		NotarizationsStore::append_to_notebook(

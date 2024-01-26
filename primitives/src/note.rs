@@ -31,10 +31,29 @@ impl Note {
 	pub fn create(milligons: u128, note_type: NoteType) -> Self {
 		Self { milligons, note_type }
 	}
+
+	pub fn calculate_transfer_tax(amount: u128) -> u128 {
+		if amount < 1000 {
+			round_up(amount, TAX_PERCENT_BASE)
+		} else {
+			TRANSFER_TAX_CAP
+		}
+	}
+
+	pub fn calculate_channel_tax(amount: u128) -> u128 {
+		round_up(amount, TAX_PERCENT_BASE)
+	}
+}
+
+pub fn round_up(value: u128, percentage: u128) -> u128 {
+	let numerator = value * percentage;
+
+	let round = if numerator % 100 == 0 { 0 } else { 1 };
+
+	numerator.saturating_div(100) + round
 }
 
 #[derive(
-	Clone,
 	PartialEq,
 	Eq,
 	Ord,
@@ -47,7 +66,9 @@ impl Note {
 	Serialize,
 	Deserialize,
 )]
+#[cfg_attr(not(feature = "napi"), derive(Clone))]
 #[serde(rename_all = "camelCase")]
+#[cfg_attr(feature = "napi", napi_derive::napi)]
 pub enum AccountType {
 	Tax = 0,
 	Deposit = 1,
@@ -64,11 +85,23 @@ impl TryFrom<i32> for AccountType {
 		}
 	}
 }
+impl From<i64> for AccountType {
+	fn from(value: i64) -> Self {
+		if value == 0 {
+			AccountType::Tax
+		} else {
+			AccountType::Deposit
+		}
+	}
+}
 
-pub const CHANNEL_EXPIRATION_NOTEBOOKS: u32 = prod_or_fast!(60, 2);
-pub const CHANNEL_CLAWBACK_NOTEBOOKS: u32 = 10; // 10 after expiration
+pub const CHANNEL_EXPIRATION_TICKS: u32 = prod_or_fast!(60, 2);
+pub const CHANNEL_CLAWBACK_TICKS: u32 = 15; // 15 after expiration
 pub const MIN_CHANNEL_NOTE_MILLIGONS: u128 = 5;
 pub type MaxNoteRecipients = ConstU32<10>;
+
+pub const TAX_PERCENT_BASE: u128 = 20;
+pub const TRANSFER_TAX_CAP: u128 = 200;
 
 #[derive(
 	Clone,
@@ -82,13 +115,14 @@ pub type MaxNoteRecipients = ConstU32<10>;
 	Serialize,
 	Deserialize,
 )]
-#[serde(tag = "op")]
+#[serde(tag = "action")]
 #[serde(rename_all = "camelCase")]
 pub enum NoteType {
 	/// Return funds to the mainchain in the next notebook
 	SendToMainchain,
 	/// Claim funds that were sent from a mainchain account to localchain via the chain_transfer
 	/// pallet
+	#[serde(rename_all = "camelCase")]
 	ClaimFromMainchain {
 		#[codec(compact)]
 		account_nonce: u32,
@@ -109,6 +143,7 @@ pub enum NoteType {
 	/// Send this tax to a BlockVote
 	SendToVote,
 	/// Channel hold notes
+	#[serde(rename_all = "camelCase")]
 	ChannelHold {
 		/// The account id of the recipient
 		recipient: AccountId,

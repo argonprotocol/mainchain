@@ -1,7 +1,8 @@
 use jsonrpsee::{core::SubscriptionResult, proc_macros::rpc, types::ErrorObjectOwned};
 
 use ulx_primitives::{
-	BalanceProof, BalanceTip, Notebook, NotebookMeta, NotebookNumber, SignedNotebookHeader,
+	AccountId, AccountType, BalanceProof, BalanceTip, Notarization, Notebook, NotebookMeta,
+	NotebookNumber, SignedNotebookHeader,
 };
 
 #[rpc(server, client, namespace = "notebook")]
@@ -14,6 +15,15 @@ pub trait NotebookRpc {
 		notebook_number: NotebookNumber,
 		balance_tip: BalanceTip,
 	) -> Result<BalanceProof, ErrorObjectOwned>;
+
+	#[method(name = "getNotarization")]
+	async fn get_notarization(
+		&self,
+		account_id: AccountId,
+		account_type: AccountType,
+		notebook_number: NotebookNumber,
+		change_number: u32,
+	) -> Result<Notarization, ErrorObjectOwned>;
 
 	#[method(name = "metadata")]
 	async fn metadata(&self) -> Result<NotebookMeta, ErrorObjectOwned>;

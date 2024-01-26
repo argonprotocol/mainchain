@@ -3,7 +3,7 @@ use sqlx::{query, FromRow, PgConnection};
 
 use ulx_primitives::{ensure, AccountId, ChainTransfer, NotebookNumber};
 
-use crate::{stores::notebook_status::NotebookStatusStore, Error};
+use crate::Error;
 
 pub struct ChainTransferStore;
 
@@ -58,14 +58,7 @@ impl ChainTransferStore {
 		notebook_number: NotebookNumber,
 		account_id: &AccountId,
 		milligons: u128,
-		max_transfer_per_notebook: u32,
 	) -> anyhow::Result<(), Error> {
-		NotebookStatusStore::increment_chain_transfers(
-			&mut *db,
-			notebook_number,
-			max_transfer_per_notebook,
-		)
-		.await?;
 		let res = query!(
 			r#"
 			INSERT INTO chain_transfers (to_localchain, amount, account_id, included_in_notebook_number) 
@@ -91,14 +84,7 @@ impl ChainTransferStore {
 		proposed_amount: u128,
 		change_index: usize,
 		note_index: usize,
-		max_transfer_per_notebook: u32,
 	) -> anyhow::Result<(), Error> {
-		NotebookStatusStore::increment_chain_transfers(
-			&mut *db,
-			notebook_number,
-			max_transfer_per_notebook,
-		)
-		.await?;
 		let stored_amount = query!(
 			r#"
 				UPDATE chain_transfers SET included_in_notebook_number = $1
@@ -175,14 +161,15 @@ impl ChainTransferStore {
 
 #[cfg(test)]
 mod tests {
-	use chrono::{Duration, Utc};
-	use frame_support::{assert_err, assert_ok};
-	use sp_keyring::{AccountKeyring::Alice, Sr25519Keyring::Bob};
-	use sqlx::PgPool;
 	use std::ops::Add;
+
+	use chrono::{Duration, Utc};
+	use frame_support::assert_ok;
+	use sp_keyring::Sr25519Keyring::Bob;
+	use sqlx::PgPool;
 	use tracing_subscriber::EnvFilter;
 
-	use crate::stores::{chain_transfer::*, notebook_status::NotebookFinalizationStep};
+	use crate::stores::{chain_transfer::*, notebook_header::NotebookHeaderStore};
 
 	fn logger() {
 		let _ = tracing_subscriber::fmt()
@@ -193,13 +180,20 @@ mod tests {
 
 	#[sqlx::test]
 	async fn test_transfer_to_localchain_flow(pool: PgPool) -> anyhow::Result<()> {
-		NotebookStatusStore::create(&pool, 1, 1, Utc::now().add(Duration::minutes(1))).await?;
+		let mut db = &mut pool.acquire().await?;
+		NotebookHeaderStore::create(
+			&mut db,
+			1,
+			1,
+			1,
+			Utc::now().add(Duration::minutes(1)).timestamp_millis() as u64,
+		)
+		.await?;
 		logger();
 		let notebook_number = 1;
 		let account_id = Bob.to_account_id();
 		let account_nonce = 1;
 		let milligons = 1000;
-		let max_transfer_per_notebook = 10;
 		let change_index = 0;
 		let note_index = 0;
 		{
@@ -227,7 +221,6 @@ mod tests {
 					milligons,
 					change_index,
 					note_index,
-					max_transfer_per_notebook
 				)
 				.await
 			);
@@ -255,12 +248,19 @@ mod tests {
 	#[sqlx::test]
 	async fn test_transfer_can_only_be_in_one_notebook(pool: PgPool) -> anyhow::Result<()> {
 		logger();
-		NotebookStatusStore::create(&pool, 1, 1, Utc::now().add(Duration::minutes(1))).await?;
+		let mut db = &mut pool.acquire().await?;
+		NotebookHeaderStore::create(
+			&mut db,
+			1,
+			1,
+			1,
+			Utc::now().add(Duration::minutes(1)).timestamp_millis() as u64,
+		)
+		.await?;
 		let notebook_number = 1;
 		let account_id = Bob.to_account_id();
 		let account_nonce = 1;
 		let milligons = 1000;
-		let max_transfer_per_notebook = 10;
 		let change_index = 0;
 		let note_index = 0;
 
@@ -284,7 +284,6 @@ mod tests {
 				milligons,
 				change_index,
 				note_index,
-				max_transfer_per_notebook
 			)
 			.await
 		);
@@ -297,82 +296,12 @@ mod tests {
 			milligons,
 			change_index,
 			note_index,
-			max_transfer_per_notebook
 		)
 		.await
 		.unwrap_err()
 		.to_string()
 		.contains("Transfer not found (or already applied)"));
 		tx.commit().await?;
-
-		Ok(())
-	}
-
-	#[sqlx::test]
-	async fn test_fails_after_max_transfers(pool: PgPool) -> anyhow::Result<()> {
-		logger();
-		NotebookStatusStore::create(&pool, 1, 1, Utc::now().add(Duration::minutes(1))).await?;
-		{
-			let mut tx = pool.begin().await?;
-			assert_ok!(
-				ChainTransferStore::record_transfer_to_mainchain(
-					&mut *tx,
-					1,
-					&Bob.to_account_id(),
-					1000,
-					2
-				)
-				.await
-			);
-			assert_ok!(
-				ChainTransferStore::record_transfer_to_mainchain(
-					&mut *tx,
-					1,
-					&Alice.to_account_id(),
-					2000,
-					2
-				)
-				.await
-			);
-			tx.commit().await?;
-		}
-		{
-			let mut tx = pool.begin().await?;
-			assert_err!(
-				ChainTransferStore::record_transfer_to_mainchain(
-					&mut *tx,
-					1,
-					&Bob.to_account_id(),
-					1005,
-					2,
-				)
-				.await,
-				Error::MaxNotebookChainTransfersReached
-			);
-			tx.rollback().await?;
-		}
-
-		{
-			let mut tx = pool.begin().await?;
-			NotebookStatusStore::next_step(&mut *tx, 1, NotebookFinalizationStep::Open).await?;
-			NotebookStatusStore::create(&mut *tx, 2, 2, Utc::now().add(Duration::minutes(2)))
-				.await?;
-			tx.commit().await?;
-
-			let mut tx = pool.begin().await?;
-			// can insert into next notebook, just not #1
-			assert_ok!(
-				ChainTransferStore::record_transfer_to_mainchain(
-					&mut *tx,
-					2,
-					&Alice.to_account_id(),
-					3000,
-					2
-				)
-				.await
-			);
-			tx.commit().await?;
-		}
 
 		Ok(())
 	}

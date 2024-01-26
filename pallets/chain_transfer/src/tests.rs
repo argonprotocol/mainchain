@@ -1,8 +1,13 @@
-use frame_support::{assert_err, assert_noop, assert_ok, traits::OnInitialize};
-use frame_system::pallet_prelude::BlockNumberFor;
+use frame_support::{
+	assert_err, assert_noop, assert_ok, dispatch::DispatchInfo, traits::OnInitialize,
+};
+use frame_system::{pallet_prelude::BlockNumberFor, CheckNonce};
 use sp_core::bounded_vec;
 use sp_keyring::AccountKeyring::Bob;
-use sp_runtime::{testing::H256, traits::UniqueSaturatedInto};
+use sp_runtime::{
+	testing::H256,
+	traits::{Dispatchable, SignedExtension, UniqueSaturatedInto},
+};
 
 use ulx_primitives::{
 	notebook::{AccountOrigin, ChainTransfer, NotebookHeader},
@@ -12,7 +17,7 @@ use ulx_primitives::{
 use crate::{
 	mock::{ChainTransfer as ChainTransferPallet, *},
 	pallet::{ExpiringTransfersOut, PendingTransfersOut},
-	Error, QueuedTransferOut,
+	Call, Error, Event, QueuedTransferOut,
 };
 
 #[test]
@@ -28,11 +33,48 @@ fn it_can_send_funds_to_localchain() {
 			RuntimeOrigin::signed(who.clone()),
 			1000,
 			1,
-			nonce
 		));
 		assert_eq!(Balances::free_balance(&who), 4000);
 		let expires_block: BlockNumberFor<Test> = (1u32 + TransferExpirationBlocks::get()).into();
 		assert_eq!(ExpiringTransfersOut::<Test>::get(expires_block)[0], (who.clone(), nonce));
+	});
+}
+
+#[test]
+fn it_increments_nonce_in_calls() {
+	new_test_ext().execute_with(|| {
+		let who = Bob.to_account_id();
+		// Go past genesis block so events get deposited
+		System::set_block_number(1);
+		let nonce = System::account_nonce(&who);
+
+		set_argons(&who, 5000);
+		let call = RuntimeCall::ChainTransfer(Call::<Test>::send_to_localchain {
+			amount: 1000,
+			notary_id: 1,
+		});
+		assert_ok!(<CheckNonce<Test> as SignedExtension>::pre_dispatch(
+			CheckNonce::from(nonce),
+			&who,
+			&call,
+			&DispatchInfo::default(),
+			1,
+		));
+		assert_ok!(call.dispatch(RuntimeOrigin::signed(who.clone())));
+		assert_eq!(Balances::free_balance(&who), 4000);
+		assert_eq!(System::account_nonce(&who), nonce + 1);
+
+		System::assert_last_event(
+			Event::TransferToLocalchain {
+				notary_id: 1,
+				account_id: who.clone(),
+				amount: 1000,
+				// should insert with previous nonce
+				account_nonce: nonce,
+				expiration_block: (1u32 + TransferExpirationBlocks::get()).into(),
+			}
+			.into(),
+		);
 	});
 }
 
@@ -42,14 +84,12 @@ fn it_allows_you_to_transfer_full_balance() {
 		let who = Bob.to_account_id();
 		// Go past genesis block so events get deposited
 		System::set_block_number(1);
-		let nonce = System::account_nonce(&who);
 		System::inc_account_nonce(&who);
 		set_argons(&who, 5000);
 		assert_ok!(ChainTransferPallet::send_to_localchain(
 			RuntimeOrigin::signed(who.clone()),
 			5000,
 			1,
-			nonce
 		));
 		assert_eq!(Balances::free_balance(&who), 0);
 		assert_eq!(System::account_exists(&who), false);
@@ -69,7 +109,6 @@ fn it_can_recreate_a_killed_account() {
 			RuntimeOrigin::signed(who.clone()),
 			2000,
 			1,
-			nonce
 		));
 		assert_eq!(Balances::free_balance(&who), 0);
 		assert_eq!(System::account_exists(&who), false);
@@ -96,23 +135,12 @@ fn it_can_handle_multiple_transfer() {
 			RuntimeOrigin::signed(who.clone()),
 			1000,
 			1,
-			nonce
 		));
 		System::inc_account_nonce(&who);
-		assert_noop!(
-			ChainTransferPallet::send_to_localchain(
-				RuntimeOrigin::signed(who.clone()),
-				700,
-				1,
-				nonce
-			),
-			Error::<Test>::InvalidAccountNonce
-		);
 		assert_ok!(ChainTransferPallet::send_to_localchain(
 			RuntimeOrigin::signed(who.clone()),
 			700,
 			1,
-			nonce + 1
 		),);
 		assert_eq!(Balances::free_balance(&who), 3300);
 		let expires_block: BlockNumberFor<Test> = (1u32 + TransferExpirationBlocks::get()).into();
@@ -124,12 +152,7 @@ fn it_can_handle_multiple_transfer() {
 		System::inc_account_nonce(&who);
 		// We have a max number of transfers out per block
 		assert_noop!(
-			ChainTransferPallet::send_to_localchain(
-				RuntimeOrigin::signed(who.clone()),
-				1200,
-				1,
-				nonce + 2
-			),
+			ChainTransferPallet::send_to_localchain(RuntimeOrigin::signed(who.clone()), 1200, 1,),
 			Error::<Test>::MaxBlockTransfersExceeded
 		);
 	});
@@ -148,7 +171,6 @@ fn it_can_handle_transfers_in() {
 			RuntimeOrigin::signed(who.clone()),
 			5000,
 			1,
-			nonce
 		));
 		let expires_block: BlockNumberFor<Test> = (1u32 + TransferExpirationBlocks::get()).into();
 		assert_eq!(ExpiringTransfersOut::<Test>::get(expires_block)[0], (who.clone(), nonce));
@@ -372,7 +394,6 @@ fn it_expires_transfers_if_not_committed() {
 			RuntimeOrigin::signed(who.clone()),
 			1000,
 			1,
-			nonce
 		));
 		assert_eq!(
 			PendingTransfersOut::<Test>::get(&who, nonce).unwrap(),
