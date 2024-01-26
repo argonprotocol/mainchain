@@ -414,7 +414,10 @@ export default {
       DecodeError: 'Null',
       AccountChannelHoldDoesntExist: 'Null',
       AccountAlreadyHasChannelHold: 'Null',
-      ChannelHoldNotReadyForClaim: 'Null',
+      ChannelHoldNotReadyForClaim: {
+        currentTick: 'u32',
+        claimTick: 'u32',
+      },
       AccountLocked: 'Null',
       MissingChannelHoldNote: 'Null',
       InvalidChannelHoldNote: 'Null',
@@ -539,6 +542,7 @@ export default {
    **/
   UlxPrimitivesDataDomainZoneRecord: {
     paymentAccount: 'AccountId32',
+    notaryId: 'u32',
     versions: 'BTreeMap<UlxPrimitivesDataDomainSemver, UlxPrimitivesDataDomainVersionHost>'
   },
   /**

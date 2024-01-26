@@ -326,6 +326,7 @@ impl MainchainClient {
 
     Ok(Some(ZoneRecord {
       payment_address: AccountStore::to_address(&payment_address),
+      notary_id: zone_record.notary_id,
       versions,
     }))
   }
@@ -588,6 +589,7 @@ pub struct ArgonBalancesAccountData {
 #[napi(object)]
 pub struct ZoneRecord {
   pub payment_address: String,
+  pub notary_id: u32,
   /// A mapping of versions to host addresses.
   pub versions: HashMap<String, VersionHost>,
 }

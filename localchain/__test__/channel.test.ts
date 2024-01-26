@@ -45,7 +45,7 @@ it('can create a zone record type', async () => {
     const ferdieDomainAddress = new Keyring({type: 'sr25519'}).createFromUri('//Ferdie//dataDomain//1');
     const ferdie = new Keyring({type: 'sr25519'}).createFromUri('//Ferdie');
 
-    await expect(registerZoneRecord(mainchainClient, dataDomain, ferdie, ferdieDomainAddress.publicKey, {
+    await expect(registerZoneRecord(mainchainClient, dataDomain, ferdie, ferdieDomainAddress.publicKey, 1,{
         "1.0.0": mainchainClient.createType('UlxPrimitivesDataDomainVersionHost', {
             datastoreId: mainchainClient.createType('Bytes', 'default'),
             host: {
@@ -56,6 +56,7 @@ it('can create a zone record type', async () => {
         })
     })).rejects.toThrow("ExtrinsicFailed:: dataDomain.DomainNotRegistered");
 }, 30e3);
+
 it('can run a data domain channel', async () => {
     let mainchain = new TestMainchain();
     const mainchainUrl = await mainchain.launch();
@@ -112,7 +113,7 @@ it('can run a data domain channel', async () => {
         await expect(ferdiechain.mainchainClient.getDataDomainRegistration(dataDomain.domainName, dataDomain.topLevelDomain)).resolves.toBeTruthy();
     }
 
-    await registerZoneRecord(mainchainClient, dataDomain, ferdie, ferdieDomainAddress.publicKey, {
+    await registerZoneRecord(mainchainClient, dataDomain, ferdie, ferdieDomainAddress.publicKey, 1, {
         "1.0.0": mainchainClient.createType('UlxPrimitivesDataDomainVersionHost', {
             datastoreId: mainchainClient.createType('Bytes', 'default'),
             host: {
@@ -125,9 +126,10 @@ it('can run a data domain channel', async () => {
 
     const zoneRecord = await bobchain.mainchainClient.getDataDomainZoneRecord(dataDomain.domainName, dataDomain.topLevelDomain);
     expect(zoneRecord).toBeTruthy();
+    expect(zoneRecord.notaryId).toBe(1);
     expect(zoneRecord.paymentAddress).toBe(ferdieDomainAddress.address);
     const bobChannelHold = bobchain.beginChange();
-    const account = await bobChannelHold.addAccount(bobChannel.address, AccountType.Deposit, 1);
+    const account = await bobChannelHold.addAccount(bobChannel.address, AccountType.Deposit, zoneRecord.notaryId);
     const change = await bobChannelHold.getBalanceChange(account);
     await change.createChannelHold(4000n, dataDomain, zoneRecord.paymentAddress);
     const holdTracker = await bobChannelHold.notarizeAndWaitForNotebook(signer);
@@ -200,7 +202,7 @@ async function transferMainchainToLocalchain(mainchainClient: UlxClient, localch
     return {notarization, balanceChange};
 }
 
-async function registerZoneRecord(client: UlxClient, dataDomain: DataDomain, owner: KeyringPair, paymentAccount:Uint8Array, versions: Record<string, UlxPrimitivesDataDomainVersionHost>) {
+async function registerZoneRecord(client: UlxClient, dataDomain: DataDomain, owner: KeyringPair, paymentAccount:Uint8Array, notaryId: number, versions: Record<string, UlxPrimitivesDataDomainVersionHost>) {
 
     const codecVersions = new Map();
     for (const [version, host] of Object.entries(versions)) {
@@ -217,6 +219,7 @@ async function registerZoneRecord(client: UlxClient, dataDomain: DataDomain, own
         topLevelDomain: client.createType('UlxPrimitivesDataTLD', dataDomain.topLevelDomain),
     }, {
         paymentAccount,
+        notaryId,
         versions: codecVersions,
     }).signAndSend(owner, ({events, status}) => {
         if (status.isFinalized) {

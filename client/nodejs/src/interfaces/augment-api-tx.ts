@@ -101,7 +101,7 @@ declare module '@polkadot/api-base/types/submittable' {
       /**
        * See `Pallet::set_zone_record`.
        **/
-      setZoneRecord: AugmentedSubmittable<(domain: UlxPrimitivesDataDomain | { domainName?: any; topLevelDomain?: any } | string | Uint8Array, zoneRecord: UlxPrimitivesDataDomainZoneRecord | { paymentAccount?: any; versions?: any } | string | Uint8Array) => SubmittableExtrinsic<ApiType>, [UlxPrimitivesDataDomain, UlxPrimitivesDataDomainZoneRecord]>;
+      setZoneRecord: AugmentedSubmittable<(domain: UlxPrimitivesDataDomain | { domainName?: any; topLevelDomain?: any } | string | Uint8Array, zoneRecord: UlxPrimitivesDataDomainZoneRecord | { paymentAccount?: any; notaryId?: any; versions?: any } | string | Uint8Array) => SubmittableExtrinsic<ApiType>, [UlxPrimitivesDataDomain, UlxPrimitivesDataDomainZoneRecord]>;
     };
     grandpa: {
       /**

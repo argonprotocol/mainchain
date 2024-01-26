@@ -442,6 +442,10 @@ declare module '@polkadot/types/lookup' {
     readonly isAccountChannelHoldDoesntExist: boolean;
     readonly isAccountAlreadyHasChannelHold: boolean;
     readonly isChannelHoldNotReadyForClaim: boolean;
+    readonly asChannelHoldNotReadyForClaim: {
+      readonly currentTick: u32;
+      readonly claimTick: u32;
+    } & Struct;
     readonly isAccountLocked: boolean;
     readonly isMissingChannelHoldNote: boolean;
     readonly isInvalidChannelHoldNote: boolean;
@@ -592,6 +596,7 @@ declare module '@polkadot/types/lookup' {
   /** @name UlxPrimitivesDataDomainZoneRecord (62) */
   interface UlxPrimitivesDataDomainZoneRecord extends Struct {
     readonly paymentAccount: AccountId32;
+    readonly notaryId: u32;
     readonly versions: BTreeMap<UlxPrimitivesDataDomainSemver, UlxPrimitivesDataDomainVersionHost>;
   }
 

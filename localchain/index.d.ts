@@ -79,6 +79,7 @@ export interface ArgonBalancesAccountData {
 }
 export interface ZoneRecord {
   paymentAddress: string
+  notaryId: number
   /** A mapping of versions to host addresses. */
   versions: Record<string, VersionHost>
 }
