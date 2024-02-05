@@ -46,6 +46,7 @@ type Error = sp_blockchain::Error;
 
 pub(crate) struct DummyFactory(pub Arc<PeersFullClient>);
 
+#[allow(dead_code)]
 pub(crate) struct DummyProposer(BlockNumber, Arc<PeersFullClient>);
 
 impl Environment<Block> for DummyFactory {

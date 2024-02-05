@@ -8,8 +8,8 @@ import '@polkadot/api-base/types/submittable';
 import type { ApiTypes, AugmentedSubmittable, SubmittableExtrinsic, SubmittableExtrinsicFunction } from '@polkadot/api-base/types';
 import type { Bytes, Compact, Option, Vec, bool, u128, u32, u64 } from '@polkadot/types-codec';
 import type { AnyNumber, IMethod, ITuple } from '@polkadot/types-codec/types';
-import type { AccountId32, Call, MultiAddress } from '@polkadot/types/interfaces/runtime';
-import type { SpConsensusGrandpaEquivocationProof, SpSessionMembershipProof, SpWeightsWeightV2Weight, UlxNodeRuntimeOpaqueSessionKeys, UlxPrimitivesBlockSealRewardDestination, UlxPrimitivesDataDomain, UlxPrimitivesDataDomainZoneRecord, UlxPrimitivesInherentsBlockSealInherent, UlxPrimitivesNotaryNotaryMeta, UlxPrimitivesNotebookSignedNotebookHeader } from '@polkadot/types/lookup';
+import type { AccountId32, Call, H256, MultiAddress } from '@polkadot/types/interfaces/runtime';
+import type { SpConsensusGrandpaEquivocationProof, SpSessionMembershipProof, SpWeightsWeightV2Weight, UlxNodeRuntimeOpaqueSessionKeys, UlxPrimitivesBlockSealRewardDestination, UlxPrimitivesDataDomainZoneRecord, UlxPrimitivesInherentsBlockSealInherent, UlxPrimitivesNotaryNotaryMeta, UlxPrimitivesNotebookSignedNotebookHeader } from '@polkadot/types/lookup';
 
 export type __AugmentedSubmittable = AugmentedSubmittable<() => unknown>;
 export type __SubmittableExtrinsic<ApiType extends ApiTypes> = SubmittableExtrinsic<ApiType>;
@@ -101,7 +101,7 @@ declare module '@polkadot/api-base/types/submittable' {
       /**
        * See `Pallet::set_zone_record`.
        **/
-      setZoneRecord: AugmentedSubmittable<(domain: UlxPrimitivesDataDomain | { domainName?: any; topLevelDomain?: any } | string | Uint8Array, zoneRecord: UlxPrimitivesDataDomainZoneRecord | { paymentAccount?: any; notaryId?: any; versions?: any } | string | Uint8Array) => SubmittableExtrinsic<ApiType>, [UlxPrimitivesDataDomain, UlxPrimitivesDataDomainZoneRecord]>;
+      setZoneRecord: AugmentedSubmittable<(domainHash: H256 | string | Uint8Array, zoneRecord: UlxPrimitivesDataDomainZoneRecord | { paymentAccount?: any; notaryId?: any; versions?: any } | string | Uint8Array) => SubmittableExtrinsic<ApiType>, [H256, UlxPrimitivesDataDomainZoneRecord]>;
     };
     grandpa: {
       /**

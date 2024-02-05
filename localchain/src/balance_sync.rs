@@ -288,11 +288,11 @@ impl BalanceSync {
     }
 
     let channels = notarization.channels().await;
-    let Some((data_domain, data_domain_address)) = channels.into_iter().find_map(|c| {
+    let Some((data_domain_hash, data_domain_address)) = channels.into_iter().find_map(|c| {
       if c.is_client == true {
         return None;
       }
-      if let Some(domain) = c.data_domain {
+      if let Some(domain) = c.data_domain_hash {
         Some((domain, c.to_address))
       } else {
         None
@@ -316,7 +316,7 @@ impl BalanceSync {
     let mut vote = BlockVote {
       account_id: AccountStore::parse_address(&vote_address)?,
       power: total_available_tax,
-      data_domain: data_domain.try_into()?,
+      data_domain_hash: H256::from_slice(data_domain_hash.as_ref()),
       data_domain_account: AccountStore::parse_address(&data_domain_address)?,
       signature: Signature([0; 64]).into(),
       index: (*tick_counter).1,

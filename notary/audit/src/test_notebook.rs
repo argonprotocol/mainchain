@@ -632,7 +632,7 @@ fn test_cannot_remove_lock_between_changesets_in_a_notebook() {
 		channel_hold_note: None,
 		notes: bounded_vec![Note::create(
 			1000,
-			NoteType::ChannelHold { recipient: Bob.to_account_id(), data_domain: None }
+			NoteType::ChannelHold { recipient: Bob.to_account_id(), data_domain_hash: None }
 		)],
 		signature: empty_signature(),
 	}
@@ -727,7 +727,7 @@ fn test_cannot_remove_lock_between_changesets_in_a_notebook() {
 			channel_hold_note: None,
 			notes: bounded_vec![Note::create(
 				1000,
-				NoteType::ChannelHold { recipient: Ferdie.to_account_id(), data_domain: None }
+				NoteType::ChannelHold { recipient: Ferdie.to_account_id(), data_domain_hash: None }
 			)],
 			signature: empty_signature(),
 		}
@@ -771,7 +771,7 @@ fn test_cannot_remove_lock_between_changesets_in_a_notebook() {
 			}),
 			channel_hold_note: Some(Note::create(
 				1000,
-				NoteType::ChannelHold { recipient: Bob.to_account_id(), data_domain: None },
+				NoteType::ChannelHold { recipient: Bob.to_account_id(), data_domain_hash: None },
 			)),
 			notes: bounded_vec![Note::create(0, NoteType::ChannelSettle)],
 			signature: empty_signature(),
@@ -823,7 +823,7 @@ fn test_votes_must_add_up() {
 				500,
 				NoteType::ChannelHold {
 					recipient: Alice.to_account_id(),
-					data_domain: Some(data_domain.clone()),
+					data_domain_hash: Some(data_domain.hash()),
 				},
 			)),
 			balance: 500,
@@ -837,7 +837,7 @@ fn test_votes_must_add_up() {
 				500,
 				NoteType::ChannelHold {
 					recipient: Alice.to_account_id(),
-					data_domain: Some(data_domain.clone()),
+					data_domain_hash: Some(data_domain.hash()),
 				},
 			)),
 			balance: 500,
@@ -877,7 +877,7 @@ fn test_votes_must_add_up() {
 						500,
 						NoteType::ChannelHold {
 							recipient: Alice.to_account_id(),
-							data_domain: Some(data_domain.clone())
+							data_domain_hash: Some(data_domain.hash())
 						}
 					)),
 					account_type: AccountType::Deposit,
@@ -902,7 +902,7 @@ fn test_votes_must_add_up() {
 						500,
 						NoteType::ChannelHold {
 							recipient: Alice.to_account_id(),
-							data_domain: Some(data_domain.clone())
+							data_domain_hash: Some(data_domain.hash())
 						}
 					)),
 					account_type: AccountType::Deposit,
@@ -963,7 +963,7 @@ fn test_votes_must_add_up() {
 					power: 4,
 					block_hash: vote_block_hash.clone(),
 					account_id: Alice.to_account_id(),
-					data_domain: data_domain.clone(),
+					data_domain_hash: data_domain.hash(),
 					data_domain_account: Ferdie.to_account_id(),
 					signature: empty_signature(),
 				}
@@ -974,7 +974,7 @@ fn test_votes_must_add_up() {
 					power: 30,
 					block_hash: vote_block_hash.clone(),
 					account_id: Alice.to_account_id(),
-					data_domain,
+					data_domain_hash: data_domain.hash(),
 					data_domain_account: Alice.to_account_id(),
 					signature: empty_signature(),
 				}

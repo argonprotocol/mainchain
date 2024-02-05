@@ -9,7 +9,7 @@ import type { ApiTypes, AugmentedEvent } from '@polkadot/api-base/types';
 import type { Bytes, Null, Option, Result, U8aFixed, Vec, bool, u128, u32, u64 } from '@polkadot/types-codec';
 import type { ITuple } from '@polkadot/types-codec/types';
 import type { AccountId32, H256 } from '@polkadot/types/interfaces/runtime';
-import type { FrameSupportDispatchDispatchInfo, FrameSupportTokensMiscBalanceStatus, PalletBlockRewardsBlockPayout, PalletDataDomainDataDomainRegistration, SpConsensusGrandpaAppPublic, SpRuntimeDispatchError, UlxNotaryAuditErrorVerifyError, UlxPrimitivesBlockSealMiningRegistration, UlxPrimitivesDataDomain, UlxPrimitivesDataDomainZoneRecord, UlxPrimitivesNotaryNotaryMeta, UlxPrimitivesNotaryNotaryRecord } from '@polkadot/types/lookup';
+import type { FrameSupportDispatchDispatchInfo, FrameSupportTokensMiscBalanceStatus, PalletBlockRewardsBlockPayout, PalletDataDomainDataDomainRegistration, SpConsensusGrandpaAppPublic, SpRuntimeDispatchError, UlxNotaryAuditErrorVerifyError, UlxPrimitivesBlockSealMiningRegistration, UlxPrimitivesDataDomainZoneRecord, UlxPrimitivesNotaryNotaryMeta, UlxPrimitivesNotaryNotaryRecord } from '@polkadot/types/lookup';
 
 export type __AugmentedEvent<ApiType extends ApiTypes> = AugmentedEvent<ApiType>;
 
@@ -133,24 +133,24 @@ declare module '@polkadot/api-base/types/events' {
       /**
        * A data domain was expired
        **/
-      DataDomainExpired: AugmentedEvent<ApiType, [domain: UlxPrimitivesDataDomain], { domain: UlxPrimitivesDataDomain }>;
+      DataDomainExpired: AugmentedEvent<ApiType, [domainHash: H256], { domainHash: H256 }>;
       /**
        * A data domain was registered
        **/
-      DataDomainRegistered: AugmentedEvent<ApiType, [domain: UlxPrimitivesDataDomain, registration: PalletDataDomainDataDomainRegistration], { domain: UlxPrimitivesDataDomain, registration: PalletDataDomainDataDomainRegistration }>;
+      DataDomainRegistered: AugmentedEvent<ApiType, [domainHash: H256, registration: PalletDataDomainDataDomainRegistration], { domainHash: H256, registration: PalletDataDomainDataDomainRegistration }>;
       /**
        * A data domain registration was canceled due to a conflicting registration in the same
        * tick
        **/
-      DataDomainRegistrationCanceled: AugmentedEvent<ApiType, [domain: UlxPrimitivesDataDomain, registration: PalletDataDomainDataDomainRegistration], { domain: UlxPrimitivesDataDomain, registration: PalletDataDomainDataDomainRegistration }>;
+      DataDomainRegistrationCanceled: AugmentedEvent<ApiType, [domainHash: H256, registration: PalletDataDomainDataDomainRegistration], { domainHash: H256, registration: PalletDataDomainDataDomainRegistration }>;
       /**
        * A data domain was registered
        **/
-      DataDomainRenewed: AugmentedEvent<ApiType, [domain: UlxPrimitivesDataDomain], { domain: UlxPrimitivesDataDomain }>;
+      DataDomainRenewed: AugmentedEvent<ApiType, [domainHash: H256], { domainHash: H256 }>;
       /**
        * A data domain zone record was updated
        **/
-      ZoneRecordUpdated: AugmentedEvent<ApiType, [domain: UlxPrimitivesDataDomain, zoneRecord: UlxPrimitivesDataDomainZoneRecord], { domain: UlxPrimitivesDataDomain, zoneRecord: UlxPrimitivesDataDomainZoneRecord }>;
+      ZoneRecordUpdated: AugmentedEvent<ApiType, [domainHash: H256, zoneRecord: UlxPrimitivesDataDomainZoneRecord], { domainHash: H256, zoneRecord: UlxPrimitivesDataDomainZoneRecord }>;
     };
     grandpa: {
       /**

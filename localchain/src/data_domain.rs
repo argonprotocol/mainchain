@@ -1,9 +1,9 @@
 use chrono::NaiveDateTime;
 use napi::bindgen_prelude::*;
+use sp_runtime::RuntimeString;
 use sqlx::{FromRow, SqliteConnection, SqlitePool};
-use subxt::ext::sp_runtime::BoundedVec;
 
-use ulx_primitives::{DataDomain, DataTLD, MAX_DOMAIN_NAME_LENGTH};
+use ulx_primitives::{DataDomain, DataTLD};
 
 use crate::{to_js_error, MainchainClient};
 
@@ -100,32 +100,21 @@ pub struct JsDataDomain {
   pub top_level_domain: DataTLD,
 }
 
-impl TryFrom<&DataDomain> for JsDataDomain {
-  type Error = anyhow::Error;
-  fn try_from(domain: &DataDomain) -> anyhow::Result<Self> {
-    Ok(Self {
-      domain_name: String::from_utf8(domain.domain_name.to_vec())?,
+impl From<DataDomain> for JsDataDomain {
+  fn from(domain: DataDomain) -> Self {
+    Self {
+      domain_name: domain.domain_name.to_string(),
       top_level_domain: domain.top_level_domain.clone(),
-    })
+    }
   }
 }
 
-impl TryInto<DataDomain> for JsDataDomain {
-  type Error = anyhow::Error;
-  fn try_into(self) -> anyhow::Result<DataDomain> {
-    let name_bytes = self.domain_name.as_bytes().to_vec();
-    if name_bytes.len() > MAX_DOMAIN_NAME_LENGTH as usize {
-      return Err(anyhow::anyhow!(
-        "Domain name '{}' exceeds max bytes ({} vs {})",
-        self.domain_name,
-        name_bytes.len(),
-        MAX_DOMAIN_NAME_LENGTH
-      ));
-    }
-    Ok(DataDomain {
-      domain_name: BoundedVec::truncate_from(name_bytes),
+impl Into<DataDomain> for JsDataDomain {
+  fn into(self) -> DataDomain {
+    DataDomain {
+      domain_name: RuntimeString::Owned(self.domain_name.clone()),
       top_level_domain: self.top_level_domain,
-    })
+    }
   }
 }
 
@@ -139,10 +128,10 @@ mod test {
   #[test]
   fn test_data_domain_js_conversion() -> anyhow::Result<()> {
     let domain = DataDomain {
-      domain_name: BoundedVec::truncate_from(b"test".to_vec()),
+      domain_name: "test".into(),
       top_level_domain: DataTLD::Cars,
     };
-    let js_domain: JsDataDomain = (&domain).try_into()?;
+    let js_domain: JsDataDomain = domain.clone().into();
     let domain2: DataDomain = js_domain.try_into()?;
     assert_eq!(domain, domain2);
     Ok(())
@@ -152,13 +141,8 @@ mod test {
   async fn test_data_domain_store(pool: SqlitePool) -> anyhow::Result<()> {
     let mainchain_client = MainchainClient::mock();
     let store = DataDomainStore::new(pool, mainchain_client);
-    let domain = DataDomain {
-      domain_name: BoundedVec::truncate_from(b"test".to_vec()),
-      top_level_domain: DataTLD::Cars,
-    };
-    let js_domain: JsDataDomain = (&domain).try_into()?;
-    let domain2: DataDomain = js_domain.clone().try_into()?;
-    assert_eq!(domain, domain2);
+    let domain = DataDomain::new("test", DataTLD::Cars);
+    let js_domain: JsDataDomain = domain.into();
 
     let mut db = store.db.acquire().await?;
     // insert a fake notarization for foreign keys

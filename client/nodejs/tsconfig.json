@@ -3,7 +3,7 @@
     // this is specific with augmented overrides
     "paths": {
       // this is the package name we use (in the interface imports, --package for generators)
-      "@ulixee/mainchain-client/*": ["src/*"],
+      "@ulixee/mainchain/*": ["src/*"],
       "@polkadot/api/augment": ["src/interfaces/augment-api.ts"],
       "@polkadot/types/lookup": ["src/interfaces/types-lookup.ts"],
       "@polkadot/types/augment": ["src/interfaces/augment-types.ts"]
@@ -34,5 +34,8 @@
   "exclude": [
     "build/**/*",
     "node_modules"
-  ]
+  ],
+  "ts-node": {
+    "experimentalSpecifierResolution": "node"
+  }
 }

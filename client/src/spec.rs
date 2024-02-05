@@ -869,10 +869,9 @@ pub mod api {
 						"query_call_info",
 						types::QueryCallInfo { call, len },
 						[
-							241u8, 212u8, 178u8, 138u8, 74u8, 177u8, 42u8, 52u8, 254u8, 102u8,
-							11u8, 75u8, 51u8, 136u8, 125u8, 115u8, 226u8, 85u8, 10u8, 199u8, 13u8,
-							167u8, 225u8, 108u8, 34u8, 179u8, 178u8, 198u8, 253u8, 0u8, 115u8,
-							223u8,
+							114u8, 4u8, 59u8, 116u8, 85u8, 50u8, 229u8, 220u8, 10u8, 86u8, 163u8,
+							135u8, 88u8, 119u8, 115u8, 115u8, 41u8, 172u8, 5u8, 133u8, 94u8, 136u8,
+							91u8, 25u8, 195u8, 151u8, 2u8, 125u8, 250u8, 255u8, 72u8, 235u8,
 						],
 					)
 				}
@@ -892,10 +891,10 @@ pub mod api {
 						"query_call_fee_details",
 						types::QueryCallFeeDetails { call, len },
 						[
-							135u8, 183u8, 234u8, 7u8, 142u8, 185u8, 235u8, 226u8, 140u8, 88u8,
-							140u8, 38u8, 16u8, 22u8, 179u8, 240u8, 80u8, 199u8, 107u8, 74u8, 59u8,
-							219u8, 179u8, 181u8, 202u8, 79u8, 114u8, 70u8, 248u8, 188u8, 59u8,
-							138u8,
+							202u8, 2u8, 164u8, 65u8, 239u8, 131u8, 129u8, 144u8, 77u8, 90u8, 5u8,
+							228u8, 218u8, 24u8, 167u8, 28u8, 161u8, 88u8, 13u8, 104u8, 220u8,
+							228u8, 67u8, 244u8, 230u8, 139u8, 188u8, 84u8, 171u8, 107u8, 67u8,
+							84u8,
 						],
 					)
 				}
@@ -1342,9 +1341,10 @@ pub mod api {
 							bytes,
 						},
 						[
-							251u8, 120u8, 218u8, 88u8, 108u8, 63u8, 6u8, 163u8, 50u8, 121u8, 65u8,
-							67u8, 43u8, 53u8, 165u8, 244u8, 139u8, 187u8, 50u8, 42u8, 219u8, 145u8,
-							212u8, 18u8, 18u8, 0u8, 163u8, 4u8, 24u8, 2u8, 46u8, 190u8,
+							129u8, 248u8, 250u8, 76u8, 105u8, 82u8, 111u8, 80u8, 214u8, 130u8,
+							254u8, 135u8, 96u8, 133u8, 239u8, 47u8, 101u8, 119u8, 66u8, 218u8,
+							12u8, 154u8, 172u8, 24u8, 50u8, 151u8, 10u8, 27u8, 187u8, 22u8, 105u8,
+							196u8,
 						],
 					)
 				}
@@ -1994,9 +1994,9 @@ pub mod api {
 			.hash();
 		runtime_metadata_hash ==
 			[
-				87u8, 50u8, 76u8, 18u8, 70u8, 70u8, 136u8, 209u8, 192u8, 89u8, 233u8, 160u8, 248u8,
-				80u8, 155u8, 19u8, 233u8, 200u8, 146u8, 67u8, 144u8, 212u8, 145u8, 224u8, 111u8,
-				13u8, 204u8, 155u8, 132u8, 176u8, 245u8, 104u8,
+				150u8, 75u8, 158u8, 201u8, 234u8, 198u8, 29u8, 161u8, 41u8, 129u8, 36u8, 145u8,
+				239u8, 90u8, 148u8, 162u8, 168u8, 14u8, 155u8, 198u8, 43u8, 29u8, 133u8, 210u8,
+				58u8, 151u8, 121u8, 82u8, 83u8, 6u8, 113u8, 240u8,
 			]
 	}
 	pub mod system {
@@ -2718,10 +2718,9 @@ pub mod api {
 						"Events",
 						vec![],
 						[
-							83u8, 53u8, 72u8, 137u8, 187u8, 249u8, 143u8, 78u8, 81u8, 68u8, 187u8,
-							249u8, 18u8, 118u8, 220u8, 114u8, 11u8, 198u8, 119u8, 21u8, 43u8,
-							167u8, 252u8, 156u8, 28u8, 168u8, 164u8, 161u8, 125u8, 140u8, 254u8,
-							29u8,
+							169u8, 36u8, 89u8, 108u8, 113u8, 187u8, 7u8, 154u8, 30u8, 233u8, 2u8,
+							188u8, 94u8, 121u8, 254u8, 177u8, 13u8, 53u8, 25u8, 116u8, 94u8, 163u8,
+							220u8, 176u8, 74u8, 89u8, 132u8, 182u8, 36u8, 21u8, 82u8, 235u8,
 						],
 					)
 				}
@@ -5165,9 +5164,9 @@ pub mod api {
 						"submit",
 						types::Submit { notebooks },
 						[
-							218u8, 51u8, 171u8, 39u8, 28u8, 242u8, 112u8, 67u8, 0u8, 255u8, 108u8,
-							248u8, 1u8, 27u8, 70u8, 229u8, 179u8, 220u8, 57u8, 3u8, 177u8, 243u8,
-							133u8, 155u8, 97u8, 62u8, 73u8, 85u8, 18u8, 82u8, 209u8, 54u8,
+							46u8, 13u8, 39u8, 34u8, 79u8, 240u8, 245u8, 238u8, 46u8, 135u8, 78u8,
+							11u8, 164u8, 101u8, 72u8, 7u8, 59u8, 193u8, 49u8, 153u8, 3u8, 14u8,
+							186u8, 63u8, 168u8, 90u8, 136u8, 155u8, 120u8, 204u8, 240u8, 145u8,
 						],
 					)
 				}
@@ -5393,9 +5392,9 @@ pub mod api {
 						"BlockNotebooks",
 						vec![],
 						[
-							133u8, 119u8, 21u8, 169u8, 3u8, 250u8, 100u8, 191u8, 160u8, 12u8, 21u8,
-							252u8, 1u8, 56u8, 24u8, 206u8, 142u8, 80u8, 157u8, 86u8, 126u8, 113u8,
-							53u8, 54u8, 50u8, 84u8, 41u8, 21u8, 70u8, 229u8, 167u8, 165u8,
+							105u8, 27u8, 240u8, 21u8, 21u8, 72u8, 56u8, 209u8, 119u8, 58u8, 253u8,
+							57u8, 67u8, 70u8, 86u8, 23u8, 190u8, 38u8, 130u8, 104u8, 28u8, 226u8,
+							17u8, 133u8, 149u8, 75u8, 36u8, 202u8, 122u8, 251u8, 32u8, 239u8,
 						],
 					)
 				}
@@ -5416,9 +5415,10 @@ pub mod api {
 						"TempNotebookDigest",
 						vec![],
 						[
-							35u8, 254u8, 54u8, 150u8, 210u8, 184u8, 42u8, 132u8, 4u8, 15u8, 112u8,
-							12u8, 97u8, 176u8, 92u8, 99u8, 12u8, 123u8, 157u8, 205u8, 10u8, 118u8,
-							138u8, 204u8, 183u8, 129u8, 81u8, 196u8, 79u8, 76u8, 227u8, 120u8,
+							56u8, 245u8, 186u8, 249u8, 237u8, 189u8, 247u8, 233u8, 52u8, 168u8,
+							102u8, 68u8, 146u8, 134u8, 148u8, 13u8, 47u8, 142u8, 208u8, 141u8,
+							146u8, 216u8, 43u8, 138u8, 238u8, 100u8, 156u8, 212u8, 23u8, 178u8,
+							103u8, 74u8,
 						],
 					)
 				}
@@ -5443,9 +5443,9 @@ pub mod api {
 						"NotariesLockedForFailedAudit",
 						vec![::subxt::storage::address::make_static_storage_map_key(_0.borrow())],
 						[
-							9u8, 242u8, 17u8, 2u8, 254u8, 58u8, 243u8, 68u8, 49u8, 151u8, 155u8,
-							193u8, 149u8, 77u8, 4u8, 176u8, 35u8, 140u8, 63u8, 120u8, 102u8, 86u8,
-							51u8, 198u8, 147u8, 127u8, 145u8, 156u8, 116u8, 32u8, 206u8, 6u8,
+							20u8, 10u8, 135u8, 200u8, 62u8, 64u8, 239u8, 193u8, 150u8, 93u8, 138u8,
+							252u8, 223u8, 64u8, 212u8, 6u8, 128u8, 93u8, 59u8, 231u8, 236u8, 136u8,
+							170u8, 218u8, 111u8, 171u8, 13u8, 105u8, 205u8, 185u8, 47u8, 1u8,
 						],
 					)
 				}
@@ -5469,9 +5469,9 @@ pub mod api {
 						"NotariesLockedForFailedAudit",
 						Vec::new(),
 						[
-							9u8, 242u8, 17u8, 2u8, 254u8, 58u8, 243u8, 68u8, 49u8, 151u8, 155u8,
-							193u8, 149u8, 77u8, 4u8, 176u8, 35u8, 140u8, 63u8, 120u8, 102u8, 86u8,
-							51u8, 198u8, 147u8, 127u8, 145u8, 156u8, 116u8, 32u8, 206u8, 6u8,
+							20u8, 10u8, 135u8, 200u8, 62u8, 64u8, 239u8, 193u8, 150u8, 93u8, 138u8,
+							252u8, 223u8, 64u8, 212u8, 6u8, 128u8, 93u8, 59u8, 231u8, 236u8, 136u8,
+							170u8, 218u8, 111u8, 171u8, 13u8, 105u8, 205u8, 185u8, 47u8, 1u8,
 						],
 					)
 				}
@@ -6181,7 +6181,7 @@ pub mod api {
 				#[decode_as_type(crate_path = ":: subxt :: ext :: scale_decode")]
 				#[encode_as_type(crate_path = ":: subxt :: ext :: scale_encode")]
 				pub struct SetZoneRecord {
-					pub domain: runtime_types::ulx_primitives::data_domain::DataDomain,
+					pub domain_hash: ::subxt::utils::H256,
 					pub zone_record: runtime_types::ulx_primitives::data_domain::ZoneRecord<
 						::subxt::utils::AccountId32,
 					>,
@@ -6196,7 +6196,7 @@ pub mod api {
 				#[doc = "See `Pallet::set_zone_record`."]
 				pub fn set_zone_record(
 					&self,
-					domain: runtime_types::ulx_primitives::data_domain::DataDomain,
+					domain_hash: ::subxt::utils::H256,
 					zone_record: runtime_types::ulx_primitives::data_domain::ZoneRecord<
 						::subxt::utils::AccountId32,
 					>,
@@ -6204,11 +6204,12 @@ pub mod api {
 					::subxt::tx::Payload::new_static(
 						"DataDomain",
 						"set_zone_record",
-						types::SetZoneRecord { domain, zone_record },
+						types::SetZoneRecord { domain_hash, zone_record },
 						[
-							57u8, 26u8, 9u8, 71u8, 123u8, 159u8, 184u8, 47u8, 110u8, 38u8, 211u8,
-							153u8, 149u8, 159u8, 222u8, 160u8, 189u8, 33u8, 187u8, 48u8, 203u8,
-							95u8, 111u8, 110u8, 35u8, 63u8, 226u8, 63u8, 41u8, 26u8, 23u8, 123u8,
+							127u8, 189u8, 78u8, 104u8, 255u8, 250u8, 14u8, 166u8, 127u8, 247u8,
+							236u8, 108u8, 116u8, 99u8, 104u8, 63u8, 3u8, 176u8, 104u8, 194u8,
+							221u8, 26u8, 35u8, 77u8, 251u8, 51u8, 136u8, 38u8, 62u8, 108u8, 102u8,
+							123u8,
 						],
 					)
 				}
@@ -6231,7 +6232,7 @@ pub mod api {
 			#[encode_as_type(crate_path = ":: subxt :: ext :: scale_encode")]
 			#[doc = "A data domain zone record was updated"]
 			pub struct ZoneRecordUpdated {
-				pub domain: runtime_types::ulx_primitives::data_domain::DataDomain,
+				pub domain_hash: ::subxt::utils::H256,
 				pub zone_record: runtime_types::ulx_primitives::data_domain::ZoneRecord<
 					::subxt::utils::AccountId32,
 				>,
@@ -6253,7 +6254,7 @@ pub mod api {
 			#[encode_as_type(crate_path = ":: subxt :: ext :: scale_encode")]
 			#[doc = "A data domain was registered"]
 			pub struct DataDomainRegistered {
-				pub domain: runtime_types::ulx_primitives::data_domain::DataDomain,
+				pub domain_hash: ::subxt::utils::H256,
 				pub registration: runtime_types::pallet_data_domain::DataDomainRegistration<
 					::subxt::utils::AccountId32,
 				>,
@@ -6275,7 +6276,7 @@ pub mod api {
 			#[encode_as_type(crate_path = ":: subxt :: ext :: scale_encode")]
 			#[doc = "A data domain was registered"]
 			pub struct DataDomainRenewed {
-				pub domain: runtime_types::ulx_primitives::data_domain::DataDomain,
+				pub domain_hash: ::subxt::utils::H256,
 			}
 			impl ::subxt::events::StaticEvent for DataDomainRenewed {
 				const PALLET: &'static str = "DataDomain";
@@ -6294,7 +6295,7 @@ pub mod api {
 			#[encode_as_type(crate_path = ":: subxt :: ext :: scale_encode")]
 			#[doc = "A data domain was expired"]
 			pub struct DataDomainExpired {
-				pub domain: runtime_types::ulx_primitives::data_domain::DataDomain,
+				pub domain_hash: ::subxt::utils::H256,
 			}
 			impl ::subxt::events::StaticEvent for DataDomainExpired {
 				const PALLET: &'static str = "DataDomain";
@@ -6314,7 +6315,7 @@ pub mod api {
 			#[doc = "A data domain registration was canceled due to a conflicting registration in the same"]
 			#[doc = "tick"]
 			pub struct DataDomainRegistrationCanceled {
-				pub domain: runtime_types::ulx_primitives::data_domain::DataDomain,
+				pub domain_hash: ::subxt::utils::H256,
 				pub registration: runtime_types::pallet_data_domain::DataDomainRegistration<
 					::subxt::utils::AccountId32,
 				>,
@@ -6330,9 +6331,7 @@ pub mod api {
 			impl StorageApi {
 				pub fn registered_data_domains(
 					&self,
-					_0: impl ::std::borrow::Borrow<
-						runtime_types::ulx_primitives::data_domain::DataDomain,
-					>,
+					_0: impl ::std::borrow::Borrow<::subxt::utils::H256>,
 				) -> ::subxt::storage::address::Address<
 					::subxt::storage::address::StaticStorageMapKey,
 					runtime_types::pallet_data_domain::DataDomainRegistration<
@@ -6347,9 +6346,10 @@ pub mod api {
 						"RegisteredDataDomains",
 						vec![::subxt::storage::address::make_static_storage_map_key(_0.borrow())],
 						[
-							81u8, 60u8, 66u8, 158u8, 89u8, 13u8, 24u8, 44u8, 109u8, 57u8, 30u8,
-							202u8, 235u8, 115u8, 93u8, 141u8, 7u8, 181u8, 80u8, 93u8, 112u8, 12u8,
-							191u8, 66u8, 199u8, 206u8, 33u8, 73u8, 162u8, 206u8, 64u8, 80u8,
+							170u8, 223u8, 96u8, 217u8, 109u8, 173u8, 60u8, 75u8, 121u8, 255u8,
+							183u8, 225u8, 40u8, 141u8, 154u8, 7u8, 236u8, 133u8, 75u8, 191u8,
+							127u8, 226u8, 48u8, 207u8, 31u8, 90u8, 194u8, 75u8, 100u8, 165u8,
+							146u8, 28u8,
 						],
 					)
 				}
@@ -6369,17 +6369,16 @@ pub mod api {
 						"RegisteredDataDomains",
 						Vec::new(),
 						[
-							81u8, 60u8, 66u8, 158u8, 89u8, 13u8, 24u8, 44u8, 109u8, 57u8, 30u8,
-							202u8, 235u8, 115u8, 93u8, 141u8, 7u8, 181u8, 80u8, 93u8, 112u8, 12u8,
-							191u8, 66u8, 199u8, 206u8, 33u8, 73u8, 162u8, 206u8, 64u8, 80u8,
+							170u8, 223u8, 96u8, 217u8, 109u8, 173u8, 60u8, 75u8, 121u8, 255u8,
+							183u8, 225u8, 40u8, 141u8, 154u8, 7u8, 236u8, 133u8, 75u8, 191u8,
+							127u8, 226u8, 48u8, 207u8, 31u8, 90u8, 194u8, 75u8, 100u8, 165u8,
+							146u8, 28u8,
 						],
 					)
 				}
 				pub fn zone_records_by_domain(
 					&self,
-					_0: impl ::std::borrow::Borrow<
-						runtime_types::ulx_primitives::data_domain::DataDomain,
-					>,
+					_0: impl ::std::borrow::Borrow<::subxt::utils::H256>,
 				) -> ::subxt::storage::address::Address<
 					::subxt::storage::address::StaticStorageMapKey,
 					runtime_types::ulx_primitives::data_domain::ZoneRecord<
@@ -6394,10 +6393,9 @@ pub mod api {
 						"ZoneRecordsByDomain",
 						vec![::subxt::storage::address::make_static_storage_map_key(_0.borrow())],
 						[
-							16u8, 194u8, 30u8, 204u8, 91u8, 136u8, 96u8, 163u8, 150u8, 12u8, 48u8,
-							249u8, 190u8, 117u8, 155u8, 35u8, 122u8, 22u8, 174u8, 218u8, 104u8,
-							22u8, 214u8, 247u8, 231u8, 40u8, 64u8, 111u8, 153u8, 135u8, 240u8,
-							108u8,
+							91u8, 171u8, 116u8, 163u8, 138u8, 33u8, 212u8, 20u8, 82u8, 171u8, 74u8,
+							128u8, 153u8, 136u8, 119u8, 240u8, 103u8, 208u8, 38u8, 196u8, 246u8,
+							51u8, 84u8, 167u8, 99u8, 7u8, 19u8, 204u8, 171u8, 17u8, 237u8, 84u8,
 						],
 					)
 				}
@@ -6417,18 +6415,15 @@ pub mod api {
 						"ZoneRecordsByDomain",
 						Vec::new(),
 						[
-							16u8, 194u8, 30u8, 204u8, 91u8, 136u8, 96u8, 163u8, 150u8, 12u8, 48u8,
-							249u8, 190u8, 117u8, 155u8, 35u8, 122u8, 22u8, 174u8, 218u8, 104u8,
-							22u8, 214u8, 247u8, 231u8, 40u8, 64u8, 111u8, 153u8, 135u8, 240u8,
-							108u8,
+							91u8, 171u8, 116u8, 163u8, 138u8, 33u8, 212u8, 20u8, 82u8, 171u8, 74u8,
+							128u8, 153u8, 136u8, 119u8, 240u8, 103u8, 208u8, 38u8, 196u8, 246u8,
+							51u8, 84u8, 167u8, 99u8, 7u8, 19u8, 204u8, 171u8, 17u8, 237u8, 84u8,
 						],
 					)
 				}
 				pub fn domain_payment_address_history(
 					&self,
-					_0: impl ::std::borrow::Borrow<
-						runtime_types::ulx_primitives::data_domain::DataDomain,
-					>,
+					_0: impl ::std::borrow::Borrow<::subxt::utils::H256>,
 				) -> ::subxt::storage::address::Address<
 					::subxt::storage::address::StaticStorageMapKey,
 					runtime_types::bounded_collections::bounded_vec::BoundedVec<(
@@ -6444,9 +6439,10 @@ pub mod api {
 						"DomainPaymentAddressHistory",
 						vec![::subxt::storage::address::make_static_storage_map_key(_0.borrow())],
 						[
-							101u8, 201u8, 20u8, 85u8, 200u8, 139u8, 61u8, 176u8, 34u8, 23u8, 25u8,
-							210u8, 215u8, 144u8, 107u8, 74u8, 55u8, 192u8, 225u8, 219u8, 179u8,
-							163u8, 68u8, 219u8, 98u8, 36u8, 99u8, 55u8, 189u8, 133u8, 155u8, 88u8,
+							139u8, 10u8, 161u8, 228u8, 6u8, 142u8, 223u8, 232u8, 177u8, 237u8,
+							179u8, 75u8, 61u8, 224u8, 169u8, 114u8, 150u8, 245u8, 215u8, 214u8,
+							246u8, 127u8, 45u8, 51u8, 246u8, 216u8, 217u8, 59u8, 232u8, 104u8,
+							124u8, 82u8,
 						],
 					)
 				}
@@ -6467,9 +6463,10 @@ pub mod api {
 						"DomainPaymentAddressHistory",
 						Vec::new(),
 						[
-							101u8, 201u8, 20u8, 85u8, 200u8, 139u8, 61u8, 176u8, 34u8, 23u8, 25u8,
-							210u8, 215u8, 144u8, 107u8, 74u8, 55u8, 192u8, 225u8, 219u8, 179u8,
-							163u8, 68u8, 219u8, 98u8, 36u8, 99u8, 55u8, 189u8, 133u8, 155u8, 88u8,
+							139u8, 10u8, 161u8, 228u8, 6u8, 142u8, 223u8, 232u8, 177u8, 237u8,
+							179u8, 75u8, 61u8, 224u8, 169u8, 114u8, 150u8, 245u8, 215u8, 214u8,
+							246u8, 127u8, 45u8, 51u8, 246u8, 216u8, 217u8, 59u8, 232u8, 104u8,
+							124u8, 82u8,
 						],
 					)
 				}
@@ -6479,7 +6476,7 @@ pub mod api {
 				) -> ::subxt::storage::address::Address<
 					::subxt::storage::address::StaticStorageMapKey,
 					runtime_types::bounded_collections::bounded_vec::BoundedVec<
-						runtime_types::ulx_primitives::data_domain::DataDomain,
+						::subxt::utils::H256,
 					>,
 					::subxt::storage::address::Yes,
 					::subxt::storage::address::Yes,
@@ -6490,9 +6487,9 @@ pub mod api {
 						"ExpiringDomainsByBlock",
 						vec![::subxt::storage::address::make_static_storage_map_key(_0.borrow())],
 						[
-							59u8, 110u8, 172u8, 209u8, 194u8, 126u8, 21u8, 67u8, 125u8, 29u8,
-							188u8, 8u8, 141u8, 94u8, 230u8, 29u8, 234u8, 145u8, 91u8, 184u8, 77u8,
-							85u8, 133u8, 141u8, 30u8, 153u8, 5u8, 197u8, 115u8, 2u8, 198u8, 207u8,
+							75u8, 15u8, 133u8, 11u8, 204u8, 248u8, 72u8, 80u8, 4u8, 5u8, 0u8,
+							168u8, 130u8, 36u8, 43u8, 246u8, 211u8, 66u8, 249u8, 52u8, 60u8, 67u8,
+							113u8, 130u8, 240u8, 148u8, 245u8, 99u8, 98u8, 203u8, 12u8, 116u8,
 						],
 					)
 				}
@@ -6501,7 +6498,7 @@ pub mod api {
 				) -> ::subxt::storage::address::Address<
 					::subxt::storage::address::StaticStorageMapKey,
 					runtime_types::bounded_collections::bounded_vec::BoundedVec<
-						runtime_types::ulx_primitives::data_domain::DataDomain,
+						::subxt::utils::H256,
 					>,
 					(),
 					::subxt::storage::address::Yes,
@@ -6512,9 +6509,9 @@ pub mod api {
 						"ExpiringDomainsByBlock",
 						Vec::new(),
 						[
-							59u8, 110u8, 172u8, 209u8, 194u8, 126u8, 21u8, 67u8, 125u8, 29u8,
-							188u8, 8u8, 141u8, 94u8, 230u8, 29u8, 234u8, 145u8, 91u8, 184u8, 77u8,
-							85u8, 133u8, 141u8, 30u8, 153u8, 5u8, 197u8, 115u8, 2u8, 198u8, 207u8,
+							75u8, 15u8, 133u8, 11u8, 204u8, 248u8, 72u8, 80u8, 4u8, 5u8, 0u8,
+							168u8, 130u8, 36u8, 43u8, 246u8, 211u8, 66u8, 249u8, 52u8, 60u8, 67u8,
+							113u8, 130u8, 240u8, 148u8, 245u8, 99u8, 98u8, 203u8, 12u8, 116u8,
 						],
 					)
 				}
@@ -6995,9 +6992,9 @@ pub mod api {
 						"apply",
 						types::Apply { seal },
 						[
-							70u8, 71u8, 125u8, 28u8, 93u8, 231u8, 59u8, 192u8, 214u8, 11u8, 165u8,
-							226u8, 120u8, 134u8, 235u8, 68u8, 155u8, 116u8, 18u8, 49u8, 98u8, 68u8,
-							111u8, 134u8, 227u8, 131u8, 117u8, 71u8, 187u8, 142u8, 178u8, 8u8,
+							248u8, 242u8, 253u8, 212u8, 169u8, 112u8, 199u8, 69u8, 128u8, 156u8,
+							187u8, 243u8, 169u8, 202u8, 95u8, 81u8, 2u8, 237u8, 247u8, 32u8, 110u8,
+							31u8, 68u8, 216u8, 97u8, 190u8, 192u8, 25u8, 212u8, 196u8, 197u8, 35u8,
 						],
 					)
 				}
@@ -7089,9 +7086,10 @@ pub mod api {
 						"TempSealInherent",
 						vec![],
 						[
-							137u8, 75u8, 47u8, 247u8, 54u8, 28u8, 160u8, 57u8, 46u8, 255u8, 10u8,
-							6u8, 134u8, 149u8, 12u8, 189u8, 32u8, 212u8, 126u8, 95u8, 83u8, 112u8,
-							98u8, 66u8, 122u8, 176u8, 169u8, 76u8, 101u8, 249u8, 210u8, 17u8,
+							101u8, 144u8, 241u8, 1u8, 106u8, 199u8, 51u8, 101u8, 237u8, 71u8,
+							196u8, 132u8, 202u8, 238u8, 117u8, 103u8, 185u8, 88u8, 242u8, 203u8,
+							253u8, 124u8, 71u8, 212u8, 19u8, 66u8, 188u8, 58u8, 54u8, 2u8, 237u8,
+							30u8,
 						],
 					)
 				}
@@ -10754,10 +10752,9 @@ pub mod api {
 						"sudo",
 						types::Sudo { call: ::std::boxed::Box::new(call) },
 						[
-							172u8, 173u8, 103u8, 132u8, 97u8, 10u8, 87u8, 105u8, 95u8, 247u8,
-							254u8, 156u8, 167u8, 137u8, 138u8, 4u8, 1u8, 117u8, 127u8, 221u8,
-							235u8, 180u8, 111u8, 96u8, 235u8, 238u8, 12u8, 254u8, 139u8, 184u8,
-							221u8, 100u8,
+							88u8, 144u8, 94u8, 141u8, 157u8, 134u8, 76u8, 237u8, 240u8, 59u8,
+							131u8, 38u8, 30u8, 245u8, 4u8, 93u8, 238u8, 51u8, 190u8, 254u8, 235u8,
+							227u8, 10u8, 111u8, 31u8, 200u8, 98u8, 223u8, 128u8, 117u8, 3u8, 250u8,
 						],
 					)
 				}
@@ -10772,9 +10769,9 @@ pub mod api {
 						"sudo_unchecked_weight",
 						types::SudoUncheckedWeight { call: ::std::boxed::Box::new(call), weight },
 						[
-							38u8, 236u8, 188u8, 129u8, 29u8, 108u8, 74u8, 13u8, 37u8, 5u8, 86u8,
-							187u8, 157u8, 29u8, 19u8, 46u8, 163u8, 179u8, 185u8, 167u8, 138u8,
-							57u8, 9u8, 102u8, 83u8, 225u8, 96u8, 216u8, 166u8, 169u8, 74u8, 68u8,
+							81u8, 155u8, 58u8, 41u8, 122u8, 252u8, 202u8, 151u8, 233u8, 48u8,
+							204u8, 116u8, 85u8, 140u8, 14u8, 234u8, 119u8, 171u8, 24u8, 52u8, 89u8,
+							57u8, 141u8, 113u8, 112u8, 233u8, 23u8, 205u8, 93u8, 75u8, 0u8, 223u8,
 						],
 					)
 				}
@@ -10805,10 +10802,10 @@ pub mod api {
 						"sudo_as",
 						types::SudoAs { who, call: ::std::boxed::Box::new(call) },
 						[
-							67u8, 236u8, 134u8, 206u8, 205u8, 4u8, 172u8, 139u8, 141u8, 165u8,
-							177u8, 64u8, 64u8, 176u8, 147u8, 247u8, 25u8, 173u8, 35u8, 205u8, 74u8,
-							233u8, 191u8, 69u8, 67u8, 171u8, 110u8, 58u8, 176u8, 94u8, 199u8,
-							227u8,
+							114u8, 197u8, 162u8, 241u8, 179u8, 207u8, 157u8, 49u8, 175u8, 243u8,
+							60u8, 207u8, 118u8, 124u8, 89u8, 229u8, 233u8, 215u8, 181u8, 219u8,
+							43u8, 161u8, 25u8, 200u8, 133u8, 23u8, 232u8, 173u8, 111u8, 167u8,
+							178u8, 188u8,
 						],
 					)
 				}
@@ -12648,7 +12645,7 @@ pub mod api {
 					#[codec(index = 0)]
 					#[doc = "See `Pallet::set_zone_record`."]
 					set_zone_record {
-						domain: runtime_types::ulx_primitives::data_domain::DataDomain,
+						domain_hash: ::subxt::utils::H256,
 						zone_record: runtime_types::ulx_primitives::data_domain::ZoneRecord<
 							::subxt::utils::AccountId32,
 						>,
@@ -12690,7 +12687,7 @@ pub mod api {
 					#[codec(index = 0)]
 					#[doc = "A data domain zone record was updated"]
 					ZoneRecordUpdated {
-						domain: runtime_types::ulx_primitives::data_domain::DataDomain,
+						domain_hash: ::subxt::utils::H256,
 						zone_record: runtime_types::ulx_primitives::data_domain::ZoneRecord<
 							::subxt::utils::AccountId32,
 						>,
@@ -12698,26 +12695,22 @@ pub mod api {
 					#[codec(index = 1)]
 					#[doc = "A data domain was registered"]
 					DataDomainRegistered {
-						domain: runtime_types::ulx_primitives::data_domain::DataDomain,
+						domain_hash: ::subxt::utils::H256,
 						registration: runtime_types::pallet_data_domain::DataDomainRegistration<
 							::subxt::utils::AccountId32,
 						>,
 					},
 					#[codec(index = 2)]
 					#[doc = "A data domain was registered"]
-					DataDomainRenewed {
-						domain: runtime_types::ulx_primitives::data_domain::DataDomain,
-					},
+					DataDomainRenewed { domain_hash: ::subxt::utils::H256 },
 					#[codec(index = 3)]
 					#[doc = "A data domain was expired"]
-					DataDomainExpired {
-						domain: runtime_types::ulx_primitives::data_domain::DataDomain,
-					},
+					DataDomainExpired { domain_hash: ::subxt::utils::H256 },
 					#[codec(index = 4)]
 					#[doc = "A data domain registration was canceled due to a conflicting registration in the same"]
 					#[doc = "tick"]
 					DataDomainRegistrationCanceled {
-						domain: runtime_types::ulx_primitives::data_domain::DataDomain,
+						domain_hash: ::subxt::utils::H256,
 						registration: runtime_types::pallet_data_domain::DataDomainRegistration<
 							::subxt::utils::AccountId32,
 						>,
@@ -15335,82 +15328,80 @@ pub mod api {
 					#[codec(index = 19)]
 					InvalidDomainLeaseAllocation,
 					#[codec(index = 20)]
-					InvalidDomainName,
-					#[codec(index = 21)]
 					TaxBalanceChangeNotNetZero {
 						sent: ::core::primitive::u128,
 						claimed: ::core::primitive::u128,
 					},
-					#[codec(index = 22)]
+					#[codec(index = 21)]
 					MissingBalanceProof,
-					#[codec(index = 23)]
+					#[codec(index = 22)]
 					InvalidPreviousBalanceProof,
-					#[codec(index = 24)]
+					#[codec(index = 23)]
 					InvalidNotebookHash,
-					#[codec(index = 25)]
+					#[codec(index = 24)]
 					InvalidNotebookHeaderHash,
-					#[codec(index = 26)]
+					#[codec(index = 25)]
 					DuplicateChainTransfer,
-					#[codec(index = 27)]
+					#[codec(index = 26)]
 					DuplicatedAccountOriginUid,
-					#[codec(index = 28)]
+					#[codec(index = 27)]
 					InvalidNotarySignature,
-					#[codec(index = 29)]
+					#[codec(index = 28)]
 					NotebookTooOld,
-					#[codec(index = 30)]
+					#[codec(index = 29)]
 					DecodeError,
-					#[codec(index = 31)]
+					#[codec(index = 30)]
 					AccountChannelHoldDoesntExist,
-					#[codec(index = 32)]
+					#[codec(index = 31)]
 					AccountAlreadyHasChannelHold,
-					#[codec(index = 33)]
+					#[codec(index = 32)]
 					ChannelHoldNotReadyForClaim {
 						current_tick: ::core::primitive::u32,
 						claim_tick: ::core::primitive::u32,
 					},
-					#[codec(index = 34)]
+					#[codec(index = 33)]
 					AccountLocked,
-					#[codec(index = 35)]
+					#[codec(index = 34)]
 					MissingChannelHoldNote,
-					#[codec(index = 36)]
+					#[codec(index = 35)]
 					InvalidChannelHoldNote,
-					#[codec(index = 37)]
+					#[codec(index = 36)]
 					InvalidChannelClaimers,
-					#[codec(index = 38)]
+					#[codec(index = 37)]
 					ChannelNoteBelowMinimum,
-					#[codec(index = 39)]
+					#[codec(index = 38)]
 					InvalidTaxNoteAccount,
-					#[codec(index = 40)]
+					#[codec(index = 39)]
 					InvalidTaxOperation,
-					#[codec(index = 41)]
+					#[codec(index = 40)]
 					InsufficientTaxIncluded {
 						tax_sent: ::core::primitive::u128,
 						tax_owed: ::core::primitive::u128,
 						account_id: ::subxt::utils::AccountId32,
 					},
-					#[codec(index = 42)]
+					#[codec(index = 41)]
 					InsufficientBlockVoteTax,
-					#[codec(index = 43)]
+					#[codec(index = 42)]
 					InvalidBlockVoteAllocation,
-					#[codec(index = 44)]
+					#[codec(index = 43)]
 					InvalidBlockVoteRoot,
-					#[codec(index = 45)]
+					#[codec(index = 44)]
 					InvalidBlockVotesCount,
-					#[codec(index = 46)]
+					#[codec(index = 45)]
 					InvalidBlockVotingPower,
-					#[codec(index = 47)]
+					#[codec(index = 46)]
 					InvalidBlockVoteList,
-					#[codec(index = 48)]
+					#[codec(index = 47)]
 					InvalidComputeProof,
-					#[codec(index = 49)]
+					#[codec(index = 48)]
 					InvalidBlockVoteSource,
-					#[codec(index = 50)]
+					#[codec(index = 49)]
 					BlockVoteInvalidSignature,
-					#[codec(index = 51)]
+					#[codec(index = 50)]
 					InsufficientBlockVoteMinimum,
-					#[codec(index = 52)]
+					#[codec(index = 51)]
 					BlockVoteDataDomainMismatch,
-					#[codec(index = 53)]
+					#[codec(index = 52)]
 					BlockVoteChannelReused,
 				}
 			}
@@ -15629,7 +15620,7 @@ pub mod api {
 					pub index: ::core::primitive::u32,
 					#[codec(compact)]
 					pub power: ::core::primitive::u128,
-					pub data_domain: runtime_types::ulx_primitives::data_domain::DataDomain,
+					pub data_domain_hash: ::subxt::utils::H256,
 					pub data_domain_account: ::subxt::utils::AccountId32,
 					pub signature: runtime_types::sp_runtime::MultiSignature,
 				}
@@ -15704,23 +15695,6 @@ pub mod api {
 				# [codec (crate = :: subxt :: ext :: codec)]
 				#[decode_as_type(crate_path = ":: subxt :: ext :: scale_decode")]
 				#[encode_as_type(crate_path = ":: subxt :: ext :: scale_encode")]
-				pub struct DataDomain {
-					pub domain_name: runtime_types::bounded_collections::bounded_vec::BoundedVec<
-						::core::primitive::u8,
-					>,
-					pub top_level_domain: runtime_types::ulx_primitives::data_tld::DataTLD,
-				}
-				#[derive(
-					:: subxt :: ext :: codec :: Decode,
-					:: subxt :: ext :: codec :: Encode,
-					:: subxt :: ext :: scale_decode :: DecodeAsType,
-					:: subxt :: ext :: scale_encode :: EncodeAsType,
-					Clone,
-					Debug,
-				)]
-				# [codec (crate = :: subxt :: ext :: codec)]
-				#[decode_as_type(crate_path = ":: subxt :: ext :: scale_decode")]
-				#[encode_as_type(crate_path = ":: subxt :: ext :: scale_encode")]
 				pub struct Semver {
 					pub major: ::core::primitive::u32,
 					pub minor: ::core::primitive::u32,
@@ -15761,62 +15735,6 @@ pub mod api {
 						runtime_types::ulx_primitives::data_domain::Semver,
 						runtime_types::ulx_primitives::data_domain::VersionHost,
 					>,
-				}
-			}
-			pub mod data_tld {
-				use super::runtime_types;
-				#[derive(
-					:: subxt :: ext :: codec :: Decode,
-					:: subxt :: ext :: codec :: Encode,
-					:: subxt :: ext :: scale_decode :: DecodeAsType,
-					:: subxt :: ext :: scale_encode :: EncodeAsType,
-					Clone,
-					Debug,
-				)]
-				# [codec (crate = :: subxt :: ext :: codec)]
-				#[decode_as_type(crate_path = ":: subxt :: ext :: scale_decode")]
-				#[encode_as_type(crate_path = ":: subxt :: ext :: scale_encode")]
-				pub enum DataTLD {
-					#[codec(index = 0)]
-					Analytics,
-					#[codec(index = 1)]
-					Automotive,
-					#[codec(index = 2)]
-					Bikes,
-					#[codec(index = 3)]
-					Business,
-					#[codec(index = 4)]
-					Cars,
-					#[codec(index = 5)]
-					Communication,
-					#[codec(index = 6)]
-					Entertainment,
-					#[codec(index = 7)]
-					Finance,
-					#[codec(index = 8)]
-					Flights,
-					#[codec(index = 9)]
-					Health,
-					#[codec(index = 10)]
-					Hotels,
-					#[codec(index = 11)]
-					Jobs,
-					#[codec(index = 12)]
-					News,
-					#[codec(index = 13)]
-					RealEstate,
-					#[codec(index = 14)]
-					Restaurants,
-					#[codec(index = 15)]
-					Shopping,
-					#[codec(index = 16)]
-					Sports,
-					#[codec(index = 17)]
-					Transportation,
-					#[codec(index = 18)]
-					Travel,
-					#[codec(index = 19)]
-					Weather,
 				}
 			}
 			pub mod digests {
@@ -16146,11 +16064,9 @@ pub mod api {
 					pub block_voting_power: ::core::primitive::u128,
 					pub secret_hash: ::subxt::utils::H256,
 					pub parent_secret: ::core::option::Option<::subxt::utils::H256>,
-					pub data_domains:
-						runtime_types::bounded_collections::bounded_vec::BoundedVec<(
-							runtime_types::ulx_primitives::data_domain::DataDomain,
-							::subxt::utils::AccountId32,
-						)>,
+					pub data_domains: runtime_types::bounded_collections::bounded_vec::BoundedVec<
+						(::subxt::utils::H256, ::subxt::utils::AccountId32),
+					>,
 				}
 				#[derive(
 					:: subxt :: ext :: codec :: Decode,

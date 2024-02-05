@@ -222,7 +222,7 @@ mod tests {
 
 	use anyhow::anyhow;
 	use chrono::Utc;
-	use codec::{Decode, Encode};
+	use codec::Decode;
 	use frame_support::assert_ok;
 	use futures::{task::noop_waker_ref, StreamExt};
 	use sp_core::{bounded_vec, ed25519::Public, Pair};
@@ -264,7 +264,7 @@ mod tests {
 		AccountId, AccountOrigin,
 		AccountType::{Deposit, Tax},
 		BalanceChange, BalanceProof, BalanceTip, BlockSealDigest, BlockVote, BlockVoteDigest,
-		DataDomain, DataTLD, HashOutput, MerkleProof, Note, NoteType,
+		DataDomain, DataDomainHash, DataTLD, HashOutput, MerkleProof, Note, NoteType,
 		NoteType::{ChannelClaim, ChannelSettle},
 		NotebookDigest, ParentVotingKeyDigest, TickDigest, CHANNEL_EXPIRATION_TICKS,
 		DATA_DOMAIN_LEASE_COST,
@@ -453,11 +453,11 @@ mod tests {
 		wait_for_transfers(&pool, vec![bob_transfer.clone(), ferdie_transfer.clone()]).await?;
 		println!("bob and ferdie transfers confirmed");
 
-		let domain = DataDomain::new("HelloWorld", DataTLD::Entertainment);
+		let domain_hash = DataDomain::new("HelloWorld", DataTLD::Entertainment).hash();
 		let result = submit_balance_change_to_notary_and_create_domain(
 			&pool,
 			ferdie_transfer,
-			domain.clone(),
+			domain_hash.clone(),
 			Alice.to_account_id(),
 		)
 		.await?;
@@ -472,17 +472,13 @@ mod tests {
 			tokio::time::sleep(tokio::time::Duration::from_millis(50)).await;
 			check_block_watch_status(block_tracker.clone()).await?;
 		}
-		let zone_block = set_zone_record(&ctx.client, domain.clone(), dev::alice()).await?;
+		let zone_block = set_zone_record(&ctx.client, domain_hash.clone(), dev::alice()).await?;
 		println!("set zone record");
 		assert_eq!(
 			ctx.client
 				.storage()
 				.at(zone_block)
-				.fetch(
-					&storage()
-						.data_domain()
-						.zone_records_by_domain(translate_domain(domain.clone()))
-				)
+				.fetch(&storage().data_domain().zone_records_by_domain(domain_hash))
 				.await?
 				.unwrap()
 				.payment_account,
@@ -503,7 +499,7 @@ mod tests {
 			5000,
 			result.tick,
 			origin.clone(),
-			domain.clone(),
+			domain_hash.clone(),
 			Alice.to_account_id(),
 		)
 		.await?;
@@ -762,7 +758,7 @@ mod tests {
 	async fn submit_balance_change_to_notary_and_create_domain(
 		pool: &PgPool,
 		transfer: (Nonce, u32, Keypair),
-		domain: DataDomain,
+		domain_hash: DataDomainHash,
 		register_domain_to: AccountId,
 	) -> anyhow::Result<AccountOrigin> {
 		let (account_nonce, amount, keypair) = transfer;
@@ -812,7 +808,7 @@ mod tests {
 				.clone(),
 			],
 			vec![],
-			vec![(domain, register_domain_to)],
+			vec![(domain_hash, register_domain_to)],
 		)
 		.await?;
 		println!("submitted chain transfer + data domain to notary");
@@ -825,16 +821,17 @@ mod tests {
 
 	async fn set_zone_record(
 		client: &UlxClient,
-		data_domain: DataDomain,
+		data_domain_hash: DataDomainHash,
 		account: Keypair,
 	) -> anyhow::Result<H256> {
 		let tx_progress = client
 			.tx()
 			.sign_and_submit_then_watch_default(
 				&tx().data_domain().set_zone_record(
-					translate_domain(data_domain),
+					data_domain_hash,
 					runtime_types::ulx_primitives::data_domain::ZoneRecord {
 						payment_account: AccountId32::from(account.public_key()),
+						notary_id: 1,
 						versions: subxt::utils::KeyedVec::new(),
 					},
 				),
@@ -852,12 +849,15 @@ mod tests {
 		amount: u128,
 		tick: Tick,
 		account_origin: AccountOrigin,
-		domain: DataDomain,
+		domain_hash: DataDomainHash,
 		domain_account: AccountId,
 	) -> anyhow::Result<(Note, BalanceChangeResult)> {
 		let hold_note = Note::create(
 			amount,
-			NoteType::ChannelHold { recipient: domain_account, data_domain: Some(domain) },
+			NoteType::ChannelHold {
+				recipient: domain_account,
+				data_domain_hash: Some(domain_hash),
+			},
 		);
 		let changes = vec![BalanceChange {
 			account_id: Bob.to_account_id(),
@@ -889,8 +889,8 @@ mod tests {
 		vote_block_hash: HashOutput,
 		bob_balance_proof: BalanceProof,
 	) -> anyhow::Result<BalanceChangeResult> {
-		let (data_domain, recipient) = match hold_note.note_type.clone() {
-			NoteType::ChannelHold { recipient, data_domain } => (data_domain, recipient),
+		let (data_domain_hash, recipient) = match hold_note.note_type.clone() {
+			NoteType::ChannelHold { recipient, data_domain_hash } => (data_domain_hash, recipient),
 			_ => panic!("Should be a channel hold note"),
 		};
 		let tax = (hold_note.milligons as f64 * 0.2f64) as u128;
@@ -943,7 +943,7 @@ mod tests {
 			1,
 			changes,
 			vec![BlockVote {
-				data_domain: data_domain.unwrap().clone(),
+				data_domain_hash: data_domain_hash.unwrap().clone(),
 				data_domain_account: recipient,
 				account_id: Alice.to_account_id(),
 				index: 1,
@@ -957,18 +957,6 @@ mod tests {
 		)
 		.await?;
 		Ok(result)
-	}
-
-	fn translate_domain(
-		data_domain: DataDomain,
-	) -> runtime_types::ulx_primitives::data_domain::DataDomain {
-		runtime_types::ulx_primitives::data_domain::DataDomain {
-			domain_name: BoundedVec(data_domain.domain_name.to_vec()),
-			top_level_domain: runtime_types::ulx_primitives::data_tld::DataTLD::decode(
-				&mut data_domain.top_level_domain.encode().as_slice(),
-			)
-			.unwrap(),
-		}
 	}
 
 	async fn create_localchain_transfer(

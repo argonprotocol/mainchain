@@ -10,7 +10,7 @@ use ulx_notary_audit::{
 };
 use ulx_primitives::{
 	ensure, AccountId, AccountOrigin, AccountType, BalanceChange, BalanceProof, BalanceTip,
-	BlockVote, DataDomain, NewAccountOrigin, Notarization, NotaryId, NoteType, NotebookNumber,
+	BlockVote, DataDomainHash, NewAccountOrigin, Notarization, NotaryId, NoteType, NotebookNumber,
 };
 
 use crate::{
@@ -36,7 +36,7 @@ struct NotarizationRow {
 	/// Scale encoded set of BlockVotes submitted together
 	pub block_votes: Json<Vec<BlockVote>>,
 	/// Scale encoded set of DataDomains submitted together
-	pub data_domains: Json<Vec<(DataDomain, AccountId)>>,
+	pub data_domains: Json<Vec<(DataDomainHash, AccountId)>>,
 }
 pub struct NotarizationsStore;
 
@@ -54,7 +54,7 @@ impl NotarizationsStore {
 		notebook_number: NotebookNumber,
 		balance_changes: Vec<BalanceChange>,
 		block_votes: Vec<BlockVote>,
-		data_domains: Vec<(DataDomain, AccountId)>,
+		data_domains: Vec<(DataDomainHash, AccountId)>,
 	) -> anyhow::Result<(), Error> {
 		let balance_changes_json = json!(balance_changes);
 		let mut account_lookups = BTreeSet::new();
@@ -105,7 +105,7 @@ impl NotarizationsStore {
 
 		let balance_changes = from_value::<Vec<BalanceChange>>(row.balance_changes)?;
 		let block_votes = from_value::<Vec<BlockVote>>(row.block_votes)?;
-		let data_domains = from_value::<Vec<(DataDomain, AccountId)>>(row.data_domains)?;
+		let data_domains = from_value::<Vec<(DataDomainHash, AccountId)>>(row.data_domains)?;
 		Ok(Notarization {
 			balance_changes: BoundedVec::truncate_from(balance_changes),
 			block_votes: BoundedVec::truncate_from(block_votes),
@@ -130,7 +130,7 @@ impl NotarizationsStore {
 		for row in rows {
 			let balance_changes = from_value::<Vec<BalanceChange>>(row.balance_changes)?;
 			let block_votes = from_value::<Vec<BlockVote>>(row.block_votes)?;
-			let data_domains = from_value::<Vec<(DataDomain, AccountId)>>(row.data_domains)?;
+			let data_domains = from_value::<Vec<(DataDomainHash, AccountId)>>(row.data_domains)?;
 			result.push(Notarization::new(balance_changes, block_votes, data_domains));
 		}
 
@@ -168,7 +168,7 @@ impl NotarizationsStore {
 		notary_id: NotaryId,
 		changes: Vec<BalanceChange>,
 		block_votes: Vec<BlockVote>,
-		data_domains: Vec<(DataDomain, AccountId)>,
+		data_domains: Vec<(DataDomainHash, AccountId)>,
 	) -> anyhow::Result<BalanceChangeResult, Error> {
 		// Before we use db resources, let's confirm these are valid transactions
 		let initial_allocation_result =
@@ -334,10 +334,10 @@ impl NotarizationsStore {
 						channel_hold_note = None;
 						if let Some(hold_note) = &prev_channel_hold_note {
 							match &hold_note.note_type {
-								&NoteType::ChannelHold { ref data_domain, ref recipient } =>
-									if let Some(data_domain) = data_domain {
+								&NoteType::ChannelHold { ref data_domain_hash, ref recipient } =>
+									if let Some(data_domain_hash) = data_domain_hash {
 										let count = channel_data_domains
-											.entry((data_domain.clone(), recipient.clone()))
+											.entry((data_domain_hash.clone(), recipient.clone()))
 											.or_insert(0);
 										*count += 1;
 									},
@@ -459,13 +459,14 @@ mod tests {
 			power: 1222,
 			account_id: Bob.to_account_id(),
 			index: 0,
-			data_domain: DataDomain::new("test", DataTLD::Analytics),
+			data_domain_hash: DataDomain::new("test", DataTLD::Analytics).hash(),
 			data_domain_account: Bob.to_account_id(),
 			signature: Signature([0u8; 64]).into(),
 		}
 		.sign(Bob.pair())
 		.clone()];
-		let domains = vec![(DataDomain::new("test", DataTLD::Analytics), Bob.to_account_id())];
+		let domains =
+			vec![(DataDomain::new("test", DataTLD::Analytics).hash(), Bob.to_account_id())];
 
 		{
 			let mut tx = pool.begin().await?;

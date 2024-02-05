@@ -267,7 +267,7 @@ fn test_sending_to_mainchain() {
 fn test_can_lock_with_a_channel_note() -> anyhow::Result<()> {
 	let channel_note = Note::create(
 		250,
-		NoteType::ChannelHold { recipient: Alice.to_account_id(), data_domain: None },
+		NoteType::ChannelHold { recipient: Alice.to_account_id(), data_domain_hash: None },
 	);
 	let balance_change = BalanceChange {
 		account_id: Bob.to_account_id(),
@@ -438,7 +438,7 @@ fn test_with_note_claim_signatures() {
 	};
 	balance_change.push_note(
 		250,
-		NoteType::ChannelHold { recipient: Alice.to_account_id(), data_domain: None },
+		NoteType::ChannelHold { recipient: Alice.to_account_id(), data_domain_hash: None },
 	);
 	balance_change.sign(Bob.pair());
 
@@ -651,7 +651,7 @@ fn test_can_buy_data_domains() {
 	let result = verify_notarization_allocation(
 		&set,
 		&vec![],
-		&vec![(DataDomain::new("Monster", DataTLD::Jobs), Alice.to_account_id())],
+		&vec![(H256::random(), Alice.to_account_id())],
 		Some(1),
 	)
 	.expect("should unwrap");
@@ -714,7 +714,7 @@ fn verify_tax_votes() {
 		block_hash: H256::zero(),
 		index: 0,
 		power: 20_000,
-		data_domain: DataDomain::new("Monster", DataTLD::Jobs),
+		data_domain_hash: H256::random(),
 		data_domain_account: Alice.to_account_id(),
 		signature: empty_signature(),
 	}
@@ -740,7 +740,7 @@ fn test_vote_sources() {
 			block_hash: vote_block_hash,
 			index: 0,
 			power: 20_000,
-			data_domain: jobs_domain.clone(),
+			data_domain_hash: jobs_domain.hash(),
 			data_domain_account: jobs_domain_author.clone(),
 			signature: empty_signature(),
 		}
@@ -751,7 +751,7 @@ fn test_vote_sources() {
 			block_hash: vote_block_hash,
 			index: 1,
 			power: 400,
-			data_domain: jobs_domain.clone(),
+			data_domain_hash: jobs_domain.hash(),
 			data_domain_account: jobs_domain_author.clone(),
 			signature: empty_signature(),
 		}
@@ -769,7 +769,7 @@ fn test_vote_sources() {
 
 	assert_err!(
 		verify_voting_sources(
-			&BTreeMap::from([((jobs_domain.clone(), jobs_domain_author.clone()), 1)]),
+			&BTreeMap::from([((jobs_domain.hash(), jobs_domain_author.clone()), 1)]),
 			&votes,
 			&vote_minimums
 		),
@@ -779,7 +779,7 @@ fn test_vote_sources() {
 	votes[1].power = 500;
 	assert_err!(
 		verify_voting_sources(
-			&BTreeMap::from([((jobs_domain.clone(), Bob.to_account_id()), 1)]),
+			&BTreeMap::from([((jobs_domain.hash(), Bob.to_account_id()), 1)]),
 			&votes,
 			&vote_minimums
 		),
@@ -788,7 +788,7 @@ fn test_vote_sources() {
 
 	assert_err!(
 		verify_voting_sources(
-			&BTreeMap::from([((jobs_domain.clone(), jobs_domain_author.clone()), 2)]),
+			&BTreeMap::from([((jobs_domain.hash(), jobs_domain_author.clone()), 2)]),
 			&votes,
 			&vote_minimums
 		),
@@ -798,7 +798,7 @@ fn test_vote_sources() {
 	votes[1].sign(Bob.pair());
 
 	assert_ok!(verify_voting_sources(
-		&BTreeMap::from([((jobs_domain.clone(), jobs_domain_author), 2)]),
+		&BTreeMap::from([((jobs_domain.hash(), jobs_domain_author), 2)]),
 		&votes,
 		&vote_minimums
 	),);

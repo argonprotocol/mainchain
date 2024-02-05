@@ -68,9 +68,6 @@ pub enum VerifyError {
 	#[snafu(display("Invalid domain lease allocation"))]
 	InvalidDomainLeaseAllocation,
 
-	#[snafu(display("Invalid domain name"))]
-	InvalidDomainName,
-
 	#[snafu(display("Tax balance changes not net zero (sent: {sent} vs claimed: {claimed})"))]
 	TaxBalanceChangeNotNetZero { sent: u128, claimed: u128 },
 

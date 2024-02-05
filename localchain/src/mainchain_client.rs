@@ -4,8 +4,6 @@ use std::sync::Arc;
 
 use crate::to_js_error;
 use crate::AccountStore;
-use codec::Decode;
-use codec::Encode;
 use napi::bindgen_prelude::*;
 use sp_core::crypto::AccountId32;
 use sp_core::{ByteArray, H256};
@@ -21,8 +19,8 @@ use ulixee_client::api::storage;
 use ulixee_client::UlxFullclient;
 use ulx_primitives::host::Host;
 use ulx_primitives::tick::Ticker;
-use ulx_primitives::DataTLD;
 use ulx_primitives::MAX_DOMAIN_NAME_LENGTH;
+use ulx_primitives::{DataDomain, DataTLD};
 
 #[napi]
 #[derive(Clone)]
@@ -229,18 +227,14 @@ impl MainchainClient {
       )));
     }
 
-    let domain = runtime_types::ulx_primitives::data_domain::DataDomain {
-      domain_name: runtime_types::bounded_collections::bounded_vec::BoundedVec(bytes),
-      top_level_domain: runtime_types::ulx_primitives::data_tld::DataTLD::decode(
-        &mut tld.encode().as_slice(),
-      )
-      .map_err(to_js_error)?,
-    };
+    let data_domain_hash = DataDomain::from_string(domain_name, tld).hash();
 
     let best_block_hash = &self.get_best_block_hash().await?.to_vec();
     if let Some(x) = self
       .fetch_storage(
-        &storage().data_domain().registered_data_domains(domain),
+        &storage()
+          .data_domain()
+          .registered_data_domains(data_domain_hash),
         Some(H256::from_slice(&best_block_hash)),
       )
       .await?
@@ -269,15 +263,7 @@ impl MainchainClient {
     domain_name: String,
     tld: DataTLD,
   ) -> Result<Option<ZoneRecord>> {
-    let domain = runtime_types::ulx_primitives::data_domain::DataDomain {
-      domain_name: runtime_types::bounded_collections::bounded_vec::BoundedVec(
-        domain_name.into_bytes(),
-      ),
-      top_level_domain: runtime_types::ulx_primitives::data_tld::DataTLD::decode(
-        &mut tld.encode().as_slice(),
-      )
-      .map_err(to_js_error)?,
-    };
+    let domain = DataDomain::from_string(domain_name, tld).hash();
     let Some(zone_record) = self
       .fetch_storage(
         &storage().data_domain().zone_records_by_domain(domain),

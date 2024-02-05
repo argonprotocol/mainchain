@@ -434,7 +434,7 @@ impl NotarizationBuilder {
       .await?;
 
     let register_to_account = AccountStore::parse_address(&register_to_address)?;
-    let domain = data_domain.try_into()?;
+    let domain = data_domain.into();
     let mut data_domains = self.data_domains.lock().await;
     data_domains.try_push((domain, register_to_account)).map_err(|_| Error::from_reason(format!(
       "Max domains reached for this notarization. Move this domain to a new notarization! ({} domains + 1 > {} max)",
@@ -712,7 +712,10 @@ impl NotarizationBuilder {
     let mut notarization = Notarization::new(
       imports.clone(),
       (*block_votes).to_vec(),
-      (*data_domains).to_vec(),
+      (*data_domains)
+        .iter()
+        .map(|(d, a)| (d.hash(), a.clone()))
+        .collect(),
     );
     let mut notary_id = None;
     for (_, balance_change_tx) in &*balance_changes_by_account {
@@ -870,7 +873,10 @@ impl NotarizationBuilder {
     for (domain, account) in &*data_domains {
       DataDomainStore::insert(
         &mut *tx,
-        JsDataDomain::try_from(domain)?,
+        JsDataDomain {
+          domain_name: domain.domain_name.clone().into(),
+          top_level_domain: domain.top_level_domain.clone(),
+        },
         AccountStore::to_address(account),
         notarization_id,
         result.tick,
@@ -944,7 +950,7 @@ pub struct JsBlockVote {
   /// The voting power of this vote, determined from the amount of tax
   pub power: BigInt,
   /// The data domain used to create this vote
-  pub data_domain: JsDataDomain,
+  pub data_domain_hash: Vec<u8>,
   /// The data domain payment address used to create this vote
   pub data_domain_address: String,
   /// A signature of the vote by the account_id
@@ -960,7 +966,7 @@ impl TryInto<BlockVote> for JsBlockVote {
       block_hash: H256::from_slice(self.block_hash.as_slice()),
       index: self.index,
       power,
-      data_domain: self.data_domain.try_into()?,
+      data_domain_hash: H256::from_slice(self.data_domain_hash.as_slice()),
       data_domain_account: AccountStore::parse_address(&self.data_domain_address)?,
       signature: MultiSignature::decode(&mut self.signature.as_slice())?,
     })

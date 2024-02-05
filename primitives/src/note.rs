@@ -4,7 +4,7 @@ use serde::{Deserialize, Serialize};
 use sp_core::{ConstU32, RuntimeDebug};
 use sp_runtime::{format_runtime_string, BoundedVec, RuntimeString};
 
-use crate::{prod_or_fast, AccountId, DataDomain};
+use crate::{prod_or_fast, AccountId, DataDomainHash};
 
 #[derive(
 	Clone,
@@ -148,7 +148,7 @@ pub enum NoteType {
 		/// The account id of the recipient
 		recipient: AccountId,
 		/// The data domain that this channel is created for
-		data_domain: Option<DataDomain>,
+		data_domain_hash: Option<DataDomainHash>,
 	},
 	/// Channel settlement note - applied to channel hold creator balance
 	ChannelSettle,

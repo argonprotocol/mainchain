@@ -17,10 +17,10 @@ use sp_std::{
 
 use ulx_primitives::{
 	ensure, round_up, tick::Tick, AccountId, AccountOrigin, AccountOriginUid, AccountType, Balance,
-	BalanceChange, BalanceProof, BalanceTip, BlockVote, ChainTransfer, DataDomain,
+	BalanceChange, BalanceProof, BalanceTip, BlockVote, ChainTransfer, DataDomainHash,
 	NewAccountOrigin, NotaryId, Note, NoteType, Notebook, NotebookHeader, NotebookNumber,
 	VoteMinimum, CHANNEL_CLAWBACK_TICKS, CHANNEL_EXPIRATION_TICKS, DATA_DOMAIN_LEASE_COST,
-	MIN_CHANNEL_NOTE_MILLIGONS, MIN_DATA_DOMAIN_NAME_LENGTH, TAX_PERCENT_BASE,
+	MIN_CHANNEL_NOTE_MILLIGONS, TAX_PERCENT_BASE,
 };
 
 pub use crate::error::VerifyError;
@@ -137,7 +137,7 @@ struct NotebookVerifyState {
 	block_votes: BTreeMap<(AccountId, u32), BlockVote>,
 	seen_transfers_in: BTreeSet<(AccountId32, u32)>,
 	new_account_origins: BTreeMap<(AccountId, AccountType), AccountOriginUid>,
-	channel_data_domains: BTreeMap<(DataDomain, AccountId), u32>,
+	channel_data_domains: BTreeMap<(DataDomainHash, AccountId), u32>,
 	blocks_voted_on: BTreeSet<H256>,
 	block_power: u128,
 	tax: u128,
@@ -278,11 +278,11 @@ fn verify_balance_sources<'a, T: NotebookHistoryLookup>(
 				NoteType::ChannelSettle => {
 					if let Some(hold_note) = &change.channel_hold_note {
 						match &hold_note.note_type {
-							&NoteType::ChannelHold { ref data_domain, ref recipient } =>
-								if let Some(data_domain) = data_domain {
+							&NoteType::ChannelHold { ref data_domain_hash, ref recipient } =>
+								if let Some(data_domain_hash) = data_domain_hash {
 									let count = state
 										.channel_data_domains
-										.entry((data_domain.clone(), recipient.clone()))
+										.entry((data_domain_hash.clone(), recipient.clone()))
 										.or_insert(0);
 									*count += 1u32;
 								},
@@ -338,7 +338,7 @@ fn verify_balance_sources<'a, T: NotebookHistoryLookup>(
 }
 
 pub fn verify_voting_sources(
-	channel_data_domains: &BTreeMap<(DataDomain, AccountId), u32>,
+	channel_data_domains: &BTreeMap<(DataDomainHash, AccountId), u32>,
 	block_votes: &Vec<BlockVote>,
 	vote_minimums: &BTreeMap<H256, VoteMinimum>,
 ) -> anyhow::Result<(), VerifyError> {
@@ -351,7 +351,7 @@ pub fn verify_voting_sources(
 		ensure!(block_vote.power >= *minimum, VerifyError::InsufficientBlockVoteMinimum);
 
 		let count = data_domain_tracker
-			.get_mut(&(block_vote.data_domain.clone(), block_vote.data_domain_account.clone()))
+			.get_mut(&(block_vote.data_domain_hash.clone(), block_vote.data_domain_account.clone()))
 			.ok_or(VerifyError::BlockVoteDataDomainMismatch)?;
 		ensure!(*count > 0, VerifyError::BlockVoteChannelReused);
 		ensure!(
@@ -708,7 +708,7 @@ impl BalanceChangesetState {
 pub fn verify_notarization_allocation(
 	changes: &Vec<BalanceChange>,
 	block_votes: &Vec<BlockVote>,
-	data_domains: &Vec<(DataDomain, AccountId)>,
+	data_domains: &Vec<(DataDomainHash, AccountId)>,
 	notebook_tick: Option<Tick>,
 ) -> anyhow::Result<BalanceChangesetState, VerifyError> {
 	let mut state = BalanceChangesetState::default();
@@ -862,12 +862,6 @@ pub fn verify_notarization_allocation(
 		state.allocated_to_domains == DATA_DOMAIN_LEASE_COST * data_domains.len() as u128,
 		VerifyError::InvalidDomainLeaseAllocation
 	);
-	for (data_domain, _) in data_domains {
-		ensure!(
-			data_domain.domain_name.len() >= MIN_DATA_DOMAIN_NAME_LENGTH,
-			VerifyError::InvalidDomainName
-		);
-	}
 
 	ensure!(
 		state.claimed_deposits == state.sent_deposits,

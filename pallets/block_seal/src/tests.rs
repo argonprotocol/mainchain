@@ -216,7 +216,7 @@ fn it_should_be_able_to_submit_a_seal() {
 			a.insert(2, vec![System::block_hash(2)]);
 		});
 		RegisteredDataDomains::mutate(|a| {
-			a.insert(DataDomain::new("test", DataTLD::Bikes));
+			a.insert(DataDomain::new("test", DataTLD::Bikes).hash());
 		});
 
 		let block_vote = default_vote();
@@ -470,7 +470,7 @@ fn it_can_find_best_vote_seals() {
 			index: 0,
 			block_hash: parent_hash,
 			power: 500,
-			data_domain: DataDomain::new("test", DataTLD::Bikes),
+			data_domain_hash: DataDomain::new("test", DataTLD::Bikes).hash(),
 			data_domain_account: Alice.to_account_id(),
 			signature: empty_vote_signature(),
 		};
@@ -573,7 +573,7 @@ fn it_checks_tax_votes() {
 		System::set_block_number(4);
 		let mut vote = BlockVote {
 			block_hash: System::block_hash(System::block_number().saturating_sub(4)),
-			data_domain: DataDomain::new("test", DataTLD::Bikes),
+			data_domain_hash: DataDomain::new("test", DataTLD::Bikes).hash(),
 			data_domain_account: Alice.to_account_id(),
 			account_id: Keyring::Alice.into(),
 			index: 1,
@@ -657,7 +657,7 @@ fn it_checks_tax_votes() {
 		);
 
 		RegisteredDataDomains::mutate(|a| {
-			a.insert(vote.data_domain.clone());
+			a.insert(vote.data_domain_hash.clone());
 		});
 
 		assert_err!(
@@ -718,7 +718,7 @@ fn get_block_vote_digest(votes: u32) -> BlockVoteDigest {
 fn default_vote() -> BlockVote {
 	BlockVote {
 		block_hash: System::block_hash(System::block_number().saturating_sub(4)),
-		data_domain: DataDomain::new("test", DataTLD::Bikes),
+		data_domain_hash: DataDomain::new("test", DataTLD::Bikes).hash(),
 		data_domain_account: Alice.to_account_id(),
 		account_id: Keyring::Alice.into(),
 		index: 1,

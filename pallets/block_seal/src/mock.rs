@@ -16,8 +16,8 @@ use ulx_primitives::{
 	block_vote::VoteMinimum,
 	notebook::NotebookNumber,
 	tick::{Tick, Ticker},
-	AuthorityProvider, BlockVotingProvider, DataDomain, DataDomainProvider, HashOutput, NotaryId,
-	NotebookProvider, NotebookSecret, TickProvider,
+	AuthorityProvider, BlockVotingProvider, DataDomainHash, DataDomainProvider, HashOutput,
+	NotaryId, NotebookProvider, NotebookSecret, TickProvider,
 };
 
 use crate as pallet_block_seal;
@@ -68,7 +68,7 @@ parameter_types! {
 	pub static NotebooksAtTick: BTreeMap<Tick, Vec<(NotaryId, NotebookNumber, Option<NotebookSecret>)>> = BTreeMap::new();
 	pub static CurrentTick: Tick = 0;
 	pub static BlocksAtTick: BTreeMap<Tick, Vec<HashOutput>> = BTreeMap::new();
-	pub static RegisteredDataDomains: BTreeSet<DataDomain> = BTreeSet::new();
+	pub static RegisteredDataDomains: BTreeSet<DataDomainHash> = BTreeSet::new();
 }
 
 pub struct StaticAuthorityProvider;
@@ -131,11 +131,11 @@ impl BlockVotingProvider<Block> for StaticBlockVotingProvider {
 pub struct StaticDataDomainProvider;
 impl DataDomainProvider<u64> for StaticDataDomainProvider {
 	fn is_registered_payment_account(
-		data_domain: &DataDomain,
+		data_domain_hash: &DataDomainHash,
 		_account_id: &u64,
 		_tick_range: (Tick, Tick),
 	) -> bool {
-		RegisteredDataDomains::get().contains(&data_domain)
+		RegisteredDataDomains::get().contains(&data_domain_hash)
 	}
 }
 impl pallet_block_seal::Config for Test {

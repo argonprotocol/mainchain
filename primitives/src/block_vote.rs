@@ -5,7 +5,7 @@ use sp_core_hashing::blake2_256;
 use sp_runtime::{scale_info::TypeInfo, MultiSignature};
 use sp_std::vec::Vec;
 
-use crate::{AccountId, BlockVotingPower, DataDomain, MerkleProof, NotaryId, NotebookNumber};
+use crate::{AccountId, BlockVotingPower, DataDomainHash, MerkleProof, NotaryId, NotebookNumber};
 
 pub type VoteMinimum = u128;
 
@@ -34,7 +34,7 @@ pub struct BlockVoteT<Hash: Codec = H256> {
 	#[codec(compact)]
 	pub power: BlockVotingPower,
 	/// The data domain used to create this vote
-	pub data_domain: DataDomain,
+	pub data_domain_hash: DataDomainHash,
 	/// The data domain payment address used to create this vote
 	pub data_domain_account: AccountId,
 	/// A signature of the vote by the account_id
@@ -47,7 +47,7 @@ struct BlockVoteHashMessage<Hash: Codec> {
 	block_hash: Hash,
 	index: u32,
 	power: BlockVotingPower,
-	data_domain: DataDomain,
+	data_domain_hash: DataDomainHash,
 	data_domain_account: AccountId,
 }
 
@@ -61,7 +61,7 @@ impl<Hash: Codec + Clone> BlockVoteT<Hash> {
 			block_hash: self.block_hash.clone(),
 			index: self.index,
 			power: self.power,
-			data_domain: self.data_domain.clone(),
+			data_domain_hash: self.data_domain_hash.clone(),
 			data_domain_account: self.data_domain_account.clone(),
 		}
 		.using_encoded(blake2_256)

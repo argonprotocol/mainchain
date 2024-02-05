@@ -1,5 +1,5 @@
 use crate::{to_js_error, AccountStore, JsDataDomain, LocalchainTransfer};
-use napi::bindgen_prelude::{BigInt, Uint8Array};
+use napi::bindgen_prelude::*;
 use napi::Error;
 use sp_core::bounded_vec::BoundedVec;
 use sp_core::{ed25519, ByteArray};
@@ -7,7 +7,7 @@ use sp_runtime::MultiSignature;
 use std::sync::Arc;
 use tokio::sync::Mutex;
 use ulx_primitives::{
-  AccountId, AccountType, BalanceChange, Note, NoteType, DATA_DOMAIN_LEASE_COST,
+  AccountId, AccountType, BalanceChange, DataDomain, Note, NoteType, DATA_DOMAIN_LEASE_COST,
   MIN_CHANNEL_NOTE_MILLIGONS,
 };
 
@@ -226,15 +226,12 @@ impl BalanceChangeBuilder {
       )));
     }
 
-    let domain_name = data_domain.domain_name.as_bytes().to_vec();
+    let domain: DataDomain = data_domain.into();
     // NOTE: channel hold doesn't manipulate balance
     balance_change.push_note(
       amount,
       NoteType::ChannelHold {
-        data_domain: Some(ulx_primitives::DataDomain {
-          domain_name: BoundedVec::truncate_from(domain_name),
-          top_level_domain: data_domain.top_level_domain,
-        }),
+        data_domain_hash: Some(domain.hash()),
         recipient: AccountStore::parse_address(&data_domain_address)?,
       },
     );
@@ -314,7 +311,7 @@ impl BalanceChangeBuilder {
     balance_change.push_note(
       amount,
       NoteType::ChannelHold {
-        data_domain: None,
+        data_domain_hash: None,
         recipient: AccountStore::parse_address(&payment_address)?,
       },
     );
@@ -339,6 +336,7 @@ impl ClaimResult {
 #[cfg(test)]
 mod test {
   use super::*;
+  use crate::JsDataDomain;
   use sp_keyring::AccountKeyring::Bob;
   use sp_keyring::Ed25519Keyring::Alice;
   use ulx_primitives::DataTLD;
@@ -445,7 +443,7 @@ mod test {
 
     match &balance_change.notes[1].note_type {
       NoteType::ChannelHold {
-        data_domain: _,
+        data_domain_hash: _,
         recipient,
       } => assert_eq!(recipient, &alice),
       _ => unreachable!(),

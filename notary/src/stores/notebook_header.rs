@@ -8,7 +8,7 @@ use sqlx::{query, types::JsonValue, FromRow, PgConnection};
 
 use ulx_primitives::{
 	ensure, notary::NotarySignature, tick::Tick, AccountId, AccountOrigin, BlockVotingPower,
-	ChainTransfer, DataDomain, NotaryId, NotebookHeader, NotebookMeta, NotebookNumber,
+	ChainTransfer, DataDomainHash, NotaryId, NotebookHeader, NotebookMeta, NotebookNumber,
 	SignedNotebookHeader, NOTEBOOK_VERSION,
 };
 
@@ -336,7 +336,7 @@ impl NotebookHeaderStore {
 		notebook_number: NotebookNumber,
 		finalized_block_number: u32,
 		transfers: Vec<ChainTransfer>,
-		data_domains: Vec<(DataDomain, AccountId)>,
+		data_domains: Vec<(DataDomainHash, AccountId)>,
 		tax: u128,
 		changed_accounts_root: H256,
 		account_changelist: Vec<AccountOrigin>,

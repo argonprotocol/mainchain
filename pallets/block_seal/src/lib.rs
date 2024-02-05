@@ -374,14 +374,14 @@ pub mod pallet {
 				authority_id.verify(&message, &signature),
 				Error::<T>::InvalidAuthoritySignature
 			);
-			let data_domain = &block_vote.data_domain;
+			let data_domain_hash = &block_vote.data_domain_hash;
 			let data_domain_account =
 				T::AccountId::decode(&mut block_vote.data_domain_account.encode().as_slice())
 					.map_err(|_| Error::<T>::UnableToDecodeVoteAccount)?;
 			let last_tick = votes_from_tick.saturating_sub(CHANNEL_EXPIRATION_TICKS);
 			ensure!(
 				T::DataDomainProvider::is_registered_payment_account(
-					data_domain,
+					data_domain_hash,
 					&data_domain_account,
 					(last_tick.saturating_sub(CHANNEL_CLAWBACK_TICKS), last_tick)
 				),

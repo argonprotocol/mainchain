@@ -7,7 +7,7 @@ use sp_std::vec::Vec;
 
 use crate::{
 	balance_change::BalanceChange, block_vote::BlockVote, notary::NotarySignature, tick::Tick,
-	AccountId, AccountType, DataDomain, NotaryId,
+	AccountId, AccountType, DataDomainHash, NotaryId,
 };
 pub use crate::{AccountOrigin, BalanceTip};
 
@@ -19,7 +19,7 @@ pub type NotarizationBalanceChangeset =
 	BoundedVec<BalanceChange, ConstU32<MAX_BALANCE_CHANGES_PER_NOTARIZATION>>;
 pub type NotarizationBlockVotes = BoundedVec<BlockVote, ConstU32<MAX_BLOCK_VOTES_PER_NOTARIZATION>>;
 pub type NotarizationDataDomains =
-	BoundedVec<(DataDomain, AccountId), ConstU32<MAX_DOMAINS_PER_NOTARIZATION>>;
+	BoundedVec<(DataDomainHash, AccountId), ConstU32<MAX_DOMAINS_PER_NOTARIZATION>>;
 
 pub const MAX_NOTEBOOK_TRANSFERS: u32 = 10_000;
 pub const MAX_NOTARIZATIONS_PER_NOTEBOOK: u32 = 100_000;
@@ -140,7 +140,7 @@ impl Notarization {
 	pub fn new(
 		balance_changes: Vec<BalanceChange>,
 		block_votes: Vec<BlockVote>,
-		data_domains: Vec<(DataDomain, AccountId)>,
+		data_domains: Vec<(DataDomainHash, AccountId)>,
 	) -> Self {
 		Self {
 			balance_changes: BoundedVec::truncate_from(balance_changes),
@@ -236,7 +236,7 @@ pub struct NotebookHeader {
 	/// The revealed secret of the parent notebook. Only optional in first notebook.
 	pub parent_secret: Option<NotebookSecret>,
 	/// Registered data domains
-	pub data_domains: BoundedVec<(DataDomain, AccountId), MaxDataDomainsPerNotebook>,
+	pub data_domains: BoundedVec<(DataDomainHash, AccountId), MaxDataDomainsPerNotebook>,
 }
 #[derive(
 	Clone,

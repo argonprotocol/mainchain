@@ -8,18 +8,16 @@ use sp_keyring::AccountKeyring::{Alice, Bob};
 use sp_runtime::{testing::H256, BoundedVec};
 use std::{collections::BTreeMap, net::Ipv4Addr};
 use ulx_primitives::{
-	host::Host, notebook::NotebookHeader, tick::Tick, AccountId, DataDomain, DataDomainProvider,
-	DataTLD, NotebookEventHandler, Semver, VersionHost, ZoneRecord,
+	host::Host, notebook::NotebookHeader, tick::Tick, AccountId, DataDomain, DataDomainHash,
+	DataDomainProvider, DataTLD, NotebookEventHandler, Semver, VersionHost, ZoneRecord,
 };
 
 #[test]
 fn it_can_register_domains() {
 	new_test_ext().execute_with(|| {
 		System::set_block_number(1);
-		let domain = DataDomain {
-			top_level_domain: DataTLD::Analytics,
-			domain_name: BoundedVec::truncate_from(b"test".to_vec()),
-		};
+		let domain =
+			DataDomain { top_level_domain: DataTLD::Analytics, domain_name: "test".into() }.hash();
 		assert_ok!(DataDomainPallet::notebook_submitted(&create_notebook(
 			1,
 			vec![(domain.clone(), Bob.to_account_id(),),]
@@ -31,7 +29,7 @@ fn it_can_register_domains() {
 		assert_eq!(ExpiringDomainsByBlock::<Test>::get(1001).len(), 1);
 		System::assert_last_event(
 			Event::DataDomainRegistered {
-				domain: domain.clone(),
+				domain_hash: domain.clone(),
 				registration: DataDomainRegistration {
 					account_id: Bob.to_account_id(),
 					registered_at_tick: 1,
@@ -45,10 +43,8 @@ fn it_can_register_domains() {
 fn it_cancels_conflicting_domains() {
 	new_test_ext().execute_with(|| {
 		System::set_block_number(1);
-		let domain = DataDomain {
-			top_level_domain: DataTLD::Analytics,
-			domain_name: BoundedVec::truncate_from(b"test".to_vec()),
-		};
+		let domain =
+			DataDomain { top_level_domain: DataTLD::Analytics, domain_name: "test".into() }.hash();
 		assert_ok!(DataDomainPallet::notebook_submitted(&create_notebook(
 			1,
 			vec![(domain.clone(), Bob.to_account_id(),), (domain.clone(), Alice.to_account_id(),),]
@@ -57,7 +53,7 @@ fn it_cancels_conflicting_domains() {
 		assert_eq!(ExpiringDomainsByBlock::<Test>::get(1001).len(), 0);
 		System::assert_last_event(
 			Event::DataDomainRegistrationCanceled {
-				domain: domain.clone(),
+				domain_hash: domain.clone(),
 				registration: DataDomainRegistration {
 					account_id: Bob.to_account_id(),
 					registered_at_tick: 1,
@@ -71,10 +67,8 @@ fn it_cancels_conflicting_domains() {
 fn it_renews_domains() {
 	new_test_ext().execute_with(|| {
 		System::set_block_number(1);
-		let domain = DataDomain {
-			top_level_domain: DataTLD::Analytics,
-			domain_name: BoundedVec::truncate_from(b"test".to_vec()),
-		};
+		let domain =
+			DataDomain { top_level_domain: DataTLD::Analytics, domain_name: "test".into() }.hash();
 		assert_ok!(DataDomainPallet::notebook_submitted(&create_notebook(
 			1,
 			vec![(domain.clone(), Bob.to_account_id(),)]
@@ -89,17 +83,15 @@ fn it_renews_domains() {
 		)));
 		assert_eq!(ExpiringDomainsByBlock::<Test>::get(1001).len(), 0);
 		assert_eq!(ExpiringDomainsByBlock::<Test>::get(1100).len(), 1);
-		System::assert_last_event(Event::DataDomainRenewed { domain: domain.clone() }.into());
+		System::assert_last_event(Event::DataDomainRenewed { domain_hash: domain.clone() }.into());
 	});
 }
 #[test]
 fn it_ignores_duplicated_domains() {
 	new_test_ext().execute_with(|| {
 		System::set_block_number(1);
-		let domain = DataDomain {
-			top_level_domain: DataTLD::Analytics,
-			domain_name: BoundedVec::truncate_from(b"test".to_vec()),
-		};
+		let domain =
+			DataDomain { top_level_domain: DataTLD::Analytics, domain_name: "test".into() }.hash();
 		assert_ok!(DataDomainPallet::notebook_submitted(&create_notebook(
 			1,
 			vec![(domain.clone(), Bob.to_account_id(),)]
@@ -122,10 +114,8 @@ fn it_registers_zone_records() {
 	new_test_ext().execute_with(|| {
 		System::set_block_number(1);
 		CurrentTick::set(2);
-		let domain = DataDomain {
-			top_level_domain: DataTLD::Analytics,
-			domain_name: BoundedVec::truncate_from(b"test".to_vec()),
-		};
+		let domain =
+			DataDomain { top_level_domain: DataTLD::Analytics, domain_name: "test".into() }.hash();
 		assert_ok!(DataDomainPallet::notebook_submitted(&create_notebook(
 			1,
 			vec![(domain.clone(), Bob.to_account_id(),)]
@@ -157,7 +147,8 @@ fn it_registers_zone_records() {
 			vec![(Bob.to_account_id(), 2 as Tick)]
 		);
 		System::assert_last_event(
-			Event::ZoneRecordUpdated { domain: domain.clone(), zone_record: zone.clone() }.into(),
+			Event::ZoneRecordUpdated { domain_hash: domain.clone(), zone_record: zone.clone() }
+				.into(),
 		);
 		assert_err!(
 			DataDomainPallet::set_zone_record(
@@ -171,10 +162,8 @@ fn it_registers_zone_records() {
 		assert_err!(
 			DataDomainPallet::set_zone_record(
 				RuntimeOrigin::signed(Bob.to_account_id()),
-				DataDomain {
-					top_level_domain: DataTLD::Automotive,
-					domain_name: BoundedVec::truncate_from(b"test".to_vec()),
-				},
+				DataDomain { top_level_domain: DataTLD::Automotive, domain_name: "test".into() }
+					.hash(),
 				zone.clone()
 			),
 			Error::<Test>::DomainNotRegistered
@@ -187,10 +176,8 @@ fn it_tracks_historical_payment() {
 	new_test_ext().execute_with(|| {
 		System::set_block_number(1);
 		CurrentTick::set(2);
-		let domain = DataDomain {
-			top_level_domain: DataTLD::Analytics,
-			domain_name: BoundedVec::truncate_from(b"test".to_vec()),
-		};
+		let domain =
+			DataDomain { top_level_domain: DataTLD::Analytics, domain_name: "test".into() }.hash();
 		assert_ok!(DataDomainPallet::notebook_submitted(&create_notebook(
 			1,
 			vec![(domain.clone(), Bob.to_account_id(),)]
@@ -245,10 +232,8 @@ fn it_tracks_historical_payment() {
 fn it_expires_domains() {
 	new_test_ext().execute_with(|| {
 		System::set_block_number(1);
-		let domain = DataDomain {
-			top_level_domain: DataTLD::Analytics,
-			domain_name: BoundedVec::truncate_from(b"test".to_vec()),
-		};
+		let domain =
+			DataDomain { top_level_domain: DataTLD::Analytics, domain_name: "test".into() }.hash();
 		assert_ok!(DataDomainPallet::notebook_submitted(&create_notebook(
 			1,
 			vec![(domain.clone(), Bob.to_account_id(),)]
@@ -261,7 +246,7 @@ fn it_expires_domains() {
 	});
 }
 
-fn create_notebook(tick: Tick, domains: Vec<(DataDomain, AccountId)>) -> NotebookHeader {
+fn create_notebook(tick: Tick, domains: Vec<(DataDomainHash, AccountId)>) -> NotebookHeader {
 	NotebookHeader {
 		version: 1,
 		notary_id: 1,

@@ -7,12 +7,12 @@ use sp_std::vec::Vec;
 use crate::{
 	block_seal::MiningAuthority,
 	tick::{Tick, Ticker},
-	DataDomain, NotaryId, NotebookHeader, NotebookNumber, NotebookSecret, VoteMinimum,
+	DataDomainHash, NotaryId, NotebookHeader, NotebookNumber, NotebookSecret, VoteMinimum,
 };
 
 pub trait DataDomainProvider<AccountId> {
 	fn is_registered_payment_account(
-		data_domain: &DataDomain,
+		data_domain_hash: &DataDomainHash,
 		account_id: &AccountId,
 		tick_range: (Tick, Tick),
 	) -> bool;

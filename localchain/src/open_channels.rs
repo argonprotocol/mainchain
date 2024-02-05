@@ -1,6 +1,5 @@
 use crate::accounts::AccountStore;
 use crate::balance_changes::BalanceChangeStore;
-use crate::data_domain::JsDataDomain;
 use crate::notary_client::NotaryClients;
 use crate::signer::Signer;
 use crate::to_js_error;
@@ -52,7 +51,7 @@ pub struct Channel {
   hold_amount: u128,
   pub from_address: String,
   pub to_address: String,
-  pub data_domain: Option<JsDataDomain>,
+  pub data_domain_hash: Option<Vec<u8>>,
   pub expiration_tick: u32,
   pub balance_change_number: u32,
   pub notarization_id: Option<i64>,
@@ -99,11 +98,11 @@ impl Channel {
       return Err(anyhow!("Balance change has no channel hold note"));
     };
 
-    let (recipient, data_domain) = match &channel_hold_note.note_type {
+    let (recipient, data_domain_hash) = match &channel_hold_note.note_type {
       NoteType::ChannelHold {
         recipient,
-        data_domain,
-      } => (recipient, data_domain),
+        data_domain_hash,
+      } => (recipient, data_domain_hash),
       _ => {
         return Err(anyhow!(
           "Balance change has invalid channel hold note type {:?}",
@@ -145,14 +144,6 @@ impl Channel {
       return Err(anyhow!("Balance change has no proof"));
     };
 
-    let data_domain = match data_domain {
-      Some(data_domain) => Some(JsDataDomain {
-        domain_name: String::from_utf8(data_domain.domain_name.to_vec())?,
-        top_level_domain: data_domain.top_level_domain,
-      }),
-      None => None,
-    };
-
     Ok(Channel {
       id: None,
       is_client: false,
@@ -161,7 +152,7 @@ impl Channel {
       from_address: AccountStore::to_address(&balance_change.account_id),
       to_address: AccountStore::to_address(&recipient),
       balance_change_number: balance_change.change_number,
-      data_domain,
+      data_domain_hash: data_domain_hash.map(|h| h.0.to_vec()).clone(),
       notary_id: proof.notary_id,
       expiration_tick: 0,
       settled_amount: settle_note.milligons,
@@ -516,11 +507,11 @@ impl OpenChannelsStore {
         account.address
       )))?;
 
-    let (data_domain, recipient) = match &hold_note.note_type {
+    let (data_domain_hash, recipient) = match &hold_note.note_type {
       NoteType::ChannelHold {
         recipient,
-        data_domain,
-      } => (data_domain, recipient),
+        data_domain_hash,
+      } => (data_domain_hash, recipient),
       _ => {
         return Err(to_js_error(format!(
           "Balance change has invalid channel hold note type {:?}",
@@ -540,11 +531,6 @@ impl OpenChannelsStore {
     balance_tip.change_number += 1;
     balance_tip.push_note(0, NoteType::ChannelSettle);
 
-    let data_domain = match data_domain {
-      Some(x) => Some(x.try_into().map_err(to_js_error)?),
-      None => None,
-    };
-
     let mut channel = Channel {
       id: None,
       is_client: true,
@@ -553,7 +539,7 @@ impl OpenChannelsStore {
       hold_amount: hold_note.milligons,
       from_address: account.address,
       to_address: AccountStore::to_address(recipient),
-      data_domain,
+      data_domain_hash: data_domain_hash.map(|h| h.0.to_vec()).clone(),
       notary_id: *notary_id,
       expiration_tick: tick + CHANNEL_EXPIRATION_TICKS,
       settled_amount: 0,
@@ -829,7 +815,10 @@ mod tests {
       sent_channel.settled_signature
     );
     assert_eq!(imported_channel.hold_amount, sent_channel.hold_amount);
-    assert_eq!(imported_channel.data_domain, sent_channel.data_domain);
+    assert_eq!(
+      imported_channel.data_domain_hash,
+      sent_channel.data_domain_hash
+    );
     assert_eq!(imported_channel.notary_id, sent_channel.notary_id);
     assert_eq!(
       imported_channel.balance_change_number,

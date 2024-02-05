@@ -302,7 +302,7 @@ async fn can_run_proof_of_tax() {
 		let vote = BlockVote {
 			block_hash: grandparent_hash,
 			account_id: account_id.clone(),
-			data_domain: DataDomain::new("delta", DataTLD::Flights),
+			data_domain_hash: DataDomain::new("delta", DataTLD::Flights).hash(),
 			data_domain_account: Keyring::Alice.to_account_id(),
 			power: 500,
 			index: 1,
