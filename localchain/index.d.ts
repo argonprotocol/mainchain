@@ -112,7 +112,7 @@ export interface BlockVote {
   /** The voting power of this vote, determined from the amount of tax */
   power: bigint
   /** The data domain used to create this vote */
-  dataDomain: DataDomain
+  dataDomainHash: Array<number>
   /** The data domain payment address used to create this vote */
   dataDomainAddress: string
   /** A signature of the vote by the account_id */
@@ -257,6 +257,7 @@ export class DataDomainLease {
 }
 export class DataDomainStore {
   get list(): Promise<Array<DataDomainLease>>
+  getHash(domainName: string, tld: DataTLD): Uint8Array
   isRegistered(domainName: string, tld: DataTLD): Promise<boolean>
   get(id: number): Promise<DataDomainLease>
 }
@@ -352,7 +353,7 @@ export class Channel {
   notaryId: number
   fromAddress: string
   toAddress: string
-  dataDomain?: DataDomain
+  dataDomainHash?: Array<number>
   expirationTick: number
   balanceChangeNumber: number
   notarizationId?: number

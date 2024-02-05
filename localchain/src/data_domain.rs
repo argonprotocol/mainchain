@@ -47,6 +47,15 @@ impl DataDomainStore {
   }
 
   #[napi]
+  pub fn get_hash(&self, domain_name: String, tld: DataTLD) -> Uint8Array {
+    let domain = DataDomain {
+      domain_name: RuntimeString::Owned(domain_name),
+      top_level_domain: tld,
+    };
+    domain.hash().0.into()
+  }
+
+  #[napi]
   pub async fn is_registered(&self, domain_name: String, tld: DataTLD) -> Result<bool> {
     let registration = self
       .mainchain_client

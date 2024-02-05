@@ -1,7 +1,6 @@
 import {
     AccountType,
     BalanceChangeBuilder,
-    DataDomain,
     DataTLD,
     Localchain,
     NotarizationBuilder,
@@ -26,6 +25,7 @@ import {
     teardown,
     transferToLocalchain
 } from "./testHelpers";
+import * as Crypto from 'node:crypto';
 
 if (process.env.RUST_LOG !== undefined) {
     // this stops jest from killing the logs
@@ -38,14 +38,11 @@ it('can create a zone record type', async () => {
     const mainchainUrl = await mainchain.launch();
     const mainchainClient = await getClient(mainchainUrl);
     disconnectOnTeardown(mainchainClient);
-    const dataDomain = {
-        domainName: 'example.com',
-        topLevelDomain: DataTLD.Analytics
-    };
+    const dataDomainHash =  Crypto.createHash('sha256',).update('example.com').digest();
     const ferdieDomainAddress = new Keyring({type: 'sr25519'}).createFromUri('//Ferdie//dataDomain//1');
     const ferdie = new Keyring({type: 'sr25519'}).createFromUri('//Ferdie');
 
-    await expect(registerZoneRecord(mainchainClient, dataDomain, ferdie, ferdieDomainAddress.publicKey, 1,{
+    await expect(registerZoneRecord(mainchainClient, dataDomainHash, ferdie, ferdieDomainAddress.publicKey, 1,{
         "1.0.0": mainchainClient.createType('UlxPrimitivesDataDomainVersionHost', {
             datastoreId: mainchainClient.createType('Bytes', 'default'),
             host: {
@@ -92,6 +89,7 @@ it('can run a data domain channel', async () => {
         domainName: 'example.com',
         topLevelDomain: DataTLD.Analytics
     };
+    const dataDomainHash = bobchain.dataDomains.getHash("example.com", DataTLD.Analytics);
     {
         const [bobChange, ferdieChange] = await Promise.all([
             transferMainchainToLocalchain(mainchainClient, bobchain, bob, 5000, 1),
@@ -113,7 +111,7 @@ it('can run a data domain channel', async () => {
         await expect(ferdiechain.mainchainClient.getDataDomainRegistration(dataDomain.domainName, dataDomain.topLevelDomain)).resolves.toBeTruthy();
     }
 
-    await registerZoneRecord(mainchainClient, dataDomain, ferdie, ferdieDomainAddress.publicKey, 1, {
+    await registerZoneRecord(mainchainClient, dataDomainHash, ferdie, ferdieDomainAddress.publicKey, 1, {
         "1.0.0": mainchainClient.createType('UlxPrimitivesDataDomainVersionHost', {
             datastoreId: mainchainClient.createType('Bytes', 'default'),
             host: {
@@ -202,7 +200,7 @@ async function transferMainchainToLocalchain(mainchainClient: UlxClient, localch
     return {notarization, balanceChange};
 }
 
-async function registerZoneRecord(client: UlxClient, dataDomain: DataDomain, owner: KeyringPair, paymentAccount:Uint8Array, notaryId: number, versions: Record<string, UlxPrimitivesDataDomainVersionHost>) {
+async function registerZoneRecord(client: UlxClient, dataDomainHash: Uint8Array, owner: KeyringPair, paymentAccount:Uint8Array, notaryId: number, versions: Record<string, UlxPrimitivesDataDomainVersionHost>) {
 
     const codecVersions = new Map();
     for (const [version, host] of Object.entries(versions)) {
@@ -214,10 +212,8 @@ async function registerZoneRecord(client: UlxClient, dataDomain: DataDomain, own
         });
         codecVersions.set(versionCodec, client.createType('UlxPrimitivesDataDomainVersionHost', host));
     }
-    await new Promise((resolve, reject) => client.tx.dataDomain.setZoneRecord({
-        domainName: client.createType('Bytes', dataDomain.domainName),
-        topLevelDomain: client.createType('UlxPrimitivesDataTLD', dataDomain.topLevelDomain),
-    }, {
+
+    await new Promise((resolve, reject) => client.tx.dataDomain.setZoneRecord(dataDomainHash, {
         paymentAccount,
         notaryId,
         versions: codecVersions,
