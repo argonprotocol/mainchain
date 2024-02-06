@@ -51,6 +51,7 @@ impl DataDomain {
 		Self { domain_name: RuntimeString::Borrowed(domain_name), top_level_domain }
 	}
 
+	#[cfg(feature = "std")]
 	pub fn from_string(domain_name: String, top_level_domain: DataTLD) -> Self {
 		Self { domain_name: RuntimeString::Owned(domain_name), top_level_domain }
 	}

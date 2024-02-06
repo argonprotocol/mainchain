@@ -186,7 +186,7 @@ impl NotarizationsStore {
 		let (current_notebook_number, tick) =
 			NotebookStatusStore::lock_open_for_appending(&mut *tx).await?;
 
-		if initial_allocation_result.needs_channel_settle_followup {
+		if initial_allocation_result.needs_escrow_settle_followup {
 			verify_notarization_allocation(&changes, &block_votes, &data_domains, Some(tick))?;
 		}
 
@@ -196,7 +196,7 @@ impl NotarizationsStore {
 		let mut new_account_origins = BTreeMap::<(AccountId, AccountType), AccountOrigin>::new();
 
 		let mut changes_with_proofs = changes.clone();
-		let mut channel_data_domains = BTreeMap::new();
+		let mut escrow_data_domains = BTreeMap::new();
 		let mut chain_transfers: u32 = 0;
 		for (change_index, change) in changes.into_iter().enumerate() {
 			let BalanceChange { account_id, account_type, change_number, balance, .. } = change;
@@ -233,7 +233,7 @@ impl NotarizationsStore {
 			let previous_balance =
 				change.previous_balance_proof.as_ref().map(|p| p.balance.clone()).unwrap_or(0);
 
-			let prev_channel_hold_note = change.channel_hold_note;
+			let prev_escrow_hold_note = change.escrow_hold_note;
 			BalanceTipStore::lock(
 				&mut *tx,
 				&account_id,
@@ -242,7 +242,7 @@ impl NotarizationsStore {
 				previous_balance.clone(),
 				&account_origin,
 				change_index,
-				prev_channel_hold_note.clone(),
+				prev_escrow_hold_note.clone(),
 				5000,
 			)
 			.await?;
@@ -254,7 +254,7 @@ impl NotarizationsStore {
 					change_number: change_number - 1,
 					balance: previous_balance,
 					account_origin: account_origin.clone(),
-					channel_hold_note: prev_channel_hold_note.clone(),
+					escrow_hold_note: prev_escrow_hold_note.clone(),
 				};
 
 				// TODO: handle notary switching
@@ -297,7 +297,7 @@ impl NotarizationsStore {
 				}
 			}
 
-			let mut channel_hold_note = None;
+			let mut escrow_hold_note = None;
 			for (note_index, note) in change.notes.into_iter().enumerate() {
 				let _ = match note.note_type {
 					NoteType::ClaimFromMainchain { account_nonce: nonce, .. } => {
@@ -326,22 +326,22 @@ impl NotarizationsStore {
 						.await
 						.map(|_| ())
 					},
-					NoteType::ChannelHold { .. } => {
-						channel_hold_note = Some(note.clone());
+					NoteType::EscrowHold { .. } => {
+						escrow_hold_note = Some(note.clone());
 						Ok(())
 					},
-					NoteType::ChannelSettle => {
-						channel_hold_note = None;
-						if let Some(hold_note) = &prev_channel_hold_note {
+					NoteType::EscrowSettle => {
+						escrow_hold_note = None;
+						if let Some(hold_note) = &prev_escrow_hold_note {
 							match &hold_note.note_type {
-								&NoteType::ChannelHold { ref data_domain_hash, ref recipient } =>
+								&NoteType::EscrowHold { ref data_domain_hash, ref recipient } =>
 									if let Some(data_domain_hash) = data_domain_hash {
-										let count = channel_data_domains
+										let count = escrow_data_domains
 											.entry((data_domain_hash.clone(), recipient.clone()))
 											.or_insert(0);
 										*count += 1;
 									},
-								_ => return Err(VerifyError::InvalidChannelHoldNote.into()),
+								_ => return Err(VerifyError::InvalidEscrowHoldNote.into()),
 							}
 						}
 						Ok(())
@@ -364,14 +364,14 @@ impl NotarizationsStore {
 				current_notebook_number,
 				tick,
 				account_origin,
-				channel_hold_note,
+				escrow_hold_note,
 				previous_balance.clone(),
-				prev_channel_hold_note,
+				prev_escrow_hold_note,
 			)
 			.await?;
 		}
 
-		verify_voting_sources(&channel_data_domains, &block_votes, &block_vote_specifications)?;
+		verify_voting_sources(&escrow_data_domains, &block_votes, &block_vote_specifications)?;
 
 		NotebookConstraintsStore::try_increment(
 			&mut *tx,
@@ -435,7 +435,7 @@ mod tests {
 				change_number: 0,
 				balance: 1000,
 				previous_balance_proof: None,
-				channel_hold_note: None,
+				escrow_hold_note: None,
 				notes: bounded_vec![Note::create(
 					1000,
 					NoteType::ClaimFromMainchain { account_nonce: 1 }
@@ -448,7 +448,7 @@ mod tests {
 				change_number: 4,
 				balance: 1000,
 				previous_balance_proof: None,
-				channel_hold_note: None,
+				escrow_hold_note: None,
 				notes: bounded_vec![Note::create(1000, NoteType::Claim,)],
 				signature: Signature([0u8; 64]).into(),
 			},

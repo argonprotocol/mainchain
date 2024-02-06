@@ -117,7 +117,7 @@ impl<B: BlockT> BasicQueue<B> {
 
 #[derive(Clone)]
 struct BasicQueueHandle<B: BlockT> {
-	/// Channel to send justification import messages to the background task.
+	/// Escrow to send justification import messages to the background task.
 	justification_sender: TracingUnboundedSender<worker_messages::ImportJustification<B>>,
 	/// Channel to send block import messages to the background task.
 	block_import_sender: TracingUnboundedSender<worker_messages::ImportBlocks<B>>,

@@ -19,8 +19,8 @@ use ulx_primitives::{
 	ensure, round_up, tick::Tick, AccountId, AccountOrigin, AccountOriginUid, AccountType, Balance,
 	BalanceChange, BalanceProof, BalanceTip, BlockVote, ChainTransfer, DataDomainHash,
 	NewAccountOrigin, NotaryId, Note, NoteType, Notebook, NotebookHeader, NotebookNumber,
-	VoteMinimum, CHANNEL_CLAWBACK_TICKS, CHANNEL_EXPIRATION_TICKS, DATA_DOMAIN_LEASE_COST,
-	MIN_CHANNEL_NOTE_MILLIGONS, TAX_PERCENT_BASE,
+	VoteMinimum, DATA_DOMAIN_LEASE_COST, ESCROW_CLAWBACK_TICKS, ESCROW_EXPIRATION_TICKS,
+	MIN_ESCROW_NOTE_MILLIGONS, TAX_PERCENT_BASE,
 };
 
 pub use crate::error::VerifyError;
@@ -92,7 +92,7 @@ pub fn notebook_verify<T: NotebookHistoryLookup>(
 		verify_changeset_signatures(&changeset)?;
 		verify_balance_sources(lookup, &mut state, header, changeset)?;
 		track_block_votes(&mut state, block_votes)?;
-		verify_voting_sources(&state.channel_data_domains, block_votes, &vote_minimums)?;
+		verify_voting_sources(&state.escrow_data_domains, block_votes, &vote_minimums)?;
 	}
 
 	ensure!(
@@ -137,7 +137,7 @@ struct NotebookVerifyState {
 	block_votes: BTreeMap<(AccountId, u32), BlockVote>,
 	seen_transfers_in: BTreeSet<(AccountId32, u32)>,
 	new_account_origins: BTreeMap<(AccountId, AccountType), AccountOriginUid>,
-	channel_data_domains: BTreeMap<(DataDomainHash, AccountId), u32>,
+	escrow_data_domains: BTreeMap<(DataDomainHash, AccountId), u32>,
 	blocks_voted_on: BTreeSet<H256>,
 	block_power: u128,
 	tax: u128,
@@ -149,7 +149,7 @@ impl NotebookVerifyState {
 		key: &(AccountId, AccountType),
 		change: &BalanceChange,
 		account_origin: AccountOrigin,
-		channel_hold_note: Option<Note>,
+		escrow_hold_note: Option<Note>,
 	) -> anyhow::Result<(), VerifyError> {
 		self.account_changelist.insert(account_origin.clone());
 
@@ -159,7 +159,7 @@ impl NotebookVerifyState {
 			change_number: change.change_number,
 			balance: change.balance,
 			account_origin,
-			channel_hold_note,
+			escrow_hold_note,
 		};
 		self.final_balances.insert(key.clone(), tip);
 		Ok(())
@@ -254,7 +254,7 @@ fn verify_balance_sources<'a, T: NotebookHistoryLookup>(
 	for change in changeset.into_iter() {
 		let account_id = &change.account_id;
 		let key = (account_id.clone(), change.account_type.clone());
-		let mut channel_hold_note = None;
+		let mut escrow_hold_note = None;
 
 		for note in &change.notes {
 			// if this note is a chain transfer, track it in chain_transfers
@@ -271,25 +271,25 @@ fn verify_balance_sources<'a, T: NotebookHistoryLookup>(
 					)?;
 					state.track_chain_transfer(account_id.clone(), note)?;
 				},
-				NoteType::ChannelHold { .. } => {
-					channel_hold_note = Some(note.clone());
+				NoteType::EscrowHold { .. } => {
+					escrow_hold_note = Some(note.clone());
 				},
 				// this condition is redundant, but leaving for clarity
-				NoteType::ChannelSettle => {
-					if let Some(hold_note) = &change.channel_hold_note {
+				NoteType::EscrowSettle => {
+					if let Some(hold_note) = &change.escrow_hold_note {
 						match &hold_note.note_type {
-							&NoteType::ChannelHold { ref data_domain_hash, ref recipient } =>
+							&NoteType::EscrowHold { ref data_domain_hash, ref recipient } =>
 								if let Some(data_domain_hash) = data_domain_hash {
 									let count = state
-										.channel_data_domains
+										.escrow_data_domains
 										.entry((data_domain_hash.clone(), recipient.clone()))
 										.or_insert(0);
 									*count += 1u32;
 								},
-							_ => return Err(VerifyError::InvalidChannelHoldNote),
+							_ => return Err(VerifyError::InvalidEscrowHoldNote),
 						}
 					}
-					channel_hold_note = None;
+					escrow_hold_note = None;
 				},
 				_ => {},
 			}
@@ -304,7 +304,7 @@ fn verify_balance_sources<'a, T: NotebookHistoryLookup>(
 						notebook_number: header.notebook_number,
 						account_uid: *account_uid,
 					},
-					channel_hold_note,
+					escrow_hold_note,
 				)?;
 			} else {
 				return Err(VerifyError::MissingAccountOrigin {
@@ -330,7 +330,7 @@ fn verify_balance_sources<'a, T: NotebookHistoryLookup>(
 				&key,
 				&change,
 				proof.account_origin.clone(),
-				channel_hold_note,
+				escrow_hold_note,
 			)?;
 		}
 	}
@@ -338,11 +338,11 @@ fn verify_balance_sources<'a, T: NotebookHistoryLookup>(
 }
 
 pub fn verify_voting_sources(
-	channel_data_domains: &BTreeMap<(DataDomainHash, AccountId), u32>,
+	escrow_data_domains: &BTreeMap<(DataDomainHash, AccountId), u32>,
 	block_votes: &Vec<BlockVote>,
 	vote_minimums: &BTreeMap<H256, VoteMinimum>,
 ) -> anyhow::Result<(), VerifyError> {
-	let mut data_domain_tracker = channel_data_domains.clone();
+	let mut data_domain_tracker = escrow_data_domains.clone();
 	for block_vote in block_votes {
 		let minimum = vote_minimums
 			.get(&block_vote.block_hash)
@@ -353,7 +353,7 @@ pub fn verify_voting_sources(
 		let count = data_domain_tracker
 			.get_mut(&(block_vote.data_domain_hash.clone(), block_vote.data_domain_account.clone()))
 			.ok_or(VerifyError::BlockVoteDataDomainMismatch)?;
-		ensure!(*count > 0, VerifyError::BlockVoteChannelReused);
+		ensure!(*count > 0, VerifyError::BlockVoteEscrowReused);
 		ensure!(
 			block_vote.signature.verify(&block_vote.hash()[..], &block_vote.account_id),
 			VerifyError::BlockVoteInvalidSignature
@@ -398,8 +398,8 @@ fn verify_previous_balance_proof<'a, T: NotebookHistoryLookup>(
 		);
 		// if none, we can add changes.. if set, we can't do anything else
 		ensure!(
-			previous_balance.channel_hold_note == change.channel_hold_note,
-			VerifyError::InvalidChannelHoldNote
+			previous_balance.escrow_hold_note == change.escrow_hold_note,
+			VerifyError::InvalidEscrowHoldNote
 		);
 	} else {
 		let last_notebook_change =
@@ -413,7 +413,7 @@ fn verify_previous_balance_proof<'a, T: NotebookHistoryLookup>(
 		};
 
 		let root = lookup.get_account_changes_root(proof.notary_id, proof.notebook_number)?;
-		let channel_hold_note = change.channel_hold_note.as_ref().cloned();
+		let escrow_hold_note = change.escrow_hold_note.as_ref().cloned();
 
 		let leaf = BalanceTip {
 			account_id: change.account_id.clone(),
@@ -421,7 +421,7 @@ fn verify_previous_balance_proof<'a, T: NotebookHistoryLookup>(
 			balance: proof.balance,
 			change_number: change.change_number - 1,
 			account_origin: proof.account_origin.clone(),
-			channel_hold_note,
+			escrow_hold_note,
 		};
 
 		ensure!(
@@ -444,10 +444,10 @@ pub fn verify_changeset_signatures(
 	// Since this is a little more expensive, confirm signatures in a second pass
 	for (index, change) in changeset.iter().enumerate() {
 		// check that note id is valid for a hold note
-		if let Some(channel_note) = &change.channel_hold_note {
+		if let Some(escrow_note) = &change.escrow_hold_note {
 			ensure!(
-				matches!(channel_note.note_type, NoteType::ChannelHold { .. }),
-				VerifyError::InvalidChannelHoldNote
+				matches!(escrow_note.note_type, NoteType::EscrowHold { .. }),
+				VerifyError::InvalidEscrowHoldNote
 			);
 		}
 
@@ -471,12 +471,12 @@ pub struct BalanceChangesetState {
 	pub claimed_tax: u128,
 	/// All new accounts that were created (change_number = 1)
 	pub new_accounts: BTreeSet<(AccountId, AccountType)>,
-	/// All channel hold notes created per account (each account can only create one)
+	/// All escrow hold notes created per account (each account can only create one)
 	pub accounts_with_new_holds: BTreeSet<AccountId>,
-	/// Whether or not the current notebook number is needed to confirm channel settles
-	pub needs_channel_settle_followup: bool,
-	/// How much in channel funds was claimed by each account id
-	pub claimed_channel_deposits_per_account: BTreeMap<AccountId, u128>,
+	/// Whether or not the current notebook number is needed to confirm escrow settles
+	pub needs_escrow_settle_followup: bool,
+	/// How much in escrow funds was claimed by each account id
+	pub claimed_escrow_deposits_per_account: BTreeMap<AccountId, u128>,
 	/// How much tax was sent per account
 	pub tax_created_per_account: BTreeMap<AccountId, u128>,
 	/// How much was deposited per account
@@ -488,7 +488,7 @@ pub struct BalanceChangesetState {
 	/// How much tax was sent per account to block seals
 	unclaimed_block_vote_tax_per_account: BTreeMap<AccountId, u128>,
 	unclaimed_restricted_balance: BTreeMap<BTreeSet<(AccountId, AccountType)>, i128>,
-	unclaimed_channel_balances: BTreeMap<BTreeSet<AccountId>, i128>,
+	unclaimed_escrow_balances: BTreeMap<BTreeSet<AccountId>, i128>,
 }
 
 impl BalanceChangesetState {
@@ -499,7 +499,7 @@ impl BalanceChangesetState {
 			let tax = Note::calculate_transfer_tax(amount);
 			*tax_owed_per_account.entry(account_id).or_insert(0) += tax;
 		}
-		for (account_id, amount) in self.claimed_channel_deposits_per_account.iter() {
+		for (account_id, amount) in self.claimed_escrow_deposits_per_account.iter() {
 			let tax = round_up(*amount, TAX_PERCENT_BASE);
 			*tax_owed_per_account.entry(account_id).or_insert(0) += tax;
 		}
@@ -627,15 +627,15 @@ impl BalanceChangesetState {
 		Ok(())
 	}
 
-	fn claim_channel_balance(
+	fn claim_escrow_balance(
 		&mut self,
 		milligons: u128,
 		claimer: &AccountId,
 	) -> anyhow::Result<(), VerifyError> {
 		self.claimed_deposits += milligons;
-		*self.claimed_channel_deposits_per_account.entry(claimer.clone()).or_insert(0) += milligons;
+		*self.claimed_escrow_deposits_per_account.entry(claimer.clone()).or_insert(0) += milligons;
 
-		self.unclaimed_channel_balances.retain(|accounts, amount| {
+		self.unclaimed_escrow_balances.retain(|accounts, amount| {
 			if accounts.contains(claimer) {
 				let restricted_change = amount.saturating_sub(milligons as i128);
 				if restricted_change > 0 {
@@ -650,13 +650,13 @@ impl BalanceChangesetState {
 		Ok(())
 	}
 
-	/// Records the channel settles. If this is the second pass once we know a notebook number, it
-	/// will also check if the channel is ready to be claimed
-	fn record_channel_settle(
+	/// Records the escrow settles. If this is the second pass once we know a notebook number, it
+	/// will also check if the escrow is ready to be claimed
+	fn record_escrow_settle(
 		&mut self,
 		key: &(AccountId, AccountType),
 		milligons: i128,
-		channel_hold_note: &Note,
+		escrow_hold_note: &Note,
 		source_change_tick: Tick,
 		notebook_tick: Option<Tick>,
 	) -> anyhow::Result<(), VerifyError> {
@@ -664,21 +664,21 @@ impl BalanceChangesetState {
 
 		// only add the recipient restrictions once we know what notebook we're in
 		if let Some(tick) = notebook_tick {
-			let expiration_tick = source_change_tick + CHANNEL_EXPIRATION_TICKS;
+			let expiration_tick = source_change_tick + ESCROW_EXPIRATION_TICKS;
 			ensure!(
 				tick >= expiration_tick,
-				VerifyError::ChannelHoldNotReadyForClaim {
+				VerifyError::EscrowHoldNotReadyForClaim {
 					current_tick: tick,
 					claim_tick: expiration_tick
 				}
 			);
 
-			let NoteType::ChannelHold { recipient, .. } = &channel_hold_note.note_type else {
-				return Err(VerifyError::InvalidChannelHoldNote)
+			let NoteType::EscrowHold { recipient, .. } = &escrow_hold_note.note_type else {
+				return Err(VerifyError::InvalidEscrowHoldNote)
 			};
 
 			recipients.insert(recipient.clone());
-			if tick >= expiration_tick + CHANNEL_CLAWBACK_TICKS {
+			if tick >= expiration_tick + ESCROW_CLAWBACK_TICKS {
 				// no claim necessary for a 0 claim
 				if milligons == 0 {
 					recipients.clear();
@@ -687,12 +687,12 @@ impl BalanceChangesetState {
 				}
 			}
 		} else {
-			self.needs_channel_settle_followup = true;
+			self.needs_escrow_settle_followup = true;
 		}
 
 		self.sent_deposits += milligons as u128;
 		if !recipients.is_empty() {
-			self.unclaimed_channel_balances
+			self.unclaimed_escrow_balances
 				.insert(BTreeSet::from_iter(recipients), milligons);
 		}
 		Ok(())
@@ -723,8 +723,8 @@ pub fn verify_notarization_allocation(
 		let mut note_index = 0;
 
 		for note in &change.notes {
-			if change.channel_hold_note.is_some() &&
-				!matches!(note.note_type, NoteType::ChannelSettle)
+			if change.escrow_hold_note.is_some() &&
+				!matches!(note.note_type, NoteType::EscrowSettle)
 			{
 				return Err(VerifyError::AccountLocked)
 			}
@@ -751,12 +751,12 @@ pub fn verify_notarization_allocation(
 						&change.account_type,
 					)?;
 				},
-				NoteType::ChannelHold { .. } => {
+				NoteType::EscrowHold { .. } => {
 					ensure!(
-						note.milligons >= MIN_CHANNEL_NOTE_MILLIGONS,
-						VerifyError::InvalidChannelHoldNote
+						note.milligons >= MIN_ESCROW_NOTE_MILLIGONS,
+						VerifyError::InvalidEscrowHoldNote
 					);
-					// A channel doesn't change the source balance
+					// A escrow doesn't change the source balance
 					ensure!(
 						change.balance ==
 							change
@@ -767,30 +767,30 @@ pub fn verify_notarization_allocation(
 						VerifyError::InvalidPreviousBalanceProof
 					);
 					ensure!(
-						change.channel_hold_note.is_none() &&
+						change.escrow_hold_note.is_none() &&
 							state.accounts_with_new_holds.insert(key.0.clone()),
-						VerifyError::AccountAlreadyHasChannelHold
+						VerifyError::AccountAlreadyHasEscrowHold
 					);
 				},
-				NoteType::ChannelClaim => {
-					state.claim_channel_balance(note.milligons, &change.account_id)?;
+				NoteType::EscrowClaim => {
+					state.claim_escrow_balance(note.milligons, &change.account_id)?;
 				},
-				NoteType::ChannelSettle => {
+				NoteType::EscrowSettle => {
 					let Some(source_change_tick) =
 						change.previous_balance_proof.as_ref().map(|a| a.tick)
 					else {
 						return Err(VerifyError::MissingBalanceProof)
 					};
 
-					let channel_hold_note = change
-						.channel_hold_note
+					let escrow_hold_note = change
+						.escrow_hold_note
 						.as_ref()
-						.ok_or(VerifyError::MissingChannelHoldNote)?;
+						.ok_or(VerifyError::MissingEscrowHoldNote)?;
 
-					state.record_channel_settle(
+					state.record_escrow_settle(
 						&key,
 						note.milligons as i128,
-						channel_hold_note,
+						escrow_hold_note,
 						source_change_tick,
 						notebook_tick,
 					)?;
@@ -825,7 +825,7 @@ pub fn verify_notarization_allocation(
 			match note.note_type {
 				NoteType::ClaimFromMainchain { .. } |
 				NoteType::Claim { .. } |
-				NoteType::ChannelClaim =>
+				NoteType::EscrowClaim =>
 					if let Some(new_balance) = balance.checked_add(note.milligons as i128) {
 						balance = new_balance;
 					} else {
@@ -838,7 +838,7 @@ pub fn verify_notarization_allocation(
 					},
 				NoteType::SendToMainchain |
 				NoteType::Send { .. } |
-				NoteType::ChannelSettle |
+				NoteType::EscrowSettle |
 				NoteType::LeaseDomain |
 				NoteType::Tax |
 				NoteType::SendToVote => balance -= note.milligons as i128,
@@ -879,7 +879,7 @@ pub fn verify_notarization_allocation(
 	);
 	// this works by removing all restricted balances as the approved users draw from them
 	ensure!(state.unclaimed_restricted_balance.is_empty(), VerifyError::InvalidNoteRecipients);
-	ensure!(state.unclaimed_channel_balances.is_empty(), VerifyError::InvalidChannelClaimers);
+	ensure!(state.unclaimed_escrow_balances.is_empty(), VerifyError::InvalidEscrowClaimers);
 
 	for block_vote in block_votes {
 		state.used_tax_vote_amount(block_vote.power, &block_vote.account_id)?;

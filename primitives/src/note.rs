@@ -40,7 +40,7 @@ impl Note {
 		}
 	}
 
-	pub fn calculate_channel_tax(amount: u128) -> u128 {
+	pub fn calculate_escrow_tax(amount: u128) -> u128 {
 		round_up(amount, TAX_PERCENT_BASE)
 	}
 }
@@ -95,9 +95,9 @@ impl From<i64> for AccountType {
 	}
 }
 
-pub const CHANNEL_EXPIRATION_TICKS: u32 = prod_or_fast!(60, 2);
-pub const CHANNEL_CLAWBACK_TICKS: u32 = 15; // 15 after expiration
-pub const MIN_CHANNEL_NOTE_MILLIGONS: u128 = 5;
+pub const ESCROW_EXPIRATION_TICKS: u32 = prod_or_fast!(60, 2);
+pub const ESCROW_CLAWBACK_TICKS: u32 = 15; // 15 after expiration
+pub const MIN_ESCROW_NOTE_MILLIGONS: u128 = 5;
 pub type MaxNoteRecipients = ConstU32<10>;
 
 pub const TAX_PERCENT_BASE: u128 = 20;
@@ -142,16 +142,16 @@ pub enum NoteType {
 	Tax,
 	/// Send this tax to a BlockVote
 	SendToVote,
-	/// Channel hold notes
+	/// Escrow hold notes
 	#[serde(rename_all = "camelCase")]
-	ChannelHold {
+	EscrowHold {
 		/// The account id of the recipient
 		recipient: AccountId,
-		/// The data domain that this channel is created for
+		/// The data domain that this escrow is created for
 		data_domain_hash: Option<DataDomainHash>,
 	},
-	/// Channel settlement note - applied to channel hold creator balance
-	ChannelSettle,
-	/// Claim funds from one or more channels - must be the recipient of the hold
-	ChannelClaim,
+	/// Escrow settlement note - applied to escrow hold creator balance
+	EscrowSettle,
+	/// Claim funds from one or more escrows - must be the recipient of the hold
+	EscrowClaim,
 }

@@ -39,7 +39,7 @@ pub struct BalanceChange {
 	/// A balance change must provide proof of a previous balance if the change_number is non-zero
 	pub previous_balance_proof: Option<BalanceProof>,
 	/// If this account is on hold, the hold note and index
-	pub channel_hold_note: Option<Note>,
+	pub escrow_hold_note: Option<Note>,
 	/// Sources of the changes
 	pub notes: BoundedVec<Note, ConstU32<100>>,
 	/// Signature of the balance change hash
@@ -52,7 +52,7 @@ struct BalanceChangeHashMessage {
 	pub account_type: AccountType,
 	pub change_number: u32,
 	pub balance: u128,
-	pub channel_hold_note: Option<Note>,
+	pub escrow_hold_note: Option<Note>,
 	pub notes: Vec<Note>,
 }
 
@@ -86,7 +86,7 @@ impl BalanceChange {
 			account_type: self.account_type.clone(),
 			change_number: self.change_number,
 			balance: self.balance,
-			channel_hold_note: self.channel_hold_note.clone(),
+			escrow_hold_note: self.escrow_hold_note.clone(),
 			notes: self.notes.to_vec(),
 		};
 		hash.using_encoded(blake2_256).into()
@@ -169,7 +169,7 @@ pub struct BalanceTip {
 	pub change_number: u32,
 	pub balance: u128,
 	pub account_origin: AccountOrigin,
-	pub channel_hold_note: Option<Note>,
+	pub escrow_hold_note: Option<Note>,
 }
 
 impl BalanceTip {
@@ -178,7 +178,7 @@ impl BalanceTip {
 			self.change_number,
 			self.balance,
 			self.account_origin.clone(),
-			self.channel_hold_note.clone(),
+			self.escrow_hold_note.clone(),
 		)
 	}
 
@@ -186,9 +186,9 @@ impl BalanceTip {
 		change_number: u32,
 		balance: u128,
 		account_origin: AccountOrigin,
-		channel_hold_note: Option<Note>,
+		escrow_hold_note: Option<Note>,
 	) -> [u8; 32] {
-		BalanceTipValue { change_number, balance, account_origin, channel_hold_note }
+		BalanceTipValue { change_number, balance, account_origin, escrow_hold_note }
 			.using_encoded(blake2_256)
 	}
 
@@ -202,7 +202,7 @@ struct BalanceTipValue {
 	pub change_number: u32,
 	pub balance: u128,
 	pub account_origin: AccountOrigin,
-	pub channel_hold_note: Option<Note>,
+	pub escrow_hold_note: Option<Note>,
 }
 
 #[derive(

@@ -233,8 +233,8 @@ impl NotebookStore {
 				for note in change.notes {
 					match note.note_type {
 						NoteType::Tax | NoteType::LeaseDomain => tax += note.milligons,
-						NoteType::ChannelHold { .. } => change_note = Some(note.clone()),
-						NoteType::ChannelSettle { .. } => change_note = None,
+						NoteType::EscrowHold { .. } => change_note = Some(note.clone()),
+						NoteType::EscrowSettle { .. } => change_note = None,
 						NoteType::ClaimFromMainchain { account_nonce } =>
 							transfers.push(ChainTransfer::ToLocalchain {
 								account_nonce,
@@ -275,7 +275,7 @@ impl NotebookStore {
 			.map(
 				|(
 					(account_id, account_type),
-					(nonce, balance, account_origin, channel_hold_note),
+					(nonce, balance, account_origin, escrow_hold_note),
 				)| {
 					account_changelist.push(account_origin.clone());
 					BalanceTip {
@@ -284,7 +284,7 @@ impl NotebookStore {
 						change_number: nonce,
 						balance,
 						account_origin,
-						channel_hold_note,
+						escrow_hold_note,
 					}
 					.encode()
 				},
@@ -441,7 +441,7 @@ mod tests {
 					balance: 1000,
 					previous_balance_proof: None,
 					notes: bounded_vec![],
-					channel_hold_note: None,
+					escrow_hold_note: None,
 					signature: Signature([0u8; 64]).into(),
 				},
 				BalanceChange {
@@ -451,7 +451,7 @@ mod tests {
 					balance: 2500,
 					previous_balance_proof: None,
 					notes: bounded_vec![],
-					channel_hold_note: None,
+					escrow_hold_note: None,
 					signature: Signature([0u8; 64]).into(),
 				},
 				BalanceChange {
@@ -461,7 +461,7 @@ mod tests {
 					balance: 500,
 					previous_balance_proof: None,
 					notes: bounded_vec![],
-					channel_hold_note: None,
+					escrow_hold_note: None,
 					signature: Signature([0u8; 64]).into(),
 				},
 			],
@@ -487,7 +487,7 @@ mod tests {
 			change_number: 1,
 			balance: 1000,
 			account_origin: AccountOrigin { notebook_number: 1, account_uid: 1 },
-			channel_hold_note: None,
+			escrow_hold_note: None,
 		};
 		let proof = NotebookStore::get_balance_proof(&pool, 1, 1, &balance_tip).await?;
 

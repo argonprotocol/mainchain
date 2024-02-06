@@ -31,7 +31,7 @@ CREATE TABLE IF NOT EXISTS balance_changes
     account_id              INT NOT NULL,
     change_number           INT NOT NULL,
     balance                 TEXT NOT NULL,
-    channel_hold_note_json  TEXT,
+    escrow_hold_note_json  TEXT,
     notary_id               INT NOT NULL,
     notes_json              TEXT NOT NULL,
     status                  INT NOT NULL,
@@ -43,8 +43,8 @@ CREATE TABLE IF NOT EXISTS balance_changes
     FOREIGN KEY (notarization_id) REFERENCES notarizations(id)
 );
 
--- Channels pending claim by this localchain. The settled_amount and settled_signature fields are only updated in the json when the channel is settled.
-CREATE TABLE IF NOT EXISTS open_channels
+-- Escrows pending claim by this localchain. The settled_amount and settled_signature fields are only updated in the json when the escrow is settled.
+CREATE TABLE IF NOT EXISTS open_escrows
 (
     id                              INTEGER NOT NULL PRIMARY KEY AUTOINCREMENT,
     is_client                       BOOLEAN NOT NULL,

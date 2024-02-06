@@ -50,7 +50,7 @@ impl NotarizationTracker {
         balance: change.balance,
         account_origin: previous_balance_proof.account_origin,
         change_number: change.change_number,
-        channel_hold_note: change.channel_hold_note.clone(),
+        escrow_hold_note: change.escrow_hold_note.clone(),
       };
       tips.push(tip);
     }
@@ -114,7 +114,7 @@ impl NotarizationTracker {
             account_uid: tip.account_origin.account_uid,
             notebook_number: tip.account_origin.notebook_number,
           },
-          channel_hold_note_json: balance_change.channel_hold_note_json.clone(),
+          escrow_hold_note_json: balance_change.escrow_hold_note_json.clone(),
           leaf_index: proof.leaf_index,
           number_of_leaves: proof.number_of_leaves,
           proof: proof.proof.iter().map(|p| p.0.to_vec().into()).collect(),
@@ -183,7 +183,7 @@ pub struct NotebookProof {
   pub balance_tip: Uint8Array,
   pub change_number: u32,
   pub account_origin: NotaryAccountOrigin,
-  pub channel_hold_note_json: Option<String>,
+  pub escrow_hold_note_json: Option<String>,
   pub leaf_index: u32,
   pub number_of_leaves: u32,
   pub proof: Vec<Uint8Array>,

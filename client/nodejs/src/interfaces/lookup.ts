@@ -411,17 +411,17 @@ export default {
       InvalidNotarySignature: 'Null',
       NotebookTooOld: 'Null',
       DecodeError: 'Null',
-      AccountChannelHoldDoesntExist: 'Null',
-      AccountAlreadyHasChannelHold: 'Null',
-      ChannelHoldNotReadyForClaim: {
+      AccountEscrowHoldDoesntExist: 'Null',
+      AccountAlreadyHasEscrowHold: 'Null',
+      EscrowHoldNotReadyForClaim: {
         currentTick: 'u32',
         claimTick: 'u32',
       },
       AccountLocked: 'Null',
-      MissingChannelHoldNote: 'Null',
-      InvalidChannelHoldNote: 'Null',
-      InvalidChannelClaimers: 'Null',
-      ChannelNoteBelowMinimum: 'Null',
+      MissingEscrowHoldNote: 'Null',
+      InvalidEscrowHoldNote: 'Null',
+      InvalidEscrowClaimers: 'Null',
+      EscrowNoteBelowMinimum: 'Null',
       InvalidTaxNoteAccount: 'Null',
       InvalidTaxOperation: 'Null',
       InsufficientTaxIncluded: {
@@ -440,7 +440,7 @@ export default {
       BlockVoteInvalidSignature: 'Null',
       InsufficientBlockVoteMinimum: 'Null',
       BlockVoteDataDomainMismatch: 'Null',
-      BlockVoteChannelReused: 'Null'
+      BlockVoteEscrowReused: 'Null'
     }
   },
   /**

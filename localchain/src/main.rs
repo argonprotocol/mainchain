@@ -9,7 +9,7 @@ use sp_keystore::KeystorePtr;
 use tokio::time;
 
 use ulx_localchain::signer::Signer;
-use ulx_localchain::{ChannelCloseOptions, Localchain, LocalchainConfig};
+use ulx_localchain::{EscrowCloseOptions, Localchain, LocalchainConfig};
 use ulx_primitives::NotaryId;
 
 #[derive(Parser, Debug)]
@@ -32,15 +32,15 @@ struct Cli {
   #[clap(short, long, env, default_value = "1")]
   notary_id: NotaryId,
 
-  /// What default account id should claimed channels be sent to?
+  /// What default account id should claimed escrows be sent to?
   #[clap(long, value_name = "SS58_ADDRESS")]
-  channel_claims_send_to_address: Option<String>,
+  escrow_claims_send_to_address: Option<String>,
 
   /// What default account id will be used to create votes, accept claims, etc
   #[clap(long, value_name = "SS58_ADDRESS")]
-  channels_default_tax_account: Option<String>,
+  escrows_default_tax_account: Option<String>,
 
-  /// What address should be used for votes (only relevant if claiming channels)
+  /// What address should be used for votes (only relevant if claiming escrows)
   #[clap(long, value_name = "SS58_ADDRESS")]
   vote_address: Option<String>,
 
@@ -48,7 +48,7 @@ struct Cli {
   #[clap(long)]
   minimum_vote_amount: Option<u128>,
 
-  /// Load keys for signing channels from the keystore.
+  /// Load keys for signing escrows from the keystore.
   #[clap(flatten)]
   keystore_params: KeystoreParams,
 
@@ -79,13 +79,13 @@ async fn main() -> anyhow::Result<()> {
   .await?;
 
   let balance_sync = localchain.balance_sync();
-  let sync_options = match cli.channels_default_tax_account {
-    Some(channel_tax_address) => Some(ChannelCloseOptions {
-      channel_tax_address,
-      channel_claims_send_to_address: cli.channel_claims_send_to_address,
+  let sync_options = match cli.escrows_default_tax_account {
+    Some(escrow_tax_address) => Some(EscrowCloseOptions {
+      escrow_tax_address,
+      escrow_claims_send_to_address: cli.escrow_claims_send_to_address,
       votes_address: cli
         .vote_address
-        .expect("vote_address is required if channel_tax_address is set"),
+        .expect("vote_address is required if escrow_tax_address is set"),
       minimum_vote_amount: cli.minimum_vote_amount.map(|v| v as i64),
     }),
     None => None,

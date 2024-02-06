@@ -31,7 +31,7 @@ impl BalanceTipStore {
 		previous_balance: u128,
 		account_origin: &AccountOrigin,
 		change_index: usize,
-		channel_hold_note: Option<Note>,
+		escrow_hold_note: Option<Note>,
 		timeout_millis: u32,
 	) -> BoxFutureResult<'a, Option<H256>> {
 		let key = BalanceTip::create_key(account_id, &account_type);
@@ -43,7 +43,7 @@ impl BalanceTipStore {
 					proposed_change_number - 1u32,
 					previous_balance,
 					account_origin.clone(),
-					channel_hold_note,
+					escrow_hold_note,
 				)
 				.into(),
 			);
@@ -108,22 +108,22 @@ impl BalanceTipStore {
 		notebook_number: NotebookNumber,
 		tick: Tick,
 		account_origin: AccountOrigin,
-		channel_hold_note: Option<Note>,
+		escrow_hold_note: Option<Note>,
 		prev_balance: u128,
-		prev_channel_hold_note: Option<Note>,
+		prev_escrow_hold_note: Option<Note>,
 	) -> BoxFutureResult<'a, ()> {
 		let key = BalanceTip::create_key(account_id, &account_type);
 		let tip = BalanceTip::compute_tip(
 			change_number,
 			balance,
 			account_origin.clone(),
-			channel_hold_note.clone(),
+			escrow_hold_note.clone(),
 		);
 		let prev = BalanceTip::compute_tip(
 			change_number - 1,
 			prev_balance,
 			account_origin,
-			prev_channel_hold_note,
+			prev_escrow_hold_note,
 		);
 		Box::pin(async move {
 			let res = sqlx::query!(

@@ -8,7 +8,7 @@ use std::sync::Arc;
 use tokio::sync::Mutex;
 use ulx_primitives::{
   AccountId, AccountType, BalanceChange, DataDomain, Note, NoteType, DATA_DOMAIN_LEASE_COST,
-  MIN_CHANNEL_NOTE_MILLIGONS,
+  MIN_ESCROW_NOTE_MILLIGONS,
 };
 
 #[napi]
@@ -44,7 +44,7 @@ impl BalanceChangeBuilder {
       change_number: 0,
       previous_balance_proof: None,
       balance: 0,
-      channel_hold_note: None,
+      escrow_hold_note: None,
       notes: Default::default(),
       signature: MultiSignature::from(ed25519::Signature([0; 64])),
     }))
@@ -130,7 +130,7 @@ impl BalanceChangeBuilder {
   }
 
   #[napi]
-  pub async fn claim_channel(&self, amount: BigInt) -> napi::Result<ClaimResult> {
+  pub async fn claim_escrow(&self, amount: BigInt) -> napi::Result<ClaimResult> {
     let mut balance_change = self.balance_change.lock().await;
     if balance_change.account_type != AccountType::Deposit {
       return Err(to_js_error(format!(
@@ -139,9 +139,9 @@ impl BalanceChangeBuilder {
       )));
     }
     let (_, amount, _) = amount.get_u128();
-    let tax_amount = Note::calculate_channel_tax(amount);
+    let tax_amount = Note::calculate_escrow_tax(amount);
     balance_change.balance += amount - tax_amount;
-    balance_change.push_note(amount, NoteType::ChannelClaim);
+    balance_change.push_note(amount, NoteType::EscrowClaim);
     balance_change.push_note(tax_amount, NoteType::Tax);
     Ok(ClaimResult::new(amount, tax_amount))
   }
@@ -198,7 +198,7 @@ impl BalanceChangeBuilder {
   }
 
   #[napi(ts_args_type = "amount: bigint, dataDomain: DataDomain, dataDomainAddress: string")]
-  pub async fn create_channel_hold(
+  pub async fn create_escrow_hold(
     &self,
     amount: BigInt,
     data_domain: JsDataDomain,
@@ -215,22 +215,22 @@ impl BalanceChangeBuilder {
 
     if balance_change.balance < amount {
       return Err(Error::from_reason(format!(
-        "Insufficient balance {} to create a channel {}",
+        "Insufficient balance {} to create an escrow {}",
         balance_change.balance, amount
       )));
     }
-    if amount < MIN_CHANNEL_NOTE_MILLIGONS {
+    if amount < MIN_ESCROW_NOTE_MILLIGONS {
       return Err(Error::from_reason(format!(
-        "Channel amount {} is less than minimum {}",
-        amount, MIN_CHANNEL_NOTE_MILLIGONS
+        "Escrow amount {} is less than minimum {}",
+        amount, MIN_ESCROW_NOTE_MILLIGONS
       )));
     }
 
     let domain: DataDomain = data_domain.into();
-    // NOTE: channel hold doesn't manipulate balance
+    // NOTE: escrow hold doesn't manipulate balance
     balance_change.push_note(
       amount,
-      NoteType::ChannelHold {
+      NoteType::EscrowHold {
         data_domain_hash: Some(domain.hash()),
         recipient: AccountStore::parse_address(&data_domain_address)?,
       },
@@ -286,7 +286,7 @@ impl BalanceChangeBuilder {
   }
 
   #[napi]
-  pub async fn create_private_server_channel_hold(
+  pub async fn create_private_server_escrow_hold(
     &self,
     amount: BigInt,
     payment_address: String,
@@ -302,7 +302,7 @@ impl BalanceChangeBuilder {
 
     if balance_change.balance < amount {
       return Err(Error::from_reason(format!(
-        "Insufficient balance {} to create a channel {}",
+        "Insufficient balance {} to create an escrow {}",
         balance_change.balance, amount
       )));
     }
@@ -310,7 +310,7 @@ impl BalanceChangeBuilder {
     balance_change.balance -= amount;
     balance_change.push_note(
       amount,
-      NoteType::ChannelHold {
+      NoteType::EscrowHold {
         data_domain_hash: None,
         recipient: AccountStore::parse_address(&payment_address)?,
       },
@@ -409,7 +409,7 @@ mod test {
   }
 
   #[tokio::test]
-  async fn test_channel_hold() -> anyhow::Result<()> {
+  async fn test_escrow_hold() -> anyhow::Result<()> {
     let address = AccountStore::to_address(&Bob.to_account_id());
     let data_domain_author = AccountStore::to_address(&Alice.to_account_id());
     let builder = BalanceChangeBuilder::new_account(address.clone(), AccountType::Deposit)?;
@@ -424,7 +424,7 @@ mod test {
       .await?;
 
     builder
-      .create_channel_hold(
+      .create_escrow_hold(
         BigInt::from(1_000u128),
         JsDataDomain {
           domain_name: "test".to_string(),
@@ -442,7 +442,7 @@ mod test {
     let alice = Alice.to_account_id();
 
     match &balance_change.notes[1].note_type {
-      NoteType::ChannelHold {
+      NoteType::EscrowHold {
         data_domain_hash: _,
         recipient,
       } => assert_eq!(recipient, &alice),

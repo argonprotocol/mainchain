@@ -57,8 +57,7 @@ declare module '@polkadot/api-base/types/consts' {
        **/
       maturationBlocks: u32 & AugmentedConst<ApiType>;
       /**
-       * Percent as a number out of 100 of the block reward that goes to the miner. 1% of this is
-       * for the channel pass signer
+       * Percent as a number out of 100 of the block reward that goes to the miner.
        **/
       minerPayoutPercent: u32 & AugmentedConst<ApiType>;
       /**

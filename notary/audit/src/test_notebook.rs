@@ -19,7 +19,7 @@ use ulx_primitives::{
 	note::{AccountType, Note, NoteType},
 	Balance, BalanceTip, BlockVote, ChainTransfer, DataDomain, DataTLD, MerkleProof,
 	NewAccountOrigin, Notarization, Notebook, NotebookHeader, NotebookNumber,
-	CHANNEL_EXPIRATION_TICKS,
+	ESCROW_EXPIRATION_TICKS,
 };
 
 use crate::{
@@ -89,7 +89,7 @@ fn test_verify_previous_balance() {
 		change_number: 500,
 		balance: 0,
 		previous_balance_proof: None,
-		channel_hold_note: None,
+		escrow_hold_note: None,
 		notes: bounded_vec![],
 		signature: empty_signature(),
 	};
@@ -100,7 +100,7 @@ fn test_verify_previous_balance() {
 			balance: 20,
 			change_number: 3,
 			account_origin: AccountOrigin { notebook_number: 5, account_uid: 2 },
-			channel_hold_note: None,
+			escrow_hold_note: None,
 		}
 		.encode(),
 		BalanceTip {
@@ -109,7 +109,7 @@ fn test_verify_previous_balance() {
 			balance: 100,
 			change_number: 1,
 			account_origin: AccountOrigin { notebook_number: 6, account_uid: 1 },
-			channel_hold_note: None,
+			escrow_hold_note: None,
 		}
 		.encode(),
 		BalanceTip {
@@ -118,7 +118,7 @@ fn test_verify_previous_balance() {
 			balance: 100,
 			change_number: change.change_number - 1,
 			account_origin: AccountOrigin { notebook_number: 1, account_uid: 1 },
-			channel_hold_note: None,
+			escrow_hold_note: None,
 		}
 		.encode(),
 	];
@@ -189,7 +189,7 @@ fn test_verify_notebook() {
 		account_id: Alice.to_account_id(),
 		account_type: AccountType::Deposit,
 		previous_balance_proof: None,
-		channel_hold_note: None,
+		escrow_hold_note: None,
 		notes: bounded_vec![note],
 		signature: empty_signature(),
 	}
@@ -207,7 +207,7 @@ fn test_verify_notebook() {
 			balance: 1000,
 			change_number: 1,
 			account_origin: AccountOrigin { notebook_number: 1, account_uid: 1 },
-			channel_hold_note: None,
+			escrow_hold_note: None,
 		}
 		.encode()]),
 		chain_transfers: bounded_vec![ChainTransfer::ToLocalchain {
@@ -289,7 +289,7 @@ fn test_disallows_double_claim() {
 		account_id: Alice.to_account_id(),
 		account_type: AccountType::Deposit,
 		previous_balance_proof: None,
-		channel_hold_note: None,
+		escrow_hold_note: None,
 		notes: bounded_vec![note1, note2],
 		signature: empty_signature(),
 	}
@@ -307,7 +307,7 @@ fn test_disallows_double_claim() {
 			balance: 2000,
 			change_number: 1,
 			account_origin: AccountOrigin { notebook_number: 1, account_uid: 1 },
-			channel_hold_note: None,
+			escrow_hold_note: None,
 		}
 		.encode()]),
 		chain_transfers: bounded_vec![ChainTransfer::ToLocalchain {
@@ -360,7 +360,7 @@ fn test_multiple_changesets_in_a_notebook() {
 			account_id: Alice.to_account_id(),
 			account_type: AccountType::Deposit,
 			previous_balance_proof: None,
-			channel_hold_note: None,
+			escrow_hold_note: None,
 			notes: bounded_vec![
 				Note::create(1000, NoteType::ClaimFromMainchain { account_nonce: 1 }),
 				Note::create(1000, NoteType::Send { to: None }),
@@ -375,7 +375,7 @@ fn test_multiple_changesets_in_a_notebook() {
 			account_id: Bob.to_account_id(),
 			account_type: AccountType::Deposit,
 			previous_balance_proof: None,
-			channel_hold_note: None,
+			escrow_hold_note: None,
 			notes: bounded_vec![
 				Note::create(1000, NoteType::Claim),
 				Note::create(200, NoteType::Tax),
@@ -390,7 +390,7 @@ fn test_multiple_changesets_in_a_notebook() {
 			account_id: Bob.to_account_id(),
 			account_type: AccountType::Tax,
 			previous_balance_proof: None,
-			channel_hold_note: None,
+			escrow_hold_note: None,
 			notes: bounded_vec![Note::create(200, NoteType::Claim),],
 			signature: empty_signature(),
 		}
@@ -409,7 +409,7 @@ fn test_multiple_changesets_in_a_notebook() {
 				balance: 0,
 				change_number: 1,
 				account_origin: AccountOrigin { notebook_number: 1, account_uid: 1 },
-				channel_hold_note: None,
+				escrow_hold_note: None,
 			},
 		),
 		(
@@ -420,7 +420,7 @@ fn test_multiple_changesets_in_a_notebook() {
 				balance: 800,
 				change_number: 1,
 				account_origin: AccountOrigin { notebook_number: 1, account_uid: 2 },
-				channel_hold_note: None,
+				escrow_hold_note: None,
 			},
 		),
 		(
@@ -431,7 +431,7 @@ fn test_multiple_changesets_in_a_notebook() {
 				balance: 200,
 				change_number: 1,
 				account_origin: AccountOrigin { notebook_number: 1, account_uid: 3 },
-				channel_hold_note: None,
+				escrow_hold_note: None,
 			},
 		),
 	]);
@@ -489,7 +489,7 @@ fn test_multiple_changesets_in_a_notebook() {
 			account_id: Bob.to_account_id(),
 			account_type: AccountType::Deposit,
 			previous_balance_proof: None,
-			channel_hold_note: None,
+			escrow_hold_note: None,
 			notes: bounded_vec![Note::create(800, NoteType::Send { to: None }),],
 			signature: empty_signature(),
 		}
@@ -501,7 +501,7 @@ fn test_multiple_changesets_in_a_notebook() {
 			account_id: Alice.to_account_id(),
 			account_type: AccountType::Deposit,
 			previous_balance_proof: None,
-			channel_hold_note: None,
+			escrow_hold_note: None,
 			notes: bounded_vec![
 				Note::create(800, NoteType::Claim),
 				Note::create(200, NoteType::Tax),
@@ -516,7 +516,7 @@ fn test_multiple_changesets_in_a_notebook() {
 			account_id: Alice.to_account_id(),
 			account_type: AccountType::Tax,
 			previous_balance_proof: None,
-			channel_hold_note: None,
+			escrow_hold_note: None,
 			notes: bounded_vec![Note::create(200, NoteType::Claim),],
 			signature: empty_signature(),
 		}
@@ -546,7 +546,7 @@ fn test_multiple_changesets_in_a_notebook() {
 			account_id: Alice.to_account_id(),
 			account_type: AccountType::Tax,
 			account_origin: AccountOrigin { notebook_number: 1, account_uid: 4 },
-			channel_hold_note: None,
+			escrow_hold_note: None,
 		},
 	);
 	notebook
@@ -610,7 +610,7 @@ fn test_cannot_remove_lock_between_changesets_in_a_notebook() {
 		account_id: Alice.to_account_id(),
 		account_type: AccountType::Deposit,
 		previous_balance_proof: None,
-		channel_hold_note: None,
+		escrow_hold_note: None,
 		notes: bounded_vec![Note::create(1000, NoteType::ClaimFromMainchain { account_nonce: 1 }),],
 		signature: empty_signature(),
 	}
@@ -629,10 +629,10 @@ fn test_cannot_remove_lock_between_changesets_in_a_notebook() {
 			account_origin: AccountOrigin { notebook_number: 1, account_uid: 1 },
 			balance: 1000,
 		}),
-		channel_hold_note: None,
+		escrow_hold_note: None,
 		notes: bounded_vec![Note::create(
 			1000,
-			NoteType::ChannelHold { recipient: Bob.to_account_id(), data_domain_hash: None }
+			NoteType::EscrowHold { recipient: Bob.to_account_id(), data_domain_hash: None }
 		)],
 		signature: empty_signature(),
 	}
@@ -653,7 +653,7 @@ fn test_cannot_remove_lock_between_changesets_in_a_notebook() {
 				balance: 1000,
 				change_number: 2,
 				account_origin: AccountOrigin { notebook_number: 1, account_uid: 1 },
-				channel_hold_note: None,
+				escrow_hold_note: None,
 			}
 			.encode()]),
 			chain_transfers: bounded_vec![ChainTransfer::ToLocalchain {
@@ -702,7 +702,7 @@ fn test_cannot_remove_lock_between_changesets_in_a_notebook() {
 		balance: 1000,
 		change_number: 2,
 		account_origin: AccountOrigin { notebook_number: 1, account_uid: 1 },
-		channel_hold_note: Some(hold_note),
+		escrow_hold_note: Some(hold_note),
 	}
 	.encode()]);
 	notebook.hash = notebook.calculate_hash();
@@ -724,10 +724,10 @@ fn test_cannot_remove_lock_between_changesets_in_a_notebook() {
 				account_origin: AccountOrigin { notebook_number: 1, account_uid: 1 },
 				balance: 1000,
 			}),
-			channel_hold_note: None,
+			escrow_hold_note: None,
 			notes: bounded_vec![Note::create(
 				1000,
-				NoteType::ChannelHold { recipient: Ferdie.to_account_id(), data_domain_hash: None }
+				NoteType::EscrowHold { recipient: Ferdie.to_account_id(), data_domain_hash: None }
 			)],
 			signature: empty_signature(),
 		}
@@ -746,12 +746,12 @@ fn test_cannot_remove_lock_between_changesets_in_a_notebook() {
 			balance: 1000,
 			change_number: 3,
 			account_origin: AccountOrigin { notebook_number: 1, account_uid: 1 },
-			channel_hold_note: Some(hold_note),
+			escrow_hold_note: Some(hold_note),
 		}
 		.encode()]);
 		assert_err!(
 			notebook_verify(&TestLookup, &notebook, &BTreeMap::new()),
-			VerifyError::InvalidChannelHoldNote
+			VerifyError::InvalidEscrowHoldNote
 		);
 	}
 	{
@@ -769,11 +769,11 @@ fn test_cannot_remove_lock_between_changesets_in_a_notebook() {
 				account_origin: AccountOrigin { notebook_number: 1, account_uid: 1 },
 				balance: 1000,
 			}),
-			channel_hold_note: Some(Note::create(
+			escrow_hold_note: Some(Note::create(
 				1000,
-				NoteType::ChannelHold { recipient: Bob.to_account_id(), data_domain_hash: None },
+				NoteType::EscrowHold { recipient: Bob.to_account_id(), data_domain_hash: None },
 			)),
-			notes: bounded_vec![Note::create(0, NoteType::ChannelSettle)],
+			notes: bounded_vec![Note::create(0, NoteType::EscrowSettle)],
 			signature: empty_signature(),
 		}
 		.sign(Alice.pair())
@@ -793,12 +793,12 @@ fn test_cannot_remove_lock_between_changesets_in_a_notebook() {
 			balance: 1000,
 			change_number: 3,
 			account_origin: AccountOrigin { notebook_number: 1, account_uid: 1 },
-			channel_hold_note: Some(hold_note),
+			escrow_hold_note: Some(hold_note),
 		}
 		.encode()]);
 		assert!(matches!(
 			notebook_verify(&TestLookup, &notebook, &BTreeMap::new()),
-			Err(VerifyError::ChannelHoldNotReadyForClaim { .. })
+			Err(VerifyError::EscrowHoldNotReadyForClaim { .. })
 		),);
 	}
 }
@@ -811,7 +811,7 @@ fn test_votes_must_add_up() {
 		BalanceTip {
 			account_id: Alice.to_account_id(),
 			account_type: AccountType::Tax,
-			channel_hold_note: None,
+			escrow_hold_note: None,
 			balance: 1000,
 			change_number: 1,
 			account_origin: AccountOrigin { notebook_number: 1, account_uid: 1 },
@@ -819,9 +819,9 @@ fn test_votes_must_add_up() {
 		BalanceTip {
 			account_id: Bob.to_account_id(),
 			account_type: AccountType::Deposit,
-			channel_hold_note: Some(Note::create(
+			escrow_hold_note: Some(Note::create(
 				500,
-				NoteType::ChannelHold {
+				NoteType::EscrowHold {
 					recipient: Alice.to_account_id(),
 					data_domain_hash: Some(data_domain.hash()),
 				},
@@ -833,9 +833,9 @@ fn test_votes_must_add_up() {
 		BalanceTip {
 			account_id: Ferdie.to_account_id(),
 			account_type: AccountType::Deposit,
-			channel_hold_note: Some(Note::create(
+			escrow_hold_note: Some(Note::create(
 				500,
-				NoteType::ChannelHold {
+				NoteType::EscrowHold {
 					recipient: Alice.to_account_id(),
 					data_domain_hash: Some(data_domain.hash()),
 				},
@@ -853,7 +853,7 @@ fn test_votes_must_add_up() {
 			notary_id: 1,
 			notebook_number: 62,
 			finalized_block_number: 100,
-			tick: CHANNEL_EXPIRATION_TICKS + 1,
+			tick: ESCROW_EXPIRATION_TICKS + 1,
 			changed_accounts_root: Default::default(),
 			chain_transfers: Default::default(),
 			changed_account_origins: Default::default(),
@@ -873,9 +873,9 @@ fn test_votes_must_add_up() {
 					balance: 0,
 					change_number: 2,
 					account_id: Bob.to_account_id(),
-					channel_hold_note: Some(Note::create(
+					escrow_hold_note: Some(Note::create(
 						500,
-						NoteType::ChannelHold {
+						NoteType::EscrowHold {
 							recipient: Alice.to_account_id(),
 							data_domain_hash: Some(data_domain.hash())
 						}
@@ -890,7 +890,7 @@ fn test_votes_must_add_up() {
 						balance: 500,
 					}),
 					signature: empty_signature(),
-					notes: bounded_vec![Note::create(500, NoteType::ChannelSettle)],
+					notes: bounded_vec![Note::create(500, NoteType::EscrowSettle)],
 				}
 				.sign(Bob.pair())
 				.clone(),
@@ -898,9 +898,9 @@ fn test_votes_must_add_up() {
 					balance: 0,
 					change_number: 2,
 					account_id: Ferdie.to_account_id(),
-					channel_hold_note: Some(Note::create(
+					escrow_hold_note: Some(Note::create(
 						500,
-						NoteType::ChannelHold {
+						NoteType::EscrowHold {
 							recipient: Alice.to_account_id(),
 							data_domain_hash: Some(data_domain.hash())
 						}
@@ -915,7 +915,7 @@ fn test_votes_must_add_up() {
 						balance: 500,
 					}),
 					signature: empty_signature(),
-					notes: bounded_vec![Note::create(500, NoteType::ChannelSettle)],
+					notes: bounded_vec![Note::create(500, NoteType::EscrowSettle)],
 				}
 				.sign(Ferdie.pair())
 				.clone(),
@@ -925,10 +925,10 @@ fn test_votes_must_add_up() {
 					account_id: Alice.to_account_id(),
 					account_type: AccountType::Deposit,
 					previous_balance_proof: None,
-					channel_hold_note: None,
+					escrow_hold_note: None,
 					notes: bounded_vec![
 						Note::create(200, NoteType::Tax),
-						Note::create(1000, NoteType::ChannelClaim),
+						Note::create(1000, NoteType::EscrowClaim),
 					],
 					signature: empty_signature(),
 				}
@@ -947,7 +947,7 @@ fn test_votes_must_add_up() {
 						account_origin: AccountOrigin { notebook_number: 1, account_uid: 1 },
 						balance: 1000,
 					}),
-					channel_hold_note: None,
+					escrow_hold_note: None,
 					notes: bounded_vec![
 						Note::create(200, NoteType::Claim),
 						Note::create(34, NoteType::SendToVote),
@@ -1009,7 +1009,7 @@ fn test_votes_must_add_up() {
 					balance: 1000 - 34 + 200,
 					change_number: 2,
 					account_origin: AccountOrigin { notebook_number: 1, account_uid: 1 },
-					channel_hold_note: None,
+					escrow_hold_note: None,
 				},
 			),
 			(
@@ -1020,7 +1020,7 @@ fn test_votes_must_add_up() {
 					balance: 800,
 					change_number: 1,
 					account_origin: AccountOrigin { notebook_number: 62, account_uid: 1 },
-					channel_hold_note: None,
+					escrow_hold_note: None,
 				},
 			),
 			(
@@ -1031,7 +1031,7 @@ fn test_votes_must_add_up() {
 					balance: 0,
 					change_number: 2,
 					account_origin: AccountOrigin { notebook_number: 1, account_uid: 2 },
-					channel_hold_note: None,
+					escrow_hold_note: None,
 				},
 			),
 			(
@@ -1042,7 +1042,7 @@ fn test_votes_must_add_up() {
 					balance: 0,
 					change_number: 2,
 					account_origin: AccountOrigin { notebook_number: 1, account_uid: 3 },
-					channel_hold_note: None,
+					escrow_hold_note: None,
 				},
 			),
 		])

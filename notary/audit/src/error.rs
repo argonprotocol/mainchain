@@ -7,7 +7,7 @@ use ulx_primitives::{tick::Tick, AccountType};
 
 use crate::AccountHistoryLookupError;
 
-const MIN_CHANNEL_NOTE_MILLIGONS: u128 = ulx_primitives::MIN_CHANNEL_NOTE_MILLIGONS;
+const MIN_ESCROW_NOTE_MILLIGONS: u128 = ulx_primitives::MIN_ESCROW_NOTE_MILLIGONS;
 #[derive(Debug, PartialEq, Clone, Snafu, TypeInfo, Encode, Decode, Serialize, Deserialize)]
 pub enum VerifyError {
 	#[snafu(display("Missing account origin {account_id:?}, {account_type:?}"))]
@@ -96,33 +96,33 @@ pub enum VerifyError {
 	#[snafu(display("Error decoding notebook"))]
 	DecodeError,
 
-	#[snafu(display("Account does not have a channel hold"))]
-	AccountChannelHoldDoesntExist,
+	#[snafu(display("Account does not have an escrow hold"))]
+	AccountEscrowHoldDoesntExist,
 
-	#[snafu(display("Account already has a channel hold"))]
-	AccountAlreadyHasChannelHold,
+	#[snafu(display("Account already has an escrow hold"))]
+	AccountAlreadyHasEscrowHold,
 
 	#[snafu(display(
-		"Channel hold not ready for claim. Current tick: {current_tick}, claim tick: {claim_tick}"
+		"Escrow hold not ready for claim. Current tick: {current_tick}, claim tick: {claim_tick}"
 	))]
-	ChannelHoldNotReadyForClaim { current_tick: Tick, claim_tick: Tick },
+	EscrowHoldNotReadyForClaim { current_tick: Tick, claim_tick: Tick },
 
-	#[snafu(display("This account is locked with a channel hold"))]
+	#[snafu(display("This account is locked with an escrow hold"))]
 	AccountLocked,
 
-	#[snafu(display("A channel hold note is required to unlock this account"))]
-	MissingChannelHoldNote,
+	#[snafu(display("An escrow hold note is required to unlock this account"))]
+	MissingEscrowHoldNote,
 
-	#[snafu(display("Invalid channel hold note"))]
-	InvalidChannelHoldNote,
+	#[snafu(display("Invalid escrow hold note"))]
+	InvalidEscrowHoldNote,
 
-	#[snafu(display("Invalid channel claimers"))]
-	InvalidChannelClaimers,
+	#[snafu(display("Invalid escrow claimers"))]
+	InvalidEscrowClaimers,
 
 	#[snafu(display(
-		"This channel note is below the minimum amount required ({MIN_CHANNEL_NOTE_MILLIGONS})"
+		"This escrow note is below the minimum amount required ({MIN_ESCROW_NOTE_MILLIGONS})"
 	))]
-	ChannelNoteBelowMinimum,
+	EscrowNoteBelowMinimum,
 
 	#[snafu(display("Tax notes can only be created from deposit accounts"))]
 	InvalidTaxNoteAccount,
@@ -166,8 +166,8 @@ pub enum VerifyError {
 	#[snafu(display("Invalid block vote data domain or account"))]
 	BlockVoteDataDomainMismatch,
 
-	#[snafu(display("Block vote channel reused"))]
-	BlockVoteChannelReused,
+	#[snafu(display("Block vote escrow reused"))]
+	BlockVoteEscrowReused,
 }
 
 impl From<AccountHistoryLookupError> for VerifyError {

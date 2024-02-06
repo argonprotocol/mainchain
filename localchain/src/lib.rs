@@ -16,7 +16,7 @@ pub use balance_sync::*;
 pub use data_domain::*;
 pub use mainchain_client::*;
 pub use notary_client::*;
-pub use open_channels::*;
+pub use open_escrows::*;
 pub use signer::Signer;
 
 mod accounts;
@@ -28,7 +28,7 @@ mod mainchain_client;
 mod notarization_builder;
 mod notarization_tracker;
 mod notary_client;
-mod open_channels;
+mod open_escrows;
 pub mod signer;
 
 #[cfg(test)]
@@ -169,12 +169,8 @@ impl Localchain {
   }
 
   #[napi(getter)]
-  pub fn open_channels(&self) -> open_channels::OpenChannelsStore {
-    open_channels::OpenChannelsStore::new(
-      self.db.clone(),
-      self.ticker.clone(),
-      &self.notary_clients,
-    )
+  pub fn open_escrows(&self) -> open_escrows::OpenEscrowsStore {
+    open_escrows::OpenEscrowsStore::new(self.db.clone(), self.ticker.clone(), &self.notary_clients)
   }
 
   #[napi(getter)]
@@ -192,7 +188,7 @@ impl Localchain {
 #[derive(Default)]
 pub struct Constants {
   pub notarization_constants: NotarizationConstants,
-  pub channel_constants: ChannelConstants,
+  pub escrow_constants: EscrowConstants,
   pub data_domain_constants: DataDomainConstants,
 }
 
@@ -214,15 +210,15 @@ impl Default for NotarizationConstants {
 }
 
 #[napi(object)]
-pub struct ChannelConstants {
+pub struct EscrowConstants {
   pub expiration_ticks: u32,
   pub ticks_to_claim: u32,
 }
-impl Default for ChannelConstants {
+impl Default for EscrowConstants {
   fn default() -> Self {
     Self {
-      expiration_ticks: ulx_primitives::CHANNEL_EXPIRATION_TICKS,
-      ticks_to_claim: ulx_primitives::CHANNEL_CLAWBACK_TICKS,
+      expiration_ticks: ulx_primitives::ESCROW_EXPIRATION_TICKS,
+      ticks_to_claim: ulx_primitives::ESCROW_CLAWBACK_TICKS,
     }
   }
 }

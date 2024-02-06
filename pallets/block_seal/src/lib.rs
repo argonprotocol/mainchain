@@ -36,8 +36,7 @@ pub mod pallet {
 		AuthorityProvider, BlockSealAuthoritySignature, BlockSealerInfo, BlockSealerProvider,
 		BlockVotingKey, BlockVotingProvider, DataDomainProvider, MerkleProof, NotaryId,
 		NotaryNotebookVotes, NotebookProvider, ParentVotingKeyDigest, TickProvider, VotingKey,
-		AUTHOR_DIGEST_ID, CHANNEL_CLAWBACK_TICKS, CHANNEL_EXPIRATION_TICKS,
-		PARENT_VOTING_KEY_DIGEST,
+		AUTHOR_DIGEST_ID, ESCROW_CLAWBACK_TICKS, ESCROW_EXPIRATION_TICKS, PARENT_VOTING_KEY_DIGEST,
 	};
 
 	use super::*;
@@ -378,12 +377,12 @@ pub mod pallet {
 			let data_domain_account =
 				T::AccountId::decode(&mut block_vote.data_domain_account.encode().as_slice())
 					.map_err(|_| Error::<T>::UnableToDecodeVoteAccount)?;
-			let last_tick = votes_from_tick.saturating_sub(CHANNEL_EXPIRATION_TICKS);
+			let last_tick = votes_from_tick.saturating_sub(ESCROW_EXPIRATION_TICKS);
 			ensure!(
 				T::DataDomainProvider::is_registered_payment_account(
 					data_domain_hash,
 					&data_domain_account,
-					(last_tick.saturating_sub(CHANNEL_CLAWBACK_TICKS), last_tick)
+					(last_tick.saturating_sub(ESCROW_CLAWBACK_TICKS), last_tick)
 				),
 				Error::<T>::InvalidDataDomainAccount
 			);

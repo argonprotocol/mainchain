@@ -18,7 +18,7 @@ pub struct BalanceChangeRow {
   pub account_id: i64,
   pub change_number: i64,
   pub balance: String,
-  pub channel_hold_note_json: Option<String>,
+  pub escrow_hold_note_json: Option<String>,
   pub notary_id: i64,
   pub notes_json: Option<String>,
   pub proof_json: Option<String>,
@@ -35,7 +35,7 @@ impl BalanceChangeRow {
       .clone()
       .ok_or_else(|| anyhow::anyhow!("Account {} has no origin", account.address))?;
 
-    let channel_hold_note = match &self.channel_hold_note_json {
+    let escrow_hold_note = match &self.escrow_hold_note_json {
       Some(s) => Some(serde_json::from_str(s)?),
       None => None,
     };
@@ -46,7 +46,7 @@ impl BalanceChangeRow {
       change_number: self.change_number as u32,
       balance: self.balance.parse()?,
       account_origin: origin.into(),
-      channel_hold_note,
+      escrow_hold_note,
     })
   }
 
@@ -246,7 +246,7 @@ impl BalanceChangeStore {
       account_type: account.account_type.clone(),
       change_number: 1,
       balance: 0,
-      channel_hold_note: None,
+      escrow_hold_note: None,
       notes: bounded_vec![],
       previous_balance_proof: None,
       signature: ed25519::Signature([0; 64]).into(),
@@ -255,8 +255,8 @@ impl BalanceChangeStore {
     if let Some(latest) = Self::get_latest_for_account(db, account.id).await? {
       balance_change.change_number = latest.change_number as u32;
       balance_change.balance = latest.balance.parse().unwrap();
-      if let Some(note_json) = latest.channel_hold_note_json {
-        balance_change.channel_hold_note = Some(from_value(note_json.parse()?)?);
+      if let Some(note_json) = latest.escrow_hold_note_json {
+        balance_change.escrow_hold_note = Some(from_value(note_json.parse()?)?);
       }
       let Some(notarization_id) = latest.notarization_id else {
         return Err(anyhow::anyhow!("Balance change not notarized"));
@@ -301,7 +301,7 @@ impl BalanceChangeStore {
   ) -> anyhow::Result<i64> {
     let mut hold_note_json = None;
     for note in balance_change.notes.iter() {
-      if matches!(note.note_type, ulx_primitives::NoteType::ChannelHold { .. }) {
+      if matches!(note.note_type, ulx_primitives::NoteType::EscrowHold { .. }) {
         hold_note_json = Some(json!(note));
       }
     }
@@ -311,7 +311,7 @@ impl BalanceChangeStore {
     let balance_str = balance_change.balance.to_string();
 
     let res = sqlx::query!(
-        r#"INSERT INTO balance_changes (account_id, change_number, balance, status, channel_hold_note_json, notes_json, notary_id) 
+        r#"INSERT INTO balance_changes (account_id, change_number, balance, status, escrow_hold_note_json, notes_json, notary_id) 
         VALUES (?, ?, ?, ?, ?, ?, ?)"#,
         account_id,
         balance_change.change_number,
@@ -340,7 +340,7 @@ impl BalanceChangeStore {
   ) -> anyhow::Result<i64> {
     let mut hold_note_json = None;
     for note in balance_change.notes.iter() {
-      if matches!(note.note_type, ulx_primitives::NoteType::ChannelHold { .. }) {
+      if matches!(note.note_type, ulx_primitives::NoteType::EscrowHold { .. }) {
         hold_note_json = Some(json!(note));
       }
     }
@@ -356,7 +356,7 @@ impl BalanceChangeStore {
         return Ok(existing.id);
       }
       let res = sqlx::query!(
-        "UPDATE balance_changes SET notarization_id = ?, balance = ?, notes_json = ?, channel_hold_note_json = ?, status = ? WHERE id = ?",
+        "UPDATE balance_changes SET notarization_id = ?, balance = ?, notes_json = ?, escrow_hold_note_json = ?, status = ? WHERE id = ?",
         notarization_id,
         balance_str,
         notes_json,
@@ -371,7 +371,7 @@ impl BalanceChangeStore {
     }
 
     let res = sqlx::query!(
-        r#"INSERT INTO balance_changes (account_id, change_number, balance, status, channel_hold_note_json, notes_json, notary_id, notarization_id) 
+        r#"INSERT INTO balance_changes (account_id, change_number, balance, status, escrow_hold_note_json, notes_json, notary_id, notarization_id) 
         VALUES (?, ?, ?, ?, ?, ?, ?, ?)"#,
         account_id,
         balance_change.change_number,

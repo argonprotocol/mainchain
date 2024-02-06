@@ -25,9 +25,9 @@ use crate::balance_changes::BalanceChangeStore;
 use crate::data_domain::JsDataDomain;
 use crate::notarization_tracker::NotarizationTracker;
 use crate::notary_client::NotaryClients;
-use crate::open_channels::OpenChannel;
+use crate::open_escrows::OpenEscrow;
 use crate::signer::Signer;
-use crate::{to_js_error, Channel, DataDomainStore, LocalchainTransfer, NotaryAccountOrigin};
+use crate::{to_js_error, DataDomainStore, Escrow, LocalchainTransfer, NotaryAccountOrigin};
 
 #[napi]
 #[derive(Clone)]
@@ -38,7 +38,7 @@ pub struct NotarizationBuilder {
   data_domains:
     Arc<Mutex<BoundedVec<(DataDomain, AccountId32), ConstU32<MAX_DOMAINS_PER_NOTARIZATION>>>>,
   loaded_accounts: Arc<Mutex<BTreeMap<(String, AccountType), LocalAccount>>>,
-  channels: Arc<Mutex<Vec<OpenChannel>>>,
+  escrows: Arc<Mutex<Vec<OpenEscrow>>>,
   db: SqlitePool,
   is_verified: Arc<Mutex<bool>>,
   is_finalized: Arc<Mutex<bool>>,
@@ -57,7 +57,7 @@ impl NotarizationBuilder {
       votes: Default::default(),
       data_domains: Default::default(),
       loaded_accounts: Default::default(),
-      channels: Default::default(),
+      escrows: Default::default(),
       is_verified: Default::default(),
       is_finalized: Default::default(),
       notary_id: Default::default(),
@@ -118,11 +118,11 @@ impl NotarizationBuilder {
   }
 
   #[napi(getter)]
-  pub async fn channels(&self) -> Vec<Channel> {
-    let channels = self.channels.lock().await;
+  pub async fn escrows(&self) -> Vec<Escrow> {
+    let escrows = self.escrows.lock().await;
     let mut result = vec![];
-    for channel in &*channels {
-      result.push(channel.inner().await);
+    for escrow in &*escrows {
+      result.push(escrow.inner().await);
     }
     result
   }
@@ -190,8 +190,8 @@ impl NotarizationBuilder {
 
       for note in change.notes {
         match note.note_type {
-          NoteType::Claim { .. } | NoteType::ChannelClaim => balance -= note.milligons as i128,
-          NoteType::Send { .. } | NoteType::ChannelSettle => balance += note.milligons as i128,
+          NoteType::Claim { .. } | NoteType::EscrowClaim => balance -= note.milligons as i128,
+          NoteType::Send { .. } | NoteType::EscrowSettle => balance += note.milligons as i128,
           _ => {}
         };
       }
@@ -300,14 +300,14 @@ impl NotarizationBuilder {
   }
 
   #[napi]
-  pub async fn can_add_channel(&self, channel: &OpenChannel, tax_address: String) -> bool {
+  pub async fn can_add_escrow(&self, escrow: &OpenEscrow, tax_address: String) -> bool {
     let balance_changes_by_account = (*(self.balance_changes_by_account.lock().await)).len();
     let imports = (*(self.imported_balance_changes.lock().await)).len();
     let mut added_accounts_needed = 2;
-    let channel = channel.inner().await;
+    let escrow = escrow.inner().await;
     let accounts_by_id = self.loaded_accounts.lock().await;
     for (_, account) in accounts_by_id.iter() {
-      if account.address == channel.to_address || account.address == tax_address {
+      if account.address == escrow.to_address || account.address == tax_address {
         added_accounts_needed -= 1;
       }
     }
@@ -316,55 +316,51 @@ impl NotarizationBuilder {
   }
 
   #[napi]
-  pub async fn cancel_channel(&self, open_channel: &OpenChannel) -> Result<()> {
-    let channel = open_channel.inner().await;
-    (*self.channels.lock().await).push(open_channel.clone());
+  pub async fn cancel_escrow(&self, open_escrow: &OpenEscrow) -> Result<()> {
+    let escrow = open_escrow.inner().await;
+    (*self.escrows.lock().await).push(open_escrow.clone());
     let sender = self
-      .add_account(
-        channel.from_address,
-        AccountType::Deposit,
-        channel.notary_id,
-      )
+      .add_account(escrow.from_address, AccountType::Deposit, escrow.notary_id)
       .await?;
 
     let balance_change_tx = self.get_balance_change(&sender).await?;
     let balance_lock = balance_change_tx.balance_change_lock();
     let mut balance_change = balance_lock.lock().await;
-    balance_change.push_note(0, NoteType::ChannelSettle);
+    balance_change.push_note(0, NoteType::EscrowSettle);
 
     Ok(())
   }
 
   #[napi]
-  pub async fn claim_channel(&self, open_channel: &OpenChannel, tax_address: String) -> Result<()> {
-    let channel = open_channel.inner().await;
+  pub async fn claim_escrow(&self, open_escrow: &OpenEscrow, tax_address: String) -> Result<()> {
+    let escrow = open_escrow.inner().await;
     {
       let mut notary_id = self.notary_id.lock().await;
       if let Some(notary_id) = *notary_id {
-        if channel.notary_id != notary_id {
+        if escrow.notary_id != notary_id {
           return Err(to_js_error(format!(
-            "Channel is not using the same notary ({:?}) as this notarization ({:?})",
-            channel.notary_id, self.notary_id
+            "Escrow is not using the same notary ({:?}) as this notarization ({:?})",
+            escrow.notary_id, self.notary_id
           )));
         }
       } else {
-        *notary_id = Some(channel.notary_id);
+        *notary_id = Some(escrow.notary_id);
       }
     }
-    let notary_id = channel.notary_id;
+    let notary_id = escrow.notary_id;
 
-    (*self.channels.lock().await).push(open_channel.clone());
+    (*self.escrows.lock().await).push(open_escrow.clone());
 
-    let settle_balance_change = channel.get_final().await.map_err(to_js_error)?;
+    let settle_balance_change = escrow.get_final().await.map_err(to_js_error)?;
     (*self.imported_balance_changes.lock().await).push(settle_balance_change);
 
     let claim_account = self
-      .add_account(channel.to_address.clone(), AccountType::Deposit, notary_id)
+      .add_account(escrow.to_address.clone(), AccountType::Deposit, notary_id)
       .await?;
 
     let claim_balance_change = self.get_balance_change(&claim_account).await?;
     let claim_result = claim_balance_change
-      .claim_channel(channel.settled_amount())
+      .claim_escrow(escrow.settled_amount())
       .await?;
 
     let tax_account = self
@@ -794,10 +790,10 @@ impl NotarizationBuilder {
     .await
     .map_err(to_js_error)?;
 
-    let channels = self.channels.lock().await;
-    for channel in (*channels).iter() {
-      let mut channel_inner = channel.inner().await;
-      channel_inner
+    let escrows = self.escrows.lock().await;
+    for escrow in (*escrows).iter() {
+      let mut escrow_inner = escrow.inner().await;
+      escrow_inner
         .mark_notarized(&mut *tx, notarization_id)
         .await
         .map_err(to_js_error)?;
@@ -1312,7 +1308,7 @@ mod test {
       }],
       signature: Signature([0u8; 64]).into(),
       change_number: 2,
-      channel_hold_note: None,
+      escrow_hold_note: None,
     };
     let balance_change = balance_change.sign(Bob.pair()).clone();
     let builder = NotarizationBuilder::new(pool.clone(), notary_clients.clone());
@@ -1364,7 +1360,7 @@ mod test {
       }],
       signature: Signature([0u8; 64]).into(),
       change_number: 2,
-      channel_hold_note: None,
+      escrow_hold_note: None,
     };
     let balance_change = balance_change.sign(Bob.pair()).clone();
     let builder = NotarizationBuilder::new(pool.clone(), notary_clients.clone());
@@ -1414,7 +1410,7 @@ mod test {
       account_type: balance_change.account_type,
       account_id: balance_change.account_id,
       balance: balance_change.balance,
-      channel_hold_note: balance_change.channel_hold_note.clone(),
+      escrow_hold_note: balance_change.escrow_hold_note.clone(),
       account_origin: AccountOrigin {
         account_uid: account_origin_uid,
         notebook_number: account_origin_notebook_number,

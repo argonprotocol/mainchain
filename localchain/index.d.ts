@@ -46,9 +46,9 @@ export const enum BalanceChangeStatus {
   WaitingForSendClaim = 4,
   Canceled = 5
 }
-export interface ChannelCloseOptions {
-  channelTaxAddress: string
-  channelClaimsSendToAddress?: string
+export interface EscrowCloseOptions {
+  escrowTaxAddress: string
+  escrowClaimsSendToAddress?: string
   votesAddress: string
   /** What's the minimum amount of tax we should wait for before voting on blocks */
   minimumVoteAmount?: number
@@ -131,7 +131,7 @@ export interface NotebookProof {
   balanceTip: Uint8Array
   changeNumber: number
   accountOrigin: NotaryAccountOrigin
-  channelHoldNoteJson?: string
+  escrowHoldNoteJson?: string
   leafIndex: number
   numberOfLeaves: number
   proof: Array<Uint8Array>
@@ -159,7 +159,7 @@ export interface LocalchainConfig {
 }
 export interface Constants {
   notarizationConstants: NotarizationConstants
-  channelConstants: ChannelConstants
+  escrowConstants: EscrowConstants
   dataDomainConstants: DataDomainConstants
 }
 export interface NotarizationConstants {
@@ -167,7 +167,7 @@ export interface NotarizationConstants {
   maxDataDomains: number
   maxBlockVotes: number
 }
-export interface ChannelConstants {
+export interface EscrowConstants {
   expirationTicks: number
   ticksToClaim: number
 }
@@ -205,14 +205,14 @@ export class BalanceChangeBuilder {
   get accountId32(): Promise<Uint8Array>
   send(amount: bigint, restrictToAddresses?: Array<string> | undefined | null): Promise<void>
   claim(amount: bigint): Promise<ClaimResult>
-  claimChannel(amount: bigint): Promise<ClaimResult>
+  claimEscrow(amount: bigint): Promise<ClaimResult>
   claimFromMainchain(transfer: LocalchainTransfer): Promise<void>
   sendToMainchain(amount: bigint): Promise<void>
-  createChannelHold(amount: bigint, dataDomain: DataDomain, dataDomainAddress: string): Promise<void>
+  createEscrowHold(amount: bigint, dataDomain: DataDomain, dataDomainAddress: string): Promise<void>
   sendToVote(amount: bigint): Promise<void>
   /** Lease a data domain. DataDomain leases are converted in full to tax. */
   leaseDataDomain(): Promise<bigint>
-  createPrivateServerChannelHold(amount: bigint, paymentAddress: string): Promise<void>
+  createPrivateServerEscrowHold(amount: bigint, paymentAddress: string): Promise<void>
 }
 export type BalanceChangeRow = BalanceChange
 export class BalanceChange {
@@ -220,7 +220,7 @@ export class BalanceChange {
   accountId: number
   changeNumber: number
   balance: string
-  channelHoldNoteJson?: string
+  escrowHoldNoteJson?: string
   notaryId: number
   notesJson?: string
   proofJson?: string
@@ -237,14 +237,14 @@ export class BalanceChangeStore {
 }
 export class BalanceSync {
   constructor(localchain: Localchain)
-  sync(options?: ChannelCloseOptions | undefined | null, signer?: Signer | undefined | null): Promise<BalanceSyncResult>
+  sync(options?: EscrowCloseOptions | undefined | null, signer?: Signer | undefined | null): Promise<BalanceSyncResult>
   syncUnsettledBalances(): Promise<Array<BalanceChange>>
   syncBalanceChange(balanceChange: BalanceChange): Promise<BalanceChange>
-  processPendingChannels(options: ChannelCloseOptions, signer: Signer): Promise<Array<NotarizationBuilder>>
+  processPendingEscrows(options: EscrowCloseOptions, signer: Signer): Promise<Array<NotarizationBuilder>>
 }
 export class BalanceSyncResult {
   get balanceChanges(): Array<BalanceChange>
-  get channelNotarizations(): Array<NotarizationBuilder>
+  get escrowNotarizations(): Array<NotarizationBuilder>
 }
 export type DataDomainRow = DataDomainLease
 export class DataDomainLease {
@@ -281,7 +281,7 @@ export class NotarizationBuilder {
   get notaryId(): Promise<number>
   get isFinalized(): Promise<boolean>
   get unclaimedTax(): Promise<bigint>
-  get channels(): Promise<Array<Channel>>
+  get escrows(): Promise<Array<Escrow>>
   get accounts(): Promise<Array<LocalAccount>>
   get balanceChangeBuilders(): Promise<Array<BalanceChangeBuilder>>
   get unusedVoteFunds(): Promise<bigint>
@@ -290,9 +290,9 @@ export class NotarizationBuilder {
   getBalanceChange(account: LocalAccount): Promise<BalanceChangeBuilder>
   addAccount(address: string, accountType: AccountType, notaryId: number): Promise<LocalAccount>
   loadAccount(account: LocalAccount): Promise<void>
-  canAddChannel(channel: OpenChannel, taxAddress: string): Promise<boolean>
-  cancelChannel(openChannel: OpenChannel): Promise<void>
-  claimChannel(openChannel: OpenChannel, taxAddress: string): Promise<void>
+  canAddEscrow(escrow: OpenEscrow, taxAddress: string): Promise<boolean>
+  cancelEscrow(openEscrow: OpenEscrow): Promise<void>
+  claimEscrow(openEscrow: OpenEscrow, taxAddress: string): Promise<void>
   addVote(vote: BlockVote): Promise<void>
   leaseDataDomain(useFundsFromAddress: string, taxAddress: string, dataDomain: DataDomain, registerToAddress: string): Promise<void>
   canAddBalanceChange(claimAddress: string, taxAddress: string): Promise<boolean>
@@ -348,7 +348,7 @@ export class BalanceTipResult {
   notebookNumber: number
   tick: number
 }
-export class Channel {
+export class Escrow {
   initialBalanceChangeJson: string
   notaryId: number
   fromAddress: string
@@ -365,20 +365,20 @@ export class Channel {
   get id(): number
   isPastClaimPeriod(currentTick: number): boolean
 }
-export class OpenChannel {
-  get channel(): Promise<Channel>
+export class OpenEscrow {
+  get escrow(): Promise<Escrow>
   sign(settledAmount: bigint, signer: Signer): Promise<SignatureResult>
   exportForSend(): Promise<Buffer>
   recordUpdatedSettlement(milligons: bigint, signature: Uint8Array): Promise<void>
 }
-export class OpenChannelsStore {
-  get(id: number): Promise<OpenChannel>
-  open(channel: Channel): OpenChannel
-  getClaimable(): Promise<Array<OpenChannel>>
-  /** Import a channel from a JSON string. Verifies with the notary that the channel hold is valid. */
-  importChannel(channelJson: Buffer): Promise<OpenChannel>
-  /** Create a new channel as a client. You must first notarize a channel hold note to the notary for the `client_address`. */
-  openClientChannel(accountId: number): Promise<OpenChannel>
+export class OpenEscrowsStore {
+  get(id: number): Promise<OpenEscrow>
+  open(escrow: Escrow): OpenEscrow
+  getClaimable(): Promise<Array<OpenEscrow>>
+  /** Import an escrow from a JSON string. Verifies with the notary that the escrow hold is valid. */
+  importEscrow(escrowJson: Buffer): Promise<OpenEscrow>
+  /** Create a new escrow as a client. You must first notarize an escrow hold note to the notary for the `client_address`. */
+  openClientEscrow(accountId: number): Promise<OpenEscrow>
 }
 export class Signer {
   constructor(signer: (address: string, signatureMessage: Uint8Array) => Promise<Uint8Array>)
@@ -398,7 +398,7 @@ export class Localchain {
   get accounts(): AccountStore
   get balanceChanges(): BalanceChangeStore
   get dataDomains(): DataDomainStore
-  get openChannels(): OpenChannelsStore
+  get openEscrows(): OpenEscrowsStore
   get balanceSync(): BalanceSync
   beginChange(): NotarizationBuilder
 }

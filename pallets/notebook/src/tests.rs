@@ -446,7 +446,7 @@ fn it_can_audit_notebooks() {
 				change_number: 1,
 				balance: 2000,
 				account_origin: AccountOrigin { notebook_number: 1, account_uid: 1 },
-				channel_hold_note: None,
+				escrow_hold_note: None,
 			}
 			.encode()]),
 			changed_account_origins: bounded_vec![AccountOrigin {
@@ -486,7 +486,7 @@ fn it_can_audit_notebooks() {
 							account_nonce: nonce.unique_saturated_into()
 						},
 					)],
-					channel_hold_note: None,
+					escrow_hold_note: None,
 					signature: ed25519::Signature([0u8; 64]).into(),
 				},],
 				vec![],

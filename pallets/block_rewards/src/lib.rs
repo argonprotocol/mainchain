@@ -94,8 +94,7 @@ pub mod pallet {
 		#[pallet::constant]
 		type HalvingBlocks: Get<u32>;
 
-		/// Percent as a number out of 100 of the block reward that goes to the miner. 1% of this is
-		/// for the channel pass signer
+		/// Percent as a number out of 100 of the block reward that goes to the miner.
 		#[pallet::constant]
 		type MinerPayoutPercent: Get<u32>;
 
