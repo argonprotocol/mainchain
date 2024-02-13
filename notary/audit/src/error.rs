@@ -3,11 +3,10 @@ use serde::{Deserialize, Serialize};
 use snafu::Snafu;
 use sp_core::crypto::AccountId32;
 use sp_runtime::{scale_info::TypeInfo, RuntimeString};
-use ulx_primitives::{tick::Tick, AccountType};
+use ulx_primitives::{tick::Tick, AccountType, MINIMUM_ESCROW_SETTLEMENT};
 
 use crate::AccountHistoryLookupError;
 
-const MIN_ESCROW_NOTE_MILLIGONS: u128 = ulx_primitives::MIN_ESCROW_NOTE_MILLIGONS;
 #[derive(Debug, PartialEq, Clone, Snafu, TypeInfo, Encode, Decode, Serialize, Deserialize)]
 pub enum VerifyError {
 	#[snafu(display("Missing account origin {account_id:?}, {account_type:?}"))]
@@ -120,7 +119,7 @@ pub enum VerifyError {
 	InvalidEscrowClaimers,
 
 	#[snafu(display(
-		"This escrow note is below the minimum amount required ({MIN_ESCROW_NOTE_MILLIGONS})"
+		"This escrow note is below the minimum amount required ({MINIMUM_ESCROW_SETTLEMENT})"
 	))]
 	EscrowNoteBelowMinimum,
 

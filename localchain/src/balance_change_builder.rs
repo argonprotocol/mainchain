@@ -1,4 +1,4 @@
-use crate::{to_js_error, AccountStore, JsDataDomain, LocalchainTransfer};
+use crate::{to_js_error, AccountStore, LocalchainTransfer};
 use napi::bindgen_prelude::*;
 use napi::Error;
 use sp_core::bounded_vec::BoundedVec;
@@ -8,7 +8,7 @@ use std::sync::Arc;
 use tokio::sync::Mutex;
 use ulx_primitives::{
   AccountId, AccountType, BalanceChange, DataDomain, Note, NoteType, DATA_DOMAIN_LEASE_COST,
-  MIN_ESCROW_NOTE_MILLIGONS,
+  MINIMUM_ESCROW_SETTLEMENT,
 };
 
 #[napi]
@@ -197,11 +197,11 @@ impl BalanceChangeBuilder {
     Ok(())
   }
 
-  #[napi(ts_args_type = "amount: bigint, dataDomain: DataDomain, dataDomainAddress: string")]
+  #[napi]
   pub async fn create_escrow_hold(
     &self,
     amount: BigInt,
-    data_domain: JsDataDomain,
+    data_domain: String,
     data_domain_address: String,
   ) -> napi::Result<()> {
     let mut balance_change = self.balance_change.lock().await;
@@ -219,14 +219,14 @@ impl BalanceChangeBuilder {
         balance_change.balance, amount
       )));
     }
-    if amount < MIN_ESCROW_NOTE_MILLIGONS {
+    if amount < MINIMUM_ESCROW_SETTLEMENT {
       return Err(Error::from_reason(format!(
         "Escrow amount {} is less than minimum {}",
-        amount, MIN_ESCROW_NOTE_MILLIGONS
+        amount, MINIMUM_ESCROW_SETTLEMENT
       )));
     }
 
-    let domain: DataDomain = data_domain.into();
+    let domain: DataDomain = DataDomain::parse(data_domain).map_err(to_js_error)?;
     // NOTE: escrow hold doesn't manipulate balance
     balance_change.push_note(
       amount,
@@ -335,11 +335,10 @@ impl ClaimResult {
 
 #[cfg(test)]
 mod test {
-  use super::*;
-  use crate::JsDataDomain;
   use sp_keyring::AccountKeyring::Bob;
   use sp_keyring::Ed25519Keyring::Alice;
-  use ulx_primitives::DataTLD;
+
+  use super::*;
 
   #[tokio::test]
   async fn test_building_balance_change() -> anyhow::Result<()> {
@@ -426,10 +425,7 @@ mod test {
     builder
       .create_escrow_hold(
         BigInt::from(1_000u128),
-        JsDataDomain {
-          domain_name: "test".to_string(),
-          top_level_domain: DataTLD::Flights,
-        },
+        "test.flights".to_string(),
         data_domain_author.clone(),
       )
       .await?;

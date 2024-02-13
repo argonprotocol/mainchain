@@ -46,7 +46,7 @@ CREATE TABLE IF NOT EXISTS balance_changes
 -- Escrows pending claim by this localchain. The settled_amount and settled_signature fields are only updated in the json when the escrow is settled.
 CREATE TABLE IF NOT EXISTS open_escrows
 (
-    id                              INTEGER NOT NULL PRIMARY KEY AUTOINCREMENT,
+    id                              TEXT NOT NULL PRIMARY KEY, -- the hash of the initial balance change
     is_client                       BOOLEAN NOT NULL,
     initial_balance_change_json     TEXT NOT NULL,
     balance_change_number           INT NOT NULL,

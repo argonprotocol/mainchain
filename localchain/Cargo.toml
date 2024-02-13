@@ -20,48 +20,49 @@ crate-type = ["lib", "cdylib"]
 targets = ["x86_64-unknown-linux-gnu"]
 
 [dependencies]
-napi = { version = "2.14", default-features = false, features = ["napi8", "async", "error_anyhow", "anyhow"] }
-napi-derive = "2.14"
+napi = { version = "2.15.1", default-features = false, features = ["napi8", "async", "error_anyhow", "anyhow"] }
+napi-derive = "2.15.0"
 anyhow = { version = "1" }
-futures = { version ="0.3" }
-getrandom = { version ="0.2" }
-parking_lot = { version ="0.12" }
+futures = { version = "0.3" }
+getrandom = { version = "0.2" }
+parking_lot = { version = "0.12" }
 async-trait = { version = "0.1" }
 codec = { package = "parity-scale-codec", version = "3.6", features = ["derive", "max-encoded-len"] }
 serde = { version = "1.0", features = ["derive"] }
 serde_json = { version = "1.0", features = ["raw_value", "arbitrary_precision"] }
 scale-info = { version = "2.10" }
-thiserror = { version ="1.0" }
+thiserror = { version = "1.0" }
 subxt = { version = "0.33", features = ["substrate-compat"] }
 subxt-signer = { version = "0.33", features = ["default"] }
-tokio = {  version =  "1.35", features = ["full"] }
-tokio-stream = {  version =  "0.1", features = ["sync"] }
-hex = {  version = "0.4" }
+tokio = { version = "1.35", features = ["full"] }
+tokio-stream = { version = "0.1", features = ["sync"] }
+hex = { version = "0.4" }
 sc-keystore = { version = "4.0.0-dev", git = "https://github.com/paritytech/polkadot-sdk.git", branch = "release-polkadot-v1.5.0" }
-sc-service = {  version = "0.10.0-dev", git = "https://github.com/paritytech/polkadot-sdk.git", branch = "release-polkadot-v1.5.0" }
+sc-service = { version = "0.10.0-dev", git = "https://github.com/paritytech/polkadot-sdk.git", branch = "release-polkadot-v1.5.0" }
 sp-keystore = { version = "0.27", git = "https://github.com/paritytech/polkadot-sdk.git", branch = "release-polkadot-v1.5.0" }
 jsonrpsee = { version = "0.20", features = ["server", "http-client", "ws-client", "macros", "client-ws-transport-native-tls"] }
 sc-utils = { version = "4.0.0-dev", git = "https://github.com/paritytech/polkadot-sdk.git", branch = "release-polkadot-v1.5.0" }
 sp-runtime = { version = "24.0.0", git = "https://github.com/paritytech/polkadot-sdk.git", branch = "release-polkadot-v1.5.0" }
 sp-core = { version = "21.0.0", git = "https://github.com/paritytech/polkadot-sdk.git", branch = "release-polkadot-v1.5.0", features = ["std", "serde"] }
-sc-cli =  { version = "0.10.0-dev", git = "https://github.com/paritytech/polkadot-sdk.git", branch = "release-polkadot-v1.5.0" }
-binary-merkle-tree = {  version = "4.0.0-dev", git = "https://github.com/paritytech/polkadot-sdk.git", branch = "release-polkadot-v1.5.0" }
-tracing = {  version="0.1" }
+sc-cli = { version = "0.10.0-dev", git = "https://github.com/paritytech/polkadot-sdk.git", branch = "release-polkadot-v1.5.0" }
+binary-merkle-tree = { version = "4.0.0-dev", git = "https://github.com/paritytech/polkadot-sdk.git", branch = "release-polkadot-v1.5.0" }
+tracing = { version = "0.1" }
 tracing-subscriber = { version = "0.3", features = ["env-filter"] }
-sqlx =  {   version = "0.7", features = [ "runtime-tokio", "sqlite", "macros", "chrono" ] }
-chrono = {version = "0.4"}
-clap = {  version = "4.4", features = ["derive", "cargo", "env"] }
+sqlx = { version = "0.7", features = ["runtime-tokio", "sqlite", "macros", "chrono"] }
+chrono = { version = "0.4" }
+clap = { version = "4.4", features = ["derive", "cargo", "env"] }
 lazy_static = "1.4.0"
+bech32 = { version = "0.10.0-beta" }
 
-ulixee-client = { path= "../client" }
-ulx-primitives = { path = "../primitives", features = [ "napi"] }
+ulixee-client = { path = "../client" }
+ulx-primitives = { path = "../primitives", features = ["napi"] }
 ulx-notary = { path = "../notary" }
 ulx-notary-audit = { path = "../notary/audit" }
 
 [dev-dependencies]
 frame-support = { version = "4.0.0-dev", git = "https://github.com/paritytech/polkadot-sdk.git", branch = "release-polkadot-v1.5.0" }
 sp-keyring = { version = "24.0.0", git = "https://github.com/paritytech/polkadot-sdk.git", branch = "release-polkadot-v1.5.0" }
-ulx-testing = {  path= "../testing" }
+ulx-testing = { path = "../testing" }
 
 [build-dependencies]
 napi-build = "2.1"
@@ -71,4 +72,4 @@ lto = true
 
 [features]
 default = []
-fast-runtime=["ulx-primitives/fast-runtime", "ulx-notary/fast-runtime"]
+fast-runtime = ["ulx-primitives/fast-runtime", "ulx-notary/fast-runtime"]

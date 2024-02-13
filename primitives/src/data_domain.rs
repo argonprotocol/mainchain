@@ -53,7 +53,32 @@ impl DataDomain {
 
 	#[cfg(feature = "std")]
 	pub fn from_string(domain_name: String, top_level_domain: DataTLD) -> Self {
-		Self { domain_name: RuntimeString::Owned(domain_name), top_level_domain }
+		Self { domain_name: RuntimeString::Owned(domain_name.to_lowercase()), top_level_domain }
+	}
+
+	#[cfg(feature = "std")]
+	pub fn parse(domain: String) -> Result<Self, String> {
+		let parts: Vec<&str> = domain.split('.').collect();
+		if parts.len() < 2 {
+			return Err("Invalid domain".to_string());
+		}
+		let tld = parts[1];
+		let domain_name = parts[0].to_lowercase();
+		let tld_str = format!("\"{}\"", tld);
+		let mut parsed_tld = serde_json::from_str(&tld_str).ok();
+		if parsed_tld.is_none() {
+			let tld_str = tld[0..1].to_uppercase() + &tld[1..];
+			let tld_str = format!("\"{}\"", tld_str);
+			parsed_tld = serde_json::from_str(&tld_str).ok();
+		}
+		if parsed_tld.is_none() {
+			let tld_str = format!("\"{}\"", tld.to_lowercase());
+			parsed_tld = serde_json::from_str(&tld_str).ok();
+		}
+		let Some(parsed_tld) = parsed_tld else {
+			return Err("Invalid tld".to_string());
+		};
+		Ok(Self::from_string(domain_name, parsed_tld))
 	}
 }
 

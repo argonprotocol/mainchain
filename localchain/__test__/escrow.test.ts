@@ -86,10 +86,10 @@ it('can run a data domain escrow', async () => {
     const ferdiechain = await createLocalchain(mainchainUrl);
 
     const dataDomain = {
-        domainName: 'example.com',
+        domainName: 'example',
         topLevelDomain: DataTLD.Analytics
     };
-    const dataDomainHash = bobchain.dataDomains.getHash("example.com", DataTLD.Analytics);
+    const dataDomainHash = bobchain.dataDomains.getHash("example.analytics");
     {
         const [bobChange, ferdieChange] = await Promise.all([
             transferMainchainToLocalchain(mainchainClient, bobchain, bob, 5000, 1),
@@ -107,8 +107,9 @@ it('can run a data domain escrow', async () => {
         expect(domains[0].name).toBe(dataDomain.domainName);
         expect(domains[0].tld).toBe(dataDomain.topLevelDomain);
 
-        await ferdieTracker.waitForFinalized(ferdiechain.mainchainClient);
-        await expect(ferdiechain.mainchainClient.getDataDomainRegistration(dataDomain.domainName, dataDomain.topLevelDomain)).resolves.toBeTruthy();
+        const ferdieMainchainClient = await ferdiechain.mainchainClient;
+        await ferdieTracker.waitForFinalized(ferdieMainchainClient);
+        await expect(ferdieMainchainClient.getDataDomainRegistration(dataDomain.domainName, dataDomain.topLevelDomain)).resolves.toBeTruthy();
     }
 
     await registerZoneRecord(mainchainClient, dataDomainHash, ferdie, ferdieDomainAddress.publicKey, 1, {
@@ -122,14 +123,15 @@ it('can run a data domain escrow', async () => {
         })
     });
 
-    const zoneRecord = await bobchain.mainchainClient.getDataDomainZoneRecord(dataDomain.domainName, dataDomain.topLevelDomain);
+    const mainchainClientBob = await bobchain.mainchainClient;
+    const zoneRecord = await mainchainClientBob.getDataDomainZoneRecord(dataDomain.domainName, dataDomain.topLevelDomain);
     expect(zoneRecord).toBeTruthy();
     expect(zoneRecord.notaryId).toBe(1);
     expect(zoneRecord.paymentAddress).toBe(ferdieDomainAddress.address);
     const bobEscrowHold = bobchain.beginChange();
     const account = await bobEscrowHold.addAccount(bobEscrow.address, AccountType.Deposit, zoneRecord.notaryId);
     const change = await bobEscrowHold.getBalanceChange(account);
-    await change.createEscrowHold(4000n, dataDomain, zoneRecord.paymentAddress);
+    await change.createEscrowHold(4000n, "example.Analytics", zoneRecord.paymentAddress);
     const holdTracker = await bobEscrowHold.notarizeAndWaitForNotebook(signer);
 
     const clientEscrow = await bobchain.openEscrows.openClientEscrow(account.id);
@@ -194,7 +196,8 @@ async function transferMainchainToLocalchain(mainchainClient: UlxClient, localch
     balanceChange: BalanceChangeBuilder
 }> {
     const nonce = await transferToLocalchain(account, amount, notaryId, mainchainClient);
-    const transfer = await localchain.mainchainClient.waitForLocalchainTransfer(account.address, nonce);
+    const locMainchainClient = await localchain.mainchainClient;
+    const transfer = await locMainchainClient.waitForLocalchainTransfer(account.address, nonce);
     const notarization = localchain.beginChange();
     const balanceChange = await notarization.claimFromMainchain(transfer);
     return {notarization, balanceChange};

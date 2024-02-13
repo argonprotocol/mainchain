@@ -1,10 +1,10 @@
 {
   "name": "@ulixee/localchain",
-  "version": "2.0.0-alpha.25",
+  "version": "2.0.0-alpha.26",
   "scripts": {
     "artifacts": "napi artifacts",
-    "build": "napi build --platform --release",
-    "build:debug": "napi build --platform",
+    "build": "napi build --platform --release --no-const-enum",
+    "build:debug": "napi build --platform --no-const-enum --features=fast-runtime",
     "prepublishOnly": "napi prepublish -t npm",
     "test": "jest",
     "universal": "napi universal",
@@ -46,6 +46,7 @@
     "typescript": "^5.3.3"
   },
   "engines": {
-    "node": ">= 16"
-  }
+    "node": ">= 18"
+  },
+  "packageManager": "yarn@4.1.0"
 }

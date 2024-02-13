@@ -563,7 +563,7 @@ impl NotarizationBuilder {
   #[napi]
   pub async fn claim_received_balance(
     &self,
-    balance_changes_json: Buffer,
+    balance_changes_json: String,
     claim_address: String,
     tax_address: String,
   ) -> Result<()> {
@@ -668,12 +668,12 @@ impl NotarizationBuilder {
   /// Exports balance changes (only) from this notarization builder with the intention that these will be sent to another
   /// user (who will import them into their own localchain). The returned byffer is utf8 encoded json.
   #[napi]
-  pub async fn export_for_send(&self) -> Result<Buffer> {
+  pub async fn export_for_send(&self) -> Result<String> {
     let notarization = self.to_notarization().await?;
 
     verify_changeset_signatures(&notarization.balance_changes.to_vec()).map_err(to_js_error)?;
 
-    let json = serde_json::to_vec(&notarization.balance_changes).map_err(to_js_error)?;
+    let json = serde_json::to_string(&notarization.balance_changes).map_err(to_js_error)?;
 
     let mut tx = self.db.begin().await.map_err(to_js_error)?;
     let Some(notary_id) = *(self.notary_id.lock().await) else {
@@ -690,7 +690,7 @@ impl NotarizationBuilder {
     }
     tx.commit().await.map_err(to_js_error)?;
     *(self.is_finalized.lock().await) = true;
-    Ok(Buffer::from(json))
+    Ok(json)
   }
 
   #[napi]
@@ -1314,7 +1314,7 @@ mod test {
     let builder = NotarizationBuilder::new(pool.clone(), notary_clients.clone());
     let res = builder
       .claim_received_balance(
-        serde_json::to_vec(&vec![balance_change])?.into(),
+        serde_json::to_string(&vec![balance_change])?,
         alice_address.clone(),
         alice_address.clone(),
       )
@@ -1366,7 +1366,7 @@ mod test {
     let builder = NotarizationBuilder::new(pool.clone(), notary_clients.clone());
     let _ = builder
       .claim_received_balance(
-        serde_json::to_vec(&vec![balance_change])?.into(),
+        serde_json::to_string(&vec![balance_change])?,
         alice_address.clone(),
         alice_address.clone(),
       )

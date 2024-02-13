@@ -28,7 +28,8 @@ it('can transfer from mainchain to local', async () => {
 
     const nonce = await transferToLocalchain(bob, 5000, 1, mainchainClient);
     const bobchain = await createLocalchain(mainchainUrl);
-    const transfer = await bobchain.mainchainClient.waitForLocalchainTransfer(bob.address, nonce);
+    const bobMainchainClient = await bobchain.mainchainClient;
+    const transfer = await bobMainchainClient.waitForLocalchainTransfer(bob.address, nonce);
     expect(transfer).toBeTruthy();
     expect(transfer?.amount).toBe(5000n);
     const notarization = bobchain.beginChange();
@@ -82,7 +83,8 @@ it('can transfer from mainchain to local to mainchain', async () => {
     const nonce = await transferToLocalchain(bob, 5000, 1, mainchainClient);
     const bobchain = await createLocalchain(mainchainUrl);
     {
-        const transfer = await bobchain.mainchainClient.waitForLocalchainTransfer(bob.address, nonce);
+        const bobMainchainClient = await bobchain.mainchainClient;
+        const transfer = await bobMainchainClient.waitForLocalchainTransfer(bob.address, nonce);
         const notarization = bobchain.beginChange();
         const bobLocalAccount = await notarization.addAccount(bob.address, AccountType.Deposit, 1);
         const balanceChange = await notarization.getBalanceChange(bobLocalAccount);
@@ -92,7 +94,7 @@ it('can transfer from mainchain to local to mainchain', async () => {
         await tracker.getNotebookProof();
     }
 
-    let jsonClaims: Buffer;
+    let jsonClaims: string;
     {
         const notarization = bobchain.beginChange();
         const bobLocalAccount = await notarization.addAccount(bob.address, AccountType.Deposit, 1);
@@ -113,14 +115,14 @@ it('can transfer from mainchain to local to mainchain', async () => {
         await balanceChange.sendToMainchain(balance);
         const tracker = await notarization.notarizeAndWaitForNotebook(signer);
         console.log('Notarized. Waiting for notebook %s at %s', tracker.notebookNumber, tracker.notaryId);
-        const mainchainClient = alicechain.mainchainClient;
+        const mainchainClient = await alicechain.mainchainClient;
         const finalized = await mainchainClient.waitForNotebookFinalized(tracker.notaryId, tracker.notebookNumber);
         console.log('Finalized notebook %s at %s', tracker.notebookNumber, finalized);
         const changesRoot = await mainchainClient.getAccountChangesRoot(tracker.notaryId, tracker.notebookNumber);
         console.log('Changes root', changesRoot);
         expect(changesRoot).toBeTruthy();
         try {
-            const finalizedBlock = await tracker.waitForFinalized(alicechain.mainchainClient);
+            const finalizedBlock = await tracker.waitForFinalized(mainchainClient);
             console.log('Finalized block %s', finalizedBlock);
         } catch (err) {
             console.error(err);

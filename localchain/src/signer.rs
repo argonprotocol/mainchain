@@ -29,14 +29,23 @@ pub struct Signer {
 }
 
 #[napi]
+pub enum CryptoType {
+  Ed25519,
+  Sr25519,
+  Ecdsa,
+}
+
+#[napi]
 impl Signer {
   #[napi(
     constructor,
-    ts_args_type = "signer: (address: string, signatureMessage: Uint8Array) => Promise<Uint8Array>"
+    ts_args_type = "signer?: (address: string, signatureMessage: Uint8Array) => Promise<Uint8Array>"
   )]
-  pub fn new(signer: ThreadsafeFunction<(String, Uint8Array), ErrorStrategy::Fatal>) -> Self {
+  pub fn new(
+    signer: Option<ThreadsafeFunction<(String, Uint8Array), ErrorStrategy::Fatal>>,
+  ) -> Self {
     Signer {
-      sign_from_js: Some(signer),
+      sign_from_js: signer,
       keystore: None,
       address_to_public_keys: Arc::new(Mutex::new(HashMap::new())),
     }
@@ -47,6 +56,33 @@ impl Signer {
       sign_from_js: None,
       keystore: Some(keystore),
       address_to_public_keys: Arc::new(Mutex::new(HashMap::new())),
+    }
+  }
+
+  #[napi]
+  pub fn create_account_id(&self, crypto_type: CryptoType) -> Result<String> {
+    let Some(ref keystore) = self.keystore else {
+      return Err(Error::from_reason("No keystore loaded"));
+    };
+    match crypto_type {
+      CryptoType::Ed25519 => {
+        let public = keystore
+          .ed25519_generate_new(ACCOUNT, None)
+          .map_err(to_js_error)?;
+        Ok(public.to_ss58check_with_version(AccountStore::address_format()))
+      }
+      CryptoType::Sr25519 => {
+        let public = keystore
+          .sr25519_generate_new(ACCOUNT, None)
+          .map_err(to_js_error)?;
+        Ok(public.to_ss58check_with_version(AccountStore::address_format()))
+      }
+      CryptoType::Ecdsa => {
+        let public = keystore
+          .ecdsa_generate_new(ACCOUNT, None)
+          .map_err(to_js_error)?;
+        Ok(public.to_ss58check_with_version(AccountStore::address_format()))
+      }
     }
   }
 
@@ -83,6 +119,36 @@ impl Signer {
     };
     self.keystore = Some(keystore);
     Ok(())
+  }
+
+  #[napi]
+  pub fn can_sign(&self, address: String) -> bool {
+    if let Some(keystore) = self.keystore.as_ref() {
+      let address_format = AccountStore::address_format();
+
+      if keystore
+        .sr25519_public_keys(ACCOUNT)
+        .iter()
+        .any(|x| x.to_ss58check_with_version(address_format) == address)
+      {
+        return true;
+      }
+      if keystore
+        .ed25519_public_keys(ACCOUNT)
+        .iter()
+        .any(|x| x.to_ss58check_with_version(address_format) == address)
+      {
+        return true;
+      }
+      if keystore
+        .ecdsa_public_keys(ACCOUNT)
+        .iter()
+        .any(|x| x.to_ss58check_with_version(address_format) == address)
+      {
+        return true;
+      }
+    }
+    return false;
   }
 
   #[napi]

@@ -2,10 +2,9 @@ use chrono::NaiveDateTime;
 use napi::bindgen_prelude::*;
 use sp_runtime::RuntimeString;
 use sqlx::{FromRow, SqliteConnection, SqlitePool};
-
 use ulx_primitives::{DataDomain, DataTLD};
 
-use crate::{to_js_error, MainchainClient};
+use crate::to_js_error;
 
 #[derive(FromRow, Clone)]
 #[allow(dead_code)]
@@ -25,16 +24,19 @@ impl DataDomainRow {}
 #[napi]
 pub struct DataDomainStore {
   db: SqlitePool,
-  mainchain_client: MainchainClient,
 }
 
 #[napi]
 impl DataDomainStore {
-  pub(crate) fn new(db: SqlitePool, mainchain_client: MainchainClient) -> Self {
-    Self {
-      db,
-      mainchain_client,
-    }
+  pub(crate) fn new(db: SqlitePool) -> Self {
+    Self { db }
+  }
+
+  #[napi]
+  pub fn tld_from_string(tld: String) -> Result<DataTLD> {
+    let tld_json_str = format!("\"{}\"", tld);
+    let tld: DataTLD = serde_json::from_str(&tld_json_str).map_err(to_js_error)?;
+    Ok(tld)
   }
 
   #[napi(getter)]
@@ -47,21 +49,25 @@ impl DataDomainStore {
   }
 
   #[napi]
-  pub fn get_hash(&self, domain_name: String, tld: DataTLD) -> Uint8Array {
-    let domain = DataDomain {
-      domain_name: RuntimeString::Owned(domain_name),
-      top_level_domain: tld,
+  pub fn hash_domain(&self, domain: JsDataDomain) -> Uint8Array {
+    let parsed_domain = DataDomain {
+      domain_name: RuntimeString::Owned(domain.domain_name.clone()),
+      top_level_domain: domain.top_level_domain.clone(),
     };
-    domain.hash().0.into()
+    parsed_domain.hash().0.into()
   }
 
   #[napi]
-  pub async fn is_registered(&self, domain_name: String, tld: DataTLD) -> Result<bool> {
-    let registration = self
-      .mainchain_client
-      .get_data_domain_registration(domain_name, tld)
-      .await?;
-    Ok(registration.is_some())
+  pub fn get_hash(domain: String) -> Result<Uint8Array> {
+    let domain = DataDomain::parse(domain).map_err(to_js_error)?;
+    Ok(domain.hash().0.into())
+  }
+
+  #[napi]
+  pub fn parse(domain: String) -> Result<JsDataDomain> {
+    DataDomain::parse(domain)
+      .map_err(to_js_error)
+      .map(Into::into)
   }
 
   #[napi]
@@ -148,8 +154,7 @@ mod test {
 
   #[sqlx::test]
   async fn test_data_domain_store(pool: SqlitePool) -> anyhow::Result<()> {
-    let mainchain_client = MainchainClient::mock();
-    let store = DataDomainStore::new(pool, mainchain_client);
+    let store = DataDomainStore::new(pool);
     let domain = DataDomain::new("test", DataTLD::Cars);
     let js_domain: JsDataDomain = domain.into();
 

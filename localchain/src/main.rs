@@ -72,7 +72,7 @@ async fn main() -> anyhow::Result<()> {
   let keystore = read_keystore(&base_path, cli.keystore_params)?;
 
   let localchain = Localchain::load(LocalchainConfig {
-    path: base_path.path().to_str().unwrap().to_string(),
+    db_path: base_path.path().to_str().unwrap().to_string(),
     mainchain_url: cli.trusted_rpc_url.clone(),
     ntp_pool_url: Some(cli.ntp_pool_url.clone()),
   })

@@ -24,7 +24,7 @@ use ulx_primitives::{AccountType, BlockVote};
 pub struct BalanceSync {
   db: SqlitePool,
   ticker: TickerRef,
-  mainchain_client: MainchainClient,
+  mainchain_client: Arc<Mutex<Option<MainchainClient>>>,
   notary_clients: NotaryClients,
   lock: Arc<Mutex<()>>,
   open_escrows: OpenEscrowsStore,
@@ -212,14 +212,14 @@ impl BalanceSync {
           .sync_client_escrow(notary_id, &open_escrow, &mut escrow, notarization)
           .await
         {
-          tracing::warn!("Error syncing client escrow (#{}): {:?}", escrow.id(), e);
+          tracing::warn!("Error syncing client escrow (#{}): {:?}", escrow.id, e);
         }
       } else {
         if let Err(e) = self
           .sync_server_escrow(&open_escrow, &mut escrow, &options, notarization, signer)
           .await
         {
-          tracing::warn!("Error syncing server escrow (#{}): {:?}", escrow.id(), e);
+          tracing::warn!("Error syncing server escrow (#{}): {:?}", escrow.id, e);
         }
         if notarization.is_finalized().await {
           if let Some(n) = builder_by_notary.remove(&notary_id) {
@@ -270,13 +270,17 @@ impl BalanceSync {
     signer: &Signer,
     options: &EscrowCloseOptions,
   ) -> anyhow::Result<()> {
+    let mainchain_mutex = self.mainchain_client.lock().await;
+    let Some(ref mainchain_client) = *mainchain_mutex else {
+      return Err(anyhow::anyhow!(
+        "Cannot create votes.. No mainchain client available!"
+      ));
+    };
+
     let (total_available_tax, tax_accounts) = self.get_available_tax_by_account(notarization).await;
 
     let current_tick = self.ticker.current();
-    let Some(best_block_for_vote) = self
-      .mainchain_client
-      .get_vote_block_hash(current_tick)
-      .await?
+    let Some(best_block_for_vote) = mainchain_client.get_vote_block_hash(current_tick).await?
     else {
       return Ok(());
     };
@@ -396,7 +400,7 @@ impl BalanceSync {
     if escrow.is_past_claim_period(current_tick) {
       tracing::warn!(
         "Escrow expired and we missed claim window, marking unable to claim. id={}",
-        escrow.id()
+        escrow.id
       );
       let mut db = self.db.acquire().await?;
       escrow.mark_unable_to_claim(&mut db).await?;
@@ -405,7 +409,7 @@ impl BalanceSync {
 
     tracing::debug!(
       "Server escrow {} ready for claim. escrow address={}, change number={}",
-      escrow.id(),
+      escrow.id,
       escrow.from_address,
       escrow.balance_change_number
     );
@@ -454,7 +458,7 @@ impl BalanceSync {
       if escrow.is_past_claim_period(current_tick) {
         tracing::info!(
           "An escrow was not claimed by the recipient. We're taking it back. id={}",
-          escrow.id()
+          escrow.id
         );
         notarization.cancel_escrow(&open_escrow).await?;
       }
@@ -638,12 +642,21 @@ impl BalanceSync {
 
   pub async fn check_finalized(&self, balance_change: &mut BalanceChangeRow) -> anyhow::Result<()> {
     let mut tx = self.db.begin().await?;
-    let latest_notebook = self
-      .mainchain_client
+
+    let mainchain_mutex = self.mainchain_client.lock().await;
+    let Some(ref mainchain_client) = *mainchain_mutex else {
+      tracing::warn!(
+        "Cannot synchronize finalization of balance change; id={}. No mainchain client available.",
+        balance_change.id,
+      );
+      return Ok(());
+    };
+
+    let latest_notebook = mainchain_client
       .get_latest_notebook(balance_change.notary_id as u32)
       .await?;
 
-    let latest_finalized = self.mainchain_client.latest_finalized_number().await?;
+    let latest_finalized = mainchain_client.latest_finalized_number().await?;
 
     let notebook_number = sqlx::query_scalar!(
       "SELECT notebook_number FROM notarizations WHERE id = ?",
@@ -662,8 +675,7 @@ impl BalanceSync {
       return Ok(());
     }
 
-    let account_change_root = self
-      .mainchain_client
+    let account_change_root = mainchain_client
       .get_account_changes_root(notary_id, notebook_number)
       .await?;
 

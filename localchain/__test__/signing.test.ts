@@ -11,7 +11,7 @@ it('can sign a message from javscript', async () => {
     const mainchainUrl = await mainchain.launch();
     const bobchain = await Localchain.load({
         mainchainUrl: mainchainUrl,
-        path: ':memory:',
+        dbPath: ':memory:',
     });
     closeOnTeardown(bobchain);
     const addressKeyring = new Keyring();

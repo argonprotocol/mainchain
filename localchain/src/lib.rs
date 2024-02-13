@@ -3,12 +3,14 @@
 #[macro_use]
 extern crate napi_derive;
 
+use std::sync::Arc;
+use std::time::Duration;
+
 use napi::bindgen_prelude::*;
 use sc_service::BasePath;
 use sqlx::Sqlite;
 use sqlx::{migrate::MigrateDatabase, SqlitePool};
-use std::time::Duration;
-use ulx_primitives::tick::Ticker;
+use tokio::sync::Mutex;
 
 pub use accounts::*;
 pub use balance_changes::*;
@@ -18,6 +20,7 @@ pub use mainchain_client::*;
 pub use notary_client::*;
 pub use open_escrows::*;
 pub use signer::Signer;
+use ulx_primitives::tick::Ticker;
 
 mod accounts;
 mod balance_change_builder;
@@ -38,13 +41,14 @@ pub(crate) mod test_utils;
 pub struct Localchain {
   pub(crate) db: SqlitePool,
   pub(crate) ticker: TickerRef,
-  pub(crate) mainchain_client: MainchainClient,
+  pub(crate) mainchain_client: Arc<Mutex<Option<MainchainClient>>>,
   pub(crate) notary_clients: NotaryClients,
+  pub path: String,
 }
 
 #[napi(object)]
 pub struct LocalchainConfig {
-  pub path: String,
+  pub db_path: String,
   pub mainchain_url: String,
   pub ntp_pool_url: Option<String>,
 }
@@ -60,19 +64,7 @@ impl ObjectFinalize for Localchain {
 
 #[napi]
 impl Localchain {
-  #[napi(factory)]
-  pub async fn load(config: LocalchainConfig) -> Result<Localchain> {
-    let _ = tracing_subscriber::fmt()
-      .with_env_filter(tracing_subscriber::EnvFilter::from_default_env())
-      // RUST_LOG=trace,soketto=info,sqlx=info,jsonrpsee_core=info
-      .try_init();
-    tracing::info!("Loading localchain at {:?}", config.path);
-
-    let LocalchainConfig {
-      path,
-      mainchain_url,
-      ntp_pool_url,
-    } = config;
+  pub async fn create_db(path: String) -> Result<SqlitePool> {
     if !Sqlite::database_exists(&path).await.unwrap_or(false) {
       Sqlite::create_database(&path)
         .await
@@ -84,6 +76,20 @@ impl Localchain {
       .run(&db)
       .await
       .map_err(|e| Error::from_reason(format!("Error migrating database {}", e.to_string())))?;
+    Ok(db)
+  }
+
+  #[napi(factory)]
+  pub async fn load(config: LocalchainConfig) -> Result<Localchain> {
+    Self::config_logs();
+    tracing::info!("Loading localchain at {:?}", config.db_path);
+
+    let LocalchainConfig {
+      db_path,
+      mainchain_url,
+      ntp_pool_url,
+    } = config;
+    let db = Self::create_db(db_path.clone()).await?;
 
     let mainchain_client = MainchainClient::connect(mainchain_url, 30_000)
       .await
@@ -96,18 +102,61 @@ impl Localchain {
         .map_err(to_js_error)?;
     }
 
+    let mainchain_mutex = Arc::new(Mutex::new(Some(mainchain_client.clone())));
+
     Ok(Localchain {
       db,
+      path: db_path,
       ticker: TickerRef { ticker },
-      mainchain_client: mainchain_client.clone(),
-      notary_clients: NotaryClients::new(&mainchain_client),
+      mainchain_client: mainchain_mutex.clone(),
+      notary_clients: NotaryClients::from(mainchain_mutex.clone()),
     })
+  }
+
+  #[napi(factory)]
+  pub async fn load_without_mainchain(
+    db_path: String,
+    ticker_config: TickerConfig,
+  ) -> Result<Localchain> {
+    Self::config_logs();
+    tracing::info!("Loading localchain at {:?}", db_path);
+
+    let mut ticker = Ticker::new(
+      ticker_config.tick_duration_millis as u64,
+      ticker_config.genesis_utc_time as u64,
+    );
+    if let Some(ntp_pool_url) = ticker_config.ntp_pool_url {
+      ticker
+        .lookup_ntp_offset(&ntp_pool_url)
+        .await
+        .map_err(to_js_error)?;
+    }
+    let db = Self::create_db(db_path.clone()).await?;
+
+    let mainchain_mutex = Arc::new(Mutex::new(None));
+
+    Ok(Localchain {
+      db,
+      path: db_path,
+      ticker: TickerRef { ticker },
+      mainchain_client: mainchain_mutex.clone(),
+      notary_clients: NotaryClients::from(mainchain_mutex),
+    })
+  }
+
+  #[napi]
+  pub async fn attach_mainchain(&self, mainchain_client: &MainchainClient) {
+    let mut mainchain_mutex = self.mainchain_client.lock().await;
+    *mainchain_mutex = Some(mainchain_client.clone());
   }
 
   #[napi]
   pub async fn close(&self) -> Result<()> {
     tracing::trace!("Closing Localchain");
-    self.mainchain_client.close().await.map_err(to_js_error)?;
+    let mut mainchain_client = self.mainchain_client.lock().await;
+    if let Some(mainchain_client) = mainchain_client.take() {
+      mainchain_client.close().await.map_err(to_js_error)?;
+    }
     self.notary_clients.close().await;
     if !self.db.is_closed() {
       self.db.close().await;
@@ -129,12 +178,12 @@ impl Localchain {
   pub fn current_tick(&self) -> u32 {
     self.ticker.current()
   }
+
   pub fn duration_to_next_tick(&self) -> Duration {
     self.ticker.duration_to_next_tick()
   }
-
   #[napi(getter)]
-  pub fn constants(&self) -> Constants {
+  pub fn constants() -> Constants {
     Constants::default()
   }
 
@@ -144,8 +193,9 @@ impl Localchain {
   }
 
   #[napi(getter)]
-  pub fn mainchain_client(&self) -> MainchainClient {
-    self.mainchain_client.clone()
+  pub async fn mainchain_client(&self) -> Option<MainchainClient> {
+    let mainchain_client = self.mainchain_client.lock().await;
+    mainchain_client.clone()
   }
 
   #[napi(getter)]
@@ -155,7 +205,7 @@ impl Localchain {
 
   #[napi(getter)]
   pub fn accounts(&self) -> accounts::AccountStore {
-    accounts::AccountStore::new(self)
+    accounts::AccountStore::new(self.db.clone())
   }
 
   #[napi(getter)]
@@ -165,7 +215,7 @@ impl Localchain {
 
   #[napi(getter)]
   pub fn data_domains(&self) -> data_domain::DataDomainStore {
-    data_domain::DataDomainStore::new(self.db.clone(), self.mainchain_client.clone())
+    data_domain::DataDomainStore::new(self.db.clone())
   }
 
   #[napi(getter)]
@@ -181,6 +231,13 @@ impl Localchain {
   #[napi]
   pub fn begin_change(&self) -> notarization_builder::NotarizationBuilder {
     notarization_builder::NotarizationBuilder::new(self.db.clone(), self.notary_clients.clone())
+  }
+
+  fn config_logs() {
+    let _ = tracing_subscriber::fmt()
+      .with_env_filter(tracing_subscriber::EnvFilter::from_default_env())
+      // RUST_LOG=trace,soketto=info,sqlx=info,jsonrpsee_core=info
+      .try_init();
   }
 }
 
@@ -275,4 +332,11 @@ impl TickerRef {
   pub fn duration_to_next_tick(&self) -> Duration {
     self.ticker.duration_to_next_tick()
   }
+}
+
+#[napi(object)]
+pub struct TickerConfig {
+  pub tick_duration_millis: i64,
+  pub genesis_utc_time: i64,
+  pub ntp_pool_url: Option<String>,
 }

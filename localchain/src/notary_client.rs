@@ -21,7 +21,7 @@ use ulx_primitives::{
 #[derive(Clone)]
 pub struct NotaryClients {
   clients_by_id: Arc<Mutex<HashMap<u32, NotaryClient>>>,
-  mainchain_client: MainchainClient,
+  mainchain_client: Arc<Mutex<Option<MainchainClient>>>,
 }
 
 #[napi]
@@ -30,7 +30,14 @@ impl NotaryClients {
   pub fn new(mainchain_client: &MainchainClient) -> Self {
     Self {
       clients_by_id: Arc::new(Mutex::new(HashMap::new())),
-      mainchain_client: mainchain_client.clone(),
+      mainchain_client: Arc::new(Mutex::new(Some(mainchain_client.clone()))),
+    }
+  }
+
+  pub fn from(mainchain_client: Arc<Mutex<Option<MainchainClient>>>) -> Self {
+    Self {
+      clients_by_id: Arc::new(Mutex::new(HashMap::new())),
+      mainchain_client: mainchain_client,
     }
   }
 
@@ -39,6 +46,11 @@ impl NotaryClients {
     for (_, client) in clients_by_id.drain() {
       drop(client);
     }
+  }
+
+  pub async fn attach_mainchain(&self, mainchain_client: Option<MainchainClient>) {
+    let mut mainchain_client_ref = self.mainchain_client.lock().await;
+    *mainchain_client_ref = mainchain_client;
   }
 
   #[napi]
@@ -56,8 +68,13 @@ impl NotaryClients {
       }
     }
 
-    let Some(notary_details) = self
-      .mainchain_client
+    let mainchain_mutex = self.mainchain_client.lock().await;
+
+    let Some(ref mainchain_client) = *mainchain_mutex else {
+      return Err(to_js_error("Mainchain client not set"));
+    };
+
+    let Some(notary_details) = mainchain_client
       .get_notary_details(notary_id)
       .await
       .map_err(to_js_error)?

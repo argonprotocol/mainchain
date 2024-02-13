@@ -15,7 +15,7 @@ use sp_debug_derive::RuntimeDebug;
 	Serialize,
 	Deserialize,
 )]
-#[serde(rename_all = "camelCase")]
+#[serde(rename_all = "kebab-case")]
 #[cfg_attr(not(feature = "napi"), derive(Clone))]
 #[cfg_attr(feature = "napi", napi_derive::napi)]
 pub enum DataTLD {

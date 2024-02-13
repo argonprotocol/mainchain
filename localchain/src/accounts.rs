@@ -1,4 +1,4 @@
-use crate::{to_js_error, Localchain};
+use crate::to_js_error;
 use chrono::NaiveDateTime;
 use napi::bindgen_prelude::*;
 use sp_core::crypto::{
@@ -95,11 +95,8 @@ pub const ADDRESS_PREFIX: u16 = Ss58AddressFormatRegistry::SubstrateAccount as u
 
 #[napi]
 impl AccountStore {
-  #[napi(constructor)]
-  pub fn new(localchain: &Localchain) -> Self {
-    AccountStore {
-      pool: localchain.db.clone(),
-    }
+  pub(crate) fn new(pool: SqlitePool) -> Self {
+    Self { pool }
   }
 
   pub fn parse_address(address: &str) -> Result<AccountId32> {

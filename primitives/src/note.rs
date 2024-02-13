@@ -97,7 +97,7 @@ impl From<i64> for AccountType {
 
 pub const ESCROW_EXPIRATION_TICKS: u32 = prod_or_fast!(60, 2);
 pub const ESCROW_CLAWBACK_TICKS: u32 = 15; // 15 after expiration
-pub const MIN_ESCROW_NOTE_MILLIGONS: u128 = 5;
+pub const MINIMUM_ESCROW_SETTLEMENT: u128 = 5u128;
 pub type MaxNoteRecipients = ConstU32<10>;
 
 pub const TAX_PERCENT_BASE: u128 = 20;

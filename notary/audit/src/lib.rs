@@ -20,7 +20,7 @@ use ulx_primitives::{
 	BalanceChange, BalanceProof, BalanceTip, BlockVote, ChainTransfer, DataDomainHash,
 	NewAccountOrigin, NotaryId, Note, NoteType, Notebook, NotebookHeader, NotebookNumber,
 	VoteMinimum, DATA_DOMAIN_LEASE_COST, ESCROW_CLAWBACK_TICKS, ESCROW_EXPIRATION_TICKS,
-	MIN_ESCROW_NOTE_MILLIGONS, TAX_PERCENT_BASE,
+	MINIMUM_ESCROW_SETTLEMENT, TAX_PERCENT_BASE,
 };
 
 pub use crate::error::VerifyError;
@@ -753,7 +753,7 @@ pub fn verify_notarization_allocation(
 				},
 				NoteType::EscrowHold { .. } => {
 					ensure!(
-						note.milligons >= MIN_ESCROW_NOTE_MILLIGONS,
+						note.milligons >= MINIMUM_ESCROW_SETTLEMENT,
 						VerifyError::InvalidEscrowHoldNote
 					);
 					// A escrow doesn't change the source balance

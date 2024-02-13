@@ -281,7 +281,7 @@ if (!nativeBinding) {
   throw new Error(`Failed to load native binding`)
 }
 
-const { DataTLD, AccountType, LocalAccount, AccountStore, BalanceChangeBuilder, BalanceChange, BalanceChangeStatus, BalanceChangeStore, BalanceSync, BalanceSyncResult, DataDomainLease, DataDomainStore, MainchainClient, NotarizationBuilder, NotarizationTracker, NotaryClients, NotaryClient, NotebookMeta, BalanceTipResult, Channel, OpenChannel, OpenChannelsStore, Signer, Localchain, TickerRef } = nativeBinding
+const { DataTLD, AccountType, LocalAccount, AccountStore, BalanceChangeBuilder, BalanceChange, BalanceChangeStatus, BalanceChangeStore, BalanceSync, BalanceSyncResult, DataDomainLease, DataDomainStore, MainchainClient, NotarizationBuilder, NotarizationTracker, NotaryClients, NotaryClient, NotebookMeta, BalanceTipResult, Escrow, OpenEscrow, OpenEscrowsStore, Signer, CryptoType, Localchain, TickerRef } = nativeBinding
 
 module.exports.DataTLD = DataTLD
 module.exports.AccountType = AccountType
@@ -302,9 +302,10 @@ module.exports.NotaryClients = NotaryClients
 module.exports.NotaryClient = NotaryClient
 module.exports.NotebookMeta = NotebookMeta
 module.exports.BalanceTipResult = BalanceTipResult
-module.exports.Channel = Channel
-module.exports.OpenChannel = OpenChannel
-module.exports.OpenChannelsStore = OpenChannelsStore
+module.exports.Escrow = Escrow
+module.exports.OpenEscrow = OpenEscrow
+module.exports.OpenEscrowsStore = OpenEscrowsStore
 module.exports.Signer = Signer
+module.exports.CryptoType = CryptoType
 module.exports.Localchain = Localchain
 module.exports.TickerRef = TickerRef
