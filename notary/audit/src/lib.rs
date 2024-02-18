@@ -6,10 +6,7 @@ use log::trace;
 use serde::{Deserialize, Serialize};
 use snafu::Snafu;
 use sp_core::{crypto::AccountId32, H256};
-use sp_runtime::{
-	scale_info::TypeInfo,
-	traits::{BlakeTwo256, Verify},
-};
+use sp_runtime::{scale_info::TypeInfo, traits::BlakeTwo256};
 use sp_std::{
 	collections::{btree_map::BTreeMap, btree_set::BTreeSet},
 	vec::Vec,
@@ -354,10 +351,7 @@ pub fn verify_voting_sources(
 			.get_mut(&(block_vote.data_domain_hash.clone(), block_vote.data_domain_account.clone()))
 			.ok_or(VerifyError::BlockVoteDataDomainMismatch)?;
 		ensure!(*count > 0, VerifyError::BlockVoteEscrowReused);
-		ensure!(
-			block_vote.signature.verify(&block_vote.hash()[..], &block_vote.account_id),
-			VerifyError::BlockVoteInvalidSignature
-		);
+
 		*count -= 1;
 	}
 	Ok(())

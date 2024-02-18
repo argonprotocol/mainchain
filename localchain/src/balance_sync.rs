@@ -8,12 +8,9 @@ use crate::NotaryClients;
 use crate::{to_js_error, TickerRef};
 use crate::{Escrow, MainchainClient};
 use crate::{Localchain, OpenEscrow};
-use codec::Decode;
 use napi::bindgen_prelude::*;
 use serde_json::json;
-use sp_core::sr25519::Signature;
 use sp_core::H256;
-use sp_runtime::MultiSignature;
 use sqlx::SqlitePool;
 use std::collections::HashMap;
 use std::sync::Arc;
@@ -267,7 +264,6 @@ impl BalanceSync {
   pub async fn convert_tax_to_votes(
     &self,
     notarization: &mut NotarizationBuilder,
-    signer: &Signer,
     options: &EscrowCloseOptions,
   ) -> anyhow::Result<()> {
     let mainchain_mutex = self.mainchain_client.lock().await;
@@ -317,22 +313,14 @@ impl BalanceSync {
       *tick_counter = (current_tick, 0);
     }
     let vote_address = options.votes_address.clone();
-    let mut vote = BlockVote {
+    let vote = BlockVote {
       account_id: AccountStore::parse_address(&vote_address)?,
       power: total_available_tax,
       data_domain_hash: H256::from_slice(data_domain_hash.as_ref()),
       data_domain_account: AccountStore::parse_address(&data_domain_address)?,
-      signature: Signature([0; 64]).into(),
       index: (*tick_counter).1,
       block_hash: H256::from_slice(best_block_for_vote.block_hash.as_ref()),
     };
-    let signature = signer
-      .sign(
-        vote_address,
-        Uint8Array::from(vote.hash().as_bytes().to_vec()),
-      )
-      .await?;
-    vote.signature = MultiSignature::decode(&mut signature.as_ref())?;
     notarization.add_vote(vote).await?;
 
     Ok(())
@@ -344,10 +332,7 @@ impl BalanceSync {
     signer: &Signer,
     options: &EscrowCloseOptions,
   ) {
-    if let Err(e) = self
-      .convert_tax_to_votes(notarization, signer, options)
-      .await
-    {
+    if let Err(e) = self.convert_tax_to_votes(notarization, options).await {
       tracing::error!(
         "Error converting tax to votes: {:?}. Continuing with notarization",
         e

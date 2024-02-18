@@ -965,10 +965,7 @@ fn test_votes_must_add_up() {
 					account_id: Alice.to_account_id(),
 					data_domain_hash: data_domain.hash(),
 					data_domain_account: Ferdie.to_account_id(),
-					signature: empty_signature(),
-				}
-				.sign(Alice.pair())
-				.clone(),
+				},
 				BlockVote {
 					index: 1,
 					power: 30,
@@ -976,10 +973,7 @@ fn test_votes_must_add_up() {
 					account_id: Alice.to_account_id(),
 					data_domain_hash: data_domain.hash(),
 					data_domain_account: Alice.to_account_id(),
-					signature: empty_signature(),
-				}
-				.sign(Alice.pair())
-				.clone(),
+				},
 			],
 			vec![]
 		),],
@@ -1079,7 +1073,6 @@ fn test_votes_must_add_up() {
 		VerifyError::BlockVoteDataDomainMismatch
 	);
 	notebook.notarizations[0].block_votes[0].data_domain_account = Alice.to_account_id();
-	notebook.notarizations[0].block_votes[0].sign(Alice.pair());
 
 	// 3. Once vote minimums are allowed, the "vote root is wrong"
 	assert_err!(

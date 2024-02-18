@@ -156,9 +156,6 @@ pub enum VerifyError {
 	#[snafu(display("Invalid block vote"))]
 	InvalidBlockVoteSource,
 
-	#[snafu(display("Invalid block vote signature"))]
-	BlockVoteInvalidSignature,
-
 	#[snafu(display("Minimums were not met for a block vote"))]
 	InsufficientBlockVoteMinimum,
 

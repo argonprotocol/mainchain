@@ -23,7 +23,7 @@ pub mod pallet {
 	use log::info;
 	use sp_core::{H256, U256};
 	use sp_runtime::{
-		traits::{BlakeTwo256, Block as BlockT, Verify},
+		traits::{BlakeTwo256, Block as BlockT},
 		ConsensusEngineId, DigestItem, RuntimeAppPublic,
 	};
 	use sp_std::{collections::btree_map::BTreeMap, vec, vec::Vec};
@@ -129,8 +129,6 @@ pub mod pallet {
 		MaxNotebooksAtTickExceeded,
 		/// No closest miner found for vote
 		NoClosestMinerFoundForVote,
-		/// The vote signature was invalid
-		BlockVoteInvalidSignature,
 	}
 
 	#[pallet::hooks]
@@ -385,11 +383,6 @@ pub mod pallet {
 					(last_tick.saturating_sub(ESCROW_CLAWBACK_TICKS), last_tick)
 				),
 				Error::<T>::InvalidDataDomainAccount
-			);
-
-			ensure!(
-				block_vote.signature.verify(&block_vote.hash()[..], &block_vote.account_id),
-				Error::<T>::BlockVoteInvalidSignature
 			);
 
 			Ok(())

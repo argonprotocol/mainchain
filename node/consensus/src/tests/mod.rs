@@ -8,7 +8,7 @@ use sc_network_test::{PeersFullClient, TestNetFactory};
 use sp_api::ProvideRuntimeApi;
 use sp_blockchain::HeaderBackend;
 use sp_consensus::{BlockOrigin, NoNetwork as DummyOracle};
-use sp_core::{bounded_vec, crypto::AccountId32, ed25519::Signature, H256};
+use sp_core::{bounded_vec, crypto::AccountId32, H256};
 use sp_keyring::sr25519::Keyring;
 use sp_keystore::{testing::MemoryKeystore, Keystore, KeystorePtr};
 use sp_timestamp::Timestamp;
@@ -306,7 +306,6 @@ async fn can_run_proof_of_tax() {
 			data_domain_account: Keyring::Alice.to_account_id(),
 			power: 500,
 			index: 1,
-			signature: Signature([0; 64]).into(),
 		};
 		let parent_voting_key = H256::random();
 		let seal_strength = vote.get_seal_strength(1, parent_voting_key);

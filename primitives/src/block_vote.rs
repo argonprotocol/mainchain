@@ -2,7 +2,7 @@ use codec::{Codec, Decode, Encode, MaxEncodedLen};
 use serde::{Deserialize, Serialize};
 use sp_core::{RuntimeDebug, H256, U256};
 use sp_core_hashing::blake2_256;
-use sp_runtime::{scale_info::TypeInfo, MultiSignature};
+use sp_runtime::scale_info::TypeInfo;
 use sp_std::vec::Vec;
 
 use crate::{AccountId, BlockVotingPower, DataDomainHash, MerkleProof, NotaryId, NotebookNumber};
@@ -37,8 +37,6 @@ pub struct BlockVoteT<Hash: Codec = H256> {
 	pub data_domain_hash: DataDomainHash,
 	/// The data domain payment address used to create this vote
 	pub data_domain_account: AccountId,
-	/// A signature of the vote by the account_id
-	pub signature: MultiSignature,
 }
 
 #[derive(Encode)]
@@ -88,14 +86,6 @@ impl<Hash: Codec + Clone> BlockVoteT<Hash> {
 	pub fn seal_signature_message<H: Codec>(block_hash: &H, seal_strength: U256) -> [u8; 32] {
 		let message = &[&block_hash.encode()[..], &seal_strength.encode()[..]].concat();
 		message.using_encoded(blake2_256)
-	}
-	#[cfg(feature = "std")]
-	pub fn sign<S: sp_core::Pair>(&mut self, pair: S) -> &Self
-	where
-		S::Signature: Into<MultiSignature>,
-	{
-		self.signature = pair.sign(&self.hash()[..]).into();
-		self
 	}
 }
 

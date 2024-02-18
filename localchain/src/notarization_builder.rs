@@ -6,7 +6,6 @@ use napi::bindgen_prelude::*;
 use serde_json::json;
 use sp_core::crypto::AccountId32;
 use sp_core::{ConstU32, H256};
-use sp_runtime::traits::Verify;
 use sp_runtime::{BoundedVec, MultiSignature};
 use sqlx::SqlitePool;
 use tokio::sync::Mutex;
@@ -388,9 +387,6 @@ impl NotarizationBuilder {
         "Insufficient tax available for this vote (available: {}, vote power {}).",
         funds, vote.power
       )));
-    }
-    if !vote.signature.verify(&vote.hash()[..], &vote.account_id) {
-      return Err(Error::from_reason("Invalid vote signature!"));
     }
 
     let mut votes = self.votes.lock().await;
@@ -964,7 +960,6 @@ impl TryInto<BlockVote> for JsBlockVote {
       power,
       data_domain_hash: H256::from_slice(self.data_domain_hash.as_slice()),
       data_domain_account: AccountStore::parse_address(&self.data_domain_address)?,
-      signature: MultiSignature::decode(&mut self.signature.as_slice())?,
     })
   }
 }

@@ -946,10 +946,7 @@ mod tests {
 				index: 1,
 				block_hash: vote_block_hash,
 				power: tax,
-				signature: sp_core::sr25519::Signature([0u8; 64]).into(),
-			}
-			.sign(Alice.pair())
-			.clone()],
+			}],
 			vec![],
 		)
 		.await?;

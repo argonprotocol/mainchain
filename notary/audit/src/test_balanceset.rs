@@ -716,10 +716,7 @@ fn verify_tax_votes() {
 		power: 20_000,
 		data_domain_hash: H256::random(),
 		data_domain_account: Alice.to_account_id(),
-		signature: empty_signature(),
-	}
-	.sign(Bob.pair())
-	.clone()];
+	}];
 
 	let result =
 		verify_notarization_allocation(&set, &votes, &vec![], Some(1)).expect("should unwrap");
@@ -742,10 +739,7 @@ fn test_vote_sources() {
 			power: 20_000,
 			data_domain_hash: jobs_domain.hash(),
 			data_domain_account: jobs_domain_author.clone(),
-			signature: empty_signature(),
-		}
-		.sign(Bob.pair())
-		.clone(),
+		},
 		BlockVote {
 			account_id: Bob.to_account_id(),
 			block_hash: vote_block_hash,
@@ -753,11 +747,7 @@ fn test_vote_sources() {
 			power: 400,
 			data_domain_hash: jobs_domain.hash(),
 			data_domain_account: jobs_domain_author.clone(),
-			signature: empty_signature(),
-		}
-		// wrong signature!
-		.sign(Alice.pair())
-		.clone(),
+		},
 	];
 
 	let vote_minimums = BTreeMap::from([(vote_block_hash, 500)]);
@@ -785,17 +775,6 @@ fn test_vote_sources() {
 		),
 		VerifyError::BlockVoteDataDomainMismatch
 	);
-
-	assert_err!(
-		verify_voting_sources(
-			&BTreeMap::from([((jobs_domain.hash(), jobs_domain_author.clone()), 2)]),
-			&votes,
-			&vote_minimums
-		),
-		VerifyError::BlockVoteInvalidSignature
-	);
-
-	votes[1].sign(Bob.pair());
 
 	assert_ok!(verify_voting_sources(
 		&BTreeMap::from([((jobs_domain.hash(), jobs_domain_author), 2)]),
