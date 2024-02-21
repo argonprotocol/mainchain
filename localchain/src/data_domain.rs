@@ -1,5 +1,6 @@
 use chrono::NaiveDateTime;
 use napi::bindgen_prelude::*;
+use serde_json::json;
 use sp_runtime::RuntimeString;
 use sqlx::{FromRow, SqliteConnection, SqlitePool};
 use ulx_primitives::{DataDomain, DataTLD};
@@ -12,7 +13,7 @@ use crate::to_js_error;
 pub struct DataDomainRow {
   pub id: i64,
   pub name: String,
-  pub tld: i64,
+  pub tld: String,
   pub registered_to_address: String,
   pub notarization_id: i64,
   pub registered_at_tick: i64,
@@ -28,7 +29,7 @@ pub struct DataDomainStore {
 
 #[napi]
 impl DataDomainStore {
-  pub(crate) fn new(db: SqlitePool) -> Self {
+  pub fn new(db: SqlitePool) -> Self {
     Self { db }
   }
 
@@ -63,7 +64,7 @@ impl DataDomainStore {
     Ok(domain.hash().0.into())
   }
 
-  #[napi]
+  #[napi(ts_return_type = "DataDomain")]
   pub fn parse(domain: String) -> Result<JsDataDomain> {
     DataDomain::parse(domain)
       .map_err(to_js_error)
@@ -86,19 +87,22 @@ impl DataDomainStore {
     notarization_id: i64,
     registered_at_tick: u32,
   ) -> Result<()> {
-    let tld_id = data_domain.top_level_domain as i64;
+    let tld = json!(data_domain.top_level_domain);
+    // remove leading and trailing quote from json
+    let tld = tld.to_string();
+    let tld = tld.trim_matches('"');
     let registered_at_tick = registered_at_tick as i64;
     let res = sqlx::query!(
       "INSERT INTO data_domains (name, tld, registered_to_address, notarization_id, registered_at_tick) VALUES (?, ?, ?, ?, ?)",
       data_domain.domain_name,
-      tld_id,
+      tld,
       registered_to_address,
       notarization_id,
       registered_at_tick,
     )
-    .execute(db)
-    .await
-    .map_err(to_js_error)?;
+            .execute(db)
+            .await
+            .map_err(to_js_error)?;
     if res.rows_affected() != 1 {
       return Err(Error::from_reason(format!(
         "Error inserting data domain {}",
@@ -108,6 +112,7 @@ impl DataDomainStore {
     Ok(())
   }
 }
+
 #[napi(object, js_name = "DataDomain")]
 #[derive(Clone, Debug, PartialEq)]
 pub struct JsDataDomain {
@@ -180,7 +185,7 @@ mod test {
 
     assert_eq!(store.list().await?.len(), 1);
     assert_eq!(store.get(1).await?.name, "test");
-    assert_eq!(store.get(1).await?.tld, DataTLD::Cars as i64);
+    assert_eq!(store.get(1).await?.tld, "cars");
     Ok(())
   }
 }

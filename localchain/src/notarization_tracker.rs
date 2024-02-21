@@ -62,9 +62,19 @@ impl NotarizationTracker {
     Ok(tips)
   }
 
+  pub async fn get_changed_accounts(&self) -> Vec<(LocalAccount, BalanceChangeRow)> {
+    let balance_changes = self.balance_changes_by_account.lock().await;
+    let mut changed_accounts = vec![];
+    for (account_id, balance_change) in (*balance_changes).iter() {
+      let account = self.accounts_by_id.get(&account_id).unwrap();
+      changed_accounts.push((account.clone(), balance_change.clone()));
+    }
+    changed_accounts
+  }
+
   #[napi(getter)]
   /// Returns the balance changes that were submitted to the notary indexed by the stringified account id (napi doesn't allow numbers as keys)
-  pub async fn balance_changes_by_account(&self) -> HashMap<String, BalanceChangeRow> {
+  pub async fn balance_changes_by_account_id(&self) -> HashMap<String, BalanceChangeRow> {
     let balance_changes = self.balance_changes_by_account.lock().await;
     (*balance_changes)
       .iter()

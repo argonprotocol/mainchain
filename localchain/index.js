@@ -281,7 +281,7 @@ if (!nativeBinding) {
   throw new Error(`Failed to load native binding`)
 }
 
-const { DataTLD, AccountType, LocalAccount, AccountStore, BalanceChangeBuilder, BalanceChange, BalanceChangeStatus, BalanceChangeStore, BalanceSync, BalanceSyncResult, DataDomainLease, DataDomainStore, MainchainClient, NotarizationBuilder, NotarizationTracker, NotaryClients, NotaryClient, NotebookMeta, BalanceTipResult, Escrow, OpenEscrow, OpenEscrowsStore, Signer, CryptoType, Localchain, TickerRef } = nativeBinding
+const { DataTLD, AccountType, LocalAccount, AccountStore, BalanceChangeBuilder, BalanceChange, BalanceChangeStatus, BalanceChangeStore, BalanceSync, BalanceSyncResult, DataDomainLease, DataDomainStore, MainchainClient, NotarizationBuilder, NotarizationTracker, NotaryClients, NotaryClient, NotebookMeta, BalanceTipResult, Escrow, OpenEscrow, OpenEscrowsStore, Signer, CryptoScheme, runCli, NOTARIZATION_MAX_BALANCE_CHANGES, NOTARIZATION_MAX_DOMAINS, NOTARIZATION_MAX_BLOCK_VOTES, ESCROW_EXPIRATION_TICKS, ESCROW_CLAWBACK_TICKS, ESCROW_MINIMUM_SETTLEMENT, DATASTORE_MAX_VERSIONS, DATA_DOMAIN_MIN_NAME_LENGTH, DATA_DOMAIN_LEASE_COST, Localchain, TickerRef } = nativeBinding
 
 module.exports.DataTLD = DataTLD
 module.exports.AccountType = AccountType
@@ -306,6 +306,16 @@ module.exports.Escrow = Escrow
 module.exports.OpenEscrow = OpenEscrow
 module.exports.OpenEscrowsStore = OpenEscrowsStore
 module.exports.Signer = Signer
-module.exports.CryptoType = CryptoType
+module.exports.CryptoScheme = CryptoScheme
+module.exports.runCli = runCli
+module.exports.NOTARIZATION_MAX_BALANCE_CHANGES = NOTARIZATION_MAX_BALANCE_CHANGES
+module.exports.NOTARIZATION_MAX_DOMAINS = NOTARIZATION_MAX_DOMAINS
+module.exports.NOTARIZATION_MAX_BLOCK_VOTES = NOTARIZATION_MAX_BLOCK_VOTES
+module.exports.ESCROW_EXPIRATION_TICKS = ESCROW_EXPIRATION_TICKS
+module.exports.ESCROW_CLAWBACK_TICKS = ESCROW_CLAWBACK_TICKS
+module.exports.ESCROW_MINIMUM_SETTLEMENT = ESCROW_MINIMUM_SETTLEMENT
+module.exports.DATASTORE_MAX_VERSIONS = DATASTORE_MAX_VERSIONS
+module.exports.DATA_DOMAIN_MIN_NAME_LENGTH = DATA_DOMAIN_MIN_NAME_LENGTH
+module.exports.DATA_DOMAIN_LEASE_COST = DATA_DOMAIN_LEASE_COST
 module.exports.Localchain = Localchain
 module.exports.TickerRef = TickerRef

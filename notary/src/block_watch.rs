@@ -65,7 +65,7 @@ async fn sync_finalized_blocks(
 	pool: &PgPool,
 	ticker: Ticker,
 ) -> anyhow::Result<()> {
-	let client = try_until_connected(url, 2500).await?;
+	let client = try_until_connected(url, 2500, 120_000).await?;
 	let notaries_query = api::storage().notaries().active_notaries();
 
 	let active_notaries = client
@@ -298,7 +298,7 @@ async fn subscribe_to_blocks(
 	pool: &PgPool,
 	ticker: &Ticker,
 ) -> anyhow::Result<bool> {
-	let client = try_until_connected(url, 2500).await?;
+	let client = try_until_connected(url, 2500, 120_000).await?;
 	let mut blocks_sub = client.blocks().subscribe_all().await?;
 	let mut finalized_sub = client.blocks().subscribe_finalized().await?;
 

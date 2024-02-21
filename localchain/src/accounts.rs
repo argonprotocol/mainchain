@@ -18,6 +18,7 @@ pub struct NotaryAccountOrigin {
   pub notebook_number: u32,
   pub account_uid: u32,
 }
+
 impl Into<AccountOrigin> for NotaryAccountOrigin {
   fn into(self) -> AccountOrigin {
     AccountOrigin {
@@ -85,6 +86,7 @@ struct AccountRow {
   created_at: NaiveDateTime,
   updated_at: NaiveDateTime,
 }
+
 #[napi]
 #[derive(Clone)]
 pub struct AccountStore {
@@ -95,7 +97,7 @@ pub const ADDRESS_PREFIX: u16 = Ss58AddressFormatRegistry::SubstrateAccount as u
 
 #[napi]
 impl AccountStore {
-  pub(crate) fn new(pool: SqlitePool) -> Self {
+  pub fn new(pool: SqlitePool) -> Self {
     Self { pool }
   }
 
@@ -193,10 +195,10 @@ impl AccountStore {
       account_type_i64,
       notary_id_i64,
     )
-    .fetch_one(&mut *db)
-    .await
-    .map_err(to_js_error)?
-    .into();
+            .fetch_one(&mut *db)
+            .await
+            .map_err(to_js_error)?
+            .into();
     Ok(res)
   }
 
@@ -228,25 +230,28 @@ impl AccountStore {
       notebook_i64,
       account_id,
     )
-    .execute(&mut *db)
-    .await?;
+            .execute(&mut *db)
+            .await?;
     if res.rows_affected() != 1 {
       Err(anyhow::anyhow!("Error updating account"))?;
     }
     Ok(())
   }
 
-  #[napi]
-  pub async fn list(&self) -> Result<Vec<LocalAccount>> {
-    let mut db = self.pool.acquire().await.map_err(to_js_error)?;
+  pub async fn list(db: &mut SqliteConnection) -> anyhow::Result<Vec<LocalAccount>> {
     let res = sqlx::query_as!(AccountRow, r#"SELECT * from accounts"#,)
       .fetch_all(&mut *db)
-      .await
-      .map_err(to_js_error)?
+      .await?
       .into_iter()
       .map(|row| row.into())
       .collect::<Vec<_>>();
     Ok(res)
+  }
+
+  #[napi(js_name = "list")]
+  pub async fn list_js(&self) -> Result<Vec<LocalAccount>> {
+    let mut db = self.pool.acquire().await.map_err(to_js_error)?;
+    Self::list(&mut db).await.map_err(to_js_error)
   }
 
   #[napi]
@@ -299,7 +304,7 @@ mod test {
       .await
       .unwrap();
 
-    let list = accounts.list().await?;
+    let list = accounts.list_js().await?;
     assert_eq!(list.len(), 3);
     assert_eq!(accounts.tax_accounts(1).await?[0], tax_account);
 

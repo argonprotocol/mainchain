@@ -1,0 +1,33 @@
+/// Max balance changes that can be in a single notarization
+#[napi]
+pub const NOTARIZATION_MAX_BALANCE_CHANGES: u32 =
+    ulx_primitives::MAX_BALANCE_CHANGES_PER_NOTARIZATION;
+
+/// Max data domains that can be in a single notarization
+#[napi]
+pub const NOTARIZATION_MAX_DOMAINS: u32 = ulx_primitives::MAX_DOMAINS_PER_NOTARIZATION;
+/// Max notarizations that can be in a single notarization
+#[napi]
+pub const NOTARIZATION_MAX_BLOCK_VOTES: u32 = ulx_primitives::MAX_BLOCK_VOTES_PER_NOTARIZATION;
+/// Number of ticks past the notarization of an escrow hold that an escrow can be claimed (and no longer used)
+#[napi]
+pub const ESCROW_EXPIRATION_TICKS: u32 = ulx_primitives::ESCROW_EXPIRATION_TICKS;
+/// Number of ticks past the expiration of an escrow that a recipient has to claim. After this point, sender can recoup the escrowed funds
+#[napi]
+pub const ESCROW_CLAWBACK_TICKS: u32 = ulx_primitives::ESCROW_CLAWBACK_TICKS;
+
+/// Minimum milligons that can be settled in an escrow
+#[napi]
+pub const ESCROW_MINIMUM_SETTLEMENT: u128 = ulx_primitives::MINIMUM_ESCROW_SETTLEMENT;
+
+/// Max versions that can be in a datastore zone record
+#[napi]
+pub const DATASTORE_MAX_VERSIONS: u32 = ulx_primitives::MAX_DATASTORE_VERSIONS;
+
+/// Minimum data domain name length
+#[napi]
+pub const DATA_DOMAIN_MIN_NAME_LENGTH: u32 = ulx_primitives::MIN_DATA_DOMAIN_NAME_LENGTH as u32;
+
+/// Cost to lease a data domain for 1 year
+#[napi]
+pub const DATA_DOMAIN_LEASE_COST: u128 = ulx_primitives::DATA_DOMAIN_LEASE_COST;

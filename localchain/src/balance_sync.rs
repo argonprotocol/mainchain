@@ -40,8 +40,8 @@ pub struct EscrowCloseOptions {
 
 #[napi]
 pub struct BalanceSyncResult {
-  balance_changes: Vec<BalanceChangeRow>,
-  escrow_notarizations: Vec<NotarizationBuilder>,
+  pub(crate) balance_changes: Vec<BalanceChangeRow>,
+  pub(crate) escrow_notarizations: Vec<NotarizationBuilder>,
 }
 #[napi]
 impl BalanceSyncResult {
@@ -167,7 +167,7 @@ impl BalanceSync {
       }
     }
 
-    if change.status == BalanceChangeStatus::InNotebook {
+    if change.status == BalanceChangeStatus::NotebookPublished {
       match self.check_finalized(&mut change).await {
         Ok(_) => {}
         Err(e) => {
@@ -340,7 +340,7 @@ impl BalanceSync {
     }
 
     if let Err(e) = notarization.sign(signer).await {
-      tracing::error!("Could not sign an escrow closing notarization -> {:?}", e);
+      tracing::error!("Could not claim an escrow -> {:?}", e);
       return;
     }
 
@@ -567,11 +567,11 @@ impl BalanceSync {
           .fetch_one(&mut *tx)
           .await?;
     balance_change.notarization_id = Some(notarization_id);
-    balance_change.status = BalanceChangeStatus::InNotebook;
+    balance_change.status = BalanceChangeStatus::NotebookPublished;
     sqlx::query!(
       "UPDATE balance_changes SET notarization_id = ?, status = ? WHERE id = ?",
       notarization_id,
-      BalanceChangeStatus::InNotebook as i64,
+      BalanceChangeStatus::NotebookPublished as i64,
       balance_change.id
     )
     .execute(&mut *tx)

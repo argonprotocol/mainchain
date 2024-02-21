@@ -1,3 +1,6 @@
+#[cfg(feature = "std")]
+use crate::serialize_unsafe_u128_as_string;
+
 use codec::{Codec, Decode, Encode, MaxEncodedLen};
 use serde::{Deserialize, Serialize};
 use sp_core::{RuntimeDebug, H256, U256};
@@ -32,6 +35,7 @@ pub struct BlockVoteT<Hash: Codec = H256> {
 	pub index: u32,
 	/// The voting power of this vote, determined from the amount of tax
 	#[codec(compact)]
+	#[cfg_attr(feature = "std", serde(with = "serialize_unsafe_u128_as_string"))]
 	pub power: BlockVotingPower,
 	/// The data domain used to create this vote
 	pub data_domain_hash: DataDomainHash,

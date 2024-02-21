@@ -11,23 +11,16 @@ use std::collections::BTreeMap;
 use std::collections::HashMap;
 use std::sync::Arc;
 
-use crate::{MainchainClient, NotaryClient, NotaryClients};
+use crate::{CryptoScheme, LocalKeystore, MainchainClient, NotaryClient, NotaryClients};
 use sc_utils::notification::NotificationSender;
-use sp_core::crypto::key_types::ACCOUNT;
 use sp_core::{LogLevelFilter, Pair, H256};
 use sp_keyring::Ed25519Keyring;
-use sp_keystore::testing::MemoryKeystore;
-use sp_keystore::{Keystore, KeystorePtr};
 use tokio::sync::Mutex;
 use ulx_notary::apis::localchain::{BalanceChangeResult, BalanceTipResult, LocalchainRpcServer};
 use ulx_notary::apis::notebook::NotebookRpcServer;
 use ulx_notary::server::pipe_from_stream_and_drop;
 use ulx_notary::server::NotebookHeaderStream;
-use ulx_primitives::{
-  AccountId, AccountType, BalanceProof, BalanceTip, Notarization, NotarizationBalanceChangeset,
-  NotarizationBlockVotes, NotarizationDataDomains, Notebook, NotebookMeta, NotebookNumber,
-  SignedNotebookHeader,
-};
+use ulx_primitives::{AccountId, AccountType, BalanceProof, BalanceTip, LocalchainAccountId, Notarization, NotarizationBalanceChangeset, NotarizationBlockVotes, NotarizationDataDomains, Notebook, NotebookMeta, NotebookNumber, SignedNotebookHeader};
 
 /// Debug sqlite connections. This function is for sqlx unit tests. To activate, your test signature
 /// should look like this:
@@ -62,36 +55,13 @@ pub(crate) async fn create_mock_notary() -> anyhow::Result<MockNotary> {
   Ok(mock_notary)
 }
 
-#[allow(dead_code)]
-pub enum CryptoType {
-  Ed25519,
-  Sr25519,
-  Ecdsa,
-}
 
-pub(crate) fn create_keystore(suri: &str, crypt_type: CryptoType) -> anyhow::Result<KeystorePtr> {
-  let keystore = MemoryKeystore::new();
-  let key = match crypt_type {
-    CryptoType::Ed25519 => {
-      let pair = sp_core::ed25519::Pair::from_string(suri, None)?;
-      let public = pair.public();
-      public.0.to_vec()
-    }
-    CryptoType::Sr25519 => {
-      let pair = sp_core::sr25519::Pair::from_string(suri, None)?;
-      let public = pair.public();
-      public.0.to_vec()
-    }
-    CryptoType::Ecdsa => {
-      let pair = sp_core::ecdsa::Pair::from_string(suri, None)?;
-      let public = pair.public();
-      public.0.to_vec()
-    }
-  };
+pub(crate) fn create_keystore(suri: &str, scheme: CryptoScheme) -> anyhow::Result<LocalKeystore> {
+  let keystore = LocalKeystore::in_memory();
   keystore
-    .insert(ACCOUNT, &suri, &key)
+    .insert(&suri, scheme, None)
     .expect("should insert");
-  Ok(keystore.into())
+  Ok(keystore)
 }
 
 pub(crate) async fn mock_notary_clients(
@@ -111,7 +81,7 @@ pub(crate) async fn mock_notary_clients(
 }
 #[derive(Debug, Default)]
 pub struct NotaryState {
-  pub balance_tips: BTreeMap<(AccountId, AccountType), BalanceTipResult>,
+  pub balance_tips: BTreeMap<LocalchainAccountId, BalanceTipResult>,
   pub balance_proofs: BTreeMap<(NotebookNumber, H256), BalanceProof>,
   pub notarize_result: Option<BalanceChangeResult>,
   pub metadata: Option<NotebookMeta>,
@@ -230,7 +200,7 @@ impl LocalchainRpcServer for MockNotary {
     let state = self.state.lock().await;
     (*state)
       .balance_tips
-      .get(&(account_id, account_type))
+      .get(&LocalchainAccountId::new(account_id, account_type))
       .cloned()
       .ok_or_else(|| {
         ErrorObjectOwned::owned(

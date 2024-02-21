@@ -5,7 +5,7 @@ use codec::{Decode, Encode};
 use log::trace;
 use serde::{Deserialize, Serialize};
 use snafu::Snafu;
-use sp_core::{crypto::AccountId32, H256};
+use sp_core::H256;
 use sp_runtime::{scale_info::TypeInfo, traits::BlakeTwo256};
 use sp_std::{
 	collections::{btree_map::BTreeMap, btree_set::BTreeSet},
@@ -15,9 +15,9 @@ use sp_std::{
 use ulx_primitives::{
 	ensure, round_up, tick::Tick, AccountId, AccountOrigin, AccountOriginUid, AccountType, Balance,
 	BalanceChange, BalanceProof, BalanceTip, BlockVote, ChainTransfer, DataDomainHash,
-	NewAccountOrigin, NotaryId, Note, NoteType, Notebook, NotebookHeader, NotebookNumber,
-	VoteMinimum, DATA_DOMAIN_LEASE_COST, ESCROW_CLAWBACK_TICKS, ESCROW_EXPIRATION_TICKS,
-	MINIMUM_ESCROW_SETTLEMENT, TAX_PERCENT_BASE,
+	LocalchainAccountId, NewAccountOrigin, NotaryId, Note, NoteType, Notebook, NotebookHeader,
+	NotebookNumber, VoteMinimum, DATA_DOMAIN_LEASE_COST, ESCROW_CLAWBACK_TICKS,
+	ESCROW_EXPIRATION_TICKS, MINIMUM_ESCROW_SETTLEMENT, TAX_PERCENT_BASE,
 };
 
 pub use crate::error::VerifyError;
@@ -57,7 +57,7 @@ pub trait NotebookHistoryLookup {
 	fn is_valid_transfer_to_localchain(
 		&self,
 		notary_id: NotaryId,
-		account_id: &AccountId32,
+		account_id: &AccountId,
 		nonce: u32,
 		milligons: Balance,
 	) -> Result<bool, AccountHistoryLookupError>;
@@ -127,13 +127,13 @@ pub fn notebook_verify<T: NotebookHistoryLookup>(
 #[derive(Clone, Default)]
 struct NotebookVerifyState {
 	account_changelist: BTreeSet<AccountOrigin>,
-	final_balances: BTreeMap<(AccountId32, AccountType), BalanceTip>,
+	final_balances: BTreeMap<LocalchainAccountId, BalanceTip>,
 	chain_transfers: Vec<ChainTransfer>,
 	/// Block votes is keyed off of account id and the index supplied by the user. If index is
 	/// duplicated, only the last entry will be used.
 	block_votes: BTreeMap<(AccountId, u32), BlockVote>,
-	seen_transfers_in: BTreeSet<(AccountId32, u32)>,
-	new_account_origins: BTreeMap<(AccountId, AccountType), AccountOriginUid>,
+	seen_transfers_in: BTreeSet<(AccountId, u32)>,
+	new_account_origins: BTreeMap<LocalchainAccountId, AccountOriginUid>,
 	escrow_data_domains: BTreeMap<(DataDomainHash, AccountId), u32>,
 	blocks_voted_on: BTreeSet<H256>,
 	block_power: u128,
@@ -143,7 +143,7 @@ struct NotebookVerifyState {
 impl NotebookVerifyState {
 	pub fn track_final_balance(
 		&mut self,
-		key: &(AccountId, AccountType),
+		key: &LocalchainAccountId,
 		change: &BalanceChange,
 		account_origin: AccountOrigin,
 		escrow_hold_note: Option<Note>,
@@ -177,7 +177,8 @@ impl NotebookVerifyState {
 	) -> anyhow::Result<(), VerifyError> {
 		let mut all_new_account_uids = BTreeSet::<AccountOriginUid>::new();
 		for NewAccountOrigin { account_id, account_type, account_uid } in origins {
-			self.new_account_origins.insert((account_id, account_type), account_uid);
+			self.new_account_origins
+				.insert(LocalchainAccountId::new(account_id, account_type), account_uid);
 			ensure!(
 				all_new_account_uids.insert(account_uid),
 				VerifyError::DuplicatedAccountOriginUid
@@ -250,7 +251,7 @@ fn verify_balance_sources<'a, T: NotebookHistoryLookup>(
 	let notary_id = header.notary_id;
 	for change in changeset.into_iter() {
 		let account_id = &change.account_id;
-		let key = (account_id.clone(), change.account_type.clone());
+		let key = LocalchainAccountId::new(account_id.clone(), change.account_type.clone());
 		let mut escrow_hold_note = None;
 
 		for note in &change.notes {
@@ -361,12 +362,12 @@ fn verify_previous_balance_proof<'a, T: NotebookHistoryLookup>(
 	lookup: &T,
 	proof: &BalanceProof,
 	notebook_number: NotebookNumber,
-	final_balances: &mut BTreeMap<(AccountId32, AccountType), BalanceTip>,
+	final_balances: &mut BTreeMap<LocalchainAccountId, BalanceTip>,
 	change: &BalanceChange,
-	key: &(AccountId32, AccountType),
+	key: &LocalchainAccountId,
 ) -> anyhow::Result<bool, VerifyError> {
 	// NOTE: something about adding logging is making lookups work for localchain transfers. if I
-	// comment out the logging, it fails with InvalidLocalchainTransfer in the notebook_closer
+	// comment out the logging, it fails with InvalidTransferToLocalchain in the notebook_closer
 	// test.
 	trace!(target:LOG_TARGET,
 		"Verify balance for uid={}. In current set of balance changes? {}",
@@ -464,45 +465,48 @@ pub struct BalanceChangesetState {
 	/// How much tax was claimed
 	pub claimed_tax: u128,
 	/// All new accounts that were created (change_number = 1)
-	pub new_accounts: BTreeSet<(AccountId, AccountType)>,
+	pub new_accounts: BTreeSet<LocalchainAccountId>,
 	/// All escrow hold notes created per account (each account can only create one)
-	pub accounts_with_new_holds: BTreeSet<AccountId>,
+	pub accounts_with_new_holds: BTreeSet<LocalchainAccountId>,
 	/// Whether or not the current notebook number is needed to confirm escrow settles
 	pub needs_escrow_settle_followup: bool,
 	/// How much in escrow funds was claimed by each account id
-	pub claimed_escrow_deposits_per_account: BTreeMap<AccountId, u128>,
-	/// How much tax was sent per account
-	pub tax_created_per_account: BTreeMap<AccountId, u128>,
+	pub claimed_escrow_deposits_per_account: BTreeMap<LocalchainAccountId, u128>,
+	/// How much tax was sent per LocalchainAccountId
+	pub tax_created_per_account: BTreeMap<LocalchainAccountId, u128>,
 	/// How much was deposited per account
-	pub claimed_deposits_per_account: BTreeMap<AccountId, u128>,
+	pub claims_per_account: BTreeMap<LocalchainAccountId, u128>,
 
 	/// How much was allocated to domains
 	pub allocated_to_domains: u128,
 
 	/// How much tax was sent per account to block seals
-	unclaimed_block_vote_tax_per_account: BTreeMap<AccountId, u128>,
-	unclaimed_restricted_balance: BTreeMap<BTreeSet<(AccountId, AccountType)>, i128>,
-	unclaimed_escrow_balances: BTreeMap<BTreeSet<AccountId>, i128>,
+	unclaimed_block_vote_tax_per_account: BTreeMap<LocalchainAccountId, u128>,
+	unclaimed_restricted_balance: BTreeMap<BTreeSet<LocalchainAccountId>, i128>,
+	unclaimed_escrow_balances: BTreeMap<BTreeSet<LocalchainAccountId>, i128>,
 }
 
 impl BalanceChangesetState {
 	pub fn verify_taxes(&self) -> anyhow::Result<(), VerifyError> {
 		let mut tax_owed_per_account = BTreeMap::new();
-		for (account_id, amount) in self.claimed_deposits_per_account.iter() {
+		for (local_account_id, amount) in self.claims_per_account.iter() {
+			if local_account_id.account_type == AccountType::Tax {
+				continue;
+			}
 			let amount = *amount;
 			let tax = Note::calculate_transfer_tax(amount);
-			*tax_owed_per_account.entry(account_id).or_insert(0) += tax;
+			*tax_owed_per_account.entry(local_account_id).or_insert(0) += tax;
 		}
-		for (account_id, amount) in self.claimed_escrow_deposits_per_account.iter() {
+		for (local_account_id, amount) in self.claimed_escrow_deposits_per_account.iter() {
 			let tax = round_up(*amount, TAX_PERCENT_BASE);
-			*tax_owed_per_account.entry(account_id).or_insert(0) += tax;
+			*tax_owed_per_account.entry(local_account_id).or_insert(0) += tax;
 		}
-		for (account_id, tax) in tax_owed_per_account {
-			let tax_sent = self.tax_created_per_account.get(&account_id).unwrap_or(&0);
+		for (local_account_id, tax) in tax_owed_per_account {
+			let tax_sent = self.tax_created_per_account.get(local_account_id).unwrap_or(&0);
 			ensure!(
 				*tax_sent >= tax,
 				VerifyError::InsufficientTaxIncluded {
-					account_id: account_id.clone(),
+					account_id: local_account_id.account_id.clone(),
 					tax_sent: *tax_sent,
 					tax_owed: tax,
 				}
@@ -511,10 +515,59 @@ impl BalanceChangesetState {
 		Ok(())
 	}
 
+	fn verify_note_claim_restrictions(&mut self) -> anyhow::Result<(), VerifyError> {
+		for (claimer, amount) in self.claims_per_account.iter() {
+			let mut balance = amount.clone() as i128;
+			self.unclaimed_restricted_balance.retain(|accounts, amount| {
+				if balance == 0 {
+					return true
+				}
+				if accounts.contains(claimer) {
+					if *amount >= balance {
+						*amount -= balance;
+						balance = 0;
+					} else {
+						balance -= *amount;
+						*amount = 0;
+					};
+					return *amount != 0
+				}
+				return true
+			});
+		}
+		ensure!(self.unclaimed_restricted_balance.is_empty(), VerifyError::InvalidNoteRecipients);
+		Ok(())
+	}
+
+	fn verify_escrow_claim_restrictions(&mut self) -> anyhow::Result<(), VerifyError> {
+		for (claimer, amount) in self.claimed_escrow_deposits_per_account.iter() {
+			let mut balance = amount.clone() as i128;
+			self.unclaimed_escrow_balances.retain(|accounts, amount| {
+				if balance == 0 {
+					return true
+				}
+				if accounts.contains(claimer) {
+					if *amount >= balance {
+						*amount -= balance;
+						balance = 0;
+					} else {
+						balance -= *amount;
+						*amount = 0;
+					};
+					return *amount != 0
+				}
+				return true
+			});
+		}
+
+		ensure!(self.unclaimed_escrow_balances.is_empty(), VerifyError::InvalidEscrowClaimers);
+		Ok(())
+	}
+
 	fn verify_change_number(
 		&mut self,
 		change: &BalanceChange,
-		key: &(AccountId, AccountType),
+		key: &LocalchainAccountId,
 	) -> anyhow::Result<(), VerifyError> {
 		ensure!(change.change_number > 0, VerifyError::InvalidBalanceChange);
 		if change.change_number == 1 {
@@ -546,16 +599,17 @@ impl BalanceChangesetState {
 		if recipients.len() > 0 {
 			let mut set = BTreeSet::new();
 			for rec in recipients {
-				set.insert((rec.clone(), account_type.clone()));
+				set.insert(LocalchainAccountId::new(rec.clone(), account_type.clone()));
 			}
-			self.unclaimed_restricted_balance.insert(set, milligons as i128);
+			let entry = self.unclaimed_restricted_balance.entry(set.clone()).or_insert(0i128);
+			*entry += milligons as i128;
 		}
 	}
 
 	fn record_tax(
 		&mut self,
 		milligons: u128,
-		claimer: &AccountId,
+		claimer: &LocalchainAccountId,
 	) -> anyhow::Result<(), VerifyError> {
 		self.sent_tax += milligons;
 		*self.tax_created_per_account.entry(claimer.clone()).or_insert(0) += milligons;
@@ -566,10 +620,12 @@ impl BalanceChangesetState {
 	fn record_tax_sent_to_vote(
 		&mut self,
 		milligons: u128,
-		account_id: &AccountId,
+		local_account_id: &LocalchainAccountId,
 	) -> anyhow::Result<(), VerifyError> {
-		*self.unclaimed_block_vote_tax_per_account.entry(account_id.clone()).or_insert(0) +=
-			milligons;
+		*self
+			.unclaimed_block_vote_tax_per_account
+			.entry(local_account_id.clone())
+			.or_insert(0) += milligons;
 
 		Ok(())
 	}
@@ -577,7 +633,7 @@ impl BalanceChangesetState {
 	fn used_tax_vote_amount(
 		&mut self,
 		milligons: u128,
-		account_id: &AccountId,
+		account_id: &LocalchainAccountId,
 	) -> anyhow::Result<(), VerifyError> {
 		let amount = self
 			.unclaimed_block_vote_tax_per_account
@@ -585,7 +641,7 @@ impl BalanceChangesetState {
 			.ok_or(VerifyError::InsufficientBlockVoteTax)?;
 
 		ensure!(*amount >= milligons, VerifyError::InsufficientBlockVoteTax);
-		*amount = amount.saturating_sub(milligons);
+		*amount -= milligons;
 		if *amount == 0 {
 			self.unclaimed_block_vote_tax_per_account.remove(account_id);
 		}
@@ -595,28 +651,14 @@ impl BalanceChangesetState {
 	fn claim_balance(
 		&mut self,
 		milligons: u128,
-		claimer: &AccountId,
-		account_type: &AccountType,
+		localchain_account_id: &LocalchainAccountId,
 	) -> anyhow::Result<(), VerifyError> {
-		if account_type == &AccountType::Tax {
+		if localchain_account_id.account_type == AccountType::Tax {
 			self.claimed_tax += milligons;
 		} else {
-			*self.claimed_deposits_per_account.entry(claimer.clone()).or_insert(0) += milligons;
 			self.claimed_deposits += milligons;
 		}
-
-		let key = (claimer.clone(), account_type.clone());
-		self.unclaimed_restricted_balance.retain(|accounts, amount| {
-			if accounts.contains(&key) {
-				let restricted_change = amount.saturating_sub(milligons as i128);
-				if restricted_change > 0 {
-					*amount = restricted_change;
-					return true
-				}
-				return false
-			}
-			return true
-		});
+		*self.claims_per_account.entry(localchain_account_id.clone()).or_insert(0) += milligons;
 
 		Ok(())
 	}
@@ -624,22 +666,10 @@ impl BalanceChangesetState {
 	fn claim_escrow_balance(
 		&mut self,
 		milligons: u128,
-		claimer: &AccountId,
+		claimer: &LocalchainAccountId,
 	) -> anyhow::Result<(), VerifyError> {
 		self.claimed_deposits += milligons;
 		*self.claimed_escrow_deposits_per_account.entry(claimer.clone()).or_insert(0) += milligons;
-
-		self.unclaimed_escrow_balances.retain(|accounts, amount| {
-			if accounts.contains(claimer) {
-				let restricted_change = amount.saturating_sub(milligons as i128);
-				if restricted_change > 0 {
-					*amount = restricted_change;
-					return true
-				}
-				return false
-			}
-			return true
-		});
 
 		Ok(())
 	}
@@ -648,7 +678,7 @@ impl BalanceChangesetState {
 	/// will also check if the escrow is ready to be claimed
 	fn record_escrow_settle(
 		&mut self,
-		key: &(AccountId, AccountType),
+		localchain_account_id: &LocalchainAccountId,
 		milligons: i128,
 		escrow_hold_note: &Note,
 		source_change_tick: Tick,
@@ -671,13 +701,13 @@ impl BalanceChangesetState {
 				return Err(VerifyError::InvalidEscrowHoldNote)
 			};
 
-			recipients.insert(recipient.clone());
+			recipients.insert(LocalchainAccountId::new(recipient.clone(), AccountType::Deposit));
 			if tick >= expiration_tick + ESCROW_CLAWBACK_TICKS {
 				// no claim necessary for a 0 claim
 				if milligons == 0 {
 					recipients.clear();
 				} else {
-					recipients.insert(key.0.clone());
+					recipients.insert(localchain_account_id.clone());
 				}
 			}
 		} else {
@@ -686,8 +716,10 @@ impl BalanceChangesetState {
 
 		self.sent_deposits += milligons as u128;
 		if !recipients.is_empty() {
-			self.unclaimed_escrow_balances
-				.insert(BTreeSet::from_iter(recipients), milligons);
+			*self
+				.unclaimed_escrow_balances
+				.entry(BTreeSet::from_iter(recipients))
+				.or_insert(0) += milligons;
 		}
 		Ok(())
 	}
@@ -709,8 +741,9 @@ pub fn verify_notarization_allocation(
 
 	let mut change_index = 0;
 	for change in changes {
-		let key = (change.account_id.clone(), change.account_type.clone());
-		state.verify_change_number(change, &key)?;
+		let localchain_account_id =
+			LocalchainAccountId::new(change.account_id.clone(), change.account_type.clone());
+		state.verify_change_number(change, &localchain_account_id)?;
 
 		let mut balance =
 			change.previous_balance_proof.as_ref().map(|a| a.balance).unwrap_or_default() as i128;
@@ -723,7 +756,7 @@ pub fn verify_notarization_allocation(
 				return Err(VerifyError::AccountLocked)
 			}
 
-			if change.account_type == AccountType::Tax {
+			if localchain_account_id.is_tax() {
 				match note.note_type {
 					NoteType::Claim | NoteType::Send { .. } | NoteType::SendToVote => {},
 					_ => Err(VerifyError::InvalidTaxOperation)?,
@@ -739,35 +772,25 @@ pub fn verify_notarization_allocation(
 					);
 				},
 				NoteType::Claim => {
-					state.claim_balance(
-						note.milligons,
-						&change.account_id,
-						&change.account_type,
-					)?;
+					state.claim_balance(note.milligons, &localchain_account_id)?;
 				},
 				NoteType::EscrowHold { .. } => {
 					ensure!(
 						note.milligons >= MINIMUM_ESCROW_SETTLEMENT,
 						VerifyError::InvalidEscrowHoldNote
 					);
-					// A escrow doesn't change the source balance
-					ensure!(
-						change.balance ==
-							change
-								.previous_balance_proof
-								.as_ref()
-								.map(|a| a.balance)
-								.unwrap_or_default(),
-						VerifyError::InvalidPreviousBalanceProof
-					);
+					// NOTE: a escrow doesn't change the source balance
 					ensure!(
 						change.escrow_hold_note.is_none() &&
-							state.accounts_with_new_holds.insert(key.0.clone()),
+							state.accounts_with_new_holds.insert(localchain_account_id.clone()),
 						VerifyError::AccountAlreadyHasEscrowHold
 					);
 				},
 				NoteType::EscrowClaim => {
-					state.claim_escrow_balance(note.milligons, &change.account_id)?;
+					if note.milligons < MINIMUM_ESCROW_SETTLEMENT {
+						return Err(VerifyError::EscrowNoteBelowMinimum)
+					}
+					state.claim_escrow_balance(note.milligons, &localchain_account_id)?;
 				},
 				NoteType::EscrowSettle => {
 					let Some(source_change_tick) =
@@ -782,7 +805,7 @@ pub fn verify_notarization_allocation(
 						.ok_or(VerifyError::MissingEscrowHoldNote)?;
 
 					state.record_escrow_settle(
-						&key,
+						&localchain_account_id,
 						note.milligons as i128,
 						escrow_hold_note,
 						source_change_tick,
@@ -790,27 +813,18 @@ pub fn verify_notarization_allocation(
 					)?;
 				},
 				NoteType::Tax => {
-					ensure!(
-						change.account_type == AccountType::Deposit,
-						VerifyError::InvalidTaxOperation
-					);
-					state.record_tax(note.milligons, &change.account_id)?;
+					ensure!(localchain_account_id.is_deposit(), VerifyError::InvalidTaxOperation);
+					state.record_tax(note.milligons, &localchain_account_id)?;
 				},
 				NoteType::LeaseDomain => {
-					ensure!(
-						change.account_type == AccountType::Deposit,
-						VerifyError::InvalidTaxOperation
-					);
-					state.record_tax(note.milligons, &change.account_id)?;
+					ensure!(localchain_account_id.is_deposit(), VerifyError::InvalidTaxOperation);
+					state.record_tax(note.milligons, &localchain_account_id)?;
 					state.allocated_to_domains =
 						state.allocated_to_domains.saturating_add(note.milligons);
 				},
 				NoteType::SendToVote { .. } => {
-					ensure!(
-						change.account_type == AccountType::Tax,
-						VerifyError::InvalidTaxOperation
-					);
-					state.record_tax_sent_to_vote(note.milligons, &change.account_id)?;
+					ensure!(localchain_account_id.is_tax(), VerifyError::InvalidTaxOperation);
+					state.record_tax_sent_to_vote(note.milligons, &localchain_account_id)?;
 				},
 				_ => {},
 			}
@@ -871,12 +885,15 @@ pub fn verify_notarization_allocation(
 			claimed: state.claimed_tax
 		}
 	);
-	// this works by removing all restricted balances as the approved users draw from them
-	ensure!(state.unclaimed_restricted_balance.is_empty(), VerifyError::InvalidNoteRecipients);
-	ensure!(state.unclaimed_escrow_balances.is_empty(), VerifyError::InvalidEscrowClaimers);
+
+	state.verify_note_claim_restrictions()?;
+	state.verify_escrow_claim_restrictions()?;
 
 	for block_vote in block_votes {
-		state.used_tax_vote_amount(block_vote.power, &block_vote.account_id)?;
+		state.used_tax_vote_amount(
+			block_vote.power,
+			&LocalchainAccountId::new(block_vote.account_id.clone(), AccountType::Tax),
+		)?;
 	}
 	ensure!(
 		state.unclaimed_block_vote_tax_per_account.is_empty(),

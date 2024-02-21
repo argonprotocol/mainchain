@@ -1,8 +1,10 @@
+#[cfg(feature = "std")]
+use crate::serialize_unsafe_u128_as_string;
 use codec::{Decode, Encode, MaxEncodedLen};
 use scale_info::TypeInfo;
 use serde::{Deserialize, Serialize};
 use sp_core::{ConstU32, RuntimeDebug};
-use sp_runtime::{format_runtime_string, BoundedVec, RuntimeString};
+use sp_runtime::{ BoundedVec, };
 
 use crate::{prod_or_fast, AccountId, DataDomainHash};
 
@@ -22,6 +24,7 @@ use crate::{prod_or_fast, AccountId, DataDomainHash};
 pub struct Note {
 	/// Number of milligons transferred
 	#[codec(compact)]
+	#[cfg_attr(feature = "std", serde(with = "serialize_unsafe_u128_as_string"))]
 	pub milligons: u128,
 	/// Type
 	pub note_type: NoteType,
@@ -53,51 +56,11 @@ pub fn round_up(value: u128, percentage: u128) -> u128 {
 	numerator.saturating_div(100) + round
 }
 
-#[derive(
-	PartialEq,
-	Eq,
-	Ord,
-	PartialOrd,
-	Encode,
-	Decode,
-	RuntimeDebug,
-	TypeInfo,
-	MaxEncodedLen,
-	Serialize,
-	Deserialize,
-)]
-#[cfg_attr(not(feature = "napi"), derive(Clone))]
-#[serde(rename_all = "camelCase")]
-#[cfg_attr(feature = "napi", napi_derive::napi)]
-pub enum AccountType {
-	Tax = 0,
-	Deposit = 1,
-}
-
-impl TryFrom<i32> for AccountType {
-	type Error = RuntimeString;
-
-	fn try_from(value: i32) -> Result<Self, Self::Error> {
-		match value {
-			0 => Ok(AccountType::Tax),
-			1 => Ok(AccountType::Deposit),
-			_ => Err(format_runtime_string!("Invalid account_type value {}", value)),
-		}
-	}
-}
-impl From<i64> for AccountType {
-	fn from(value: i64) -> Self {
-		if value == 0 {
-			AccountType::Tax
-		} else {
-			AccountType::Deposit
-		}
-	}
-}
-
 pub const ESCROW_EXPIRATION_TICKS: u32 = prod_or_fast!(60, 2);
-pub const ESCROW_CLAWBACK_TICKS: u32 = 15; // 15 after expiration
+pub const ESCROW_CLAWBACK_TICKS: u32 = 15;
+// 15 after expiration
 pub const MINIMUM_ESCROW_SETTLEMENT: u128 = 5u128;
+
 pub type MaxNoteRecipients = ConstU32<10>;
 
 pub const TAX_PERCENT_BASE: u128 = 20;

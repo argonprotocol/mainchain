@@ -39,11 +39,17 @@ export interface ClaimResult {
   tax: bigint
 }
 export enum BalanceChangeStatus {
+  /** The balance change has been submitted, but is not in a known notebook yet. */
   SubmittedToNotary = 0,
+  /** A balance change that doesn't get final proof because it is one of many in a single notebook. Aka, another balance change superseded it in the notebook. */
   SupersededInNotebook = 1,
-  InNotebook = 2,
-  Finalized = 3,
+  /** Proof has been obtained from a notebook */
+  NotebookPublished = 2,
+  /** The mainchain has finalized the notebook with the balance change */
+  MainchainFinal = 3,
+  /** A balance change has been sent to another user to claim. Keep checking until it is claimed. */
   WaitingForSendClaim = 4,
+  /** A pending balance change that was canceled before being claimed by another user (escrow or send). */
   Canceled = 5
 }
 export interface EscrowCloseOptions {
@@ -140,11 +146,6 @@ export interface SignatureResult {
   signature: Uint8Array
   milligons: bigint
 }
-export enum CryptoType {
-  Ed25519 = 0,
-  Sr25519 = 1,
-  Ecdsa = 2
-}
 /**
  * Options to provide the password for a keystore. NOTE that this library cannot clear out memory in javascript.
  * Only a single option should be picked.
@@ -157,30 +158,34 @@ export interface KeystorePasswordOption {
   /** Load the password from a file. */
   passwordFile?: string
 }
+export enum CryptoScheme {
+  Ed25519 = 0,
+  Sr25519 = 1,
+  Ecdsa = 2
+}
+export function runCli(): Promise<void>
+/** Max balance changes that can be in a single notarization */
+export const NOTARIZATION_MAX_BALANCE_CHANGES: number
+/** Max data domains that can be in a single notarization */
+export const NOTARIZATION_MAX_DOMAINS: number
+/** Max notarizations that can be in a single notarization */
+export const NOTARIZATION_MAX_BLOCK_VOTES: number
+/** Number of ticks past the notarization of an escrow hold that an escrow can be claimed (and no longer used) */
+export const ESCROW_EXPIRATION_TICKS: number
+/** Number of ticks past the expiration of an escrow that a recipient has to claim. After this point, sender can recoup the escrowed funds */
+export const ESCROW_CLAWBACK_TICKS: number
+/** Minimum milligons that can be settled in an escrow */
+export const ESCROW_MINIMUM_SETTLEMENT: bigint
+/** Max versions that can be in a datastore zone record */
+export const DATASTORE_MAX_VERSIONS: number
+/** Minimum data domain name length */
+export const DATA_DOMAIN_MIN_NAME_LENGTH: number
+/** Cost to lease a data domain for 1 year */
+export const DATA_DOMAIN_LEASE_COST: bigint
 export interface LocalchainConfig {
   dbPath: string
   mainchainUrl: string
   ntpPoolUrl?: string
-}
-export interface Constants {
-  notarizationConstants: NotarizationConstants
-  escrowConstants: EscrowConstants
-  dataDomainConstants: DataDomainConstants
-}
-export interface NotarizationConstants {
-  maxBalanceChanges: number
-  maxDataDomains: number
-  maxBlockVotes: number
-}
-export interface EscrowConstants {
-  expirationTicks: number
-  ticksToClaim: number
-}
-export interface DataDomainConstants {
-  maxDatastoreVersions: number
-  minDomainNameLength: number
-  maxDomainNameLength: number
-  leaseCost: bigint
 }
 export interface TickerConfig {
   tickDurationMillis: number
@@ -218,10 +223,10 @@ export class BalanceChangeBuilder {
   claimFromMainchain(transfer: LocalchainTransfer): Promise<void>
   sendToMainchain(amount: bigint): Promise<void>
   createEscrowHold(amount: bigint, dataDomain: string, dataDomainAddress: string): Promise<void>
+  createPrivateServerEscrowHold(amount: bigint, paymentAddress: string): Promise<void>
   sendToVote(amount: bigint): Promise<void>
   /** Lease a data domain. DataDomain leases are converted in full to tax. */
   leaseDataDomain(): Promise<bigint>
-  createPrivateServerEscrowHold(amount: bigint, paymentAddress: string): Promise<void>
 }
 export type BalanceChangeRow = BalanceChange
 export class BalanceChange {
@@ -259,7 +264,7 @@ export type DataDomainRow = DataDomainLease
 export class DataDomainLease {
   id: number
   name: string
-  tld: number
+  tld: string
   registeredToAddress: string
   notarizationId: number
   registeredAtTick: number
@@ -269,7 +274,7 @@ export class DataDomainStore {
   get list(): Promise<Array<DataDomainLease>>
   hashDomain(domain: JsDataDomain): Uint8Array
   static getHash(domain: string): Uint8Array
-  static parse(domain: string): JsDataDomain
+  static parse(domain: string): DataDomain
   get(id: number): Promise<DataDomainLease>
 }
 export class MainchainClient {
@@ -305,8 +310,13 @@ export class NotarizationBuilder {
   cancelEscrow(openEscrow: OpenEscrow): Promise<void>
   claimEscrow(openEscrow: OpenEscrow, taxAddress: string): Promise<void>
   addVote(vote: BlockVote): Promise<void>
-  leaseDataDomain(useFundsFromAddress: string, taxAddress: string, dataDomain: DataDomain, registerToAddress: string): Promise<void>
+  leaseDataDomain(useFundsFromAddress: string, taxAddress: string, dataDomain: string, registerToAddress: string): Promise<void>
   canAddBalanceChange(claimAddress: string, taxAddress: string): Promise<boolean>
+  /** Calculates the transfer tax on the given amount */
+  getTransferTaxAmount(amount: bigint): bigint
+  /** Calculates the total needed to end up with the given balance */
+  getTotalForAfterTaxBalance(finalBalance: bigint): bigint
+  getEscrowTaxAmount(amount: bigint): bigint
   moveToSubAddress(fromAddress: string, toSubAddress: string, accountType: AccountType, amount: bigint, taxAddress: string): Promise<void>
   moveClaimsToAddress(address: string, accountType: AccountType, taxAddress: string): Promise<void>
   claimFromMainchain(transfer: LocalchainTransfer): Promise<BalanceChangeBuilder>
@@ -330,7 +340,7 @@ export class NotarizationTracker {
   notarizedBalanceChanges: number
   notarizedVotes: number
   /** Returns the balance changes that were submitted to the notary indexed by the stringified account id (napi doesn't allow numbers as keys) */
-  get balanceChangesByAccount(): Promise<Record<string, BalanceChange>>
+  get balanceChangesByAccountId(): Promise<Record<string, BalanceChange>>
   waitForNotebook(): Promise<void>
   /** Asks the notary for proof the transaction was included in a notebook header. If this notebook has not been finalized yet, it will return an error. */
   getNotebookProof(): Promise<Array<NotebookProof>>
@@ -393,7 +403,7 @@ export class OpenEscrowsStore {
 }
 export class Signer {
   constructor(signer?: (address: string, signatureMessage: Uint8Array) => Promise<Uint8Array>)
-  createAccountId(cryptoType: CryptoType): string
+  createAccountId(scheme: CryptoScheme): string
   attachKeystore(path: string, password: KeystorePasswordOption): Promise<void>
   canSign(address: string): boolean
   sign(address: string, message: Uint8Array): Promise<Uint8Array>
@@ -407,7 +417,6 @@ export class Localchain {
   close(): Promise<void>
   static getDefaultPath(): string
   get currentTick(): number
-  get constants(): Constants
   get ticker(): TickerRef
   get mainchainClient(): Promise<MainchainClient | null>
   get notaryClients(): NotaryClients

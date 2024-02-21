@@ -10,7 +10,8 @@ use ulx_notary_audit::{
 };
 use ulx_primitives::{
 	ensure, AccountId, AccountOrigin, AccountType, BalanceChange, BalanceProof, BalanceTip,
-	BlockVote, DataDomainHash, NewAccountOrigin, Notarization, NotaryId, NoteType, NotebookNumber,
+	BlockVote, DataDomainHash, LocalchainAccountId, NewAccountOrigin, Notarization, NotaryId,
+	NoteType, NotebookNumber,
 };
 
 use crate::{
@@ -193,20 +194,21 @@ impl NotarizationsStore {
 		let block_vote_specifications =
 			BlocksStore.get_vote_minimums(&mut tx, &voted_blocks).await?;
 
-		let mut new_account_origins = BTreeMap::<(AccountId, AccountType), AccountOrigin>::new();
+		let mut new_account_origins = BTreeMap::<LocalchainAccountId, AccountOrigin>::new();
 
 		let mut changes_with_proofs = changes.clone();
 		let mut escrow_data_domains = BTreeMap::new();
 		let mut chain_transfers: u32 = 0;
 		for (change_index, change) in changes.into_iter().enumerate() {
 			let BalanceChange { account_id, account_type, change_number, balance, .. } = change;
-			let key = (account_id.clone(), account_type.clone());
+			let localchain_account_id =
+				LocalchainAccountId::new(account_id.clone(), account_type.clone());
 
 			let account_origin = change
 				.previous_balance_proof
 				.as_ref()
 				.map(|p| p.account_origin.clone())
-				.or_else(|| new_account_origins.get(&key).map(|a| a.clone()));
+				.or_else(|| new_account_origins.get(&localchain_account_id).map(|a| a.clone()));
 
 			let account_origin = match account_origin {
 				Some(account_origin) => account_origin,
@@ -226,7 +228,7 @@ impl NotarizationsStore {
 					let origin =
 						AccountOrigin { notebook_number: current_notebook_number, account_uid };
 
-					new_account_origins.insert(key.clone(), origin.clone());
+					new_account_origins.insert(localchain_account_id.clone(), origin.clone());
 					origin
 				},
 			};
@@ -401,8 +403,12 @@ impl NotarizationsStore {
 			tick,
 			new_account_origins: new_account_origins
 				.into_iter()
-				.map(|((account_id, account_type), origin)| {
-					NewAccountOrigin::new(account_id, account_type, origin.account_uid)
+				.map(|(localchain_account_id, origin)| {
+					NewAccountOrigin::new(
+						localchain_account_id.account_id,
+						localchain_account_id.account_type,
+						origin.account_uid,
+					)
 				})
 				.collect(),
 		})

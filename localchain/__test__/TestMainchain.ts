@@ -6,6 +6,7 @@ import {addTeardown, ITeardownable} from "./testHelpers";
 
 export default class TestMainchain implements ITeardownable {
     public address: string;
+    public loglevel = 'warn';
     #binPath: string;
     #process: ChildProcess;
     #interfaces: readline.Interface[] = [];
@@ -23,8 +24,7 @@ export default class TestMainchain implements ITeardownable {
         console.log('launching ulx-node from', path.dirname(path.resolve(this.#binPath)))
         this.#process = spawn(path.resolve(this.#binPath), ['--dev', '--alice', `--miners=${miningThreads}`, '--port=0'], {
             stdio: ['ignore', 'pipe', 'pipe', "ignore"],
-            // NOTE: if you go lower than info, we can't figure out the port
-            env: {...process.env, RUST_LOG: 'info'}
+            env: {...process.env, RUST_LOG: 'warn,sc_rpc_server=info'}
         });
 
         this.#process.stderr.setEncoding('utf8');
@@ -38,6 +38,7 @@ export default class TestMainchain implements ITeardownable {
         });
         this.#interfaces.push(i);
 
+        let isReady = false;
         this.address = await new Promise<string>((resolve, reject) => {
             this.#process.on('error', (err) => {
                 console.warn("Error running mainchain", err);
@@ -45,9 +46,17 @@ export default class TestMainchain implements ITeardownable {
             });
 
             const i = readline.createInterface({input: this.#process.stderr}).on('line', line => {
+                if (isReady && (this.loglevel === 'warn' || this.loglevel === 'error')) {
+                    const showWarn = line.includes('WARN') && this.loglevel !== 'error';
+                    if (showWarn || this.loglevel.includes('ERROR')) {
+                        console.log('Main >> %s', line);
+                    }
+                    return;
+                }
                 console.log('Main >> %s', line);
                 let match = line.match(/Running JSON-RPC server: addr=127.0.0.1:(\d+)/);
                 if (match) {
+                    isReady = true;
                     resolve(`ws://127.0.0.1:${match[1]}`);
                 }
             });

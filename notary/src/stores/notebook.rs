@@ -14,8 +14,8 @@ use sp_keystore::KeystorePtr;
 use sqlx::PgConnection;
 
 use ulx_primitives::{
-	ensure, note::AccountType, AccountId, AccountOrigin, Balance, BalanceTip, BlockVote,
-	ChainTransfer, MaxNotebookNotarizations, MerkleProof, NewAccountOrigin, NotaryId, Note,
+	ensure, AccountId, AccountOrigin, Balance, BalanceTip, BlockVote, ChainTransfer,
+	LocalchainAccountId, MaxNotebookNotarizations, MerkleProof, NewAccountOrigin, NotaryId, Note,
 	NoteType, Notebook, NotebookNumber,
 };
 
@@ -193,8 +193,7 @@ impl NotebookStore {
 		let notarizations = NotarizationsStore::get_for_notebook(&mut *db, notebook_number).await?;
 
 		let mut changed_accounts =
-			BTreeMap::<(AccountId, AccountType), (u32, Balance, AccountOrigin, Option<Note>)>::new(
-			);
+			BTreeMap::<LocalchainAccountId, (u32, Balance, AccountOrigin, Option<Note>)>::new();
 		let mut block_votes = BTreeMap::<(AccountId, u32), BlockVote>::new();
 		let new_account_origins =
 			NotebookNewAccountsStore::take_notebook_origins(&mut *db, notebook_number).await?;
@@ -202,7 +201,7 @@ impl NotebookStore {
 		let new_account_origin_map =
 			BTreeMap::from_iter(new_account_origins.iter().map(|origin| {
 				(
-					(origin.account_id.clone(), origin.account_type.clone()),
+					LocalchainAccountId::new(origin.account_id.clone(), origin.account_type.clone()),
 					AccountOrigin { notebook_number, account_uid: origin.account_uid },
 				)
 			}));
@@ -216,15 +215,16 @@ impl NotebookStore {
 		for change in notarizations.clone() {
 			for change in change.balance_changes {
 				let account_id = change.account_id;
-				let key = (account_id.clone(), change.account_type);
+				let localchain_account_id =
+					LocalchainAccountId::new(account_id.clone(), change.account_type);
 				let origin = change
 					.previous_balance_proof
 					.map(|a| a.account_origin)
-					.or_else(|| new_account_origin_map.get(&key).cloned())
+					.or_else(|| new_account_origin_map.get(&localchain_account_id).cloned())
 					.ok_or(|| {
 						Error::InternalError(format!(
-							"Could not find origin for account {} {:?}",
-							key.0, key.1
+							"Could not find origin for account {:?}",
+							localchain_account_id
 						))
 					})
 					.map_err(|e| Error::InternalError(e().to_string()))?;
@@ -248,11 +248,13 @@ impl NotebookStore {
 					}
 				}
 
-				if !changed_accounts.contains_key(&key) ||
-					changed_accounts.get(&key).is_some_and(|a| a.0 < change.change_number)
+				if !changed_accounts.contains_key(&localchain_account_id) ||
+					changed_accounts
+						.get(&localchain_account_id)
+						.is_some_and(|a| a.0 < change.change_number)
 				{
 					changed_accounts.insert(
-						key.clone(),
+						localchain_account_id.clone(),
 						(change.change_number, change.balance, origin, change_note),
 					);
 				}
@@ -272,23 +274,18 @@ impl NotebookStore {
 		let mut account_changelist = vec![];
 		let merkle_leafs = changed_accounts
 			.into_iter()
-			.map(
-				|(
-					(account_id, account_type),
-					(nonce, balance, account_origin, escrow_hold_note),
-				)| {
-					account_changelist.push(account_origin.clone());
-					BalanceTip {
-						account_id,
-						account_type,
-						change_number: nonce,
-						balance,
-						account_origin,
-						escrow_hold_note,
-					}
-					.encode()
-				},
-			)
+			.map(|(localchain_account_id, (nonce, balance, account_origin, escrow_hold_note))| {
+				account_changelist.push(account_origin.clone());
+				BalanceTip {
+					account_id: localchain_account_id.account_id,
+					account_type: localchain_account_id.account_type,
+					change_number: nonce,
+					balance,
+					account_origin,
+					escrow_hold_note,
+				}
+				.encode()
+			})
 			.collect::<Vec<_>>();
 
 		let changes_root = merkle_root::<Blake2Hasher, _>(&merkle_leafs);

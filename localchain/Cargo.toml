@@ -37,9 +37,7 @@ subxt-signer = { version = "0.33", features = ["default"] }
 tokio = { version = "1.35", features = ["full"] }
 tokio-stream = { version = "0.1", features = ["sync"] }
 hex = { version = "0.4" }
-sc-keystore = { version = "4.0.0-dev", git = "https://github.com/paritytech/polkadot-sdk.git", branch = "release-polkadot-v1.5.0" }
 sc-service = { version = "0.10.0-dev", git = "https://github.com/paritytech/polkadot-sdk.git", branch = "release-polkadot-v1.5.0" }
-sp-keystore = { version = "0.27", git = "https://github.com/paritytech/polkadot-sdk.git", branch = "release-polkadot-v1.5.0" }
 jsonrpsee = { version = "0.20", features = ["server", "http-client", "ws-client", "macros", "client-ws-transport-native-tls"] }
 sc-utils = { version = "4.0.0-dev", git = "https://github.com/paritytech/polkadot-sdk.git", branch = "release-polkadot-v1.5.0" }
 sp-runtime = { version = "24.0.0", git = "https://github.com/paritytech/polkadot-sdk.git", branch = "release-polkadot-v1.5.0" }
@@ -51,8 +49,11 @@ tracing-subscriber = { version = "0.3", features = ["env-filter"] }
 sqlx = { version = "0.7", features = ["runtime-tokio", "sqlite", "macros", "chrono"] }
 chrono = { version = "0.4" }
 clap = { version = "4.4", features = ["derive", "cargo", "env"] }
+comfy-table = { version = "7.1" }
 lazy_static = "1.4.0"
 bech32 = { version = "0.10.0-beta" }
+array-bytes = { version = "6.1" }
+directories = { version = "5.0" }
 
 ulixee-client = { path = "../client" }
 ulx-primitives = { path = "../primitives", features = ["napi"] }
@@ -63,6 +64,7 @@ ulx-notary-audit = { path = "../notary/audit" }
 frame-support = { version = "4.0.0-dev", git = "https://github.com/paritytech/polkadot-sdk.git", branch = "release-polkadot-v1.5.0" }
 sp-keyring = { version = "24.0.0", git = "https://github.com/paritytech/polkadot-sdk.git", branch = "release-polkadot-v1.5.0" }
 ulx-testing = { path = "../testing" }
+tempfile = { version = "3.1.0" }
 
 [build-dependencies]
 napi-build = "2.1"

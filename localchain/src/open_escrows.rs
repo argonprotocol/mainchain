@@ -18,8 +18,8 @@ use std::sync::Arc;
 use tokio::sync::Mutex;
 use ulx_notary_audit::verify_changeset_signatures;
 use ulx_primitives::{
-  AccountType, BalanceChange, BalanceTip, NoteType, NotebookNumber, ESCROW_CLAWBACK_TICKS,
-  ESCROW_EXPIRATION_TICKS, MINIMUM_ESCROW_SETTLEMENT,
+  AccountType, BalanceChange, BalanceTip, MultiSignatureBytes, NoteType, NotebookNumber,
+  ESCROW_CLAWBACK_TICKS, ESCROW_EXPIRATION_TICKS, MINIMUM_ESCROW_SETTLEMENT,
 };
 
 lazy_static! {
@@ -95,7 +95,6 @@ impl Escrow {
     let Ok(hrp) = Hrp::parse("esc") else {
       return Err(anyhow!("Failed to parse internal bech32 encoding hrp"));
     };
-    println!("Creating escrow id {:?}", balance_change);
     let id = bech32::encode::<Bech32m>(hrp, balance_change.hash().as_ref())?;
     Ok(id)
   }
@@ -183,9 +182,9 @@ impl Escrow {
   pub async fn get_final(&self) -> anyhow::Result<BalanceChange> {
     let mut balance_change = self.get_change_with_settled_amount(self.settled_amount);
     if self.settled_signature.len() == 0 || self.settled_signature == *EMPTY_SIGNATURE {
-      return Err(anyhow::anyhow!("Escrow has not been signed"));
+      return Err(anyhow::anyhow!("Escrow settlement has not been signed"));
     }
-    balance_change.signature = MultiSignature::decode(&mut self.settled_signature.as_slice())?;
+    balance_change.signature = MultiSignatureBytes::decode(&mut self.settled_signature.as_slice())?;
     verify_changeset_signatures(&vec![balance_change.clone()])?;
     Ok(balance_change)
   }
@@ -236,7 +235,7 @@ impl Escrow {
     signature: Vec<u8>,
   ) -> anyhow::Result<()> {
     let mut balance_change = self.get_change_with_settled_amount(milligons);
-    balance_change.signature = MultiSignature::decode(&mut signature.as_slice())?;
+    balance_change.signature = MultiSignatureBytes::decode(&mut signature.as_slice())?;
     verify_changeset_signatures(&vec![balance_change.clone()])?;
 
     self.settled_amount = milligons;
@@ -581,8 +580,8 @@ pub struct SignatureResult {
 mod tests {
   use super::*;
   use crate::balance_change_builder::BalanceChangeBuilder;
-  use crate::test_utils::CryptoType::Ed25519;
   use crate::test_utils::{create_keystore, create_mock_notary, mock_notary_clients, MockNotary};
+  use crate::CryptoScheme::Ed25519;
   use crate::*;
   use anyhow::bail;
   use serde_json::json;
@@ -590,7 +589,7 @@ mod tests {
   use sp_keyring::Ed25519Keyring::Bob;
   use sp_keyring::Ed25519Keyring::Ferdie;
   use ulx_primitives::tick::Tick;
-  use ulx_primitives::{AccountId, Notarization};
+  use ulx_primitives::{AccountId, LocalchainAccountId, Notarization};
 
   async fn register_account(
     db: &mut SqliteConnection,
@@ -664,7 +663,7 @@ mod tests {
     println!("got balance tip for account {:?}", balance_tip);
     let mut state = mock_notary.state.lock().await;
     (*state).balance_tips.insert(
-      (account.get_account_id32()?, account.account_type.clone()),
+      LocalchainAccountId::new(account.get_account_id32()?, account.account_type.clone()),
       ulx_notary::apis::localchain::BalanceTipResult {
         tick,
         balance_tip: balance_tip.tip().into(),
@@ -704,14 +703,14 @@ mod tests {
     println!("opened escrow");
     let escrow = open_escrow.inner().await;
     assert_eq!(escrow.to_address.clone(), alice_address);
-    assert_eq!(escrow.expiration_tick, 1 + ESCROW_EXPIRATION_TICKS);
+    assert_eq!(escrow.expiration_tick, 1 + crate::ESCROW_EXPIRATION_TICKS);
 
     assert_eq!(store.get_claimable().await?.len(), 0);
 
     let Err(e) = open_escrow.export_for_send().await else {
       bail!("Expected error");
     };
-    assert_eq!(e.reason.to_string(), "Escrow has not been signed");
+    assert_eq!(e.reason.to_string(), "Escrow settlement has not been signed");
 
     let keystore = create_keystore(&Bob.to_seed(), Ed25519)?;
 
@@ -832,7 +831,10 @@ mod tests {
       sent_escrow.balance_change_number
     );
 
-    assert_eq!(imported_escrow.expiration_tick, 1 + ESCROW_EXPIRATION_TICKS);
+    assert_eq!(
+      imported_escrow.expiration_tick,
+      1 + crate::ESCROW_EXPIRATION_TICKS
+    );
     assert_eq!(imported_escrow.settled_amount, MINIMUM_ESCROW_SETTLEMENT);
     assert_eq!(imported_escrow.id, sent_escrow.id);
 

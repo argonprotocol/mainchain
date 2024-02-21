@@ -157,7 +157,7 @@ mod tests {
 	use sp_keyring::Sr25519Keyring::Bob;
 	use sqlx::PgPool;
 
-	use ulx_primitives::{note::AccountType::Deposit, AccountOrigin, BalanceTip};
+	use ulx_primitives::{AccountType::Deposit, AccountOrigin, BalanceTip};
 
 	use crate::stores::balance_tip::BalanceTipStore;
 

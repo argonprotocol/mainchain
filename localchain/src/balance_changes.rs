@@ -8,7 +8,10 @@ use serde_json::{from_value, json};
 use sp_core::{bounded_vec, ed25519, H256};
 use sp_runtime::traits::BlakeTwo256;
 use sqlx::{FromRow, Sqlite, SqliteConnection, SqlitePool, Transaction};
-use ulx_primitives::{BalanceChange, BalanceProof, BalanceTip, MerkleProof, NotaryId};
+use ulx_primitives::tick::Tick;
+use ulx_primitives::{
+  BalanceChange, BalanceProof, BalanceTip, MerkleProof, NotaryId, NotebookNumber,
+};
 
 #[derive(FromRow, Clone, Debug)]
 #[allow(dead_code)]
@@ -87,11 +90,17 @@ impl BalanceChangeRow {
 #[derive(Debug, PartialOrd, PartialEq)]
 #[napi]
 pub enum BalanceChangeStatus {
+  /// The balance change has been submitted, but is not in a known notebook yet.
   SubmittedToNotary,
+  /// A balance change that doesn't get final proof because it is one of many in a single notebook. Aka, another balance change superseded it in the notebook.
   SupersededInNotebook,
-  InNotebook,
-  Finalized,
+  /// Proof has been obtained from a notebook
+  NotebookPublished,
+  /// The mainchain has finalized the notebook with the balance change
+  MainchainFinal,
+  /// A balance change has been sent to another user to claim. Keep checking until it is claimed.
   WaitingForSendClaim,
+  /// A pending balance change that was canceled before being claimed by another user (escrow or send).
   Canceled,
 }
 
@@ -100,8 +109,8 @@ impl From<i64> for BalanceChangeStatus {
     match i {
       0 => BalanceChangeStatus::SubmittedToNotary,
       1 => BalanceChangeStatus::SupersededInNotebook,
-      2 => BalanceChangeStatus::InNotebook,
-      3 => BalanceChangeStatus::Finalized,
+      2 => BalanceChangeStatus::NotebookPublished,
+      3 => BalanceChangeStatus::MainchainFinal,
       4 => BalanceChangeStatus::WaitingForSendClaim,
       5 => BalanceChangeStatus::Canceled,
       _ => panic!("Unknown balance change status {}", i),
@@ -116,7 +125,7 @@ pub struct BalanceChangeStore {
 
 #[napi]
 impl BalanceChangeStore {
-  pub(crate) fn new(db: SqlitePool) -> Self {
+  pub fn new(db: SqlitePool) -> Self {
     Self { db }
   }
 
@@ -159,8 +168,8 @@ impl BalanceChangeStore {
       account_id,
       BalanceChangeStatus::Canceled as i64,
     )
-        .fetch_optional(db)
-        .await?;
+            .fetch_optional(db)
+            .await?;
     Ok(row)
   }
 
@@ -229,12 +238,28 @@ impl BalanceChangeStore {
       BalanceChangeRow,
       "SELECT * FROM balance_changes WHERE status in (?,?,?) ORDER BY account_id ASC, change_number DESC",
       BalanceChangeStatus::WaitingForSendClaim as i64,
-      BalanceChangeStatus::InNotebook as i64,
+      BalanceChangeStatus::NotebookPublished as i64,
       BalanceChangeStatus::SubmittedToNotary as i64,
     )
-    .fetch_all(&mut *db)
-    .await?;
+            .fetch_all(&mut *db)
+            .await?;
     Ok(rows)
+  }
+
+  pub async fn get_notarization_notebook(
+    db: &mut SqliteConnection,
+    notarization_id: i64,
+  ) -> anyhow::Result<(Option<NotebookNumber>, Option<Tick>)> {
+    let record = sqlx::query!(
+      "SELECT notebook_number, tick FROM notarizations WHERE id = ?",
+      notarization_id
+    )
+    .fetch_one(&mut *db)
+    .await?;
+    Ok((
+      record.notebook_number.map(|x| x as NotebookNumber),
+      record.tick.map(|x| x as Tick),
+    ))
   }
 
   pub async fn build_for_account(
@@ -321,8 +346,8 @@ impl BalanceChangeStore {
         notes_json,
         notary_id,
       )
-        .execute(&mut **db)
-        .await?;
+            .execute(&mut **db)
+            .await?;
     if res.rows_affected() != 1 {
       Err(anyhow::anyhow!("Error inserting balance change"))?;
     }
@@ -350,8 +375,8 @@ impl BalanceChangeStore {
     let balance_str = balance_change.balance.to_string();
 
     if let Some(existing) = Self::find_account_change(db, account_id, balance_change).await? {
-      if existing.status == BalanceChangeStatus::InNotebook
-        || existing.status == BalanceChangeStatus::Finalized
+      if existing.status == BalanceChangeStatus::NotebookPublished
+        || existing.status == BalanceChangeStatus::MainchainFinal
       {
         return Ok(existing.id);
       }
@@ -382,8 +407,8 @@ impl BalanceChangeStore {
         notary_id,
         notarization_id
       )
-      .execute(&mut **db)
-      .await?;
+            .execute(&mut **db)
+            .await?;
     if res.rows_affected() != 1 {
       Err(anyhow::anyhow!("Error inserting balance change"))?;
     }
@@ -400,11 +425,11 @@ impl BalanceChangeStore {
       "SELECT id FROM balance_changes WHERE account_id = ? AND change_number > ? AND status in (?,?) ORDER BY change_number DESC LIMIT 1",
       balance_change.account_id,
       balance_change.change_number,
-      BalanceChangeStatus::Finalized as i64,
-      BalanceChangeStatus::InNotebook as i64,
+      BalanceChangeStatus::MainchainFinal as i64,
+      BalanceChangeStatus::NotebookPublished as i64,
     )
-    .fetch_optional(&mut *db)
-    .await?;
+            .fetch_optional(&mut *db)
+            .await?;
     if res.is_some() {
       balance_change.status = BalanceChangeStatus::SupersededInNotebook;
       sqlx::query!(
@@ -426,11 +451,11 @@ impl BalanceChangeStore {
   ) -> anyhow::Result<()> {
     let proof_json = json!(proof.notebook_proof);
     balance_change.proof_json = Some(proof_json.to_string());
-    balance_change.status = BalanceChangeStatus::InNotebook;
+    balance_change.status = BalanceChangeStatus::NotebookPublished;
     sqlx::query!(
       "UPDATE balance_changes SET proof_json = ?, status = ? WHERE id = ?",
       proof_json,
-      BalanceChangeStatus::InNotebook as i64,
+      BalanceChangeStatus::NotebookPublished as i64,
       balance_change.id
     )
     .execute(&mut **db)
@@ -447,13 +472,13 @@ impl BalanceChangeStore {
     finalized_block_number: u32,
   ) -> anyhow::Result<()> {
     balance_change.verify_balance_proof(account, account_change_root)?;
-    balance_change.status = BalanceChangeStatus::Finalized;
+    balance_change.status = BalanceChangeStatus::MainchainFinal;
     balance_change.finalized_block_number = Some(finalized_block_number as i64);
 
     sqlx::query!(
       "UPDATE balance_changes SET finalized_block_number = ?, status = ? WHERE id = ?",
       balance_change.finalized_block_number,
-      BalanceChangeStatus::Finalized as i64,
+      BalanceChangeStatus::MainchainFinal as i64,
       balance_change.id
     )
     .execute(&mut **db)

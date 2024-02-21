@@ -46,11 +46,15 @@ pub async fn local_client() -> Result<UlxClient, Error> {
 	OnlineClient::<UlxConfig>::new().await
 }
 
-pub async fn try_until_connected(url: String, retry_delay_millis: u64) -> Result<UlxClient, Error> {
+pub async fn try_until_connected(url: String, retry_delay_millis: u64, timeout_millis: u64) -> Result<UlxClient, Error> {
+	let start = std::time::Instant::now();
 	let rpc = loop {
 		match UlxClient::from_url(url.clone()).await {
 			Ok(client) => break client,
 			Err(why) => {
+				if start.elapsed().as_millis() as u64 > timeout_millis {
+					return Err(Error::Other("Failed to connect to client within timeout".to_string()));
+				}
 				println!("failed to connect to client due to {:?}, retrying soon..", why);
 				tokio::time::sleep(std::time::Duration::from_millis(retry_delay_millis)).await;
 			},
@@ -67,11 +71,15 @@ pub struct UlxFullclient {
 	pub methods: LegacyRpcMethods<UlxConfig>,
 }
 impl UlxFullclient {
-	pub async fn try_until_connected(url: String, retry_delay_millis: u64) -> Result<Self, Error> {
+	pub async fn try_until_connected(url: String, retry_delay_millis: u64, timeout_millis: u64) -> Result<Self, Error> {
+		let start = std::time::Instant::now();
 		let ws_client = loop {
 			match WsClientBuilder::default().build(&url).await {
 				Ok(client) => break client,
 				Err(why) => {
+					if start.elapsed().as_millis() as u64 > timeout_millis {
+						return Err(Error::Other("Failed to connect to client within timeout".to_string()));
+					}
 					warn!(
 						"failed to connect to client due to {} - {:?}, retrying soon..",
 						url, why

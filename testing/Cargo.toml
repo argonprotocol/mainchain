@@ -8,13 +8,12 @@ license.workspace = true
 repository.workspace = true
 documentation.workspace = true
 homepage.workspace = true
-publish=false
+publish = false
 
 [dependencies]
-ulixee-client = { path= "../client" }
+ulixee-client = { path = "../client" }
 frame-support = { version = "4.0.0-dev", git = "https://github.com/paritytech/polkadot-sdk.git", branch = "release-polkadot-v1.5.0" }
 sp-keyring = { version = "24.0.0", git = "https://github.com/paritytech/polkadot-sdk.git", branch = "release-polkadot-v1.5.0" }
-substrate-runner = { git="https://github.com/paritytech/subxt.git", branch="master" }
 tracing = "0.1"
 tracing-subscriber = { version = "0.3", features = ["env-filter"] }
 subxt = { version = "0.33", features = ["substrate-compat"] }

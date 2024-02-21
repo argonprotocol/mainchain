@@ -9,7 +9,6 @@ use sp_std::{cmp::Ordering, collections::btree_map::BTreeMap, str};
 use crate::{data_tld::DataTLD, host::Host, NotaryId};
 
 pub const MAX_DATASTORE_VERSIONS: u32 = 25;
-pub const MAX_DOMAIN_NAME_LENGTH: u32 = 50;
 
 pub const DATA_DOMAIN_LEASE_COST: u128 = 1_000;
 
@@ -144,11 +143,13 @@ pub struct Semver {
 	pub minor: u32,
 	pub patch: u32,
 }
+
 impl Semver {
 	pub fn new(major: u32, minor: u32, patch: u32) -> Self {
 		Self { major, minor, patch }
 	}
 }
+
 impl PartialOrd for Semver {
 	fn partial_cmp(&self, other: &Self) -> Option<Ordering> {
 		if self.major != other.major {

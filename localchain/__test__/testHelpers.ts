@@ -50,7 +50,7 @@ export async function transferToLocalchain(account: KeyringPair, amount: number,
                     .then(() => {
                         for (const { event } of events) {
                             if (client.events.chainTransfer.TransferToLocalchain.is(event)) {
-                                let nonce = event.data.accountNonce.toNumber();
+                                let nonce = event.data.accountNonce.toPrimitive() as number;
                                 resolve(nonce)
                             }
                         }

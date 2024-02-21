@@ -166,8 +166,10 @@ async fn main() -> anyhow::Result<()> {
 		Commands::InsertKey { suri, keystore_params } => {
 			let suri = utils::read_uri(suri.as_ref())?;
 			let password = keystore_params.read_password()?;
-			let public =
-				with_crypto_scheme!(CryptoScheme::Ed25519, to_vec(&suri, password.clone()))?;
+			let public = with_crypto_scheme!(
+				CryptoScheme::Ed25519,
+				get_public_key_bytes(&suri, password.clone())
+			)?;
 			let keystore = read_keystore(keystore_params, false)?;
 			keystore
 				.insert(NOTARY_KEYID, &suri, &public[..])
@@ -186,7 +188,8 @@ async fn main() -> anyhow::Result<()> {
 
 	Ok(())
 }
-fn to_vec<P: sp_core::Pair>(
+
+fn get_public_key_bytes<P: sp_core::Pair>(
 	uri: &str,
 	pass: Option<SecretString>,
 ) -> anyhow::Result<Vec<u8>, Error> {

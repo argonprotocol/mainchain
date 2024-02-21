@@ -19,7 +19,6 @@ use ulixee_client::api::storage;
 use ulixee_client::UlxFullclient;
 use ulx_primitives::host::Host;
 use ulx_primitives::tick::Ticker;
-use ulx_primitives::MAX_DOMAIN_NAME_LENGTH;
 use ulx_primitives::{DataDomain, DataTLD};
 
 #[napi]
@@ -59,7 +58,7 @@ impl MainchainClient {
       return Ok(());
     }
 
-    let client = UlxFullclient::try_until_connected(self.host.clone(), timeout_millis as u64)
+    let client = UlxFullclient::try_until_connected(self.host.clone(), 5_000, timeout_millis as u64)
       .await
       .map_err(to_js_error)?;
     let ws_client = client.ws_client.clone();
@@ -219,14 +218,6 @@ impl MainchainClient {
     domain_name: String,
     tld: DataTLD,
   ) -> Result<Option<DataDomainRegistration>> {
-    let bytes = domain_name.as_bytes().to_vec();
-    if bytes.len() > MAX_DOMAIN_NAME_LENGTH as usize {
-      return Err(to_js_error(format!(
-        "Domain name {} is too long",
-        domain_name
-      )));
-    }
-
     let data_domain_hash = DataDomain::from_string(domain_name, tld).hash();
 
     let best_block_hash = &self.get_best_block_hash().await?.to_vec();
@@ -245,7 +236,7 @@ impl MainchainClient {
           return Err(to_js_error(format!(
             "Could not parse the data domain registration address {}",
             &x.account_id
-          )))
+          )));
         }
       };
       Ok(Some(DataDomainRegistration {
@@ -280,7 +271,7 @@ impl MainchainClient {
         return Err(to_js_error(format!(
           "Could not parse the data domain zone record payment address {}",
           &zone_record.payment_account
-        )))
+        )));
       }
     };
     let mut versions = HashMap::new();
@@ -297,7 +288,7 @@ impl MainchainClient {
         Err(_) => {
           return Err(to_js_error(format!(
             "Could not parse datastore_id bytes into string"
-          )))
+          )));
         }
       };
 
@@ -556,6 +547,7 @@ pub struct LocalchainTransfer {
   pub expiration_block: u32,
   pub account_nonce: u32,
 }
+
 #[napi(object)]
 pub struct AccountInfo {
   pub nonce: u32,
@@ -572,6 +564,7 @@ pub struct ArgonBalancesAccountData {
   pub frozen: BigInt,
   pub flags: BigInt,
 }
+
 #[napi(object)]
 pub struct ZoneRecord {
   pub payment_address: String,
@@ -587,6 +580,7 @@ pub struct VersionHost {
   /// The host address where the data domain can be accessed.
   pub host: String,
 }
+
 #[napi(object)]
 pub struct NotaryDetails {
   pub id: u32,

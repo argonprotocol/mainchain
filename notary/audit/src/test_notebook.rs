@@ -12,14 +12,14 @@ use sp_keyring::{
 	Ed25519Keyring::{Dave, Ferdie},
 	Sr25519Keyring::{Alice, Bob},
 };
-use sp_runtime::{traits::BlakeTwo256, MultiSignature};
+use sp_runtime::traits::BlakeTwo256;
 
 use ulx_primitives::{
 	balance_change::{AccountOrigin, BalanceChange, BalanceProof},
-	note::{AccountType, Note, NoteType},
-	Balance, BalanceTip, BlockVote, ChainTransfer, DataDomain, DataTLD, MerkleProof,
-	NewAccountOrigin, Notarization, Notebook, NotebookHeader, NotebookNumber,
-	ESCROW_EXPIRATION_TICKS,
+	note::{Note, NoteType},
+	AccountType, Balance, BalanceTip, BlockVote, ChainTransfer, DataDomain, DataTLD,
+	LocalchainAccountId, MerkleProof, MultiSignatureBytes, NewAccountOrigin, Notarization,
+	Notebook, NotebookHeader, NotebookNumber, ESCROW_EXPIRATION_TICKS,
 };
 
 use crate::{
@@ -28,7 +28,7 @@ use crate::{
 
 use super::notebook_verify;
 
-fn empty_signature() -> MultiSignature {
+fn empty_signature() -> MultiSignatureBytes {
 	Signature([0u8; 64]).into()
 }
 
@@ -78,10 +78,10 @@ impl NotebookHistoryLookup for TestLookup {
 
 #[test]
 fn test_verify_previous_balance() {
-	let mut final_balances = BTreeMap::<(AccountId32, AccountType), BalanceTip>::new();
+	let mut final_balances = BTreeMap::<LocalchainAccountId, BalanceTip>::new();
 	let account_id = Alice.to_account_id();
 	let account_type = AccountType::Deposit;
-	let key = (account_id.clone(), account_type.clone());
+	let localchain_account_id = LocalchainAccountId::new(account_id.clone(), account_type.clone());
 
 	let mut change = BalanceChange {
 		account_id,
@@ -150,7 +150,7 @@ fn test_verify_previous_balance() {
 			7,
 			&mut final_balances,
 			&change,
-			&key,
+			&localchain_account_id,
 		),
 		VerifyError::InvalidPreviousBalanceChangeNotebook
 	);
@@ -163,7 +163,7 @@ fn test_verify_previous_balance() {
 			7,
 			&mut final_balances,
 			&change,
-			&key,
+			&localchain_account_id,
 		),
 		VerifyError::InvalidPreviousBalanceProof
 	);
@@ -175,7 +175,7 @@ fn test_verify_previous_balance() {
 		7,
 		&mut final_balances,
 		&change,
-		&key,
+		&localchain_account_id,
 	));
 }
 

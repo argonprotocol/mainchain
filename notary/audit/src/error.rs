@@ -42,7 +42,7 @@ pub enum VerifyError {
 	#[snafu(display("Invalid balance change signature #{change_index}"))]
 	InvalidBalanceChangeSignature { change_index: u16 },
 
-	#[snafu(display("Invalid note recipients for a claimed note"))]
+	#[snafu(display("Some notes with restricted recipients did not balance to zero."))]
 	InvalidNoteRecipients,
 
 	#[snafu(display(
@@ -72,8 +72,10 @@ pub enum VerifyError {
 
 	#[snafu(display("Must include proof of previous balance"))]
 	MissingBalanceProof,
+
 	#[snafu(display("Invalid previous balance proof"))]
 	InvalidPreviousBalanceProof,
+
 	#[snafu(display("Invalid notebook hash"))]
 	InvalidNotebookHash,
 

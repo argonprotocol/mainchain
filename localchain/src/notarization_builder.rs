@@ -5,16 +5,16 @@ use codec::Decode;
 use napi::bindgen_prelude::*;
 use serde_json::json;
 use sp_core::crypto::AccountId32;
-use sp_core::{ConstU32, H256};
+use sp_core::{bounded_vec, ConstU32, H256};
 use sp_runtime::{BoundedVec, MultiSignature};
 use sqlx::SqlitePool;
 use tokio::sync::Mutex;
 
 use ulx_notary_audit::{verify_changeset_signatures, verify_notarization_allocation};
 use ulx_primitives::{
-  AccountType, BalanceChange, BlockVote, DataDomain, Notarization, NotaryId, NoteType,
+  AccountType, BalanceChange, BlockVote, DataDomain, Notarization, NotaryId, Note, NoteType,
   DATA_DOMAIN_LEASE_COST, MAX_BALANCE_CHANGES_PER_NOTARIZATION, MAX_BLOCK_VOTES_PER_NOTARIZATION,
-  MAX_DOMAINS_PER_NOTARIZATION,
+  MAX_DOMAINS_PER_NOTARIZATION, TAX_PERCENT_BASE, TRANSFER_TAX_CAP,
 };
 
 use crate::accounts::AccountStore;
@@ -401,7 +401,7 @@ impl NotarizationBuilder {
     &self,
     use_funds_from_address: String,
     tax_address: String,
-    data_domain: JsDataDomain,
+    data_domain: String,
     register_to_address: String,
   ) -> Result<()> {
     let notary_id = self.get_notary_id().await?;
@@ -426,7 +426,7 @@ impl NotarizationBuilder {
       .await?;
 
     let register_to_account = AccountStore::parse_address(&register_to_address)?;
-    let domain = data_domain.into();
+    let domain = DataDomain::parse(data_domain).map_err(to_js_error)?;
     let mut data_domains = self.data_domains.lock().await;
     data_domains.try_push((domain, register_to_account)).map_err(|_| Error::from_reason(format!(
       "Max domains reached for this notarization. Move this domain to a new notarization! ({} domains + 1 > {} max)",
@@ -451,6 +451,32 @@ impl NotarizationBuilder {
       <= MAX_BALANCE_CHANGES_PER_NOTARIZATION as usize
   }
 
+  /// Calculates the transfer tax on the given amount
+  #[napi]
+  pub fn get_transfer_tax_amount(&self, amount: BigInt) -> BigInt {
+    Note::calculate_transfer_tax(amount.get_u128().1).into()
+  }
+
+  /// Calculates the total needed to end up with the given balance
+  #[napi]
+  pub fn get_total_for_after_tax_balance(&self, final_balance: BigInt) -> BigInt {
+    let amount = final_balance.get_u128().1;
+    if amount < 1000 {
+      let total_before_tax = (amount * 100) / (100 - TAX_PERCENT_BASE);
+
+      let round = if total_before_tax % 100 == 0 { 0 } else { 1 };
+
+      (total_before_tax + round).into()
+    } else {
+      (amount + TRANSFER_TAX_CAP).into()
+    }
+  }
+
+  #[napi]
+  pub fn get_escrow_tax_amount(&self, amount: BigInt) -> BigInt {
+    Note::calculate_escrow_tax(amount.get_u128().1).into()
+  }
+
   #[napi]
   pub async fn move_to_sub_address(
     &self,
@@ -469,7 +495,9 @@ impl NotarizationBuilder {
       .await?;
 
     let balance_change = self.get_balance_change(&from_account).await?;
-    balance_change.send(amount.clone(), None).await?;
+    balance_change
+      .send(amount.clone(), Some(vec![to_sub_address]))
+      .await?;
 
     let to_balance_change = self.get_balance_change(&to_account).await?;
     let result = to_balance_change.claim(amount).await?;
@@ -495,6 +523,7 @@ impl NotarizationBuilder {
     tax_address: String,
   ) -> Result<()> {
     let balance_changes_by_account = self.balance_changes_by_account.lock().await;
+    let account_id = AccountStore::parse_address(&address)?;
     let mut net_claim_amount = 0u128;
     for (_, balance_change_tx) in &*balance_changes_by_account {
       let balance_lock = balance_change_tx.balance_change_lock();
@@ -515,7 +544,12 @@ impl NotarizationBuilder {
         if claim_amount > 0 {
           net_claim_amount += claim_amount;
           (*balance_change).balance -= claim_amount;
-          (*balance_change).push_note(claim_amount, NoteType::Send { to: None });
+          (*balance_change).push_note(
+            claim_amount,
+            NoteType::Send {
+              to: Some(bounded_vec![account_id.clone()]),
+            },
+          );
         }
       }
     }
@@ -718,7 +752,7 @@ impl NotarizationBuilder {
         .map(|x| x.notary_id.clone());
       if notary_id == None {
         notary_id = change_notary_id;
-      } else if notary_id != change_notary_id {
+      } else if change_notary_id.is_some() && notary_id != change_notary_id {
         return Err(Error::from_reason(
           "All balance changes must use the same notary",
         ));
@@ -887,6 +921,7 @@ impl NotarizationBuilder {
   pub async fn verify(&self) -> Result<()> {
     let mut is_verified = self.is_verified.lock().await;
     let notarization = self.to_notarization().await?;
+
     verify_notarization_allocation(
       &notarization.balance_changes,
       &notarization.block_votes,
@@ -915,8 +950,10 @@ impl NotarizationBuilder {
             Uint8Array::from(bytes.as_bytes().to_vec()),
           )
           .await?;
-        balance_change.signature =
+        let multi_signature =
           MultiSignature::decode(&mut signature.as_ref()).map_err(to_js_error)?;
+
+        balance_change.signature = multi_signature.into();
 
         if !balance_change.verify_signature() {
           return Err(Error::from_reason(format!(
@@ -970,6 +1007,7 @@ mod test {
 
   use binary_merkle_tree::{merkle_proof, merkle_root};
   use codec::Encode;
+  use frame_support::assert_ok;
   use sp_core::ed25519::Signature;
   use sp_core::sr25519::Pair as SrPair;
   use sp_core::{bounded_vec, Blake2Hasher, LogLevelFilter, Pair};
@@ -981,13 +1019,13 @@ mod test {
 
   use ulx_notary::apis::localchain::BalanceChangeResult;
   use ulx_primitives::{
-    AccountOrigin, AccountOriginUid, BalanceProof, BalanceTip, ChainTransfer, MerkleProof,
-    NewAccountOrigin, Note, NotebookHeader, NotebookNumber, SignedNotebookHeader,
+    AccountOrigin, AccountOriginUid, BalanceProof, BalanceTip, ChainTransfer, LocalchainAccountId,
+    MerkleProof, NewAccountOrigin, Note, NotebookHeader, NotebookNumber, SignedNotebookHeader,
   };
 
-  use crate::test_utils::CryptoType::Sr25519;
   use crate::test_utils::{create_keystore, create_mock_notary, mock_notary_clients, MockNotary};
   use crate::AccountStore;
+  use crate::CryptoScheme::Sr25519;
   use crate::*;
 
   use super::*;
@@ -1023,10 +1061,7 @@ mod test {
       10_000
     );
     assert_eq!(test_notarization.balance_changes[0].balance, 10_000);
-    println!(
-      "Signature after to_notarization is {:?}",
-      test_notarization.balance_changes[0].signature
-    );
+
     assert!(test_notarization.balance_changes[0].verify_signature());
     mock_notary
       .set_notarization_result(BalanceChangeResult {
@@ -1100,7 +1135,7 @@ mod test {
         .await?
         .unwrap();
       assert_eq!(latest.balance, "10000");
-      assert_eq!(latest.status, BalanceChangeStatus::InNotebook);
+      assert_eq!(latest.status, BalanceChangeStatus::NotebookPublished);
       assert_ne!(latest.proof_json, None);
       let merkle_proof: MerkleProof = serde_json::from_str(&latest.proof_json.unwrap())?;
       assert_eq!(merkle_proof.number_of_leaves, 1);
@@ -1242,13 +1277,16 @@ mod test {
     let bob_latest = BalanceChangeStore::get_latest_for_account(&mut bob_db, bob_account.id)
       .await?
       .unwrap();
-    assert_eq!(bob_latest.status, BalanceChangeStatus::InNotebook);
+    assert_eq!(bob_latest.status, BalanceChangeStatus::NotebookPublished);
     assert_ne!(bob_latest.proof_json, None);
     let bob_tax_latest =
       BalanceChangeStore::get_latest_for_account(&mut bob_db, bob_tax_account.id)
         .await?
         .unwrap();
-    assert_eq!(bob_tax_latest.status, BalanceChangeStatus::InNotebook);
+    assert_eq!(
+      bob_tax_latest.status,
+      BalanceChangeStatus::NotebookPublished
+    );
     assert_ne!(bob_tax_latest.proof_json, None);
 
     // Simulate alice sync
@@ -1266,7 +1304,10 @@ mod test {
       );
 
       BalanceSync::check_notary(&alice_pool, &mut waiting_for_send, &notary_clients).await?;
-      assert_eq!(waiting_for_send.status, BalanceChangeStatus::InNotebook);
+      assert_eq!(
+        waiting_for_send.status,
+        BalanceChangeStatus::NotebookPublished
+      );
       assert_ne!(waiting_for_send.proof_json, None);
     }
 
@@ -1327,9 +1368,8 @@ mod test {
     let notary_clients = mock_notary_clients(&mock_notary, Ferdie).await?;
     let alice_account_id = Alice.to_account_id();
     let alice_address = AccountStore::to_address(&alice_account_id);
-    println!("deriving");
+
     let alice_1 = SrPair::from_string("//Alice//1", None).expect("can derive");
-    println!("derived {:?}", alice_1.public());
     let alice_1_address = AccountStore::to_address(&AccountId32::from(alice_1.public()));
 
     let mut balance_change = BalanceChange {
@@ -1396,6 +1436,153 @@ mod test {
     Ok(())
   }
 
+  #[sqlx::test]
+  async fn it_can_move_funds_to_subaccount(pool: SqlitePool) -> anyhow::Result<()> {
+    let mock_notary = create_mock_notary().await?;
+    let notary_clients = mock_notary_clients(&mock_notary, Ferdie).await?;
+    let alice_account_id = Alice.to_account_id();
+    let alice_address = AccountStore::to_address(&alice_account_id);
+
+    let alice_1 = SrPair::from_string("//Alice//1", None).expect("can derive");
+    let alice_tax = SrPair::from_string("//Alice//tax//1", None).expect("can derive");
+    let alice_1_address = AccountStore::to_address(&AccountId32::from(alice_1.public()));
+    let alice_tax_address = AccountStore::to_address(&AccountId32::from(alice_tax.public()));
+    let keystore = create_keystore("//Alice//1", Sr25519).expect("");
+    keystore.insert("//Alice//tax//1", Sr25519, None).expect("");
+    keystore.insert("//Alice", Sr25519, None).expect("");
+
+    let mut balance_change = BalanceChange {
+      account_id: Bob.to_account_id(),
+      account_type: AccountType::Deposit,
+      balance: 10_000,
+      previous_balance_proof: Some(BalanceProof {
+        notary_id: 1,
+        balance: 11_000,
+        account_origin: AccountOrigin {
+          account_uid: 1,
+          notebook_number: 1,
+        },
+        notebook_number: 1,
+        tick: 1,
+        notebook_proof: None,
+      }),
+      notes: bounded_vec![Note {
+        milligons: 1000,
+        note_type: NoteType::Send {
+          to: Some(bounded_vec![Alice.to_account_id()])
+        }
+      }],
+      signature: Signature([0u8; 64]).into(),
+      change_number: 2,
+      escrow_hold_note: None,
+    };
+    let balance_change = balance_change.sign(Bob.pair()).clone();
+    let builder = NotarizationBuilder::new(pool.clone(), notary_clients.clone());
+    let _ = builder
+      .claim_received_balance(
+        serde_json::to_string(&vec![balance_change])?,
+        alice_address.clone(),
+        alice_address.clone(),
+      )
+      .await?;
+    builder
+      .move_to_sub_address(
+        alice_address.clone(),
+        alice_1_address.clone(),
+        AccountType::Deposit,
+        BigInt::from(800u128),
+        alice_tax_address.clone(),
+      )
+      .await?;
+    assert_eq!(builder.unclaimed_deposits().await?.get_u128().1, 0);
+
+    assert_eq!(builder.unclaimed_deposits().await?.get_u128().1, 0);
+    let accounts = builder.accounts().await;
+    assert_eq!(accounts.len(), 4);
+    let alice1_account = accounts
+      .iter()
+      .find(|x| x.address == alice_1_address && x.account_type == AccountType::Deposit)
+      .unwrap();
+    let alice1_balance = builder.get_balance_change(alice1_account).await?;
+    assert_eq!(alice1_balance.inner().await.balance, 640);
+
+    let original_recipient = accounts
+      .iter()
+      .find(|x| x.address == alice_address && x.account_type == AccountType::Deposit)
+      .unwrap();
+    let original_recipient_balance = builder.get_balance_change(original_recipient).await?;
+    assert_eq!(original_recipient_balance.inner().await.balance, 0);
+
+    let signer = Signer::with_keystore(keystore);
+    builder.sign(&signer).await.expect("can sign");
+    builder.verify().await.expect("can verify");
+
+    Ok(())
+  }
+
+  #[sqlx::test]
+  async fn it_can_read_json() -> anyhow::Result<()> {
+    let balance_change = r#"{
+  "balanceChanges": [
+    {
+      "accountId": "5CiPPseXPECbkjWCa6MnjNokrgYjMqmKndv2rSnekmSK2DjL",
+      "accountType": "deposit",
+      "changeNumber": 1,
+      "balance": 4000,
+      "previousBalanceProof": null,
+      "escrowHoldNote": null,
+      "notes": [
+        {
+          "milligons": 5000,
+          "noteType": {
+            "action": "claimFromMainchain",
+            "accountNonce": 0
+          }
+        },
+        {
+          "milligons": 1000,
+          "noteType": {
+            "action": "leaseDomain"
+          }
+        }
+      ],
+      "signature": "0x01804acb1551182297e77da0afa3250c1ec6a034279d5cdb853ee89be38d09b61ce4afc347f9f9aa77f738babb0b96ece810caae1a46a9d34f6e218d94fd092c8a"
+    },
+    {
+      "accountId": "5CiPPseXPECbkjWCa6MnjNokrgYjMqmKndv2rSnekmSK2DjL",
+      "accountType": "tax",
+      "changeNumber": 1,
+      "balance": 1000,
+      "previousBalanceProof": null,
+      "escrowHoldNote": null,
+      "notes": [
+        {
+          "milligons": 1000,
+          "noteType": {
+            "action": "claim"
+          }
+        }
+      ],
+      "signature": "0x017214cf11f8e3fdfe62625aaf7c7a5aab93ed9707cec5a6aa7b75e05a36b9f23290da323d9c5ba5be9db6836631d538e07550705f45c1c1e1e9103d572677ea8f"
+    }
+  ],
+  "blockVotes": [],
+  "dataDomains": [
+    [
+      "0x653a9ab2d0648508094d117cff1dcb474a2c2cda8f5b94882678e9c447458fc1",
+      "5CiPPseXPECbkjWCa6MnjNokrgYjMqmKndv2rSnekmSK2DjL"
+    ]
+  ]
+  }"#;
+    let balance_change: Notarization = serde_json::from_str(balance_change)?;
+    assert_ok!(verify_notarization_allocation(
+      &balance_change.balance_changes,
+      &balance_change.block_votes,
+      &balance_change.data_domains,
+      None,
+    ));
+    Ok(())
+  }
   fn get_balance_tip(
     balance_change: BalanceChange,
     account_origin_uid: AccountOriginUid,
@@ -1456,7 +1643,7 @@ mod test {
       );
 
       notary_state.balance_tips.insert(
-        (
+        LocalchainAccountId::new(
           balance_tip.account_id.clone(),
           balance_tip.account_type.clone(),
         ),

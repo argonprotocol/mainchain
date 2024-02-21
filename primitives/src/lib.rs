@@ -1,17 +1,21 @@
 #![cfg_attr(not(feature = "std"), no_std)]
 
-pub use crate::{apis::*, notary::NotaryId, note::*, notebook::*, providers::*};
+use sp_core::H256;
+use sp_runtime::{
+	MultiSignature,
+	traits::{BlakeTwo256, IdentifyAccount, Verify},
+};
+
+pub use account::{AccountType, LocalchainAccountId};
 pub use balance_change::*;
-pub use block_seal::{BlockSealAuthorityId, BlockSealAuthoritySignature, BLOCK_SEAL_KEY_TYPE};
+pub use block_seal::{BLOCK_SEAL_KEY_TYPE, BlockSealAuthorityId, BlockSealAuthoritySignature};
 pub use block_vote::*;
 pub use data_domain::*;
 pub use data_tld::DataTLD;
-pub use digests::{BlockSealDigest, AUTHOR_DIGEST_ID, BLOCK_SEAL_DIGEST_ID, *};
-use sp_core::H256;
-use sp_runtime::{
-	traits::{BlakeTwo256, IdentifyAccount, Verify},
-	MultiSignature,
-};
+pub use digests::{*, AUTHOR_DIGEST_ID, BLOCK_SEAL_DIGEST_ID, BlockSealDigest};
+
+pub use crate::{apis::*, notary::NotaryId, note::*, notebook::*, providers::*};
+
 pub type ComputeDifficulty = u128;
 
 mod apis;
@@ -31,6 +35,7 @@ pub mod note;
 pub mod notebook;
 mod providers;
 pub mod tick;
+pub mod account;
 
 /// An index to a block.
 pub type BlockNumber = u32;

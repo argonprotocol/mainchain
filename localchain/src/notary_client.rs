@@ -171,6 +171,7 @@ impl NotaryClient {
 
   pub async fn notarize(&self, notarization: Notarization) -> anyhow::Result<BalanceChangeResult> {
     let client = self.client.lock().await;
+    let json = serde_json::to_string_pretty(&notarization).unwrap();
     let res = (*client)
       .notarize(
         notarization.balance_changes,
@@ -179,7 +180,7 @@ impl NotaryClient {
       )
       .await
       .map_err(|e| {
-        tracing::error!("Error sending notarization: {:?}", e);
+        tracing::error!("Error sending notarization: {:?} {}", e, json);
         e
       })?;
     Ok(res)

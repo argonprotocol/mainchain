@@ -305,7 +305,7 @@ mod tests {
 		let ticker = client.lookup_ticker().await?;
 		let ticker = Ticker::new(ticker.tick_duration_millis, ticker.genesis_utc_time);
 		let server = NotaryServer::create_http_server("127.0.0.1:0").await?;
-		let block_tracker = track_blocks(ctx.ws_url, 1, &pool.clone(), ticker.clone());
+		let block_tracker = track_blocks(ctx.ws_url.clone(), 1, &pool.clone(), ticker.clone());
 		let block_tracker = Arc::new(Mutex::new(Some(block_tracker)));
 
 		propose_bob_as_notary(&ctx.client, notary_key, server.local_addr()?).await?;
@@ -429,7 +429,7 @@ mod tests {
 
 		let server = NotaryServer::create_http_server("127.0.0.1:0").await?;
 		let addr = server.local_addr()?;
-		let block_tracker = track_blocks(ctx.ws_url, 1, &pool.clone(), ticker.clone());
+		let block_tracker = track_blocks(ctx.ws_url.clone(), 1, &pool.clone(), ticker.clone());
 		let block_tracker = Arc::new(Mutex::new(Some(block_tracker)));
 
 		let mut notary_server = NotaryServer::start_with(server, notary_id, pool.clone()).await?;

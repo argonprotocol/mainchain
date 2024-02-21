@@ -3,11 +3,12 @@
 #[macro_use]
 extern crate napi_derive;
 
+use directories::BaseDirs;
+use std::path::PathBuf;
 use std::sync::Arc;
 use std::time::Duration;
 
 use napi::bindgen_prelude::*;
-use sc_service::BasePath;
 use sqlx::Sqlite;
 use sqlx::{migrate::MigrateDatabase, SqlitePool};
 use tokio::sync::Mutex;
@@ -15,6 +16,7 @@ use tokio::sync::Mutex;
 pub use accounts::*;
 pub use balance_changes::*;
 pub use balance_sync::*;
+pub use constants::*;
 pub use data_domain::*;
 pub use mainchain_client::*;
 pub use notary_client::*;
@@ -34,6 +36,13 @@ mod notary_client;
 mod open_escrows;
 pub mod signer;
 
+pub mod keystore;
+
+pub use keystore::{CryptoScheme, LocalKeystore};
+
+pub mod cli;
+pub mod constants;
+pub mod macros;
 #[cfg(test)]
 pub(crate) mod test_utils;
 
@@ -167,8 +176,11 @@ impl Localchain {
 
   #[napi]
   pub fn get_default_path() -> String {
-    BasePath::from_project("org", "ulixee", "localchain")
-      .path()
+    let base_dirs = BaseDirs::new().unwrap();
+    let data_local_dir = base_dirs.data_local_dir();
+    PathBuf::from(data_local_dir)
+      .join("ulixee")
+      .join("localchain")
       .to_str()
       .unwrap()
       .to_string()
@@ -181,10 +193,6 @@ impl Localchain {
 
   pub fn duration_to_next_tick(&self) -> Duration {
     self.ticker.duration_to_next_tick()
-  }
-  #[napi(getter)]
-  pub fn constants() -> Constants {
-    Constants::default()
   }
 
   #[napi(getter)]
@@ -238,64 +246,6 @@ impl Localchain {
       .with_env_filter(tracing_subscriber::EnvFilter::from_default_env())
       // RUST_LOG=trace,soketto=info,sqlx=info,jsonrpsee_core=info
       .try_init();
-  }
-}
-
-#[napi(object)]
-#[derive(Default)]
-pub struct Constants {
-  pub notarization_constants: NotarizationConstants,
-  pub escrow_constants: EscrowConstants,
-  pub data_domain_constants: DataDomainConstants,
-}
-
-#[napi(object)]
-pub struct NotarizationConstants {
-  pub max_balance_changes: u32,
-  pub max_data_domains: u32,
-  pub max_block_votes: u32,
-}
-
-impl Default for NotarizationConstants {
-  fn default() -> Self {
-    Self {
-      max_balance_changes: ulx_primitives::MAX_BALANCE_CHANGES_PER_NOTARIZATION,
-      max_data_domains: ulx_primitives::MAX_DOMAINS_PER_NOTARIZATION,
-      max_block_votes: ulx_primitives::MAX_BLOCK_VOTES_PER_NOTARIZATION,
-    }
-  }
-}
-
-#[napi(object)]
-pub struct EscrowConstants {
-  pub expiration_ticks: u32,
-  pub ticks_to_claim: u32,
-}
-impl Default for EscrowConstants {
-  fn default() -> Self {
-    Self {
-      expiration_ticks: ulx_primitives::ESCROW_EXPIRATION_TICKS,
-      ticks_to_claim: ulx_primitives::ESCROW_CLAWBACK_TICKS,
-    }
-  }
-}
-
-#[napi(object)]
-pub struct DataDomainConstants {
-  pub max_datastore_versions: u32,
-  pub min_domain_name_length: u32,
-  pub max_domain_name_length: u32,
-  pub lease_cost: BigInt,
-}
-
-impl Default for DataDomainConstants {
-  fn default() -> Self {
-    Self {
-      max_datastore_versions: ulx_primitives::MAX_DATASTORE_VERSIONS,
-      min_domain_name_length: ulx_primitives::MIN_DATA_DOMAIN_NAME_LENGTH as u32,
-      max_domain_name_length: ulx_primitives::MAX_DOMAIN_NAME_LENGTH,
-      lease_cost: ulx_primitives::DATA_DOMAIN_LEASE_COST.into(),
-    }
   }
 }
 

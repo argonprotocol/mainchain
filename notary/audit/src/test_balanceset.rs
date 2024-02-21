@@ -6,13 +6,8 @@ use sp_keyring::{
 	Ed25519Keyring::{Dave, Ferdie},
 	Sr25519Keyring::{Alice, Bob},
 };
-use sp_runtime::MultiSignature;
 
-use ulx_primitives::{
-	balance_change::{AccountOrigin, BalanceChange, BalanceProof},
-	note::{AccountType, Note, NoteType},
-	BlockVote, DataDomain, DataTLD, ESCROW_CLAWBACK_TICKS, ESCROW_EXPIRATION_TICKS,
-};
+use ulx_primitives::{balance_change::{AccountOrigin, BalanceChange, BalanceProof}, note::{Note, NoteType}, BlockVote, DataDomain, DataTLD, MultiSignatureBytes, ESCROW_CLAWBACK_TICKS, ESCROW_EXPIRATION_TICKS, AccountType, LocalchainAccountId};
 
 use crate::{
 	verify_changeset_signatures, verify_notarization_allocation, verify_voting_sources,
@@ -30,7 +25,7 @@ fn empty_proof(balance: u128) -> Option<BalanceProof> {
 	})
 }
 
-fn empty_signature() -> MultiSignature {
+fn empty_signature() -> MultiSignatureBytes {
 	Signature([0u8; 64]).into()
 }
 
@@ -327,13 +322,15 @@ fn test_can_lock_with_a_escrow_note() -> anyhow::Result<()> {
 	escrow_settle.balance = 250;
 	escrow_settle.notes[0].milligons = 0;
 
-	// it won't let you claim your own note back
+	let proof_tick = escrow_settle.clone().previous_balance_proof.unwrap().tick;
+
+	// it won't let you claim your own note back before the clawback period
 	assert_err!(
 		verify_notarization_allocation(
 			&vec![escrow_settle.clone()],
 			&vec![],
 			&vec![],
-			Some(ESCROW_EXPIRATION_TICKS + 1)
+			Some(ESCROW_EXPIRATION_TICKS + proof_tick)
 		),
 		VerifyError::InvalidEscrowClaimers
 	);
@@ -388,7 +385,7 @@ fn test_can_lock_with_a_escrow_note() -> anyhow::Result<()> {
 		assert_eq!(res.needs_escrow_settle_followup, false);
 		assert_eq!(res.unclaimed_escrow_balances.len(), 0);
 		assert_eq!(res.claimed_escrow_deposits_per_account.len(), 1);
-		assert_eq!(res.claimed_escrow_deposits_per_account.get(&Alice.to_account_id()), Some(&50));
+		assert_eq!(res.claimed_escrow_deposits_per_account.get(&LocalchainAccountId::new(Alice.to_account_id(), AccountType::Deposit)), Some(&50));
 		assert_err!(
 			res.verify_taxes(),
 			VerifyError::InsufficientTaxIncluded {
@@ -667,8 +664,9 @@ fn test_can_buy_data_domains() {
 fn verify_taxes() {
 	let mut set = BalanceChangesetState::default();
 	assert_ok!(set.verify_taxes());
+	let localchain_account_id = LocalchainAccountId::new(Alice.to_account_id(), AccountType::Deposit);
 
-	set.claimed_deposits_per_account.insert(Alice.to_account_id(), 100);
+	set.claims_per_account.insert(localchain_account_id.clone(), 100);
 	assert_err!(
 		set.verify_taxes(),
 		VerifyError::InsufficientTaxIncluded {
@@ -677,10 +675,10 @@ fn verify_taxes() {
 			tax_owed: 20
 		}
 	);
-	set.tax_created_per_account.insert(Alice.to_account_id(), 22);
+	set.tax_created_per_account.insert(localchain_account_id.clone(), 22);
 	assert_ok!(set.verify_taxes());
 
-	set.claimed_escrow_deposits_per_account.insert(Alice.to_account_id(), 1000);
+	set.claimed_escrow_deposits_per_account.insert(localchain_account_id.clone(), 1000);
 	assert_err!(
 		set.verify_taxes(),
 		VerifyError::InsufficientTaxIncluded {

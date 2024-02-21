@@ -1,12 +1,12 @@
 import {
     AccountType,
-    BalanceChangeBuilder,
-    DataTLD,
+    BalanceChangeBuilder, DataDomainStore,
+    DataTLD, ESCROW_EXPIRATION_TICKS,
     Localchain,
     NotarizationBuilder,
     Signer,
 } from "../index";
-import { format } from 'node:util';
+import {format} from 'node:util';
 import TestMainchain from "./TestMainchain";
 import TestNotary from "./TestNotary";
 import {
@@ -31,6 +31,7 @@ if (process.env.RUST_LOG !== undefined) {
     // this stops jest from killing the logs
     global.console.log = (...args) => process.stdout.write(format(...args));
 }
+afterEach(teardown);
 afterAll(teardown);
 
 it('can create a zone record type', async () => {
@@ -38,11 +39,11 @@ it('can create a zone record type', async () => {
     const mainchainUrl = await mainchain.launch();
     const mainchainClient = await getClient(mainchainUrl);
     disconnectOnTeardown(mainchainClient);
-    const dataDomainHash =  Crypto.createHash('sha256',).update('example.com').digest();
+    const dataDomainHash = Crypto.createHash('sha256',).update('example.com').digest();
     const ferdieDomainAddress = new Keyring({type: 'sr25519'}).createFromUri('//Ferdie//dataDomain//1');
     const ferdie = new Keyring({type: 'sr25519'}).createFromUri('//Ferdie');
 
-    await expect(registerZoneRecord(mainchainClient, dataDomainHash, ferdie, ferdieDomainAddress.publicKey, 1,{
+    await expect(registerZoneRecord(mainchainClient, dataDomainHash, ferdie, ferdieDomainAddress.publicKey, 1, {
         "1.0.0": mainchainClient.createType('UlxPrimitivesDataDomainVersionHost', {
             datastoreId: mainchainClient.createType('Bytes', 'default'),
             host: {
@@ -89,13 +90,13 @@ it('can run a data domain escrow', async () => {
         domainName: 'example',
         topLevelDomain: DataTLD.Analytics
     };
-    const dataDomainHash = bobchain.dataDomains.getHash("example.analytics");
+    const dataDomainHash = DataDomainStore.getHash("example.analytics");
     {
         const [bobChange, ferdieChange] = await Promise.all([
             transferMainchainToLocalchain(mainchainClient, bobchain, bob, 5000, 1),
             transferMainchainToLocalchain(mainchainClient, ferdiechain, ferdie, 5000, 1),
         ]);
-        await ferdieChange.notarization.leaseDataDomain(ferdie.address, ferdie.address, dataDomain, ferdie.address);
+        await ferdieChange.notarization.leaseDataDomain(ferdie.address, ferdie.address, "example.Analytics", ferdie.address);
         // need to send enough to create an escrow after tax
         await bobChange.notarization.moveToSubAddress(bob.address, bobEscrow.address, AccountType.Deposit, 4200n, taxAddress.address);
         let [ferdieTracker] = await Promise.all([
@@ -105,7 +106,7 @@ it('can run a data domain escrow', async () => {
 
         const domains = await ferdiechain.dataDomains.list;
         expect(domains[0].name).toBe(dataDomain.domainName);
-        expect(domains[0].tld).toBe(dataDomain.topLevelDomain);
+        expect(domains[0].tld).toBe("analytics");
 
         const ferdieMainchainClient = await ferdiechain.mainchainClient;
         await ferdieTracker.waitForFinalized(ferdieMainchainClient);
@@ -135,7 +136,7 @@ it('can run a data domain escrow', async () => {
     const holdTracker = await bobEscrowHold.notarizeAndWaitForNotebook(signer);
 
     const clientEscrow = await bobchain.openEscrows.openClientEscrow(account.id);
-    await clientEscrow.sign(0n, signer);
+    await clientEscrow.sign(5n, signer);
     const escrowJson = await clientEscrow.exportForSend();
     {
         const parsed = JSON.parse(escrowJson.toString());
@@ -143,15 +144,15 @@ it('can run a data domain escrow', async () => {
         expect(parsed).toBeTruthy();
         expect(parsed.escrowHoldNote).toBeTruthy();
         expect(parsed.escrowHoldNote.milligons).toBe(4000);
-        expect(parsed.notes[0].milligons).toBe(0);
-        expect(parsed.balance).toBe(parsed.previousBalanceProof.balance);
+        expect(parsed.notes[0].milligons).toBe(5);
+        expect(parsed.balance).toBe(parsed.previousBalanceProof.balance - 5);
     }
 
-    const ferdieEscrowRecord= await ferdiechain.openEscrows.importEscrow(escrowJson);
+    const ferdieEscrowRecord = await ferdiechain.openEscrows.importEscrow(escrowJson);
 
     // get to 2500 in escrow costs so that 20% is 500 (minimum vote)
-    for (let i= 0n; i <= 10n; i++) {
-        const next = await clientEscrow.sign(500n + i*200n, signer);
+    for (let i = 0n; i <= 10n; i++) {
+        const next = await clientEscrow.sign(500n + i * 200n, signer);
         // now we would send to ferdie
         await expect(ferdieEscrowRecord.recordUpdatedSettlement(next.milligons, next.signature)).resolves.toBeUndefined();
     }
@@ -168,9 +169,9 @@ it('can run a data domain escrow', async () => {
 
     const insideEscrow = await ferdieEscrowRecord.escrow;
     const currentTick = ferdiechain.currentTick;
-    expect(insideEscrow.expirationTick).toBe(holdTracker.tick + ferdiechain.constants.escrowConstants.expirationTicks);
+    expect(insideEscrow.expirationTick).toBe(holdTracker.tick + ESCROW_EXPIRATION_TICKS);
     const timeForExpired = new Date(Number(ferdiechain.ticker.timeForTick(insideEscrow.expirationTick)));
-    console.log('Escrow expires in %s seconds. Current Tick=%s, expiration=%s', (timeForExpired.getTime() - Date.now())/1000, currentTick, insideEscrow.expirationTick);
+    console.log('Escrow expires in %s seconds. Current Tick=%s, expiration=%s', (timeForExpired.getTime() - Date.now()) / 1000, currentTick, insideEscrow.expirationTick);
     expect(timeForExpired.getTime() - Date.now()).toBeLessThan(30e3);
     await new Promise(resolve => setTimeout(resolve, timeForExpired.getTime() - Date.now() + 10));
     const vote_result = await ferdiechain.balanceSync.sync({
@@ -203,7 +204,7 @@ async function transferMainchainToLocalchain(mainchainClient: UlxClient, localch
     return {notarization, balanceChange};
 }
 
-async function registerZoneRecord(client: UlxClient, dataDomainHash: Uint8Array, owner: KeyringPair, paymentAccount:Uint8Array, notaryId: number, versions: Record<string, UlxPrimitivesDataDomainVersionHost>) {
+async function registerZoneRecord(client: UlxClient, dataDomainHash: Uint8Array, owner: KeyringPair, paymentAccount: Uint8Array, notaryId: number, versions: Record<string, UlxPrimitivesDataDomainVersionHost>) {
 
     const codecVersions = new Map();
     for (const [version, host] of Object.entries(versions)) {

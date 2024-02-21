@@ -1,6 +1,6 @@
 {
   "name": "@ulixee/localchain-win32-ia32-msvc",
-  "version": "0.0.0",
+  "version": "2.0.0-alpha.26",
   "os": [
     "win32"
   ],

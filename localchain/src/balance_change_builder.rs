@@ -3,13 +3,9 @@ use napi::bindgen_prelude::*;
 use napi::Error;
 use sp_core::bounded_vec::BoundedVec;
 use sp_core::{ed25519, ByteArray};
-use sp_runtime::MultiSignature;
 use std::sync::Arc;
 use tokio::sync::Mutex;
-use ulx_primitives::{
-  AccountId, AccountType, BalanceChange, DataDomain, Note, NoteType, DATA_DOMAIN_LEASE_COST,
-  MINIMUM_ESCROW_SETTLEMENT,
-};
+use ulx_primitives::{AccountId, AccountType, BalanceChange, DataDomain, MultiSignatureBytes, Note, NoteType, DATA_DOMAIN_LEASE_COST, MINIMUM_ESCROW_SETTLEMENT, DataDomainHash};
 
 #[napi]
 #[derive(Clone)]
@@ -46,7 +42,7 @@ impl BalanceChangeBuilder {
       balance: 0,
       escrow_hold_note: None,
       notes: Default::default(),
-      signature: MultiSignature::from(ed25519::Signature([0; 64])),
+      signature: MultiSignatureBytes::from(ed25519::Signature([0; 64])),
     }))
   }
 
@@ -95,9 +91,6 @@ impl BalanceChangeBuilder {
     let mut to = None;
 
     if let Some(restrict_to_addresses) = restrict_to_addresses {
-      if restrict_to_addresses.len() > 1 {
-        return Err(Error::from_reason("Only one recipient is allowed"));
-      }
       let list: napi::Result<Vec<AccountId>> = restrict_to_addresses
         .iter()
         .map(|a| AccountStore::parse_address(&a))
@@ -204,6 +197,29 @@ impl BalanceChangeBuilder {
     data_domain: String,
     data_domain_address: String,
   ) -> napi::Result<()> {
+    let domain: DataDomain = DataDomain::parse(data_domain).map_err(to_js_error)?;
+    self
+      .internal_create_escrow_hold(amount, Some(domain.hash()), data_domain_address)
+      .await
+  }
+
+  #[napi]
+  pub async fn create_private_server_escrow_hold(
+    &self,
+    amount: BigInt,
+    payment_address: String,
+  ) -> napi::Result<()> {
+    self
+        .internal_create_escrow_hold(amount, None, payment_address)
+        .await
+  }
+
+  async fn internal_create_escrow_hold(
+    &self,
+    amount: BigInt,
+    data_domain_hash: Option<DataDomainHash>,
+    payment_address: String,
+  ) -> napi::Result<()> {
     let mut balance_change = self.balance_change.lock().await;
     if balance_change.account_type != AccountType::Deposit {
       return Err(Error::from_reason(format!(
@@ -215,8 +231,8 @@ impl BalanceChangeBuilder {
 
     if balance_change.balance < amount {
       return Err(Error::from_reason(format!(
-        "Insufficient balance {} to create an escrow {}",
-        balance_change.balance, amount
+        "Insufficient balance to create an escrow (address={}, balance={}, amount={})",
+        self.address, balance_change.balance, amount
       )));
     }
     if amount < MINIMUM_ESCROW_SETTLEMENT {
@@ -226,13 +242,12 @@ impl BalanceChangeBuilder {
       )));
     }
 
-    let domain: DataDomain = DataDomain::parse(data_domain).map_err(to_js_error)?;
     // NOTE: escrow hold doesn't manipulate balance
     balance_change.push_note(
       amount,
       NoteType::EscrowHold {
-        data_domain_hash: Some(domain.hash()),
-        recipient: AccountStore::parse_address(&data_domain_address)?,
+        data_domain_hash,
+        recipient: AccountStore::parse_address(&payment_address)?,
       },
     );
     Ok(())
@@ -283,39 +298,6 @@ impl BalanceChangeBuilder {
     balance_change.balance -= amount;
     balance_change.push_note(amount, NoteType::LeaseDomain);
     Ok(BigInt::from(amount))
-  }
-
-  #[napi]
-  pub async fn create_private_server_escrow_hold(
-    &self,
-    amount: BigInt,
-    payment_address: String,
-  ) -> napi::Result<()> {
-    let mut balance_change = self.balance_change.lock().await;
-    if balance_change.account_type != AccountType::Deposit {
-      return Err(Error::from_reason(format!(
-        "Account {:?} is not a deposit account",
-        balance_change.account_id
-      )));
-    }
-    let (_, amount, _) = amount.get_u128();
-
-    if balance_change.balance < amount {
-      return Err(Error::from_reason(format!(
-        "Insufficient balance {} to create an escrow {}",
-        balance_change.balance, amount
-      )));
-    }
-
-    balance_change.balance -= amount;
-    balance_change.push_note(
-      amount,
-      NoteType::EscrowHold {
-        data_domain_hash: None,
-        recipient: AccountStore::parse_address(&payment_address)?,
-      },
-    );
-    Ok(())
   }
 }
 
