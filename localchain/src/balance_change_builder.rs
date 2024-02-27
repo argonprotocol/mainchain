@@ -1,11 +1,14 @@
-use crate::{to_js_error, AccountStore, LocalchainTransfer};
+use crate::{to_js_error, AccountStore, BalanceChangeStatus, LocalchainTransfer};
 use napi::bindgen_prelude::*;
 use napi::Error;
 use sp_core::bounded_vec::BoundedVec;
 use sp_core::{ed25519, ByteArray};
 use std::sync::Arc;
 use tokio::sync::Mutex;
-use ulx_primitives::{AccountId, AccountType, BalanceChange, DataDomain, MultiSignatureBytes, Note, NoteType, DATA_DOMAIN_LEASE_COST, MINIMUM_ESCROW_SETTLEMENT, DataDomainHash};
+use ulx_primitives::{
+  AccountId, AccountType, BalanceChange, DataDomain, DataDomainHash, MultiSignatureBytes, Note,
+  NoteType, DATA_DOMAIN_LEASE_COST, MINIMUM_ESCROW_SETTLEMENT,
+};
 
 #[napi]
 #[derive(Clone)]
@@ -14,11 +17,12 @@ pub struct BalanceChangeBuilder {
   pub account_type: AccountType,
   pub address: String,
   pub change_number: u32,
+  pub sync_status: Option<BalanceChangeStatus>,
 }
 
 #[napi]
 impl BalanceChangeBuilder {
-  pub(crate) fn new(balance_change: BalanceChange) -> Self {
+  pub(crate) fn new(balance_change: BalanceChange, status: Option<BalanceChangeStatus>) -> Self {
     let account_type = balance_change.account_type;
     let change_number = balance_change.change_number;
     let address = AccountStore::to_address(&balance_change.account_id);
@@ -29,21 +33,25 @@ impl BalanceChangeBuilder {
       account_type,
       address,
       change_number,
+      sync_status: status,
     }
   }
 
   #[napi(factory)]
   pub fn new_account(address: String, account_type: AccountType) -> napi::Result<Self> {
-    Ok(Self::new(BalanceChange {
-      account_id: AccountStore::parse_address(&address)?,
-      account_type,
-      change_number: 0,
-      previous_balance_proof: None,
-      balance: 0,
-      escrow_hold_note: None,
-      notes: Default::default(),
-      signature: MultiSignatureBytes::from(ed25519::Signature([0; 64])),
-    }))
+    Ok(
+      Self::new(BalanceChange {
+        account_id: AccountStore::parse_address(&address)?,
+        account_type,
+        change_number: 0,
+        previous_balance_proof: None,
+        balance: 0,
+        escrow_hold_note: None,
+        notes: Default::default(),
+        signature: MultiSignatureBytes::from(ed25519::Signature([0; 64])),
+      },
+      None),
+    )
   }
 
   #[napi]
@@ -71,6 +79,18 @@ impl BalanceChangeBuilder {
     let balance_change = self.balance_change.lock().await;
     let bytes = (*balance_change).account_id.to_raw_vec();
     bytes.into()
+  }
+
+  #[napi]
+  pub async fn is_pending_claim(&self) -> bool {
+    if let Some(status) = self.sync_status {
+      match status {
+        BalanceChangeStatus::WaitingForSendClaim => true,
+        _ => false,
+      }
+    } else {
+      false
+    }
   }
 
   #[napi]
@@ -210,8 +230,8 @@ impl BalanceChangeBuilder {
     payment_address: String,
   ) -> napi::Result<()> {
     self
-        .internal_create_escrow_hold(amount, None, payment_address)
-        .await
+      .internal_create_escrow_hold(amount, None, payment_address)
+      .await
   }
 
   async fn internal_create_escrow_hold(

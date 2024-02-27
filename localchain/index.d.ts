@@ -182,6 +182,12 @@ export const DATASTORE_MAX_VERSIONS: number
 export const DATA_DOMAIN_MIN_NAME_LENGTH: number
 /** Cost to lease a data domain for 1 year */
 export const DATA_DOMAIN_LEASE_COST: bigint
+/** The version of the Argon file format. */
+export const VERSION: string
+export enum ArgonFileType {
+  Send = 0,
+  Request = 1
+}
 export interface LocalchainConfig {
   dbPath: string
   mainchainUrl: string
@@ -205,6 +211,9 @@ export class LocalAccount {
 export class AccountStore {
   get(address: string, accountType: AccountType, notaryId: number): Promise<LocalAccount>
   getById(id: number): Promise<LocalAccount>
+  hasAccount(address: string, accountType: AccountType, notaryId: number): Promise<boolean>
+  /** Finds an account with no balance that is not waiting for a send claim */
+  findFreeAccount(accountType: AccountType, notaryId: number): Promise<LocalAccount | null>
   insert(address: string, accountType: AccountType, notaryId: number): Promise<LocalAccount>
   list(): Promise<Array<LocalAccount>>
   taxAccounts(notaryId: number): Promise<Array<LocalAccount>>
@@ -213,10 +222,12 @@ export class BalanceChangeBuilder {
   accountType: AccountType
   address: string
   changeNumber: number
+  syncStatus?: BalanceChangeStatus
   static newAccount(address: string, accountType: AccountType): BalanceChangeBuilder
   isEmptySignature(): Promise<boolean>
   get balance(): Promise<bigint>
   get accountId32(): Promise<Uint8Array>
+  isPendingClaim(): Promise<boolean>
   send(amount: bigint, restrictToAddresses?: Array<string> | undefined | null): Promise<void>
   claim(amount: bigint): Promise<ClaimResult>
   claimEscrow(amount: bigint): Promise<ClaimResult>
@@ -318,14 +329,19 @@ export class NotarizationBuilder {
   getTotalForAfterTaxBalance(finalBalance: bigint): bigint
   getEscrowTaxAmount(amount: bigint): bigint
   moveToSubAddress(fromAddress: string, toSubAddress: string, accountType: AccountType, amount: bigint, taxAddress: string): Promise<void>
+  claimAndPayTax(milligons: bigint, address: string, taxAddress?: string | undefined | null): Promise<void>
   moveClaimsToAddress(address: string, accountType: AccountType, taxAddress: string): Promise<void>
   claimFromMainchain(transfer: LocalchainTransfer): Promise<BalanceChangeBuilder>
-  claimReceivedBalance(balanceChangesJson: string, claimAddress: string, taxAddress: string): Promise<void>
+  loadFunding(milligons: bigint, fundWithAddress?: string | undefined | null, restrictToAddress?: string | undefined | null): Promise<void>
+  isWholeBalance(address: string, milligons: bigint): Promise<boolean>
+  fundAndNotarizeJumpAccount(milligons: bigint, signer: Signer, fromAddress?: string | undefined | null): Promise<LocalAccount>
+  acceptRequestedBalanceChanges(argonFileJson: string, fundWithAddress?: string | undefined | null): Promise<void>
+  claimReceivedBalance(argonFileJson: string, claimAddress: string, taxAddress: string): Promise<void>
   /**
-   * Exports balance changes (only) from this notarization builder with the intention that these will be sent to another
-   * user (who will import them into their own localchain). The returned byffer is utf8 encoded json.
+   * Exports an argon file from this notarization builder with the intention that these will be sent to another
+   * user (who will import into their own localchain).
    */
-  exportForSend(): Promise<string>
+  exportAsFile(fileType: ArgonFileType): Promise<string>
   toJson(): Promise<string>
   notarizeAndWaitForNotebook(signer: Signer): Promise<NotarizationTracker>
   notarize(): Promise<NotarizationTracker>

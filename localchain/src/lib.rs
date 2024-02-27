@@ -45,6 +45,7 @@ pub mod constants;
 pub mod macros;
 #[cfg(test)]
 pub(crate) mod test_utils;
+mod file_transfer;
 
 #[napi(custom_finalize)]
 pub struct Localchain {

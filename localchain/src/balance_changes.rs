@@ -265,7 +265,7 @@ impl BalanceChangeStore {
   pub async fn build_for_account(
     db: &mut SqliteConnection,
     account: &LocalAccount,
-  ) -> anyhow::Result<BalanceChange> {
+  ) -> anyhow::Result<(BalanceChange, Option<BalanceChangeStatus>)> {
     let mut balance_change = BalanceChange {
       account_id: AccountStore::parse_address(&account.address)?,
       account_type: account.account_type.clone(),
@@ -277,9 +277,12 @@ impl BalanceChangeStore {
       signature: ed25519::Signature([0; 64]).into(),
     };
 
+    let mut status = None;
+
     if let Some(latest) = Self::get_latest_for_account(db, account.id).await? {
       balance_change.change_number = latest.change_number as u32;
       balance_change.balance = latest.balance.parse().unwrap();
+      status = Some(latest.status);
       if let Some(note_json) = latest.escrow_hold_note_json {
         balance_change.escrow_hold_note = Some(from_value(note_json.parse()?)?);
       }
@@ -315,7 +318,7 @@ impl BalanceChangeStore {
         balance: balance_change.balance,
       });
     }
-    Ok(balance_change)
+    Ok((balance_change,status))
   }
 
   pub async fn save_sent(
@@ -516,7 +519,7 @@ mod test {
     AccountStore::update_origin(&mut *db, account.id, 1, 1).await?;
     let account = AccountStore::get_by_id(&mut *db, account.id).await?;
 
-    let mut balance_change = BalanceChangeStore::build_for_account(&mut *db, &account).await?;
+    let (mut balance_change, _) = BalanceChangeStore::build_for_account(&mut *db, &account).await?;
     assert_eq!(balance_change.balance, 0);
     assert_eq!(balance_change.change_number, 1);
 
@@ -573,7 +576,7 @@ mod test {
     BalanceChangeStore::upsert_notarized(&mut tx, account.id, &balance_change, 1, 1).await?;
     tx.commit().await?;
 
-    let reloaded = BalanceChangeStore::build_for_account(&mut *db, &account).await?;
+    let (reloaded,_) = BalanceChangeStore::build_for_account(&mut *db, &account).await?;
     assert_eq!(reloaded.balance, 100);
     assert_eq!(reloaded.change_number, 2);
 
@@ -593,7 +596,7 @@ mod test {
     let id2 = BalanceChangeStore::upsert_notarized(&mut tx, account.id, &next, 1, 1).await?;
     tx.commit().await?;
 
-    let reloaded = BalanceChangeStore::build_for_account(&mut *db, &account).await?;
+    let (reloaded,_) = BalanceChangeStore::build_for_account(&mut *db, &account).await?;
     assert_eq!(reloaded.balance, 200);
     assert_eq!(reloaded.change_number, 3);
 

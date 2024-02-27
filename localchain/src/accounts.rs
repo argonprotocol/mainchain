@@ -1,4 +1,4 @@
-use crate::to_js_error;
+use crate::{to_js_error, BalanceChangeStatus, BalanceChangeStore};
 use chrono::NaiveDateTime;
 use napi::bindgen_prelude::*;
 use sp_core::crypto::{
@@ -152,6 +152,7 @@ impl AccountStore {
     let res = Self::get(&mut *db, address, account_type, notary_id).await?;
     Ok(res)
   }
+
   pub async fn get_by_id(
     db: &mut SqliteConnection,
     account_id: i64,
@@ -173,6 +174,73 @@ impl AccountStore {
     let mut db = self.pool.acquire().await.map_err(to_js_error)?;
     let res = Self::get_by_id(&mut *db, id).await?;
     Ok(res)
+  }
+
+  #[napi(js_name = "hasAccount")]
+  pub async fn has_account_js(
+    &self,
+    address: String,
+    account_type: AccountType,
+    notary_id: u32,
+  ) -> Result<bool> {
+    let mut db = self.pool.acquire().await.map_err(to_js_error)?;
+    Ok(Self::has_account(&mut *db, address, account_type, notary_id).await)
+  }
+
+  pub async fn has_account(
+    db: &mut SqliteConnection,
+    address: String,
+    account_type: AccountType,
+    notary_id: u32,
+  ) -> bool {
+    Self::get(&mut *db, address, account_type, notary_id)
+      .await
+      .ok()
+      .is_some()
+  }
+  pub async fn find_free_account(
+    db: &mut SqliteConnection,
+    account_type: AccountType,
+    notary_id: u32,
+  ) -> Result<Option<LocalAccount>> {
+    let account_type_i64 = account_type as i64;
+    let notary_id = notary_id as i64;
+    let res = sqlx::query_as!(
+      AccountRow,
+      r#"SELECT * from accounts WHERE account_type = ? AND notary_id = ?"#,
+      account_type_i64,
+      notary_id,
+    )
+    .fetch_all(&mut *db)
+    .await
+    .map_err(to_js_error)?;
+
+    for row in res {
+      let balance = BalanceChangeStore::get_latest_for_account(&mut *db, row.id)
+        .await
+        .map_err(to_js_error)?;
+      if let Some(latest_balance) = balance {
+        if latest_balance.balance == "0"
+          && latest_balance.status != BalanceChangeStatus::WaitingForSendClaim
+        {
+          return Ok(Some(row.into()));
+        }
+      } else {
+        return Ok(Some(row.into()));
+      }
+    }
+    Ok(None)
+  }
+  /// Finds an account with no balance that is not waiting for a send claim
+  #[napi(js_name = "findFreeAccount")]
+  pub async fn find_free_account_js(
+    &self,
+    account_type: AccountType,
+    notary_id: u32,
+  ) -> Result<Option<LocalAccount>> {
+    let mut db = self.pool.acquire().await.map_err(to_js_error)?;
+
+    Self::find_free_account(&mut *db, account_type, notary_id).await
   }
 
   pub async fn insert(
@@ -254,10 +322,10 @@ impl AccountStore {
     Self::list(&mut db).await.map_err(to_js_error)
   }
 
-  #[napi]
-  pub async fn tax_accounts(&self, notary_id: u32) -> Result<Vec<LocalAccount>> {
-    let mut db = self.pool.acquire().await.map_err(to_js_error)?;
-    let notary_id = notary_id as i64;
+  pub async fn tax_accounts(
+    db: &mut SqliteConnection,
+    notary_id: NotaryId,
+  ) -> anyhow::Result<Vec<LocalAccount>> {
     let res = sqlx::query_as!(
       AccountRow,
       r#"SELECT * from accounts WHERE notary_id=? and account_type=?"#,
@@ -265,13 +333,19 @@ impl AccountStore {
       AccountType::Tax as i64,
     )
     .fetch_all(&mut *db)
-    .await
-    .map_err(to_js_error)?
+    .await?
     .into_iter()
     .map(|row| row.into())
     .collect::<Vec<_>>();
-
     Ok(res)
+  }
+
+  #[napi(js_name = "taxAccounts")]
+  pub async fn tax_accounts_js(&self, notary_id: u32) -> Result<Vec<LocalAccount>> {
+    let mut db = self.pool.acquire().await.map_err(to_js_error)?;
+    Self::tax_accounts(&mut db, notary_id)
+      .await
+      .map_err(to_js_error)
   }
 }
 
@@ -306,7 +380,7 @@ mod test {
 
     let list = accounts.list_js().await?;
     assert_eq!(list.len(), 3);
-    assert_eq!(accounts.tax_accounts(1).await?[0], tax_account);
+    assert_eq!(accounts.tax_accounts_js(1).await?[0], tax_account);
 
     assert_eq!(accounts.get_by_id_js(account.id).await?, account);
     assert_eq!(

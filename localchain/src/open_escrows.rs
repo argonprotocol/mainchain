@@ -2,7 +2,7 @@ use crate::accounts::AccountStore;
 use crate::balance_changes::BalanceChangeStore;
 use crate::notary_client::NotaryClients;
 use crate::signer::Signer;
-use crate::to_js_error;
+use crate::{BalanceChangeStatus, to_js_error};
 use crate::TickerRef;
 use anyhow::anyhow;
 use bech32::{Bech32m, Hrp};
@@ -509,7 +509,13 @@ impl OpenEscrowsStore {
   pub async fn open_client_escrow(&self, account_id: i64) -> Result<OpenEscrow> {
     let mut tx = self.db.begin().await.map_err(to_js_error)?;
     let account = AccountStore::get_by_id(&mut *tx, account_id).await?;
-    let mut balance_tip = BalanceChangeStore::build_for_account(&mut *tx, &account).await?;
+    let (mut balance_tip, status) = BalanceChangeStore::build_for_account(&mut *tx, &account).await?;
+    if status == Some(BalanceChangeStatus::WaitingForSendClaim) {
+      return Err(to_js_error(format!(
+        "This balance change is not in a state to open {}: {:?}",
+        account.address, status
+      )));
+    }
 
     let hold_note = &balance_tip
       .escrow_hold_note
@@ -615,8 +621,8 @@ mod tests {
     tick: Tick,
   ) -> anyhow::Result<BalanceChangeRow> {
     let mut tx = pool.begin().await?;
-    let balance_tip = BalanceChangeStore::build_for_account(&mut *tx, account).await?;
-    let builder = BalanceChangeBuilder::new(balance_tip);
+    let (balance_tip, status) = BalanceChangeStore::build_for_account(&mut *tx, account).await?;
+    let builder = BalanceChangeBuilder::new(balance_tip, status);
     builder
       .claim_from_mainchain(LocalchainTransfer {
         address: account.address.clone(),
