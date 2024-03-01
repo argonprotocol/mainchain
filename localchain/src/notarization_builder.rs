@@ -5,7 +5,7 @@ use codec::Decode;
 use napi::bindgen_prelude::*;
 use serde_json::json;
 use sp_core::crypto::AccountId32;
-use sp_core::{bounded_vec, ConstU32, H256};
+use sp_core::{ConstU32, H256};
 use sp_runtime::{BoundedVec, MultiSignature};
 use sqlx::SqlitePool;
 use tokio::sync::Mutex;
@@ -19,7 +19,7 @@ use ulx_primitives::{
 
 use crate::accounts::AccountStore;
 use crate::accounts::LocalAccount;
-use crate::balance_change_builder::BalanceChangeBuilder;
+use crate::balance_change_builder::{BalanceChangeBuilder, ClaimResult};
 use crate::balance_changes::BalanceChangeStore;
 use crate::data_domain::JsDataDomain;
 use crate::file_transfer::{ArgonFile, ArgonFileType};
@@ -27,9 +27,7 @@ use crate::notarization_tracker::NotarizationTracker;
 use crate::notary_client::NotaryClients;
 use crate::open_escrows::OpenEscrow;
 use crate::signer::Signer;
-use crate::{
-  to_js_error, CryptoScheme, DataDomainStore, Escrow, LocalchainTransfer, NotaryAccountOrigin,
-};
+use crate::{to_js_error, DataDomainStore, Escrow, LocalchainTransfer, NotaryAccountOrigin};
 
 #[napi]
 #[derive(Clone)]
@@ -46,11 +44,12 @@ pub struct NotarizationBuilder {
   is_finalized: Arc<Mutex<bool>>,
   notary_clients: NotaryClients,
   notary_id: Arc<Mutex<Option<u32>>>,
+  signer: Signer,
 }
 
 #[napi]
 impl NotarizationBuilder {
-  pub(crate) fn new(db: SqlitePool, notary_clients: NotaryClients) -> Self {
+  pub(crate) fn new(db: SqlitePool, notary_clients: NotaryClients, signer: Signer) -> Self {
     NotarizationBuilder {
       notary_clients,
       db,
@@ -62,7 +61,8 @@ impl NotarizationBuilder {
       escrows: Default::default(),
       is_verified: Default::default(),
       is_finalized: Default::default(),
-      notary_id: Default::default(),
+      notary_id: Arc::new(Mutex::new(Some(1))),
+      signer,
     }
   }
 
@@ -219,10 +219,17 @@ impl NotarizationBuilder {
     address: String,
     account_type: AccountType,
     notary_id: NotaryId,
-  ) -> Result<LocalAccount> {
+    hd_path: String,
+  ) -> Result<BalanceChangeBuilder> {
     let mut db = self.db.acquire().await.map_err(to_js_error)?;
-    let account =
-      AccountStore::insert(&mut db, address.clone(), account_type.clone(), notary_id).await?;
+    let account = AccountStore::insert(
+      &mut db,
+      address.clone(),
+      account_type.clone(),
+      notary_id,
+      Some(hd_path),
+    )
+    .await?;
     self.ensure_notary_id(notary_id).await?;
 
     let imports = (*(self.imported_balance_changes.lock().await)).len();
@@ -241,11 +248,9 @@ impl NotarizationBuilder {
     let mut accounts = self.loaded_accounts.lock().await;
     accounts.insert((address.clone(), account_type.clone()), account.clone());
 
-    balance_changes_by_account.insert(
-      account.id,
-      BalanceChangeBuilder::new_account(address, account_type)?,
-    );
-    Ok(account)
+    let builder = BalanceChangeBuilder::new_account(address, account.id, account_type)?;
+    balance_changes_by_account.insert(account.id, builder.clone());
+    Ok(builder)
   }
 
   #[napi]
@@ -254,28 +259,62 @@ impl NotarizationBuilder {
     address: String,
     account_type: AccountType,
     notary_id: u32,
-  ) -> Result<LocalAccount> {
+  ) -> Result<BalanceChangeBuilder> {
     self.ensure_notary_id(notary_id).await?;
     let mut db = self.db.acquire().await.map_err(to_js_error)?;
-    return match AccountStore::get(&mut db, address.clone(), account_type, notary_id).await {
-      Ok(account) => {
-        self.load_account(&account).await.map_err(to_js_error)?;
-        Ok(account)
-      }
-      Err(_) => self
-        .register_new_account(address.clone(), account_type, notary_id)
-        .await
-        .map_err(to_js_error),
-    };
+    let account = AccountStore::get(&mut db, address.clone(), account_type, notary_id)
+      .await
+      .map_err(to_js_error)?;
+
+    return self.load_account(&account).await.map_err(to_js_error);
   }
 
   #[napi]
-  pub async fn load_account(&self, account: &LocalAccount) -> Result<()> {
-    self.ensure_notary_id(account.notary_id).await?;
-    let mut balance_changes_by_account = self.balance_changes_by_account.lock().await;
-    if balance_changes_by_account.contains_key(&account.id) {
-      return Ok(());
+  pub async fn get_jump_account(&self, account_type: AccountType) -> Result<BalanceChangeBuilder> {
+    let notary_id = self.get_notary_id().await?;
+    let mut db = self.db.acquire().await.map_err(to_js_error)?;
+
+    if let Some(account) =
+      AccountStore::find_idle_jump_account(&mut db, account_type, notary_id).await?
+    {
+      return self.load_account(&account).await;
     }
+
+    let hd_path = AccountStore::get_next_jump_path(&mut db, account_type, notary_id)
+      .await
+      .map_err(to_js_error)?;
+    let address = self.signer.derive_account_id(hd_path.clone()).await?;
+    let balance_change = self
+      .register_new_account(address, account_type, notary_id, hd_path)
+      .await?;
+    Ok(balance_change)
+  }
+
+  #[napi]
+  pub async fn default_deposit_account(&self) -> Result<BalanceChangeBuilder> {
+    let notary_id = self.get_notary_id().await?;
+    let mut db = self.db.acquire().await.map_err(to_js_error)?;
+    let account = AccountStore::deposit_account(&mut db, Some(notary_id)).await?;
+    self.load_account(&account).await
+  }
+
+  #[napi]
+  pub async fn default_tax_account(&self) -> Result<BalanceChangeBuilder> {
+    let notary_id = self.get_notary_id().await?;
+    let mut db = self.db.acquire().await.map_err(to_js_error)?;
+    let account = AccountStore::tax_account(&mut db, Some(notary_id)).await?;
+    self.load_account(&account).await
+  }
+
+  #[napi]
+  pub async fn load_account(&self, account: &LocalAccount) -> Result<BalanceChangeBuilder> {
+    self.ensure_notary_id(account.notary_id).await?;
+
+    let mut balance_changes_by_account = self.balance_changes_by_account.lock().await;
+    if let Some(balance_change) = balance_changes_by_account.get(&account.id) {
+      return Ok(balance_change.clone());
+    }
+
     let imports = self.imported_balance_changes.lock().await;
     let mut accounts = self.loaded_accounts.lock().await;
     if balance_changes_by_account.len() + imports.len() + 1
@@ -297,22 +336,20 @@ impl NotarizationBuilder {
     let (balance_change, status) = BalanceChangeStore::build_for_account(&mut *db, &account)
       .await
       .map_err(to_js_error)?;
-    balance_changes_by_account.insert(
-      account.id,
-      BalanceChangeBuilder::new(balance_change, status),
-    );
-    Ok(())
+    let builder = BalanceChangeBuilder::new(balance_change, account.id, status);
+    balance_changes_by_account.insert(account.id, builder.clone());
+    Ok(builder)
   }
 
   #[napi]
-  pub async fn can_add_escrow(&self, escrow: &OpenEscrow, tax_address: String) -> bool {
+  pub async fn can_add_escrow(&self, escrow: &OpenEscrow) -> bool {
     let balance_changes_by_account = (*(self.balance_changes_by_account.lock().await)).len();
     let imports = (*(self.imported_balance_changes.lock().await)).len();
     let mut added_accounts_needed = 2;
     let escrow = escrow.inner().await;
     let accounts_by_id = self.loaded_accounts.lock().await;
     for (_, account) in accounts_by_id.iter() {
-      if account.address == escrow.to_address || account.address == tax_address {
+      if account.address == escrow.to_address {
         added_accounts_needed -= 1;
       }
     }
@@ -324,11 +361,10 @@ impl NotarizationBuilder {
   pub async fn cancel_escrow(&self, open_escrow: &OpenEscrow) -> Result<()> {
     let escrow = open_escrow.inner().await;
     (*self.escrows.lock().await).push(open_escrow.clone());
-    let sender = self
+    let balance_change_tx = self
       .add_account(escrow.from_address, AccountType::Deposit, escrow.notary_id)
       .await?;
 
-    let balance_change_tx = self.get_balance_change(&sender).await?;
     let balance_lock = balance_change_tx.balance_change_lock();
     let mut balance_change = balance_lock.lock().await;
     balance_change.push_note(0, NoteType::EscrowSettle);
@@ -337,7 +373,7 @@ impl NotarizationBuilder {
   }
 
   #[napi]
-  pub async fn claim_escrow(&self, open_escrow: &OpenEscrow, tax_address: String) -> Result<()> {
+  pub async fn claim_escrow(&self, open_escrow: &OpenEscrow) -> Result<()> {
     let escrow = open_escrow.inner().await;
     {
       let mut notary_id = self.notary_id.lock().await;
@@ -352,29 +388,28 @@ impl NotarizationBuilder {
         *notary_id = Some(escrow.notary_id);
       }
     }
-    let notary_id = escrow.notary_id;
 
     (*self.escrows.lock().await).push(open_escrow.clone());
 
     let settle_balance_change = escrow.get_final().await.map_err(to_js_error)?;
     (*self.imported_balance_changes.lock().await).push(settle_balance_change);
 
-    let claim_account = self
-      .add_account(escrow.to_address.clone(), AccountType::Deposit, notary_id)
-      .await?;
+    let default_deposit_account = self.default_deposit_account().await?;
+    if default_deposit_account.address != escrow.to_address {
+      return Err(Error::from_reason(
+        "Escrow claim address doesn't match this localchain address",
+      ));
+    }
 
-    let claim_balance_change = self.get_balance_change(&claim_account).await?;
-    let claim_result = claim_balance_change
+    let claim_result = default_deposit_account
       .claim_escrow(escrow.settled_amount())
       .await?;
 
-    let tax_account = self
-      .add_account(tax_address.clone(), AccountType::Tax, notary_id)
+    self
+      .default_tax_account()
+      .await?
+      .claim(claim_result.tax)
       .await?;
-
-    let tax_balance_change = self.get_balance_change(&tax_account).await?;
-
-    tax_balance_change.claim(claim_result.tax).await?;
 
     Ok(())
   }
@@ -405,31 +440,16 @@ impl NotarizationBuilder {
   #[napi]
   pub async fn lease_data_domain(
     &self,
-    use_funds_from_address: String,
-    tax_address: String,
     data_domain: String,
     register_to_address: String,
   ) -> Result<()> {
-    let notary_id = self.get_notary_id().await?;
-    let from_account = self
-      .add_account(
-        use_funds_from_address.clone(),
-        AccountType::Deposit,
-        notary_id,
-      )
-      .await?;
-
-    let balance_change = self.get_balance_change(&from_account).await?;
-    let lease = balance_change.lease_data_domain().await?;
-
-    let tax_account = self
-      .add_account(tax_address.clone(), AccountType::Tax, notary_id)
-      .await?;
-    self
-      .get_balance_change(&tax_account)
+    let lease = self
+      .default_deposit_account()
       .await?
-      .claim(lease)
+      .lease_data_domain()
       .await?;
+
+    self.default_tax_account().await?.claim(lease).await?;
 
     let register_to_account = AccountStore::parse_address(&register_to_address)?;
     let domain = DataDomain::parse(data_domain).map_err(to_js_error)?;
@@ -440,21 +460,6 @@ impl NotarizationBuilder {
       MAX_DOMAINS_PER_NOTARIZATION
     )))?;
     Ok(())
-  }
-
-  #[napi]
-  pub async fn can_add_balance_change(&self, claim_address: String, tax_address: String) -> bool {
-    let balance_changes = (*(self.balance_changes_by_account.lock().await)).len();
-    let mut added_accounts_needed = 2;
-    let accounts_by_id = self.loaded_accounts.lock().await;
-    for (_, account) in accounts_by_id.iter() {
-      if account.address == claim_address || account.address == tax_address {
-        added_accounts_needed -= 1;
-      }
-    }
-    let imports = self.imported_balance_changes.lock().await;
-    balance_changes + added_accounts_needed + imports.len() + 1
-      <= MAX_BALANCE_CHANGES_PER_NOTARIZATION as usize
   }
 
   /// Calculates the transfer tax on the given amount
@@ -484,354 +489,90 @@ impl NotarizationBuilder {
   }
 
   #[napi]
-  pub async fn move_to_sub_address(
-    &self,
-    from_address: String,
-    to_sub_address: String,
-    account_type: AccountType,
-    amount: BigInt,
-    tax_address: String,
-  ) -> Result<()> {
-    let notary_id = self.get_notary_id().await?;
-    let from_account = self
-      .add_account(from_address.clone(), account_type, notary_id)
-      .await?;
-    let to_account = self
-      .add_account(to_sub_address.clone(), account_type, notary_id)
-      .await?;
-
-    let balance_change = self.get_balance_change(&from_account).await?;
-    balance_change
-      .send(amount.clone(), Some(vec![to_sub_address]))
-      .await?;
-
-    let to_balance_change = self.get_balance_change(&to_account).await?;
-    let result = to_balance_change.claim(amount).await?;
-
-    let (_, tax, _) = result.tax.get_u128();
-
-    if account_type == AccountType::Deposit && tax > 0 {
-      let tax_account = self
-        .add_account(tax_address.clone(), AccountType::Tax, notary_id)
-        .await?;
-      let tax_balance = self.get_balance_change(&tax_account).await?;
-      tax_balance.claim(result.tax).await?;
-    }
-
-    Ok(())
-  }
-
-  #[napi]
-  pub async fn claim_and_pay_tax(
-    &self,
-    milligons: BigInt,
-    address: String,
-    tax_address: Option<String>,
-  ) -> Result<()> {
-    let notary_id = self.get_notary_id().await?;
-    let account = self
-      .add_account(address.clone(), AccountType::Deposit, notary_id)
-      .await?;
-    let balance_change = self.get_balance_change(&account).await?;
-    let result = balance_change.claim(milligons).await?;
-
-    let (_, tax, _) = result.tax.get_u128();
-
-    if tax > 0 {
-      let tax_account = match tax_address {
-        Some(tax_address) => {
-          self
-            .add_account(tax_address.clone(), AccountType::Tax, notary_id)
-            .await?
-        }
-        None => {
-          let mut db = self.db.acquire().await.map_err(to_js_error)?;
-          let accounts = AccountStore::tax_accounts(&mut db, notary_id).await?;
-          if accounts.len() > 0 {
-            accounts[0].clone()
-          } else {
-            self
-              .add_account(address.clone(), AccountType::Tax, notary_id)
-              .await?
-          }
-        }
-      };
-      let tax_balance = self.get_balance_change(&tax_account).await?;
-      tax_balance.claim(result.tax).await?;
-    }
-
-    Ok(())
-  }
-
-  #[napi]
-  pub async fn move_claims_to_address(
-    &self,
-    address: String,
-    account_type: AccountType,
-    tax_address: String,
-  ) -> Result<()> {
-    let balance_changes_by_account = self.balance_changes_by_account.lock().await;
-    let account_id = AccountStore::parse_address(&address)?;
-    let mut net_claim_amount = 0u128;
-    for (_, balance_change_tx) in &*balance_changes_by_account {
-      let balance_lock = balance_change_tx.balance_change_lock();
-      let mut balance_change = balance_lock.lock().await;
-
-      if balance_change.account_type == account_type {
-        if balance_change.account_id == AccountStore::parse_address(&address)? {
-          continue;
-        }
-
-        let claim_amount = balance_change.balance.saturating_sub(
-          balance_change
-            .previous_balance_proof
-            .as_ref()
-            .map(|x| x.balance)
-            .unwrap_or_default(),
-        );
-        if claim_amount > 0 {
-          net_claim_amount += claim_amount;
-          (*balance_change).balance -= claim_amount;
-          (*balance_change).push_note(
-            claim_amount,
-            NoteType::Send {
-              to: Some(bounded_vec![account_id.clone()]),
-            },
-          );
-        }
-      }
-    }
-    let notary_id = self.get_notary_id().await?;
-    drop(balance_changes_by_account);
-    let account = self.add_account(address, account_type, notary_id).await?;
-
-    let balance_change = self.get_balance_change(&account).await?;
-    let result = balance_change.claim(BigInt::from(net_claim_amount)).await?;
-
-    let (_, tax, _) = result.tax.get_u128();
-
-    if account_type == AccountType::Deposit && tax > 0 {
-      let tax_account = self
-        .add_account(tax_address.clone(), AccountType::Tax, notary_id)
-        .await?;
-      let tax_balance = self.get_balance_change(&tax_account).await?;
-      tax_balance.claim(result.tax).await?;
-    }
-
-    Ok(())
-  }
-
-  #[napi]
   pub async fn claim_from_mainchain(
     &self,
     transfer: LocalchainTransfer,
   ) -> Result<BalanceChangeBuilder> {
-    let claim_account = self
-      .add_account(
-        transfer.address.clone(),
-        AccountType::Deposit,
-        transfer.notary_id,
-      )
+    self.set_notary_id(transfer.notary_id).await;
+    let default_deposit_account = self.default_deposit_account().await?;
+    if default_deposit_account.address != transfer.address {
+      return Err(Error::from_reason(
+        "Mainchain transfer address doesn't match this localchain address",
+      ));
+    }
+    default_deposit_account
+      .claim_from_mainchain(transfer)
       .await?;
-    let balance_change = self.get_balance_change(&claim_account).await?;
-    balance_change.claim_from_mainchain(transfer).await?;
-    Ok(balance_change)
+    Ok(default_deposit_account)
   }
 
   #[napi]
-  pub async fn load_funding(
-    &self,
-    milligons: BigInt,
-    fund_with_address: Option<String>,
-    restrict_to_address: Option<String>,
-  ) -> Result<()> {
-    let mut notary_id = self.get_notary_id().await.ok();
-    let mut db = self.db.acquire().await.map_err(to_js_error)?;
-
-    let accounts = AccountStore::list(&mut db).await?;
-    let recipients = if let Some(to_address) = restrict_to_address {
-      let to_account = accounts
-        .iter()
-        .find(|account| account.address == to_address);
-      if to_account.is_some() && notary_id.is_none() {
-        notary_id = to_account.map(|account| account.notary_id);
-      }
-      Some(vec![to_address.clone()])
-    } else {
-      None
-    };
-
-    if let Some(ref fund_with_address) = fund_with_address {
-      let from_account = accounts.iter().find(|account| {
-        account.address == *fund_with_address
-          && (notary_id.is_none() || Some(account.notary_id) == notary_id)
-      });
-      let Some(from_account) = from_account else {
-        return Err(Error::from_reason(format!(
-          "Requesting funding source account {} not found",
-          fund_with_address
-        )));
-      };
-      if notary_id.is_none() {
-        notary_id = Some(from_account.notary_id);
-      }
-    }
-
-    if let Some(notary_id) = notary_id {
-      self.set_notary_id(notary_id).await;
-    }
-
-    self
-      .allocate_funding(milligons.get_u128().1, fund_with_address, recipients)
-      .await?;
-
-    Ok(())
-  }
-
-  pub async fn allocate_funding(
-    &self,
-    milligons: u128,
-    fund_with_address: Option<String>,
-    recipients: Option<Vec<String>>,
-  ) -> Result<()> {
-    let notary_id = self.get_notary_id().await?;
-    if let Some(fund_with_address) = fund_with_address {
-      let account = self
-        .add_account(fund_with_address, AccountType::Deposit, notary_id)
-        .await?;
-      let balance_change = self.get_balance_change(&account).await?;
-      balance_change
-        .send(milligons.into(), recipients.clone())
-        .await?;
-    } else {
-      let mut remaining_milligons = milligons;
-      let accounts = self.loaded_accounts.lock().await;
-      let mut db = self.db.acquire().await.map_err(to_js_error)?;
-      for account in accounts.values() {
-        if account.account_type == AccountType::Deposit && account.notary_id == notary_id {
-          let balance_change =
-            BalanceChangeStore::get_latest_for_account(&mut db, account.id).await?;
-          if let Some(balance_change) = balance_change {
-            if balance_change.balance == "0" {
-              continue;
-            }
-            let balance: u128 = balance_change.balance.parse().map_err(to_js_error)?;
-            self.load_account(account).await?;
-            let balance_change_tx = self.get_balance_change(account).await?;
-
-            if balance >= remaining_milligons {
-              balance_change_tx
-                .send(remaining_milligons.into(), recipients.clone())
-                .await?;
-              remaining_milligons = 0u128;
-            } else {
-              balance_change_tx
-                .send(balance.into(), recipients.clone())
-                .await?;
-              remaining_milligons -= balance;
-            };
-          }
-        }
-      }
-      if remaining_milligons > 0 {
-        return Err(Error::from_reason(format!(
-          "Not enough funds to fulfill the requested balance changes ({} milligons short)",
-          remaining_milligons
-        )));
-      }
-    };
-    Ok(())
-  }
-
-  #[napi]
-  pub async fn is_whole_balance(&self, address: String, milligons: BigInt) -> Result<bool> {
-    let notary_id = self.get_notary_id().await?;
-    let mut db = self.db.acquire().await.map_err(to_js_error)?;
-    let from_account = AccountStore::get(&mut db, address.clone(), AccountType::Deposit, notary_id)
-      .await
-      .ok();
-
-    let mut is_whole_balance = false;
-    if let Some(from_account) = from_account {
-      if let Some(balance) =
-        BalanceChangeStore::get_latest_for_account(&mut db, from_account.id).await?
-      {
-        is_whole_balance =
-          balance.balance.parse::<u128>().map_err(to_js_error)? == milligons.get_u128().1;
-      }
-    }
-
-    Ok(is_whole_balance)
-  }
-
-  #[napi]
-  pub async fn fund_and_notarize_jump_account(
-    &self,
-    milligons: BigInt,
-    signer: &Signer,
-    from_address: Option<String>,
-  ) -> Result<LocalAccount> {
-    let notary_id = self.get_notary_id().await?;
-    let mut db = self.db.acquire().await.map_err(to_js_error)?;
-    let jump_account =
-      match AccountStore::find_free_account(&mut db, AccountType::Deposit, notary_id).await? {
-        Some(account) => account,
-        None => {
-          let address = signer.create_account_id(CryptoScheme::Sr25519)?;
-          self
-            .add_account(address, AccountType::Deposit, notary_id)
-            .await?
-        }
-      };
+  pub async fn create_jump_request(&self, milligons: BigInt) -> Result<BalanceChangeBuilder> {
     let milligons_plus_tax = self.get_total_for_after_tax_balance(milligons.clone());
-    self
-      .load_funding(
-        milligons_plus_tax,
-        from_address,
-        Some(jump_account.address.clone()),
-      )
-      .await?;
-    self
-      .claim_and_pay_tax(milligons, jump_account.address.clone(), None)
-      .await?;
-    self.sign(signer).await?;
-    self.notarize().await?;
+    let jump_account = self.get_jump_account(AccountType::Deposit).await?;
+    let tax_result = jump_account.claim(milligons_plus_tax).await?;
+
+    let tax = tax_result.tax.get_u128().1;
+
+    if tax > 0 {
+      let tax = tax_result.tax;
+      self
+        .get_jump_account(AccountType::Tax)
+        .await?
+        .claim(tax)
+        .await?;
+    }
     Ok(jump_account)
   }
 
   #[napi]
-  pub async fn accept_requested_balance_changes(
-    &self,
-    argon_file_json: String,
-    fund_with_address: Option<String>,
-  ) -> Result<()> {
+  pub async fn fund_jump_account(&self, milligons: BigInt) -> Result<BalanceChangeBuilder> {
+    let milligons_plus_tax = self.get_total_for_after_tax_balance(milligons.clone());
+
+    let jump_account = self.get_jump_account(AccountType::Deposit).await?;
+
+    self
+      .default_deposit_account()
+      .await?
+      .send(
+        milligons_plus_tax.clone(),
+        Some(vec![jump_account.address.clone()]),
+      )
+      .await?;
+
+    let tax_result = jump_account.claim(milligons_plus_tax).await?;
+
+    let tax = tax_result.tax.get_u128().1;
+
+    if tax > 0 {
+      let tax = tax_result.tax;
+      self
+        .get_jump_account(AccountType::Tax)
+        .await?
+        .claim(tax)
+        .await?;
+    }
+
+    Ok(jump_account)
+  }
+
+  #[napi]
+  pub async fn accept_requested_balance_changes(&self, argon_file_json: String) -> Result<()> {
     let argon_file = ArgonFile::from_json(&argon_file_json)?;
     let mut balance_changes: Vec<BalanceChange> = argon_file.request.ok_or(Error::from_reason(
       "No requested balance changes found in the argon file",
     ))?;
 
-    {
-      let mut notary_id = self.notary_id.lock().await;
-
-      for change in balance_changes.iter() {
-        let balance_notary_id = change
-          .previous_balance_proof
-          .as_ref()
-          .map(|x| x.notary_id.clone());
-
-        if *notary_id == None {
-          *notary_id = balance_notary_id;
-        } else if *notary_id != balance_notary_id {
-          return Err(Error::from_reason(
-            "All balance changes must use the same notary",
-          ));
-        }
-      }
-      notary_id.ok_or(Error::new(
-        Status::GenericFailure,
-        "No notary id found in balance changes",
-      ))?
-    };
+    for change in balance_changes.iter() {
+      let balance_notary_id = change
+        .previous_balance_proof
+        .as_ref()
+        .map(|x| x.notary_id.clone())
+        .ok_or(Error::from_reason(
+          "No previous balance proof found in the requested balance changes",
+        ))?;
+      self.ensure_notary_id(balance_notary_id).await?;
+    }
 
     let mut recipients = vec![];
     let mut requested_milligons: u128 = 0;
@@ -851,6 +592,7 @@ impl NotarizationBuilder {
         match note.note_type {
           NoteType::Claim => {
             recipients.push(AccountStore::to_address(&change.account_id));
+            requested_milligons += note.milligons;
           }
           _ => {
             return Err(Error::from_reason(format!(
@@ -859,7 +601,6 @@ impl NotarizationBuilder {
             )));
           }
         }
-        requested_milligons += note.milligons;
       }
     }
     if !paid_tax {
@@ -867,7 +608,9 @@ impl NotarizationBuilder {
     }
 
     self
-      .allocate_funding(requested_milligons, fund_with_address, Some(recipients))
+      .default_deposit_account()
+      .await?
+      .send(BigInt::from(requested_milligons), Some(recipients))
       .await?;
 
     let mut imports = self.imported_balance_changes.lock().await;
@@ -877,76 +620,62 @@ impl NotarizationBuilder {
   }
 
   #[napi]
-  pub async fn claim_received_balance(
-    &self,
-    argon_file_json: String,
-    claim_address: String,
-    tax_address: String,
-  ) -> Result<()> {
+  pub async fn claim_received_balance(&self, argon_file_json: String) -> Result<()> {
     let argon_file = ArgonFile::from_json(&argon_file_json)?;
     let mut balance_changes: Vec<BalanceChange> = argon_file.send.ok_or(Error::from_reason(
       "No balance changes to claim found in the argon file",
     ))?;
-    let notary_id = {
-      let mut notary_id = self.notary_id.lock().await;
 
-      for change in balance_changes.iter() {
-        let balance_notary_id = change
-          .previous_balance_proof
-          .as_ref()
-          .map(|x| x.notary_id.clone());
+    for change in balance_changes.iter() {
+      let balance_notary_id = change
+        .previous_balance_proof
+        .as_ref()
+        .map(|x| x.notary_id.clone())
+        .ok_or(Error::from_reason(
+          "No previous balance proof found in the requested balance changes",
+        ))?;
+      self.ensure_notary_id(balance_notary_id).await?;
+    }
 
-        if *notary_id == None {
-          *notary_id = balance_notary_id;
-        } else if *notary_id != balance_notary_id {
-          return Err(Error::from_reason(
-            "All balance changes must use the same notary",
-          ));
-        }
-      }
-      notary_id.ok_or(Error::new(
-        Status::GenericFailure,
-        "No notary id found in balance changes",
-      ))?
-    };
+    let tax_account = self.default_tax_account().await?;
 
-    let mut amount = 0;
+    let deposit_account = self.default_deposit_account().await?;
 
-    let claim_account = self
-      .add_account(claim_address.clone(), AccountType::Deposit, notary_id)
-      .await?;
-
-    let tax_account = self
-      .add_account(tax_address.clone(), AccountType::Tax, notary_id)
-      .await?;
-
-    let claim_account_id32 = AccountStore::parse_address(&claim_account.address)?;
     for (i, balance_change) in balance_changes.iter().enumerate() {
       if !balance_change.verify_signature() {
         return Err(Error::from_reason(format!(
           "Claimed balance change #{i} has an invalid signature"
         )));
       }
-      if balance_change.account_type != claim_account.account_type {
-        return Err(Error::from_reason(
-          format!(
-            "Claimed balance change #{i} is not the same account type ({:?}) as the claim account ({:?})",
-            balance_change.account_type,
-            claim_account.account_type,
-          ),
-        ));
-      }
+      let mut claim_result: Option<ClaimResult> = None;
       for note in balance_change.notes.iter() {
         match &note.note_type {
           &NoteType::Send { ref to } => {
             if let Some(to) = to {
-              if !to.iter().any(|a| a == &claim_account_id32) {
+              let claim_addresses = to
+                .iter()
+                .map(|a| AccountStore::to_address(a))
+                .collect::<Vec<_>>();
+              if balance_change.account_type == AccountType::Deposit
+                && claim_addresses.contains(&deposit_account.address)
+              {
+                claim_result = deposit_account
+                  .claim(BigInt::from(note.milligons))
+                  .await
+                  .ok();
+              } else if balance_change.account_type == AccountType::Tax
+                && claim_addresses.contains(&tax_account.address)
+              {
+                claim_result = tax_account.claim(BigInt::from(note.milligons)).await.ok();
+              }
+
+              if claim_result.is_none() {
                 return Err(Error::new(
                   Status::GenericFailure,
                   format!(
-                    "Claimed balance change #{i} has an account restriction that doesn't match the supplied claim account (restricted to: {:?}, claim_account: {:?})",
+                    "Claimed balance change #{i} has an account restriction that doesn't match your localchain (restricted to: {:?}, your account: {:?})",
                     to.iter().map(|a| AccountStore::to_address(a)).collect::<Vec<_>>(),
-                    claim_address,
+                    deposit_account.address,
                   ),
                 ));
               }
@@ -960,25 +689,11 @@ impl NotarizationBuilder {
             ),
           ))?,
         }
-        amount += note.milligons;
       }
     }
 
     let mut imports = self.imported_balance_changes.lock().await;
     imports.append(&mut balance_changes);
-
-    let balance_changes_by_account = self.balance_changes_by_account.lock().await;
-    let claim_result = balance_changes_by_account
-      .get(&claim_account.id)
-      .unwrap()
-      .claim(BigInt::from(amount))
-      .await?;
-
-    balance_changes_by_account
-      .get(&tax_account.id)
-      .unwrap()
-      .claim(claim_result.tax)
-      .await?;
 
     Ok(())
   }
@@ -987,6 +702,7 @@ impl NotarizationBuilder {
   /// user (who will import into their own localchain).
   #[napi]
   pub async fn export_as_file(&self, file_type: ArgonFileType) -> Result<String> {
+    self.sign().await?;
     let notarization = self.to_notarization().await?;
 
     verify_changeset_signatures(&notarization.balance_changes.to_vec()).map_err(to_js_error)?;
@@ -1060,11 +776,8 @@ impl NotarizationBuilder {
   }
 
   #[napi]
-  pub async fn notarize_and_wait_for_notebook(
-    &self,
-    signer: &Signer,
-  ) -> Result<NotarizationTracker> {
-    self.sign(signer).await?;
+  pub async fn notarize_and_wait_for_notebook(&self) -> Result<NotarizationTracker> {
+    self.sign().await?;
     let tracker = self.notarize().await?;
     tracker.wait_for_notebook().await?;
     tracker.get_notebook_proof().await?;
@@ -1078,6 +791,7 @@ impl NotarizationBuilder {
       drop(is_verified);
       self.verify().await?;
     }
+    self.sign().await?;
     let notarization = self.to_notarization().await?;
 
     let Some(notary_id) = self.get_notary_id().await.ok() else {
@@ -1224,7 +938,17 @@ impl NotarizationBuilder {
   }
 
   #[napi]
-  pub async fn sign(&self, signer: &Signer) -> Result<()> {
+  pub async fn sign(&self) -> Result<()> {
+    if self.signer.is_embedded_unlocked().await {
+      let accounts = self.loaded_accounts.lock().await;
+      for (_, account) in accounts.iter() {
+        if let Some(hd_path) = &account.hd_path {
+          // load derived
+          self.signer.derive_account_id(hd_path.clone()).await?;
+        }
+      }
+    }
+
     let mut balance_changes_by_account = self.balance_changes_by_account.lock().await;
     for (_, balance_change_tx) in balance_changes_by_account.iter_mut() {
       if balance_change_tx.is_empty_signature().await {
@@ -1232,7 +956,8 @@ impl NotarizationBuilder {
         let mut balance_change = balance_lock.lock().await;
         let bytes = balance_change.hash();
 
-        let signature = signer
+        let signature = self
+          .signer
           .sign(
             AccountStore::to_address(&balance_change.account_id),
             Uint8Array::from(bytes.as_bytes().to_vec()),
@@ -1802,7 +1527,7 @@ mod test {
     assert_eq!(original_recipient_balance.inner().await.balance, 0);
 
     let signer = Signer::with_keystore(keystore);
-    builder.sign(&signer).await.expect("can sign");
+    builder.sign().await.expect("can sign");
     builder.verify().await.expect("can verify");
 
     Ok(())

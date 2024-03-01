@@ -61,7 +61,7 @@ impl sp_std::hash::Hash for LocalchainAccountId {
 	Deserialize,
 )]
 #[cfg_attr(feature = "std", derive(clap::ValueEnum))]
-#[cfg_attr(not(feature = "napi"), derive(Clone))]
+#[cfg_attr(not(feature = "napi"), derive(Clone, Copy))]
 #[serde(rename_all = "camelCase")]
 #[cfg_attr(feature = "napi", napi_derive::napi)]
 pub enum AccountType {

@@ -4,7 +4,6 @@ import {
     DataTLD, ESCROW_EXPIRATION_TICKS,
     Localchain,
     NotarizationBuilder,
-    Signer,
 } from "../index";
 import {format} from 'node:util';
 import TestMainchain from "./TestMainchain";
@@ -62,29 +61,32 @@ it('can run a data domain escrow', async () => {
     await notary.start(mainchainUrl);
 
     const sudo = new Keyring({type: 'sr25519'}).createFromUri('//Alice');
-    const bob = new Keyring({type: 'sr25519'}).createFromUri('//Bob');
-    const ferdie = new Keyring({type: 'sr25519'}).createFromUri('//Ferdie');
-    const ferdieDomainAddress = new Keyring({type: 'sr25519'}).createFromUri('//Ferdie//dataDomain//1');
-    const ferdieDomainProfitsAddress = new Keyring({type: 'sr25519'}).createFromUri('//Ferdie//dataDomainProfits//1');
-    const ferdieVotesAddress = new Keyring({type: 'sr25519'}).createFromUri('//Ferdie//voter//1');
-    const bobEscrow = new Keyring({type: 'sr25519'}).createFromUri('//Bob//escrows//1');
-    const taxAddress = new Keyring({type: 'sr25519'}).createFromUri('//Bob//tax//1');
+    const bobkeys = new Keyring({type: 'sr25519'});
+    const bob = bobkeys.createFromUri('//Bob');
 
-    const signer = new Signer(async (address, signatureMessage) => {
-        for (const account of [bob, ferdie, bobEscrow, taxAddress, ferdieDomainAddress, ferdieVotesAddress]) {
-            if (account.address === address) {
-                return account.sign(signatureMessage, {withType: true});
-            }
-        }
-        throw new Error("Unsupported address requested");
-    });
+    const ferdiekeys = new Keyring({type: 'sr25519'});
+    const ferdie = ferdiekeys.createFromUri('//Ferdie');
+    const ferdieDomainAddress = new Keyring({type: 'sr25519'}).createFromUri('//Ferdie//dataDomain//1');
+    const ferdieVotesAddress = new Keyring({type: 'sr25519'}).createFromUri('//Ferdie//voter//1');
 
     const mainchainClient = await getClient(mainchainUrl);
     disconnectOnTeardown(mainchainClient);
     await activateNotary(sudo, mainchainClient, notary);
 
     const bobchain = await createLocalchain(mainchainUrl);
+
+    await bobchain.signer.useExternal(bob.address, async (address, signatureMessage) => {
+        return bobkeys.getPair(address)?.sign(signatureMessage, {withType: true});
+    }, async hd_path => {
+        return bobkeys.addPair(bob.derive(hd_path)).address;
+    });
+
     const ferdiechain = await createLocalchain(mainchainUrl);
+    await ferdiechain.signer.useExternal(ferdie.address, async (address, signatureMessage) => {
+        return ferdiekeys.getPair(address)?.sign(signatureMessage, {withType: true});
+    }, async hd_path => {
+        return ferdiekeys.addPair(ferdie.derive(hd_path)).address;
+    });
 
     const dataDomain = {
         domainName: 'example',
@@ -96,12 +98,10 @@ it('can run a data domain escrow', async () => {
             transferMainchainToLocalchain(mainchainClient, bobchain, bob, 5000, 1),
             transferMainchainToLocalchain(mainchainClient, ferdiechain, ferdie, 5000, 1),
         ]);
-        await ferdieChange.notarization.leaseDataDomain(ferdie.address, ferdie.address, "example.Analytics", ferdie.address);
-        // need to send enough to create an escrow after tax
-        await bobChange.notarization.moveToSubAddress(bob.address, bobEscrow.address, AccountType.Deposit, 4200n, taxAddress.address);
+        await ferdieChange.notarization.leaseDataDomain("example.Analytics", ferdie.address);
         let [ferdieTracker] = await Promise.all([
-            bobChange.notarization.notarizeAndWaitForNotebook(signer),
-            ferdieChange.notarization.notarizeAndWaitForNotebook(signer),
+            bobChange.notarization.notarizeAndWaitForNotebook(),
+            ferdieChange.notarization.notarizeAndWaitForNotebook(),
         ]);
 
         const domains = await ferdiechain.dataDomains.list;
@@ -129,14 +129,17 @@ it('can run a data domain escrow', async () => {
     expect(zoneRecord).toBeTruthy();
     expect(zoneRecord.notaryId).toBe(1);
     expect(zoneRecord.paymentAddress).toBe(ferdieDomainAddress.address);
-    const bobEscrowHold = bobchain.beginChange();
-    const account = await bobEscrowHold.addAccount(bobEscrow.address, AccountType.Deposit, zoneRecord.notaryId);
-    const change = await bobEscrowHold.getBalanceChange(account);
-    await change.createEscrowHold(4000n, "example.Analytics", zoneRecord.paymentAddress);
-    const holdTracker = await bobEscrowHold.notarizeAndWaitForNotebook(signer);
+    const escrowFunding = bobchain.beginChange();
+    const jumpAccount = await escrowFunding.fundJumpAccount(4200n);
+    await escrowFunding.notarize();
 
-    const clientEscrow = await bobchain.openEscrows.openClientEscrow(account.id);
-    await clientEscrow.sign(5n, signer);
+    const bobEscrowHold = bobchain.beginChange();
+    const change = await bobEscrowHold.addAccount(jumpAccount.address, AccountType.Deposit, 1);
+    await change.createEscrowHold(4000n, "example.Analytics", zoneRecord.paymentAddress);
+    const holdTracker = await bobEscrowHold.notarizeAndWaitForNotebook();
+
+    const clientEscrow = await bobchain.openEscrows.openClientEscrow(jumpAccount.localAccountId);
+    await clientEscrow.sign(5n);
     const escrowJson = await clientEscrow.exportForSend();
     {
         const parsed = JSON.parse(escrowJson.toString());
@@ -152,17 +155,15 @@ it('can run a data domain escrow', async () => {
 
     // get to 2500 in escrow costs so that 20% is 500 (minimum vote)
     for (let i = 0n; i <= 10n; i++) {
-        const next = await clientEscrow.sign(500n + i * 200n, signer);
+        const next = await clientEscrow.sign(500n + i * 200n,);
         // now we would send to ferdie
         await expect(ferdieEscrowRecord.recordUpdatedSettlement(next.milligons, next.signature)).resolves.toBeUndefined();
     }
 
     // now ferdie goes to claim it
     const result = await ferdiechain.balanceSync.sync({
-        escrowTaxAddress: ferdieVotesAddress.address,
-        escrowClaimsSendToAddress: ferdieDomainProfitsAddress.address,
         votesAddress: ferdieVotesAddress.address,
-    }, signer);
+    },);
     expect(result).toBeTruthy();
     expect(result.balanceChanges).toHaveLength(2);
     expect(result.escrowNotarizations).toHaveLength(0);
@@ -175,10 +176,8 @@ it('can run a data domain escrow', async () => {
     expect(timeForExpired.getTime() - Date.now()).toBeLessThan(30e3);
     await new Promise(resolve => setTimeout(resolve, timeForExpired.getTime() - Date.now() + 10));
     const vote_result = await ferdiechain.balanceSync.sync({
-        escrowTaxAddress: ferdieVotesAddress.address,
-        escrowClaimsSendToAddress: ferdieDomainProfitsAddress.address,
         votesAddress: ferdieVotesAddress.address,
-    }, signer);
+    },);
     console.log("Result of balance sync notarization of escrow. Balance Changes=%s, Escrows=%s", vote_result.balanceChanges.length, vote_result.escrowNotarizations.length);
     expect(vote_result.escrowNotarizations).toHaveLength(1);
     const notarization = vote_result.escrowNotarizations[0];

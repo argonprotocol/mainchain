@@ -2,6 +2,7 @@ CREATE TABLE IF NOT EXISTS accounts
 (
     id                     INTEGER  NOT NULL PRIMARY KEY AUTOINCREMENT,
     address                TEXT     NOT NULL,
+    hd_path                TEXT, -- the derivation path of the account if applicable
     account_id32           BLOB     NOT NULL,
     account_type           INT      NOT NULL,
     notary_id              INT      NOT NULL,
@@ -12,6 +13,16 @@ CREATE TABLE IF NOT EXISTS accounts
 );
 
 CREATE UNIQUE INDEX IF NOT EXISTS accounts_address_idx ON accounts (address, account_type, notary_id);
+-- only one tax/deposit per hd_path per notary. Meaning, only a single primary account allowed
+CREATE UNIQUE INDEX IF NOT EXISTS accounts_path_idx ON accounts (account_type, notary_id, hd_path);
+
+-- optional embedded key store.
+CREATE TABLE IF NOT EXISTS key
+(
+    address     TEXT NOT NULL PRIMARY KEY,
+    crypto_type INT  NOT NULL,
+    data        BLOB NOT NULL
+);
 
 -- The notarizations stores the notarization json and the new account origins json if the notarization was done by this wallet.
 -- If the notarization was done by another wallet, the notarization will be populated once it is found in a wallet for any pending balance changes.

@@ -25,14 +25,13 @@ pub struct BalanceSync {
   notary_clients: NotaryClients,
   lock: Arc<Mutex<()>>,
   open_escrows: OpenEscrowsStore,
+  signer: Signer,
   tick_counter: Arc<Mutex<(u32, u32)>>,
 }
 
 #[napi(object)]
 #[derive(Clone)]
 pub struct EscrowCloseOptions {
-  pub escrow_tax_address: String,
-  pub escrow_claims_send_to_address: Option<String>,
   pub votes_address: String,
   /// What's the minimum amount of tax we should wait for before voting on blocks
   pub minimum_vote_amount: Option<i64>,
@@ -67,27 +66,20 @@ impl BalanceSync {
       lock: Arc::new(Mutex::new(())),
       open_escrows: localchain.open_escrows(),
       tick_counter: Arc::new(Mutex::new((0, 0))),
+      signer: localchain.signer.clone(),
     }
   }
 
   #[napi]
-  pub async fn sync(
-    &self,
-    options: Option<EscrowCloseOptions>,
-    signer: Option<&Signer>,
-  ) -> Result<BalanceSyncResult> {
+  pub async fn sync(&self, options: Option<EscrowCloseOptions>) -> Result<BalanceSyncResult> {
     let balance_changes = self.sync_unsettled_balances().await?;
 
     tracing::debug!(
-      "Finished processing unsettled balances {}. Has options? {:?} {:?}",
+      "Finished processing unsettled balances {}",
       balance_changes.len(),
-      options.is_some(),
-      signer.is_some()
     );
-    let escrow_notarizations = match (options, signer) {
-      (Some(options), Some(signer)) => self.process_pending_escrows(options, signer).await?,
-      _ => vec![],
-    };
+
+    let escrow_notarizations = self.process_pending_escrows(options).await?;
 
     Ok(BalanceSyncResult {
       balance_changes,
@@ -181,8 +173,7 @@ impl BalanceSync {
   #[napi]
   pub async fn process_pending_escrows(
     &self,
-    options: EscrowCloseOptions,
-    signer: &Signer,
+    options: Option<EscrowCloseOptions>,
   ) -> Result<Vec<NotarizationBuilder>> {
     let _lock = self.lock.lock().await;
     let open_escrows = self.open_escrows.get_claimable().await?;
@@ -200,9 +191,13 @@ impl BalanceSync {
 
       let notary_id = escrow.notary_id as u32;
 
-      let notarization = builder_by_notary
-        .entry(notary_id)
-        .or_insert_with(|| NotarizationBuilder::new(self.db.clone(), self.notary_clients.clone()));
+      let notarization = builder_by_notary.entry(notary_id).or_insert_with(|| {
+        NotarizationBuilder::new(
+          self.db.clone(),
+          self.notary_clients.clone(),
+          self.signer.clone(),
+        )
+      });
 
       if escrow.is_client {
         if let Err(e) = self
@@ -213,7 +208,7 @@ impl BalanceSync {
         }
       } else {
         if let Err(e) = self
-          .sync_server_escrow(&open_escrow, &mut escrow, &options, notarization, signer)
+          .sync_server_escrow(&open_escrow, &mut escrow, &options, notarization)
           .await
         {
           tracing::warn!("Error syncing server escrow (#{}): {:?}", escrow.id, e);
@@ -228,7 +223,7 @@ impl BalanceSync {
 
     for (_, mut notarization) in builder_by_notary {
       self
-        .finalize_escrow_notarization(&mut notarization, signer, &options)
+        .finalize_escrow_notarization(&mut notarization, &options)
         .await;
       if notarization.is_finalized().await {
         notarizations.push(notarization.clone());
@@ -264,8 +259,11 @@ impl BalanceSync {
   pub async fn convert_tax_to_votes(
     &self,
     notarization: &mut NotarizationBuilder,
-    options: &EscrowCloseOptions,
+    options: &Option<EscrowCloseOptions>,
   ) -> anyhow::Result<()> {
+    let Some(options) = options else {
+      return Err(anyhow::anyhow!("No options provided to create votes with tax"));
+    };
     let mainchain_mutex = self.mainchain_client.lock().await;
     let Some(ref mainchain_client) = *mainchain_mutex else {
       return Err(anyhow::anyhow!(
@@ -329,8 +327,7 @@ impl BalanceSync {
   pub async fn finalize_escrow_notarization(
     &self,
     notarization: &mut NotarizationBuilder,
-    signer: &Signer,
-    options: &EscrowCloseOptions,
+    options: &Option<EscrowCloseOptions>,
   ) {
     if let Err(e) = self.convert_tax_to_votes(notarization, options).await {
       tracing::error!(
@@ -339,7 +336,7 @@ impl BalanceSync {
       );
     }
 
-    if let Err(e) = notarization.sign(signer).await {
+    if let Err(e) = notarization.sign().await {
       tracing::error!("Could not claim an escrow -> {:?}", e);
       return;
     }
@@ -376,9 +373,8 @@ impl BalanceSync {
     &self,
     open_escrow: &OpenEscrow,
     escrow: &mut Escrow,
-    options: &EscrowCloseOptions,
+    options: &Option<EscrowCloseOptions>,
     notarization: &mut NotarizationBuilder,
-    signer: &Signer,
   ) -> anyhow::Result<()> {
     let current_tick = self.ticker.current();
 
@@ -398,27 +394,13 @@ impl BalanceSync {
       escrow.from_address,
       escrow.balance_change_number
     );
-    if !notarization
-      .can_add_escrow(&open_escrow, options.escrow_tax_address.clone())
-      .await
-    {
-      if let Some(address) = options.escrow_claims_send_to_address.clone() {
-        notarization
-          .move_claims_to_address(
-            address,
-            AccountType::Deposit,
-            options.escrow_tax_address.clone(),
-          )
-          .await?;
-      }
+    if !notarization.can_add_escrow(&open_escrow).await {
       self
-        .finalize_escrow_notarization(notarization, signer, options)
+        .finalize_escrow_notarization(notarization, options)
         .await;
       return Ok(());
     }
-    notarization
-      .claim_escrow(&open_escrow, options.escrow_tax_address.clone())
-      .await?;
+    notarization.claim_escrow(&open_escrow).await?;
     Ok(())
   }
 

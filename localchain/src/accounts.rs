@@ -1,4 +1,3 @@
-use crate::{to_js_error, BalanceChangeStatus, BalanceChangeStore};
 use chrono::NaiveDateTime;
 use napi::bindgen_prelude::*;
 use sp_core::crypto::{
@@ -6,10 +5,13 @@ use sp_core::crypto::{
 };
 use sp_core::ByteArray;
 use sqlx::{FromRow, SqliteConnection, SqlitePool};
+
 use ulx_primitives::AccountOriginUid;
 use ulx_primitives::NotaryId;
 use ulx_primitives::NotebookNumber;
 use ulx_primitives::{AccountOrigin, AccountType};
+
+use crate::{to_js_error, BalanceChangeStatus, BalanceChangeStore};
 
 #[napi(object)]
 #[derive(Debug, Clone, Eq, PartialEq)]
@@ -33,6 +35,7 @@ impl Into<AccountOrigin> for NotaryAccountOrigin {
 pub struct LocalAccount {
   pub id: i64,
   pub address: String,
+  pub hd_path: Option<String>,
   pub account_id32: String,
   pub notary_id: u32,
   pub account_type: AccountType,
@@ -56,6 +59,7 @@ impl Into<LocalAccount> for AccountRow {
     let row = self;
     LocalAccount {
       id: row.id,
+      hd_path: row.hd_path,
       account_id32: hex::encode(row.account_id32),
       address: row.address,
       account_type: row.account_type,
@@ -80,6 +84,7 @@ struct AccountRow {
   address: String,
   account_id32: Vec<u8>,
   account_type: AccountType,
+  hd_path: Option<String>,
   notary_id: i64,
   origin_uid: Option<i64>,
   origin_notebook_number: Option<i64>,
@@ -93,6 +98,7 @@ pub struct AccountStore {
   pool: SqlitePool,
 }
 
+pub const DEFAULT_NOTARY_ID: NotaryId = 1;
 pub const ADDRESS_PREFIX: u16 = Ss58AddressFormatRegistry::SubstrateAccount as u16;
 
 #[napi]
@@ -116,6 +122,56 @@ impl AccountStore {
 
   pub fn address_format() -> Ss58AddressFormat {
     Ss58AddressFormat::from(ADDRESS_PREFIX)
+  }
+
+  #[napi(js_name = "getDepositAccount")]
+  pub async fn deposit_account_js(&self, notary_id: Option<u32>) -> Result<LocalAccount> {
+    let mut db = self.pool.acquire().await.map_err(to_js_error)?;
+    let res = Self::deposit_account(&mut *db, notary_id).await?;
+    Ok(res)
+  }
+
+  pub async fn deposit_account(
+    db: &mut SqliteConnection,
+    notary_id: Option<NotaryId>,
+  ) -> anyhow::Result<LocalAccount> {
+    let notary_id = notary_id.unwrap_or(DEFAULT_NOTARY_ID) as i32;
+    let res = sqlx::query_as!(
+      AccountRow,
+      r#"SELECT * from accounts WHERE hd_path IS NULL AND account_type = ? AND notary_id = ?"#,
+      AccountType::Deposit as i64,
+      notary_id
+    )
+    .fetch_one(&mut *db)
+    .await?
+    .into();
+
+    Ok(res)
+  }
+
+  #[napi(js_name = "getTaxAccount")]
+  pub async fn tax_accounts_js(&self, notary_id: Option<NotaryId>) -> Result<LocalAccount> {
+    let mut db = self.pool.acquire().await.map_err(to_js_error)?;
+    let res = Self::tax_account(&mut *db, notary_id).await?;
+    Ok(res)
+  }
+
+  pub async fn tax_account(
+    db: &mut SqliteConnection,
+    notary_id: Option<NotaryId>,
+  ) -> anyhow::Result<LocalAccount> {
+    let notary_id = notary_id.unwrap_or(DEFAULT_NOTARY_ID) as i32;
+    let res = sqlx::query_as!(
+      AccountRow,
+      r#"SELECT * from accounts WHERE hd_path IS NULL AND account_type = ? AND notary_id = ?"#,
+      AccountType::Tax as i64,
+      notary_id
+    )
+    .fetch_one(&mut *db)
+    .await?
+    .into();
+
+    Ok(res)
   }
 
   pub async fn get(
@@ -198,7 +254,42 @@ impl AccountStore {
       .ok()
       .is_some()
   }
-  pub async fn find_free_account(
+
+  pub async fn get_next_jump_path(
+    db: &mut SqliteConnection,
+    account_type: AccountType,
+    notary_id: u32,
+  ) -> Result<String> {
+    let account_type_i64 = account_type as i64;
+    let notary_id = notary_id as i64;
+    let res = sqlx::query_scalar!(
+      r#"SELECT hd_path from accounts WHERE hd_path IS NOT NULL AND account_type = ? AND notary_id = ? ORDER BY hd_path DESC"#,
+      account_type_i64,
+      notary_id,
+    )
+    .fetch_all(&mut *db)
+    .await
+    .map_err(to_js_error)?;
+
+    let mut max_jump_id = 0u32;
+    for path in res {
+      let Some(last_path) = path else {
+        continue;
+      };
+      let jump_counter = last_path
+        .split("//")
+        .last()
+        .unwrap()
+        .parse::<u32>()
+        .unwrap_or_default();
+      if jump_counter > max_jump_id {
+        max_jump_id = jump_counter;
+      }
+    }
+    return Ok(format!("//jump//{}", max_jump_id + 1));
+  }
+
+  pub async fn find_idle_jump_account(
     db: &mut SqliteConnection,
     account_type: AccountType,
     notary_id: u32,
@@ -207,7 +298,7 @@ impl AccountStore {
     let notary_id = notary_id as i64;
     let res = sqlx::query_as!(
       AccountRow,
-      r#"SELECT * from accounts WHERE account_type = ? AND notary_id = ?"#,
+      r#"SELECT * from accounts WHERE hd_path IS NOT NULL AND account_type = ? AND notary_id = ?"#,
       account_type_i64,
       notary_id,
     )
@@ -231,16 +322,46 @@ impl AccountStore {
     }
     Ok(None)
   }
+
   /// Finds an account with no balance that is not waiting for a send claim
-  #[napi(js_name = "findFreeAccount")]
-  pub async fn find_free_account_js(
+  #[napi(js_name = "findIdleJumpAccount")]
+  pub async fn find_idle_jump_account_js(
     &self,
     account_type: AccountType,
     notary_id: u32,
   ) -> Result<Option<LocalAccount>> {
     let mut db = self.pool.acquire().await.map_err(to_js_error)?;
 
-    Self::find_free_account(&mut *db, account_type, notary_id).await
+    Self::find_idle_jump_account(&mut *db, account_type, notary_id).await
+  }
+
+  pub async fn bootstrap(
+    pool: SqlitePool,
+    address: String,
+    notary_id: Option<NotaryId>,
+  ) -> anyhow::Result<()> {
+    let mut db = pool.acquire().await?;
+
+    if let Ok(account) = AccountStore::deposit_account(&mut db, notary_id).await {
+      if account.address != address {
+        return Err(anyhow::anyhow!(
+          "Cannot bootstrap this localchain with a different address"
+        ));
+      }
+      return Ok(());
+    }
+
+    let notary_id = notary_id.unwrap_or(DEFAULT_NOTARY_ID);
+    AccountStore::insert(
+      &mut db,
+      address.clone(),
+      AccountType::Deposit,
+      notary_id,
+      None,
+    )
+    .await?;
+    AccountStore::insert(&mut db, address.clone(), AccountType::Tax, notary_id, None).await?;
+    Ok(())
   }
 
   pub async fn insert(
@@ -248,6 +369,7 @@ impl AccountStore {
     address: String,
     account_type: AccountType,
     notary_id: NotaryId,
+    hd_path: Option<String>,
   ) -> anyhow::Result<LocalAccount> {
     let account_type_i64 = account_type as i64;
 
@@ -257,11 +379,12 @@ impl AccountStore {
 
     let res = sqlx::query_as!(
       AccountRow,
-      r#"INSERT INTO accounts (address, account_id32, account_type, notary_id) VALUES ($1, $2, $3, $4) RETURNING *"#,
+      r#"INSERT INTO accounts (address, account_id32, account_type, notary_id,  hd_path) VALUES ($1, $2, $3, $4, $5) RETURNING *"#,
       address,
       account_id32,
       account_type_i64,
       notary_id_i64,
+      hd_path,
     )
             .fetch_one(&mut *db)
             .await
@@ -276,9 +399,10 @@ impl AccountStore {
     address: String,
     account_type: AccountType,
     notary_id: u32,
+    hd_path: Option<String>,
   ) -> Result<LocalAccount> {
     let mut db = self.pool.acquire().await.map_err(to_js_error)?;
-    let res = Self::insert(&mut *db, address, account_type, notary_id)
+    let res = Self::insert(&mut *db, address, account_type, notary_id, hd_path)
       .await
       .map_err(to_js_error)?;
     Ok(res)
@@ -306,44 +430,28 @@ impl AccountStore {
     Ok(())
   }
 
-  pub async fn list(db: &mut SqliteConnection) -> anyhow::Result<Vec<LocalAccount>> {
-    let res = sqlx::query_as!(AccountRow, r#"SELECT * from accounts"#,)
-      .fetch_all(&mut *db)
-      .await?
-      .into_iter()
-      .map(|row| row.into())
-      .collect::<Vec<_>>();
+  pub async fn list(
+    db: &mut SqliteConnection,
+    include_jump_accounts: bool,
+  ) -> anyhow::Result<Vec<LocalAccount>> {
+    let query = if include_jump_accounts {
+      sqlx::query_as!(AccountRow, "SELECT * from accounts",)
+        .fetch_all(&mut *db)
+        .await?
+    } else {
+      sqlx::query_as!(AccountRow, "SELECT * from accounts WHERE hd_path IS NULL",)
+        .fetch_all(&mut *db)
+        .await?
+    };
+
+    let res = query.into_iter().map(|row| row.into()).collect::<Vec<_>>();
     Ok(res)
   }
 
   #[napi(js_name = "list")]
-  pub async fn list_js(&self) -> Result<Vec<LocalAccount>> {
+  pub async fn list_js(&self, include_jump_accounts: Option<bool>) -> Result<Vec<LocalAccount>> {
     let mut db = self.pool.acquire().await.map_err(to_js_error)?;
-    Self::list(&mut db).await.map_err(to_js_error)
-  }
-
-  pub async fn tax_accounts(
-    db: &mut SqliteConnection,
-    notary_id: NotaryId,
-  ) -> anyhow::Result<Vec<LocalAccount>> {
-    let res = sqlx::query_as!(
-      AccountRow,
-      r#"SELECT * from accounts WHERE notary_id=? and account_type=?"#,
-      notary_id,
-      AccountType::Tax as i64,
-    )
-    .fetch_all(&mut *db)
-    .await?
-    .into_iter()
-    .map(|row| row.into())
-    .collect::<Vec<_>>();
-    Ok(res)
-  }
-
-  #[napi(js_name = "taxAccounts")]
-  pub async fn tax_accounts_js(&self, notary_id: u32) -> Result<Vec<LocalAccount>> {
-    let mut db = self.pool.acquire().await.map_err(to_js_error)?;
-    Self::tax_accounts(&mut db, notary_id)
+    Self::list(&mut db, include_jump_accounts.unwrap_or(false))
       .await
       .map_err(to_js_error)
   }
@@ -351,10 +459,12 @@ impl AccountStore {
 
 #[cfg(test)]
 mod test {
-  use super::*;
-  use crate::*;
   use sp_keyring::AccountKeyring::Bob;
   use sp_keyring::Ed25519Keyring::Alice;
+
+  use crate::*;
+
+  use super::*;
 
   #[sqlx::test]
   async fn accounts_stored_and_retrieved(pool: SqlitePool) -> anyhow::Result<()> {
@@ -400,6 +510,8 @@ mod test {
       AccountStore::to_address(&Bob.to_account_id()),
       AccountType::Deposit,
       1,
+      None,
+      None,
     )
     .await
     .expect("Could not insert account");

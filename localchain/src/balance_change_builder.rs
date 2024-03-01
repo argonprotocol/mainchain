@@ -16,13 +16,18 @@ pub struct BalanceChangeBuilder {
   balance_change: Arc<Mutex<BalanceChange>>,
   pub account_type: AccountType,
   pub address: String,
+  pub local_account_id: i64,
   pub change_number: u32,
   pub sync_status: Option<BalanceChangeStatus>,
 }
 
 #[napi]
 impl BalanceChangeBuilder {
-  pub(crate) fn new(balance_change: BalanceChange, status: Option<BalanceChangeStatus>) -> Self {
+  pub(crate) fn new(
+    balance_change: BalanceChange,
+    local_account_id: i64,
+    status: Option<BalanceChangeStatus>,
+  ) -> Self {
     let account_type = balance_change.account_type;
     let change_number = balance_change.change_number;
     let address = AccountStore::to_address(&balance_change.account_id);
@@ -31,6 +36,7 @@ impl BalanceChangeBuilder {
     Self {
       balance_change: Arc::new(Mutex::new(change)),
       account_type,
+      local_account_id,
       address,
       change_number,
       sync_status: status,
@@ -38,9 +44,13 @@ impl BalanceChangeBuilder {
   }
 
   #[napi(factory)]
-  pub fn new_account(address: String, account_type: AccountType) -> napi::Result<Self> {
-    Ok(
-      Self::new(BalanceChange {
+  pub fn new_account(
+    address: String,
+    local_account_id: i64,
+    account_type: AccountType,
+  ) -> napi::Result<Self> {
+    Ok(Self::new(
+      BalanceChange {
         account_id: AccountStore::parse_address(&address)?,
         account_type,
         change_number: 0,
@@ -50,8 +60,9 @@ impl BalanceChangeBuilder {
         notes: Default::default(),
         signature: MultiSignatureBytes::from(ed25519::Signature([0; 64])),
       },
-      None),
-    )
+      local_account_id,
+      None,
+    ))
   }
 
   #[napi]
@@ -345,7 +356,7 @@ mod test {
   #[tokio::test]
   async fn test_building_balance_change() -> anyhow::Result<()> {
     let address = AccountStore::to_address(&Bob.to_account_id());
-    let builder = BalanceChangeBuilder::new_account(address.clone(), AccountType::Deposit)?;
+    let builder = BalanceChangeBuilder::new_account(address.clone(), 1, AccountType::Deposit)?;
     builder
       .claim_from_mainchain(LocalchainTransfer {
         address,
@@ -370,7 +381,7 @@ mod test {
   #[tokio::test]
   async fn test_building_balance_change_with_restrict_to_addresses() -> anyhow::Result<()> {
     let address = AccountStore::to_address(&Bob.to_account_id());
-    let builder = BalanceChangeBuilder::new_account(address.clone(), AccountType::Deposit)?;
+    let builder = BalanceChangeBuilder::new_account(address.clone(), 1, AccountType::Deposit)?;
     builder
       .claim_from_mainchain(LocalchainTransfer {
         address,

@@ -53,8 +53,6 @@ export enum BalanceChangeStatus {
   Canceled = 5
 }
 export interface EscrowCloseOptions {
-  escrowTaxAddress: string
-  escrowClaimsSendToAddress?: string
   votesAddress: string
   /** What's the minimum amount of tax we should wait for before voting on blocks */
   minimumVoteAmount?: number
@@ -192,6 +190,7 @@ export interface LocalchainConfig {
   dbPath: string
   mainchainUrl: string
   ntpPoolUrl?: string
+  keystorePassword?: KeystorePasswordOption
 }
 export interface TickerConfig {
   tickDurationMillis: number
@@ -201,6 +200,7 @@ export interface TickerConfig {
 export class LocalAccount {
   id: number
   address: string
+  hdPath?: string
   accountId32: string
   notaryId: number
   accountType: AccountType
@@ -209,21 +209,23 @@ export class LocalAccount {
   origin?: NotaryAccountOrigin
 }
 export class AccountStore {
+  getDepositAccount(notaryId?: number | undefined | null): Promise<LocalAccount>
+  getTaxAccount(notaryId?: NotaryId | undefined | null): Promise<LocalAccount>
   get(address: string, accountType: AccountType, notaryId: number): Promise<LocalAccount>
   getById(id: number): Promise<LocalAccount>
   hasAccount(address: string, accountType: AccountType, notaryId: number): Promise<boolean>
   /** Finds an account with no balance that is not waiting for a send claim */
-  findFreeAccount(accountType: AccountType, notaryId: number): Promise<LocalAccount | null>
-  insert(address: string, accountType: AccountType, notaryId: number): Promise<LocalAccount>
-  list(): Promise<Array<LocalAccount>>
-  taxAccounts(notaryId: number): Promise<Array<LocalAccount>>
+  findIdleJumpAccount(accountType: AccountType, notaryId: number): Promise<LocalAccount | null>
+  insert(address: string, accountType: AccountType, notaryId: number, hdPath?: string | undefined | null): Promise<LocalAccount>
+  list(includeJumpAccounts?: boolean | undefined | null): Promise<Array<LocalAccount>>
 }
 export class BalanceChangeBuilder {
   accountType: AccountType
   address: string
+  localAccountId: number
   changeNumber: number
   syncStatus?: BalanceChangeStatus
-  static newAccount(address: string, accountType: AccountType): BalanceChangeBuilder
+  static newAccount(address: string, localAccountId: number, accountType: AccountType): BalanceChangeBuilder
   isEmptySignature(): Promise<boolean>
   get balance(): Promise<bigint>
   get accountId32(): Promise<Uint8Array>
@@ -262,10 +264,10 @@ export class BalanceChangeStore {
 }
 export class BalanceSync {
   constructor(localchain: Localchain)
-  sync(options?: EscrowCloseOptions | undefined | null, signer?: Signer | undefined | null): Promise<BalanceSyncResult>
+  sync(options?: EscrowCloseOptions | undefined | null): Promise<BalanceSyncResult>
   syncUnsettledBalances(): Promise<Array<BalanceChange>>
   syncBalanceChange(balanceChange: BalanceChange): Promise<BalanceChange>
-  processPendingEscrows(options: EscrowCloseOptions, signer: Signer): Promise<Array<NotarizationBuilder>>
+  processPendingEscrows(options?: EscrowCloseOptions | undefined | null): Promise<Array<NotarizationBuilder>>
 }
 export class BalanceSyncResult {
   get balanceChanges(): Array<BalanceChange>
@@ -315,38 +317,36 @@ export class NotarizationBuilder {
   get unusedDomainFunds(): Promise<bigint>
   get unclaimedDeposits(): Promise<bigint>
   getBalanceChange(account: LocalAccount): Promise<BalanceChangeBuilder>
-  addAccount(address: string, accountType: AccountType, notaryId: number): Promise<LocalAccount>
-  loadAccount(account: LocalAccount): Promise<void>
-  canAddEscrow(escrow: OpenEscrow, taxAddress: string): Promise<boolean>
+  addAccount(address: string, accountType: AccountType, notaryId: number): Promise<BalanceChangeBuilder>
+  getJumpAccount(accountType: AccountType): Promise<BalanceChangeBuilder>
+  defaultDepositAccount(): Promise<BalanceChangeBuilder>
+  defaultTaxAccount(): Promise<BalanceChangeBuilder>
+  loadAccount(account: LocalAccount): Promise<BalanceChangeBuilder>
+  canAddEscrow(escrow: OpenEscrow): Promise<boolean>
   cancelEscrow(openEscrow: OpenEscrow): Promise<void>
-  claimEscrow(openEscrow: OpenEscrow, taxAddress: string): Promise<void>
+  claimEscrow(openEscrow: OpenEscrow): Promise<void>
   addVote(vote: BlockVote): Promise<void>
-  leaseDataDomain(useFundsFromAddress: string, taxAddress: string, dataDomain: string, registerToAddress: string): Promise<void>
-  canAddBalanceChange(claimAddress: string, taxAddress: string): Promise<boolean>
+  leaseDataDomain(dataDomain: string, registerToAddress: string): Promise<void>
   /** Calculates the transfer tax on the given amount */
   getTransferTaxAmount(amount: bigint): bigint
   /** Calculates the total needed to end up with the given balance */
   getTotalForAfterTaxBalance(finalBalance: bigint): bigint
   getEscrowTaxAmount(amount: bigint): bigint
-  moveToSubAddress(fromAddress: string, toSubAddress: string, accountType: AccountType, amount: bigint, taxAddress: string): Promise<void>
-  claimAndPayTax(milligons: bigint, address: string, taxAddress?: string | undefined | null): Promise<void>
-  moveClaimsToAddress(address: string, accountType: AccountType, taxAddress: string): Promise<void>
   claimFromMainchain(transfer: LocalchainTransfer): Promise<BalanceChangeBuilder>
-  loadFunding(milligons: bigint, fundWithAddress?: string | undefined | null, restrictToAddress?: string | undefined | null): Promise<void>
-  isWholeBalance(address: string, milligons: bigint): Promise<boolean>
-  fundAndNotarizeJumpAccount(milligons: bigint, signer: Signer, fromAddress?: string | undefined | null): Promise<LocalAccount>
-  acceptRequestedBalanceChanges(argonFileJson: string, fundWithAddress?: string | undefined | null): Promise<void>
-  claimReceivedBalance(argonFileJson: string, claimAddress: string, taxAddress: string): Promise<void>
+  createJumpRequest(milligons: bigint): Promise<BalanceChangeBuilder>
+  fundJumpAccount(milligons: bigint): Promise<BalanceChangeBuilder>
+  acceptRequestedBalanceChanges(argonFileJson: string): Promise<void>
+  claimReceivedBalance(argonFileJson: string): Promise<void>
   /**
    * Exports an argon file from this notarization builder with the intention that these will be sent to another
    * user (who will import into their own localchain).
    */
   exportAsFile(fileType: ArgonFileType): Promise<string>
   toJson(): Promise<string>
-  notarizeAndWaitForNotebook(signer: Signer): Promise<NotarizationTracker>
+  notarizeAndWaitForNotebook(): Promise<NotarizationTracker>
   notarize(): Promise<NotarizationTracker>
   verify(): Promise<void>
-  sign(signer: Signer): Promise<void>
+  sign(): Promise<void>
 }
 export class NotarizationTracker {
   notebookNumber: number
@@ -404,7 +404,7 @@ export class Escrow {
 }
 export class OpenEscrow {
   get escrow(): Promise<Escrow>
-  sign(settledAmount: bigint, signer: Signer): Promise<SignatureResult>
+  sign(settledAmount: bigint): Promise<SignatureResult>
   exportForSend(): Promise<string>
   recordUpdatedSettlement(milligons: bigint, signature: Uint8Array): Promise<void>
 }
@@ -418,22 +418,29 @@ export class OpenEscrowsStore {
   openClientEscrow(accountId: number): Promise<OpenEscrow>
 }
 export class Signer {
-  constructor(signer?: (address: string, signatureMessage: Uint8Array) => Promise<Uint8Array>)
-  createAccountId(scheme: CryptoScheme): string
-  attachKeystore(path: string, password: KeystorePasswordOption): Promise<void>
-  canSign(address: string): boolean
+  useExternal(defaultAddress: string, sign: (address: string, signatureMessage: Uint8Array) => Promise<Uint8Array>, derive: (hd_path: string) => Promise<string>): Promise<void>
+  /** Bootstrap this localchain with a new key. Must be empty or will throw an error! Defaults to SR25519 if no scheme is provided. */
+  bootstrapEmbedded(scheme?: CryptoScheme | undefined | null, passwordOption?: KeystorePasswordOption | undefined | null): Promise<string>
+  /** Import a known keypair into the embedded keystore. */
+  importToEmbedded(suri: string, scheme: CryptoScheme, passwordOption?: KeystorePasswordOption | undefined | null): Promise<string>
+  unlockEmbedded(passwordOption?: KeystorePasswordOption | undefined | null): Promise<void>
+  lockEmbedded(): Promise<void>
+  isEmbeddedUnlocked(): Promise<boolean>
+  deriveAccountId(hdPath: string): Promise<string>
   sign(address: string, message: Uint8Array): Promise<Uint8Array>
-  signWithKeystore(address: string, message: Uint8Array): Promise<Uint8Array>
 }
 export class Localchain {
   path: string
   static load(config: LocalchainConfig): Promise<Localchain>
-  static loadWithoutMainchain(dbPath: string, tickerConfig: TickerConfig): Promise<Localchain>
+  static loadWithoutMainchain(dbPath: string, tickerConfig: TickerConfig, keystorePassword?: KeystorePasswordOption | undefined | null): Promise<Localchain>
   attachMainchain(mainchainClient: MainchainClient): Promise<void>
   close(): Promise<void>
+  static getDefaultDir(): string
   static getDefaultPath(): string
+  get address(): Promise<string>
   get currentTick(): number
   get ticker(): TickerRef
+  get signer(): Signer
   get mainchainClient(): Promise<MainchainClient | null>
   get notaryClients(): NotaryClients
   get accounts(): AccountStore

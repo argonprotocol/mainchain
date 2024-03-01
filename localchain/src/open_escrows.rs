@@ -2,8 +2,8 @@ use crate::accounts::AccountStore;
 use crate::balance_changes::BalanceChangeStore;
 use crate::notary_client::NotaryClients;
 use crate::signer::Signer;
-use crate::{BalanceChangeStatus, to_js_error};
 use crate::TickerRef;
+use crate::{to_js_error, BalanceChangeStatus};
 use anyhow::anyhow;
 use bech32::{Bech32m, Hrp};
 use chrono::NaiveDateTime;
@@ -311,14 +311,16 @@ impl TryFrom<EscrowRow> for Escrow {
 pub struct OpenEscrow {
   db: SqlitePool,
   escrow: Arc<Mutex<Escrow>>,
+  signer: Signer,
 }
 
 #[napi]
 impl OpenEscrow {
-  pub fn new(db: SqlitePool, escrow: Escrow) -> Self {
+  pub fn new(db: SqlitePool, escrow: Escrow, signer: &Signer) -> Self {
     OpenEscrow {
       db,
       escrow: Arc::new(Mutex::new(escrow)),
+      signer: signer.clone(),
     }
   }
 
@@ -328,7 +330,7 @@ impl OpenEscrow {
   }
 
   #[napi]
-  pub async fn sign(&self, settled_amount: BigInt, signer: &Signer) -> Result<SignatureResult> {
+  pub async fn sign(&self, settled_amount: BigInt) -> Result<SignatureResult> {
     if settled_amount.get_u128().1 < MINIMUM_ESCROW_SETTLEMENT {
       return Err(to_js_error(format!("Settled amount must be greater than the minimum escrow settlement amount ({MINIMUM_ESCROW_SETTLEMENT})")));
     }
@@ -338,7 +340,8 @@ impl OpenEscrow {
     let balance_change = escrow.get_change_with_settled_amount(milligons);
     let bytes = balance_change.hash();
 
-    let signature = signer
+    let signature = self
+      .signer
       .sign(
         AccountStore::to_address(&balance_change.account_id),
         Uint8Array::from(bytes.as_bytes().to_vec()),
@@ -396,14 +399,21 @@ pub struct OpenEscrowsStore {
   db: SqlitePool,
   ticker: TickerRef,
   notary_clients: NotaryClients,
+  signer: Signer,
 }
 #[napi]
 impl OpenEscrowsStore {
-  pub(crate) fn new(db: SqlitePool, ticker: TickerRef, notary_clients: &NotaryClients) -> Self {
+  pub(crate) fn new(
+    db: SqlitePool,
+    ticker: TickerRef,
+    notary_clients: &NotaryClients,
+    signer: &Signer,
+  ) -> Self {
     Self {
       db,
       ticker,
       notary_clients: notary_clients.clone(),
+      signer: signer.clone(),
     }
   }
 
@@ -421,7 +431,7 @@ impl OpenEscrowsStore {
 
   #[napi]
   pub fn open(&self, escrow: &Escrow) -> OpenEscrow {
-    OpenEscrow::new(self.db.clone(), escrow.clone())
+    OpenEscrow::new(self.db.clone(), escrow.clone(), &self.signer)
   }
 
   pub async fn record_notarized(
@@ -461,7 +471,7 @@ impl OpenEscrowsStore {
     let mut escrows = vec![];
     for row in expired.into_iter() {
       let escrow = Escrow::try_from(row).map_err(to_js_error)?;
-      escrows.push(OpenEscrow::new(self.db.clone(), escrow))
+      escrows.push(OpenEscrow::new(self.db.clone(), escrow, &self.signer))
     }
     tracing::info!("return escrows {}", escrows.len());
     Ok(escrows)
@@ -501,7 +511,7 @@ impl OpenEscrowsStore {
     escrow.expiration_tick = balance_tip.tick + ESCROW_EXPIRATION_TICKS;
     let mut db = self.db.acquire().await.map_err(to_js_error)?;
     escrow.insert(&mut db).await.map_err(to_js_error)?;
-    Ok(OpenEscrow::new(self.db.clone(), escrow))
+    Ok(OpenEscrow::new(self.db.clone(), escrow, &self.signer))
   }
 
   #[napi]
@@ -509,7 +519,8 @@ impl OpenEscrowsStore {
   pub async fn open_client_escrow(&self, account_id: i64) -> Result<OpenEscrow> {
     let mut tx = self.db.begin().await.map_err(to_js_error)?;
     let account = AccountStore::get_by_id(&mut *tx, account_id).await?;
-    let (mut balance_tip, status) = BalanceChangeStore::build_for_account(&mut *tx, &account).await?;
+    let (mut balance_tip, status) =
+      BalanceChangeStore::build_for_account(&mut *tx, &account).await?;
     if status == Some(BalanceChangeStatus::WaitingForSendClaim) {
       return Err(to_js_error(format!(
         "This balance change is not in a state to open {}: {:?}",
@@ -572,7 +583,7 @@ impl OpenEscrowsStore {
     escrow.insert(&mut *tx).await.map_err(to_js_error)?;
     tx.commit().await.map_err(to_js_error)?;
 
-    Ok(OpenEscrow::new(self.db.clone(), escrow))
+    Ok(OpenEscrow::new(self.db.clone(), escrow, &self.signer))
   }
 }
 
@@ -604,7 +615,7 @@ mod tests {
     origin_notebook: u32,
   ) -> anyhow::Result<LocalAccount> {
     let address = AccountStore::to_address(&account_id);
-    let account = AccountStore::insert(db, address, AccountType::Deposit, 1).await?;
+    let account = AccountStore::insert(db, address, AccountType::Deposit, 1, None, None).await?;
     AccountStore::update_origin(db, account.id, origin_notebook, origin_uid).await?;
     let account = AccountStore::get_by_id(db, account.id).await?;
     Ok(account)
@@ -622,7 +633,7 @@ mod tests {
   ) -> anyhow::Result<BalanceChangeRow> {
     let mut tx = pool.begin().await?;
     let (balance_tip, status) = BalanceChangeStore::build_for_account(&mut *tx, account).await?;
-    let builder = BalanceChangeBuilder::new(balance_tip, status);
+    let builder = BalanceChangeBuilder::new(balance_tip, account.id, status);
     builder
       .claim_from_mainchain(LocalchainTransfer {
         address: account.address.clone(),
@@ -704,7 +715,9 @@ mod tests {
       ticker: Ticker::start(Duration::from_secs(60)),
     };
     println!("about to open escrow");
-    let store = OpenEscrowsStore::new(pool, ticker, &notary_clients);
+    let keystore = create_keystore(&Bob.to_seed(), Ed25519)?;
+    let signer = Signer::with_keystore(keystore);
+    let store = OpenEscrowsStore::new(pool, ticker, &notary_clients, &signer);
     let open_escrow = store.open_client_escrow(bob_account.id).await?;
     println!("opened escrow");
     let escrow = open_escrow.inner().await;
@@ -716,11 +729,11 @@ mod tests {
     let Err(e) = open_escrow.export_for_send().await else {
       bail!("Expected error");
     };
-    assert_eq!(e.reason.to_string(), "Escrow settlement has not been signed");
+    assert_eq!(
+      e.reason.to_string(),
+      "Escrow settlement has not been signed"
+    );
 
-    let keystore = create_keystore(&Bob.to_seed(), Ed25519)?;
-
-    let signer = Signer::with_keystore(keystore);
     println!("signing");
     open_escrow.sign(BigInt::from(5u128), &signer).await?;
     println!("signed");
@@ -793,14 +806,14 @@ mod tests {
     let ticker = TickerRef {
       ticker: Ticker::start(Duration::from_secs(60)),
     };
-    let bob_store = OpenEscrowsStore::new(bob_pool, ticker.clone(), &notary_clients);
+    let signer = Signer::with_keystore(create_keystore(&Bob.to_seed(), Ed25519)?);
+    let bob_store = OpenEscrowsStore::new(bob_pool, ticker.clone(), &notary_clients, &signer);
     let open_escrow = bob_store.open_client_escrow(bob_account.id).await?;
 
-    let signer = Signer::with_keystore(create_keystore(&Bob.to_seed(), Ed25519)?);
-    open_escrow.sign(BigInt::from(5u128), &signer).await?;
+    open_escrow.sign(BigInt::from(5u128)).await?;
     let json = open_escrow.export_for_send().await?;
 
-    let alice_store = OpenEscrowsStore::new(alice_pool, ticker, &notary_clients);
+    let alice_store = OpenEscrowsStore::new(alice_pool, ticker, &notary_clients, &signer);
     // before registered with notary, should fail
     match alice_store.import_escrow(json.clone()).await {
       Err(e) => {

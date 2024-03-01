@@ -37,12 +37,10 @@ subxt-signer = { version = "0.33", features = ["default"] }
 tokio = { version = "1.35", features = ["full"] }
 tokio-stream = { version = "0.1", features = ["sync"] }
 hex = { version = "0.4" }
-sc-service = { version = "0.10.0-dev", git = "https://github.com/paritytech/polkadot-sdk.git", branch = "release-polkadot-v1.5.0" }
 jsonrpsee = { version = "0.20", features = ["server", "http-client", "ws-client", "macros", "client-ws-transport-native-tls"] }
 sc-utils = { version = "4.0.0-dev", git = "https://github.com/paritytech/polkadot-sdk.git", branch = "release-polkadot-v1.5.0" }
 sp-runtime = { version = "24.0.0", git = "https://github.com/paritytech/polkadot-sdk.git", branch = "release-polkadot-v1.5.0" }
 sp-core = { version = "21.0.0", git = "https://github.com/paritytech/polkadot-sdk.git", branch = "release-polkadot-v1.5.0", features = ["std", "serde"] }
-sc-cli = { version = "0.10.0-dev", git = "https://github.com/paritytech/polkadot-sdk.git", branch = "release-polkadot-v1.5.0" }
 binary-merkle-tree = { version = "4.0.0-dev", git = "https://github.com/paritytech/polkadot-sdk.git", branch = "release-polkadot-v1.5.0" }
 tracing = { version = "0.1" }
 tracing-subscriber = { version = "0.3", features = ["env-filter"] }
@@ -54,6 +52,7 @@ lazy_static = "1.4.0"
 bech32 = { version = "0.10.0-beta" }
 array-bytes = { version = "6.1" }
 directories = { version = "5.0" }
+rpassword = { version = "7.3" }
 
 ulixee-client = { path = "../client" }
 ulx-primitives = { path = "../primitives", features = ["napi"] }

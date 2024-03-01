@@ -36,16 +36,17 @@ mod notary_client;
 mod open_escrows;
 pub mod signer;
 
-pub mod keystore;
+pub mod embedded_keystore;
 
-pub use keystore::{CryptoScheme, LocalKeystore};
+use crate::signer::KeystorePasswordOption;
+pub use embedded_keystore::CryptoScheme;
 
 pub mod cli;
 pub mod constants;
+mod file_transfer;
 pub mod macros;
 #[cfg(test)]
 pub(crate) mod test_utils;
-mod file_transfer;
 
 #[napi(custom_finalize)]
 pub struct Localchain {
@@ -53,6 +54,7 @@ pub struct Localchain {
   pub(crate) ticker: TickerRef,
   pub(crate) mainchain_client: Arc<Mutex<Option<MainchainClient>>>,
   pub(crate) notary_clients: NotaryClients,
+  pub(crate) signer: Signer,
   pub path: String,
 }
 
@@ -61,6 +63,7 @@ pub struct LocalchainConfig {
   pub db_path: String,
   pub mainchain_url: String,
   pub ntp_pool_url: Option<String>,
+  pub keystore_password: Option<KeystorePasswordOption>,
 }
 
 impl ObjectFinalize for Localchain {
@@ -95,10 +98,12 @@ impl Localchain {
     tracing::info!("Loading localchain at {:?}", config.db_path);
 
     let LocalchainConfig {
+      keystore_password,
       db_path,
       mainchain_url,
       ntp_pool_url,
     } = config;
+
     let db = Self::create_db(db_path.clone()).await?;
 
     let mainchain_client = MainchainClient::connect(mainchain_url, 30_000)
@@ -113,6 +118,13 @@ impl Localchain {
     }
 
     let mainchain_mutex = Arc::new(Mutex::new(Some(mainchain_client.clone())));
+    let signer = Signer::new(db.clone());
+    if let Some(password_option) = keystore_password {
+      signer
+        .unlock_embedded(Some(password_option))
+        .await
+        .map_err(to_js_error)?;
+    }
 
     Ok(Localchain {
       db,
@@ -120,6 +132,7 @@ impl Localchain {
       ticker: TickerRef { ticker },
       mainchain_client: mainchain_mutex.clone(),
       notary_clients: NotaryClients::from(mainchain_mutex.clone()),
+      signer,
     })
   }
 
@@ -127,6 +140,7 @@ impl Localchain {
   pub async fn load_without_mainchain(
     db_path: String,
     ticker_config: TickerConfig,
+    keystore_password: Option<KeystorePasswordOption>,
   ) -> Result<Localchain> {
     Self::config_logs();
     tracing::info!("Loading localchain at {:?}", db_path);
@@ -144,6 +158,13 @@ impl Localchain {
     let db = Self::create_db(db_path.clone()).await?;
 
     let mainchain_mutex = Arc::new(Mutex::new(None));
+    let signer = Signer::new(db.clone());
+    if let Some(password_option) = keystore_password {
+      signer
+        .unlock_embedded(Some(password_option))
+        .await
+        .map_err(to_js_error)?;
+    }
 
     Ok(Localchain {
       db,
@@ -151,6 +172,7 @@ impl Localchain {
       ticker: TickerRef { ticker },
       mainchain_client: mainchain_mutex.clone(),
       notary_clients: NotaryClients::from(mainchain_mutex),
+      signer,
     })
   }
 
@@ -176,7 +198,7 @@ impl Localchain {
   }
 
   #[napi]
-  pub fn get_default_path() -> String {
+  pub fn get_default_dir() -> String {
     let base_dirs = BaseDirs::new().unwrap();
     let data_local_dir = base_dirs.data_local_dir();
     PathBuf::from(data_local_dir)
@@ -185,6 +207,20 @@ impl Localchain {
       .to_str()
       .unwrap()
       .to_string()
+  }
+
+  #[napi]
+  pub fn get_default_path() -> String {
+    PathBuf::from(Self::get_default_dir())
+      .join("primary.db")
+      .to_str()
+      .unwrap()
+      .to_string()
+  }
+
+  #[napi(getter)]
+  pub async fn address(&self) -> Result<String> {
+    Ok(self.accounts().deposit_account_js(None).await?.address)
   }
 
   #[napi(getter)]
@@ -199,6 +235,11 @@ impl Localchain {
   #[napi(getter)]
   pub fn ticker(&self) -> TickerRef {
     self.ticker.clone()
+  }
+
+  #[napi(getter)]
+  pub fn signer(&self) -> Signer {
+    self.signer.clone()
   }
 
   #[napi(getter)]
@@ -229,7 +270,12 @@ impl Localchain {
 
   #[napi(getter)]
   pub fn open_escrows(&self) -> open_escrows::OpenEscrowsStore {
-    open_escrows::OpenEscrowsStore::new(self.db.clone(), self.ticker.clone(), &self.notary_clients)
+    open_escrows::OpenEscrowsStore::new(
+      self.db.clone(),
+      self.ticker.clone(),
+      &self.notary_clients,
+      &self.signer,
+    )
   }
 
   #[napi(getter)]
@@ -239,7 +285,11 @@ impl Localchain {
 
   #[napi]
   pub fn begin_change(&self) -> notarization_builder::NotarizationBuilder {
-    notarization_builder::NotarizationBuilder::new(self.db.clone(), self.notary_clients.clone())
+    notarization_builder::NotarizationBuilder::new(
+      self.db.clone(),
+      self.notary_clients.clone(),
+      self.signer.clone(),
+    )
   }
 
   fn config_logs() {
