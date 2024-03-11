@@ -119,6 +119,8 @@ export interface BlockVote {
   dataDomainHash: Array<number>
   /** The data domain payment address used to create this vote */
   dataDomainAddress: string
+  /** The mainchain address where rewards will be sent */
+  blockRewardsAddress: string
   /** A signature of the vote by the account_id */
   signature: Array<number>
 }
@@ -185,6 +187,15 @@ export const VERSION: string
 export enum ArgonFileType {
   Send = 0,
   Request = 1
+}
+export enum TransactionType {
+  Send = 0,
+  Request = 1,
+  OpenEscrow = 2
+}
+export interface LocalchainTransaction {
+  id: number
+  transactionType: TransactionType
 }
 export interface LocalchainConfig {
   dbPath: string
@@ -253,6 +264,7 @@ export class BalanceChange {
   proofJson?: string
   finalizedBlockNumber?: number
   status: BalanceChangeStatus
+  transactionId?: number
   notarizationId?: number
 }
 export class BalanceChangeStore {
@@ -265,6 +277,7 @@ export class BalanceChangeStore {
 export class BalanceSync {
   constructor(localchain: Localchain)
   sync(options?: EscrowCloseOptions | undefined | null): Promise<BalanceSyncResult>
+  consolidateJumpAccounts(): Promise<Array<NotarizationTracker>>
   syncUnsettledBalances(): Promise<Array<BalanceChange>>
   syncBalanceChange(balanceChange: BalanceChange): Promise<BalanceChange>
   processPendingEscrows(options?: EscrowCloseOptions | undefined | null): Promise<Array<NotarizationBuilder>>
@@ -272,6 +285,7 @@ export class BalanceSync {
 export class BalanceSyncResult {
   get balanceChanges(): Array<BalanceChange>
   get escrowNotarizations(): Array<NotarizationBuilder>
+  get jumpAccountConsolidations(): Array<NotarizationTracker>
 }
 export type DataDomainRow = DataDomainLease
 export class DataDomainLease {
@@ -308,6 +322,8 @@ export class MainchainClient {
 export class NotarizationBuilder {
   set notaryId(notaryId: number)
   get notaryId(): Promise<number>
+  set transaction(transaction: LocalchainTransaction)
+  get transaction(): Promise<LocalchainTransaction | null>
   get isFinalized(): Promise<boolean>
   get unclaimedTax(): Promise<bigint>
   get escrows(): Promise<Array<Escrow>>
@@ -318,6 +334,7 @@ export class NotarizationBuilder {
   get unclaimedDeposits(): Promise<bigint>
   getBalanceChange(account: LocalAccount): Promise<BalanceChangeBuilder>
   addAccount(address: string, accountType: AccountType, notaryId: number): Promise<BalanceChangeBuilder>
+  addAccountById(localAccountId: number): Promise<BalanceChangeBuilder>
   getJumpAccount(accountType: AccountType): Promise<BalanceChangeBuilder>
   defaultDepositAccount(): Promise<BalanceChangeBuilder>
   defaultTaxAccount(): Promise<BalanceChangeBuilder>
@@ -333,10 +350,10 @@ export class NotarizationBuilder {
   getTotalForAfterTaxBalance(finalBalance: bigint): bigint
   getEscrowTaxAmount(amount: bigint): bigint
   claimFromMainchain(transfer: LocalchainTransfer): Promise<BalanceChangeBuilder>
-  createJumpRequest(milligons: bigint): Promise<BalanceChangeBuilder>
+  claimAndPayTax(milligonsPlusTax: bigint, depositAccountId: number | undefined | null, useDefaultTaxAccount: boolean): Promise<BalanceChangeBuilder>
   fundJumpAccount(milligons: bigint): Promise<BalanceChangeBuilder>
-  acceptRequestedBalanceChanges(argonFileJson: string): Promise<void>
-  claimReceivedBalance(argonFileJson: string): Promise<void>
+  acceptArgonFileRequest(argonFileJson: string): Promise<void>
+  importArgonFile(argonFileJson: string): Promise<void>
   /**
    * Exports an argon file from this notarization builder with the intention that these will be sent to another
    * user (who will import into their own localchain).
@@ -422,12 +439,17 @@ export class Signer {
   /** Bootstrap this localchain with a new key. Must be empty or will throw an error! Defaults to SR25519 if no scheme is provided. */
   bootstrapEmbedded(scheme?: CryptoScheme | undefined | null, passwordOption?: KeystorePasswordOption | undefined | null): Promise<string>
   /** Import a known keypair into the embedded keystore. */
-  importToEmbedded(suri: string, scheme: CryptoScheme, passwordOption?: KeystorePasswordOption | undefined | null): Promise<string>
+  importSuriToEmbedded(suri: string, scheme: CryptoScheme, passwordOption?: KeystorePasswordOption | undefined | null): Promise<string>
   unlockEmbedded(passwordOption?: KeystorePasswordOption | undefined | null): Promise<void>
   lockEmbedded(): Promise<void>
   isEmbeddedUnlocked(): Promise<boolean>
   deriveAccountId(hdPath: string): Promise<string>
   sign(address: string, message: Uint8Array): Promise<Uint8Array>
+}
+export class Transactions {
+  request(milligons: bigint): Promise<string>
+  createEscrow(escrowMilligons: bigint, dataDomain: string, dataDomainAddress: string): Promise<OpenEscrow>
+  send(milligons: bigint, to?: Array<string> | undefined | null): Promise<string>
 }
 export class Localchain {
   path: string
@@ -448,6 +470,7 @@ export class Localchain {
   get dataDomains(): DataDomainStore
   get openEscrows(): OpenEscrowsStore
   get balanceSync(): BalanceSync
+  get transactions(): Transactions
   beginChange(): NotarizationBuilder
 }
 export class TickerRef {

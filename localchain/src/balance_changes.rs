@@ -1,5 +1,3 @@
-use crate::accounts::{AccountStore, LocalAccount};
-use crate::to_js_error;
 use binary_merkle_tree::{verify_proof, Leaf};
 use chrono::NaiveDateTime;
 use codec::Encode;
@@ -8,10 +6,14 @@ use serde_json::{from_value, json};
 use sp_core::{bounded_vec, ed25519, H256};
 use sp_runtime::traits::BlakeTwo256;
 use sqlx::{FromRow, Sqlite, SqliteConnection, SqlitePool, Transaction};
+
 use ulx_primitives::tick::Tick;
 use ulx_primitives::{
   BalanceChange, BalanceProof, BalanceTip, MerkleProof, NotaryId, NotebookNumber,
 };
+
+use crate::accounts::{AccountStore, LocalAccount};
+use crate::to_js_error;
 
 #[derive(FromRow, Clone, Debug)]
 #[allow(dead_code)]
@@ -27,6 +29,7 @@ pub struct BalanceChangeRow {
   pub proof_json: Option<String>,
   pub finalized_block_number: Option<i64>,
   pub status: BalanceChangeStatus,
+  pub transaction_id: Option<i64>,
   timestamp: NaiveDateTime,
   pub notarization_id: Option<i64>,
 }
@@ -318,7 +321,7 @@ impl BalanceChangeStore {
         balance: balance_change.balance,
       });
     }
-    Ok((balance_change,status))
+    Ok((balance_change, status))
   }
 
   pub async fn save_sent(
@@ -326,6 +329,7 @@ impl BalanceChangeStore {
     account_id: i64,
     balance_change: BalanceChange,
     notary_id: NotaryId,
+    transaction_id: Option<i64>,
   ) -> anyhow::Result<i64> {
     let mut hold_note_json = None;
     for note in balance_change.notes.iter() {
@@ -339,8 +343,8 @@ impl BalanceChangeStore {
     let balance_str = balance_change.balance.to_string();
 
     let res = sqlx::query!(
-        r#"INSERT INTO balance_changes (account_id, change_number, balance, status, escrow_hold_note_json, notes_json, notary_id) 
-        VALUES (?, ?, ?, ?, ?, ?, ?)"#,
+        r#"INSERT INTO balance_changes (account_id, change_number, balance, status, escrow_hold_note_json, notes_json, notary_id, transaction_id)
+        VALUES (?, ?, ?, ?, ?, ?, ?, ?)"#,
         account_id,
         balance_change.change_number,
         balance_str,
@@ -348,6 +352,7 @@ impl BalanceChangeStore {
         hold_note_json,
         notes_json,
         notary_id,
+        transaction_id
       )
             .execute(&mut **db)
             .await?;
@@ -365,6 +370,7 @@ impl BalanceChangeStore {
     balance_change: &BalanceChange,
     notary_id: NotaryId,
     notarization_id: i64,
+    transaction_id: Option<i64>,
   ) -> anyhow::Result<i64> {
     let mut hold_note_json = None;
     for note in balance_change.notes.iter() {
@@ -384,13 +390,15 @@ impl BalanceChangeStore {
         return Ok(existing.id);
       }
       let res = sqlx::query!(
-        "UPDATE balance_changes SET notarization_id = ?, balance = ?, notes_json = ?, escrow_hold_note_json = ?, status = ? WHERE id = ?",
+        "UPDATE balance_changes SET notarization_id = ?, balance = ?, notes_json = ?, escrow_hold_note_json = ?, status = ?, \
+        transaction_id = ? WHERE id = ?",
         notarization_id,
         balance_str,
         notes_json,
         hold_note_json,
         BalanceChangeStatus::SubmittedToNotary as i64,
-        existing.id
+        transaction_id,
+        existing.id,
       ).execute(&mut **db).await?;
       if res.rows_affected() != 1 {
         Err(anyhow::anyhow!("Error updating balance change"))?;
@@ -399,8 +407,8 @@ impl BalanceChangeStore {
     }
 
     let res = sqlx::query!(
-        r#"INSERT INTO balance_changes (account_id, change_number, balance, status, escrow_hold_note_json, notes_json, notary_id, notarization_id) 
-        VALUES (?, ?, ?, ?, ?, ?, ?, ?)"#,
+        r#"INSERT INTO balance_changes (account_id, change_number, balance, status, escrow_hold_note_json, notes_json, notary_id, notarization_id, transaction_id)
+        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)"#,
         account_id,
         balance_change.change_number,
         balance_str,
@@ -408,7 +416,8 @@ impl BalanceChangeStore {
         hold_note_json,
         notes_json,
         notary_id,
-        notarization_id
+        notarization_id,
+        transaction_id,
       )
             .execute(&mut **db)
             .await?;
@@ -493,12 +502,15 @@ impl BalanceChangeStore {
 
 #[cfg(test)]
 mod test {
-  use super::*;
-  use crate::test_utils::connect_with_logs;
-  use crate::*;
   use sp_keyring::AccountKeyring::Ferdie;
   use sqlx::sqlite::{SqliteConnectOptions, SqlitePoolOptions};
+
   use ulx_primitives::{AccountOrigin, AccountType, Note, NoteType};
+
+  use crate::test_utils::connect_with_logs;
+  use crate::*;
+
+  use super::*;
 
   #[sqlx::test]
   async fn test_storage(
@@ -513,6 +525,7 @@ mod test {
       AccountStore::to_address(&Ferdie.to_account_id()),
       AccountType::Tax,
       1,
+      None
     )
     .await?;
     // need to set the id and get the updated origin
@@ -538,7 +551,7 @@ mod test {
       balance: 0,
     });
     let mut tx = pool.begin().await?;
-    let id = BalanceChangeStore::save_sent(&mut tx, account.id, balance_change.clone(), 1).await?;
+    let id = BalanceChangeStore::save_sent(&mut tx, account.id, balance_change.clone(), 1, None).await?;
     tx.commit().await?;
 
     assert_eq!(
@@ -573,10 +586,10 @@ mod test {
     .await?;
 
     let mut tx = pool.begin().await?;
-    BalanceChangeStore::upsert_notarized(&mut tx, account.id, &balance_change, 1, 1).await?;
+    BalanceChangeStore::upsert_notarized(&mut tx, account.id, &balance_change, 1, 1, None).await?;
     tx.commit().await?;
 
-    let (reloaded,_) = BalanceChangeStore::build_for_account(&mut *db, &account).await?;
+    let (reloaded, _) = BalanceChangeStore::build_for_account(&mut *db, &account).await?;
     assert_eq!(reloaded.balance, 100);
     assert_eq!(reloaded.change_number, 2);
 
@@ -593,10 +606,10 @@ mod test {
       milligons: 100
     }];
     let mut tx = pool.begin().await?;
-    let id2 = BalanceChangeStore::upsert_notarized(&mut tx, account.id, &next, 1, 1).await?;
+    let id2 = BalanceChangeStore::upsert_notarized(&mut tx, account.id, &next, 1, 1, None).await?;
     tx.commit().await?;
 
-    let (reloaded,_) = BalanceChangeStore::build_for_account(&mut *db, &account).await?;
+    let (reloaded, _) = BalanceChangeStore::build_for_account(&mut *db, &account).await?;
     assert_eq!(reloaded.balance, 200);
     assert_eq!(reloaded.change_number, 3);
 

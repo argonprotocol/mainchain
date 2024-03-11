@@ -103,6 +103,8 @@ CREATE TABLE IF NOT EXISTS notebooks
     signature           bytea       NOT NULL,
     last_updated        timestamptz NOT NULL default now()
 );
+CREATE INDEX IF NOT EXISTS notebook_new_account_origins ON notebooks USING GIN (new_account_origins);
+
 
 CREATE TABLE IF NOT EXISTS notebooks_raw
 (

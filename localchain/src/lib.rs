@@ -47,6 +47,7 @@ mod file_transfer;
 pub mod macros;
 #[cfg(test)]
 pub(crate) mod test_utils;
+pub mod transactions;
 
 #[napi(custom_finalize)]
 pub struct Localchain {
@@ -281,6 +282,15 @@ impl Localchain {
   #[napi(getter)]
   pub fn balance_sync(&self) -> balance_sync::BalanceSync {
     balance_sync::BalanceSync::new(&self)
+  }
+  #[napi(getter)]
+  pub fn transactions(&self) -> transactions::Transactions {
+    transactions::Transactions::new(
+      self.db.clone(),
+      self.ticker.clone(),
+      &self.notary_clients,
+      &self.signer,
+    )
   }
 
   #[napi]

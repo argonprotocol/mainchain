@@ -225,7 +225,7 @@ mod tests {
 	use codec::Decode;
 	use frame_support::assert_ok;
 	use futures::{task::noop_waker_ref, StreamExt};
-	use sp_core::{bounded_vec, ed25519::Public, Pair};
+	use sp_core::{bounded_vec, ed25519::Public, sr25519::Signature, Pair};
 	use sp_keyring::Sr25519Keyring::{Alice, Bob, Ferdie};
 	use sp_keystore::{testing::MemoryKeystore, Keystore, KeystoreExt};
 	use sqlx::PgPool;
@@ -946,7 +946,11 @@ mod tests {
 				index: 1,
 				block_hash: vote_block_hash,
 				power: tax,
-			}],
+				block_rewards_account_id: Alice.to_account_id(),
+				signature: Signature([0u8; 64]).into(),
+			}
+			.sign(Alice.pair())
+			.clone()],
 			vec![],
 		)
 		.await?;

@@ -46,7 +46,11 @@ impl EmbeddedKeystore {
       .await
       .map_err(|_| anyhow!("No embedded key found"))?;
 
+    let expected_address = key.address.clone();
     let pair = self.unlock_key(key, password.clone()).await?;
+    if pair.address() != expected_address {
+      return Err(anyhow!("Could not unlock the embedded key"));
+    }
 
     *self.unlocked_account.lock().await = Some(UnlockedAccount {
       address: pair.address(),
@@ -112,10 +116,13 @@ impl EmbeddedKeystore {
     phrase: String,
     crypto_scheme: CryptoScheme,
   ) -> Result<()> {
-    let _ = sqlx::query!("SELECT address as true FROM key LIMIT 1",)
-      .fetch_one(&self.db)
-      .await
-      .map_err(|_| anyhow!("This keystore already has an embedded key"))?;
+    // Only one row allowed!!
+    let existing = sqlx::query!("SELECT address as true FROM key LIMIT 1",)
+      .fetch_optional(&self.db)
+      .await?;
+    if let Some(_) = existing {
+      return Err(anyhow!("This keystore already has an embedded key"))?;
+    }
 
     let phrase_bytes = phrase.as_bytes();
     let crypto_scheme = crypto_scheme as i64;
@@ -185,17 +192,9 @@ impl EmbeddedKeystore {
       return Ok(Some(pair.sign(msg)));
     }
 
-    if let Some(unlocked_address) = self
-      .unlocked_account
-      .lock()
-      .await
-      .as_ref()
-      .map(|a| a.address.clone())
-    {
-      if unlocked_address == address {
-        let pair = self.load_key().await?;
-        return Ok(Some(pair.sign(msg)));
-      }
+    let pair = self.load_key().await?;
+    if pair.address() == address {
+      return Ok(Some(pair.sign(msg)));
     }
 
     Err(anyhow!("Unable to sign for address {}", address))
@@ -347,42 +346,75 @@ impl PairWrapper {
 #[cfg(test)]
 mod tests {
   use sp_core::{sr25519, Pair};
-  use tempfile::TempDir;
+  use sp_keyring::Sr25519Keyring;
 
   use super::*;
 
-  #[test]
-  fn store_unknown_and_extract_it() {
-    let temp_dir = TempDir::new().unwrap();
-    let mut store = KeystoreInner::open(temp_dir.path(), None).unwrap();
+  #[sqlx::test]
+  async fn imports_and_reloads(pool: SqlitePool) -> anyhow::Result<()> {
+    let keystore = EmbeddedKeystore::new(pool.clone());
+    let address = keystore
+      .import(&"//Alice", CryptoScheme::Sr25519, None)
+      .await?;
+    let keyring = Sr25519Keyring::Alice
+      .to_account_id()
+      .to_ss58check_with_version(AccountStore::address_format());
+    assert_eq!(address, keyring);
+    assert_eq!(keystore.can_sign(address.clone()).await, true);
+    keystore.lock().await;
+    assert_eq!(keystore.can_sign(address.clone()).await, false);
 
-    let secret_uri = "//Alice";
-    let key_pair = sr25519::Pair::from_string(secret_uri, None).expect("Generates key pair");
+    let keystore2 = EmbeddedKeystore::new(pool.clone());
+    assert_eq!(keystore2.can_sign(address.clone()).await, false);
+    assert!(keystore2.unlock(None).await.is_ok());
+    assert_eq!(keystore2.can_sign(address.clone()).await, true);
 
-    store
-      .insert::<sr25519::Pair>(secret_uri, &key_pair.public())
-      .expect("Inserts unknown key");
+    Ok(())
+  }
+  #[sqlx::test]
+  async fn imports_and_derives(pool: SqlitePool) -> anyhow::Result<()> {
+    let keystore = EmbeddedKeystore::new(pool.clone());
+    let address = keystore
+      .import(&"//Alice", CryptoScheme::Sr25519, None)
+      .await?;
+    let keyring = Sr25519Keyring::Alice
+      .to_account_id()
+      .to_ss58check_with_version(AccountStore::address_format());
+    assert_eq!(address, keyring);
 
-    let store_key_pair = store
-      .key_pair_by_type::<sr25519::Pair>(&key_pair.public())
-      .expect("Gets key pair from keystore")
-      .unwrap();
+    let derived_1 = keystore.derive(&"//1").await?;
+    assert_eq!(
+      derived_1,
+      sr25519::Pair::from_string("//Alice//1", None)?
+        .public()
+        .to_ss58check_with_version(AccountStore::address_format())
+    );
 
-    assert_eq!(key_pair.public(), store_key_pair.public());
+    Ok(())
   }
 
-  #[test]
-  fn generate_with_seed_is_not_stored() {
-    let temp_dir = TempDir::new().unwrap();
-    let store = LocalKeystore::open(temp_dir.path(), None).unwrap();
-    let _alice_tmp_key = store
-      .generate_new::<sr25519::Pair>(Some("//Alice"))
-      .unwrap();
+  #[sqlx::test]
+  async fn password_being_used(pool: SqlitePool) -> anyhow::Result<()> {
+    let password = String::from("password");
+    let keystore = EmbeddedKeystore::new(pool.clone());
+    let address = keystore
+      .import(
+        &"//Alice",
+        CryptoScheme::Sr25519,
+        Some(password.clone().into()),
+      )
+      .await?;
 
-    assert_eq!(store.public_keys::<sr25519::Pair>().len(), 1);
+    let keystore2 = EmbeddedKeystore::new(pool.clone());
+    assert!(keystore2.unlock(None).await.is_err());
+    assert_eq!(keystore2.can_sign(address.clone()).await, false);
 
-    drop(store);
-    let store = LocalKeystore::open(temp_dir.path(), None).unwrap();
-    assert_eq!(store.public_keys::<sr25519::Pair>().len(), 0);
+    assert!(keystore2
+      .unlock(Some(password.clone().into()))
+      .await
+      .is_ok());
+    assert_eq!(keystore2.can_sign(address).await, true);
+
+    Ok(())
   }
 }

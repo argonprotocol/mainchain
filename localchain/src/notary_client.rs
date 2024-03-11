@@ -13,7 +13,7 @@ use ulx_notary::apis::localchain::BalanceChangeResult;
 use ulx_notary::apis::LocalchainRpcClient;
 use ulx_notary::apis::NotebookRpcClient;
 use ulx_primitives::{
-  AccountId, AccountType, BalanceProof, BalanceTip, Notarization, NotebookNumber,
+  AccountId, AccountOrigin, AccountType, BalanceProof, BalanceTip, Notarization, NotebookNumber,
   SignedNotebookHeader,
 };
 
@@ -143,6 +143,21 @@ impl NotaryClient {
     let client = self.client.lock().await;
     let res = (*client)
       .get_notarization(account_id32, account_type, notebook_number, change_number)
+      .await
+      .map_err(to_js_error)?;
+
+    Ok(res)
+  }
+
+  pub async fn get_account_origin(
+    &self,
+    address: String,
+    account_type: AccountType,
+  ) -> Result<AccountOrigin> {
+    let client = self.client.lock().await;
+    let account_id = AccountId::from_ss58check(&address).map_err(to_js_error)?;
+    let res = (*client)
+      .get_origin(account_id, account_type)
       .await
       .map_err(to_js_error)?;
 

@@ -7,6 +7,7 @@ use serde::{Deserialize, Serialize};
 use snafu::Snafu;
 use sp_core::H256;
 use sp_runtime::{scale_info::TypeInfo, traits::BlakeTwo256};
+use sp_runtime::traits::Verify;
 use sp_std::{
 	collections::{btree_map::BTreeMap, btree_set::BTreeSet},
 	vec::Vec,
@@ -352,7 +353,10 @@ pub fn verify_voting_sources(
 			.get_mut(&(block_vote.data_domain_hash.clone(), block_vote.data_domain_account.clone()))
 			.ok_or(VerifyError::BlockVoteDataDomainMismatch)?;
 		ensure!(*count > 0, VerifyError::BlockVoteEscrowReused);
-
+		ensure!(
+			block_vote.signature.verify(&block_vote.hash()[..], &block_vote.account_id),
+			VerifyError::BlockVoteInvalidSignature
+		);
 		*count -= 1;
 	}
 	Ok(())
@@ -480,7 +484,7 @@ pub struct BalanceChangesetState {
 	/// How much was allocated to domains
 	pub allocated_to_domains: u128,
 
-	/// How much tax was sent per account to block seals
+	/// How much tax was sent per account to block votes
 	unclaimed_block_vote_tax_per_account: BTreeMap<LocalchainAccountId, u128>,
 	unclaimed_restricted_balance: BTreeMap<BTreeSet<LocalchainAccountId>, i128>,
 	unclaimed_escrow_balances: BTreeMap<BTreeSet<LocalchainAccountId>, i128>,
@@ -638,7 +642,7 @@ impl BalanceChangesetState {
 		let amount = self
 			.unclaimed_block_vote_tax_per_account
 			.get_mut(account_id)
-			.ok_or(VerifyError::InsufficientBlockVoteTax)?;
+			.ok_or(VerifyError::IneligibleTaxVoter)?;
 
 		ensure!(*amount >= milligons, VerifyError::InsufficientBlockVoteTax);
 		*amount -= milligons;

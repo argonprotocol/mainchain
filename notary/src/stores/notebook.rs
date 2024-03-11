@@ -14,7 +14,7 @@ use sp_keystore::KeystorePtr;
 use sqlx::PgConnection;
 
 use ulx_primitives::{
-	ensure, AccountId, AccountOrigin, Balance, BalanceTip, BlockVote, ChainTransfer,
+	ensure, AccountId, AccountOrigin, AccountType, Balance, BalanceTip, BlockVote, ChainTransfer,
 	LocalchainAccountId, MaxNotebookNotarizations, MerkleProof, NewAccountOrigin, NotaryId, Note,
 	NoteType, Notebook, NotebookNumber,
 };
@@ -45,7 +45,8 @@ impl NotebookStore {
 				notebook_number as i32
 			)
 			.fetch_one(db)
-			.await?;
+			.await
+			.map_err(|_| Error::NotebookNotFinalized)?;
 
 			let merkle_leafs = rows.change_merkle_leafs;
 
@@ -68,6 +69,42 @@ impl NotebookStore {
 		})
 	}
 
+	pub async fn get_account_origin(
+		db: &mut PgConnection,
+		account_id: AccountId,
+		account_type: AccountType,
+	) -> anyhow::Result<AccountOrigin, Error> {
+		let origin = json!([
+			{
+				"accountId": account_id,
+				"accountType": account_type
+			}
+		]);
+		let result = sqlx::query!(
+			r#"
+			SELECT new_account_origins, notebook_number FROM notebooks
+			WHERE new_account_origins @> $1::jsonb 
+			ORDER BY notebook_number DESC LIMIT 1
+			"#,
+			origin
+		)
+		.fetch_one(db)
+		.await
+		.map_err(|_| Error::MissingAccountOrigin)?;
+
+		let origins: Vec<NewAccountOrigin> = serde_json::from_value(result.new_account_origins)?;
+
+		let origin = origins
+			.iter()
+			.find(|a| a.account_type == account_type && a.account_id == account_id)
+			.ok_or(Error::MissingAccountOrigin)?;
+
+		Ok(AccountOrigin {
+			notebook_number: result.notebook_number as NotebookNumber,
+			account_uid: origin.account_uid,
+		})
+	}
+
 	pub async fn get_block_votes(
 		db: &mut PgConnection,
 		notebook_number: NotebookNumber,
@@ -77,7 +114,8 @@ impl NotebookStore {
 			notebook_number as i32
 		)
 		.fetch_one(db)
-		.await?;
+		.await
+		.map_err(|_| Error::NotebookNotFinalized)?;
 
 		let block_votes = from_value(votes_json)?;
 
@@ -201,7 +239,10 @@ impl NotebookStore {
 		let new_account_origin_map =
 			BTreeMap::from_iter(new_account_origins.iter().map(|origin| {
 				(
-					LocalchainAccountId::new(origin.account_id.clone(), origin.account_type.clone()),
+					LocalchainAccountId::new(
+						origin.account_id.clone(),
+						origin.account_type.clone(),
+					),
 					AccountOrigin { notebook_number, account_uid: origin.account_uid },
 				)
 			}));
@@ -499,6 +540,12 @@ mod tests {
 				NewAccountOrigin::new(Alice.to_account_id(), Deposit, 2),
 				NewAccountOrigin::new(Dave.to_account_id(), Deposit, 3),
 			]
+		);
+
+		let mut db = pool.acquire().await?;
+		assert_eq!(
+			NotebookStore::get_account_origin(&mut db, Bob.to_account_id(), Deposit).await?,
+			AccountOrigin { notebook_number: 1, account_uid: 1 }
 		);
 
 		Ok(())

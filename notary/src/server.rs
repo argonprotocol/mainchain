@@ -4,31 +4,27 @@ use codec::Encode;
 use futures::{Stream, StreamExt};
 use jsonrpsee::{
 	core::{async_trait, SubscriptionResult},
+	RpcModule,
 	server::{PendingSubscriptionSink, Server, ServerHandle, SubscriptionMessage},
-	types::ErrorObjectOwned,
-	RpcModule, TrySendError,
+	TrySendError, types::ErrorObjectOwned,
 };
 use sc_utils::notification::{NotificationSender, NotificationStream, TracingKeyStr};
 use serde::Serialize;
 use sqlx::PgPool;
 use tokio::net::ToSocketAddrs;
 
-use ulx_primitives::{
-	AccountId, AccountType, BalanceProof, BalanceTip, Notarization, NotarizationBalanceChangeset,
-	NotarizationBlockVotes, NotarizationDataDomains, NotaryId, Notebook, NotebookMeta,
-	NotebookNumber, SignedNotebookHeader,
-};
+use ulx_primitives::{AccountId, AccountOrigin, AccountType, BalanceProof, BalanceTip, Notarization, NotarizationBalanceChangeset, NotarizationBlockVotes, NotarizationDataDomains, NotaryId, Notebook, NotebookMeta, NotebookNumber, SignedNotebookHeader};
 
 use crate::{
 	apis::{
 		localchain::{BalanceChangeResult, BalanceTipResult, LocalchainRpcServer},
 		notebook::NotebookRpcServer,
 	},
+	Error,
 	stores::{
 		balance_tip::BalanceTipStore, notarizations::NotarizationsStore, notebook::NotebookStore,
 		notebook_header::NotebookHeaderStore,
 	},
-	Error,
 };
 
 pub type NotebookHeaderStream = NotificationStream<SignedNotebookHeader, NotebookHeaderTracingKey>;
@@ -269,6 +265,17 @@ impl LocalchainRpcServer for NotaryServer {
 			.await
 			.map_err(from_crate_error)?)
 	}
+
+	async fn get_origin(&self, account_id: AccountId, account_type: AccountType) -> Result<AccountOrigin, ErrorObjectOwned> {
+		let mut db = self
+			.pool
+			.acquire()
+			.await
+			.map_err(|e| from_crate_error(Error::Database(e.to_string())))?;
+		Ok(NotebookStore::get_account_origin(&mut db, account_id.clone(), account_type)
+			.await
+			.map_err(from_crate_error)?)
+	}
 }
 
 pub async fn pipe_from_stream_and_drop<T: Serialize>(
@@ -310,14 +317,14 @@ mod tests {
 	use codec::Encode;
 	use futures::{StreamExt, TryStreamExt};
 	use jsonrpsee::ws_client::WsClientBuilder;
-	use sp_core::{bounded_vec, ed25519::Signature, Blake2Hasher};
+	use sp_core::{Blake2Hasher, bounded_vec, ed25519::Signature};
 	use sp_keyring::Ed25519Keyring::Bob;
-	use sp_keystore::{testing::MemoryKeystore, Keystore, KeystoreExt};
+	use sp_keystore::{Keystore, KeystoreExt, testing::MemoryKeystore};
 	use sqlx::PgPool;
 
 	use ulx_primitives::{
-		tick::Ticker, AccountOrigin, AccountType::Deposit, BalanceChange, BalanceTip,
-		ChainTransfer, NewAccountOrigin, Note, NoteType,
+		AccountOrigin, AccountType::Deposit, BalanceChange, BalanceTip, ChainTransfer,
+		NewAccountOrigin, Note, NoteType, tick::Ticker,
 	};
 
 	use crate::{
@@ -325,7 +332,7 @@ mod tests {
 			localchain::{BalanceChangeResult, LocalchainRpcClient},
 			notebook::NotebookRpcClient,
 		},
-		notebook_closer::{FinalizedNotebookHeaderListener, NotebookCloser, NOTARY_KEYID},
+		notebook_closer::{FinalizedNotebookHeaderListener, NOTARY_KEYID, NotebookCloser},
 		stores::{
 			blocks::BlocksStore, chain_transfer::ChainTransferStore,
 			notebook_header::NotebookHeaderStore, registered_key::RegisteredKeyStore,

@@ -7,7 +7,12 @@ use sp_keyring::{
 	Sr25519Keyring::{Alice, Bob},
 };
 
-use ulx_primitives::{balance_change::{AccountOrigin, BalanceChange, BalanceProof}, note::{Note, NoteType}, BlockVote, DataDomain, DataTLD, MultiSignatureBytes, ESCROW_CLAWBACK_TICKS, ESCROW_EXPIRATION_TICKS, AccountType, LocalchainAccountId};
+use ulx_primitives::{
+	balance_change::{AccountOrigin, BalanceChange, BalanceProof},
+	note::{Note, NoteType},
+	AccountType, BlockVote, DataDomain, DataTLD, LocalchainAccountId, MultiSignatureBytes,
+	ESCROW_CLAWBACK_TICKS, ESCROW_EXPIRATION_TICKS,
+};
 
 use crate::{
 	verify_changeset_signatures, verify_notarization_allocation, verify_voting_sources,
@@ -385,7 +390,11 @@ fn test_can_lock_with_a_escrow_note() -> anyhow::Result<()> {
 		assert_eq!(res.needs_escrow_settle_followup, false);
 		assert_eq!(res.unclaimed_escrow_balances.len(), 0);
 		assert_eq!(res.claimed_escrow_deposits_per_account.len(), 1);
-		assert_eq!(res.claimed_escrow_deposits_per_account.get(&LocalchainAccountId::new(Alice.to_account_id(), AccountType::Deposit)), Some(&50));
+		assert_eq!(
+			res.claimed_escrow_deposits_per_account
+				.get(&LocalchainAccountId::new(Alice.to_account_id(), AccountType::Deposit)),
+			Some(&50)
+		);
 		assert_err!(
 			res.verify_taxes(),
 			VerifyError::InsufficientTaxIncluded {
@@ -664,7 +673,8 @@ fn test_can_buy_data_domains() {
 fn verify_taxes() {
 	let mut set = BalanceChangesetState::default();
 	assert_ok!(set.verify_taxes());
-	let localchain_account_id = LocalchainAccountId::new(Alice.to_account_id(), AccountType::Deposit);
+	let localchain_account_id =
+		LocalchainAccountId::new(Alice.to_account_id(), AccountType::Deposit);
 
 	set.claims_per_account.insert(localchain_account_id.clone(), 100);
 	assert_err!(
@@ -678,7 +688,8 @@ fn verify_taxes() {
 	set.tax_created_per_account.insert(localchain_account_id.clone(), 22);
 	assert_ok!(set.verify_taxes());
 
-	set.claimed_escrow_deposits_per_account.insert(localchain_account_id.clone(), 1000);
+	set.claimed_escrow_deposits_per_account
+		.insert(localchain_account_id.clone(), 1000);
 	assert_err!(
 		set.verify_taxes(),
 		VerifyError::InsufficientTaxIncluded {
@@ -699,7 +710,7 @@ fn verify_tax_votes() {
 		previous_balance_proof: empty_proof(20_000),
 		escrow_hold_note: None,
 		notes: bounded_vec!(Note::create(20_000, NoteType::SendToVote)),
-		signature: empty_signature(),
+		signature: Signature([0u8; 64]).into(),
 	}];
 
 	assert_err!(
@@ -714,7 +725,11 @@ fn verify_tax_votes() {
 		power: 20_000,
 		data_domain_hash: H256::random(),
 		data_domain_account: Alice.to_account_id(),
-	}];
+		block_rewards_account_id: Bob.to_account_id(),
+		signature: Signature([0u8; 64]).into(),
+	}
+	.sign(Bob.pair())
+	.clone()];
 
 	let result =
 		verify_notarization_allocation(&set, &votes, &vec![], Some(1)).expect("should unwrap");
@@ -737,7 +752,11 @@ fn test_vote_sources() {
 			power: 20_000,
 			data_domain_hash: jobs_domain.hash(),
 			data_domain_account: jobs_domain_author.clone(),
-		},
+			block_rewards_account_id: Bob.to_account_id(),
+			signature: Signature([0u8; 64]).into(),
+		}
+		.sign(Bob.pair())
+		.clone(),
 		BlockVote {
 			account_id: Bob.to_account_id(),
 			block_hash: vote_block_hash,
@@ -745,7 +764,11 @@ fn test_vote_sources() {
 			power: 400,
 			data_domain_hash: jobs_domain.hash(),
 			data_domain_account: jobs_domain_author.clone(),
-		},
+			block_rewards_account_id: Bob.to_account_id(),
+			signature: Signature([0u8; 64]).into(),
+		}
+		.sign(Alice.pair())
+		.clone(),
 	];
 
 	let vote_minimums = BTreeMap::from([(vote_block_hash, 500)]);
@@ -774,6 +797,16 @@ fn test_vote_sources() {
 		VerifyError::BlockVoteDataDomainMismatch
 	);
 
+	assert_err!(
+		verify_voting_sources(
+			&BTreeMap::from([((jobs_domain.hash(), jobs_domain_author.clone()), 2)]),
+			&votes,
+			&vote_minimums
+		),
+		VerifyError::BlockVoteInvalidSignature
+	);
+
+	votes[1].sign(Bob.pair());
 	assert_ok!(verify_voting_sources(
 		&BTreeMap::from([((jobs_domain.hash(), jobs_domain_author), 2)]),
 		&votes,

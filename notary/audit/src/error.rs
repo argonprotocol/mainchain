@@ -137,6 +137,12 @@ pub enum VerifyError {
 	#[snafu(display("Insufficient tax allocated for the given block votes"))]
 	InsufficientBlockVoteTax,
 
+	#[snafu(display("The account voting does not have any tax funds available"))]
+	IneligibleTaxVoter,
+
+	#[snafu(display("Invalid block vote signature"))]
+	BlockVoteInvalidSignature,
+
 	#[snafu(display("Invalid block vote allocation"))]
 	InvalidBlockVoteAllocation,
 

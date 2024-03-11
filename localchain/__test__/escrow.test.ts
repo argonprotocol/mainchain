@@ -1,7 +1,8 @@
 import {
-    AccountType,
-    BalanceChangeBuilder, DataDomainStore,
-    DataTLD, ESCROW_EXPIRATION_TICKS,
+    BalanceChangeBuilder,
+    DataDomainStore,
+    DataTLD,
+    ESCROW_EXPIRATION_TICKS,
     Localchain,
     NotarizationBuilder,
 } from "../index";
@@ -21,6 +22,7 @@ import {
     createLocalchain,
     disconnectOnTeardown,
     ipToInt32,
+    KeyringSigner,
     teardown,
     transferToLocalchain
 } from "./testHelpers";
@@ -54,6 +56,7 @@ it('can create a zone record type', async () => {
     })).rejects.toThrow("ExtrinsicFailed:: dataDomain.DomainNotRegistered");
 }, 30e3);
 
+
 it('can run a data domain escrow', async () => {
     let mainchain = new TestMainchain();
     const mainchainUrl = await mainchain.launch();
@@ -62,11 +65,9 @@ it('can run a data domain escrow', async () => {
 
     const sudo = new Keyring({type: 'sr25519'}).createFromUri('//Alice');
     const bobkeys = new Keyring({type: 'sr25519'});
-    const bob = bobkeys.createFromUri('//Bob');
+    const bob = bobkeys.addFromUri('//Bob');
 
-    const ferdiekeys = new Keyring({type: 'sr25519'});
-    const ferdie = ferdiekeys.createFromUri('//Ferdie');
-    const ferdieDomainAddress = new Keyring({type: 'sr25519'}).createFromUri('//Ferdie//dataDomain//1');
+    const ferdiekeys = new KeyringSigner("//Ferdie");
     const ferdieVotesAddress = new Keyring({type: 'sr25519'}).createFromUri('//Ferdie//voter//1');
 
     const mainchainClient = await getClient(mainchainUrl);
@@ -82,11 +83,7 @@ it('can run a data domain escrow', async () => {
     });
 
     const ferdiechain = await createLocalchain(mainchainUrl);
-    await ferdiechain.signer.useExternal(ferdie.address, async (address, signatureMessage) => {
-        return ferdiekeys.getPair(address)?.sign(signatureMessage, {withType: true});
-    }, async hd_path => {
-        return ferdiekeys.addPair(ferdie.derive(hd_path)).address;
-    });
+    await ferdiechain.signer.useExternal(ferdiekeys.address, ferdiekeys.sign, ferdiekeys.derive);
 
     const dataDomain = {
         domainName: 'example',
@@ -95,10 +92,10 @@ it('can run a data domain escrow', async () => {
     const dataDomainHash = DataDomainStore.getHash("example.analytics");
     {
         const [bobChange, ferdieChange] = await Promise.all([
-            transferMainchainToLocalchain(mainchainClient, bobchain, bob, 5000, 1),
-            transferMainchainToLocalchain(mainchainClient, ferdiechain, ferdie, 5000, 1),
+            transferMainchainToLocalchain(mainchainClient, bobchain, bob, 5200, 1),
+            transferMainchainToLocalchain(mainchainClient, ferdiechain, ferdiekeys.defaultPair, 5000, 1),
         ]);
-        await ferdieChange.notarization.leaseDataDomain("example.Analytics", ferdie.address);
+        await ferdieChange.notarization.leaseDataDomain("example.Analytics", ferdiekeys.address);
         let [ferdieTracker] = await Promise.all([
             bobChange.notarization.notarizeAndWaitForNotebook(),
             ferdieChange.notarization.notarizeAndWaitForNotebook(),
@@ -113,7 +110,7 @@ it('can run a data domain escrow', async () => {
         await expect(ferdieMainchainClient.getDataDomainRegistration(dataDomain.domainName, dataDomain.topLevelDomain)).resolves.toBeTruthy();
     }
 
-    await registerZoneRecord(mainchainClient, dataDomainHash, ferdie, ferdieDomainAddress.publicKey, 1, {
+    await registerZoneRecord(mainchainClient, dataDomainHash, ferdiekeys.defaultPair, ferdiekeys.defaultPair.publicKey, 1, {
         "1.0.0": mainchainClient.createType('UlxPrimitivesDataDomainVersionHost', {
             datastoreId: mainchainClient.createType('Bytes', 'default'),
             host: {
@@ -128,14 +125,14 @@ it('can run a data domain escrow', async () => {
     const zoneRecord = await mainchainClientBob.getDataDomainZoneRecord(dataDomain.domainName, dataDomain.topLevelDomain);
     expect(zoneRecord).toBeTruthy();
     expect(zoneRecord.notaryId).toBe(1);
-    expect(zoneRecord.paymentAddress).toBe(ferdieDomainAddress.address);
+    expect(zoneRecord.paymentAddress).toBe(ferdiekeys.address);
     const escrowFunding = bobchain.beginChange();
-    const jumpAccount = await escrowFunding.fundJumpAccount(4200n);
+    const jumpAccount = await escrowFunding.fundJumpAccount(5200n);
     await escrowFunding.notarize();
 
     const bobEscrowHold = bobchain.beginChange();
-    const change = await bobEscrowHold.addAccount(jumpAccount.address, AccountType.Deposit, 1);
-    await change.createEscrowHold(4000n, "example.Analytics", zoneRecord.paymentAddress);
+    const change = await bobEscrowHold.addAccountById(jumpAccount.localAccountId);
+    await change.createEscrowHold(5000n, "example.Analytics", zoneRecord.paymentAddress);
     const holdTracker = await bobEscrowHold.notarizeAndWaitForNotebook();
 
     const clientEscrow = await bobchain.openEscrows.openClientEscrow(jumpAccount.localAccountId);
@@ -146,7 +143,7 @@ it('can run a data domain escrow', async () => {
         console.log(parsed)
         expect(parsed).toBeTruthy();
         expect(parsed.escrowHoldNote).toBeTruthy();
-        expect(parsed.escrowHoldNote.milligons).toBe(4000);
+        expect(parsed.escrowHoldNote.milligons).toBe(5000);
         expect(parsed.notes[0].milligons).toBe(5);
         expect(parsed.balance).toBe(parsed.previousBalanceProof.balance - 5);
     }

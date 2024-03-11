@@ -70,6 +70,7 @@ impl NotebookNewAccountsStore {
 		let next_number = next as u32;
 		Ok(next_number)
 	}
+
 	pub async fn take_notebook_origins<'a>(
 		db: impl sqlx::PgExecutor<'a> + 'a,
 		notebook_number: NotebookNumber,

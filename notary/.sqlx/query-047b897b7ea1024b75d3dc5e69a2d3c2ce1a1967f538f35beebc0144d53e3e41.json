@@ -1,0 +1,28 @@
+{
+  "db_name": "PostgreSQL",
+  "query": "\n\t\t\tSELECT new_account_origins, notebook_number FROM notebooks\n\t\t\tWHERE new_account_origins @> $1::jsonb \n\t\t\tORDER BY notebook_number DESC LIMIT 1\n\t\t\t",
+  "describe": {
+    "columns": [
+      {
+        "ordinal": 0,
+        "name": "new_account_origins",
+        "type_info": "Jsonb"
+      },
+      {
+        "ordinal": 1,
+        "name": "notebook_number",
+        "type_info": "Int4"
+      }
+    ],
+    "parameters": {
+      "Left": [
+        "Jsonb"
+      ]
+    },
+    "nullable": [
+      false,
+      false
+    ]
+  },
+  "hash": "047b897b7ea1024b75d3dc5e69a2d3c2ce1a1967f538f35beebc0144d53e3e41"
+}

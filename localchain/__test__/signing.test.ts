@@ -1,7 +1,7 @@
-import {Keyring} from "@ulixee/mainchain";
-import {AccountType, Localchain, Signer} from "../index";
+import {CryptoScheme, Localchain} from "../index";
 import TestMainchain from "./TestMainchain";
-import { teardown, closeOnTeardown} from "./testHelpers";
+import {closeOnTeardown, KeyringSigner, teardown} from "./testHelpers";
+import {Keyring} from "@ulixee/mainchain";
 
 
 afterAll(teardown);
@@ -14,11 +14,10 @@ it('can sign a message from javscript', async () => {
         dbPath: ':memory:',
     });
     closeOnTeardown(bobchain);
-    const addressKeyring = new Keyring();
-    const bob = addressKeyring.createFromUri('//Bob', {type: 'ed25519'});
+    const bob = new KeyringSigner("//Bob");
+    await bobchain.signer.useExternal(bob.address, bob.sign, bob.derive);
     const notarization = bobchain.beginChange();
-    const bobLocalAccount = await notarization.addAccount(bob.address, AccountType.Deposit, 1);
-    const balanceChange = await notarization.getBalanceChange(bobLocalAccount);
+    const balanceChange = await notarization.defaultDepositAccount();
     await balanceChange.claimFromMainchain({
         address: bob.address,
         amount: 5000n,
@@ -26,10 +25,30 @@ it('can sign a message from javscript', async () => {
         notaryId: 1,
         accountNonce: 1
     });
-    const signer = new Signer(async (address, signatureMessage) => {
-        expect(address).toBe(bob.address);
-        return bob.sign(signatureMessage, {withType: true});
+    await expect(notarization.sign()).resolves.toBeUndefined();
+    await expect(notarization.verify()).resolves.toBeUndefined();
+});
+it('can sign using built-in', async () => {
+    let mainchain = new TestMainchain();
+    const mainchainUrl = await mainchain.launch();
+    const bobchain = await Localchain.load({
+        mainchainUrl: mainchainUrl,
+        dbPath: ':memory:',
     });
-    await expect(notarization.sign(signer)).resolves.toBeUndefined();
+    closeOnTeardown(bobchain);
+
+    await bobchain.signer.importSuriToEmbedded("//Bob", CryptoScheme.Ed25519, {});
+    await expect(bobchain.address).resolves.toBe(new Keyring().createFromUri("//Bob", {}, 'ed25519').address);
+
+    const notarization = bobchain.beginChange();
+    const balanceChange = await notarization.defaultDepositAccount();
+    await balanceChange.claimFromMainchain({
+        address: await bobchain.address,
+        amount: 5000n,
+        expirationBlock: 1,
+        notaryId: 1,
+        accountNonce: 1
+    });
+    await expect(notarization.sign()).resolves.toBeUndefined();
     await expect(notarization.verify()).resolves.toBeUndefined();
 });

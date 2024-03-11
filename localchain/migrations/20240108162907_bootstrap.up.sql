@@ -36,6 +36,12 @@ CREATE TABLE IF NOT EXISTS notarizations
     timestamp       DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP
 );
 
+CREATE TABLE IF NOT EXISTS transactions
+(
+    id               INTEGER NOT NULL PRIMARY KEY AUTOINCREMENT,
+    transaction_type INT     NOT NULL
+);
+
 CREATE TABLE IF NOT EXISTS balance_changes
 (
     id                     INTEGER  NOT NULL PRIMARY KEY AUTOINCREMENT,
@@ -46,12 +52,14 @@ CREATE TABLE IF NOT EXISTS balance_changes
     notary_id              INT      NOT NULL,
     notes_json             TEXT     NOT NULL,
     status                 INT      NOT NULL,
+    transaction_id         INT,
     proof_json             TEXT,
     finalized_block_number INT,
     notarization_id        INT,
     timestamp              DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
     FOREIGN KEY (account_id) REFERENCES accounts (id),
-    FOREIGN KEY (notarization_id) REFERENCES notarizations (id)
+    FOREIGN KEY (notarization_id) REFERENCES notarizations (id),
+    FOREIGN KEY (transaction_id) REFERENCES transactions (id)
 );
 
 -- Escrows pending claim by this localchain. The settled_amount and settled_signature fields are only updated in the json when the escrow is settled.

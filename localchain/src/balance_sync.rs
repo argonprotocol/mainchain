@@ -1,17 +1,21 @@
 use crate::accounts::AccountStore;
 use crate::balance_changes::{BalanceChangeRow, BalanceChangeStatus, BalanceChangeStore};
 use crate::notarization_builder::NotarizationBuilder;
+use crate::notarization_tracker::NotarizationTracker;
 use crate::open_escrows::OpenEscrowsStore;
 use crate::signer::Signer;
-use crate::LocalAccount;
-use crate::NotaryClients;
-use crate::{to_js_error, TickerRef};
+use crate::{to_js_error, NotaryAccountOrigin, TickerRef};
 use crate::{Escrow, MainchainClient};
+use crate::{LocalAccount, NOTARIZATION_MAX_BALANCE_CHANGES};
 use crate::{Localchain, OpenEscrow};
+use crate::{NotaryClient, NotaryClients};
 use napi::bindgen_prelude::*;
 use serde_json::json;
+use sp_core::sr25519::Signature;
+use sp_core::Decode;
 use sp_core::H256;
-use sqlx::SqlitePool;
+use sp_runtime::MultiSignature;
+use sqlx::{Sqlite, SqlitePool, Transaction};
 use std::collections::HashMap;
 use std::sync::Arc;
 use tokio::sync::Mutex;
@@ -41,6 +45,7 @@ pub struct EscrowCloseOptions {
 pub struct BalanceSyncResult {
   pub(crate) balance_changes: Vec<BalanceChangeRow>,
   pub(crate) escrow_notarizations: Vec<NotarizationBuilder>,
+  pub(crate) jump_account_consolidations: Vec<NotarizationTracker>,
 }
 #[napi]
 impl BalanceSyncResult {
@@ -51,6 +56,11 @@ impl BalanceSyncResult {
   #[napi(getter)]
   pub fn escrow_notarizations(&self) -> Vec<NotarizationBuilder> {
     self.escrow_notarizations.clone()
+  }
+
+  #[napi(getter)]
+  pub fn jump_account_consolidations(&self) -> Vec<NotarizationTracker> {
+    self.jump_account_consolidations.clone()
   }
 }
 
@@ -81,10 +91,76 @@ impl BalanceSync {
 
     let escrow_notarizations = self.process_pending_escrows(options).await?;
 
+    let jump_account_consolidations = self.consolidate_jump_accounts().await?;
+
     Ok(BalanceSyncResult {
       balance_changes,
       escrow_notarizations,
+      jump_account_consolidations,
     })
+  }
+
+  #[napi]
+  pub async fn consolidate_jump_accounts(&self) -> Result<Vec<NotarizationTracker>> {
+    let mut db = self.db.acquire().await.map_err(to_js_error)?;
+
+    let all_accounts = AccountStore::list(&mut db, true)
+      .await
+      .map_err(to_js_error)?;
+    let mut notarizations: Vec<NotarizationTracker> = vec![];
+    let mut notarization = NotarizationBuilder::new(
+      self.db.clone(),
+      self.notary_clients.clone(),
+      self.signer.clone(),
+    );
+    for jump_account in all_accounts {
+      let latest = BalanceChangeStore::get_latest_for_account(&mut db, jump_account.id)
+        .await
+        .map_err(to_js_error)?;
+      if let Some(latest) = latest {
+        let balance = latest.balance.parse::<u128>().map_err(to_js_error)?;
+        if balance > 0 {
+          let claim_account = match jump_account.account_type {
+            AccountType::Deposit => notarization.default_deposit_account().await?,
+            AccountType::Tax => notarization.default_tax_account().await?,
+          };
+          if claim_account.local_account_id == jump_account.id {
+            continue;
+          }
+          notarization
+            .load_account(&jump_account)
+            .await?
+            .send(
+              BigInt::from(balance),
+              Some(vec![claim_account.address.clone()]),
+            )
+            .await?;
+          let claim_result = claim_account.claim(BigInt::from(balance)).await?;
+          if claim_result.tax.get_u128().1 > 0 {
+            notarization
+              .default_tax_account()
+              .await?
+              .claim(claim_result.tax)
+              .await?;
+          }
+          if notarization.accounts().await.len() >= NOTARIZATION_MAX_BALANCE_CHANGES as usize {
+            let tracker = notarization.notarize().await?;
+            notarizations.push(tracker);
+            notarization = NotarizationBuilder::new(
+              self.db.clone(),
+              self.notary_clients.clone(),
+              self.signer.clone(),
+            );
+          }
+        }
+      }
+    }
+    if notarization.accounts().await.len() > 0 {
+      let tracker = notarization.notarize().await?;
+      notarizations.push(tracker);
+    }
+
+    return Ok(notarizations);
   }
 
   #[napi]
@@ -242,7 +318,7 @@ impl BalanceSync {
     let mut total_available_tax = 0;
 
     for account in accounts {
-      if account.account_type == AccountType::Deposit {
+      if account.account_type == AccountType::Deposit || account.hd_path.is_some() {
         continue;
       }
       if let Ok(balance) = notarization.get_balance_change(&account).await {
@@ -262,7 +338,9 @@ impl BalanceSync {
     options: &Option<EscrowCloseOptions>,
   ) -> anyhow::Result<()> {
     let Some(options) = options else {
-      return Err(anyhow::anyhow!("No options provided to create votes with tax"));
+      return Err(anyhow::anyhow!(
+        "No options provided to create votes with tax"
+      ));
     };
     let mainchain_mutex = self.mainchain_client.lock().await;
     let Some(ref mainchain_client) = *mainchain_mutex else {
@@ -299,9 +377,13 @@ impl BalanceSync {
       return Ok(());
     };
 
+    let mut tax_account = None;
     for (_, (account, tax)) in tax_accounts {
       let balance_change = notarization.get_balance_change(&account).await?;
       balance_change.send_to_vote(BigInt::from(tax)).await?;
+      if tax_account.is_none() {
+        tax_account = Some(account.clone());
+      }
     }
 
     let mut tick_counter = self.tick_counter.lock().await;
@@ -311,14 +393,25 @@ impl BalanceSync {
       *tick_counter = (current_tick, 0);
     }
     let vote_address = options.votes_address.clone();
-    let vote = BlockVote {
-      account_id: AccountStore::parse_address(&vote_address)?,
+    let tax_account = tax_account.unwrap();
+    let mut vote = BlockVote {
+      account_id: tax_account.get_account_id32()?,
       power: total_available_tax,
       data_domain_hash: H256::from_slice(data_domain_hash.as_ref()),
       data_domain_account: AccountStore::parse_address(&data_domain_address)?,
       index: (*tick_counter).1,
       block_hash: H256::from_slice(best_block_for_vote.block_hash.as_ref()),
+      block_rewards_account_id: AccountStore::parse_address(&vote_address)?,
+      signature: Signature([0; 64]).into(),
     };
+    let signature = self
+      .signer
+      .sign(
+        tax_account.address,
+        Uint8Array::from(vote.hash().as_bytes().to_vec()),
+      )
+      .await?;
+    vote.signature = MultiSignature::decode(&mut signature.as_ref())?;
     notarization.add_vote(vote).await?;
 
     Ok(())
@@ -485,6 +578,11 @@ impl BalanceSync {
       .fetch_one(&mut *tx)
       .await?;
 
+    let transaction_id = sqlx::query_scalar!("SELECT transaction_id FROM balance_changes WHERE notarization_id = ? AND transaction_id IS NOT NULL", notarization_id)
+        .fetch_optional(&mut *tx)
+        .await?
+        .map(|a| a.unwrap());
+
     for balance_change in notarization.balance_changes.iter() {
       let _ = OpenEscrowsStore::record_notarized(&mut *tx, &balance_change, notarization_id).await;
 
@@ -494,6 +592,7 @@ impl BalanceSync {
         &balance_change,
         notary_id,
         notarization_id,
+        transaction_id,
       )
       .await?;
     }
@@ -509,9 +608,12 @@ impl BalanceSync {
     notary_clients: &NotaryClients,
   ) -> anyhow::Result<()> {
     let mut tx = db.begin().await?;
-    let account = AccountStore::get_by_id(&mut *tx, balance_change.account_id).await?;
+    let mut account = AccountStore::get_by_id(&mut *tx, balance_change.account_id).await?;
     let notary_id = balance_change.notary_id as u32;
     let notary_client = notary_clients.get(notary_id).await?;
+    if account.origin.is_none() {
+      Self::sync_account_origin(&mut tx, &mut account, &notary_client).await?;
+    }
 
     let expected_tip = balance_change.get_balance_tip(&account)?;
     let tip = notary_client
@@ -569,6 +671,32 @@ impl BalanceSync {
     Ok(())
   }
 
+  pub async fn sync_account_origin(
+    tx: &mut Transaction<'static, Sqlite>,
+    account: &mut LocalAccount,
+    notary_client: &NotaryClient,
+  ) -> anyhow::Result<bool> {
+    let Ok(result) = notary_client
+      .get_account_origin(account.address.clone(), account.account_type)
+      .await
+    else {
+      return Ok(false);
+    };
+    AccountStore::update_origin(
+      &mut *tx,
+      account.id,
+      result.notebook_number,
+      result.account_uid,
+    )
+    .await?;
+    account.origin = Some(NotaryAccountOrigin {
+      account_uid: result.account_uid,
+      notary_id: account.notary_id,
+      notebook_number: result.notebook_number,
+    });
+    Ok(true)
+  }
+
   /// Asks the notary to supply their own proof
   pub async fn sync_notebook_proof(
     db: &SqlitePool,
@@ -587,11 +715,15 @@ impl BalanceSync {
     let Some(notebook_number) = notebook_number else {
       return Ok(false);
     };
-    let account = AccountStore::get_by_id(&mut tx, balance_change.account_id).await?;
+    let mut account = AccountStore::get_by_id(&mut tx, balance_change.account_id).await?;
+    let notary_client = notary_clients.get(balance_change.notary_id as u32).await?;
+
+    if account.origin.is_none() {
+      Self::sync_account_origin(&mut tx, &mut account, &notary_client).await?;
+    }
 
     let tip = balance_change.get_balance_tip(&account)?;
 
-    let notary_client = notary_clients.get(balance_change.notary_id as u32).await?;
     let result = notary_client
       .get_balance_proof(notebook_number as u32, tip)
       .await?;

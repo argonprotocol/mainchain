@@ -23,7 +23,7 @@ pub mod pallet {
 	use log::info;
 	use sp_core::{H256, U256};
 	use sp_runtime::{
-		traits::{BlakeTwo256, Block as BlockT},
+		traits::{BlakeTwo256, Block as BlockT, Verify},
 		ConsensusEngineId, DigestItem, RuntimeAppPublic,
 	};
 	use sp_std::{collections::btree_map::BTreeMap, vec, vec::Vec};
@@ -129,6 +129,8 @@ pub mod pallet {
 		MaxNotebooksAtTickExceeded,
 		/// No closest miner found for vote
 		NoClosestMinerFoundForVote,
+		/// The vote signature was invalid
+		BlockVoteInvalidSignature,
 	}
 
 	#[pallet::hooks]
@@ -283,8 +285,8 @@ pub mod pallet {
 					);
 
 					let votes_from_tick = current_tick - 2u32;
-					let block_vote_account_id =
-						T::AccountId::decode(&mut block_vote.account_id.encode().as_slice())
+					let block_vote_rewards_account =
+						T::AccountId::decode(&mut block_vote.block_rewards_account_id.encode().as_slice())
 							.map_err(|_| Error::<T>::UnableToDecodeVoteAccount)?;
 					Self::verify_block_vote(
 						seal_strength,
@@ -302,7 +304,7 @@ pub mod pallet {
 					)?;
 					<LastBlockSealerInfo<T>>::put(BlockSealerInfo {
 						miner_rewards_account,
-						block_vote_rewards_account: block_vote_account_id.clone(),
+						block_vote_rewards_account,
 					});
 				},
 			}
@@ -383,6 +385,10 @@ pub mod pallet {
 					(last_tick.saturating_sub(ESCROW_CLAWBACK_TICKS), last_tick)
 				),
 				Error::<T>::InvalidDataDomainAccount
+			);
+			ensure!(
+				block_vote.signature.verify(&block_vote.hash()[..], &block_vote.account_id),
+				Error::<T>::BlockVoteInvalidSignature
 			);
 
 			Ok(())

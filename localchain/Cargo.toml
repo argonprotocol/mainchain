@@ -63,7 +63,6 @@ ulx-notary-audit = { path = "../notary/audit" }
 frame-support = { version = "4.0.0-dev", git = "https://github.com/paritytech/polkadot-sdk.git", branch = "release-polkadot-v1.5.0" }
 sp-keyring = { version = "24.0.0", git = "https://github.com/paritytech/polkadot-sdk.git", branch = "release-polkadot-v1.5.0" }
 ulx-testing = { path = "../testing" }
-tempfile = { version = "3.1.0" }
 
 [build-dependencies]
 napi-build = "2.1"

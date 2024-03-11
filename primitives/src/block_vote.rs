@@ -5,7 +5,7 @@ use codec::{Codec, Decode, Encode, MaxEncodedLen};
 use serde::{Deserialize, Serialize};
 use sp_core::{RuntimeDebug, H256, U256};
 use sp_core_hashing::blake2_256;
-use sp_runtime::scale_info::TypeInfo;
+use sp_runtime::{scale_info::TypeInfo, MultiSignature};
 use sp_std::vec::Vec;
 
 use crate::{AccountId, BlockVotingPower, DataDomainHash, MerkleProof, NotaryId, NotebookNumber};
@@ -26,7 +26,7 @@ pub type VoteMinimum = u128;
 )]
 #[serde(rename_all = "camelCase")]
 pub struct BlockVoteT<Hash: Codec = H256> {
-	/// The creator of the seal
+	/// The creator of the block vote
 	pub account_id: AccountId,
 	/// The block hash being voted on. Must be in last 2 ticks.
 	pub block_hash: Hash,
@@ -41,6 +41,10 @@ pub struct BlockVoteT<Hash: Codec = H256> {
 	pub data_domain_hash: DataDomainHash,
 	/// The data domain payment address used to create this vote
 	pub data_domain_account: AccountId,
+	/// A signature of the vote by the account_id
+	pub signature: MultiSignature,
+	/// The claimer of rewards
+	pub block_rewards_account_id: AccountId,
 }
 
 #[derive(Encode)]
@@ -51,6 +55,7 @@ struct BlockVoteHashMessage<Hash: Codec> {
 	power: BlockVotingPower,
 	data_domain_hash: DataDomainHash,
 	data_domain_account: AccountId,
+	block_rewards_account_id: AccountId,
 }
 
 pub type BlockVote = BlockVoteT<H256>;
@@ -65,6 +70,7 @@ impl<Hash: Codec + Clone> BlockVoteT<Hash> {
 			power: self.power,
 			data_domain_hash: self.data_domain_hash.clone(),
 			data_domain_account: self.data_domain_account.clone(),
+			block_rewards_account_id: self.block_rewards_account_id.clone(),
 		}
 		.using_encoded(blake2_256)
 		.into()
@@ -90,6 +96,15 @@ impl<Hash: Codec + Clone> BlockVoteT<Hash> {
 	pub fn seal_signature_message<H: Codec>(block_hash: &H, seal_strength: U256) -> [u8; 32] {
 		let message = &[&block_hash.encode()[..], &seal_strength.encode()[..]].concat();
 		message.using_encoded(blake2_256)
+	}
+
+	#[cfg(feature = "std")]
+	pub fn sign<S: sp_core::Pair>(&mut self, pair: S) -> &Self
+	where
+		S::Signature: Into<MultiSignature>,
+	{
+		self.signature = pair.sign(&self.hash()[..]).into();
+		self
 	}
 }
 

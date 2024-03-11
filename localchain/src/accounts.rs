@@ -1,3 +1,4 @@
+use anyhow::anyhow;
 use chrono::NaiveDateTime;
 use napi::bindgen_prelude::*;
 use sp_core::crypto::{
@@ -142,15 +143,19 @@ impl AccountStore {
       AccountType::Deposit as i64,
       notary_id
     )
-    .fetch_one(&mut *db)
-    .await?
-    .into();
+    .fetch_optional(&mut *db)
+    .await?;
+    if let Some(res) = res {
+      return Ok(res.into());
+    }
 
-    Ok(res)
+    return Err(anyhow!(
+      "This localchain has not been setup with an address! Import or create a new account."
+    ));
   }
 
   #[napi(js_name = "getTaxAccount")]
-  pub async fn tax_accounts_js(&self, notary_id: Option<NotaryId>) -> Result<LocalAccount> {
+  pub async fn tax_account_js(&self, notary_id: Option<NotaryId>) -> Result<LocalAccount> {
     let mut db = self.pool.acquire().await.map_err(to_js_error)?;
     let res = Self::tax_account(&mut *db, notary_id).await?;
     Ok(res)
@@ -167,11 +172,15 @@ impl AccountStore {
       AccountType::Tax as i64,
       notary_id
     )
-    .fetch_one(&mut *db)
-    .await?
-    .into();
+    .fetch_optional(&mut *db)
+    .await?;
+    if let Some(res) = res {
+      return Ok(res.into());
+    }
 
-    Ok(res)
+    return Err(anyhow!(
+      "This localchain has not been setup with an address! Import or create a new account."
+    ));
   }
 
   pub async fn get(
@@ -471,7 +480,7 @@ mod test {
     let bob_address = AccountStore::to_address(&Bob.to_account_id());
     let accounts = AccountStore { pool };
     let tax_account = accounts
-      .insert_js(bob_address.clone(), AccountType::Tax, 1)
+      .insert_js(bob_address.clone(), AccountType::Tax, 1, None)
       .await
       .expect("Could not insert account");
 
@@ -479,18 +488,18 @@ mod test {
     assert_eq!(tax_account.get_account_id32()?, Bob.to_account_id());
 
     let _ = accounts
-      .insert_js(bob_address.clone(), AccountType::Tax, 2)
+      .insert_js(bob_address.clone(), AccountType::Tax, 2, None)
       .await
       .expect("Could not insert account");
 
     let account = accounts
-      .insert_js(bob_address.clone(), AccountType::Deposit, 1)
+      .insert_js(bob_address.clone(), AccountType::Deposit, 1, None)
       .await
       .unwrap();
 
-    let list = accounts.list_js().await?;
+    let list = accounts.list_js(Some(true)).await?;
     assert_eq!(list.len(), 3);
-    assert_eq!(accounts.tax_accounts_js(1).await?[0], tax_account);
+    assert_eq!(accounts.tax_account_js(Some(1)).await?, tax_account);
 
     assert_eq!(accounts.get_by_id_js(account.id).await?, account);
     assert_eq!(
@@ -510,7 +519,6 @@ mod test {
       AccountStore::to_address(&Bob.to_account_id()),
       AccountType::Deposit,
       1,
-      None,
       None,
     )
     .await

@@ -373,7 +373,7 @@ where
         let signer = Signer::new(db.clone());
         if let Some(suri) = suri {
           signer
-            .import_to_embedded(suri, scheme, Some(keystore_password.into()))
+            .import_suri_to_embedded(suri, scheme, Some(keystore_password.into()))
             .await?;
         } else {
           signer

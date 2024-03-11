@@ -467,7 +467,9 @@ mod tests {
 			index: 0,
 			data_domain_hash: DataDomain::new("test", DataTLD::Analytics).hash(),
 			data_domain_account: Bob.to_account_id(),
-		}];
+			block_rewards_account_id: Bob.to_account_id(),
+			signature: Signature([0u8; 64]).into(),
+		}.sign(Bob.pair()).clone()];
 		let domains =
 			vec![(DataDomain::new("test", DataTLD::Analytics).hash(), Bob.to_account_id())];
 

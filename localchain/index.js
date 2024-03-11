@@ -281,7 +281,7 @@ if (!nativeBinding) {
   throw new Error(`Failed to load native binding`)
 }
 
-const { DataTLD, AccountType, LocalAccount, AccountStore, BalanceChangeBuilder, BalanceChange, BalanceChangeStatus, BalanceChangeStore, BalanceSync, BalanceSyncResult, DataDomainLease, DataDomainStore, MainchainClient, NotarizationBuilder, NotarizationTracker, NotaryClients, NotaryClient, NotebookMeta, BalanceTipResult, Escrow, OpenEscrow, OpenEscrowsStore, Signer, CryptoScheme, runCli, NOTARIZATION_MAX_BALANCE_CHANGES, NOTARIZATION_MAX_DOMAINS, NOTARIZATION_MAX_BLOCK_VOTES, ESCROW_EXPIRATION_TICKS, ESCROW_CLAWBACK_TICKS, ESCROW_MINIMUM_SETTLEMENT, DATASTORE_MAX_VERSIONS, DATA_DOMAIN_MIN_NAME_LENGTH, DATA_DOMAIN_LEASE_COST, VERSION, ArgonFileType, Localchain, TickerRef } = nativeBinding
+const { DataTLD, AccountType, LocalAccount, AccountStore, BalanceChangeBuilder, BalanceChange, BalanceChangeStatus, BalanceChangeStore, BalanceSync, BalanceSyncResult, DataDomainLease, DataDomainStore, MainchainClient, NotarizationBuilder, NotarizationTracker, NotaryClients, NotaryClient, NotebookMeta, BalanceTipResult, Escrow, OpenEscrow, OpenEscrowsStore, Signer, CryptoScheme, runCli, NOTARIZATION_MAX_BALANCE_CHANGES, NOTARIZATION_MAX_DOMAINS, NOTARIZATION_MAX_BLOCK_VOTES, ESCROW_EXPIRATION_TICKS, ESCROW_CLAWBACK_TICKS, ESCROW_MINIMUM_SETTLEMENT, DATASTORE_MAX_VERSIONS, DATA_DOMAIN_MIN_NAME_LENGTH, DATA_DOMAIN_LEASE_COST, VERSION, ArgonFileType, TransactionType, Transactions, Localchain, TickerRef } = nativeBinding
 
 module.exports.DataTLD = DataTLD
 module.exports.AccountType = AccountType
@@ -319,5 +319,7 @@ module.exports.DATA_DOMAIN_MIN_NAME_LENGTH = DATA_DOMAIN_MIN_NAME_LENGTH
 module.exports.DATA_DOMAIN_LEASE_COST = DATA_DOMAIN_LEASE_COST
 module.exports.VERSION = VERSION
 module.exports.ArgonFileType = ArgonFileType
+module.exports.TransactionType = TransactionType
+module.exports.Transactions = Transactions
 module.exports.Localchain = Localchain
 module.exports.TickerRef = TickerRef

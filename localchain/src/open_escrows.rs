@@ -2,8 +2,8 @@ use crate::accounts::AccountStore;
 use crate::balance_changes::BalanceChangeStore;
 use crate::notary_client::NotaryClients;
 use crate::signer::Signer;
-use crate::TickerRef;
 use crate::{to_js_error, BalanceChangeStatus};
+use crate::{TickerRef, ESCROW_MINIMUM_SETTLEMENT};
 use anyhow::anyhow;
 use bech32::{Bech32m, Hrp};
 use chrono::NaiveDateTime;
@@ -363,6 +363,14 @@ impl OpenEscrow {
 
   #[napi]
   pub async fn export_for_send(&self) -> Result<String> {
+    {
+      let escrow = self.escrow.lock().await;
+      let is_empty = escrow.settled_signature == *EMPTY_SIGNATURE;
+      drop(escrow);
+      if is_empty {
+        self.sign(BigInt::from(ESCROW_MINIMUM_SETTLEMENT)).await?;
+      }
+    }
     let escrow = self.escrow.lock().await;
     let balance_change = escrow.get_final().await.map_err(to_js_error)?;
     let json = serde_json::to_string(&balance_change)?;
@@ -482,6 +490,14 @@ impl OpenEscrowsStore {
   pub async fn import_escrow(&self, escrow_json: String) -> Result<OpenEscrow> {
     let mut escrow = Escrow::try_from_balance_change_json(escrow_json).map_err(to_js_error)?;
     verify_changeset_signatures(&vec![escrow.balance_change.clone()]).map_err(to_js_error)?;
+    let mut db = self.db.acquire().await.map_err(to_js_error)?;
+    let default_account = AccountStore::deposit_account(&mut db, Some(escrow.notary_id)).await?;
+    if default_account.address != escrow.to_address {
+      return Err(to_js_error(format!(
+        "This localchain is not configured to accept payments addressed to {}",
+        escrow.to_address,
+      )));
+    }
 
     let notary_client = self.notary_clients.get(escrow.notary_id).await?;
 
@@ -509,7 +525,6 @@ impl OpenEscrowsStore {
       )));
     }
     escrow.expiration_tick = balance_tip.tick + ESCROW_EXPIRATION_TICKS;
-    let mut db = self.db.acquire().await.map_err(to_js_error)?;
     escrow.insert(&mut db).await.map_err(to_js_error)?;
     Ok(OpenEscrow::new(self.db.clone(), escrow, &self.signer))
   }
@@ -597,10 +612,10 @@ pub struct SignatureResult {
 mod tests {
   use super::*;
   use crate::balance_change_builder::BalanceChangeBuilder;
-  use crate::test_utils::{create_keystore, create_mock_notary, mock_notary_clients, MockNotary};
-  use crate::CryptoScheme::Ed25519;
+  use crate::notarization_builder::NotarizationBuilder;
+  use crate::test_utils::{create_mock_notary, mock_notary_clients, MockNotary};
+  use crate::transactions::Transactions;
   use crate::*;
-  use anyhow::bail;
   use serde_json::json;
   use sp_keyring::AccountKeyring::Alice;
   use sp_keyring::Ed25519Keyring::Bob;
@@ -615,7 +630,7 @@ mod tests {
     origin_notebook: u32,
   ) -> anyhow::Result<LocalAccount> {
     let address = AccountStore::to_address(&account_id);
-    let account = AccountStore::insert(db, address, AccountType::Deposit, 1, None, None).await?;
+    let account = AccountStore::insert(db, address, AccountType::Deposit, 1, None).await?;
     AccountStore::update_origin(db, account.id, origin_notebook, origin_uid).await?;
     let account = AccountStore::get_by_id(db, account.id).await?;
     Ok(account)
@@ -661,7 +676,8 @@ mod tests {
         .fetch_one(&mut *tx)
         .await?;
     let id =
-      BalanceChangeStore::upsert_notarized(&mut tx, account.id, &balance_change, 1, id).await?;
+      BalanceChangeStore::upsert_notarized(&mut tx, account.id, &balance_change, 1, id, None)
+        .await?;
     tx.commit().await?;
 
     let mut db = pool.acquire().await?;
@@ -715,8 +731,10 @@ mod tests {
       ticker: Ticker::start(Duration::from_secs(60)),
     };
     println!("about to open escrow");
-    let keystore = create_keystore(&Bob.to_seed(), Ed25519)?;
-    let signer = Signer::with_keystore(keystore);
+    let signer = Signer::new(pool.clone());
+    let _ = signer
+      .import_suri_to_embedded(Bob.to_seed(), CryptoScheme::Ed25519, None)
+      .await?;
     let store = OpenEscrowsStore::new(pool, ticker, &notary_clients, &signer);
     let open_escrow = store.open_client_escrow(bob_account.id).await?;
     println!("opened escrow");
@@ -725,19 +743,6 @@ mod tests {
     assert_eq!(escrow.expiration_tick, 1 + crate::ESCROW_EXPIRATION_TICKS);
 
     assert_eq!(store.get_claimable().await?.len(), 0);
-
-    let Err(e) = open_escrow.export_for_send().await else {
-      bail!("Expected error");
-    };
-    assert_eq!(
-      e.reason.to_string(),
-      "Escrow settlement has not been signed"
-    );
-
-    println!("signing");
-    open_escrow.sign(BigInt::from(5u128), &signer).await?;
-    println!("signed");
-
     let json = open_escrow.export_for_send().await?;
 
     println!("escrow {}", &json);
@@ -755,7 +760,7 @@ mod tests {
       "can reload from db"
     );
 
-    open_escrow.sign(BigInt::from(10u128), &signer).await?;
+    open_escrow.sign(BigInt::from(10u128)).await?;
 
     assert_eq!(
       store
@@ -806,11 +811,13 @@ mod tests {
     let ticker = TickerRef {
       ticker: Ticker::start(Duration::from_secs(60)),
     };
-    let signer = Signer::with_keystore(create_keystore(&Bob.to_seed(), Ed25519)?);
+    let signer = Signer::new(bob_pool.clone());
+    signer
+      .import_suri_to_embedded("//Bob".to_string(), CryptoScheme::Ed25519, None)
+      .await?;
     let bob_store = OpenEscrowsStore::new(bob_pool, ticker.clone(), &notary_clients, &signer);
     let open_escrow = bob_store.open_client_escrow(bob_account.id).await?;
 
-    open_escrow.sign(BigInt::from(5u128)).await?;
     let json = open_escrow.export_for_send().await?;
 
     let alice_store = OpenEscrowsStore::new(alice_pool, ticker, &notary_clients, &signer);
@@ -857,7 +864,7 @@ mod tests {
     assert_eq!(imported_escrow.settled_amount, MINIMUM_ESCROW_SETTLEMENT);
     assert_eq!(imported_escrow.id, sent_escrow.id);
 
-    let result = open_escrow.sign(BigInt::from(10u128), &signer).await?;
+    let result = open_escrow.sign(BigInt::from(10u128)).await?;
     alice_escrow
       .record_updated_settlement(result.milligons, result.signature)
       .await?;
@@ -866,6 +873,85 @@ mod tests {
       10_u128
     );
 
+    Ok(())
+  }
+
+  #[sqlx::test]
+  async fn test_will_not_import_if_not_own_account(bob_pool: SqlitePool) -> anyhow::Result<()> {
+    let mock_notary = create_mock_notary().await?;
+    let notary_clients = mock_notary_clients(&mock_notary, Ferdie).await?;
+
+    let alice_pool = SqlitePool::connect(&":memory:")
+      .await
+      .map_err(to_js_error)?;
+    sqlx::migrate!()
+      .run(&alice_pool)
+      .await
+      .map_err(|e| Error::from_reason(format!("Error migrating database {}", e.to_string())))?;
+
+    let not_alice = AccountStore::to_address(&Ferdie.to_account_id());
+
+    let bob_signer = Signer::new(bob_pool.clone());
+    let bob_address = bob_signer
+      .import_suri_to_embedded("//Bob".to_string(), CryptoScheme::Ed25519, None)
+      .await?;
+
+    let ticker = TickerRef {
+      ticker: Ticker::start(Duration::from_secs(1)),
+    };
+    let builder =
+      NotarizationBuilder::new(bob_pool.clone(), notary_clients.clone(), bob_signer.clone());
+    builder
+      .claim_from_mainchain(LocalchainTransfer {
+        address: bob_address.clone(),
+        notary_id: 1,
+        amount: BigInt::from(2_000u128),
+        expiration_block: 100,
+        account_nonce: 1,
+      })
+      .await?;
+
+    builder.notarize().await?;
+    let bob_account = builder.default_deposit_account().await?;
+    let accounts = builder.accounts().await;
+    let bob_account = accounts
+      .iter()
+      .find(|a| a.id == bob_account.local_account_id)
+      .expect("should get");
+
+    let transactions =
+      Transactions::new(bob_pool.clone(), ticker.clone(), &notary_clients, &bob_signer);
+
+    let escrow = transactions
+      .create_escrow(
+        800u128.into(),
+        "delta.flights".to_string(),
+        not_alice.clone(),
+      )
+      .await?;
+    let json = escrow.export_for_send().await?;
+
+    let mut db = bob_pool.acquire().await?;
+    let bob_hold = BalanceChangeStore::get_latest_for_account(&mut db, bob_account.id)
+      .await?
+      .expect("should have a latest");
+    register_balance_tip(&bob_account, &mock_notary, &bob_hold, 1, 1).await?;
+
+
+    let alice_signer = Signer::new(alice_pool.clone());
+    let _ = alice_signer
+        .import_suri_to_embedded("//Alice".to_string(), CryptoScheme::Sr25519, None)
+        .await?;
+    let alice_store = OpenEscrowsStore::new(alice_pool, ticker, &notary_clients, &alice_signer);
+
+    let result = alice_store.import_escrow(json.clone()).await;
+    assert!(result.is_err());
+    println!("{:?}", result.clone().err());
+    assert!(result
+      .err()
+      .expect("")
+      .reason
+      .contains("This localchain is not configured to accept payments addressed "));
     Ok(())
   }
 }

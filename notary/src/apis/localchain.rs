@@ -5,8 +5,8 @@ use serde::{Deserialize, Serialize};
 use sp_core::{RuntimeDebug, H256};
 
 use ulx_primitives::{
-	tick::Tick, AccountId, AccountType, NewAccountOrigin, NotarizationBalanceChangeset,
-	NotarizationBlockVotes, NotarizationDataDomains, NotebookNumber,
+	tick::Tick, AccountId, AccountOrigin, AccountType, NewAccountOrigin,
+	NotarizationBalanceChangeset, NotarizationBlockVotes, NotarizationDataDomains, NotebookNumber,
 };
 
 #[rpc(server, client, namespace = "localchain")]
@@ -25,6 +25,13 @@ pub trait LocalchainRpc {
 		account_id: AccountId,
 		account_type: AccountType,
 	) -> Result<BalanceTipResult, ErrorObjectOwned>;
+
+	#[method(name = "getAccountOrigin")]
+	async fn get_origin(
+		&self,
+		account_id: AccountId,
+		account_type: AccountType,
+	) -> Result<AccountOrigin, ErrorObjectOwned>;
 }
 #[derive(Clone, PartialEq, Eq, Encode, Decode, RuntimeDebug, TypeInfo, Serialize, Deserialize)]
 pub struct BalanceChangeResult {

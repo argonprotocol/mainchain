@@ -88,7 +88,7 @@ impl Signer {
 
   /// Import a known keypair into the embedded keystore.
   #[napi]
-  pub async fn import_to_embedded(
+  pub async fn import_suri_to_embedded(
     &self,
     // The secret uri path to import.
     suri: String,
@@ -166,12 +166,13 @@ impl Signer {
   #[napi]
   pub async fn sign(&self, address: String, message: Uint8Array) -> Result<Uint8Array> {
     if self.embedded_keystore.is_unlocked().await {
-      let signature = self
+      if let Some(signature) = self
         .embedded_keystore
-        .sign(address, message.as_ref())
-        .await?;
-      let signature = signature.encode();
-      return Ok(signature.into());
+        .sign(address.clone(), message.as_ref())
+        .await?
+      {
+        return Ok(signature.encode().into());
+      }
     }
 
     if let Some(js_callbacks) = self.js_callbacks.lock().await.as_ref() {

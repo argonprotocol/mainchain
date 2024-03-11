@@ -11,9 +11,10 @@ use sp_core::{
 };
 use sp_inherents::InherentDataProvider;
 use sp_keyring::{ed25519::Keyring, AccountKeyring::Bob, Ed25519Keyring::Alice};
+use sp_keyring::AccountKeyring::Ferdie;
 use sp_runtime::{
 	traits::{BlakeTwo256, Header},
-	BoundedVec, Digest, DigestItem,
+	BoundedVec, Digest, DigestItem, MultiSignature,
 };
 
 use ulx_primitives::{
@@ -472,6 +473,8 @@ fn it_can_find_best_vote_seals() {
 			power: 500,
 			data_domain_hash: DataDomain::new("test", DataTLD::Bikes).hash(),
 			data_domain_account: Alice.to_account_id(),
+			block_rewards_account_id: Alice.to_account_id(),
+			signature: empty_vote_signature(),
 		};
 		XorClosest::set(Some(MiningAuthority {
 			account_id: 1,
@@ -570,13 +573,15 @@ fn it_checks_tax_votes() {
 		// Go past genesis block so events get deposited
 		setup_blocks(2);
 		System::set_block_number(4);
-		let vote = BlockVote {
+		let mut vote = BlockVote {
 			block_hash: System::block_hash(System::block_number().saturating_sub(4)),
 			data_domain_hash: DataDomain::new("test", DataTLD::Bikes).hash(),
 			data_domain_account: Alice.to_account_id(),
 			account_id: Keyring::Alice.into(),
 			index: 1,
 			power: 500,
+			block_rewards_account_id: Ferdie.to_account_id(),
+			signature: empty_vote_signature(),
 		};
 
 		let default_authority = default_authority();
@@ -658,6 +663,18 @@ fn it_checks_tax_votes() {
 			a.insert(vote.data_domain_hash.clone());
 		});
 
+		assert_err!(
+			BlockSeal::verify_block_vote(
+				seal_strength,
+				&vote,
+				author,
+				votes_from_tick,
+				signature.clone()
+			),
+			Error::<Test>::BlockVoteInvalidSignature
+		);
+		vote.sign(Alice.pair());
+
 		assert_ok!(BlockSeal::verify_block_vote(
 			seal_strength,
 			&vote,
@@ -709,6 +726,12 @@ fn default_vote() -> BlockVote {
 		account_id: Keyring::Alice.into(),
 		index: 1,
 		power: 500,
+		block_rewards_account_id: Alice.to_account_id(),
+		signature: empty_vote_signature(),
 	}
+	.sign(Alice.pair())
 	.clone()
+}
+fn empty_vote_signature() -> MultiSignature {
+	sp_core::sr25519::Signature([0u8; 64]).into()
 }

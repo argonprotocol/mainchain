@@ -424,7 +424,7 @@ mod test {
   async fn test_escrow_hold() -> anyhow::Result<()> {
     let address = AccountStore::to_address(&Bob.to_account_id());
     let data_domain_author = AccountStore::to_address(&Alice.to_account_id());
-    let builder = BalanceChangeBuilder::new_account(address.clone(), AccountType::Deposit)?;
+    let builder = BalanceChangeBuilder::new_account(address.clone(), 1, AccountType::Deposit)?;
     builder
       .claim_from_mainchain(LocalchainTransfer {
         address,
