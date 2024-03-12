@@ -63,7 +63,7 @@ export async function getMainchainBalance(client: UlxClient, address: string): P
 export async function createLocalchain(mainchainUrl: string): Promise<Localchain> {
     const localchain = await Localchain.load({
         mainchainUrl,
-        dbPath: ':memory:',
+        path: ':memory:',
     });
     closeOnTeardown(localchain);
     return localchain;

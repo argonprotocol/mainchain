@@ -76,14 +76,14 @@ it('can run a data domain escrow', async () => {
 
     const bobchain = await createLocalchain(mainchainUrl);
 
-    await bobchain.signer.useExternal(bob.address, async (address, signatureMessage) => {
+    await bobchain.keystore.useExternal(bob.address, async (address, signatureMessage) => {
         return bobkeys.getPair(address)?.sign(signatureMessage, {withType: true});
     }, async hd_path => {
         return bobkeys.addPair(bob.derive(hd_path)).address;
     });
 
     const ferdiechain = await createLocalchain(mainchainUrl);
-    await ferdiechain.signer.useExternal(ferdiekeys.address, ferdiekeys.sign, ferdiekeys.derive);
+    await ferdiechain.keystore.useExternal(ferdiekeys.address, ferdiekeys.sign, ferdiekeys.derive);
 
     const dataDomain = {
         domainName: 'example',

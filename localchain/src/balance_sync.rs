@@ -1,9 +1,10 @@
 use crate::accounts::AccountStore;
 use crate::balance_changes::{BalanceChangeRow, BalanceChangeStatus, BalanceChangeStore};
+use crate::keystore::Keystore;
 use crate::notarization_builder::NotarizationBuilder;
 use crate::notarization_tracker::NotarizationTracker;
 use crate::open_escrows::OpenEscrowsStore;
-use crate::signer::Signer;
+use crate::transactions::{TransactionType, Transactions};
 use crate::{to_js_error, NotaryAccountOrigin, TickerRef};
 use crate::{Escrow, MainchainClient};
 use crate::{LocalAccount, NOTARIZATION_MAX_BALANCE_CHANGES};
@@ -29,14 +30,14 @@ pub struct BalanceSync {
   notary_clients: NotaryClients,
   lock: Arc<Mutex<()>>,
   open_escrows: OpenEscrowsStore,
-  signer: Signer,
+  keystore: Keystore,
   tick_counter: Arc<Mutex<(u32, u32)>>,
 }
 
 #[napi(object)]
 #[derive(Clone)]
 pub struct EscrowCloseOptions {
-  pub votes_address: String,
+  pub votes_address: Option<String>,
   /// What's the minimum amount of tax we should wait for before voting on blocks
   pub minimum_vote_amount: Option<i64>,
 }
@@ -76,7 +77,7 @@ impl BalanceSync {
       lock: Arc::new(Mutex::new(())),
       open_escrows: localchain.open_escrows(),
       tick_counter: Arc::new(Mutex::new((0, 0))),
-      signer: localchain.signer.clone(),
+      keystore: localchain.keystore.clone(),
     }
   }
 
@@ -111,8 +112,10 @@ impl BalanceSync {
     let mut notarization = NotarizationBuilder::new(
       self.db.clone(),
       self.notary_clients.clone(),
-      self.signer.clone(),
+      self.keystore.clone(),
     );
+    let transaction = Transactions::create_static(&mut db, TransactionType::Consolidation).await?;
+    notarization.set_transaction(transaction).await;
     for jump_account in all_accounts {
       let latest = BalanceChangeStore::get_latest_for_account(&mut db, jump_account.id)
         .await
@@ -149,8 +152,11 @@ impl BalanceSync {
             notarization = NotarizationBuilder::new(
               self.db.clone(),
               self.notary_clients.clone(),
-              self.signer.clone(),
+              self.keystore.clone(),
             );
+            let transaction =
+              Transactions::create_static(&mut db, TransactionType::Consolidation).await?;
+            notarization.set_transaction(transaction).await;
           }
         }
       }
@@ -271,7 +277,7 @@ impl BalanceSync {
         NotarizationBuilder::new(
           self.db.clone(),
           self.notary_clients.clone(),
-          self.signer.clone(),
+          self.keystore.clone(),
         )
       });
 
@@ -342,6 +348,12 @@ impl BalanceSync {
         "No options provided to create votes with tax"
       ));
     };
+    let Some(votes_address) = options.votes_address.as_ref() else {
+      return Err(anyhow::anyhow!(
+        "No votes address provided to create votes with tax"
+      ));
+    };
+
     let mainchain_mutex = self.mainchain_client.lock().await;
     let Some(ref mainchain_client) = *mainchain_mutex else {
       return Err(anyhow::anyhow!(
@@ -392,7 +404,7 @@ impl BalanceSync {
     } else {
       *tick_counter = (current_tick, 0);
     }
-    let vote_address = options.votes_address.clone();
+    let vote_address = votes_address.clone();
     let tax_account = tax_account.unwrap();
     let mut vote = BlockVote {
       account_id: tax_account.get_account_id32()?,
@@ -405,7 +417,7 @@ impl BalanceSync {
       signature: Signature([0; 64]).into(),
     };
     let signature = self
-      .signer
+      .keystore
       .sign(
         tax_account.address,
         Uint8Array::from(vote.hash().as_bytes().to_vec()),
@@ -615,57 +627,98 @@ impl BalanceSync {
       Self::sync_account_origin(&mut tx, &mut account, &notary_client).await?;
     }
 
+    let mut needs_notarization_download = true;
+    let mut notebook_number = None;
     let expected_tip = balance_change.get_balance_tip(&account)?;
-    let tip = notary_client
-      .get_balance_tip(account.address.clone(), account.account_type)
+
+    if let Some(notarization_id) = balance_change.notarization_id {
+      let record = sqlx::query!(
+        "SELECT notebook_number, json IS NOT NULL as json FROM notarizations WHERE id = ?",
+        notarization_id
+      )
+      .fetch_one(&mut *tx)
       .await?;
 
-    if tip.balance_tip.as_ref() != expected_tip.tip().as_slice() {
-      return Ok(());
+      println!("record: {:?}", record);
+
+      notebook_number = record.notebook_number.map(|a| a as u32);
+      needs_notarization_download = record.json == 0;
     }
 
-    let notarization = notary_client
-      .get_notarization(
-        account.get_account_id32()?,
-        account.account_type,
-        tip.notebook_number,
-        balance_change.change_number as u32,
-      )
-      .await?;
-    tracing::debug!(
-      "Downloaded notarization for balance change. id={}, change={}. In notebook #{}, tick {}.",
-      balance_change.id,
-      balance_change.change_number,
-      tip.notebook_number,
-      tip.tick
-    );
+    if needs_notarization_download {
+      let tip = notary_client
+        .get_balance_tip(account.address.clone(), account.account_type)
+        .await?;
 
-    let json = json!(notarization);
-    let notarization_id = sqlx::query_scalar!(
-          "INSERT INTO notarizations (json, notary_id, notebook_number, tick) VALUES (?, ?, ?, ?) RETURNING id",
-            json,
-            balance_change.notary_id,
-            tip.notebook_number,
-            tip.tick,
-          )
-          .fetch_one(&mut *tx)
-          .await?;
-    balance_change.notarization_id = Some(notarization_id);
+      if tip.balance_tip.as_ref() != expected_tip.tip().as_slice() {
+        return Ok(());
+      }
+
+      notebook_number = Some(tip.notebook_number);
+
+      let notarization = notary_client
+        .get_notarization(
+          account.get_account_id32()?,
+          account.account_type,
+          tip.notebook_number,
+          balance_change.change_number as u32,
+        )
+        .await?;
+      tracing::debug!(
+        "Downloaded notarization for balance change. id={}, notarization_id={:?}, change={}. In notebook #{}, tick {}.",
+          balance_change.id,
+          balance_change.notarization_id,
+          balance_change.change_number,
+          tip.notebook_number,
+          tip.tick
+      );
+
+      let json = json!(notarization);
+
+      let notarization_id = match balance_change.notarization_id {
+        Some(id) => {
+          sqlx::query!(
+              "UPDATE notarizations SET json = ?, notebook_number = ?, tick = ? WHERE id = ?",
+              json,
+              tip.notebook_number,
+              tip.tick,
+              id
+            )
+              .execute(&mut *tx)
+              .await?;
+          id
+        },
+        None =>
+          sqlx::query_scalar!(
+              "INSERT INTO notarizations (json, notary_id, notebook_number, tick) VALUES (?, ?, ?, ?) RETURNING id",
+                json,
+                balance_change.notary_id,
+                tip.notebook_number,
+                tip.tick,
+              )
+              .fetch_one(&mut *tx)
+              .await?
+      };
+      balance_change.notarization_id = Some(notarization_id);
+    }
+
     balance_change.status = BalanceChangeStatus::NotebookPublished;
     sqlx::query!(
       "UPDATE balance_changes SET notarization_id = ?, status = ? WHERE id = ?",
-      notarization_id,
+      balance_change.notarization_id,
       BalanceChangeStatus::NotebookPublished as i64,
       balance_change.id
     )
     .execute(&mut *tx)
     .await?;
 
-    let result = notary_client
-      .get_balance_proof(tip.notebook_number, expected_tip)
-      .await?;
+    if let Some(notebook_number) = notebook_number {
+      let result = notary_client
+        .get_balance_proof(notebook_number, expected_tip)
+        .await?;
 
-    BalanceChangeStore::save_notebook_proof(&mut tx, balance_change, &result).await?;
+      BalanceChangeStore::save_notebook_proof(&mut tx, balance_change, &result).await?;
+    }
     tx.commit().await?;
 
     Ok(())

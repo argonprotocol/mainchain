@@ -10,7 +10,7 @@ use comfy_table::{Cell, CellAlignment, ContentArrangement, Table};
 
 use ulx_primitives::DataDomain;
 
-use crate::signer::Signer;
+use crate::keystore::Keystore;
 use crate::{
   to_js_error, AccountStore, BalanceChangeRow, BalanceChangeStore, CryptoScheme, DataDomainStore,
   EscrowCloseOptions, LocalAccount, Localchain, LocalchainConfig, MainchainClient, TickerConfig,
@@ -211,9 +211,9 @@ where
       minimum_vote_amount,
       name,
     } => {
-      let db_path = get_db_path(base_dir.clone(), name.clone());
+      let path = get_path(base_dir.clone(), name.clone());
       let localchain = Localchain::load(LocalchainConfig {
-        db_path,
+        path,
         mainchain_url,
         ntp_pool_url: None,
         keystore_password: Some(keystore_password.into()),
@@ -223,7 +223,7 @@ where
       let balance_sync = localchain.balance_sync();
       let sync_options = match vote_address {
         Some(vote_address) => Some(EscrowCloseOptions {
-          votes_address: vote_address,
+          votes_address: Some(vote_address),
           minimum_vote_amount: minimum_vote_amount.map(|v| v as i64),
         }),
         None => None,
@@ -238,7 +238,7 @@ where
     }
     Commands::DataDomains { subcommand } => match subcommand {
       DataDomainsSubcommand::List { base_dir, name } => {
-        let db = Localchain::create_db(get_db_path(base_dir, name)).await?;
+        let db = Localchain::create_db(get_path(base_dir, name)).await?;
         let domains = DataDomainStore::new(db);
         let data_domains = domains.list().await?;
 
@@ -313,9 +313,9 @@ where
       } => {
         let domain =
           DataDomain::parse(data_domain.clone()).map_err(|_| anyhow!("Not a valid data domain"))?;
-        let db_path = get_db_path(base_dir.clone(), name);
+        let path = get_path(base_dir.clone(), name);
         let localchain = Localchain::load_without_mainchain(
-          db_path,
+          path,
           TickerConfig {
             ntp_pool_url: None,
             genesis_utc_time: 0,
@@ -364,20 +364,20 @@ where
         suri,
         keystore_password,
       } => {
-        let db_path = get_db_path(base_dir.clone(), name.clone());
-        if fs::metadata(&db_path).is_ok() {
-          return Err(anyhow!("Localchain already exists at {:?}", db_path));
+        let path = get_path(base_dir.clone(), name.clone());
+        if fs::metadata(&path).is_ok() {
+          return Err(anyhow!("Localchain already exists at {:?}", path));
         }
 
-        let db = Localchain::create_db(db_path).await?;
-        let signer = Signer::new(db.clone());
+        let db = Localchain::create_db(path).await?;
+        let keystore = Keystore::new(db.clone());
         if let Some(suri) = suri {
-          signer
-            .import_suri_to_embedded(suri, scheme, Some(keystore_password.into()))
+          keystore
+            .import_suri(suri, scheme, Some(keystore_password.into()))
             .await?;
         } else {
-          signer
-            .bootstrap_embedded(Some(scheme), Some(keystore_password.into()))
+          keystore
+            .bootstrap(Some(scheme), Some(keystore_password.into()))
             .await?;
         }
 
@@ -423,8 +423,8 @@ where
             continue;
           };
           if name.ends_with(".db") {
-            let db_path = get_db_path(Some(dir.clone()), name.clone());
-            let db = Localchain::create_db(db_path).await?;
+            let path = get_path(Some(dir.clone()), name.clone());
+            let db = Localchain::create_db(path).await?;
             let mut conn = db.acquire().await?;
             let accounts = AccountStore::list(&mut conn, false).await?;
             for account in accounts {
@@ -471,7 +471,7 @@ fn format_account_record(
   ]
 }
 
-fn get_db_path(base_dir: Option<PathBuf>, name: String) -> String {
+fn get_path(base_dir: Option<PathBuf>, name: String) -> String {
   let base_dir = base_dir.unwrap_or(PathBuf::from(Localchain::get_default_path()));
   base_dir
     .join(format!("{}.db", name.replace(".db", "")))
@@ -484,7 +484,7 @@ fn get_db_path(base_dir: Option<PathBuf>, name: String) -> String {
 #[derive(Debug, Clone, Args)]
 pub struct EmbeddedKeyPassword {
   /// Use interactive shell for entering the password used by the embedded keystore.
-  #[arg(long, conflicts_with_all = &["password", "password_filename"])]
+  #[arg(long, conflicts_with_all = &["key_password", "key_password_filename"])]
   pub key_password_interactive: bool,
 
   /// Password used by the embedded keystore.
@@ -492,7 +492,7 @@ pub struct EmbeddedKeyPassword {
   /// This allows appending an extra user-defined secret to the seed.
   #[arg(
     long,
-    conflicts_with_all = &["password_interactive", "password_filename"]
+    conflicts_with_all = &["key_password_interactive", "key_password_filename"]
   )]
   pub key_password: Option<String>,
 
@@ -500,7 +500,7 @@ pub struct EmbeddedKeyPassword {
   #[arg(
     long,
     value_name = "PATH",
-    conflicts_with_all = &["password_interactive", "password"]
+    conflicts_with_all = &["key_password_interactive", "key_password"]
   )]
   pub key_password_filename: Option<String>,
 }

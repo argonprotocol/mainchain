@@ -27,7 +27,7 @@ use crate::file_transfer::{ArgonFile, ArgonFileType};
 use crate::notarization_tracker::NotarizationTracker;
 use crate::notary_client::NotaryClients;
 use crate::open_escrows::OpenEscrow;
-use crate::signer::Signer;
+use crate::keystore::Keystore;
 use crate::transactions::LocalchainTransaction;
 use crate::{to_js_error, DataDomainStore, Escrow, LocalchainTransfer, NotaryAccountOrigin};
 
@@ -47,12 +47,12 @@ pub struct NotarizationBuilder {
   notary_clients: NotaryClients,
   notary_id: Arc<Mutex<Option<u32>>>,
   transaction: Arc<Mutex<Option<LocalchainTransaction>>>,
-  signer: Signer,
+  keystore: Keystore,
 }
 
 #[napi]
 impl NotarizationBuilder {
-  pub(crate) fn new(db: SqlitePool, notary_clients: NotaryClients, signer: Signer) -> Self {
+  pub(crate) fn new(db: SqlitePool, notary_clients: NotaryClients, keystore: Keystore) -> Self {
     NotarizationBuilder {
       notary_clients,
       db,
@@ -66,7 +66,7 @@ impl NotarizationBuilder {
       is_finalized: Default::default(),
       notary_id: Arc::new(Mutex::new(Some(1))),
       transaction: Default::default(),
-      signer,
+      keystore,
     }
   }
 
@@ -321,7 +321,7 @@ impl NotarizationBuilder {
     let hd_path = AccountStore::get_next_jump_path(&mut db, account_type, notary_id)
       .await
       .map_err(to_js_error)?;
-    let address = self.signer.derive_account_id(hd_path.clone()).await?;
+    let address = self.keystore.derive_account_id(hd_path.clone()).await?;
     let balance_change = self
       .register_new_account(address, account_type, notary_id, hd_path)
       .await?;
@@ -982,12 +982,12 @@ impl NotarizationBuilder {
 
   #[napi]
   pub async fn sign(&self) -> Result<()> {
-    if self.signer.is_embedded_unlocked().await {
+    if self.keystore.is_unlocked().await {
       let accounts = self.loaded_accounts.lock().await;
       for (_, account) in accounts.iter() {
         if let Some(hd_path) = &account.hd_path {
           // load derived
-          self.signer.derive_account_id(hd_path.clone()).await?;
+          self.keystore.derive_account_id(hd_path.clone()).await?;
         }
       }
     }
@@ -999,7 +999,7 @@ impl NotarizationBuilder {
         let mut balance_change = balance_lock.lock().await;
         let bytes = balance_change.hash();
         let signature = self
-          .signer
+          .keystore
           .sign(
             AccountStore::to_address(&balance_change.account_id),
             Uint8Array::from(bytes.as_bytes().to_vec()),
@@ -1087,9 +1087,9 @@ mod test {
     let mock_notary = create_mock_notary().await?;
     let notary_clients = mock_notary_clients(&mock_notary, Ferdie).await?;
 
-    let alice_signer = Signer::new(pool.clone());
+    let alice_signer = Keystore::new(pool.clone());
     let alice_address = alice_signer
-      .import_suri_to_embedded(Alice.to_seed(), Sr25519, None)
+      .import_suri(Alice.to_seed(), Sr25519, None)
       .await?;
 
     let alice_builder = NotarizationBuilder::new(pool, notary_clients.clone(), alice_signer);
@@ -1127,9 +1127,9 @@ mod test {
     let bob_address = AccountStore::to_address(&Bob.to_account_id());
 
     let alice_pool = create_pool().await?;
-    let alice_signer = Signer::new(alice_pool.clone());
+    let alice_signer = Keystore::new(alice_pool.clone());
     let alice_address = alice_signer
-      .import_suri_to_embedded(Alice.to_seed(), Sr25519, None)
+      .import_suri(Alice.to_seed(), Sr25519, None)
       .await?;
 
     let mut alice_db = alice_pool.acquire().await?;
@@ -1185,9 +1185,9 @@ mod test {
     };
     println!("Alice exported a balance change");
 
-    let bob_signer = Signer::new(bob_pool.clone());
+    let bob_signer = Keystore::new(bob_pool.clone());
     bob_signer
-      .import_suri_to_embedded(Bob.to_seed(), Sr25519, None)
+      .import_suri(Bob.to_seed(), Sr25519, None)
       .await?;
     let bob_builder =
       NotarizationBuilder::new(bob_pool.clone(), notary_clients.clone(), bob_signer);
@@ -1320,8 +1320,8 @@ mod test {
       escrow_hold_note: None,
     };
     let balance_change = balance_change.sign(Bob.pair()).clone();
-    let signer = Signer::new(pool.clone());
-    let builder = NotarizationBuilder::new(pool.clone(), notary_clients.clone(), signer.clone());
+    let keystore = Keystore::new(pool.clone());
+    let builder = NotarizationBuilder::new(pool.clone(), notary_clients.clone(), keystore.clone());
     {
       let res = builder
         .import_argon_file(
@@ -1330,8 +1330,8 @@ mod test {
         .await;
       assert!(res.unwrap_err().reason.contains("has not been setup"));
     }
-    let _ = signer
-      .import_suri_to_embedded(Alice.to_seed(), Ed25519, None)
+    let _ = keystore
+      .import_suri(Alice.to_seed(), Ed25519, None)
       .await?;
     let res = builder
       .import_argon_file(ArgonFile::create(vec![balance_change], ArgonFileType::Send).to_json()?)

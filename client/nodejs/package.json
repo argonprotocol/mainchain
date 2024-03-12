@@ -47,7 +47,8 @@
     }
   },
   "dependencies": {
-    "@polkadot/api": "^10.11.2"
+    "@polkadot/api": "^10.11.2",
+    "tslib": "^2.6.2"
   },
   "devDependencies": {
     "@polkadot/typegen": "^10.11.2",

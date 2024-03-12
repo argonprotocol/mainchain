@@ -1,7 +1,7 @@
 use crate::accounts::AccountStore;
 use crate::balance_changes::BalanceChangeStore;
 use crate::notary_client::NotaryClients;
-use crate::signer::Signer;
+use crate::keystore::Keystore;
 use crate::{to_js_error, BalanceChangeStatus};
 use crate::{TickerRef, ESCROW_MINIMUM_SETTLEMENT};
 use anyhow::anyhow;
@@ -311,16 +311,16 @@ impl TryFrom<EscrowRow> for Escrow {
 pub struct OpenEscrow {
   db: SqlitePool,
   escrow: Arc<Mutex<Escrow>>,
-  signer: Signer,
+  keystore: Keystore,
 }
 
 #[napi]
 impl OpenEscrow {
-  pub fn new(db: SqlitePool, escrow: Escrow, signer: &Signer) -> Self {
+  pub fn new(db: SqlitePool, escrow: Escrow, keystore: &Keystore) -> Self {
     OpenEscrow {
       db,
       escrow: Arc::new(Mutex::new(escrow)),
-      signer: signer.clone(),
+      keystore: keystore.clone(),
     }
   }
 
@@ -341,7 +341,7 @@ impl OpenEscrow {
     let bytes = balance_change.hash();
 
     let signature = self
-      .signer
+      .keystore
       .sign(
         AccountStore::to_address(&balance_change.account_id),
         Uint8Array::from(bytes.as_bytes().to_vec()),
@@ -407,7 +407,7 @@ pub struct OpenEscrowsStore {
   db: SqlitePool,
   ticker: TickerRef,
   notary_clients: NotaryClients,
-  signer: Signer,
+  keystore: Keystore,
 }
 #[napi]
 impl OpenEscrowsStore {
@@ -415,13 +415,13 @@ impl OpenEscrowsStore {
     db: SqlitePool,
     ticker: TickerRef,
     notary_clients: &NotaryClients,
-    signer: &Signer,
+    keystore: &Keystore,
   ) -> Self {
     Self {
       db,
       ticker,
       notary_clients: notary_clients.clone(),
-      signer: signer.clone(),
+      keystore: keystore.clone(),
     }
   }
 
@@ -439,7 +439,7 @@ impl OpenEscrowsStore {
 
   #[napi]
   pub fn open(&self, escrow: &Escrow) -> OpenEscrow {
-    OpenEscrow::new(self.db.clone(), escrow.clone(), &self.signer)
+    OpenEscrow::new(self.db.clone(), escrow.clone(), &self.keystore)
   }
 
   pub async fn record_notarized(
@@ -479,7 +479,7 @@ impl OpenEscrowsStore {
     let mut escrows = vec![];
     for row in expired.into_iter() {
       let escrow = Escrow::try_from(row).map_err(to_js_error)?;
-      escrows.push(OpenEscrow::new(self.db.clone(), escrow, &self.signer))
+      escrows.push(OpenEscrow::new(self.db.clone(), escrow, &self.keystore))
     }
     tracing::info!("return escrows {}", escrows.len());
     Ok(escrows)
@@ -526,7 +526,7 @@ impl OpenEscrowsStore {
     }
     escrow.expiration_tick = balance_tip.tick + ESCROW_EXPIRATION_TICKS;
     escrow.insert(&mut db).await.map_err(to_js_error)?;
-    Ok(OpenEscrow::new(self.db.clone(), escrow, &self.signer))
+    Ok(OpenEscrow::new(self.db.clone(), escrow, &self.keystore))
   }
 
   #[napi]
@@ -598,7 +598,7 @@ impl OpenEscrowsStore {
     escrow.insert(&mut *tx).await.map_err(to_js_error)?;
     tx.commit().await.map_err(to_js_error)?;
 
-    Ok(OpenEscrow::new(self.db.clone(), escrow, &self.signer))
+    Ok(OpenEscrow::new(self.db.clone(), escrow, &self.keystore))
   }
 }
 
@@ -731,11 +731,11 @@ mod tests {
       ticker: Ticker::start(Duration::from_secs(60)),
     };
     println!("about to open escrow");
-    let signer = Signer::new(pool.clone());
-    let _ = signer
-      .import_suri_to_embedded(Bob.to_seed(), CryptoScheme::Ed25519, None)
+    let keystore = Keystore::new(pool.clone());
+    let _ = keystore
+      .import_suri(Bob.to_seed(), CryptoScheme::Ed25519, None)
       .await?;
-    let store = OpenEscrowsStore::new(pool, ticker, &notary_clients, &signer);
+    let store = OpenEscrowsStore::new(pool, ticker, &notary_clients, &keystore);
     let open_escrow = store.open_client_escrow(bob_account.id).await?;
     println!("opened escrow");
     let escrow = open_escrow.inner().await;
@@ -811,16 +811,16 @@ mod tests {
     let ticker = TickerRef {
       ticker: Ticker::start(Duration::from_secs(60)),
     };
-    let signer = Signer::new(bob_pool.clone());
-    signer
-      .import_suri_to_embedded("//Bob".to_string(), CryptoScheme::Ed25519, None)
+    let keystore = Keystore::new(bob_pool.clone());
+    keystore
+      .import_suri("//Bob".to_string(), CryptoScheme::Ed25519, None)
       .await?;
-    let bob_store = OpenEscrowsStore::new(bob_pool, ticker.clone(), &notary_clients, &signer);
+    let bob_store = OpenEscrowsStore::new(bob_pool, ticker.clone(), &notary_clients, &keystore);
     let open_escrow = bob_store.open_client_escrow(bob_account.id).await?;
 
     let json = open_escrow.export_for_send().await?;
 
-    let alice_store = OpenEscrowsStore::new(alice_pool, ticker, &notary_clients, &signer);
+    let alice_store = OpenEscrowsStore::new(alice_pool, ticker, &notary_clients, &keystore);
     // before registered with notary, should fail
     match alice_store.import_escrow(json.clone()).await {
       Err(e) => {
@@ -891,9 +891,9 @@ mod tests {
 
     let not_alice = AccountStore::to_address(&Ferdie.to_account_id());
 
-    let bob_signer = Signer::new(bob_pool.clone());
+    let bob_signer = Keystore::new(bob_pool.clone());
     let bob_address = bob_signer
-      .import_suri_to_embedded("//Bob".to_string(), CryptoScheme::Ed25519, None)
+      .import_suri("//Bob".to_string(), CryptoScheme::Ed25519, None)
       .await?;
 
     let ticker = TickerRef {
@@ -919,14 +919,19 @@ mod tests {
       .find(|a| a.id == bob_account.local_account_id)
       .expect("should get");
 
-    let transactions =
-      Transactions::new(bob_pool.clone(), ticker.clone(), &notary_clients, &bob_signer);
+    let transactions = Transactions::new(
+      bob_pool.clone(),
+      ticker.clone(),
+      &notary_clients,
+      &bob_signer,
+    );
 
     let escrow = transactions
       .create_escrow(
         800u128.into(),
-        "delta.flights".to_string(),
         not_alice.clone(),
+        Some("delta.flights".to_string()),
+        None,
       )
       .await?;
     let json = escrow.export_for_send().await?;
@@ -937,11 +942,10 @@ mod tests {
       .expect("should have a latest");
     register_balance_tip(&bob_account, &mock_notary, &bob_hold, 1, 1).await?;
 
-
-    let alice_signer = Signer::new(alice_pool.clone());
+    let alice_signer = Keystore::new(alice_pool.clone());
     let _ = alice_signer
-        .import_suri_to_embedded("//Alice".to_string(), CryptoScheme::Sr25519, None)
-        .await?;
+      .import_suri("//Alice".to_string(), CryptoScheme::Sr25519, None)
+      .await?;
     let alice_store = OpenEscrowsStore::new(alice_pool, ticker, &notary_clients, &alice_signer);
 
     let result = alice_store.import_escrow(json.clone()).await;

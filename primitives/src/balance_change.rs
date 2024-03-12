@@ -60,6 +60,10 @@ struct BalanceChangeHashMessage {
 }
 
 impl BalanceChange {
+	pub fn net_balance_change(&self) -> i128 {
+		self.balance as i128 - self.previous_balance_proof.as_ref().map_or(0, |p| p.balance as i128)
+	}
+
 	pub fn push_note(&mut self, milligons: u128, note_type: NoteType) -> &mut Self {
 		if let Some(existing) = self.notes.iter_mut().find(|n| n.note_type == note_type) {
 			existing.milligons += milligons;

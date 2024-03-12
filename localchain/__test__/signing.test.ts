@@ -11,11 +11,11 @@ it('can sign a message from javscript', async () => {
     const mainchainUrl = await mainchain.launch();
     const bobchain = await Localchain.load({
         mainchainUrl: mainchainUrl,
-        dbPath: ':memory:',
+        path: ':memory:',
     });
     closeOnTeardown(bobchain);
     const bob = new KeyringSigner("//Bob");
-    await bobchain.signer.useExternal(bob.address, bob.sign, bob.derive);
+    await bobchain.keystore.useExternal(bob.address, bob.sign, bob.derive);
     const notarization = bobchain.beginChange();
     const balanceChange = await notarization.defaultDepositAccount();
     await balanceChange.claimFromMainchain({
@@ -33,11 +33,11 @@ it('can sign using built-in', async () => {
     const mainchainUrl = await mainchain.launch();
     const bobchain = await Localchain.load({
         mainchainUrl: mainchainUrl,
-        dbPath: ':memory:',
+        path: ':memory:',
     });
     closeOnTeardown(bobchain);
 
-    await bobchain.signer.importSuriToEmbedded("//Bob", CryptoScheme.Ed25519, {});
+    await bobchain.keystore.importSuri("//Bob", CryptoScheme.Ed25519, {});
     await expect(bobchain.address).resolves.toBe(new Keyring().createFromUri("//Bob", {}, 'ed25519').address);
 
     const notarization = bobchain.beginChange();

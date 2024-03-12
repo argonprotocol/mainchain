@@ -53,13 +53,25 @@ export enum BalanceChangeStatus {
   Canceled = 5
 }
 export interface EscrowCloseOptions {
-  votesAddress: string
+  votesAddress?: string
   /** What's the minimum amount of tax we should wait for before voting on blocks */
   minimumVoteAmount?: number
 }
 export interface DataDomain {
   domainName: string
   topLevelDomain: DataTLD
+}
+/**
+ * Options to provide the password for a keystore. NOTE that this library cannot clear out memory in javascript.
+ * Only a single option should be picked.
+ */
+export interface KeystorePasswordOption {
+  /** Provides a password directly for the keystore. Converted to a SecretString inside Rust, but not cleared out in javascript or napi. */
+  password?: Buffer
+  /** Initiate a prompt from the cli to load the password. */
+  interactiveCli?: boolean
+  /** Load the password from a file. */
+  passwordFile?: string
 }
 export interface LocalchainTransfer {
   address: string
@@ -146,18 +158,6 @@ export interface SignatureResult {
   signature: Uint8Array
   milligons: bigint
 }
-/**
- * Options to provide the password for a keystore. NOTE that this library cannot clear out memory in javascript.
- * Only a single option should be picked.
- */
-export interface KeystorePasswordOption {
-  /** Provides a password directly for the keystore. Converted to a SecretString inside Rust, but not cleared out in javascript or napi. */
-  password?: Buffer
-  /** Initiate a prompt from the cli to load the password. */
-  interactiveCli?: boolean
-  /** Load the password from a file. */
-  passwordFile?: string
-}
 export enum CryptoScheme {
   Ed25519 = 0,
   Sr25519 = 1,
@@ -188,17 +188,59 @@ export enum ArgonFileType {
   Send = 0,
   Request = 1
 }
+export interface BalanceChangeGroup {
+  netBalanceChange: bigint
+  netTax: bigint
+  heldBalance: bigint
+  notes: Array<string>
+  finalizedBlockNumber?: number
+  status: BalanceChangeStatus
+  notarizationId?: number
+  transactionId?: number
+  transactionType?: TransactionType
+  balanceChanges: Array<BalanceChangeSummary>
+  notebookNumber?: number
+}
+export interface BalanceChangeSummary {
+  id: number
+  finalBalance: bigint
+  holdBalance: bigint
+  netBalanceChange: bigint
+  changeNumber: number
+  accountId: number
+  accountType: AccountType
+  isJumpAccount: boolean
+  notes: Array<string>
+  status: BalanceChangeStatus
+  notebookNumber?: number
+  finalizedBlockNumber?: number
+}
+export interface LocalchainOverview {
+  /** The current account balance */
+  balance: bigint
+  /** The net pending balance change acceptance/confirmation */
+  pendingBalanceChange: bigint
+  /** Balance held in escrow */
+  heldBalance: bigint
+  /** Tax accumulated for the account */
+  tax: bigint
+  /** The net pending tax balance change */
+  pendingTaxChange: bigint
+  /** Changes to the account ordered from most recent to oldest */
+  changes: Array<BalanceChangeGroup>
+}
 export enum TransactionType {
   Send = 0,
   Request = 1,
-  OpenEscrow = 2
+  OpenEscrow = 2,
+  Consolidation = 3
 }
 export interface LocalchainTransaction {
   id: number
   transactionType: TransactionType
 }
 export interface LocalchainConfig {
-  dbPath: string
+  path: string
   mainchainUrl: string
   ntpPoolUrl?: string
   keystorePassword?: KeystorePasswordOption
@@ -258,9 +300,10 @@ export class BalanceChange {
   accountId: number
   changeNumber: number
   balance: string
+  netBalanceChange: string
   escrowHoldNoteJson?: string
   notaryId: number
-  notesJson?: string
+  notesJson: string
   proofJson?: string
   finalizedBlockNumber?: number
   status: BalanceChangeStatus
@@ -303,6 +346,18 @@ export class DataDomainStore {
   static getHash(domain: string): Uint8Array
   static parse(domain: string): DataDomain
   get(id: number): Promise<DataDomainLease>
+}
+export class Keystore {
+  useExternal(defaultAddress: string, sign: (address: string, signatureMessage: Uint8Array) => Promise<Uint8Array>, derive: (hd_path: string) => Promise<string>): Promise<void>
+  /** Bootstrap this localchain with a new key. Must be empty or will throw an error! Defaults to SR25519 if no scheme is provided. */
+  bootstrap(scheme?: CryptoScheme | undefined | null, passwordOption?: KeystorePasswordOption | undefined | null): Promise<string>
+  /** Import a known keypair into the embedded keystore. */
+  importSuri(suri: string, scheme: CryptoScheme, passwordOption?: KeystorePasswordOption | undefined | null): Promise<string>
+  unlock(passwordOption?: KeystorePasswordOption | undefined | null): Promise<void>
+  lock(): Promise<void>
+  isUnlocked(): Promise<boolean>
+  deriveAccountId(hdPath: string): Promise<string>
+  sign(address: string, message: Uint8Array): Promise<Uint8Array>
 }
 export class MainchainClient {
   close(): Promise<void>
@@ -434,35 +489,28 @@ export class OpenEscrowsStore {
   /** Create a new escrow as a client. You must first notarize an escrow hold note to the notary for the `client_address`. */
   openClientEscrow(accountId: number): Promise<OpenEscrow>
 }
-export class Signer {
-  useExternal(defaultAddress: string, sign: (address: string, signatureMessage: Uint8Array) => Promise<Uint8Array>, derive: (hd_path: string) => Promise<string>): Promise<void>
-  /** Bootstrap this localchain with a new key. Must be empty or will throw an error! Defaults to SR25519 if no scheme is provided. */
-  bootstrapEmbedded(scheme?: CryptoScheme | undefined | null, passwordOption?: KeystorePasswordOption | undefined | null): Promise<string>
-  /** Import a known keypair into the embedded keystore. */
-  importSuriToEmbedded(suri: string, scheme: CryptoScheme, passwordOption?: KeystorePasswordOption | undefined | null): Promise<string>
-  unlockEmbedded(passwordOption?: KeystorePasswordOption | undefined | null): Promise<void>
-  lockEmbedded(): Promise<void>
-  isEmbeddedUnlocked(): Promise<boolean>
-  deriveAccountId(hdPath: string): Promise<string>
-  sign(address: string, message: Uint8Array): Promise<Uint8Array>
+export class OverviewStore {
+  get(): Promise<LocalchainOverview>
 }
 export class Transactions {
+  create(transactionType: TransactionType): Promise<LocalchainTransaction>
   request(milligons: bigint): Promise<string>
-  createEscrow(escrowMilligons: bigint, dataDomain: string, dataDomainAddress: string): Promise<OpenEscrow>
+  createEscrow(escrowMilligons: bigint, recipientAddress: string, dataDomain?: string | undefined | null, notaryId?: number | undefined | null): Promise<OpenEscrow>
   send(milligons: bigint, to?: Array<string> | undefined | null): Promise<string>
 }
 export class Localchain {
   path: string
   static load(config: LocalchainConfig): Promise<Localchain>
-  static loadWithoutMainchain(dbPath: string, tickerConfig: TickerConfig, keystorePassword?: KeystorePasswordOption | undefined | null): Promise<Localchain>
+  static loadWithoutMainchain(path: string, tickerConfig: TickerConfig, keystorePassword?: KeystorePasswordOption | undefined | null): Promise<Localchain>
   attachMainchain(mainchainClient: MainchainClient): Promise<void>
   close(): Promise<void>
+  accountOverview(): Promise<LocalchainOverview>
   static getDefaultDir(): string
   static getDefaultPath(): string
   get address(): Promise<string>
   get currentTick(): number
   get ticker(): TickerRef
-  get signer(): Signer
+  get keystore(): Keystore
   get mainchainClient(): Promise<MainchainClient | null>
   get notaryClients(): NotaryClients
   get accounts(): AccountStore

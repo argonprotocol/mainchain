@@ -18,7 +18,7 @@ use crate::{to_js_error, AccountStore};
 
 #[napi]
 #[derive(Clone)]
-pub struct Signer {
+pub struct Keystore {
   js_callbacks: Arc<Mutex<Option<JsCallbacks>>>,
   embedded_keystore: EmbeddedKeystore,
   db: SqlitePool,
@@ -30,9 +30,9 @@ struct JsCallbacks {
 }
 
 #[napi]
-impl Signer {
+impl Keystore {
   pub(crate) fn new(db: SqlitePool) -> Self {
-    Signer {
+    Keystore {
       js_callbacks: Default::default(),
       embedded_keystore: EmbeddedKeystore::new(db.clone()),
       db,
@@ -63,7 +63,7 @@ impl Signer {
 
   /// Bootstrap this localchain with a new key. Must be empty or will throw an error! Defaults to SR25519 if no scheme is provided.
   #[napi]
-  pub async fn bootstrap_embedded(
+  pub async fn bootstrap(
     &self,
     // The crypto scheme. Defaults to SR25519 if not provided.
     scheme: Option<CryptoScheme>,
@@ -88,7 +88,7 @@ impl Signer {
 
   /// Import a known keypair into the embedded keystore.
   #[napi]
-  pub async fn import_suri_to_embedded(
+  pub async fn import_suri(
     &self,
     // The secret uri path to import.
     suri: String,
@@ -113,7 +113,7 @@ impl Signer {
   }
 
   #[napi]
-  pub async fn unlock_embedded(
+  pub async fn unlock(
     &self,
     password_option: Option<KeystorePasswordOption>,
   ) -> Result<()> {
@@ -130,18 +130,18 @@ impl Signer {
   }
 
   #[napi]
-  pub async fn lock_embedded(&self) {
+  pub async fn lock(&self) {
     self.embedded_keystore.lock().await;
   }
 
   #[napi]
-  pub async fn is_embedded_unlocked(&self) -> bool {
+  pub async fn is_unlocked(&self) -> bool {
     self.embedded_keystore.is_unlocked().await
   }
 
   #[napi]
   pub async fn derive_account_id(&self, hd_path: String) -> Result<String> {
-    if self.is_embedded_unlocked().await {
+    if self.is_unlocked().await {
       return self
         .embedded_keystore
         .derive(&hd_path)

@@ -1,18 +1,18 @@
 use anyhow::anyhow;
 use chrono::NaiveDateTime;
 use napi::bindgen_prelude::*;
-use sp_core::crypto::{
-  AccountId32, PublicError, Ss58AddressFormat, Ss58AddressFormatRegistry, Ss58Codec,
-};
 use sp_core::ByteArray;
+use sp_core::crypto::{
+  AccountId32, PublicError, Ss58AddressFormat, Ss58Codec,
+};
 use sqlx::{FromRow, SqliteConnection, SqlitePool};
 
+use ulx_primitives::{AccountOrigin, AccountType, ADDRESS_PREFIX};
 use ulx_primitives::AccountOriginUid;
 use ulx_primitives::NotaryId;
 use ulx_primitives::NotebookNumber;
-use ulx_primitives::{AccountOrigin, AccountType};
 
-use crate::{to_js_error, BalanceChangeStatus, BalanceChangeStore};
+use crate::{BalanceChangeStatus, BalanceChangeStore, to_js_error};
 
 #[napi(object)]
 #[derive(Debug, Clone, Eq, PartialEq)]
@@ -100,7 +100,6 @@ pub struct AccountStore {
 }
 
 pub const DEFAULT_NOTARY_ID: NotaryId = 1;
-pub const ADDRESS_PREFIX: u16 = Ss58AddressFormatRegistry::SubstrateAccount as u16;
 
 #[napi]
 impl AccountStore {

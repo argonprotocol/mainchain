@@ -23,14 +23,15 @@ pub struct BalanceChangeRow {
   pub account_id: i64,
   pub change_number: i64,
   pub balance: String,
+  pub net_balance_change: String,
   pub escrow_hold_note_json: Option<String>,
   pub notary_id: i64,
-  pub notes_json: Option<String>,
+  pub notes_json: String,
   pub proof_json: Option<String>,
   pub finalized_block_number: Option<i64>,
   pub status: BalanceChangeStatus,
   pub transaction_id: Option<i64>,
-  timestamp: NaiveDateTime,
+  pub(crate) timestamp: NaiveDateTime,
   pub notarization_id: Option<i64>,
 }
 
@@ -132,14 +133,24 @@ impl BalanceChangeStore {
     Self { db }
   }
 
-  #[napi]
-  pub async fn all_for_account(&self, account_id: i64) -> Result<Vec<BalanceChangeRow>> {
+  #[napi(js_name = "allForAccount")]
+  pub async fn all_for_account_js(&self, account_id: i64) -> Result<Vec<BalanceChangeRow>> {
+    let mut db = self.db.acquire().await.map_err(to_js_error)?;
+    Self::all_for_account(&mut *db, account_id)
+      .await
+      .map_err(to_js_error)
+  }
+
+  pub async fn all_for_account(
+    db: &mut SqliteConnection,
+    account_id: i64,
+  ) -> Result<Vec<BalanceChangeRow>> {
     let row = sqlx::query_as!(
       BalanceChangeRow,
       "SELECT * FROM balance_changes WHERE account_id = ? ORDER BY change_number DESC",
       account_id
     )
-    .fetch_all(&self.db)
+    .fetch_all(db)
     .await
     .map_err(to_js_error)?;
     Ok(row)
@@ -341,13 +352,15 @@ impl BalanceChangeStore {
     let notes_json = json!(balance_change.notes);
 
     let balance_str = balance_change.balance.to_string();
+    let net_balance_change = balance_change.net_balance_change().to_string();
 
     let res = sqlx::query!(
-        r#"INSERT INTO balance_changes (account_id, change_number, balance, status, escrow_hold_note_json, notes_json, notary_id, transaction_id)
-        VALUES (?, ?, ?, ?, ?, ?, ?, ?)"#,
+        r#"INSERT INTO balance_changes (account_id, change_number, balance, net_balance_change, status, escrow_hold_note_json, notes_json, notary_id, transaction_id)
+        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)"#,
         account_id,
         balance_change.change_number,
         balance_str,
+        net_balance_change,
         BalanceChangeStatus::WaitingForSendClaim as i64,
         hold_note_json,
         notes_json,
@@ -382,6 +395,7 @@ impl BalanceChangeStore {
     let notes_json = json!(balance_change.notes);
 
     let balance_str = balance_change.balance.to_string();
+    let net_balance_change = balance_change.net_balance_change().to_string();
 
     if let Some(existing) = Self::find_account_change(db, account_id, balance_change).await? {
       if existing.status == BalanceChangeStatus::NotebookPublished
@@ -390,10 +404,11 @@ impl BalanceChangeStore {
         return Ok(existing.id);
       }
       let res = sqlx::query!(
-        "UPDATE balance_changes SET notarization_id = ?, balance = ?, notes_json = ?, escrow_hold_note_json = ?, status = ?, \
+        "UPDATE balance_changes SET notarization_id = ?, balance = ?, net_balance_change = ?, notes_json = ?, escrow_hold_note_json = ?, status = ?, \
         transaction_id = ? WHERE id = ?",
         notarization_id,
         balance_str,
+        net_balance_change,
         notes_json,
         hold_note_json,
         BalanceChangeStatus::SubmittedToNotary as i64,
@@ -407,11 +422,12 @@ impl BalanceChangeStore {
     }
 
     let res = sqlx::query!(
-        r#"INSERT INTO balance_changes (account_id, change_number, balance, status, escrow_hold_note_json, notes_json, notary_id, notarization_id, transaction_id)
-        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)"#,
+        r#"INSERT INTO balance_changes (account_id, change_number, balance, net_balance_change, status, escrow_hold_note_json, notes_json, notary_id, notarization_id, transaction_id)
+        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)"#,
         account_id,
         balance_change.change_number,
         balance_str,
+        net_balance_change,
         BalanceChangeStatus::SubmittedToNotary as i64,
         hold_note_json,
         notes_json,
@@ -525,7 +541,7 @@ mod test {
       AccountStore::to_address(&Ferdie.to_account_id()),
       AccountType::Tax,
       1,
-      None
+      None,
     )
     .await?;
     // need to set the id and get the updated origin
@@ -551,7 +567,8 @@ mod test {
       balance: 0,
     });
     let mut tx = pool.begin().await?;
-    let id = BalanceChangeStore::save_sent(&mut tx, account.id, balance_change.clone(), 1, None).await?;
+    let id =
+      BalanceChangeStore::save_sent(&mut tx, account.id, balance_change.clone(), 1, None).await?;
     tx.commit().await?;
 
     assert_eq!(

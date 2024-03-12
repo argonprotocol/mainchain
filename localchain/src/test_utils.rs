@@ -2,6 +2,7 @@ use std::collections::BTreeMap;
 use std::collections::HashMap;
 use std::str::FromStr;
 use std::sync::Arc;
+use std::time::Duration;
 
 use binary_merkle_tree::{merkle_proof, merkle_root};
 use codec::Encode;
@@ -25,6 +26,7 @@ use ulx_notary::apis::localchain::{BalanceChangeResult, BalanceTipResult, Localc
 use ulx_notary::apis::notebook::NotebookRpcServer;
 use ulx_notary::server::pipe_from_stream_and_drop;
 use ulx_notary::server::NotebookHeaderStream;
+use ulx_primitives::tick::Ticker;
 use ulx_primitives::{
   AccountId, AccountOrigin, AccountOriginUid, AccountType, BalanceChange, BalanceProof, BalanceTip,
   ChainTransfer, LocalchainAccountId, MerkleProof, NewAccountOrigin, Notarization,
@@ -34,7 +36,10 @@ use ulx_primitives::{
 
 use crate::notarization_builder::NotarizationBuilder;
 use crate::notarization_tracker::NotebookProof;
-use crate::{AccountStore, LocalchainTransfer, MainchainClient, NotaryClient, NotaryClients};
+use crate::{
+  AccountStore, CryptoScheme, Localchain, LocalchainTransfer, MainchainClient, NotaryClient,
+  NotaryClients, Keystore, TickerRef,
+};
 
 /// Debug sqlite connections. This function is for sqlx unit tests. To activate, your test signature
 /// should look like this:
@@ -67,6 +72,30 @@ pub(crate) async fn create_mock_notary() -> anyhow::Result<MockNotary> {
   let mut mock_notary = MockNotary::new(1);
   mock_notary.start().await?;
   Ok(mock_notary)
+}
+
+pub(crate) async fn mock_localchain(
+  pool: &SqlitePool,
+  suri: &str,
+  crypto_scheme: CryptoScheme,
+  notary_clients: &NotaryClients,
+) -> Localchain {
+  let ticker = TickerRef {
+    ticker: Ticker::start(Duration::from_secs(60)),
+  };
+  let keystore = Keystore::new(pool.clone());
+  let _ = keystore
+    .import_suri(suri.to_string(), crypto_scheme, None)
+    .await
+    .expect("should import");
+  Localchain {
+    db: pool.clone(),
+    keystore: keystore.clone(),
+    ticker: ticker.clone(),
+    notary_clients: notary_clients.clone(),
+    path: ":memory:".to_string(),
+    mainchain_client: Default::default(),
+  }
 }
 
 pub(crate) async fn mock_notary_clients(

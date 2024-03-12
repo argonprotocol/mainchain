@@ -3,6 +3,7 @@
 #[macro_use]
 extern crate napi_derive;
 
+use std::env;
 use directories::BaseDirs;
 use std::path::PathBuf;
 use std::sync::Arc;
@@ -18,10 +19,10 @@ pub use balance_changes::*;
 pub use balance_sync::*;
 pub use constants::*;
 pub use data_domain::*;
+pub use keystore::Keystore;
 pub use mainchain_client::*;
 pub use notary_client::*;
 pub use open_escrows::*;
-pub use signer::Signer;
 use ulx_primitives::tick::Ticker;
 
 mod accounts;
@@ -29,22 +30,23 @@ mod balance_change_builder;
 mod balance_changes;
 mod balance_sync;
 mod data_domain;
+pub mod keystore;
 mod mainchain_client;
 mod notarization_builder;
 mod notarization_tracker;
 mod notary_client;
 mod open_escrows;
-pub mod signer;
 
 pub mod embedded_keystore;
 
-use crate::signer::KeystorePasswordOption;
+use crate::keystore::KeystorePasswordOption;
 pub use embedded_keystore::CryptoScheme;
 
 pub mod cli;
 pub mod constants;
 mod file_transfer;
 pub mod macros;
+mod overview;
 #[cfg(test)]
 pub(crate) mod test_utils;
 pub mod transactions;
@@ -55,13 +57,13 @@ pub struct Localchain {
   pub(crate) ticker: TickerRef,
   pub(crate) mainchain_client: Arc<Mutex<Option<MainchainClient>>>,
   pub(crate) notary_clients: NotaryClients,
-  pub(crate) signer: Signer,
+  pub(crate) keystore: Keystore,
   pub path: String,
 }
 
 #[napi(object)]
 pub struct LocalchainConfig {
-  pub db_path: String,
+  pub path: String,
   pub mainchain_url: String,
   pub ntp_pool_url: Option<String>,
   pub keystore_password: Option<KeystorePasswordOption>,
@@ -96,16 +98,16 @@ impl Localchain {
   #[napi(factory)]
   pub async fn load(config: LocalchainConfig) -> Result<Localchain> {
     Self::config_logs();
-    tracing::info!("Loading localchain at {:?}", config.db_path);
+    tracing::info!("Loading localchain at {:?}", config.path);
 
     let LocalchainConfig {
       keystore_password,
-      db_path,
+      path,
       mainchain_url,
       ntp_pool_url,
     } = config;
 
-    let db = Self::create_db(db_path.clone()).await?;
+    let db = Self::create_db(path.clone()).await?;
 
     let mainchain_client = MainchainClient::connect(mainchain_url, 30_000)
       .await
@@ -119,32 +121,35 @@ impl Localchain {
     }
 
     let mainchain_mutex = Arc::new(Mutex::new(Some(mainchain_client.clone())));
-    let signer = Signer::new(db.clone());
+    let keystore = Keystore::new(db.clone());
     if let Some(password_option) = keystore_password {
-      signer
-        .unlock_embedded(Some(password_option))
+      keystore
+        .unlock(Some(password_option))
         .await
         .map_err(to_js_error)?;
+    } else {
+      // might not unlock, but try in case
+      let _ = keystore.unlock(None).await;
     }
 
     Ok(Localchain {
       db,
-      path: db_path,
+      path: path,
       ticker: TickerRef { ticker },
       mainchain_client: mainchain_mutex.clone(),
       notary_clients: NotaryClients::from(mainchain_mutex.clone()),
-      signer,
+      keystore,
     })
   }
 
   #[napi(factory)]
   pub async fn load_without_mainchain(
-    db_path: String,
+    path: String,
     ticker_config: TickerConfig,
     keystore_password: Option<KeystorePasswordOption>,
   ) -> Result<Localchain> {
     Self::config_logs();
-    tracing::info!("Loading localchain at {:?}", db_path);
+    tracing::info!("Loading localchain at {:?}", path);
 
     let mut ticker = Ticker::new(
       ticker_config.tick_duration_millis as u64,
@@ -156,24 +161,24 @@ impl Localchain {
         .await
         .map_err(to_js_error)?;
     }
-    let db = Self::create_db(db_path.clone()).await?;
+    let db = Self::create_db(path.clone()).await?;
 
     let mainchain_mutex = Arc::new(Mutex::new(None));
-    let signer = Signer::new(db.clone());
+    let keystore = Keystore::new(db.clone());
     if let Some(password_option) = keystore_password {
-      signer
-        .unlock_embedded(Some(password_option))
+      keystore
+        .unlock(Some(password_option))
         .await
         .map_err(to_js_error)?;
     }
 
     Ok(Localchain {
       db,
-      path: db_path,
+      path: path,
       ticker: TickerRef { ticker },
       mainchain_client: mainchain_mutex.clone(),
       notary_clients: NotaryClients::from(mainchain_mutex),
-      signer,
+      keystore,
     })
   }
 
@@ -196,6 +201,11 @@ impl Localchain {
     }
     tracing::trace!("Closed Localchain");
     Ok(())
+  }
+
+  #[napi]
+  pub async fn account_overview(&self) -> Result<overview::LocalchainOverviewJs> {
+    overview::OverviewStore::new(self.db.clone()).get_js().await
   }
 
   #[napi]
@@ -239,8 +249,8 @@ impl Localchain {
   }
 
   #[napi(getter)]
-  pub fn signer(&self) -> Signer {
-    self.signer.clone()
+  pub fn keystore(&self) -> Keystore {
+    self.keystore.clone()
   }
 
   #[napi(getter)]
@@ -275,7 +285,7 @@ impl Localchain {
       self.db.clone(),
       self.ticker.clone(),
       &self.notary_clients,
-      &self.signer,
+      &self.keystore,
     )
   }
 
@@ -289,7 +299,7 @@ impl Localchain {
       self.db.clone(),
       self.ticker.clone(),
       &self.notary_clients,
-      &self.signer,
+      &self.keystore,
     )
   }
 
@@ -298,7 +308,7 @@ impl Localchain {
     notarization_builder::NotarizationBuilder::new(
       self.db.clone(),
       self.notary_clients.clone(),
-      self.signer.clone(),
+      self.keystore.clone(),
     )
   }
 
@@ -307,6 +317,8 @@ impl Localchain {
       .with_env_filter(tracing_subscriber::EnvFilter::from_default_env())
       // RUST_LOG=trace,soketto=info,sqlx=info,jsonrpsee_core=info
       .try_init();
+
+    env::set_var("RUST_BACKTRACE", "1");
   }
 }
 

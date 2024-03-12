@@ -29,7 +29,7 @@ it('can transfer from mainchain to local', async () => {
 
     const nonce = await transferToLocalchain(bob.defaultPair, 5000, 1, mainchainClient);
     const bobchain = await createLocalchain(mainchainUrl);
-    await bobchain.signer.importSuriToEmbedded("//Bob", CryptoScheme.Sr25519);
+    await bobchain.keystore.importSuri("//Bob", CryptoScheme.Sr25519);
     const bobMainchainClient = await bobchain.mainchainClient;
     const transfer = await bobMainchainClient.waitForLocalchainTransfer(bob.address, nonce);
     expect(transfer).toBeTruthy();
@@ -69,7 +69,7 @@ it('can transfer from mainchain to local to mainchain', async () => {
     const ferdie = new Keyring().createFromUri("//Ferdie//1", {}, 'sr25519');
 
     // TODO: convert this to export pkcs8 and then import it
-    await bobchain.signer.importSuriToEmbedded("//Bob", CryptoScheme.Sr25519);
+    await bobchain.keystore.importSuri("//Bob", CryptoScheme.Sr25519);
     {
         const bobMainchainClient = await bobchain.mainchainClient;
         const transfer = await bobMainchainClient.waitForLocalchainTransfer(bob.address, nonce);
@@ -85,7 +85,7 @@ it('can transfer from mainchain to local to mainchain', async () => {
     let expectedAliceBalance = 0n;
     {
         const ferdiechain = await createLocalchain(mainchainUrl);
-        await ferdiechain.signer.importSuriToEmbedded("//Ferdie//1", CryptoScheme.Sr25519);
+        await ferdiechain.keystore.importSuri("//Ferdie//1", CryptoScheme.Sr25519);
         const notarization = ferdiechain.beginChange();
         await notarization.importArgonFile(bobSendArgonFile);
         const balanceChange = (await notarization.balanceChangeBuilders).find(x => x.address == ferdie.address && x.accountType == AccountType.Deposit);

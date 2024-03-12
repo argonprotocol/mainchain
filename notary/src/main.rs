@@ -111,6 +111,7 @@ async fn main() -> anyhow::Result<()> {
 		.with_env_filter(tracing_subscriber::EnvFilter::from_default_env())
 		.try_init()
 		.expect("setting default subscriber failed");
+	env::set_var("RUST_BACKTRACE", "1");
 
 	match cli.command {
 		Commands::Run {

@@ -1,21 +1,22 @@
 use futures::TryFutureExt;
 use napi::bindgen_prelude::*;
-use sqlx::SqlitePool;
+use sqlx::{SqliteConnection, SqlitePool};
 
 use ulx_primitives::{AccountType, Note};
 
 use crate::file_transfer::ArgonFileType;
+use crate::keystore::Keystore;
 use crate::notarization_builder::NotarizationBuilder;
 use crate::notary_client::NotaryClients;
-use crate::signer::Signer;
-use crate::{to_js_error, OpenEscrow, OpenEscrowsStore, TickerRef};
+use crate::{to_js_error, OpenEscrow, OpenEscrowsStore, TickerRef, ESCROW_MINIMUM_SETTLEMENT};
 
 #[derive(Debug, PartialOrd, PartialEq)]
 #[napi]
 pub enum TransactionType {
-  Send,
-  Request,
-  OpenEscrow,
+  Send = 0,
+  Request = 1,
+  OpenEscrow = 2,
+  Consolidation = 3,
 }
 
 impl From<i64> for TransactionType {
@@ -24,6 +25,7 @@ impl From<i64> for TransactionType {
       0 => TransactionType::Send,
       1 => TransactionType::Request,
       2 => TransactionType::OpenEscrow,
+      3 => TransactionType::Consolidation,
       _ => panic!("Unknown transaction type {}", i),
     }
   }
@@ -41,7 +43,7 @@ pub struct Transactions {
   db: SqlitePool,
   ticker: TickerRef,
   notary_clients: NotaryClients,
-  signer: Signer,
+  keystore: Keystore,
 }
 #[napi]
 impl Transactions {
@@ -49,30 +51,26 @@ impl Transactions {
     db: SqlitePool,
     ticker: TickerRef,
     notary_clients: &NotaryClients,
-    signer: &Signer,
+    keystore: &Keystore,
   ) -> Self {
     Self {
       db,
       ticker,
       notary_clients: notary_clients.clone(),
-      signer: signer.clone(),
+      keystore: keystore.clone(),
     }
   }
 
-  fn new_notarization(&self) -> NotarizationBuilder {
-    NotarizationBuilder::new(
-      self.db.clone(),
-      self.notary_clients.clone(),
-      self.signer.clone(),
-    )
-  }
-
-  pub async fn create(&self, transaction_type: TransactionType) -> Result<LocalchainTransaction> {
+  pub async fn create_static(
+    db: &mut SqliteConnection,
+    transaction_type: TransactionType,
+  ) -> Result<LocalchainTransaction> {
+    let type_id = transaction_type as i64;
     let transaction_id = sqlx::query_scalar!(
       "INSERT INTO transactions (transaction_type) VALUES (?) RETURNING ID",
-      TransactionType::Request as i64
+      type_id,
     )
-    .fetch_one(&self.db)
+    .fetch_one(db)
     .map_err(to_js_error)
     .await?;
 
@@ -80,6 +78,12 @@ impl Transactions {
       id: transaction_id as u32,
       transaction_type,
     })
+  }
+
+  #[napi]
+  pub async fn create(&self, transaction_type: TransactionType) -> Result<LocalchainTransaction> {
+    let mut db = self.db.acquire().await.map_err(to_js_error)?;
+    Self::create_static(&mut db, transaction_type).await
   }
 
   #[napi]
@@ -110,32 +114,49 @@ impl Transactions {
   pub async fn create_escrow(
     &self,
     escrow_milligons: BigInt,
-    data_domain: String,
-    data_domain_address: String,
+    recipient_address: String,
+    data_domain: Option<String>,
+    notary_id: Option<u32>,
   ) -> Result<OpenEscrow> {
     let jump_notarization = self.new_notarization();
+    if let Some(notary_id) = notary_id {
+      jump_notarization.set_notary_id(notary_id).await;
+    }
     let transaction = self.create(TransactionType::OpenEscrow).await?;
     jump_notarization.set_transaction(transaction.clone()).await;
 
-    let amount_plus_tax =
-      jump_notarization.get_total_for_after_tax_balance(escrow_milligons.clone());
+    let escrow_milligons = if escrow_milligons.get_u128().1 < ESCROW_MINIMUM_SETTLEMENT {
+      BigInt::from(ESCROW_MINIMUM_SETTLEMENT)
+    } else {
+      escrow_milligons
+    };
+
+    let amount_plus_tax = jump_notarization.get_total_for_after_tax_balance(escrow_milligons.clone());
     let jump_account = jump_notarization.fund_jump_account(amount_plus_tax).await?;
     let _ = jump_notarization.notarize().await?;
 
     let escrow_notarization = self.new_notarization();
     escrow_notarization.set_transaction(transaction).await;
-    escrow_notarization
+    let balance_change = escrow_notarization
       .add_account_by_id(jump_account.local_account_id)
-      .await?
-      .create_escrow_hold(escrow_milligons, data_domain, data_domain_address)
       .await?;
+
+    if let Some(data_domain) = data_domain {
+      balance_change
+        .create_escrow_hold(escrow_milligons, data_domain, recipient_address)
+        .await?;
+    } else {
+      balance_change
+        .create_private_server_escrow_hold(escrow_milligons, recipient_address)
+        .await?;
+    }
     escrow_notarization.notarize().await?;
 
     let escrow = OpenEscrowsStore::new(
       self.db.clone(),
       self.ticker.clone(),
       &self.notary_clients,
-      &self.signer,
+      &self.keystore,
     );
     let open_escrow = escrow
       .open_client_escrow(jump_account.local_account_id)
@@ -170,6 +191,14 @@ impl Transactions {
 
     Ok(json)
   }
+
+  fn new_notarization(&self) -> NotarizationBuilder {
+    NotarizationBuilder::new(
+      self.db.clone(),
+      self.notary_clients.clone(),
+      self.keystore.clone(),
+    )
+  }
 }
 
 #[cfg(test)]
@@ -177,9 +206,10 @@ mod tests {
   use sp_keyring::AccountKeyring::{Alice, Bob};
   use sp_keyring::Ed25519Keyring;
   use sp_keyring::Ed25519Keyring::Ferdie;
+
   use ulx_primitives::AccountType;
 
-  use crate::test_utils::{create_mock_notary, create_pool, mock_notary_clients};
+  use crate::test_utils::{create_mock_notary, create_pool, mock_localchain, mock_notary_clients};
   use crate::CryptoScheme::{Ed25519, Sr25519};
   use crate::*;
 
@@ -526,9 +556,11 @@ mod tests {
         }
       } else {
         if account.hd_path.is_some() {
+          // should be getting consolidated
           assert_eq!(latest.balance, "0");
           assert_eq!(latest.status, BalanceChangeStatus::SubmittedToNotary);
-          assert!(latest.transaction_id.is_none());
+          assert!(latest.transaction_id.is_some());
+          assert_eq!(latest.net_balance_change, "-3500");
           assert_eq!(latest.change_number, 2);
         } else {
           assert_eq!(latest.balance, "3500");
@@ -549,29 +581,5 @@ mod tests {
       .is_some());
 
     Ok(())
-  }
-
-  async fn mock_localchain(
-    pool: &SqlitePool,
-    suri: &str,
-    crypto_scheme: CryptoScheme,
-    notary_clients: &NotaryClients,
-  ) -> Localchain {
-    let ticker = TickerRef {
-      ticker: Ticker::start(Duration::from_secs(60)),
-    };
-    let signer = Signer::new(pool.clone());
-    let _ = signer
-      .import_suri_to_embedded(suri.to_string(), crypto_scheme, None)
-      .await
-      .expect("should import");
-    Localchain {
-      db: pool.clone(),
-      signer: signer.clone(),
-      ticker: ticker.clone(),
-      notary_clients: notary_clients.clone(),
-      path: ":memory:".to_string(),
-      mainchain_client: Default::default(),
-    }
   }
 }

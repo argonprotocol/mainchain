@@ -3,10 +3,14 @@ use crate::serialize_unsafe_u128_as_string;
 use codec::{Decode, Encode, MaxEncodedLen};
 use scale_info::TypeInfo;
 use serde::{Deserialize, Serialize};
-use sp_core::{ConstU32, RuntimeDebug};
-use sp_runtime::{ BoundedVec, };
+use sp_core::{
+	crypto::{Ss58AddressFormat, Ss58Codec},
+	ConstU32, RuntimeDebug,
+};
+use sp_runtime::BoundedVec;
+use sp_std::fmt::{Display, Formatter, Result};
 
-use crate::{prod_or_fast, AccountId, DataDomainHash};
+use crate::{prod_or_fast, AccountId, DataDomainHash, ADDRESS_PREFIX};
 
 #[derive(
 	Clone,
@@ -45,6 +49,13 @@ impl Note {
 
 	pub fn calculate_escrow_tax(amount: u128) -> u128 {
 		round_up(amount, TAX_PERCENT_BASE)
+	}
+}
+
+impl Display for Note {
+	fn fmt(&self, f: &mut Formatter<'_>) -> Result {
+		let formatted_number = format!("{:.3}", self.milligons as f64 / 1000.0);
+		write!(f, "{} ₳{:.3}", self.note_type, formatted_number)
 	}
 }
 
@@ -117,4 +128,59 @@ pub enum NoteType {
 	EscrowSettle,
 	/// Claim funds from one or more escrows - must be the recipient of the hold
 	EscrowClaim,
+}
+
+impl Display for NoteType {
+	fn fmt(&self, f: &mut Formatter<'_>) -> Result {
+		match self {
+			NoteType::SendToMainchain => {
+				write!(f, "SendToMainchain")
+			},
+			NoteType::ClaimFromMainchain { account_nonce } => {
+				write!(f, "ClaimFromMainchain(nonce={})", account_nonce)
+			},
+			NoteType::Claim => {
+				write!(f, "Claim")
+			},
+			NoteType::Send { to } =>
+				if let Some(to) = to {
+					write!(
+						f,
+						"Send(restrictedTo: {:?})",
+						to.iter()
+							.map(|a| a
+								.to_ss58check_with_version(Ss58AddressFormat::from(ADDRESS_PREFIX)))
+							.collect::<Vec<_>>()
+					)
+				} else {
+					write!(f, "Send")
+				},
+			NoteType::LeaseDomain => {
+				write!(f, "LeaseDomain")
+			},
+			NoteType::Fee => {
+				write!(f, "Fee")
+			},
+			NoteType::Tax => {
+				write!(f, "Tax")
+			},
+			NoteType::SendToVote => {
+				write!(f, "SendToVote")
+			},
+			NoteType::EscrowHold { data_domain_hash, recipient } => {
+				write!(
+					f,
+					"EscrowHold(data_domain_hash: {:?}, recipient: {:?})",
+					data_domain_hash,
+					recipient.to_ss58check_with_version(Ss58AddressFormat::from(ADDRESS_PREFIX))
+				)
+			},
+			NoteType::EscrowSettle => {
+				write!(f, "EscrowSettle")
+			},
+			NoteType::EscrowClaim => {
+				write!(f, "EscrowClaim")
+			},
+		}
+	}
 }

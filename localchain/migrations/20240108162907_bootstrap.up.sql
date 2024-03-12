@@ -48,6 +48,7 @@ CREATE TABLE IF NOT EXISTS balance_changes
     account_id             INT      NOT NULL,
     change_number          INT      NOT NULL,
     balance                TEXT     NOT NULL,
+    net_balance_change     TEXT     NOT NULL,
     escrow_hold_note_json  TEXT,
     notary_id              INT      NOT NULL,
     notes_json             TEXT     NOT NULL,
