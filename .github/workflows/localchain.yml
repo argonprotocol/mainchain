@@ -19,11 +19,13 @@ permissions:
       - .editorconfig
       - docs/**
   pull_request: null
+
+defaults:
+  run:
+    working-directory: ./localchain
+    
 jobs:
   build:
-    defaults:
-      run:
-        working-directory: ./localchain
     strategy:
       fail-fast: false
       matrix:

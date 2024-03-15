@@ -14,15 +14,16 @@ pub mod weights;
 
 #[frame_support::pallet(dev_mode)]
 pub mod pallet {
-
 	use frame_support::pallet_prelude::*;
 	use frame_system::pallet_prelude::*;
 	use log::warn;
 	use sp_core::H256;
 	use sp_runtime::{app_crypto::RuntimePublic, BoundedBTreeMap, Saturating};
 	use sp_std::vec::Vec;
+
 	use ulx_primitives::notary::{
-		NotaryId, NotaryMeta, NotaryProvider, NotaryPublic, NotaryRecord, NotarySignature,
+		GenesisNotary, NotaryId, NotaryMeta, NotaryProvider, NotaryPublic, NotaryRecord,
+		NotarySignature,
 	};
 
 	use super::*;
@@ -142,6 +143,30 @@ pub mod pallet {
 		NoMoreNotaryIds,
 	}
 
+	#[pallet::genesis_config]
+	#[derive(frame_support::DefaultNoBound)]
+	pub struct GenesisConfig<T: Config> {
+		pub list: Vec<GenesisNotary<T::AccountId>>,
+		pub _phantom: PhantomData<T>,
+	}
+
+	#[pallet::genesis_build]
+	impl<T: Config> BuildGenesisConfig for GenesisConfig<T> {
+		fn build(&self) {
+			for notary in self.list.iter() {
+				Pallet::<T>::activate_notary(
+					notary.account_id.clone(),
+					NotaryMeta {
+						public: notary.public.clone(),
+						hosts: BoundedVec::truncate_from(notary.hosts.clone()),
+					},
+					0u32.into(),
+				)
+				.unwrap();
+			}
+		}
+	}
+
 	#[pallet::hooks]
 	impl<T: Config> Hooks<BlockNumberFor<T>> for Pallet<T> {
 		fn on_initialize(n: BlockNumberFor<T>) -> Weight {
@@ -232,22 +257,7 @@ pub mod pallet {
 
 			let block_number = frame_system::Pallet::<T>::block_number();
 
-			let notary_id = Self::next_notary_id()?;
-			let notary = NotaryRecord {
-				notary_id,
-				meta: proposal.clone(),
-				meta_updated_block: block_number,
-				activated_block: block_number,
-				operator_account_id: operator_account.clone(),
-			};
-
-			<ActiveNotaries<T>>::try_mutate(|x| x.try_push(notary.clone()))
-				.map_err(|_| Error::<T>::MaxNotariesExceeded)?;
-
-			<NotaryKeyHistory<T>>::try_append(notary_id, (block_number, proposal.public.clone()))
-				.map_err(|_| Error::<T>::MaxNotariesExceeded)?;
-
-			Self::deposit_event(Event::NotaryActivated { notary });
+			Self::activate_notary(operator_account, proposal, block_number)?;
 
 			Ok(())
 		}
@@ -286,6 +296,35 @@ pub mod pallet {
 	}
 
 	impl<T: Config> Pallet<T> {
+		fn activate_notary(
+			operator_account: T::AccountId,
+			meta: NotaryMetaOf<T>,
+			block_number: BlockNumberFor<T>,
+		) -> DispatchResult {
+			let notary_id = Self::next_notary_id()?;
+
+			let public = meta.public.clone();
+
+			let notary = NotaryRecord {
+				notary_id,
+				operator_account_id: operator_account.clone(),
+				activated_block: block_number,
+				meta_updated_block: block_number,
+				meta,
+			};
+
+			<ActiveNotaries<T>>::try_mutate(|active| -> DispatchResult {
+				active.try_push(notary.clone()).map_err(|_| Error::<T>::MaxNotariesExceeded)?;
+				Ok(())
+			})?;
+			<NotaryKeyHistory<T>>::try_append(notary_id, (block_number, public))
+				.map_err(|_| Error::<T>::MaxNotariesExceeded)?;
+
+			Self::deposit_event(Event::NotaryActivated { notary });
+
+			Ok(())
+		}
+
 		fn next_notary_id() -> Result<u32, Error<T>> {
 			let notary_id = NextNotaryId::<T>::get()
 				.or(Some(1u32.into()))

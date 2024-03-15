@@ -1,5 +1,3 @@
-#[cfg(feature = "std")]
-use crate::serialize_unsafe_u128_as_string;
 use codec::{Decode, Encode, MaxEncodedLen};
 use scale_info::TypeInfo;
 use serde::{Deserialize, Serialize};
@@ -8,8 +6,13 @@ use sp_core::{
 	ConstU32, RuntimeDebug,
 };
 use sp_runtime::BoundedVec;
-use sp_std::fmt::{Display, Formatter, Result};
+use sp_std::{
+	fmt::{Display, Formatter, Result},
+	vec::Vec,
+};
 
+#[cfg(feature = "std")]
+use crate::serialize_unsafe_u128_as_string;
 use crate::{prod_or_fast, AccountId, DataDomainHash, ADDRESS_PREFIX};
 
 #[derive(
@@ -54,8 +57,7 @@ impl Note {
 
 impl Display for Note {
 	fn fmt(&self, f: &mut Formatter<'_>) -> Result {
-		let formatted_number = format!("{:.3}", self.milligons as f64 / 1000.0);
-		write!(f, "{} ₳{:.3}", self.note_type, formatted_number)
+		write!(f, "{} ₳{:.3}", self.note_type, self.milligons as f64 / 1000.0)
 	}
 }
 
