@@ -65,8 +65,8 @@ impl Into<LocalAccount> for AccountRow {
       address: row.address,
       account_type: row.account_type,
       notary_id: row.notary_id as u32,
-      created_at: row.created_at.timestamp_millis(),
-      updated_at: row.updated_at.timestamp_millis(),
+      created_at: row.created_at.and_utc().timestamp_millis(),
+      updated_at: row.updated_at.and_utc().timestamp_millis(),
       origin: match row.origin_notebook_number {
         Some(notebook_number) => Some(NotaryAccountOrigin {
           notary_id: row.notary_id as u32,

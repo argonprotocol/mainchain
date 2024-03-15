@@ -236,7 +236,7 @@ impl OverviewStore {
         notes: get_note_descriptions(&change),
         finalized_block_number: change.finalized_block_number.map(|n| n as u32),
         status: change.status,
-        timestamp: change.timestamp.timestamp_millis(),
+        timestamp: change.timestamp.and_utc().timestamp_millis(),
         notarization_id: change.notarization_id,
         transaction_id: change.transaction_id,
         transaction_type: change

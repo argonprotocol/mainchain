@@ -1,8 +1,12 @@
+use std::sync::Arc;
+
 use anyhow::anyhow;
 use futures::FutureExt;
-use jsonrpsee::ws_client::{WsClient, WsClientBuilder};
-pub use spec::api;
-use std::sync::Arc;
+use jsonrpsee::{
+	client_transport::ws::{Url, WsTransportClientBuilder},
+	core::client::ClientBuilder,
+	ws_client::{PingConfig, WsClient, WsClientBuilder},
+};
 use subxt::{
 	backend::{legacy::LegacyRpcMethods, rpc::RpcClient},
 	config::{Config, DefaultExtrinsicParams, DefaultExtrinsicParamsBuilder},
@@ -14,6 +18,8 @@ use tokio::{
 	task::JoinHandle,
 };
 use tracing::warn;
+
+pub use spec::api;
 
 use crate::api::runtime_types::ulx_primitives::tick::Ticker;
 
@@ -46,14 +52,20 @@ pub async fn local_client() -> Result<UlxClient, Error> {
 	OnlineClient::<UlxConfig>::new().await
 }
 
-pub async fn try_until_connected(url: String, retry_delay_millis: u64, timeout_millis: u64) -> Result<UlxClient, Error> {
+pub async fn try_until_connected(
+	url: String,
+	retry_delay_millis: u64,
+	timeout_millis: u64,
+) -> Result<UlxClient, Error> {
 	let start = std::time::Instant::now();
 	let rpc = loop {
 		match UlxClient::from_url(url.clone()).await {
 			Ok(client) => break client,
 			Err(why) => {
 				if start.elapsed().as_millis() as u64 > timeout_millis {
-					return Err(Error::Other("Failed to connect to client within timeout".to_string()));
+					return Err(Error::Other(
+						"Failed to connect to client within timeout".to_string(),
+					));
 				}
 				println!("failed to connect to client due to {:?}, retrying soon..", why);
 				tokio::time::sleep(std::time::Duration::from_millis(retry_delay_millis)).await;
@@ -70,15 +82,23 @@ pub struct UlxFullclient {
 	pub ws_client: Arc<WsClient>,
 	pub methods: LegacyRpcMethods<UlxConfig>,
 }
+
 impl UlxFullclient {
-	pub async fn try_until_connected(url: String, retry_delay_millis: u64, timeout_millis: u64) -> Result<Self, Error> {
+	pub async fn try_until_connected(
+		url: String,
+		retry_delay_millis: u64,
+		timeout_millis: u64,
+	) -> Result<Self, Error> {
 		let start = std::time::Instant::now();
-		let ws_client = loop {
-			match WsClientBuilder::default().build(&url).await {
+		let url = Url::parse(&url).map_err(|e| Error::Other(format!("Invalid URL: {}", e)))?;
+		let (sender, receiver) = loop {
+			match WsTransportClientBuilder::default().build(url.clone()).await {
 				Ok(client) => break client,
 				Err(why) => {
 					if start.elapsed().as_millis() as u64 > timeout_millis {
-						return Err(Error::Other("Failed to connect to client within timeout".to_string()));
+						return Err(Error::Other(
+							"Failed to connect to client within timeout".to_string(),
+						));
 					}
 					warn!(
 						"failed to connect to client due to {} - {:?}, retrying soon..",
@@ -88,13 +108,17 @@ impl UlxFullclient {
 				},
 			}
 		};
-		let ws_client = Arc::new(ws_client);
-		let rpc = RpcClient::new(ws_client.clone());
+		let client = ClientBuilder::default()
+			.enable_ws_ping(PingConfig::default())
+			.build_with_tokio(sender, receiver);
+		let client = Arc::new(client);
+
+		let rpc = RpcClient::new(client.clone());
 		Ok(Self {
 			rpc: rpc.clone(),
 			live: UlxClient::from_rpc_client(rpc.clone()).await?,
 			methods: LegacyRpcMethods::new(rpc.clone()),
-			ws_client,
+			ws_client: client,
 		})
 	}
 }

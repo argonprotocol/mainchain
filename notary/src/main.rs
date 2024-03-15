@@ -34,7 +34,7 @@ enum Commands {
 		dev: bool,
 
 		/// Bind to a specific address on this machine
-		#[clap(short, long, env, default_value = "127.0.0.1:9925")]
+		#[clap(short, long, env, default_value = "127.0.0.1:0")]
 		bind_addr: String,
 
 		/// What mainchain RPC websocket url do you want to reach out use to sync blocks?
@@ -132,7 +132,7 @@ async fn main() -> anyhow::Result<()> {
 				.context("failed to connect to db")?;
 			let keystore = read_keystore(keystore_params, dev)?;
 			if dev {
-				let suri = "//Ferdie/notary";
+				let suri = "//Ferdie//notary";
 				let pair = ed25519::Pair::from_string(&suri, None)?;
 				keystore
 					.insert(NOTARY_KEYID, &suri, pair.public().as_slice())

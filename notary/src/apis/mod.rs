@@ -5,7 +5,7 @@ pub use crate::apis::{localchain::LocalchainRpcClient, notebook::NotebookRpcClie
 pub mod localchain;
 pub mod notebook;
 
-pub type Client = jsonrpsee::async_client::Client;
+pub type Client = jsonrpsee::core::client::Client;
 
 pub async fn create_client(url: &str) -> anyhow::Result<Client> {
 	let client = WsClientBuilder::default().build(&url).await?;

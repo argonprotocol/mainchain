@@ -1,24 +1,24 @@
 use std::collections::BTreeSet;
 
-use chrono::{NaiveDateTime, TimeZone, Utc};
+use chrono::{DateTime, TimeZone, Utc};
 use codec::Encode;
 use serde_json::{from_value, json};
 use sp_core::{bounded::BoundedVec, H256};
-use sqlx::{query, types::JsonValue, FromRow, PgConnection};
+use sqlx::{FromRow, PgConnection, query, types::JsonValue};
 
 use ulx_primitives::{
-	ensure, notary::NotarySignature, tick::Tick, AccountId, AccountOrigin, BlockVotingPower,
-	ChainTransfer, DataDomainHash, NotaryId, NotebookHeader, NotebookMeta, NotebookNumber,
-	SignedNotebookHeader, NOTEBOOK_VERSION,
+	AccountId, AccountOrigin, BlockVotingPower, ChainTransfer, DataDomainHash, ensure,
+	notary::NotarySignature, NotaryId, NOTEBOOK_VERSION, NotebookHeader, NotebookMeta, NotebookNumber,
+	SignedNotebookHeader, tick::Tick,
 };
 
 use crate::{
-	stores::{
-		notebook_constraints::NotebookConstraintsStore,
-		notebook_new_accounts::NotebookNewAccountsStore, notebook_status::NotebookStatusStore,
-		BoxFutureResult,
-	},
 	Error,
+	stores::{
+		BoxFutureResult,
+		notebook_constraints::NotebookConstraintsStore, notebook_new_accounts::NotebookNewAccountsStore,
+		notebook_status::NotebookStatusStore,
+	},
 };
 
 #[derive(FromRow)]
@@ -171,7 +171,7 @@ impl NotebookHeaderStore {
 				notebook_number,
 				tick,
 				Utc.from_utc_datetime(
-					&NaiveDateTime::from_timestamp_millis(end_time_for_tick as i64).unwrap(),
+					&DateTime::from_timestamp_millis(end_time_for_tick as i64).unwrap().naive_utc(),
 				),
 			)
 			.await?;
@@ -437,14 +437,14 @@ mod tests {
 
 	use chrono::{Duration, Utc};
 	use sp_keyring::AccountKeyring::{Alice, Bob};
-	use sp_keystore::{testing::MemoryKeystore, KeystoreExt};
+	use sp_keystore::{KeystoreExt, testing::MemoryKeystore};
 	use sp_runtime::traits::Verify;
 	use sqlx::PgPool;
 
 	use ulx_primitives::{AccountOrigin, ChainTransfer, NOTEBOOK_VERSION};
 
 	use crate::{
-		notebook_closer::{notary_sign, NOTARY_KEYID},
+		notebook_closer::{NOTARY_KEYID, notary_sign},
 		stores::notebook_header::NotebookHeaderStore,
 	};
 

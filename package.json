@@ -1,0 +1,41 @@
+{
+  "name": "@ulixee/mainchain-monorepo",
+  "version": "2.0.0-alpha.21",
+  "scripts": {
+    "build": "yarn workspaces foreach --all run build",
+    "pretest": "yarn workspace @ulixee/localchain build:debug && cargo build --release --features=fast-runtime",
+    "test": "yarn pretest && jest"
+  },
+  "private": true,
+  "engines": {
+    "node": ">= 18"
+  },
+  "workspaces": [
+    "localchain",
+    "client/nodejs"
+  ],
+  "devDependencies": {
+    "@types/jest": "^29.5.11",
+    "@types/node": "^18.19.6",
+    "jest": "^29.7.0",
+    "ts-jest": "^29.1.2",
+    "tslib": "^2.6.2",
+    "typescript": "^5.3.3"
+  },
+  "jest": {
+    "preset": "ts-jest",
+    "testEnvironment": "node",
+    "testMatch": [
+      "**/__test__/*.test.ts"
+    ],
+    "transform": {
+      "^.+\\.ts": [
+        "ts-jest",
+        {
+          "useESM": false,
+          "tsconfig": "./tsconfig-cjs.json"
+        }
+      ]
+    }
+  }
+}

@@ -29,8 +29,8 @@ sp-core-hashing = { version = "9.0", default-features = false, git = "https://gi
 frame-support = { version = "4.0.0-dev", default-features = false, git = "https://github.com/paritytech/polkadot-sdk.git", branch = "release-polkadot-v1.5.0" }
 thiserror = { version = "1.0", optional = true }
 impl-trait-for-tuples = "0.2.2"
-napi-derive = { version = "2.14", optional = true }
-napi = { version = "2.14", optional = true }
+napi-derive = { version = "2.16", optional = true }
+napi = { version = "2.16", optional = true }
 rsntp = { version = "4.0", optional = true }
 hex = { version = "0.4", optional = true }
 clap = { version = "4.5.1", optional = true, features = ["derive"] }
