@@ -47,7 +47,7 @@ impl frame_system::Config for Test {
 	type SystemWeightInfo = ();
 	type SS58Prefix = ConstU16<42>;
 	type OnSetCode = ();
-	type MaxConsumers = ConstU32<16>;
+	type MaxConsumers = ConstU32<16>;type RuntimeTask = ();
 }
 
 parameter_types! {
@@ -70,7 +70,7 @@ impl pallet_balances::Config<UlixeeToken> for Test {
 	type MaxFreezes = ();
 	type RuntimeHoldReason = RuntimeHoldReason;
 	type RuntimeFreezeReason = RuntimeFreezeReason;
-	type MaxHolds = ConstU32<100>;
+
 }
 
 pub fn set_argons(account_id: u64, amount: Balance) {

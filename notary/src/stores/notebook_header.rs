@@ -459,7 +459,7 @@ mod tests {
 				1,
 				notebook_number,
 				1,
-				Utc::now().add(Duration::minutes(1)).timestamp_millis() as u64,
+				Utc::now().add(Duration::try_minutes(1).unwrap()).timestamp_millis() as u64,
 			)
 			.await?;
 
@@ -492,7 +492,7 @@ mod tests {
 				1,
 				notebook_number,
 				1,
-				Utc::now().add(Duration::minutes(1)).timestamp_millis() as u64,
+				Utc::now().add(Duration::try_minutes(1).unwrap()).timestamp_millis() as u64,
 			)
 			.await?;
 
@@ -518,7 +518,7 @@ mod tests {
 				1,
 				notebook_number,
 				1,
-				Utc::now().add(Duration::minutes(1)).timestamp_millis() as u64,
+				Utc::now().add(Duration::try_minutes(1).unwrap()).timestamp_millis() as u64,
 			)
 			.await?;
 

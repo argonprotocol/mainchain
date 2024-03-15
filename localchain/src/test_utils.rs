@@ -10,7 +10,7 @@ use frame_support::BoundedVec;
 use jsonrpsee::{
   core::{async_trait, SubscriptionResult},
   server::{PendingSubscriptionSink, Server, ServerHandle, SubscriptionMessage},
-  types::ErrorObjectOwned,
+  types::error::ErrorObjectOwned,
   RpcModule,
 };
 use napi::bindgen_prelude::Uint8Array;
@@ -429,6 +429,7 @@ pub fn mock_mainchain_transfer(address: &str, amount: u128) -> LocalchainTransfe
 
 #[async_trait]
 impl LocalchainRpcServer for MockNotary {
+
   async fn notarize(
     &self,
     balance_changeset: NotarizationBalanceChangeset,

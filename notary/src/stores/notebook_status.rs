@@ -226,7 +226,7 @@ mod tests {
 			let mut tx = pool.begin().await?;
 
 			let _ =
-				NotebookStatusStore::create(&mut *tx, 1, 1, Utc::now().add(Duration::minutes(1)))
+				NotebookStatusStore::create(&mut *tx, 1, 1, Utc::now().add(Duration::try_minutes(1).unwrap()))
 					.await?;
 
 			tx.commit().await?;
@@ -269,7 +269,7 @@ mod tests {
 					NotebookFinalizationStep::Open,
 				)
 				.await?;
-				NotebookStatusStore::create(&mut *tx, 2, 2, Utc::now().add(Duration::minutes(2)))
+				NotebookStatusStore::create(&mut *tx, 2, 2, Utc::now().add(Duration::try_minutes(1).unwrap()))
 					.await?;
 				tx.commit().await?;
 				Result::<(), Error>::Ok(())
@@ -335,7 +335,7 @@ mod tests {
 			.await?;
 		let mut tx = pool.begin().await?;
 
-		let _ = NotebookStatusStore::create(&mut *tx, 1, 1, Utc::now().add(Duration::minutes(1)))
+		let _ = NotebookStatusStore::create(&mut *tx, 1, 1, Utc::now().add(Duration::try_minutes(1).unwrap()))
 			.await?;
 		assert_eq!(NotebookStatusStore::step_up_expired_open(&mut *tx).await?, None);
 		tx.commit().await?;

@@ -869,10 +869,10 @@ pub mod api {
 						"query_call_info",
 						types::QueryCallInfo { call, len },
 						[
-							92u8, 129u8, 253u8, 56u8, 173u8, 235u8, 135u8, 128u8, 244u8, 234u8,
-							138u8, 128u8, 215u8, 208u8, 1u8, 60u8, 22u8, 210u8, 212u8, 140u8,
-							229u8, 231u8, 71u8, 129u8, 26u8, 201u8, 218u8, 251u8, 81u8, 11u8,
-							154u8, 138u8,
+							215u8, 254u8, 102u8, 129u8, 116u8, 198u8, 114u8, 21u8, 189u8, 238u8,
+							106u8, 6u8, 39u8, 174u8, 35u8, 40u8, 109u8, 26u8, 162u8, 230u8, 40u8,
+							222u8, 182u8, 181u8, 137u8, 176u8, 176u8, 126u8, 78u8, 82u8, 209u8,
+							61u8,
 						],
 					)
 				}
@@ -892,10 +892,10 @@ pub mod api {
 						"query_call_fee_details",
 						types::QueryCallFeeDetails { call, len },
 						[
-							211u8, 171u8, 148u8, 134u8, 9u8, 197u8, 204u8, 132u8, 73u8, 97u8,
-							233u8, 192u8, 67u8, 185u8, 139u8, 82u8, 94u8, 97u8, 158u8, 22u8, 166u8,
-							53u8, 61u8, 161u8, 171u8, 222u8, 137u8, 4u8, 132u8, 104u8, 219u8,
-							157u8,
+							207u8, 28u8, 187u8, 173u8, 183u8, 33u8, 130u8, 187u8, 20u8, 219u8,
+							173u8, 132u8, 246u8, 241u8, 73u8, 38u8, 231u8, 193u8, 28u8, 222u8,
+							169u8, 212u8, 166u8, 207u8, 147u8, 102u8, 31u8, 222u8, 27u8, 3u8, 83u8,
+							113u8,
 						],
 					)
 				}
@@ -1994,9 +1994,9 @@ pub mod api {
 			.hash();
 		runtime_metadata_hash ==
 			[
-				15u8, 167u8, 71u8, 252u8, 13u8, 245u8, 182u8, 46u8, 117u8, 112u8, 166u8, 114u8,
-				216u8, 10u8, 145u8, 96u8, 250u8, 57u8, 138u8, 0u8, 23u8, 159u8, 13u8, 88u8, 251u8,
-				77u8, 124u8, 19u8, 152u8, 228u8, 120u8, 7u8,
+				77u8, 185u8, 14u8, 160u8, 194u8, 21u8, 16u8, 174u8, 24u8, 99u8, 110u8, 143u8,
+				188u8, 152u8, 104u8, 120u8, 142u8, 75u8, 126u8, 192u8, 31u8, 199u8, 239u8, 111u8,
+				129u8, 75u8, 163u8, 230u8, 236u8, 203u8, 144u8, 252u8,
 			]
 	}
 	pub mod system {
@@ -2159,6 +2159,60 @@ pub mod api {
 					const PALLET: &'static str = "System";
 					const CALL: &'static str = "remark_with_event";
 				}
+				#[derive(
+					:: subxt :: ext :: codec :: Decode,
+					:: subxt :: ext :: codec :: Encode,
+					:: subxt :: ext :: scale_decode :: DecodeAsType,
+					:: subxt :: ext :: scale_encode :: EncodeAsType,
+					Clone,
+					Debug,
+				)]
+				# [codec (crate = :: subxt :: ext :: codec)]
+				#[decode_as_type(crate_path = ":: subxt :: ext :: scale_decode")]
+				#[encode_as_type(crate_path = ":: subxt :: ext :: scale_encode")]
+				pub struct AuthorizeUpgrade {
+					pub code_hash: ::subxt::utils::H256,
+				}
+				impl ::subxt::blocks::StaticExtrinsic for AuthorizeUpgrade {
+					const PALLET: &'static str = "System";
+					const CALL: &'static str = "authorize_upgrade";
+				}
+				#[derive(
+					:: subxt :: ext :: codec :: Decode,
+					:: subxt :: ext :: codec :: Encode,
+					:: subxt :: ext :: scale_decode :: DecodeAsType,
+					:: subxt :: ext :: scale_encode :: EncodeAsType,
+					Clone,
+					Debug,
+				)]
+				# [codec (crate = :: subxt :: ext :: codec)]
+				#[decode_as_type(crate_path = ":: subxt :: ext :: scale_decode")]
+				#[encode_as_type(crate_path = ":: subxt :: ext :: scale_encode")]
+				pub struct AuthorizeUpgradeWithoutChecks {
+					pub code_hash: ::subxt::utils::H256,
+				}
+				impl ::subxt::blocks::StaticExtrinsic for AuthorizeUpgradeWithoutChecks {
+					const PALLET: &'static str = "System";
+					const CALL: &'static str = "authorize_upgrade_without_checks";
+				}
+				#[derive(
+					:: subxt :: ext :: codec :: Decode,
+					:: subxt :: ext :: codec :: Encode,
+					:: subxt :: ext :: scale_decode :: DecodeAsType,
+					:: subxt :: ext :: scale_encode :: EncodeAsType,
+					Clone,
+					Debug,
+				)]
+				# [codec (crate = :: subxt :: ext :: codec)]
+				#[decode_as_type(crate_path = ":: subxt :: ext :: scale_decode")]
+				#[encode_as_type(crate_path = ":: subxt :: ext :: scale_encode")]
+				pub struct ApplyAuthorizedUpgrade {
+					pub code: ::std::vec::Vec<::core::primitive::u8>,
+				}
+				impl ::subxt::blocks::StaticExtrinsic for ApplyAuthorizedUpgrade {
+					const PALLET: &'static str = "System";
+					const CALL: &'static str = "apply_authorized_upgrade";
+				}
 			}
 			pub struct TransactionApi;
 			impl TransactionApi {
@@ -2300,6 +2354,56 @@ pub mod api {
 						],
 					)
 				}
+				#[doc = "See [`Pallet::authorize_upgrade`]."]
+				pub fn authorize_upgrade(
+					&self,
+					code_hash: ::subxt::utils::H256,
+				) -> ::subxt::tx::Payload<types::AuthorizeUpgrade> {
+					::subxt::tx::Payload::new_static(
+						"System",
+						"authorize_upgrade",
+						types::AuthorizeUpgrade { code_hash },
+						[
+							4u8, 14u8, 76u8, 107u8, 209u8, 129u8, 9u8, 39u8, 193u8, 17u8, 84u8,
+							254u8, 170u8, 214u8, 24u8, 155u8, 29u8, 184u8, 249u8, 241u8, 109u8,
+							58u8, 145u8, 131u8, 109u8, 63u8, 38u8, 165u8, 107u8, 215u8, 217u8,
+							172u8,
+						],
+					)
+				}
+				#[doc = "See [`Pallet::authorize_upgrade_without_checks`]."]
+				pub fn authorize_upgrade_without_checks(
+					&self,
+					code_hash: ::subxt::utils::H256,
+				) -> ::subxt::tx::Payload<types::AuthorizeUpgradeWithoutChecks> {
+					::subxt::tx::Payload::new_static(
+						"System",
+						"authorize_upgrade_without_checks",
+						types::AuthorizeUpgradeWithoutChecks { code_hash },
+						[
+							126u8, 126u8, 55u8, 26u8, 47u8, 55u8, 66u8, 8u8, 167u8, 18u8, 29u8,
+							136u8, 146u8, 14u8, 189u8, 117u8, 16u8, 227u8, 162u8, 61u8, 149u8,
+							197u8, 104u8, 184u8, 185u8, 161u8, 99u8, 154u8, 80u8, 125u8, 181u8,
+							233u8,
+						],
+					)
+				}
+				#[doc = "See [`Pallet::apply_authorized_upgrade`]."]
+				pub fn apply_authorized_upgrade(
+					&self,
+					code: ::std::vec::Vec<::core::primitive::u8>,
+				) -> ::subxt::tx::Payload<types::ApplyAuthorizedUpgrade> {
+					::subxt::tx::Payload::new_static(
+						"System",
+						"apply_authorized_upgrade",
+						types::ApplyAuthorizedUpgrade { code },
+						[
+							232u8, 107u8, 127u8, 38u8, 230u8, 29u8, 97u8, 4u8, 160u8, 191u8, 222u8,
+							156u8, 245u8, 102u8, 196u8, 141u8, 44u8, 163u8, 98u8, 68u8, 125u8,
+							32u8, 124u8, 101u8, 108u8, 93u8, 211u8, 52u8, 0u8, 231u8, 33u8, 227u8,
+						],
+					)
+				}
 			}
 		}
 		#[doc = "Event for the System pallet."]
@@ -2419,6 +2523,26 @@ pub mod api {
 			impl ::subxt::events::StaticEvent for Remarked {
 				const PALLET: &'static str = "System";
 				const EVENT: &'static str = "Remarked";
+			}
+			#[derive(
+				:: subxt :: ext :: codec :: Decode,
+				:: subxt :: ext :: codec :: Encode,
+				:: subxt :: ext :: scale_decode :: DecodeAsType,
+				:: subxt :: ext :: scale_encode :: EncodeAsType,
+				Clone,
+				Debug,
+			)]
+			# [codec (crate = :: subxt :: ext :: codec)]
+			#[decode_as_type(crate_path = ":: subxt :: ext :: scale_decode")]
+			#[encode_as_type(crate_path = ":: subxt :: ext :: scale_encode")]
+			#[doc = "An upgrade was authorized."]
+			pub struct UpgradeAuthorized {
+				pub code_hash: ::subxt::utils::H256,
+				pub check_version: ::core::primitive::bool,
+			}
+			impl ::subxt::events::StaticEvent for UpgradeAuthorized {
+				const PALLET: &'static str = "System";
+				const EVENT: &'static str = "UpgradeAuthorized";
 			}
 		}
 		pub mod storage {
@@ -2718,9 +2842,9 @@ pub mod api {
 						"Events",
 						vec![],
 						[
-							245u8, 194u8, 145u8, 35u8, 15u8, 208u8, 193u8, 125u8, 196u8, 192u8,
-							166u8, 239u8, 95u8, 11u8, 37u8, 26u8, 21u8, 129u8, 106u8, 251u8, 38u8,
-							66u8, 112u8, 33u8, 138u8, 224u8, 131u8, 190u8, 17u8, 58u8, 106u8, 80u8,
+							110u8, 196u8, 121u8, 59u8, 137u8, 8u8, 188u8, 210u8, 13u8, 21u8, 161u8,
+							13u8, 137u8, 42u8, 195u8, 163u8, 140u8, 131u8, 119u8, 219u8, 199u8,
+							135u8, 21u8, 136u8, 234u8, 13u8, 33u8, 31u8, 94u8, 251u8, 115u8, 207u8,
 						],
 					)
 				}
@@ -2890,6 +3014,27 @@ pub mod api {
 							191u8, 129u8, 100u8, 134u8, 126u8, 116u8, 154u8, 203u8, 220u8, 200u8,
 							0u8, 26u8, 161u8, 250u8, 133u8, 205u8, 146u8, 24u8, 5u8, 156u8, 158u8,
 							35u8, 36u8, 253u8, 52u8, 235u8, 86u8, 167u8, 35u8, 100u8, 119u8, 27u8,
+						],
+					)
+				}
+				#[doc = " `Some` if a code upgrade has been authorized."]
+				pub fn authorized_upgrade(
+					&self,
+				) -> ::subxt::storage::address::Address<
+					::subxt::storage::address::StaticStorageMapKey,
+					runtime_types::frame_system::CodeUpgradeAuthorization,
+					::subxt::storage::address::Yes,
+					(),
+					(),
+				> {
+					::subxt::storage::address::Address::new_static(
+						"System",
+						"AuthorizedUpgrade",
+						vec![],
+						[
+							165u8, 97u8, 27u8, 138u8, 2u8, 28u8, 55u8, 92u8, 96u8, 96u8, 168u8,
+							169u8, 55u8, 178u8, 44u8, 127u8, 58u8, 140u8, 206u8, 178u8, 1u8, 37u8,
+							214u8, 213u8, 251u8, 123u8, 5u8, 111u8, 90u8, 148u8, 217u8, 135u8,
 						],
 					)
 				}
@@ -10752,9 +10897,9 @@ pub mod api {
 						"sudo",
 						types::Sudo { call: ::std::boxed::Box::new(call) },
 						[
-							54u8, 20u8, 43u8, 30u8, 79u8, 241u8, 81u8, 240u8, 23u8, 124u8, 90u8,
-							37u8, 212u8, 7u8, 6u8, 243u8, 57u8, 68u8, 59u8, 81u8, 22u8, 215u8,
-							140u8, 17u8, 219u8, 83u8, 178u8, 6u8, 5u8, 85u8, 43u8, 71u8,
+							22u8, 68u8, 102u8, 222u8, 187u8, 50u8, 188u8, 228u8, 226u8, 175u8,
+							58u8, 142u8, 9u8, 2u8, 0u8, 112u8, 25u8, 169u8, 16u8, 79u8, 208u8,
+							143u8, 214u8, 85u8, 95u8, 198u8, 19u8, 5u8, 32u8, 126u8, 214u8, 228u8,
 						],
 					)
 				}
@@ -10769,9 +10914,10 @@ pub mod api {
 						"sudo_unchecked_weight",
 						types::SudoUncheckedWeight { call: ::std::boxed::Box::new(call), weight },
 						[
-							12u8, 234u8, 133u8, 164u8, 121u8, 15u8, 7u8, 108u8, 82u8, 201u8, 131u8,
-							13u8, 17u8, 211u8, 137u8, 251u8, 223u8, 227u8, 136u8, 255u8, 220u8,
-							34u8, 101u8, 36u8, 44u8, 171u8, 3u8, 27u8, 187u8, 211u8, 101u8, 228u8,
+							190u8, 137u8, 254u8, 165u8, 176u8, 245u8, 48u8, 41u8, 121u8, 41u8,
+							126u8, 75u8, 244u8, 244u8, 178u8, 245u8, 43u8, 102u8, 241u8, 21u8,
+							198u8, 189u8, 111u8, 178u8, 67u8, 136u8, 43u8, 218u8, 82u8, 37u8, 91u8,
+							12u8,
 						],
 					)
 				}
@@ -10802,9 +10948,9 @@ pub mod api {
 						"sudo_as",
 						types::SudoAs { who, call: ::std::boxed::Box::new(call) },
 						[
-							242u8, 133u8, 160u8, 64u8, 96u8, 70u8, 78u8, 78u8, 135u8, 3u8, 138u8,
-							166u8, 119u8, 73u8, 12u8, 155u8, 24u8, 62u8, 58u8, 138u8, 177u8, 160u8,
-							68u8, 88u8, 160u8, 210u8, 86u8, 18u8, 46u8, 95u8, 125u8, 174u8,
+							183u8, 197u8, 7u8, 76u8, 36u8, 250u8, 169u8, 35u8, 89u8, 126u8, 9u8,
+							42u8, 213u8, 42u8, 75u8, 126u8, 251u8, 176u8, 231u8, 89u8, 58u8, 168u8,
+							250u8, 2u8, 66u8, 94u8, 121u8, 0u8, 179u8, 96u8, 224u8, 58u8,
 						],
 					)
 				}
@@ -11362,6 +11508,15 @@ pub mod api {
 					#[codec(index = 7)]
 					#[doc = "See [`Pallet::remark_with_event`]."]
 					remark_with_event { remark: ::std::vec::Vec<::core::primitive::u8> },
+					#[codec(index = 9)]
+					#[doc = "See [`Pallet::authorize_upgrade`]."]
+					authorize_upgrade { code_hash: ::subxt::utils::H256 },
+					#[codec(index = 10)]
+					#[doc = "See [`Pallet::authorize_upgrade_without_checks`]."]
+					authorize_upgrade_without_checks { code_hash: ::subxt::utils::H256 },
+					#[codec(index = 11)]
+					#[doc = "See [`Pallet::apply_authorized_upgrade`]."]
+					apply_authorized_upgrade { code: ::std::vec::Vec<::core::primitive::u8> },
 				}
 				#[derive(
 					:: subxt :: ext :: codec :: Decode,
@@ -11398,6 +11553,12 @@ pub mod api {
 					#[codec(index = 5)]
 					#[doc = "The origin filter prevent the call to be dispatched."]
 					CallFiltered,
+					#[codec(index = 6)]
+					#[doc = "No upgrade authorized."]
+					NothingAuthorized,
+					#[codec(index = 7)]
+					#[doc = "The submitted code is not authorized."]
+					Unauthorized,
 				}
 				#[derive(
 					:: subxt :: ext :: codec :: Decode,
@@ -11435,6 +11596,12 @@ pub mod api {
 					#[codec(index = 5)]
 					#[doc = "On on-chain remark happened."]
 					Remarked { sender: ::subxt::utils::AccountId32, hash: ::subxt::utils::H256 },
+					#[codec(index = 6)]
+					#[doc = "An upgrade was authorized."]
+					UpgradeAuthorized {
+						code_hash: ::subxt::utils::H256,
+						check_version: ::core::primitive::bool,
+					},
 				}
 			}
 			#[derive(
@@ -11454,6 +11621,21 @@ pub mod api {
 				pub providers: ::core::primitive::u32,
 				pub sufficients: ::core::primitive::u32,
 				pub data: _1,
+			}
+			#[derive(
+				:: subxt :: ext :: codec :: Decode,
+				:: subxt :: ext :: codec :: Encode,
+				:: subxt :: ext :: scale_decode :: DecodeAsType,
+				:: subxt :: ext :: scale_encode :: EncodeAsType,
+				Clone,
+				Debug,
+			)]
+			# [codec (crate = :: subxt :: ext :: codec)]
+			#[decode_as_type(crate_path = ":: subxt :: ext :: scale_decode")]
+			#[encode_as_type(crate_path = ":: subxt :: ext :: scale_encode")]
+			pub struct CodeUpgradeAuthorization {
+				pub code_hash: ::subxt::utils::H256,
+				pub check_version: ::core::primitive::bool,
 			}
 			#[derive(
 				:: subxt :: ext :: codec :: Decode,

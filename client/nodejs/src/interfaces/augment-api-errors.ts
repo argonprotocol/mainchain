@@ -400,10 +400,18 @@ declare module '@polkadot/api-base/types/errors' {
        **/
       NonZeroRefCount: AugmentedError<ApiType>;
       /**
+       * No upgrade authorized.
+       **/
+      NothingAuthorized: AugmentedError<ApiType>;
+      /**
        * The specification version is not allowed to decrease between the current runtime
        * and the new runtime.
        **/
       SpecVersionNeedsToIncrease: AugmentedError<ApiType>;
+      /**
+       * The submitted code is not authorized.
+       **/
+      Unauthorized: AugmentedError<ApiType>;
     };
     ticks: {
     };

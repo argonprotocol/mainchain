@@ -2,6 +2,7 @@ use frame_benchmarking_cli::{BenchmarkCmd, ExtrinsicFactory, SUBSTRATE_REFERENCE
 use sc_cli::SubstrateCli;
 use sc_service::PartialComponents;
 use sp_keyring::Sr25519Keyring;
+use sp_runtime::traits::HashingFor;
 
 use ulx_node_runtime::{Block, EXISTENTIAL_DEPOSIT};
 
@@ -119,7 +120,8 @@ pub fn run() -> sc_cli::Result<()> {
 							)
 						}
 
-						cmd.run::<Block, ()>(config)
+
+						cmd.run::<HashingFor<Block>, sp_statement_store::runtime_api::HostFunctions>(config)
 					},
 					BenchmarkCmd::Block(cmd) => {
 						let PartialComponents { client, .. } = service::new_partial(&config)?;

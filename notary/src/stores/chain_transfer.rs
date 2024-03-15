@@ -186,7 +186,7 @@ mod tests {
 			1,
 			1,
 			1,
-			Utc::now().add(Duration::minutes(1)).timestamp_millis() as u64,
+			Utc::now().add(Duration::try_minutes(1).unwrap()).timestamp_millis() as u64,
 		)
 		.await?;
 		logger();
@@ -254,7 +254,7 @@ mod tests {
 			1,
 			1,
 			1,
-			Utc::now().add(Duration::minutes(1)).timestamp_millis() as u64,
+			Utc::now().add(Duration::try_minutes(1).unwrap()).timestamp_millis() as u64,
 		)
 		.await?;
 		let notebook_number = 1;

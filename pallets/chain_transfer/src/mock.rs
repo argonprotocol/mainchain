@@ -58,6 +58,7 @@ impl frame_system::Config for Test {
 	type SS58Prefix = ConstU16<42>;
 	type OnSetCode = ();
 	type MaxConsumers = ConstU32<16>;
+	type RuntimeTask = ();
 }
 
 parameter_types! {
@@ -104,7 +105,7 @@ impl pallet_balances::Config for Test {
 	type FreezeIdentifier = ();
 	type MaxFreezes = ();
 	type RuntimeHoldReason = RuntimeHoldReason;
-	type MaxHolds = ConstU32<100>;
+
 	type RuntimeFreezeReason = RuntimeFreezeReason;
 }
 

@@ -56,6 +56,7 @@ impl frame_system::Config for Test {
 	type SS58Prefix = ConstU16<42>;
 	type OnSetCode = ();
 	type MaxConsumers = frame_support::traits::ConstU32<16>;
+	type RuntimeTask = ();
 }
 
 pub type Balance = u128;
@@ -79,7 +80,6 @@ impl pallet_balances::Config<ArgonToken> for Test {
 	type MaxFreezes = ConstU32<1>;
 	type RuntimeHoldReason = RuntimeHoldReason;
 	type RuntimeFreezeReason = RuntimeFreezeReason;
-	type MaxHolds = ConstU32<100>;
 }
 
 type UlixeeToken = pallet_balances::Instance2;
@@ -101,7 +101,6 @@ impl pallet_balances::Config<UlixeeToken> for Test {
 	type RuntimeFreezeReason = RuntimeFreezeReason;
 	type MaxFreezes = ConstU32<1>;
 	type RuntimeHoldReason = RuntimeHoldReason;
-	type MaxHolds = ConstU32<100>;
 }
 
 parameter_types! {
