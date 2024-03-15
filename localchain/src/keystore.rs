@@ -1,16 +1,24 @@
+use anyhow::anyhow;
 use std::fs;
 use std::path::PathBuf;
+use std::str::FromStr;
 use std::sync::Arc;
 
-use codec::Encode;
+use codec::{ Encode};
 use napi::bindgen_prelude::*;
 use napi::threadsafe_function::ErrorStrategy;
 use napi::threadsafe_function::ThreadsafeFunction;
 use sp_core::crypto::SecretString;
 use sp_core::crypto::Ss58Codec;
 use sp_core::{ByteArray, Pair};
+use sp_runtime::MultiSignature;
 use sqlx::SqlitePool;
+use subxt::config::Config;
+use subxt::tx::Signer;
+use subxt::utils::{AccountId32, MultiAddress};
 use tokio::sync::Mutex;
+
+use ulixee_client::UlxConfig;
 
 use crate::cli::EmbeddedKeyPassword;
 use crate::embedded_keystore::{CryptoScheme, EmbeddedKeystore};
@@ -19,7 +27,7 @@ use crate::{to_js_error, AccountStore};
 #[napi]
 #[derive(Clone)]
 pub struct Keystore {
-  js_callbacks: Arc<Mutex<Option<JsCallbacks>>>,
+  js_callbacks: Arc<Mutex<Option<(JsCallbacks, String)>>>,
   embedded_keystore: EmbeddedKeystore,
   db: SqlitePool,
 }
@@ -49,7 +57,7 @@ impl Keystore {
     derive: ThreadsafeFunction<String, ErrorStrategy::Fatal>,
   ) -> Result<()> {
     // this will check that the address matches
-    AccountStore::bootstrap(self.db.clone(), default_address, None)
+    AccountStore::bootstrap(self.db.clone(), default_address.clone(), None)
       .await
       .map_err(to_js_error)?;
 
@@ -57,7 +65,7 @@ impl Keystore {
       .js_callbacks
       .lock()
       .await
-      .insert(JsCallbacks { derive, sign });
+      .insert((JsCallbacks { derive, sign }, default_address));
     Ok(())
   }
 
@@ -113,10 +121,7 @@ impl Keystore {
   }
 
   #[napi]
-  pub async fn unlock(
-    &self,
-    password_option: Option<KeystorePasswordOption>,
-  ) -> Result<()> {
+  pub async fn unlock(&self, password_option: Option<KeystorePasswordOption>) -> Result<()> {
     let mut password = None;
     if let Some(password_option) = password_option {
       password = password_option.get_password().map_err(to_js_error)?;
@@ -151,6 +156,7 @@ impl Keystore {
 
     if let Some(js_callbacks) = self.js_callbacks.lock().await.as_ref() {
       let promise_result = js_callbacks
+        .0
         .derive
         .call_async::<Promise<String>>(hd_path)
         .await?;
@@ -177,6 +183,7 @@ impl Keystore {
 
     if let Some(js_callbacks) = self.js_callbacks.lock().await.as_ref() {
       let promise_result = js_callbacks
+        .0
         .sign
         .call_async::<Promise<Uint8Array>>((address, message))
         .await?;
@@ -188,6 +195,74 @@ impl Keystore {
       "Unable to sign for address {}",
       address
     )))
+  }
+
+  pub async fn get_subxt_signer(&self, address: String) -> anyhow::Result<AccountSubxtSigner> {
+    let account = AccountId32::from_str(&address)?;
+
+    if self.embedded_keystore.can_sign(address.clone()).await {
+      return Ok(AccountSubxtSigner {
+        address,
+        account,
+        keystore: self.clone(),
+      });
+    }
+
+    if let Some((_js_callbacks, default_address)) = self.js_callbacks.lock().await.as_ref() {
+      if address == *default_address {
+        return Ok(AccountSubxtSigner {
+          address: default_address.clone(),
+          account: account.clone(),
+          keystore: self.clone(),
+        });
+      }
+    }
+
+    Err(anyhow!("Unable to sign for address {}", address))
+  }
+}
+
+pub struct AccountSubxtSigner {
+  pub address: String,
+  pub account: AccountId32,
+  keystore: Keystore,
+}
+
+impl Signer<UlxConfig> for AccountSubxtSigner {
+  fn account_id(&self) -> <UlxConfig as Config>::AccountId {
+    self.account.clone()
+  }
+
+  fn address(&self) -> <UlxConfig as Config>::Address {
+    MultiAddress::from(self.account_id())
+  }
+
+  fn sign(&self, message: &[u8]) -> <UlxConfig as Config>::Signature {
+    let keystore = self.keystore.clone();
+    let address = self.address.clone();
+    let message = message.to_owned();
+
+    let signature = std::thread::spawn(move || {
+      // Create a new runtime for the async block
+      let rt = tokio::runtime::Runtime::new().unwrap();
+      rt.block_on(async move {
+        let signature = keystore
+          .embedded_keystore
+          .sign(address.clone(), message.as_ref())
+          .await
+          .unwrap()
+          .expect("Unable to sign");
+        match signature {
+          MultiSignature::Ed25519(a) => <UlxConfig as Config>::Signature::Ed25519(a.0),
+          MultiSignature::Sr25519(a) => <UlxConfig as Config>::Signature::Sr25519(a.0),
+          MultiSignature::Ecdsa(a) => <UlxConfig as Config>::Signature::Ecdsa(a.0),
+        }
+      })
+    })
+    .join()
+    .expect("Thread panicked or could not execute");
+
+    signature
   }
 }
 

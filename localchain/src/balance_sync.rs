@@ -1,15 +1,6 @@
-use crate::accounts::AccountStore;
-use crate::balance_changes::{BalanceChangeRow, BalanceChangeStatus, BalanceChangeStore};
-use crate::keystore::Keystore;
-use crate::notarization_builder::NotarizationBuilder;
-use crate::notarization_tracker::NotarizationTracker;
-use crate::open_escrows::OpenEscrowsStore;
-use crate::transactions::{TransactionType, Transactions};
-use crate::{to_js_error, NotaryAccountOrigin, TickerRef};
-use crate::{Escrow, MainchainClient};
-use crate::{LocalAccount, NOTARIZATION_MAX_BALANCE_CHANGES};
-use crate::{Localchain, OpenEscrow};
-use crate::{NotaryClient, NotaryClients};
+use std::collections::HashMap;
+use std::sync::Arc;
+
 use napi::bindgen_prelude::*;
 use serde_json::json;
 use sp_core::sr25519::Signature;
@@ -17,10 +8,23 @@ use sp_core::Decode;
 use sp_core::H256;
 use sp_runtime::MultiSignature;
 use sqlx::{Sqlite, SqlitePool, Transaction};
-use std::collections::HashMap;
-use std::sync::Arc;
 use tokio::sync::Mutex;
+
 use ulx_primitives::{AccountType, BlockVote};
+
+use crate::accounts::AccountStore;
+use crate::balance_changes::{BalanceChangeRow, BalanceChangeStatus, BalanceChangeStore};
+use crate::keystore::Keystore;
+use crate::mainchain_transfer::MainchainTransferStore;
+use crate::notarization_builder::NotarizationBuilder;
+use crate::notarization_tracker::NotarizationTracker;
+use crate::open_escrows::OpenEscrowsStore;
+use crate::transactions::{TransactionType, Transactions};
+use crate::{to_js_error, LocalchainTransfer, NotaryAccountOrigin, TickerRef};
+use crate::{Escrow, MainchainClient};
+use crate::{LocalAccount, NOTARIZATION_MAX_BALANCE_CHANGES};
+use crate::{Localchain, OpenEscrow};
+use crate::{NotaryClient, NotaryClients};
 
 #[napi]
 pub struct BalanceSync {
@@ -45,6 +49,7 @@ pub struct EscrowCloseOptions {
 #[napi]
 pub struct BalanceSyncResult {
   pub(crate) balance_changes: Vec<BalanceChangeRow>,
+  pub(crate) mainchain_transfers: Vec<NotarizationTracker>,
   pub(crate) escrow_notarizations: Vec<NotarizationBuilder>,
   pub(crate) jump_account_consolidations: Vec<NotarizationTracker>,
 }
@@ -57,6 +62,11 @@ impl BalanceSyncResult {
   #[napi(getter)]
   pub fn escrow_notarizations(&self) -> Vec<NotarizationBuilder> {
     self.escrow_notarizations.clone()
+  }
+
+  #[napi(getter)]
+  pub fn mainchain_transfers(&self) -> Vec<NotarizationTracker> {
+    self.mainchain_transfers.clone()
   }
 
   #[napi(getter)]
@@ -94,10 +104,13 @@ impl BalanceSync {
 
     let jump_account_consolidations = self.consolidate_jump_accounts().await?;
 
+    let mainchain_transfers = self.sync_mainchain_transfers().await?;
+
     Ok(BalanceSyncResult {
       balance_changes,
       escrow_notarizations,
       jump_account_consolidations,
+      mainchain_transfers,
     })
   }
 
@@ -187,7 +200,62 @@ impl BalanceSync {
         .map_err(to_js_error)?;
       results.push(updated);
     }
+
     Ok(results)
+  }
+
+  #[napi]
+  pub async fn sync_mainchain_transfers(&self) -> Result<Vec<NotarizationTracker>> {
+    {
+      let mainchain_mutex = self.mainchain_client.lock().await;
+      let Some(_) = *mainchain_mutex else {
+        return Ok(vec![]);
+      };
+    }
+    let _lock = self.lock.lock().await;
+    let mainchain_transfers = MainchainTransferStore::new(
+      self.db.clone(),
+      self.mainchain_client.clone(),
+      self.keystore.clone(),
+    );
+    mainchain_transfers
+      .update_finalization()
+      .await
+      .map_err(to_js_error)?;
+
+    let transfers = mainchain_transfers.find_ready_for_claim().await?;
+    if transfers.len() == 0 {
+      return Ok(vec![]);
+    }
+    let notarization = NotarizationBuilder::new(
+      self.db.clone(),
+      self.notary_clients.clone(),
+      self.keystore.clone(),
+    );
+    let mut notarizations = vec![];
+
+    for x in &transfers {
+      let transfer = LocalchainTransfer {
+        address: x.address.clone(),
+        amount: BigInt::from(x.amount.parse::<u128>().unwrap_or_default()),
+        account_nonce: x.account_nonce as u32,
+        notary_id: x.notary_id as u32,
+        expiration_block: 0,
+      };
+      notarization.claim_from_mainchain(transfer).await?;
+    }
+
+    if notarization.accounts().await.len() > 0 {
+      let tracker = notarization.notarize().await?;
+      for transfer in transfers {
+        mainchain_transfers
+          .record_balance_change_id(transfer.id, tracker.notarization_id)
+          .await?;
+      }
+      notarizations.push(tracker);
+    }
+
+    Ok(notarizations)
   }
 
   #[napi]

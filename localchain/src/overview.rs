@@ -1,16 +1,22 @@
 use std::collections::BTreeMap;
+use std::sync::Arc;
 
 use napi::bindgen_prelude::*;
 use sqlx::SqlitePool;
+use tokio::sync::Mutex;
 
 use ulx_primitives::{AccountType, Note, NoteType};
 
 use crate::transactions::TransactionType;
-use crate::{to_js_error, BalanceChangeStatus, LocalAccount};
+use crate::{to_js_error, BalanceChangeStatus, LocalAccount, MainchainClient};
 use crate::{AccountStore, BalanceChangeRow};
 
 #[derive(Clone, Debug, Default)]
 pub struct LocalchainOverview {
+  /// The name of this localchain
+  pub name: String,
+  /// The primary localchain address
+  pub address: String,
   /// The current account balance
   pub balance: i128,
   /// The net pending balance change acceptance/confirmation
@@ -23,17 +29,22 @@ pub struct LocalchainOverview {
   pub pending_tax_change: i128,
   /// Changes to the account ordered from most recent to oldest
   pub changes: Vec<BalanceChangeGroup>,
+  /// The mainchain balance
+  pub mainchain_balance: i128,
 }
 
 impl Into<LocalchainOverviewJs> for LocalchainOverview {
   fn into(self) -> LocalchainOverviewJs {
     LocalchainOverviewJs {
+      name: self.name,
+      address: self.address,
       balance: self.balance.into(),
       pending_balance_change: self.pending_balance_change.into(),
       held_balance: self.held_balance.into(),
       tax: self.tax.into(),
       pending_tax_change: self.pending_tax_change.into(),
       changes: self.changes,
+      mainchain_balance: self.mainchain_balance.into(),
     }
   }
 }
@@ -44,6 +55,7 @@ pub struct BalanceChangeGroup {
   pub net_balance_change: BigInt,
   pub net_tax: BigInt,
   pub held_balance: BigInt,
+  pub timestamp: i64,
   pub notes: Vec<String>,
   pub finalized_block_number: Option<u32>,
   pub status: BalanceChangeStatus,
@@ -74,6 +86,10 @@ pub struct BalanceChangeSummary {
 #[napi(object, js_name = "LocalchainOverview")]
 #[derive(Clone, Debug)]
 pub struct LocalchainOverviewJs {
+  /// The name of this localchain
+  pub name: String,
+  /// The primary localchain address
+  pub address: String,
   /// The current account balance
   pub balance: BigInt,
   /// The net pending balance change acceptance/confirmation
@@ -86,6 +102,8 @@ pub struct LocalchainOverviewJs {
   pub pending_tax_change: BigInt,
   /// Changes to the account ordered from most recent to oldest
   pub changes: Vec<BalanceChangeGroup>,
+  /// The mainchain balance
+  pub mainchain_balance: BigInt,
 }
 
 fn get_note_descriptions(change: &BalanceChangeRow) -> Vec<String> {
@@ -102,11 +120,21 @@ fn get_notes(change: &BalanceChangeRow) -> Vec<Note> {
 #[napi]
 pub struct OverviewStore {
   db: SqlitePool,
+  name: String,
+  mainchain_client: Arc<Mutex<Option<MainchainClient>>>,
 }
 #[napi]
 impl OverviewStore {
-  pub fn new(db: SqlitePool) -> Self {
-    Self { db }
+  pub fn new(
+    db: SqlitePool,
+    name: String,
+    mainchain_client: Arc<Mutex<Option<MainchainClient>>>,
+  ) -> Self {
+    Self {
+      db,
+      name,
+      mainchain_client,
+    }
   }
 
   #[napi(js_name = "get")]
@@ -116,6 +144,7 @@ impl OverviewStore {
 
   pub async fn get(&self) -> anyhow::Result<LocalchainOverview> {
     let mut overview = LocalchainOverview::default();
+    overview.name = self.name.clone();
 
     let transactions_by_id: BTreeMap<i64, TransactionType> =
       sqlx::query!("SELECT * from transactions")
@@ -146,6 +175,22 @@ impl OverviewStore {
       .into_iter()
       .map(|a| (a.id, a))
       .collect();
+
+    overview.address = accounts_by_id
+      .values()
+      .find(|a| a.account_type == AccountType::Deposit && a.hd_path.is_none())
+      .map(|a| a.address.clone())
+      .unwrap_or_default();
+
+    if overview.address.is_empty() {
+      return Ok(overview);
+    }
+
+    if let Some(mainchain_client) = self.mainchain_client.lock().await.as_ref() {
+      if let Ok(account) = mainchain_client.get_account(overview.address.clone()).await {
+        overview.mainchain_balance = account.data.free.get_i128().0;
+      }
+    }
 
     for change in balance_changes {
       if change.status == BalanceChangeStatus::Canceled {
@@ -191,6 +236,7 @@ impl OverviewStore {
         notes: get_note_descriptions(&change),
         finalized_block_number: change.finalized_block_number.map(|n| n as u32),
         status: change.status,
+        timestamp: change.timestamp.timestamp_millis(),
         notarization_id: change.notarization_id,
         transaction_id: change.transaction_id,
         transaction_type: change
@@ -327,7 +373,7 @@ mod tests {
       )
       .await?;
 
-    let alice_overview = OverviewStore::new(alice_pool.clone());
+    let alice_overview = OverviewStore::new(alice_pool.clone(), "alice".to_string(), Default::default());
     {
       let overview = alice_overview.get().await?;
       println!("Alice {:#?}", overview);
@@ -377,7 +423,7 @@ mod tests {
     let bob_builder = bob_localchain.begin_change();
     bob_builder.import_argon_file(alice_json).await?;
     let _ = bob_builder.notarize().await?;
-    let bob_overview = OverviewStore::new(bob_pool.clone());
+    let bob_overview = OverviewStore::new(bob_pool.clone(), "bob".to_string(), Default::default());
     {
       let overview = bob_overview.get().await?;
       println!("Bob {:#?}", overview);

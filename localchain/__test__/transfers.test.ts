@@ -1,4 +1,4 @@
-import {AccountType, CryptoScheme} from "../index";
+import {AccountType, CryptoScheme, NotarizationTracker} from "../index";
 import TestMainchain from "./TestMainchain";
 import TestNotary from "./TestNotary";
 import {getClient, Keyring} from "@ulixee/mainchain";
@@ -59,11 +59,9 @@ it('can transfer from mainchain to local to mainchain', async () => {
     const mainchainClient = await getClient(mainchainUrl);
     disconnectOnTeardown(mainchainClient);
     const alice = new Keyring({type: 'sr25519'}).createFromUri('//Alice');
-    const bob = new Keyring({type: 'sr25519'}).createFromUri('//Bob');
 
     await activateNotary(alice, mainchainClient, notary);
 
-    const nonce = await transferToLocalchain(bob, 5000, 1, mainchainClient);
     const bobchain = await createLocalchain(mainchainUrl);
 
     const ferdie = new Keyring().createFromUri("//Ferdie//1", {}, 'sr25519');
@@ -71,12 +69,18 @@ it('can transfer from mainchain to local to mainchain', async () => {
     // TODO: convert this to export pkcs8 and then import it
     await bobchain.keystore.importSuri("//Bob", CryptoScheme.Sr25519);
     {
-        const bobMainchainClient = await bobchain.mainchainClient;
-        const transfer = await bobMainchainClient.waitForLocalchainTransfer(bob.address, nonce);
-        const notarization = bobchain.beginChange();
-        await notarization.claimFromMainchain(transfer);
+        const transfer = await bobchain.mainchainTransfers.sendToLocalchain(5000n, 1);
+        console.log('Transfer', transfer);
+        expect(transfer.accountNonce).toBe(1);
 
-        const tracker = await notarization.notarizeAndWaitForNotebook();
+        let tracker: NotarizationTracker = null;
+        while (!tracker) {
+            const result = await bobchain.balanceSync.sync();
+            tracker = result.mainchainTransfers[0];
+            if (!tracker) {
+                await new Promise(resolve => setTimeout(resolve, 1000));
+            }
+        }
         await tracker.getNotebookProof();
     }
 
@@ -114,5 +118,5 @@ it('can transfer from mainchain to local to mainchain', async () => {
     expect(ferdieMainchainBalance).toBeGreaterThanOrEqual(expectedAliceBalance);
 
 
-}, 60e3);
+}, 120e3);
 

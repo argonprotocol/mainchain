@@ -4,11 +4,12 @@
 extern crate napi_derive;
 
 use std::env;
-use directories::BaseDirs;
+use std::fs::create_dir_all;
 use std::path::PathBuf;
 use std::sync::Arc;
 use std::time::Duration;
 
+use directories::BaseDirs;
 use napi::bindgen_prelude::*;
 use sqlx::Sqlite;
 use sqlx::{migrate::MigrateDatabase, SqlitePool};
@@ -19,11 +20,15 @@ pub use balance_changes::*;
 pub use balance_sync::*;
 pub use constants::*;
 pub use data_domain::*;
+pub use embedded_keystore::CryptoScheme;
 pub use keystore::Keystore;
 pub use mainchain_client::*;
 pub use notary_client::*;
 pub use open_escrows::*;
 use ulx_primitives::tick::Ticker;
+
+use crate::keystore::KeystorePasswordOption;
+use crate::mainchain_transfer::MainchainTransferStore;
 
 mod accounts;
 mod balance_change_builder;
@@ -32,6 +37,7 @@ mod balance_sync;
 mod data_domain;
 pub mod keystore;
 mod mainchain_client;
+mod mainchain_transfer;
 mod notarization_builder;
 mod notarization_tracker;
 mod notary_client;
@@ -39,12 +45,9 @@ mod open_escrows;
 
 pub mod embedded_keystore;
 
-use crate::keystore::KeystorePasswordOption;
-pub use embedded_keystore::CryptoScheme;
-
+mod argon_file;
 pub mod cli;
 pub mod constants;
-mod file_transfer;
 pub mod macros;
 mod overview;
 #[cfg(test)]
@@ -81,6 +84,12 @@ impl ObjectFinalize for Localchain {
 #[napi]
 impl Localchain {
   pub async fn create_db(path: String) -> Result<SqlitePool> {
+    let db_path = PathBuf::from(path.clone());
+    if let Some(dir) = db_path.parent() {
+      create_dir_all(dir)
+        .map_err(|_| to_js_error("Could not create the parent directory for your localchain"))?;
+    }
+
     if !Sqlite::database_exists(&path).await.unwrap_or(false) {
       Sqlite::create_database(&path)
         .await
@@ -170,11 +179,14 @@ impl Localchain {
         .unlock(Some(password_option))
         .await
         .map_err(to_js_error)?;
+    } else {
+      // might not unlock, but try in case
+      let _ = keystore.unlock(None).await;
     }
 
     Ok(Localchain {
       db,
-      path: path,
+      path,
       ticker: TickerRef { ticker },
       mainchain_client: mainchain_mutex.clone(),
       notary_clients: NotaryClients::from(mainchain_mutex),
@@ -205,7 +217,9 @@ impl Localchain {
 
   #[napi]
   pub async fn account_overview(&self) -> Result<overview::LocalchainOverviewJs> {
-    overview::OverviewStore::new(self.db.clone()).get_js().await
+    overview::OverviewStore::new(self.db.clone(), self.name(), self.mainchain_client.clone())
+      .get_js()
+      .await
   }
 
   #[napi]
@@ -235,6 +249,16 @@ impl Localchain {
   }
 
   #[napi(getter)]
+  pub fn name(&self) -> String {
+    PathBuf::from(&self.path)
+      .file_stem()
+      .unwrap()
+      .to_str()
+      .unwrap()
+      .to_string()
+  }
+
+  #[napi(getter)]
   pub fn current_tick(&self) -> u32 {
     self.ticker.current()
   }
@@ -257,6 +281,15 @@ impl Localchain {
   pub async fn mainchain_client(&self) -> Option<MainchainClient> {
     let mainchain_client = self.mainchain_client.lock().await;
     mainchain_client.clone()
+  }
+
+  #[napi(getter)]
+  pub fn mainchain_transfers(&self) -> MainchainTransferStore {
+    MainchainTransferStore::new(
+      self.db.clone(),
+      self.mainchain_client.clone(),
+      self.keystore.clone(),
+    )
   }
 
   #[napi(getter)]

@@ -2,8 +2,7 @@ use std::collections::HashMap;
 use std::str::FromStr;
 use std::sync::Arc;
 
-use crate::to_js_error;
-use crate::AccountStore;
+use anyhow::anyhow;
 use napi::bindgen_prelude::*;
 use sp_core::crypto::AccountId32;
 use sp_core::{ByteArray, H256};
@@ -11,15 +10,21 @@ use subxt::error::RpcError;
 use subxt::runtime_api::RuntimeApiPayload;
 use subxt::storage::address::Yes;
 use subxt::storage::StorageAddress;
+use subxt::tx::{Signer, TxInBlock, TxProgress, TxStatus};
+use subxt::OnlineClient;
 use tokio::sync::Mutex;
 use tracing::warn;
-use ulixee_client::api;
-use ulixee_client::api::runtime_types;
-use ulixee_client::api::storage;
+
+use ulixee_client::api::{constants, storage};
+use ulixee_client::api::{runtime_types, tx};
 use ulixee_client::UlxFullclient;
+use ulixee_client::{api, UlxConfig};
 use ulx_primitives::host::Host;
 use ulx_primitives::tick::Ticker;
 use ulx_primitives::{DataDomain, DataTLD};
+
+use crate::AccountStore;
+use crate::{to_js_error, Keystore};
 
 #[napi]
 #[derive(Clone)]
@@ -58,9 +63,10 @@ impl MainchainClient {
       return Ok(());
     }
 
-    let client = UlxFullclient::try_until_connected(self.host.clone(), 5_000, timeout_millis as u64)
-      .await
-      .map_err(to_js_error)?;
+    let client =
+      UlxFullclient::try_until_connected(self.host.clone(), 5_000, timeout_millis as u64)
+        .await
+        .map_err(to_js_error)?;
     let ws_client = client.ws_client.clone();
 
     *client_lock = Some(client);
@@ -346,7 +352,7 @@ impl MainchainClient {
       consumers: info.consumers,
       providers: info.providers,
       sufficients: info.sufficients,
-      data: ArgonBalancesAccountData {
+      data: BalancesAccountData {
         free: BigInt::from(info.data.free),
         reserved: BigInt::from(info.data.reserved),
         frozen: BigInt::from(info.data.frozen),
@@ -356,14 +362,135 @@ impl MainchainClient {
   }
 
   #[napi]
+  pub async fn get_ulixees(&self, address: String) -> Result<BalancesAccountData> {
+    let account_id32 = subxt::utils::AccountId32::from_str(&address).map_err(to_js_error)?;
+    let balance = self
+      .fetch_storage(&storage().ulixee_balances().account(account_id32), None)
+      .await?
+      .ok_or_else(|| to_js_error(format!("No record found for address {}", address)))?;
+    Ok(BalancesAccountData {
+      free: BigInt::from(balance.free),
+      reserved: BigInt::from(balance.reserved),
+      frozen: BigInt::from(balance.frozen),
+      flags: BigInt::from(balance.flags.0),
+    })
+  }
+
+  #[napi]
   pub async fn get_account_nonce(&self, address: String) -> Result<u32> {
     let account_id32 = subxt::utils::AccountId32::from_str(&address).map_err(to_js_error)?;
     let nonce = self
-      .fetch_storage(&storage().system().account(account_id32), None)
+      .client()
       .await?
-      .ok_or_else(|| to_js_error(format!("No account found for address {}", address)))?
-      .nonce;
-    Ok(nonce)
+      .methods
+      .system_account_next_index(&account_id32)
+      .await
+      .map_err(to_js_error)?;
+    Ok(nonce as u32)
+  }
+  async fn wait_for_in_block(
+    mut tx_progress: TxProgress<UlxConfig, OnlineClient<UlxConfig>>,
+  ) -> anyhow::Result<TxInBlock<UlxConfig, OnlineClient<UlxConfig>>> {
+    while let Some(status) = tx_progress.next().await {
+      match status? {
+        TxStatus::InBestBlock(tx_in_block) | TxStatus::InFinalizedBlock(tx_in_block) => {
+          println!("tx in block");
+          // now, we can attempt to work with the block, eg:
+          tx_in_block.wait_for_success().await?;
+          return Ok(tx_in_block);
+        }
+        TxStatus::Error { message }
+        | TxStatus::Invalid { message }
+        | TxStatus::Dropped { message } => {
+          println!("error tx {}", message);
+          // Handle any errors:
+          return Err(anyhow!("Error submitting notebook to block: {}", message));
+        }
+        // Continue otherwise:
+        _ => continue,
+      }
+    }
+    Err(anyhow!("No valid status encountered for notebook"))
+  }
+
+  pub async fn get_transfer_to_localchain_finalized_block(
+    &self,
+    address: String,
+    nonce: u32,
+  ) -> anyhow::Result<Option<u32>> {
+    let account_id32 = subxt::utils::AccountId32::from_str(&address).map_err(to_js_error)?;
+    let Ok(Some(transfer)) = self
+      .fetch_storage(
+        &storage()
+          .chain_transfer()
+          .pending_transfers_out(account_id32, nonce),
+        None,
+      )
+      .await
+    else {
+      return Ok(None);
+    };
+
+    let constant_query = constants().chain_transfer().transfer_expiration_blocks();
+    let expiration_blocks = self.client().await?.live.constants().at(&constant_query)?;
+
+    Ok(Some(transfer.expiration_block - expiration_blocks))
+  }
+
+  pub async fn create_transfer_to_localchain(
+    &self,
+    address: String,
+    amount: u128,
+    notary_id: u32,
+    keystore: &Keystore,
+  ) -> anyhow::Result<(
+    LocalchainTransfer,
+    TxInBlock<UlxConfig, OnlineClient<UlxConfig>>,
+  )> {
+    let signer = keystore.get_subxt_signer(address.clone()).await?;
+
+    let current_nonce = self.get_account_nonce(address.clone()).await?;
+    let client = self.client().await?;
+    let tx_progress = client
+      .live
+      .tx()
+      .create_signed_with_nonce(
+        &tx().chain_transfer().send_to_localchain(amount, notary_id),
+        &signer,
+        current_nonce as u64,
+        Default::default(),
+      )?
+      .submit_and_watch()
+      .await?;
+    println!("submitted tx");
+    let in_block = Self::wait_for_in_block(tx_progress).await?;
+    let transfer = in_block.fetch_events().await?.iter().find_map(|event| {
+      if let Ok(event) = event {
+        if let Some(Ok(transfer)) = event
+          .as_event::<api::chain_transfer::events::TransferToLocalchain>()
+          .transpose()
+        {
+          if transfer.account_id == signer.account_id() {
+            return Some(transfer);
+          }
+        }
+      }
+      None
+    });
+    let Some(transfer) = transfer else {
+      return Err(anyhow!("No transfer event found for account {}", address));
+    };
+
+    Ok((
+      LocalchainTransfer {
+        address,
+        amount: amount.into(),
+        notary_id,
+        expiration_block: transfer.expiration_block,
+        account_nonce: transfer.account_nonce,
+      },
+      in_block,
+    ))
   }
 
   #[napi]
@@ -554,11 +681,11 @@ pub struct AccountInfo {
   pub consumers: u32,
   pub providers: u32,
   pub sufficients: u32,
-  pub data: ArgonBalancesAccountData,
+  pub data: BalancesAccountData,
 }
 
 #[napi(object)]
-pub struct ArgonBalancesAccountData {
+pub struct BalancesAccountData {
   pub free: BigInt,
   pub reserved: BigInt,
   pub frozen: BigInt,

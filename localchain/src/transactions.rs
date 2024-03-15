@@ -4,7 +4,7 @@ use sqlx::{SqliteConnection, SqlitePool};
 
 use ulx_primitives::{AccountType, Note};
 
-use crate::file_transfer::ArgonFileType;
+use crate::argon_file::ArgonFileType;
 use crate::keystore::Keystore;
 use crate::notarization_builder::NotarizationBuilder;
 use crate::notary_client::NotaryClients;

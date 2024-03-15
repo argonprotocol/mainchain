@@ -281,7 +281,7 @@ if (!nativeBinding) {
   throw new Error(`Failed to load native binding`)
 }
 
-const { DataTLD, AccountType, LocalAccount, AccountStore, BalanceChangeBuilder, BalanceChange, BalanceChangeStatus, BalanceChangeStore, BalanceSync, BalanceSyncResult, DataDomainLease, DataDomainStore, Keystore, MainchainClient, NotarizationBuilder, NotarizationTracker, NotaryClients, NotaryClient, NotebookMeta, BalanceTipResult, Escrow, OpenEscrow, OpenEscrowsStore, CryptoScheme, runCli, NOTARIZATION_MAX_BALANCE_CHANGES, NOTARIZATION_MAX_DOMAINS, NOTARIZATION_MAX_BLOCK_VOTES, ESCROW_EXPIRATION_TICKS, ESCROW_CLAWBACK_TICKS, ESCROW_MINIMUM_SETTLEMENT, DATASTORE_MAX_VERSIONS, DATA_DOMAIN_MIN_NAME_LENGTH, DATA_DOMAIN_LEASE_COST, VERSION, ArgonFileType, OverviewStore, TransactionType, Transactions, Localchain, TickerRef } = nativeBinding
+const { DataTLD, AccountType, LocalAccount, AccountStore, BalanceChangeBuilder, BalanceChange, BalanceChangeStatus, BalanceChangeStore, BalanceSync, BalanceSyncResult, DataDomainLease, DataDomainStore, Keystore, MainchainClient, MainchainTransferStore, NotarizationBuilder, NotarizationTracker, NotaryClients, NotaryClient, NotebookMeta, BalanceTipResult, Escrow, OpenEscrow, OpenEscrowsStore, CryptoScheme, VERSION, ArgonFileType, runCli, NOTARIZATION_MAX_BALANCE_CHANGES, NOTARIZATION_MAX_DOMAINS, NOTARIZATION_MAX_BLOCK_VOTES, ESCROW_EXPIRATION_TICKS, ESCROW_CLAWBACK_TICKS, ESCROW_MINIMUM_SETTLEMENT, DATASTORE_MAX_VERSIONS, DATA_DOMAIN_MIN_NAME_LENGTH, DATA_DOMAIN_LEASE_COST, OverviewStore, TransactionType, Transactions, Localchain, TickerRef } = nativeBinding
 
 module.exports.DataTLD = DataTLD
 module.exports.AccountType = AccountType
@@ -297,6 +297,7 @@ module.exports.DataDomainLease = DataDomainLease
 module.exports.DataDomainStore = DataDomainStore
 module.exports.Keystore = Keystore
 module.exports.MainchainClient = MainchainClient
+module.exports.MainchainTransferStore = MainchainTransferStore
 module.exports.NotarizationBuilder = NotarizationBuilder
 module.exports.NotarizationTracker = NotarizationTracker
 module.exports.NotaryClients = NotaryClients
@@ -307,6 +308,8 @@ module.exports.Escrow = Escrow
 module.exports.OpenEscrow = OpenEscrow
 module.exports.OpenEscrowsStore = OpenEscrowsStore
 module.exports.CryptoScheme = CryptoScheme
+module.exports.VERSION = VERSION
+module.exports.ArgonFileType = ArgonFileType
 module.exports.runCli = runCli
 module.exports.NOTARIZATION_MAX_BALANCE_CHANGES = NOTARIZATION_MAX_BALANCE_CHANGES
 module.exports.NOTARIZATION_MAX_DOMAINS = NOTARIZATION_MAX_DOMAINS
@@ -317,8 +320,6 @@ module.exports.ESCROW_MINIMUM_SETTLEMENT = ESCROW_MINIMUM_SETTLEMENT
 module.exports.DATASTORE_MAX_VERSIONS = DATASTORE_MAX_VERSIONS
 module.exports.DATA_DOMAIN_MIN_NAME_LENGTH = DATA_DOMAIN_MIN_NAME_LENGTH
 module.exports.DATA_DOMAIN_LEASE_COST = DATA_DOMAIN_LEASE_COST
-module.exports.VERSION = VERSION
-module.exports.ArgonFileType = ArgonFileType
 module.exports.OverviewStore = OverviewStore
 module.exports.TransactionType = TransactionType
 module.exports.Transactions = Transactions

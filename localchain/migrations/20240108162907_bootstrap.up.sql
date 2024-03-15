@@ -63,6 +63,22 @@ CREATE TABLE IF NOT EXISTS balance_changes
     FOREIGN KEY (transaction_id) REFERENCES transactions (id)
 );
 
+CREATE TABLE IF NOT EXISTS mainchain_transfers_in
+(
+    id                     INTEGER  NOT NULL PRIMARY KEY AUTOINCREMENT,
+    address                TEXT     NOT NULL,
+    amount                 TEXT     NOT NULL,
+    account_nonce          INT      NOT NULL,
+    expiration_block       INT      NOT NULL,
+    notary_id              INT      NOT NULL,
+    balance_change_id      INT,
+    first_block_hash       TEXT     NOT NULL,
+    extrinsic_hash         TEXT     NOT NULL,
+    finalized_block_number INT,
+    created_at             DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    FOREIGN KEY (balance_change_id) REFERENCES balance_changes (id)
+);
+
 -- Escrows pending claim by this localchain. The settled_amount and settled_signature fields are only updated in the json when the escrow is settled.
 CREATE TABLE IF NOT EXISTS open_escrows
 (

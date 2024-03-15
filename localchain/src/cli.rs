@@ -337,14 +337,9 @@ where
           .load_preset(UTF8_FULL)
           .apply_modifier(UTF8_ROUND_CORNERS)
           .set_content_arrangement(ContentArrangement::Dynamic)
-          .set_header(vec![
-            "Address", "Type", "NotaryId", "Change #", "Balance", "Status",
-          ]);
-        for (account, balance_change) in tracker.get_changed_accounts().await {
+          .set_header(vec!["Change #", "Balance", "Status"]);
+        for (_account, balance_change) in tracker.get_changed_accounts().await {
           table.add_row(vec![
-            account.address,
-            account.account_type.as_str().to_string(),
-            account.notary_id.to_string(),
             balance_change.change_number.to_string(),
             balance_change.balance,
             format!("{:?}", balance_change.status),
@@ -369,7 +364,7 @@ where
           return Err(anyhow!("Localchain already exists at {:?}", path));
         }
 
-        let db = Localchain::create_db(path).await?;
+        let db = Localchain::create_db(path.clone()).await?;
         let keystore = Keystore::new(db.clone());
         if let Some(suri) = suri {
           keystore
@@ -388,14 +383,11 @@ where
           .load_preset(UTF8_FULL)
           .apply_modifier(UTF8_ROUND_CORNERS)
           .set_content_arrangement(ContentArrangement::Dynamic)
-          .set_header(account_columns());
-        for account in AccountStore::list(&mut conn, false).await? {
-          let balance_change =
-            BalanceChangeStore::get_latest_for_account(&mut *conn, account.id).await?;
-          table.add_row(format_account_record(&name, account, balance_change));
-        }
+          .set_header(vec!["Address", "Path", "NotaryId"]);
+        let account = AccountStore::deposit_account(&mut conn, None).await?;
+        table.add_row(vec![account.address, path, account.notary_id.to_string()]);
 
-        println!("{table}");
+        println!("Account created at:\n{table}");
       }
 
       AccountsSubcommand::List { base_dir } => {

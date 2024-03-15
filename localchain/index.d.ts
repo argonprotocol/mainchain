@@ -85,9 +85,9 @@ export interface AccountInfo {
   consumers: number
   providers: number
   sufficients: number
-  data: ArgonBalancesAccountData
+  data: BalancesAccountData
 }
-export interface ArgonBalancesAccountData {
+export interface BalancesAccountData {
   free: bigint
   reserved: bigint
   frozen: bigint
@@ -163,6 +163,12 @@ export enum CryptoScheme {
   Sr25519 = 1,
   Ecdsa = 2
 }
+/** The version of the Argon file format. */
+export const VERSION: string
+export enum ArgonFileType {
+  Send = 0,
+  Request = 1
+}
 export function runCli(): Promise<void>
 /** Max balance changes that can be in a single notarization */
 export const NOTARIZATION_MAX_BALANCE_CHANGES: number
@@ -182,16 +188,11 @@ export const DATASTORE_MAX_VERSIONS: number
 export const DATA_DOMAIN_MIN_NAME_LENGTH: number
 /** Cost to lease a data domain for 1 year */
 export const DATA_DOMAIN_LEASE_COST: bigint
-/** The version of the Argon file format. */
-export const VERSION: string
-export enum ArgonFileType {
-  Send = 0,
-  Request = 1
-}
 export interface BalanceChangeGroup {
   netBalanceChange: bigint
   netTax: bigint
   heldBalance: bigint
+  timestamp: number
   notes: Array<string>
   finalizedBlockNumber?: number
   status: BalanceChangeStatus
@@ -216,6 +217,10 @@ export interface BalanceChangeSummary {
   finalizedBlockNumber?: number
 }
 export interface LocalchainOverview {
+  /** The name of this localchain */
+  name: string
+  /** The primary localchain address */
+  address: string
   /** The current account balance */
   balance: bigint
   /** The net pending balance change acceptance/confirmation */
@@ -228,6 +233,8 @@ export interface LocalchainOverview {
   pendingTaxChange: bigint
   /** Changes to the account ordered from most recent to oldest */
   changes: Array<BalanceChangeGroup>
+  /** The mainchain balance */
+  mainchainBalance: bigint
 }
 export enum TransactionType {
   Send = 0,
@@ -322,12 +329,14 @@ export class BalanceSync {
   sync(options?: EscrowCloseOptions | undefined | null): Promise<BalanceSyncResult>
   consolidateJumpAccounts(): Promise<Array<NotarizationTracker>>
   syncUnsettledBalances(): Promise<Array<BalanceChange>>
+  syncMainchainTransfers(): Promise<Array<NotarizationTracker>>
   syncBalanceChange(balanceChange: BalanceChange): Promise<BalanceChange>
   processPendingEscrows(options?: EscrowCloseOptions | undefined | null): Promise<Array<NotarizationBuilder>>
 }
 export class BalanceSyncResult {
   get balanceChanges(): Array<BalanceChange>
   get escrowNotarizations(): Array<NotarizationBuilder>
+  get mainchainTransfers(): Array<NotarizationTracker>
   get jumpAccountConsolidations(): Array<NotarizationTracker>
 }
 export type DataDomainRow = DataDomainLease
@@ -368,11 +377,15 @@ export class MainchainClient {
   getDataDomainZoneRecord(domainName: string, tld: DataTLD): Promise<ZoneRecord | null>
   getNotaryDetails(notaryId: number): Promise<NotaryDetails | null>
   getAccount(address: string): Promise<AccountInfo>
+  getUlixees(address: string): Promise<BalancesAccountData>
   getAccountNonce(address: string): Promise<number>
   waitForLocalchainTransfer(address: string, nonce: number): Promise<LocalchainTransfer | null>
   getAccountChangesRoot(notaryId: number, notebookNumber: number): Promise<Uint8Array>
   latestFinalizedNumber(): Promise<number>
   waitForNotebookFinalized(notaryId: number, notebookNumber: number): Promise<number>
+}
+export class MainchainTransferStore {
+  sendToLocalchain(amount: bigint, notaryId?: number | undefined | null): Promise<LocalchainTransfer>
 }
 export class NotarizationBuilder {
   set notaryId(notaryId: number)
@@ -508,10 +521,12 @@ export class Localchain {
   static getDefaultDir(): string
   static getDefaultPath(): string
   get address(): Promise<string>
+  get name(): string
   get currentTick(): number
   get ticker(): TickerRef
   get keystore(): Keystore
   get mainchainClient(): Promise<MainchainClient | null>
+  get mainchainTransfers(): MainchainTransferStore
   get notaryClients(): NotaryClients
   get accounts(): AccountStore
   get balanceChanges(): BalanceChangeStore

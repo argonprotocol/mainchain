@@ -23,7 +23,7 @@ use crate::accounts::LocalAccount;
 use crate::balance_change_builder::BalanceChangeBuilder;
 use crate::balance_changes::BalanceChangeStore;
 use crate::data_domain::JsDataDomain;
-use crate::file_transfer::{ArgonFile, ArgonFileType};
+use crate::argon_file::{ArgonFile, ArgonFileType};
 use crate::notarization_tracker::NotarizationTracker;
 use crate::notary_client::NotaryClients;
 use crate::open_escrows::OpenEscrow;
