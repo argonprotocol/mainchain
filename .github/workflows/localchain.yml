@@ -1,4 +1,4 @@
-name: CI
+name: Localchain Napi.rs
 env:
   DEBUG: napi:*
   APP_NAME: localchain
@@ -21,6 +21,9 @@ permissions:
   pull_request: null
 jobs:
   build:
+    defaults:
+      run:
+        working-directory: ./localchain
     strategy:
       fail-fast: false
       matrix:
