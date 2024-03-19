@@ -51,7 +51,7 @@ pub fn development_config() -> Result<ChainSpec, String> {
 	let mut properties = Properties::new();
 	properties.insert("tokenDecimals".into(), 3.into());
 
-	const HASHES_PER_SECOND: u64 = 1_000_000;
+	const HASHES_PER_SECOND: u64 = 100_000;
 
 	Ok(ChainSpec::builder(
 		WASM_BINARY.ok_or_else(|| "Development wasm not available".to_string())?,

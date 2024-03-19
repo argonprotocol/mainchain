@@ -3,7 +3,7 @@
   "version": "2.0.0-alpha.21",
   "scripts": {
     "build": "yarn workspaces foreach --all run build",
-    "pretest": "yarn workspace @ulixee/localchain build:debug && cargo build --release --features=fast-runtime",
+    "pretest": "yarn workspace @ulixee/localchain pretest && cargo build --profile=test --features=fast-runtime",
     "test": "yarn pretest && jest"
   },
   "private": true,
@@ -37,5 +37,6 @@
         }
       ]
     }
-  }
+  },
+  "packageManager": "yarn@4.1.1"
 }

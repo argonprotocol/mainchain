@@ -1,0 +1,80 @@
+{
+  "db_name": "SQLite",
+  "query": "SELECT * FROM mainchain_transfers_in where balance_change_id IS NULL ORDER BY id DESC",
+  "describe": {
+    "columns": [
+      {
+        "name": "id",
+        "ordinal": 0,
+        "type_info": "Int64"
+      },
+      {
+        "name": "address",
+        "ordinal": 1,
+        "type_info": "Text"
+      },
+      {
+        "name": "amount",
+        "ordinal": 2,
+        "type_info": "Text"
+      },
+      {
+        "name": "account_nonce",
+        "ordinal": 3,
+        "type_info": "Int64"
+      },
+      {
+        "name": "expiration_block",
+        "ordinal": 4,
+        "type_info": "Int64"
+      },
+      {
+        "name": "notary_id",
+        "ordinal": 5,
+        "type_info": "Int64"
+      },
+      {
+        "name": "balance_change_id",
+        "ordinal": 6,
+        "type_info": "Int64"
+      },
+      {
+        "name": "first_block_hash",
+        "ordinal": 7,
+        "type_info": "Text"
+      },
+      {
+        "name": "extrinsic_hash",
+        "ordinal": 8,
+        "type_info": "Text"
+      },
+      {
+        "name": "finalized_block_number",
+        "ordinal": 9,
+        "type_info": "Int64"
+      },
+      {
+        "name": "created_at",
+        "ordinal": 10,
+        "type_info": "Datetime"
+      }
+    ],
+    "parameters": {
+      "Right": 0
+    },
+    "nullable": [
+      false,
+      false,
+      false,
+      false,
+      false,
+      false,
+      true,
+      false,
+      false,
+      true,
+      false
+    ]
+  },
+  "hash": "731478727135b1bd57d715659f48cd74492a5a38b824bb7821b25c1f57f7a1eb"
+}

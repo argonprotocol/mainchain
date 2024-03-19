@@ -1,7 +1,7 @@
 use codec::{Codec, Decode, Encode, MaxEncodedLen};
 use frame_support::{pallet_prelude::TypeInfo, Deserialize, Serialize};
 use sp_core::{ConstU32, H256};
-use sp_core_hashing::blake2_256;
+use sp_crypto_hashing::blake2_256;
 use sp_debug_derive::RuntimeDebug;
 use sp_runtime::{BoundedBTreeMap, BoundedVec, RuntimeString};
 use sp_std::{cmp::Ordering, collections::btree_map::BTreeMap, str};

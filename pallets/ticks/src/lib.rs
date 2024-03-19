@@ -1,4 +1,4 @@
-#![feature(slice_take)]
+
 #![cfg_attr(not(feature = "std"), no_std)]
 
 use frame_support::traits::OnTimestampSet;
@@ -72,7 +72,7 @@ pub mod pallet {
 		pub genesis_utc_time: u64,
 
 		#[serde(skip)]
-		_phantom: PhantomData<T>,
+		pub _phantom: PhantomData<T>,
 	}
 
 	#[pallet::genesis_build]

@@ -1,0 +1,20 @@
+{
+  "db_name": "SQLite",
+  "query": "SELECT transaction_id FROM balance_changes WHERE notarization_id = ? AND transaction_id IS NOT NULL",
+  "describe": {
+    "columns": [
+      {
+        "name": "transaction_id",
+        "ordinal": 0,
+        "type_info": "Int64"
+      }
+    ],
+    "parameters": {
+      "Right": 1
+    },
+    "nullable": [
+      true
+    ]
+  },
+  "hash": "2c0ae5662fcbee11f72189772718782f9d85700fbd1445cd18b8adc10077e432"
+}

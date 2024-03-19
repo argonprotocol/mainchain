@@ -1,0 +1,12 @@
+{
+  "db_name": "SQLite",
+  "query": "UPDATE balance_changes SET proof_json = ?, status = ? WHERE id = ?",
+  "describe": {
+    "columns": [],
+    "parameters": {
+      "Right": 3
+    },
+    "nullable": []
+  },
+  "hash": "d5aed9d98d5e5397317aef8fc937c41d430d989d4bc5e545989b2a643e0518eb"
+}

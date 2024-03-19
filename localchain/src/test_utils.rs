@@ -37,8 +37,8 @@ use ulx_primitives::{
 use crate::notarization_builder::NotarizationBuilder;
 use crate::notarization_tracker::NotebookProof;
 use crate::{
-  AccountStore, CryptoScheme, Localchain, LocalchainTransfer, MainchainClient, NotaryClient,
-  NotaryClients, Keystore, TickerRef,
+  AccountStore, CryptoScheme, Keystore, Localchain, LocalchainTransfer, MainchainClient,
+  NotaryClient, NotaryClients, TickerRef,
 };
 
 /// Debug sqlite connections. This function is for sqlx unit tests. To activate, your test signature
@@ -427,7 +427,6 @@ pub fn mock_mainchain_transfer(address: &str, amount: u128) -> LocalchainTransfe
 
 #[async_trait]
 impl LocalchainRpcServer for MockNotary {
-
   async fn notarize(
     &self,
     balance_changeset: NotarizationBalanceChangeset,
@@ -595,7 +594,8 @@ impl NotebookRpcServer for MockNotary {
 
   async fn get_raw_headers(
     &self,
-    _since_notebook: NotebookNumber,
+    _since_notebook: Option<NotebookNumber>,
+    _list: Option<Vec<NotebookNumber>>,
   ) -> Result<Vec<(NotebookNumber, Vec<u8>)>, ErrorObjectOwned> {
     todo!()
   }

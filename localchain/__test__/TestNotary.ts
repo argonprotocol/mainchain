@@ -47,7 +47,7 @@ export default class TestNotary implements ITeardownable {
             await client.end();
         }
 
-        let notaryPath = pathToNotaryBin ?? `${__dirname}/../../target/release/ulx-notary`;
+        let notaryPath = pathToNotaryBin ?? `${__dirname}/../../target/debug/ulx-notary`;
         if (!fs.existsSync(notaryPath)) {
             throw new Error(`Notary binary not found at ${notaryPath}`);
         }

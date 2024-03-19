@@ -5,7 +5,7 @@ pub use block_creator::{notary_client_task, tax_block_creator};
 #[cfg(test)]
 mod tests;
 
-pub mod aux;
+pub mod aux_client;
 pub mod basic_queue;
 mod basic_queue_import;
 mod block_creator;

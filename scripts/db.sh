@@ -1,0 +1,1 @@
+SQLX_OFFLINE=0 SQLX_OFFLINE_DIR=.sqlx cargo check

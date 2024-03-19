@@ -1,4 +1,4 @@
-#![feature(slice_take)]
+
 #![cfg_attr(not(feature = "std"), no_std)]
 
 extern crate core;
@@ -143,7 +143,7 @@ pub mod pallet {
 		pub initial_compute_difficulty: ComputeDifficulty,
 		pub initial_vote_minimum: VoteMinimum,
 		#[serde(skip)]
-		_phantom: PhantomData<T>,
+		pub _phantom: PhantomData<T>,
 	}
 
 	#[pallet::genesis_build]

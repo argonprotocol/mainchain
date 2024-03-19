@@ -1,0 +1,74 @@
+{
+  "db_name": "SQLite",
+  "query": "SELECT * from accounts WHERE address = $1 AND account_type = $2 AND notary_id = $3",
+  "describe": {
+    "columns": [
+      {
+        "name": "id",
+        "ordinal": 0,
+        "type_info": "Int64"
+      },
+      {
+        "name": "address",
+        "ordinal": 1,
+        "type_info": "Text"
+      },
+      {
+        "name": "hd_path",
+        "ordinal": 2,
+        "type_info": "Text"
+      },
+      {
+        "name": "account_id32",
+        "ordinal": 3,
+        "type_info": "Blob"
+      },
+      {
+        "name": "account_type",
+        "ordinal": 4,
+        "type_info": "Int64"
+      },
+      {
+        "name": "notary_id",
+        "ordinal": 5,
+        "type_info": "Int64"
+      },
+      {
+        "name": "origin_notebook_number",
+        "ordinal": 6,
+        "type_info": "Int64"
+      },
+      {
+        "name": "origin_uid",
+        "ordinal": 7,
+        "type_info": "Int64"
+      },
+      {
+        "name": "created_at",
+        "ordinal": 8,
+        "type_info": "Datetime"
+      },
+      {
+        "name": "updated_at",
+        "ordinal": 9,
+        "type_info": "Datetime"
+      }
+    ],
+    "parameters": {
+      "Right": 3
+    },
+    "nullable": [
+      false,
+      false,
+      true,
+      false,
+      false,
+      false,
+      true,
+      true,
+      false,
+      false
+    ]
+  },
+  "hash": "005338f0a055a94a2f57f0938a569543c71e1d52ecc97df7c69a00c4035d3ef7"
+}

@@ -5,7 +5,7 @@ use sp_core::{
 	crypto::{Ss58AddressFormat, Ss58Codec},
 	ConstU32, RuntimeDebug,
 };
-use sp_runtime::{format_runtime_string, BoundedVec};
+use sp_runtime::BoundedVec;
 use sp_std::{
 	fmt::{Display, Formatter, Result},
 	vec::Vec,
@@ -57,15 +57,14 @@ impl Note {
 
 impl Display for Note {
 	fn fmt(&self, f: &mut Formatter<'_>) -> Result {
-		let milligons = format_runtime_string!("{:.3}", self.milligons as f64 / 1000.0);
-		let str = if milligons.ends_with("00") {
-			milligons.strip_suffix("00").unwrap()
-		} else if milligons.ends_with("0") {
-			milligons.strip_suffix("0").unwrap()
+		let argons = self.milligons as f64 / 1000.0;
+		if self.milligons % 1000 == 0 || self.milligons % 100 == 0 {
+			write!(f, "{} ₳{:.1}", self.note_type, argons)
+		} else if self.milligons % 10 == 0 {
+			write!(f, "{} ₳{:.2}", self.note_type, argons)
 		} else {
-			&milligons
-		};
-		write!(f, "{} ₳{}", self.note_type, str)
+			write!(f, "{} ₳{:.3}", self.note_type, argons)
+		}
 	}
 }
 

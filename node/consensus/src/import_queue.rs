@@ -22,12 +22,12 @@ use ulx_primitives::{
 };
 
 use crate::{
-	aux::UlxAux,
-	basic_queue::BasicQueue,
-	compute_solver::BlockComputeNonce,
-	digests::{load_digests, read_seal_digest},
-	error::Error,
-	notary_client::verify_notebook_audits,
+    aux_client::UlxAux,
+    basic_queue::BasicQueue,
+    compute_solver::BlockComputeNonce,
+    digests::{load_digests, read_seal_digest},
+    error::Error,
+    notary_client::verify_notebook_audits,
 };
 
 /// A block importer for Ulx.

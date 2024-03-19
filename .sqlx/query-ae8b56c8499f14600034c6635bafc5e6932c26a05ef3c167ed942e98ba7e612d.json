@@ -1,0 +1,56 @@
+{
+  "db_name": "SQLite",
+  "query": "SELECT * FROM data_domains",
+  "describe": {
+    "columns": [
+      {
+        "name": "id",
+        "ordinal": 0,
+        "type_info": "Int64"
+      },
+      {
+        "name": "name",
+        "ordinal": 1,
+        "type_info": "Text"
+      },
+      {
+        "name": "tld",
+        "ordinal": 2,
+        "type_info": "Text"
+      },
+      {
+        "name": "registered_to_address",
+        "ordinal": 3,
+        "type_info": "Text"
+      },
+      {
+        "name": "registered_at_tick",
+        "ordinal": 4,
+        "type_info": "Int64"
+      },
+      {
+        "name": "notarization_id",
+        "ordinal": 5,
+        "type_info": "Int64"
+      },
+      {
+        "name": "created_at",
+        "ordinal": 6,
+        "type_info": "Datetime"
+      }
+    ],
+    "parameters": {
+      "Right": 0
+    },
+    "nullable": [
+      false,
+      false,
+      false,
+      false,
+      false,
+      false,
+      false
+    ]
+  },
+  "hash": "ae8b56c8499f14600034c6635bafc5e6932c26a05ef3c167ed942e98ba7e612d"
+}

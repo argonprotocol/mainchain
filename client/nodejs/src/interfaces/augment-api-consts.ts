@@ -30,10 +30,6 @@ declare module '@polkadot/api-base/types/consts' {
        **/
       maxFreezes: u32 & AugmentedConst<ApiType>;
       /**
-       * The maximum number of holds that can exist on an account at any time.
-       **/
-      maxHolds: u32 & AugmentedConst<ApiType>;
-      /**
        * The maximum number of locks that should exist on an account.
        * Not strictly enforced, but used for weight estimation.
        **/
@@ -270,10 +266,6 @@ declare module '@polkadot/api-base/types/consts' {
        * The maximum number of individual freeze locks that can exist on an account at any time.
        **/
       maxFreezes: u32 & AugmentedConst<ApiType>;
-      /**
-       * The maximum number of holds that can exist on an account at any time.
-       **/
-      maxHolds: u32 & AugmentedConst<ApiType>;
       /**
        * The maximum number of locks that should exist on an account.
        * Not strictly enforced, but used for weight estimation.

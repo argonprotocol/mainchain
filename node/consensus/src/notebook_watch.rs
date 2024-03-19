@@ -24,11 +24,11 @@ use ulx_primitives::{
 };
 
 use crate::{
-	aux::{ForkPower, UlxAux},
-	block_creator::CreateTaxVoteBlock,
-	error::Error,
-	notary_client::NotaryClient,
-	LOG_TARGET,
+    aux_client::{ForkPower, UlxAux},
+    block_creator::CreateTaxVoteBlock,
+    error::Error,
+    notary_client::NotaryClient,
+    LOG_TARGET,
 };
 
 pub struct NotebookWatch<B: BlockT, C: AuxStore, SC, AC: Clone + Codec> {

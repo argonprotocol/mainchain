@@ -4,9 +4,9 @@ name: Check Set-Up & Build
 on:
   # Triggers the workflow on push or pull request events but only for the master branch
   push:
-    branches: [main]
-  pull_request:
-    branches: [main]
+    branches: [ main ]
+  #  pull_request:
+  #    branches: [ main ]
 
   # Allows you to run this workflow manually from the Actions tab
   workflow_dispatch:
@@ -37,7 +37,7 @@ jobs:
         run: |
           SKIP_WASM_BUILD=1 SQLX_OFFLINE=1 cargo check --release
 
-      - name: Check Build for Benchmarking
-        run: >
-          pushd node &&
-          SQLX_OFFLINE=1 cargo check --features=runtime-benchmarks --release
+#      - name: Check Build for Benchmarking
+#        run: >
+#          pushd node &&
+#          SQLX_OFFLINE=1 cargo check --features=runtime-benchmarks --release

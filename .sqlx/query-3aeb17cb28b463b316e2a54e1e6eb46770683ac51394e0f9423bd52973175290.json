@@ -1,0 +1,12 @@
+{
+  "db_name": "SQLite",
+  "query": "UPDATE mainchain_transfers_in SET finalized_block_number = ? WHERE id = ?",
+  "describe": {
+    "columns": [],
+    "parameters": {
+      "Right": 2
+    },
+    "nullable": []
+  },
+  "hash": "3aeb17cb28b463b316e2a54e1e6eb46770683ac51394e0f9423bd52973175290"
+}

@@ -1,0 +1,26 @@
+{
+  "db_name": "SQLite",
+  "query": "SELECT notebook_number, id from notarizations",
+  "describe": {
+    "columns": [
+      {
+        "name": "notebook_number",
+        "ordinal": 0,
+        "type_info": "Int64"
+      },
+      {
+        "name": "id",
+        "ordinal": 1,
+        "type_info": "Int64"
+      }
+    ],
+    "parameters": {
+      "Right": 0
+    },
+    "nullable": [
+      true,
+      false
+    ]
+  },
+  "hash": "09de0ad9188544836d0593dae02b0491a9fff132d393ba9f7b8a640f91ac04f8"
+}

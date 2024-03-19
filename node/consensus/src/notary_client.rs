@@ -18,7 +18,7 @@ use ulx_primitives::{
 };
 
 use crate::{
-	aux::{NotebookAuditResult, UlxAux},
+	aux_client::{NotebookAuditResult, UlxAux},
 	error::Error,
 };
 
@@ -153,6 +153,8 @@ where
 		if missing_notebooks.is_empty() {
 			return Ok(());
 		}
+
+		info!(target: LOG_TARGET, "Retrieving missing notebooks from notary #{} - {:?}", notary_id, missing_notebooks);
 
 		let headers =
 			client

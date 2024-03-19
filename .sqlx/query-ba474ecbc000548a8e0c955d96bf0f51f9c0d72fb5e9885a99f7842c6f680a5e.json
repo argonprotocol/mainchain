@@ -1,0 +1,12 @@
+{
+  "db_name": "SQLite",
+  "query": "UPDATE accounts SET origin_uid = ?, origin_notebook_number = ?, updated_at = CURRENT_TIMESTAMP WHERE id = ?",
+  "describe": {
+    "columns": [],
+    "parameters": {
+      "Right": 3
+    },
+    "nullable": []
+  },
+  "hash": "ba474ecbc000548a8e0c955d96bf0f51f9c0d72fb5e9885a99f7842c6f680a5e"
+}

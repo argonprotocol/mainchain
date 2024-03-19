@@ -1,0 +1,74 @@
+{
+  "db_name": "SQLite",
+  "query": "INSERT INTO accounts (address, account_id32, account_type, notary_id,  hd_path) VALUES ($1, $2, $3, $4, $5) RETURNING *",
+  "describe": {
+    "columns": [
+      {
+        "name": "id",
+        "ordinal": 0,
+        "type_info": "Int64"
+      },
+      {
+        "name": "address",
+        "ordinal": 1,
+        "type_info": "Text"
+      },
+      {
+        "name": "hd_path",
+        "ordinal": 2,
+        "type_info": "Text"
+      },
+      {
+        "name": "account_id32",
+        "ordinal": 3,
+        "type_info": "Blob"
+      },
+      {
+        "name": "account_type",
+        "ordinal": 4,
+        "type_info": "Int64"
+      },
+      {
+        "name": "notary_id",
+        "ordinal": 5,
+        "type_info": "Int64"
+      },
+      {
+        "name": "origin_notebook_number",
+        "ordinal": 6,
+        "type_info": "Int64"
+      },
+      {
+        "name": "origin_uid",
+        "ordinal": 7,
+        "type_info": "Int64"
+      },
+      {
+        "name": "created_at",
+        "ordinal": 8,
+        "type_info": "Datetime"
+      },
+      {
+        "name": "updated_at",
+        "ordinal": 9,
+        "type_info": "Datetime"
+      }
+    ],
+    "parameters": {
+      "Right": 5
+    },
+    "nullable": [
+      false,
+      false,
+      true,
+      false,
+      false,
+      false,
+      true,
+      true,
+      false,
+      false
+    ]
+  },
+  "hash": "18b4414ffac9bc2e068b053b44e73b20b88bc706b461654a8a7d20adbf481291"
+}

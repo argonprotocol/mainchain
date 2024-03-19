@@ -28,11 +28,11 @@ use ulx_primitives::{
 };
 
 use crate::{
-	aux::UlxAux,
-	digests::{create_pre_runtime_digests, create_seal_digest},
-	error::Error,
-	notary_client::{get_notebook_header_data, NotaryClient},
-	notebook_watch::NotebookWatch,
+    aux_client::UlxAux,
+    digests::{create_pre_runtime_digests, create_seal_digest},
+    error::Error,
+    notary_client::{get_notebook_header_data, NotaryClient},
+    notebook_watch::NotebookWatch,
 };
 
 const LOG_TARGET: &str = "node::consensus::block_creator";

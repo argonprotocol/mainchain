@@ -5,20 +5,21 @@ use std::sync::Arc;
 use anyhow::anyhow;
 use napi::bindgen_prelude::*;
 use sp_core::crypto::AccountId32;
+use sp_core::Decode;
 use sp_core::{ByteArray, H256};
 use subxt::error::RpcError;
 use subxt::runtime_api::RuntimeApiPayload;
 use subxt::storage::address::Yes;
 use subxt::storage::StorageAddress;
-use subxt::tx::{Signer, TxInBlock, TxProgress, TxStatus};
+use subxt::tx::{TxInBlock, TxProgress, TxStatus};
 use subxt::OnlineClient;
 use tokio::sync::Mutex;
 use tracing::warn;
 
 use ulixee_client::api::{constants, storage};
 use ulixee_client::api::{runtime_types, tx};
-use ulixee_client::UlxFullclient;
 use ulixee_client::{api, UlxConfig};
+use ulixee_client::{UlxExtrinsicParamsBuilder, UlxFullclient};
 use ulx_primitives::host::Host;
 use ulx_primitives::tick::Ticker;
 use ulx_primitives::{DataDomain, DataTLD};
@@ -188,7 +189,7 @@ impl MainchainClient {
 
   #[napi]
   pub async fn get_vote_block_hash(&self, current_tick: u32) -> Result<Option<BestBlockForVote>> {
-    let best_hash = &self.get_best_block_hash().await?;
+    let best_hash = H256::from_slice(self.get_best_block_hash().await?.as_ref());
     let best_hash_bytes = best_hash.as_ref();
     let grandparent_tick = current_tick - 2;
     let best_votes = self
@@ -445,21 +446,47 @@ impl MainchainClient {
     LocalchainTransfer,
     TxInBlock<UlxConfig, OnlineClient<UlxConfig>>,
   )> {
-    let signer = keystore.get_subxt_signer(address.clone()).await?;
-
     let current_nonce = self.get_account_nonce(address.clone()).await?;
+    let best_block = H256::from_slice(self.get_best_block_hash().await?.as_ref());
+
     let client = self.client().await?;
-    let tx_progress = client
-      .live
-      .tx()
-      .create_signed_with_nonce(
+
+    let account_id = subxt::utils::AccountId32::from_str(&address)?;
+    let multi_address = subxt::utils::MultiAddress::from(account_id.clone());
+    let latest_block = client.live.blocks().at(best_block).await?;
+
+    let payload = {
+      let params = UlxExtrinsicParamsBuilder::<UlxConfig>::new()
+        .nonce(current_nonce as u64)
+        .mortal(latest_block.header(), 32)
+        .build();
+      let tx_tmp = client.live.tx().create_partial_signed_offline(
         &tx().chain_transfer().send_to_localchain(amount, notary_id),
-        &signer,
-        current_nonce as u64,
-        Default::default(),
-      )?
-      .submit_and_watch()
-      .await?;
+        params,
+      )?;
+      tx_tmp.signer_payload()
+    };
+
+    let signature = keystore.sign(address.clone(), payload.into()).await?;
+
+    let multi_signature = subxt::utils::MultiSignature::decode(&mut signature.as_ref())?;
+
+    // have to recreate this because the internal types are not send. inefficient, but small penalty
+    let submittable = {
+      client
+        .live
+        .tx()
+        .create_partial_signed_offline(
+          &tx().chain_transfer().send_to_localchain(amount, notary_id),
+          UlxExtrinsicParamsBuilder::<UlxConfig>::new()
+            .nonce(current_nonce as u64)
+            .mortal(latest_block.header(), 32)
+            .build(),
+        )?
+        .sign_with_address_and_signature(&multi_address, &multi_signature)
+    };
+
+    let tx_progress = submittable.submit_and_watch().await?;
 
     let in_block = Self::wait_for_in_block(tx_progress).await?;
     let transfer = in_block.fetch_events().await?.iter().find_map(|event| {
@@ -468,7 +495,7 @@ impl MainchainClient {
           .as_event::<api::chain_transfer::events::TransferToLocalchain>()
           .transpose()
         {
-          if transfer.account_id == signer.account_id() {
+          if transfer.account_id == account_id {
             return Some(transfer);
           }
         }

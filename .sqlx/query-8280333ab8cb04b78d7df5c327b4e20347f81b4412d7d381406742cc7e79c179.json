@@ -1,0 +1,12 @@
+{
+  "db_name": "SQLite",
+  "query": "UPDATE mainchain_transfers_in SET balance_change_id = ? WHERE id = ?",
+  "describe": {
+    "columns": [],
+    "parameters": {
+      "Right": 2
+    },
+    "nullable": []
+  },
+  "hash": "8280333ab8cb04b78d7df5c327b4e20347f81b4412d7d381406742cc7e79c179"
+}

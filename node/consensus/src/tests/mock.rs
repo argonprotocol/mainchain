@@ -40,7 +40,7 @@ use ulx_primitives::{
 	NotebookNumber, VoteMinimum,
 };
 
-use crate::{aux::UlxAux, import_queue};
+use crate::{aux_client::UlxAux, import_queue};
 
 type Error = sp_blockchain::Error;
 

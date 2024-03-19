@@ -20,18 +20,18 @@ serde = { version = "1.0", features = ["derive"] }
 serde_json = { version = "1.0", features = ["raw_value"] }
 scale-info = { version = "2.10" }
 thiserror = { version = "1.0" }
-subxt = { version = "0.34", features = ["substrate-compat"] }
-subxt-signer = { version = "0.34", features = ["subxt"] }
+subxt = { version = "0.35", features = ["substrate-compat"] }
+subxt-signer = { version = "0.35", features = ["subxt"] }
 hex = "0.4"
-jsonrpsee = { version = "0.21", features = ["server", "http-client", "ws-client", "macros", "client-ws-transport-native-tls"] } # needs to be in sync with subxt
+jsonrpsee = { version = "0.22", features = ["server", "http-client", "ws-client", "macros", "client-ws-transport-native-tls"] } # needs to be in sync with subxt
 tracing = "0.1"
 tracing-subscriber = { version = "0.3", features = ["env-filter"] }
-sp-keystore = { git = "https://github.com/paritytech/polkadot-sdk.git", branch = "release-polkadot-v1.8.0" }
-sp-runtime = { git = "https://github.com/paritytech/polkadot-sdk.git", branch = "release-polkadot-v1.8.0" }
-sp-core = { git = "https://github.com/paritytech/polkadot-sdk.git", branch = "release-polkadot-v1.8.0" }
+sp-keystore = { git = "https://github.com/paritytech/polkadot-sdk.git", branch = "release-polkadot-v1.9.0" }
+sp-runtime = { git = "https://github.com/paritytech/polkadot-sdk.git", branch = "release-polkadot-v1.9.0" }
+sp-core = { git = "https://github.com/paritytech/polkadot-sdk.git", branch = "release-polkadot-v1.9.0" }
 anyhow = "1.0"
 tokio = { version = "1.35" }
 
 [dev-dependencies]
-sp-keyring = { git = "https://github.com/paritytech/polkadot-sdk.git", branch = "release-polkadot-v1.8.0" }
+sp-keyring = { git = "https://github.com/paritytech/polkadot-sdk.git", branch = "release-polkadot-v1.9.0" }
 tokio = { version = "1.35", features = ["full"] }

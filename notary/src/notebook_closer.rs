@@ -117,7 +117,7 @@ impl NotebookCloser {
 				let _ = self.iterate_notebook_close_loop().await;
 				let tick = self.ticker.current();
 				let next_tick = self.ticker.time_for_tick(tick + 1);
-				let sleep = next_tick.min(LOOP_MILLIS) - 1;
+				let sleep = next_tick.min(LOOP_MILLIS) + 1;
 				// wait before resuming
 				tokio::time::sleep(tokio::time::Duration::from_millis(sleep)).await;
 			}
@@ -504,10 +504,7 @@ mod tests {
 		)
 		.await?;
 
-		#[cfg(not(feature = "fast-runtime"))]
-		{
-			panic!("This test will not complete in time because the fast-runtime feature is not enabled in the build (run cargo build --release --features=fast-runtime)");
-		}
+		assert_eq!(ESCROW_EXPIRATION_TICKS, 2, "Should have a short expiration");
 		println!("created escrow hold. Waiting for notebook {}", hold_result.notebook_number);
 
 		let mut header_sub = notary_server.completed_notebook_stream.subscribe(100);
@@ -557,9 +554,14 @@ mod tests {
 			.expect("should find a best block");
 
 		println!(
-			"Got a notebook proof at block {:?}. Current tick {}",
+			"Got a notebook proof at block {:?}. Current tick {}. Block Tick {}",
 			best_hash,
-			ticker.current()
+			ticker.current(),
+			ctx.client
+				.runtime_api()
+				.at(best_hash)
+				.call(api::runtime_apis::tick_apis::TickApis.current_tick())
+				.await?
 		);
 
 		let grandparent_tick = ticker.current() - 2;

@@ -1,20 +1,26 @@
 #![deny(clippy::all)]
-#![feature(async_closure)]
 #[macro_use]
 extern crate napi_derive;
+
+#[cfg(feature = "uniffi")]
+mod uniffi {
+  uniffi::setup_scaffolding!();
+  ulx_primitives::uniffi_reexport_scaffolding!();
+}
 
 use std::env;
 use std::fs::create_dir_all;
 use std::path::PathBuf;
+use std::str::FromStr;
 use std::sync::Arc;
 use std::time::Duration;
 
 use directories::BaseDirs;
 use napi::bindgen_prelude::*;
 use parking_lot::RwLock;
-use sqlx::sqlite::{SqliteConnectOptions, SqliteJournalMode, SqlitePoolOptions, SqliteSynchronous};
-use sqlx::Sqlite;
 use sqlx::{migrate::MigrateDatabase, SqlitePool};
+use sqlx::sqlite::{SqliteConnectOptions, SqlitePoolOptions, SqliteSynchronous};
+use sqlx::Sqlite;
 use tokio::sync::Mutex;
 
 pub use accounts::*;
@@ -98,11 +104,10 @@ impl Localchain {
         .map_err(|e| Error::from_reason(format!("Error creating database {}", e.to_string())))?;
     }
 
-    let options = SqliteConnectOptions::new()
+    let options = SqliteConnectOptions::from_str(&path)
+      .map_err(|e| Error::from_reason(format!("Error opening database at path {}", e.to_string())))?
       .optimize_on_close(true, None)
-      .synchronous(SqliteSynchronous::Normal)
-      .journal_mode(SqliteJournalMode::Wal)
-      .filename(&path);
+      .synchronous(SqliteSynchronous::Normal);
 
     let db = SqlitePoolOptions::new()
       .connect_with(options)

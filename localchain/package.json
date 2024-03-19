@@ -5,9 +5,9 @@
   "scripts": {
     "artifacts": "napi artifacts",
     "build": "napi build --platform --release --no-const-enum",
-    "build:debug": "shx rm -rf target && napi build --platform --no-const-enum --features=fast-runtime",
+    "build:debug": "shx rm -rf target && napi build --platform --no-const-enum --features=fast-runtime -p ulx-localchain",
     "prepublishOnly": "napi prepublish -t npm",
-    "pretest": "npm run build:debug && cd .. && cargo build --release --features=fast-runtime",
+    "pretest": "npm run build:debug",
     "test": "npm run pretest && jest",
     "universal": "napi universal",
     "version": "napi version"
@@ -16,26 +16,15 @@
   "main": "index.js",
   "types": "index.d.ts",
   "napi": {
-    "name": "localchain",
-    "triples": {
-      "additional": [
-        "aarch64-apple-darwin",
-        "aarch64-linux-android",
-        "aarch64-unknown-linux-gnu",
-        "aarch64-unknown-linux-musl",
-        "aarch64-pc-windows-msvc",
-        "armv7-unknown-linux-gnueabihf",
-        "x86_64-unknown-linux-musl",
-        "x86_64-unknown-freebsd",
-        "i686-pc-windows-msvc",
-        "armv7-linux-androideabi",
-        "universal-apple-darwin",
-        "riscv64gc-unknown-linux-gnu"
-      ]
-    }
+    "binaryName": "localchain",
+    "targets": [
+      "x86_64-pc-windows-msvc",
+      "x86_64-unknown-linux-gnu",
+      "universal-apple-darwin"
+    ]
   },
   "devDependencies": {
-    "@napi-rs/cli": "^2.17.0",
+    "@napi-rs/cli": "^3.0.0-alpha.44",
     "@polkadot/util-crypto": "^12.6.2",
     "@types/jest": "^29.5.11",
     "@types/node": "^18.19.6",

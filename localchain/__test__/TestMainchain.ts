@@ -13,7 +13,7 @@ export default class TestMainchain implements ITeardownable {
 
 
     constructor(binPath?: string) {
-        this.#binPath = binPath ?? `${__dirname}/../../target/release/ulx-node`;
+        this.#binPath = binPath ?? `${__dirname}/../../target/debug/ulx-node`;
         if (!fs.existsSync(this.#binPath)) {
             throw new Error(`Mainchain binary not found at ${this.#binPath}`);
         }

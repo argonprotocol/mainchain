@@ -1,0 +1,12 @@
+{
+  "db_name": "SQLite",
+  "query": "INSERT INTO mainchain_transfers_in (address, amount, account_nonce, notary_id, expiration_block, first_block_hash, extrinsic_hash) VALUES (?, ?, ?, ?, ?, ?, ?)",
+  "describe": {
+    "columns": [],
+    "parameters": {
+      "Right": 7
+    },
+    "nullable": []
+  },
+  "hash": "0a57e764e3f7d2f785ffc43ed46784dc358f3fddba0740a436a3289173d643fe"
+}

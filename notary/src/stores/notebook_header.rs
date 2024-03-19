@@ -457,6 +457,7 @@ mod tests {
 	use std::ops::Add;
 
 	use chrono::{Duration, Utc};
+	use sp_core::H256;
 	use sp_keyring::AccountKeyring::{Alice, Bob};
 	use sp_keystore::{testing::MemoryKeystore, KeystoreExt};
 	use sp_runtime::traits::Verify;
@@ -495,7 +496,7 @@ mod tests {
 
 			assert_eq!(
 				NotebookHeaderStore::get_changed_accounts_root(&pool, notebook_number).await?,
-				[0u8; 32].into()
+				H256([0u8; 32])
 			);
 		}
 
@@ -590,7 +591,7 @@ mod tests {
 			);
 
 			assert_eq!(header.tick, 1);
-			assert_eq!(header.changed_accounts_root, [1u8; 32].into());
+			assert_eq!(header.changed_accounts_root, H256([1u8; 32]));
 			assert_eq!(header.changed_account_origins.len(), 2);
 			assert_eq!(header.changed_account_origins[0].account_uid, 1);
 			assert_eq!(header.changed_account_origins[1].account_uid, 2);

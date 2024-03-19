@@ -434,7 +434,6 @@ pub mod pallet {
 			);
 
 			for account_origin in header.changed_account_origins.into_iter() {
-				println!("Changed account origin: {}->{}", account_origin.notebook_number, account_origin.account_uid);
 				<AccountOriginLastChangedNotebookByNotary<T>>::insert(
 					notary_id,
 					account_origin,

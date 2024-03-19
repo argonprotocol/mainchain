@@ -1,7 +1,7 @@
 use codec::{Decode, Encode, MaxEncodedLen};
 use serde::{Deserialize, Serialize};
 use sp_core::{bounded::BoundedVec, ed25519::Signature, ConstU32, RuntimeDebug, H256};
-use sp_core_hashing::blake2_256;
+use sp_crypto_hashing::blake2_256;
 use sp_runtime::scale_info::TypeInfo;
 use sp_std::vec::Vec;
 

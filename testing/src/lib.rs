@@ -36,19 +36,22 @@ impl TestContext {
 		let root = workspace_cargo_path.as_os_str();
 		Command::new("cargo")
 			.env("RUST_BACKTRACE", "1")
+			.env("SQLX_OFFLINE", "1")
 			.current_dir(root)
 			.arg("build")
-			.arg("--release")
+			.arg("--profile=test")
 			.arg("--features=fast-runtime")
+			.arg("--bin=ulx-node")
 			.spawn().expect("Could not build latest!");
 
 		let mut proc = Command::new("cargo")
 			.current_dir(root)
 			.env("RUST_LOG", rust_log)
 			.env("SQLX_OFFLINE", "1")
+			.env("RUST_BACKTRACE", "1")
 			.stderr(process::Stdio::piped())
 			.arg("run")
-			.arg("--release")
+			.arg("--profile=test")
 			.arg("--features=fast-runtime")
 			.arg("--bin=ulx-node")
 			.arg("--")
@@ -56,6 +59,7 @@ impl TestContext {
 			.arg(format!("--{}", authority.to_lowercase()))
 			.arg("--miners=4")
 			.arg("--port=0")
+			.arg("--rpc-port=0")
 			.spawn()?;
 
 		// Wait for RPC port to be logged (it's logged to stderr).

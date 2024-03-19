@@ -704,7 +704,14 @@ export default {
       },
       Thawed: {
         who: 'AccountId32',
-        amount: 'u128'
+        amount: 'u128',
+      },
+      TotalIssuanceForced: {
+        _alias: {
+          new_: 'new',
+        },
+        old: 'u128',
+        new_: 'u128'
       }
     }
   },
@@ -1601,22 +1608,32 @@ export default {
       __Unused7: 'Null',
       force_set_balance: {
         who: 'MultiAddress',
-        newFree: 'Compact<u128>'
+        newFree: 'Compact<u128>',
+      },
+      force_adjust_total_issuance: {
+        direction: 'PalletBalancesAdjustmentDirection',
+        delta: 'Compact<u128>'
       }
     }
   },
   /**
-   * Lookup267: pallet_balances::pallet::Error<T, I>
+   * Lookup267: pallet_balances::types::AdjustmentDirection
    **/
-  PalletBalancesError: {
-    _enum: ['VestingBalance', 'LiquidityRestrictions', 'InsufficientBalance', 'ExistentialDeposit', 'Expendability', 'ExistingVestingSchedule', 'DeadAccount', 'TooManyReserves', 'TooManyHolds', 'TooManyFreezes']
+  PalletBalancesAdjustmentDirection: {
+    _enum: ['Increase', 'Decrease']
   },
   /**
-   * Lookup268: pallet_mint::pallet::Call<T>
+   * Lookup268: pallet_balances::pallet::Error<T, I>
+   **/
+  PalletBalancesError: {
+    _enum: ['VestingBalance', 'LiquidityRestrictions', 'InsufficientBalance', 'ExistentialDeposit', 'Expendability', 'ExistingVestingSchedule', 'DeadAccount', 'TooManyReserves', 'TooManyHolds', 'TooManyFreezes', 'IssuanceDeactivated', 'DeltaZero']
+  },
+  /**
+   * Lookup269: pallet_mint::pallet::Call<T>
    **/
   PalletMintCall: 'Null',
   /**
-   * Lookup269: pallet_mint::pallet::Error<T>
+   * Lookup270: pallet_mint::pallet::Error<T>
    **/
   PalletMintError: 'Null',
   /**

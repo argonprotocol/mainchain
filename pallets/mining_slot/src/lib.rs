@@ -1,4 +1,4 @@
-#![feature(slice_take)]
+
 #![cfg_attr(not(feature = "std"), no_std)]
 
 use codec::Codec;
@@ -218,7 +218,7 @@ pub mod pallet {
 	pub struct GenesisConfig<T: Config> {
 		pub miner_zero: Option<Registration<T>>,
 		#[serde(skip)]
-		_phantom: PhantomData<T>,
+		pub _phantom: PhantomData<T>,
 	}
 
 	#[pallet::genesis_build]
