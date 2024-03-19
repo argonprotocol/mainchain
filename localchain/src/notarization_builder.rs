@@ -6,8 +6,8 @@ use napi::bindgen_prelude::*;
 use serde_json::json;
 use sp_core::crypto::AccountId32;
 use sp_core::{ConstU32, H256};
-use sp_runtime::{BoundedVec, MultiSignature};
 use sp_runtime::traits::Verify;
+use sp_runtime::{BoundedVec, MultiSignature};
 use sqlx::SqlitePool;
 use tokio::sync::Mutex;
 
@@ -20,14 +20,14 @@ use ulx_primitives::{
 
 use crate::accounts::AccountStore;
 use crate::accounts::LocalAccount;
+use crate::argon_file::{ArgonFile, ArgonFileType};
 use crate::balance_change_builder::BalanceChangeBuilder;
 use crate::balance_changes::BalanceChangeStore;
 use crate::data_domain::JsDataDomain;
-use crate::argon_file::{ArgonFile, ArgonFileType};
+use crate::keystore::Keystore;
 use crate::notarization_tracker::NotarizationTracker;
 use crate::notary_client::NotaryClients;
 use crate::open_escrows::OpenEscrow;
-use crate::keystore::Keystore;
 use crate::transactions::LocalchainTransaction;
 use crate::{to_js_error, DataDomainStore, Escrow, LocalchainTransfer, NotaryAccountOrigin};
 
@@ -481,7 +481,6 @@ impl NotarizationBuilder {
       return Err(Error::from_reason("Invalid vote signature!"));
     }
 
-
     let mut votes = self.votes.lock().await;
     votes
       .try_push(vote)
@@ -774,6 +773,19 @@ impl NotarizationBuilder {
     Ok(json)
   }
 
+  pub(crate) async fn has_items_to_notarize(&self) -> bool {
+    let balance_changes_by_account = self.balance_changes_by_account.lock().await;
+
+    let mut balance_changes = 0;
+    for (_key, balance_change_tx) in &*balance_changes_by_account {
+      let balance_change = balance_change_tx.inner().await;
+      if balance_change.notes.len() > 0 {
+        balance_changes += 1;
+      }
+    }
+    return balance_changes > 0;
+  }
+
   pub(crate) async fn to_notarization(&self) -> Result<Notarization> {
     let imports = self.imported_balance_changes.lock().await;
     let block_votes = self.votes.lock().await;
@@ -788,12 +800,17 @@ impl NotarizationBuilder {
     );
 
     let mut to_delete = vec![];
+    let mut accounts_to_delete = vec![];
     {
       let balance_changes_by_account = self.balance_changes_by_account.lock().await;
       for (key, balance_change_tx) in &*balance_changes_by_account {
         let balance_change = balance_change_tx.inner().await;
         if balance_change.notes.len() == 0 {
           to_delete.push(key.clone());
+          accounts_to_delete.push((
+            balance_change_tx.address.clone(),
+            balance_change.account_type.clone(),
+          ))
         }
         notarization
           .balance_changes
@@ -811,6 +828,11 @@ impl NotarizationBuilder {
       .lock()
       .await
       .retain(|id, _| !to_delete.contains(&id));
+    self
+      .loaded_accounts
+      .lock()
+      .await
+      .retain(|id, _| !accounts_to_delete.contains(&id));
 
     Ok(notarization)
   }
@@ -833,6 +855,11 @@ impl NotarizationBuilder {
       self.verify().await?;
     }
     let notarization = self.to_notarization().await?;
+    if notarization.balance_changes.is_empty() {
+      return Err(Error::from_reason(
+        "No balance changes found in this notarization",
+      ));
+    }
 
     let Some(notary_id) = self.get_notary_id().await.ok() else {
       return Err(Error::from_reason(
@@ -1186,9 +1213,7 @@ mod test {
     println!("Alice exported a balance change");
 
     let bob_signer = Keystore::new(bob_pool.clone());
-    bob_signer
-      .import_suri(Bob.to_seed(), Sr25519, None)
-      .await?;
+    bob_signer.import_suri(Bob.to_seed(), Sr25519, None).await?;
     let bob_builder =
       NotarizationBuilder::new(bob_pool.clone(), notary_clients.clone(), bob_signer);
     println!("Bob importing the balance change");
@@ -1330,9 +1355,7 @@ mod test {
         .await;
       assert!(res.unwrap_err().reason.contains("has not been setup"));
     }
-    let _ = keystore
-      .import_suri(Alice.to_seed(), Ed25519, None)
-      .await?;
+    let _ = keystore.import_suri(Alice.to_seed(), Ed25519, None).await?;
     let res = builder
       .import_argon_file(ArgonFile::create(vec![balance_change], ArgonFileType::Send).to_json()?)
       .await;

@@ -147,7 +147,6 @@ pub mod pallet {
 	#[derive(frame_support::DefaultNoBound)]
 	pub struct GenesisConfig<T: Config> {
 		pub list: Vec<GenesisNotary<T::AccountId>>,
-		pub _phantom: PhantomData<T>,
 	}
 
 	#[pallet::genesis_build]

@@ -1,5 +1,5 @@
 use codec::Decode;
-use sp_core::{ed25519, H256};
+use sp_core::{ed25519, ed25519::Public, H256};
 use sqlx::{PgConnection, PgPool};
 use subxt::{
 	blocks::{Block, BlockRef},
@@ -81,6 +81,15 @@ async fn sync_finalized_blocks(
 		return Ok(());
 	};
 	let oldest_block_to_sync = notary.activated_block;
+	{
+		let mut db = pool.acquire().await?;
+
+		let public = ed25519::Public(notary.meta.public.0);
+		let _ =
+			activate_notebook_processing(&mut *db, notary_id, public, oldest_block_to_sync, &ticker)
+				.await
+				.ok();
+	}
 
 	let mut tx = pool.begin().await?;
 	BlocksStore::lock(&mut tx).await?;
@@ -193,6 +202,21 @@ async fn process_fork(
 	Ok(())
 }
 
+async fn activate_notebook_processing(
+	db: &mut PgConnection,
+	notary_id: NotaryId,
+	public: Public,
+	block_height: u32,
+	ticker: &Ticker,
+) -> anyhow::Result<()> {
+	// it might already be stored
+	let _ = RegisteredKeyStore::store_public(&mut *db, public, block_height).await.ok();
+	let tick = ticker.current();
+	NotebookHeaderStore::create(&mut *db, notary_id, 1, tick, ticker.time_for_tick(tick + 1))
+		.await?;
+	Ok(())
+}
+
 async fn process_finalized_block(
 	db: &mut PgConnection,
 	block: Block<UlxConfig, UlxClient>,
@@ -225,21 +249,9 @@ async fn process_finalized_block(
 			{
 				info!("Notary activated: {:?}", activated_event);
 				if activated_event.notary.notary_id == notary_id {
-					RegisteredKeyStore::store_public(
-						&mut *db,
-						ed25519::Public(activated_event.notary.meta.public.0),
-						block_height,
-					)
-					.await?;
-					let tick = ticker.current();
-					NotebookHeaderStore::create(
-						&mut *db,
-						notary_id,
-						1,
-						tick,
-						ticker.time_for_tick(tick + 1),
-					)
-					.await?;
+					let public = ed25519::Public(activated_event.notary.meta.public.0);
+					activate_notebook_processing(&mut *db, notary_id, public, block_height, ticker)
+						.await?;
 				}
 				continue
 			}

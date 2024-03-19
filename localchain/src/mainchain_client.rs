@@ -394,7 +394,6 @@ impl MainchainClient {
     while let Some(status) = tx_progress.next().await {
       match status? {
         TxStatus::InBestBlock(tx_in_block) | TxStatus::InFinalizedBlock(tx_in_block) => {
-          println!("tx in block");
           // now, we can attempt to work with the block, eg:
           tx_in_block.wait_for_success().await?;
           return Ok(tx_in_block);
@@ -402,7 +401,6 @@ impl MainchainClient {
         TxStatus::Error { message }
         | TxStatus::Invalid { message }
         | TxStatus::Dropped { message } => {
-          println!("error tx {}", message);
           // Handle any errors:
           return Err(anyhow!("Error submitting notebook to block: {}", message));
         }
@@ -462,7 +460,7 @@ impl MainchainClient {
       )?
       .submit_and_watch()
       .await?;
-    println!("submitted tx");
+
     let in_block = Self::wait_for_in_block(tx_progress).await?;
     let transfer = in_block.fetch_events().await?.iter().find_map(|event| {
       if let Ok(event) = event {

@@ -22,7 +22,7 @@ export default class TestNotary implements ITeardownable {
         this.#connectionString = dbConnectionString ?? process.env.NOTARY_DB_URL ?? "postgres://postgres:postgres@localhost:5432";
         addTeardown(this);
         this.operator = new Keyring({type: 'sr25519'}).createFromUri('//Bob');
-        this.registeredPublicKey = new Keyring({type: 'ed25519'}).createFromUri('//Notary').publicKey;
+        this.registeredPublicKey = new Keyring({type: 'ed25519'}).createFromUri('//Ferdie//notary').publicKey;
     }
 
     public async start(mainchainUrl: string, pathToNotaryBin?: string): Promise<string> {
@@ -62,7 +62,7 @@ export default class TestNotary implements ITeardownable {
 
         this.#childProcess = child_process.spawn(notaryPath, ['run', `--db-url=${this.#connectionString}/${this.#dbName}`, `--dev`, `-t ${mainchainUrl}`], {
             stdio: ['ignore', 'pipe', 'pipe'],
-            env: {...process.env, RUST_LOG:"warn"}
+            env: {...process.env, RUST_LOG: "warn"}
         });
         this.#childProcess.stdout.setEncoding('utf8');
         this.#childProcess.stderr.setEncoding('utf8');

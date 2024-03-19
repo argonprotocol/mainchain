@@ -142,7 +142,8 @@ pub mod pallet {
 	pub struct GenesisConfig<T: Config> {
 		pub initial_compute_difficulty: ComputeDifficulty,
 		pub initial_vote_minimum: VoteMinimum,
-		pub _phantom: PhantomData<T>,
+		#[serde(skip)]
+		_phantom: PhantomData<T>,
 	}
 
 	#[pallet::genesis_build]

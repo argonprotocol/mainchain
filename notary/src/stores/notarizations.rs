@@ -171,6 +171,9 @@ impl NotarizationsStore {
 		block_votes: Vec<BlockVote>,
 		data_domains: Vec<(DataDomainHash, AccountId)>,
 	) -> anyhow::Result<BalanceChangeResult, Error> {
+		if changes.is_empty() {
+			return Err(Error::EmptyNotarizationProposed)
+		}
 		// Before we use db resources, let's confirm these are valid transactions
 		let initial_allocation_result =
 			verify_notarization_allocation(&changes, &block_votes, &data_domains, None)?;

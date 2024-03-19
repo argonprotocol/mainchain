@@ -172,9 +172,10 @@ impl NotebookRpcServer for NotaryServer {
 
 	async fn get_raw_headers(
 		&self,
-		since_notebook: NotebookNumber,
+		since_notebook: Option<NotebookNumber>,
+		or_specific_notebooks: Option<Vec<NotebookNumber>>
 	) -> Result<Vec<(NotebookNumber, Vec<u8>)>, ErrorObjectOwned> {
-		NotebookHeaderStore::load_raw_signed_headers(&self.pool, since_notebook)
+		NotebookHeaderStore::load_raw_signed_headers(&self.pool, since_notebook, or_specific_notebooks)
 			.await
 			.map_err(from_crate_error)
 	}

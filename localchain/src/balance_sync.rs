@@ -127,8 +127,6 @@ impl BalanceSync {
       self.notary_clients.clone(),
       self.keystore.clone(),
     );
-    let transaction = Transactions::create_static(&mut db, TransactionType::Consolidation).await?;
-    notarization.set_transaction(transaction).await;
     for jump_account in all_accounts {
       let latest = BalanceChangeStore::get_latest_for_account(&mut db, jump_account.id)
         .await
@@ -174,7 +172,10 @@ impl BalanceSync {
         }
       }
     }
-    if notarization.accounts().await.len() > 0 {
+
+    if notarization.has_items_to_notarize().await {
+      let transaction = Transactions::create_static(&mut db, TransactionType::Consolidation).await?;
+      notarization.set_transaction(transaction).await;
       let tracker = notarization.notarize().await?;
       notarizations.push(tracker);
     }
@@ -245,7 +246,7 @@ impl BalanceSync {
       notarization.claim_from_mainchain(transfer).await?;
     }
 
-    if notarization.accounts().await.len() > 0 {
+    if notarization.has_items_to_notarize().await {
       let tracker = notarization.notarize().await?;
       for transfer in transfers {
         mainchain_transfers
@@ -372,6 +373,9 @@ impl BalanceSync {
     }
 
     for (_, mut notarization) in builder_by_notary {
+      if !notarization.has_items_to_notarize().await {
+        continue;
+      }
       self
         .finalize_escrow_notarization(&mut notarization, &options)
         .await;
@@ -706,8 +710,6 @@ impl BalanceSync {
       )
       .fetch_one(&mut *tx)
       .await?;
-
-      println!("record: {:?}", record);
 
       notebook_number = record.notebook_number.map(|a| a as u32);
       needs_notarization_download = record.json == 0;

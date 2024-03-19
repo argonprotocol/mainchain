@@ -217,7 +217,8 @@ pub mod pallet {
 	#[derive(frame_support::DefaultNoBound)]
 	pub struct GenesisConfig<T: Config> {
 		pub miner_zero: Option<Registration<T>>,
-		pub _phantom: PhantomData<T>,
+		#[serde(skip)]
+		_phantom: PhantomData<T>,
 	}
 
 	#[pallet::genesis_build]

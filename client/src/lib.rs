@@ -5,7 +5,7 @@ use futures::FutureExt;
 use jsonrpsee::{
 	client_transport::ws::{Url, WsTransportClientBuilder},
 	core::client::ClientBuilder,
-	ws_client::{PingConfig, WsClient, WsClientBuilder},
+	ws_client::{PingConfig, WsClient},
 };
 use subxt::{
 	backend::{legacy::LegacyRpcMethods, rpc::RpcClient},
@@ -173,12 +173,31 @@ impl MultiurlClient {
 
 		let mut lock = self.client.write().await;
 		let client_lock = self.client.clone();
-		let ws_client = WsClientBuilder::default()
-			.build(&url)
-			.await
-			.map_err(|e| anyhow!("Could not connect to mainchain node at {} - {:?}", url, e))?;
-		let ws_client = Arc::new(ws_client);
-		let rpc_client = RpcClient::new(ws_client.clone());
+		let start = std::time::Instant::now();
+		let url = Url::parse(&url).map_err(|e| Error::Other(format!("Invalid URL: {}", e)))?;
+		let (sender, receiver) = loop {
+			match WsTransportClientBuilder::default().build(url.clone()).await {
+				Ok(client) => break client,
+				Err(why) => {
+					if start.elapsed().as_millis() as u64 > 10_000u64 {
+						return Err(anyhow!(
+							"Failed to connect to client within timeout",
+						));
+					}
+					warn!(
+						"failed to connect to client due to {} - {:?}, retrying soon..",
+						url, why
+					);
+					tokio::time::sleep(std::time::Duration::from_millis(1_000u64)).await;
+				},
+			}
+		};
+		let client = ClientBuilder::default()
+			.enable_ws_ping(PingConfig::default())
+			.build_with_tokio(sender, receiver);
+
+		let client = Arc::new(client);
+		let rpc_client = RpcClient::new(client.clone());
 		let ulx_client = UlxClient::from_rpc_client(rpc_client).await?;
 		*lock = Some(ulx_client.clone());
 		drop(lock);
@@ -187,7 +206,7 @@ impl MultiurlClient {
 		let handle = tokio::spawn(async move {
 			let url = url.clone();
 			let client_lock = client_lock.clone();
-			let ws_client = ws_client.clone();
+			let ws_client = client.clone();
 			let _ = ws_client.on_disconnect().await;
 
 			warn!("Disconnected from mainchain at {url} client",);

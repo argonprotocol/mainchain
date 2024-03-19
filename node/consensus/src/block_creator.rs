@@ -154,6 +154,7 @@ where
 			}
 			to_remove.clear();
 			update_notaries_with_hash = None;
+			let _ = notary_client.retrieve_missing_notebooks().await;
 		}
 	};
 	(task, receiver)

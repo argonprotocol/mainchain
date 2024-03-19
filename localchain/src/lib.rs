@@ -11,6 +11,8 @@ use std::time::Duration;
 
 use directories::BaseDirs;
 use napi::bindgen_prelude::*;
+use parking_lot::RwLock;
+use sqlx::sqlite::{SqliteConnectOptions, SqliteJournalMode, SqlitePoolOptions, SqliteSynchronous};
 use sqlx::Sqlite;
 use sqlx::{migrate::MigrateDatabase, SqlitePool};
 use tokio::sync::Mutex;
@@ -96,7 +98,16 @@ impl Localchain {
         .map_err(|e| Error::from_reason(format!("Error creating database {}", e.to_string())))?;
     }
 
-    let db = SqlitePool::connect(&path).await.map_err(to_js_error)?;
+    let options = SqliteConnectOptions::new()
+      .optimize_on_close(true, None)
+      .synchronous(SqliteSynchronous::Normal)
+      .journal_mode(SqliteJournalMode::Wal)
+      .filename(&path);
+
+    let db = SqlitePoolOptions::new()
+      .connect_with(options)
+      .await
+      .map_err(to_js_error)?;
     sqlx::migrate!()
       .run(&db)
       .await
@@ -128,7 +139,6 @@ impl Localchain {
         .await
         .map_err(to_js_error)?;
     }
-
     let mainchain_mutex = Arc::new(Mutex::new(Some(mainchain_client.clone())));
     let keystore = Keystore::new(db.clone());
     if let Some(password_option) = keystore_password {
@@ -144,7 +154,7 @@ impl Localchain {
     Ok(Localchain {
       db,
       path: path,
-      ticker: TickerRef { ticker },
+      ticker: TickerRef::new(ticker),
       mainchain_client: mainchain_mutex.clone(),
       notary_clients: NotaryClients::from(mainchain_mutex.clone()),
       keystore,
@@ -187,7 +197,7 @@ impl Localchain {
     Ok(Localchain {
       db,
       path,
-      ticker: TickerRef { ticker },
+      ticker: TickerRef::new(ticker),
       mainchain_client: mainchain_mutex.clone(),
       notary_clients: NotaryClients::from(mainchain_mutex),
       keystore,
@@ -195,9 +205,26 @@ impl Localchain {
   }
 
   #[napi]
-  pub async fn attach_mainchain(&self, mainchain_client: &MainchainClient) {
+  pub async fn attach_mainchain(&self, mainchain_client: &MainchainClient) -> Result<()> {
     let mut mainchain_mutex = self.mainchain_client.lock().await;
     *mainchain_mutex = Some(mainchain_client.clone());
+    Ok(())
+  }
+
+  #[napi]
+  pub async fn update_ticker(&self, ntp_sync_pool_url: Option<String>) -> Result<()> {
+    let Some(ref mainchain_client) = *(self.mainchain_client.lock().await) else {
+      return Err(to_js_error("No mainchain client attached"));
+    };
+    let mut ticker = mainchain_client.get_ticker().await.map_err(to_js_error)?;
+    if let Some(ntp_pool_url) = ntp_sync_pool_url {
+      ticker
+        .lookup_ntp_offset(&ntp_pool_url)
+        .await
+        .map_err(to_js_error)?;
+    }
+    self.ticker.set(ticker);
+    Ok(())
   }
 
   #[napi]
@@ -362,23 +389,33 @@ pub(crate) fn to_js_error(e: impl std::fmt::Display) -> Error {
 #[napi]
 #[derive(Clone)]
 pub struct TickerRef {
-  pub(crate) ticker: Ticker,
+  pub(crate) ticker: Arc<RwLock<Ticker>>,
 }
 
 #[napi]
 impl TickerRef {
+  pub fn new(ticker: Ticker) -> Self {
+    Self {
+      ticker: Arc::new(RwLock::new(ticker)),
+    }
+  }
+
+  pub fn set(&self, ticker: Ticker) {
+    *self.ticker.write() = ticker;
+  }
+
   #[napi(getter)]
   pub fn current(&self) -> u32 {
-    self.ticker.current()
+    self.ticker.read().current()
   }
   #[napi]
   pub fn tick_for_time(&self, timestamp_millis: i64) -> u32 {
-    self.ticker.tick_for_time(timestamp_millis as u64)
+    self.ticker.read().tick_for_time(timestamp_millis as u64)
   }
 
   #[napi]
   pub fn time_for_tick(&self, tick: u32) -> u64 {
-    self.ticker.time_for_tick(tick)
+    self.ticker.read().time_for_tick(tick)
   }
   #[napi]
   pub fn millis_to_next_tick(&self) -> u64 {
@@ -386,7 +423,7 @@ impl TickerRef {
   }
 
   pub fn duration_to_next_tick(&self) -> Duration {
-    self.ticker.duration_to_next_tick()
+    self.ticker.read().duration_to_next_tick()
   }
 }
 

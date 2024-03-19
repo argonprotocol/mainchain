@@ -92,7 +92,7 @@ impl BalanceChangeRow {
 }
 
 #[derive(Debug, PartialOrd, PartialEq)]
-#[napi]
+#[napi(string_enum)]
 pub enum BalanceChangeStatus {
   /// The balance change has been submitted, but is not in a known notebook yet.
   SubmittedToNotary,

@@ -17,7 +17,7 @@ use ulx_primitives::{
 	notary::{NotaryNotebookTickState, NotaryNotebookVoteDetails, NotaryNotebookVoteDigestDetails},
 	tick::Tick,
 	BlockSealDigest, BlockVotingPower, ComputeDifficulty, NotaryId, NotaryNotebookVotes,
-	NotebookDigestRecord, NotebookNumber,
+	NotebookDigestRecord, NotebookHeaderData, NotebookNumber,
 };
 
 use crate::{convert_u32, error::Error};
@@ -113,11 +113,15 @@ impl<B: BlockT, C: AuxStore> UlxAux<B, C> {
 		notary_id: NotaryId,
 		latest_runtime_notebook_number: NotebookNumber,
 		submitting_tick: Tick,
-		signed_headers: &mut Vec<Vec<u8>>,
-		tick_notebooks: &mut Vec<NotaryNotebookVoteDigestDetails>,
-		notebook_digests: &mut Vec<NotebookDigestRecord<NotebookVerifyError>>,
-		latest_finalized_block_needed: &mut BlockNumber,
-	) -> Result<(), Error<B>> {
+	) -> Result<
+		(
+			NotebookHeaderData<NotebookVerifyError, BlockNumber>,
+			Option<NotaryNotebookVoteDigestDetails>,
+		),
+		Error<B>,
+	> {
+		let mut headers = NotebookHeaderData::default();
+		let mut tick_notebook = None;
 		let audit_results = self.get_notary_audit_history(notary_id)?;
 
 		for notebook in audit_results {
@@ -137,13 +141,13 @@ impl<B: BlockT, C: AuxStore> UlxAux<B, C> {
 							notebook.notebook_number, notary_id, tick
 						))
 					})?;
-				tick_notebooks.push(details.clone());
-				*latest_finalized_block_needed =
-					state.latest_finalized_block_needed.max(*latest_finalized_block_needed);
+				tick_notebook = Some(details.clone());
+				headers.latest_finalized_block_needed =
+					state.latest_finalized_block_needed.max(headers.latest_finalized_block_needed);
 			}
 			if let Some(raw_data) = state.raw_headers_by_notary.get(&notary_id) {
-				signed_headers.push(raw_data.clone());
-				notebook_digests.push(NotebookDigestRecord {
+				headers.signed_headers.push(raw_data.clone());
+				headers.notebook_digest.notebooks.push(NotebookDigestRecord {
 					notary_id,
 					notebook_number: notebook.notebook_number,
 					tick,
@@ -156,6 +160,27 @@ impl<B: BlockT, C: AuxStore> UlxAux<B, C> {
 				)))
 			}
 		}
+		Ok((headers, tick_notebook))
+	}
+
+	pub fn get_missing_notebooks(
+		&self,
+		notary_id: NotaryId,
+	) -> Result<Vec<NotebookNumber>, Error<B>> {
+		let key = notary_missing_notebooks_key(notary_id);
+		Ok(match self.client.get_aux(&key)? {
+			Some(bytes) => <Vec<NotebookNumber>>::decode(&mut &bytes[..]).unwrap_or_default(),
+			None => Default::default(),
+		})
+	}
+
+	pub fn set_missing_notebooks(
+		&self,
+		notary_id: NotaryId,
+		missing: Vec<NotebookNumber>,
+	) -> Result<(), Error<B>> {
+		let key = notary_missing_notebooks_key(notary_id);
+		self.client.insert_aux(&[(key.as_slice(), missing.encode().as_slice())], &[])?;
 		Ok(())
 	}
 
@@ -312,6 +337,11 @@ fn get_authors_at_height_key(block_number: BlockNumber) -> Vec<u8> {
 fn notary_notebooks_key(notary_id: NotaryId) -> Vec<u8> {
 	("NotaryNotebooksFor", notary_id).encode()
 }
+
+fn notary_missing_notebooks_key(notary_id: NotaryId) -> Vec<u8> {
+	("MissingNotebooksFor", notary_id).encode()
+}
+
 fn get_votes_key(tick: Tick) -> Vec<u8> {
 	("VotesAtTick", tick).encode()
 }

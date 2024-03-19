@@ -10,6 +10,7 @@ use ulx_primitives::{AccountType, Note, NoteType};
 use crate::transactions::TransactionType;
 use crate::{to_js_error, BalanceChangeStatus, LocalAccount, MainchainClient};
 use crate::{AccountStore, BalanceChangeRow};
+use crate::mainchain_transfer::MainchainTransferIn;
 
 #[derive(Clone, Debug, Default)]
 pub struct LocalchainOverview {
@@ -31,6 +32,8 @@ pub struct LocalchainOverview {
   pub changes: Vec<BalanceChangeGroup>,
   /// The mainchain balance
   pub mainchain_balance: i128,
+  /// The net pending mainchain balance pending movement in/out of the localchain
+  pub pending_mainchain_balance_change: i128,
 }
 
 impl Into<LocalchainOverviewJs> for LocalchainOverview {
@@ -45,6 +48,7 @@ impl Into<LocalchainOverviewJs> for LocalchainOverview {
       pending_tax_change: self.pending_tax_change.into(),
       changes: self.changes,
       mainchain_balance: self.mainchain_balance.into(),
+      pending_mainchain_balance_change: self.pending_mainchain_balance_change.into(),
     }
   }
 }
@@ -104,6 +108,8 @@ pub struct LocalchainOverviewJs {
   pub changes: Vec<BalanceChangeGroup>,
   /// The mainchain balance
   pub mainchain_balance: BigInt,
+  /// The net pending mainchain balance pending movement in/out of the localchain
+  pub pending_mainchain_balance_change: BigInt,
 }
 
 fn get_note_descriptions(change: &BalanceChangeRow) -> Vec<String> {
@@ -169,6 +175,13 @@ impl OverviewStore {
     .fetch_all(&self.db)
     .await?;
 
+    let pending_mainchain_transfers = sqlx::query_as!(
+      MainchainTransferIn,
+      "SELECT * FROM mainchain_transfers_in where balance_change_id IS NULL ORDER BY id DESC"
+    )
+    .fetch_all(&self.db)
+    .await?;
+
     let mut db = self.db.acquire().await?;
     let accounts_by_id: BTreeMap<i64, LocalAccount> = AccountStore::list(&mut db, true)
       .await?
@@ -184,6 +197,10 @@ impl OverviewStore {
 
     if overview.address.is_empty() {
       return Ok(overview);
+    }
+
+    for transfer in pending_mainchain_transfers {
+      overview.pending_mainchain_balance_change -= transfer.amount.parse::<i128>()?;
     }
 
     if let Some(mainchain_client) = self.mainchain_client.lock().await.as_ref() {
@@ -373,7 +390,8 @@ mod tests {
       )
       .await?;
 
-    let alice_overview = OverviewStore::new(alice_pool.clone(), "alice".to_string(), Default::default());
+    let alice_overview =
+      OverviewStore::new(alice_pool.clone(), "alice".to_string(), Default::default());
     {
       let overview = alice_overview.get().await?;
       println!("Alice {:#?}", overview);

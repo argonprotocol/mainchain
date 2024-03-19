@@ -4,21 +4,21 @@ use chrono::{DateTime, TimeZone, Utc};
 use codec::Encode;
 use serde_json::{from_value, json};
 use sp_core::{bounded::BoundedVec, H256};
-use sqlx::{FromRow, PgConnection, query, types::JsonValue};
+use sqlx::{query, types::JsonValue, FromRow, PgConnection};
 
 use ulx_primitives::{
-	AccountId, AccountOrigin, BlockVotingPower, ChainTransfer, DataDomainHash, ensure,
-	notary::NotarySignature, NotaryId, NOTEBOOK_VERSION, NotebookHeader, NotebookMeta, NotebookNumber,
-	SignedNotebookHeader, tick::Tick,
+	ensure, notary::NotarySignature, tick::Tick, AccountId, AccountOrigin, BlockVotingPower,
+	ChainTransfer, DataDomainHash, NotaryId, NotebookHeader, NotebookMeta, NotebookNumber,
+	SignedNotebookHeader, NOTEBOOK_VERSION,
 };
 
 use crate::{
-	Error,
 	stores::{
+		notebook_constraints::NotebookConstraintsStore,
+		notebook_new_accounts::NotebookNewAccountsStore, notebook_status::NotebookStatusStore,
 		BoxFutureResult,
-		notebook_constraints::NotebookConstraintsStore, notebook_new_accounts::NotebookNewAccountsStore,
-		notebook_status::NotebookStatusStore,
 	},
+	Error,
 };
 
 #[derive(FromRow)]
@@ -218,21 +218,42 @@ impl NotebookHeaderStore {
 
 	pub async fn load_raw_signed_headers<'a>(
 		db: impl sqlx::PgExecutor<'a> + 'a,
-		since_notebook: NotebookNumber,
+		since_notebook: Option<NotebookNumber>,
+		or_specific_notebooks: Option<Vec<NotebookNumber>>,
 	) -> anyhow::Result<Vec<(NotebookNumber, Vec<u8>)>, Error> {
-		let records = sqlx::query_as!(
-			NotebookHeaderRow,
-			r#"
+		let records = if let Some(notebook_number) = since_notebook {
+			sqlx::query_as!(
+				NotebookHeaderRow,
+				r#"
+				SELECT *
+				FROM notebook_headers WHERE notebook_number = $1
+				AND signature IS NOT NULL
+				"#,
+				notebook_number as i32
+			)
+			.fetch_all(db)
+			.await?
+		} else if let Some(or_specific_notebooks) = or_specific_notebooks {
+			let notebook_numbers =
+				or_specific_notebooks.into_iter().map(|a| a as i32).collect::<Vec<_>>();
+			sqlx::query_as!(
+				NotebookHeaderRow,
+				r#"
 				SELECT *
 				FROM notebook_headers
-				WHERE notebook_number > $1
+				WHERE notebook_number = ANY($1)
 				AND signature IS NOT NULL
 				ORDER BY notebook_number ASC
 				"#,
-			since_notebook as i32
-		)
-		.fetch_all(db)
-		.await?;
+				&notebook_numbers
+			)
+			.fetch_all(db)
+			.await?
+		} else {
+			return Err(Error::InternalError(
+				"Must provide either since_notebook or or_specific_notebooks".to_string(),
+			));
+		};
 
 		let mut headers = Vec::new();
 		for record in records {
@@ -437,14 +458,14 @@ mod tests {
 
 	use chrono::{Duration, Utc};
 	use sp_keyring::AccountKeyring::{Alice, Bob};
-	use sp_keystore::{KeystoreExt, testing::MemoryKeystore};
+	use sp_keystore::{testing::MemoryKeystore, KeystoreExt};
 	use sp_runtime::traits::Verify;
 	use sqlx::PgPool;
 
 	use ulx_primitives::{AccountOrigin, ChainTransfer, NOTEBOOK_VERSION};
 
 	use crate::{
-		notebook_closer::{NOTARY_KEYID, notary_sign},
+		notebook_closer::{notary_sign, NOTARY_KEYID},
 		stores::notebook_header::NotebookHeaderStore,
 	};
 

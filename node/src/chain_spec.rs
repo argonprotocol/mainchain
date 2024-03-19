@@ -95,7 +95,7 @@ pub fn local_testnet_config() -> Result<ChainSpec, String> {
 	.with_id("local_testnet")
 	.with_chain_type(ChainType::Local)
 	.with_properties(properties)
-	.with_genesis_config(testnet_genesis(
+	.with_genesis_config_patch(testnet_genesis(
 		// Initial BlockSeal authorities
 		vec![(
 			get_account_id_from_seed::<sr25519::Public>("Alice"),
@@ -113,7 +113,7 @@ pub fn local_testnet_config() -> Result<ChainSpec, String> {
 			get_account_id_from_seed::<sr25519::Public>("Ferdie"),
 		],
 		500,
-		100_000_000,
+		(TICK_MILLIS * 1_000_000 / 1_000) as ComputeDifficulty,
 		TICK_MILLIS,
 		vec![GenesisNotary {
 			account_id: get_account_id_from_seed::<sr25519::Public>("Ferdie"),

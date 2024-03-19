@@ -295,7 +295,7 @@ if (!nativeBinding) {
   throw new Error(`Failed to load native binding`)
 }
 
-const { DataTLD, AccountType, LocalAccount, AccountStore, BalanceChangeBuilder, BalanceChange, BalanceChangeStatus, BalanceChangeStore, BalanceSync, BalanceSyncResult, DataDomainLease, DataDomainStore, Keystore, MainchainClient, MainchainTransferStore, NotarizationBuilder, NotarizationTracker, NotaryClients, NotaryClient, NotebookMeta, BalanceTipResult, Escrow, OpenEscrow, OpenEscrowsStore, CryptoScheme, VERSION, ArgonFileType, runCli, NOTARIZATION_MAX_BALANCE_CHANGES, NOTARIZATION_MAX_DOMAINS, NOTARIZATION_MAX_BLOCK_VOTES, ESCROW_EXPIRATION_TICKS, ESCROW_CLAWBACK_TICKS, ESCROW_MINIMUM_SETTLEMENT, DATASTORE_MAX_VERSIONS, DATA_DOMAIN_MIN_NAME_LENGTH, DATA_DOMAIN_LEASE_COST, OverviewStore, TransactionType, Transactions, Localchain, TickerRef } = nativeBinding
+const { DataTLD, AccountType, LocalAccount, AccountStore, BalanceChangeBuilder, BalanceChange, BalanceChangeStatus, BalanceChangeStore, BalanceSync, BalanceSyncResult, DataDomainLease, DataDomainStore, Keystore, MainchainClient, MainchainTransferStore, NotarizationBuilder, NotarizationTracker, NotaryClients, NotaryClient, NotebookMeta, BalanceTipResult, Escrow, OpenEscrow, OpenEscrowsStore, CryptoScheme, ARGON_FILE_VERSION, ArgonFileType, runCli, NOTARIZATION_MAX_BALANCE_CHANGES, NOTARIZATION_MAX_DOMAINS, NOTARIZATION_MAX_BLOCK_VOTES, ESCROW_EXPIRATION_TICKS, ESCROW_CLAWBACK_TICKS, ESCROW_MINIMUM_SETTLEMENT, DATASTORE_MAX_VERSIONS, DATA_DOMAIN_MIN_NAME_LENGTH, DATA_DOMAIN_LEASE_COST, OverviewStore, TransactionType, Transactions, Localchain, TickerRef } = nativeBinding
 
 module.exports.DataTLD = DataTLD
 module.exports.AccountType = AccountType
@@ -322,7 +322,7 @@ module.exports.Escrow = Escrow
 module.exports.OpenEscrow = OpenEscrow
 module.exports.OpenEscrowsStore = OpenEscrowsStore
 module.exports.CryptoScheme = CryptoScheme
-module.exports.VERSION = VERSION
+module.exports.ARGON_FILE_VERSION = ARGON_FILE_VERSION
 module.exports.ArgonFileType = ArgonFileType
 module.exports.runCli = runCli
 module.exports.NOTARIZATION_MAX_BALANCE_CHANGES = NOTARIZATION_MAX_BALANCE_CHANGES

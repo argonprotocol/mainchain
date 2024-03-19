@@ -5,7 +5,7 @@ use crate::to_js_error;
 
 /// The version of the Argon file format.
 #[napi]
-pub const VERSION: &str = crate_version!();
+pub const ARGON_FILE_VERSION: &str = crate_version!();
 
 #[derive(Debug, Serialize, Deserialize)]
 pub struct ArgonFile {
@@ -30,12 +30,12 @@ impl ArgonFile {
   pub fn create(balance_changes: Vec<BalanceChange>, file_type: ArgonFileType) -> Self {
     return match file_type {
       ArgonFileType::Send => Self {
-        version: VERSION.to_string(),
+        version: ARGON_FILE_VERSION.to_string(),
         send: Some(balance_changes),
         request: None,
       },
       ArgonFileType::Request => Self {
-        version: VERSION.to_string(),
+        version: ARGON_FILE_VERSION.to_string(),
         send: None,
         request: Some(balance_changes),
       },

@@ -1,7 +1,7 @@
 use crate::accounts::AccountStore;
 use crate::balance_changes::BalanceChangeStore;
-use crate::notary_client::NotaryClients;
 use crate::keystore::Keystore;
+use crate::notary_client::NotaryClients;
 use crate::{to_js_error, BalanceChangeStatus};
 use crate::{TickerRef, ESCROW_MINIMUM_SETTLEMENT};
 use anyhow::anyhow;
@@ -727,9 +727,7 @@ mod tests {
     )
     .await?;
 
-    let ticker = TickerRef {
-      ticker: Ticker::start(Duration::from_secs(60)),
-    };
+    let ticker = TickerRef::new(Ticker::start(Duration::from_secs(60)));
     println!("about to open escrow");
     let keystore = Keystore::new(pool.clone());
     let _ = keystore
@@ -808,9 +806,7 @@ mod tests {
     )
     .await?;
 
-    let ticker = TickerRef {
-      ticker: Ticker::start(Duration::from_secs(60)),
-    };
+    let ticker = TickerRef::new(Ticker::start(Duration::from_secs(60)));
     let keystore = Keystore::new(bob_pool.clone());
     keystore
       .import_suri("//Bob".to_string(), CryptoScheme::Ed25519, None)
@@ -896,9 +892,7 @@ mod tests {
       .import_suri("//Bob".to_string(), CryptoScheme::Ed25519, None)
       .await?;
 
-    let ticker = TickerRef {
-      ticker: Ticker::start(Duration::from_secs(1)),
-    };
+    let ticker = TickerRef::new(Ticker::start(Duration::from_secs(1)));
     let builder =
       NotarizationBuilder::new(bob_pool.clone(), notary_clients.clone(), bob_signer.clone());
     builder

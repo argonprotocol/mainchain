@@ -7,6 +7,8 @@ use ulx_notary_audit::VerifyError;
 pub enum Error {
 	#[error("Notary not found")]
 	NotaryNotFound,
+	#[error("Empty Notarization Proposed")]
+	EmptyNotarizationProposed,
 	#[error("An invalid balance change was submitted ({change_index}.{note_index}): {message}")]
 	BalanceChangeError { change_index: usize, note_index: usize, message: String },
 	#[error(
@@ -86,6 +88,7 @@ impl From<Error> for i32 {
 			Error::MaxNotebookChainTransfersReached => 15,
 			Error::CrossNotaryProofsNotImplemented => 16,
 			Error::UnsignedNotebookHeader => 17,
+			Error::EmptyNotarizationProposed => 18,
 		}
 	}
 }

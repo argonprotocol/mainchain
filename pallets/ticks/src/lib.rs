@@ -70,7 +70,9 @@ pub mod pallet {
 	pub struct GenesisConfig<T: Config> {
 		pub tick_duration_millis: u64,
 		pub genesis_utc_time: u64,
-		pub _phantom: PhantomData<T>,
+
+		#[serde(skip)]
+		_phantom: PhantomData<T>,
 	}
 
 	#[pallet::genesis_build]

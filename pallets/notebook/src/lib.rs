@@ -207,15 +207,23 @@ pub mod pallet {
 			notebooks.sort_by(|a, b| a.header.notebook_number.cmp(&b.header.notebook_number));
 
 			for SignedNotebookHeader { header, signature } in notebooks {
+				let notebook_number = header.notebook_number;
+				info!(
+					target: LOG_TARGET,
+					"Auditing {}", notebook_number
+				);
 				let did_pass_audit = Self::check_audit_result(
 					header.notary_id,
 					header.notebook_number,
 					header.tick,
 					&notebook_digest,
 				)?;
+				info!(
+					target: LOG_TARGET,
+					"Audit ok for {}? {}", notebook_number, did_pass_audit
+				);
 
 				Self::verify_notebook_order(&header)?;
-				// make the sender provide the hash. We'll just reject it if it's bad
 				ensure!(
 					T::NotaryProvider::verify_signature(
 						header.notary_id,
@@ -228,10 +236,23 @@ pub mod pallet {
 				);
 
 				T::EventHandler::notebook_submitted(&header)?;
+
+				info!(
+					target: LOG_TARGET,
+					"Processing {}", notebook_number
+				);
 				Self::process_notebook(header, did_pass_audit)?;
+				info!(
+					target: LOG_TARGET,
+					"Processed {}", notebook_number,
+				);
 			}
 
 			<BlockNotebooks<T>>::put(notebook_digest);
+			info!(
+				target: LOG_TARGET,
+				"Done processing notebooks",
+			);
 			Ok(())
 		}
 	}
@@ -413,6 +434,7 @@ pub mod pallet {
 			);
 
 			for account_origin in header.changed_account_origins.into_iter() {
+				println!("Changed account origin: {}->{}", account_origin.notebook_number, account_origin.account_uid);
 				<AccountOriginLastChangedNotebookByNotary<T>>::insert(
 					notary_id,
 					account_origin,

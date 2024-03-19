@@ -201,7 +201,7 @@ pub fn notary_sign(
 				e
 			))
 		})?
-		.unwrap();
+		.expect(format!("Could not sign the notebook header. Ensure the notary key {:?} is installed in the keystore", public).as_str());
 	Ok(sig)
 }
 

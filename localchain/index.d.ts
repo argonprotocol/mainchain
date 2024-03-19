@@ -26,8 +26,8 @@ export enum DataTLD {
   Weather = 19
 }
 export enum AccountType {
-  Tax = 0,
-  Deposit = 1
+  Tax = 'Tax',
+  Deposit = 'Deposit'
 }
 export interface NotaryAccountOrigin {
   notaryId: number
@@ -40,17 +40,17 @@ export interface ClaimResult {
 }
 export enum BalanceChangeStatus {
   /** The balance change has been submitted, but is not in a known notebook yet. */
-  SubmittedToNotary = 0,
+  SubmittedToNotary = 'SubmittedToNotary',
   /** A balance change that doesn't get final proof because it is one of many in a single notebook. Aka, another balance change superseded it in the notebook. */
-  SupersededInNotebook = 1,
+  SupersededInNotebook = 'SupersededInNotebook',
   /** Proof has been obtained from a notebook */
-  NotebookPublished = 2,
+  NotebookPublished = 'NotebookPublished',
   /** The mainchain has finalized the notebook with the balance change */
-  MainchainFinal = 3,
+  MainchainFinal = 'MainchainFinal',
   /** A balance change has been sent to another user to claim. Keep checking until it is claimed. */
-  WaitingForSendClaim = 4,
+  WaitingForSendClaim = 'WaitingForSendClaim',
   /** A pending balance change that was canceled before being claimed by another user (escrow or send). */
-  Canceled = 5
+  Canceled = 'Canceled'
 }
 export interface EscrowCloseOptions {
   votesAddress?: string
@@ -164,7 +164,7 @@ export enum CryptoScheme {
   Ecdsa = 2
 }
 /** The version of the Argon file format. */
-export const VERSION: string
+export const ARGON_FILE_VERSION: string
 export enum ArgonFileType {
   Send = 0,
   Request = 1
@@ -235,6 +235,8 @@ export interface LocalchainOverview {
   changes: Array<BalanceChangeGroup>
   /** The mainchain balance */
   mainchainBalance: bigint
+  /** The net pending mainchain balance pending movement in/out of the localchain */
+  pendingMainchainBalanceChange: bigint
 }
 export enum TransactionType {
   Send = 0,
@@ -516,6 +518,7 @@ export class Localchain {
   static load(config: LocalchainConfig): Promise<Localchain>
   static loadWithoutMainchain(path: string, tickerConfig: TickerConfig, keystorePassword?: KeystorePasswordOption | undefined | null): Promise<Localchain>
   attachMainchain(mainchainClient: MainchainClient): Promise<void>
+  updateTicker(ntpSyncPoolUrl?: string | undefined | null): Promise<void>
   close(): Promise<void>
   accountOverview(): Promise<LocalchainOverview>
   static getDefaultDir(): string
