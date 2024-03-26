@@ -1,8 +1,7 @@
-use codec::{Codec, Decode, Encode};
+use codec::{Codec, Decode, Encode, MaxEncodedLen};
 use frame_support::PalletError;
 use scale_info::TypeInfo;
-use sp_core::MaxEncodedLen;
-use sp_runtime::RuntimeDebug;
+use sp_debug_derive::RuntimeDebug;
 
 pub trait BondProvider {
 	type BondFundId: Codec + MaxEncodedLen;

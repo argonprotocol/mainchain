@@ -52,7 +52,7 @@ sp-io = { git = "https://github.com/paritytech/polkadot-sdk.git", branch = "rele
 
 # Local Dependencies
 ulx-primitives = { path = "../../primitives" }
-ulx-notary = { path = "../../notary", default-features = false, features = ["api"] }
+ulx-notary-apis = { path = "../../notary/apis" }
 ulx-node-runtime = { path = "../../runtime" }
 
 

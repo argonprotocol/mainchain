@@ -22,8 +22,8 @@ use sqlx::sqlite::{SqliteConnectOptions, SqlitePoolOptions};
 use sqlx::{ConnectOptions, SqlitePool};
 use tokio::sync::Mutex;
 
-use ulx_notary::apis::localchain::{BalanceChangeResult, BalanceTipResult, LocalchainRpcServer};
-use ulx_notary::apis::notebook::NotebookRpcServer;
+use ulx_notary_apis::localchain::{BalanceChangeResult, BalanceTipResult, LocalchainRpcServer};
+use ulx_notary_apis::notebook::NotebookRpcServer;
 use ulx_notary::server::pipe_from_stream_and_drop;
 use ulx_notary::server::NotebookHeaderStream;
 use ulx_primitives::tick::Ticker;

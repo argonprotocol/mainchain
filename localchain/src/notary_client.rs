@@ -9,9 +9,9 @@ use sp_runtime::traits::Verify;
 use std::collections::HashMap;
 use std::sync::Arc;
 use tokio::sync::Mutex;
-use ulx_notary::apis::localchain::BalanceChangeResult;
-use ulx_notary::apis::LocalchainRpcClient;
-use ulx_notary::apis::NotebookRpcClient;
+use ulx_notary_apis::localchain::BalanceChangeResult;
+use ulx_notary_apis::LocalchainRpcClient;
+use ulx_notary_apis::NotebookRpcClient;
 use ulx_primitives::{
   AccountId, AccountOrigin, AccountType, BalanceProof, BalanceTip, Notarization, NotebookNumber,
   SignedNotebookHeader,
@@ -99,7 +99,7 @@ impl NotaryClients {
 pub struct NotaryClient {
   pub notary_id: u32,
   public: ed25519::Public,
-  client: Arc<Mutex<ulx_notary::Client>>,
+  client: Arc<Mutex<ulx_notary_apis::Client>>,
   last_metadata: Arc<Mutex<Option<ulx_primitives::NotebookMeta>>>,
   pub auto_verify_header_signatures: bool,
 }
@@ -126,7 +126,7 @@ impl NotaryClient {
       auto_verify_header_signatures,
       last_metadata: Arc::new(Mutex::new(None)),
       client: Arc::new(Mutex::new(
-        ulx_notary::create_client(&host)
+        ulx_notary_apis::create_client(&host)
           .await
           .map_err(to_js_error)?,
       )),

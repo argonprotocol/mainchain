@@ -1,12 +1,14 @@
 use codec::{Decode, Encode, MaxEncodedLen};
+use scale_info::TypeInfo;
 use serde::{Deserialize, Serialize};
-use sp_core::{bounded::BoundedVec, ecdsa, ed25519, sr25519, ConstU32, RuntimeDebug, H256};
+use sp_core::{bounded::BoundedVec, ecdsa, ed25519, sr25519, ConstU32, H256};
 use sp_crypto_hashing::blake2_256;
-use sp_runtime::{format_runtime_string, scale_info::TypeInfo, traits::Verify, MultiSignature};
+use sp_runtime::{traits::Verify, MultiSignature};
 use sp_std::vec::Vec;
 
 #[cfg(feature = "std")]
 use sp_core::crypto::Pair;
+use sp_debug_derive::RuntimeDebug;
 
 #[cfg(feature = "std")]
 use crate::serialize_unsafe_u128_as_string;
@@ -265,15 +267,11 @@ impl<'a> serde::Deserialize<'a> for MultiSignatureBytes {
 		let hex = String::deserialize(deserializer)?;
 		let bytes = match sp_core::bytes::from_hex(&hex) {
 			Ok(bytes) => bytes,
-			Err(e) =>
-				return Err(serde::de::Error::custom(format_runtime_string!("Invalid hex: {}", e))),
+			Err(e) => return Err(serde::de::Error::custom(std::format!("Invalid hex: {}", e))),
 		};
 
 		Decode::decode(&mut &bytes[..]).map_err(|e| {
-			serde::de::Error::custom(format_runtime_string!(
-				"Unable to decode Multisignature {}",
-				e
-			))
+			serde::de::Error::custom(std::format!("Unable to decode Multisignature {}", e))
 		})
 	}
 }

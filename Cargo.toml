@@ -19,6 +19,7 @@ members = [
     "runtime",
     "notary",
     "notary/audit",
+    "notary/apis",
     "testing"
 ]
 resolver = "2"
@@ -30,10 +31,12 @@ authors = ["Ulixee <https://github.com/ulixee>"]
 description = "A Ulixee miner node using the substrate platform."
 homepage = "https://ulixee.org"
 license = "MIT-0"
-rust-version = "1.70.0"
+rust-version = "1.77.0"
 repository = "https://github.com/ulixee/mainchain"
 documentation = "https://ulixee.org/docs"
 
+[patch."https://github.com/paritytech/polkadot-sdk.git"]
+sp-wasm-interface = { path = "../../polkadot/polkadot-sdk/substrate/primitives/wasm-interface" }
 
 
 [profile.release]

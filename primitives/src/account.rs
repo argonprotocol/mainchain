@@ -1,7 +1,7 @@
 use codec::{Decode, Encode, MaxEncodedLen};
 use scale_info::TypeInfo;
 use serde::{Deserialize, Serialize};
-use sp_core::RuntimeDebug;
+use sp_debug_derive::RuntimeDebug;
 use sp_runtime::{format_runtime_string, RuntimeString};
 
 use crate::AccountId;

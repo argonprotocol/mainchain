@@ -1,15 +1,15 @@
-use std::env;
+use std::path::PathBuf;
+use std::{env, fs};
 
-use anyhow::Context;
-use clap::{crate_version, Parser, Subcommand};
-use sc_cli::{utils, with_crypto_scheme, CryptoScheme, KeystoreParams};
+use anyhow::{anyhow, Context};
+use clap::{crate_version, Args, Parser, Subcommand};
 use sc_keystore::LocalKeystore;
-use sc_service::config::KeystoreConfig;
+use sp_core::crypto::{ExposeSecret, Zeroize};
 use sp_core::{crypto::SecretString, ed25519, ByteArray, Pair as PairT};
 use sp_keystore::{testing::MemoryKeystore, Keystore, KeystorePtr};
 use sqlx::{migrate, postgres::PgPoolOptions};
-use ulixee_client::MultiurlClient;
 
+use ulixee_client::MultiurlClient;
 use ulx_notary::{
 	block_watch::spawn_block_sync,
 	notebook_closer::{spawn_notebook_closer, NOTARY_KEYID},
@@ -130,7 +130,8 @@ async fn main() -> anyhow::Result<()> {
 				.connect(&db_url)
 				.await
 				.context("failed to connect to db")?;
-			let keystore = read_keystore(keystore_params, dev)?;
+			let password = read_password(keystore_params.clone())?;
+			let keystore = read_keystore(keystore_params.keystore_path, password, dev)?;
 			if dev {
 				let suri = "//Ferdie//notary";
 				let pair = ed25519::Pair::from_string(&suri, None)?;
@@ -165,13 +166,21 @@ async fn main() -> anyhow::Result<()> {
 			tracing::info!("Notary server closed");
 		},
 		Commands::InsertKey { suri, keystore_params } => {
-			let suri = utils::read_uri(suri.as_ref())?;
-			let password = keystore_params.read_password()?;
-			let public = with_crypto_scheme!(
-				CryptoScheme::Ed25519,
-				get_public_key_bytes(&suri, password.clone())
-			)?;
-			let keystore = read_keystore(keystore_params, false)?;
+			let suri = read_uri(suri.as_ref())?;
+
+			let password = read_password(keystore_params.clone())?;
+			let keystore = read_keystore(keystore_params.keystore_path, password.clone(), false)?;
+
+			let p: ed25519::Pair = if let Some(pass) = password {
+				let mut pass_str = pass.expose_secret().clone();
+				let pair = ed25519::Pair::from_string(&suri, Some(&pass_str));
+				pass_str.zeroize();
+				pair
+			} else {
+				ed25519::Pair::from_string(&suri, None)
+			}
+			.map_err(|e| Error::Input(e.to_string()))?;
+			let public = p.public().0;
 			keystore
 				.insert(NOTARY_KEYID, &suri, &public[..])
 				.map_err(|_| Error::KeystoreOperation)?;
@@ -190,27 +199,81 @@ async fn main() -> anyhow::Result<()> {
 	Ok(())
 }
 
-fn get_public_key_bytes<P: sp_core::Pair>(
-	uri: &str,
-	pass: Option<SecretString>,
-) -> anyhow::Result<Vec<u8>, Error> {
-	let p = utils::pair_from_suri::<P>(uri, pass).map_err(|e| Error::Input(e.to_string()))?;
-	Ok(p.public().as_ref().to_vec())
+/// Parameters of the keystore
+#[derive(Debug, Clone, Args)]
+pub struct KeystoreParams {
+	/// Specify custom keystore path.
+	#[arg(long, value_name = "PATH")]
+	pub keystore_path: Option<PathBuf>,
+
+	/// Use interactive shell for entering the password used by the keystore.
+	#[arg(long, conflicts_with_all = &["password", "password_filename"])]
+	pub password_interactive: bool,
+
+	/// Password used by the keystore.
+	///
+	/// This allows appending an extra user-defined secret to the seed.
+	#[arg(
+	long,
+	value_parser = secret_string_from_str,
+	conflicts_with_all = &["password_interactive", "password_filename"]
+	)]
+	pub password: Option<SecretString>,
+
+	/// File that contains the password used by the keystore.
+	#[arg(
+	long,
+	value_name = "PATH",
+	conflicts_with_all = &["password_interactive", "password"]
+	)]
+	pub password_filename: Option<PathBuf>,
 }
 
-fn read_keystore(keystore_params: KeystoreParams, dev: bool) -> anyhow::Result<KeystorePtr> {
-	let keystore: KeystorePtr = match &keystore_params.keystore_path {
-		Some(r) => {
-			let base_path = r.clone();
-			match keystore_params.keystore_config(&base_path)? {
-				KeystoreConfig::Path { path, password } =>
-					Ok(LocalKeystore::open(path, password)?.into()),
-				_ => unreachable!("keystore_config always returns path and password; qed"),
-			}
-		},
+fn read_password(keystore_params: KeystoreParams) -> anyhow::Result<Option<SecretString>> {
+	let (password_interactive, password) =
+		(keystore_params.password_interactive, keystore_params.password.clone());
+
+	let pass = if password_interactive {
+		Some(SecretString::new(rpassword::prompt_password("Keystore Password: ")?))
+	} else if let Some(ref file) = keystore_params.password_filename {
+		let password = fs::read_to_string(file).map_err(|e| anyhow!("Unable to read password file: {}", e))?;
+		Some(SecretString::new(password))
+	} else {
+		password
+	};
+
+	Ok(pass)
+}
+
+fn read_keystore(
+	keystore_path: Option<PathBuf>,
+	password: Option<SecretString>,
+	dev: bool,
+) -> anyhow::Result<KeystorePtr> {
+	let keystore: KeystorePtr = match &keystore_path {
+		Some(r) => Ok(LocalKeystore::open(r, password)?.into()),
 		None if dev => Ok(MemoryKeystore::new().into()),
 		None => Err("No keystore path provided"),
 	}
 	.map_err(|_| Error::KeystoreOperation)?;
 	Ok(keystore)
+}
+
+pub fn read_uri(uri: Option<&String>) -> anyhow::Result<String> {
+	let uri = if let Some(uri) = uri {
+		let file = PathBuf::from(&uri);
+		if file.is_file() {
+			std::fs::read_to_string(uri)?.trim_end().to_owned()
+		} else {
+			uri.into()
+		}
+	} else {
+		rpassword::prompt_password("URI: ")?
+	};
+
+	Ok(uri)
+}
+/// Parse a secret string, returning a displayable error.
+pub fn secret_string_from_str(s: &str) -> std::result::Result<SecretString, String> {
+	std::str::FromStr::from_str(s).map_err(|_| "Could not get SecretString".to_string())
 }

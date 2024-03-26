@@ -55,7 +55,9 @@ impl FinalizedNotebookHeaderListener {
 
 				header
 			},
-			Err(e) => return Err(anyhow::anyhow!("Error parsing notified notebook number {:?}", e)),
+			Err(e) => {
+				return Err(anyhow::anyhow!("Error parsing notified notebook number {:?}", e))
+			},
 		};
 
 		self.completed_notebook_sender.notify(|| Ok(header.clone())).map_err(
@@ -74,7 +76,7 @@ impl FinalizedNotebookHeaderListener {
 					Err(e) => {
 						tracing::error!("Error listening for finalized notebook header {:?}", e);
 						if e.to_string().contains("closed pool") {
-							return Err(e.into())
+							return Err(e.into());
 						}
 					},
 				}
@@ -225,6 +227,7 @@ mod tests {
 	use codec::Decode;
 	use frame_support::assert_ok;
 	use futures::{task::noop_waker_ref, StreamExt};
+	use sp_core::hexdisplay::AsBytesRef;
 	use sp_core::{bounded_vec, ed25519::Public, sr25519::Signature, Pair};
 	use sp_keyring::Sr25519Keyring::{Alice, Bob, Ferdie};
 	use sp_keystore::{testing::MemoryKeystore, Keystore, KeystoreExt};
@@ -232,7 +235,6 @@ mod tests {
 	use subxt::{
 		blocks::Block,
 		config::substrate::DigestItem,
-		ext::sp_core::hexdisplay::AsBytesRef,
 		tx::{TxInBlock, TxProgress, TxStatus},
 		utils::AccountId32,
 		OnlineClient,
@@ -240,6 +242,12 @@ mod tests {
 	use subxt_signer::sr25519::{dev, Keypair};
 	use tokio::{spawn, sync::Mutex};
 
+	use crate::{
+		block_watch::track_blocks,
+		notebook_closer::NOTARY_KEYID,
+		stores::{notarizations::NotarizationsStore, notebook_status::NotebookStatusStore},
+		NotaryServer,
+	};
 	use ulixee_client::{
 		api,
 		api::{
@@ -258,6 +266,7 @@ mod tests {
 		},
 		UlxClient, UlxConfig,
 	};
+	use ulx_notary_apis::localchain::BalanceChangeResult;
 	use ulx_notary_audit::VerifyError;
 	use ulx_primitives::{
 		tick::Tick,
@@ -270,14 +279,6 @@ mod tests {
 		ESCROW_EXPIRATION_TICKS,
 	};
 	use ulx_testing::{test_context, test_context_from_url};
-
-	use crate::{
-		apis::localchain::BalanceChangeResult,
-		block_watch::track_blocks,
-		notebook_closer::NOTARY_KEYID,
-		stores::{notarizations::NotarizationsStore, notebook_status::NotebookStatusStore},
-		NotaryServer,
-	};
 
 	use super::*;
 	use ulixee_client::MultiurlClient;
@@ -361,7 +362,7 @@ mod tests {
 			let _ = &closer.iterate_notebook_close_loop().await;
 			let status = NotebookStatusStore::get(&pool, 1).await?;
 			if status.finalized_time.is_some() {
-				break
+				break;
 			}
 			// yield
 			tokio::time::sleep(tokio::time::Duration::from_millis(50)).await;
@@ -466,7 +467,7 @@ mod tests {
 		loop {
 			let status = NotebookStatusStore::get(&pool, result.notebook_number).await?;
 			if status.finalized_time.is_some() {
-				break
+				break;
 			}
 			// yield
 			tokio::time::sleep(tokio::time::Duration::from_millis(50)).await;
@@ -619,7 +620,7 @@ mod tests {
 							matches!(seal, BlockSealDigest::Vote { .. }),
 							"Should be vote seal"
 						);
-						break
+						break;
 					}
 				},
 				_ => break,
@@ -642,7 +643,7 @@ mod tests {
 			match Pin::new(&mut block_tracker_inner).poll(&mut cx) {
 				Poll::Ready(Err(e)) => {
 					tracing::error!("Error tracking blocks {:?}", e);
-					return Err(anyhow!(e.to_string()))
+					return Err(anyhow!(e.to_string()));
 				},
 				_ => {
 					*block_tracker_lock = Some(block_tracker_inner);
@@ -663,16 +664,21 @@ mod tests {
 		let mut parent_voting_key = None;
 		for log in block.header().digest.logs.iter() {
 			match log {
-				DigestItem::PreRuntime(ulx_primitives::TICK_DIGEST_ID, data) =>
-					tick = TickDigest::decode(&mut &data[..]).ok(),
-				DigestItem::PreRuntime(ulx_primitives::BLOCK_VOTES_DIGEST_ID, data) =>
-					votes = BlockVoteDigest::decode(&mut &data[..]).ok(),
-				DigestItem::PreRuntime(ulx_primitives::NOTEBOOKS_DIGEST_ID, data) =>
-					notebook_digest = NotebookDigest::decode(&mut &data[..]).ok(),
-				DigestItem::Seal(ulx_primitives::BLOCK_SEAL_DIGEST_ID, data) =>
-					block_seal = BlockSealDigest::decode(&mut &data[..]).ok(),
-				DigestItem::Consensus(ulx_primitives::PARENT_VOTING_KEY_DIGEST, data) =>
-					parent_voting_key = ParentVotingKeyDigest::decode(&mut &data[..]).ok(),
+				DigestItem::PreRuntime(ulx_primitives::TICK_DIGEST_ID, data) => {
+					tick = TickDigest::decode(&mut &data[..]).ok()
+				},
+				DigestItem::PreRuntime(ulx_primitives::BLOCK_VOTES_DIGEST_ID, data) => {
+					votes = BlockVoteDigest::decode(&mut &data[..]).ok()
+				},
+				DigestItem::PreRuntime(ulx_primitives::NOTEBOOKS_DIGEST_ID, data) => {
+					notebook_digest = NotebookDigest::decode(&mut &data[..]).ok()
+				},
+				DigestItem::Seal(ulx_primitives::BLOCK_SEAL_DIGEST_ID, data) => {
+					block_seal = BlockSealDigest::decode(&mut &data[..]).ok()
+				},
+				DigestItem::Consensus(ulx_primitives::PARENT_VOTING_KEY_DIGEST, data) => {
+					parent_voting_key = ParentVotingKeyDigest::decode(&mut &data[..]).ok()
+				},
 				_ => (),
 			}
 		}
@@ -983,12 +989,16 @@ mod tests {
 					.transpose()
 				{
 					if transfer.account_id == account.public_key().to_account_id() {
-						return Ok((transfer.account_nonce, transfer.amount as u32, account.clone()))
+						return Ok((
+							transfer.account_nonce,
+							transfer.amount as u32,
+							account.clone(),
+						));
 					}
 				}
 			}
 		}
-		return Err(anyhow!("Should have found the chain transfer in events"))
+		return Err(anyhow!("Should have found the chain transfer in events"));
 	}
 
 	async fn wait_for_transfers(
@@ -1012,13 +1022,13 @@ mod tests {
 						Some(*nonce as i32),
 						"Should have recorded a chain transfer"
 					);
-					return Some(())
+					return Some(());
 				}
 				None
 			});
 			if is_complete.count() == transfers.len() {
 				found = true;
-				break
+				break;
 			}
 			// wait for 500 ms
 			tokio::time::sleep(tokio::time::Duration::from_millis(500)).await;
@@ -1057,7 +1067,7 @@ mod tests {
 				.await?;
 			if let Some(_) = meta {
 				found = true;
-				break
+				break;
 			}
 			// wait for 500 ms
 			tokio::time::sleep(tokio::time::Duration::from_millis(500)).await;
@@ -1074,11 +1084,11 @@ mod tests {
 				TxStatus::InBestBlock(tx_in_block) | TxStatus::InFinalizedBlock(tx_in_block) => {
 					// now, we can attempt to work with the block, eg:
 					tx_in_block.wait_for_success().await?;
-					return Ok(tx_in_block)
+					return Ok(tx_in_block);
 				},
-				TxStatus::Error { message } |
-				TxStatus::Invalid { message } |
-				TxStatus::Dropped { message } => {
+				TxStatus::Error { message }
+				| TxStatus::Invalid { message }
+				| TxStatus::Dropped { message } => {
 					// Handle any errors:
 					return Err(Error::InternalError(format!(
 						"Error submitting notebook to block: {message}"

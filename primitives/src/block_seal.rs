@@ -1,13 +1,14 @@
-use codec::{Decode, Encode};
-use frame_support::{CloneNoBound, EqNoBound, Parameter, PartialEqNoBound};
+use codec::{Decode, Encode, MaxEncodedLen};
+use frame_support::Parameter;
+use frame_support_procedural::{CloneNoBound, EqNoBound, PartialEqNoBound};
 use scale_info::TypeInfo;
 use serde::{Deserialize, Serialize};
 use sp_application_crypto::AppCrypto;
 use sp_core::{
 	crypto::{CryptoTypeId, KeyTypeId},
-	MaxEncodedLen, OpaquePeerId,
+	OpaquePeerId,
 };
-use sp_runtime::RuntimeDebug;
+use sp_debug_derive::RuntimeDebug;
 
 pub const BLOCK_SEAL_KEY_TYPE: KeyTypeId = KeyTypeId(*b"seal");
 

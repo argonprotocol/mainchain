@@ -1,5 +1,5 @@
 use codec::{Codec, Decode, Encode, MaxEncodedLen};
-use frame_support::{CloneNoBound, PartialEqNoBound, RuntimeDebugNoBound};
+use frame_support_procedural::{CloneNoBound, PartialEqNoBound, RuntimeDebugNoBound};
 use scale_info::TypeInfo;
 use serde::{Deserialize, Serialize};
 use sp_core::{ed25519, Get, RuntimeDebug, H256};

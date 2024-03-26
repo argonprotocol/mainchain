@@ -3,8 +3,9 @@ use crate::serialize_unsafe_u128_as_string;
 
 use codec::{Codec, Decode, Encode, MaxEncodedLen};
 use serde::{Deserialize, Serialize};
-use sp_core::{RuntimeDebug, H256, U256};
+use sp_core::{H256, U256};
 use sp_crypto_hashing::blake2_256;
+use sp_debug_derive::RuntimeDebug;
 use sp_runtime::{scale_info::TypeInfo, MultiSignature};
 use sp_std::vec::Vec;
 

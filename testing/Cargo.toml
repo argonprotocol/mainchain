@@ -16,5 +16,5 @@ frame-support = { git = "https://github.com/paritytech/polkadot-sdk.git", branch
 sp-keyring = { git = "https://github.com/paritytech/polkadot-sdk.git", branch = "release-polkadot-v1.9.0" }
 tracing = "0.1"
 tracing-subscriber = { version = "0.3", features = ["env-filter"] }
-subxt = { version = "0.35", features = ["substrate-compat"] }
+subxt = { version = "0.35" }
 anyhow = "1.0"

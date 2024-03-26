@@ -4,27 +4,30 @@ use codec::Encode;
 use futures::{Stream, StreamExt};
 use jsonrpsee::{
 	core::{async_trait, SubscriptionResult},
-	RpcModule,
 	server::{PendingSubscriptionSink, Server, ServerHandle, SubscriptionMessage},
-	TrySendError, types::ErrorObjectOwned,
+	types::ErrorObjectOwned,
+	RpcModule, TrySendError,
 };
 use sc_utils::notification::{NotificationSender, NotificationStream, TracingKeyStr};
 use serde::Serialize;
 use sqlx::PgPool;
 use tokio::net::ToSocketAddrs;
 
-use ulx_primitives::{AccountId, AccountOrigin, AccountType, BalanceProof, BalanceTip, Notarization, NotarizationBalanceChangeset, NotarizationBlockVotes, NotarizationDataDomains, NotaryId, Notebook, NotebookMeta, NotebookNumber, SignedNotebookHeader};
-
 use crate::{
-	apis::{
-		localchain::{BalanceChangeResult, BalanceTipResult, LocalchainRpcServer},
-		notebook::NotebookRpcServer,
-	},
-	Error,
 	stores::{
 		balance_tip::BalanceTipStore, notarizations::NotarizationsStore, notebook::NotebookStore,
 		notebook_header::NotebookHeaderStore,
 	},
+	Error,
+};
+use ulx_notary_apis::{
+	localchain::{BalanceChangeResult, BalanceTipResult, LocalchainRpcServer},
+	notebook::NotebookRpcServer,
+};
+use ulx_primitives::{
+	AccountId, AccountOrigin, AccountType, BalanceProof, BalanceTip, Notarization,
+	NotarizationBalanceChangeset, NotarizationBlockVotes, NotarizationDataDomains, NotaryId,
+	Notebook, NotebookMeta, NotebookNumber, SignedNotebookHeader,
 };
 
 pub type NotebookHeaderStream = NotificationStream<SignedNotebookHeader, NotebookHeaderTracingKey>;
@@ -173,11 +176,15 @@ impl NotebookRpcServer for NotaryServer {
 	async fn get_raw_headers(
 		&self,
 		since_notebook: Option<NotebookNumber>,
-		or_specific_notebooks: Option<Vec<NotebookNumber>>
+		or_specific_notebooks: Option<Vec<NotebookNumber>>,
 	) -> Result<Vec<(NotebookNumber, Vec<u8>)>, ErrorObjectOwned> {
-		NotebookHeaderStore::load_raw_signed_headers(&self.pool, since_notebook, or_specific_notebooks)
-			.await
-			.map_err(from_crate_error)
+		NotebookHeaderStore::load_raw_signed_headers(
+			&self.pool,
+			since_notebook,
+			or_specific_notebooks,
+		)
+		.await
+		.map_err(from_crate_error)
 	}
 
 	async fn metadata(&self) -> Result<NotebookMeta, ErrorObjectOwned> {
@@ -267,7 +274,11 @@ impl LocalchainRpcServer for NotaryServer {
 			.map_err(from_crate_error)?)
 	}
 
-	async fn get_origin(&self, account_id: AccountId, account_type: AccountType) -> Result<AccountOrigin, ErrorObjectOwned> {
+	async fn get_origin(
+		&self,
+		account_id: AccountId,
+		account_type: AccountType,
+	) -> Result<AccountOrigin, ErrorObjectOwned> {
 		let mut db = self
 			.pool
 			.acquire()
@@ -318,26 +329,26 @@ mod tests {
 	use codec::Encode;
 	use futures::{StreamExt, TryStreamExt};
 	use jsonrpsee::ws_client::WsClientBuilder;
-	use sp_core::{Blake2Hasher, bounded_vec, ed25519::Signature};
+	use sp_core::{bounded_vec, ed25519::Signature, Blake2Hasher};
 	use sp_keyring::Ed25519Keyring::Bob;
-	use sp_keystore::{Keystore, KeystoreExt, testing::MemoryKeystore};
+	use sp_keystore::{testing::MemoryKeystore, Keystore, KeystoreExt};
 	use sqlx::PgPool;
 
 	use ulx_primitives::{
-		AccountOrigin, AccountType::Deposit, BalanceChange, BalanceTip, ChainTransfer,
-		NewAccountOrigin, Note, NoteType, tick::Ticker,
+		tick::Ticker, AccountOrigin, AccountType::Deposit, BalanceChange, BalanceTip,
+		ChainTransfer, NewAccountOrigin, Note, NoteType,
 	};
 
 	use crate::{
-		apis::{
-			localchain::{BalanceChangeResult, LocalchainRpcClient},
-			notebook::NotebookRpcClient,
-		},
-		notebook_closer::{FinalizedNotebookHeaderListener, NOTARY_KEYID, NotebookCloser},
+		notebook_closer::{FinalizedNotebookHeaderListener, NotebookCloser, NOTARY_KEYID},
 		stores::{
 			blocks::BlocksStore, chain_transfer::ChainTransferStore,
 			notebook_header::NotebookHeaderStore, registered_key::RegisteredKeyStore,
 		},
+	};
+	use ulx_notary_apis::{
+		localchain::{BalanceChangeResult, LocalchainRpcClient},
+		notebook::NotebookRpcClient,
 	};
 
 	use super::NotaryServer;

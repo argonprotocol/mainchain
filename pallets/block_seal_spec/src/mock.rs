@@ -1,24 +1,20 @@
 use std::collections::BTreeMap;
 
 use env_logger::{Builder, Env};
-use frame_support::{
-	parameter_types,
-	traits::{ConstU16, ConstU64},
-};
+use frame_support::derive_impl;
+use frame_support::parameter_types;
 use sp_core::{H256, U256};
-use sp_runtime::{
-	traits::{BlakeTwo256, IdentityLookup},
-	BuildStorage,
-};
+use sp_core::ConstU64;
+use sp_runtime::BuildStorage;
 
 use ulx_primitives::{
+	AuthorityProvider,
 	block_seal::MiningAuthority,
 	block_vote::VoteMinimum,
-	inherents::BlockSealInherent,
-	notebook::NotebookNumber,
-	tick::{Tick, Ticker},
-	AuthorityProvider, BlockSealAuthorityId, BlockVotingProvider, NotaryId, NotebookProvider,
-	NotebookSecret, TickProvider,
+	BlockSealAuthorityId,
+	BlockVotingProvider,
+	inherents::BlockSealInherent, NotaryId, notebook::NotebookNumber, NotebookProvider, NotebookSecret,
+	tick::{Tick, Ticker}, TickProvider,
 };
 
 use crate as pallet_block_seal_spec;
@@ -41,31 +37,10 @@ impl pallet_timestamp::Config for Test {
 	type MinimumPeriod = ConstU64<1>;
 	type WeightInfo = ();
 }
+
+#[derive_impl(frame_system::config_preludes::TestDefaultConfig as frame_system::DefaultConfig)]
 impl frame_system::Config for Test {
-	type BaseCallFilter = frame_support::traits::Everything;
-	type BlockWeights = ();
-	type BlockLength = ();
-	type DbWeight = ();
-	type RuntimeOrigin = RuntimeOrigin;
-	type RuntimeCall = RuntimeCall;
-	type Nonce = u64;
-	type Hash = H256;
-	type Hashing = BlakeTwo256;
-	type AccountId = u64;
-	type Lookup = IdentityLookup<Self::AccountId>;
 	type Block = Block;
-	type RuntimeEvent = RuntimeEvent;
-	type BlockHashCount = ConstU64<250>;
-	type Version = ();
-	type PalletInfo = PalletInfo;
-	type AccountData = ();
-	type OnNewAccount = ();
-	type OnKilledAccount = ();
-	type SystemWeightInfo = ();
-	type SS58Prefix = ConstU16<42>;
-	type OnSetCode = ();
-	type MaxConsumers = frame_support::traits::ConstU32<16>;
-	type RuntimeTask = ();
 }
 
 parameter_types! {

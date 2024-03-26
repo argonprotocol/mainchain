@@ -1,5 +1,6 @@
 use codec::{Decode, Encode, MaxEncodedLen};
-use frame_support::{pallet_prelude::TypeInfo, Deserialize, Serialize};
+use scale_info::TypeInfo;
+use serde::{Deserialize, Serialize};
 use sp_debug_derive::RuntimeDebug;
 
 #[derive(

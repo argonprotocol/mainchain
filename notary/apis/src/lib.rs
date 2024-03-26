@@ -1,6 +1,6 @@
 use jsonrpsee::ws_client::WsClientBuilder;
 
-pub use crate::apis::{localchain::LocalchainRpcClient, notebook::NotebookRpcClient};
+pub use crate::{localchain::LocalchainRpcClient, notebook::NotebookRpcClient};
 
 pub mod localchain;
 pub mod notebook;

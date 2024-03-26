@@ -1,7 +1,8 @@
+use bounded_collections::BoundedVec;
 use codec::{Codec, Decode, Encode, MaxEncodedLen};
 use scale_info::TypeInfo;
 use sp_core::{ConstU32, RuntimeDebug, H256, U256};
-use sp_runtime::{BoundedVec, DispatchError};
+use sp_runtime::DispatchError;
 use sp_std::{collections::btree_map::BTreeMap, vec::Vec};
 
 use crate::{

@@ -16,10 +16,11 @@ pub use data_tld::DataTLD;
 pub use digests::{*, AUTHOR_DIGEST_ID, BLOCK_SEAL_DIGEST_ID, BlockSealDigest};
 
 pub use crate::{apis::*, notary::NotaryId, note::*, notebook::*, providers::*};
+#[cfg(feature = "uniffi")]
+use core::ffi;
 
 #[cfg(feature = "uniffi")]
 uniffi::setup_scaffolding!();
-
 pub type ComputeDifficulty = u128;
 
 mod apis;

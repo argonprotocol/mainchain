@@ -1,8 +1,9 @@
 use codec::{Decode, Encode, MaxEncodedLen};
+use scale_info::TypeInfo;
 use serde::{Deserialize, Serialize};
-use sp_core::{bounded::BoundedVec, ed25519::Signature, ConstU32, RuntimeDebug, H256};
+use sp_core::{bounded::BoundedVec, ed25519::Signature, ConstU32, H256};
 use sp_crypto_hashing::blake2_256;
-use sp_runtime::scale_info::TypeInfo;
+use sp_debug_derive::RuntimeDebug;
 use sp_std::vec::Vec;
 
 use crate::{
@@ -108,8 +109,8 @@ impl Notebook {
 	}
 
 	pub fn verify_hash(&self) -> bool {
-		self.hash ==
-			Self::create_hash(
+		self.hash
+			== Self::create_hash(
 				self.header.hash(),
 				self.notarizations.clone().into(),
 				self.new_account_origins.clone().into(),

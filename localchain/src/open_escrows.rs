@@ -697,7 +697,7 @@ mod tests {
     let mut state = mock_notary.state.lock().await;
     (*state).balance_tips.insert(
       LocalchainAccountId::new(account.get_account_id32()?, account.account_type.clone()),
-      ulx_notary::apis::localchain::BalanceTipResult {
+      ulx_notary_apis::localchain::BalanceTipResult {
         tick,
         balance_tip: balance_tip.tip().into(),
         notebook_number,

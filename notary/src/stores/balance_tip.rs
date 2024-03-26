@@ -3,11 +3,12 @@ use std::default::Default;
 use sp_core::H256;
 use sqlx::PgConnection;
 
+use ulx_notary_apis::localchain::BalanceTipResult;
 use ulx_primitives::{
 	ensure, tick::Tick, AccountId, AccountOrigin, AccountType, BalanceTip, Note, NotebookNumber,
 };
 
-use crate::{apis::localchain::BalanceTipResult, stores::BoxFutureResult, Error};
+use crate::{stores::BoxFutureResult, Error};
 
 /// This table is used as a quick verification of the last balance change. It is also the last valid
 /// entry in a notebook. Without this table, you must obtain proof that a balance has not changed
@@ -157,7 +158,7 @@ mod tests {
 	use sp_keyring::Sr25519Keyring::Bob;
 	use sqlx::PgPool;
 
-	use ulx_primitives::{AccountType::Deposit, AccountOrigin, BalanceTip};
+	use ulx_primitives::{AccountOrigin, AccountType::Deposit, BalanceTip};
 
 	use crate::stores::balance_tip::BalanceTipStore;
 

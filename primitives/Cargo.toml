@@ -26,6 +26,7 @@ sp-debug-derive = { default-features = false, git = "https://github.com/parityte
 sp-core = { default-features = false, git = "https://github.com/paritytech/polkadot-sdk.git", branch = "release-polkadot-v1.9.0" }
 sp-std = { default-features = false, git = "https://github.com/paritytech/polkadot-sdk.git", branch = "release-polkadot-v1.9.0" }
 sp-crypto-hashing = { default-features = false, git = "https://github.com/paritytech/polkadot-sdk.git", branch = "release-polkadot-v1.9.0" }
+frame-support-procedural = { default-features = false, git = "https://github.com/paritytech/polkadot-sdk.git", branch = "release-polkadot-v1.9.0" }
 frame-support = { default-features = false, git = "https://github.com/paritytech/polkadot-sdk.git", branch = "release-polkadot-v1.9.0" }
 thiserror = { version = "1.0", optional = true }
 impl-trait-for-tuples = "0.2.2"
@@ -35,6 +36,8 @@ rsntp = { version = "4.0", optional = true }
 hex = { version = "0.4", optional = true }
 clap = { version = "4.5.1", optional = true, features = ["derive"] }
 uniffi = { version = "0.26.1", optional = true }
+primitive-types = { version = "0.12.0", default-features = false, features = ["codec", "scale-info"] }
+bounded-collections = { version = "0.2.0", default-features = false }
 
 [build-dependencies]
 uniffi = { version = "0.26.1", features = ["build"] }
@@ -53,15 +56,23 @@ std = [
     "scale-info/derive",
     "serde/std",
     "serde_json/std",
+    "bounded-collections/std",
     "sp-api/std",
     "sp-application-crypto/std",
+    "sp-application-crypto/full_crypto",
     "sp-debug-derive/std",
+    "primitive-types/byteorder",
+    "primitive-types/rustc-hex",
+    "primitive-types/serde",
+    "primitive-types/std",
     "sp-core/std",
+    "sp-core/full_crypto",
     "sp-crypto-hashing/std",
     "sp-inherents/std",
     "sp-runtime/std",
     "sp-std/std",
     "frame-support/std",
+    "frame-support-procedural/std",
     "thiserror",
     "clap",
     "hex",
@@ -76,5 +87,25 @@ napi = [
     "napi-derive/type-def",
 ]
 uniffi = [
+    "codec/std",
+    "codec/derive",
+    "scale-info/std",
+    "scale-info/derive",
+    "serde/std",
+    "serde_json/std",
+    "bounded-collections/std",
+    "sp-api/std",
+    "async-trait",
+    "sp-debug-derive/std",
+    "primitive-types/byteorder",
+    "primitive-types/rustc-hex",
+    "primitive-types/serde",
+    "sp-application-crypto/full_crypto",
+    "sp-application-crypto/serde",
+    "sp-core/serde",
+    "sp-core/full_crypto",
     "dep:uniffi",
+    "thiserror",
+    "hex",
+    "rsntp",
 ]

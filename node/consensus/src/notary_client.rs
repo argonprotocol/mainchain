@@ -10,11 +10,11 @@ use sp_runtime::traits::Block as BlockT;
 use tokio::sync::Mutex;
 
 use ulx_node_runtime::{NotaryRecordT, NotebookVerifyError};
-use ulx_notary::apis::notebook::{NotebookRpcClient, RawHeadersSubscription};
+use ulx_notary_apis::notebook::{NotebookRpcClient, RawHeadersSubscription};
 use ulx_primitives::{
-	notary::NotaryNotebookVoteDetails, notebook::NotebookNumber, tick::Tick, BlockNumber,
-	BlockSealApis, BlockSealAuthorityId, NotaryApis, NotaryId, NotebookApis, NotebookDigest,
-	NotebookHeaderData,
+	BlockNumber, BlockSealApis, BlockSealAuthorityId, notary::NotaryNotebookVoteDetails,
+	NotaryApis, NotaryId, notebook::NotebookNumber, NotebookApis, NotebookDigest, NotebookHeaderData,
+	tick::Tick,
 };
 
 use crate::{
@@ -24,7 +24,7 @@ use crate::{
 
 pub struct NotaryClient<B: BlockT, C: AuxStore, AC> {
 	client: Arc<C>,
-	pub notary_client_by_id: Arc<Mutex<BTreeMap<NotaryId, Arc<ulx_notary::Client>>>>,
+	pub notary_client_by_id: Arc<Mutex<BTreeMap<NotaryId, Arc<ulx_notary_apis::Client>>>>,
 	pub notaries_by_id: Arc<Mutex<BTreeMap<NotaryId, NotaryRecordT>>>,
 	pub subscriptions_by_id: Arc<Mutex<BTreeMap<NotaryId, RawHeadersSubscription>>>,
 	header_stream: TracingUnboundedSender<(NotaryId, NotebookNumber, Vec<u8>)>,
@@ -300,7 +300,7 @@ where
 		Ok(audit_result)
 	}
 
-	async fn get_client(&self, notary_id: NotaryId) -> Result<Arc<ulx_notary::Client>, Error<B>> {
+	async fn get_client(&self, notary_id: NotaryId) -> Result<Arc<ulx_notary_apis::Client>, Error<B>> {
 		let mut clients = self.notary_client_by_id.lock().await;
 		if !clients.contains_key(&notary_id) {
 			let notaries = self.notaries_by_id.lock().await;
@@ -310,7 +310,7 @@ where
 			let host = record.meta.hosts.get(0).ok_or_else(|| {
 				Error::NotaryError("No rpc endpoint found for notary".to_string())
 			})?;
-			let c = ulx_notary::create_client(host.get_url().as_str()).await.map_err(|e| {
+			let c = ulx_notary_apis::create_client(host.get_url().as_str()).await.map_err(|e| {
 				Error::NotaryError(format!(
 					"Could not connect to notary {} ({}) for audit - {:?}",
 					notary_id,

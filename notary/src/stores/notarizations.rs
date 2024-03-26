@@ -5,17 +5,7 @@ use serde_json::{from_value, json};
 use sp_runtime::BoundedVec;
 use sqlx::{query, types::Json, FromRow, PgConnection, PgPool};
 
-use ulx_notary_audit::{
-	verify_changeset_signatures, verify_notarization_allocation, verify_voting_sources, VerifyError,
-};
-use ulx_primitives::{
-	ensure, AccountId, AccountOrigin, AccountType, BalanceChange, BalanceProof, BalanceTip,
-	BlockVote, DataDomainHash, LocalchainAccountId, NewAccountOrigin, Notarization, NotaryId,
-	NoteType, NotebookNumber,
-};
-
 use crate::{
-	apis::localchain::BalanceChangeResult,
 	error::Error,
 	stores::{
 		balance_tip::BalanceTipStore,
@@ -26,6 +16,15 @@ use crate::{
 		notebook_new_accounts::NotebookNewAccountsStore,
 		notebook_status::NotebookStatusStore,
 	},
+};
+use ulx_notary_apis::localchain::BalanceChangeResult;
+use ulx_notary_audit::{
+	verify_changeset_signatures, verify_notarization_allocation, verify_voting_sources, VerifyError,
+};
+use ulx_primitives::{
+	ensure, AccountId, AccountOrigin, AccountType, BalanceChange, BalanceProof, BalanceTip,
+	BlockVote, DataDomainHash, LocalchainAccountId, NewAccountOrigin, Notarization, NotaryId,
+	NoteType, NotebookNumber,
 };
 
 #[derive(FromRow)]
@@ -172,7 +171,7 @@ impl NotarizationsStore {
 		data_domains: Vec<(DataDomainHash, AccountId)>,
 	) -> anyhow::Result<BalanceChangeResult, Error> {
 		if changes.is_empty() {
-			return Err(Error::EmptyNotarizationProposed)
+			return Err(Error::EmptyNotarizationProposed);
 		}
 		// Before we use db resources, let's confirm these are valid transactions
 		let initial_allocation_result =
@@ -217,7 +216,7 @@ impl NotarizationsStore {
 				Some(account_origin) => account_origin,
 				None => {
 					if change.change_number != 1 {
-						return Err(Error::MissingAccountOrigin)
+						return Err(Error::MissingAccountOrigin);
 					}
 
 					let account_uid = NotebookNewAccountsStore::insert_origin(
@@ -339,13 +338,14 @@ impl NotarizationsStore {
 						escrow_hold_note = None;
 						if let Some(hold_note) = &prev_escrow_hold_note {
 							match &hold_note.note_type {
-								&NoteType::EscrowHold { ref data_domain_hash, ref recipient } =>
+								&NoteType::EscrowHold { ref data_domain_hash, ref recipient } => {
 									if let Some(data_domain_hash) = data_domain_hash {
 										let count = escrow_data_domains
 											.entry((data_domain_hash.clone(), recipient.clone()))
 											.or_insert(0);
 										*count += 1;
-									},
+									}
+								},
 								_ => return Err(VerifyError::InvalidEscrowHoldNote.into()),
 							}
 						}
@@ -472,7 +472,9 @@ mod tests {
 			data_domain_account: Bob.to_account_id(),
 			block_rewards_account_id: Bob.to_account_id(),
 			signature: Signature([0u8; 64]).into(),
-		}.sign(Bob.pair()).clone()];
+		}
+		.sign(Bob.pair())
+		.clone()];
 		let domains =
 			vec![(DataDomain::new("test", DataTLD::Analytics).hash(), Bob.to_account_id())];
 
