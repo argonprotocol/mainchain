@@ -13,7 +13,6 @@ use jsonrpsee::{
   types::error::ErrorObjectOwned,
   RpcModule,
 };
-use napi::bindgen_prelude::Uint8Array;
 use sc_utils::notification::NotificationSender;
 use sp_core::ed25519::Signature;
 use sp_core::{Blake2Hasher, LogLevelFilter, Pair, H256};
@@ -22,10 +21,10 @@ use sqlx::sqlite::{SqliteConnectOptions, SqlitePoolOptions};
 use sqlx::{ConnectOptions, SqlitePool};
 use tokio::sync::Mutex;
 
-use ulx_notary_apis::localchain::{BalanceChangeResult, BalanceTipResult, LocalchainRpcServer};
-use ulx_notary_apis::notebook::NotebookRpcServer;
 use ulx_notary::server::pipe_from_stream_and_drop;
 use ulx_notary::server::NotebookHeaderStream;
+use ulx_notary_apis::localchain::{BalanceChangeResult, BalanceTipResult, LocalchainRpcServer};
+use ulx_notary_apis::notebook::NotebookRpcServer;
 use ulx_primitives::tick::Ticker;
 use ulx_primitives::{
   AccountId, AccountOrigin, AccountOriginUid, AccountType, BalanceChange, BalanceProof, BalanceTip,
@@ -103,7 +102,7 @@ pub(crate) async fn mock_notary_clients(
   let notary_clients = NotaryClients::new(&MainchainClient::mock());
   let notary_client = NotaryClient::connect(
     mock_notary.notary_id,
-    Uint8Array::from(operator.pair().public().to_vec()),
+    operator.pair().public().to_vec(),
     mock_notary.addr.clone(),
     false,
   )

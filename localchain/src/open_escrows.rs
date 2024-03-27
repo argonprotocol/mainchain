@@ -2,14 +2,13 @@ use crate::accounts::AccountStore;
 use crate::balance_changes::BalanceChangeStore;
 use crate::keystore::Keystore;
 use crate::notary_client::NotaryClients;
-use crate::{to_js_error, BalanceChangeStatus};
+use crate::{bail, BalanceChangeStatus, Error, Result};
 use crate::{TickerRef, ESCROW_MINIMUM_SETTLEMENT};
 use anyhow::anyhow;
 use bech32::{Bech32m, Hrp};
 use chrono::NaiveDateTime;
 use codec::Encode;
 use lazy_static::lazy_static;
-use napi::bindgen_prelude::*;
 use sp_core::ed25519::Signature;
 use sp_core::Decode;
 use sp_runtime::MultiSignature;
@@ -18,7 +17,7 @@ use std::sync::Arc;
 use tokio::sync::Mutex;
 use ulx_notary_audit::verify_changeset_signatures;
 use ulx_primitives::{
-  AccountType, BalanceChange, BalanceTip, MultiSignatureBytes, NoteType, NotebookNumber,
+  AccountType, Balance, BalanceChange, BalanceTip, MultiSignatureBytes, NoteType, NotebookNumber,
   ESCROW_CLAWBACK_TICKS, ESCROW_EXPIRATION_TICKS, MINIMUM_ESCROW_SETTLEMENT,
 };
 
@@ -44,7 +43,7 @@ struct EscrowRow {
   updated_at: NaiveDateTime,
 }
 
-#[napi]
+#[cfg_attr(feature = "napi", napi)]
 #[derive(Clone, Debug, PartialEq)]
 pub struct Escrow {
   pub id: String,
@@ -64,22 +63,18 @@ pub struct Escrow {
   balance_change: BalanceChange,
 }
 
-#[napi]
 impl Escrow {
-  #[napi(getter)]
-  pub fn hold_amount(&self) -> BigInt {
-    BigInt::from(self.hold_amount)
+  pub fn hold_amount(&self) -> u128 {
+    self.hold_amount
   }
-  #[napi(getter)]
-  pub fn settled_amount(&self) -> BigInt {
-    BigInt::from(self.settled_amount)
-  }
-  #[napi(getter)]
-  pub fn settled_signature(&self) -> Uint8Array {
-    Uint8Array::from(self.settled_signature.clone())
+  pub fn settled_amount(&self) -> u128 {
+    self.settled_amount
   }
 
-  #[napi]
+  pub fn settled_signature(&self) -> Vec<u8> {
+    self.settled_signature.clone()
+  }
+
   pub fn is_past_claim_period(&self, current_tick: u32) -> bool {
     current_tick > self.expiration_tick + ESCROW_CLAWBACK_TICKS
   }
@@ -88,28 +83,29 @@ impl Escrow {
     self.balance_change.clone()
   }
 
-  pub fn create_escrow_id(balance_change: &BalanceChange) -> anyhow::Result<String> {
+  pub fn create_escrow_id(balance_change: &BalanceChange) -> Result<String> {
     let mut balance_change = balance_change.clone();
     // set to minimum for id
     balance_change.notes[0].milligons = MINIMUM_ESCROW_SETTLEMENT;
     let Ok(hrp) = Hrp::parse("esc") else {
-      return Err(anyhow!("Failed to parse internal bech32 encoding hrp"));
+      bail!("Failed to parse internal bech32 encoding hrp");
     };
-    let id = bech32::encode::<Bech32m>(hrp, balance_change.hash().as_ref())?;
+    let id =
+      bech32::encode::<Bech32m>(hrp, balance_change.hash().as_ref()).map_err(|e| anyhow!(e))?;
     Ok(id)
   }
 
-  pub fn try_from_balance_change_json(balance_change_json: String) -> anyhow::Result<Escrow> {
+  pub fn try_from_balance_change_json(balance_change_json: String) -> Result<Escrow> {
     let balance_change: BalanceChange = serde_json::from_str(&balance_change_json)?;
     let Some(ref escrow_hold_note) = balance_change.escrow_hold_note else {
-      return Err(anyhow!("Balance change has no escrow hold note"));
+      bail!("Balance change has no escrow hold note");
     };
     if escrow_hold_note.milligons < MINIMUM_ESCROW_SETTLEMENT {
-      return Err(anyhow!(
+      bail!(
         "Escrow hold note {} is less than minimum settlement amount: {}",
         escrow_hold_note.milligons,
         MINIMUM_ESCROW_SETTLEMENT
-      ));
+      );
     }
 
     let (recipient, data_domain_hash) = match &escrow_hold_note.note_type {
@@ -118,35 +114,35 @@ impl Escrow {
         data_domain_hash,
       } => (recipient, data_domain_hash),
       _ => {
-        return Err(anyhow!(
+        bail!(
           "Balance change has invalid escrow hold note type {:?}",
           escrow_hold_note.note_type
-        ));
+        );
       }
     };
 
     if balance_change.account_type != AccountType::Deposit {
-      return Err(anyhow!(
+      bail!(
         "Account {:?} is not a deposit account",
         balance_change.account_id
-      ));
+      );
     }
 
     if balance_change.notes.len() != 1 {
-      return Err(anyhow!(
+      bail!(
         "Balance change has {} notes, expected 1",
         balance_change.notes.len()
-      ));
+      );
     }
     let settle_note = &balance_change.notes[0];
     if settle_note.note_type != NoteType::EscrowSettle {
-      return Err(anyhow!(
+      bail!(
         "Balance change doesn't have a EscrowSettle note. It is: {:?}",
         settle_note.note_type
-      ));
+      );
     }
     let Some(proof) = &balance_change.previous_balance_proof else {
-      return Err(anyhow!("Balance change has no proof"));
+      bail!("Balance change has no proof");
     };
 
     let id = Escrow::create_escrow_id(&balance_change)?;
@@ -179,17 +175,17 @@ impl Escrow {
       .unwrap_or_default()
   }
 
-  pub async fn get_final(&self) -> anyhow::Result<BalanceChange> {
+  pub async fn get_final(&self) -> Result<BalanceChange> {
     let mut balance_change = self.get_change_with_settled_amount(self.settled_amount);
     if self.settled_signature.len() == 0 || self.settled_signature == *EMPTY_SIGNATURE {
-      return Err(anyhow::anyhow!("Escrow settlement has not been signed"));
+      bail!("Escrow settlement has not been signed");
     }
     balance_change.signature = MultiSignatureBytes::decode(&mut self.settled_signature.as_slice())?;
     verify_changeset_signatures(&vec![balance_change.clone()])?;
     Ok(balance_change)
   }
 
-  pub async fn insert(&mut self, db: &mut SqliteConnection) -> anyhow::Result<()> {
+  pub async fn db_insert(&mut self, db: &mut SqliteConnection) -> Result<()> {
     let settled_amount = self.settled_amount.to_string();
     let balance_change_number = self.balance_change_number as i64;
     let from_address = self.from_address.clone();
@@ -210,7 +206,7 @@ impl Escrow {
     .execute(&mut *db)
     .await?;
     if res.rows_affected() != 1 {
-      return Err(anyhow!("Failed to insert escrow"));
+      bail!("Failed to insert escrow");
     }
 
     Ok(())
@@ -228,12 +224,12 @@ impl Escrow {
     balance_change
   }
 
-  pub async fn update_signature(
+  pub async fn db_update_signature(
     &mut self,
     db: &mut SqliteConnection,
-    milligons: u128,
+    milligons: Balance,
     signature: Vec<u8>,
-  ) -> anyhow::Result<()> {
+  ) -> Result<()> {
     let mut balance_change = self.get_change_with_settled_amount(milligons);
     balance_change.signature = MultiSignatureBytes::decode(&mut signature.as_slice())?;
     verify_changeset_signatures(&vec![balance_change.clone()])?;
@@ -251,12 +247,12 @@ impl Escrow {
     .execute(&mut *db)
     .await?;
     if res.rows_affected() != 1 {
-      return Err(anyhow!("Failed to update escrow"));
+      bail!("Failed to update escrow");
     }
     Ok(())
   }
 
-  pub async fn mark_unable_to_claim(&mut self, db: &mut SqliteConnection) -> anyhow::Result<()> {
+  pub async fn db_mark_unable_to_claim(&mut self, db: &mut SqliteConnection) -> Result<()> {
     let res = sqlx::query!(
       "UPDATE open_escrows SET missed_claim_window = true, updated_at = CURRENT_TIMESTAMP WHERE id = ?",
       self.id,
@@ -264,17 +260,17 @@ impl Escrow {
         .execute(&mut *db)
         .await?;
     if res.rows_affected() != 1 {
-      return Err(anyhow!("Failed to update escrow"));
+      bail!("Failed to update escrow");
     }
     self.missed_claim_window = true;
     Ok(())
   }
 
-  pub async fn mark_notarized(
+  pub async fn db_mark_notarized(
     &mut self,
     db: &mut SqliteConnection,
     notarization_id: i64,
-  ) -> anyhow::Result<()> {
+  ) -> Result<()> {
     self.notarization_id = Some(notarization_id);
     let id = &self.id;
     let res = sqlx::query!(
@@ -285,15 +281,15 @@ impl Escrow {
     .execute(&mut *db)
     .await?;
     if res.rows_affected() != 1 {
-      return Err(anyhow!("Failed to update escrow"));
+      bail!("Failed to update escrow");
     }
     Ok(())
   }
 }
 
 impl TryFrom<EscrowRow> for Escrow {
-  type Error = anyhow::Error;
-  fn try_from(row: EscrowRow) -> anyhow::Result<Self> {
+  type Error = Error;
+  fn try_from(row: EscrowRow) -> Result<Self> {
     let mut escrow = Escrow::try_from_balance_change_json(row.initial_balance_change_json)?;
 
     escrow.expiration_tick = row.expiration_tick as u32;
@@ -306,7 +302,7 @@ impl TryFrom<EscrowRow> for Escrow {
   }
 }
 
-#[napi]
+#[cfg_attr(feature = "napi", napi)]
 #[derive(Clone)]
 pub struct OpenEscrow {
   db: SqlitePool,
@@ -314,7 +310,6 @@ pub struct OpenEscrow {
   keystore: Keystore,
 }
 
-#[napi]
 impl OpenEscrow {
   pub fn new(db: SqlitePool, escrow: Escrow, keystore: &Keystore) -> Self {
     OpenEscrow {
@@ -324,36 +319,32 @@ impl OpenEscrow {
     }
   }
 
-  #[napi(getter)]
   pub async fn escrow(&self) -> Escrow {
     self.escrow.lock().await.clone()
   }
 
-  #[napi]
-  pub async fn sign(&self, settled_amount: BigInt) -> Result<SignatureResult> {
-    if settled_amount.get_u128().1 < MINIMUM_ESCROW_SETTLEMENT {
-      return Err(to_js_error(format!("Settled amount must be greater than the minimum escrow settlement amount ({MINIMUM_ESCROW_SETTLEMENT})")));
+  pub async fn sign(&self, settled_amount: Balance) -> Result<SignatureResult> {
+    if settled_amount < MINIMUM_ESCROW_SETTLEMENT {
+      bail!("Settled amount must be greater than the minimum escrow settlement amount ({MINIMUM_ESCROW_SETTLEMENT})");
     }
     let mut escrow = self.escrow.lock().await;
-    let mut tx = self.db.begin().await.map_err(to_js_error)?;
-    let (_, milligons, _) = settled_amount.get_u128();
-    let balance_change = escrow.get_change_with_settled_amount(milligons);
+    let mut tx = self.db.begin().await?;
+    let balance_change = escrow.get_change_with_settled_amount(settled_amount);
     let bytes = balance_change.hash();
 
     let signature = self
       .keystore
       .sign(
         AccountStore::to_address(&balance_change.account_id),
-        Uint8Array::from(bytes.as_bytes().to_vec()),
+        bytes.as_bytes().to_vec(),
       )
       .await?;
 
     escrow
-      .update_signature(&mut *tx, milligons, signature.to_vec())
-      .await
-      .map_err(to_js_error)?;
+      .db_update_signature(&mut *tx, settled_amount, signature.to_vec())
+      .await?;
 
-    tx.commit().await.map_err(to_js_error)?;
+    tx.commit().await?;
 
     Ok(SignatureResult {
       signature,
@@ -361,38 +352,34 @@ impl OpenEscrow {
     })
   }
 
-  #[napi]
   pub async fn export_for_send(&self) -> Result<String> {
     {
       let escrow = self.escrow.lock().await;
       let is_empty = escrow.settled_signature == *EMPTY_SIGNATURE;
       drop(escrow);
       if is_empty {
-        self.sign(BigInt::from(ESCROW_MINIMUM_SETTLEMENT)).await?;
+        self.sign(ESCROW_MINIMUM_SETTLEMENT).await?;
       }
     }
     let escrow = self.escrow.lock().await;
-    let balance_change = escrow.get_final().await.map_err(to_js_error)?;
+    let balance_change = escrow.get_final().await?;
     let json = serde_json::to_string(&balance_change)?;
     Ok(json)
   }
 
-  #[napi]
   pub async fn record_updated_settlement(
     &self,
-    milligons: BigInt,
-    signature: Uint8Array,
+    milligons: Balance,
+    signature: Vec<u8>,
   ) -> Result<()> {
-    if milligons.get_u128().1 < MINIMUM_ESCROW_SETTLEMENT {
-      return Err(to_js_error(format!("Settled amount is less than minimum escrow settlement amount ({MINIMUM_ESCROW_SETTLEMENT})")));
+    if milligons < MINIMUM_ESCROW_SETTLEMENT {
+      bail!("Settled amount is less than minimum escrow settlement amount ({MINIMUM_ESCROW_SETTLEMENT})");
     }
     let mut escrow = self.escrow.lock().await;
-    let mut db = self.db.acquire().await.map_err(to_js_error)?;
-    let (_, milligons, _) = milligons.get_u128();
+    let mut db = self.db.acquire().await?;
     escrow
-      .update_signature(&mut *db, milligons, signature.to_vec())
-      .await
-      .map_err(to_js_error)?;
+      .db_update_signature(&mut *db, milligons, signature)
+      .await?;
 
     Ok(())
   }
@@ -402,14 +389,14 @@ impl OpenEscrow {
   }
 }
 
-#[napi]
+#[cfg_attr(feature = "napi", napi)]
 pub struct OpenEscrowsStore {
   db: SqlitePool,
   ticker: TickerRef,
   notary_clients: NotaryClients,
   keystore: Keystore,
 }
-#[napi]
+
 impl OpenEscrowsStore {
   pub(crate) fn new(
     db: SqlitePool,
@@ -425,28 +412,25 @@ impl OpenEscrowsStore {
     }
   }
 
-  #[napi]
   pub async fn get(&self, id: String) -> Result<OpenEscrow> {
     let row = sqlx::query_as!(EscrowRow, "SELECT * FROM open_escrows WHERE id = ?", id)
       .fetch_one(&self.db)
-      .await
-      .map_err(to_js_error)?;
+      .await?;
 
-    let escrow = Escrow::try_from(row).map_err(to_js_error)?;
+    let escrow = Escrow::try_from(row)?;
 
     Ok(self.open(&escrow))
   }
 
-  #[napi]
   pub fn open(&self, escrow: &Escrow) -> OpenEscrow {
     OpenEscrow::new(self.db.clone(), escrow.clone(), &self.keystore)
   }
 
-  pub async fn record_notarized(
+  pub async fn db_record_notarized(
     db: &mut SqliteConnection,
     balance_change: &BalanceChange,
     notarization_id: i64,
-  ) -> anyhow::Result<()> {
+  ) -> Result<()> {
     let address = AccountStore::to_address(&balance_change.account_id);
     let res = sqlx::query!(
       r#"UPDATE open_escrows SET notarization_id = ?, updated_at = CURRENT_TIMESTAMP
@@ -458,12 +442,11 @@ impl OpenEscrowsStore {
     .execute(db)
     .await?;
     if res.rows_affected() != 1 {
-      return Err(anyhow!("Failed to update escrow"));
+      bail!("Failed to update escrow");
     }
     Ok(())
   }
 
-  #[napi]
   pub async fn get_claimable(&self) -> Result<Vec<OpenEscrow>> {
     let current_tick = self.ticker.current();
     let expired = sqlx::query_as!(
@@ -473,30 +456,29 @@ impl OpenEscrowsStore {
     )
     .fetch_all(&self.db)
     .await
-    .map_err(to_js_error)?;
+    ?;
     tracing::info!("Found {} claimable escrows", expired.len());
 
     let mut escrows = vec![];
     for row in expired.into_iter() {
-      let escrow = Escrow::try_from(row).map_err(to_js_error)?;
+      let escrow = Escrow::try_from(row)?;
       escrows.push(OpenEscrow::new(self.db.clone(), escrow, &self.keystore))
     }
     tracing::info!("return escrows {}", escrows.len());
     Ok(escrows)
   }
 
-  #[napi]
   /// Import an escrow from a JSON string. Verifies with the notary that the escrow hold is valid.
   pub async fn import_escrow(&self, escrow_json: String) -> Result<OpenEscrow> {
-    let mut escrow = Escrow::try_from_balance_change_json(escrow_json).map_err(to_js_error)?;
-    verify_changeset_signatures(&vec![escrow.balance_change.clone()]).map_err(to_js_error)?;
-    let mut db = self.db.acquire().await.map_err(to_js_error)?;
-    let default_account = AccountStore::deposit_account(&mut db, Some(escrow.notary_id)).await?;
+    let mut escrow = Escrow::try_from_balance_change_json(escrow_json)?;
+    verify_changeset_signatures(&vec![escrow.balance_change.clone()])?;
+    let mut db = self.db.acquire().await?;
+    let default_account = AccountStore::db_deposit_account(&mut db, Some(escrow.notary_id)).await?;
     if default_account.address != escrow.to_address {
-      return Err(to_js_error(format!(
+      bail!(
         "This localchain is not configured to accept payments addressed to {}",
         escrow.to_address,
-      )));
+      );
     }
 
     let notary_client = self.notary_clients.get(escrow.notary_id).await?;
@@ -506,7 +488,7 @@ impl OpenEscrowsStore {
       .await?;
 
     let Some(balance_proof) = &escrow.balance_change.previous_balance_proof else {
-      return Err(to_js_error("Balance change has no previous balance proof"));
+      bail!("Balance change has no previous balance proof");
     };
 
     let calculated_tip = BalanceTip::compute_tip(
@@ -519,37 +501,35 @@ impl OpenEscrowsStore {
     let current_tip = balance_tip.balance_tip.as_ref();
 
     if calculated_tip != current_tip {
-      return Err(to_js_error(format!(
+      bail!(
         "Balance tip mismatch. Expected {:#x?}, got {:#x?}",
-        calculated_tip, current_tip
-      )));
+        calculated_tip,
+        current_tip
+      );
     }
     escrow.expiration_tick = balance_tip.tick + ESCROW_EXPIRATION_TICKS;
-    escrow.insert(&mut db).await.map_err(to_js_error)?;
+    escrow.db_insert(&mut db).await?;
     Ok(OpenEscrow::new(self.db.clone(), escrow, &self.keystore))
   }
 
-  #[napi]
   /// Create a new escrow as a client. You must first notarize an escrow hold note to the notary for the `client_address`.
   pub async fn open_client_escrow(&self, account_id: i64) -> Result<OpenEscrow> {
-    let mut tx = self.db.begin().await.map_err(to_js_error)?;
-    let account = AccountStore::get_by_id(&mut *tx, account_id).await?;
+    let mut tx = self.db.begin().await?;
+    let account = AccountStore::db_get_by_id(&mut *tx, account_id).await?;
     let (mut balance_tip, status) =
-      BalanceChangeStore::build_for_account(&mut *tx, &account).await?;
+      BalanceChangeStore::db_build_for_account(&mut *tx, &account).await?;
     if status == Some(BalanceChangeStatus::WaitingForSendClaim) {
-      return Err(to_js_error(format!(
+      bail!(
         "This balance change is not in a state to open {}: {:?}",
-        account.address, status
-      )));
+        account.address,
+        status
+      );
     }
 
-    let hold_note = &balance_tip
-      .escrow_hold_note
-      .clone()
-      .ok_or(to_js_error(format!(
-        "Account {} has no escrow hold note",
-        account.address
-      )))?;
+    let hold_note = &balance_tip.escrow_hold_note.clone().ok_or(anyhow!(
+      "Account {} has no escrow hold note",
+      account.address
+    ))?;
 
     let (data_domain_hash, recipient) = match &hold_note.note_type {
       NoteType::EscrowHold {
@@ -557,10 +537,10 @@ impl OpenEscrowsStore {
         data_domain_hash,
       } => (data_domain_hash, recipient),
       _ => {
-        return Err(to_js_error(format!(
+        bail!(
           "Balance change has invalid escrow hold note type {:?}",
           hold_note.note_type
-        )));
+        );
       }
     };
 
@@ -568,9 +548,7 @@ impl OpenEscrowsStore {
       .previous_balance_proof
       .clone()
       .map(|p| (p.notary_id, p.tick))
-      .ok_or(to_js_error(format!(
-        "Balance change has no previous balance proof"
-      )))?;
+      .ok_or(anyhow!("Balance change has no previous balance proof"))?;
 
     balance_tip.change_number += 1;
     balance_tip.push_note(MINIMUM_ESCROW_SETTLEMENT, NoteType::EscrowSettle);
@@ -595,17 +573,107 @@ impl OpenEscrowsStore {
       balance_change: balance_tip,
       missed_claim_window: false,
     };
-    escrow.insert(&mut *tx).await.map_err(to_js_error)?;
-    tx.commit().await.map_err(to_js_error)?;
+    escrow.db_insert(&mut *tx).await?;
+    tx.commit().await?;
 
     Ok(OpenEscrow::new(self.db.clone(), escrow, &self.keystore))
   }
 }
 
-#[napi(object)]
 pub struct SignatureResult {
-  pub signature: Uint8Array,
-  pub milligons: BigInt,
+  pub signature: Vec<u8>,
+  pub milligons: Balance,
+}
+
+#[cfg(feature = "napi")]
+pub mod napi_ext {
+  use super::{Escrow, OpenEscrow, OpenEscrowsStore};
+  use crate::error::NapiOk;
+  use napi::bindgen_prelude::{BigInt, Uint8Array};
+
+  #[napi]
+  impl Escrow {
+    #[napi(getter, js_name = "holdAmount")]
+    pub fn hold_amount_napi(&self) -> BigInt {
+      BigInt::from(self.hold_amount)
+    }
+    #[napi(getter, js_name = "settledAmount")]
+    pub fn settled_amount_napi(&self) -> BigInt {
+      BigInt::from(self.settled_amount)
+    }
+    #[napi(getter, js_name = "settledSignature")]
+    pub fn settled_signature_napi(&self) -> Uint8Array {
+      Uint8Array::from(self.settled_signature.clone())
+    }
+    #[napi(js_name = "isPastClaimPeriod")]
+    pub fn is_past_claim_period_napi(&self, current_tick: u32) -> bool {
+      self.is_past_claim_period(current_tick)
+    }
+  }
+
+  #[napi(object)]
+  pub struct SignatureResult {
+    pub signature: Uint8Array,
+    pub milligons: BigInt,
+  }
+
+  #[napi]
+  impl OpenEscrow {
+    #[napi(getter, js_name = "escrow")]
+    pub async fn escrow_napi(&self) -> Escrow {
+      self.escrow().await
+    }
+    #[napi(js_name = "sign")]
+    pub async fn sign_napi(&self, settled_amount: BigInt) -> napi::Result<SignatureResult> {
+      let result = self.sign(settled_amount.get_u128().1).await.napi_ok()?;
+      Ok(SignatureResult {
+        signature: result.signature.into(),
+        milligons: result.milligons.into(),
+      })
+    }
+    #[napi(js_name = "exportForSend")]
+    pub async fn export_for_send_napi(&self) -> napi::Result<String> {
+      self.export_for_send().await.napi_ok()
+    }
+    #[napi(js_name = "recordUpdatedSettlement")]
+    pub async fn record_updated_settlement_napi(
+      &self,
+      milligons: BigInt,
+      signature: Uint8Array,
+    ) -> napi::Result<()> {
+      self
+        .record_updated_settlement(milligons.get_u128().1, signature.to_vec())
+        .await
+        .napi_ok()
+    }
+  }
+
+  #[napi]
+  impl OpenEscrowsStore {
+    #[napi(js_name = "get")]
+    pub async fn get_napi(&self, id: String) -> napi::Result<OpenEscrow> {
+      self.get(id).await.napi_ok()
+    }
+    #[napi(js_name = "open")]
+    pub fn open_napi(&self, escrow: &Escrow) -> OpenEscrow {
+      self.open(escrow)
+    }
+
+    #[napi(js_name = "getClaimable")]
+    pub async fn get_claimable_napi(&self) -> napi::Result<Vec<OpenEscrow>> {
+      self.get_claimable().await.napi_ok()
+    }
+    #[napi(js_name = "importEscrow")]
+    /// Import an escrow from a JSON string. Verifies with the notary that the escrow hold is valid.
+    pub async fn import_escrow_napi(&self, escrow_json: String) -> napi::Result<OpenEscrow> {
+      self.import_escrow(escrow_json).await.napi_ok()
+    }
+    #[napi(js_name = "openClientEscrow")]
+    /// Create a new escrow as a client. You must first notarize an escrow hold note to the notary for the `client_address`.
+    pub async fn open_client_escrow_napi(&self, account_id: i64) -> napi::Result<OpenEscrow> {
+      self.open_client_escrow(account_id).await.napi_ok()
+    }
+  }
 }
 
 #[cfg(test)]
@@ -628,11 +696,11 @@ mod tests {
     account_id: AccountId,
     origin_uid: u32,
     origin_notebook: u32,
-  ) -> anyhow::Result<LocalAccount> {
+  ) -> Result<LocalAccount> {
     let address = AccountStore::to_address(&account_id);
-    let account = AccountStore::insert(db, address, AccountType::Deposit, 1, None).await?;
-    AccountStore::update_origin(db, account.id, origin_notebook, origin_uid).await?;
-    let account = AccountStore::get_by_id(db, account.id).await?;
+    let account = AccountStore::db_insert(db, address, AccountType::Deposit, 1, None).await?;
+    AccountStore::db_update_origin(db, account.id, origin_notebook, origin_uid).await?;
+    let account = AccountStore::db_get_by_id(db, account.id).await?;
     Ok(account)
   }
 
@@ -645,21 +713,21 @@ mod tests {
     recipient: String,
     notebook_number: NotebookNumber,
     tick: Tick,
-  ) -> anyhow::Result<BalanceChangeRow> {
+  ) -> Result<BalanceChangeRow> {
     let mut tx = pool.begin().await?;
-    let (balance_tip, status) = BalanceChangeStore::build_for_account(&mut *tx, account).await?;
+    let (balance_tip, status) = BalanceChangeStore::db_build_for_account(&mut *tx, account).await?;
     let builder = BalanceChangeBuilder::new(balance_tip, account.id, status);
     builder
       .claim_from_mainchain(LocalchainTransfer {
         address: account.address.clone(),
         notary_id: 1,
-        amount: BigInt::from(localchain_transfer_amount),
+        amount: localchain_transfer_amount,
         expiration_block: 100,
         account_nonce: 1,
       })
       .await?;
     builder
-      .create_escrow_hold(BigInt::from(hold_amount), data_domain, recipient.clone())
+      .create_escrow_hold(hold_amount, data_domain, recipient.clone())
       .await?;
 
     let balance_change = builder.inner().await;
@@ -676,12 +744,12 @@ mod tests {
         .fetch_one(&mut *tx)
         .await?;
     let id =
-      BalanceChangeStore::upsert_notarized(&mut tx, account.id, &balance_change, 1, id, None)
+      BalanceChangeStore::tx_upsert_notarized(&mut tx, account.id, &balance_change, 1, id, None)
         .await?;
     tx.commit().await?;
 
     let mut db = pool.acquire().await?;
-    let balance_change = BalanceChangeStore::get_by_id(&mut db, id).await?;
+    let balance_change = BalanceChangeStore::db_get_by_id(&mut db, id).await?;
     Ok(balance_change)
   }
 
@@ -691,7 +759,7 @@ mod tests {
     balance_change: &BalanceChangeRow,
     notebook_number: NotebookNumber,
     tick: Tick,
-  ) -> anyhow::Result<()> {
+  ) -> Result<()> {
     let balance_tip = balance_change.get_balance_tip(&account)?;
     println!("got balance tip for account {:?}", balance_tip);
     let mut state = mock_notary.state.lock().await;
@@ -707,7 +775,7 @@ mod tests {
   }
 
   #[sqlx::test]
-  async fn test_open_escrow(pool: SqlitePool) -> anyhow::Result<()> {
+  async fn test_open_escrow(pool: SqlitePool) -> Result<()> {
     let mock_notary = create_mock_notary().await?;
     let notary_clients = mock_notary_clients(&mock_notary, Ferdie).await?;
 
@@ -758,17 +826,10 @@ mod tests {
       "can reload from db"
     );
 
-    open_escrow.sign(BigInt::from(10u128)).await?;
+    open_escrow.sign(10u128).await?;
 
     assert_eq!(
-      store
-        .get(escrow.id)
-        .await?
-        .inner()
-        .await
-        .settled_amount()
-        .get_u128()
-        .1,
+      store.get(escrow.id).await?.inner().await.settled_amount(),
       10_u128
     );
 
@@ -776,17 +837,15 @@ mod tests {
   }
 
   #[sqlx::test]
-  async fn test_importing_escrow(bob_pool: SqlitePool) -> anyhow::Result<()> {
+  async fn test_importing_escrow(bob_pool: SqlitePool) -> Result<()> {
     let mock_notary = create_mock_notary().await?;
     let notary_clients = mock_notary_clients(&mock_notary, Ferdie).await?;
 
-    let alice_pool = SqlitePool::connect(&":memory:")
-      .await
-      .map_err(to_js_error)?;
+    let alice_pool = SqlitePool::connect(&":memory:").await?;
     sqlx::migrate!()
       .run(&alice_pool)
       .await
-      .map_err(|e| Error::from_reason(format!("Error migrating database {}", e.to_string())))?;
+      .map_err(|e| anyhow!("Error migrating database {:?}", e))?;
     let mut alice_db = alice_pool.acquire().await?;
 
     let alice_address = AccountStore::to_address(&Alice.to_account_id());
@@ -820,10 +879,10 @@ mod tests {
     // before registered with notary, should fail
     match alice_store.import_escrow(json.clone()).await {
       Err(e) => {
-        assert!(e.reason.contains("balance_tip not set"))
+        assert!(e.to_string().contains("balance_tip not set"))
       }
       Ok(_) => {
-        return Err(anyhow!("Expected error"));
+        bail!("Expected error");
       }
     }
     println!("registering balance tip");
@@ -860,30 +919,25 @@ mod tests {
     assert_eq!(imported_escrow.settled_amount, MINIMUM_ESCROW_SETTLEMENT);
     assert_eq!(imported_escrow.id, sent_escrow.id);
 
-    let result = open_escrow.sign(BigInt::from(10u128)).await?;
+    let result = open_escrow.sign(10u128).await?;
     alice_escrow
       .record_updated_settlement(result.milligons, result.signature)
       .await?;
-    assert_eq!(
-      alice_escrow.inner().await.settled_amount().get_u128().1,
-      10_u128
-    );
+    assert_eq!(alice_escrow.inner().await.settled_amount(), 10_u128);
 
     Ok(())
   }
 
   #[sqlx::test]
-  async fn test_will_not_import_if_not_own_account(bob_pool: SqlitePool) -> anyhow::Result<()> {
+  async fn test_will_not_import_if_not_own_account(bob_pool: SqlitePool) -> Result<()> {
     let mock_notary = create_mock_notary().await?;
     let notary_clients = mock_notary_clients(&mock_notary, Ferdie).await?;
 
-    let alice_pool = SqlitePool::connect(&":memory:")
-      .await
-      .map_err(to_js_error)?;
+    let alice_pool = SqlitePool::connect(&":memory:").await?;
     sqlx::migrate!()
       .run(&alice_pool)
       .await
-      .map_err(|e| Error::from_reason(format!("Error migrating database {}", e.to_string())))?;
+      .map_err(|e| anyhow!("Error migrating database {:?}", e))?;
 
     let not_alice = AccountStore::to_address(&Ferdie.to_account_id());
 
@@ -899,7 +953,7 @@ mod tests {
       .claim_from_mainchain(LocalchainTransfer {
         address: bob_address.clone(),
         notary_id: 1,
-        amount: BigInt::from(2_000u128),
+        amount: 2_000u128,
         expiration_block: 100,
         account_nonce: 1,
       })
@@ -931,7 +985,7 @@ mod tests {
     let json = escrow.export_for_send().await?;
 
     let mut db = bob_pool.acquire().await?;
-    let bob_hold = BalanceChangeStore::get_latest_for_account(&mut db, bob_account.id)
+    let bob_hold = BalanceChangeStore::db_get_latest_for_account(&mut db, bob_account.id)
       .await?
       .expect("should have a latest");
     register_balance_tip(&bob_account, &mock_notary, &bob_hold, 1, 1).await?;
@@ -944,11 +998,11 @@ mod tests {
 
     let result = alice_store.import_escrow(json.clone()).await;
     assert!(result.is_err());
-    println!("{:?}", result.clone().err());
+    println!("{:?}", result.as_ref().err());
     assert!(result
       .err()
       .expect("")
-      .reason
+      .to_string()
       .contains("This localchain is not configured to accept payments addressed "));
     Ok(())
   }

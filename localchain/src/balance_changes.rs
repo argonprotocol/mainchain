@@ -1,23 +1,21 @@
 use binary_merkle_tree::{verify_proof, Leaf};
 use chrono::NaiveDateTime;
 use codec::Encode;
-use napi::bindgen_prelude::*;
 use serde_json::{from_value, json};
 use sp_core::{bounded_vec, ed25519, H256};
 use sp_runtime::traits::BlakeTwo256;
 use sqlx::{FromRow, Sqlite, SqliteConnection, SqlitePool, Transaction};
-
 use ulx_primitives::tick::Tick;
 use ulx_primitives::{
   BalanceChange, BalanceProof, BalanceTip, MerkleProof, NotaryId, NotebookNumber,
 };
 
 use crate::accounts::{AccountStore, LocalAccount};
-use crate::to_js_error;
+use crate::{bail, Result};
 
 #[derive(FromRow, Clone, Debug)]
 #[allow(dead_code)]
-#[napi(js_name = "BalanceChange")]
+#[cfg_attr(feature = "napi", napi(js_name = "BalanceChange"))]
 pub struct BalanceChangeRow {
   pub id: i64,
   pub account_id: i64,
@@ -36,7 +34,7 @@ pub struct BalanceChangeRow {
 }
 
 impl BalanceChangeRow {
-  pub fn get_balance_tip(&self, account: &LocalAccount) -> anyhow::Result<BalanceTip> {
+  pub fn get_balance_tip(&self, account: &LocalAccount) -> Result<BalanceTip> {
     let origin = account
       .origin
       .clone()
@@ -57,7 +55,7 @@ impl BalanceChangeRow {
     })
   }
 
-  pub fn get_proof(&self) -> anyhow::Result<Option<MerkleProof>> {
+  pub fn get_proof(&self) -> Result<Option<MerkleProof>> {
     if let Some(proof_json) = self.proof_json.clone() {
       let proof: MerkleProof = serde_json::from_str(&proof_json)?;
       return Ok(Some(proof));
@@ -69,7 +67,7 @@ impl BalanceChangeRow {
     &self,
     account: &LocalAccount,
     account_change_root: H256,
-  ) -> anyhow::Result<bool> {
+  ) -> Result<bool> {
     let tip = self.get_balance_tip(account)?;
 
     let notebook_proof = self
@@ -92,7 +90,8 @@ impl BalanceChangeRow {
 }
 
 #[derive(Debug, PartialOrd, PartialEq)]
-#[napi(string_enum)]
+#[cfg_attr(not(feature = "napi"), derive(Clone, Copy))]
+#[cfg_attr(feature = "napi", napi(string_enum))]
 pub enum BalanceChangeStatus {
   /// The balance change has been submitted, but is not in a known notebook yet.
   SubmittedToNotary,
@@ -122,26 +121,36 @@ impl From<i64> for BalanceChangeStatus {
   }
 }
 
-#[napi]
+#[cfg_attr(feature = "napi", napi)]
 pub struct BalanceChangeStore {
   db: SqlitePool,
 }
 
-#[napi]
 impl BalanceChangeStore {
   pub fn new(db: SqlitePool) -> Self {
     Self { db }
   }
 
-  #[napi(js_name = "allForAccount")]
-  pub async fn all_for_account_js(&self, account_id: i64) -> Result<Vec<BalanceChangeRow>> {
-    let mut db = self.db.acquire().await.map_err(to_js_error)?;
-    Self::all_for_account(&mut *db, account_id)
-      .await
-      .map_err(to_js_error)
+  pub async fn all_for_account(&self, account_id: i64) -> Result<Vec<BalanceChangeRow>> {
+    let mut db = self.db.acquire().await?;
+    Ok(Self::db_all_for_account(&mut *db, account_id).await?)
   }
 
-  pub async fn all_for_account(
+  pub async fn get_latest_for_account(&self, account_id: i64) -> Result<Option<BalanceChangeRow>> {
+    let mut db = self.db.acquire().await?;
+    Ok(Self::db_get_latest_for_account(&mut *db, account_id).await?)
+  }
+
+  pub async fn get_by_id(&self, id: i64) -> Result<BalanceChangeRow> {
+    let mut db = self.db.acquire().await?;
+    Self::db_get_by_id(&mut *db, id).await
+  }
+
+  pub async fn find_unsettled(&self) -> Result<Vec<BalanceChangeRow>> {
+    let mut db = self.db.acquire().await?;
+    Self::db_find_unsettled(&mut *db).await
+  }
+  pub async fn db_all_for_account(
     db: &mut SqliteConnection,
     account_id: i64,
   ) -> Result<Vec<BalanceChangeRow>> {
@@ -151,16 +160,15 @@ impl BalanceChangeStore {
       account_id
     )
     .fetch_all(db)
-    .await
-    .map_err(to_js_error)?;
+    .await?;
     Ok(row)
   }
 
-  pub async fn find_account_change(
+  pub async fn db_find_account_change(
     db: &mut Transaction<'static, Sqlite>,
     account_id: i64,
     balance_change: &BalanceChange,
-  ) -> anyhow::Result<Option<BalanceChangeRow>> {
+  ) -> Result<Option<BalanceChangeRow>> {
     let res = sqlx::query_as!(
       BalanceChangeRow,
       "SELECT * FROM balance_changes WHERE account_id = ? AND change_number = ?",
@@ -172,10 +180,10 @@ impl BalanceChangeStore {
     Ok(res)
   }
 
-  pub async fn get_latest_for_account(
+  pub async fn db_get_latest_for_account(
     db: &mut SqliteConnection,
     account_id: i64,
-  ) -> anyhow::Result<Option<BalanceChangeRow>> {
+  ) -> Result<Option<BalanceChangeRow>> {
     let row = sqlx::query_as!(
       BalanceChangeRow,
       "SELECT * FROM balance_changes WHERE account_id = ? AND status <> ? ORDER BY change_number DESC LIMIT 1",
@@ -187,24 +195,11 @@ impl BalanceChangeStore {
     Ok(row)
   }
 
-  #[napi(js_name = "getLatestForAccount")]
-  pub async fn get_latest_for_account_js(
-    &self,
-    account_id: i64,
-  ) -> Result<Option<BalanceChangeRow>> {
-    let mut db = self.db.acquire().await.map_err(to_js_error)?;
-    Self::get_latest_for_account(&mut *db, account_id)
-      .await
-      .map_err(to_js_error)
-  }
-
-  #[napi]
   pub async fn cancel(&self, id: i64) -> Result<()> {
-    let mut tx = self.db.begin().await.map_err(to_js_error)?;
+    let mut tx = self.db.begin().await?;
     let status = sqlx::query_scalar!("SELECT status FROM balance_changes WHERE id = ?", id)
       .fetch_one(&mut *tx)
-      .await
-      .map_err(to_js_error)?;
+      .await?;
     if status != BalanceChangeStatus::WaitingForSendClaim as i64 {
       return Err(anyhow::anyhow!(
         "Balance change not in correct state - {:?}",
@@ -218,19 +213,12 @@ impl BalanceChangeStore {
       id
     )
     .execute(&mut *tx)
-    .await
-    .map_err(to_js_error)?;
-    tx.commit().await.map_err(to_js_error)?;
+    .await?;
+    tx.commit().await?;
     Ok(())
   }
 
-  #[napi(js_name = "getById")]
-  pub async fn get_by_id_js(&self, id: i64) -> Result<BalanceChangeRow> {
-    let mut db = self.db.acquire().await.map_err(to_js_error)?;
-    Self::get_by_id(&mut *db, id).await.map_err(to_js_error)
-  }
-
-  pub async fn get_by_id(db: &mut SqliteConnection, id: i64) -> anyhow::Result<BalanceChangeRow> {
+  pub async fn db_get_by_id(db: &mut SqliteConnection, id: i64) -> Result<BalanceChangeRow> {
     let row = sqlx::query_as!(
       BalanceChangeRow,
       "SELECT * FROM balance_changes WHERE id = ?",
@@ -241,13 +229,7 @@ impl BalanceChangeStore {
     Ok(row)
   }
 
-  #[napi(js_name = "findUnsettled")]
-  pub async fn find_unsettled_js(&self) -> Result<Vec<BalanceChangeRow>> {
-    let mut db = self.db.acquire().await.map_err(to_js_error)?;
-    Self::find_unsettled(&mut *db).await.map_err(to_js_error)
-  }
-
-  pub async fn find_unsettled(db: &mut SqliteConnection) -> anyhow::Result<Vec<BalanceChangeRow>> {
+  pub async fn db_find_unsettled(db: &mut SqliteConnection) -> Result<Vec<BalanceChangeRow>> {
     let rows = sqlx::query_as!(
       BalanceChangeRow,
       "SELECT * FROM balance_changes WHERE status in (?,?,?) ORDER BY account_id ASC, change_number DESC",
@@ -260,10 +242,10 @@ impl BalanceChangeStore {
     Ok(rows)
   }
 
-  pub async fn get_notarization_notebook(
+  pub async fn db_get_notarization_notebook(
     db: &mut SqliteConnection,
     notarization_id: i64,
-  ) -> anyhow::Result<(Option<NotebookNumber>, Option<Tick>)> {
+  ) -> Result<(Option<NotebookNumber>, Option<Tick>)> {
     let record = sqlx::query!(
       "SELECT notebook_number, tick FROM notarizations WHERE id = ?",
       notarization_id
@@ -276,10 +258,10 @@ impl BalanceChangeStore {
     ))
   }
 
-  pub async fn build_for_account(
+  pub async fn db_build_for_account(
     db: &mut SqliteConnection,
     account: &LocalAccount,
-  ) -> anyhow::Result<(BalanceChange, Option<BalanceChangeStatus>)> {
+  ) -> Result<(BalanceChange, Option<BalanceChangeStatus>)> {
     let mut balance_change = BalanceChange {
       account_id: AccountStore::parse_address(&account.address)?,
       account_type: account.account_type.clone(),
@@ -293,7 +275,7 @@ impl BalanceChangeStore {
 
     let mut status = None;
 
-    if let Some(latest) = Self::get_latest_for_account(db, account.id).await? {
+    if let Some(latest) = Self::db_get_latest_for_account(db, account.id).await? {
       balance_change.change_number = latest.change_number as u32;
       balance_change.balance = latest.balance.parse().unwrap();
       status = Some(latest.status);
@@ -301,7 +283,7 @@ impl BalanceChangeStore {
         balance_change.escrow_hold_note = Some(from_value(note_json.parse()?)?);
       }
       let Some(notarization_id) = latest.notarization_id else {
-        return Err(anyhow::anyhow!("Balance change not notarized"));
+        bail!("Balance change not notarized");
       };
 
       let notarization = sqlx::query!(
@@ -322,7 +304,7 @@ impl BalanceChangeStore {
           Some(Ok(proof)) => proof,
           // TODO: we should prolly only allow this to be none if the change is in the current notebook
           None => None,
-          Some(Err(e)) => Err(anyhow::anyhow!("Invalid proof json - {:?}", e))?,
+          Some(Err(e)) => bail!("Invalid proof json - {:?}", e),
         },
         account_origin: account
           .origin
@@ -335,13 +317,13 @@ impl BalanceChangeStore {
     Ok((balance_change, status))
   }
 
-  pub async fn save_sent(
+  pub async fn tx_save_sent(
     db: &mut Transaction<'static, Sqlite>,
     account_id: i64,
     balance_change: BalanceChange,
     notary_id: NotaryId,
     transaction_id: Option<i64>,
-  ) -> anyhow::Result<i64> {
+  ) -> Result<i64> {
     let mut hold_note_json = None;
     for note in balance_change.notes.iter() {
       if matches!(note.note_type, ulx_primitives::NoteType::EscrowHold { .. }) {
@@ -377,14 +359,14 @@ impl BalanceChangeStore {
     Ok(change_id)
   }
 
-  pub async fn upsert_notarized(
+  pub async fn tx_upsert_notarized(
     db: &mut Transaction<'static, Sqlite>,
     account_id: i64,
     balance_change: &BalanceChange,
     notary_id: NotaryId,
     notarization_id: i64,
     transaction_id: Option<i64>,
-  ) -> anyhow::Result<i64> {
+  ) -> Result<i64> {
     let mut hold_note_json = None;
     for note in balance_change.notes.iter() {
       if matches!(note.note_type, ulx_primitives::NoteType::EscrowHold { .. }) {
@@ -397,7 +379,7 @@ impl BalanceChangeStore {
     let balance_str = balance_change.balance.to_string();
     let net_balance_change = balance_change.net_balance_change().to_string();
 
-    if let Some(existing) = Self::find_account_change(db, account_id, balance_change).await? {
+    if let Some(existing) = Self::db_find_account_change(db, account_id, balance_change).await? {
       if existing.status == BalanceChangeStatus::NotebookPublished
         || existing.status == BalanceChangeStatus::MainchainFinal
       {
@@ -445,10 +427,10 @@ impl BalanceChangeStore {
     Ok(change_id)
   }
 
-  pub async fn check_if_superseded(
+  pub async fn db_check_if_superseded(
     db: &mut SqliteConnection,
     balance_change: &mut BalanceChangeRow,
-  ) -> anyhow::Result<bool> {
+  ) -> Result<bool> {
     let res = sqlx::query_scalar!(
       "SELECT id FROM balance_changes WHERE account_id = ? AND change_number > ? AND status in (?,?) ORDER BY change_number DESC LIMIT 1",
       balance_change.account_id,
@@ -472,11 +454,11 @@ impl BalanceChangeStore {
     Ok(false)
   }
 
-  pub async fn save_notebook_proof(
+  pub async fn tx_save_notebook_proof(
     db: &mut Transaction<'static, Sqlite>,
     balance_change: &mut BalanceChangeRow,
     proof: &BalanceProof,
-  ) -> anyhow::Result<()> {
+  ) -> Result<()> {
     let proof_json = json!(proof.notebook_proof);
     balance_change.proof_json = Some(proof_json.to_string());
     balance_change.status = BalanceChangeStatus::NotebookPublished;
@@ -487,18 +469,17 @@ impl BalanceChangeStore {
       balance_change.id
     )
     .execute(&mut **db)
-    .await
-    .map_err(to_js_error)?;
+    .await?;
     Ok(())
   }
 
-  pub async fn save_finalized(
+  pub async fn tx_save_finalized(
     db: &mut Transaction<'static, Sqlite>,
     balance_change: &mut BalanceChangeRow,
     account: &LocalAccount,
     account_change_root: H256,
     finalized_block_number: u32,
-  ) -> anyhow::Result<()> {
+  ) -> Result<()> {
     balance_change.verify_balance_proof(account, account_change_root)?;
     balance_change.status = BalanceChangeStatus::MainchainFinal;
     balance_change.finalized_block_number = Some(finalized_block_number as i64);
@@ -516,11 +497,48 @@ impl BalanceChangeStore {
   }
 }
 
+#[cfg(feature = "napi")]
+pub mod napi_ext {
+  use crate::error::NapiOk;
+  use crate::{BalanceChangeRow, BalanceChangeStore};
+
+  #[napi]
+  impl BalanceChangeStore {
+    #[napi(js_name = "allForAccount")]
+    pub async fn all_for_account_napi(
+      &self,
+      account_id: i64,
+    ) -> napi::Result<Vec<BalanceChangeRow>> {
+      self.all_for_account(account_id).await.napi_ok()
+    }
+    #[napi(js_name = "getLatestForAccount")]
+    pub async fn get_latest_for_account_napi(
+      &self,
+      account_id: i64,
+    ) -> napi::Result<Option<BalanceChangeRow>> {
+      self.get_latest_for_account(account_id).await.napi_ok()
+    }
+
+    #[napi(js_name = "cancel")]
+    pub async fn cancel_napi(&self, id: i64) -> napi::Result<()> {
+      self.cancel(id).await.napi_ok()
+    }
+
+    #[napi(js_name = "getById")]
+    pub async fn get_by_id_napi(&self, id: i64) -> napi::Result<BalanceChangeRow> {
+      self.get_by_id(id).await.napi_ok()
+    }
+    #[napi(js_name = "findUnsettled")]
+    pub async fn find_unsettled_napi(&self) -> napi::Result<Vec<BalanceChangeRow>> {
+      self.find_unsettled().await.napi_ok()
+    }
+  }
+}
+
 #[cfg(test)]
 mod test {
   use sp_keyring::AccountKeyring::Ferdie;
   use sqlx::sqlite::{SqliteConnectOptions, SqlitePoolOptions};
-
   use ulx_primitives::{AccountOrigin, AccountType, Note, NoteType};
 
   use crate::test_utils::connect_with_logs;
@@ -532,11 +550,11 @@ mod test {
   async fn test_storage(
     pool_options: SqlitePoolOptions,
     connect_options: SqliteConnectOptions,
-  ) -> anyhow::Result<()> {
+  ) -> Result<()> {
     let pool = connect_with_logs(pool_options, connect_options).await?;
 
     let mut db = pool.acquire().await?;
-    let account = AccountStore::insert(
+    let account = AccountStore::db_insert(
       &mut *db,
       AccountStore::to_address(&Ferdie.to_account_id()),
       AccountType::Tax,
@@ -545,10 +563,11 @@ mod test {
     )
     .await?;
     // need to set the id and get the updated origin
-    AccountStore::update_origin(&mut *db, account.id, 1, 1).await?;
-    let account = AccountStore::get_by_id(&mut *db, account.id).await?;
+    AccountStore::db_update_origin(&mut *db, account.id, 1, 1).await?;
+    let account = AccountStore::db_get_by_id(&mut *db, account.id).await?;
 
-    let (mut balance_change, _) = BalanceChangeStore::build_for_account(&mut *db, &account).await?;
+    let (mut balance_change, _) =
+      BalanceChangeStore::db_build_for_account(&mut *db, &account).await?;
     assert_eq!(balance_change.balance, 0);
     assert_eq!(balance_change.change_number, 1);
 
@@ -567,12 +586,12 @@ mod test {
       balance: 0,
     });
     let mut tx = pool.begin().await?;
-    let id =
-      BalanceChangeStore::save_sent(&mut tx, account.id, balance_change.clone(), 1, None).await?;
+    let id = BalanceChangeStore::tx_save_sent(&mut tx, account.id, balance_change.clone(), 1, None)
+      .await?;
     tx.commit().await?;
 
     assert_eq!(
-      BalanceChangeStore::build_for_account(&mut *db, &account)
+      BalanceChangeStore::db_build_for_account(&mut *db, &account)
         .await
         .unwrap_err()
         .to_string(),
@@ -580,16 +599,16 @@ mod test {
       "Should not be able to load account with no notarization"
     );
 
-    let by_id = BalanceChangeStore::get_by_id(&mut *db, id).await?;
+    let by_id = BalanceChangeStore::db_get_by_id(&mut *db, id).await?;
     println!("{:?}", by_id);
     assert_eq!(by_id.balance, "100");
     assert_eq!(by_id.status, BalanceChangeStatus::WaitingForSendClaim);
 
-    let unsettled = BalanceChangeStore::find_unsettled(&mut *db).await?;
+    let unsettled = BalanceChangeStore::db_find_unsettled(&mut *db).await?;
     assert_eq!(unsettled.len(), 1);
     assert_eq!(unsettled[0].id, id);
 
-    let for_account = BalanceChangeStore::get_latest_for_account(&mut *db, account.id).await?;
+    let for_account = BalanceChangeStore::db_get_latest_for_account(&mut *db, account.id).await?;
     assert_eq!(for_account.unwrap().id, id);
 
     sqlx::query!(
@@ -603,15 +622,16 @@ mod test {
     .await?;
 
     let mut tx = pool.begin().await?;
-    BalanceChangeStore::upsert_notarized(&mut tx, account.id, &balance_change, 1, 1, None).await?;
+    BalanceChangeStore::tx_upsert_notarized(&mut tx, account.id, &balance_change, 1, 1, None)
+      .await?;
     tx.commit().await?;
 
-    let (reloaded, _) = BalanceChangeStore::build_for_account(&mut *db, &account).await?;
+    let (reloaded, _) = BalanceChangeStore::db_build_for_account(&mut *db, &account).await?;
     assert_eq!(reloaded.balance, 100);
     assert_eq!(reloaded.change_number, 2);
 
     assert_eq!(
-      BalanceChangeStore::get_by_id(&mut *db, id).await?.status,
+      BalanceChangeStore::db_get_by_id(&mut *db, id).await?.status,
       BalanceChangeStatus::SubmittedToNotary
     );
 
@@ -623,21 +643,22 @@ mod test {
       milligons: 100
     }];
     let mut tx = pool.begin().await?;
-    let id2 = BalanceChangeStore::upsert_notarized(&mut tx, account.id, &next, 1, 1, None).await?;
+    let id2 =
+      BalanceChangeStore::tx_upsert_notarized(&mut tx, account.id, &next, 1, 1, None).await?;
     tx.commit().await?;
 
-    let (reloaded, _) = BalanceChangeStore::build_for_account(&mut *db, &account).await?;
+    let (reloaded, _) = BalanceChangeStore::db_build_for_account(&mut *db, &account).await?;
     assert_eq!(reloaded.balance, 200);
     assert_eq!(reloaded.change_number, 3);
 
-    let for_account = BalanceChangeStore::get_latest_for_account(&mut *db, account.id).await?;
+    let for_account = BalanceChangeStore::db_get_latest_for_account(&mut *db, account.id).await?;
     assert_eq!(for_account.unwrap().id, id2);
 
-    let mut unsettled = BalanceChangeStore::find_unsettled(&mut *db).await?;
+    let mut unsettled = BalanceChangeStore::db_find_unsettled(&mut *db).await?;
     assert_eq!(unsettled.len(), 2);
 
     let mut tx = pool.begin().await?;
-    BalanceChangeStore::save_notebook_proof(
+    BalanceChangeStore::tx_save_notebook_proof(
       &mut tx,
       &mut unsettled[0],
       &BalanceProof {
@@ -656,7 +677,7 @@ mod test {
     tx.commit().await?;
 
     assert_ne!(
-      BalanceChangeStore::get_by_id(&mut *db, unsettled[0].id)
+      BalanceChangeStore::db_get_by_id(&mut *db, unsettled[0].id)
         .await?
         .proof_json,
       None

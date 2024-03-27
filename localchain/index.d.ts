@@ -3,7 +3,7 @@
 
 export class AccountStore {
   getDepositAccount(notaryId?: number | undefined | null): Promise<LocalAccount>
-  getTaxAccount(notaryId?: NotaryId | undefined | null): Promise<LocalAccount>
+  getTaxAccount(notaryId?: number | undefined | null): Promise<LocalAccount>
   get(address: string, accountType: AccountType, notaryId: number): Promise<LocalAccount>
   getById(id: number): Promise<LocalAccount>
   hasAccount(address: string, accountType: AccountType, notaryId: number): Promise<boolean>
@@ -159,6 +159,7 @@ export class Localchain {
   get address(): Promise<string>
   get name(): string
   get currentTick(): number
+  durationToNextTick(): bigint
   get ticker(): TickerRef
   get keystore(): Keystore
   get mainchainClient(): Promise<MainchainClient | null>
@@ -174,6 +175,7 @@ export class Localchain {
 }
 
 export class MainchainClient {
+  host: string
   close(): Promise<void>
   static connect(host: string, timeoutMillis: number): Promise<MainchainClient>
   getBestBlockHash(): Promise<Uint8Array>
@@ -184,6 +186,7 @@ export class MainchainClient {
   getAccount(address: string): Promise<AccountInfo>
   getUlixees(address: string): Promise<BalancesAccountData>
   getAccountNonce(address: string): Promise<number>
+  getTransferToLocalchainFinalizedBlock(address: string, nonce: number): Promise<number | null>
   waitForLocalchainTransfer(address: string, nonce: number): Promise<LocalchainTransfer | null>
   getAccountChangesRoot(notaryId: number, notebookNumber: number): Promise<Uint8Array>
   latestFinalizedNumber(): Promise<number>
@@ -234,7 +237,7 @@ export class NotarizationBuilder {
    * user (who will import into their own localchain).
    */
   exportAsFile(fileType: ArgonFileType): Promise<string>
-  toJson(): Promise<string>
+  toJSON(): Promise<string>
   notarizeAndWaitForNotebook(): Promise<NotarizationTracker>
   notarize(): Promise<NotarizationTracker>
   verify(): Promise<void>
@@ -248,6 +251,7 @@ export class NotarizationTracker {
   notarizationId: number
   notarizedBalanceChanges: number
   notarizedVotes: number
+
   /** Returns the balance changes that were submitted to the notary indexed by the stringified account id (napi doesn't allow numbers as keys) */
   get balanceChangesByAccountId(): Promise<Record<string, BalanceChange>>
   waitForNotebook(): Promise<void>
@@ -268,13 +272,9 @@ export class NotaryClient {
 
 export class NotaryClients {
   static new(mainchainClient: MainchainClient): NotaryClients
+  close(): Promise<void>
   useClient(client: NotaryClient): Promise<void>
   get(notaryId: number): Promise<NotaryClient>
-}
-
-export class NotebookMeta {
-  finalizedNotebookNumber: number
-  finalizedTick: number
 }
 
 export class OpenEscrow {
@@ -557,6 +557,11 @@ export interface NotaryDetails {
   id: number
   hosts: Array<string>
   publicKey: Uint8Array
+}
+
+export interface NotebookMeta {
+  finalizedNotebookNumber: number
+  finalizedTick: number
 }
 
 export interface NotebookProof {

@@ -3,7 +3,8 @@ use std::str::FromStr;
 use std::string::String;
 use std::sync::Arc;
 
-use anyhow::{anyhow, Result};
+use crate::{bail, Result};
+use anyhow::anyhow;
 use clap::ValueEnum;
 use sp_core::crypto::{
   ExposeSecret, Pair as CorePair, SecretString, SecretUri, Ss58Codec, Zeroize,
@@ -49,7 +50,7 @@ impl EmbeddedKeystore {
     let expected_address = key.address.clone();
     let pair = self.unlock_key(key, password.clone()).await?;
     if pair.address() != expected_address {
-      return Err(anyhow!("Could not unlock the embedded key"));
+      bail!("Could not unlock the embedded key");
     }
 
     *self.unlocked_account.lock().await = Some(UnlockedAccount {
@@ -138,7 +139,7 @@ impl EmbeddedKeystore {
     .execute(&self.db)
     .await?;
     if res.rows_affected() != 1 {
-      return Err(anyhow!("Unable to insert key"));
+      bail!("Unable to insert key");
     }
 
     Ok(())
@@ -197,12 +198,12 @@ impl EmbeddedKeystore {
       return Ok(Some(pair.sign(msg)));
     }
 
-    Err(anyhow!("Unable to sign for address {}", address))
+    bail!("Unable to sign for address {}", address)
   }
 
   async fn load_key(&self) -> Result<PairWrapper> {
     let Some(ref unlocked_account) = *self.unlocked_account.lock().await else {
-      return Err(anyhow!("This keystore is not unlocked"));
+      bail!("This keystore is not unlocked");
     };
 
     let address = unlocked_account.address.clone();
@@ -221,14 +222,15 @@ impl EmbeddedKeystore {
       .await?;
 
     if pair.address() != key_address {
-      return Err(anyhow!("Address mismatch"));
+      bail!("Address mismatch");
     }
 
     Ok(pair)
   }
 
   async fn unlock_key(&self, key: KeyRow, password: Option<SecretString>) -> Result<PairWrapper> {
-    let suri = String::from_utf8(key.data)?;
+    let suri =
+      String::from_utf8(key.data).map_err(|_| anyhow!("Unable to read key data from keystore"))?;
 
     let password = password
       .as_ref()
@@ -242,7 +244,8 @@ impl EmbeddedKeystore {
   }
 }
 
-#[napi]
+#[cfg_attr(feature = "napi", napi)]
+#[cfg_attr(not(feature = "napi"), derive(Clone, Copy))]
 #[derive(Eq, PartialEq, PartialOrd, Ord, Debug, ValueEnum)]
 #[value(rename_all = "kebab-case")]
 pub enum CryptoScheme {

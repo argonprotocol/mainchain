@@ -1,7 +1,6 @@
 use std::collections::HashMap;
 use std::sync::Arc;
 
-use napi::bindgen_prelude::*;
 use serde_json::json;
 use sp_core::sr25519::Signature;
 use sp_core::Decode;
@@ -10,7 +9,9 @@ use sp_runtime::MultiSignature;
 use sqlx::{Sqlite, SqlitePool, Transaction};
 use tokio::sync::Mutex;
 
-use ulx_primitives::{AccountType, BlockVote};
+use crate::{bail, Result};
+use ulx_primitives::tick::Tick;
+use ulx_primitives::{AccountType, BlockVote, NotaryId, NotebookNumber};
 
 use crate::accounts::AccountStore;
 use crate::balance_changes::{BalanceChangeRow, BalanceChangeStatus, BalanceChangeStore};
@@ -20,13 +21,13 @@ use crate::notarization_builder::NotarizationBuilder;
 use crate::notarization_tracker::NotarizationTracker;
 use crate::open_escrows::OpenEscrowsStore;
 use crate::transactions::{TransactionType, Transactions};
-use crate::{to_js_error, LocalchainTransfer, NotaryAccountOrigin, TickerRef};
 use crate::{Escrow, MainchainClient};
 use crate::{LocalAccount, NOTARIZATION_MAX_BALANCE_CHANGES};
 use crate::{Localchain, OpenEscrow};
+use crate::{LocalchainTransfer, NotaryAccountOrigin, TickerRef};
 use crate::{NotaryClient, NotaryClients};
 
-#[napi]
+#[cfg_attr(feature = "napi", napi)]
 pub struct BalanceSync {
   db: SqlitePool,
   ticker: TickerRef,
@@ -38,7 +39,7 @@ pub struct BalanceSync {
   tick_counter: Arc<Mutex<(u32, u32)>>,
 }
 
-#[napi(object)]
+#[cfg_attr(feature = "napi", napi(object))]
 #[derive(Clone)]
 pub struct EscrowCloseOptions {
   pub votes_address: Option<String>,
@@ -46,38 +47,102 @@ pub struct EscrowCloseOptions {
   pub minimum_vote_amount: Option<i64>,
 }
 
-#[napi]
+#[cfg_attr(feature = "napi", napi)]
 pub struct BalanceSyncResult {
   pub(crate) balance_changes: Vec<BalanceChangeRow>,
   pub(crate) mainchain_transfers: Vec<NotarizationTracker>,
   pub(crate) escrow_notarizations: Vec<NotarizationBuilder>,
   pub(crate) jump_account_consolidations: Vec<NotarizationTracker>,
 }
-#[napi]
+
 impl BalanceSyncResult {
-  #[napi(getter)]
   pub fn balance_changes(&self) -> Vec<BalanceChangeRow> {
     self.balance_changes.clone()
   }
-  #[napi(getter)]
   pub fn escrow_notarizations(&self) -> Vec<NotarizationBuilder> {
     self.escrow_notarizations.clone()
   }
 
-  #[napi(getter)]
   pub fn mainchain_transfers(&self) -> Vec<NotarizationTracker> {
     self.mainchain_transfers.clone()
   }
 
-  #[napi(getter)]
   pub fn jump_account_consolidations(&self) -> Vec<NotarizationTracker> {
     self.jump_account_consolidations.clone()
   }
 }
 
-#[napi]
+#[cfg(feature = "napi")]
+pub mod napi_ext {
+  use crate::error::NapiOk;
+  use crate::notarization_builder::NotarizationBuilder;
+  use crate::notarization_tracker::NotarizationTracker;
+  use crate::{BalanceChangeRow, BalanceSync, BalanceSyncResult, EscrowCloseOptions, Localchain};
+  use napi_derive::napi;
+
+  #[napi]
+  impl BalanceSyncResult {
+    #[napi(getter, js_name = "balanceChanges")]
+    pub fn balance_changes_napi(&self) -> Vec<BalanceChangeRow> {
+      self.balance_changes.clone()
+    }
+    #[napi(getter, js_name = "escrowNotarizations")]
+    pub fn escrow_notarizations_napi(&self) -> Vec<NotarizationBuilder> {
+      self.escrow_notarizations.clone()
+    }
+    #[napi(getter, js_name = "mainchainTransfers")]
+    pub fn mainchain_transfers_napi(&self) -> Vec<NotarizationTracker> {
+      self.mainchain_transfers.clone()
+    }
+    #[napi(getter, js_name = "jumpAccountConsolidations")]
+    pub fn jump_account_consolidations_napi(&self) -> Vec<NotarizationTracker> {
+      self.jump_account_consolidations.clone()
+    }
+  }
+
+  #[napi]
+  impl BalanceSync {
+    #[napi(constructor)]
+    pub fn new_napi(localchain: &Localchain) -> Self {
+      Self::new(localchain)
+    }
+    #[napi(js_name = "sync")]
+    pub async fn sync_napi(
+      &self,
+      options: Option<EscrowCloseOptions>,
+    ) -> napi::Result<BalanceSyncResult> {
+      self.sync(options).await.napi_ok()
+    }
+    #[napi(js_name = "consolidateJumpAccounts")]
+    pub async fn consolidate_jump_accounts_napi(&self) -> napi::Result<Vec<NotarizationTracker>> {
+      self.consolidate_jump_accounts().await.napi_ok()
+    }
+    #[napi(js_name = "syncUnsettledBalances")]
+    pub async fn sync_unsettled_balances_napi(&self) -> napi::Result<Vec<BalanceChangeRow>> {
+      self.sync_unsettled_balances().await.napi_ok()
+    }
+    #[napi(js_name = "syncMainchainTransfers")]
+    pub async fn sync_mainchain_transfers_napi(&self) -> napi::Result<Vec<NotarizationTracker>> {
+      self.sync_mainchain_transfers().await.napi_ok()
+    }
+    #[napi(js_name = "syncBalanceChange")]
+    pub async fn sync_balance_change_napi(
+      &self,
+      balance_change: &BalanceChangeRow,
+    ) -> napi::Result<BalanceChangeRow> {
+      self.sync_balance_change(balance_change).await.napi_ok()
+    }
+    #[napi(js_name = "processPendingEscrows")]
+    pub async fn process_pending_escrows_napi(
+      &self,
+      options: Option<EscrowCloseOptions>,
+    ) -> napi::Result<Vec<NotarizationBuilder>> {
+      self.process_pending_escrows(options).await.napi_ok()
+    }
+  }
+}
+
 impl BalanceSync {
-  #[napi(constructor)]
   pub fn new(localchain: &Localchain) -> Self {
     BalanceSync {
       db: localchain.db.clone(),
@@ -91,7 +156,6 @@ impl BalanceSync {
     }
   }
 
-  #[napi]
   pub async fn sync(&self, options: Option<EscrowCloseOptions>) -> Result<BalanceSyncResult> {
     let balance_changes = self.sync_unsettled_balances().await?;
 
@@ -114,13 +178,10 @@ impl BalanceSync {
     })
   }
 
-  #[napi]
   pub async fn consolidate_jump_accounts(&self) -> Result<Vec<NotarizationTracker>> {
-    let mut db = self.db.acquire().await.map_err(to_js_error)?;
+    let mut db = self.db.acquire().await?;
 
-    let all_accounts = AccountStore::list(&mut db, true)
-      .await
-      .map_err(to_js_error)?;
+    let all_accounts = AccountStore::db_list(&mut db, true).await?;
     let mut notarizations: Vec<NotarizationTracker> = vec![];
     let mut notarization = NotarizationBuilder::new(
       self.db.clone(),
@@ -128,11 +189,9 @@ impl BalanceSync {
       self.keystore.clone(),
     );
     for jump_account in all_accounts {
-      let latest = BalanceChangeStore::get_latest_for_account(&mut db, jump_account.id)
-        .await
-        .map_err(to_js_error)?;
+      let latest = BalanceChangeStore::db_get_latest_for_account(&mut db, jump_account.id).await?;
       if let Some(latest) = latest {
-        let balance = latest.balance.parse::<u128>().map_err(to_js_error)?;
+        let balance = latest.balance.parse::<u128>()?;
         if balance > 0 {
           let claim_account = match jump_account.account_type {
             AccountType::Deposit => notarization.default_deposit_account().await?,
@@ -144,13 +203,10 @@ impl BalanceSync {
           notarization
             .load_account(&jump_account)
             .await?
-            .send(
-              BigInt::from(balance),
-              Some(vec![claim_account.address.clone()]),
-            )
+            .send(balance, Some(vec![claim_account.address.clone()]))
             .await?;
-          let claim_result = claim_account.claim(BigInt::from(balance)).await?;
-          if claim_result.tax.get_u128().1 > 0 {
+          let claim_result = claim_account.claim(balance).await?;
+          if claim_result.tax > 0 {
             notarization
               .default_tax_account()
               .await?
@@ -174,7 +230,8 @@ impl BalanceSync {
     }
 
     if notarization.has_items_to_notarize().await {
-      let transaction = Transactions::create_static(&mut db, TransactionType::Consolidation).await?;
+      let transaction =
+        Transactions::create_static(&mut db, TransactionType::Consolidation).await?;
       notarization.set_transaction(transaction).await;
       let tracker = notarization.notarize().await?;
       notarizations.push(tracker);
@@ -183,29 +240,22 @@ impl BalanceSync {
     return Ok(notarizations);
   }
 
-  #[napi]
   pub async fn sync_unsettled_balances(&self) -> Result<Vec<BalanceChangeRow>> {
-    let mut db = self.db.acquire().await.map_err(to_js_error)?;
+    let mut db = self.db.acquire().await?;
 
-    let pending_changes = BalanceChangeStore::find_unsettled(&mut db)
-      .await
-      .map_err(to_js_error)?;
+    let pending_changes = BalanceChangeStore::db_find_unsettled(&mut db).await?;
     tracing::debug!("Found {} unsettled balance changes", pending_changes.len());
 
     let mut results = vec![];
 
     for change in pending_changes.into_iter() {
-      let updated = self
-        .sync_balance_change(&change)
-        .await
-        .map_err(to_js_error)?;
+      let updated = self.sync_balance_change(&change).await?;
       results.push(updated);
     }
 
     Ok(results)
   }
 
-  #[napi]
   pub async fn sync_mainchain_transfers(&self) -> Result<Vec<NotarizationTracker>> {
     {
       let mainchain_mutex = self.mainchain_client.lock().await;
@@ -219,10 +269,7 @@ impl BalanceSync {
       self.mainchain_client.clone(),
       self.keystore.clone(),
     );
-    mainchain_transfers
-      .update_finalization()
-      .await
-      .map_err(to_js_error)?;
+    mainchain_transfers.update_finalization().await?;
 
     let transfers = mainchain_transfers.find_ready_for_claim().await?;
     if transfers.len() == 0 {
@@ -238,7 +285,7 @@ impl BalanceSync {
     for x in &transfers {
       let transfer = LocalchainTransfer {
         address: x.address.clone(),
-        amount: BigInt::from(x.amount.parse::<u128>().unwrap_or_default()),
+        amount: x.amount.parse::<u128>().unwrap_or_default(),
         account_nonce: x.account_nonce as u32,
         notary_id: x.notary_id as u32,
         expiration_block: 0,
@@ -259,7 +306,6 @@ impl BalanceSync {
     Ok(notarizations)
   }
 
-  #[napi]
   pub async fn sync_balance_change(
     &self,
     balance_change: &BalanceChangeRow,
@@ -267,7 +313,7 @@ impl BalanceSync {
     let _lock = self.lock.lock().await;
     let mut change = balance_change.clone();
 
-    let mut db = self.db.acquire().await.map_err(to_js_error)?;
+    let mut db = self.db.acquire().await?;
     tracing::debug!(
       "Checking status of balance change; id={}, change #{} (account={}), in status {:?}.",
       change.id,
@@ -275,7 +321,7 @@ impl BalanceSync {
       change.account_id,
       change.status
     );
-    match BalanceChangeStore::check_if_superseded(&mut db, &mut change).await {
+    match BalanceChangeStore::db_check_if_superseded(&mut db, &mut change).await {
       Ok(true) => {
         tracing::debug!(
           "Balance Change superseded by another change; id={}.",
@@ -321,7 +367,6 @@ impl BalanceSync {
     return Ok(change);
   }
 
-  #[napi]
   pub async fn process_pending_escrows(
     &self,
     options: Option<EscrowCloseOptions>,
@@ -340,7 +385,7 @@ impl BalanceSync {
     for open_escrow in open_escrows {
       let mut escrow = open_escrow.inner().await;
 
-      let notary_id = escrow.notary_id as u32;
+      let notary_id = escrow.notary_id;
 
       let notarization = builder_by_notary.entry(notary_id).or_insert_with(|| {
         NotarizationBuilder::new(
@@ -400,7 +445,7 @@ impl BalanceSync {
         continue;
       }
       if let Ok(balance) = notarization.get_balance_change(&account).await {
-        let (_, tax, _) = balance.balance().await.get_u128();
+        let tax = balance.balance().await;
         if tax > 0 {
           total_available_tax += tax;
           tax_accounts.insert(account.id, (account, tax));
@@ -414,23 +459,17 @@ impl BalanceSync {
     &self,
     notarization: &mut NotarizationBuilder,
     options: &Option<EscrowCloseOptions>,
-  ) -> anyhow::Result<()> {
+  ) -> Result<()> {
     let Some(options) = options else {
-      return Err(anyhow::anyhow!(
-        "No options provided to create votes with tax"
-      ));
+      bail!("No options provided to create votes with tax");
     };
     let Some(votes_address) = options.votes_address.as_ref() else {
-      return Err(anyhow::anyhow!(
-        "No votes address provided to create votes with tax"
-      ));
+      bail!("No votes address provided to create votes with tax");
     };
 
     let mainchain_mutex = self.mainchain_client.lock().await;
     let Some(ref mainchain_client) = *mainchain_mutex else {
-      return Err(anyhow::anyhow!(
-        "Cannot create votes.. No mainchain client available!"
-      ));
+      bail!("Cannot create votes.. No mainchain client available!");
     };
 
     let (total_available_tax, tax_accounts) = self.get_available_tax_by_account(notarization).await;
@@ -442,7 +481,7 @@ impl BalanceSync {
     };
 
     if total_available_tax < options.minimum_vote_amount.unwrap_or_default() as u128
-      || total_available_tax < best_block_for_vote.vote_minimum.get_u128().1
+      || total_available_tax < best_block_for_vote.vote_minimum
     {
       return Ok(());
     }
@@ -464,7 +503,7 @@ impl BalanceSync {
     let mut tax_account = None;
     for (_, (account, tax)) in tax_accounts {
       let balance_change = notarization.get_balance_change(&account).await?;
-      balance_change.send_to_vote(BigInt::from(tax)).await?;
+      balance_change.send_to_vote(tax).await?;
       if tax_account.is_none() {
         tax_account = Some(account.clone());
       }
@@ -490,10 +529,7 @@ impl BalanceSync {
     };
     let signature = self
       .keystore
-      .sign(
-        tax_account.address,
-        Uint8Array::from(vote.hash().as_bytes().to_vec()),
-      )
+      .sign(tax_account.address, vote.hash().as_bytes().to_vec())
       .await?;
     vote.signature = MultiSignature::decode(&mut signature.as_ref())?;
     notarization.add_vote(vote).await?;
@@ -534,7 +570,7 @@ impl BalanceSync {
           break;
         }
         Err(e) => {
-          if e.reason.contains("Escrow hold not ready for claim") {
+          if e.to_string().contains("Escrow hold not ready for claim") {
             let delay = 2 + i ^ 5;
             tracing::debug!("Escrow hold not ready for claim. Waiting {delay} seconds.");
             tokio::time::sleep(tokio::time::Duration::from_secs(delay)).await;
@@ -552,7 +588,7 @@ impl BalanceSync {
     escrow: &mut Escrow,
     options: &Option<EscrowCloseOptions>,
     notarization: &mut NotarizationBuilder,
-  ) -> anyhow::Result<()> {
+  ) -> Result<()> {
     let current_tick = self.ticker.current();
 
     if escrow.is_past_claim_period(current_tick) {
@@ -561,7 +597,7 @@ impl BalanceSync {
         escrow.id
       );
       let mut db = self.db.acquire().await?;
-      escrow.mark_unable_to_claim(&mut db).await?;
+      escrow.db_mark_unable_to_claim(&mut db).await?;
       return Ok(());
     }
 
@@ -587,7 +623,7 @@ impl BalanceSync {
     open_escrow: &OpenEscrow,
     escrow: &mut Escrow,
     notarization: &mut NotarizationBuilder,
-  ) -> anyhow::Result<()> {
+  ) -> Result<()> {
     let tip = self
       .notary_clients
       .get(notary_id)
@@ -632,13 +668,13 @@ impl BalanceSync {
     &self,
     address: String,
     account_type: AccountType,
-    notary_id: u32,
-    notebook_number: u32,
+    notary_id: NotaryId,
+    notebook_number: NotebookNumber,
     change_number: u32,
-    tick: u32,
-  ) -> anyhow::Result<i64> {
+    tick: Tick,
+  ) -> Result<i64> {
     let mut tx = self.db.begin().await?;
-    let account = AccountStore::get(&mut tx, address, account_type, notary_id).await?;
+    let account = AccountStore::db_get(&mut tx, address, account_type, notary_id).await?;
     let notary_client = self.notary_clients.get(notary_id).await?;
 
     let notarization = notary_client
@@ -668,9 +704,10 @@ impl BalanceSync {
         .map(|a| a.unwrap());
 
     for balance_change in notarization.balance_changes.iter() {
-      let _ = OpenEscrowsStore::record_notarized(&mut *tx, &balance_change, notarization_id).await;
+      let _ =
+        OpenEscrowsStore::db_record_notarized(&mut *tx, &balance_change, notarization_id).await;
 
-      BalanceChangeStore::upsert_notarized(
+      BalanceChangeStore::tx_upsert_notarized(
         &mut tx,
         account.id,
         &balance_change,
@@ -690,9 +727,9 @@ impl BalanceSync {
     db: &SqlitePool,
     balance_change: &mut BalanceChangeRow,
     notary_clients: &NotaryClients,
-  ) -> anyhow::Result<()> {
+  ) -> Result<()> {
     let mut tx = db.begin().await?;
-    let mut account = AccountStore::get_by_id(&mut *tx, balance_change.account_id).await?;
+    let mut account = AccountStore::db_get_by_id(&mut *tx, balance_change.account_id).await?;
     let notary_id = balance_change.notary_id as u32;
     let notary_client = notary_clients.get(notary_id).await?;
     if account.origin.is_none() {
@@ -787,7 +824,7 @@ impl BalanceSync {
         .get_balance_proof(notebook_number, expected_tip)
         .await?;
 
-      BalanceChangeStore::save_notebook_proof(&mut tx, balance_change, &result).await?;
+      BalanceChangeStore::tx_save_notebook_proof(&mut tx, balance_change, &result).await?;
     }
     tx.commit().await?;
 
@@ -798,14 +835,14 @@ impl BalanceSync {
     tx: &mut Transaction<'static, Sqlite>,
     account: &mut LocalAccount,
     notary_client: &NotaryClient,
-  ) -> anyhow::Result<bool> {
+  ) -> Result<bool> {
     let Ok(result) = notary_client
       .get_account_origin(account.address.clone(), account.account_type)
       .await
     else {
       return Ok(false);
     };
-    AccountStore::update_origin(
+    AccountStore::db_update_origin(
       &mut *tx,
       account.id,
       result.notebook_number,
@@ -825,7 +862,7 @@ impl BalanceSync {
     db: &SqlitePool,
     balance_change: &mut BalanceChangeRow,
     notary_clients: &NotaryClients,
-  ) -> anyhow::Result<bool> {
+  ) -> Result<bool> {
     let mut tx = db.begin().await?;
 
     let notebook_number = sqlx::query_scalar!(
@@ -838,7 +875,7 @@ impl BalanceSync {
     let Some(notebook_number) = notebook_number else {
       return Ok(false);
     };
-    let mut account = AccountStore::get_by_id(&mut tx, balance_change.account_id).await?;
+    let mut account = AccountStore::db_get_by_id(&mut tx, balance_change.account_id).await?;
     let notary_client = notary_clients.get(balance_change.notary_id as u32).await?;
 
     if account.origin.is_none() {
@@ -851,7 +888,7 @@ impl BalanceSync {
       .get_balance_proof(notebook_number as u32, tip)
       .await?;
 
-    BalanceChangeStore::save_notebook_proof(&mut tx, balance_change, &result).await?;
+    BalanceChangeStore::tx_save_notebook_proof(&mut tx, balance_change, &result).await?;
     tx.commit().await?;
     tracing::debug!(
       "Balance Change synched notebook proof; id={}. Notebook={}, tick={}",
@@ -862,7 +899,7 @@ impl BalanceSync {
     Ok(true)
   }
 
-  pub async fn check_finalized(&self, balance_change: &mut BalanceChangeRow) -> anyhow::Result<()> {
+  pub async fn check_finalized(&self, balance_change: &mut BalanceChangeRow) -> Result<()> {
     let mut tx = self.db.begin().await?;
 
     let mainchain_mutex = self.mainchain_client.lock().await;
@@ -901,9 +938,9 @@ impl BalanceSync {
       .get_account_changes_root(notary_id, notebook_number)
       .await?;
 
-    let account = AccountStore::get_by_id(&mut tx, balance_change.account_id).await?;
+    let account = AccountStore::db_get_by_id(&mut tx, balance_change.account_id).await?;
     let change_root = H256::from_slice(&account_change_root.as_ref()[..]);
-    BalanceChangeStore::save_finalized(
+    BalanceChangeStore::tx_save_finalized(
       &mut tx,
       balance_change,
       &account,

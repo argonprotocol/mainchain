@@ -12,7 +12,7 @@ use ulx_primitives::DataDomain;
 
 use crate::keystore::Keystore;
 use crate::{
-  to_js_error, AccountStore, BalanceChangeRow, BalanceChangeStore, CryptoScheme, DataDomainStore,
+  AccountStore, BalanceChangeRow, BalanceChangeStore, CryptoScheme, DataDomainStore,
   EscrowCloseOptions, LocalAccount, Localchain, LocalchainConfig, MainchainClient, TickerConfig,
 };
 
@@ -178,6 +178,7 @@ enum AccountsSubcommand {
   },
 }
 
+#[cfg(feature = "napi")]
 #[napi(js_name = "runCli")]
 pub async fn run_js() -> napi::Result<()> {
   let _ = tracing_subscriber::FmtSubscriber::builder()
@@ -191,7 +192,7 @@ pub async fn run_js() -> napi::Result<()> {
     args.collect::<Vec<OsString>>()
   };
   let result = run(inner_args).await;
-  result.map_err(to_js_error)?;
+  result?;
   Ok(())
 }
 
@@ -384,7 +385,7 @@ where
           .apply_modifier(UTF8_ROUND_CORNERS)
           .set_content_arrangement(ContentArrangement::Dynamic)
           .set_header(vec!["Address", "Path", "NotaryId"]);
-        let account = AccountStore::deposit_account(&mut conn, None).await?;
+        let account = AccountStore::db_deposit_account(&mut conn, None).await?;
         table.add_row(vec![account.address, path, account.notary_id.to_string()]);
 
         println!("Account created at:\n{table}");
@@ -418,10 +419,10 @@ where
             let path = get_path(Some(dir.clone()), name.clone());
             let db = Localchain::create_db(path).await?;
             let mut conn = db.acquire().await?;
-            let accounts = AccountStore::list(&mut conn, false).await?;
+            let accounts = AccountStore::db_list(&mut conn, false).await?;
             for account in accounts {
               let balance_change =
-                BalanceChangeStore::get_latest_for_account(&mut conn, account.id).await?;
+                BalanceChangeStore::db_get_latest_for_account(&mut conn, account.id).await?;
               table.add_row(format_account_record(&name, account, balance_change));
             }
           }

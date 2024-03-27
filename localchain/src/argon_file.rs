@@ -1,10 +1,9 @@
+use crate::Result;
 use clap::crate_version;
 use serde::{Deserialize, Serialize};
 use ulx_primitives::{BalanceChange, Notarization};
-use crate::to_js_error;
-
 /// The version of the Argon file format.
-#[napi]
+#[cfg_attr(feature = "napi", napi)]
 pub const ARGON_FILE_VERSION: &str = crate_version!();
 
 #[derive(Debug, Serialize, Deserialize)]
@@ -15,12 +14,12 @@ pub struct ArgonFile {
 }
 
 impl ArgonFile {
-  pub fn to_json(&self) -> napi::Result<String> {
-    serde_json::to_string(self).map_err(to_js_error)
+  pub fn to_json(&self) -> Result<String> {
+    Ok(serde_json::to_string(self)?)
   }
 
-  pub fn from_json(json: &str) -> napi::Result<Self> {
-    serde_json::from_str(json).map_err(to_js_error)
+  pub fn from_json(json: &str) -> Result<Self> {
+    Ok(serde_json::from_str(json)?)
   }
 
   pub fn from_notarization(notarization: &Notarization, file_type: ArgonFileType) -> Self {
@@ -43,7 +42,7 @@ impl ArgonFile {
   }
 }
 
-#[napi]
+#[cfg_attr(feature = "napi", napi)]
 pub enum ArgonFileType {
   Send,
   Request,

@@ -1,17 +1,17 @@
-use futures::TryFutureExt;
-use napi::bindgen_prelude::*;
 use sqlx::{SqliteConnection, SqlitePool};
 
-use ulx_primitives::{AccountType, Note};
+use ulx_primitives::{AccountType, Balance, Note};
 
 use crate::argon_file::ArgonFileType;
 use crate::keystore::Keystore;
 use crate::notarization_builder::NotarizationBuilder;
 use crate::notary_client::NotaryClients;
-use crate::{to_js_error, OpenEscrow, OpenEscrowsStore, TickerRef, ESCROW_MINIMUM_SETTLEMENT};
+use crate::Result;
+use crate::{OpenEscrow, OpenEscrowsStore, TickerRef, ESCROW_MINIMUM_SETTLEMENT};
 
 #[derive(Debug, PartialOrd, PartialEq)]
-#[napi]
+#[cfg_attr(feature = "napi", napi)]
+#[cfg_attr(not(feature = "napi"), derive(Clone, Copy))]
 pub enum TransactionType {
   Send = 0,
   Request = 1,
@@ -31,21 +31,21 @@ impl From<i64> for TransactionType {
   }
 }
 
-#[napi(object)]
+#[cfg_attr(feature = "napi", napi(object))]
 #[derive(Clone, Debug, PartialOrd, PartialEq)]
 pub struct LocalchainTransaction {
   pub id: u32,
   pub transaction_type: TransactionType,
 }
 
-#[napi]
+#[cfg_attr(feature = "napi", napi)]
 pub struct Transactions {
   db: SqlitePool,
   ticker: TickerRef,
   notary_clients: NotaryClients,
   keystore: Keystore,
 }
-#[napi]
+
 impl Transactions {
   pub fn new(
     db: SqlitePool,
@@ -71,7 +71,6 @@ impl Transactions {
       type_id,
     )
     .fetch_one(db)
-    .map_err(to_js_error)
     .await?;
 
     Ok(LocalchainTransaction {
@@ -80,14 +79,12 @@ impl Transactions {
     })
   }
 
-  #[napi]
   pub async fn create(&self, transaction_type: TransactionType) -> Result<LocalchainTransaction> {
-    let mut db = self.db.acquire().await.map_err(to_js_error)?;
+    let mut db = self.db.acquire().await?;
     Self::create_static(&mut db, transaction_type).await
   }
 
-  #[napi]
-  pub async fn request(&self, milligons: BigInt) -> Result<String> {
+  pub async fn request(&self, milligons: Balance) -> Result<String> {
     let transaction = self.create(TransactionType::Request).await?;
 
     let jump_notarization = self.new_notarization();
@@ -110,10 +107,9 @@ impl Transactions {
     Ok(json_file)
   }
 
-  #[napi]
   pub async fn create_escrow(
     &self,
-    escrow_milligons: BigInt,
+    escrow_milligons: Balance,
     recipient_address: String,
     data_domain: Option<String>,
     notary_id: Option<u32>,
@@ -125,13 +121,10 @@ impl Transactions {
     let transaction = self.create(TransactionType::OpenEscrow).await?;
     jump_notarization.set_transaction(transaction.clone()).await;
 
-    let escrow_milligons = if escrow_milligons.get_u128().1 < ESCROW_MINIMUM_SETTLEMENT {
-      BigInt::from(ESCROW_MINIMUM_SETTLEMENT)
-    } else {
-      escrow_milligons
-    };
+    let escrow_milligons = escrow_milligons.max(ESCROW_MINIMUM_SETTLEMENT);
 
-    let amount_plus_tax = jump_notarization.get_total_for_after_tax_balance(escrow_milligons.clone());
+    let amount_plus_tax =
+      jump_notarization.get_total_for_after_tax_balance(escrow_milligons.clone());
     let jump_account = jump_notarization.fund_jump_account(amount_plus_tax).await?;
     let _ = jump_notarization.notarize().await?;
 
@@ -164,17 +157,14 @@ impl Transactions {
     Ok(open_escrow)
   }
 
-  #[napi]
-  pub async fn send(&self, milligons: BigInt, to: Option<Vec<String>>) -> Result<String> {
+  pub async fn send(&self, milligons: u128, to: Option<Vec<String>>) -> Result<String> {
     let jump_notarization = self.new_notarization();
     let transaction = self.create(TransactionType::Send).await?;
     jump_notarization.set_transaction(transaction.clone()).await;
-    let jump_account = jump_notarization
-      .fund_jump_account(milligons.clone())
-      .await?;
+    let jump_account = jump_notarization.fund_jump_account(milligons).await?;
     let _ = jump_notarization.notarize().await?;
 
-    let amount = milligons.get_u128().1;
+    let amount = milligons;
     let tax = Note::calculate_transfer_tax(amount);
 
     let fund_notarization = self.new_notarization();
@@ -182,7 +172,7 @@ impl Transactions {
     fund_notarization
       .add_account_by_id(jump_account.local_account_id)
       .await?
-      .send(BigInt::from(amount - tax), to)
+      .send(amount - tax, to)
       .await?;
 
     let json = fund_notarization
@@ -198,6 +188,60 @@ impl Transactions {
       self.notary_clients.clone(),
       self.keystore.clone(),
     )
+  }
+}
+
+#[cfg(feature = "napi")]
+pub mod napi_ext {
+  use crate::error::NapiOk;
+  use napi::bindgen_prelude::BigInt;
+
+  use super::Transactions;
+  use super::{LocalchainTransaction, TransactionType};
+  use crate::open_escrows::OpenEscrow;
+
+  #[napi]
+  impl Transactions {
+    #[napi(js_name = "create")]
+    pub async fn create_napi(
+      &self,
+      transaction_type: TransactionType,
+    ) -> napi::Result<LocalchainTransaction> {
+      self.create(transaction_type).await.napi_ok()
+    }
+
+    #[napi(js_name = "request")]
+    pub async fn request_napi(&self, milligons: BigInt) -> napi::Result<String> {
+      self.request(milligons.get_u128().1).await.napi_ok()
+    }
+
+    #[napi(js_name = "createEscrow")]
+    pub async fn create_escrow_napi(
+      &self,
+      escrow_milligons: BigInt,
+      recipient_address: String,
+      data_domain: Option<String>,
+      notary_id: Option<u32>,
+    ) -> napi::Result<OpenEscrow> {
+      self
+        .create_escrow(
+          escrow_milligons.get_u128().1,
+          recipient_address,
+          data_domain,
+          notary_id,
+        )
+        .await
+        .napi_ok()
+    }
+
+    #[napi(js_name = "send")]
+    pub async fn send_napi(
+      &self,
+      milligons: BigInt,
+      to: Option<Vec<String>>,
+    ) -> napi::Result<String> {
+      self.send(milligons.get_u128().1, to).await.napi_ok()
+    }
   }
 }
 
@@ -244,17 +288,17 @@ mod tests {
     bob_builder.import_argon_file(alice_json).await?;
     let _ = bob_builder.notarize().await?;
 
-    let alice_accounts = alice_localchain.accounts().list_js(Some(true)).await?;
+    let alice_accounts = alice_localchain.accounts().list(Some(true)).await?;
     assert_eq!(alice_accounts.len(), 4);
 
-    let bob_accounts = bob_localchain.accounts().list_js(Some(true)).await?;
+    let bob_accounts = bob_localchain.accounts().list(Some(true)).await?;
     assert_eq!(bob_accounts.len(), 2);
 
     let mut tips = vec![];
     for account in alice_accounts.clone() {
       if let Some(latest) = alice_localchain
         .balance_changes()
-        .get_latest_for_account_js(account.id)
+        .get_latest_for_account(account.id)
         .await?
       {
         println!(
@@ -286,19 +330,19 @@ mod tests {
 
     assert!(alice_localchain
       .accounts()
-      .find_idle_jump_account_js(AccountType::Deposit, 1)
+      .find_idle_jump_account(AccountType::Deposit, 1)
       .await?
       .is_none());
     assert!(alice_localchain
       .accounts()
-      .find_idle_jump_account_js(AccountType::Tax, 1)
+      .find_idle_jump_account(AccountType::Tax, 1)
       .await?
       .is_none());
 
     for account in bob_accounts.clone() {
       let latest = bob_localchain
         .balance_changes()
-        .get_latest_for_account_js(account.id)
+        .get_latest_for_account(account.id)
         .await?
         .expect("Bob accounts should have balance");
       if account.account_type == AccountType::Tax {
@@ -315,7 +359,7 @@ mod tests {
     for account in alice_accounts {
       if let Some(latest) = alice_localchain
         .balance_changes()
-        .get_latest_for_account_js(account.id)
+        .get_latest_for_account(account.id)
         .await?
       {
         println!(
@@ -352,7 +396,7 @@ mod tests {
     for account in bob_accounts {
       let latest = bob_localchain
         .balance_changes()
-        .get_latest_for_account_js(account.id)
+        .get_latest_for_account(account.id)
         .await?
         .expect("Bob accounts should have balance");
       println!(
@@ -369,12 +413,12 @@ mod tests {
     }
     assert!(alice_localchain
       .accounts()
-      .find_idle_jump_account_js(AccountType::Deposit, 1)
+      .find_idle_jump_account(AccountType::Deposit, 1)
       .await?
       .is_some());
     assert!(alice_localchain
       .accounts()
-      .find_idle_jump_account_js(AccountType::Tax, 1)
+      .find_idle_jump_account(AccountType::Tax, 1)
       .await?
       .is_some());
 
@@ -421,16 +465,16 @@ mod tests {
       .await?;
     let _ = alice_builder.notarize().await?;
     println!("Alice accepted");
-    let alice_accounts = alice_localchain.accounts().list_js(Some(true)).await?;
+    let alice_accounts = alice_localchain.accounts().list(Some(true)).await?;
     assert_eq!(alice_accounts.len(), 2);
 
-    let bob_accounts = bob_localchain.accounts().list_js(Some(true)).await?;
+    let bob_accounts = bob_localchain.accounts().list(Some(true)).await?;
     assert_eq!(bob_accounts.len(), 4);
 
     for account in alice_accounts.clone() {
       if let Some(latest) = alice_localchain
         .balance_changes()
-        .get_latest_for_account_js(account.id)
+        .get_latest_for_account(account.id)
         .await?
       {
         println!(
@@ -449,19 +493,19 @@ mod tests {
 
     assert!(alice_localchain
       .accounts()
-      .find_idle_jump_account_js(AccountType::Deposit, 1)
+      .find_idle_jump_account(AccountType::Deposit, 1)
       .await?
       .is_none());
     assert!(alice_localchain
       .accounts()
-      .find_idle_jump_account_js(AccountType::Tax, 1)
+      .find_idle_jump_account(AccountType::Tax, 1)
       .await?
       .is_none());
 
     for account in bob_accounts.clone() {
       let Some(latest) = bob_localchain
         .balance_changes()
-        .get_latest_for_account_js(account.id)
+        .get_latest_for_account(account.id)
         .await?
       else {
         continue;
@@ -503,7 +547,7 @@ mod tests {
     for account in alice_accounts {
       if let Some(latest) = alice_localchain
         .balance_changes()
-        .get_latest_for_account_js(account.id)
+        .get_latest_for_account(account.id)
         .await?
       {
         println!(
@@ -539,7 +583,7 @@ mod tests {
     for account in bob_accounts {
       let latest = bob_localchain
         .balance_changes()
-        .get_latest_for_account_js(account.id)
+        .get_latest_for_account(account.id)
         .await?
         .expect("Bob accounts should have balance");
       println!(
@@ -571,12 +615,12 @@ mod tests {
     }
     assert!(bob_localchain
       .accounts()
-      .find_idle_jump_account_js(AccountType::Deposit, 1)
+      .find_idle_jump_account(AccountType::Deposit, 1)
       .await?
       .is_some());
     assert!(bob_localchain
       .accounts()
-      .find_idle_jump_account_js(AccountType::Tax, 1)
+      .find_idle_jump_account(AccountType::Tax, 1)
       .await?
       .is_some());
 

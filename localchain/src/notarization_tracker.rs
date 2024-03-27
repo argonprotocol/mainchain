@@ -1,20 +1,18 @@
-use std::collections::HashMap;
-use std::sync::Arc;
-
 use anyhow::anyhow;
-use napi::bindgen_prelude::*;
 use sp_core::H256;
 use sqlx::SqlitePool;
+use std::collections::HashMap;
+use std::sync::Arc;
 use tokio::sync::Mutex;
-
-use ulx_primitives::{AccountType, BalanceChange, BalanceTip, Notarization};
+use ulx_primitives::{AccountType, Balance, BalanceChange, BalanceTip, Notarization};
 
 use crate::accounts::LocalAccount;
 use crate::balance_changes::{BalanceChangeRow, BalanceChangeStatus};
 use crate::mainchain_client::MainchainClient;
-use crate::{to_js_error, BalanceChangeStore, BalanceSync, NotaryAccountOrigin, NotaryClients};
+use crate::Result;
+use crate::{BalanceChangeStore, BalanceSync, NotaryAccountOrigin, NotaryClients};
 
-#[napi]
+#[cfg_attr(feature = "napi", napi)]
 #[derive(Clone)]
 pub struct NotarizationTracker {
   pub notebook_number: u32,
@@ -32,9 +30,9 @@ pub struct NotarizationTracker {
   pub(crate) db: SqlitePool,
 }
 
-#[napi]
+#[cfg_attr(feature = "napi", napi)]
 impl NotarizationTracker {
-  pub async fn get_balance_tips(&self) -> anyhow::Result<Vec<BalanceTip>> {
+  pub async fn get_balance_tips(&self) -> Result<Vec<BalanceTip>> {
     let balance_changes = self.balance_changes_by_account.lock().await;
     let mut tips: Vec<BalanceTip> = vec![];
     for change in &self.imports {
@@ -72,7 +70,6 @@ impl NotarizationTracker {
     changed_accounts
   }
 
-  #[napi(getter)]
   /// Returns the balance changes that were submitted to the notary indexed by the stringified account id (napi doesn't allow numbers as keys)
   pub async fn balance_changes_by_account_id(&self) -> HashMap<String, BalanceChangeRow> {
     let balance_changes = self.balance_changes_by_account.lock().await;
@@ -82,31 +79,22 @@ impl NotarizationTracker {
       .collect()
   }
 
-  #[napi]
   pub async fn wait_for_notebook(&self) -> Result<()> {
-    let notary_client = self
-      .notary_clients
-      .get(self.notary_id)
-      .await
-      .map_err(to_js_error)?;
+    let notary_client = self.notary_clients.get(self.notary_id).await?;
     notary_client
       .wait_for_notebook(self.notebook_number)
-      .await
-      .map_err(to_js_error)?;
+      .await?;
     Ok(())
   }
 
   /// Asks the notary for proof the transaction was included in a notebook header. If this notebook has not been finalized yet, it will return an error.
-  #[napi]
   pub async fn get_notebook_proof(&self) -> Result<Vec<NotebookProof>> {
     self.wait_for_notebook().await?;
     let mut balance_changes = self.balance_changes_by_account.lock().await;
     let mut proofs = vec![];
     for (_, balance_change) in (*balance_changes).iter_mut() {
       if balance_change.status == BalanceChangeStatus::SubmittedToNotary {
-        BalanceSync::sync_notebook_proof(&self.db, balance_change, &self.notary_clients)
-          .await
-          .map_err(to_js_error)?;
+        BalanceSync::sync_notebook_proof(&self.db, balance_change, &self.notary_clients).await?;
       }
 
       if let Ok(Some(proof)) = balance_change.get_proof() {
@@ -127,7 +115,7 @@ impl NotarizationTracker {
           escrow_hold_note_json: balance_change.escrow_hold_note_json.clone(),
           leaf_index: proof.leaf_index,
           number_of_leaves: proof.number_of_leaves,
-          proof: proof.proof.iter().map(|p| p.0.to_vec().into()).collect(),
+          proof: proof.proof.to_vec(),
         };
         proofs.push(notebook_proof);
       }
@@ -136,7 +124,6 @@ impl NotarizationTracker {
   }
 
   /// Confirms the root added to the mainchain
-  #[napi]
   pub async fn wait_for_finalized(
     &self,
     mainchain_client: &MainchainClient,
@@ -152,22 +139,21 @@ impl NotarizationTracker {
 
     let mut balance_changes = self.balance_changes_by_account.lock().await;
     for (account_id, balance_change) in (*balance_changes).iter_mut() {
-      let mut tx = self.db.begin().await.map_err(to_js_error)?;
+      let mut tx = self.db.begin().await?;
       let account = self
         .accounts_by_id
         .get(&account_id)
         .expect("account not found");
 
-      BalanceChangeStore::save_finalized(
+      BalanceChangeStore::tx_save_finalized(
         &mut tx,
         balance_change,
         &account,
         change_root,
         finalized_block,
       )
-      .await
-      .map_err(to_js_error)?;
-      tx.commit().await.map_err(to_js_error)?;
+      .await?;
+      tx.commit().await?;
     }
 
     Ok(FinalizedBlock {
@@ -176,25 +162,112 @@ impl NotarizationTracker {
     })
   }
 }
-
-#[napi(object)]
 pub struct FinalizedBlock {
   pub finalized_block_number: u32,
-  pub account_changes_merkle_root: Uint8Array,
+  pub account_changes_merkle_root: H256,
 }
 
-#[napi(object)]
 pub struct NotebookProof {
   pub address: String,
   pub account_type: AccountType,
   pub notebook_number: u32,
-  pub balance: BigInt,
+  pub balance: Balance,
   /// H256 hash of the balance tip
-  pub balance_tip: Uint8Array,
+  pub balance_tip: H256,
   pub change_number: u32,
   pub account_origin: NotaryAccountOrigin,
   pub escrow_hold_note_json: Option<String>,
   pub leaf_index: u32,
   pub number_of_leaves: u32,
-  pub proof: Vec<Uint8Array>,
+  pub proof: Vec<H256>,
+}
+
+#[cfg(feature = "napi")]
+pub mod napi_ext {
+  use napi::bindgen_prelude::{BigInt, Uint8Array};
+  use std::collections::HashMap;
+  use ulx_primitives::AccountType;
+
+  use crate::error::NapiOk;
+  use crate::BalanceChangeRow;
+  use crate::MainchainClient;
+  use crate::NotaryAccountOrigin;
+
+  use super::NotarizationTracker;
+
+  #[napi(object)]
+  pub struct FinalizedBlock {
+    pub finalized_block_number: u32,
+    pub account_changes_merkle_root: Uint8Array,
+  }
+
+  #[napi(object)]
+  pub struct NotebookProof {
+    pub address: String,
+    pub account_type: AccountType,
+    pub notebook_number: u32,
+    pub balance: BigInt,
+    /// H256 hash of the balance tip
+    pub balance_tip: Uint8Array,
+    pub change_number: u32,
+    pub account_origin: NotaryAccountOrigin,
+    pub escrow_hold_note_json: Option<String>,
+    pub leaf_index: u32,
+    pub number_of_leaves: u32,
+    pub proof: Vec<Uint8Array>,
+  }
+
+  #[napi]
+  impl NotarizationTracker {
+    #[napi(getter, js_name = "balanceChangesByAccountId")]
+    /// Returns the balance changes that were submitted to the notary indexed by the stringified account id (napi doesn't allow numbers as keys)
+    pub async fn balance_changes_by_account_id_napi(&self) -> HashMap<String, BalanceChangeRow> {
+      self.balance_changes_by_account_id().await
+    }
+    #[napi(js_name = "waitForNotebook")]
+    pub async fn wait_for_notebook_napi(&self) -> napi::Result<()> {
+      self.wait_for_notebook().await.napi_ok()
+    }
+    /// Asks the notary for proof the transaction was included in a notebook header. If this notebook has not been finalized yet, it will return an error.
+    #[napi(js_name = "getNotebookProof")]
+    pub async fn get_notebook_proof_napi(&self) -> napi::Result<Vec<NotebookProof>> {
+      self
+        .get_notebook_proof()
+        .await
+        .napi_ok()?
+        .into_iter()
+        .map(|p| {
+          Ok(NotebookProof {
+            address: p.address,
+            account_type: p.account_type,
+            notebook_number: p.notebook_number,
+            balance: p.balance.into(),
+            balance_tip: p.balance_tip.0.to_vec().into(),
+            change_number: p.change_number,
+            account_origin: p.account_origin,
+            escrow_hold_note_json: p.escrow_hold_note_json,
+            leaf_index: p.leaf_index,
+            number_of_leaves: p.number_of_leaves,
+            proof: p
+              .proof
+              .into_iter()
+              .map(|p| p.0.to_vec().into())
+              .collect::<Vec<_>>(),
+          })
+        })
+        .collect::<napi::Result<Vec<NotebookProof>>>()
+    }
+    /// Confirms the root added to the mainchain
+    #[napi(js_name = "waitForFinalized")]
+    pub async fn wait_for_finalized_napi(
+      &self,
+      mainchain_client: &MainchainClient,
+    ) -> napi::Result<FinalizedBlock> {
+      let result = self.wait_for_finalized(mainchain_client).await.napi_ok()?;
+      Ok(FinalizedBlock {
+        finalized_block_number: result.finalized_block_number,
+        account_changes_merkle_root: result.account_changes_merkle_root.0.to_vec().into(),
+      })
+    }
+  }
 }

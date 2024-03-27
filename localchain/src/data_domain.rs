@@ -1,15 +1,14 @@
 use chrono::NaiveDateTime;
-use napi::bindgen_prelude::*;
 use serde_json::json;
 use sp_runtime::RuntimeString;
 use sqlx::{FromRow, SqliteConnection, SqlitePool};
-use ulx_primitives::{DataDomain, DataTLD};
+use ulx_primitives::{DataDomain, DataDomainHash, DataTLD};
 
-use crate::to_js_error;
+use crate::{bail, Result};
 
 #[derive(FromRow, Clone)]
 #[allow(dead_code)]
-#[napi(js_name = "DataDomainLease")]
+#[cfg_attr(feature = "napi", napi(js_name = "DataDomainLease"))]
 pub struct DataDomainRow {
   pub id: i64,
   pub name: String,
@@ -22,65 +21,58 @@ pub struct DataDomainRow {
 
 impl DataDomainRow {}
 
-#[napi]
+#[cfg_attr(feature = "napi", napi)]
 pub struct DataDomainStore {
   db: SqlitePool,
 }
 
-#[napi]
 impl DataDomainStore {
   pub fn new(db: SqlitePool) -> Self {
     Self { db }
   }
 
-  #[napi]
   pub fn tld_from_string(tld: String) -> Result<DataTLD> {
     let tld_json_str = format!("\"{}\"", tld);
-    let tld: DataTLD = serde_json::from_str(&tld_json_str).map_err(to_js_error)?;
+    let tld: DataTLD = serde_json::from_str(&tld_json_str)?;
     Ok(tld)
   }
 
-  #[napi(getter)]
   pub async fn list(&self) -> Result<Vec<DataDomainRow>> {
-    let mut db = self.db.acquire().await.map_err(to_js_error)?;
-    sqlx::query_as!(DataDomainRow, "SELECT * FROM data_domains")
-      .fetch_all(&mut *db)
-      .await
-      .map_err(to_js_error)
+    let mut db = self.db.acquire().await?;
+    Ok(
+      sqlx::query_as!(DataDomainRow, "SELECT * FROM data_domains")
+        .fetch_all(&mut *db)
+        .await?,
+    )
   }
 
-  #[napi]
-  pub fn hash_domain(&self, domain: JsDataDomain) -> Uint8Array {
+  pub fn hash_domain(&self, domain: JsDataDomain) -> DataDomainHash {
     let parsed_domain = DataDomain {
       domain_name: RuntimeString::Owned(domain.domain_name.clone()),
       top_level_domain: domain.top_level_domain.clone(),
     };
-    parsed_domain.hash().0.into()
+    parsed_domain.hash()
   }
 
-  #[napi]
-  pub fn get_hash(domain: String) -> Result<Uint8Array> {
-    let domain = DataDomain::parse(domain).map_err(to_js_error)?;
-    Ok(domain.hash().0.into())
+  pub fn get_hash(domain: String) -> Result<DataDomainHash> {
+    let domain = DataDomain::parse(domain)?;
+    Ok(domain.hash())
   }
 
-  #[napi(ts_return_type = "DataDomain")]
   pub fn parse(domain: String) -> Result<JsDataDomain> {
-    DataDomain::parse(domain)
-      .map_err(to_js_error)
-      .map(Into::into)
+    Ok(DataDomain::parse(domain).map(Into::into)?)
   }
 
-  #[napi]
   pub async fn get(&self, id: i64) -> Result<DataDomainRow> {
-    let mut db = self.db.acquire().await.map_err(to_js_error)?;
-    sqlx::query_as!(DataDomainRow, "SELECT * FROM data_domains WHERE id = ?", id)
-      .fetch_one(&mut *db)
-      .await
-      .map_err(to_js_error)
+    let mut db = self.db.acquire().await?;
+    Ok(
+      sqlx::query_as!(DataDomainRow, "SELECT * FROM data_domains WHERE id = ?", id)
+        .fetch_one(&mut *db)
+        .await?,
+    )
   }
 
-  pub async fn insert(
+  pub async fn db_insert(
     db: &mut SqliteConnection,
     data_domain: JsDataDomain,
     registered_to_address: String,
@@ -102,18 +94,56 @@ impl DataDomainStore {
     )
             .execute(db)
             .await
-            .map_err(to_js_error)?;
+            ?;
     if res.rows_affected() != 1 {
-      return Err(Error::from_reason(format!(
-        "Error inserting data domain {}",
-        data_domain.domain_name
-      )));
+      bail!("Error inserting data domain {}", data_domain.domain_name);
     }
     Ok(())
   }
 }
 
-#[napi(object, js_name = "DataDomain")]
+#[cfg(feature = "napi")]
+pub mod napi_ext {
+  use super::*;
+  use crate::{DataDomainStore, JsDataDomain};
+  use napi::bindgen_prelude::*;
+  use ulx_primitives::DataTLD;
+  use crate::error::NapiOk;
+
+  #[napi]
+  impl DataDomainStore {
+    #[napi(js_name = "tldFromString")]
+    pub fn tld_from_string_napi(tld: String) -> napi::Result<DataTLD> {
+      DataDomainStore::tld_from_string(tld).napi_ok()
+    }
+    #[napi(js_name = "list", getter)]
+    pub async fn list_napi(&self) -> napi::Result<Vec<DataDomainRow>> {
+      self.list().await.napi_ok()
+    }
+
+    #[napi(js_name = "hashDomain")]
+    pub fn hash_domain_napi(&self, domain: JsDataDomain) -> Uint8Array {
+      self.hash_domain(domain).0.into()
+    }
+
+    #[napi(js_name = "getHash")]
+    pub fn get_hash_napi(domain: String) -> napi::Result<Uint8Array> {
+      DataDomainStore::get_hash(domain).map(|a| a.0.into()).napi_ok()
+    }
+
+    #[napi(js_name = "parse", ts_return_type = "DataDomain")]
+    pub fn parse_napi(domain: String) -> napi::Result<JsDataDomain> {
+      DataDomainStore::parse(domain).napi_ok()
+    }
+
+    #[napi(js_name = "get")]
+    pub async fn get_napi(&self, id: i64) -> napi::Result<DataDomainRow> {
+      self.get(id).await.napi_ok()
+    }
+  }
+}
+
+#[cfg_attr(feature = "napi", napi(object, js_name = "DataDomain"))]
 #[derive(Clone, Debug, PartialEq)]
 pub struct JsDataDomain {
   pub domain_name: String,
@@ -174,7 +204,7 @@ mod test {
     )
     .execute(&mut *db)
     .await?;
-    DataDomainStore::insert(
+    DataDomainStore::db_insert(
       &mut *db,
       js_domain.clone(),
       AccountStore::to_address(&Bob.to_account_id()),

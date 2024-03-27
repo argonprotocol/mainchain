@@ -1,12 +1,12 @@
 use std::sync::Arc;
 
-use anyhow::anyhow;
 use chrono::NaiveDateTime;
-use napi::bindgen_prelude::*;
 use sqlx::{FromRow, SqlitePool};
 use tokio::sync::Mutex;
 
-use crate::{to_js_error, AccountStore, Keystore, LocalchainTransfer, MainchainClient};
+use ulx_primitives::Balance;
+
+use crate::{bail, AccountStore, Keystore, LocalchainTransfer, MainchainClient, Result};
 
 #[derive(FromRow, Clone)]
 #[allow(dead_code)]
@@ -24,14 +24,44 @@ pub struct MainchainTransferIn {
   pub created_at: NaiveDateTime,
 }
 
-#[napi]
+#[cfg_attr(feature = "napi", napi)]
 pub struct MainchainTransferStore {
   db: SqlitePool,
   mainchain_client: Arc<Mutex<Option<MainchainClient>>>,
   keystore: Keystore,
 }
 
-#[napi]
+#[cfg(feature = "napi")]
+pub mod napi_ext {
+  use crate::error::NapiOk;
+  use napi::bindgen_prelude::BigInt;
+
+  use crate::mainchain_client::napi_ext::LocalchainTransfer;
+  use crate::mainchain_transfer::MainchainTransferStore;
+
+  #[napi]
+  impl MainchainTransferStore {
+    #[napi(js_name = "sendToLocalchain")]
+    pub async fn send_to_localchain_napi(
+      &self,
+      amount: BigInt,
+      notary_id: Option<u32>,
+    ) -> napi::Result<LocalchainTransfer> {
+      let transfer = self
+        .send_to_localchain(amount.get_u128().1, notary_id)
+        .await
+        .napi_ok()?;
+      Ok(LocalchainTransfer {
+        address: transfer.address,
+        amount: transfer.amount.into(),
+        notary_id: transfer.notary_id,
+        expiration_block: transfer.expiration_block,
+        account_nonce: transfer.account_nonce,
+      })
+    }
+  }
+}
+
 impl MainchainTransferStore {
   pub fn new(
     db: SqlitePool,
@@ -45,21 +75,20 @@ impl MainchainTransferStore {
     }
   }
 
-  #[napi]
   pub async fn send_to_localchain(
     &self,
-    amount: BigInt,
+    amount: Balance,
     notary_id: Option<u32>,
   ) -> Result<LocalchainTransfer> {
     let Some(ref mainchain_client) = *(self.mainchain_client.lock().await) else {
-      return Err(Error::from_reason("Mainchain client not initialized"));
+      bail!("Mainchain client not initialized");
     };
-    let mut db = self.db.acquire().await.map_err(to_js_error)?;
-    let account = AccountStore::deposit_account(&mut *db, notary_id).await?;
+    let mut db = self.db.acquire().await?;
+    let account = AccountStore::db_deposit_account(&mut *db, notary_id).await?;
     let (transfer, block) = mainchain_client
       .create_transfer_to_localchain(
         account.address.clone(),
-        amount.get_u128().1,
+        amount,
         account.notary_id,
         &self.keystore,
       )
@@ -67,7 +96,7 @@ impl MainchainTransferStore {
 
     let block_hash = hex::encode(block.block_hash().as_ref());
     let ext_hash = hex::encode(block.extrinsic_hash().as_ref());
-    let amount_str = amount.get_u128().1.to_string();
+    let amount_str = amount.to_string();
     let res = sqlx::query!(
       "INSERT INTO mainchain_transfers_in (address, amount, account_nonce, notary_id, expiration_block, first_block_hash, extrinsic_hash) VALUES (?, ?, ?, ?, ?, ?, ?)",
       account.address,
@@ -80,18 +109,18 @@ impl MainchainTransferStore {
     )
     .execute(&mut *db)
     .await
-    .map_err(to_js_error)?;
+    ?;
     if res.rows_affected() != 1 {
-      return Err(Error::from_reason("Error storing mainchain transfer"));
+      bail!("Error storing mainchain transfer");
     }
     Ok(transfer)
   }
 
-  pub async fn update_finalization(&self) -> anyhow::Result<()> {
+  pub async fn update_finalization(&self) -> Result<()> {
     let Some(ref mainchain_client) = *(self.mainchain_client.lock().await) else {
-      return Err(anyhow!("Mainchain client not initialized"));
+      bail!("Mainchain client not initialized");
     };
-    let mut db = self.db.acquire().await.map_err(to_js_error)?;
+    let mut db = self.db.acquire().await?;
     let transfers = sqlx::query_as!(
       MainchainTransferIn,
       "SELECT * FROM mainchain_transfers_in WHERE finalized_block_number IS NULL ORDER BY created_at LIMIT 1"
@@ -113,7 +142,7 @@ impl MainchainTransferStore {
         .execute(&mut *db)
         .await?;
         if res.rows_affected() != 1 {
-          return Err(anyhow!("Error updating mainchain transfer"));
+          bail!("Error updating mainchain transfer");
         }
       }
     }
@@ -122,14 +151,14 @@ impl MainchainTransferStore {
   }
 
   pub async fn find_ready_for_claim(&self) -> Result<Vec<MainchainTransferIn>> {
-    let mut db = self.db.acquire().await.map_err(to_js_error)?;
+    let mut db = self.db.acquire().await?;
     let res = sqlx::query_as!(
         MainchainTransferIn,
         "SELECT * FROM mainchain_transfers_in WHERE finalized_block_number IS NOT NULL AND balance_change_id IS NULL ORDER BY created_at LIMIT 1",
       )
       .fetch_all(&mut *db)
       .await
-      .map_err(to_js_error)?;
+      ?;
     Ok(res)
   }
 
@@ -138,17 +167,16 @@ impl MainchainTransferStore {
     transfer_id: i64,
     balance_change_id: i64,
   ) -> Result<()> {
-    let mut db = self.db.acquire().await.map_err(to_js_error)?;
+    let mut db = self.db.acquire().await?;
     let res = sqlx::query!(
       "UPDATE mainchain_transfers_in SET balance_change_id = ? WHERE id = ?",
       balance_change_id,
       transfer_id
     )
     .execute(&mut *db)
-    .await
-    .map_err(to_js_error)?;
+    .await?;
     if res.rows_affected() != 1 {
-      return Err(Error::from_reason("Error updating mainchain transfer"));
+      bail!("Error updating mainchain transfer");
     }
     Ok(())
   }

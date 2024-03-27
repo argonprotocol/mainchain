@@ -1,16 +1,16 @@
 use std::collections::BTreeMap;
 use std::sync::Arc;
 
-use napi::bindgen_prelude::*;
 use sqlx::SqlitePool;
 use tokio::sync::Mutex;
 
 use ulx_primitives::{AccountType, Note, NoteType};
 
-use crate::transactions::TransactionType;
-use crate::{to_js_error, BalanceChangeStatus, LocalAccount, MainchainClient};
-use crate::{AccountStore, BalanceChangeRow};
 use crate::mainchain_transfer::MainchainTransferIn;
+use crate::transactions::TransactionType;
+use crate::Result;
+use crate::{AccountStore, BalanceChangeRow};
+use crate::{BalanceChangeStatus, LocalAccount, MainchainClient};
 
 #[derive(Clone, Debug, Default)]
 pub struct LocalchainOverview {
@@ -36,29 +36,11 @@ pub struct LocalchainOverview {
   pub pending_mainchain_balance_change: i128,
 }
 
-impl Into<LocalchainOverviewJs> for LocalchainOverview {
-  fn into(self) -> LocalchainOverviewJs {
-    LocalchainOverviewJs {
-      name: self.name,
-      address: self.address,
-      balance: self.balance.into(),
-      pending_balance_change: self.pending_balance_change.into(),
-      held_balance: self.held_balance.into(),
-      tax: self.tax.into(),
-      pending_tax_change: self.pending_tax_change.into(),
-      changes: self.changes,
-      mainchain_balance: self.mainchain_balance.into(),
-      pending_mainchain_balance_change: self.pending_mainchain_balance_change.into(),
-    }
-  }
-}
-
 #[derive(Clone, Debug)]
-#[napi(object)]
 pub struct BalanceChangeGroup {
-  pub net_balance_change: BigInt,
-  pub net_tax: BigInt,
-  pub held_balance: BigInt,
+  pub net_balance_change: i128,
+  pub net_tax: i128,
+  pub held_balance: i128,
   pub timestamp: i64,
   pub notes: Vec<String>,
   pub finalized_block_number: Option<u32>,
@@ -71,12 +53,11 @@ pub struct BalanceChangeGroup {
 }
 
 #[derive(Clone, Debug)]
-#[napi(object)]
 pub struct BalanceChangeSummary {
   pub id: i64,
-  pub final_balance: BigInt,
-  pub hold_balance: BigInt,
-  pub net_balance_change: BigInt,
+  pub final_balance: i128,
+  pub hold_balance: i128,
+  pub net_balance_change: i128,
   pub change_number: u32,
   pub account_id: i64,
   pub account_type: AccountType,
@@ -85,31 +66,6 @@ pub struct BalanceChangeSummary {
   pub status: BalanceChangeStatus,
   pub notebook_number: Option<u32>,
   pub finalized_block_number: Option<u32>,
-}
-
-#[napi(object, js_name = "LocalchainOverview")]
-#[derive(Clone, Debug)]
-pub struct LocalchainOverviewJs {
-  /// The name of this localchain
-  pub name: String,
-  /// The primary localchain address
-  pub address: String,
-  /// The current account balance
-  pub balance: BigInt,
-  /// The net pending balance change acceptance/confirmation
-  pub pending_balance_change: BigInt,
-  /// Balance held in escrow
-  pub held_balance: BigInt,
-  /// Tax accumulated for the account
-  pub tax: BigInt,
-  /// The net pending tax balance change
-  pub pending_tax_change: BigInt,
-  /// Changes to the account ordered from most recent to oldest
-  pub changes: Vec<BalanceChangeGroup>,
-  /// The mainchain balance
-  pub mainchain_balance: BigInt,
-  /// The net pending mainchain balance pending movement in/out of the localchain
-  pub pending_mainchain_balance_change: BigInt,
 }
 
 fn get_note_descriptions(change: &BalanceChangeRow) -> Vec<String> {
@@ -123,13 +79,13 @@ fn get_notes(change: &BalanceChangeRow) -> Vec<Note> {
   serde_json::from_str(&change.notes_json).unwrap_or_default()
 }
 
-#[napi]
+#[cfg_attr(feature = "napi", napi)]
 pub struct OverviewStore {
   db: SqlitePool,
   name: String,
   mainchain_client: Arc<Mutex<Option<MainchainClient>>>,
 }
-#[napi]
+
 impl OverviewStore {
   pub fn new(
     db: SqlitePool,
@@ -143,12 +99,7 @@ impl OverviewStore {
     }
   }
 
-  #[napi(js_name = "get")]
-  pub async fn get_js(&self) -> Result<LocalchainOverviewJs> {
-    self.get().await.map_err(to_js_error).map(Into::into)
-  }
-
-  pub async fn get(&self) -> anyhow::Result<LocalchainOverview> {
+  pub async fn get(&self) -> Result<LocalchainOverview> {
     let mut overview = LocalchainOverview::default();
     overview.name = self.name.clone();
 
@@ -183,7 +134,7 @@ impl OverviewStore {
     .await?;
 
     let mut db = self.db.acquire().await?;
-    let accounts_by_id: BTreeMap<i64, LocalAccount> = AccountStore::list(&mut db, true)
+    let accounts_by_id: BTreeMap<i64, LocalAccount> = AccountStore::db_list(&mut db, true)
       .await?
       .into_iter()
       .map(|a| (a.id, a))
@@ -205,7 +156,7 @@ impl OverviewStore {
 
     if let Some(mainchain_client) = self.mainchain_client.lock().await.as_ref() {
       if let Ok(account) = mainchain_client.get_account(overview.address.clone()).await {
-        overview.mainchain_balance = account.data.free.get_i128().0;
+        overview.mainchain_balance = account.data.free as i128;
       }
     }
 
@@ -221,7 +172,7 @@ impl OverviewStore {
       let mut balance_change = BalanceChangeSummary {
         id: change.id,
         final_balance: change.balance.parse::<i128>()?.into(),
-        hold_balance: 0u128.into(),
+        hold_balance: 0i128,
         net_balance_change: change.net_balance_change.parse::<i128>()?.into(),
         change_number: change.change_number as u32,
         account_id: change.account_id,
@@ -242,13 +193,13 @@ impl OverviewStore {
         .find(|n| matches!(n.note_type, NoteType::EscrowHold { .. }))
       {
         overview.held_balance += note.milligons as i128;
-        balance_change.hold_balance = note.milligons.into();
+        balance_change.hold_balance = note.milligons as i128;
       }
 
       let net_balance_change = change.net_balance_change.parse::<i128>()?;
       let change_group = BalanceChangeGroup {
         net_balance_change: net_balance_change.into(),
-        net_tax: 0u128.into(),
+        net_tax: 0i128,
         held_balance: balance_change.hold_balance.clone(),
         notes: get_note_descriptions(&change),
         finalized_block_number: change.finalized_block_number.map(|n| n as u32),
@@ -282,9 +233,9 @@ impl OverviewStore {
 
       if let Some(existing) = existing {
         existing.balance_changes.push(balance_change.clone());
-        let existing_hold = existing.held_balance.get_i128().0;
+        let existing_hold = existing.held_balance;
         if existing_hold > 0i128 {
-          existing.held_balance = (existing_hold + balance_change.hold_balance.get_i128().0).into();
+          existing.held_balance = existing_hold + balance_change.hold_balance;
         }
       } else {
         overview.changes.push(change_group);
@@ -308,19 +259,15 @@ impl OverviewStore {
 
     for group in overview.changes.iter_mut() {
       group.balance_changes.sort_by(|a, b| b.id.cmp(&a.id));
-      let mut net_balance_change = 0i128;
-      let mut net_tax = 0i128;
 
       let is_transaction = group.transaction_id.is_some();
       for change in &group.balance_changes {
         if change.account_type == AccountType::Tax {
-          net_tax += change.net_balance_change.get_i128().0;
+          group.net_tax += change.net_balance_change;
         } else {
-          net_balance_change += change.net_balance_change.get_i128().0;
+          group.net_balance_change += change.net_balance_change;
         }
       }
-      group.net_balance_change = net_balance_change.into();
-      group.net_tax = net_tax.into();
 
       let change = group
         .balance_changes
@@ -350,6 +297,136 @@ impl OverviewStore {
     }
 
     Ok(overview)
+  }
+}
+
+#[cfg(feature = "napi")]
+pub mod napi_ext {
+  use super::OverviewStore;
+  use napi::bindgen_prelude::*;
+
+  use crate::transactions::TransactionType;
+  use crate::BalanceChangeStatus;
+  use ulx_primitives::AccountType;
+  use crate::error::NapiOk;
+
+  #[napi(object)]
+  #[derive(Clone, Debug)]
+  pub struct LocalchainOverview {
+    /// The name of this localchain
+    pub name: String,
+    /// The primary localchain address
+    pub address: String,
+    /// The current account balance
+    pub balance: BigInt,
+    /// The net pending balance change acceptance/confirmation
+    pub pending_balance_change: BigInt,
+    /// Balance held in escrow
+    pub held_balance: BigInt,
+    /// Tax accumulated for the account
+    pub tax: BigInt,
+    /// The net pending tax balance change
+    pub pending_tax_change: BigInt,
+    /// Changes to the account ordered from most recent to oldest
+    pub changes: Vec<BalanceChangeGroup>,
+    /// The mainchain balance
+    pub mainchain_balance: BigInt,
+    /// The net pending mainchain balance pending movement in/out of the localchain
+    pub pending_mainchain_balance_change: BigInt,
+  }
+
+  #[napi(object)]
+  #[derive(Clone, Debug)]
+  pub struct BalanceChangeGroup {
+    pub net_balance_change: BigInt,
+    pub net_tax: BigInt,
+    pub held_balance: BigInt,
+    pub timestamp: i64,
+    pub notes: Vec<String>,
+    pub finalized_block_number: Option<u32>,
+    pub status: BalanceChangeStatus,
+    pub notarization_id: Option<i64>,
+    pub transaction_id: Option<i64>,
+    pub transaction_type: Option<TransactionType>,
+    pub balance_changes: Vec<BalanceChangeSummary>,
+    pub notebook_number: Option<u32>,
+  }
+
+  #[napi(object)]
+  #[derive(Clone, Debug)]
+  pub struct BalanceChangeSummary {
+    pub id: i64,
+    pub final_balance: BigInt,
+    pub hold_balance: BigInt,
+    pub net_balance_change: BigInt,
+    pub change_number: u32,
+    pub account_id: i64,
+    pub account_type: AccountType,
+    pub is_jump_account: bool,
+    pub notes: Vec<String>,
+    pub status: BalanceChangeStatus,
+    pub notebook_number: Option<u32>,
+    pub finalized_block_number: Option<u32>,
+  }
+
+  impl Into<LocalchainOverview> for super::LocalchainOverview {
+    fn into(self) -> LocalchainOverview {
+      LocalchainOverview {
+        name: self.name,
+        address: self.address,
+        balance: self.balance.into(),
+        pending_balance_change: self.pending_balance_change.into(),
+        held_balance: self.held_balance.into(),
+        tax: self.tax.into(),
+        pending_tax_change: self.pending_tax_change.into(),
+        changes: self.changes.into_iter().map(|c| c.into()).collect::<Vec<_>>(),
+        mainchain_balance: self.mainchain_balance.into(),
+        pending_mainchain_balance_change: self.pending_mainchain_balance_change.into(),
+      }
+    }
+  }
+  impl Into<BalanceChangeGroup> for super::BalanceChangeGroup {
+    fn into(self) -> BalanceChangeGroup {
+      BalanceChangeGroup {
+        net_balance_change: self.net_balance_change.into(),
+        net_tax: self.net_tax.into(),
+        held_balance: self.held_balance.into(),
+        timestamp: self.timestamp,
+        notes: self.notes,
+        finalized_block_number: self.finalized_block_number,
+        status: self.status,
+        notarization_id: self.notarization_id,
+        transaction_id: self.transaction_id,
+        transaction_type: self.transaction_type,
+        balance_changes: self
+          .balance_changes
+          .into_iter()
+          .map(|c| BalanceChangeSummary {
+            id: c.id,
+            final_balance: c.final_balance.into(),
+            hold_balance: c.hold_balance.into(),
+            net_balance_change: c.net_balance_change.into(),
+            change_number: c.change_number,
+            account_id: c.account_id,
+            account_type: c.account_type,
+            is_jump_account: c.is_jump_account,
+            notes: c.notes,
+            status: c.status,
+            notebook_number: c.notebook_number,
+            finalized_block_number: c.finalized_block_number,
+          })
+          .collect::<Vec<_>>(),
+        notebook_number: self.notebook_number,
+      }
+    }
+  }
+
+  #[napi]
+  impl OverviewStore {
+    #[napi(js_name = "get")]
+    pub async fn get_napi(&self) -> napi::Result<LocalchainOverview> {
+      self.get().await.map(Into::into).napi_ok()
+    }
   }
 }
 

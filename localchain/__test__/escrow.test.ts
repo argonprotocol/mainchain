@@ -181,7 +181,7 @@ it('can run a data domain escrow', async () => {
     const notarizationEscrows = await notarization.escrows;
     expect(notarizationEscrows).toHaveLength(1);
     expect(notarizationEscrows[0].id).toBe(insideEscrow.id);
-    const json = JSON.parse(await notarization.toJson());
+    const json = JSON.parse(await notarization.toJSON());
     expect(json).toBeTruthy();
     expect(json.blockVotes).toBeTruthy();
     expect(json.blockVotes).toHaveLength(1);

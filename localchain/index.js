@@ -356,7 +356,6 @@ module.exports.NotarizationBuilder = nativeBinding.NotarizationBuilder
 module.exports.NotarizationTracker = nativeBinding.NotarizationTracker
 module.exports.NotaryClient = nativeBinding.NotaryClient
 module.exports.NotaryClients = nativeBinding.NotaryClients
-module.exports.NotebookMeta = nativeBinding.NotebookMeta
 module.exports.OpenEscrow = nativeBinding.OpenEscrow
 module.exports.OpenEscrowsStore = nativeBinding.OpenEscrowsStore
 module.exports.OverviewStore = nativeBinding.OverviewStore

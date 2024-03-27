@@ -1,15 +1,12 @@
-use crate::mainchain_client::MainchainClient;
-use crate::to_js_error;
+use anyhow::anyhow;
 use futures::stream::TryStreamExt;
 use futures::StreamExt;
-use napi::bindgen_prelude::*;
-use sp_core::crypto::Ss58Codec;
 use sp_core::ed25519;
 use sp_runtime::traits::Verify;
 use std::collections::HashMap;
 use std::sync::Arc;
 use tokio::sync::Mutex;
-use ulx_notary_apis::localchain::BalanceChangeResult;
+use ulx_notary_apis::localchain::{BalanceChangeResult, BalanceTipResult};
 use ulx_notary_apis::LocalchainRpcClient;
 use ulx_notary_apis::NotebookRpcClient;
 use ulx_primitives::{
@@ -17,16 +14,17 @@ use ulx_primitives::{
   SignedNotebookHeader,
 };
 
-#[napi]
+use crate::mainchain_client::MainchainClient;
+use crate::{bail, AccountStore, Result};
+
+#[cfg_attr(feature = "napi", napi)]
 #[derive(Clone)]
 pub struct NotaryClients {
   clients_by_id: Arc<Mutex<HashMap<u32, NotaryClient>>>,
   mainchain_client: Arc<Mutex<Option<MainchainClient>>>,
 }
 
-#[napi]
 impl NotaryClients {
-  #[napi(factory)]
   pub fn new(mainchain_client: &MainchainClient) -> Self {
     Self {
       clients_by_id: Arc::new(Mutex::new(HashMap::new())),
@@ -37,7 +35,7 @@ impl NotaryClients {
   pub fn from(mainchain_client: Arc<Mutex<Option<MainchainClient>>>) -> Self {
     Self {
       clients_by_id: Arc::new(Mutex::new(HashMap::new())),
-      mainchain_client: mainchain_client,
+      mainchain_client,
     }
   }
 
@@ -53,13 +51,11 @@ impl NotaryClients {
     *mainchain_client_ref = mainchain_client;
   }
 
-  #[napi]
   pub async fn use_client(&self, client: &NotaryClient) {
     let mut clients_by_id = self.clients_by_id.lock().await;
     clients_by_id.insert(client.notary_id, client.clone());
   }
 
-  #[napi]
   pub async fn get(&self, notary_id: u32) -> Result<NotaryClient> {
     let mut clients_by_id = self.clients_by_id.lock().await;
     if let Some(client) = clients_by_id.get(&notary_id) {
@@ -71,15 +67,11 @@ impl NotaryClients {
     let mainchain_mutex = self.mainchain_client.lock().await;
 
     let Some(ref mainchain_client) = *mainchain_mutex else {
-      return Err(to_js_error("Mainchain client not set"));
+      bail!("Mainchain client not set");
     };
 
-    let Some(notary_details) = mainchain_client
-      .get_notary_details(notary_id)
-      .await
-      .map_err(to_js_error)?
-    else {
-      return Err(to_js_error(format!("Notary {} not found", notary_id)));
+    let Some(notary_details) = mainchain_client.get_notary_details(notary_id).await? else {
+      bail!("Notary {} not found", notary_id);
     };
 
     let client = NotaryClient::connect(
@@ -94,7 +86,7 @@ impl NotaryClients {
   }
 }
 
-#[napi]
+#[cfg_attr(feature = "napi", napi)]
 #[derive(Clone)]
 pub struct NotaryClient {
   pub notary_id: u32,
@@ -104,32 +96,27 @@ pub struct NotaryClient {
   pub auto_verify_header_signatures: bool,
 }
 
-#[napi]
 impl NotaryClient {
-  #[napi]
   pub async fn is_connected(&self) -> bool {
     let client = self.client.lock().await;
     (*client).is_connected()
   }
 
-  #[napi(factory)]
   pub async fn connect(
     notary_id: u32,
-    public_key: Uint8Array,
+    public_key: Vec<u8>,
     host: String,
     auto_verify_header_signatures: bool,
   ) -> Result<Self> {
-    let public: [u8; 32] = public_key.as_ref().try_into().map_err(to_js_error)?;
+    let public: [u8; 32] = public_key
+      .try_into()
+      .map_err(|_| anyhow!("Unable to parse the notary public key"))?;
     Ok(Self {
       notary_id,
       public: ed25519::Public::from_raw(public),
       auto_verify_header_signatures,
       last_metadata: Arc::new(Mutex::new(None)),
-      client: Arc::new(Mutex::new(
-        ulx_notary_apis::create_client(&host)
-          .await
-          .map_err(to_js_error)?,
-      )),
+      client: Arc::new(Mutex::new(ulx_notary_apis::create_client(&host).await?)),
     })
   }
 
@@ -143,8 +130,7 @@ impl NotaryClient {
     let client = self.client.lock().await;
     let res = (*client)
       .get_notarization(account_id32, account_type, notebook_number, change_number)
-      .await
-      .map_err(to_js_error)?;
+      .await?;
 
     Ok(res)
   }
@@ -155,36 +141,25 @@ impl NotaryClient {
     account_type: AccountType,
   ) -> Result<AccountOrigin> {
     let client = self.client.lock().await;
-    let account_id = AccountId::from_ss58check(&address).map_err(to_js_error)?;
-    let res = (*client)
-      .get_origin(account_id, account_type)
-      .await
-      .map_err(to_js_error)?;
+    let account_id = AccountStore::parse_address(&address)?;
+    let res = (*client).get_origin(account_id, account_type).await?;
 
     Ok(res)
   }
 
-  #[napi]
   pub async fn get_balance_tip(
     &self,
     address: String,
     account_type: AccountType,
   ) -> Result<BalanceTipResult> {
     let client = self.client.lock().await;
-    let account_id = AccountId::from_ss58check(&address).map_err(to_js_error)?;
-    let res = (*client)
-      .get_tip(account_id, account_type)
-      .await
-      .map_err(to_js_error)?;
+    let account_id = AccountStore::parse_address(&address)?;
+    let res = (*client).get_tip(account_id, account_type).await?;
 
-    Ok(BalanceTipResult {
-      balance_tip: Uint8Array::from(res.balance_tip.as_ref()),
-      notebook_number: res.notebook_number,
-      tick: res.tick,
-    })
+    Ok(res)
   }
 
-  pub async fn notarize(&self, notarization: Notarization) -> anyhow::Result<BalanceChangeResult> {
+  pub async fn notarize(&self, notarization: Notarization) -> Result<BalanceChangeResult> {
     let client = self.client.lock().await;
     let json = serde_json::to_string_pretty(&notarization).unwrap();
     let res = (*client)
@@ -201,10 +176,9 @@ impl NotaryClient {
     Ok(res)
   }
 
-  #[napi(getter)]
   pub async fn metadata(&self) -> Result<NotebookMeta> {
     let client = self.client.lock().await;
-    let meta = (*client).metadata().await.map_err(to_js_error)?;
+    let meta = (*client).metadata().await?;
 
     *self.last_metadata.lock().await = Some(meta.clone());
     Ok(NotebookMeta {
@@ -217,27 +191,24 @@ impl NotaryClient {
     &self,
     notebook_number: NotebookNumber,
     tip: BalanceTip,
-  ) -> anyhow::Result<BalanceProof> {
+  ) -> Result<BalanceProof> {
     let client = self.client.lock().await;
 
     let proof = (*client).get_balance_proof(notebook_number, tip).await?;
     Ok(proof)
   }
 
-  pub fn verify_header(&self, header: &SignedNotebookHeader) -> anyhow::Result<()> {
+  pub fn verify_header(&self, header: &SignedNotebookHeader) -> Result<()> {
     if !header
       .signature
       .verify(header.header.hash().as_bytes(), &self.public)
     {
-      return Err(anyhow::anyhow!("This header has an invalid signature"));
+      bail!("This header has an invalid signature");
     }
     Ok(())
   }
 
-  pub async fn wait_for_notebook(
-    &self,
-    notebook_number: u32,
-  ) -> anyhow::Result<SignedNotebookHeader> {
+  pub async fn wait_for_notebook(&self, notebook_number: u32) -> Result<SignedNotebookHeader> {
     let mut has_seen_notebook = {
       let last_metadata = self.last_metadata.lock().await;
       if let Some(meta) = &*last_metadata {
@@ -279,20 +250,100 @@ impl NotaryClient {
         return Ok(header);
       }
     }
-    anyhow::bail!("No header found")
+    bail!("No header found")
   }
 }
-#[napi]
+
+#[cfg(feature = "napi")]
+pub mod napi_ext {
+  use crate::error::NapiOk;
+  use crate::{MainchainClient, NotebookMeta};
+  use napi::bindgen_prelude::*;
+  use ulx_primitives::AccountType;
+
+  use super::NotaryClient;
+  use super::NotaryClients;
+
+  #[napi]
+  pub struct BalanceTipResult {
+    pub balance_tip: Uint8Array,
+    pub notebook_number: u32,
+    pub tick: u32,
+  }
+
+  #[napi]
+  impl NotaryClients {
+    #[napi(factory, js_name = "new")]
+    pub fn new_napi(mainchain_client: &MainchainClient) -> NotaryClients {
+      NotaryClients::new(mainchain_client)
+    }
+
+    #[napi(js_name = "close")]
+    pub async fn close_napi(&self) {
+      self.close().await;
+    }
+
+    #[napi(js_name = "useClient")]
+    pub async fn use_client_napi(&self, client: &NotaryClient) {
+      self.use_client(client).await;
+    }
+
+    #[napi(js_name = "get")]
+    pub async fn get_napi(&self, notary_id: u32) -> napi::Result<NotaryClient> {
+      self.get(notary_id).await.napi_ok()
+    }
+  }
+  #[napi]
+  impl NotaryClient {
+    #[napi(js_name = "isConnected")]
+    pub async fn is_connected_napi(&self) -> bool {
+      self.is_connected().await
+    }
+
+    #[napi(factory, js_name = "connect")]
+    pub async fn connect_napi(
+      notary_id: u32,
+      public_key: Uint8Array,
+      host: String,
+      auto_verify_header_signatures: bool,
+    ) -> napi::Result<NotaryClient> {
+      NotaryClient::connect(
+        notary_id,
+        public_key.as_ref().to_vec(),
+        host,
+        auto_verify_header_signatures,
+      )
+      .await
+      .napi_ok()
+    }
+
+    #[napi(js_name = "getBalanceTip")]
+    pub async fn get_balance_tip_napi(
+      &self,
+      address: String,
+      account_type: AccountType,
+    ) -> napi::Result<BalanceTipResult> {
+      let result = self
+        .get_balance_tip(address, account_type)
+        .await
+        .napi_ok()?;
+      Ok(BalanceTipResult {
+        balance_tip: result.balance_tip.as_ref().to_vec().into(),
+        notebook_number: result.notebook_number,
+        tick: result.tick,
+      })
+    }
+
+    #[napi(getter, js_name = "metadata")]
+    pub async fn get_metadata_napi(&self) -> napi::Result<NotebookMeta> {
+      self.metadata().await.napi_ok()
+    }
+  }
+}
+
+#[cfg_attr(feature = "napi", napi(object))]
 #[derive(Clone)]
 pub struct NotebookMeta {
   pub finalized_notebook_number: u32,
   pub finalized_tick: u32,
-}
-
-#[napi]
-#[derive(Clone)]
-pub struct BalanceTipResult {
-  pub balance_tip: Uint8Array,
-  pub notebook_number: u32,
-  pub tick: u32,
 }

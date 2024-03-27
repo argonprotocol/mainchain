@@ -4,8 +4,8 @@
   "bin": "cli.js",
   "scripts": {
     "artifacts": "napi artifacts",
-    "build": "napi build --platform --release --no-const-enum",
-    "build:debug": "shx rm -rf target && napi build --platform --no-const-enum --features=fast-runtime -p ulx-localchain",
+    "build": "napi build --platform --release --no-const-enum --features=napi",
+    "build:debug": "shx rm -rf target && napi build --platform --no-const-enum --features=fast-runtime,napi -p ulx-localchain",
     "prepublishOnly": "napi prepublish -t npm",
     "pretest": "npm run build:debug",
     "test": "npm run pretest && jest",
