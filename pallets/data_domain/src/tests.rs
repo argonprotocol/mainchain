@@ -6,9 +6,9 @@ use crate::{
 use frame_support::{assert_err, assert_ok, traits::Hooks};
 use sp_keyring::AccountKeyring::{Alice, Bob};
 use sp_runtime::{testing::H256, BoundedVec};
-use std::{collections::BTreeMap, net::Ipv4Addr};
+use std::collections::BTreeMap;
 use ulx_primitives::{
-	host::Host, notebook::NotebookHeader, tick::Tick, AccountId, DataDomain, DataDomainHash,
+	notebook::NotebookHeader, tick::Tick, AccountId, DataDomain, DataDomainHash,
 	DataDomainProvider, DataTLD, NotebookEventHandler, Semver, VersionHost, ZoneRecord,
 };
 
@@ -127,11 +127,7 @@ fn it_registers_zone_records() {
 			versions: BTreeMap::from([(
 				Semver::new(1, 0, 0),
 				VersionHost {
-					host: Host {
-						ip: Ipv4Addr::new(127, 0, 0, 1).into(),
-						port: 8080,
-						is_secure: true,
-					},
+					host: "wss://127.0.0.1:8080".into(),
 					datastore_id: BoundedVec::truncate_from(b"test".to_vec()),
 				},
 			)]),

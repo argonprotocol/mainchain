@@ -244,6 +244,7 @@ pub struct AccountOrigin {
 
 #[derive(Clone, PartialEq, Eq, Encode, Decode, RuntimeDebug, TypeInfo, MaxEncodedLen)]
 #[cfg_attr(not(feature = "std"), derive(Serialize, Deserialize))]
+#[repr(transparent)]
 pub struct MultiSignatureBytes(pub MultiSignature);
 
 #[cfg(feature = "std")]

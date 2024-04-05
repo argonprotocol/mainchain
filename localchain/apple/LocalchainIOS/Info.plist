@@ -1,0 +1,53 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<plist version="1.0">
+<dict>
+	<key>NSCameraUsageDescription</key>
+	<string>Import Argon Files via QR Code</string>
+	<key>CFBundleDocumentTypes</key>
+	<array>
+		<dict>
+			<key>CFBundleTypeIconFile</key>
+			<string>argfile.icns</string>
+			<key>UTTypeIconFiles</key>
+			<array>
+				<string>argfile.png</string>
+			</array>
+			<key>CFBundleTypeName</key>
+			<string>Argon File</string>
+			<key>LSHandlerRank</key>
+			<string>Owner</string>
+			<key>LSItemContentTypes</key>
+			<array>
+				<string>org.ulixee.argon</string>
+			</array>
+		</dict>
+	</array>
+	<key>UTExportedTypeDeclarations</key>
+	<array>
+		<dict>
+			<key>CFBundleTypeIconFile</key>
+			<string>argfile.icns</string>
+			<key>UTTypeIconFiles</key>
+			<array>
+				<string>argfile.png</string>
+			</array>
+			<key>UTTypeConformsTo</key>
+			<array>
+				<string>public.json</string>
+			</array>
+			<key>UTTypeDescription</key>
+			<string>Argon File</string>
+			<key>UTTypeIdentifier</key>
+			<string>org.ulixee.argon</string>
+			<key>UTTypeTagSpecification</key>
+			<dict>
+				<key>public.filename-extension</key>
+				<array>
+					<string>arg</string>
+				</array>
+			</dict>
+		</dict>
+	</array>
+</dict>
+</plist>

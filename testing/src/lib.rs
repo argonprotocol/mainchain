@@ -1,6 +1,7 @@
-use std::{process, process::Command};
+use std::env;
 use std::io::{BufRead, BufReader};
 use std::path::PathBuf;
+use std::{process, process::Command};
 
 use anyhow::anyhow;
 use subxt::backend::{legacy::LegacyRpcMethods, rpc};
@@ -28,33 +29,19 @@ impl TestContext {
 	pub async fn test_context_with(authority: String) -> anyhow::Result<Self> {
 		let project_dir = PathBuf::from(env!("CARGO_MANIFEST_DIR"));
 
-		let rust_log = format!("{},sc_rpc_server=info", option_env!("RUST_LOG").unwrap_or("warn"));
+		let rust_log = format!("{},sc_rpc_server=info", env::var("RUST_LOG").unwrap_or("warn".to_string()));
 
 		let workspace_cargo_path = project_dir.join("..");
-		let workspace_cargo_path = workspace_cargo_path.canonicalize().expect("Failed to canonicalize path");
-		let workspace_cargo_path = workspace_cargo_path.as_path();
+		let workspace_cargo_path =
+			workspace_cargo_path.canonicalize().expect("Failed to canonicalize path");
+		let workspace_cargo_path = workspace_cargo_path.as_path().join("target/debug");
 		let root = workspace_cargo_path.as_os_str();
-		Command::new("cargo")
-			.env("RUST_BACKTRACE", "1")
-			.env("SQLX_OFFLINE", "1")
-			.current_dir(root)
-			.arg("build")
-			.arg("--profile=test")
-			.arg("--features=fast-runtime")
-			.arg("--bin=ulx-node")
-			.spawn().expect("Could not build latest!");
+		println!("run from {}", root.to_str().unwrap_or(""));
 
-		let mut proc = Command::new("cargo")
+		let mut proc = Command::new("./ulx-node")
 			.current_dir(root)
 			.env("RUST_LOG", rust_log)
-			.env("SQLX_OFFLINE", "1")
-			.env("RUST_BACKTRACE", "1")
 			.stderr(process::Stdio::piped())
-			.arg("run")
-			.arg("--profile=test")
-			.arg("--features=fast-runtime")
-			.arg("--bin=ulx-node")
-			.arg("--")
 			.arg("--dev")
 			.arg(format!("--{}", authority.to_lowercase()))
 			.arg("--miners=4")
@@ -69,7 +56,9 @@ impl TestContext {
 		for line in BufReader::new(stderr).lines().take(500) {
 			let line = line.expect("failed to obtain next line from stdout for port discovery");
 
-			let line_port = line.rsplit_once("Running JSON-RPC server: addr=127.0.0.1:").map(|(_, port)| port);
+			let line_port = line
+				.rsplit_once("Running JSON-RPC server: addr=127.0.0.1:")
+				.map(|(_, port)| port);
 
 			if let Some(line_port) = line_port {
 				// trim non-numeric chars from the end of the port part of the line.

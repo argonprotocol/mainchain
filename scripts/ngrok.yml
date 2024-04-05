@@ -1,0 +1,9 @@
+version: 2
+tunnels:
+  node:
+    proto: http
+    addr: 9944
+    domain: husky-witty-highly.ngrok-free.app
+  notary:
+    proto: http
+    addr: 9925

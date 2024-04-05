@@ -1,4 +1,4 @@
-import {AccountType, NotaryClient} from "../index";
+import {AccountType, MainchainClient, NotaryClient} from "../index";
 import TestMainchain from "./TestMainchain";
 import TestNotary from "./TestNotary";
 import {getClient, Keyring} from "@ulixee/mainchain";
@@ -15,6 +15,14 @@ it('can start a mainchain', async () => {
     expect(url.port).toBeTruthy();
 });
 
+
+it('can get a ticker', async () => {
+    const mainchain = new TestMainchain();
+    const mainchainUrl = await mainchain.launch();
+
+    const client = await MainchainClient.connect(mainchainUrl, 2000);
+    await expect(client.getTicker()).resolves.toBeTruthy();
+});
 
 it('can start a notary', async () => {
     const mainchain = new TestMainchain();

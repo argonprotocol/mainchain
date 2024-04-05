@@ -300,15 +300,134 @@ impl OverviewStore {
   }
 }
 
+#[cfg(feature = "uniffi")]
+pub mod uniffi_ext {
+  use crate::transactions::TransactionType;
+  use crate::BalanceChangeStatus;
+  use ulx_primitives::AccountType;
+
+  #[derive(uniffi::Record, Clone, Debug)]
+  pub struct LocalchainOverview {
+    /// The name of this localchain
+    pub name: String,
+    /// The primary localchain address
+    pub address: String,
+    /// The current account balance
+    pub balance: String,
+    /// The net pending balance change acceptance/confirmation
+    pub pending_balance_change: String,
+    /// Balance held in escrow
+    pub held_balance: String,
+    /// Tax accumulated for the account
+    pub tax: String,
+    /// The net pending tax balance change
+    pub pending_tax_change: String,
+    /// Changes to the account ordered from most recent to oldest
+    pub changes: Vec<BalanceChangeGroup>,
+    /// The mainchain balance
+    pub mainchain_balance: String,
+    /// The net pending mainchain balance pending movement in/out of the localchain
+    pub pending_mainchain_balance_change: String,
+  }
+
+  #[derive(uniffi::Record, Clone, Debug)]
+  pub struct BalanceChangeGroup {
+    pub net_balance_change: String,
+    pub net_tax: String,
+    pub held_balance: String,
+    pub timestamp: i64,
+    pub notes: Vec<String>,
+    pub finalized_block_number: Option<u32>,
+    pub status: BalanceChangeStatus,
+    pub notarization_id: Option<i64>,
+    pub transaction_id: Option<i64>,
+    pub transaction_type: Option<TransactionType>,
+    pub balance_changes: Vec<BalanceChangeSummary>,
+    pub notebook_number: Option<u32>,
+  }
+
+  #[derive(uniffi::Record, Clone, Debug)]
+  pub struct BalanceChangeSummary {
+    pub id: i64,
+    pub final_balance: String,
+    pub hold_balance: String,
+    pub net_balance_change: String,
+    pub change_number: u32,
+    pub account_id: i64,
+    pub account_type: AccountType,
+    pub is_jump_account: bool,
+    pub notes: Vec<String>,
+    pub status: BalanceChangeStatus,
+    pub notebook_number: Option<u32>,
+    pub finalized_block_number: Option<u32>,
+  }
+
+  impl Into<LocalchainOverview> for super::LocalchainOverview {
+    fn into(self) -> LocalchainOverview {
+      LocalchainOverview {
+        name: self.name,
+        address: self.address,
+        balance: self.balance.to_string(),
+        pending_balance_change: self.pending_balance_change.to_string(),
+        held_balance: self.held_balance.to_string(),
+        tax: self.tax.to_string(),
+        pending_tax_change: self.pending_tax_change.to_string(),
+        changes: self
+          .changes
+          .into_iter()
+          .map(|c| c.into())
+          .collect::<Vec<_>>(),
+        mainchain_balance: self.mainchain_balance.to_string(),
+        pending_mainchain_balance_change: self.pending_mainchain_balance_change.to_string(),
+      }
+    }
+  }
+  impl Into<BalanceChangeGroup> for super::BalanceChangeGroup {
+    fn into(self) -> BalanceChangeGroup {
+      BalanceChangeGroup {
+        net_balance_change: self.net_balance_change.to_string(),
+        net_tax: self.net_tax.to_string(),
+        held_balance: self.held_balance.to_string(),
+        timestamp: self.timestamp,
+        notes: self.notes,
+        finalized_block_number: self.finalized_block_number,
+        status: self.status,
+        notarization_id: self.notarization_id,
+        transaction_id: self.transaction_id,
+        transaction_type: self.transaction_type,
+        balance_changes: self
+          .balance_changes
+          .into_iter()
+          .map(|c| BalanceChangeSummary {
+            id: c.id,
+            final_balance: c.final_balance.to_string(),
+            hold_balance: c.hold_balance.to_string(),
+            net_balance_change: c.net_balance_change.to_string(),
+            change_number: c.change_number,
+            account_id: c.account_id,
+            account_type: c.account_type,
+            is_jump_account: c.is_jump_account,
+            notes: c.notes,
+            status: c.status,
+            notebook_number: c.notebook_number,
+            finalized_block_number: c.finalized_block_number,
+          })
+          .collect::<Vec<_>>(),
+        notebook_number: self.notebook_number,
+      }
+    }
+  }
+}
+
 #[cfg(feature = "napi")]
 pub mod napi_ext {
   use super::OverviewStore;
   use napi::bindgen_prelude::*;
 
+  use crate::error::NapiOk;
   use crate::transactions::TransactionType;
   use crate::BalanceChangeStatus;
   use ulx_primitives::AccountType;
-  use crate::error::NapiOk;
 
   #[napi(object)]
   #[derive(Clone, Debug)]
@@ -379,7 +498,11 @@ pub mod napi_ext {
         held_balance: self.held_balance.into(),
         tax: self.tax.into(),
         pending_tax_change: self.pending_tax_change.into(),
-        changes: self.changes.into_iter().map(|c| c.into()).collect::<Vec<_>>(),
+        changes: self
+          .changes
+          .into_iter()
+          .map(|c| c.into())
+          .collect::<Vec<_>>(),
         mainchain_balance: self.mainchain_balance.into(),
         pending_mainchain_balance_change: self.pending_mainchain_balance_change.into(),
       }

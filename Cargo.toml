@@ -15,6 +15,7 @@ members = [
     "pallets/ticks",
     "client",
     "localchain",
+    "localchain/uniffi-bindgen",
     "primitives",
     "runtime",
     "notary",
@@ -36,13 +37,14 @@ repository = "https://github.com/ulixee/mainchain"
 documentation = "https://ulixee.org/docs"
 
 [patch."https://github.com/paritytech/polkadot-sdk.git"]
-sp-wasm-interface = { path = "../../polkadot/polkadot-sdk/substrate/primitives/wasm-interface" }
+sp-wasm-interface = { git = "https://github.com/ulixee/polkadot-sdk.git", branch = "release-polkadot-v1.9.0" }
 
 
 [profile.release]
 # Polkadot runtime requires unwinding.
 panic = "unwind"
 opt-level = 3
+lto = true
 
 # make sure dev builds with backtrace do not slow us down
 [profile.dev.package.backtrace]

@@ -1,4 +1,5 @@
-use std::{net::Ipv4Addr, time::Duration};
+use std::env;
+use std::time::Duration;
 
 use sc_service::{ChainType, Properties};
 use sp_consensus_grandpa::AuthorityId as GrandpaId;
@@ -11,7 +12,6 @@ use ulx_node_runtime::{
 use ulx_primitives::{
 	block_seal::{MiningRegistration, RewardDestination},
 	block_vote::VoteMinimum,
-	host::Host,
 	notary::{GenesisNotary, NotaryPublic},
 	tick::{Ticker, TICK_MILLIS},
 	BlockSealAuthorityId, BondId, ComputeDifficulty,
@@ -87,6 +87,9 @@ pub fn local_testnet_config() -> Result<ChainSpec, String> {
 	let mut properties = Properties::new();
 	properties.insert("tokenDecimals".into(), 3.into());
 
+	let notary_host =
+		env::var("ULX_LOCAL_TESTNET_NOTARY_URL").unwrap_or("ws://127.0.0.1:9925".to_string()).into();
+
 	Ok(ChainSpec::builder(
 		WASM_BINARY.ok_or_else(|| "Development wasm not available".to_string())?,
 		None,
@@ -118,11 +121,7 @@ pub fn local_testnet_config() -> Result<ChainSpec, String> {
 		vec![GenesisNotary {
 			account_id: get_account_id_from_seed::<sr25519::Public>("Ferdie"),
 			public: get_from_seed::<NotaryPublic>("Ferdie//notary"),
-			hosts: vec![Host {
-				ip: Ipv4Addr::new(127, 0, 0, 1).into(),
-				port: 9925,
-				is_secure: false,
-			}],
+			hosts: vec![notary_host],
 		}],
 	))
 	.build())

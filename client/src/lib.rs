@@ -91,8 +91,16 @@ impl UlxFullclient {
 	) -> Result<Self, Error> {
 		let start = std::time::Instant::now();
 		let url = Url::parse(&url).map_err(|e| Error::Other(format!("Invalid URL: {}", e)))?;
+
 		let (sender, receiver) = loop {
-			match WsTransportClientBuilder::default().build(url.clone()).await {
+			let builder = {
+				let transport_builder = WsTransportClientBuilder::default();
+				#[cfg(any(target_os = "ios", target_os = "android"))]
+				let transport_builder = transport_builder.use_webpki_rustls();
+
+				transport_builder
+			};
+			match builder.build(url.clone()).await {
 				Ok(client) => break client,
 				Err(why) => {
 					if start.elapsed().as_millis() as u64 > timeout_millis {
@@ -161,7 +169,7 @@ impl MultiurlClient {
 		{
 			let lock = self.client.read().await;
 			if let Some(client) = &*lock {
-				return Ok(client.clone())
+				return Ok(client.clone());
 			}
 		}
 
@@ -180,9 +188,7 @@ impl MultiurlClient {
 				Ok(client) => break client,
 				Err(why) => {
 					if start.elapsed().as_millis() as u64 > 10_000u64 {
-						return Err(anyhow!(
-							"Failed to connect to client within timeout",
-						));
+						return Err(anyhow!("Failed to connect to client within timeout",));
 					}
 					warn!(
 						"failed to connect to client due to {} - {:?}, retrying soon..",
@@ -221,5 +227,46 @@ impl MultiurlClient {
 	pub fn on_rpc_error(&mut self) {
 		let mut lock = self.client.write().now_or_never().unwrap();
 		*lock = None;
+	}
+}
+
+#[cfg(test)]
+mod test {
+	use super::*;
+	use std::env;
+	use ulx_testing::{test_context, test_context_from_url};
+
+	#[tokio::test]
+	async fn test_getting_ticker() -> anyhow::Result<()> {
+		let _ = tracing_subscriber::fmt::try_init();
+		let use_live = env::var("USE_LIVE").unwrap_or(String::from("false")).parse::<bool>()?;
+		let ctx = if use_live {
+			test_context_from_url("ws://localhost:9944").await
+		} else {
+			test_context().await
+		};
+
+		let ws_url = ctx.ws_url.clone();
+
+		let mut client = MultiurlClient::new(vec![ws_url.clone()]);
+		let ticker = client.lookup_ticker().await;
+		assert!(ticker.is_ok());
+		Ok(())
+	}
+
+	#[ignore]
+	#[tokio::test]
+	async fn test_redirecting_client() -> anyhow::Result<()> {
+		let _ = tracing_subscriber::fmt::try_init();
+
+		let client =
+			UlxClient::from_insecure_url("wss://husky-witty-highly.ngrok-free.app").await?;
+		let ticker = client
+			.runtime_api()
+			.at(client.genesis_hash())
+			.call(api::runtime_apis::tick_apis::TickApis.ticker())
+			.await;
+		assert!(ticker.is_ok());
+		Ok(())
 	}
 }

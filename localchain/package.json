@@ -5,7 +5,7 @@
   "scripts": {
     "artifacts": "napi artifacts",
     "build": "napi build --platform --release --no-const-enum --features=napi",
-    "build:debug": "shx rm -rf target && napi build --platform --no-const-enum --features=fast-runtime,napi -p ulx-localchain",
+    "build:debug": "napi build --platform --no-const-enum --features=fast-runtime,napi -p ulx-localchain",
     "prepublishOnly": "napi prepublish -t npm",
     "pretest": "npm run build:debug",
     "test": "npm run pretest && jest",

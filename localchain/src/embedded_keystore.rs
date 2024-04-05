@@ -246,6 +246,7 @@ impl EmbeddedKeystore {
 
 #[cfg_attr(feature = "napi", napi)]
 #[cfg_attr(not(feature = "napi"), derive(Clone, Copy))]
+#[cfg_attr(feature="uniffi", derive(uniffi::Enum))]
 #[derive(Eq, PartialEq, PartialOrd, Ord, Debug, ValueEnum)]
 #[value(rename_all = "kebab-case")]
 pub enum CryptoScheme {

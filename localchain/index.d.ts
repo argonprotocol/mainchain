@@ -155,6 +155,7 @@ export class Localchain {
   close(): Promise<void>
   accountOverview(): Promise<LocalchainOverview>
   static getDefaultDir(): string
+  static setDefaultDir(value: string): void
   static getDefaultPath(): string
   get address(): Promise<string>
   get name(): string
@@ -178,6 +179,7 @@ export class MainchainClient {
   host: string
   close(): Promise<void>
   static connect(host: string, timeoutMillis: number): Promise<MainchainClient>
+  getTicker(): Promise<Ticker>
   getBestBlockHash(): Promise<Uint8Array>
   getVoteBlockHash(currentTick: number): Promise<BestBlockForVote | null>
   getDataDomainRegistration(domainName: string, tld: DataTLD): Promise<DataDomainRegistration | null>
@@ -251,7 +253,6 @@ export class NotarizationTracker {
   notarizationId: number
   notarizedBalanceChanges: number
   notarizedVotes: number
-
   /** Returns the balance changes that were submitted to the notary indexed by the stringified account id (napi doesn't allow numbers as keys) */
   get balanceChangesByAccountId(): Promise<Record<string, BalanceChange>>
   waitForNotebook(): Promise<void>
@@ -310,6 +311,8 @@ export class Transactions {
   request(milligons: bigint): Promise<string>
   createEscrow(escrowMilligons: bigint, recipientAddress: string, dataDomain?: string | undefined | null, notaryId?: number | undefined | null): Promise<OpenEscrow>
   send(milligons: bigint, to?: Array<string> | undefined | null): Promise<string>
+  importArgons(argonFile: string): Promise<NotarizationTracker>
+  acceptArgonRequest(argonFile: string): Promise<NotarizationTracker>
 }
 
 export interface AccountInfo {
@@ -584,6 +587,11 @@ export function runCli(): Promise<void>
 export interface SignatureResult {
   signature: Uint8Array
   milligons: bigint
+}
+
+export interface Ticker {
+  tickDurationMillis: number
+  genesisUtcTime: number
 }
 
 export interface TickerConfig {

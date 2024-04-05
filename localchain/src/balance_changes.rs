@@ -92,6 +92,7 @@ impl BalanceChangeRow {
 #[derive(Debug, PartialOrd, PartialEq)]
 #[cfg_attr(not(feature = "napi"), derive(Clone, Copy))]
 #[cfg_attr(feature = "napi", napi(string_enum))]
+#[cfg_attr(feature = "uniffi", derive(uniffi::Enum))]
 pub enum BalanceChangeStatus {
   /// The balance change has been submitted, but is not in a known notebook yet.
   SubmittedToNotary,

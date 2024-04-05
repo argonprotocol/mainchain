@@ -258,8 +258,7 @@ mod tests {
 				sp_core::ed25519,
 				ulx_node_runtime::RuntimeCall,
 				ulx_primitives::{
-					balance_change::AccountOrigin as SubxtAccountOrigin, host::Host,
-					notary::NotaryMeta,
+					balance_change::AccountOrigin as SubxtAccountOrigin, notary::NotaryMeta,
 				},
 			},
 			storage, tx,
@@ -282,6 +281,7 @@ mod tests {
 
 	use super::*;
 	use ulixee_client::MultiurlClient;
+	use ulx_primitives::host::Host;
 
 	type Nonce = u32;
 
@@ -700,12 +700,11 @@ mod tests {
 			IpAddr::V4(ip) => ip,
 			IpAddr::V6(_) => panic!("Should be ipv4"),
 		};
+		let host: Host = format!("ws://{}:{}", ip, addr.port()).into();
 		let notary_proposal = tx().notaries().propose(NotaryMeta {
-			hosts: BoundedVec(vec![Host {
-				is_secure: false,
-				ip: ip.into(),
-				port: addr.port().into(),
-			}]),
+			hosts: BoundedVec(vec![runtime_types::ulx_primitives::host::Host(BoundedVec(
+				host.0.to_vec(),
+			))]),
 			public: ed25519::Public(notary_key.0),
 		});
 		println!("notary proposal {:?}", notary_proposal.call_data());

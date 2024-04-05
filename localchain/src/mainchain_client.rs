@@ -263,13 +263,6 @@ impl MainchainClient {
     };
     let mut versions = HashMap::new();
     for (version, host) in zone_record.versions {
-      let host_url = Host {
-        is_secure: host.host.is_secure,
-        ip: host.host.ip,
-        port: host.host.port,
-      }
-      .get_url();
-
       let datastore_id = match String::from_utf8(host.datastore_id.0) {
         Ok(s) => s,
         Err(_) => {
@@ -277,11 +270,13 @@ impl MainchainClient {
         }
       };
 
+      let prim_host: Host = host.host.0 .0.into();
+      let host_string: String = prim_host.try_into()?;
       versions.insert(
         format!("{}.{}.{}", version.major, version.minor, version.patch),
         VersionHost {
           datastore_id,
-          host: host_url,
+          host: host_string,
         },
       );
     }
@@ -300,22 +295,28 @@ impl MainchainClient {
       .ok_or_else(|| anyhow!("No notaries found"))?;
     let notary = notaries.0.into_iter().find_map(|n| {
       if n.notary_id == notary_id {
-        return Some(NotaryDetails {
-          id: n.notary_id,
-          hosts: n
-            .meta
-            .hosts
-            .0
-            .into_iter()
-            .map(|h| Host::format_url(h.is_secure, h.ip, h.port))
-            .collect::<Vec<_>>(),
-          public_key: n.meta.public.0.to_vec(),
-        });
+        return Some(n);
       }
       None
     });
+    let Some(notary) = notary else {
+      return Ok(None);
+    };
 
-    Ok(notary)
+    let hosts: anyhow::Result<Vec<String>, _> = notary
+      .meta
+      .hosts
+      .0
+      .into_iter()
+      .map(|h| Host::from(h.0 .0).try_into())
+      .collect();
+    let notary = NotaryDetails {
+      id: notary.notary_id,
+      hosts: hosts?,
+      public_key: notary.meta.public.0.into(),
+    };
+
+    Ok(Some(notary))
   }
 
   pub async fn get_account(&self, address: String) -> Result<AccountInfo> {
@@ -701,6 +702,11 @@ pub mod napi_ext {
     pub block_hash: Uint8Array,
     pub vote_minimum: BigInt,
   }
+  #[napi(object)]
+  pub struct Ticker {
+    pub tick_duration_millis: i64,
+    pub genesis_utc_time: i64,
+  }
 
   #[napi]
   impl MainchainClient {
@@ -715,6 +721,16 @@ pub mod napi_ext {
         .await
         .napi_ok()
     }
+
+    #[napi(js_name = "getTicker")]
+    pub async fn get_ticker_napi(&self) -> napi::Result<Ticker> {
+      let ticker = self.get_ticker().await.napi_ok()?;
+      Ok(Ticker {
+        tick_duration_millis: ticker.tick_duration_millis as i64,
+        genesis_utc_time: ticker.genesis_utc_time as i64,
+      })
+    }
+
     #[napi(js_name = "getBestBlockHash")]
     pub async fn get_best_block_hash_napi(&self) -> napi::Result<Uint8Array> {
       let hash = self.get_best_block_hash().await.napi_ok()?;

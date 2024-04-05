@@ -72,6 +72,42 @@ impl BalanceSyncResult {
   }
 }
 
+#[cfg(feature = "uniffi")]
+pub mod uniffi_ext {
+  use crate::notarization_tracker::uniffi_ext::BalanceChange;
+  use crate::notarization_tracker::uniffi_ext::NotarizationTracker;
+  use std::sync::Arc;
+
+  #[derive(uniffi::Record)]
+  pub struct BalanceSyncResult {
+    pub balance_changes: Vec<BalanceChange>,
+    pub mainchain_transfers: Vec<Arc<NotarizationTracker>>,
+    pub jump_account_consolidations: Vec<Arc<NotarizationTracker>>,
+  }
+
+  impl From<super::BalanceSyncResult> for BalanceSyncResult {
+    fn from(result: super::BalanceSyncResult) -> Self {
+      BalanceSyncResult {
+        balance_changes: result
+          .balance_changes
+          .into_iter()
+          .map(|x| x.into())
+          .collect(),
+        mainchain_transfers: result
+          .mainchain_transfers
+          .into_iter()
+          .map(|x| Arc::new(x.into()))
+          .collect(),
+        jump_account_consolidations: result
+          .jump_account_consolidations
+          .into_iter()
+          .map(|x| Arc::new(x.into()))
+          .collect(),
+      }
+    }
+  }
+}
+
 #[cfg(feature = "napi")]
 pub mod napi_ext {
   use crate::error::NapiOk;
@@ -733,13 +769,15 @@ impl BalanceSync {
     let notary_id = balance_change.notary_id as u32;
     let notary_client = notary_clients.get(notary_id).await?;
     if account.origin.is_none() {
-      Self::sync_account_origin(&mut tx, &mut account, &notary_client).await?;
+      let is_synched = Self::sync_account_origin(&mut tx, &mut account, &notary_client).await?;
+      if !is_synched {
+        return Ok(());
+      }
     }
 
     let mut needs_notarization_download = true;
     let mut notebook_number = None;
     let expected_tip = balance_change.get_balance_tip(&account)?;
-
     if let Some(notarization_id) = balance_change.notarization_id {
       let record = sqlx::query!(
         "SELECT notebook_number, json IS NOT NULL as json FROM notarizations WHERE id = ?",

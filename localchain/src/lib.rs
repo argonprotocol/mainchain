@@ -12,6 +12,7 @@ use std::time::Duration;
 
 use anyhow::{anyhow, Context};
 use directories::BaseDirs;
+use lazy_static::lazy_static;
 use parking_lot::RwLock;
 use sqlx::sqlite::{SqliteConnectOptions, SqlitePoolOptions, SqliteSynchronous};
 use sqlx::Sqlite;
@@ -35,10 +36,9 @@ use crate::cli::EmbeddedKeyPassword;
 use crate::mainchain_transfer::MainchainTransferStore;
 
 #[cfg(feature = "uniffi")]
-mod uniffi {
-  uniffi::setup_scaffolding!();
-  ulx_primitives::uniffi_reexport_scaffolding!();
-}
+uniffi::setup_scaffolding!();
+#[cfg(feature = "uniffi")]
+ulx_primitives::uniffi_reexport_scaffolding!();
 
 mod accounts;
 mod balance_change_builder;
@@ -65,6 +65,20 @@ mod overview;
 pub(crate) mod test_utils;
 pub mod transactions;
 
+lazy_static! {
+  static ref DEFAULT_DATA_DIR: Arc<RwLock<String>> = {
+    let base_dirs = BaseDirs::new().unwrap();
+    let data_local_dir = base_dirs.data_local_dir();
+    let path = PathBuf::from(data_local_dir)
+      .join("ulixee")
+      .join("localchain")
+      .to_str()
+      .unwrap()
+      .to_string();
+    Arc::new(RwLock::new(path))
+  };
+}
+
 #[cfg_attr(feature = "napi", napi(custom_finalize))]
 pub struct Localchain {
   pub(crate) db: SqlitePool,
@@ -87,7 +101,14 @@ impl Localchain {
   pub async fn create_db(path: String) -> Result<SqlitePool> {
     let db_path = PathBuf::from(path.clone());
     if let Some(dir) = db_path.parent() {
-      create_dir_all(dir).context("Could not create the parent directory for your localchain")?;
+      if !dir.exists() {
+        create_dir_all(dir).with_context(|| {
+          format!(
+            "Could not create the parent directory ({}) for your localchain",
+            dir.display()
+          )
+        })?;
+      }
     }
 
     if !Sqlite::database_exists(&path).await.unwrap_or(false) {
@@ -119,11 +140,11 @@ impl Localchain {
 
     let db = Self::create_db(path.clone())
       .await
-      .context("Creating database")?;
+      .with_context(|| format!("Creating database at {}", path.clone()))?;
 
-    let mainchain_client = MainchainClient::connect(mainchain_url, 30_000)
+    let mainchain_client = MainchainClient::connect(mainchain_url.clone(), 30_000)
       .await
-      .context("Connecting")?;
+      .with_context(|| format!("Connecting to mainchain at ({})", mainchain_url.clone()))?;
     let mut ticker = mainchain_client.get_ticker().await?;
     if let Some(ntp_pool_url) = ntp_pool_url {
       ticker.lookup_ntp_offset(&ntp_pool_url).await?;
@@ -222,14 +243,11 @@ impl Localchain {
   }
 
   pub fn get_default_dir() -> String {
-    let base_dirs = BaseDirs::new().unwrap();
-    let data_local_dir = base_dirs.data_local_dir();
-    PathBuf::from(data_local_dir)
-      .join("ulixee")
-      .join("localchain")
-      .to_str()
-      .unwrap()
-      .to_string()
+    DEFAULT_DATA_DIR.read().clone()
+  }
+
+  pub fn set_default_dir(value: String) {
+    *DEFAULT_DATA_DIR.write() = value;
   }
 
   pub fn get_default_path() -> String {
@@ -329,12 +347,173 @@ impl Localchain {
   }
 
   fn config_logs() {
-    let _ = tracing_subscriber::fmt()
+    // RUST_LOG=trace,soketto=info,sqlx=info,jsonrpsee_core=info
+    let trace = tracing_subscriber::fmt()
       .with_env_filter(tracing_subscriber::EnvFilter::from_default_env())
-      // RUST_LOG=trace,soketto=info,sqlx=info,jsonrpsee_core=info
-      .try_init();
+      .pretty();
+    #[cfg(feature = "uniffi")]
+    let trace = trace.with_ansi(false);
+    let _ = trace.try_init();
 
     env::set_var("RUST_BACKTRACE", "1");
+  }
+}
+
+#[cfg(feature = "uniffi")]
+pub mod uniffi_ext {
+  use super::{balance_sync, transactions};
+  use crate::cli::EmbeddedKeyPassword;
+  use crate::error::UniffiResult;
+  use crate::CryptoScheme;
+  use crate::MainchainClient;
+
+  #[derive(uniffi::Record)]
+  pub struct LocalchainConfig {
+    pub path: String,
+    pub mainchain_url: String,
+    pub ntp_pool_url: Option<String>,
+    pub keystore_password: Option<String>,
+  }
+
+  impl Into<super::LocalchainConfig> for LocalchainConfig {
+    fn into(self) -> super::LocalchainConfig {
+      super::LocalchainConfig {
+        path: self.path,
+        mainchain_url: self.mainchain_url,
+        ntp_pool_url: self.ntp_pool_url,
+        keystore_password: self.keystore_password.map(|a| EmbeddedKeyPassword {
+          key_password: Some(a),
+          key_password_filename: None,
+          key_password_interactive: false,
+        }),
+      }
+    }
+  }
+
+  #[derive(uniffi::Object)]
+  pub struct Localchain {
+    pub path: String,
+    pub name: String,
+    inner: super::Localchain,
+  }
+
+  #[uniffi::export(async_runtime = "tokio")]
+  impl Localchain {
+    #[uniffi::constructor(name = "newLive")]
+    pub async fn load_uniffi(config: LocalchainConfig) -> UniffiResult<Self> {
+      let inner = super::Localchain::load(config.into()).await?;
+      Ok(Self {
+        path: inner.path.clone(),
+        name: inner.name(),
+        inner,
+      })
+    }
+
+    #[uniffi::constructor(name = "newWithoutMainchain")]
+    pub async fn load_without_mainchain_uniffi(
+      path: String,
+      ticker_config: crate::TickerConfig,
+      keystore_password: Option<String>,
+    ) -> UniffiResult<Self> {
+      let keystore_password = keystore_password.map(|a| EmbeddedKeyPassword {
+        key_password: Some(a),
+        key_password_filename: None,
+        key_password_interactive: false,
+      });
+      let inner =
+        super::Localchain::load_without_mainchain(path, ticker_config, keystore_password).await?;
+      Ok(Self {
+        path: inner.path.clone(),
+        name: inner.name(),
+        inner,
+      })
+    }
+
+    #[uniffi::method(name = "isConnectedToMainchain")]
+    pub async fn is_connected_to_mainchain_napi(&self) -> bool {
+      self.inner.mainchain_client().await.is_some()
+    }
+
+    #[uniffi::method(name = "connectMainchain", default(timeout_millis = 30_000))]
+    pub async fn connect_mainchain_uniffi(
+      &self,
+      mainchain_url: String,
+      timeout_millis: u64,
+    ) -> UniffiResult<()> {
+      let mainchain_client = MainchainClient::connect(mainchain_url, timeout_millis as i64).await?;
+      self.inner.attach_mainchain(&mainchain_client).await?;
+      self.inner.update_ticker(None).await?;
+      Ok(())
+    }
+
+    #[uniffi::method(name = "close")]
+    pub async fn close_uniffi(&self) -> UniffiResult<()> {
+      Ok(self.inner.close().await?)
+    }
+
+    #[uniffi::method(name = "accountOverview")]
+    pub async fn account_overview_uniffi(
+      &self,
+    ) -> UniffiResult<crate::overview::uniffi_ext::LocalchainOverview> {
+      Ok(self.inner.account_overview().await?.into())
+    }
+
+    #[uniffi::method(name = "address")]
+    pub async fn address_uniffi(&self) -> UniffiResult<String> {
+      Ok(self.inner.address().await?)
+    }
+
+    #[uniffi::method(name = "currentTick")]
+    pub fn current_tick_uniffi(&self) -> u32 {
+      self.inner.current_tick()
+    }
+
+    #[uniffi::method(name = "durationToNextTick")]
+    pub fn duration_to_next_tick_uniffi(&self) -> u64 {
+      self.inner.duration_to_next_tick().as_millis() as u64
+    }
+
+    #[uniffi::method(name = "useAccount")]
+    pub async fn use_account(
+      &self,
+      suri: Option<String>,
+      password: Option<String>,
+      crypto_scheme: Option<CryptoScheme>,
+    ) -> UniffiResult<String> {
+      if let Some(deposit_account) = self.inner.accounts().deposit_account(None).await.ok() {
+        return Ok(deposit_account.address);
+      }
+      let keystore = self.inner.keystore();
+      let password = password.map(|a| EmbeddedKeyPassword {
+        key_password: Some(a),
+        key_password_filename: None,
+        key_password_interactive: false,
+      });
+      if let Some(suri) = suri {
+        Ok(
+          keystore
+            .import_suri(
+              suri,
+              crypto_scheme.unwrap_or(CryptoScheme::Sr25519),
+              password,
+            )
+            .await?,
+        )
+      } else {
+        Ok(keystore.bootstrap(crypto_scheme, password).await?)
+      }
+    }
+
+    #[uniffi::method(name = "sync")]
+    pub async fn sync_uniffi(&self) -> UniffiResult<balance_sync::uniffi_ext::BalanceSyncResult> {
+      let balance_sync = self.inner.balance_sync();
+      Ok(balance_sync.sync(None).await?.into())
+    }
+
+    #[uniffi::method(name = "transactions")]
+    pub fn transactions_uniffi(&self) -> transactions::Transactions {
+      self.inner.transactions()
+    }
   }
 }
 
@@ -419,6 +598,11 @@ pub mod napi_ext {
     #[napi(js_name = "getDefaultDir")]
     pub fn get_default_dir_napi() -> String {
       Localchain::get_default_dir()
+    }
+
+    #[napi(js_name = "setDefaultDir")]
+    pub fn set_default_dir_napi(value: String) {
+      Localchain::set_default_dir(value)
     }
 
     #[napi(js_name = "getDefaultPath")]
@@ -570,6 +754,7 @@ impl TickerRef {
 }
 
 #[cfg_attr(feature = "napi", napi(object))]
+#[cfg_attr(feature = "uniffi", derive(uniffi::Record))]
 pub struct TickerConfig {
   pub tick_duration_millis: i64,
   pub genesis_utc_time: i64,

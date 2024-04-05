@@ -60,7 +60,7 @@ impl sp_std::hash::Hash for LocalchainAccountId {
 	Serialize,
 	Deserialize,
 )]
-#[cfg_attr(feature = "std", derive(clap::ValueEnum))]
+#[cfg_attr(all(feature = "std", not(feature = "uniffi")), derive(clap::ValueEnum))]
 #[cfg_attr(not(feature = "napi"), derive(Clone, Copy))]
 #[serde(rename_all = "camelCase")]
 #[cfg_attr(feature = "napi", napi_derive::napi(string_enum))]

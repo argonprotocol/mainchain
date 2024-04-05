@@ -7,6 +7,7 @@ use std::{
 
 use codec::{Decode, Encode};
 use log::info;
+use parking_lot::Mutex;
 use sc_client_api::{self, backend::AuxStore};
 use sc_consensus::BlockImportParams;
 use sp_core::{H256, U256};
@@ -25,17 +26,29 @@ use crate::{convert_u32, error::Error};
 pub struct UlxAux<B: BlockT, C: AuxStore> {
 	client: Arc<C>,
 	_block: std::marker::PhantomData<B>,
+	pub lock: Arc<Mutex<()>>,
+	missing_notebook_lock: Arc<Mutex<()>>,
 }
 
 impl<B: BlockT, C: AuxStore> Clone for UlxAux<B, C> {
 	fn clone(&self) -> Self {
-		Self { client: self.client.clone(), _block: Default::default() }
+		Self {
+			client: self.client.clone(),
+			_block: Default::default(),
+			lock: self.lock.clone(),
+			missing_notebook_lock: self.missing_notebook_lock.clone(),
+		}
 	}
 }
 
 impl<B: BlockT, C: AuxStore> UlxAux<B, C> {
 	pub fn new(client: Arc<C>) -> Self {
-		Self { client, _block: Default::default() }
+		Self {
+			client,
+			_block: Default::default(),
+			lock: Default::default(),
+			missing_notebook_lock: Default::default(),
+		}
 	}
 }
 
@@ -63,6 +76,7 @@ impl<B: BlockT, C: AuxStore> UlxAux<B, C> {
 		seal_digest: BlockSealDigest,
 		compute_difficulty: Option<ComputeDifficulty>,
 	) -> Result<(ForkPower, ForkPower), Error<B>> {
+		let _lock = self.lock.lock();
 		let block_number = convert_u32::<B>(&block.header.number());
 		let strongest_at_height = self.strongest_fork_at_tick(tick)?;
 
@@ -74,7 +88,7 @@ impl<B: BlockT, C: AuxStore> UlxAux<B, C> {
 				.or_insert_with(BTreeSet::new)
 				.insert(author.clone());
 			if !is_new_entry {
-				return Err(Error::<B>::DuplicateAuthoredBlock(author).into())
+				return Err(Error::<B>::DuplicateAuthoredBlock(author).into());
 			}
 		}
 
@@ -95,14 +109,17 @@ impl<B: BlockT, C: AuxStore> UlxAux<B, C> {
 		));
 
 		// cleanup old votes (None deletes)
-		if tick > 5 {
-			let cleanup_height = tick - 5;
+		if tick >= 10 {
+			let cleanup_height = tick - 10;
 			block.auxiliary.push((get_votes_key(cleanup_height), None));
 			block.auxiliary.push((get_strongest_fork_at_tick_key(cleanup_height), None));
-			block.auxiliary.push((notary_state_key(cleanup_height), None));
 			block
 				.auxiliary
 				.push((get_authors_at_height_key(block_number.saturating_sub(5)), None));
+		}
+		// Cleanup old notary state. We keep this longer because we might need to catchup on notebooks
+		if tick >= 256 {
+			block.auxiliary.push((notary_state_key(tick - 256), None));
 		}
 
 		Ok((fork_power, best_header_fork_power))
@@ -125,8 +142,8 @@ impl<B: BlockT, C: AuxStore> UlxAux<B, C> {
 		let audit_results = self.get_notary_audit_history(notary_id)?;
 
 		for notebook in audit_results {
-			if notebook.notebook_number <= latest_runtime_notebook_number ||
-				notebook.tick > submitting_tick
+			if notebook.notebook_number <= latest_runtime_notebook_number
+				|| notebook.tick > submitting_tick
 			{
 				continue;
 			}
@@ -157,7 +174,7 @@ impl<B: BlockT, C: AuxStore> UlxAux<B, C> {
 				return Err(Error::NotebookHeaderBuildError(format!(
 					"Unable to find notebook #{} for notary {} at tick {}",
 					notebook.notebook_number, notary_id, tick
-				)))
+				)));
 			}
 		}
 		Ok((headers, tick_notebook))
@@ -174,13 +191,23 @@ impl<B: BlockT, C: AuxStore> UlxAux<B, C> {
 		})
 	}
 
-	pub fn set_missing_notebooks(
+	pub fn update_missing_notebooks(
 		&self,
 		notary_id: NotaryId,
-		missing: Vec<NotebookNumber>,
+		new_missing: Vec<NotebookNumber>,
+		remove_missing: Vec<NotebookNumber>,
 	) -> Result<(), Error<B>> {
+		let lock = self.missing_notebook_lock.lock();
+		let mut missing = self.get_missing_notebooks(notary_id)?;
+		for notebook in new_missing {
+			if !missing.contains(&notebook) {
+				missing.push(notebook);
+			}
+		}
+		missing.retain(|x| !remove_missing.contains(x));
 		let key = notary_missing_notebooks_key(notary_id);
 		self.client.insert_aux(&[(key.as_slice(), missing.encode().as_slice())], &[])?;
+		drop(lock);
 		Ok(())
 	}
 
@@ -253,7 +280,7 @@ impl<B: BlockT, C: AuxStore> UlxAux<B, C> {
 		Ok(aux)
 	}
 
-	pub fn get_notebook_tick_state(&self, tick: Tick) -> Result<NotaryNotebookTickState, Error<B>> {
+	fn get_notebook_tick_state(&self, tick: Tick) -> Result<NotaryNotebookTickState, Error<B>> {
 		let state_key = notary_state_key(tick);
 		let notary_state = match self.client.get_aux(&state_key)? {
 			Some(bytes) => NotaryNotebookTickState::decode(&mut &bytes[..]).unwrap_or_default(),
@@ -265,12 +292,21 @@ impl<B: BlockT, C: AuxStore> UlxAux<B, C> {
 	pub fn store_notebook_result(
 		&self,
 		notary_id: NotaryId,
-		validated_notebooks: Vec<NotebookAuditResult>,
+		audit_result: NotebookAuditResult,
 		raw_signed_header: Vec<u8>,
 		vote_details: &NotaryNotebookVoteDetails<B::Hash>,
 	) -> Result<NotaryNotebookTickState, Error<B>> {
+		let lock = self.lock.lock();
 		let notary_state = self.update_tick_state(raw_signed_header, &vote_details)?;
-		self.store_notebook_audit_result(notary_id, validated_notebooks)?;
+		let mut validated_notebooks = self.get_notary_audit_history(notary_id)?;
+		if !validated_notebooks
+			.iter()
+			.any(|n| n.notebook_number == audit_result.notebook_number)
+		{
+			validated_notebooks.push(audit_result);
+			self.store_notebook_audit_result(notary_id, validated_notebooks)?;
+		}
+		drop(lock);
 		Ok(notary_state)
 	}
 
@@ -460,23 +496,23 @@ mod test {
 		assert_eq!(ForkPower::default(), ForkPower::default());
 
 		assert!(
-			ForkPower { voting_power: 1.into(), ..Default::default() } >
-				ForkPower { voting_power: 0.into(), ..Default::default() }
+			ForkPower { voting_power: 1.into(), ..Default::default() }
+				> ForkPower { voting_power: 0.into(), ..Default::default() }
 		);
 
 		assert!(
-			ForkPower { notebooks: 1, ..Default::default() } >
-				ForkPower { notebooks: 0, ..Default::default() }
+			ForkPower { notebooks: 1, ..Default::default() }
+				> ForkPower { notebooks: 0, ..Default::default() }
 		);
 
 		assert!(
-			ForkPower { seal_strength: 200.into(), ..Default::default() } >
-				ForkPower { seal_strength: 201.into(), ..Default::default() }
+			ForkPower { seal_strength: 200.into(), ..Default::default() }
+				> ForkPower { seal_strength: 201.into(), ..Default::default() }
 		);
 
 		assert!(
-			ForkPower { total_compute_difficulty: 1000.into(), ..Default::default() } >
-				ForkPower { total_compute_difficulty: 999.into(), ..Default::default() }
+			ForkPower { total_compute_difficulty: 1000.into(), ..Default::default() }
+				> ForkPower { total_compute_difficulty: 999.into(), ..Default::default() }
 		);
 	}
 }

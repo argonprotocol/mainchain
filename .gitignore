@@ -16,3 +16,4 @@ node_modules
 /localchain/test.db
 /client/nodejs/lib
 /.run/
+/localchain/apple/Localchain/*.a

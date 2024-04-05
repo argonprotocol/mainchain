@@ -1,3 +1,4 @@
+use bounded_collections::{BoundedVec, ConstU32};
 use codec::{Decode, Encode, MaxEncodedLen};
 use scale_info::TypeInfo;
 use serde::{Deserialize, Serialize};
@@ -15,27 +16,36 @@ use sp_debug_derive::RuntimeDebug;
 	Deserialize,
 	Serialize,
 )]
-pub struct Host {
-	#[codec(compact)]
-	/// ip encoded as u32 big endian (eg, from octets)
-	pub ip: u32,
-	#[codec(compact)]
-	pub port: u16,
-	pub is_secure: bool,
+#[serde(transparent)]
+#[repr(transparent)]
+pub struct Host(pub BoundedVec<u8, ConstU32<253>>);
+
+#[cfg(feature = "std")]
+impl From<String> for Host {
+	fn from(host: String) -> Self {
+		host.into_bytes().to_vec().into()
+	}
 }
 
-impl Host {
-	#[cfg(feature = "std")]
-	pub fn get_url(&self) -> String {
-		Self::format_url(self.is_secure, self.ip, self.port)
+#[cfg(feature = "std")]
+impl From<&str> for Host {
+	fn from(host: &str) -> Self {
+		host.as_bytes().to_vec().into()
 	}
-	#[cfg(feature = "std")]
-	pub fn format_url(is_secure: bool, ip: u32, port: u16) -> String {
-		format!(
-			"{}://{}:{}",
-			if is_secure { "wss" } else { "ws" },
-			std::net::Ipv4Addr::from(ip),
-			port
-		)
+}
+
+#[cfg(feature = "std")]
+impl From<Vec<u8>> for Host {
+	fn from(host: Vec<u8>) -> Self {
+		Self(BoundedVec::truncate_from(host))
+	}
+}
+
+#[cfg(feature = "std")]
+impl TryInto<String> for Host {
+	type Error = String;
+
+	fn try_into(self) -> Result<String, Self::Error> {
+		String::from_utf8(self.0.into_inner()).map_err(|_| "Invalid UTF-8".to_string())
 	}
 }

@@ -12,9 +12,9 @@ use tokio::sync::Mutex;
 use ulx_node_runtime::{NotaryRecordT, NotebookVerifyError};
 use ulx_notary_apis::notebook::{NotebookRpcClient, RawHeadersSubscription};
 use ulx_primitives::{
-	BlockNumber, BlockSealApis, BlockSealAuthorityId, notary::NotaryNotebookVoteDetails,
-	NotaryApis, NotaryId, notebook::NotebookNumber, NotebookApis, NotebookDigest, NotebookHeaderData,
-	tick::Tick,
+	notary::NotaryNotebookVoteDetails, notebook::NotebookNumber, tick::Tick, BlockNumber,
+	BlockSealApis, BlockSealAuthorityId, NotaryApis, NotaryId, NotebookApis, NotebookDigest,
+	NotebookHeaderData,
 };
 
 use crate::{
@@ -72,8 +72,8 @@ where
 				let mut subscriptions_by_id = self.subscriptions_by_id.lock().await;
 				for notary in notaries {
 					if let Some(existing) = notaries_by_id.get(&notary.notary_id) {
-						if existing.meta_updated_block < notary.meta_updated_block ||
-							!clients.contains_key(&notary.notary_id)
+						if existing.meta_updated_block < notary.meta_updated_block
+							|| !clients.contains_key(&notary.notary_id)
 						{
 							// need to reconnect
 							needs_connect.push(notary.notary_id);
@@ -149,7 +149,8 @@ where
 
 	async fn retrieve_notary_missing_notebooks(&self, notary_id: NotaryId) -> Result<(), Error<B>> {
 		let client = self.get_client(notary_id).await?;
-		let mut missing_notebooks = self.aux_client.get_missing_notebooks(notary_id)?;
+		let lock = self.notary_client_by_id.lock().await;
+		let missing_notebooks = self.aux_client.get_missing_notebooks(notary_id)?;
 		if missing_notebooks.is_empty() {
 			return Ok(());
 		}
@@ -163,17 +164,18 @@ where
 				.map_err(|e| {
 					Error::NotaryError(format!("Could not get notebooks from notary - {:?}", e))
 				})?;
+
+		let mut downloaded = vec![];
 		for (notebook_number, header) in headers {
-			if let Some(index) = missing_notebooks.iter().position(|&n| n == notebook_number) {
-				missing_notebooks.remove(index);
-			}
+			downloaded.push(notebook_number);
 			self.header_stream
 				.unbounded_send((notary_id, notebook_number, header))
 				.map_err(|e| {
 					Error::NotaryError(format!("Could not send header to stream - {:?}", e))
 				})?;
 		}
-		self.aux_client.set_missing_notebooks(notary_id, missing_notebooks)?;
+		self.aux_client.update_missing_notebooks(notary_id, vec![], downloaded)?;
+		drop(lock);
 
 		Ok(())
 	}
@@ -300,7 +302,10 @@ where
 		Ok(audit_result)
 	}
 
-	async fn get_client(&self, notary_id: NotaryId) -> Result<Arc<ulx_notary_apis::Client>, Error<B>> {
+	async fn get_client(
+		&self,
+		notary_id: NotaryId,
+	) -> Result<Arc<ulx_notary_apis::Client>, Error<B>> {
 		let mut clients = self.notary_client_by_id.lock().await;
 		if !clients.contains_key(&notary_id) {
 			let notaries = self.notaries_by_id.lock().await;
@@ -310,12 +315,16 @@ where
 			let host = record.meta.hosts.get(0).ok_or_else(|| {
 				Error::NotaryError("No rpc endpoint found for notary".to_string())
 			})?;
-			let c = ulx_notary_apis::create_client(host.get_url().as_str()).await.map_err(|e| {
+			let host_str: String = host.clone().try_into().map_err(|e| {
+				Error::NotaryError(format!(
+					"Could not convert host to string for notary {} - {:?}",
+					notary_id, e
+				))
+			})?;
+			let c = ulx_notary_apis::create_client(&host_str).await.map_err(|e| {
 				Error::NotaryError(format!(
 					"Could not connect to notary {} ({}) for audit - {:?}",
-					notary_id,
-					host.get_url(),
-					e
+					notary_id, host_str, e
 				))
 			})?;
 			let c = Arc::new(c);
@@ -361,13 +370,14 @@ where
 				.iter()
 				.find(|a| a.notebook_number == digest_record.notebook_number)
 			{
-				Some(audit) =>
+				Some(audit) => {
 					if digest_record.audit_first_failure != audit.first_error_reason {
 						return Err(Error::<B>::InvalidNotebookDigest(format!(
 							"Notary {}, notebook #{} has an audit mismatch \"{:?}\" with local result. \"{:?}\"",
 							digest_record.notary_id, digest_record.notebook_number, digest_record.audit_first_failure, audit.first_error_reason
-						)))
-					},
+						)));
+					}
+				},
 				None => {
 					is_missing_entries = true;
 					info!(
@@ -405,6 +415,7 @@ where
 	let mut tick_notebooks = vec![];
 
 	let notaries = client.runtime_api().notaries(*best_hash)?;
+	let lock = aux_client.lock.lock();
 	for notary in notaries {
 		let (latest_runtime_notebook_number, _) =
 			latest_notebooks_in_runtime.get(&notary.notary_id).unwrap_or(&(0, 0));
@@ -423,7 +434,7 @@ where
 				missing_notebooks,
 				notary.notary_id
 			);
-			aux_client.set_missing_notebooks(notary.notary_id, missing_notebooks)?;
+			aux_client.update_missing_notebooks(notary.notary_id, missing_notebooks, vec![])?;
 			continue;
 		}
 
@@ -444,7 +455,7 @@ where
 		client
 			.runtime_api()
 			.create_vote_digest(*best_hash, submitting_tick, tick_notebooks)?;
-
+	drop(lock);
 	Ok(headers)
 }
 

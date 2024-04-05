@@ -12,6 +12,7 @@ use ulx_primitives::{AccountOrigin, AccountType, ADDRESS_PREFIX};
 use crate::{bail, BalanceChangeStatus, BalanceChangeStore, Result};
 
 #[cfg_attr(feature = "napi", napi(object))]
+#[cfg_attr(feature = "uniffi", derive(uniffi::Record))]
 #[derive(Debug, Clone, Eq, PartialEq)]
 pub struct NotaryAccountOrigin {
   pub notary_id: u32,

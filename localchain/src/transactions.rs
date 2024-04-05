@@ -5,12 +5,14 @@ use ulx_primitives::{AccountType, Balance, Note};
 use crate::argon_file::ArgonFileType;
 use crate::keystore::Keystore;
 use crate::notarization_builder::NotarizationBuilder;
+use crate::notarization_tracker::NotarizationTracker;
 use crate::notary_client::NotaryClients;
 use crate::Result;
 use crate::{OpenEscrow, OpenEscrowsStore, TickerRef, ESCROW_MINIMUM_SETTLEMENT};
 
 #[derive(Debug, PartialOrd, PartialEq)]
 #[cfg_attr(feature = "napi", napi)]
+#[cfg_attr(feature = "uniffi", derive(uniffi::Enum))]
 #[cfg_attr(not(feature = "napi"), derive(Clone, Copy))]
 pub enum TransactionType {
   Send = 0,
@@ -32,6 +34,7 @@ impl From<i64> for TransactionType {
 }
 
 #[cfg_attr(feature = "napi", napi(object))]
+#[cfg_attr(feature = "uniffi", derive(uniffi::Object))]
 #[derive(Clone, Debug, PartialOrd, PartialEq)]
 pub struct LocalchainTransaction {
   pub id: u32,
@@ -39,6 +42,7 @@ pub struct LocalchainTransaction {
 }
 
 #[cfg_attr(feature = "napi", napi)]
+#[cfg_attr(feature = "uniffi", derive(uniffi::Object))]
 pub struct Transactions {
   db: SqlitePool,
   ticker: TickerRef,
@@ -182,6 +186,18 @@ impl Transactions {
     Ok(json)
   }
 
+  pub async fn import_argons(&self, argon_file: String) -> Result<NotarizationTracker> {
+    let notarization = self.new_notarization();
+    notarization.import_argon_file(argon_file).await?;
+    Ok(notarization.notarize().await?)
+  }
+
+  pub async fn accept_argon_request(&self, argon_file: String) -> Result<NotarizationTracker> {
+    let notarization = self.new_notarization();
+    notarization.accept_argon_file_request(argon_file).await?;
+    Ok(notarization.notarize().await?)
+  }
+
   fn new_notarization(&self) -> NotarizationBuilder {
     NotarizationBuilder::new(
       self.db.clone(),
@@ -198,6 +214,7 @@ pub mod napi_ext {
 
   use super::Transactions;
   use super::{LocalchainTransaction, TransactionType};
+  use crate::notarization_tracker::NotarizationTracker;
   use crate::open_escrows::OpenEscrow;
 
   #[napi]
@@ -241,6 +258,80 @@ pub mod napi_ext {
       to: Option<Vec<String>>,
     ) -> napi::Result<String> {
       self.send(milligons.get_u128().1, to).await.napi_ok()
+    }
+
+    #[napi(js_name = "importArgons")]
+    pub async fn import_argons_napi(
+      &self,
+      argon_file: String,
+    ) -> napi::Result<NotarizationTracker> {
+      self.import_argons(argon_file).await.napi_ok()
+    }
+
+    #[napi(js_name = "acceptArgonRequest")]
+    pub async fn accept_argon_request_napi(
+      &self,
+      argon_file: String,
+    ) -> napi::Result<NotarizationTracker> {
+      self.accept_argon_request(argon_file).await.napi_ok()
+    }
+  }
+}
+
+#[cfg(feature = "uniffi")]
+pub mod uniffi_ext {
+  use crate::error::UniffiResult;
+  use anyhow::anyhow;
+
+  use super::Transactions;
+  use super::{LocalchainTransaction, TransactionType};
+  use crate::notarization_tracker::uniffi_ext::NotarizationTracker;
+
+  #[uniffi::export(async_runtime = "tokio")]
+  impl Transactions {
+    #[uniffi::method(name = "create")]
+    pub async fn create_uniffi(
+      &self,
+      transaction_type: TransactionType,
+    ) -> UniffiResult<LocalchainTransaction> {
+      Ok(self.create(transaction_type).await?)
+    }
+
+    #[uniffi::method(name = "request")]
+    pub async fn request_uniffi(&self, milligons: String) -> UniffiResult<String> {
+      let milligons = milligons
+        .parse::<u128>()
+        .map_err(|e| anyhow!("Could not parse the milligon value -> {:?}", e))?;
+      Ok(self.request(milligons).await?)
+    }
+
+    #[uniffi::method(name = "send")]
+    pub async fn send_uniffi(
+      &self,
+      milligons: String,
+      to: Option<Vec<String>>,
+    ) -> UniffiResult<String> {
+      let milligons = milligons
+        .parse::<u128>()
+        .map_err(|e| anyhow!("Could not parse the milligon value -> {:?}", e))?;
+
+      Ok(self.send(milligons, to).await?)
+    }
+
+    #[uniffi::method(name = "importArgons")]
+    pub async fn import_argons_uniffi(
+      &self,
+      argon_file: String,
+    ) -> UniffiResult<NotarizationTracker> {
+      Ok(self.import_argons(argon_file).await?.into())
+    }
+
+    #[uniffi::method(name = "acceptArgonRequest")]
+    pub async fn accept_argon_request_uniffi(
+      &self,
+      argon_file: String,
+    ) -> UniffiResult<NotarizationTracker> {
+      Ok(self.accept_argon_request(argon_file).await?.into())
     }
   }
 }

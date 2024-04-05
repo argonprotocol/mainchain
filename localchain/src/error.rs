@@ -47,6 +47,30 @@ pub enum Error {
   NapiError(#[from] napi::Error),
 }
 
+#[cfg(feature = "uniffi")]
+#[derive(thiserror::Error, Debug, uniffi::Error)]
+#[uniffi(flat_error)]
+pub enum UniffiError {
+  #[error("{0}")]
+  Generic(String),
+}
+
+#[cfg(feature = "uniffi")]
+pub type UniffiResult<T> = uniffi::Result<T, UniffiError>;
+
+#[cfg(feature = "uniffi")]
+impl From<Error> for UniffiError {
+  fn from(e: Error) -> Self {
+    UniffiError::Generic(format!("{:#?}", e))
+  }
+}
+#[cfg(feature = "uniffi")]
+impl From<anyhow::Error> for UniffiError {
+  fn from(e: anyhow::Error) -> Self {
+    UniffiError::Generic(format!("{:#?}", e))
+  }
+}
+
 #[cfg(feature = "napi")]
 pub trait NapiOk<T> {
   fn napi_ok(self) -> Result<T, napi::Error>;
@@ -54,7 +78,7 @@ pub trait NapiOk<T> {
 #[cfg(feature = "napi")]
 impl<T> NapiOk<T> for Result<T, Error> {
   fn napi_ok(self) -> Result<T, napi::Error> {
-    self.map_err(|e| napi::Error::from_reason(format!("{}", e)))
+    self.map_err(|e| napi::Error::from_reason(format!("{:#?}", e)))
   }
 }
 

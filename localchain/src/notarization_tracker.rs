@@ -1,9 +1,11 @@
+use std::collections::HashMap;
+use std::sync::Arc;
+
 use anyhow::anyhow;
 use sp_core::H256;
 use sqlx::SqlitePool;
-use std::collections::HashMap;
-use std::sync::Arc;
 use tokio::sync::Mutex;
+
 use ulx_primitives::{AccountType, Balance, BalanceChange, BalanceTip, Notarization};
 
 use crate::accounts::LocalAccount;
@@ -30,7 +32,6 @@ pub struct NotarizationTracker {
   pub(crate) db: SqlitePool,
 }
 
-#[cfg_attr(feature = "napi", napi)]
 impl NotarizationTracker {
   pub async fn get_balance_tips(&self) -> Result<Vec<BalanceTip>> {
     let balance_changes = self.balance_changes_by_account.lock().await;
@@ -182,10 +183,142 @@ pub struct NotebookProof {
   pub proof: Vec<H256>,
 }
 
+#[cfg(feature = "uniffi")]
+pub mod uniffi_ext {
+  use ulx_primitives::AccountType;
+
+  use crate::error::UniffiResult;
+  use crate::BalanceChangeStatus;
+  use crate::NotaryAccountOrigin;
+  use std::collections::HashMap;
+
+  #[derive(uniffi::Object, Debug)]
+  #[uniffi::export(Debug)]
+  pub struct FinalizedBlock {
+    pub finalized_block_number: u32,
+    pub account_changes_merkle_root: Vec<u8>,
+  }
+
+  #[derive(uniffi::Record, Debug)]
+  pub struct NotebookProof {
+    pub address: String,
+    pub account_type: AccountType,
+    pub notebook_number: u32,
+    pub balance: String,
+    /// H256 hash of the balance tip
+    pub balance_tip: Vec<u8>,
+    pub change_number: u32,
+    pub account_origin: NotaryAccountOrigin,
+    pub escrow_hold_note_json: Option<String>,
+    pub leaf_index: u32,
+    pub number_of_leaves: u32,
+    pub proof: Vec<Vec<u8>>,
+  }
+
+  #[derive(uniffi::Object)]
+  pub struct NotarizationTracker {
+    inner: super::NotarizationTracker,
+  }
+
+  impl NotarizationTracker {
+    pub fn new(inner: super::NotarizationTracker) -> Self {
+      NotarizationTracker {
+        inner,
+      }
+    }
+  }
+
+  impl From<super::NotarizationTracker> for NotarizationTracker {
+    fn from(inner: super::NotarizationTracker) -> Self {
+      NotarizationTracker::new(inner)
+    }
+  }
+
+  #[derive(uniffi::Record, Debug)]
+  pub struct BalanceChange {
+    pub id: i64,
+    pub account_id: i64,
+    pub change_number: i64,
+    pub balance: String,
+    pub net_balance_change: String,
+    pub escrow_hold_note_json: Option<String>,
+    pub notary_id: i64,
+    pub notes_json: String,
+    pub proof_json: Option<String>,
+    pub finalized_block_number: Option<i64>,
+    pub status: BalanceChangeStatus,
+    pub transaction_id: Option<i64>,
+    pub notarization_id: Option<i64>,
+  }
+
+  impl From<crate::BalanceChangeRow> for BalanceChange {
+    fn from(row: crate::BalanceChangeRow) -> Self {
+      BalanceChange {
+        id: row.id,
+        account_id: row.account_id,
+        change_number: row.change_number,
+        balance: row.balance.to_string(),
+        net_balance_change: row.net_balance_change.to_string(),
+        escrow_hold_note_json: row.escrow_hold_note_json,
+        notary_id: row.notary_id,
+        notes_json: row.notes_json,
+        proof_json: row.proof_json,
+        finalized_block_number: row.finalized_block_number,
+        status: row.status,
+        transaction_id: row.transaction_id,
+        notarization_id: row.notarization_id,
+      }
+    }
+  }
+
+  #[uniffi::export(async_runtime = "tokio")]
+  impl NotarizationTracker {
+    #[uniffi::method(name = "balanceChangesByAccountId")]
+    /// Returns the balance changes that were submitted to the notary indexed by the stringified account id (napi doesn't allow numbers as keys)
+    pub async fn balance_changes_by_account_id_uniffi(&self) -> HashMap<String, BalanceChange> {
+      let result = self.inner.balance_changes_by_account_id().await;
+      result.into_iter().map(|(k, v)| (k, v.into())).collect()
+    }
+    #[uniffi::method(name = "waitForNotebook")]
+    pub async fn wait_for_notebook_uniffi(&self) -> UniffiResult<()> {
+      Ok(self.inner.wait_for_notebook().await?)
+    }
+    /// Asks the notary for proof the transaction was included in a notebook header. If this notebook has not been finalized yet, it will return an error.
+    #[uniffi::method(name = "getNotebookProof")]
+    pub async fn get_notebook_proof_uniffi(&self) -> UniffiResult<Vec<NotebookProof>> {
+      let proofs = self.inner.get_notebook_proof().await?;
+      Ok(
+        proofs
+          .into_iter()
+          .map(|p| NotebookProof {
+            address: p.address,
+            account_type: p.account_type,
+            notebook_number: p.notebook_number,
+            balance: p.balance.to_string(),
+            balance_tip: p.balance_tip.0.to_vec(),
+            change_number: p.change_number,
+            account_origin: p.account_origin,
+            escrow_hold_note_json: p.escrow_hold_note_json,
+            leaf_index: p.leaf_index,
+            number_of_leaves: p.number_of_leaves,
+            proof: p
+              .proof
+              .into_iter()
+              .map(|p| p.0.to_vec())
+              .collect::<Vec<_>>(),
+          })
+          .collect::<Vec<_>>(),
+      )
+    }
+  }
+}
+
 #[cfg(feature = "napi")]
 pub mod napi_ext {
-  use napi::bindgen_prelude::{BigInt, Uint8Array};
   use std::collections::HashMap;
+
+  use napi::bindgen_prelude::{BigInt, Uint8Array};
+
   use ulx_primitives::AccountType;
 
   use crate::error::NapiOk;
