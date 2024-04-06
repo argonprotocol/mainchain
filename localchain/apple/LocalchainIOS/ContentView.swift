@@ -84,7 +84,7 @@ struct ContentView: View {
           .padding(.top, -20)
           .padding(.horizontal, -30)
 
-        Text("Argon is an inflation-proof stablecoin that uses sound money principles to ensure long-term stability")
+        Text("Argon is an inflation-proof stablecoin that uses sound money principles to ensure long-term stability.")
           .font(.caption)
           .foregroundColor(.gray)
           .multilineTextAlignment(.center)
@@ -133,12 +133,14 @@ struct ContentView: View {
           .padding(.bottom, -10)
 
         HStack(spacing: 2) {
-          Text("\((localchainLoader.balance.toDecimal() / Decimal(1_000.0)).formatted(dollarsFormatter) ?? "Err")")
-            .fontWeight(.bold)
-            .font(.system(size: 40.0))
-            .foregroundColor(.accentColor)
           Text(
-            "\(formatCents(localchainLoader.balance))"
+            "\((localchainLoader.currentBuyingPower.toDecimal() / Decimal(1_000.0)).formatted(dollarsFormatter) ?? "Err")"
+          )
+          .fontWeight(.bold)
+          .font(.system(size: 40.0))
+          .foregroundColor(.accentColor)
+          Text(
+            "\(formatCents(localchainLoader.currentBuyingPower))"
           )
           .bold()
           .font(.system(size: 18.0))
