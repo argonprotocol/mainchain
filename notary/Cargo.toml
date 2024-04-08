@@ -57,6 +57,8 @@ ulx-testing = { path = "../testing" }
 
 [build-dependencies]
 patch-crate = "0.1.9"
+dotenv = { version = "0.15" }
+sqlx-cli = { version = "0.7" }
 
 [features]
 fast-runtime = ["ulx-primitives/fast-runtime"]

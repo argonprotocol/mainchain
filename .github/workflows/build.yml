@@ -1,9 +1,8 @@
-name: Localchain Napi.rs
+name: Build and Test
 env:
   DEBUG: napi:*
   APP_NAME: localchain
   MACOSX_DEPLOYMENT_TARGET: '10.13'
-  CARGO_TARGET_AARCH64_UNKNOWN_LINUX_MUSL_LINKER: aarch64-linux-gnu-gcc
 permissions:
   contents: write
   id-token: write
@@ -11,14 +10,6 @@ permissions:
   push:
     branches:
       - main
-    tags-ignore:
-      - '**'
-    paths-ignore:
-      - '**/*.md'
-      - LICENSE
-      - '**/*.gitignore'
-      - .editorconfig
-      - docs/**
   pull_request: null
 
 
@@ -34,12 +25,10 @@ jobs:
           #          - os: windows-latest
           #            build: yarn build
           #            target: x86_64-pc-windows-msvc
-          - os: ubuntu-20.04
+          - os: ubuntu-22.04
             target: x86_64-unknown-linux-gnu
-            #            docker: ghcr.io/napi-rs/napi-rs/nodejs-rust:lts-debian
-            build: |
-              OPENSSL_LIB_DIR=/usr/lib OPENSSL_INCLUDE_DIR=/usr/include PKG_CONFIG_PATH=/usr/lib/pkgconfig yarn workspace @ulixee/localchain build --target x86_64-unknown-linux-gnu --use-napi-cross
-            sqlx_offline: false
+            build: yarn build --target x86_64-unknown-linux-gnu
+            check_sql: true
     #          - os: macos-latest
     #            target: aarch64-apple-darwin
     #            build: yarn build --target aarch64-apple-darwin
@@ -56,6 +45,9 @@ jobs:
           --health-interval 10s
           --health-timeout 5s
           --health-retries 5
+        ports:
+          # Maps tcp port 5432 on service container to the host
+          - 5432:5432
 
     name: stable - ${{ matrix.target }} - node@20
     runs-on: ${{ matrix.os }}
@@ -71,16 +63,9 @@ jobs:
         working-directory: localchain
         run: echo "DATABASE_URL=sqlite://${{ runner.temp }}/temp.db" > .env
 
-      - name: Set Notary Db Url
-        working-directory: notary
-        run: |
-          echo "DATABASE_URL=postgres://postgres:postgres@postgres/notary" > .env
-
       - name: Install linux dependencies
         if: (matrix.os == '' || startsWith(matrix.os, 'ubuntu'))
-        run: |
-          sudo apt-get -qq update
-          sudo apt-get install -y protobuf-compiler libssl-dev pkg-config openssl
+        run: sudo apt-get install -y clang libssl-dev llvm libudev-dev protobuf-compiler pkg-config
 
       - name: Install mac dependencies
         if: startsWith(matrix.os, 'macos')
@@ -91,12 +76,41 @@ jobs:
 
       - uses: moonrepo/setup-rust@v1
         with:
+          bins: sqlx-cli@0.7
           targets: ${{ matrix.target }},wasm32-unknown-unknown
         env:
-          SQLX_OFFLINE: ${{ matrix.sqlx_offline || 'true' }}
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
 
-      - name: Build in docker
+      - name: Migrate Notary Db
+        if: (matrix.check_sql == true)
+        working-directory: notary
+        run: cargo sqlx database setup
+
+      - name: Migrate Localchain Db
+        if: (matrix.check_sql == true)
+        working-directory: localchain
+        run: cargo sqlx database setup
+
+      - name: Build
+        run: cargo build --features=fast-runtime
+        shell: bash
+        env:
+          SQLX_OFFLINE: ${{ !matrix.check_sql || 'true' }}
+
+      - name: Test
+        run: cargo test
+        env:
+          SQLX_OFFLINE: true
+
+      - name: Upload Debug Assets
+        uses: actions/upload-artifact@v4
+        with:
+          name: bins-${{ matrix.target }}
+          path: target/debug/ulx-*
+          if-no-files-found: error
+
+
+      - name: Build Localchain in docker
         uses: addnab/docker-run-action@v3
         if: ${{ matrix.docker }}
         with:
@@ -104,29 +118,19 @@ jobs:
           options: '--user 0:0 -e SQLX_OFFLINE=true -v ${{ github.workspace }}/.cargo-cache/git/db:/usr/local/cargo/git/db -v ${{ github.workspace }}/.cargo/registry/cache:/usr/local/cargo/registry/cache -v ${{ github.workspace }}/.cargo/registry/index:/usr/local/cargo/registry/index -v ${{ github.workspace }}:/build -w /build'
           run: ${{ matrix.build }}
 
-      - name: Build
+      - name: Build Localchain
         if: ${{ !matrix.docker }}
         run: ${{ matrix.build }}
         shell: bash
         working-directory: ./localchain
         env:
-          SQLX_OFFLINE: ${{ matrix.sqlx_offline || 'true' }}
+          SQLX_OFFLINE: true
 
-      - name: Test
-        run: cargo test
-
-      - name: Upload artifact
+      - name: Upload Localchain artifact
         uses: actions/upload-artifact@v4
         with:
           name: bindings-${{ matrix.target }}
           path: localchain/${{ env.APP_NAME }}.*.node
-          if-no-files-found: error
-
-      - name: Upload Release Assets
-        uses: actions/upload-artifact@v4
-        with:
-          name: bins-${{ matrix.target }}
-          path: target/build/ulx-*
           if-no-files-found: error
 
   test-binding:
@@ -178,7 +182,7 @@ jobs:
         uses: actions/download-artifact@v4
         with:
           name: bins-${{ matrix.target }}
-          path: target/build
+          path: target/debug
       - name: List packages
         run: ls -R .
         shell: bash
@@ -186,13 +190,11 @@ jobs:
 
       - name: Test bindings In Docker
         if: ${{ matrix.docker }}
-        run: docker run --rm -v $(pwd):/build -e NOTARY_DB_URL=postgres://postgres:postgres@postgres -w /build node:${{ matrix.node }}-slim yarn test
+        run: docker run --rm -v $(pwd):/build -w /build node:${{ matrix.node }}-slim yarn test
 
       - name: Test bindings
         if: ${{ !matrix.docker }}
         run: yarn test
-        env:
-          NOTARY_DB_URL: postgres://postgres:postgres@postgres
   universal-macOS:
     name: Build universal macOS binary
     needs:

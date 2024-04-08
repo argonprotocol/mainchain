@@ -70,6 +70,7 @@ subxt-signer = { version = "0.35.0", features = ["default"] }
 napi-build = "2.1"
 dotenv = { version = "0.15" }
 uniffi = { version = "0.27", features = ["build"] }
+sqlx-cli = { version = "0.7" }
 
 [features]
 default = []
