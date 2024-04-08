@@ -11,7 +11,7 @@ homepage.workspace = true
 publish = false
 
 [dependencies]
-ulixee-client = { path = "../client" }
-tracing = "0.1"
-subxt = { version = "0.35" }
-anyhow = "1.0"
+ulixee-client = { workspace = true }
+tracing = { workspace = true }
+subxt = { workspace = true }
+anyhow = { workspace = true, features = ["default"] }

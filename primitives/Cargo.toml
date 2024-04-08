@@ -13,38 +13,36 @@ homepage.workspace = true
 targets = ["x86_64-unknown-linux-gnu"]
 
 [dependencies]
-async-trait = { version = "0.1.76", optional = true }
-codec = { package = "parity-scale-codec", version = "3.6.4", default-features = false, features = ["derive", "max-encoded-len"] }
-serde = { version = "1.0", default-features = false, features = ["derive"] }
-serde_json = { version = "1.0", default-features = false, features = ["alloc"] }
-scale-info = { version = "2.10", default-features = false, features = ["derive"] }
-sp-runtime = { default-features = false, git = "https://github.com/paritytech/polkadot-sdk.git", branch = "release-polkadot-v1.9.0" }
-sp-inherents = { default-features = false, git = "https://github.com/paritytech/polkadot-sdk.git", branch = "release-polkadot-v1.9.0" }
-sp-api = { default-features = false, git = "https://github.com/paritytech/polkadot-sdk.git", branch = "release-polkadot-v1.9.0" }
-sp-application-crypto = { default-features = false, git = "https://github.com/paritytech/polkadot-sdk.git", branch = "release-polkadot-v1.9.0" }
-sp-debug-derive = { default-features = false, git = "https://github.com/paritytech/polkadot-sdk.git", branch = "release-polkadot-v1.9.0" }
-sp-core = { default-features = false, git = "https://github.com/paritytech/polkadot-sdk.git", branch = "release-polkadot-v1.9.0" }
-sp-std = { default-features = false, git = "https://github.com/paritytech/polkadot-sdk.git", branch = "release-polkadot-v1.9.0" }
-sp-crypto-hashing = { default-features = false, git = "https://github.com/paritytech/polkadot-sdk.git", branch = "release-polkadot-v1.9.0" }
-frame-support-procedural = { default-features = false, git = "https://github.com/paritytech/polkadot-sdk.git", branch = "release-polkadot-v1.9.0" }
-frame-support = { default-features = false, git = "https://github.com/paritytech/polkadot-sdk.git", branch = "release-polkadot-v1.9.0" }
-thiserror = { version = "1.0", optional = true }
-impl-trait-for-tuples = "0.2.2"
-napi-derive = { version = "2.16", optional = true }
-napi = { version = "2.16", optional = true }
-rsntp = { version = "4.0", optional = true }
-hex = { version = "0.4", optional = true }
-clap = { version = "4.5.1", optional = true, features = ["derive"] }
-uniffi = { version = "0.27", optional = true }
-primitive-types = { version = "0.12.0", default-features = false, features = ["codec", "scale-info"] }
-bounded-collections = { version = "0.2.0", default-features = false }
+async-trait = { workspace = true, optional = true }
+codec = { workspace = true }
+serde = { workspace = true }
+serde_json = { workspace = true }
+scale-info = { workspace = true }
+sp-runtime = { workspace = true }
+sp-inherents = { workspace = true }
+sp-api = { workspace = true }
+sp-application-crypto = { workspace = true }
+sp-debug-derive = { workspace = true }
+sp-core = { workspace = true }
+sp-std = { workspace = true }
+sp-crypto-hashing = { workspace = true }
+frame-support-procedural = { workspace = true }
+frame-support = { workspace = true }
+thiserror = { workspace = true, optional = true }
+impl-trait-for-tuples = { workspace = true }
+napi-derive = { workspace = true, optional = true }
+napi = { workspace = true, optional = true }
+rsntp = { workspace = true, optional = true }
+hex = { workspace = true, optional = true }
+clap = { workspace = true, optional = true }
+uniffi = { workspace = true, optional = true }
 
 [build-dependencies]
-uniffi = { version = "0.27", features = ["build"] }
+uniffi = { workspace = true, features = ["build"] }
 
 [dev-dependencies]
-chrono = "0.4"
-tokio = { version = "1.35", features = ["full"] }
+chrono = { workspace = true }
+tokio = { workspace = true, features = ["test-util"] }
 
 [features]
 default = ["std"]
@@ -56,15 +54,10 @@ std = [
     "scale-info/derive",
     "serde/std",
     "serde_json/std",
-    "bounded-collections/std",
     "sp-api/std",
     "sp-application-crypto/std",
     "sp-application-crypto/full_crypto",
     "sp-debug-derive/std",
-    "primitive-types/byteorder",
-    "primitive-types/rustc-hex",
-    "primitive-types/serde",
-    "primitive-types/std",
     "sp-core/std",
     "sp-core/full_crypto",
     "sp-crypto-hashing/std",
@@ -87,25 +80,5 @@ napi = [
     "napi-derive/type-def",
 ]
 uniffi = [
-    "codec/std",
-    "codec/derive",
-    "scale-info/std",
-    "scale-info/derive",
-    "serde/std",
-    "serde_json/std",
-    "bounded-collections/std",
-    "sp-api/std",
-    "async-trait",
-    "sp-debug-derive/std",
-    "primitive-types/byteorder",
-    "primitive-types/rustc-hex",
-    "primitive-types/serde",
-    "sp-application-crypto/full_crypto",
-    "sp-application-crypto/serde",
-    "sp-core/serde",
-    "sp-core/full_crypto",
-    "dep:uniffi",
-    "thiserror",
-    "hex",
-    "rsntp",
+    "dep:uniffi"
 ]

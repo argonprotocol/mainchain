@@ -21,56 +21,55 @@ crate-type = ["lib", "cdylib", "staticlib"]
 targets = ["x86_64-unknown-linux-gnu"]
 
 [dependencies]
-napi = { optional = true, version = "2.16", default-features = false, features = ["napi9", "async", "error_anyhow"] }
-napi-derive = { optional = true, version = "2.16" }
-anyhow = { version = "1" }
-futures = { version = "0.3" }
-getrandom = { version = "0.2" }
-parking_lot = { version = "0.12" }
-async-trait = { version = "0.1" }
-codec = { package = "parity-scale-codec", version = "3.6", features = ["derive", "max-encoded-len"] }
-serde = { version = "1.0", features = ["derive"] }
-serde_json = { version = "1.0", features = ["raw_value", "arbitrary_precision"] }
-scale-info = { version = "2.10" }
-thiserror = { version = "1.0" }
-subxt = { version = "0.35.0" }
-tokio = { version = "1.35", features = ["rt", "sync"] }
-hex = { version = "0.4" }
-sp-runtime = { git = "https://github.com/paritytech/polkadot-sdk.git", branch = "release-polkadot-v1.9.0", default-features = false, features = ["serde"] }
-sp-core = { git = "https://github.com/paritytech/polkadot-sdk.git", branch = "release-polkadot-v1.9.0", default-features = false, features = ["serde", "full_crypto"] }
-binary-merkle-tree = { git = "https://github.com/paritytech/polkadot-sdk.git", branch = "release-polkadot-v1.9.0" }
-tracing = { version = "0.1" }
-tracing-subscriber = { version = "0.3", features = ["env-filter"] }
-sqlx = { version = "0.7", features = ["runtime-tokio", "sqlite", "macros", "chrono"] }
-chrono = { version = "0.4" }
-clap = { version = "4.4", features = ["derive", "cargo", "env"] }
-comfy-table = { version = "7.1" }
-lazy_static = "1.4.0"
-bech32 = { version = "0.11.0" }
-array-bytes = { version = "6.1" }
-directories = { version = "5.0" }
-rpassword = { version = "7.3" }
-ulixee-client = { path = "../client" }
-ulx-primitives = { path = "../primitives" }
-ulx-notary-apis = { path = "../notary/apis" }
-ulx-notary-audit = { path = "../notary/audit" }
-uniffi = { version = "0.27", optional = true, features = ["tokio"] }
-jsonrpsee = { version = "0.22", features = ["ws-client", "macros", "client-ws-transport-native-tls", "client-ws-transport-webpki-tls"] }
+napi = { optional = true, workspace = true }
+napi-derive = { optional = true, workspace = true }
+anyhow = { workspace = true }
+futures = { workspace = true }
+getrandom = { workspace = true }
+parking_lot = { workspace = true }
+async-trait = { workspace = true }
+codec = { workspace = true, features = ["default"] }
+serde = { workspace = true, features = ["default"] }
+serde_json = { workspace = true, features = ["default"] }
+scale-info = { workspace = true, features = ["default"] }
+thiserror = { workspace = true }
+subxt = { workspace = true, features = ["default"] }
+tokio = { workspace = true }
+hex = { workspace = true, features = ["default"] }
+sp-runtime = { workspace = true, features = ["default"] }
+sp-core = { workspace = true, features = ["default", "serde", "full_crypto"] }
+binary-merkle-tree = { workspace = true, features = ["default"] }
+tracing = { workspace = true }
+tracing-subscriber = { workspace = true }
+sqlx = { workspace = true, features = ["runtime-tokio", "sqlite", "macros", "chrono"] }
+chrono = { workspace = true }
+clap = { workspace = true }
+comfy-table = { workspace = true }
+lazy_static = { workspace = true }
+bech32 = { workspace = true }
+array-bytes = { workspace = true }
+directories = { workspace = true }
+rpassword = { workspace = true }
+ulixee-client = { workspace = true }
+ulx-primitives = { workspace = true, features = ["default"] }
+ulx-notary-apis = { workspace = true }
+ulx-notary-audit = { workspace = true, features = ["default"] }
+uniffi = { workspace = true, optional = true }
+jsonrpsee = { workspace = true }
 
 
 [dev-dependencies]
-frame-support = { git = "https://github.com/paritytech/polkadot-sdk.git", branch = "release-polkadot-v1.9.0" }
-sp-keyring = { git = "https://github.com/paritytech/polkadot-sdk.git", branch = "release-polkadot-v1.9.0" }
-ulx-testing = { path = "../testing" }
-sc-utils = { git = "https://github.com/paritytech/polkadot-sdk.git", branch = "release-polkadot-v1.9.0" }
-ulx-notary = { path = "../notary" }
-subxt-signer = { version = "0.35.0", features = ["default"] }
+frame-support = { workspace = true }
+sp-keyring = { workspace = true }
+ulx-testing = { workspace = true }
+sc-utils = { workspace = true }
+ulx-notary = { workspace = true }
+subxt-signer = { workspace = true }
 
 [build-dependencies]
-napi-build = "2.1"
-dotenv = { version = "0.15" }
-uniffi = { version = "0.27", features = ["build"] }
-sqlx = { version = "0.7", features = ["any", "migrate", "sqlite"] }
+napi-build = { workspace = true }
+dotenv = { workspace = true }
+uniffi = { workspace = true, features = ["build"] }
 
 [features]
 default = []

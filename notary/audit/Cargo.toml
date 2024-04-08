@@ -10,24 +10,23 @@ documentation.workspace = true
 homepage.workspace = true
 
 [dependencies]
+log = { workspace = true }
+anyhow = { workspace = true }
+codec = { workspace = true }
+serde = { workspace = true }
+scale-info = { workspace = true }
+sp-core = { workspace = true }
+sp-runtime = { workspace = true }
+sp-std = { workspace = true }
+snafu = { workspace = true }
+binary-merkle-tree = { workspace = true }
 
-log = { version = "0.4.20", default-features = false }
-anyhow = { version = "1.0", default-features = false }
-codec = { package = "parity-scale-codec", version = "3.6", default-features = false, features = ["derive", "max-encoded-len"] }
-serde = { version = "1.0", default-features = false, features = ["derive"] }
-scale-info = { version = "2.10", default-features = false, features = ["derive"] }
-sp-core = { default-features = false, git = "https://github.com/paritytech/polkadot-sdk.git", branch = "release-polkadot-v1.9.0", features = ["serde"] }
-sp-runtime = { default-features = false, git = "https://github.com/paritytech/polkadot-sdk.git", branch = "release-polkadot-v1.9.0" }
-sp-std = { default-features = false, git = "https://github.com/paritytech/polkadot-sdk.git", branch = "release-polkadot-v1.9.0" }
-snafu = { version = "0.7", default-features = false }
-binary-merkle-tree = { default-features = false, git = "https://github.com/paritytech/polkadot-sdk.git", branch = "release-polkadot-v1.9.0" }
-
-ulx-primitives = { path = "../../primitives", default-features = false }
+ulx-primitives = { workspace = true }
 
 [dev-dependencies]
-frame-support = { git = "https://github.com/paritytech/polkadot-sdk.git", branch = "release-polkadot-v1.9.0" }
-sp-keyring = { git = "https://github.com/paritytech/polkadot-sdk.git", branch = "release-polkadot-v1.9.0" }
-chrono = "0.4"
+frame-support = { workspace = true }
+sp-keyring = { workspace = true }
+chrono = { workspace = true }
 
 [features]
 default = ["std"]

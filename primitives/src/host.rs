@@ -1,8 +1,9 @@
-use bounded_collections::{BoundedVec, ConstU32};
+use sp_runtime::{BoundedVec,};
 use codec::{Decode, Encode, MaxEncodedLen};
 use scale_info::TypeInfo;
 use serde::{Deserialize, Serialize};
 use sp_debug_derive::RuntimeDebug;
+use sp_runtime::traits::ConstU32;
 
 #[derive(
 	PartialEq,

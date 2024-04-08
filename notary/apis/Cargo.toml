@@ -11,13 +11,13 @@ documentation.workspace = true
 homepage.workspace = true
 
 [dependencies]
-anyhow = { version = "1" }
-codec = { package = "parity-scale-codec", version = "3.6", features = ["derive", "max-encoded-len"] }
-serde = { version = "1.0", features = ["derive"] }
-serde_json = { version = "1.0", features = ["raw_value", "arbitrary_precision"] }
-scale-info = { version = "2.10" }
-sp-runtime = { default-features = false, git = "https://github.com/paritytech/polkadot-sdk.git", branch = "release-polkadot-v1.9.0", features = ["serde"] }
-sp-core = { default-features = false, git = "https://github.com/paritytech/polkadot-sdk.git", branch = "release-polkadot-v1.9.0", features = ["serde"] }
-jsonrpsee = { version = "0.22", features = ["http-client", "ws-client", "macros", "server", "client-ws-transport-native-tls", "client-ws-transport-webpki-tls"] }
+anyhow = { workspace = true, features = ["default"] }
+codec = { workspace = true, features = ["default"] }
+serde = { workspace = true, features = ["default"] }
+serde_json = { workspace = true, features = ["default"] }
+scale-info = { workspace = true, features = ["default"] }
+sp-runtime = { workspace = true }
+sp-core = { workspace = true }
+jsonrpsee = { workspace = true, features = ["server"] }
 
-ulx-primitives = { path = "../../primitives", default-features = false }
+ulx-primitives = { workspace = true }

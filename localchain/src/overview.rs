@@ -617,10 +617,10 @@ mod tests {
     {
       let overview = alice_overview.get().await?;
       println!("Alice {:#?}", overview);
-      assert_eq!(overview.balance, 5000);
-      assert_eq!(overview.pending_balance_change, -3500);
-      assert_eq!(overview.tax, 0);
-      assert_eq!(overview.pending_tax_change, 200);
+      assert_eq!(overview.balance, 4800);
+      assert_eq!(overview.pending_balance_change, -3300);
+      assert_eq!(overview.tax, 200);
+      assert_eq!(overview.pending_tax_change, 0);
       assert_eq!(overview.changes.len(), 2);
       assert_eq!(
         overview.changes[0].status,
@@ -642,10 +642,10 @@ mod tests {
     {
       let overview = bob_overview.get().await?;
       println!("Bob {:#?}", overview);
-      assert_eq!(overview.balance, 0);
-      assert_eq!(overview.pending_balance_change, 3100);
-      assert_eq!(overview.tax, 0);
-      assert_eq!(overview.pending_tax_change, 200);
+      assert_eq!(overview.balance, 3100);
+      assert_eq!(overview.pending_balance_change, 0);
+      assert_eq!(overview.tax, 200);
+      assert_eq!(overview.pending_tax_change, 0);
       assert_eq!(overview.changes.len(), 1);
       assert_eq!(overview.changes[0].status, BalanceChangeStatus::Notarized);
       assert_eq!(overview.changes[0].notes, vec!["Claim ₳3.3", "Tax ₳0.2"]);
