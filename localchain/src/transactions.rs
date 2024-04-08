@@ -410,7 +410,7 @@ mod tests {
             assert_eq!(latest.change_number, 2);
           } else {
             assert_eq!(latest.balance, "1500");
-            assert_eq!(latest.status, BalanceChangeStatus::SubmittedToNotary);
+            assert_eq!(latest.status, BalanceChangeStatus::Notarized);
             assert!(latest.transaction_id.is_some());
             assert_eq!(latest.change_number, 2);
           }
@@ -461,11 +461,11 @@ mod tests {
           if account.hd_path.is_some() {
             // should get moved to tax
             assert_eq!(latest.balance, "0");
-            assert_eq!(latest.status, BalanceChangeStatus::SubmittedToNotary);
+            assert_eq!(latest.status, BalanceChangeStatus::Notarized);
             assert_eq!(latest.change_number, 2);
           } else {
             assert_eq!(latest.balance, "200");
-            assert_eq!(latest.status, BalanceChangeStatus::SubmittedToNotary);
+            assert_eq!(latest.status, BalanceChangeStatus::Notarized);
             assert_eq!(latest.change_number, 1);
           }
         } else {
@@ -576,7 +576,7 @@ mod tests {
           assert_eq!(latest.balance, "0");
         } else {
           assert_eq!(latest.balance, "1300");
-          assert_eq!(latest.status, BalanceChangeStatus::SubmittedToNotary);
+          assert_eq!(latest.status, BalanceChangeStatus::Notarized);
           assert_eq!(latest.change_number, 2);
         }
       }
@@ -649,11 +649,11 @@ mod tests {
           if account.hd_path.is_some() {
             // should get moved to default tax
             assert_eq!(latest.balance, "0");
-            assert_eq!(latest.status, BalanceChangeStatus::SubmittedToNotary);
+            assert_eq!(latest.status, BalanceChangeStatus::Notarized);
             assert_eq!(latest.change_number, 2);
           } else {
             assert_eq!(latest.balance, "200");
-            assert_eq!(latest.status, BalanceChangeStatus::SubmittedToNotary);
+            assert_eq!(latest.status, BalanceChangeStatus::Notarized);
             assert_eq!(latest.change_number, 1);
           }
         } else {
@@ -693,13 +693,13 @@ mod tests {
         if account.hd_path.is_some() {
           // should be getting consolidated
           assert_eq!(latest.balance, "0");
-          assert_eq!(latest.status, BalanceChangeStatus::SubmittedToNotary);
+          assert_eq!(latest.status, BalanceChangeStatus::Notarized);
           assert!(latest.transaction_id.is_some());
           assert_eq!(latest.net_balance_change, "-3500");
           assert_eq!(latest.change_number, 2);
         } else {
           assert_eq!(latest.balance, "3500");
-          assert_eq!(latest.status, BalanceChangeStatus::SubmittedToNotary);
+          assert_eq!(latest.status, BalanceChangeStatus::Notarized);
           assert_eq!(latest.change_number, 2);
         }
       }

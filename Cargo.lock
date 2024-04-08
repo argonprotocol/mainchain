@@ -6799,7 +6799,6 @@ dependencies = [
 name = "pallet-block-rewards"
 version = "0.0.1"
 dependencies = [
- "binary-merkle-tree",
  "env_logger",
  "frame-benchmarking",
  "frame-support",
@@ -12822,7 +12821,6 @@ dependencies = [
  "sp-keyring",
  "sp-runtime",
  "sqlx",
- "sqlx-cli",
  "subxt",
  "subxt-signer",
  "thiserror",
@@ -13024,7 +13022,6 @@ dependencies = [
  "jsonrpsee",
  "parity-scale-codec",
  "parking_lot 0.12.1",
- "patch-crate",
  "rpassword",
  "sc-keystore",
  "sc-utils",
@@ -13124,11 +13121,8 @@ name = "ulx-testing"
 version = "0.0.1"
 dependencies = [
  "anyhow",
- "frame-support",
- "sp-keyring",
  "subxt",
  "tracing",
- "tracing-subscriber 0.3.18",
  "ulixee-client",
 ]
 

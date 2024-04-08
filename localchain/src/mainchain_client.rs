@@ -422,6 +422,7 @@ impl MainchainClient {
   )> {
     let current_nonce = self.get_account_nonce(address.clone()).await?;
     let best_block = H256::from_slice(self.get_best_block_hash().await?.as_ref());
+    let mortality = 50; // artibrary number of blocks to keep this tx alive
 
     let client = self.client().await?;
 
@@ -432,7 +433,7 @@ impl MainchainClient {
     let payload = {
       let params = UlxExtrinsicParamsBuilder::<UlxConfig>::new()
         .nonce(current_nonce as u64)
-        .mortal(latest_block.header(), 32)
+        .mortal(latest_block.header(), mortality)
         .build();
       let tx_tmp = client.live.tx().create_partial_signed_offline(
         &tx().chain_transfer().send_to_localchain(amount, notary_id),
@@ -454,7 +455,7 @@ impl MainchainClient {
           &tx().chain_transfer().send_to_localchain(amount, notary_id),
           UlxExtrinsicParamsBuilder::<UlxConfig>::new()
             .nonce(current_nonce as u64)
-            .mortal(latest_block.header(), 32)
+            .mortal(latest_block.header(), mortality)
             .build(),
         )?
         .sign_with_address_and_signature(&multi_address, &multi_signature)
@@ -560,12 +561,13 @@ impl MainchainClient {
     &self,
     notary_id: u32,
   ) -> Result<runtime_types::ulx_primitives::notary::NotaryNotebookKeyDetails> {
+    let best_block = self.get_best_block_hash().await?;
     if let Some((details, _did_receive_at_tick)) = self
       .fetch_storage(
         &storage()
           .notebook()
           .last_notebook_details_by_notary(&notary_id),
-        None,
+        Some(best_block),
       )
       .await?
       .ok_or_else(|| anyhow!("No notebook found for notary {}", notary_id))?
@@ -609,7 +611,7 @@ impl MainchainClient {
     Ok(block_number)
   }
 
-  pub async fn wait_for_notebook_finalized(
+  pub async fn wait_for_notebook_immortalized(
     &self,
     notary_id: NotaryId,
     notebook_number: NotebookNumber,
@@ -879,14 +881,14 @@ pub mod napi_ext {
       self.latest_finalized_number().await.napi_ok()
     }
 
-    #[napi(js_name = "waitForNotebookFinalized")]
-    pub async fn wait_for_notebook_finalized_napi(
+    #[napi(js_name = "waitForNotebookImmortalized")]
+    pub async fn wait_for_notebook_immortalized_napi(
       &self,
       notary_id: u32,
       notebook_number: u32,
     ) -> napi::Result<u32> {
       self
-        .wait_for_notebook_finalized(notary_id, notebook_number)
+        .wait_for_notebook_immortalized(notary_id, notebook_number)
         .await
         .napi_ok()
     }

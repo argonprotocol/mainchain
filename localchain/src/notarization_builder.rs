@@ -1447,7 +1447,7 @@ mod test {
       .await?
       .unwrap();
     assert_eq!(bob_latest.balance, "800");
-    assert_eq!(bob_latest.status, BalanceChangeStatus::SubmittedToNotary);
+    assert_eq!(bob_latest.status, BalanceChangeStatus::Notarized);
     assert_eq!(bob_latest.proof_json, None);
     let bob_tax_latest =
       BalanceChangeStore::db_get_latest_for_account(&mut bob_db, bob_tax_account.id)

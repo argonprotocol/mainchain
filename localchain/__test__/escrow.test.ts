@@ -21,7 +21,6 @@ import {
     activateNotary,
     createLocalchain,
     disconnectOnTeardown,
-    ipToInt32,
     KeyringSigner,
     teardown,
     transferToLocalchain
@@ -47,11 +46,7 @@ it('can create a zone record type', async () => {
     await expect(registerZoneRecord(mainchainClient, dataDomainHash, ferdie, ferdieDomainAddress.publicKey, 1, {
         "1.0.0": mainchainClient.createType('UlxPrimitivesDataDomainVersionHost', {
             datastoreId: mainchainClient.createType('Bytes', 'default'),
-            host: {
-                ip: ipToInt32('192.168.1.1'),
-                port: 80,
-                isSecure: false
-            }
+            host: 'ws://192.168.1.1:80'
         })
     })).rejects.toThrow("ExtrinsicFailed:: dataDomain.DomainNotRegistered");
 }, 30e3);
@@ -106,18 +101,14 @@ it('can run a data domain escrow', async () => {
         expect(domains[0].tld).toBe("analytics");
 
         const ferdieMainchainClient = await ferdiechain.mainchainClient;
-        await ferdieTracker.waitForFinalized(ferdieMainchainClient);
+        await ferdieTracker.waitForImmortalized(ferdieMainchainClient);
         await expect(ferdieMainchainClient.getDataDomainRegistration(dataDomain.domainName, dataDomain.topLevelDomain)).resolves.toBeTruthy();
     }
 
     await registerZoneRecord(mainchainClient, dataDomainHash, ferdiekeys.defaultPair, ferdiekeys.defaultPair.publicKey, 1, {
         "1.0.0": mainchainClient.createType('UlxPrimitivesDataDomainVersionHost', {
             datastoreId: mainchainClient.createType('Bytes', 'default'),
-            host: {
-                ip: ipToInt32('192.168.1.1'),
-                port: 80,
-                isSecure: false
-            }
+            host: 'ws://192.168.1.1:80'
         })
     });
 

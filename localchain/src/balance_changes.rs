@@ -94,14 +94,14 @@ impl BalanceChangeRow {
 #[cfg_attr(feature = "napi", napi(string_enum))]
 #[cfg_attr(feature = "uniffi", derive(uniffi::Enum))]
 pub enum BalanceChangeStatus {
-  /// The balance change has been submitted, but is not in a known notebook yet.
-  SubmittedToNotary,
+  /// The balance change has been notarized by a notary. It isn't necessarily in a notebook yet.
+  Notarized,
   /// A balance change that doesn't get final proof because it is one of many in a single notebook. Aka, another balance change superseded it in the notebook.
   SupersededInNotebook,
   /// Proof has been obtained from a notebook
   NotebookPublished,
-  /// The mainchain has finalized the notebook with the balance change
-  MainchainFinal,
+  /// The mainchain has included the notebook with the balance change
+  Immortalized,
   /// A balance change has been sent to another user to claim. Keep checking until it is claimed.
   WaitingForSendClaim,
   /// A pending balance change that was canceled before being claimed by another user (escrow or send).
@@ -111,10 +111,10 @@ pub enum BalanceChangeStatus {
 impl From<i64> for BalanceChangeStatus {
   fn from(i: i64) -> Self {
     match i {
-      0 => BalanceChangeStatus::SubmittedToNotary,
+      0 => BalanceChangeStatus::Notarized,
       1 => BalanceChangeStatus::SupersededInNotebook,
       2 => BalanceChangeStatus::NotebookPublished,
-      3 => BalanceChangeStatus::MainchainFinal,
+      3 => BalanceChangeStatus::Immortalized,
       4 => BalanceChangeStatus::WaitingForSendClaim,
       5 => BalanceChangeStatus::Canceled,
       _ => panic!("Unknown balance change status {}", i),
@@ -236,7 +236,7 @@ impl BalanceChangeStore {
       "SELECT * FROM balance_changes WHERE status in (?,?,?) ORDER BY account_id ASC, change_number DESC",
       BalanceChangeStatus::WaitingForSendClaim as i64,
       BalanceChangeStatus::NotebookPublished as i64,
-      BalanceChangeStatus::SubmittedToNotary as i64,
+      BalanceChangeStatus::Notarized as i64,
     )
             .fetch_all(&mut *db)
             .await?;
@@ -382,7 +382,7 @@ impl BalanceChangeStore {
 
     if let Some(existing) = Self::db_find_account_change(db, account_id, balance_change).await? {
       if existing.status == BalanceChangeStatus::NotebookPublished
-        || existing.status == BalanceChangeStatus::MainchainFinal
+        || existing.status == BalanceChangeStatus::Immortalized
       {
         return Ok(existing.id);
       }
@@ -394,7 +394,7 @@ impl BalanceChangeStore {
         net_balance_change,
         notes_json,
         hold_note_json,
-        BalanceChangeStatus::SubmittedToNotary as i64,
+        BalanceChangeStatus::Notarized as i64,
         transaction_id,
         existing.id,
       ).execute(&mut **db).await?;
@@ -411,7 +411,7 @@ impl BalanceChangeStore {
         balance_change.change_number,
         balance_str,
         net_balance_change,
-        BalanceChangeStatus::SubmittedToNotary as i64,
+        BalanceChangeStatus::Notarized as i64,
         hold_note_json,
         notes_json,
         notary_id,
@@ -436,7 +436,7 @@ impl BalanceChangeStore {
       "SELECT id FROM balance_changes WHERE account_id = ? AND change_number > ? AND status in (?,?) ORDER BY change_number DESC LIMIT 1",
       balance_change.account_id,
       balance_change.change_number,
-      BalanceChangeStatus::MainchainFinal as i64,
+      BalanceChangeStatus::Immortalized as i64,
       BalanceChangeStatus::NotebookPublished as i64,
     )
             .fetch_optional(&mut *db)
@@ -474,7 +474,7 @@ impl BalanceChangeStore {
     Ok(())
   }
 
-  pub async fn tx_save_finalized(
+  pub async fn tx_save_immortalized(
     db: &mut Transaction<'static, Sqlite>,
     balance_change: &mut BalanceChangeRow,
     account: &LocalAccount,
@@ -482,13 +482,13 @@ impl BalanceChangeStore {
     finalized_block_number: u32,
   ) -> Result<()> {
     balance_change.verify_balance_proof(account, account_change_root)?;
-    balance_change.status = BalanceChangeStatus::MainchainFinal;
+    balance_change.status = BalanceChangeStatus::Immortalized;
     balance_change.finalized_block_number = Some(finalized_block_number as i64);
 
     sqlx::query!(
       "UPDATE balance_changes SET finalized_block_number = ?, status = ? WHERE id = ?",
       balance_change.finalized_block_number,
-      BalanceChangeStatus::MainchainFinal as i64,
+      BalanceChangeStatus::Immortalized as i64,
       balance_change.id
     )
     .execute(&mut **db)
@@ -633,7 +633,7 @@ mod test {
 
     assert_eq!(
       BalanceChangeStore::db_get_by_id(&mut *db, id).await?.status,
-      BalanceChangeStatus::SubmittedToNotary
+      BalanceChangeStatus::Notarized
     );
 
     let mut next = balance_change.clone();

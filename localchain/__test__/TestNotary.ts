@@ -5,7 +5,7 @@ import {UlxClient, KeyringPair, Keyring} from "@ulixee/mainchain";
 import fs from "node:fs";
 import * as readline from "node:readline";
 import {checkForExtrinsicSuccess} from "@ulixee/mainchain";
-import {addTeardown, ipToInt32, ITeardownable} from "./testHelpers";
+import {addTeardown, ITeardownable} from "./testHelpers";
 import * as process from "node:process";
 
 const nanoid = customAlphabet('0123456789abcdefghijklmnopqrstuvwxyz', 4);
@@ -93,16 +93,11 @@ export default class TestNotary implements ITeardownable {
 
     public async register(client: UlxClient): Promise<void> {
         let address = new URL(this.#address);
-        const ip = ipToInt32(address.hostname);
 
         await new Promise<void>(async (resolve, reject) => {
             await client.tx.notaries.propose({
                 public: this.registeredPublicKey,
-                hosts: [{
-                    ip,
-                    port: parseInt(address.port, 10),
-                    isSecure: address.protocol === 'wss:'
-                }]
+                hosts: [address.href]
             }).signAndSend(this.operator, ({events, status}) => {
                 if (status.isInBlock) {
                     checkForExtrinsicSuccess(events, client).then(() => {

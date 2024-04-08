@@ -27,7 +27,6 @@ serde_json = { version = "1.0", features = ["raw_value", "arbitrary_precision"] 
 scale-info = { version = "2.10" }
 thiserror = { version = "1.0" }
 subxt = { version = "0.35" }
-subxt-signer = { version = "0.35", features = ["default"] }
 tokio = { version = "1.35", features = ["rt", "sync", "time"] }
 hex = { version = "0.4" }
 jsonrpsee = { version = "0.22", features = ["server", "http-client", "ws-client", "macros", "client-ws-transport-native-tls"] }
@@ -54,9 +53,9 @@ url = "2.5.0"
 frame-support = { git = "https://github.com/paritytech/polkadot-sdk.git", branch = "release-polkadot-v1.9.0" }
 sp-keyring = { git = "https://github.com/paritytech/polkadot-sdk.git", branch = "release-polkadot-v1.9.0" }
 ulx-testing = { path = "../testing" }
+subxt-signer = { version = "0.35", features = ["default"] }
 
 [build-dependencies]
-patch-crate = "0.1.9"
 dotenv = { version = "0.15" }
 sqlx-cli = { version = "0.7" }
 

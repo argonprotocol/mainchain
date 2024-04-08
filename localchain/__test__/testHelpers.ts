@@ -107,8 +107,3 @@ export async function activateNotary(sudo: KeyringPair, client: UlxClient, notar
         })
     });
 }
-
-export function ipToInt32(ipAddress: string): number {
-    let ip = ipAddress.split('.').reduce((ip, octet) => (ip << 8) + parseInt(octet, 10), 0);
-    return ip >>> 0;
-}

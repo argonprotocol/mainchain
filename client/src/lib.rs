@@ -90,7 +90,7 @@ impl UlxFullclient {
 		timeout_millis: u64,
 	) -> Result<Self, Error> {
 		let start = std::time::Instant::now();
-		let url = Url::parse(&url).map_err(|e| Error::Other(format!("Invalid URL: {}", e)))?;
+		let url = Url::parse(&url).map_err(|e| Error::Other(format!("Invalid Mainchain URL: {} -> {}", url, e)))?;
 
 		let (sender, receiver) = loop {
 			let builder = {
@@ -182,7 +182,7 @@ impl MultiurlClient {
 		let mut lock = self.client.write().await;
 		let client_lock = self.client.clone();
 		let start = std::time::Instant::now();
-		let url = Url::parse(&url).map_err(|e| Error::Other(format!("Invalid URL: {}", e)))?;
+		let url = Url::parse(&url).map_err(|e| Error::Other(format!("Invalid Notary URL:  {} -> {}", url, e)))?;
 		let (sender, receiver) = loop {
 			match WsTransportClientBuilder::default().build(url.clone()).await {
 				Ok(client) => break client,

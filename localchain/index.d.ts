@@ -192,7 +192,7 @@ export class MainchainClient {
   waitForLocalchainTransfer(address: string, nonce: number): Promise<LocalchainTransfer | null>
   getAccountChangesRoot(notaryId: number, notebookNumber: number): Promise<Uint8Array>
   latestFinalizedNumber(): Promise<number>
-  waitForNotebookFinalized(notaryId: number, notebookNumber: number): Promise<number>
+  waitForNotebookImmortalized(notaryId: number, notebookNumber: number): Promise<number>
 }
 
 export class MainchainTransferStore {
@@ -259,7 +259,7 @@ export class NotarizationTracker {
   /** Asks the notary for proof the transaction was included in a notebook header. If this notebook has not been finalized yet, it will return an error. */
   getNotebookProof(): Promise<Array<NotebookProof>>
   /** Confirms the root added to the mainchain */
-  waitForFinalized(mainchainClient: MainchainClient): Promise<FinalizedBlock>
+  waitForImmortalized(mainchainClient: MainchainClient): Promise<ImmortalizedBlock>
 }
 
 export class NotaryClient {
@@ -352,14 +352,14 @@ export interface BalanceChangeGroup {
 }
 
 export enum BalanceChangeStatus {
-  /** The balance change has been submitted, but is not in a known notebook yet. */
-  SubmittedToNotary = 'SubmittedToNotary',
+  /** The balance change has been notarized by a notary. It isn't necessarily in a notebook yet. */
+  Notarized = 'Notarized',
   /** A balance change that doesn't get final proof because it is one of many in a single notebook. Aka, another balance change superseded it in the notebook. */
   SupersededInNotebook = 'SupersededInNotebook',
   /** Proof has been obtained from a notebook */
   NotebookPublished = 'NotebookPublished',
-  /** The mainchain has finalized the notebook with the balance change */
-  MainchainFinal = 'MainchainFinal',
+  /** The mainchain has included the notebook with the balance change */
+  Immortalized = 'Immortalized',
   /** A balance change has been sent to another user to claim. Keep checking until it is claimed. */
   WaitingForSendClaim = 'WaitingForSendClaim',
   /** A pending balance change that was canceled before being claimed by another user (escrow or send). */
@@ -480,8 +480,8 @@ export interface EscrowCloseOptions {
   minimumVoteAmount?: number
 }
 
-export interface FinalizedBlock {
-  finalizedBlockNumber: number
+export interface ImmortalizedBlock {
+  immortalizedBlock: number
   accountChangesMerkleRoot: Uint8Array
 }
 
@@ -525,7 +525,7 @@ export interface LocalchainOverview {
   /** The mainchain balance */
   mainchainBalance: bigint
   /** The net pending mainchain balance pending movement in/out of the localchain */
-  pendingMainchainBalanceChange: bigint
+  processingMainchainBalanceChange: bigint
 }
 
 export interface LocalchainTransaction {

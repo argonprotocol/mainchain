@@ -31,37 +31,6 @@ pub struct MainchainTransferStore {
   keystore: Keystore,
 }
 
-#[cfg(feature = "napi")]
-pub mod napi_ext {
-  use crate::error::NapiOk;
-  use napi::bindgen_prelude::BigInt;
-
-  use crate::mainchain_client::napi_ext::LocalchainTransfer;
-  use crate::mainchain_transfer::MainchainTransferStore;
-
-  #[napi]
-  impl MainchainTransferStore {
-    #[napi(js_name = "sendToLocalchain")]
-    pub async fn send_to_localchain_napi(
-      &self,
-      amount: BigInt,
-      notary_id: Option<u32>,
-    ) -> napi::Result<LocalchainTransfer> {
-      let transfer = self
-        .send_to_localchain(amount.get_u128().1, notary_id)
-        .await
-        .napi_ok()?;
-      Ok(LocalchainTransfer {
-        address: transfer.address,
-        amount: transfer.amount.into(),
-        notary_id: transfer.notary_id,
-        expiration_block: transfer.expiration_block,
-        account_nonce: transfer.account_nonce,
-      })
-    }
-  }
-}
-
 impl MainchainTransferStore {
   pub fn new(
     db: SqlitePool,
@@ -179,5 +148,36 @@ impl MainchainTransferStore {
       bail!("Error updating mainchain transfer");
     }
     Ok(())
+  }
+}
+
+#[cfg(feature = "napi")]
+pub mod napi_ext {
+  use crate::error::NapiOk;
+  use napi::bindgen_prelude::BigInt;
+
+  use crate::mainchain_client::napi_ext::LocalchainTransfer;
+  use crate::mainchain_transfer::MainchainTransferStore;
+
+  #[napi]
+  impl MainchainTransferStore {
+    #[napi(js_name = "sendToLocalchain")]
+    pub async fn send_to_localchain_napi(
+      &self,
+      amount: BigInt,
+      notary_id: Option<u32>,
+    ) -> napi::Result<LocalchainTransfer> {
+      let transfer = self
+          .send_to_localchain(amount.get_u128().1, notary_id)
+          .await
+          .napi_ok()?;
+      Ok(LocalchainTransfer {
+        address: transfer.address,
+        amount: transfer.amount.into(),
+        notary_id: transfer.notary_id,
+        expiration_block: transfer.expiration_block,
+        account_nonce: transfer.account_nonce,
+      })
+    }
   }
 }

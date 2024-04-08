@@ -20,20 +20,20 @@ pub struct LocalchainOverview {
   pub address: String,
   /// The current account balance
   pub balance: i128,
-  /// The net pending balance change acceptance/confirmation
+  /// The net pending balance change acceptance pending acceptance by another party
   pub pending_balance_change: i128,
   /// Balance held in escrow
   pub held_balance: i128,
   /// Tax accumulated for the account
   pub tax: i128,
-  /// The net pending tax balance change
+  /// The net tax balance change pending acceptance by another party
   pub pending_tax_change: i128,
   /// Changes to the account ordered from most recent to oldest
   pub changes: Vec<BalanceChangeGroup>,
   /// The mainchain balance
   pub mainchain_balance: i128,
   /// The net pending mainchain balance pending movement in/out of the localchain
-  pub pending_mainchain_balance_change: i128,
+  pub processing_mainchain_balance_change: i128,
 }
 
 #[derive(Clone, Debug)]
@@ -151,7 +151,7 @@ impl OverviewStore {
     }
 
     for transfer in pending_mainchain_transfers {
-      overview.pending_mainchain_balance_change -= transfer.amount.parse::<i128>()?;
+      overview.processing_mainchain_balance_change -= transfer.amount.parse::<i128>()?;
     }
 
     if let Some(mainchain_client) = self.mainchain_client.lock().await.as_ref() {
@@ -327,7 +327,7 @@ pub mod uniffi_ext {
     /// The mainchain balance
     pub mainchain_balance: String,
     /// The net pending mainchain balance pending movement in/out of the localchain
-    pub pending_mainchain_balance_change: String,
+    pub processing_mainchain_balance_change: String,
   }
 
   #[derive(uniffi::Record, Clone, Debug)]
@@ -378,7 +378,7 @@ pub mod uniffi_ext {
           .map(|c| c.into())
           .collect::<Vec<_>>(),
         mainchain_balance: self.mainchain_balance.to_string(),
-        pending_mainchain_balance_change: self.pending_mainchain_balance_change.to_string(),
+        processing_mainchain_balance_change: self.processing_mainchain_balance_change.to_string(),
       }
     }
   }
@@ -451,7 +451,7 @@ pub mod napi_ext {
     /// The mainchain balance
     pub mainchain_balance: BigInt,
     /// The net pending mainchain balance pending movement in/out of the localchain
-    pub pending_mainchain_balance_change: BigInt,
+    pub processing_mainchain_balance_change: BigInt,
   }
 
   #[napi(object)]
@@ -504,7 +504,7 @@ pub mod napi_ext {
           .map(|c| c.into())
           .collect::<Vec<_>>(),
         mainchain_balance: self.mainchain_balance.into(),
-        pending_mainchain_balance_change: self.pending_mainchain_balance_change.into(),
+        processing_mainchain_balance_change: self.processing_mainchain_balance_change.into(),
       }
     }
   }
@@ -554,10 +554,7 @@ pub mod napi_ext {
 }
 
 fn is_pending(status: &BalanceChangeStatus) -> bool {
-  matches!(
-    status,
-    BalanceChangeStatus::SubmittedToNotary | BalanceChangeStatus::WaitingForSendClaim
-  )
+  matches!(status, BalanceChangeStatus::WaitingForSendClaim)
 }
 
 #[cfg(test)]
@@ -650,10 +647,7 @@ mod tests {
       assert_eq!(overview.tax, 0);
       assert_eq!(overview.pending_tax_change, 200);
       assert_eq!(overview.changes.len(), 1);
-      assert_eq!(
-        overview.changes[0].status,
-        BalanceChangeStatus::SubmittedToNotary
-      );
+      assert_eq!(overview.changes[0].status, BalanceChangeStatus::Notarized);
       assert_eq!(overview.changes[0].notes, vec!["Claim ₳3.3", "Tax ₳0.2"]);
     }
 
@@ -685,10 +679,7 @@ mod tests {
       assert_eq!(overview.tax, 200);
       assert_eq!(overview.pending_tax_change, 0);
       assert_eq!(overview.changes.len(), 3);
-      assert_eq!(
-        overview.changes[0].status,
-        BalanceChangeStatus::SubmittedToNotary
-      );
+      assert_eq!(overview.changes[0].status, BalanceChangeStatus::Notarized);
       assert_eq!(
         overview.changes[0].transaction_type,
         Some(TransactionType::Consolidation)

@@ -10,14 +10,23 @@ fn main() {
     dotenv().ok();
     let project_dir = env::current_dir().unwrap(); // Get the current directory
 
-    let database_url = env::var("DATABASE_URL").expect("DATABASE_URL must be set");
-    let _ = Command::new("sqlx")
-      .args(["database", "drop", "--database-url", &database_url])
-      .current_dir(&project_dir) // Set the current directory for the command
-      .output();
+    match Command::new("cargo").args(&["sqlx", "--version"]).output() {
+      Ok(output) if output.status.success() => {
+        println!("`sqlx-cli` is already installed.");
+      }
+      _ => {
+        println!("Installing `sqlx-cli`...");
+        Command::new("cargo")
+          .args(&["install", "sqlx-cli@^0.7"])
+          .status()
+          .expect("Failed to install `sqlx-cli`");
+      }
+    }
 
-    let output = Command::new("sqlx")
-      .args(["database", "setup", "--database-url", &database_url])
+    let database_url = env::var("DATABASE_URL").expect("DATABASE_URL must be set");
+
+    let output = Command::new("cargo")
+      .args(["sqlx", "database", "reset", "--database-url", &database_url])
       .current_dir(&project_dir) // Set the current directory for the command
       .output()
       .expect(&format!(

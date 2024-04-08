@@ -372,7 +372,7 @@ impl BalanceSync {
     }
 
     let mut check_notary_for_tip = change.status == BalanceChangeStatus::WaitingForSendClaim;
-    if change.status == BalanceChangeStatus::SubmittedToNotary {
+    if change.status == BalanceChangeStatus::Notarized {
       check_notary_for_tip =
         match Self::sync_notebook_proof(&self.db, &mut change, &self.notary_clients).await {
           Ok(x) => x,
@@ -978,7 +978,7 @@ impl BalanceSync {
 
     let account = AccountStore::db_get_by_id(&mut tx, balance_change.account_id).await?;
     let change_root = H256::from_slice(&account_change_root.as_ref()[..]);
-    BalanceChangeStore::tx_save_finalized(
+    BalanceChangeStore::tx_save_immortalized(
       &mut tx,
       balance_change,
       &account,

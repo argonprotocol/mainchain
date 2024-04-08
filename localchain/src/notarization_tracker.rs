@@ -94,7 +94,7 @@ impl NotarizationTracker {
     let mut balance_changes = self.balance_changes_by_account.lock().await;
     let mut proofs = vec![];
     for (_, balance_change) in (*balance_changes).iter_mut() {
-      if balance_change.status == BalanceChangeStatus::SubmittedToNotary {
+      if balance_change.status == BalanceChangeStatus::Notarized {
         BalanceSync::sync_notebook_proof(&self.db, balance_change, &self.notary_clients).await?;
       }
 
@@ -125,13 +125,13 @@ impl NotarizationTracker {
   }
 
   /// Confirms the root added to the mainchain
-  pub async fn wait_for_finalized(
+  pub async fn wait_for_immortalized(
     &self,
     mainchain_client: &MainchainClient,
-  ) -> Result<FinalizedBlock> {
+  ) -> Result<ImmortalizedBlock> {
     let _ = self.get_notebook_proof().await?;
-    let finalized_block = mainchain_client
-      .wait_for_notebook_finalized(self.notary_id, self.notebook_number)
+    let immortalized_block = mainchain_client
+      .wait_for_notebook_immortalized(self.notary_id, self.notebook_number)
       .await?;
     let account_change_root = mainchain_client
       .get_account_changes_root(self.notary_id, self.notebook_number)
@@ -146,25 +146,25 @@ impl NotarizationTracker {
         .get(&account_id)
         .expect("account not found");
 
-      BalanceChangeStore::tx_save_finalized(
+      BalanceChangeStore::tx_save_immortalized(
         &mut tx,
         balance_change,
         &account,
         change_root,
-        finalized_block,
+        immortalized_block,
       )
       .await?;
       tx.commit().await?;
     }
 
-    Ok(FinalizedBlock {
-      finalized_block_number: finalized_block,
+    Ok(ImmortalizedBlock {
+      immortalized_block,
       account_changes_merkle_root: account_change_root.into(),
     })
   }
 }
-pub struct FinalizedBlock {
-  pub finalized_block_number: u32,
+pub struct ImmortalizedBlock {
+  pub immortalized_block: u32,
   pub account_changes_merkle_root: H256,
 }
 
@@ -194,8 +194,8 @@ pub mod uniffi_ext {
 
   #[derive(uniffi::Object, Debug)]
   #[uniffi::export(Debug)]
-  pub struct FinalizedBlock {
-    pub finalized_block_number: u32,
+  pub struct ImmortalizedBlock {
+    pub immortalized_block: u32,
     pub account_changes_merkle_root: Vec<u8>,
   }
 
@@ -222,9 +222,7 @@ pub mod uniffi_ext {
 
   impl NotarizationTracker {
     pub fn new(inner: super::NotarizationTracker) -> Self {
-      NotarizationTracker {
-        inner,
-      }
+      NotarizationTracker { inner }
     }
   }
 
@@ -329,8 +327,8 @@ pub mod napi_ext {
   use super::NotarizationTracker;
 
   #[napi(object)]
-  pub struct FinalizedBlock {
-    pub finalized_block_number: u32,
+  pub struct ImmortalizedBlock {
+    pub immortalized_block: u32,
     pub account_changes_merkle_root: Uint8Array,
   }
 
@@ -391,14 +389,17 @@ pub mod napi_ext {
         .collect::<napi::Result<Vec<NotebookProof>>>()
     }
     /// Confirms the root added to the mainchain
-    #[napi(js_name = "waitForFinalized")]
-    pub async fn wait_for_finalized_napi(
+    #[napi(js_name = "waitForImmortalized")]
+    pub async fn wait_for_immortalized_napi(
       &self,
       mainchain_client: &MainchainClient,
-    ) -> napi::Result<FinalizedBlock> {
-      let result = self.wait_for_finalized(mainchain_client).await.napi_ok()?;
-      Ok(FinalizedBlock {
-        finalized_block_number: result.finalized_block_number,
+    ) -> napi::Result<ImmortalizedBlock> {
+      let result = self
+        .wait_for_immortalized(mainchain_client)
+        .await
+        .napi_ok()?;
+      Ok(ImmortalizedBlock {
+        immortalized_block: result.immortalized_block,
         account_changes_merkle_root: result.account_changes_merkle_root.0.to_vec().into(),
       })
     }

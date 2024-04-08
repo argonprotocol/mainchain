@@ -99,13 +99,13 @@ it('can transfer from mainchain to local to mainchain', async () => {
         const tracker = await notarization.notarizeAndWaitForNotebook();
         console.log('Notarized. Waiting for notebook %s at %s', tracker.notebookNumber, tracker.notaryId);
         const mainchainClient = await ferdiechain.mainchainClient;
-        const finalized = await mainchainClient.waitForNotebookFinalized(tracker.notaryId, tracker.notebookNumber);
+        const finalized = await mainchainClient.waitForNotebookImmortalized(tracker.notaryId, tracker.notebookNumber);
         console.log('Finalized notebook %s at %s', tracker.notebookNumber, finalized);
         const changesRoot = await mainchainClient.getAccountChangesRoot(tracker.notaryId, tracker.notebookNumber);
         console.log('Changes root', changesRoot);
         expect(changesRoot).toBeTruthy();
         try {
-            const finalizedBlock = await tracker.waitForFinalized(mainchainClient);
+            const finalizedBlock = await tracker.waitForImmortalized(mainchainClient);
             console.log('Finalized block %s', finalizedBlock);
         } catch (err) {
             console.error(err);
