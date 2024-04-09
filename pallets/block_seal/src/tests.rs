@@ -34,7 +34,7 @@ use crate::{
 };
 
 fn empty_signature() -> BlockSealAuthoritySignature {
-	Signature([0u8; 64]).into()
+	Signature::from_raw([0u8; 64]).into()
 }
 
 #[test]
@@ -267,7 +267,7 @@ fn it_requires_vote_notebook_proof() {
 		setup_blocks(2);
 		System::set_block_number(3);
 		System::reset_events();
-		AuthorityList::set(vec![(10, BlockSealAuthorityId::from(Public([0; 32])))]);
+		AuthorityList::set(vec![(10, BlockSealAuthorityId::from(Public::from_raw([0; 32])))]);
 
 		let mut block_vote = default_vote();
 		let merkle_proof = merkle_proof::<BlakeTwo256, _, _>(vec![block_vote.encode()], 0).proof;
@@ -733,5 +733,5 @@ fn default_vote() -> BlockVote {
 	.clone()
 }
 fn empty_vote_signature() -> MultiSignature {
-	sp_core::sr25519::Signature([0u8; 64]).into()
+	sp_core::sr25519::Signature::from_raw([0u8; 64]).into()
 }

@@ -1,6 +1,7 @@
 use sp_core::bounded_vec::BoundedVec;
-use sp_core::{ed25519, ByteArray};
+use sp_core::{ed25519::Signature as EdSignature, ByteArray};
 use std::sync::Arc;
+use lazy_static::lazy_static;
 use tokio::sync::Mutex;
 use ulx_primitives::{
   AccountId, AccountType, Balance, BalanceChange, DataDomain, DataDomainHash, MultiSignatureBytes,
@@ -10,6 +11,10 @@ use ulx_primitives::{
 use crate::bail;
 use crate::Result;
 use crate::{AccountStore, BalanceChangeStatus, LocalchainTransfer};
+
+lazy_static!(
+  static ref EMPTY_SIGNATURE: MultiSignatureBytes = MultiSignatureBytes::from(EdSignature::from_raw([0; 64]));
+);
 
 #[cfg_attr(feature = "napi", napi)]
 #[derive(Clone)]
@@ -57,7 +62,7 @@ impl BalanceChangeBuilder {
         balance: 0,
         escrow_hold_note: None,
         notes: Default::default(),
-        signature: MultiSignatureBytes::from(ed25519::Signature([0; 64])),
+        signature: EMPTY_SIGNATURE.clone(),
       },
       local_account_id,
       None,
@@ -66,7 +71,7 @@ impl BalanceChangeBuilder {
 
   pub async fn is_empty_signature(&self) -> bool {
     let balance_change = self.balance_change.lock().await;
-    (*balance_change).signature == ed25519::Signature([0; 64]).into()
+    (*balance_change).signature == *EMPTY_SIGNATURE
   }
 
   pub async fn inner(&self) -> BalanceChange {

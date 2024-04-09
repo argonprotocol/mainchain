@@ -313,7 +313,7 @@ impl MainchainClient {
     let notary = NotaryDetails {
       id: notary.notary_id,
       hosts: hosts?,
-      public_key: notary.meta.public.0.into(),
+      public_key: notary.meta.public.into(),
     };
 
     Ok(Some(notary))

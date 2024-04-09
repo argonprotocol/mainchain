@@ -106,7 +106,7 @@ pub async fn test_context_from_url(url: &str) -> TestContext {
 }
 
 pub async fn test_context_with(authority: String) -> TestContext {
-	TestContext::test_context_with(authority).await.unwrap()
+	TestContext::test_context_with(authority).await.expect("Unable to create test context - ensure debug ulx-node build is available")
 }
 
 pub async fn test_context() -> TestContext {

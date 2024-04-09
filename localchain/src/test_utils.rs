@@ -257,7 +257,7 @@ impl MockNotary {
     self
       .add_notebook_header(SignedNotebookHeader {
         header: notebook_header,
-        signature: Signature([0u8; 64]),
+        signature: Signature::from_raw([0u8; 64]),
       })
       .await;
 
@@ -377,7 +377,7 @@ impl MockNotary {
     self
       .add_notebook_header(SignedNotebookHeader {
         header: notebook_header.clone(),
-        signature: Signature([0u8; 64]),
+        signature: Signature::from_raw([0u8; 64]),
       })
       .await;
     notebook_header

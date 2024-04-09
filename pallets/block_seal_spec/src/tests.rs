@@ -280,7 +280,7 @@ fn it_doesnt_adjust_difficulty_if_tax_block() {
 				account_id: AccountId32::new([0u8; 32]),
 				index: 1,
 				power: 500,
-				signature: sp_core::sr25519::Signature([0u8; 64]).into(),
+				signature: sp_core::sr25519::Signature::from_raw([0u8; 64]).into(),
 				block_rewards_account_id: AccountId32::new([0u8; 32]),
 			},
 			seal_strength: 1.into(),
@@ -290,7 +290,7 @@ fn it_doesnt_adjust_difficulty_if_tax_block() {
 				leaf_index: 0,
 			},
 			source_notebook_number: 1,
-			miner_signature: Signature([0u8; 64]).into(),
+			miner_signature: Signature::from_raw([0u8; 64]).into(),
 		});
 
 		assert_ok!(PastComputeBlockTimes::<Test>::try_mutate(|a| {

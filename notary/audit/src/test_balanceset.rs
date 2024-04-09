@@ -31,7 +31,7 @@ fn empty_proof(balance: u128) -> Option<BalanceProof> {
 }
 
 fn empty_signature() -> MultiSignatureBytes {
-	Signature([0u8; 64]).into()
+	Signature::from_raw([0u8; 64]).into()
 }
 
 #[test]
@@ -710,7 +710,7 @@ fn verify_tax_votes() {
 		previous_balance_proof: empty_proof(20_000),
 		escrow_hold_note: None,
 		notes: bounded_vec!(Note::create(20_000, NoteType::SendToVote)),
-		signature: Signature([0u8; 64]).into(),
+		signature: Signature::from_raw([0u8; 64]).into(),
 	}];
 
 	assert_err!(
@@ -726,7 +726,7 @@ fn verify_tax_votes() {
 		data_domain_hash: H256::random(),
 		data_domain_account: Alice.to_account_id(),
 		block_rewards_account_id: Bob.to_account_id(),
-		signature: Signature([0u8; 64]).into(),
+		signature: Signature::from_raw([0u8; 64]).into(),
 	}
 	.sign(Bob.pair())
 	.clone()];
@@ -753,7 +753,7 @@ fn test_vote_sources() {
 			data_domain_hash: jobs_domain.hash(),
 			data_domain_account: jobs_domain_author.clone(),
 			block_rewards_account_id: Bob.to_account_id(),
-			signature: Signature([0u8; 64]).into(),
+			signature: Signature::from_raw([0u8; 64]).into(),
 		}
 		.sign(Bob.pair())
 		.clone(),
@@ -765,7 +765,7 @@ fn test_vote_sources() {
 			data_domain_hash: jobs_domain.hash(),
 			data_domain_account: jobs_domain_author.clone(),
 			block_rewards_account_id: Bob.to_account_id(),
-			signature: Signature([0u8; 64]).into(),
+			signature: Signature::from_raw([0u8; 64]).into(),
 		}
 		.sign(Alice.pair())
 		.clone(),

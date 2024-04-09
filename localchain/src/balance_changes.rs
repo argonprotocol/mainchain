@@ -271,7 +271,7 @@ impl BalanceChangeStore {
       escrow_hold_note: None,
       notes: bounded_vec![],
       previous_balance_proof: None,
-      signature: ed25519::Signature([0; 64]).into(),
+      signature: ed25519::Signature::from_raw([0; 64]).into(),
     };
 
     let mut status = None;

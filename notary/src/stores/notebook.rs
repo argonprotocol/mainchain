@@ -480,7 +480,7 @@ mod tests {
 					previous_balance_proof: None,
 					notes: bounded_vec![],
 					escrow_hold_note: None,
-					signature: Signature([0u8; 64]).into(),
+					signature: Signature::from_raw([0u8; 64]).into(),
 				},
 				BalanceChange {
 					account_id: Alice.to_account_id(),
@@ -490,7 +490,7 @@ mod tests {
 					previous_balance_proof: None,
 					notes: bounded_vec![],
 					escrow_hold_note: None,
-					signature: Signature([0u8; 64]).into(),
+					signature: Signature::from_raw([0u8; 64]).into(),
 				},
 				BalanceChange {
 					account_id: Dave.to_account_id(),
@@ -500,7 +500,7 @@ mod tests {
 					previous_balance_proof: None,
 					notes: bounded_vec![],
 					escrow_hold_note: None,
-					signature: Signature([0u8; 64]).into(),
+					signature: Signature::from_raw([0u8; 64]).into(),
 				},
 			],
 			vec![],

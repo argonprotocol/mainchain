@@ -1535,7 +1535,7 @@ mod test {
           to: Some(bounded_vec![Ferdie.to_account_id()])
         }
       }],
-      signature: Signature([0u8; 64]).into(),
+      signature: Signature::from_raw([0u8; 64]).into(),
       change_number: 2,
       escrow_hold_note: None,
     };

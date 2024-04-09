@@ -306,7 +306,7 @@ async fn can_run_proof_of_tax() {
 			data_domain_account: Keyring::Alice.to_account_id(),
 			power: 500,
 			index: 1,
-			signature: Signature([0; 64]).into(),
+			signature: Signature::from_raw([0; 64]).into(),
 			block_rewards_account_id: account_id.clone(),
 		};
 		let parent_voting_key = H256::random();

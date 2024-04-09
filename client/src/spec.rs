@@ -1060,9 +1060,9 @@ pub mod api {
 						"query_call_info",
 						types::QueryCallInfo { call, len },
 						[
-							189u8, 245u8, 142u8, 20u8, 111u8, 47u8, 100u8, 160u8, 78u8, 5u8, 9u8,
-							15u8, 139u8, 82u8, 50u8, 230u8, 227u8, 92u8, 8u8, 94u8, 27u8, 71u8,
-							248u8, 4u8, 10u8, 169u8, 214u8, 15u8, 148u8, 204u8, 218u8, 36u8,
+							158u8, 180u8, 104u8, 146u8, 165u8, 49u8, 43u8, 41u8, 71u8, 41u8, 56u8,
+							117u8, 175u8, 201u8, 247u8, 53u8, 169u8, 114u8, 96u8, 15u8, 114u8,
+							15u8, 222u8, 248u8, 35u8, 78u8, 144u8, 181u8, 120u8, 13u8, 12u8, 181u8,
 						],
 					)
 				}
@@ -1080,9 +1080,10 @@ pub mod api {
 						"query_call_fee_details",
 						types::QueryCallFeeDetails { call, len },
 						[
-							32u8, 88u8, 240u8, 124u8, 128u8, 182u8, 102u8, 77u8, 48u8, 226u8, 72u8,
-							37u8, 7u8, 91u8, 182u8, 147u8, 205u8, 238u8, 111u8, 186u8, 83u8, 143u8,
-							132u8, 67u8, 100u8, 158u8, 34u8, 237u8, 47u8, 47u8, 143u8, 110u8,
+							129u8, 254u8, 17u8, 202u8, 130u8, 118u8, 40u8, 200u8, 34u8, 47u8, 22u8,
+							252u8, 255u8, 136u8, 225u8, 246u8, 189u8, 162u8, 15u8, 85u8, 246u8,
+							51u8, 158u8, 167u8, 138u8, 7u8, 205u8, 100u8, 162u8, 87u8, 115u8,
+							156u8,
 						],
 					)
 				}
@@ -1245,9 +1246,10 @@ pub mod api {
 						"get_authority_id",
 						types::GetAuthorityId { account_id },
 						[
-							43u8, 193u8, 165u8, 208u8, 29u8, 211u8, 139u8, 217u8, 15u8, 248u8, 0u8,
-							62u8, 230u8, 36u8, 112u8, 214u8, 123u8, 108u8, 198u8, 5u8, 132u8,
-							165u8, 99u8, 72u8, 168u8, 200u8, 40u8, 94u8, 77u8, 175u8, 235u8, 46u8,
+							77u8, 76u8, 252u8, 255u8, 70u8, 110u8, 251u8, 108u8, 92u8, 141u8, 6u8,
+							122u8, 191u8, 248u8, 214u8, 19u8, 136u8, 46u8, 207u8, 152u8, 27u8,
+							241u8, 131u8, 117u8, 28u8, 251u8, 178u8, 207u8, 247u8, 136u8, 204u8,
+							164u8,
 						],
 					)
 				}
@@ -1354,9 +1356,9 @@ pub mod api {
 						"find_vote_block_seals",
 						types::FindVoteBlockSeals { votes, with_better_strength },
 						[
-							206u8, 163u8, 115u8, 57u8, 138u8, 2u8, 35u8, 4u8, 250u8, 117u8, 247u8,
-							237u8, 180u8, 83u8, 218u8, 212u8, 21u8, 5u8, 81u8, 215u8, 69u8, 205u8,
-							127u8, 18u8, 27u8, 30u8, 150u8, 252u8, 40u8, 193u8, 148u8, 147u8,
+							11u8, 172u8, 29u8, 248u8, 46u8, 146u8, 69u8, 138u8, 206u8, 18u8, 2u8,
+							200u8, 125u8, 106u8, 244u8, 88u8, 44u8, 56u8, 57u8, 91u8, 130u8, 39u8,
+							101u8, 78u8, 29u8, 159u8, 40u8, 45u8, 107u8, 180u8, 86u8, 140u8,
 						],
 					)
 				}
@@ -1479,10 +1481,9 @@ pub mod api {
 						"notary_by_id",
 						types::NotaryById { notary_id },
 						[
-							31u8, 215u8, 235u8, 63u8, 118u8, 209u8, 160u8, 5u8, 193u8, 162u8,
-							118u8, 107u8, 223u8, 58u8, 102u8, 199u8, 72u8, 58u8, 124u8, 237u8,
-							138u8, 25u8, 96u8, 190u8, 72u8, 208u8, 164u8, 135u8, 179u8, 197u8,
-							223u8, 93u8,
+							222u8, 166u8, 35u8, 137u8, 223u8, 254u8, 225u8, 124u8, 123u8, 149u8,
+							173u8, 2u8, 25u8, 223u8, 46u8, 144u8, 115u8, 2u8, 67u8, 116u8, 143u8,
+							201u8, 188u8, 146u8, 238u8, 5u8, 52u8, 233u8, 202u8, 236u8, 41u8, 2u8,
 						],
 					)
 				}
@@ -1495,10 +1496,10 @@ pub mod api {
 						"notaries",
 						types::Notaries {},
 						[
-							0u8, 9u8, 116u8, 88u8, 104u8, 76u8, 203u8, 207u8, 141u8, 133u8, 186u8,
-							155u8, 210u8, 222u8, 109u8, 43u8, 143u8, 104u8, 115u8, 224u8, 188u8,
-							126u8, 121u8, 90u8, 169u8, 191u8, 15u8, 177u8, 108u8, 43u8, 114u8,
-							135u8,
+							19u8, 198u8, 120u8, 130u8, 98u8, 0u8, 101u8, 197u8, 91u8, 98u8, 148u8,
+							69u8, 101u8, 146u8, 244u8, 190u8, 156u8, 167u8, 110u8, 63u8, 40u8,
+							194u8, 11u8, 52u8, 60u8, 126u8, 244u8, 211u8, 72u8, 143u8, 224u8,
+							109u8,
 						],
 					)
 				}
@@ -1918,10 +1919,9 @@ pub mod api {
 						"grandpa_authorities",
 						types::GrandpaAuthorities {},
 						[
-							166u8, 76u8, 160u8, 101u8, 242u8, 145u8, 213u8, 10u8, 16u8, 130u8,
-							230u8, 196u8, 125u8, 152u8, 92u8, 143u8, 119u8, 223u8, 140u8, 189u8,
-							203u8, 95u8, 52u8, 105u8, 147u8, 107u8, 135u8, 228u8, 62u8, 178u8,
-							128u8, 33u8,
+							8u8, 1u8, 99u8, 227u8, 52u8, 95u8, 230u8, 139u8, 198u8, 90u8, 159u8,
+							146u8, 193u8, 81u8, 37u8, 27u8, 216u8, 227u8, 108u8, 126u8, 12u8, 94u8,
+							125u8, 183u8, 143u8, 231u8, 87u8, 101u8, 114u8, 190u8, 193u8, 180u8,
 						],
 					)
 				}
@@ -1949,10 +1949,9 @@ pub mod api {
 							key_owner_proof,
 						},
 						[
-							112u8, 94u8, 150u8, 250u8, 132u8, 127u8, 185u8, 24u8, 113u8, 62u8,
-							28u8, 171u8, 83u8, 9u8, 41u8, 228u8, 92u8, 137u8, 29u8, 190u8, 214u8,
-							232u8, 100u8, 66u8, 100u8, 168u8, 149u8, 122u8, 93u8, 17u8, 236u8,
-							104u8,
+							27u8, 32u8, 16u8, 79u8, 172u8, 124u8, 44u8, 13u8, 176u8, 89u8, 69u8,
+							60u8, 45u8, 176u8, 72u8, 151u8, 252u8, 5u8, 243u8, 82u8, 170u8, 51u8,
+							179u8, 197u8, 117u8, 177u8, 110u8, 111u8, 97u8, 15u8, 109u8, 169u8,
 						],
 					)
 				}
@@ -1980,10 +1979,9 @@ pub mod api {
 						"generate_key_ownership_proof",
 						types::GenerateKeyOwnershipProof { set_id, authority_id },
 						[
-							40u8, 126u8, 113u8, 27u8, 245u8, 45u8, 123u8, 138u8, 12u8, 3u8, 125u8,
-							186u8, 151u8, 53u8, 186u8, 93u8, 13u8, 150u8, 163u8, 176u8, 206u8,
-							89u8, 244u8, 127u8, 182u8, 85u8, 203u8, 41u8, 101u8, 183u8, 209u8,
-							179u8,
+							13u8, 144u8, 66u8, 235u8, 24u8, 190u8, 39u8, 75u8, 29u8, 157u8, 215u8,
+							181u8, 173u8, 145u8, 224u8, 244u8, 189u8, 79u8, 6u8, 116u8, 139u8,
+							196u8, 54u8, 16u8, 89u8, 190u8, 121u8, 43u8, 137u8, 150u8, 117u8, 68u8,
 						],
 					)
 				}
@@ -2397,9 +2395,9 @@ pub mod api {
 			.hash();
 		runtime_metadata_hash
 			== [
-				111u8, 50u8, 15u8, 215u8, 7u8, 217u8, 94u8, 249u8, 24u8, 159u8, 10u8, 150u8, 79u8,
-				93u8, 83u8, 77u8, 183u8, 145u8, 25u8, 251u8, 174u8, 44u8, 146u8, 31u8, 78u8, 161u8,
-				241u8, 170u8, 231u8, 72u8, 127u8, 229u8,
+				225u8, 21u8, 20u8, 22u8, 147u8, 207u8, 199u8, 78u8, 11u8, 232u8, 121u8, 118u8,
+				131u8, 48u8, 225u8, 111u8, 252u8, 59u8, 226u8, 73u8, 34u8, 189u8, 93u8, 35u8,
+				238u8, 25u8, 33u8, 224u8, 122u8, 59u8, 29u8, 154u8,
 			]
 	}
 	pub mod system {
@@ -3478,9 +3476,10 @@ pub mod api {
 						"Events",
 						(),
 						[
-							136u8, 71u8, 226u8, 149u8, 245u8, 53u8, 62u8, 171u8, 108u8, 75u8,
-							246u8, 81u8, 87u8, 147u8, 156u8, 21u8, 70u8, 43u8, 162u8, 169u8, 82u8,
-							96u8, 50u8, 73u8, 155u8, 70u8, 65u8, 8u8, 2u8, 218u8, 154u8, 185u8,
+							253u8, 207u8, 18u8, 53u8, 234u8, 184u8, 141u8, 113u8, 176u8, 97u8,
+							147u8, 179u8, 59u8, 195u8, 22u8, 174u8, 25u8, 113u8, 118u8, 251u8,
+							32u8, 101u8, 249u8, 140u8, 210u8, 154u8, 177u8, 21u8, 206u8, 120u8,
+							118u8, 69u8,
 						],
 					)
 				}
@@ -4430,9 +4429,9 @@ pub mod api {
 						"AuthoritiesByIndex",
 						(),
 						[
-							44u8, 145u8, 62u8, 168u8, 74u8, 162u8, 56u8, 32u8, 145u8, 183u8, 228u8,
-							230u8, 148u8, 129u8, 172u8, 60u8, 187u8, 45u8, 251u8, 221u8, 251u8,
-							209u8, 140u8, 97u8, 195u8, 91u8, 6u8, 230u8, 242u8, 200u8, 154u8, 69u8,
+							35u8, 35u8, 17u8, 184u8, 250u8, 250u8, 12u8, 2u8, 78u8, 97u8, 114u8,
+							1u8, 33u8, 200u8, 71u8, 158u8, 77u8, 136u8, 234u8, 148u8, 193u8, 5u8,
+							111u8, 235u8, 252u8, 16u8, 104u8, 203u8, 219u8, 244u8, 1u8, 98u8,
 						],
 					)
 				}
@@ -5728,9 +5727,10 @@ pub mod api {
 						"propose",
 						types::Propose { meta },
 						[
-							23u8, 96u8, 118u8, 232u8, 5u8, 241u8, 150u8, 54u8, 164u8, 69u8, 48u8,
-							170u8, 63u8, 250u8, 5u8, 149u8, 250u8, 170u8, 36u8, 92u8, 16u8, 209u8,
-							77u8, 164u8, 169u8, 124u8, 6u8, 169u8, 175u8, 200u8, 76u8, 37u8,
+							44u8, 216u8, 215u8, 181u8, 41u8, 226u8, 208u8, 110u8, 193u8, 208u8,
+							231u8, 174u8, 196u8, 194u8, 136u8, 170u8, 222u8, 73u8, 32u8, 199u8,
+							57u8, 135u8, 86u8, 140u8, 199u8, 185u8, 84u8, 204u8, 69u8, 69u8, 197u8,
+							115u8,
 						],
 					)
 				}
@@ -5760,10 +5760,9 @@ pub mod api {
 						"update",
 						types::Update { notary_id, meta },
 						[
-							27u8, 101u8, 79u8, 238u8, 242u8, 137u8, 232u8, 129u8, 156u8, 185u8,
-							141u8, 175u8, 167u8, 163u8, 175u8, 4u8, 230u8, 177u8, 56u8, 133u8,
-							120u8, 156u8, 164u8, 19u8, 193u8, 234u8, 68u8, 41u8, 25u8, 144u8, 2u8,
-							193u8,
+							122u8, 85u8, 68u8, 206u8, 249u8, 188u8, 198u8, 137u8, 101u8, 103u8,
+							235u8, 229u8, 92u8, 95u8, 74u8, 205u8, 235u8, 25u8, 69u8, 101u8, 52u8,
+							159u8, 79u8, 70u8, 112u8, 84u8, 143u8, 104u8, 135u8, 0u8, 244u8, 98u8,
 						],
 					)
 				}
@@ -5916,7 +5915,7 @@ pub mod api {
 					pub type NotaryKeyHistory =
 						runtime_types::bounded_collections::bounded_vec::BoundedVec<(
 							::core::primitive::u32,
-							runtime_types::sp_core::ed25519::Public,
+							[::core::primitive::u8; 32usize],
 						)>;
 					pub type Param0 = ::core::primitive::u32;
 				}
@@ -5966,9 +5965,10 @@ pub mod api {
 						"ProposedNotaries",
 						(),
 						[
-							9u8, 71u8, 88u8, 230u8, 202u8, 27u8, 160u8, 24u8, 57u8, 6u8, 105u8,
-							237u8, 117u8, 140u8, 79u8, 215u8, 124u8, 243u8, 160u8, 85u8, 150u8,
-							124u8, 151u8, 165u8, 17u8, 75u8, 247u8, 47u8, 75u8, 28u8, 123u8, 13u8,
+							166u8, 255u8, 186u8, 215u8, 39u8, 135u8, 255u8, 9u8, 218u8, 186u8,
+							151u8, 170u8, 253u8, 136u8, 125u8, 101u8, 238u8, 157u8, 189u8, 141u8,
+							255u8, 95u8, 62u8, 136u8, 122u8, 241u8, 215u8, 59u8, 14u8, 145u8,
+							115u8, 164u8,
 						],
 					)
 				}
@@ -5987,9 +5987,10 @@ pub mod api {
 						"ProposedNotaries",
 						::subxt::storage::address::StaticStorageKey::new(_0.borrow()),
 						[
-							9u8, 71u8, 88u8, 230u8, 202u8, 27u8, 160u8, 24u8, 57u8, 6u8, 105u8,
-							237u8, 117u8, 140u8, 79u8, 215u8, 124u8, 243u8, 160u8, 85u8, 150u8,
-							124u8, 151u8, 165u8, 17u8, 75u8, 247u8, 47u8, 75u8, 28u8, 123u8, 13u8,
+							166u8, 255u8, 186u8, 215u8, 39u8, 135u8, 255u8, 9u8, 218u8, 186u8,
+							151u8, 170u8, 253u8, 136u8, 125u8, 101u8, 238u8, 157u8, 189u8, 141u8,
+							255u8, 95u8, 62u8, 136u8, 122u8, 241u8, 215u8, 59u8, 14u8, 145u8,
+							115u8, 164u8,
 						],
 					)
 				}
@@ -6050,10 +6051,9 @@ pub mod api {
 						"ActiveNotaries",
 						(),
 						[
-							89u8, 140u8, 93u8, 225u8, 71u8, 140u8, 61u8, 171u8, 50u8, 209u8, 94u8,
-							244u8, 178u8, 114u8, 125u8, 243u8, 146u8, 98u8, 213u8, 169u8, 119u8,
-							193u8, 235u8, 239u8, 139u8, 63u8, 183u8, 216u8, 160u8, 229u8, 146u8,
-							47u8,
+							104u8, 213u8, 247u8, 16u8, 20u8, 163u8, 47u8, 221u8, 84u8, 68u8, 80u8,
+							208u8, 162u8, 121u8, 48u8, 117u8, 7u8, 59u8, 118u8, 120u8, 113u8, 0u8,
+							57u8, 234u8, 151u8, 152u8, 21u8, 249u8, 56u8, 222u8, 87u8, 144u8,
 						],
 					)
 				}
@@ -6071,9 +6071,9 @@ pub mod api {
 						"NotaryKeyHistory",
 						(),
 						[
-							71u8, 175u8, 193u8, 253u8, 234u8, 40u8, 253u8, 120u8, 166u8, 216u8,
-							37u8, 202u8, 122u8, 54u8, 134u8, 79u8, 227u8, 135u8, 241u8, 51u8, 98u8,
-							97u8, 176u8, 124u8, 49u8, 97u8, 68u8, 52u8, 66u8, 20u8, 197u8, 105u8,
+							59u8, 52u8, 23u8, 225u8, 223u8, 28u8, 225u8, 2u8, 39u8, 170u8, 155u8,
+							214u8, 55u8, 134u8, 180u8, 53u8, 230u8, 255u8, 30u8, 165u8, 102u8,
+							81u8, 80u8, 26u8, 213u8, 207u8, 158u8, 183u8, 71u8, 77u8, 191u8, 123u8,
 						],
 					)
 				}
@@ -6092,9 +6092,9 @@ pub mod api {
 						"NotaryKeyHistory",
 						::subxt::storage::address::StaticStorageKey::new(_0.borrow()),
 						[
-							71u8, 175u8, 193u8, 253u8, 234u8, 40u8, 253u8, 120u8, 166u8, 216u8,
-							37u8, 202u8, 122u8, 54u8, 134u8, 79u8, 227u8, 135u8, 241u8, 51u8, 98u8,
-							97u8, 176u8, 124u8, 49u8, 97u8, 68u8, 52u8, 66u8, 20u8, 197u8, 105u8,
+							59u8, 52u8, 23u8, 225u8, 223u8, 28u8, 225u8, 2u8, 39u8, 170u8, 155u8,
+							214u8, 55u8, 134u8, 180u8, 53u8, 230u8, 255u8, 30u8, 165u8, 102u8,
+							81u8, 80u8, 26u8, 213u8, 207u8, 158u8, 183u8, 71u8, 77u8, 191u8, 123u8,
 						],
 					)
 				}
@@ -6112,10 +6112,9 @@ pub mod api {
 						"QueuedNotaryMetaChanges",
 						(),
 						[
-							222u8, 163u8, 29u8, 87u8, 242u8, 5u8, 215u8, 100u8, 16u8, 154u8, 225u8,
-							66u8, 112u8, 183u8, 234u8, 242u8, 68u8, 140u8, 217u8, 12u8, 91u8,
-							233u8, 13u8, 199u8, 67u8, 196u8, 197u8, 173u8, 114u8, 220u8, 66u8,
-							180u8,
+							31u8, 5u8, 40u8, 5u8, 210u8, 34u8, 25u8, 238u8, 1u8, 128u8, 173u8,
+							92u8, 209u8, 210u8, 102u8, 233u8, 174u8, 54u8, 5u8, 5u8, 186u8, 172u8,
+							109u8, 5u8, 138u8, 87u8, 32u8, 58u8, 25u8, 89u8, 26u8, 82u8,
 						],
 					)
 				}
@@ -6136,10 +6135,9 @@ pub mod api {
 						"QueuedNotaryMetaChanges",
 						::subxt::storage::address::StaticStorageKey::new(_0.borrow()),
 						[
-							222u8, 163u8, 29u8, 87u8, 242u8, 5u8, 215u8, 100u8, 16u8, 154u8, 225u8,
-							66u8, 112u8, 183u8, 234u8, 242u8, 68u8, 140u8, 217u8, 12u8, 91u8,
-							233u8, 13u8, 199u8, 67u8, 196u8, 197u8, 173u8, 114u8, 220u8, 66u8,
-							180u8,
+							31u8, 5u8, 40u8, 5u8, 210u8, 34u8, 25u8, 238u8, 1u8, 128u8, 173u8,
+							92u8, 209u8, 210u8, 102u8, 233u8, 174u8, 54u8, 5u8, 5u8, 186u8, 172u8,
+							109u8, 5u8, 138u8, 87u8, 32u8, 58u8, 25u8, 89u8, 26u8, 82u8,
 						],
 					)
 				}
@@ -6291,9 +6289,9 @@ pub mod api {
 						"submit",
 						types::Submit { notebooks },
 						[
-							46u8, 13u8, 39u8, 34u8, 79u8, 240u8, 245u8, 238u8, 46u8, 135u8, 78u8,
-							11u8, 164u8, 101u8, 72u8, 7u8, 59u8, 193u8, 49u8, 153u8, 3u8, 14u8,
-							186u8, 63u8, 168u8, 90u8, 136u8, 155u8, 120u8, 204u8, 240u8, 145u8,
+							2u8, 96u8, 178u8, 122u8, 98u8, 171u8, 16u8, 52u8, 88u8, 195u8, 4u8,
+							5u8, 217u8, 33u8, 23u8, 122u8, 171u8, 208u8, 154u8, 180u8, 71u8, 93u8,
+							209u8, 98u8, 209u8, 3u8, 154u8, 69u8, 208u8, 91u8, 16u8, 55u8,
 						],
 					)
 				}
@@ -8091,9 +8089,10 @@ pub mod api {
 						"set_keys",
 						types::SetKeys { keys, proof },
 						[
-							236u8, 25u8, 135u8, 232u8, 99u8, 88u8, 192u8, 190u8, 245u8, 173u8,
-							196u8, 17u8, 61u8, 103u8, 72u8, 41u8, 119u8, 156u8, 202u8, 221u8, 17u8,
-							155u8, 41u8, 44u8, 238u8, 152u8, 118u8, 74u8, 35u8, 168u8, 240u8, 98u8,
+							152u8, 217u8, 176u8, 109u8, 66u8, 122u8, 90u8, 250u8, 1u8, 124u8,
+							215u8, 216u8, 118u8, 182u8, 223u8, 236u8, 96u8, 202u8, 80u8, 211u8,
+							36u8, 242u8, 64u8, 65u8, 116u8, 9u8, 178u8, 35u8, 202u8, 98u8, 151u8,
+							65u8,
 						],
 					)
 				}
@@ -8277,9 +8276,10 @@ pub mod api {
 						"QueuedKeys",
 						(),
 						[
-							217u8, 110u8, 17u8, 82u8, 156u8, 134u8, 163u8, 105u8, 251u8, 3u8, 75u8,
-							109u8, 155u8, 252u8, 102u8, 172u8, 193u8, 92u8, 42u8, 101u8, 69u8,
-							134u8, 75u8, 28u8, 178u8, 7u8, 140u8, 238u8, 147u8, 49u8, 27u8, 216u8,
+							184u8, 60u8, 226u8, 158u8, 118u8, 58u8, 50u8, 111u8, 207u8, 71u8,
+							206u8, 234u8, 200u8, 44u8, 199u8, 184u8, 229u8, 70u8, 32u8, 199u8,
+							202u8, 46u8, 136u8, 31u8, 181u8, 146u8, 22u8, 226u8, 216u8, 20u8,
+							214u8, 253u8,
 						],
 					)
 				}
@@ -8323,10 +8323,9 @@ pub mod api {
 						"NextKeys",
 						(),
 						[
-							25u8, 1u8, 69u8, 59u8, 90u8, 33u8, 59u8, 39u8, 221u8, 183u8, 101u8,
-							140u8, 35u8, 166u8, 124u8, 245u8, 26u8, 245u8, 99u8, 105u8, 96u8,
-							239u8, 46u8, 104u8, 158u8, 21u8, 76u8, 45u8, 164u8, 150u8, 134u8,
-							201u8,
+							78u8, 250u8, 134u8, 66u8, 119u8, 121u8, 215u8, 245u8, 120u8, 34u8,
+							46u8, 97u8, 251u8, 104u8, 7u8, 233u8, 153u8, 10u8, 6u8, 169u8, 23u8,
+							152u8, 62u8, 22u8, 137u8, 3u8, 222u8, 144u8, 201u8, 56u8, 179u8, 87u8,
 						],
 					)
 				}
@@ -8346,10 +8345,9 @@ pub mod api {
 						"NextKeys",
 						::subxt::storage::address::StaticStorageKey::new(_0.borrow()),
 						[
-							25u8, 1u8, 69u8, 59u8, 90u8, 33u8, 59u8, 39u8, 221u8, 183u8, 101u8,
-							140u8, 35u8, 166u8, 124u8, 245u8, 26u8, 245u8, 99u8, 105u8, 96u8,
-							239u8, 46u8, 104u8, 158u8, 21u8, 76u8, 45u8, 164u8, 150u8, 134u8,
-							201u8,
+							78u8, 250u8, 134u8, 66u8, 119u8, 121u8, 215u8, 245u8, 120u8, 34u8,
+							46u8, 97u8, 251u8, 104u8, 7u8, 233u8, 153u8, 10u8, 6u8, 169u8, 23u8,
+							152u8, 62u8, 22u8, 137u8, 3u8, 222u8, 144u8, 201u8, 56u8, 179u8, 87u8,
 						],
 					)
 				}
@@ -8478,10 +8476,9 @@ pub mod api {
 						"apply",
 						types::Apply { seal },
 						[
-							118u8, 189u8, 185u8, 194u8, 112u8, 237u8, 174u8, 160u8, 3u8, 50u8,
-							85u8, 40u8, 241u8, 112u8, 77u8, 86u8, 12u8, 91u8, 221u8, 205u8, 244u8,
-							61u8, 42u8, 240u8, 191u8, 197u8, 107u8, 108u8, 37u8, 237u8, 152u8,
-							144u8,
+							219u8, 28u8, 137u8, 83u8, 119u8, 114u8, 20u8, 229u8, 253u8, 233u8,
+							140u8, 58u8, 32u8, 228u8, 139u8, 84u8, 9u8, 93u8, 54u8, 8u8, 96u8, 8u8,
+							97u8, 25u8, 73u8, 9u8, 55u8, 175u8, 198u8, 182u8, 196u8, 85u8,
 						],
 					)
 				}
@@ -8599,9 +8596,10 @@ pub mod api {
 						"TempSealInherent",
 						(),
 						[
-							206u8, 208u8, 226u8, 115u8, 79u8, 69u8, 104u8, 138u8, 47u8, 90u8,
-							203u8, 36u8, 211u8, 96u8, 244u8, 90u8, 63u8, 154u8, 109u8, 223u8, 67u8,
-							95u8, 76u8, 249u8, 3u8, 116u8, 27u8, 89u8, 89u8, 15u8, 219u8, 49u8,
+							155u8, 198u8, 152u8, 193u8, 160u8, 65u8, 79u8, 57u8, 173u8, 165u8,
+							225u8, 42u8, 102u8, 64u8, 210u8, 78u8, 243u8, 181u8, 84u8, 156u8,
+							139u8, 238u8, 34u8, 129u8, 199u8, 138u8, 84u8, 136u8, 156u8, 115u8,
+							10u8, 107u8,
 						],
 					)
 				}
@@ -8988,9 +8986,10 @@ pub mod api {
 							key_owner_proof,
 						},
 						[
-							11u8, 183u8, 81u8, 93u8, 41u8, 7u8, 70u8, 155u8, 8u8, 57u8, 177u8,
-							245u8, 131u8, 79u8, 236u8, 118u8, 147u8, 114u8, 40u8, 204u8, 177u8,
-							2u8, 43u8, 42u8, 2u8, 201u8, 202u8, 120u8, 150u8, 109u8, 108u8, 156u8,
+							197u8, 206u8, 246u8, 26u8, 171u8, 25u8, 214u8, 211u8, 138u8, 132u8,
+							148u8, 48u8, 66u8, 12u8, 92u8, 17u8, 190u8, 155u8, 121u8, 222u8, 226u8,
+							171u8, 208u8, 123u8, 253u8, 247u8, 253u8, 191u8, 90u8, 4u8, 224u8,
+							104u8,
 						],
 					)
 				}
@@ -9016,9 +9015,9 @@ pub mod api {
 							key_owner_proof,
 						},
 						[
-							141u8, 133u8, 227u8, 65u8, 22u8, 181u8, 108u8, 9u8, 157u8, 27u8, 124u8,
-							53u8, 177u8, 27u8, 5u8, 16u8, 193u8, 66u8, 59u8, 87u8, 143u8, 238u8,
-							251u8, 167u8, 117u8, 138u8, 246u8, 236u8, 65u8, 148u8, 20u8, 131u8,
+							109u8, 97u8, 251u8, 184u8, 77u8, 61u8, 95u8, 187u8, 132u8, 146u8, 18u8,
+							105u8, 109u8, 124u8, 181u8, 74u8, 143u8, 171u8, 248u8, 188u8, 69u8,
+							63u8, 65u8, 92u8, 64u8, 42u8, 104u8, 131u8, 67u8, 202u8, 172u8, 73u8,
 						],
 					)
 				}
@@ -9195,10 +9194,10 @@ pub mod api {
 						"PendingChange",
 						(),
 						[
-							150u8, 194u8, 185u8, 248u8, 239u8, 43u8, 141u8, 253u8, 61u8, 106u8,
-							74u8, 164u8, 209u8, 204u8, 206u8, 200u8, 32u8, 38u8, 11u8, 78u8, 84u8,
-							243u8, 181u8, 142u8, 179u8, 151u8, 81u8, 204u8, 244u8, 150u8, 137u8,
-							250u8,
+							32u8, 165u8, 141u8, 100u8, 109u8, 66u8, 58u8, 22u8, 118u8, 84u8, 92u8,
+							164u8, 119u8, 130u8, 104u8, 25u8, 244u8, 111u8, 223u8, 54u8, 184u8,
+							95u8, 196u8, 30u8, 244u8, 129u8, 110u8, 127u8, 200u8, 66u8, 226u8,
+							26u8,
 						],
 					)
 				}
@@ -9343,10 +9342,10 @@ pub mod api {
 						"Authorities",
 						(),
 						[
-							67u8, 196u8, 244u8, 13u8, 246u8, 245u8, 198u8, 98u8, 81u8, 55u8, 182u8,
-							187u8, 214u8, 5u8, 181u8, 76u8, 251u8, 213u8, 144u8, 166u8, 36u8,
-							153u8, 234u8, 181u8, 252u8, 55u8, 198u8, 175u8, 55u8, 211u8, 105u8,
-							85u8,
+							192u8, 157u8, 98u8, 244u8, 104u8, 38u8, 195u8, 114u8, 183u8, 62u8,
+							247u8, 18u8, 31u8, 152u8, 246u8, 206u8, 97u8, 13u8, 118u8, 211u8,
+							104u8, 54u8, 150u8, 152u8, 126u8, 170u8, 228u8, 158u8, 108u8, 129u8,
+							134u8, 44u8,
 						],
 					)
 				}
@@ -9784,7 +9783,7 @@ pub mod api {
 				#[doc = ""]
 				#[doc = "This will waive the transaction fee if at least all but 10% of the accounts needed to"]
 				#[doc = "be upgraded. (We let some not have to be upgraded just in order to allow for the"]
-				#[doc = "possibililty of churn)."]
+				#[doc = "possibility of churn)."]
 				pub struct UpgradeAccounts {
 					pub who: upgrade_accounts::Who,
 				}
@@ -9980,7 +9979,7 @@ pub mod api {
 				#[doc = ""]
 				#[doc = "This will waive the transaction fee if at least all but 10% of the accounts needed to"]
 				#[doc = "be upgraded. (We let some not have to be upgraded just in order to allow for the"]
-				#[doc = "possibililty of churn)."]
+				#[doc = "possibility of churn)."]
 				pub fn upgrade_accounts(
 					&self,
 					who: types::upgrade_accounts::Who,
@@ -10792,6 +10791,8 @@ pub mod api {
 				}
 				#[doc = " Any liquidity locks on some account balances."]
 				#[doc = " NOTE: Should only be accessed when setting, changing and freeing a lock."]
+				#[doc = ""]
+				#[doc = " Use of locks is deprecated in favour of freezes. See `https://github.com/paritytech/substrate/pull/12951/`"]
 				pub fn locks_iter(
 					&self,
 				) -> ::subxt::storage::address::Address<
@@ -10814,6 +10815,8 @@ pub mod api {
 				}
 				#[doc = " Any liquidity locks on some account balances."]
 				#[doc = " NOTE: Should only be accessed when setting, changing and freeing a lock."]
+				#[doc = ""]
+				#[doc = " Use of locks is deprecated in favour of freezes. See `https://github.com/paritytech/substrate/pull/12951/`"]
 				pub fn locks(
 					&self,
 					_0: impl ::std::borrow::Borrow<types::locks::Param0>,
@@ -10836,6 +10839,8 @@ pub mod api {
 					)
 				}
 				#[doc = " Named reserves on some account balances."]
+				#[doc = ""]
+				#[doc = " Use of reserves is deprecated in favour of holds. See `https://github.com/paritytech/substrate/pull/12951/`"]
 				pub fn reserves_iter(
 					&self,
 				) -> ::subxt::storage::address::Address<
@@ -10857,6 +10862,8 @@ pub mod api {
 					)
 				}
 				#[doc = " Named reserves on some account balances."]
+				#[doc = ""]
+				#[doc = " Use of reserves is deprecated in favour of holds. See `https://github.com/paritytech/substrate/pull/12951/`"]
 				pub fn reserves(
 					&self,
 					_0: impl ::std::borrow::Borrow<types::reserves::Param0>,
@@ -10997,6 +11004,8 @@ pub mod api {
 				}
 				#[doc = " The maximum number of locks that should exist on an account."]
 				#[doc = " Not strictly enforced, but used for weight estimation."]
+				#[doc = ""]
+				#[doc = " Use of locks is deprecated in favour of freezes. See `https://github.com/paritytech/substrate/pull/12951/`"]
 				pub fn max_locks(&self) -> ::subxt::constants::Address<::core::primitive::u32> {
 					::subxt::constants::Address::new_static(
 						"ArgonBalances",
@@ -11010,6 +11019,8 @@ pub mod api {
 					)
 				}
 				#[doc = " The maximum number of named reserves that can exist on an account."]
+				#[doc = ""]
+				#[doc = " Use of reserves is deprecated in favour of holds. See `https://github.com/paritytech/substrate/pull/12951/`"]
 				pub fn max_reserves(&self) -> ::subxt::constants::Address<::core::primitive::u32> {
 					::subxt::constants::Address::new_static(
 						"ArgonBalances",
@@ -11309,7 +11320,7 @@ pub mod api {
 				#[doc = ""]
 				#[doc = "This will waive the transaction fee if at least all but 10% of the accounts needed to"]
 				#[doc = "be upgraded. (We let some not have to be upgraded just in order to allow for the"]
-				#[doc = "possibililty of churn)."]
+				#[doc = "possibility of churn)."]
 				pub struct UpgradeAccounts {
 					pub who: upgrade_accounts::Who,
 				}
@@ -11505,7 +11516,7 @@ pub mod api {
 				#[doc = ""]
 				#[doc = "This will waive the transaction fee if at least all but 10% of the accounts needed to"]
 				#[doc = "be upgraded. (We let some not have to be upgraded just in order to allow for the"]
-				#[doc = "possibililty of churn)."]
+				#[doc = "possibility of churn)."]
 				pub fn upgrade_accounts(
 					&self,
 					who: types::upgrade_accounts::Who,
@@ -12317,6 +12328,8 @@ pub mod api {
 				}
 				#[doc = " Any liquidity locks on some account balances."]
 				#[doc = " NOTE: Should only be accessed when setting, changing and freeing a lock."]
+				#[doc = ""]
+				#[doc = " Use of locks is deprecated in favour of freezes. See `https://github.com/paritytech/substrate/pull/12951/`"]
 				pub fn locks_iter(
 					&self,
 				) -> ::subxt::storage::address::Address<
@@ -12339,6 +12352,8 @@ pub mod api {
 				}
 				#[doc = " Any liquidity locks on some account balances."]
 				#[doc = " NOTE: Should only be accessed when setting, changing and freeing a lock."]
+				#[doc = ""]
+				#[doc = " Use of locks is deprecated in favour of freezes. See `https://github.com/paritytech/substrate/pull/12951/`"]
 				pub fn locks(
 					&self,
 					_0: impl ::std::borrow::Borrow<types::locks::Param0>,
@@ -12361,6 +12376,8 @@ pub mod api {
 					)
 				}
 				#[doc = " Named reserves on some account balances."]
+				#[doc = ""]
+				#[doc = " Use of reserves is deprecated in favour of holds. See `https://github.com/paritytech/substrate/pull/12951/`"]
 				pub fn reserves_iter(
 					&self,
 				) -> ::subxt::storage::address::Address<
@@ -12382,6 +12399,8 @@ pub mod api {
 					)
 				}
 				#[doc = " Named reserves on some account balances."]
+				#[doc = ""]
+				#[doc = " Use of reserves is deprecated in favour of holds. See `https://github.com/paritytech/substrate/pull/12951/`"]
 				pub fn reserves(
 					&self,
 					_0: impl ::std::borrow::Borrow<types::reserves::Param0>,
@@ -12522,6 +12541,8 @@ pub mod api {
 				}
 				#[doc = " The maximum number of locks that should exist on an account."]
 				#[doc = " Not strictly enforced, but used for weight estimation."]
+				#[doc = ""]
+				#[doc = " Use of locks is deprecated in favour of freezes. See `https://github.com/paritytech/substrate/pull/12951/`"]
 				pub fn max_locks(&self) -> ::subxt::constants::Address<::core::primitive::u32> {
 					::subxt::constants::Address::new_static(
 						"UlixeeBalances",
@@ -12535,6 +12556,8 @@ pub mod api {
 					)
 				}
 				#[doc = " The maximum number of named reserves that can exist on an account."]
+				#[doc = ""]
+				#[doc = " Use of reserves is deprecated in favour of holds. See `https://github.com/paritytech/substrate/pull/12951/`"]
 				pub fn max_reserves(&self) -> ::subxt::constants::Address<::core::primitive::u32> {
 					::subxt::constants::Address::new_static(
 						"UlixeeBalances",
@@ -13148,9 +13171,10 @@ pub mod api {
 						"sudo",
 						types::Sudo { call: ::std::boxed::Box::new(call) },
 						[
-							52u8, 196u8, 14u8, 186u8, 119u8, 175u8, 106u8, 5u8, 166u8, 79u8, 107u8,
-							59u8, 25u8, 110u8, 151u8, 128u8, 30u8, 26u8, 70u8, 114u8, 82u8, 124u8,
-							1u8, 190u8, 144u8, 61u8, 156u8, 23u8, 152u8, 190u8, 159u8, 58u8,
+							146u8, 238u8, 55u8, 198u8, 160u8, 71u8, 40u8, 254u8, 112u8, 137u8,
+							107u8, 229u8, 6u8, 29u8, 22u8, 158u8, 4u8, 64u8, 63u8, 235u8, 214u8,
+							193u8, 187u8, 122u8, 45u8, 239u8, 245u8, 218u8, 177u8, 83u8, 50u8,
+							135u8,
 						],
 					)
 				}
@@ -13169,10 +13193,9 @@ pub mod api {
 						"sudo_unchecked_weight",
 						types::SudoUncheckedWeight { call: ::std::boxed::Box::new(call), weight },
 						[
-							213u8, 231u8, 172u8, 173u8, 193u8, 206u8, 243u8, 96u8, 171u8, 44u8,
-							19u8, 242u8, 99u8, 182u8, 191u8, 165u8, 46u8, 124u8, 240u8, 51u8,
-							181u8, 201u8, 63u8, 168u8, 8u8, 197u8, 251u8, 110u8, 139u8, 79u8, 90u8,
-							11u8,
+							221u8, 196u8, 97u8, 164u8, 218u8, 144u8, 77u8, 72u8, 29u8, 210u8,
+							240u8, 223u8, 98u8, 48u8, 49u8, 165u8, 226u8, 66u8, 6u8, 255u8, 190u8,
+							240u8, 99u8, 196u8, 7u8, 79u8, 102u8, 58u8, 114u8, 170u8, 50u8, 55u8,
 						],
 					)
 				}
@@ -13207,9 +13230,9 @@ pub mod api {
 						"sudo_as",
 						types::SudoAs { who, call: ::std::boxed::Box::new(call) },
 						[
-							106u8, 130u8, 191u8, 183u8, 26u8, 43u8, 11u8, 112u8, 214u8, 50u8, 93u8,
-							174u8, 113u8, 8u8, 84u8, 34u8, 154u8, 189u8, 171u8, 245u8, 61u8, 195u8,
-							134u8, 74u8, 94u8, 249u8, 126u8, 218u8, 200u8, 243u8, 157u8, 197u8,
+							65u8, 129u8, 118u8, 85u8, 177u8, 165u8, 37u8, 109u8, 189u8, 94u8,
+							203u8, 183u8, 76u8, 84u8, 62u8, 218u8, 187u8, 90u8, 35u8, 143u8, 107u8,
+							9u8, 245u8, 37u8, 147u8, 61u8, 220u8, 234u8, 219u8, 108u8, 151u8, 26u8,
 						],
 					)
 				}
@@ -14086,7 +14109,7 @@ pub mod api {
 					#[doc = ""]
 					#[doc = "This will waive the transaction fee if at least all but 10% of the accounts needed to"]
 					#[doc = "be upgraded. (We let some not have to be upgraded just in order to allow for the"]
-					#[doc = "possibililty of churn)."]
+					#[doc = "possibility of churn)."]
 					upgrade_accounts { who: ::std::vec::Vec<::subxt::utils::AccountId32> },
 					#[codec(index = 8)]
 					#[doc = "Set the regular balance of a given account."]
@@ -14192,7 +14215,7 @@ pub mod api {
 					#[doc = ""]
 					#[doc = "This will waive the transaction fee if at least all but 10% of the accounts needed to"]
 					#[doc = "be upgraded. (We let some not have to be upgraded just in order to allow for the"]
-					#[doc = "possibililty of churn)."]
+					#[doc = "possibility of churn)."]
 					upgrade_accounts { who: ::std::vec::Vec<::subxt::utils::AccountId32> },
 					#[codec(index = 8)]
 					#[doc = "Set the regular balance of a given account."]
@@ -16559,7 +16582,7 @@ pub mod api {
 				# [codec (crate = :: subxt :: ext :: codec)]
 				#[decode_as_type(crate_path = ":: subxt :: ext :: scale_decode")]
 				#[encode_as_type(crate_path = ":: subxt :: ext :: scale_encode")]
-				pub struct Public(pub runtime_types::sp_core::ed25519::Public);
+				pub struct Public(pub [::core::primitive::u8; 32usize]);
 				#[derive(
 					:: subxt :: ext :: codec :: Decode,
 					:: subxt :: ext :: codec :: Encode,
@@ -16571,7 +16594,7 @@ pub mod api {
 				# [codec (crate = :: subxt :: ext :: codec)]
 				#[decode_as_type(crate_path = ":: subxt :: ext :: scale_decode")]
 				#[encode_as_type(crate_path = ":: subxt :: ext :: scale_encode")]
-				pub struct Signature(pub runtime_types::sp_core::ed25519::Signature);
+				pub struct Signature(pub [::core::primitive::u8; 64usize]);
 			}
 			#[derive(
 				:: subxt :: ext :: codec :: Decode,
@@ -16646,63 +16669,6 @@ pub mod api {
 				#[decode_as_type(crate_path = ":: subxt :: ext :: scale_decode")]
 				#[encode_as_type(crate_path = ":: subxt :: ext :: scale_encode")]
 				pub struct KeyTypeId(pub [::core::primitive::u8; 4usize]);
-			}
-			pub mod ecdsa {
-				use super::runtime_types;
-				#[derive(
-					:: subxt :: ext :: codec :: Decode,
-					:: subxt :: ext :: codec :: Encode,
-					:: subxt :: ext :: scale_decode :: DecodeAsType,
-					:: subxt :: ext :: scale_encode :: EncodeAsType,
-					Clone,
-					Debug,
-				)]
-				# [codec (crate = :: subxt :: ext :: codec)]
-				#[decode_as_type(crate_path = ":: subxt :: ext :: scale_decode")]
-				#[encode_as_type(crate_path = ":: subxt :: ext :: scale_encode")]
-				pub struct Signature(pub [::core::primitive::u8; 65usize]);
-			}
-			pub mod ed25519 {
-				use super::runtime_types;
-				#[derive(
-					:: subxt :: ext :: codec :: Decode,
-					:: subxt :: ext :: codec :: Encode,
-					:: subxt :: ext :: scale_decode :: DecodeAsType,
-					:: subxt :: ext :: scale_encode :: EncodeAsType,
-					Clone,
-					Debug,
-				)]
-				# [codec (crate = :: subxt :: ext :: codec)]
-				#[decode_as_type(crate_path = ":: subxt :: ext :: scale_decode")]
-				#[encode_as_type(crate_path = ":: subxt :: ext :: scale_encode")]
-				pub struct Public(pub [::core::primitive::u8; 32usize]);
-				#[derive(
-					:: subxt :: ext :: codec :: Decode,
-					:: subxt :: ext :: codec :: Encode,
-					:: subxt :: ext :: scale_decode :: DecodeAsType,
-					:: subxt :: ext :: scale_encode :: EncodeAsType,
-					Clone,
-					Debug,
-				)]
-				# [codec (crate = :: subxt :: ext :: codec)]
-				#[decode_as_type(crate_path = ":: subxt :: ext :: scale_decode")]
-				#[encode_as_type(crate_path = ":: subxt :: ext :: scale_encode")]
-				pub struct Signature(pub [::core::primitive::u8; 64usize]);
-			}
-			pub mod sr25519 {
-				use super::runtime_types;
-				#[derive(
-					:: subxt :: ext :: codec :: Decode,
-					:: subxt :: ext :: codec :: Encode,
-					:: subxt :: ext :: scale_decode :: DecodeAsType,
-					:: subxt :: ext :: scale_encode :: EncodeAsType,
-					Clone,
-					Debug,
-				)]
-				# [codec (crate = :: subxt :: ext :: codec)]
-				#[decode_as_type(crate_path = ":: subxt :: ext :: scale_decode")]
-				#[encode_as_type(crate_path = ":: subxt :: ext :: scale_encode")]
-				pub struct Signature(pub [::core::primitive::u8; 64usize]);
 			}
 			#[derive(
 				:: subxt :: ext :: codec :: Decode,
@@ -17573,11 +17539,11 @@ pub mod api {
 			#[encode_as_type(crate_path = ":: subxt :: ext :: scale_encode")]
 			pub enum MultiSignature {
 				#[codec(index = 0)]
-				Ed25519(runtime_types::sp_core::ed25519::Signature),
+				Ed25519([::core::primitive::u8; 64usize]),
 				#[codec(index = 1)]
-				Sr25519(runtime_types::sp_core::sr25519::Signature),
+				Sr25519([::core::primitive::u8; 64usize]),
 				#[codec(index = 2)]
-				Ecdsa(runtime_types::sp_core::ecdsa::Signature),
+				Ecdsa([::core::primitive::u8; 65usize]),
 			}
 			#[derive(
 				:: subxt :: ext :: codec :: Decode,
@@ -18237,7 +18203,7 @@ pub mod api {
 					# [codec (crate = :: subxt :: ext :: codec)]
 					#[decode_as_type(crate_path = ":: subxt :: ext :: scale_decode")]
 					#[encode_as_type(crate_path = ":: subxt :: ext :: scale_encode")]
-					pub struct Public(pub runtime_types::sp_core::ed25519::Public);
+					pub struct Public(pub [::core::primitive::u8; 32usize]);
 					#[derive(
 						:: subxt :: ext :: codec :: Decode,
 						:: subxt :: ext :: codec :: Encode,
@@ -18249,7 +18215,7 @@ pub mod api {
 					# [codec (crate = :: subxt :: ext :: codec)]
 					#[decode_as_type(crate_path = ":: subxt :: ext :: scale_decode")]
 					#[encode_as_type(crate_path = ":: subxt :: ext :: scale_encode")]
-					pub struct Signature(pub runtime_types::sp_core::ed25519::Signature);
+					pub struct Signature(pub [::core::primitive::u8; 64usize]);
 				}
 				#[derive(
 					:: subxt :: ext :: codec :: Decode,
@@ -18602,7 +18568,7 @@ pub mod api {
 				#[decode_as_type(crate_path = ":: subxt :: ext :: scale_decode")]
 				#[encode_as_type(crate_path = ":: subxt :: ext :: scale_encode")]
 				pub struct NotaryMeta {
-					pub public: runtime_types::sp_core::ed25519::Public,
+					pub public: [::core::primitive::u8; 32usize],
 					pub hosts: runtime_types::bounded_collections::bounded_vec::BoundedVec<
 						runtime_types::ulx_primitives::host::Host,
 					>,
@@ -18789,7 +18755,7 @@ pub mod api {
 				#[encode_as_type(crate_path = ":: subxt :: ext :: scale_encode")]
 				pub struct SignedNotebookHeader {
 					pub header: runtime_types::ulx_primitives::notebook::NotebookHeader,
-					pub signature: runtime_types::sp_core::ed25519::Signature,
+					pub signature: [::core::primitive::u8; 64usize],
 				}
 			}
 			pub mod providers {

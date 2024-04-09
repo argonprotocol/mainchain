@@ -449,7 +449,7 @@ mod tests {
 					1000,
 					NoteType::ClaimFromMainchain { account_nonce: 1 }
 				)],
-				signature: Signature([0u8; 64]).into(),
+				signature: Signature::from_raw([0u8; 64]).into(),
 			},
 			BalanceChange {
 				account_id: Ferdie.to_account_id(),
@@ -459,7 +459,7 @@ mod tests {
 				previous_balance_proof: None,
 				escrow_hold_note: None,
 				notes: bounded_vec![Note::create(1000, NoteType::Claim,)],
-				signature: Signature([0u8; 64]).into(),
+				signature: Signature::from_raw([0u8; 64]).into(),
 			},
 		];
 
@@ -471,7 +471,7 @@ mod tests {
 			data_domain_hash: DataDomain::new("test", DataTLD::Analytics).hash(),
 			data_domain_account: Bob.to_account_id(),
 			block_rewards_account_id: Bob.to_account_id(),
-			signature: Signature([0u8; 64]).into(),
+			signature: Signature::from_raw([0u8; 64]).into(),
 		}
 		.sign(Bob.pair())
 		.clone()];

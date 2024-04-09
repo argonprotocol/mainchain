@@ -37,7 +37,7 @@ subxt = { workspace = true, features = ["default"] }
 tokio = { workspace = true }
 hex = { workspace = true, features = ["default"] }
 sp-runtime = { workspace = true, features = ["default"] }
-sp-core = { workspace = true, features = ["default", "serde", "full_crypto"] }
+sp-core = { workspace = true, features = ["default", "serde"] }
 binary-merkle-tree = { workspace = true, features = ["default"] }
 tracing = { workspace = true }
 tracing-subscriber = { workspace = true }

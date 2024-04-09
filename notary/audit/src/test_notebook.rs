@@ -29,7 +29,7 @@ use crate::{
 use super::notebook_verify;
 
 fn empty_signature() -> MultiSignatureBytes {
-	Signature([0u8; 64]).into()
+	Signature::from_raw([0u8; 64]).into()
 }
 
 struct TestLookup;
@@ -242,7 +242,7 @@ fn test_verify_notebook() {
 			1
 		)],
 		hash,
-		signature: ed25519::Signature([0u8; 64]),
+		signature: ed25519::Signature::from_raw([0u8; 64]),
 	};
 
 	notebook1.hash = notebook1.calculate_hash();
@@ -476,7 +476,7 @@ fn test_multiple_changesets_in_a_notebook() {
 			NewAccountOrigin::new(Bob.to_account_id(), AccountType::Tax, 3)
 		],
 		hash: H256::from_slice(&[0u8; 32]),
-		signature: ed25519::Signature([0u8; 64]),
+		signature: ed25519::Signature::from_raw([0u8; 64]),
 	};
 
 	notebook.hash = notebook.calculate_hash();
@@ -684,7 +684,7 @@ fn test_cannot_remove_lock_between_changesets_in_a_notebook() {
 			1
 		)],
 		hash: H256::from_slice(&[0u8; 32]),
-		signature: ed25519::Signature([0u8; 64]),
+		signature: ed25519::Signature::from_raw([0u8; 64]),
 	};
 	notebook.hash = notebook.calculate_hash();
 
@@ -991,7 +991,7 @@ fn test_votes_must_add_up() {
 			1
 		)],
 		hash: H256::from_slice(&[0u8; 32]),
-		signature: ed25519::Signature([0u8; 64]),
+		signature: ed25519::Signature::from_raw([0u8; 64]),
 	};
 
 	notebook.header.tax = 200;

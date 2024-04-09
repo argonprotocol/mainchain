@@ -49,15 +49,15 @@ sc-executor = { workspace = true, features = ["default"] }
 sp-io = { workspace = true, features = ["default"] }
 
 # Local Dependencies
-ulx-primitives = { workspace = true }
+ulx-primitives = { workspace = true, features = ["default"] }
 ulx-notary-apis = { workspace = true }
-ulx-node-runtime = { workspace = true }
+ulx-node-runtime = { workspace = true, features = ["default"] }
 
 
 [dev-dependencies]
 env_logger = { workspace = true }
 sc-block-builder = { workspace = true }
-frame-support = { workspace = true }
+frame-support = { workspace = true, features = ["default"] }
 sp-tracing = { workspace = true }
 sc-client-db = { workspace = true }
 sc-keystore = { workspace = true }
@@ -67,6 +67,6 @@ sp-test-primitives = { workspace = true }
 substrate-test-runtime = { workspace = true }
 substrate-test-runtime-client = { workspace = true }
 sp-keyring = { workspace = true }
-libp2p-identity = { workspace = true }
-pallet-mining-slot = { workspace = true }
+sc-network = { workspace = true }
+pallet-mining-slot = { workspace = true, features = ["default"] }
 ulx-notary = { workspace = true }

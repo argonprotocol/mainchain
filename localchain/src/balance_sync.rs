@@ -561,7 +561,7 @@ impl BalanceSync {
       index: (*tick_counter).1,
       block_hash: H256::from_slice(best_block_for_vote.block_hash.as_ref()),
       block_rewards_account_id: AccountStore::parse_address(&vote_address)?,
-      signature: Signature([0; 64]).into(),
+      signature: Signature::from_raw([0; 64]).into(),
     };
     let signature = self
       .keystore

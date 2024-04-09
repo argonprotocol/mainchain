@@ -1,5 +1,5 @@
 use codec::Decode;
-use sp_core::{ed25519, ed25519::Public, H256};
+use sp_core::{ed25519::Public as Ed25519Public, H256};
 use sqlx::{PgConnection, PgPool};
 use subxt::{
 	blocks::{Block, BlockRef},
@@ -84,11 +84,16 @@ async fn sync_finalized_blocks(
 	{
 		let mut db = pool.acquire().await?;
 
-		let public = ed25519::Public(notary.meta.public.0);
-		let _ =
-			activate_notebook_processing(&mut *db, notary_id, public, oldest_block_to_sync, &ticker)
-				.await
-				.ok();
+		let public = Ed25519Public::from_raw(notary.meta.public);
+		let _ = activate_notebook_processing(
+			&mut *db,
+			notary_id,
+			public,
+			oldest_block_to_sync,
+			&ticker,
+		)
+		.await
+		.ok();
 	}
 
 	let mut tx = pool.begin().await?;
@@ -103,7 +108,7 @@ async fn sync_finalized_blocks(
 	loop {
 		let block = client.blocks().at(block_hash.clone()).await?;
 		if block.number() <= last_synched_block || block.number() <= oldest_block_to_sync {
-			break
+			break;
 		}
 		block_hash = BlockRef::from(block.header().parent_hash);
 		missing_blocks.insert(0, block);
@@ -137,8 +142,9 @@ async fn process_block(
 		.unwrap_or_default();
 
 	let notebooks_header = block.header().digest.logs.iter().find_map(|log| match log {
-		DigestItem::PreRuntime(ulx_primitives::NOTEBOOKS_DIGEST_ID, data) =>
-			NotebookDigest::decode(&mut &data[..]).ok(),
+		DigestItem::PreRuntime(ulx_primitives::NOTEBOOKS_DIGEST_ID, data) => {
+			NotebookDigest::decode(&mut &data[..]).ok()
+		},
 		_ => None,
 	});
 
@@ -181,7 +187,7 @@ async fn find_missing_blocks(
 		blocks.insert(0, block);
 		// can't get a parent of genesis block
 		if is_genesis {
-			break
+			break;
 		}
 	}
 	Ok(blocks)
@@ -205,7 +211,7 @@ async fn process_fork(
 async fn activate_notebook_processing(
 	db: &mut PgConnection,
 	notary_id: NotaryId,
-	public: Public,
+	public: Ed25519Public,
 	block_height: u32,
 	ticker: &Ticker,
 ) -> anyhow::Result<()> {
@@ -237,23 +243,23 @@ async fn process_finalized_block(
 				if meta_change.notary_id == notary_id {
 					RegisteredKeyStore::store_public(
 						&mut *db,
-						ed25519::Public(meta_change.meta.public.0),
+						Ed25519Public::from_raw(meta_change.meta.public),
 						block_height,
 					)
 					.await?;
 				}
-				continue
+				continue;
 			}
 			if let Some(Ok(activated_event)) =
 				event.as_event::<api::notaries::events::NotaryActivated>().transpose()
 			{
 				info!("Notary activated: {:?}", activated_event);
 				if activated_event.notary.notary_id == notary_id {
-					let public = ed25519::Public(activated_event.notary.meta.public.0);
+					let public = Ed25519Public::from_raw(activated_event.notary.meta.public);
 					activate_notebook_processing(&mut *db, notary_id, public, block_height, ticker)
 						.await?;
 				}
-				continue
+				continue;
 			}
 
 			if let Some(Ok(notebook)) =
@@ -268,7 +274,7 @@ async fn process_finalized_block(
 					)
 					.await?;
 				}
-				continue
+				continue;
 			}
 
 			if let Some(Ok(notebook)) =
@@ -277,7 +283,7 @@ async fn process_finalized_block(
 				if notebook.notary_id == notary_id {
 					panic!("Notebook audit failed! Need to shut down {:?}", notebook);
 				}
-				continue
+				continue;
 			}
 
 			if let Some(Ok(to_localchain)) = event
@@ -295,7 +301,7 @@ async fn process_finalized_block(
 					)
 					.await?;
 				}
-				continue
+				continue;
 			}
 		}
 	}

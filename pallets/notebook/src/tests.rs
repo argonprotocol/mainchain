@@ -487,12 +487,12 @@ fn it_can_audit_notebooks() {
 						},
 					)],
 					escrow_hold_note: None,
-					signature: ed25519::Signature([0u8; 64]).into(),
+					signature: ed25519::Signature::from_raw([0u8; 64]).into(),
 				},],
 				vec![],
 				vec![]
 			)],
-			signature: ed25519::Signature([0u8; 64]),
+			signature: ed25519::Signature::from_raw([0u8; 64]),
 		};
 		notebook.notarizations[0].balance_changes[0].sign(Bob.pair());
 		notebook.hash = notebook.calculate_hash();

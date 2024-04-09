@@ -255,7 +255,6 @@ mod tests {
 			runtime_types::{
 				bounded_collections::bounded_vec::BoundedVec,
 				pallet_notaries::pallet::Call as NotaryCall,
-				sp_core::ed25519,
 				ulx_node_runtime::RuntimeCall,
 				ulx_primitives::{
 					balance_change::AccountOrigin as SubxtAccountOrigin, notary::NotaryMeta,
@@ -705,7 +704,7 @@ mod tests {
 			hosts: BoundedVec(vec![runtime_types::ulx_primitives::host::Host(BoundedVec(
 				host.0.to_vec(),
 			))]),
-			public: ed25519::Public(notary_key.0),
+			public: notary_key.0,
 		});
 		println!("notary proposal {:?}", notary_proposal.call_data());
 		let tx_progress = client
@@ -749,7 +748,7 @@ mod tests {
 					NoteType::ClaimFromMainchain { account_nonce },
 				)],
 				escrow_hold_note: None,
-				signature: sp_core::ed25519::Signature([0u8; 64]).into(),
+				signature: sp_core::ed25519::Signature::from_raw([0u8; 64]).into(),
 			}
 			.sign(keypair)
 			.clone()],
@@ -797,7 +796,7 @@ mod tests {
 						Note::create(DATA_DOMAIN_LEASE_COST, NoteType::LeaseDomain,)
 					],
 					escrow_hold_note: None,
-					signature: sp_core::ed25519::Signature([0u8; 64]).into(),
+					signature: sp_core::ed25519::Signature::from_raw([0u8; 64]).into(),
 				}
 				.sign(keypair.clone())
 				.clone(),
@@ -809,7 +808,7 @@ mod tests {
 					previous_balance_proof: None,
 					notes: bounded_vec![Note::create(DATA_DOMAIN_LEASE_COST, NoteType::Claim,)],
 					escrow_hold_note: None,
-					signature: sp_core::ed25519::Signature([0u8; 64]).into(),
+					signature: sp_core::ed25519::Signature::from_raw([0u8; 64]).into(),
 				}
 				.sign(keypair.clone())
 				.clone(),
@@ -878,7 +877,7 @@ mod tests {
 			}),
 			notes: bounded_vec![hold_note.clone()],
 			escrow_hold_note: None,
-			signature: sp_core::sr25519::Signature([0u8; 64]).into(),
+			signature: sp_core::sr25519::Signature::from_raw([0u8; 64]).into(),
 		}
 		.sign(Bob.pair())
 		.clone()];
@@ -907,7 +906,7 @@ mod tests {
 				previous_balance_proof: Some(bob_balance_proof),
 				escrow_hold_note: Some(hold_note.clone()),
 				notes: bounded_vec![Note::create(hold_note.milligons, EscrowSettle)],
-				signature: sp_core::sr25519::Signature([0u8; 64]).into(),
+				signature: sp_core::sr25519::Signature::from_raw([0u8; 64]).into(),
 			}
 			.sign(Bob.pair())
 			.clone(),
@@ -922,7 +921,7 @@ mod tests {
 					Note::create(hold_note.milligons, EscrowClaim),
 					Note::create(tax, NoteType::Tax)
 				],
-				signature: sp_core::sr25519::Signature([0u8; 64]).into(),
+				signature: sp_core::sr25519::Signature::from_raw([0u8; 64]).into(),
 			}
 			.sign(Alice.pair())
 			.clone(),
@@ -937,7 +936,7 @@ mod tests {
 					Note::create(tax, NoteType::Claim),
 					Note::create(tax, NoteType::SendToVote)
 				],
-				signature: sp_core::sr25519::Signature([0u8; 64]).into(),
+				signature: sp_core::sr25519::Signature::from_raw([0u8; 64]).into(),
 			}
 			.sign(Alice.pair())
 			.clone(),
@@ -954,7 +953,7 @@ mod tests {
 				block_hash: vote_block_hash,
 				power: tax,
 				block_rewards_account_id: Alice.to_account_id(),
-				signature: Signature([0u8; 64]).into(),
+				signature: Signature::from_raw([0u8; 64]).into(),
 			}
 			.sign(Alice.pair())
 			.clone()],

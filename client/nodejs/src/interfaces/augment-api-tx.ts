@@ -88,7 +88,7 @@ declare module '@polkadot/api-base/types/submittable' {
        * 
        * This will waive the transaction fee if at least all but 10% of the accounts needed to
        * be upgraded. (We let some not have to be upgraded just in order to allow for the
-       * possibililty of churn).
+       * possibility of churn).
        **/
       upgradeAccounts: AugmentedSubmittable<(who: Vec<AccountId32> | (AccountId32 | string | Uint8Array)[]) => SubmittableExtrinsic<ApiType>, [Vec<AccountId32>]>;
     };
@@ -417,7 +417,7 @@ declare module '@polkadot/api-base/types/submittable' {
        * 
        * This will waive the transaction fee if at least all but 10% of the accounts needed to
        * be upgraded. (We let some not have to be upgraded just in order to allow for the
-       * possibililty of churn).
+       * possibility of churn).
        **/
       upgradeAccounts: AugmentedSubmittable<(who: Vec<AccountId32> | (AccountId32 | string | Uint8Array)[]) => SubmittableExtrinsic<ApiType>, [Vec<AccountId32>]>;
     };

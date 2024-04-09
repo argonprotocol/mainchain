@@ -387,7 +387,7 @@ mod tests {
 				NoteType::ClaimFromMainchain { account_nonce: 1 }
 			)],
 			escrow_hold_note: None,
-			signature: Signature([0; 64]).into(),
+			signature: Signature::from_raw([0; 64]).into(),
 		}
 		.sign(Bob.pair())
 		.clone();

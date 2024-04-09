@@ -1,10 +1,9 @@
-use std::collections::BTreeSet;
-
 use chrono::{DateTime, TimeZone, Utc};
 use codec::Encode;
 use serde_json::{from_value, json};
 use sp_core::{bounded::BoundedVec, H256};
 use sqlx::{query, types::JsonValue, FromRow, PgConnection};
+use std::collections::BTreeSet;
 
 use ulx_primitives::{
 	ensure, notary::NotarySignature, tick::Tick, AccountId, AccountOrigin, BlockVotingPower,
@@ -258,9 +257,13 @@ impl NotebookHeaderStore {
 		let mut headers = Vec::new();
 		for record in records {
 			let notebook_number = record.notebook_number as u32;
-			let signature =
-				NotarySignature::from_slice(&record.signature.clone().unwrap_or_default()[..])
-					.ok_or(Error::UnsignedNotebookHeader)?;
+			let bytes: [u8; 64] = record
+				.signature
+				.clone()
+				.unwrap_or_default()
+				.try_into()
+				.map_err(|_| Error::UnsignedNotebookHeader)?;
+			let signature = NotarySignature::from_raw(bytes);
 			let header: NotebookHeader = record.try_into()?;
 			let signed_header = SignedNotebookHeader { header, signature };
 			headers.push((notebook_number, signed_header.encode()));
@@ -285,9 +288,14 @@ impl NotebookHeaderStore {
 		)
 		.fetch_one(db)
 		.await?;
-		let signature =
-			NotarySignature::from_slice(&record.signature.clone().unwrap_or_default()[..])
-				.ok_or(Error::UnsignedNotebookHeader)?;
+
+		let bytes: [u8; 64] = record
+			.signature
+			.clone()
+			.unwrap_or_default()
+			.try_into()
+			.map_err(|_| Error::UnsignedNotebookHeader)?;
+		let signature = NotarySignature::from_raw(bytes);
 		let header: NotebookHeader = record.try_into()?;
 		let signed_header = SignedNotebookHeader { header, signature };
 
