@@ -11,9 +11,6 @@ repository.workspace = true
 documentation.workspace = true
 exclude = ["/npm", "/__test__", "package.*", "*.js", "tsconfig*", "/node_modules"]
 
-[profile.dev.package.sqlx-macros]
-opt-level = 3
-
 [lib]
 crate-type = ["lib", "cdylib", "staticlib"]
 

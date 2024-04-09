@@ -1,0 +1,42 @@
+[config]
+default_to_workspace = false
+skip_core_tasks = true
+init_task = "prep"
+
+[env]
+CARGO_MAKE_EXTEND_WORKSPACE_MAKEFILE = "true"
+
+[tasks.prep]
+description = "Ensure all tools are installed"
+script = [
+    "cargo binstall sqlx-cli@^0.7 --no-confirm || true",
+    "cargo binstall cargo-nextest@^0.9 --no-confirm || true"
+]
+
+[tasks.build]
+description = "Compiles the project"
+command = "cargo"
+args = ["build", "--features", "fast-runtime"]
+
+[tasks.test]
+description = "Run tests with nextest,"
+command = "cargo"
+args = ["nextest", "run", "--features", "fast-runtime"]
+dependencies = ["build"]
+
+[tasks.watch]
+description = "Watch for changes and rebuild"
+command = "cargo"
+args = ["watch", "-x", "build", "--features", "fast-runtime"]
+
+
+[tasks.build-ci]
+description = "Compiles the project for CI with --locked"
+command = "cargo"
+args = ["build", "--features", "fast-runtime", "--locked"]
+
+[tasks.test-ci]
+description = "Tasks to run in CI for fast builds"
+args = ["nextest", "run", "--features", "fast-runtime", "--profile", "ci"]
+dependencies = ["build-ci"]
+

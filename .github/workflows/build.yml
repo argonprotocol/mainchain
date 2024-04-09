@@ -1,8 +1,4 @@
 name: Build and Test
-env:
-  DEBUG: napi:*
-  APP_NAME: localchain
-  MACOSX_DEPLOYMENT_TARGET: '10.13'
 permissions:
   contents: write
   id-token: write
@@ -14,24 +10,18 @@ permissions:
 
 
 jobs:
-  build:
+  build-and-test:
     strategy:
       fail-fast: false
       matrix:
         include:
-          #          - os: windows-latest
-          #            build: yarn build
-          #            target: x86_64-pc-windows-msvc
           - os: ubuntu-22.04
             target: x86_64-unknown-linux-gnu
-            build: yarn build --target x86_64-unknown-linux-gnu
             check_sql: true
     #          - os: macos-latest
     #            target: aarch64-apple-darwin
-    #            build: yarn build --target aarch64-apple-darwin
     #          - os: macos-latest
     #            target: x86_64-apple-darwin
-    #            build: yarn build
 
 
     services:
@@ -47,49 +37,13 @@ jobs:
         ports:
           - 5432:5432
 
-    name: stable - ${{ matrix.target }} - node@20
+    name: ${{ matrix.target }}
     runs-on: ${{ matrix.os }}
     steps:
+      - uses: actions/checkout@v4
       - name: Free Disk Space
         if: (matrix.os == '' || startsWith(matrix.os, 'ubuntu'))
-        run: |
-          echo "Listing 100 largest packages"
-          dpkg-query -Wf '${Installed-Size}\t${Package}\n' | sort -n | tail -n 100
-          df -h
-          echo "Removing large packages"
-          sudo apt-get remove -y '^dotnet-.*'
-          sudo apt-get remove -y 'php.*'
-          sudo apt-get remove -y '^mongodb-.*'
-          sudo apt-get remove -y '^mysql-.*'
-          sudo apt-get remove -y azure-cli google-chrome-stable firefox powershell mono-devel libgl1-mesa-dri
-          sudo apt-get autoremove -y
-          sudo apt-get clean
-          df -h
-          echo "Removing large directories"
-          
-          sudo rm -rf /usr/share/dotnet/
-          sudo rm -rf /usr/local/graalvm/
-          sudo rm -rf /usr/local/.ghcup/
-          sudo rm -rf /usr/local/share/powershell
-          sudo rm -rf /usr/local/share/chromium
-          sudo rm -rf /usr/local/lib/android
-          
-          sudo rm -rf /opt/ghc || true
-          
-          sudo docker image prune --all --force || true
-          
-          sudo swapoff -a || true
-          sudo rm -f /mnt/swapfile || true
-          free -h
-          
-          df -h
-
-      - uses: actions/checkout@v4
-      - name: Setup node
-        uses: actions/setup-node@v4
-        with:
-          node-version: 20
-          cache: yarn
+        uses: ./.github/templates/clear-space
 
       - name: Set Localchain Db Url
         working-directory: localchain
@@ -103,12 +57,20 @@ jobs:
         if: startsWith(matrix.os, 'macos')
         run: brew install protobuf
 
-      - name: Install dependencies
-        run: yarn install
+      - name: Start sccache
+        uses: hendrikmuhs/ccache-action@v1.2
+        with:
+          variant: sccache
+          key: ${{ runner.os }}-${{ github.sha }}
+          restore-keys: ${{ runner.os }}
+          max-size: 10G
+
+      - uses: rui314/setup-mold@v1
+        if: startsWith(matrix.os, 'ubuntu')
 
       - uses: moonrepo/setup-rust@v1
         with:
-          bins: sqlx-cli@0.7
+          bins: cargo-make,sqlx-cli
           targets: ${{ matrix.target }},wasm32-unknown-unknown
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
@@ -123,14 +85,12 @@ jobs:
         working-directory: localchain
         run: cargo sqlx database setup
 
-      - name: Build
-        run: cargo build --locked --features=fast-runtime
-        shell: bash
-        env:
-          SQLX_OFFLINE: ${{ !matrix.check_sql || 'true' }}
-
       - name: Test
-        run: cargo test
+        run: cargo make test-ci
+        env:
+          RUSTC_WRAPPER: "sccache"
+          CARGO_INCREMENTAL: "0"
+          SQLX_OFFLINE: ${{ matrix.check_sql != true }}
 
       - name: Upload Debug Assets
         uses: actions/upload-artifact@v4
@@ -139,18 +99,62 @@ jobs:
           path: target/debug/ulx-*
           if-no-files-found: error
 
+  localchain:
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - target: x86_64-unknown-linux-gnu
+          - target: aarch64-apple-darwin
+          - target: x86_64-apple-darwin
+          - target: x86_64-pc-windows-msvc
+    name: stable - ${{ matrix.target }} - node@18
+    runs-on: ubuntu-latest
+    env:
+      DEBUG: napi:*
+      APP_NAME: localchain
+      MACOSX_DEPLOYMENT_TARGET: '10.13'
+    steps:
+      - uses: actions/checkout@v4
 
-      - name: Build Localchain in docker
-        uses: addnab/docker-run-action@v3
-        if: ${{ matrix.docker }}
+      - name: Free Disk Space
+        uses: ./.github/templates/clear-space
+
+      - name: Setup node
+        uses: actions/setup-node@v4
         with:
-          image: ${{ matrix.docker }}
-          options: '--user 0:0 -e SQLX_OFFLINE=true -v ${{ github.workspace }}/.cargo-cache/git/db:/usr/local/cargo/git/db -v ${{ github.workspace }}/.cargo/registry/cache:/usr/local/cargo/registry/cache -v ${{ github.workspace }}/.cargo/registry/index:/usr/local/cargo/registry/index -v ${{ github.workspace }}:/build -w /build'
-          run: ${{ matrix.build }}
+          node-version: 18
+          cache: yarn
+
+      - name: Install dependencies
+        run: yarn install
+
+      - name: Install ziglang
+        uses: goto-bus-stop/setup-zig@v1
+        with:
+          version: 0.11.0
+
+      - name: Set Localchain Db Url
+        working-directory: localchain
+        run: echo "DATABASE_URL=sqlite://${{ runner.temp }}/temp.db" > .env
+
+      - name: Install linux dependencies
+        if: (matrix.os == '' || startsWith(matrix.os, 'ubuntu'))
+        run: sudo apt-get install -y clang libssl-dev llvm libudev-dev protobuf-compiler pkg-config
+
+      - name: Install mac dependencies
+        if: startsWith(matrix.os, 'macos')
+        run: brew install protobuf
+
+      - uses: moonrepo/setup-rust@v1
+        with:
+          bins: cargo-xwin
+          targets: ${{ matrix.target }},wasm32-unknown-unknown
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
 
       - name: Build Localchain
-        if: ${{ !matrix.docker }}
-        run: ${{ matrix.build }}
+        run: yarn build:debug --target ${{ matrix.target }}
         shell: bash
         working-directory: ./localchain
         env:
@@ -166,7 +170,7 @@ jobs:
   test-binding:
     name: Test bindings on ${{ matrix.target }} - node@${{ matrix.node }}
     needs:
-      - build
+      - localchain
     strategy:
       fail-fast: false
       matrix:
@@ -218,17 +222,12 @@ jobs:
         shell: bash
         working-directory: ./localchain
 
-      - name: Test bindings In Docker
-        if: ${{ matrix.docker }}
-        run: docker run --rm -v $(pwd):/build -w /build node:${{ matrix.node }}-slim yarn test
-
       - name: Test bindings
-        if: ${{ !matrix.docker }}
         run: yarn test
   universal-macOS:
     name: Build universal macOS binary
     needs:
-      - build
+      - localchain
     runs-on: macos-latest
     steps:
       - uses: actions/checkout@v4

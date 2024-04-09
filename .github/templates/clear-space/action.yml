@@ -1,0 +1,40 @@
+name: Clear space
+description: |
+  Empty out extra space on the github runner
+
+runs:
+  using: "composite"
+  steps:
+    - name: Clear space
+      shell: bash
+      run: |
+        df -h
+        echo "Removing large packages"
+        sudo apt-get remove -y '^dotnet-.*'
+        sudo apt-get remove -y 'php.*'
+        sudo apt-get remove -y '^mongodb-.*'
+        sudo apt-get remove -y '^mysql-.*'
+        sudo apt-get remove -y azure-cli google-chrome-stable firefox powershell mono-devel libgl1-mesa-dri
+        sudo apt-get autoremove -y
+        sudo apt-get clean
+        df -h
+        echo "Removing large directories"
+        
+        sudo rm -rf /usr/share/dotnet/
+        sudo rm -rf /usr/local/graalvm/
+        sudo rm -rf /usr/local/.ghcup/
+        sudo rm -rf /usr/local/share/powershell
+        sudo rm -rf /usr/local/share/chromium
+        sudo rm -rf /usr/local/lib/android
+        
+        sudo rm -rf /opt/ghc || true
+        
+        sudo docker image prune --all --force || true
+        
+        sudo swapoff -a || true
+        sudo rm -f /mnt/swapfile || true
+        free -h
+        echo "Listing 100 largest packages"
+        dpkg-query -Wf '${Installed-Size}\t${Package}\n' | sort -n | tail -n 100
+        
+        df -h

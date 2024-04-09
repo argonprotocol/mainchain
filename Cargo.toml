@@ -46,6 +46,10 @@ debug = 1               # debug symbols are useful for profilers
 debug-assertions = true
 overflow-checks = true
 
+
+[profile.dev.package.sqlx-macros]
+opt-level = 3
+
 # COPIED FROM SUBSTRATE REPO
 #
 # The list of dependencies below (which can be both direct and indirect dependencies) are crates
