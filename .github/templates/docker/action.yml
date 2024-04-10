@@ -1,0 +1,61 @@
+name: Build Docker image
+description: |
+  Build a docker image with caching layers
+
+inputs:
+  image:
+    description: 'The name of the image to build and push'
+    required: true
+  dockerfile:
+    description: 'The path to the Dockerfile to build'
+    required: false
+    default: Containerfile
+  GITHUB_TOKEN:
+    description: 'The github token'
+    required: true
+
+runs:
+  using: "composite"
+  steps:
+    - name: Check out
+      uses: actions/checkout@v4
+    - name: Set up QEMU
+      uses: docker/setup-qemu-action@v2
+    - name: Set up Docker Buildx
+      uses: docker/setup-buildx-action@v3
+    - name: Set up tags
+      id: meta
+      uses: docker/metadata-action@v4
+      with:
+        images: ${{ inputs.image }}
+        labels: |
+          org.opencontainers.image.licenses=MIT
+          org.opencontainers.image.vendor=ulixee
+        tags: |
+          flavor=latest=false,prefix=dev
+          type=ref,event=branch
+          type=edge
+          type=sha
+    - name: Login to container registry
+      uses: docker/login-action@v3
+      with:
+        registry: ghcr.io
+        username: ${{ github.repository_owner }}
+        password: ${{ inputs.GITHUB_TOKEN }}
+
+    - name: Copy the binary
+      shell: bash
+      run: cp ${{ inputs.build-args }} ./app
+
+    - name: Build and push image to container registry
+      uses: docker/build-push-action@v5
+      with:
+        context: .
+        file: ${{ inputs.dockerfile }}
+        build-args: BIN=app
+        platforms: linux/amd64,linux/arm64
+        push: ${{ github.event_name != 'pull_request' }}
+        tags: ${{ steps.meta.outputs.tags }}
+        labels: ${{ steps.meta.outputs.labels }}
+        cache-from: type=registry,ref=${{ inputs.image }}:buildcache
+        cache-to: type=registry,ref=${{ inputs.image }}:buildcache,mode=max

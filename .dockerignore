@@ -5,13 +5,17 @@
 **/*.rs.bk
 
 .DS_Store
+target
 
 # direnv files
 .envrc
 .direnv
 .idea
 rustc-ice*
-node_modules
+**/node_modules
 /localchain/test.db-wal
 /localchain/test.db
 /client/nodejs/lib
+*.a
+*.so
+*.d

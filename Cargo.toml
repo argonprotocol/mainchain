@@ -25,6 +25,7 @@ members = [
 ]
 resolver = "2"
 
+
 [workspace.package]
 version = "0.0.1"
 edition = "2021"
@@ -46,9 +47,17 @@ debug = 1               # debug symbols are useful for profilers
 debug-assertions = true
 overflow-checks = true
 
+[profile.dev]
+debug = 1
+debug-assertions = true
+incremental = false
+codegen-units = 256
+opt-level = 0
+split-debuginfo = "unpacked"
 
-[profile.dev.package.sqlx-macros]
-opt-level = 3
+# make sure dev builds with backtrace do not slow us down
+[profile.dev.package.backtrace]
+inherits = "release"
 
 # COPIED FROM SUBSTRATE REPO
 #
@@ -103,6 +112,7 @@ substrate-bip39 = { opt-level = 3 }
 twox-hash = { opt-level = 3 }
 uint = { opt-level = 3 }
 wasmi = { opt-level = 3 }
+sqlx-macros = { opt-level = 3 }
 x25519-dalek = { opt-level = 3 }
 yamux = { opt-level = 3 }
 zeroize = { opt-level = 3 }
@@ -110,13 +120,18 @@ zeroize = { opt-level = 3 }
 [workspace.dependencies]
 futures = { version = "0.3" }
 futures-timer = "3.0.1"
-getrandom = { version = "0.2" }
 parking_lot = { version = "0.12" }
 async-trait = { version = "0.1" }
+tokio = { version = "1.35", features = ["sync", "time", "rt"] }
+
+getrandom = { version = "0.2" }
 rand = { version = "0.8.5" }
 lazy_static = "1.4.0"
-
 smallvec = { version = "1.13" }
+hex = { version = "0.4" }
+url = "2.5.0"
+num_cpus = "1.16"
+
 codec = { default-features = false, package = "parity-scale-codec", version = "3.6", features = ["derive", "max-encoded-len"] }
 serde = { default-features = false, version = "1.0", features = ["derive"] }
 serde_json = { default-features = false, version = "1.0", features = ["raw_value", "arbitrary_precision", "alloc"] }
@@ -126,20 +141,17 @@ anyhow = { version = "1", default-features = false }
 thiserror = { version = "1.0" }
 snafu = { version = "0.8", default-features = false }
 
-tokio = { version = "1.35", features = ["sync", "time", "rt"] }
-hex = { version = "0.4" }
+
 jsonrpsee = { version = "0.22", features = ["http-client", "ws-client", "macros", "client-ws-transport-native-tls", "client-ws-transport-webpki-tls"] }
+
 tracing = { version = "0.1" }
 tracing-subscriber = { version = "0.3", features = ["env-filter"] }
-
 log = { version = "0.4", default-features = false }
 env_logger = "0.11"
 
-sqlx = { version = "0.7" }
+sqlx = { version = "0.7", features = ["macros"] }
 chrono = { version = "0.4", features = ["serde"] }
 
-url = "2.5.0"
-num_cpus = "1.16"
 
 binary-merkle-tree = { default-features = false, git = "https://github.com/paritytech/polkadot-sdk.git", branch = "release-polkadot-v1.10.0" }
 
@@ -233,8 +245,8 @@ impl-trait-for-tuples = "0.2.2"
 
 rsntp = { version = "4.0" }
 
-napi-derive = { version = "2.16" }
-napi = { version = "2.16", features = ["napi9", "async", "error_anyhow"] }
+napi-derive = { version = "3.0.0-alpha.1" }
+napi = { version = "3.0.0-alpha.1", features = ["napi9", "async", "error_anyhow"] }
 napi-build = { version = "2.1" }
 uniffi = { version = "0.27", features = ["tokio"] }
 

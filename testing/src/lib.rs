@@ -78,7 +78,7 @@ impl TestContext {
 
 		let ws_url = format!("ws://127.0.0.1:{}", ws_port);
 
-		let rpc_client = rpc::RpcClient::from_url(ws_url.as_str())
+		let rpc_client = rpc::RpcClient::from_insecure_url(ws_url.as_str())
 			.await
 			.expect("Unable to connect RPC client to test node");
 
@@ -93,7 +93,7 @@ impl TestContext {
 }
 
 pub async fn test_context_from_url(url: &str) -> TestContext {
-	let rpc_client = rpc::RpcClient::from_url(url)
+	let rpc_client = rpc::RpcClient::from_insecure_url(url)
 		.await
 		.expect("Unable to connect RPC client to test node");
 

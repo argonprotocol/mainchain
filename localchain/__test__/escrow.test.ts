@@ -56,7 +56,7 @@ it('can run a data domain escrow', async () => {
     let mainchain = new TestMainchain();
     const mainchainUrl = await mainchain.launch();
     const notary = new TestNotary();
-    await notary.start(mainchainUrl);
+    await notary.start(mainchain.containerSafeAddress);
 
     const sudo = new Keyring({type: 'sr25519'}).createFromUri('//Alice');
     const bobkeys = new Keyring({type: 'sr25519'});

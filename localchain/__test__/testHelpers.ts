@@ -2,6 +2,7 @@ import {checkForExtrinsicSuccess, Keyring, KeyringPair, UlxClient} from "@ulixee
 import {Localchain} from "../index";
 import TestNotary from "./TestNotary";
 import type {KeypairType} from "@polkadot/util-crypto/types";
+import process from "node:process";
 
 export interface ITeardownable {
     teardown(): Promise<void>;
@@ -14,6 +15,16 @@ export async function teardown() {
         await t.teardown();
     }
     toTeardown.length = 0;
+}
+
+export function cleanHostForDocker(host: string): string {
+    if (process.env.ULX_USE_DOCKER_BINS) {
+        if (process.platform !== "linux") {
+            const replacer = 'host.docker.internal';
+            return host.replace('localhost', replacer).replace('127.0.0.1', replacer).replace('0.0.0.0', replacer);
+        }
+    }
+    return host
 }
 
 export class KeyringSigner {

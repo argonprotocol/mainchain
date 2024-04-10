@@ -1,0 +1,70 @@
+{
+  "db_name": "PostgreSQL",
+  "query": "select * from blocks where block_hash=$1",
+  "describe": {
+    "columns": [
+      {
+        "ordinal": 0,
+        "name": "block_hash",
+        "type_info": "Bytea"
+      },
+      {
+        "ordinal": 1,
+        "name": "parent_hash",
+        "type_info": "Bytea"
+      },
+      {
+        "ordinal": 2,
+        "name": "block_number",
+        "type_info": "Int4"
+      },
+      {
+        "ordinal": 3,
+        "name": "block_vote_minimum",
+        "type_info": "Varchar"
+      },
+      {
+        "ordinal": 4,
+        "name": "latest_notebook_number",
+        "type_info": "Int4"
+      },
+      {
+        "ordinal": 5,
+        "name": "notebook_digests",
+        "type_info": "Jsonb"
+      },
+      {
+        "ordinal": 6,
+        "name": "is_finalized",
+        "type_info": "Bool"
+      },
+      {
+        "ordinal": 7,
+        "name": "finalized_time",
+        "type_info": "Timestamptz"
+      },
+      {
+        "ordinal": 8,
+        "name": "received_time",
+        "type_info": "Timestamptz"
+      }
+    ],
+    "parameters": {
+      "Left": [
+        "Bytea"
+      ]
+    },
+    "nullable": [
+      false,
+      false,
+      false,
+      false,
+      true,
+      true,
+      false,
+      true,
+      false
+    ]
+  },
+  "hash": "a505e9ce0b4097ee2a8dafc6e1d3bfe99ac0de4545762e65780c57923e40738b"
+}

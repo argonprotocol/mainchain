@@ -147,7 +147,7 @@ async fn main() -> anyhow::Result<()> {
 			let server = NotaryServer::start(notary_id, pool.clone(), bind_addr).await?;
 
 			if sync_blocks {
-				spawn_block_sync(trusted_rpc_url.clone(), notary_id, &pool, ticker.clone()).await?;
+				spawn_block_sync(trusted_rpc_url.clone(), notary_id, pool.clone(), ticker.clone()).await?;
 			}
 			if finalize_notebooks {
 				let _ = spawn_notebook_closer(

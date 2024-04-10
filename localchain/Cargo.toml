@@ -38,7 +38,7 @@ sp-core = { workspace = true, features = ["default", "serde"] }
 binary-merkle-tree = { workspace = true, features = ["default"] }
 tracing = { workspace = true }
 tracing-subscriber = { workspace = true }
-sqlx = { workspace = true, features = ["runtime-tokio", "sqlite", "macros", "chrono"] }
+sqlx = { workspace = true, features = ["runtime-tokio", "sqlite", "chrono"] }
 chrono = { workspace = true }
 clap = { workspace = true }
 comfy-table = { workspace = true }

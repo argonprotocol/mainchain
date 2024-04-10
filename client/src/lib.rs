@@ -59,7 +59,11 @@ pub async fn try_until_connected(
 ) -> Result<UlxClient, Error> {
 	let start = std::time::Instant::now();
 	let rpc = loop {
-		match UlxClient::from_url(url.clone()).await {
+		match if cfg!(any(debug_assertions, test)) {
+			UlxClient::from_insecure_url(url.clone()).await
+		} else {
+			UlxClient::from_url(url.clone()).await
+		} {
 			Ok(client) => break client,
 			Err(why) => {
 				if start.elapsed().as_millis() as u64 > timeout_millis {
@@ -90,7 +94,8 @@ impl UlxFullclient {
 		timeout_millis: u64,
 	) -> Result<Self, Error> {
 		let start = std::time::Instant::now();
-		let url = Url::parse(&url).map_err(|e| Error::Other(format!("Invalid Mainchain URL: {} -> {}", url, e)))?;
+		let url = Url::parse(&url)
+			.map_err(|e| Error::Other(format!("Invalid Mainchain URL: {} -> {}", url, e)))?;
 
 		let (sender, receiver) = loop {
 			let builder = {
@@ -182,7 +187,8 @@ impl MultiurlClient {
 		let mut lock = self.client.write().await;
 		let client_lock = self.client.clone();
 		let start = std::time::Instant::now();
-		let url = Url::parse(&url).map_err(|e| Error::Other(format!("Invalid Notary URL:  {} -> {}", url, e)))?;
+		let url = Url::parse(&url)
+			.map_err(|e| Error::Other(format!("Invalid Notary URL:  {} -> {}", url, e)))?;
 		let (sender, receiver) = loop {
 			match WsTransportClientBuilder::default().build(url.clone()).await {
 				Ok(client) => break client,

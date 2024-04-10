@@ -4,7 +4,8 @@
   "scripts": {
     "build": "yarn workspaces foreach --all run build",
     "pretest": "yarn workspace @ulixee/localchain pretest",
-    "test": "yarn pretest && jest"
+    "test": "yarn pretest && jest",
+    "test:js-only": "ULX_USE_DOCKER_BINS=1 jest"
   },
   "private": true,
   "engines": {

@@ -1,13 +1,10 @@
 name: Build and Test
-permissions:
-  contents: write
-  id-token: write
 'on':
   push:
     branches:
       - main
+  workflow_dispatch: null
   pull_request: null
-
 
 jobs:
   build-and-test:
@@ -37,12 +34,12 @@ jobs:
         ports:
           - 5432:5432
 
-    name: ${{ matrix.target }}
+    name: Build All ${{ matrix.target }}
     runs-on: ${{ matrix.os }}
     steps:
       - uses: actions/checkout@v4
       - name: Free Disk Space
-        if: (matrix.os == '' || startsWith(matrix.os, 'ubuntu'))
+        if: startsWith(matrix.os, 'ubuntu')
         uses: ./.github/templates/clear-space
 
       - name: Set Localchain Db Url
@@ -50,7 +47,7 @@ jobs:
         run: echo "DATABASE_URL=sqlite://${{ runner.temp }}/temp.db" > .env
 
       - name: Install linux dependencies
-        if: (matrix.os == '' || startsWith(matrix.os, 'ubuntu'))
+        if: startsWith(matrix.os, 'ubuntu')
         run: sudo apt-get install -y clang libssl-dev llvm libudev-dev protobuf-compiler pkg-config
 
       - name: Install mac dependencies
@@ -66,7 +63,6 @@ jobs:
           max-size: 10G
 
       - uses: rui314/setup-mold@v1
-        if: startsWith(matrix.os, 'ubuntu')
 
       - uses: moonrepo/setup-rust@v1
         with:
@@ -76,12 +72,10 @@ jobs:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
 
       - name: Migrate Notary Db
-        if: (matrix.check_sql == true)
         working-directory: notary
         run: cargo sqlx database setup
 
       - name: Migrate Localchain Db
-        if: (matrix.check_sql == true)
         working-directory: localchain
         run: cargo sqlx database setup
 
@@ -89,8 +83,8 @@ jobs:
         run: cargo make test-ci
         env:
           RUSTC_WRAPPER: "sccache"
-          CARGO_INCREMENTAL: "0"
-          SQLX_OFFLINE: ${{ matrix.check_sql != true }}
+          CARGO_INCREMENTAL: 0
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
 
       - name: Upload Debug Assets
         uses: actions/upload-artifact@v4
@@ -99,197 +93,32 @@ jobs:
           path: target/debug/ulx-*
           if-no-files-found: error
 
-  localchain:
-    strategy:
-      fail-fast: false
-      matrix:
-        include:
-          - target: x86_64-unknown-linux-gnu
-          - target: aarch64-apple-darwin
-          - target: x86_64-apple-darwin
-          - target: x86_64-pc-windows-msvc
-    name: stable - ${{ matrix.target }} - node@18
-    runs-on: ubuntu-latest
-    env:
-      DEBUG: napi:*
-      APP_NAME: localchain
-      MACOSX_DEPLOYMENT_TARGET: '10.13'
-    steps:
-      - uses: actions/checkout@v4
-
-      - name: Free Disk Space
-        uses: ./.github/templates/clear-space
-
-      - name: Setup node
-        uses: actions/setup-node@v4
-        with:
-          node-version: 18
-          cache: yarn
-
-      - name: Install dependencies
-        run: yarn install
-
-      - name: Install ziglang
-        uses: goto-bus-stop/setup-zig@v1
-        with:
-          version: 0.11.0
-
-      - name: Set Localchain Db Url
-        working-directory: localchain
-        run: echo "DATABASE_URL=sqlite://${{ runner.temp }}/temp.db" > .env
-
-      - name: Install linux dependencies
-        if: (matrix.os == '' || startsWith(matrix.os, 'ubuntu'))
-        run: sudo apt-get install -y clang libssl-dev llvm libudev-dev protobuf-compiler pkg-config
-
-      - name: Install mac dependencies
-        if: startsWith(matrix.os, 'macos')
-        run: brew install protobuf
-
-      - uses: moonrepo/setup-rust@v1
-        with:
-          bins: cargo-xwin
-          targets: ${{ matrix.target }},wasm32-unknown-unknown
-        env:
-          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-
-      - name: Build Localchain
-        run: yarn build:debug --target ${{ matrix.target }}
-        shell: bash
-        working-directory: ./localchain
-        env:
-          SQLX_OFFLINE: true
-
-      - name: Upload Localchain artifact
-        uses: actions/upload-artifact@v4
-        with:
-          name: bindings-${{ matrix.target }}
-          path: localchain/${{ env.APP_NAME }}.*.node
-          if-no-files-found: error
-
-  test-binding:
-    name: Test bindings on ${{ matrix.target }} - node@${{ matrix.node }}
+  docker:
+    name: Docker
     needs:
-      - localchain
-    strategy:
-      fail-fast: false
-      matrix:
-        include:
-          #          - os: macos-latest
-          #            target: x86_64-apple-darwin
-          #          - os: windows-latest
-          #            target: x86_64-pc-windows-msvc
-          - os: ubuntu-latest
-            target: x86_64-unknown-linux-gnu
-        node:
-          - '18'
-          - '20'
-
-    services:
-      postgres:
-        image: postgres
-        env:
-          POSTGRES_PASSWORD: postgres
-        # Set health checks to wait until postgres has started
-        options: >-
-          --health-cmd pg_isready
-          --health-interval 10s
-          --health-timeout 5s
-          --health-retries 5
-
-    runs-on: ${{ matrix.os }}
+      - build-and-test
+    runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
-      - name: Setup node
-        uses: actions/setup-node@v4
-        with:
-          node-version: ${{ matrix.node }}
-          cache: yarn
-      - name: Install dependencies
-        run: yarn install
-      - name: Download artifacts
-        uses: actions/download-artifact@v4
-        with:
-          name: bindings-${{ matrix.target }}
-          path: localchain
       - name: Download artifacts
         uses: actions/download-artifact@v4
         with:
           name: bins-${{ matrix.target }}
-          path: target/debug
-      - name: List packages
-        run: ls -R .
-        shell: bash
-        working-directory: ./localchain
+          path: .
 
-      - name: Test bindings
-        run: yarn test
-  universal-macOS:
-    name: Build universal macOS binary
-    needs:
-      - localchain
-    runs-on: macos-latest
-    steps:
-      - uses: actions/checkout@v4
-      - name: Setup node
-        uses: actions/setup-node@v4
-        with:
-          node-version: 20
-          cache: yarn
-      - name: Install dependencies
-        run: yarn install
-      - name: Download macOS x64 artifact
-        uses: actions/download-artifact@v4
-        with:
-          name: bindings-x86_64-apple-darwin
-          path: localchain/artifacts
-      - name: Combine binaries
-        run: yarn universal
-        working-directory: ./localchain
-      - name: Upload artifact
-        uses: actions/upload-artifact@v4
-        with:
-          name: bindings-universal-apple-darwin
-          path: localchain/${{ env.APP_NAME }}.*.node
-          if-no-files-found: error
-  publish:
-    name: Publish
-    runs-on: ubuntu-latest
-    needs:
-      - test-binding
-      - universal-macOS
-    steps:
-      - uses: actions/checkout@v4
-      - name: Setup node
-        uses: actions/setup-node@v4
-        with:
-          node-version: 20
-          cache: yarn
-      - name: Install dependencies
-        run: yarn install
-      - name: Download all artifacts
-        uses: actions/download-artifact@v4
-        with:
-          path: localchain/artifacts
-      - name: Move artifacts
-        run: yarn artifacts
-      - name: List packages
-        run: ls -R ./npm
+      - name: List assets in root
+        run: ls
         shell: bash
-      - name: Publish
-        run: |
-          npm config set provenance true
-          if git log -1 --pretty=%B | grep "^[0-9]\+\.[0-9]\+\.[0-9]\+";
-          then
-          echo "//registry.npmjs.org/:_authToken=$NPM_TOKEN" >> ~/.npmrc
-          npm publish --access public
-          elif git log -1 --pretty=%B | grep "^[0-9]\+\.[0-9]\+\.[0-9]\+";
-          then
-          echo "//registry.npmjs.org/:_authToken=$NPM_TOKEN" >> ~/.npmrc
-          npm publish --tag next --access public
-          else
-          echo "Not a release, skipping publish"
-          fi
-        env:
+
+      - name: Node
+        uses: ./.github/templates/docker
+        with:
+          image: ulixee/ulx-node
+          build-args: 'BIN=ulx-node'
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-          NPM_TOKEN: ${{ secrets.NPM_TOKEN }}
+      - name: Notary
+        uses: ./.github/templates/docker
+        with:
+          image: ulixee/ulx-notary
+          build-args: 'BIN=ulx-notary'
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}

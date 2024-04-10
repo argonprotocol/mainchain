@@ -19,7 +19,7 @@ it('can transfer from mainchain to local', async () => {
     const mainchain = new TestMainchain();
     const mainchainUrl = await mainchain.launch();
     const notary = new TestNotary();
-    await notary.start(mainchainUrl);
+    await notary.start(mainchain.containerSafeAddress);
 
     const mainchainClient = await getClient(mainchainUrl);
     disconnectOnTeardown(mainchainClient);
@@ -54,7 +54,7 @@ it('can transfer from mainchain to local to mainchain', async () => {
     const mainchain = new TestMainchain();
     const mainchainUrl = await mainchain.launch();
     const notary = new TestNotary();
-    await notary.start(mainchainUrl);
+    await notary.start(mainchain.containerSafeAddress);
 
     const mainchainClient = await getClient(mainchainUrl);
     disconnectOnTeardown(mainchainClient);

@@ -14,8 +14,6 @@ build = "build.rs"
 [package.metadata.docs.rs]
 targets = ["x86_64-unknown-linux-gnu"]
 
-[[bin]]
-name = "ulx-node"
 
 [dependencies]
 num_cpus = { workspace = true }
@@ -52,7 +50,6 @@ sp-keyring = { workspace = true, features = ["default"] }
 frame-system = { workspace = true, features = ["default"] }
 pallet-transaction-payment = { workspace = true, features = ["default"] }
 
-# These dependencies are used for the node template's RPCs
 jsonrpsee = { workspace = true, features = ["server"] }
 sp-api = { workspace = true, features = ["default"] }
 sc-rpc = { workspace = true }

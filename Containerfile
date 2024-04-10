@@ -15,14 +15,13 @@ RUN apt-get update && \
 	useradd -m -u 1000 -U -s /bin/sh -d /ulixee ulixee && \
 	mkdir -p /data /ulixee/.local/share && \
 	chown -R ulixee:ulixee /data && \
-	ln -s /data /ulixee/.local/share/ulx-node
+    ln -s /data /ulixee/.local/share/${BIN}
 
 USER ulixee
-
 # copy the compiled binary to the container
-COPY --chown=ulixee:ulixee --chmod=774 ulx-node /usr/bin/ulx-node
+COPY --chown=ulixee:ulixee --chmod=774 ${BIN} /usr/bin/${BIN}
 
 # check if executable works in this container
-RUN /usr/bin/ulx-node --version
+RUN /usr/bin/${BIN} --version
 
-CMD ["/usr/bin/ulx-node"]
+CMD /usr/bin/${BIN}

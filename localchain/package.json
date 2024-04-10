@@ -4,12 +4,11 @@
   "bin": "cli.js",
   "scripts": {
     "artifacts": "napi artifacts",
-    "build": "napi build --platform --release --no-const-enum --features=napi -p ulx-localchain",
+    "build": "napi build --platform --release --no-const-enum --features=napi -p ulx-localchain --strip",
     "build:debug": "napi build --platform --no-const-enum --features=fast-runtime,napi -p ulx-localchain",
     "prepublishOnly": "napi prepublish -t npm",
     "pretest": "npm run build:debug",
     "test": "npm run pretest && cd .. && jest",
-    "universal": "napi universal",
     "version": "napi version"
   },
   "license": "MIT",
@@ -17,14 +16,17 @@
   "types": "index.d.ts",
   "napi": {
     "binaryName": "localchain",
+    "packageName": "@ulixee/localchain",
     "targets": [
+      "x86_64-apple-darwin",
+      "aarch64-apple-darwin",
       "x86_64-pc-windows-msvc",
       "x86_64-unknown-linux-gnu",
-      "universal-apple-darwin"
+      "aarch64-unknown-linux-gnu"
     ]
   },
   "devDependencies": {
-    "@napi-rs/cli": "^3.0.0-alpha.44",
+    "@napi-rs/cli": "^3.0.0-alpha.46",
     "@polkadot/util-crypto": "^12.6.2",
     "@types/jest": "^29.5.11",
     "@types/node": "^18.19.6",

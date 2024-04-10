@@ -1,0 +1,126 @@
+name: Localchain Bindings
+permissions:
+  contents: write
+  id-token: write
+'on':
+  push:
+    branches:
+      - main
+  workflow_dispatch: null
+  pull_request: null
+
+jobs:
+  localchain:
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - os: macos-latest
+            target: x86_64-apple-darwin
+            build: |
+              export RUSTFLAGS="-C link-args=-Wl,-undefined,dynamic_lookup"
+              yarn build:debug
+              strip -x *.node
+          #          - os: macos-latest
+          #            target: aarch64-apple-darwin
+          #            build: |
+          #              sudo rm -Rf /Library/Developer/CommandLineTools/SDKs/*;
+          #              export CC=$(xcrun -f clang);
+          #              export CXX=$(xcrun -f clang++);
+          #              SYSROOT=$(xcrun --sdk macosx --show-sdk-path);
+          #              export RUSTFLAGS="-C link-args=-Wl,-undefined,dynamic_lookup"
+          #              export CFLAGS="-isysroot $SYSROOT -isystem $SYSROOT";
+          #              yarn build:debug --target aarch64-apple-darwin
+          #              strip -x *.node
+          - os: ubuntu-latest
+            target: x86_64-unknown-linux-gnu
+            docker: ghcr.io/napi-rs/napi-rs/nodejs-rust:lts-debian
+            build: |
+              cd localchain
+              yarn build:debug
+          - os: ubuntu-latest
+            target: aarch64-unknown-linux-gnu
+            docker: ghcr.io/napi-rs/napi-rs/nodejs-rust:lts-debian-aarch64
+            build: |
+              cd localchain
+              yarn build:debug --target x86_64-unknown-linux-gnu
+    #          - os: windows-latest
+    #            target: x86_64-pc-windows-msvc
+    #            build: |
+    #              yarn build --target x86_64-pc-windows-msvc
+    #              strip -x *.node
+    name: localchain - ${{ matrix.target }} - node@20
+    runs-on: ${{matrix.os}}
+    env:
+      DEBUG: napi:*
+      APP_NAME: localchain
+      MACOSX_DEPLOYMENT_TARGET: '10.13'
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Setup node
+        if: ${{ !matrix.settings.docker }}
+        uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: yarn
+
+      - name: Install dependencies
+        run: yarn install
+
+      - name: Install
+        uses: dtolnay/rust-toolchain@stable
+        if: ${{ !matrix.settings.docker }}
+        with:
+          toolchain: stable
+          targets: ${{ matrix.target }}
+
+      - name: Cache cargo
+        uses: actions/cache@v4
+        with:
+          path: |
+            ~/.cargo/registry/index/
+            ~/.cargo/registry/cache/
+            ~/.cargo/git/db/
+            .cargo-cache
+            target/
+          key: localchain-${{ matrix.target }}-cargo-${{ matrix.os }}
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Install dependencies
+        run: yarn install
+
+      - name: Build in docker
+        uses: addnab/docker-run-action@v3
+        if: ${{ matrix.docker }}
+        with:
+          image: ${{ matrix.docker }}
+          options: |
+            --user 0:0 
+            -e SQLX_OFFLINE=true 
+            -e SKIP_WASM_BUILD=1 
+            -e GITHUB_TOKEN=${{ secrets.GITHUB_TOKEN }}
+            -v ${{ github.workspace }}/.cargo-cache/git/db:/usr/local/cargo/git/db 
+            -v ${{ github.workspace }}/.cargo/registry/cache:/usr/local/cargo/registry/cache 
+            -v ${{ github.workspace }}/.cargo/registry/index:/usr/local/cargo/registry/index 
+            -v ${{ github.workspace }}:/build 
+            -w /build
+          run: ${{ matrix.build }}
+
+      - name: Build
+        if: ${{ !matrix.docker }}
+        run: ${{ matrix.build }}
+        shell: bash
+        working-directory: ./localchain
+        env:
+          SQLX_OFFLINE: true
+          SKIP_WASM_BUILD: 1
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Upload Localchain artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: bindings-${{ matrix.target }}
+          path: localchain/${{ env.APP_NAME }}.*.node
+          if-no-files-found: error

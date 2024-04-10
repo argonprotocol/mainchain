@@ -28,13 +28,13 @@ use crate::{
 pub async fn spawn_block_sync(
 	rpc_url: String,
 	notary_id: NotaryId,
-	pool: &PgPool,
+	pool: PgPool,
 	ticker: Ticker,
 ) -> anyhow::Result<(), Error> {
-	sync_finalized_blocks(rpc_url.clone(), notary_id, pool, ticker.clone())
+	sync_finalized_blocks(rpc_url.clone(), notary_id, pool.clone(), ticker.clone())
 		.await
 		.map_err(|e| Error::BlockSyncError(e.to_string()))?;
-	track_blocks(rpc_url.clone(), notary_id, pool, ticker.clone());
+	track_blocks(rpc_url.clone(), notary_id, pool.clone(), ticker.clone());
 
 	Ok(())
 }
@@ -42,10 +42,9 @@ pub async fn spawn_block_sync(
 pub(crate) fn track_blocks(
 	rpc_url: String,
 	notary_id: NotaryId,
-	pool: &PgPool,
+	pool: PgPool,
 	ticker: Ticker,
 ) -> tokio::task::JoinHandle<()> {
-	let pool = pool.clone();
 	tokio::task::spawn(async move {
 		let ticker = ticker.clone();
 		loop {
@@ -62,7 +61,7 @@ pub(crate) fn track_blocks(
 async fn sync_finalized_blocks(
 	url: String,
 	notary_id: NotaryId,
-	pool: &PgPool,
+	pool: PgPool,
 	ticker: Ticker,
 ) -> anyhow::Result<()> {
 	let client = try_until_connected(url, 2500, 120_000).await?;
