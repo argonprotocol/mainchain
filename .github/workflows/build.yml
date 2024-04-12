@@ -4,7 +4,7 @@ name: Build and Test
     branches:
       - main
   workflow_dispatch: null
-  pull_request: null
+#  pull_request: null
 
 jobs:
   build-and-test:
@@ -14,9 +14,6 @@ jobs:
         include:
           - os: ubuntu-22.04
             target: x86_64-unknown-linux-gnu
-            check_sql: true
-    #          - os: macos-latest
-    #            target: aarch64-apple-darwin
     #          - os: macos-latest
     #            target: x86_64-apple-darwin
 

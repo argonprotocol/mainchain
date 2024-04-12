@@ -99,11 +99,12 @@ impl Keystore {
 
     #[cfg(feature = "napi")]
     {
+      use napi::bindgen_prelude::Promise;
       if let Some(js_callbacks) = self.js_callbacks.lock().await.as_ref() {
         let promise_result = js_callbacks
           .0
           .derive
-          .call_async(Ok(hd_path))
+          .call_async::<Promise<String>>(hd_path)
           .await?;
         return Ok(promise_result.await?);
       }
@@ -128,11 +129,12 @@ impl Keystore {
 
     #[cfg(feature = "napi")]
     {
+      use napi::bindgen_prelude::{Promise, Uint8Array};
       if let Some(js_callbacks) = self.js_callbacks.lock().await.as_ref() {
         let promise_result = js_callbacks
           .0
           .sign
-          .call_async(Ok((address, message.into())))
+          .call_async::<Promise<Uint8Array>>((address, message.into()))
           .await?;
         let buffer = promise_result.await?;
         return Ok(buffer.as_ref().to_vec());
@@ -145,8 +147,8 @@ impl Keystore {
 
 #[cfg(feature = "napi")]
 pub mod napi_ext {
-  use napi::bindgen_prelude::{Buffer, Promise, Uint8Array};
-  use napi::threadsafe_function::ThreadsafeFunction;
+  use napi::bindgen_prelude::{Buffer, Uint8Array};
+  use napi::threadsafe_function::{ErrorStrategy, ThreadsafeFunction};
   use napi_derive::napi;
 
   use crate::cli::EmbeddedKeyPassword;
@@ -154,8 +156,8 @@ pub mod napi_ext {
   use crate::{AccountStore, CryptoScheme, Keystore};
 
   pub(crate) struct JsCallbacks {
-    pub(crate) sign: ThreadsafeFunction<(String, Uint8Array), Promise<Uint8Array>>,
-    pub(crate) derive: ThreadsafeFunction<String, Promise<String>>,
+    pub(crate) sign: ThreadsafeFunction<(String, Uint8Array), ErrorStrategy::Fatal>,
+    pub(crate) derive: ThreadsafeFunction<String, ErrorStrategy::Fatal>,
   }
 
   /// Options to provide the password for a keystore. NOTE that this library cannot clear out memory in javascript.
@@ -189,8 +191,8 @@ pub mod napi_ext {
     pub async fn use_external(
       &self,
       default_address: String,
-      sign: ThreadsafeFunction<(String, Uint8Array), Promise<Uint8Array>>,
-      derive: ThreadsafeFunction<String, Promise<String>>,
+      sign: ThreadsafeFunction<(String, Uint8Array), ErrorStrategy::Fatal>,
+      derive: ThreadsafeFunction<String, ErrorStrategy::Fatal>,
     ) -> napi::Result<()> {
       // this will check that the address matches
       AccountStore::bootstrap(self.db.clone(), default_address.clone(), None)

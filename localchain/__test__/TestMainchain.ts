@@ -21,6 +21,10 @@ export default class TestMainchain implements ITeardownable {
         return `ws://${this.containerName ?? '127.0.0.1'}:${this.port}`;
     }
 
+    public get address(): string {
+        return `ws://127.0.0.1:${this.port}`
+    }
+
     constructor(binPath?: string) {
         this.#binPath = binPath ?? `${__dirname}/../../target/debug/ulx-node`;
         this.#binPath = path.resolve(this.#binPath);
@@ -46,7 +50,7 @@ export default class TestMainchain implements ITeardownable {
             this.containerName = containerName;
             this.#binPath = 'docker';
             execArgs = ['run', '--rm', `--name=${containerName}`, '-p=9945', '-p=33344', '--network=ulx_test', '-e', `RUST_LOG=info,sc_rpc_server=info`,
-                'ulixee/ulixee-miner:edge', '--dev', '--alice', `--miners=${miningThreads}`, '--port=33344', '--rpc-port=9945', '--rpc-external'];
+                'ghcr.io/ulixee/ulixee-miner:edge', '--dev', '--alice', `--miners=${miningThreads}`, '--port=33344', '--rpc-port=9945', '--rpc-external'];
         }
         console.log('launching ulx-node from', this.#binPath, execArgs);
         this.#process = spawn(this.#binPath, execArgs, {

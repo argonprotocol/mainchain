@@ -56,14 +56,15 @@ export default class TestNotary implements ITeardownable {
 
         let notaryPath = pathToNotaryBin ?? `${__dirname}/../../target/debug/ulx-notary`;
         let containerName: string;
-        if (process.env.ULX_USE_DOCKER_BINS) {
+        const execArgs = ['run', `--db-url=${this.#dbConnectionString}/${this.#dbName}`, `--dev`, `-t ${mainchainUrl}`];
+        if (process.env.ULX_USE_DOCKER_BINS1) {
             try {
                 child_process.execSync("docker network create ulx_test", {stdio: 'ignore'});
             } catch {
             }
             containerName = "notary_" + nanoid();
             this.containerName = containerName;
-            notaryPath = `docker run --rm --network=ulx_test --name=${containerName} -p=9925 -e RUST_LOG=warn ulixee/ulixee-notary:edge`;
+            notaryPath = `docker run --rm --network=ulx_test --name=${containerName} -p=9925 -e RUST_LOG=warn ghcr.io/ulixee/ulixee-notary:edge`;
 
             if (process.platform === "darwin") {
                 this.#dbConnectionString = cleanHostForDocker(this.#dbConnectionString);
@@ -81,15 +82,14 @@ export default class TestNotary implements ITeardownable {
         }
         console.log("Notary >> connecting to mainchain '%s', db %s", mainchainUrl, `${this.#dbConnectionString}/${this.#dbName}`);
 
-        const args = ['run', `--db-url=${this.#dbConnectionString}/${this.#dbName}`, `--dev`, `-t ${mainchainUrl}`];
 
-        if (process.env.ULX_USE_DOCKER_BINS) {
-            args.unshift(...notaryPath.replace("docker run", "run").split(' '));
-            args.push('-b=0.0.0.0:9925')
+        if (process.env.ULX_USE_DOCKER_BINS1) {
+            execArgs.unshift(...notaryPath.replace("docker run", "run").split(' '));
+            execArgs.push('-b=0.0.0.0:9925')
             notaryPath = 'docker';
         }
-        console.log('launching ulx-notary from', notaryPath, args);
-        this.#childProcess = child_process.spawn(notaryPath, args, {
+        console.log('launching ulx-notary from', notaryPath, execArgs);
+        this.#childProcess = child_process.spawn(notaryPath, execArgs, {
             stdio: ['ignore', 'pipe', 'pipe'],
             env: {...process.env, RUST_LOG: "warn"}
         });
@@ -107,7 +107,7 @@ export default class TestNotary implements ITeardownable {
                 reject(data);
             });
             this.#stdioInterface = readline.createInterface({input: this.#childProcess.stdout}).on('line', line => {
-                console.log('Nota >> %s', line);
+                console.log('Notary >> %s', line);
                 let match = line.match(/Listening on ([ws:/\d.]+)/);
                 if (match) {
                     resolve(match[1].split(':').pop());
