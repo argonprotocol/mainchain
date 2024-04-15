@@ -1,8 +1,7 @@
 #![cfg_attr(not(feature = "std"), no_std)]
 
-use binary_merkle_tree::{merkle_root, verify_proof, Leaf};
+use binary_merkle_tree::{Leaf, merkle_root, verify_proof};
 use codec::{Decode, Encode};
-use log::trace;
 use serde::{Deserialize, Serialize};
 use snafu::Snafu;
 use sp_core::H256;
@@ -14,11 +13,11 @@ use sp_std::{
 };
 
 use ulx_primitives::{
-	ensure, round_up, tick::Tick, AccountId, AccountOrigin, AccountOriginUid, AccountType, Balance,
-	BalanceChange, BalanceProof, BalanceTip, BlockVote, ChainTransfer, DataDomainHash,
-	LocalchainAccountId, NewAccountOrigin, NotaryId, Note, NoteType, Notebook, NotebookHeader,
-	NotebookNumber, VoteMinimum, DATA_DOMAIN_LEASE_COST, ESCROW_CLAWBACK_TICKS,
-	ESCROW_EXPIRATION_TICKS, MINIMUM_ESCROW_SETTLEMENT, TAX_PERCENT_BASE,
+	AccountId, AccountOrigin, AccountOriginUid, AccountType, Balance, BalanceChange, BalanceProof, BalanceTip,
+	BlockVote, ChainTransfer, DATA_DOMAIN_LEASE_COST, DataDomainHash, ensure, ESCROW_CLAWBACK_TICKS,
+	ESCROW_EXPIRATION_TICKS, LocalchainAccountId, MINIMUM_ESCROW_SETTLEMENT, NewAccountOrigin, NotaryId, Note, Notebook,
+	NotebookHeader, NotebookNumber, NoteType, round_up,
+	TAX_PERCENT_BASE, tick::Tick, VoteMinimum,
 };
 
 pub use crate::error::VerifyError;
@@ -29,7 +28,6 @@ mod test_balanceset;
 #[cfg(test)]
 mod test_notebook;
 
-const LOG_TARGET: &str = "notary::audit";
 
 #[derive(Debug, Clone, PartialEq, TypeInfo, Encode, Decode, Serialize, Deserialize, Snafu)]
 pub enum AccountHistoryLookupError {
@@ -370,14 +368,6 @@ fn verify_previous_balance_proof<'a, T: NotebookHistoryLookup>(
 	change: &BalanceChange,
 	key: &LocalchainAccountId,
 ) -> anyhow::Result<bool, VerifyError> {
-	// NOTE: something about adding logging is making lookups work for localchain transfers. if I
-	// comment out the logging, it fails with InvalidTransferToLocalchain in the notebook_closer
-	// test.
-	trace!(target:LOG_TARGET,
-		"Verify balance for uid={}. In current set of balance changes? {}",
-		proof.account_origin.account_uid,
-		final_balances.contains_key(&key)
-	);
 	// if we've changed balance in this notebook before, it must match the previous
 	// entry
 	if final_balances.contains_key(&key) {

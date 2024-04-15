@@ -56,7 +56,7 @@ it('can run a data domain escrow', async () => {
     let mainchain = new TestMainchain();
     const mainchainUrl = await mainchain.launch();
     const notary = new TestNotary();
-    await notary.start(mainchain.containerSafeAddress);
+    await notary.start(mainchainUrl);
 
     const sudo = new Keyring({type: 'sr25519'}).createFromUri('//Alice');
     const bobkeys = new Keyring({type: 'sr25519'});
@@ -211,6 +211,9 @@ async function registerZoneRecord(client: UlxClient, dataDomainHash: Uint8Array,
     }).signAndSend(owner, ({events, status}) => {
         if (status.isFinalized) {
             checkForExtrinsicSuccess(events, client).then(resolve).catch(reject);
+        }
+        if (status.isInBlock) {
+            checkForExtrinsicSuccess(events, client).catch(reject);
         }
     }));
 }

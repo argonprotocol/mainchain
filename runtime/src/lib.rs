@@ -7,9 +7,9 @@ extern crate alloc;
 #[macro_use]
 extern crate frame_benchmarking;
 
+use frame_support::derive_impl;
 pub use frame_support::{
 	construct_runtime, parameter_types,
-	StorageValue,
 	traits::{
 		ConstBool, ConstU128, ConstU32, ConstU64, ConstU8, KeyOwnerProofSystem, Randomness,
 		StorageInfo,
@@ -20,13 +20,13 @@ pub use frame_support::{
 		},
 		IdentityFee, Weight, WeightToFeePolynomial,
 	},
+	StorageValue,
 };
 use frame_support::{
 	genesis_builder_helper::{build_config, create_default_config},
-	PalletId,
 	traits::{Contains, Currency, InsideBoth, OnUnbalanced},
+	PalletId,
 };
-use frame_support::derive_impl;
 // Configure FRAME pallets to include in runtime.
 use frame_support::traits::Everything;
 pub use frame_system::Call as SystemCall;
@@ -37,37 +37,38 @@ use pallet_transaction_payment::{ConstFeeMultiplier, CurrencyAdapter, Multiplier
 use pallet_tx_pause::RuntimeCallNameOf;
 use sp_api::impl_runtime_apis;
 use sp_consensus_grandpa::AuthorityId as GrandpaId;
-use sp_core::{crypto::KeyTypeId, H256, OpaqueMetadata, U256};
-use sp_runtime::{
-	ApplyExtrinsicResult, BoundedVec,
-	create_runtime_str,
-	DispatchError,
-	generic, traits::{BlakeTwo256, Block as BlockT, NumberFor, One, OpaqueKeys}, transaction_validity::{TransactionSource, TransactionValidity},
-};
-pub use sp_runtime::{Perbill, Permill};
+use sp_core::{crypto::KeyTypeId, OpaqueMetadata, H256, U256};
 #[cfg(any(feature = "std", test))]
 pub use sp_runtime::BuildStorage;
+use sp_runtime::{
+	create_runtime_str, generic,
+	traits::{BlakeTwo256, Block as BlockT, NumberFor, One, OpaqueKeys},
+	transaction_validity::{TransactionSource, TransactionValidity},
+	ApplyExtrinsicResult, BoundedVec, DispatchError,
+};
+pub use sp_runtime::{Perbill, Permill};
 use sp_std::{collections::btree_map::BTreeMap, prelude::*, vec::Vec};
 #[cfg(feature = "std")]
 use sp_version::NativeVersion;
 use sp_version::RuntimeVersion;
 
 pub use pallet_notebook::NotebookVerifyError;
+use ulx_primitives::block_seal::MiningAuthority;
+use ulx_primitives::NotebookAuditSummary;
 use ulx_primitives::{
 	block_vote::VoteMinimum,
-	BlockSealAuthorityId,
-	BondFundId,
-	BondId,
 	digests::BlockVoteDigest,
-	ESCROW_CLAWBACK_TICKS,
-	ESCROW_EXPIRATION_TICKS,
-	localchain::BestBlockVoteSeal, notary::{NotaryId, NotaryNotebookVoteDetails, NotaryNotebookVoteDigestDetails, NotaryRecord}, NotaryNotebookVotes, notebook::NotebookNumber, prod_or_fast,
-	tick::{Tick, TICK_MILLIS, Ticker}, TickProvider,
+	localchain::BestBlockVoteSeal,
+	notary::{NotaryId, NotaryNotebookVoteDetails, NotaryNotebookVoteDigestDetails, NotaryRecord},
+	notebook::NotebookNumber,
+	prod_or_fast,
+	tick::{Tick, Ticker, TICK_MILLIS},
+	BlockSealAuthorityId, BondFundId, BondId, NotaryNotebookVotes, NotebookAuditResult,
+	TickProvider, ESCROW_CLAWBACK_TICKS, ESCROW_EXPIRATION_TICKS,
 };
 pub use ulx_primitives::{
 	AccountId, Balance, BlockHash, BlockNumber, HashOutput, Moment, Nonce, Signature,
 };
-use ulx_primitives::block_seal::MiningAuthority;
 
 use crate::opaque::SessionKeys;
 // A few exports that help ease life for downstream crates.
@@ -785,8 +786,9 @@ impl_runtime_apis! {
 			header_hash: H256,
 			vote_minimums: &BTreeMap<<Block as BlockT>::Hash, VoteMinimum>,
 			bytes: &Vec<u8>,
-		) -> Result<NotaryNotebookVotes, NotebookVerifyError> {
-			Notebook::audit_notebook(version, notary_id, notebook_number, header_hash, vote_minimums, bytes)
+			audit_dependency_summaries: Vec<NotebookAuditSummary>,
+		) -> Result<NotebookAuditResult, NotebookVerifyError> {
+			Notebook::audit_notebook(version, notary_id, notebook_number, header_hash, vote_minimums, bytes, audit_dependency_summaries)
 		}
 
 		fn decode_signed_raw_notebook_header(raw_header: Vec<u8>) -> Result<NotaryNotebookVoteDetails<<Block as BlockT>::Hash>, DispatchError> {

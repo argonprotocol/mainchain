@@ -324,8 +324,8 @@ export interface AccountInfo {
 }
 
 export enum AccountType {
-  Tax = 'Tax',
-  Deposit = 'Deposit'
+  Tax = 'tax',
+  Deposit = 'deposit'
 }
 
 /** The version of the Argon file format. */

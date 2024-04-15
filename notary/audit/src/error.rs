@@ -94,6 +94,9 @@ pub enum VerifyError {
 	#[snafu(display("Submitted notebook older than most recent in storage"))]
 	NotebookTooOld,
 
+	#[snafu(display("Missing needed catchup notebooks"))]
+	CatchupNotebooksMissing,
+
 	#[snafu(display("Error decoding notebook"))]
 	DecodeError,
 

@@ -17,6 +17,7 @@ pub mod import_queue;
 mod metrics;
 mod notary_client;
 pub mod notebook_watch;
+mod aux_data;
 
 const LOG_TARGET: &str = "node::consensus";
 

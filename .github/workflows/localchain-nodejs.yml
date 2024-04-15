@@ -5,9 +5,14 @@ permissions:
 'on':
   push:
     tags:
-      - 'v*'
+      - v[0-9]+.*
   workflow_dispatch: null
-  pull_request: null
+  # note: temporary, remove when this is stable
+#  pull_request: null
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
 
 jobs:
   localchain:
@@ -44,7 +49,7 @@ jobs:
             docker: ghcr.io/napi-rs/napi-rs/nodejs-rust:lts-debian-aarch64
             build: |
               cd localchain
-              yarn build:debug --target x86_64-unknown-linux-gnu -- --lib
+              yarn build:debug --target aarch64-unknown-linux-gnu -- --lib
           - os: windows-latest
             target: x86_64-pc-windows-msvc
             build: |
@@ -85,7 +90,7 @@ jobs:
             ~/.cargo/git/db/
             .cargo-cache
             target/
-          key: localchain-${{ matrix.target }}-cargo-${{ matrix.os }}
+          key: localchain-${{ matrix.target }}-cargo
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
 
@@ -166,6 +171,19 @@ jobs:
 
       - name: Install dependencies
         run: yarn install
+      - name: Find Host IP and Modify Hosts (Linux and macOS)
+        if: matrix.os != 'windows-latest'
+        run: |
+          echo "127.0.0.1 host.docker.internal" | sudo tee -a /etc/hosts
+          HOST_IP=$(ip -4 route show default | cut -d" " -f3)
+          echo "HOST_IP=$HOST_IP" >> $GITHUB_ENV
+
+      - name: Find Host IP and Modify Hosts (Windows)
+        if: matrix.os == 'windows-latest'
+        run: |
+          Add-Content -Path C:\Windows\System32\drivers\etc\hosts -Value "127.0.0.1 host.docker.internal"
+          $ip = (Get-NetIPConfiguration | Where-Object { $_.IPv4DefaultGateway -ne $null -and $_.NetAdapter.Status -ne "Disconnected" }).IPv4Address.IPAddress
+          echo "HOST_IP=$ip" >> $GITHUB_ENV
 
       - name: Login to GitHub Container Registry
         uses: docker/login-action@v3
@@ -192,6 +210,7 @@ jobs:
         run: yarn test:js-only
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          DOCKER_HOST_IP: ${{ env.HOST_IP }}
   publish:
     name: Publish
     runs-on: ubuntu-latest
@@ -199,6 +218,9 @@ jobs:
       - test-binding
     steps:
       - uses: actions/checkout@v4
+        with:
+          ref: ${{ github.head_ref }}
+          fetch-depth: 0
       - name: Setup node
         uses: actions/setup-node@v4
         with:
@@ -213,6 +235,21 @@ jobs:
       - name: Move artifacts
         run: yarn artifacts
         working-directory: ./localchain
+
+      - uses: stefanzweifel/git-auto-commit-action@v5
+        with:
+          branch: napi-bindings
+          commit_message: Check-in binding files
+          commit_user_name: github-actions[bot]
+          commit_user_email: github-actions[bot]@users.noreply.github.com
+          file_pattern: ./localchain/npm/**/*.node
+          create_branch: true
+          push_options: '--force-with-lease'
+
+      - name: Push changes
+        uses: ad-m/github-push-action@master
+        with:
+          force_with_lease: true
       - name: List packages
         run: ls -R ./npm
         shell: bash

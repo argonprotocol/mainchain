@@ -15,7 +15,9 @@ script = [
     "cargo binstall cargo-nextest@^0.9 --no-confirm || true",
     "cargo binstall cargo-watch@^7.8 --no-confirm || true",
     "sccache --show-stats || cargo binstall sccache@^0.7 || true",
-    "sccache --start-server || true"
+    "sccache --start-server || true",
+    "cd localchain && cargo sqlx database setup|| true",
+    "cd notary && cargo sqlx database setup || true",
 ]
 
 [tasks.docker]

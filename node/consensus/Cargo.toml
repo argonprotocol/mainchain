@@ -47,6 +47,7 @@ serde = { workspace = true, features = ["default"] }
 sc-utils = { workspace = true }
 sc-executor = { workspace = true, features = ["default"] }
 sp-io = { workspace = true, features = ["default"] }
+schnellru = { workspace = true }
 
 # Local Dependencies
 ulx-primitives = { workspace = true, features = ["default"] }

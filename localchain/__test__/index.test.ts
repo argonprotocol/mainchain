@@ -21,14 +21,15 @@ it('can get a ticker', async () => {
     const mainchainUrl = await mainchain.launch();
 
     const client = await MainchainClient.connect(mainchainUrl, 2000);
+
     await expect(client.getTicker()).resolves.toBeTruthy();
 });
 
-it.only('can start a notary', async () => {
+it('can start a notary', async () => {
     const mainchain = new TestMainchain();
-    await mainchain.launch();
+    const mainchainUrl = await mainchain.launch();
     const notary = new TestNotary();
-    const notaryUrl = await notary.start(mainchain.containerSafeAddress);
+    const notaryUrl = await notary.start(mainchainUrl);
     expect(notaryUrl).toBeTruthy();
     const url = new URL(notaryUrl);
     expect(url.protocol).toEqual("ws:");
@@ -48,7 +49,7 @@ it('can register a notary', async () => {
     const mainchain = new TestMainchain();
     const mainchainUrl = await mainchain.launch();
     const notary = new TestNotary();
-    await notary.start(mainchain.containerSafeAddress);
+    await notary.start(mainchainUrl);
     const mainchainClient = await getClient(mainchainUrl);
     disconnectOnTeardown(mainchainClient);
 

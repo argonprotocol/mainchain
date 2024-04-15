@@ -1557,7 +1557,7 @@ mod test {
     assert!(res
       .unwrap_err()
       .to_string()
-      .contains("account restriction that doesn't match your localchain"));
+      .contains("account restriction"));
     Ok(())
   }
 

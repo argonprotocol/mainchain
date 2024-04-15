@@ -28,11 +28,11 @@ use ulx_primitives::{
 };
 
 use crate::{
-    aux_client::UlxAux,
-    digests::{create_pre_runtime_digests, create_seal_digest},
-    error::Error,
-    notary_client::{get_notebook_header_data, NotaryClient},
-    notebook_watch::NotebookWatch,
+	aux_client::UlxAux,
+	digests::{create_pre_runtime_digests, create_seal_digest},
+	error::Error,
+	notary_client::{get_notebook_header_data, NotaryClient},
+	notebook_watch::NotebookWatch,
 };
 
 const LOG_TARGET: &str = "node::consensus::block_creator";
@@ -203,7 +203,7 @@ pub async fn tax_block_creator<Block, C, E, L, CS, A>(
 			Ok(x) => x,
 			Err(err) => {
 				warn!(target: LOG_TARGET, "Unable to propose new block: {:?}", err);
-				continue
+				continue;
 			},
 		};
 		submit_block::<Block, L, _>(
@@ -253,7 +253,7 @@ where
 					target: LOG_TARGET,
 					"Unable to pull new block for compute miner. No notebook header data found!! {}", err
 				);
-				return Err(err.into())
+				return Err(err.into());
 			},
 		};
 
@@ -272,7 +272,7 @@ where
 				 Creating inherent data failed: {:?}",
 				err,
 			);
-			return Err(err.into())
+			return Err(err.into());
 		},
 	};
 
@@ -284,7 +284,7 @@ where
 						Initializing proposer failed: {:?}",
 				err
 			);
-			return Err(Error::StringError(msg))
+			return Err(Error::StringError(msg));
 		},
 	};
 
@@ -313,7 +313,7 @@ where
 		Ok(x) => x,
 		Err(err) => {
 			let msg = format!("Unable to propose. Creating proposer failed: {:?}", err);
-			return Err(Error::StringError(msg))
+			return Err(Error::StringError(msg));
 		},
 	};
 	Ok(proposal)

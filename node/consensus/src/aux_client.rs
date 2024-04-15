@@ -1,3 +1,4 @@
+use std::any::Any;
 use std::{
 	cmp::Ordering,
 	collections::{BTreeMap, BTreeSet},
@@ -7,9 +8,10 @@ use std::{
 
 use codec::{Decode, Encode};
 use log::info;
-use parking_lot::Mutex;
+use parking_lot::RwLock;
 use sc_client_api::{self, backend::AuxStore};
 use sc_consensus::BlockImportParams;
+use schnellru::{ByLength, LruMap};
 use sp_core::{H256, U256};
 use sp_runtime::traits::{Block as BlockT, Header};
 
@@ -18,25 +20,97 @@ use ulx_primitives::{
 	notary::{NotaryNotebookTickState, NotaryNotebookVoteDetails, NotaryNotebookVoteDigestDetails},
 	tick::Tick,
 	BlockSealDigest, BlockVotingPower, ComputeDifficulty, NotaryId, NotaryNotebookVotes,
-	NotebookDigestRecord, NotebookHeaderData, NotebookNumber,
+	NotebookAuditSummary, NotebookDigestRecord, NotebookHeaderData, NotebookNumber,
 };
 
+use crate::aux_data::AuxData;
 use crate::{convert_u32, error::Error};
 
+pub enum AuxState<C: AuxStore> {
+	NotaryStateAtTick(Arc<AuxData<NotaryNotebookTickState, C>>),
+	AuthorsAtHeight(Arc<AuxData<BTreeMap<H256, BTreeSet<AccountId>>, C>>),
+	NotaryNotebooks(Arc<AuxData<Vec<NotebookAuditResult>, C>>),
+	NotaryMissingNotebooks(Arc<AuxData<BTreeSet<NotebookNumber>, C>>),
+	VotesAtTick(Arc<AuxData<Vec<NotaryNotebookVotes>, C>>),
+	NotaryAuditSummaries(Arc<AuxData<Vec<NotebookAuditSummary>, C>>),
+	ForkVotingPower(Arc<AuxData<ForkPower, C>>),
+	MaxVotingPowerAtTick(Arc<AuxData<ForkPower, C>>),
+}
+trait AuxStateData {
+	fn as_any(&self) -> &dyn Any;
+}
+
+impl<C: AuxStore + 'static> AuxStateData for AuxState<C> {
+	fn as_any(&self) -> &dyn Any {
+		match self {
+			AuxState::NotaryStateAtTick(a) => a,
+			AuxState::AuthorsAtHeight(a) => a,
+			AuxState::NotaryNotebooks(a) => a,
+			AuxState::NotaryMissingNotebooks(a) => a,
+			AuxState::VotesAtTick(a) => a,
+			AuxState::NotaryAuditSummaries(a) => a,
+			AuxState::ForkVotingPower(a) => a,
+			AuxState::MaxVotingPowerAtTick(a) => a,
+		}
+	}
+}
+#[derive(Clone, Encode, Decode, Debug, Hash, Eq, PartialEq)]
+pub enum AuxKey {
+	NotaryStateAtTick(Tick),
+	AuthorsAtHeight(BlockNumber),
+	NotaryNotebooks(NotaryId),
+	NotaryMissingNotebooks(NotaryId),
+	VotesAtTick(Tick),
+	NotaryAuditSummaries(NotaryId),
+	ForkVotingPower(H256),
+	MaxVotingPowerAtTick(Tick),
+}
+
+impl AuxKey {
+	pub fn default_state<C: AuxStore>(&self, client: Arc<C>) -> AuxState<C> {
+		match self {
+			AuxKey::NotaryStateAtTick(_) => {
+				AuxState::NotaryStateAtTick(AuxData::new(client, self.clone()).into())
+			},
+			AuxKey::AuthorsAtHeight(_) => {
+				AuxState::AuthorsAtHeight(AuxData::new(client, self.clone()).into())
+			},
+			AuxKey::NotaryNotebooks(_) => {
+				AuxState::NotaryNotebooks(AuxData::new(client, self.clone()).into())
+			},
+			AuxKey::NotaryMissingNotebooks(_) => {
+				AuxState::NotaryMissingNotebooks(AuxData::new(client, self.clone()).into())
+			},
+			AuxKey::VotesAtTick(_) => {
+				AuxState::VotesAtTick(AuxData::new(client, self.clone()).into())
+			},
+			AuxKey::NotaryAuditSummaries(_) => {
+				AuxState::NotaryAuditSummaries(AuxData::new(client, self.clone()).into())
+			},
+			AuxKey::ForkVotingPower(_) => {
+				AuxState::ForkVotingPower(AuxData::new(client, self.clone()).into())
+			},
+			AuxKey::MaxVotingPowerAtTick(_) => {
+				AuxState::MaxVotingPowerAtTick(AuxData::new(client, self.clone()).into())
+			},
+		}
+	}
+}
+
 pub struct UlxAux<B: BlockT, C: AuxStore> {
+	pub lock: Arc<RwLock<()>>,
 	client: Arc<C>,
+	state: Arc<RwLock<LruMap<AuxKey, AuxState<C>>>>,
 	_block: std::marker::PhantomData<B>,
-	pub lock: Arc<Mutex<()>>,
-	missing_notebook_lock: Arc<Mutex<()>>,
 }
 
 impl<B: BlockT, C: AuxStore> Clone for UlxAux<B, C> {
 	fn clone(&self) -> Self {
 		Self {
 			client: self.client.clone(),
-			_block: Default::default(),
+			state: self.state.clone(),
 			lock: self.lock.clone(),
-			missing_notebook_lock: self.missing_notebook_lock.clone(),
+			_block: Default::default(),
 		}
 	}
 }
@@ -45,9 +119,9 @@ impl<B: BlockT, C: AuxStore> UlxAux<B, C> {
 	pub fn new(client: Arc<C>) -> Self {
 		Self {
 			client,
-			_block: Default::default(),
+			state: Arc::new(RwLock::new(LruMap::new(ByLength::new(500)))),
 			lock: Default::default(),
-			missing_notebook_lock: Default::default(),
+			_block: Default::default(),
 		}
 	}
 }
@@ -63,7 +137,7 @@ impl<B: BlockT, C: AuxStore> UlxAux<B, C> {
 ///   create a block
 /// - `AuthorsAtHeight` - the authors at a given height for every voting key. A block will only be
 ///   accepted once per author per key
-impl<B: BlockT, C: AuxStore> UlxAux<B, C> {
+impl<B: BlockT, C: AuxStore + 'static> UlxAux<B, C> {
 	pub fn record_block(
 		&self,
 		best_header: B::Header,
@@ -76,50 +150,51 @@ impl<B: BlockT, C: AuxStore> UlxAux<B, C> {
 		seal_digest: BlockSealDigest,
 		compute_difficulty: Option<ComputeDifficulty>,
 	) -> Result<(ForkPower, ForkPower), Error<B>> {
-		let _lock = self.lock.lock();
+		let _lock = self.lock.write();
 		let block_number = convert_u32::<B>(&block.header.number());
-		let strongest_at_height = self.strongest_fork_at_tick(tick)?;
+		let strongest_at_height = self.strongest_fork_at_tick(tick)?.get();
 
 		// add author to voting key
 		if let Some(voting_key) = voting_key {
-			let mut authors_at_height = self.authors_by_voting_key_at_height(block_number)?;
-			let is_new_entry = authors_at_height
-				.entry(voting_key)
-				.or_insert_with(BTreeSet::new)
-				.insert(author.clone());
-			if !is_new_entry {
-				return Err(Error::<B>::DuplicateAuthoredBlock(author).into());
-			}
+			self.authors_by_voting_key_at_height(block_number)?
+				.mutate(|authors_at_height| {
+					if !authors_at_height.entry(voting_key).or_default().insert(author.clone()) {
+						return Err(Error::<B>::DuplicateAuthoredBlock(author).into());
+					}
+					Ok::<(), Error<B>>(())
+				})??;
 		}
 
 		let parent_hash = block.header.parent_hash();
-		let mut fork_power = self.get_fork_voting_power(&parent_hash)?;
+		let mut fork_power = self.get_fork_voting_power(&parent_hash)?.get();
 		fork_power.add(block_voting_power, notebooks, seal_digest, compute_difficulty);
 
 		if fork_power > strongest_at_height {
-			let key = get_strongest_fork_at_tick_key(tick);
+			let key = AuxKey::MaxVotingPowerAtTick(tick).encode();
 			block.auxiliary.push((key, Some(fork_power.encode())));
 		}
 
-		let best_header_fork_power = self.get_fork_voting_power(&best_header.hash())?;
+		let best_header_fork_power = self.get_fork_voting_power(&best_header.hash())?.get();
 
 		block.auxiliary.push((
-			get_fork_voting_power_aux_key::<B>(&block.post_hash()),
+			AuxKey::ForkVotingPower(H256::from_slice(block.post_hash().as_ref())).encode(),
 			Some(fork_power.encode()),
 		));
 
 		// cleanup old votes (None deletes)
 		if tick >= 10 {
 			let cleanup_height = tick - 10;
-			block.auxiliary.push((get_votes_key(cleanup_height), None));
-			block.auxiliary.push((get_strongest_fork_at_tick_key(cleanup_height), None));
+			block.auxiliary.push((AuxKey::VotesAtTick(cleanup_height).encode(), None));
 			block
 				.auxiliary
-				.push((get_authors_at_height_key(block_number.saturating_sub(5)), None));
+				.push((AuxKey::MaxVotingPowerAtTick(cleanup_height).encode(), None));
+			block
+				.auxiliary
+				.push((AuxKey::AuthorsAtHeight(block_number.saturating_sub(5)).encode(), None));
 		}
 		// Cleanup old notary state. We keep this longer because we might need to catchup on notebooks
 		if tick >= 256 {
-			block.auxiliary.push((notary_state_key(tick - 256), None));
+			block.auxiliary.push((AuxKey::NotaryStateAtTick(tick - 256).encode(), None));
 		}
 
 		Ok((fork_power, best_header_fork_power))
@@ -141,7 +216,7 @@ impl<B: BlockT, C: AuxStore> UlxAux<B, C> {
 		let mut tick_notebook = None;
 		let audit_results = self.get_notary_audit_history(notary_id)?;
 
-		for notebook in audit_results {
+		for notebook in audit_results.get() {
 			if notebook.notebook_number <= latest_runtime_notebook_number
 				|| notebook.tick > submitting_tick
 			{
@@ -149,7 +224,7 @@ impl<B: BlockT, C: AuxStore> UlxAux<B, C> {
 			}
 			let tick = notebook.tick;
 
-			let state = self.get_notebook_tick_state(tick).unwrap_or_default();
+			let state = self.get_notebook_tick_state(tick)?.get();
 			if tick == submitting_tick {
 				let details =
 					state.notebook_key_details_by_notary.get(&notary_id).ok_or_else(|| {
@@ -183,110 +258,79 @@ impl<B: BlockT, C: AuxStore> UlxAux<B, C> {
 	pub fn get_missing_notebooks(
 		&self,
 		notary_id: NotaryId,
-	) -> Result<Vec<NotebookNumber>, Error<B>> {
-		let key = notary_missing_notebooks_key(notary_id);
-		Ok(match self.client.get_aux(&key)? {
-			Some(bytes) => <Vec<NotebookNumber>>::decode(&mut &bytes[..]).unwrap_or_default(),
-			None => Default::default(),
-		})
-	}
-
-	pub fn update_missing_notebooks(
-		&self,
-		notary_id: NotaryId,
-		new_missing: Vec<NotebookNumber>,
-		remove_missing: Vec<NotebookNumber>,
-	) -> Result<(), Error<B>> {
-		let lock = self.missing_notebook_lock.lock();
-		let mut missing = self.get_missing_notebooks(notary_id)?;
-		for notebook in new_missing {
-			if !missing.contains(&notebook) {
-				missing.push(notebook);
-			}
-		}
-		missing.retain(|x| !remove_missing.contains(x));
-		let key = notary_missing_notebooks_key(notary_id);
-		self.client.insert_aux(&[(key.as_slice(), missing.encode().as_slice())], &[])?;
-		drop(lock);
-		Ok(())
+	) -> Result<Arc<AuxData<BTreeSet<NotebookNumber>, C>>, Error<B>> {
+		let key = AuxKey::NotaryMissingNotebooks(notary_id);
+		self.get_or_insert_state(key)
 	}
 
 	pub fn get_notary_audit_history(
 		&self,
 		notary_id: NotaryId,
-	) -> Result<Vec<NotebookAuditResult>, Error<B>> {
-		let key = notary_notebooks_key(notary_id);
-		Ok(match self.client.get_aux(&key)? {
-			Some(bytes) => <Vec<NotebookAuditResult>>::decode(&mut &bytes[..]).unwrap_or_default(),
-			None => Default::default(),
-		})
+	) -> Result<Arc<AuxData<Vec<NotebookAuditResult>, C>>, Error<B>> {
+		let key = AuxKey::NotaryNotebooks(notary_id);
+		self.get_or_insert_state(key)
 	}
 
 	pub fn authors_by_voting_key_at_height(
 		&self,
 		block_number: BlockNumber,
-	) -> Result<BTreeMap<H256, BTreeSet<AccountId>>, Error<B>> {
-		let state_key = get_authors_at_height_key(block_number);
-		let aux = match self.client.get_aux(&state_key)? {
-			Some(bytes) => BTreeMap::decode(&mut &bytes[..]).unwrap_or_default(),
-			None => Default::default(),
-		};
-		Ok(aux)
+	) -> Result<Arc<AuxData<BTreeMap<H256, BTreeSet<AccountId>>, C>>, Error<B>> {
+		let key = AuxKey::AuthorsAtHeight(block_number);
+		self.get_or_insert_state(key)
 	}
 
 	/// Retrieves aggregate voting power for a fork
-	pub fn get_fork_voting_power(&self, block_hash: &B::Hash) -> Result<ForkPower, Error<B>> {
-		let key = get_fork_voting_power_aux_key::<B>(block_hash);
-		let aux = match self.client.get_aux(&key)? {
-			Some(bytes) => ForkPower::decode(&mut &bytes[..]).unwrap_or_default(),
-			None => Default::default(),
-		};
-		Ok(aux)
-	}
-
-	pub fn store_votes(
+	pub fn get_fork_voting_power(
 		&self,
-		tick: Tick,
-		votes: NotaryNotebookVotes,
-	) -> Result<Vec<NotaryNotebookVotes>, Error<B>> {
-		let mut existing = self.get_votes(tick)?;
-
-		if !existing
-			.iter()
-			.any(|x| x.notary_id == votes.notary_id && x.notebook_number == votes.notebook_number)
-		{
-			existing.push(votes);
-		}
-
-		let key = get_votes_key(tick);
-		self.client.insert_aux(&[(key.as_slice(), existing.encode().as_slice())], &[])?;
-		Ok(existing)
+		block_hash: &B::Hash,
+	) -> Result<Arc<AuxData<ForkPower, C>>, Error<B>> {
+		let key = AuxKey::ForkVotingPower(H256::from_slice(block_hash.as_ref()));
+		self.get_or_insert_state(key)
 	}
 
-	pub fn get_votes(&self, tick: Tick) -> Result<Vec<NotaryNotebookVotes>, Error<B>> {
-		let key = get_votes_key(tick);
-		Ok(match self.client.get_aux(&key)? {
-			Some(bytes) => <Vec<NotaryNotebookVotes>>::decode(&mut &bytes[..]).unwrap_or_default(),
-			None => Default::default(),
-		})
+	pub fn store_votes(&self, tick: Tick, votes: NotaryNotebookVotes) -> Result<(), Error<B>> {
+		self.get_votes(tick)?.mutate(|existing| {
+			if !existing.iter().any(|x| {
+				x.notary_id == votes.notary_id && x.notebook_number == votes.notebook_number
+			}) {
+				existing.push(votes);
+			}
+		})?;
+		Ok(())
 	}
 
-	pub fn strongest_fork_at_tick(&self, tick: Tick) -> Result<ForkPower, Error<B>> {
-		let state_key = get_strongest_fork_at_tick_key(tick);
-		let aux = match self.client.get_aux(&state_key)? {
-			Some(bytes) => ForkPower::decode(&mut &bytes[..]).unwrap_or_default(),
-			None => Default::default(),
-		};
-		Ok(aux)
+	pub fn store_audit_summary(
+		&self,
+		summary: NotebookAuditSummary,
+		oldest_tick_to_keep: Tick,
+	) -> Result<(), Error<B>> {
+		let notary_id = summary.notary_id;
+		self.get_audit_summaries(notary_id)?.mutate(|summaries| {
+			summaries.retain(|s| s.tick >= oldest_tick_to_keep);
+			if !summaries.iter().any(|s| s.notebook_number == summary.notebook_number) {
+				summaries.push(summary);
+				summaries.sort_by(|a, b| a.notebook_number.cmp(&b.notebook_number));
+			}
+		})?;
+		Ok(())
 	}
 
-	fn get_notebook_tick_state(&self, tick: Tick) -> Result<NotaryNotebookTickState, Error<B>> {
-		let state_key = notary_state_key(tick);
-		let notary_state = match self.client.get_aux(&state_key)? {
-			Some(bytes) => NotaryNotebookTickState::decode(&mut &bytes[..]).unwrap_or_default(),
-			None => Default::default(),
-		};
-		Ok(notary_state)
+	pub fn get_votes(&self, tick: Tick) -> Result<Arc<AuxData<Vec<NotaryNotebookVotes>, C>>, Error<B>> {
+		let key = AuxKey::VotesAtTick(tick);
+		self.get_or_insert_state(key)
+	}
+
+	pub fn get_audit_summaries(
+		&self,
+		notary_id: NotaryId,
+	) -> Result<Arc<AuxData<Vec<NotebookAuditSummary>, C>>, Error<B>> {
+		let key = AuxKey::NotaryAuditSummaries(notary_id);
+		self.get_or_insert_state(key)
+	}
+
+	pub fn strongest_fork_at_tick(&self, tick: Tick) -> Result<Arc<AuxData<ForkPower, C>>, Error<B>> {
+		let key = AuxKey::MaxVotingPowerAtTick(tick);
+		self.get_or_insert_state(key)
 	}
 
 	pub fn store_notebook_result(
@@ -296,31 +340,22 @@ impl<B: BlockT, C: AuxStore> UlxAux<B, C> {
 		raw_signed_header: Vec<u8>,
 		vote_details: &NotaryNotebookVoteDetails<B::Hash>,
 	) -> Result<NotaryNotebookTickState, Error<B>> {
-		let lock = self.lock.lock();
 		let notary_state = self.update_tick_state(raw_signed_header, &vote_details)?;
-		let mut validated_notebooks = self.get_notary_audit_history(notary_id)?;
-		if !validated_notebooks
-			.iter()
-			.any(|n| n.notebook_number == audit_result.notebook_number)
-		{
-			validated_notebooks.push(audit_result);
-			self.store_notebook_audit_result(notary_id, validated_notebooks)?;
-		}
-		drop(lock);
+
+		self.get_notary_audit_history(notary_id)?.mutate(|notebooks| {
+			if !notebooks.iter().any(|n| n.notebook_number == audit_result.notebook_number) {
+				notebooks.push(audit_result.clone());
+			}
+		})?;
 		Ok(notary_state)
 	}
 
-	fn store_notebook_audit_result(
+	fn get_notebook_tick_state(
 		&self,
-		notary_id: NotaryId,
-		validated_notebooks: Vec<NotebookAuditResult>,
-	) -> Result<(), Error<B>> {
-		let key = notary_notebooks_key(notary_id);
-
-		self.client
-			.insert_aux(&[(key.as_slice(), validated_notebooks.encode().as_slice())], &[])?;
-
-		Ok(())
+		tick: Tick,
+	) -> Result<Arc<AuxData<NotaryNotebookTickState, C>>, Error<B>> {
+		let key = AuxKey::NotaryStateAtTick(tick);
+		self.get_or_insert_state(key)
 	}
 
 	fn update_tick_state(
@@ -330,62 +365,35 @@ impl<B: BlockT, C: AuxStore> UlxAux<B, C> {
 	) -> Result<NotaryNotebookTickState, Error<B>> {
 		let tick = vote_details.tick;
 		let notary_id = vote_details.notary_id;
-		let mut state = self.get_notebook_tick_state(tick)?;
+		self.get_notebook_tick_state(tick)?.mutate(|state| {
+			state.latest_finalized_block_needed =
+				state.latest_finalized_block_needed.max(vote_details.finalized_block_number);
 
-		state.latest_finalized_block_needed =
-			state.latest_finalized_block_needed.max(vote_details.finalized_block_number);
+			let vote_details = NotaryNotebookVoteDigestDetails::from(vote_details);
 
-		let vote_details = NotaryNotebookVoteDigestDetails::from(vote_details);
+			info!(
+				"Storing vote details for tick {} and notary {} at notebook #{}",
+				tick, notary_id, vote_details.notebook_number
+			);
 
-		info!(
-			"Storing vote details for tick {} and notary {} at notebook #{}",
-			tick, notary_id, vote_details.notebook_number
-		);
+			if state.notebook_key_details_by_notary.insert(notary_id, vote_details).is_none() {
+				state.raw_headers_by_notary.insert(notary_id, raw_signed_header);
+			}
+			Ok(state.clone())
+		})?
+	}
 
-		if state.notebook_key_details_by_notary.insert(notary_id, vote_details).is_none() {
-			state.raw_headers_by_notary.insert(notary_id, raw_signed_header);
-
-			self.update_notebook_tick_state(tick, state.clone())?;
+	fn get_or_insert_state<T: 'static + Clone>(&self, key: AuxKey) -> Result<Arc<AuxData<T, C>>, Error<B>> {
+		let mut state = self.state.write();
+		let entry = state
+			.get_or_insert(key.clone(), || key.default_state(self.client.clone()).into())
+			.ok_or(Error::<B>::StringError(format!("Error unlocking notary state for {key:?}")))?;
+		if let Some(data) = entry.as_any().downcast_ref::<Arc<AuxData<T, C>>>() {
+			Ok(data.clone())
+		} else {
+			Err(format!("Could not downcast AuxState for {key:?}").into())
 		}
-		Ok(state)
 	}
-
-	fn update_notebook_tick_state(
-		&self,
-		tick: Tick,
-		notary_state: NotaryNotebookTickState,
-	) -> Result<(), Error<B>> {
-		let state_key = notary_state_key(tick);
-		self.client
-			.insert_aux(&[(state_key.as_slice(), notary_state.encode().as_slice())], &[])?;
-		Ok(())
-	}
-}
-
-fn notary_state_key(tick: Tick) -> Vec<u8> {
-	("NotaryStateAtTick", tick).encode()
-}
-
-fn get_authors_at_height_key(block_number: BlockNumber) -> Vec<u8> {
-	("AuthorsAtHeight", block_number).encode()
-}
-
-fn notary_notebooks_key(notary_id: NotaryId) -> Vec<u8> {
-	("NotaryNotebooksFor", notary_id).encode()
-}
-
-fn notary_missing_notebooks_key(notary_id: NotaryId) -> Vec<u8> {
-	("MissingNotebooksFor", notary_id).encode()
-}
-
-fn get_votes_key(tick: Tick) -> Vec<u8> {
-	("VotesAtTick", tick).encode()
-}
-fn get_fork_voting_power_aux_key<B: BlockT>(block_hash: &B::Hash) -> Vec<u8> {
-	("ForkVotingPower", block_hash).encode()
-}
-fn get_strongest_fork_at_tick_key(tick: Tick) -> Vec<u8> {
-	("MaxVotingPowerAtTick", tick).encode()
 }
 
 #[derive(Clone, Encode, Decode, Debug, Eq, PartialEq)]

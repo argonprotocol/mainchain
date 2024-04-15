@@ -71,7 +71,7 @@ pub async fn try_until_connected(
 						"Failed to connect to client within timeout".to_string(),
 					));
 				}
-				println!("failed to connect to client due to {:?}, retrying soon..", why);
+				println!("failed to connect client to {:?}, {:?} retrying soon..", url.clone(), why);
 				tokio::time::sleep(std::time::Duration::from_millis(retry_delay_millis)).await;
 			},
 		}
@@ -114,7 +114,7 @@ impl UlxFullclient {
 						));
 					}
 					warn!(
-						"failed to connect to client due to {} - {:?}, retrying soon..",
+						"UlxFullClient: failed to connect client to {} - {:?}, retrying soon..",
 						url, why
 					);
 					tokio::time::sleep(std::time::Duration::from_millis(retry_delay_millis)).await;

@@ -22,12 +22,12 @@ use ulx_primitives::{
 };
 
 use crate::{
-    aux_client::UlxAux,
-    basic_queue::BasicQueue,
-    compute_solver::BlockComputeNonce,
-    digests::{load_digests, read_seal_digest},
-    error::Error,
-    notary_client::verify_notebook_audits,
+	aux_client::UlxAux,
+	basic_queue::BasicQueue,
+	compute_solver::BlockComputeNonce,
+	digests::{load_digests, read_seal_digest},
+	error::Error,
+	notary_client::verify_notebook_audits,
 };
 
 /// A block importer for Ulx.
@@ -87,7 +87,8 @@ where
 		+ HeaderBackend<B>
 		+ BlockchainEvents<B>
 		+ AuxStore
-		+ BlockOf,
+		+ BlockOf
+		+ 'static,
 	C::Api: BlockBuilderApi<B> + BlockSealApis<B, AC, BlockSealAuthorityId>,
 	AC: Codec + Send + Sync,
 {
@@ -108,7 +109,7 @@ where
 		let digests = load_digests::<B>(&block.header)?;
 
 		if &digests.finalized_block.number > block.header.number() {
-			return Err(Error::<B>::InvalidFinalizedBlockDigest.into())
+			return Err(Error::<B>::InvalidFinalizedBlockDigest.into());
 		}
 
 		let latest_verified_finalized = self.client.info().finalized_number;
@@ -117,7 +118,7 @@ where
 				digests.finalized_block.hash,
 				digests.finalized_block.number,
 			)
-			.into())
+			.into());
 		}
 
 		// if we're importing a non-finalized block from someone else, verify the notebook audits
@@ -126,7 +127,7 @@ where
 		}
 
 		let Some(Some(seal_digest)) = block.post_digests.last().map(read_seal_digest) else {
-			return Err(Error::<B>::MissingBlockSealDigest.into())
+			return Err(Error::<B>::MissingBlockSealDigest.into());
 		};
 		let parent_hash = *block.header.parent_hash();
 
@@ -155,8 +156,11 @@ where
 					for (identifier, error) in inherent_res.into_errors() {
 						match inherent_data_providers.try_handle_error(&identifier, &error).await {
 							Some(res) => res.map_err(Error::<B>::CheckInherents)?,
-							None =>
-								return Err(Error::<B>::CheckInherentsUnknownError(identifier).into()),
+							None => {
+								return Err(
+									Error::<B>::CheckInherentsUnknownError(identifier).into()
+								)
+							},
 						}
 					}
 				}
@@ -180,7 +184,7 @@ where
 						)
 					})?;
 				if !BlockComputeNonce::is_valid(nonce, pre_hash.as_ref().to_vec(), difficulty) {
-					return Err(Error::<B>::InvalidComputeNonce.into())
+					return Err(Error::<B>::InvalidComputeNonce.into());
 				}
 				compute_difficulty = Some(difficulty);
 			},
@@ -241,12 +245,13 @@ impl<B: BlockT> Verifier<B> for UlxVerifier<B> {
 		let hash = header.hash();
 
 		let seal_digest = match header.digest_mut().pop() {
-			Some(DigestItem::Seal(id, signature_digest)) =>
+			Some(DigestItem::Seal(id, signature_digest)) => {
 				if id == BLOCK_SEAL_DIGEST_ID {
 					Ok(DigestItem::Seal(id, signature_digest.clone()))
 				} else {
 					Err(Error::<B>::WrongEngine(id))
-				},
+				}
+			},
 			_ => Err(Error::<B>::MissingBlockSealDigest),
 		}?;
 

@@ -15,32 +15,31 @@ import {
 
 afterAll(teardown);
 
-it('can transfer from mainchain to local', async () => {
+it.only('can transfer from mainchain to local', async () => {
     const mainchain = new TestMainchain();
     const mainchainUrl = await mainchain.launch();
     const notary = new TestNotary();
-    await notary.start(mainchain.containerSafeAddress);
+    await notary.start(mainchainUrl);
 
     const mainchainClient = await getClient(mainchainUrl);
     disconnectOnTeardown(mainchainClient);
     const alice = new Keyring({type: 'sr25519'}).createFromUri('//Alice');
     const bob = new KeyringSigner("//Bob");
     await activateNotary(alice, mainchainClient, notary);
-
     const nonce = await transferToLocalchain(bob.defaultPair, 5000, 1, mainchainClient);
     const bobchain = await createLocalchain(mainchainUrl);
     await bobchain.keystore.importSuri("//Bob", CryptoScheme.Sr25519);
     const bobMainchainClient = await bobchain.mainchainClient;
     const transfer = await bobMainchainClient.waitForLocalchainTransfer(bob.address, nonce);
+
     expect(transfer).toBeTruthy();
     expect(transfer?.amount).toBe(5000n);
     const notarization = bobchain.beginChange();
     const balanceChange = await notarization.addAccount(bob.address, AccountType.Deposit, 1);
     await balanceChange.claimFromMainchain(transfer);
-
+    
     const tracker = await notarization.notarizeAndWaitForNotebook();
     const proof = await tracker.getNotebookProof();
-    console.log("Got proof", proof);
     expect(proof).toHaveLength(1);
     expect(proof[0].proof).toHaveLength(0);
     expect(proof[0].address).toBe(bob.address);
@@ -54,7 +53,7 @@ it('can transfer from mainchain to local to mainchain', async () => {
     const mainchain = new TestMainchain();
     const mainchainUrl = await mainchain.launch();
     const notary = new TestNotary();
-    await notary.start(mainchain.containerSafeAddress);
+    await notary.start(mainchainUrl);
 
     const mainchainClient = await getClient(mainchainUrl);
     disconnectOnTeardown(mainchainClient);

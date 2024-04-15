@@ -37,7 +37,7 @@ const LOG_TARGET: &str = "node::notary_client";
 impl<B, C, AC> NotaryClient<B, C, AC>
 where
 	B: BlockT,
-	C: ProvideRuntimeApi<B> + AuxStore,
+	C: ProvideRuntimeApi<B> + AuxStore + 'static,
 	C::Api: NotaryApis<B, NotaryRecordT>
 		+ NotebookApis<B, NotebookVerifyError>
 		+ BlockSealApis<B, AC, BlockSealAuthorityId>,
@@ -150,31 +150,33 @@ where
 	async fn retrieve_notary_missing_notebooks(&self, notary_id: NotaryId) -> Result<(), Error<B>> {
 		let client = self.get_client(notary_id).await?;
 		let lock = self.notary_client_by_id.lock().await;
-		let missing_notebooks = self.aux_client.get_missing_notebooks(notary_id)?;
+		let missing_notebooks_aux = self.aux_client.get_missing_notebooks(notary_id)?;
+		let missing_notebooks = missing_notebooks_aux.get();
 		if missing_notebooks.is_empty() {
 			return Ok(());
 		}
 
 		info!(target: LOG_TARGET, "Retrieving missing notebooks from notary #{} - {:?}", notary_id, missing_notebooks);
 
-		let headers =
-			client
-				.get_raw_headers(None, Some(missing_notebooks.clone()))
-				.await
-				.map_err(|e| {
-					Error::NotaryError(format!("Could not get notebooks from notary - {:?}", e))
-				})?;
+		let mut headers = client
+			.get_raw_headers(None, Some(missing_notebooks.iter().cloned().collect::<Vec<_>>()))
+			.await
+			.map_err(|e| {
+				Error::NotaryError(format!("Could not get notebooks from notary - {:?}", e))
+			})?;
 
-		let mut downloaded = vec![];
+		// ensure headers are sorted
+		headers.sort_by(|a, b| a.0.cmp(&b.0));
+
 		for (notebook_number, header) in headers {
-			downloaded.push(notebook_number);
+			missing_notebooks_aux.mutate(|x| x.remove(&notebook_number))?;
 			self.header_stream
 				.unbounded_send((notary_id, notebook_number, header))
 				.map_err(|e| {
 					Error::NotaryError(format!("Could not send header to stream - {:?}", e))
 				})?;
 		}
-		self.aux_client.update_missing_notebooks(notary_id, vec![], downloaded)?;
+
 		drop(lock);
 
 		Ok(())
@@ -185,7 +187,7 @@ where
 		let notebook_meta = client.metadata().await.map_err(|e| {
 			Error::NotaryError(format!("Could not get notebooks from notary - {:?}", e))
 		})?;
-		let notary_notebooks = self.aux_client.get_notary_audit_history(id)?;
+		let notary_notebooks = self.aux_client.get_notary_audit_history(id)?.get();
 		let latest_stored = notary_notebooks.last().map(|n| n.notebook_number).unwrap_or_default();
 		if latest_stored < notebook_meta.finalized_notebook_number.saturating_sub(1) {
 			let catchup = client.get_raw_headers(Some(latest_stored), None).await.map_err(|e| {
@@ -224,11 +226,37 @@ where
 
 	pub async fn try_audit_notebook(
 		&self,
-		block_hash: &B::Hash,
+		finalized_hash: &B::Hash,
+		best_hash: &B::Hash,
 		vote_details: &NotaryNotebookVoteDetails<B::Hash>,
 	) -> Result<NotebookAuditResult, Error<B>> {
 		let notary_id = vote_details.notary_id;
 		let notebook_number = vote_details.notebook_number;
+
+		// load the audit history for the notary
+		let latest_notebook_by_notary =
+			self.client.runtime_api().latest_notebook_by_notary(best_hash.clone())?;
+		let mut notebook_dependencies = vec![];
+		let latest_notebook =
+			latest_notebook_by_notary.get(&notary_id).map(|a| a.0).unwrap_or_default();
+
+		if latest_notebook < notebook_number - 1 {
+			let notary_notebooks = self.aux_client.get_audit_summaries(notary_id)?.get();
+			for notebook_number_needed in latest_notebook + 1..notebook_number {
+				if let Some(summary) =
+					notary_notebooks.iter().find(|s| s.notebook_number == notebook_number_needed)
+				{
+					notebook_dependencies.push(summary.clone());
+				} else {
+					return Err(Error::NotaryError(format!(
+						"Missing notebook #{} for notary {}",
+						notebook_number_needed, notary_id
+					)));
+				}
+			}
+		}
+		// for all other notaries, load the history we have?
+		// TODO: what do we need for cross-notary transfers?
 
 		info!(
 			target: LOG_TARGET,
@@ -266,20 +294,31 @@ where
 			body_hash: blake2_256(&full_notebook),
 			first_error_reason: None,
 		};
+
+		let latest_finalized_notebook_by_notary =
+			self.client.runtime_api().latest_notebook_by_notary(finalized_hash.clone())?;
+		let oldest_tick_to_keep = latest_finalized_notebook_by_notary
+			.get(&notary_id)
+			.map(|(_, t)| t.clone())
+			.unwrap_or_default();
+
 		let mut vote_count = 0;
 		// audit on the best block at the height of the notebook
 		match self.client.runtime_api().audit_notebook_and_get_votes(
-			block_hash.clone(),
+			best_hash.clone(),
 			vote_details.version,
 			notary_id,
 			notebook_number,
 			vote_details.header_hash.clone(),
 			&vote_minimums,
 			&full_notebook,
+			notebook_dependencies,
 		)? {
-			Ok(votes) => {
-				vote_count = votes.raw_votes.len();
+			Ok(result) => {
+				vote_count = result.raw_votes.len();
+				let (summary, votes) = result.into();
 				self.aux_client.store_votes(vote_details.tick, votes)?;
+				self.aux_client.store_audit_summary(summary, oldest_tick_to_keep)?;
 			},
 			Err(error) => {
 				audit_result.is_valid = false;
@@ -359,14 +398,14 @@ pub async fn verify_notebook_audits<B: BlockT, C>(
 	notebook_digest: &NotebookDigest<NotebookVerifyError>,
 ) -> Result<(), Error<B>>
 where
-	C: AuxStore,
+	C: AuxStore + 'static,
 {
 	let mut is_missing_entries = false;
 	'retries: for _ in 0..10 {
 		for digest_record in &notebook_digest.notebooks {
 			let notary_audits = aux_client.get_notary_audit_history(digest_record.notary_id)?;
 
-			match notary_audits
+			match notary_audits.get()
 				.iter()
 				.find(|a| a.notebook_number == digest_record.notebook_number)
 			{
@@ -405,7 +444,7 @@ pub async fn get_notebook_header_data<B: BlockT, C, AccountId: Codec>(
 	submitting_tick: Tick,
 ) -> Result<NotebookHeaderData<NotebookVerifyError, BlockNumber>, Error<B>>
 where
-	C: ProvideRuntimeApi<B> + AuxStore,
+	C: ProvideRuntimeApi<B> + AuxStore + 'static,
 	C::Api: NotebookApis<B, NotebookVerifyError>
 		+ NotaryApis<B, NotaryRecordT>
 		+ BlockSealApis<B, AccountId, BlockSealAuthorityId>,
@@ -415,7 +454,6 @@ where
 	let mut tick_notebooks = vec![];
 
 	let notaries = client.runtime_api().notaries(*best_hash)?;
-	let lock = aux_client.lock.lock();
 	for notary in notaries {
 		let (latest_runtime_notebook_number, _) =
 			latest_notebooks_in_runtime.get(&notary.notary_id).unwrap_or(&(0, 0));
@@ -434,7 +472,11 @@ where
 				missing_notebooks,
 				notary.notary_id
 			);
-			aux_client.update_missing_notebooks(notary.notary_id, missing_notebooks, vec![])?;
+			aux_client.get_missing_notebooks(notary.notary_id)?.mutate(|a| {
+				for notebook_number in missing_notebooks {
+					a.insert(notebook_number);
+				}
+			})?;
 			continue;
 		}
 
@@ -455,7 +497,6 @@ where
 		client
 			.runtime_api()
 			.create_vote_digest(*best_hash, submitting_tick, tick_notebooks)?;
-	drop(lock);
 	Ok(headers)
 }
 

@@ -30,6 +30,7 @@ pub mod pallet {
 		PalletId,
 	};
 	use frame_system::pallet_prelude::*;
+	use log::warn;
 	use sp_core::{crypto::AccountId32, H256};
 	use sp_runtime::{
 		traits::{AccountIdConversion, AtLeast32BitUnsigned, One},
@@ -202,8 +203,8 @@ pub mod pallet {
 			let who = ensure_signed(origin)?;
 
 			ensure!(
-				T::Currency::reducible_balance(&who, Preservation::Expendable, Fortitude::Force) >=
-					amount,
+				T::Currency::reducible_balance(&who, Preservation::Expendable, Fortitude::Force)
+					>= amount,
 				Error::<T>::InsufficientFunds,
 			);
 
@@ -218,8 +219,8 @@ pub mod pallet {
 				Preservation::Expendable,
 			)?;
 
-			let expiration_block: BlockNumberFor<T> = <frame_system::Pallet<T>>::block_number() +
-				T::TransferExpirationBlocks::get().into();
+			let expiration_block: BlockNumberFor<T> = <frame_system::Pallet<T>>::block_number()
+				+ T::TransferExpirationBlocks::get().into();
 
 			PendingTransfersOut::<T>::insert(
 				&who,
@@ -322,6 +323,8 @@ pub mod pallet {
 			milligons: T::Balance,
 		) -> bool {
 			let result = <PendingTransfersOut<T>>::get(account_id, nonce);
+			let pending = <PendingTransfersOut<T>>::iter().collect::<Vec<_>>();
+			warn!("IS valid transfer to localchain? {account_id:?}, nonce={nonce:?}, milligons={milligons:?}, found={result:?}, transfers={:?}", pending);
 			if let Some(transfer) = result {
 				return transfer.notary_id == notary_id && transfer.amount == milligons;
 			}

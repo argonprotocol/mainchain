@@ -21,10 +21,12 @@ const LOG_TARGET: &str = "runtime::notebook";
 pub mod pallet {
 	use codec::alloc::string::ToString;
 	use frame_support::pallet_prelude::*;
+	use frame_support::DefaultNoBound;
 	use frame_system::pallet_prelude::*;
 	use log::info;
 	use sp_core::{crypto::AccountId32, H256};
 	use sp_runtime::traits::Block as BlockT;
+	use sp_std::collections::btree_set::BTreeSet;
 	use sp_std::{collections::btree_map::BTreeMap, vec, vec::Vec};
 
 	use ulx_notary_audit::{notebook_verify, AccountHistoryLookupError, NotebookHistoryLookup};
@@ -34,9 +36,10 @@ pub mod pallet {
 		notary::{NotaryId, NotaryNotebookKeyDetails, NotaryNotebookVoteDetails},
 		notebook::{AccountOrigin, Notebook, NotebookHeader},
 		tick::Tick,
-		Balance, BlockVotingProvider, ChainTransferLookup, NotaryNotebookVotes,
-		NotebookDigest as NotebookDigestT, NotebookEventHandler, NotebookProvider, NotebookSecret,
-		SignedNotebookHeader, TickProvider, NOTEBOOKS_DIGEST_ID,
+		AccountOriginUid, Balance, BlockVotingProvider, ChainTransfer, ChainTransferLookup,
+		NotebookAuditResult, NotebookAuditSummary, NotebookDigest as NotebookDigestT,
+		NotebookEventHandler, NotebookProvider, NotebookSecret, SignedNotebookHeader, TickProvider,
+		NOTEBOOKS_DIGEST_ID,
 	};
 
 	use super::*;
@@ -276,7 +279,7 @@ pub mod pallet {
 		}
 
 		fn is_inherent_required(_: &InherentData) -> Result<Option<Self::Error>, Self::Error> {
-			return Ok(Some(NotebookInherentError::MissingInherent))
+			return Ok(Some(NotebookInherentError::MissingInherent));
 		}
 
 		fn is_inherent(call: &Self::Call) -> bool {
@@ -284,12 +287,37 @@ pub mod pallet {
 		}
 	}
 
+	#[derive(DefaultNoBound)]
 	pub struct LocalchainHistoryLookup<T: Config> {
-		_phantom: PhantomData<T>,
+		pub last_changed_notebooks:
+			BTreeMap<(NotaryId, NotebookNumber, AccountOriginUid), NotebookNumber>,
+		pub account_changes_root: BTreeMap<(NotaryId, NotebookNumber), H256>,
+		pub used_transfers_to_localchain: BTreeSet<(NotaryId, AccountId32, u32)>,
+		_marker: PhantomData<T>,
 	}
 	impl<T: Config> LocalchainHistoryLookup<T> {
 		pub fn new() -> Self {
-			Self { _phantom: Default::default() }
+			Default::default()
+		}
+
+		pub fn add_audit_summary(&mut self, audit_summary: NotebookAuditSummary) {
+			let notary_id = audit_summary.notary_id;
+			let notebook_number = audit_summary.notebook_number;
+			for (account_id, account_nonce) in audit_summary.used_transfers_to_localchain.iter() {
+				self.used_transfers_to_localchain.insert((
+					notary_id,
+					account_id.clone(),
+					*account_nonce,
+				));
+			}
+			self.account_changes_root
+				.insert((notary_id, notebook_number), audit_summary.changed_accounts_root);
+			for account_origin in audit_summary.account_changelist.iter() {
+				self.last_changed_notebooks.insert(
+					(notary_id, account_origin.notebook_number, account_origin.account_uid),
+					notebook_number,
+				);
+			}
 		}
 	}
 
@@ -299,6 +327,9 @@ pub mod pallet {
 			notary_id: NotaryId,
 			notebook_number: NotebookNumber,
 		) -> Result<H256, AccountHistoryLookupError> {
+			if let Some(root) = self.account_changes_root.get(&(notary_id, notebook_number)) {
+				return Ok(*root);
+			}
 			<NotebookChangedAccountsRootByNotary<T>>::get(notary_id, notebook_number)
 				.ok_or(AccountHistoryLookupError::RootNotFound)
 		}
@@ -308,6 +339,13 @@ pub mod pallet {
 			notary_id: NotaryId,
 			account_origin: AccountOrigin,
 		) -> Result<NotebookNumber, AccountHistoryLookupError> {
+			if let Some(notebook) = self.last_changed_notebooks.get(&(
+				notary_id,
+				account_origin.notebook_number,
+				account_origin.account_uid,
+			)) {
+				return Ok(*notebook);
+			}
 			<AccountOriginLastChangedNotebookByNotary<T>>::get(notary_id, account_origin)
 				.ok_or(AccountHistoryLookupError::LastChangeNotFound)
 		}
@@ -319,6 +357,12 @@ pub mod pallet {
 			nonce: u32,
 			amount: Balance,
 		) -> Result<bool, AccountHistoryLookupError> {
+			if self
+				.used_transfers_to_localchain
+				.contains(&(notary_id, account_id.clone(), nonce))
+			{
+				return Err(AccountHistoryLookupError::InvalidTransferToLocalchain);
+			}
 			if T::ChainTransferLookup::is_valid_transfer_to_localchain(
 				notary_id,
 				account_id,
@@ -373,9 +417,9 @@ pub mod pallet {
 				.notebooks
 				.iter()
 				.find(|n| {
-					n.notary_id == notary_id &&
-						n.notebook_number == notebook_number &&
-						n.tick == tick
+					n.notary_id == notary_id
+						&& n.notebook_number == notebook_number
+						&& n.tick == tick
 				})
 				.ok_or(Error::<T>::InvalidNotebookDigest)?;
 
@@ -391,7 +435,7 @@ pub mod pallet {
 						(notebook_number, tick, first_failure_reason.clone()),
 					);
 				}
-				return Ok(false)
+				return Ok(false);
 			}
 
 			Ok(true)
@@ -455,13 +499,38 @@ pub mod pallet {
 			header_hash: H256,
 			block_vote_minimums: &BTreeMap<<T::Block as BlockT>::Hash, VoteMinimum>,
 			bytes: &Vec<u8>,
-		) -> Result<NotaryNotebookVotes, NotebookVerifyError> {
-			if let Some((notebook, _)) = <LastNotebookDetailsByNotary<T>>::get(notary_id).first() {
+			audit_dependency_summaries: Vec<NotebookAuditSummary>,
+		) -> Result<NotebookAuditResult, NotebookVerifyError> {
+			let mut history_lookup = LocalchainHistoryLookup::<T>::new();
+
+			let mut audit_dependency_summaries = audit_dependency_summaries;
+			audit_dependency_summaries.sort_by(|a, b| {
+				let tick_cmp = a.tick.cmp(&b.tick);
+				if tick_cmp != sp_std::cmp::Ordering::Equal {
+					return tick_cmp;
+				}
+				a.notebook_number.cmp(&b.notebook_number)
+			});
+
+			let mut last_notebook_processed: NotebookNumber =
+				<LastNotebookDetailsByNotary<T>>::get(notary_id)
+					.first()
+					.map(|(details, _)| details.notebook_number)
+					.unwrap_or_default();
+
+			for audit_summary in audit_dependency_summaries {
 				ensure!(
-					notebook_number > notebook.notebook_number,
-					NotebookVerifyError::NotebookTooOld
+					audit_summary.notebook_number == last_notebook_processed + 1,
+					NotebookVerifyError::CatchupNotebooksMissing
 				);
+				last_notebook_processed = audit_summary.notebook_number;
+				history_lookup.add_audit_summary(audit_summary);
 			}
+
+			ensure!(
+				notebook_number == last_notebook_processed + 1,
+				NotebookVerifyError::CatchupNotebooksMissing
+			);
 
 			let notebook = Notebook::decode(&mut bytes.as_ref()).map_err(|e| {
 				log::warn!(
@@ -471,6 +540,10 @@ pub mod pallet {
 				NotebookVerifyError::DecodeError
 			})?;
 
+			ensure!(
+				notebook.header.notebook_number == notebook_number,
+				NotebookVerifyError::InvalidNotebookHeaderHash
+			);
 			ensure!(
 				notebook.header.hash() == header_hash,
 				NotebookVerifyError::InvalidNotebookHeaderHash
@@ -486,8 +559,7 @@ pub mod pallet {
 				NotebookVerifyError::InvalidNotarySignature
 			);
 
-			notebook_verify(&LocalchainHistoryLookup::<T>::new(), &notebook, block_vote_minimums)
-				.map_err(|e| {
+			notebook_verify(&history_lookup, &notebook, block_vote_minimums).map_err(|e| {
 				info!(
 					target: LOG_TARGET,
 					"Notebook audit failed for notary {notary_id}, notebook {notebook_number}: {:?}", e.to_string()
@@ -495,9 +567,23 @@ pub mod pallet {
 				e
 			})?;
 
-			let notebook_votes = NotaryNotebookVotes {
+			let audit_result = NotebookAuditResult {
 				notary_id,
 				notebook_number,
+				tick: notebook.header.tick,
+				changed_accounts_root: notebook.header.changed_accounts_root,
+				account_changelist: notebook.header.changed_account_origins.clone().to_vec(),
+				used_transfers_to_localchain: notebook
+					.header
+					.chain_transfers
+					.iter()
+					.filter_map(|t| match t {
+						ChainTransfer::ToLocalchain { account_id, account_nonce } => {
+							Some((account_id.clone(), *account_nonce))
+						},
+						_ => None,
+					})
+					.collect(),
 				raw_votes: notebook
 					.notarizations
 					.iter()
@@ -507,7 +593,7 @@ pub mod pallet {
 					.flatten()
 					.collect::<Vec<_>>(),
 			};
-			Ok(notebook_votes)
+			Ok(audit_result)
 		}
 
 		/// Decode the notebook submission into high level details
@@ -527,7 +613,7 @@ pub mod pallet {
 				block_votes_count: header.block_votes_count,
 				block_voting_power: header.block_voting_power,
 				blocks_with_votes: header.blocks_with_votes.to_vec().clone(),
-			})
+			});
 		}
 
 		pub fn latest_notebook_by_notary() -> BTreeMap<NotaryId, (NotebookNumber, Tick)> {
@@ -552,7 +638,7 @@ pub mod pallet {
 			let history = LastNotebookDetailsByNotary::<T>::get(notary_id);
 			for (entry, is_eligible) in history {
 				if entry.tick == tick && is_eligible {
-					return Some((entry.block_votes_root, entry.notebook_number))
+					return Some((entry.block_votes_root, entry.notebook_number));
 				}
 			}
 			None
@@ -586,7 +672,7 @@ pub mod pallet {
 					return true;
 				}
 			}
-			return false
+			return false;
 		}
 	}
 }

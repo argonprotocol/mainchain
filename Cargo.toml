@@ -123,7 +123,7 @@ futures-timer = "3.0.1"
 parking_lot = { version = "0.12" }
 async-trait = { version = "0.1" }
 tokio = { version = "1.35", features = ["sync", "time", "rt"] }
-
+schnellru = { version = "0.2" }
 getrandom = { version = "0.2" }
 rand = { version = "0.8.5" }
 lazy_static = "1.4.0"

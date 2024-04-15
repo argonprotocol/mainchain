@@ -3,6 +3,12 @@ import {Localchain} from "../index";
 import TestNotary from "./TestNotary";
 import type {KeypairType} from "@polkadot/util-crypto/types";
 import process from "node:process";
+import HttpProxy from "http-proxy";
+import child_process from "node:child_process";
+import * as http from "node:http";
+import * as url from "node:url";
+import * as net from "node:net";
+
 
 export interface ITeardownable {
     teardown(): Promise<void>;
@@ -10,19 +16,72 @@ export interface ITeardownable {
 
 const toTeardown: ITeardownable[] = [];
 
+let proxy: HttpProxy;
+let proxyServer: http.Server;
+
+export async function getProxy() {
+    if (!proxy) {
+        proxy = HttpProxy.createProxyServer({
+            changeOrigin: true,
+            ws: true,
+            autoRewrite: true,
+        });
+        proxy.on('error', () => null);
+        proxyServer = http.createServer(function (req, res) {
+            //parse query string and get targetUrl
+            const queryData = url.parse(req.url, true).query;
+            if (!queryData.target) {
+                res.writeHead(500, {'Content-Type': 'text/plain'});
+                res.end('Target parameter is required');
+                return;
+            }
+            console.log('Proxying http request', queryData.target);
+            proxy.web(req, res, {target: queryData.target as string});
+        });
+        proxyServer.on('upgrade', function (req, clientSocket, head) {
+            const queryData = url.parse(req.url, true).query;
+            const target = url.parse(queryData.target as string);
+            proxy.ws(req, clientSocket, head, {
+                target: target.href,
+                ws: true
+            });
+            clientSocket.on('error', console.error);
+        })
+        await new Promise<void>(resolve => proxyServer.listen(0, resolve));
+        toTeardown.push({
+            teardown: () => new Promise<void>(resolve => {
+                proxy.close();
+                proxyServer.close(_ => null);
+                proxy = null;
+                proxyServer = null;
+                resolve()
+            })
+        })
+    }
+    const port = (proxyServer.address() as net.AddressInfo).port;
+    return `ws://host.docker.internal:${port}`;
+
+}
+
+export async function getDockerPortMapping(containerName: string, port: number): Promise<string> {
+    return child_process.execSync(`docker port ${containerName} ${port}`, {encoding: 'utf8'}).trim().split(':').pop();
+}
+
+
 export async function teardown() {
     for (const t of toTeardown) {
-        await t.teardown();
+        try {
+            await t.teardown().catch(console.error);
+        } catch {
+        }
     }
     toTeardown.length = 0;
 }
 
 export function cleanHostForDocker(host: string): string {
     if (process.env.ULX_USE_DOCKER_BINS) {
-        if (process.platform !== "linux") {
-            const replacer = 'host.docker.internal';
-            return host.replace('localhost', replacer).replace('127.0.0.1', replacer).replace('0.0.0.0', replacer);
-        }
+        const replacer = 'host.docker.internal';
+        return host.replace('localhost', replacer).replace('127.0.0.1', replacer).replace('0.0.0.0', replacer);
     }
     return host
 }
@@ -95,6 +154,9 @@ export async function transferToLocalchain(account: KeyringPair, amount: number,
 
                     })
                     .catch(reject);
+            }
+            if (status.isInBlock) {
+                checkForExtrinsicSuccess(events, client).catch(reject);
             }
         });
     });

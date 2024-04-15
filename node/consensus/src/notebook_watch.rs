@@ -100,9 +100,10 @@ where
 		let best_header = self.select_chain.best_chain().await.map_err(|_| {
 			Error::NoBestHeader("Unable to get best header for notebook processing".to_string())
 		})?;
+		let finalized_hash = self.client.info().finalized_hash;
 		let best_hash = best_header.hash();
 
-		let validated_notebooks = self.aux_client.get_notary_audit_history(notary_id)?;
+		let validated_notebooks = self.aux_client.get_notary_audit_history(notary_id)?.get();
 		if validated_notebooks.iter().any(|n| n.notebook_number == notebook_number) {
 			return Ok(());
 		}
@@ -130,8 +131,9 @@ where
 			lookup_tick -= 1;
 		}
 
-		let audit_result =
-			notary_client.try_audit_notebook(&audit_at_block_hash, &vote_details).await?;
+		let audit_result = notary_client
+			.try_audit_notebook(&finalized_hash, &audit_at_block_hash, &vote_details)
+			.await?;
 
 		let notary_state = self.aux_client.store_notebook_result(
 			notary_id,
@@ -152,7 +154,7 @@ where
 
 		let votes_tick = tick.saturating_sub(2);
 		let vote_key_tick = tick.saturating_sub(1);
-		let block_votes = self.aux_client.get_votes(votes_tick)?;
+		let block_votes = self.aux_client.get_votes(votes_tick)?.get();
 		let votes_count = block_votes.iter().fold(0u32, |acc, x| acc + x.raw_votes.len() as u32);
 		if votes_count == 0 {
 			return Ok(());
@@ -160,7 +162,7 @@ where
 		info!(target: LOG_TARGET, "Checking {} block votes for tick {}", votes_count, votes_tick);
 
 		// aren't these ordered?
-		let strongest_fork_at_tick = self.aux_client.strongest_fork_at_tick(tick)?;
+		let strongest_fork_at_tick = self.aux_client.strongest_fork_at_tick(tick)?.get();
 		let strongest_seal_strength = strongest_fork_at_tick.seal_strength;
 
 		let (voting_power, notebooks) = notary_state
@@ -233,7 +235,7 @@ where
 				continue;
 			};
 
-			let mut fork_power = self.aux_client.get_fork_voting_power(&block_hash)?;
+			let mut fork_power = self.aux_client.get_fork_voting_power(&block_hash)?.get();
 			fork_power.add_vote(block_voting_power, block_notebooks, max_nonce);
 
 			if fork_power > strongest_fork_at_tick && fork_power > best_fork {
