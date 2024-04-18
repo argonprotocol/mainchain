@@ -1,23 +1,23 @@
 #![cfg_attr(not(feature = "std"), no_std)]
 
-use binary_merkle_tree::{Leaf, merkle_root, verify_proof};
+use binary_merkle_tree::{merkle_root, verify_proof, Leaf};
 use codec::{Decode, Encode};
 use serde::{Deserialize, Serialize};
 use snafu::Snafu;
 use sp_core::H256;
-use sp_runtime::{scale_info::TypeInfo, traits::BlakeTwo256};
 use sp_runtime::traits::Verify;
+use sp_runtime::{scale_info::TypeInfo, traits::BlakeTwo256};
 use sp_std::{
 	collections::{btree_map::BTreeMap, btree_set::BTreeSet},
 	vec::Vec,
 };
 
 use ulx_primitives::{
-	AccountId, AccountOrigin, AccountOriginUid, AccountType, Balance, BalanceChange, BalanceProof, BalanceTip,
-	BlockVote, ChainTransfer, DATA_DOMAIN_LEASE_COST, DataDomainHash, ensure, ESCROW_CLAWBACK_TICKS,
-	ESCROW_EXPIRATION_TICKS, LocalchainAccountId, MINIMUM_ESCROW_SETTLEMENT, NewAccountOrigin, NotaryId, Note, Notebook,
-	NotebookHeader, NotebookNumber, NoteType, round_up,
-	TAX_PERCENT_BASE, tick::Tick, VoteMinimum,
+	ensure, round_up, tick::Tick, AccountId, AccountOrigin, AccountOriginUid, AccountType, Balance,
+	BalanceChange, BalanceProof, BalanceTip, BlockVote, ChainTransfer, DataDomainHash,
+	LocalchainAccountId, NewAccountOrigin, NotaryId, Note, NoteType, Notebook, NotebookHeader,
+	NotebookNumber, TransferToLocalchainId, VoteMinimum, DATA_DOMAIN_LEASE_COST,
+	ESCROW_CLAWBACK_TICKS, ESCROW_EXPIRATION_TICKS, MINIMUM_ESCROW_SETTLEMENT, TAX_PERCENT_BASE,
 };
 
 pub use crate::error::VerifyError;
@@ -27,7 +27,6 @@ pub mod error;
 mod test_balanceset;
 #[cfg(test)]
 mod test_notebook;
-
 
 #[derive(Debug, Clone, PartialEq, TypeInfo, Encode, Decode, Serialize, Deserialize, Snafu)]
 pub enum AccountHistoryLookupError {
@@ -56,8 +55,8 @@ pub trait NotebookHistoryLookup {
 	fn is_valid_transfer_to_localchain(
 		&self,
 		notary_id: NotaryId,
+		transfer_id: TransferToLocalchainId,
 		account_id: &AccountId,
-		nonce: u32,
 		milligons: Balance,
 	) -> Result<bool, AccountHistoryLookupError>;
 }
@@ -131,7 +130,7 @@ struct NotebookVerifyState {
 	/// Block votes is keyed off of account id and the index supplied by the user. If index is
 	/// duplicated, only the last entry will be used.
 	block_votes: BTreeMap<(AccountId, u32), BlockVote>,
-	seen_transfers_in: BTreeSet<(AccountId, u32)>,
+	seen_transfers_in: BTreeSet<(AccountId, TransferToLocalchainId)>,
 	new_account_origins: BTreeMap<LocalchainAccountId, AccountOriginUid>,
 	escrow_data_domains: BTreeMap<(DataDomainHash, AccountId), u32>,
 	blocks_voted_on: BTreeSet<H256>,
@@ -210,15 +209,12 @@ impl NotebookVerifyState {
 					account_id: account_id.clone(),
 				});
 			},
-			NoteType::ClaimFromMainchain { account_nonce } => {
+			NoteType::ClaimFromMainchain { transfer_id } => {
 				ensure!(
-					self.seen_transfers_in.insert((account_id.clone(), account_nonce,)),
+					self.seen_transfers_in.insert((account_id.clone(), transfer_id,)),
 					VerifyError::DuplicateChainTransfer
 				);
-				self.chain_transfers.push(ChainTransfer::ToLocalchain {
-					account_id: account_id.clone(),
-					account_nonce: account_nonce.clone(),
-				});
+				self.chain_transfers.push(ChainTransfer::ToLocalchain { transfer_id });
 			},
 			_ => {},
 		}
@@ -259,11 +255,11 @@ fn verify_balance_sources<'a, T: NotebookHistoryLookup>(
 				NoteType::SendToMainchain => {
 					state.track_chain_transfer(account_id.clone(), note)?;
 				},
-				NoteType::ClaimFromMainchain { account_nonce } => {
+				NoteType::ClaimFromMainchain { transfer_id } => {
 					lookup.is_valid_transfer_to_localchain(
 						notary_id,
+						*transfer_id,
 						account_id,
-						account_nonce.clone(),
 						note.milligons,
 					)?;
 					state.track_chain_transfer(account_id.clone(), note)?;
@@ -275,14 +271,15 @@ fn verify_balance_sources<'a, T: NotebookHistoryLookup>(
 				NoteType::EscrowSettle => {
 					if let Some(hold_note) = &change.escrow_hold_note {
 						match &hold_note.note_type {
-							&NoteType::EscrowHold { ref data_domain_hash, ref recipient } =>
+							&NoteType::EscrowHold { ref data_domain_hash, ref recipient } => {
 								if let Some(data_domain_hash) = data_domain_hash {
 									let count = state
 										.escrow_data_domains
 										.entry((data_domain_hash.clone(), recipient.clone()))
 										.or_insert(0);
 									*count += 1u32;
-								},
+								}
+							},
 							_ => return Err(VerifyError::InvalidEscrowHoldNote),
 						}
 					}
@@ -307,7 +304,7 @@ fn verify_balance_sources<'a, T: NotebookHistoryLookup>(
 				return Err(VerifyError::MissingAccountOrigin {
 					account_id: change.account_id.clone(),
 					account_type: change.account_type.clone(),
-				})
+				});
 			}
 		} else {
 			let proof = change
@@ -380,9 +377,9 @@ fn verify_previous_balance_proof<'a, T: NotebookHistoryLookup>(
 			VerifyError::InvalidPreviousNonce
 		);
 		ensure!(
-			previous_balance.account_origin.account_uid == proof.account_origin.account_uid &&
-				previous_balance.account_origin.notebook_number ==
-					proof.account_origin.notebook_number,
+			previous_balance.account_origin.account_uid == proof.account_origin.account_uid
+				&& previous_balance.account_origin.notebook_number
+					== proof.account_origin.notebook_number,
 			VerifyError::InvalidPreviousAccountOrigin
 		);
 		// if none, we can add changes.. if set, we can't do anything else
@@ -398,7 +395,7 @@ fn verify_previous_balance_proof<'a, T: NotebookHistoryLookup>(
 			VerifyError::InvalidPreviousBalanceChangeNotebook
 		);
 		let Some(notebook_proof) = proof.notebook_proof.as_ref() else {
-			return Err(VerifyError::MissingBalanceProof)
+			return Err(VerifyError::MissingBalanceProof);
 		};
 
 		let root = lookup.get_account_changes_root(proof.notary_id, proof.notebook_number)?;
@@ -514,7 +511,7 @@ impl BalanceChangesetState {
 			let mut balance = amount.clone() as i128;
 			self.unclaimed_restricted_balance.retain(|accounts, amount| {
 				if balance == 0 {
-					return true
+					return true;
 				}
 				if accounts.contains(claimer) {
 					if *amount >= balance {
@@ -524,9 +521,9 @@ impl BalanceChangesetState {
 						balance -= *amount;
 						*amount = 0;
 					};
-					return *amount != 0
+					return *amount != 0;
 				}
-				return true
+				return true;
 			});
 		}
 		ensure!(self.unclaimed_restricted_balance.is_empty(), VerifyError::InvalidNoteRecipients);
@@ -538,7 +535,7 @@ impl BalanceChangesetState {
 			let mut balance = amount.clone() as i128;
 			self.unclaimed_escrow_balances.retain(|accounts, amount| {
 				if balance == 0 {
-					return true
+					return true;
 				}
 				if accounts.contains(claimer) {
 					if *amount >= balance {
@@ -548,9 +545,9 @@ impl BalanceChangesetState {
 						balance -= *amount;
 						*amount = 0;
 					};
-					return *amount != 0
+					return *amount != 0;
 				}
-				return true
+				return true;
 			});
 		}
 
@@ -692,7 +689,7 @@ impl BalanceChangesetState {
 			);
 
 			let NoteType::EscrowHold { recipient, .. } = &escrow_hold_note.note_type else {
-				return Err(VerifyError::InvalidEscrowHoldNote)
+				return Err(VerifyError::InvalidEscrowHoldNote);
 			};
 
 			recipients.insert(LocalchainAccountId::new(recipient.clone(), AccountType::Deposit));
@@ -744,10 +741,10 @@ pub fn verify_notarization_allocation(
 		let mut note_index = 0;
 
 		for note in &change.notes {
-			if change.escrow_hold_note.is_some() &&
-				!matches!(note.note_type, NoteType::EscrowSettle)
+			if change.escrow_hold_note.is_some()
+				&& !matches!(note.note_type, NoteType::EscrowSettle)
 			{
-				return Err(VerifyError::AccountLocked)
+				return Err(VerifyError::AccountLocked);
 			}
 
 			if localchain_account_id.is_tax() {
@@ -775,14 +772,14 @@ pub fn verify_notarization_allocation(
 					);
 					// NOTE: a escrow doesn't change the source balance
 					ensure!(
-						change.escrow_hold_note.is_none() &&
-							state.accounts_with_new_holds.insert(localchain_account_id.clone()),
+						change.escrow_hold_note.is_none()
+							&& state.accounts_with_new_holds.insert(localchain_account_id.clone()),
 						VerifyError::AccountAlreadyHasEscrowHold
 					);
 				},
 				NoteType::EscrowClaim => {
 					if note.milligons < MINIMUM_ESCROW_SETTLEMENT {
-						return Err(VerifyError::EscrowNoteBelowMinimum)
+						return Err(VerifyError::EscrowNoteBelowMinimum);
 					}
 					state.claim_escrow_balance(note.milligons, &localchain_account_id)?;
 				},
@@ -790,7 +787,7 @@ pub fn verify_notarization_allocation(
 					let Some(source_change_tick) =
 						change.previous_balance_proof.as_ref().map(|a| a.tick)
 					else {
-						return Err(VerifyError::MissingBalanceProof)
+						return Err(VerifyError::MissingBalanceProof);
 					};
 
 					let escrow_hold_note = change
@@ -825,9 +822,9 @@ pub fn verify_notarization_allocation(
 
 			// track the balances moved in this note
 			match note.note_type {
-				NoteType::ClaimFromMainchain { .. } |
-				NoteType::Claim { .. } |
-				NoteType::EscrowClaim =>
+				NoteType::ClaimFromMainchain { .. }
+				| NoteType::Claim { .. }
+				| NoteType::EscrowClaim => {
 					if let Some(new_balance) = balance.checked_add(note.milligons as i128) {
 						balance = new_balance;
 					} else {
@@ -836,14 +833,15 @@ pub fn verify_notarization_allocation(
 							amount: note.milligons,
 							note_index,
 							change_index,
-						})
-					},
-				NoteType::SendToMainchain |
-				NoteType::Send { .. } |
-				NoteType::EscrowSettle |
-				NoteType::LeaseDomain |
-				NoteType::Tax |
-				NoteType::SendToVote => balance -= note.milligons as i128,
+						});
+					}
+				},
+				NoteType::SendToMainchain
+				| NoteType::Send { .. }
+				| NoteType::EscrowSettle
+				| NoteType::LeaseDomain
+				| NoteType::Tax
+				| NoteType::SendToVote => balance -= note.milligons as i128,
 				_ => {},
 			};
 			note_index += 1;

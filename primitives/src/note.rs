@@ -13,7 +13,7 @@ use sp_std::{
 
 #[cfg(feature = "std")]
 use crate::serialize_unsafe_u128_as_string;
-use crate::{prod_or_fast, AccountId, DataDomainHash, ADDRESS_PREFIX};
+use crate::{prod_or_fast, AccountId, DataDomainHash, ADDRESS_PREFIX, TransferToLocalchainId};
 
 #[derive(
 	Clone,
@@ -108,7 +108,7 @@ pub enum NoteType {
 	#[serde(rename_all = "camelCase")]
 	ClaimFromMainchain {
 		#[codec(compact)]
-		account_nonce: u32,
+		transfer_id: TransferToLocalchainId,
 	},
 	/// Claim funds from a note (must be in the series of balance changes)
 	Claim,
@@ -145,8 +145,8 @@ impl Display for NoteType {
 			NoteType::SendToMainchain => {
 				write!(f, "SendToMainchain")
 			},
-			NoteType::ClaimFromMainchain { account_nonce } => {
-				write!(f, "ClaimFromMainchain(nonce={})", account_nonce)
+			NoteType::ClaimFromMainchain { transfer_id } => {
+				write!(f, "ClaimFromMainchain(transfer_id={})", transfer_id)
 			},
 			NoteType::Claim => {
 				write!(f, "Claim")

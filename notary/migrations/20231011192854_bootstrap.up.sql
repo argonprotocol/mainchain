@@ -55,7 +55,7 @@ CREATE TABLE IF NOT EXISTS chain_transfers
 (
     to_localchain               boolean NOT NULL,
     account_id                  bytea   NOT NULL,
-    account_nonce               integer NULL,
+    transfer_id                 integer NULL,
     amount                      varchar NOT NULL,
     finalized_block_number      integer NULL,
     included_in_notebook_number integer NULL REFERENCES notebook_headers (notebook_number)

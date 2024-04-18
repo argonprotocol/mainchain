@@ -723,7 +723,7 @@ mod tests {
         notary_id: 1,
         amount: localchain_transfer_amount,
         expiration_block: 100,
-        account_nonce: 1,
+        transfer_id: 1,
       })
       .await?;
     builder
@@ -955,7 +955,7 @@ mod tests {
         notary_id: 1,
         amount: 2_000u128,
         expiration_block: 100,
-        account_nonce: 1,
+        transfer_id: 1,
       })
       .await?;
 

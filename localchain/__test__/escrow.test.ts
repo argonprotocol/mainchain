@@ -183,9 +183,9 @@ async function transferMainchainToLocalchain(mainchainClient: UlxClient, localch
     notarization: NotarizationBuilder,
     balanceChange: BalanceChangeBuilder
 }> {
-    const nonce = await transferToLocalchain(account, amount, notaryId, mainchainClient);
+    const transferId = await transferToLocalchain(account, amount, notaryId, mainchainClient);
     const locMainchainClient = await localchain.mainchainClient;
-    const transfer = await locMainchainClient.waitForLocalchainTransfer(account.address, nonce);
+    const transfer = await locMainchainClient.waitForLocalchainTransfer(transferId);
     const notarization = localchain.beginChange();
     const balanceChange = await notarization.claimFromMainchain(transfer);
     return {notarization, balanceChange};

@@ -26,18 +26,18 @@ it.only('can transfer from mainchain to local', async () => {
     const alice = new Keyring({type: 'sr25519'}).createFromUri('//Alice');
     const bob = new KeyringSigner("//Bob");
     await activateNotary(alice, mainchainClient, notary);
-    const nonce = await transferToLocalchain(bob.defaultPair, 5000, 1, mainchainClient);
+    const transferId = await transferToLocalchain(bob.defaultPair, 5000, 1, mainchainClient);
     const bobchain = await createLocalchain(mainchainUrl);
     await bobchain.keystore.importSuri("//Bob", CryptoScheme.Sr25519);
     const bobMainchainClient = await bobchain.mainchainClient;
-    const transfer = await bobMainchainClient.waitForLocalchainTransfer(bob.address, nonce);
+    const transfer = await bobMainchainClient.waitForLocalchainTransfer(transferId);
 
     expect(transfer).toBeTruthy();
     expect(transfer?.amount).toBe(5000n);
     const notarization = bobchain.beginChange();
     const balanceChange = await notarization.addAccount(bob.address, AccountType.Deposit, 1);
     await balanceChange.claimFromMainchain(transfer);
-    
+
     const tracker = await notarization.notarizeAndWaitForNotebook();
     const proof = await tracker.getNotebookProof();
     expect(proof).toHaveLength(1);
@@ -70,7 +70,7 @@ it('can transfer from mainchain to local to mainchain', async () => {
     {
         const transfer = await bobchain.mainchainTransfers.sendToLocalchain(5000n, 1);
         console.log('Transfer', transfer);
-        expect(transfer.accountNonce).toBe(1);
+        expect(transfer.transferId).toBe(1);
 
         let tracker: NotarizationTracker = null;
         while (!tracker) {

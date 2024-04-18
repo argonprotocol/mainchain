@@ -19,7 +19,7 @@
         "type_info": "Text"
       },
       {
-        "name": "account_nonce",
+        "name": "transfer_id",
         "ordinal": 3,
         "type_info": "Int64"
       },

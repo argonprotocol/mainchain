@@ -603,7 +603,7 @@ mod tests {
       );
       assert_eq!(
         overview.changes[0].notes,
-        vec!["ClaimFromMainchain(nonce=1) ₳5.0"]
+        vec!["ClaimFromMainchain(transfer_id=1) ₳5.0"]
       );
     }
 

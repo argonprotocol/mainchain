@@ -322,7 +322,7 @@ impl BalanceSync {
       let transfer = LocalchainTransfer {
         address: x.address.clone(),
         amount: x.amount.parse::<u128>().unwrap_or_default(),
-        account_nonce: x.account_nonce as u32,
+        transfer_id: x.transfer_id as u32,
         notary_id: x.notary_id as u32,
         expiration_block: 0,
       };

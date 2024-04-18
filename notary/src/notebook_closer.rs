@@ -223,7 +223,6 @@ mod tests {
 	};
 
 	use anyhow::anyhow;
-	use chrono::Utc;
 	use codec::Decode;
 	use frame_support::assert_ok;
 	use futures::{task::noop_waker_ref, StreamExt};
@@ -273,16 +272,14 @@ mod tests {
 		BalanceChange, BalanceProof, BalanceTip, BlockSealDigest, BlockVote, BlockVoteDigest,
 		DataDomain, DataDomainHash, DataTLD, HashOutput, MerkleProof, Note, NoteType,
 		NoteType::{EscrowClaim, EscrowSettle},
-		NotebookDigest, ParentVotingKeyDigest, TickDigest, DATA_DOMAIN_LEASE_COST,
-		ESCROW_EXPIRATION_TICKS,
+		NotebookDigest, ParentVotingKeyDigest, TickDigest, TransferToLocalchainId,
+		DATA_DOMAIN_LEASE_COST, ESCROW_EXPIRATION_TICKS,
 	};
 	use ulx_testing::{test_context, test_context_from_url};
 
 	use super::*;
 	use ulixee_client::MultiurlClient;
 	use ulx_primitives::host::Host;
-
-	type Nonce = u32;
 
 	#[sqlx::test]
 	async fn test_chain_to_chain(pool: PgPool) -> anyhow::Result<()> {
@@ -326,14 +323,8 @@ mod tests {
 		// Submit a transfer to localchain and wait for result
 		let bob_transfer = create_localchain_transfer(&ctx.client, dev::bob(), 1000).await?;
 		wait_for_transfers(&pool, vec![bob_transfer.clone()]).await?;
-
 		// Record the balance change
 		submit_balance_change_to_notary(&pool, bob_transfer).await?;
-
-		sqlx::query("update notebook_status set end_time = $1 where notebook_number = 1")
-			.bind(Utc::now())
-			.execute(&pool)
-			.await?;
 
 		let mut closer = NotebookCloser {
 			pool: pool.clone(),
@@ -564,15 +555,24 @@ mod tests {
 				.await?
 		);
 
-		let grandparent_tick = ticker.current() - 2;
-		let best_grandparents = ctx
-			.client
-			.storage()
-			.at(best_hash)
-			.fetch(&api::ticks::storage::StorageApi.recent_blocks_at_ticks(grandparent_tick))
-			.await?
-			.expect("Should have a block hash")
-			.0;
+		let (grandparent_tick, best_grandparents) = {
+			loop {
+				let grandparent_tick = ticker.current() - 2;
+				match ctx
+					.client
+					.storage()
+					.at(best_hash)
+					.fetch(
+						&api::ticks::storage::StorageApi.recent_blocks_at_ticks(grandparent_tick),
+					)
+					.await?
+				{
+					Some(x) => break (grandparent_tick, x.0),
+					// wait a second
+					None => tokio::time::sleep(ticker.duration_to_next_tick()).await,
+				}
+			}
+		};
 
 		let best_grandparent = best_grandparents.last().expect("Should have blocks in every tick");
 		println!("Voting for grandparent {:?} at tick {}", best_grandparent, grandparent_tick);
@@ -721,9 +721,9 @@ mod tests {
 
 	async fn submit_balance_change_to_notary(
 		pool: &PgPool,
-		transfer: (Nonce, u32, Keypair),
+		transfer: (TransferToLocalchainId, u32, Keypair),
 	) -> anyhow::Result<BalanceChangeResult> {
-		let (account_nonce, amount, keypair) = transfer;
+		let (transfer_id, amount, keypair) = transfer;
 		let public = keypair.public_key();
 		let public = public.as_ref();
 
@@ -745,7 +745,7 @@ mod tests {
 				previous_balance_proof: None,
 				notes: bounded_vec![Note::create(
 					amount as u128,
-					NoteType::ClaimFromMainchain { account_nonce },
+					NoteType::ClaimFromMainchain { transfer_id },
 				)],
 				escrow_hold_note: None,
 				signature: sp_core::ed25519::Signature::from_raw([0u8; 64]).into(),
@@ -763,11 +763,11 @@ mod tests {
 	}
 	async fn submit_balance_change_to_notary_and_create_domain(
 		pool: &PgPool,
-		transfer: (Nonce, u32, Keypair),
+		transfer: (TransferToLocalchainId, u32, Keypair),
 		domain_hash: DataDomainHash,
 		register_domain_to: AccountId,
 	) -> anyhow::Result<AccountOrigin> {
-		let (account_nonce, amount, keypair) = transfer;
+		let (transfer_id, amount, keypair) = transfer;
 		let public = keypair.public_key();
 		let public = public.as_ref();
 
@@ -789,10 +789,7 @@ mod tests {
 					balance: amount as u128 - DATA_DOMAIN_LEASE_COST,
 					previous_balance_proof: None,
 					notes: bounded_vec![
-						Note::create(
-							amount as u128,
-							NoteType::ClaimFromMainchain { account_nonce },
-						),
+						Note::create(amount as u128, NoteType::ClaimFromMainchain { transfer_id },),
 						Note::create(DATA_DOMAIN_LEASE_COST, NoteType::LeaseDomain,)
 					],
 					escrow_hold_note: None,
@@ -967,7 +964,7 @@ mod tests {
 		client: &UlxClient,
 		account: Keypair,
 		amount: u32,
-	) -> anyhow::Result<(Nonce, u32, Keypair)> {
+	) -> anyhow::Result<(TransferToLocalchainId, u32, Keypair)> {
 		let in_block = client
 			.tx()
 			.sign_and_submit_then_watch_default(
@@ -987,11 +984,7 @@ mod tests {
 					.transpose()
 				{
 					if transfer.account_id == account.public_key().to_account_id() {
-						return Ok((
-							transfer.account_nonce,
-							transfer.amount as u32,
-							account.clone(),
-						));
+						return Ok((transfer.transfer_id, transfer.amount as u32, account.clone()));
 					}
 				}
 			}
@@ -1001,24 +994,19 @@ mod tests {
 
 	async fn wait_for_transfers(
 		pool: &PgPool,
-		transfers: Vec<(Nonce, u32, Keypair)>,
+		transfers: Vec<(TransferToLocalchainId, u32, Keypair)>,
 	) -> anyhow::Result<()> {
 		let mut found = false;
 		for _ in 0..5 {
 			let rows = sqlx::query!("select * from chain_transfers").fetch_all(pool).await?;
-			let is_complete = transfers.iter().filter_map(|(nonce, amount, account)| {
+			let is_complete = transfers.iter().filter_map(|(transfer_id, amount, _account)| {
 				if let Some(record) =
-					rows.iter().find(|r| r.account_id.as_slice() == account.public_key().as_ref())
+					rows.iter().find(|r| (r.transfer_id.unwrap_or_default() as u32) == *transfer_id)
 				{
 					assert_eq!(
 						record.amount,
 						amount.to_string(),
-						"Should have recorded a chain transfer"
-					);
-					assert_eq!(
-						record.account_nonce,
-						Some(*nonce as i32),
-						"Should have recorded a chain transfer"
+						"Should have recorded a chain transfer amount"
 					);
 					return Some(());
 				}

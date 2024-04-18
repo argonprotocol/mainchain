@@ -227,7 +227,7 @@ impl MockNotary {
         notary_id: 1,
         expiration_block: 1,
         address: AccountStore::to_address(&account_id),
-        account_nonce: 1,
+        transfer_id: 1,
       })
       .await?;
 
@@ -248,10 +248,7 @@ impl MockNotary {
     let mut notebook_header = self.create_notebook_header(vec![balance_tip]).await;
     notebook_header
       .chain_transfers
-      .try_push(ChainTransfer::ToLocalchain {
-        account_id,
-        account_nonce: 1,
-      })
+      .try_push(ChainTransfer::ToLocalchain { transfer_id: 1 })
       .expect("should be able to push");
 
     self
@@ -420,7 +417,7 @@ pub fn mock_mainchain_transfer(address: &str, amount: u128) -> LocalchainTransfe
     notary_id: 1,
     expiration_block: 1,
     address: address.to_string(),
-    account_nonce: 1,
+    transfer_id: 1,
   }
 }
 

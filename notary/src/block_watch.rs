@@ -295,7 +295,7 @@ async fn process_finalized_block(
 						&mut *db,
 						block_height,
 						&AccountId::from(to_localchain.account_id.0),
-						to_localchain.account_nonce,
+						to_localchain.transfer_id,
 						to_localchain.amount,
 					)
 					.await?;

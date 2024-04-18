@@ -55,7 +55,7 @@ export default class TestMainchain implements ITeardownable {
             this.containerName = containerName;
             this.#binPath = 'docker';
             execArgs = ['run', '--rm', `--name=${containerName}`, `-p=0:9944`, '-p=0:33344', '-e', `RUST_LOG=${this.loglevel},sc_rpc_server=info`,
-                'ghcr.io/ulixee/ulixee-miner:edge'];
+                'ghcr.io/ulixee/ulixee-miner:dev'];
 
             if (process.env.DOCKER_HOST_IP) {
                 execArgs.splice(2, 0, `--add-host host.docker.internal:${process.env.DOCKER_HOST_IP}`);

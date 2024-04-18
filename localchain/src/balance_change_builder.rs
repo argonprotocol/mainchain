@@ -187,7 +187,7 @@ impl BalanceChangeBuilder {
     balance_change.push_note(
       amount,
       NoteType::ClaimFromMainchain {
-        account_nonce: transfer.account_nonce,
+        transfer_id: transfer.transfer_id,
       },
     );
     Ok(())
@@ -418,7 +418,7 @@ pub mod napi_ext {
           amount: transfer.amount.get_u128().1,
           notary_id: transfer.notary_id,
           expiration_block: transfer.expiration_block,
-          account_nonce: transfer.account_nonce,
+          transfer_id: transfer.transfer_id,
         })
         .await
         .napi_ok()
@@ -494,7 +494,7 @@ mod test {
         amount: 100u128,
         notary_id: 1,
         expiration_block: 500,
-        account_nonce: 1,
+        transfer_id: 1,
       })
       .await?;
 
@@ -519,7 +519,7 @@ mod test {
         amount: 100u128,
         notary_id: 1,
         expiration_block: 500,
-        account_nonce: 1,
+        transfer_id: 1,
       })
       .await?;
 
@@ -562,7 +562,7 @@ mod test {
         amount: 20_000u128,
         notary_id: 1,
         expiration_block: 500,
-        account_nonce: 1,
+        transfer_id: 1,
       })
       .await?;
 

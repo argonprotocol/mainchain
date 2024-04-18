@@ -130,8 +130,8 @@ declare module '@polkadot/api-base/types/events' {
     };
     chainTransfer: {
       TransferIn: AugmentedEvent<ApiType, [accountId: AccountId32, amount: u128, notaryId: u32], { accountId: AccountId32, amount: u128, notaryId: u32 }>;
-      TransferToLocalchain: AugmentedEvent<ApiType, [accountId: AccountId32, amount: u128, accountNonce: u32, notaryId: u32, expirationBlock: u32], { accountId: AccountId32, amount: u128, accountNonce: u32, notaryId: u32, expirationBlock: u32 }>;
-      TransferToLocalchainExpired: AugmentedEvent<ApiType, [accountId: AccountId32, accountNonce: u32, notaryId: u32], { accountId: AccountId32, accountNonce: u32, notaryId: u32 }>;
+      TransferToLocalchain: AugmentedEvent<ApiType, [accountId: AccountId32, amount: u128, transferId: u32, notaryId: u32, expirationBlock: u32], { accountId: AccountId32, amount: u128, transferId: u32, notaryId: u32, expirationBlock: u32 }>;
+      TransferToLocalchainExpired: AugmentedEvent<ApiType, [accountId: AccountId32, transferId: u32, notaryId: u32], { accountId: AccountId32, transferId: u32, notaryId: u32 }>;
     };
     dataDomain: {
       /**

@@ -2,7 +2,7 @@ FROM docker.io/library/ubuntu:22.04
 
 # show backtraces
 ENV RUST_BACKTRACE 1
-
+ARG BIN=ulx-node
 # install tools and dependencies
 RUN apt-get update && \
 	DEBIAN_FRONTEND=noninteractive apt-get install -y --no-install-recommends \

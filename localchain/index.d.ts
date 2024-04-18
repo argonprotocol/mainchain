@@ -122,7 +122,7 @@ export class Escrow {
 }
 
 export class Keystore {
-  useExternal(defaultAddress: string, sign: (address: string, signatureMessage: Uint8Array) => Promise<Uint8Array>, derive: (hd_path: string) => Promise<string>): Promise<void>
+  useExternal(defaultAddress: string, sign: (address: string, signatureMessage: Uint8Array) => Promise<Uint8Array>, derive: (hdPath: string) => Promise<string>): Promise<void>
   /** Bootstrap this localchain with a new key. Must be empty or will throw an error! Defaults to SR25519 if no scheme is provided. */
   bootstrap(scheme?: CryptoScheme | undefined | null, passwordOption?: KeystorePasswordOption | undefined | null): Promise<string>
   /** Import a known keypair into the embedded keystore. */
@@ -187,9 +187,8 @@ export class MainchainClient {
   getNotaryDetails(notaryId: number): Promise<NotaryDetails | null>
   getAccount(address: string): Promise<AccountInfo>
   getUlixees(address: string): Promise<BalancesAccountData>
-  getAccountNonce(address: string): Promise<number>
-  getTransferToLocalchainFinalizedBlock(address: string, nonce: number): Promise<number | null>
-  waitForLocalchainTransfer(address: string, nonce: number): Promise<LocalchainTransfer | null>
+  getTransferToLocalchainFinalizedBlock(transferId: number): Promise<number | null>
+  waitForLocalchainTransfer(transferId: number): Promise<LocalchainTransfer | null>
   getAccountChangesRoot(notaryId: number, notebookNumber: number): Promise<Uint8Array>
   latestFinalizedNumber(): Promise<number>
   waitForNotebookImmortalized(notaryId: number, notebookNumber: number): Promise<number>
@@ -538,7 +537,7 @@ export interface LocalchainTransfer {
   amount: bigint
   notaryId: number
   expirationBlock: number
-  accountNonce: number
+  transferId: number
 }
 
 /** Max balance changes that can be in a single notarization */

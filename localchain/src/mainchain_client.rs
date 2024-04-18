@@ -19,7 +19,9 @@ use ulixee_client::{api, UlxConfig};
 use ulixee_client::{UlxExtrinsicParamsBuilder, UlxFullclient};
 use ulx_primitives::host::Host;
 use ulx_primitives::tick::Ticker;
-use ulx_primitives::{Balance, DataDomain, DataTLD, NotaryId, NotebookNumber};
+use ulx_primitives::{
+  Balance, DataDomain, DataTLD, NotaryId, NotebookNumber, TransferToLocalchainId,
+};
 
 use crate::AccountStore;
 use crate::Keystore;
@@ -363,6 +365,7 @@ impl MainchainClient {
       .await?;
     Ok(nonce as u32)
   }
+
   async fn wait_for_in_block(
     mut tx_progress: TxProgress<UlxConfig, OnlineClient<UlxConfig>>,
   ) -> Result<TxInBlock<UlxConfig, OnlineClient<UlxConfig>>> {
@@ -388,15 +391,13 @@ impl MainchainClient {
 
   pub async fn get_transfer_to_localchain_finalized_block(
     &self,
-    address: String,
-    nonce: u32,
+    transfer_id: TransferToLocalchainId,
   ) -> Result<Option<u32>> {
-    let account_id32 = subxt::utils::AccountId32::from_str(&address).map_err(|e| anyhow!(e))?;
     let Ok(Some(transfer)) = self
       .fetch_storage(
         &storage()
           .chain_transfer()
-          .pending_transfers_out(account_id32, nonce),
+          .pending_transfers_out(transfer_id),
         None,
       )
       .await
@@ -487,38 +488,41 @@ impl MainchainClient {
         amount: amount.into(),
         notary_id,
         expiration_block: transfer.expiration_block,
-        account_nonce: transfer.account_nonce,
+        transfer_id: transfer.transfer_id,
       },
       in_block,
     ))
   }
 
+  fn subxt_account_to_address(
+    &self,
+    account_id: subxt::utils::AccountId32,
+  ) -> anyhow::Result<String> {
+    let account_id = AccountId32::from_slice(account_id.as_ref())
+      .map_err(|_| anyhow!("Unable to decode subxt account"))?;
+    Ok(AccountStore::to_address(&account_id))
+  }
+
   pub async fn wait_for_localchain_transfer(
     &self,
-    address: String,
-    nonce: u32,
+    transfer_id: TransferToLocalchainId,
   ) -> Result<Option<LocalchainTransfer>> {
-    let account_id32 = subxt::utils::AccountId32::from_str(&address).map_err(|e| anyhow!(e))?;
     if let Some(transfer) = self
       .fetch_storage(
         &storage()
           .chain_transfer()
-          .pending_transfers_out(account_id32.clone(), nonce),
+          .pending_transfers_out(transfer_id),
         None,
       )
       .await?
     {
       return Ok(Some(LocalchainTransfer {
-        address,
+        address: self.subxt_account_to_address(transfer.account_id)?,
         amount: transfer.amount,
         notary_id: transfer.notary_id,
         expiration_block: transfer.expiration_block,
-        account_nonce: nonce,
+        transfer_id,
       }));
-    }
-
-    if self.get_account_nonce(address.clone()).await? >= nonce {
-      return Ok(None);
     }
 
     let mut subscription = self
@@ -542,13 +546,13 @@ impl MainchainClient {
           .as_event::<api::chain_transfer::events::TransferToLocalchain>()
           .transpose()
         {
-          if transfer.account_id == account_id32 && transfer.account_nonce == nonce {
+          if transfer.transfer_id == transfer_id {
             return Ok(Some(LocalchainTransfer {
-              address,
+              address: self.subxt_account_to_address(transfer.account_id)?,
               amount: transfer.amount,
               notary_id: transfer.notary_id,
               expiration_block: transfer.expiration_block,
-              account_nonce: nonce,
+              transfer_id,
             }));
           }
         }
@@ -672,7 +676,7 @@ pub mod napi_ext {
     pub amount: BigInt,
     pub notary_id: u32,
     pub expiration_block: u32,
-    pub account_nonce: u32,
+    pub transfer_id: u32,
   }
 
   #[napi(object)]
@@ -823,19 +827,13 @@ pub mod napi_ext {
       })
     }
 
-    #[napi(js_name = "getAccountNonce")]
-    pub async fn get_account_nonce_napi(&self, address: String) -> napi::Result<u32> {
-      self.get_account_nonce(address).await.napi_ok()
-    }
-
     #[napi(js_name = "getTransferToLocalchainFinalizedBlock")]
     pub async fn get_transfer_to_localchain_finalized_block_napi(
       &self,
-      address: String,
-      nonce: u32,
+      transfer_id: u32,
     ) -> napi::Result<Option<u32>> {
       self
-        .get_transfer_to_localchain_finalized_block(address, nonce)
+        .get_transfer_to_localchain_finalized_block(transfer_id)
         .await
         .napi_ok()
     }
@@ -843,11 +841,10 @@ pub mod napi_ext {
     #[napi(js_name = "waitForLocalchainTransfer")]
     pub async fn wait_for_localchain_transfer_napi(
       &self,
-      address: String,
-      nonce: u32,
+      transfer_id: u32,
     ) -> napi::Result<Option<LocalchainTransfer>> {
       let result = self
-        .wait_for_localchain_transfer(address.clone(), nonce)
+        .wait_for_localchain_transfer(transfer_id)
         .await
         .napi_ok()?;
       let Some(result) = result else {
@@ -855,11 +852,11 @@ pub mod napi_ext {
       };
 
       Ok(Some(LocalchainTransfer {
-        address,
+        address: result.address,
         amount: result.amount.into(),
         notary_id: result.notary_id,
         expiration_block: result.expiration_block,
-        account_nonce: nonce,
+        transfer_id,
       }))
     }
 
@@ -900,7 +897,7 @@ pub struct LocalchainTransfer {
   pub amount: Balance,
   pub notary_id: u32,
   pub expiration_block: u32,
-  pub account_nonce: u32,
+  pub transfer_id: TransferToLocalchainId,
 }
 
 pub struct BalancesAccountData {

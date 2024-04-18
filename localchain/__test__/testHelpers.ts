@@ -147,8 +147,8 @@ export async function transferToLocalchain(account: KeyringPair, amount: number,
                     .then(() => {
                         for (const {event} of events) {
                             if (client.events.chainTransfer.TransferToLocalchain.is(event)) {
-                                let nonce = event.data.accountNonce.toPrimitive() as number;
-                                resolve(nonce)
+                                let transferId = event.data.transferId.toPrimitive() as number;
+                                resolve(transferId)
                             }
                         }
 

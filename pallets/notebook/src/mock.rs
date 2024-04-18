@@ -7,14 +7,7 @@ use sp_runtime::{
 	BuildStorage,
 };
 
-use ulx_primitives::{
-	block_seal::MiningAuthority,
-	block_vote::VoteMinimum,
-	notary::{NotaryId, NotaryProvider, NotarySignature},
-	tick::{Tick, Ticker},
-	AuthorityProvider, BlockSealAuthorityId, BlockVotingProvider, ChainTransferLookup,
-	TickProvider,
-};
+use ulx_primitives::{block_seal::MiningAuthority, block_vote::VoteMinimum, notary::{NotaryId, NotaryProvider, NotarySignature}, tick::{Tick, Ticker}, AuthorityProvider, BlockSealAuthorityId, BlockVotingProvider, ChainTransferLookup, TickProvider, TransferToLocalchainId};
 
 use crate as pallet_notebook;
 
@@ -82,23 +75,23 @@ impl NotaryProvider<Block> for NotaryProviderImpl {
 }
 
 parameter_types! {
-	pub static ChainTransfers: Vec<(NotaryId, AccountId32, u64, Balance)> = vec![];
+	pub static ChainTransfers: Vec<(NotaryId, AccountId32, TransferToLocalchainId, Balance)> = vec![];
 	pub static ParentVotingKey: Option<H256> = None;
 	pub static GrandpaVoteMinimum: Option<VoteMinimum> = None;
 	pub static CurrentTick: Tick = 0;
 }
 pub struct ChainTransferLookupImpl;
-impl ChainTransferLookup<u64, AccountId32, Balance> for ChainTransferLookupImpl {
+impl ChainTransferLookup<AccountId32, Balance> for ChainTransferLookupImpl {
 	fn is_valid_transfer_to_localchain(
 		notary_id: NotaryId,
+		transfer_to_localchain_id: TransferToLocalchainId,
 		account_id: &AccountId32,
-		nonce: u64,
 		milligons: Balance,
 	) -> bool {
 		ChainTransfers::get()
 			.iter()
-			.find(|(id, acc, n, t_mill)| {
-				*id == notary_id && *acc == *account_id && *n == nonce && *t_mill == milligons
+			.find(|(id, acc, tid, t_mill)| {
+				*id == notary_id && *acc == *account_id && *tid == transfer_to_localchain_id && *t_mill == milligons
 			})
 			.is_some()
 	}

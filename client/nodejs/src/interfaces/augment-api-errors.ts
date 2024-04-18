@@ -193,10 +193,6 @@ declare module '@polkadot/api-base/types/errors' {
        **/
       InsufficientNotarizedFunds: AugmentedError<ApiType>;
       /**
-       * The account nonce used for this transfer is no longer valid
-       **/
-      InvalidAccountNonce: AugmentedError<ApiType>;
-      /**
        * The notary id is not registered
        **/
       InvalidNotaryUsedForTransfer: AugmentedError<ApiType>;

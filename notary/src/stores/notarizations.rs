@@ -304,7 +304,7 @@ impl NotarizationsStore {
 			let mut escrow_hold_note = None;
 			for (note_index, note) in change.notes.into_iter().enumerate() {
 				let _ = match note.note_type {
-					NoteType::ClaimFromMainchain { account_nonce: nonce, .. } => {
+					NoteType::ClaimFromMainchain { transfer_id, .. } => {
 						chain_transfers += 1;
 						// NOTE: transfers can expire. We need to ensure this can still get into a
 						// notebook
@@ -312,7 +312,7 @@ impl NotarizationsStore {
 							&mut *tx,
 							current_notebook_number,
 							&account_id,
-							nonce,
+							transfer_id,
 							note.milligons,
 							change_index,
 							note_index,
@@ -447,7 +447,7 @@ mod tests {
 				escrow_hold_note: None,
 				notes: bounded_vec![Note::create(
 					1000,
-					NoteType::ClaimFromMainchain { account_nonce: 1 }
+					NoteType::ClaimFromMainchain { transfer_id: 1 }
 				)],
 				signature: Signature::from_raw([0u8; 64]).into(),
 			},

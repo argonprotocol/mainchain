@@ -193,7 +193,7 @@ jobs:
           password: ${{ secrets.GITHUB_TOKEN }}
 
       - name: Pull Miner
-        run: docker pull ghcr.io/ulixee/ulixee-miner:edge && docker pull ghcr.io/ulixee/ulixee-notary:edge
+        run: docker pull ghcr.io/ulixee/ulixee-miner:dev && docker pull ghcr.io/ulixee/ulixee-notary:dev
 
       - name: Download artifacts
         uses: actions/download-artifact@v4

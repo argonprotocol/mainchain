@@ -40,7 +40,7 @@ jobs:
     steps:
       - uses: actions/checkout@v4
       - name: Free Disk Space
-        if: startsWith(matrix.os, 'ubuntu')
+        if: ${{startsWith(matrix.os, 'ubuntu') && !vars.BUILD_ASSET_RUNID}}
         uses: ./.github/templates/clear-space
 
       - name: Set Localchain Db Url
@@ -48,7 +48,7 @@ jobs:
         run: echo "DATABASE_URL=sqlite://${{ runner.temp }}/temp.db" > .env
 
       - name: Install linux dependencies
-        if: startsWith(matrix.os, 'ubuntu')
+        if: ${{startsWith(matrix.os, 'ubuntu') && !vars.BUILD_ASSET_RUNID}}
         run: sudo apt-get install -y clang libssl-dev llvm libudev-dev protobuf-compiler pkg-config
 
       - name: Install mac dependencies
@@ -56,6 +56,7 @@ jobs:
         run: brew install protobuf
 
       - name: Start sccache
+        if: ${{!vars.BUILD_ASSET_RUNID}}
         uses: hendrikmuhs/ccache-action@v1.2
         with:
           variant: sccache
@@ -67,12 +68,14 @@ jobs:
       - uses: rui314/setup-mold@v1
 
       - name: Install
+        if: ${{!vars.BUILD_ASSET_RUNID}}
         uses: dtolnay/rust-toolchain@stable
         with:
           toolchain: stable
           targets: ${{ matrix.target }},wasm32-unknown-unknown
 
       - name: Cache cargo
+        if: ${{!vars.BUILD_ASSET_RUNID}}
         uses: actions/cache@v4
         with:
           path: |
@@ -86,19 +89,23 @@ jobs:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
 
       - uses: taiki-e/install-action@v2
+        if: ${{!vars.BUILD_ASSET_RUNID}}
         with:
           tool: cargo-make,sqlx-cli
 
       - name: Migrate Notary Db
+        if: ${{!vars.BUILD_ASSET_RUNID}}
         working-directory: notary
         run: cargo sqlx database setup
 
       - name: Migrate Localchain Db
+        if: ${{!vars.BUILD_ASSET_RUNID}}
         working-directory: localchain
         run: cargo sqlx database setup
 
       - name: Test
-        run: cargo make test-ci
+        if: ${{!vars.BUILD_ASSET_RUNID}}
+        run: cargo build --features=fast-runtime && cargo test --features=fast-runtime
         env:
           RUSTC_WRAPPER: "sccache"
           CARGO_INCREMENTAL: 0
@@ -106,6 +113,7 @@ jobs:
           RUST_LOG: info
 
       - name: Upload Debug Assets
+        if: ${{!vars.BUILD_ASSET_RUNID}}
         uses: actions/upload-artifact@v4
         with:
           name: bins-${{ matrix.target }}
@@ -120,7 +128,7 @@ jobs:
     steps:
       - uses: actions/checkout@v4
       - name: Set up QEMU
-        uses: docker/setup-qemu-action@v2
+        uses: docker/setup-qemu-action@v3
       - name: Set up Docker Buildx
         uses: docker/setup-buildx-action@v3
 
@@ -128,21 +136,23 @@ jobs:
         uses: actions/download-artifact@v4
         with:
           name: bins-x86_64-unknown-linux-gnu
+          run-id: ${{ vars.BUILD_ASSET_RUNID || github.run_id}}
+          github-token: ${{ secrets.GITHUB_TOKEN }}
           path: .
 
       - name: List assets in root
         run: ls
         shell: bash
 
-      - name: Node
+      - name: UlxNode
         uses: ./.github/templates/docker
         with:
-          image: ulixee/ulx-node
-          build-args: 'BIN=ulx-node'
-          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          image: ghcr.io/ulixee/ulixee-miner
+          bin: ulx-node
+          github-token: ${{ secrets.GITHUB_TOKEN }}
       - name: Notary
         uses: ./.github/templates/docker
         with:
-          image: ulixee/ulx-notary
-          build-args: 'BIN=ulx-notary'
-          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          image: ghcr.io/ulixee/ulixee-notary
+          bin: ulx-notary
+          github-token: ${{ secrets.GITHUB_TOKEN }}

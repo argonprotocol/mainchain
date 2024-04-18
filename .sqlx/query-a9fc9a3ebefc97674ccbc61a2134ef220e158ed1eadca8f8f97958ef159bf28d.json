@@ -15,7 +15,7 @@
       },
       {
         "ordinal": 2,
-        "name": "account_nonce",
+        "name": "transfer_id",
         "type_info": "Int4"
       },
       {

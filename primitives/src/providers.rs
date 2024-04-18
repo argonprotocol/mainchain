@@ -4,11 +4,7 @@ use sp_core::{RuntimeDebug, H256, U256};
 use sp_runtime::{traits::Block as BlockT, DispatchResult};
 use sp_std::vec::Vec;
 
-use crate::{
-	block_seal::MiningAuthority,
-	tick::{Tick, Ticker},
-	DataDomainHash, NotaryId, NotebookHeader, NotebookNumber, NotebookSecret, VoteMinimum,
-};
+use crate::{block_seal::MiningAuthority, tick::{Tick, Ticker}, DataDomainHash, NotaryId, NotebookHeader, NotebookNumber, NotebookSecret, VoteMinimum, TransferToLocalchainId};
 
 pub trait DataDomainProvider<AccountId> {
 	fn is_registered_payment_account(
@@ -33,11 +29,11 @@ pub trait NotebookProvider {
 	fn is_notary_locked_at_tick(notary_id: NotaryId, tick: Tick) -> bool;
 }
 
-pub trait ChainTransferLookup<Nonce, AccountId, Balance> {
+pub trait ChainTransferLookup<AccountId, Balance> {
 	fn is_valid_transfer_to_localchain(
 		notary_id: NotaryId,
+		transfer_to_localchain_id: TransferToLocalchainId,
 		account_id: &AccountId,
-		nonce: Nonce,
 		milligons: Balance,
 	) -> bool;
 }

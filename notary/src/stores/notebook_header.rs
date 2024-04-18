@@ -466,7 +466,7 @@ mod tests {
 
 	use chrono::{Duration, Utc};
 	use sp_core::H256;
-	use sp_keyring::AccountKeyring::{Alice, Bob};
+	use sp_keyring::AccountKeyring::{Alice};
 	use sp_keystore::{testing::MemoryKeystore, KeystoreExt};
 	use sp_runtime::traits::Verify;
 	use sqlx::PgPool;
@@ -562,10 +562,7 @@ mod tests {
 				notebook_number,
 				notebook_number,
 				vec![
-					ChainTransfer::ToLocalchain {
-						account_id: Bob.to_account_id(),
-						account_nonce: 1,
-					},
+					ChainTransfer::ToLocalchain { transfer_id: 1 },
 					ChainTransfer::ToMainchain { account_id: Alice.to_account_id(), amount: 100 },
 				],
 				vec![],
@@ -589,10 +586,7 @@ mod tests {
 			let header = NotebookHeaderStore::load(&mut *tx, notebook_number).await?;
 
 			assert_eq!(header.chain_transfers.len(), 2);
-			assert_eq!(
-				header.chain_transfers[0],
-				ChainTransfer::ToLocalchain { account_id: Bob.to_account_id(), account_nonce: 1 }
-			);
+			assert_eq!(header.chain_transfers[0], ChainTransfer::ToLocalchain { transfer_id: 1 });
 			assert_eq!(
 				header.chain_transfers[1],
 				ChainTransfer::ToMainchain { account_id: Alice.to_account_id(), amount: 100 }

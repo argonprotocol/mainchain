@@ -384,7 +384,7 @@ mod tests {
 			previous_balance_proof: None,
 			notes: bounded_vec![Note::create(
 				1000,
-				NoteType::ClaimFromMainchain { account_nonce: 1 }
+				NoteType::ClaimFromMainchain { transfer_id: 1 }
 			)],
 			escrow_hold_note: None,
 			signature: Signature::from_raw([0; 64]).into(),
@@ -436,10 +436,7 @@ mod tests {
 		let header = stream.next().await.unwrap()?.header;
 
 		assert_eq!(header.notebook_number, 1);
-		assert_eq!(
-			header.chain_transfers[0],
-			ChainTransfer::ToLocalchain { account_id: Bob.to_account_id(), account_nonce: 1 }
-		);
+		assert_eq!(header.chain_transfers[0], ChainTransfer::ToLocalchain { transfer_id: 1 });
 
 		let tip = BalanceTip {
 			account_id: Bob.to_account_id(),

@@ -319,6 +319,8 @@ pub type BlockVotingPower = u128;
 pub type NotebookSecret = H256;
 pub type NotebookSecretHash = H256;
 
+pub type TransferToLocalchainId = u32;
+
 #[derive(
 	Clone,
 	PartialEq,
@@ -345,9 +347,8 @@ pub enum ChainTransfer {
 	},
 	#[serde(rename_all = "camelCase")]
 	ToLocalchain {
-		account_id: AccountId,
 		#[codec(compact)]
-		account_nonce: u32,
+		transfer_id: TransferToLocalchainId,
 	},
 }
 

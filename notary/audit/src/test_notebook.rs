@@ -14,13 +14,7 @@ use sp_keyring::{
 };
 use sp_runtime::traits::BlakeTwo256;
 
-use ulx_primitives::{
-	balance_change::{AccountOrigin, BalanceChange, BalanceProof},
-	note::{Note, NoteType},
-	AccountType, Balance, BalanceTip, BlockVote, ChainTransfer, DataDomain, DataTLD,
-	LocalchainAccountId, MerkleProof, MultiSignatureBytes, NewAccountOrigin, Notarization,
-	Notebook, NotebookHeader, NotebookNumber, ESCROW_EXPIRATION_TICKS,
-};
+use ulx_primitives::{balance_change::{AccountOrigin, BalanceChange, BalanceProof}, note::{Note, NoteType}, AccountType, Balance, BalanceTip, BlockVote, ChainTransfer, DataDomain, DataTLD, LocalchainAccountId, MerkleProof, MultiSignatureBytes, NewAccountOrigin, Notarization, Notebook, NotebookHeader, NotebookNumber, ESCROW_EXPIRATION_TICKS, TransferToLocalchainId};
 
 use crate::{
 	verify_previous_balance_proof, AccountHistoryLookupError, NotebookHistoryLookup, VerifyError,
@@ -37,7 +31,7 @@ struct TestLookup;
 parameter_types! {
 	pub static NotebookRoots: BTreeMap<u32, H256> = BTreeMap::new();
 	pub static LastChangedNotebook: BTreeMap<AccountOrigin, u32> = BTreeMap::new();
-	pub static ValidLocalchainTransfers: BTreeSet<(AccountId32, u32)> = BTreeSet::new();
+	pub static ValidLocalchainTransfers: BTreeSet<(AccountId32, TransferToLocalchainId)> = BTreeSet::new();
 }
 
 impl NotebookHistoryLookup for TestLookup {
@@ -64,12 +58,12 @@ impl NotebookHistoryLookup for TestLookup {
 	fn is_valid_transfer_to_localchain(
 		&self,
 		_notary_id: u32,
+		transfer_to_localchain_id: TransferToLocalchainId,
 		account_id: &AccountId32,
-		nonce: u32,
 		_milligons: Balance,
 	) -> Result<bool, AccountHistoryLookupError> {
 		ValidLocalchainTransfers::get()
-			.get(&(account_id.clone(), nonce))
+			.get(&(account_id.clone(), transfer_to_localchain_id))
 			.cloned()
 			.ok_or(AccountHistoryLookupError::InvalidTransferToLocalchain)
 			.map(|_| true)
@@ -181,7 +175,7 @@ fn test_verify_previous_balance() {
 
 #[test]
 fn test_verify_notebook() {
-	let note = Note::create(1000, NoteType::ClaimFromMainchain { account_nonce: 1 });
+	let note = Note::create(1000, NoteType::ClaimFromMainchain { transfer_id: 1 });
 
 	let alice_balance_changeset = vec![BalanceChange {
 		balance: 1000,
@@ -211,8 +205,7 @@ fn test_verify_notebook() {
 		}
 		.encode()]),
 		chain_transfers: bounded_vec![ChainTransfer::ToLocalchain {
-			account_id: Alice.to_account_id(),
-			account_nonce: 1,
+			transfer_id: 1,
 		}],
 		tax: 0,
 		changed_account_origins: bounded_vec![AccountOrigin { notebook_number: 1, account_uid: 1 }],
@@ -259,7 +252,7 @@ fn test_verify_notebook() {
 	let mut bad_notebook1 = notebook1.clone();
 	let _ = bad_notebook1.header.chain_transfers.try_insert(
 		0,
-		ChainTransfer::ToLocalchain { account_id: Bob.to_account_id(), account_nonce: 2 },
+		ChainTransfer::ToLocalchain { transfer_id: 2 },
 	);
 	bad_notebook1.hash = hash;
 
@@ -280,8 +273,8 @@ fn test_verify_notebook() {
 
 #[test]
 fn test_disallows_double_claim() {
-	let note1 = Note::create(1000, NoteType::ClaimFromMainchain { account_nonce: 1 });
-	let note2 = Note::create(1000, NoteType::ClaimFromMainchain { account_nonce: 1 });
+	let note1 = Note::create(1000, NoteType::ClaimFromMainchain { transfer_id: 1 });
+	let note2 = Note::create(1000, NoteType::ClaimFromMainchain { transfer_id: 1 });
 
 	let alice_balance_changeset = vec![BalanceChange {
 		balance: 2000,
@@ -311,8 +304,7 @@ fn test_disallows_double_claim() {
 		}
 		.encode()]),
 		chain_transfers: bounded_vec![ChainTransfer::ToLocalchain {
-			account_id: Alice.to_account_id(),
-			account_nonce: 1,
+			transfer_id: 1,
 		}],
 		tax: 0,
 		changed_account_origins: bounded_vec![AccountOrigin { notebook_number: 1, account_uid: 1 }],
@@ -362,7 +354,7 @@ fn test_multiple_changesets_in_a_notebook() {
 			previous_balance_proof: None,
 			escrow_hold_note: None,
 			notes: bounded_vec![
-				Note::create(1000, NoteType::ClaimFromMainchain { account_nonce: 1 }),
+				Note::create(1000, NoteType::ClaimFromMainchain { transfer_id: 1 }),
 				Note::create(1000, NoteType::Send { to: None }),
 			],
 			signature: empty_signature(),
@@ -448,8 +440,7 @@ fn test_multiple_changesets_in_a_notebook() {
 				balance_tips.iter().map(|(_, v)| v.encode()).collect::<Vec<_>>(),
 			),
 			chain_transfers: bounded_vec![ChainTransfer::ToLocalchain {
-				account_id: Alice.to_account_id(),
-				account_nonce: 1,
+				transfer_id: 1,
 			}],
 			changed_account_origins: bounded_vec![
 				AccountOrigin { notebook_number: 1, account_uid: 1 },
@@ -611,7 +602,7 @@ fn test_cannot_remove_lock_between_changesets_in_a_notebook() {
 		account_type: AccountType::Deposit,
 		previous_balance_proof: None,
 		escrow_hold_note: None,
-		notes: bounded_vec![Note::create(1000, NoteType::ClaimFromMainchain { account_nonce: 1 }),],
+		notes: bounded_vec![Note::create(1000, NoteType::ClaimFromMainchain { transfer_id: 1 }),],
 		signature: empty_signature(),
 	}
 	.sign(Alice.pair())
@@ -657,8 +648,7 @@ fn test_cannot_remove_lock_between_changesets_in_a_notebook() {
 			}
 			.encode()]),
 			chain_transfers: bounded_vec![ChainTransfer::ToLocalchain {
-				account_id: Alice.to_account_id(),
-				account_nonce: 1,
+				transfer_id: 1,
 			}],
 			changed_account_origins: bounded_vec![AccountOrigin {
 				notebook_number: 1,

@@ -23,7 +23,7 @@ it('can sign a message from javscript', async () => {
         amount: 5000n,
         expirationBlock: 1,
         notaryId: 1,
-        accountNonce: 1
+        transferId: 1
     });
     await expect(notarization.sign()).resolves.toBeUndefined();
     await expect(notarization.verify()).resolves.toBeUndefined();
@@ -47,7 +47,7 @@ it('can sign using built-in', async () => {
         amount: 5000n,
         expirationBlock: 1,
         notaryId: 1,
-        accountNonce: 1
+        transferId: 1
     });
     await expect(notarization.sign()).resolves.toBeUndefined();
     await expect(notarization.verify()).resolves.toBeUndefined();

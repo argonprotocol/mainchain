@@ -6,7 +6,7 @@ use frame_support::{assert_err, assert_noop, assert_ok, traits::OnInitialize};
 use sp_core::{bounded_vec, ed25519, Blake2Hasher, Pair};
 use sp_keyring::AccountKeyring::Alice;
 use sp_keyring::{AccountKeyring::Bob, Ed25519Keyring};
-use sp_runtime::{testing::H256, traits::UniqueSaturatedInto, BoundedVec, Digest, DigestItem};
+use sp_runtime::{testing::H256, BoundedVec, Digest, DigestItem};
 
 use ulx_notary_audit::{AccountHistoryLookupError, VerifyError};
 use ulx_primitives::{
@@ -224,9 +224,8 @@ fn it_tracks_changed_accounts() {
 		// Go past genesis block so events get deposited
 		System::set_block_number(1);
 		let who = Bob.to_account_id();
-		let nonce = System::account_nonce(&who).into();
 		set_argons(&who, 5000);
-		ChainTransfers::mutate(|v| v.push((1, who.clone(), nonce, 5000)));
+		ChainTransfers::mutate(|v| v.push((1, who.clone(), 1, 5000)));
 
 		System::set_block_number(3);
 		System::on_initialize(3);
@@ -235,10 +234,7 @@ fn it_tracks_changed_accounts() {
 		let mut secret_hashes = vec![];
 		// block number must be 1 prior to the current block number
 		let mut header = make_header(1, 2);
-		header.chain_transfers = bounded_vec![ChainTransfer::ToLocalchain {
-			account_id: who.clone(),
-			account_nonce: nonce.unique_saturated_into()
-		}];
+		header.chain_transfers = bounded_vec![ChainTransfer::ToLocalchain { transfer_id: 1 }];
 		header.changed_accounts_root = changed_accounts_root.clone();
 		header.changed_account_origins =
 			bounded_vec![AccountOrigin { notebook_number: 1, account_uid: 1 }];
@@ -424,11 +420,9 @@ fn it_can_audit_notebooks() {
 		// Go past genesis block so events get deposited
 		System::set_block_number(1);
 		let who = Bob.to_account_id();
-		let nonce = System::account_nonce(&who);
 		let notary_id = 1;
-		System::inc_account_nonce(&who);
 		set_argons(&who, 2000);
-		ChainTransfers::mutate(|v| v.push((notary_id, who.clone(), nonce, 2000)));
+		ChainTransfers::mutate(|v| v.push((notary_id, who.clone(), 1, 2000)));
 
 		System::set_block_number(2);
 
@@ -437,10 +431,7 @@ fn it_can_audit_notebooks() {
 			notebook_number: 1,
 			tick: 1,
 			finalized_block_number: 1,
-			chain_transfers: bounded_vec![ChainTransfer::ToLocalchain {
-				account_id: who.clone(),
-				account_nonce: nonce.unique_saturated_into()
-			}],
+			chain_transfers: bounded_vec![ChainTransfer::ToLocalchain { transfer_id: 1 }],
 			changed_accounts_root: merkle_root::<Blake2Hasher, _>(vec![BalanceTip {
 				account_id: who.clone(),
 				account_type: AccountType::Deposit,
@@ -483,9 +474,7 @@ fn it_can_audit_notebooks() {
 					change_number: 1,
 					notes: bounded_vec![Note::create(
 						2000,
-						NoteType::ClaimFromMainchain {
-							account_nonce: nonce.unique_saturated_into()
-						},
+						NoteType::ClaimFromMainchain { transfer_id: 1 },
 					)],
 					escrow_hold_note: None,
 					signature: ed25519::Signature::from_raw([0u8; 64]).into(),
@@ -519,11 +508,9 @@ fn it_can_audit_notebooks_with_history() {
 		// Go past genesis block so events get deposited
 		System::set_block_number(1);
 		let who = Bob.to_account_id();
-		let nonce = System::account_nonce(&who);
 		let notary_id = 1;
-		System::inc_account_nonce(&who);
 		set_argons(&who, 2000);
-		ChainTransfers::mutate(|v| v.push((notary_id, who.clone(), nonce, 2000)));
+		ChainTransfers::mutate(|v| v.push((notary_id, who.clone(), 1, 2000)));
 
 		System::set_block_number(2);
 
@@ -542,10 +529,7 @@ fn it_can_audit_notebooks_with_history() {
 
 		let mut header = make_header(notebook_number, tick);
 		header.changed_accounts_root = changed_accounts_root.clone();
-		header.chain_transfers = bounded_vec![ChainTransfer::ToLocalchain {
-			account_id: who.clone(),
-			account_nonce: nonce.unique_saturated_into()
-		}];
+		header.chain_transfers = bounded_vec![ChainTransfer::ToLocalchain { transfer_id: 1 }];
 		header.changed_account_origins =
 			bounded_vec![AccountOrigin { notebook_number, account_uid: 1 }];
 		let header_hash = header.hash();
@@ -570,9 +554,7 @@ fn it_can_audit_notebooks_with_history() {
 					change_number: 1,
 					notes: bounded_vec![Note::create(
 						2000,
-						NoteType::ClaimFromMainchain {
-							account_nonce: nonce.unique_saturated_into()
-						},
+						NoteType::ClaimFromMainchain { transfer_id: 1 },
 					)],
 					escrow_hold_note: None,
 					signature: ed25519::Signature::from_raw([0u8; 64]).into(),
@@ -632,10 +614,7 @@ fn it_can_audit_notebooks_with_history() {
 					tick: tick - 1,
 					changed_accounts_root: H256::random(),
 					account_changelist: vec![],
-					used_transfers_to_localchain: vec![(
-						who.clone(),
-						nonce.unique_saturated_into()
-					)],
+					used_transfers_to_localchain: vec![1],
 				}]
 			),
 			VerifyError::HistoryLookupError {

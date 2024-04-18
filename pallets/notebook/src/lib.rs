@@ -39,7 +39,7 @@ pub mod pallet {
 		AccountOriginUid, Balance, BlockVotingProvider, ChainTransfer, ChainTransferLookup,
 		NotebookAuditResult, NotebookAuditSummary, NotebookDigest as NotebookDigestT,
 		NotebookEventHandler, NotebookProvider, NotebookSecret, SignedNotebookHeader, TickProvider,
-		NOTEBOOKS_DIGEST_ID,
+		TransferToLocalchainId, NOTEBOOKS_DIGEST_ID,
 	};
 
 	use super::*;
@@ -64,7 +64,7 @@ pub mod pallet {
 
 		type NotaryProvider: NotaryProvider<<Self as frame_system::Config>::Block>;
 
-		type ChainTransferLookup: ChainTransferLookup<Self::Nonce, Self::AccountId, Balance>;
+		type ChainTransferLookup: ChainTransferLookup<Self::AccountId, Balance>;
 
 		type BlockVotingProvider: BlockVotingProvider<Self::Block>;
 		type TickProvider: TickProvider<Self::Block>;
@@ -292,7 +292,7 @@ pub mod pallet {
 		pub last_changed_notebooks:
 			BTreeMap<(NotaryId, NotebookNumber, AccountOriginUid), NotebookNumber>,
 		pub account_changes_root: BTreeMap<(NotaryId, NotebookNumber), H256>,
-		pub used_transfers_to_localchain: BTreeSet<(NotaryId, AccountId32, u32)>,
+		pub used_transfers_to_localchain: BTreeSet<TransferToLocalchainId>,
 		_marker: PhantomData<T>,
 	}
 	impl<T: Config> LocalchainHistoryLookup<T> {
@@ -303,12 +303,8 @@ pub mod pallet {
 		pub fn add_audit_summary(&mut self, audit_summary: NotebookAuditSummary) {
 			let notary_id = audit_summary.notary_id;
 			let notebook_number = audit_summary.notebook_number;
-			for (account_id, account_nonce) in audit_summary.used_transfers_to_localchain.iter() {
-				self.used_transfers_to_localchain.insert((
-					notary_id,
-					account_id.clone(),
-					*account_nonce,
-				));
+			for id in audit_summary.used_transfers_to_localchain.iter() {
+				self.used_transfers_to_localchain.insert(*id);
 			}
 			self.account_changes_root
 				.insert((notary_id, notebook_number), audit_summary.changed_accounts_root);
@@ -353,20 +349,17 @@ pub mod pallet {
 		fn is_valid_transfer_to_localchain(
 			&self,
 			notary_id: NotaryId,
+			transfer_id: TransferToLocalchainId,
 			account_id: &AccountId32,
-			nonce: u32,
 			amount: Balance,
 		) -> Result<bool, AccountHistoryLookupError> {
-			if self
-				.used_transfers_to_localchain
-				.contains(&(notary_id, account_id.clone(), nonce))
-			{
+			if self.used_transfers_to_localchain.contains(&transfer_id) {
 				return Err(AccountHistoryLookupError::InvalidTransferToLocalchain);
 			}
 			if T::ChainTransferLookup::is_valid_transfer_to_localchain(
 				notary_id,
+				transfer_id,
 				account_id,
-				nonce.into(),
 				amount,
 			) {
 				Ok(true)
@@ -578,9 +571,7 @@ pub mod pallet {
 					.chain_transfers
 					.iter()
 					.filter_map(|t| match t {
-						ChainTransfer::ToLocalchain { account_id, account_nonce } => {
-							Some((account_id.clone(), *account_nonce))
-						},
+						ChainTransfer::ToLocalchain { transfer_id } => Some(*transfer_id),
 						_ => None,
 					})
 					.collect(),

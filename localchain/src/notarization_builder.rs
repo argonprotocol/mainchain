@@ -1161,7 +1161,7 @@ pub mod napi_ext {
         address: transfer.address,
         amount: transfer.amount.get_u128().1,
         notary_id: transfer.notary_id,
-        account_nonce: transfer.account_nonce,
+        transfer_id: transfer.transfer_id,
         expiration_block: transfer.expiration_block,
       };
       self.claim_from_mainchain(transfer).await.napi_ok()
@@ -1370,10 +1370,7 @@ mod test {
       let mut notebook_header = mock_notary.create_notebook_header(vec![balance_tip]).await;
       notebook_header
         .chain_transfers
-        .try_push(ChainTransfer::ToLocalchain {
-          account_id: Alice.to_account_id(),
-          account_nonce: 1,
-        })
+        .try_push(ChainTransfer::ToLocalchain { transfer_id: 1 })
         .expect("should be able to push");
 
       alice_notarization.get_notebook_proof().await?;
@@ -1541,26 +1538,59 @@ mod test {
     };
     let balance_change = balance_change.sign(Bob.pair()).clone();
     let keystore = Keystore::new(pool.clone());
-    let builder = NotarizationBuilder::new(pool.clone(), notary_clients.clone(), keystore.clone());
-    {
-      let res = builder
-        .import_argon_file(
-          ArgonFile::create(vec![balance_change.clone()], ArgonFileType::Send).to_json()?,
-        )
-        .await;
-      assert!(res.unwrap_err().to_string().contains("has not been setup"));
-    }
     let _ = keystore.import_suri(Alice.to_seed(), Ed25519, None).await?;
+    let builder = NotarizationBuilder::new(pool.clone(), notary_clients.clone(), keystore.clone());
     let res = builder
       .import_argon_file(ArgonFile::create(vec![balance_change], ArgonFileType::Send).to_json()?)
       .await;
-    assert!(res
-      .unwrap_err()
-      .to_string()
-      .contains("account restriction"));
+    let error_message = res.unwrap_err().to_string();
+    println!("Error accepting funds {:?}", error_message);
+    assert!(error_message.contains("account restriction"));
     Ok(())
   }
 
+  #[sqlx::test]
+  async fn it_informs_user_if_not_setup(pool: SqlitePool) -> anyhow::Result<()> {
+    let mock_notary = create_mock_notary().await?;
+    let notary_clients = mock_notary_clients(&mock_notary, Ferdie).await?;
+
+    let mut balance_change = BalanceChange {
+      account_id: Bob.to_account_id(),
+      account_type: AccountType::Deposit,
+      balance: 10_000,
+      previous_balance_proof: Some(BalanceProof {
+        notary_id: 1,
+        balance: 11_000,
+        account_origin: AccountOrigin {
+          account_uid: 1,
+          notebook_number: 1,
+        },
+        notebook_number: 1,
+        tick: 1,
+        notebook_proof: None,
+      }),
+      notes: bounded_vec![Note {
+        milligons: 1000,
+        note_type: NoteType::Send {
+          to: Some(bounded_vec![Ferdie.to_account_id()])
+        }
+      }],
+      signature: Signature::from_raw([0u8; 64]).into(),
+      change_number: 2,
+      escrow_hold_note: None,
+    };
+    let balance_change = balance_change.sign(Bob.pair()).clone();
+    let keystore = Keystore::new(pool.clone());
+    let builder = NotarizationBuilder::new(pool.clone(), notary_clients.clone(), keystore.clone());
+    let res = builder
+      .import_argon_file(
+        ArgonFile::create(vec![balance_change.clone()], ArgonFileType::Send).to_json()?,
+      )
+      .await;
+    assert!(res.unwrap_err().to_string().contains("has not been setup"));
+
+    Ok(())
+  }
   #[sqlx::test]
   async fn it_can_read_json() -> anyhow::Result<()> {
     let balance_change = r#"{
@@ -1577,7 +1607,7 @@ mod test {
           "milligons": 5000,
           "noteType": {
             "action": "claimFromMainchain",
-            "accountNonce": 0
+            "transferId": 1
           }
         },
         {
@@ -1595,7 +1625,7 @@ mod test {
       "changeNumber": 1,
       "balance": 1000,
       "previousBalanceProof": null,
-      "escrowHoldNote": null,
+      "escrowHoldNote": null, 
       "notes": [
         {
           "milligons": 1000,

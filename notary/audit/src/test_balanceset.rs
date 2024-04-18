@@ -218,7 +218,7 @@ fn test_sending_to_localchain() {
 		escrow_hold_note: None,
 		notes: bounded_vec![Note {
 			milligons: 250,
-			note_type: NoteType::ClaimFromMainchain { account_nonce: 1 },
+			note_type: NoteType::ClaimFromMainchain { transfer_id: 1 },
 		}],
 		signature: empty_signature(),
 	}];
@@ -240,7 +240,7 @@ fn test_sending_to_mainchain() {
 			previous_balance_proof: empty_proof(50),
 			escrow_hold_note: None,
 			notes: bounded_vec![
-				Note::create(250, NoteType::ClaimFromMainchain { account_nonce: 15 }),
+				Note::create(250, NoteType::ClaimFromMainchain { transfer_id: 15 }),
 				Note::create(200, NoteType::Send { to: None }),
 			],
 			signature: empty_signature(),
@@ -418,7 +418,7 @@ fn test_change_signature() {
 		balance: 250,
 		previous_balance_proof: None,
 		escrow_hold_note: None,
-		notes: bounded_vec![Note::create(250, NoteType::ClaimFromMainchain { account_nonce: 1 }),],
+		notes: bounded_vec![Note::create(250, NoteType::ClaimFromMainchain { transfer_id: 1 }),],
 		signature: empty_signature(),
 	}];
 
@@ -572,7 +572,7 @@ fn test_can_transfer_tax() {
 		escrow_hold_note: None,
 		notes: bounded_vec!(Note::create(
 			20_000,
-			NoteType::ClaimFromMainchain { account_nonce: 1 }
+			NoteType::ClaimFromMainchain { transfer_id: 1 }
 		)),
 		signature: empty_signature(),
 	}];

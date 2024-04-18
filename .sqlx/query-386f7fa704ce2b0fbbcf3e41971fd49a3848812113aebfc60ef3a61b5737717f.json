@@ -1,6 +1,6 @@
 {
   "db_name": "PostgreSQL",
-  "query": "\n\t\t\t\tUPDATE chain_transfers SET included_in_notebook_number = $1\n\t\t\t\tWHERE account_id = $2 AND account_nonce = $3\n\t\t\t\tAND included_in_notebook_number IS NULL\n\t\t\t\tRETURNING amount\n\t\t\t\t",
+  "query": "\n\t\t\t\tUPDATE chain_transfers SET included_in_notebook_number = $1\n\t\t\t\tWHERE account_id = $2 AND transfer_id = $3\n\t\t\t\tAND included_in_notebook_number IS NULL\n\t\t\t\tRETURNING amount\n\t\t\t\t",
   "describe": {
     "columns": [
       {
@@ -20,5 +20,5 @@
       false
     ]
   },
-  "hash": "ef140a35c52441ba6beb4d5559511051f7ccb4b3dc29ae6553651e4c568470ca"
+  "hash": "386f7fa704ce2b0fbbcf3e41971fd49a3848812113aebfc60ef3a61b5737717f"
 }

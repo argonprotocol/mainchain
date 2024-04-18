@@ -23,8 +23,8 @@ script = [
 [tasks.docker]
 description = "Build docker image"
 script = [
-    "docker buildx build -t ghcr.io/ulixee/ulixee-miner:edge . -f dev.Dockerfile --target ulx-node",
-    "docker buildx build -t ghcr.io/ulixee/ulixee-notary:edge . -f dev.Dockerfile --target ulx-notary",
+    "docker buildx build -t ghcr.io/ulixee/ulixee-miner:dev . -f dev.Dockerfile --target ulx-node",
+    "docker buildx build -t ghcr.io/ulixee/ulixee-notary:dev . -f dev.Dockerfile --target ulx-notary",
 ]
 
 [tasks.sqlx]

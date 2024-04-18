@@ -14,7 +14,7 @@ pub struct MainchainTransferIn {
   pub id: i64,
   pub address: String,
   pub amount: String,
-  pub account_nonce: i64,
+  pub transfer_id: i64,
   pub notary_id: i64,
   pub first_block_hash: String,
   pub expiration_block: Option<i64>,
@@ -67,10 +67,10 @@ impl MainchainTransferStore {
     let ext_hash = hex::encode(block.extrinsic_hash().as_ref());
     let amount_str = amount.to_string();
     let res = sqlx::query!(
-      "INSERT INTO mainchain_transfers_in (address, amount, account_nonce, notary_id, expiration_block, first_block_hash, extrinsic_hash) VALUES (?, ?, ?, ?, ?, ?, ?)",
+      "INSERT INTO mainchain_transfers_in (address, amount, transfer_id, notary_id, expiration_block, first_block_hash, extrinsic_hash) VALUES (?, ?, ?, ?, ?, ?, ?)",
       account.address,
       amount_str,
-      transfer.account_nonce,
+      transfer.transfer_id,
       account.notary_id,
       transfer.expiration_block,
       block_hash,
@@ -97,10 +97,7 @@ impl MainchainTransferStore {
 
     for transfer in transfers {
       let finalized_block_number = mainchain_client
-        .get_transfer_to_localchain_finalized_block(
-          transfer.address.clone(),
-          transfer.account_nonce as u32,
-        )
+        .get_transfer_to_localchain_finalized_block(transfer.transfer_id as u32)
         .await?;
       if let Some(finalized_block_number) = finalized_block_number {
         let res = sqlx::query!(
@@ -168,15 +165,15 @@ pub mod napi_ext {
       notary_id: Option<u32>,
     ) -> napi::Result<LocalchainTransfer> {
       let transfer = self
-          .send_to_localchain(amount.get_u128().1, notary_id)
-          .await
-          .napi_ok()?;
+        .send_to_localchain(amount.get_u128().1, notary_id)
+        .await
+        .napi_ok()?;
       Ok(LocalchainTransfer {
         address: transfer.address,
         amount: transfer.amount.into(),
         notary_id: transfer.notary_id,
         expiration_block: transfer.expiration_block,
-        account_nonce: transfer.account_nonce,
+        transfer_id: transfer.transfer_id,
       })
     }
   }

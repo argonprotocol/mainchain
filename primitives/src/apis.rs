@@ -1,18 +1,11 @@
 use codec::{Codec, Decode, Encode, MaxEncodedLen};
 use scale_info::TypeInfo;
-use sp_core::crypto::AccountId32;
 use sp_core::{ConstU32, RuntimeDebug, H256, U256};
 use sp_runtime::BoundedVec;
 use sp_runtime::DispatchError;
 use sp_std::{collections::btree_map::BTreeMap, vec::Vec};
 
-use crate::{
-	block_seal::MiningAuthority,
-	notary::{NotaryId, NotaryNotebookVoteDetails, NotaryNotebookVoteDigestDetails},
-	tick::{Tick, Ticker},
-	AccountOrigin, BestBlockVoteSeal, BlockVoteDigest, BlockVotingPower, NotebookNumber,
-	VoteMinimum,
-};
+use crate::{block_seal::MiningAuthority, notary::{NotaryId, NotaryNotebookVoteDetails, NotaryNotebookVoteDigestDetails}, tick::{Tick, Ticker}, AccountOrigin, BestBlockVoteSeal, BlockVoteDigest, BlockVotingPower, NotebookNumber, VoteMinimum, TransferToLocalchainId};
 
 sp_api::decl_runtime_apis! {
 	pub trait BlockSealApis<AccountId:Codec, BlockSealAuthorityId:Codec> {
@@ -86,7 +79,7 @@ pub struct NotebookAuditSummary {
 	pub tick: Tick,
 	pub changed_accounts_root: H256,
 	pub account_changelist: Vec<AccountOrigin>,
-	pub used_transfers_to_localchain: Vec<(AccountId32, u32)>,
+	pub used_transfers_to_localchain: Vec<TransferToLocalchainId>,
 }
 
 #[derive(Encode, Decode, Clone, PartialEq, Eq, TypeInfo, RuntimeDebug)]
@@ -100,7 +93,7 @@ pub struct NotebookAuditResult {
 	pub raw_votes: Vec<(Vec<u8>, BlockVotingPower)>,
 	pub changed_accounts_root: H256,
 	pub account_changelist: Vec<AccountOrigin>,
-	pub used_transfers_to_localchain: Vec<(AccountId32, u32)>,
+	pub used_transfers_to_localchain: Vec<TransferToLocalchainId>,
 }
 
 impl Into<(NotebookAuditSummary, NotaryNotebookVotes)> for NotebookAuditResult {

@@ -186,7 +186,7 @@ pub mod napi_ext {
   #[napi]
   impl Keystore {
     #[napi(
-      ts_args_type = "defaultAddress: string, sign: (address: string, signatureMessage: Uint8Array) => Promise<Uint8Array>, derive: (hd_path: string) => Promise<string>"
+      ts_args_type = "defaultAddress: string, sign: (address: string, signatureMessage: Uint8Array) => Promise<Uint8Array>, derive: (hdPath: string) => Promise<string>"
     )]
     pub async fn use_external(
       &self,

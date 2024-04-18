@@ -49,7 +49,7 @@ export default class TestNotary implements ITeardownable {
             this.containerName = "notary_" + nanoid();
             const addHost = process.env.DOCKER_HOST_IP ? ` --add-host host.docker.internal:${process.env.DOCKER_HOST_IP}` : '';
 
-            notaryPath = `docker run --rm -p=0:9925${addHost} --name=${this.containerName} -e RUST_LOG=warn ghcr.io/ulixee/ulixee-notary:edge`;
+            notaryPath = `docker run --rm -p=0:9925${addHost} --name=${this.containerName} -e RUST_LOG=warn ghcr.io/ulixee/ulixee-notary:dev`;
 
 
             this.#dbConnectionString = cleanHostForDocker(this.#dbConnectionString);

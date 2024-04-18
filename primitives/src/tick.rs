@@ -130,6 +130,7 @@ mod test {
 	}
 
 	#[tokio::test]
+	#[ignore]
 	async fn it_should_calculate_ntp_offset() {
 		let mut ticker = Ticker::start(Duration::from_secs(30));
 

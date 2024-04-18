@@ -155,8 +155,9 @@ declare module '@polkadot/api-base/types/storage' {
       nextBondId: AugmentedQuery<ApiType, () => Observable<Option<u64>>, []>;
     };
     chainTransfer: {
-      expiringTransfersOut: AugmentedQuery<ApiType, (arg: u32 | AnyNumber | Uint8Array) => Observable<Vec<ITuple<[AccountId32, u32]>>>, [u32]>;
-      pendingTransfersOut: AugmentedQuery<ApiType, (arg1: AccountId32 | string | Uint8Array, arg2: u32 | AnyNumber | Uint8Array) => Observable<Option<PalletChainTransferQueuedTransferOut>>, [AccountId32, u32]>;
+      expiringTransfersOut: AugmentedQuery<ApiType, (arg: u32 | AnyNumber | Uint8Array) => Observable<Vec<u32>>, [u32]>;
+      nextTransferId: AugmentedQuery<ApiType, () => Observable<Option<u32>>, []>;
+      pendingTransfersOut: AugmentedQuery<ApiType, (arg: u32 | AnyNumber | Uint8Array) => Observable<Option<PalletChainTransferQueuedTransferOut>>, [u32]>;
       transfersUsedInBlockNotebooks: AugmentedQuery<ApiType, (arg: u32 | AnyNumber | Uint8Array) => Observable<Vec<ITuple<[AccountId32, u32]>>>, [u32]>;
     };
     dataDomain: {
