@@ -57,8 +57,8 @@ export default class TestMainchain implements ITeardownable {
             execArgs = ['run', '--rm', `--name=${containerName}`, `-p=0:9944`, '-p=0:33344', '-e', `RUST_LOG=${this.loglevel},sc_rpc_server=info`,
                 'ghcr.io/ulixee/ulixee-miner:dev'];
 
-            if (process.env.DOCKER_HOST_IP) {
-                execArgs.splice(2, 0, `--add-host host.docker.internal:${process.env.DOCKER_HOST_IP}`);
+            if (process.env.ADD_DOCKER_HOST) {
+                execArgs.splice(2, 0, `--add-host=host.docker.internal:host-gateway`);
             }
 
             execArgs.push('--dev', '--alice', `--miners=${miningThreads}`, '--port=33344', '--rpc-port=9944', '--rpc-external');

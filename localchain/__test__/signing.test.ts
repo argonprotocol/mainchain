@@ -1,5 +1,4 @@
 import {CryptoScheme, Localchain} from "../index";
-import TestMainchain from "./TestMainchain";
 import {closeOnTeardown, KeyringSigner, teardown} from "./testHelpers";
 import {Keyring} from "@ulixee/mainchain";
 
@@ -7,14 +6,12 @@ import {Keyring} from "@ulixee/mainchain";
 afterAll(teardown);
 
 it('can sign a message from javscript', async () => {
-    let mainchain = new TestMainchain();
-    const mainchainUrl = await mainchain.launch();
-    const bobchain = await Localchain.load({
-        mainchainUrl: mainchainUrl,
-        path: ':memory:',
+    const bobchain = await Localchain.loadWithoutMainchain(':memory:', {
+        genesisUtcTime: Date.now(),
+        tickDurationMillis: 1000
     });
     closeOnTeardown(bobchain);
-    const bob = new KeyringSigner("//Bob");
+    const bob = await KeyringSigner.load("//Bob");
     await bobchain.keystore.useExternal(bob.address, bob.sign, bob.derive);
     const notarization = bobchain.beginChange();
     const balanceChange = await notarization.defaultDepositAccount();
@@ -29,11 +26,9 @@ it('can sign a message from javscript', async () => {
     await expect(notarization.verify()).resolves.toBeUndefined();
 });
 it('can sign using built-in', async () => {
-    let mainchain = new TestMainchain();
-    const mainchainUrl = await mainchain.launch();
-    const bobchain = await Localchain.load({
-        mainchainUrl: mainchainUrl,
-        path: ':memory:',
+    const bobchain = await Localchain.loadWithoutMainchain(':memory:', {
+        genesisUtcTime: Date.now(),
+        tickDurationMillis: 1000
     });
     closeOnTeardown(bobchain);
 

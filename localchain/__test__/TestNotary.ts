@@ -47,7 +47,7 @@ export default class TestNotary implements ITeardownable {
         let notaryPath = pathToNotaryBin ?? `${__dirname}/../../target/debug/ulx-notary`;
         if (process.env.ULX_USE_DOCKER_BINS) {
             this.containerName = "notary_" + nanoid();
-            const addHost = process.env.DOCKER_HOST_IP ? ` --add-host host.docker.internal:${process.env.DOCKER_HOST_IP}` : '';
+            const addHost = process.env.ADD_DOCKER_HOST ? ` --add-host=host.docker.internal:host-gateway` : '';
 
             notaryPath = `docker run --rm -p=0:9925${addHost} --name=${this.containerName} -e RUST_LOG=warn ghcr.io/ulixee/ulixee-notary:dev`;
 
@@ -110,6 +110,7 @@ export default class TestNotary implements ITeardownable {
             this.#childProcess.once('error', onProcessError);
             this.#childProcess.stderr.on('data', (data) => {
                 console.warn('Notary >> %s', data);
+                if (data.startsWith("WARNING")) return;
                 this.#childProcess.off('error', onProcessError);
                 reject(data);
             });

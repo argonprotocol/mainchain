@@ -3,6 +3,7 @@ FROM docker.io/library/ubuntu:22.04
 # show backtraces
 ENV RUST_BACKTRACE 1
 ARG BIN=ulx-node
+ENV BIN=${BIN}
 # install tools and dependencies
 RUN apt-get update && \
 	DEBIAN_FRONTEND=noninteractive apt-get install -y --no-install-recommends \
@@ -24,4 +25,4 @@ COPY --chown=ulixee:ulixee --chmod=774 ${BIN} /usr/bin/${BIN}
 # check if executable works in this container
 RUN /usr/bin/${BIN} --version
 
-CMD /usr/bin/${BIN}
+ENTRYPOINT ["/bin/sh", "-c", "/usr/bin/$BIN \"$@\"", "--"]

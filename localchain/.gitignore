@@ -196,3 +196,4 @@ Cargo.lock
 __test__/*.js
 __test__/*.js.map
 *.node
+!npm/**/*.node

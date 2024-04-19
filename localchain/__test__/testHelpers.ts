@@ -8,7 +8,7 @@ import child_process from "node:child_process";
 import * as http from "node:http";
 import * as url from "node:url";
 import * as net from "node:net";
-
+import {cryptoWaitReady} from '@polkadot/util-crypto';
 
 export interface ITeardownable {
     teardown(): Promise<void>;
@@ -18,6 +18,8 @@ const toTeardown: ITeardownable[] = [];
 
 let proxy: HttpProxy;
 let proxyServer: http.Server;
+export const describeIntegration = (process.env.SKIP_E2E === "true" || process.env.SKIP_E2E === "1") ? describe.skip : describe;
+
 
 export async function getProxy() {
     if (!proxy) {
@@ -78,9 +80,8 @@ export async function teardown() {
     toTeardown.length = 0;
 }
 
-export function cleanHostForDocker(host: string): string {
+export function cleanHostForDocker(host: string, replacer = 'host.docker.internal'): string {
     if (process.env.ULX_USE_DOCKER_BINS) {
-        const replacer = 'host.docker.internal';
         return host.replace('localhost', replacer).replace('127.0.0.1', replacer).replace('0.0.0.0', replacer);
     }
     return host
@@ -94,7 +95,7 @@ export class KeyringSigner {
         return this.defaultPair.address;
     }
 
-    constructor(mainSuri: string, type: KeypairType = "sr25519") {
+    private constructor(mainSuri: string, type: KeypairType = "sr25519") {
         this.keyring = new Keyring();
         this.defaultPair = this.keyring.addFromUri(mainSuri, {}, type);
         this.sign = this.sign.bind(this);
@@ -109,6 +110,12 @@ export class KeyringSigner {
         const pair = this.defaultPair.derive(hdPath);
         return this.keyring.addPair(pair).address;
     }
+
+    static async load(mainSuri: string, type: KeypairType = "sr25519"): Promise<KeyringSigner> {
+        await cryptoWaitReady();
+        return new KeyringSigner(mainSuri, type)
+    }
+
 }
 
 export function addTeardown(teardownable: ITeardownable) {
