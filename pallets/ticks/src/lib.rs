@@ -1,4 +1,3 @@
-#![feature(slice_take)]
 #![cfg_attr(not(feature = "std"), no_std)]
 
 use frame_support::traits::OnTimestampSet;
@@ -24,8 +23,7 @@ pub mod weights;
 pub mod pallet {
 	use frame_support::pallet_prelude::*;
 	use frame_system::pallet_prelude::*;
-	use sp_api::__private::BlockT;
-
+	use sp_runtime::traits::Block as BlockT;
 	use ulx_primitives::{
 		digests::TICK_DIGEST_ID,
 		tick::{Tick, Ticker},
@@ -70,6 +68,8 @@ pub mod pallet {
 	pub struct GenesisConfig<T: Config> {
 		pub tick_duration_millis: u64,
 		pub genesis_utc_time: u64,
+
+		#[serde(skip)]
 		pub _phantom: PhantomData<T>,
 	}
 

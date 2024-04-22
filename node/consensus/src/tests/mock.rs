@@ -37,10 +37,10 @@ use ulx_primitives::{
 	notary::{NotaryNotebookVoteDetails, NotaryNotebookVoteDigestDetails},
 	tick::{Tick, Ticker},
 	BestBlockVoteSeal, ComputeDifficulty, HashOutput, NotaryId, NotaryNotebookVotes,
-	NotebookNumber, VoteMinimum,
+	NotebookAuditSummary,NotebookAuditResult, NotebookNumber, VoteMinimum,
 };
 
-use crate::{aux::UlxAux, import_queue};
+use crate::{aux_client::UlxAux, import_queue};
 
 type Error = sp_blockchain::Error;
 
@@ -277,7 +277,8 @@ sp_api::mock_impl_runtime_apis! {
 			_header_hash: H256,
 			_vote_minimums: &BTreeMap<HashOutput, VoteMinimum>,
 			_bytes: &Vec<u8>,
-		) -> Result<NotaryNotebookVotes, NotebookVerifyError> {
+			_audit_dependency_summaries: Vec<NotebookAuditSummary>,
+		) -> Result<NotebookAuditResult, NotebookVerifyError> {
 			todo!("implement audit_notebook_and_get_votes")
 		}
 

@@ -1,5 +1,6 @@
 use codec::{Decode, Encode, MaxEncodedLen};
-use frame_support::{pallet_prelude::TypeInfo, Deserialize, Serialize};
+use scale_info::TypeInfo;
+use serde::{Deserialize, Serialize};
 use sp_debug_derive::RuntimeDebug;
 
 #[derive(
@@ -15,9 +16,10 @@ use sp_debug_derive::RuntimeDebug;
 	Serialize,
 	Deserialize,
 )]
-#[serde(rename_all = "camelCase")]
-#[cfg_attr(not(feature = "napi"), derive(Clone))]
+#[serde(rename_all = "kebab-case")]
+#[cfg_attr(not(feature = "napi"), derive(Clone,Copy))]
 #[cfg_attr(feature = "napi", napi_derive::napi)]
+#[cfg_attr(feature = "uniffi", derive(uniffi::Enum))]
 pub enum DataTLD {
 	Analytics,
 	Automotive,

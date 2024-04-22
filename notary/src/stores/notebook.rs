@@ -14,8 +14,8 @@ use sp_keystore::KeystorePtr;
 use sqlx::PgConnection;
 
 use ulx_primitives::{
-	ensure, note::AccountType, AccountId, AccountOrigin, Balance, BalanceTip, BlockVote,
-	ChainTransfer, MaxNotebookNotarizations, MerkleProof, NewAccountOrigin, NotaryId, Note,
+	ensure, AccountId, AccountOrigin, AccountType, Balance, BalanceTip, BlockVote, ChainTransfer,
+	LocalchainAccountId, MaxNotebookNotarizations, MerkleProof, NewAccountOrigin, NotaryId, Note,
 	NoteType, Notebook, NotebookNumber,
 };
 
@@ -45,7 +45,8 @@ impl NotebookStore {
 				notebook_number as i32
 			)
 			.fetch_one(db)
-			.await?;
+			.await
+			.map_err(|_| Error::NotebookNotFinalized)?;
 
 			let merkle_leafs = rows.change_merkle_leafs;
 
@@ -68,6 +69,42 @@ impl NotebookStore {
 		})
 	}
 
+	pub async fn get_account_origin(
+		db: &mut PgConnection,
+		account_id: AccountId,
+		account_type: AccountType,
+	) -> anyhow::Result<AccountOrigin, Error> {
+		let origin = json!([
+			{
+				"accountId": account_id,
+				"accountType": account_type
+			}
+		]);
+		let result = sqlx::query!(
+			r#"
+			SELECT new_account_origins, notebook_number FROM notebooks
+			WHERE new_account_origins @> $1::jsonb 
+			ORDER BY notebook_number DESC LIMIT 1
+			"#,
+			origin
+		)
+		.fetch_one(db)
+		.await
+		.map_err(|_| Error::MissingAccountOrigin)?;
+
+		let origins: Vec<NewAccountOrigin> = serde_json::from_value(result.new_account_origins)?;
+
+		let origin = origins
+			.iter()
+			.find(|a| a.account_type == account_type && a.account_id == account_id)
+			.ok_or(Error::MissingAccountOrigin)?;
+
+		Ok(AccountOrigin {
+			notebook_number: result.notebook_number as NotebookNumber,
+			account_uid: origin.account_uid,
+		})
+	}
+
 	pub async fn get_block_votes(
 		db: &mut PgConnection,
 		notebook_number: NotebookNumber,
@@ -77,7 +114,8 @@ impl NotebookStore {
 			notebook_number as i32
 		)
 		.fetch_one(db)
-		.await?;
+		.await
+		.map_err(|_| Error::NotebookNotFinalized)?;
 
 		let block_votes = from_value(votes_json)?;
 
@@ -193,8 +231,7 @@ impl NotebookStore {
 		let notarizations = NotarizationsStore::get_for_notebook(&mut *db, notebook_number).await?;
 
 		let mut changed_accounts =
-			BTreeMap::<(AccountId, AccountType), (u32, Balance, AccountOrigin, Option<Note>)>::new(
-			);
+			BTreeMap::<LocalchainAccountId, (u32, Balance, AccountOrigin, Option<Note>)>::new();
 		let mut block_votes = BTreeMap::<(AccountId, u32), BlockVote>::new();
 		let new_account_origins =
 			NotebookNewAccountsStore::take_notebook_origins(&mut *db, notebook_number).await?;
@@ -202,7 +239,10 @@ impl NotebookStore {
 		let new_account_origin_map =
 			BTreeMap::from_iter(new_account_origins.iter().map(|origin| {
 				(
-					(origin.account_id.clone(), origin.account_type.clone()),
+					LocalchainAccountId::new(
+						origin.account_id.clone(),
+						origin.account_type.clone(),
+					),
 					AccountOrigin { notebook_number, account_uid: origin.account_uid },
 				)
 			}));
@@ -216,15 +256,16 @@ impl NotebookStore {
 		for change in notarizations.clone() {
 			for change in change.balance_changes {
 				let account_id = change.account_id;
-				let key = (account_id.clone(), change.account_type);
+				let localchain_account_id =
+					LocalchainAccountId::new(account_id.clone(), change.account_type);
 				let origin = change
 					.previous_balance_proof
 					.map(|a| a.account_origin)
-					.or_else(|| new_account_origin_map.get(&key).cloned())
+					.or_else(|| new_account_origin_map.get(&localchain_account_id).cloned())
 					.ok_or(|| {
 						Error::InternalError(format!(
-							"Could not find origin for account {} {:?}",
-							key.0, key.1
+							"Could not find origin for account {:?}",
+							localchain_account_id
 						))
 					})
 					.map_err(|e| Error::InternalError(e().to_string()))?;
@@ -233,13 +274,11 @@ impl NotebookStore {
 				for note in change.notes {
 					match note.note_type {
 						NoteType::Tax | NoteType::LeaseDomain => tax += note.milligons,
-						NoteType::ChannelHold { .. } => change_note = Some(note.clone()),
-						NoteType::ChannelSettle { .. } => change_note = None,
-						NoteType::ClaimFromMainchain { account_nonce } =>
-							transfers.push(ChainTransfer::ToLocalchain {
-								account_nonce,
-								account_id: account_id.clone(),
-							}),
+						NoteType::EscrowHold { .. } => change_note = Some(note.clone()),
+						NoteType::EscrowSettle { .. } => change_note = None,
+						NoteType::ClaimFromMainchain { transfer_id } => {
+							transfers.push(ChainTransfer::ToLocalchain { transfer_id })
+						},
 						NoteType::SendToMainchain => transfers.push(ChainTransfer::ToMainchain {
 							account_id: account_id.clone(),
 							amount: note.milligons,
@@ -248,11 +287,13 @@ impl NotebookStore {
 					}
 				}
 
-				if !changed_accounts.contains_key(&key) ||
-					changed_accounts.get(&key).is_some_and(|a| a.0 < change.change_number)
+				if !changed_accounts.contains_key(&localchain_account_id)
+					|| changed_accounts
+						.get(&localchain_account_id)
+						.is_some_and(|a| a.0 < change.change_number)
 				{
 					changed_accounts.insert(
-						key.clone(),
+						localchain_account_id.clone(),
 						(change.change_number, change.balance, origin, change_note),
 					);
 				}
@@ -272,23 +313,18 @@ impl NotebookStore {
 		let mut account_changelist = vec![];
 		let merkle_leafs = changed_accounts
 			.into_iter()
-			.map(
-				|(
-					(account_id, account_type),
-					(nonce, balance, account_origin, channel_hold_note),
-				)| {
-					account_changelist.push(account_origin.clone());
-					BalanceTip {
-						account_id,
-						account_type,
-						change_number: nonce,
-						balance,
-						account_origin,
-						channel_hold_note,
-					}
-					.encode()
-				},
-			)
+			.map(|(localchain_account_id, (nonce, balance, account_origin, escrow_hold_note))| {
+				account_changelist.push(account_origin.clone());
+				BalanceTip {
+					account_id: localchain_account_id.account_id,
+					account_type: localchain_account_id.account_type,
+					change_number: nonce,
+					balance,
+					account_origin,
+					escrow_hold_note,
+				}
+				.encode()
+			})
 			.collect::<Vec<_>>();
 
 		let changes_root = merkle_root::<Blake2Hasher, _>(&merkle_leafs);
@@ -409,7 +445,7 @@ mod tests {
 			1,
 			1,
 			1,
-			Utc::now().add(Duration::minutes(1)).timestamp_millis() as u64,
+			Utc::now().add(Duration::try_minutes(1).unwrap()).timestamp_millis() as u64,
 		)
 		.await?;
 		ChainTransferStore::record_transfer_to_local_from_block(
@@ -441,8 +477,8 @@ mod tests {
 					balance: 1000,
 					previous_balance_proof: None,
 					notes: bounded_vec![],
-					channel_hold_note: None,
-					signature: Signature([0u8; 64]).into(),
+					escrow_hold_note: None,
+					signature: Signature::from_raw([0u8; 64]).into(),
 				},
 				BalanceChange {
 					account_id: Alice.to_account_id(),
@@ -451,8 +487,8 @@ mod tests {
 					balance: 2500,
 					previous_balance_proof: None,
 					notes: bounded_vec![],
-					channel_hold_note: None,
-					signature: Signature([0u8; 64]).into(),
+					escrow_hold_note: None,
+					signature: Signature::from_raw([0u8; 64]).into(),
 				},
 				BalanceChange {
 					account_id: Dave.to_account_id(),
@@ -461,8 +497,8 @@ mod tests {
 					balance: 500,
 					previous_balance_proof: None,
 					notes: bounded_vec![],
-					channel_hold_note: None,
-					signature: Signature([0u8; 64]).into(),
+					escrow_hold_note: None,
+					signature: Signature::from_raw([0u8; 64]).into(),
 				},
 			],
 			vec![],
@@ -487,7 +523,7 @@ mod tests {
 			change_number: 1,
 			balance: 1000,
 			account_origin: AccountOrigin { notebook_number: 1, account_uid: 1 },
-			channel_hold_note: None,
+			escrow_hold_note: None,
 		};
 		let proof = NotebookStore::get_balance_proof(&pool, 1, 1, &balance_tip).await?;
 
@@ -502,6 +538,12 @@ mod tests {
 				NewAccountOrigin::new(Alice.to_account_id(), Deposit, 2),
 				NewAccountOrigin::new(Dave.to_account_id(), Deposit, 3),
 			]
+		);
+
+		let mut db = pool.acquire().await?;
+		assert_eq!(
+			NotebookStore::get_account_origin(&mut db, Bob.to_account_id(), Deposit).await?,
+			AccountOrigin { notebook_number: 1, account_uid: 1 }
 		);
 
 		Ok(())

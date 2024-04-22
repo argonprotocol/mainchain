@@ -1,4 +1,4 @@
-#![feature(slice_take)]
+
 #![cfg_attr(not(feature = "std"), no_std)]
 
 use codec::Codec;
@@ -217,6 +217,7 @@ pub mod pallet {
 	#[derive(frame_support::DefaultNoBound)]
 	pub struct GenesisConfig<T: Config> {
 		pub miner_zero: Option<Registration<T>>,
+		#[serde(skip)]
 		pub _phantom: PhantomData<T>,
 	}
 

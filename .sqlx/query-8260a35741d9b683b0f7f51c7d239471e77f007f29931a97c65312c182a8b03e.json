@@ -1,0 +1,12 @@
+{
+  "db_name": "SQLite",
+  "query": "UPDATE notarizations SET json = ?, notebook_number = ?, tick = ? WHERE id = ?",
+  "describe": {
+    "columns": [],
+    "parameters": {
+      "Right": 4
+    },
+    "nullable": []
+  },
+  "hash": "8260a35741d9b683b0f7f51c7d239471e77f007f29931a97c65312c182a8b03e"
+}

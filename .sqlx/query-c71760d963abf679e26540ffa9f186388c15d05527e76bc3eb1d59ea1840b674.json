@@ -1,0 +1,12 @@
+{
+  "db_name": "SQLite",
+  "query": "UPDATE balance_changes SET finalized_block_number = ?, status = ? WHERE id = ?",
+  "describe": {
+    "columns": [],
+    "parameters": {
+      "Right": 3
+    },
+    "nullable": []
+  },
+  "hash": "c71760d963abf679e26540ffa9f186388c15d05527e76bc3eb1d59ea1840b674"
+}

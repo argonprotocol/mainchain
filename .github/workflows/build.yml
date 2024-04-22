@@ -1,0 +1,452 @@
+name: Build and Test
+'on':
+  push:
+    tags:
+      - v[0-9]+.*
+  workflow_dispatch: null
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  build-and-test:
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - os: ubuntu-22.04
+            target: x86_64-unknown-linux-gnu
+    #          - os: macos-latest
+    #            target: x86_64-apple-darwin
+
+
+    services:
+      postgres:
+        image: postgres
+        env:
+          POSTGRES_PASSWORD: postgres
+        options: >-
+          --health-cmd pg_isready
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 5
+        ports:
+          - 5432:5432
+
+    name: Build All ${{ matrix.target }}
+    runs-on: ${{ matrix.os }}
+    steps:
+      - uses: actions/checkout@v4
+      - name: Free Disk Space
+        if: ${{startsWith(matrix.os, 'ubuntu') && !vars.BUILD_ASSET_RUNID}}
+        uses: ./.github/templates/clear-space
+
+      - name: Set Localchain Db Url
+        working-directory: localchain
+        run: echo "DATABASE_URL=sqlite://${{ runner.temp }}/temp.db" > .env
+
+      - name: Install linux dependencies
+        if: ${{startsWith(matrix.os, 'ubuntu') && !vars.BUILD_ASSET_RUNID}}
+        run: sudo apt-get install -y clang libssl-dev llvm libudev-dev protobuf-compiler pkg-config
+
+      - name: Install mac dependencies
+        if: startsWith(matrix.os, 'macos')
+        run: brew install protobuf
+
+      - name: Start sccache
+        if: ${{!vars.BUILD_ASSET_RUNID}}
+        uses: hendrikmuhs/ccache-action@v1.2
+        with:
+          variant: sccache
+          key: sccache-${{ github.job }}-${{ matrix.target }}
+          restore-keys: ${{ runner.os }}
+          max-size: 10G
+          append-timestamp: false
+
+      - uses: rui314/setup-mold@v1
+
+      - name: Install
+        if: ${{!vars.BUILD_ASSET_RUNID}}
+        uses: dtolnay/rust-toolchain@stable
+        with:
+          toolchain: stable
+          targets: ${{ matrix.target }},wasm32-unknown-unknown
+      #
+      #      - name: Cache cargo
+      #        if: ${{!vars.BUILD_ASSET_RUNID}}
+      #        uses: actions/cache@v4
+      #        with:
+      #          path: |
+      #            ~/.cargo/registry/index/
+      #            ~/.cargo/registry/cache/
+      #            ~/.cargo/git/db/
+      #            .cargo-cache
+      #          key: cargo-${{github.job}}-${{ matrix.target }}
+      #        env:
+      #          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
+      - uses: taiki-e/install-action@v2
+        if: ${{!vars.BUILD_ASSET_RUNID}}
+        with:
+          tool: cargo-make,sqlx-cli
+
+      - name: Migrate Notary Db
+        if: ${{!vars.BUILD_ASSET_RUNID}}
+        working-directory: notary
+        run: cargo sqlx database setup
+
+      - name: Migrate Localchain Db
+        if: ${{!vars.BUILD_ASSET_RUNID}}
+        working-directory: localchain
+        run: cargo sqlx database setup
+
+      - name: Test
+        if: ${{!vars.BUILD_ASSET_RUNID}}
+        run: cargo build --features=fast-runtime && cargo test --features=fast-runtime
+        env:
+          RUSTC_WRAPPER: "sccache"
+          CARGO_INCREMENTAL: 0
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          RUST_LOG: info
+
+      - name: Upload Debug Assets
+        if: ${{!vars.BUILD_ASSET_RUNID}}
+        uses: actions/upload-artifact@v4
+        with:
+          name: bins-${{ matrix.target }}
+          path: target/debug/ulx-*
+          if-no-files-found: error
+
+  docker:
+    name: Docker
+    needs:
+      - build-and-test
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Set up QEMU
+        uses: docker/setup-qemu-action@v3
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@v3
+
+      - name: Download artifacts
+        uses: actions/download-artifact@v4
+        with:
+          name: bins-x86_64-unknown-linux-gnu
+          run-id: ${{ vars.BUILD_ASSET_RUNID || github.run_id}}
+          github-token: ${{ secrets.GITHUB_TOKEN }}
+          path: .
+
+      - name: List assets in root
+        run: ls
+        shell: bash
+
+      - name: UlxNode
+        uses: ./.github/templates/docker
+        with:
+          image: ghcr.io/ulixee/ulixee-miner
+          bin: ulx-node
+          github-token: ${{ secrets.GITHUB_TOKEN }}
+      - name: Notary
+        uses: ./.github/templates/docker
+        with:
+          image: ghcr.io/ulixee/ulixee-notary
+          bin: ulx-notary
+          github-token: ${{ secrets.GITHUB_TOKEN }}
+
+  localchain:
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - os: macos-latest
+            target: x86_64-apple-darwin
+            build: |
+              export RUSTFLAGS="-C link-args=-Wl,-undefined,dynamic_lookup"
+              yarn build:debug
+              strip -x *.node
+          - os: macos-latest
+            target: aarch64-apple-darwin
+            build: |
+              sudo rm -Rf /Library/Developer/CommandLineTools/SDKs/*;
+              export CC=$(xcrun -f clang);
+              export CXX=$(xcrun -f clang++);
+              SYSROOT=$(xcrun --sdk macosx --show-sdk-path);
+              export RUSTFLAGS="-C link-args=-Wl,-undefined,dynamic_lookup"
+              export CFLAGS="-isysroot $SYSROOT -isystem $SYSROOT";
+              yarn build:debug --target aarch64-apple-darwin
+              strip -x *.node
+          - os: ubuntu-latest
+            target: x86_64-unknown-linux-gnu
+            docker: ghcr.io/napi-rs/napi-rs/nodejs-rust:lts-debian
+            build: |
+              export DEBUG=napi:*
+              cd localchain
+              yarn build:debug -- --lib
+          - os: ubuntu-latest
+            target: aarch64-unknown-linux-gnu
+            docker: ghcr.io/napi-rs/napi-rs/nodejs-rust:lts-debian-aarch64
+            build: |
+              cd localchain
+              yarn build:debug --target aarch64-unknown-linux-gnu -- --lib
+          - os: windows-latest
+            target: x86_64-pc-windows-msvc
+            build: |
+              yarn build --target x86_64-pc-windows-msvc
+              strip -x *.node
+    name: localchain - ${{ matrix.target }} - node@20
+    runs-on: ${{matrix.os}}
+    env:
+      DEBUG: napi:*
+      APP_NAME: localchain
+      MACOSX_DEPLOYMENT_TARGET: '10.13'
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Setup node
+        if: ${{ !matrix.docker }}
+        uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: yarn
+
+      - name: Install dependencies
+        run: yarn install
+
+      - name: Install
+        uses: dtolnay/rust-toolchain@stable
+        if: ${{ !matrix.docker }}
+        with:
+          toolchain: stable
+          targets: ${{ matrix.target }}
+
+      - name: Cache cargo
+        uses: actions/cache@v4
+        with:
+          path: |
+            ~/.cargo/registry/index/
+            ~/.cargo/registry/cache/
+            ~/.cargo/git/db/
+            .cargo-cache
+            target/
+          key: localchain-${{ matrix.target }}-cargo
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Install dependencies
+        run: yarn install
+
+      - name: Build in docker
+        uses: addnab/docker-run-action@v3
+        if: ${{ matrix.docker }}
+        with:
+          image: ${{ matrix.docker }}
+          options: |
+            --user 0:0 
+            -e SQLX_OFFLINE=true 
+            -e SKIP_WASM_BUILD=1 
+            -e GITHUB_TOKEN=${{ secrets.GITHUB_TOKEN }}
+            -v ${{ github.workspace }}/.cargo-cache/git/db:/usr/local/cargo/git/db 
+            -v ${{ github.workspace }}/.cargo/registry/cache:/usr/local/cargo/registry/cache 
+            -v ${{ github.workspace }}/.cargo/registry/index:/usr/local/cargo/registry/index 
+            -v ${{ github.workspace }}:/build 
+            -w /build
+          run: ${{ matrix.build }}
+
+      - name: Build
+        if: ${{ !matrix.docker }}
+        run: ${{ matrix.build }}
+        shell: bash
+        working-directory: ./localchain
+        env:
+          SQLX_OFFLINE: true
+          SKIP_WASM_BUILD: 1
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Upload Localchain artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: bindings-${{ matrix.target }}
+          path: localchain/${{ env.APP_NAME }}.*.node
+          if-no-files-found: error
+  test-mac-win:
+    name: Test bindings on ${{ matrix.target }} - node@${{ matrix.node }}
+    needs: [ localchain ]
+    strategy:
+      fail-fast: false
+      matrix:
+        os:
+          - macos-latest
+          - windows-latest
+        include:
+          - os: macos-latest
+            target: x86_64-apple-darwin
+          - os: windows-latest
+            target: x86_64-pc-windows-msvc
+        node: [ 18, 20 ]
+
+    runs-on: ${{ matrix.os }}
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Setup node
+        uses: actions/setup-node@v4
+        with:
+          node-version: ${{ matrix.node }}
+          cache: yarn
+
+      - name: Install dependencies
+        run: yarn
+
+      - name: Install client
+        run: yarn tsc
+        shell: bash
+        working-directory: ./client/nodejs
+
+      - name: Download artifacts
+        uses: actions/download-artifact@v4
+        with:
+          name: bindings-${{ matrix.target }}
+          path: localchain
+          github-token: ${{ secrets.GITHUB_TOKEN }}
+      #          run-id: 8755170162
+
+      - name: Test bindings
+        run: yarn test:js-only --testTimeout=30000 --forceExit --verbose
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          SKIP_E2E: true
+
+  test-linux:
+    name: Test bindings on ${{ matrix.target }} - node@${{ matrix.node }}
+    needs: [ localchain, docker ]
+    strategy:
+      fail-fast: false
+      matrix:
+        os:
+          - ubuntu-latest
+        include:
+          - os: ubuntu-latest
+            target: x86_64-unknown-linux-gnu
+        node: [ 18, 20 ]
+
+    services:
+      postgres:
+        image: postgres
+        env:
+          POSTGRES_PASSWORD: postgres
+        # Set health checks to wait until postgres has started
+        options: >-
+          --health-cmd pg_isready
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 5
+        ports:
+          - 5432:5432
+
+    runs-on: ${{ matrix.os }}
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Setup node
+        uses: actions/setup-node@v4
+        with:
+          node-version: ${{ matrix.node }}
+          cache: yarn
+
+      - name: Login to GitHub Container Registry
+        uses: docker/login-action@v3
+        with:
+          registry: ghcr.io
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Install dependencies
+        run: yarn
+
+      - name: Install client
+        run: yarn tsc
+        shell: bash
+        working-directory: ./client/nodejs
+
+      - name: Docker Internal Host
+        run: |
+          echo "127.0.0.1 host.docker.internal" | sudo tee -a /etc/hosts
+
+      - name: Pull Miner
+        run: docker pull ghcr.io/ulixee/ulixee-miner:dev && docker pull ghcr.io/ulixee/ulixee-notary:dev
+
+      - name: Download artifacts
+        uses: actions/download-artifact@v4
+        with:
+          name: bindings-${{ matrix.target }}
+          path: localchain
+          github-token: ${{ secrets.GITHUB_TOKEN }}
+      #          run-id: 8755170162
+
+      - name: Test bindings
+        run: yarn test:js-only --testTimeout=30000 --forceExit --verbose
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          ADD_DOCKER_HOST: true
+  publish:
+    name: Publish
+    runs-on: ubuntu-latest
+    needs:
+      - test-linux
+      - test-mac-win
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ github.head_ref }}
+          fetch-depth: 0
+      - name: Setup node
+        uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: yarn
+      - name: Install dependencies
+        run: yarn install
+      - name: Download all artifacts
+        uses: actions/download-artifact@v4
+        with:
+          path: localchain/artifacts
+          github-token: ${{ secrets.GITHUB_TOKEN }}
+      #          run-id: 8755170162
+
+      - name: Move artifacts
+        run: yarn artifacts
+        working-directory: ./localchain
+
+      - uses: stefanzweifel/git-auto-commit-action@v5
+        with:
+          branch: napi-bindings
+          commit_message: Check-in binding files
+          commit_user_name: github-actions[bot]
+          commit_user_email: github-actions[bot]@users.noreply.github.com
+          file_pattern: ./localchain/npm/**/*.node
+          create_branch: true
+          push_options: '--force-with-lease'
+
+      - name: List packages
+        run: ls -R ./npm
+        shell: bash
+        working-directory: ./localchain
+      - name: Publish
+        working-directory: ./localchain
+        run: |
+          if git log -1 --pretty=%B | grep "^[0-9]\+\.[0-9]\+\.[0-9]\+";
+          then
+          echo "//registry.npmjs.org/:_authToken=$NPM_TOKEN" >> ~/.npmrc
+          npm publish --provenance --access public
+          elif git log -1 --pretty=%B | grep "^[0-9]\+\.[0-9]\+\.[0-9]\+";
+          then
+          echo "//registry.npmjs.org/:_authToken=$NPM_TOKEN" >> ~/.npmrc
+          npm publish --provenance --tag next --access public
+          else
+          echo "Not a release, skipping publish"
+          fi
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          NPM_TOKEN: ${{ secrets.NPM_TOKEN }}

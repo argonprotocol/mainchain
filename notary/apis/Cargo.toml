@@ -1,0 +1,23 @@
+[package]
+name = "ulx-notary-apis"
+
+version.workspace = true
+authors.workspace = true
+edition.workspace = true
+rust-version.workspace = true
+license.workspace = true
+repository.workspace = true
+documentation.workspace = true
+homepage.workspace = true
+
+[dependencies]
+anyhow = { workspace = true, features = ["default"] }
+codec = { workspace = true, features = ["default"] }
+serde = { workspace = true, features = ["default"] }
+serde_json = { workspace = true, features = ["default"] }
+scale-info = { workspace = true, features = ["default"] }
+sp-runtime = { workspace = true }
+sp-core = { workspace = true }
+jsonrpsee = { workspace = true, features = ["server", "async-client"] }
+
+ulx-primitives = { workspace = true }

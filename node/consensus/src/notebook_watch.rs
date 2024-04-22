@@ -24,7 +24,7 @@ use ulx_primitives::{
 };
 
 use crate::{
-	aux::{ForkPower, UlxAux},
+	aux_client::{ForkPower, UlxAux},
 	block_creator::CreateTaxVoteBlock,
 	error::Error,
 	notary_client::NotaryClient,
@@ -100,9 +100,10 @@ where
 		let best_header = self.select_chain.best_chain().await.map_err(|_| {
 			Error::NoBestHeader("Unable to get best header for notebook processing".to_string())
 		})?;
+		let finalized_hash = self.client.info().finalized_hash;
 		let best_hash = best_header.hash();
 
-		let mut validated_notebooks = self.aux_client.get_notary_audit_history(notary_id)?;
+		let validated_notebooks = self.aux_client.get_notary_audit_history(notary_id)?.get();
 		if validated_notebooks.iter().any(|n| n.notebook_number == notebook_number) {
 			return Ok(());
 		}
@@ -130,13 +131,13 @@ where
 			lookup_tick -= 1;
 		}
 
-		let audit_result =
-			notary_client.try_audit_notebook(&audit_at_block_hash, &vote_details).await?;
+		let audit_result = notary_client
+			.try_audit_notebook(&finalized_hash, &audit_at_block_hash, &vote_details)
+			.await?;
 
-		validated_notebooks.push(audit_result);
 		let notary_state = self.aux_client.store_notebook_result(
 			notary_id,
-			validated_notebooks,
+			audit_result,
 			raw_data,
 			&vote_details,
 		)?;
@@ -153,15 +154,15 @@ where
 
 		let votes_tick = tick.saturating_sub(2);
 		let vote_key_tick = tick.saturating_sub(1);
-		let block_votes = self.aux_client.get_votes(votes_tick)?;
+		let block_votes = self.aux_client.get_votes(votes_tick)?.get();
 		let votes_count = block_votes.iter().fold(0u32, |acc, x| acc + x.raw_votes.len() as u32);
 		if votes_count == 0 {
-			return Ok(())
+			return Ok(());
 		}
 		info!(target: LOG_TARGET, "Checking {} block votes for tick {}", votes_count, votes_tick);
 
 		// aren't these ordered?
-		let strongest_fork_at_tick = self.aux_client.strongest_fork_at_tick(tick)?;
+		let strongest_fork_at_tick = self.aux_client.strongest_fork_at_tick(tick)?.get();
 		let strongest_seal_strength = strongest_fork_at_tick.seal_strength;
 
 		let (voting_power, notebooks) = notary_state
@@ -176,7 +177,7 @@ where
 			.await?
 		else {
 			trace!(target: LOG_TARGET, "No beatable fork at tick {} with {} notebooks and {} voting power",vote_key_tick, notebooks, voting_power);
-			return Ok(())
+			return Ok(());
 		};
 
 		let stronger_seals = self
@@ -193,7 +194,7 @@ where
 				vote.seal_strength,
 			) else {
 				// can't sign, not an error
-				return Ok(())
+				return Ok(());
 			};
 
 			let mut sender = self.sender.clone();
@@ -206,7 +207,7 @@ where
 					signature: miner_signature,
 				})
 				.await?;
-			return Ok(())
+			return Ok(());
 		}
 		Ok(())
 	}
@@ -231,10 +232,10 @@ where
 
 		for leaf in leaves {
 			let Some(block_hash) = get_block_descendent_with_tick(&self.client, leaf, tick) else {
-				continue
+				continue;
 			};
 
-			let mut fork_power = self.aux_client.get_fork_voting_power(&block_hash)?;
+			let mut fork_power = self.aux_client.get_fork_voting_power(&block_hash)?.get();
 			fork_power.add_vote(block_voting_power, block_notebooks, max_nonce);
 
 			if fork_power > strongest_fork_at_tick && fork_power > best_fork {
@@ -256,7 +257,7 @@ where
 	C::Api: TickApis<B>,
 {
 	if at_tick < 2 {
-		return false
+		return false;
 	}
 	let Some(block_with_tick) =
 		get_block_descendent_with_tick(client, solve_header.hash(), at_tick)
@@ -272,7 +273,7 @@ where
 
 	for log in &descendent_with_tick.digest().logs {
 		if let Some(votes) = log.pre_runtime_try_to::<BlockVoteDigest>(&BLOCK_VOTES_DIGEST_ID) {
-			return votes.votes_count > 0
+			return votes.votes_count > 0;
 		}
 	}
 
@@ -289,11 +290,11 @@ where
 {
 	if let Ok(current_tick) = client.runtime_api().current_tick(hash) {
 		if current_tick == tick {
-			return Some(hash)
+			return Some(hash);
 		}
 	}
 	if let Ok(blocks) = client.runtime_api().blocks_at_tick(hash, tick) {
-		return blocks.last().copied()
+		return blocks.last().copied();
 	}
 	None
 }
@@ -308,7 +309,7 @@ pub(crate) fn try_sign_vote<Hash: Codec>(
 		return Err(ConsensusError::CannotSign(format!(
 			"Keystore does not have keys for {}",
 			seal_authority_id
-		)))
+		)));
 	}
 
 	let message = BlockVote::seal_signature_message(block_hash, seal_strength);

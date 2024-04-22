@@ -5,7 +5,7 @@ pub use block_creator::{notary_client_task, tax_block_creator};
 #[cfg(test)]
 mod tests;
 
-pub mod aux;
+pub mod aux_client;
 pub mod basic_queue;
 mod basic_queue_import;
 mod block_creator;
@@ -17,6 +17,7 @@ pub mod import_queue;
 mod metrics;
 mod notary_client;
 pub mod notebook_watch;
+mod aux_data;
 
 const LOG_TARGET: &str = "node::consensus";
 

@@ -11,7 +11,7 @@ use std::{
 // You should have received a copy of the GNU General Public License
 // along with this program. If not, see <https://www.gnu.org/licenses/>.
 use futures::{
-	future::{select, Either},
+	future::{Either, select},
 	prelude::*,
 	task::{Context, Poll},
 };
@@ -20,15 +20,15 @@ use log::{debug, trace, warn};
 use prometheus_endpoint::Registry;
 use sc_client_api::BlockchainEvents;
 use sc_consensus::import_queue::{
-	buffered_link::{self, BufferedLinkReceiver, BufferedLinkSender},
-	BlockImportError, BlockImportStatus, BoxBlockImport, BoxJustificationImport, ImportQueue,
+	BlockImportError,
+	BlockImportStatus, BoxBlockImport, BoxJustificationImport, buffered_link::{self, BufferedLinkReceiver, BufferedLinkSender}, ImportQueue,
 	ImportQueueService, IncomingBlock, Link, RuntimeOrigin, Verifier,
 };
 use sc_utils::mpsc::{tracing_unbounded, TracingUnboundedReceiver, TracingUnboundedSender};
 use sp_consensus::BlockOrigin;
 use sp_runtime::{
-	traits::{Block as BlockT, Header as HeaderT, NumberFor},
-	Justification, Justifications,
+	Justification,
+	Justifications, traits::{Block as BlockT, Header as HeaderT, NumberFor},
 };
 
 use crate::{
@@ -117,7 +117,7 @@ impl<B: BlockT> BasicQueue<B> {
 
 #[derive(Clone)]
 struct BasicQueueHandle<B: BlockT> {
-	/// Channel to send justification import messages to the background task.
+	/// Escrow to send justification import messages to the background task.
 	justification_sender: TracingUnboundedSender<worker_messages::ImportJustification<B>>,
 	/// Channel to send block import messages to the background task.
 	block_import_sender: TracingUnboundedSender<worker_messages::ImportBlocks<B>>,
@@ -665,7 +665,7 @@ mod tests {
 	use std::{collections::BTreeMap, ops::Range};
 
 	use env_logger::{Builder, Env};
-	use futures::{executor::block_on, task::Poll, Future};
+	use futures::{executor::block_on, Future, task::Poll};
 	use parking_lot::Mutex;
 	use sc_client_api::{
 		FinalityNotification, FinalityNotifications, FinalizeSummary, ImportNotifications,
@@ -677,6 +677,7 @@ mod tests {
 		},
 		import_queue::Verifier,
 	};
+	use sc_network::PeerId;
 	use sp_consensus::BlockOrigin;
 	use sp_test_primitives::{Block, BlockNumber, Hash, Header};
 
@@ -889,7 +890,7 @@ mod tests {
 			let hash = Hash::random();
 			finality_sender
 				.unbounded_send(worker_messages::ImportJustification(
-					libp2p_identity::PeerId::random(),
+					PeerId::random(),
 					hash,
 					1,
 					(*b"TEST", Vec::new()),
@@ -999,7 +1000,7 @@ mod tests {
 			let hash = Hash::random();
 			finality_sender
 				.unbounded_send(worker_messages::ImportJustification(
-					libp2p_identity::PeerId::random(),
+					PeerId::random(),
 					hash,
 					1,
 					(*b"TEST", Vec::new()),

@@ -1,15 +1,11 @@
 use codec::{Codec, Decode, Encode, MaxEncodedLen};
 use scale_info::TypeInfo;
 use sp_core::{ConstU32, RuntimeDebug, H256, U256};
-use sp_runtime::{BoundedVec, DispatchError};
+use sp_runtime::BoundedVec;
+use sp_runtime::DispatchError;
 use sp_std::{collections::btree_map::BTreeMap, vec::Vec};
 
-use crate::{
-	block_seal::MiningAuthority,
-	notary::{NotaryId, NotaryNotebookVoteDetails, NotaryNotebookVoteDigestDetails},
-	tick::{Tick, Ticker},
-	BestBlockVoteSeal, BlockVoteDigest, BlockVotingPower, NotebookNumber, VoteMinimum,
-};
+use crate::{block_seal::MiningAuthority, notary::{NotaryId, NotaryNotebookVoteDetails, NotaryNotebookVoteDigestDetails}, tick::{Tick, Ticker}, AccountOrigin, BestBlockVoteSeal, BlockVoteDigest, BlockVotingPower, NotebookNumber, VoteMinimum, TransferToLocalchainId};
 
 sp_api::decl_runtime_apis! {
 	pub trait BlockSealApis<AccountId:Codec, BlockSealAuthorityId:Codec> {
@@ -54,7 +50,8 @@ sp_api::decl_runtime_apis! {
 			header_hash: H256,
 			vote_minimums: &BTreeMap<Block::Hash, VoteMinimum>,
 			bytes: &Vec<u8>,
-		) -> Result<NotaryNotebookVotes, VerifyError>;
+			audit_dependency_summaries: Vec<NotebookAuditSummary>,
+		) -> Result<NotebookAuditResult, VerifyError>;
 
 
 		fn decode_signed_raw_notebook_header(raw_header: Vec<u8>) -> Result<NotaryNotebookVoteDetails<Block::Hash>, DispatchError>;
@@ -70,4 +67,51 @@ pub struct NotaryNotebookVotes {
 	#[codec(compact)]
 	pub notebook_number: NotebookNumber,
 	pub raw_votes: Vec<(Vec<u8>, BlockVotingPower)>,
+}
+
+#[derive(Encode, Decode, Clone, PartialEq, Eq, TypeInfo, RuntimeDebug)]
+pub struct NotebookAuditSummary {
+	#[codec(compact)]
+	pub notary_id: NotaryId,
+	#[codec(compact)]
+	pub notebook_number: NotebookNumber,
+	#[codec(compact)]
+	pub tick: Tick,
+	pub changed_accounts_root: H256,
+	pub account_changelist: Vec<AccountOrigin>,
+	pub used_transfers_to_localchain: Vec<TransferToLocalchainId>,
+}
+
+#[derive(Encode, Decode, Clone, PartialEq, Eq, TypeInfo, RuntimeDebug)]
+pub struct NotebookAuditResult {
+	#[codec(compact)]
+	pub notary_id: NotaryId,
+	#[codec(compact)]
+	pub notebook_number: NotebookNumber,
+	#[codec(compact)]
+	pub tick: Tick,
+	pub raw_votes: Vec<(Vec<u8>, BlockVotingPower)>,
+	pub changed_accounts_root: H256,
+	pub account_changelist: Vec<AccountOrigin>,
+	pub used_transfers_to_localchain: Vec<TransferToLocalchainId>,
+}
+
+impl Into<(NotebookAuditSummary, NotaryNotebookVotes)> for NotebookAuditResult {
+	fn into(self) -> (NotebookAuditSummary, NotaryNotebookVotes) {
+		(
+			NotebookAuditSummary {
+				notary_id: self.notary_id,
+				notebook_number: self.notebook_number,
+				tick: self.tick,
+				changed_accounts_root: self.changed_accounts_root,
+				account_changelist: self.account_changelist,
+				used_transfers_to_localchain: self.used_transfers_to_localchain,
+			},
+			NotaryNotebookVotes {
+				notary_id: self.notary_id,
+				notebook_number: self.notebook_number,
+				raw_votes: self.raw_votes,
+			},
+		)
+	}
 }

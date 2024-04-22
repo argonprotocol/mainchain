@@ -1,0 +1,12 @@
+{
+  "db_name": "PostgreSQL",
+  "query": "ALTER TABLE notebook_origins DROP CONSTRAINT IF EXISTS notebook_origins_notebook_number_fkey",
+  "describe": {
+    "columns": [],
+    "parameters": {
+      "Left": []
+    },
+    "nullable": []
+  },
+  "hash": "38bd77be87036dfd16615c338898529581d452fa3aea5642d20b9a15ad9a8800"
+}

@@ -1,0 +1,32 @@
+{
+  "db_name": "SQLite",
+  "query": "SELECT * FROM key LIMIT 1",
+  "describe": {
+    "columns": [
+      {
+        "name": "address",
+        "ordinal": 0,
+        "type_info": "Text"
+      },
+      {
+        "name": "crypto_type",
+        "ordinal": 1,
+        "type_info": "Int64"
+      },
+      {
+        "name": "data",
+        "ordinal": 2,
+        "type_info": "Blob"
+      }
+    ],
+    "parameters": {
+      "Right": 0
+    },
+    "nullable": [
+      false,
+      false,
+      false
+    ]
+  },
+  "hash": "ab5677c2eea3ecca55d68b729e8fc3d40288e0708112001391d23bb09b5abd03"
+}

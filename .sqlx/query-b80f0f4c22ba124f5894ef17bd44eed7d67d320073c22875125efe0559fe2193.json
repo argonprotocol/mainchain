@@ -1,0 +1,26 @@
+{
+  "db_name": "SQLite",
+  "query": "SELECT notebook_number, json IS NOT NULL as json FROM notarizations WHERE id = ?",
+  "describe": {
+    "columns": [
+      {
+        "name": "notebook_number",
+        "ordinal": 0,
+        "type_info": "Int64"
+      },
+      {
+        "name": "json",
+        "ordinal": 1,
+        "type_info": "Int"
+      }
+    ],
+    "parameters": {
+      "Right": 1
+    },
+    "nullable": [
+      true,
+      false
+    ]
+  },
+  "hash": "b80f0f4c22ba124f5894ef17bd44eed7d67d320073c22875125efe0559fe2193"
+}

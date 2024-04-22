@@ -14,157 +14,156 @@ publish = false
 targets = ["x86_64-unknown-linux-gnu"]
 
 [dependencies]
-codec = { package = "parity-scale-codec", version = "3.6.1", default-features = false, features = ["derive"] }
-scale-info = { version = "2.10", default-features = false, features = ["derive"] }
-smallvec = { version = "1.11.1", default-features = false }
-log = { version = "0.4.20", default-features = false }
+codec = { workspace = true }
+scale-info = { workspace = true }
+smallvec = { workspace = true }
+log = { workspace = true }
+serde_json = { workspace = true }
 
-pallet-authorship = { version = "4.0.0-dev", default-features = false, git = "https://github.com/paritytech/polkadot-sdk.git", branch = "release-polkadot-v1.5.0" }
-pallet-balances = { version = "4.0.0-dev", default-features = false, git = "https://github.com/paritytech/polkadot-sdk.git", branch = "release-polkadot-v1.5.0" }
-pallet-sudo = { version = "4.0.0-dev", default-features = false, git = "https://github.com/paritytech/polkadot-sdk.git", branch = "release-polkadot-v1.5.0" }
-pallet-timestamp = { version = "4.0.0-dev", default-features = false, git = "https://github.com/paritytech/polkadot-sdk.git", branch = "release-polkadot-v1.5.0" }
-pallet-session = { version = "4.0.0-dev", default-features = false, git = "https://github.com/paritytech/polkadot-sdk.git", branch = "release-polkadot-v1.5.0", features = ["historical"] }
-pallet-grandpa = { version = "4.0.0-dev", default-features = false, git = "https://github.com/paritytech/polkadot-sdk.git", branch = "release-polkadot-v1.5.0" }
-pallet-offences = { version = "4.0.0-dev", default-features = false, git = "https://github.com/paritytech/polkadot-sdk.git", branch = "release-polkadot-v1.5.0" }
-pallet-tx-pause = { version = "4.0.0-dev", default-features = false, git = "https://github.com/paritytech/polkadot-sdk.git", branch = "release-polkadot-v1.5.0" }
-pallet-transaction-payment = { version = "4.0.0-dev", default-features = false, git = "https://github.com/paritytech/polkadot-sdk.git", branch = "release-polkadot-v1.5.0" }
-frame-support = { version = "4.0.0-dev", default-features = false, git = "https://github.com/paritytech/polkadot-sdk.git", branch = "release-polkadot-v1.5.0" }
-frame-system = { version = "4.0.0-dev", default-features = false, git = "https://github.com/paritytech/polkadot-sdk.git", branch = "release-polkadot-v1.5.0" }
-frame-try-runtime = { version = "0.10.0-dev", default-features = false, git = "https://github.com/paritytech/polkadot-sdk.git", optional = true , branch = "release-polkadot-v1.5.0" }
-frame-executive = { version = "4.0.0-dev", default-features = false, git = "https://github.com/paritytech/polkadot-sdk.git", branch = "release-polkadot-v1.5.0" }
-sp-api = { version = "4.0.0-dev", default-features = false, git = "https://github.com/paritytech/polkadot-sdk.git", branch = "release-polkadot-v1.5.0" }
-sp-arithmetic = { version = "16.0.0", default-features = false, git = "https://github.com/paritytech/polkadot-sdk.git", branch = "release-polkadot-v1.5.0" }
-sp-block-builder = { version = "4.0.0-dev", default-features = false, git = "https://github.com/paritytech/polkadot-sdk.git", branch = "release-polkadot-v1.5.0" }
-sp-debug-derive = { version = "8.0.0", default-features = false, git = "https://github.com/paritytech/polkadot-sdk.git", branch = "release-polkadot-v1.5.0" }
-sp-core = { version = "21.0.0", default-features = false, git = "https://github.com/paritytech/polkadot-sdk.git", branch = "release-polkadot-v1.5.0" }
-sp-inherents = { version = "4.0.0-dev", default-features = false, git = "https://github.com/paritytech/polkadot-sdk.git", branch = "release-polkadot-v1.5.0" }
-sp-offchain = { version = "4.0.0-dev", default-features = false, git = "https://github.com/paritytech/polkadot-sdk.git", branch = "release-polkadot-v1.5.0" }
-sp-runtime = { version = "24.0.0", default-features = false, git = "https://github.com/paritytech/polkadot-sdk.git", branch = "release-polkadot-v1.5.0" }
-sp-session = { version = "4.0.0-dev", default-features = false, git = "https://github.com/paritytech/polkadot-sdk.git", branch = "release-polkadot-v1.5.0" }
-sp-std = { version = "8.0.0", default-features = false, git = "https://github.com/paritytech/polkadot-sdk.git", branch = "release-polkadot-v1.5.0" }
-sp-transaction-pool = { version = "4.0.0-dev", default-features = false, git = "https://github.com/paritytech/polkadot-sdk.git", branch = "release-polkadot-v1.5.0" }
-sp-version = { version = "22.0.0", default-features = false, git = "https://github.com/paritytech/polkadot-sdk.git", branch = "release-polkadot-v1.5.0", features = ["serde"] }
-sp-genesis-builder = { version = "0.1.0-dev", default-features = false, git = "https://github.com/paritytech/polkadot-sdk.git", branch = "release-polkadot-v1.5.0" }
-serde_json = { version = "1.0.85", default-features = false, features = ["alloc"] }
-sp-consensus-grandpa = { version = "4.0.0-dev", default-features = false, git = "https://github.com/paritytech/polkadot-sdk.git", optional = true , branch = "release-polkadot-v1.5.0" }
-# Used for the node template's RPCs
-frame-system-rpc-runtime-api = { version = "4.0.0-dev", default-features = false, git = "https://github.com/paritytech/polkadot-sdk.git", branch = "release-polkadot-v1.5.0" }
-pallet-transaction-payment-rpc-runtime-api = { version = "4.0.0-dev", default-features = false, git = "https://github.com/paritytech/polkadot-sdk.git", branch = "release-polkadot-v1.5.0" }
+pallet-authorship = { workspace = true }
+pallet-balances = { workspace = true }
+pallet-sudo = { workspace = true }
+pallet-timestamp = { workspace = true }
+pallet-session = { workspace = true }
+pallet-grandpa = { workspace = true }
+pallet-offences = { workspace = true }
+pallet-tx-pause = { workspace = true }
+pallet-transaction-payment = { workspace = true }
+frame-support = { workspace = true }
+frame-system = { workspace = true }
+frame-try-runtime = { workspace = true, optional = true }
+frame-executive = { workspace = true }
+sp-api = { workspace = true }
+sp-arithmetic = { workspace = true }
+sp-block-builder = { workspace = true }
+sp-debug-derive = { workspace = true }
+sp-core = { workspace = true }
+sp-inherents = { workspace = true }
+sp-offchain = { workspace = true }
+sp-runtime = { workspace = true }
+sp-session = { workspace = true }
+sp-std = { workspace = true }
+sp-transaction-pool = { workspace = true }
+sp-version = { workspace = true }
+sp-genesis-builder = { workspace = true }
+sp-consensus-grandpa = { workspace = true }
+frame-system-rpc-runtime-api = { workspace = true }
+pallet-transaction-payment-rpc-runtime-api = { workspace = true }
 
 # Used for runtime benchmarking
-frame-benchmarking = { version = "4.0.0-dev", default-features = false, git = "https://github.com/paritytech/polkadot-sdk.git", optional = true , branch = "release-polkadot-v1.5.0" }
-frame-system-benchmarking = { version = "4.0.0-dev", default-features = false, git = "https://github.com/paritytech/polkadot-sdk.git", optional = true , branch = "release-polkadot-v1.5.0" }
+frame-benchmarking = { workspace = true, optional = true }
+frame-system-benchmarking = { workspace = true, optional = true }
 
 # Local Dependencies
-pallet-block-seal = {  default-features = false, path = "../pallets/block_seal" }
-pallet-block-seal-spec = {  default-features = false, path = "../pallets/block_seal_spec" }
-pallet-block-rewards = {  default-features = false, path = "../pallets/block_rewards" }
-pallet-bond = {  default-features = false, path = "../pallets/bond" }
-pallet-chain-transfer = {  default-features = false, path = "../pallets/chain_transfer" }
-pallet-data-domain = {  default-features = false, path = "../pallets/data_domain" }
-pallet-mint = {  default-features = false, path = "../pallets/mint" }
-pallet-notebook = {  default-features = false, path = "../pallets/notebook" }
-pallet-notaries = {  default-features = false, path = "../pallets/notaries" }
-pallet-mining-slot = {  default-features = false, path = "../pallets/mining_slot" }
-pallet-ticks = {  default-features = false, path = "../pallets/ticks" }
-ulx-primitives = {  default-features = false, path = "../primitives" }
+pallet-block-seal = { workspace = true }
+pallet-block-seal-spec = { workspace = true }
+pallet-block-rewards = { workspace = true }
+pallet-bond = { workspace = true }
+pallet-chain-transfer = { workspace = true }
+pallet-data-domain = { workspace = true }
+pallet-mint = { workspace = true }
+pallet-notebook = { workspace = true }
+pallet-notaries = { workspace = true }
+pallet-mining-slot = { workspace = true }
+pallet-ticks = { workspace = true }
+ulx-primitives = { workspace = true }
 
 [build-dependencies]
-substrate-wasm-builder = { version = "5.0.0-dev", git = "https://github.com/paritytech/polkadot-sdk.git", optional = true , branch = "release-polkadot-v1.5.0" }
+substrate-wasm-builder = { workspace = true, optional = true }
 
 [features]
 default = ["std"]
 std = [
-	"frame-try-runtime?/std",
-	"frame-system-benchmarking?/std",
-	"frame-benchmarking?/std",
-	"codec/std",
-	"scale-info/std",
-	"pallet-balances/std",
-	"pallet-sudo/std",
-	"pallet-timestamp/std",
-	"pallet-session/std",
-	"pallet-offences/std",
-	"pallet-grandpa/std",
-	"pallet-chain-transfer/std",
-	"pallet-notaries/std",
-	"pallet-ticks/std",
-	"pallet-transaction-payment/std",
-	"pallet-authorship/std",
-	"pallet-transaction-payment-rpc-runtime-api/std",
-	"pallet-mining-slot/std",
-	"pallet-notebook/std",
-	"pallet-bond/std",
-	"pallet-block-seal-spec/std",
-	"pallet-block-rewards/std",
-	"pallet-block-seal/std",
-	"pallet-data-domain/std",
-	"pallet-mint/std",
-	"pallet-tx-pause/std",
-	"frame-support/std",
-	"frame-system/std",
-	"frame-system-rpc-runtime-api/std",
-	"frame-executive/std",
-	"serde_json/std",
-	"log/std",
-	"sp-api/std",
-	"sp-arithmetic/std",
-	"sp-block-builder/std",
-	"sp-core/std",
-	"sp-consensus-grandpa/std",
-	"sp-genesis-builder/std",
-	"sp-inherents/std",
-	"sp-offchain/std",
-	"sp-runtime/std",
-	"sp-session/std",
-	"sp-debug-derive/std",
-	"sp-std/std",
-	"sp-transaction-pool/std",
-	"sp-version/std",
-	"substrate-wasm-builder",
-	"ulx-primitives/std",
+    "frame-try-runtime?/std",
+    "frame-system-benchmarking?/std",
+    "frame-benchmarking?/std",
+    "codec/std",
+    "scale-info/std",
+    "pallet-balances/std",
+    "pallet-sudo/std",
+    "pallet-timestamp/std",
+    "pallet-session/std",
+    "pallet-offences/std",
+    "pallet-grandpa/std",
+    "pallet-chain-transfer/std",
+    "pallet-notaries/std",
+    "pallet-ticks/std",
+    "pallet-transaction-payment/std",
+    "pallet-authorship/std",
+    "pallet-transaction-payment-rpc-runtime-api/std",
+    "pallet-mining-slot/std",
+    "pallet-notebook/std",
+    "pallet-bond/std",
+    "pallet-block-seal-spec/std",
+    "pallet-block-rewards/std",
+    "pallet-block-seal/std",
+    "pallet-data-domain/std",
+    "pallet-mint/std",
+    "pallet-tx-pause/std",
+    "frame-support/std",
+    "frame-system/std",
+    "frame-system-rpc-runtime-api/std",
+    "frame-executive/std",
+    "serde_json/std",
+    "log/std",
+    "sp-api/std",
+    "sp-arithmetic/std",
+    "sp-block-builder/std",
+    "sp-core/std",
+    "sp-consensus-grandpa/std",
+    "sp-genesis-builder/std",
+    "sp-inherents/std",
+    "sp-offchain/std",
+    "sp-runtime/std",
+    "sp-session/std",
+    "sp-debug-derive/std",
+    "sp-std/std",
+    "sp-transaction-pool/std",
+    "sp-version/std",
+    "substrate-wasm-builder",
+    "ulx-primitives/std",
 ]
 runtime-benchmarks = [
-	"frame-benchmarking/runtime-benchmarks",
-	"frame-support/runtime-benchmarks",
-	"frame-system-benchmarking/runtime-benchmarks",
-	"frame-system/runtime-benchmarks",
-	"pallet-balances/runtime-benchmarks",
-	"pallet-sudo/runtime-benchmarks",
-	"pallet-bond/runtime-benchmarks",
-	"pallet-block-rewards/runtime-benchmarks",
-	"pallet-notaries/runtime-benchmarks",
-	"pallet-chain-transfer/runtime-benchmarks",
-	"pallet-offences/runtime-benchmarks",
-	"pallet-grandpa/runtime-benchmarks",
-	"pallet-block-seal/runtime-benchmarks",
-	"pallet-data-domain/runtime-benchmarks",
-	"pallet-mint/runtime-benchmarks",
-	"pallet-timestamp/runtime-benchmarks",
-	"sp-runtime/runtime-benchmarks",
-	"pallet-tx-pause/runtime-benchmarks",
+    "frame-benchmarking/runtime-benchmarks",
+    "frame-support/runtime-benchmarks",
+    "frame-system-benchmarking/runtime-benchmarks",
+    "frame-system/runtime-benchmarks",
+    "pallet-balances/runtime-benchmarks",
+    "pallet-sudo/runtime-benchmarks",
+    "pallet-bond/runtime-benchmarks",
+    "pallet-block-rewards/runtime-benchmarks",
+    "pallet-notaries/runtime-benchmarks",
+    "pallet-chain-transfer/runtime-benchmarks",
+    "pallet-offences/runtime-benchmarks",
+    "pallet-grandpa/runtime-benchmarks",
+    "pallet-block-seal/runtime-benchmarks",
+    "pallet-data-domain/runtime-benchmarks",
+    "pallet-mint/runtime-benchmarks",
+    "pallet-timestamp/runtime-benchmarks",
+    "sp-runtime/runtime-benchmarks",
+    "pallet-tx-pause/runtime-benchmarks",
 ]
 try-runtime = [
-	"pallet-notaries/try-runtime",
-	"pallet-chain-transfer/try-runtime",
-	"pallet-offences/try-runtime",
-	"pallet-authorship/try-runtime",
-	"frame-try-runtime/try-runtime",
-	"frame-executive/try-runtime",
-	"frame-system/try-runtime",
-	"frame-support/try-runtime",
-	"pallet-mint/try-runtime",
-	"pallet-balances/try-runtime",
-	"pallet-sudo/try-runtime",
-	"pallet-bond/try-runtime",
-	"pallet-grandpa/try-runtime",
-	"pallet-block-seal/try-runtime",
-	"pallet-data-domain/try-runtime",
-	"pallet-block-rewards/try-runtime",
-	"pallet-timestamp/try-runtime",
-	"pallet-transaction-payment/try-runtime",
-	"pallet-session/try-runtime",
-	"pallet-tx-pause/try-runtime",
+    "pallet-notaries/try-runtime",
+    "pallet-chain-transfer/try-runtime",
+    "pallet-offences/try-runtime",
+    "pallet-authorship/try-runtime",
+    "frame-try-runtime/try-runtime",
+    "frame-executive/try-runtime",
+    "frame-system/try-runtime",
+    "frame-support/try-runtime",
+    "pallet-mint/try-runtime",
+    "pallet-balances/try-runtime",
+    "pallet-sudo/try-runtime",
+    "pallet-bond/try-runtime",
+    "pallet-grandpa/try-runtime",
+    "pallet-block-seal/try-runtime",
+    "pallet-data-domain/try-runtime",
+    "pallet-block-rewards/try-runtime",
+    "pallet-timestamp/try-runtime",
+    "pallet-transaction-payment/try-runtime",
+    "pallet-session/try-runtime",
+    "pallet-tx-pause/try-runtime",
 ]
 # Set timing constants (e.g. session period) to faster versions to speed up testing.
-fast-runtime= ["ulx-primitives/fast-runtime", "sp-debug-derive/force-debug"]
+fast-runtime = ["ulx-primitives/fast-runtime", "sp-debug-derive/force-debug"]

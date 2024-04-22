@@ -1,0 +1,20 @@
+{
+  "db_name": "SQLite",
+  "query": "SELECT hd_path from accounts WHERE hd_path IS NOT NULL AND account_type = ? AND notary_id = ? ORDER BY hd_path DESC",
+  "describe": {
+    "columns": [
+      {
+        "name": "hd_path",
+        "ordinal": 0,
+        "type_info": "Text"
+      }
+    ],
+    "parameters": {
+      "Right": 2
+    },
+    "nullable": [
+      true
+    ]
+  },
+  "hash": "bb55c371414c1e24e72bb3bbe7714adc96d53789328cdd6c90c63688d135e533"
+}

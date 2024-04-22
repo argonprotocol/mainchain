@@ -3,11 +3,10 @@ use serde::{Deserialize, Serialize};
 use snafu::Snafu;
 use sp_core::crypto::AccountId32;
 use sp_runtime::{scale_info::TypeInfo, RuntimeString};
-use ulx_primitives::{tick::Tick, AccountType};
+use ulx_primitives::{tick::Tick, AccountType, MINIMUM_ESCROW_SETTLEMENT};
 
 use crate::AccountHistoryLookupError;
 
-const MIN_CHANNEL_NOTE_MILLIGONS: u128 = ulx_primitives::MIN_CHANNEL_NOTE_MILLIGONS;
 #[derive(Debug, PartialEq, Clone, Snafu, TypeInfo, Encode, Decode, Serialize, Deserialize)]
 pub enum VerifyError {
 	#[snafu(display("Missing account origin {account_id:?}, {account_type:?}"))]
@@ -43,7 +42,7 @@ pub enum VerifyError {
 	#[snafu(display("Invalid balance change signature #{change_index}"))]
 	InvalidBalanceChangeSignature { change_index: u16 },
 
-	#[snafu(display("Invalid note recipients for a claimed note"))]
+	#[snafu(display("Some notes with restricted recipients did not balance to zero."))]
 	InvalidNoteRecipients,
 
 	#[snafu(display(
@@ -73,8 +72,10 @@ pub enum VerifyError {
 
 	#[snafu(display("Must include proof of previous balance"))]
 	MissingBalanceProof,
+
 	#[snafu(display("Invalid previous balance proof"))]
 	InvalidPreviousBalanceProof,
+
 	#[snafu(display("Invalid notebook hash"))]
 	InvalidNotebookHash,
 
@@ -93,36 +94,39 @@ pub enum VerifyError {
 	#[snafu(display("Submitted notebook older than most recent in storage"))]
 	NotebookTooOld,
 
+	#[snafu(display("Missing needed catchup notebooks"))]
+	CatchupNotebooksMissing,
+
 	#[snafu(display("Error decoding notebook"))]
 	DecodeError,
 
-	#[snafu(display("Account does not have a channel hold"))]
-	AccountChannelHoldDoesntExist,
+	#[snafu(display("Account does not have an escrow hold"))]
+	AccountEscrowHoldDoesntExist,
 
-	#[snafu(display("Account already has a channel hold"))]
-	AccountAlreadyHasChannelHold,
+	#[snafu(display("Account already has an escrow hold"))]
+	AccountAlreadyHasEscrowHold,
 
 	#[snafu(display(
-		"Channel hold not ready for claim. Current tick: {current_tick}, claim tick: {claim_tick}"
+		"Escrow hold not ready for claim. Current tick: {current_tick}, claim tick: {claim_tick}"
 	))]
-	ChannelHoldNotReadyForClaim { current_tick: Tick, claim_tick: Tick },
+	EscrowHoldNotReadyForClaim { current_tick: Tick, claim_tick: Tick },
 
-	#[snafu(display("This account is locked with a channel hold"))]
+	#[snafu(display("This account is locked with an escrow hold"))]
 	AccountLocked,
 
-	#[snafu(display("A channel hold note is required to unlock this account"))]
-	MissingChannelHoldNote,
+	#[snafu(display("An escrow hold note is required to unlock this account"))]
+	MissingEscrowHoldNote,
 
-	#[snafu(display("Invalid channel hold note"))]
-	InvalidChannelHoldNote,
+	#[snafu(display("Invalid escrow hold note"))]
+	InvalidEscrowHoldNote,
 
-	#[snafu(display("Invalid channel claimers"))]
-	InvalidChannelClaimers,
+	#[snafu(display("Invalid escrow claimers"))]
+	InvalidEscrowClaimers,
 
 	#[snafu(display(
-		"This channel note is below the minimum amount required ({MIN_CHANNEL_NOTE_MILLIGONS})"
+		"This escrow note is below the minimum amount required ({MINIMUM_ESCROW_SETTLEMENT})"
 	))]
-	ChannelNoteBelowMinimum,
+	EscrowNoteBelowMinimum,
 
 	#[snafu(display("Tax notes can only be created from deposit accounts"))]
 	InvalidTaxNoteAccount,
@@ -135,6 +139,12 @@ pub enum VerifyError {
 
 	#[snafu(display("Insufficient tax allocated for the given block votes"))]
 	InsufficientBlockVoteTax,
+
+	#[snafu(display("The account voting does not have any tax funds available"))]
+	IneligibleTaxVoter,
+
+	#[snafu(display("Invalid block vote signature"))]
+	BlockVoteInvalidSignature,
 
 	#[snafu(display("Invalid block vote allocation"))]
 	InvalidBlockVoteAllocation,
@@ -157,17 +167,14 @@ pub enum VerifyError {
 	#[snafu(display("Invalid block vote"))]
 	InvalidBlockVoteSource,
 
-	#[snafu(display("Invalid block vote signature"))]
-	BlockVoteInvalidSignature,
-
 	#[snafu(display("Minimums were not met for a block vote"))]
 	InsufficientBlockVoteMinimum,
 
 	#[snafu(display("Invalid block vote data domain or account"))]
 	BlockVoteDataDomainMismatch,
 
-	#[snafu(display("Block vote channel reused"))]
-	BlockVoteChannelReused,
+	#[snafu(display("Block vote escrow reused"))]
+	BlockVoteEscrowReused,
 }
 
 impl From<AccountHistoryLookupError> for VerifyError {

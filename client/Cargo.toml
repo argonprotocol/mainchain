@@ -13,25 +13,25 @@ homepage.workspace = true
 targets = ["x86_64-unknown-linux-gnu"]
 
 [dependencies]
-futures = "0.3"
-async-trait = { version = "0.1" }
-codec = { package = "parity-scale-codec", version = "3.6", features = ["derive", "max-encoded-len"] }
-serde = { version = "1.0", features = ["derive"] }
-serde_json = { version = "1.0", features = ["raw_value"] }
-scale-info = { version = "2.10" }
-thiserror = { version ="1.0" }
-subxt = { version = "0.33", features = ["substrate-compat"] }
-subxt-signer = { version = "0.33", features = ["subxt"] }
-hex = "0.4"
-jsonrpsee = { version = "0.20", features = ["server", "http-client", "ws-client", "macros", "client-ws-transport-native-tls"] }
-tracing = "0.1"
-tracing-subscriber = { version = "0.3", features = ["env-filter"] }
-sp-keystore = { version = "0.27", git = "https://github.com/paritytech/polkadot-sdk.git", branch = "release-polkadot-v1.5.0" }
-sp-runtime = { version = "24.0.0", git = "https://github.com/paritytech/polkadot-sdk.git", branch = "release-polkadot-v1.5.0" }
-sp-core = { version = "21.0.0", git = "https://github.com/paritytech/polkadot-sdk.git", branch = "release-polkadot-v1.5.0" }
-anyhow = "1.0"
-tokio = { version =  "1.35"}
+futures = { workspace = true }
+async-trait = { workspace = true }
+codec = { workspace = true, features = ["default"] }
+serde = { workspace = true, features = ["default"] }
+serde_json = { workspace = true, features = ["default"] }
+scale-info = { workspace = true, features = ["default"] }
+thiserror = { workspace = true }
+subxt = { workspace = true }
+hex = { workspace = true }
+jsonrpsee = { workspace = true, features = ["server", "ws-client", "macros", "client-ws-transport-native-tls", "client-ws-transport-webpki-tls"] } # needs to be in sync with subxt
+tracing = { workspace = true }
+tracing-subscriber = { workspace = true }
+
+anyhow = { workspace = true, features = ["default"] }
+tokio = { workspace = true }
 
 [dev-dependencies]
-sp-keyring = { version = "24.0.0", git = "https://github.com/paritytech/polkadot-sdk.git", branch = "release-polkadot-v1.5.0" }
-tokio = { version =  "1.35", features = ["full"] }
+sp-keyring = { workspace = true }
+tokio = { workspace = true, features = ["test-util"] }
+sp-core = { workspace = true, features = ["default"] }
+ulx-testing = { workspace = true }
+subxt-signer = { workspace = true }

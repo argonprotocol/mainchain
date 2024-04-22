@@ -1,0 +1,52 @@
+name: Build Docker image
+description: |
+  Build a docker image with caching layers
+
+inputs:
+  image:
+    description: 'The name of the image to build and push'
+    required: true
+  dockerfile:
+    description: 'The path to the Dockerfile to build'
+    required: false
+    default: Containerfile
+  bin:
+    description: 'Path to the bin file to copy'
+    required: true
+  github-token:
+    description: 'The github token'
+    required: true
+
+runs:
+  using: "composite"
+  steps:
+    - name: Set up tags
+      id: meta
+      uses: docker/metadata-action@v5
+      with:
+        images: ${{ inputs.image }}
+        labels: |
+          org.opencontainers.image.licenses=MIT
+          org.opencontainers.image.vendor=ulixee
+        flavor: latest=false
+        tags: |
+          type=raw,dev
+          type=sha
+    - name: Login to container registry
+      uses: docker/login-action@v3
+      with:
+        registry: ghcr.io
+        username: ${{ github.repository_owner }}
+        password: ${{ inputs.github-token }}
+
+    - name: Build and push image to container registry
+      uses: docker/build-push-action@v5
+      with:
+        context: .
+        file: ${{ inputs.dockerfile }}
+        build-args: BIN=${{ inputs.bin }}
+        push: true
+        tags: ${{ steps.meta.outputs.tags }}
+        labels: ${{ steps.meta.outputs.labels }}
+        cache-from: type=registry,ref=${{ inputs.image }}:buildcache
+        cache-to: type=registry,ref=${{ inputs.image }}:buildcache,mode=max

@@ -55,7 +55,9 @@ impl FinalizedNotebookHeaderListener {
 
 				header
 			},
-			Err(e) => return Err(anyhow::anyhow!("Error parsing notified notebook number {:?}", e)),
+			Err(e) => {
+				return Err(anyhow::anyhow!("Error parsing notified notebook number {:?}", e))
+			},
 		};
 
 		self.completed_notebook_sender.notify(|| Ok(header.clone())).map_err(
@@ -74,7 +76,7 @@ impl FinalizedNotebookHeaderListener {
 					Err(e) => {
 						tracing::error!("Error listening for finalized notebook header {:?}", e);
 						if e.to_string().contains("closed pool") {
-							return Err(e.into())
+							return Err(e.into());
 						}
 					},
 				}
@@ -117,7 +119,7 @@ impl NotebookCloser {
 				let _ = self.iterate_notebook_close_loop().await;
 				let tick = self.ticker.current();
 				let next_tick = self.ticker.time_for_tick(tick + 1);
-				let sleep = next_tick.min(LOOP_MILLIS) - 1;
+				let sleep = next_tick.min(LOOP_MILLIS) + 1;
 				// wait before resuming
 				tokio::time::sleep(tokio::time::Duration::from_millis(sleep)).await;
 			}
@@ -201,7 +203,7 @@ pub fn notary_sign(
 				e
 			))
 		})?
-		.unwrap();
+		.expect(format!("Could not sign the notebook header. Ensure the notary key {:?} is installed in the keystore", public).as_str());
 	Ok(sig)
 }
 
@@ -221,18 +223,17 @@ mod tests {
 	};
 
 	use anyhow::anyhow;
-	use chrono::Utc;
 	use codec::Decode;
 	use frame_support::assert_ok;
 	use futures::{task::noop_waker_ref, StreamExt};
-	use sp_core::{bounded_vec, ed25519::Public, Pair};
+	use sp_core::hexdisplay::AsBytesRef;
+	use sp_core::{bounded_vec, ed25519::Public, sr25519::Signature, Pair};
 	use sp_keyring::Sr25519Keyring::{Alice, Bob, Ferdie};
 	use sp_keystore::{testing::MemoryKeystore, Keystore, KeystoreExt};
 	use sqlx::PgPool;
 	use subxt::{
 		blocks::Block,
 		config::substrate::DigestItem,
-		ext::sp_core::hexdisplay::AsBytesRef,
 		tx::{TxInBlock, TxProgress, TxStatus},
 		utils::AccountId32,
 		OnlineClient,
@@ -240,6 +241,12 @@ mod tests {
 	use subxt_signer::sr25519::{dev, Keypair};
 	use tokio::{spawn, sync::Mutex};
 
+	use crate::{
+		block_watch::track_blocks,
+		notebook_closer::NOTARY_KEYID,
+		stores::{notarizations::NotarizationsStore, notebook_status::NotebookStatusStore},
+		NotaryServer,
+	};
 	use ulixee_client::{
 		api,
 		api::{
@@ -247,17 +254,16 @@ mod tests {
 			runtime_types::{
 				bounded_collections::bounded_vec::BoundedVec,
 				pallet_notaries::pallet::Call as NotaryCall,
-				sp_core::ed25519,
 				ulx_node_runtime::RuntimeCall,
 				ulx_primitives::{
-					balance_change::AccountOrigin as SubxtAccountOrigin, host::Host,
-					notary::NotaryMeta,
+					balance_change::AccountOrigin as SubxtAccountOrigin, notary::NotaryMeta,
 				},
 			},
 			storage, tx,
 		},
 		UlxClient, UlxConfig,
 	};
+	use ulx_notary_apis::localchain::BalanceChangeResult;
 	use ulx_notary_audit::VerifyError;
 	use ulx_primitives::{
 		tick::Tick,
@@ -265,24 +271,15 @@ mod tests {
 		AccountType::{Deposit, Tax},
 		BalanceChange, BalanceProof, BalanceTip, BlockSealDigest, BlockVote, BlockVoteDigest,
 		DataDomain, DataDomainHash, DataTLD, HashOutput, MerkleProof, Note, NoteType,
-		NoteType::{ChannelClaim, ChannelSettle},
-		NotebookDigest, ParentVotingKeyDigest, TickDigest, CHANNEL_EXPIRATION_TICKS,
-		DATA_DOMAIN_LEASE_COST,
+		NoteType::{EscrowClaim, EscrowSettle},
+		NotebookDigest, ParentVotingKeyDigest, TickDigest, TransferToLocalchainId,
+		DATA_DOMAIN_LEASE_COST, ESCROW_EXPIRATION_TICKS,
 	};
 	use ulx_testing::{test_context, test_context_from_url};
 
-	use crate::{
-		apis::localchain::BalanceChangeResult,
-		block_watch::track_blocks,
-		notebook_closer::NOTARY_KEYID,
-		stores::{notarizations::NotarizationsStore, notebook_status::NotebookStatusStore},
-		NotaryServer,
-	};
-
 	use super::*;
 	use ulixee_client::MultiurlClient;
-
-	type Nonce = u32;
+	use ulx_primitives::host::Host;
 
 	#[sqlx::test]
 	async fn test_chain_to_chain(pool: PgPool) -> anyhow::Result<()> {
@@ -305,7 +302,7 @@ mod tests {
 		let ticker = client.lookup_ticker().await?;
 		let ticker = Ticker::new(ticker.tick_duration_millis, ticker.genesis_utc_time);
 		let server = NotaryServer::create_http_server("127.0.0.1:0").await?;
-		let block_tracker = track_blocks(ctx.ws_url, 1, &pool.clone(), ticker.clone());
+		let block_tracker = track_blocks(ctx.ws_url.clone(), 1, pool.clone(), ticker.clone());
 		let block_tracker = Arc::new(Mutex::new(Some(block_tracker)));
 
 		propose_bob_as_notary(&ctx.client, notary_key, server.local_addr()?).await?;
@@ -326,14 +323,8 @@ mod tests {
 		// Submit a transfer to localchain and wait for result
 		let bob_transfer = create_localchain_transfer(&ctx.client, dev::bob(), 1000).await?;
 		wait_for_transfers(&pool, vec![bob_transfer.clone()]).await?;
-
 		// Record the balance change
 		submit_balance_change_to_notary(&pool, bob_transfer).await?;
-
-		sqlx::query("update notebook_status set end_time = $1 where notebook_number = 1")
-			.bind(Utc::now())
-			.execute(&pool)
-			.await?;
 
 		let mut closer = NotebookCloser {
 			pool: pool.clone(),
@@ -361,7 +352,7 @@ mod tests {
 			let _ = &closer.iterate_notebook_close_loop().await;
 			let status = NotebookStatusStore::get(&pool, 1).await?;
 			if status.finalized_time.is_some() {
-				break
+				break;
 			}
 			// yield
 			tokio::time::sleep(tokio::time::Duration::from_millis(50)).await;
@@ -429,7 +420,7 @@ mod tests {
 
 		let server = NotaryServer::create_http_server("127.0.0.1:0").await?;
 		let addr = server.local_addr()?;
-		let block_tracker = track_blocks(ctx.ws_url, 1, &pool.clone(), ticker.clone());
+		let block_tracker = track_blocks(ctx.ws_url.clone(), 1, pool.clone(), ticker.clone());
 		let block_tracker = Arc::new(Mutex::new(Some(block_tracker)));
 
 		let mut notary_server = NotaryServer::start_with(server, notary_id, pool.clone()).await?;
@@ -466,7 +457,7 @@ mod tests {
 		loop {
 			let status = NotebookStatusStore::get(&pool, result.notebook_number).await?;
 			if status.finalized_time.is_some() {
-				break
+				break;
 			}
 			// yield
 			tokio::time::sleep(tokio::time::Duration::from_millis(50)).await;
@@ -493,7 +484,7 @@ mod tests {
 			notebook_number: result.notebook_number,
 		};
 
-		let (hold_note, hold_result) = create_channel_hold(
+		let (hold_note, hold_result) = create_escrow_hold(
 			&pool,
 			bob_balance as u128,
 			5000,
@@ -504,11 +495,8 @@ mod tests {
 		)
 		.await?;
 
-		#[cfg(not(feature = "fast-runtime"))]
-		{
-			panic!("This test will not complete in time because the fast-runtime feature is not enabled in the build (run cargo build --release --features=fast-runtime)");
-		}
-		println!("created channel hold. Waiting for notebook {}", hold_result.notebook_number);
+		assert_eq!(ESCROW_EXPIRATION_TICKS, 2, "Should have a short expiration");
+		println!("created escrow hold. Waiting for notebook {}", hold_result.notebook_number);
 
 		let mut header_sub = notary_server.completed_notebook_stream.subscribe(100);
 		let mut notebook_proof: Option<MerkleProof> = None;
@@ -528,7 +516,7 @@ mod tests {
 											account_origin: origin.clone(),
 											balance: bob_balance as u128,
 											account_id: Bob.to_account_id(),
-											channel_hold_note: Some(hold_note.clone()),
+											escrow_hold_note: Some(hold_note.clone()),
 											change_number: 2,
 											account_type: Deposit,
 										},
@@ -536,9 +524,9 @@ mod tests {
 									.await?,
 								);
 							}
-							if header.notebook_number >= hold_result.notebook_number + CHANNEL_EXPIRATION_TICKS
+							if header.notebook_number >= hold_result.notebook_number + ESCROW_EXPIRATION_TICKS
 							{
-								println!("Expiration of channel ready");
+								println!("Expiration of escrow ready");
 								break;
 							}
 						},
@@ -557,27 +545,41 @@ mod tests {
 			.expect("should find a best block");
 
 		println!(
-			"Got a notebook proof at block {:?}. Current tick {}",
+			"Got a notebook proof at block {:?}. Current tick {}. Block Tick {}",
 			best_hash,
-			ticker.current()
+			ticker.current(),
+			ctx.client
+				.runtime_api()
+				.at(best_hash)
+				.call(api::runtime_apis::tick_apis::TickApis.current_tick())
+				.await?
 		);
 
-		let grandparent_tick = ticker.current() - 2;
-		let best_grandparents = ctx
-			.client
-			.storage()
-			.at(best_hash)
-			.fetch(&api::ticks::storage::StorageApi.recent_blocks_at_ticks(grandparent_tick))
-			.await?
-			.expect("Should have a block hash")
-			.0;
+		let (grandparent_tick, best_grandparents) = {
+			loop {
+				let grandparent_tick = ticker.current() - 2;
+				match ctx
+					.client
+					.storage()
+					.at(best_hash)
+					.fetch(
+						&api::ticks::storage::StorageApi.recent_blocks_at_ticks(grandparent_tick),
+					)
+					.await?
+				{
+					Some(x) => break (grandparent_tick, x.0),
+					// wait a second
+					None => tokio::time::sleep(ticker.duration_to_next_tick()).await,
+				}
+			}
+		};
 
 		let best_grandparent = best_grandparents.last().expect("Should have blocks in every tick");
 		println!("Voting for grandparent {:?} at tick {}", best_grandparent, grandparent_tick);
 
 		let vote_power = (hold_note.milligons as f64 * 0.2f64) as u128;
 
-		let channel_result = settle_channel_and_vote(
+		let escrow_result = settle_escrow_and_vote(
 			&pool,
 			hold_note,
 			best_grandparent.clone(),
@@ -591,7 +593,7 @@ mod tests {
 			},
 		)
 		.await?;
-		println!("Channel result is {:?}", channel_result);
+		println!("Escrow result is {:?}", escrow_result);
 
 		let mut best_sub = ctx.client.blocks().subscribe_finalized().await?;
 		while let Some(block) = best_sub.next().await {
@@ -600,15 +602,15 @@ mod tests {
 					let (tick, votes, seal, key, notebooks) = get_digests(block);
 					if let Some(notebook) = notebooks.notebooks.get(0) {
 						assert_eq!(notebook.audit_first_failure, None);
-						if notebook.notebook_number == channel_result.notebook_number {
+						if notebook.notebook_number == escrow_result.notebook_number {
 							assert_eq!(votes.votes_count, 1, "Should have votes");
 							assert_eq!(votes.voting_power, vote_power);
-							assert_eq!(tick, channel_result.tick)
+							assert_eq!(tick, escrow_result.tick)
 						}
 					}
 					println!("Got block with tick {tick} {:?} {:?}", votes, seal);
 
-					if tick >= channel_result.tick + 2 {
+					if tick >= escrow_result.tick + 2 {
 						assert!(
 							key.parent_voting_key.is_some(),
 							"Should be including parent voting keys"
@@ -617,7 +619,7 @@ mod tests {
 							matches!(seal, BlockSealDigest::Vote { .. }),
 							"Should be vote seal"
 						);
-						break
+						break;
 					}
 				},
 				_ => break,
@@ -640,7 +642,7 @@ mod tests {
 			match Pin::new(&mut block_tracker_inner).poll(&mut cx) {
 				Poll::Ready(Err(e)) => {
 					tracing::error!("Error tracking blocks {:?}", e);
-					return Err(anyhow!(e.to_string()))
+					return Err(anyhow!(e.to_string()));
 				},
 				_ => {
 					*block_tracker_lock = Some(block_tracker_inner);
@@ -661,16 +663,21 @@ mod tests {
 		let mut parent_voting_key = None;
 		for log in block.header().digest.logs.iter() {
 			match log {
-				DigestItem::PreRuntime(ulx_primitives::TICK_DIGEST_ID, data) =>
-					tick = TickDigest::decode(&mut &data[..]).ok(),
-				DigestItem::PreRuntime(ulx_primitives::BLOCK_VOTES_DIGEST_ID, data) =>
-					votes = BlockVoteDigest::decode(&mut &data[..]).ok(),
-				DigestItem::PreRuntime(ulx_primitives::NOTEBOOKS_DIGEST_ID, data) =>
-					notebook_digest = NotebookDigest::decode(&mut &data[..]).ok(),
-				DigestItem::Seal(ulx_primitives::BLOCK_SEAL_DIGEST_ID, data) =>
-					block_seal = BlockSealDigest::decode(&mut &data[..]).ok(),
-				DigestItem::Consensus(ulx_primitives::PARENT_VOTING_KEY_DIGEST, data) =>
-					parent_voting_key = ParentVotingKeyDigest::decode(&mut &data[..]).ok(),
+				DigestItem::PreRuntime(ulx_primitives::TICK_DIGEST_ID, data) => {
+					tick = TickDigest::decode(&mut &data[..]).ok()
+				},
+				DigestItem::PreRuntime(ulx_primitives::BLOCK_VOTES_DIGEST_ID, data) => {
+					votes = BlockVoteDigest::decode(&mut &data[..]).ok()
+				},
+				DigestItem::PreRuntime(ulx_primitives::NOTEBOOKS_DIGEST_ID, data) => {
+					notebook_digest = NotebookDigest::decode(&mut &data[..]).ok()
+				},
+				DigestItem::Seal(ulx_primitives::BLOCK_SEAL_DIGEST_ID, data) => {
+					block_seal = BlockSealDigest::decode(&mut &data[..]).ok()
+				},
+				DigestItem::Consensus(ulx_primitives::PARENT_VOTING_KEY_DIGEST, data) => {
+					parent_voting_key = ParentVotingKeyDigest::decode(&mut &data[..]).ok()
+				},
 				_ => (),
 			}
 		}
@@ -692,13 +699,12 @@ mod tests {
 			IpAddr::V4(ip) => ip,
 			IpAddr::V6(_) => panic!("Should be ipv4"),
 		};
+		let host: Host = format!("ws://{}:{}", ip, addr.port()).into();
 		let notary_proposal = tx().notaries().propose(NotaryMeta {
-			hosts: BoundedVec(vec![Host {
-				is_secure: false,
-				ip: ip.into(),
-				port: addr.port().into(),
-			}]),
-			public: ed25519::Public(notary_key.0),
+			hosts: BoundedVec(vec![runtime_types::ulx_primitives::host::Host(BoundedVec(
+				host.0.to_vec(),
+			))]),
+			public: notary_key.0,
 		});
 		println!("notary proposal {:?}", notary_proposal.call_data());
 		let tx_progress = client
@@ -715,9 +721,9 @@ mod tests {
 
 	async fn submit_balance_change_to_notary(
 		pool: &PgPool,
-		transfer: (Nonce, u32, Keypair),
+		transfer: (TransferToLocalchainId, u32, Keypair),
 	) -> anyhow::Result<BalanceChangeResult> {
-		let (account_nonce, amount, keypair) = transfer;
+		let (transfer_id, amount, keypair) = transfer;
 		let public = keypair.public_key();
 		let public = public.as_ref();
 
@@ -739,10 +745,10 @@ mod tests {
 				previous_balance_proof: None,
 				notes: bounded_vec![Note::create(
 					amount as u128,
-					NoteType::ClaimFromMainchain { account_nonce },
+					NoteType::ClaimFromMainchain { transfer_id },
 				)],
-				channel_hold_note: None,
-				signature: sp_core::ed25519::Signature([0u8; 64]).into(),
+				escrow_hold_note: None,
+				signature: sp_core::ed25519::Signature::from_raw([0u8; 64]).into(),
 			}
 			.sign(keypair)
 			.clone()],
@@ -757,11 +763,11 @@ mod tests {
 	}
 	async fn submit_balance_change_to_notary_and_create_domain(
 		pool: &PgPool,
-		transfer: (Nonce, u32, Keypair),
+		transfer: (TransferToLocalchainId, u32, Keypair),
 		domain_hash: DataDomainHash,
 		register_domain_to: AccountId,
 	) -> anyhow::Result<AccountOrigin> {
-		let (account_nonce, amount, keypair) = transfer;
+		let (transfer_id, amount, keypair) = transfer;
 		let public = keypair.public_key();
 		let public = public.as_ref();
 
@@ -783,14 +789,11 @@ mod tests {
 					balance: amount as u128 - DATA_DOMAIN_LEASE_COST,
 					previous_balance_proof: None,
 					notes: bounded_vec![
-						Note::create(
-							amount as u128,
-							NoteType::ClaimFromMainchain { account_nonce },
-						),
+						Note::create(amount as u128, NoteType::ClaimFromMainchain { transfer_id },),
 						Note::create(DATA_DOMAIN_LEASE_COST, NoteType::LeaseDomain,)
 					],
-					channel_hold_note: None,
-					signature: sp_core::ed25519::Signature([0u8; 64]).into(),
+					escrow_hold_note: None,
+					signature: sp_core::ed25519::Signature::from_raw([0u8; 64]).into(),
 				}
 				.sign(keypair.clone())
 				.clone(),
@@ -801,8 +804,8 @@ mod tests {
 					balance: DATA_DOMAIN_LEASE_COST,
 					previous_balance_proof: None,
 					notes: bounded_vec![Note::create(DATA_DOMAIN_LEASE_COST, NoteType::Claim,)],
-					channel_hold_note: None,
-					signature: sp_core::ed25519::Signature([0u8; 64]).into(),
+					escrow_hold_note: None,
+					signature: sp_core::ed25519::Signature::from_raw([0u8; 64]).into(),
 				}
 				.sign(keypair.clone())
 				.clone(),
@@ -843,7 +846,7 @@ mod tests {
 		Ok(result.unwrap().block_hash())
 	}
 
-	async fn create_channel_hold(
+	async fn create_escrow_hold(
 		pool: &PgPool,
 		balance: u128,
 		amount: u128,
@@ -854,10 +857,7 @@ mod tests {
 	) -> anyhow::Result<(Note, BalanceChangeResult)> {
 		let hold_note = Note::create(
 			amount,
-			NoteType::ChannelHold {
-				recipient: domain_account,
-				data_domain_hash: Some(domain_hash),
-			},
+			NoteType::EscrowHold { recipient: domain_account, data_domain_hash: Some(domain_hash) },
 		);
 		let changes = vec![BalanceChange {
 			account_id: Bob.to_account_id(),
@@ -873,8 +873,8 @@ mod tests {
 				account_origin: account_origin.clone(),
 			}),
 			notes: bounded_vec![hold_note.clone()],
-			channel_hold_note: None,
-			signature: sp_core::sr25519::Signature([0u8; 64]).into(),
+			escrow_hold_note: None,
+			signature: sp_core::sr25519::Signature::from_raw([0u8; 64]).into(),
 		}
 		.sign(Bob.pair())
 		.clone()];
@@ -883,15 +883,15 @@ mod tests {
 		Ok((hold_note.clone(), result))
 	}
 
-	async fn settle_channel_and_vote(
+	async fn settle_escrow_and_vote(
 		pool: &PgPool,
 		hold_note: Note,
 		vote_block_hash: HashOutput,
 		bob_balance_proof: BalanceProof,
 	) -> anyhow::Result<BalanceChangeResult> {
 		let (data_domain_hash, recipient) = match hold_note.note_type.clone() {
-			NoteType::ChannelHold { recipient, data_domain_hash } => (data_domain_hash, recipient),
-			_ => panic!("Should be a channel hold note"),
+			NoteType::EscrowHold { recipient, data_domain_hash } => (data_domain_hash, recipient),
+			_ => panic!("Should be an escrow hold note"),
 		};
 		let tax = (hold_note.milligons as f64 * 0.2f64) as u128;
 		let changes = vec![
@@ -901,9 +901,9 @@ mod tests {
 				change_number: 3,
 				balance: bob_balance_proof.balance - hold_note.milligons,
 				previous_balance_proof: Some(bob_balance_proof),
-				channel_hold_note: Some(hold_note.clone()),
-				notes: bounded_vec![Note::create(hold_note.milligons, ChannelSettle)],
-				signature: sp_core::sr25519::Signature([0u8; 64]).into(),
+				escrow_hold_note: Some(hold_note.clone()),
+				notes: bounded_vec![Note::create(hold_note.milligons, EscrowSettle)],
+				signature: sp_core::sr25519::Signature::from_raw([0u8; 64]).into(),
 			}
 			.sign(Bob.pair())
 			.clone(),
@@ -913,12 +913,12 @@ mod tests {
 				change_number: 1,
 				balance: hold_note.milligons - tax,
 				previous_balance_proof: None,
-				channel_hold_note: None,
+				escrow_hold_note: None,
 				notes: bounded_vec![
-					Note::create(hold_note.milligons, ChannelClaim),
+					Note::create(hold_note.milligons, EscrowClaim),
 					Note::create(tax, NoteType::Tax)
 				],
-				signature: sp_core::sr25519::Signature([0u8; 64]).into(),
+				signature: sp_core::sr25519::Signature::from_raw([0u8; 64]).into(),
 			}
 			.sign(Alice.pair())
 			.clone(),
@@ -928,12 +928,12 @@ mod tests {
 				change_number: 1,
 				balance: 0,
 				previous_balance_proof: None,
-				channel_hold_note: None,
+				escrow_hold_note: None,
 				notes: bounded_vec![
 					Note::create(tax, NoteType::Claim),
 					Note::create(tax, NoteType::SendToVote)
 				],
-				signature: sp_core::sr25519::Signature([0u8; 64]).into(),
+				signature: sp_core::sr25519::Signature::from_raw([0u8; 64]).into(),
 			}
 			.sign(Alice.pair())
 			.clone(),
@@ -949,7 +949,8 @@ mod tests {
 				index: 1,
 				block_hash: vote_block_hash,
 				power: tax,
-				signature: sp_core::sr25519::Signature([0u8; 64]).into(),
+				block_rewards_account_id: Alice.to_account_id(),
+				signature: Signature::from_raw([0u8; 64]).into(),
 			}
 			.sign(Alice.pair())
 			.clone()],
@@ -963,7 +964,7 @@ mod tests {
 		client: &UlxClient,
 		account: Keypair,
 		amount: u32,
-	) -> anyhow::Result<(Nonce, u32, Keypair)> {
+	) -> anyhow::Result<(TransferToLocalchainId, u32, Keypair)> {
 		let in_block = client
 			.tx()
 			.sign_and_submit_then_watch_default(
@@ -983,42 +984,37 @@ mod tests {
 					.transpose()
 				{
 					if transfer.account_id == account.public_key().to_account_id() {
-						return Ok((transfer.account_nonce, transfer.amount as u32, account.clone()))
+						return Ok((transfer.transfer_id, transfer.amount as u32, account.clone()));
 					}
 				}
 			}
 		}
-		return Err(anyhow!("Should have found the chain transfer in events"))
+		return Err(anyhow!("Should have found the chain transfer in events"));
 	}
 
 	async fn wait_for_transfers(
 		pool: &PgPool,
-		transfers: Vec<(Nonce, u32, Keypair)>,
+		transfers: Vec<(TransferToLocalchainId, u32, Keypair)>,
 	) -> anyhow::Result<()> {
 		let mut found = false;
 		for _ in 0..5 {
 			let rows = sqlx::query!("select * from chain_transfers").fetch_all(pool).await?;
-			let is_complete = transfers.iter().filter_map(|(nonce, amount, account)| {
+			let is_complete = transfers.iter().filter_map(|(transfer_id, amount, _account)| {
 				if let Some(record) =
-					rows.iter().find(|r| r.account_id.as_slice() == account.public_key().as_ref())
+					rows.iter().find(|r| (r.transfer_id.unwrap_or_default() as u32) == *transfer_id)
 				{
 					assert_eq!(
 						record.amount,
 						amount.to_string(),
-						"Should have recorded a chain transfer"
+						"Should have recorded a chain transfer amount"
 					);
-					assert_eq!(
-						record.account_nonce,
-						Some(*nonce as i32),
-						"Should have recorded a chain transfer"
-					);
-					return Some(())
+					return Some(());
 				}
 				None
 			});
 			if is_complete.count() == transfers.len() {
 				found = true;
-				break
+				break;
 			}
 			// wait for 500 ms
 			tokio::time::sleep(tokio::time::Duration::from_millis(500)).await;
@@ -1057,7 +1053,7 @@ mod tests {
 				.await?;
 			if let Some(_) = meta {
 				found = true;
-				break
+				break;
 			}
 			// wait for 500 ms
 			tokio::time::sleep(tokio::time::Duration::from_millis(500)).await;
@@ -1074,11 +1070,11 @@ mod tests {
 				TxStatus::InBestBlock(tx_in_block) | TxStatus::InFinalizedBlock(tx_in_block) => {
 					// now, we can attempt to work with the block, eg:
 					tx_in_block.wait_for_success().await?;
-					return Ok(tx_in_block)
+					return Ok(tx_in_block);
 				},
-				TxStatus::Error { message } |
-				TxStatus::Invalid { message } |
-				TxStatus::Dropped { message } => {
+				TxStatus::Error { message }
+				| TxStatus::Invalid { message }
+				| TxStatus::Dropped { message } => {
 					// Handle any errors:
 					return Err(Error::InternalError(format!(
 						"Error submitting notebook to block: {message}"

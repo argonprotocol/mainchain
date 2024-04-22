@@ -9,79 +9,51 @@ repository.workspace = true
 documentation.workspace = true
 homepage.workspace = true
 
-[profile.dev.package.sqlx-macros]
-opt-level = 3
-
 [package.metadata.docs.rs]
 targets = ["x86_64-unknown-linux-gnu"]
 
 [dependencies]
-anyhow = { version = "1" }
-futures = { version ="0.3", optional = true }
-getrandom = { version ="0.2", optional = true }
-parking_lot = { version ="0.12", optional=true }
-async-trait = { version = "0.1" }
-codec = { package = "parity-scale-codec", version = "3.6", features = ["derive", "max-encoded-len"] }
-serde = { version = "1.0", features = ["derive"] }
-serde_json = { version = "1.0", features = ["raw_value", "arbitrary_precision"] }
-scale-info = { version = "2.10" }
-thiserror = { version ="1.0", optional=true }
-subxt = { version = "0.33", features = ["substrate-compat"] }
-subxt-signer = { version = "0.33", features = ["default"] }
-tokio = { optional = true, version =  "1.35", features = ["full"] }
-tokio-stream = { optional = true, version =  "0.1", features = ["sync"] }
-hex = {  version = "0.4", optional = true }
-sc-keystore = {  optional = true, version = "4.0.0-dev", git = "https://github.com/paritytech/polkadot-sdk.git", branch = "release-polkadot-v1.5.0" }
-sc-service = {  optional = true, version = "0.10.0-dev", git = "https://github.com/paritytech/polkadot-sdk.git", branch = "release-polkadot-v1.5.0" }
-sp-keystore = {  optional = true, version = "0.27", git = "https://github.com/paritytech/polkadot-sdk.git", branch = "release-polkadot-v1.5.0" }
-jsonrpsee = { optional = true, version = "0.20", features = ["server", "http-client", "ws-client", "macros", "client-ws-transport-native-tls"] }
-sc-utils = {  optional = true, version = "4.0.0-dev", git = "https://github.com/paritytech/polkadot-sdk.git", branch = "release-polkadot-v1.5.0" }
-sp-runtime = { optional = true, version = "24.0.0", git = "https://github.com/paritytech/polkadot-sdk.git", branch = "release-polkadot-v1.5.0" }
-sp-core = {  optional = true, version = "21.0.0", git = "https://github.com/paritytech/polkadot-sdk.git", branch = "release-polkadot-v1.5.0", features = ["std", "serde"] }
-sc-cli =  {  optional = true, version = "0.10.0-dev", git = "https://github.com/paritytech/polkadot-sdk.git", branch = "release-polkadot-v1.5.0" }
-binary-merkle-tree = { optional = true, version = "4.0.0-dev", git = "https://github.com/paritytech/polkadot-sdk.git", branch = "release-polkadot-v1.5.0" }
-tracing = {  version="0.1", optional = true }
-tracing-subscriber = { version = "0.3", features = ["env-filter"], optional = true }
-sqlx =  { optional = true,  version = "0.7", features = [ "runtime-tokio-native-tls", "postgres", "macros","chrono" ] }
-chrono = {optional = true,  version = "0.4", features = ["serde"] }
-clap = { optional = true, version = "4.4", features = ["derive", "cargo","env"] }
+anyhow = { workspace = true, features = ["default"] }
+futures = { workspace = true }
+getrandom = { workspace = true }
+parking_lot = { workspace = true }
+async-trait = { workspace = true }
+codec = { workspace = true, features = ["default"] }
+serde = { workspace = true, features = ["default"] }
+serde_json = { workspace = true, features = ["default"] }
+scale-info = { workspace = true, features = ["default"] }
+thiserror = { workspace = true }
+subxt = { workspace = true }
+tokio = { workspace = true }
+hex = { workspace = true }
+jsonrpsee = { workspace = true, features = ["server"] }
+sp-runtime = { workspace = true, features = ["default"] }
+sp-core = { workspace = true, features = ["default"] }
+sc-utils = { workspace = true }
+sc-keystore = { workspace = true }
+sp-keystore = { workspace = true, features = ["default"] }
+binary-merkle-tree = { workspace = true, features = ["default"] }
+tracing = { workspace = true }
+tracing-subscriber = { workspace = true }
+sqlx = { workspace = true, features = ["runtime-tokio-native-tls", "postgres", "macros", "chrono"] }
+chrono = { workspace = true }
+clap = { workspace = true }
+rpassword = { workspace = true }
 
-
-ulixee-client = { path= "../client" }
-ulx-notary-audit = { optional = true, path = "audit" }
-ulx-primitives = { path = "../primitives" }
+ulixee-client = { workspace = true }
+ulx-notary-audit = { workspace = true, features = ["default"] }
+ulx-primitives = { workspace = true, features = ["default"] }
+ulx-notary-apis = { workspace = true }
+url = { workspace = true }
 
 [dev-dependencies]
-frame-support = { version = "4.0.0-dev", git = "https://github.com/paritytech/polkadot-sdk.git", branch = "release-polkadot-v1.5.0" }
-sp-keyring = { version = "24.0.0", git = "https://github.com/paritytech/polkadot-sdk.git", branch = "release-polkadot-v1.5.0" }
-ulx-testing = {  path= "../testing" }
+frame-support = { workspace = true }
+sp-keyring = { workspace = true }
+ulx-testing = { workspace = true }
+subxt-signer = { workspace = true }
+
+[build-dependencies]
+dotenv = { workspace = true }
 
 [features]
-default = ["std"]
-std =[
-    "dep:futures",
-    "dep:getrandom",
-    "dep:parking_lot",
-    "dep:thiserror",
-    "dep:tokio",
-    "dep:tokio-stream",
-    "dep:hex",
-    "dep:sc-keystore",
-    "dep:sc-service",
-    "dep:sp-keystore",
-    "dep:jsonrpsee",
-    "dep:tracing",
-    "dep:tracing-subscriber",
-    "dep:sc-utils",
-    "dep:sp-runtime",
-    "dep:sp-core",
-    "dep:sc-cli",
-    "dep:binary-merkle-tree",
-    "dep:sqlx",
-    "dep:chrono",
-    "dep:clap",
-    "dep:ulx-notary-audit",
-    "api"
-]
-api = ["jsonrpsee/http-client", "jsonrpsee/ws-client", "jsonrpsee/macros", "jsonrpsee/client-ws-transport-native-tls"]
-fast-runtime= ["ulx-primitives/fast-runtime"]
+fast-runtime = ["ulx-primitives/fast-runtime"]

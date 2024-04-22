@@ -1,0 +1,20 @@
+{
+  "db_name": "SQLite",
+  "query": "INSERT into notarizations (json, notary_id, notebook_number, tick) VALUES (?, ?, ?, ?) RETURNING id",
+  "describe": {
+    "columns": [
+      {
+        "name": "id",
+        "ordinal": 0,
+        "type_info": "Int64"
+      }
+    ],
+    "parameters": {
+      "Right": 4
+    },
+    "nullable": [
+      false
+    ]
+  },
+  "hash": "e58d47a1e510ca3bda761039dc779e8b17d9b1dd91bf77a26bc0c333d8261ad8"
+}

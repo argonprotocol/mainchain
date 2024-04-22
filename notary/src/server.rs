@@ -13,22 +13,21 @@ use serde::Serialize;
 use sqlx::PgPool;
 use tokio::net::ToSocketAddrs;
 
-use ulx_primitives::{
-	AccountId, AccountType, BalanceProof, BalanceTip, Notarization, NotarizationBalanceChangeset,
-	NotarizationBlockVotes, NotarizationDataDomains, NotaryId, Notebook, NotebookMeta,
-	NotebookNumber, SignedNotebookHeader,
-};
-
 use crate::{
-	apis::{
-		localchain::{BalanceChangeResult, BalanceTipResult, LocalchainRpcServer},
-		notebook::NotebookRpcServer,
-	},
 	stores::{
 		balance_tip::BalanceTipStore, notarizations::NotarizationsStore, notebook::NotebookStore,
 		notebook_header::NotebookHeaderStore,
 	},
 	Error,
+};
+use ulx_notary_apis::{
+	localchain::{BalanceChangeResult, BalanceTipResult, LocalchainRpcServer},
+	notebook::NotebookRpcServer,
+};
+use ulx_primitives::{
+	AccountId, AccountOrigin, AccountType, BalanceProof, BalanceTip, Notarization,
+	NotarizationBalanceChangeset, NotarizationBlockVotes, NotarizationDataDomains, NotaryId,
+	Notebook, NotebookMeta, NotebookNumber, SignedNotebookHeader,
 };
 
 pub type NotebookHeaderStream = NotificationStream<SignedNotebookHeader, NotebookHeaderTracingKey>;
@@ -176,11 +175,16 @@ impl NotebookRpcServer for NotaryServer {
 
 	async fn get_raw_headers(
 		&self,
-		since_notebook: NotebookNumber,
+		since_notebook: Option<NotebookNumber>,
+		or_specific_notebooks: Option<Vec<NotebookNumber>>,
 	) -> Result<Vec<(NotebookNumber, Vec<u8>)>, ErrorObjectOwned> {
-		NotebookHeaderStore::load_raw_signed_headers(&self.pool, since_notebook)
-			.await
-			.map_err(from_crate_error)
+		NotebookHeaderStore::load_raw_signed_headers(
+			&self.pool,
+			since_notebook,
+			or_specific_notebooks,
+		)
+		.await
+		.map_err(from_crate_error)
 	}
 
 	async fn metadata(&self) -> Result<NotebookMeta, ErrorObjectOwned> {
@@ -269,6 +273,21 @@ impl LocalchainRpcServer for NotaryServer {
 			.await
 			.map_err(from_crate_error)?)
 	}
+
+	async fn get_origin(
+		&self,
+		account_id: AccountId,
+		account_type: AccountType,
+	) -> Result<AccountOrigin, ErrorObjectOwned> {
+		let mut db = self
+			.pool
+			.acquire()
+			.await
+			.map_err(|e| from_crate_error(Error::Database(e.to_string())))?;
+		Ok(NotebookStore::get_account_origin(&mut db, account_id.clone(), account_type)
+			.await
+			.map_err(from_crate_error)?)
+	}
 }
 
 pub async fn pipe_from_stream_and_drop<T: Serialize>(
@@ -321,15 +340,15 @@ mod tests {
 	};
 
 	use crate::{
-		apis::{
-			localchain::{BalanceChangeResult, LocalchainRpcClient},
-			notebook::NotebookRpcClient,
-		},
 		notebook_closer::{FinalizedNotebookHeaderListener, NotebookCloser, NOTARY_KEYID},
 		stores::{
 			blocks::BlocksStore, chain_transfer::ChainTransferStore,
 			notebook_header::NotebookHeaderStore, registered_key::RegisteredKeyStore,
 		},
+	};
+	use ulx_notary_apis::{
+		localchain::{BalanceChangeResult, LocalchainRpcClient},
+		notebook::NotebookRpcClient,
 	};
 
 	use super::NotaryServer;
@@ -365,10 +384,10 @@ mod tests {
 			previous_balance_proof: None,
 			notes: bounded_vec![Note::create(
 				1000,
-				NoteType::ClaimFromMainchain { account_nonce: 1 }
+				NoteType::ClaimFromMainchain { transfer_id: 1 }
 			)],
-			channel_hold_note: None,
-			signature: Signature([0; 64]).into(),
+			escrow_hold_note: None,
+			signature: Signature::from_raw([0; 64]).into(),
 		}
 		.sign(Bob.pair())
 		.clone();
@@ -417,10 +436,7 @@ mod tests {
 		let header = stream.next().await.unwrap()?.header;
 
 		assert_eq!(header.notebook_number, 1);
-		assert_eq!(
-			header.chain_transfers[0],
-			ChainTransfer::ToLocalchain { account_id: Bob.to_account_id(), account_nonce: 1 }
-		);
+		assert_eq!(header.chain_transfers[0], ChainTransfer::ToLocalchain { transfer_id: 1 });
 
 		let tip = BalanceTip {
 			account_id: Bob.to_account_id(),
@@ -428,7 +444,7 @@ mod tests {
 			change_number: 1,
 			balance: 1000,
 			account_origin: AccountOrigin { notebook_number: 1, account_uid: 1 },
-			channel_hold_note: None,
+			escrow_hold_note: None,
 		};
 
 		let proof = client.get_balance_proof(header.notebook_number, tip.clone()).await?;

@@ -1,3 +1,4 @@
+use std::env;
 use std::time::Duration;
 
 use sc_service::{ChainType, Properties};
@@ -11,6 +12,7 @@ use ulx_node_runtime::{
 use ulx_primitives::{
 	block_seal::{MiningRegistration, RewardDestination},
 	block_vote::VoteMinimum,
+	notary::{GenesisNotary, NotaryPublic},
 	tick::{Ticker, TICK_MILLIS},
 	BlockSealAuthorityId, BondId, ComputeDifficulty,
 };
@@ -49,7 +51,7 @@ pub fn development_config() -> Result<ChainSpec, String> {
 	let mut properties = Properties::new();
 	properties.insert("tokenDecimals".into(), 3.into());
 
-	const HASHES_PER_SECOND: u64 = 1_000_000;
+	const HASHES_PER_SECOND: u64 = 100_000;
 
 	Ok(ChainSpec::builder(
 		WASM_BINARY.ok_or_else(|| "Development wasm not available".to_string())?,
@@ -76,6 +78,7 @@ pub fn development_config() -> Result<ChainSpec, String> {
 		500,
 		(TICK_MILLIS * HASHES_PER_SECOND / 1_000) as ComputeDifficulty,
 		TICK_MILLIS,
+		vec![], // No notaries
 	))
 	.build())
 }
@@ -83,6 +86,9 @@ pub fn development_config() -> Result<ChainSpec, String> {
 pub fn local_testnet_config() -> Result<ChainSpec, String> {
 	let mut properties = Properties::new();
 	properties.insert("tokenDecimals".into(), 3.into());
+
+	let notary_host =
+		env::var("ULX_LOCAL_TESTNET_NOTARY_URL").unwrap_or("ws://127.0.0.1:9925".to_string()).into();
 
 	Ok(ChainSpec::builder(
 		WASM_BINARY.ok_or_else(|| "Development wasm not available".to_string())?,
@@ -92,22 +98,12 @@ pub fn local_testnet_config() -> Result<ChainSpec, String> {
 	.with_id("local_testnet")
 	.with_chain_type(ChainType::Local)
 	.with_properties(properties)
-	.with_genesis_config(testnet_genesis(
+	.with_genesis_config_patch(testnet_genesis(
 		// Initial BlockSeal authorities
-		vec![
-			(
-				get_account_id_from_seed::<sr25519::Public>("Alice"),
-				authority_keys_from_seed("Alice"),
-			),
-			// (
-			// 	get_account_id_from_seed::<sr25519::Public>("Bob"),
-			// 	authority_keys_from_seed("Bob"),
-			// ),
-			// (
-			// 	get_account_id_from_seed::<sr25519::Public>("Dave"),
-			// 	authority_keys_from_seed("Dave"),
-			// ),
-		],
+		vec![(
+			get_account_id_from_seed::<sr25519::Public>("Alice"),
+			authority_keys_from_seed("Alice"),
+		)],
 		// Sudo account
 		get_account_id_from_seed::<sr25519::Public>("Alice"),
 		// Pre-funded accounts
@@ -120,8 +116,13 @@ pub fn local_testnet_config() -> Result<ChainSpec, String> {
 			get_account_id_from_seed::<sr25519::Public>("Ferdie"),
 		],
 		500,
-		100_000_000,
+		(TICK_MILLIS * 1_000_000 / 1_000) as ComputeDifficulty,
 		TICK_MILLIS,
+		vec![GenesisNotary {
+			account_id: get_account_id_from_seed::<sr25519::Public>("Ferdie"),
+			public: get_from_seed::<NotaryPublic>("Ferdie//notary"),
+			hosts: vec![notary_host],
+		}],
 	))
 	.build())
 }
@@ -134,6 +135,7 @@ fn testnet_genesis(
 	initial_vote_minimum: VoteMinimum,
 	initial_difficulty: ComputeDifficulty,
 	tick_millis: u64,
+	initial_notaries: Vec<GenesisNotary<AccountId>>,
 ) -> serde_json::Value {
 	let authority_zero = initial_authorities[0].clone();
 	let ticker = Ticker::start(Duration::from_millis(tick_millis));
@@ -166,6 +168,9 @@ fn testnet_genesis(
 		"blockSealSpec":  {
 			"initialVoteMinimum": initial_vote_minimum,
 			"initialComputeDifficulty": initial_difficulty,
+		},
+		"notaries": {
+			"list": initial_notaries,
 		},
 		"session":  {
 			"keys": initial_authorities

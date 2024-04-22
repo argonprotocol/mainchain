@@ -1,0 +1,130 @@
+{
+  "db_name": "PostgreSQL",
+  "query": "\n\t\t\t\tSELECT *\n\t\t\t\tFROM notebook_headers\n\t\t\t\tWHERE notebook_number = ANY($1)\n\t\t\t\tAND signature IS NOT NULL\n\t\t\t\tORDER BY notebook_number ASC\n\t\t\t\t",
+  "describe": {
+    "columns": [
+      {
+        "ordinal": 0,
+        "name": "notebook_number",
+        "type_info": "Int4"
+      },
+      {
+        "ordinal": 1,
+        "name": "version",
+        "type_info": "Int4"
+      },
+      {
+        "ordinal": 2,
+        "name": "hash",
+        "type_info": "Bytea"
+      },
+      {
+        "ordinal": 3,
+        "name": "signature",
+        "type_info": "Bytea"
+      },
+      {
+        "ordinal": 4,
+        "name": "tick",
+        "type_info": "Int4"
+      },
+      {
+        "ordinal": 5,
+        "name": "finalized_block_number",
+        "type_info": "Int4"
+      },
+      {
+        "ordinal": 6,
+        "name": "notary_id",
+        "type_info": "Int4"
+      },
+      {
+        "ordinal": 7,
+        "name": "tax",
+        "type_info": "Varchar"
+      },
+      {
+        "ordinal": 8,
+        "name": "chain_transfers",
+        "type_info": "Jsonb"
+      },
+      {
+        "ordinal": 9,
+        "name": "changed_accounts_root",
+        "type_info": "Bytea"
+      },
+      {
+        "ordinal": 10,
+        "name": "changed_account_origins",
+        "type_info": "Jsonb"
+      },
+      {
+        "ordinal": 11,
+        "name": "block_votes_root",
+        "type_info": "Bytea"
+      },
+      {
+        "ordinal": 12,
+        "name": "block_votes_count",
+        "type_info": "Int4"
+      },
+      {
+        "ordinal": 13,
+        "name": "block_voting_power",
+        "type_info": "Varchar"
+      },
+      {
+        "ordinal": 14,
+        "name": "blocks_with_votes",
+        "type_info": "ByteaArray"
+      },
+      {
+        "ordinal": 15,
+        "name": "secret_hash",
+        "type_info": "Bytea"
+      },
+      {
+        "ordinal": 16,
+        "name": "parent_secret",
+        "type_info": "Bytea"
+      },
+      {
+        "ordinal": 17,
+        "name": "data_domains",
+        "type_info": "Jsonb"
+      },
+      {
+        "ordinal": 18,
+        "name": "last_updated",
+        "type_info": "Timestamptz"
+      }
+    ],
+    "parameters": {
+      "Left": [
+        "Int4Array"
+      ]
+    },
+    "nullable": [
+      false,
+      false,
+      true,
+      true,
+      false,
+      true,
+      false,
+      true,
+      false,
+      false,
+      false,
+      false,
+      false,
+      false,
+      false,
+      false,
+      true,
+      false,
+      false
+    ]
+  },
+  "hash": "5d373fcd1130da44549f822edb4f0d335f04fbbd407ec396192c607c470bc698"
+}

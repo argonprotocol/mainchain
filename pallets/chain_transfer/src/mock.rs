@@ -1,15 +1,10 @@
 use env_logger::{Builder, Env};
-use frame_support::{
-	parameter_types,
-	traits::{ConstU16, ConstU64, Currency},
-	PalletId,
-};
+use frame_support::derive_impl;
+use frame_support::{parameter_types, traits::Currency, PalletId};
 use frame_system::pallet_prelude::BlockNumberFor;
 use sp_core::{crypto::AccountId32, ConstU32, H256};
-use sp_runtime::{
-	traits::{BlakeTwo256, IdentityLookup, NumberFor},
-	BuildStorage,
-};
+use sp_runtime::traits::IdentityLookup;
+use sp_runtime::{traits::NumberFor, BuildStorage};
 use sp_std::collections::btree_map::BTreeMap;
 
 use ulx_primitives::{
@@ -34,30 +29,12 @@ frame_support::construct_runtime!(
 	}
 );
 
+#[derive_impl(frame_system::config_preludes::TestDefaultConfig as frame_system::DefaultConfig)]
 impl frame_system::Config for Test {
-	type BaseCallFilter = frame_support::traits::Everything;
-	type BlockWeights = ();
-	type BlockLength = ();
-	type DbWeight = ();
-	type RuntimeOrigin = RuntimeOrigin;
-	type RuntimeCall = RuntimeCall;
-	type Nonce = u64;
-	type Hash = H256;
-	type Hashing = BlakeTwo256;
 	type AccountId = AccountId32;
 	type Lookup = IdentityLookup<Self::AccountId>;
 	type Block = Block;
-	type RuntimeEvent = RuntimeEvent;
-	type BlockHashCount = ConstU64<250>;
-	type Version = ();
-	type PalletInfo = PalletInfo;
 	type AccountData = pallet_balances::AccountData<Balance>;
-	type OnNewAccount = ();
-	type OnKilledAccount = ();
-	type SystemWeightInfo = ();
-	type SS58Prefix = ConstU16<42>;
-	type OnSetCode = ();
-	type MaxConsumers = ConstU32<16>;
 }
 
 parameter_types! {
@@ -104,7 +81,7 @@ impl pallet_balances::Config for Test {
 	type FreezeIdentifier = ();
 	type MaxFreezes = ();
 	type RuntimeHoldReason = RuntimeHoldReason;
-	type MaxHolds = ConstU32<100>;
+
 	type RuntimeFreezeReason = RuntimeFreezeReason;
 }
 
@@ -126,7 +103,7 @@ impl NotebookProvider for StaticNotebookProvider {
 	}
 	fn is_notary_locked_at_tick(notary_id: NotaryId, tick: Tick) -> bool {
 		if let Some(lock_tick) = LockedNotaries::get().get(&notary_id) {
-			return *lock_tick <= tick
+			return *lock_tick <= tick;
 		}
 		false
 	}

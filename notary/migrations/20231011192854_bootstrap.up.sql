@@ -55,7 +55,7 @@ CREATE TABLE IF NOT EXISTS chain_transfers
 (
     to_localchain               boolean NOT NULL,
     account_id                  bytea   NOT NULL,
-    account_nonce               integer NULL,
+    transfer_id                 integer NULL,
     amount                      varchar NOT NULL,
     finalized_block_number      integer NULL,
     included_in_notebook_number integer NULL REFERENCES notebook_headers (notebook_number)
@@ -103,6 +103,8 @@ CREATE TABLE IF NOT EXISTS notebooks
     signature           bytea       NOT NULL,
     last_updated        timestamptz NOT NULL default now()
 );
+CREATE INDEX IF NOT EXISTS notebook_new_account_origins ON notebooks USING GIN (new_account_origins);
+
 
 CREATE TABLE IF NOT EXISTS notebooks_raw
 (

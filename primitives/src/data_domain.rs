@@ -1,7 +1,8 @@
 use codec::{Codec, Decode, Encode, MaxEncodedLen};
-use frame_support::{pallet_prelude::TypeInfo, Deserialize, Serialize};
+use scale_info::TypeInfo;
+use serde::{Deserialize, Serialize};
 use sp_core::{ConstU32, H256};
-use sp_core_hashing::blake2_256;
+use sp_crypto_hashing::blake2_256;
 use sp_debug_derive::RuntimeDebug;
 use sp_runtime::{BoundedBTreeMap, BoundedVec, RuntimeString};
 use sp_std::{cmp::Ordering, collections::btree_map::BTreeMap, str};
@@ -9,7 +10,6 @@ use sp_std::{cmp::Ordering, collections::btree_map::BTreeMap, str};
 use crate::{data_tld::DataTLD, host::Host, NotaryId};
 
 pub const MAX_DATASTORE_VERSIONS: u32 = 25;
-pub const MAX_DOMAIN_NAME_LENGTH: u32 = 50;
 
 pub const DATA_DOMAIN_LEASE_COST: u128 = 1_000;
 
@@ -51,8 +51,34 @@ impl DataDomain {
 		Self { domain_name: RuntimeString::Borrowed(domain_name), top_level_domain }
 	}
 
+	#[cfg(feature = "std")]
 	pub fn from_string(domain_name: String, top_level_domain: DataTLD) -> Self {
-		Self { domain_name: RuntimeString::Owned(domain_name), top_level_domain }
+		Self { domain_name: RuntimeString::Owned(domain_name.to_lowercase()), top_level_domain }
+	}
+
+	#[cfg(feature = "std")]
+	pub fn parse(domain: String) -> Result<Self, String> {
+		let parts: Vec<&str> = domain.split('.').collect();
+		if parts.len() < 2 {
+			return Err("Invalid domain".to_string());
+		}
+		let tld = parts[1];
+		let domain_name = parts[0].to_lowercase();
+		let tld_str = format!("\"{}\"", tld);
+		let mut parsed_tld = serde_json::from_str(&tld_str).ok();
+		if parsed_tld.is_none() {
+			let tld_str = tld[0..1].to_uppercase() + &tld[1..];
+			let tld_str = format!("\"{}\"", tld_str);
+			parsed_tld = serde_json::from_str(&tld_str).ok();
+		}
+		if parsed_tld.is_none() {
+			let tld_str = format!("\"{}\"", tld.to_lowercase());
+			parsed_tld = serde_json::from_str(&tld_str).ok();
+		}
+		let Some(parsed_tld) = parsed_tld else {
+			return Err("Invalid tld".to_string());
+		};
+		Ok(Self::from_string(domain_name, parsed_tld))
 	}
 }
 
@@ -118,11 +144,13 @@ pub struct Semver {
 	pub minor: u32,
 	pub patch: u32,
 }
+
 impl Semver {
 	pub fn new(major: u32, minor: u32, patch: u32) -> Self {
 		Self { major, minor, patch }
 	}
 }
+
 impl PartialOrd for Semver {
 	fn partial_cmp(&self, other: &Self) -> Option<Ordering> {
 		if self.major != other.major {

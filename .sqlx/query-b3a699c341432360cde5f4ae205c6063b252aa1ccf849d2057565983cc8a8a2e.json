@@ -1,0 +1,98 @@
+{
+  "db_name": "SQLite",
+  "query": "SELECT * FROM balance_changes ORDER BY id DESC",
+  "describe": {
+    "columns": [
+      {
+        "name": "id",
+        "ordinal": 0,
+        "type_info": "Int64"
+      },
+      {
+        "name": "account_id",
+        "ordinal": 1,
+        "type_info": "Int64"
+      },
+      {
+        "name": "change_number",
+        "ordinal": 2,
+        "type_info": "Int64"
+      },
+      {
+        "name": "balance",
+        "ordinal": 3,
+        "type_info": "Text"
+      },
+      {
+        "name": "net_balance_change",
+        "ordinal": 4,
+        "type_info": "Text"
+      },
+      {
+        "name": "escrow_hold_note_json",
+        "ordinal": 5,
+        "type_info": "Text"
+      },
+      {
+        "name": "notary_id",
+        "ordinal": 6,
+        "type_info": "Int64"
+      },
+      {
+        "name": "notes_json",
+        "ordinal": 7,
+        "type_info": "Text"
+      },
+      {
+        "name": "status",
+        "ordinal": 8,
+        "type_info": "Int64"
+      },
+      {
+        "name": "transaction_id",
+        "ordinal": 9,
+        "type_info": "Int64"
+      },
+      {
+        "name": "proof_json",
+        "ordinal": 10,
+        "type_info": "Text"
+      },
+      {
+        "name": "finalized_block_number",
+        "ordinal": 11,
+        "type_info": "Int64"
+      },
+      {
+        "name": "notarization_id",
+        "ordinal": 12,
+        "type_info": "Int64"
+      },
+      {
+        "name": "timestamp",
+        "ordinal": 13,
+        "type_info": "Datetime"
+      }
+    ],
+    "parameters": {
+      "Right": 0
+    },
+    "nullable": [
+      false,
+      false,
+      false,
+      false,
+      false,
+      true,
+      false,
+      false,
+      false,
+      true,
+      true,
+      true,
+      true,
+      false
+    ]
+  },
+  "hash": "b3a699c341432360cde5f4ae205c6063b252aa1ccf849d2057565983cc8a8a2e"
+}

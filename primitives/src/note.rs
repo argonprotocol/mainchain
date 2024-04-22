@@ -1,10 +1,19 @@
 use codec::{Decode, Encode, MaxEncodedLen};
 use scale_info::TypeInfo;
 use serde::{Deserialize, Serialize};
-use sp_core::{ConstU32, RuntimeDebug};
-use sp_runtime::{format_runtime_string, BoundedVec, RuntimeString};
+use sp_core::{
+	crypto::{Ss58AddressFormat, Ss58Codec},
+	ConstU32, RuntimeDebug,
+};
+use sp_runtime::BoundedVec;
+use sp_std::{
+	fmt::{Display, Formatter, Result},
+	vec::Vec,
+};
 
-use crate::{prod_or_fast, AccountId, DataDomainHash};
+#[cfg(feature = "std")]
+use crate::serialize_unsafe_u128_as_string;
+use crate::{prod_or_fast, AccountId, DataDomainHash, ADDRESS_PREFIX, TransferToLocalchainId};
 
 #[derive(
 	Clone,
@@ -22,6 +31,7 @@ use crate::{prod_or_fast, AccountId, DataDomainHash};
 pub struct Note {
 	/// Number of milligons transferred
 	#[codec(compact)]
+	#[cfg_attr(feature = "std", serde(with = "serialize_unsafe_u128_as_string"))]
 	pub milligons: u128,
 	/// Type
 	pub note_type: NoteType,
@@ -40,8 +50,21 @@ impl Note {
 		}
 	}
 
-	pub fn calculate_channel_tax(amount: u128) -> u128 {
+	pub fn calculate_escrow_tax(amount: u128) -> u128 {
 		round_up(amount, TAX_PERCENT_BASE)
+	}
+}
+
+impl Display for Note {
+	fn fmt(&self, f: &mut Formatter<'_>) -> Result {
+		let argons = self.milligons as f64 / 1000.0;
+		if self.milligons % 1000 == 0 || self.milligons % 100 == 0 {
+			write!(f, "{} ₳{:.1}", self.note_type, argons)
+		} else if self.milligons % 10 == 0 {
+			write!(f, "{} ₳{:.2}", self.note_type, argons)
+		} else {
+			write!(f, "{} ₳{:.3}", self.note_type, argons)
+		}
 	}
 }
 
@@ -53,51 +76,11 @@ pub fn round_up(value: u128, percentage: u128) -> u128 {
 	numerator.saturating_div(100) + round
 }
 
-#[derive(
-	PartialEq,
-	Eq,
-	Ord,
-	PartialOrd,
-	Encode,
-	Decode,
-	RuntimeDebug,
-	TypeInfo,
-	MaxEncodedLen,
-	Serialize,
-	Deserialize,
-)]
-#[cfg_attr(not(feature = "napi"), derive(Clone))]
-#[serde(rename_all = "camelCase")]
-#[cfg_attr(feature = "napi", napi_derive::napi)]
-pub enum AccountType {
-	Tax = 0,
-	Deposit = 1,
-}
+pub const ESCROW_EXPIRATION_TICKS: u32 = prod_or_fast!(60, 2);
+pub const ESCROW_CLAWBACK_TICKS: u32 = 15;
+// 15 after expiration
+pub const MINIMUM_ESCROW_SETTLEMENT: u128 = 5u128;
 
-impl TryFrom<i32> for AccountType {
-	type Error = RuntimeString;
-
-	fn try_from(value: i32) -> Result<Self, Self::Error> {
-		match value {
-			0 => Ok(AccountType::Tax),
-			1 => Ok(AccountType::Deposit),
-			_ => Err(format_runtime_string!("Invalid account_type value {}", value)),
-		}
-	}
-}
-impl From<i64> for AccountType {
-	fn from(value: i64) -> Self {
-		if value == 0 {
-			AccountType::Tax
-		} else {
-			AccountType::Deposit
-		}
-	}
-}
-
-pub const CHANNEL_EXPIRATION_TICKS: u32 = prod_or_fast!(60, 2);
-pub const CHANNEL_CLAWBACK_TICKS: u32 = 15; // 15 after expiration
-pub const MIN_CHANNEL_NOTE_MILLIGONS: u128 = 5;
 pub type MaxNoteRecipients = ConstU32<10>;
 
 pub const TAX_PERCENT_BASE: u128 = 20;
@@ -125,7 +108,7 @@ pub enum NoteType {
 	#[serde(rename_all = "camelCase")]
 	ClaimFromMainchain {
 		#[codec(compact)]
-		account_nonce: u32,
+		transfer_id: TransferToLocalchainId,
 	},
 	/// Claim funds from a note (must be in the series of balance changes)
 	Claim,
@@ -142,16 +125,71 @@ pub enum NoteType {
 	Tax,
 	/// Send this tax to a BlockVote
 	SendToVote,
-	/// Channel hold notes
+	/// Escrow hold notes
 	#[serde(rename_all = "camelCase")]
-	ChannelHold {
+	EscrowHold {
 		/// The account id of the recipient
 		recipient: AccountId,
-		/// The data domain that this channel is created for
+		/// The data domain that this escrow is created for
 		data_domain_hash: Option<DataDomainHash>,
 	},
-	/// Channel settlement note - applied to channel hold creator balance
-	ChannelSettle,
-	/// Claim funds from one or more channels - must be the recipient of the hold
-	ChannelClaim,
+	/// Escrow settlement note - applied to escrow hold creator balance
+	EscrowSettle,
+	/// Claim funds from one or more escrows - must be the recipient of the hold
+	EscrowClaim,
+}
+
+impl Display for NoteType {
+	fn fmt(&self, f: &mut Formatter<'_>) -> Result {
+		match self {
+			NoteType::SendToMainchain => {
+				write!(f, "SendToMainchain")
+			},
+			NoteType::ClaimFromMainchain { transfer_id } => {
+				write!(f, "ClaimFromMainchain(transfer_id={})", transfer_id)
+			},
+			NoteType::Claim => {
+				write!(f, "Claim")
+			},
+			NoteType::Send { to } =>
+				if let Some(to) = to {
+					write!(
+						f,
+						"Send(restrictedTo: {:?})",
+						to.iter()
+							.map(|a| a
+								.to_ss58check_with_version(Ss58AddressFormat::from(ADDRESS_PREFIX)))
+							.collect::<Vec<_>>()
+					)
+				} else {
+					write!(f, "Send")
+				},
+			NoteType::LeaseDomain => {
+				write!(f, "LeaseDomain")
+			},
+			NoteType::Fee => {
+				write!(f, "Fee")
+			},
+			NoteType::Tax => {
+				write!(f, "Tax")
+			},
+			NoteType::SendToVote => {
+				write!(f, "SendToVote")
+			},
+			NoteType::EscrowHold { data_domain_hash, recipient } => {
+				write!(
+					f,
+					"EscrowHold(data_domain_hash: {:?}, recipient: {:?})",
+					data_domain_hash,
+					recipient.to_ss58check_with_version(Ss58AddressFormat::from(ADDRESS_PREFIX))
+				)
+			},
+			NoteType::EscrowSettle => {
+				write!(f, "EscrowSettle")
+			},
+			NoteType::EscrowClaim => {
+				write!(f, "EscrowClaim")
+			},
+		}
+	}
 }

@@ -15,3 +15,5 @@ node_modules
 /localchain/test.db-wal
 /localchain/test.db
 /client/nodejs/lib
+/.run/
+/localchain/apple/Localchain/*.a

@@ -1,10 +1,9 @@
-use std::collections::BTreeSet;
-
-use chrono::{NaiveDateTime, TimeZone, Utc};
+use chrono::{DateTime, TimeZone, Utc};
 use codec::Encode;
 use serde_json::{from_value, json};
 use sp_core::{bounded::BoundedVec, H256};
 use sqlx::{query, types::JsonValue, FromRow, PgConnection};
+use std::collections::BTreeSet;
 
 use ulx_primitives::{
 	ensure, notary::NotarySignature, tick::Tick, AccountId, AccountOrigin, BlockVotingPower,
@@ -171,7 +170,7 @@ impl NotebookHeaderStore {
 				notebook_number,
 				tick,
 				Utc.from_utc_datetime(
-					&NaiveDateTime::from_timestamp_millis(end_time_for_tick as i64).unwrap(),
+					&DateTime::from_timestamp_millis(end_time_for_tick as i64).unwrap().naive_utc(),
 				),
 			)
 			.await?;
@@ -218,28 +217,53 @@ impl NotebookHeaderStore {
 
 	pub async fn load_raw_signed_headers<'a>(
 		db: impl sqlx::PgExecutor<'a> + 'a,
-		since_notebook: NotebookNumber,
+		since_notebook: Option<NotebookNumber>,
+		or_specific_notebooks: Option<Vec<NotebookNumber>>,
 	) -> anyhow::Result<Vec<(NotebookNumber, Vec<u8>)>, Error> {
-		let records = sqlx::query_as!(
-			NotebookHeaderRow,
-			r#"
+		let records = if let Some(notebook_number) = since_notebook {
+			sqlx::query_as!(
+				NotebookHeaderRow,
+				r#"
+				SELECT *
+				FROM notebook_headers WHERE notebook_number = $1
+				AND signature IS NOT NULL
+				"#,
+				notebook_number as i32
+			)
+			.fetch_all(db)
+			.await?
+		} else if let Some(or_specific_notebooks) = or_specific_notebooks {
+			let notebook_numbers =
+				or_specific_notebooks.into_iter().map(|a| a as i32).collect::<Vec<_>>();
+			sqlx::query_as!(
+				NotebookHeaderRow,
+				r#"
 				SELECT *
 				FROM notebook_headers
-				WHERE notebook_number > $1
+				WHERE notebook_number = ANY($1)
 				AND signature IS NOT NULL
 				ORDER BY notebook_number ASC
 				"#,
-			since_notebook as i32
-		)
-		.fetch_all(db)
-		.await?;
+				&notebook_numbers
+			)
+			.fetch_all(db)
+			.await?
+		} else {
+			return Err(Error::InternalError(
+				"Must provide either since_notebook or or_specific_notebooks".to_string(),
+			));
+		};
 
 		let mut headers = Vec::new();
 		for record in records {
 			let notebook_number = record.notebook_number as u32;
-			let signature =
-				NotarySignature::from_slice(&record.signature.clone().unwrap_or_default()[..])
-					.ok_or(Error::UnsignedNotebookHeader)?;
+			let bytes: [u8; 64] = record
+				.signature
+				.clone()
+				.unwrap_or_default()
+				.try_into()
+				.map_err(|_| Error::UnsignedNotebookHeader)?;
+			let signature = NotarySignature::from_raw(bytes);
 			let header: NotebookHeader = record.try_into()?;
 			let signed_header = SignedNotebookHeader { header, signature };
 			headers.push((notebook_number, signed_header.encode()));
@@ -264,9 +288,14 @@ impl NotebookHeaderStore {
 		)
 		.fetch_one(db)
 		.await?;
-		let signature =
-			NotarySignature::from_slice(&record.signature.clone().unwrap_or_default()[..])
-				.ok_or(Error::UnsignedNotebookHeader)?;
+
+		let bytes: [u8; 64] = record
+			.signature
+			.clone()
+			.unwrap_or_default()
+			.try_into()
+			.map_err(|_| Error::UnsignedNotebookHeader)?;
+		let signature = NotarySignature::from_raw(bytes);
 		let header: NotebookHeader = record.try_into()?;
 		let signed_header = SignedNotebookHeader { header, signature };
 
@@ -436,7 +465,8 @@ mod tests {
 	use std::ops::Add;
 
 	use chrono::{Duration, Utc};
-	use sp_keyring::AccountKeyring::{Alice, Bob};
+	use sp_core::H256;
+	use sp_keyring::AccountKeyring::{Alice};
 	use sp_keystore::{testing::MemoryKeystore, KeystoreExt};
 	use sp_runtime::traits::Verify;
 	use sqlx::PgPool;
@@ -459,7 +489,7 @@ mod tests {
 				1,
 				notebook_number,
 				1,
-				Utc::now().add(Duration::minutes(1)).timestamp_millis() as u64,
+				Utc::now().add(Duration::try_minutes(1).unwrap()).timestamp_millis() as u64,
 			)
 			.await?;
 
@@ -474,7 +504,7 @@ mod tests {
 
 			assert_eq!(
 				NotebookHeaderStore::get_changed_accounts_root(&pool, notebook_number).await?,
-				[0u8; 32].into()
+				H256([0u8; 32])
 			);
 		}
 
@@ -492,7 +522,7 @@ mod tests {
 				1,
 				notebook_number,
 				1,
-				Utc::now().add(Duration::minutes(1)).timestamp_millis() as u64,
+				Utc::now().add(Duration::try_minutes(1).unwrap()).timestamp_millis() as u64,
 			)
 			.await?;
 
@@ -518,7 +548,7 @@ mod tests {
 				1,
 				notebook_number,
 				1,
-				Utc::now().add(Duration::minutes(1)).timestamp_millis() as u64,
+				Utc::now().add(Duration::try_minutes(1).unwrap()).timestamp_millis() as u64,
 			)
 			.await?;
 
@@ -532,10 +562,7 @@ mod tests {
 				notebook_number,
 				notebook_number,
 				vec![
-					ChainTransfer::ToLocalchain {
-						account_id: Bob.to_account_id(),
-						account_nonce: 1,
-					},
+					ChainTransfer::ToLocalchain { transfer_id: 1 },
 					ChainTransfer::ToMainchain { account_id: Alice.to_account_id(), amount: 100 },
 				],
 				vec![],
@@ -559,17 +586,14 @@ mod tests {
 			let header = NotebookHeaderStore::load(&mut *tx, notebook_number).await?;
 
 			assert_eq!(header.chain_transfers.len(), 2);
-			assert_eq!(
-				header.chain_transfers[0],
-				ChainTransfer::ToLocalchain { account_id: Bob.to_account_id(), account_nonce: 1 }
-			);
+			assert_eq!(header.chain_transfers[0], ChainTransfer::ToLocalchain { transfer_id: 1 });
 			assert_eq!(
 				header.chain_transfers[1],
 				ChainTransfer::ToMainchain { account_id: Alice.to_account_id(), amount: 100 }
 			);
 
 			assert_eq!(header.tick, 1);
-			assert_eq!(header.changed_accounts_root, [1u8; 32].into());
+			assert_eq!(header.changed_accounts_root, H256([1u8; 32]));
 			assert_eq!(header.changed_account_origins.len(), 2);
 			assert_eq!(header.changed_account_origins[0].account_uid, 1);
 			assert_eq!(header.changed_account_origins[1].account_uid, 2);

@@ -1,4 +1,4 @@
-//! Substrate Node Template CLI library.
+//! Ulixee node implementation.
 #![warn(missing_docs)]
 
 mod chain_spec;

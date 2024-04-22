@@ -2,7 +2,8 @@ FROM docker.io/library/ubuntu:22.04
 
 # show backtraces
 ENV RUST_BACKTRACE 1
-
+ARG BIN=ulx-node
+ENV BIN=${BIN}
 # install tools and dependencies
 RUN apt-get update && \
 	DEBIAN_FRONTEND=noninteractive apt-get install -y --no-install-recommends \
@@ -11,21 +12,17 @@ RUN apt-get update && \
 	apt-get autoremove -y && \
 	apt-get clean && \
 	find /var/lib/apt/lists/ -type f -not -name lock -delete; \
-# add user and link ~/.local/share/polkadot to /data
-	useradd -m -u 1000 -U -s /bin/sh -d /polkadot polkadot && \
-	mkdir -p /data /polkadot/.local/share && \
-	chown -R polkadot:polkadot /data && \
-	ln -s /data /polkadot/.local/share/node-template
+# add user and link ~/.local/share/ulixee to /data
+	useradd -m -u 1000 -U -s /bin/sh -d /ulixee ulixee && \
+	mkdir -p /data /ulixee/.local/share && \
+	chown -R ulixee:ulixee /data && \
+    ln -s /data /ulixee/.local/share/${BIN}
 
-USER polkadot
-
+USER ulixee
 # copy the compiled binary to the container
-COPY --chown=polkadot:polkadot --chmod=774 node-template /usr/bin/node-template
+COPY --chown=ulixee:ulixee --chmod=774 ${BIN} /usr/bin/${BIN}
 
 # check if executable works in this container
-RUN /usr/bin/node-template --version
+RUN /usr/bin/${BIN} --version
 
-# ws_port
-EXPOSE 9930 9333 9944 30333 30334
-
-CMD ["/usr/bin/node-template"]
+ENTRYPOINT ["/bin/sh", "-c", "/usr/bin/$BIN \"$@\"", "--"]

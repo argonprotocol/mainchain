@@ -1,19 +1,18 @@
 use chrono::NaiveDateTime;
-use napi::bindgen_prelude::*;
+use serde_json::json;
 use sp_runtime::RuntimeString;
 use sqlx::{FromRow, SqliteConnection, SqlitePool};
+use ulx_primitives::{DataDomain, DataDomainHash, DataTLD};
 
-use ulx_primitives::{DataDomain, DataTLD};
-
-use crate::{to_js_error, MainchainClient};
+use crate::{bail, Result};
 
 #[derive(FromRow, Clone)]
 #[allow(dead_code)]
-#[napi(js_name = "DataDomainLease")]
+#[cfg_attr(feature = "napi", napi(js_name = "DataDomainLease"))]
 pub struct DataDomainRow {
   pub id: i64,
   pub name: String,
-  pub tld: i64,
+  pub tld: String,
   pub registered_to_address: String,
   pub notarization_id: i64,
   pub registered_at_tick: i64,
@@ -22,87 +21,129 @@ pub struct DataDomainRow {
 
 impl DataDomainRow {}
 
-#[napi]
+#[cfg_attr(feature = "napi", napi)]
 pub struct DataDomainStore {
   db: SqlitePool,
-  mainchain_client: MainchainClient,
 }
 
-#[napi]
 impl DataDomainStore {
-  pub(crate) fn new(db: SqlitePool, mainchain_client: MainchainClient) -> Self {
-    Self {
-      db,
-      mainchain_client,
-    }
+  pub fn new(db: SqlitePool) -> Self {
+    Self { db }
   }
 
-  #[napi(getter)]
+  pub fn tld_from_string(tld: String) -> Result<DataTLD> {
+    let tld_json_str = format!("\"{}\"", tld);
+    let tld: DataTLD = serde_json::from_str(&tld_json_str)?;
+    Ok(tld)
+  }
+
   pub async fn list(&self) -> Result<Vec<DataDomainRow>> {
-    let mut db = self.db.acquire().await.map_err(to_js_error)?;
-    sqlx::query_as!(DataDomainRow, "SELECT * FROM data_domains")
-      .fetch_all(&mut *db)
-      .await
-      .map_err(to_js_error)
+    let mut db = self.db.acquire().await?;
+    Ok(
+      sqlx::query_as!(DataDomainRow, "SELECT * FROM data_domains")
+        .fetch_all(&mut *db)
+        .await?,
+    )
   }
 
-  #[napi]
-  pub fn get_hash(&self, domain_name: String, tld: DataTLD) -> Uint8Array {
-    let domain = DataDomain {
-      domain_name: RuntimeString::Owned(domain_name),
-      top_level_domain: tld,
+  pub fn hash_domain(&self, domain: JsDataDomain) -> DataDomainHash {
+    let parsed_domain = DataDomain {
+      domain_name: RuntimeString::Owned(domain.domain_name.clone()),
+      top_level_domain: domain.top_level_domain.clone(),
     };
-    domain.hash().0.into()
+    parsed_domain.hash()
   }
 
-  #[napi]
-  pub async fn is_registered(&self, domain_name: String, tld: DataTLD) -> Result<bool> {
-    let registration = self
-      .mainchain_client
-      .get_data_domain_registration(domain_name, tld)
-      .await?;
-    Ok(registration.is_some())
+  pub fn get_hash(domain: String) -> Result<DataDomainHash> {
+    let domain = DataDomain::parse(domain)?;
+    Ok(domain.hash())
   }
 
-  #[napi]
+  pub fn parse(domain: String) -> Result<JsDataDomain> {
+    Ok(DataDomain::parse(domain).map(Into::into)?)
+  }
+
   pub async fn get(&self, id: i64) -> Result<DataDomainRow> {
-    let mut db = self.db.acquire().await.map_err(to_js_error)?;
-    sqlx::query_as!(DataDomainRow, "SELECT * FROM data_domains WHERE id = ?", id)
-      .fetch_one(&mut *db)
-      .await
-      .map_err(to_js_error)
+    let mut db = self.db.acquire().await?;
+    Ok(
+      sqlx::query_as!(DataDomainRow, "SELECT * FROM data_domains WHERE id = ?", id)
+        .fetch_one(&mut *db)
+        .await?,
+    )
   }
 
-  pub async fn insert(
+  pub async fn db_insert(
     db: &mut SqliteConnection,
     data_domain: JsDataDomain,
     registered_to_address: String,
     notarization_id: i64,
     registered_at_tick: u32,
   ) -> Result<()> {
-    let tld_id = data_domain.top_level_domain as i64;
+    let tld = json!(data_domain.top_level_domain);
+    // remove leading and trailing quote from json
+    let tld = tld.to_string();
+    let tld = tld.trim_matches('"');
     let registered_at_tick = registered_at_tick as i64;
     let res = sqlx::query!(
       "INSERT INTO data_domains (name, tld, registered_to_address, notarization_id, registered_at_tick) VALUES (?, ?, ?, ?, ?)",
       data_domain.domain_name,
-      tld_id,
+      tld,
       registered_to_address,
       notarization_id,
       registered_at_tick,
     )
-    .execute(db)
-    .await
-    .map_err(to_js_error)?;
+            .execute(db)
+            .await
+            ?;
     if res.rows_affected() != 1 {
-      return Err(Error::from_reason(format!(
-        "Error inserting data domain {}",
-        data_domain.domain_name
-      )));
+      bail!("Error inserting data domain {}", data_domain.domain_name);
     }
     Ok(())
   }
 }
-#[napi(object, js_name = "DataDomain")]
+
+#[cfg(feature = "napi")]
+pub mod napi_ext {
+  use super::*;
+  use crate::{DataDomainStore, JsDataDomain};
+  use napi::bindgen_prelude::*;
+  use ulx_primitives::DataTLD;
+  use crate::error::NapiOk;
+
+  #[napi]
+  impl DataDomainStore {
+    #[napi(js_name = "tldFromString")]
+    pub fn tld_from_string_napi(tld: String) -> napi::Result<DataTLD> {
+      DataDomainStore::tld_from_string(tld).napi_ok()
+    }
+    #[napi(js_name = "list", getter)]
+    pub async fn list_napi(&self) -> napi::Result<Vec<DataDomainRow>> {
+      self.list().await.napi_ok()
+    }
+
+    #[napi(js_name = "hashDomain")]
+    pub fn hash_domain_napi(&self, domain: JsDataDomain) -> Uint8Array {
+      self.hash_domain(domain).0.into()
+    }
+
+    #[napi(js_name = "getHash")]
+    pub fn get_hash_napi(domain: String) -> napi::Result<Uint8Array> {
+      DataDomainStore::get_hash(domain).map(|a| a.0.into()).napi_ok()
+    }
+
+    #[napi(js_name = "parse", ts_return_type = "DataDomain")]
+    pub fn parse_napi(domain: String) -> napi::Result<JsDataDomain> {
+      DataDomainStore::parse(domain).napi_ok()
+    }
+
+    #[napi(js_name = "get")]
+    pub async fn get_napi(&self, id: i64) -> napi::Result<DataDomainRow> {
+      self.get(id).await.napi_ok()
+    }
+  }
+}
+
+#[cfg_attr(feature = "napi", napi(object, js_name = "DataDomain"))]
 #[derive(Clone, Debug, PartialEq)]
 pub struct JsDataDomain {
   pub domain_name: String,
@@ -148,8 +189,7 @@ mod test {
 
   #[sqlx::test]
   async fn test_data_domain_store(pool: SqlitePool) -> anyhow::Result<()> {
-    let mainchain_client = MainchainClient::mock();
-    let store = DataDomainStore::new(pool, mainchain_client);
+    let store = DataDomainStore::new(pool);
     let domain = DataDomain::new("test", DataTLD::Cars);
     let js_domain: JsDataDomain = domain.into();
 
@@ -164,7 +204,7 @@ mod test {
     )
     .execute(&mut *db)
     .await?;
-    DataDomainStore::insert(
+    DataDomainStore::db_insert(
       &mut *db,
       js_domain.clone(),
       AccountStore::to_address(&Bob.to_account_id()),
@@ -175,7 +215,7 @@ mod test {
 
     assert_eq!(store.list().await?.len(), 1);
     assert_eq!(store.get(1).await?.name, "test");
-    assert_eq!(store.get(1).await?.tld, DataTLD::Cars as i64);
+    assert_eq!(store.get(1).await?.tld, "cars");
     Ok(())
   }
 }

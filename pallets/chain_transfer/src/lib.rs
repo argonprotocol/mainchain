@@ -8,6 +8,7 @@ use sp_std::{fmt::Debug, prelude::*};
 pub use pallet::*;
 pub use ulx_notary_audit::VerifyError as NotebookVerifyError;
 use ulx_primitives::notary::{NotaryId, NotaryProvider};
+use ulx_primitives::TransferToLocalchainId;
 pub use weights::*;
 
 #[cfg(test)]
@@ -21,6 +22,7 @@ const LOG_TARGET: &str = "runtime::chain_transfer";
 
 #[frame_support::pallet(dev_mode)]
 pub mod pallet {
+	use frame_support::traits::Incrementable;
 	use frame_support::{
 		pallet_prelude::*,
 		traits::{
@@ -32,8 +34,7 @@ pub mod pallet {
 	use frame_system::pallet_prelude::*;
 	use sp_core::{crypto::AccountId32, H256};
 	use sp_runtime::{
-		traits::{AccountIdConversion, AtLeast32BitUnsigned, One},
-		Saturating,
+		traits::{AccountIdConversion, AtLeast32BitUnsigned},
 	};
 
 	use ulx_primitives::{
@@ -84,14 +85,16 @@ pub mod pallet {
 	}
 
 	#[pallet::storage]
-	pub(super) type PendingTransfersOut<T: Config> = StorageDoubleMap<
-		Hasher1 = Blake2_128Concat,
-		Hasher2 = Twox64Concat,
-		Key1 = T::AccountId,
-		Key2 = T::Nonce,
-		Value = QueuedTransferOut<T::Balance, BlockNumberFor<T>>,
-		QueryKind = OptionQuery,
-		MaxValues = ConstU32<1_000_000>,
+	pub(super) type NextTransferId<T: Config> =
+		StorageValue<_, TransferToLocalchainId, OptionQuery>;
+
+	#[pallet::storage]
+	pub(super) type PendingTransfersOut<T: Config> = StorageMap<
+		_,
+		Blake2_128Concat,
+		TransferToLocalchainId,
+		QueuedTransferOut<T::AccountId, T::Balance, BlockNumberFor<T>>,
+		OptionQuery,
 	>;
 
 	#[pallet::storage]
@@ -99,7 +102,7 @@ pub mod pallet {
 		_,
 		Twox64Concat,
 		BlockNumberFor<T>,
-		BoundedVec<(T::AccountId, T::Nonce), T::MaxPendingTransfersOutPerBlock>,
+		BoundedVec<TransferToLocalchainId, T::MaxPendingTransfersOutPerBlock>,
 		ValueQuery,
 	>;
 
@@ -118,13 +121,13 @@ pub mod pallet {
 		TransferToLocalchain {
 			account_id: T::AccountId,
 			amount: T::Balance,
-			account_nonce: T::Nonce,
+			transfer_id: TransferToLocalchainId,
 			notary_id: NotaryId,
 			expiration_block: BlockNumberFor<T>,
 		},
 		TransferToLocalchainExpired {
 			account_id: T::AccountId,
-			account_nonce: T::Nonce,
+			transfer_id: TransferToLocalchainId,
 			notary_id: NotaryId,
 		},
 		TransferIn {
@@ -139,8 +142,6 @@ pub mod pallet {
 		MaxBlockTransfersExceeded,
 		/// Insufficient balance to create this transfer
 		InsufficientFunds,
-		/// The account nonce used for this transfer is no longer valid
-		InvalidAccountNonce,
 		/// Insufficient balance to fulfill a mainchain transfer
 		InsufficientNotarizedFunds,
 		/// The transfer was already submitted in a previous block
@@ -155,13 +156,11 @@ pub mod pallet {
 	impl<T: Config> Hooks<BlockNumberFor<T>> for Pallet<T> {
 		fn on_initialize(block_number: BlockNumberFor<T>) -> Weight {
 			let expiring = <ExpiringTransfersOut<T>>::take(block_number);
-			for (account_id, account_nonce) in expiring.into_iter() {
-				if let Some(transfer) =
-					<PendingTransfersOut<T>>::take(account_id.clone(), account_nonce)
-				{
+			for transfer_id in expiring.into_iter() {
+				if let Some(transfer) = <PendingTransfersOut<T>>::take(transfer_id) {
 					let _ = T::Currency::transfer(
 						&Self::notary_account_id(transfer.notary_id),
-						&account_id,
+						&transfer.account_id,
 						transfer.amount,
 						Preservation::Expendable,
 					)
@@ -170,14 +169,14 @@ pub mod pallet {
 						log::warn!(
 							target: LOG_TARGET,
 							"Failed to return pending Localchain transfer to account {:?} (amount={:?}): {:?}",
-							&account_id,
+							&transfer.account_id,
 							transfer.amount,
 							e
 						);
 					});
 					Self::deposit_event(Event::TransferToLocalchainExpired {
-						account_id,
-						account_nonce,
+						account_id: transfer.account_id.clone(),
+						transfer_id,
 						notary_id: transfer.notary_id,
 					});
 				}
@@ -202,14 +201,13 @@ pub mod pallet {
 			let who = ensure_signed(origin)?;
 
 			ensure!(
-				T::Currency::reducible_balance(&who, Preservation::Expendable, Fortitude::Force) >=
-					amount,
+				T::Currency::reducible_balance(&who, Preservation::Expendable, Fortitude::Force)
+					>= amount,
 				Error::<T>::InsufficientFunds,
 			);
 
 			// the nonce is incremented pre-dispatch. we want the nonce for the transaction
-			let account_nonce =
-				<frame_system::Pallet<T>>::account_nonce(&who).saturating_sub(T::Nonce::one());
+			let transfer_id = Pallet::<T>::next_transfer_id()?;
 
 			T::Currency::transfer(
 				&who,
@@ -218,21 +216,20 @@ pub mod pallet {
 				Preservation::Expendable,
 			)?;
 
-			let expiration_block: BlockNumberFor<T> = <frame_system::Pallet<T>>::block_number() +
-				T::TransferExpirationBlocks::get().into();
+			let expiration_block: BlockNumberFor<T> = <frame_system::Pallet<T>>::block_number()
+				+ T::TransferExpirationBlocks::get().into();
 
 			PendingTransfersOut::<T>::insert(
-				&who,
-				account_nonce,
-				QueuedTransferOut { amount, expiration_block, notary_id },
+				transfer_id,
+				QueuedTransferOut { account_id: who.clone(), amount, expiration_block, notary_id },
 			);
-			ExpiringTransfersOut::<T>::try_append(expiration_block, (&who, account_nonce))
+			ExpiringTransfersOut::<T>::try_append(expiration_block, transfer_id)
 				.map_err(|_| Error::<T>::MaxBlockTransfersExceeded)?;
 
 			Self::deposit_event(Event::TransferToLocalchain {
 				account_id: who,
 				amount,
-				account_nonce,
+				transfer_id,
 				notary_id,
 				expiration_block,
 			});
@@ -275,10 +272,8 @@ pub mod pallet {
 							amount,
 						});
 					},
-					ChainTransfer::ToLocalchain { account_id, account_nonce: nonce } => {
-						let nonce = nonce.clone().into();
-						let account_id = account_id;
-						let transfer = <PendingTransfersOut<T>>::take(&account_id, nonce)
+					ChainTransfer::ToLocalchain { transfer_id } => {
+						let transfer = <PendingTransfersOut<T>>::take(&transfer_id)
 							.ok_or(Error::<T>::InvalidOrDuplicatedLocalchainTransfer)?;
 						ensure!(
 							transfer.expiration_block > <frame_system::Pallet<T>>::block_number(),
@@ -290,9 +285,7 @@ pub mod pallet {
 						);
 						let _ =
 							<ExpiringTransfersOut<T>>::try_mutate(transfer.expiration_block, |e| {
-								if let Some(pos) =
-									e.iter().position(|x| x.0 == *account_id && x.1 == nonce)
-								{
+								if let Some(pos) = e.iter().position(|x| x == transfer_id) {
 									e.remove(pos);
 								}
 								Ok::<_, Error<T>>(())
@@ -314,16 +307,18 @@ pub mod pallet {
 		}
 	}
 
-	impl<T: Config> ChainTransferLookup<T::Nonce, T::AccountId, T::Balance> for Pallet<T> {
+	impl<T: Config> ChainTransferLookup<T::AccountId, T::Balance> for Pallet<T> {
 		fn is_valid_transfer_to_localchain(
 			notary_id: NotaryId,
+			transfer_id: TransferToLocalchainId,
 			account_id: &T::AccountId,
-			nonce: T::Nonce,
 			milligons: T::Balance,
 		) -> bool {
-			let result = <PendingTransfersOut<T>>::get(account_id, nonce);
+			let result = <PendingTransfersOut<T>>::get(transfer_id);
 			if let Some(transfer) = result {
-				return transfer.notary_id == notary_id && transfer.amount == milligons;
+				return transfer.notary_id == notary_id
+					&& transfer.amount == milligons
+					&& transfer.account_id == *account_id;
 			}
 
 			false
@@ -334,12 +329,19 @@ pub mod pallet {
 		pub fn notary_account_id(notary_id: NotaryId) -> T::AccountId {
 			T::PalletId::get().into_sub_account_truncating(notary_id)
 		}
+		fn next_transfer_id() -> Result<TransferToLocalchainId, Error<T>> {
+			let transfer_id = NextTransferId::<T>::get().unwrap_or(1);
+			let next_transfer_id = transfer_id.increment();
+			NextTransferId::<T>::set(next_transfer_id);
+			Ok(transfer_id)
+		}
 	}
 }
 
 #[derive(Clone, PartialEq, Eq, Encode, Decode, RuntimeDebug, TypeInfo)]
 #[codec(mel_bound(Balance: MaxEncodedLen, BlockNumber: MaxEncodedLen))]
-pub struct QueuedTransferOut<Balance, BlockNumber> {
+pub struct QueuedTransferOut<AccountId, Balance, BlockNumber> {
+	pub account_id: AccountId,
 	pub amount: Balance,
 	pub expiration_block: BlockNumber,
 	pub notary_id: NotaryId,

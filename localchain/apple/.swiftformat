@@ -1,0 +1,24 @@
+# format options
+--allman false
+--indent 2
+--maxwidth 120
+--commas inline
+--decimalgrouping 3
+--wraparguments before-first
+
+# file options
+--exclude Generated/
+
+# rules
+--enable blankLineAfterImports
+--enable blockComments
+--enable isEmpty
+--enable wrapAttributes
+--enable wrapEnumCases
+--enable wrapLoopBodies
+--enable wrapSwitchCases
+--enable wrapMultilineConditionalAssignment
+--enable leadingDelimiters
+--enable modifierOrder
+--disable preferForLoop
+--disable wrapMultilineStatementBraces

@@ -1,0 +1,17 @@
+{
+  "db_name": "PostgreSQL",
+  "query": "\n\t\t\tINSERT INTO chain_transfers (to_localchain, amount, account_id, included_in_notebook_number)\n\t\t\tSELECT $1, $2, $3, $4\n\t\t\t",
+  "describe": {
+    "columns": [],
+    "parameters": {
+      "Left": [
+        "Bool",
+        "Varchar",
+        "Bytea",
+        "Int4"
+      ]
+    },
+    "nullable": []
+  },
+  "hash": "f9e7f89cb230d9aa4a8cc4f6ee9afc7a3404c934f4fc61058cc68bc40b8532b6"
+}

@@ -11,6 +11,7 @@ use sp_core::{
 };
 use sp_inherents::InherentDataProvider;
 use sp_keyring::{ed25519::Keyring, AccountKeyring::Bob, Ed25519Keyring::Alice};
+use sp_keyring::AccountKeyring::Ferdie;
 use sp_runtime::{
 	traits::{BlakeTwo256, Header},
 	BoundedVec, Digest, DigestItem, MultiSignature,
@@ -33,7 +34,7 @@ use crate::{
 };
 
 fn empty_signature() -> BlockSealAuthoritySignature {
-	Signature([0u8; 64]).into()
+	Signature::from_raw([0u8; 64]).into()
 }
 
 #[test]
@@ -266,7 +267,7 @@ fn it_requires_vote_notebook_proof() {
 		setup_blocks(2);
 		System::set_block_number(3);
 		System::reset_events();
-		AuthorityList::set(vec![(10, BlockSealAuthorityId::from(Public([0; 32])))]);
+		AuthorityList::set(vec![(10, BlockSealAuthorityId::from(Public::from_raw([0; 32])))]);
 
 		let mut block_vote = default_vote();
 		let merkle_proof = merkle_proof::<BlakeTwo256, _, _>(vec![block_vote.encode()], 0).proof;
@@ -472,6 +473,7 @@ fn it_can_find_best_vote_seals() {
 			power: 500,
 			data_domain_hash: DataDomain::new("test", DataTLD::Bikes).hash(),
 			data_domain_account: Alice.to_account_id(),
+			block_rewards_account_id: Alice.to_account_id(),
 			signature: empty_vote_signature(),
 		};
 		XorClosest::set(Some(MiningAuthority {
@@ -578,6 +580,7 @@ fn it_checks_tax_votes() {
 			account_id: Keyring::Alice.into(),
 			index: 1,
 			power: 500,
+			block_rewards_account_id: Ferdie.to_account_id(),
 			signature: empty_vote_signature(),
 		};
 
@@ -723,11 +726,12 @@ fn default_vote() -> BlockVote {
 		account_id: Keyring::Alice.into(),
 		index: 1,
 		power: 500,
+		block_rewards_account_id: Alice.to_account_id(),
 		signature: empty_vote_signature(),
 	}
 	.sign(Alice.pair())
 	.clone()
 }
 fn empty_vote_signature() -> MultiSignature {
-	sp_core::sr25519::Signature([0u8; 64]).into()
+	sp_core::sr25519::Signature::from_raw([0u8; 64]).into()
 }

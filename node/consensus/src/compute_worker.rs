@@ -31,8 +31,8 @@ use ulx_node_runtime::{NotaryRecordT, NotebookVerifyError};
 use ulx_primitives::{inherents::BlockSealInherentNodeSide, tick::Tick, *};
 
 use crate::{
-	aux::UlxAux, block_creator, block_creator::propose, compute_solver::ComputeSolver,
-	digests::get_tick_digest, error::Error, notebook_watch::has_votes_at_tick,
+    aux_client::UlxAux, block_creator, block_creator::propose, compute_solver::ComputeSolver,
+    digests::get_tick_digest, error::Error, notebook_watch::has_votes_at_tick,
 };
 
 /// Version of the mining worker.

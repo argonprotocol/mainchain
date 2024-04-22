@@ -83,6 +83,10 @@ declare module '@polkadot/api-base/types/events' {
        **/
       Thawed: AugmentedEvent<ApiType, [who: AccountId32, amount: u128], { who: AccountId32, amount: u128 }>;
       /**
+       * The `TotalIssuance` was forcefully changed.
+       **/
+      TotalIssuanceForced: AugmentedEvent<ApiType, [old: u128, new_: u128], { old: u128, new_: u128 }>;
+      /**
        * Transfer succeeded.
        **/
       Transfer: AugmentedEvent<ApiType, [from: AccountId32, to: AccountId32, amount: u128], { from: AccountId32, to: AccountId32, amount: u128 }>;
@@ -126,8 +130,8 @@ declare module '@polkadot/api-base/types/events' {
     };
     chainTransfer: {
       TransferIn: AugmentedEvent<ApiType, [accountId: AccountId32, amount: u128, notaryId: u32], { accountId: AccountId32, amount: u128, notaryId: u32 }>;
-      TransferToLocalchain: AugmentedEvent<ApiType, [accountId: AccountId32, amount: u128, accountNonce: u32, notaryId: u32, expirationBlock: u32], { accountId: AccountId32, amount: u128, accountNonce: u32, notaryId: u32, expirationBlock: u32 }>;
-      TransferToLocalchainExpired: AugmentedEvent<ApiType, [accountId: AccountId32, accountNonce: u32, notaryId: u32], { accountId: AccountId32, accountNonce: u32, notaryId: u32 }>;
+      TransferToLocalchain: AugmentedEvent<ApiType, [accountId: AccountId32, amount: u128, transferId: u32, notaryId: u32, expirationBlock: u32], { accountId: AccountId32, amount: u128, transferId: u32, notaryId: u32, expirationBlock: u32 }>;
+      TransferToLocalchainExpired: AugmentedEvent<ApiType, [accountId: AccountId32, transferId: u32, notaryId: u32], { accountId: AccountId32, transferId: u32, notaryId: u32 }>;
     };
     dataDomain: {
       /**
@@ -254,6 +258,10 @@ declare module '@polkadot/api-base/types/events' {
        * On on-chain remark happened.
        **/
       Remarked: AugmentedEvent<ApiType, [sender: AccountId32, hash_: H256], { sender: AccountId32, hash_: H256 }>;
+      /**
+       * An upgrade was authorized.
+       **/
+      UpgradeAuthorized: AugmentedEvent<ApiType, [codeHash: H256, checkVersion: bool], { codeHash: H256, checkVersion: bool }>;
     };
     transactionPayment: {
       /**
@@ -339,6 +347,10 @@ declare module '@polkadot/api-base/types/events' {
        * Some balance was thawed.
        **/
       Thawed: AugmentedEvent<ApiType, [who: AccountId32, amount: u128], { who: AccountId32, amount: u128 }>;
+      /**
+       * The `TotalIssuance` was forcefully changed.
+       **/
+      TotalIssuanceForced: AugmentedEvent<ApiType, [old: u128, new_: u128], { old: u128, new_: u128 }>;
       /**
        * Transfer succeeded.
        **/

@@ -1,0 +1,12 @@
+{
+  "db_name": "PostgreSQL",
+  "query": "ALTER TABLE notarizations DROP CONSTRAINT IF EXISTS notarizations_notebook_number_fkey",
+  "describe": {
+    "columns": [],
+    "parameters": {
+      "Left": []
+    },
+    "nullable": []
+  },
+  "hash": "830cb5b6acc5d07cfad27dad2aa4e13534c48e7e09cc77a4d218783ce1eb5d91"
+}

@@ -224,7 +224,7 @@ mod tests {
 				vec![NotebookDigestRecord {
 					notebook_number: 1,
 					notary_id: 1,
-					audit_first_failure: Some(VerifyError::AccountAlreadyHasChannelHold),
+					audit_first_failure: Some(VerifyError::AccountAlreadyHasEscrowHold),
 					tick: 1,
 				}],
 			)

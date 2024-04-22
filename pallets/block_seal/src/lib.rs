@@ -1,4 +1,4 @@
-#![feature(slice_take)]
+
 #![cfg_attr(not(feature = "std"), no_std)]
 
 pub use pallet::*;
@@ -36,8 +36,7 @@ pub mod pallet {
 		AuthorityProvider, BlockSealAuthoritySignature, BlockSealerInfo, BlockSealerProvider,
 		BlockVotingKey, BlockVotingProvider, DataDomainProvider, MerkleProof, NotaryId,
 		NotaryNotebookVotes, NotebookProvider, ParentVotingKeyDigest, TickProvider, VotingKey,
-		AUTHOR_DIGEST_ID, CHANNEL_CLAWBACK_TICKS, CHANNEL_EXPIRATION_TICKS,
-		PARENT_VOTING_KEY_DIGEST,
+		AUTHOR_DIGEST_ID, ESCROW_CLAWBACK_TICKS, ESCROW_EXPIRATION_TICKS, PARENT_VOTING_KEY_DIGEST,
 	};
 
 	use super::*;
@@ -286,8 +285,8 @@ pub mod pallet {
 					);
 
 					let votes_from_tick = current_tick - 2u32;
-					let block_vote_account_id =
-						T::AccountId::decode(&mut block_vote.account_id.encode().as_slice())
+					let block_vote_rewards_account =
+						T::AccountId::decode(&mut block_vote.block_rewards_account_id.encode().as_slice())
 							.map_err(|_| Error::<T>::UnableToDecodeVoteAccount)?;
 					Self::verify_block_vote(
 						seal_strength,
@@ -305,7 +304,7 @@ pub mod pallet {
 					)?;
 					<LastBlockSealerInfo<T>>::put(BlockSealerInfo {
 						miner_rewards_account,
-						block_vote_rewards_account: block_vote_account_id.clone(),
+						block_vote_rewards_account,
 					});
 				},
 			}
@@ -378,16 +377,15 @@ pub mod pallet {
 			let data_domain_account =
 				T::AccountId::decode(&mut block_vote.data_domain_account.encode().as_slice())
 					.map_err(|_| Error::<T>::UnableToDecodeVoteAccount)?;
-			let last_tick = votes_from_tick.saturating_sub(CHANNEL_EXPIRATION_TICKS);
+			let last_tick = votes_from_tick.saturating_sub(ESCROW_EXPIRATION_TICKS);
 			ensure!(
 				T::DataDomainProvider::is_registered_payment_account(
 					data_domain_hash,
 					&data_domain_account,
-					(last_tick.saturating_sub(CHANNEL_CLAWBACK_TICKS), last_tick)
+					(last_tick.saturating_sub(ESCROW_CLAWBACK_TICKS), last_tick)
 				),
 				Error::<T>::InvalidDataDomainAccount
 			);
-
 			ensure!(
 				block_vote.signature.verify(&block_vote.hash()[..], &block_vote.account_id),
 				Error::<T>::BlockVoteInvalidSignature

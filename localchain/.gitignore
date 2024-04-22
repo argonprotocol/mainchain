@@ -52,7 +52,7 @@ typings/
 *.tsbuildinfo
 
 # Optional npm cache directory
-.npm
+#.npm
 
 # Optional eslint cache
 .eslintcache
@@ -196,3 +196,4 @@ Cargo.lock
 __test__/*.js
 __test__/*.js.map
 *.node
+!npm/**/*.node

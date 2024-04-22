@@ -26,7 +26,7 @@ env:
   RUSTUP_MAX_RETRIES: 10
   CARGO_TERM_COLOR: always
   # Set an environment variable (that can be overriden) for the Docker Repo
-  DOCKER_REPO: tripleight/node-template
+  DOCKER_REPO: ulixee/ulixee-miner
 
 defaults:
   run:
@@ -61,12 +61,13 @@ jobs:
         #
         # When updating this list, remember to update the target list in tests too
         include:
-          # - target: aarch64-unknown-linux-gnu
+          - target: aarch64-unknown-linux-gnu
           - target: x86_64-unknown-linux-gnu
           - target: aarch64-apple-darwin
             os: macos-11
           - target: x86_64-apple-darwin
             os: macos-11
+          - os: windows-latest
           # - target: universal-apple-darwin
           #   os: macos-11
 
@@ -104,17 +105,34 @@ jobs:
       # Build and upload the binary to the new release
       - uses: taiki-e/upload-rust-binary-action@v1
         with:
-          bin: node-template
+          bin: ulx-node
+          checksum: sha256,sha512,sha1,md5
           target: ${{ matrix.target }}
-          tar: all
+          archive: $bin-$tag-$target
+          token: ${{ secrets.GITHUB_TOKEN }}
+
+      - uses: taiki-e/upload-rust-binary-action@v1
+        with:
+          bin: ulx-notary
+          checksum: sha256,sha512,sha1,md5
+          target: ${{ matrix.target }}
+          archive: $bin-$tag-$target
+          token: ${{ secrets.GITHUB_TOKEN }}
+
+      - uses: taiki-e/upload-rust-binary-action@v1
+        with:
+          bin: ulx-localchain
+          checksum: sha256,sha512,sha1,md5
+          target: ${{ matrix.target }}
+          archive: $bin-$tag-$target
           token: ${{ secrets.GITHUB_TOKEN }}
 
       - name: Upload x86_64 linux binary to workflow
         if: (matrix.target == 'x86_64-unknown-linux-gnu')
         uses: actions/upload-artifact@v4
         with:
-          name: node-template
-          path: ${{ github.workspace }}/target/x86_64-unknown-linux-gnu/release/node-template
+          name: ulx-node
+          path: ${{ github.workspace }}/target/x86_64-unknown-linux-gnu/release/ulx-node
 
   build-image:
     # The type of runner that the job will run on
@@ -138,7 +156,7 @@ jobs:
       - name: Download x86_64 linux binary
         uses: actions/download-artifact@v4
         with:
-          name: node-template
+          name: ulx-node
           path: ${{ github.workspace }}
 
       # Build and push 2 images, One with the version tag and the other with latest tag

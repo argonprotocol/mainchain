@@ -1,12 +1,17 @@
 use codec::{Decode, Encode, MaxEncodedLen};
+use scale_info::TypeInfo;
 use serde::{Deserialize, Serialize};
-use sp_core::{bounded::BoundedVec, ConstU32, RuntimeDebug, H256};
-use sp_core_hashing::blake2_256;
-use sp_runtime::{scale_info::TypeInfo, traits::Verify, MultiSignature};
+use sp_core::{bounded::BoundedVec, ecdsa, ed25519, sr25519, ConstU32, H256};
+use sp_crypto_hashing::blake2_256;
+use sp_runtime::{traits::Verify, MultiSignature};
 use sp_std::vec::Vec;
 
 #[cfg(feature = "std")]
 use sp_core::crypto::Pair;
+use sp_debug_derive::RuntimeDebug;
+
+#[cfg(feature = "std")]
+use crate::serialize_unsafe_u128_as_string;
 
 use crate::{
 	notary::NotaryId, tick::Tick, AccountId, AccountOriginUid, AccountType, Note, NoteType,
@@ -35,28 +40,32 @@ pub struct BalanceChange {
 	pub change_number: u32,
 	/// New balance after change
 	#[codec(compact)]
+	#[cfg_attr(feature = "std", serde(with = "serialize_unsafe_u128_as_string"))]
 	pub balance: u128,
 	/// A balance change must provide proof of a previous balance if the change_number is non-zero
 	pub previous_balance_proof: Option<BalanceProof>,
 	/// If this account is on hold, the hold note and index
-	pub channel_hold_note: Option<Note>,
+	pub escrow_hold_note: Option<Note>,
 	/// Sources of the changes
 	pub notes: BoundedVec<Note, ConstU32<100>>,
 	/// Signature of the balance change hash
-	pub signature: MultiSignature,
+	pub signature: MultiSignatureBytes,
 }
-
 #[derive(Encode)]
 struct BalanceChangeHashMessage {
 	pub account_id: AccountId,
 	pub account_type: AccountType,
 	pub change_number: u32,
 	pub balance: u128,
-	pub channel_hold_note: Option<Note>,
+	pub escrow_hold_note: Option<Note>,
 	pub notes: Vec<Note>,
 }
 
 impl BalanceChange {
+	pub fn net_balance_change(&self) -> i128 {
+		self.balance as i128 - self.previous_balance_proof.as_ref().map_or(0, |p| p.balance as i128)
+	}
+
 	pub fn push_note(&mut self, milligons: u128, note_type: NoteType) -> &mut Self {
 		if let Some(existing) = self.notes.iter_mut().find(|n| n.note_type == note_type) {
 			existing.milligons += milligons;
@@ -72,7 +81,8 @@ impl BalanceChange {
 	where
 		S::Signature: Into<MultiSignature>,
 	{
-		self.signature = pair.sign(&self.hash()[..]).into();
+		let signature: MultiSignature = pair.sign(&self.hash()[..]).into();
+		self.signature = MultiSignatureBytes(signature);
 		self
 	}
 
@@ -86,14 +96,14 @@ impl BalanceChange {
 			account_type: self.account_type.clone(),
 			change_number: self.change_number,
 			balance: self.balance,
-			channel_hold_note: self.channel_hold_note.clone(),
+			escrow_hold_note: self.escrow_hold_note.clone(),
 			notes: self.notes.to_vec(),
 		};
 		hash.using_encoded(blake2_256).into()
 	}
 
 	pub fn verify_signature(&self) -> bool {
-		self.signature.verify(&self.hash()[..], &self.account_id)
+		self.signature.0.verify(&self.hash()[..], &self.account_id)
 	}
 }
 
@@ -122,6 +132,7 @@ pub struct BalanceProof {
 	pub tick: Tick,
 	/// The source balance being proven
 	#[codec(compact)]
+	#[cfg_attr(feature = "std", serde(with = "serialize_unsafe_u128_as_string"))]
 	pub balance: u128,
 	/// The id created during the first balance change for the given account
 	pub account_origin: AccountOrigin,
@@ -167,9 +178,10 @@ pub struct BalanceTip {
 	pub account_id: AccountId,
 	pub account_type: AccountType,
 	pub change_number: u32,
+	#[cfg_attr(feature = "std", serde(with = "serialize_unsafe_u128_as_string"))]
 	pub balance: u128,
 	pub account_origin: AccountOrigin,
-	pub channel_hold_note: Option<Note>,
+	pub escrow_hold_note: Option<Note>,
 }
 
 impl BalanceTip {
@@ -178,7 +190,7 @@ impl BalanceTip {
 			self.change_number,
 			self.balance,
 			self.account_origin.clone(),
-			self.channel_hold_note.clone(),
+			self.escrow_hold_note.clone(),
 		)
 	}
 
@@ -186,9 +198,9 @@ impl BalanceTip {
 		change_number: u32,
 		balance: u128,
 		account_origin: AccountOrigin,
-		channel_hold_note: Option<Note>,
+		escrow_hold_note: Option<Note>,
 	) -> [u8; 32] {
-		BalanceTipValue { change_number, balance, account_origin, channel_hold_note }
+		BalanceTipValue { change_number, balance, account_origin, escrow_hold_note }
 			.using_encoded(blake2_256)
 	}
 
@@ -202,7 +214,7 @@ struct BalanceTipValue {
 	pub change_number: u32,
 	pub balance: u128,
 	pub account_origin: AccountOrigin,
-	pub channel_hold_note: Option<Note>,
+	pub escrow_hold_note: Option<Note>,
 }
 
 #[derive(
@@ -228,4 +240,63 @@ pub struct AccountOrigin {
 	/// A unique identifier for an account
 	#[codec(compact)]
 	pub account_uid: AccountOriginUid,
+}
+
+#[derive(Clone, PartialEq, Eq, Encode, Decode, RuntimeDebug, TypeInfo, MaxEncodedLen)]
+#[cfg_attr(not(feature = "std"), derive(Serialize, Deserialize))]
+#[repr(transparent)]
+pub struct MultiSignatureBytes(pub MultiSignature);
+
+#[cfg(feature = "std")]
+impl serde::Serialize for MultiSignatureBytes {
+	fn serialize<S>(&self, serializer: S) -> Result<S::Ok, S::Error>
+	where
+		S: serde::Serializer,
+	{
+		Encode::using_encoded(&self.0, |bytes| {
+			let hex_str = format!("0x{}", hex::encode(bytes));
+			serializer.serialize_str(&hex_str)
+		})
+	}
+}
+#[cfg(feature = "std")]
+impl<'a> serde::Deserialize<'a> for MultiSignatureBytes {
+	fn deserialize<D>(deserializer: D) -> Result<MultiSignatureBytes, D::Error>
+	where
+		D: serde::Deserializer<'a>,
+	{
+		let hex = String::deserialize(deserializer)?;
+		let bytes = match sp_core::bytes::from_hex(&hex) {
+			Ok(bytes) => bytes,
+			Err(e) => return Err(serde::de::Error::custom(std::format!("Invalid hex: {}", e))),
+		};
+
+		Decode::decode(&mut &bytes[..]).map_err(|e| {
+			serde::de::Error::custom(std::format!("Unable to decode Multisignature {}", e))
+		})
+	}
+}
+
+impl From<MultiSignature> for MultiSignatureBytes {
+	fn from(m: MultiSignature) -> Self {
+		MultiSignatureBytes(m)
+	}
+}
+
+impl From<ed25519::Signature> for MultiSignatureBytes {
+	fn from(x: ed25519::Signature) -> Self {
+		MultiSignatureBytes(MultiSignature::Ed25519(x))
+	}
+}
+
+impl From<sr25519::Signature> for MultiSignatureBytes {
+	fn from(x: sr25519::Signature) -> Self {
+		MultiSignatureBytes(MultiSignature::Sr25519(x))
+	}
+}
+
+impl From<ecdsa::Signature> for MultiSignatureBytes {
+	fn from(x: ecdsa::Signature) -> Self {
+		MultiSignatureBytes(MultiSignature::Ecdsa(x))
+	}
 }

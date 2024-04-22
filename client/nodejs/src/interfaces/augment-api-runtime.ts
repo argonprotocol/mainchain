@@ -17,7 +17,6 @@ import type { AuthorityList, GrandpaEquivocationProof, SetId } from '@polkadot/t
 import type { OpaqueMetadata } from '@polkadot/types/interfaces/metadata';
 import type { FeeDetails, RuntimeDispatchInfo } from '@polkadot/types/interfaces/payment';
 import type { AccountId, Balance, Block, Call, Header, Index, KeyTypeId, Weight } from '@polkadot/types/interfaces/runtime';
-import type { RuntimeVersion } from '@polkadot/types/interfaces/state';
 import type { ApplyExtrinsicResult } from '@polkadot/types/interfaces/system';
 import type { TransactionSource, TransactionValidity } from '@polkadot/types/interfaces/txqueue';
 import type { IExtrinsic, Observable } from '@polkadot/types/types';
@@ -52,21 +51,6 @@ declare module '@polkadot/api-base/types/calls' {
        * Generate inherent extrinsics.
        **/
       inherentExtrinsics: AugmentedCall<ApiType, (inherent: InherentData | { data?: any } | string | Uint8Array) => Observable<Vec<Extrinsic>>>;
-    };
-    /** 0xdf6acb689907609b/4 */
-    core: {
-      /**
-       * Execute the given block.
-       **/
-      executeBlock: AugmentedCall<ApiType, (block: Block | { header?: any; extrinsics?: any } | string | Uint8Array) => Observable<Null>>;
-      /**
-       * Initialize a block with the given header.
-       **/
-      initializeBlock: AugmentedCall<ApiType, (header: Header | { parentHash?: any; number?: any; stateRoot?: any; extrinsicsRoot?: any; digest?: any } | string | Uint8Array) => Observable<Null>>;
-      /**
-       * Returns the version of the runtime.
-       **/
-      version: AugmentedCall<ApiType, () => Observable<RuntimeVersion>>;
     };
     /** 0xed99c5acb25eedf5/3 */
     grandpaApi: {

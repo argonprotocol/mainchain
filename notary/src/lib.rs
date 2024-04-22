@@ -1,10 +1,13 @@
-pub use apis::{create_client, Client};
+pub use ulx_notary_apis::{create_client, Client};
+
+pub mod apis {
+    pub use ulx_notary_apis::localchain;
+    pub use ulx_notary_apis::notebook;
+}
 pub use error::Error;
 pub use server::NotaryServer;
 pub use ulx_primitives::ensure;
 
-#[cfg(feature = "api")]
-pub mod apis;
 pub mod error;
 pub mod stores;
 

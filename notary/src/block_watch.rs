@@ -1,5 +1,5 @@
 use codec::Decode;
-use sp_core::{ed25519, H256};
+use sp_core::{ed25519::Public as Ed25519Public, H256};
 use sqlx::{PgConnection, PgPool};
 use subxt::{
 	blocks::{Block, BlockRef},
@@ -28,13 +28,13 @@ use crate::{
 pub async fn spawn_block_sync(
 	rpc_url: String,
 	notary_id: NotaryId,
-	pool: &PgPool,
+	pool: PgPool,
 	ticker: Ticker,
 ) -> anyhow::Result<(), Error> {
-	sync_finalized_blocks(rpc_url.clone(), notary_id, pool, ticker.clone())
+	sync_finalized_blocks(rpc_url.clone(), notary_id, pool.clone(), ticker.clone())
 		.await
 		.map_err(|e| Error::BlockSyncError(e.to_string()))?;
-	track_blocks(rpc_url.clone(), notary_id, pool, ticker.clone());
+	track_blocks(rpc_url.clone(), notary_id, pool.clone(), ticker.clone());
 
 	Ok(())
 }
@@ -42,10 +42,9 @@ pub async fn spawn_block_sync(
 pub(crate) fn track_blocks(
 	rpc_url: String,
 	notary_id: NotaryId,
-	pool: &PgPool,
+	pool: PgPool,
 	ticker: Ticker,
 ) -> tokio::task::JoinHandle<()> {
-	let pool = pool.clone();
 	tokio::task::spawn(async move {
 		let ticker = ticker.clone();
 		loop {
@@ -62,10 +61,10 @@ pub(crate) fn track_blocks(
 async fn sync_finalized_blocks(
 	url: String,
 	notary_id: NotaryId,
-	pool: &PgPool,
+	pool: PgPool,
 	ticker: Ticker,
 ) -> anyhow::Result<()> {
-	let client = try_until_connected(url, 2500).await?;
+	let client = try_until_connected(url, 2500, 120_000).await?;
 	let notaries_query = api::storage().notaries().active_notaries();
 
 	let active_notaries = client
@@ -81,6 +80,20 @@ async fn sync_finalized_blocks(
 		return Ok(());
 	};
 	let oldest_block_to_sync = notary.activated_block;
+	{
+		let mut db = pool.acquire().await?;
+
+		let public = Ed25519Public::from_raw(notary.meta.public);
+		let _ = activate_notebook_processing(
+			&mut *db,
+			notary_id,
+			public,
+			oldest_block_to_sync,
+			&ticker,
+		)
+		.await
+		.ok();
+	}
 
 	let mut tx = pool.begin().await?;
 	BlocksStore::lock(&mut tx).await?;
@@ -94,7 +107,7 @@ async fn sync_finalized_blocks(
 	loop {
 		let block = client.blocks().at(block_hash.clone()).await?;
 		if block.number() <= last_synched_block || block.number() <= oldest_block_to_sync {
-			break
+			break;
 		}
 		block_hash = BlockRef::from(block.header().parent_hash);
 		missing_blocks.insert(0, block);
@@ -128,8 +141,9 @@ async fn process_block(
 		.unwrap_or_default();
 
 	let notebooks_header = block.header().digest.logs.iter().find_map(|log| match log {
-		DigestItem::PreRuntime(ulx_primitives::NOTEBOOKS_DIGEST_ID, data) =>
-			NotebookDigest::decode(&mut &data[..]).ok(),
+		DigestItem::PreRuntime(ulx_primitives::NOTEBOOKS_DIGEST_ID, data) => {
+			NotebookDigest::decode(&mut &data[..]).ok()
+		},
 		_ => None,
 	});
 
@@ -172,7 +186,7 @@ async fn find_missing_blocks(
 		blocks.insert(0, block);
 		// can't get a parent of genesis block
 		if is_genesis {
-			break
+			break;
 		}
 	}
 	Ok(blocks)
@@ -190,6 +204,21 @@ async fn process_fork(
 	for missing_block in missing_blocks {
 		process_block(db, &client, &missing_block, notary_id).await?;
 	}
+	Ok(())
+}
+
+async fn activate_notebook_processing(
+	db: &mut PgConnection,
+	notary_id: NotaryId,
+	public: Ed25519Public,
+	block_height: u32,
+	ticker: &Ticker,
+) -> anyhow::Result<()> {
+	// it might already be stored
+	let _ = RegisteredKeyStore::store_public(&mut *db, public, block_height).await.ok();
+	let tick = ticker.current();
+	NotebookHeaderStore::create(&mut *db, notary_id, 1, tick, ticker.time_for_tick(tick + 1))
+		.await?;
 	Ok(())
 }
 
@@ -213,35 +242,23 @@ async fn process_finalized_block(
 				if meta_change.notary_id == notary_id {
 					RegisteredKeyStore::store_public(
 						&mut *db,
-						ed25519::Public(meta_change.meta.public.0),
+						Ed25519Public::from_raw(meta_change.meta.public),
 						block_height,
 					)
 					.await?;
 				}
-				continue
+				continue;
 			}
 			if let Some(Ok(activated_event)) =
 				event.as_event::<api::notaries::events::NotaryActivated>().transpose()
 			{
 				info!("Notary activated: {:?}", activated_event);
 				if activated_event.notary.notary_id == notary_id {
-					RegisteredKeyStore::store_public(
-						&mut *db,
-						ed25519::Public(activated_event.notary.meta.public.0),
-						block_height,
-					)
-					.await?;
-					let tick = ticker.current();
-					NotebookHeaderStore::create(
-						&mut *db,
-						notary_id,
-						1,
-						tick,
-						ticker.time_for_tick(tick + 1),
-					)
-					.await?;
+					let public = Ed25519Public::from_raw(activated_event.notary.meta.public);
+					activate_notebook_processing(&mut *db, notary_id, public, block_height, ticker)
+						.await?;
 				}
-				continue
+				continue;
 			}
 
 			if let Some(Ok(notebook)) =
@@ -256,7 +273,7 @@ async fn process_finalized_block(
 					)
 					.await?;
 				}
-				continue
+				continue;
 			}
 
 			if let Some(Ok(notebook)) =
@@ -265,7 +282,7 @@ async fn process_finalized_block(
 				if notebook.notary_id == notary_id {
 					panic!("Notebook audit failed! Need to shut down {:?}", notebook);
 				}
-				continue
+				continue;
 			}
 
 			if let Some(Ok(to_localchain)) = event
@@ -278,12 +295,12 @@ async fn process_finalized_block(
 						&mut *db,
 						block_height,
 						&AccountId::from(to_localchain.account_id.0),
-						to_localchain.account_nonce,
+						to_localchain.transfer_id,
 						to_localchain.amount,
 					)
 					.await?;
 				}
-				continue
+				continue;
 			}
 		}
 	}
@@ -298,7 +315,7 @@ async fn subscribe_to_blocks(
 	pool: &PgPool,
 	ticker: &Ticker,
 ) -> anyhow::Result<bool> {
-	let client = try_until_connected(url, 2500).await?;
+	let client = try_until_connected(url, 2500, 120_000).await?;
 	let mut blocks_sub = client.blocks().subscribe_all().await?;
 	let mut finalized_sub = client.blocks().subscribe_finalized().await?;
 

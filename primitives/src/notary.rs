@@ -1,6 +1,7 @@
 use codec::{Codec, Decode, Encode, MaxEncodedLen};
-use frame_support::{CloneNoBound, PartialEqNoBound, RuntimeDebugNoBound};
+use frame_support_procedural::{CloneNoBound, PartialEqNoBound, RuntimeDebugNoBound};
 use scale_info::TypeInfo;
+use serde::{Deserialize, Serialize};
 use sp_core::{ed25519, Get, RuntimeDebug, H256};
 use sp_runtime::{
 	traits::{Block as BlockT, NumberFor},
@@ -34,6 +35,13 @@ pub trait NotaryProvider<B: BlockT> {
 pub struct NotaryMeta<MaxHosts: Get<u32>> {
 	pub public: NotaryPublic,
 	pub hosts: BoundedVec<Host, MaxHosts>,
+}
+
+#[derive(Serialize, Deserialize)]
+pub struct GenesisNotary<AccountId> {
+	pub account_id: AccountId,
+	pub public: NotaryPublic,
+	pub hosts: Vec<Host>,
 }
 
 #[derive(

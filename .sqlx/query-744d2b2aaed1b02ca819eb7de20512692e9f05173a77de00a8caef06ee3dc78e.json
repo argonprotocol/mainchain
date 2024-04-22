@@ -1,0 +1,86 @@
+{
+  "db_name": "SQLite",
+  "query": "SELECT * FROM open_escrows WHERE id = ?",
+  "describe": {
+    "columns": [
+      {
+        "name": "id",
+        "ordinal": 0,
+        "type_info": "Text"
+      },
+      {
+        "name": "is_client",
+        "ordinal": 1,
+        "type_info": "Bool"
+      },
+      {
+        "name": "initial_balance_change_json",
+        "ordinal": 2,
+        "type_info": "Text"
+      },
+      {
+        "name": "balance_change_number",
+        "ordinal": 3,
+        "type_info": "Int64"
+      },
+      {
+        "name": "from_address",
+        "ordinal": 4,
+        "type_info": "Text"
+      },
+      {
+        "name": "expiration_tick",
+        "ordinal": 5,
+        "type_info": "Int64"
+      },
+      {
+        "name": "settled_amount",
+        "ordinal": 6,
+        "type_info": "Text"
+      },
+      {
+        "name": "settled_signature",
+        "ordinal": 7,
+        "type_info": "Blob"
+      },
+      {
+        "name": "created_at",
+        "ordinal": 8,
+        "type_info": "Datetime"
+      },
+      {
+        "name": "notarization_id",
+        "ordinal": 9,
+        "type_info": "Int64"
+      },
+      {
+        "name": "missed_claim_window",
+        "ordinal": 10,
+        "type_info": "Bool"
+      },
+      {
+        "name": "updated_at",
+        "ordinal": 11,
+        "type_info": "Datetime"
+      }
+    ],
+    "parameters": {
+      "Right": 1
+    },
+    "nullable": [
+      false,
+      false,
+      false,
+      false,
+      false,
+      false,
+      false,
+      false,
+      false,
+      true,
+      false,
+      false
+    ]
+  },
+  "hash": "744d2b2aaed1b02ca819eb7de20512692e9f05173a77de00a8caef06ee3dc78e"
+}

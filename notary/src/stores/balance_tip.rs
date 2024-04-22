@@ -3,11 +3,12 @@ use std::default::Default;
 use sp_core::H256;
 use sqlx::PgConnection;
 
+use ulx_notary_apis::localchain::BalanceTipResult;
 use ulx_primitives::{
 	ensure, tick::Tick, AccountId, AccountOrigin, AccountType, BalanceTip, Note, NotebookNumber,
 };
 
-use crate::{apis::localchain::BalanceTipResult, stores::BoxFutureResult, Error};
+use crate::{stores::BoxFutureResult, Error};
 
 /// This table is used as a quick verification of the last balance change. It is also the last valid
 /// entry in a notebook. Without this table, you must obtain proof that a balance has not changed
@@ -31,7 +32,7 @@ impl BalanceTipStore {
 		previous_balance: u128,
 		account_origin: &AccountOrigin,
 		change_index: usize,
-		channel_hold_note: Option<Note>,
+		escrow_hold_note: Option<Note>,
 		timeout_millis: u32,
 	) -> BoxFutureResult<'a, Option<H256>> {
 		let key = BalanceTip::create_key(account_id, &account_type);
@@ -43,7 +44,7 @@ impl BalanceTipStore {
 					proposed_change_number - 1u32,
 					previous_balance,
 					account_origin.clone(),
-					channel_hold_note,
+					escrow_hold_note,
 				)
 				.into(),
 			);
@@ -108,22 +109,22 @@ impl BalanceTipStore {
 		notebook_number: NotebookNumber,
 		tick: Tick,
 		account_origin: AccountOrigin,
-		channel_hold_note: Option<Note>,
+		escrow_hold_note: Option<Note>,
 		prev_balance: u128,
-		prev_channel_hold_note: Option<Note>,
+		prev_escrow_hold_note: Option<Note>,
 	) -> BoxFutureResult<'a, ()> {
 		let key = BalanceTip::create_key(account_id, &account_type);
 		let tip = BalanceTip::compute_tip(
 			change_number,
 			balance,
 			account_origin.clone(),
-			channel_hold_note.clone(),
+			escrow_hold_note.clone(),
 		);
 		let prev = BalanceTip::compute_tip(
 			change_number - 1,
 			prev_balance,
 			account_origin,
-			prev_channel_hold_note,
+			prev_escrow_hold_note,
 		);
 		Box::pin(async move {
 			let res = sqlx::query!(
@@ -157,7 +158,7 @@ mod tests {
 	use sp_keyring::Sr25519Keyring::Bob;
 	use sqlx::PgPool;
 
-	use ulx_primitives::{note::AccountType::Deposit, AccountOrigin, BalanceTip};
+	use ulx_primitives::{AccountOrigin, AccountType::Deposit, BalanceTip};
 
 	use crate::stores::balance_tip::BalanceTipStore;
 

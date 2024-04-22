@@ -1,0 +1,12 @@
+{
+  "db_name": "SQLite",
+  "query": "UPDATE open_escrows SET notarization_id = ?, updated_at = CURRENT_TIMESTAMP\n       WHERE from_address = ? AND balance_change_number = ?",
+  "describe": {
+    "columns": [],
+    "parameters": {
+      "Right": 3
+    },
+    "nullable": []
+  },
+  "hash": "0646f97c45a4e8841d67468c8216ccc4376c9658579cd7ff7fb074327b01b5f2"
+}

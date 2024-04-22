@@ -1,0 +1,14 @@
+{
+  "compilerOptions": {
+    "target": "es2022",
+    "module": "es2022"
+  },
+  "references": [
+    {
+      "path": "localchain/tsconfig.json"
+    },
+    {
+      "path": "client/nodejs/tsconfig.json"
+    }
+  ]
+}

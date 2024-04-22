@@ -1,4 +1,4 @@
-#![feature(slice_take)]
+
 #![cfg_attr(not(feature = "std"), no_std)]
 
 extern crate core;
@@ -142,6 +142,7 @@ pub mod pallet {
 	pub struct GenesisConfig<T: Config> {
 		pub initial_compute_difficulty: ComputeDifficulty,
 		pub initial_vote_minimum: VoteMinimum,
+		#[serde(skip)]
 		pub _phantom: PhantomData<T>,
 	}
 

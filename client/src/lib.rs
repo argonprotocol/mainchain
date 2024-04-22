@@ -1,8 +1,12 @@
+use std::sync::Arc;
+
 use anyhow::anyhow;
 use futures::FutureExt;
-use jsonrpsee::ws_client::{WsClient, WsClientBuilder};
-pub use spec::api;
-use std::sync::Arc;
+use jsonrpsee::{
+	client_transport::ws::{Url, WsTransportClientBuilder},
+	core::client::ClientBuilder,
+	ws_client::{PingConfig, WsClient},
+};
 use subxt::{
 	backend::{legacy::LegacyRpcMethods, rpc::RpcClient},
 	config::{Config, DefaultExtrinsicParams, DefaultExtrinsicParamsBuilder},
@@ -14,6 +18,8 @@ use tokio::{
 	task::JoinHandle,
 };
 use tracing::warn;
+
+pub use spec::api;
 
 use crate::api::runtime_types::ulx_primitives::tick::Ticker;
 
@@ -46,12 +52,26 @@ pub async fn local_client() -> Result<UlxClient, Error> {
 	OnlineClient::<UlxConfig>::new().await
 }
 
-pub async fn try_until_connected(url: String, retry_delay_millis: u64) -> Result<UlxClient, Error> {
+pub async fn try_until_connected(
+	url: String,
+	retry_delay_millis: u64,
+	timeout_millis: u64,
+) -> Result<UlxClient, Error> {
+	let start = std::time::Instant::now();
 	let rpc = loop {
-		match UlxClient::from_url(url.clone()).await {
+		match if cfg!(any(debug_assertions, test)) {
+			UlxClient::from_insecure_url(url.clone()).await
+		} else {
+			UlxClient::from_url(url.clone()).await
+		} {
 			Ok(client) => break client,
 			Err(why) => {
-				println!("failed to connect to client due to {:?}, retrying soon..", why);
+				if start.elapsed().as_millis() as u64 > timeout_millis {
+					return Err(Error::Other(
+						"Failed to connect to client within timeout".to_string(),
+					));
+				}
+				println!("failed to connect client to {:?}, {:?} retrying soon..", url.clone(), why);
 				tokio::time::sleep(std::time::Duration::from_millis(retry_delay_millis)).await;
 			},
 		}
@@ -66,27 +86,52 @@ pub struct UlxFullclient {
 	pub ws_client: Arc<WsClient>,
 	pub methods: LegacyRpcMethods<UlxConfig>,
 }
+
 impl UlxFullclient {
-	pub async fn try_until_connected(url: String, retry_delay_millis: u64) -> Result<Self, Error> {
-		let ws_client = loop {
-			match WsClientBuilder::default().build(&url).await {
+	pub async fn try_until_connected(
+		url: String,
+		retry_delay_millis: u64,
+		timeout_millis: u64,
+	) -> Result<Self, Error> {
+		let start = std::time::Instant::now();
+		let url = Url::parse(&url)
+			.map_err(|e| Error::Other(format!("Invalid Mainchain URL: {} -> {}", url, e)))?;
+
+		let (sender, receiver) = loop {
+			let builder = {
+				let transport_builder = WsTransportClientBuilder::default();
+				#[cfg(any(target_os = "ios", target_os = "android"))]
+				let transport_builder = transport_builder.use_webpki_rustls();
+
+				transport_builder
+			};
+			match builder.build(url.clone()).await {
 				Ok(client) => break client,
 				Err(why) => {
+					if start.elapsed().as_millis() as u64 > timeout_millis {
+						return Err(Error::Other(
+							"Failed to connect to client within timeout".to_string(),
+						));
+					}
 					warn!(
-						"failed to connect to client due to {} - {:?}, retrying soon..",
+						"UlxFullClient: failed to connect client to {} - {:?}, retrying soon..",
 						url, why
 					);
 					tokio::time::sleep(std::time::Duration::from_millis(retry_delay_millis)).await;
 				},
 			}
 		};
-		let ws_client = Arc::new(ws_client);
-		let rpc = RpcClient::new(ws_client.clone());
+		let client = ClientBuilder::default()
+			.enable_ws_ping(PingConfig::default())
+			.build_with_tokio(sender, receiver);
+		let client = Arc::new(client);
+
+		let rpc = RpcClient::new(client.clone());
 		Ok(Self {
 			rpc: rpc.clone(),
 			live: UlxClient::from_rpc_client(rpc.clone()).await?,
 			methods: LegacyRpcMethods::new(rpc.clone()),
-			ws_client,
+			ws_client: client,
 		})
 	}
 }
@@ -129,7 +174,7 @@ impl MultiurlClient {
 		{
 			let lock = self.client.read().await;
 			if let Some(client) = &*lock {
-				return Ok(client.clone())
+				return Ok(client.clone());
 			}
 		}
 
@@ -141,12 +186,30 @@ impl MultiurlClient {
 
 		let mut lock = self.client.write().await;
 		let client_lock = self.client.clone();
-		let ws_client = WsClientBuilder::default()
-			.build(&url)
-			.await
-			.map_err(|e| anyhow!("Could not connect to mainchain node at {} - {:?}", url, e))?;
-		let ws_client = Arc::new(ws_client);
-		let rpc_client = RpcClient::new(ws_client.clone());
+		let start = std::time::Instant::now();
+		let url = Url::parse(&url)
+			.map_err(|e| Error::Other(format!("Invalid Notary URL:  {} -> {}", url, e)))?;
+		let (sender, receiver) = loop {
+			match WsTransportClientBuilder::default().build(url.clone()).await {
+				Ok(client) => break client,
+				Err(why) => {
+					if start.elapsed().as_millis() as u64 > 10_000u64 {
+						return Err(anyhow!("Failed to connect to client within timeout",));
+					}
+					warn!(
+						"failed to connect to client due to {} - {:?}, retrying soon..",
+						url, why
+					);
+					tokio::time::sleep(std::time::Duration::from_millis(1_000u64)).await;
+				},
+			}
+		};
+		let client = ClientBuilder::default()
+			.enable_ws_ping(PingConfig::default())
+			.build_with_tokio(sender, receiver);
+
+		let client = Arc::new(client);
+		let rpc_client = RpcClient::new(client.clone());
 		let ulx_client = UlxClient::from_rpc_client(rpc_client).await?;
 		*lock = Some(ulx_client.clone());
 		drop(lock);
@@ -155,7 +218,7 @@ impl MultiurlClient {
 		let handle = tokio::spawn(async move {
 			let url = url.clone();
 			let client_lock = client_lock.clone();
-			let ws_client = ws_client.clone();
+			let ws_client = client.clone();
 			let _ = ws_client.on_disconnect().await;
 
 			warn!("Disconnected from mainchain at {url} client",);
@@ -170,5 +233,46 @@ impl MultiurlClient {
 	pub fn on_rpc_error(&mut self) {
 		let mut lock = self.client.write().now_or_never().unwrap();
 		*lock = None;
+	}
+}
+
+#[cfg(test)]
+mod test {
+	use super::*;
+	use std::env;
+	use ulx_testing::{test_context, test_context_from_url};
+
+	#[tokio::test]
+	async fn test_getting_ticker() -> anyhow::Result<()> {
+		let _ = tracing_subscriber::fmt::try_init();
+		let use_live = env::var("USE_LIVE").unwrap_or(String::from("false")).parse::<bool>()?;
+		let ctx = if use_live {
+			test_context_from_url("ws://localhost:9944").await
+		} else {
+			test_context().await
+		};
+
+		let ws_url = ctx.ws_url.clone();
+
+		let mut client = MultiurlClient::new(vec![ws_url.clone()]);
+		let ticker = client.lookup_ticker().await;
+		assert!(ticker.is_ok());
+		Ok(())
+	}
+
+	#[ignore]
+	#[tokio::test]
+	async fn test_redirecting_client() -> anyhow::Result<()> {
+		let _ = tracing_subscriber::fmt::try_init();
+
+		let client =
+			UlxClient::from_insecure_url("wss://husky-witty-highly.ngrok-free.app").await?;
+		let ticker = client
+			.runtime_api()
+			.at(client.genesis_hash())
+			.call(api::runtime_apis::tick_apis::TickApis.ticker())
+			.await;
+		assert!(ticker.is_ok());
+		Ok(())
 	}
 }
