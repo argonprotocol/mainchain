@@ -69,7 +69,7 @@ pub struct BalanceChangeSummary {
 }
 
 fn get_note_descriptions(change: &BalanceChangeRow) -> Vec<String> {
-  get_notes(&change)
+  get_notes(change)
     .iter()
     .map(|n| format!("{}", n))
     .collect()
@@ -171,12 +171,12 @@ impl OverviewStore {
 
       let mut balance_change = BalanceChangeSummary {
         id: change.id,
-        final_balance: change.balance.parse::<i128>()?.into(),
+        final_balance: change.balance.parse::<i128>()?,
         hold_balance: 0i128,
-        net_balance_change: change.net_balance_change.parse::<i128>()?.into(),
+        net_balance_change: change.net_balance_change.parse::<i128>()?,
         change_number: change.change_number as u32,
         account_id: change.account_id,
-        account_type: account.account_type.clone(),
+        account_type: account.account_type,
         is_jump_account: account.hd_path.is_some(),
         notes: get_note_descriptions(&change),
         status: change.status,
@@ -198,9 +198,9 @@ impl OverviewStore {
 
       let net_balance_change = change.net_balance_change.parse::<i128>()?;
       let change_group = BalanceChangeGroup {
-        net_balance_change: net_balance_change.into(),
+        net_balance_change,
         net_tax: 0i128,
-        held_balance: balance_change.hold_balance.clone(),
+        held_balance: balance_change.hold_balance,
         notes: get_note_descriptions(&change),
         finalized_block_number: change.finalized_block_number.map(|n| n as u32),
         status: change.status,
@@ -248,12 +248,10 @@ impl OverviewStore {
         } else {
           overview.tax += net_balance_change;
         }
+      } else if is_pending {
+        overview.pending_balance_change += net_balance_change;
       } else {
-        if is_pending {
-          overview.pending_balance_change += net_balance_change;
-        } else {
-          overview.balance += net_balance_change;
-        }
+        overview.balance += net_balance_change;
       }
     }
 
@@ -285,9 +283,9 @@ impl OverviewStore {
               }
               _ => {}
             }
-            return change.is_jump_account && change.account_type == AccountType::Deposit;
+            change.is_jump_account && change.account_type == AccountType::Deposit
           } else {
-            return change.account_type == AccountType::Deposit;
+            change.account_type == AccountType::Deposit
           }
         })
         .unwrap_or(group.balance_changes.first().unwrap());
@@ -610,7 +608,7 @@ mod tests {
     let alice_json = alice_localchain
       .transactions()
       .send(
-        3500_u128.into(),
+        3500_u128,
         Some(vec![bob_localchain.address().await?]),
       )
       .await?;

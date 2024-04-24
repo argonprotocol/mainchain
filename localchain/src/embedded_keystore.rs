@@ -69,7 +69,7 @@ impl EmbeddedKeystore {
   ) -> Result<String> {
     let mut pass_str = password.clone().map(|x| x.expose_secret().clone());
 
-    let pair = PairWrapper::from_string(suri, pass_str.as_ref().map(|a| a.as_str()), crypto_scheme)
+    let pair = PairWrapper::from_string(suri, pass_str.as_deref(), crypto_scheme)
       .map_err(|_| anyhow!("Could not generate pair from secret uri"))?;
 
     let address = pair.address();
@@ -95,7 +95,7 @@ impl EmbeddedKeystore {
   ) -> Result<String> {
     let mut pass_str = password.clone().map(|x| x.expose_secret().clone());
     let (pair, phrase) =
-      PairWrapper::generate_with_phrase(pass_str.as_ref().map(|a| a.as_str()), crypto_scheme);
+      PairWrapper::generate_with_phrase(pass_str.as_deref(), crypto_scheme);
 
     let address = pair.address();
     self
@@ -121,7 +121,7 @@ impl EmbeddedKeystore {
     let existing = sqlx::query!("SELECT address as true FROM key LIMIT 1",)
       .fetch_optional(&self.db)
       .await?;
-    if let Some(_) = existing {
+    if existing.is_some() {
       return Err(anyhow!("This keystore already has an embedded key"))?;
     }
 
@@ -358,20 +358,20 @@ mod tests {
   async fn imports_and_reloads(pool: SqlitePool) -> anyhow::Result<()> {
     let keystore = EmbeddedKeystore::new(pool.clone());
     let address = keystore
-      .import(&"//Alice", CryptoScheme::Sr25519, None)
+      .import("//Alice", CryptoScheme::Sr25519, None)
       .await?;
     let keyring = Sr25519Keyring::Alice
       .to_account_id()
       .to_ss58check_with_version(AccountStore::address_format());
     assert_eq!(address, keyring);
-    assert_eq!(keystore.can_sign(address.clone()).await, true);
+    assert!(keystore.can_sign(address.clone()).await);
     keystore.lock().await;
-    assert_eq!(keystore.can_sign(address.clone()).await, false);
+    assert!(!(keystore.can_sign(address.clone()).await));
 
     let keystore2 = EmbeddedKeystore::new(pool.clone());
-    assert_eq!(keystore2.can_sign(address.clone()).await, false);
+    assert!(!(keystore2.can_sign(address.clone()).await));
     assert!(keystore2.unlock(None).await.is_ok());
-    assert_eq!(keystore2.can_sign(address.clone()).await, true);
+    assert!(keystore2.can_sign(address.clone()).await);
 
     Ok(())
   }
@@ -379,14 +379,14 @@ mod tests {
   async fn imports_and_derives(pool: SqlitePool) -> anyhow::Result<()> {
     let keystore = EmbeddedKeystore::new(pool.clone());
     let address = keystore
-      .import(&"//Alice", CryptoScheme::Sr25519, None)
+      .import("//Alice", CryptoScheme::Sr25519, None)
       .await?;
     let keyring = Sr25519Keyring::Alice
       .to_account_id()
       .to_ss58check_with_version(AccountStore::address_format());
     assert_eq!(address, keyring);
 
-    let derived_1 = keystore.derive(&"//1").await?;
+    let derived_1 = keystore.derive("//1").await?;
     assert_eq!(
       derived_1,
       sr25519::Pair::from_string("//Alice//1", None)?
@@ -403,7 +403,7 @@ mod tests {
     let keystore = EmbeddedKeystore::new(pool.clone());
     let address = keystore
       .import(
-        &"//Alice",
+        "//Alice",
         CryptoScheme::Sr25519,
         Some(password.clone().into()),
       )
@@ -411,13 +411,13 @@ mod tests {
 
     let keystore2 = EmbeddedKeystore::new(pool.clone());
     assert!(keystore2.unlock(None).await.is_err());
-    assert_eq!(keystore2.can_sign(address.clone()).await, false);
+    assert!(!(keystore2.can_sign(address.clone()).await));
 
     assert!(keystore2
       .unlock(Some(password.clone().into()))
       .await
       .is_ok());
-    assert_eq!(keystore2.can_sign(address).await, true);
+    assert!(keystore2.can_sign(address).await);
 
     Ok(())
   }

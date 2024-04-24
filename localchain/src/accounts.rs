@@ -20,11 +20,11 @@ pub struct NotaryAccountOrigin {
   pub account_uid: u32,
 }
 
-impl Into<AccountOrigin> for NotaryAccountOrigin {
-  fn into(self) -> AccountOrigin {
+impl From<NotaryAccountOrigin> for AccountOrigin {
+  fn from(val: NotaryAccountOrigin) -> Self {
     AccountOrigin {
-      notebook_number: self.notebook_number,
-      account_uid: self.account_uid,
+      notebook_number: val.notebook_number,
+      account_uid: val.account_uid,
     }
   }
 }
@@ -53,9 +53,9 @@ impl LocalAccount {
   }
 }
 
-impl Into<LocalAccount> for AccountRow {
-  fn into(self) -> LocalAccount {
-    let row = self;
+impl From<AccountRow> for LocalAccount {
+  fn from(val: AccountRow) -> Self {
+    let row = val;
     LocalAccount {
       id: row.id,
       hd_path: row.hd_path,
@@ -125,7 +125,7 @@ impl AccountStore {
 
   pub async fn deposit_account(&self, notary_id: Option<u32>) -> Result<LocalAccount> {
     let mut db = self.pool.acquire().await?;
-    let res = Self::db_deposit_account(&mut *db, notary_id).await?;
+    let res = Self::db_deposit_account(&mut db, notary_id).await?;
     Ok(res)
   }
 
@@ -151,7 +151,7 @@ impl AccountStore {
 
   pub async fn tax_account(&self, notary_id: Option<NotaryId>) -> Result<LocalAccount> {
     let mut db = self.pool.acquire().await?;
-    let res = super::AccountStore::db_tax_account(&mut *db, notary_id).await?;
+    let res = super::AccountStore::db_tax_account(&mut db, notary_id).await?;
     Ok(res)
   }
   pub async fn db_tax_account(
@@ -176,7 +176,7 @@ impl AccountStore {
 
   pub async fn get_by_id(&self, id: i64) -> Result<LocalAccount> {
     let mut db = self.pool.acquire().await?;
-    let res = Self::db_get_by_id(&mut *db, id).await?;
+    let res = Self::db_get_by_id(&mut db, id).await?;
     Ok(res)
   }
 
@@ -199,7 +199,7 @@ impl AccountStore {
     notary_id: u32,
   ) -> Result<LocalAccount> {
     let mut db = self.pool.acquire().await?;
-    let res = Self::db_get(&mut *db, address, account_type, notary_id).await?;
+    let res = Self::db_get(&mut db, address, account_type, notary_id).await?;
     Ok(res)
   }
 
@@ -232,7 +232,7 @@ impl AccountStore {
     notary_id: u32,
   ) -> Result<bool> {
     let mut db = self.pool.acquire().await?;
-    Ok(Self::db_has_account(&mut *db, address, account_type, notary_id).await)
+    Ok(Self::db_has_account(&mut db, address, account_type, notary_id).await)
   }
 
   pub async fn db_has_account(
@@ -254,7 +254,7 @@ impl AccountStore {
     notary_id: u32,
   ) -> Result<Option<LocalAccount>> {
     let mut db = self.pool.acquire().await?;
-    Ok(super::AccountStore::db_find_idle_jump_account(&mut *db, account_type, notary_id).await?)
+    super::AccountStore::db_find_idle_jump_account(&mut db, account_type, notary_id).await
   }
 
   pub async fn db_get_next_jump_path(
@@ -287,7 +287,7 @@ impl AccountStore {
         max_jump_id = jump_counter;
       }
     }
-    return Ok(format!("//jump//{}", max_jump_id + 1));
+    Ok(format!("//jump//{}", max_jump_id + 1))
   }
 
   pub async fn db_find_idle_jump_account(
@@ -357,7 +357,7 @@ impl AccountStore {
   ) -> Result<LocalAccount> {
     let mut db = self.pool.acquire().await?;
     let res =
-      super::AccountStore::db_insert(&mut *db, address, account_type, notary_id, hd_path).await?;
+      super::AccountStore::db_insert(&mut db, address, account_type, notary_id, hd_path).await?;
     Ok(res)
   }
 
@@ -566,7 +566,7 @@ mod test {
   async fn can_update_an_origin(pool: SqlitePool) -> Result<()> {
     let mut db = &mut *pool.acquire().await?;
     let account = AccountStore::db_insert(
-      &mut db,
+      db,
       AccountStore::to_address(&Bob.to_account_id()),
       AccountType::Deposit,
       1,
@@ -576,10 +576,10 @@ mod test {
     .expect("Could not insert account");
     assert_eq!(account.origin, None);
 
-    AccountStore::db_update_origin(&mut db, account.id, 1, 1).await?;
+    AccountStore::db_update_origin(db, account.id, 1, 1).await?;
 
     assert_eq!(
-      AccountStore::db_get_by_id(&mut db, account.id)
+      AccountStore::db_get_by_id(db, account.id)
         .await?
         .origin,
       Some(NotaryAccountOrigin {

@@ -23,11 +23,11 @@ impl ArgonFile {
   }
 
   pub fn from_notarization(notarization: &Notarization, file_type: ArgonFileType) -> Self {
-    return Self::create(notarization.balance_changes.to_vec(), file_type);
+    Self::create(notarization.balance_changes.to_vec(), file_type)
   }
 
   pub fn create(balance_changes: Vec<BalanceChange>, file_type: ArgonFileType) -> Self {
-    return match file_type {
+    match file_type {
       ArgonFileType::Send => Self {
         version: ARGON_FILE_VERSION.to_string(),
         send: Some(balance_changes),
@@ -38,7 +38,7 @@ impl ArgonFile {
         send: None,
         request: Some(balance_changes),
       },
-    };
+    }
   }
 }
 

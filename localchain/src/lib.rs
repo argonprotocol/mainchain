@@ -1,4 +1,3 @@
-#![deny(clippy::all)]
 #[cfg(feature = "napi")]
 #[macro_use]
 extern crate napi_derive;
@@ -326,7 +325,7 @@ impl Localchain {
   }
 
   pub fn balance_sync(&self) -> balance_sync::BalanceSync {
-    balance_sync::BalanceSync::new(&self)
+    balance_sync::BalanceSync::new(self)
   }
 
   pub fn transactions(&self) -> transactions::Transactions {

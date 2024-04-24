@@ -107,7 +107,7 @@ impl DataDomainProvider<u64> for StaticDataDomainProvider {
 		_account_id: &u64,
 		_tick_range: (Tick, Tick),
 	) -> bool {
-		RegisteredDataDomains::get().contains(&data_domain_hash)
+		RegisteredDataDomains::get().contains(data_domain_hash)
 	}
 }
 impl pallet_block_seal::Config for Test {
@@ -125,7 +125,7 @@ pub fn new_test_ext() -> sp_io::TestExternalities {
 	let env = Env::new().default_filter_or("debug");
 	let _ = Builder::from_env(env).is_test(true).try_init();
 
-	let t = frame_system::GenesisConfig::<Test>::default().build_storage().unwrap().into();
+	let t = frame_system::GenesisConfig::<Test>::default().build_storage().unwrap();
 
 	sp_io::TestExternalities::new(t)
 }

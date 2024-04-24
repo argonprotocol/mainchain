@@ -201,20 +201,17 @@ pub mod pallet {
 		fn on_initialize(_: BlockNumberFor<T>) -> Weight {
 			let digest = <frame_system::Pallet<T>>::digest();
 			for log in digest.logs.iter() {
-				match log {
-					DigestItem::PreRuntime(BLOCK_VOTES_DIGEST_ID, data) => {
-						assert!(
-							!<TempBlockVoteDigest<T>>::exists(),
-							"Block vote digest can only be provided once!"
-						);
+				if let DigestItem::PreRuntime(BLOCK_VOTES_DIGEST_ID, data) = log {
+					assert!(
+						!<TempBlockVoteDigest<T>>::exists(),
+						"Block vote digest can only be provided once!"
+					);
 
-						let decoded = BlockVoteDigest::decode(&mut data.as_ref());
-						if let Ok(votes_digest) = decoded {
-							<TempBlockVoteDigest<T>>::put(votes_digest.clone());
-						}
-					},
-					_ => {},
-				};
+					let decoded = BlockVoteDigest::decode(&mut data.as_ref());
+					if let Ok(votes_digest) = decoded {
+						<TempBlockVoteDigest<T>>::put(votes_digest.clone());
+					}
+				}
 			}
 
 			T::DbWeight::get().reads_writes(3, 3)

@@ -46,7 +46,7 @@ impl BalanceChangeRow {
     };
 
     Ok(BalanceTip {
-      account_type: account.account_type.clone(),
+      account_type: account.account_type,
       account_id: account.get_account_id32()?,
       change_number: self.change_number as u32,
       balance: self.balance.parse()?,
@@ -134,22 +134,22 @@ impl BalanceChangeStore {
 
   pub async fn all_for_account(&self, account_id: i64) -> Result<Vec<BalanceChangeRow>> {
     let mut db = self.db.acquire().await?;
-    Ok(Self::db_all_for_account(&mut *db, account_id).await?)
+    Self::db_all_for_account(&mut db, account_id).await
   }
 
   pub async fn get_latest_for_account(&self, account_id: i64) -> Result<Option<BalanceChangeRow>> {
     let mut db = self.db.acquire().await?;
-    Ok(Self::db_get_latest_for_account(&mut *db, account_id).await?)
+    Self::db_get_latest_for_account(&mut db, account_id).await
   }
 
   pub async fn get_by_id(&self, id: i64) -> Result<BalanceChangeRow> {
     let mut db = self.db.acquire().await?;
-    Self::db_get_by_id(&mut *db, id).await
+    Self::db_get_by_id(&mut db, id).await
   }
 
   pub async fn find_unsettled(&self) -> Result<Vec<BalanceChangeRow>> {
     let mut db = self.db.acquire().await?;
-    Self::db_find_unsettled(&mut *db).await
+    Self::db_find_unsettled(&mut db).await
   }
   pub async fn db_all_for_account(
     db: &mut SqliteConnection,
@@ -265,7 +265,7 @@ impl BalanceChangeStore {
   ) -> Result<(BalanceChange, Option<BalanceChangeStatus>)> {
     let mut balance_change = BalanceChange {
       account_id: AccountStore::parse_address(&account.address)?,
-      account_type: account.account_type.clone(),
+      account_type: account.account_type,
       change_number: 1,
       balance: 0,
       escrow_hold_note: None,
@@ -556,7 +556,7 @@ mod test {
 
     let mut db = pool.acquire().await?;
     let account = AccountStore::db_insert(
-      &mut *db,
+      &mut db,
       AccountStore::to_address(&Ferdie.to_account_id()),
       AccountType::Tax,
       1,
@@ -564,11 +564,11 @@ mod test {
     )
     .await?;
     // need to set the id and get the updated origin
-    AccountStore::db_update_origin(&mut *db, account.id, 1, 1).await?;
-    let account = AccountStore::db_get_by_id(&mut *db, account.id).await?;
+    AccountStore::db_update_origin(&mut db, account.id, 1, 1).await?;
+    let account = AccountStore::db_get_by_id(&mut db, account.id).await?;
 
     let (mut balance_change, _) =
-      BalanceChangeStore::db_build_for_account(&mut *db, &account).await?;
+      BalanceChangeStore::db_build_for_account(&mut db, &account).await?;
     assert_eq!(balance_change.balance, 0);
     assert_eq!(balance_change.change_number, 1);
 
@@ -592,7 +592,7 @@ mod test {
     tx.commit().await?;
 
     assert_eq!(
-      BalanceChangeStore::db_build_for_account(&mut *db, &account)
+      BalanceChangeStore::db_build_for_account(&mut db, &account)
         .await
         .unwrap_err()
         .to_string(),
@@ -600,16 +600,16 @@ mod test {
       "Should not be able to load account with no notarization"
     );
 
-    let by_id = BalanceChangeStore::db_get_by_id(&mut *db, id).await?;
+    let by_id = BalanceChangeStore::db_get_by_id(&mut db, id).await?;
     println!("{:?}", by_id);
     assert_eq!(by_id.balance, "100");
     assert_eq!(by_id.status, BalanceChangeStatus::WaitingForSendClaim);
 
-    let unsettled = BalanceChangeStore::db_find_unsettled(&mut *db).await?;
+    let unsettled = BalanceChangeStore::db_find_unsettled(&mut db).await?;
     assert_eq!(unsettled.len(), 1);
     assert_eq!(unsettled[0].id, id);
 
-    let for_account = BalanceChangeStore::db_get_latest_for_account(&mut *db, account.id).await?;
+    let for_account = BalanceChangeStore::db_get_latest_for_account(&mut db, account.id).await?;
     assert_eq!(for_account.unwrap().id, id);
 
     sqlx::query!(
@@ -627,12 +627,12 @@ mod test {
       .await?;
     tx.commit().await?;
 
-    let (reloaded, _) = BalanceChangeStore::db_build_for_account(&mut *db, &account).await?;
+    let (reloaded, _) = BalanceChangeStore::db_build_for_account(&mut db, &account).await?;
     assert_eq!(reloaded.balance, 100);
     assert_eq!(reloaded.change_number, 2);
 
     assert_eq!(
-      BalanceChangeStore::db_get_by_id(&mut *db, id).await?.status,
+      BalanceChangeStore::db_get_by_id(&mut db, id).await?.status,
       BalanceChangeStatus::Notarized
     );
 
@@ -648,14 +648,14 @@ mod test {
       BalanceChangeStore::tx_upsert_notarized(&mut tx, account.id, &next, 1, 1, None).await?;
     tx.commit().await?;
 
-    let (reloaded, _) = BalanceChangeStore::db_build_for_account(&mut *db, &account).await?;
+    let (reloaded, _) = BalanceChangeStore::db_build_for_account(&mut db, &account).await?;
     assert_eq!(reloaded.balance, 200);
     assert_eq!(reloaded.change_number, 3);
 
-    let for_account = BalanceChangeStore::db_get_latest_for_account(&mut *db, account.id).await?;
+    let for_account = BalanceChangeStore::db_get_latest_for_account(&mut db, account.id).await?;
     assert_eq!(for_account.unwrap().id, id2);
 
-    let mut unsettled = BalanceChangeStore::db_find_unsettled(&mut *db).await?;
+    let mut unsettled = BalanceChangeStore::db_find_unsettled(&mut db).await?;
     assert_eq!(unsettled.len(), 2);
 
     let mut tx = pool.begin().await?;
@@ -678,7 +678,7 @@ mod test {
     tx.commit().await?;
 
     assert_ne!(
-      BalanceChangeStore::db_get_by_id(&mut *db, unsettled[0].id)
+      BalanceChangeStore::db_get_by_id(&mut db, unsettled[0].id)
         .await?
         .proof_json,
       None

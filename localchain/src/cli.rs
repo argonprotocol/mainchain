@@ -217,18 +217,15 @@ where
         path,
         mainchain_url,
         ntp_pool_url: None,
-        keystore_password: Some(keystore_password.into()),
+        keystore_password: Some(keystore_password),
       })
       .await?;
 
       let balance_sync = localchain.balance_sync();
-      let sync_options = match vote_address {
-        Some(vote_address) => Some(EscrowCloseOptions {
+      let sync_options = vote_address.map(|vote_address| EscrowCloseOptions {
           votes_address: Some(vote_address),
           minimum_vote_amount: minimum_vote_amount.map(|v| v as i64),
-        }),
-        None => None,
-      };
+        });
 
       let sync = balance_sync.sync(sync_options.clone()).await?;
       println!(
@@ -299,12 +296,12 @@ where
           .set_header(vec!["Domain", "Registered?", "Hash"]);
         table.add_row(vec![
           Cell::new(&data_domain),
-          Cell::new(&match registration.is_some() {
+          Cell::new(match registration.is_some() {
             true => "Yes",
             false => "No",
           })
           .set_alignment(CellAlignment::Center),
-          Cell::new(&hex::encode(domain.hash().0)).set_alignment(CellAlignment::Center),
+          Cell::new(hex::encode(domain.hash().0)).set_alignment(CellAlignment::Center),
         ]);
         println!("{table}");
       }
@@ -325,7 +322,7 @@ where
             genesis_utc_time: 0,
             tick_duration_millis: 0,
           },
-          Some(keystore_password.into()),
+          Some(keystore_password),
         )
         .await?;
 
@@ -372,11 +369,11 @@ where
         let keystore = Keystore::new(db.clone());
         if let Some(suri) = suri {
           keystore
-            .import_suri(suri, scheme, Some(keystore_password.into()))
+            .import_suri(suri, scheme, Some(keystore_password))
             .await?;
         } else {
           keystore
-            .bootstrap(Some(scheme), Some(keystore_password.into()))
+            .bootstrap(Some(scheme), Some(keystore_password))
             .await?;
         }
 

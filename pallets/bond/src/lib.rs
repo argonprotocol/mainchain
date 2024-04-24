@@ -864,7 +864,7 @@ pub mod pallet {
 			let current_block_number = frame_system::Pallet::<T>::block_number();
 			let remaining_blocks =
 				blocks_into_u32::<T>(bond.completion_block - current_block_number);
-			if remaining_blocks <= 0 {
+			if remaining_blocks == 0 {
 				return Err(BondError::BondAlreadyClosed);
 			}
 			let updated_fee: T::Balance = Self::calculate_fees(

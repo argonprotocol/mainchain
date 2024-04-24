@@ -93,7 +93,7 @@ impl NotarizationBuilder {
 
   pub async fn ensure_notary_id(&self, notary_id: NotaryId) -> Result<()> {
     let mut notary_id_lock = self.notary_id.lock().await;
-    if *notary_id_lock == None {
+    if (*notary_id_lock).is_none() {
       *notary_id_lock = Some(notary_id);
     } else if *notary_id_lock != Some(notary_id) {
       bail!("Account is not from the same notary as this notarization");
@@ -108,7 +108,7 @@ impl NotarizationBuilder {
       let balance_notary_id = change
         .previous_balance_proof
         .as_ref()
-        .map(|x| x.notary_id.clone())
+        .map(|x| x.notary_id)
         .ok_or(anyhow!(
           "No previous balance proof found in the requested balance changes",
         ))?;
@@ -132,10 +132,8 @@ impl NotarizationBuilder {
             NoteType::Send { .. } => balance += note.milligons as i128,
             _ => {}
           }
-        } else {
-          if note.note_type == NoteType::Tax {
-            balance += note.milligons as i128;
-          }
+        } else if note.note_type == NoteType::Tax {
+          balance += note.milligons as i128;
         }
       }
     }
@@ -239,7 +237,7 @@ impl NotarizationBuilder {
     let account = AccountStore::db_insert(
       &mut db,
       address.clone(),
-      account_type.clone(),
+      account_type,
       notary_id,
       Some(hd_path),
     )
@@ -260,7 +258,7 @@ impl NotarizationBuilder {
     }
 
     let mut accounts = self.loaded_accounts.lock().await;
-    accounts.insert((address.clone(), account_type.clone()), account.clone());
+    accounts.insert((address.clone(), account_type), account.clone());
 
     let builder = BalanceChangeBuilder::new_account(address, account.id, account_type)?;
     balance_changes_by_account.insert(account.id, builder.clone());
@@ -277,13 +275,13 @@ impl NotarizationBuilder {
     let mut db = self.db.acquire().await?;
     let account = AccountStore::db_get(&mut db, address.clone(), account_type, notary_id).await?;
 
-    return self.load_account(&account).await;
+    self.load_account(&account).await
   }
 
   pub async fn add_account_by_id(&self, local_account_id: i64) -> Result<BalanceChangeBuilder> {
     let mut db = self.db.acquire().await?;
     let account = AccountStore::db_get_by_id(&mut db, local_account_id).await?;
-    return self.load_account(&account).await;
+    self.load_account(&account).await
   }
 
   pub async fn get_jump_account(&self, account_type: AccountType) -> Result<BalanceChangeBuilder> {
@@ -339,13 +337,13 @@ impl NotarizationBuilder {
       );
     }
     accounts.insert(
-      (account.address.clone(), account.account_type.clone()),
+      (account.address.clone(), account.account_type),
       account.clone(),
     );
 
     let mut db = self.db.acquire().await?;
     let (balance_change, status) =
-      BalanceChangeStore::db_build_for_account(&mut *db, &account).await?;
+      BalanceChangeStore::db_build_for_account(&mut db, account).await?;
     let is_new = balance_change.change_number == 1 && status.is_none();
 
     let builder = match is_new {
@@ -371,8 +369,7 @@ impl NotarizationBuilder {
         added_accounts_needed -= 1;
       }
     }
-    balance_changes_by_account + added_accounts_needed + imports + 1
-      <= MAX_BALANCE_CHANGES_PER_NOTARIZATION as usize
+    balance_changes_by_account + added_accounts_needed + imports < MAX_BALANCE_CHANGES_PER_NOTARIZATION as usize
   }
 
   pub async fn cancel_escrow(&self, open_escrow: &OpenEscrow) -> Result<()> {
@@ -487,9 +484,9 @@ impl NotarizationBuilder {
 
       let round = if total_before_tax % 100 == 0 { 0 } else { 1 };
 
-      (total_before_tax + round).into()
+      total_before_tax + round
     } else {
-      (amount + TRANSFER_TAX_CAP).into()
+      amount + TRANSFER_TAX_CAP
     }
   }
 
@@ -544,7 +541,7 @@ impl NotarizationBuilder {
     self
       .default_deposit_account()
       .await?
-      .send(milligons.clone(), Some(vec![jump_account.address.clone()]))
+      .send(milligons, Some(vec![jump_account.address.clone()]))
       .await?;
 
     self
@@ -569,7 +566,7 @@ impl NotarizationBuilder {
       if let Some(balance_notary_id) = change
         .previous_balance_proof
         .as_ref()
-        .map(|x| x.notary_id.clone())
+        .map(|x| x.notary_id)
       {
         self.ensure_notary_id(balance_notary_id).await?;
       }
@@ -631,11 +628,11 @@ impl NotarizationBuilder {
       }
       for note in balance_change.notes.iter() {
         match &note.note_type {
-          &NoteType::Send { ref to } => {
+          NoteType::Send { to } => {
             if let Some(to) = to {
               let claim_addresses = to
                 .iter()
-                .map(|a| AccountStore::to_address(a))
+                .map(AccountStore::to_address)
                 .collect::<Vec<_>>();
               if (balance_change.account_type == AccountType::Deposit
                 && !claim_addresses.contains(&deposit_account.address))
@@ -644,7 +641,7 @@ impl NotarizationBuilder {
               {
                 bail!(
                     "Claimed balance change #{i} has an account restriction that doesn't match your localchain (restricted to: {:?}, your account: {:?})",
-                    to.iter().map(|a| AccountStore::to_address(a)).collect::<Vec<_>>(),
+                    to.iter().map(AccountStore::to_address).collect::<Vec<_>>(),
                     deposit_account.address,
                   );
               }
@@ -672,7 +669,7 @@ impl NotarizationBuilder {
     self.sign().await?;
     let notarization = self.to_notarization().await?;
 
-    verify_changeset_signatures(&notarization.balance_changes.to_vec())?;
+    verify_changeset_signatures(notarization.balance_changes.as_ref())?;
 
     let file = ArgonFile::from_notarization(&notarization, file_type);
 
@@ -698,7 +695,7 @@ impl NotarizationBuilder {
     }
     tx.commit().await?;
     *(self.is_finalized.lock().await) = true;
-    Ok(file.to_json()?)
+    file.to_json()
   }
 
   pub async fn to_json(&self) -> Result<String> {
@@ -717,7 +714,7 @@ impl NotarizationBuilder {
         balance_changes += 1;
       }
     }
-    return balance_changes > 0;
+    balance_changes > 0
   }
 
   pub(crate) async fn to_notarization(&self) -> Result<Notarization> {
@@ -740,10 +737,10 @@ impl NotarizationBuilder {
       for (key, balance_change_tx) in &*balance_changes_by_account {
         let balance_change = balance_change_tx.inner().await;
         if balance_change.notes.len() == 0 {
-          to_delete.push(key.clone());
+          to_delete.push(*key);
           accounts_to_delete.push((
             balance_change_tx.address.clone(),
-            balance_change.account_type.clone(),
+            balance_change.account_type,
           ))
         }
         notarization
@@ -756,12 +753,12 @@ impl NotarizationBuilder {
       .balance_changes_by_account
       .lock()
       .await
-      .retain(|id, _| !to_delete.contains(&id));
+      .retain(|id, _| !to_delete.contains(id));
     self
       .loaded_accounts
       .lock()
       .await
-      .retain(|id, _| !accounts_to_delete.contains(&id));
+      .retain(|id, _| !accounts_to_delete.contains(id));
 
     Ok(notarization)
   }
@@ -813,7 +810,7 @@ impl NotarizationBuilder {
     for escrow in (*escrows).iter() {
       let mut escrow_inner = escrow.inner().await;
       escrow_inner
-        .db_mark_notarized(&mut *tx, notarization_id)
+        .db_mark_notarized(&mut tx, notarization_id)
         .await?;
     }
 
@@ -879,7 +876,7 @@ impl NotarizationBuilder {
           notebook_number,
         });
         loaded_accounts.insert(
-          (account.address.clone(), account.account_type.clone()),
+          (account.address.clone(), account.account_type),
           account.clone(),
         );
       }
@@ -894,10 +891,10 @@ impl NotarizationBuilder {
     let data_domains = self.data_domains.lock().await;
     for (domain, account) in &*data_domains {
       DataDomainStore::db_insert(
-        &mut *tx,
+        &mut tx,
         JsDataDomain {
           domain_name: domain.domain_name.clone().into(),
-          top_level_domain: domain.top_level_domain.clone(),
+          top_level_domain: domain.top_level_domain,
         },
         AccountStore::to_address(account),
         notarization_id,
@@ -1398,7 +1395,7 @@ mod test {
       notarization
         .default_deposit_account()
         .await?
-        .send(1000u128.into(), Some(vec![bob_address.clone()]))
+        .send(1000u128, Some(vec![bob_address.clone()]))
         .await?;
       notarization.export_as_file(ArgonFileType::Send).await?
     };

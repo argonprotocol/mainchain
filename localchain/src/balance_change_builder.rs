@@ -72,7 +72,7 @@ impl BalanceChangeBuilder {
 
   pub async fn is_empty_signature(&self) -> bool {
     let balance_change = self.balance_change.lock().await;
-    (*balance_change).signature == *EMPTY_SIGNATURE
+    balance_change.signature == *EMPTY_SIGNATURE
   }
 
   pub async fn inner(&self) -> BalanceChange {
@@ -85,12 +85,12 @@ impl BalanceChangeBuilder {
 
   pub async fn balance(&self) -> Balance {
     let balance_change = self.balance_change.lock().await;
-    (*balance_change).balance
+    balance_change.balance
   }
 
   pub async fn account_id32(&self) -> Vec<u8> {
     let balance_change = self.balance_change.lock().await;
-    (*balance_change).account_id.to_raw_vec()
+    balance_change.account_id.to_raw_vec()
   }
 
   pub async fn is_pending_claim(&self) -> bool {
@@ -123,7 +123,7 @@ impl BalanceChangeBuilder {
     if let Some(restrict_to_addresses) = restrict_to_addresses {
       let list: Result<Vec<AccountId>> = restrict_to_addresses
         .iter()
-        .map(|a| AccountStore::parse_address(&a))
+        .map(|a| AccountStore::parse_address(a))
         .collect::<_>();
       let list = list?;
       to = Some(BoundedVec::truncate_from(list));

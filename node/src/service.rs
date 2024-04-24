@@ -271,7 +271,7 @@ pub fn new_full(
 					sync_service.clone(),
 					block_author.clone(),
 					sync_service.clone(),
-					block_seconds.clone(),
+					block_seconds,
 				);
 
 			task_manager.spawn_essential_handle().spawn_blocking(

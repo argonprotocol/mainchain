@@ -137,7 +137,7 @@ pub fn new_test_ext(
 ) -> sp_io::TestExternalities {
 	let env = Env::new().default_filter_or("debug");
 	let _ = Builder::from_env(env).is_test(true).try_init();
-	let mut t = frame_system::GenesisConfig::<Test>::default().build_storage().unwrap().into();
+	let mut t = frame_system::GenesisConfig::<Test>::default().build_storage().unwrap();
 
 	pallet_block_seal_spec::GenesisConfig::<Test> {
 		initial_vote_minimum,

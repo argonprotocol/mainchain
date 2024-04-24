@@ -169,7 +169,7 @@ impl MockNotary {
 
   pub async fn add_notebook_header(&self, header: SignedNotebookHeader) {
     let mut state = self.state.lock().await;
-    (*state)
+    state
       .headers
       .insert(header.header.notebook_number, header.clone());
     state.metadata = Some(NotebookMeta {
@@ -190,10 +190,10 @@ impl MockNotary {
   ) {
     let mut state = self.state.lock().await;
     for change in &notarization.balance_changes {
-      (*state).notarizations.insert(
+      state.notarizations.insert(
         (
           change.account_id.clone(),
-          change.account_type.clone(),
+          change.account_type,
           notebook_number,
           change.change_number,
         ),
@@ -207,7 +207,7 @@ impl MockNotary {
     let mut notebook_number = 0u32;
     for (num, _) in state.headers.iter() {
       if num > &notebook_number {
-        notebook_number = num.clone();
+        notebook_number = *num;
       }
     }
     notebook_number += 1u32;
@@ -223,7 +223,7 @@ impl MockNotary {
     let notebook_number = self.next_notebook_number().await;
     let change_builder = notarization_builder
       .claim_from_mainchain(LocalchainTransfer {
-        amount: amount.into(),
+        amount: amount,
         notary_id: 1,
         expiration_block: 1,
         address: AccountStore::to_address(&account_id),
@@ -271,7 +271,7 @@ impl MockNotary {
       notary_state.notarizations.iter()
     {
       if *notebook_number == next_notebook_number {
-        let key = LocalchainAccountId::new(account_id.clone(), account_type.clone());
+        let key = LocalchainAccountId::new(account_id.clone(), *account_type);
         let should_use = match change_by_account.get(&key) {
           Some(x) => x < &change_number,
           None => true,
@@ -289,10 +289,10 @@ impl MockNotary {
             .expect("");
           let account = notary_state.accounts.get(&key).unwrap();
           pending_tips.push(BalanceTip {
-            account_type: account_type.clone(),
+            account_type: *account_type,
             account_id: account_id.clone(),
             account_origin: account.clone(),
-            change_number: change_number.clone(),
+            change_number: *change_number,
             balance: balance_change.balance,
             escrow_hold_note: balance_change
               .notes
@@ -335,7 +335,7 @@ impl MockNotary {
       notary_state.balance_tips.insert(
         LocalchainAccountId::new(
           balance_tip.account_id.clone(),
-          balance_tip.account_type.clone(),
+          balance_tip.account_type,
         ),
         BalanceTipResult {
           tick: notebook_number,
@@ -382,7 +382,7 @@ impl MockNotary {
 }
 pub async fn create_pool() -> anyhow::Result<SqlitePool> {
   let pool = SqlitePool::connect_with(
-    SqliteConnectOptions::from_str(&":memory:")?
+    SqliteConnectOptions::from_str(":memory:")?
       .clone()
       .log_statements(LogLevelFilter::Debug.into()),
   )
@@ -413,7 +413,7 @@ pub fn get_balance_tip(
 
 pub fn mock_mainchain_transfer(address: &str, amount: u128) -> LocalchainTransfer {
   LocalchainTransfer {
-    amount: amount.into(),
+    amount: amount,
     notary_id: 1,
     expiration_block: 1,
     address: address.to_string(),
@@ -432,7 +432,7 @@ impl LocalchainRpcServer for MockNotary {
     let notebook_number = self.next_notebook_number().await;
     self
       .add_notarization(
-        notebook_number.clone(),
+        notebook_number,
         Notarization {
           data_domains,
           block_votes,
@@ -446,7 +446,7 @@ impl LocalchainRpcServer for MockNotary {
       if change.change_number == 1 {
         let id = state.accounts.len() + 1;
         let account_id =
-          LocalchainAccountId::new(change.account_id.clone(), change.account_type.clone());
+          LocalchainAccountId::new(change.account_id.clone(), change.account_type);
         let not = NewAccountOrigin {
           account_id: change.account_id,
           account_type: change.account_type,
@@ -455,7 +455,7 @@ impl LocalchainRpcServer for MockNotary {
         state.accounts.insert(
           account_id,
           AccountOrigin {
-            notebook_number: notebook_number.clone(),
+            notebook_number: notebook_number,
             account_uid: id as u32,
           },
         );
@@ -465,7 +465,7 @@ impl LocalchainRpcServer for MockNotary {
 
     Ok(BalanceChangeResult {
       new_account_origins: new_origins,
-      notebook_number: notebook_number.clone(),
+      notebook_number: notebook_number,
       tick: state
         .headers
         .get(&notebook_number)
@@ -502,7 +502,7 @@ impl LocalchainRpcServer for MockNotary {
     account_type: AccountType,
   ) -> Result<BalanceTipResult, ErrorObjectOwned> {
     let state = self.state.lock().await;
-    (*state)
+    state
       .balance_tips
       .get(&LocalchainAccountId::new(account_id, account_type))
       .cloned()
@@ -525,7 +525,7 @@ impl NotebookRpcServer for MockNotary {
   ) -> Result<BalanceProof, ErrorObjectOwned> {
     let hash = balance_tip.tip();
     let state = self.state.lock().await;
-    (*state)
+    state
       .balance_proofs
       .get(&(notebook_number, hash.into()))
       .cloned()
@@ -546,7 +546,7 @@ impl NotebookRpcServer for MockNotary {
     change_number: u32,
   ) -> Result<Notarization, ErrorObjectOwned> {
     let state = self.state.lock().await;
-    (*state)
+    state
       .notarizations
       .get(&(account_id, account_type, notebook_number, change_number))
       .cloned()
@@ -561,7 +561,7 @@ impl NotebookRpcServer for MockNotary {
 
   async fn metadata(&self) -> Result<NotebookMeta, ErrorObjectOwned> {
     let state = self.state.lock().await;
-    (*state).metadata.clone().ok_or_else(|| {
+    state.metadata.clone().ok_or_else(|| {
       ErrorObjectOwned::owned(
         -32000,
         "MockNotary metadata not set".to_string(),
@@ -575,7 +575,7 @@ impl NotebookRpcServer for MockNotary {
     notebook_number: NotebookNumber,
   ) -> Result<SignedNotebookHeader, ErrorObjectOwned> {
     let state = self.state.lock().await;
-    (*state)
+    state
       .headers
       .get(&notebook_number)
       .cloned()

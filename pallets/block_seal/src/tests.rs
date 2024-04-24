@@ -171,9 +171,9 @@ fn it_requires_the_nonce_to_match() {
 		System::reset_events();
 		let block_vote = default_vote();
 		let parent_voting_key = H256::random();
-		ParentVotingKey::<Test>::set(Some(parent_voting_key.clone()));
+		ParentVotingKey::<Test>::set(Some(parent_voting_key));
 		let seal_strength =
-			block_vote.get_seal_strength(1, parent_voting_key.clone()) + U256::from(1u32);
+			block_vote.get_seal_strength(1, parent_voting_key) + U256::from(1u32);
 		System::initialize(
 			&4,
 			&System::parent_hash(),
@@ -213,7 +213,7 @@ fn it_should_be_able_to_submit_a_seal() {
 		}));
 
 		let parent_voting_key = H256::random();
-		ParentVotingKey::<Test>::put(Some(parent_voting_key.clone()));
+		ParentVotingKey::<Test>::put(Some(parent_voting_key));
 		GrandpaVoteMinimum::set(Some(500));
 		CurrentTick::set(6);
 		BlocksAtTick::mutate(|a| {
@@ -224,7 +224,7 @@ fn it_should_be_able_to_submit_a_seal() {
 		});
 
 		let block_vote = default_vote();
-		let seal_strength = block_vote.get_seal_strength(1, parent_voting_key.clone());
+		let seal_strength = block_vote.get_seal_strength(1, parent_voting_key);
 
 		let root = merkle_root::<BlakeTwo256, _>(vec![block_vote.encode()]);
 		VotingRoots::mutate(|a| a.insert((1, 4), (root, 1)));
@@ -354,8 +354,8 @@ fn it_creates_the_next_parent_key() {
 		let book2_secret = H256::from_slice(&[2u8; 32]);
 
 		let parent_key = BlockVotingKey::create_key(vec![
-			BlockVotingKey { parent_secret: book1_secret.clone(), parent_vote_root: old_root1 },
-			BlockVotingKey { parent_secret: book2_secret.clone(), parent_vote_root: old_root2 },
+			BlockVotingKey { parent_secret: book1_secret, parent_vote_root: old_root1 },
+			BlockVotingKey { parent_secret: book2_secret, parent_vote_root: old_root2 },
 		]);
 
 		System::initialize(
@@ -364,7 +364,7 @@ fn it_creates_the_next_parent_key() {
 			&Digest {
 				logs: vec![DigestItem::Consensus(
 					PARENT_VOTING_KEY_DIGEST,
-					ParentVotingKeyDigest { parent_voting_key: Some(parent_key.clone()) }.encode(),
+					ParentVotingKeyDigest { parent_voting_key: Some(parent_key) }.encode(),
 				)],
 			},
 		);
@@ -377,12 +377,12 @@ fn it_creates_the_next_parent_key() {
 		NotebooksAtTick::mutate(|a| {
 			a.insert(
 				3,
-				vec![(1, 2, Some(book1_secret.clone())), (2, 2, Some(book2_secret.clone()))],
+				vec![(1, 2, Some(book1_secret)), (2, 2, Some(book2_secret))],
 			);
 		});
 
 		BlockSeal::on_finalize(3);
-		assert_eq!(ParentVotingKey::<Test>::get(), Some(parent_key.clone()));
+		assert_eq!(ParentVotingKey::<Test>::get(), Some(parent_key));
 	});
 }
 
@@ -403,7 +403,7 @@ fn it_should_panic_if_voting_key_digest_is_wrong() {
 			&Digest {
 				logs: vec![DigestItem::Consensus(
 					PARENT_VOTING_KEY_DIGEST,
-					ParentVotingKeyDigest { parent_voting_key: Some(parent_key.clone()) }.encode(),
+					ParentVotingKeyDigest { parent_voting_key: Some(parent_key) }.encode(),
 				)],
 			},
 		);
@@ -443,7 +443,7 @@ fn it_skips_ineligible_voting_roots() {
 			&Digest {
 				logs: vec![DigestItem::Consensus(
 					PARENT_VOTING_KEY_DIGEST,
-					ParentVotingKeyDigest { parent_voting_key: Some(parent_key.clone()) }.encode(),
+					ParentVotingKeyDigest { parent_voting_key: Some(parent_key) }.encode(),
 				)],
 			},
 		);
@@ -453,12 +453,12 @@ fn it_skips_ineligible_voting_roots() {
 
 		// still add both notebooks
 		NotebooksAtTick::mutate(|a| {
-			a.insert(3, vec![(1, 2, Some(book1_secret.clone()))]);
-			a.insert(3, vec![(2, 2, Some(book2_secret.clone()))]);
+			a.insert(3, vec![(1, 2, Some(book1_secret))]);
+			a.insert(3, vec![(2, 2, Some(book2_secret))]);
 		});
 
 		BlockSeal::on_finalize(3);
-		assert_eq!(ParentVotingKey::<Test>::get(), Some(parent_key.clone()));
+		assert_eq!(ParentVotingKey::<Test>::get(), Some(parent_key));
 	});
 }
 
@@ -663,7 +663,7 @@ fn it_checks_tax_votes() {
 		);
 
 		RegisteredDataDomains::mutate(|a| {
-			a.insert(vote.data_domain_hash.clone());
+			a.insert(vote.data_domain_hash);
 		});
 
 		assert_err!(

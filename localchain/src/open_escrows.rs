@@ -154,7 +154,7 @@ impl Escrow {
       initial_balance_change_json: balance_change_json,
       hold_amount: escrow_hold_note.milligons,
       from_address: AccountStore::to_address(&balance_change.account_id),
-      to_address: AccountStore::to_address(&recipient),
+      to_address: AccountStore::to_address(recipient),
       balance_change_number: balance_change.change_number,
       data_domain_hash: data_domain_hash.map(|h| h.0.to_vec()).clone(),
       notary_id: proof.notary_id,
@@ -178,7 +178,7 @@ impl Escrow {
 
   pub async fn get_final(&self) -> Result<BalanceChange> {
     let mut balance_change = self.get_change_with_settled_amount(self.settled_amount);
-    if self.settled_signature.len() == 0 || self.settled_signature == *EMPTY_SIGNATURE {
+    if self.settled_signature.is_empty() || self.settled_signature == *EMPTY_SIGNATURE {
       bail!("Escrow settlement has not been signed");
     }
     balance_change.signature = MultiSignatureBytes::decode(&mut self.settled_signature.as_slice())?;
@@ -342,7 +342,7 @@ impl OpenEscrow {
       .await?;
 
     escrow
-      .db_update_signature(&mut *tx, settled_amount, signature.to_vec())
+      .db_update_signature(&mut tx, settled_amount, signature.to_vec())
       .await?;
 
     tx.commit().await?;
@@ -379,7 +379,7 @@ impl OpenEscrow {
     let mut escrow = self.escrow.lock().await;
     let mut db = self.db.acquire().await?;
     escrow
-      .db_update_signature(&mut *db, milligons, signature)
+      .db_update_signature(&mut db, milligons, signature)
       .await?;
 
     Ok(())
@@ -516,9 +516,9 @@ impl OpenEscrowsStore {
   /// Create a new escrow as a client. You must first notarize an escrow hold note to the notary for the `client_address`.
   pub async fn open_client_escrow(&self, account_id: i64) -> Result<OpenEscrow> {
     let mut tx = self.db.begin().await?;
-    let account = AccountStore::db_get_by_id(&mut *tx, account_id).await?;
+    let account = AccountStore::db_get_by_id(&mut tx, account_id).await?;
     let (mut balance_tip, status) =
-      BalanceChangeStore::db_build_for_account(&mut *tx, &account).await?;
+      BalanceChangeStore::db_build_for_account(&mut tx, &account).await?;
     if status == Some(BalanceChangeStatus::WaitingForSendClaim) {
       bail!(
         "This balance change is not in a state to open {}: {:?}",
@@ -574,7 +574,7 @@ impl OpenEscrowsStore {
       balance_change: balance_tip,
       missed_claim_window: false,
     };
-    escrow.db_insert(&mut *tx).await?;
+    escrow.db_insert(&mut tx).await?;
     tx.commit().await?;
 
     Ok(OpenEscrow::new(self.db.clone(), escrow, &self.keystore))
@@ -716,7 +716,7 @@ mod tests {
     tick: Tick,
   ) -> Result<BalanceChangeRow> {
     let mut tx = pool.begin().await?;
-    let (balance_tip, status) = BalanceChangeStore::db_build_for_account(&mut *tx, account).await?;
+    let (balance_tip, status) = BalanceChangeStore::db_build_for_account(&mut tx, account).await?;
     let builder = BalanceChangeBuilder::new(balance_tip, account.id, status);
     builder
       .claim_from_mainchain(LocalchainTransfer {
@@ -761,11 +761,11 @@ mod tests {
     notebook_number: NotebookNumber,
     tick: Tick,
   ) -> Result<()> {
-    let balance_tip = balance_change.get_balance_tip(&account)?;
+    let balance_tip = balance_change.get_balance_tip(account)?;
     println!("got balance tip for account {:?}", balance_tip);
     let mut state = mock_notary.state.lock().await;
-    (*state).balance_tips.insert(
-      LocalchainAccountId::new(account.get_account_id32()?, account.account_type.clone()),
+    state.balance_tips.insert(
+      LocalchainAccountId::new(account.get_account_id32()?, account.account_type),
       ulx_notary_apis::localchain::BalanceTipResult {
         tick,
         balance_tip: balance_tip.tip().into(),
@@ -782,7 +782,7 @@ mod tests {
 
     let alice_address = AccountStore::to_address(&Alice.to_account_id());
     let mut db = pool.acquire().await?;
-    let bob_account = register_account(&mut *db, Bob.to_account_id(), 1, 1).await?;
+    let bob_account = register_account(&mut db, Bob.to_account_id(), 1, 1).await?;
 
     let _bob_hold = create_escrow_hold(
       &pool,
@@ -842,7 +842,7 @@ mod tests {
     let mock_notary = create_mock_notary().await?;
     let notary_clients = mock_notary_clients(&mock_notary, Ferdie).await?;
 
-    let alice_pool = SqlitePool::connect(&":memory:").await?;
+    let alice_pool = SqlitePool::connect(":memory:").await?;
     sqlx::migrate!()
       .run(&alice_pool)
       .await
@@ -851,9 +851,9 @@ mod tests {
 
     let alice_address = AccountStore::to_address(&Alice.to_account_id());
     let mut bob_db = bob_pool.acquire().await?;
-    let bob_account = register_account(&mut *bob_db, Bob.to_account_id(), 1, 1).await?;
+    let bob_account = register_account(&mut bob_db, Bob.to_account_id(), 1, 1).await?;
 
-    let _alice_account = register_account(&mut *alice_db, Alice.to_account_id(), 1, 1).await?;
+    let _alice_account = register_account(&mut alice_db, Alice.to_account_id(), 1, 1).await?;
     let bob_hold = create_escrow_hold(
       &bob_pool,
       &bob_account,
@@ -934,7 +934,7 @@ mod tests {
     let mock_notary = create_mock_notary().await?;
     let notary_clients = mock_notary_clients(&mock_notary, Ferdie).await?;
 
-    let alice_pool = SqlitePool::connect(&":memory:").await?;
+    let alice_pool = SqlitePool::connect(":memory:").await?;
     sqlx::migrate!()
       .run(&alice_pool)
       .await
@@ -977,7 +977,7 @@ mod tests {
 
     let escrow = transactions
       .create_escrow(
-        800u128.into(),
+        800u128,
         not_alice.clone(),
         Some("delta.flights".to_string()),
         None,
@@ -989,7 +989,7 @@ mod tests {
     let bob_hold = BalanceChangeStore::db_get_latest_for_account(&mut db, bob_account.id)
       .await?
       .expect("should have a latest");
-    register_balance_tip(&bob_account, &mock_notary, &bob_hold, 1, 1).await?;
+    register_balance_tip(bob_account, &mock_notary, &bob_hold, 1, 1).await?;
 
     let alice_signer = Keystore::new(alice_pool.clone());
     let _ = alice_signer

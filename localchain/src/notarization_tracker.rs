@@ -45,7 +45,7 @@ impl NotarizationTracker {
       ))?;
       let tip = BalanceTip {
         account_id: change.account_id.clone(),
-        account_type: change.account_type.clone(),
+        account_type: change.account_type,
         balance: change.balance,
         account_origin: previous_balance_proof.account_origin,
         change_number: change.change_number,
@@ -54,8 +54,8 @@ impl NotarizationTracker {
       tips.push(tip);
     }
     for (account_id, balance_change) in (*balance_changes).iter() {
-      let account = self.accounts_by_id.get(&account_id).unwrap();
-      let tip = balance_change.get_balance_tip(&account)?;
+      let account = self.accounts_by_id.get(account_id).unwrap();
+      let tip = balance_change.get_balance_tip(account)?;
       tips.push(tip);
     }
     Ok(tips)
@@ -65,7 +65,7 @@ impl NotarizationTracker {
     let balance_changes = self.balance_changes_by_account.lock().await;
     let mut changed_accounts = vec![];
     for (account_id, balance_change) in (*balance_changes).iter() {
-      let account = self.accounts_by_id.get(&account_id).unwrap();
+      let account = self.accounts_by_id.get(account_id).unwrap();
       changed_accounts.push((account.clone(), balance_change.clone()));
     }
     changed_accounts
@@ -100,13 +100,13 @@ impl NotarizationTracker {
 
       if let Ok(Some(proof)) = balance_change.get_proof() {
         let account = self.accounts_by_id.get(&balance_change.account_id).unwrap();
-        let tip = balance_change.get_balance_tip(&account)?;
+        let tip = balance_change.get_balance_tip(account)?;
         let notebook_proof = NotebookProof {
           address: account.address.clone(),
-          account_type: account.account_type.clone(),
+          account_type: account.account_type,
           notebook_number: self.notebook_number,
           balance_tip: tip.tip().into(),
-          balance: tip.balance.into(),
+          balance: tip.balance,
           change_number: tip.change_number,
           account_origin: NotaryAccountOrigin {
             notary_id: self.notary_id,
@@ -136,20 +136,20 @@ impl NotarizationTracker {
     let account_change_root = mainchain_client
       .get_account_changes_root(self.notary_id, self.notebook_number)
       .await?;
-    let change_root = H256::from_slice(&account_change_root.as_ref()[..]);
+    let change_root = H256::from_slice(account_change_root.as_ref());
 
     let mut balance_changes = self.balance_changes_by_account.lock().await;
     for (account_id, balance_change) in (*balance_changes).iter_mut() {
       let mut tx = self.db.begin().await?;
       let account = self
         .accounts_by_id
-        .get(&account_id)
+        .get(account_id)
         .expect("account not found");
 
       BalanceChangeStore::tx_save_immortalized(
         &mut tx,
         balance_change,
-        &account,
+        account,
         change_root,
         immortalized_block,
       )
@@ -159,7 +159,7 @@ impl NotarizationTracker {
 
     Ok(ImmortalizedBlock {
       immortalized_block,
-      account_changes_merkle_root: account_change_root.into(),
+      account_changes_merkle_root: account_change_root,
     })
   }
 }

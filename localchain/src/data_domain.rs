@@ -49,7 +49,7 @@ impl DataDomainStore {
   pub fn hash_domain(&self, domain: JsDataDomain) -> DataDomainHash {
     let parsed_domain = DataDomain {
       domain_name: RuntimeString::Owned(domain.domain_name.clone()),
-      top_level_domain: domain.top_level_domain.clone(),
+      top_level_domain: domain.top_level_domain,
     };
     parsed_domain.hash()
   }
@@ -156,16 +156,16 @@ impl From<DataDomain> for JsDataDomain {
   fn from(domain: DataDomain) -> Self {
     Self {
       domain_name: domain.domain_name.to_string(),
-      top_level_domain: domain.top_level_domain.clone(),
+      top_level_domain: domain.top_level_domain,
     }
   }
 }
 
-impl Into<DataDomain> for JsDataDomain {
-  fn into(self) -> DataDomain {
+impl From<JsDataDomain> for DataDomain {
+  fn from(val: JsDataDomain) -> Self {
     DataDomain {
-      domain_name: RuntimeString::Owned(self.domain_name.clone()),
-      top_level_domain: self.top_level_domain,
+      domain_name: RuntimeString::Owned(val.domain_name.clone()),
+      top_level_domain: val.top_level_domain,
     }
   }
 }
@@ -207,7 +207,7 @@ mod test {
     .execute(&mut *db)
     .await?;
     DataDomainStore::db_insert(
-      &mut *db,
+      &mut db,
       js_domain.clone(),
       AccountStore::to_address(&Bob.to_account_id()),
       1,

@@ -36,7 +36,7 @@ impl pallet_ticks::Config for Test {
 pub fn new_test_ext(tick_duration_millis: u64, genesis_utc_time: u64) -> sp_io::TestExternalities {
 	let env = Env::new().default_filter_or("debug");
 	let _ = Builder::from_env(env).is_test(true).try_init();
-	let mut t = frame_system::GenesisConfig::<Test>::default().build_storage().unwrap().into();
+	let mut t = frame_system::GenesisConfig::<Test>::default().build_storage().unwrap();
 
 	pallet_ticks::GenesisConfig::<Test> {
 		tick_duration_millis,

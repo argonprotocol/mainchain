@@ -179,7 +179,7 @@ impl MainchainClient {
     let best_votes = self
       .fetch_storage(
         &api::ticks::storage::StorageApi.recent_blocks_at_ticks(grandparent_tick),
-        Some(H256::from_slice(&best_hash_bytes)),
+        Some(H256::from_slice(best_hash_bytes)),
       )
       .await?
       .ok_or_else(|| anyhow!("No best block found"))?
@@ -192,7 +192,7 @@ impl MainchainClient {
     let minimum = self
       .fetch_storage(
         &api::block_seal_spec::storage::StorageApi.current_vote_minimum(),
-        Some(H256::from_slice(&best_hash_bytes)),
+        Some(H256::from_slice(best_hash_bytes)),
       )
       .await?
       .ok_or_else(|| anyhow!("No minimum vote requirement found"))?;
@@ -216,7 +216,7 @@ impl MainchainClient {
         &storage()
           .data_domain()
           .registered_data_domains(data_domain_hash),
-        Some(H256::from_slice(&best_block_hash)),
+        Some(H256::from_slice(best_block_hash)),
       )
       .await?
     {
@@ -443,7 +443,7 @@ impl MainchainClient {
       tx_tmp.signer_payload()
     };
 
-    let signature = keystore.sign(address.clone(), payload.into()).await?;
+    let signature = keystore.sign(address.clone(), payload).await?;
 
     let multi_signature = subxt::utils::MultiSignature::decode(&mut signature.as_ref())?;
 
@@ -485,7 +485,7 @@ impl MainchainClient {
     Ok((
       LocalchainTransfer {
         address,
-        amount: amount.into(),
+        amount,
         notary_id,
         expiration_block: transfer.expiration_block,
         transfer_id: transfer.transfer_id,
@@ -570,7 +570,7 @@ impl MainchainClient {
       .fetch_storage(
         &storage()
           .notebook()
-          .last_notebook_details_by_notary(&notary_id),
+          .last_notebook_details_by_notary(notary_id),
         Some(best_block),
       )
       .await?
@@ -592,7 +592,7 @@ impl MainchainClient {
       .fetch_storage(
         &storage()
           .notebook()
-          .notebook_changed_accounts_root_by_notary(&notary_id, &notebook_number),
+          .notebook_changed_accounts_root_by_notary(notary_id, notebook_number),
         None,
       )
       .await?

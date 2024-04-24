@@ -53,7 +53,7 @@ impl MainchainTransferStore {
       bail!("Mainchain client not initialized");
     };
     let mut db = self.db.acquire().await?;
-    let account = AccountStore::db_deposit_account(&mut *db, notary_id).await?;
+    let account = AccountStore::db_deposit_account(&mut db, notary_id).await?;
     let (transfer, block) = mainchain_client
       .create_transfer_to_localchain(
         account.address.clone(),

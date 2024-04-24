@@ -123,7 +123,7 @@ impl Keystore {
         .sign(address.clone(), message.as_ref())
         .await?
       {
-        return Ok(signature.encode().into());
+        return Ok(signature.encode());
       }
     }
 
@@ -280,7 +280,7 @@ pub mod napi_ext {
 /// Only a single option should be picked.
 impl EmbeddedKeyPassword {
   pub fn get_password(&self) -> Result<Option<SecretString>> {
-    if self.key_password_interactive == true {
+    if self.key_password_interactive {
       let password = rpassword::prompt_password("Key password: ")?;
       return Ok(Some(SecretString::new(password)));
     } else if let Some(ref file) = self.key_password_filename {

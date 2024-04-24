@@ -93,7 +93,7 @@ impl Transactions {
 
     let jump_notarization = self.new_notarization();
     jump_notarization.set_transaction(transaction).await;
-    let milligons_plus_tax = jump_notarization.get_total_for_after_tax_balance(milligons.clone());
+    let milligons_plus_tax = jump_notarization.get_total_for_after_tax_balance(milligons);
     let jump_account = jump_notarization
       .get_jump_account(AccountType::Deposit)
       .await?;
@@ -128,7 +128,7 @@ impl Transactions {
     let escrow_milligons = escrow_milligons.max(ESCROW_MINIMUM_SETTLEMENT);
 
     let amount_plus_tax =
-      jump_notarization.get_total_for_after_tax_balance(escrow_milligons.clone());
+      jump_notarization.get_total_for_after_tax_balance(escrow_milligons);
     let jump_account = jump_notarization.fund_jump_account(amount_plus_tax).await?;
     let _ = jump_notarization.notarize().await?;
 
@@ -189,13 +189,13 @@ impl Transactions {
   pub async fn import_argons(&self, argon_file: String) -> Result<NotarizationTracker> {
     let notarization = self.new_notarization();
     notarization.import_argon_file(argon_file).await?;
-    Ok(notarization.notarize().await?)
+    notarization.notarize().await
   }
 
   pub async fn accept_argon_request(&self, argon_file: String) -> Result<NotarizationTracker> {
     let notarization = self.new_notarization();
     notarization.accept_argon_file_request(argon_file).await?;
-    Ok(notarization.notarize().await?)
+    notarization.notarize().await
   }
 
   fn new_notarization(&self) -> NotarizationBuilder {
@@ -370,7 +370,7 @@ mod tests {
     let alice_json = alice_localchain
       .transactions()
       .send(
-        3500_u128.into(),
+        3500_u128,
         Some(vec![bob_localchain.address().await?]),
       )
       .await?;
@@ -402,18 +402,16 @@ mod tests {
             assert!(latest.transaction_id.is_some());
             assert_eq!(latest.change_number, 1);
           }
+        } else if account.hd_path.is_some() {
+          assert_eq!(latest.balance, "0");
+          assert_eq!(latest.status, BalanceChangeStatus::WaitingForSendClaim);
+          assert!(latest.transaction_id.is_some());
+          assert_eq!(latest.change_number, 2);
         } else {
-          if account.hd_path.is_some() {
-            assert_eq!(latest.balance, "0");
-            assert_eq!(latest.status, BalanceChangeStatus::WaitingForSendClaim);
-            assert!(latest.transaction_id.is_some());
-            assert_eq!(latest.change_number, 2);
-          } else {
-            assert_eq!(latest.balance, "1500");
-            assert_eq!(latest.status, BalanceChangeStatus::Notarized);
-            assert!(latest.transaction_id.is_some());
-            assert_eq!(latest.change_number, 2);
-          }
+          assert_eq!(latest.balance, "1500");
+          assert_eq!(latest.status, BalanceChangeStatus::Notarized);
+          assert!(latest.transaction_id.is_some());
+          assert_eq!(latest.change_number, 2);
         }
         tips.push(latest.get_balance_tip(&account)?);
       }
@@ -468,18 +466,16 @@ mod tests {
             assert_eq!(latest.status, BalanceChangeStatus::Notarized);
             assert_eq!(latest.change_number, 1);
           }
+        } else if account.hd_path.is_some() {
+          assert_eq!(latest.balance, "0");
+          assert_eq!(latest.status, BalanceChangeStatus::NotebookPublished);
+          assert!(latest.transaction_id.is_some());
+          assert_eq!(latest.change_number, 2);
         } else {
-          if account.hd_path.is_some() {
-            assert_eq!(latest.balance, "0");
-            assert_eq!(latest.status, BalanceChangeStatus::NotebookPublished);
-            assert!(latest.transaction_id.is_some());
-            assert_eq!(latest.change_number, 2);
-          } else {
-            assert_eq!(latest.balance, "1500");
-            assert_eq!(latest.status, BalanceChangeStatus::NotebookPublished);
-            assert!(latest.transaction_id.is_some());
-            assert_eq!(latest.change_number, 2);
-          }
+          assert_eq!(latest.balance, "1500");
+          assert_eq!(latest.status, BalanceChangeStatus::NotebookPublished);
+          assert!(latest.transaction_id.is_some());
+          assert_eq!(latest.change_number, 2);
         }
       }
     }
@@ -547,7 +543,7 @@ mod tests {
     println!("Bob requesting");
     let bob_request_json = bob_localchain
       .transactions()
-      .request(3500_u128.into())
+      .request(3500_u128)
       .await?;
 
     let alice_builder = alice_localchain.begin_change();
@@ -614,18 +610,16 @@ mod tests {
           assert!(latest.transaction_id.is_some());
           assert_eq!(latest.change_number, 1);
         }
+      } else if account.hd_path.is_some() {
+        assert_eq!(latest.balance, "3500");
+        assert_eq!(latest.status, BalanceChangeStatus::WaitingForSendClaim);
+        assert!(latest.transaction_id.is_some());
+        assert_eq!(latest.change_number, 1);
       } else {
-        if account.hd_path.is_some() {
-          assert_eq!(latest.balance, "3500");
-          assert_eq!(latest.status, BalanceChangeStatus::WaitingForSendClaim);
-          assert!(latest.transaction_id.is_some());
-          assert_eq!(latest.change_number, 1);
-        } else {
-          // this is still the claim from mainchain
-          assert_eq!(latest.balance, "200");
-          assert_eq!(latest.status, BalanceChangeStatus::NotebookPublished);
-          assert_eq!(latest.change_number, 1);
-        }
+        // this is still the claim from mainchain
+        assert_eq!(latest.balance, "200");
+        assert_eq!(latest.status, BalanceChangeStatus::NotebookPublished);
+        assert_eq!(latest.change_number, 1);
       }
     }
     let tips = mock_notary.get_pending_tips().await;
@@ -656,17 +650,15 @@ mod tests {
             assert_eq!(latest.status, BalanceChangeStatus::Notarized);
             assert_eq!(latest.change_number, 1);
           }
+        } else if account.hd_path.is_some() {
+          assert_eq!(latest.balance, "0");
+          assert_eq!(latest.status, BalanceChangeStatus::NotebookPublished);
+          assert!(latest.transaction_id.is_some());
+          assert_eq!(latest.change_number, 2);
         } else {
-          if account.hd_path.is_some() {
-            assert_eq!(latest.balance, "0");
-            assert_eq!(latest.status, BalanceChangeStatus::NotebookPublished);
-            assert!(latest.transaction_id.is_some());
-            assert_eq!(latest.change_number, 2);
-          } else {
-            assert_eq!(latest.balance, "1300");
-            assert_eq!(latest.status, BalanceChangeStatus::NotebookPublished);
-            assert_eq!(latest.change_number, 2);
-          }
+          assert_eq!(latest.balance, "1300");
+          assert_eq!(latest.status, BalanceChangeStatus::NotebookPublished);
+          assert_eq!(latest.change_number, 2);
         }
       }
     }
@@ -689,19 +681,17 @@ mod tests {
           assert_eq!(latest.balance, "400");
           assert_eq!(latest.change_number, 1);
         }
+      } else if account.hd_path.is_some() {
+        // should be getting consolidated
+        assert_eq!(latest.balance, "0");
+        assert_eq!(latest.status, BalanceChangeStatus::Notarized);
+        assert!(latest.transaction_id.is_some());
+        assert_eq!(latest.net_balance_change, "-3500");
+        assert_eq!(latest.change_number, 2);
       } else {
-        if account.hd_path.is_some() {
-          // should be getting consolidated
-          assert_eq!(latest.balance, "0");
-          assert_eq!(latest.status, BalanceChangeStatus::Notarized);
-          assert!(latest.transaction_id.is_some());
-          assert_eq!(latest.net_balance_change, "-3500");
-          assert_eq!(latest.change_number, 2);
-        } else {
-          assert_eq!(latest.balance, "3500");
-          assert_eq!(latest.status, BalanceChangeStatus::Notarized);
-          assert_eq!(latest.change_number, 2);
-        }
+        assert_eq!(latest.balance, "3500");
+        assert_eq!(latest.status, BalanceChangeStatus::Notarized);
+        assert_eq!(latest.change_number, 2);
       }
     }
     assert!(bob_localchain

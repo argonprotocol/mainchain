@@ -229,14 +229,10 @@ pub mod pallet {
 			let freeze_id = FreezeReason::MaturationPeriod.into();
 			let reward_height = n.saturating_add(T::MaturationBlocks::get().into());
 			for reward in rewards.iter_mut() {
-				if T::ArgonCurrency::mint_into(&reward.account_id, reward.argons)
-					.map_err(|e| {
-						reward.argons = 0u128.into();
-						log::error!(target: LOG_TARGET, "Failed to mint argons for reward: {:?}, {:?}", reward, e);
-						e
-					})
-					.is_ok()
-				{
+				if let Err(e) = T::ArgonCurrency::mint_into(&reward.account_id, reward.argons) {
+					reward.argons = 0u128.into();
+					log::error!(target: LOG_TARGET, "Failed to mint argons for reward: {:?}, {:?}", reward, e);
+				} else {
 					let frozen = T::ArgonCurrency::balance_frozen(&freeze_id, &reward.account_id);
 					let _ = T::ArgonCurrency::set_freeze(
 						&freeze_id,
@@ -247,14 +243,10 @@ pub mod pallet {
 						log::error!(target: LOG_TARGET, "Failed to freeze argons for reward: {:?}, {:?}", reward, e);
 					});
 				}
-				if T::UlixeeCurrency::mint_into(&reward.account_id, reward.ulixees)
-					.map_err(|e| {
-						reward.ulixees = 0u128.into();
-						log::error!(target: LOG_TARGET, "Failed to mint ulixees for reward: {:?}, {:?}", reward, e);
-						e
-					})
-					.is_ok()
-				{
+				if let Err(e) = T::UlixeeCurrency::mint_into(&reward.account_id, reward.ulixees) {
+					reward.ulixees = 0u128.into();
+					log::error!(target: LOG_TARGET, "Failed to mint ulixees for reward: {:?}, {:?}", reward, e);
+				} else {
 					let frozen = T::UlixeeCurrency::balance_frozen(&freeze_id, &reward.account_id);
 					let _ = T::UlixeeCurrency::set_freeze(
 						&freeze_id,

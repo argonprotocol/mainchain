@@ -273,7 +273,7 @@ impl BalanceSync {
       notarizations.push(tracker);
     }
 
-    return Ok(notarizations);
+    Ok(notarizations)
   }
 
   pub async fn sync_unsettled_balances(&self) -> Result<Vec<BalanceChangeRow>> {
@@ -308,7 +308,7 @@ impl BalanceSync {
     mainchain_transfers.update_finalization().await?;
 
     let transfers = mainchain_transfers.find_ready_for_claim().await?;
-    if transfers.len() == 0 {
+    if transfers.is_empty() {
       return Ok(vec![]);
     }
     let notarization = NotarizationBuilder::new(
@@ -400,7 +400,7 @@ impl BalanceSync {
         }
       }
     }
-    return Ok(change);
+    Ok(change)
   }
 
   pub async fn process_pending_escrows(
@@ -524,7 +524,7 @@ impl BalanceSync {
 
     let escrows = notarization.escrows().await;
     let Some((data_domain_hash, data_domain_address)) = escrows.into_iter().find_map(|c| {
-      if c.is_client == true {
+      if c.is_client {
         return None;
       }
       if let Some(domain) = c.data_domain_hash {
@@ -546,8 +546,8 @@ impl BalanceSync {
     }
 
     let mut tick_counter = self.tick_counter.lock().await;
-    if (*tick_counter).0 == current_tick {
-      (*tick_counter).1 += 1;
+    if tick_counter.0 == current_tick {
+      tick_counter.1 += 1;
     } else {
       *tick_counter = (current_tick, 0);
     }
@@ -558,7 +558,7 @@ impl BalanceSync {
       power: total_available_tax,
       data_domain_hash: H256::from_slice(data_domain_hash.as_ref()),
       data_domain_account: AccountStore::parse_address(&data_domain_address)?,
-      index: (*tick_counter).1,
+      index: tick_counter.1,
       block_hash: H256::from_slice(best_block_for_vote.block_hash.as_ref()),
       block_rewards_account_id: AccountStore::parse_address(&vote_address)?,
       signature: Signature::from_raw([0; 64]).into(),
@@ -607,7 +607,7 @@ impl BalanceSync {
         }
         Err(e) => {
           if e.to_string().contains("Escrow hold not ready for claim") {
-            let delay = 2 + i ^ 5;
+            let delay = (2 + i) ^ 5;
             tracing::debug!("Escrow hold not ready for claim. Waiting {delay} seconds.");
             tokio::time::sleep(tokio::time::Duration::from_secs(delay)).await;
             continue;
@@ -643,13 +643,13 @@ impl BalanceSync {
       escrow.from_address,
       escrow.balance_change_number
     );
-    if !notarization.can_add_escrow(&open_escrow).await {
+    if !notarization.can_add_escrow(open_escrow).await {
       self
         .finalize_escrow_notarization(notarization, options)
         .await;
       return Ok(());
     }
-    notarization.claim_escrow(&open_escrow).await?;
+    notarization.claim_escrow(open_escrow).await?;
     Ok(())
   }
 
@@ -676,7 +676,7 @@ impl BalanceSync {
           "An escrow was not claimed by the recipient. We're taking it back. id={}",
           escrow.id
         );
-        notarization.cancel_escrow(&open_escrow).await?;
+        notarization.cancel_escrow(open_escrow).await?;
       }
       return Ok(());
     }
@@ -741,12 +741,12 @@ impl BalanceSync {
 
     for balance_change in notarization.balance_changes.iter() {
       let _ =
-        OpenEscrowsStore::db_record_notarized(&mut *tx, &balance_change, notarization_id).await;
+        OpenEscrowsStore::db_record_notarized(&mut tx, balance_change, notarization_id).await;
 
       BalanceChangeStore::tx_upsert_notarized(
         &mut tx,
         account.id,
-        &balance_change,
+        balance_change,
         notary_id,
         notarization_id,
         transaction_id,
@@ -765,7 +765,7 @@ impl BalanceSync {
     notary_clients: &NotaryClients,
   ) -> Result<()> {
     let mut tx = db.begin().await?;
-    let mut account = AccountStore::db_get_by_id(&mut *tx, balance_change.account_id).await?;
+    let mut account = AccountStore::db_get_by_id(&mut tx, balance_change.account_id).await?;
     let notary_id = balance_change.notary_id as u32;
     let notary_client = notary_clients.get(notary_id).await?;
     if account.origin.is_none() {
@@ -977,7 +977,7 @@ impl BalanceSync {
       .await?;
 
     let account = AccountStore::db_get_by_id(&mut tx, balance_change.account_id).await?;
-    let change_root = H256::from_slice(&account_change_root.as_ref()[..]);
+    let change_root = H256::from_slice(account_change_root.as_ref());
     BalanceChangeStore::tx_save_immortalized(
       &mut tx,
       balance_change,

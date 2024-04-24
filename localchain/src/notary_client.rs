@@ -217,7 +217,7 @@ impl NotaryClient {
         false
       }
     };
-    if has_seen_notebook == false {
+    if !has_seen_notebook {
       let meta = self.metadata().await?;
       has_seen_notebook = meta.finalized_notebook_number >= notebook_number;
     }
