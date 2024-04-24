@@ -38,7 +38,7 @@ pub trait NotebookRpc {
 	async fn get_raw_headers(
 		&self,
 		since_notebook: Option<NotebookNumber>,
-		or_specific_notebooks: Option<Vec<NotebookNumber>>
+		or_specific_notebooks: Option<Vec<NotebookNumber>>,
 	) -> Result<Vec<(NotebookNumber, Vec<u8>)>, ErrorObjectOwned>;
 
 	#[method(name = "get")]

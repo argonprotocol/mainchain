@@ -72,8 +72,8 @@ where
 				let mut subscriptions_by_id = self.subscriptions_by_id.lock().await;
 				for notary in notaries {
 					if let Some(existing) = notaries_by_id.get(&notary.notary_id) {
-						if existing.meta_updated_block < notary.meta_updated_block
-							|| !clients.contains_key(&notary.notary_id)
+						if existing.meta_updated_block < notary.meta_updated_block ||
+							!clients.contains_key(&notary.notary_id)
 						{
 							// need to reconnect
 							needs_connect.push(notary.notary_id);
@@ -405,18 +405,18 @@ where
 		for digest_record in &notebook_digest.notebooks {
 			let notary_audits = aux_client.get_notary_audit_history(digest_record.notary_id)?;
 
-			match notary_audits.get()
+			match notary_audits
+				.get()
 				.iter()
 				.find(|a| a.notebook_number == digest_record.notebook_number)
 			{
-				Some(audit) => {
+				Some(audit) =>
 					if digest_record.audit_first_failure != audit.first_error_reason {
 						return Err(Error::<B>::InvalidNotebookDigest(format!(
 							"Notary {}, notebook #{} has an audit mismatch \"{:?}\" with local result. \"{:?}\"",
 							digest_record.notary_id, digest_record.notebook_number, digest_record.audit_first_failure, audit.first_error_reason
 						)));
-					}
-				},
+					},
 				None => {
 					is_missing_entries = true;
 					info!(

@@ -56,7 +56,7 @@ fn it_can_offer_a_fund() {
 			Event::BondFundExpired { offer_account_id: 1, bond_fund_id: 1 }.into(),
 		);
 		assert_eq!(BondFunds::<Test>::get(1), None);
-		assert_eq!(BondFundExpirations::<Test>::contains_key(10), false);
+		assert!(!BondFundExpirations::<Test>::contains_key(10));
 	});
 }
 
@@ -113,7 +113,7 @@ fn it_can_stop_offering_a_fund() {
 
 		// got back 20_000
 		assert_eq!(Balances::free_balance(1), 50_000 + 20_000 + fee1 + fee2);
-		assert_eq!(Balances::balance_on_hold(&&HoldReason::EnterBondFund.into(), &1u64), 30_000);
+		assert_eq!(Balances::balance_on_hold(&HoldReason::EnterBondFund.into(), &1u64), 30_000);
 
 		System::set_block_number(800);
 
@@ -153,7 +153,7 @@ fn it_can_stop_offering_a_fund() {
 			}
 			.into(),
 		);
-		assert_eq!(BondFunds::<Test>::contains_key(1), false);
+		assert!(!BondFunds::<Test>::contains_key(1));
 		assert_eq!(BondFundExpirations::<Test>::get(1440), vec![]);
 
 		assert_eq!(Balances::free_balance(2), 10_000 - final_fee1 - final_fee2);
@@ -195,8 +195,8 @@ fn it_can_lease_a_bond() {
 
 		System::set_block_number(2440);
 		Bonds::on_initialize(2440);
-		assert_eq!(BondsStorage::<Test>::contains_key(1), false);
-		assert_eq!(BondCompletions::<Test>::contains_key(2440), false);
+		assert!(!BondsStorage::<Test>::contains_key(1));
+		assert!(!BondCompletions::<Test>::contains_key(2440));
 	});
 }
 
@@ -235,8 +235,8 @@ fn it_can_bond_from_self() {
 
 		System::set_block_number(100);
 		Bonds::on_initialize(100);
-		assert_eq!(BondFunds::<Test>::contains_key(1), false);
-		assert_eq!(BondCompletions::<Test>::contains_key(100), false);
+		assert!(!BondFunds::<Test>::contains_key(1));
+		assert!(!BondCompletions::<Test>::contains_key(100));
 		assert_eq!(Balances::free_balance(2), 2100);
 		assert!(System::account_exists(&2));
 	});
@@ -314,10 +314,10 @@ fn it_can_recoup_funds_from_a_bond_fund_if_spent() {
 		);
 		assert_eq!(Balances::free_balance(1), Balances::minimum_balance());
 		assert_eq!(
-			Balances::balance_on_hold(&&HoldReason::EnterBondFund.into(), &1),
+			Balances::balance_on_hold(&HoldReason::EnterBondFund.into(), &1),
 			100_000 - recoverable_fee - Balances::minimum_balance()
 		);
-		assert_eq!(BondsStorage::<Test>::contains_key(1), false);
+		assert!(!BondsStorage::<Test>::contains_key(1));
 		assert_eq!(BondCompletions::<Test>::get(103), vec![]);
 	});
 }
@@ -372,10 +372,10 @@ fn it_can_send_minimum_balance_transfers() {
 		set_argons(1, 1060);
 		assert_ok!(Balances::transfer(&1, &2, 1000, Preservation::Preserve));
 		assert_ok!(Balances::transfer(&1, &2, 50, Preservation::Preserve));
-		assert_eq!(Balances::free_balance(&1), 10);
+		assert_eq!(Balances::free_balance(1), 10);
 		assert_ok!(Balances::transfer(&1, &2, 4, Preservation::Expendable));
 		// dusted! will remove anything below ED
-		assert_eq!(Balances::free_balance(&1), 0);
+		assert_eq!(Balances::free_balance(1), 0);
 	})
 }
 #[test]
@@ -396,14 +396,14 @@ fn it_can_extend_a_bond_from_lease() {
 		assert_eq!(BondsStorage::<Test>::get(1).unwrap().amount, 200_000);
 		assert_eq!(BondCompletions::<Test>::get(1440).into_inner(), vec![1]);
 
-		let fee: Balance = BASE_FEE + u128::from(200_000u128 / 10u128 / 365);
+		let fee: Balance = BASE_FEE + (200_000u128 / 10u128 / 365);
 		assert_eq!(BondsStorage::<Test>::get(1).unwrap().fee, fee);
 		assert_eq!(Balances::free_balance(2), 3_000 - fee);
 		assert_eq!(Balances::free_balance(1), 100 + fee);
 
 		// extend the amount
 		assert_ok!(Bonds::extend_bond(RuntimeOrigin::signed(2), 1, 200_000u128, 2880));
-		let fee: Balance = BASE_FEE + u128::from(2 * 200_000u128 / 10u128 / 365);
+		let fee: Balance = BASE_FEE + (2 * 200_000u128 / 10u128 / 365);
 		assert_eq!(Balances::free_balance(2), 3000 - fee);
 		assert_eq!(BondCompletions::<Test>::get(1440).into_inner(), Vec::<u64>::new());
 		assert_eq!(BondCompletions::<Test>::get(2880).into_inner(), vec![1]);
@@ -416,7 +416,7 @@ fn it_can_extend_a_bond_from_lease() {
 		);
 		Balances::transfer(&10, &2, 2800, Preservation::Expendable).unwrap();
 		assert_ok!(Bonds::extend_bond(RuntimeOrigin::signed(2), 1, 200_000u128, 3000));
-		let fee = BASE_FEE + u128::from(3000 * 200_000u128 / 10u128 / 365 / 1440);
+		let fee = BASE_FEE + (3000 * 200_000u128 / 10u128 / 365 / 1440);
 		assert_eq!(Balances::free_balance(2), 3000 - fee);
 		assert_eq!(Balances::free_balance(1), 100 + fee);
 		assert_eq!(BondCompletions::<Test>::get(2880).into_inner(), Vec::<u64>::new());

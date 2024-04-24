@@ -20,14 +20,16 @@ const LOG_TARGET: &str = "runtime::notebook";
 #[frame_support::pallet(dev_mode)]
 pub mod pallet {
 	use codec::alloc::string::ToString;
-	use frame_support::pallet_prelude::*;
-	use frame_support::DefaultNoBound;
+	use frame_support::{pallet_prelude::*, DefaultNoBound};
 	use frame_system::pallet_prelude::*;
 	use log::info;
 	use sp_core::{crypto::AccountId32, H256};
 	use sp_runtime::traits::Block as BlockT;
-	use sp_std::collections::btree_set::BTreeSet;
-	use sp_std::{collections::btree_map::BTreeMap, vec, vec::Vec};
+	use sp_std::{
+		collections::{btree_map::BTreeMap, btree_set::BTreeSet},
+		vec,
+		vec::Vec,
+	};
 
 	use ulx_notary_audit::{notebook_verify, AccountHistoryLookupError, NotebookHistoryLookup};
 	use ulx_primitives::{
@@ -279,7 +281,7 @@ pub mod pallet {
 		}
 
 		fn is_inherent_required(_: &InherentData) -> Result<Option<Self::Error>, Self::Error> {
-			return Ok(Some(NotebookInherentError::MissingInherent));
+			Ok(Some(NotebookInherentError::MissingInherent))
 		}
 
 		fn is_inherent(call: &Self::Call) -> bool {
@@ -410,9 +412,9 @@ pub mod pallet {
 				.notebooks
 				.iter()
 				.find(|n| {
-					n.notary_id == notary_id
-						&& n.notebook_number == notebook_number
-						&& n.tick == tick
+					n.notary_id == notary_id &&
+						n.notebook_number == notebook_number &&
+						n.tick == tick
 				})
 				.ok_or(Error::<T>::InvalidNotebookDigest)?;
 
@@ -422,7 +424,7 @@ pub mod pallet {
 					notebook_number,
 					first_failure_reason: first_failure_reason.clone(),
 				});
-				if !Self::notary_failed_audit_by_id(&notary_id).is_some() {
+				if Self::notary_failed_audit_by_id(notary_id).is_none() {
 					<NotariesLockedForFailedAudit<T>>::insert(
 						notary_id,
 						(notebook_number, tick, first_failure_reason.clone()),
@@ -578,10 +580,9 @@ pub mod pallet {
 				raw_votes: notebook
 					.notarizations
 					.iter()
-					.map(|notarization| {
+					.flat_map(|notarization| {
 						notarization.block_votes.iter().map(|vote| (vote.encode(), vote.power))
 					})
-					.flatten()
 					.collect::<Vec<_>>(),
 			};
 			Ok(audit_result)
@@ -594,7 +595,7 @@ pub mod pallet {
 			let header = NotebookHeader::decode(&mut header_data.as_ref())
 				.map_err(|_| Error::<T>::CouldNotDecodeNotebook)?;
 
-			return Ok(NotaryNotebookVoteDetails {
+			Ok(NotaryNotebookVoteDetails {
 				notary_id: header.notary_id,
 				notebook_number: header.notebook_number,
 				version: header.version as u32,
@@ -604,7 +605,7 @@ pub mod pallet {
 				block_votes_count: header.block_votes_count,
 				block_voting_power: header.block_voting_power,
 				blocks_with_votes: header.blocks_with_votes.to_vec().clone(),
-			});
+			})
 		}
 
 		pub fn latest_notebook_by_notary() -> BTreeMap<NotaryId, (NotebookNumber, Tick)> {
@@ -658,12 +659,12 @@ pub mod pallet {
 		}
 
 		fn is_notary_locked_at_tick(notary_id: NotaryId, tick: Tick) -> bool {
-			if let Some((_, locked_at_tick, _)) = Self::notary_failed_audit_by_id(&notary_id) {
+			if let Some((_, locked_at_tick, _)) = Self::notary_failed_audit_by_id(notary_id) {
 				if locked_at_tick <= tick {
 					return true;
 				}
 			}
-			return false;
+			false
 		}
 	}
 }

@@ -156,11 +156,8 @@ where
 					for (identifier, error) in inherent_res.into_errors() {
 						match inherent_data_providers.try_handle_error(&identifier, &error).await {
 							Some(res) => res.map_err(Error::<B>::CheckInherents)?,
-							None => {
-								return Err(
-									Error::<B>::CheckInherentsUnknownError(identifier).into()
-								)
-							},
+							None =>
+								return Err(Error::<B>::CheckInherentsUnknownError(identifier).into()),
 						}
 					}
 				}
@@ -245,13 +242,12 @@ impl<B: BlockT> Verifier<B> for UlxVerifier<B> {
 		let hash = header.hash();
 
 		let seal_digest = match header.digest_mut().pop() {
-			Some(DigestItem::Seal(id, signature_digest)) => {
+			Some(DigestItem::Seal(id, signature_digest)) =>
 				if id == BLOCK_SEAL_DIGEST_ID {
 					Ok(DigestItem::Seal(id, signature_digest.clone()))
 				} else {
 					Err(Error::<B>::WrongEngine(id))
-				}
-			},
+				},
 			_ => Err(Error::<B>::MissingBlockSealDigest),
 		}?;
 

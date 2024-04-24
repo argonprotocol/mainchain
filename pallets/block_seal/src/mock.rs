@@ -1,12 +1,8 @@
 use std::collections::{BTreeMap, BTreeSet};
 
 use env_logger::{Builder, Env};
-use frame_support::derive_impl;
-use frame_support::{
-	parameter_types,
-};
-use sp_core::H256;
-use sp_core::U256;
+use frame_support::{derive_impl, parameter_types};
+use sp_core::{H256, U256};
 use sp_runtime::BuildStorage;
 
 use ulx_primitives::{

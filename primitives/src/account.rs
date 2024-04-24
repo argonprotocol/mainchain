@@ -43,7 +43,7 @@ impl LocalchainAccountId {
 impl sp_std::hash::Hash for LocalchainAccountId {
 	fn hash<H: sp_std::hash::Hasher>(&self, state: &mut H) {
 		state.write(self.account_id.as_ref());
-		state.write_i32(self.account_type.clone() as i32);
+		state.write_i32(self.account_type as i32);
 	}
 }
 

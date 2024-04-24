@@ -1,12 +1,8 @@
-use frame_support::{
-	assert_err, assert_noop, assert_ok, traits::OnInitialize,
-};
+use frame_support::{assert_err, assert_noop, assert_ok, traits::OnInitialize};
 use frame_system::pallet_prelude::BlockNumberFor;
 use sp_core::bounded_vec;
 use sp_keyring::AccountKeyring::Bob;
-use sp_runtime::{
-	testing::H256,
-};
+use sp_runtime::testing::H256;
 
 use ulx_primitives::{
 	notebook::{AccountOrigin, ChainTransfer, NotebookHeader},
@@ -14,11 +10,10 @@ use ulx_primitives::{
 };
 
 use crate::{
-	Error,
-	mock::{*, ChainTransfer as ChainTransferPallet}
-	, pallet::{ExpiringTransfersOut, PendingTransfersOut}, QueuedTransferOut,
+	mock::{ChainTransfer as ChainTransferPallet, *},
+	pallet::{ExpiringTransfersOut, NextTransferId, PendingTransfersOut},
+	Error, QueuedTransferOut,
 };
-use crate::pallet::NextTransferId;
 
 #[test]
 fn it_can_send_funds_to_localchain() {
@@ -53,7 +48,7 @@ fn it_allows_you_to_transfer_full_balance() {
 			1,
 		));
 		assert_eq!(Balances::free_balance(&who), 0);
-		assert_eq!(System::account_exists(&who), false);
+		assert!(!System::account_exists(&who));
 	});
 }
 
@@ -70,12 +65,12 @@ fn it_can_recreate_a_killed_account() {
 			1,
 		));
 		assert_eq!(Balances::free_balance(&who), 0);
-		assert_eq!(System::account_exists(&who), false);
+		assert!(!System::account_exists(&who));
 		let expires_block: BlockNumberFor<Test> = (1u32 + TransferExpirationBlocks::get()).into();
 		assert_eq!(ExpiringTransfersOut::<Test>::get(expires_block)[0], 1);
 		System::set_block_number(expires_block);
 		ChainTransferPallet::on_initialize(expires_block);
-		assert_eq!(System::account_exists(&who), true);
+		assert!(System::account_exists(&who));
 		assert_eq!(Balances::free_balance(&who), 2000);
 	});
 }
@@ -137,7 +132,7 @@ fn it_can_handle_transfers_in() {
 			notebook_number: 1,
 			tick: 1,
 			chain_transfers: bounded_vec![ChainTransfer::ToLocalchain { transfer_id: 1 }],
-			changed_accounts_root: changed_accounts_root.clone(),
+			changed_accounts_root,
 			changed_account_origins: bounded_vec![AccountOrigin {
 				notebook_number: 1,
 				account_uid: 1
@@ -170,7 +165,7 @@ fn it_can_handle_transfers_in() {
 				account_id: who.clone(),
 				amount: 5000
 			}],
-			changed_accounts_root: change_root_2.clone(),
+			changed_accounts_root: change_root_2,
 			changed_account_origins: bounded_vec![AccountOrigin {
 				notebook_number: 1,
 				account_uid: 1
@@ -344,7 +339,7 @@ fn it_expires_transfers_if_not_committed() {
 			1,
 		));
 		assert_eq!(
-			PendingTransfersOut::<Test>::get(&1).unwrap(),
+			PendingTransfersOut::<Test>::get(1).unwrap(),
 			QueuedTransferOut {
 				account_id: who,
 				amount: 1000u128,

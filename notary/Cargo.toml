@@ -56,4 +56,4 @@ subxt-signer = { workspace = true }
 dotenv = { workspace = true }
 
 [features]
-fast-runtime = ["ulx-primitives/fast-runtime"]
+fast-runtime = [ "ulx-primitives/fast-runtime" ]

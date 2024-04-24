@@ -1,4 +1,3 @@
-
 #![cfg_attr(not(feature = "std"), no_std)]
 
 pub use pallet::*;
@@ -351,14 +350,14 @@ pub mod pallet {
 			let who = ensure_signed(origin)?;
 
 			if amount_offered < T::MinimumBondAmount::get() {
-				return Err(Error::<T>::MinimumBondAmountNotMet.into())
+				return Err(Error::<T>::MinimumBondAmountNotMet.into());
 			}
 
 			if expiration_block <= frame_system::Pallet::<T>::block_number() {
-				return Err(Error::<T>::ExpirationTooSoon.into())
+				return Err(Error::<T>::ExpirationTooSoon.into());
 			}
 
-			Self::hold(&who, amount_offered).map_err(|e| Error::<T>::from(e))?;
+			Self::hold(&who, amount_offered).map_err(Error::<T>::from)?;
 
 			let bond_fund_id = Self::next_bond_fund_id()?;
 
@@ -393,16 +392,16 @@ pub mod pallet {
 		pub fn end_fund(origin: OriginFor<T>, bond_fund_id: T::BondFundId) -> DispatchResult {
 			let who = ensure_signed(origin)?;
 
-			let mut fund = BondFunds::<T>::get(bond_fund_id)
-				.ok_or::<Error<T>>(Error::<T>::NoBondFundFound.into())?;
+			let mut fund =
+				BondFunds::<T>::get(bond_fund_id).ok_or::<Error<T>>(Error::<T>::NoBondFundFound)?;
 
 			if fund.offer_account_id != who {
-				return Err(Error::<T>::NoPermissions.into())
+				return Err(Error::<T>::NoPermissions.into());
 			}
 
 			let return_amount = fund.amount_reserved.saturating_sub(fund.amount_bonded);
 			if Self::held_balance(&who) < return_amount {
-				return Err(Error::<T>::HoldUnexpectedlyModified.into())
+				return Err(Error::<T>::HoldUnexpectedlyModified.into());
 			}
 			Self::release_hold(&who, return_amount)?;
 
@@ -427,14 +426,14 @@ pub mod pallet {
 			let who = ensure_signed(origin)?;
 			let mut fund = BondFunds::<T>::get(bond_fund_id).ok_or(Error::<T>::NoBondFundFound)?;
 			if fund.offer_account_id != who {
-				return Err(Error::<T>::NoPermissions.into())
+				return Err(Error::<T>::NoPermissions.into());
 			}
 			if fund.offer_expiration_block > expiration_block {
-				return Err(Error::<T>::FundExtensionMustBeLater.into())
+				return Err(Error::<T>::FundExtensionMustBeLater.into());
 			}
 
 			if total_amount_offered < fund.amount_bonded {
-				return Err(Error::<T>::BondFundReductionExceedsAllocatedFunds.into())
+				return Err(Error::<T>::BondFundReductionExceedsAllocatedFunds.into());
 			}
 
 			if fund.amount_reserved > total_amount_offered {
@@ -442,7 +441,7 @@ pub mod pallet {
 				Self::release_hold(&who, return_amount)?;
 			} else {
 				let amount_to_reserve = total_amount_offered.saturating_sub(fund.amount_reserved);
-				Self::hold(&who, amount_to_reserve).map_err(|e| Error::<T>::from(e))?;
+				Self::hold(&who, amount_to_reserve).map_err(Error::<T>::from)?;
 			}
 
 			if expiration_block != fund.offer_expiration_block {
@@ -474,7 +473,7 @@ pub mod pallet {
 		) -> DispatchResult {
 			let who = ensure_signed(origin)?;
 			<Self as BondProvider>::bond_self(who, amount, bond_until_block)
-				.map_err(|e| Error::<T>::from(e))?;
+				.map_err(Error::<T>::from)?;
 
 			Ok(())
 		}
@@ -489,7 +488,7 @@ pub mod pallet {
 		) -> DispatchResult {
 			let who = ensure_signed(origin)?;
 			<Self as BondProvider>::lease(bond_fund_id, who, amount, lease_until_block)
-				.map_err(|e| Error::<T>::from(e))?;
+				.map_err(Error::<T>::from)?;
 			Ok(())
 		}
 
@@ -497,7 +496,7 @@ pub mod pallet {
 		#[pallet::weight(0)]
 		pub fn return_bond(origin: OriginFor<T>, bond_id: T::BondId) -> DispatchResult {
 			let who = ensure_signed(origin)?;
-			<Self as BondProvider>::return_bond(bond_id, who).map_err(|e| Error::<T>::from(e))?;
+			<Self as BondProvider>::return_bond(bond_id, who).map_err(Error::<T>::from)?;
 			Ok(())
 		}
 
@@ -511,7 +510,7 @@ pub mod pallet {
 		) -> DispatchResult {
 			let who = ensure_signed(origin)?;
 			<Self as BondProvider>::extend_bond(bond_id, who, total_amount, bond_until_block)
-				.map_err(|e| Error::<T>::from(e))?;
+				.map_err(Error::<T>::from)?;
 			Ok(())
 		}
 	}
@@ -536,24 +535,24 @@ pub mod pallet {
 		}
 
 		fn hold(who: &T::AccountId, amount: T::Balance) -> Result<(), BondError> {
-			T::Currency::hold(&&HoldReason::EnterBondFund.into(), &who, amount).map_err(|e| {
-				let balance = T::Currency::balance(&who);
+			T::Currency::hold(&HoldReason::EnterBondFund.into(), who, amount).map_err(|e| {
+				let balance = T::Currency::balance(who);
 				warn!( target: LOG_TARGET, "Hold failed for {:?} from {:?}. Current Balance={:?}. {:?}", amount, who, balance, e);
 
 				match e {
-					Token(TokenError::BelowMinimum) => BondError::AccountWouldBeBelowMinimum.into(),
+					Token(TokenError::BelowMinimum) => BondError::AccountWouldBeBelowMinimum,
 					_ => {
 						if balance.checked_sub(&amount).is_some()  && balance.saturating_sub(amount) <
 							T::Currency::minimum_balance()
 						{
-							return BondError::AccountWouldBeBelowMinimum.into()
+							return BondError::AccountWouldBeBelowMinimum
 						}
 
-						BondError::InsufficientFunds.into()
+						BondError::InsufficientFunds
 					},
 				}
 			})?;
-			frame_system::Pallet::<T>::inc_providers(&who);
+			frame_system::Pallet::<T>::inc_providers(who);
 			Ok(())
 		}
 
@@ -562,15 +561,15 @@ pub mod pallet {
 			amount: T::Balance,
 		) -> Result<T::Balance, DispatchError> {
 			let reason = &HoldReason::EnterBondFund.into();
-			if amount == Self::held_balance(&who) {
-				let _ = frame_system::Pallet::<T>::dec_providers(&who);
+			if amount == Self::held_balance(who) {
+				let _ = frame_system::Pallet::<T>::dec_providers(who);
 			}
-			T::Currency::release(&reason, &who, amount, Precision::Exact)
+			T::Currency::release(reason, who, amount, Precision::Exact)
 		}
 
 		fn held_balance(who: &T::AccountId) -> T::Balance {
 			let reason = &HoldReason::EnterBondFund.into();
-			T::Currency::balance_on_hold(&reason, &who)
+			T::Currency::balance_on_hold(reason, who)
 		}
 
 		fn transfer(
@@ -581,8 +580,8 @@ pub mod pallet {
 			T::Currency::transfer(from, to, amount, Preservation::Preserve).map_err(|e| {
 				warn!( target: LOG_TARGET, "Transfer failed for {:?} from {:?} to {:?} {:?}", amount, from, to, e);
 				match e {
-					Token(TokenError::BelowMinimum) => BondError::AccountWouldBeBelowMinimum.into(),
-					_ => BondError::InsufficientFunds.into(),
+					Token(TokenError::BelowMinimum) => BondError::AccountWouldBeBelowMinimum,
+					_ => BondError::InsufficientFunds,
 				}
 			})?;
 			Ok(())
@@ -605,7 +604,7 @@ pub mod pallet {
 							"Expiring bond hold could not all be returned {:?} - remaining not un-reserved ({:?}).",
 							bond, unreserved
 						);
-						return Err(Error::<T>::UnrecoverableHold.into())
+						return Err(Error::<T>::UnrecoverableHold.into());
 					}
 					Ok(())
 				},
@@ -632,7 +631,7 @@ pub mod pallet {
 						}
 						Ok(())
 					} else {
-						return Err(Error::<T>::BondFundNotFound.into())
+						Err(Error::<T>::BondFundNotFound.into())
 					}
 				},
 			}
@@ -640,7 +639,7 @@ pub mod pallet {
 
 		fn remove_bond_completion(bond_id: T::BondId, completion_block: BlockNumberFor<T>) {
 			if !BondCompletions::<T>::contains_key(completion_block) {
-				return
+				return;
 			}
 			BondCompletions::<T>::mutate(completion_block, |bonds| {
 				if let Some(index) = bonds.iter().position(|b| *b == bond_id) {
@@ -654,7 +653,7 @@ pub mod pallet {
 			expiration_block: BlockNumberFor<T>,
 		) {
 			if !BondFundExpirations::<T>::contains_key(expiration_block) {
-				return
+				return;
 			}
 			BondFundExpirations::<T>::mutate(expiration_block, |funds| {
 				if let Some(index) = funds.iter().position(|id| *id == bond_fund_id) {
@@ -692,8 +691,8 @@ pub mod pallet {
 			who: &T::AccountId,
 			block_number: BlockNumberFor<T>,
 		) -> Result<Fee<T::Balance>, BondError> {
-			let mut bond_fund = BondFunds::<T>::get(bond_fund_id)
-				.ok_or::<BondError>(BondError::NoBondFundFound.into())?;
+			let mut bond_fund =
+				BondFunds::<T>::get(bond_fund_id).ok_or::<BondError>(BondError::NoBondFundFound)?;
 
 			if bond_fund.amount_reserved.saturating_sub(bond_fund.amount_bonded) < amount {
 				log::info!(
@@ -702,15 +701,15 @@ pub mod pallet {
 					amount,
 					lease_until_block
 				);
-				return Err(BondError::InsufficientBondFunds.into())
+				return Err(BondError::InsufficientBondFunds);
 			}
 
 			if bond_fund.is_ended {
-				return Err(BondError::BondFundClosed.into())
+				return Err(BondError::BondFundClosed);
 			}
 
 			if lease_until_block > bond_fund.offer_expiration_block {
-				return Err(BondError::LeaseUntilPastFundExpiration.into())
+				return Err(BondError::LeaseUntilPastFundExpiration);
 			}
 
 			let base_fee = bond_fund.lease_base_fee;
@@ -723,7 +722,7 @@ pub mod pallet {
 				T::BlocksPerYear::get(),
 			);
 
-			Self::transfer(&who, &bond_fund.offer_account_id, fee)?;
+			Self::transfer(who, &bond_fund.offer_account_id, fee)?;
 
 			bond_fund.amount_bonded = bond_fund.amount_bonded.saturating_add(amount);
 			BondFunds::<T>::set(bond_fund_id, Some(bond_fund));
@@ -752,12 +751,12 @@ pub mod pallet {
 			bond_until_block: BlockNumberFor<T>,
 		) -> Result<Self::BondId, BondError> {
 			if amount < T::MinimumBondAmount::get() {
-				return Err(BondError::MinimumBondAmountNotMet.into())
+				return Err(BondError::MinimumBondAmountNotMet);
 			}
 
 			let block_number = frame_system::Pallet::<T>::block_number();
 			if bond_until_block <= block_number {
-				return Err(BondError::ExpirationTooSoon.into())
+				return Err(BondError::ExpirationTooSoon);
 			}
 
 			Self::hold(&account_id, amount)?;
@@ -769,7 +768,7 @@ pub mod pallet {
 				amount,
 				start_block: block_number,
 				completion_block: bond_until_block,
-				annual_percent_rate: 0u32.into(),
+				annual_percent_rate: 0u32,
 				base_fee: 0u32.into(),
 				fee: 0u32.into(),
 				is_locked: false,
@@ -795,11 +794,11 @@ pub mod pallet {
 			lease_until_block: BlockNumberFor<T>,
 		) -> Result<Self::BondId, BondError> {
 			if amount < T::MinimumBondAmount::get() {
-				return Err(BondError::MinimumBondAmountNotMet.into())
+				return Err(BondError::MinimumBondAmountNotMet);
 			}
 			let block_number = frame_system::Pallet::<T>::block_number();
 			if lease_until_block <= block_number {
-				return Err(BondError::LeaseUntilBlockTooSoon.into())
+				return Err(BondError::LeaseUntilBlockTooSoon);
 			}
 
 			let fee = Self::charge_lease_fees(
@@ -811,7 +810,7 @@ pub mod pallet {
 			)?;
 
 			if fee.total_fee > amount {
-				return Err(BondError::FeeExceedsBondAmount.into())
+				return Err(BondError::FeeExceedsBondAmount);
 			}
 
 			let bond_id = Self::next_bond_id()?;
@@ -846,29 +845,27 @@ pub mod pallet {
 		fn return_bond(bond_id: T::BondId, account_id: T::AccountId) -> Result<(), BondError> {
 			let bond = Bonds::<T>::get(bond_id).ok_or(BondError::BondNotFound)?;
 			if bond.is_locked {
-				return Err(BondError::BondLockedCannotModify.into())
+				return Err(BondError::BondLockedCannotModify);
 			}
 			if bond.bonded_account_id != account_id {
-				return Err(BondError::NoPermissions.into())
+				return Err(BondError::NoPermissions);
 			}
 
 			// if own bond, go ahead and return it
 			if bond.bond_fund_id.is_none() {
-				return Ok(
-					Self::bond_completed(bond_id).map_err(|_| BondError::UnrecoverableHold.into())
-				)?
+				return Ok(Self::bond_completed(bond_id).map_err(|_| BondError::UnrecoverableHold))?;
 			}
 
 			let bond_fund_id = bond.bond_fund_id.ok_or(BondError::NoBondFundFound)?;
 
-			let mut bond_fund = BondFunds::<T>::get(bond_fund_id)
-				.ok_or::<BondError>(BondError::NoBondFundFound.into())?;
+			let mut bond_fund =
+				BondFunds::<T>::get(bond_fund_id).ok_or::<BondError>(BondError::NoBondFundFound)?;
 
 			let current_block_number = frame_system::Pallet::<T>::block_number();
 			let remaining_blocks =
 				blocks_into_u32::<T>(bond.completion_block - current_block_number);
 			if remaining_blocks <= 0 {
-				return Err(BondError::BondAlreadyClosed.into())
+				return Err(BondError::BondAlreadyClosed);
 			}
 			let updated_fee: T::Balance = Self::calculate_fees(
 				// use rate stored on bond in case it change
@@ -885,8 +882,8 @@ pub mod pallet {
 			if refund_amount > 0u32.into() {
 				let offer_account_id = &bond_fund.offer_account_id.clone();
 				// first try to get from the account
-				if Self::can_transfer(&offer_account_id, refund_amount) {
-					Self::transfer(&offer_account_id, &bond.bonded_account_id, refund_amount)?;
+				if Self::can_transfer(offer_account_id, refund_amount) {
+					Self::transfer(offer_account_id, &bond.bonded_account_id, refund_amount)?;
 					Self::deposit_event(Event::BondFeeRefund {
 						bond_fund_id,
 						bond_id,
@@ -900,10 +897,10 @@ pub mod pallet {
 				else {
 					if bond_fund.amount_reserved < refund_amount {
 						// should not be possible!
-						return Err(BondError::InsufficientFunds.into())
+						return Err(BondError::InsufficientFunds);
 					}
 					let mut amount_to_pull = refund_amount;
-					if T::Currency::balance(&offer_account_id) < T::Currency::minimum_balance() {
+					if T::Currency::balance(offer_account_id) < T::Currency::minimum_balance() {
 						amount_to_pull += T::Currency::minimum_balance();
 					}
 					log::info!(target: LOG_TARGET, "Cannot refund returned bond. Pulling funds from the bond fund instead. refund_amount={:?}, amount_to_satisfy_minimum_balance={:?}, bond_fund_id={:?} bond_id={:?}", refund_amount, amount_to_pull, bond_fund_id, bond_id);
@@ -931,7 +928,7 @@ pub mod pallet {
 					});
 				}
 			}
-			Self::bond_completed(bond_id).map_err(|_| BondError::UnrecoverableHold.into())?;
+			Self::bond_completed(bond_id).map_err(|_| BondError::UnrecoverableHold)?;
 			Ok(())
 		}
 
@@ -942,22 +939,22 @@ pub mod pallet {
 			lease_until: BlockNumberFor<T>,
 		) -> Result<(), BondError> {
 			if total_amount < T::MinimumBondAmount::get() {
-				return Err(BondError::MinimumBondAmountNotMet.into())
+				return Err(BondError::MinimumBondAmountNotMet);
 			}
 			let block_number = frame_system::Pallet::<T>::block_number();
 			if lease_until <= block_number {
-				return Err(BondError::LeaseUntilBlockTooSoon.into())
+				return Err(BondError::LeaseUntilBlockTooSoon);
 			}
 
 			let mut bond = Bonds::<T>::get(bond_id).ok_or(BondError::BondNotFound)?;
 			if bond.bonded_account_id != account_id {
-				return Err(BondError::NoPermissions.into())
+				return Err(BondError::NoPermissions);
 			}
 
 			// If a bond is locked, it can only be increased
 			if bond.is_locked && (total_amount < bond.amount || lease_until < bond.completion_block)
 			{
-				return Err(BondError::BondLockedCannotModify.into())
+				return Err(BondError::BondLockedCannotModify);
 			}
 
 			// if the expiration changed, remove from old slot
@@ -974,25 +971,25 @@ pub mod pallet {
 						Self::hold(&account_id, total_amount - bond.amount)?;
 					} else if total_amount < bond.amount {
 						Self::release_hold(&account_id, bond.amount - total_amount)
-							.map_err(|_| BondError::UnrecoverableHold.into())?;
+							.map_err(|_| BondError::UnrecoverableHold)?;
 					}
 				},
 				Some(bond_fund_id) => {
 					let mut bond_fund = BondFunds::<T>::get(bond_fund_id)
-						.ok_or::<BondError>(BondError::NoBondFundFound.into())?;
+						.ok_or::<BondError>(BondError::NoBondFundFound)?;
 					let additional_funds = total_amount.saturating_sub(bond.amount);
 
 					if additional_funds >
 						bond_fund.amount_reserved.saturating_sub(bond_fund.amount_bonded)
 					{
-						return Err(BondError::InsufficientBondFunds.into())
+						return Err(BondError::InsufficientBondFunds);
 					}
 
 					if lease_until > bond_fund.offer_expiration_block {
-						return Err(BondError::LeaseUntilPastFundExpiration.into())
+						return Err(BondError::LeaseUntilPastFundExpiration);
 					}
 
-					let lease_annual_percent_rate = bond_fund.lease_annual_percent_rate.clone();
+					let lease_annual_percent_rate = bond_fund.lease_annual_percent_rate;
 					// must take the current fee structure
 					let fee = Self::calculate_fees(
 						// we pay the current rate to extend
@@ -1052,7 +1049,7 @@ pub mod pallet {
 		fn lock_bond(bond_id: T::BondId) -> Result<(), BondError> {
 			let mut bond = Bonds::<T>::get(bond_id).ok_or(BondError::BondNotFound)?;
 			if bond.is_locked {
-				return Err(BondError::BondAlreadyLocked.into())
+				return Err(BondError::BondAlreadyLocked);
 			}
 			bond.is_locked = true;
 
@@ -1068,7 +1065,7 @@ pub mod pallet {
 		fn unlock_bond(bond_id: T::BondId) -> Result<(), BondError> {
 			let mut bond = Bonds::<T>::get(bond_id).ok_or(BondError::BondNotFound)?;
 			if !bond.is_locked {
-				return Ok(())
+				return Ok(());
 			}
 			bond.is_locked = false;
 

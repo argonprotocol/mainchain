@@ -1,10 +1,11 @@
 use env_logger::{Builder, Env};
-use frame_support::derive_impl;
-use frame_support::{parameter_types, traits::Currency, PalletId};
+use frame_support::{derive_impl, parameter_types, traits::Currency, PalletId};
 use frame_system::pallet_prelude::BlockNumberFor;
 use sp_core::{crypto::AccountId32, ConstU32, H256};
-use sp_runtime::traits::IdentityLookup;
-use sp_runtime::{traits::NumberFor, BuildStorage};
+use sp_runtime::{
+	traits::{IdentityLookup, NumberFor},
+	BuildStorage,
+};
 use sp_std::collections::btree_map::BTreeMap;
 
 use ulx_primitives::{
@@ -86,7 +87,7 @@ impl pallet_balances::Config for Test {
 }
 
 pub fn set_argons(account_id: &AccountId32, amount: Balance) {
-	let _ = Balances::make_free_balance_be(&account_id, amount);
+	let _ = Balances::make_free_balance_be(account_id, amount);
 	drop(Balances::issue(amount));
 }
 

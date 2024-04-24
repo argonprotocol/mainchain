@@ -114,11 +114,11 @@ pub mod pallet {
 	impl<T: Config> Hooks<BlockNumberFor<T>> for Pallet<T> {
 		fn on_initialize(_n: BlockNumberFor<T>) -> Weight {
 			let tick = T::TickProvider::current_tick();
-			let expiring = ExpiringDomainsByBlock::<T>::take(&tick);
+			let expiring = ExpiringDomainsByBlock::<T>::take(tick);
 			let entries = expiring.len() as u64;
 			for domain_hash in expiring {
-				RegisteredDataDomains::<T>::remove(&domain_hash);
-				ZoneRecordsByDomain::<T>::remove(&domain_hash);
+				RegisteredDataDomains::<T>::remove(domain_hash);
+				ZoneRecordsByDomain::<T>::remove(domain_hash);
 				Self::clean_old_payment_addresses(&domain_hash, tick);
 				Self::deposit_event(Event::DataDomainExpired { domain_hash });
 			}
@@ -137,16 +137,16 @@ pub mod pallet {
 			zone_record: ZoneRecord<T::AccountId>,
 		) -> DispatchResult {
 			let who = ensure_signed(origin)?;
-			let Some(registration) = RegisteredDataDomains::<T>::get(&domain_hash) else {
+			let Some(registration) = RegisteredDataDomains::<T>::get(domain_hash) else {
 				return Err(Error::<T>::DomainNotRegistered.into());
 			};
 
 			ensure!(registration.account_id == who, Error::<T>::NotDomainOwner);
 
-			ZoneRecordsByDomain::<T>::insert(&domain_hash, &zone_record);
+			ZoneRecordsByDomain::<T>::insert(domain_hash, &zone_record);
 			let tick = T::TickProvider::current_tick();
 			Self::clean_old_payment_addresses(&domain_hash, tick);
-			DomainPaymentAddressHistory::<T>::try_mutate(&domain_hash, |entry| {
+			DomainPaymentAddressHistory::<T>::try_mutate(domain_hash, |entry| {
 				entry.try_push((zone_record.payment_account.clone(), tick))
 			})
 			.map_err(|_| DispatchError::Other("Failed to add payment address to history"))?;
@@ -173,10 +173,10 @@ pub mod pallet {
 					};
 
 					if registration.registered_at_tick >= header.tick {
-						<RegisteredDataDomains<T>>::remove(&domain_hash);
+						<RegisteredDataDomains<T>>::remove(domain_hash);
 						remove_expired();
 						Self::deposit_event(Event::DataDomainRegistrationCanceled {
-							domain_hash: domain_hash.clone(),
+							domain_hash: *domain_hash,
 							registration,
 						});
 						continue;
@@ -195,17 +195,15 @@ pub mod pallet {
 					DataDomainRegistration { account_id, registered_at_tick: header.tick };
 				<RegisteredDataDomains<T>>::insert(domain_hash, registration.clone());
 				<ExpiringDomainsByBlock<T>>::mutate(header.tick + expiration_ticks, |domains| {
-					domains.try_push(domain_hash.clone())
+					domains.try_push(*domain_hash)
 				})
 				.map_err(|_| DispatchError::Other("Failed to add domain to expiration list"))?;
 
 				if is_renewal {
-					Self::deposit_event(Event::DataDomainRenewed {
-						domain_hash: domain_hash.clone(),
-					});
+					Self::deposit_event(Event::DataDomainRenewed { domain_hash: *domain_hash });
 				} else {
 					Self::deposit_event(Event::DataDomainRegistered {
-						domain_hash: domain_hash.clone(),
+						domain_hash: *domain_hash,
 						registration,
 					});
 				}
@@ -238,13 +236,13 @@ pub mod pallet {
 		) -> bool {
 			if let Some(zone) = ZoneRecordsByDomain::<T>::get(data_domain_hash) {
 				if zone.payment_account == *account_id {
-					return true
+					return true;
 				}
 			}
 
 			for (addr, tick) in <DomainPaymentAddressHistory<T>>::get(data_domain_hash) {
 				if addr == *account_id && tick >= tick_range.0 && tick <= tick_range.1 {
-					return true
+					return true;
 				}
 			}
 

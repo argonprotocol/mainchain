@@ -1,4 +1,3 @@
-
 #![cfg_attr(not(feature = "std"), no_std)]
 
 extern crate core;
@@ -210,7 +209,7 @@ pub mod pallet {
 						);
 
 						let decoded = BlockVoteDigest::decode(&mut data.as_ref());
-						if let Some(votes_digest) = decoded.ok() {
+						if let Ok(votes_digest) = decoded {
 							<TempBlockVoteDigest<T>>::put(votes_digest.clone());
 						}
 					},
@@ -256,14 +255,14 @@ pub mod pallet {
 					if entry.0 == tick {
 						entry.1 = entry.1.saturating_add(total_votes);
 						entry.2 = entry.2.saturating_add(total_voting_power);
-						return Ok(())
+						return Ok(());
 					}
 				}
 				x.try_push((tick, total_votes, total_voting_power))
 			})
 			.ok();
 			if did_append.is_some() {
-				return
+				return;
 			}
 
 			let period_votes = <PastBlockVotes<T>>::get();
@@ -305,7 +304,7 @@ pub mod pallet {
 			<PreviousBlockTimestamp<T>>::put(now);
 
 			if T::SealInherent::get() != BlockSealInherent::Compute {
-				return
+				return;
 			}
 
 			let now: u64 = UniqueSaturatedInto::<u64>::unique_saturated_into(now);
@@ -318,8 +317,8 @@ pub mod pallet {
 				<PastComputeBlockTimes<T>>::try_mutate(|x| x.try_push(block_period)).ok();
 
 			// if we can still append, keep going
-			if let Some(_) = did_append {
-				return
+			if did_append.is_some() {
+				return;
 			}
 
 			let timestamps = <PastComputeBlockTimes<T>>::get();
@@ -362,7 +361,7 @@ pub mod pallet {
 
 			for header in included_notebooks {
 				if header.tick != tick {
-					continue
+					continue;
 				}
 				if !T::NotebookProvider::is_notary_locked_at_tick(header.notary_id, header.tick) {
 					block_votes.votes_count += header.block_votes_count;
@@ -450,7 +449,7 @@ pub mod pallet {
 
 	impl<T: Config> BlockVotingProvider<T::Block> for Pallet<T> {
 		fn grandparent_vote_minimum() -> Option<VoteMinimum> {
-			<VoteMinimumHistory<T>>::get().get(0).cloned()
+			<VoteMinimumHistory<T>>::get().first().cloned()
 		}
 	}
 }

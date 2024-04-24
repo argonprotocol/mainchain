@@ -71,7 +71,11 @@ pub async fn try_until_connected(
 						"Failed to connect to client within timeout".to_string(),
 					));
 				}
-				println!("failed to connect client to {:?}, {:?} retrying soon..", url.clone(), why);
+				println!(
+					"failed to connect client to {:?}, {:?} retrying soon..",
+					url.clone(),
+					why
+				);
 				tokio::time::sleep(std::time::Duration::from_millis(retry_delay_millis)).await;
 			},
 		}
@@ -99,6 +103,7 @@ impl UlxFullclient {
 
 		let (sender, receiver) = loop {
 			let builder = {
+				#[allow(clippy::let_and_return)]
 				let transport_builder = WsTransportClientBuilder::default();
 				#[cfg(any(target_os = "ios", target_os = "android"))]
 				let transport_builder = transport_builder.use_webpki_rustls();

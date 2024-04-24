@@ -7,7 +7,6 @@ extern crate alloc;
 #[macro_use]
 extern crate frame_benchmarking;
 
-use frame_support::derive_impl;
 pub use frame_support::{
 	construct_runtime, parameter_types,
 	traits::{
@@ -23,6 +22,7 @@ pub use frame_support::{
 	StorageValue,
 };
 use frame_support::{
+	derive_impl,
 	genesis_builder_helper::{build_config, create_default_config},
 	traits::{Contains, Currency, InsideBoth, OnUnbalanced},
 	PalletId,
@@ -53,9 +53,8 @@ use sp_version::NativeVersion;
 use sp_version::RuntimeVersion;
 
 pub use pallet_notebook::NotebookVerifyError;
-use ulx_primitives::block_seal::MiningAuthority;
-use ulx_primitives::NotebookAuditSummary;
 use ulx_primitives::{
+	block_seal::MiningAuthority,
 	block_vote::VoteMinimum,
 	digests::BlockVoteDigest,
 	localchain::BestBlockVoteSeal,
@@ -64,7 +63,7 @@ use ulx_primitives::{
 	prod_or_fast,
 	tick::{Tick, Ticker, TICK_MILLIS},
 	BlockSealAuthorityId, BondFundId, BondId, NotaryNotebookVotes, NotebookAuditResult,
-	TickProvider, ESCROW_CLAWBACK_TICKS, ESCROW_EXPIRATION_TICKS,
+	NotebookAuditSummary, TickProvider, ESCROW_CLAWBACK_TICKS, ESCROW_EXPIRATION_TICKS,
 };
 pub use ulx_primitives::{
 	AccountId, Balance, BlockHash, BlockNumber, HashOutput, Moment, Nonce, Signature,

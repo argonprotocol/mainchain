@@ -1,4 +1,3 @@
-
 #![cfg_attr(not(feature = "std"), no_std)]
 
 use codec::Codec;
@@ -352,7 +351,7 @@ pub mod pallet {
 				UniqueSaturatedInto::<u32>::unique_saturated_into(block_number);
 			let blocks_between_slots = T::BlocksBetweenSlots::get();
 			if block_number_u32 % blocks_between_slots != 0 {
-				return T::DbWeight::get().reads_writes(0, 0)
+				return T::DbWeight::get().reads_writes(0, 0);
 			}
 
 			let start_index_to_replace_miners = Self::get_slot_starting_index(
@@ -369,7 +368,7 @@ pub mod pallet {
 			for i in 0..cohort_size {
 				let index = i + start_index_to_replace_miners;
 
-				if let Some(entry) = ActiveMinersByIndex::<T>::take(&index) {
+				if let Some(entry) = ActiveMinersByIndex::<T>::take(index) {
 					let account_id = entry.account_id.clone();
 					AccountIndexLookup::<T>::remove(&account_id);
 					active_miners -= 1;
@@ -389,18 +388,18 @@ pub mod pallet {
 				}
 
 				if let Some(registration) = slot_cohort.get(i as usize) {
-					AccountIndexLookup::<T>::insert(&registration.account_id, &index);
+					AccountIndexLookup::<T>::insert(&registration.account_id, index);
 					active_miners += 1;
-					ActiveMinersByIndex::<T>::insert(&index, registration.clone());
+					ActiveMinersByIndex::<T>::insert(index, registration.clone());
 				}
 			}
 
 			if active_miners == 0 {
 				if let Some(miner) = MinerZero::<T>::get() {
 					let index = start_index_to_replace_miners;
-					AccountIndexLookup::<T>::insert(&miner.account_id, &index);
+					AccountIndexLookup::<T>::insert(&miner.account_id, index);
 					active_miners = 1;
-					ActiveMinersByIndex::<T>::insert(&index, miner.clone());
+					ActiveMinersByIndex::<T>::insert(index, miner.clone());
 				}
 			}
 
@@ -451,8 +450,7 @@ pub mod pallet {
 
 			let mut bid: T::Balance = 0u32.into();
 			if let Some(bond_id) = bond_id {
-				let bond = T::BondProvider::get_bond(bond_id.clone())
-					.map_err(|err| Error::<T>::from(err))?;
+				let bond = T::BondProvider::get_bond(bond_id).map_err(Error::<T>::from)?;
 
 				ensure!(bond.bonded_account_id == who, Error::<T>::NoPermissions);
 
@@ -467,10 +465,9 @@ pub mod pallet {
 				let is_same_bond = current_registration
 					.as_ref()
 					.map(|x| x.bond_id == Some(bond_id))
-					.unwrap_or(false)
-					.clone();
+					.unwrap_or(false);
 				if !is_same_bond {
-					T::BondProvider::lock_bond(bond_id).map_err(|err| Error::<T>::from(err))?;
+					T::BondProvider::lock_bond(bond_id).map_err(Error::<T>::from)?;
 				}
 			}
 
@@ -510,8 +507,8 @@ pub mod pallet {
 						MiningRegistration {
 							account_id: who.clone(),
 							reward_destination,
-							bond_id: bond_id.clone(),
-							bond_amount: bid.clone(),
+							bond_id,
+							bond_amount: bid,
 							ownership_tokens,
 						},
 					)
@@ -519,7 +516,7 @@ pub mod pallet {
 
 				Self::deposit_event(Event::<T>::SlotBidderAdded {
 					account_id: who.clone(),
-					bid_amount: bid.clone(),
+					bid_amount: bid,
 					index: UniqueSaturatedInto::<u32>::unique_saturated_into(pos),
 				});
 
@@ -550,7 +547,7 @@ impl<T: Config> AuthorityProvider<BlockSealAuthorityId, T::Block, T::AccountId> 
 		let closest = find_xor_closest(<AuthoritiesByIndex<T>>::get(), nonce);
 
 		closest.map(|(authority_id, index)| {
-			let registration = Self::active_miners_by_index(&index).unwrap();
+			let registration = Self::active_miners_by_index(index).unwrap();
 			MiningAuthority {
 				authority_id,
 				account_id: registration.account_id.clone(),
@@ -624,7 +621,7 @@ impl<T: Config> Pallet<T> {
 
 	pub(crate) fn get_active_registration(account_id: &T::AccountId) -> Option<Registration<T>> {
 		if let Some(index) = AccountIndexLookup::<T>::get(account_id) {
-			return ActiveMinersByIndex::<T>::get(index)
+			return ActiveMinersByIndex::<T>::get(index);
 		}
 		None
 	}
@@ -634,10 +631,7 @@ impl<T: Config> Pallet<T> {
 	}
 
 	pub(crate) fn get_next_registration(account_id: &T::AccountId) -> Option<Registration<T>> {
-		NextSlotCohort::<T>::get()
-			.into_iter()
-			.find(|x| x.account_id == *account_id)
-			.map(|x| x.clone())
+		NextSlotCohort::<T>::get().into_iter().find(|x| x.account_id == *account_id)
 	}
 
 	pub(crate) fn load_session_keys<'a>(
@@ -646,7 +640,7 @@ impl<T: Config> Pallet<T> {
 		let mut next_authorities =
 			BoundedBTreeMap::<u32, (BlockSealAuthorityId, U256), T::MaxMiners>::new();
 		for (account_id, authority_id) in miners_with_keys {
-			if let Some(account_index) = <AccountIndexLookup<T>>::get(&account_id) {
+			if let Some(account_index) = <AccountIndexLookup<T>>::get(account_id) {
 				let hash = blake2_256(&authority_id.clone().into_inner().0);
 				// this should not be possible to fail. The bounds equal the source lookup
 				next_authorities
@@ -682,7 +676,7 @@ impl<T: Config> Pallet<T> {
 		current_registration: Option<Registration<T>>,
 	) -> Result<T::Balance, DispatchError> {
 		let ownership_tokens = OwnershipBondAmount::<T>::get();
-		let next_registration = Self::get_next_registration(&who);
+		let next_registration = Self::get_next_registration(who);
 		let mut ownership_bond_needed = ownership_tokens;
 
 		// if we've already held for next, reduce now
@@ -693,22 +687,22 @@ impl<T: Config> Pallet<T> {
 		}
 
 		if ownership_bond_needed == 0u32.into() {
-			return Ok(ownership_tokens)
+			return Ok(ownership_tokens);
 		}
 
 		let hold_reason = HoldReason::RegisterAsMiner;
-		if T::OwnershipCurrency::balance_on_hold(&&hold_reason.into(), who) != 0u32.into() {
-			frame_system::Pallet::<T>::inc_providers(&who);
+		if T::OwnershipCurrency::balance_on_hold(&hold_reason.into(), who) != 0u32.into() {
+			frame_system::Pallet::<T>::inc_providers(who);
 		}
 
-		T::OwnershipCurrency::hold(&&hold_reason.into(), &who, ownership_bond_needed)
+		T::OwnershipCurrency::hold(&hold_reason.into(), who, ownership_bond_needed)
 			.map_err(|_| Error::<T>::InsufficientOwnershipTokens)?;
 		Ok(ownership_tokens)
 	}
 
 	pub(crate) fn unlock_bond_for_next(registration: Registration<T>) -> DispatchResult {
 		if let Some(bond_id) = registration.bond_id {
-			T::BondProvider::unlock_bond(bond_id).map_err(|e| Error::<T>::from(e))?;
+			T::BondProvider::unlock_bond(bond_id).map_err(Error::<T>::from)?;
 		}
 
 		let account_id = registration.account_id;
@@ -733,12 +727,12 @@ impl<T: Config> Pallet<T> {
 	fn release_ownership_hold(account_id: &T::AccountId, amount: T::Balance) -> DispatchResult {
 		let reason = HoldReason::RegisterAsMiner;
 		if amount == 0u32.into() {
-			return Ok(())
+			return Ok(());
 		}
-		T::OwnershipCurrency::release(&&reason.into(), account_id, amount, Precision::Exact)
+		T::OwnershipCurrency::release(&reason.into(), account_id, amount, Precision::Exact)
 			.map_err(|_| Error::<T>::UnrecoverableHold)?;
 
-		if T::OwnershipCurrency::balance_on_hold(&&reason.into(), account_id) == 0u32.into() {
+		if T::OwnershipCurrency::balance_on_hold(&reason.into(), account_id) == 0u32.into() {
 			let _ = frame_system::Pallet::<T>::dec_providers(account_id);
 		}
 		Ok(())
@@ -757,7 +751,7 @@ impl<T: Config> Pallet<T> {
 				Self::release_ownership_hold(&account_id, active_registration.ownership_tokens)?;
 
 				if let Some(bond_id) = active_bond_id {
-					T::BondProvider::unlock_bond(bond_id).map_err(|e| Error::<T>::from(e))?;
+					T::BondProvider::unlock_bond(bond_id).map_err(Error::<T>::from)?;
 				}
 
 				Self::deposit_event(Event::<T>::UnbondedMiner {
@@ -769,7 +763,7 @@ impl<T: Config> Pallet<T> {
 			Some(next) =>
 				if active_bond_id.is_some() && active_bond_id != next.bond_id {
 					T::BondProvider::unlock_bond(active_bond_id.unwrap())
-						.map_err(|e| Error::<T>::from(e))?;
+						.map_err(Error::<T>::from)?;
 
 					Self::deposit_event(Event::<T>::UnbondedMiner {
 						account_id: account_id.clone(),
@@ -823,7 +817,7 @@ pub struct FullIdentificationOf<T>(PhantomData<T>);
 impl<T: Config> Convert<T::AccountId, Option<MinerHistory>> for FullIdentificationOf<T> {
 	fn convert(miner: T::AccountId) -> Option<MinerHistory> {
 		if let Some(index) = <AccountIndexLookup<T>>::get(&miner) {
-			return Some(MinerHistory { authority_index: index.clone() })
+			return Some(MinerHistory { authority_index: index });
 		}
 		None
 	}
@@ -841,7 +835,7 @@ impl<T: Config> SessionManager<T::AccountId> for Pallet<T> {
 		// only rotate miners on cohort changeover. The keys representing the authority ids will
 		// auto-change
 		if block_number_u32 % T::BlocksBetweenSlots::get() != 0 {
-			return None
+			return None;
 		}
 		Some(Self::get_miner_accounts())
 	}
@@ -865,7 +859,7 @@ where
 				.into_iter()
 				.filter_map(|v| {
 					if let Some(miner) = FullIdentificationOf::<T>::convert(v.clone()) {
-						return Some((v, miner))
+						return Some((v, miner));
 					}
 					None
 				})

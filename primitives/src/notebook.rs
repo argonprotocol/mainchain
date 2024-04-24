@@ -109,8 +109,8 @@ impl Notebook {
 	}
 
 	pub fn verify_hash(&self) -> bool {
-		self.hash
-			== Self::create_hash(
+		self.hash ==
+			Self::create_hash(
 				self.header.hash(),
 				self.notarizations.clone().into(),
 				self.new_account_origins.clone().into(),

@@ -1,11 +1,12 @@
-use std::path::PathBuf;
-use std::{env, fs};
+use std::{env, fs, path::PathBuf};
 
 use anyhow::{anyhow, Context};
 use clap::{crate_version, Args, Parser, Subcommand};
 use sc_keystore::LocalKeystore;
-use sp_core::crypto::{ExposeSecret, Zeroize};
-use sp_core::{crypto::SecretString, ed25519, ByteArray, Pair as PairT};
+use sp_core::{
+	crypto::{ExposeSecret, SecretString, Zeroize},
+	ed25519, ByteArray, Pair as PairT,
+};
 use sp_keystore::{testing::MemoryKeystore, Keystore, KeystorePtr};
 use sqlx::{migrate, postgres::PgPoolOptions};
 
@@ -134,9 +135,9 @@ async fn main() -> anyhow::Result<()> {
 			let keystore = read_keystore(keystore_params.keystore_path, password, dev)?;
 			if dev {
 				let suri = "//Ferdie//notary";
-				let pair = ed25519::Pair::from_string(&suri, None)?;
+				let pair = ed25519::Pair::from_string(suri, None)?;
 				keystore
-					.insert(NOTARY_KEYID, &suri, pair.public().as_slice())
+					.insert(NOTARY_KEYID, suri, pair.public().as_slice())
 					.map_err(|_| Error::KeystoreOperation)?;
 			}
 
@@ -147,7 +148,7 @@ async fn main() -> anyhow::Result<()> {
 			let server = NotaryServer::start(notary_id, pool.clone(), bind_addr).await?;
 
 			if sync_blocks {
-				spawn_block_sync(trusted_rpc_url.clone(), notary_id, pool.clone(), ticker.clone()).await?;
+				spawn_block_sync(trusted_rpc_url.clone(), notary_id, pool.clone(), ticker).await?;
 			}
 			if finalize_notebooks {
 				let _ = spawn_notebook_closer(
@@ -236,7 +237,8 @@ fn read_password(keystore_params: KeystoreParams) -> anyhow::Result<Option<Secre
 	let pass = if password_interactive {
 		Some(SecretString::new(rpassword::prompt_password("Keystore Password: ")?))
 	} else if let Some(ref file) = keystore_params.password_filename {
-		let password = fs::read_to_string(file).map_err(|e| anyhow!("Unable to read password file: {}", e))?;
+		let password =
+			fs::read_to_string(file).map_err(|e| anyhow!("Unable to read password file: {}", e))?;
 		Some(SecretString::new(password))
 	} else {
 		password

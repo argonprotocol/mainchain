@@ -1,4 +1,3 @@
-
 #![cfg_attr(not(feature = "std"), no_std)]
 
 pub use pallet::*;
@@ -184,7 +183,7 @@ pub mod pallet {
 				TryInto::<u128>::try_into(T::StartingUlixeesPerBlock::get()).ok()
 			else {
 				log::error!(target: LOG_TARGET, "Failed to convert ulixees per block to u128");
-				return
+				return;
 			};
 
 			let mut block_ulixees = block_ulixees.saturating_div(halvings + 1u128);

@@ -7,8 +7,10 @@ use sp_std::{fmt::Debug, prelude::*};
 
 pub use pallet::*;
 pub use ulx_notary_audit::VerifyError as NotebookVerifyError;
-use ulx_primitives::notary::{NotaryId, NotaryProvider};
-use ulx_primitives::TransferToLocalchainId;
+use ulx_primitives::{
+	notary::{NotaryId, NotaryProvider},
+	TransferToLocalchainId,
+};
 pub use weights::*;
 
 #[cfg(test)]
@@ -22,20 +24,18 @@ const LOG_TARGET: &str = "runtime::chain_transfer";
 
 #[frame_support::pallet(dev_mode)]
 pub mod pallet {
-	use frame_support::traits::Incrementable;
 	use frame_support::{
 		pallet_prelude::*,
 		traits::{
 			fungible::{Inspect, Mutate},
 			tokens::{Fortitude, Precision, Preservation},
+			Incrementable,
 		},
 		PalletId,
 	};
 	use frame_system::pallet_prelude::*;
 	use sp_core::{crypto::AccountId32, H256};
-	use sp_runtime::{
-		traits::{AccountIdConversion, AtLeast32BitUnsigned},
-	};
+	use sp_runtime::traits::{AccountIdConversion, AtLeast32BitUnsigned};
 
 	use ulx_primitives::{
 		notebook::{ChainTransfer, NotebookHeader},
@@ -201,8 +201,8 @@ pub mod pallet {
 			let who = ensure_signed(origin)?;
 
 			ensure!(
-				T::Currency::reducible_balance(&who, Preservation::Expendable, Fortitude::Force)
-					>= amount,
+				T::Currency::reducible_balance(&who, Preservation::Expendable, Fortitude::Force) >=
+					amount,
 				Error::<T>::InsufficientFunds,
 			);
 
@@ -216,8 +216,8 @@ pub mod pallet {
 				Preservation::Expendable,
 			)?;
 
-			let expiration_block: BlockNumberFor<T> = <frame_system::Pallet<T>>::block_number()
-				+ T::TransferExpirationBlocks::get().into();
+			let expiration_block: BlockNumberFor<T> = <frame_system::Pallet<T>>::block_number() +
+				T::TransferExpirationBlocks::get().into();
 
 			PendingTransfersOut::<T>::insert(
 				transfer_id,
@@ -251,7 +251,7 @@ pub mod pallet {
 						if is_locked {
 							continue;
 						}
-						let amount = amount.clone().into();
+						let amount = (*amount).into();
 						ensure!(
 							T::Currency::reducible_balance(
 								&notary_pallet_account_id,
@@ -262,7 +262,7 @@ pub mod pallet {
 						);
 						T::Currency::transfer(
 							&notary_pallet_account_id,
-							&account_id,
+							account_id,
 							amount,
 							Preservation::Expendable,
 						)?;
@@ -273,7 +273,7 @@ pub mod pallet {
 						});
 					},
 					ChainTransfer::ToLocalchain { transfer_id } => {
-						let transfer = <PendingTransfersOut<T>>::take(&transfer_id)
+						let transfer = <PendingTransfersOut<T>>::take(transfer_id)
 							.ok_or(Error::<T>::InvalidOrDuplicatedLocalchainTransfer)?;
 						ensure!(
 							transfer.expiration_block > <frame_system::Pallet<T>>::block_number(),
@@ -316,9 +316,9 @@ pub mod pallet {
 		) -> bool {
 			let result = <PendingTransfersOut<T>>::get(transfer_id);
 			if let Some(transfer) = result {
-				return transfer.notary_id == notary_id
-					&& transfer.amount == milligons
-					&& transfer.account_id == *account_id;
+				return transfer.notary_id == notary_id &&
+					transfer.amount == milligons &&
+					transfer.account_id == *account_id;
 			}
 
 			false

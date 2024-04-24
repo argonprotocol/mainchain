@@ -1,11 +1,16 @@
 use codec::{Codec, Decode, Encode, MaxEncodedLen};
 use scale_info::TypeInfo;
 use sp_core::{ConstU32, RuntimeDebug, H256, U256};
-use sp_runtime::BoundedVec;
-use sp_runtime::DispatchError;
+use sp_runtime::{BoundedVec, DispatchError};
 use sp_std::{collections::btree_map::BTreeMap, vec::Vec};
 
-use crate::{block_seal::MiningAuthority, notary::{NotaryId, NotaryNotebookVoteDetails, NotaryNotebookVoteDigestDetails}, tick::{Tick, Ticker}, AccountOrigin, BestBlockVoteSeal, BlockVoteDigest, BlockVotingPower, NotebookNumber, VoteMinimum, TransferToLocalchainId};
+use crate::{
+	block_seal::MiningAuthority,
+	notary::{NotaryId, NotaryNotebookVoteDetails, NotaryNotebookVoteDigestDetails},
+	tick::{Tick, Ticker},
+	AccountOrigin, BestBlockVoteSeal, BlockVoteDigest, BlockVotingPower, NotebookNumber,
+	TransferToLocalchainId, VoteMinimum,
+};
 
 sp_api::decl_runtime_apis! {
 	pub trait BlockSealApis<AccountId:Codec, BlockSealAuthorityId:Codec> {
@@ -96,21 +101,21 @@ pub struct NotebookAuditResult {
 	pub used_transfers_to_localchain: Vec<TransferToLocalchainId>,
 }
 
-impl Into<(NotebookAuditSummary, NotaryNotebookVotes)> for NotebookAuditResult {
-	fn into(self) -> (NotebookAuditSummary, NotaryNotebookVotes) {
+impl From<NotebookAuditResult> for (NotebookAuditSummary, NotaryNotebookVotes) {
+	fn from(val: NotebookAuditResult) -> Self {
 		(
 			NotebookAuditSummary {
-				notary_id: self.notary_id,
-				notebook_number: self.notebook_number,
-				tick: self.tick,
-				changed_accounts_root: self.changed_accounts_root,
-				account_changelist: self.account_changelist,
-				used_transfers_to_localchain: self.used_transfers_to_localchain,
+				notary_id: val.notary_id,
+				notebook_number: val.notebook_number,
+				tick: val.tick,
+				changed_accounts_root: val.changed_accounts_root,
+				account_changelist: val.account_changelist,
+				used_transfers_to_localchain: val.used_transfers_to_localchain,
 			},
 			NotaryNotebookVotes {
-				notary_id: self.notary_id,
-				notebook_number: self.notebook_number,
-				raw_votes: self.raw_votes,
+				notary_id: val.notary_id,
+				notebook_number: val.notebook_number,
+				raw_votes: val.raw_votes,
 			},
 		)
 	}

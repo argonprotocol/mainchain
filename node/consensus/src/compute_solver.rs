@@ -61,7 +61,7 @@ impl ComputeSolver {
 
 		let hash = blake2_256(&payload);
 		if BlockComputeNonce::meets_threshold(hash, self.threshold) {
-			return Some(self.wip_nonce.clone())
+			return Some(self.wip_nonce.clone());
 		}
 		None
 	}

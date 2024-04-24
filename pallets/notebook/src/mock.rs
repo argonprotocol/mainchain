@@ -1,13 +1,19 @@
 use env_logger::{Builder, Env};
-use frame_support::derive_impl;
-use frame_support::{parameter_types, traits::Currency};
+use frame_support::{derive_impl, parameter_types, traits::Currency};
 use sp_core::{crypto::AccountId32, ConstU32, H256, U256};
 use sp_runtime::{
 	traits::{IdentityLookup, NumberFor},
 	BuildStorage,
 };
 
-use ulx_primitives::{block_seal::MiningAuthority, block_vote::VoteMinimum, notary::{NotaryId, NotaryProvider, NotarySignature}, tick::{Tick, Ticker}, AuthorityProvider, BlockSealAuthorityId, BlockVotingProvider, ChainTransferLookup, TickProvider, TransferToLocalchainId};
+use ulx_primitives::{
+	block_seal::MiningAuthority,
+	block_vote::VoteMinimum,
+	notary::{NotaryId, NotaryProvider, NotarySignature},
+	tick::{Tick, Ticker},
+	AuthorityProvider, BlockSealAuthorityId, BlockVotingProvider, ChainTransferLookup,
+	TickProvider, TransferToLocalchainId,
+};
 
 use crate as pallet_notebook;
 
@@ -91,7 +97,9 @@ impl ChainTransferLookup<AccountId32, Balance> for ChainTransferLookupImpl {
 		ChainTransfers::get()
 			.iter()
 			.find(|(id, acc, tid, t_mill)| {
-				*id == notary_id && *acc == *account_id && *tid == transfer_to_localchain_id && *t_mill == milligons
+				*id == notary_id &&
+					*acc == *account_id && *tid == transfer_to_localchain_id &&
+					*t_mill == milligons
 			})
 			.is_some()
 	}
@@ -114,7 +122,7 @@ impl pallet_balances::Config for Test {
 }
 
 pub fn set_argons(account_id: &AccountId32, amount: Balance) {
-	let _ = Balances::make_free_balance_be(&account_id, amount);
+	let _ = Balances::make_free_balance_be(account_id, amount);
 	drop(Balances::issue(amount));
 }
 

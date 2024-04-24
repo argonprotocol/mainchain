@@ -4,8 +4,10 @@ use binary_merkle_tree::{merkle_proof, merkle_root};
 use codec::Encode;
 use frame_support::{assert_err, assert_noop, assert_ok, traits::OnInitialize};
 use sp_core::{bounded_vec, ed25519, Blake2Hasher, Pair};
-use sp_keyring::AccountKeyring::Alice;
-use sp_keyring::{AccountKeyring::Bob, Ed25519Keyring};
+use sp_keyring::{
+	AccountKeyring::{Alice, Bob},
+	Ed25519Keyring,
+};
 use sp_runtime::{testing::H256, BoundedVec, Digest, DigestItem};
 
 use ulx_notary_audit::{AccountHistoryLookupError, VerifyError};
@@ -101,16 +103,16 @@ fn it_locks_notaries_on_audit_failure() {
 			]
 		));
 		// should store that it's no longer valid
-		assert_eq!(LastNotebookDetailsByNotary::<Test>::get(2)[0].1, false);
+		assert!(!LastNotebookDetailsByNotary::<Test>::get(2)[0].1);
 		// this is the default verify error
 		assert_eq!(Notebook::notary_failed_audit_by_id(1), None);
 		assert_eq!(
 			Notebook::notary_failed_audit_by_id(2),
 			Some((1, 1, VerifyError::InvalidBlockVoteRoot))
 		);
-		assert_eq!(Notebook::is_notary_locked_at_tick(2, 1), true);
-		assert_eq!(Notebook::is_notary_locked_at_tick(2, 2), true);
-		assert_eq!(Notebook::is_notary_locked_at_tick(2, 0), false);
+		assert!(Notebook::is_notary_locked_at_tick(2, 1));
+		assert!(Notebook::is_notary_locked_at_tick(2, 2));
+		assert!(!Notebook::is_notary_locked_at_tick(2, 0));
 	});
 }
 
@@ -140,8 +142,8 @@ fn it_supports_multiple_notebooks() {
 
 		assert_eq!(LastNotebookDetailsByNotary::<Test>::get(1).len(), 1);
 		assert_eq!(LastNotebookDetailsByNotary::<Test>::get(2).len(), 1);
-		assert_eq!(LastNotebookDetailsByNotary::<Test>::get(1)[0].1, true);
-		assert_eq!(LastNotebookDetailsByNotary::<Test>::get(2)[0].1, true);
+		assert!(LastNotebookDetailsByNotary::<Test>::get(1)[0].1);
+		assert!(LastNotebookDetailsByNotary::<Test>::get(2)[0].1);
 		assert_eq!(Notebook::notebooks_at_tick(1), vec![(2, 1, None), (1, 1, None),]);
 		assert_eq!(Notebook::notebooks_in_block(), vec![(1, 1, 1), (2, 1, 1),]);
 		assert_eq!(
@@ -230,12 +232,12 @@ fn it_tracks_changed_accounts() {
 		System::set_block_number(3);
 		System::on_initialize(3);
 		let changed_accounts_root = H256::random();
-		let secrets = vec![H256::random(), H256::random(), H256::random()];
+		let secrets = [H256::random(), H256::random(), H256::random()];
 		let mut secret_hashes = vec![];
 		// block number must be 1 prior to the current block number
 		let mut header = make_header(1, 2);
 		header.chain_transfers = bounded_vec![ChainTransfer::ToLocalchain { transfer_id: 1 }];
-		header.changed_accounts_root = changed_accounts_root.clone();
+		header.changed_accounts_root = changed_accounts_root;
 		header.changed_account_origins =
 			bounded_vec![AccountOrigin { notebook_number: 1, account_uid: 1 }];
 		header.secret_hash =
@@ -265,7 +267,7 @@ fn it_tracks_changed_accounts() {
 		let mut header = make_header(2, 3);
 		header.chain_transfers =
 			bounded_vec![ChainTransfer::ToMainchain { account_id: who.clone(), amount: 5000 }];
-		header.changed_accounts_root = change_root_2.clone();
+		header.changed_accounts_root = change_root_2;
 		header.changed_account_origins =
 			bounded_vec![AccountOrigin { notebook_number: 1, account_uid: 1 }];
 		header.secret_hash =
@@ -380,7 +382,7 @@ fn it_tracks_notebooks_received_out_of_tick() {
 	new_test_ext().execute_with(|| {
 		System::set_block_number(3);
 		System::on_initialize(3);
-		let secrets = vec![H256::random(), H256::random()];
+		let secrets = [H256::random(), H256::random()];
 		let mut secret_hashes = vec![];
 		// block number must be 1 prior to the current block number
 		let mut header1 = make_header(1, 2);
@@ -398,7 +400,7 @@ fn it_tracks_notebooks_received_out_of_tick() {
 
 		let last_details = LastNotebookDetailsByNotary::<Test>::get(1);
 
-		let (details_2, at_tick_2) = last_details.get(0).unwrap();
+		let (details_2, at_tick_2) = last_details.first().unwrap();
 		assert_eq!(details_2.tick, header2.tick);
 		assert_eq!(at_tick_2, &true);
 
@@ -528,7 +530,7 @@ fn it_can_audit_notebooks_with_history() {
 		let changed_accounts_root = merkle_root::<Blake2Hasher, _>(vec![account_root.encode()]);
 
 		let mut header = make_header(notebook_number, tick);
-		header.changed_accounts_root = changed_accounts_root.clone();
+		header.changed_accounts_root = changed_accounts_root;
 		header.chain_transfers = bounded_vec![ChainTransfer::ToLocalchain { transfer_id: 1 }];
 		header.changed_account_origins =
 			bounded_vec![AccountOrigin { notebook_number, account_uid: 1 }];
@@ -646,7 +648,7 @@ fn it_can_audit_notebooks_with_history() {
 						tick,
 						parent_secret: None,
 						secret_hash: H256::random(),
-						block_votes_root: header.changed_accounts_root.clone(),
+						block_votes_root: header.changed_accounts_root,
 						notebook_number,
 					},
 					true,
@@ -654,15 +656,15 @@ fn it_can_audit_notebooks_with_history() {
 			)
 		})
 		.expect("Couldn't insert details");
-		let _ = AccountOriginLastChangedNotebookByNotary::<Test>::mutate(
+		AccountOriginLastChangedNotebookByNotary::<Test>::mutate(
 			1,
 			AccountOrigin { notebook_number, account_uid: 1 },
 			|a| *a = Some(5),
 		);
-		let _ = <NotebookChangedAccountsRootByNotary<Test>>::insert(
+		<NotebookChangedAccountsRootByNotary<Test>>::insert(
 			notary_id,
 			notebook_number,
-			changed_accounts_root.clone(),
+			changed_accounts_root,
 		);
 
 		// Test that account change history takes too

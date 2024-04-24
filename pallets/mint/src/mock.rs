@@ -1,9 +1,5 @@
 use env_logger::{Builder, Env};
-use frame_support::{
-	parameter_types,
-	traits::Currency,
-};
-use frame_support::derive_impl;
+use frame_support::{derive_impl, parameter_types, traits::Currency};
 use sp_core::ConstU32;
 use sp_runtime::BuildStorage;
 
@@ -21,7 +17,6 @@ frame_support::construct_runtime!(
 		Mint: pallet_mint
 	}
 );
-
 
 #[derive_impl(frame_system::config_preludes::TestDefaultConfig as frame_system::DefaultConfig)]
 impl frame_system::Config for Test {
@@ -48,7 +43,6 @@ impl pallet_balances::Config<UlixeeToken> for Test {
 	type MaxFreezes = ();
 	type RuntimeHoldReason = RuntimeHoldReason;
 	type RuntimeFreezeReason = RuntimeFreezeReason;
-
 }
 
 pub fn set_argons(account_id: u64, amount: Balance) {

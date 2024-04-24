@@ -1,4 +1,3 @@
-
 #![cfg_attr(not(feature = "std"), no_std)]
 
 pub use pallet::*;
@@ -194,7 +193,7 @@ pub mod pallet {
 						if let Some((parent_vote_root, _)) =
 							T::NotebookProvider::get_eligible_tick_votes_root(notary_id, votes_tick)
 						{
-							return Some(BlockVotingKey { parent_vote_root, parent_secret })
+							return Some(BlockVotingKey { parent_vote_root, parent_secret });
 						}
 					}
 					None
@@ -285,9 +284,10 @@ pub mod pallet {
 					);
 
 					let votes_from_tick = current_tick - 2u32;
-					let block_vote_rewards_account =
-						T::AccountId::decode(&mut block_vote.block_rewards_account_id.encode().as_slice())
-							.map_err(|_| Error::<T>::UnableToDecodeVoteAccount)?;
+					let block_vote_rewards_account = T::AccountId::decode(
+						&mut block_vote.block_rewards_account_id.encode().as_slice(),
+					)
+					.map_err(|_| Error::<T>::UnableToDecodeVoteAccount)?;
 					Self::verify_block_vote(
 						seal_strength,
 						&block_vote,
@@ -367,7 +367,7 @@ pub mod pallet {
 
 			let message = BlockVote::seal_signature_message(&parent_hash, seal_strength);
 			let Ok(signature) = AuthoritySignature::<T>::decode(&mut signature.as_ref()) else {
-				return Err(Error::<T>::InvalidAuthoritySignature.into())
+				return Err(Error::<T>::InvalidAuthoritySignature.into());
 			};
 			ensure!(
 				authority_id.verify(&message, &signature),
@@ -405,13 +405,13 @@ pub mod pallet {
 			Error<T>,
 		> {
 			let Some(parent_key) = <ParentVotingKey<T>>::get() else {
-				return Ok(BoundedVec::new())
+				return Ok(BoundedVec::new());
 			};
 
 			// runtime tick will have the voting key for the parent
 			let runtime_tick = T::TickProvider::current_tick();
-			if runtime_tick <= 4u32.into() {
-				return Ok(BoundedVec::new())
+			if runtime_tick <= 4u32 {
+				return Ok(BoundedVec::new());
 			}
 
 			let votes_in_tick = runtime_tick - 1u32;
@@ -434,13 +434,13 @@ pub mod pallet {
 			{
 				// don't use locked notary votes!
 				if T::NotebookProvider::is_notary_locked_at_tick(notary_id, votes_in_tick) {
-					continue
+					continue;
 				}
 
 				for (index, (vote_bytes, power)) in raw_votes.iter().enumerate() {
 					leafs_by_notary
 						.entry(notary_id)
-						.or_insert_with(|| Vec::new())
+						.or_insert_with(Vec::new)
 						.push(vote_bytes.clone());
 
 					let seal_strength = BlockVote::calculate_seal_strength(
@@ -450,7 +450,7 @@ pub mod pallet {
 						parent_key,
 					);
 					if seal_strength >= with_better_strength {
-						continue
+						continue;
 					}
 					best_votes.push((seal_strength, notary_id, notebook_number, index));
 				}
@@ -470,7 +470,7 @@ pub mod pallet {
 
 				if !grandparent_tick_blocks.contains(&vote.block_hash) {
 					info!(target: LOG_TARGET, "cant use vote for grandparent tick {:?}", vote.block_hash);
-					continue
+					continue;
 				}
 
 				let closest_authority = T::AuthorityProvider::xor_closest_authority(seal_strength)
@@ -489,7 +489,7 @@ pub mod pallet {
 					closest_miner: (closest_authority.account_id, closest_authority.authority_id),
 				};
 				if result.try_push(best_nonce).is_err() {
-					break
+					break;
 				}
 			}
 			Ok(result)
@@ -531,7 +531,7 @@ pub mod pallet {
 		}
 
 		fn is_inherent_required(_: &InherentData) -> Result<Option<Self::Error>, Self::Error> {
-			return Ok(Some(SealInherentError::MissingSeal))
+			Ok(Some(SealInherentError::MissingSeal))
 		}
 
 		fn is_inherent(call: &Self::Call) -> bool {
@@ -546,15 +546,15 @@ pub mod pallet {
 		{
 			// if this is called after initialize, we're fine, but it might not be
 			if let Some(account_id) = <TempAuthor<T>>::get() {
-				return Some(account_id)
+				return Some(account_id);
 			}
 
 			for (id, mut data) in digests.into_iter() {
 				if id == AUTHOR_DIGEST_ID {
 					let decoded = T::AccountId::decode(&mut data);
-					if let Some(account_id) = decoded.ok() {
+					if let Ok(account_id) = decoded {
 						<TempAuthor<T>>::put(&account_id);
-						return Some(account_id)
+						return Some(account_id);
 					}
 				}
 			}

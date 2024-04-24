@@ -69,7 +69,7 @@ impl<Hash: Codec + Clone> BlockVoteT<Hash> {
 			block_hash: self.block_hash.clone(),
 			index: self.index,
 			power: self.power,
-			data_domain_hash: self.data_domain_hash.clone(),
+			data_domain_hash: self.data_domain_hash,
 			data_domain_account: self.data_domain_account.clone(),
 			block_rewards_account_id: self.block_rewards_account_id.clone(),
 		}

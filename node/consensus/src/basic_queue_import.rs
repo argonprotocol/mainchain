@@ -42,7 +42,7 @@ pub(crate) async fn import_single_block_metered<B: BlockT, V: Verifier<B>>(
 			} else {
 				debug!(target: LOG_TARGET, "Header {} was not provided ", block.hash);
 			}
-			return Err(BlockImportError::IncompleteHeader(peer).into())
+			return Err(BlockImportError::IncompleteHeader(peer).into());
 		},
 	};
 
@@ -151,7 +151,7 @@ pub(crate) async fn import_single_block_metered<B: BlockT, V: Verifier<B>>(
 		if let Some(Error::<B>::PendingFinalizedBlockDigest(hash, num)) =
 			o.downcast_ref::<Error<B>>()
 		{
-			return Err(ImportOrFinalizeError::<B>::FinalizedBlockNeeded(*hash, *num))
+			return Err(ImportOrFinalizeError::<B>::FinalizedBlockNeeded(*hash, *num));
 		}
 	}
 

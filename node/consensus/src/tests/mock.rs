@@ -37,7 +37,7 @@ use ulx_primitives::{
 	notary::{NotaryNotebookVoteDetails, NotaryNotebookVoteDigestDetails},
 	tick::{Tick, Ticker},
 	BestBlockVoteSeal, ComputeDifficulty, HashOutput, NotaryId, NotaryNotebookVotes,
-	NotebookAuditSummary,NotebookAuditResult, NotebookNumber, VoteMinimum,
+	NotebookAuditResult, NotebookAuditSummary, NotebookNumber, VoteMinimum,
 };
 
 use crate::{aux_client::UlxAux, import_queue};

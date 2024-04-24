@@ -141,9 +141,8 @@ async fn process_block(
 		.unwrap_or_default();
 
 	let notebooks_header = block.header().digest.logs.iter().find_map(|log| match log {
-		DigestItem::PreRuntime(ulx_primitives::NOTEBOOKS_DIGEST_ID, data) => {
-			NotebookDigest::decode(&mut &data[..]).ok()
-		},
+		DigestItem::PreRuntime(ulx_primitives::NOTEBOOKS_DIGEST_ID, data) =>
+			NotebookDigest::decode(&mut &data[..]).ok(),
 		_ => None,
 	});
 

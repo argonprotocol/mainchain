@@ -70,6 +70,6 @@ uniffi = { workspace = true, features = ["build"] }
 
 [features]
 default = []
-napi = ["dep:napi", "napi-derive", "ulx-primitives/napi"]
-fast-runtime = ["ulx-primitives/fast-runtime"]
-uniffi = ["dep:uniffi", "ulx-primitives/uniffi"]
+napi = [ "dep:napi", "napi-derive", "ulx-primitives/napi" ]
+fast-runtime = [ "ulx-primitives/fast-runtime" ]
+uniffi = [ "dep:uniffi", "ulx-primitives/uniffi" ]

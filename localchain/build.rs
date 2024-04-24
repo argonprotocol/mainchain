@@ -10,14 +10,14 @@ fn main() {
     dotenv().ok();
     let project_dir = env::current_dir().unwrap(); // Get the current directory
 
-    match Command::new("cargo").args(&["sqlx", "--version"]).output() {
+    match Command::new("cargo").args(["sqlx", "--version"]).output() {
       Ok(output) if output.status.success() => {
         println!("`sqlx-cli` is already installed.");
       }
       _ => {
         println!("Installing `sqlx-cli`...");
         Command::new("cargo")
-          .args(&["install", "sqlx-cli@^0.7"])
+          .args(["install", "sqlx-cli@^0.7"])
           .status()
           .expect("Failed to install `sqlx-cli`");
       }
@@ -29,10 +29,7 @@ fn main() {
       .args(["sqlx", "database", "reset", "--database-url", &database_url])
       .current_dir(&project_dir) // Set the current directory for the command
       .output()
-      .expect(&format!(
-        "failed to build database at {}",
-        database_url.clone()
-      ));
+      .unwrap_or_else(|_| panic!("failed to build database at {}", database_url.clone()));
     if !output.status.success() {
       // Convert the output to a String to display the error
       let stderr = String::from_utf8_lossy(&output.stderr);

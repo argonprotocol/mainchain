@@ -112,7 +112,7 @@ impl BlockSealInherentData for InherentData {
 	fn block_seal(&self) -> Result<Option<BlockSealInherent>, sp_inherents::Error> {
 		if let Some(x) = self.get_data::<BlockSealInherentNodeSide>(&SEAL_INHERENT_IDENTIFIER)? {
 			let result = x.try_into()?;
-			return Ok(Some(result))
+			return Ok(Some(result));
 		}
 		Ok(None)
 	}
@@ -199,7 +199,7 @@ impl NotebookInherentData for InherentData {
 				})?;
 				result.push(entry);
 			}
-			return Ok(Some(result))
+			return Ok(Some(result));
 		}
 		Ok(None)
 	}

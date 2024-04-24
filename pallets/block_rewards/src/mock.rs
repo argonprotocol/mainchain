@@ -1,17 +1,16 @@
 use env_logger::{Builder, Env};
-use frame_support::{parameter_types, traits::StorageMapShim};
-use frame_support::derive_impl;
+use frame_support::{derive_impl, parameter_types, traits::StorageMapShim};
 use sp_core::{ConstU32, H256};
 use sp_runtime::{
-	BuildStorage,
 	traits::{IdentityLookup, NumberFor},
+	BuildStorage,
 };
 
 use ulx_primitives::{
-	BlockSealerInfo,
-	BlockSealerProvider,
-	notary::{NotaryProvider, NotarySignature}, NotaryId, NotebookNumber, NotebookProvider, NotebookSecret,
+	notary::{NotaryProvider, NotarySignature},
 	tick::Tick,
+	BlockSealerInfo, BlockSealerProvider, NotaryId, NotebookNumber, NotebookProvider,
+	NotebookSecret,
 };
 
 use crate as pallet_block_rewards;

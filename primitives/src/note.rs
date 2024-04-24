@@ -13,7 +13,7 @@ use sp_std::{
 
 #[cfg(feature = "std")]
 use crate::serialize_unsafe_u128_as_string;
-use crate::{prod_or_fast, AccountId, DataDomainHash, ADDRESS_PREFIX, TransferToLocalchainId};
+use crate::{prod_or_fast, AccountId, DataDomainHash, TransferToLocalchainId, ADDRESS_PREFIX};
 
 #[derive(
 	Clone,

@@ -73,7 +73,7 @@ impl NotebookStatusStore {
 			.fetch_optional(&mut *db)
 			.await?;
 			if let Some(row) = row {
-				return Ok((row.notebook_number as NotebookNumber, row.tick as Tick))
+				return Ok((row.notebook_number as NotebookNumber, row.tick as Tick));
 			}
 			tokio::time::sleep(tokio::time::Duration::from_millis(100)).await;
 		}
@@ -162,7 +162,7 @@ impl NotebookStatusStore {
 		if let Some(result) = result {
 			let notebook_number = result.notebook_number as u32;
 			Self::next_step(&mut *db, notebook_number, NotebookFinalizationStep::Open).await?;
-			return Ok(Some(notebook_number))
+			return Ok(Some(notebook_number));
 		}
 		Ok(None)
 	}
@@ -225,9 +225,13 @@ mod tests {
 		{
 			let mut tx = pool.begin().await?;
 
-			let _ =
-				NotebookStatusStore::create(&mut *tx, 1, 1, Utc::now().add(Duration::try_minutes(1).unwrap()))
-					.await?;
+			let _ = NotebookStatusStore::create(
+				&mut *tx,
+				1,
+				1,
+				Utc::now().add(Duration::try_minutes(1).unwrap()),
+			)
+			.await?;
 
 			tx.commit().await?;
 		}
@@ -269,8 +273,13 @@ mod tests {
 					NotebookFinalizationStep::Open,
 				)
 				.await?;
-				NotebookStatusStore::create(&mut *tx, 2, 2, Utc::now().add(Duration::try_minutes(1).unwrap()))
-					.await?;
+				NotebookStatusStore::create(
+					&mut *tx,
+					2,
+					2,
+					Utc::now().add(Duration::try_minutes(1).unwrap()),
+				)
+				.await?;
 				tx.commit().await?;
 				Result::<(), Error>::Ok(())
 			});
@@ -335,8 +344,13 @@ mod tests {
 			.await?;
 		let mut tx = pool.begin().await?;
 
-		let _ = NotebookStatusStore::create(&mut *tx, 1, 1, Utc::now().add(Duration::try_minutes(1).unwrap()))
-			.await?;
+		let _ = NotebookStatusStore::create(
+			&mut *tx,
+			1,
+			1,
+			Utc::now().add(Duration::try_minutes(1).unwrap()),
+		)
+		.await?;
 		assert_eq!(NotebookStatusStore::step_up_expired_open(&mut *tx).await?, None);
 		tx.commit().await?;
 

@@ -18,8 +18,8 @@ use crate::{
 		ActiveNotaries, ExpiringProposals, NotaryKeyHistory, ProposedNotaries,
 		QueuedNotaryMetaChanges,
 	},
+	Error, Event,
 };
-use crate::{Error, Event};
 
 #[test]
 fn it_can_propose_a_notary() {

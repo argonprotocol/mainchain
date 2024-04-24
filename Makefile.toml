@@ -11,14 +11,38 @@ SCCACHE_CACHE_SIZE = "20G"
 [tasks.prep]
 description = "Ensure all tools are installed"
 script = [
-    "cargo binstall sqlx-cli@^0.7 --no-confirm || true",
-    "cargo binstall cargo-nextest@^0.9 --no-confirm || true",
-    "cargo binstall cargo-watch@^7.8 --no-confirm || true",
-    "sccache --show-stats || cargo binstall sccache@^0.7 || true",
-    "sccache --start-server || true",
-    "cd localchain && cargo sqlx database setup|| true",
-    "cd notary && cargo sqlx database setup || true",
+    "sccache --show-stats || cargo binstall sccache@^0.7 --no-confirm || true",
+    "sccache --start-server || true"
 ]
+
+[tasks.lint]
+description = "Run clippy"
+command = "cargo"
+args = ["clippy", "--workspace", "--release", "--fix"]
+
+[tasks.fmt]
+description = "Run rustfmt"
+toolchain = "nightly"
+command = "cargo"
+args = ["fmt", "--all"]
+
+[tasks.zepter]
+description = "Run zepter"
+command = "zepter"
+args = ["run", "default"]
+install_crate_args = ["--no-confirm"]
+
+[tasks.zepter.install_crate]
+crate_name = "zepter"
+binary = "zepter"
+test_arg = "--version"
+install_command = "binstall"
+force = false
+version = "^0.15"
+
+[tasks.format]
+description = "Run zepter and fmt"
+dependencies = ["zepter", "fmt"]
 
 [tasks.docker]
 description = "Build docker image"
@@ -27,10 +51,26 @@ script = [
     "docker buildx build -t ghcr.io/ulixee/ulixee-notary:dev . -f dev.Dockerfile --target ulx-notary",
 ]
 
+[tasks.sqlx-setup]
+description = "Run sqlx setup"
+script = [
+    "cd localchain && cargo sqlx database setup || true",
+    "cd notary && cargo sqlx database setup || true",
+]
+install_crate_args = ["--no-confirm"]
+
+[tasks.sqlx-setup.install_crate]
+crate_name = "sqlx-cli"
+binary = "sqlx"
+test_arg = "--version"
+install_command = "binstall --no-confirm"
+version = "^0.7"
+
 [tasks.sqlx]
 description = "Run sqlx prepare"
 command = "cargo"
 args = ["sqlx", "prepare", "--workspace", "--", "--profile=test"]
+dependencies = ["sqlx-setup"]
 
 [tasks.stat]
 description = "Show sccache stats"
@@ -49,24 +89,27 @@ command = "cargo"
 args = ["nextest", "run", "--features", "fast-runtime"]
 dependencies = ["build"]
 env = { "RUSTC_WRAPPER" = "sccache" }
+install_crate_args = ["--no-confirm"]
+
+[tasks.test.install_crate]
+crate_name = "cargo-nextest"
+binary = "nextest"
+test_arg = "--version"
+install_command = "binstall"
+version = "^0.9"
 
 [tasks.watch]
 description = "Watch for changes and rebuild"
 command = "cargo"
 args = ["watch", "-x", "build", "--features", "fast-runtime"]
 env = { "RUSTC_WRAPPER" = "sccache" }
+install_crate_args = ["--no-confirm"]
 
-
-[tasks.build-ci]
-description = "Compiles the project for CI with --locked"
-command = "cargo"
-args = ["build", "--features", "fast-runtime", "--locked"]
-env = { "RUSTC_WRAPPER" = "sccache" }
-
-[tasks.test-ci]
-description = "Tasks to run in CI for fast builds"
-command = "cargo"
-args = ["nextest", "run", "--features", "fast-runtime", "--profile", "ci"]
-dependencies = ["build-ci"]
-env = { "RUSTC_WRAPPER" = "sccache" }
+[tasks.watch.install_crate]
+crate_name = "cargo-watch"
+version = "7.8"
+binary = "cargo-watch"
+test_arg = "--version"
+force = false
+install_command = "binstall"
 

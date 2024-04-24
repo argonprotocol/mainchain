@@ -36,7 +36,7 @@ impl PartialOrd for DataDomain {
 			return self.top_level_domain.partial_cmp(&other.top_level_domain);
 		}
 
-		Some(self.domain_name.as_ref().cmp(&other.domain_name.as_ref()))
+		Some(self.domain_name.as_ref().cmp(other.domain_name.as_ref()))
 	}
 }
 

@@ -55,9 +55,7 @@ impl FinalizedNotebookHeaderListener {
 
 				header
 			},
-			Err(e) => {
-				return Err(anyhow::anyhow!("Error parsing notified notebook number {:?}", e))
-			},
+			Err(e) => return Err(anyhow::anyhow!("Error parsing notified notebook number {:?}", e)),
 		};
 
 		self.completed_notebook_sender.notify(|| Ok(header.clone())).map_err(
@@ -226,8 +224,7 @@ mod tests {
 	use codec::Decode;
 	use frame_support::assert_ok;
 	use futures::{task::noop_waker_ref, StreamExt};
-	use sp_core::hexdisplay::AsBytesRef;
-	use sp_core::{bounded_vec, ed25519::Public, sr25519::Signature, Pair};
+	use sp_core::{bounded_vec, ed25519::Public, hexdisplay::AsBytesRef, sr25519::Signature, Pair};
 	use sp_keyring::Sr25519Keyring::{Alice, Bob, Ferdie};
 	use sp_keystore::{testing::MemoryKeystore, Keystore, KeystoreExt};
 	use sqlx::PgPool;
@@ -663,21 +660,16 @@ mod tests {
 		let mut parent_voting_key = None;
 		for log in block.header().digest.logs.iter() {
 			match log {
-				DigestItem::PreRuntime(ulx_primitives::TICK_DIGEST_ID, data) => {
-					tick = TickDigest::decode(&mut &data[..]).ok()
-				},
-				DigestItem::PreRuntime(ulx_primitives::BLOCK_VOTES_DIGEST_ID, data) => {
-					votes = BlockVoteDigest::decode(&mut &data[..]).ok()
-				},
-				DigestItem::PreRuntime(ulx_primitives::NOTEBOOKS_DIGEST_ID, data) => {
-					notebook_digest = NotebookDigest::decode(&mut &data[..]).ok()
-				},
-				DigestItem::Seal(ulx_primitives::BLOCK_SEAL_DIGEST_ID, data) => {
-					block_seal = BlockSealDigest::decode(&mut &data[..]).ok()
-				},
-				DigestItem::Consensus(ulx_primitives::PARENT_VOTING_KEY_DIGEST, data) => {
-					parent_voting_key = ParentVotingKeyDigest::decode(&mut &data[..]).ok()
-				},
+				DigestItem::PreRuntime(ulx_primitives::TICK_DIGEST_ID, data) =>
+					tick = TickDigest::decode(&mut &data[..]).ok(),
+				DigestItem::PreRuntime(ulx_primitives::BLOCK_VOTES_DIGEST_ID, data) =>
+					votes = BlockVoteDigest::decode(&mut &data[..]).ok(),
+				DigestItem::PreRuntime(ulx_primitives::NOTEBOOKS_DIGEST_ID, data) =>
+					notebook_digest = NotebookDigest::decode(&mut &data[..]).ok(),
+				DigestItem::Seal(ulx_primitives::BLOCK_SEAL_DIGEST_ID, data) =>
+					block_seal = BlockSealDigest::decode(&mut &data[..]).ok(),
+				DigestItem::Consensus(ulx_primitives::PARENT_VOTING_KEY_DIGEST, data) =>
+					parent_voting_key = ParentVotingKeyDigest::decode(&mut &data[..]).ok(),
 				_ => (),
 			}
 		}
@@ -1072,9 +1064,9 @@ mod tests {
 					tx_in_block.wait_for_success().await?;
 					return Ok(tx_in_block);
 				},
-				TxStatus::Error { message }
-				| TxStatus::Invalid { message }
-				| TxStatus::Dropped { message } => {
+				TxStatus::Error { message } |
+				TxStatus::Invalid { message } |
+				TxStatus::Dropped { message } => {
 					// Handle any errors:
 					return Err(Error::InternalError(format!(
 						"Error submitting notebook to block: {message}"

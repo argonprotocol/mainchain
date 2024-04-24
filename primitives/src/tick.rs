@@ -31,7 +31,7 @@ impl Ticker {
 		let genesis_utc_time = current_time - offset;
 		Self {
 			tick_duration_millis: tick_duration.as_millis() as u64,
-			genesis_utc_time: genesis_utc_time as u64,
+			genesis_utc_time,
 			ntp_offset_millis: 0,
 		}
 	}
@@ -109,11 +109,13 @@ mod test {
 		use chrono::{DurationRound, Utc};
 
 		let ticker = Ticker::start(Duration::from_secs(1));
-		let beginning_of_second = Utc::now().duration_trunc(chrono::Duration::try_seconds(1).unwrap()).unwrap();
+		let beginning_of_second =
+			Utc::now().duration_trunc(chrono::Duration::try_seconds(1).unwrap()).unwrap();
 		assert_eq!(ticker.genesis_utc_time, beginning_of_second.timestamp_millis() as u64);
 
 		let ticker = Ticker::start(Duration::from_secs(60));
-		let beginning_of_minute = Utc::now().duration_trunc(chrono::Duration::try_minutes(1).unwrap()).unwrap();
+		let beginning_of_minute =
+			Utc::now().duration_trunc(chrono::Duration::try_minutes(1).unwrap()).unwrap();
 		assert_eq!(ticker.genesis_utc_time, beginning_of_minute.timestamp_millis() as u64);
 	}
 

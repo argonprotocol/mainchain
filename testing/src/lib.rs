@@ -1,7 +1,10 @@
-use std::env;
-use std::io::{BufRead, BufReader};
-use std::path::PathBuf;
-use std::{process, process::Command};
+use std::{
+	env,
+	io::{BufRead, BufReader},
+	path::PathBuf,
+	process,
+	process::Command,
+};
 
 use anyhow::anyhow;
 use subxt::backend::{legacy::LegacyRpcMethods, rpc};
@@ -29,7 +32,8 @@ impl TestContext {
 	pub async fn test_context_with(authority: String) -> anyhow::Result<Self> {
 		let project_dir = PathBuf::from(env!("CARGO_MANIFEST_DIR"));
 
-		let rust_log = format!("{},sc_rpc_server=info", env::var("RUST_LOG").unwrap_or("warn".to_string()));
+		let rust_log =
+			format!("{},sc_rpc_server=info", env::var("RUST_LOG").unwrap_or("warn".to_string()));
 
 		let workspace_cargo_path = project_dir.join("..");
 		let workspace_cargo_path =
@@ -74,7 +78,7 @@ impl TestContext {
 			}
 		}
 
-		let ws_port = ws_port.expect("Failed to find ws port") as u16;
+		let ws_port = ws_port.expect("Failed to find ws port");
 
 		let ws_url = format!("ws://127.0.0.1:{}", ws_port);
 
@@ -106,7 +110,9 @@ pub async fn test_context_from_url(url: &str) -> TestContext {
 }
 
 pub async fn test_context_with(authority: String) -> TestContext {
-	TestContext::test_context_with(authority).await.expect("Unable to create test context - ensure debug ulx-node build is available")
+	TestContext::test_context_with(authority)
+		.await
+		.expect("Unable to create test context - ensure debug ulx-node build is available")
 }
 
 pub async fn test_context() -> TestContext {

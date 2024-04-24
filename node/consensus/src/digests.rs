@@ -41,7 +41,7 @@ pub fn load_digests<B: BlockT>(header: &B::Header) -> Result<Digests<B>, Error<B
 				if finalized_block.is_some() {
 					return Err(Error::DuplicatePreRuntimeDigest(
 						"FinalizedBlockNeededDigest".to_string(),
-					))
+					));
 				}
 				let digest = FinalizedBlockNeededDigest::<B>::decode(&mut &v[..])
 					.map_err(|e| Error::<B>::Codec(e.clone()))?;
@@ -49,7 +49,7 @@ pub fn load_digests<B: BlockT>(header: &B::Header) -> Result<Digests<B>, Error<B
 			},
 			DigestItem::PreRuntime(BLOCK_VOTES_DIGEST_ID, v) => {
 				if block_vote.is_some() {
-					return Err(Error::DuplicatePreRuntimeDigest("BlockVoteDigest".to_string()))
+					return Err(Error::DuplicatePreRuntimeDigest("BlockVoteDigest".to_string()));
 				}
 				let digest = BlockVoteDigest::decode(&mut &v[..])
 					.map_err(|e| Error::<B>::Codec(e.clone()))?;
@@ -57,7 +57,7 @@ pub fn load_digests<B: BlockT>(header: &B::Header) -> Result<Digests<B>, Error<B
 			},
 			DigestItem::PreRuntime(AUTHOR_DIGEST_ID, v) => {
 				if author.is_some() {
-					return Err(Error::DuplicatePreRuntimeDigest("AuthorDigest".to_string()))
+					return Err(Error::DuplicatePreRuntimeDigest("AuthorDigest".to_string()));
 				}
 				let digest =
 					AccountId::decode(&mut &v[..]).map_err(|e| Error::<B>::Codec(e.clone()))?;
@@ -65,7 +65,7 @@ pub fn load_digests<B: BlockT>(header: &B::Header) -> Result<Digests<B>, Error<B
 			},
 			DigestItem::PreRuntime(TICK_DIGEST_ID, v) => {
 				if tick.is_some() {
-					return Err(Error::DuplicatePreRuntimeDigest("TickDigest".to_string()))
+					return Err(Error::DuplicatePreRuntimeDigest("TickDigest".to_string()));
 				}
 				let digest =
 					TickDigest::decode(&mut &v[..]).map_err(|e| Error::<B>::Codec(e.clone()))?;
@@ -75,7 +75,7 @@ pub fn load_digests<B: BlockT>(header: &B::Header) -> Result<Digests<B>, Error<B
 				if parent_voting_key.is_some() {
 					return Err(Error::DuplicatePreRuntimeDigest(
 						"ParentVotingKeyDigest".to_string(),
-					))
+					));
 				}
 				let digest = ParentVotingKeyDigest::decode(&mut &v[..])
 					.map_err(|e| Error::<B>::Codec(e.clone()))?;
@@ -83,7 +83,7 @@ pub fn load_digests<B: BlockT>(header: &B::Header) -> Result<Digests<B>, Error<B
 			},
 			DigestItem::PreRuntime(NOTEBOOKS_DIGEST_ID, v) => {
 				if notebooks.is_some() {
-					return Err(Error::DuplicatePreRuntimeDigest("NotebookDigest".to_string()))
+					return Err(Error::DuplicatePreRuntimeDigest("NotebookDigest".to_string()));
 				}
 				let digest = NotebookDigest::decode(&mut &v[..])
 					.map_err(|e| Error::<B>::Codec(e.clone()))?;
@@ -118,7 +118,7 @@ pub fn read_seal_digest(digest: &DigestItem) -> Option<BlockSealDigest> {
 pub fn get_tick_digest(digest: &Digest) -> Option<Tick> {
 	for log in digest.logs() {
 		if let Some(tick) = log.pre_runtime_try_to::<TickDigest>(&TICK_DIGEST_ID) {
-			return Some(tick.tick)
+			return Some(tick.tick);
 		}
 	}
 	None

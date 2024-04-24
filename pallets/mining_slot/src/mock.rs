@@ -1,13 +1,10 @@
 use env_logger::{Builder, Env};
 use frame_support::{
-	parameter_types,
+	derive_impl, parameter_types,
 	traits::{Currency, StorageMapShim},
 };
-use frame_support::derive_impl;
 use sp_core::{ConstU32, ConstU64};
-use sp_runtime::{
-	BuildStorage,
-};
+use sp_runtime::BuildStorage;
 
 use crate as pallet_mining_slot;
 use crate::Registration;
@@ -25,7 +22,6 @@ frame_support::construct_runtime!(
 		Bonds: pallet_bond
 	}
 );
-
 
 #[derive_impl(frame_system::config_preludes::TestDefaultConfig as frame_system::DefaultConfig)]
 impl frame_system::Config for Test {
@@ -132,7 +128,7 @@ pub fn new_test_ext(miner_zero: Option<Registration<Test>>) -> sp_io::TestExtern
 	let env = Env::new().default_filter_or("debug");
 	let _ = Builder::from_env(env).is_test(true).try_init();
 
-	let mut t = frame_system::GenesisConfig::<Test>::default().build_storage().unwrap().into();
+	let mut t = frame_system::GenesisConfig::<Test>::default().build_storage().unwrap();
 	pallet_mining_slot::GenesisConfig::<Test> { miner_zero, _phantom: Default::default() }
 		.assimilate_storage(&mut t)
 		.unwrap();

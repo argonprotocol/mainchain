@@ -33,7 +33,7 @@ macro_rules! prod_or_fast {
 #[macro_export]
 macro_rules! fail {
 	( $y:expr ) => {{
-		return Err($y.into())
+		return Err($y.into());
 	}};
 }
 

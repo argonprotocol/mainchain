@@ -29,15 +29,18 @@ sp-keyring = { workspace = true }
 chrono = { workspace = true }
 
 [features]
-default = ["std"]
+default = [ "std" ]
 std = [
-    "anyhow/std",
-    "codec/std",
-    "snafu/std",
-    "sp-core/std",
-    "sp-std/std",
-    "sp-runtime/std",
-    "binary-merkle-tree/std",
-    "ulx-primitives/std"
+	"anyhow/std",
+	"binary-merkle-tree/std",
+	"codec/std",
+	"log/std",
+	"scale-info/std",
+	"serde/std",
+	"snafu/std",
+	"sp-core/std",
+	"sp-runtime/std",
+	"sp-std/std",
+	"ulx-primitives/std",
 ]
-fast-runtime = ["ulx-primitives/fast-runtime"]
+fast-runtime = [ "ulx-primitives/fast-runtime" ]

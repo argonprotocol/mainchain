@@ -440,7 +440,7 @@ pub mod napi_ext {
   use super::*;
   use crate::error::NapiOk;
   use crate::LocalAccount;
-  use ulx_primitives::{AccountType};
+  use ulx_primitives::AccountType;
 
   #[napi]
   impl AccountStore {
@@ -450,10 +450,7 @@ pub mod napi_ext {
     }
 
     #[napi(js_name = "getTaxAccount")]
-    pub async fn tax_account_napi(
-      &self,
-      notary_id: Option<u32>,
-    ) -> napi::Result<LocalAccount> {
+    pub async fn tax_account_napi(&self, notary_id: Option<u32>) -> napi::Result<LocalAccount> {
       self.tax_account(notary_id).await.napi_ok()
     }
     #[napi(js_name = "get")]

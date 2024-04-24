@@ -97,7 +97,7 @@ pub mod pallet {
 			Ok(())
 		}
 		fn remove(k: &T::AccountId) -> Result<(), DispatchError> {
-			if T::UlixeeTokenStorage::contains_key(&k) {
+			if T::UlixeeTokenStorage::contains_key(k) {
 				T::UlixeeTokenStorage::remove(k);
 			}
 			Ok(())

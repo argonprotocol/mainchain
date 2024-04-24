@@ -156,7 +156,7 @@ pub mod pallet {
 				Pallet::<T>::activate_notary(
 					notary.account_id.clone(),
 					NotaryMeta {
-						public: notary.public.clone(),
+						public: notary.public,
 						hosts: BoundedVec::truncate_from(notary.hosts.clone()),
 					},
 					0u32.into(),
@@ -181,7 +181,7 @@ pub mod pallet {
 							if let Err(e) =
 								<NotaryKeyHistory<T>>::try_mutate(notary_id, |history| {
 									history.retain(|(block, _)| *block >= old_block_to_preserve);
-									history.try_push((n, meta.public.clone()))
+									history.try_push((n, meta.public))
 								}) {
 								warn!("Failed to update notary key history: {:?} {notary_id:?}", e);
 							}
@@ -281,7 +281,7 @@ pub mod pallet {
 
 			let effective_block = meta_change + frame_system::Pallet::<T>::block_number();
 
-			<QueuedNotaryMetaChanges<T>>::try_mutate(effective_block.clone(), |changes| {
+			<QueuedNotaryMetaChanges<T>>::try_mutate(effective_block, |changes| {
 				changes
 					.try_insert(notary_id, meta.clone())
 					// shouldn't be possible.
@@ -302,7 +302,7 @@ pub mod pallet {
 		) -> DispatchResult {
 			let notary_id = Self::next_notary_id()?;
 
-			let public = meta.public.clone();
+			let public = meta.public;
 
 			let notary = NotaryRecord {
 				notary_id,
@@ -325,9 +325,8 @@ pub mod pallet {
 		}
 
 		fn next_notary_id() -> Result<u32, Error<T>> {
-			let notary_id = NextNotaryId::<T>::get()
-				.or(Some(1u32.into()))
-				.ok_or(Error::<T>::NoMoreNotaryIds)?;
+			let notary_id =
+				NextNotaryId::<T>::get().or(Some(1u32)).ok_or(Error::<T>::NoMoreNotaryIds)?;
 			let next_notary_id = notary_id.checked_add(1).ok_or(Error::<T>::NoMoreNotaryIds)?;
 			NextNotaryId::<T>::set(Some(next_notary_id));
 			Ok(notary_id)
@@ -348,14 +347,12 @@ pub mod pallet {
 				.iter()
 				.find(|(block, _)| *block >= at_block_height)
 				.map(|(_, public)| public);
-			if public.is_none() && key_history.len() > 0 {
-				if key_history[0].0 < at_block_height {
-					public = key_history.first().map(|(_, public)| public);
-				}
+			if public.is_none() && key_history.len() > 0 && key_history[0].0 < at_block_height {
+				public = key_history.first().map(|(_, public)| public);
 			}
 
 			if let Some(public) = public {
-				return public.verify(message, &signature)
+				return public.verify(message, signature);
 			}
 			false
 		}

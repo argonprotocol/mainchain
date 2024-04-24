@@ -282,7 +282,7 @@ fn test_can_lock_with_a_escrow_note() -> anyhow::Result<()> {
 	{
 		let res = verify_notarization_allocation(&vec![balance_change], &vec![], &vec![], Some(1))
 			.expect("should be ok");
-		assert_eq!(res.needs_escrow_settle_followup, false);
+		assert!(!res.needs_escrow_settle_followup);
 		assert_eq!(res.unclaimed_escrow_balances.len(), 0);
 		assert_eq!(res.sent_deposits, 0);
 		assert_ok!(res.verify_taxes());
@@ -349,7 +349,7 @@ fn test_can_lock_with_a_escrow_note() -> anyhow::Result<()> {
 			Some(1 + ESCROW_CLAWBACK_TICKS + ESCROW_EXPIRATION_TICKS),
 		)
 		.expect("should be ok");
-		assert_eq!(res.needs_escrow_settle_followup, false);
+		assert!(!res.needs_escrow_settle_followup);
 		assert_eq!(res.unclaimed_escrow_balances.len(), 0);
 		assert_eq!(res.sent_deposits, 0);
 		assert_ok!(res.verify_taxes());
@@ -378,16 +378,15 @@ fn test_can_lock_with_a_escrow_note() -> anyhow::Result<()> {
 		},
 	];
 
-	assert_eq!(
+	assert!(
 		verify_notarization_allocation(&changes, &vec![], &vec![], None)?
-			.needs_escrow_settle_followup,
-		true
+			.needs_escrow_settle_followup
 	);
 	// a valid claim is also acceptable
 	{
 		let res = verify_notarization_allocation(&changes, &vec![], &vec![], Some(61))
 			.expect("should be ok");
-		assert_eq!(res.needs_escrow_settle_followup, false);
+		assert!(!res.needs_escrow_settle_followup);
 		assert_eq!(res.unclaimed_escrow_balances.len(), 0);
 		assert_eq!(res.claimed_escrow_deposits_per_account.len(), 1);
 		assert_eq!(
@@ -570,10 +569,7 @@ fn test_can_transfer_tax() {
 		account_type: AccountType::Tax,
 		previous_balance_proof: None,
 		escrow_hold_note: None,
-		notes: bounded_vec!(Note::create(
-			20_000,
-			NoteType::ClaimFromMainchain { transfer_id: 1 }
-		)),
+		notes: bounded_vec!(Note::create(20_000, NoteType::ClaimFromMainchain { transfer_id: 1 })),
 		signature: empty_signature(),
 	}];
 

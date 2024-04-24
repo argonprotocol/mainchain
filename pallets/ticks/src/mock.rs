@@ -1,6 +1,5 @@
 use env_logger::{Builder, Env};
-use frame_support::derive_impl;
-use frame_support::traits::ConstU64;
+use frame_support::{derive_impl, traits::ConstU64};
 use sp_runtime::BuildStorage;
 
 use crate as pallet_ticks;

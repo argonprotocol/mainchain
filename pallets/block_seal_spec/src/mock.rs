@@ -1,20 +1,18 @@
 use std::collections::BTreeMap;
 
 use env_logger::{Builder, Env};
-use frame_support::derive_impl;
-use frame_support::parameter_types;
-use sp_core::{H256, U256};
-use sp_core::ConstU64;
+use frame_support::{derive_impl, parameter_types};
+use sp_core::{ConstU64, H256, U256};
 use sp_runtime::BuildStorage;
 
 use ulx_primitives::{
-	AuthorityProvider,
 	block_seal::MiningAuthority,
 	block_vote::VoteMinimum,
-	BlockSealAuthorityId,
-	BlockVotingProvider,
-	inherents::BlockSealInherent, NotaryId, notebook::NotebookNumber, NotebookProvider, NotebookSecret,
-	tick::{Tick, Ticker}, TickProvider,
+	inherents::BlockSealInherent,
+	notebook::NotebookNumber,
+	tick::{Tick, Ticker},
+	AuthorityProvider, BlockSealAuthorityId, BlockVotingProvider, NotaryId, NotebookProvider,
+	NotebookSecret, TickProvider,
 };
 
 use crate as pallet_block_seal_spec;

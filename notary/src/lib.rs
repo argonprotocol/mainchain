@@ -1,8 +1,7 @@
 pub use ulx_notary_apis::{create_client, Client};
 
 pub mod apis {
-    pub use ulx_notary_apis::localchain;
-    pub use ulx_notary_apis::notebook;
+	pub use ulx_notary_apis::{localchain, notebook};
 }
 pub use error::Error;
 pub use server::NotaryServer;

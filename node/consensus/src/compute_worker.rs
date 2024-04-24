@@ -31,8 +31,8 @@ use ulx_node_runtime::{NotaryRecordT, NotebookVerifyError};
 use ulx_primitives::{inherents::BlockSealInherentNodeSide, tick::Tick, *};
 
 use crate::{
-    aux_client::UlxAux, block_creator, block_creator::propose, compute_solver::ComputeSolver,
-    digests::get_tick_digest, error::Error, notebook_watch::has_votes_at_tick,
+	aux_client::UlxAux, block_creator, block_creator::propose, compute_solver::ComputeSolver,
+	digests::get_tick_digest, error::Error, notebook_watch::has_votes_at_tick,
 };
 
 /// Version of the mining worker.
@@ -114,7 +114,7 @@ where
 	) {
 		if self.best_hash() != Some(best_hash) {
 			self.stop_solving_current();
-			return
+			return;
 		}
 
 		let mut build = self.build.lock();
@@ -166,7 +166,7 @@ where
 		match self.metadata.lock().as_ref() {
 			Some(x) => {
 				if !x.has_tax_votes {
-					return true
+					return true;
 				}
 				x.parent_tick <= current_tick.saturating_sub(2)
 			},
@@ -183,7 +183,7 @@ where
 			Some(x) => x,
 			_ => {
 				trace!(target: LOG_TARGET, "Unable to submit mined block in compute worker: internal build does not exist",);
-				return Ok(())
+				return Ok(());
 			},
 		};
 
@@ -312,12 +312,12 @@ where
 			if timer.next().await.is_none() {
 				// this should occur if the block import notifications completely stop... indicating
 				// we should exit
-				break
+				break;
 			}
 			if sync_oracle.is_major_syncing() {
 				debug!(target: LOG_TARGET, "Skipping proposal due to sync.");
 				mining_handle.stop_solving_current();
-				continue
+				continue;
 			}
 
 			let best_header = match select_chain.best_chain().await {
@@ -328,7 +328,7 @@ where
 						"Unable to pull new block for compute miner. Select best chain error: {}",
 						err
 					);
-					continue
+					continue;
 				},
 			};
 			let best_hash = best_header.hash();
@@ -344,7 +344,7 @@ where
 			let time = Timestamp::current();
 			let tick = ticker.tick_for_time(time.as_millis());
 			if !mining_handle.ready_to_solve(tick) {
-				continue
+				continue;
 			}
 
 			if mining_handle.build_hash() != Some(best_hash) {
@@ -357,7 +357,7 @@ where
 							target: LOG_TARGET,
 							"Unable to pull new block for compute miner. No difficulty found!! {}", err
 						);
-						continue
+						continue;
 					},
 				};
 
@@ -380,7 +380,7 @@ where
 							target: LOG_TARGET,
 							"Unable to propose a new block {}", err
 						);
-						continue
+						continue;
 					},
 				};
 

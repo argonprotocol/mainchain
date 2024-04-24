@@ -286,7 +286,10 @@ where
           DataDomain::parse(data_domain.clone()).map_err(|_| anyhow!("Not a valid data domain"))?;
         let mainchain = MainchainClient::connect(mainchain_url, 5_000).await?;
         let registration = mainchain
-          .get_data_domain_registration(domain.domain_name.clone().to_string(), domain.top_level_domain)
+          .get_data_domain_registration(
+            domain.domain_name.clone().to_string(),
+            domain.top_level_domain,
+          )
           .await?;
         let mut table = Table::new();
         table

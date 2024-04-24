@@ -1,5 +1,5 @@
-use std::any::Any;
 use std::{
+	any::Any,
 	cmp::Ordering,
 	collections::{BTreeMap, BTreeSet},
 	fmt::Debug,
@@ -23,8 +23,7 @@ use ulx_primitives::{
 	NotebookAuditSummary, NotebookDigestRecord, NotebookHeaderData, NotebookNumber,
 };
 
-use crate::aux_data::AuxData;
-use crate::{convert_u32, error::Error};
+use crate::{aux_data::AuxData, convert_u32, error::Error};
 
 pub enum AuxState<C: AuxStore> {
 	NotaryStateAtTick(Arc<AuxData<NotaryNotebookTickState, C>>),
@@ -69,30 +68,22 @@ pub enum AuxKey {
 impl AuxKey {
 	pub fn default_state<C: AuxStore>(&self, client: Arc<C>) -> AuxState<C> {
 		match self {
-			AuxKey::NotaryStateAtTick(_) => {
-				AuxState::NotaryStateAtTick(AuxData::new(client, self.clone()).into())
-			},
-			AuxKey::AuthorsAtHeight(_) => {
-				AuxState::AuthorsAtHeight(AuxData::new(client, self.clone()).into())
-			},
-			AuxKey::NotaryNotebooks(_) => {
-				AuxState::NotaryNotebooks(AuxData::new(client, self.clone()).into())
-			},
-			AuxKey::NotaryMissingNotebooks(_) => {
-				AuxState::NotaryMissingNotebooks(AuxData::new(client, self.clone()).into())
-			},
-			AuxKey::VotesAtTick(_) => {
-				AuxState::VotesAtTick(AuxData::new(client, self.clone()).into())
-			},
-			AuxKey::NotaryAuditSummaries(_) => {
-				AuxState::NotaryAuditSummaries(AuxData::new(client, self.clone()).into())
-			},
-			AuxKey::ForkVotingPower(_) => {
-				AuxState::ForkVotingPower(AuxData::new(client, self.clone()).into())
-			},
-			AuxKey::MaxVotingPowerAtTick(_) => {
-				AuxState::MaxVotingPowerAtTick(AuxData::new(client, self.clone()).into())
-			},
+			AuxKey::NotaryStateAtTick(_) =>
+				AuxState::NotaryStateAtTick(AuxData::new(client, self.clone()).into()),
+			AuxKey::AuthorsAtHeight(_) =>
+				AuxState::AuthorsAtHeight(AuxData::new(client, self.clone()).into()),
+			AuxKey::NotaryNotebooks(_) =>
+				AuxState::NotaryNotebooks(AuxData::new(client, self.clone()).into()),
+			AuxKey::NotaryMissingNotebooks(_) =>
+				AuxState::NotaryMissingNotebooks(AuxData::new(client, self.clone()).into()),
+			AuxKey::VotesAtTick(_) =>
+				AuxState::VotesAtTick(AuxData::new(client, self.clone()).into()),
+			AuxKey::NotaryAuditSummaries(_) =>
+				AuxState::NotaryAuditSummaries(AuxData::new(client, self.clone()).into()),
+			AuxKey::ForkVotingPower(_) =>
+				AuxState::ForkVotingPower(AuxData::new(client, self.clone()).into()),
+			AuxKey::MaxVotingPowerAtTick(_) =>
+				AuxState::MaxVotingPowerAtTick(AuxData::new(client, self.clone()).into()),
 		}
 	}
 }
@@ -192,7 +183,8 @@ impl<B: BlockT, C: AuxStore + 'static> UlxAux<B, C> {
 				.auxiliary
 				.push((AuxKey::AuthorsAtHeight(block_number.saturating_sub(5)).encode(), None));
 		}
-		// Cleanup old notary state. We keep this longer because we might need to catchup on notebooks
+		// Cleanup old notary state. We keep this longer because we might need to catchup on
+		// notebooks
 		if tick >= 256 {
 			block.auxiliary.push((AuxKey::NotaryStateAtTick(tick - 256).encode(), None));
 		}
@@ -217,8 +209,8 @@ impl<B: BlockT, C: AuxStore + 'static> UlxAux<B, C> {
 		let audit_results = self.get_notary_audit_history(notary_id)?;
 
 		for notebook in audit_results.get() {
-			if notebook.notebook_number <= latest_runtime_notebook_number
-				|| notebook.tick > submitting_tick
+			if notebook.notebook_number <= latest_runtime_notebook_number ||
+				notebook.tick > submitting_tick
 			{
 				continue;
 			}
@@ -315,7 +307,10 @@ impl<B: BlockT, C: AuxStore + 'static> UlxAux<B, C> {
 		Ok(())
 	}
 
-	pub fn get_votes(&self, tick: Tick) -> Result<Arc<AuxData<Vec<NotaryNotebookVotes>, C>>, Error<B>> {
+	pub fn get_votes(
+		&self,
+		tick: Tick,
+	) -> Result<Arc<AuxData<Vec<NotaryNotebookVotes>, C>>, Error<B>> {
 		let key = AuxKey::VotesAtTick(tick);
 		self.get_or_insert_state(key)
 	}
@@ -328,7 +323,10 @@ impl<B: BlockT, C: AuxStore + 'static> UlxAux<B, C> {
 		self.get_or_insert_state(key)
 	}
 
-	pub fn strongest_fork_at_tick(&self, tick: Tick) -> Result<Arc<AuxData<ForkPower, C>>, Error<B>> {
+	pub fn strongest_fork_at_tick(
+		&self,
+		tick: Tick,
+	) -> Result<Arc<AuxData<ForkPower, C>>, Error<B>> {
 		let key = AuxKey::MaxVotingPowerAtTick(tick);
 		self.get_or_insert_state(key)
 	}
@@ -383,7 +381,10 @@ impl<B: BlockT, C: AuxStore + 'static> UlxAux<B, C> {
 		})?
 	}
 
-	fn get_or_insert_state<T: 'static + Clone>(&self, key: AuxKey) -> Result<Arc<AuxData<T, C>>, Error<B>> {
+	fn get_or_insert_state<T: 'static + Clone>(
+		&self,
+		key: AuxKey,
+	) -> Result<Arc<AuxData<T, C>>, Error<B>> {
 		let mut state = self.state.write();
 		let entry = state
 			.get_or_insert(key.clone(), || key.default_state(self.client.clone()).into())
@@ -504,23 +505,23 @@ mod test {
 		assert_eq!(ForkPower::default(), ForkPower::default());
 
 		assert!(
-			ForkPower { voting_power: 1.into(), ..Default::default() }
-				> ForkPower { voting_power: 0.into(), ..Default::default() }
+			ForkPower { voting_power: 1.into(), ..Default::default() } >
+				ForkPower { voting_power: 0.into(), ..Default::default() }
 		);
 
 		assert!(
-			ForkPower { notebooks: 1, ..Default::default() }
-				> ForkPower { notebooks: 0, ..Default::default() }
+			ForkPower { notebooks: 1, ..Default::default() } >
+				ForkPower { notebooks: 0, ..Default::default() }
 		);
 
 		assert!(
-			ForkPower { seal_strength: 200.into(), ..Default::default() }
-				> ForkPower { seal_strength: 201.into(), ..Default::default() }
+			ForkPower { seal_strength: 200.into(), ..Default::default() } >
+				ForkPower { seal_strength: 201.into(), ..Default::default() }
 		);
 
 		assert!(
-			ForkPower { total_compute_difficulty: 1000.into(), ..Default::default() }
-				> ForkPower { total_compute_difficulty: 999.into(), ..Default::default() }
+			ForkPower { total_compute_difficulty: 1000.into(), ..Default::default() } >
+				ForkPower { total_compute_difficulty: 999.into(), ..Default::default() }
 		);
 	}
 }

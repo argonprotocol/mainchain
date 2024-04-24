@@ -1,7 +1,7 @@
+use lazy_static::lazy_static;
 use sp_core::bounded_vec::BoundedVec;
 use sp_core::{ed25519::Signature as EdSignature, ByteArray};
 use std::sync::Arc;
-use lazy_static::lazy_static;
 use tokio::sync::Mutex;
 use ulx_primitives::{
   AccountId, AccountType, Balance, BalanceChange, DataDomain, DataDomainHash, MultiSignatureBytes,
@@ -12,9 +12,10 @@ use crate::bail;
 use crate::Result;
 use crate::{AccountStore, BalanceChangeStatus, LocalchainTransfer};
 
-lazy_static!(
-  static ref EMPTY_SIGNATURE: MultiSignatureBytes = MultiSignatureBytes::from(EdSignature::from_raw([0; 64]));
-);
+lazy_static! {
+  static ref EMPTY_SIGNATURE: MultiSignatureBytes =
+    MultiSignatureBytes::from(EdSignature::from_raw([0; 64]));
+}
 
 #[cfg_attr(feature = "napi", napi)]
 #[derive(Clone)]

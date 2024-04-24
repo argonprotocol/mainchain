@@ -10,8 +10,11 @@ use sp_core::{
 	H256, U256,
 };
 use sp_inherents::InherentDataProvider;
-use sp_keyring::{ed25519::Keyring, AccountKeyring::Bob, Ed25519Keyring::Alice};
-use sp_keyring::AccountKeyring::Ferdie;
+use sp_keyring::{
+	ed25519::Keyring,
+	AccountKeyring::{Bob, Ferdie},
+	Ed25519Keyring::Alice,
+};
 use sp_runtime::{
 	traits::{BlakeTwo256, Header},
 	BoundedVec, Digest, DigestItem, MultiSignature,

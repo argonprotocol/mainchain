@@ -144,7 +144,7 @@ impl Miner {
 			let info = peer.client().as_client().info();
 			println!("current_block #{}. id={}", info.best_number, id);
 			if info.best_number >= block_number {
-				return
+				return;
 			}
 		}
 		let stream = self

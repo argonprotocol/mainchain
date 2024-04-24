@@ -1,7 +1,6 @@
 use env_logger::{Builder, Env};
-use frame_support::{parameter_types, traits::Currency};
-use frame_support::derive_impl;
-use sp_core::{ConstU32};
+use frame_support::{derive_impl, parameter_types, traits::Currency};
+use sp_core::ConstU32;
 use sp_runtime::BuildStorage;
 
 use crate as pallet_bond;

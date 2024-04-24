@@ -466,7 +466,7 @@ mod tests {
 
 	use chrono::{Duration, Utc};
 	use sp_core::H256;
-	use sp_keyring::AccountKeyring::{Alice};
+	use sp_keyring::AccountKeyring::Alice;
 	use sp_keystore::{testing::MemoryKeystore, KeystoreExt};
 	use sp_runtime::traits::Verify;
 	use sqlx::PgPool;

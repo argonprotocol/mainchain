@@ -12,10 +12,10 @@ use sc_telemetry::{log, Telemetry, TelemetryWorker};
 use sc_transaction_pool_api::OffchainTransactionPoolFactory;
 
 use ulx_node_consensus::{
-    aux_client::UlxAux,
-    basic_queue::BasicQueue,
-    compute_worker::run_compute_solver_threads,
-    import_queue::{UlxImportQueue, UlxVerifier},
+	aux_client::UlxAux,
+	basic_queue::BasicQueue,
+	compute_worker::run_compute_solver_threads,
+	import_queue::{UlxImportQueue, UlxVerifier},
 };
 use ulx_node_runtime::{self, opaque::Block, AccountId, RuntimeApi};
 

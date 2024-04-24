@@ -45,40 +45,32 @@ chrono = { workspace = true }
 tokio = { workspace = true, features = ["test-util"] }
 
 [features]
-default = ["std"]
+default = [ "std" ]
 std = [
-    "async-trait",
-    "codec/std",
-    "codec/derive",
-    "scale-info/std",
-    "scale-info/derive",
-    "serde/std",
-    "serde_json/std",
-    "sp-api/std",
-    "sp-application-crypto/std",
-    "sp-application-crypto/full_crypto",
-    "sp-debug-derive/std",
-    "sp-core/std",
-    "sp-core/full_crypto",
-    "sp-crypto-hashing/std",
-    "sp-inherents/std",
-    "sp-runtime/std",
-    "sp-std/std",
-    "frame-support/std",
-    "frame-support-procedural/std",
-    "thiserror",
-    "clap",
-    "hex",
-    "rsntp",
+	"async-trait",
+	"clap",
+	"codec/derive",
+	"codec/std",
+	"frame-support-procedural/std",
+	"frame-support/std",
+	"hex",
+	"rsntp",
+	"scale-info/derive",
+	"scale-info/std",
+	"serde/std",
+	"serde_json/std",
+	"sp-api/std",
+	"sp-application-crypto/full_crypto",
+	"sp-application-crypto/std",
+	"sp-core/full_crypto",
+	"sp-core/std",
+	"sp-crypto-hashing/std",
+	"sp-debug-derive/std",
+	"sp-inherents/std",
+	"sp-runtime/std",
+	"sp-std/std",
+	"thiserror",
 ]
-fast-runtime = [
-    "sp-debug-derive/force-debug",
-]
-napi = [
-    "napi/napi9",
-    "napi/serde-json",
-    "napi-derive/type-def",
-]
-uniffi = [
-    "dep:uniffi"
-]
+fast-runtime = [ "sp-debug-derive/force-debug" ]
+napi = [ "napi-derive/type-def", "napi/napi9", "napi/serde-json" ]
+uniffi = [ "dep:uniffi" ]

@@ -11,7 +11,7 @@ use std::{
 // You should have received a copy of the GNU General Public License
 // along with this program. If not, see <https://www.gnu.org/licenses/>.
 use futures::{
-	future::{Either, select},
+	future::{select, Either},
 	prelude::*,
 	task::{Context, Poll},
 };
@@ -20,15 +20,15 @@ use log::{debug, trace, warn};
 use prometheus_endpoint::Registry;
 use sc_client_api::BlockchainEvents;
 use sc_consensus::import_queue::{
-	BlockImportError,
-	BlockImportStatus, BoxBlockImport, BoxJustificationImport, buffered_link::{self, BufferedLinkReceiver, BufferedLinkSender}, ImportQueue,
+	buffered_link::{self, BufferedLinkReceiver, BufferedLinkSender},
+	BlockImportError, BlockImportStatus, BoxBlockImport, BoxJustificationImport, ImportQueue,
 	ImportQueueService, IncomingBlock, Link, RuntimeOrigin, Verifier,
 };
 use sc_utils::mpsc::{tracing_unbounded, TracingUnboundedReceiver, TracingUnboundedSender};
 use sp_consensus::BlockOrigin;
 use sp_runtime::{
-	Justification,
-	Justifications, traits::{Block as BlockT, Header as HeaderT, NumberFor},
+	traits::{Block as BlockT, Header as HeaderT, NumberFor},
+	Justification, Justifications,
 };
 
 use crate::{
@@ -140,7 +140,7 @@ impl<B: BlockT> BasicQueueHandle<B> {
 impl<B: BlockT> ImportQueueService<B> for BasicQueueHandle<B> {
 	fn import_blocks(&mut self, origin: BlockOrigin, blocks: Vec<IncomingBlock<B>>) {
 		if blocks.is_empty() {
-			return
+			return;
 		}
 
 		trace!(target: LOG_TARGET, "Scheduling {} blocks for import", blocks.len());
@@ -208,7 +208,7 @@ impl<B: BlockT> ImportQueue<B> for BasicQueue<B> {
 		loop {
 			if let Err(_) = self.result_port.next_action(&mut *link).await {
 				log::error!(target: "sync", "poll_actions: Background import task is no longer alive");
-				return
+				return;
 			}
 		}
 	}
@@ -286,7 +286,7 @@ async fn block_import_process<B: BlockT, S: 'static + Send + BlockchainEvents<B>
 					} else {
 						retained_finalizations.push((justification, import_blocks, first_seen));
 					}
-					continue
+					continue;
 				}
 
 				if let Some((just, remaining)) = process_ready_blocks(
@@ -320,15 +320,15 @@ async fn block_import_process<B: BlockT, S: 'static + Send + BlockchainEvents<B>
 					latest_finalized = *finality.header.number();
 					has_updated_finality = true;
 				}
-				continue
+				continue;
 			},
 			Either::Right((None, _)) => {
 				log::info!(target: LOG_TARGET, "Block import channel closed, terminating");
-				return
+				return;
 			},
 			Either::Left((None, _)) => {
 				log::info!(target: LOG_TARGET, "Finality notification channel closed, terminating");
-				return
+				return;
 			},
 		};
 
@@ -380,7 +380,7 @@ async fn process_ready_blocks<B: BlockT, V: Verifier<B>>(
 		let remaining = blocks[index..].to_vec();
 		result_sender.blocks_processed(res.imported, res.block_count, res.results);
 
-		return Some(((hash, number), ImportBlocks(origin, remaining)))
+		return Some(((hash, number), ImportBlocks(origin, remaining)));
 	}
 
 	result_sender.blocks_processed(res.imported, res.block_count, res.results);
@@ -449,7 +449,7 @@ impl<B: BlockT> BlockImportWorker<B> {
 						target: LOG_TARGET,
 						"Stopping block import because result channel was closed!",
 					);
-					return
+					return;
 				}
 
 				// Make sure to first process all justifications
@@ -462,13 +462,13 @@ impl<B: BlockT> BlockImportWorker<B> {
 								target: LOG_TARGET,
 								"Stopping block import because justification channel was closed!",
 							);
-							return
+							return;
 						},
 					}
 				}
 
 				if let Poll::Ready(()) = futures::poll!(&mut block_import_process) {
-					return
+					return;
 				}
 
 				// All futures that we polled are now pending.
@@ -572,7 +572,7 @@ async fn import_many_blocks<B: BlockT, V: Verifier<B>>(
 					imported,
 					results,
 					needs_justification,
-				}
+				};
 			},
 		};
 
@@ -665,7 +665,7 @@ mod tests {
 	use std::{collections::BTreeMap, ops::Range};
 
 	use env_logger::{Builder, Env};
-	use futures::{executor::block_on, Future, task::Poll};
+	use futures::{executor::block_on, task::Poll, Future};
 	use parking_lot::Mutex;
 	use sc_client_api::{
 		FinalityNotification, FinalityNotifications, FinalizeSummary, ImportNotifications,
@@ -784,7 +784,7 @@ mod tests {
 					// since we won't be running the loop below which
 					// would also remove any closed sinks.
 					sinks.retain(|sink| !sink.is_closed());
-					return Ok(())
+					return Ok(());
 				},
 			};
 

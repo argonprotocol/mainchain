@@ -1,6 +1,5 @@
 use env_logger::{Builder, Env};
-use frame_support::derive_impl;
-use frame_support::parameter_types;
+use frame_support::{derive_impl, parameter_types};
 use sp_core::{crypto::AccountId32, H256};
 use sp_runtime::{traits::IdentityLookup, BuildStorage};
 

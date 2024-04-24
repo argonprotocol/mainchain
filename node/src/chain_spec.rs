@@ -1,5 +1,4 @@
-use std::env;
-use std::time::Duration;
+use std::{env, time::Duration};
 
 use sc_service::{ChainType, Properties};
 use sp_consensus_grandpa::AuthorityId as GrandpaId;
@@ -87,8 +86,9 @@ pub fn local_testnet_config() -> Result<ChainSpec, String> {
 	let mut properties = Properties::new();
 	properties.insert("tokenDecimals".into(), 3.into());
 
-	let notary_host =
-		env::var("ULX_LOCAL_TESTNET_NOTARY_URL").unwrap_or("ws://127.0.0.1:9925".to_string()).into();
+	let notary_host = env::var("ULX_LOCAL_TESTNET_NOTARY_URL")
+		.unwrap_or("ws://127.0.0.1:9925".to_string())
+		.into();
 
 	Ok(ChainSpec::builder(
 		WASM_BINARY.ok_or_else(|| "Development wasm not available".to_string())?,

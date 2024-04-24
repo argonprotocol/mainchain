@@ -22,8 +22,9 @@ use ulx_primitives::{
 };
 
 lazy_static! {
-  pub static ref EMPTY_SIGNATURE: Vec<u8> =
-    MultiSignature::from(Signature::from_raw([0; 64])).encode().to_vec();
+  pub static ref EMPTY_SIGNATURE: Vec<u8> = MultiSignature::from(Signature::from_raw([0; 64]))
+    .encode()
+    .to_vec();
 }
 
 #[derive(FromRow, Clone)]

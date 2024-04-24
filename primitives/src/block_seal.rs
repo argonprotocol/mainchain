@@ -59,17 +59,13 @@ pub struct MiningRegistration<
 	MaxEncodedLen,
 	Deserialize,
 	Serialize,
+	Default,
 )]
 pub enum RewardDestination<AccountId> {
+	#[default]
 	Owner,
 	/// Pay into a specified account.
 	Account(AccountId),
-}
-
-impl<AccountId> Default for RewardDestination<AccountId> {
-	fn default() -> Self {
-		RewardDestination::Owner
-	}
 }
 
 #[derive(PartialEq, Eq, Clone, Encode, Decode, RuntimeDebug, TypeInfo, Serialize, Deserialize)]

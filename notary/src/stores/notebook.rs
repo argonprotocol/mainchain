@@ -276,9 +276,8 @@ impl NotebookStore {
 						NoteType::Tax | NoteType::LeaseDomain => tax += note.milligons,
 						NoteType::EscrowHold { .. } => change_note = Some(note.clone()),
 						NoteType::EscrowSettle { .. } => change_note = None,
-						NoteType::ClaimFromMainchain { transfer_id } => {
-							transfers.push(ChainTransfer::ToLocalchain { transfer_id })
-						},
+						NoteType::ClaimFromMainchain { transfer_id } =>
+							transfers.push(ChainTransfer::ToLocalchain { transfer_id }),
 						NoteType::SendToMainchain => transfers.push(ChainTransfer::ToMainchain {
 							account_id: account_id.clone(),
 							amount: note.milligons,
@@ -287,8 +286,8 @@ impl NotebookStore {
 					}
 				}
 
-				if !changed_accounts.contains_key(&localchain_account_id)
-					|| changed_accounts
+				if !changed_accounts.contains_key(&localchain_account_id) ||
+					changed_accounts
 						.get(&localchain_account_id)
 						.is_some_and(|a| a.0 < change.change_number)
 				{

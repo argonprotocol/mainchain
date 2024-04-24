@@ -105,10 +105,10 @@ impl DataDomainStore {
 #[cfg(feature = "napi")]
 pub mod napi_ext {
   use super::*;
+  use crate::error::NapiOk;
   use crate::{DataDomainStore, JsDataDomain};
   use napi::bindgen_prelude::*;
   use ulx_primitives::DataTLD;
-  use crate::error::NapiOk;
 
   #[napi]
   impl DataDomainStore {
@@ -128,7 +128,9 @@ pub mod napi_ext {
 
     #[napi(js_name = "getHash")]
     pub fn get_hash_napi(domain: String) -> napi::Result<Uint8Array> {
-      DataDomainStore::get_hash(domain).map(|a| a.0.into()).napi_ok()
+      DataDomainStore::get_hash(domain)
+        .map(|a| a.0.into())
+        .napi_ok()
     }
 
     #[napi(js_name = "parse", ts_return_type = "DataDomain")]

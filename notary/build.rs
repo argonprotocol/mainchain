@@ -1,5 +1,4 @@
-use std::env;
-use std::process::Command;
+use std::{env, process::Command};
 
 use dotenv::dotenv;
 
@@ -11,17 +10,17 @@ fn main() {
 
 		let database_url = env::var("DATABASE_URL").expect("DATABASE_URL must be set");
 
-		match Command::new("cargo").args(&["sqlx", "--version"]).output() {
+		match Command::new("cargo").args(["sqlx", "--version"]).output() {
 			Ok(output) if output.status.success() => {
 				println!("`sqlx-cli` is already installed.");
-			}
+			},
 			_ => {
 				println!("Installing `sqlx-cli`...");
 				Command::new("cargo")
-					.args(&["install", "sqlx-cli@^0.7"])
+					.args(["install", "sqlx-cli@^0.7"])
 					.status()
 					.expect("Failed to install `sqlx-cli`");
-			}
+			},
 		}
 
 		match Command::new("cargo")

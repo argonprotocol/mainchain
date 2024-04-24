@@ -117,9 +117,8 @@ pub fn run() -> sc_cli::Result<()> {
 								"Runtime benchmarking wasn't enabled when building the node. \
 							You can enable it with `--features runtime-benchmarks`."
 									.into(),
-							)
+							);
 						}
-
 
 						cmd.run::<HashingFor<Block>, sp_statement_store::runtime_api::HostFunctions>(config)
 					},

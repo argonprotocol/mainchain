@@ -257,25 +257,19 @@ fn it_adds_new_cohorts_on_block() {
 			3,
 			"Should have 3 validators still after insertion"
 		);
-		assert_eq!(validators.contains_key(&2), true, "Should insert validator at index 2");
-		assert_eq!(
-			validators.contains_key(&3),
-			false,
-			"Should no longer have a validator at index 3"
-		);
+		assert!(validators.contains_key(&2), "Should insert validator at index 2");
+		assert!(!validators.contains_key(&3), "Should no longer have a validator at index 3");
 		assert_eq!(
 			AccountIndexLookup::<Test>::get(1),
 			Some(2),
 			"Should add an index lookup for account 1 at index 2"
 		);
-		assert_eq!(
-			AccountIndexLookup::<Test>::contains_key(6),
-			false,
+		assert!(
+			!AccountIndexLookup::<Test>::contains_key(6),
 			"Should no longer have account 6 registered"
 		);
-		assert_eq!(
-			AccountIndexLookup::<Test>::contains_key(7),
-			false,
+		assert!(
+			!AccountIndexLookup::<Test>::contains_key(7),
 			"Should no longer have account 7 registered"
 		);
 
@@ -360,10 +354,8 @@ fn it_unbonds_accounts_when_a_window_closes() {
 
 		let events = frame_system::Pallet::<Test>::events();
 		// compare to the last event record
-		let events = &events[events.len() - 4..]
-			.into_iter()
-			.map(|a| a.event.clone())
-			.collect::<Vec<_>>();
+		let events =
+			&events[events.len() - 4..].iter().map(|a| a.event.clone()).collect::<Vec<_>>();
 		assert_eq!(
 			events[0],
 			UlixeeBalancesEvent::<Test, UlixeeToken>::Endowed {
@@ -382,17 +374,17 @@ fn it_unbonds_accounts_when_a_window_closes() {
 			}
 			.into()
 		);
-		assert_eq!(UlixeeBalances::free_balance(&2), 0);
+		assert_eq!(UlixeeBalances::free_balance(2), 0);
 		assert_eq!(UlixeeBalances::total_balance(&2), 1000);
-		assert_eq!(ArgonBalances::free_balance(&2), 8990);
+		assert_eq!(ArgonBalances::free_balance(2), 8990);
 
 		let bond2 = <Bonds as BondProvider>::get_bond(bond_2).expect("bond should exist");
-		assert_eq!(bond2.is_locked, true);
+		assert!(bond2.is_locked);
 
-		assert_eq!(UlixeeBalances::free_balance(&3), 1000);
-		assert_eq!(ArgonBalances::free_balance(&3), 8997);
+		assert_eq!(UlixeeBalances::free_balance(3), 1000);
+		assert_eq!(ArgonBalances::free_balance(3), 8997);
 		let bond3 = <Bonds as BondProvider>::get_bond(bond_3).expect("bond should exist");
-		assert_eq!(bond3.is_locked, false);
+		assert!(!bond3.is_locked);
 
 		assert!(System::account_exists(&0));
 		assert!(System::account_exists(&1));
@@ -432,7 +424,7 @@ fn it_can_take_cohort_bids() {
 		System::assert_last_event(
 			Event::SlotBidderAdded { account_id: 1, bid_amount: 0u32.into(), index: 0 }.into(),
 		);
-		assert_eq!(UlixeeBalances::free_balance(&1), 334);
+		assert_eq!(UlixeeBalances::free_balance(1), 334);
 
 		// should be able to re-register
 		assert_ok!(MiningSlots::bid(RuntimeOrigin::signed(1), None, RewardDestination::Owner));
@@ -440,7 +432,7 @@ fn it_can_take_cohort_bids() {
 			NextSlotCohort::<Test>::get().iter().map(|a| a.account_id).collect::<Vec<_>>(),
 			vec![1]
 		);
-		assert_eq!(UlixeeBalances::free_balance(&1), 334, "should not alter reserved balance");
+		assert_eq!(UlixeeBalances::free_balance(1), 334, "should not alter reserved balance");
 		assert_eq!(UlixeeBalances::total_balance(&1), 1000, "should still have their full balance");
 
 		assert!(System::account_exists(&1));
@@ -542,10 +534,10 @@ fn it_will_order_bids_with_argon_bonds() {
 		System::assert_last_event(
 			Event::SlotBidderAdded { account_id: 1, bid_amount: 1000u32.into(), index: 0 }.into(),
 		);
-		assert_eq!(UlixeeBalances::free_balance(&1), 600);
+		assert_eq!(UlixeeBalances::free_balance(1), 600);
 
 		let bond = <Bonds as BondProvider>::get_bond(acc_1_bond_id).expect("bond should exist");
-		assert_eq!(bond.is_locked, true);
+		assert!(bond.is_locked);
 
 		// 2. Account 2 bids highest and takes top slot
 		let acc_2_bond_id =
@@ -586,9 +578,9 @@ fn it_will_order_bids_with_argon_bonds() {
 		);
 
 		let bond_1 = <Bonds as BondProvider>::get_bond(acc_1_bond_id).expect("bond should exist");
-		assert_eq!(bond_1.is_locked, false, "bond should be unlocked");
-		assert_eq!(UlixeeBalances::free_balance(&1), 1000);
-		assert_eq!(ArgonBalances::free_balance(&1), 9000); // should still be locked up
+		assert!(!bond_1.is_locked, "bond should be unlocked");
+		assert_eq!(UlixeeBalances::free_balance(1), 1000);
+		assert_eq!(ArgonBalances::free_balance(1), 9000); // should still be locked up
 
 		// 4. Account 1 increases bid and resubmits
 		<Bonds as BondProvider>::extend_bond(acc_1_bond_id, 1, 1002, bond_until_block)
@@ -612,12 +604,12 @@ fn it_will_order_bids_with_argon_bonds() {
 				}
 			)
 		);
-		assert_eq!(ArgonBalances::free_balance(&1), 8998); // should still be locked up
+		assert_eq!(ArgonBalances::free_balance(1), 8998); // should still be locked up
 
 		System::assert_last_event(
 			Event::SlotBidderAdded { account_id: 1, bid_amount: 1002u32.into(), index: 0 }.into(),
 		);
-		assert_eq!(UlixeeBalances::free_balance(&3), 1000);
+		assert_eq!(UlixeeBalances::free_balance(3), 1000);
 
 		assert_eq!(
 			NextSlotCohort::<Test>::get().iter().map(|a| a.account_id).collect::<Vec<_>>(),
@@ -757,14 +749,9 @@ fn it_can_replace_authority_keys() {
 		assert_eq!(AuthoritiesByIndex::<Test>::get().len(), 1);
 		MiningSlots::on_new_session(true, with_keys, queued_keys);
 		assert_eq!(AuthoritiesByIndex::<Test>::get().len(), 8, "should register only 8 keys");
-		assert_eq!(
-			AuthoritiesByIndex::<Test>::get().contains_key(&0u32),
-			false,
-			"should not have index 0"
-		);
-		assert_eq!(
-			AuthoritiesByIndex::<Test>::get().contains_key(&10u32),
-			false,
+		assert!(!AuthoritiesByIndex::<Test>::get().contains_key(&0u32), "should not have index 0");
+		assert!(
+			!AuthoritiesByIndex::<Test>::get().contains_key(&10u32),
 			"should not have index 11"
 		);
 	});

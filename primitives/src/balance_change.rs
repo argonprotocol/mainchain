@@ -93,7 +93,7 @@ impl BalanceChange {
 	pub fn hash(&self) -> H256 {
 		let hash = BalanceChangeHashMessage {
 			account_id: self.account_id.clone(),
-			account_type: self.account_type.clone(),
+			account_type: self.account_type,
 			change_number: self.change_number,
 			balance: self.balance,
 			escrow_hold_note: self.escrow_hold_note.clone(),
