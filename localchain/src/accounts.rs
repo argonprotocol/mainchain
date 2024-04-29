@@ -579,9 +579,7 @@ mod test {
     AccountStore::db_update_origin(db, account.id, 1, 1).await?;
 
     assert_eq!(
-      AccountStore::db_get_by_id(db, account.id)
-        .await?
-        .origin,
+      AccountStore::db_get_by_id(db, account.id).await?.origin,
       Some(NotaryAccountOrigin {
         notary_id: 1,
         notebook_number: 1,

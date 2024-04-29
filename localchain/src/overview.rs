@@ -69,10 +69,7 @@ pub struct BalanceChangeSummary {
 }
 
 fn get_note_descriptions(change: &BalanceChangeRow) -> Vec<String> {
-  get_notes(change)
-    .iter()
-    .map(|n| format!("{}", n))
-    .collect()
+  get_notes(change).iter().map(|n| format!("{}", n)).collect()
 }
 
 fn get_notes(change: &BalanceChangeRow) -> Vec<Note> {
@@ -607,10 +604,7 @@ mod tests {
 
     let alice_json = alice_localchain
       .transactions()
-      .send(
-        3500_u128,
-        Some(vec![bob_localchain.address().await?]),
-      )
+      .send(3500_u128, Some(vec![bob_localchain.address().await?]))
       .await?;
     {
       let overview = alice_overview.get().await?;

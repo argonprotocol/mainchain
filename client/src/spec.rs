@@ -6,9 +6,10 @@ pub mod api {
 	mod root_mod {
 		pub use super::*;
 	}
-	pub static PALLETS: [&str; 23usize] = [
+	pub static PALLETS: [&str; 26usize] = [
 		"System",
 		"Timestamp",
+		"Proxy",
 		"Ticks",
 		"MiningSlot",
 		"Bond",
@@ -17,6 +18,7 @@ pub mod api {
 		"ChainTransfer",
 		"BlockSealSpec",
 		"DataDomain",
+		"PriceIndex",
 		"Authorship",
 		"Historical",
 		"Session",
@@ -24,8 +26,9 @@ pub mod api {
 		"BlockRewards",
 		"Grandpa",
 		"Offences",
+		"BitcoinMint",
 		"ArgonBalances",
-		"Mint",
+		"UlixeeMint",
 		"UlixeeBalances",
 		"TxPause",
 		"TransactionPayment",
@@ -1050,10 +1053,9 @@ pub mod api {
 						"query_call_info",
 						types::QueryCallInfo { call, len },
 						[
-							41u8, 88u8, 107u8, 173u8, 84u8, 218u8, 118u8, 142u8, 132u8, 255u8,
-							12u8, 60u8, 242u8, 255u8, 151u8, 228u8, 143u8, 175u8, 251u8, 119u8,
-							223u8, 205u8, 24u8, 63u8, 39u8, 2u8, 155u8, 105u8, 157u8, 51u8, 183u8,
-							174u8,
+							191u8, 225u8, 242u8, 96u8, 150u8, 48u8, 30u8, 230u8, 209u8, 53u8, 87u8,
+							78u8, 99u8, 30u8, 152u8, 24u8, 164u8, 225u8, 190u8, 22u8, 231u8, 118u8,
+							171u8, 48u8, 218u8, 86u8, 75u8, 137u8, 145u8, 3u8, 168u8, 43u8,
 						],
 					)
 				}
@@ -1071,10 +1073,10 @@ pub mod api {
 						"query_call_fee_details",
 						types::QueryCallFeeDetails { call, len },
 						[
-							169u8, 220u8, 56u8, 116u8, 51u8, 35u8, 150u8, 245u8, 188u8, 94u8,
-							188u8, 9u8, 191u8, 131u8, 163u8, 84u8, 140u8, 206u8, 161u8, 135u8,
-							207u8, 147u8, 71u8, 200u8, 176u8, 89u8, 6u8, 210u8, 187u8, 241u8,
-							210u8, 97u8,
+							56u8, 115u8, 1u8, 170u8, 250u8, 219u8, 217u8, 38u8, 107u8, 65u8, 67u8,
+							255u8, 136u8, 73u8, 223u8, 52u8, 248u8, 165u8, 60u8, 109u8, 153u8,
+							34u8, 122u8, 212u8, 134u8, 222u8, 218u8, 209u8, 39u8, 18u8, 166u8,
+							240u8,
 						],
 					)
 				}
@@ -2210,6 +2212,9 @@ pub mod api {
 		pub fn timestamp(&self) -> timestamp::constants::ConstantsApi {
 			timestamp::constants::ConstantsApi
 		}
+		pub fn proxy(&self) -> proxy::constants::ConstantsApi {
+			proxy::constants::ConstantsApi
+		}
 		pub fn mining_slot(&self) -> mining_slot::constants::ConstantsApi {
 			mining_slot::constants::ConstantsApi
 		}
@@ -2225,11 +2230,17 @@ pub mod api {
 		pub fn block_seal_spec(&self) -> block_seal_spec::constants::ConstantsApi {
 			block_seal_spec::constants::ConstantsApi
 		}
+		pub fn price_index(&self) -> price_index::constants::ConstantsApi {
+			price_index::constants::ConstantsApi
+		}
 		pub fn block_rewards(&self) -> block_rewards::constants::ConstantsApi {
 			block_rewards::constants::ConstantsApi
 		}
 		pub fn grandpa(&self) -> grandpa::constants::ConstantsApi {
 			grandpa::constants::ConstantsApi
+		}
+		pub fn bitcoin_mint(&self) -> bitcoin_mint::constants::ConstantsApi {
+			bitcoin_mint::constants::ConstantsApi
 		}
 		pub fn argon_balances(&self) -> argon_balances::constants::ConstantsApi {
 			argon_balances::constants::ConstantsApi
@@ -2251,6 +2262,9 @@ pub mod api {
 		}
 		pub fn timestamp(&self) -> timestamp::storage::StorageApi {
 			timestamp::storage::StorageApi
+		}
+		pub fn proxy(&self) -> proxy::storage::StorageApi {
+			proxy::storage::StorageApi
 		}
 		pub fn ticks(&self) -> ticks::storage::StorageApi {
 			ticks::storage::StorageApi
@@ -2276,6 +2290,9 @@ pub mod api {
 		pub fn data_domain(&self) -> data_domain::storage::StorageApi {
 			data_domain::storage::StorageApi
 		}
+		pub fn price_index(&self) -> price_index::storage::StorageApi {
+			price_index::storage::StorageApi
+		}
 		pub fn authorship(&self) -> authorship::storage::StorageApi {
 			authorship::storage::StorageApi
 		}
@@ -2297,11 +2314,14 @@ pub mod api {
 		pub fn offences(&self) -> offences::storage::StorageApi {
 			offences::storage::StorageApi
 		}
+		pub fn bitcoin_mint(&self) -> bitcoin_mint::storage::StorageApi {
+			bitcoin_mint::storage::StorageApi
+		}
 		pub fn argon_balances(&self) -> argon_balances::storage::StorageApi {
 			argon_balances::storage::StorageApi
 		}
-		pub fn mint(&self) -> mint::storage::StorageApi {
-			mint::storage::StorageApi
+		pub fn ulixee_mint(&self) -> ulixee_mint::storage::StorageApi {
+			ulixee_mint::storage::StorageApi
 		}
 		pub fn ulixee_balances(&self) -> ulixee_balances::storage::StorageApi {
 			ulixee_balances::storage::StorageApi
@@ -2323,6 +2343,9 @@ pub mod api {
 		}
 		pub fn timestamp(&self) -> timestamp::calls::TransactionApi {
 			timestamp::calls::TransactionApi
+		}
+		pub fn proxy(&self) -> proxy::calls::TransactionApi {
+			proxy::calls::TransactionApi
 		}
 		pub fn ticks(&self) -> ticks::calls::TransactionApi {
 			ticks::calls::TransactionApi
@@ -2348,6 +2371,9 @@ pub mod api {
 		pub fn data_domain(&self) -> data_domain::calls::TransactionApi {
 			data_domain::calls::TransactionApi
 		}
+		pub fn price_index(&self) -> price_index::calls::TransactionApi {
+			price_index::calls::TransactionApi
+		}
 		pub fn session(&self) -> session::calls::TransactionApi {
 			session::calls::TransactionApi
 		}
@@ -2360,11 +2386,14 @@ pub mod api {
 		pub fn grandpa(&self) -> grandpa::calls::TransactionApi {
 			grandpa::calls::TransactionApi
 		}
+		pub fn bitcoin_mint(&self) -> bitcoin_mint::calls::TransactionApi {
+			bitcoin_mint::calls::TransactionApi
+		}
 		pub fn argon_balances(&self) -> argon_balances::calls::TransactionApi {
 			argon_balances::calls::TransactionApi
 		}
-		pub fn mint(&self) -> mint::calls::TransactionApi {
-			mint::calls::TransactionApi
+		pub fn ulixee_mint(&self) -> ulixee_mint::calls::TransactionApi {
+			ulixee_mint::calls::TransactionApi
 		}
 		pub fn ulixee_balances(&self) -> ulixee_balances::calls::TransactionApi {
 			ulixee_balances::calls::TransactionApi
@@ -2385,9 +2414,9 @@ pub mod api {
 			.hash();
 		runtime_metadata_hash ==
 			[
-				221u8, 163u8, 174u8, 173u8, 245u8, 117u8, 70u8, 2u8, 226u8, 16u8, 56u8, 215u8,
-				39u8, 197u8, 116u8, 96u8, 119u8, 153u8, 11u8, 80u8, 15u8, 131u8, 188u8, 149u8,
-				187u8, 223u8, 251u8, 141u8, 35u8, 123u8, 0u8, 98u8,
+				52u8, 195u8, 104u8, 182u8, 145u8, 247u8, 50u8, 21u8, 238u8, 49u8, 253u8, 60u8,
+				184u8, 98u8, 39u8, 134u8, 211u8, 37u8, 123u8, 20u8, 247u8, 46u8, 65u8, 142u8, 51u8,
+				97u8, 173u8, 174u8, 102u8, 83u8, 38u8, 24u8,
 			]
 	}
 	pub mod system {
@@ -3464,10 +3493,10 @@ pub mod api {
 						"Events",
 						(),
 						[
-							204u8, 231u8, 223u8, 173u8, 74u8, 173u8, 229u8, 160u8, 202u8, 154u8,
-							83u8, 212u8, 175u8, 167u8, 66u8, 19u8, 129u8, 120u8, 72u8, 255u8,
-							118u8, 209u8, 175u8, 29u8, 85u8, 234u8, 202u8, 57u8, 114u8, 83u8,
-							197u8, 35u8,
+							254u8, 141u8, 137u8, 74u8, 114u8, 251u8, 178u8, 121u8, 227u8, 15u8,
+							40u8, 56u8, 243u8, 23u8, 252u8, 206u8, 109u8, 149u8, 246u8, 37u8,
+							218u8, 52u8, 212u8, 20u8, 120u8, 14u8, 146u8, 8u8, 146u8, 233u8, 31u8,
+							105u8,
 						],
 					)
 				}
@@ -3931,6 +3960,1051 @@ pub mod api {
 							59u8, 226u8, 157u8, 101u8, 103u8, 117u8, 249u8, 65u8, 18u8, 191u8,
 							103u8, 119u8, 53u8, 85u8, 81u8, 96u8, 220u8, 42u8, 184u8, 239u8, 42u8,
 							246u8,
+						],
+					)
+				}
+			}
+		}
+	}
+	pub mod proxy {
+		use super::{root_mod, runtime_types};
+		#[doc = "The `Error` enum of this pallet."]
+		pub type Error = runtime_types::pallet_proxy::pallet::Error;
+		#[doc = "Contains a variant per dispatchable extrinsic that this pallet has."]
+		pub type Call = runtime_types::pallet_proxy::pallet::Call;
+		pub mod calls {
+			use super::{root_mod, runtime_types};
+			type DispatchError = runtime_types::sp_runtime::DispatchError;
+			pub mod types {
+				use super::runtime_types;
+				#[derive(
+					:: subxt :: ext :: codec :: Decode,
+					:: subxt :: ext :: codec :: Encode,
+					:: subxt :: ext :: scale_decode :: DecodeAsType,
+					:: subxt :: ext :: scale_encode :: EncodeAsType,
+					Clone,
+					Debug,
+				)]
+				# [codec (crate = :: subxt :: ext :: codec)]
+				#[decode_as_type(crate_path = ":: subxt :: ext :: scale_decode")]
+				#[encode_as_type(crate_path = ":: subxt :: ext :: scale_encode")]
+				#[doc = "Dispatch the given `call` from an account that the sender is authorised for through"]
+				#[doc = "`add_proxy`."]
+				#[doc = ""]
+				#[doc = "The dispatch origin for this call must be _Signed_."]
+				#[doc = ""]
+				#[doc = "Parameters:"]
+				#[doc = "- `real`: The account that the proxy will make a call on behalf of."]
+				#[doc = "- `force_proxy_type`: Specify the exact proxy type to be used and checked for this call."]
+				#[doc = "- `call`: The call to be made by the `real` account."]
+				pub struct Proxy {
+					pub real: proxy::Real,
+					pub force_proxy_type: proxy::ForceProxyType,
+					pub call: ::std::boxed::Box<proxy::Call>,
+				}
+				pub mod proxy {
+					use super::runtime_types;
+					pub type Real = ::subxt::utils::MultiAddress<::subxt::utils::AccountId32, ()>;
+					pub type ForceProxyType =
+						::core::option::Option<runtime_types::ulx_node_runtime::ProxyType>;
+					pub type Call = runtime_types::ulx_node_runtime::RuntimeCall;
+				}
+				impl ::subxt::blocks::StaticExtrinsic for Proxy {
+					const PALLET: &'static str = "Proxy";
+					const CALL: &'static str = "proxy";
+				}
+				#[derive(
+					:: subxt :: ext :: codec :: Decode,
+					:: subxt :: ext :: codec :: Encode,
+					:: subxt :: ext :: scale_decode :: DecodeAsType,
+					:: subxt :: ext :: scale_encode :: EncodeAsType,
+					Clone,
+					Debug,
+				)]
+				# [codec (crate = :: subxt :: ext :: codec)]
+				#[decode_as_type(crate_path = ":: subxt :: ext :: scale_decode")]
+				#[encode_as_type(crate_path = ":: subxt :: ext :: scale_encode")]
+				#[doc = "Register a proxy account for the sender that is able to make calls on its behalf."]
+				#[doc = ""]
+				#[doc = "The dispatch origin for this call must be _Signed_."]
+				#[doc = ""]
+				#[doc = "Parameters:"]
+				#[doc = "- `proxy`: The account that the `caller` would like to make a proxy."]
+				#[doc = "- `proxy_type`: The permissions allowed for this proxy account."]
+				#[doc = "- `delay`: The announcement period required of the initial proxy. Will generally be"]
+				#[doc = "zero."]
+				pub struct AddProxy {
+					pub delegate: add_proxy::Delegate,
+					pub proxy_type: add_proxy::ProxyType,
+					pub delay: add_proxy::Delay,
+				}
+				pub mod add_proxy {
+					use super::runtime_types;
+					pub type Delegate =
+						::subxt::utils::MultiAddress<::subxt::utils::AccountId32, ()>;
+					pub type ProxyType = runtime_types::ulx_node_runtime::ProxyType;
+					pub type Delay = ::core::primitive::u32;
+				}
+				impl ::subxt::blocks::StaticExtrinsic for AddProxy {
+					const PALLET: &'static str = "Proxy";
+					const CALL: &'static str = "add_proxy";
+				}
+				#[derive(
+					:: subxt :: ext :: codec :: Decode,
+					:: subxt :: ext :: codec :: Encode,
+					:: subxt :: ext :: scale_decode :: DecodeAsType,
+					:: subxt :: ext :: scale_encode :: EncodeAsType,
+					Clone,
+					Debug,
+				)]
+				# [codec (crate = :: subxt :: ext :: codec)]
+				#[decode_as_type(crate_path = ":: subxt :: ext :: scale_decode")]
+				#[encode_as_type(crate_path = ":: subxt :: ext :: scale_encode")]
+				#[doc = "Unregister a proxy account for the sender."]
+				#[doc = ""]
+				#[doc = "The dispatch origin for this call must be _Signed_."]
+				#[doc = ""]
+				#[doc = "Parameters:"]
+				#[doc = "- `proxy`: The account that the `caller` would like to remove as a proxy."]
+				#[doc = "- `proxy_type`: The permissions currently enabled for the removed proxy account."]
+				pub struct RemoveProxy {
+					pub delegate: remove_proxy::Delegate,
+					pub proxy_type: remove_proxy::ProxyType,
+					pub delay: remove_proxy::Delay,
+				}
+				pub mod remove_proxy {
+					use super::runtime_types;
+					pub type Delegate =
+						::subxt::utils::MultiAddress<::subxt::utils::AccountId32, ()>;
+					pub type ProxyType = runtime_types::ulx_node_runtime::ProxyType;
+					pub type Delay = ::core::primitive::u32;
+				}
+				impl ::subxt::blocks::StaticExtrinsic for RemoveProxy {
+					const PALLET: &'static str = "Proxy";
+					const CALL: &'static str = "remove_proxy";
+				}
+				#[derive(
+					:: subxt :: ext :: codec :: Decode,
+					:: subxt :: ext :: codec :: Encode,
+					:: subxt :: ext :: scale_decode :: DecodeAsType,
+					:: subxt :: ext :: scale_encode :: EncodeAsType,
+					Clone,
+					Debug,
+				)]
+				# [codec (crate = :: subxt :: ext :: codec)]
+				#[decode_as_type(crate_path = ":: subxt :: ext :: scale_decode")]
+				#[encode_as_type(crate_path = ":: subxt :: ext :: scale_encode")]
+				#[doc = "Unregister all proxy accounts for the sender."]
+				#[doc = ""]
+				#[doc = "The dispatch origin for this call must be _Signed_."]
+				#[doc = ""]
+				#[doc = "WARNING: This may be called on accounts created by `pure`, however if done, then"]
+				#[doc = "the unreserved fees will be inaccessible. **All access to this account will be lost.**"]
+				pub struct RemoveProxies;
+				impl ::subxt::blocks::StaticExtrinsic for RemoveProxies {
+					const PALLET: &'static str = "Proxy";
+					const CALL: &'static str = "remove_proxies";
+				}
+				#[derive(
+					:: subxt :: ext :: codec :: Decode,
+					:: subxt :: ext :: codec :: Encode,
+					:: subxt :: ext :: scale_decode :: DecodeAsType,
+					:: subxt :: ext :: scale_encode :: EncodeAsType,
+					Clone,
+					Debug,
+				)]
+				# [codec (crate = :: subxt :: ext :: codec)]
+				#[decode_as_type(crate_path = ":: subxt :: ext :: scale_decode")]
+				#[encode_as_type(crate_path = ":: subxt :: ext :: scale_encode")]
+				#[doc = "Spawn a fresh new account that is guaranteed to be otherwise inaccessible, and"]
+				#[doc = "initialize it with a proxy of `proxy_type` for `origin` sender."]
+				#[doc = ""]
+				#[doc = "Requires a `Signed` origin."]
+				#[doc = ""]
+				#[doc = "- `proxy_type`: The type of the proxy that the sender will be registered as over the"]
+				#[doc = "new account. This will almost always be the most permissive `ProxyType` possible to"]
+				#[doc = "allow for maximum flexibility."]
+				#[doc = "- `index`: A disambiguation index, in case this is called multiple times in the same"]
+				#[doc = "transaction (e.g. with `utility::batch`). Unless you're using `batch` you probably just"]
+				#[doc = "want to use `0`."]
+				#[doc = "- `delay`: The announcement period required of the initial proxy. Will generally be"]
+				#[doc = "zero."]
+				#[doc = ""]
+				#[doc = "Fails with `Duplicate` if this has already been called in this transaction, from the"]
+				#[doc = "same sender, with the same parameters."]
+				#[doc = ""]
+				#[doc = "Fails if there are insufficient funds to pay for deposit."]
+				pub struct CreatePure {
+					pub proxy_type: create_pure::ProxyType,
+					pub delay: create_pure::Delay,
+					pub index: create_pure::Index,
+				}
+				pub mod create_pure {
+					use super::runtime_types;
+					pub type ProxyType = runtime_types::ulx_node_runtime::ProxyType;
+					pub type Delay = ::core::primitive::u32;
+					pub type Index = ::core::primitive::u16;
+				}
+				impl ::subxt::blocks::StaticExtrinsic for CreatePure {
+					const PALLET: &'static str = "Proxy";
+					const CALL: &'static str = "create_pure";
+				}
+				#[derive(
+					:: subxt :: ext :: codec :: Decode,
+					:: subxt :: ext :: codec :: Encode,
+					:: subxt :: ext :: scale_decode :: DecodeAsType,
+					:: subxt :: ext :: scale_encode :: EncodeAsType,
+					Clone,
+					Debug,
+				)]
+				# [codec (crate = :: subxt :: ext :: codec)]
+				#[decode_as_type(crate_path = ":: subxt :: ext :: scale_decode")]
+				#[encode_as_type(crate_path = ":: subxt :: ext :: scale_encode")]
+				#[doc = "Removes a previously spawned pure proxy."]
+				#[doc = ""]
+				#[doc = "WARNING: **All access to this account will be lost.** Any funds held in it will be"]
+				#[doc = "inaccessible."]
+				#[doc = ""]
+				#[doc = "Requires a `Signed` origin, and the sender account must have been created by a call to"]
+				#[doc = "`pure` with corresponding parameters."]
+				#[doc = ""]
+				#[doc = "- `spawner`: The account that originally called `pure` to create this account."]
+				#[doc = "- `index`: The disambiguation index originally passed to `pure`. Probably `0`."]
+				#[doc = "- `proxy_type`: The proxy type originally passed to `pure`."]
+				#[doc = "- `height`: The height of the chain when the call to `pure` was processed."]
+				#[doc = "- `ext_index`: The extrinsic index in which the call to `pure` was processed."]
+				#[doc = ""]
+				#[doc = "Fails with `NoPermission` in case the caller is not a previously created pure"]
+				#[doc = "account whose `pure` call has corresponding parameters."]
+				pub struct KillPure {
+					pub spawner: kill_pure::Spawner,
+					pub proxy_type: kill_pure::ProxyType,
+					pub index: kill_pure::Index,
+					#[codec(compact)]
+					pub height: kill_pure::Height,
+					#[codec(compact)]
+					pub ext_index: kill_pure::ExtIndex,
+				}
+				pub mod kill_pure {
+					use super::runtime_types;
+					pub type Spawner =
+						::subxt::utils::MultiAddress<::subxt::utils::AccountId32, ()>;
+					pub type ProxyType = runtime_types::ulx_node_runtime::ProxyType;
+					pub type Index = ::core::primitive::u16;
+					pub type Height = ::core::primitive::u32;
+					pub type ExtIndex = ::core::primitive::u32;
+				}
+				impl ::subxt::blocks::StaticExtrinsic for KillPure {
+					const PALLET: &'static str = "Proxy";
+					const CALL: &'static str = "kill_pure";
+				}
+				#[derive(
+					:: subxt :: ext :: codec :: Decode,
+					:: subxt :: ext :: codec :: Encode,
+					:: subxt :: ext :: scale_decode :: DecodeAsType,
+					:: subxt :: ext :: scale_encode :: EncodeAsType,
+					Clone,
+					Debug,
+				)]
+				# [codec (crate = :: subxt :: ext :: codec)]
+				#[decode_as_type(crate_path = ":: subxt :: ext :: scale_decode")]
+				#[encode_as_type(crate_path = ":: subxt :: ext :: scale_encode")]
+				#[doc = "Publish the hash of a proxy-call that will be made in the future."]
+				#[doc = ""]
+				#[doc = "This must be called some number of blocks before the corresponding `proxy` is attempted"]
+				#[doc = "if the delay associated with the proxy relationship is greater than zero."]
+				#[doc = ""]
+				#[doc = "No more than `MaxPending` announcements may be made at any one time."]
+				#[doc = ""]
+				#[doc = "This will take a deposit of `AnnouncementDepositFactor` as well as"]
+				#[doc = "`AnnouncementDepositBase` if there are no other pending announcements."]
+				#[doc = ""]
+				#[doc = "The dispatch origin for this call must be _Signed_ and a proxy of `real`."]
+				#[doc = ""]
+				#[doc = "Parameters:"]
+				#[doc = "- `real`: The account that the proxy will make a call on behalf of."]
+				#[doc = "- `call_hash`: The hash of the call to be made by the `real` account."]
+				pub struct Announce {
+					pub real: announce::Real,
+					pub call_hash: announce::CallHash,
+				}
+				pub mod announce {
+					use super::runtime_types;
+					pub type Real = ::subxt::utils::MultiAddress<::subxt::utils::AccountId32, ()>;
+					pub type CallHash = ::subxt::utils::H256;
+				}
+				impl ::subxt::blocks::StaticExtrinsic for Announce {
+					const PALLET: &'static str = "Proxy";
+					const CALL: &'static str = "announce";
+				}
+				#[derive(
+					:: subxt :: ext :: codec :: Decode,
+					:: subxt :: ext :: codec :: Encode,
+					:: subxt :: ext :: scale_decode :: DecodeAsType,
+					:: subxt :: ext :: scale_encode :: EncodeAsType,
+					Clone,
+					Debug,
+				)]
+				# [codec (crate = :: subxt :: ext :: codec)]
+				#[decode_as_type(crate_path = ":: subxt :: ext :: scale_decode")]
+				#[encode_as_type(crate_path = ":: subxt :: ext :: scale_encode")]
+				#[doc = "Remove a given announcement."]
+				#[doc = ""]
+				#[doc = "May be called by a proxy account to remove a call they previously announced and return"]
+				#[doc = "the deposit."]
+				#[doc = ""]
+				#[doc = "The dispatch origin for this call must be _Signed_."]
+				#[doc = ""]
+				#[doc = "Parameters:"]
+				#[doc = "- `real`: The account that the proxy will make a call on behalf of."]
+				#[doc = "- `call_hash`: The hash of the call to be made by the `real` account."]
+				pub struct RemoveAnnouncement {
+					pub real: remove_announcement::Real,
+					pub call_hash: remove_announcement::CallHash,
+				}
+				pub mod remove_announcement {
+					use super::runtime_types;
+					pub type Real = ::subxt::utils::MultiAddress<::subxt::utils::AccountId32, ()>;
+					pub type CallHash = ::subxt::utils::H256;
+				}
+				impl ::subxt::blocks::StaticExtrinsic for RemoveAnnouncement {
+					const PALLET: &'static str = "Proxy";
+					const CALL: &'static str = "remove_announcement";
+				}
+				#[derive(
+					:: subxt :: ext :: codec :: Decode,
+					:: subxt :: ext :: codec :: Encode,
+					:: subxt :: ext :: scale_decode :: DecodeAsType,
+					:: subxt :: ext :: scale_encode :: EncodeAsType,
+					Clone,
+					Debug,
+				)]
+				# [codec (crate = :: subxt :: ext :: codec)]
+				#[decode_as_type(crate_path = ":: subxt :: ext :: scale_decode")]
+				#[encode_as_type(crate_path = ":: subxt :: ext :: scale_encode")]
+				#[doc = "Remove the given announcement of a delegate."]
+				#[doc = ""]
+				#[doc = "May be called by a target (proxied) account to remove a call that one of their delegates"]
+				#[doc = "(`delegate`) has announced they want to execute. The deposit is returned."]
+				#[doc = ""]
+				#[doc = "The dispatch origin for this call must be _Signed_."]
+				#[doc = ""]
+				#[doc = "Parameters:"]
+				#[doc = "- `delegate`: The account that previously announced the call."]
+				#[doc = "- `call_hash`: The hash of the call to be made."]
+				pub struct RejectAnnouncement {
+					pub delegate: reject_announcement::Delegate,
+					pub call_hash: reject_announcement::CallHash,
+				}
+				pub mod reject_announcement {
+					use super::runtime_types;
+					pub type Delegate =
+						::subxt::utils::MultiAddress<::subxt::utils::AccountId32, ()>;
+					pub type CallHash = ::subxt::utils::H256;
+				}
+				impl ::subxt::blocks::StaticExtrinsic for RejectAnnouncement {
+					const PALLET: &'static str = "Proxy";
+					const CALL: &'static str = "reject_announcement";
+				}
+				#[derive(
+					:: subxt :: ext :: codec :: Decode,
+					:: subxt :: ext :: codec :: Encode,
+					:: subxt :: ext :: scale_decode :: DecodeAsType,
+					:: subxt :: ext :: scale_encode :: EncodeAsType,
+					Clone,
+					Debug,
+				)]
+				# [codec (crate = :: subxt :: ext :: codec)]
+				#[decode_as_type(crate_path = ":: subxt :: ext :: scale_decode")]
+				#[encode_as_type(crate_path = ":: subxt :: ext :: scale_encode")]
+				#[doc = "Dispatch the given `call` from an account that the sender is authorized for through"]
+				#[doc = "`add_proxy`."]
+				#[doc = ""]
+				#[doc = "Removes any corresponding announcement(s)."]
+				#[doc = ""]
+				#[doc = "The dispatch origin for this call must be _Signed_."]
+				#[doc = ""]
+				#[doc = "Parameters:"]
+				#[doc = "- `real`: The account that the proxy will make a call on behalf of."]
+				#[doc = "- `force_proxy_type`: Specify the exact proxy type to be used and checked for this call."]
+				#[doc = "- `call`: The call to be made by the `real` account."]
+				pub struct ProxyAnnounced {
+					pub delegate: proxy_announced::Delegate,
+					pub real: proxy_announced::Real,
+					pub force_proxy_type: proxy_announced::ForceProxyType,
+					pub call: ::std::boxed::Box<proxy_announced::Call>,
+				}
+				pub mod proxy_announced {
+					use super::runtime_types;
+					pub type Delegate =
+						::subxt::utils::MultiAddress<::subxt::utils::AccountId32, ()>;
+					pub type Real = ::subxt::utils::MultiAddress<::subxt::utils::AccountId32, ()>;
+					pub type ForceProxyType =
+						::core::option::Option<runtime_types::ulx_node_runtime::ProxyType>;
+					pub type Call = runtime_types::ulx_node_runtime::RuntimeCall;
+				}
+				impl ::subxt::blocks::StaticExtrinsic for ProxyAnnounced {
+					const PALLET: &'static str = "Proxy";
+					const CALL: &'static str = "proxy_announced";
+				}
+			}
+			pub struct TransactionApi;
+			impl TransactionApi {
+				#[doc = "Dispatch the given `call` from an account that the sender is authorised for through"]
+				#[doc = "`add_proxy`."]
+				#[doc = ""]
+				#[doc = "The dispatch origin for this call must be _Signed_."]
+				#[doc = ""]
+				#[doc = "Parameters:"]
+				#[doc = "- `real`: The account that the proxy will make a call on behalf of."]
+				#[doc = "- `force_proxy_type`: Specify the exact proxy type to be used and checked for this call."]
+				#[doc = "- `call`: The call to be made by the `real` account."]
+				pub fn proxy(
+					&self,
+					real: types::proxy::Real,
+					force_proxy_type: types::proxy::ForceProxyType,
+					call: types::proxy::Call,
+				) -> ::subxt::tx::Payload<types::Proxy> {
+					::subxt::tx::Payload::new_static(
+						"Proxy",
+						"proxy",
+						types::Proxy { real, force_proxy_type, call: ::std::boxed::Box::new(call) },
+						[
+							147u8, 196u8, 218u8, 2u8, 124u8, 145u8, 10u8, 91u8, 104u8, 136u8,
+							220u8, 115u8, 126u8, 254u8, 172u8, 215u8, 111u8, 238u8, 31u8, 121u8,
+							94u8, 183u8, 208u8, 227u8, 26u8, 209u8, 160u8, 159u8, 190u8, 22u8,
+							145u8, 184u8,
+						],
+					)
+				}
+				#[doc = "Register a proxy account for the sender that is able to make calls on its behalf."]
+				#[doc = ""]
+				#[doc = "The dispatch origin for this call must be _Signed_."]
+				#[doc = ""]
+				#[doc = "Parameters:"]
+				#[doc = "- `proxy`: The account that the `caller` would like to make a proxy."]
+				#[doc = "- `proxy_type`: The permissions allowed for this proxy account."]
+				#[doc = "- `delay`: The announcement period required of the initial proxy. Will generally be"]
+				#[doc = "zero."]
+				pub fn add_proxy(
+					&self,
+					delegate: types::add_proxy::Delegate,
+					proxy_type: types::add_proxy::ProxyType,
+					delay: types::add_proxy::Delay,
+				) -> ::subxt::tx::Payload<types::AddProxy> {
+					::subxt::tx::Payload::new_static(
+						"Proxy",
+						"add_proxy",
+						types::AddProxy { delegate, proxy_type, delay },
+						[
+							30u8, 5u8, 200u8, 92u8, 168u8, 67u8, 155u8, 131u8, 40u8, 91u8, 231u8,
+							100u8, 94u8, 217u8, 231u8, 253u8, 244u8, 28u8, 110u8, 177u8, 145u8,
+							70u8, 234u8, 94u8, 33u8, 101u8, 251u8, 28u8, 222u8, 24u8, 220u8, 139u8,
+						],
+					)
+				}
+				#[doc = "Unregister a proxy account for the sender."]
+				#[doc = ""]
+				#[doc = "The dispatch origin for this call must be _Signed_."]
+				#[doc = ""]
+				#[doc = "Parameters:"]
+				#[doc = "- `proxy`: The account that the `caller` would like to remove as a proxy."]
+				#[doc = "- `proxy_type`: The permissions currently enabled for the removed proxy account."]
+				pub fn remove_proxy(
+					&self,
+					delegate: types::remove_proxy::Delegate,
+					proxy_type: types::remove_proxy::ProxyType,
+					delay: types::remove_proxy::Delay,
+				) -> ::subxt::tx::Payload<types::RemoveProxy> {
+					::subxt::tx::Payload::new_static(
+						"Proxy",
+						"remove_proxy",
+						types::RemoveProxy { delegate, proxy_type, delay },
+						[
+							108u8, 252u8, 57u8, 123u8, 13u8, 169u8, 85u8, 69u8, 153u8, 216u8, 54u8,
+							238u8, 191u8, 104u8, 117u8, 251u8, 233u8, 193u8, 213u8, 190u8, 246u8,
+							101u8, 86u8, 17u8, 162u8, 183u8, 209u8, 250u8, 131u8, 42u8, 218u8,
+							186u8,
+						],
+					)
+				}
+				#[doc = "Unregister all proxy accounts for the sender."]
+				#[doc = ""]
+				#[doc = "The dispatch origin for this call must be _Signed_."]
+				#[doc = ""]
+				#[doc = "WARNING: This may be called on accounts created by `pure`, however if done, then"]
+				#[doc = "the unreserved fees will be inaccessible. **All access to this account will be lost.**"]
+				pub fn remove_proxies(&self) -> ::subxt::tx::Payload<types::RemoveProxies> {
+					::subxt::tx::Payload::new_static(
+						"Proxy",
+						"remove_proxies",
+						types::RemoveProxies {},
+						[
+							1u8, 126u8, 36u8, 227u8, 185u8, 34u8, 218u8, 236u8, 125u8, 231u8, 68u8,
+							185u8, 145u8, 63u8, 250u8, 225u8, 103u8, 3u8, 189u8, 37u8, 172u8,
+							195u8, 197u8, 216u8, 99u8, 210u8, 240u8, 162u8, 158u8, 132u8, 24u8,
+							6u8,
+						],
+					)
+				}
+				#[doc = "Spawn a fresh new account that is guaranteed to be otherwise inaccessible, and"]
+				#[doc = "initialize it with a proxy of `proxy_type` for `origin` sender."]
+				#[doc = ""]
+				#[doc = "Requires a `Signed` origin."]
+				#[doc = ""]
+				#[doc = "- `proxy_type`: The type of the proxy that the sender will be registered as over the"]
+				#[doc = "new account. This will almost always be the most permissive `ProxyType` possible to"]
+				#[doc = "allow for maximum flexibility."]
+				#[doc = "- `index`: A disambiguation index, in case this is called multiple times in the same"]
+				#[doc = "transaction (e.g. with `utility::batch`). Unless you're using `batch` you probably just"]
+				#[doc = "want to use `0`."]
+				#[doc = "- `delay`: The announcement period required of the initial proxy. Will generally be"]
+				#[doc = "zero."]
+				#[doc = ""]
+				#[doc = "Fails with `Duplicate` if this has already been called in this transaction, from the"]
+				#[doc = "same sender, with the same parameters."]
+				#[doc = ""]
+				#[doc = "Fails if there are insufficient funds to pay for deposit."]
+				pub fn create_pure(
+					&self,
+					proxy_type: types::create_pure::ProxyType,
+					delay: types::create_pure::Delay,
+					index: types::create_pure::Index,
+				) -> ::subxt::tx::Payload<types::CreatePure> {
+					::subxt::tx::Payload::new_static(
+						"Proxy",
+						"create_pure",
+						types::CreatePure { proxy_type, delay, index },
+						[
+							185u8, 202u8, 223u8, 190u8, 46u8, 164u8, 170u8, 194u8, 106u8, 39u8,
+							83u8, 211u8, 56u8, 152u8, 212u8, 82u8, 126u8, 63u8, 117u8, 94u8, 1u8,
+							45u8, 207u8, 69u8, 63u8, 197u8, 122u8, 169u8, 149u8, 26u8, 212u8, 9u8,
+						],
+					)
+				}
+				#[doc = "Removes a previously spawned pure proxy."]
+				#[doc = ""]
+				#[doc = "WARNING: **All access to this account will be lost.** Any funds held in it will be"]
+				#[doc = "inaccessible."]
+				#[doc = ""]
+				#[doc = "Requires a `Signed` origin, and the sender account must have been created by a call to"]
+				#[doc = "`pure` with corresponding parameters."]
+				#[doc = ""]
+				#[doc = "- `spawner`: The account that originally called `pure` to create this account."]
+				#[doc = "- `index`: The disambiguation index originally passed to `pure`. Probably `0`."]
+				#[doc = "- `proxy_type`: The proxy type originally passed to `pure`."]
+				#[doc = "- `height`: The height of the chain when the call to `pure` was processed."]
+				#[doc = "- `ext_index`: The extrinsic index in which the call to `pure` was processed."]
+				#[doc = ""]
+				#[doc = "Fails with `NoPermission` in case the caller is not a previously created pure"]
+				#[doc = "account whose `pure` call has corresponding parameters."]
+				pub fn kill_pure(
+					&self,
+					spawner: types::kill_pure::Spawner,
+					proxy_type: types::kill_pure::ProxyType,
+					index: types::kill_pure::Index,
+					height: types::kill_pure::Height,
+					ext_index: types::kill_pure::ExtIndex,
+				) -> ::subxt::tx::Payload<types::KillPure> {
+					::subxt::tx::Payload::new_static(
+						"Proxy",
+						"kill_pure",
+						types::KillPure { spawner, proxy_type, index, height, ext_index },
+						[
+							149u8, 241u8, 131u8, 170u8, 127u8, 52u8, 48u8, 187u8, 72u8, 221u8,
+							196u8, 137u8, 168u8, 43u8, 25u8, 42u8, 225u8, 94u8, 228u8, 168u8, 93u8,
+							245u8, 25u8, 33u8, 253u8, 93u8, 186u8, 72u8, 198u8, 108u8, 47u8, 99u8,
+						],
+					)
+				}
+				#[doc = "Publish the hash of a proxy-call that will be made in the future."]
+				#[doc = ""]
+				#[doc = "This must be called some number of blocks before the corresponding `proxy` is attempted"]
+				#[doc = "if the delay associated with the proxy relationship is greater than zero."]
+				#[doc = ""]
+				#[doc = "No more than `MaxPending` announcements may be made at any one time."]
+				#[doc = ""]
+				#[doc = "This will take a deposit of `AnnouncementDepositFactor` as well as"]
+				#[doc = "`AnnouncementDepositBase` if there are no other pending announcements."]
+				#[doc = ""]
+				#[doc = "The dispatch origin for this call must be _Signed_ and a proxy of `real`."]
+				#[doc = ""]
+				#[doc = "Parameters:"]
+				#[doc = "- `real`: The account that the proxy will make a call on behalf of."]
+				#[doc = "- `call_hash`: The hash of the call to be made by the `real` account."]
+				pub fn announce(
+					&self,
+					real: types::announce::Real,
+					call_hash: types::announce::CallHash,
+				) -> ::subxt::tx::Payload<types::Announce> {
+					::subxt::tx::Payload::new_static(
+						"Proxy",
+						"announce",
+						types::Announce { real, call_hash },
+						[
+							105u8, 218u8, 232u8, 82u8, 80u8, 10u8, 11u8, 1u8, 93u8, 241u8, 121u8,
+							198u8, 167u8, 218u8, 95u8, 15u8, 75u8, 122u8, 155u8, 233u8, 10u8,
+							175u8, 145u8, 73u8, 214u8, 230u8, 67u8, 107u8, 23u8, 239u8, 69u8,
+							240u8,
+						],
+					)
+				}
+				#[doc = "Remove a given announcement."]
+				#[doc = ""]
+				#[doc = "May be called by a proxy account to remove a call they previously announced and return"]
+				#[doc = "the deposit."]
+				#[doc = ""]
+				#[doc = "The dispatch origin for this call must be _Signed_."]
+				#[doc = ""]
+				#[doc = "Parameters:"]
+				#[doc = "- `real`: The account that the proxy will make a call on behalf of."]
+				#[doc = "- `call_hash`: The hash of the call to be made by the `real` account."]
+				pub fn remove_announcement(
+					&self,
+					real: types::remove_announcement::Real,
+					call_hash: types::remove_announcement::CallHash,
+				) -> ::subxt::tx::Payload<types::RemoveAnnouncement> {
+					::subxt::tx::Payload::new_static(
+						"Proxy",
+						"remove_announcement",
+						types::RemoveAnnouncement { real, call_hash },
+						[
+							40u8, 237u8, 179u8, 128u8, 201u8, 183u8, 20u8, 47u8, 99u8, 182u8, 81u8,
+							31u8, 27u8, 212u8, 133u8, 36u8, 8u8, 248u8, 57u8, 230u8, 138u8, 80u8,
+							241u8, 147u8, 69u8, 236u8, 156u8, 167u8, 205u8, 49u8, 60u8, 16u8,
+						],
+					)
+				}
+				#[doc = "Remove the given announcement of a delegate."]
+				#[doc = ""]
+				#[doc = "May be called by a target (proxied) account to remove a call that one of their delegates"]
+				#[doc = "(`delegate`) has announced they want to execute. The deposit is returned."]
+				#[doc = ""]
+				#[doc = "The dispatch origin for this call must be _Signed_."]
+				#[doc = ""]
+				#[doc = "Parameters:"]
+				#[doc = "- `delegate`: The account that previously announced the call."]
+				#[doc = "- `call_hash`: The hash of the call to be made."]
+				pub fn reject_announcement(
+					&self,
+					delegate: types::reject_announcement::Delegate,
+					call_hash: types::reject_announcement::CallHash,
+				) -> ::subxt::tx::Payload<types::RejectAnnouncement> {
+					::subxt::tx::Payload::new_static(
+						"Proxy",
+						"reject_announcement",
+						types::RejectAnnouncement { delegate, call_hash },
+						[
+							150u8, 178u8, 49u8, 160u8, 211u8, 75u8, 58u8, 228u8, 121u8, 253u8,
+							167u8, 72u8, 68u8, 105u8, 159u8, 52u8, 41u8, 155u8, 92u8, 26u8, 169u8,
+							177u8, 102u8, 36u8, 1u8, 47u8, 87u8, 189u8, 223u8, 238u8, 244u8, 110u8,
+						],
+					)
+				}
+				#[doc = "Dispatch the given `call` from an account that the sender is authorized for through"]
+				#[doc = "`add_proxy`."]
+				#[doc = ""]
+				#[doc = "Removes any corresponding announcement(s)."]
+				#[doc = ""]
+				#[doc = "The dispatch origin for this call must be _Signed_."]
+				#[doc = ""]
+				#[doc = "Parameters:"]
+				#[doc = "- `real`: The account that the proxy will make a call on behalf of."]
+				#[doc = "- `force_proxy_type`: Specify the exact proxy type to be used and checked for this call."]
+				#[doc = "- `call`: The call to be made by the `real` account."]
+				pub fn proxy_announced(
+					&self,
+					delegate: types::proxy_announced::Delegate,
+					real: types::proxy_announced::Real,
+					force_proxy_type: types::proxy_announced::ForceProxyType,
+					call: types::proxy_announced::Call,
+				) -> ::subxt::tx::Payload<types::ProxyAnnounced> {
+					::subxt::tx::Payload::new_static(
+						"Proxy",
+						"proxy_announced",
+						types::ProxyAnnounced {
+							delegate,
+							real,
+							force_proxy_type,
+							call: ::std::boxed::Box::new(call),
+						},
+						[
+							232u8, 214u8, 245u8, 230u8, 43u8, 9u8, 92u8, 174u8, 177u8, 200u8, 98u8,
+							104u8, 207u8, 165u8, 139u8, 162u8, 161u8, 233u8, 93u8, 14u8, 218u8,
+							215u8, 236u8, 221u8, 159u8, 232u8, 160u8, 129u8, 174u8, 213u8, 155u8,
+							32u8,
+						],
+					)
+				}
+			}
+		}
+		#[doc = "The `Event` enum of this pallet"]
+		pub type Event = runtime_types::pallet_proxy::pallet::Event;
+		pub mod events {
+			use super::runtime_types;
+			#[derive(
+				:: subxt :: ext :: codec :: Decode,
+				:: subxt :: ext :: codec :: Encode,
+				:: subxt :: ext :: scale_decode :: DecodeAsType,
+				:: subxt :: ext :: scale_encode :: EncodeAsType,
+				Clone,
+				Debug,
+			)]
+			# [codec (crate = :: subxt :: ext :: codec)]
+			#[decode_as_type(crate_path = ":: subxt :: ext :: scale_decode")]
+			#[encode_as_type(crate_path = ":: subxt :: ext :: scale_encode")]
+			#[doc = "A proxy was executed correctly, with the given."]
+			pub struct ProxyExecuted {
+				pub result: proxy_executed::Result,
+			}
+			pub mod proxy_executed {
+				use super::runtime_types;
+				pub type Result =
+					::core::result::Result<(), runtime_types::sp_runtime::DispatchError>;
+			}
+			impl ::subxt::events::StaticEvent for ProxyExecuted {
+				const PALLET: &'static str = "Proxy";
+				const EVENT: &'static str = "ProxyExecuted";
+			}
+			#[derive(
+				:: subxt :: ext :: codec :: Decode,
+				:: subxt :: ext :: codec :: Encode,
+				:: subxt :: ext :: scale_decode :: DecodeAsType,
+				:: subxt :: ext :: scale_encode :: EncodeAsType,
+				Clone,
+				Debug,
+			)]
+			# [codec (crate = :: subxt :: ext :: codec)]
+			#[decode_as_type(crate_path = ":: subxt :: ext :: scale_decode")]
+			#[encode_as_type(crate_path = ":: subxt :: ext :: scale_encode")]
+			#[doc = "A pure account has been created by new proxy with given"]
+			#[doc = "disambiguation index and proxy type."]
+			pub struct PureCreated {
+				pub pure: pure_created::Pure,
+				pub who: pure_created::Who,
+				pub proxy_type: pure_created::ProxyType,
+				pub disambiguation_index: pure_created::DisambiguationIndex,
+			}
+			pub mod pure_created {
+				use super::runtime_types;
+				pub type Pure = ::subxt::utils::AccountId32;
+				pub type Who = ::subxt::utils::AccountId32;
+				pub type ProxyType = runtime_types::ulx_node_runtime::ProxyType;
+				pub type DisambiguationIndex = ::core::primitive::u16;
+			}
+			impl ::subxt::events::StaticEvent for PureCreated {
+				const PALLET: &'static str = "Proxy";
+				const EVENT: &'static str = "PureCreated";
+			}
+			#[derive(
+				:: subxt :: ext :: codec :: Decode,
+				:: subxt :: ext :: codec :: Encode,
+				:: subxt :: ext :: scale_decode :: DecodeAsType,
+				:: subxt :: ext :: scale_encode :: EncodeAsType,
+				Clone,
+				Debug,
+			)]
+			# [codec (crate = :: subxt :: ext :: codec)]
+			#[decode_as_type(crate_path = ":: subxt :: ext :: scale_decode")]
+			#[encode_as_type(crate_path = ":: subxt :: ext :: scale_encode")]
+			#[doc = "An announcement was placed to make a call in the future."]
+			pub struct Announced {
+				pub real: announced::Real,
+				pub proxy: announced::Proxy,
+				pub call_hash: announced::CallHash,
+			}
+			pub mod announced {
+				use super::runtime_types;
+				pub type Real = ::subxt::utils::AccountId32;
+				pub type Proxy = ::subxt::utils::AccountId32;
+				pub type CallHash = ::subxt::utils::H256;
+			}
+			impl ::subxt::events::StaticEvent for Announced {
+				const PALLET: &'static str = "Proxy";
+				const EVENT: &'static str = "Announced";
+			}
+			#[derive(
+				:: subxt :: ext :: codec :: Decode,
+				:: subxt :: ext :: codec :: Encode,
+				:: subxt :: ext :: scale_decode :: DecodeAsType,
+				:: subxt :: ext :: scale_encode :: EncodeAsType,
+				Clone,
+				Debug,
+			)]
+			# [codec (crate = :: subxt :: ext :: codec)]
+			#[decode_as_type(crate_path = ":: subxt :: ext :: scale_decode")]
+			#[encode_as_type(crate_path = ":: subxt :: ext :: scale_encode")]
+			#[doc = "A proxy was added."]
+			pub struct ProxyAdded {
+				pub delegator: proxy_added::Delegator,
+				pub delegatee: proxy_added::Delegatee,
+				pub proxy_type: proxy_added::ProxyType,
+				pub delay: proxy_added::Delay,
+			}
+			pub mod proxy_added {
+				use super::runtime_types;
+				pub type Delegator = ::subxt::utils::AccountId32;
+				pub type Delegatee = ::subxt::utils::AccountId32;
+				pub type ProxyType = runtime_types::ulx_node_runtime::ProxyType;
+				pub type Delay = ::core::primitive::u32;
+			}
+			impl ::subxt::events::StaticEvent for ProxyAdded {
+				const PALLET: &'static str = "Proxy";
+				const EVENT: &'static str = "ProxyAdded";
+			}
+			#[derive(
+				:: subxt :: ext :: codec :: Decode,
+				:: subxt :: ext :: codec :: Encode,
+				:: subxt :: ext :: scale_decode :: DecodeAsType,
+				:: subxt :: ext :: scale_encode :: EncodeAsType,
+				Clone,
+				Debug,
+			)]
+			# [codec (crate = :: subxt :: ext :: codec)]
+			#[decode_as_type(crate_path = ":: subxt :: ext :: scale_decode")]
+			#[encode_as_type(crate_path = ":: subxt :: ext :: scale_encode")]
+			#[doc = "A proxy was removed."]
+			pub struct ProxyRemoved {
+				pub delegator: proxy_removed::Delegator,
+				pub delegatee: proxy_removed::Delegatee,
+				pub proxy_type: proxy_removed::ProxyType,
+				pub delay: proxy_removed::Delay,
+			}
+			pub mod proxy_removed {
+				use super::runtime_types;
+				pub type Delegator = ::subxt::utils::AccountId32;
+				pub type Delegatee = ::subxt::utils::AccountId32;
+				pub type ProxyType = runtime_types::ulx_node_runtime::ProxyType;
+				pub type Delay = ::core::primitive::u32;
+			}
+			impl ::subxt::events::StaticEvent for ProxyRemoved {
+				const PALLET: &'static str = "Proxy";
+				const EVENT: &'static str = "ProxyRemoved";
+			}
+		}
+		pub mod storage {
+			use super::runtime_types;
+			pub mod types {
+				use super::runtime_types;
+				pub mod proxies {
+					use super::runtime_types;
+					pub type Proxies = (
+						runtime_types::bounded_collections::bounded_vec::BoundedVec<
+							runtime_types::pallet_proxy::ProxyDefinition<
+								::subxt::utils::AccountId32,
+								runtime_types::ulx_node_runtime::ProxyType,
+								::core::primitive::u32,
+							>,
+						>,
+						::core::primitive::u128,
+					);
+					pub type Param0 = ::subxt::utils::AccountId32;
+				}
+				pub mod announcements {
+					use super::runtime_types;
+					pub type Announcements = (
+						runtime_types::bounded_collections::bounded_vec::BoundedVec<
+							runtime_types::pallet_proxy::Announcement<
+								::subxt::utils::AccountId32,
+								::subxt::utils::H256,
+								::core::primitive::u32,
+							>,
+						>,
+						::core::primitive::u128,
+					);
+					pub type Param0 = ::subxt::utils::AccountId32;
+				}
+			}
+			pub struct StorageApi;
+			impl StorageApi {
+				#[doc = " The set of account proxies. Maps the account which has delegated to the accounts"]
+				#[doc = " which are being delegated to, together with the amount held on deposit."]
+				pub fn proxies_iter(
+					&self,
+				) -> ::subxt::storage::address::Address<
+					(),
+					types::proxies::Proxies,
+					(),
+					::subxt::storage::address::Yes,
+					::subxt::storage::address::Yes,
+				> {
+					::subxt::storage::address::Address::new_static(
+						"Proxy",
+						"Proxies",
+						(),
+						[
+							251u8, 183u8, 22u8, 123u8, 4u8, 156u8, 182u8, 68u8, 66u8, 31u8, 166u8,
+							196u8, 5u8, 225u8, 243u8, 133u8, 91u8, 196u8, 104u8, 27u8, 22u8, 129u8,
+							131u8, 129u8, 218u8, 66u8, 195u8, 145u8, 45u8, 37u8, 187u8, 23u8,
+						],
+					)
+				}
+				#[doc = " The set of account proxies. Maps the account which has delegated to the accounts"]
+				#[doc = " which are being delegated to, together with the amount held on deposit."]
+				pub fn proxies(
+					&self,
+					_0: impl ::std::borrow::Borrow<types::proxies::Param0>,
+				) -> ::subxt::storage::address::Address<
+					::subxt::storage::address::StaticStorageKey<types::proxies::Param0>,
+					types::proxies::Proxies,
+					::subxt::storage::address::Yes,
+					::subxt::storage::address::Yes,
+					(),
+				> {
+					::subxt::storage::address::Address::new_static(
+						"Proxy",
+						"Proxies",
+						::subxt::storage::address::StaticStorageKey::new(_0.borrow()),
+						[
+							251u8, 183u8, 22u8, 123u8, 4u8, 156u8, 182u8, 68u8, 66u8, 31u8, 166u8,
+							196u8, 5u8, 225u8, 243u8, 133u8, 91u8, 196u8, 104u8, 27u8, 22u8, 129u8,
+							131u8, 129u8, 218u8, 66u8, 195u8, 145u8, 45u8, 37u8, 187u8, 23u8,
+						],
+					)
+				}
+				#[doc = " The announcements made by the proxy (key)."]
+				pub fn announcements_iter(
+					&self,
+				) -> ::subxt::storage::address::Address<
+					(),
+					types::announcements::Announcements,
+					(),
+					::subxt::storage::address::Yes,
+					::subxt::storage::address::Yes,
+				> {
+					::subxt::storage::address::Address::new_static(
+						"Proxy",
+						"Announcements",
+						(),
+						[
+							129u8, 228u8, 198u8, 210u8, 90u8, 69u8, 151u8, 198u8, 206u8, 174u8,
+							148u8, 58u8, 134u8, 14u8, 53u8, 56u8, 234u8, 71u8, 84u8, 247u8, 246u8,
+							207u8, 117u8, 221u8, 84u8, 72u8, 254u8, 215u8, 102u8, 49u8, 21u8,
+							173u8,
+						],
+					)
+				}
+				#[doc = " The announcements made by the proxy (key)."]
+				pub fn announcements(
+					&self,
+					_0: impl ::std::borrow::Borrow<types::announcements::Param0>,
+				) -> ::subxt::storage::address::Address<
+					::subxt::storage::address::StaticStorageKey<types::announcements::Param0>,
+					types::announcements::Announcements,
+					::subxt::storage::address::Yes,
+					::subxt::storage::address::Yes,
+					(),
+				> {
+					::subxt::storage::address::Address::new_static(
+						"Proxy",
+						"Announcements",
+						::subxt::storage::address::StaticStorageKey::new(_0.borrow()),
+						[
+							129u8, 228u8, 198u8, 210u8, 90u8, 69u8, 151u8, 198u8, 206u8, 174u8,
+							148u8, 58u8, 134u8, 14u8, 53u8, 56u8, 234u8, 71u8, 84u8, 247u8, 246u8,
+							207u8, 117u8, 221u8, 84u8, 72u8, 254u8, 215u8, 102u8, 49u8, 21u8,
+							173u8,
+						],
+					)
+				}
+			}
+		}
+		pub mod constants {
+			use super::runtime_types;
+			pub struct ConstantsApi;
+			impl ConstantsApi {
+				#[doc = " The base amount of currency needed to reserve for creating a proxy."]
+				#[doc = ""]
+				#[doc = " This is held for an additional storage item whose value size is"]
+				#[doc = " `sizeof(Balance)` bytes and whose key size is `sizeof(AccountId)` bytes."]
+				pub fn proxy_deposit_base(
+					&self,
+				) -> ::subxt::constants::Address<::core::primitive::u128> {
+					::subxt::constants::Address::new_static(
+						"Proxy",
+						"ProxyDepositBase",
+						[
+							84u8, 157u8, 140u8, 4u8, 93u8, 57u8, 29u8, 133u8, 105u8, 200u8, 214u8,
+							27u8, 144u8, 208u8, 218u8, 160u8, 130u8, 109u8, 101u8, 54u8, 210u8,
+							136u8, 71u8, 63u8, 49u8, 237u8, 234u8, 15u8, 178u8, 98u8, 148u8, 156u8,
+						],
+					)
+				}
+				#[doc = " The amount of currency needed per proxy added."]
+				#[doc = ""]
+				#[doc = " This is held for adding 32 bytes plus an instance of `ProxyType` more into a"]
+				#[doc = " pre-existing storage value. Thus, when configuring `ProxyDepositFactor` one should take"]
+				#[doc = " into account `32 + proxy_type.encode().len()` bytes of data."]
+				pub fn proxy_deposit_factor(
+					&self,
+				) -> ::subxt::constants::Address<::core::primitive::u128> {
+					::subxt::constants::Address::new_static(
+						"Proxy",
+						"ProxyDepositFactor",
+						[
+							84u8, 157u8, 140u8, 4u8, 93u8, 57u8, 29u8, 133u8, 105u8, 200u8, 214u8,
+							27u8, 144u8, 208u8, 218u8, 160u8, 130u8, 109u8, 101u8, 54u8, 210u8,
+							136u8, 71u8, 63u8, 49u8, 237u8, 234u8, 15u8, 178u8, 98u8, 148u8, 156u8,
+						],
+					)
+				}
+				#[doc = " The maximum amount of proxies allowed for a single account."]
+				pub fn max_proxies(&self) -> ::subxt::constants::Address<::core::primitive::u32> {
+					::subxt::constants::Address::new_static(
+						"Proxy",
+						"MaxProxies",
+						[
+							98u8, 252u8, 116u8, 72u8, 26u8, 180u8, 225u8, 83u8, 200u8, 157u8,
+							125u8, 151u8, 53u8, 76u8, 168u8, 26u8, 10u8, 9u8, 98u8, 68u8, 9u8,
+							178u8, 197u8, 113u8, 31u8, 79u8, 200u8, 90u8, 203u8, 100u8, 41u8,
+							145u8,
+						],
+					)
+				}
+				#[doc = " The maximum amount of time-delayed announcements that are allowed to be pending."]
+				pub fn max_pending(&self) -> ::subxt::constants::Address<::core::primitive::u32> {
+					::subxt::constants::Address::new_static(
+						"Proxy",
+						"MaxPending",
+						[
+							98u8, 252u8, 116u8, 72u8, 26u8, 180u8, 225u8, 83u8, 200u8, 157u8,
+							125u8, 151u8, 53u8, 76u8, 168u8, 26u8, 10u8, 9u8, 98u8, 68u8, 9u8,
+							178u8, 197u8, 113u8, 31u8, 79u8, 200u8, 90u8, 203u8, 100u8, 41u8,
+							145u8,
+						],
+					)
+				}
+				#[doc = " The base amount of currency needed to reserve for creating an announcement."]
+				#[doc = ""]
+				#[doc = " This is held when a new storage item holding a `Balance` is created (typically 16"]
+				#[doc = " bytes)."]
+				pub fn announcement_deposit_base(
+					&self,
+				) -> ::subxt::constants::Address<::core::primitive::u128> {
+					::subxt::constants::Address::new_static(
+						"Proxy",
+						"AnnouncementDepositBase",
+						[
+							84u8, 157u8, 140u8, 4u8, 93u8, 57u8, 29u8, 133u8, 105u8, 200u8, 214u8,
+							27u8, 144u8, 208u8, 218u8, 160u8, 130u8, 109u8, 101u8, 54u8, 210u8,
+							136u8, 71u8, 63u8, 49u8, 237u8, 234u8, 15u8, 178u8, 98u8, 148u8, 156u8,
+						],
+					)
+				}
+				#[doc = " The amount of currency needed per announcement made."]
+				#[doc = ""]
+				#[doc = " This is held for adding an `AccountId`, `Hash` and `BlockNumber` (typically 68 bytes)"]
+				#[doc = " into a pre-existing storage value."]
+				pub fn announcement_deposit_factor(
+					&self,
+				) -> ::subxt::constants::Address<::core::primitive::u128> {
+					::subxt::constants::Address::new_static(
+						"Proxy",
+						"AnnouncementDepositFactor",
+						[
+							84u8, 157u8, 140u8, 4u8, 93u8, 57u8, 29u8, 133u8, 105u8, 200u8, 214u8,
+							27u8, 144u8, 208u8, 218u8, 160u8, 130u8, 109u8, 101u8, 54u8, 210u8,
+							136u8, 71u8, 63u8, 49u8, 237u8, 234u8, 15u8, 178u8, 98u8, 148u8, 156u8,
 						],
 					)
 				}
@@ -5194,6 +6268,32 @@ pub mod api {
 			impl ::subxt::events::StaticEvent for BondCompleted {
 				const PALLET: &'static str = "Bond";
 				const EVENT: &'static str = "BondCompleted";
+			}
+			#[derive(
+				:: subxt :: ext :: codec :: Decode,
+				:: subxt :: ext :: codec :: Encode,
+				:: subxt :: ext :: scale_decode :: DecodeAsType,
+				:: subxt :: ext :: scale_encode :: EncodeAsType,
+				Clone,
+				Debug,
+			)]
+			# [codec (crate = :: subxt :: ext :: codec)]
+			#[decode_as_type(crate_path = ":: subxt :: ext :: scale_decode")]
+			#[encode_as_type(crate_path = ":: subxt :: ext :: scale_encode")]
+			pub struct BondBurned {
+				pub bond_fund_id: bond_burned::BondFundId,
+				pub bond_id: bond_burned::BondId,
+				pub amount: bond_burned::Amount,
+			}
+			pub mod bond_burned {
+				use super::runtime_types;
+				pub type BondFundId = ::core::option::Option<::core::primitive::u32>;
+				pub type BondId = ::core::primitive::u64;
+				pub type Amount = ::core::primitive::u128;
+			}
+			impl ::subxt::events::StaticEvent for BondBurned {
+				const PALLET: &'static str = "Bond";
+				const EVENT: &'static str = "BondBurned";
 			}
 			#[derive(
 				:: subxt :: ext :: codec :: Decode,
@@ -7828,6 +8928,300 @@ pub mod api {
 			}
 		}
 	}
+	pub mod price_index {
+		use super::{root_mod, runtime_types};
+		#[doc = "The `Error` enum of this pallet."]
+		pub type Error = runtime_types::pallet_price_index::pallet::Error;
+		#[doc = "Contains a variant per dispatchable extrinsic that this pallet has."]
+		pub type Call = runtime_types::pallet_price_index::pallet::Call;
+		pub mod calls {
+			use super::{root_mod, runtime_types};
+			type DispatchError = runtime_types::sp_runtime::DispatchError;
+			pub mod types {
+				use super::runtime_types;
+				#[derive(
+					:: subxt :: ext :: codec :: Decode,
+					:: subxt :: ext :: codec :: Encode,
+					:: subxt :: ext :: scale_decode :: DecodeAsType,
+					:: subxt :: ext :: scale_encode :: EncodeAsType,
+					Clone,
+					Debug,
+				)]
+				# [codec (crate = :: subxt :: ext :: codec)]
+				#[decode_as_type(crate_path = ":: subxt :: ext :: scale_decode")]
+				#[encode_as_type(crate_path = ":: subxt :: ext :: scale_encode")]
+				#[doc = "Submit the latest price index. Only valid for the configured operator account"]
+				pub struct Submit {
+					pub index: submit::Index,
+				}
+				pub mod submit {
+					use super::runtime_types;
+					pub type Index =
+						runtime_types::pallet_price_index::PriceIndex<::core::primitive::u64>;
+				}
+				impl ::subxt::blocks::StaticExtrinsic for Submit {
+					const PALLET: &'static str = "PriceIndex";
+					const CALL: &'static str = "submit";
+				}
+				#[derive(
+					:: subxt :: ext :: codec :: Decode,
+					:: subxt :: ext :: codec :: Encode,
+					:: subxt :: ext :: scale_decode :: DecodeAsType,
+					:: subxt :: ext :: scale_encode :: EncodeAsType,
+					Clone,
+					Debug,
+				)]
+				# [codec (crate = :: subxt :: ext :: codec)]
+				#[decode_as_type(crate_path = ":: subxt :: ext :: scale_decode")]
+				#[encode_as_type(crate_path = ":: subxt :: ext :: scale_encode")]
+				#[doc = "Sets the operator account id (only executable by the Root account)"]
+				#[doc = ""]
+				#[doc = "# Arguments"]
+				#[doc = "* `account_id` - the account id of the operator"]
+				pub struct SetOperator {
+					pub account_id: set_operator::AccountId,
+				}
+				pub mod set_operator {
+					use super::runtime_types;
+					pub type AccountId = ::subxt::utils::AccountId32;
+				}
+				impl ::subxt::blocks::StaticExtrinsic for SetOperator {
+					const PALLET: &'static str = "PriceIndex";
+					const CALL: &'static str = "set_operator";
+				}
+			}
+			pub struct TransactionApi;
+			impl TransactionApi {
+				#[doc = "Submit the latest price index. Only valid for the configured operator account"]
+				pub fn submit(
+					&self,
+					index: types::submit::Index,
+				) -> ::subxt::tx::Payload<types::Submit> {
+					::subxt::tx::Payload::new_static(
+						"PriceIndex",
+						"submit",
+						types::Submit { index },
+						[
+							40u8, 221u8, 37u8, 237u8, 227u8, 9u8, 38u8, 120u8, 246u8, 34u8, 212u8,
+							179u8, 158u8, 197u8, 156u8, 255u8, 13u8, 221u8, 130u8, 242u8, 122u8,
+							223u8, 220u8, 18u8, 161u8, 211u8, 98u8, 134u8, 46u8, 70u8, 84u8, 220u8,
+						],
+					)
+				}
+				#[doc = "Sets the operator account id (only executable by the Root account)"]
+				#[doc = ""]
+				#[doc = "# Arguments"]
+				#[doc = "* `account_id` - the account id of the operator"]
+				pub fn set_operator(
+					&self,
+					account_id: types::set_operator::AccountId,
+				) -> ::subxt::tx::Payload<types::SetOperator> {
+					::subxt::tx::Payload::new_static(
+						"PriceIndex",
+						"set_operator",
+						types::SetOperator { account_id },
+						[
+							160u8, 195u8, 42u8, 151u8, 18u8, 138u8, 64u8, 248u8, 118u8, 157u8,
+							178u8, 120u8, 23u8, 254u8, 8u8, 157u8, 220u8, 244u8, 50u8, 65u8, 219u8,
+							177u8, 56u8, 216u8, 58u8, 76u8, 168u8, 143u8, 16u8, 155u8, 250u8, 21u8,
+						],
+					)
+				}
+			}
+		}
+		#[doc = "The `Event` enum of this pallet"]
+		pub type Event = runtime_types::pallet_price_index::pallet::Event;
+		pub mod events {
+			use super::runtime_types;
+			#[derive(
+				:: subxt :: ext :: codec :: Decode,
+				:: subxt :: ext :: codec :: Encode,
+				:: subxt :: ext :: scale_decode :: DecodeAsType,
+				:: subxt :: ext :: scale_encode :: EncodeAsType,
+				Clone,
+				Debug,
+			)]
+			# [codec (crate = :: subxt :: ext :: codec)]
+			#[decode_as_type(crate_path = ":: subxt :: ext :: scale_decode")]
+			#[encode_as_type(crate_path = ":: subxt :: ext :: scale_encode")]
+			#[doc = "Event emitted when a new price index is submitted"]
+			pub struct NewIndex {
+				pub price_index: new_index::PriceIndex,
+			}
+			pub mod new_index {
+				use super::runtime_types;
+				pub type PriceIndex =
+					runtime_types::pallet_price_index::PriceIndex<::core::primitive::u64>;
+			}
+			impl ::subxt::events::StaticEvent for NewIndex {
+				const PALLET: &'static str = "PriceIndex";
+				const EVENT: &'static str = "NewIndex";
+			}
+			#[derive(
+				:: subxt :: ext :: codec :: Decode,
+				:: subxt :: ext :: codec :: Encode,
+				:: subxt :: ext :: scale_decode :: DecodeAsType,
+				:: subxt :: ext :: scale_encode :: EncodeAsType,
+				Clone,
+				Debug,
+			)]
+			# [codec (crate = :: subxt :: ext :: codec)]
+			#[decode_as_type(crate_path = ":: subxt :: ext :: scale_decode")]
+			#[encode_as_type(crate_path = ":: subxt :: ext :: scale_encode")]
+			pub struct OperatorChanged {
+				pub operator_id: operator_changed::OperatorId,
+			}
+			pub mod operator_changed {
+				use super::runtime_types;
+				pub type OperatorId = ::subxt::utils::AccountId32;
+			}
+			impl ::subxt::events::StaticEvent for OperatorChanged {
+				const PALLET: &'static str = "PriceIndex";
+				const EVENT: &'static str = "OperatorChanged";
+			}
+		}
+		pub mod storage {
+			use super::runtime_types;
+			pub mod types {
+				use super::runtime_types;
+				pub mod current {
+					use super::runtime_types;
+					pub type Current =
+						runtime_types::pallet_price_index::PriceIndex<::core::primitive::u64>;
+				}
+				pub mod history {
+					use super::runtime_types;
+					pub type History = runtime_types::bounded_collections::bounded_vec::BoundedVec<
+						runtime_types::pallet_price_index::PriceIndex<::core::primitive::u64>,
+					>;
+				}
+				pub mod operator {
+					use super::runtime_types;
+					pub type Operator = ::subxt::utils::AccountId32;
+				}
+			}
+			pub struct StorageApi;
+			impl StorageApi {
+				#[doc = " Stores the active price index"]
+				pub fn current(
+					&self,
+				) -> ::subxt::storage::address::Address<
+					(),
+					types::current::Current,
+					::subxt::storage::address::Yes,
+					(),
+					(),
+				> {
+					::subxt::storage::address::Address::new_static(
+						"PriceIndex",
+						"Current",
+						(),
+						[
+							22u8, 70u8, 194u8, 201u8, 112u8, 145u8, 195u8, 100u8, 228u8, 97u8,
+							177u8, 80u8, 214u8, 182u8, 55u8, 154u8, 233u8, 243u8, 134u8, 202u8,
+							4u8, 255u8, 250u8, 168u8, 70u8, 232u8, 179u8, 166u8, 74u8, 141u8, 49u8,
+							108u8,
+						],
+					)
+				}
+				#[doc = " Stores unprocessed values as they're submitted by operators"]
+				pub fn history(
+					&self,
+				) -> ::subxt::storage::address::Address<
+					(),
+					types::history::History,
+					::subxt::storage::address::Yes,
+					::subxt::storage::address::Yes,
+					(),
+				> {
+					::subxt::storage::address::Address::new_static(
+						"PriceIndex",
+						"History",
+						(),
+						[
+							122u8, 120u8, 237u8, 209u8, 43u8, 221u8, 131u8, 233u8, 176u8, 33u8,
+							149u8, 235u8, 22u8, 21u8, 166u8, 7u8, 159u8, 73u8, 126u8, 91u8, 226u8,
+							191u8, 147u8, 202u8, 225u8, 45u8, 110u8, 173u8, 109u8, 139u8, 20u8,
+							114u8,
+						],
+					)
+				}
+				#[doc = " The price index operator account"]
+				pub fn operator(
+					&self,
+				) -> ::subxt::storage::address::Address<
+					(),
+					types::operator::Operator,
+					::subxt::storage::address::Yes,
+					(),
+					(),
+				> {
+					::subxt::storage::address::Address::new_static(
+						"PriceIndex",
+						"Operator",
+						(),
+						[
+							152u8, 164u8, 78u8, 48u8, 12u8, 43u8, 174u8, 179u8, 169u8, 249u8,
+							152u8, 14u8, 233u8, 30u8, 112u8, 171u8, 78u8, 85u8, 4u8, 212u8, 122u8,
+							243u8, 113u8, 8u8, 231u8, 105u8, 183u8, 70u8, 147u8, 227u8, 225u8,
+							44u8,
+						],
+					)
+				}
+			}
+		}
+		pub mod constants {
+			use super::runtime_types;
+			pub struct ConstantsApi;
+			impl ConstantsApi {
+				#[doc = " The maximum number of oracle operators that can be authorized"]
+				pub fn max_downtime_before_reset(
+					&self,
+				) -> ::subxt::constants::Address<::core::primitive::u64> {
+					::subxt::constants::Address::new_static(
+						"PriceIndex",
+						"MaxDowntimeBeforeReset",
+						[
+							128u8, 214u8, 205u8, 242u8, 181u8, 142u8, 124u8, 231u8, 190u8, 146u8,
+							59u8, 226u8, 157u8, 101u8, 103u8, 117u8, 249u8, 65u8, 18u8, 191u8,
+							103u8, 119u8, 53u8, 85u8, 81u8, 96u8, 220u8, 42u8, 184u8, 239u8, 42u8,
+							246u8,
+						],
+					)
+				}
+				#[doc = " Oldest history entries to keep"]
+				pub fn oldest_history_to_keep(
+					&self,
+				) -> ::subxt::constants::Address<::core::primitive::u64> {
+					::subxt::constants::Address::new_static(
+						"PriceIndex",
+						"OldestHistoryToKeep",
+						[
+							128u8, 214u8, 205u8, 242u8, 181u8, 142u8, 124u8, 231u8, 190u8, 146u8,
+							59u8, 226u8, 157u8, 101u8, 103u8, 117u8, 249u8, 65u8, 18u8, 191u8,
+							103u8, 119u8, 53u8, 85u8, 81u8, 96u8, 220u8, 42u8, 184u8, 239u8, 42u8,
+							246u8,
+						],
+					)
+				}
+				#[doc = " Max entries to keep in history"]
+				pub fn max_history_to_keep(
+					&self,
+				) -> ::subxt::constants::Address<::core::primitive::u32> {
+					::subxt::constants::Address::new_static(
+						"PriceIndex",
+						"MaxHistoryToKeep",
+						[
+							98u8, 252u8, 116u8, 72u8, 26u8, 180u8, 225u8, 83u8, 200u8, 157u8,
+							125u8, 151u8, 53u8, 76u8, 168u8, 26u8, 10u8, 9u8, 98u8, 68u8, 9u8,
+							178u8, 197u8, 113u8, 31u8, 79u8, 200u8, 90u8, 203u8, 100u8, 41u8,
+							145u8,
+						],
+					)
+				}
+			}
+		}
+	}
 	pub mod authorship {
 		use super::{root_mod, runtime_types};
 		pub mod storage {
@@ -8621,7 +10015,7 @@ pub mod api {
 				use super::runtime_types;
 				pub type MaturationBlock = ::core::primitive::u32;
 				pub type Rewards = ::std::vec::Vec<
-					runtime_types::pallet_block_rewards::pallet::BlockPayout<
+					runtime_types::ulx_primitives::block_seal::BlockPayout<
 						::subxt::utils::AccountId32,
 						::core::primitive::u128,
 					>,
@@ -8648,7 +10042,7 @@ pub mod api {
 			pub mod reward_unlocked {
 				use super::runtime_types;
 				pub type Rewards = ::std::vec::Vec<
-					runtime_types::pallet_block_rewards::pallet::BlockPayout<
+					runtime_types::ulx_primitives::block_seal::BlockPayout<
 						::subxt::utils::AccountId32,
 						::core::primitive::u128,
 					>,
@@ -8667,7 +10061,7 @@ pub mod api {
 					use super::runtime_types;
 					pub type PayoutsByBlock =
 						runtime_types::bounded_collections::bounded_vec::BoundedVec<
-							runtime_types::pallet_block_rewards::pallet::BlockPayout<
+							runtime_types::ulx_primitives::block_seal::BlockPayout<
 								::subxt::utils::AccountId32,
 								::core::primitive::u128,
 							>,
@@ -9539,6 +10933,599 @@ pub mod api {
 							241u8, 20u8, 235u8, 108u8, 126u8, 215u8, 82u8, 73u8, 113u8, 199u8,
 							138u8, 24u8, 58u8, 216u8, 72u8, 221u8, 232u8, 252u8, 244u8, 96u8,
 							247u8,
+						],
+					)
+				}
+			}
+		}
+	}
+	pub mod bitcoin_mint {
+		use super::{root_mod, runtime_types};
+		#[doc = "The `Error` enum of this pallet."]
+		pub type Error = runtime_types::pallet_bitcoin_mint::pallet::Error;
+		#[doc = "Contains a variant per dispatchable extrinsic that this pallet has."]
+		pub type Call = runtime_types::pallet_bitcoin_mint::pallet::Call;
+		pub mod calls {
+			use super::{root_mod, runtime_types};
+			type DispatchError = runtime_types::sp_runtime::DispatchError;
+			pub mod types {
+				use super::runtime_types;
+				#[derive(
+					:: subxt :: ext :: codec :: Decode,
+					:: subxt :: ext :: codec :: Encode,
+					:: subxt :: ext :: scale_decode :: DecodeAsType,
+					:: subxt :: ext :: scale_encode :: EncodeAsType,
+					Clone,
+					Debug,
+				)]
+				# [codec (crate = :: subxt :: ext :: codec)]
+				#[decode_as_type(crate_path = ":: subxt :: ext :: scale_decode")]
+				#[encode_as_type(crate_path = ":: subxt :: ext :: scale_encode")]
+				#[doc = "Submitted when a bitcoin UTXO has been moved or confirmed"]
+				pub struct Sync {
+					pub utxo_sync: sync::UtxoSync,
+				}
+				pub mod sync {
+					use super::runtime_types;
+					pub type UtxoSync = runtime_types::ulx_primitives::inherents::BitcoinUtxoSync;
+				}
+				impl ::subxt::blocks::StaticExtrinsic for Sync {
+					const PALLET: &'static str = "BitcoinMint";
+					const CALL: &'static str = "sync";
+				}
+				#[derive(
+					:: subxt :: ext :: codec :: Decode,
+					:: subxt :: ext :: codec :: Encode,
+					:: subxt :: ext :: scale_decode :: DecodeAsType,
+					:: subxt :: ext :: scale_encode :: EncodeAsType,
+					Clone,
+					Debug,
+				)]
+				# [codec (crate = :: subxt :: ext :: codec)]
+				#[decode_as_type(crate_path = ":: subxt :: ext :: scale_decode")]
+				#[encode_as_type(crate_path = ":: subxt :: ext :: scale_encode")]
+				#[doc = "Submit bitcoins to be minted as minting becomes available. You must provide a"]
+				#[doc = "`sign_message` signature proving ownership. Currently, this is only supported for P2PKH,"]
+				#[doc = "P2WPKH and P2PK UTXOs."]
+				pub struct Lock {
+					pub bond_id: lock::BondId,
+					pub txid: lock::Txid,
+					pub output_index: lock::OutputIndex,
+					pub satoshis: lock::Satoshis,
+					pub pubkey: lock::Pubkey,
+					pub ownership_proof_signature: lock::OwnershipProofSignature,
+				}
+				pub mod lock {
+					use super::runtime_types;
+					pub type BondId = ::core::option::Option<::core::primitive::u64>;
+					pub type Txid = runtime_types::ulx_primitives::bitcoin::H256Le;
+					pub type OutputIndex = ::core::primitive::u32;
+					pub type Satoshis = ::core::primitive::u64;
+					pub type Pubkey = runtime_types::ulx_primitives::bitcoin::CompressedPublicKey;
+					pub type OwnershipProofSignature = [::core::primitive::u8; 65usize];
+				}
+				impl ::subxt::blocks::StaticExtrinsic for Lock {
+					const PALLET: &'static str = "BitcoinMint";
+					const CALL: &'static str = "lock";
+				}
+				#[derive(
+					:: subxt :: ext :: codec :: Decode,
+					:: subxt :: ext :: codec :: Encode,
+					:: subxt :: ext :: scale_decode :: DecodeAsType,
+					:: subxt :: ext :: scale_encode :: EncodeAsType,
+					Clone,
+					Debug,
+				)]
+				# [codec (crate = :: subxt :: ext :: codec)]
+				#[decode_as_type(crate_path = ":: subxt :: ext :: scale_decode")]
+				#[encode_as_type(crate_path = ":: subxt :: ext :: scale_encode")]
+				#[doc = "Unlock a bitcoin UTXO that has been confirmed."]
+				#[doc = ""]
+				#[doc = "NOTE: this call will burn from your account the current argon value of the UTXO maxed at"]
+				#[doc = "your buy-in price."]
+				pub struct Unlock {
+					pub txid: unlock::Txid,
+					pub output_index: unlock::OutputIndex,
+				}
+				pub mod unlock {
+					use super::runtime_types;
+					pub type Txid = runtime_types::ulx_primitives::bitcoin::H256Le;
+					pub type OutputIndex = ::core::primitive::u32;
+				}
+				impl ::subxt::blocks::StaticExtrinsic for Unlock {
+					const PALLET: &'static str = "BitcoinMint";
+					const CALL: &'static str = "unlock";
+				}
+			}
+			pub struct TransactionApi;
+			impl TransactionApi {
+				#[doc = "Submitted when a bitcoin UTXO has been moved or confirmed"]
+				pub fn sync(
+					&self,
+					utxo_sync: types::sync::UtxoSync,
+				) -> ::subxt::tx::Payload<types::Sync> {
+					::subxt::tx::Payload::new_static(
+						"BitcoinMint",
+						"sync",
+						types::Sync { utxo_sync },
+						[
+							83u8, 122u8, 119u8, 15u8, 240u8, 193u8, 192u8, 92u8, 233u8, 56u8,
+							131u8, 21u8, 23u8, 189u8, 7u8, 150u8, 228u8, 93u8, 211u8, 225u8, 162u8,
+							254u8, 109u8, 249u8, 187u8, 112u8, 208u8, 225u8, 224u8, 41u8, 89u8,
+							82u8,
+						],
+					)
+				}
+				#[doc = "Submit bitcoins to be minted as minting becomes available. You must provide a"]
+				#[doc = "`sign_message` signature proving ownership. Currently, this is only supported for P2PKH,"]
+				#[doc = "P2WPKH and P2PK UTXOs."]
+				pub fn lock(
+					&self,
+					bond_id: types::lock::BondId,
+					txid: types::lock::Txid,
+					output_index: types::lock::OutputIndex,
+					satoshis: types::lock::Satoshis,
+					pubkey: types::lock::Pubkey,
+					ownership_proof_signature: types::lock::OwnershipProofSignature,
+				) -> ::subxt::tx::Payload<types::Lock> {
+					::subxt::tx::Payload::new_static(
+						"BitcoinMint",
+						"lock",
+						types::Lock {
+							bond_id,
+							txid,
+							output_index,
+							satoshis,
+							pubkey,
+							ownership_proof_signature,
+						},
+						[
+							101u8, 231u8, 89u8, 206u8, 17u8, 18u8, 27u8, 154u8, 134u8, 41u8, 165u8,
+							10u8, 57u8, 178u8, 193u8, 40u8, 207u8, 216u8, 159u8, 101u8, 80u8, 92u8,
+							96u8, 146u8, 157u8, 176u8, 1u8, 229u8, 205u8, 56u8, 212u8, 145u8,
+						],
+					)
+				}
+				#[doc = "Unlock a bitcoin UTXO that has been confirmed."]
+				#[doc = ""]
+				#[doc = "NOTE: this call will burn from your account the current argon value of the UTXO maxed at"]
+				#[doc = "your buy-in price."]
+				pub fn unlock(
+					&self,
+					txid: types::unlock::Txid,
+					output_index: types::unlock::OutputIndex,
+				) -> ::subxt::tx::Payload<types::Unlock> {
+					::subxt::tx::Payload::new_static(
+						"BitcoinMint",
+						"unlock",
+						types::Unlock { txid, output_index },
+						[
+							138u8, 177u8, 80u8, 28u8, 232u8, 228u8, 51u8, 15u8, 155u8, 105u8, 53u8,
+							105u8, 163u8, 235u8, 168u8, 170u8, 146u8, 180u8, 3u8, 156u8, 214u8,
+							19u8, 130u8, 224u8, 164u8, 132u8, 204u8, 190u8, 35u8, 222u8, 85u8,
+							243u8,
+						],
+					)
+				}
+			}
+		}
+		#[doc = "The `Event` enum of this pallet"]
+		pub type Event = runtime_types::pallet_bitcoin_mint::pallet::Event;
+		pub mod events {
+			use super::runtime_types;
+			#[derive(
+				:: subxt :: ext :: codec :: Decode,
+				:: subxt :: ext :: codec :: Encode,
+				:: subxt :: ext :: scale_decode :: DecodeAsType,
+				:: subxt :: ext :: scale_encode :: EncodeAsType,
+				Clone,
+				Debug,
+			)]
+			# [codec (crate = :: subxt :: ext :: codec)]
+			#[decode_as_type(crate_path = ":: subxt :: ext :: scale_decode")]
+			#[encode_as_type(crate_path = ":: subxt :: ext :: scale_encode")]
+			pub struct UtxoOwnershipConfirmed {
+				pub utxo: utxo_ownership_confirmed::Utxo,
+				pub account_id: utxo_ownership_confirmed::AccountId,
+				pub bond_id: utxo_ownership_confirmed::BondId,
+				pub amount: utxo_ownership_confirmed::Amount,
+				pub expiration_block: utxo_ownership_confirmed::ExpirationBlock,
+			}
+			pub mod utxo_ownership_confirmed {
+				use super::runtime_types;
+				pub type Utxo = runtime_types::ulx_primitives::bitcoin::BitcoinUtxoId;
+				pub type AccountId = ::subxt::utils::AccountId32;
+				pub type BondId = ::core::primitive::u64;
+				pub type Amount = ::core::primitive::u128;
+				pub type ExpirationBlock = ::core::primitive::u32;
+			}
+			impl ::subxt::events::StaticEvent for UtxoOwnershipConfirmed {
+				const PALLET: &'static str = "BitcoinMint";
+				const EVENT: &'static str = "UtxoOwnershipConfirmed";
+			}
+			#[derive(
+				:: subxt :: ext :: codec :: Decode,
+				:: subxt :: ext :: codec :: Encode,
+				:: subxt :: ext :: scale_decode :: DecodeAsType,
+				:: subxt :: ext :: scale_encode :: EncodeAsType,
+				Clone,
+				Debug,
+			)]
+			# [codec (crate = :: subxt :: ext :: codec)]
+			#[decode_as_type(crate_path = ":: subxt :: ext :: scale_decode")]
+			#[encode_as_type(crate_path = ":: subxt :: ext :: scale_encode")]
+			pub struct UtxoUnlocked {
+				pub utxo: utxo_unlocked::Utxo,
+				pub account_id: utxo_unlocked::AccountId,
+				pub bond_id: utxo_unlocked::BondId,
+				pub amount: utxo_unlocked::Amount,
+			}
+			pub mod utxo_unlocked {
+				use super::runtime_types;
+				pub type Utxo = runtime_types::ulx_primitives::bitcoin::BitcoinUtxoId;
+				pub type AccountId = ::subxt::utils::AccountId32;
+				pub type BondId = ::core::primitive::u64;
+				pub type Amount = ::core::primitive::u128;
+			}
+			impl ::subxt::events::StaticEvent for UtxoUnlocked {
+				const PALLET: &'static str = "BitcoinMint";
+				const EVENT: &'static str = "UtxoUnlocked";
+			}
+			#[derive(
+				:: subxt :: ext :: codec :: Decode,
+				:: subxt :: ext :: codec :: Encode,
+				:: subxt :: ext :: scale_decode :: DecodeAsType,
+				:: subxt :: ext :: scale_encode :: EncodeAsType,
+				Clone,
+				Debug,
+			)]
+			# [codec (crate = :: subxt :: ext :: codec)]
+			#[decode_as_type(crate_path = ":: subxt :: ext :: scale_decode")]
+			#[encode_as_type(crate_path = ":: subxt :: ext :: scale_encode")]
+			pub struct UtxoOwnershipDenied {
+				pub utxo: utxo_ownership_denied::Utxo,
+				pub account_id: utxo_ownership_denied::AccountId,
+				pub bond_id: utxo_ownership_denied::BondId,
+				pub amount: utxo_ownership_denied::Amount,
+				pub expiration_block: utxo_ownership_denied::ExpirationBlock,
+			}
+			pub mod utxo_ownership_denied {
+				use super::runtime_types;
+				pub type Utxo = runtime_types::ulx_primitives::bitcoin::BitcoinUtxoId;
+				pub type AccountId = ::subxt::utils::AccountId32;
+				pub type BondId = ::core::primitive::u64;
+				pub type Amount = ::core::primitive::u128;
+				pub type ExpirationBlock = ::core::primitive::u32;
+			}
+			impl ::subxt::events::StaticEvent for UtxoOwnershipDenied {
+				const PALLET: &'static str = "BitcoinMint";
+				const EVENT: &'static str = "UtxoOwnershipDenied";
+			}
+			#[derive(
+				:: subxt :: ext :: codec :: Decode,
+				:: subxt :: ext :: codec :: Encode,
+				:: subxt :: ext :: scale_decode :: DecodeAsType,
+				:: subxt :: ext :: scale_encode :: EncodeAsType,
+				Clone,
+				Debug,
+			)]
+			# [codec (crate = :: subxt :: ext :: codec)]
+			#[decode_as_type(crate_path = ":: subxt :: ext :: scale_decode")]
+			#[encode_as_type(crate_path = ":: subxt :: ext :: scale_encode")]
+			pub struct UtxoMovedWithBurn {
+				pub utxo: utxo_moved_with_burn::Utxo,
+				pub bond_id: utxo_moved_with_burn::BondId,
+			}
+			pub mod utxo_moved_with_burn {
+				use super::runtime_types;
+				pub type Utxo = runtime_types::ulx_primitives::bitcoin::BitcoinUtxoId;
+				pub type BondId = ::core::primitive::u64;
+			}
+			impl ::subxt::events::StaticEvent for UtxoMovedWithBurn {
+				const PALLET: &'static str = "BitcoinMint";
+				const EVENT: &'static str = "UtxoMovedWithBurn";
+			}
+		}
+		pub mod storage {
+			use super::runtime_types;
+			pub mod types {
+				use super::runtime_types;
+				pub mod locked_utxos {
+					use super::runtime_types;
+					pub type LockedUtxos = runtime_types::pallet_bitcoin_mint::LockedUtxo<
+						::subxt::utils::AccountId32,
+						::core::primitive::u64,
+						::core::primitive::u128,
+						::core::primitive::u32,
+					>;
+					pub type Param0 = runtime_types::ulx_primitives::bitcoin::BitcoinUtxoId;
+				}
+				pub mod tracked_utxos {
+					use super::runtime_types;
+					pub type TrackedUtxos =
+						runtime_types::bounded_collections::bounded_btree_set::BoundedBTreeSet<
+							runtime_types::ulx_primitives::bitcoin::BitcoinUtxoId,
+						>;
+				}
+				pub mod utxos_pending_confirmation {
+					use super::runtime_types;
+					pub type UtxosPendingConfirmation =
+						runtime_types::bounded_collections::bounded_btree_map::BoundedBTreeMap<
+							runtime_types::ulx_primitives::bitcoin::BitcoinUtxoId,
+							runtime_types::pallet_bitcoin_mint::LockedUtxoPendingConfirmation<
+								::subxt::utils::AccountId32,
+								::core::primitive::u64,
+								::core::primitive::u128,
+								::core::primitive::u32,
+							>,
+						>;
+				}
+				pub mod pending_mint_utxos {
+					use super::runtime_types;
+					pub type PendingMintUtxos =
+						runtime_types::bounded_collections::bounded_vec::BoundedVec<(
+							runtime_types::ulx_primitives::bitcoin::BitcoinUtxoId,
+							::subxt::utils::AccountId32,
+							::core::primitive::u128,
+						)>;
+				}
+				pub mod locked_utxo_expiration_blocks {
+					use super::runtime_types;
+					pub type LockedUtxoExpirationBlocks =
+						runtime_types::bounded_collections::bounded_vec::BoundedVec<
+							runtime_types::ulx_primitives::bitcoin::BitcoinUtxoId,
+						>;
+					pub type Param0 = ::core::primitive::u32;
+				}
+				pub mod minted_argons {
+					use super::runtime_types;
+					pub type MintedArgons = ::core::primitive::u128;
+				}
+			}
+			pub struct StorageApi;
+			impl StorageApi {
+				#[doc = " Locked Bitcoin UTXOs that have had ownership confirmed. If a Bitcoin UTXO is moved before"]
+				#[doc = " the expiration block, the bond is burned and the UTXO is unlocked."]
+				pub fn locked_utxos_iter(
+					&self,
+				) -> ::subxt::storage::address::Address<
+					(),
+					types::locked_utxos::LockedUtxos,
+					(),
+					(),
+					::subxt::storage::address::Yes,
+				> {
+					::subxt::storage::address::Address::new_static(
+						"BitcoinMint",
+						"LockedUtxos",
+						(),
+						[
+							110u8, 79u8, 151u8, 41u8, 236u8, 123u8, 155u8, 219u8, 86u8, 136u8,
+							250u8, 75u8, 67u8, 213u8, 201u8, 126u8, 40u8, 126u8, 228u8, 187u8,
+							146u8, 189u8, 133u8, 214u8, 228u8, 98u8, 65u8, 208u8, 195u8, 188u8,
+							152u8, 195u8,
+						],
+					)
+				}
+				#[doc = " Locked Bitcoin UTXOs that have had ownership confirmed. If a Bitcoin UTXO is moved before"]
+				#[doc = " the expiration block, the bond is burned and the UTXO is unlocked."]
+				pub fn locked_utxos(
+					&self,
+					_0: impl ::std::borrow::Borrow<types::locked_utxos::Param0>,
+				) -> ::subxt::storage::address::Address<
+					::subxt::storage::address::StaticStorageKey<types::locked_utxos::Param0>,
+					types::locked_utxos::LockedUtxos,
+					::subxt::storage::address::Yes,
+					(),
+					(),
+				> {
+					::subxt::storage::address::Address::new_static(
+						"BitcoinMint",
+						"LockedUtxos",
+						::subxt::storage::address::StaticStorageKey::new(_0.borrow()),
+						[
+							110u8, 79u8, 151u8, 41u8, 236u8, 123u8, 155u8, 219u8, 86u8, 136u8,
+							250u8, 75u8, 67u8, 213u8, 201u8, 126u8, 40u8, 126u8, 228u8, 187u8,
+							146u8, 189u8, 133u8, 214u8, 228u8, 98u8, 65u8, 208u8, 195u8, 188u8,
+							152u8, 195u8,
+						],
+					)
+				}
+				#[doc = " All tracked bitcoin utxos"]
+				pub fn tracked_utxos(
+					&self,
+				) -> ::subxt::storage::address::Address<
+					(),
+					types::tracked_utxos::TrackedUtxos,
+					::subxt::storage::address::Yes,
+					::subxt::storage::address::Yes,
+					(),
+				> {
+					::subxt::storage::address::Address::new_static(
+						"BitcoinMint",
+						"TrackedUtxos",
+						(),
+						[
+							92u8, 187u8, 244u8, 116u8, 2u8, 66u8, 55u8, 242u8, 224u8, 60u8, 30u8,
+							125u8, 191u8, 168u8, 217u8, 31u8, 252u8, 176u8, 237u8, 244u8, 24u8,
+							45u8, 13u8, 231u8, 196u8, 95u8, 198u8, 130u8, 207u8, 136u8, 98u8,
+							159u8,
+						],
+					)
+				}
+				#[doc = " Bitcoin UTXOs that have been submitted for ownership confirmation"]
+				pub fn utxos_pending_confirmation(
+					&self,
+				) -> ::subxt::storage::address::Address<
+					(),
+					types::utxos_pending_confirmation::UtxosPendingConfirmation,
+					::subxt::storage::address::Yes,
+					::subxt::storage::address::Yes,
+					(),
+				> {
+					::subxt::storage::address::Address::new_static(
+						"BitcoinMint",
+						"UtxosPendingConfirmation",
+						(),
+						[
+							78u8, 240u8, 243u8, 68u8, 100u8, 228u8, 100u8, 206u8, 235u8, 5u8,
+							224u8, 124u8, 189u8, 1u8, 11u8, 183u8, 216u8, 49u8, 70u8, 109u8, 43u8,
+							134u8, 168u8, 219u8, 148u8, 155u8, 49u8, 242u8, 247u8, 215u8, 191u8,
+							49u8,
+						],
+					)
+				}
+				#[doc = " Bitcoin UTXOs that have been submitted for minting. This list is FIFO for minting whenever"]
+				#[doc = " a) CPI >= 0 and"]
+				#[doc = " b) the aggregate minted Bitcoins <= the aggregate minted Argons from Ulixee Shares"]
+				pub fn pending_mint_utxos(
+					&self,
+				) -> ::subxt::storage::address::Address<
+					(),
+					types::pending_mint_utxos::PendingMintUtxos,
+					::subxt::storage::address::Yes,
+					::subxt::storage::address::Yes,
+					(),
+				> {
+					::subxt::storage::address::Address::new_static(
+						"BitcoinMint",
+						"PendingMintUtxos",
+						(),
+						[
+							136u8, 106u8, 1u8, 52u8, 168u8, 72u8, 61u8, 146u8, 18u8, 186u8, 196u8,
+							223u8, 247u8, 197u8, 210u8, 16u8, 157u8, 20u8, 188u8, 53u8, 103u8,
+							50u8, 90u8, 43u8, 29u8, 214u8, 196u8, 197u8, 82u8, 156u8, 212u8, 89u8,
+						],
+					)
+				}
+				#[doc = " Expiration blocks mapped to Bitcoin UTXOs"]
+				pub fn locked_utxo_expiration_blocks_iter(
+					&self,
+				) -> ::subxt::storage::address::Address<
+					(),
+					types::locked_utxo_expiration_blocks::LockedUtxoExpirationBlocks,
+					(),
+					::subxt::storage::address::Yes,
+					::subxt::storage::address::Yes,
+				> {
+					::subxt::storage::address::Address::new_static(
+						"BitcoinMint",
+						"LockedUtxoExpirationBlocks",
+						(),
+						[
+							222u8, 63u8, 182u8, 213u8, 205u8, 166u8, 141u8, 147u8, 24u8, 84u8, 0u8,
+							69u8, 57u8, 121u8, 53u8, 17u8, 125u8, 245u8, 170u8, 204u8, 35u8, 189u8,
+							220u8, 134u8, 124u8, 47u8, 57u8, 93u8, 141u8, 106u8, 160u8, 150u8,
+						],
+					)
+				}
+				#[doc = " Expiration blocks mapped to Bitcoin UTXOs"]
+				pub fn locked_utxo_expiration_blocks(
+					&self,
+					_0: impl ::std::borrow::Borrow<types::locked_utxo_expiration_blocks::Param0>,
+				) -> ::subxt::storage::address::Address<
+					::subxt::storage::address::StaticStorageKey<
+						types::locked_utxo_expiration_blocks::Param0,
+					>,
+					types::locked_utxo_expiration_blocks::LockedUtxoExpirationBlocks,
+					::subxt::storage::address::Yes,
+					::subxt::storage::address::Yes,
+					(),
+				> {
+					::subxt::storage::address::Address::new_static(
+						"BitcoinMint",
+						"LockedUtxoExpirationBlocks",
+						::subxt::storage::address::StaticStorageKey::new(_0.borrow()),
+						[
+							222u8, 63u8, 182u8, 213u8, 205u8, 166u8, 141u8, 147u8, 24u8, 84u8, 0u8,
+							69u8, 57u8, 121u8, 53u8, 17u8, 125u8, 245u8, 170u8, 204u8, 35u8, 189u8,
+							220u8, 134u8, 124u8, 47u8, 57u8, 93u8, 141u8, 106u8, 160u8, 150u8,
+						],
+					)
+				}
+				pub fn minted_argons(
+					&self,
+				) -> ::subxt::storage::address::Address<
+					(),
+					types::minted_argons::MintedArgons,
+					::subxt::storage::address::Yes,
+					::subxt::storage::address::Yes,
+					(),
+				> {
+					::subxt::storage::address::Address::new_static(
+						"BitcoinMint",
+						"MintedArgons",
+						(),
+						[
+							240u8, 140u8, 179u8, 21u8, 93u8, 206u8, 71u8, 36u8, 76u8, 127u8, 64u8,
+							247u8, 242u8, 132u8, 48u8, 60u8, 147u8, 15u8, 128u8, 120u8, 153u8,
+							170u8, 39u8, 114u8, 110u8, 42u8, 97u8, 98u8, 202u8, 0u8, 206u8, 67u8,
+						],
+					)
+				}
+			}
+		}
+		pub mod constants {
+			use super::runtime_types;
+			pub struct ConstantsApi;
+			impl ConstantsApi {
+				#[doc = " The minimum number of satoshis that can be submitted in a single transaction"]
+				pub fn minimum_satoshi_amount(
+					&self,
+				) -> ::subxt::constants::Address<::core::primitive::u64> {
+					::subxt::constants::Address::new_static(
+						"BitcoinMint",
+						"MinimumSatoshiAmount",
+						[
+							128u8, 214u8, 205u8, 242u8, 181u8, 142u8, 124u8, 231u8, 190u8, 146u8,
+							59u8, 226u8, 157u8, 101u8, 103u8, 117u8, 249u8, 65u8, 18u8, 191u8,
+							103u8, 119u8, 53u8, 85u8, 81u8, 96u8, 220u8, 42u8, 184u8, 239u8, 42u8,
+							246u8,
+						],
+					)
+				}
+				#[doc = " The required bond duration for a Bitcoin submission"]
+				pub fn bond_duration_blocks(
+					&self,
+				) -> ::subxt::constants::Address<::core::primitive::u32> {
+					::subxt::constants::Address::new_static(
+						"BitcoinMint",
+						"BondDurationBlocks",
+						[
+							98u8, 252u8, 116u8, 72u8, 26u8, 180u8, 225u8, 83u8, 200u8, 157u8,
+							125u8, 151u8, 53u8, 76u8, 168u8, 26u8, 10u8, 9u8, 98u8, 68u8, 9u8,
+							178u8, 197u8, 113u8, 31u8, 79u8, 200u8, 90u8, 203u8, 100u8, 41u8,
+							145u8,
+						],
+					)
+				}
+				#[doc = " The maximum number of UTXOs that can be waiting for minting"]
+				pub fn max_pending_mint_utxos(
+					&self,
+				) -> ::subxt::constants::Address<::core::primitive::u32> {
+					::subxt::constants::Address::new_static(
+						"BitcoinMint",
+						"MaxPendingMintUtxos",
+						[
+							98u8, 252u8, 116u8, 72u8, 26u8, 180u8, 225u8, 83u8, 200u8, 157u8,
+							125u8, 151u8, 53u8, 76u8, 168u8, 26u8, 10u8, 9u8, 98u8, 68u8, 9u8,
+							178u8, 197u8, 113u8, 31u8, 79u8, 200u8, 90u8, 203u8, 100u8, 41u8,
+							145u8,
+						],
+					)
+				}
+				#[doc = " The maximum number of UTXOs that can be tracked at a given time"]
+				pub fn max_tracked_utxos(
+					&self,
+				) -> ::subxt::constants::Address<::core::primitive::u32> {
+					::subxt::constants::Address::new_static(
+						"BitcoinMint",
+						"MaxTrackedUtxos",
+						[
+							98u8, 252u8, 116u8, 72u8, 26u8, 180u8, 225u8, 83u8, 200u8, 157u8,
+							125u8, 151u8, 53u8, 76u8, 168u8, 26u8, 10u8, 9u8, 98u8, 68u8, 9u8,
+							178u8, 197u8, 113u8, 31u8, 79u8, 200u8, 90u8, 203u8, 100u8, 41u8,
+							145u8,
 						],
 					)
 				}
@@ -10849,10 +12836,9 @@ pub mod api {
 						"Holds",
 						(),
 						[
-							85u8, 24u8, 200u8, 7u8, 154u8, 94u8, 116u8, 110u8, 33u8, 50u8, 143u8,
-							62u8, 93u8, 155u8, 53u8, 121u8, 132u8, 232u8, 173u8, 102u8, 117u8,
-							201u8, 165u8, 121u8, 184u8, 147u8, 237u8, 67u8, 74u8, 66u8, 206u8,
-							55u8,
+							220u8, 33u8, 252u8, 15u8, 122u8, 136u8, 219u8, 250u8, 246u8, 126u8,
+							112u8, 191u8, 4u8, 48u8, 161u8, 204u8, 170u8, 30u8, 95u8, 78u8, 83u8,
+							78u8, 164u8, 193u8, 114u8, 45u8, 18u8, 234u8, 1u8, 193u8, 5u8, 143u8,
 						],
 					)
 				}
@@ -10872,10 +12858,9 @@ pub mod api {
 						"Holds",
 						::subxt::storage::address::StaticStorageKey::new(_0.borrow()),
 						[
-							85u8, 24u8, 200u8, 7u8, 154u8, 94u8, 116u8, 110u8, 33u8, 50u8, 143u8,
-							62u8, 93u8, 155u8, 53u8, 121u8, 132u8, 232u8, 173u8, 102u8, 117u8,
-							201u8, 165u8, 121u8, 184u8, 147u8, 237u8, 67u8, 74u8, 66u8, 206u8,
-							55u8,
+							220u8, 33u8, 252u8, 15u8, 122u8, 136u8, 219u8, 250u8, 246u8, 126u8,
+							112u8, 191u8, 4u8, 48u8, 161u8, 204u8, 170u8, 30u8, 95u8, 78u8, 83u8,
+							78u8, 164u8, 193u8, 114u8, 45u8, 18u8, 234u8, 1u8, 193u8, 5u8, 143u8,
 						],
 					)
 				}
@@ -10998,7 +12983,7 @@ pub mod api {
 			}
 		}
 	}
-	pub mod mint {
+	pub mod ulixee_mint {
 		use super::{root_mod, runtime_types};
 		#[doc = "The `Error` enum of this pallet."]
 		pub type Error = runtime_types::pallet_ulixee_mint::pallet::Error;
@@ -11027,6 +13012,10 @@ pub mod api {
 					pub type UlixeeAccountLastTransferBlock = ::core::primitive::u32;
 					pub type Param0 = ::subxt::utils::AccountId32;
 				}
+				pub mod minted_argons {
+					use super::runtime_types;
+					pub type MintedArgons = ::core::primitive::u128;
+				}
 			}
 			pub struct StorageApi;
 			impl StorageApi {
@@ -11041,7 +13030,7 @@ pub mod api {
 					::subxt::storage::address::Yes,
 				> {
 					::subxt::storage::address::Address::new_static(
-						"Mint",
+						"UlixeeMint",
 						"UlixeeAccountLastTransferBlock",
 						(),
 						[
@@ -11065,13 +13054,33 @@ pub mod api {
 					(),
 				> {
 					::subxt::storage::address::Address::new_static(
-						"Mint",
+						"UlixeeMint",
 						"UlixeeAccountLastTransferBlock",
 						::subxt::storage::address::StaticStorageKey::new(_0.borrow()),
 						[
 							232u8, 20u8, 173u8, 109u8, 248u8, 121u8, 166u8, 86u8, 210u8, 179u8,
 							221u8, 52u8, 245u8, 209u8, 218u8, 193u8, 1u8, 95u8, 84u8, 124u8, 97u8,
 							252u8, 90u8, 88u8, 125u8, 51u8, 91u8, 134u8, 239u8, 21u8, 124u8, 41u8,
+						],
+					)
+				}
+				pub fn minted_argons(
+					&self,
+				) -> ::subxt::storage::address::Address<
+					(),
+					types::minted_argons::MintedArgons,
+					::subxt::storage::address::Yes,
+					::subxt::storage::address::Yes,
+					(),
+				> {
+					::subxt::storage::address::Address::new_static(
+						"UlixeeMint",
+						"MintedArgons",
+						(),
+						[
+							240u8, 140u8, 179u8, 21u8, 93u8, 206u8, 71u8, 36u8, 76u8, 127u8, 64u8,
+							247u8, 242u8, 132u8, 48u8, 60u8, 147u8, 15u8, 128u8, 120u8, 153u8,
+							170u8, 39u8, 114u8, 110u8, 42u8, 97u8, 98u8, 202u8, 0u8, 206u8, 67u8,
 						],
 					)
 				}
@@ -12382,10 +14391,9 @@ pub mod api {
 						"Holds",
 						(),
 						[
-							85u8, 24u8, 200u8, 7u8, 154u8, 94u8, 116u8, 110u8, 33u8, 50u8, 143u8,
-							62u8, 93u8, 155u8, 53u8, 121u8, 132u8, 232u8, 173u8, 102u8, 117u8,
-							201u8, 165u8, 121u8, 184u8, 147u8, 237u8, 67u8, 74u8, 66u8, 206u8,
-							55u8,
+							220u8, 33u8, 252u8, 15u8, 122u8, 136u8, 219u8, 250u8, 246u8, 126u8,
+							112u8, 191u8, 4u8, 48u8, 161u8, 204u8, 170u8, 30u8, 95u8, 78u8, 83u8,
+							78u8, 164u8, 193u8, 114u8, 45u8, 18u8, 234u8, 1u8, 193u8, 5u8, 143u8,
 						],
 					)
 				}
@@ -12405,10 +14413,9 @@ pub mod api {
 						"Holds",
 						::subxt::storage::address::StaticStorageKey::new(_0.borrow()),
 						[
-							85u8, 24u8, 200u8, 7u8, 154u8, 94u8, 116u8, 110u8, 33u8, 50u8, 143u8,
-							62u8, 93u8, 155u8, 53u8, 121u8, 132u8, 232u8, 173u8, 102u8, 117u8,
-							201u8, 165u8, 121u8, 184u8, 147u8, 237u8, 67u8, 74u8, 66u8, 206u8,
-							55u8,
+							220u8, 33u8, 252u8, 15u8, 122u8, 136u8, 219u8, 250u8, 246u8, 126u8,
+							112u8, 191u8, 4u8, 48u8, 161u8, 204u8, 170u8, 30u8, 95u8, 78u8, 83u8,
+							78u8, 164u8, 193u8, 114u8, 45u8, 18u8, 234u8, 1u8, 193u8, 5u8, 143u8,
 						],
 					)
 				}
@@ -13111,9 +15118,9 @@ pub mod api {
 						"sudo",
 						types::Sudo { call: ::std::boxed::Box::new(call) },
 						[
-							9u8, 123u8, 116u8, 167u8, 80u8, 41u8, 40u8, 18u8, 198u8, 158u8, 6u8,
-							245u8, 195u8, 163u8, 1u8, 14u8, 95u8, 39u8, 216u8, 53u8, 176u8, 10u8,
-							158u8, 57u8, 110u8, 233u8, 182u8, 222u8, 130u8, 158u8, 232u8, 230u8,
+							74u8, 68u8, 203u8, 150u8, 184u8, 209u8, 60u8, 142u8, 221u8, 65u8, 21u8,
+							10u8, 117u8, 79u8, 105u8, 53u8, 243u8, 132u8, 130u8, 175u8, 238u8,
+							231u8, 199u8, 73u8, 203u8, 78u8, 90u8, 45u8, 1u8, 12u8, 71u8, 86u8,
 						],
 					)
 				}
@@ -13132,10 +15139,10 @@ pub mod api {
 						"sudo_unchecked_weight",
 						types::SudoUncheckedWeight { call: ::std::boxed::Box::new(call), weight },
 						[
-							153u8, 235u8, 175u8, 85u8, 181u8, 3u8, 34u8, 99u8, 200u8, 185u8, 226u8,
-							254u8, 156u8, 24u8, 131u8, 192u8, 191u8, 130u8, 68u8, 235u8, 245u8,
-							32u8, 91u8, 226u8, 32u8, 106u8, 171u8, 175u8, 73u8, 146u8, 130u8,
-							184u8,
+							133u8, 51u8, 211u8, 93u8, 131u8, 158u8, 116u8, 22u8, 127u8, 160u8,
+							150u8, 38u8, 108u8, 111u8, 6u8, 132u8, 248u8, 23u8, 115u8, 133u8,
+							207u8, 19u8, 118u8, 188u8, 138u8, 154u8, 76u8, 28u8, 92u8, 232u8,
+							152u8, 65u8,
 						],
 					)
 				}
@@ -13170,10 +15177,10 @@ pub mod api {
 						"sudo_as",
 						types::SudoAs { who, call: ::std::boxed::Box::new(call) },
 						[
-							175u8, 109u8, 231u8, 126u8, 67u8, 69u8, 212u8, 240u8, 108u8, 124u8,
-							205u8, 216u8, 101u8, 242u8, 104u8, 164u8, 250u8, 137u8, 153u8, 72u8,
-							101u8, 80u8, 186u8, 230u8, 73u8, 227u8, 228u8, 37u8, 113u8, 4u8, 48u8,
-							72u8,
+							232u8, 103u8, 237u8, 81u8, 11u8, 118u8, 117u8, 207u8, 255u8, 239u8,
+							227u8, 115u8, 109u8, 171u8, 60u8, 39u8, 56u8, 209u8, 17u8, 115u8,
+							250u8, 51u8, 201u8, 51u8, 50u8, 159u8, 97u8, 188u8, 141u8, 6u8, 85u8,
+							26u8,
 						],
 					)
 				}
@@ -13343,6 +15350,21 @@ pub mod api {
 				#[decode_as_type(crate_path = ":: subxt :: ext :: scale_decode")]
 				#[encode_as_type(crate_path = ":: subxt :: ext :: scale_encode")]
 				pub struct BoundedBTreeMap<_0, _1>(pub ::subxt::utils::KeyedVec<_0, _1>);
+			}
+			pub mod bounded_btree_set {
+				use super::runtime_types;
+				#[derive(
+					:: subxt :: ext :: codec :: Decode,
+					:: subxt :: ext :: codec :: Encode,
+					:: subxt :: ext :: scale_decode :: DecodeAsType,
+					:: subxt :: ext :: scale_encode :: EncodeAsType,
+					Clone,
+					Debug,
+				)]
+				# [codec (crate = :: subxt :: ext :: codec)]
+				#[decode_as_type(crate_path = ":: subxt :: ext :: scale_decode")]
+				#[encode_as_type(crate_path = ":: subxt :: ext :: scale_encode")]
+				pub struct BoundedBTreeSet<_0>(pub ::std::vec::Vec<_0>);
 			}
 			pub mod bounded_vec {
 				use super::runtime_types;
@@ -14598,7 +16620,7 @@ pub mod api {
 				}
 			}
 		}
-		pub mod pallet_block_rewards {
+		pub mod pallet_bitcoin_mint {
 			use super::runtime_types;
 			pub mod pallet {
 				use super::runtime_types;
@@ -14613,11 +16635,218 @@ pub mod api {
 				# [codec (crate = :: subxt :: ext :: codec)]
 				#[decode_as_type(crate_path = ":: subxt :: ext :: scale_decode")]
 				#[encode_as_type(crate_path = ":: subxt :: ext :: scale_encode")]
-				pub struct BlockPayout<_0, _1> {
-					pub account_id: _0,
-					pub ulixees: _1,
-					pub argons: _1,
+				#[doc = "Contains a variant per dispatchable extrinsic that this pallet has."]
+				pub enum Call {
+					#[codec(index = 0)]
+					#[doc = "Submitted when a bitcoin UTXO has been moved or confirmed"]
+					sync { utxo_sync: runtime_types::ulx_primitives::inherents::BitcoinUtxoSync },
+					#[codec(index = 1)]
+					#[doc = "Submit bitcoins to be minted as minting becomes available. You must provide a"]
+					#[doc = "`sign_message` signature proving ownership. Currently, this is only supported for P2PKH,"]
+					#[doc = "P2WPKH and P2PK UTXOs."]
+					lock {
+						bond_id: ::core::option::Option<::core::primitive::u64>,
+						txid: runtime_types::ulx_primitives::bitcoin::H256Le,
+						output_index: ::core::primitive::u32,
+						satoshis: ::core::primitive::u64,
+						pubkey: runtime_types::ulx_primitives::bitcoin::CompressedPublicKey,
+						ownership_proof_signature: [::core::primitive::u8; 65usize],
+					},
+					#[codec(index = 2)]
+					#[doc = "Unlock a bitcoin UTXO that has been confirmed."]
+					#[doc = ""]
+					#[doc = "NOTE: this call will burn from your account the current argon value of the UTXO maxed at"]
+					#[doc = "your buy-in price."]
+					unlock {
+						txid: runtime_types::ulx_primitives::bitcoin::H256Le,
+						output_index: ::core::primitive::u32,
+					},
 				}
+				#[derive(
+					:: subxt :: ext :: codec :: Decode,
+					:: subxt :: ext :: codec :: Encode,
+					:: subxt :: ext :: scale_decode :: DecodeAsType,
+					:: subxt :: ext :: scale_encode :: EncodeAsType,
+					Clone,
+					Debug,
+				)]
+				# [codec (crate = :: subxt :: ext :: codec)]
+				#[decode_as_type(crate_path = ":: subxt :: ext :: scale_decode")]
+				#[encode_as_type(crate_path = ":: subxt :: ext :: scale_encode")]
+				#[doc = "The `Error` enum of this pallet."]
+				pub enum Error {
+					#[codec(index = 0)]
+					#[doc = "An invalid bond was submitted"]
+					InvalidBondSubmitted,
+					#[codec(index = 1)]
+					#[doc = "Insufficient bitcoin amount"]
+					InsufficientBitcoinAmount,
+					#[codec(index = 2)]
+					#[doc = "Not enough argons were bonded"]
+					InsufficientBondAmount,
+					#[codec(index = 3)]
+					#[doc = "The bond expires sooner than required"]
+					PrematureBondExpiration,
+					#[codec(index = 4)]
+					#[doc = "No prices are available to mint bitcoins"]
+					NoBitcoinPricesAvailable,
+					#[codec(index = 5)]
+					#[doc = "This bitcoin utxo is already locked"]
+					BitcoinAlreadyLocked,
+					#[codec(index = 6)]
+					#[doc = "No more slots available for bitcoin minting"]
+					MaxPendingMintUtxosExceeded,
+					#[codec(index = 7)]
+					#[doc = "Locked Utxo Not Found"]
+					UtxoNotLocked,
+					#[codec(index = 8)]
+					#[doc = "Redemptions not currently available"]
+					RedemptionsUnavailable,
+					#[codec(index = 9)]
+					BadState,
+					#[codec(index = 10)]
+					BondNotFound,
+					#[codec(index = 11)]
+					NoMoreBondIds,
+					#[codec(index = 12)]
+					BondFundClosed,
+					#[codec(index = 13)]
+					MinimumBondAmountNotMet,
+					#[codec(index = 14)]
+					LeaseUntilBlockTooSoon,
+					#[codec(index = 15)]
+					LeaseUntilPastFundExpiration,
+					#[codec(index = 16)]
+					#[doc = "There are too many bond or bond funds expiring in the given expiration block"]
+					ExpirationAtBlockOverflow,
+					#[codec(index = 17)]
+					InsufficientFunds,
+					#[codec(index = 18)]
+					InsufficientBondFunds,
+					#[codec(index = 19)]
+					ExpirationTooSoon,
+					#[codec(index = 20)]
+					NoPermissions,
+					#[codec(index = 21)]
+					NoBondFundFound,
+					#[codec(index = 22)]
+					HoldUnexpectedlyModified,
+					#[codec(index = 23)]
+					BondFundMaximumBondsExceeded,
+					#[codec(index = 24)]
+					UnrecoverableHold,
+					#[codec(index = 25)]
+					BondFundNotFound,
+					#[codec(index = 26)]
+					BondAlreadyClosed,
+					#[codec(index = 27)]
+					BondAlreadyLocked,
+					#[codec(index = 28)]
+					BondLockedCannotModify,
+					#[codec(index = 29)]
+					#[doc = "The fee for this bond exceeds the amount of the bond, which is unsafe"]
+					FeeExceedsBondAmount,
+					#[codec(index = 30)]
+					AccountWouldBeBelowMinimum,
+				}
+				#[derive(
+					:: subxt :: ext :: codec :: Decode,
+					:: subxt :: ext :: codec :: Encode,
+					:: subxt :: ext :: scale_decode :: DecodeAsType,
+					:: subxt :: ext :: scale_encode :: EncodeAsType,
+					Clone,
+					Debug,
+				)]
+				# [codec (crate = :: subxt :: ext :: codec)]
+				#[decode_as_type(crate_path = ":: subxt :: ext :: scale_decode")]
+				#[encode_as_type(crate_path = ":: subxt :: ext :: scale_encode")]
+				#[doc = "The `Event` enum of this pallet"]
+				pub enum Event {
+					#[codec(index = 0)]
+					UtxoOwnershipConfirmed {
+						utxo: runtime_types::ulx_primitives::bitcoin::BitcoinUtxoId,
+						account_id: ::subxt::utils::AccountId32,
+						bond_id: ::core::primitive::u64,
+						amount: ::core::primitive::u128,
+						expiration_block: ::core::primitive::u32,
+					},
+					#[codec(index = 1)]
+					UtxoUnlocked {
+						utxo: runtime_types::ulx_primitives::bitcoin::BitcoinUtxoId,
+						account_id: ::subxt::utils::AccountId32,
+						bond_id: ::core::primitive::u64,
+						amount: ::core::primitive::u128,
+					},
+					#[codec(index = 2)]
+					UtxoOwnershipDenied {
+						utxo: runtime_types::ulx_primitives::bitcoin::BitcoinUtxoId,
+						account_id: ::subxt::utils::AccountId32,
+						bond_id: ::core::primitive::u64,
+						amount: ::core::primitive::u128,
+						expiration_block: ::core::primitive::u32,
+					},
+					#[codec(index = 3)]
+					UtxoMovedWithBurn {
+						utxo: runtime_types::ulx_primitives::bitcoin::BitcoinUtxoId,
+						bond_id: ::core::primitive::u64,
+					},
+				}
+				#[derive(
+					:: subxt :: ext :: codec :: Decode,
+					:: subxt :: ext :: codec :: Encode,
+					:: subxt :: ext :: scale_decode :: DecodeAsType,
+					:: subxt :: ext :: scale_encode :: EncodeAsType,
+					Clone,
+					Debug,
+				)]
+				# [codec (crate = :: subxt :: ext :: codec)]
+				#[decode_as_type(crate_path = ":: subxt :: ext :: scale_decode")]
+				#[encode_as_type(crate_path = ":: subxt :: ext :: scale_encode")]
+				pub enum HoldReason {}
+			}
+			#[derive(
+				:: subxt :: ext :: codec :: Decode,
+				:: subxt :: ext :: codec :: Encode,
+				:: subxt :: ext :: scale_decode :: DecodeAsType,
+				:: subxt :: ext :: scale_encode :: EncodeAsType,
+				Clone,
+				Debug,
+			)]
+			# [codec (crate = :: subxt :: ext :: codec)]
+			#[decode_as_type(crate_path = ":: subxt :: ext :: scale_decode")]
+			#[encode_as_type(crate_path = ":: subxt :: ext :: scale_encode")]
+			pub struct LockedUtxo<_0, _1, _2, _3> {
+				pub account_id: _0,
+				pub bond_id: _1,
+				pub amount: _2,
+				pub satoshis: ::core::primitive::u64,
+				pub expiration_block: _3,
+			}
+			#[derive(
+				:: subxt :: ext :: codec :: Decode,
+				:: subxt :: ext :: codec :: Encode,
+				:: subxt :: ext :: scale_decode :: DecodeAsType,
+				:: subxt :: ext :: scale_encode :: EncodeAsType,
+				Clone,
+				Debug,
+			)]
+			# [codec (crate = :: subxt :: ext :: codec)]
+			#[decode_as_type(crate_path = ":: subxt :: ext :: scale_decode")]
+			#[encode_as_type(crate_path = ":: subxt :: ext :: scale_encode")]
+			pub struct LockedUtxoPendingConfirmation<_0, _1, _2, _3> {
+				pub account_id: _0,
+				pub bond_id: _1,
+				pub amount: _2,
+				pub satoshis: ::core::primitive::u64,
+				pub expiration_block: _3,
+				pub public_key: runtime_types::ulx_primitives::bitcoin::CompressedPublicKey,
+				pub ownership_proof_signature: [::core::primitive::u8; 65usize],
+			}
+		}
+		pub mod pallet_block_rewards {
+			use super::runtime_types;
+			pub mod pallet {
+				use super::runtime_types;
 				#[derive(
 					:: subxt :: ext :: codec :: Decode,
 					:: subxt :: ext :: codec :: Encode,
@@ -14661,7 +16890,7 @@ pub mod api {
 					RewardCreated {
 						maturation_block: ::core::primitive::u32,
 						rewards: ::std::vec::Vec<
-							runtime_types::pallet_block_rewards::pallet::BlockPayout<
+							runtime_types::ulx_primitives::block_seal::BlockPayout<
 								::subxt::utils::AccountId32,
 								::core::primitive::u128,
 							>,
@@ -14670,7 +16899,7 @@ pub mod api {
 					#[codec(index = 1)]
 					RewardUnlocked {
 						rewards: ::std::vec::Vec<
-							runtime_types::pallet_block_rewards::pallet::BlockPayout<
+							runtime_types::ulx_primitives::block_seal::BlockPayout<
 								::subxt::utils::AccountId32,
 								::core::primitive::u128,
 							>,
@@ -15064,6 +17293,12 @@ pub mod api {
 						bond_id: ::core::primitive::u64,
 					},
 					#[codec(index = 8)]
+					BondBurned {
+						bond_fund_id: ::core::option::Option<::core::primitive::u32>,
+						bond_id: ::core::primitive::u64,
+						amount: ::core::primitive::u128,
+					},
+					#[codec(index = 9)]
 					BondFeeRefund {
 						bond_fund_id: ::core::primitive::u32,
 						bond_id: ::core::primitive::u64,
@@ -15072,12 +17307,12 @@ pub mod api {
 						final_fee: ::core::primitive::u128,
 						refund_amount: ::core::primitive::u128,
 					},
-					#[codec(index = 9)]
+					#[codec(index = 10)]
 					BondLocked {
 						bond_id: ::core::primitive::u64,
 						bonded_account_id: ::subxt::utils::AccountId32,
 					},
-					#[codec(index = 10)]
+					#[codec(index = 11)]
 					BondUnlocked {
 						bond_id: ::core::primitive::u64,
 						bonded_account_id: ::subxt::utils::AccountId32,
@@ -15676,63 +17911,6 @@ pub mod api {
 				pub authority_index: ::core::primitive::u32,
 			}
 		}
-		pub mod pallet_ulixee_mint {
-			use super::runtime_types;
-			pub mod pallet {
-				use super::runtime_types;
-				#[derive(
-					:: subxt :: ext :: codec :: Decode,
-					:: subxt :: ext :: codec :: Encode,
-					:: subxt :: ext :: scale_decode :: DecodeAsType,
-					:: subxt :: ext :: scale_encode :: EncodeAsType,
-					Clone,
-					Debug,
-				)]
-				# [codec (crate = :: subxt :: ext :: codec)]
-				#[decode_as_type(crate_path = ":: subxt :: ext :: scale_decode")]
-				#[encode_as_type(crate_path = ":: subxt :: ext :: scale_encode")]
-				#[doc = "Contains a variant per dispatchable extrinsic that this pallet has."]
-				pub enum Call {}
-				#[derive(
-					:: subxt :: ext :: codec :: Decode,
-					:: subxt :: ext :: codec :: Encode,
-					:: subxt :: ext :: scale_decode :: DecodeAsType,
-					:: subxt :: ext :: scale_encode :: EncodeAsType,
-					Clone,
-					Debug,
-				)]
-				# [codec (crate = :: subxt :: ext :: codec)]
-				#[decode_as_type(crate_path = ":: subxt :: ext :: scale_decode")]
-				#[encode_as_type(crate_path = ":: subxt :: ext :: scale_encode")]
-				#[doc = "The `Error` enum of this pallet."]
-				pub enum Error {}
-				#[derive(
-					:: subxt :: ext :: codec :: Decode,
-					:: subxt :: ext :: codec :: Encode,
-					:: subxt :: ext :: scale_decode :: DecodeAsType,
-					:: subxt :: ext :: scale_encode :: EncodeAsType,
-					Clone,
-					Debug,
-				)]
-				# [codec (crate = :: subxt :: ext :: codec)]
-				#[decode_as_type(crate_path = ":: subxt :: ext :: scale_decode")]
-				#[encode_as_type(crate_path = ":: subxt :: ext :: scale_encode")]
-				#[doc = "The `Event` enum of this pallet"]
-				pub enum Event {}
-				#[derive(
-					:: subxt :: ext :: codec :: Decode,
-					:: subxt :: ext :: codec :: Encode,
-					:: subxt :: ext :: scale_decode :: DecodeAsType,
-					:: subxt :: ext :: scale_encode :: EncodeAsType,
-					Clone,
-					Debug,
-				)]
-				# [codec (crate = :: subxt :: ext :: codec)]
-				#[decode_as_type(crate_path = ":: subxt :: ext :: scale_decode")]
-				#[encode_as_type(crate_path = ":: subxt :: ext :: scale_encode")]
-				pub enum HoldReason {}
-			}
-		}
 		pub mod pallet_notaries {
 			use super::runtime_types;
 			pub mod pallet {
@@ -15955,6 +18133,416 @@ pub mod api {
 						timeslot: ::std::vec::Vec<::core::primitive::u8>,
 					},
 				}
+			}
+		}
+		pub mod pallet_price_index {
+			use super::runtime_types;
+			pub mod pallet {
+				use super::runtime_types;
+				#[derive(
+					:: subxt :: ext :: codec :: Decode,
+					:: subxt :: ext :: codec :: Encode,
+					:: subxt :: ext :: scale_decode :: DecodeAsType,
+					:: subxt :: ext :: scale_encode :: EncodeAsType,
+					Clone,
+					Debug,
+				)]
+				# [codec (crate = :: subxt :: ext :: codec)]
+				#[decode_as_type(crate_path = ":: subxt :: ext :: scale_decode")]
+				#[encode_as_type(crate_path = ":: subxt :: ext :: scale_encode")]
+				#[doc = "Contains a variant per dispatchable extrinsic that this pallet has."]
+				pub enum Call {
+					#[codec(index = 0)]
+					#[doc = "Submit the latest price index. Only valid for the configured operator account"]
+					submit {
+						index:
+							runtime_types::pallet_price_index::PriceIndex<::core::primitive::u64>,
+					},
+					#[codec(index = 1)]
+					#[doc = "Sets the operator account id (only executable by the Root account)"]
+					#[doc = ""]
+					#[doc = "# Arguments"]
+					#[doc = "* `account_id` - the account id of the operator"]
+					set_operator { account_id: ::subxt::utils::AccountId32 },
+				}
+				#[derive(
+					:: subxt :: ext :: codec :: Decode,
+					:: subxt :: ext :: codec :: Encode,
+					:: subxt :: ext :: scale_decode :: DecodeAsType,
+					:: subxt :: ext :: scale_encode :: EncodeAsType,
+					Clone,
+					Debug,
+				)]
+				# [codec (crate = :: subxt :: ext :: codec)]
+				#[decode_as_type(crate_path = ":: subxt :: ext :: scale_decode")]
+				#[encode_as_type(crate_path = ":: subxt :: ext :: scale_encode")]
+				#[doc = "The `Error` enum of this pallet."]
+				pub enum Error {
+					#[codec(index = 0)]
+					#[doc = "Not authorized as an oracle operator"]
+					NotAuthorizedOperator,
+					#[codec(index = 1)]
+					#[doc = "Missing value"]
+					MissingValue,
+					#[codec(index = 2)]
+					#[doc = "Couldn't record history"]
+					HistoryRecordingError,
+				}
+				#[derive(
+					:: subxt :: ext :: codec :: Decode,
+					:: subxt :: ext :: codec :: Encode,
+					:: subxt :: ext :: scale_decode :: DecodeAsType,
+					:: subxt :: ext :: scale_encode :: EncodeAsType,
+					Clone,
+					Debug,
+				)]
+				# [codec (crate = :: subxt :: ext :: codec)]
+				#[decode_as_type(crate_path = ":: subxt :: ext :: scale_decode")]
+				#[encode_as_type(crate_path = ":: subxt :: ext :: scale_encode")]
+				#[doc = "The `Event` enum of this pallet"]
+				pub enum Event {
+					#[codec(index = 0)]
+					#[doc = "Event emitted when a new price index is submitted"]
+					NewIndex {
+						price_index:
+							runtime_types::pallet_price_index::PriceIndex<::core::primitive::u64>,
+					},
+					#[codec(index = 1)]
+					OperatorChanged { operator_id: ::subxt::utils::AccountId32 },
+				}
+			}
+			#[derive(
+				:: subxt :: ext :: codec :: Decode,
+				:: subxt :: ext :: codec :: Encode,
+				:: subxt :: ext :: scale_decode :: DecodeAsType,
+				:: subxt :: ext :: scale_encode :: EncodeAsType,
+				Clone,
+				Debug,
+			)]
+			# [codec (crate = :: subxt :: ext :: codec)]
+			#[decode_as_type(crate_path = ":: subxt :: ext :: scale_decode")]
+			#[encode_as_type(crate_path = ":: subxt :: ext :: scale_encode")]
+			pub struct PriceIndex<_0> {
+				#[codec(compact)]
+				pub btc_usd_price: _0,
+				#[codec(compact)]
+				pub argon_usd_price: _0,
+				pub argon_cpi: ::core::primitive::i16,
+				#[codec(compact)]
+				pub timestamp: _0,
+			}
+		}
+		pub mod pallet_proxy {
+			use super::runtime_types;
+			pub mod pallet {
+				use super::runtime_types;
+				#[derive(
+					:: subxt :: ext :: codec :: Decode,
+					:: subxt :: ext :: codec :: Encode,
+					:: subxt :: ext :: scale_decode :: DecodeAsType,
+					:: subxt :: ext :: scale_encode :: EncodeAsType,
+					Clone,
+					Debug,
+				)]
+				# [codec (crate = :: subxt :: ext :: codec)]
+				#[decode_as_type(crate_path = ":: subxt :: ext :: scale_decode")]
+				#[encode_as_type(crate_path = ":: subxt :: ext :: scale_encode")]
+				#[doc = "Contains a variant per dispatchable extrinsic that this pallet has."]
+				pub enum Call {
+					#[codec(index = 0)]
+					#[doc = "Dispatch the given `call` from an account that the sender is authorised for through"]
+					#[doc = "`add_proxy`."]
+					#[doc = ""]
+					#[doc = "The dispatch origin for this call must be _Signed_."]
+					#[doc = ""]
+					#[doc = "Parameters:"]
+					#[doc = "- `real`: The account that the proxy will make a call on behalf of."]
+					#[doc = "- `force_proxy_type`: Specify the exact proxy type to be used and checked for this call."]
+					#[doc = "- `call`: The call to be made by the `real` account."]
+					proxy {
+						real: ::subxt::utils::MultiAddress<::subxt::utils::AccountId32, ()>,
+						force_proxy_type:
+							::core::option::Option<runtime_types::ulx_node_runtime::ProxyType>,
+						call: ::std::boxed::Box<runtime_types::ulx_node_runtime::RuntimeCall>,
+					},
+					#[codec(index = 1)]
+					#[doc = "Register a proxy account for the sender that is able to make calls on its behalf."]
+					#[doc = ""]
+					#[doc = "The dispatch origin for this call must be _Signed_."]
+					#[doc = ""]
+					#[doc = "Parameters:"]
+					#[doc = "- `proxy`: The account that the `caller` would like to make a proxy."]
+					#[doc = "- `proxy_type`: The permissions allowed for this proxy account."]
+					#[doc = "- `delay`: The announcement period required of the initial proxy. Will generally be"]
+					#[doc = "zero."]
+					add_proxy {
+						delegate: ::subxt::utils::MultiAddress<::subxt::utils::AccountId32, ()>,
+						proxy_type: runtime_types::ulx_node_runtime::ProxyType,
+						delay: ::core::primitive::u32,
+					},
+					#[codec(index = 2)]
+					#[doc = "Unregister a proxy account for the sender."]
+					#[doc = ""]
+					#[doc = "The dispatch origin for this call must be _Signed_."]
+					#[doc = ""]
+					#[doc = "Parameters:"]
+					#[doc = "- `proxy`: The account that the `caller` would like to remove as a proxy."]
+					#[doc = "- `proxy_type`: The permissions currently enabled for the removed proxy account."]
+					remove_proxy {
+						delegate: ::subxt::utils::MultiAddress<::subxt::utils::AccountId32, ()>,
+						proxy_type: runtime_types::ulx_node_runtime::ProxyType,
+						delay: ::core::primitive::u32,
+					},
+					#[codec(index = 3)]
+					#[doc = "Unregister all proxy accounts for the sender."]
+					#[doc = ""]
+					#[doc = "The dispatch origin for this call must be _Signed_."]
+					#[doc = ""]
+					#[doc = "WARNING: This may be called on accounts created by `pure`, however if done, then"]
+					#[doc = "the unreserved fees will be inaccessible. **All access to this account will be lost.**"]
+					remove_proxies,
+					#[codec(index = 4)]
+					#[doc = "Spawn a fresh new account that is guaranteed to be otherwise inaccessible, and"]
+					#[doc = "initialize it with a proxy of `proxy_type` for `origin` sender."]
+					#[doc = ""]
+					#[doc = "Requires a `Signed` origin."]
+					#[doc = ""]
+					#[doc = "- `proxy_type`: The type of the proxy that the sender will be registered as over the"]
+					#[doc = "new account. This will almost always be the most permissive `ProxyType` possible to"]
+					#[doc = "allow for maximum flexibility."]
+					#[doc = "- `index`: A disambiguation index, in case this is called multiple times in the same"]
+					#[doc = "transaction (e.g. with `utility::batch`). Unless you're using `batch` you probably just"]
+					#[doc = "want to use `0`."]
+					#[doc = "- `delay`: The announcement period required of the initial proxy. Will generally be"]
+					#[doc = "zero."]
+					#[doc = ""]
+					#[doc = "Fails with `Duplicate` if this has already been called in this transaction, from the"]
+					#[doc = "same sender, with the same parameters."]
+					#[doc = ""]
+					#[doc = "Fails if there are insufficient funds to pay for deposit."]
+					create_pure {
+						proxy_type: runtime_types::ulx_node_runtime::ProxyType,
+						delay: ::core::primitive::u32,
+						index: ::core::primitive::u16,
+					},
+					#[codec(index = 5)]
+					#[doc = "Removes a previously spawned pure proxy."]
+					#[doc = ""]
+					#[doc = "WARNING: **All access to this account will be lost.** Any funds held in it will be"]
+					#[doc = "inaccessible."]
+					#[doc = ""]
+					#[doc = "Requires a `Signed` origin, and the sender account must have been created by a call to"]
+					#[doc = "`pure` with corresponding parameters."]
+					#[doc = ""]
+					#[doc = "- `spawner`: The account that originally called `pure` to create this account."]
+					#[doc = "- `index`: The disambiguation index originally passed to `pure`. Probably `0`."]
+					#[doc = "- `proxy_type`: The proxy type originally passed to `pure`."]
+					#[doc = "- `height`: The height of the chain when the call to `pure` was processed."]
+					#[doc = "- `ext_index`: The extrinsic index in which the call to `pure` was processed."]
+					#[doc = ""]
+					#[doc = "Fails with `NoPermission` in case the caller is not a previously created pure"]
+					#[doc = "account whose `pure` call has corresponding parameters."]
+					kill_pure {
+						spawner: ::subxt::utils::MultiAddress<::subxt::utils::AccountId32, ()>,
+						proxy_type: runtime_types::ulx_node_runtime::ProxyType,
+						index: ::core::primitive::u16,
+						#[codec(compact)]
+						height: ::core::primitive::u32,
+						#[codec(compact)]
+						ext_index: ::core::primitive::u32,
+					},
+					#[codec(index = 6)]
+					#[doc = "Publish the hash of a proxy-call that will be made in the future."]
+					#[doc = ""]
+					#[doc = "This must be called some number of blocks before the corresponding `proxy` is attempted"]
+					#[doc = "if the delay associated with the proxy relationship is greater than zero."]
+					#[doc = ""]
+					#[doc = "No more than `MaxPending` announcements may be made at any one time."]
+					#[doc = ""]
+					#[doc = "This will take a deposit of `AnnouncementDepositFactor` as well as"]
+					#[doc = "`AnnouncementDepositBase` if there are no other pending announcements."]
+					#[doc = ""]
+					#[doc = "The dispatch origin for this call must be _Signed_ and a proxy of `real`."]
+					#[doc = ""]
+					#[doc = "Parameters:"]
+					#[doc = "- `real`: The account that the proxy will make a call on behalf of."]
+					#[doc = "- `call_hash`: The hash of the call to be made by the `real` account."]
+					announce {
+						real: ::subxt::utils::MultiAddress<::subxt::utils::AccountId32, ()>,
+						call_hash: ::subxt::utils::H256,
+					},
+					#[codec(index = 7)]
+					#[doc = "Remove a given announcement."]
+					#[doc = ""]
+					#[doc = "May be called by a proxy account to remove a call they previously announced and return"]
+					#[doc = "the deposit."]
+					#[doc = ""]
+					#[doc = "The dispatch origin for this call must be _Signed_."]
+					#[doc = ""]
+					#[doc = "Parameters:"]
+					#[doc = "- `real`: The account that the proxy will make a call on behalf of."]
+					#[doc = "- `call_hash`: The hash of the call to be made by the `real` account."]
+					remove_announcement {
+						real: ::subxt::utils::MultiAddress<::subxt::utils::AccountId32, ()>,
+						call_hash: ::subxt::utils::H256,
+					},
+					#[codec(index = 8)]
+					#[doc = "Remove the given announcement of a delegate."]
+					#[doc = ""]
+					#[doc = "May be called by a target (proxied) account to remove a call that one of their delegates"]
+					#[doc = "(`delegate`) has announced they want to execute. The deposit is returned."]
+					#[doc = ""]
+					#[doc = "The dispatch origin for this call must be _Signed_."]
+					#[doc = ""]
+					#[doc = "Parameters:"]
+					#[doc = "- `delegate`: The account that previously announced the call."]
+					#[doc = "- `call_hash`: The hash of the call to be made."]
+					reject_announcement {
+						delegate: ::subxt::utils::MultiAddress<::subxt::utils::AccountId32, ()>,
+						call_hash: ::subxt::utils::H256,
+					},
+					#[codec(index = 9)]
+					#[doc = "Dispatch the given `call` from an account that the sender is authorized for through"]
+					#[doc = "`add_proxy`."]
+					#[doc = ""]
+					#[doc = "Removes any corresponding announcement(s)."]
+					#[doc = ""]
+					#[doc = "The dispatch origin for this call must be _Signed_."]
+					#[doc = ""]
+					#[doc = "Parameters:"]
+					#[doc = "- `real`: The account that the proxy will make a call on behalf of."]
+					#[doc = "- `force_proxy_type`: Specify the exact proxy type to be used and checked for this call."]
+					#[doc = "- `call`: The call to be made by the `real` account."]
+					proxy_announced {
+						delegate: ::subxt::utils::MultiAddress<::subxt::utils::AccountId32, ()>,
+						real: ::subxt::utils::MultiAddress<::subxt::utils::AccountId32, ()>,
+						force_proxy_type:
+							::core::option::Option<runtime_types::ulx_node_runtime::ProxyType>,
+						call: ::std::boxed::Box<runtime_types::ulx_node_runtime::RuntimeCall>,
+					},
+				}
+				#[derive(
+					:: subxt :: ext :: codec :: Decode,
+					:: subxt :: ext :: codec :: Encode,
+					:: subxt :: ext :: scale_decode :: DecodeAsType,
+					:: subxt :: ext :: scale_encode :: EncodeAsType,
+					Clone,
+					Debug,
+				)]
+				# [codec (crate = :: subxt :: ext :: codec)]
+				#[decode_as_type(crate_path = ":: subxt :: ext :: scale_decode")]
+				#[encode_as_type(crate_path = ":: subxt :: ext :: scale_encode")]
+				#[doc = "The `Error` enum of this pallet."]
+				pub enum Error {
+					#[codec(index = 0)]
+					#[doc = "There are too many proxies registered or too many announcements pending."]
+					TooMany,
+					#[codec(index = 1)]
+					#[doc = "Proxy registration not found."]
+					NotFound,
+					#[codec(index = 2)]
+					#[doc = "Sender is not a proxy of the account to be proxied."]
+					NotProxy,
+					#[codec(index = 3)]
+					#[doc = "A call which is incompatible with the proxy type's filter was attempted."]
+					Unproxyable,
+					#[codec(index = 4)]
+					#[doc = "Account is already a proxy."]
+					Duplicate,
+					#[codec(index = 5)]
+					#[doc = "Call may not be made by proxy because it may escalate its privileges."]
+					NoPermission,
+					#[codec(index = 6)]
+					#[doc = "Announcement, if made at all, was made too recently."]
+					Unannounced,
+					#[codec(index = 7)]
+					#[doc = "Cannot add self as proxy."]
+					NoSelfProxy,
+				}
+				#[derive(
+					:: subxt :: ext :: codec :: Decode,
+					:: subxt :: ext :: codec :: Encode,
+					:: subxt :: ext :: scale_decode :: DecodeAsType,
+					:: subxt :: ext :: scale_encode :: EncodeAsType,
+					Clone,
+					Debug,
+				)]
+				# [codec (crate = :: subxt :: ext :: codec)]
+				#[decode_as_type(crate_path = ":: subxt :: ext :: scale_decode")]
+				#[encode_as_type(crate_path = ":: subxt :: ext :: scale_encode")]
+				#[doc = "The `Event` enum of this pallet"]
+				pub enum Event {
+					#[codec(index = 0)]
+					#[doc = "A proxy was executed correctly, with the given."]
+					ProxyExecuted {
+						result:
+							::core::result::Result<(), runtime_types::sp_runtime::DispatchError>,
+					},
+					#[codec(index = 1)]
+					#[doc = "A pure account has been created by new proxy with given"]
+					#[doc = "disambiguation index and proxy type."]
+					PureCreated {
+						pure: ::subxt::utils::AccountId32,
+						who: ::subxt::utils::AccountId32,
+						proxy_type: runtime_types::ulx_node_runtime::ProxyType,
+						disambiguation_index: ::core::primitive::u16,
+					},
+					#[codec(index = 2)]
+					#[doc = "An announcement was placed to make a call in the future."]
+					Announced {
+						real: ::subxt::utils::AccountId32,
+						proxy: ::subxt::utils::AccountId32,
+						call_hash: ::subxt::utils::H256,
+					},
+					#[codec(index = 3)]
+					#[doc = "A proxy was added."]
+					ProxyAdded {
+						delegator: ::subxt::utils::AccountId32,
+						delegatee: ::subxt::utils::AccountId32,
+						proxy_type: runtime_types::ulx_node_runtime::ProxyType,
+						delay: ::core::primitive::u32,
+					},
+					#[codec(index = 4)]
+					#[doc = "A proxy was removed."]
+					ProxyRemoved {
+						delegator: ::subxt::utils::AccountId32,
+						delegatee: ::subxt::utils::AccountId32,
+						proxy_type: runtime_types::ulx_node_runtime::ProxyType,
+						delay: ::core::primitive::u32,
+					},
+				}
+			}
+			#[derive(
+				:: subxt :: ext :: codec :: Decode,
+				:: subxt :: ext :: codec :: Encode,
+				:: subxt :: ext :: scale_decode :: DecodeAsType,
+				:: subxt :: ext :: scale_encode :: EncodeAsType,
+				Clone,
+				Debug,
+			)]
+			# [codec (crate = :: subxt :: ext :: codec)]
+			#[decode_as_type(crate_path = ":: subxt :: ext :: scale_decode")]
+			#[encode_as_type(crate_path = ":: subxt :: ext :: scale_encode")]
+			pub struct Announcement<_0, _1, _2> {
+				pub real: _0,
+				pub call_hash: _1,
+				pub height: _2,
+			}
+			#[derive(
+				:: subxt :: ext :: codec :: Decode,
+				:: subxt :: ext :: codec :: Encode,
+				:: subxt :: ext :: scale_decode :: DecodeAsType,
+				:: subxt :: ext :: scale_encode :: EncodeAsType,
+				Clone,
+				Debug,
+			)]
+			# [codec (crate = :: subxt :: ext :: codec)]
+			#[decode_as_type(crate_path = ":: subxt :: ext :: scale_decode")]
+			#[encode_as_type(crate_path = ":: subxt :: ext :: scale_encode")]
+			pub struct ProxyDefinition<_0, _1, _2> {
+				pub delegate: _0,
+				pub proxy_type: _1,
+				pub delay: _2,
 			}
 		}
 		pub mod pallet_session {
@@ -16451,6 +19039,63 @@ pub mod api {
 						),
 					},
 				}
+			}
+		}
+		pub mod pallet_ulixee_mint {
+			use super::runtime_types;
+			pub mod pallet {
+				use super::runtime_types;
+				#[derive(
+					:: subxt :: ext :: codec :: Decode,
+					:: subxt :: ext :: codec :: Encode,
+					:: subxt :: ext :: scale_decode :: DecodeAsType,
+					:: subxt :: ext :: scale_encode :: EncodeAsType,
+					Clone,
+					Debug,
+				)]
+				# [codec (crate = :: subxt :: ext :: codec)]
+				#[decode_as_type(crate_path = ":: subxt :: ext :: scale_decode")]
+				#[encode_as_type(crate_path = ":: subxt :: ext :: scale_encode")]
+				#[doc = "Contains a variant per dispatchable extrinsic that this pallet has."]
+				pub enum Call {}
+				#[derive(
+					:: subxt :: ext :: codec :: Decode,
+					:: subxt :: ext :: codec :: Encode,
+					:: subxt :: ext :: scale_decode :: DecodeAsType,
+					:: subxt :: ext :: scale_encode :: EncodeAsType,
+					Clone,
+					Debug,
+				)]
+				# [codec (crate = :: subxt :: ext :: codec)]
+				#[decode_as_type(crate_path = ":: subxt :: ext :: scale_decode")]
+				#[encode_as_type(crate_path = ":: subxt :: ext :: scale_encode")]
+				#[doc = "The `Error` enum of this pallet."]
+				pub enum Error {}
+				#[derive(
+					:: subxt :: ext :: codec :: Decode,
+					:: subxt :: ext :: codec :: Encode,
+					:: subxt :: ext :: scale_decode :: DecodeAsType,
+					:: subxt :: ext :: scale_encode :: EncodeAsType,
+					Clone,
+					Debug,
+				)]
+				# [codec (crate = :: subxt :: ext :: codec)]
+				#[decode_as_type(crate_path = ":: subxt :: ext :: scale_decode")]
+				#[encode_as_type(crate_path = ":: subxt :: ext :: scale_encode")]
+				#[doc = "The `Event` enum of this pallet"]
+				pub enum Event {}
+				#[derive(
+					:: subxt :: ext :: codec :: Decode,
+					:: subxt :: ext :: codec :: Encode,
+					:: subxt :: ext :: scale_decode :: DecodeAsType,
+					:: subxt :: ext :: scale_encode :: EncodeAsType,
+					Clone,
+					Debug,
+				)]
+				# [codec (crate = :: subxt :: ext :: codec)]
+				#[decode_as_type(crate_path = ":: subxt :: ext :: scale_decode")]
+				#[encode_as_type(crate_path = ":: subxt :: ext :: scale_encode")]
+				pub enum HoldReason {}
 			}
 		}
 		pub mod primitive_types {
@@ -17670,6 +20315,25 @@ pub mod api {
 			# [codec (crate = :: subxt :: ext :: codec)]
 			#[decode_as_type(crate_path = ":: subxt :: ext :: scale_decode")]
 			#[encode_as_type(crate_path = ":: subxt :: ext :: scale_encode")]
+			pub enum ProxyType {
+				#[codec(index = 0)]
+				Any,
+				#[codec(index = 1)]
+				NonTransfer,
+				#[codec(index = 2)]
+				PriceIndex,
+			}
+			#[derive(
+				:: subxt :: ext :: codec :: Decode,
+				:: subxt :: ext :: codec :: Encode,
+				:: subxt :: ext :: scale_decode :: DecodeAsType,
+				:: subxt :: ext :: scale_encode :: EncodeAsType,
+				Clone,
+				Debug,
+			)]
+			# [codec (crate = :: subxt :: ext :: codec)]
+			#[decode_as_type(crate_path = ":: subxt :: ext :: scale_decode")]
+			#[encode_as_type(crate_path = ":: subxt :: ext :: scale_encode")]
 			pub struct Runtime;
 			#[derive(
 				:: subxt :: ext :: codec :: Decode,
@@ -17688,38 +20352,44 @@ pub mod api {
 				#[codec(index = 1)]
 				Timestamp(runtime_types::pallet_timestamp::pallet::Call),
 				#[codec(index = 2)]
-				Ticks(runtime_types::pallet_ticks::pallet::Call),
+				Proxy(runtime_types::pallet_proxy::pallet::Call),
 				#[codec(index = 3)]
-				MiningSlot(runtime_types::pallet_mining_slot::pallet::Call),
+				Ticks(runtime_types::pallet_ticks::pallet::Call),
 				#[codec(index = 4)]
-				Bond(runtime_types::pallet_bond::pallet::Call),
+				MiningSlot(runtime_types::pallet_mining_slot::pallet::Call),
 				#[codec(index = 5)]
-				Notaries(runtime_types::pallet_notaries::pallet::Call),
+				Bond(runtime_types::pallet_bond::pallet::Call),
 				#[codec(index = 6)]
-				Notebook(runtime_types::pallet_notebook::pallet::Call),
+				Notaries(runtime_types::pallet_notaries::pallet::Call),
 				#[codec(index = 7)]
-				ChainTransfer(runtime_types::pallet_chain_transfer::pallet::Call),
+				Notebook(runtime_types::pallet_notebook::pallet::Call),
 				#[codec(index = 8)]
-				BlockSealSpec(runtime_types::pallet_block_seal_spec::pallet::Call),
+				ChainTransfer(runtime_types::pallet_chain_transfer::pallet::Call),
 				#[codec(index = 9)]
+				BlockSealSpec(runtime_types::pallet_block_seal_spec::pallet::Call),
+				#[codec(index = 10)]
 				DataDomain(runtime_types::pallet_data_domain::pallet::Call),
-				#[codec(index = 12)]
-				Session(runtime_types::pallet_session::pallet::Call),
-				#[codec(index = 13)]
-				BlockSeal(runtime_types::pallet_block_seal::pallet::Call),
+				#[codec(index = 11)]
+				PriceIndex(runtime_types::pallet_price_index::pallet::Call),
 				#[codec(index = 14)]
-				BlockRewards(runtime_types::pallet_block_rewards::pallet::Call),
+				Session(runtime_types::pallet_session::pallet::Call),
 				#[codec(index = 15)]
-				Grandpa(runtime_types::pallet_grandpa::pallet::Call),
+				BlockSeal(runtime_types::pallet_block_seal::pallet::Call),
+				#[codec(index = 16)]
+				BlockRewards(runtime_types::pallet_block_rewards::pallet::Call),
 				#[codec(index = 17)]
-				ArgonBalances(runtime_types::pallet_balances::pallet::Call),
-				#[codec(index = 18)]
-				Mint(runtime_types::pallet_ulixee_mint::pallet::Call),
+				Grandpa(runtime_types::pallet_grandpa::pallet::Call),
 				#[codec(index = 19)]
-				UlixeeBalances(runtime_types::pallet_balances::pallet::Call2),
+				BitcoinMint(runtime_types::pallet_bitcoin_mint::pallet::Call),
 				#[codec(index = 20)]
-				TxPause(runtime_types::pallet_tx_pause::pallet::Call),
+				ArgonBalances(runtime_types::pallet_balances::pallet::Call),
+				#[codec(index = 21)]
+				UlixeeMint(runtime_types::pallet_ulixee_mint::pallet::Call),
 				#[codec(index = 22)]
+				UlixeeBalances(runtime_types::pallet_balances::pallet::Call2),
+				#[codec(index = 23)]
+				TxPause(runtime_types::pallet_tx_pause::pallet::Call),
+				#[codec(index = 25)]
 				Sudo(runtime_types::pallet_sudo::pallet::Call),
 			}
 			#[derive(
@@ -17737,38 +20407,44 @@ pub mod api {
 				#[codec(index = 0)]
 				System(runtime_types::frame_system::pallet::Error),
 				#[codec(index = 2)]
-				Ticks(runtime_types::pallet_ticks::pallet::Error),
+				Proxy(runtime_types::pallet_proxy::pallet::Error),
 				#[codec(index = 3)]
-				MiningSlot(runtime_types::pallet_mining_slot::pallet::Error),
+				Ticks(runtime_types::pallet_ticks::pallet::Error),
 				#[codec(index = 4)]
-				Bond(runtime_types::pallet_bond::pallet::Error),
+				MiningSlot(runtime_types::pallet_mining_slot::pallet::Error),
 				#[codec(index = 5)]
-				Notaries(runtime_types::pallet_notaries::pallet::Error),
+				Bond(runtime_types::pallet_bond::pallet::Error),
 				#[codec(index = 6)]
-				Notebook(runtime_types::pallet_notebook::pallet::Error),
+				Notaries(runtime_types::pallet_notaries::pallet::Error),
 				#[codec(index = 7)]
-				ChainTransfer(runtime_types::pallet_chain_transfer::pallet::Error),
+				Notebook(runtime_types::pallet_notebook::pallet::Error),
 				#[codec(index = 8)]
-				BlockSealSpec(runtime_types::pallet_block_seal_spec::pallet::Error),
+				ChainTransfer(runtime_types::pallet_chain_transfer::pallet::Error),
 				#[codec(index = 9)]
+				BlockSealSpec(runtime_types::pallet_block_seal_spec::pallet::Error),
+				#[codec(index = 10)]
 				DataDomain(runtime_types::pallet_data_domain::pallet::Error),
-				#[codec(index = 12)]
-				Session(runtime_types::pallet_session::pallet::Error),
-				#[codec(index = 13)]
-				BlockSeal(runtime_types::pallet_block_seal::pallet::Error),
+				#[codec(index = 11)]
+				PriceIndex(runtime_types::pallet_price_index::pallet::Error),
 				#[codec(index = 14)]
-				BlockRewards(runtime_types::pallet_block_rewards::pallet::Error),
+				Session(runtime_types::pallet_session::pallet::Error),
 				#[codec(index = 15)]
-				Grandpa(runtime_types::pallet_grandpa::pallet::Error),
+				BlockSeal(runtime_types::pallet_block_seal::pallet::Error),
+				#[codec(index = 16)]
+				BlockRewards(runtime_types::pallet_block_rewards::pallet::Error),
 				#[codec(index = 17)]
-				ArgonBalances(runtime_types::pallet_balances::pallet::Error),
-				#[codec(index = 18)]
-				Mint(runtime_types::pallet_ulixee_mint::pallet::Error),
+				Grandpa(runtime_types::pallet_grandpa::pallet::Error),
 				#[codec(index = 19)]
-				UlixeeBalances(runtime_types::pallet_balances::pallet::Error2),
+				BitcoinMint(runtime_types::pallet_bitcoin_mint::pallet::Error),
 				#[codec(index = 20)]
-				TxPause(runtime_types::pallet_tx_pause::pallet::Error),
+				ArgonBalances(runtime_types::pallet_balances::pallet::Error),
+				#[codec(index = 21)]
+				UlixeeMint(runtime_types::pallet_ulixee_mint::pallet::Error),
 				#[codec(index = 22)]
+				UlixeeBalances(runtime_types::pallet_balances::pallet::Error2),
+				#[codec(index = 23)]
+				TxPause(runtime_types::pallet_tx_pause::pallet::Error),
+				#[codec(index = 25)]
 				Sudo(runtime_types::pallet_sudo::pallet::Error),
 			}
 			#[derive(
@@ -17785,39 +20461,45 @@ pub mod api {
 			pub enum RuntimeEvent {
 				#[codec(index = 0)]
 				System(runtime_types::frame_system::pallet::Event),
-				#[codec(index = 3)]
-				MiningSlot(runtime_types::pallet_mining_slot::pallet::Event),
+				#[codec(index = 2)]
+				Proxy(runtime_types::pallet_proxy::pallet::Event),
 				#[codec(index = 4)]
-				Bond(runtime_types::pallet_bond::pallet::Event),
+				MiningSlot(runtime_types::pallet_mining_slot::pallet::Event),
 				#[codec(index = 5)]
-				Notaries(runtime_types::pallet_notaries::pallet::Event),
+				Bond(runtime_types::pallet_bond::pallet::Event),
 				#[codec(index = 6)]
-				Notebook(runtime_types::pallet_notebook::pallet::Event),
+				Notaries(runtime_types::pallet_notaries::pallet::Event),
 				#[codec(index = 7)]
-				ChainTransfer(runtime_types::pallet_chain_transfer::pallet::Event),
+				Notebook(runtime_types::pallet_notebook::pallet::Event),
 				#[codec(index = 8)]
-				BlockSealSpec(runtime_types::pallet_block_seal_spec::pallet::Event),
+				ChainTransfer(runtime_types::pallet_chain_transfer::pallet::Event),
 				#[codec(index = 9)]
+				BlockSealSpec(runtime_types::pallet_block_seal_spec::pallet::Event),
+				#[codec(index = 10)]
 				DataDomain(runtime_types::pallet_data_domain::pallet::Event),
-				#[codec(index = 12)]
-				Session(runtime_types::pallet_session::pallet::Event),
+				#[codec(index = 11)]
+				PriceIndex(runtime_types::pallet_price_index::pallet::Event),
 				#[codec(index = 14)]
-				BlockRewards(runtime_types::pallet_block_rewards::pallet::Event),
-				#[codec(index = 15)]
-				Grandpa(runtime_types::pallet_grandpa::pallet::Event),
+				Session(runtime_types::pallet_session::pallet::Event),
 				#[codec(index = 16)]
-				Offences(runtime_types::pallet_offences::pallet::Event),
+				BlockRewards(runtime_types::pallet_block_rewards::pallet::Event),
 				#[codec(index = 17)]
-				ArgonBalances(runtime_types::pallet_balances::pallet::Event),
+				Grandpa(runtime_types::pallet_grandpa::pallet::Event),
 				#[codec(index = 18)]
-				Mint(runtime_types::pallet_ulixee_mint::pallet::Event),
+				Offences(runtime_types::pallet_offences::pallet::Event),
 				#[codec(index = 19)]
-				UlixeeBalances(runtime_types::pallet_balances::pallet::Event2),
+				BitcoinMint(runtime_types::pallet_bitcoin_mint::pallet::Event),
 				#[codec(index = 20)]
-				TxPause(runtime_types::pallet_tx_pause::pallet::Event),
+				ArgonBalances(runtime_types::pallet_balances::pallet::Event),
 				#[codec(index = 21)]
-				TransactionPayment(runtime_types::pallet_transaction_payment::pallet::Event),
+				UlixeeMint(runtime_types::pallet_ulixee_mint::pallet::Event),
 				#[codec(index = 22)]
+				UlixeeBalances(runtime_types::pallet_balances::pallet::Event2),
+				#[codec(index = 23)]
+				TxPause(runtime_types::pallet_tx_pause::pallet::Event),
+				#[codec(index = 24)]
+				TransactionPayment(runtime_types::pallet_transaction_payment::pallet::Event),
+				#[codec(index = 25)]
 				Sudo(runtime_types::pallet_sudo::pallet::Event),
 			}
 			#[derive(
@@ -17832,7 +20514,7 @@ pub mod api {
 			#[decode_as_type(crate_path = ":: subxt :: ext :: scale_decode")]
 			#[encode_as_type(crate_path = ":: subxt :: ext :: scale_encode")]
 			pub enum RuntimeFreezeReason {
-				#[codec(index = 14)]
+				#[codec(index = 16)]
 				BlockRewards(runtime_types::pallet_block_rewards::pallet::FreezeReason),
 			}
 			#[derive(
@@ -17847,14 +20529,16 @@ pub mod api {
 			#[decode_as_type(crate_path = ":: subxt :: ext :: scale_decode")]
 			#[encode_as_type(crate_path = ":: subxt :: ext :: scale_encode")]
 			pub enum RuntimeHoldReason {
-				#[codec(index = 3)]
-				MiningSlot(runtime_types::pallet_mining_slot::pallet::HoldReason),
 				#[codec(index = 4)]
+				MiningSlot(runtime_types::pallet_mining_slot::pallet::HoldReason),
+				#[codec(index = 5)]
 				Bond(runtime_types::pallet_bond::pallet::HoldReason),
-				#[codec(index = 14)]
+				#[codec(index = 16)]
 				BlockRewards(runtime_types::pallet_block_rewards::pallet::HoldReason),
-				#[codec(index = 18)]
-				Mint(runtime_types::pallet_ulixee_mint::pallet::HoldReason),
+				#[codec(index = 19)]
+				BitcoinMint(runtime_types::pallet_bitcoin_mint::pallet::HoldReason),
+				#[codec(index = 21)]
+				UlixeeMint(runtime_types::pallet_ulixee_mint::pallet::HoldReason),
 			}
 		}
 		pub mod ulx_notary_audit {
@@ -18181,6 +20865,48 @@ pub mod api {
 					pub leaf_index: ::core::primitive::u32,
 				}
 			}
+			pub mod bitcoin {
+				use super::runtime_types;
+				#[derive(
+					:: subxt :: ext :: codec :: Decode,
+					:: subxt :: ext :: codec :: Encode,
+					:: subxt :: ext :: scale_decode :: DecodeAsType,
+					:: subxt :: ext :: scale_encode :: EncodeAsType,
+					Clone,
+					Debug,
+				)]
+				# [codec (crate = :: subxt :: ext :: codec)]
+				#[decode_as_type(crate_path = ":: subxt :: ext :: scale_decode")]
+				#[encode_as_type(crate_path = ":: subxt :: ext :: scale_encode")]
+				pub struct BitcoinUtxoId {
+					pub txid: runtime_types::ulx_primitives::bitcoin::H256Le,
+					pub output_index: ::core::primitive::u32,
+				}
+				#[derive(
+					:: subxt :: ext :: codec :: Decode,
+					:: subxt :: ext :: codec :: Encode,
+					:: subxt :: ext :: scale_decode :: DecodeAsType,
+					:: subxt :: ext :: scale_encode :: EncodeAsType,
+					Clone,
+					Debug,
+				)]
+				# [codec (crate = :: subxt :: ext :: codec)]
+				#[decode_as_type(crate_path = ":: subxt :: ext :: scale_decode")]
+				#[encode_as_type(crate_path = ":: subxt :: ext :: scale_encode")]
+				pub struct CompressedPublicKey(pub [::core::primitive::u8; 33usize]);
+				#[derive(
+					:: subxt :: ext :: codec :: Decode,
+					:: subxt :: ext :: codec :: Encode,
+					:: subxt :: ext :: scale_decode :: DecodeAsType,
+					:: subxt :: ext :: scale_encode :: EncodeAsType,
+					Clone,
+					Debug,
+				)]
+				# [codec (crate = :: subxt :: ext :: codec)]
+				#[decode_as_type(crate_path = ":: subxt :: ext :: scale_decode")]
+				#[encode_as_type(crate_path = ":: subxt :: ext :: scale_encode")]
+				pub struct H256Le(pub [::core::primitive::u8; 32usize]);
+			}
 			pub mod block_seal {
 				use super::runtime_types;
 				pub mod app {
@@ -18209,6 +20935,22 @@ pub mod api {
 					#[decode_as_type(crate_path = ":: subxt :: ext :: scale_decode")]
 					#[encode_as_type(crate_path = ":: subxt :: ext :: scale_encode")]
 					pub struct Signature(pub [::core::primitive::u8; 64usize]);
+				}
+				#[derive(
+					:: subxt :: ext :: codec :: Decode,
+					:: subxt :: ext :: codec :: Encode,
+					:: subxt :: ext :: scale_decode :: DecodeAsType,
+					:: subxt :: ext :: scale_encode :: EncodeAsType,
+					Clone,
+					Debug,
+				)]
+				# [codec (crate = :: subxt :: ext :: codec)]
+				#[decode_as_type(crate_path = ":: subxt :: ext :: scale_decode")]
+				#[encode_as_type(crate_path = ":: subxt :: ext :: scale_encode")]
+				pub struct BlockPayout<_0, _1> {
+					pub account_id: _0,
+					pub ulixees: _1,
+					pub argons: _1,
 				}
 				#[derive(
 					:: subxt :: ext :: codec :: Decode,
@@ -18517,6 +21259,27 @@ pub mod api {
 			}
 			pub mod inherents {
 				use super::runtime_types;
+				#[derive(
+					:: subxt :: ext :: codec :: Decode,
+					:: subxt :: ext :: codec :: Encode,
+					:: subxt :: ext :: scale_decode :: DecodeAsType,
+					:: subxt :: ext :: scale_encode :: EncodeAsType,
+					Clone,
+					Debug,
+				)]
+				# [codec (crate = :: subxt :: ext :: codec)]
+				#[decode_as_type(crate_path = ":: subxt :: ext :: scale_decode")]
+				#[encode_as_type(crate_path = ":: subxt :: ext :: scale_encode")]
+				pub struct BitcoinUtxoSync {
+					pub moved: runtime_types::bounded_collections::bounded_vec::BoundedVec<
+						runtime_types::ulx_primitives::bitcoin::BitcoinUtxoId,
+					>,
+					pub confirmed: runtime_types::bounded_collections::bounded_vec::BoundedVec<
+						runtime_types::ulx_primitives::bitcoin::BitcoinUtxoId,
+					>,
+					pub block_hash: runtime_types::ulx_primitives::bitcoin::H256Le,
+					pub block_height: ::core::primitive::u32,
+				}
 				#[derive(
 					:: subxt :: ext :: codec :: Decode,
 					:: subxt :: ext :: codec :: Encode,

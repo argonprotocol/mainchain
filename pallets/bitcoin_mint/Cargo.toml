@@ -1,5 +1,5 @@
 [package]
-name = "pallet-mint"
+name = "pallet-bitcoin-mint"
 version.workspace = true
 authors.workspace = true
 edition.workspace = true
@@ -25,13 +25,15 @@ sp-runtime = { workspace = true }
 sp-core = { workspace = true }
 sp-std = { workspace = true }
 sp-api = { workspace = true }
-pallet-balances = { workspace = true }
 
 ulx-primitives = { workspace = true }
 
 [dev-dependencies]
 sp-io = { workspace = true }
 env_logger = { workspace = true }
+pallet-balances = { workspace = true }
+pallet-bond = { workspace = true }
+
 
 [features]
 default = [ "std" ]
@@ -41,7 +43,6 @@ std = [
 	"frame-support/std",
 	"frame-system/std",
 	"log/std",
-	"pallet-balances/std",
 	"scale-info/std",
 	"sp-api/std",
 	"sp-core/std",
@@ -54,12 +55,10 @@ runtime-benchmarks = [
 	"frame-benchmarking/runtime-benchmarks",
 	"frame-support/runtime-benchmarks",
 	"frame-system/runtime-benchmarks",
-	"pallet-balances/runtime-benchmarks",
 	"sp-runtime/runtime-benchmarks",
 ]
 try-runtime = [
 	"frame-support/try-runtime",
 	"frame-system/try-runtime",
-	"pallet-balances/try-runtime",
 	"sp-runtime/try-runtime",
 ]

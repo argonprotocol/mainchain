@@ -46,6 +46,11 @@ pub trait BondProvider {
 
 	/// Free the bond to be used for other things (or extended)
 	fn unlock_bond(bond_id: Self::BondId) -> Result<(), BondError>;
+	/// Take the bond funds and burn them
+	fn burn_bond(
+		bond_id: Self::BondId,
+		updated_price: Option<Self::Balance>,
+	) -> Result<(), BondError>;
 }
 
 #[derive(Clone, PartialEq, Eq, Encode, Decode, RuntimeDebug, TypeInfo, PalletError)]

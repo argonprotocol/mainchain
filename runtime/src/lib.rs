@@ -7,6 +7,7 @@ extern crate alloc;
 #[macro_use]
 extern crate frame_benchmarking;
 
+use codec::{Decode, Encode, MaxEncodedLen};
 pub use frame_support::{
 	construct_runtime, parameter_types,
 	traits::{
@@ -28,16 +29,22 @@ use frame_support::{
 	PalletId,
 };
 // Configure FRAME pallets to include in runtime.
-use frame_support::traits::Everything;
+use frame_support::{
+	traits::{Everything, InstanceFilter},
+	weights::{WeightToFeeCoefficient, WeightToFeeCoefficients},
+};
 pub use frame_system::Call as SystemCall;
 use frame_system::EnsureRoot;
 use pallet_session::historical as pallet_session_historical;
 pub use pallet_timestamp::Call as TimestampCall;
 use pallet_transaction_payment::{ConstFeeMultiplier, CurrencyAdapter, Multiplier};
 use pallet_tx_pause::RuntimeCallNameOf;
+use scale_info::TypeInfo;
+use smallvec::smallvec;
 use sp_api::impl_runtime_apis;
 use sp_consensus_grandpa::AuthorityId as GrandpaId;
 use sp_core::{crypto::KeyTypeId, OpaqueMetadata, H256, U256};
+use sp_debug_derive::RuntimeDebug;
 #[cfg(any(feature = "std", test))]
 pub use sp_runtime::BuildStorage;
 use sp_runtime::{
@@ -52,6 +59,7 @@ use sp_std::{collections::btree_map::BTreeMap, prelude::*, vec::Vec};
 use sp_version::NativeVersion;
 use sp_version::RuntimeVersion;
 
+pub use currency::*;
 pub use pallet_notebook::NotebookVerifyError;
 use ulx_primitives::{
 	block_seal::MiningAuthority,
@@ -62,8 +70,9 @@ use ulx_primitives::{
 	notebook::NotebookNumber,
 	prod_or_fast,
 	tick::{Tick, Ticker, TICK_MILLIS},
-	BlockSealAuthorityId, BondFundId, BondId, NotaryNotebookVotes, NotebookAuditResult,
-	NotebookAuditSummary, TickProvider, ESCROW_CLAWBACK_TICKS, ESCROW_EXPIRATION_TICKS,
+	ArgonPriceProvider, BlockSealAuthorityId, BondFundId, BondId, NotaryNotebookVotes,
+	NotebookAuditResult, NotebookAuditSummary, TickProvider, ESCROW_CLAWBACK_TICKS,
+	ESCROW_EXPIRATION_TICKS,
 };
 pub use ulx_primitives::{
 	AccountId, Balance, BlockHash, BlockNumber, HashOutput, Moment, Nonce, Signature,
@@ -71,9 +80,6 @@ pub use ulx_primitives::{
 
 use crate::opaque::SessionKeys;
 // A few exports that help ease life for downstream crates.
-use crate::wage_protector::WageProtectorFee;
-
-pub mod wage_protector;
 
 // Make the WASM binary available.
 #[cfg(feature = "std")]
@@ -102,6 +108,23 @@ pub mod opaque {
 			pub grandpa: Grandpa,
 			pub block_seal_authority: MiningSlot,
 		}
+	}
+}
+
+/// Money matters.
+pub mod currency {
+	use ulx_primitives::Balance;
+
+	/// The existential deposit.
+	pub const EXISTENTIAL_DEPOSIT: Balance = 500;
+
+	pub const UNITS: Balance = 1_000;
+	pub const CENTS: Balance = UNITS / 100;
+	pub const MILLICENTS: Balance = CENTS / 1_000;
+	pub const GRAND: Balance = CENTS * 100_000;
+
+	pub const fn deposit(items: u32, bytes: u32) -> Balance {
+		items as Balance * 100 * CENTS + (bytes as Balance) * 5 * MILLICENTS
 	}
 }
 
@@ -246,6 +269,7 @@ impl pallet_block_rewards::Config for Runtime {
 	type MinerPayoutPercent = MinerPayoutPercent;
 	type MaturationBlocks = MaturationBlocks;
 	type RuntimeFreezeReason = RuntimeFreezeReason;
+	type EventHandler = UlixeeMint;
 }
 
 impl pallet_data_domain::Config for Runtime {
@@ -409,6 +433,7 @@ impl pallet_chain_transfer::Config for Runtime {
 	type TransferExpirationBlocks = TransferExpirationBlocks;
 	type MaxPendingTransfersOutPerBlock = MaxPendingTransfersOutPerBlock;
 	type NotebookProvider = Notebook;
+	type EventHandler = (UlixeeMint, BitcoinMint);
 }
 
 impl pallet_notebook::Config for Runtime {
@@ -443,9 +468,6 @@ impl pallet_notaries::Config for Runtime {
 	type MaxBlocksForKeyHistory = MaxBlocksForKeyHistory;
 	type MaxNotaryHosts = MaxNotaryHosts;
 }
-
-/// Existential deposit.
-pub const EXISTENTIAL_DEPOSIT: u128 = 500;
 
 pub struct Author;
 impl OnUnbalanced<NegativeImbalance> for Author {
@@ -489,13 +511,123 @@ impl pallet_balances::Config<ArgonToken> for Runtime {
 	type RuntimeFreezeReason = RuntimeFreezeReason;
 }
 
-impl pallet_mint::Config for Runtime {
+parameter_types! {
+	// One storage item; key size 32, value size 8; .
+	pub const ProxyDepositBase: Balance = deposit(1, 40);
+	// Additional storage item size of 33 bytes.
+	pub const ProxyDepositFactor: Balance = deposit(0, 33);
+	// One storage item; key size 32, value size 16
+	pub const AnnouncementDepositBase: Balance = deposit(1, 48);
+	pub const AnnouncementDepositFactor: Balance = deposit(0, 66);
+	pub const MaxProxies: u16 = 32;
+	pub const MaxPending: u16 = 32;
+}
+
+/// The type used to represent the kinds of proxying allowed.
+#[derive(
+	Copy,
+	Clone,
+	Eq,
+	PartialEq,
+	Ord,
+	PartialOrd,
+	TypeInfo,
+	Encode,
+	Decode,
+	RuntimeDebug,
+	MaxEncodedLen,
+)]
+pub enum ProxyType {
+	Any,
+	NonTransfer,
+	PriceIndex,
+}
+impl Default for ProxyType {
+	fn default() -> Self {
+		Self::Any
+	}
+}
+impl InstanceFilter<RuntimeCall> for ProxyType {
+	fn filter(&self, c: &RuntimeCall) -> bool {
+		match self {
+			ProxyType::Any => true,
+			ProxyType::NonTransfer =>
+				!matches!(c, RuntimeCall::ArgonBalances(..) | RuntimeCall::UlixeeBalances(..)),
+			ProxyType::PriceIndex => matches!(c, RuntimeCall::PriceIndex(..)),
+		}
+	}
+	fn is_superset(&self, o: &Self) -> bool {
+		match (self, o) {
+			(x, y) if x == y => true,
+			(ProxyType::Any, _) => true,
+			(_, ProxyType::Any) => false,
+			(ProxyType::NonTransfer, _) => true,
+			_ => false,
+		}
+	}
+}
+
+impl pallet_proxy::Config for Runtime {
 	type RuntimeEvent = RuntimeEvent;
-	type WeightInfo = pallet_mint::weights::SubstrateWeight<Runtime>;
+	type RuntimeCall = RuntimeCall;
+	type Currency = ArgonBalances;
+	type ProxyType = ProxyType;
+	type ProxyDepositBase = ProxyDepositBase;
+	type ProxyDepositFactor = ProxyDepositFactor;
+	type MaxProxies = MaxProxies;
+	type WeightInfo = pallet_proxy::weights::SubstrateWeight<Runtime>;
+	type MaxPending = MaxPending;
+	type CallHasher = BlakeTwo256;
+	type AnnouncementDepositBase = AnnouncementDepositBase;
+	type AnnouncementDepositFactor = AnnouncementDepositFactor;
+}
+
+parameter_types! {
+	pub const BitcoinBondDuration: u32 = 60 * 24 * 365; // 1 year
+	pub const MinBitcoinSatoshiAmount: u64 = 100_000_000; // 1 bitcoin minimum
+	pub const MaxPendingMintUtxos: u32 = 10_000;
+	pub const MaxTrackedUtxos: u32 = 18_000_000;
+
+	pub const MaxDowntimeBeforeReset: Moment = 60 * 60 * 1000; // 1 hour
+	pub const MaxHistoryToKeep: u32 = 24 * 60; // 1 day worth of prices
+	pub const OldestHistoryToKeep: Moment = 24 * 60 * 60 * 1000; // 1 day
+}
+
+impl pallet_price_index::Config for Runtime {
+	type RuntimeEvent = RuntimeEvent;
+	type Time = Timestamp;
+	type WeightInfo = pallet_price_index::weights::SubstrateWeight<Runtime>;
+	type Balance = Balance;
+	type MaxDowntimeBeforeReset = MaxDowntimeBeforeReset;
+	type MaxHistoryToKeep = MaxHistoryToKeep;
+	type OldestHistoryToKeep = OldestHistoryToKeep;
+}
+
+impl pallet_bitcoin_mint::Config for Runtime {
+	type RuntimeEvent = RuntimeEvent;
+	type WeightInfo = pallet_bitcoin_mint::weights::SubstrateWeight<Runtime>;
+	type Currency = ArgonBalances;
+	type Balance = Balance;
+	type UlixeeMintCirculation = UlixeeMint;
+	type RuntimeHoldReason = RuntimeHoldReason;
+	type BondProvider = Bond;
+	type BondId = BondId;
+	type BitcoinPriceProvider = PriceIndex;
+	type BondDurationBlocks = BitcoinBondDuration;
+	type MinimumSatoshiAmount = MinBitcoinSatoshiAmount;
+	type ArgonPriceProvider = PriceIndex;
+	type MaxPendingMintUtxos = MaxPendingMintUtxos;
+	type MaxTrackedUtxos = MaxTrackedUtxos;
+}
+
+impl pallet_ulixee_mint::Config for Runtime {
+	type RuntimeEvent = RuntimeEvent;
+	type WeightInfo = pallet_ulixee_mint::weights::SubstrateWeight<Runtime>;
 	type Currency = ArgonBalances;
 	type RuntimeHoldReason = RuntimeHoldReason;
 	type Balance = Balance;
 	type UlixeeTokenStorage = pallet_balances::Account<Runtime, UlixeeToken>;
+	type BitcoinMintCirculation = BitcoinMint;
 }
 
 type UlixeeToken = pallet_balances::Instance2;
@@ -510,7 +642,7 @@ impl pallet_balances::Config<UlixeeToken> for Runtime {
 	type DustRemoval = ();
 	type ExistentialDeposit = ConstU128<EXISTENTIAL_DEPOSIT>;
 	/// redirect through mint
-	type AccountStore = Mint;
+	type AccountStore = UlixeeMint;
 	type WeightInfo = pallet_balances::weights::SubstrateWeight<Runtime>;
 	type FreezeIdentifier = RuntimeFreezeReason;
 	type MaxFreezes = ConstU32<2>;
@@ -520,6 +652,28 @@ impl pallet_balances::Config<UlixeeToken> for Runtime {
 
 parameter_types! {
 	pub FeeMultiplier: Multiplier = Multiplier::one();
+}
+
+pub struct WageProtectorFee;
+
+impl WeightToFeePolynomial for WageProtectorFee {
+	type Balance = Balance;
+
+	fn polynomial() -> WeightToFeeCoefficients<Self::Balance> {
+		let cpi = PriceIndex::get_argon_cpi_price().unwrap_or(0);
+		let mut p = 1_000; // milligons
+		if cpi > 0 {
+			let adjustment = (p * (cpi as u128) * 1_000).checked_div(1_000).unwrap_or_default();
+			p += adjustment;
+		}
+		let q = 10 * Self::Balance::from(ExtrinsicBaseWeight::get().ref_time());
+		smallvec![WeightToFeeCoefficient::<Self::Balance> {
+			degree: 1,
+			negative: false,
+			coeff_frac: Perbill::from_rational(p % q, q),
+			coeff_integer: p / q,
+		}]
+	}
 }
 
 impl pallet_transaction_payment::Config for Runtime {
@@ -542,6 +696,7 @@ construct_runtime!(
 	pub struct Runtime {
 		System: frame_system,
 		Timestamp: pallet_timestamp,
+		Proxy: pallet_proxy,
 		Ticks: pallet_ticks,
 		MiningSlot: pallet_mining_slot,
 		Bond: pallet_bond,
@@ -550,6 +705,7 @@ construct_runtime!(
 		ChainTransfer: pallet_chain_transfer,
 		BlockSealSpec: pallet_block_seal_spec,
 		DataDomain: pallet_data_domain,
+		PriceIndex: pallet_price_index,
 		// Authorship must be before session
 		Authorship: pallet_authorship,
 		Historical: pallet_session_historical,
@@ -559,8 +715,9 @@ construct_runtime!(
 		BlockRewards: pallet_block_rewards,
 		Grandpa: pallet_grandpa,
 		Offences: pallet_offences,
+		BitcoinMint: pallet_bitcoin_mint,
 		ArgonBalances: pallet_balances::<Instance1>::{Pallet, Call, Storage, Config<T>, Event<T>},
-		Mint: pallet_mint,
+		UlixeeMint: pallet_ulixee_mint,
 		UlixeeBalances: pallet_balances::<Instance2>::{Pallet, Call, Storage, Config<T>, Event<T>},
 		TxPause: pallet_tx_pause,
 		TransactionPayment: pallet_transaction_payment,
@@ -935,7 +1092,8 @@ mod benches {
 		[pallet_block_rewards, BlockRewards]
 		[pallet_mining_slot, MiningSlot]
 		[pallet_bond, Bond]
-		[pallet_mint, Mint]
+		[pallet_bitcoin_mint, BitcoinMint]
+		[pallet_ulixee_mint, UlixeeMint]
 		[pallet_session, Session]
 		[pallet_block_seal, BlockSeal]
 		[pallet_authorship, Authorship]

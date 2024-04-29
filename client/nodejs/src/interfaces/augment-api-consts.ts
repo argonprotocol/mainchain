@@ -16,12 +16,12 @@ declare module '@polkadot/api-base/types/consts' {
     argonBalances: {
       /**
        * The minimum amount required to keep an account open. MUST BE GREATER THAN ZERO!
-       * 
+       *
        * If you *really* need it to be zero, you can enable the feature `insecure_zero_ed` for
        * this pallet. However, you do so at your own risk: this will open up a major DoS vector.
        * In case you have multiple sources of provider references, you may also get unexpected
        * behaviour if you set this to zero.
-       * 
+       *
        * Bottom line: Do yourself a favour and make it at least one!
        **/
       existentialDeposit: u128 & AugmentedConst<ApiType>;
@@ -32,16 +32,34 @@ declare module '@polkadot/api-base/types/consts' {
       /**
        * The maximum number of locks that should exist on an account.
        * Not strictly enforced, but used for weight estimation.
-       * 
+       *
        * Use of locks is deprecated in favour of freezes. See `https://github.com/paritytech/substrate/pull/12951/`
        **/
       maxLocks: u32 & AugmentedConst<ApiType>;
       /**
        * The maximum number of named reserves that can exist on an account.
-       * 
+       *
        * Use of reserves is deprecated in favour of holds. See `https://github.com/paritytech/substrate/pull/12951/`
        **/
       maxReserves: u32 & AugmentedConst<ApiType>;
+    };
+    bitcoinMint: {
+      /**
+       * The required bond duration for a Bitcoin submission
+       **/
+      bondDurationBlocks: u32 & AugmentedConst<ApiType>;
+      /**
+       * The maximum number of UTXOs that can be waiting for minting
+       **/
+      maxPendingMintUtxos: u32 & AugmentedConst<ApiType>;
+      /**
+       * The maximum number of UTXOs that can be tracked at a given time
+       **/
+      maxTrackedUtxos: u32 & AugmentedConst<ApiType>;
+      /**
+       * The minimum number of satoshis that can be submitted in a single transaction
+       **/
+      minimumSatoshiAmount: u64 & AugmentedConst<ApiType>;
     };
     blockRewards: {
       /**
@@ -121,7 +139,7 @@ declare module '@polkadot/api-base/types/consts' {
       maxNominators: u32 & AugmentedConst<ApiType>;
       /**
        * The maximum number of entries to keep in the set id to session index mapping.
-       * 
+       *
        * Since the `SetIdSession` map is only used for validating equivocations this
        * value should relate to the bonding duration of whatever staking system is
        * being used (if any). If equivocation handling is not enabled then this value
@@ -179,6 +197,59 @@ declare module '@polkadot/api-base/types/consts' {
        **/
       metaChangesBlockDelay: u32 & AugmentedConst<ApiType>;
     };
+    priceIndex: {
+      /**
+       * The maximum number of oracle operators that can be authorized
+       **/
+      maxDowntimeBeforeReset: u64 & AugmentedConst<ApiType>;
+      /**
+       * Max entries to keep in history
+       **/
+      maxHistoryToKeep: u32 & AugmentedConst<ApiType>;
+      /**
+       * Oldest history entries to keep
+       **/
+      oldestHistoryToKeep: u64 & AugmentedConst<ApiType>;
+    };
+    proxy: {
+      /**
+       * The base amount of currency needed to reserve for creating an announcement.
+       *
+       * This is held when a new storage item holding a `Balance` is created (typically 16
+       * bytes).
+       **/
+      announcementDepositBase: u128 & AugmentedConst<ApiType>;
+      /**
+       * The amount of currency needed per announcement made.
+       *
+       * This is held for adding an `AccountId`, `Hash` and `BlockNumber` (typically 68 bytes)
+       * into a pre-existing storage value.
+       **/
+      announcementDepositFactor: u128 & AugmentedConst<ApiType>;
+      /**
+       * The maximum amount of time-delayed announcements that are allowed to be pending.
+       **/
+      maxPending: u32 & AugmentedConst<ApiType>;
+      /**
+       * The maximum amount of proxies allowed for a single account.
+       **/
+      maxProxies: u32 & AugmentedConst<ApiType>;
+      /**
+       * The base amount of currency needed to reserve for creating a proxy.
+       *
+       * This is held for an additional storage item whose value size is
+       * `sizeof(Balance)` bytes and whose key size is `sizeof(AccountId)` bytes.
+       **/
+      proxyDepositBase: u128 & AugmentedConst<ApiType>;
+      /**
+       * The amount of currency needed per proxy added.
+       *
+       * This is held for adding 32 bytes plus an instance of `ProxyType` more into a
+       * pre-existing storage value. Thus, when configuring `ProxyDepositFactor` one should take
+       * into account `32 + proxy_type.encode().len()` bytes of data.
+       **/
+      proxyDepositFactor: u128 & AugmentedConst<ApiType>;
+    };
     system: {
       /**
        * Maximum number of block number to block hash mappings to keep (oldest pruned first).
@@ -198,7 +269,7 @@ declare module '@polkadot/api-base/types/consts' {
       dbWeight: SpWeightsRuntimeDbWeight & AugmentedConst<ApiType>;
       /**
        * The designated SS58 prefix of this chain.
-       * 
+       *
        * This replaces the "ss58Format" property declared in the chain spec. Reason is
        * that the runtime should know about the prefix in order to make use of it as
        * an identifier of the chain.
@@ -212,7 +283,7 @@ declare module '@polkadot/api-base/types/consts' {
     timestamp: {
       /**
        * The minimum period between blocks.
-       * 
+       *
        * Be aware that this is different to the *expected* period that the block production
        * apparatus provides. Your chosen consensus system will generally work with this to
        * determine a sensible block time. For example, in the Aura pallet it will be double this
@@ -224,21 +295,21 @@ declare module '@polkadot/api-base/types/consts' {
       /**
        * A fee multiplier for `Operational` extrinsics to compute "virtual tip" to boost their
        * `priority`
-       * 
+       *
        * This value is multiplied by the `final_fee` to obtain a "virtual tip" that is later
        * added to a tip component in regular `priority` calculations.
        * It means that a `Normal` transaction can front-run a similarly-sized `Operational`
        * extrinsic (with no tip), by including a tip value greater than the virtual tip.
-       * 
+       *
        * ```rust,ignore
        * // For `Normal`
        * let priority = priority_calc(tip);
-       * 
+       *
        * // For `Operational`
        * let virtual_tip = (inclusion_fee + tip) * OperationalFeeMultiplier;
        * let priority = priority_calc(tip + virtual_tip);
        * ```
-       * 
+       *
        * Note that since we use `final_fee` the multiplier applies also to the regular `tip`
        * sent with the transaction. So, not only does the transaction get a priority bump based
        * on the `inclusion_fee`, but we also amplify the impact of tips applied to `Operational`
@@ -249,7 +320,7 @@ declare module '@polkadot/api-base/types/consts' {
     txPause: {
       /**
        * Maximum length for pallet name and call name SCALE encoded string names.
-       * 
+       *
        * TOO LONG NAMES WILL BE TREATED AS PAUSED.
        **/
       maxNameLen: u32 & AugmentedConst<ApiType>;
@@ -257,12 +328,12 @@ declare module '@polkadot/api-base/types/consts' {
     ulixeeBalances: {
       /**
        * The minimum amount required to keep an account open. MUST BE GREATER THAN ZERO!
-       * 
+       *
        * If you *really* need it to be zero, you can enable the feature `insecure_zero_ed` for
        * this pallet. However, you do so at your own risk: this will open up a major DoS vector.
        * In case you have multiple sources of provider references, you may also get unexpected
        * behaviour if you set this to zero.
-       * 
+       *
        * Bottom line: Do yourself a favour and make it at least one!
        **/
       existentialDeposit: u128 & AugmentedConst<ApiType>;
@@ -273,13 +344,13 @@ declare module '@polkadot/api-base/types/consts' {
       /**
        * The maximum number of locks that should exist on an account.
        * Not strictly enforced, but used for weight estimation.
-       * 
+       *
        * Use of locks is deprecated in favour of freezes. See `https://github.com/paritytech/substrate/pull/12951/`
        **/
       maxLocks: u32 & AugmentedConst<ApiType>;
       /**
        * The maximum number of named reserves that can exist on an account.
-       * 
+       *
        * Use of reserves is deprecated in favour of holds. See `https://github.com/paritytech/substrate/pull/12951/`
        **/
       maxReserves: u32 & AugmentedConst<ApiType>;

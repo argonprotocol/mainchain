@@ -223,9 +223,9 @@ where
 
       let balance_sync = localchain.balance_sync();
       let sync_options = vote_address.map(|vote_address| EscrowCloseOptions {
-          votes_address: Some(vote_address),
-          minimum_vote_amount: minimum_vote_amount.map(|v| v as i64),
-        });
+        votes_address: Some(vote_address),
+        minimum_vote_amount: minimum_vote_amount.map(|v| v as i64),
+      });
 
       let sync = balance_sync.sync(sync_options.clone()).await?;
       println!(

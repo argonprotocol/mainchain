@@ -2,9 +2,13 @@ use codec::{Codec, Decode, Encode, MaxEncodedLen};
 use scale_info::TypeInfo;
 use sp_core::{ConstU32, RuntimeDebug, H256, U256};
 use sp_runtime::{BoundedVec, DispatchError};
-use sp_std::{collections::btree_map::BTreeMap, vec::Vec};
+use sp_std::{
+	collections::{btree_map::BTreeMap, btree_set::BTreeSet},
+	vec::Vec,
+};
 
 use crate::{
+	bitcoin::{BitcoinUtxoId, Satoshis},
 	block_seal::MiningAuthority,
 	notary::{NotaryId, NotaryNotebookVoteDetails, NotaryNotebookVoteDigestDetails},
 	tick::{Tick, Ticker},
@@ -62,6 +66,13 @@ sp_api::decl_runtime_apis! {
 		fn decode_signed_raw_notebook_header(raw_header: Vec<u8>) -> Result<NotaryNotebookVoteDetails<Block::Hash>, DispatchError>;
 
 		fn latest_notebook_by_notary() -> BTreeMap<NotaryId, (NotebookNumber, Tick)>;
+	}
+}
+
+sp_api::decl_runtime_apis! {
+	pub trait BitcoinApis<Balance: Codec> {
+		fn active_utxos() -> BTreeSet<BitcoinUtxoId>;
+		fn redemption_rate(satoshis: Satoshis) -> Balance;
 	}
 }
 

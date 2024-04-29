@@ -27,6 +27,7 @@ pallet-timestamp = { workspace = true }
 pallet-session = { workspace = true }
 pallet-grandpa = { workspace = true }
 pallet-offences = { workspace = true }
+pallet-proxy = { workspace = true }
 pallet-tx-pause = { workspace = true }
 pallet-transaction-payment = { workspace = true }
 frame-support = { workspace = true }
@@ -55,18 +56,22 @@ frame-benchmarking = { workspace = true, optional = true }
 frame-system-benchmarking = { workspace = true, optional = true }
 
 # Local Dependencies
+pallet-bitcoin-mint = { workspace = true }
 pallet-block-seal = { workspace = true }
 pallet-block-seal-spec = { workspace = true }
 pallet-block-rewards = { workspace = true }
 pallet-bond = { workspace = true }
 pallet-chain-transfer = { workspace = true }
 pallet-data-domain = { workspace = true }
-pallet-mint = { workspace = true }
+pallet-membership = { workspace = true }
 pallet-notebook = { workspace = true }
 pallet-notaries = { workspace = true }
 pallet-mining-slot = { workspace = true }
+pallet-price-index = { workspace = true }
 pallet-ticks = { workspace = true }
+pallet-ulixee-mint = { workspace = true }
 ulx-primitives = { workspace = true }
+
 
 [build-dependencies]
 substrate-wasm-builder = { workspace = true, optional = true }
@@ -85,6 +90,7 @@ std = [
 	"log/std",
 	"pallet-authorship/std",
 	"pallet-balances/std",
+	"pallet-bitcoin-mint/std",
 	"pallet-block-rewards/std",
 	"pallet-block-seal-spec/std",
 	"pallet-block-seal/std",
@@ -92,11 +98,13 @@ std = [
 	"pallet-chain-transfer/std",
 	"pallet-data-domain/std",
 	"pallet-grandpa/std",
+	"pallet-membership/std",
 	"pallet-mining-slot/std",
-	"pallet-mint/std",
 	"pallet-notaries/std",
 	"pallet-notebook/std",
 	"pallet-offences/std",
+	"pallet-price-index/std",
+	"pallet-proxy/std",
 	"pallet-session/std",
 	"pallet-sudo/std",
 	"pallet-ticks/std",
@@ -104,6 +112,7 @@ std = [
 	"pallet-transaction-payment-rpc-runtime-api/std",
 	"pallet-transaction-payment/std",
 	"pallet-tx-pause/std",
+	"pallet-ulixee-mint/std",
 	"scale-info/std",
 	"serde_json/std",
 	"sp-api/std",
@@ -129,6 +138,7 @@ runtime-benchmarks = [
 	"frame-system-benchmarking/runtime-benchmarks",
 	"frame-system/runtime-benchmarks",
 	"pallet-balances/runtime-benchmarks",
+	"pallet-bitcoin-mint/runtime-benchmarks",
 	"pallet-block-rewards/runtime-benchmarks",
 	"pallet-block-seal-spec/runtime-benchmarks",
 	"pallet-block-seal/runtime-benchmarks",
@@ -136,15 +146,18 @@ runtime-benchmarks = [
 	"pallet-chain-transfer/runtime-benchmarks",
 	"pallet-data-domain/runtime-benchmarks",
 	"pallet-grandpa/runtime-benchmarks",
+	"pallet-membership/runtime-benchmarks",
 	"pallet-mining-slot/runtime-benchmarks",
-	"pallet-mint/runtime-benchmarks",
 	"pallet-notaries/runtime-benchmarks",
 	"pallet-notebook/runtime-benchmarks",
 	"pallet-offences/runtime-benchmarks",
+	"pallet-price-index/runtime-benchmarks",
+	"pallet-proxy/runtime-benchmarks",
 	"pallet-sudo/runtime-benchmarks",
 	"pallet-ticks/runtime-benchmarks",
 	"pallet-timestamp/runtime-benchmarks",
 	"pallet-tx-pause/runtime-benchmarks",
+	"pallet-ulixee-mint/runtime-benchmarks",
 	"sp-runtime/runtime-benchmarks",
 ]
 try-runtime = [
@@ -154,6 +167,7 @@ try-runtime = [
 	"frame-try-runtime/try-runtime",
 	"pallet-authorship/try-runtime",
 	"pallet-balances/try-runtime",
+	"pallet-bitcoin-mint/try-runtime",
 	"pallet-block-rewards/try-runtime",
 	"pallet-block-seal-spec/try-runtime",
 	"pallet-block-seal/try-runtime",
@@ -161,17 +175,20 @@ try-runtime = [
 	"pallet-chain-transfer/try-runtime",
 	"pallet-data-domain/try-runtime",
 	"pallet-grandpa/try-runtime",
+	"pallet-membership/try-runtime",
 	"pallet-mining-slot/try-runtime",
-	"pallet-mint/try-runtime",
 	"pallet-notaries/try-runtime",
 	"pallet-notebook/try-runtime",
 	"pallet-offences/try-runtime",
+	"pallet-price-index/try-runtime",
+	"pallet-proxy/try-runtime",
 	"pallet-session/try-runtime",
 	"pallet-sudo/try-runtime",
 	"pallet-ticks/try-runtime",
 	"pallet-timestamp/try-runtime",
 	"pallet-transaction-payment/try-runtime",
 	"pallet-tx-pause/try-runtime",
+	"pallet-ulixee-mint/try-runtime",
 	"sp-runtime/try-runtime",
 ]
 # Set timing constants (e.g. session period) to faster versions to speed up testing.

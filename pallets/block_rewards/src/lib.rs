@@ -16,7 +16,6 @@ pub mod weights;
 const LOG_TARGET: &str = "runtime::block_rewards";
 #[frame_support::pallet(dev_mode)]
 pub mod pallet {
-	use codec::Codec;
 	use frame_support::{
 		pallet_prelude::*,
 		traits::fungible::{InspectFreeze, Mutate, MutateFreeze},
@@ -29,17 +28,11 @@ pub mod pallet {
 	use sp_std::{vec, vec::Vec};
 
 	use ulx_primitives::{
-		notary::NotaryProvider, tick::Tick, BlockSealerProvider, NotebookProvider,
+		block_seal::BlockPayout, notary::NotaryProvider, tick::Tick, BlockRewardsEventHandler,
+		BlockSealerProvider, NotebookProvider,
 	};
 
 	use super::*;
-
-	#[derive(Encode, Decode, Clone, PartialEq, Eq, TypeInfo, MaxEncodedLen, RuntimeDebug)]
-	pub struct BlockPayout<AccountId: Codec, Balance: Codec> {
-		pub account_id: AccountId,
-		pub ulixees: Balance,
-		pub argons: Balance,
-	}
 
 	/// A reason for the pallet placing a hold on funds.
 	#[pallet::composite_enum]
@@ -102,6 +95,7 @@ pub mod pallet {
 		type MaturationBlocks: Get<u32>;
 		/// The overarching freeze reason.
 		type RuntimeFreezeReason: From<FreezeReason>;
+		type EventHandler: BlockRewardsEventHandler<Self::AccountId, Self::Balance>;
 	}
 
 	#[pallet::storage]
@@ -263,6 +257,7 @@ pub mod pallet {
 				maturation_block: reward_height,
 				rewards: rewards.clone(),
 			});
+			T::EventHandler::rewards_created(&rewards);
 			<PayoutsByBlock<T>>::insert(reward_height, BoundedVec::truncate_from(rewards));
 		}
 	}

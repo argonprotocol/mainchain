@@ -222,6 +222,12 @@ pub mod pallet {
 			bond_fund_id: Option<T::BondFundId>,
 			bond_id: T::BondId,
 		},
+		BondBurned {
+			bond_fund_id: Option<T::BondFundId>,
+			bond_id: T::BondId,
+			amount_burned: T::Balance,
+			amount_returned: T::Balance,
+		},
 		BondFeeRefund {
 			bond_fund_id: T::BondFundId,
 			bond_id: T::BondId,
@@ -567,6 +573,14 @@ pub mod pallet {
 			T::Currency::release(reason, who, amount, Precision::Exact)
 		}
 
+		fn burn_hold(who: &T::AccountId, amount: T::Balance) -> Result<T::Balance, DispatchError> {
+			let reason = &HoldReason::EnterBondFund.into();
+			if amount == Self::held_balance(&who) {
+				let _ = frame_system::Pallet::<T>::dec_providers(&who);
+			}
+			T::Currency::burn_held(&reason, &who, amount, Precision::Exact, Fortitude::Force)
+		}
+
 		fn held_balance(who: &T::AccountId) -> T::Balance {
 			let reason = &HoldReason::EnterBondFund.into();
 			T::Currency::balance_on_hold(reason, who)
@@ -840,6 +854,67 @@ pub mod pallet {
 			});
 
 			Ok(bond_id)
+		}
+
+		fn burn_bond(
+			bond_id: T::BondId,
+			final_amount: Option<T::Balance>,
+		) -> Result<(), BondError> {
+			let bond = Bonds::<T>::take(bond_id).ok_or(BondError::BondNotFound)?;
+			Self::remove_bond_completion(bond_id, bond.completion_block);
+			let amount_burned = final_amount.unwrap_or(bond.amount);
+			let amount_returned = bond.amount.saturating_sub(amount_burned);
+			ensure!(amount_burned <= bond.amount, BondError::InsufficientFunds);
+
+			Self::deposit_event(Event::BondBurned {
+				bond_fund_id: bond.bond_fund_id,
+				bond_id,
+				amount_burned,
+				amount_returned,
+			});
+			match bond.bond_fund_id {
+				None => {
+					let unreserved = Self::burn_hold(&bond.bonded_account_id, amount_burned)
+						.map_err(|_| BondError::UnrecoverableHold)?;
+					if unreserved != amount_burned {
+						warn!(
+							"Expiring bond hold could not all be burned {:?}. Final amount {:?} - remaining not un-reserved ({:?}).",
+							bond, final_amount, unreserved
+						);
+						return Err(BondError::UnrecoverableHold);
+					}
+					Ok(())
+				},
+				Some(bond_fund_id) => {
+					if let Some(mut bond_fund) = BondFunds::<T>::get(bond_fund_id) {
+						// return bond amount to fund
+						bond_fund.amount_bonded = bond_fund
+							.amount_bonded
+							.saturating_sub(bond.amount)
+							.saturating_add(amount_returned);
+						bond_fund.amount_reserved = bond_fund
+							.amount_reserved
+							.saturating_sub(bond.amount)
+							.saturating_add(amount_returned);
+
+						Self::burn_hold(&bond_fund.offer_account_id, amount_burned)
+							.map_err(|_| BondError::UnrecoverableHold)?;
+
+						if bond_fund.amount_bonded == 0u32.into() && bond_fund.is_ended {
+							BondFunds::<T>::take(bond_fund_id);
+							Self::remove_bond_fund_expiration(
+								bond_fund_id,
+								bond_fund.offer_expiration_block,
+							);
+						} else {
+							BondFunds::<T>::set(bond_fund_id, Some(bond_fund));
+						}
+						Ok(())
+					} else {
+						Err(BondError::BondFundNotFound)
+					}
+				},
+			}
 		}
 
 		fn return_bond(bond_id: T::BondId, account_id: T::AccountId) -> Result<(), BondError> {

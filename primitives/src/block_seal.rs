@@ -1,6 +1,5 @@
-use codec::{Decode, Encode, MaxEncodedLen};
-use frame_support::Parameter;
-use frame_support_procedural::{CloneNoBound, EqNoBound, PartialEqNoBound};
+use codec::{Codec, Decode, Encode, MaxEncodedLen};
+use frame_support::{CloneNoBound, EqNoBound, Parameter, PartialEqNoBound};
 use scale_info::TypeInfo;
 use serde::{Deserialize, Serialize};
 use sp_application_crypto::AppCrypto;
@@ -85,4 +84,11 @@ pub struct MiningAuthority<AuthorityId, AccountId> {
 	pub authority_index: MinerIndex,
 	pub authority_id: AuthorityId,
 	pub account_id: AccountId,
+}
+
+#[derive(Encode, Decode, Clone, PartialEq, Eq, TypeInfo, MaxEncodedLen, RuntimeDebug)]
+pub struct BlockPayout<AccountId: Codec, Balance: Codec> {
+	pub account_id: AccountId,
+	pub ulixees: Balance,
+	pub argons: Balance,
 }

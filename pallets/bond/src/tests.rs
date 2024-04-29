@@ -449,3 +449,42 @@ fn it_can_lock_and_unlock_bonds() {
 		assert_ok!(Bonds::return_bond(RuntimeOrigin::signed(2), 1));
 	});
 }
+
+#[test]
+fn it_can_burn_a_bond_from_a_fund() {
+	new_test_ext().execute_with(|| {
+		// Go past genesis block so events get deposited
+		System::set_block_number(1);
+		Bonds::on_initialize(1);
+
+		set_argons(1, 500_100);
+		const BASE_FEE: Balance = 4u128;
+		const APR: u32 = 10000u32; // 1 percent apr for the year
+
+		assert_ok!(Bonds::offer_fund(RuntimeOrigin::signed(1), APR, BASE_FEE, 500_000, 5000));
+		assert_eq!(Balances::free_balance(1), 100);
+		set_argons(2, 3_000);
+		assert_ok!(Bonds::lease(RuntimeOrigin::signed(2), 1, 200_000, 1440));
+		assert_eq!(BondsStorage::<Test>::get(1).unwrap().amount, 200_000);
+		assert_eq!(BondCompletions::<Test>::get(1440).into_inner(), vec![1]);
+
+		let fee: Balance = BASE_FEE + (200_000u128 / 10u128 / 365);
+		assert_eq!(BondsStorage::<Test>::get(1).unwrap().fee, fee);
+		assert_eq!(Balances::free_balance(2), 3_000 - fee);
+		assert_eq!(Balances::free_balance(1), 100 + fee);
+
+		// burn the bond
+		assert_ok!(Bonds::burn_bond(1));
+		System::assert_last_event(
+			Event::<Test>::BondBurned { bond_id: 1, bond_fund_id: Some(1), amount: 200_000 }.into(),
+		);
+		assert_eq!(Balances::reserved_balance(1), 500_000 - 200_000);
+		assert_eq!(Balances::free_balance(2), 3000 - fee);
+		let bond_fund = BondFunds::<Test>::get(1).unwrap();
+		assert_eq!(bond_fund.amount_bonded, 0);
+		assert_eq!(bond_fund.amount_reserved, 500_000 - 200_000);
+
+		assert!(BondCompletions::<Test>::get(1440).into_inner().is_empty());
+		assert!(BondCompletions::<Test>::get(2880).into_inner().is_empty());
+	});
+}

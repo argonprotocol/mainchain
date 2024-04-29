@@ -6,10 +6,10 @@
 import '@polkadot/api-base/types/events';
 
 import type { ApiTypes, AugmentedEvent } from '@polkadot/api-base/types';
-import type { Bytes, Null, Option, Result, U8aFixed, Vec, bool, u128, u32, u64 } from '@polkadot/types-codec';
+import type { Bytes, Null, Option, Result, U8aFixed, Vec, bool, u128, u16, u32, u64 } from '@polkadot/types-codec';
 import type { ITuple } from '@polkadot/types-codec/types';
 import type { AccountId32, H256 } from '@polkadot/types/interfaces/runtime';
-import type { FrameSupportDispatchDispatchInfo, FrameSupportTokensMiscBalanceStatus, PalletBlockRewardsBlockPayout, PalletDataDomainDataDomainRegistration, SpConsensusGrandpaAppPublic, SpRuntimeDispatchError, UlxNotaryAuditErrorVerifyError, UlxPrimitivesBlockSealMiningRegistration, UlxPrimitivesDataDomainZoneRecord, UlxPrimitivesNotaryNotaryMeta, UlxPrimitivesNotaryNotaryRecord } from '@polkadot/types/lookup';
+import type { FrameSupportDispatchDispatchInfo, FrameSupportTokensMiscBalanceStatus, PalletDataDomainDataDomainRegistration, PalletPriceIndexPriceIndex, SpConsensusGrandpaAppPublic, SpRuntimeDispatchError, UlxNodeRuntimeProxyType, UlxNotaryAuditErrorVerifyError, UlxPrimitivesBitcoinBitcoinUtxoId, UlxPrimitivesBlockSealBlockPayout, UlxPrimitivesBlockSealMiningRegistration, UlxPrimitivesDataDomainZoneRecord, UlxPrimitivesNotaryNotaryMeta, UlxPrimitivesNotaryNotaryRecord } from '@polkadot/types/lookup';
 
 export type __AugmentedEvent<ApiType extends ApiTypes> = AugmentedEvent<ApiType>;
 
@@ -107,15 +107,22 @@ declare module '@polkadot/api-base/types/events' {
        **/
       Withdraw: AugmentedEvent<ApiType, [who: AccountId32, amount: u128], { who: AccountId32, amount: u128 }>;
     };
+    bitcoinMint: {
+      UtxoMovedWithBurn: AugmentedEvent<ApiType, [utxo: UlxPrimitivesBitcoinBitcoinUtxoId, bondId: u64], { utxo: UlxPrimitivesBitcoinBitcoinUtxoId, bondId: u64 }>;
+      UtxoOwnershipConfirmed: AugmentedEvent<ApiType, [utxo: UlxPrimitivesBitcoinBitcoinUtxoId, accountId: AccountId32, bondId: u64, amount: u128, expirationBlock: u32], { utxo: UlxPrimitivesBitcoinBitcoinUtxoId, accountId: AccountId32, bondId: u64, amount: u128, expirationBlock: u32 }>;
+      UtxoOwnershipDenied: AugmentedEvent<ApiType, [utxo: UlxPrimitivesBitcoinBitcoinUtxoId, accountId: AccountId32, bondId: u64, amount: u128, expirationBlock: u32], { utxo: UlxPrimitivesBitcoinBitcoinUtxoId, accountId: AccountId32, bondId: u64, amount: u128, expirationBlock: u32 }>;
+      UtxoUnlocked: AugmentedEvent<ApiType, [utxo: UlxPrimitivesBitcoinBitcoinUtxoId, accountId: AccountId32, bondId: u64, amount: u128], { utxo: UlxPrimitivesBitcoinBitcoinUtxoId, accountId: AccountId32, bondId: u64, amount: u128 }>;
+    };
     blockRewards: {
-      RewardCreated: AugmentedEvent<ApiType, [maturationBlock: u32, rewards: Vec<PalletBlockRewardsBlockPayout>], { maturationBlock: u32, rewards: Vec<PalletBlockRewardsBlockPayout> }>;
-      RewardUnlocked: AugmentedEvent<ApiType, [rewards: Vec<PalletBlockRewardsBlockPayout>], { rewards: Vec<PalletBlockRewardsBlockPayout> }>;
+      RewardCreated: AugmentedEvent<ApiType, [maturationBlock: u32, rewards: Vec<UlxPrimitivesBlockSealBlockPayout>], { maturationBlock: u32, rewards: Vec<UlxPrimitivesBlockSealBlockPayout> }>;
+      RewardUnlocked: AugmentedEvent<ApiType, [rewards: Vec<UlxPrimitivesBlockSealBlockPayout>], { rewards: Vec<UlxPrimitivesBlockSealBlockPayout> }>;
     };
     blockSealSpec: {
       ComputeDifficultyAdjusted: AugmentedEvent<ApiType, [expectedBlockTime: u64, actualBlockTime: u64, startDifficulty: u128, newDifficulty: u128], { expectedBlockTime: u64, actualBlockTime: u64, startDifficulty: u128, newDifficulty: u128 }>;
       VoteMinimumAdjusted: AugmentedEvent<ApiType, [expectedBlockVotes: u128, actualBlockVotes: u128, startVoteMinimum: u128, newVoteMinimum: u128], { expectedBlockVotes: u128, actualBlockVotes: u128, startVoteMinimum: u128, newVoteMinimum: u128 }>;
     };
     bond: {
+      BondBurned: AugmentedEvent<ApiType, [bondFundId: Option<u32>, bondId: u64, amount: u128], { bondFundId: Option<u32>, bondId: u64, amount: u128 }>;
       BondCompleted: AugmentedEvent<ApiType, [bondFundId: Option<u32>, bondId: u64], { bondFundId: Option<u32>, bondId: u64 }>;
       BondedSelf: AugmentedEvent<ApiType, [bondId: u64, bondedAccountId: AccountId32, amount: u128, completionBlock: u32], { bondId: u64, bondedAccountId: AccountId32, amount: u128, completionBlock: u32 }>;
       BondExtended: AugmentedEvent<ApiType, [bondFundId: Option<u32>, bondId: u64, amount: u128, completionBlock: u32, feeChange: u128, annualPercentRate: u32], { bondFundId: Option<u32>, bondId: u64, amount: u128, completionBlock: u32, feeChange: u128, annualPercentRate: u32 }>;
@@ -176,8 +183,6 @@ declare module '@polkadot/api-base/types/events' {
       SlotBidderReplaced: AugmentedEvent<ApiType, [accountId: AccountId32, bondId: Option<u64>, keptOwnershipBond: bool], { accountId: AccountId32, bondId: Option<u64>, keptOwnershipBond: bool }>;
       UnbondedMiner: AugmentedEvent<ApiType, [accountId: AccountId32, bondId: Option<u64>, keptOwnershipBond: bool], { accountId: AccountId32, bondId: Option<u64>, keptOwnershipBond: bool }>;
     };
-    mint: {
-    };
     notaries: {
       /**
        * A notary proposal has been accepted
@@ -207,6 +212,36 @@ declare module '@polkadot/api-base/types/events' {
        * \[kind, timeslot\].
        **/
       Offence: AugmentedEvent<ApiType, [kind: U8aFixed, timeslot: Bytes], { kind: U8aFixed, timeslot: Bytes }>;
+    };
+    priceIndex: {
+      /**
+       * Event emitted when a new price index is submitted
+       **/
+      NewIndex: AugmentedEvent<ApiType, [priceIndex: PalletPriceIndexPriceIndex], { priceIndex: PalletPriceIndexPriceIndex }>;
+      OperatorChanged: AugmentedEvent<ApiType, [operatorId: AccountId32], { operatorId: AccountId32 }>;
+    };
+    proxy: {
+      /**
+       * An announcement was placed to make a call in the future.
+       **/
+      Announced: AugmentedEvent<ApiType, [real: AccountId32, proxy: AccountId32, callHash: H256], { real: AccountId32, proxy: AccountId32, callHash: H256 }>;
+      /**
+       * A proxy was added.
+       **/
+      ProxyAdded: AugmentedEvent<ApiType, [delegator: AccountId32, delegatee: AccountId32, proxyType: UlxNodeRuntimeProxyType, delay: u32], { delegator: AccountId32, delegatee: AccountId32, proxyType: UlxNodeRuntimeProxyType, delay: u32 }>;
+      /**
+       * A proxy was executed correctly, with the given.
+       **/
+      ProxyExecuted: AugmentedEvent<ApiType, [result: Result<Null, SpRuntimeDispatchError>], { result: Result<Null, SpRuntimeDispatchError> }>;
+      /**
+       * A proxy was removed.
+       **/
+      ProxyRemoved: AugmentedEvent<ApiType, [delegator: AccountId32, delegatee: AccountId32, proxyType: UlxNodeRuntimeProxyType, delay: u32], { delegator: AccountId32, delegatee: AccountId32, proxyType: UlxNodeRuntimeProxyType, delay: u32 }>;
+      /**
+       * A pure account has been created by new proxy with given
+       * disambiguation index and proxy type.
+       **/
+      PureCreated: AugmentedEvent<ApiType, [pure: AccountId32, who: AccountId32, proxyType: UlxNodeRuntimeProxyType, disambiguationIndex: u16], { pure: AccountId32, who: AccountId32, proxyType: UlxNodeRuntimeProxyType, disambiguationIndex: u16 }>;
     };
     session: {
       /**
@@ -371,6 +406,8 @@ declare module '@polkadot/api-base/types/events' {
        * Some amount was withdrawn from the account (e.g. for transaction fees).
        **/
       Withdraw: AugmentedEvent<ApiType, [who: AccountId32, amount: u128], { who: AccountId32, amount: u128 }>;
+    };
+    ulixeeMint: {
     };
   } // AugmentedEvents
 } // declare module

@@ -2,6 +2,8 @@
 members = [
     "node",
     "node/consensus",
+    "node/bitcoin",
+    "pallets/bitcoin_mint",
     "pallets/block_rewards",
     "pallets/block_seal",
     "pallets/block_seal_spec",
@@ -9,10 +11,11 @@ members = [
     "pallets/bond",
     "pallets/chain_transfer",
     "pallets/mining_slot",
-    "pallets/mint",
     "pallets/notaries",
     "pallets/notebook",
+    "pallets/price_index",
     "pallets/ticks",
+    "pallets/ulixee_mint",
     "client",
     "localchain",
     "localchain/uniffi-bindgen",
@@ -151,7 +154,7 @@ env_logger = "0.11"
 
 sqlx = { version = "0.7", features = ["macros"] }
 chrono = { version = "0.4", features = ["serde"] }
-
+mocktopus = "0.8.0"
 
 binary-merkle-tree = { default-features = false, git = "https://github.com/paritytech/polkadot-sdk.git", branch = "release-polkadot-v1.10.0" }
 
@@ -192,6 +195,8 @@ pallet-authorship = { default-features = false, git = "https://github.com/parity
 pallet-balances = { default-features = false, git = "https://github.com/paritytech/polkadot-sdk.git", branch = "release-polkadot-v1.10.0" }
 pallet-grandpa = { default-features = false, git = "https://github.com/paritytech/polkadot-sdk.git", branch = "release-polkadot-v1.10.0" }
 pallet-offences = { default-features = false, git = "https://github.com/paritytech/polkadot-sdk.git", branch = "release-polkadot-v1.10.0" }
+pallet-membership = { default-features = false, git = "https://github.com/paritytech/polkadot-sdk.git", branch = "release-polkadot-v1.10.0" }
+pallet-proxy = { default-features = false, git = "https://github.com/paritytech/polkadot-sdk.git", branch = "release-polkadot-v1.10.0" }
 pallet-session = { default-features = false, features = ["historical"], git = "https://github.com/paritytech/polkadot-sdk.git", branch = "release-polkadot-v1.10.0" }
 pallet-sudo = { default-features = false, git = "https://github.com/paritytech/polkadot-sdk.git", branch = "release-polkadot-v1.10.0" }
 pallet-tx-pause = { default-features = false, git = "https://github.com/paritytech/polkadot-sdk.git", branch = "release-polkadot-v1.10.0" }
@@ -245,6 +250,13 @@ impl-trait-for-tuples = "0.2.2"
 
 rsntp = { version = "4.0" }
 
+nakamoto-client = { version = "0.4" }
+nakamoto-p2p = { version = "0.4" }
+nakamoto-common = { version = "0.4" }
+nakamoto-net-poll = { version = "0.4" }
+bitcoin = { version = "0.32" }
+
+
 napi-derive = { version = "2.16" }
 napi = { version = "2.16", features = ["napi9", "async", "error_anyhow"] }
 napi-build = { version = "2.1" }
@@ -266,6 +278,7 @@ ulx-testing = { path = "testing" }
 ulx-localchain = { path = "localchain" }
 ulixee-client = { path = "client" }
 ulx-node-consensus = { path = "node/consensus" }
+ulx-node-bitcoin = { path = "node/bitcoin" }
 ulx-node = { path = "node" }
 ulx-node-runtime = { path = "runtime" }
 ulx-notary = { path = "notary" }
@@ -275,12 +288,14 @@ ulx-primitives = { path = "primitives", default-features = false }
 
 pallet-block-seal = { path = "pallets/block_seal", default-features = false }
 pallet-block-seal-spec = { path = "pallets/block_seal_spec", default-features = false }
+pallet-bitcoin-mint = { path = "pallets/bitcoin_mint", default-features = false }
 pallet-block-rewards = { path = "pallets/block_rewards", default-features = false }
 pallet-bond = { path = "pallets/bond", default-features = false }
 pallet-chain-transfer = { path = "pallets/chain_transfer", default-features = false }
 pallet-data-domain = { path = "pallets/data_domain", default-features = false }
-pallet-mint = { path = "pallets/mint", default-features = false }
+pallet-mining-slot = { path = "pallets/mining_slot", default-features = false }
 pallet-notebook = { path = "pallets/notebook", default-features = false }
 pallet-notaries = { path = "pallets/notaries", default-features = false }
-pallet-mining-slot = { path = "pallets/mining_slot", default-features = false }
 pallet-ticks = { path = "pallets/ticks", default-features = false }
+pallet-ulixee-mint = { path = "pallets/ulixee_mint", default-features = false }
+pallet-price-index = { path = "pallets/price_index", default-features = false }

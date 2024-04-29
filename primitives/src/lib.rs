@@ -34,6 +34,7 @@ pub mod macros;
 pub mod notary;
 
 pub mod account;
+pub mod bitcoin;
 pub mod note;
 pub mod notebook;
 mod providers;

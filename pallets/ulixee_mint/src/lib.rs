@@ -1,6 +1,10 @@
 #![cfg_attr(not(feature = "std"), no_std)]
 
+use sp_runtime::{traits::Zero, Saturating};
+use sp_std::vec::Vec;
+
 pub use pallet::*;
+use ulx_primitives::{block_seal::BlockPayout, BlockRewardsEventHandler};
 pub use weights::*;
 
 #[cfg(test)]
@@ -22,7 +26,9 @@ pub mod pallet {
 		StorageMap as StorageMapT,
 	};
 	use frame_system::pallet_prelude::*;
-	use sp_runtime::traits::AtLeast32BitUnsigned;
+	use sp_runtime::traits::{AtLeast32BitUnsigned, CheckedDiv};
+
+	use ulx_primitives::{BurnEventHandler, MintCirculationProvider};
 
 	use super::*;
 
@@ -55,12 +61,17 @@ pub mod pallet {
 
 		/// The hold reason when reserving funds for entering or extending the safe-mode.
 		type RuntimeHoldReason: From<HoldReason>;
+
+		type BitcoinMintCirculation: MintCirculationProvider<Self::Balance>;
 	}
 
 	/// Last moved block of ulixee tokens
 	#[pallet::storage]
 	pub(super) type UlixeeAccountLastTransferBlock<T: Config> =
 		StorageMap<_, Blake2_128Concat, T::AccountId, BlockNumberFor<T>, OptionQuery>;
+
+	#[pallet::storage]
+	pub(super) type MintedArgons<T: Config> = StorageValue<_, T::Balance, ValueQuery>;
 
 	/// A reason for the pallet placing a hold on funds.
 	#[pallet::composite_enum]
@@ -82,6 +93,25 @@ pub mod pallet {
 				frame_system::Pallet::<T>::block_number(),
 			);
 		}
+
+		pub fn track_block_mint(amount: T::Balance) {
+			MintedArgons::<T>::mutate(|mint| *mint += amount);
+		}
+
+		pub fn on_argon_burn(amount: T::Balance) {
+			let ulixee_mint = MintedArgons::<T>::get();
+			let total_minted = ulixee_mint + T::BitcoinMintCirculation::get_mint_circulation();
+			let prorata = (amount * ulixee_mint).checked_div(&total_minted);
+			if let Some(milligons) = prorata {
+				MintedArgons::<T>::mutate(|mint| *mint -= milligons);
+			}
+		}
+	}
+
+	impl<T: Config> MintCirculationProvider<T::Balance> for Pallet<T> {
+		fn get_mint_circulation() -> T::Balance {
+			MintedArgons::<T>::get()
+		}
 	}
 
 	impl<T: Config> StoredMap<T::AccountId, pallet_balances::AccountData<T::Balance>> for Pallet<T> {
@@ -97,7 +127,7 @@ pub mod pallet {
 			Ok(())
 		}
 		fn remove(k: &T::AccountId) -> Result<(), DispatchError> {
-			if T::UlixeeTokenStorage::contains_key(k) {
+			if T::UlixeeTokenStorage::contains_key(&k) {
 				T::UlixeeTokenStorage::remove(k);
 			}
 			Ok(())
@@ -129,6 +159,25 @@ pub mod pallet {
 				Self::track_ulixees_transferred(k);
 				Ok(r)
 			})
+		}
+	}
+
+	impl<T: Config> BurnEventHandler<T::Balance> for Pallet<T> {
+		fn on_argon_burn(milligons: &T::Balance) -> sp_runtime::DispatchResult {
+			Self::on_argon_burn(milligons.clone());
+			Ok(())
+		}
+	}
+}
+
+impl<T: Config> BlockRewardsEventHandler<T::AccountId, T::Balance> for Pallet<T> {
+	fn rewards_created(payout: &Vec<BlockPayout<T::AccountId, T::Balance>>) {
+		let mut argons = T::Balance::zero();
+		for reward in payout {
+			argons = argons.saturating_add(reward.argons);
+		}
+		if argons != T::Balance::zero() {
+			Self::track_block_mint(argons);
 		}
 	}
 }

@@ -61,6 +61,72 @@ declare module '@polkadot/api-base/types/errors' {
        **/
       VestingBalance: AugmentedError<ApiType>;
     };
+    bitcoinMint: {
+      AccountWouldBeBelowMinimum: AugmentedError<ApiType>;
+      BadState: AugmentedError<ApiType>;
+      /**
+       * This bitcoin utxo is already locked
+       **/
+      BitcoinAlreadyLocked: AugmentedError<ApiType>;
+      BondAlreadyClosed: AugmentedError<ApiType>;
+      BondAlreadyLocked: AugmentedError<ApiType>;
+      BondFundClosed: AugmentedError<ApiType>;
+      BondFundMaximumBondsExceeded: AugmentedError<ApiType>;
+      BondFundNotFound: AugmentedError<ApiType>;
+      BondLockedCannotModify: AugmentedError<ApiType>;
+      BondNotFound: AugmentedError<ApiType>;
+      /**
+       * There are too many bond or bond funds expiring in the given expiration block
+       **/
+      ExpirationAtBlockOverflow: AugmentedError<ApiType>;
+      ExpirationTooSoon: AugmentedError<ApiType>;
+      /**
+       * The fee for this bond exceeds the amount of the bond, which is unsafe
+       **/
+      FeeExceedsBondAmount: AugmentedError<ApiType>;
+      HoldUnexpectedlyModified: AugmentedError<ApiType>;
+      /**
+       * Insufficient bitcoin amount
+       **/
+      InsufficientBitcoinAmount: AugmentedError<ApiType>;
+      /**
+       * Not enough argons were bonded
+       **/
+      InsufficientBondAmount: AugmentedError<ApiType>;
+      InsufficientBondFunds: AugmentedError<ApiType>;
+      InsufficientFunds: AugmentedError<ApiType>;
+      /**
+       * An invalid bond was submitted
+       **/
+      InvalidBondSubmitted: AugmentedError<ApiType>;
+      LeaseUntilBlockTooSoon: AugmentedError<ApiType>;
+      LeaseUntilPastFundExpiration: AugmentedError<ApiType>;
+      /**
+       * No more slots available for bitcoin minting
+       **/
+      MaxPendingMintUtxosExceeded: AugmentedError<ApiType>;
+      MinimumBondAmountNotMet: AugmentedError<ApiType>;
+      /**
+       * No prices are available to mint bitcoins
+       **/
+      NoBitcoinPricesAvailable: AugmentedError<ApiType>;
+      NoBondFundFound: AugmentedError<ApiType>;
+      NoMoreBondIds: AugmentedError<ApiType>;
+      NoPermissions: AugmentedError<ApiType>;
+      /**
+       * The bond expires sooner than required
+       **/
+      PrematureBondExpiration: AugmentedError<ApiType>;
+      /**
+       * Redemptions not currently available
+       **/
+      RedemptionsUnavailable: AugmentedError<ApiType>;
+      UnrecoverableHold: AugmentedError<ApiType>;
+      /**
+       * Locked Utxo Not Found
+       **/
+      UtxoNotLocked: AugmentedError<ApiType>;
+    };
     blockRewards: {
     };
     blockSeal: {
@@ -295,8 +361,6 @@ declare module '@polkadot/api-base/types/errors' {
       UnableToRotateAuthority: AugmentedError<ApiType>;
       UnrecoverableHold: AugmentedError<ApiType>;
     };
-    mint: {
-    };
     notaries: {
       InvalidNotaryOperator: AugmentedError<ApiType>;
       MaxNotariesExceeded: AugmentedError<ApiType>;
@@ -351,6 +415,54 @@ declare module '@polkadot/api-base/types/errors' {
        **/
       NotebookTickAlreadyUsed: AugmentedError<ApiType>;
     };
+    priceIndex: {
+      /**
+       * Couldn't record history
+       **/
+      HistoryRecordingError: AugmentedError<ApiType>;
+      /**
+       * Missing value
+       **/
+      MissingValue: AugmentedError<ApiType>;
+      /**
+       * Not authorized as an oracle operator
+       **/
+      NotAuthorizedOperator: AugmentedError<ApiType>;
+    };
+    proxy: {
+      /**
+       * Account is already a proxy.
+       **/
+      Duplicate: AugmentedError<ApiType>;
+      /**
+       * Call may not be made by proxy because it may escalate its privileges.
+       **/
+      NoPermission: AugmentedError<ApiType>;
+      /**
+       * Cannot add self as proxy.
+       **/
+      NoSelfProxy: AugmentedError<ApiType>;
+      /**
+       * Proxy registration not found.
+       **/
+      NotFound: AugmentedError<ApiType>;
+      /**
+       * Sender is not a proxy of the account to be proxied.
+       **/
+      NotProxy: AugmentedError<ApiType>;
+      /**
+       * There are too many proxies registered or too many announcements pending.
+       **/
+      TooMany: AugmentedError<ApiType>;
+      /**
+       * Announcement, if made at all, was made too recently.
+       **/
+      Unannounced: AugmentedError<ApiType>;
+      /**
+       * A call which is incompatible with the proxy type's filter was attempted.
+       **/
+      Unproxyable: AugmentedError<ApiType>;
+    };
     session: {
       /**
        * Registered duplicate key.
@@ -386,7 +498,7 @@ declare module '@polkadot/api-base/types/errors' {
       CallFiltered: AugmentedError<ApiType>;
       /**
        * Failed to extract the runtime version from the new runtime.
-       * 
+       *
        * Either calling `Core_version` or decoding `RuntimeVersion` failed.
        **/
       FailedToExtractRuntimeVersion: AugmentedError<ApiType>;
@@ -487,6 +599,8 @@ declare module '@polkadot/api-base/types/errors' {
        * Vesting balance too high to send value.
        **/
       VestingBalance: AugmentedError<ApiType>;
+    };
+    ulixeeMint: {
     };
   } // AugmentedErrors
 } // declare module

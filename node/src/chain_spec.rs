@@ -68,6 +68,8 @@ pub fn development_config() -> Result<ChainSpec, String> {
 		)],
 		// Sudo account
 		get_account_id_from_seed::<sr25519::Public>("Alice"),
+		// Price index operator
+		get_account_id_from_seed::<sr25519::Public>("Alice"),
 		// Pre-funded accounts
 		vec![
 			get_account_id_from_seed::<sr25519::Public>("Alice"),
@@ -106,6 +108,8 @@ pub fn local_testnet_config() -> Result<ChainSpec, String> {
 		)],
 		// Sudo account
 		get_account_id_from_seed::<sr25519::Public>("Alice"),
+		// Price index operator
+		get_account_id_from_seed::<sr25519::Public>("Alice"),
 		// Pre-funded accounts
 		vec![
 			get_account_id_from_seed::<sr25519::Public>("Alice"),
@@ -131,6 +135,7 @@ pub fn local_testnet_config() -> Result<ChainSpec, String> {
 fn testnet_genesis(
 	initial_authorities: Vec<(AccountId, (BlockSealAuthorityId, GrandpaId))>,
 	root_key: AccountId,
+	price_index_operator: AccountId,
 	endowed_accounts: Vec<AccountId>,
 	initial_vote_minimum: VoteMinimum,
 	initial_difficulty: ComputeDifficulty,
@@ -153,6 +158,9 @@ fn testnet_genesis(
 		},
 		"ulixeeBalances": {
 			"balances": endowed_accounts.iter().cloned().map(|k| (k, 10_000)).collect::<Vec<_>>(),
+		},
+		"priceIndex": {
+			"operator": Some(price_index_operator),
 		},
 		"miningSlot":  {
 			"minerZero": Some(miner_zero),

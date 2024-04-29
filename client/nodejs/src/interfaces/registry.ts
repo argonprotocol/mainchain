@@ -5,7 +5,7 @@
 // this is required to allow for ambient/previous definitions
 import '@polkadot/types/types/registry';
 
-import type { FinalityGrandpaEquivocationPrecommit, FinalityGrandpaEquivocationPrevote, FinalityGrandpaPrecommit, FinalityGrandpaPrevote, FrameSupportDispatchDispatchClass, FrameSupportDispatchDispatchInfo, FrameSupportDispatchPays, FrameSupportDispatchPerDispatchClassU32, FrameSupportDispatchPerDispatchClassWeight, FrameSupportDispatchPerDispatchClassWeightsPerClass, FrameSupportPalletId, FrameSupportTokensMiscBalanceStatus, FrameSystemAccountInfo, FrameSystemCall, FrameSystemCodeUpgradeAuthorization, FrameSystemError, FrameSystemEvent, FrameSystemEventRecord, FrameSystemExtensionsCheckGenesis, FrameSystemExtensionsCheckNonZeroSender, FrameSystemExtensionsCheckNonce, FrameSystemExtensionsCheckSpecVersion, FrameSystemExtensionsCheckTxVersion, FrameSystemExtensionsCheckWeight, FrameSystemLastRuntimeUpgradeInfo, FrameSystemLimitsBlockLength, FrameSystemLimitsBlockWeights, FrameSystemLimitsWeightsPerClass, FrameSystemPhase, PalletBalancesAccountData, PalletBalancesAdjustmentDirection, PalletBalancesBalanceLock, PalletBalancesCall, PalletBalancesError, PalletBalancesEvent, PalletBalancesIdAmountRuntimeFreezeReason, PalletBalancesIdAmountRuntimeHoldReason, PalletBalancesReasons, PalletBalancesReserveData, PalletBlockRewardsBlockPayout, PalletBlockRewardsCall, PalletBlockRewardsError, PalletBlockRewardsEvent, PalletBlockRewardsFreezeReason, PalletBlockRewardsHoldReason, PalletBlockSealCall, PalletBlockSealError, PalletBlockSealSpecCall, PalletBlockSealSpecError, PalletBlockSealSpecEvent, PalletBondCall, PalletBondError, PalletBondEvent, PalletBondHoldReason, PalletChainTransferCall, PalletChainTransferError, PalletChainTransferEvent, PalletChainTransferQueuedTransferOut, PalletDataDomainCall, PalletDataDomainDataDomainRegistration, PalletDataDomainError, PalletDataDomainEvent, PalletGrandpaCall, PalletGrandpaError, PalletGrandpaEvent, PalletGrandpaStoredPendingChange, PalletGrandpaStoredState, PalletMiningSlotCall, PalletMiningSlotError, PalletMiningSlotEvent, PalletMiningSlotHoldReason, PalletMiningSlotMinerHistory, PalletMintCall, PalletMintError, PalletMintEvent, PalletMintHoldReason, PalletNotariesCall, PalletNotariesError, PalletNotariesEvent, PalletNotebookCall, PalletNotebookError, PalletNotebookEvent, PalletOffencesEvent, PalletSessionCall, PalletSessionError, PalletSessionEvent, PalletSudoCall, PalletSudoError, PalletSudoEvent, PalletTicksCall, PalletTicksError, PalletTimestampCall, PalletTransactionPaymentChargeTransactionPayment, PalletTransactionPaymentEvent, PalletTransactionPaymentReleases, PalletTxPauseCall, PalletTxPauseError, PalletTxPauseEvent, SpArithmeticArithmeticError, SpConsensusGrandpaAppPublic, SpConsensusGrandpaAppSignature, SpConsensusGrandpaEquivocation, SpConsensusGrandpaEquivocationProof, SpCoreCryptoKeyTypeId, SpRuntimeDigest, SpRuntimeDigestDigestItem, SpRuntimeDispatchError, SpRuntimeModuleError, SpRuntimeMultiSignature, SpRuntimeTokenError, SpRuntimeTransactionalError, SpSessionMembershipProof, SpStakingOffenceOffenceDetails, SpVersionRuntimeVersion, SpWeightsRuntimeDbWeight, SpWeightsWeightV2Weight, UlxNodeRuntimeOpaqueSessionKeys, UlxNodeRuntimeRuntime, UlxNodeRuntimeRuntimeFreezeReason, UlxNodeRuntimeRuntimeHoldReason, UlxNotaryAuditAccountHistoryLookupError, UlxNotaryAuditErrorVerifyError, UlxPrimitivesAccountAccountType, UlxPrimitivesBalanceChangeAccountOrigin, UlxPrimitivesBalanceChangeMerkleProof, UlxPrimitivesBlockSealAppPublic, UlxPrimitivesBlockSealAppSignature, UlxPrimitivesBlockSealMiningRegistration, UlxPrimitivesBlockSealRewardDestination, UlxPrimitivesBlockVoteBlockVoteT, UlxPrimitivesBond, UlxPrimitivesBondBondFund, UlxPrimitivesDataDomainSemver, UlxPrimitivesDataDomainVersionHost, UlxPrimitivesDataDomainZoneRecord, UlxPrimitivesDigestsBlockVoteDigest, UlxPrimitivesDigestsNotebookDigest, UlxPrimitivesDigestsNotebookDigestRecord, UlxPrimitivesDigestsParentVotingKeyDigest, UlxPrimitivesInherentsBlockSealInherent, UlxPrimitivesNotaryNotaryMeta, UlxPrimitivesNotaryNotaryNotebookKeyDetails, UlxPrimitivesNotaryNotaryNotebookVoteDigestDetails, UlxPrimitivesNotaryNotaryRecord, UlxPrimitivesNotebookChainTransfer, UlxPrimitivesNotebookNotebookHeader, UlxPrimitivesNotebookSignedNotebookHeader, UlxPrimitivesProvidersBlockSealerInfo } from '@polkadot/types/lookup';
+import type { FinalityGrandpaEquivocationPrecommit, FinalityGrandpaEquivocationPrevote, FinalityGrandpaPrecommit, FinalityGrandpaPrevote, FrameSupportDispatchDispatchClass, FrameSupportDispatchDispatchInfo, FrameSupportDispatchPays, FrameSupportDispatchPerDispatchClassU32, FrameSupportDispatchPerDispatchClassWeight, FrameSupportDispatchPerDispatchClassWeightsPerClass, FrameSupportPalletId, FrameSupportTokensMiscBalanceStatus, FrameSystemAccountInfo, FrameSystemCall, FrameSystemCodeUpgradeAuthorization, FrameSystemError, FrameSystemEvent, FrameSystemEventRecord, FrameSystemExtensionsCheckGenesis, FrameSystemExtensionsCheckNonZeroSender, FrameSystemExtensionsCheckNonce, FrameSystemExtensionsCheckSpecVersion, FrameSystemExtensionsCheckTxVersion, FrameSystemExtensionsCheckWeight, FrameSystemLastRuntimeUpgradeInfo, FrameSystemLimitsBlockLength, FrameSystemLimitsBlockWeights, FrameSystemLimitsWeightsPerClass, FrameSystemPhase, PalletBalancesAccountData, PalletBalancesAdjustmentDirection, PalletBalancesBalanceLock, PalletBalancesCall, PalletBalancesError, PalletBalancesEvent, PalletBalancesIdAmountRuntimeFreezeReason, PalletBalancesIdAmountRuntimeHoldReason, PalletBalancesReasons, PalletBalancesReserveData, PalletBitcoinMintCall, PalletBitcoinMintError, PalletBitcoinMintEvent, PalletBitcoinMintHoldReason, PalletBitcoinMintLockedUtxo, PalletBitcoinMintLockedUtxoPendingConfirmation, PalletBlockRewardsCall, PalletBlockRewardsError, PalletBlockRewardsEvent, PalletBlockRewardsFreezeReason, PalletBlockRewardsHoldReason, PalletBlockSealCall, PalletBlockSealError, PalletBlockSealSpecCall, PalletBlockSealSpecError, PalletBlockSealSpecEvent, PalletBondCall, PalletBondError, PalletBondEvent, PalletBondHoldReason, PalletChainTransferCall, PalletChainTransferError, PalletChainTransferEvent, PalletChainTransferQueuedTransferOut, PalletDataDomainCall, PalletDataDomainDataDomainRegistration, PalletDataDomainError, PalletDataDomainEvent, PalletGrandpaCall, PalletGrandpaError, PalletGrandpaEvent, PalletGrandpaStoredPendingChange, PalletGrandpaStoredState, PalletMiningSlotCall, PalletMiningSlotError, PalletMiningSlotEvent, PalletMiningSlotHoldReason, PalletMiningSlotMinerHistory, PalletNotariesCall, PalletNotariesError, PalletNotariesEvent, PalletNotebookCall, PalletNotebookError, PalletNotebookEvent, PalletOffencesEvent, PalletPriceIndexCall, PalletPriceIndexError, PalletPriceIndexEvent, PalletPriceIndexPriceIndex, PalletProxyAnnouncement, PalletProxyCall, PalletProxyError, PalletProxyEvent, PalletProxyProxyDefinition, PalletSessionCall, PalletSessionError, PalletSessionEvent, PalletSudoCall, PalletSudoError, PalletSudoEvent, PalletTicksCall, PalletTicksError, PalletTimestampCall, PalletTransactionPaymentChargeTransactionPayment, PalletTransactionPaymentEvent, PalletTransactionPaymentReleases, PalletTxPauseCall, PalletTxPauseError, PalletTxPauseEvent, PalletUlixeeMintCall, PalletUlixeeMintError, PalletUlixeeMintEvent, PalletUlixeeMintHoldReason, SpArithmeticArithmeticError, SpConsensusGrandpaAppPublic, SpConsensusGrandpaAppSignature, SpConsensusGrandpaEquivocation, SpConsensusGrandpaEquivocationProof, SpCoreCryptoKeyTypeId, SpRuntimeDigest, SpRuntimeDigestDigestItem, SpRuntimeDispatchError, SpRuntimeModuleError, SpRuntimeMultiSignature, SpRuntimeTokenError, SpRuntimeTransactionalError, SpSessionMembershipProof, SpStakingOffenceOffenceDetails, SpVersionRuntimeVersion, SpWeightsRuntimeDbWeight, SpWeightsWeightV2Weight, UlxNodeRuntimeOpaqueSessionKeys, UlxNodeRuntimeProxyType, UlxNodeRuntimeRuntime, UlxNodeRuntimeRuntimeFreezeReason, UlxNodeRuntimeRuntimeHoldReason, UlxNotaryAuditAccountHistoryLookupError, UlxNotaryAuditErrorVerifyError, UlxPrimitivesAccountAccountType, UlxPrimitivesBalanceChangeAccountOrigin, UlxPrimitivesBalanceChangeMerkleProof, UlxPrimitivesBitcoinBitcoinUtxoId, UlxPrimitivesBitcoinCompressedPublicKey, UlxPrimitivesBitcoinH256Le, UlxPrimitivesBlockSealAppPublic, UlxPrimitivesBlockSealAppSignature, UlxPrimitivesBlockSealBlockPayout, UlxPrimitivesBlockSealMiningRegistration, UlxPrimitivesBlockSealRewardDestination, UlxPrimitivesBlockVoteBlockVoteT, UlxPrimitivesBond, UlxPrimitivesBondBondFund, UlxPrimitivesDataDomainSemver, UlxPrimitivesDataDomainVersionHost, UlxPrimitivesDataDomainZoneRecord, UlxPrimitivesDigestsBlockVoteDigest, UlxPrimitivesDigestsNotebookDigest, UlxPrimitivesDigestsNotebookDigestRecord, UlxPrimitivesDigestsParentVotingKeyDigest, UlxPrimitivesInherentsBitcoinUtxoSync, UlxPrimitivesInherentsBlockSealInherent, UlxPrimitivesNotaryNotaryMeta, UlxPrimitivesNotaryNotaryNotebookKeyDetails, UlxPrimitivesNotaryNotaryNotebookVoteDigestDetails, UlxPrimitivesNotaryNotaryRecord, UlxPrimitivesNotebookChainTransfer, UlxPrimitivesNotebookNotebookHeader, UlxPrimitivesNotebookSignedNotebookHeader, UlxPrimitivesProvidersBlockSealerInfo } from '@polkadot/types/lookup';
 
 declare module '@polkadot/types/types/registry' {
   interface InterfaceTypes {
@@ -48,7 +48,12 @@ declare module '@polkadot/types/types/registry' {
     PalletBalancesIdAmountRuntimeHoldReason: PalletBalancesIdAmountRuntimeHoldReason;
     PalletBalancesReasons: PalletBalancesReasons;
     PalletBalancesReserveData: PalletBalancesReserveData;
-    PalletBlockRewardsBlockPayout: PalletBlockRewardsBlockPayout;
+    PalletBitcoinMintCall: PalletBitcoinMintCall;
+    PalletBitcoinMintError: PalletBitcoinMintError;
+    PalletBitcoinMintEvent: PalletBitcoinMintEvent;
+    PalletBitcoinMintHoldReason: PalletBitcoinMintHoldReason;
+    PalletBitcoinMintLockedUtxo: PalletBitcoinMintLockedUtxo;
+    PalletBitcoinMintLockedUtxoPendingConfirmation: PalletBitcoinMintLockedUtxoPendingConfirmation;
     PalletBlockRewardsCall: PalletBlockRewardsCall;
     PalletBlockRewardsError: PalletBlockRewardsError;
     PalletBlockRewardsEvent: PalletBlockRewardsEvent;
@@ -81,10 +86,6 @@ declare module '@polkadot/types/types/registry' {
     PalletMiningSlotEvent: PalletMiningSlotEvent;
     PalletMiningSlotHoldReason: PalletMiningSlotHoldReason;
     PalletMiningSlotMinerHistory: PalletMiningSlotMinerHistory;
-    PalletMintCall: PalletMintCall;
-    PalletMintError: PalletMintError;
-    PalletMintEvent: PalletMintEvent;
-    PalletMintHoldReason: PalletMintHoldReason;
     PalletNotariesCall: PalletNotariesCall;
     PalletNotariesError: PalletNotariesError;
     PalletNotariesEvent: PalletNotariesEvent;
@@ -92,6 +93,15 @@ declare module '@polkadot/types/types/registry' {
     PalletNotebookError: PalletNotebookError;
     PalletNotebookEvent: PalletNotebookEvent;
     PalletOffencesEvent: PalletOffencesEvent;
+    PalletPriceIndexCall: PalletPriceIndexCall;
+    PalletPriceIndexError: PalletPriceIndexError;
+    PalletPriceIndexEvent: PalletPriceIndexEvent;
+    PalletPriceIndexPriceIndex: PalletPriceIndexPriceIndex;
+    PalletProxyAnnouncement: PalletProxyAnnouncement;
+    PalletProxyCall: PalletProxyCall;
+    PalletProxyError: PalletProxyError;
+    PalletProxyEvent: PalletProxyEvent;
+    PalletProxyProxyDefinition: PalletProxyProxyDefinition;
     PalletSessionCall: PalletSessionCall;
     PalletSessionError: PalletSessionError;
     PalletSessionEvent: PalletSessionEvent;
@@ -107,6 +117,10 @@ declare module '@polkadot/types/types/registry' {
     PalletTxPauseCall: PalletTxPauseCall;
     PalletTxPauseError: PalletTxPauseError;
     PalletTxPauseEvent: PalletTxPauseEvent;
+    PalletUlixeeMintCall: PalletUlixeeMintCall;
+    PalletUlixeeMintError: PalletUlixeeMintError;
+    PalletUlixeeMintEvent: PalletUlixeeMintEvent;
+    PalletUlixeeMintHoldReason: PalletUlixeeMintHoldReason;
     SpArithmeticArithmeticError: SpArithmeticArithmeticError;
     SpConsensusGrandpaAppPublic: SpConsensusGrandpaAppPublic;
     SpConsensusGrandpaAppSignature: SpConsensusGrandpaAppSignature;
@@ -126,6 +140,7 @@ declare module '@polkadot/types/types/registry' {
     SpWeightsRuntimeDbWeight: SpWeightsRuntimeDbWeight;
     SpWeightsWeightV2Weight: SpWeightsWeightV2Weight;
     UlxNodeRuntimeOpaqueSessionKeys: UlxNodeRuntimeOpaqueSessionKeys;
+    UlxNodeRuntimeProxyType: UlxNodeRuntimeProxyType;
     UlxNodeRuntimeRuntime: UlxNodeRuntimeRuntime;
     UlxNodeRuntimeRuntimeFreezeReason: UlxNodeRuntimeRuntimeFreezeReason;
     UlxNodeRuntimeRuntimeHoldReason: UlxNodeRuntimeRuntimeHoldReason;
@@ -134,8 +149,12 @@ declare module '@polkadot/types/types/registry' {
     UlxPrimitivesAccountAccountType: UlxPrimitivesAccountAccountType;
     UlxPrimitivesBalanceChangeAccountOrigin: UlxPrimitivesBalanceChangeAccountOrigin;
     UlxPrimitivesBalanceChangeMerkleProof: UlxPrimitivesBalanceChangeMerkleProof;
+    UlxPrimitivesBitcoinBitcoinUtxoId: UlxPrimitivesBitcoinBitcoinUtxoId;
+    UlxPrimitivesBitcoinCompressedPublicKey: UlxPrimitivesBitcoinCompressedPublicKey;
+    UlxPrimitivesBitcoinH256Le: UlxPrimitivesBitcoinH256Le;
     UlxPrimitivesBlockSealAppPublic: UlxPrimitivesBlockSealAppPublic;
     UlxPrimitivesBlockSealAppSignature: UlxPrimitivesBlockSealAppSignature;
+    UlxPrimitivesBlockSealBlockPayout: UlxPrimitivesBlockSealBlockPayout;
     UlxPrimitivesBlockSealMiningRegistration: UlxPrimitivesBlockSealMiningRegistration;
     UlxPrimitivesBlockSealRewardDestination: UlxPrimitivesBlockSealRewardDestination;
     UlxPrimitivesBlockVoteBlockVoteT: UlxPrimitivesBlockVoteBlockVoteT;
@@ -148,6 +167,7 @@ declare module '@polkadot/types/types/registry' {
     UlxPrimitivesDigestsNotebookDigest: UlxPrimitivesDigestsNotebookDigest;
     UlxPrimitivesDigestsNotebookDigestRecord: UlxPrimitivesDigestsNotebookDigestRecord;
     UlxPrimitivesDigestsParentVotingKeyDigest: UlxPrimitivesDigestsParentVotingKeyDigest;
+    UlxPrimitivesInherentsBitcoinUtxoSync: UlxPrimitivesInherentsBitcoinUtxoSync;
     UlxPrimitivesInherentsBlockSealInherent: UlxPrimitivesInherentsBlockSealInherent;
     UlxPrimitivesNotaryNotaryMeta: UlxPrimitivesNotaryNotaryMeta;
     UlxPrimitivesNotaryNotaryNotebookKeyDetails: UlxPrimitivesNotaryNotaryNotebookKeyDetails;
