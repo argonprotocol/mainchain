@@ -887,16 +887,6 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "6107fe1be6682a68940da878d9e9f5e90ca5745b3dec9fd1bb393c8777d4f581"
 
 [[package]]
-name = "base58ck"
-version = "0.1.0"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "2c8d66485a3a2ea485c1913c4572ce0256067a5377ac8c75c4960e1cda98605f"
-dependencies = [
- "bitcoin-internals 0.3.0",
- "bitcoin_hashes 0.14.0",
-]
-
-[[package]]
 name = "base64"
 version = "0.13.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -1007,48 +997,10 @@ dependencies = [
 ]
 
 [[package]]
-name = "bitcoin"
-version = "0.32.0"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "7170e7750a20974246f17ece04311b4205a6155f1db564c5b224af817663c3ea"
-dependencies = [
- "base58ck",
- "bech32 0.11.0",
- "bitcoin-internals 0.3.0",
- "bitcoin-io",
- "bitcoin-units",
- "bitcoin_hashes 0.14.0",
- "hex-conservative 0.2.0",
- "hex_lit",
- "secp256k1 0.29.0",
-]
-
-[[package]]
 name = "bitcoin-internals"
 version = "0.2.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "9425c3bf7089c983facbae04de54513cce73b41c7f9ff8c845b54e7bc64ebbfb"
-
-[[package]]
-name = "bitcoin-internals"
-version = "0.3.0"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "30bdbe14aa07b06e6cfeffc529a1f099e5fbe249524f8125358604df99a4bed2"
-
-[[package]]
-name = "bitcoin-io"
-version = "0.1.2"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "340e09e8399c7bd8912f495af6aa58bea0c9214773417ffaa8f6460f93aaee56"
-
-[[package]]
-name = "bitcoin-units"
-version = "0.1.1"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "cb54da0b28892f3c52203a7191534033e051b6f4b52bc15480681b57b7e036f5"
-dependencies = [
- "bitcoin-internals 0.3.0",
-]
 
 [[package]]
 name = "bitcoin_hashes"
@@ -1062,18 +1014,8 @@ version = "0.13.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "1930a4dabfebb8d7d9992db18ebe3ae2876f0a305fab206fd168df931ede293b"
 dependencies = [
- "bitcoin-internals 0.2.0",
- "hex-conservative 0.1.1",
-]
-
-[[package]]
-name = "bitcoin_hashes"
-version = "0.14.0"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "bb18c03d0db0247e147a21a6faafd5a7eb851c743db062de72018b6b7e8e4d16"
-dependencies = [
- "bitcoin-io",
- "hex-conservative 0.2.0",
+ "bitcoin-internals",
+ "hex-conservative",
 ]
 
 [[package]]
@@ -3554,21 +3496,6 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "30ed443af458ccb6d81c1e7e661545f94d3176752fb1df2f543b902a1e0f51e2"
 
 [[package]]
-name = "hex-conservative"
-version = "0.2.0"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "e1aa273bf451e37ed35ced41c71a5e2a4e29064afb104158f2514bcd71c2c986"
-dependencies = [
- "arrayvec 0.7.4",
-]
-
-[[package]]
-name = "hex_lit"
-version = "0.1.1"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "3011d1213f159867b13cfd6ac92d2cd5f1345762c63be3554e84092d85a50bbd"
-
-[[package]]
 name = "hkdf"
 version = "0.12.4"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -5265,7 +5192,7 @@ version = "0.4.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "4ce6260eda171e60381e40c24a59b5f103d0ca0225c7071972b7c2da52958ca0"
 dependencies = [
- "bitcoin 0.29.2",
+ "bitcoin",
  "bitcoin_hashes 0.11.0",
  "fastrand 1.9.0",
  "log",
@@ -5285,6 +5212,20 @@ dependencies = [
  "fastrand 1.9.0",
  "log",
  "thiserror",
+]
+
+[[package]]
+name = "nakamoto-net-poll"
+version = "0.4.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "c9395d7eff8212c961bb3d5aab80d34cae3b77ddc85af8c71b4ae26ff2e4c0d1"
+dependencies = [
+ "crossbeam-channel",
+ "libc",
+ "log",
+ "nakamoto-net",
+ "popol",
+ "socket2 0.4.10",
 ]
 
 [[package]]
@@ -6760,6 +6701,15 @@ dependencies = [
  "cpufeatures",
  "opaque-debug 0.3.1",
  "universal-hash",
+]
+
+[[package]]
+name = "popol"
+version = "2.2.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "a953dd115cbe3b9d10340d47e6825a9700059a2fee12cee722975776caf3c531"
+dependencies = [
+ "libc",
 ]
 
 [[package]]
@@ -8939,16 +8889,6 @@ dependencies = [
 ]
 
 [[package]]
-name = "secp256k1"
-version = "0.29.0"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "0e0cc0f1cf93f4969faf3ea1c7d8a9faed25918d96affa959720823dfe86d4f3"
-dependencies = [
- "bitcoin_hashes 0.13.0",
- "secp256k1-sys 0.10.0",
-]
-
-[[package]]
 name = "secp256k1-sys"
 version = "0.6.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -8962,15 +8902,6 @@ name = "secp256k1-sys"
 version = "0.9.2"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "e5d1746aae42c19d583c3c1a8c646bfad910498e2051c551a7f2e3c0c9fbb7eb"
-dependencies = [
- "cc",
-]
-
-[[package]]
-name = "secp256k1-sys"
-version = "0.10.0"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "1433bd67156263443f14d603720b082dd3121779323fce20cba2aa07b874bc1b"
 dependencies = [
  "cc",
 ]
@@ -11666,6 +11597,28 @@ dependencies = [
 ]
 
 [[package]]
+name = "ulx-bitcoin-utxo-tracker"
+version = "0.0.1"
+dependencies = [
+ "anyhow",
+ "async-trait",
+ "bitcoin",
+ "log",
+ "nakamoto-client",
+ "nakamoto-common",
+ "nakamoto-net",
+ "nakamoto-net-poll",
+ "nakamoto-p2p",
+ "parity-scale-codec",
+ "parking_lot 0.12.1",
+ "sc-service",
+ "sp-api",
+ "sp-runtime",
+ "thiserror",
+ "ulx-primitives",
+]
+
+[[package]]
 name = "ulx-localchain"
 version = "0.0.1"
 dependencies = [
@@ -11767,24 +11720,10 @@ dependencies = [
  "substrate-prometheus-endpoint",
  "thiserror",
  "try-runtime-cli",
+ "ulx-bitcoin-utxo-tracker",
  "ulx-node-consensus",
  "ulx-node-runtime",
  "ulx-primitives",
-]
-
-[[package]]
-name = "ulx-node-bitcoin"
-version = "0.0.1"
-dependencies = [
- "async-trait",
- "bitcoin 0.32.0",
- "log",
- "nakamoto-client",
- "nakamoto-common",
- "nakamoto-p2p",
- "parity-scale-codec",
- "parking_lot 0.12.1",
- "thiserror",
 ]
 
 [[package]]
@@ -11838,6 +11777,7 @@ dependencies = [
  "substrate-test-runtime-client",
  "thiserror",
  "tokio",
+ "ulx-bitcoin-utxo-tracker",
  "ulx-node-runtime",
  "ulx-notary",
  "ulx-notary-apis",

@@ -13,18 +13,21 @@ use sp_consensus::{BlockOrigin, Environment, Proposal, Proposer, SelectChain};
 use sp_core::H256;
 use sp_inherents::InherentDataProvider;
 use sp_keystore::KeystorePtr;
-use sp_runtime::traits::{Block as BlockT, Header as HeaderT};
+use sp_runtime::traits::{Block as BlockT, Header as HeaderT, NumberFor};
 use sp_timestamp::Timestamp;
+use ulx_bitcoin_utxo_tracker::{get_bitcoin_inherent, UtxoTracker};
 
 use ulx_node_runtime::{NotaryRecordT, NotebookVerifyError};
 use ulx_primitives::{
 	digests::FinalizedBlockNeededDigest,
 	inherents::{
-		BlockSealInherentDataProvider, BlockSealInherentNodeSide, NotebooksInherentDataProvider,
+		BitcoinInherentDataProvider, BlockSealInherentDataProvider, BlockSealInherentNodeSide,
+		NotebooksInherentDataProvider,
 	},
 	tick::Tick,
-	BestBlockVoteSeal, BlockSealApis, BlockSealAuthorityId, BlockSealAuthoritySignature,
-	BlockSealDigest, NotaryApis, NotaryId, NotebookApis, TickApis,
+	Balance, BestBlockVoteSeal, BitcoinApis, BlockSealApis, BlockSealAuthorityId,
+	BlockSealAuthoritySignature, BlockSealDigest, BondId, NotaryApis, NotaryId, NotebookApis,
+	TickApis,
 };
 
 use crate::{
@@ -160,27 +163,29 @@ where
 	(task, receiver)
 }
 
-pub async fn tax_block_creator<Block, C, E, L, CS, A>(
-	mut block_import: BoxBlockImport<Block>,
+pub async fn tax_block_creator<B, C, E, L, CS, A>(
+	mut block_import: BoxBlockImport<B>,
 	client: Arc<C>,
-	aux_client: UlxAux<Block, C>,
+	aux_client: UlxAux<B, C>,
 	mut env: E,
 	justification_sync_link: L,
 	max_time_to_build_block: Duration,
 	mut tax_block_create_stream: CS,
+	utxo_tracker: Arc<UtxoTracker>,
 ) where
-	Block: BlockT + 'static,
-	Block::Hash: Send + 'static,
-	C: ProvideRuntimeApi<Block> + HeaderBackend<Block> + AuxStore + 'static,
-	C::Api: NotebookApis<Block, NotebookVerifyError>
-		+ BlockSealApis<Block, A, BlockSealAuthorityId>
-		+ NotaryApis<Block, NotaryRecordT>
-		+ TickApis<Block>,
-	E: Environment<Block> + Send + Sync + 'static,
+	B: BlockT + 'static,
+	B::Hash: Send + 'static,
+	C: ProvideRuntimeApi<B> + HeaderBackend<B> + AuxStore + 'static,
+	C::Api: NotebookApis<B, NotebookVerifyError>
+		+ BlockSealApis<B, A, BlockSealAuthorityId>
+		+ NotaryApis<B, NotaryRecordT>
+		+ TickApis<B>
+		+ BitcoinApis<B, A, BondId, Balance, NumberFor<B>>,
+	E: Environment<B> + Send + Sync + 'static,
 	E::Error: std::fmt::Debug,
-	E::Proposer: Proposer<Block>,
-	L: sc_consensus::JustificationSyncLink<Block> + 'static,
-	CS: Stream<Item = CreateTaxVoteBlock<Block, A>> + Unpin + 'static,
+	E::Proposer: Proposer<B>,
+	L: sc_consensus::JustificationSyncLink<B> + 'static,
+	CS: Stream<Item = CreateTaxVoteBlock<B, A>> + Unpin + 'static,
 	A: Codec + Clone + Send + Sync + 'static,
 {
 	while let Some(command) = tax_block_create_stream.next().await {
@@ -196,6 +201,7 @@ pub async fn tax_block_creator<Block, C, E, L, CS, A>(
 			command.timestamp_millis,
 			command.parent_hash,
 			BlockSealInherentNodeSide::from_vote(vote, command.signature),
+			utxo_tracker.clone(),
 			max_time_to_build_block,
 		)
 		.await
@@ -206,7 +212,7 @@ pub async fn tax_block_creator<Block, C, E, L, CS, A>(
 				continue;
 			},
 		};
-		submit_block::<Block, L, _>(
+		submit_block::<B, L, _>(
 			&mut block_import,
 			proposal,
 			&justification_sync_link,
@@ -225,6 +231,7 @@ pub async fn propose<B, C, E, A>(
 	timestamp_millis: u64,
 	parent_hash: B::Hash,
 	seal_inherent: BlockSealInherentNodeSide,
+	utxo_tracker: Arc<UtxoTracker>,
 	max_time_to_build_block: Duration,
 ) -> Result<Proposal<B, <E::Proposer as Proposer<B>>::Proof>, Error<B>>
 where
@@ -233,7 +240,8 @@ where
 	C::Api: NotebookApis<B, NotebookVerifyError>
 		+ BlockSealApis<B, A, BlockSealAuthorityId>
 		+ NotaryApis<B, NotaryRecordT>
-		+ TickApis<B>,
+		+ TickApis<B>
+		+ BitcoinApis<B, A, BondId, Balance, NumberFor<B>>,
 	E: Environment<B> + Send + Sync + 'static,
 	E::Error: std::fmt::Debug,
 	E::Proposer: Proposer<B>,
@@ -243,6 +251,14 @@ where
 		Ok(Some(x)) => x,
 		Ok(None) => return Err(Error::BlockNotFound(parent_hash.to_string())),
 		Err(err) => return Err(err.into()),
+	};
+
+	let bitcoin_utxo_sync = match get_bitcoin_inherent(&utxo_tracker, &client, &parent_hash) {
+		Ok(x) => x,
+		Err(err) => {
+			warn!(target: LOG_TARGET, "Unable to get bitcoin inherent: {:?}", err);
+			return Err(Error::FailedToSyncBitcoinUtxos);
+		},
 	};
 
 	let notebook_header_data =
@@ -263,7 +279,8 @@ where
 	let seal = BlockSealInherentDataProvider { seal: Some(seal_inherent.clone()), digest: None };
 	let notebooks =
 		NotebooksInherentDataProvider { raw_notebooks: notebook_header_data.signed_headers };
-	let inherent_data = match (timestamp, seal, notebooks).create_inherent_data().await {
+
+	let mut inherent_data = match (timestamp, seal, notebooks).create_inherent_data().await {
 		Ok(r) => r,
 		Err(err) => {
 			warn!(
@@ -275,6 +292,12 @@ where
 			return Err(err.into());
 		},
 	};
+
+	if let Some(bitcoin_utxo_sync) = bitcoin_utxo_sync {
+		BitcoinInherentDataProvider { bitcoin_utxo_sync }
+			.provide_inherent_data(&mut inherent_data)
+			.await?;
+	}
 
 	let proposer: E::Proposer = match env.init(&parent_header).await {
 		Ok(x) => x,

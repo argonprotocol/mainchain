@@ -2,13 +2,10 @@ use codec::{Codec, Decode, Encode, MaxEncodedLen};
 use scale_info::TypeInfo;
 use sp_core::{ConstU32, RuntimeDebug, H256, U256};
 use sp_runtime::{BoundedVec, DispatchError};
-use sp_std::{
-	collections::{btree_map::BTreeMap, btree_set::BTreeSet},
-	vec::Vec,
-};
+use sp_std::{collections::btree_map::BTreeMap, vec::Vec};
 
 use crate::{
-	bitcoin::{BitcoinUtxoId, Satoshis},
+	bitcoin::{BitcoinSyncStatus, BitcoinUtxo, Satoshis, UtxoLookup},
 	block_seal::MiningAuthority,
 	notary::{NotaryId, NotaryNotebookVoteDetails, NotaryNotebookVoteDigestDetails},
 	tick::{Tick, Ticker},
@@ -70,9 +67,10 @@ sp_api::decl_runtime_apis! {
 }
 
 sp_api::decl_runtime_apis! {
-	pub trait BitcoinApis<Balance: Codec> {
-		fn active_utxos() -> BTreeSet<BitcoinUtxoId>;
-		fn redemption_rate(satoshis: Satoshis) -> Balance;
+	pub trait BitcoinApis<AccountId: Codec, BondId: Codec, Balance: Codec, BlockNumber: Codec> {
+		fn get_sync_status() -> Option<BitcoinSyncStatus>;
+		fn active_utxos() ->  BTreeMap<BitcoinUtxo, UtxoLookup>;
+		fn redemption_rate(satoshis: Satoshis) -> Option<Balance>;
 	}
 }
 

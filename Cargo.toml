@@ -2,7 +2,7 @@
 members = [
     "node",
     "node/consensus",
-    "node/bitcoin",
+    "node/bitcoin_utxo_tracker",
     "pallets/bitcoin_mint",
     "pallets/block_rewards",
     "pallets/block_seal",
@@ -252,9 +252,10 @@ rsntp = { version = "4.0" }
 
 nakamoto-client = { version = "0.4" }
 nakamoto-p2p = { version = "0.4" }
+nakamoto-net = { version = "0.4" }
 nakamoto-common = { version = "0.4" }
 nakamoto-net-poll = { version = "0.4" }
-bitcoin = { version = "0.32" }
+bitcoin = { version = "0.29.2" }
 
 
 napi-derive = { version = "2.16" }
@@ -278,7 +279,7 @@ ulx-testing = { path = "testing" }
 ulx-localchain = { path = "localchain" }
 ulixee-client = { path = "client" }
 ulx-node-consensus = { path = "node/consensus" }
-ulx-node-bitcoin = { path = "node/bitcoin" }
+ulx-bitcoin-utxo-tracker = { path = "node/bitcoin_utxo_tracker" }
 ulx-node = { path = "node" }
 ulx-node-runtime = { path = "runtime" }
 ulx-notary = { path = "notary" }

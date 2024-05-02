@@ -1,6 +1,6 @@
 //! Service and ServiceFactory implementation. Specialized wrapper over substrate service.
 
-use std::{cmp::max, sync::Arc, time::Duration};
+use std::{cmp::max, net::SocketAddr, sync::Arc, time::Duration};
 
 use futures::FutureExt;
 use sc_client_api::{Backend, BlockBackend};
@@ -11,6 +11,7 @@ use sc_service::{
 use sc_telemetry::{log, Telemetry, TelemetryWorker};
 use sc_transaction_pool_api::OffchainTransactionPoolFactory;
 
+use ulx_bitcoin_utxo_tracker::UtxoTracker;
 use ulx_node_consensus::{
 	aux_client::UlxAux,
 	basic_queue::BasicQueue,
@@ -18,6 +19,7 @@ use ulx_node_consensus::{
 	import_queue::{UlxImportQueue, UlxVerifier},
 };
 use ulx_node_runtime::{self, opaque::Block, AccountId, RuntimeApi};
+use ulx_primitives::bitcoin::BitcoinNetwork;
 
 use crate::rpc;
 
@@ -43,6 +45,8 @@ type UlxBlockImport = ulx_node_consensus::import_queue::UlxBlockImport<
 #[allow(clippy::type_complexity)]
 pub fn new_partial(
 	config: &Configuration,
+	bitcoin_network: BitcoinNetwork,
+	bitcoin_peers: Vec<String>,
 ) -> Result<
 	sc_service::PartialComponents<
 		FullClient,
@@ -53,6 +57,7 @@ pub fn new_partial(
 		(
 			UlxBlockImport,
 			UlxAux<Block, FullClient>,
+			Arc<UtxoTracker>,
 			sc_consensus_grandpa::LinkHalf<Block, FullClient, FullSelectChain>,
 			Option<Telemetry>,
 		),
@@ -70,6 +75,7 @@ pub fn new_partial(
 		})
 		.transpose()?;
 
+	let data_path = config.data_path.clone();
 	let executor = sc_service::new_wasm_executor::<sp_io::SubstrateHostFunctions>(config);
 
 	let (client, backend, keystore_container, task_manager) =
@@ -102,12 +108,30 @@ pub fn new_partial(
 		telemetry.as_ref().map(|x| x.handle()),
 	)?;
 
+	let mut connect_peers: Vec<SocketAddr> = vec![];
+	for peer in bitcoin_peers.iter() {
+		connect_peers.push(
+			peer.parse().map_err(|e| {
+				ServiceError::Other(format!("Unable to parse bitcoin peer {:?}", e))
+			})?,
+		);
+	}
+
+	let utxo_tracker =
+		UtxoTracker::new(bitcoin_network, connect_peers, data_path.join("bitcoin"), &task_manager)
+			.map_err(|e| {
+				ServiceError::Other(format!("Failed to initialize bitcoin monitoring {:?}", e))
+			})?;
+
+	let utxo_tracker = Arc::new(utxo_tracker);
+
 	let aux_client = UlxAux::<Block, _>::new(client.clone());
 	let ulx_block_import = UlxBlockImport::new(
 		grandpa_block_import.clone(),
 		client.clone(),
 		aux_client.clone(),
 		select_chain.clone(),
+		utxo_tracker.clone(),
 	);
 
 	let import_queue = UlxImportQueue::<Block>::new(
@@ -127,7 +151,7 @@ pub fn new_partial(
 		keystore_container,
 		select_chain,
 		transaction_pool,
-		other: (ulx_block_import, aux_client, grandpa_link, telemetry),
+		other: (ulx_block_import, aux_client, utxo_tracker, grandpa_link, telemetry),
 	})
 }
 
@@ -136,6 +160,8 @@ pub fn new_full(
 	config: Configuration,
 	mining_account_id: Option<AccountId>,
 	mining_threads: Option<u32>,
+	bitcoin_network: BitcoinNetwork,
+	bitcoin_peers: Vec<String>,
 ) -> Result<TaskManager, ServiceError> {
 	let sc_service::PartialComponents {
 		client,
@@ -145,8 +171,8 @@ pub fn new_full(
 		import_queue,
 		keystore_container,
 		select_chain,
-		other: (ulx_block_import, aux_client, grandpa_link, mut telemetry),
-	} = new_partial(&config)?;
+		other: (ulx_block_import, aux_client, utxo_tracker, grandpa_link, mut telemetry),
+	} = new_partial(&config, bitcoin_network, bitcoin_peers)?;
 
 	let mut net_config = sc_network::config::FullNetworkConfiguration::new(&config.network);
 	let grandpa_protocol_name = sc_consensus_grandpa::protocol_standard_name(
@@ -271,6 +297,7 @@ pub fn new_full(
 					sync_service.clone(),
 					block_author.clone(),
 					sync_service.clone(),
+					utxo_tracker.clone(),
 					block_seconds,
 				);
 
@@ -301,6 +328,7 @@ pub fn new_full(
 				sync_service.clone(),
 				block_seconds,
 				create_block_stream,
+				utxo_tracker.clone(),
 			);
 
 			task_manager.spawn_essential_handle().spawn_blocking(

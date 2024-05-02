@@ -24,8 +24,9 @@ use sp_api::ProvideRuntimeApi;
 use sp_blockchain::HeaderBackend;
 use sp_consensus::{Environment, Proposal, Proposer, SelectChain, SyncOracle};
 use sp_core::{traits::SpawnEssentialNamed, RuntimeDebug, U256};
-use sp_runtime::traits::{Block as BlockT, Header as HeaderT};
+use sp_runtime::traits::{Block as BlockT, Header as HeaderT, NumberFor};
 use sp_timestamp::Timestamp;
+use ulx_bitcoin_utxo_tracker::UtxoTracker;
 
 use ulx_node_runtime::{NotaryRecordT, NotebookVerifyError};
 use ulx_primitives::{inherents::BlockSealInherentNodeSide, tick::Tick, *};
@@ -274,6 +275,7 @@ pub fn create_compute_miner<B, C, S, E, SO, L, AccountId>(
 	sync_oracle: SO,
 	account_id: AccountId,
 	justification_sync_link: L,
+	utxo_tracker: Arc<UtxoTracker>,
 	max_time_to_build_block: Duration,
 ) -> (MiningHandle<B, L, <E::Proposer as Proposer<B>>::Proof>, impl Future<Output = ()> + 'static)
 where
@@ -282,7 +284,8 @@ where
 	C::Api: BlockSealApis<B, AccountId, BlockSealAuthorityId>
 		+ TickApis<B>
 		+ NotebookApis<B, NotebookVerifyError>
-		+ NotaryApis<B, NotaryRecordT>,
+		+ NotaryApis<B, NotaryRecordT>
+		+ BitcoinApis<B, AccountId, BondId, Balance, NumberFor<B>>,
 	S: SelectChain<B> + 'static,
 	E: Environment<B> + Send + Sync + 'static,
 	E::Error: std::fmt::Debug,
@@ -370,6 +373,7 @@ where
 					time.as_millis(),
 					best_hash,
 					BlockSealInherentNodeSide::Compute,
+					utxo_tracker.clone(),
 					max_time_to_build_block,
 				)
 				.await

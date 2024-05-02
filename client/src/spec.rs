@@ -11133,7 +11133,7 @@ pub mod api {
 			}
 			pub mod utxo_ownership_confirmed {
 				use super::runtime_types;
-				pub type Utxo = runtime_types::ulx_primitives::bitcoin::BitcoinUtxoId;
+				pub type Utxo = runtime_types::ulx_primitives::bitcoin::BitcoinUtxo;
 				pub type AccountId = ::subxt::utils::AccountId32;
 				pub type BondId = ::core::primitive::u64;
 				pub type Amount = ::core::primitive::u128;
@@ -11162,7 +11162,7 @@ pub mod api {
 			}
 			pub mod utxo_unlocked {
 				use super::runtime_types;
-				pub type Utxo = runtime_types::ulx_primitives::bitcoin::BitcoinUtxoId;
+				pub type Utxo = runtime_types::ulx_primitives::bitcoin::BitcoinUtxo;
 				pub type AccountId = ::subxt::utils::AccountId32;
 				pub type BondId = ::core::primitive::u64;
 				pub type Amount = ::core::primitive::u128;
@@ -11191,7 +11191,7 @@ pub mod api {
 			}
 			pub mod utxo_ownership_denied {
 				use super::runtime_types;
-				pub type Utxo = runtime_types::ulx_primitives::bitcoin::BitcoinUtxoId;
+				pub type Utxo = runtime_types::ulx_primitives::bitcoin::BitcoinUtxo;
 				pub type AccountId = ::subxt::utils::AccountId32;
 				pub type BondId = ::core::primitive::u64;
 				pub type Amount = ::core::primitive::u128;
@@ -11218,7 +11218,7 @@ pub mod api {
 			}
 			pub mod utxo_moved_with_burn {
 				use super::runtime_types;
-				pub type Utxo = runtime_types::ulx_primitives::bitcoin::BitcoinUtxoId;
+				pub type Utxo = runtime_types::ulx_primitives::bitcoin::BitcoinUtxo;
 				pub type BondId = ::core::primitive::u64;
 			}
 			impl ::subxt::events::StaticEvent for UtxoMovedWithBurn {
@@ -11238,20 +11238,20 @@ pub mod api {
 						::core::primitive::u128,
 						::core::primitive::u32,
 					>;
-					pub type Param0 = runtime_types::ulx_primitives::bitcoin::BitcoinUtxoId;
+					pub type Param0 = runtime_types::ulx_primitives::bitcoin::BitcoinUtxo;
 				}
 				pub mod tracked_utxos {
 					use super::runtime_types;
 					pub type TrackedUtxos =
 						runtime_types::bounded_collections::bounded_btree_set::BoundedBTreeSet<
-							runtime_types::ulx_primitives::bitcoin::BitcoinUtxoId,
+							runtime_types::ulx_primitives::bitcoin::BitcoinUtxo,
 						>;
 				}
 				pub mod utxos_pending_confirmation {
 					use super::runtime_types;
 					pub type UtxosPendingConfirmation =
 						runtime_types::bounded_collections::bounded_btree_map::BoundedBTreeMap<
-							runtime_types::ulx_primitives::bitcoin::BitcoinUtxoId,
+							runtime_types::ulx_primitives::bitcoin::BitcoinUtxo,
 							runtime_types::pallet_bitcoin_mint::LockedUtxoPendingConfirmation<
 								::subxt::utils::AccountId32,
 								::core::primitive::u64,
@@ -11264,7 +11264,7 @@ pub mod api {
 					use super::runtime_types;
 					pub type PendingMintUtxos =
 						runtime_types::bounded_collections::bounded_vec::BoundedVec<(
-							runtime_types::ulx_primitives::bitcoin::BitcoinUtxoId,
+							runtime_types::ulx_primitives::bitcoin::BitcoinUtxo,
 							::subxt::utils::AccountId32,
 							::core::primitive::u128,
 						)>;
@@ -11273,7 +11273,7 @@ pub mod api {
 					use super::runtime_types;
 					pub type LockedUtxoExpirationBlocks =
 						runtime_types::bounded_collections::bounded_vec::BoundedVec<
-							runtime_types::ulx_primitives::bitcoin::BitcoinUtxoId,
+							runtime_types::ulx_primitives::bitcoin::BitcoinUtxo,
 						>;
 					pub type Param0 = ::core::primitive::u32;
 				}
@@ -16764,7 +16764,7 @@ pub mod api {
 				pub enum Event {
 					#[codec(index = 0)]
 					UtxoOwnershipConfirmed {
-						utxo: runtime_types::ulx_primitives::bitcoin::BitcoinUtxoId,
+						utxo: runtime_types::ulx_primitives::bitcoin::BitcoinUtxo,
 						account_id: ::subxt::utils::AccountId32,
 						bond_id: ::core::primitive::u64,
 						amount: ::core::primitive::u128,
@@ -16772,14 +16772,14 @@ pub mod api {
 					},
 					#[codec(index = 1)]
 					UtxoUnlocked {
-						utxo: runtime_types::ulx_primitives::bitcoin::BitcoinUtxoId,
+						utxo: runtime_types::ulx_primitives::bitcoin::BitcoinUtxo,
 						account_id: ::subxt::utils::AccountId32,
 						bond_id: ::core::primitive::u64,
 						amount: ::core::primitive::u128,
 					},
 					#[codec(index = 2)]
 					UtxoOwnershipDenied {
-						utxo: runtime_types::ulx_primitives::bitcoin::BitcoinUtxoId,
+						utxo: runtime_types::ulx_primitives::bitcoin::BitcoinUtxo,
 						account_id: ::subxt::utils::AccountId32,
 						bond_id: ::core::primitive::u64,
 						amount: ::core::primitive::u128,
@@ -16787,7 +16787,7 @@ pub mod api {
 					},
 					#[codec(index = 3)]
 					UtxoMovedWithBurn {
-						utxo: runtime_types::ulx_primitives::bitcoin::BitcoinUtxoId,
+						utxo: runtime_types::ulx_primitives::bitcoin::BitcoinUtxo,
 						bond_id: ::core::primitive::u64,
 					},
 				}
@@ -20878,7 +20878,7 @@ pub mod api {
 				# [codec (crate = :: subxt :: ext :: codec)]
 				#[decode_as_type(crate_path = ":: subxt :: ext :: scale_decode")]
 				#[encode_as_type(crate_path = ":: subxt :: ext :: scale_encode")]
-				pub struct BitcoinUtxoId {
+				pub struct BitcoinUtxo {
 					pub txid: runtime_types::ulx_primitives::bitcoin::H256Le,
 					pub output_index: ::core::primitive::u32,
 				}
@@ -21272,10 +21272,10 @@ pub mod api {
 				#[encode_as_type(crate_path = ":: subxt :: ext :: scale_encode")]
 				pub struct BitcoinUtxoSync {
 					pub moved: runtime_types::bounded_collections::bounded_vec::BoundedVec<
-						runtime_types::ulx_primitives::bitcoin::BitcoinUtxoId,
+						runtime_types::ulx_primitives::bitcoin::BitcoinUtxo,
 					>,
 					pub confirmed: runtime_types::bounded_collections::bounded_vec::BoundedVec<
-						runtime_types::ulx_primitives::bitcoin::BitcoinUtxoId,
+						runtime_types::ulx_primitives::bitcoin::BitcoinUtxo,
 					>,
 					pub block_hash: runtime_types::ulx_primitives::bitcoin::H256Le,
 					pub block_height: ::core::primitive::u32,

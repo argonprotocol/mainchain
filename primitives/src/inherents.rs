@@ -1,12 +1,12 @@
 use codec::{Codec, Decode, Encode};
 use scale_info::TypeInfo;
-use sp_core::{ConstU32, U256};
+use sp_core::U256;
 use sp_inherents::{InherentData, InherentIdentifier, IsFatalError};
-use sp_runtime::{BoundedVec, RuntimeDebug};
-use sp_std::vec::Vec;
+use sp_runtime::RuntimeDebug;
+use sp_std::{collections::btree_map::BTreeMap, vec::Vec};
 
 use crate::{
-	bitcoin::{BitcoinUtxoId, H256Le},
+	bitcoin::{BitcoinBlock, BitcoinHeight, BitcoinRejectedReason, BitcoinUtxo},
 	BestBlockVoteSeal, BlockSealAuthoritySignature, BlockSealDigest, BlockVote, MerkleProof,
 	NotaryId, NotebookNumber, SignedNotebookHeader,
 };
@@ -274,15 +274,15 @@ impl BitcoinInherentData for InherentData {
 
 #[derive(Clone, PartialEq, Encode, Decode, RuntimeDebug, TypeInfo)]
 pub struct BitcoinUtxoSync {
-	pub moved: BoundedVec<BitcoinUtxoId, ConstU32<100>>,
-	pub confirmed: BoundedVec<BitcoinUtxoId, ConstU32<100>>,
-	pub block_hash: H256Le,
-	pub block_height: u32,
+	pub spent: BTreeMap<BitcoinUtxo, BitcoinHeight>,
+	pub verified: BTreeMap<BitcoinUtxo, BitcoinHeight>,
+	pub invalid: BTreeMap<BitcoinUtxo, BitcoinRejectedReason>,
+	pub sync_to_block: BitcoinBlock,
 }
 
 #[cfg(feature = "std")]
 pub struct BitcoinInherentDataProvider {
-	pub bitcoin_sync: BitcoinUtxoSync,
+	pub bitcoin_utxo_sync: BitcoinUtxoSync,
 }
 #[cfg(feature = "std")]
 #[async_trait::async_trait]
@@ -291,7 +291,7 @@ impl sp_inherents::InherentDataProvider for BitcoinInherentDataProvider {
 		&self,
 		inherent_data: &mut InherentData,
 	) -> Result<(), sp_inherents::Error> {
-		inherent_data.put_data(BITCOIN_INHERENT_IDENTIFIER, &self.bitcoin_sync)?;
+		inherent_data.put_data(BITCOIN_INHERENT_IDENTIFIER, &self.bitcoin_utxo_sync)?;
 		Ok(())
 	}
 
@@ -309,12 +309,12 @@ impl sp_inherents::InherentDataProvider for BitcoinInherentDataProvider {
 #[derive(Encode, RuntimeDebug)]
 #[cfg_attr(feature = "std", derive(Decode, thiserror::Error))]
 pub enum BitcoinInherentError {
-	/// The block seal is missing
-	#[cfg_attr(feature = "std", error("The bitcoin inherent is missing."))]
-	MissingInherent,
-	/// The inherent has a mismatch with the details included in the block
-	#[cfg_attr(feature = "std", error("The bitcoin inherent does not match the block."))]
-	InherentMismatch,
+	/// The inherent has a mismatch with the details coordinated between bitcoin and the block
+	#[cfg_attr(
+		feature = "std",
+		error("The bitcoin inherent does not match the bitcoin state compared to the block.")
+	)]
+	InvalidInherentData,
 }
 
 impl BitcoinInherentError {

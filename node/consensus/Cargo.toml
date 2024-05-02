@@ -53,6 +53,7 @@ schnellru = { workspace = true }
 ulx-primitives = { workspace = true, features = ["default"] }
 ulx-notary-apis = { workspace = true }
 ulx-node-runtime = { workspace = true, features = ["default"] }
+ulx-bitcoin-utxo-tracker = { workspace = true }
 
 
 [dev-dependencies]

@@ -55,6 +55,7 @@ script = [
 description = "Run sqlx setup"
 script = [
     "cd localchain && cargo sqlx database setup || true",
+    "cd ..",
     "cd notary && cargo sqlx database setup || true",
 ]
 install_crate_args = ["--no-confirm"]
@@ -82,6 +83,7 @@ description = "Compiles the project"
 command = "cargo"
 args = ["build", "--features", "fast-runtime"]
 env = { "RUSTC_WRAPPER" = "sccache" }
+dependencies = ["sqlx-setup"]
 
 [tasks.test]
 description = "Run tests with nextest,"
@@ -104,6 +106,7 @@ command = "cargo"
 args = ["watch", "-x", "build", "--features", "fast-runtime"]
 env = { "RUSTC_WRAPPER" = "sccache" }
 install_crate_args = ["--no-confirm"]
+dependencies = ["sqlx-setup"]
 
 [tasks.watch.install_crate]
 crate_name = "cargo-watch"
@@ -112,4 +115,3 @@ binary = "cargo-watch"
 test_arg = "--version"
 force = false
 install_command = "binstall"
-

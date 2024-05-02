@@ -62,6 +62,7 @@ use sp_version::RuntimeVersion;
 pub use currency::*;
 pub use pallet_notebook::NotebookVerifyError;
 use ulx_primitives::{
+	bitcoin::{BitcoinHeight, BitcoinSyncStatus, BitcoinUtxo, Satoshis, UtxoLookup},
 	block_seal::MiningAuthority,
 	block_vote::VoteMinimum,
 	digests::BlockVoteDigest,
@@ -79,6 +80,7 @@ pub use ulx_primitives::{
 };
 
 use crate::opaque::SessionKeys;
+
 // A few exports that help ease life for downstream crates.
 
 // Make the WASM binary available.
@@ -591,6 +593,8 @@ parameter_types! {
 	pub const MaxDowntimeBeforeReset: Moment = 60 * 60 * 1000; // 1 hour
 	pub const MaxHistoryToKeep: u32 = 24 * 60; // 1 day worth of prices
 	pub const OldestHistoryToKeep: Moment = 24 * 60 * 60 * 1000; // 1 day
+
+	pub const MaxBitcoinBirthBlocksOld: BitcoinHeight = 10 * (6 * 24); // 10 days of bitcoin blocks
 }
 
 impl pallet_price_index::Config for Runtime {
@@ -618,6 +622,7 @@ impl pallet_bitcoin_mint::Config for Runtime {
 	type ArgonPriceProvider = PriceIndex;
 	type MaxPendingMintUtxos = MaxPendingMintUtxos;
 	type MaxTrackedUtxos = MaxTrackedUtxos;
+	type MaxBitcoinBirthBlocksOld = MaxBitcoinBirthBlocksOld;
 }
 
 impl pallet_ulixee_mint::Config for Runtime {
@@ -965,6 +970,20 @@ impl_runtime_apis! {
 		}
 		fn blocks_at_tick(tick: Tick) -> Vec<<Block as BlockT>::Hash> {
 			Ticks::blocks_at_tick(tick)
+		}
+	}
+
+	impl ulx_primitives::BitcoinApis<Block, AccountId, BondId, Balance, BlockNumber> for Runtime {
+		fn get_sync_status() -> Option<BitcoinSyncStatus> {
+			BitcoinMint::get_sync_status()
+		}
+
+		fn active_utxos() ->  BTreeMap<BitcoinUtxo, UtxoLookup> {
+			BitcoinMint::active_utxos()
+		}
+
+		fn redemption_rate(satoshis: Satoshis) -> Option<Balance> {
+			BitcoinMint::get_redemption_price(&satoshis).ok()
 		}
 	}
 

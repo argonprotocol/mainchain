@@ -1,5 +1,6 @@
 use sc_cli::RunCmd;
 use ulx_node_runtime::AccountId;
+use ulx_primitives::bitcoin::BitcoinNetwork;
 
 #[derive(Debug, clap::Parser)]
 pub struct Cli {
@@ -18,6 +19,14 @@ pub struct Cli {
 	/// How many mining threads to run
 	#[arg(long)]
 	pub miners: Option<u32>,
+
+	/// Which Bitcoin network to connect to. Should only be used for testing.
+	#[arg(long, default_value("mainnet"))]
+	pub bitcoin_network: BitcoinNetwork,
+
+	/// Bitcoin peers to connect to. Will use p2p if none provided (unsafe).
+	#[arg(long)]
+	pub bitcoin_peers: Option<Vec<String>>,
 }
 
 impl Cli {
