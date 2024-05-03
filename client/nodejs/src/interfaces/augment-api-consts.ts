@@ -43,23 +43,20 @@ declare module '@polkadot/api-base/types/consts' {
        **/
       maxReserves: u32 & AugmentedConst<ApiType>;
     };
-    bitcoinMint: {
+    bitcoinUtxos: {
       /**
-       * The required bond duration for a Bitcoin submission
+       * Maximum bitcoin blocks to watch a Utxo for confirmation before canceling
        **/
-      bondDurationBlocks: u32 & AugmentedConst<ApiType>;
+      maxPendingConfirmationBlocks: u64 & AugmentedConst<ApiType>;
       /**
-       * The maximum number of UTXOs that can be waiting for minting
+       * The maximum number of UTXOs that can be tracked in a block and/or expiring at same block
        **/
-      maxPendingMintUtxos: u32 & AugmentedConst<ApiType>;
+      maxPendingConfirmationUtxos: u32 & AugmentedConst<ApiType>;
       /**
-       * The maximum number of UTXOs that can be tracked at a given time
+       * The number of blocks previous to the tip that a bitcoin UTXO will be allowed to be
+       * locked
        **/
-      maxTrackedUtxos: u32 & AugmentedConst<ApiType>;
-      /**
-       * The minimum number of satoshis that can be submitted in a single transaction
-       **/
-      minimumSatoshiAmount: u64 & AugmentedConst<ApiType>;
+      maxUtxoBirthBlocksOld: u64 & AugmentedConst<ApiType>;
     };
     blockRewards: {
       /**
@@ -97,25 +94,41 @@ declare module '@polkadot/api-base/types/consts' {
        **/
       targetBlockVotes: u128 & AugmentedConst<ApiType>;
     };
-    bond: {
+    bonds: {
       /**
-       * Blocks per year used for APR calculations
+       * The number of blocks a bitcoin bond is locked for
        **/
-      blocksPerYear: u32 & AugmentedConst<ApiType>;
+      bitcoinBondDurationBlocks: u64 & AugmentedConst<ApiType>;
       /**
-       * Pallet storage requires bounds, so we have to set a maximum number that can expire in a
-       * single block
+       * The bitcoin blocks after a bond expires which the vault will be allowed to claim a
+       * bitcoin
        **/
-      maxConcurrentlyExpiringBondFunds: u32 & AugmentedConst<ApiType>;
+      bitcoinBondReclamationBlocks: u64 & AugmentedConst<ApiType>;
       /**
        * Pallet storage requires bounds, so we have to set a maximum number that can expire in a
        * single block
        **/
       maxConcurrentlyExpiringBonds: u32 & AugmentedConst<ApiType>;
       /**
+       * Maximum unlocking utxos at a time
+       **/
+      maxUnlockingUtxos: u32 & AugmentedConst<ApiType>;
+      /**
+       * The minimum number of satoshis that can be bonded
+       **/
+      minimumBitcoinBondSatoshis: u64 & AugmentedConst<ApiType>;
+      /**
        * Minimum amount for a bond
        **/
       minimumBondAmount: u128 & AugmentedConst<ApiType>;
+      /**
+       * Ulixee blocks per day
+       **/
+      ulixeeBlocksPerDay: u32 & AugmentedConst<ApiType>;
+      /**
+       * Number of bitcoin blocks a vault has to counter-sign a bitcoin unlock
+       **/
+      utxoUnlockCosignDeadlineBlocks: u64 & AugmentedConst<ApiType>;
     };
     chainTransfer: {
       /**
@@ -173,6 +186,12 @@ declare module '@polkadot/api-base/types/consts' {
        **/
       sessionIndicesToKeepInHistory: u32 & AugmentedConst<ApiType>;
     };
+    mint: {
+      /**
+       * The maximum number of UTXOs that can be waiting for minting
+       **/
+      maxPendingMintUtxos: u32 & AugmentedConst<ApiType>;
+    };
     notaries: {
       /**
        * The maximum active notaries allowed
@@ -203,13 +222,9 @@ declare module '@polkadot/api-base/types/consts' {
        **/
       maxDowntimeBeforeReset: u64 & AugmentedConst<ApiType>;
       /**
-       * Max entries to keep in history
+       * The oldest history to keep
        **/
-      maxHistoryToKeep: u32 & AugmentedConst<ApiType>;
-      /**
-       * Oldest history entries to keep
-       **/
-      oldestHistoryToKeep: u64 & AugmentedConst<ApiType>;
+      oldestPriceAllowed: u64 & AugmentedConst<ApiType>;
     };
     proxy: {
       /**
@@ -354,6 +369,20 @@ declare module '@polkadot/api-base/types/consts' {
        * Use of reserves is deprecated in favour of holds. See `https://github.com/paritytech/substrate/pull/12951/`
        **/
       maxReserves: u32 & AugmentedConst<ApiType>;
+    };
+    vaults: {
+      /**
+       * Ulixee blocks per day
+       **/
+      blocksPerDay: u32 & AugmentedConst<ApiType>;
+      /**
+       * The max amount of pending bitcoin pubkey hashes allowed
+       **/
+      maxVaultBitcoinPubkeys: u32 & AugmentedConst<ApiType>;
+      /**
+       * Minimum amount for a bond
+       **/
+      minimumBondAmount: u128 & AugmentedConst<ApiType>;
     };
   } // AugmentedConsts
 } // declare module

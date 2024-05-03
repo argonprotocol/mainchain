@@ -62,33 +62,23 @@ pub fn run() -> sc_cli::Result<()> {
 			let runner = cli.create_runner(cmd)?;
 			runner.async_run(|config| {
 				let PartialComponents { client, task_manager, import_queue, .. } =
-					service::new_partial(
-						&config,
-						cli.bitcoin_network,
-						cli.bitcoin_peers.unwrap_or_default(),
-					)?;
+					service::new_partial(&config, cli.bitcoin_rpc_url)?;
 				Ok((cmd.run(client, import_queue), task_manager))
 			})
 		},
 		Some(Subcommand::ExportBlocks(cmd)) => {
 			let runner = cli.create_runner(cmd)?;
 			runner.async_run(|config| {
-				let PartialComponents { client, task_manager, .. } = service::new_partial(
-					&config,
-					cli.bitcoin_network,
-					cli.bitcoin_peers.unwrap_or_default(),
-				)?;
+				let PartialComponents { client, task_manager, .. } =
+					service::new_partial(&config, cli.bitcoin_rpc_url)?;
 				Ok((cmd.run(client, config.database), task_manager))
 			})
 		},
 		Some(Subcommand::ExportState(cmd)) => {
 			let runner = cli.create_runner(cmd)?;
 			runner.async_run(|config| {
-				let PartialComponents { client, task_manager, .. } = service::new_partial(
-					&config,
-					cli.bitcoin_network,
-					cli.bitcoin_peers.unwrap_or_default(),
-				)?;
+				let PartialComponents { client, task_manager, .. } =
+					service::new_partial(&config, cli.bitcoin_rpc_url)?;
 				Ok((cmd.run(client, config.chain_spec), task_manager))
 			})
 		},
@@ -96,11 +86,7 @@ pub fn run() -> sc_cli::Result<()> {
 			let runner = cli.create_runner(cmd)?;
 			runner.async_run(|config| {
 				let PartialComponents { client, task_manager, import_queue, .. } =
-					service::new_partial(
-						&config,
-						cli.bitcoin_network,
-						cli.bitcoin_peers.unwrap_or_default(),
-					)?;
+					service::new_partial(&config, cli.bitcoin_rpc_url)?;
 				Ok((cmd.run(client, import_queue), task_manager))
 			})
 		},
@@ -111,11 +97,8 @@ pub fn run() -> sc_cli::Result<()> {
 		Some(Subcommand::Revert(cmd)) => {
 			let runner = cli.create_runner(cmd)?;
 			runner.async_run(|config| {
-				let PartialComponents { client, task_manager, backend, .. } = service::new_partial(
-					&config,
-					cli.bitcoin_network,
-					cli.bitcoin_peers.unwrap_or_default(),
-				)?;
+				let PartialComponents { client, task_manager, backend, .. } =
+					service::new_partial(&config, cli.bitcoin_rpc_url)?;
 				let aux_revert = Box::new(|client, _, blocks| {
 					sc_consensus_grandpa::revert(client, blocks)?;
 					Ok(())
@@ -125,8 +108,7 @@ pub fn run() -> sc_cli::Result<()> {
 		},
 		Some(Subcommand::Benchmark(cmd)) => {
 			let runner = cli.create_runner(cmd)?;
-			let btc_network = cli.bitcoin_network;
-			let btc_peers = cli.bitcoin_peers.unwrap_or_default();
+			let bitcoin_rpc_url = cli.bitcoin_rpc_url;
 
 			runner.sync_run(|config| {
 				// This switch needs to be in the client, since the client decides
@@ -145,7 +127,7 @@ pub fn run() -> sc_cli::Result<()> {
 					},
 					BenchmarkCmd::Block(cmd) => {
 						let PartialComponents { client, .. } =
-							service::new_partial(&config, btc_network, btc_peers)?;
+							service::new_partial(&config, bitcoin_rpc_url)?;
 						cmd.run(client)
 					},
 					#[cfg(not(feature = "runtime-benchmarks"))]
@@ -164,7 +146,7 @@ pub fn run() -> sc_cli::Result<()> {
 					},
 					BenchmarkCmd::Overhead(cmd) => {
 						let PartialComponents { client, .. } =
-							service::new_partial(&config, btc_network, btc_peers)?;
+							service::new_partial(&config, bitcoin_rpc_url)?;
 						let ext_builder = RemarkBuilder::new(client.clone());
 
 						cmd.run(
@@ -177,7 +159,7 @@ pub fn run() -> sc_cli::Result<()> {
 					},
 					BenchmarkCmd::Extrinsic(cmd) => {
 						let PartialComponents { client, .. } =
-							service::new_partial(&config, btc_network, btc_peers)?;
+							service::new_partial(&config, bitcoin_rpc_url)?;
 						// Register the *Remark* and *TKA* builders.
 						let ext_factory = ExtrinsicFactory(vec![
 							Box::new(RemarkBuilder::new(client.clone())),
@@ -208,14 +190,8 @@ pub fn run() -> sc_cli::Result<()> {
 		None => {
 			let runner = cli.create_runner(&cli.run)?;
 			runner.run_node_until_exit(|config| async move {
-				service::new_full(
-					config,
-					cli.block_author(),
-					cli.miners,
-					cli.bitcoin_network,
-					cli.bitcoin_peers.unwrap_or_default(),
-				)
-				.map_err(sc_cli::Error::Service)
+				service::new_full(config, cli.block_author(), cli.miners, cli.bitcoin_rpc_url)
+					.map_err(sc_cli::Error::Service)
 			})
 		},
 	}

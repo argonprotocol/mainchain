@@ -51,15 +51,10 @@ pub struct PriceIndex<Moment: Codec + Clone + MaxEncodedLen> {
 pub mod pallet {
 	use frame_support::{pallet_prelude::*, traits::Time};
 	use frame_system::pallet_prelude::*;
-	use sp_arithmetic::traits::{
-		AtLeast32BitUnsigned, CheckedDiv, Saturating, UniqueSaturatedInto,
-	};
-	use sp_std::{fmt::Debug, vec, vec::Vec};
+	use sp_arithmetic::traits::AtLeast32BitUnsigned;
+	use sp_std::{fmt::Debug, vec};
 
-	use ulx_primitives::{
-		bitcoin::{Satoshis, SATOSHIS_PER_BITCOIN},
-		ArgonPriceProvider, BitcoinPriceProvider,
-	};
+	use ulx_primitives::PriceProvider;
 
 	use super::*;
 
@@ -96,22 +91,16 @@ pub mod pallet {
 		#[pallet::constant]
 		type MaxDowntimeBeforeReset: Get<<Self::Time as Time>::Moment>;
 
-		/// Oldest history entries to keep
+		/// The oldest history to keep
 		#[pallet::constant]
-		type OldestHistoryToKeep: Get<<Self::Time as Time>::Moment>;
-
-		/// Max entries to keep in history
-		#[pallet::constant]
-		type MaxHistoryToKeep: Get<u32>;
+		type OldestPriceAllowed: Get<<Self::Time as Time>::Moment>;
 	}
 
 	#[pallet::event]
 	#[pallet::generate_deposit(pub(super) fn deposit_event)]
 	pub enum Event<T: Config> {
 		/// Event emitted when a new price index is submitted
-		NewIndex {
-			price_index: PriceIndexOf<T>,
-		},
+		NewIndex,
 		OperatorChanged {
 			operator_id: T::AccountId,
 		},
@@ -123,8 +112,6 @@ pub mod pallet {
 		NotAuthorizedOperator,
 		/// Missing value
 		MissingValue,
-		/// Couldn't record history
-		HistoryRecordingError,
 		/// The submitted prices are too old
 		PricesTooOld,
 	}
@@ -132,11 +119,6 @@ pub mod pallet {
 	/// Stores the active price index
 	#[pallet::storage]
 	pub type Current<T: Config> = StorageValue<_, PriceIndexOf<T>>;
-
-	/// Stores unprocessed values as they're submitted by operators
-	#[pallet::storage]
-	pub type History<T: Config> =
-		StorageValue<_, BoundedVec<PriceIndexOf<T>, T::MaxHistoryToKeep>, ValueQuery>;
 
 	/// The price index operator account
 	#[pallet::storage]
@@ -185,7 +167,7 @@ pub mod pallet {
 			let operator = <Operator<T>>::get().ok_or(Error::<T>::NotAuthorizedOperator)?;
 			ensure!(operator == who, Error::<T>::NotAuthorizedOperator);
 
-			let oldest_age = T::Time::now() - T::OldestHistoryToKeep::get();
+			let oldest_age = T::Time::now() - T::OldestPriceAllowed::get();
 
 			ensure!(oldest_age < index.timestamp, Error::<T>::PricesTooOld);
 
@@ -195,26 +177,8 @@ pub mod pallet {
 			}
 			if should_use_as_current {
 				<Current<T>>::put(index.clone());
-				Self::deposit_event(Event::<T>::NewIndex { price_index: index });
+				Self::deposit_event(Event::<T>::NewIndex);
 			}
-			<History<T>>::try_mutate(|entry| {
-				entry.retain(|a| a.timestamp >= oldest_age);
-				let pos = entry
-					.binary_search_by(|p| index.timestamp.cmp(&p.timestamp))
-					.unwrap_or_else(|x| x);
-				let max_length = T::MaxHistoryToKeep::get() as usize;
-
-				if pos < max_length {
-					if entry.len() >= max_length {
-						entry.pop();
-					}
-
-					entry
-						.try_insert(pos, index.clone())
-						.map_err(|_| Error::<T>::HistoryRecordingError)?;
-				}
-				Ok::<(), Error<T>>(())
-			})?;
 
 			Ok(Pays::No.into())
 		}
@@ -234,64 +198,24 @@ pub mod pallet {
 	}
 
 	impl<T: Config> Pallet<T> {
-		fn calculate_argon_price_in_milligons(
-			satoshis: Satoshis,
-			price: &PriceIndexOf<T>,
-		) -> Option<T::Balance> {
-			let satoshis: T::Balance = satoshis.unique_saturated_into();
-			let satoshis_per_bitcoin: T::Balance = SATOSHIS_PER_BITCOIN.unique_saturated_into();
-			let milligons_per_argon: T::Balance = 1000u128.unique_saturated_into();
-
-			let btc_usd_price: T::Balance = price.btc_usd_price.unique_saturated_into();
-			let argon_usd_price: T::Balance = price.argon_usd_price.unique_saturated_into();
-
-			let satoshi_cents: T::Balance =
-				satoshis.saturating_mul(btc_usd_price).checked_div(&satoshis_per_bitcoin)?;
-
-			let milligons = satoshi_cents
-				.saturating_mul(milligons_per_argon)
-				.checked_div(&argon_usd_price)?;
-			Some(milligons)
-		}
-
 		fn get_current() -> Option<PriceIndexOf<T>> {
 			let price = <Current<T>>::get()?;
-			if price.timestamp < T::Time::now() - T::OldestHistoryToKeep::get() {
+			if price.timestamp < T::Time::now() - T::OldestPriceAllowed::get() {
 				return None;
 			}
 			Some(price)
 		}
 	}
 
-	impl<T: Config> ArgonPriceProvider for Pallet<T> {
+	impl<T: Config> PriceProvider<T::Balance> for Pallet<T> {
 		fn get_argon_cpi_price() -> Option<ArgonCPI> {
-			<Current<T>>::get().map(|a| a.argon_cpi)
+			Self::get_current().map(|a| a.argon_cpi)
 		}
-		fn get_latest_price_in_us_cents() -> Option<u64> {
-			<Current<T>>::get().map(|a| a.argon_usd_price)
-		}
-	}
-
-	impl<T: Config> BitcoinPriceProvider<T::Balance> for Pallet<T> {
-		fn get_bitcoin_argon_prices(satoshis: Satoshis) -> Vec<T::Balance> {
-			let oldest_valid_time = T::Time::now() - T::OldestHistoryToKeep::get();
-			<History<T>>::get()
-				.iter()
-				.filter_map(|price| {
-					if price.timestamp < oldest_valid_time {
-						return None;
-					}
-					Self::calculate_argon_price_in_milligons(satoshis, price)
-				})
-				.collect::<Vec<_>>()
+		fn get_latest_argon_price_in_us_cents() -> Option<u64> {
+			Self::get_current().map(|a| a.argon_usd_price)
 		}
 
-		fn get_bitcoin_argon_price(satoshis: Satoshis) -> Option<T::Balance> {
-			let price = Self::get_current()?;
-			Self::calculate_argon_price_in_milligons(satoshis, &price)
-		}
-
-		fn get_latest_price_in_us_cents() -> Option<u64> {
+		fn get_latest_btc_price_in_us_cents() -> Option<u64> {
 			Self::get_current().map(|a| a.btc_usd_price)
 		}
 	}

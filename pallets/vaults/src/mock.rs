@@ -1,16 +1,9 @@
 use env_logger::{Builder, Env};
-use frame_support::{
-	parameter_types,
-	traits::{ConstU16, ConstU64, Currency},
-};
-use sp_core::{ConstU32, H256};
-use sp_runtime::{
-	traits::{BlakeTwo256, IdentityLookup},
-	BuildStorage,
-};
-use ulx_primitives::MintCirculationProvider;
+use frame_support::{derive_impl, parameter_types, traits::Currency};
+use sp_core::{ConstU32, ConstU64};
+use sp_runtime::BuildStorage;
 
-use crate as pallet_ulixee_mint;
+use crate as pallet_vaults;
 
 pub type Balance = u128;
 type Block = frame_system::mocking::MockBlock<Test>;
@@ -20,23 +13,25 @@ frame_support::construct_runtime!(
 	pub enum Test
 	{
 		System: frame_system,
-		Balances: pallet_balances::<Instance1>::{Pallet, Call, Storage, Config<T>, Event<T>},
-		UlixeeMint: pallet_ulixee_mint
+		Balances: pallet_balances,
+		Vaults: pallet_vaults,
 	}
 );
 
 #[derive_impl(frame_system::config_preludes::TestDefaultConfig as frame_system::DefaultConfig)]
 impl frame_system::Config for Test {
 	type Block = Block;
+	type AccountData = pallet_balances::AccountData<Balance>;
 }
 
 parameter_types! {
 
 	pub static ExistentialDeposit: Balance = 10;
+	pub const MinimumBondAmount:u128 = 1_000;
+	pub const BlocksPerYear:u32 = 1440*365;
 }
 
-type UlixeeToken = pallet_balances::Instance1;
-impl pallet_balances::Config<UlixeeToken> for Test {
+impl pallet_balances::Config for Test {
 	type MaxLocks = ConstU32<0>;
 	type MaxReserves = ConstU32<0>;
 	type ReserveIdentifier = ();
@@ -44,7 +39,7 @@ impl pallet_balances::Config<UlixeeToken> for Test {
 	type RuntimeEvent = RuntimeEvent;
 	type DustRemoval = ();
 	type ExistentialDeposit = ExistentialDeposit;
-	type AccountStore = UlixeeMint;
+	type AccountStore = System;
 	type WeightInfo = ();
 	type FreezeIdentifier = ();
 	type MaxFreezes = ();
@@ -58,25 +53,17 @@ pub fn set_argons(account_id: u64, amount: Balance) {
 }
 
 parameter_types! {
-
-	pub static BitcoinMintCirculation: Balance = 0;
+	pub static MaxVaultBitcoinPubkeys: u32 = 10;
 }
-pub struct BitcoinMintCirculationProvider;
-
-impl MintCirculationProvider<Balance> for BitcoinMintCirculationProvider {
-	fn get_mint_circulation() -> Balance {
-		BitcoinMintCirculation::get()
-	}
-}
-
-impl pallet_ulixee_mint::Config for Test {
+impl pallet_vaults::Config for Test {
 	type RuntimeEvent = RuntimeEvent;
 	type WeightInfo = ();
 	type Currency = Balances;
 	type RuntimeHoldReason = RuntimeHoldReason;
 	type Balance = Balance;
-	type UlixeeTokenStorage = pallet_balances::Account<Test, UlixeeToken>;
-	type BitcoinMintCirculation = BitcoinMintCirculationProvider;
+	type BlocksPerDay = ConstU64<1440>;
+	type MinimumBondAmount = MinimumBondAmount;
+	type MaxVaultBitcoinPubkeys = MaxVaultBitcoinPubkeys;
 }
 
 // Build genesis storage according to the mock runtime.

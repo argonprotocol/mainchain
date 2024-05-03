@@ -5,3 +5,6 @@ failure-output = "immediate-final"
 # Do not cancel the test run on the first failure.
 fail-fast = false
 retries = { backoff = "exponential", count = 2, delay = "5s", jitter = true }
+
+[profile.default]
+retries = { backoff = "exponential", count = 2, delay = "5s", jitter = true }

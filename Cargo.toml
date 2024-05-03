@@ -3,7 +3,7 @@ members = [
     "node",
     "node/consensus",
     "node/bitcoin_utxo_tracker",
-    "pallets/bitcoin_mint",
+    "pallets/bitcoin_utxos",
     "pallets/block_rewards",
     "pallets/block_seal",
     "pallets/block_seal_spec",
@@ -15,7 +15,8 @@ members = [
     "pallets/notebook",
     "pallets/price_index",
     "pallets/ticks",
-    "pallets/ulixee_mint",
+    "pallets/mint",
+    "pallets/vaults",
     "client",
     "localchain",
     "localchain/uniffi-bindgen",
@@ -24,7 +25,8 @@ members = [
     "notary",
     "notary/audit",
     "notary/apis",
-    "testing"
+    "testing",
+    "testing/bitcoin"
 ]
 resolver = "2"
 
@@ -154,7 +156,7 @@ env_logger = "0.11"
 
 sqlx = { version = "0.7", features = ["macros"] }
 chrono = { version = "0.4", features = ["serde"] }
-mocktopus = "0.8.0"
+mockall = "0.12"
 
 binary-merkle-tree = { default-features = false, git = "https://github.com/paritytech/polkadot-sdk.git", branch = "release-polkadot-v1.10.0" }
 
@@ -213,6 +215,7 @@ sc-network-test = { git = "https://github.com/paritytech/polkadot-sdk.git", bran
 sp-test-primitives = { git = "https://github.com/paritytech/polkadot-sdk.git", branch = "release-polkadot-v1.10.0" }
 substrate-test-runtime = { git = "https://github.com/paritytech/polkadot-sdk.git", branch = "release-polkadot-v1.10.0" }
 substrate-test-runtime-client = { git = "https://github.com/paritytech/polkadot-sdk.git", branch = "release-polkadot-v1.10.0" }
+fs2 = { version = "0.4" }
 
 substrate-wasm-builder = { git = "https://github.com/paritytech/polkadot-sdk.git", branch = "release-polkadot-v1.10.0" }
 
@@ -250,14 +253,11 @@ impl-trait-for-tuples = "0.2.2"
 
 rsntp = { version = "4.0" }
 
-nakamoto-client = { version = "0.4" }
-nakamoto-p2p = { version = "0.4" }
-nakamoto-net = { version = "0.4" }
-nakamoto-common = { version = "0.4" }
-nakamoto-net-poll = { version = "0.4" }
-bitcoin = { version = "0.29.2" }
-
-
+bitcoincore-rpc = { version = "0.19" }
+bitcoin = { version = "0.32.0", default-features = false }
+hwi = { git = "https://github.com/ulixee/rust-hwi", branch = "master" }
+bitcoind = { version = "0.36", features = ["25_0"] }
+secp256k1 = { version = "0.29" }
 napi-derive = { version = "2.16" }
 napi = { version = "2.16", features = ["napi9", "async", "error_anyhow"] }
 napi-build = { version = "2.1" }
@@ -289,7 +289,7 @@ ulx-primitives = { path = "primitives", default-features = false }
 
 pallet-block-seal = { path = "pallets/block_seal", default-features = false }
 pallet-block-seal-spec = { path = "pallets/block_seal_spec", default-features = false }
-pallet-bitcoin-mint = { path = "pallets/bitcoin_mint", default-features = false }
+pallet-bitcoin-utxos = { path = "pallets/bitcoin_utxos", default-features = false }
 pallet-block-rewards = { path = "pallets/block_rewards", default-features = false }
 pallet-bond = { path = "pallets/bond", default-features = false }
 pallet-chain-transfer = { path = "pallets/chain_transfer", default-features = false }
@@ -298,5 +298,6 @@ pallet-mining-slot = { path = "pallets/mining_slot", default-features = false }
 pallet-notebook = { path = "pallets/notebook", default-features = false }
 pallet-notaries = { path = "pallets/notaries", default-features = false }
 pallet-ticks = { path = "pallets/ticks", default-features = false }
-pallet-ulixee-mint = { path = "pallets/ulixee_mint", default-features = false }
+pallet-mint = { path = "pallets/mint", default-features = false }
 pallet-price-index = { path = "pallets/price_index", default-features = false }
+pallet-vaults = { path = "pallets/vaults", default-features = false }

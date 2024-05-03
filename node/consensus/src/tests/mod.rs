@@ -67,6 +67,7 @@ impl Miner {
 		let environ = DummyFactory(client.clone());
 		let api = data.api.clone();
 		let aux_client = data.aux_client.clone();
+		let uxto_tracker = data.utxo_tracker.clone();
 		let (compute_handle, task) = create_compute_miner(
 			Box::new(ulx_block_import.clone()),
 			api.clone(),
@@ -76,6 +77,7 @@ impl Miner {
 			DummyOracle,
 			node.account_id.clone().into(),
 			(),
+			uxto_tracker,
 			// how long to take to actually build the block (i.e. executing extrinsics)
 			Duration::from_millis(10),
 		);
@@ -286,6 +288,7 @@ async fn can_run_proof_of_tax() {
 		let peer = net.peer(0);
 		let api = peer.data.as_ref().expect("required").api.clone();
 		let aux_client = peer.data.as_ref().expect("required").aux_client.clone();
+		let utxo_tracker = peer.data.as_ref().expect("required").utxo_tracker.clone();
 
 		let client = peer.client().as_client();
 
@@ -359,6 +362,7 @@ async fn can_run_proof_of_tax() {
 			(),
 			Duration::from_millis(100),
 			block_create_stream,
+			utxo_tracker,
 		);
 		block_create_sink.send(create_block).await.expect("Submitted block");
 

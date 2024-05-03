@@ -61,7 +61,7 @@ pub type Nonce = u32;
 pub type Moment = u64;
 
 pub type BondId = u64;
-pub type BondFundId = u32;
+pub type VaultId = u32;
 
 /// A hash of some data used by the chain.
 pub type HashOutput = H256;

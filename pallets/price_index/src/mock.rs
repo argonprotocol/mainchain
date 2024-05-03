@@ -27,7 +27,6 @@ type Moment = u64;
 
 parameter_types! {
 	pub const MaxDowntimeBeforeReset: Moment = 60 * 60 * 1000; // 1 hour
-	pub static MaxHistoryToKeep: u32 = 24 * 60; // 1 day worth of prices
 	pub static OldestHistoryToKeep: Moment = 24 * 60 * 60 * 1000; // 1 day
 	pub static Now: Moment = SystemTime::now().duration_since(SystemTime::UNIX_EPOCH).unwrap().as_millis() as Moment;
 }
@@ -48,8 +47,7 @@ impl pallet_price_index::Config for Test {
 	type WeightInfo = ();
 	type Balance = u128;
 	type MaxDowntimeBeforeReset = MaxDowntimeBeforeReset;
-	type MaxHistoryToKeep = MaxHistoryToKeep;
-	type OldestHistoryToKeep = OldestHistoryToKeep;
+	type OldestPriceAllowed = OldestHistoryToKeep;
 }
 
 pub fn new_test_ext(operator: Option<u64>) -> sp_io::TestExternalities {

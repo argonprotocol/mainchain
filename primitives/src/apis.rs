@@ -5,7 +5,7 @@ use sp_runtime::{BoundedVec, DispatchError};
 use sp_std::{collections::btree_map::BTreeMap, vec::Vec};
 
 use crate::{
-	bitcoin::{BitcoinSyncStatus, BitcoinUtxo, Satoshis, UtxoLookup},
+	bitcoin::{BitcoinSyncStatus, Satoshis, UtxoRef, UtxoValue},
 	block_seal::MiningAuthority,
 	notary::{NotaryId, NotaryNotebookVoteDetails, NotaryNotebookVoteDigestDetails},
 	tick::{Tick, Ticker},
@@ -67,9 +67,9 @@ sp_api::decl_runtime_apis! {
 }
 
 sp_api::decl_runtime_apis! {
-	pub trait BitcoinApis<AccountId: Codec, BondId: Codec, Balance: Codec, BlockNumber: Codec> {
+	pub trait BitcoinApis<Balance: Codec> {
 		fn get_sync_status() -> Option<BitcoinSyncStatus>;
-		fn active_utxos() ->  BTreeMap<BitcoinUtxo, UtxoLookup>;
+		fn active_utxos() -> Vec<(Option<UtxoRef>, UtxoValue)>;
 		fn redemption_rate(satoshis: Satoshis) -> Option<Balance>;
 	}
 }

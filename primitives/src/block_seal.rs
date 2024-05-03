@@ -1,3 +1,4 @@
+use crate::BondId;
 use codec::{Codec, Decode, Encode, MaxEncodedLen};
 use frame_support::{CloneNoBound, EqNoBound, Parameter, PartialEqNoBound};
 use scale_info::TypeInfo;
@@ -31,11 +32,7 @@ pub const BLOCK_SEAL_CRYPTO_ID: CryptoTypeId = <app::Public as AppCrypto>::CRYPT
 )]
 #[scale_info(skip_type_params(MaxHosts))]
 #[derive(Deserialize, Serialize)]
-pub struct MiningRegistration<
-	AccountId: Parameter,
-	BondId: Parameter,
-	Balance: Parameter + MaxEncodedLen,
-> {
+pub struct MiningRegistration<AccountId: Parameter, Balance: Parameter + MaxEncodedLen> {
 	pub account_id: AccountId,
 	pub reward_destination: RewardDestination<AccountId>,
 	pub bond_id: Option<BondId>,

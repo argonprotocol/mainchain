@@ -30,7 +30,6 @@ ulx-primitives = { workspace = true }
 
 [dev-dependencies]
 pallet-balances = { workspace = true }
-pallet-bond = { workspace = true }
 env_logger = { workspace = true }
 
 [features]
@@ -43,7 +42,6 @@ std = [
 	"frame-system/std",
 	"log/std",
 	"pallet-balances/std",
-	"pallet-bond/std",
 	"pallet-session/std",
 	"scale-info/std",
 	"sp-api/std",

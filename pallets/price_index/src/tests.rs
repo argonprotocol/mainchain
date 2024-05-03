@@ -1,11 +1,10 @@
 use std::time::SystemTime;
 
 use frame_support::{assert_err, assert_ok};
-use sp_runtime::BoundedVec;
 
-use ulx_primitives::{bitcoin::SATOSHIS_PER_BITCOIN, BitcoinPriceProvider, Moment};
+use ulx_primitives::{bitcoin::SATOSHIS_PER_BITCOIN, Moment, PriceProvider};
 
-use crate::{mock::*, Current, History, Operator, PriceIndex as PriceIndexEntry};
+use crate::{mock::*, Current, Operator, PriceIndex as PriceIndexEntry};
 
 type Event = crate::Event<Test>;
 type Error = crate::Error<Test>;
@@ -46,9 +45,8 @@ fn can_set_a_price_index() {
 		let entry = create_index();
 		assert_ok!(PriceIndex::submit(RuntimeOrigin::signed(1), entry.clone()),);
 		assert_eq!(Current::<Test>::get(), Some(entry.clone()));
-		assert_eq!(History::<Test>::get().to_vec(), vec![entry]);
 
-		System::assert_last_event(Event::NewIndex { price_index: entry.clone() }.into());
+		System::assert_last_event(Event::NewIndex.into());
 	});
 }
 
@@ -62,22 +60,19 @@ fn uses_latest_as_current() {
 		entry.timestamp = start;
 		assert_ok!(PriceIndex::submit(RuntimeOrigin::signed(1), entry.clone()),);
 		assert_eq!(Current::<Test>::get(), Some(entry.clone()));
-		assert_eq!(History::<Test>::get().to_vec(), vec![entry]);
-		System::assert_last_event(Event::NewIndex { price_index: entry.clone() }.into());
+		System::assert_last_event(Event::NewIndex.into());
 
 		let mut entry2 = entry.clone();
 		entry2.argon_cpi = 1;
 		entry2.timestamp = start + 4;
 		assert_ok!(PriceIndex::submit(RuntimeOrigin::signed(1), entry2.clone()),);
 		assert_eq!(Current::<Test>::get(), Some(entry2.clone()));
-		assert_eq!(History::<Test>::get().to_vec(), vec![entry2, entry]);
 
 		let mut entry_backwards = entry.clone();
 		entry_backwards.argon_cpi = 2;
 		entry_backwards.timestamp = start + 1;
 		assert_ok!(PriceIndex::submit(RuntimeOrigin::signed(1), entry_backwards.clone()),);
 		assert_eq!(Current::<Test>::get(), Some(entry2.clone()));
-		assert_eq!(History::<Test>::get().to_vec(), vec![entry2, entry_backwards, entry]);
 	});
 }
 
@@ -93,42 +88,6 @@ fn doesnt_use_expired_values() {
 			Error::PricesTooOld
 		);
 		assert_eq!(Current::<Test>::get(), None);
-		assert_eq!(History::<Test>::get().to_vec(), vec![]);
-	});
-}
-
-#[test]
-fn removes_expired_values() {
-	new_test_ext(Some(1)).execute_with(|| {
-		System::set_block_number(1);
-		OldestHistoryToKeep::set(100);
-		let mut index1 = create_index();
-		index1.timestamp = now() - 101;
-		let mut index2 = create_index();
-		index2.timestamp = now() - 10;
-
-		History::<Test>::put(BoundedVec::truncate_from(vec![index1, index2]));
-		let entry = create_index();
-		assert_ok!(PriceIndex::submit(RuntimeOrigin::signed(1), entry.clone()),);
-		assert_eq!(Current::<Test>::get(), Some(entry));
-		assert_eq!(History::<Test>::get().to_vec(), vec![entry, index2]);
-	});
-}
-
-#[test]
-fn handles_overflowing_history() {
-	new_test_ext(Some(1)).execute_with(|| {
-		System::set_block_number(1);
-		OldestHistoryToKeep::set(100);
-		MaxHistoryToKeep::set(2);
-		let index1 = create_index();
-		let index2 = create_index();
-
-		History::<Test>::put(BoundedVec::truncate_from(vec![index1, index2]));
-		let entry = create_index();
-		assert_ok!(PriceIndex::submit(RuntimeOrigin::signed(1), entry.clone()),);
-		assert_eq!(Current::<Test>::get(), Some(entry));
-		assert_eq!(History::<Test>::get().to_vec(), vec![entry, index2]);
 	});
 }
 
@@ -145,9 +104,7 @@ fn can_convert_argon_prices() {
 		Current::<Test>::put(index);
 
 		assert_eq!(
-			<PriceIndex as BitcoinPriceProvider<u128>>::get_bitcoin_argon_price(
-				SATOSHIS_PER_BITCOIN
-			),
+			<PriceIndex as PriceProvider<u128>>::get_bitcoin_argon_price(SATOSHIS_PER_BITCOIN),
 			Some(62_000 * 1000),
 			"price in milligons"
 		);
@@ -156,9 +113,7 @@ fn can_convert_argon_prices() {
 		Current::<Test>::put(index);
 
 		assert_eq!(
-			<PriceIndex as BitcoinPriceProvider<u128>>::get_bitcoin_argon_price(
-				SATOSHIS_PER_BITCOIN
-			),
+			<PriceIndex as PriceProvider<u128>>::get_bitcoin_argon_price(SATOSHIS_PER_BITCOIN),
 			Some(1000 * (62_000 * 100) / 101),
 		);
 	});

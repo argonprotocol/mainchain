@@ -13,13 +13,13 @@ use sp_consensus::{BlockOrigin, Error as ConsensusError, SelectChain};
 use sp_inherents::InherentDataProvider;
 use sp_runtime::{
 	generic::DigestItem,
-	traits::{Block as BlockT, Header as HeaderT, NumberFor},
+	traits::{Block as BlockT, Header as HeaderT},
 };
 use ulx_bitcoin_utxo_tracker::{get_bitcoin_inherent, UtxoTracker};
 
 use ulx_primitives::{
 	inherents::{BitcoinInherentDataProvider, BlockSealInherentDataProvider},
-	Balance, BitcoinApis, BlockSealApis, BlockSealAuthorityId, BlockSealDigest, BondId,
+	Balance, BitcoinApis, BlockSealApis, BlockSealAuthorityId, BlockSealDigest,
 	BLOCK_SEAL_DIGEST_ID,
 };
 
@@ -99,9 +99,8 @@ where
 		+ AuxStore
 		+ BlockOf
 		+ 'static,
-	C::Api: BlockBuilderApi<B>
-		+ BlockSealApis<B, AC, BlockSealAuthorityId>
-		+ BitcoinApis<B, AC, BondId, Balance, NumberFor<B>>,
+	C::Api:
+		BlockBuilderApi<B> + BlockSealApis<B, AC, BlockSealAuthorityId> + BitcoinApis<B, Balance>,
 	AC: Codec + Clone + Send + Sync,
 {
 	type Error = ConsensusError;

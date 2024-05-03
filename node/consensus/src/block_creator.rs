@@ -13,7 +13,7 @@ use sp_consensus::{BlockOrigin, Environment, Proposal, Proposer, SelectChain};
 use sp_core::H256;
 use sp_inherents::InherentDataProvider;
 use sp_keystore::KeystorePtr;
-use sp_runtime::traits::{Block as BlockT, Header as HeaderT, NumberFor};
+use sp_runtime::traits::{Block as BlockT, Header as HeaderT};
 use sp_timestamp::Timestamp;
 use ulx_bitcoin_utxo_tracker::{get_bitcoin_inherent, UtxoTracker};
 
@@ -26,8 +26,7 @@ use ulx_primitives::{
 	},
 	tick::Tick,
 	Balance, BestBlockVoteSeal, BitcoinApis, BlockSealApis, BlockSealAuthorityId,
-	BlockSealAuthoritySignature, BlockSealDigest, BondId, NotaryApis, NotaryId, NotebookApis,
-	TickApis,
+	BlockSealAuthoritySignature, BlockSealDigest, NotaryApis, NotaryId, NotebookApis, TickApis,
 };
 
 use crate::{
@@ -180,7 +179,7 @@ pub async fn tax_block_creator<B, C, E, L, CS, A>(
 		+ BlockSealApis<B, A, BlockSealAuthorityId>
 		+ NotaryApis<B, NotaryRecordT>
 		+ TickApis<B>
-		+ BitcoinApis<B, A, BondId, Balance, NumberFor<B>>,
+		+ BitcoinApis<B, Balance>,
 	E: Environment<B> + Send + Sync + 'static,
 	E::Error: std::fmt::Debug,
 	E::Proposer: Proposer<B>,
@@ -241,7 +240,7 @@ where
 		+ BlockSealApis<B, A, BlockSealAuthorityId>
 		+ NotaryApis<B, NotaryRecordT>
 		+ TickApis<B>
-		+ BitcoinApis<B, A, BondId, Balance, NumberFor<B>>,
+		+ BitcoinApis<B, Balance>,
 	E: Environment<B> + Send + Sync + 'static,
 	E::Error: std::fmt::Debug,
 	E::Proposer: Proposer<B>,
@@ -253,13 +252,11 @@ where
 		Err(err) => return Err(err.into()),
 	};
 
-	let bitcoin_utxo_sync = match get_bitcoin_inherent(&utxo_tracker, &client, &parent_hash) {
-		Ok(x) => x,
-		Err(err) => {
+	let bitcoin_utxo_sync = get_bitcoin_inherent(&utxo_tracker, &client, &parent_hash)
+		.unwrap_or_else(|err| {
 			warn!(target: LOG_TARGET, "Unable to get bitcoin inherent: {:?}", err);
-			return Err(Error::FailedToSyncBitcoinUtxos);
-		},
-	};
+			None
+		});
 
 	let notebook_header_data =
 		match get_notebook_header_data(&client, &aux_client, &parent_hash, tick).await {

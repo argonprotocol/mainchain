@@ -76,6 +76,7 @@ ulx-bitcoin-utxo-tracker = { workspace = true }
 
 # CLI-specific dependencies
 try-runtime-cli = { workspace = true, optional = true }
+url = { workspace = true }
 
 [build-dependencies]
 substrate-build-script-utils = { workspace = true }

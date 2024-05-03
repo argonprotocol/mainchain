@@ -12,40 +12,75 @@ mod tests;
 pub mod weights;
 const LOG_TARGET: &str = "runtime::bond";
 
-/// The bond pallet allows users to lock funds for a period of time, and optionally lease them out
-/// to other users for a fee. The intended operation is to lock argons into a bond that allow users
-/// to perform operations like bidding for mining slots and operating as a vault.
+/// The bond pallet allows users to manage the lifecycle of Bitcoin bonds, and stores the state for
+/// Mining Bonds. Bonds lock up argons for a pre-defined period of time for a fee. A vault issuer
+/// can determine that fee on their own.
 ///
-/// Terms:
+/// ** Vaults: **
+/// Vaults are managed in the vault pallet, but determine the amount of funding eligible for
+/// bonding.
 ///
-/// ** BondFund ** A bond fund is a pool of funds that are offered for bonding. The provider of a
-/// bond fund can set their APR (annual percentage return) rate as well as a base fee and expiration
-/// date. BondFunds can be extended and/or ended. When a bond fund is ended, it will no longer
-/// accept new bond, and will return any expired bond to the bond fund provider once they are
-/// completed.
+/// ** Bitcoin Bonds: **
 ///
-/// ** Leasing a Bond ** A user can lease a bond from a bond fund. The user specifies the amount of
-/// time they want to lease the bond for, and the amount of the bond they want to lease. The apr on
-/// the bond fund determines the upfront fee that will be charged. A bond can be returned at any
-/// point and they will receive a prorated return back. If the leaser no longer has funds, the funds
-/// will be taken from the bond-fund itself.
+/// Bitcoin bonds allow a user to mint new argons equal to the current market price of the bonded
+/// UTXO's satoshis. The bond must lock up the equivalent argons for a year's time. At any time
+/// during the bonded year, a Bitcoin holder is eligible to cancel their bond and unlock their
+/// bitcoin. To unlock a bitcoin, a user must pay back the current market price of bitcoin (capped
+/// at their bonded price). Should they move their UTXO via the bitcoin network, the current value
+/// of the UTXO will be burned from the bond and vault funds.
 ///
-/// ** Self-Bond ** A user can self-bond, which essentially puts their own funds on hold. This is a
-/// convenience if you possess the necessary funds and want to bid for a validator slot without
-/// paying fees.
+/// _Bitcoin multisig/ownership_
+/// A bitcoin holder retains ownership of their UTXO via a pubkey script that is pre-agreed by the
+/// vault user and the bitcoin holder. The vault's hashed public key can be obtained in this pallet,
+/// and will be combined with a hashed pubkey provided by the user. The pre-agreed script will be
+/// such that both signatures are required to unlock the bitcoin before 370 days of blocks. After
+/// 370 days, only the Vault's signature will be required to unlock the bitcoin for 30 days. After
+/// 400 days, either party will be able to unlock.
+///
+/// NOTE: the bond will end on day 365, which gives a 5-day grace period for a bitcoin owner to buy
+/// back their bitcoin before the vault can claim it.
+///
+/// _Unlocking a Bitcoin_
+/// A bitcoin owner will pre-create a transaction to unlock their UTXO and submit the sighash to
+/// this pallet. The vault operator has 10 days to publish a counter signature along with the public
+/// key. If the vault operator fails to do so, they will lose their Ulixee shares and all underlying
+/// Bitcoin bonds. A user will be made whole via a governance vote.
+///
+/// _Penalties_
+/// 1. If a UTXO is found to have moved before a bond expiration via the bitcoin network, the vault
+///    will be penalized by the amount of the UTXOs' current value.
+/// 2. If a vault operator fails to counter-sign a transaction within 10 days, they will lose their
+///    Ulixee shares and all underlying Bitcoin bonds.
+///
+/// ** Mining Bonds: **
+///
+/// A mining bond allows a user to jump the line for mining slots. A bond with a higher number of
+/// locked argons will take the place of a non-bonded or lower bonded miner. In such cases, the bond
+/// will be canceled and refunded.
+///
+/// Mining bonds can be offered by a vault operator up to a maximum of the number of bitcoin argons
+/// they have bonded. Eg, they must be bonded 1-to-1 with bitcoin argons.
+///
+/// Mining bonds last the duration of a slot window, which is 40 days.
+///
+/// NOTE: a bond has a minimum 1-day cost which will not be refunded. This cost is required to make
+/// it uneconomical to try to eat up all bonds to win a mining slot.
 ///
 ///
-/// -----
+/// ** Bitcoin Securitization **
 ///
-/// Bonds are available via the BondProvider trait for use in other pallets. It's used in the
-/// mining_slot pallet and expected to also be used in the vaults pallet in the future.
+/// A vault may apply a securitization bond to their account up to 2x the locked value of their
+/// bitcoin argons. This allows a vault to issue more mining bonds, but the funds are locked up for
+/// the duration of the bitcoin bonds, and will be taken in the case of bitcoins not being returned.
 #[frame_support::pallet(dev_mode)]
 pub mod pallet {
+	use codec::Codec;
 	use frame_support::{
 		pallet_prelude::*,
+		storage::with_storage_layer,
 		traits::{
-			fungible::{Inspect, InspectHold, Mutate, MutateHold},
-			tokens::{Fortitude, Precision, Preservation},
+			fungible::{Inspect, Mutate, MutateHold},
+			tokens::{Fortitude, Precision},
 			Incrementable,
 		},
 		BoundedVec,
@@ -53,12 +88,20 @@ pub mod pallet {
 	use frame_system::pallet_prelude::*;
 	use log::warn;
 	use sp_runtime::{
-		traits::{AtLeast32BitUnsigned, CheckedSub, UniqueSaturatedInto},
+		traits::{AtLeast32BitUnsigned, UniqueSaturatedInto},
 		DispatchError::Token,
 		Saturating, TokenError,
 	};
+	use sp_std::vec;
 
-	use ulx_primitives::bond::{Bond, BondError, BondFund, BondProvider, Fee};
+	use ulx_primitives::{
+		bitcoin::{
+			BitcoinCosignScriptPubkey, BitcoinHeight, BitcoinPubkeyHash, BitcoinRejectedReason,
+			BitcoinScriptPubkey, BitcoinSignature, CompressedBitcoinPubkey, Satoshis, UtxoId,
+		},
+		bond::{Bond, BondError, BondExpiration, BondProvider, BondType, VaultProvider},
+		BitcoinUtxoEvents, BitcoinUtxoTracker, BondId, PriceProvider, UtxoBondedEvents, VaultId,
+	};
 
 	use super::*;
 
@@ -90,220 +133,254 @@ pub mod pallet {
 		/// The hold reason when reserving funds for entering or extending the safe-mode.
 		type RuntimeHoldReason: From<HoldReason>;
 
-		/// Identifier for the bond fund id
-		type BondFundId: Member
-			+ Parameter
-			+ MaxEncodedLen
-			+ Copy
-			+ Incrementable
-			+ AtLeast32BitUnsigned;
+		type BondEvents: UtxoBondedEvents<Self::AccountId, Self::Balance>;
 
-		/// Identifier for the bond id
-		type BondId: Member
-			+ Parameter
-			+ MaxEncodedLen
-			+ Copy
-			+ Incrementable
-			+ AtLeast32BitUnsigned;
+		/// Utxo tracker for bitcoin
+		type BitcoinUtxoTracker: BitcoinUtxoTracker;
+
+		type PriceProvider: PriceProvider<Self::Balance>;
+
+		/// Bitcoin time provider
+		type BitcoinBlockHeight: Get<BitcoinHeight>;
+
+		type VaultProvider: VaultProvider<
+			AccountId = Self::AccountId,
+			Balance = Self::Balance,
+			BlockNumber = BlockNumberFor<Self>,
+		>;
 
 		/// Minimum amount for a bond
 		#[pallet::constant]
 		type MinimumBondAmount: Get<Self::Balance>;
 
-		/// Blocks per year used for APR calculations
+		/// Ulixee blocks per day
 		#[pallet::constant]
-		type BlocksPerYear: Get<BlockNumberFor<Self>>;
+		type UlixeeBlocksPerDay: Get<BlockNumberFor<Self>>;
 
-		/// Pallet storage requires bounds, so we have to set a maximum number that can expire in a
-		/// single block
+		/// Maximum unlocking utxos at a time
 		#[pallet::constant]
-		type MaxConcurrentlyExpiringBondFunds: Get<u32>;
+		type MaxUnlockingUtxos: Get<u32>;
 		/// Pallet storage requires bounds, so we have to set a maximum number that can expire in a
 		/// single block
 		#[pallet::constant]
 		type MaxConcurrentlyExpiringBonds: Get<u32>;
+
+		/// The minimum number of satoshis that can be bonded
+		#[pallet::constant]
+		type MinimumBitcoinBondSatoshis: Get<Satoshis>;
+
+		/// The number of blocks a bitcoin bond is locked for
+		#[pallet::constant]
+		type BitcoinBondDurationBlocks: Get<BitcoinHeight>;
+
+		/// The bitcoin blocks after a bond expires which the vault will be allowed to claim a
+		/// bitcoin
+		#[pallet::constant]
+		type BitcoinBondReclamationBlocks: Get<BitcoinHeight>;
+
+		/// Number of bitcoin blocks a vault has to counter-sign a bitcoin unlock
+		#[pallet::constant]
+		type UtxoUnlockCosignDeadlineBlocks: Get<BitcoinHeight>;
 	}
 
 	/// A reason for the pallet placing a hold on funds.
 	#[pallet::composite_enum]
 	pub enum HoldReason {
-		EnterBondFund,
+		UnlockingBitcoin,
 	}
 
 	#[pallet::storage]
-	pub(super) type NextBondId<T: Config> = StorageValue<_, T::BondId, OptionQuery>;
-	#[pallet::storage]
-	pub(super) type NextBondFundId<T: Config> = StorageValue<_, T::BondFundId, OptionQuery>;
-
-	/// BondFunds by id
-	#[pallet::storage]
-	pub(super) type BondFunds<T: Config> = StorageMap<
-		_,
-		Twox64Concat,
-		T::BondFundId,
-		BondFund<T::AccountId, T::Balance, BlockNumberFor<T>>,
-		OptionQuery,
-	>;
-	/// Expiration block number for each bond fund
-	#[pallet::storage]
-	pub(super) type BondFundExpirations<T: Config> = StorageMap<
-		_,
-		Twox64Concat,
-		BlockNumberFor<T>,
-		BoundedVec<T::BondFundId, T::MaxConcurrentlyExpiringBondFunds>,
-		ValueQuery,
-	>;
+	pub(super) type NextBondId<T: Config> = StorageValue<_, BondId, OptionQuery>;
 
 	/// Bonds by id
 	#[pallet::storage]
-	pub(super) type Bonds<T: Config> = StorageMap<
+	pub(super) type BondsById<T: Config> = StorageMap<
 		_,
 		Twox64Concat,
-		T::BondId,
-		Bond<T::AccountId, T::Balance, BlockNumberFor<T>, T::BondFundId>,
+		BondId,
+		Bond<T::AccountId, T::Balance, BlockNumberFor<T>>,
 		OptionQuery,
 	>;
-	/// Completion of each bond, upon which date funds are returned to the bond fund or self-bonder
+	/// Completion of mining bonds, upon which funds are returned to the vault
 	#[pallet::storage]
-	pub(super) type BondCompletions<T: Config> = StorageMap<
+	pub(super) type MiningBondCompletions<T: Config> = StorageMap<
 		_,
 		Twox64Concat,
 		BlockNumberFor<T>,
-		BoundedVec<T::BondId, T::MaxConcurrentlyExpiringBonds>,
+		BoundedVec<BondId, T::MaxConcurrentlyExpiringBonds>,
 		ValueQuery,
 	>;
+
+	/// Completion of bitcoin bonds by bitcoin height. Bond funds are returned to the vault if
+	/// unlocked or used as the price of the bitcoin
+	#[pallet::storage]
+	pub(super) type BitcoinBondCompletions<T: Config> = StorageMap<
+		_,
+		Twox64Concat,
+		BitcoinHeight,
+		BoundedVec<BondId, T::MaxConcurrentlyExpiringBonds>,
+		ValueQuery,
+	>;
+
+	/// Stores bitcoin utxos that have requested to be unlocked
+	#[pallet::storage]
+	pub(super) type UtxosById<T: Config> =
+		StorageMap<_, Twox64Concat, UtxoId, UtxoState, OptionQuery>;
+
+	/// Stores Utxos that were not paid back in full
+	///
+	/// Tuple stores Account, Vault, Still Owed, State
+	#[pallet::storage]
+	pub(super) type OwedUtxoAggrieved<T: Config> = StorageMap<
+		_,
+		Twox64Concat,
+		UtxoId,
+		(T::AccountId, VaultId, T::Balance, UtxoState),
+		OptionQuery,
+	>;
+
+	/// Utxos that have been requested to be cosigned for unlocking
+	#[pallet::storage]
+	pub(super) type UtxosPendingUnlock<T: Config> = StorageValue<
+		_,
+		BoundedBTreeMap<UtxoId, UtxoCosignRequest<T::Balance>, T::MaxUnlockingUtxos>,
+		ValueQuery,
+	>;
+
+	#[derive(Decode, Encode, Clone, PartialEq, Eq, RuntimeDebug, TypeInfo)]
+	pub struct UtxoState {
+		pub bond_id: BondId,
+		pub satoshis: Satoshis,
+		pub vault_pubkey_hash: BitcoinPubkeyHash,
+		pub owner_pubkey_hash: BitcoinPubkeyHash,
+		pub vault_claim_height: BitcoinHeight,
+		pub open_claim_height: BitcoinHeight,
+		pub register_block: BitcoinHeight,
+		pub utxo_script_pubkey: BitcoinCosignScriptPubkey,
+		pub is_verified: bool,
+	}
+
+	#[derive(Decode, Encode, CloneNoBound, PartialEqNoBound, EqNoBound, RuntimeDebug, TypeInfo)]
+	pub struct UtxoCosignRequest<Balance: Clone + Eq + PartialEq + TypeInfo + Codec> {
+		pub bitcoin_network_fee: Satoshis,
+		pub cosign_due_block: BitcoinHeight,
+		pub to_script_pubkey: BitcoinScriptPubkey,
+		pub redemption_price: Balance,
+	}
 
 	#[pallet::event]
 	#[pallet::generate_deposit(pub(super) fn deposit_event)]
 	pub enum Event<T: Config> {
-		BondFundOffered {
-			bond_fund_id: T::BondFundId,
-			amount_offered: T::Balance,
-			expiration_block: BlockNumberFor<T>,
-			offer_account_id: T::AccountId,
-		},
-		BondFundExtended {
-			bond_fund_id: T::BondFundId,
-			amount_offered: T::Balance,
-			expiration_block: BlockNumberFor<T>,
-		},
-		BondFundEnded {
-			bond_fund_id: T::BondFundId,
-			amount_still_bonded: T::Balance,
-		},
-		BondFundExpired {
-			bond_fund_id: T::BondFundId,
-			offer_account_id: T::AccountId,
-		},
-		BondedSelf {
-			bond_id: T::BondId,
+		BondCreated {
+			vault_id: VaultId,
+			bond_id: BondId,
+			bond_type: BondType,
 			bonded_account_id: T::AccountId,
+			utxo_id: Option<UtxoId>,
 			amount: T::Balance,
-			completion_block: BlockNumberFor<T>,
-		},
-		BondLeased {
-			bond_fund_id: T::BondFundId,
-			bond_id: T::BondId,
-			bonded_account_id: T::AccountId,
-			amount: T::Balance,
-			total_fee: T::Balance,
-			annual_percent_rate: u32,
-			completion_block: BlockNumberFor<T>,
-		},
-		BondExtended {
-			bond_fund_id: Option<T::BondFundId>,
-			bond_id: T::BondId,
-			amount: T::Balance,
-			completion_block: BlockNumberFor<T>,
-			fee_change: T::Balance,
-			annual_percent_rate: u32,
+			expiration: BondExpiration<BlockNumberFor<T>>,
 		},
 		BondCompleted {
-			bond_fund_id: Option<T::BondFundId>,
-			bond_id: T::BondId,
+			vault_id: VaultId,
+			bond_id: BondId,
 		},
-		BondBurned {
-			bond_fund_id: Option<T::BondFundId>,
-			bond_id: T::BondId,
+		BondCanceled {
+			vault_id: VaultId,
+			bond_id: BondId,
+			bonded_account_id: T::AccountId,
+			bond_type: BondType,
+			returned_fee: T::Balance,
+		},
+		BitcoinBondBurned {
+			vault_id: VaultId,
+			bond_id: BondId,
+			utxo_id: UtxoId,
 			amount_burned: T::Balance,
-			amount_returned: T::Balance,
+			amount_held: T::Balance,
+			was_utxo_spent: bool,
 		},
-		BondFeeRefund {
-			bond_fund_id: T::BondFundId,
-			bond_id: T::BondId,
-			bonded_account_id: T::AccountId,
-			bond_fund_reduction_for_payment: T::Balance,
-			final_fee: T::Balance,
-			refund_amount: T::Balance,
+		BitcoinUtxoCosignRequested {
+			bond_id: BondId,
+			vault_id: VaultId,
+			utxo_id: UtxoId,
 		},
-		BondLocked {
-			bond_id: T::BondId,
-			bonded_account_id: T::AccountId,
+		BitcoinUtxoCosigned {
+			bond_id: BondId,
+			vault_id: VaultId,
+			utxo_id: UtxoId,
+			pubkey: CompressedBitcoinPubkey,
+			signature: BitcoinSignature,
 		},
-		BondUnlocked {
-			bond_id: T::BondId,
-			bonded_account_id: T::AccountId,
+		BitcoinCosignPastDue {
+			bond_id: BondId,
+			vault_id: VaultId,
+			utxo_id: UtxoId,
+			compensation_amount: T::Balance,
+			compensation_still_owed: T::Balance,
+			compensated_account_id: T::AccountId,
 		},
 	}
 
 	#[pallet::error]
 	pub enum Error<T> {
-		BadState,
 		BondNotFound,
-		NoMoreBondFundIds,
 		NoMoreBondIds,
 		MinimumBondAmountNotMet,
 		/// There are too many bond or bond funds expiring in the given expiration block
 		ExpirationAtBlockOverflow,
 		InsufficientFunds,
-		InsufficientBondFunds,
-		TransactionWouldTakeAccountBelowMinimumBalance,
-		BondFundClosed,
-		/// This reduction in bond funds offered goes below the amount that is already committed to
-		/// bond
-		BondFundReductionExceedsAllocatedFunds,
+		InsufficientVaultFunds,
+		/// The vault does not have enough bitcoins to cover the mining bond
+		InsufficientBitcoinsForMining,
+		/// The proposed transaction would take the account below the minimum (existential) balance
+		AccountWouldGoBelowMinimumBalance,
+		VaultClosed,
+		/// Funding would result in an overflow of the balance type
+		InvalidVaultAmount,
+		/// This bitcoin redemption has not been locked in
+		BondRedemptionNotLocked,
+		/// The bitcoin has passed the deadline to unlock it
+		BitcoinUnlockInitiationDeadlinePassed,
+		/// The fee for this bitcoin unlock is too high
+		BitcoinFeeTooHigh,
+		InvalidBondType,
+		BitcoinUtxoNotFound,
+		InsufficientSatoshisBonded,
+		NoBitcoinPricesAvailable,
+		/// The bitcoin script to lock this bitcoin has errors
+		InvalidBitcoinScript,
 		ExpirationTooSoon,
-		LeaseUntilBlockTooSoon,
-		LeaseUntilPastFundExpiration,
 		NoPermissions,
-		NoBondFundFound,
-		FundExtensionMustBeLater,
 		HoldUnexpectedlyModified,
-		BondFundMaximumBondsExceeded,
 		UnrecoverableHold,
-		BondFundNotFound,
-		BondAlreadyLocked,
-		BondLockedCannotModify,
+		VaultNotFound,
 		/// The fee for this bond exceeds the amount of the bond, which is unsafe
 		FeeExceedsBondAmount,
+		GenericBondError(BondError),
 	}
 
 	impl<T> From<BondError> for Error<T> {
 		fn from(e: BondError) -> Error<T> {
 			match e {
-				BondError::BadState => Error::<T>::BadState,
 				BondError::BondNotFound => Error::<T>::BondNotFound,
 				BondError::NoMoreBondIds => Error::<T>::NoMoreBondIds,
 				BondError::MinimumBondAmountNotMet => Error::<T>::MinimumBondAmountNotMet,
 				BondError::ExpirationAtBlockOverflow => Error::<T>::ExpirationAtBlockOverflow,
 				BondError::InsufficientFunds => Error::<T>::InsufficientFunds,
-				BondError::InsufficientBondFunds => Error::<T>::InsufficientBondFunds,
 				BondError::ExpirationTooSoon => Error::<T>::ExpirationTooSoon,
 				BondError::NoPermissions => Error::<T>::NoPermissions,
-				BondError::NoBondFundFound => Error::<T>::NoBondFundFound,
 				BondError::HoldUnexpectedlyModified => Error::<T>::HoldUnexpectedlyModified,
-				BondError::BondFundMaximumBondsExceeded => Error::<T>::BondFundMaximumBondsExceeded,
 				BondError::UnrecoverableHold => Error::<T>::UnrecoverableHold,
-				BondError::BondFundNotFound => Error::<T>::BondFundNotFound,
-				BondError::BondAlreadyLocked => Error::<T>::BondAlreadyLocked,
-				BondError::BondLockedCannotModify => Error::<T>::BondLockedCannotModify,
+				BondError::VaultNotFound => Error::<T>::VaultNotFound,
 				BondError::FeeExceedsBondAmount => Error::<T>::FeeExceedsBondAmount,
-				BondError::LeaseUntilBlockTooSoon => Error::<T>::LeaseUntilBlockTooSoon,
-				BondError::LeaseUntilPastFundExpiration => Error::<T>::LeaseUntilPastFundExpiration,
-				BondError::BondAlreadyClosed => Error::<T>::BondLockedCannotModify,
-				BondError::BondFundClosed => Error::<T>::BondFundClosed,
+				BondError::InsufficientVaultFunds => Error::<T>::InsufficientVaultFunds,
+				BondError::InsufficientBitcoinsForMining =>
+					Error::<T>::InsufficientBitcoinsForMining,
+				BondError::VaultClosed => Error::<T>::VaultClosed,
 				BondError::AccountWouldBeBelowMinimum =>
-					Error::<T>::TransactionWouldTakeAccountBelowMinimumBalance,
+					Error::<T>::AccountWouldGoBelowMinimumBalance,
+				BondError::InvalidBitcoinScript => Error::<T>::InvalidBitcoinScript,
+				_ => Error::<T>::GenericBondError(e),
 			}
 		}
 	}
@@ -311,30 +388,45 @@ pub mod pallet {
 	#[pallet::hooks]
 	impl<T: Config> Hooks<BlockNumberFor<T>> for Pallet<T> {
 		fn on_initialize(block_number: BlockNumberFor<T>) -> Weight {
-			let bond_completions = BondCompletions::<T>::take(block_number);
+			let bond_completions = MiningBondCompletions::<T>::take(block_number);
 			for bond_id in bond_completions {
-				Self::bond_completed(bond_id)
-					.map_err(|err| {
-						warn!( target: LOG_TARGET, "Bond id {:?} failed to `complete` {:?}", bond_id, err);
+				let _ = with_storage_layer(|| {
+					Self::bond_completed(bond_id).map_err(|e| {
+						warn!( target: LOG_TARGET, "Mining bond id {:?} failed to `complete` {:?}", bond_id, e);
+						e
 					})
-					.ok();
+				});
 			}
 
-			let fund_expirations = BondFundExpirations::<T>::take(block_number);
-			for bond_fund_id in fund_expirations {
-				if let Some(bond_fund) = BondFunds::<T>::take(bond_fund_id) {
-					Self::release_hold(&bond_fund.offer_account_id, bond_fund.amount_reserved)
-						.map_err(|err| {
-							warn!( target: LOG_TARGET, "Bond fund {:?} failed to `release hold` {:?}", bond_fund, err);
-						})
-						.ok();
-					Self::deposit_event(Event::BondFundExpired {
-						bond_fund_id,
-						offer_account_id: bond_fund.offer_account_id,
-					});
-				} else {
-					warn!( target: LOG_TARGET, "Bond fund id {:?} expired but was not found", bond_fund_id);
-				}
+			let mut overdue = vec![];
+			let bitcoin_block_height = T::BitcoinBlockHeight::get();
+			<UtxosPendingUnlock<T>>::mutate(|pending| {
+				pending.retain(|id, x| {
+					if x.cosign_due_block > bitcoin_block_height {
+						return true;
+					}
+					overdue.push((*id, x.redemption_price));
+					false
+				});
+			});
+
+			for (utxo_id, redemption_amount) in overdue {
+				let _ = with_storage_layer(|| {
+					Self::cosign_bitcoin_overdue(utxo_id,redemption_amount).map_err(|e| {
+						warn!( target: LOG_TARGET, "Utxo id {:?} was not cosigned by vault. Claiming funds {:?}", utxo_id, e);
+						e
+					})
+				});
+			}
+
+			let bitcoin_bond_completions = BitcoinBondCompletions::<T>::take(bitcoin_block_height);
+			for bond_id in bitcoin_bond_completions {
+				let _ = with_storage_layer(|| {
+					Self::bond_completed(bond_id).map_err(|e| {
+						warn!( target: LOG_TARGET, "Bitcoin bond id {:?} failed to `complete` {:?}", bond_id, e);
+						e
+					})
+				});
 			}
 			T::DbWeight::get().reads_writes(2, 1)
 		}
@@ -344,821 +436,519 @@ pub mod pallet {
 
 	#[pallet::call]
 	impl<T: Config> Pallet<T> {
+		/// Bond a bitcoin. This will create a bond for the submitting account and log the Bitcoin
+		/// Script hash to Events. A bondee must create the UTXO in order to be added to the Bitcoin
+		/// Mint line.
+		///
+		/// NOTE: The script
 		#[pallet::call_index(0)]
 		#[pallet::weight(0)]
-		pub fn offer_fund(
+		pub fn bond_bitcoin(
 			origin: OriginFor<T>,
-			#[pallet::compact] lease_annual_percent_rate: u32,
-			#[pallet::compact] lease_base_fee: T::Balance,
-			#[pallet::compact] amount_offered: T::Balance,
-			expiration_block: BlockNumberFor<T>,
+			vault_id: VaultId,
+			#[pallet::compact] satoshis: Satoshis,
+			bitcoin_pubkey_hash: BitcoinPubkeyHash,
+		) -> DispatchResult {
+			let account_id = ensure_signed(origin)?;
+
+			ensure!(
+				satoshis >= T::MinimumBitcoinBondSatoshis::get(),
+				Error::<T>::InsufficientSatoshisBonded
+			);
+
+			let vault_claim_height =
+				T::BitcoinBlockHeight::get() + T::BitcoinBondDurationBlocks::get();
+			let open_claim_height = vault_claim_height + T::BitcoinBondReclamationBlocks::get();
+
+			let amount = T::PriceProvider::get_bitcoin_argon_price(satoshis)
+				.ok_or(Error::<T>::NoBitcoinPricesAvailable)?;
+
+			let (total_fee, prepaid_fee) = T::VaultProvider::bond_funds(
+				vault_id,
+				amount,
+				BondType::Bitcoin,
+				// charge in 1 year of blocks (even though we'll expire off bitcoin time)
+				T::UlixeeBlocksPerDay::get() * 365u32.into(),
+				&account_id,
+			)
+			.map_err(Error::<T>::from)?;
+			ensure!(total_fee <= amount, Error::<T>::FeeExceedsBondAmount);
+
+			let utxo_id = T::BitcoinUtxoTracker::new_utxo_id();
+
+			let (vault_pubkey_hash, script_pubkey) = T::VaultProvider::create_utxo_script_pubkey(
+				vault_id,
+				utxo_id,
+				bitcoin_pubkey_hash.clone(),
+				vault_claim_height,
+				open_claim_height,
+			)
+			.map_err(|_| Error::<T>::InvalidBitcoinScript)?;
+
+			T::BitcoinUtxoTracker::watch_for_utxo(
+				utxo_id,
+				script_pubkey.clone(),
+				satoshis,
+				// translate back into a time with millis
+				vault_claim_height,
+			)?;
+
+			let bond_id = Self::create_bond(
+				vault_id,
+				account_id,
+				BondType::Bitcoin,
+				amount,
+				BondExpiration::BitcoinBlock(vault_claim_height),
+				total_fee,
+				prepaid_fee,
+				Some(utxo_id),
+			)
+			.map_err(Error::<T>::from)?;
+
+			UtxosById::<T>::insert(
+				utxo_id,
+				UtxoState {
+					bond_id,
+					satoshis,
+					vault_pubkey_hash,
+					owner_pubkey_hash: bitcoin_pubkey_hash,
+					vault_claim_height,
+					open_claim_height,
+					register_block: T::BitcoinBlockHeight::get(),
+					utxo_script_pubkey: script_pubkey,
+					is_verified: false,
+				},
+			);
+
+			Ok(())
+		}
+
+		/// Submitted by a Bitcoin holder to trigger the unlock of their Bitcoin. A transaction
+		/// spending the UTXO from the given bond should be pre-created so that the sighash can be
+		/// submitted here. The vault operator will have 10 days to counter-sign the transaction. It
+		/// will be published with the public key as a BitcoinUtxoCosigned Event.
+		///
+		/// Owner must submit a script pubkey and also a fee to pay to the bitcoin network.
+		#[pallet::call_index(4)]
+		#[pallet::weight(0)]
+		pub fn unlock_bitcoin_bond(
+			origin: OriginFor<T>,
+			bond_id: BondId,
+			to_script_pubkey: BitcoinScriptPubkey,
+			bitcoin_network_fee: Satoshis,
 		) -> DispatchResult {
 			let who = ensure_signed(origin)?;
-
-			if amount_offered < T::MinimumBondAmount::get() {
-				return Err(Error::<T>::MinimumBondAmountNotMet.into());
-			}
-
-			if expiration_block <= frame_system::Pallet::<T>::block_number() {
-				return Err(Error::<T>::ExpirationTooSoon.into());
-			}
-
-			Self::hold(&who, amount_offered).map_err(Error::<T>::from)?;
-
-			let bond_fund_id = Self::next_bond_fund_id()?;
-
-			let bond_fund = BondFund {
-				lease_annual_percent_rate,
-				lease_base_fee,
-				offer_account_id: who.clone(),
-				amount_reserved: amount_offered,
-				amount_bonded: 0u32.into(),
-				offer_expiration_block: expiration_block,
-				is_ended: false,
+			let bond = BondsById::<T>::get(bond_id).ok_or(Error::<T>::BondNotFound)?;
+			ensure!(bond.bond_type == BondType::Bitcoin, Error::<T>::NoPermissions);
+			ensure!(bond.bonded_account_id == who, Error::<T>::NoPermissions);
+			let expiration = match bond.expiration {
+				BondExpiration::BitcoinBlock(vault_claim_height) => vault_claim_height,
+				_ => return Err(Error::<T>::InvalidBondType.into()),
 			};
-			BondFunds::<T>::insert(bond_fund_id, bond_fund);
-			BondFundExpirations::<T>::try_mutate(expiration_block, |funds| {
-				funds.try_push(bond_fund_id)
-			})
-			.map_err(|_| Error::<T>::ExpirationAtBlockOverflow)?;
-			Self::deposit_event(Event::BondFundOffered {
-				bond_fund_id,
-				amount_offered,
-				expiration_block,
-				offer_account_id: who,
-			});
+			let unlock_due_date =
+				expiration.saturating_sub(T::UtxoUnlockCosignDeadlineBlocks::get());
+			ensure!(
+				T::BitcoinBlockHeight::get() <= unlock_due_date,
+				Error::<T>::BitcoinUnlockInitiationDeadlinePassed
+			);
 
-			Ok(())
-		}
+			let utxo_id = bond.utxo_id.ok_or(Error::<T>::InvalidBondType)?;
 
-		/// Stop offering this fund for new bond. Will not affect existing bond. Unreserved funds
-		/// are returned immediately.
-		#[pallet::call_index(1)]
-		#[pallet::weight(0)]
-		pub fn end_fund(origin: OriginFor<T>, bond_fund_id: T::BondFundId) -> DispatchResult {
-			let who = ensure_signed(origin)?;
+			let utxo = <UtxosById<T>>::get(utxo_id).ok_or(Error::<T>::BitcoinUtxoNotFound)?;
+			// If this is a confirmed utxo, we require the unlock price to be paid
+			if utxo.is_verified {
+				ensure!(bitcoin_network_fee < utxo.satoshis, Error::<T>::BitcoinFeeTooHigh);
+				let redemption_price = Self::get_redemption_price(&utxo.satoshis)?.min(bond.amount);
+				let cosign_due_block =
+					T::UtxoUnlockCosignDeadlineBlocks::get() + T::BitcoinBlockHeight::get();
 
-			let mut fund =
-				BondFunds::<T>::get(bond_fund_id).ok_or::<Error<T>>(Error::<T>::NoBondFundFound)?;
+				// hold funds until the utxo is seen in the chain
+				let balance = T::Currency::balance(&who);
+				ensure!(
+					balance.saturating_sub(redemption_price) >= T::Currency::minimum_balance(),
+					Error::<T>::AccountWouldGoBelowMinimumBalance
+				);
 
-			if fund.offer_account_id != who {
-				return Err(Error::<T>::NoPermissions.into());
-			}
+				T::Currency::hold(&HoldReason::UnlockingBitcoin.into(), &who, redemption_price)
+					.map_err(|e| match e {
+						Token(TokenError::BelowMinimum) =>
+							Error::<T>::AccountWouldGoBelowMinimumBalance,
+						_ => Error::<T>::InsufficientFunds,
+					})?;
+				frame_system::Pallet::<T>::inc_providers(&who);
 
-			let return_amount = fund.amount_reserved.saturating_sub(fund.amount_bonded);
-			if Self::held_balance(&who) < return_amount {
-				return Err(Error::<T>::HoldUnexpectedlyModified.into());
-			}
-			Self::release_hold(&who, return_amount)?;
-
-			fund.is_ended = true;
-			let amount_still_bonded = fund.amount_bonded;
-			fund.amount_reserved = amount_still_bonded;
-			BondFunds::<T>::set(bond_fund_id, Some(fund));
-
-			Self::deposit_event(Event::BondFundEnded { bond_fund_id, amount_still_bonded });
-			Ok(())
-		}
-
-		/// Add additional time or funds to the bond fund
-		#[pallet::call_index(2)]
-		#[pallet::weight(0)]
-		pub fn extend_fund(
-			origin: OriginFor<T>,
-			bond_fund_id: T::BondFundId,
-			total_amount_offered: T::Balance,
-			expiration_block: BlockNumberFor<T>,
-		) -> DispatchResult {
-			let who = ensure_signed(origin)?;
-			let mut fund = BondFunds::<T>::get(bond_fund_id).ok_or(Error::<T>::NoBondFundFound)?;
-			if fund.offer_account_id != who {
-				return Err(Error::<T>::NoPermissions.into());
-			}
-			if fund.offer_expiration_block > expiration_block {
-				return Err(Error::<T>::FundExtensionMustBeLater.into());
-			}
-
-			if total_amount_offered < fund.amount_bonded {
-				return Err(Error::<T>::BondFundReductionExceedsAllocatedFunds.into());
-			}
-
-			if fund.amount_reserved > total_amount_offered {
-				let return_amount = fund.amount_reserved.saturating_sub(total_amount_offered);
-				Self::release_hold(&who, return_amount)?;
-			} else {
-				let amount_to_reserve = total_amount_offered.saturating_sub(fund.amount_reserved);
-				Self::hold(&who, amount_to_reserve).map_err(Error::<T>::from)?;
-			}
-
-			if expiration_block != fund.offer_expiration_block {
-				Self::remove_bond_fund_expiration(bond_fund_id, fund.offer_expiration_block);
-
-				BondFundExpirations::<T>::try_mutate(expiration_block, |funds| {
-					funds.try_push(bond_fund_id)
+				<UtxosPendingUnlock<T>>::try_mutate(|a| {
+					a.try_insert(
+						utxo_id,
+						UtxoCosignRequest {
+							bitcoin_network_fee,
+							cosign_due_block,
+							to_script_pubkey,
+							redemption_price,
+						},
+					)
 				})
 				.map_err(|_| Error::<T>::ExpirationAtBlockOverflow)?;
 
-				fund.offer_expiration_block = expiration_block;
+				Self::deposit_event(Event::<T>::BitcoinUtxoCosignRequested {
+					bond_id,
+					vault_id: bond.vault_id,
+					utxo_id,
+				});
+			} else {
+				<Self as BondProvider>::cancel_bond(bond_id).map_err(Error::<T>::from)?;
 			}
-			BondFunds::<T>::set(bond_fund_id, Some(fund));
-			Self::deposit_event(Event::BondFundExtended {
-				bond_fund_id,
-				amount_offered: total_amount_offered,
-				expiration_block,
-			});
-
 			Ok(())
 		}
 
-		#[pallet::call_index(3)]
-		#[pallet::weight(0)]
-		pub fn bond_self(
-			origin: OriginFor<T>,
-			amount: T::Balance,
-			bond_until_block: BlockNumberFor<T>,
-		) -> DispatchResult {
-			let who = ensure_signed(origin)?;
-			<Self as BondProvider>::bond_self(who, amount, bond_until_block)
-				.map_err(Error::<T>::from)?;
-
-			Ok(())
-		}
-
-		#[pallet::call_index(4)]
-		#[pallet::weight(0)]
-		pub fn lease(
-			origin: OriginFor<T>,
-			bond_fund_id: T::BondFundId,
-			amount: T::Balance,
-			lease_until_block: BlockNumberFor<T>,
-		) -> DispatchResult {
-			let who = ensure_signed(origin)?;
-			<Self as BondProvider>::lease(bond_fund_id, who, amount, lease_until_block)
-				.map_err(Error::<T>::from)?;
-			Ok(())
-		}
-
+		/// Submitted by a Vault operator to cosign the unlock of a bitcoin utxo. The Bitcoin owner
+		/// unlock fee will be burned, and the bond will be allowed to expire without penalty.
+		///
+		/// This is submitted as a no-fee transaction off chain to allow keys to remain in cold
+		/// wallets.
 		#[pallet::call_index(5)]
 		#[pallet::weight(0)]
-		pub fn return_bond(origin: OriginFor<T>, bond_id: T::BondId) -> DispatchResult {
+		pub fn cosign_bitcoin_unlock(
+			origin: OriginFor<T>,
+			bond_id: BondId,
+			pubkey: CompressedBitcoinPubkey,
+			signature: BitcoinSignature,
+		) -> DispatchResultWithPostInfo {
 			let who = ensure_signed(origin)?;
-			<Self as BondProvider>::return_bond(bond_id, who).map_err(Error::<T>::from)?;
+			let bond = BondsById::<T>::get(bond_id).ok_or(Error::<T>::BondNotFound)?;
+			ensure!(bond.bond_type == BondType::Bitcoin, Error::<T>::NoPermissions);
+
+			let utxo_id = bond.utxo_id.ok_or(Error::<T>::InvalidBondType)?;
+			let vault_id = bond.vault_id;
+
+			let vault = T::VaultProvider::get(vault_id).ok_or(Error::<T>::VaultNotFound)?;
+			ensure!(vault.operator_account_id == who, Error::<T>::NoPermissions);
+			let request = UtxosPendingUnlock::<T>::mutate(|a| a.remove(&utxo_id))
+				.ok_or(Error::<T>::BondRedemptionNotLocked)?;
+
+			// TODO: check that the signature is valid
+
+			// burn the owner's held funds
+			let _ = T::Currency::burn_held(
+				&HoldReason::UnlockingBitcoin.into(),
+				&bond.bonded_account_id,
+				request.redemption_price,
+				Precision::Exact,
+				Fortitude::Force,
+			)?;
+			frame_system::Pallet::<T>::dec_providers(&who)?;
+
+			T::BitcoinUtxoTracker::unwatch(utxo_id);
+			<UtxosById<T>>::take(utxo_id);
+
+			Self::deposit_event(Event::BitcoinUtxoCosigned {
+				bond_id,
+				vault_id,
+				utxo_id,
+				pubkey,
+				signature,
+			});
+
+			// no fee for cosigning
+			Ok(Pays::No.into())
+		}
+	}
+
+	impl<T: Config> BitcoinUtxoEvents for Pallet<T> {
+		fn utxo_verified(utxo_id: UtxoId) -> DispatchResult {
+			UtxosById::<T>::mutate(utxo_id, |a| {
+				if let Some(utxo_state) = a {
+					utxo_state.is_verified = true;
+					let bond =
+						BondsById::<T>::get(utxo_state.bond_id).ok_or(Error::<T>::BondNotFound)?;
+					T::BondEvents::utxo_bonded(utxo_id, &bond.bonded_account_id, bond.amount)?;
+				} else {
+					warn!( target: LOG_TARGET, "Verified utxo_id {:?} not found", utxo_id);
+				}
+				Ok::<(), DispatchError>(())
+			})
+		}
+
+		fn utxo_rejected(utxo_id: UtxoId, _reason: BitcoinRejectedReason) -> DispatchResult {
+			if let Some(utxo_state) = UtxosById::<T>::take(utxo_id) {
+				Self::cancel_bond(utxo_state.bond_id).map_err(Error::<T>::from)?;
+			}
 			Ok(())
 		}
 
-		#[pallet::call_index(6)]
-		#[pallet::weight(0)]
-		pub fn extend_bond(
-			origin: OriginFor<T>,
-			bond_id: T::BondId,
-			total_amount: T::Balance,
-			bond_until_block: BlockNumberFor<T>,
-		) -> DispatchResult {
-			let who = ensure_signed(origin)?;
-			<Self as BondProvider>::extend_bond(bond_id, who, total_amount, bond_until_block)
-				.map_err(Error::<T>::from)?;
-			Ok(())
+		fn utxo_spent(utxo_id: UtxoId) -> DispatchResult {
+			if let Some(utxo) = UtxosById::<T>::take(utxo_id) {
+				Self::burn_bitcoin_bond(utxo_id, utxo, true)
+			} else {
+				Ok(())
+			}
+		}
+
+		fn utxo_expired(utxo_id: UtxoId) -> DispatchResult {
+			if let Some(utxo) = UtxosById::<T>::take(utxo_id) {
+				Self::burn_bitcoin_bond(utxo_id, utxo, false)
+			} else {
+				Ok(())
+			}
 		}
 	}
 
 	impl<T: Config> Pallet<T> {
-		fn next_bond_id() -> Result<T::BondId, BondError> {
-			let bond_id =
-				NextBondId::<T>::get().or(Some(1u32.into())).ok_or(BondError::NoMoreBondIds)?;
+		fn create_bond(
+			vault_id: VaultId,
+			account_id: T::AccountId,
+			bond_type: BondType,
+			amount: T::Balance,
+			expiration: BondExpiration<BlockNumberFor<T>>,
+			total_fee: T::Balance,
+			prepaid_fee: T::Balance,
+			utxo_id: Option<UtxoId>,
+		) -> Result<BondId, BondError> {
+			let bond_id = NextBondId::<T>::get().unwrap_or(1);
+
 			let next_bond_id = bond_id.increment().ok_or(BondError::NoMoreBondIds)?;
 			NextBondId::<T>::set(Some(next_bond_id));
+
+			let bond = Bond {
+				vault_id,
+				utxo_id,
+				bond_type: bond_type.clone(),
+				bonded_account_id: account_id.clone(),
+				amount,
+				expiration: expiration.clone(),
+				total_fee,
+				prepaid_fee,
+			};
+			BondsById::<T>::set(bond_id, Some(bond));
+			match expiration {
+				BondExpiration::UlixeeBlock(block) => {
+					MiningBondCompletions::<T>::try_mutate(block, |a| {
+						a.try_push(bond_id).map_err(|_| BondError::ExpirationAtBlockOverflow)
+					})?;
+				},
+				BondExpiration::BitcoinBlock(block) => {
+					BitcoinBondCompletions::<T>::try_mutate(block, |a| {
+						a.try_push(bond_id).map_err(|_| BondError::ExpirationAtBlockOverflow)
+					})?;
+				},
+			}
+
+			Self::deposit_event(Event::BondCreated {
+				vault_id,
+				bond_id,
+				bonded_account_id: account_id,
+				utxo_id,
+				amount,
+				expiration,
+				bond_type,
+			});
 			Ok(bond_id)
 		}
 
-		fn next_bond_fund_id() -> Result<T::BondFundId, Error<T>> {
-			let bond_fund_id = NextBondFundId::<T>::get()
-				.or(Some(1u32.into()))
-				.ok_or(Error::<T>::NoMoreBondFundIds)?;
-			let next_bond_fund_id =
-				bond_fund_id.increment().ok_or(Error::<T>::NoMoreBondFundIds)?;
-			NextBondFundId::<T>::set(Some(next_bond_fund_id));
-			Ok(bond_fund_id)
-		}
+		/// Return bonded funds to the vault and complete the bond
+		fn bond_completed(bond_id: BondId) -> DispatchResult {
+			let bond = BondsById::<T>::get(bond_id).ok_or(Error::<T>::BondNotFound)?;
+			Self::remove_bond_completion(bond_id, bond.expiration.clone());
 
-		fn hold(who: &T::AccountId, amount: T::Balance) -> Result<(), BondError> {
-			T::Currency::hold(&HoldReason::EnterBondFund.into(), who, amount).map_err(|e| {
-				let balance = T::Currency::balance(who);
-				warn!( target: LOG_TARGET, "Hold failed for {:?} from {:?}. Current Balance={:?}. {:?}", amount, who, balance, e);
-
-				match e {
-					Token(TokenError::BelowMinimum) => BondError::AccountWouldBeBelowMinimum,
-					_ => {
-						if balance.checked_sub(&amount).is_some()  && balance.saturating_sub(amount) <
-							T::Currency::minimum_balance()
-						{
-							return BondError::AccountWouldBeBelowMinimum
-						}
-
-						BondError::InsufficientFunds
-					},
+			if bond.bond_type == BondType::Bitcoin {
+				let utxo_id = bond.utxo_id.ok_or(Error::<T>::InvalidBondType)?;
+				if let Some(utxo) = <UtxosById<T>>::take(utxo_id) {
+					Self::burn_bitcoin_bond(utxo_id, utxo, false)?;
+					BondsById::<T>::remove(bond_id);
+					return Ok(());
 				}
-			})?;
-			frame_system::Pallet::<T>::inc_providers(who);
+			}
+			// reload bond
+			let bond = BondsById::<T>::get(bond_id).ok_or(Error::<T>::BondNotFound)?;
+			T::VaultProvider::release_bonded_funds(&bond, true).map_err(Error::<T>::from)?;
+			Self::deposit_event(Event::BondCompleted { vault_id: bond.vault_id, bond_id });
+			BondsById::<T>::remove(bond_id);
 			Ok(())
 		}
 
-		fn release_hold(
-			who: &T::AccountId,
-			amount: T::Balance,
-		) -> Result<T::Balance, DispatchError> {
-			let reason = &HoldReason::EnterBondFund.into();
-			if amount == Self::held_balance(who) {
-				let _ = frame_system::Pallet::<T>::dec_providers(who);
+		fn burn_bitcoin_bond(utxo_id: UtxoId, utxo: UtxoState, is_spent: bool) -> DispatchResult {
+			let bond_id = utxo.bond_id;
+
+			if !utxo.is_verified {
+				Self::cancel_bond(bond_id).map_err(Error::<T>::from)?;
+				return Ok(());
 			}
-			T::Currency::release(reason, who, amount, Precision::Exact)
-		}
+			let mut bond = BondsById::<T>::get(bond_id).ok_or(Error::<T>::BondNotFound)?;
 
-		fn burn_hold(who: &T::AccountId, amount: T::Balance) -> Result<T::Balance, DispatchError> {
-			let reason = &HoldReason::EnterBondFund.into();
-			if amount == Self::held_balance(&who) {
-				let _ = frame_system::Pallet::<T>::dec_providers(&who);
-			}
-			T::Currency::burn_held(&reason, &who, amount, Precision::Exact, Fortitude::Force)
-		}
+			// burn the current redemption price from the bond
+			let amount_to_burn = Self::get_redemption_price(&utxo.satoshis)
+				.unwrap_or(bond.amount)
+				.min(bond.amount);
 
-		fn held_balance(who: &T::AccountId) -> T::Balance {
-			let reason = &HoldReason::EnterBondFund.into();
-			T::Currency::balance_on_hold(reason, who)
-		}
+			T::VaultProvider::burn_vault_bitcoin_funds(&bond, amount_to_burn)
+				.map_err(Error::<T>::from)?;
+			let vault_id = bond.vault_id;
+			bond.amount = bond.amount.saturating_sub(amount_to_burn);
 
-		fn transfer(
-			from: &T::AccountId,
-			to: &T::AccountId,
-			amount: T::Balance,
-		) -> Result<(), BondError> {
-			T::Currency::transfer(from, to, amount, Preservation::Preserve).map_err(|e| {
-				warn!( target: LOG_TARGET, "Transfer failed for {:?} from {:?} to {:?} {:?}", amount, from, to, e);
-				match e {
-					Token(TokenError::BelowMinimum) => BondError::AccountWouldBeBelowMinimum,
-					_ => BondError::InsufficientFunds,
-				}
-			})?;
+			Self::deposit_event(Event::BitcoinBondBurned {
+				vault_id,
+				bond_id,
+				utxo_id,
+				amount_burned: amount_to_burn,
+				amount_held: bond.amount,
+				was_utxo_spent: is_spent,
+			});
+			BondsById::<T>::insert(bond_id, bond);
+
+			T::BitcoinUtxoTracker::unwatch(utxo_id);
+
 			Ok(())
 		}
 
-		fn can_transfer(from: &T::AccountId, amount: T::Balance) -> bool {
-			T::Currency::reducible_balance(from, Preservation::Preserve, Fortitude::Force) >= amount
-		}
+		/// Call made during the on_initialize to implement cosign overdue penalties.
+		pub(crate) fn cosign_bitcoin_overdue(
+			utxo_id: UtxoId,
+			redemption_amount_held: T::Balance,
+		) -> DispatchResult {
+			let utxo = <UtxosById<T>>::take(utxo_id).ok_or(Error::<T>::BitcoinUtxoNotFound)?;
+			let bond_id = utxo.bond_id;
+			let mut bond = BondsById::<T>::get(bond_id).ok_or(Error::<T>::BondNotFound)?;
+			let vault_id = bond.vault_id;
 
-		/// Return bonded funds to a bond fund or to the self-bonder if necessary
-		fn bond_completed(bond_id: T::BondId) -> DispatchResult {
-			let bond = Bonds::<T>::take(bond_id).ok_or(Error::<T>::BondNotFound)?;
-			Self::remove_bond_completion(bond_id, bond.completion_block);
-			Self::deposit_event(Event::BondCompleted { bond_fund_id: bond.bond_fund_id, bond_id });
-			match bond.bond_fund_id {
-				None => {
-					let unreserved = Self::release_hold(&bond.bonded_account_id, bond.amount)?;
-					if unreserved != bond.amount {
-						warn!(
-							"Expiring bond hold could not all be returned {:?} - remaining not un-reserved ({:?}).",
-							bond, unreserved
-						);
-						return Err(Error::<T>::UnrecoverableHold.into());
-					}
-					Ok(())
-				},
-				Some(bond_fund_id) => {
-					if let Some(mut bond_fund) = BondFunds::<T>::get(bond_fund_id) {
-						// return bond amount to fund
-						bond_fund.amount_bonded =
-							bond_fund.amount_bonded.saturating_sub(bond.amount);
-						if bond_fund.is_ended {
-							Self::release_hold(&bond_fund.offer_account_id, bond.amount)
-								.map_err(|_| Error::<T>::UnrecoverableHold)?;
-							bond_fund.amount_reserved =
-								bond_fund.amount_reserved.saturating_sub(bond.amount);
-						}
+			let market_price = T::PriceProvider::get_bitcoin_argon_price(utxo.satoshis)
+				.ok_or(Error::<T>::NoBitcoinPricesAvailable)?;
 
-						if bond_fund.amount_bonded == 0u32.into() && bond_fund.is_ended {
-							BondFunds::<T>::take(bond_fund_id);
-							Self::remove_bond_fund_expiration(
-								bond_fund_id,
-								bond_fund.offer_expiration_block,
-							);
-						} else {
-							BondFunds::<T>::set(bond_fund_id, Some(bond_fund));
-						}
-						Ok(())
-					} else {
-						Err(Error::<T>::BondFundNotFound.into())
-					}
-				},
-			}
-		}
+			let repaid = T::VaultProvider::compensate_lost_bitcoin(&bond, market_price)
+				.map_err(Error::<T>::from)?;
 
-		fn remove_bond_completion(bond_id: T::BondId, completion_block: BlockNumberFor<T>) {
-			if !BondCompletions::<T>::contains_key(completion_block) {
-				return;
-			}
-			BondCompletions::<T>::mutate(completion_block, |bonds| {
-				if let Some(index) = bonds.iter().position(|b| *b == bond_id) {
-					bonds.remove(index);
-				}
-			});
-		}
-
-		fn remove_bond_fund_expiration(
-			bond_fund_id: T::BondFundId,
-			expiration_block: BlockNumberFor<T>,
-		) {
-			if !BondFundExpirations::<T>::contains_key(expiration_block) {
-				return;
-			}
-			BondFundExpirations::<T>::mutate(expiration_block, |funds| {
-				if let Some(index) = funds.iter().position(|id| *id == bond_fund_id) {
-					funds.remove(index);
-				}
-			});
-		}
-
-		pub fn calculate_fees(
-			annual_percentage_rate: u32,
-			base_fee: T::Balance,
-			amount: T::Balance,
-			blocks: BlockNumberFor<T>,
-			blocks_per_year: BlockNumberFor<T>,
-		) -> T::Balance {
-			let amount: u128 = amount.try_into().unwrap_or(0u128);
-			let percent_basis = 100_000u128;
-			let lease_price: u128 = amount
-				.saturating_mul(annual_percentage_rate.into())
-				.saturating_mul(blocks_into_u128::<T>(blocks))
-				.checked_div(blocks_into_u128::<T>(blocks_per_year))
-				.unwrap_or_default()
-				.checked_div(percent_basis)
-				.unwrap_or_default(); // amount is in milligons
-
-			let lease_price = T::Balance::from(lease_price);
-
-			base_fee.saturating_add(lease_price)
-		}
-
-		pub fn charge_lease_fees(
-			bond_fund_id: <T as Config>::BondFundId,
-			amount: T::Balance,
-			lease_until_block: BlockNumberFor<T>,
-			who: &T::AccountId,
-			block_number: BlockNumberFor<T>,
-		) -> Result<Fee<T::Balance>, BondError> {
-			let mut bond_fund =
-				BondFunds::<T>::get(bond_fund_id).ok_or::<BondError>(BondError::NoBondFundFound)?;
-
-			if bond_fund.amount_reserved.saturating_sub(bond_fund.amount_bonded) < amount {
-				log::info!(
-					"Insufficient bond funds for bond fund {:?} amount {:?} lease_until_block {:?}",
-					bond_fund,
-					amount,
-					lease_until_block
+			bond.amount = bond.amount.saturating_sub(market_price);
+			let still_owed = market_price.saturating_sub(repaid);
+			if still_owed > 0u128.into() {
+				<OwedUtxoAggrieved<T>>::insert(
+					utxo_id,
+					(bond.bonded_account_id.clone(), vault_id, still_owed, utxo),
 				);
-				return Err(BondError::InsufficientBondFunds);
 			}
 
-			if bond_fund.is_ended {
-				return Err(BondError::BondFundClosed);
+			T::Currency::release(
+				&HoldReason::UnlockingBitcoin.into(),
+				&bond.bonded_account_id,
+				redemption_amount_held,
+				Precision::Exact,
+			)?;
+			frame_system::Pallet::<T>::dec_providers(&bond.bonded_account_id)?;
+
+			Self::deposit_event(Event::BitcoinCosignPastDue {
+				vault_id,
+				bond_id,
+				utxo_id,
+				compensation_amount: repaid,
+				compensation_still_owed: still_owed,
+				compensated_account_id: bond.bonded_account_id.clone(),
+			});
+			T::BitcoinUtxoTracker::unwatch(utxo_id);
+			BondsById::<T>::insert(bond_id, bond);
+
+			Ok(())
+		}
+		fn remove_bond_completion(bond_id: BondId, expiration: BondExpiration<BlockNumberFor<T>>) {
+			match expiration {
+				BondExpiration::BitcoinBlock(completion_block) => {
+					if !BitcoinBondCompletions::<T>::contains_key(completion_block) {
+						return;
+					}
+					BitcoinBondCompletions::<T>::mutate(completion_block, |bonds| {
+						if let Some(index) = bonds.iter().position(|b| *b == bond_id) {
+							bonds.remove(index);
+						}
+					});
+				},
+				BondExpiration::UlixeeBlock(completion_block) => {
+					if !MiningBondCompletions::<T>::contains_key(completion_block) {
+						return;
+					}
+					MiningBondCompletions::<T>::mutate(completion_block, |bonds| {
+						if let Some(index) = bonds.iter().position(|b| *b == bond_id) {
+							bonds.remove(index);
+						}
+					});
+				},
 			}
+		}
 
-			if lease_until_block > bond_fund.offer_expiration_block {
-				return Err(BondError::LeaseUntilPastFundExpiration);
-			}
+		pub fn get_redemption_price(satoshis: &Satoshis) -> Result<T::Balance, Error<T>> {
+			let mut price: u128 = T::PriceProvider::get_bitcoin_argon_price(*satoshis)
+				.ok_or(Error::<T>::NoBitcoinPricesAvailable)?
+				.unique_saturated_into();
+			let cpi = T::PriceProvider::get_argon_cpi_price().unwrap_or_default();
+			if cpi > 0 {
+				let argon_price =
+					T::PriceProvider::get_latest_argon_price_in_us_cents().unwrap_or_default();
 
-			let base_fee = bond_fund.lease_base_fee;
-			let apr = bond_fund.lease_annual_percent_rate;
-			let fee = Self::calculate_fees(
-				apr,
-				base_fee,
-				amount,
-				lease_until_block - block_number,
-				T::BlocksPerYear::get(),
-			);
+				let multiplier = 0.713f32 * (argon_price as f32 / 100f32) + 0.274f32;
 
-			Self::transfer(who, &bond_fund.offer_account_id, fee)?;
+				// Apply the formula: R = (Pb / Pa) * (0.713 * Pa + 0.274)
+				// Pa should be in a float value (1.01)
+				// `price` is already (Pb / Pa)
+				// The redemption price of the argon allocates fluctuating incentives based on how
+				// fast the dip should be incentivized to be capitalized on.
+				price = price * (multiplier * 1000.0) as u128 / 1000;
+			};
 
-			bond_fund.amount_bonded = bond_fund.amount_bonded.saturating_add(amount);
-			BondFunds::<T>::set(bond_fund_id, Some(bond_fund));
-
-			Ok(Fee { total_fee: fee, base_fee, annual_percent_rate: apr })
+			Ok(price.into())
 		}
 	}
 
 	impl<T: Config> BondProvider for Pallet<T> {
-		type BondFundId = T::BondFundId;
-		type BondId = T::BondId;
 		type Balance = T::Balance;
 		type AccountId = T::AccountId;
 		type BlockNumber = BlockNumberFor<T>;
 
-		fn get_bond(
-			bond_id: Self::BondId,
-		) -> Result<Bond<T::AccountId, T::Balance, BlockNumberFor<T>, Self::BondFundId>, BondError>
-		{
-			Bonds::<T>::get(bond_id).ok_or(BondError::BondNotFound)
-		}
-
-		fn bond_self(
-			account_id: T::AccountId,
-			amount: T::Balance,
-			bond_until_block: BlockNumberFor<T>,
-		) -> Result<Self::BondId, BondError> {
-			if amount < T::MinimumBondAmount::get() {
-				return Err(BondError::MinimumBondAmountNotMet);
-			}
+		fn bond_mining_slot(
+			vault_id: VaultId,
+			account_id: Self::AccountId,
+			amount: Self::Balance,
+			bond_until_block: Self::BlockNumber,
+		) -> Result<BondId, BondError> {
+			ensure!(amount >= T::MinimumBondAmount::get(), BondError::MinimumBondAmountNotMet);
 
 			let block_number = frame_system::Pallet::<T>::block_number();
-			if bond_until_block <= block_number {
-				return Err(BondError::ExpirationTooSoon);
-			}
+			ensure!(bond_until_block > block_number, BondError::ExpirationTooSoon);
 
-			Self::hold(&account_id, amount)?;
-			let bond_id = Self::next_bond_id()?;
-
-			let bond = Bond {
-				bond_fund_id: None,
-				bonded_account_id: account_id.clone(),
+			let (total_fee, prepaid_fee) = T::VaultProvider::bond_funds(
+				vault_id,
 				amount,
-				start_block: block_number,
-				completion_block: bond_until_block,
-				annual_percent_rate: 0u32,
-				base_fee: 0u32.into(),
-				fee: 0u32.into(),
-				is_locked: false,
-			};
-			Bonds::<T>::set(bond_id, Some(bond));
-			BondCompletions::<T>::try_mutate(bond_until_block, |bonds| bonds.try_push(bond_id))
-				.map_err(|_| BondError::ExpirationAtBlockOverflow)?;
-
-			Self::deposit_event(Event::BondedSelf {
-				bond_id,
-				bonded_account_id: account_id,
-				amount,
-				completion_block: bond_until_block,
-			});
-
-			Ok(bond_id)
-		}
-
-		fn lease(
-			bond_fund_id: Self::BondFundId,
-			account_id: T::AccountId,
-			amount: T::Balance,
-			lease_until_block: BlockNumberFor<T>,
-		) -> Result<Self::BondId, BondError> {
-			if amount < T::MinimumBondAmount::get() {
-				return Err(BondError::MinimumBondAmountNotMet);
-			}
-			let block_number = frame_system::Pallet::<T>::block_number();
-			if lease_until_block <= block_number {
-				return Err(BondError::LeaseUntilBlockTooSoon);
-			}
-
-			let fee = Self::charge_lease_fees(
-				bond_fund_id,
-				amount,
-				lease_until_block,
+				BondType::Mining,
+				bond_until_block - block_number,
 				&account_id,
-				block_number,
 			)?;
 
-			if fee.total_fee > amount {
-				return Err(BondError::FeeExceedsBondAmount);
-			}
-
-			let bond_id = Self::next_bond_id()?;
-			let bond = Bond {
-				bond_fund_id: Some(bond_fund_id),
-				bonded_account_id: account_id.clone(),
+			Self::create_bond(
+				vault_id,
+				account_id,
+				BondType::Mining,
 				amount,
-				start_block: block_number,
-				completion_block: lease_until_block,
-				base_fee: fee.base_fee,
-				annual_percent_rate: fee.annual_percent_rate,
-				fee: fee.total_fee,
-				is_locked: false,
-			};
-			Bonds::<T>::set(bond_id, Some(bond));
-			BondCompletions::<T>::try_mutate(lease_until_block, |bonds| bonds.try_push(bond_id))
-				.map_err(|_| BondError::ExpirationAtBlockOverflow)?;
-
-			Self::deposit_event(Event::BondLeased {
-				bond_fund_id,
-				bond_id,
-				bonded_account_id: account_id,
-				amount,
-				completion_block: lease_until_block,
-				annual_percent_rate: fee.annual_percent_rate,
-				total_fee: fee.total_fee,
-			});
-
-			Ok(bond_id)
+				BondExpiration::UlixeeBlock(bond_until_block),
+				total_fee,
+				prepaid_fee,
+				None,
+			)
 		}
 
-		fn burn_bond(
-			bond_id: T::BondId,
-			final_amount: Option<T::Balance>,
-		) -> Result<(), BondError> {
-			let bond = Bonds::<T>::take(bond_id).ok_or(BondError::BondNotFound)?;
-			Self::remove_bond_completion(bond_id, bond.completion_block);
-			let amount_burned = final_amount.unwrap_or(bond.amount);
-			let amount_returned = bond.amount.saturating_sub(amount_burned);
-			ensure!(amount_burned <= bond.amount, BondError::InsufficientFunds);
+		fn cancel_bond(bond_id: BondId) -> Result<(), BondError> {
+			let bond = BondsById::<T>::take(bond_id).ok_or(BondError::BondNotFound)?;
 
-			Self::deposit_event(Event::BondBurned {
-				bond_fund_id: bond.bond_fund_id,
-				bond_id,
-				amount_burned,
-				amount_returned,
-			});
-			match bond.bond_fund_id {
-				None => {
-					let unreserved = Self::burn_hold(&bond.bonded_account_id, amount_burned)
-						.map_err(|_| BondError::UnrecoverableHold)?;
-					if unreserved != amount_burned {
-						warn!(
-							"Expiring bond hold could not all be burned {:?}. Final amount {:?} - remaining not un-reserved ({:?}).",
-							bond, final_amount, unreserved
-						);
-						return Err(BondError::UnrecoverableHold);
-					}
-					Ok(())
-				},
-				Some(bond_fund_id) => {
-					if let Some(mut bond_fund) = BondFunds::<T>::get(bond_fund_id) {
-						// return bond amount to fund
-						bond_fund.amount_bonded = bond_fund
-							.amount_bonded
-							.saturating_sub(bond.amount)
-							.saturating_add(amount_returned);
-						bond_fund.amount_reserved = bond_fund
-							.amount_reserved
-							.saturating_sub(bond.amount)
-							.saturating_add(amount_returned);
+			let returned_fee = T::VaultProvider::release_bonded_funds(&bond, false)?;
 
-						Self::burn_hold(&bond_fund.offer_account_id, amount_burned)
-							.map_err(|_| BondError::UnrecoverableHold)?;
-
-						if bond_fund.amount_bonded == 0u32.into() && bond_fund.is_ended {
-							BondFunds::<T>::take(bond_fund_id);
-							Self::remove_bond_fund_expiration(
-								bond_fund_id,
-								bond_fund.offer_expiration_block,
-							);
-						} else {
-							BondFunds::<T>::set(bond_fund_id, Some(bond_fund));
-						}
-						Ok(())
-					} else {
-						Err(BondError::BondFundNotFound)
-					}
-				},
-			}
-		}
-
-		fn return_bond(bond_id: T::BondId, account_id: T::AccountId) -> Result<(), BondError> {
-			let bond = Bonds::<T>::get(bond_id).ok_or(BondError::BondNotFound)?;
-			if bond.is_locked {
-				return Err(BondError::BondLockedCannotModify);
-			}
-			if bond.bonded_account_id != account_id {
-				return Err(BondError::NoPermissions);
-			}
-
-			// if own bond, go ahead and return it
-			if bond.bond_fund_id.is_none() {
-				return Ok(Self::bond_completed(bond_id).map_err(|_| BondError::UnrecoverableHold))?;
-			}
-
-			let bond_fund_id = bond.bond_fund_id.ok_or(BondError::NoBondFundFound)?;
-
-			let mut bond_fund =
-				BondFunds::<T>::get(bond_fund_id).ok_or::<BondError>(BondError::NoBondFundFound)?;
-
-			let current_block_number = frame_system::Pallet::<T>::block_number();
-			let remaining_blocks =
-				blocks_into_u32::<T>(bond.completion_block - current_block_number);
-			if remaining_blocks == 0 {
-				return Err(BondError::BondAlreadyClosed);
-			}
-			let updated_fee: T::Balance = Self::calculate_fees(
-				// use rate stored on bond in case it change
-				bond.annual_percent_rate,
-				// don't refund base fee
-				bond.base_fee,
-				bond.amount,
-				current_block_number - bond.start_block,
-				T::BlocksPerYear::get(),
-			);
-
-			let refund_amount = bond.fee - updated_fee;
-
-			if refund_amount > 0u32.into() {
-				let offer_account_id = &bond_fund.offer_account_id.clone();
-				// first try to get from the account
-				if Self::can_transfer(offer_account_id, refund_amount) {
-					Self::transfer(offer_account_id, &bond.bonded_account_id, refund_amount)?;
-					Self::deposit_event(Event::BondFeeRefund {
-						bond_fund_id,
-						bond_id,
-						bonded_account_id: account_id,
-						bond_fund_reduction_for_payment: 0u32.into(),
-						final_fee: bond.fee - refund_amount,
-						refund_amount,
-					});
-				}
-				// if that fails, try to get from the bond fund
-				else {
-					if bond_fund.amount_reserved < refund_amount {
-						// should not be possible!
-						return Err(BondError::InsufficientFunds);
-					}
-					let mut amount_to_pull = refund_amount;
-					if T::Currency::balance(offer_account_id) < T::Currency::minimum_balance() {
-						amount_to_pull += T::Currency::minimum_balance();
-					}
-					log::info!(target: LOG_TARGET, "Cannot refund returned bond. Pulling funds from the bond fund instead. refund_amount={:?}, amount_to_satisfy_minimum_balance={:?}, bond_fund_id={:?} bond_id={:?}", refund_amount, amount_to_pull, bond_fund_id, bond_id);
-					bond_fund.amount_reserved =
-						bond_fund.amount_reserved.saturating_sub(amount_to_pull);
-					bond_fund.amount_bonded =
-						bond_fund.amount_bonded.saturating_sub(amount_to_pull);
-					BondFunds::<T>::set(bond_fund_id, Some(bond_fund));
-					// move refund amount out of hold and into bonded account
-					Self::release_hold(offer_account_id, amount_to_pull)
-						.map_err(|e| {
-							warn!( target: LOG_TARGET, "Cannot release hold from bond fund owner amount={:?}, account={:?}, {:?}", amount_to_pull, offer_account_id, e);
-
-							BondError::UnrecoverableHold
-						})?;
-					Self::transfer(offer_account_id, &bond.bonded_account_id, refund_amount)?;
-
-					Self::deposit_event(Event::BondFeeRefund {
-						bond_fund_id,
-						bond_id,
-						bonded_account_id: account_id,
-						bond_fund_reduction_for_payment: amount_to_pull,
-						final_fee: bond.fee - refund_amount,
-						refund_amount,
-					});
-				}
-			}
-			Self::bond_completed(bond_id).map_err(|_| BondError::UnrecoverableHold)?;
-			Ok(())
-		}
-
-		fn extend_bond(
-			bond_id: T::BondId,
-			account_id: T::AccountId,
-			total_amount: T::Balance,
-			lease_until: BlockNumberFor<T>,
-		) -> Result<(), BondError> {
-			if total_amount < T::MinimumBondAmount::get() {
-				return Err(BondError::MinimumBondAmountNotMet);
-			}
-			let block_number = frame_system::Pallet::<T>::block_number();
-			if lease_until <= block_number {
-				return Err(BondError::LeaseUntilBlockTooSoon);
-			}
-
-			let mut bond = Bonds::<T>::get(bond_id).ok_or(BondError::BondNotFound)?;
-			if bond.bonded_account_id != account_id {
-				return Err(BondError::NoPermissions);
-			}
-
-			// If a bond is locked, it can only be increased
-			if bond.is_locked && (total_amount < bond.amount || lease_until < bond.completion_block)
-			{
-				return Err(BondError::BondLockedCannotModify);
-			}
-
-			// if the expiration changed, remove from old slot
-			let needs_new_expiration = bond.completion_block != lease_until;
-			if needs_new_expiration {
-				Self::remove_bond_completion(bond_id, bond.completion_block);
-			}
-			let start_fee = bond.fee;
-
-			match bond.bond_fund_id {
-				None => {
-					// if self bonded, adjust hold
-					if total_amount > bond.amount {
-						Self::hold(&account_id, total_amount - bond.amount)?;
-					} else if total_amount < bond.amount {
-						Self::release_hold(&account_id, bond.amount - total_amount)
-							.map_err(|_| BondError::UnrecoverableHold)?;
-					}
-				},
-				Some(bond_fund_id) => {
-					let mut bond_fund = BondFunds::<T>::get(bond_fund_id)
-						.ok_or::<BondError>(BondError::NoBondFundFound)?;
-					let additional_funds = total_amount.saturating_sub(bond.amount);
-
-					if additional_funds >
-						bond_fund.amount_reserved.saturating_sub(bond_fund.amount_bonded)
-					{
-						return Err(BondError::InsufficientBondFunds);
-					}
-
-					if lease_until > bond_fund.offer_expiration_block {
-						return Err(BondError::LeaseUntilPastFundExpiration);
-					}
-
-					let lease_annual_percent_rate = bond_fund.lease_annual_percent_rate;
-					// must take the current fee structure
-					let fee = Self::calculate_fees(
-						// we pay the current rate to extend
-						lease_annual_percent_rate,
-						bond_fund.lease_base_fee,
-						total_amount,
-						lease_until - bond.start_block,
-						T::BlocksPerYear::get(),
-					);
-
-					if fee > bond.fee {
-						let additional_fee = fee - bond.fee;
-
-						Self::transfer(&account_id, &bond_fund.offer_account_id, additional_fee)?;
-
-						bond_fund.amount_bonded =
-							bond_fund.amount_bonded.saturating_add(additional_fee);
-						BondFunds::<T>::set(bond_fund_id, Some(bond_fund));
-					} else if fee < bond.fee {
-						let refund_amount = bond.fee - fee;
-
-						// Extensions only support refunding from the payee account
-						Self::transfer(&bond_fund.offer_account_id, &account_id, refund_amount)?;
-
-						bond_fund.amount_bonded =
-							bond_fund.amount_bonded.saturating_sub(refund_amount);
-						BondFunds::<T>::set(bond_fund_id, Some(bond_fund));
-					}
-
-					bond.annual_percent_rate = lease_annual_percent_rate;
-					bond.fee = fee;
-				},
-			}
-
-			bond.amount = total_amount;
-			bond.completion_block = lease_until;
-
-			Self::deposit_event(Event::BondExtended {
-				bond_fund_id: bond.bond_fund_id,
-				bond_id,
-				amount: total_amount,
-				completion_block: lease_until,
-				fee_change: bond.fee - start_fee,
-				annual_percent_rate: bond.annual_percent_rate,
-			});
-
-			Bonds::<T>::set(bond_id, Some(bond));
-
-			if needs_new_expiration {
-				BondCompletions::<T>::try_mutate(lease_until, |bonds| bonds.try_push(bond_id))
-					.map_err(|_| BondError::ExpirationAtBlockOverflow)?;
-			}
-
-			Ok(())
-		}
-
-		fn lock_bond(bond_id: T::BondId) -> Result<(), BondError> {
-			let mut bond = Bonds::<T>::get(bond_id).ok_or(BondError::BondNotFound)?;
-			if bond.is_locked {
-				return Err(BondError::BondAlreadyLocked);
-			}
-			bond.is_locked = true;
-
-			Self::deposit_event(Event::BondLocked {
+			Self::deposit_event(Event::BondCanceled {
+				vault_id: bond.vault_id,
 				bond_id,
 				bonded_account_id: bond.bonded_account_id.clone(),
+				bond_type: bond.bond_type,
+				returned_fee,
 			});
-			Bonds::<T>::set(bond_id, Some(bond));
-
-			Ok(())
-		}
-
-		fn unlock_bond(bond_id: T::BondId) -> Result<(), BondError> {
-			let mut bond = Bonds::<T>::get(bond_id).ok_or(BondError::BondNotFound)?;
-			if !bond.is_locked {
-				return Ok(());
+			Self::remove_bond_completion(bond_id, bond.expiration.clone());
+			if let Some(utxo_id) = bond.utxo_id {
+				UtxosById::<T>::take(utxo_id);
+				T::BitcoinUtxoTracker::unwatch(utxo_id);
 			}
-			bond.is_locked = false;
-
-			Self::deposit_event(Event::BondUnlocked {
-				bond_id,
-				bonded_account_id: bond.bonded_account_id.clone(),
-			});
-			Bonds::<T>::set(bond_id, Some(bond));
 
 			Ok(())
 		}
-	}
-
-	fn blocks_into_u32<T: Config>(blocks: BlockNumberFor<T>) -> u32 {
-		UniqueSaturatedInto::<u32>::unique_saturated_into(blocks)
-	}
-
-	fn blocks_into_u128<T: Config>(blocks: BlockNumberFor<T>) -> u128 {
-		UniqueSaturatedInto::<u128>::unique_saturated_into(blocks)
 	}
 }

@@ -6,7 +6,7 @@ use sp_runtime::RuntimeDebug;
 use sp_std::{collections::btree_map::BTreeMap, vec::Vec};
 
 use crate::{
-	bitcoin::{BitcoinBlock, BitcoinHeight, BitcoinRejectedReason, BitcoinUtxo},
+	bitcoin::{BitcoinBlock, BitcoinHeight, BitcoinRejectedReason, UtxoId, UtxoRef},
 	BestBlockVoteSeal, BlockSealAuthoritySignature, BlockSealDigest, BlockVote, MerkleProof,
 	NotaryId, NotebookNumber, SignedNotebookHeader,
 };
@@ -274,9 +274,9 @@ impl BitcoinInherentData for InherentData {
 
 #[derive(Clone, PartialEq, Encode, Decode, RuntimeDebug, TypeInfo)]
 pub struct BitcoinUtxoSync {
-	pub spent: BTreeMap<BitcoinUtxo, BitcoinHeight>,
-	pub verified: BTreeMap<BitcoinUtxo, BitcoinHeight>,
-	pub invalid: BTreeMap<BitcoinUtxo, BitcoinRejectedReason>,
+	pub spent: BTreeMap<UtxoId, BitcoinHeight>,
+	pub verified: BTreeMap<UtxoId, UtxoRef>,
+	pub invalid: BTreeMap<UtxoId, BitcoinRejectedReason>,
 	pub sync_to_block: BitcoinBlock,
 }
 

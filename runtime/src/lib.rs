@@ -30,7 +30,7 @@ use frame_support::{
 };
 // Configure FRAME pallets to include in runtime.
 use frame_support::{
-	traits::{Everything, InstanceFilter},
+	traits::{Everything, InstanceFilter, StorageMapShim},
 	weights::{WeightToFeeCoefficient, WeightToFeeCoefficients},
 };
 pub use frame_system::Call as SystemCall;
@@ -62,7 +62,7 @@ use sp_version::RuntimeVersion;
 pub use currency::*;
 pub use pallet_notebook::NotebookVerifyError;
 use ulx_primitives::{
-	bitcoin::{BitcoinHeight, BitcoinSyncStatus, BitcoinUtxo, Satoshis, UtxoLookup},
+	bitcoin::{BitcoinHeight, BitcoinSyncStatus, Satoshis, UtxoRef, UtxoValue},
 	block_seal::MiningAuthority,
 	block_vote::VoteMinimum,
 	digests::BlockVoteDigest,
@@ -71,9 +71,8 @@ use ulx_primitives::{
 	notebook::NotebookNumber,
 	prod_or_fast,
 	tick::{Tick, Ticker, TICK_MILLIS},
-	ArgonPriceProvider, BlockSealAuthorityId, BondFundId, BondId, NotaryNotebookVotes,
-	NotebookAuditResult, NotebookAuditSummary, TickProvider, ESCROW_CLAWBACK_TICKS,
-	ESCROW_EXPIRATION_TICKS,
+	BlockSealAuthorityId, NotaryNotebookVotes, NotebookAuditResult, NotebookAuditSummary,
+	PriceProvider, TickProvider, ESCROW_CLAWBACK_TICKS, ESCROW_EXPIRATION_TICKS,
 };
 pub use ulx_primitives::{
 	AccountId, Balance, BlockHash, BlockNumber, HashOutput, Moment, Nonce, Signature,
@@ -271,7 +270,7 @@ impl pallet_block_rewards::Config for Runtime {
 	type MinerPayoutPercent = MinerPayoutPercent;
 	type MaturationBlocks = MaturationBlocks;
 	type RuntimeFreezeReason = RuntimeFreezeReason;
-	type EventHandler = UlixeeMint;
+	type EventHandler = Mint;
 }
 
 impl pallet_data_domain::Config for Runtime {
@@ -308,9 +307,10 @@ parameter_types! {
 	pub const OwnershipPercentDamper: u32 = 80;
 
 	pub const BlocksBufferToStopAcceptingBids: u32 = prod_or_fast!(10, 1);
-	pub const MaxConcurrentlyExpiringBondFunds: u32 = 1000;
+
 	pub const MaxConcurrentlyExpiringBonds: u32 = 1000;
 	pub const MinimumBondAmount:u128 = 1_000;
+	pub const BlocksPerDay:u32 = 1440;
 	pub const BlocksPerYear:u32 = 1440 * 365;
 
 	const ValidatorWindow: u32 = (MaxMiners::get() / MaxCohortSize::get()) * BlocksBetweenSlots::get();
@@ -323,6 +323,27 @@ parameter_types! {
 	pub const MaxSetIdSessionEntries: u32 = SessionsPerWindow::get() * 2u32;
 	pub const ReportLongevity: u64 = ValidatorWindow::get() as u64 * 2;
 	pub const HistoricalBlockSealersToKeep: u32 = BlocksBetweenSlots::get();
+
+
+	const BitcoinBlocksPerDay:BitcoinHeight = 6  *24;
+	pub const BitcoinBondDurationBlocks: BitcoinHeight = BitcoinBlocksPerDay::get() * 365; // 1 year
+	pub const BitcoinBondReclamationBlocks: BitcoinHeight = BitcoinBlocksPerDay::get() * 30; // 30 days
+	pub const UtxoUnlockCosignDeadlineBlocks: BitcoinHeight = BitcoinBlocksPerDay::get() * 5; // 5 days
+
+	pub const MaxUnlockingUtxos: u32 = 1000;
+	pub const MinBitcoinSatoshiAmount: Satoshis = 100_000_000; // 1 bitcoin minimum
+	pub const MaxBitcoinPubkeysPerVault: u32 = 100;
+}
+
+impl pallet_vaults::Config for Runtime {
+	type RuntimeEvent = RuntimeEvent;
+	type WeightInfo = pallet_vaults::weights::SubstrateWeight<Runtime>;
+	type Currency = ArgonBalances;
+	type Balance = Balance;
+	type RuntimeHoldReason = RuntimeHoldReason;
+	type MinimumBondAmount = MinimumBondAmount;
+	type BlocksPerDay = BlocksPerDay;
+	type MaxVaultBitcoinPubkeys = MaxBitcoinPubkeysPerVault;
 }
 
 impl pallet_bond::Config for Runtime {
@@ -330,13 +351,20 @@ impl pallet_bond::Config for Runtime {
 	type WeightInfo = pallet_bond::weights::SubstrateWeight<Runtime>;
 	type Currency = ArgonBalances;
 	type RuntimeHoldReason = RuntimeHoldReason;
-	type BondFundId = BondFundId;
-	type BondId = BondId;
 	type MinimumBondAmount = MinimumBondAmount;
 	type MaxConcurrentlyExpiringBonds = MaxConcurrentlyExpiringBonds;
-	type MaxConcurrentlyExpiringBondFunds = MaxConcurrentlyExpiringBondFunds;
 	type Balance = Balance;
-	type BlocksPerYear = BlocksPerYear;
+	type VaultProvider = Vaults;
+	type PriceProvider = PriceIndex;
+	type BitcoinBlockHeight = BitcoinUtxos;
+	type BitcoinBondDurationBlocks = BitcoinBondDurationBlocks;
+	type BitcoinBondReclamationBlocks = BitcoinBondReclamationBlocks;
+	type BitcoinUtxoTracker = BitcoinUtxos;
+	type MaxUnlockingUtxos = MaxUnlockingUtxos;
+	type BondEvents = Mint;
+	type MinimumBitcoinBondSatoshis = MinBitcoinSatoshiAmount;
+	type UlixeeBlocksPerDay = BlocksPerDay;
+	type UtxoUnlockCosignDeadlineBlocks = UtxoUnlockCosignDeadlineBlocks;
 }
 
 impl pallet_mining_slot::Config for Runtime {
@@ -351,8 +379,7 @@ impl pallet_mining_slot::Config for Runtime {
 	type SessionIndicesToKeepInHistory = SessionIndicesToKeepInHistory;
 	type BlocksBetweenSlots = BlocksBetweenSlots;
 	type Balance = Balance;
-	type BondId = BondId;
-	type BondProvider = Bond;
+	type BondProvider = Bonds;
 }
 
 impl pallet_block_seal::Config for Runtime {
@@ -435,7 +462,7 @@ impl pallet_chain_transfer::Config for Runtime {
 	type TransferExpirationBlocks = TransferExpirationBlocks;
 	type MaxPendingTransfersOutPerBlock = MaxPendingTransfersOutPerBlock;
 	type NotebookProvider = Notebook;
-	type EventHandler = (UlixeeMint, BitcoinMint);
+	type EventHandler = Mint;
 }
 
 impl pallet_notebook::Config for Runtime {
@@ -586,7 +613,6 @@ impl pallet_proxy::Config for Runtime {
 
 parameter_types! {
 	pub const BitcoinBondDuration: u32 = 60 * 24 * 365; // 1 year
-	pub const MinBitcoinSatoshiAmount: u64 = 100_000_000; // 1 bitcoin minimum
 	pub const MaxPendingMintUtxos: u32 = 10_000;
 	pub const MaxTrackedUtxos: u32 = 18_000_000;
 
@@ -594,6 +620,9 @@ parameter_types! {
 	pub const MaxHistoryToKeep: u32 = 24 * 60; // 1 day worth of prices
 	pub const OldestHistoryToKeep: Moment = 24 * 60 * 60 * 1000; // 1 day
 
+	pub const MaxPendingConfirmationBlocks: BitcoinHeight = 10 * (6 * 24); // 10 days of bitcoin blocks
+
+	pub const MaxPendingConfirmationUtxos: u32 = 10_000;
 	pub const MaxBitcoinBirthBlocksOld: BitcoinHeight = 10 * (6 * 24); // 10 days of bitcoin blocks
 }
 
@@ -603,36 +632,26 @@ impl pallet_price_index::Config for Runtime {
 	type WeightInfo = pallet_price_index::weights::SubstrateWeight<Runtime>;
 	type Balance = Balance;
 	type MaxDowntimeBeforeReset = MaxDowntimeBeforeReset;
-	type MaxHistoryToKeep = MaxHistoryToKeep;
-	type OldestHistoryToKeep = OldestHistoryToKeep;
+	type OldestPriceAllowed = OldestHistoryToKeep;
 }
 
-impl pallet_bitcoin_mint::Config for Runtime {
+impl pallet_bitcoin_utxos::Config for Runtime {
 	type RuntimeEvent = RuntimeEvent;
-	type WeightInfo = pallet_bitcoin_mint::weights::SubstrateWeight<Runtime>;
+	type WeightInfo = pallet_bitcoin_utxos::weights::SubstrateWeight<Runtime>;
+	type EventHandler = Bonds;
+	type MaxUtxoBirthBlocksOld = MaxBitcoinBirthBlocksOld;
+	type MaxPendingConfirmationBlocks = MaxPendingConfirmationBlocks;
+	type MaxPendingConfirmationUtxos = MaxPendingConfirmationUtxos;
+}
+
+impl pallet_mint::Config for Runtime {
+	type RuntimeEvent = RuntimeEvent;
+	type WeightInfo = pallet_mint::weights::SubstrateWeight<Runtime>;
 	type Currency = ArgonBalances;
 	type Balance = Balance;
-	type UlixeeMintCirculation = UlixeeMint;
-	type RuntimeHoldReason = RuntimeHoldReason;
-	type BondProvider = Bond;
-	type BondId = BondId;
-	type BitcoinPriceProvider = PriceIndex;
-	type BondDurationBlocks = BitcoinBondDuration;
-	type MinimumSatoshiAmount = MinBitcoinSatoshiAmount;
-	type ArgonPriceProvider = PriceIndex;
+	type PriceProvider = PriceIndex;
 	type MaxPendingMintUtxos = MaxPendingMintUtxos;
-	type MaxTrackedUtxos = MaxTrackedUtxos;
-	type MaxBitcoinBirthBlocksOld = MaxBitcoinBirthBlocksOld;
-}
-
-impl pallet_ulixee_mint::Config for Runtime {
-	type RuntimeEvent = RuntimeEvent;
-	type WeightInfo = pallet_ulixee_mint::weights::SubstrateWeight<Runtime>;
-	type Currency = ArgonBalances;
-	type RuntimeHoldReason = RuntimeHoldReason;
-	type Balance = Balance;
-	type UlixeeTokenStorage = pallet_balances::Account<Runtime, UlixeeToken>;
-	type BitcoinMintCirculation = BitcoinMint;
+	type MiningProvider = MiningSlot;
 }
 
 type UlixeeToken = pallet_balances::Instance2;
@@ -646,8 +665,12 @@ impl pallet_balances::Config<UlixeeToken> for Runtime {
 	type RuntimeEvent = RuntimeEvent;
 	type DustRemoval = ();
 	type ExistentialDeposit = ConstU128<EXISTENTIAL_DEPOSIT>;
-	/// redirect through mint
-	type AccountStore = UlixeeMint;
+	type AccountStore = StorageMapShim<
+		pallet_balances::Account<Runtime, UlixeeToken>,
+		AccountId,
+		pallet_balances::AccountData<Balance>,
+	>;
+
 	type WeightInfo = pallet_balances::weights::SubstrateWeight<Runtime>;
 	type FreezeIdentifier = RuntimeFreezeReason;
 	type MaxFreezes = ConstU32<2>;
@@ -704,7 +727,9 @@ construct_runtime!(
 		Proxy: pallet_proxy,
 		Ticks: pallet_ticks,
 		MiningSlot: pallet_mining_slot,
-		Bond: pallet_bond,
+		BitcoinUtxos: pallet_bitcoin_utxos,
+		Vaults: pallet_vaults,
+		Bonds: pallet_bond,
 		Notaries: pallet_notaries,
 		Notebook: pallet_notebook,
 		ChainTransfer: pallet_chain_transfer,
@@ -720,9 +745,8 @@ construct_runtime!(
 		BlockRewards: pallet_block_rewards,
 		Grandpa: pallet_grandpa,
 		Offences: pallet_offences,
-		BitcoinMint: pallet_bitcoin_mint,
+		Mint: pallet_mint,
 		ArgonBalances: pallet_balances::<Instance1>::{Pallet, Call, Storage, Config<T>, Event<T>},
-		UlixeeMint: pallet_ulixee_mint,
 		UlixeeBalances: pallet_balances::<Instance2>::{Pallet, Call, Storage, Config<T>, Event<T>},
 		TxPause: pallet_tx_pause,
 		TransactionPayment: pallet_transaction_payment,
@@ -973,17 +997,17 @@ impl_runtime_apis! {
 		}
 	}
 
-	impl ulx_primitives::BitcoinApis<Block, AccountId, BondId, Balance, BlockNumber> for Runtime {
+	impl ulx_primitives::BitcoinApis<Block,Balance> for Runtime {
 		fn get_sync_status() -> Option<BitcoinSyncStatus> {
-			BitcoinMint::get_sync_status()
+			BitcoinUtxos::get_sync_status()
 		}
 
-		fn active_utxos() ->  BTreeMap<BitcoinUtxo, UtxoLookup> {
-			BitcoinMint::active_utxos()
+		fn active_utxos() -> Vec<(Option<UtxoRef>, UtxoValue)>{
+			BitcoinUtxos::active_utxos()
 		}
 
 		fn redemption_rate(satoshis: Satoshis) -> Option<Balance> {
-			BitcoinMint::get_redemption_price(&satoshis).ok()
+			Bonds::get_redemption_price(&satoshis).ok()
 		}
 	}
 
@@ -1110,9 +1134,9 @@ mod benches {
 		[pallet_block_seal_spec, VoteEligibility]
 		[pallet_block_rewards, BlockRewards]
 		[pallet_mining_slot, MiningSlot]
-		[pallet_bond, Bond]
-		[pallet_bitcoin_mint, BitcoinMint]
-		[pallet_ulixee_mint, UlixeeMint]
+		[pallet_bond, Bonds]
+		[pallet_bitcoin_utxos, BitcoinMint]
+		[pallet_mint, Mint]
 		[pallet_session, Session]
 		[pallet_block_seal, BlockSeal]
 		[pallet_authorship, Authorship]

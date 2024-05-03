@@ -1,54 +1,36 @@
 #![allow(dead_code)]
 
-use std::{
-	collections::BTreeMap,
-	net::{SocketAddr, TcpStream},
-	path::PathBuf,
-	sync::Arc,
-};
+use std::{collections::BTreeMap, sync::Arc};
 
-use bitcoin::Script;
-use codec::Codec;
-pub use nakamoto_client;
-use nakamoto_client::{chan::Receiver, traits::Handle as HandleT, Client, Config, Event};
-use nakamoto_common::{
-	bitcoin_hashes::Hash,
-	network::{Network, Services},
-};
-use sc_service::TaskManager;
+use anyhow::bail;
+use bitcoin::{bip158, hashes::Hash};
+use bitcoincore_rpc::{Auth, Client, RpcApi};
+use codec::{Decode, Encode};
+use parking_lot::Mutex;
+use sc_client_api::backend::AuxStore;
 use sp_api::ProvideRuntimeApi;
-use sp_runtime::traits::{Block as BlockT, NumberFor};
+use sp_runtime::{traits::Block as BlockT, RuntimeDebug};
 
 use ulx_primitives::{
 	bitcoin::{
-		BitcoinNetwork, BitcoinRejectedReason, BitcoinSyncStatus, BitcoinUtxo, H256Le, LockedUtxo,
-		UtxoLookup,
+		BitcoinBlock, BitcoinHeight, BitcoinRejectedReason, BitcoinSyncStatus, H256Le, UtxoRef,
+		UtxoValue,
 	},
 	inherents::BitcoinUtxoSync,
-	AccountId, Balance, BitcoinApis, BlockNumber, BondId,
+	Balance, BitcoinApis,
 };
 
-type Reactor = nakamoto_net_poll::Reactor<TcpStream>;
-type Waker = <nakamoto_net_poll::Reactor<TcpStream> as nakamoto_net::Reactor>::Waker;
-type Handle = nakamoto_client::Handle<Waker>;
+mod unlocker;
 
-pub type BitcoinHeight = nakamoto_common::block::Height;
-
-pub struct UtxoTracker {
-	receiver: Receiver<Event>,
-	handle: Handle,
-}
-
-pub fn get_bitcoin_inherent<C, B, A>(
+pub fn get_bitcoin_inherent<C, B>(
 	tracker: &Arc<UtxoTracker>,
 	client: &Arc<C>,
 	block_hash: &B::Hash,
 ) -> anyhow::Result<Option<BitcoinUtxoSync>>
 where
 	B: BlockT,
-	C: ProvideRuntimeApi<B> + 'static,
-	C::Api: BitcoinApis<B, A, BondId, Balance, NumberFor<B>>,
-	A: Codec + Clone,
+	C: ProvideRuntimeApi<B> + AuxStore + 'static,
+	C::Api: BitcoinApis<B, Balance>,
 {
 	let api = client.runtime_api();
 	let Some(sync_status) = api.get_sync_status(*block_hash)? else {
@@ -56,182 +38,956 @@ where
 	};
 
 	let utxos = api.active_utxos(*block_hash)?;
-	Ok(Some(tracker.sync(sync_status, utxos)?))
+	Ok(Some(tracker.sync(sync_status, utxos, client)?))
 }
 
-type DefaultLockedUtxo = LockedUtxo<AccountId, BondId, Balance, BlockNumber>;
+pub struct UtxoTracker {
+	client: Client,
+	sync_lock: Mutex<()>,
+}
+
+#[derive(Clone, Decode, Encode, PartialEq, Eq, RuntimeDebug)]
+pub struct BlockFilter {
+	pub block_hash: H256Le,
+	pub previous_block_hash: Option<H256Le>,
+	pub block_height: u64,
+	pub filter: Vec<u8>,
+}
+
+impl BlockFilter {
+	pub fn to_filter(&self) -> bip158::BlockFilter {
+		bip158::BlockFilter::new(&self.filter)
+	}
+
+	pub fn to_block(&self) -> BitcoinBlock {
+		BitcoinBlock { block_hash: self.block_hash.clone(), block_height: self.block_height }
+	}
+}
 
 impl UtxoTracker {
-	pub fn new(
-		network: BitcoinNetwork,
-		peers: Vec<SocketAddr>,
-		storage_dir: PathBuf,
-		task_handle: &TaskManager,
-	) -> anyhow::Result<Self> {
-		let client = Client::<Reactor>::new()?;
-
-		let handle = client.handle();
-		let client_recv = handle.events();
-		let network: Network = match network {
-			BitcoinNetwork::Mainnet => Network::Mainnet,
-			BitcoinNetwork::Testnet => Network::Testnet,
-			BitcoinNetwork::Signet => Network::Signet,
-			BitcoinNetwork::Regtest => Network::Regtest,
+	pub fn new(rpc_url: String, auth: Option<(String, String)>) -> anyhow::Result<Self> {
+		let auth = if let Some((username, password)) = auth {
+			Auth::UserPass(username, password)
+		} else {
+			Auth::None
 		};
-		task_handle.spawn_essential_handle().spawn_blocking(
-			"bitcoin-utxo-monitor",
-			None,
-			async move {
-				match client.run(Config {
-					listen: vec![], // Don't listen for incoming connections.
-					connect: peers,
-					root: storage_dir,
-					network,
-					..Config::default()
-				}) {
-					Err(e) => panic!("Bitcoin synching failed! {:?}", e),
-					Ok(_) => {},
-				}
-			},
-		);
+		let client = Client::new(&rpc_url, auth)?;
 
-		handle.wait_for_peers(1, Services::All)?;
+		Ok(Self { client, sync_lock: Mutex::new(()) })
+	}
 
-		Ok(Self { receiver: client_recv, handle })
+	fn get_header_and_filter(&self, block_hash: &H256Le) -> anyhow::Result<BlockFilter> {
+		let hash = bitcoin::BlockHash::from_slice(&block_hash.0)?;
+		let header = self.client.get_block_header_info(&hash)?;
+		let filter = self.client.get_block_filter(&hash)?;
+		Ok(BlockFilter {
+			block_height: header.height as u64,
+			block_hash: block_hash.clone(),
+			previous_block_hash: header.previous_block_hash.map(Into::into),
+			filter: filter.filter,
+		})
+	}
+
+	fn sync_to_block(
+		&self,
+		sync_status: &BitcoinSyncStatus,
+		stored_filters: &mut Vec<BlockFilter>,
+	) -> anyhow::Result<()> {
+		let latest_block_hash = &sync_status.confirmed_block.block_hash;
+		if stored_filters.last().map(|a| a.block_hash.clone()) != Some(latest_block_hash.clone()) {
+			let entry = self.get_header_and_filter(latest_block_hash)?;
+			stored_filters.push(entry);
+		}
+
+		let mut keep_sync_back_to = sync_status.oldest_allowed_block_height;
+		// make sure we don't have a gap in the blocks
+		if let Some(synched_block) = &sync_status.synched_block {
+			if synched_block.block_height < keep_sync_back_to {
+				keep_sync_back_to = synched_block.block_height;
+			}
+		}
+
+		Self::prune_filters(keep_sync_back_to, stored_filters);
+		while stored_filters.first().map(|x| x.block_height) > Some(keep_sync_back_to) {
+			let Some(first) = stored_filters.first() else {
+				break;
+			};
+			if let Some(prev_hash) = &first.previous_block_hash {
+				let entry = self.get_header_and_filter(prev_hash)?;
+				stored_filters.insert(0, entry);
+			} else {
+				break;
+			}
+		}
+		Ok(())
+	}
+
+	fn update_filters(
+		&self,
+		sync_status: &BitcoinSyncStatus,
+		aux_store: &Arc<impl AuxStore>,
+	) -> anyhow::Result<Vec<BlockFilter>> {
+		let _lock = self.sync_lock.lock();
+		const UTXO_KEY: &[u8; 28] = b"bitcoin_utxo_tracker_filters";
+
+		let mut stored_filters = if let Ok(Some(bytes)) = aux_store.get_aux(&UTXO_KEY[..]) {
+			<Vec<BlockFilter>>::decode(&mut &bytes[..]).ok().unwrap_or_default()
+		} else {
+			Default::default()
+		};
+
+		self.sync_to_block(&sync_status, &mut stored_filters)?;
+
+		let encoded = stored_filters.encode();
+		aux_store.insert_aux(&[(&UTXO_KEY[..], encoded.as_slice())], &[])?;
+		Ok(stored_filters)
 	}
 
 	/// Synchronize with the latest blocks on the network.
 	pub fn sync(
 		&self,
 		sync_status: BitcoinSyncStatus,
-		utxos: BTreeMap<BitcoinUtxo, UtxoLookup>,
+		tracked_utxos: Vec<(Option<UtxoRef>, UtxoValue)>,
+		aux_store: &Arc<impl AuxStore>,
 	) -> anyhow::Result<BitcoinUtxoSync> {
-		let mut scripts = vec![];
+		let mut scripts: Vec<Vec<u8>> = vec![];
+		let mut utxos_by_ref = BTreeMap::new();
+		let mut pending_confirmation_by_script = BTreeMap::new();
 
-		let confirmed_block = self
-			.handle
-			.get_block_by_height(sync_status.confirmed_block.block_height)?
-			.ok_or(anyhow::anyhow!(
-				"Failed to get block by height: {:?}",
-				sync_status.confirmed_block.block_height
-			))?;
-		if confirmed_block.block_hash().into_inner() != sync_status.confirmed_block.block_hash.0 {
-			return Err(anyhow::anyhow!(
-				"Latest confirmed block hash mismatch: {:?} != {:?}. Could be on a different chain, so aborting.",
-				confirmed_block.block_hash().into_inner(),
-				sync_status.confirmed_block.block_hash.0
-			));
-		}
-
-		let mut start_block = sync_status.oldest_allowed_block_height;
-
-		if let Some(synched_block) = &sync_status.synched_block {
-			let start_block_header = self
-				.handle
-				.get_block_by_height(synched_block.block_height)?
-				.ok_or(anyhow::anyhow!(
-				"Failed to get block by height: {:?}",
-				synched_block.block_height
-			))?;
-			// if this block is a different hash, we've re-orged, so go back to the oldest allowed
-			// block height to check for moves
-			if start_block_header.block_hash().into_inner() != synched_block.block_hash.0 {
-				start_block = sync_status.oldest_allowed_block_height;
+		for (utxo_ref, lookup) in tracked_utxos {
+			scripts.push(lookup.script_pubkey.to_script_bytes());
+			if let Some(utxo_ref) = utxo_ref {
+				utxos_by_ref.insert(utxo_ref, lookup.clone());
 			} else {
-				start_block = synched_block.block_height;
+				pending_confirmation_by_script
+					.insert(lookup.script_pubkey.to_script_bytes(), lookup);
 			}
 		}
+		let scripts = scripts.into_iter();
 
-		let mut pending_confirmation_txids = BTreeMap::new();
-		for (id, looukup) in &utxos {
-			let script: Script = looukup.script_pubkey.to_vec().into();
-			if let Some((satoshis, height)) = looukup.pending_confirmation {
-				pending_confirmation_txids.entry(id.txid).or_insert(Vec::new()).push((
-					id.clone(),
-					satoshis,
-					script.clone(),
-				));
-				start_block = start_block.min(height as BitcoinHeight);
-			}
-			scripts.push(script);
-		}
-
+		let stored_filters = self.update_filters(&sync_status, aux_store)?;
+		let Some(latest) = stored_filters.last() else {
+			bail!("Could not find latest block filter")
+		};
 		let mut result = BitcoinUtxoSync {
-			sync_to_block: sync_status.confirmed_block.clone(),
+			sync_to_block: latest.to_block(),
 			verified: BTreeMap::new(),
 			invalid: BTreeMap::new(),
 			spent: BTreeMap::new(),
 		};
 
-		self.handle.rescan(
-			(start_block as u64)..sync_status.confirmed_block.block_height,
-			scripts.into_iter(),
-		)?;
+		for filter in stored_filters {
+			let block_hash = bitcoin::BlockHash::from_slice(&filter.block_hash.0)?;
+			if !filter.to_filter().match_any(&block_hash, scripts.clone())? {
+				continue;
+			}
 
-		loop {
-			match self.receiver.recv()? {
-				Event::BlockMatched { height, transactions, .. } => {
-					for tx in transactions {
-						let tx_id = H256Le(tx.txid().into_inner());
-
-						for input in tx.input {
-							let utxo_id = BitcoinUtxo {
-								txid: H256Le(input.previous_output.txid.into_inner()),
-								output_index: input.previous_output.vout,
-							};
-							// If we're tracking the UTXO, it has been spent
-							if utxos.contains_key(&utxo_id) {
-								// TODO: should we figure out who spent it here?
-								result.spent.insert(utxo_id, height as u64);
-							}
-						}
-
-						// only take a look at the outputs for the transactions we're waiting for
-						let Some(pending) = pending_confirmation_txids.get(&tx_id) else {
-							continue;
-						};
-
-						for (idx, output) in tx.output.iter().enumerate() {
-							let utxo_id = BitcoinUtxo { txid: tx_id, output_index: idx as u32 };
-							if let Some((_id, satoshis, script)) =
-								pending.iter().find(|(id, _, _)| id == &utxo_id)
-							{
-								let is_satoshi_match = output.value == *satoshis;
-								let is_script_pubkey_match = output.script_pubkey == *script;
-								let is_age_appropriate =
-									height as u64 > sync_status.oldest_allowed_block_height;
-
-								if is_satoshi_match && is_script_pubkey_match && is_age_appropriate
-								{
-									result.verified.insert(utxo_id, height as u64);
-								} else {
-									let reason = if !is_satoshi_match {
-										BitcoinRejectedReason::SatoshisMismatch
-									} else if !is_age_appropriate {
-										BitcoinRejectedReason::TooOld
-									} else {
-										BitcoinRejectedReason::ScriptPubkeyMismatch
-									};
-									result.invalid.insert(utxo_id, reason);
-								}
-							}
-						}
+			let block = self.client.get_block(&block_hash)?;
+			let height = filter.block_height;
+			for tx in block.txdata {
+				for input in &tx.input {
+					let utxo_ref = input.previous_output.into();
+					// If we're tracking the UTXO, it has been spent
+					if let Some(value) = utxos_by_ref.get(&utxo_ref) {
+						// TODO: should we figure out who spent it here?
+						result.spent.insert(value.utxo_id, height);
 					}
-				},
+				}
 
-				Event::Synced { height, .. } =>
-					if height == sync_status.confirmed_block.block_height {
-						break;
-					},
-				_ => { /* ignore */ },
+				for (idx, output) in tx.output.iter().enumerate() {
+					let Some(pending) =
+						pending_confirmation_by_script.remove(output.script_pubkey.as_bytes())
+					else {
+						continue;
+					};
+
+					let utxo_id = pending.utxo_id;
+
+					if output.value.to_sat() != pending.satoshis {
+						result.invalid.insert(utxo_id, BitcoinRejectedReason::SatoshisMismatch);
+					} else {
+						let tx_id = tx.compute_txid().into();
+						result
+							.verified
+							.insert(utxo_id, UtxoRef { txid: tx_id, output_index: idx as u32 });
+					};
+				}
 			}
 		}
 
 		Ok(result)
 	}
 
-	// Destroys self
-	pub fn shutdown(self) -> anyhow::Result<()> {
-		Ok(self.handle.shutdown()?)
+	fn prune_filters(oldest_allowed_block_height: BitcoinHeight, filters: &mut Vec<BlockFilter>) {
+		let mut drain_to = 0;
+		// make sure the blocks link together with prev_hash
+		for (i, header) in filters.iter().enumerate().rev() {
+			if i == 0 {
+				break;
+			}
+			let prev_header = &filters[i - 1];
+			if let Some(prev_hash) = &header.previous_block_hash {
+				if prev_hash != &prev_header.block_hash {
+					drain_to = i;
+					break;
+				}
+			}
+		}
+
+		if drain_to > 0 {
+			filters.drain(..drain_to);
+		}
+		filters.retain(|f| f.block_height >= oldest_allowed_block_height);
+	}
+}
+
+#[cfg(test)]
+mod test {
+	use std::str::FromStr;
+
+	use bitcoin::{
+		absolute::LockTime,
+		bip32::{DerivationPath, Fingerprint, Xpriv, Xpub},
+		hashes::Hash,
+		secp256k1::Secp256k1,
+		Address, Amount, CompressedPublicKey, FeeRate, Network, PrivateKey, Script, Txid,
+	};
+	use bitcoincore_rpc::{json::GetRawTransactionResult, RawTx};
+	use bitcoind::{bitcoincore_rpc::RpcApi, BitcoinD};
+	use lazy_static::lazy_static;
+	use rand::{rngs::OsRng, RngCore};
+
+	use ulx_primitives::bitcoin::{
+		create_timelock_multisig_script, BitcoinBlock, BitcoinCosignScriptPubkey,
+		BitcoinPubkeyHash, BitcoinScriptPubkey, Satoshis,
+	};
+
+	use crate::unlocker::{CosignScript, UnlockStep, UtxoUnlocker};
+
+	use super::*;
+
+	const NUM_BLOCKS: u32 = 101;
+
+	#[test]
+	fn test_prune_filters() {
+		// TEST: only keep above the oldest allowed height
+		{
+			let mut filters: Vec<BlockFilter> = vec![];
+			for i in 100..105 {
+				filters.push(BlockFilter {
+					block_hash: H256Le([i; 32]),
+					previous_block_hash: Some(H256Le([i - 1; 32])),
+					block_height: i as u64,
+					filter: vec![],
+				});
+			}
+
+			UtxoTracker::prune_filters(101, &mut filters);
+			assert_eq!(filters.len(), 4);
+		}
+
+		// TEST: should clear history if reorg
+		{
+			let mut filters: Vec<BlockFilter> = vec![];
+			for i in 100..105 {
+				filters.push(BlockFilter {
+					block_hash: H256Le([i; 32]),
+					previous_block_hash: Some(H256Le([i - 1; 32])),
+					block_height: i as u64,
+					filter: vec![],
+				});
+			}
+
+			// now simulate us adding a new confirmed block
+			filters.push(BlockFilter {
+				block_hash: H256Le([111; 32]),
+				previous_block_hash: Some(H256Le([1; 32])),
+				block_height: 105,
+				filter: vec![],
+			});
+			UtxoTracker::prune_filters(100, &mut filters);
+			assert_eq!(filters.len(), 1);
+			assert_eq!(filters[0].block_height, 105);
+			assert_eq!(filters[0].block_hash, H256Le([111; 32]));
+		}
+	}
+
+	#[test]
+	fn can_track_blocks_and_verify_utxos() {
+		let (bitcoind, tracker, block_address) = start_bitcoind();
+
+		let block_height = bitcoind.client.get_block_count().unwrap();
+
+		let key1 = "033bc8c83c52df5712229a2f72206d90192366c36428cb0c12b6af98324d97bfbc"
+			.parse::<CompressedPublicKey>()
+			.unwrap();
+		let key2 = "026c468be64d22761c30cd2f12cbc7de255d592d7904b1bab07236897cc4c2e766"
+			.parse::<CompressedPublicKey>()
+			.unwrap();
+
+		let script = create_timelock_multisig_script(
+			key1.pubkey_hash().into(),
+			key2.pubkey_hash().into(),
+			block_height + 100,
+			block_height + 200,
+		)
+		.expect("script");
+		let script_address = Address::p2wsh(script.as_script(), Network::Regtest);
+
+		let submitted_at_height = block_height + 1;
+
+		let (txid, vout, _tx) = fund_script_address(
+			&bitcoind,
+			&script_address,
+			Amount::ONE_BTC.to_sat(),
+			&block_address,
+		);
+
+		add_blocks(&bitcoind, 6, &block_address);
+		let confirmed = bitcoind.client.get_best_block_hash().unwrap();
+		let block_height = bitcoind.client.get_block_count().unwrap();
+
+		let aux = Arc::new(TestAuxStore::new());
+		let sync_status = BitcoinSyncStatus {
+			confirmed_block: BitcoinBlock {
+				block_hash: H256Le(confirmed.to_byte_array()),
+				block_height,
+			},
+			synched_block: None,
+			oldest_allowed_block_height: block_height - 10,
+		};
+		let updated_filters = tracker.update_filters(&sync_status, &aux).unwrap();
+		assert_eq!(updated_filters.len(), 11);
+		assert_eq!(updated_filters[0].block_height, block_height - 10);
+		assert_eq!(updated_filters[10].block_height, block_height);
+		assert_eq!(updated_filters[10].block_hash, sync_status.confirmed_block.block_hash);
+
+		let tracked = UtxoValue {
+			utxo_id: 1,
+			satoshis: Amount::ONE_BTC.to_sat(),
+			script_pubkey: script_address.try_into().expect("can convert address to script"),
+			submitted_at_height,
+			watch_for_spent_until_height: 150,
+		};
+		{
+			let result =
+				tracker.sync(sync_status.clone(), vec![(None, tracked.clone())], &aux).unwrap();
+			assert_eq!(result.verified.len(), 1);
+			assert_eq!(
+				result.verified.get(&1),
+				Some(&UtxoRef { txid: txid.into(), output_index: vout as u32 })
+			);
+		}
+		{
+			let mut tracked = tracked.clone();
+			tracked.satoshis = Amount::from_int_btc(2).to_sat();
+			let result =
+				tracker.sync(sync_status.clone(), vec![(None, tracked.clone())], &aux).unwrap();
+			assert_eq!(result.verified.len(), 0);
+			assert_eq!(result.invalid.get(&1), Some(&BitcoinRejectedReason::SatoshisMismatch));
+		}
+	}
+
+	#[test]
+	fn vault_can_claim_the_timelock_script() {
+		let (bitcoind, tracker, block_address) = start_bitcoind();
+
+		let block_height = bitcoind.client.get_block_count().unwrap();
+
+		let (master_xpriv, fingerprint) = create_xpriv();
+		let (vault_compressed_pubkey, vault_hd_path) = derive(&master_xpriv, "m/0'/0/1");
+
+		let owner_compressed_pubkey =
+			"026c468be64d22761c30cd2f12cbc7de255d592d7904b1bab07236897cc4c2e766"
+				.parse::<CompressedPublicKey>()
+				.unwrap();
+
+		let open_claim_height = block_height + 8;
+		let vault_claim_height = block_height + 4;
+
+		let script = create_timelock_multisig_script(
+			vault_compressed_pubkey.pubkey_hash().into(),
+			owner_compressed_pubkey.pubkey_hash().into(),
+			vault_claim_height,
+			open_claim_height,
+		)
+		.expect("script")
+		.to_bytes();
+		println!("{:#?}", Script::from_bytes(script.as_slice()).to_asm_string());
+
+		let script_address = Address::p2wsh(Script::from_bytes(&script.clone()), Network::Regtest);
+
+		let (txid, vout, src_tx) = fund_script_address(
+			&bitcoind,
+			&script_address,
+			Amount::ONE_BTC.to_sat(),
+			&block_address,
+		);
+
+		println!("{:#?} #{:?}", src_tx, vout);
+
+		let block_height = bitcoind.client.get_block_count().unwrap();
+		let register_height = block_height;
+		assert!(block_height < open_claim_height);
+
+		let fee_rate = FeeRate::from_sat_per_vb(15).expect("cant translate fee");
+		let cosign_script = CosignScript::new(
+			vault_compressed_pubkey.pubkey_hash().into(),
+			owner_compressed_pubkey.pubkey_hash().into(),
+			vault_claim_height,
+			open_claim_height,
+			register_height,
+		)
+		.unwrap();
+
+		let pay_to_script_pubkey = vault_compressed_pubkey.p2wpkh_script_code();
+		let fee = cosign_script
+			.calculate_fee(false, pay_to_script_pubkey.clone(), fee_rate)
+			.unwrap();
+
+		// fails locktime if not cleared
+		{
+			let mut unlocker = UtxoUnlocker::from_script(
+				cosign_script.clone(),
+				Amount::ONE_BTC.to_sat(),
+				txid,
+				vout as u32,
+				UnlockStep::VaultClaim,
+				fee,
+				pay_to_script_pubkey.clone(),
+			)
+			.expect("unlocker");
+
+			unlocker.psbt.unsigned_tx.lock_time = LockTime::from_consensus(block_height as u32);
+			unlocker
+				.sign_derived(master_xpriv, (fingerprint, vault_hd_path.clone()))
+				.expect("sign");
+
+			let tx = unlocker.extract_tx().expect("tx");
+			let acceptance = bitcoind.client.test_mempool_accept(&[tx.raw_hex()]).expect("checked");
+			let did_accept = acceptance.first().unwrap();
+			println!("{:?}", did_accept);
+			assert_eq!(did_accept.allowed, false);
+			let reject = did_accept.reject_reason.as_ref().unwrap();
+			assert!(reject.contains("Locktime requirement not satisfied"));
+		}
+
+		let mut unlocker = UtxoUnlocker::from_script(
+			cosign_script.clone(),
+			Amount::ONE_BTC.to_sat(),
+			txid,
+			vout as u32,
+			UnlockStep::VaultClaim,
+			fee,
+			pay_to_script_pubkey.clone(),
+		)
+		.expect("unlocker");
+
+		unlocker
+			.sign_derived(master_xpriv, (fingerprint, vault_hd_path.clone()))
+			.expect("sign");
+
+		let tx = unlocker.extract_tx().expect("tx");
+		let tx_hex = tx.raw_hex();
+
+		// returns non-final if tx locktime not reached yet
+		{
+			let acceptance =
+				bitcoind.client.test_mempool_accept(&[tx_hex.clone()]).expect("checked");
+
+			println!("{:?}", acceptance[0]);
+			assert_eq!(acceptance[0].allowed, false);
+			let reject = acceptance[0].reject_reason.as_ref().unwrap();
+			assert!(reject.contains("non-final"));
+		}
+
+		// cannot accept until the cosign height
+		let mut block_height = block_height;
+		while block_height < vault_claim_height {
+			let acceptance =
+				bitcoind.client.test_mempool_accept(&[tx_hex.clone()]).expect("checked");
+			assert_eq!(acceptance[0].allowed, false);
+			add_blocks(&bitcoind, 1, &block_address);
+			block_height = bitcoind.client.get_block_count().unwrap();
+		}
+
+		assert_eq!(bitcoind.client.get_block_count().unwrap(), vault_claim_height);
+		{
+			let acceptance =
+				bitcoind.client.test_mempool_accept(&[tx_hex.clone()]).expect("checked");
+
+			println!("{:?}", acceptance[0]);
+			println!(
+				"btcdeb --tx={:?} --txin={:?}",
+				tx.raw_hex(),
+				src_tx.transaction().unwrap().raw_hex()
+			);
+			assert!(acceptance[0].allowed);
+		}
+
+		check_spent(
+			tx_hex.as_str(),
+			&tracker,
+			&bitcoind,
+			UtxoRef { txid: txid.into(), output_index: vout as u32 },
+			UtxoValue {
+				utxo_id: 1,
+				satoshis: Amount::ONE_BTC.to_sat(),
+				script_pubkey: cosign_script.get_script_pubkey().try_into().unwrap(),
+				submitted_at_height: register_height,
+				watch_for_spent_until_height: open_claim_height,
+			},
+			&block_address,
+		);
+	}
+
+	#[test]
+	fn owner_can_reclaim_the_timelock_script() {
+		let (bitcoind, tracker, block_address) = start_bitcoind();
+
+		let block_height = bitcoind.client.get_block_count().unwrap();
+
+		let (master_xpriv, _) = create_xpriv();
+		let (vault_compressed_pubkey, _) = derive(&master_xpriv, "m/0'/0/1");
+
+		let secp = Secp256k1::new();
+		let owner_keypair = PrivateKey::generate(Network::Regtest);
+		let owner_compressed_pubkey = owner_keypair.public_key(&secp);
+		let owner_pubkey_hash: BitcoinPubkeyHash = owner_compressed_pubkey.pubkey_hash().into();
+		let amount: Satoshis = Amount::ONE_BTC.to_sat() * 5;
+
+		let open_claim_height = block_height + 10;
+		let vault_claim_height = block_height + 5;
+		let register_height = block_height;
+		let mut cosign_script = CosignScript::new(
+			vault_compressed_pubkey.pubkey_hash().into(),
+			owner_pubkey_hash.clone(),
+			vault_claim_height,
+			open_claim_height,
+			register_height,
+		)
+		.unwrap();
+
+		let script_address = cosign_script.get_script_address(Network::Regtest);
+
+		let (txid, vout, src_tx) =
+			fund_script_address(&bitcoind, &script_address, amount, &block_address);
+
+		let block_height = bitcoind.client.get_block_count().unwrap();
+
+		assert!(block_height < open_claim_height);
+		cosign_script.set_registered_height(block_height);
+
+		let fee_rate = FeeRate::from_sat_per_vb(15).expect("cant translate fee");
+
+		let pay_to_script_pubkey = owner_compressed_pubkey.p2wpkh_script_code().unwrap();
+		let fee = cosign_script
+			.calculate_fee(false, pay_to_script_pubkey.clone(), fee_rate)
+			.unwrap();
+
+		// cannot accept until the cosign height
+		let mut block_height = block_height;
+		while block_height < open_claim_height {
+			let mut unlocker = UtxoUnlocker::from_script(
+				cosign_script.clone(),
+				amount,
+				txid,
+				vout,
+				UnlockStep::OwnerClaim,
+				fee,
+				pay_to_script_pubkey.clone(),
+			)
+			.expect("unlocker");
+
+			unlocker.psbt.unsigned_tx.lock_time = LockTime::from_consensus(block_height as u32);
+			unlocker.sign(owner_keypair).expect("sign");
+
+			let tx = unlocker.extract_tx().expect("tx");
+			let acceptance = bitcoind.client.test_mempool_accept(&[tx.raw_hex()]).expect("checked");
+			let did_accept = acceptance.first().unwrap();
+			println!("{} {:?}", block_height, did_accept);
+			assert_eq!(did_accept.allowed, false);
+			let reject = did_accept.reject_reason.as_ref().unwrap();
+			if reject.contains("Script failed") {
+				println!(
+					"btcdeb --tx={:?} --txin={:?}",
+					tx.raw_hex(),
+					src_tx.transaction().unwrap().raw_hex()
+				);
+			}
+			assert!(reject.contains("Locktime requirement not satisfied"));
+
+			add_blocks(&bitcoind, 1, &block_address);
+			block_height = bitcoind.client.get_block_count().unwrap();
+		}
+
+		assert_eq!(bitcoind.client.get_block_count().unwrap(), open_claim_height);
+		{
+			let mut unlocker = UtxoUnlocker::from_script(
+				cosign_script.clone(),
+				amount,
+				txid,
+				vout,
+				UnlockStep::OwnerClaim,
+				fee,
+				pay_to_script_pubkey.clone(),
+			)
+			.expect("unlocker");
+
+			unlocker.sign(owner_keypair).expect("sign");
+			let tx = unlocker.extract_tx().expect("tx");
+
+			println!(
+				"btcdeb --tx={:?} --txin={:?}",
+				tx.raw_hex(),
+				src_tx.transaction().unwrap().raw_hex()
+			);
+			let acceptance = bitcoind.client.test_mempool_accept(&[tx.raw_hex()]).expect("checked");
+
+			println!("{:?}", acceptance[0]);
+			assert!(acceptance[0].allowed);
+
+			check_spent(
+				&tx.raw_hex(),
+				&tracker,
+				&bitcoind,
+				UtxoRef { txid: txid.into(), output_index: vout },
+				UtxoValue {
+					utxo_id: 1,
+					satoshis: Amount::ONE_BTC.to_sat(),
+					script_pubkey: cosign_script.get_script_pubkey().try_into().unwrap(),
+					submitted_at_height: register_height,
+					watch_for_spent_until_height: open_claim_height,
+				},
+				&block_address,
+			);
+		}
+	}
+
+	#[test]
+	fn vault_and_owner_can_cosign() {
+		let (bitcoind, tracker, block_address) = start_bitcoind();
+
+		// 1. Owner creates a new pubkey and submits to blockchain
+		let secp = Secp256k1::new();
+		let owner_keypair = PrivateKey::generate(Network::Regtest);
+		let owner_compressed_pubkey = owner_keypair.public_key(&secp);
+		let owner_pubkey_hash: BitcoinPubkeyHash = owner_compressed_pubkey.pubkey_hash().into();
+		let amount: Satoshis = Amount::ONE_BTC.to_sat() * 5;
+
+		let (vault_master_xpriv, vault_fingerprint) = create_xpriv();
+		let (vault_compressed_pubkey, vault_hd_path) =
+			derive(&vault_master_xpriv, "m/48'/0'/0'/0/1");
+		let vault_pubkey_hash: BitcoinPubkeyHash = vault_compressed_pubkey.pubkey_hash().into();
+
+		let block_height = bitcoind.client.get_block_count().unwrap();
+
+		let open_claim_height = block_height + 20;
+		let vault_claim_height = block_height + 10;
+
+		// 2. Vault publishes details script_pubkey and vault pubkey hash
+
+		// 3. Owner recreates the script from the details and submits to blockchain
+		let script_address = {
+			let cosign_script = CosignScript::new(
+				vault_pubkey_hash.clone(),
+				owner_pubkey_hash.clone(),
+				vault_claim_height,
+				open_claim_height,
+				block_height,
+			)
+			.expect("script address");
+			cosign_script.get_script_address(Network::Regtest)
+		};
+
+		let utxo_script_pubkey: BitcoinCosignScriptPubkey =
+			script_address.clone().try_into().expect("can convert address to script");
+
+		let (txid, _vout, tx) =
+			fund_script_address(&bitcoind, &script_address, amount, &block_address);
+
+		let source_txin = tx.transaction().unwrap().raw_hex();
+		let block_hash = tx.blockhash.unwrap();
+		let block_height = bitcoind.client.get_block_count().unwrap();
+		let register_height = block_height;
+		let sync = tracker
+			.sync(
+				BitcoinSyncStatus {
+					confirmed_block: BitcoinBlock { block_hash: block_hash.into(), block_height },
+					synched_block: None,
+					oldest_allowed_block_height: block_height - 10,
+				},
+				vec![(
+					None,
+					UtxoValue {
+						utxo_id: 1,
+						satoshis: amount,
+						script_pubkey: utxo_script_pubkey.clone(),
+						submitted_at_height: block_height,
+						watch_for_spent_until_height: open_claim_height,
+					},
+				)],
+				&Arc::new(TestAuxStore::new()),
+			)
+			.unwrap();
+		assert_eq!(sync.verified.len(), 1);
+		let utxo = sync.verified.get(&1).unwrap();
+		assert_eq!(utxo.txid, txid.into());
+
+		// 4. User submits the out address
+		let out_script_pubkey: BitcoinScriptPubkey =
+			owner_compressed_pubkey.p2wpkh_script_code().unwrap().try_into().unwrap();
+		let feerate = FeeRate::from_sat_per_vb(15).expect("cant translate fee");
+		let user_cosign_script = CosignScript::new(
+			vault_pubkey_hash.clone(),
+			owner_pubkey_hash.clone(),
+			vault_claim_height,
+			open_claim_height,
+			register_height,
+		)
+		.unwrap();
+		let fee = user_cosign_script
+			.calculate_fee(true, out_script_pubkey.clone().into(), feerate)
+			.unwrap();
+
+		// 5. vault sees unlock request (outaddress, fee) and creates a transaction
+		let (vault_signature, vault_pubkey) = {
+			let mut unlocker = UtxoUnlocker::new(
+				vault_pubkey_hash.clone().into(),
+				owner_pubkey_hash.clone().into(),
+				register_height,
+				vault_claim_height,
+				open_claim_height,
+				amount,
+				utxo.txid.clone().into(),
+				utxo.output_index,
+				UnlockStep::VaultCosign,
+				fee,
+				out_script_pubkey.clone().into(),
+			)
+			.expect("unlocker");
+
+			unlocker
+				.sign_derived(vault_master_xpriv, (vault_fingerprint, vault_hd_path))
+				.expect("sign")
+		};
+
+		// 6. User sees the transaction and cosigns
+		let tx = {
+			let mut unlocker = UtxoUnlocker::from_script(
+				user_cosign_script.clone(),
+				amount,
+				utxo.txid.clone().into(),
+				utxo.output_index,
+				UnlockStep::OwnerCosign,
+				fee,
+				out_script_pubkey.clone().into(),
+			)
+			.unwrap();
+			unlocker.add_signature(vault_pubkey, vault_signature.into());
+			unlocker.sign(owner_keypair).expect("sign");
+			unlocker.extract_tx().expect("tx")
+		};
+
+		println!("{:#?}", tx);
+		let tx_hex = tx.raw_hex();
+
+		let acceptance = bitcoind.client.test_mempool_accept(&[tx_hex.clone()]).expect("checked");
+		let did_accept = acceptance.first().unwrap();
+		println!("{:?}", did_accept);
+		println!("btcdeb --tx={:?} --txin={:?}", tx_hex, source_txin);
+		assert!(did_accept.allowed);
+
+		check_spent(
+			tx_hex.as_str(),
+			&tracker,
+			&bitcoind,
+			utxo.clone(),
+			UtxoValue {
+				utxo_id: 1,
+				satoshis: amount,
+				script_pubkey: utxo_script_pubkey.clone(),
+				submitted_at_height: register_height,
+				watch_for_spent_until_height: open_claim_height,
+			},
+			&block_address,
+		);
+	}
+
+	fn check_spent(
+		tx_hex: &str,
+		tracker: &UtxoTracker,
+		bitcoind: &BitcoinD,
+		utxo_ref: UtxoRef,
+		utxo_value: UtxoValue,
+		block_address: &Address,
+	) {
+		let final_txid = bitcoind.client.send_raw_transaction(tx_hex).expect("sent");
+		let tx_result = wait_for_txid(&bitcoind, &final_txid, block_address);
+		let tx_block_height = bitcoind
+			.client
+			.get_block_header_info(&tx_result.blockhash.unwrap())
+			.unwrap()
+			.height;
+		let block_height = bitcoind.client.get_block_count().unwrap();
+		let block_hash = bitcoind.client.get_best_block_hash().unwrap();
+
+		let latest = tracker
+			.sync(
+				BitcoinSyncStatus {
+					confirmed_block: BitcoinBlock { block_hash: block_hash.into(), block_height },
+					synched_block: None,
+					oldest_allowed_block_height: block_height - 10,
+				},
+				vec![(Some(utxo_ref), utxo_value)],
+				&Arc::new(TestAuxStore::new()),
+			)
+			.expect("sync 2");
+		assert_eq!(latest.spent.len(), 1);
+
+		assert_eq!(latest.spent.get(&1), Some(&(tx_block_height as BitcoinHeight)));
+	}
+
+	fn fund_script_address(
+		bitcoind: &BitcoinD,
+		script_address: &Address,
+		amount: Satoshis,
+		block_address: &Address,
+	) -> (Txid, u32, GetRawTransactionResult) {
+		let txid = bitcoind
+			.client
+			.send_to_address(
+				&script_address,
+				Amount::from_sat(amount),
+				None,
+				None,
+				None,
+				None,
+				None,
+				None,
+			)
+			.unwrap();
+		let tx = wait_for_txid(&bitcoind, &txid, &block_address);
+		let vout = tx
+			.vout
+			.iter()
+			.position(|o| o.script_pub_key.script().unwrap() == script_address.script_pubkey())
+			.unwrap() as u32;
+		(txid, vout, tx)
+	}
+
+	lazy_static! {
+		static ref BITCOIND_LOCK: std::sync::Mutex<()> = std::sync::Mutex::new(());
+	}
+	fn start_bitcoind() -> (BitcoinD, UtxoTracker, Address) {
+		// bitcoin will get in a fight with ulixee for ports, so lock here too
+		let _lock = BITCOIND_LOCK.lock().unwrap();
+		let (bitcoind, rpc_url) = ulx_testing::start_bitcoind().expect("start_bitcoin");
+		let _ = env_logger::builder().is_test(true).try_init();
+
+		let block_address = add_wallet_address(&bitcoind);
+		add_blocks(&bitcoind, NUM_BLOCKS as u64, &block_address);
+
+		let auth = if rpc_url.username().len() > 0 {
+			Some((
+				rpc_url.username().to_string(),
+				rpc_url.password().unwrap_or_default().to_string(),
+			))
+		} else {
+			None
+		};
+
+		let tracker = UtxoTracker::new(rpc_url.origin().ascii_serialization(), auth).unwrap();
+		(bitcoind, tracker, block_address.into())
+	}
+
+	fn wait_for_txid(
+		bitcoind: &BitcoinD,
+		txid: &Txid,
+		block_address: &Address,
+	) -> GetRawTransactionResult {
+		loop {
+			// Attempt to get the raw transaction with verbose output
+			let result = bitcoind.client.call::<GetRawTransactionResult>(
+				"getrawtransaction",
+				&[txid.to_string().into(), 1.into()],
+			);
+
+			if let Ok(tx) = result {
+				if tx.confirmations.unwrap_or_default() > 1 {
+					return tx;
+				}
+			}
+			std::thread::sleep(std::time::Duration::from_secs(1));
+			add_blocks(&bitcoind, 1, block_address);
+		}
+	}
+
+	fn create_xpriv() -> (Xpriv, Fingerprint) {
+		let secp = Secp256k1::new();
+		let mut seed = [0u8; 32];
+		OsRng.fill_bytes(&mut seed);
+		let master_xpriv = Xpriv::new_master(Network::Regtest, &seed).unwrap();
+		let master_xpub = Xpub::from_priv(&secp, &master_xpriv);
+		let fingerprint = master_xpub.fingerprint();
+		(master_xpriv, fingerprint)
+	}
+
+	fn derive(master_xpriv: &Xpriv, path: &str) -> (CompressedPublicKey, DerivationPath) {
+		let secp = Secp256k1::new();
+		let path = DerivationPath::from_str(path).expect("Invalid derivation path");
+		let child_xpriv =
+			master_xpriv.derive_priv(&secp, &path).expect("Unable to derive child key");
+
+		let vault_privkey = child_xpriv.to_priv();
+		let vault_compressed_pubkey = CompressedPublicKey::from_private_key(&secp, &vault_privkey)
+			.expect("Unable to derive pubkey");
+		(vault_compressed_pubkey, path)
+	}
+
+	fn add_wallet_address(bitcoind: &BitcoinD) -> Address {
+		let address = bitcoind.client.get_new_address(None, None).unwrap();
+		address.require_network(Network::Regtest).unwrap()
+	}
+
+	fn add_blocks(bitcoind: &BitcoinD, count: u64, grant_to_address: &Address) {
+		bitcoind.client.generate_to_address(count, grant_to_address).unwrap();
+	}
+
+	struct TestAuxStore {
+		aux: Mutex<BTreeMap<Vec<u8>, Vec<u8>>>,
+	}
+	impl TestAuxStore {
+		fn new() -> Self {
+			Self { aux: Mutex::new(BTreeMap::new()) }
+		}
+	}
+
+	impl AuxStore for TestAuxStore {
+		fn insert_aux<
+			'a,
+			'b: 'a,
+			'c: 'a,
+			I: IntoIterator<Item = &'a (&'c [u8], &'c [u8])>,
+			D: IntoIterator<Item = &'a &'b [u8]>,
+		>(
+			&self,
+			insert: I,
+			delete: D,
+		) -> sc_client_api::blockchain::Result<()> {
+			let mut aux = self.aux.lock();
+			for (k, v) in insert {
+				aux.insert(k.to_vec(), v.to_vec());
+			}
+			for k in delete {
+				aux.remove(*k);
+			}
+			Ok(())
+		}
+
+		fn get_aux(&self, key: &[u8]) -> sc_client_api::blockchain::Result<Option<Vec<u8>>> {
+			let aux = self.aux.lock();
+			Ok(aux.get(key).cloned())
+		}
 	}
 }

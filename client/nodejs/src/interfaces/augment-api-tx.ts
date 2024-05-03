@@ -6,10 +6,10 @@
 import '@polkadot/api-base/types/submittable';
 
 import type { ApiTypes, AugmentedSubmittable, SubmittableExtrinsic, SubmittableExtrinsicFunction } from '@polkadot/api-base/types';
-import type { Bytes, Compact, Option, U8aFixed, Vec, bool, u128, u16, u32, u64 } from '@polkadot/types-codec';
+import type { Bytes, Compact, Option, Vec, bool, u128, u16, u32, u64 } from '@polkadot/types-codec';
 import type { AnyNumber, IMethod, ITuple } from '@polkadot/types-codec/types';
 import type { AccountId32, Call, H256, MultiAddress } from '@polkadot/types/interfaces/runtime';
-import type { PalletBalancesAdjustmentDirection, PalletPriceIndexPriceIndex, SpConsensusGrandpaEquivocationProof, SpSessionMembershipProof, SpWeightsWeightV2Weight, UlxNodeRuntimeOpaqueSessionKeys, UlxNodeRuntimeProxyType, UlxPrimitivesBitcoinCompressedPublicKey, UlxPrimitivesBitcoinH256Le, UlxPrimitivesBlockSealRewardDestination, UlxPrimitivesDataDomainZoneRecord, UlxPrimitivesInherentsBitcoinUtxoSync, UlxPrimitivesInherentsBlockSealInherent, UlxPrimitivesNotaryNotaryMeta, UlxPrimitivesNotebookSignedNotebookHeader } from '@polkadot/types/lookup';
+import type { PalletBalancesAdjustmentDirection, PalletMiningSlotMiningSlotBid, PalletPriceIndexPriceIndex, SpConsensusGrandpaEquivocationProof, SpSessionMembershipProof, SpWeightsWeightV2Weight, UlxNodeRuntimeOpaqueSessionKeys, UlxNodeRuntimeProxyType, UlxPrimitivesBitcoinBitcoinPubkeyHash, UlxPrimitivesBitcoinCompressedBitcoinPubkey, UlxPrimitivesBitcoinH256Le, UlxPrimitivesBlockSealRewardDestination, UlxPrimitivesDataDomainZoneRecord, UlxPrimitivesInherentsBitcoinUtxoSync, UlxPrimitivesInherentsBlockSealInherent, UlxPrimitivesNotaryNotaryMeta, UlxPrimitivesNotebookSignedNotebookHeader } from '@polkadot/types/lookup';
 
 export type __AugmentedSubmittable = AugmentedSubmittable<() => unknown>;
 export type __SubmittableExtrinsic<ApiType extends ApiTypes> = SubmittableExtrinsic<ApiType>;
@@ -92,24 +92,26 @@ declare module '@polkadot/api-base/types/submittable' {
        **/
       upgradeAccounts: AugmentedSubmittable<(who: Vec<AccountId32> | (AccountId32 | string | Uint8Array)[]) => SubmittableExtrinsic<ApiType>, [Vec<AccountId32>]>;
     };
-    bitcoinMint: {
+    bitcoinUtxos: {
       /**
-       * Submit bitcoins to be minted as minting becomes available. You must provide a
-       * `sign_message` signature proving ownership. Currently, this is only supported for P2PKH,
-       * P2WPKH and P2PK UTXOs.
+       * Sets the most recent confirmed bitcoin block height (only executable by the Oracle
+       * Operator account)
+       *
+       * # Arguments
+       * * `bitcoin_height` - the latest bitcoin block height to be confirmed
        **/
-      lock: AugmentedSubmittable<(bondId: Option<u64> | null | Uint8Array | u64 | AnyNumber, txid: UlxPrimitivesBitcoinH256Le | string | Uint8Array, outputIndex: u32 | AnyNumber | Uint8Array, satoshis: u64 | AnyNumber | Uint8Array, pubkey: UlxPrimitivesBitcoinCompressedPublicKey | string | Uint8Array, ownershipProofSignature: U8aFixed | string | Uint8Array) => SubmittableExtrinsic<ApiType>, [Option<u64>, UlxPrimitivesBitcoinH256Le, u32, u64, UlxPrimitivesBitcoinCompressedPublicKey, U8aFixed]>;
+      setConfirmedBlock: AugmentedSubmittable<(bitcoinHeight: u64 | AnyNumber | Uint8Array, bitcoinBlockHash: UlxPrimitivesBitcoinH256Le | string | Uint8Array) => SubmittableExtrinsic<ApiType>, [u64, UlxPrimitivesBitcoinH256Le]>;
+      /**
+       * Sets the oracle operator account id (only executable by the Root account)
+       *
+       * # Arguments
+       * * `account_id` - the account id of the operator
+       **/
+      setOperator: AugmentedSubmittable<(accountId: AccountId32 | string | Uint8Array) => SubmittableExtrinsic<ApiType>, [AccountId32]>;
       /**
        * Submitted when a bitcoin UTXO has been moved or confirmed
        **/
-      sync: AugmentedSubmittable<(utxoSync: UlxPrimitivesInherentsBitcoinUtxoSync | { moved?: any; confirmed?: any; blockHash?: any; blockHeight?: any } | string | Uint8Array) => SubmittableExtrinsic<ApiType>, [UlxPrimitivesInherentsBitcoinUtxoSync]>;
-      /**
-       * Unlock a bitcoin UTXO that has been confirmed.
-       *
-       * NOTE: this call will burn from your account the current argon value of the UTXO maxed at
-       * your buy-in price.
-       **/
-      unlock: AugmentedSubmittable<(txid: UlxPrimitivesBitcoinH256Le | string | Uint8Array, outputIndex: u32 | AnyNumber | Uint8Array) => SubmittableExtrinsic<ApiType>, [UlxPrimitivesBitcoinH256Le, u32]>;
+      sync: AugmentedSubmittable<(utxoSync: UlxPrimitivesInherentsBitcoinUtxoSync | { spent?: any; verified?: any; invalid?: any; syncToBlock?: any } | string | Uint8Array) => SubmittableExtrinsic<ApiType>, [UlxPrimitivesInherentsBitcoinUtxoSync]>;
     };
     blockRewards: {
     };
@@ -119,21 +121,32 @@ declare module '@polkadot/api-base/types/submittable' {
     blockSealSpec: {
       configure: AugmentedSubmittable<(voteMinimum: Option<u128> | null | Uint8Array | u128 | AnyNumber, computeDifficulty: Option<u128> | null | Uint8Array | u128 | AnyNumber) => SubmittableExtrinsic<ApiType>, [Option<u128>, Option<u128>]>;
     };
-    bond: {
-      bondSelf: AugmentedSubmittable<(amount: u128 | AnyNumber | Uint8Array, bondUntilBlock: u32 | AnyNumber | Uint8Array) => SubmittableExtrinsic<ApiType>, [u128, u32]>;
+    bonds: {
       /**
-       * Stop offering this fund for new bond. Will not affect existing bond. Unreserved funds
-       * are returned immediately.
+       * Bond a bitcoin. This will create a bond for the submitting account and log the Bitcoin
+       * Script hash to Events. A bondee must create the UTXO in order to be added to the Bitcoin
+       * Mint line.
+       *
+       * NOTE: The script
        **/
-      endFund: AugmentedSubmittable<(bondFundId: u32 | AnyNumber | Uint8Array) => SubmittableExtrinsic<ApiType>, [u32]>;
-      extendBond: AugmentedSubmittable<(bondId: u64 | AnyNumber | Uint8Array, totalAmount: u128 | AnyNumber | Uint8Array, bondUntilBlock: u32 | AnyNumber | Uint8Array) => SubmittableExtrinsic<ApiType>, [u64, u128, u32]>;
+      bondBitcoin: AugmentedSubmittable<(vaultId: u32 | AnyNumber | Uint8Array, satoshis: Compact<u64> | AnyNumber | Uint8Array, bitcoinPubkeyHash: UlxPrimitivesBitcoinBitcoinPubkeyHash | string | Uint8Array) => SubmittableExtrinsic<ApiType>, [u32, Compact<u64>, UlxPrimitivesBitcoinBitcoinPubkeyHash]>;
       /**
-       * Add additional time or funds to the bond fund
+       * Submitted by a Vault operator to cosign the unlock of a bitcoin utxo. The Bitcoin owner
+       * unlock fee will be burned, and the bond will be allowed to expire without penalty.
+       *
+       * This is submitted as a no-fee transaction off chain to allow keys to remain in cold
+       * wallets.
        **/
-      extendFund: AugmentedSubmittable<(bondFundId: u32 | AnyNumber | Uint8Array, totalAmountOffered: u128 | AnyNumber | Uint8Array, expirationBlock: u32 | AnyNumber | Uint8Array) => SubmittableExtrinsic<ApiType>, [u32, u128, u32]>;
-      lease: AugmentedSubmittable<(bondFundId: u32 | AnyNumber | Uint8Array, amount: u128 | AnyNumber | Uint8Array, leaseUntilBlock: u32 | AnyNumber | Uint8Array) => SubmittableExtrinsic<ApiType>, [u32, u128, u32]>;
-      offerFund: AugmentedSubmittable<(leaseAnnualPercentRate: Compact<u32> | AnyNumber | Uint8Array, leaseBaseFee: Compact<u128> | AnyNumber | Uint8Array, amountOffered: Compact<u128> | AnyNumber | Uint8Array, expirationBlock: u32 | AnyNumber | Uint8Array) => SubmittableExtrinsic<ApiType>, [Compact<u32>, Compact<u128>, Compact<u128>, u32]>;
-      returnBond: AugmentedSubmittable<(bondId: u64 | AnyNumber | Uint8Array) => SubmittableExtrinsic<ApiType>, [u64]>;
+      cosignBitcoinUnlock: AugmentedSubmittable<(bondId: u64 | AnyNumber | Uint8Array, pubkey: UlxPrimitivesBitcoinCompressedBitcoinPubkey | string | Uint8Array, signature: Bytes | string | Uint8Array) => SubmittableExtrinsic<ApiType>, [u64, UlxPrimitivesBitcoinCompressedBitcoinPubkey, Bytes]>;
+      /**
+       * Submitted by a Bitcoin holder to trigger the unlock of their Bitcoin. A transaction
+       * spending the UTXO from the given bond should be pre-created so that the sighash can be
+       * submitted here. The vault operator will have 10 days to counter-sign the transaction. It
+       * will be published with the public key as a BitcoinUtxoCosigned Event.
+       *
+       * Owner must submit a script pubkey and also a fee to pay to the bitcoin network.
+       **/
+      unlockBitcoinBond: AugmentedSubmittable<(bondId: u64 | AnyNumber | Uint8Array, toScriptPubkey: Bytes | string | Uint8Array, bitcoinNetworkFee: u64 | AnyNumber | Uint8Array) => SubmittableExtrinsic<ApiType>, [u64, Bytes, u64]>;
     };
     chainTransfer: {
       sendToLocalchain: AugmentedSubmittable<(amount: Compact<u128> | AnyNumber | Uint8Array, notaryId: u32 | AnyNumber | Uint8Array) => SubmittableExtrinsic<ApiType>, [Compact<u128>, u32]>;
@@ -178,7 +191,9 @@ declare module '@polkadot/api-base/types/submittable' {
       reportEquivocationUnsigned: AugmentedSubmittable<(equivocationProof: SpConsensusGrandpaEquivocationProof | { setId?: any; equivocation?: any } | string | Uint8Array, keyOwnerProof: SpSessionMembershipProof | { session?: any; trieNodes?: any; validatorCount?: any } | string | Uint8Array) => SubmittableExtrinsic<ApiType>, [SpConsensusGrandpaEquivocationProof, SpSessionMembershipProof]>;
     };
     miningSlot: {
-      bid: AugmentedSubmittable<(bondId: Option<u64> | null | Uint8Array | u64 | AnyNumber, rewardDestination: UlxPrimitivesBlockSealRewardDestination | { Owner: any } | { Account: any } | string | Uint8Array) => SubmittableExtrinsic<ApiType>, [Option<u64>, UlxPrimitivesBlockSealRewardDestination]>;
+      bid: AugmentedSubmittable<(bondInfo: Option<PalletMiningSlotMiningSlotBid> | null | Uint8Array | PalletMiningSlotMiningSlotBid | { vaultId?: any; amount?: any } | string, rewardDestination: UlxPrimitivesBlockSealRewardDestination | { Owner: any } | { Account: any } | string | Uint8Array) => SubmittableExtrinsic<ApiType>, [Option<PalletMiningSlotMiningSlotBid>, UlxPrimitivesBlockSealRewardDestination]>;
+    };
+    mint: {
     };
     notaries: {
       activate: AugmentedSubmittable<(operatorAccount: AccountId32 | string | Uint8Array) => SubmittableExtrinsic<ApiType>, [AccountId32]>;
@@ -594,7 +609,21 @@ declare module '@polkadot/api-base/types/submittable' {
        **/
       upgradeAccounts: AugmentedSubmittable<(who: Vec<AccountId32> | (AccountId32 | string | Uint8Array)[]) => SubmittableExtrinsic<ApiType>, [Vec<AccountId32>]>;
     };
-    ulixeeMint: {
+    vaults: {
+      /**
+       * Add public key hashes to the vault. Will be inserted at the beginning of the list.
+       **/
+      addBitcoinPubkeyHashes: AugmentedSubmittable<(vaultId: u32 | AnyNumber | Uint8Array, bitcoinPubkeyHashes: Vec<UlxPrimitivesBitcoinBitcoinPubkeyHash> | (UlxPrimitivesBitcoinBitcoinPubkeyHash | string | Uint8Array)[]) => SubmittableExtrinsic<ApiType>, [u32, Vec<UlxPrimitivesBitcoinBitcoinPubkeyHash>]>;
+      /**
+       * Stop offering additional bonds from this vault. Will not affect existing bond.
+       * As funds are returned, they will be released to the vault owner.
+       **/
+      close: AugmentedSubmittable<(vaultId: u32 | AnyNumber | Uint8Array) => SubmittableExtrinsic<ApiType>, [u32]>;
+      create: AugmentedSubmittable<(bitcoinAnnualPercentRate: u32 | AnyNumber | Uint8Array, miningAnnualPercentRate: u32 | AnyNumber | Uint8Array, bitcoinAmountAllocated: Compact<u128> | AnyNumber | Uint8Array, miningAmountAllocated: Compact<u128> | AnyNumber | Uint8Array, securitizationPercent: Compact<u16> | AnyNumber | Uint8Array, bitcoinPubkeyHashes: Vec<UlxPrimitivesBitcoinBitcoinPubkeyHash> | (UlxPrimitivesBitcoinBitcoinPubkeyHash | string | Uint8Array)[]) => SubmittableExtrinsic<ApiType>, [u32, u32, Compact<u128>, Compact<u128>, Compact<u16>, Vec<UlxPrimitivesBitcoinBitcoinPubkeyHash>]>;
+      /**
+       * Add additional funds to the vault
+       **/
+      modify: AugmentedSubmittable<(vaultId: u32 | AnyNumber | Uint8Array, totalMiningAmountOffered: u128 | AnyNumber | Uint8Array, totalBitcoinAmountOffered: u128 | AnyNumber | Uint8Array, securitizationPercent: u16 | AnyNumber | Uint8Array) => SubmittableExtrinsic<ApiType>, [u32, u128, u128, u16]>;
     };
   } // AugmentedSubmittables
 } // declare module

@@ -24,7 +24,7 @@ use sp_api::ProvideRuntimeApi;
 use sp_blockchain::HeaderBackend;
 use sp_consensus::{Environment, Proposal, Proposer, SelectChain, SyncOracle};
 use sp_core::{traits::SpawnEssentialNamed, RuntimeDebug, U256};
-use sp_runtime::traits::{Block as BlockT, Header as HeaderT, NumberFor};
+use sp_runtime::traits::{Block as BlockT, Header as HeaderT};
 use sp_timestamp::Timestamp;
 use ulx_bitcoin_utxo_tracker::UtxoTracker;
 
@@ -285,7 +285,7 @@ where
 		+ TickApis<B>
 		+ NotebookApis<B, NotebookVerifyError>
 		+ NotaryApis<B, NotaryRecordT>
-		+ BitcoinApis<B, AccountId, BondId, Balance, NumberFor<B>>,
+		+ BitcoinApis<B, Balance>,
 	S: SelectChain<B> + 'static,
 	E: Environment<B> + Send + Sync + 'static,
 	E::Error: std::fmt::Debug,

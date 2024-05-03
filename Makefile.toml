@@ -85,6 +85,11 @@ args = ["build", "--features", "fast-runtime"]
 env = { "RUSTC_WRAPPER" = "sccache" }
 dependencies = ["sqlx-setup"]
 
+[tasks.update-metadata]
+description = "Update metadata"
+script = "client/update.sh"
+dependencies = ["build"]
+
 [tasks.test]
 description = "Run tests with nextest,"
 command = "cargo"
