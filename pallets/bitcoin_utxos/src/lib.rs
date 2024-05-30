@@ -252,19 +252,19 @@ pub mod pallet {
 		/// # Arguments
 		/// * `bitcoin_height` - the latest bitcoin block height to be confirmed
 		#[pallet::call_index(1)]
-		#[pallet::weight((0, DispatchClass::Mandatory))]
+		#[pallet::weight((0, DispatchClass::Operational))]
 		pub fn set_confirmed_block(
 			origin: OriginFor<T>,
 			bitcoin_height: BitcoinHeight,
 			bitcoin_block_hash: BitcoinBlockHash,
-		) -> DispatchResult {
+		) -> DispatchResultWithPostInfo {
 			let who = ensure_signed(origin)?;
 			ensure!(Some(who) == <OracleOperatorAccount<T>>::get(), Error::<T>::NoPermissions);
 			<ConfirmedBitcoinBlockTip<T>>::put(BitcoinBlock {
 				block_height: bitcoin_height,
 				block_hash: bitcoin_block_hash,
 			});
-			Ok(())
+			Ok(Pays::No.into())
 		}
 
 		/// Sets the oracle operator account id (only executable by the Root account)

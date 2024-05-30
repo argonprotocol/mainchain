@@ -3,6 +3,10 @@ use frame_support::pallet_prelude::TypeInfo;
 use sp_core::{ConstU32, H256};
 use sp_debug_derive::RuntimeDebug;
 use sp_runtime::BoundedVec;
+use sp_std::{
+	convert::{TryFrom, TryInto},
+	vec::Vec,
+};
 
 #[derive(Encode, Decode, Clone, PartialEq, Eq, TypeInfo, RuntimeDebug)]
 pub struct BitcoinSyncStatus {
@@ -30,16 +34,29 @@ pub enum BitcoinError {
 	InvalidByteLength,
 }
 
-#[derive(Clone, Copy, PartialEq, Eq, Encode, Decode, TypeInfo, RuntimeDebug)]
+#[derive(Clone, Copy, PartialEq, Eq, Ord, PartialOrd, Encode, Decode, TypeInfo, RuntimeDebug)]
 #[repr(transparent)]
 pub struct BitcoinPubkeyHash(pub [u8; 20]);
 
 #[derive(Clone, Copy, PartialEq, Eq, Encode, Decode, TypeInfo, RuntimeDebug)]
 #[repr(transparent)]
 pub struct CompressedBitcoinPubkey(pub [u8; 33]);
+impl From<[u8; 33]> for CompressedBitcoinPubkey {
+	fn from(value: [u8; 33]) -> Self {
+		Self(value)
+	}
+}
+
 #[derive(Clone, PartialEq, Eq, Encode, Decode, TypeInfo, RuntimeDebug)]
 #[repr(transparent)]
 pub struct BitcoinSignature(pub BoundedVec<u8, ConstU32<73>>);
+
+impl TryFrom<Vec<u8>> for BitcoinSignature {
+	type Error = Vec<u8>;
+	fn try_from(value: Vec<u8>) -> Result<Self, Self::Error> {
+		Ok(Self(value.try_into()?))
+	}
+}
 
 /// Creates a bitcoin script the does the following:
 /// - Until `vault_claim_height`, multisig requires both public keys and signatures to be revealed
@@ -124,6 +141,12 @@ pub enum BitcoinCosignScriptPubkey {
 #[derive(Clone, PartialEq, Eq, Encode, Decode, TypeInfo, RuntimeDebug)]
 #[repr(transparent)]
 pub struct BitcoinScriptPubkey(pub BoundedVec<u8, ConstU32<34>>); // allow p2wsh, p2tr max
+impl TryFrom<Vec<u8>> for BitcoinScriptPubkey {
+	type Error = Vec<u8>;
+	fn try_from(value: Vec<u8>) -> Result<Self, Self::Error> {
+		Ok(Self(value.try_into()?))
+	}
+}
 
 /// A Bitcoin sighash. This is a 32-byte hash that is used to sign a Bitcoin transaction.
 #[derive(Clone, PartialEq, Eq, Encode, Decode, TypeInfo, RuntimeDebug)]
@@ -172,7 +195,7 @@ mod bitcoin_compat {
 
 	use crate::bitcoin::{
 		BitcoinCosignScriptPubkey, BitcoinPubkeyHash, BitcoinScriptPubkey, BitcoinSignature,
-		H256Le, UtxoRef,
+		CompressedBitcoinPubkey, H256Le, UtxoRef,
 	};
 
 	impl From<bitcoin::BlockHash> for H256Le {
@@ -245,6 +268,38 @@ mod bitcoin_compat {
 		type Error = bitcoin::ecdsa::Error;
 		fn try_into(self) -> Result<bitcoin::ecdsa::Signature, Self::Error> {
 			bitcoin::ecdsa::Signature::from_slice(&self.0.as_slice())
+		}
+	}
+
+	impl TryFrom<bitcoin::ecdsa::Signature> for BitcoinSignature {
+		type Error = Vec<u8>;
+		fn try_from(sig: bitcoin::ecdsa::Signature) -> Result<Self, Self::Error> {
+			Ok(Self(sig.serialize().to_vec().try_into()?))
+		}
+	}
+
+	impl TryInto<bitcoin::CompressedPublicKey> for CompressedBitcoinPubkey {
+		type Error = bitcoin::secp256k1::Error;
+		fn try_into(self) -> Result<bitcoin::CompressedPublicKey, Self::Error> {
+			bitcoin::CompressedPublicKey::from_slice(&self.0)
+		}
+	}
+
+	impl From<bitcoin::CompressedPublicKey> for CompressedBitcoinPubkey {
+		fn from(pubkey: bitcoin::CompressedPublicKey) -> Self {
+			Self(pubkey.to_bytes().into())
+		}
+	}
+
+	impl From<bitcoin::PublicKey> for CompressedBitcoinPubkey {
+		fn from(pubkey: bitcoin::PublicKey) -> Self {
+			pubkey.inner.serialize().into()
+		}
+	}
+	impl TryInto<bitcoin::PublicKey> for CompressedBitcoinPubkey {
+		type Error = bitcoin::key::FromSliceError;
+		fn try_into(self) -> Result<bitcoin::PublicKey, Self::Error> {
+			bitcoin::PublicKey::from_slice(&self.0)
 		}
 	}
 

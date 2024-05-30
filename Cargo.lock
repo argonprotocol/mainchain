@@ -2532,6 +2532,24 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "a357d28ed41a50f9c765dbfe56cbc04a64e53e5fc58ba79fbc34c10ef3df831f"
 
 [[package]]
+name = "end-to-end"
+version = "0.0.1"
+dependencies = [
+ "bitcoin",
+ "bitcoind",
+ "lazy_static",
+ "rand",
+ "sp-core",
+ "subxt",
+ "subxt-signer",
+ "tokio",
+ "ulixee-client",
+ "ulx-bitcoin-utxo-tracker",
+ "ulx-primitives",
+ "ulx-testing",
+]
+
+[[package]]
 name = "enum-as-inner"
 version = "0.5.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -11738,6 +11756,7 @@ dependencies = [
  "tokio",
  "tracing",
  "tracing-subscriber 0.3.18",
+ "ulx-primitives",
  "ulx-testing",
 ]
 
@@ -12112,9 +12131,15 @@ dependencies = [
  "env_logger 0.11.3",
  "fs2",
  "lazy_static",
+ "rand",
+ "sp-core",
+ "sp-keyring",
+ "sqlx",
  "subxt",
  "tracing",
  "ulixee-client",
+ "ulx-notary-apis",
+ "ulx-primitives",
  "url",
 ]
 

@@ -18,6 +18,7 @@ members = [
     "pallets/mint",
     "pallets/vaults",
     "client",
+    "end-to-end",
     "localchain",
     "localchain/uniffi-bindgen",
     "primitives",
@@ -26,7 +27,7 @@ members = [
     "notary/audit",
     "notary/apis",
     "testing",
-    "testing/bitcoin"
+    "testing/bitcoin",
 ]
 resolver = "2"
 

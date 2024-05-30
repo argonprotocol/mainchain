@@ -607,7 +607,7 @@ pub mod pallet {
 		/// This is submitted as a no-fee transaction off chain to allow keys to remain in cold
 		/// wallets.
 		#[pallet::call_index(5)]
-		#[pallet::weight(0)]
+		#[pallet::weight((0, DispatchClass::Operational))]
 		pub fn cosign_bitcoin_unlock(
 			origin: OriginFor<T>,
 			bond_id: BondId,

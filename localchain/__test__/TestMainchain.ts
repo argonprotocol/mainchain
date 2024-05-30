@@ -12,7 +12,6 @@ import {
 import process from "node:process";
 import child_process from "node:child_process";
 import {customAlphabet} from "nanoid";
-import * as PortFinder from "portfinder";
 
 const nanoid = customAlphabet('0123456789abcdefghijklmnopqrstuvwxyz', 4);
 
@@ -43,20 +42,6 @@ export default class TestMainchain implements ITeardownable {
             throw new Error(`Mainchain binary not found at ${this.#binPath}`);
         }
         addTeardown(this);
-    }
-
-    private async startBitcoin(): Promise<string> {
-        const rpcPort = await PortFinder.getPortPromise();
-
-        const path = child_process.execSync(`${__dirname}/../../target/debug/ulx-testing-bitcoin`, {encoding: 'utf8'}).trim();
-
-        const tmpDir = fs.mkdtempSync('/tmp/ulx-bitcoin-');
-
-        this.#bitcoind = spawn(path, ['-regtest', '-fallbackfee=0.0001', '-listen=0', `-datadir=${tmpDir}`, '-blockfilterindex', '-txindex', `-rpcport=${rpcPort}`, '-rpcuser=bitcoin', '-rpcpassword=bitcoin'], {
-            stdio: ['ignore', 'inherit', 'inherit', "ignore"],
-        });
-
-        return cleanHostForDocker(`http://bitcoin:bitcoin@localhost:${rpcPort}`);
     }
 
     /**
@@ -136,5 +121,21 @@ export default class TestMainchain implements ITeardownable {
         for (const i of this.#interfaces) {
             i.close();
         }
+    }
+
+    private async startBitcoin(): Promise<string> {
+        const rpcPort = 14338;
+        // const rpcPort = await PortFinder.getPortPromise();
+        //
+        // const path = child_process.execSync(`${__dirname}/../../target/debug/ulx-testing-bitcoin`, {encoding: 'utf8'}).trim();
+        //
+        // const tmpDir = fs.mkdtempSync('/tmp/ulx-bitcoin-');
+        //
+        // this.#bitcoind = spawn(path, ['-regtest', '-fallbackfee=0.0001', '-listen=0', `-datadir=${tmpDir}`, '-blockfilterindex', '-txindex', `-rpcport=${rpcPort}`, '-rpcuser=bitcoin', '-rpcpassword=bitcoin'], {
+        //     stdio: ['ignore', 'inherit', 'inherit', "ignore"],
+        // });
+
+        // return a fake url - not part of testing localchain
+        return cleanHostForDocker(`http://bitcoin:bitcoin@localhost:${rpcPort}`);
     }
 }

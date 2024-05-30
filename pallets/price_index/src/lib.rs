@@ -160,7 +160,7 @@ pub mod pallet {
 	impl<T: Config> Pallet<T> {
 		/// Submit the latest price index. Only valid for the configured operator account
 		#[pallet::call_index(0)]
-		#[pallet::weight(0)]
+		#[pallet::weight((0, DispatchClass::Operational))]
 		pub fn submit(origin: OriginFor<T>, index: PriceIndexOf<T>) -> DispatchResultWithPostInfo {
 			let who = ensure_signed(origin)?;
 

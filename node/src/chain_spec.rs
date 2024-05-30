@@ -159,7 +159,7 @@ fn testnet_genesis(
 
 	serde_json::json!({
 		"argonBalances": {
-			"balances": endowed_accounts.iter().cloned().map(|k| (k, 10_000)).collect::<Vec<_>>(),
+			"balances": endowed_accounts.iter().cloned().map(|k| (k, 100_000_000)).collect::<Vec<_>>(),
 		},
 		"ulixeeBalances": {
 			"balances": endowed_accounts.iter().cloned().map(|k| (k, 10_000)).collect::<Vec<_>>(),

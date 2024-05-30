@@ -120,9 +120,8 @@ pub fn new_partial(
 				None
 			},
 	};
-	let utxo_tracker =
-		UtxoTracker::new(bitcoin_url.host().expect("Url has not host").to_string(), bitcoin_auth)
-			.map_err(|e| {
+	let utxo_tracker = UtxoTracker::new(bitcoin_url.origin().unicode_serialization(), bitcoin_auth)
+		.map_err(|e| {
 			ServiceError::Other(format!("Failed to initialize bitcoin monitoring {:?}", e))
 		})?;
 

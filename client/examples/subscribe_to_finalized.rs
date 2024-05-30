@@ -1,9 +1,10 @@
-use ulixee_client::{api, local_client};
+use ulixee_client::{api, UlxOnlineClient};
 
 #[tokio::main]
 async fn main() -> Result<(), Box<dyn std::error::Error>> {
 	// Create a client to use:
-	let client = local_client().await?;
+
+	let client = UlxOnlineClient::new().await?;
 
 	// Subscribe to all finalized blocks:
 	let mut blocks_sub = client.blocks().subscribe_finalized().await?;

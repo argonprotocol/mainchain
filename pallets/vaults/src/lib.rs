@@ -436,7 +436,7 @@ pub mod pallet {
 			reason: HoldReason,
 		) -> Result<(), BondError> {
 			if amount == T::Balance::zero() {
-				return Ok(())
+				return Ok(());
 			}
 
 			let needs_providers = T::Currency::balance_on_hold(&reason.into(), who) == 0u128.into();
@@ -448,7 +448,7 @@ pub mod pallet {
 					if balance.checked_sub(&amount).is_some() &&
 						balance.saturating_sub(amount) < T::Currency::minimum_balance()
 					{
-						return BondError::AccountWouldBeBelowMinimum
+						return BondError::AccountWouldBeBelowMinimum;
 					}
 
 					BondError::InsufficientFunds
@@ -466,7 +466,7 @@ pub mod pallet {
 			reason: HoldReason,
 		) -> Result<T::Balance, DispatchError> {
 			if amount == T::Balance::zero() {
-				return Ok(amount)
+				return Ok(amount);
 			}
 			if amount == T::Currency::balance_on_hold(&reason.into(), who) {
 				let _ = frame_system::Pallet::<T>::dec_providers(who);
