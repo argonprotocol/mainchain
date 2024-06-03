@@ -31,12 +31,13 @@ done <"$PIPE"
 subxt codegen  --derive Clone \
   --derive-for-type bounded_collections::bounded_vec::BoundedVec=serde::Serialize \
   --attributes-for-type bounded_collections::bounded_vec::BoundedVec="#[serde(transparent)]" \
+  --substitute-type primitive_types::H256=::sp_core::H256 \
    | rustfmt > "$BASEDIR/src/spec.rs"
 
-curl -H "Content-Type: application/json" -d '{"id":"1", "jsonrpc":"2.0", "method": "state_getMetadata", "params":[]}' http://localhost:9944 > "$BASEDIR/nodejs/metadata.json"
-
-cd "$BASEDIR" && yarn
-cd "nodejs" && yarn build
+#curl -H "Content-Type: application/json" -d '{"id":"1", "jsonrpc":"2.0", "method": "state_getMetadata", "params":[]}' http://localhost:9944 > "$BASEDIR/nodejs/metadata.json"
+#
+#cd "$BASEDIR" && yarn
+#cd "nodejs" && yarn build
 
 # Cleanup and exit (this will be called automatically via trap)
 cleanup

@@ -38,7 +38,7 @@ pub mod pallet {
 			AtLeast32BitUnsigned, CheckedAdd, CheckedDiv, CheckedSub, UniqueSaturatedInto, Zero,
 		},
 		DispatchError::Token,
-		Saturating, TokenError,
+		FixedPointNumber, FixedU128, Saturating, TokenError,
 	};
 	use sp_std::vec;
 
@@ -47,10 +47,7 @@ pub mod pallet {
 			create_timelock_multisig_script, BitcoinCosignScriptPubkey, BitcoinHeight,
 			BitcoinPubkeyHash, UtxoId,
 		},
-		bond::{
-			Bond, BondError, BondType, ThreeDecimalPercent, Vault, VaultArgons, VaultProvider,
-			WholePercent,
-		},
+		bond::{Bond, BondError, BondType, Vault, VaultArgons, VaultProvider},
 		VaultId,
 	};
 
@@ -127,14 +124,14 @@ pub mod pallet {
 			vault_id: VaultId,
 			bitcoin_argons: T::Balance,
 			mining_argons: T::Balance,
-			securitization_percent: WholePercent,
+			securitization_percent: FixedU128,
 			operator_account_id: T::AccountId,
 		},
 		VaultModified {
 			vault_id: VaultId,
 			bitcoin_argons: T::Balance,
 			mining_argons: T::Balance,
-			securitization_percent: WholePercent,
+			securitization_percent: FixedU128,
 		},
 		VaultClosed {
 			vault_id: VaultId,
@@ -219,17 +216,17 @@ pub mod pallet {
 		#[pallet::weight(0)]
 		pub fn create(
 			origin: OriginFor<T>,
-			bitcoin_annual_percent_rate: ThreeDecimalPercent,
-			mining_annual_percent_rate: ThreeDecimalPercent,
+			#[pallet::compact] bitcoin_annual_percent_rate: FixedU128,
+			#[pallet::compact] mining_annual_percent_rate: FixedU128,
 			#[pallet::compact] bitcoin_amount_allocated: T::Balance,
 			#[pallet::compact] mining_amount_allocated: T::Balance,
-			#[pallet::compact] securitization_percent: WholePercent,
+			#[pallet::compact] securitization_percent: FixedU128,
 			bitcoin_pubkey_hashes: BoundedVec<BitcoinPubkeyHash, T::MaxVaultBitcoinPubkeys>,
 		) -> DispatchResult {
 			let who = ensure_signed(origin)?;
 
 			ensure!(
-				securitization_percent <= 200u16.into(),
+				securitization_percent <= FixedU128::from_rational(2, 1),
 				Error::<T>::MaxSecuritizationPercentExceeded
 			);
 			ensure!(
@@ -288,7 +285,7 @@ pub mod pallet {
 			vault_id: VaultId,
 			total_mining_amount_offered: T::Balance,
 			total_bitcoin_amount_offered: T::Balance,
-			securitization_percent: u16,
+			securitization_percent: FixedU128,
 		) -> DispatchResult {
 			let who = ensure_signed(origin)?;
 			let mut vault = VaultsById::<T>::get(vault_id).ok_or(Error::<T>::VaultNotFound)?;
@@ -475,28 +472,27 @@ pub mod pallet {
 		}
 
 		pub(crate) fn calculate_fees(
-			annual_percentage_rate: ThreeDecimalPercent,
+			annual_percentage_rate: FixedU128,
 			amount: T::Balance,
 			blocks: BlockNumberFor<T>,
 		) -> T::Balance {
-			let percent_basis: T::Balance = 100_000u128.into();
+			let blocks_per_day = FixedU128::saturating_from_integer(T::BlocksPerDay::get());
 
-			let blocks_per_day: T::Balance = blocks_into_u128::<T>(T::BlocksPerDay::get()).into();
-
-			let blocks_per_year: T::Balance = blocks_per_day * 365u32.into();
-			let blocks: T::Balance = blocks_into_u128::<T>(blocks).into();
+			let blocks_per_year = blocks_per_day * FixedU128::saturating_from_integer(365);
+			let blocks = FixedU128::saturating_from_integer(blocks);
 
 			// min of 1 day
 			let blocks = blocks.max(blocks_per_day);
+			let block_ratio = blocks.checked_div(&blocks_per_year).unwrap_or_default();
 
-			let fee: T::Balance = amount
-				.saturating_mul(annual_percentage_rate.into())
-				.saturating_mul(blocks)
-				.checked_div(&blocks_per_year)
-				.unwrap_or_default()
-				.checked_div(&percent_basis)
-				.unwrap_or_default(); // amount is in milligons
-			fee
+			let amount: u128 = amount.unique_saturated_into();
+			let amount = FixedU128::saturating_from_integer(amount);
+
+			let fee = amount
+				.saturating_mul(annual_percentage_rate)
+				.saturating_mul(block_ratio)
+				.into_inner() / FixedU128::accuracy();
+			fee.unique_saturated_into()
 		}
 	}
 
@@ -741,10 +737,6 @@ pub mod pallet {
 					.map_err(|_| BondError::InvalidBitcoinScript)?,
 			))
 		}
-	}
-
-	fn blocks_into_u128<T: Config>(blocks: BlockNumberFor<T>) -> u128 {
-		UniqueSaturatedInto::<u128>::unique_saturated_into(blocks)
 	}
 
 	fn balance_to_i128<T: Config>(balance: T::Balance) -> i128 {

@@ -3,6 +3,7 @@
 
 use codec::{Codec, Decode, Encode, MaxEncodedLen};
 use scale_info::TypeInfo;
+use sp_arithmetic::FixedU128;
 use sp_core::RuntimeDebug;
 use sp_std::convert::TryInto;
 
@@ -36,10 +37,10 @@ mod mock;
 pub struct PriceIndex<Moment: Codec + Clone + MaxEncodedLen> {
 	/// Bitcoin to usd price in cents
 	#[codec(compact)]
-	pub btc_usd_price: u64,
+	pub btc_usd_price: FixedU128,
 	/// Argon to usd price in cents
 	#[codec(compact)]
-	pub argon_usd_price: u64,
+	pub argon_usd_price: FixedU128,
 	/// Argon CPI calculated using consumer price index + argon price vs a base year
 	pub argon_cpi: ArgonCPI,
 	/// User created timestamp of submission
@@ -211,11 +212,11 @@ pub mod pallet {
 		fn get_argon_cpi_price() -> Option<ArgonCPI> {
 			Self::get_current().map(|a| a.argon_cpi)
 		}
-		fn get_latest_argon_price_in_us_cents() -> Option<u64> {
+		fn get_latest_argon_price_in_us_cents() -> Option<FixedU128> {
 			Self::get_current().map(|a| a.argon_usd_price)
 		}
 
-		fn get_latest_btc_price_in_us_cents() -> Option<u64> {
+		fn get_latest_btc_price_in_us_cents() -> Option<FixedU128> {
 			Self::get_current().map(|a| a.btc_usd_price)
 		}
 	}

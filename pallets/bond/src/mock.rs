@@ -3,6 +3,7 @@ use std::collections::BTreeMap;
 use env_logger::{Builder, Env};
 use frame_support::{derive_impl, parameter_types, traits::Currency};
 use frame_system::pallet_prelude::BlockNumberFor;
+use sp_arithmetic::{FixedI128, FixedU128};
 use sp_core::{ConstU32, ConstU64, H256};
 use sp_runtime::{BuildStorage, DispatchError};
 
@@ -63,9 +64,9 @@ pub fn set_argons(account_id: u64, amount: Balance) {
 
 parameter_types! {
 	pub static MaxUnlockingUtxos: u32 = 10;
-	pub static BitcoinPricePerUsd: Option<u64> = Some(62000_00);
-	pub static ArgonPricePerUsd: Option<u64> = Some(1_00);
-	pub static ArgonCPI: Option<ulx_primitives::ArgonCPI> = Some(0_100);
+	pub static BitcoinPricePerUsd: Option<FixedU128> = Some(FixedU128::from_float(62000.00));
+	pub static ArgonPricePerUsd: Option<FixedU128> = Some(FixedU128::from_float(1.00));
+	pub static ArgonCPI: Option<ulx_primitives::ArgonCPI> = Some(FixedI128::from_float(0.1));
 	pub static UtxoUnlockCosignDeadlineBlocks: BitcoinHeight = 5;
 	pub static BitcoinBondReclamationBlocks: BitcoinHeight = 30;
 	pub static BitcoinBondDurationBlocks: BitcoinHeight = 365;
@@ -75,15 +76,15 @@ parameter_types! {
 		mining_argons: VaultArgons {
 			allocated: 100_000_000,
 			bonded: 0,
-			annual_percent_rate: 1000,
+			annual_percent_rate: FixedU128::from_float(10.0),
 		},
 		bitcoin_argons: VaultArgons {
 			allocated: 200_000_000,
 			bonded: 0,
-			annual_percent_rate: 1000,
+			annual_percent_rate: FixedU128::from_float(10.0),
 		},
 		operator_account_id: 1,
-		securitization_percent: 0,
+		securitization_percent: FixedU128::from_float(0.0),
 		securitized_argons: 0,
 		is_closed: false,
 	};
@@ -111,10 +112,10 @@ impl PriceProvider<Balance> for StaticPriceProvider {
 	fn get_argon_cpi_price() -> Option<ulx_primitives::ArgonCPI> {
 		ArgonCPI::get()
 	}
-	fn get_latest_argon_price_in_us_cents() -> Option<u64> {
+	fn get_latest_argon_price_in_us_cents() -> Option<FixedU128> {
 		ArgonPricePerUsd::get()
 	}
-	fn get_latest_btc_price_in_us_cents() -> Option<u64> {
+	fn get_latest_btc_price_in_us_cents() -> Option<FixedU128> {
 		BitcoinPricePerUsd::get()
 	}
 }

@@ -1,8 +1,10 @@
 use std::time::SystemTime;
 
 use frame_support::{assert_err, assert_ok};
+use sp_arithmetic::{FixedI128, FixedU128};
+use sp_runtime::traits::Zero;
 
-use ulx_primitives::{bitcoin::SATOSHIS_PER_BITCOIN, Moment, PriceProvider};
+use ulx_primitives::{bitcoin::SATOSHIS_PER_BITCOIN, ArgonCPI, Moment, PriceProvider};
 
 use crate::{mock::*, Current, Operator, PriceIndex as PriceIndexEntry};
 
@@ -63,13 +65,13 @@ fn uses_latest_as_current() {
 		System::assert_last_event(Event::NewIndex.into());
 
 		let mut entry2 = entry.clone();
-		entry2.argon_cpi = 1;
+		entry2.argon_cpi = ArgonCPI::from_float(1.0);
 		entry2.timestamp = start + 4;
 		assert_ok!(PriceIndex::submit(RuntimeOrigin::signed(1), entry2.clone()),);
 		assert_eq!(Current::<Test>::get(), Some(entry2.clone()));
 
 		let mut entry_backwards = entry.clone();
-		entry_backwards.argon_cpi = 2;
+		entry_backwards.argon_cpi = ArgonCPI::from_float(2.0);
 		entry_backwards.timestamp = start + 1;
 		assert_ok!(PriceIndex::submit(RuntimeOrigin::signed(1), entry_backwards.clone()),);
 		assert_eq!(Current::<Test>::get(), Some(entry2.clone()));
@@ -97,9 +99,9 @@ fn can_convert_argon_prices() {
 		System::set_block_number(1);
 		let mut index = PriceIndexEntry {
 			timestamp: now(),
-			btc_usd_price: 62_000 * 100, // 62,000.00
-			argon_usd_price: 100,        // 100 cents
-			argon_cpi: 0,
+			btc_usd_price: FixedU128::from_float(62_000.00), // 62,000.00
+			argon_usd_price: FixedU128::from_float(1.00),    // 100 cents
+			argon_cpi: ArgonCPI::zero(),
 		};
 		Current::<Test>::put(index);
 
@@ -109,7 +111,7 @@ fn can_convert_argon_prices() {
 			"price in milligons"
 		);
 
-		index.argon_usd_price = 101;
+		index.argon_usd_price = FixedU128::from_float(1.01);
 		Current::<Test>::put(index);
 
 		assert_eq!(
@@ -122,9 +124,9 @@ fn can_convert_argon_prices() {
 fn create_index() -> PriceIndexEntry<u64> {
 	PriceIndexEntry {
 		timestamp: now(),
-		btc_usd_price: 62_000 * 100,
-		argon_usd_price: 1_000 * 100,
-		argon_cpi: 0,
+		btc_usd_price: FixedU128::from_float(62_000.00),
+		argon_usd_price: FixedU128::from_float(1_000.00),
+		argon_cpi: FixedI128::from_float(0.0),
 	}
 }
 

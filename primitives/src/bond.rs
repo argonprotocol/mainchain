@@ -1,6 +1,7 @@
 use codec::{Codec, Decode, Encode, MaxEncodedLen};
 use frame_support::PalletError;
 use scale_info::TypeInfo;
+use sp_arithmetic::{traits::UniqueSaturatedInto, FixedPointNumber, FixedU128};
 use sp_debug_derive::RuntimeDebug;
 use sp_runtime::traits::AtLeast32BitUnsigned;
 
@@ -118,7 +119,7 @@ pub struct Vault<
 > {
 	pub operator_account_id: AccountId,
 	pub bitcoin_argons: VaultArgons<Balance>,
-	pub securitization_percent: u16, // Whole number as a perentage
+	pub securitization_percent: FixedU128, // Whole number as a perentage
 	pub securitized_argons: Balance,
 	pub mining_argons: VaultArgons<Balance>,
 	pub is_closed: bool,
@@ -150,10 +151,11 @@ impl<AccountId: Codec, Balance: Codec + Copy + MaxEncodedLen + Default + AtLeast
 		let argons =
 			if self.is_closed { self.bitcoin_argons.bonded } else { self.bitcoin_argons.allocated };
 
-		argons
-			.saturating_mul(self.securitization_percent.into())
-			.checked_div(&100u32.into())
-			.unwrap_or_default()
+		let argons = self
+			.securitization_percent
+			.saturating_mul_int::<u128>(argons.unique_saturated_into());
+
+		argons.unique_saturated_into()
 	}
 
 	pub fn mut_argons(&mut self, bond_type: &BondType) -> &mut VaultArgons<Balance> {
@@ -166,7 +168,8 @@ impl<AccountId: Codec, Balance: Codec + Copy + MaxEncodedLen + Default + AtLeast
 
 #[derive(Clone, PartialEq, Eq, Encode, Decode, RuntimeDebug, TypeInfo, MaxEncodedLen, Default)]
 pub struct VaultArgons<Balance: Codec + Copy + MaxEncodedLen + Default + AtLeast32BitUnsigned> {
-	pub annual_percent_rate: ThreeDecimalPercent,
+	#[codec(compact)]
+	pub annual_percent_rate: FixedU128,
 	#[codec(compact)]
 	pub allocated: Balance,
 	#[codec(compact)]
@@ -207,13 +210,6 @@ impl<Balance: Codec + Copy + MaxEncodedLen + Default + AtLeast32BitUnsigned> Vau
 		self.allocated.saturating_sub(self.bonded)
 	}
 }
-
-/// Annual Percentage Rate, represented as a percentage with 3 decimal places. Eg, 1 = 0.001%; 1000
-/// = 1%
-pub type ThreeDecimalPercent = u32;
-
-/// Whole percent, represented as a percentage with 0 decimal places. Eg, 1 = 1%; 100 = 100%
-pub type WholePercent = u16;
 
 #[derive(Clone, PartialEq, Eq, Encode, Decode, RuntimeDebug, TypeInfo)]
 pub struct Bond<AccountId: Codec, Balance: Codec, BlockNumber: Codec> {

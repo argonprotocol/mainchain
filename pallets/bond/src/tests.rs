@@ -3,6 +3,7 @@ use frame_support::{
 	pallet_prelude::*,
 	traits::fungible::{Inspect, InspectHold, Mutate},
 };
+use sp_arithmetic::{traits::Zero, FixedI128, FixedPointNumber, FixedU128};
 use sp_core::H256;
 
 use ulx_primitives::{
@@ -120,24 +121,25 @@ fn marks_a_verified_bitcoin() {
 #[test]
 fn calculates_redemption_prices() {
 	new_test_ext().execute_with(|| {
-		BitcoinPricePerUsd::set(50000_00.into());
-		ArgonPricePerUsd::set(1_00.into());
-		ArgonCPI::set(0.into());
+		BitcoinPricePerUsd::set(Some(FixedU128::saturating_from_integer(50000)));
+		ArgonPricePerUsd::set(Some(FixedU128::saturating_from_integer(1)));
+		ArgonCPI::set(Some(FixedI128::zero()));
 		{
 			let new_price = Bonds::get_redemption_price(&100_000_000).expect("should have price");
 			assert_eq!(new_price, 50_000_000);
 		}
-		ArgonPricePerUsd::set(1_01.into());
+		ArgonPricePerUsd::set(Some(FixedU128::from_float(1.01)));
 		{
 			let new_price = Bonds::get_redemption_price(&100_000_000).expect("should have price");
 			assert_eq!(new_price, (50_000_000f64 / 1.01f64) as u128);
 		}
-		ArgonCPI::set(0_100.into());
+		ArgonCPI::set(Some(FixedI128::from_float(0.1)));
 		{
 			let new_price = Bonds::get_redemption_price(&100_000_000).expect("should have price");
 			// round to 3 digit precision for multiplier
-			let multiplier = ((0.713f32 * 1.01f32 + 0.274f32) * 1000f32) as u128;
-			assert_eq!(new_price, (multiplier * (50_000_000f64 / 1.01f64) as u128) / 1000);
+			let multiplier = 0.713 * 1.01 + 0.274;
+			// NOTE: floating point yields diffferent rounding, so need to subtract 1
+			assert_eq!(new_price, (multiplier * (50_000_000.0 / 1.01)) as u128 - 1);
 		}
 	});
 }
@@ -167,7 +169,8 @@ fn burns_a_spent_bitcoin() {
 		// first verify
 		assert_ok!(Bonds::utxo_verified(1));
 
-		BitcoinPricePerUsd::set(50000_00.into());
+		BitcoinPricePerUsd::set(Some(FixedU128::saturating_from_integer(50000)));
+
 		let new_price =
 			Bonds::get_redemption_price(&SATOSHIS_PER_BITCOIN).expect("should have price");
 		// 50_000_000 milligons for a bitcoin
@@ -285,7 +288,7 @@ fn can_unlock_a_bitcoin() {
 		// Mint the argons into account
 		assert_ok!(Balances::mint_into(&who, bond.amount));
 
-		BitcoinPricePerUsd::set(65000_00.into());
+		BitcoinPricePerUsd::set(Some(FixedU128::from_float(65_000.00)));
 		// now the user goes to unlock
 		// 1. We would create a psbt and output address
 		let unlock_script_pubkey = make_script_pubkey(&[0; 32]);

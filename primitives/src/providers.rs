@@ -1,9 +1,10 @@
 use codec::{Codec, Decode, Encode, FullCodec, MaxEncodedLen};
 use scale_info::TypeInfo;
+use sp_arithmetic::{FixedI128, FixedPointNumber};
 use sp_core::{RuntimeDebug, H256, U256};
 use sp_runtime::{
-	traits::{AtLeast32BitUnsigned, Block as BlockT, UniqueSaturatedInto},
-	DispatchError, DispatchResult,
+	traits::{AtLeast32BitUnsigned, Block as BlockT, CheckedDiv, UniqueSaturatedInto},
+	DispatchError, DispatchResult, FixedU128, Saturating,
 };
 use sp_std::vec::Vec;
 
@@ -44,28 +45,27 @@ pub trait NotebookProvider {
 pub trait PriceProvider<Balance: Codec + AtLeast32BitUnsigned> {
 	/// Price of the given satoshis in milligons
 	fn get_bitcoin_argon_price(satoshis: Satoshis) -> Option<Balance> {
-		let satoshis: Balance = satoshis.unique_saturated_into();
-		let satoshis_per_bitcoin: Balance = SATOSHIS_PER_BITCOIN.unique_saturated_into();
-		let milligons_per_argon: Balance = 1000u128.unique_saturated_into();
+		let satoshis = FixedU128::saturating_from_integer(satoshis);
+		let satoshis_per_bitcoin = FixedU128::saturating_from_integer(SATOSHIS_PER_BITCOIN);
+		let milligons_per_argon = FixedU128::saturating_from_integer(1000);
 
-		let btc_usd_price: Balance =
-			Self::get_latest_btc_price_in_us_cents()?.unique_saturated_into();
-		let argon_usd_price: Balance =
-			Self::get_latest_argon_price_in_us_cents()?.unique_saturated_into();
+		let btc_usd_price = Self::get_latest_btc_price_in_us_cents()?;
+		let argon_usd_price = Self::get_latest_argon_price_in_us_cents()?;
 
-		let satoshi_cents: Balance =
+		let satoshi_cents =
 			satoshis.saturating_mul(btc_usd_price).checked_div(&satoshis_per_bitcoin)?;
 
 		let milligons = satoshi_cents
 			.saturating_mul(milligons_per_argon)
 			.checked_div(&argon_usd_price)?;
-		Some(milligons)
+
+		Some((milligons.into_inner() / FixedU128::accuracy()).unique_saturated_into())
 	}
 
 	/// Prices of a single bitcoin in US cents
-	fn get_latest_btc_price_in_us_cents() -> Option<u64>;
+	fn get_latest_btc_price_in_us_cents() -> Option<FixedU128>;
 	/// Prices of a single argon in US cents
-	fn get_latest_argon_price_in_us_cents() -> Option<u64>;
+	fn get_latest_argon_price_in_us_cents() -> Option<FixedU128>;
 
 	/// The argon CPI is the US CPI deconstructed by the Argon market price in Dollars.
 	/// This value has 3 decimal places of precision in a whole number (eg, 1 = 1_000, -1 = -1_000)
@@ -127,9 +127,8 @@ impl<AccountId: Codec, Balance: Codec + Copy> UtxoBondedEvents<AccountId, Balanc
 	}
 }
 
-/// Argon CPI is the US CPI deconstructed by the Argon market price in Dollars with 3 decimal places
-/// of precision in a whole number (eg, 1 = 1_000, -1 = -1_000)
-pub type ArgonCPI = i16;
+/// Argon CPI is the US CPI deconstructed by the Argon market price in Dollars
+pub type ArgonCPI = FixedI128;
 
 pub trait ChainTransferLookup<AccountId, Balance> {
 	fn is_valid_transfer_to_localchain(

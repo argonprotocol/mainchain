@@ -622,7 +622,7 @@ pub mod api {
 					pub type Source =
 						runtime_types::sp_runtime::transaction_validity::TransactionSource;
 					pub type Tx = :: subxt :: utils :: UncheckedExtrinsic < :: subxt :: utils :: MultiAddress < :: subxt :: utils :: AccountId32 , () > , runtime_types :: ulx_node_runtime :: RuntimeCall , runtime_types :: sp_runtime :: MultiSignature , (runtime_types :: frame_system :: extensions :: check_non_zero_sender :: CheckNonZeroSender , runtime_types :: frame_system :: extensions :: check_spec_version :: CheckSpecVersion , runtime_types :: frame_system :: extensions :: check_tx_version :: CheckTxVersion , runtime_types :: frame_system :: extensions :: check_genesis :: CheckGenesis , runtime_types :: frame_system :: extensions :: check_mortality :: CheckMortality , runtime_types :: frame_system :: extensions :: check_nonce :: CheckNonce , runtime_types :: frame_system :: extensions :: check_weight :: CheckWeight , runtime_types :: pallet_transaction_payment :: ChargeTransactionPayment ,) > ;
-					pub type BlockHash = ::subxt::utils::H256;
+					pub type BlockHash = ::sp_core::H256;
 					pub mod output {
 						use super::runtime_types;
 						pub type Output = :: core :: result :: Result < runtime_types :: sp_runtime :: transaction_validity :: ValidTransaction , runtime_types :: sp_runtime :: transaction_validity :: TransactionValidityError > ;
@@ -1058,9 +1058,10 @@ pub mod api {
 						"query_call_info",
 						types::QueryCallInfo { call, len },
 						[
-							246u8, 249u8, 150u8, 75u8, 161u8, 147u8, 3u8, 193u8, 145u8, 67u8, 17u8,
-							24u8, 101u8, 224u8, 73u8, 32u8, 24u8, 22u8, 151u8, 44u8, 143u8, 57u8,
-							89u8, 180u8, 63u8, 152u8, 19u8, 33u8, 23u8, 22u8, 78u8, 107u8,
+							73u8, 217u8, 139u8, 167u8, 51u8, 140u8, 240u8, 137u8, 69u8, 28u8,
+							213u8, 50u8, 255u8, 239u8, 77u8, 120u8, 203u8, 42u8, 187u8, 221u8, 9u8,
+							218u8, 77u8, 246u8, 121u8, 55u8, 234u8, 204u8, 159u8, 213u8, 140u8,
+							250u8,
 						],
 					)
 				}
@@ -1078,10 +1079,10 @@ pub mod api {
 						"query_call_fee_details",
 						types::QueryCallFeeDetails { call, len },
 						[
-							243u8, 146u8, 47u8, 210u8, 200u8, 101u8, 34u8, 246u8, 239u8, 149u8,
-							127u8, 66u8, 81u8, 41u8, 149u8, 140u8, 159u8, 47u8, 73u8, 235u8, 24u8,
-							77u8, 146u8, 129u8, 251u8, 130u8, 61u8, 167u8, 124u8, 207u8, 90u8,
-							135u8,
+							151u8, 104u8, 123u8, 110u8, 14u8, 145u8, 180u8, 115u8, 21u8, 176u8,
+							48u8, 131u8, 170u8, 73u8, 225u8, 29u8, 72u8, 76u8, 140u8, 238u8, 108u8,
+							176u8, 15u8, 148u8, 200u8, 242u8, 152u8, 29u8, 16u8, 242u8, 241u8,
+							46u8,
 						],
 					)
 				}
@@ -1682,9 +1683,9 @@ pub mod api {
 					pub type Version = ::core::primitive::u32;
 					pub type NotaryId = ::core::primitive::u32;
 					pub type NotebookNumber = ::core::primitive::u32;
-					pub type HeaderHash = ::subxt::utils::H256;
+					pub type HeaderHash = ::sp_core::H256;
 					pub type VoteMinimums =
-						::subxt::utils::KeyedVec<::subxt::utils::H256, ::core::primitive::u128>;
+						::subxt::utils::KeyedVec<::sp_core::H256, ::core::primitive::u128>;
 					pub type Bytes = ::std::vec::Vec<::core::primitive::u8>;
 					pub type AuditDependencySummaries =
 						::std::vec::Vec<runtime_types::ulx_primitives::apis::NotebookAuditSummary>;
@@ -1724,7 +1725,7 @@ pub mod api {
 						use super::runtime_types;
 						pub type Output = ::core::result::Result<
 							runtime_types::ulx_primitives::notary::NotaryNotebookVoteDetails<
-								::subxt::utils::H256,
+								::sp_core::H256,
 							>,
 							runtime_types::sp_runtime::DispatchError,
 						>;
@@ -1868,7 +1869,7 @@ pub mod api {
 					pub type Tick = ::core::primitive::u32;
 					pub mod output {
 						use super::runtime_types;
-						pub type Output = ::std::vec::Vec<::subxt::utils::H256>;
+						pub type Output = ::std::vec::Vec<::sp_core::H256>;
 					}
 				}
 				#[derive(
@@ -2158,7 +2159,7 @@ pub mod api {
 					use super::runtime_types;
 					pub type EquivocationProof =
 						runtime_types::sp_consensus_grandpa::EquivocationProof<
-							::subxt::utils::H256,
+							::sp_core::H256,
 							::core::primitive::u32,
 						>;
 					pub type KeyOwnerProof =
@@ -2558,9 +2559,9 @@ pub mod api {
 			.hash();
 		runtime_metadata_hash ==
 			[
-				227u8, 8u8, 70u8, 248u8, 193u8, 211u8, 229u8, 48u8, 94u8, 97u8, 19u8, 235u8, 131u8,
-				149u8, 97u8, 37u8, 43u8, 183u8, 251u8, 24u8, 18u8, 20u8, 64u8, 125u8, 204u8, 189u8,
-				47u8, 100u8, 96u8, 231u8, 227u8, 36u8,
+				29u8, 202u8, 182u8, 98u8, 190u8, 13u8, 24u8, 45u8, 182u8, 233u8, 181u8, 53u8, 3u8,
+				4u8, 198u8, 191u8, 87u8, 166u8, 254u8, 4u8, 100u8, 223u8, 147u8, 48u8, 183u8, 38u8,
+				13u8, 201u8, 147u8, 245u8, 137u8, 89u8,
 			]
 	}
 	pub mod system {
@@ -2791,7 +2792,7 @@ pub mod api {
 				}
 				pub mod authorize_upgrade {
 					use super::runtime_types;
-					pub type CodeHash = ::subxt::utils::H256;
+					pub type CodeHash = ::sp_core::H256;
 				}
 				impl ::subxt::blocks::StaticExtrinsic for AuthorizeUpgrade {
 					const PALLET: &'static str = "System";
@@ -2821,7 +2822,7 @@ pub mod api {
 				}
 				pub mod authorize_upgrade_without_checks {
 					use super::runtime_types;
-					pub type CodeHash = ::subxt::utils::H256;
+					pub type CodeHash = ::sp_core::H256;
 				}
 				impl ::subxt::blocks::StaticExtrinsic for AuthorizeUpgradeWithoutChecks {
 					const PALLET: &'static str = "System";
@@ -3208,7 +3209,7 @@ pub mod api {
 			pub mod remarked {
 				use super::runtime_types;
 				pub type Sender = ::subxt::utils::AccountId32;
-				pub type Hash = ::subxt::utils::H256;
+				pub type Hash = ::sp_core::H256;
 			}
 			impl ::subxt::events::StaticEvent for Remarked {
 				const PALLET: &'static str = "System";
@@ -3232,7 +3233,7 @@ pub mod api {
 			}
 			pub mod upgrade_authorized {
 				use super::runtime_types;
-				pub type CodeHash = ::subxt::utils::H256;
+				pub type CodeHash = ::sp_core::H256;
 				pub type CheckVersion = ::core::primitive::bool;
 			}
 			impl ::subxt::events::StaticEvent for UpgradeAuthorized {
@@ -3272,7 +3273,7 @@ pub mod api {
 				}
 				pub mod block_hash {
 					use super::runtime_types;
-					pub type BlockHash = ::subxt::utils::H256;
+					pub type BlockHash = ::sp_core::H256;
 					pub type Param0 = ::core::primitive::u32;
 				}
 				pub mod extrinsic_data {
@@ -3286,7 +3287,7 @@ pub mod api {
 				}
 				pub mod parent_hash {
 					use super::runtime_types;
-					pub type ParentHash = ::subxt::utils::H256;
+					pub type ParentHash = ::sp_core::H256;
 				}
 				pub mod digest {
 					use super::runtime_types;
@@ -3297,7 +3298,7 @@ pub mod api {
 					pub type Events = ::std::vec::Vec<
 						runtime_types::frame_system::EventRecord<
 							runtime_types::ulx_node_runtime::RuntimeEvent,
-							::subxt::utils::H256,
+							::sp_core::H256,
 						>,
 					>;
 				}
@@ -3309,7 +3310,7 @@ pub mod api {
 					use super::runtime_types;
 					pub type EventTopics =
 						::std::vec::Vec<(::core::primitive::u32, ::core::primitive::u32)>;
-					pub type Param0 = ::subxt::utils::H256;
+					pub type Param0 = ::sp_core::H256;
 				}
 				pub mod last_runtime_upgrade {
 					use super::runtime_types;
@@ -3637,9 +3638,9 @@ pub mod api {
 						"Events",
 						(),
 						[
-							10u8, 164u8, 7u8, 193u8, 141u8, 59u8, 239u8, 240u8, 49u8, 218u8, 148u8,
-							38u8, 70u8, 44u8, 93u8, 201u8, 116u8, 137u8, 134u8, 229u8, 175u8,
-							211u8, 26u8, 76u8, 102u8, 209u8, 184u8, 68u8, 6u8, 160u8, 207u8, 96u8,
+							41u8, 151u8, 4u8, 41u8, 91u8, 96u8, 44u8, 232u8, 135u8, 61u8, 158u8,
+							176u8, 226u8, 8u8, 26u8, 252u8, 36u8, 114u8, 61u8, 127u8, 213u8, 184u8,
+							159u8, 195u8, 224u8, 18u8, 84u8, 10u8, 140u8, 127u8, 32u8, 220u8,
 						],
 					)
 				}
@@ -4374,7 +4375,7 @@ pub mod api {
 				pub mod announce {
 					use super::runtime_types;
 					pub type Real = ::subxt::utils::MultiAddress<::subxt::utils::AccountId32, ()>;
-					pub type CallHash = ::subxt::utils::H256;
+					pub type CallHash = ::sp_core::H256;
 				}
 				impl ::subxt::blocks::StaticExtrinsic for Announce {
 					const PALLET: &'static str = "Proxy";
@@ -4408,7 +4409,7 @@ pub mod api {
 				pub mod remove_announcement {
 					use super::runtime_types;
 					pub type Real = ::subxt::utils::MultiAddress<::subxt::utils::AccountId32, ()>;
-					pub type CallHash = ::subxt::utils::H256;
+					pub type CallHash = ::sp_core::H256;
 				}
 				impl ::subxt::blocks::StaticExtrinsic for RemoveAnnouncement {
 					const PALLET: &'static str = "Proxy";
@@ -4443,7 +4444,7 @@ pub mod api {
 					use super::runtime_types;
 					pub type Delegate =
 						::subxt::utils::MultiAddress<::subxt::utils::AccountId32, ()>;
-					pub type CallHash = ::subxt::utils::H256;
+					pub type CallHash = ::sp_core::H256;
 				}
 				impl ::subxt::blocks::StaticExtrinsic for RejectAnnouncement {
 					const PALLET: &'static str = "Proxy";
@@ -4513,9 +4514,10 @@ pub mod api {
 						"proxy",
 						types::Proxy { real, force_proxy_type, call: ::std::boxed::Box::new(call) },
 						[
-							86u8, 15u8, 159u8, 254u8, 10u8, 125u8, 91u8, 89u8, 2u8, 247u8, 232u8,
-							77u8, 111u8, 128u8, 219u8, 72u8, 133u8, 242u8, 33u8, 180u8, 40u8, 85u8,
-							140u8, 166u8, 71u8, 32u8, 142u8, 32u8, 137u8, 228u8, 144u8, 115u8,
+							172u8, 155u8, 140u8, 132u8, 105u8, 58u8, 161u8, 226u8, 145u8, 11u8,
+							163u8, 255u8, 176u8, 20u8, 238u8, 156u8, 92u8, 231u8, 204u8, 194u8,
+							247u8, 35u8, 22u8, 118u8, 217u8, 148u8, 0u8, 60u8, 63u8, 95u8, 173u8,
+							226u8,
 						],
 					)
 				}
@@ -4771,10 +4773,9 @@ pub mod api {
 							call: ::std::boxed::Box::new(call),
 						},
 						[
-							178u8, 88u8, 178u8, 166u8, 75u8, 32u8, 101u8, 151u8, 91u8, 47u8, 32u8,
-							43u8, 165u8, 184u8, 38u8, 190u8, 150u8, 109u8, 160u8, 218u8, 192u8,
-							253u8, 255u8, 68u8, 80u8, 213u8, 210u8, 122u8, 95u8, 234u8, 41u8,
-							115u8,
+							126u8, 62u8, 67u8, 154u8, 164u8, 8u8, 169u8, 60u8, 54u8, 105u8, 40u8,
+							145u8, 192u8, 22u8, 168u8, 7u8, 254u8, 157u8, 37u8, 72u8, 98u8, 92u8,
+							9u8, 240u8, 78u8, 97u8, 200u8, 86u8, 60u8, 163u8, 145u8, 141u8,
 						],
 					)
 				}
@@ -4859,7 +4860,7 @@ pub mod api {
 				use super::runtime_types;
 				pub type Real = ::subxt::utils::AccountId32;
 				pub type Proxy = ::subxt::utils::AccountId32;
-				pub type CallHash = ::subxt::utils::H256;
+				pub type CallHash = ::sp_core::H256;
 			}
 			impl ::subxt::events::StaticEvent for Announced {
 				const PALLET: &'static str = "Proxy";
@@ -4948,7 +4949,7 @@ pub mod api {
 						runtime_types::bounded_collections::bounded_vec::BoundedVec<
 							runtime_types::pallet_proxy::Announcement<
 								::subxt::utils::AccountId32,
-								::subxt::utils::H256,
+								::sp_core::H256,
 								::core::primitive::u32,
 							>,
 						>,
@@ -5188,7 +5189,7 @@ pub mod api {
 					use super::runtime_types;
 					pub type RecentBlocksAtTicks =
 						runtime_types::bounded_collections::bounded_vec::BoundedVec<
-							::subxt::utils::H256,
+							::sp_core::H256,
 						>;
 					pub type Param0 = ::core::primitive::u32;
 				}
@@ -6484,7 +6485,9 @@ pub mod api {
 				#[decode_as_type(crate_path = ":: subxt :: ext :: scale_decode")]
 				#[encode_as_type(crate_path = ":: subxt :: ext :: scale_encode")]
 				pub struct Create {
+					#[codec(compact)]
 					pub bitcoin_annual_percent_rate: create::BitcoinAnnualPercentRate,
+					#[codec(compact)]
 					pub mining_annual_percent_rate: create::MiningAnnualPercentRate,
 					#[codec(compact)]
 					pub bitcoin_amount_allocated: create::BitcoinAmountAllocated,
@@ -6496,11 +6499,14 @@ pub mod api {
 				}
 				pub mod create {
 					use super::runtime_types;
-					pub type BitcoinAnnualPercentRate = ::core::primitive::u32;
-					pub type MiningAnnualPercentRate = ::core::primitive::u32;
+					pub type BitcoinAnnualPercentRate =
+						runtime_types::sp_arithmetic::fixed_point::FixedU128;
+					pub type MiningAnnualPercentRate =
+						runtime_types::sp_arithmetic::fixed_point::FixedU128;
 					pub type BitcoinAmountAllocated = ::core::primitive::u128;
 					pub type MiningAmountAllocated = ::core::primitive::u128;
-					pub type SecuritizationPercent = ::core::primitive::u16;
+					pub type SecuritizationPercent =
+						runtime_types::sp_arithmetic::fixed_point::FixedU128;
 					pub type BitcoinPubkeyHashes =
 						runtime_types::bounded_collections::bounded_vec::BoundedVec<
 							runtime_types::ulx_primitives::bitcoin::BitcoinPubkeyHash,
@@ -6533,7 +6539,8 @@ pub mod api {
 					pub type VaultId = ::core::primitive::u32;
 					pub type TotalMiningAmountOffered = ::core::primitive::u128;
 					pub type TotalBitcoinAmountOffered = ::core::primitive::u128;
-					pub type SecuritizationPercent = ::core::primitive::u16;
+					pub type SecuritizationPercent =
+						runtime_types::sp_arithmetic::fixed_point::FixedU128;
 				}
 				impl ::subxt::blocks::StaticExtrinsic for Modify {
 					const PALLET: &'static str = "Vaults";
@@ -6615,10 +6622,10 @@ pub mod api {
 							bitcoin_pubkey_hashes,
 						},
 						[
-							48u8, 32u8, 162u8, 125u8, 76u8, 2u8, 135u8, 204u8, 107u8, 98u8, 199u8,
-							243u8, 163u8, 222u8, 99u8, 96u8, 143u8, 230u8, 59u8, 169u8, 153u8,
-							69u8, 168u8, 123u8, 38u8, 130u8, 11u8, 233u8, 134u8, 28u8, 147u8,
-							180u8,
+							22u8, 140u8, 232u8, 222u8, 224u8, 245u8, 154u8, 152u8, 187u8, 7u8,
+							100u8, 101u8, 234u8, 105u8, 212u8, 62u8, 247u8, 163u8, 3u8, 78u8, 70u8,
+							92u8, 215u8, 77u8, 66u8, 233u8, 53u8, 187u8, 229u8, 251u8, 171u8,
+							235u8,
 						],
 					)
 				}
@@ -6640,9 +6647,9 @@ pub mod api {
 							securitization_percent,
 						},
 						[
-							235u8, 164u8, 172u8, 255u8, 3u8, 103u8, 63u8, 110u8, 55u8, 4u8, 112u8,
-							3u8, 62u8, 48u8, 133u8, 194u8, 6u8, 213u8, 195u8, 33u8, 216u8, 195u8,
-							91u8, 122u8, 249u8, 216u8, 103u8, 165u8, 100u8, 141u8, 98u8, 17u8,
+							54u8, 138u8, 124u8, 65u8, 152u8, 5u8, 14u8, 52u8, 116u8, 138u8, 179u8,
+							204u8, 4u8, 191u8, 247u8, 249u8, 123u8, 22u8, 219u8, 90u8, 145u8, 13u8,
+							82u8, 129u8, 148u8, 29u8, 207u8, 8u8, 235u8, 13u8, 227u8, 220u8,
 						],
 					)
 				}
@@ -6709,7 +6716,8 @@ pub mod api {
 				pub type VaultId = ::core::primitive::u32;
 				pub type BitcoinArgons = ::core::primitive::u128;
 				pub type MiningArgons = ::core::primitive::u128;
-				pub type SecuritizationPercent = ::core::primitive::u16;
+				pub type SecuritizationPercent =
+					runtime_types::sp_arithmetic::fixed_point::FixedU128;
 				pub type OperatorAccountId = ::subxt::utils::AccountId32;
 			}
 			impl ::subxt::events::StaticEvent for VaultCreated {
@@ -6738,7 +6746,8 @@ pub mod api {
 				pub type VaultId = ::core::primitive::u32;
 				pub type BitcoinArgons = ::core::primitive::u128;
 				pub type MiningArgons = ::core::primitive::u128;
-				pub type SecuritizationPercent = ::core::primitive::u16;
+				pub type SecuritizationPercent =
+					runtime_types::sp_arithmetic::fixed_point::FixedU128;
 			}
 			impl ::subxt::events::StaticEvent for VaultModified {
 				const PALLET: &'static str = "Vaults";
@@ -6836,10 +6845,9 @@ pub mod api {
 						"VaultsById",
 						(),
 						[
-							175u8, 101u8, 146u8, 43u8, 38u8, 201u8, 213u8, 131u8, 28u8, 8u8, 132u8,
-							108u8, 177u8, 19u8, 181u8, 162u8, 234u8, 130u8, 172u8, 11u8, 150u8,
-							14u8, 116u8, 36u8, 165u8, 85u8, 192u8, 255u8, 172u8, 105u8, 186u8,
-							128u8,
+							179u8, 57u8, 136u8, 10u8, 248u8, 159u8, 203u8, 108u8, 76u8, 127u8,
+							73u8, 112u8, 35u8, 92u8, 95u8, 254u8, 207u8, 169u8, 10u8, 242u8, 106u8,
+							198u8, 84u8, 53u8, 146u8, 63u8, 123u8, 96u8, 22u8, 92u8, 177u8, 32u8,
 						],
 					)
 				}
@@ -6859,10 +6867,9 @@ pub mod api {
 						"VaultsById",
 						::subxt::storage::address::StaticStorageKey::new(_0.borrow()),
 						[
-							175u8, 101u8, 146u8, 43u8, 38u8, 201u8, 213u8, 131u8, 28u8, 8u8, 132u8,
-							108u8, 177u8, 19u8, 181u8, 162u8, 234u8, 130u8, 172u8, 11u8, 150u8,
-							14u8, 116u8, 36u8, 165u8, 85u8, 192u8, 255u8, 172u8, 105u8, 186u8,
-							128u8,
+							179u8, 57u8, 136u8, 10u8, 248u8, 159u8, 203u8, 108u8, 76u8, 127u8,
+							73u8, 112u8, 35u8, 92u8, 95u8, 254u8, 207u8, 169u8, 10u8, 242u8, 106u8,
+							198u8, 84u8, 53u8, 146u8, 63u8, 123u8, 96u8, 22u8, 92u8, 177u8, 32u8,
 						],
 					)
 				}
@@ -8543,7 +8550,7 @@ pub mod api {
 				use super::runtime_types;
 				pub mod notebook_changed_accounts_root_by_notary {
 					use super::runtime_types;
-					pub type NotebookChangedAccountsRootByNotary = ::subxt::utils::H256;
+					pub type NotebookChangedAccountsRootByNotary = ::sp_core::H256;
 					pub type Param0 = ::core::primitive::u32;
 					pub type Param1 = ::core::primitive::u32;
 				}
@@ -9652,7 +9659,7 @@ pub mod api {
 				}
 				pub mod set_zone_record {
 					use super::runtime_types;
-					pub type DomainHash = ::subxt::utils::H256;
+					pub type DomainHash = ::sp_core::H256;
 					pub type ZoneRecord = runtime_types::ulx_primitives::data_domain::ZoneRecord<
 						::subxt::utils::AccountId32,
 					>;
@@ -9705,7 +9712,7 @@ pub mod api {
 			}
 			pub mod zone_record_updated {
 				use super::runtime_types;
-				pub type DomainHash = ::subxt::utils::H256;
+				pub type DomainHash = ::sp_core::H256;
 				pub type ZoneRecord = runtime_types::ulx_primitives::data_domain::ZoneRecord<
 					::subxt::utils::AccountId32,
 				>;
@@ -9732,7 +9739,7 @@ pub mod api {
 			}
 			pub mod data_domain_registered {
 				use super::runtime_types;
-				pub type DomainHash = ::subxt::utils::H256;
+				pub type DomainHash = ::sp_core::H256;
 				pub type Registration = runtime_types::pallet_data_domain::DataDomainRegistration<
 					::subxt::utils::AccountId32,
 				>;
@@ -9758,7 +9765,7 @@ pub mod api {
 			}
 			pub mod data_domain_renewed {
 				use super::runtime_types;
-				pub type DomainHash = ::subxt::utils::H256;
+				pub type DomainHash = ::sp_core::H256;
 			}
 			impl ::subxt::events::StaticEvent for DataDomainRenewed {
 				const PALLET: &'static str = "DataDomain";
@@ -9781,7 +9788,7 @@ pub mod api {
 			}
 			pub mod data_domain_expired {
 				use super::runtime_types;
-				pub type DomainHash = ::subxt::utils::H256;
+				pub type DomainHash = ::sp_core::H256;
 			}
 			impl ::subxt::events::StaticEvent for DataDomainExpired {
 				const PALLET: &'static str = "DataDomain";
@@ -9806,7 +9813,7 @@ pub mod api {
 			}
 			pub mod data_domain_registration_canceled {
 				use super::runtime_types;
-				pub type DomainHash = ::subxt::utils::H256;
+				pub type DomainHash = ::sp_core::H256;
 				pub type Registration = runtime_types::pallet_data_domain::DataDomainRegistration<
 					::subxt::utils::AccountId32,
 				>;
@@ -9826,7 +9833,7 @@ pub mod api {
 						runtime_types::pallet_data_domain::DataDomainRegistration<
 							::subxt::utils::AccountId32,
 						>;
-					pub type Param0 = ::subxt::utils::H256;
+					pub type Param0 = ::sp_core::H256;
 				}
 				pub mod zone_records_by_domain {
 					use super::runtime_types;
@@ -9834,7 +9841,7 @@ pub mod api {
 						runtime_types::ulx_primitives::data_domain::ZoneRecord<
 							::subxt::utils::AccountId32,
 						>;
-					pub type Param0 = ::subxt::utils::H256;
+					pub type Param0 = ::sp_core::H256;
 				}
 				pub mod domain_payment_address_history {
 					use super::runtime_types;
@@ -9843,13 +9850,13 @@ pub mod api {
 							::subxt::utils::AccountId32,
 							::core::primitive::u32,
 						)>;
-					pub type Param0 = ::subxt::utils::H256;
+					pub type Param0 = ::sp_core::H256;
 				}
 				pub mod expiring_domains_by_block {
 					use super::runtime_types;
 					pub type ExpiringDomainsByBlock =
 						runtime_types::bounded_collections::bounded_vec::BoundedVec<
-							::subxt::utils::H256,
+							::sp_core::H256,
 						>;
 					pub type Param0 = ::core::primitive::u32;
 				}
@@ -10111,9 +10118,10 @@ pub mod api {
 						"submit",
 						types::Submit { index },
 						[
-							40u8, 221u8, 37u8, 237u8, 227u8, 9u8, 38u8, 120u8, 246u8, 34u8, 212u8,
-							179u8, 158u8, 197u8, 156u8, 255u8, 13u8, 221u8, 130u8, 242u8, 122u8,
-							223u8, 220u8, 18u8, 161u8, 211u8, 98u8, 134u8, 46u8, 70u8, 84u8, 220u8,
+							159u8, 72u8, 123u8, 240u8, 209u8, 109u8, 40u8, 142u8, 13u8, 176u8,
+							45u8, 100u8, 252u8, 199u8, 133u8, 34u8, 96u8, 74u8, 163u8, 57u8, 129u8,
+							130u8, 102u8, 9u8, 248u8, 73u8, 226u8, 148u8, 186u8, 38u8, 232u8,
+							166u8,
 						],
 					)
 				}
@@ -10213,10 +10221,10 @@ pub mod api {
 						"Current",
 						(),
 						[
-							22u8, 70u8, 194u8, 201u8, 112u8, 145u8, 195u8, 100u8, 228u8, 97u8,
-							177u8, 80u8, 214u8, 182u8, 55u8, 154u8, 233u8, 243u8, 134u8, 202u8,
-							4u8, 255u8, 250u8, 168u8, 70u8, 232u8, 179u8, 166u8, 74u8, 141u8, 49u8,
-							108u8,
+							148u8, 164u8, 32u8, 155u8, 241u8, 242u8, 242u8, 131u8, 183u8, 176u8,
+							219u8, 60u8, 154u8, 32u8, 233u8, 92u8, 11u8, 15u8, 195u8, 34u8, 80u8,
+							219u8, 44u8, 93u8, 138u8, 191u8, 255u8, 25u8, 226u8, 214u8, 141u8,
+							184u8,
 						],
 					)
 				}
@@ -10327,7 +10335,7 @@ pub mod api {
 				use super::runtime_types;
 				pub mod historical_sessions {
 					use super::runtime_types;
-					pub type HistoricalSessions = (::subxt::utils::H256, ::core::primitive::u32);
+					pub type HistoricalSessions = (::sp_core::H256, ::core::primitive::u32);
 					pub type Param0 = ::core::primitive::u32;
 				}
 				pub mod stored_range {
@@ -10906,7 +10914,7 @@ pub mod api {
 				}
 				pub mod parent_voting_key {
 					use super::runtime_types;
-					pub type ParentVotingKey = ::core::option::Option<::subxt::utils::H256>;
+					pub type ParentVotingKey = ::core::option::Option<::sp_core::H256>;
 				}
 				pub mod temp_author {
 					use super::runtime_types;
@@ -11288,7 +11296,7 @@ pub mod api {
 					use super::runtime_types;
 					pub type EquivocationProof =
 						runtime_types::sp_consensus_grandpa::EquivocationProof<
-							::subxt::utils::H256,
+							::sp_core::H256,
 							::core::primitive::u32,
 						>;
 					pub type KeyOwnerProof = runtime_types::sp_session::MembershipProof;
@@ -11326,7 +11334,7 @@ pub mod api {
 					use super::runtime_types;
 					pub type EquivocationProof =
 						runtime_types::sp_consensus_grandpa::EquivocationProof<
-							::subxt::utils::H256,
+							::sp_core::H256,
 							::core::primitive::u32,
 						>;
 					pub type KeyOwnerProof = runtime_types::sp_session::MembershipProof;
@@ -11860,11 +11868,11 @@ pub mod api {
 							runtime_types::pallet_mining_slot::MinerHistory,
 						),
 					>;
-					pub type Param0 = ::subxt::utils::H256;
+					pub type Param0 = ::sp_core::H256;
 				}
 				pub mod concurrent_reports_index {
 					use super::runtime_types;
-					pub type ConcurrentReportsIndex = ::std::vec::Vec<::subxt::utils::H256>;
+					pub type ConcurrentReportsIndex = ::std::vec::Vec<::sp_core::H256>;
 					pub type Param0 = [::core::primitive::u8; 16usize];
 					pub type Param1 = [::core::primitive::u8];
 				}
@@ -15645,9 +15653,10 @@ pub mod api {
 						"sudo",
 						types::Sudo { call: ::std::boxed::Box::new(call) },
 						[
-							106u8, 17u8, 37u8, 26u8, 196u8, 251u8, 11u8, 25u8, 10u8, 49u8, 106u8,
-							108u8, 188u8, 101u8, 212u8, 15u8, 86u8, 7u8, 55u8, 111u8, 9u8, 52u8,
-							85u8, 165u8, 74u8, 234u8, 189u8, 41u8, 126u8, 249u8, 121u8, 41u8,
+							96u8, 80u8, 218u8, 238u8, 26u8, 248u8, 78u8, 49u8, 6u8, 90u8, 72u8,
+							184u8, 155u8, 220u8, 183u8, 227u8, 70u8, 76u8, 78u8, 250u8, 136u8,
+							241u8, 188u8, 217u8, 12u8, 237u8, 53u8, 237u8, 240u8, 200u8, 228u8,
+							91u8,
 						],
 					)
 				}
@@ -15666,9 +15675,10 @@ pub mod api {
 						"sudo_unchecked_weight",
 						types::SudoUncheckedWeight { call: ::std::boxed::Box::new(call), weight },
 						[
-							48u8, 217u8, 195u8, 17u8, 138u8, 8u8, 157u8, 91u8, 23u8, 62u8, 151u8,
-							231u8, 177u8, 165u8, 43u8, 145u8, 64u8, 114u8, 162u8, 37u8, 198u8,
-							37u8, 155u8, 154u8, 68u8, 56u8, 65u8, 254u8, 187u8, 143u8, 1u8, 195u8,
+							222u8, 109u8, 33u8, 102u8, 218u8, 49u8, 236u8, 85u8, 159u8, 52u8,
+							116u8, 210u8, 54u8, 253u8, 209u8, 116u8, 201u8, 121u8, 57u8, 33u8,
+							135u8, 66u8, 90u8, 157u8, 128u8, 97u8, 59u8, 128u8, 85u8, 168u8, 248u8,
+							154u8,
 						],
 					)
 				}
@@ -15703,10 +15713,10 @@ pub mod api {
 						"sudo_as",
 						types::SudoAs { who, call: ::std::boxed::Box::new(call) },
 						[
-							34u8, 194u8, 6u8, 190u8, 30u8, 162u8, 209u8, 250u8, 59u8, 4u8, 132u8,
-							142u8, 102u8, 149u8, 142u8, 82u8, 30u8, 249u8, 235u8, 10u8, 166u8,
-							47u8, 54u8, 193u8, 219u8, 202u8, 225u8, 112u8, 30u8, 178u8, 191u8,
-							243u8,
+							39u8, 130u8, 189u8, 125u8, 254u8, 123u8, 150u8, 56u8, 113u8, 255u8,
+							180u8, 173u8, 109u8, 126u8, 141u8, 47u8, 10u8, 183u8, 208u8, 177u8,
+							97u8, 71u8, 162u8, 193u8, 151u8, 32u8, 1u8, 173u8, 61u8, 198u8, 248u8,
+							234u8,
 						],
 					)
 				}
@@ -16299,7 +16309,7 @@ pub mod api {
 					#[doc = "later."]
 					#[doc = ""]
 					#[doc = "This call requires Root origin."]
-					authorize_upgrade { code_hash: ::subxt::utils::H256 },
+					authorize_upgrade { code_hash: ::sp_core::H256 },
 					#[codec(index = 10)]
 					#[doc = "Authorize an upgrade to a given `code_hash` for the runtime. The runtime can be supplied"]
 					#[doc = "later."]
@@ -16309,7 +16319,7 @@ pub mod api {
 					#[doc = "recommended for normal use. Use `authorize_upgrade` instead."]
 					#[doc = ""]
 					#[doc = "This call requires Root origin."]
-					authorize_upgrade_without_checks { code_hash: ::subxt::utils::H256 },
+					authorize_upgrade_without_checks { code_hash: ::sp_core::H256 },
 					#[codec(index = 11)]
 					#[doc = "Provide the preimage (runtime binary) `code` for an upgrade that has been authorized."]
 					#[doc = ""]
@@ -16402,11 +16412,11 @@ pub mod api {
 					KilledAccount { account: ::subxt::utils::AccountId32 },
 					#[codec(index = 5)]
 					#[doc = "On on-chain remark happened."]
-					Remarked { sender: ::subxt::utils::AccountId32, hash: ::subxt::utils::H256 },
+					Remarked { sender: ::subxt::utils::AccountId32, hash: ::sp_core::H256 },
 					#[codec(index = 6)]
 					#[doc = "An upgrade was authorized."]
 					UpgradeAuthorized {
-						code_hash: ::subxt::utils::H256,
+						code_hash: ::sp_core::H256,
 						check_version: ::core::primitive::bool,
 					},
 				}
@@ -16441,7 +16451,7 @@ pub mod api {
 			#[decode_as_type(crate_path = ":: subxt :: ext :: scale_decode")]
 			#[encode_as_type(crate_path = ":: subxt :: ext :: scale_encode")]
 			pub struct CodeUpgradeAuthorization {
-				pub code_hash: ::subxt::utils::H256,
+				pub code_hash: ::sp_core::H256,
 				pub check_version: ::core::primitive::bool,
 			}
 			#[derive(
@@ -17890,7 +17900,7 @@ pub mod api {
 				pub enum Call {
 					#[codec(index = 0)]
 					set_zone_record {
-						domain_hash: ::subxt::utils::H256,
+						domain_hash: ::sp_core::H256,
 						zone_record: runtime_types::ulx_primitives::data_domain::ZoneRecord<
 							::subxt::utils::AccountId32,
 						>,
@@ -17932,7 +17942,7 @@ pub mod api {
 					#[codec(index = 0)]
 					#[doc = "A data domain zone record was updated"]
 					ZoneRecordUpdated {
-						domain_hash: ::subxt::utils::H256,
+						domain_hash: ::sp_core::H256,
 						zone_record: runtime_types::ulx_primitives::data_domain::ZoneRecord<
 							::subxt::utils::AccountId32,
 						>,
@@ -17940,22 +17950,22 @@ pub mod api {
 					#[codec(index = 1)]
 					#[doc = "A data domain was registered"]
 					DataDomainRegistered {
-						domain_hash: ::subxt::utils::H256,
+						domain_hash: ::sp_core::H256,
 						registration: runtime_types::pallet_data_domain::DataDomainRegistration<
 							::subxt::utils::AccountId32,
 						>,
 					},
 					#[codec(index = 2)]
 					#[doc = "A data domain was registered"]
-					DataDomainRenewed { domain_hash: ::subxt::utils::H256 },
+					DataDomainRenewed { domain_hash: ::sp_core::H256 },
 					#[codec(index = 3)]
 					#[doc = "A data domain was expired"]
-					DataDomainExpired { domain_hash: ::subxt::utils::H256 },
+					DataDomainExpired { domain_hash: ::sp_core::H256 },
 					#[codec(index = 4)]
 					#[doc = "A data domain registration was canceled due to a conflicting registration in the same"]
 					#[doc = "tick"]
 					DataDomainRegistrationCanceled {
-						domain_hash: ::subxt::utils::H256,
+						domain_hash: ::sp_core::H256,
 						registration: runtime_types::pallet_data_domain::DataDomainRegistration<
 							::subxt::utils::AccountId32,
 						>,
@@ -18003,7 +18013,7 @@ pub mod api {
 					report_equivocation {
 						equivocation_proof: ::std::boxed::Box<
 							runtime_types::sp_consensus_grandpa::EquivocationProof<
-								::subxt::utils::H256,
+								::sp_core::H256,
 								::core::primitive::u32,
 							>,
 						>,
@@ -18022,7 +18032,7 @@ pub mod api {
 					report_equivocation_unsigned {
 						equivocation_proof: ::std::boxed::Box<
 							runtime_types::sp_consensus_grandpa::EquivocationProof<
-								::subxt::utils::H256,
+								::sp_core::H256,
 								::core::primitive::u32,
 							>,
 						>,
@@ -18717,10 +18727,10 @@ pub mod api {
 			#[encode_as_type(crate_path = ":: subxt :: ext :: scale_encode")]
 			pub struct PriceIndex<_0> {
 				#[codec(compact)]
-				pub btc_usd_price: _0,
+				pub btc_usd_price: runtime_types::sp_arithmetic::fixed_point::FixedU128,
 				#[codec(compact)]
-				pub argon_usd_price: _0,
-				pub argon_cpi: ::core::primitive::i16,
+				pub argon_usd_price: runtime_types::sp_arithmetic::fixed_point::FixedU128,
+				pub argon_cpi: runtime_types::sp_arithmetic::fixed_point::FixedI128,
 				#[codec(compact)]
 				pub timestamp: _0,
 			}
@@ -18862,7 +18872,7 @@ pub mod api {
 					#[doc = "- `call_hash`: The hash of the call to be made by the `real` account."]
 					announce {
 						real: ::subxt::utils::MultiAddress<::subxt::utils::AccountId32, ()>,
-						call_hash: ::subxt::utils::H256,
+						call_hash: ::sp_core::H256,
 					},
 					#[codec(index = 7)]
 					#[doc = "Remove a given announcement."]
@@ -18877,7 +18887,7 @@ pub mod api {
 					#[doc = "- `call_hash`: The hash of the call to be made by the `real` account."]
 					remove_announcement {
 						real: ::subxt::utils::MultiAddress<::subxt::utils::AccountId32, ()>,
-						call_hash: ::subxt::utils::H256,
+						call_hash: ::sp_core::H256,
 					},
 					#[codec(index = 8)]
 					#[doc = "Remove the given announcement of a delegate."]
@@ -18892,7 +18902,7 @@ pub mod api {
 					#[doc = "- `call_hash`: The hash of the call to be made."]
 					reject_announcement {
 						delegate: ::subxt::utils::MultiAddress<::subxt::utils::AccountId32, ()>,
-						call_hash: ::subxt::utils::H256,
+						call_hash: ::sp_core::H256,
 					},
 					#[codec(index = 9)]
 					#[doc = "Dispatch the given `call` from an account that the sender is authorized for through"]
@@ -18985,7 +18995,7 @@ pub mod api {
 					Announced {
 						real: ::subxt::utils::AccountId32,
 						proxy: ::subxt::utils::AccountId32,
-						call_hash: ::subxt::utils::H256,
+						call_hash: ::sp_core::H256,
 					},
 					#[codec(index = 3)]
 					#[doc = "A proxy was added."]
@@ -19553,14 +19563,19 @@ pub mod api {
 				pub enum Call {
 					#[codec(index = 0)]
 					create {
-						bitcoin_annual_percent_rate: ::core::primitive::u32,
-						mining_annual_percent_rate: ::core::primitive::u32,
+						#[codec(compact)]
+						bitcoin_annual_percent_rate:
+							runtime_types::sp_arithmetic::fixed_point::FixedU128,
+						#[codec(compact)]
+						mining_annual_percent_rate:
+							runtime_types::sp_arithmetic::fixed_point::FixedU128,
 						#[codec(compact)]
 						bitcoin_amount_allocated: ::core::primitive::u128,
 						#[codec(compact)]
 						mining_amount_allocated: ::core::primitive::u128,
 						#[codec(compact)]
-						securitization_percent: ::core::primitive::u16,
+						securitization_percent:
+							runtime_types::sp_arithmetic::fixed_point::FixedU128,
 						bitcoin_pubkey_hashes:
 							runtime_types::bounded_collections::bounded_vec::BoundedVec<
 								runtime_types::ulx_primitives::bitcoin::BitcoinPubkeyHash,
@@ -19572,7 +19587,8 @@ pub mod api {
 						vault_id: ::core::primitive::u32,
 						total_mining_amount_offered: ::core::primitive::u128,
 						total_bitcoin_amount_offered: ::core::primitive::u128,
-						securitization_percent: ::core::primitive::u16,
+						securitization_percent:
+							runtime_types::sp_arithmetic::fixed_point::FixedU128,
 					},
 					#[codec(index = 2)]
 					#[doc = "Stop offering additional bonds from this vault. Will not affect existing bond."]
@@ -19686,7 +19702,8 @@ pub mod api {
 						vault_id: ::core::primitive::u32,
 						bitcoin_argons: ::core::primitive::u128,
 						mining_argons: ::core::primitive::u128,
-						securitization_percent: ::core::primitive::u16,
+						securitization_percent:
+							runtime_types::sp_arithmetic::fixed_point::FixedU128,
 						operator_account_id: ::subxt::utils::AccountId32,
 					},
 					#[codec(index = 1)]
@@ -19694,7 +19711,8 @@ pub mod api {
 						vault_id: ::core::primitive::u32,
 						bitcoin_argons: ::core::primitive::u128,
 						mining_argons: ::core::primitive::u128,
-						securitization_percent: ::core::primitive::u16,
+						securitization_percent:
+							runtime_types::sp_arithmetic::fixed_point::FixedU128,
 					},
 					#[codec(index = 2)]
 					VaultClosed {
@@ -19742,6 +19760,18 @@ pub mod api {
 			use super::runtime_types;
 			pub mod fixed_point {
 				use super::runtime_types;
+				#[derive(
+					:: subxt :: ext :: codec :: Decode,
+					:: subxt :: ext :: codec :: Encode,
+					:: subxt :: ext :: scale_decode :: DecodeAsType,
+					:: subxt :: ext :: scale_encode :: EncodeAsType,
+					Clone,
+					Debug,
+				)]
+				# [codec (crate = :: subxt :: ext :: codec)]
+				#[decode_as_type(crate_path = ":: subxt :: ext :: scale_decode")]
+				#[encode_as_type(crate_path = ":: subxt :: ext :: scale_encode")]
+				pub struct FixedI128(pub ::core::primitive::i128);
 				#[derive(
 					:: subxt :: ext :: codec :: CompactAs,
 					:: subxt :: ext :: codec :: Decode,
@@ -20542,11 +20572,11 @@ pub mod api {
 					#[decode_as_type(crate_path = ":: subxt :: ext :: scale_decode")]
 					#[encode_as_type(crate_path = ":: subxt :: ext :: scale_encode")]
 					pub struct Header<_0> {
-						pub parent_hash: ::subxt::utils::H256,
+						pub parent_hash: ::sp_core::H256,
 						#[codec(compact)]
 						pub number: _0,
-						pub state_root: ::subxt::utils::H256,
-						pub extrinsics_root: ::subxt::utils::H256,
+						pub state_root: ::sp_core::H256,
+						pub extrinsics_root: ::sp_core::H256,
 						pub digest: runtime_types::sp_runtime::generic::digest::Digest,
 					}
 				}
@@ -21423,7 +21453,7 @@ pub mod api {
 						::std::vec::Vec<::core::primitive::u8>,
 						::core::primitive::u128,
 					)>,
-					pub changed_accounts_root: ::subxt::utils::H256,
+					pub changed_accounts_root: ::sp_core::H256,
 					pub account_changelist: ::std::vec::Vec<
 						runtime_types::ulx_primitives::balance_change::AccountOrigin,
 					>,
@@ -21447,7 +21477,7 @@ pub mod api {
 					pub notebook_number: ::core::primitive::u32,
 					#[codec(compact)]
 					pub tick: ::core::primitive::u32,
-					pub changed_accounts_root: ::subxt::utils::H256,
+					pub changed_accounts_root: ::sp_core::H256,
 					pub account_changelist: ::std::vec::Vec<
 						runtime_types::ulx_primitives::balance_change::AccountOrigin,
 					>,
@@ -21486,7 +21516,7 @@ pub mod api {
 				#[encode_as_type(crate_path = ":: subxt :: ext :: scale_encode")]
 				pub struct MerkleProof {
 					pub proof: runtime_types::bounded_collections::bounded_vec::BoundedVec<
-						::subxt::utils::H256,
+						::sp_core::H256,
 					>,
 					#[codec(compact)]
 					pub number_of_leaves: ::core::primitive::u32,
@@ -21525,7 +21555,7 @@ pub mod api {
 				#[encode_as_type(crate_path = ":: subxt :: ext :: scale_encode")]
 				pub enum BitcoinCosignScriptPubkey {
 					#[codec(index = 0)]
-					P2WSH { wscript_hash: ::subxt::utils::H256 },
+					P2WSH { wscript_hash: ::sp_core::H256 },
 				}
 				#[derive(
 					:: subxt :: ext :: codec :: Decode,
@@ -21816,7 +21846,7 @@ pub mod api {
 					pub index: ::core::primitive::u32,
 					#[codec(compact)]
 					pub power: ::core::primitive::u128,
-					pub data_domain_hash: ::subxt::utils::H256,
+					pub data_domain_hash: ::sp_core::H256,
 					pub data_domain_account: ::subxt::utils::AccountId32,
 					pub signature: runtime_types::sp_runtime::MultiSignature,
 					pub block_rewards_account_id: ::subxt::utils::AccountId32,
@@ -21943,7 +21973,8 @@ pub mod api {
 				pub struct Vault<_0, _1> {
 					pub operator_account_id: _0,
 					pub bitcoin_argons: runtime_types::ulx_primitives::bond::VaultArgons<_1>,
-					pub securitization_percent: ::core::primitive::u16,
+					pub securitization_percent:
+						runtime_types::sp_arithmetic::fixed_point::FixedU128,
 					pub securitized_argons: _1,
 					pub mining_argons: runtime_types::ulx_primitives::bond::VaultArgons<_1>,
 					pub is_closed: ::core::primitive::bool,
@@ -21960,7 +21991,8 @@ pub mod api {
 				#[decode_as_type(crate_path = ":: subxt :: ext :: scale_decode")]
 				#[encode_as_type(crate_path = ":: subxt :: ext :: scale_encode")]
 				pub struct VaultArgons<_0> {
-					pub annual_percent_rate: ::core::primitive::u32,
+					#[codec(compact)]
+					pub annual_percent_rate: runtime_types::sp_arithmetic::fixed_point::FixedU128,
 					#[codec(compact)]
 					pub allocated: _0,
 					#[codec(compact)]
@@ -22089,7 +22121,7 @@ pub mod api {
 				#[decode_as_type(crate_path = ":: subxt :: ext :: scale_decode")]
 				#[encode_as_type(crate_path = ":: subxt :: ext :: scale_encode")]
 				pub struct ParentVotingKeyDigest {
-					pub parent_voting_key: ::core::option::Option<::subxt::utils::H256>,
+					pub parent_voting_key: ::core::option::Option<::sp_core::H256>,
 				}
 			}
 			pub mod host {
@@ -22158,9 +22190,8 @@ pub mod api {
 						source_notebook_number: ::core::primitive::u32,
 						source_notebook_proof:
 							runtime_types::ulx_primitives::balance_change::MerkleProof,
-						block_vote: runtime_types::ulx_primitives::block_vote::BlockVoteT<
-							::subxt::utils::H256,
-						>,
+						block_vote:
+							runtime_types::ulx_primitives::block_vote::BlockVoteT<::sp_core::H256>,
 						miner_signature: runtime_types::ulx_primitives::block_seal::app::Signature,
 					},
 					#[codec(index = 1)]
@@ -22202,9 +22233,9 @@ pub mod api {
 					pub notebook_number: ::core::primitive::u32,
 					#[codec(compact)]
 					pub tick: ::core::primitive::u32,
-					pub block_votes_root: ::subxt::utils::H256,
-					pub secret_hash: ::subxt::utils::H256,
-					pub parent_secret: ::core::option::Option<::subxt::utils::H256>,
+					pub block_votes_root: ::sp_core::H256,
+					pub secret_hash: ::sp_core::H256,
+					pub parent_secret: ::core::option::Option<::sp_core::H256>,
 				}
 				#[derive(
 					:: subxt :: ext :: codec :: Decode,
@@ -22228,7 +22259,7 @@ pub mod api {
 					pub tick: ::core::primitive::u32,
 					#[codec(compact)]
 					pub finalized_block_number: ::core::primitive::u32,
-					pub header_hash: ::subxt::utils::H256,
+					pub header_hash: ::sp_core::H256,
 					#[codec(compact)]
 					pub block_votes_count: ::core::primitive::u32,
 					#[codec(compact)]
@@ -22334,24 +22365,24 @@ pub mod api {
 						runtime_types::bounded_collections::bounded_vec::BoundedVec<
 							runtime_types::ulx_primitives::notebook::ChainTransfer,
 						>,
-					pub changed_accounts_root: ::subxt::utils::H256,
+					pub changed_accounts_root: ::sp_core::H256,
 					pub changed_account_origins:
 						runtime_types::bounded_collections::bounded_vec::BoundedVec<
 							runtime_types::ulx_primitives::balance_change::AccountOrigin,
 						>,
-					pub block_votes_root: ::subxt::utils::H256,
+					pub block_votes_root: ::sp_core::H256,
 					#[codec(compact)]
 					pub block_votes_count: ::core::primitive::u32,
 					pub blocks_with_votes:
 						runtime_types::bounded_collections::bounded_vec::BoundedVec<
-							::subxt::utils::H256,
+							::sp_core::H256,
 						>,
 					#[codec(compact)]
 					pub block_voting_power: ::core::primitive::u128,
-					pub secret_hash: ::subxt::utils::H256,
-					pub parent_secret: ::core::option::Option<::subxt::utils::H256>,
+					pub secret_hash: ::sp_core::H256,
+					pub parent_secret: ::core::option::Option<::sp_core::H256>,
 					pub data_domains: runtime_types::bounded_collections::bounded_vec::BoundedVec<
-						(::subxt::utils::H256, ::subxt::utils::AccountId32),
+						(::sp_core::H256, ::subxt::utils::AccountId32),
 					>,
 				}
 				#[derive(

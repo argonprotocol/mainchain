@@ -6,7 +6,7 @@ use frame_support::{
 	},
 };
 use sp_core::bounded_vec;
-use sp_runtime::BoundedVec;
+use sp_runtime::{traits::Zero, BoundedVec, FixedU128};
 use ulx_primitives::{
 	bitcoin::BitcoinPubkeyHash,
 	bond::{Bond, BondError, BondExpiration, BondType, VaultProvider},
@@ -18,6 +18,8 @@ use crate::{
 	Error, Event, HoldReason,
 };
 
+const TEN_PCT: FixedU128 = FixedU128::from_rational(10, 100);
+
 fn keys() -> BoundedVec<BitcoinPubkeyHash, MaxVaultBitcoinPubkeys> {
 	bounded_vec![BitcoinPubkeyHash([0u8; 20])]
 }
@@ -28,20 +30,36 @@ fn it_can_create_a_vault() {
 		System::set_block_number(1);
 
 		assert_noop!(
-			Vaults::create(RuntimeOrigin::signed(1), 10, 10, 50_000, 50_000, 0, keys()),
+			Vaults::create(
+				RuntimeOrigin::signed(1),
+				TEN_PCT,
+				TEN_PCT,
+				50_000,
+				50_000,
+				FixedU128::zero(),
+				keys()
+			),
 			Error::<Test>::InsufficientFunds
 		);
 
 		set_argons(1, 100_010);
 
-		assert_ok!(Vaults::create(RuntimeOrigin::signed(1), 10, 10, 50_000, 50_000, 0, keys()));
+		assert_ok!(Vaults::create(
+			RuntimeOrigin::signed(1),
+			TEN_PCT,
+			TEN_PCT,
+			50_000,
+			50_000,
+			FixedU128::zero(),
+			keys()
+		));
 		System::assert_last_event(
 			Event::VaultCreated {
 				vault_id: 1,
 				operator_account_id: 1,
 				bitcoin_argons: 50_000,
 				mining_argons: 50_000,
-				securitization_percent: 0,
+				securitization_percent: FixedU128::zero(),
 			}
 			.into(),
 		);
@@ -65,11 +83,11 @@ fn it_can_add_securitization_to_a_vault() {
 		set_argons(1, 110_010);
 		assert_ok!(Vaults::create(
 			RuntimeOrigin::signed(1),
-			10,
-			10,
+			TEN_PCT,
+			TEN_PCT,
 			50_000,
 			50_000,
-			10, // 10%
+			TEN_PCT, // 10%
 			keys()
 		));
 
@@ -79,7 +97,7 @@ fn it_can_add_securitization_to_a_vault() {
 				operator_account_id: 1,
 				bitcoin_argons: 50_000,
 				mining_argons: 50_000,
-				securitization_percent: 10,
+				securitization_percent: TEN_PCT,
 			}
 			.into(),
 		);
@@ -89,7 +107,15 @@ fn it_can_add_securitization_to_a_vault() {
 
 		// can only go up to 200% (2x)
 		assert_err!(
-			Vaults::create(RuntimeOrigin::signed(2), 1, 1, 1, 1, 201, keys()),
+			Vaults::create(
+				RuntimeOrigin::signed(2),
+				TEN_PCT,
+				TEN_PCT,
+				1,
+				1,
+				FixedU128::from_float(2.1),
+				keys()
+			),
 			Error::<Test>::MaxSecuritizationPercentExceeded
 		);
 	});
@@ -102,16 +128,33 @@ fn it_can_modify_a_vault() {
 		System::set_block_number(1);
 
 		set_argons(1, 20_000);
-		assert_ok!(Vaults::create(RuntimeOrigin::signed(1), 1, 1, 1000, 1000, 0, keys()));
+		assert_ok!(Vaults::create(
+			RuntimeOrigin::signed(1),
+			TEN_PCT,
+			TEN_PCT,
+			1000,
+			1000,
+			FixedU128::zero(),
+			keys()
+		));
 		assert_eq!(Balances::reserved_balance(1), 2000);
 
 		assert_noop!(
-			Vaults::modify(RuntimeOrigin::signed(2), 1, 1000, 1000, 200),
+			Vaults::modify(RuntimeOrigin::signed(2), 1, 1000, 1000, FixedU128::from_float(2.0)),
 			Error::<Test>::NoPermissions
 		);
 
-		assert_ok!(Vaults::modify(RuntimeOrigin::signed(1), 1, 1000, 1010, 200));
-		assert_eq!(VaultsById::<Test>::get(1).unwrap().securitization_percent, 200);
+		assert_ok!(Vaults::modify(
+			RuntimeOrigin::signed(1),
+			1,
+			1000,
+			1010,
+			FixedU128::from_float(2.0)
+		));
+		assert_eq!(
+			VaultsById::<Test>::get(1).unwrap().securitization_percent,
+			FixedU128::from_float(2.0)
+		);
 		assert_eq!(
 			VaultsById::<Test>::get(1).unwrap().get_minimum_securitization_needed(),
 			1010 * 2
@@ -121,7 +164,7 @@ fn it_can_modify_a_vault() {
 				vault_id: 1,
 				bitcoin_argons: 1010,
 				mining_argons: 1000,
-				securitization_percent: 200,
+				securitization_percent: FixedU128::from_float(2.0),
 			}
 			.into(),
 		);
@@ -136,7 +179,15 @@ fn it_can_reduce_vault_funds_down_to_bonded() {
 		System::set_block_number(1);
 
 		set_argons(1, 20_000);
-		assert_ok!(Vaults::create(RuntimeOrigin::signed(1), 1, 1, 1000, 1000, 200, keys()));
+		assert_ok!(Vaults::create(
+			RuntimeOrigin::signed(1),
+			TEN_PCT,
+			TEN_PCT,
+			1000,
+			1000,
+			FixedU128::from_float(2.0),
+			keys()
+		));
 		assert_eq!(Balances::reserved_balance(1), 4000);
 
 		VaultsById::<Test>::mutate(1, |vault| {
@@ -151,17 +202,26 @@ fn it_can_reduce_vault_funds_down_to_bonded() {
 		);
 
 		assert_err!(
-			Vaults::modify(RuntimeOrigin::signed(1), 1, 1000, 499, 200),
+			Vaults::modify(RuntimeOrigin::signed(1), 1, 1000, 499, FixedU128::from_float(2.0)),
 			Error::<Test>::VaultReductionBelowAllocatedFunds
 		);
 		// can't reduce the securitization
 		assert_err!(
-			Vaults::modify(RuntimeOrigin::signed(1), 1, 1000, 500, 150),
+			Vaults::modify(RuntimeOrigin::signed(1), 1, 1000, 500, FixedU128::from_float(1.5)),
 			Error::<Test>::InvalidSecuritization
 		);
 
-		assert_ok!(Vaults::modify(RuntimeOrigin::signed(1), 1, 1000, 500, 200));
-		assert_eq!(VaultsById::<Test>::get(1).unwrap().securitization_percent, 200);
+		assert_ok!(Vaults::modify(
+			RuntimeOrigin::signed(1),
+			1,
+			1000,
+			500,
+			FixedU128::from_float(2.0)
+		));
+		assert_eq!(
+			VaultsById::<Test>::get(1).unwrap().securitization_percent,
+			FixedU128::from_float(2.0)
+		);
 		assert_eq!(
 			VaultsById::<Test>::get(1).unwrap().get_minimum_securitization_needed(),
 			500 * 2
@@ -171,7 +231,7 @@ fn it_can_reduce_vault_funds_down_to_bonded() {
 				vault_id: 1,
 				bitcoin_argons: 500,
 				mining_argons: 1000,
-				securitization_percent: 200,
+				securitization_percent: FixedU128::from_float(2.0),
 			}
 			.into(),
 		);
@@ -197,11 +257,11 @@ fn it_can_close_a_vault() {
 		set_argons(2, 100_000);
 		assert_ok!(Vaults::create(
 			RuntimeOrigin::signed(1),
-			1_000,
-			1_000,
+			FixedU128::from_float(0.01),
+			FixedU128::from_float(0.01),
 			50_000,
 			50_000,
-			200,
+			FixedU128::from_float(2.0),
 			keys()
 		));
 		assert_eq!(Balances::free_balance(1), 1000);
@@ -267,7 +327,15 @@ fn it_can_bond_funds() {
 		System::set_block_number(5);
 
 		set_argons(1, 1_000_000);
-		assert_ok!(Vaults::create(RuntimeOrigin::signed(1), 1000, 0, 500_000, 0, 0, keys()));
+		assert_ok!(Vaults::create(
+			RuntimeOrigin::signed(1),
+			FixedU128::from_float(0.01), // 1%
+			FixedU128::zero(),
+			500_000,
+			0,
+			FixedU128::zero(),
+			keys()
+		));
 		assert_eq!(Balances::free_balance(1), 500_000);
 
 		set_argons(2, 2_000);
@@ -309,7 +377,15 @@ fn it_can_burn_a_bond() {
 		System::set_block_number(5);
 
 		set_argons(1, 1_000_000);
-		assert_ok!(Vaults::create(RuntimeOrigin::signed(1), 0, 0, 100_000, 100_000, 0, keys()));
+		assert_ok!(Vaults::create(
+			RuntimeOrigin::signed(1),
+			FixedU128::zero(),
+			FixedU128::zero(),
+			100_000,
+			100_000,
+			FixedU128::zero(),
+			keys()
+		));
 		assert_eq!(Balances::free_balance(1), 800_000);
 
 		set_argons(2, 2_000);
@@ -352,14 +428,22 @@ fn it_can_recoup_reduced_value_bitcoins_from_bond_funds() {
 
 		set_argons(1, 200_200);
 
-		assert_ok!(Vaults::create(RuntimeOrigin::signed(1), 1, 1, 100_000, 100_000, 0, keys()));
+		assert_ok!(Vaults::create(
+			RuntimeOrigin::signed(1),
+			FixedU128::from_float(0.001),
+			FixedU128::from_float(0.001),
+			100_000,
+			100_000,
+			FixedU128::zero(),
+			keys()
+		));
 
 		assert_eq!(Balances::free_balance(1), 200);
 		assert_eq!(Balances::balance_on_hold(&HoldReason::EnterVault.into(), &1), 200_000);
 
 		let (total_fee, paid) = Vaults::bond_funds(1, 100_000, BondType::Bitcoin, 1440 * 365, &2)
 			.expect("bonding failed");
-		assert_eq!(total_fee, 1);
+		assert_eq!(total_fee, 100);
 		assert_eq!(paid, 0);
 
 		assert_eq!(
@@ -399,16 +483,24 @@ fn it_can_recoup_increased_value_bitcoins_from_securitizations() {
 
 		set_argons(1, 350_200);
 
-		assert_ok!(Vaults::create(RuntimeOrigin::signed(1), 1, 1, 100_000, 50_000, 200, keys()));
+		assert_ok!(Vaults::create(
+			RuntimeOrigin::signed(1),
+			FixedU128::from_float(0.001),
+			FixedU128::from_float(0.001),
+			100_000,
+			50_000,
+			FixedU128::from_float(2.0),
+			keys()
+		));
 
 		assert_eq!(Balances::free_balance(1), 200);
 		assert_eq!(Balances::balance_on_hold(&HoldReason::EnterVault.into(), &1), 350_000);
 
 		let (total_fee, paid) = Vaults::bond_funds(1, 50_000, BondType::Bitcoin, 1440 * 365, &2)
 			.expect("bonding failed");
-		assert_eq!(total_fee, 0);
+		assert_eq!(total_fee, 50);
 		assert_eq!(paid, 0);
-		assert_eq!(Balances::free_balance(&2), 2_000);
+		assert_eq!(Balances::free_balance(&2), 2_000 - 50);
 
 		assert_eq!(
 			Vaults::compensate_lost_bitcoin(
@@ -454,11 +546,11 @@ fn it_should_allow_vaults_to_add_public_keys() {
 		}
 		assert_ok!(Vaults::create(
 			RuntimeOrigin::signed(1),
-			1,
-			1,
+			TEN_PCT,
+			TEN_PCT,
 			100_000,
 			100_000,
-			0,
+			FixedU128::zero(),
 			keys.clone()
 		));
 		assert_eq!(
@@ -499,10 +591,26 @@ fn it_should_allow_multiple_vaults_per_account() {
 		System::set_block_number(5);
 
 		set_argons(1, 1_000_000);
-		assert_ok!(Vaults::create(RuntimeOrigin::signed(1), 1, 1, 100_000, 100_000, 0, keys()));
+		assert_ok!(Vaults::create(
+			RuntimeOrigin::signed(1),
+			TEN_PCT,
+			TEN_PCT,
+			100_000,
+			100_000,
+			FixedU128::zero(),
+			keys()
+		));
 		assert_eq!(Balances::free_balance(1), 800_000);
 
-		assert_ok!(Vaults::create(RuntimeOrigin::signed(1), 1, 1, 100_000, 100_000, 0, keys()));
+		assert_ok!(Vaults::create(
+			RuntimeOrigin::signed(1),
+			TEN_PCT,
+			TEN_PCT,
+			100_000,
+			100_000,
+			FixedU128::zero(),
+			keys()
+		));
 		assert_eq!(Balances::free_balance(1), 600_000);
 		assert_eq!(Balances::balance_on_hold(&HoldReason::EnterVault.into(), &1), 400_000);
 
@@ -513,13 +621,14 @@ fn it_should_allow_multiple_vaults_per_account() {
 #[test]
 fn it_can_calculate_apr() {
 	new_test_ext().execute_with(|| {
-		assert_eq!(Vaults::calculate_fees(1000, 1000, 1440), 0);
-		assert_eq!(Vaults::calculate_fees(1000, 100, 1440 * 365), 1);
-		assert_eq!(Vaults::calculate_fees(1000, 99, 1440 * 365), 0);
-		assert_eq!(Vaults::calculate_fees(1000, 365000, 1440 * 365), 3650);
-		assert_eq!(Vaults::calculate_fees(1000, 365000, 1440), 10);
+		let percent = FixedU128::from_float(10.0); // 1000%
+		assert_eq!(Vaults::calculate_fees(percent, 1000, 1440), 27);
+		assert_eq!(Vaults::calculate_fees(percent, 100, 1440 * 365), 1000);
+		assert_eq!(Vaults::calculate_fees(percent, 99, 1440 * 365), 990);
+		assert_eq!(Vaults::calculate_fees(percent, 365000, 1440 * 365), 3650000);
+		assert_eq!(Vaults::calculate_fees(percent, 365000, 1440), 9999);
 		// minimum argons for a day that will charge anything
-		assert_eq!(Vaults::calculate_fees(1000, 36500, 1440), 1);
+		assert_eq!(Vaults::calculate_fees(percent, 36500, 1200), 999);
 	})
 }
 

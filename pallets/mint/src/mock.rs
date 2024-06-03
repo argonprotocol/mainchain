@@ -1,6 +1,7 @@
 use env_logger::{Builder, Env};
 use frame_support::{derive_impl, parameter_types};
 use pallet_balances::AccountData;
+use sp_arithmetic::{FixedI128, FixedU128};
 use sp_core::U256;
 use sp_runtime::BuildStorage;
 
@@ -51,9 +52,9 @@ impl pallet_balances::Config for Test {
 
 parameter_types! {
 	pub static MaxPendingMintUtxos: u32 = 10;
-	pub static BitcoinPricePerUsd: Option<u64> = Some(62000_00);
-	pub static ArgonPricePerUsd: Option<u64> = Some(1_00);
-	pub static ArgonCPI: Option<ulx_primitives::ArgonCPI> = Some(1_00);
+	pub static BitcoinPricePerUsd: Option<FixedU128> = Some(FixedU128::from_float(62000.00));
+	pub static ArgonPricePerUsd: Option<FixedU128> = Some(FixedU128::from_float(1.00));
+	pub static ArgonCPI: Option<ulx_primitives::ArgonCPI> = Some(FixedI128::from_float(1.00));
 	pub static Miners: Vec<u64> = vec![];
 }
 
@@ -62,10 +63,10 @@ impl PriceProvider<Balance> for StaticPriceProvider {
 	fn get_argon_cpi_price() -> Option<ulx_primitives::ArgonCPI> {
 		ArgonCPI::get()
 	}
-	fn get_latest_argon_price_in_us_cents() -> Option<u64> {
+	fn get_latest_argon_price_in_us_cents() -> Option<FixedU128> {
 		ArgonPricePerUsd::get()
 	}
-	fn get_latest_btc_price_in_us_cents() -> Option<u64> {
+	fn get_latest_btc_price_in_us_cents() -> Option<FixedU128> {
 		BitcoinPricePerUsd::get()
 	}
 }

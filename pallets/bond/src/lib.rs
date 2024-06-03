@@ -90,10 +90,12 @@ pub mod pallet {
 	use sp_runtime::{
 		traits::{AtLeast32BitUnsigned, UniqueSaturatedInto},
 		DispatchError::Token,
-		Saturating, TokenError,
+		FixedPointNumber, Saturating, TokenError,
 	};
 	use sp_std::vec;
 
+	use super::*;
+	use sp_arithmetic::FixedU128;
 	use ulx_primitives::{
 		bitcoin::{
 			BitcoinCosignScriptPubkey, BitcoinHeight, BitcoinPubkeyHash, BitcoinRejectedReason,
@@ -102,8 +104,6 @@ pub mod pallet {
 		bond::{Bond, BondError, BondExpiration, BondProvider, BondType, VaultProvider},
 		BitcoinUtxoEvents, BitcoinUtxoTracker, BondId, PriceProvider, UtxoBondedEvents, VaultId,
 	};
-
-	use super::*;
 
 	#[pallet::pallet]
 	pub struct Pallet<T>(_);
@@ -872,22 +872,30 @@ pub mod pallet {
 		}
 
 		pub fn get_redemption_price(satoshis: &Satoshis) -> Result<T::Balance, Error<T>> {
+			const REDEMPTION_MULTIPLIER: FixedU128 = FixedU128::from_rational(713, 1000);
+			const REDEMPTION_ADDON: FixedU128 = FixedU128::from_rational(274, 1000);
 			let mut price: u128 = T::PriceProvider::get_bitcoin_argon_price(*satoshis)
 				.ok_or(Error::<T>::NoBitcoinPricesAvailable)?
 				.unique_saturated_into();
 			let cpi = T::PriceProvider::get_argon_cpi_price().unwrap_or_default();
-			if cpi > 0 {
+
+			if cpi.is_positive() {
 				let argon_price =
 					T::PriceProvider::get_latest_argon_price_in_us_cents().unwrap_or_default();
 
-				let multiplier = 0.713f32 * (argon_price as f32 / 100f32) + 0.274f32;
+				let multiplier = REDEMPTION_MULTIPLIER
+					.saturating_mul(argon_price)
+					.saturating_add(REDEMPTION_ADDON);
 
 				// Apply the formula: R = (Pb / Pa) * (0.713 * Pa + 0.274)
 				// Pa should be in a float value (1.01)
 				// `price` is already (Pb / Pa)
 				// The redemption price of the argon allocates fluctuating incentives based on how
 				// fast the dip should be incentivized to be capitalized on.
-				price = price * (multiplier * 1000.0) as u128 / 1000;
+				let adjusted_price = FixedU128::saturating_from_integer(price);
+				let fixed_price =
+					multiplier.saturating_mul(adjusted_price).into_inner() / FixedU128::accuracy();
+				price = fixed_price.unique_saturated_into();
 			};
 
 			Ok(price.into())

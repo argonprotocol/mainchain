@@ -17,11 +17,18 @@ use bitcoind::{
 	BitcoinD,
 };
 use rand::{rngs::OsRng, RngCore};
+use sp_arithmetic::{FixedI128, FixedU128};
 use sp_core::{crypto::AccountId32, sr25519, Pair};
 
 use ulixee_client::{
 	api,
-	api::{price_index::calls::types::submit::Index, storage, tx},
+	api::{
+		price_index::calls::types::submit::Index,
+		runtime_types::sp_arithmetic::fixed_point::{
+			FixedI128 as FixedI128Ext, FixedU128 as FixedU128Ext,
+		},
+		storage, tx,
+	},
 	signer::Sr25519Signer,
 	MainchainClient,
 };
@@ -173,11 +180,11 @@ async fn test_bitcoin_minting_e2e() -> anyhow::Result<()> {
 			.tx()
 			.sign_and_submit_then_watch(
 				&tx().vaults().create(
-					0_100,
-					0_100,
+					FixedU128Ext(FixedU128::from_float(0.01).into_inner()),
+					FixedU128Ext(FixedU128::from_float(0.01).into_inner()),
 					100_000_000,
 					0,
-					0,
+					FixedU128Ext(FixedU128::from_float(0.0).into_inner()),
 					pubkey_hashes.into_iter().map(Into::into).collect::<Vec<_>>().into(),
 				),
 				&vault_signer,
@@ -199,9 +206,9 @@ async fn test_bitcoin_minting_e2e() -> anyhow::Result<()> {
 		.tx()
 		.sign_and_submit_then_watch_default(
 			&tx().price_index().submit(Index {
-				btc_usd_price: 62_000_00,
-				argon_cpi: 0_100,
-				argon_usd_price: 1_00,
+				btc_usd_price: FixedU128Ext(FixedU128::from_rational(62_000_00, 1_00).into_inner()),
+				argon_cpi: FixedI128Ext(FixedI128::from_float(0.1).into_inner()),
+				argon_usd_price: FixedU128Ext(FixedU128::from_rational(1_00, 1_00).into_inner()),
 				timestamp: SystemTime::now()
 					.duration_since(SystemTime::UNIX_EPOCH)
 					.unwrap()

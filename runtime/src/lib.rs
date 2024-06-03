@@ -42,6 +42,7 @@ use pallet_tx_pause::RuntimeCallNameOf;
 use scale_info::TypeInfo;
 use smallvec::smallvec;
 use sp_api::impl_runtime_apis;
+use sp_arithmetic::{traits::Zero, FixedPointNumber};
 use sp_consensus_grandpa::AuthorityId as GrandpaId;
 use sp_core::{crypto::KeyTypeId, OpaqueMetadata, H256, U256};
 use sp_debug_derive::RuntimeDebug;
@@ -71,7 +72,7 @@ use ulx_primitives::{
 	notebook::NotebookNumber,
 	prod_or_fast,
 	tick::{Tick, Ticker, TICK_MILLIS},
-	BlockSealAuthorityId, NotaryNotebookVotes, NotebookAuditResult, NotebookAuditSummary,
+	ArgonCPI, BlockSealAuthorityId, NotaryNotebookVotes, NotebookAuditResult, NotebookAuditSummary,
 	PriceProvider, TickProvider, ESCROW_CLAWBACK_TICKS, ESCROW_EXPIRATION_TICKS,
 };
 pub use ulx_primitives::{
@@ -687,14 +688,18 @@ pub struct WageProtectorFee;
 impl WeightToFeePolynomial for WageProtectorFee {
 	type Balance = Balance;
 
+	/// This function attempts to add some weight to larger transactions, but given the 3 digits of
+	/// milligons to work with, it can be difficult to scale this properly.
 	fn polynomial() -> WeightToFeeCoefficients<Self::Balance> {
-		let cpi = PriceIndex::get_argon_cpi_price().unwrap_or(0);
+		let cpi = PriceIndex::get_argon_cpi_price().unwrap_or(ArgonCPI::zero());
 		let mut p = 1_000; // milligons
-		if cpi > 0 {
+		if cpi.is_positive() {
+			let cpi = cpi.into_inner() / ArgonCPI::accuracy();
 			let adjustment = (p * (cpi as u128) * 1_000).checked_div(1_000).unwrap_or_default();
 			p += adjustment;
 		}
 		let q = 10 * Self::Balance::from(ExtrinsicBaseWeight::get().ref_time());
+
 		smallvec![WeightToFeeCoefficient::<Self::Balance> {
 			degree: 1,
 			negative: false,

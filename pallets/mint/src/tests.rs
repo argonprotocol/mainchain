@@ -2,6 +2,7 @@ use frame_support::{
 	assert_ok,
 	traits::{fungible::Unbalanced, OnInitialize},
 };
+use sp_arithmetic::FixedI128;
 use ulx_primitives::{block_seal::BlockPayout, BlockRewardsEventHandler, UtxoBondedEvents};
 
 use crate::{
@@ -55,18 +56,18 @@ fn it_calculates_per_miner_mint() {
 	new_test_ext().execute_with(|| {
 		Balances::set_total_issuance(1000);
 		// zero conditions
-		assert_eq!(UlixeeMint::get_argons_to_print_per_miner(0, 0), 0);
-		assert_eq!(UlixeeMint::get_argons_to_print_per_miner(-1, 100), 0);
-		assert_eq!(UlixeeMint::get_argons_to_print_per_miner(0_01, 0), 0);
-		assert_eq!(UlixeeMint::get_argons_to_print_per_miner(0, 1), 0);
+		assert_eq!(UlixeeMint::get_argons_to_print_per_miner(FixedI128::from_float(0.0), 0), 0);
+		assert_eq!(UlixeeMint::get_argons_to_print_per_miner(FixedI128::from_float(-1.0), 100), 0);
+		assert_eq!(UlixeeMint::get_argons_to_print_per_miner(FixedI128::from_float(0.01), 0), 0);
+		assert_eq!(UlixeeMint::get_argons_to_print_per_miner(FixedI128::from_float(0.0), 1), 0);
 
 		// divides cleanly
-		assert_eq!(UlixeeMint::get_argons_to_print_per_miner(0_01, 1), 10);
-		assert_eq!(UlixeeMint::get_argons_to_print_per_miner(0_01, 2), 5);
-		assert_eq!(UlixeeMint::get_argons_to_print_per_miner(0_02, 2), 10);
+		assert_eq!(UlixeeMint::get_argons_to_print_per_miner(FixedI128::from_float(0.01), 1), 10);
+		assert_eq!(UlixeeMint::get_argons_to_print_per_miner(FixedI128::from_float(0.01), 2), 5);
+		assert_eq!(UlixeeMint::get_argons_to_print_per_miner(FixedI128::from_float(0.02), 2), 10);
 
 		// handles uneven splits
-		assert_eq!(UlixeeMint::get_argons_to_print_per_miner(0_01, 3), 3);
+		assert_eq!(UlixeeMint::get_argons_to_print_per_miner(FixedI128::from_float(0.01), 3), 3);
 	});
 }
 
@@ -83,7 +84,7 @@ fn it_does_not_mint_bitcoin_with_negative_cpi() {
 		// nothing to mint
 		MintedUlixeeArgons::<Test>::set(1000);
 		MintedBitcoinArgons::<Test>::set(0);
-		ArgonCPI::set(Some(-1));
+		ArgonCPI::set(Some(FixedI128::from_float(-1.0)));
 
 		UlixeeMint::on_initialize(1);
 		// should not mint

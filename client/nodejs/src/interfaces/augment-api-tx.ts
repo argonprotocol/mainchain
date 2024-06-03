@@ -619,11 +619,11 @@ declare module '@polkadot/api-base/types/submittable' {
        * As funds are returned, they will be released to the vault owner.
        **/
       close: AugmentedSubmittable<(vaultId: u32 | AnyNumber | Uint8Array) => SubmittableExtrinsic<ApiType>, [u32]>;
-      create: AugmentedSubmittable<(bitcoinAnnualPercentRate: u32 | AnyNumber | Uint8Array, miningAnnualPercentRate: u32 | AnyNumber | Uint8Array, bitcoinAmountAllocated: Compact<u128> | AnyNumber | Uint8Array, miningAmountAllocated: Compact<u128> | AnyNumber | Uint8Array, securitizationPercent: Compact<u16> | AnyNumber | Uint8Array, bitcoinPubkeyHashes: Vec<UlxPrimitivesBitcoinBitcoinPubkeyHash> | (UlxPrimitivesBitcoinBitcoinPubkeyHash | string | Uint8Array)[]) => SubmittableExtrinsic<ApiType>, [u32, u32, Compact<u128>, Compact<u128>, Compact<u16>, Vec<UlxPrimitivesBitcoinBitcoinPubkeyHash>]>;
+      create: AugmentedSubmittable<(bitcoinAnnualPercentRate: Compact<u128> | AnyNumber | Uint8Array, miningAnnualPercentRate: Compact<u128> | AnyNumber | Uint8Array, bitcoinAmountAllocated: Compact<u128> | AnyNumber | Uint8Array, miningAmountAllocated: Compact<u128> | AnyNumber | Uint8Array, securitizationPercent: Compact<u128> | AnyNumber | Uint8Array, bitcoinPubkeyHashes: Vec<UlxPrimitivesBitcoinBitcoinPubkeyHash> | (UlxPrimitivesBitcoinBitcoinPubkeyHash | string | Uint8Array)[]) => SubmittableExtrinsic<ApiType>, [Compact<u128>, Compact<u128>, Compact<u128>, Compact<u128>, Compact<u128>, Vec<UlxPrimitivesBitcoinBitcoinPubkeyHash>]>;
       /**
        * Add additional funds to the vault
        **/
-      modify: AugmentedSubmittable<(vaultId: u32 | AnyNumber | Uint8Array, totalMiningAmountOffered: u128 | AnyNumber | Uint8Array, totalBitcoinAmountOffered: u128 | AnyNumber | Uint8Array, securitizationPercent: u16 | AnyNumber | Uint8Array) => SubmittableExtrinsic<ApiType>, [u32, u128, u128, u16]>;
+      modify: AugmentedSubmittable<(vaultId: u32 | AnyNumber | Uint8Array, totalMiningAmountOffered: u128 | AnyNumber | Uint8Array, totalBitcoinAmountOffered: u128 | AnyNumber | Uint8Array, securitizationPercent: u128 | AnyNumber | Uint8Array) => SubmittableExtrinsic<ApiType>, [u32, u128, u128, u128]>;
     };
   } // AugmentedSubmittables
 } // declare module

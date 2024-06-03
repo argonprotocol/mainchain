@@ -24,7 +24,11 @@ pub mod pallet {
 	};
 	use frame_system::pallet_prelude::*;
 	use log::warn;
-	use sp_runtime::traits::{AtLeast32BitUnsigned, CheckedDiv};
+	use sp_arithmetic::FixedI128;
+	use sp_runtime::{
+		traits::{AtLeast32BitUnsigned, CheckedDiv, UniqueSaturatedInto},
+		FixedPointNumber,
+	};
 
 	use ulx_primitives::{
 		bitcoin::UtxoId, ArgonCPI, AuthorityProvider, BlockSealAuthorityId, BurnEventHandler,
@@ -97,7 +101,7 @@ pub mod pallet {
 	impl<T: Config> Hooks<BlockNumberFor<T>> for Pallet<T> {
 		fn on_initialize(_: BlockNumberFor<T>) -> Weight {
 			let argon_cpi = T::PriceProvider::get_argon_cpi_price().unwrap_or_default();
-			if argon_cpi < 0 {
+			if argon_cpi.is_negative() {
 				return T::DbWeight::get().reads(1);
 			}
 
@@ -191,20 +195,22 @@ pub mod pallet {
 			argon_cpi: ArgonCPI,
 			active_miners: u128,
 		) -> T::Balance {
-			if argon_cpi < 0 || active_miners == 0 {
+			if argon_cpi.is_negative() || active_miners == 0 {
 				return T::Balance::zero();
 			}
-
-			let circulation = T::Currency::total_issuance();
-			let argons_to_print = circulation
-				.saturating_mul((argon_cpi as u128).into())
-				.checked_div(&100u128.into())
-				.unwrap_or_default();
-			if argons_to_print == 0u128.into() {
+			let circulation: u128 =
+				UniqueSaturatedInto::<u128>::unique_saturated_into(T::Currency::total_issuance());
+			let circulation = FixedI128::saturating_from_integer(circulation);
+			let argons_to_print =
+				argon_cpi.saturating_mul(circulation).into_inner() / ArgonCPI::accuracy();
+			if argons_to_print <= 0 {
 				return T::Balance::zero();
 			}
+			let argons_to_print = argons_to_print as u128;
 
-			argons_to_print / active_miners.into()
+			let per_miner = argons_to_print.checked_div(active_miners).unwrap_or_default();
+
+			per_miner.unique_saturated_into()
 		}
 		pub fn track_block_mint(amount: T::Balance) {
 			MintedUlixeeArgons::<T>::mutate(|mint| *mint += amount);
