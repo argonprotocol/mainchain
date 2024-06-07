@@ -1561,7 +1561,11 @@ export default {
       },
       force_adjust_total_issuance: {
         direction: 'PalletBalancesAdjustmentDirection',
-        delta: 'Compact<u128>'
+        delta: 'Compact<u128>',
+      },
+      burn: {
+        value: 'Compact<u128>',
+        keepAlive: 'bool'
       }
     }
   },

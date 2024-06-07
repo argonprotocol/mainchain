@@ -1058,10 +1058,10 @@ pub mod api {
 						"query_call_info",
 						types::QueryCallInfo { call, len },
 						[
-							73u8, 217u8, 139u8, 167u8, 51u8, 140u8, 240u8, 137u8, 69u8, 28u8,
-							213u8, 50u8, 255u8, 239u8, 77u8, 120u8, 203u8, 42u8, 187u8, 221u8, 9u8,
-							218u8, 77u8, 246u8, 121u8, 55u8, 234u8, 204u8, 159u8, 213u8, 140u8,
-							250u8,
+							185u8, 122u8, 23u8, 150u8, 145u8, 105u8, 254u8, 170u8, 117u8, 104u8,
+							13u8, 21u8, 38u8, 173u8, 143u8, 12u8, 86u8, 2u8, 38u8, 76u8, 218u8,
+							117u8, 101u8, 158u8, 62u8, 229u8, 191u8, 16u8, 217u8, 201u8, 184u8,
+							38u8,
 						],
 					)
 				}
@@ -1079,10 +1079,9 @@ pub mod api {
 						"query_call_fee_details",
 						types::QueryCallFeeDetails { call, len },
 						[
-							151u8, 104u8, 123u8, 110u8, 14u8, 145u8, 180u8, 115u8, 21u8, 176u8,
-							48u8, 131u8, 170u8, 73u8, 225u8, 29u8, 72u8, 76u8, 140u8, 238u8, 108u8,
-							176u8, 15u8, 148u8, 200u8, 242u8, 152u8, 29u8, 16u8, 242u8, 241u8,
-							46u8,
+							147u8, 9u8, 205u8, 199u8, 52u8, 251u8, 215u8, 42u8, 21u8, 105u8, 105u8,
+							87u8, 180u8, 234u8, 93u8, 239u8, 193u8, 243u8, 110u8, 114u8, 92u8,
+							71u8, 171u8, 130u8, 80u8, 227u8, 199u8, 163u8, 219u8, 6u8, 52u8, 23u8,
 						],
 					)
 				}
@@ -2238,76 +2237,92 @@ pub mod api {
 			#[doc = " API to interact with RuntimeGenesisConfig for the runtime"]
 			pub struct GenesisBuilder;
 			impl GenesisBuilder {
-				#[doc = " Creates the default `RuntimeGenesisConfig` and returns it as a JSON blob."]
+				#[doc = " Build `RuntimeGenesisConfig` from a JSON blob not using any defaults and store it in the"]
+				#[doc = " storage."]
 				#[doc = ""]
-				#[doc = " This function instantiates the default `RuntimeGenesisConfig` struct for the runtime and serializes it into a JSON"]
-				#[doc = " blob. It returns a `Vec<u8>` containing the JSON representation of the default `RuntimeGenesisConfig`."]
-				pub fn create_default_config(
+				#[doc = " In the case of a FRAME-based runtime, this function deserializes the full `RuntimeGenesisConfig` from the given JSON blob and"]
+				#[doc = " puts it into the storage. If the provided JSON blob is incorrect or incomplete or the"]
+				#[doc = " deserialization fails, an error is returned."]
+				#[doc = ""]
+				#[doc = " Please note that provided JSON blob must contain all `RuntimeGenesisConfig` fields, no"]
+				#[doc = " defaults will be used."]
+				pub fn build_state(
 					&self,
+					json: types::build_state::Json,
 				) -> ::subxt::runtime_api::Payload<
-					types::CreateDefaultConfig,
-					types::create_default_config::output::Output,
+					types::BuildState,
+					types::build_state::output::Output,
 				> {
 					::subxt::runtime_api::Payload::new_static(
 						"GenesisBuilder",
-						"create_default_config",
-						types::CreateDefaultConfig {},
+						"build_state",
+						types::BuildState { json },
 						[
-							238u8, 5u8, 139u8, 81u8, 184u8, 155u8, 221u8, 118u8, 190u8, 76u8,
-							229u8, 67u8, 132u8, 89u8, 83u8, 80u8, 56u8, 171u8, 169u8, 64u8, 123u8,
-							20u8, 129u8, 159u8, 28u8, 135u8, 84u8, 52u8, 192u8, 98u8, 104u8, 214u8,
+							203u8, 233u8, 104u8, 116u8, 111u8, 131u8, 201u8, 235u8, 117u8, 116u8,
+							140u8, 185u8, 93u8, 25u8, 155u8, 210u8, 56u8, 49u8, 23u8, 32u8, 253u8,
+							92u8, 149u8, 241u8, 85u8, 245u8, 137u8, 45u8, 209u8, 189u8, 81u8, 2u8,
 						],
 					)
 				}
-				#[doc = " Build `RuntimeGenesisConfig` from a JSON blob not using any defaults and store it in the storage."]
+				#[doc = " Returns a JSON blob representation of the built-in `RuntimeGenesisConfig` identified by"]
+				#[doc = " `id`."]
 				#[doc = ""]
-				#[doc = " This function deserializes the full `RuntimeGenesisConfig` from the given JSON blob and puts it into the storage."]
-				#[doc = " If the provided JSON blob is incorrect or incomplete or the deserialization fails, an error is returned."]
-				#[doc = " It is recommended to log any errors encountered during the process."]
+				#[doc = " If `id` is `None` the function returns JSON blob representation of the default"]
+				#[doc = " `RuntimeGenesisConfig` struct of the runtime. Implementation must provide default"]
+				#[doc = " `RuntimeGenesisConfig`."]
 				#[doc = ""]
-				#[doc = " Please note that provided json blob must contain all `RuntimeGenesisConfig` fields, no defaults will be used."]
-				pub fn build_config(
+				#[doc = " Otherwise function returns a JSON representation of the built-in, named"]
+				#[doc = " `RuntimeGenesisConfig` preset identified by `id`, or `None` if such preset does not"]
+				#[doc = " exists. Returned `Vec<u8>` contains bytes of JSON blob (patch) which comprises a list of"]
+				#[doc = " (potentially nested) key-value pairs that are intended for customizing the default"]
+				#[doc = " runtime genesis config. The patch shall be merged (rfc7386) with the JSON representation"]
+				#[doc = " of the default `RuntimeGenesisConfig` to create a comprehensive genesis config that can"]
+				#[doc = " be used in `build_state` method."]
+				pub fn get_preset(
 					&self,
-					json: types::build_config::Json,
+					id: types::get_preset::Id,
 				) -> ::subxt::runtime_api::Payload<
-					types::BuildConfig,
-					types::build_config::output::Output,
+					types::GetPreset,
+					types::get_preset::output::Output,
 				> {
 					::subxt::runtime_api::Payload::new_static(
 						"GenesisBuilder",
-						"build_config",
-						types::BuildConfig { json },
+						"get_preset",
+						types::GetPreset { id },
 						[
-							6u8, 98u8, 68u8, 125u8, 157u8, 26u8, 107u8, 86u8, 213u8, 227u8, 26u8,
-							229u8, 122u8, 161u8, 229u8, 114u8, 123u8, 192u8, 66u8, 231u8, 148u8,
-							175u8, 5u8, 185u8, 248u8, 88u8, 40u8, 122u8, 230u8, 209u8, 170u8,
-							254u8,
+							43u8, 153u8, 23u8, 52u8, 113u8, 161u8, 227u8, 122u8, 169u8, 135u8,
+							119u8, 8u8, 128u8, 33u8, 143u8, 235u8, 13u8, 173u8, 58u8, 121u8, 178u8,
+							223u8, 66u8, 217u8, 22u8, 244u8, 168u8, 113u8, 202u8, 186u8, 241u8,
+							124u8,
+						],
+					)
+				}
+				#[doc = " Returns a list of identifiers for available builtin `RuntimeGenesisConfig` presets."]
+				#[doc = ""]
+				#[doc = " The presets from the list can be queried with [`GenesisBuilder::get_preset`] method. If"]
+				#[doc = " no named presets are provided by the runtime the list is empty."]
+				pub fn preset_names(
+					&self,
+				) -> ::subxt::runtime_api::Payload<
+					types::PresetNames,
+					types::preset_names::output::Output,
+				> {
+					::subxt::runtime_api::Payload::new_static(
+						"GenesisBuilder",
+						"preset_names",
+						types::PresetNames {},
+						[
+							150u8, 117u8, 54u8, 129u8, 221u8, 130u8, 186u8, 71u8, 13u8, 140u8,
+							77u8, 180u8, 141u8, 37u8, 22u8, 219u8, 149u8, 218u8, 186u8, 206u8,
+							80u8, 42u8, 165u8, 41u8, 99u8, 184u8, 73u8, 37u8, 125u8, 188u8, 167u8,
+							122u8,
 						],
 					)
 				}
 			}
 			pub mod types {
 				use super::runtime_types;
-				pub mod create_default_config {
-					use super::runtime_types;
-					pub mod output {
-						use super::runtime_types;
-						pub type Output = ::std::vec::Vec<::core::primitive::u8>;
-					}
-				}
-				#[derive(
-					:: subxt :: ext :: codec :: Decode,
-					:: subxt :: ext :: codec :: Encode,
-					:: subxt :: ext :: scale_decode :: DecodeAsType,
-					:: subxt :: ext :: scale_encode :: EncodeAsType,
-					Clone,
-					Debug,
-				)]
-				# [codec (crate = :: subxt :: ext :: codec)]
-				#[decode_as_type(crate_path = ":: subxt :: ext :: scale_decode")]
-				#[encode_as_type(crate_path = ":: subxt :: ext :: scale_encode")]
-				pub struct CreateDefaultConfig {}
-				pub mod build_config {
+				pub mod build_state {
 					use super::runtime_types;
 					pub type Json = ::std::vec::Vec<::core::primitive::u8>;
 					pub mod output {
@@ -2326,9 +2341,51 @@ pub mod api {
 				# [codec (crate = :: subxt :: ext :: codec)]
 				#[decode_as_type(crate_path = ":: subxt :: ext :: scale_decode")]
 				#[encode_as_type(crate_path = ":: subxt :: ext :: scale_encode")]
-				pub struct BuildConfig {
-					pub json: build_config::Json,
+				pub struct BuildState {
+					pub json: build_state::Json,
 				}
+				pub mod get_preset {
+					use super::runtime_types;
+					pub type Id = ::core::option::Option<::std::string::String>;
+					pub mod output {
+						use super::runtime_types;
+						pub type Output =
+							::core::option::Option<::std::vec::Vec<::core::primitive::u8>>;
+					}
+				}
+				#[derive(
+					:: subxt :: ext :: codec :: Decode,
+					:: subxt :: ext :: codec :: Encode,
+					:: subxt :: ext :: scale_decode :: DecodeAsType,
+					:: subxt :: ext :: scale_encode :: EncodeAsType,
+					Clone,
+					Debug,
+				)]
+				# [codec (crate = :: subxt :: ext :: codec)]
+				#[decode_as_type(crate_path = ":: subxt :: ext :: scale_decode")]
+				#[encode_as_type(crate_path = ":: subxt :: ext :: scale_encode")]
+				pub struct GetPreset {
+					pub id: get_preset::Id,
+				}
+				pub mod preset_names {
+					use super::runtime_types;
+					pub mod output {
+						use super::runtime_types;
+						pub type Output = ::std::vec::Vec<::std::string::String>;
+					}
+				}
+				#[derive(
+					:: subxt :: ext :: codec :: Decode,
+					:: subxt :: ext :: codec :: Encode,
+					:: subxt :: ext :: scale_decode :: DecodeAsType,
+					:: subxt :: ext :: scale_encode :: EncodeAsType,
+					Clone,
+					Debug,
+				)]
+				# [codec (crate = :: subxt :: ext :: codec)]
+				#[decode_as_type(crate_path = ":: subxt :: ext :: scale_decode")]
+				#[encode_as_type(crate_path = ":: subxt :: ext :: scale_encode")]
+				pub struct PresetNames {}
 			}
 		}
 	}
@@ -2559,9 +2616,9 @@ pub mod api {
 			.hash();
 		runtime_metadata_hash ==
 			[
-				29u8, 202u8, 182u8, 98u8, 190u8, 13u8, 24u8, 45u8, 182u8, 233u8, 181u8, 53u8, 3u8,
-				4u8, 198u8, 191u8, 87u8, 166u8, 254u8, 4u8, 100u8, 223u8, 147u8, 48u8, 183u8, 38u8,
-				13u8, 201u8, 147u8, 245u8, 137u8, 89u8,
+				81u8, 163u8, 76u8, 197u8, 148u8, 250u8, 191u8, 35u8, 219u8, 13u8, 206u8, 240u8,
+				105u8, 190u8, 53u8, 150u8, 112u8, 52u8, 39u8, 207u8, 246u8, 18u8, 85u8, 20u8,
+				222u8, 110u8, 164u8, 44u8, 108u8, 61u8, 245u8, 143u8,
 			]
 	}
 	pub mod system {
@@ -4514,10 +4571,9 @@ pub mod api {
 						"proxy",
 						types::Proxy { real, force_proxy_type, call: ::std::boxed::Box::new(call) },
 						[
-							172u8, 155u8, 140u8, 132u8, 105u8, 58u8, 161u8, 226u8, 145u8, 11u8,
-							163u8, 255u8, 176u8, 20u8, 238u8, 156u8, 92u8, 231u8, 204u8, 194u8,
-							247u8, 35u8, 22u8, 118u8, 217u8, 148u8, 0u8, 60u8, 63u8, 95u8, 173u8,
-							226u8,
+							84u8, 82u8, 159u8, 2u8, 175u8, 150u8, 119u8, 144u8, 85u8, 24u8, 134u8,
+							164u8, 90u8, 165u8, 146u8, 106u8, 99u8, 133u8, 229u8, 29u8, 227u8,
+							119u8, 63u8, 211u8, 14u8, 17u8, 119u8, 108u8, 161u8, 28u8, 46u8, 152u8,
 						],
 					)
 				}
@@ -4773,9 +4829,10 @@ pub mod api {
 							call: ::std::boxed::Box::new(call),
 						},
 						[
-							126u8, 62u8, 67u8, 154u8, 164u8, 8u8, 169u8, 60u8, 54u8, 105u8, 40u8,
-							145u8, 192u8, 22u8, 168u8, 7u8, 254u8, 157u8, 37u8, 72u8, 98u8, 92u8,
-							9u8, 240u8, 78u8, 97u8, 200u8, 86u8, 60u8, 163u8, 145u8, 141u8,
+							22u8, 33u8, 13u8, 193u8, 180u8, 95u8, 161u8, 173u8, 231u8, 127u8,
+							232u8, 6u8, 173u8, 220u8, 84u8, 61u8, 223u8, 234u8, 210u8, 204u8,
+							160u8, 91u8, 18u8, 96u8, 134u8, 119u8, 180u8, 25u8, 134u8, 221u8,
+							100u8, 62u8,
 						],
 					)
 				}
@@ -12424,6 +12481,38 @@ pub mod api {
 					const PALLET: &'static str = "ArgonBalances";
 					const CALL: &'static str = "force_adjust_total_issuance";
 				}
+				#[derive(
+					:: subxt :: ext :: codec :: Decode,
+					:: subxt :: ext :: codec :: Encode,
+					:: subxt :: ext :: scale_decode :: DecodeAsType,
+					:: subxt :: ext :: scale_encode :: EncodeAsType,
+					Clone,
+					Debug,
+				)]
+				# [codec (crate = :: subxt :: ext :: codec)]
+				#[decode_as_type(crate_path = ":: subxt :: ext :: scale_decode")]
+				#[encode_as_type(crate_path = ":: subxt :: ext :: scale_encode")]
+				#[doc = "Burn the specified liquid free balance from the origin account."]
+				#[doc = ""]
+				#[doc = "If the origin's account ends up below the existential deposit as a result"]
+				#[doc = "of the burn and `keep_alive` is false, the account will be reaped."]
+				#[doc = ""]
+				#[doc = "Unlike sending funds to a _burn_ address, which merely makes the funds inaccessible,"]
+				#[doc = "this `burn` operation will reduce total issuance by the amount _burned_."]
+				pub struct Burn {
+					#[codec(compact)]
+					pub value: burn::Value,
+					pub keep_alive: burn::KeepAlive,
+				}
+				pub mod burn {
+					use super::runtime_types;
+					pub type Value = ::core::primitive::u128;
+					pub type KeepAlive = ::core::primitive::bool;
+				}
+				impl ::subxt::blocks::StaticExtrinsic for Burn {
+					const PALLET: &'static str = "ArgonBalances";
+					const CALL: &'static str = "burn";
+				}
 			}
 			pub struct TransactionApi;
 			impl TransactionApi {
@@ -12604,6 +12693,29 @@ pub mod api {
 							190u8, 63u8, 236u8, 186u8, 96u8, 122u8, 104u8, 87u8, 173u8, 38u8, 58u8,
 							176u8, 21u8, 78u8, 42u8, 106u8, 46u8, 248u8, 251u8, 190u8, 150u8,
 							202u8,
+						],
+					)
+				}
+				#[doc = "Burn the specified liquid free balance from the origin account."]
+				#[doc = ""]
+				#[doc = "If the origin's account ends up below the existential deposit as a result"]
+				#[doc = "of the burn and `keep_alive` is false, the account will be reaped."]
+				#[doc = ""]
+				#[doc = "Unlike sending funds to a _burn_ address, which merely makes the funds inaccessible,"]
+				#[doc = "this `burn` operation will reduce total issuance by the amount _burned_."]
+				pub fn burn(
+					&self,
+					value: types::burn::Value,
+					keep_alive: types::burn::KeepAlive,
+				) -> ::subxt::tx::Payload<types::Burn> {
+					::subxt::tx::Payload::new_static(
+						"ArgonBalances",
+						"burn",
+						types::Burn { value, keep_alive },
+						[
+							176u8, 64u8, 7u8, 109u8, 16u8, 44u8, 145u8, 125u8, 147u8, 152u8, 130u8,
+							114u8, 221u8, 201u8, 150u8, 162u8, 118u8, 71u8, 52u8, 92u8, 240u8,
+							116u8, 203u8, 98u8, 5u8, 22u8, 43u8, 102u8, 94u8, 208u8, 101u8, 57u8,
 						],
 					)
 				}
@@ -13877,6 +13989,38 @@ pub mod api {
 					const PALLET: &'static str = "UlixeeBalances";
 					const CALL: &'static str = "force_adjust_total_issuance";
 				}
+				#[derive(
+					:: subxt :: ext :: codec :: Decode,
+					:: subxt :: ext :: codec :: Encode,
+					:: subxt :: ext :: scale_decode :: DecodeAsType,
+					:: subxt :: ext :: scale_encode :: EncodeAsType,
+					Clone,
+					Debug,
+				)]
+				# [codec (crate = :: subxt :: ext :: codec)]
+				#[decode_as_type(crate_path = ":: subxt :: ext :: scale_decode")]
+				#[encode_as_type(crate_path = ":: subxt :: ext :: scale_encode")]
+				#[doc = "Burn the specified liquid free balance from the origin account."]
+				#[doc = ""]
+				#[doc = "If the origin's account ends up below the existential deposit as a result"]
+				#[doc = "of the burn and `keep_alive` is false, the account will be reaped."]
+				#[doc = ""]
+				#[doc = "Unlike sending funds to a _burn_ address, which merely makes the funds inaccessible,"]
+				#[doc = "this `burn` operation will reduce total issuance by the amount _burned_."]
+				pub struct Burn {
+					#[codec(compact)]
+					pub value: burn::Value,
+					pub keep_alive: burn::KeepAlive,
+				}
+				pub mod burn {
+					use super::runtime_types;
+					pub type Value = ::core::primitive::u128;
+					pub type KeepAlive = ::core::primitive::bool;
+				}
+				impl ::subxt::blocks::StaticExtrinsic for Burn {
+					const PALLET: &'static str = "UlixeeBalances";
+					const CALL: &'static str = "burn";
+				}
 			}
 			pub struct TransactionApi;
 			impl TransactionApi {
@@ -14057,6 +14201,29 @@ pub mod api {
 							190u8, 63u8, 236u8, 186u8, 96u8, 122u8, 104u8, 87u8, 173u8, 38u8, 58u8,
 							176u8, 21u8, 78u8, 42u8, 106u8, 46u8, 248u8, 251u8, 190u8, 150u8,
 							202u8,
+						],
+					)
+				}
+				#[doc = "Burn the specified liquid free balance from the origin account."]
+				#[doc = ""]
+				#[doc = "If the origin's account ends up below the existential deposit as a result"]
+				#[doc = "of the burn and `keep_alive` is false, the account will be reaped."]
+				#[doc = ""]
+				#[doc = "Unlike sending funds to a _burn_ address, which merely makes the funds inaccessible,"]
+				#[doc = "this `burn` operation will reduce total issuance by the amount _burned_."]
+				pub fn burn(
+					&self,
+					value: types::burn::Value,
+					keep_alive: types::burn::KeepAlive,
+				) -> ::subxt::tx::Payload<types::Burn> {
+					::subxt::tx::Payload::new_static(
+						"UlixeeBalances",
+						"burn",
+						types::Burn { value, keep_alive },
+						[
+							176u8, 64u8, 7u8, 109u8, 16u8, 44u8, 145u8, 125u8, 147u8, 152u8, 130u8,
+							114u8, 221u8, 201u8, 150u8, 162u8, 118u8, 71u8, 52u8, 92u8, 240u8,
+							116u8, 203u8, 98u8, 5u8, 22u8, 43u8, 102u8, 94u8, 208u8, 101u8, 57u8,
 						],
 					)
 				}
@@ -15653,10 +15820,10 @@ pub mod api {
 						"sudo",
 						types::Sudo { call: ::std::boxed::Box::new(call) },
 						[
-							96u8, 80u8, 218u8, 238u8, 26u8, 248u8, 78u8, 49u8, 6u8, 90u8, 72u8,
-							184u8, 155u8, 220u8, 183u8, 227u8, 70u8, 76u8, 78u8, 250u8, 136u8,
-							241u8, 188u8, 217u8, 12u8, 237u8, 53u8, 237u8, 240u8, 200u8, 228u8,
-							91u8,
+							98u8, 164u8, 234u8, 242u8, 125u8, 39u8, 160u8, 249u8, 3u8, 240u8,
+							160u8, 180u8, 59u8, 71u8, 59u8, 157u8, 81u8, 153u8, 245u8, 254u8,
+							114u8, 146u8, 239u8, 111u8, 193u8, 92u8, 220u8, 151u8, 159u8, 85u8,
+							159u8, 97u8,
 						],
 					)
 				}
@@ -15675,10 +15842,10 @@ pub mod api {
 						"sudo_unchecked_weight",
 						types::SudoUncheckedWeight { call: ::std::boxed::Box::new(call), weight },
 						[
-							222u8, 109u8, 33u8, 102u8, 218u8, 49u8, 236u8, 85u8, 159u8, 52u8,
-							116u8, 210u8, 54u8, 253u8, 209u8, 116u8, 201u8, 121u8, 57u8, 33u8,
-							135u8, 66u8, 90u8, 157u8, 128u8, 97u8, 59u8, 128u8, 85u8, 168u8, 248u8,
-							154u8,
+							59u8, 102u8, 175u8, 230u8, 43u8, 68u8, 154u8, 109u8, 207u8, 103u8,
+							131u8, 87u8, 23u8, 227u8, 145u8, 16u8, 105u8, 97u8, 135u8, 254u8,
+							169u8, 171u8, 236u8, 64u8, 207u8, 243u8, 170u8, 0u8, 171u8, 174u8,
+							35u8, 122u8,
 						],
 					)
 				}
@@ -15713,10 +15880,9 @@ pub mod api {
 						"sudo_as",
 						types::SudoAs { who, call: ::std::boxed::Box::new(call) },
 						[
-							39u8, 130u8, 189u8, 125u8, 254u8, 123u8, 150u8, 56u8, 113u8, 255u8,
-							180u8, 173u8, 109u8, 126u8, 141u8, 47u8, 10u8, 183u8, 208u8, 177u8,
-							97u8, 71u8, 162u8, 193u8, 151u8, 32u8, 1u8, 173u8, 61u8, 198u8, 248u8,
-							234u8,
+							142u8, 46u8, 102u8, 51u8, 90u8, 91u8, 234u8, 36u8, 177u8, 47u8, 112u8,
+							236u8, 7u8, 58u8, 208u8, 158u8, 144u8, 229u8, 18u8, 47u8, 31u8, 154u8,
+							106u8, 6u8, 77u8, 115u8, 106u8, 116u8, 193u8, 10u8, 148u8, 244u8,
 						],
 					)
 				}
@@ -16615,6 +16781,19 @@ pub mod api {
 						#[codec(compact)]
 						delta: ::core::primitive::u128,
 					},
+					#[codec(index = 10)]
+					#[doc = "Burn the specified liquid free balance from the origin account."]
+					#[doc = ""]
+					#[doc = "If the origin's account ends up below the existential deposit as a result"]
+					#[doc = "of the burn and `keep_alive` is false, the account will be reaped."]
+					#[doc = ""]
+					#[doc = "Unlike sending funds to a _burn_ address, which merely makes the funds inaccessible,"]
+					#[doc = "this `burn` operation will reduce total issuance by the amount _burned_."]
+					burn {
+						#[codec(compact)]
+						value: ::core::primitive::u128,
+						keep_alive: ::core::primitive::bool,
+					},
 				}
 				#[derive(
 					:: subxt :: ext :: codec :: Decode,
@@ -16720,6 +16899,19 @@ pub mod api {
 						direction: runtime_types::pallet_balances::types::AdjustmentDirection,
 						#[codec(compact)]
 						delta: ::core::primitive::u128,
+					},
+					#[codec(index = 10)]
+					#[doc = "Burn the specified liquid free balance from the origin account."]
+					#[doc = ""]
+					#[doc = "If the origin's account ends up below the existential deposit as a result"]
+					#[doc = "of the burn and `keep_alive` is false, the account will be reaped."]
+					#[doc = ""]
+					#[doc = "Unlike sending funds to a _burn_ address, which merely makes the funds inaccessible,"]
+					#[doc = "this `burn` operation will reduce total issuance by the amount _burned_."]
+					burn {
+						#[codec(compact)]
+						value: ::core::primitive::u128,
+						keep_alive: ::core::primitive::bool,
 					},
 				}
 				#[derive(

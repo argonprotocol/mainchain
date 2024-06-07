@@ -24,20 +24,21 @@ pub use frame_support::{
 };
 use frame_support::{
 	derive_impl,
-	genesis_builder_helper::{build_config, create_default_config},
+	genesis_builder_helper::{build_state, get_preset},
 	traits::{Contains, Currency, InsideBoth, OnUnbalanced},
 	PalletId,
 };
+use sp_std::marker::PhantomData;
 // Configure FRAME pallets to include in runtime.
 use frame_support::{
-	traits::{Everything, InstanceFilter, StorageMapShim},
+	traits::{fungible, fungible::Balanced, Everything, Imbalance, InstanceFilter, StorageMapShim},
 	weights::{WeightToFeeCoefficient, WeightToFeeCoefficients},
 };
 pub use frame_system::Call as SystemCall;
 use frame_system::EnsureRoot;
 use pallet_session::historical as pallet_session_historical;
 pub use pallet_timestamp::Call as TimestampCall;
-use pallet_transaction_payment::{ConstFeeMultiplier, CurrencyAdapter, Multiplier};
+use pallet_transaction_payment::{ConstFeeMultiplier, FungibleAdapter, Multiplier};
 use pallet_tx_pause::RuntimeCallNameOf;
 use scale_info::TypeInfo;
 use smallvec::smallvec;
@@ -195,7 +196,7 @@ impl pallet_tx_pause::Config for Runtime {
 	type WeightInfo = pallet_tx_pause::weights::SubstrateWeight<Runtime>;
 }
 
-#[derive_impl(frame_system::config_preludes::SolochainDefaultConfig as frame_system::DefaultConfig)]
+#[derive_impl(frame_system::config_preludes::SolochainDefaultConfig)]
 impl frame_system::Config for Runtime {
 	/// The basic call filter to use in dispatchable.
 	/// example filter: https://github.com/AcalaNetwork/Acala/blob/f4b80d7200c19b78d3777e8a4a87bc6893740d23/runtime/karura/src/lib.rs#L198
@@ -498,30 +499,53 @@ impl pallet_notaries::Config for Runtime {
 	type MaxBlocksForKeyHistory = MaxBlocksForKeyHistory;
 	type MaxNotaryHosts = MaxNotaryHosts;
 }
+pub type AccountIdOf<T> = <T as frame_system::Config>::AccountId;
+pub type ArgonNegativeImbalance<T> = <pallet_balances::Pallet<T, ArgonToken> as Currency<
+	<T as frame_system::Config>::AccountId,
+>>::NegativeImbalance;
 
-pub struct Author;
-impl OnUnbalanced<NegativeImbalance> for Author {
-	fn on_nonzero_unbalanced(amount: NegativeImbalance) {
-		if let Some(author) = BlockSeal::author() {
-			ArgonBalances::resolve_creating(&author, amount);
+pub struct Author<R>(PhantomData<R>);
+impl<R> OnUnbalanced<ArgonNegativeImbalance<R>> for Author<R>
+where
+	R: pallet_authorship::Config + pallet_balances::Config<ArgonToken>,
+	AccountIdOf<R>: From<AccountId> + Into<AccountId>,
+	<R as frame_system::Config>::RuntimeEvent: From<pallet_balances::Event<R, ArgonToken>>,
+{
+	fn on_nonzero_unbalanced(amount: ArgonNegativeImbalance<R>) {
+		if let Some(author) = pallet_authorship::Pallet::<R>::author() {
+			<pallet_balances::Pallet<R, ArgonToken>>::resolve_creating(&author, amount);
 		} else {
 			drop(amount);
 		}
 	}
 }
 
-pub struct DealWithFees;
-type NegativeImbalance = <ArgonBalances as Currency<AccountId>>::NegativeImbalance;
-impl OnUnbalanced<NegativeImbalance> for DealWithFees {
-	fn on_unbalanceds<B>(mut fees_then_tips: impl Iterator<Item = NegativeImbalance>) {
-		if let Some(fees) = fees_then_tips.next() {
-			Author::on_unbalanced(fees);
+pub struct DealWithFees<R>(PhantomData<R>);
+
+impl<R> OnUnbalanced<fungible::Credit<R::AccountId, pallet_balances::Pallet<R, ArgonToken>>>
+	for DealWithFees<R>
+where
+	R: pallet_authorship::Config + pallet_balances::Config<ArgonToken>,
+	AccountIdOf<R>: From<AccountId> + Into<AccountId>,
+	<R as frame_system::Config>::RuntimeEvent: From<pallet_balances::Event<R, ArgonToken>>,
+{
+	fn on_unbalanceds<B>(
+		mut fees_then_tips: impl Iterator<
+			Item = fungible::Credit<R::AccountId, pallet_balances::Pallet<R, ArgonToken>>,
+		>,
+	) {
+		if let Some(mut fees) = fees_then_tips.next() {
 			if let Some(tips) = fees_then_tips.next() {
-				Author::on_unbalanced(tips);
+				tips.merge_into(&mut fees);
+			}
+			if let Some(author) = pallet_authorship::Pallet::<R>::author() {
+				let _ = <pallet_balances::Pallet<R, ArgonToken>>::resolve(&author, fees)
+					.map_err(|c| drop(c));
 			}
 		}
 	}
 }
+
 type ArgonToken = pallet_balances::Instance1;
 impl pallet_balances::Config<ArgonToken> for Runtime {
 	type MaxLocks = ConstU32<50>;
@@ -711,7 +735,7 @@ impl WeightToFeePolynomial for WageProtectorFee {
 
 impl pallet_transaction_payment::Config for Runtime {
 	type RuntimeEvent = RuntimeEvent;
-	type OnChargeTransaction = CurrencyAdapter<ArgonBalances, DealWithFees>;
+	type OnChargeTransaction = FungibleAdapter<ArgonBalances, DealWithFees<Runtime>>;
 	type OperationalFeeMultiplier = ConstU8<5>;
 	type WeightToFee = WageProtectorFee;
 	type LengthToFee = WageProtectorFee;
@@ -725,39 +749,77 @@ impl pallet_sudo::Config for Runtime {
 }
 
 // Create the runtime by composing the FRAME pallets that were previously configured.
-construct_runtime!(
-	pub struct Runtime {
-		System: frame_system,
-		Timestamp: pallet_timestamp,
-		Proxy: pallet_proxy,
-		Ticks: pallet_ticks,
-		MiningSlot: pallet_mining_slot,
-		BitcoinUtxos: pallet_bitcoin_utxos,
-		Vaults: pallet_vaults,
-		Bonds: pallet_bond,
-		Notaries: pallet_notaries,
-		Notebook: pallet_notebook,
-		ChainTransfer: pallet_chain_transfer,
-		BlockSealSpec: pallet_block_seal_spec,
-		DataDomain: pallet_data_domain,
-		PriceIndex: pallet_price_index,
-		// Authorship must be before session
-		Authorship: pallet_authorship,
-		Historical: pallet_session_historical,
-		Session: pallet_session,
-		BlockSeal: pallet_block_seal,
-		// BlockRewards must come after seal
-		BlockRewards: pallet_block_rewards,
-		Grandpa: pallet_grandpa,
-		Offences: pallet_offences,
-		Mint: pallet_mint,
-		ArgonBalances: pallet_balances::<Instance1>::{Pallet, Call, Storage, Config<T>, Event<T>},
-		UlixeeBalances: pallet_balances::<Instance2>::{Pallet, Call, Storage, Config<T>, Event<T>},
-		TxPause: pallet_tx_pause,
-		TransactionPayment: pallet_transaction_payment,
-		Sudo: pallet_sudo,
-	}
-);
+
+#[frame_support::runtime]
+mod runtime {
+	#[runtime::runtime]
+	#[runtime::derive(
+		RuntimeCall,
+		RuntimeEvent,
+		RuntimeError,
+		RuntimeOrigin,
+		RuntimeFreezeReason,
+		RuntimeHoldReason,
+		RuntimeTask
+	)]
+	pub struct Runtime;
+	#[runtime::pallet_index(0)]
+	pub type System = frame_system;
+	#[runtime::pallet_index(1)]
+	pub type Timestamp = pallet_timestamp;
+	#[runtime::pallet_index(2)]
+	pub type Proxy = pallet_proxy;
+	#[runtime::pallet_index(3)]
+	pub type Ticks = pallet_ticks;
+	#[runtime::pallet_index(4)]
+	pub type MiningSlot = pallet_mining_slot;
+	#[runtime::pallet_index(5)]
+	pub type BitcoinUtxos = pallet_bitcoin_utxos;
+	#[runtime::pallet_index(6)]
+	pub type Vaults = pallet_vaults;
+	#[runtime::pallet_index(7)]
+	pub type Bonds = pallet_bond;
+	#[runtime::pallet_index(8)]
+	pub type Notaries = pallet_notaries;
+	#[runtime::pallet_index(9)]
+	pub type Notebook = pallet_notebook;
+	#[runtime::pallet_index(10)]
+	pub type ChainTransfer = pallet_chain_transfer;
+	#[runtime::pallet_index(11)]
+	pub type BlockSealSpec = pallet_block_seal_spec;
+	#[runtime::pallet_index(12)]
+	pub type DataDomain = pallet_data_domain;
+	#[runtime::pallet_index(13)]
+	pub type PriceIndex = pallet_price_index;
+	// Authorship must be before session
+	#[runtime::pallet_index(14)]
+	pub type Authorship = pallet_authorship;
+	#[runtime::pallet_index(15)]
+	pub type Historical = pallet_session_historical;
+	#[runtime::pallet_index(16)]
+	pub type Session = pallet_session;
+	#[runtime::pallet_index(17)]
+	pub type BlockSeal = pallet_block_seal;
+	// BlockRewards must come after seal
+	#[runtime::pallet_index(18)]
+	pub type BlockRewards = pallet_block_rewards;
+	#[runtime::pallet_index(19)]
+	pub type Grandpa = pallet_grandpa;
+	#[runtime::pallet_index(20)]
+	pub type Offences = pallet_offences;
+	#[runtime::pallet_index(21)]
+	pub type Mint = pallet_mint;
+	#[runtime::pallet_index(22)]
+	pub type ArgonBalances = pallet_balances<Instance1>;
+	#[runtime::pallet_index(23)]
+	pub type UlixeeBalances = pallet_balances<Instance2>;
+	#[runtime::pallet_index(24)]
+	pub type TxPause = pallet_tx_pause;
+	#[runtime::pallet_index(25)]
+	pub type TransactionPayment = pallet_transaction_payment;
+	#[runtime::pallet_index(26)]
+	pub type Sudo = pallet_sudo;
+}
 
 /// The address format for describing accounts.
 pub type Address = sp_runtime::MultiAddress<AccountId, ()>;
@@ -1117,12 +1179,16 @@ impl_runtime_apis! {
 	}
 
 	impl sp_genesis_builder::GenesisBuilder<Block> for Runtime {
-		fn create_default_config() -> Vec<u8> {
-			create_default_config::<RuntimeGenesisConfig>()
+		fn build_state(config: Vec<u8>) -> sp_genesis_builder::Result {
+			build_state::<RuntimeGenesisConfig>(config)
 		}
 
-		fn build_config(config: Vec<u8>) -> sp_genesis_builder::Result {
-			build_config::<RuntimeGenesisConfig>(config)
+		fn get_preset(id: &Option<sp_genesis_builder::PresetId>) -> Option<Vec<u8>> {
+			get_preset::<RuntimeGenesisConfig>(id, |_| None)
+		}
+
+		fn preset_names() -> Vec<sp_genesis_builder::PresetId> {
+			vec![]
 		}
 	}
 }

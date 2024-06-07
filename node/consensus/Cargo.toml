@@ -64,6 +64,7 @@ sp-tracing = { workspace = true }
 sc-client-db = { workspace = true }
 sc-keystore = { workspace = true }
 sc-network-test = { workspace = true }
+sc-network-types = { workspace = true }
 sc-utils = { workspace = true }
 sp-test-primitives = { workspace = true }
 substrate-test-runtime = { workspace = true }

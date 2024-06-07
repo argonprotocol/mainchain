@@ -299,6 +299,7 @@ pub mod pallet {
 				T::Currency::burn_from(
 					&notary_pallet_account_id,
 					header.tax.into(),
+					Preservation::Preserve,
 					Precision::Exact,
 					Fortitude::Force,
 				)?;

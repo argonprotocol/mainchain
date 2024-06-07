@@ -30,7 +30,7 @@ pallet-offences = { workspace = true }
 pallet-proxy = { workspace = true }
 pallet-tx-pause = { workspace = true }
 pallet-transaction-payment = { workspace = true }
-frame-support = { workspace = true }
+frame-support = { workspace = true, features = ["experimental"] }
 frame-system = { workspace = true }
 frame-try-runtime = { workspace = true, optional = true }
 frame-executive = { workspace = true }

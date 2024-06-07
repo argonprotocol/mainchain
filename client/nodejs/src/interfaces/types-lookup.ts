@@ -1594,7 +1594,12 @@ declare module '@polkadot/types/lookup' {
       readonly direction: PalletBalancesAdjustmentDirection;
       readonly delta: Compact<u128>;
     } & Struct;
-    readonly type: 'TransferAllowDeath' | 'ForceTransfer' | 'TransferKeepAlive' | 'TransferAll' | 'ForceUnreserve' | 'UpgradeAccounts' | 'ForceSetBalance' | 'ForceAdjustTotalIssuance';
+    readonly isBurn: boolean;
+    readonly asBurn: {
+      readonly value: Compact<u128>;
+      readonly keepAlive: bool;
+    } & Struct;
+    readonly type: 'TransferAllowDeath' | 'ForceTransfer' | 'TransferKeepAlive' | 'TransferAll' | 'ForceUnreserve' | 'UpgradeAccounts' | 'ForceSetBalance' | 'ForceAdjustTotalIssuance' | 'Burn';
   }
 
   /** @name PalletBalancesAdjustmentDirection (218) */

@@ -42,27 +42,25 @@ type UlxBlockImport = ulx_node_consensus::import_queue::UlxBlockImport<
 	AccountId,
 >;
 
-#[allow(clippy::type_complexity)]
+pub type Service = sc_service::PartialComponents<
+	FullClient,
+	FullBackend,
+	FullSelectChain,
+	BasicQueue<Block>,
+	sc_transaction_pool::FullPool<Block, FullClient>,
+	(
+		UlxBlockImport,
+		UlxAux<Block, FullClient>,
+		Arc<UtxoTracker>,
+		sc_consensus_grandpa::LinkHalf<Block, FullClient, FullSelectChain>,
+		Option<Telemetry>,
+	),
+>;
+
 pub fn new_partial(
 	config: &Configuration,
 	bitcoin_rpc_url: String,
-) -> Result<
-	sc_service::PartialComponents<
-		FullClient,
-		FullBackend,
-		FullSelectChain,
-		BasicQueue<Block>,
-		sc_transaction_pool::FullPool<Block, FullClient>,
-		(
-			UlxBlockImport,
-			UlxAux<Block, FullClient>,
-			Arc<UtxoTracker>,
-			sc_consensus_grandpa::LinkHalf<Block, FullClient, FullSelectChain>,
-			Option<Telemetry>,
-		),
-	>,
-	ServiceError,
-> {
+) -> Result<Service, ServiceError> {
 	let telemetry = config
 		.telemetry_endpoints
 		.clone()
@@ -158,7 +156,9 @@ pub fn new_partial(
 }
 
 /// Builds a new service for a full client.
-pub fn new_full(
+pub fn new_full<
+	N: sc_network::NetworkBackend<Block, <Block as sp_runtime::traits::Block>::Hash>,
+>(
 	config: Configuration,
 	mining_account_id: Option<AccountId>,
 	mining_threads: Option<u32>,
@@ -175,13 +175,25 @@ pub fn new_full(
 		other: (ulx_block_import, aux_client, utxo_tracker, grandpa_link, mut telemetry),
 	} = new_partial(&config, bitcoin_rpc_url)?;
 
-	let mut net_config = sc_network::config::FullNetworkConfiguration::new(&config.network);
+	let metrics = N::register_notification_metrics(config.prometheus_registry());
+	let mut net_config = sc_network::config::FullNetworkConfiguration::<
+		Block,
+		<Block as sp_runtime::traits::Block>::Hash,
+		N,
+	>::new(&config.network);
+	let peer_store_handle = net_config.peer_store_handle();
+
 	let grandpa_protocol_name = sc_consensus_grandpa::protocol_standard_name(
 		&client.block_hash(0).ok().flatten().expect("Genesis block exists; qed"),
 		&config.chain_spec,
 	);
+
 	let (grandpa_protocol_config, grandpa_notification_service) =
-		sc_consensus_grandpa::grandpa_peers_set_config(grandpa_protocol_name.clone());
+		sc_consensus_grandpa::grandpa_peers_set_config::<_, N>(
+			grandpa_protocol_name.clone(),
+			metrics.clone(),
+			Arc::clone(&peer_store_handle),
+		);
 	net_config.add_notification_protocol(grandpa_protocol_config);
 
 	let warp_sync = Arc::new(sc_consensus_grandpa::warp_proof::NetworkProvider::new(
@@ -200,6 +212,7 @@ pub fn new_full(
 			block_announce_validator_builder: None,
 			warp_sync_params: Some(WarpSyncParams::WithProvider(warp_sync)),
 			block_relay: None,
+			metrics,
 		})?;
 
 	if config.offchain_worker.enabled {
@@ -214,7 +227,7 @@ pub fn new_full(
 				transaction_pool: Some(OffchainTransactionPoolFactory::new(
 					transaction_pool.clone(),
 				)),
-				network_provider: network.clone(),
+				network_provider: Arc::new(network.clone()),
 				enable_http_requests: true,
 				custom_extensions: |_| vec![],
 			})

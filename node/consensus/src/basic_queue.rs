@@ -677,7 +677,7 @@ mod tests {
 		},
 		import_queue::Verifier,
 	};
-	use sc_network::PeerId;
+	use sc_network_types::PeerId;
 	use sp_consensus::BlockOrigin;
 	use sp_test_primitives::{Block, BlockNumber, Hash, Header};
 
