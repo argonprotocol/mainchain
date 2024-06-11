@@ -228,7 +228,7 @@ async fn can_build_compute_blocks() {
 	let net = UlxTestNet::new(
 		3,
 		Config {
-			difficulty: 10_000,
+			difficulty: 200,
 			tax_minimum: 1,
 			tick_duration,
 			genesis_utc_time: Ticker::start(tick_duration).genesis_utc_time,

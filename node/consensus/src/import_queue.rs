@@ -27,6 +27,7 @@ use crate::{
 	aux_client::UlxAux,
 	basic_queue::BasicQueue,
 	compute_solver::BlockComputeNonce,
+	compute_worker::randomx_key_block,
 	digests::{load_digests, read_seal_digest},
 	error::Error,
 	notary_client::verify_notebook_audits,
@@ -191,19 +192,27 @@ where
 
 		// NOTE: we verify compute nonce in import queue because we use the pre-hash, which we'd
 		// have to inject into the runtime
-
-		if let BlockSealDigest::Compute { nonce } = &seal_digest {
-			// verify compute effort
-			let difficulty =
-				self.client.runtime_api().compute_difficulty(parent_hash).map_err(|e| {
-					Error::<B>::MissingRuntimeData(
-						format!("Failed to get difficulty from runtime: {}", e).to_string(),
-					)
-				})?;
-			if !BlockComputeNonce::is_valid(nonce, pre_hash.as_ref().to_vec(), difficulty) {
-				return Err(Error::<B>::InvalidComputeNonce.into());
-			}
-			compute_difficulty = Some(difficulty);
+		match &seal_digest {
+			BlockSealDigest::Compute { nonce } => {
+				// verify compute effort
+				let difficulty =
+					self.client.runtime_api().compute_difficulty(parent_hash).map_err(|e| {
+						Error::<B>::MissingRuntimeData(
+							format!("Failed to get difficulty from runtime: {}", e).to_string(),
+						)
+					})?;
+				let key_block_hash = randomx_key_block(&self.client, &parent_hash)?;
+				if !BlockComputeNonce::is_valid(
+					nonce,
+					pre_hash.as_ref().to_vec(),
+					&key_block_hash,
+					difficulty,
+				) {
+					return Err(Error::<B>::InvalidComputeNonce.into());
+				}
+				compute_difficulty = Some(difficulty);
+			},
+			_ => {},
 		}
 
 		let best_header = self

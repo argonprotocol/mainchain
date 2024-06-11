@@ -1,5 +1,6 @@
 use std::{
 	pin::Pin,
+	string::ToString,
 	sync::{
 		atomic::{AtomicUsize, Ordering},
 		Arc,
@@ -21,15 +22,17 @@ use sc_client_api::{AuxStore, BlockchainEvents, ImportNotifications};
 use sc_consensus::BoxBlockImport;
 use sc_service::TaskManager;
 use sp_api::ProvideRuntimeApi;
+use sp_arithmetic::traits::UniqueSaturatedInto;
 use sp_blockchain::HeaderBackend;
 use sp_consensus::{Environment, Proposal, Proposer, SelectChain, SyncOracle};
-use sp_core::{traits::SpawnEssentialNamed, RuntimeDebug, U256};
+use sp_core::{traits::SpawnEssentialNamed, RuntimeDebug, H256, U256};
 use sp_runtime::traits::{Block as BlockT, Header as HeaderT};
 use sp_timestamp::Timestamp;
 use ulx_bitcoin_utxo_tracker::UtxoTracker;
 
 use ulx_node_runtime::{NotaryRecordT, NotebookVerifyError};
 use ulx_primitives::{inherents::BlockSealInherentNodeSide, tick::Tick, *};
+use ulx_randomx::RandomXError;
 
 use crate::{
 	aux_client::UlxAux, block_creator, block_creator::propose, compute_solver::ComputeSolver,
@@ -48,6 +51,7 @@ pub struct MiningMetadata<H> {
 	pub import_time: Instant,
 	pub has_tax_votes: bool,
 	pub parent_tick: Tick,
+	pub key_block_hash: H256,
 }
 
 struct MiningBuild<B: BlockT, Proof> {
@@ -95,7 +99,13 @@ where
 		self.increment_version();
 	}
 
-	pub(crate) fn on_block(&self, best_hash: B::Hash, has_tax_votes: bool, parent_tick: Tick) {
+	pub(crate) fn on_block(
+		&self,
+		best_hash: B::Hash,
+		has_tax_votes: bool,
+		parent_tick: Tick,
+		key_block: H256,
+	) {
 		self.stop_solving_current();
 		let mut metadata = self.metadata.lock();
 		*metadata = Some(MiningMetadata {
@@ -103,6 +113,7 @@ where
 			has_tax_votes,
 			import_time: Instant::now(),
 			parent_tick,
+			key_block_hash: key_block,
 		});
 	}
 
@@ -135,6 +146,12 @@ where
 		self.metadata.lock().as_ref().map(|b| b.best_hash)
 	}
 
+	/// Get the current key block hash. `None` if the worker has just started or the client is doing
+	/// major syncing.
+	pub fn key_block_hash(&self) -> Option<H256> {
+		self.metadata.lock().as_ref().map(|b| b.key_block_hash)
+	}
+
 	pub fn build_hash(&self) -> Option<B::Hash> {
 		self.build
 			.lock()
@@ -149,11 +166,20 @@ where
 	}
 
 	pub fn create_solver(&self) -> Option<ComputeSolver> {
+		let key_block_hash = match self.metadata.lock().as_ref() {
+			Some(x) => x.key_block_hash,
+			_ => return None,
+		};
 		match self.build.lock().as_ref() {
 			Some(x) => {
 				let pre_hash = x.pre_hash;
 
-				Some(ComputeSolver::new(self.version(), pre_hash.as_ref().to_vec(), x.difficulty))
+				Some(ComputeSolver::new(
+					self.version(),
+					pre_hash.as_ref().to_vec(),
+					H256::from_slice(key_block_hash.as_ref()),
+					x.difficulty,
+				))
 			},
 			_ => None,
 		}
@@ -218,7 +244,7 @@ where
 	}
 }
 
-const LOG_TARGET: &str = "voter::compute::miner";
+const LOG_TARGET: &str = "node::compute::miner";
 pub(crate) fn create_compute_solver_task<B, L, Proof>(
 	mut worker: MiningHandle<B, L, Proof>,
 ) -> BoxFuture<'static, ()>
@@ -228,18 +254,29 @@ where
 	Proof: Send + 'static,
 {
 	async move {
-		let mut solver: Option<Box<ComputeSolver>> = None;
+		let mut solver_ref = None;
 		loop {
-			if !worker.is_valid_solver(&solver) {
-				solver = worker.create_solver().map(Box::new);
+			if !worker.is_valid_solver(&solver_ref) {
+				solver_ref = worker.create_solver().map(Box::new);
 			}
 
-			if let Some(solver) = solver.as_mut() {
-				if let Some(nonce) = solver.check_next() {
-					let _ = block_on(worker.submit(nonce.nonce));
-				}
-			} else {
+			let Some(solver) = solver_ref.as_mut() else {
 				tokio::time::sleep(Duration::from_millis(500)).await;
+				continue;
+			};
+
+			match solver.check_next() {
+				Ok(Some(nonce)) => {
+					let _ = block_on(worker.submit(nonce.nonce));
+				},
+				Ok(None) => (),
+				Err(RandomXError::CreationError(err)) => {
+					warn!("RandomX creation failed for mining: {:?}", err);
+					tokio::time::sleep(Duration::from_secs(10)).await;
+				},
+				Err(err) => {
+					warn!("Mining failed: {:?}", err);
+				},
 			}
 		}
 	}
@@ -340,8 +377,9 @@ where
 				let parent_tick = get_tick_digest(best_header.digest()).unwrap_or_default();
 				let votes_tick = parent_tick.saturating_sub(1);
 				let has_tax_votes = has_votes_at_tick(&client, &best_header, votes_tick);
+				let key_block = randomx_key_block(&client, &best_hash).unwrap_or_default();
 
-				mining_handle.on_block(best_hash, has_tax_votes, parent_tick);
+				mining_handle.on_block(best_hash, has_tax_votes, parent_tick, key_block);
 			}
 
 			let time = Timestamp::current();
@@ -396,6 +434,41 @@ where
 	};
 
 	(handle_to_return, task)
+}
+
+/// The key K is selected to be the hash of a block in the blockchain - this block is called the
+/// 'key block'. For optimal mining and verification performance, the key should change every 2048
+/// blocks (~2.8 days) and there should be a delay of 64 blocks (~2 hours) between the key block and
+/// the change of the key K. This can be achieved by changing the key when blockHeight % 2048 == 64
+/// and selecting key block such that keyBlockHeight % 2048 == 0.
+pub fn randomx_key_block<B, C>(client: &Arc<C>, parent_hash: &B::Hash) -> Result<H256, Error<B>>
+where
+	B: BlockT,
+	C: HeaderBackend<B>,
+{
+	const PERIOD: u32 = (1440.0 * 2.8) as u32; // 2.8 days
+	const OFFSET: u32 = 120; // 2 hours
+
+	let parent_number = client
+		.number(*parent_hash)
+		.map_err(|e| Error::Environment(format!("Client execution error: {:?}", e)))?
+		.ok_or(Error::Environment("Parent header not found".to_string()))?;
+	let parent_number = UniqueSaturatedInto::<u32>::unique_saturated_into(parent_number);
+
+	let mut key_block = parent_number.saturating_sub(parent_number % PERIOD);
+
+	// if we're before offset, stick with previous key block
+	if parent_number % PERIOD < OFFSET {
+		key_block = key_block.saturating_sub(PERIOD)
+	};
+
+	info!("Using key block: {}", key_block);
+
+	let hash = client
+		.hash(key_block.unique_saturated_into())
+		.map_err(|e| Error::Environment(format!("Key hash lookup error: {:?}", e)))?
+		.ok_or(Error::Environment("Key hash not found".to_string()))?;
+	Ok(H256::from_slice(hash.as_ref()))
 }
 
 /// A stream that waits for a block import or timeout.

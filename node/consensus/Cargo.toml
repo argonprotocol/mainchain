@@ -48,13 +48,14 @@ sc-utils = { workspace = true }
 sc-executor = { workspace = true, features = ["default"] }
 sp-io = { workspace = true, features = ["default"] }
 schnellru = { workspace = true }
+humantime = { workspace = true }
 
 # Local Dependencies
 ulx-primitives = { workspace = true, features = ["default"] }
 ulx-notary-apis = { workspace = true }
 ulx-node-runtime = { workspace = true, features = ["default"] }
 ulx-bitcoin-utxo-tracker = { workspace = true }
-
+ulx-randomx = { workspace = true }
 
 [dev-dependencies]
 env_logger = { workspace = true }

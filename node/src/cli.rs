@@ -1,3 +1,4 @@
+use clap::ValueEnum;
 use sc_cli::RunCmd;
 use ulx_node_runtime::AccountId;
 
@@ -23,6 +24,15 @@ pub struct Cli {
 	/// full node. Include optional auth inline
 	#[arg(long)]
 	pub bitcoin_rpc_url: String,
+
+	#[arg(long)]
+	pub randomx_flags: Vec<RandomxFlag>,
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq, ValueEnum)]
+pub enum RandomxFlag {
+	LargePages,
+	Secure,
 }
 
 impl Cli {

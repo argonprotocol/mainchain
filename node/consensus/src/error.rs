@@ -49,7 +49,7 @@ pub enum Error<B: BlockT> {
 	CreateInherents(sp_inherents::Error),
 	#[error("Checking inherents failed: {0}")]
 	CheckInherents(sp_inherents::Error),
-	#[error("Invalid compute nonce used")]
+	#[error("Invalid compute nonce provided")]
 	InvalidComputeNonce,
 	#[error(
 	"Checking inherents unknown error for identifier: {}",

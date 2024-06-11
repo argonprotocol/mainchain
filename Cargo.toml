@@ -3,6 +3,7 @@ members = [
     "node",
     "node/consensus",
     "node/bitcoin_utxo_tracker",
+    "node/randomx",
     "pallets/bitcoin_utxos",
     "pallets/block_rewards",
     "pallets/block_seal",
@@ -130,6 +131,7 @@ parking_lot = { version = "0.12" }
 async-trait = { version = "0.1" }
 tokio = { version = "1.35", features = ["sync", "time", "rt"] }
 schnellru = { version = "0.2" }
+lru-cache = { version = "0.1.2" }
 getrandom = { version = "0.2" }
 rand = { version = "0.8.5" }
 lazy_static = "1.4.0"
@@ -154,6 +156,7 @@ tracing = { version = "0.1" }
 tracing-subscriber = { version = "0.3", features = ["env-filter"] }
 log = { version = "0.4", default-features = false }
 env_logger = "0.11"
+humantime = { version = "2.1" }
 
 sqlx = { version = "0.7", features = ["macros"] }
 chrono = { version = "0.4", features = ["serde"] }
@@ -263,6 +266,7 @@ napi-derive = { version = "2.16" }
 napi = { version = "2.16", features = ["napi9", "async", "error_anyhow"] }
 napi-build = { version = "2.1" }
 uniffi = { version = "0.27", features = ["tokio"] }
+randomx-rs = { git = "https://github.com/ulixee/randomx-rs", branch = "main" }
 
 clap = { version = "4.5", features = ["derive", "cargo", "env"] }
 rpassword = { version = "7.3" }
@@ -270,6 +274,9 @@ comfy-table = { version = "7.1" }
 bech32 = { version = "0.11.0" }
 array-bytes = { version = "6.1" }
 directories = { version = "5.0" }
+
+bindgen = { version = "0.69" }
+cmake = { version = "0.1" }
 
 dotenv = { version = "0.15" }
 
@@ -283,6 +290,7 @@ ulx-node-consensus = { path = "node/consensus" }
 ulx-bitcoin-utxo-tracker = { path = "node/bitcoin_utxo_tracker" }
 ulx-node = { path = "node" }
 ulx-node-runtime = { path = "runtime" }
+ulx-randomx = { path = "node/randomx" }
 ulx-notary = { path = "notary" }
 ulx-notary-apis = { path = "notary/apis" }
 ulx-notary-audit = { path = "notary/audit", default-features = false }

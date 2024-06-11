@@ -73,6 +73,7 @@ ulx-node-consensus = { workspace = true }
 ulx-node-runtime = { workspace = true, features = ["default"] }
 ulx-primitives = { workspace = true, features = ["default"] }
 ulx-bitcoin-utxo-tracker = { workspace = true }
+ulx-randomx = { workspace = true }
 
 # CLI-specific dependencies
 url = { workspace = true }
