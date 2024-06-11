@@ -1,0 +1,29 @@
+[package]
+name = "ulx-randomx"
+version.workspace = true
+authors.workspace = true
+edition.workspace = true
+rust-version.workspace = true
+license.workspace = true
+repository.workspace = true
+documentation.workspace = true
+homepage.workspace = true
+publish = false
+
+[dependencies]
+thiserror = { workspace = true }
+sp-core = { workspace = true, features = ["std"] }
+lazy_static = { workspace = true }
+lru-cache = { workspace = true }
+parking_lot = { workspace = true }
+log = { workspace = true }
+randomx-rs = { workspace = true }
+hex = { workspace = true }
+futures = { workspace = true }
+num_cpus = { workspace = true }
+
+[build-dependencies]
+bindgen = { workspace = true }
+cmake = { workspace = true }
+
+[dev-dependencies]

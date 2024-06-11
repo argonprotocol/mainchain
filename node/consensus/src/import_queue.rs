@@ -27,6 +27,7 @@ use crate::{
 	aux_client::UlxAux,
 	basic_queue::BasicQueue,
 	compute_solver::BlockComputeNonce,
+	compute_worker::randomx_key_block,
 	digests::{load_digests, read_seal_digest},
 	error::Error,
 	notary_client::verify_notebook_audits,
@@ -200,7 +201,13 @@ where
 							format!("Failed to get difficulty from runtime: {}", e).to_string(),
 						)
 					})?;
-				if !BlockComputeNonce::is_valid(nonce, pre_hash.as_ref().to_vec(), difficulty) {
+				let key_block_hash = randomx_key_block(&self.client, &parent_hash)?;
+				if !BlockComputeNonce::is_valid(
+					nonce,
+					pre_hash.as_ref().to_vec(),
+					&key_block_hash,
+					difficulty,
+				) {
 					return Err(Error::<B>::InvalidComputeNonce.into());
 				}
 				compute_difficulty = Some(difficulty);

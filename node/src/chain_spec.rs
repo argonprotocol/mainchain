@@ -50,7 +50,7 @@ pub fn development_config() -> Result<ChainSpec, String> {
 	let mut properties = Properties::new();
 	properties.insert("tokenDecimals".into(), 3.into());
 
-	const HASHES_PER_SECOND: u64 = 100_000;
+	const HASHES_PER_SECOND: u64 = 100;
 
 	Ok(ChainSpec::builder(
 		WASM_BINARY.ok_or_else(|| "Development wasm not available".to_string())?,
@@ -93,7 +93,7 @@ pub fn local_testnet_config() -> Result<ChainSpec, String> {
 	let notary_host = env::var("ULX_LOCAL_TESTNET_NOTARY_URL")
 		.unwrap_or("ws://127.0.0.1:9925".to_string())
 		.into();
-
+	const HASHES_PER_SECOND: u64 = 1_000;
 	Ok(ChainSpec::builder(
 		WASM_BINARY.ok_or_else(|| "Development wasm not available".to_string())?,
 		None,
@@ -124,7 +124,7 @@ pub fn local_testnet_config() -> Result<ChainSpec, String> {
 			get_account_id_from_seed::<sr25519::Public>("Ferdie"),
 		],
 		500,
-		(TICK_MILLIS * 1_000_000 / 1_000) as ComputeDifficulty,
+		(TICK_MILLIS * HASHES_PER_SECOND / 1_000) as ComputeDifficulty,
 		TICK_MILLIS,
 		vec![GenesisNotary {
 			account_id: get_account_id_from_seed::<sr25519::Public>("Ferdie"),

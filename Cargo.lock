@@ -946,6 +946,29 @@ dependencies = [
 ]
 
 [[package]]
+name = "bindgen"
+version = "0.69.4"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "a00dc851838a2120612785d195287475a3ac45514741da670b735818822129a0"
+dependencies = [
+ "bitflags 2.5.0",
+ "cexpr",
+ "clang-sys",
+ "itertools 0.12.1",
+ "lazy_static",
+ "lazycell",
+ "log",
+ "prettyplease 0.2.20",
+ "proc-macro2",
+ "quote",
+ "regex",
+ "rustc-hash",
+ "shlex",
+ "syn 2.0.66",
+ "which",
+]
+
+[[package]]
 name = "bip39"
 version = "2.0.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -1521,6 +1544,15 @@ name = "clap_lex"
 version = "0.7.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "98cc8fbded0c607b7ba9dd60cd98df59af97e84d24e49c8557331cfc26d301ce"
+
+[[package]]
+name = "cmake"
+version = "0.1.50"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "a31c789563b815f77f4250caee12365734369f942439b7defd71e18a48197130"
+dependencies = [
+ "cc",
+]
 
 [[package]]
 name = "codespan-reporting"
@@ -4740,7 +4772,7 @@ version = "0.11.0+8.1.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "d3386f101bcb4bd252d8e9d2fb41ec3b0862a15a62b478c355b2982efa469e3e"
 dependencies = [
- "bindgen",
+ "bindgen 0.65.1",
  "bzip2-sys",
  "cc",
  "glob",
@@ -7521,6 +7553,16 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "59cad018caf63deb318e5a4586d99a24424a364f40f1e5778c29aca23f4fc73e"
 dependencies = [
  "rand_core 0.6.4",
+]
+
+[[package]]
+name = "randomx-rs"
+version = "1.3.0"
+source = "git+https://github.com/ulixee/randomx-rs?branch=main#32c42f1440adc8e5f08b983dc0c884580dbb1667"
+dependencies = [
+ "bitflags 1.3.2",
+ "libc",
+ "thiserror",
 ]
 
 [[package]]
@@ -12190,6 +12232,7 @@ dependencies = [
  "ulx-node-consensus",
  "ulx-node-runtime",
  "ulx-primitives",
+ "ulx-randomx",
  "url",
 ]
 
@@ -12202,6 +12245,7 @@ dependencies = [
  "frame-support",
  "futures",
  "futures-timer",
+ "humantime",
  "jsonrpsee",
  "lazy_static",
  "log",
@@ -12250,6 +12294,7 @@ dependencies = [
  "ulx-notary",
  "ulx-notary-apis",
  "ulx-primitives",
+ "ulx-randomx",
 ]
 
 [[package]]
@@ -12420,6 +12465,24 @@ dependencies = [
  "thiserror",
  "tokio",
  "uniffi",
+]
+
+[[package]]
+name = "ulx-randomx"
+version = "0.0.1"
+dependencies = [
+ "bindgen 0.69.4",
+ "cmake",
+ "futures",
+ "hex",
+ "lazy_static",
+ "log",
+ "lru-cache",
+ "num_cpus",
+ "parking_lot 0.12.3",
+ "randomx-rs",
+ "sp-core",
+ "thiserror",
 ]
 
 [[package]]
