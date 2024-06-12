@@ -246,7 +246,6 @@ fn create_notebook(tick: Tick, domains: Vec<(DataDomainHash, AccountId)>) -> Not
 		notary_id: 1,
 		notebook_number: 1,
 		tick,
-		finalized_block_number: 1,
 		changed_accounts_root: Default::default(),
 		chain_transfers: Default::default(),
 		changed_account_origins: Default::default(),

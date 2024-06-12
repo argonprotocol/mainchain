@@ -35,7 +35,6 @@ CREATE TABLE IF NOT EXISTS notebook_headers
     hash                    bytea,
     signature               bytea,
     tick                    integer             NOT NULL,
-    finalized_block_number  integer,
     notary_id               integer             NOT NULL,
     tax                     varchar,
     chain_transfers         jsonb               NOT NULL,
@@ -67,7 +66,7 @@ CREATE INDEX IF NOT EXISTS chain_transfers_included_in_notebook_number ON chain_
 CREATE TABLE IF NOT EXISTS registered_keys
 (
     public                 bytea PRIMARY KEY,
-    finalized_block_number integer NOT NULL
+    effective_tick         integer NOT NULL
 );
 CREATE TABLE IF NOT EXISTS notarizations
 (

@@ -1,7 +1,11 @@
 use env_logger::{Builder, Env};
 use frame_support::{derive_impl, parameter_types, traits::ConstU16};
-use sp_core::ConstU32;
+use sp_core::{ConstU32, H256};
 use sp_runtime::{traits::IdentityLookup, BuildStorage};
+use ulx_primitives::{
+	tick::{Tick, Ticker},
+	TickProvider,
+};
 
 use crate as pallet_notaries;
 
@@ -30,7 +34,21 @@ parameter_types! {
 	pub static MaxActiveNotaries: u32 = 2;
 	pub static MaxProposalsPerBlock:u32 = 1;
 	pub static MaxNotaryHosts:u32 = 1;
-	pub static MaxBlocksForKeyHistory:u32 = 10;
+	pub static MaxTicksForKeyHistory:u32 = 10;
+	pub static CurrentTick: Tick = 1;
+}
+
+pub struct StaticTickProvider;
+impl TickProvider<Block> for StaticTickProvider {
+	fn current_tick() -> Tick {
+		CurrentTick::get()
+	}
+	fn ticker() -> Ticker {
+		Ticker::new(1, 1)
+	}
+	fn blocks_at_tick(_: Tick) -> Vec<H256> {
+		todo!()
+	}
 }
 
 impl pallet_notaries::Config for Test {
@@ -39,9 +57,10 @@ impl pallet_notaries::Config for Test {
 	type MaxProposalHoldBlocks = MaxProposalHoldBlocks;
 	type MaxActiveNotaries = MaxActiveNotaries;
 	type MaxProposalsPerBlock = MaxProposalsPerBlock;
-	type MetaChangesBlockDelay = ConstU32<1>;
+	type MetaChangesTickDelay = ConstU32<1>;
 	type MaxNotaryHosts = MaxNotaryHosts;
-	type MaxBlocksForKeyHistory = MaxBlocksForKeyHistory;
+	type MaxTicksForKeyHistory = MaxTicksForKeyHistory;
+	type TickProvider = StaticTickProvider;
 }
 
 // Build genesis storage according to the mock runtime.

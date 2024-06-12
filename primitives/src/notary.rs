@@ -3,10 +3,7 @@ use frame_support_procedural::{CloneNoBound, PartialEqNoBound, RuntimeDebugNoBou
 use scale_info::TypeInfo;
 use serde::{Deserialize, Serialize};
 use sp_core::{ed25519, Get, RuntimeDebug, H256};
-use sp_runtime::{
-	traits::{Block as BlockT, NumberFor},
-	BoundedVec,
-};
+use sp_runtime::{traits::Block as BlockT, BoundedVec};
 use sp_std::{collections::btree_map::BTreeMap, fmt::Debug, vec::Vec};
 
 use crate::{
@@ -21,7 +18,7 @@ pub type NotarySignature = ed25519::Signature;
 pub trait NotaryProvider<B: BlockT> {
 	fn verify_signature(
 		notary_id: NotaryId,
-		at_block_height: NumberFor<B>,
+		at_tick: Tick,
 		message: &H256,
 		signature: &NotarySignature,
 	) -> bool;
@@ -61,6 +58,8 @@ pub struct NotaryRecord<
 
 	#[codec(compact)]
 	pub meta_updated_block: BlockNumber,
+	#[codec(compact)]
+	pub meta_updated_tick: Tick,
 	pub meta: NotaryMeta<MaxHosts>,
 }
 #[derive(Clone, PartialEq, Eq, Encode, Decode, RuntimeDebug, TypeInfo, Default)]
@@ -69,8 +68,6 @@ pub struct NotaryNotebookTickState {
 	pub notaries: u16,
 	pub notebook_key_details_by_notary: BTreeMap<NotaryId, NotaryNotebookVoteDigestDetails>,
 	pub raw_headers_by_notary: BTreeMap<NotaryId, Vec<u8>>,
-	#[codec(compact)]
-	pub latest_finalized_block_needed: u32,
 }
 
 #[derive(Clone, PartialEq, Eq, Encode, Decode, RuntimeDebug, TypeInfo)]
@@ -83,8 +80,6 @@ pub struct NotaryNotebookVoteDetails<Hash: Codec> {
 	pub notebook_number: NotebookNumber,
 	#[codec(compact)]
 	pub tick: Tick,
-	#[codec(compact)]
-	pub finalized_block_number: u32,
 	pub header_hash: H256,
 	#[codec(compact)]
 	pub block_votes_count: u32,

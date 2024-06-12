@@ -9,7 +9,10 @@ use tracing::info;
 
 pub use ulixee_client;
 use ulixee_client::{api, MainchainClient, UlxConfig, UlxOnlineClient};
-use ulx_primitives::{tick::Ticker, AccountId, NotaryId, NotebookDigest};
+use ulx_primitives::{
+	tick::{Tick, Ticker},
+	AccountId, NotaryId, NotebookDigest, TickDigest,
+};
 
 use crate::{
 	stores::{
@@ -80,7 +83,7 @@ async fn sync_finalized_blocks(
 			&mut *db,
 			notary_id,
 			public,
-			oldest_block_to_sync,
+			notary.meta_updated_tick,
 			&ticker,
 		)
 		.await
@@ -202,11 +205,11 @@ async fn activate_notebook_processing(
 	db: &mut PgConnection,
 	notary_id: NotaryId,
 	public: Ed25519Public,
-	block_height: u32,
+	active_at_tick: Tick,
 	ticker: &Ticker,
 ) -> anyhow::Result<()> {
 	// it might already be stored
-	let _ = RegisteredKeyStore::store_public(&mut *db, public, block_height).await.ok();
+	let _ = RegisteredKeyStore::store_public(&mut *db, public, active_at_tick).await.ok();
 	let tick = ticker.current();
 	NotebookHeaderStore::create(&mut *db, notary_id, 1, tick, ticker.time_for_tick(tick + 1))
 		.await?;
@@ -223,6 +226,18 @@ async fn process_finalized_block(
 	BlocksStore::record_finalized(db, block.hash()).await?;
 
 	let block_height = block.number();
+	let tick = block
+		.header()
+		.digest
+		.logs
+		.iter()
+		.find_map(|log| match log {
+			DigestItem::PreRuntime(ulx_primitives::TICK_DIGEST_ID, data) =>
+				TickDigest::decode(&mut &data[..]).ok(),
+			_ => None,
+		})
+		.map(|digest| digest.tick)
+		.unwrap_or(ticker.current());
 
 	let events = block.events().await?;
 	for event in events.iter() {
@@ -234,7 +249,7 @@ async fn process_finalized_block(
 					RegisteredKeyStore::store_public(
 						&mut *db,
 						Ed25519Public::from_raw(meta_change.meta.public),
-						block_height,
+						tick,
 					)
 					.await?;
 				}

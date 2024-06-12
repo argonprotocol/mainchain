@@ -199,7 +199,6 @@ fn test_verify_notebook() {
 		version: 1,
 		notary_id: 1,
 		notebook_number: 1,
-		finalized_block_number: 100,
 		tick: 1,
 		changed_accounts_root: merkle_root::<Blake2Hasher, _>(vec![BalanceTip {
 			account_id: Alice.to_account_id(),
@@ -296,7 +295,6 @@ fn test_disallows_double_claim() {
 		version: 1,
 		notary_id: 1,
 		notebook_number: 1,
-		finalized_block_number: 100,
 		tick: 0,
 		changed_accounts_root: merkle_root::<Blake2Hasher, _>(vec![BalanceTip {
 			account_id: Alice.to_account_id(),
@@ -435,7 +433,6 @@ fn test_multiple_changesets_in_a_notebook() {
 			version: 1,
 			notary_id: 1,
 			notebook_number: 1,
-			finalized_block_number: 100,
 			tick: 0,
 			tax: 200,
 			changed_accounts_root: merkle_root::<Blake2Hasher, _>(
@@ -636,7 +633,6 @@ fn test_cannot_remove_lock_between_changesets_in_a_notebook() {
 			version: 1,
 			notary_id: 1,
 			notebook_number: 1,
-			finalized_block_number: 100,
 			tick: 0,
 			changed_accounts_root: merkle_root::<Blake2Hasher, _>(vec![BalanceTip {
 				account_id: Alice.to_account_id(),
@@ -840,7 +836,6 @@ fn test_votes_must_add_up() {
 			version: 1,
 			notary_id: 1,
 			notebook_number: 62,
-			finalized_block_number: 100,
 			tick: ESCROW_EXPIRATION_TICKS + 1,
 			changed_accounts_root: Default::default(),
 			chain_transfers: Default::default(),

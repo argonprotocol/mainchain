@@ -231,7 +231,6 @@ fn create_default_notebook(
 		notary_id,
 		notebook_number,
 		tick,
-		finalized_block_number: 1,
 		changed_accounts_root: Default::default(),
 		chain_transfers: Default::default(),
 		changed_account_origins: Default::default(),

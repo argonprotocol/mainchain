@@ -193,7 +193,7 @@ declare module '@polkadot/api-base/types/events' {
       /**
        * Notary metadata queued for update
        **/
-      NotaryMetaUpdateQueued: AugmentedEvent<ApiType, [notaryId: u32, meta: UlxPrimitivesNotaryNotaryMeta, effectiveBlock: u32], { notaryId: u32, meta: UlxPrimitivesNotaryNotaryMeta, effectiveBlock: u32 }>;
+      NotaryMetaUpdateQueued: AugmentedEvent<ApiType, [notaryId: u32, meta: UlxPrimitivesNotaryNotaryMeta, effectiveTick: u32], { notaryId: u32, meta: UlxPrimitivesNotaryNotaryMeta, effectiveTick: u32 }>;
       /**
        * A user has proposed operating as a notary
        **/

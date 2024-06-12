@@ -19,7 +19,6 @@ use ulx_bitcoin_utxo_tracker::{get_bitcoin_inherent, UtxoTracker};
 
 use ulx_node_runtime::{NotaryRecordT, NotebookVerifyError};
 use ulx_primitives::{
-	digests::FinalizedBlockNeededDigest,
 	inherents::{
 		BitcoinInherentDataProvider, BlockSealInherentDataProvider, BlockSealInherentNodeSide,
 		NotebooksInherentDataProvider,
@@ -232,7 +231,7 @@ pub async fn propose<B, C, E, A>(
 	seal_inherent: BlockSealInherentNodeSide,
 	utxo_tracker: Arc<UtxoTracker>,
 	max_time_to_build_block: Duration,
-) -> Result<Proposal<B, <E::Proposer as Proposer<B>>::Proof>, Error<B>>
+) -> Result<Proposal<B, <E::Proposer as Proposer<B>>::Proof>, Error>
 where
 	B: BlockT + 'static,
 	C: ProvideRuntimeApi<B> + HeaderBackend<B> + AuxStore + 'static,
@@ -308,21 +307,10 @@ where
 		},
 	};
 
-	let latest_finalized_block_needed = notebook_header_data.latest_finalized_block_needed;
-	let finalized_hash_needed = match client.hash(latest_finalized_block_needed.into()) {
-		Ok(Some(x)) => x,
-		Ok(None) => return Err(Error::InvalidFinalizedBlockNeeded),
-		Err(err) => return Err(err.into()),
-	};
-
 	let inherent_digest = create_pre_runtime_digests(
 		author,
 		tick,
 		notebook_header_data.vote_digest,
-		FinalizedBlockNeededDigest::<B> {
-			number: latest_finalized_block_needed.into(),
-			hash: finalized_hash_needed,
-		},
 		notebook_header_data.notebook_digest,
 	);
 

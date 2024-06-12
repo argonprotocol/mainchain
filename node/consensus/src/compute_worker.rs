@@ -201,7 +201,7 @@ where
 		}
 	}
 
-	pub async fn submit(&mut self, nonce: U256) -> Result<(), Error<B>> {
+	pub async fn submit(&mut self, nonce: U256) -> Result<(), Error> {
 		let build = match {
 			let mut build = self.build.lock();
 			// try to take out of option. if not exists, we've moved on
@@ -441,7 +441,7 @@ where
 /// blocks (~2.8 days) and there should be a delay of 64 blocks (~2 hours) between the key block and
 /// the change of the key K. This can be achieved by changing the key when blockHeight % 2048 == 64
 /// and selecting key block such that keyBlockHeight % 2048 == 0.
-pub fn randomx_key_block<B, C>(client: &Arc<C>, parent_hash: &B::Hash) -> Result<H256, Error<B>>
+pub fn randomx_key_block<B, C>(client: &Arc<C>, parent_hash: &B::Hash) -> Result<H256, Error>
 where
 	B: BlockT,
 	C: HeaderBackend<B>,

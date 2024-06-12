@@ -12,7 +12,6 @@ use ulx_primitives::{prod_or_fast, tick::Ticker, NotaryId, SignedNotebookHeader}
 use crate::{
 	error::Error,
 	stores::{
-		blocks::BlocksStore,
 		notebook::NotebookStore,
 		notebook_header::NotebookHeaderStore,
 		notebook_status::{NotebookFinalizationStep, NotebookStatusStore},
@@ -159,25 +158,16 @@ impl NotebookCloser {
 		async move {
 			let mut tx = self.pool.begin().await?;
 			let step = NotebookFinalizationStep::ReadyForClose;
-			let notebook_number =
+			let (notebook_number, tick) =
 				match NotebookStatusStore::find_and_lock_ready_for_close(&mut *tx).await? {
 					Some(notebook_number) => notebook_number,
 					None => return Ok(()),
 				};
 
-			// TODO: we can potentially improve mainchain intake speed by only referencing the
-			// 	latest finalized block needed by the chain transfers/keys
-			let finalized_block = BlocksStore::get_latest_finalized_block_number(&mut *tx).await?;
-			let public = RegisteredKeyStore::get_valid_public(&mut *tx, finalized_block).await?;
+			let public = RegisteredKeyStore::get_valid_public(&mut *tx, tick).await?;
 
-			NotebookStore::close_notebook(
-				&mut *tx,
-				notebook_number,
-				finalized_block,
-				public,
-				&self.keystore,
-			)
-			.await?;
+			NotebookStore::close_notebook(&mut *tx, notebook_number, public, &self.keystore)
+				.await?;
 
 			NotebookStatusStore::next_step(&mut *tx, notebook_number, step).await?;
 			tx.commit().await?;
@@ -274,6 +264,7 @@ mod tests {
 
 	use super::*;
 	use ulixee_client::ReconnectingClient;
+	use ulx_notary_apis::Client;
 	use ulx_primitives::host::Host;
 
 	#[sqlx::test]
@@ -940,16 +931,15 @@ mod tests {
 		account: Keypair,
 		amount: u32,
 	) -> anyhow::Result<(TransferToLocalchainId, u32, Keypair)> {
-		let in_block = client
+		let in_block = Client::client
 			.tx()
 			.sign_and_submit_then_watch_default(
 				&tx().chain_transfer().send_to_localchain(amount.into(), 1),
 				&account,
 			)
 			.await?
-			.wait_for_finalized()
+			.wait_for_finalized_success()
 			.await?;
-		in_block.wait_for_success().await?;
 		let events = in_block.fetch_events().await?;
 
 		for event in events.iter() {

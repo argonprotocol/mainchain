@@ -83,7 +83,7 @@ impl NotebookStore {
 		let result = sqlx::query!(
 			r#"
 			SELECT new_account_origins, notebook_number FROM notebooks
-			WHERE new_account_origins @> $1::jsonb 
+			WHERE new_account_origins @> $1::jsonb
 			ORDER BY notebook_number DESC LIMIT 1
 			"#,
 			origin
@@ -224,7 +224,6 @@ impl NotebookStore {
 	pub async fn close_notebook(
 		db: &mut PgConnection,
 		notebook_number: NotebookNumber,
-		finalized_block: u32,
 		public: Public,
 		keystore: &KeystorePtr,
 	) -> anyhow::Result<(), Error> {
@@ -339,7 +338,6 @@ impl NotebookStore {
 		NotebookHeaderStore::complete_notebook(
 			&mut *db,
 			notebook_number,
-			finalized_block,
 			transfers,
 			data_domains,
 			tax,
@@ -378,7 +376,7 @@ impl NotebookStore {
 
 		let res = sqlx::query!(
 			r#"
-				INSERT INTO notebooks (notebook_number, change_merkle_leafs, new_account_origins, block_votes, hash, signature) 
+				INSERT INTO notebooks (notebook_number, change_merkle_leafs, new_account_origins, block_votes, hash, signature)
 				VALUES ($1, $2, $3, $4, $5, $6)
 			"#,
 			notebook_number as i32,
@@ -513,7 +511,7 @@ mod tests {
 		tx.commit().await?;
 
 		let mut tx = pool.begin().await?;
-		NotebookStore::close_notebook(&mut *tx, 1, 1, public, &keystore.into()).await?;
+		NotebookStore::close_notebook(&mut *tx, 1, public, &keystore.into()).await?;
 		tx.commit().await?;
 
 		let balance_tip = BalanceTip {

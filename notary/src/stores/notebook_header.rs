@@ -29,7 +29,6 @@ struct NotebookHeaderRow {
 	pub hash: Option<Vec<u8>>,
 	pub signature: Option<Vec<u8>>,
 	pub tick: i32,
-	pub finalized_block_number: Option<i32>,
 	pub notary_id: i32,
 	pub tax: Option<String>,
 	pub chain_transfers: JsonValue,
@@ -52,10 +51,6 @@ impl TryInto<NotebookHeader> for NotebookHeaderRow {
 			version: self.version as u16,
 			notebook_number: self.notebook_number as u32,
 			tick: self.tick as u32,
-			finalized_block_number: self
-				.finalized_block_number
-				.map(|a| a as u32)
-				.unwrap_or_default(),
 			notary_id: self.notary_id as u32,
 			tax: self
 				.tax
@@ -364,7 +359,6 @@ impl NotebookHeaderStore {
 	pub fn complete_notebook<'a>(
 		db: &'a mut PgConnection,
 		notebook_number: NotebookNumber,
-		finalized_block_number: u32,
 		transfers: Vec<ChainTransfer>,
 		data_domains: Vec<(DataDomainHash, AccountId)>,
 		tax: u128,
@@ -393,7 +387,6 @@ impl NotebookHeaderStore {
 			let account_changelist = BTreeSet::from_iter(account_changelist);
 			header.changed_account_origins =
 				BoundedVec::truncate_from(account_changelist.into_iter().collect::<Vec<_>>());
-			header.finalized_block_number = finalized_block_number;
 			header.block_votes_root = block_votes_root;
 			header.block_votes_count = block_votes_count;
 			header.blocks_with_votes =
@@ -417,13 +410,12 @@ impl NotebookHeaderStore {
 					block_voting_power=$6,
 					block_votes_root=$7,
 					block_votes_count=$8,
-					finalized_block_number=$9,
-					blocks_with_votes=$10,
-					secret_hash=$11,
-					parent_secret=$12,
-					signature=$13,
-					data_domains=$14
-				WHERE notebook_number = $15
+					blocks_with_votes=$9,
+					secret_hash=$10,
+					parent_secret=$11,
+					signature=$12,
+					data_domains=$13
+				WHERE notebook_number = $14
 			"#,
 				&hash,
 				header.changed_accounts_root.as_bytes(),
@@ -433,7 +425,6 @@ impl NotebookHeaderStore {
 				header.block_voting_power.to_string(),
 				header.block_votes_root.as_bytes(),
 				header.block_votes_count as i32,
-				header.finalized_block_number as i32,
 				&header
 					.blocks_with_votes
 					.into_iter()
@@ -560,7 +551,6 @@ mod tests {
 			let mut tx = pool.begin().await?;
 			NotebookHeaderStore::complete_notebook(
 				&mut *tx,
-				notebook_number,
 				notebook_number,
 				vec![
 					ChainTransfer::ToLocalchain { transfer_id: 1 },

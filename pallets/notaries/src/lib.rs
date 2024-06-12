@@ -18,12 +18,16 @@ pub mod pallet {
 	use frame_system::pallet_prelude::*;
 	use log::warn;
 	use sp_core::H256;
-	use sp_runtime::{app_crypto::RuntimePublic, BoundedBTreeMap, Saturating};
+	use sp_runtime::{app_crypto::RuntimePublic, BoundedBTreeMap};
 	use sp_std::vec::Vec;
 
-	use ulx_primitives::notary::{
-		GenesisNotary, NotaryId, NotaryMeta, NotaryProvider, NotaryPublic, NotaryRecord,
-		NotarySignature,
+	use ulx_primitives::{
+		notary::{
+			GenesisNotary, NotaryId, NotaryMeta, NotaryProvider, NotaryPublic, NotaryRecord,
+			NotarySignature,
+		},
+		tick::Tick,
+		TickProvider,
 	};
 
 	use super::*;
@@ -54,18 +58,22 @@ pub mod pallet {
 		#[pallet::constant]
 		type MaxProposalsPerBlock: Get<u32>;
 
-		/// Number of blocks to delay changing a notaries' meta
+		/// Number of ticks to delay changing a notaries' meta (this is to allow a window for
+		/// notaries to switch to new keys after a new key is finalized)
 		#[pallet::constant]
-		type MetaChangesBlockDelay: Get<u32>;
+		type MetaChangesTickDelay: Get<Tick>;
 
-		/// Number of blocks to maintain key history for each notary
+		/// Number of ticks to maintain key history for each notary
 		/// NOTE: only pruned when new keys are added
 		#[pallet::constant]
-		type MaxBlocksForKeyHistory: Get<u32>;
+		type MaxTicksForKeyHistory: Get<Tick>;
 
 		/// Maximum hosts a notary can supply
 		#[pallet::constant]
 		type MaxNotaryHosts: Get<u32>;
+
+		/// Provides the current tick
+		type TickProvider: TickProvider<Self::Block>;
 	}
 
 	#[pallet::storage]
@@ -99,15 +107,16 @@ pub mod pallet {
 		_,
 		Twox64Concat,
 		NotaryId,
-		BoundedVec<(BlockNumberFor<T>, NotaryPublic), T::MaxBlocksForKeyHistory>,
+		BoundedVec<(Tick, NotaryPublic), T::MaxTicksForKeyHistory>,
 		ValueQuery,
 	>;
 
+	/// Metadata changes to be activated at the given tick
 	#[pallet::storage]
 	pub(super) type QueuedNotaryMetaChanges<T: Config> = StorageMap<
 		_,
 		Twox64Concat,
-		BlockNumberFor<T>,
+		Tick,
 		BoundedBTreeMap<NotaryId, NotaryMetaOf<T>, T::MaxActiveNotaries>,
 		ValueQuery,
 	>;
@@ -124,23 +133,27 @@ pub mod pallet {
 		/// A notary proposal has been accepted
 		NotaryActivated { notary: NotaryRecordOf<T> },
 		/// Notary metadata queued for update
-		NotaryMetaUpdateQueued {
-			notary_id: NotaryId,
-			meta: NotaryMetaOf<T>,
-			effective_block: BlockNumberFor<T>,
-		},
+		NotaryMetaUpdateQueued { notary_id: NotaryId, meta: NotaryMetaOf<T>, effective_tick: Tick },
 		/// Notary metadata updated
 		NotaryMetaUpdated { notary_id: NotaryId, meta: NotaryMetaOf<T> },
 	}
 
 	#[pallet::error]
 	pub enum Error<T> {
+		/// The proposal to activate was not found
 		ProposalNotFound,
+		/// Maximum number of notaries exceeded
 		MaxNotariesExceeded,
+		/// Maximum number of proposals per block exceeded
 		MaxProposalsPerBlockExceeded,
+		/// This notary is not active, so this change cannot be made yet
 		NotAnActiveNotary,
+		/// Invalid notary operator for this operation
 		InvalidNotaryOperator,
+		/// An internal error has occurred. The notary ids are exhausted.
 		NoMoreNotaryIds,
+		/// The proposed effective tick is too soon
+		EffectiveTickTooSoon,
 	}
 
 	#[pallet::genesis_config]
@@ -169,23 +182,26 @@ pub mod pallet {
 	#[pallet::hooks]
 	impl<T: Config> Hooks<BlockNumberFor<T>> for Pallet<T> {
 		fn on_initialize(n: BlockNumberFor<T>) -> Weight {
-			let meta_changes = QueuedNotaryMetaChanges::<T>::take(n);
+			let current_tick = T::TickProvider::current_tick();
+			let meta_changes = QueuedNotaryMetaChanges::<T>::take(current_tick);
 			if meta_changes.len() > 0 {
 				let old_block_to_preserve =
-					n.saturating_sub(T::MaxBlocksForKeyHistory::get().into());
+					current_tick.saturating_sub(T::MaxTicksForKeyHistory::get().into());
 				let _ = <ActiveNotaries<T>>::try_mutate(|active| -> DispatchResult {
 					for (notary_id, meta) in meta_changes.into_iter() {
 						if let Some(pos) = active.iter().position(|n| n.notary_id == notary_id) {
 							active[pos].meta = meta.clone();
 							active[pos].meta_updated_block = n;
+							active[pos].meta_updated_tick = current_tick;
 							if let Err(e) =
 								<NotaryKeyHistory<T>>::try_mutate(notary_id, |history| {
-									history.retain(|(block, _)| *block >= old_block_to_preserve);
-									history.try_push((n, meta.public))
+									history.retain(|(tick, _)| *tick >= old_block_to_preserve);
+									history.try_push((current_tick, meta.public))
 								}) {
 								warn!("Failed to update notary key history: {:?} {notary_id:?}", e);
+							} else {
+								Self::deposit_event(Event::NotaryMetaUpdated { notary_id, meta });
 							}
-							Self::deposit_event(Event::NotaryMetaUpdated { notary_id, meta });
 						} else {
 							warn!(
 								"Invalid notary meta queued (id={:?}) at block {:?}",
@@ -261,12 +277,15 @@ pub mod pallet {
 			Ok(())
 		}
 
+		/// Update the metadata of a notary, to be effective at the given tick height, which must be
+		/// >= MetaChangesTickDelay ticks in the future.
 		#[pallet::call_index(2)]
 		#[pallet::weight(0)]
 		pub fn update(
 			origin: OriginFor<T>,
 			#[pallet::compact] notary_id: NotaryId,
 			meta: NotaryMetaOf<T>,
+			#[pallet::compact] effective_tick: Tick,
 		) -> DispatchResult {
 			let who = ensure_signed(origin)?;
 
@@ -277,18 +296,20 @@ pub mod pallet {
 
 			ensure!(notary.operator_account_id == who, Error::<T>::InvalidNotaryOperator);
 
-			let meta_change: BlockNumberFor<T> = T::MetaChangesBlockDelay::get().into();
+			let current_tick = T::TickProvider::current_tick();
+			ensure!(
+				effective_tick >= current_tick + T::MetaChangesTickDelay::get(),
+				Error::<T>::EffectiveTickTooSoon
+			);
 
-			let effective_block = meta_change + frame_system::Pallet::<T>::block_number();
-
-			<QueuedNotaryMetaChanges<T>>::try_mutate(effective_block, |changes| {
+			<QueuedNotaryMetaChanges<T>>::try_mutate(effective_tick, |changes| {
 				changes
 					.try_insert(notary_id, meta.clone())
 					// shouldn't be possible.
 					.map_err(|_| Error::<T>::MaxNotariesExceeded)?;
 				Ok::<_, Error<T>>(())
 			})?;
-			Self::deposit_event(Event::NotaryMetaUpdateQueued { notary_id, meta, effective_block });
+			Self::deposit_event(Event::NotaryMetaUpdateQueued { notary_id, meta, effective_tick });
 
 			Ok(())
 		}
@@ -309,6 +330,7 @@ pub mod pallet {
 				operator_account_id: operator_account.clone(),
 				activated_block: block_number,
 				meta_updated_block: block_number,
+				meta_updated_tick: T::TickProvider::current_tick(),
 				meta,
 			};
 
@@ -316,7 +338,7 @@ pub mod pallet {
 				active.try_push(notary.clone()).map_err(|_| Error::<T>::MaxNotariesExceeded)?;
 				Ok(())
 			})?;
-			<NotaryKeyHistory<T>>::try_append(notary_id, (block_number, public))
+			<NotaryKeyHistory<T>>::try_append(notary_id, (notary.meta_updated_tick, public))
 				.map_err(|_| Error::<T>::MaxNotariesExceeded)?;
 
 			Self::deposit_event(Event::NotaryActivated { notary });
@@ -336,18 +358,16 @@ pub mod pallet {
 	impl<T: Config> NotaryProvider<T::Block> for Pallet<T> {
 		fn verify_signature(
 			notary_id: NotaryId,
-			at_block_height: BlockNumberFor<T>,
+			at_tick: Tick,
 			message: &H256,
 			signature: &NotarySignature,
 		) -> bool {
 			let key_history = <NotaryKeyHistory<T>>::get(notary_id);
 
 			// find the first key that is valid at the given block height
-			let mut public = key_history
-				.iter()
-				.find(|(block, _)| *block >= at_block_height)
-				.map(|(_, public)| public);
-			if public.is_none() && key_history.len() > 0 && key_history[0].0 < at_block_height {
+			let mut public =
+				key_history.iter().find(|(tick, _)| *tick >= at_tick).map(|(_, public)| public);
+			if public.is_none() && key_history.len() > 0 && key_history[0].0 < at_tick {
 				public = key_history.first().map(|(_, public)| public);
 			}
 

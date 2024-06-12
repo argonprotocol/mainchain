@@ -357,7 +357,6 @@ impl MockNotary {
       tick: 1,
       tax: 0,
       data_domains: Default::default(),
-      finalized_block_number: 1,
       block_votes_count: 0,
       block_voting_power: 0,
       parent_secret: None,

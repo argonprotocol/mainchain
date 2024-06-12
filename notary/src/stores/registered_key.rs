@@ -1,5 +1,6 @@
 use crate::ensure;
 use sp_core::{ed25519, ByteArray};
+use ulx_primitives::tick::Tick;
 
 use crate::error::Error;
 
@@ -11,15 +12,15 @@ impl RegisteredKeyStore {
 	pub async fn store_public<'a>(
 		db: impl sqlx::PgExecutor<'a> + 'a,
 		public: ed25519::Public,
-		finalized_block_number: u32,
+		effective_tick: Tick,
 	) -> anyhow::Result<(), Error> {
 		let res = sqlx::query!(
 			r#"
-            INSERT INTO registered_keys (public, finalized_block_number)
+            INSERT INTO registered_keys (public, effective_tick)
             VALUES ($1, $2)
             "#,
 			&public.0,
-			finalized_block_number as i32,
+			effective_tick as i32,
 		)
 		.execute(db)
 		.await?;
@@ -32,16 +33,16 @@ impl RegisteredKeyStore {
 
 	pub async fn get_valid_public<'a>(
 		db: impl sqlx::PgExecutor<'a> + 'a,
-		block_number: u32,
+		tick: Tick,
 	) -> anyhow::Result<ed25519::Public, Error> {
 		let public = sqlx::query!(
 			r#"
 				SELECT public FROM registered_keys
-				WHERE finalized_block_number <= $1
-				ORDER BY finalized_block_number DESC
+				WHERE effective_tick <= $1
+				ORDER BY effective_tick DESC
 				LIMIT 1
             "#,
-			block_number as i32
+			tick as i32
 		)
 		.fetch_one(db)
 		.await?

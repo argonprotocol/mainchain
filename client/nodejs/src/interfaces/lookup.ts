@@ -393,7 +393,7 @@ export default {
       NotaryMetaUpdateQueued: {
         notaryId: 'u32',
         meta: 'UlxPrimitivesNotaryNotaryMeta',
-        effectiveBlock: 'u32',
+        effectiveTick: 'u32',
       },
       NotaryMetaUpdated: {
         notaryId: 'u32',
@@ -416,6 +416,7 @@ export default {
     operatorAccountId: 'AccountId32',
     activatedBlock: 'Compact<u32>',
     metaUpdatedBlock: 'Compact<u32>',
+    metaUpdatedTick: 'Compact<u32>',
     meta: 'UlxPrimitivesNotaryNotaryMeta'
   },
   /**
@@ -1232,7 +1233,8 @@ export default {
       },
       update: {
         notaryId: 'Compact<u32>',
-        meta: 'UlxPrimitivesNotaryNotaryMeta'
+        meta: 'UlxPrimitivesNotaryNotaryMeta',
+        effectiveTick: 'Compact<u32>'
       }
     }
   },
@@ -1260,7 +1262,6 @@ export default {
     version: 'Compact<u16>',
     notebookNumber: 'Compact<u32>',
     tick: 'Compact<u32>',
-    finalizedBlockNumber: 'Compact<u32>',
     tax: 'Compact<u128>',
     notaryId: 'Compact<u32>',
     chainTransfers: 'Vec<UlxPrimitivesNotebookChainTransfer>',
@@ -1780,7 +1781,7 @@ export default {
    * Lookup266: pallet_notaries::pallet::Error<T>
    **/
   PalletNotariesError: {
-    _enum: ['ProposalNotFound', 'MaxNotariesExceeded', 'MaxProposalsPerBlockExceeded', 'NotAnActiveNotary', 'InvalidNotaryOperator', 'NoMoreNotaryIds']
+    _enum: ['ProposalNotFound', 'MaxNotariesExceeded', 'MaxProposalsPerBlockExceeded', 'NotAnActiveNotary', 'InvalidNotaryOperator', 'NoMoreNotaryIds', 'EffectiveTickTooSoon']
   },
   /**
    * Lookup270: ulx_primitives::notary::NotaryNotebookKeyDetails

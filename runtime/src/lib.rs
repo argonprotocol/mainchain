@@ -481,8 +481,8 @@ parameter_types! {
 	pub const MaxActiveNotaries: u32 = 25; // arbitrarily set
 	pub const MaxProposalHoldBlocks: u32 = 1440 * 14; // 2 weeks to approve
 	pub const MaxProposalsPerBlock: u32 = 10;
-	pub const MetaChangesBlockDelay: u32 = 1;
-	pub const MaxBlocksForKeyHistory: u32 = 1440 * 2; // keep for 2 days.. only used for notebook submission
+	pub const MetaChangesTickDelay: u32 = 6; // delay pubkey changes for minimum of an hour
+	pub const MaxTicksForKeyHistory: u32 = 1440 * 2; // keep for 2 days.. only used for notebook submission
 	/// Max host ips a notary can provide
 	pub const MaxNotaryHosts: u32 = 4;
 }
@@ -495,9 +495,10 @@ impl pallet_notaries::Config for Runtime {
 	type MaxActiveNotaries = MaxActiveNotaries;
 	type MaxProposalHoldBlocks = MaxProposalHoldBlocks;
 	type MaxProposalsPerBlock = MaxProposalsPerBlock;
-	type MetaChangesBlockDelay = MetaChangesBlockDelay;
-	type MaxBlocksForKeyHistory = MaxBlocksForKeyHistory;
+	type MetaChangesTickDelay = MetaChangesTickDelay;
+	type MaxTicksForKeyHistory = MaxTicksForKeyHistory;
 	type MaxNotaryHosts = MaxNotaryHosts;
+	type TickProvider = Ticks;
 }
 pub type AccountIdOf<T> = <T as frame_system::Config>::AccountId;
 pub type ArgonNegativeImbalance<T> = <pallet_balances::Pallet<T, ArgonToken> as Currency<

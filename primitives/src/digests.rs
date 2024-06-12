@@ -3,10 +3,7 @@ use frame_support_procedural::DefaultNoBound;
 use scale_info::TypeInfo;
 use serde::{Deserialize, Serialize};
 use sp_core::{RuntimeDebug, U256};
-use sp_runtime::{
-	traits::{Block as BlockT, NumberFor},
-	ConsensusEngineId,
-};
+use sp_runtime::ConsensusEngineId;
 use sp_std::vec::Vec;
 
 use crate::{tick::Tick, BlockVotingPower, NotaryId, NotebookNumber, VotingKey};
@@ -18,9 +15,6 @@ pub const AUTHOR_DIGEST_ID: ConsensusEngineId = [b'p', b'o', b'w', b'_'];
 /// details in the node.
 pub const BLOCK_SEAL_DIGEST_ID: ConsensusEngineId = [b's', b'e', b'a', b'l'];
 
-/// The finalized block needed to sync (FinalizedBlockNeededDigest)
-pub const FINALIZED_BLOCK_DIGEST_ID: ConsensusEngineId = [b'f', b'i', b'n', b'_'];
-
 /// The tick of the given block
 pub const TICK_DIGEST_ID: ConsensusEngineId = [b't', b'i', b'c', b'k'];
 
@@ -30,13 +24,6 @@ pub const BLOCK_VOTES_DIGEST_ID: ConsensusEngineId = [b'v', b'o', b't', b'e'];
 pub const NOTEBOOKS_DIGEST_ID: ConsensusEngineId = [b'b', b'o', b'o', b'k'];
 /// Parent Voting Key Digest
 pub const PARENT_VOTING_KEY_DIGEST: ConsensusEngineId = [b'p', b'k', b'e', b'y'];
-
-#[derive(Clone, PartialEq, Eq, Encode, Decode, RuntimeDebug, TypeInfo)]
-pub struct FinalizedBlockNeededDigest<B: BlockT> {
-	#[codec(compact)]
-	pub number: NumberFor<B>,
-	pub hash: B::Hash,
-}
 
 #[derive(Clone, PartialEq, Eq, Encode, Decode, RuntimeDebug, TypeInfo)]
 pub enum BlockSealDigest {
@@ -122,11 +109,10 @@ pub struct NotebookDigest<VerifyError: Codec> {
 	Deserialize,
 	DefaultNoBound,
 )]
-pub struct NotebookHeaderData<VerifyError: Codec, BlockNumber: Default + Codec> {
+pub struct NotebookHeaderData<VerifyError: Codec> {
 	pub signed_headers: Vec<Vec<u8>>,
 	pub notebook_digest: NotebookDigest<VerifyError>,
 	pub vote_digest: BlockVoteDigest,
-	pub latest_finalized_block_needed: BlockNumber,
 }
 
 #[derive(

@@ -348,11 +348,33 @@ declare module '@polkadot/api-base/types/errors' {
       TooManyPendingMints: AugmentedError<ApiType>;
     };
     notaries: {
+      /**
+       * The proposed effective tick is too soon
+       **/
+      EffectiveTickTooSoon: AugmentedError<ApiType>;
+      /**
+       * Invalid notary operator for this operation
+       **/
       InvalidNotaryOperator: AugmentedError<ApiType>;
+      /**
+       * Maximum number of notaries exceeded
+       **/
       MaxNotariesExceeded: AugmentedError<ApiType>;
+      /**
+       * Maximum number of proposals per block exceeded
+       **/
       MaxProposalsPerBlockExceeded: AugmentedError<ApiType>;
+      /**
+       * An internal error has occurred. The notary ids are exhausted.
+       **/
       NoMoreNotaryIds: AugmentedError<ApiType>;
+      /**
+       * This notary is not active, so this change cannot be made yet
+       **/
       NotAnActiveNotary: AugmentedError<ApiType>;
+      /**
+       * The proposal to activate was not found
+       **/
       ProposalNotFound: AugmentedError<ApiType>;
     };
     notebook: {

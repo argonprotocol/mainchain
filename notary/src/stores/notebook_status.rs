@@ -98,11 +98,11 @@ impl NotebookStatusStore {
 
 	pub async fn find_and_lock_ready_for_close(
 		db: &mut PgConnection,
-	) -> anyhow::Result<Option<u32>, Error> {
+	) -> anyhow::Result<Option<(NotebookNumber, Tick)>, Error> {
 		let result = sqlx::query!(
 			r#"
-				SELECT notebook_number FROM notebook_status 
-				WHERE step=$1  
+				SELECT notebook_number, tick FROM notebook_status
+				WHERE step=$1
 				ORDER BY notebook_number ASC
 				LIMIT 1
 			"#,
@@ -114,7 +114,7 @@ impl NotebookStatusStore {
 		if let Some(row) = result {
 			let notebook_number = row.notebook_number as u32;
 			Self::lock_to_stop_appends(&mut *db, notebook_number).await?;
-			return Ok(Some(notebook_number));
+			return Ok(Some((notebook_number, row.tick as Tick)));
 		}
 		Ok(None)
 	}
@@ -148,9 +148,9 @@ impl NotebookStatusStore {
 	) -> anyhow::Result<Option<u32>, Error> {
 		let result = sqlx::query!(
 			r#"
-				SELECT * FROM notebook_status 
+				SELECT * FROM notebook_status
 				WHERE step = $1 AND end_time <= $2
-				ORDER BY open_time ASC 
+				ORDER BY open_time ASC
 				LIMIT 1
 			"#,
 			NotebookFinalizationStep::Open as i32,
@@ -312,14 +312,17 @@ mod tests {
 			let _ = NotebookStatusStore::step_up_expired_open(&mut *tx).await?;
 			assert_eq!(
 				NotebookStatusStore::find_and_lock_ready_for_close(&mut *tx,).await?,
-				Some(1)
+				Some((1, 1))
 			);
 
 			tx.commit().await?;
 		}
 
 		let mut tx = pool.begin().await?;
-		assert_eq!(NotebookStatusStore::find_and_lock_ready_for_close(&mut *tx).await?, Some(1));
+		assert_eq!(
+			NotebookStatusStore::find_and_lock_ready_for_close(&mut *tx).await?,
+			Some((1, 1))
+		);
 		{
 			let mut tx2 = pool.begin().await?;
 			assert!(matches!(
