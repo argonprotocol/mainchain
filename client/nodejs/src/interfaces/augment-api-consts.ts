@@ -198,11 +198,6 @@ declare module '@polkadot/api-base/types/consts' {
        **/
       maxActiveNotaries: u32 & AugmentedConst<ApiType>;
       /**
-       * Number of blocks to maintain key history for each notary
-       * NOTE: only pruned when new keys are added
-       **/
-      maxBlocksForKeyHistory: u32 & AugmentedConst<ApiType>;
-      /**
        * Maximum hosts a notary can supply
        **/
       maxNotaryHosts: u32 & AugmentedConst<ApiType>;
@@ -212,9 +207,15 @@ declare module '@polkadot/api-base/types/consts' {
       maxProposalHoldBlocks: u32 & AugmentedConst<ApiType>;
       maxProposalsPerBlock: u32 & AugmentedConst<ApiType>;
       /**
-       * Number of blocks to delay changing a notaries' meta
+       * Number of ticks to maintain key history for each notary
+       * NOTE: only pruned when new keys are added
        **/
-      metaChangesBlockDelay: u32 & AugmentedConst<ApiType>;
+      maxTicksForKeyHistory: u32 & AugmentedConst<ApiType>;
+      /**
+       * Number of ticks to delay changing a notaries' meta (this is to allow a window for
+       * notaries to switch to new keys after a new key is finalized)
+       **/
+      metaChangesTickDelay: u32 & AugmentedConst<ApiType>;
     };
     priceIndex: {
       /**

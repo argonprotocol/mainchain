@@ -13,9 +13,8 @@ use tokio::sync::Mutex;
 use ulx_node_runtime::{NotaryRecordT, NotebookVerifyError};
 use ulx_notary_apis::notebook::{NotebookRpcClient, RawHeadersSubscription};
 use ulx_primitives::{
-	notary::NotaryNotebookVoteDetails, notebook::NotebookNumber, tick::Tick, BlockNumber,
-	BlockSealApis, BlockSealAuthorityId, NotaryApis, NotaryId, NotebookApis, NotebookDigest,
-	NotebookHeaderData,
+	notary::NotaryNotebookVoteDetails, notebook::NotebookNumber, tick::Tick, BlockSealApis,
+	BlockSealAuthorityId, NotaryApis, NotaryId, NotebookApis, NotebookDigest, NotebookHeaderData,
 };
 
 use crate::{
@@ -60,7 +59,7 @@ where
 		}
 	}
 
-	pub async fn update_notaries(&self, block_hash: &B::Hash) -> Result<(), Error<B>> {
+	pub async fn update_notaries(&self, block_hash: &B::Hash) -> Result<(), Error> {
 		let mut needs_connect = vec![];
 		{
 			let notaries = self.client.runtime_api().notaries(*block_hash)?;
@@ -123,7 +122,7 @@ where
 		Ok(())
 	}
 
-	pub async fn retrieve_missing_notebooks(&self) -> Result<(), Error<B>> {
+	pub async fn retrieve_missing_notebooks(&self) -> Result<(), Error> {
 		let mut notaries: Vec<NotaryId> = vec![];
 		{
 			let notaries_by_id = self.notaries_by_id.lock().await;
@@ -140,7 +139,7 @@ where
 		Ok(())
 	}
 
-	async fn retrieve_notary_missing_notebooks(&self, notary_id: NotaryId) -> Result<(), Error<B>> {
+	async fn retrieve_notary_missing_notebooks(&self, notary_id: NotaryId) -> Result<(), Error> {
 		let client = self.get_client(notary_id).await?;
 		let lock = self.notary_client_by_id.lock().await;
 		let missing_notebooks_aux = self.aux_client.get_missing_notebooks(notary_id)?;
@@ -175,7 +174,7 @@ where
 		Ok(())
 	}
 
-	async fn sync_notebooks(&self, id: NotaryId) -> Result<(), Error<B>> {
+	async fn sync_notebooks(&self, id: NotaryId) -> Result<(), Error> {
 		let client = self.get_client(id).await?;
 		let notebook_meta = client.metadata().await.map_err(|e| {
 			Error::NotaryError(format!("Could not get notebooks from notary - {:?}", e))
@@ -207,7 +206,7 @@ where
 		drop(subs.remove(notary_id));
 	}
 
-	async fn subscribe_to_notebooks(&self, id: NotaryId) -> Result<(), Error<B>> {
+	async fn subscribe_to_notebooks(&self, id: NotaryId) -> Result<(), Error> {
 		let client = self.get_client(id).await?;
 		let stream = client.subscribe_raw_headers().await.map_err(|e| {
 			Error::NotaryError(format!("Could not subscribe to notebooks from notary - {:?}", e))
@@ -222,7 +221,7 @@ where
 		finalized_hash: &B::Hash,
 		best_hash: &B::Hash,
 		vote_details: &NotaryNotebookVoteDetails<B::Hash>,
-	) -> Result<NotebookAuditResult, Error<B>> {
+	) -> Result<NotebookAuditResult, Error> {
 		let notary_id = vote_details.notary_id;
 		let notebook_number = vote_details.notebook_number;
 
@@ -275,7 +274,7 @@ where
 						"Error getting vote minimums for block {}. Notary {}, notebook {}. {:?}",
 						block_hash, notary_id, notebook_number, e
 					);
-					Error::<B>::StringError(message)
+					Error::StringError(message)
 				})?,
 			);
 		}
@@ -334,10 +333,7 @@ where
 		Ok(audit_result)
 	}
 
-	async fn get_client(
-		&self,
-		notary_id: NotaryId,
-	) -> Result<Arc<ulx_notary_apis::Client>, Error<B>> {
+	async fn get_client(&self, notary_id: NotaryId) -> Result<Arc<ulx_notary_apis::Client>, Error> {
 		let mut clients = self.notary_client_by_id.lock().await;
 		if let std::collections::btree_map::Entry::Vacant(e) = clients.entry(notary_id) {
 			let notaries = self.notaries_by_id.lock().await;
@@ -372,7 +368,7 @@ where
 		&self,
 		notary_id: NotaryId,
 		notebook_number: NotebookNumber,
-	) -> Result<Vec<u8>, Error<B>> {
+	) -> Result<Vec<u8>, Error> {
 		let client = self.get_client(notary_id).await?;
 
 		match client.get_raw_body(notebook_number).await {
@@ -389,7 +385,7 @@ where
 pub async fn verify_notebook_audits<B: BlockT, C>(
 	aux_client: &UlxAux<B, C>,
 	notebook_digest: &NotebookDigest<NotebookVerifyError>,
-) -> Result<(), Error<B>>
+) -> Result<(), Error>
 where
 	C: AuxStore + 'static,
 {
@@ -405,7 +401,7 @@ where
 			{
 				Some(audit) =>
 					if digest_record.audit_first_failure != audit.first_error_reason {
-						return Err(Error::<B>::InvalidNotebookDigest(format!(
+						return Err(Error::InvalidNotebookDigest(format!(
 							"Notary {}, notebook #{} has an audit mismatch \"{:?}\" with local result. \"{:?}\"",
 							digest_record.notary_id, digest_record.notebook_number, digest_record.audit_first_failure, audit.first_error_reason
 						)));
@@ -425,7 +421,7 @@ where
 			return Ok(());
 		}
 	}
-	Err(Error::<B>::InvalidNotebookDigest(
+	Err(Error::InvalidNotebookDigest(
 		"Notebook digest record could not verify all records in local storage".to_string(),
 	))
 }
@@ -435,7 +431,7 @@ pub async fn get_notebook_header_data<B: BlockT, C, AccountId: Codec>(
 	aux_client: &UlxAux<B, C>,
 	best_hash: &B::Hash,
 	submitting_tick: Tick,
-) -> Result<NotebookHeaderData<NotebookVerifyError, BlockNumber>, Error<B>>
+) -> Result<NotebookHeaderData<NotebookVerifyError>, Error>
 where
 	C: ProvideRuntimeApi<B> + HeaderBackend<B> + AuxStore + 'static,
 	C::Api: NotebookApis<B, NotebookVerifyError>
@@ -445,7 +441,6 @@ where
 	let latest_notebooks_in_runtime = client.runtime_api().latest_notebook_by_notary(*best_hash)?;
 	let mut headers = NotebookHeaderData::default();
 	let mut tick_notebooks = vec![];
-	let finalized_block = client.info().finalized_number;
 
 	let notaries = client.runtime_api().notaries(*best_hash)?;
 	for notary in notaries {
@@ -455,7 +450,6 @@ where
 			notary.notary_id,
 			*latest_runtime_notebook_number,
 			submitting_tick,
-			finalized_block,
 		)?;
 
 		let missing_notebooks =
@@ -476,9 +470,6 @@ where
 		}
 
 		headers.signed_headers.append(&mut notary_headers.signed_headers);
-		headers.latest_finalized_block_needed = notary_headers
-			.latest_finalized_block_needed
-			.max(headers.latest_finalized_block_needed);
 		headers
 			.notebook_digest
 			.notebooks
@@ -497,7 +488,7 @@ where
 
 fn get_missing_notebooks(
 	latest_notebook_in_runtime: NotebookNumber,
-	notary_headers: &mut NotebookHeaderData<NotebookVerifyError, BlockNumber>,
+	notary_headers: &mut NotebookHeaderData<NotebookVerifyError>,
 ) -> Vec<NotebookNumber> {
 	notary_headers
 		.notebook_digest

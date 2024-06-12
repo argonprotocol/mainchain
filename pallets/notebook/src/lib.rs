@@ -232,8 +232,8 @@ pub mod pallet {
 				ensure!(
 					T::NotaryProvider::verify_signature(
 						header.notary_id,
-						// allow the signature to come from the latest finalized block
-						header.finalized_block_number.into(),
+						// we validate signatures based on the latest tick
+						header.tick,
 						&header.hash(),
 						&signature
 					),
@@ -599,7 +599,6 @@ pub mod pallet {
 				notary_id: header.notary_id,
 				notebook_number: header.notebook_number,
 				version: header.version as u32,
-				finalized_block_number: header.finalized_block_number,
 				tick: header.tick,
 				header_hash: header.hash(),
 				block_votes_count: header.block_votes_count,

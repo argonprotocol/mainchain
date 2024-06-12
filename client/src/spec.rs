@@ -1059,10 +1059,10 @@ pub mod api {
 						"query_call_info",
 						types::QueryCallInfo { call, len },
 						[
-							185u8, 122u8, 23u8, 150u8, 145u8, 105u8, 254u8, 170u8, 117u8, 104u8,
-							13u8, 21u8, 38u8, 173u8, 143u8, 12u8, 86u8, 2u8, 38u8, 76u8, 218u8,
-							117u8, 101u8, 158u8, 62u8, 229u8, 191u8, 16u8, 217u8, 201u8, 184u8,
-							38u8,
+							225u8, 66u8, 197u8, 163u8, 88u8, 4u8, 175u8, 120u8, 213u8, 152u8,
+							177u8, 163u8, 72u8, 112u8, 16u8, 128u8, 120u8, 109u8, 120u8, 219u8,
+							234u8, 96u8, 30u8, 186u8, 6u8, 91u8, 161u8, 46u8, 223u8, 186u8, 19u8,
+							254u8,
 						],
 					)
 				}
@@ -1080,9 +1080,9 @@ pub mod api {
 						"query_call_fee_details",
 						types::QueryCallFeeDetails { call, len },
 						[
-							147u8, 9u8, 205u8, 199u8, 52u8, 251u8, 215u8, 42u8, 21u8, 105u8, 105u8,
-							87u8, 180u8, 234u8, 93u8, 239u8, 193u8, 243u8, 110u8, 114u8, 92u8,
-							71u8, 171u8, 130u8, 80u8, 227u8, 199u8, 163u8, 219u8, 6u8, 52u8, 23u8,
+							22u8, 227u8, 85u8, 186u8, 149u8, 151u8, 201u8, 15u8, 255u8, 0u8, 124u8,
+							170u8, 22u8, 26u8, 160u8, 124u8, 133u8, 146u8, 168u8, 68u8, 103u8,
+							179u8, 152u8, 41u8, 187u8, 205u8, 7u8, 186u8, 174u8, 4u8, 94u8, 139u8,
 						],
 					)
 				}
@@ -1477,9 +1477,10 @@ pub mod api {
 						"notary_by_id",
 						types::NotaryById { notary_id },
 						[
-							222u8, 166u8, 35u8, 137u8, 223u8, 254u8, 225u8, 124u8, 123u8, 149u8,
-							173u8, 2u8, 25u8, 223u8, 46u8, 144u8, 115u8, 2u8, 67u8, 116u8, 143u8,
-							201u8, 188u8, 146u8, 238u8, 5u8, 52u8, 233u8, 202u8, 236u8, 41u8, 2u8,
+							47u8, 240u8, 19u8, 67u8, 147u8, 79u8, 39u8, 96u8, 180u8, 141u8, 179u8,
+							190u8, 207u8, 29u8, 156u8, 124u8, 142u8, 145u8, 187u8, 102u8, 19u8,
+							249u8, 254u8, 240u8, 56u8, 233u8, 229u8, 188u8, 252u8, 78u8, 227u8,
+							211u8,
 						],
 					)
 				}
@@ -1492,10 +1493,10 @@ pub mod api {
 						"notaries",
 						types::Notaries {},
 						[
-							19u8, 198u8, 120u8, 130u8, 98u8, 0u8, 101u8, 197u8, 91u8, 98u8, 148u8,
-							69u8, 101u8, 146u8, 244u8, 190u8, 156u8, 167u8, 110u8, 63u8, 40u8,
-							194u8, 11u8, 52u8, 60u8, 126u8, 244u8, 211u8, 72u8, 143u8, 224u8,
-							109u8,
+							101u8, 243u8, 224u8, 120u8, 151u8, 140u8, 84u8, 60u8, 145u8, 253u8,
+							185u8, 187u8, 40u8, 173u8, 231u8, 255u8, 206u8, 149u8, 38u8, 146u8,
+							238u8, 212u8, 184u8, 144u8, 134u8, 190u8, 15u8, 105u8, 35u8, 181u8,
+							253u8, 8u8,
 						],
 					)
 				}
@@ -1650,10 +1651,10 @@ pub mod api {
 						"decode_signed_raw_notebook_header",
 						types::DecodeSignedRawNotebookHeader { raw_header },
 						[
-							13u8, 81u8, 253u8, 91u8, 223u8, 71u8, 227u8, 7u8, 31u8, 197u8, 139u8,
-							211u8, 168u8, 241u8, 101u8, 203u8, 183u8, 69u8, 120u8, 170u8, 223u8,
-							148u8, 215u8, 81u8, 151u8, 177u8, 165u8, 250u8, 119u8, 66u8, 29u8,
-							96u8,
+							161u8, 122u8, 93u8, 183u8, 54u8, 151u8, 145u8, 232u8, 214u8, 0u8,
+							254u8, 196u8, 214u8, 65u8, 221u8, 233u8, 63u8, 175u8, 209u8, 15u8,
+							227u8, 20u8, 89u8, 192u8, 50u8, 46u8, 159u8, 34u8, 44u8, 2u8, 125u8,
+							57u8,
 						],
 					)
 				}
@@ -2618,9 +2619,9 @@ pub mod api {
 			.hash();
 		runtime_metadata_hash ==
 			[
-				81u8, 163u8, 76u8, 197u8, 148u8, 250u8, 191u8, 35u8, 219u8, 13u8, 206u8, 240u8,
-				105u8, 190u8, 53u8, 150u8, 112u8, 52u8, 39u8, 207u8, 246u8, 18u8, 85u8, 20u8,
-				222u8, 110u8, 164u8, 44u8, 108u8, 61u8, 245u8, 143u8,
+				157u8, 225u8, 235u8, 153u8, 198u8, 246u8, 242u8, 118u8, 241u8, 34u8, 56u8, 159u8,
+				35u8, 127u8, 202u8, 255u8, 179u8, 211u8, 149u8, 159u8, 27u8, 21u8, 95u8, 132u8,
+				178u8, 158u8, 150u8, 172u8, 62u8, 110u8, 71u8, 118u8,
 			]
 	}
 	pub mod system {
@@ -3697,9 +3698,9 @@ pub mod api {
 						"Events",
 						(),
 						[
-							41u8, 151u8, 4u8, 41u8, 91u8, 96u8, 44u8, 232u8, 135u8, 61u8, 158u8,
-							176u8, 226u8, 8u8, 26u8, 252u8, 36u8, 114u8, 61u8, 127u8, 213u8, 184u8,
-							159u8, 195u8, 224u8, 18u8, 84u8, 10u8, 140u8, 127u8, 32u8, 220u8,
+							251u8, 10u8, 8u8, 142u8, 17u8, 27u8, 113u8, 83u8, 184u8, 188u8, 155u8,
+							71u8, 224u8, 51u8, 80u8, 18u8, 166u8, 115u8, 129u8, 99u8, 119u8, 235u8,
+							106u8, 105u8, 74u8, 158u8, 57u8, 192u8, 66u8, 221u8, 162u8, 114u8,
 						],
 					)
 				}
@@ -4574,9 +4575,9 @@ pub mod api {
 						"proxy",
 						types::Proxy { real, force_proxy_type, call: ::std::boxed::Box::new(call) },
 						[
-							84u8, 82u8, 159u8, 2u8, 175u8, 150u8, 119u8, 144u8, 85u8, 24u8, 134u8,
-							164u8, 90u8, 165u8, 146u8, 106u8, 99u8, 133u8, 229u8, 29u8, 227u8,
-							119u8, 63u8, 211u8, 14u8, 17u8, 119u8, 108u8, 161u8, 28u8, 46u8, 152u8,
+							113u8, 149u8, 51u8, 158u8, 142u8, 110u8, 152u8, 0u8, 125u8, 226u8,
+							65u8, 145u8, 44u8, 38u8, 136u8, 206u8, 173u8, 99u8, 211u8, 193u8, 74u8,
+							188u8, 9u8, 89u8, 159u8, 14u8, 223u8, 54u8, 34u8, 78u8, 88u8, 158u8,
 						],
 					)
 				}
@@ -4832,10 +4833,9 @@ pub mod api {
 							call: ::std::boxed::Box::new(call),
 						},
 						[
-							22u8, 33u8, 13u8, 193u8, 180u8, 95u8, 161u8, 173u8, 231u8, 127u8,
-							232u8, 6u8, 173u8, 220u8, 84u8, 61u8, 223u8, 234u8, 210u8, 204u8,
-							160u8, 91u8, 18u8, 96u8, 134u8, 119u8, 180u8, 25u8, 134u8, 221u8,
-							100u8, 62u8,
+							197u8, 169u8, 226u8, 46u8, 80u8, 151u8, 107u8, 216u8, 35u8, 206u8,
+							41u8, 178u8, 169u8, 177u8, 87u8, 39u8, 196u8, 135u8, 38u8, 20u8, 149u8,
+							205u8, 57u8, 74u8, 167u8, 62u8, 89u8, 0u8, 129u8, 21u8, 132u8, 38u8,
 						],
 					)
 				}
@@ -7955,15 +7955,20 @@ pub mod api {
 				# [codec (crate = :: subxt :: ext :: codec)]
 				#[decode_as_type(crate_path = ":: subxt :: ext :: scale_decode")]
 				#[encode_as_type(crate_path = ":: subxt :: ext :: scale_encode")]
+				#[doc = "Update the metadata of a notary, to be effective at the given tick height, which must be"]
+				#[doc = ">= MetaChangesTickDelay ticks in the future."]
 				pub struct Update {
 					#[codec(compact)]
 					pub notary_id: update::NotaryId,
 					pub meta: update::Meta,
+					#[codec(compact)]
+					pub effective_tick: update::EffectiveTick,
 				}
 				pub mod update {
 					use super::runtime_types;
 					pub type NotaryId = ::core::primitive::u32;
 					pub type Meta = runtime_types::ulx_primitives::notary::NotaryMeta;
+					pub type EffectiveTick = ::core::primitive::u32;
 				}
 				impl ::subxt::blocks::StaticExtrinsic for Update {
 					const PALLET: &'static str = "Notaries";
@@ -8004,19 +8009,22 @@ pub mod api {
 						],
 					)
 				}
+				#[doc = "Update the metadata of a notary, to be effective at the given tick height, which must be"]
+				#[doc = ">= MetaChangesTickDelay ticks in the future."]
 				pub fn update(
 					&self,
 					notary_id: types::update::NotaryId,
 					meta: types::update::Meta,
+					effective_tick: types::update::EffectiveTick,
 				) -> ::subxt::tx::Payload<types::Update> {
 					::subxt::tx::Payload::new_static(
 						"Notaries",
 						"update",
-						types::Update { notary_id, meta },
+						types::Update { notary_id, meta, effective_tick },
 						[
-							122u8, 85u8, 68u8, 206u8, 249u8, 188u8, 198u8, 137u8, 101u8, 103u8,
-							235u8, 229u8, 92u8, 95u8, 74u8, 205u8, 235u8, 25u8, 69u8, 101u8, 52u8,
-							159u8, 79u8, 70u8, 112u8, 84u8, 143u8, 104u8, 135u8, 0u8, 244u8, 98u8,
+							36u8, 62u8, 191u8, 232u8, 95u8, 224u8, 174u8, 199u8, 18u8, 25u8, 12u8,
+							239u8, 38u8, 5u8, 9u8, 245u8, 169u8, 4u8, 155u8, 12u8, 60u8, 141u8,
+							47u8, 118u8, 223u8, 55u8, 110u8, 209u8, 26u8, 0u8, 107u8, 41u8,
 						],
 					)
 				}
@@ -8094,13 +8102,13 @@ pub mod api {
 			pub struct NotaryMetaUpdateQueued {
 				pub notary_id: notary_meta_update_queued::NotaryId,
 				pub meta: notary_meta_update_queued::Meta,
-				pub effective_block: notary_meta_update_queued::EffectiveBlock,
+				pub effective_tick: notary_meta_update_queued::EffectiveTick,
 			}
 			pub mod notary_meta_update_queued {
 				use super::runtime_types;
 				pub type NotaryId = ::core::primitive::u32;
 				pub type Meta = runtime_types::ulx_primitives::notary::NotaryMeta;
-				pub type EffectiveBlock = ::core::primitive::u32;
+				pub type EffectiveTick = ::core::primitive::u32;
 			}
 			impl ::subxt::events::StaticEvent for NotaryMetaUpdateQueued {
 				const PALLET: &'static str = "Notaries";
@@ -8305,9 +8313,10 @@ pub mod api {
 						"ActiveNotaries",
 						(),
 						[
-							104u8, 213u8, 247u8, 16u8, 20u8, 163u8, 47u8, 221u8, 84u8, 68u8, 80u8,
-							208u8, 162u8, 121u8, 48u8, 117u8, 7u8, 59u8, 118u8, 120u8, 113u8, 0u8,
-							57u8, 234u8, 151u8, 152u8, 21u8, 249u8, 56u8, 222u8, 87u8, 144u8,
+							177u8, 164u8, 124u8, 149u8, 126u8, 195u8, 56u8, 178u8, 169u8, 182u8,
+							37u8, 12u8, 207u8, 141u8, 132u8, 3u8, 234u8, 151u8, 39u8, 164u8, 28u8,
+							180u8, 117u8, 162u8, 1u8, 129u8, 147u8, 192u8, 196u8, 112u8, 4u8,
+							160u8,
 						],
 					)
 				}
@@ -8352,6 +8361,7 @@ pub mod api {
 						],
 					)
 				}
+				#[doc = " Metadata changes to be activated at the given tick"]
 				pub fn queued_notary_meta_changes_iter(
 					&self,
 				) -> ::subxt::storage::address::Address<
@@ -8372,6 +8382,7 @@ pub mod api {
 						],
 					)
 				}
+				#[doc = " Metadata changes to be activated at the given tick"]
 				pub fn queued_notary_meta_changes(
 					&self,
 					_0: impl ::std::borrow::Borrow<types::queued_notary_meta_changes::Param0>,
@@ -8445,13 +8456,14 @@ pub mod api {
 						],
 					)
 				}
-				#[doc = " Number of blocks to delay changing a notaries' meta"]
-				pub fn meta_changes_block_delay(
+				#[doc = " Number of ticks to delay changing a notaries' meta (this is to allow a window for"]
+				#[doc = " notaries to switch to new keys after a new key is finalized)"]
+				pub fn meta_changes_tick_delay(
 					&self,
 				) -> ::subxt::constants::Address<::core::primitive::u32> {
 					::subxt::constants::Address::new_static(
 						"Notaries",
-						"MetaChangesBlockDelay",
+						"MetaChangesTickDelay",
 						[
 							98u8, 252u8, 116u8, 72u8, 26u8, 180u8, 225u8, 83u8, 200u8, 157u8,
 							125u8, 151u8, 53u8, 76u8, 168u8, 26u8, 10u8, 9u8, 98u8, 68u8, 9u8,
@@ -8460,14 +8472,14 @@ pub mod api {
 						],
 					)
 				}
-				#[doc = " Number of blocks to maintain key history for each notary"]
+				#[doc = " Number of ticks to maintain key history for each notary"]
 				#[doc = " NOTE: only pruned when new keys are added"]
-				pub fn max_blocks_for_key_history(
+				pub fn max_ticks_for_key_history(
 					&self,
 				) -> ::subxt::constants::Address<::core::primitive::u32> {
 					::subxt::constants::Address::new_static(
 						"Notaries",
-						"MaxBlocksForKeyHistory",
+						"MaxTicksForKeyHistory",
 						[
 							98u8, 252u8, 116u8, 72u8, 26u8, 180u8, 225u8, 83u8, 200u8, 157u8,
 							125u8, 151u8, 53u8, 76u8, 168u8, 26u8, 10u8, 9u8, 98u8, 68u8, 9u8,
@@ -8541,9 +8553,9 @@ pub mod api {
 						"submit",
 						types::Submit { notebooks },
 						[
-							10u8, 16u8, 67u8, 117u8, 66u8, 129u8, 194u8, 16u8, 90u8, 92u8, 175u8,
-							89u8, 57u8, 209u8, 1u8, 95u8, 186u8, 32u8, 5u8, 155u8, 105u8, 205u8,
-							223u8, 127u8, 101u8, 158u8, 100u8, 39u8, 103u8, 167u8, 60u8, 233u8,
+							226u8, 89u8, 102u8, 115u8, 24u8, 77u8, 60u8, 95u8, 160u8, 22u8, 110u8,
+							135u8, 8u8, 45u8, 166u8, 138u8, 247u8, 23u8, 18u8, 65u8, 247u8, 171u8,
+							43u8, 78u8, 118u8, 91u8, 56u8, 174u8, 235u8, 5u8, 87u8, 38u8,
 						],
 					)
 				}
@@ -15823,10 +15835,10 @@ pub mod api {
 						"sudo",
 						types::Sudo { call: ::std::boxed::Box::new(call) },
 						[
-							98u8, 164u8, 234u8, 242u8, 125u8, 39u8, 160u8, 249u8, 3u8, 240u8,
-							160u8, 180u8, 59u8, 71u8, 59u8, 157u8, 81u8, 153u8, 245u8, 254u8,
-							114u8, 146u8, 239u8, 111u8, 193u8, 92u8, 220u8, 151u8, 159u8, 85u8,
-							159u8, 97u8,
+							77u8, 42u8, 229u8, 14u8, 132u8, 182u8, 84u8, 251u8, 9u8, 251u8, 82u8,
+							197u8, 159u8, 93u8, 233u8, 221u8, 219u8, 197u8, 80u8, 221u8, 156u8,
+							242u8, 67u8, 232u8, 145u8, 241u8, 114u8, 49u8, 88u8, 50u8, 255u8,
+							146u8,
 						],
 					)
 				}
@@ -15845,10 +15857,9 @@ pub mod api {
 						"sudo_unchecked_weight",
 						types::SudoUncheckedWeight { call: ::std::boxed::Box::new(call), weight },
 						[
-							59u8, 102u8, 175u8, 230u8, 43u8, 68u8, 154u8, 109u8, 207u8, 103u8,
-							131u8, 87u8, 23u8, 227u8, 145u8, 16u8, 105u8, 97u8, 135u8, 254u8,
-							169u8, 171u8, 236u8, 64u8, 207u8, 243u8, 170u8, 0u8, 171u8, 174u8,
-							35u8, 122u8,
+							43u8, 226u8, 119u8, 47u8, 62u8, 36u8, 90u8, 221u8, 173u8, 33u8, 83u8,
+							183u8, 225u8, 232u8, 108u8, 150u8, 98u8, 12u8, 214u8, 230u8, 133u8,
+							252u8, 126u8, 156u8, 206u8, 83u8, 159u8, 87u8, 247u8, 14u8, 14u8, 97u8,
 						],
 					)
 				}
@@ -15883,9 +15894,9 @@ pub mod api {
 						"sudo_as",
 						types::SudoAs { who, call: ::std::boxed::Box::new(call) },
 						[
-							142u8, 46u8, 102u8, 51u8, 90u8, 91u8, 234u8, 36u8, 177u8, 47u8, 112u8,
-							236u8, 7u8, 58u8, 208u8, 158u8, 144u8, 229u8, 18u8, 47u8, 31u8, 154u8,
-							106u8, 6u8, 77u8, 115u8, 106u8, 116u8, 193u8, 10u8, 148u8, 244u8,
+							224u8, 98u8, 1u8, 68u8, 222u8, 17u8, 236u8, 68u8, 166u8, 160u8, 94u8,
+							83u8, 232u8, 111u8, 100u8, 40u8, 251u8, 217u8, 4u8, 30u8, 94u8, 45u8,
+							95u8, 73u8, 213u8, 214u8, 114u8, 244u8, 181u8, 15u8, 102u8, 202u8,
 						],
 					)
 				}
@@ -18634,10 +18645,14 @@ pub mod api {
 					#[codec(index = 1)]
 					activate { operator_account: ::subxt::utils::AccountId32 },
 					#[codec(index = 2)]
+					#[doc = "Update the metadata of a notary, to be effective at the given tick height, which must be"]
+					#[doc = ">= MetaChangesTickDelay ticks in the future."]
 					update {
 						#[codec(compact)]
 						notary_id: ::core::primitive::u32,
 						meta: runtime_types::ulx_primitives::notary::NotaryMeta,
+						#[codec(compact)]
+						effective_tick: ::core::primitive::u32,
 					},
 				}
 				#[derive(
@@ -18654,17 +18669,26 @@ pub mod api {
 				#[doc = "The `Error` enum of this pallet."]
 				pub enum Error {
 					#[codec(index = 0)]
+					#[doc = "The proposal to activate was not found"]
 					ProposalNotFound,
 					#[codec(index = 1)]
+					#[doc = "Maximum number of notaries exceeded"]
 					MaxNotariesExceeded,
 					#[codec(index = 2)]
+					#[doc = "Maximum number of proposals per block exceeded"]
 					MaxProposalsPerBlockExceeded,
 					#[codec(index = 3)]
+					#[doc = "This notary is not active, so this change cannot be made yet"]
 					NotAnActiveNotary,
 					#[codec(index = 4)]
+					#[doc = "Invalid notary operator for this operation"]
 					InvalidNotaryOperator,
 					#[codec(index = 5)]
+					#[doc = "An internal error has occurred. The notary ids are exhausted."]
 					NoMoreNotaryIds,
+					#[codec(index = 6)]
+					#[doc = "The proposed effective tick is too soon"]
+					EffectiveTickTooSoon,
 				}
 				#[derive(
 					:: subxt :: ext :: codec :: Decode,
@@ -18699,7 +18723,7 @@ pub mod api {
 					NotaryMetaUpdateQueued {
 						notary_id: ::core::primitive::u32,
 						meta: runtime_types::ulx_primitives::notary::NotaryMeta,
-						effective_block: ::core::primitive::u32,
+						effective_tick: ::core::primitive::u32,
 					},
 					#[codec(index = 3)]
 					#[doc = "Notary metadata updated"]
@@ -22452,8 +22476,6 @@ pub mod api {
 					pub notebook_number: ::core::primitive::u32,
 					#[codec(compact)]
 					pub tick: ::core::primitive::u32,
-					#[codec(compact)]
-					pub finalized_block_number: ::core::primitive::u32,
 					pub header_hash: ::sp_core::H256,
 					#[codec(compact)]
 					pub block_votes_count: ::core::primitive::u32,
@@ -22503,6 +22525,8 @@ pub mod api {
 					pub activated_block: _1,
 					#[codec(compact)]
 					pub meta_updated_block: _1,
+					#[codec(compact)]
+					pub meta_updated_tick: _1,
 					pub meta: runtime_types::ulx_primitives::notary::NotaryMeta,
 				}
 			}
@@ -22550,8 +22574,6 @@ pub mod api {
 					pub notebook_number: ::core::primitive::u32,
 					#[codec(compact)]
 					pub tick: ::core::primitive::u32,
-					#[codec(compact)]
-					pub finalized_block_number: ::core::primitive::u32,
 					#[codec(compact)]
 					pub tax: ::core::primitive::u128,
 					#[codec(compact)]

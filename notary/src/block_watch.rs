@@ -9,7 +9,10 @@ use tracing::info;
 
 pub use ulixee_client;
 use ulixee_client::{api, MainchainClient, UlxConfig, UlxOnlineClient};
-use ulx_primitives::{tick::Ticker, AccountId, NotaryId, NotebookDigest};
+use ulx_primitives::{
+	tick::{Tick, Ticker},
+	AccountId, NotaryId, NotebookDigest, TickDigest,
+};
 
 use crate::{
 	stores::{
@@ -74,10 +77,15 @@ async fn sync_finalized_blocks(
 		let mut db = pool.acquire().await?;
 
 		let public = Ed25519Public::from_raw(notary.meta.public);
-		let _ =
-			activate_notebook_processing(&mut db, notary_id, public, oldest_block_to_sync, &ticker)
-				.await
-				.ok();
+		let _ = activate_notebook_processing(
+			&mut *db,
+			notary_id,
+			public,
+			notary.meta_updated_tick,
+			&ticker,
+		)
+		.await
+		.ok();
 	}
 
 	let mut tx = pool.begin().await?;
@@ -195,11 +203,11 @@ async fn activate_notebook_processing(
 	db: &mut PgConnection,
 	notary_id: NotaryId,
 	public: Ed25519Public,
-	block_height: u32,
+	active_at_tick: Tick,
 	ticker: &Ticker,
 ) -> anyhow::Result<()> {
 	// it might already be stored
-	let _ = RegisteredKeyStore::store_public(&mut *db, public, block_height).await.ok();
+	let _ = RegisteredKeyStore::store_public(&mut *db, public, active_at_tick).await.ok();
 	let tick = ticker.current();
 	NotebookHeaderStore::create(&mut *db, notary_id, 1, tick, ticker.time_for_tick(tick + 1))
 		.await?;
@@ -216,29 +224,84 @@ async fn process_finalized_block(
 	BlocksStore::record_finalized(db, block.hash()).await?;
 
 	let block_height = block.number();
+	let tick = block
+		.header()
+		.digest
+		.logs
+		.iter()
+		.find_map(|log| match log {
+			DigestItem::PreRuntime(ulx_primitives::TICK_DIGEST_ID, data) =>
+				TickDigest::decode(&mut &data[..]).ok(),
+			_ => None,
+		})
+		.map(|digest| digest.tick)
+		.unwrap_or(ticker.current());
 
 	let events = block.events().await?;
-	for event in events.iter().flatten() {
-		if let Some(Ok(meta_change)) =
-			event.as_event::<api::notaries::events::NotaryMetaUpdated>().transpose()
-		{
-			if meta_change.notary_id == notary_id {
-				RegisteredKeyStore::store_public(
-					&mut *db,
-					Ed25519Public::from_raw(meta_change.meta.public),
-					block_height,
-				)
-				.await?;
+	for event in events.iter() {
+		if let Ok(event) = event {
+			if let Some(Ok(meta_change)) =
+				event.as_event::<api::notaries::events::NotaryMetaUpdated>().transpose()
+			{
+				if meta_change.notary_id == notary_id {
+					RegisteredKeyStore::store_public(
+						&mut *db,
+						Ed25519Public::from_raw(meta_change.meta.public),
+						tick,
+					)
+					.await?;
+				}
+				continue;
 			}
-			continue;
-		}
-		if let Some(Ok(activated_event)) =
-			event.as_event::<api::notaries::events::NotaryActivated>().transpose()
-		{
-			info!("Notary activated: {:?}", activated_event);
-			if activated_event.notary.notary_id == notary_id {
-				let public = Ed25519Public::from_raw(activated_event.notary.meta.public);
-				activate_notebook_processing(&mut *db, notary_id, public, block_height, ticker)
+			if let Some(Ok(activated_event)) =
+				event.as_event::<api::notaries::events::NotaryActivated>().transpose()
+			{
+				info!("Notary activated: {:?}", activated_event);
+				if activated_event.notary.notary_id == notary_id {
+					let public = Ed25519Public::from_raw(activated_event.notary.meta.public);
+					activate_notebook_processing(&mut *db, notary_id, public, block_height, ticker)
+						.await?;
+				}
+				continue;
+			}
+
+			if let Some(Ok(notebook)) =
+				event.as_event::<api::notebook::events::NotebookSubmitted>().transpose()
+			{
+				if notebook.notary_id == notary_id {
+					info!("Notebook finalized: {:?}", notebook);
+					NotebookStatusStore::next_step(
+						&mut *db,
+						notebook.notebook_number,
+						NotebookFinalizationStep::Closed,
+					)
+					.await?;
+				}
+				continue;
+			}
+
+			if let Some(Ok(notebook)) =
+				event.as_event::<api::notebook::events::NotebookAuditFailure>().transpose()
+			{
+				if notebook.notary_id == notary_id {
+					panic!("Notebook audit failed! Need to shut down {:?}", notebook);
+				}
+				continue;
+			}
+
+			if let Some(Ok(to_localchain)) = event
+				.as_event::<api::chain_transfer::events::TransferToLocalchain>()
+				.transpose()
+			{
+				if to_localchain.notary_id == notary_id {
+					info!("Transfer to localchain: {:?}", to_localchain);
+					ChainTransferStore::record_transfer_to_local_from_block(
+						&mut *db,
+						block_height,
+						&AccountId::from(to_localchain.account_id.0),
+						to_localchain.transfer_id,
+						to_localchain.amount,
+					)
 					.await?;
 			}
 			continue;

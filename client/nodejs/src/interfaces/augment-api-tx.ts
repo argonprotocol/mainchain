@@ -208,7 +208,11 @@ declare module '@polkadot/api-base/types/submittable' {
     notaries: {
       activate: AugmentedSubmittable<(operatorAccount: AccountId32 | string | Uint8Array) => SubmittableExtrinsic<ApiType>, [AccountId32]>;
       propose: AugmentedSubmittable<(meta: UlxPrimitivesNotaryNotaryMeta | { public?: any; hosts?: any } | string | Uint8Array) => SubmittableExtrinsic<ApiType>, [UlxPrimitivesNotaryNotaryMeta]>;
-      update: AugmentedSubmittable<(notaryId: Compact<u32> | AnyNumber | Uint8Array, meta: UlxPrimitivesNotaryNotaryMeta | { public?: any; hosts?: any } | string | Uint8Array) => SubmittableExtrinsic<ApiType>, [Compact<u32>, UlxPrimitivesNotaryNotaryMeta]>;
+      /**
+       * Update the metadata of a notary, to be effective at the given tick height, which must be
+       * >= MetaChangesTickDelay ticks in the future.
+       **/
+      update: AugmentedSubmittable<(notaryId: Compact<u32> | AnyNumber | Uint8Array, meta: UlxPrimitivesNotaryNotaryMeta | { public?: any; hosts?: any } | string | Uint8Array, effectiveTick: Compact<u32> | AnyNumber | Uint8Array) => SubmittableExtrinsic<ApiType>, [Compact<u32>, UlxPrimitivesNotaryNotaryMeta, Compact<u32>]>;
     };
     notebook: {
       submit: AugmentedSubmittable<(notebooks: Vec<UlxPrimitivesNotebookSignedNotebookHeader> | (UlxPrimitivesNotebookSignedNotebookHeader | { header?: any; signature?: any } | string | Uint8Array)[]) => SubmittableExtrinsic<ApiType>, [Vec<UlxPrimitivesNotebookSignedNotebookHeader>]>;

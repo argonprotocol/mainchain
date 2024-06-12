@@ -15,7 +15,6 @@ use url::Url;
 use ulx_bitcoin_utxo_tracker::UtxoTracker;
 use ulx_node_consensus::{
 	aux_client::UlxAux,
-	basic_queue::BasicQueue,
 	compute_worker::run_compute_solver_threads,
 	import_queue::{UlxImportQueue, UlxVerifier},
 };
@@ -46,7 +45,7 @@ pub type Service = sc_service::PartialComponents<
 	FullClient,
 	FullBackend,
 	FullSelectChain,
-	BasicQueue<Block>,
+	UlxImportQueue<Block>,
 	sc_transaction_pool::FullPool<Block, FullClient>,
 	(
 		UlxBlockImport,
@@ -137,7 +136,6 @@ pub fn new_partial(
 	let import_queue = UlxImportQueue::<Block>::new(
 		UlxVerifier::new(),
 		Box::new(ulx_block_import.clone()),
-		client.clone(),
 		Some(Box::new(grandpa_block_import.clone())),
 		&task_manager.spawn_essential_handle(),
 		config.prometheus_registry(),

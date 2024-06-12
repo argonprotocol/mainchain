@@ -105,6 +105,7 @@ fn it_allows_proposal_activation() {
 			}
 		));
 		System::set_block_number(2);
+		CurrentTick::set(3);
 		assert_ok!(Notaries::activate(RuntimeOrigin::root(), 1,));
 		assert_eq!(ProposedNotaries::<Test>::get(1).len(), 0);
 		assert_eq!(
@@ -120,6 +121,7 @@ fn it_allows_proposal_activation() {
 				},
 				activated_block: 2,
 				meta_updated_block: 2,
+				meta_updated_tick: 3
 			}]
 		);
 
@@ -134,7 +136,7 @@ fn it_allows_proposal_activation() {
 		assert_eq!(ProposedNotaries::<Test>::get(1).len(), 0);
 		assert_eq!(
 			NotaryKeyHistory::<Test>::get(1),
-			BoundedVec::<(BlockNumberFor<Test>, NotaryPublic), MaxBlocksForKeyHistory>::truncate_from(vec![(2u32, Ed25519Keyring::Alice.public())])
+			BoundedVec::<(BlockNumberFor<Test>, NotaryPublic), MaxTicksForKeyHistory>::truncate_from(vec![(3u32, Ed25519Keyring::Alice.public())])
 		);
 	});
 }
@@ -157,6 +159,8 @@ fn it_allows_a_notary_to_update_meta() {
 
 		System::set_block_number(3);
 		Notaries::on_initialize(3);
+		CurrentTick::set(4);
+
 		assert_noop!(
 			Notaries::update(
 				RuntimeOrigin::signed(2),
@@ -164,9 +168,22 @@ fn it_allows_a_notary_to_update_meta() {
 				NotaryMeta::<MaxNotaryHosts> {
 					public: Ed25519Keyring::Alice.public(),
 					hosts: rpc_hosts("ws://localhost:9946"),
-				}
+				},
+				10
 			),
 			Error::<Test>::InvalidNotaryOperator
+		);
+		assert_noop!(
+			Notaries::update(
+				RuntimeOrigin::signed(1),
+				1,
+				NotaryMeta::<MaxNotaryHosts> {
+					public: Ed25519Keyring::Bob.public(),
+					hosts: rpc_hosts("ws://localhost:9946"),
+				},
+				4
+			),
+			Error::<Test>::EffectiveTickTooSoon
 		);
 		assert_ok!(Notaries::update(
 			RuntimeOrigin::signed(1),
@@ -174,7 +191,8 @@ fn it_allows_a_notary_to_update_meta() {
 			NotaryMeta::<MaxNotaryHosts> {
 				public: Ed25519Keyring::Bob.public(),
 				hosts: rpc_hosts("ws://localhost:9946"),
-			}
+			},
+			10
 		),);
 		Notaries::on_finalize(3);
 
@@ -188,16 +206,19 @@ fn it_allows_a_notary_to_update_meta() {
 					public: Ed25519Keyring::Bob.public(),
 					hosts: rpc_hosts("ws://localhost:9946"),
 				},
-				effective_block: 4,
+				effective_tick: 10,
 			}
 			.into(),
 		);
-		assert_eq!(QueuedNotaryMetaChanges::<Test>::get(4).len(), 1);
+		assert_eq!(QueuedNotaryMetaChanges::<Test>::get(10).len(), 1);
 
 		System::set_block_number(4);
+		CurrentTick::set(10);
 		Notaries::on_initialize(4);
 		assert_eq!(ActiveNotaries::<Test>::get()[0].meta.hosts[0], "ws://localhost:9946".into());
 		assert_eq!(ActiveNotaries::<Test>::get()[0].meta_updated_block, 4);
+		assert_eq!(ActiveNotaries::<Test>::get()[0].meta_updated_tick, 10);
+
 		System::assert_last_event(
 			Event::NotaryMetaUpdated {
 				notary_id: 1,
@@ -210,9 +231,9 @@ fn it_allows_a_notary_to_update_meta() {
 		);
 		assert_eq!(
 			NotaryKeyHistory::<Test>::get(1),
-			BoundedVec::<(BlockNumberFor<Test>, NotaryPublic), MaxBlocksForKeyHistory>::truncate_from(vec![
-				(2u32, Ed25519Keyring::Alice.public()),
-				(4u32, Ed25519Keyring::Bob.public())
+			BoundedVec::<(BlockNumberFor<Test>, NotaryPublic), MaxTicksForKeyHistory>::truncate_from(vec![
+				(1u32, Ed25519Keyring::Alice.public()),
+				(10u32, Ed25519Keyring::Bob.public())
 			])
 		);
 	});
@@ -230,11 +251,13 @@ fn it_verifies_notary_signatures_matching_block_heights() {
 			}
 		));
 		System::set_block_number(2);
+		CurrentTick::set(2);
 		Notaries::on_initialize(2);
 		assert_ok!(Notaries::activate(RuntimeOrigin::root(), 1,));
 		Notaries::on_finalize(2);
 
 		System::set_block_number(3);
+		CurrentTick::set(3);
 		Notaries::on_initialize(3);
 		assert_ok!(Notaries::update(
 			RuntimeOrigin::signed(1),
@@ -242,20 +265,26 @@ fn it_verifies_notary_signatures_matching_block_heights() {
 			NotaryMeta::<MaxNotaryHosts> {
 				public: Ed25519Keyring::Bob.public(),
 				hosts: rpc_hosts("ws://localhost:9946"),
-			}
+			},
+			4
 		),);
 		Notaries::on_finalize(3);
 		System::set_block_number(4);
+		CurrentTick::set(4);
 		Notaries::on_initialize(4);
 		Notaries::on_initialize(4);
+
 		let hash: H256 = [1u8; 32].into();
 
-		assert!(!<Notaries as NotaryProvider<Block>>::verify_signature(
-			1,
-			4,
-			&hash,
-			&Ed25519Keyring::Alice.sign(&hash[..]),
-		));
+		assert_eq!(
+			<Notaries as NotaryProvider<Block>>::verify_signature(
+				1,
+				4,
+				&hash,
+				&Ed25519Keyring::Alice.sign(&hash[..]),
+			),
+			false
+		);
 		assert!(<Notaries as NotaryProvider<Block>>::verify_signature(
 			1,
 			2,

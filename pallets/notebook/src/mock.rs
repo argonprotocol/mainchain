@@ -1,10 +1,7 @@
 use env_logger::{Builder, Env};
 use frame_support::{derive_impl, parameter_types, traits::Currency};
 use sp_core::{crypto::AccountId32, ConstU32, H256, U256};
-use sp_runtime::{
-	traits::{IdentityLookup, NumberFor},
-	BuildStorage,
-};
+use sp_runtime::{traits::IdentityLookup, BuildStorage};
 
 use ulx_primitives::{
 	block_seal::MiningAuthority,
@@ -75,7 +72,7 @@ impl AuthorityProvider<BlockSealAuthorityId, Block, AccountId32> for StaticAutho
 
 pub struct NotaryProviderImpl;
 impl NotaryProvider<Block> for NotaryProviderImpl {
-	fn verify_signature(_: NotaryId, _: NumberFor<Block>, _: &H256, _: &NotarySignature) -> bool {
+	fn verify_signature(_: NotaryId, _: Tick, _: &H256, _: &NotarySignature) -> bool {
 		true
 	}
 	fn active_notaries() -> Vec<NotaryId> {

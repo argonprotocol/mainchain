@@ -432,7 +432,6 @@ fn it_can_audit_notebooks() {
 			notary_id,
 			notebook_number: 1,
 			tick: 1,
-			finalized_block_number: 1,
 			chain_transfers: bounded_vec![ChainTransfer::ToLocalchain { transfer_id: 1 }],
 			changed_accounts_root: merkle_root::<Blake2Hasher, _>(vec![BalanceTip {
 				account_id: who.clone(),
@@ -820,7 +819,6 @@ fn make_header(notebook_number: NotebookNumber, tick: Tick) -> NotebookHeader {
 		changed_accounts_root: H256::random(),
 		changed_account_origins: Default::default(),
 		version: 1,
-		finalized_block_number: 1,
 		tax: 0,
 		block_voting_power: 0,
 		blocks_with_votes: Default::default(),

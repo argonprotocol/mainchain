@@ -4,7 +4,8 @@ use std::{marker::PhantomData, sync::Arc};
 use log::info;
 use sc_client_api::{self, backend::AuxStore, BlockOf, BlockchainEvents};
 use sc_consensus::{
-	BlockCheckParams, BlockImport, BlockImportParams, ForkChoiceStrategy, ImportResult, Verifier,
+	BasicQueue, BlockCheckParams, BlockImport, BlockImportParams, ForkChoiceStrategy, ImportResult,
+	Verifier,
 };
 use sp_api::ProvideRuntimeApi;
 use sp_block_builder::BlockBuilder as BlockBuilderApi;
@@ -25,7 +26,6 @@ use ulx_primitives::{
 
 use crate::{
 	aux_client::UlxAux,
-	basic_queue::BasicQueue,
 	compute_solver::BlockComputeNonce,
 	compute_worker::randomx_key_block,
 	digests::{load_digests, read_seal_digest},
@@ -120,26 +120,13 @@ where
 		info!("Importing block with hash {:?} ({})", block.post_hash(), block.header.number());
 		let digests = load_digests::<B>(&block.header)?;
 
-		if &digests.finalized_block.number > block.header.number() {
-			return Err(Error::<B>::InvalidFinalizedBlockDigest.into());
-		}
-
-		let latest_verified_finalized = self.client.info().finalized_number;
-		if digests.finalized_block.number > latest_verified_finalized {
-			return Err(Error::<B>::PendingFinalizedBlockDigest(
-				digests.finalized_block.hash,
-				digests.finalized_block.number,
-			)
-			.into());
-		}
-
 		// if we're importing a non-finalized block from someone else, verify the notebook audits
-		if block.origin != BlockOrigin::Own && block.header.number() > &latest_verified_finalized {
+		if block.origin != BlockOrigin::Own {
 			verify_notebook_audits(&self.aux_client, &digests.notebooks).await?;
 		}
 
 		let Some(Some(seal_digest)) = block.post_digests.last().map(read_seal_digest) else {
-			return Err(Error::<B>::MissingBlockSealDigest.into());
+			return Err(Error::MissingBlockSealDigest.into());
 		};
 		let parent_hash = *block.header.parent_hash();
 
@@ -155,7 +142,7 @@ where
 				let mut inherent_data = inherent_data_providers
 					.create_inherent_data()
 					.await
-					.map_err(|e| Error::<B>::CreateInherents(e))?;
+					.map_err(|e| Error::CreateInherents(e))?;
 
 				if let Ok(Some(bitcoin_utxo_sync)) =
 					get_bitcoin_inherent(&self.utxo_tracker, &self.client, &parent_hash)
@@ -163,7 +150,7 @@ where
 					BitcoinInherentDataProvider { bitcoin_utxo_sync }
 						.provide_inherent_data(&mut inherent_data)
 						.await
-						.map_err(|e| Error::<B>::CreateInherents(e))?;
+						.map_err(|e| Error::CreateInherents(e))?;
 				}
 
 				// inherent data passed in is what we would have generated...
@@ -171,14 +158,14 @@ where
 					.client
 					.runtime_api()
 					.check_inherents(parent_hash, check_block.clone(), inherent_data)
-					.map_err(|e| Error::<B>::Client(e.into()))?;
+					.map_err(|e| Error::Client(e.into()))?;
 
 				if !inherent_res.ok() {
 					for (identifier, error) in inherent_res.into_errors() {
 						match inherent_data_providers.try_handle_error(&identifier, &error).await {
-							Some(res) => res.map_err(Error::<B>::CheckInherents)?,
+							Some(res) => res.map_err(Error::CheckInherents)?,
 							None =>
-								return Err(Error::<B>::CheckInherentsUnknownError(identifier).into()),
+								return Err(Error::CheckInherentsUnknownError(identifier).into()),
 						}
 					}
 				}
@@ -197,7 +184,7 @@ where
 				// verify compute effort
 				let difficulty =
 					self.client.runtime_api().compute_difficulty(parent_hash).map_err(|e| {
-						Error::<B>::MissingRuntimeData(
+						Error::MissingRuntimeData(
 							format!("Failed to get difficulty from runtime: {}", e).to_string(),
 						)
 					})?;
@@ -208,7 +195,7 @@ where
 					&key_block_hash,
 					difficulty,
 				) {
-					return Err(Error::<B>::InvalidComputeNonce.into());
+					return Err(Error::InvalidComputeNonce.into());
 				}
 				compute_difficulty = Some(difficulty);
 			},
@@ -279,9 +266,9 @@ impl<B: BlockT> Verifier<B> for UlxVerifier<B> {
 				if id == BLOCK_SEAL_DIGEST_ID {
 					Ok(DigestItem::Seal(id, signature_digest.clone()))
 				} else {
-					Err(Error::<B>::WrongEngine(id))
+					Err(Error::WrongEngine(id))
 				},
-			_ => Err(Error::<B>::MissingBlockSealDigest),
+			_ => Err(Error::MissingBlockSealDigest),
 		}?;
 
 		block.header = header;

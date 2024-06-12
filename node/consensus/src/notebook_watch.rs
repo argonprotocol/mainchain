@@ -96,7 +96,7 @@ where
 		notebook_number: NotebookNumber,
 		notary_client: Arc<NotaryClient<B, C, AC>>,
 		raw_data: Vec<u8>,
-	) -> Result<(), Error<B>> {
+	) -> Result<(), Error> {
 		let best_header = self.select_chain.best_chain().await.map_err(|_| {
 			Error::NoBestHeader("Unable to get best header for notebook processing".to_string())
 		})?;
@@ -149,7 +149,7 @@ where
 		&self,
 		tick: Tick,
 		notary_state: NotaryNotebookTickState,
-	) -> Result<(), Error<B>> {
+	) -> Result<(), Error> {
 		let timestamp_millis = Timestamp::current().as_millis();
 
 		let votes_tick = tick.saturating_sub(2);
@@ -222,7 +222,7 @@ where
 		block_voting_power: BlockVotingPower,
 		block_notebooks: u32,
 		strongest_fork_at_tick: ForkPower,
-	) -> Result<Option<B::Hash>, Error<B>> {
+	) -> Result<Option<B::Hash>, Error> {
 		let leaves = self.select_chain.leaves().await?;
 
 		let mut best_fork = ForkPower::default();

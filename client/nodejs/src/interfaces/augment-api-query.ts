@@ -304,6 +304,9 @@ declare module '@polkadot/api-base/types/storage' {
       nextNotaryId: AugmentedQuery<ApiType, () => Observable<Option<u32>>, []>;
       notaryKeyHistory: AugmentedQuery<ApiType, (arg: u32 | AnyNumber | Uint8Array) => Observable<Vec<ITuple<[u32, U8aFixed]>>>, [u32]>;
       proposedNotaries: AugmentedQuery<ApiType, (arg: AccountId32 | string | Uint8Array) => Observable<Option<ITuple<[UlxPrimitivesNotaryNotaryMeta, u32]>>>, [AccountId32]>;
+      /**
+       * Metadata changes to be activated at the given tick
+       **/
       queuedNotaryMetaChanges: AugmentedQuery<ApiType, (arg: u32 | AnyNumber | Uint8Array) => Observable<BTreeMap<u32, UlxPrimitivesNotaryNotaryMeta>>, [u32]>;
     };
     notebook: {

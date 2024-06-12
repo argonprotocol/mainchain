@@ -424,7 +424,7 @@ declare module '@polkadot/types/lookup' {
     readonly asNotaryMetaUpdateQueued: {
       readonly notaryId: u32;
       readonly meta: UlxPrimitivesNotaryNotaryMeta;
-      readonly effectiveBlock: u32;
+      readonly effectiveTick: u32;
     } & Struct;
     readonly isNotaryMetaUpdated: boolean;
     readonly asNotaryMetaUpdated: {
@@ -446,6 +446,7 @@ declare module '@polkadot/types/lookup' {
     readonly operatorAccountId: AccountId32;
     readonly activatedBlock: Compact<u32>;
     readonly metaUpdatedBlock: Compact<u32>;
+    readonly metaUpdatedTick: Compact<u32>;
     readonly meta: UlxPrimitivesNotaryNotaryMeta;
   }
 
@@ -1286,6 +1287,7 @@ declare module '@polkadot/types/lookup' {
     readonly asUpdate: {
       readonly notaryId: Compact<u32>;
       readonly meta: UlxPrimitivesNotaryNotaryMeta;
+      readonly effectiveTick: Compact<u32>;
     } & Struct;
     readonly type: 'Propose' | 'Activate' | 'Update';
   }
@@ -1310,7 +1312,6 @@ declare module '@polkadot/types/lookup' {
     readonly version: Compact<u16>;
     readonly notebookNumber: Compact<u32>;
     readonly tick: Compact<u32>;
-    readonly finalizedBlockNumber: Compact<u32>;
     readonly tax: Compact<u128>;
     readonly notaryId: Compact<u32>;
     readonly chainTransfers: Vec<UlxPrimitivesNotebookChainTransfer>;
@@ -1866,7 +1867,8 @@ declare module '@polkadot/types/lookup' {
     readonly isNotAnActiveNotary: boolean;
     readonly isInvalidNotaryOperator: boolean;
     readonly isNoMoreNotaryIds: boolean;
-    readonly type: 'ProposalNotFound' | 'MaxNotariesExceeded' | 'MaxProposalsPerBlockExceeded' | 'NotAnActiveNotary' | 'InvalidNotaryOperator' | 'NoMoreNotaryIds';
+    readonly isEffectiveTickTooSoon: boolean;
+    readonly type: 'ProposalNotFound' | 'MaxNotariesExceeded' | 'MaxProposalsPerBlockExceeded' | 'NotAnActiveNotary' | 'InvalidNotaryOperator' | 'NoMoreNotaryIds' | 'EffectiveTickTooSoon';
   }
 
   /** @name UlxPrimitivesNotaryNotaryNotebookKeyDetails (270) */
