@@ -302,7 +302,7 @@ impl pallet_ticks::Config for Runtime {
 }
 
 parameter_types! {
-	pub const MaxCohortSize: u32 = 250; // this means mining_slot last 40 days
+	pub const MaxCohortSize: u32 = 1_000; // this means mining_slot last 10 days
 	pub const BlocksBetweenSlots: u32 = prod_or_fast!(1440, 4); // going to add a cohort every day
 	pub const MaxMiners: u32 = 10_000; // must multiply cleanly by MaxCohortSize
 	pub const SessionRotationPeriod: u32 = prod_or_fast!(120, 2); // must be cleanly divisible by BlocksBetweenSlots
@@ -334,8 +334,8 @@ parameter_types! {
 	pub const UtxoUnlockCosignDeadlineBlocks: BitcoinHeight = BitcoinBlocksPerDay::get() * 5; // 5 days
 
 	pub const MaxUnlockingUtxos: u32 = 1000;
-	pub const MinBitcoinSatoshiAmount: Satoshis = 100_000_000; // 1 bitcoin minimum
-	pub const MaxBitcoinPubkeysPerVault: u32 = 100;
+	pub const MinBitcoinSatoshiAmount: Satoshis = 10_000_000; // 1/10th bitcoin minimum
+	pub const MaxPendingBitcoinPubkeysPerVault: u32 = 100;
 }
 
 impl pallet_vaults::Config for Runtime {
@@ -346,7 +346,7 @@ impl pallet_vaults::Config for Runtime {
 	type RuntimeHoldReason = RuntimeHoldReason;
 	type MinimumBondAmount = MinimumBondAmount;
 	type BlocksPerDay = BlocksPerDay;
-	type MaxVaultBitcoinPubkeys = MaxBitcoinPubkeysPerVault;
+	type MaxPendingVaultBitcoinPubkeys = MaxPendingBitcoinPubkeysPerVault;
 }
 
 impl pallet_bond::Config for Runtime {
@@ -623,6 +623,23 @@ impl InstanceFilter<RuntimeCall> for ProxyType {
 	}
 }
 
+parameter_types! {
+	// One storage item; key size is 32; value is size 4+4+16+32 bytes = 56 bytes.
+	pub const DepositBase: Balance = deposit(1, 88);
+	// Additional storage item size of 32 bytes.
+	pub const DepositFactor: Balance = deposit(0, 32);
+	pub const MaxSignatories: u32 = 100;
+}
+
+impl pallet_multisig::Config for Runtime {
+	type RuntimeEvent = RuntimeEvent;
+	type RuntimeCall = RuntimeCall;
+	type Currency = ArgonBalances;
+	type DepositBase = DepositBase;
+	type DepositFactor = DepositFactor;
+	type MaxSignatories = MaxSignatories;
+	type WeightInfo = pallet_multisig::weights::SubstrateWeight<Runtime>;
+}
 impl pallet_proxy::Config for Runtime {
 	type RuntimeEvent = RuntimeEvent;
 	type RuntimeCall = RuntimeCall;
@@ -770,56 +787,59 @@ mod runtime {
 	#[runtime::pallet_index(1)]
 	pub type Timestamp = pallet_timestamp;
 	#[runtime::pallet_index(2)]
-	pub type Proxy = pallet_proxy;
+	pub type Multisig = pallet_multisig;
+
 	#[runtime::pallet_index(3)]
-	pub type Ticks = pallet_ticks;
+	pub type Proxy = pallet_proxy;
 	#[runtime::pallet_index(4)]
-	pub type MiningSlot = pallet_mining_slot;
+	pub type Ticks = pallet_ticks;
 	#[runtime::pallet_index(5)]
-	pub type BitcoinUtxos = pallet_bitcoin_utxos;
+	pub type MiningSlot = pallet_mining_slot;
 	#[runtime::pallet_index(6)]
-	pub type Vaults = pallet_vaults;
+	pub type BitcoinUtxos = pallet_bitcoin_utxos;
 	#[runtime::pallet_index(7)]
-	pub type Bonds = pallet_bond;
+	pub type Vaults = pallet_vaults;
 	#[runtime::pallet_index(8)]
-	pub type Notaries = pallet_notaries;
+	pub type Bonds = pallet_bond;
 	#[runtime::pallet_index(9)]
-	pub type Notebook = pallet_notebook;
+	pub type Notaries = pallet_notaries;
 	#[runtime::pallet_index(10)]
-	pub type ChainTransfer = pallet_chain_transfer;
+	pub type Notebook = pallet_notebook;
 	#[runtime::pallet_index(11)]
-	pub type BlockSealSpec = pallet_block_seal_spec;
+	pub type ChainTransfer = pallet_chain_transfer;
 	#[runtime::pallet_index(12)]
-	pub type DataDomain = pallet_data_domain;
+	pub type BlockSealSpec = pallet_block_seal_spec;
 	#[runtime::pallet_index(13)]
+	pub type DataDomain = pallet_data_domain;
+	#[runtime::pallet_index(14)]
 	pub type PriceIndex = pallet_price_index;
 	// Authorship must be before session
-	#[runtime::pallet_index(14)]
-	pub type Authorship = pallet_authorship;
 	#[runtime::pallet_index(15)]
-	pub type Historical = pallet_session_historical;
+	pub type Authorship = pallet_authorship;
 	#[runtime::pallet_index(16)]
-	pub type Session = pallet_session;
+	pub type Historical = pallet_session_historical;
 	#[runtime::pallet_index(17)]
+	pub type Session = pallet_session;
+	#[runtime::pallet_index(18)]
 	pub type BlockSeal = pallet_block_seal;
 	// BlockRewards must come after seal
-	#[runtime::pallet_index(18)]
-	pub type BlockRewards = pallet_block_rewards;
 	#[runtime::pallet_index(19)]
-	pub type Grandpa = pallet_grandpa;
+	pub type BlockRewards = pallet_block_rewards;
 	#[runtime::pallet_index(20)]
-	pub type Offences = pallet_offences;
+	pub type Grandpa = pallet_grandpa;
 	#[runtime::pallet_index(21)]
-	pub type Mint = pallet_mint;
+	pub type Offences = pallet_offences;
 	#[runtime::pallet_index(22)]
-	pub type ArgonBalances = pallet_balances<Instance1>;
+	pub type Mint = pallet_mint;
 	#[runtime::pallet_index(23)]
-	pub type UlixeeBalances = pallet_balances<Instance2>;
+	pub type ArgonBalances = pallet_balances<Instance1>;
 	#[runtime::pallet_index(24)]
-	pub type TxPause = pallet_tx_pause;
+	pub type UlixeeBalances = pallet_balances<Instance2>;
 	#[runtime::pallet_index(25)]
-	pub type TransactionPayment = pallet_transaction_payment;
+	pub type TxPause = pallet_tx_pause;
 	#[runtime::pallet_index(26)]
+	pub type TransactionPayment = pallet_transaction_payment;
+	#[runtime::pallet_index(27)]
 	pub type Sudo = pallet_sudo;
 }
 

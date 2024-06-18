@@ -25,7 +25,7 @@ use ulx_primitives::{
 	NotebookAuditSummary, NotebookDigestRecord, NotebookHeaderData, NotebookNumber,
 };
 
-use crate::{aux_data::AuxData, convert_u32, error::Error};
+use crate::{aux_data::AuxData, error::Error};
 
 pub enum AuxState<C: AuxStore> {
 	NotaryStateAtTick(Arc<AuxData<NotaryNotebookTickState, C>>),
@@ -146,7 +146,7 @@ impl<B: BlockT, C: AuxStore + 'static> UlxAux<B, C> {
 	) -> Result<(ForkPower, ForkPower), Error> {
 		let _lock = self.lock.write();
 		let block_number =
-			UniqueSaturatedInto::<u32>::unique_saturated_into(&block.header.number());
+			UniqueSaturatedInto::<u32>::unique_saturated_into(*block.header.number());
 		let strongest_at_height = self.strongest_fork_at_tick(tick)?.get();
 
 		// add author to voting key

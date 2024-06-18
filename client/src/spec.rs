@@ -6,9 +6,10 @@ pub mod api {
 	mod root_mod {
 		pub use super::*;
 	}
-	pub static PALLETS: [&str; 27usize] = [
+	pub static PALLETS: [&str; 28usize] = [
 		"System",
 		"Timestamp",
+		"Multisig",
 		"Proxy",
 		"Ticks",
 		"MiningSlot",
@@ -1059,10 +1060,9 @@ pub mod api {
 						"query_call_info",
 						types::QueryCallInfo { call, len },
 						[
-							225u8, 66u8, 197u8, 163u8, 88u8, 4u8, 175u8, 120u8, 213u8, 152u8,
-							177u8, 163u8, 72u8, 112u8, 16u8, 128u8, 120u8, 109u8, 120u8, 219u8,
-							234u8, 96u8, 30u8, 186u8, 6u8, 91u8, 161u8, 46u8, 223u8, 186u8, 19u8,
-							254u8,
+							132u8, 48u8, 233u8, 89u8, 70u8, 181u8, 197u8, 197u8, 209u8, 39u8,
+							194u8, 116u8, 195u8, 207u8, 1u8, 94u8, 100u8, 130u8, 34u8, 33u8, 99u8,
+							89u8, 104u8, 76u8, 86u8, 172u8, 214u8, 4u8, 107u8, 180u8, 38u8, 207u8,
 						],
 					)
 				}
@@ -1080,9 +1080,10 @@ pub mod api {
 						"query_call_fee_details",
 						types::QueryCallFeeDetails { call, len },
 						[
-							22u8, 227u8, 85u8, 186u8, 149u8, 151u8, 201u8, 15u8, 255u8, 0u8, 124u8,
-							170u8, 22u8, 26u8, 160u8, 124u8, 133u8, 146u8, 168u8, 68u8, 103u8,
-							179u8, 152u8, 41u8, 187u8, 205u8, 7u8, 186u8, 174u8, 4u8, 94u8, 139u8,
+							71u8, 255u8, 213u8, 192u8, 153u8, 86u8, 220u8, 136u8, 101u8, 92u8,
+							211u8, 151u8, 155u8, 238u8, 168u8, 36u8, 132u8, 41u8, 44u8, 146u8,
+							198u8, 144u8, 112u8, 23u8, 144u8, 38u8, 107u8, 194u8, 236u8, 79u8,
+							111u8, 49u8,
 						],
 					)
 				}
@@ -2405,6 +2406,9 @@ pub mod api {
 		pub fn timestamp(&self) -> timestamp::constants::ConstantsApi {
 			timestamp::constants::ConstantsApi
 		}
+		pub fn multisig(&self) -> multisig::constants::ConstantsApi {
+			multisig::constants::ConstantsApi
+		}
 		pub fn proxy(&self) -> proxy::constants::ConstantsApi {
 			proxy::constants::ConstantsApi
 		}
@@ -2461,6 +2465,9 @@ pub mod api {
 		}
 		pub fn timestamp(&self) -> timestamp::storage::StorageApi {
 			timestamp::storage::StorageApi
+		}
+		pub fn multisig(&self) -> multisig::storage::StorageApi {
+			multisig::storage::StorageApi
 		}
 		pub fn proxy(&self) -> proxy::storage::StorageApi {
 			proxy::storage::StorageApi
@@ -2546,6 +2553,9 @@ pub mod api {
 		pub fn timestamp(&self) -> timestamp::calls::TransactionApi {
 			timestamp::calls::TransactionApi
 		}
+		pub fn multisig(&self) -> multisig::calls::TransactionApi {
+			multisig::calls::TransactionApi
+		}
 		pub fn proxy(&self) -> proxy::calls::TransactionApi {
 			proxy::calls::TransactionApi
 		}
@@ -2619,9 +2629,9 @@ pub mod api {
 			.hash();
 		runtime_metadata_hash ==
 			[
-				157u8, 225u8, 235u8, 153u8, 198u8, 246u8, 242u8, 118u8, 241u8, 34u8, 56u8, 159u8,
-				35u8, 127u8, 202u8, 255u8, 179u8, 211u8, 149u8, 159u8, 27u8, 21u8, 95u8, 132u8,
-				178u8, 158u8, 150u8, 172u8, 62u8, 110u8, 71u8, 118u8,
+				159u8, 163u8, 4u8, 185u8, 114u8, 153u8, 31u8, 47u8, 207u8, 241u8, 39u8, 56u8,
+				187u8, 243u8, 133u8, 178u8, 198u8, 74u8, 225u8, 145u8, 238u8, 130u8, 112u8, 23u8,
+				141u8, 191u8, 73u8, 164u8, 207u8, 102u8, 133u8, 155u8,
 			]
 	}
 	pub mod system {
@@ -3698,9 +3708,9 @@ pub mod api {
 						"Events",
 						(),
 						[
-							251u8, 10u8, 8u8, 142u8, 17u8, 27u8, 113u8, 83u8, 184u8, 188u8, 155u8,
-							71u8, 224u8, 51u8, 80u8, 18u8, 166u8, 115u8, 129u8, 99u8, 119u8, 235u8,
-							106u8, 105u8, 74u8, 158u8, 57u8, 192u8, 66u8, 221u8, 162u8, 114u8,
+							80u8, 242u8, 171u8, 58u8, 175u8, 6u8, 245u8, 232u8, 234u8, 147u8,
+							177u8, 61u8, 144u8, 24u8, 199u8, 171u8, 214u8, 30u8, 30u8, 20u8, 131u8,
+							0u8, 160u8, 66u8, 93u8, 135u8, 7u8, 24u8, 184u8, 244u8, 8u8, 138u8,
 						],
 					)
 				}
@@ -4171,6 +4181,701 @@ pub mod api {
 			}
 		}
 	}
+	pub mod multisig {
+		use super::{root_mod, runtime_types};
+		#[doc = "The `Error` enum of this pallet."]
+		pub type Error = runtime_types::pallet_multisig::pallet::Error;
+		#[doc = "Contains a variant per dispatchable extrinsic that this pallet has."]
+		pub type Call = runtime_types::pallet_multisig::pallet::Call;
+		pub mod calls {
+			use super::{root_mod, runtime_types};
+			type DispatchError = runtime_types::sp_runtime::DispatchError;
+			pub mod types {
+				use super::runtime_types;
+				#[derive(
+					:: subxt :: ext :: codec :: Decode,
+					:: subxt :: ext :: codec :: Encode,
+					:: subxt :: ext :: scale_decode :: DecodeAsType,
+					:: subxt :: ext :: scale_encode :: EncodeAsType,
+					Clone,
+					Debug,
+				)]
+				# [codec (crate = :: subxt :: ext :: codec)]
+				#[decode_as_type(crate_path = ":: subxt :: ext :: scale_decode")]
+				#[encode_as_type(crate_path = ":: subxt :: ext :: scale_encode")]
+				#[doc = "Immediately dispatch a multi-signature call using a single approval from the caller."]
+				#[doc = ""]
+				#[doc = "The dispatch origin for this call must be _Signed_."]
+				#[doc = ""]
+				#[doc = "- `other_signatories`: The accounts (other than the sender) who are part of the"]
+				#[doc = "multi-signature, but do not participate in the approval process."]
+				#[doc = "- `call`: The call to be executed."]
+				#[doc = ""]
+				#[doc = "Result is equivalent to the dispatched result."]
+				#[doc = ""]
+				#[doc = "## Complexity"]
+				#[doc = "O(Z + C) where Z is the length of the call and C its execution weight."]
+				pub struct AsMultiThreshold1 {
+					pub other_signatories: as_multi_threshold1::OtherSignatories,
+					pub call: ::std::boxed::Box<as_multi_threshold1::Call>,
+				}
+				pub mod as_multi_threshold1 {
+					use super::runtime_types;
+					pub type OtherSignatories = ::std::vec::Vec<::subxt::utils::AccountId32>;
+					pub type Call = runtime_types::ulx_node_runtime::RuntimeCall;
+				}
+				impl ::subxt::blocks::StaticExtrinsic for AsMultiThreshold1 {
+					const PALLET: &'static str = "Multisig";
+					const CALL: &'static str = "as_multi_threshold_1";
+				}
+				#[derive(
+					:: subxt :: ext :: codec :: Decode,
+					:: subxt :: ext :: codec :: Encode,
+					:: subxt :: ext :: scale_decode :: DecodeAsType,
+					:: subxt :: ext :: scale_encode :: EncodeAsType,
+					Clone,
+					Debug,
+				)]
+				# [codec (crate = :: subxt :: ext :: codec)]
+				#[decode_as_type(crate_path = ":: subxt :: ext :: scale_decode")]
+				#[encode_as_type(crate_path = ":: subxt :: ext :: scale_encode")]
+				#[doc = "Register approval for a dispatch to be made from a deterministic composite account if"]
+				#[doc = "approved by a total of `threshold - 1` of `other_signatories`."]
+				#[doc = ""]
+				#[doc = "If there are enough, then dispatch the call."]
+				#[doc = ""]
+				#[doc = "Payment: `DepositBase` will be reserved if this is the first approval, plus"]
+				#[doc = "`threshold` times `DepositFactor`. It is returned once this dispatch happens or"]
+				#[doc = "is cancelled."]
+				#[doc = ""]
+				#[doc = "The dispatch origin for this call must be _Signed_."]
+				#[doc = ""]
+				#[doc = "- `threshold`: The total number of approvals for this dispatch before it is executed."]
+				#[doc = "- `other_signatories`: The accounts (other than the sender) who can approve this"]
+				#[doc = "dispatch. May not be empty."]
+				#[doc = "- `maybe_timepoint`: If this is the first approval, then this must be `None`. If it is"]
+				#[doc = "not the first approval, then it must be `Some`, with the timepoint (block number and"]
+				#[doc = "transaction index) of the first approval transaction."]
+				#[doc = "- `call`: The call to be executed."]
+				#[doc = ""]
+				#[doc = "NOTE: Unless this is the final approval, you will generally want to use"]
+				#[doc = "`approve_as_multi` instead, since it only requires a hash of the call."]
+				#[doc = ""]
+				#[doc = "Result is equivalent to the dispatched result if `threshold` is exactly `1`. Otherwise"]
+				#[doc = "on success, result is `Ok` and the result from the interior call, if it was executed,"]
+				#[doc = "may be found in the deposited `MultisigExecuted` event."]
+				#[doc = ""]
+				#[doc = "## Complexity"]
+				#[doc = "- `O(S + Z + Call)`."]
+				#[doc = "- Up to one balance-reserve or unreserve operation."]
+				#[doc = "- One passthrough operation, one insert, both `O(S)` where `S` is the number of"]
+				#[doc = "  signatories. `S` is capped by `MaxSignatories`, with weight being proportional."]
+				#[doc = "- One call encode & hash, both of complexity `O(Z)` where `Z` is tx-len."]
+				#[doc = "- One encode & hash, both of complexity `O(S)`."]
+				#[doc = "- Up to one binary search and insert (`O(logS + S)`)."]
+				#[doc = "- I/O: 1 read `O(S)`, up to 1 mutate `O(S)`. Up to one remove."]
+				#[doc = "- One event."]
+				#[doc = "- The weight of the `call`."]
+				#[doc = "- Storage: inserts one item, value size bounded by `MaxSignatories`, with a deposit"]
+				#[doc = "  taken for its lifetime of `DepositBase + threshold * DepositFactor`."]
+				pub struct AsMulti {
+					pub threshold: as_multi::Threshold,
+					pub other_signatories: as_multi::OtherSignatories,
+					pub maybe_timepoint: as_multi::MaybeTimepoint,
+					pub call: ::std::boxed::Box<as_multi::Call>,
+					pub max_weight: as_multi::MaxWeight,
+				}
+				pub mod as_multi {
+					use super::runtime_types;
+					pub type Threshold = ::core::primitive::u16;
+					pub type OtherSignatories = ::std::vec::Vec<::subxt::utils::AccountId32>;
+					pub type MaybeTimepoint = ::core::option::Option<
+						runtime_types::pallet_multisig::Timepoint<::core::primitive::u32>,
+					>;
+					pub type Call = runtime_types::ulx_node_runtime::RuntimeCall;
+					pub type MaxWeight = runtime_types::sp_weights::weight_v2::Weight;
+				}
+				impl ::subxt::blocks::StaticExtrinsic for AsMulti {
+					const PALLET: &'static str = "Multisig";
+					const CALL: &'static str = "as_multi";
+				}
+				#[derive(
+					:: subxt :: ext :: codec :: Decode,
+					:: subxt :: ext :: codec :: Encode,
+					:: subxt :: ext :: scale_decode :: DecodeAsType,
+					:: subxt :: ext :: scale_encode :: EncodeAsType,
+					Clone,
+					Debug,
+				)]
+				# [codec (crate = :: subxt :: ext :: codec)]
+				#[decode_as_type(crate_path = ":: subxt :: ext :: scale_decode")]
+				#[encode_as_type(crate_path = ":: subxt :: ext :: scale_encode")]
+				#[doc = "Register approval for a dispatch to be made from a deterministic composite account if"]
+				#[doc = "approved by a total of `threshold - 1` of `other_signatories`."]
+				#[doc = ""]
+				#[doc = "Payment: `DepositBase` will be reserved if this is the first approval, plus"]
+				#[doc = "`threshold` times `DepositFactor`. It is returned once this dispatch happens or"]
+				#[doc = "is cancelled."]
+				#[doc = ""]
+				#[doc = "The dispatch origin for this call must be _Signed_."]
+				#[doc = ""]
+				#[doc = "- `threshold`: The total number of approvals for this dispatch before it is executed."]
+				#[doc = "- `other_signatories`: The accounts (other than the sender) who can approve this"]
+				#[doc = "dispatch. May not be empty."]
+				#[doc = "- `maybe_timepoint`: If this is the first approval, then this must be `None`. If it is"]
+				#[doc = "not the first approval, then it must be `Some`, with the timepoint (block number and"]
+				#[doc = "transaction index) of the first approval transaction."]
+				#[doc = "- `call_hash`: The hash of the call to be executed."]
+				#[doc = ""]
+				#[doc = "NOTE: If this is the final approval, you will want to use `as_multi` instead."]
+				#[doc = ""]
+				#[doc = "## Complexity"]
+				#[doc = "- `O(S)`."]
+				#[doc = "- Up to one balance-reserve or unreserve operation."]
+				#[doc = "- One passthrough operation, one insert, both `O(S)` where `S` is the number of"]
+				#[doc = "  signatories. `S` is capped by `MaxSignatories`, with weight being proportional."]
+				#[doc = "- One encode & hash, both of complexity `O(S)`."]
+				#[doc = "- Up to one binary search and insert (`O(logS + S)`)."]
+				#[doc = "- I/O: 1 read `O(S)`, up to 1 mutate `O(S)`. Up to one remove."]
+				#[doc = "- One event."]
+				#[doc = "- Storage: inserts one item, value size bounded by `MaxSignatories`, with a deposit"]
+				#[doc = "  taken for its lifetime of `DepositBase + threshold * DepositFactor`."]
+				pub struct ApproveAsMulti {
+					pub threshold: approve_as_multi::Threshold,
+					pub other_signatories: approve_as_multi::OtherSignatories,
+					pub maybe_timepoint: approve_as_multi::MaybeTimepoint,
+					pub call_hash: approve_as_multi::CallHash,
+					pub max_weight: approve_as_multi::MaxWeight,
+				}
+				pub mod approve_as_multi {
+					use super::runtime_types;
+					pub type Threshold = ::core::primitive::u16;
+					pub type OtherSignatories = ::std::vec::Vec<::subxt::utils::AccountId32>;
+					pub type MaybeTimepoint = ::core::option::Option<
+						runtime_types::pallet_multisig::Timepoint<::core::primitive::u32>,
+					>;
+					pub type CallHash = [::core::primitive::u8; 32usize];
+					pub type MaxWeight = runtime_types::sp_weights::weight_v2::Weight;
+				}
+				impl ::subxt::blocks::StaticExtrinsic for ApproveAsMulti {
+					const PALLET: &'static str = "Multisig";
+					const CALL: &'static str = "approve_as_multi";
+				}
+				#[derive(
+					:: subxt :: ext :: codec :: Decode,
+					:: subxt :: ext :: codec :: Encode,
+					:: subxt :: ext :: scale_decode :: DecodeAsType,
+					:: subxt :: ext :: scale_encode :: EncodeAsType,
+					Clone,
+					Debug,
+				)]
+				# [codec (crate = :: subxt :: ext :: codec)]
+				#[decode_as_type(crate_path = ":: subxt :: ext :: scale_decode")]
+				#[encode_as_type(crate_path = ":: subxt :: ext :: scale_encode")]
+				#[doc = "Cancel a pre-existing, on-going multisig transaction. Any deposit reserved previously"]
+				#[doc = "for this operation will be unreserved on success."]
+				#[doc = ""]
+				#[doc = "The dispatch origin for this call must be _Signed_."]
+				#[doc = ""]
+				#[doc = "- `threshold`: The total number of approvals for this dispatch before it is executed."]
+				#[doc = "- `other_signatories`: The accounts (other than the sender) who can approve this"]
+				#[doc = "dispatch. May not be empty."]
+				#[doc = "- `timepoint`: The timepoint (block number and transaction index) of the first approval"]
+				#[doc = "transaction for this dispatch."]
+				#[doc = "- `call_hash`: The hash of the call to be executed."]
+				#[doc = ""]
+				#[doc = "## Complexity"]
+				#[doc = "- `O(S)`."]
+				#[doc = "- Up to one balance-reserve or unreserve operation."]
+				#[doc = "- One passthrough operation, one insert, both `O(S)` where `S` is the number of"]
+				#[doc = "  signatories. `S` is capped by `MaxSignatories`, with weight being proportional."]
+				#[doc = "- One encode & hash, both of complexity `O(S)`."]
+				#[doc = "- One event."]
+				#[doc = "- I/O: 1 read `O(S)`, one remove."]
+				#[doc = "- Storage: removes one item."]
+				pub struct CancelAsMulti {
+					pub threshold: cancel_as_multi::Threshold,
+					pub other_signatories: cancel_as_multi::OtherSignatories,
+					pub timepoint: cancel_as_multi::Timepoint,
+					pub call_hash: cancel_as_multi::CallHash,
+				}
+				pub mod cancel_as_multi {
+					use super::runtime_types;
+					pub type Threshold = ::core::primitive::u16;
+					pub type OtherSignatories = ::std::vec::Vec<::subxt::utils::AccountId32>;
+					pub type Timepoint =
+						runtime_types::pallet_multisig::Timepoint<::core::primitive::u32>;
+					pub type CallHash = [::core::primitive::u8; 32usize];
+				}
+				impl ::subxt::blocks::StaticExtrinsic for CancelAsMulti {
+					const PALLET: &'static str = "Multisig";
+					const CALL: &'static str = "cancel_as_multi";
+				}
+			}
+			pub struct TransactionApi;
+			impl TransactionApi {
+				#[doc = "Immediately dispatch a multi-signature call using a single approval from the caller."]
+				#[doc = ""]
+				#[doc = "The dispatch origin for this call must be _Signed_."]
+				#[doc = ""]
+				#[doc = "- `other_signatories`: The accounts (other than the sender) who are part of the"]
+				#[doc = "multi-signature, but do not participate in the approval process."]
+				#[doc = "- `call`: The call to be executed."]
+				#[doc = ""]
+				#[doc = "Result is equivalent to the dispatched result."]
+				#[doc = ""]
+				#[doc = "## Complexity"]
+				#[doc = "O(Z + C) where Z is the length of the call and C its execution weight."]
+				pub fn as_multi_threshold_1(
+					&self,
+					other_signatories: types::as_multi_threshold1::OtherSignatories,
+					call: types::as_multi_threshold1::Call,
+				) -> ::subxt::tx::Payload<types::AsMultiThreshold1> {
+					::subxt::tx::Payload::new_static(
+						"Multisig",
+						"as_multi_threshold_1",
+						types::AsMultiThreshold1 {
+							other_signatories,
+							call: ::std::boxed::Box::new(call),
+						},
+						[
+							76u8, 125u8, 167u8, 218u8, 228u8, 62u8, 59u8, 19u8, 95u8, 81u8, 240u8,
+							238u8, 118u8, 49u8, 179u8, 79u8, 118u8, 180u8, 65u8, 57u8, 228u8,
+							247u8, 244u8, 60u8, 85u8, 254u8, 149u8, 2u8, 165u8, 202u8, 80u8, 128u8,
+						],
+					)
+				}
+				#[doc = "Register approval for a dispatch to be made from a deterministic composite account if"]
+				#[doc = "approved by a total of `threshold - 1` of `other_signatories`."]
+				#[doc = ""]
+				#[doc = "If there are enough, then dispatch the call."]
+				#[doc = ""]
+				#[doc = "Payment: `DepositBase` will be reserved if this is the first approval, plus"]
+				#[doc = "`threshold` times `DepositFactor`. It is returned once this dispatch happens or"]
+				#[doc = "is cancelled."]
+				#[doc = ""]
+				#[doc = "The dispatch origin for this call must be _Signed_."]
+				#[doc = ""]
+				#[doc = "- `threshold`: The total number of approvals for this dispatch before it is executed."]
+				#[doc = "- `other_signatories`: The accounts (other than the sender) who can approve this"]
+				#[doc = "dispatch. May not be empty."]
+				#[doc = "- `maybe_timepoint`: If this is the first approval, then this must be `None`. If it is"]
+				#[doc = "not the first approval, then it must be `Some`, with the timepoint (block number and"]
+				#[doc = "transaction index) of the first approval transaction."]
+				#[doc = "- `call`: The call to be executed."]
+				#[doc = ""]
+				#[doc = "NOTE: Unless this is the final approval, you will generally want to use"]
+				#[doc = "`approve_as_multi` instead, since it only requires a hash of the call."]
+				#[doc = ""]
+				#[doc = "Result is equivalent to the dispatched result if `threshold` is exactly `1`. Otherwise"]
+				#[doc = "on success, result is `Ok` and the result from the interior call, if it was executed,"]
+				#[doc = "may be found in the deposited `MultisigExecuted` event."]
+				#[doc = ""]
+				#[doc = "## Complexity"]
+				#[doc = "- `O(S + Z + Call)`."]
+				#[doc = "- Up to one balance-reserve or unreserve operation."]
+				#[doc = "- One passthrough operation, one insert, both `O(S)` where `S` is the number of"]
+				#[doc = "  signatories. `S` is capped by `MaxSignatories`, with weight being proportional."]
+				#[doc = "- One call encode & hash, both of complexity `O(Z)` where `Z` is tx-len."]
+				#[doc = "- One encode & hash, both of complexity `O(S)`."]
+				#[doc = "- Up to one binary search and insert (`O(logS + S)`)."]
+				#[doc = "- I/O: 1 read `O(S)`, up to 1 mutate `O(S)`. Up to one remove."]
+				#[doc = "- One event."]
+				#[doc = "- The weight of the `call`."]
+				#[doc = "- Storage: inserts one item, value size bounded by `MaxSignatories`, with a deposit"]
+				#[doc = "  taken for its lifetime of `DepositBase + threshold * DepositFactor`."]
+				pub fn as_multi(
+					&self,
+					threshold: types::as_multi::Threshold,
+					other_signatories: types::as_multi::OtherSignatories,
+					maybe_timepoint: types::as_multi::MaybeTimepoint,
+					call: types::as_multi::Call,
+					max_weight: types::as_multi::MaxWeight,
+				) -> ::subxt::tx::Payload<types::AsMulti> {
+					::subxt::tx::Payload::new_static(
+						"Multisig",
+						"as_multi",
+						types::AsMulti {
+							threshold,
+							other_signatories,
+							maybe_timepoint,
+							call: ::std::boxed::Box::new(call),
+							max_weight,
+						},
+						[
+							75u8, 255u8, 202u8, 204u8, 19u8, 59u8, 226u8, 24u8, 10u8, 209u8, 2u8,
+							196u8, 131u8, 197u8, 126u8, 80u8, 223u8, 52u8, 106u8, 61u8, 43u8,
+							147u8, 93u8, 166u8, 66u8, 69u8, 254u8, 176u8, 203u8, 167u8, 2u8, 242u8,
+						],
+					)
+				}
+				#[doc = "Register approval for a dispatch to be made from a deterministic composite account if"]
+				#[doc = "approved by a total of `threshold - 1` of `other_signatories`."]
+				#[doc = ""]
+				#[doc = "Payment: `DepositBase` will be reserved if this is the first approval, plus"]
+				#[doc = "`threshold` times `DepositFactor`. It is returned once this dispatch happens or"]
+				#[doc = "is cancelled."]
+				#[doc = ""]
+				#[doc = "The dispatch origin for this call must be _Signed_."]
+				#[doc = ""]
+				#[doc = "- `threshold`: The total number of approvals for this dispatch before it is executed."]
+				#[doc = "- `other_signatories`: The accounts (other than the sender) who can approve this"]
+				#[doc = "dispatch. May not be empty."]
+				#[doc = "- `maybe_timepoint`: If this is the first approval, then this must be `None`. If it is"]
+				#[doc = "not the first approval, then it must be `Some`, with the timepoint (block number and"]
+				#[doc = "transaction index) of the first approval transaction."]
+				#[doc = "- `call_hash`: The hash of the call to be executed."]
+				#[doc = ""]
+				#[doc = "NOTE: If this is the final approval, you will want to use `as_multi` instead."]
+				#[doc = ""]
+				#[doc = "## Complexity"]
+				#[doc = "- `O(S)`."]
+				#[doc = "- Up to one balance-reserve or unreserve operation."]
+				#[doc = "- One passthrough operation, one insert, both `O(S)` where `S` is the number of"]
+				#[doc = "  signatories. `S` is capped by `MaxSignatories`, with weight being proportional."]
+				#[doc = "- One encode & hash, both of complexity `O(S)`."]
+				#[doc = "- Up to one binary search and insert (`O(logS + S)`)."]
+				#[doc = "- I/O: 1 read `O(S)`, up to 1 mutate `O(S)`. Up to one remove."]
+				#[doc = "- One event."]
+				#[doc = "- Storage: inserts one item, value size bounded by `MaxSignatories`, with a deposit"]
+				#[doc = "  taken for its lifetime of `DepositBase + threshold * DepositFactor`."]
+				pub fn approve_as_multi(
+					&self,
+					threshold: types::approve_as_multi::Threshold,
+					other_signatories: types::approve_as_multi::OtherSignatories,
+					maybe_timepoint: types::approve_as_multi::MaybeTimepoint,
+					call_hash: types::approve_as_multi::CallHash,
+					max_weight: types::approve_as_multi::MaxWeight,
+				) -> ::subxt::tx::Payload<types::ApproveAsMulti> {
+					::subxt::tx::Payload::new_static(
+						"Multisig",
+						"approve_as_multi",
+						types::ApproveAsMulti {
+							threshold,
+							other_signatories,
+							maybe_timepoint,
+							call_hash,
+							max_weight,
+						},
+						[
+							248u8, 46u8, 131u8, 35u8, 204u8, 12u8, 218u8, 150u8, 88u8, 131u8, 89u8,
+							13u8, 95u8, 122u8, 87u8, 107u8, 136u8, 154u8, 92u8, 199u8, 108u8, 92u8,
+							207u8, 171u8, 113u8, 8u8, 47u8, 248u8, 65u8, 26u8, 203u8, 135u8,
+						],
+					)
+				}
+				#[doc = "Cancel a pre-existing, on-going multisig transaction. Any deposit reserved previously"]
+				#[doc = "for this operation will be unreserved on success."]
+				#[doc = ""]
+				#[doc = "The dispatch origin for this call must be _Signed_."]
+				#[doc = ""]
+				#[doc = "- `threshold`: The total number of approvals for this dispatch before it is executed."]
+				#[doc = "- `other_signatories`: The accounts (other than the sender) who can approve this"]
+				#[doc = "dispatch. May not be empty."]
+				#[doc = "- `timepoint`: The timepoint (block number and transaction index) of the first approval"]
+				#[doc = "transaction for this dispatch."]
+				#[doc = "- `call_hash`: The hash of the call to be executed."]
+				#[doc = ""]
+				#[doc = "## Complexity"]
+				#[doc = "- `O(S)`."]
+				#[doc = "- Up to one balance-reserve or unreserve operation."]
+				#[doc = "- One passthrough operation, one insert, both `O(S)` where `S` is the number of"]
+				#[doc = "  signatories. `S` is capped by `MaxSignatories`, with weight being proportional."]
+				#[doc = "- One encode & hash, both of complexity `O(S)`."]
+				#[doc = "- One event."]
+				#[doc = "- I/O: 1 read `O(S)`, one remove."]
+				#[doc = "- Storage: removes one item."]
+				pub fn cancel_as_multi(
+					&self,
+					threshold: types::cancel_as_multi::Threshold,
+					other_signatories: types::cancel_as_multi::OtherSignatories,
+					timepoint: types::cancel_as_multi::Timepoint,
+					call_hash: types::cancel_as_multi::CallHash,
+				) -> ::subxt::tx::Payload<types::CancelAsMulti> {
+					::subxt::tx::Payload::new_static(
+						"Multisig",
+						"cancel_as_multi",
+						types::CancelAsMulti { threshold, other_signatories, timepoint, call_hash },
+						[
+							212u8, 179u8, 123u8, 40u8, 209u8, 228u8, 181u8, 0u8, 109u8, 28u8, 27u8,
+							48u8, 15u8, 47u8, 203u8, 54u8, 106u8, 114u8, 28u8, 118u8, 101u8, 201u8,
+							95u8, 187u8, 46u8, 182u8, 4u8, 30u8, 227u8, 105u8, 14u8, 81u8,
+						],
+					)
+				}
+			}
+		}
+		#[doc = "The `Event` enum of this pallet"]
+		pub type Event = runtime_types::pallet_multisig::pallet::Event;
+		pub mod events {
+			use super::runtime_types;
+			#[derive(
+				:: subxt :: ext :: codec :: Decode,
+				:: subxt :: ext :: codec :: Encode,
+				:: subxt :: ext :: scale_decode :: DecodeAsType,
+				:: subxt :: ext :: scale_encode :: EncodeAsType,
+				Clone,
+				Debug,
+			)]
+			# [codec (crate = :: subxt :: ext :: codec)]
+			#[decode_as_type(crate_path = ":: subxt :: ext :: scale_decode")]
+			#[encode_as_type(crate_path = ":: subxt :: ext :: scale_encode")]
+			#[doc = "A new multisig operation has begun."]
+			pub struct NewMultisig {
+				pub approving: new_multisig::Approving,
+				pub multisig: new_multisig::Multisig,
+				pub call_hash: new_multisig::CallHash,
+			}
+			pub mod new_multisig {
+				use super::runtime_types;
+				pub type Approving = ::subxt::utils::AccountId32;
+				pub type Multisig = ::subxt::utils::AccountId32;
+				pub type CallHash = [::core::primitive::u8; 32usize];
+			}
+			impl ::subxt::events::StaticEvent for NewMultisig {
+				const PALLET: &'static str = "Multisig";
+				const EVENT: &'static str = "NewMultisig";
+			}
+			#[derive(
+				:: subxt :: ext :: codec :: Decode,
+				:: subxt :: ext :: codec :: Encode,
+				:: subxt :: ext :: scale_decode :: DecodeAsType,
+				:: subxt :: ext :: scale_encode :: EncodeAsType,
+				Clone,
+				Debug,
+			)]
+			# [codec (crate = :: subxt :: ext :: codec)]
+			#[decode_as_type(crate_path = ":: subxt :: ext :: scale_decode")]
+			#[encode_as_type(crate_path = ":: subxt :: ext :: scale_encode")]
+			#[doc = "A multisig operation has been approved by someone."]
+			pub struct MultisigApproval {
+				pub approving: multisig_approval::Approving,
+				pub timepoint: multisig_approval::Timepoint,
+				pub multisig: multisig_approval::Multisig,
+				pub call_hash: multisig_approval::CallHash,
+			}
+			pub mod multisig_approval {
+				use super::runtime_types;
+				pub type Approving = ::subxt::utils::AccountId32;
+				pub type Timepoint =
+					runtime_types::pallet_multisig::Timepoint<::core::primitive::u32>;
+				pub type Multisig = ::subxt::utils::AccountId32;
+				pub type CallHash = [::core::primitive::u8; 32usize];
+			}
+			impl ::subxt::events::StaticEvent for MultisigApproval {
+				const PALLET: &'static str = "Multisig";
+				const EVENT: &'static str = "MultisigApproval";
+			}
+			#[derive(
+				:: subxt :: ext :: codec :: Decode,
+				:: subxt :: ext :: codec :: Encode,
+				:: subxt :: ext :: scale_decode :: DecodeAsType,
+				:: subxt :: ext :: scale_encode :: EncodeAsType,
+				Clone,
+				Debug,
+			)]
+			# [codec (crate = :: subxt :: ext :: codec)]
+			#[decode_as_type(crate_path = ":: subxt :: ext :: scale_decode")]
+			#[encode_as_type(crate_path = ":: subxt :: ext :: scale_encode")]
+			#[doc = "A multisig operation has been executed."]
+			pub struct MultisigExecuted {
+				pub approving: multisig_executed::Approving,
+				pub timepoint: multisig_executed::Timepoint,
+				pub multisig: multisig_executed::Multisig,
+				pub call_hash: multisig_executed::CallHash,
+				pub result: multisig_executed::Result,
+			}
+			pub mod multisig_executed {
+				use super::runtime_types;
+				pub type Approving = ::subxt::utils::AccountId32;
+				pub type Timepoint =
+					runtime_types::pallet_multisig::Timepoint<::core::primitive::u32>;
+				pub type Multisig = ::subxt::utils::AccountId32;
+				pub type CallHash = [::core::primitive::u8; 32usize];
+				pub type Result =
+					::core::result::Result<(), runtime_types::sp_runtime::DispatchError>;
+			}
+			impl ::subxt::events::StaticEvent for MultisigExecuted {
+				const PALLET: &'static str = "Multisig";
+				const EVENT: &'static str = "MultisigExecuted";
+			}
+			#[derive(
+				:: subxt :: ext :: codec :: Decode,
+				:: subxt :: ext :: codec :: Encode,
+				:: subxt :: ext :: scale_decode :: DecodeAsType,
+				:: subxt :: ext :: scale_encode :: EncodeAsType,
+				Clone,
+				Debug,
+			)]
+			# [codec (crate = :: subxt :: ext :: codec)]
+			#[decode_as_type(crate_path = ":: subxt :: ext :: scale_decode")]
+			#[encode_as_type(crate_path = ":: subxt :: ext :: scale_encode")]
+			#[doc = "A multisig operation has been cancelled."]
+			pub struct MultisigCancelled {
+				pub cancelling: multisig_cancelled::Cancelling,
+				pub timepoint: multisig_cancelled::Timepoint,
+				pub multisig: multisig_cancelled::Multisig,
+				pub call_hash: multisig_cancelled::CallHash,
+			}
+			pub mod multisig_cancelled {
+				use super::runtime_types;
+				pub type Cancelling = ::subxt::utils::AccountId32;
+				pub type Timepoint =
+					runtime_types::pallet_multisig::Timepoint<::core::primitive::u32>;
+				pub type Multisig = ::subxt::utils::AccountId32;
+				pub type CallHash = [::core::primitive::u8; 32usize];
+			}
+			impl ::subxt::events::StaticEvent for MultisigCancelled {
+				const PALLET: &'static str = "Multisig";
+				const EVENT: &'static str = "MultisigCancelled";
+			}
+		}
+		pub mod storage {
+			use super::runtime_types;
+			pub mod types {
+				use super::runtime_types;
+				pub mod multisigs {
+					use super::runtime_types;
+					pub type Multisigs = runtime_types::pallet_multisig::Multisig<
+						::core::primitive::u32,
+						::core::primitive::u128,
+						::subxt::utils::AccountId32,
+					>;
+					pub type Param0 = ::subxt::utils::AccountId32;
+					pub type Param1 = [::core::primitive::u8; 32usize];
+				}
+			}
+			pub struct StorageApi;
+			impl StorageApi {
+				#[doc = " The set of open multisig operations."]
+				pub fn multisigs_iter(
+					&self,
+				) -> ::subxt::storage::address::Address<
+					(),
+					types::multisigs::Multisigs,
+					(),
+					(),
+					::subxt::storage::address::Yes,
+				> {
+					::subxt::storage::address::Address::new_static(
+						"Multisig",
+						"Multisigs",
+						(),
+						[
+							154u8, 109u8, 45u8, 18u8, 155u8, 151u8, 81u8, 28u8, 86u8, 127u8, 189u8,
+							151u8, 49u8, 61u8, 12u8, 149u8, 84u8, 61u8, 110u8, 197u8, 200u8, 140u8,
+							37u8, 100u8, 14u8, 162u8, 158u8, 161u8, 48u8, 117u8, 102u8, 61u8,
+						],
+					)
+				}
+				#[doc = " The set of open multisig operations."]
+				pub fn multisigs_iter1(
+					&self,
+					_0: impl ::std::borrow::Borrow<types::multisigs::Param0>,
+				) -> ::subxt::storage::address::Address<
+					::subxt::storage::address::StaticStorageKey<types::multisigs::Param0>,
+					types::multisigs::Multisigs,
+					(),
+					(),
+					::subxt::storage::address::Yes,
+				> {
+					::subxt::storage::address::Address::new_static(
+						"Multisig",
+						"Multisigs",
+						::subxt::storage::address::StaticStorageKey::new(_0.borrow()),
+						[
+							154u8, 109u8, 45u8, 18u8, 155u8, 151u8, 81u8, 28u8, 86u8, 127u8, 189u8,
+							151u8, 49u8, 61u8, 12u8, 149u8, 84u8, 61u8, 110u8, 197u8, 200u8, 140u8,
+							37u8, 100u8, 14u8, 162u8, 158u8, 161u8, 48u8, 117u8, 102u8, 61u8,
+						],
+					)
+				}
+				#[doc = " The set of open multisig operations."]
+				pub fn multisigs(
+					&self,
+					_0: impl ::std::borrow::Borrow<types::multisigs::Param0>,
+					_1: impl ::std::borrow::Borrow<types::multisigs::Param1>,
+				) -> ::subxt::storage::address::Address<
+					(
+						::subxt::storage::address::StaticStorageKey<types::multisigs::Param0>,
+						::subxt::storage::address::StaticStorageKey<types::multisigs::Param1>,
+					),
+					types::multisigs::Multisigs,
+					::subxt::storage::address::Yes,
+					(),
+					(),
+				> {
+					::subxt::storage::address::Address::new_static(
+						"Multisig",
+						"Multisigs",
+						(
+							::subxt::storage::address::StaticStorageKey::new(_0.borrow()),
+							::subxt::storage::address::StaticStorageKey::new(_1.borrow()),
+						),
+						[
+							154u8, 109u8, 45u8, 18u8, 155u8, 151u8, 81u8, 28u8, 86u8, 127u8, 189u8,
+							151u8, 49u8, 61u8, 12u8, 149u8, 84u8, 61u8, 110u8, 197u8, 200u8, 140u8,
+							37u8, 100u8, 14u8, 162u8, 158u8, 161u8, 48u8, 117u8, 102u8, 61u8,
+						],
+					)
+				}
+			}
+		}
+		pub mod constants {
+			use super::runtime_types;
+			pub struct ConstantsApi;
+			impl ConstantsApi {
+				#[doc = " The base amount of currency needed to reserve for creating a multisig execution or to"]
+				#[doc = " store a dispatch call for later."]
+				#[doc = ""]
+				#[doc = " This is held for an additional storage item whose value size is"]
+				#[doc = " `4 + sizeof((BlockNumber, Balance, AccountId))` bytes and whose key size is"]
+				#[doc = " `32 + sizeof(AccountId)` bytes."]
+				pub fn deposit_base(&self) -> ::subxt::constants::Address<::core::primitive::u128> {
+					::subxt::constants::Address::new_static(
+						"Multisig",
+						"DepositBase",
+						[
+							84u8, 157u8, 140u8, 4u8, 93u8, 57u8, 29u8, 133u8, 105u8, 200u8, 214u8,
+							27u8, 144u8, 208u8, 218u8, 160u8, 130u8, 109u8, 101u8, 54u8, 210u8,
+							136u8, 71u8, 63u8, 49u8, 237u8, 234u8, 15u8, 178u8, 98u8, 148u8, 156u8,
+						],
+					)
+				}
+				#[doc = " The amount of currency needed per unit threshold when creating a multisig execution."]
+				#[doc = ""]
+				#[doc = " This is held for adding 32 bytes more into a pre-existing storage value."]
+				pub fn deposit_factor(
+					&self,
+				) -> ::subxt::constants::Address<::core::primitive::u128> {
+					::subxt::constants::Address::new_static(
+						"Multisig",
+						"DepositFactor",
+						[
+							84u8, 157u8, 140u8, 4u8, 93u8, 57u8, 29u8, 133u8, 105u8, 200u8, 214u8,
+							27u8, 144u8, 208u8, 218u8, 160u8, 130u8, 109u8, 101u8, 54u8, 210u8,
+							136u8, 71u8, 63u8, 49u8, 237u8, 234u8, 15u8, 178u8, 98u8, 148u8, 156u8,
+						],
+					)
+				}
+				#[doc = " The maximum amount of signatories allowed in the multisig."]
+				pub fn max_signatories(
+					&self,
+				) -> ::subxt::constants::Address<::core::primitive::u32> {
+					::subxt::constants::Address::new_static(
+						"Multisig",
+						"MaxSignatories",
+						[
+							98u8, 252u8, 116u8, 72u8, 26u8, 180u8, 225u8, 83u8, 200u8, 157u8,
+							125u8, 151u8, 53u8, 76u8, 168u8, 26u8, 10u8, 9u8, 98u8, 68u8, 9u8,
+							178u8, 197u8, 113u8, 31u8, 79u8, 200u8, 90u8, 203u8, 100u8, 41u8,
+							145u8,
+						],
+					)
+				}
+			}
+		}
+	}
 	pub mod proxy {
 		use super::{root_mod, runtime_types};
 		#[doc = "The `Error` enum of this pallet."]
@@ -4575,9 +5280,9 @@ pub mod api {
 						"proxy",
 						types::Proxy { real, force_proxy_type, call: ::std::boxed::Box::new(call) },
 						[
-							113u8, 149u8, 51u8, 158u8, 142u8, 110u8, 152u8, 0u8, 125u8, 226u8,
-							65u8, 145u8, 44u8, 38u8, 136u8, 206u8, 173u8, 99u8, 211u8, 193u8, 74u8,
-							188u8, 9u8, 89u8, 159u8, 14u8, 223u8, 54u8, 34u8, 78u8, 88u8, 158u8,
+							46u8, 153u8, 51u8, 129u8, 43u8, 87u8, 21u8, 209u8, 188u8, 224u8, 82u8,
+							221u8, 208u8, 38u8, 228u8, 101u8, 95u8, 23u8, 40u8, 188u8, 94u8, 84u8,
+							45u8, 196u8, 212u8, 170u8, 238u8, 144u8, 180u8, 48u8, 11u8, 49u8,
 						],
 					)
 				}
@@ -4833,9 +5538,9 @@ pub mod api {
 							call: ::std::boxed::Box::new(call),
 						},
 						[
-							197u8, 169u8, 226u8, 46u8, 80u8, 151u8, 107u8, 216u8, 35u8, 206u8,
-							41u8, 178u8, 169u8, 177u8, 87u8, 39u8, 196u8, 135u8, 38u8, 20u8, 149u8,
-							205u8, 57u8, 74u8, 167u8, 62u8, 89u8, 0u8, 129u8, 21u8, 132u8, 38u8,
+							255u8, 26u8, 127u8, 57u8, 112u8, 18u8, 198u8, 71u8, 195u8, 103u8, 12u8,
+							124u8, 114u8, 71u8, 75u8, 190u8, 235u8, 241u8, 59u8, 93u8, 75u8, 248u8,
+							38u8, 11u8, 144u8, 210u8, 153u8, 73u8, 169u8, 51u8, 242u8, 23u8,
 						],
 					)
 				}
@@ -7014,12 +7719,12 @@ pub mod api {
 					)
 				}
 				#[doc = " The max amount of pending bitcoin pubkey hashes allowed"]
-				pub fn max_vault_bitcoin_pubkeys(
+				pub fn max_pending_vault_bitcoin_pubkeys(
 					&self,
 				) -> ::subxt::constants::Address<::core::primitive::u32> {
 					::subxt::constants::Address::new_static(
 						"Vaults",
-						"MaxVaultBitcoinPubkeys",
+						"MaxPendingVaultBitcoinPubkeys",
 						[
 							98u8, 252u8, 116u8, 72u8, 26u8, 180u8, 225u8, 83u8, 200u8, 157u8,
 							125u8, 151u8, 53u8, 76u8, 168u8, 26u8, 10u8, 9u8, 98u8, 68u8, 9u8,
@@ -15835,10 +16540,9 @@ pub mod api {
 						"sudo",
 						types::Sudo { call: ::std::boxed::Box::new(call) },
 						[
-							77u8, 42u8, 229u8, 14u8, 132u8, 182u8, 84u8, 251u8, 9u8, 251u8, 82u8,
-							197u8, 159u8, 93u8, 233u8, 221u8, 219u8, 197u8, 80u8, 221u8, 156u8,
-							242u8, 67u8, 232u8, 145u8, 241u8, 114u8, 49u8, 88u8, 50u8, 255u8,
-							146u8,
+							190u8, 24u8, 252u8, 232u8, 221u8, 179u8, 73u8, 148u8, 245u8, 184u8,
+							160u8, 11u8, 106u8, 8u8, 79u8, 133u8, 5u8, 233u8, 226u8, 225u8, 152u8,
+							171u8, 63u8, 224u8, 47u8, 35u8, 46u8, 38u8, 146u8, 138u8, 220u8, 99u8,
 						],
 					)
 				}
@@ -15857,9 +16561,10 @@ pub mod api {
 						"sudo_unchecked_weight",
 						types::SudoUncheckedWeight { call: ::std::boxed::Box::new(call), weight },
 						[
-							43u8, 226u8, 119u8, 47u8, 62u8, 36u8, 90u8, 221u8, 173u8, 33u8, 83u8,
-							183u8, 225u8, 232u8, 108u8, 150u8, 98u8, 12u8, 214u8, 230u8, 133u8,
-							252u8, 126u8, 156u8, 206u8, 83u8, 159u8, 87u8, 247u8, 14u8, 14u8, 97u8,
+							70u8, 153u8, 103u8, 182u8, 116u8, 100u8, 218u8, 85u8, 161u8, 215u8,
+							233u8, 142u8, 163u8, 40u8, 76u8, 75u8, 244u8, 117u8, 218u8, 161u8,
+							58u8, 171u8, 147u8, 108u8, 77u8, 116u8, 201u8, 38u8, 105u8, 109u8,
+							19u8, 10u8,
 						],
 					)
 				}
@@ -15894,9 +16599,10 @@ pub mod api {
 						"sudo_as",
 						types::SudoAs { who, call: ::std::boxed::Box::new(call) },
 						[
-							224u8, 98u8, 1u8, 68u8, 222u8, 17u8, 236u8, 68u8, 166u8, 160u8, 94u8,
-							83u8, 232u8, 111u8, 100u8, 40u8, 251u8, 217u8, 4u8, 30u8, 94u8, 45u8,
-							95u8, 73u8, 213u8, 214u8, 114u8, 244u8, 181u8, 15u8, 102u8, 202u8,
+							46u8, 25u8, 217u8, 129u8, 105u8, 252u8, 62u8, 214u8, 64u8, 198u8,
+							186u8, 217u8, 62u8, 85u8, 219u8, 198u8, 186u8, 72u8, 217u8, 47u8, 68u8,
+							242u8, 75u8, 19u8, 221u8, 234u8, 23u8, 111u8, 134u8, 43u8, 173u8,
+							139u8,
 						],
 					)
 				}
@@ -18623,6 +19329,299 @@ pub mod api {
 				}
 			}
 		}
+		pub mod pallet_multisig {
+			use super::runtime_types;
+			pub mod pallet {
+				use super::runtime_types;
+				#[derive(
+					:: subxt :: ext :: codec :: Decode,
+					:: subxt :: ext :: codec :: Encode,
+					:: subxt :: ext :: scale_decode :: DecodeAsType,
+					:: subxt :: ext :: scale_encode :: EncodeAsType,
+					Clone,
+					Debug,
+				)]
+				# [codec (crate = :: subxt :: ext :: codec)]
+				#[decode_as_type(crate_path = ":: subxt :: ext :: scale_decode")]
+				#[encode_as_type(crate_path = ":: subxt :: ext :: scale_encode")]
+				#[doc = "Contains a variant per dispatchable extrinsic that this pallet has."]
+				pub enum Call {
+					#[codec(index = 0)]
+					#[doc = "Immediately dispatch a multi-signature call using a single approval from the caller."]
+					#[doc = ""]
+					#[doc = "The dispatch origin for this call must be _Signed_."]
+					#[doc = ""]
+					#[doc = "- `other_signatories`: The accounts (other than the sender) who are part of the"]
+					#[doc = "multi-signature, but do not participate in the approval process."]
+					#[doc = "- `call`: The call to be executed."]
+					#[doc = ""]
+					#[doc = "Result is equivalent to the dispatched result."]
+					#[doc = ""]
+					#[doc = "## Complexity"]
+					#[doc = "O(Z + C) where Z is the length of the call and C its execution weight."]
+					as_multi_threshold_1 {
+						other_signatories: ::std::vec::Vec<::subxt::utils::AccountId32>,
+						call: ::std::boxed::Box<runtime_types::ulx_node_runtime::RuntimeCall>,
+					},
+					#[codec(index = 1)]
+					#[doc = "Register approval for a dispatch to be made from a deterministic composite account if"]
+					#[doc = "approved by a total of `threshold - 1` of `other_signatories`."]
+					#[doc = ""]
+					#[doc = "If there are enough, then dispatch the call."]
+					#[doc = ""]
+					#[doc = "Payment: `DepositBase` will be reserved if this is the first approval, plus"]
+					#[doc = "`threshold` times `DepositFactor`. It is returned once this dispatch happens or"]
+					#[doc = "is cancelled."]
+					#[doc = ""]
+					#[doc = "The dispatch origin for this call must be _Signed_."]
+					#[doc = ""]
+					#[doc = "- `threshold`: The total number of approvals for this dispatch before it is executed."]
+					#[doc = "- `other_signatories`: The accounts (other than the sender) who can approve this"]
+					#[doc = "dispatch. May not be empty."]
+					#[doc = "- `maybe_timepoint`: If this is the first approval, then this must be `None`. If it is"]
+					#[doc = "not the first approval, then it must be `Some`, with the timepoint (block number and"]
+					#[doc = "transaction index) of the first approval transaction."]
+					#[doc = "- `call`: The call to be executed."]
+					#[doc = ""]
+					#[doc = "NOTE: Unless this is the final approval, you will generally want to use"]
+					#[doc = "`approve_as_multi` instead, since it only requires a hash of the call."]
+					#[doc = ""]
+					#[doc = "Result is equivalent to the dispatched result if `threshold` is exactly `1`. Otherwise"]
+					#[doc = "on success, result is `Ok` and the result from the interior call, if it was executed,"]
+					#[doc = "may be found in the deposited `MultisigExecuted` event."]
+					#[doc = ""]
+					#[doc = "## Complexity"]
+					#[doc = "- `O(S + Z + Call)`."]
+					#[doc = "- Up to one balance-reserve or unreserve operation."]
+					#[doc = "- One passthrough operation, one insert, both `O(S)` where `S` is the number of"]
+					#[doc = "  signatories. `S` is capped by `MaxSignatories`, with weight being proportional."]
+					#[doc = "- One call encode & hash, both of complexity `O(Z)` where `Z` is tx-len."]
+					#[doc = "- One encode & hash, both of complexity `O(S)`."]
+					#[doc = "- Up to one binary search and insert (`O(logS + S)`)."]
+					#[doc = "- I/O: 1 read `O(S)`, up to 1 mutate `O(S)`. Up to one remove."]
+					#[doc = "- One event."]
+					#[doc = "- The weight of the `call`."]
+					#[doc = "- Storage: inserts one item, value size bounded by `MaxSignatories`, with a deposit"]
+					#[doc = "  taken for its lifetime of `DepositBase + threshold * DepositFactor`."]
+					as_multi {
+						threshold: ::core::primitive::u16,
+						other_signatories: ::std::vec::Vec<::subxt::utils::AccountId32>,
+						maybe_timepoint: ::core::option::Option<
+							runtime_types::pallet_multisig::Timepoint<::core::primitive::u32>,
+						>,
+						call: ::std::boxed::Box<runtime_types::ulx_node_runtime::RuntimeCall>,
+						max_weight: runtime_types::sp_weights::weight_v2::Weight,
+					},
+					#[codec(index = 2)]
+					#[doc = "Register approval for a dispatch to be made from a deterministic composite account if"]
+					#[doc = "approved by a total of `threshold - 1` of `other_signatories`."]
+					#[doc = ""]
+					#[doc = "Payment: `DepositBase` will be reserved if this is the first approval, plus"]
+					#[doc = "`threshold` times `DepositFactor`. It is returned once this dispatch happens or"]
+					#[doc = "is cancelled."]
+					#[doc = ""]
+					#[doc = "The dispatch origin for this call must be _Signed_."]
+					#[doc = ""]
+					#[doc = "- `threshold`: The total number of approvals for this dispatch before it is executed."]
+					#[doc = "- `other_signatories`: The accounts (other than the sender) who can approve this"]
+					#[doc = "dispatch. May not be empty."]
+					#[doc = "- `maybe_timepoint`: If this is the first approval, then this must be `None`. If it is"]
+					#[doc = "not the first approval, then it must be `Some`, with the timepoint (block number and"]
+					#[doc = "transaction index) of the first approval transaction."]
+					#[doc = "- `call_hash`: The hash of the call to be executed."]
+					#[doc = ""]
+					#[doc = "NOTE: If this is the final approval, you will want to use `as_multi` instead."]
+					#[doc = ""]
+					#[doc = "## Complexity"]
+					#[doc = "- `O(S)`."]
+					#[doc = "- Up to one balance-reserve or unreserve operation."]
+					#[doc = "- One passthrough operation, one insert, both `O(S)` where `S` is the number of"]
+					#[doc = "  signatories. `S` is capped by `MaxSignatories`, with weight being proportional."]
+					#[doc = "- One encode & hash, both of complexity `O(S)`."]
+					#[doc = "- Up to one binary search and insert (`O(logS + S)`)."]
+					#[doc = "- I/O: 1 read `O(S)`, up to 1 mutate `O(S)`. Up to one remove."]
+					#[doc = "- One event."]
+					#[doc = "- Storage: inserts one item, value size bounded by `MaxSignatories`, with a deposit"]
+					#[doc = "  taken for its lifetime of `DepositBase + threshold * DepositFactor`."]
+					approve_as_multi {
+						threshold: ::core::primitive::u16,
+						other_signatories: ::std::vec::Vec<::subxt::utils::AccountId32>,
+						maybe_timepoint: ::core::option::Option<
+							runtime_types::pallet_multisig::Timepoint<::core::primitive::u32>,
+						>,
+						call_hash: [::core::primitive::u8; 32usize],
+						max_weight: runtime_types::sp_weights::weight_v2::Weight,
+					},
+					#[codec(index = 3)]
+					#[doc = "Cancel a pre-existing, on-going multisig transaction. Any deposit reserved previously"]
+					#[doc = "for this operation will be unreserved on success."]
+					#[doc = ""]
+					#[doc = "The dispatch origin for this call must be _Signed_."]
+					#[doc = ""]
+					#[doc = "- `threshold`: The total number of approvals for this dispatch before it is executed."]
+					#[doc = "- `other_signatories`: The accounts (other than the sender) who can approve this"]
+					#[doc = "dispatch. May not be empty."]
+					#[doc = "- `timepoint`: The timepoint (block number and transaction index) of the first approval"]
+					#[doc = "transaction for this dispatch."]
+					#[doc = "- `call_hash`: The hash of the call to be executed."]
+					#[doc = ""]
+					#[doc = "## Complexity"]
+					#[doc = "- `O(S)`."]
+					#[doc = "- Up to one balance-reserve or unreserve operation."]
+					#[doc = "- One passthrough operation, one insert, both `O(S)` where `S` is the number of"]
+					#[doc = "  signatories. `S` is capped by `MaxSignatories`, with weight being proportional."]
+					#[doc = "- One encode & hash, both of complexity `O(S)`."]
+					#[doc = "- One event."]
+					#[doc = "- I/O: 1 read `O(S)`, one remove."]
+					#[doc = "- Storage: removes one item."]
+					cancel_as_multi {
+						threshold: ::core::primitive::u16,
+						other_signatories: ::std::vec::Vec<::subxt::utils::AccountId32>,
+						timepoint:
+							runtime_types::pallet_multisig::Timepoint<::core::primitive::u32>,
+						call_hash: [::core::primitive::u8; 32usize],
+					},
+				}
+				#[derive(
+					:: subxt :: ext :: codec :: Decode,
+					:: subxt :: ext :: codec :: Encode,
+					:: subxt :: ext :: scale_decode :: DecodeAsType,
+					:: subxt :: ext :: scale_encode :: EncodeAsType,
+					Clone,
+					Debug,
+				)]
+				# [codec (crate = :: subxt :: ext :: codec)]
+				#[decode_as_type(crate_path = ":: subxt :: ext :: scale_decode")]
+				#[encode_as_type(crate_path = ":: subxt :: ext :: scale_encode")]
+				#[doc = "The `Error` enum of this pallet."]
+				pub enum Error {
+					#[codec(index = 0)]
+					#[doc = "Threshold must be 2 or greater."]
+					MinimumThreshold,
+					#[codec(index = 1)]
+					#[doc = "Call is already approved by this signatory."]
+					AlreadyApproved,
+					#[codec(index = 2)]
+					#[doc = "Call doesn't need any (more) approvals."]
+					NoApprovalsNeeded,
+					#[codec(index = 3)]
+					#[doc = "There are too few signatories in the list."]
+					TooFewSignatories,
+					#[codec(index = 4)]
+					#[doc = "There are too many signatories in the list."]
+					TooManySignatories,
+					#[codec(index = 5)]
+					#[doc = "The signatories were provided out of order; they should be ordered."]
+					SignatoriesOutOfOrder,
+					#[codec(index = 6)]
+					#[doc = "The sender was contained in the other signatories; it shouldn't be."]
+					SenderInSignatories,
+					#[codec(index = 7)]
+					#[doc = "Multisig operation not found when attempting to cancel."]
+					NotFound,
+					#[codec(index = 8)]
+					#[doc = "Only the account that originally created the multisig is able to cancel it."]
+					NotOwner,
+					#[codec(index = 9)]
+					#[doc = "No timepoint was given, yet the multisig operation is already underway."]
+					NoTimepoint,
+					#[codec(index = 10)]
+					#[doc = "A different timepoint was given to the multisig operation that is underway."]
+					WrongTimepoint,
+					#[codec(index = 11)]
+					#[doc = "A timepoint was given, yet no multisig operation is underway."]
+					UnexpectedTimepoint,
+					#[codec(index = 12)]
+					#[doc = "The maximum weight information provided was too low."]
+					MaxWeightTooLow,
+					#[codec(index = 13)]
+					#[doc = "The data to be stored is already stored."]
+					AlreadyStored,
+				}
+				#[derive(
+					:: subxt :: ext :: codec :: Decode,
+					:: subxt :: ext :: codec :: Encode,
+					:: subxt :: ext :: scale_decode :: DecodeAsType,
+					:: subxt :: ext :: scale_encode :: EncodeAsType,
+					Clone,
+					Debug,
+				)]
+				# [codec (crate = :: subxt :: ext :: codec)]
+				#[decode_as_type(crate_path = ":: subxt :: ext :: scale_decode")]
+				#[encode_as_type(crate_path = ":: subxt :: ext :: scale_encode")]
+				#[doc = "The `Event` enum of this pallet"]
+				pub enum Event {
+					#[codec(index = 0)]
+					#[doc = "A new multisig operation has begun."]
+					NewMultisig {
+						approving: ::subxt::utils::AccountId32,
+						multisig: ::subxt::utils::AccountId32,
+						call_hash: [::core::primitive::u8; 32usize],
+					},
+					#[codec(index = 1)]
+					#[doc = "A multisig operation has been approved by someone."]
+					MultisigApproval {
+						approving: ::subxt::utils::AccountId32,
+						timepoint:
+							runtime_types::pallet_multisig::Timepoint<::core::primitive::u32>,
+						multisig: ::subxt::utils::AccountId32,
+						call_hash: [::core::primitive::u8; 32usize],
+					},
+					#[codec(index = 2)]
+					#[doc = "A multisig operation has been executed."]
+					MultisigExecuted {
+						approving: ::subxt::utils::AccountId32,
+						timepoint:
+							runtime_types::pallet_multisig::Timepoint<::core::primitive::u32>,
+						multisig: ::subxt::utils::AccountId32,
+						call_hash: [::core::primitive::u8; 32usize],
+						result:
+							::core::result::Result<(), runtime_types::sp_runtime::DispatchError>,
+					},
+					#[codec(index = 3)]
+					#[doc = "A multisig operation has been cancelled."]
+					MultisigCancelled {
+						cancelling: ::subxt::utils::AccountId32,
+						timepoint:
+							runtime_types::pallet_multisig::Timepoint<::core::primitive::u32>,
+						multisig: ::subxt::utils::AccountId32,
+						call_hash: [::core::primitive::u8; 32usize],
+					},
+				}
+			}
+			#[derive(
+				:: subxt :: ext :: codec :: Decode,
+				:: subxt :: ext :: codec :: Encode,
+				:: subxt :: ext :: scale_decode :: DecodeAsType,
+				:: subxt :: ext :: scale_encode :: EncodeAsType,
+				Clone,
+				Debug,
+			)]
+			# [codec (crate = :: subxt :: ext :: codec)]
+			#[decode_as_type(crate_path = ":: subxt :: ext :: scale_decode")]
+			#[encode_as_type(crate_path = ":: subxt :: ext :: scale_encode")]
+			pub struct Multisig<_0, _1, _2> {
+				pub when: runtime_types::pallet_multisig::Timepoint<_0>,
+				pub deposit: _1,
+				pub depositor: _2,
+				pub approvals: runtime_types::bounded_collections::bounded_vec::BoundedVec<_2>,
+			}
+			#[derive(
+				:: subxt :: ext :: codec :: Decode,
+				:: subxt :: ext :: codec :: Encode,
+				:: subxt :: ext :: scale_decode :: DecodeAsType,
+				:: subxt :: ext :: scale_encode :: EncodeAsType,
+				Clone,
+				Debug,
+			)]
+			# [codec (crate = :: subxt :: ext :: codec)]
+			#[decode_as_type(crate_path = ":: subxt :: ext :: scale_decode")]
+			#[encode_as_type(crate_path = ":: subxt :: ext :: scale_encode")]
+			pub struct Timepoint<_0> {
+				pub height: _0,
+				pub index: ::core::primitive::u32,
+			}
+		}
 		pub mod pallet_notaries {
 			use super::runtime_types;
 			pub mod pallet {
@@ -19871,7 +20870,7 @@ pub mod api {
 					InvalidSecuritization,
 					#[codec(index = 13)]
 					#[doc = "The maximum number of bitcoin pubkeys for a vault has been exceeded"]
-					MaxVaultBitcoinPubkeys,
+					MaxPendingVaultBitcoinPubkeys,
 					#[codec(index = 14)]
 					#[doc = "Securitization percent would exceed the maximum allowed"]
 					MaxSecuritizationPercentExceeded,
@@ -21226,46 +22225,48 @@ pub mod api {
 				#[codec(index = 1)]
 				Timestamp(runtime_types::pallet_timestamp::pallet::Call),
 				#[codec(index = 2)]
-				Proxy(runtime_types::pallet_proxy::pallet::Call),
+				Multisig(runtime_types::pallet_multisig::pallet::Call),
 				#[codec(index = 3)]
-				Ticks(runtime_types::pallet_ticks::pallet::Call),
+				Proxy(runtime_types::pallet_proxy::pallet::Call),
 				#[codec(index = 4)]
-				MiningSlot(runtime_types::pallet_mining_slot::pallet::Call),
+				Ticks(runtime_types::pallet_ticks::pallet::Call),
 				#[codec(index = 5)]
-				BitcoinUtxos(runtime_types::pallet_bitcoin_utxos::pallet::Call),
+				MiningSlot(runtime_types::pallet_mining_slot::pallet::Call),
 				#[codec(index = 6)]
-				Vaults(runtime_types::pallet_vaults::pallet::Call),
+				BitcoinUtxos(runtime_types::pallet_bitcoin_utxos::pallet::Call),
 				#[codec(index = 7)]
-				Bonds(runtime_types::pallet_bond::pallet::Call),
+				Vaults(runtime_types::pallet_vaults::pallet::Call),
 				#[codec(index = 8)]
-				Notaries(runtime_types::pallet_notaries::pallet::Call),
+				Bonds(runtime_types::pallet_bond::pallet::Call),
 				#[codec(index = 9)]
-				Notebook(runtime_types::pallet_notebook::pallet::Call),
+				Notaries(runtime_types::pallet_notaries::pallet::Call),
 				#[codec(index = 10)]
-				ChainTransfer(runtime_types::pallet_chain_transfer::pallet::Call),
+				Notebook(runtime_types::pallet_notebook::pallet::Call),
 				#[codec(index = 11)]
-				BlockSealSpec(runtime_types::pallet_block_seal_spec::pallet::Call),
+				ChainTransfer(runtime_types::pallet_chain_transfer::pallet::Call),
 				#[codec(index = 12)]
-				DataDomain(runtime_types::pallet_data_domain::pallet::Call),
+				BlockSealSpec(runtime_types::pallet_block_seal_spec::pallet::Call),
 				#[codec(index = 13)]
+				DataDomain(runtime_types::pallet_data_domain::pallet::Call),
+				#[codec(index = 14)]
 				PriceIndex(runtime_types::pallet_price_index::pallet::Call),
-				#[codec(index = 16)]
-				Session(runtime_types::pallet_session::pallet::Call),
 				#[codec(index = 17)]
-				BlockSeal(runtime_types::pallet_block_seal::pallet::Call),
+				Session(runtime_types::pallet_session::pallet::Call),
 				#[codec(index = 18)]
-				BlockRewards(runtime_types::pallet_block_rewards::pallet::Call),
+				BlockSeal(runtime_types::pallet_block_seal::pallet::Call),
 				#[codec(index = 19)]
+				BlockRewards(runtime_types::pallet_block_rewards::pallet::Call),
+				#[codec(index = 20)]
 				Grandpa(runtime_types::pallet_grandpa::pallet::Call),
-				#[codec(index = 21)]
-				Mint(runtime_types::pallet_mint::pallet::Call),
 				#[codec(index = 22)]
-				ArgonBalances(runtime_types::pallet_balances::pallet::Call),
+				Mint(runtime_types::pallet_mint::pallet::Call),
 				#[codec(index = 23)]
-				UlixeeBalances(runtime_types::pallet_balances::pallet::Call2),
+				ArgonBalances(runtime_types::pallet_balances::pallet::Call),
 				#[codec(index = 24)]
+				UlixeeBalances(runtime_types::pallet_balances::pallet::Call2),
+				#[codec(index = 25)]
 				TxPause(runtime_types::pallet_tx_pause::pallet::Call),
-				#[codec(index = 26)]
+				#[codec(index = 27)]
 				Sudo(runtime_types::pallet_sudo::pallet::Call),
 			}
 			#[derive(
@@ -21283,46 +22284,48 @@ pub mod api {
 				#[codec(index = 0)]
 				System(runtime_types::frame_system::pallet::Error),
 				#[codec(index = 2)]
-				Proxy(runtime_types::pallet_proxy::pallet::Error),
+				Multisig(runtime_types::pallet_multisig::pallet::Error),
 				#[codec(index = 3)]
-				Ticks(runtime_types::pallet_ticks::pallet::Error),
+				Proxy(runtime_types::pallet_proxy::pallet::Error),
 				#[codec(index = 4)]
-				MiningSlot(runtime_types::pallet_mining_slot::pallet::Error),
+				Ticks(runtime_types::pallet_ticks::pallet::Error),
 				#[codec(index = 5)]
-				BitcoinUtxos(runtime_types::pallet_bitcoin_utxos::pallet::Error),
+				MiningSlot(runtime_types::pallet_mining_slot::pallet::Error),
 				#[codec(index = 6)]
-				Vaults(runtime_types::pallet_vaults::pallet::Error),
+				BitcoinUtxos(runtime_types::pallet_bitcoin_utxos::pallet::Error),
 				#[codec(index = 7)]
-				Bonds(runtime_types::pallet_bond::pallet::Error),
+				Vaults(runtime_types::pallet_vaults::pallet::Error),
 				#[codec(index = 8)]
-				Notaries(runtime_types::pallet_notaries::pallet::Error),
+				Bonds(runtime_types::pallet_bond::pallet::Error),
 				#[codec(index = 9)]
-				Notebook(runtime_types::pallet_notebook::pallet::Error),
+				Notaries(runtime_types::pallet_notaries::pallet::Error),
 				#[codec(index = 10)]
-				ChainTransfer(runtime_types::pallet_chain_transfer::pallet::Error),
+				Notebook(runtime_types::pallet_notebook::pallet::Error),
 				#[codec(index = 11)]
-				BlockSealSpec(runtime_types::pallet_block_seal_spec::pallet::Error),
+				ChainTransfer(runtime_types::pallet_chain_transfer::pallet::Error),
 				#[codec(index = 12)]
-				DataDomain(runtime_types::pallet_data_domain::pallet::Error),
+				BlockSealSpec(runtime_types::pallet_block_seal_spec::pallet::Error),
 				#[codec(index = 13)]
+				DataDomain(runtime_types::pallet_data_domain::pallet::Error),
+				#[codec(index = 14)]
 				PriceIndex(runtime_types::pallet_price_index::pallet::Error),
-				#[codec(index = 16)]
-				Session(runtime_types::pallet_session::pallet::Error),
 				#[codec(index = 17)]
-				BlockSeal(runtime_types::pallet_block_seal::pallet::Error),
+				Session(runtime_types::pallet_session::pallet::Error),
 				#[codec(index = 18)]
-				BlockRewards(runtime_types::pallet_block_rewards::pallet::Error),
+				BlockSeal(runtime_types::pallet_block_seal::pallet::Error),
 				#[codec(index = 19)]
+				BlockRewards(runtime_types::pallet_block_rewards::pallet::Error),
+				#[codec(index = 20)]
 				Grandpa(runtime_types::pallet_grandpa::pallet::Error),
-				#[codec(index = 21)]
-				Mint(runtime_types::pallet_mint::pallet::Error),
 				#[codec(index = 22)]
-				ArgonBalances(runtime_types::pallet_balances::pallet::Error),
+				Mint(runtime_types::pallet_mint::pallet::Error),
 				#[codec(index = 23)]
-				UlixeeBalances(runtime_types::pallet_balances::pallet::Error2),
+				ArgonBalances(runtime_types::pallet_balances::pallet::Error),
 				#[codec(index = 24)]
+				UlixeeBalances(runtime_types::pallet_balances::pallet::Error2),
+				#[codec(index = 25)]
 				TxPause(runtime_types::pallet_tx_pause::pallet::Error),
-				#[codec(index = 26)]
+				#[codec(index = 27)]
 				Sudo(runtime_types::pallet_sudo::pallet::Error),
 			}
 			#[derive(
@@ -21340,46 +22343,48 @@ pub mod api {
 				#[codec(index = 0)]
 				System(runtime_types::frame_system::pallet::Event),
 				#[codec(index = 2)]
+				Multisig(runtime_types::pallet_multisig::pallet::Event),
+				#[codec(index = 3)]
 				Proxy(runtime_types::pallet_proxy::pallet::Event),
-				#[codec(index = 4)]
-				MiningSlot(runtime_types::pallet_mining_slot::pallet::Event),
 				#[codec(index = 5)]
-				BitcoinUtxos(runtime_types::pallet_bitcoin_utxos::pallet::Event),
+				MiningSlot(runtime_types::pallet_mining_slot::pallet::Event),
 				#[codec(index = 6)]
-				Vaults(runtime_types::pallet_vaults::pallet::Event),
+				BitcoinUtxos(runtime_types::pallet_bitcoin_utxos::pallet::Event),
 				#[codec(index = 7)]
-				Bonds(runtime_types::pallet_bond::pallet::Event),
+				Vaults(runtime_types::pallet_vaults::pallet::Event),
 				#[codec(index = 8)]
-				Notaries(runtime_types::pallet_notaries::pallet::Event),
+				Bonds(runtime_types::pallet_bond::pallet::Event),
 				#[codec(index = 9)]
-				Notebook(runtime_types::pallet_notebook::pallet::Event),
+				Notaries(runtime_types::pallet_notaries::pallet::Event),
 				#[codec(index = 10)]
-				ChainTransfer(runtime_types::pallet_chain_transfer::pallet::Event),
+				Notebook(runtime_types::pallet_notebook::pallet::Event),
 				#[codec(index = 11)]
-				BlockSealSpec(runtime_types::pallet_block_seal_spec::pallet::Event),
+				ChainTransfer(runtime_types::pallet_chain_transfer::pallet::Event),
 				#[codec(index = 12)]
-				DataDomain(runtime_types::pallet_data_domain::pallet::Event),
+				BlockSealSpec(runtime_types::pallet_block_seal_spec::pallet::Event),
 				#[codec(index = 13)]
+				DataDomain(runtime_types::pallet_data_domain::pallet::Event),
+				#[codec(index = 14)]
 				PriceIndex(runtime_types::pallet_price_index::pallet::Event),
-				#[codec(index = 16)]
+				#[codec(index = 17)]
 				Session(runtime_types::pallet_session::pallet::Event),
-				#[codec(index = 18)]
-				BlockRewards(runtime_types::pallet_block_rewards::pallet::Event),
 				#[codec(index = 19)]
-				Grandpa(runtime_types::pallet_grandpa::pallet::Event),
+				BlockRewards(runtime_types::pallet_block_rewards::pallet::Event),
 				#[codec(index = 20)]
-				Offences(runtime_types::pallet_offences::pallet::Event),
+				Grandpa(runtime_types::pallet_grandpa::pallet::Event),
 				#[codec(index = 21)]
-				Mint(runtime_types::pallet_mint::pallet::Event),
+				Offences(runtime_types::pallet_offences::pallet::Event),
 				#[codec(index = 22)]
-				ArgonBalances(runtime_types::pallet_balances::pallet::Event),
+				Mint(runtime_types::pallet_mint::pallet::Event),
 				#[codec(index = 23)]
-				UlixeeBalances(runtime_types::pallet_balances::pallet::Event2),
+				ArgonBalances(runtime_types::pallet_balances::pallet::Event),
 				#[codec(index = 24)]
-				TxPause(runtime_types::pallet_tx_pause::pallet::Event),
+				UlixeeBalances(runtime_types::pallet_balances::pallet::Event2),
 				#[codec(index = 25)]
-				TransactionPayment(runtime_types::pallet_transaction_payment::pallet::Event),
+				TxPause(runtime_types::pallet_tx_pause::pallet::Event),
 				#[codec(index = 26)]
+				TransactionPayment(runtime_types::pallet_transaction_payment::pallet::Event),
+				#[codec(index = 27)]
 				Sudo(runtime_types::pallet_sudo::pallet::Event),
 			}
 			#[derive(
@@ -21394,7 +22399,7 @@ pub mod api {
 			#[decode_as_type(crate_path = ":: subxt :: ext :: scale_decode")]
 			#[encode_as_type(crate_path = ":: subxt :: ext :: scale_encode")]
 			pub enum RuntimeFreezeReason {
-				#[codec(index = 18)]
+				#[codec(index = 19)]
 				BlockRewards(runtime_types::pallet_block_rewards::pallet::FreezeReason),
 			}
 			#[derive(
@@ -21409,13 +22414,13 @@ pub mod api {
 			#[decode_as_type(crate_path = ":: subxt :: ext :: scale_decode")]
 			#[encode_as_type(crate_path = ":: subxt :: ext :: scale_encode")]
 			pub enum RuntimeHoldReason {
-				#[codec(index = 4)]
+				#[codec(index = 5)]
 				MiningSlot(runtime_types::pallet_mining_slot::pallet::HoldReason),
-				#[codec(index = 6)]
-				Vaults(runtime_types::pallet_vaults::pallet::HoldReason),
 				#[codec(index = 7)]
+				Vaults(runtime_types::pallet_vaults::pallet::HoldReason),
+				#[codec(index = 8)]
 				Bonds(runtime_types::pallet_bond::pallet::HoldReason),
-				#[codec(index = 18)]
+				#[codec(index = 19)]
 				BlockRewards(runtime_types::pallet_block_rewards::pallet::HoldReason),
 			}
 		}

@@ -53,7 +53,7 @@ pub fn set_argons(account_id: u64, amount: Balance) {
 }
 
 parameter_types! {
-	pub static MaxVaultBitcoinPubkeys: u32 = 10;
+	pub static MaxPendingVaultBitcoinPubkeys: u32 = 10;
 }
 impl pallet_vaults::Config for Test {
 	type RuntimeEvent = RuntimeEvent;
@@ -63,7 +63,7 @@ impl pallet_vaults::Config for Test {
 	type Balance = Balance;
 	type BlocksPerDay = ConstU64<1440>;
 	type MinimumBondAmount = MinimumBondAmount;
-	type MaxVaultBitcoinPubkeys = MaxVaultBitcoinPubkeys;
+	type MaxPendingVaultBitcoinPubkeys = MaxPendingVaultBitcoinPubkeys;
 }
 
 // Build genesis storage according to the mock runtime.
