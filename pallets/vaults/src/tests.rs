@@ -20,7 +20,7 @@ use crate::{
 
 const TEN_PCT: FixedU128 = FixedU128::from_rational(10, 100);
 
-fn keys() -> BoundedVec<BitcoinPubkeyHash, MaxVaultBitcoinPubkeys> {
+fn keys() -> BoundedVec<BitcoinPubkeyHash, MaxPendingVaultBitcoinPubkeys> {
 	bounded_vec![BitcoinPubkeyHash([0u8; 20])]
 }
 #[test]
@@ -540,7 +540,7 @@ fn it_should_allow_vaults_to_add_public_keys() {
 		System::set_block_number(5);
 
 		set_argons(1, 1_000_000);
-		let mut keys = BoundedVec::<BitcoinPubkeyHash, MaxVaultBitcoinPubkeys>::new();
+		let mut keys = BoundedVec::<BitcoinPubkeyHash, MaxPendingVaultBitcoinPubkeys>::new();
 		for i in 0..10 {
 			let _ = keys.try_push(BitcoinPubkeyHash([i as u8; 20]));
 		}
@@ -568,7 +568,7 @@ fn it_should_allow_vaults_to_add_public_keys() {
 
 		assert_err!(
 			Vaults::add_bitcoin_pubkey_hashes(RuntimeOrigin::signed(1), 1, keys.clone()),
-			Error::<Test>::MaxVaultBitcoinPubkeys
+			Error::<Test>::MaxPendingVaultBitcoinPubkeys
 		);
 		assert_ok!(Vaults::add_bitcoin_pubkey_hashes(
 			RuntimeOrigin::signed(1),

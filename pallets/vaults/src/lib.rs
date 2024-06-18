@@ -89,7 +89,7 @@ pub mod pallet {
 
 		/// The max amount of pending bitcoin pubkey hashes allowed
 		#[pallet::constant]
-		type MaxVaultBitcoinPubkeys: Get<u32>;
+		type MaxPendingVaultBitcoinPubkeys: Get<u32>;
 	}
 
 	/// A reason for the pallet placing a hold on funds.
@@ -113,7 +113,7 @@ pub mod pallet {
 		_,
 		Twox64Concat,
 		VaultId,
-		BoundedVec<BitcoinPubkeyHash, T::MaxVaultBitcoinPubkeys>,
+		BoundedVec<BitcoinPubkeyHash, T::MaxPendingVaultBitcoinPubkeys>,
 		OptionQuery,
 	>;
 
@@ -164,7 +164,7 @@ pub mod pallet {
 		/// decreased
 		InvalidSecuritization,
 		/// The maximum number of bitcoin pubkeys for a vault has been exceeded
-		MaxVaultBitcoinPubkeys,
+		MaxPendingVaultBitcoinPubkeys,
 		/// Securitization percent would exceed the maximum allowed
 		MaxSecuritizationPercentExceeded,
 		InvalidBondType,
@@ -221,7 +221,7 @@ pub mod pallet {
 			#[pallet::compact] bitcoin_amount_allocated: T::Balance,
 			#[pallet::compact] mining_amount_allocated: T::Balance,
 			#[pallet::compact] securitization_percent: FixedU128,
-			bitcoin_pubkey_hashes: BoundedVec<BitcoinPubkeyHash, T::MaxVaultBitcoinPubkeys>,
+			bitcoin_pubkey_hashes: BoundedVec<BitcoinPubkeyHash, T::MaxPendingVaultBitcoinPubkeys>,
 		) -> DispatchResult {
 			let who = ensure_signed(origin)?;
 
@@ -400,7 +400,7 @@ pub mod pallet {
 		pub fn add_bitcoin_pubkey_hashes(
 			origin: OriginFor<T>,
 			vault_id: VaultId,
-			bitcoin_pubkey_hashes: BoundedVec<BitcoinPubkeyHash, T::MaxVaultBitcoinPubkeys>,
+			bitcoin_pubkey_hashes: BoundedVec<BitcoinPubkeyHash, T::MaxPendingVaultBitcoinPubkeys>,
 		) -> DispatchResult {
 			let who = ensure_signed(origin)?;
 
@@ -414,7 +414,7 @@ pub mod pallet {
 					let mut bitcoin_pubkey_hashes = bitcoin_pubkey_hashes;
 					bitcoin_pubkey_hashes
 						.try_append(&mut x.to_vec())
-						.map_err(|_| Error::<T>::MaxVaultBitcoinPubkeys)?;
+						.map_err(|_| Error::<T>::MaxPendingVaultBitcoinPubkeys)?;
 					*x = bitcoin_pubkey_hashes;
 				} else {
 					*x = Some(bitcoin_pubkey_hashes);

@@ -22,6 +22,7 @@ serde_json = { workspace = true }
 
 pallet-authorship = { workspace = true }
 pallet-balances = { workspace = true }
+pallet-multisig = { workspace = true }
 pallet-sudo = { workspace = true }
 pallet-timestamp = { workspace = true }
 pallet-session = { workspace = true }
@@ -63,7 +64,6 @@ pallet-block-rewards = { workspace = true }
 pallet-bond = { workspace = true }
 pallet-chain-transfer = { workspace = true }
 pallet-data-domain = { workspace = true }
-pallet-membership = { workspace = true }
 pallet-notebook = { workspace = true }
 pallet-notaries = { workspace = true }
 pallet-mining-slot = { workspace = true }
@@ -99,9 +99,9 @@ std = [
 	"pallet-chain-transfer/std",
 	"pallet-data-domain/std",
 	"pallet-grandpa/std",
-	"pallet-membership/std",
 	"pallet-mining-slot/std",
 	"pallet-mint/std",
+	"pallet-multisig/std",
 	"pallet-notaries/std",
 	"pallet-notebook/std",
 	"pallet-offences/std",
@@ -148,9 +148,9 @@ runtime-benchmarks = [
 	"pallet-chain-transfer/runtime-benchmarks",
 	"pallet-data-domain/runtime-benchmarks",
 	"pallet-grandpa/runtime-benchmarks",
-	"pallet-membership/runtime-benchmarks",
 	"pallet-mining-slot/runtime-benchmarks",
 	"pallet-mint/runtime-benchmarks",
+	"pallet-multisig/runtime-benchmarks",
 	"pallet-notaries/runtime-benchmarks",
 	"pallet-notebook/runtime-benchmarks",
 	"pallet-offences/runtime-benchmarks",
@@ -178,9 +178,9 @@ try-runtime = [
 	"pallet-chain-transfer/try-runtime",
 	"pallet-data-domain/try-runtime",
 	"pallet-grandpa/try-runtime",
-	"pallet-membership/try-runtime",
 	"pallet-mining-slot/try-runtime",
 	"pallet-mint/try-runtime",
+	"pallet-multisig/try-runtime",
 	"pallet-notaries/try-runtime",
 	"pallet-notebook/try-runtime",
 	"pallet-offences/try-runtime",

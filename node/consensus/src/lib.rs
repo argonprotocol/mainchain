@@ -1,5 +1,3 @@
-use sp_runtime::traits::{Block as BlockT, Header as HeaderT, UniqueSaturatedInto};
-
 pub use block_creator::{notary_client_task, tax_block_creator};
 
 #[cfg(test)]
