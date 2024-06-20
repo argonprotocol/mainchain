@@ -60,10 +60,13 @@ pub struct Notebook {
 
 #[derive(Encode)]
 struct NotebookHashMessage {
+	prefix: &'static str,
 	header_hash: H256,
 	notarizations: BoundedVec<Notarization, MaxNotebookNotarizations>,
 	new_account_origins: BoundedVec<NewAccountOrigin, MaxNotebookNotarizations>,
 }
+
+const NOTEBOOK_HASH_PREFIX: &str = "Notebook";
 
 impl Notebook {
 	pub fn build(
@@ -73,7 +76,9 @@ impl Notebook {
 	) -> Self {
 		let notarizations = BoundedVec::truncate_from(notarizations);
 		let new_account_origins = BoundedVec::truncate_from(new_account_origins);
+
 		let hash = NotebookHashMessage {
+			prefix: NOTEBOOK_HASH_PREFIX,
 			header_hash: header.hash(),
 			notarizations: notarizations.clone(),
 			new_account_origins: new_account_origins.clone(),
@@ -103,8 +108,13 @@ impl Notebook {
 	) -> H256 {
 		let notarizations = BoundedVec::truncate_from(notarizations);
 		let new_account_origins = BoundedVec::truncate_from(new_account_origins);
-		let hash = NotebookHashMessage { header_hash, notarizations, new_account_origins }
-			.using_encoded(blake2_256);
+		let hash = NotebookHashMessage {
+			prefix: NOTEBOOK_HASH_PREFIX,
+			header_hash,
+			notarizations,
+			new_account_origins,
+		}
+		.using_encoded(blake2_256);
 		H256::from_slice(&hash[..])
 	}
 
