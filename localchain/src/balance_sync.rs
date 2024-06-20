@@ -437,6 +437,8 @@ impl BalanceSync {
           .await
         {
           tracing::warn!("Error syncing client escrow (#{}): {:?}", escrow.id, e);
+        } else {
+          let _ = open_escrow.reload().await;
         }
       } else {
         if let Err(e) = self
@@ -686,6 +688,7 @@ impl BalanceSync {
       escrow.from_address,
       escrow.balance_change_number
     );
+
     // will handle notarization
     let _ = self
       .sync_notarization(
@@ -697,6 +700,7 @@ impl BalanceSync {
         tip.tick,
       )
       .await?;
+    notarization.add_escrow(open_escrow).await;
     Ok(())
   }
 

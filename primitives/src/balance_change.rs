@@ -106,7 +106,20 @@ impl BalanceChange {
 	}
 
 	pub fn verify_signature(&self) -> bool {
-		self.signature.0.verify(&self.hash()[..], &self.account_id)
+		let hash = self.hash();
+		let hash = hash.as_ref();
+		if let Some(hold_note) = &self.escrow_hold_note {
+			if let NoteType::EscrowHold { delegated_signer, .. } = &hold_note.note_type {
+				if let Some(delegated_signer) = delegated_signer {
+					// allow the delegated signer to sign the balance change (NOTE: still accept the
+					// account_id signature)
+					if self.signature.0.verify(hash, delegated_signer) {
+						return true;
+					}
+				}
+			}
+		}
+		self.signature.0.verify(hash, &self.account_id)
 	}
 }
 

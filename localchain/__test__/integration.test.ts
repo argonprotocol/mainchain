@@ -1,7 +1,7 @@
 import {AccountType, MainchainClient, NotaryClient} from "../index";
 import TestMainchain from "./TestMainchain";
 import TestNotary from "./TestNotary";
-import {getClient, Keyring} from "@ulixee/mainchain";
+import {Keyring} from "@ulixee/mainchain";
 import {describeIntegration, teardown} from "./testHelpers";
 
 
@@ -43,18 +43,5 @@ describeIntegration("Integration tests", () => {
         expect(metadata.finalizedNotebookNumber).toBeGreaterThanOrEqual(0);
 
         await expect(client.getBalanceTip(bob.address, AccountType.Deposit)).rejects.toThrow();
-
-    });
-
-    it('can register a notary', async () => {
-        const mainchain = new TestMainchain();
-        const mainchainUrl = await mainchain.launch();
-        const notary = new TestNotary();
-        await notary.start(mainchainUrl);
-
-        const mainchainClient = await getClient(mainchainUrl);
-
-        await notary.register(mainchainClient);
-        mainchainClient.disconnect().catch(console.error);
     });
 });

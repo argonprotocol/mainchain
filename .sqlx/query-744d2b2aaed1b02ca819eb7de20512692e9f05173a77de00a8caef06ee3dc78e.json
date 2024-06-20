@@ -29,38 +29,43 @@
         "type_info": "Text"
       },
       {
-        "name": "expiration_tick",
+        "name": "delegated_signer_address",
         "ordinal": 5,
+        "type_info": "Text"
+      },
+      {
+        "name": "expiration_tick",
+        "ordinal": 6,
         "type_info": "Int64"
       },
       {
         "name": "settled_amount",
-        "ordinal": 6,
+        "ordinal": 7,
         "type_info": "Text"
       },
       {
         "name": "settled_signature",
-        "ordinal": 7,
+        "ordinal": 8,
         "type_info": "Blob"
       },
       {
         "name": "created_at",
-        "ordinal": 8,
+        "ordinal": 9,
         "type_info": "Datetime"
       },
       {
         "name": "notarization_id",
-        "ordinal": 9,
+        "ordinal": 10,
         "type_info": "Int64"
       },
       {
         "name": "missed_claim_window",
-        "ordinal": 10,
+        "ordinal": 11,
         "type_info": "Bool"
       },
       {
         "name": "updated_at",
-        "ordinal": 11,
+        "ordinal": 12,
         "type_info": "Datetime"
       }
     ],
@@ -73,6 +78,7 @@
       false,
       false,
       false,
+      true,
       false,
       false,
       false,

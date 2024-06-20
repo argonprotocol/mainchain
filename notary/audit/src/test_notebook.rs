@@ -620,7 +620,11 @@ fn test_cannot_remove_lock_between_changesets_in_a_notebook() {
 		escrow_hold_note: None,
 		notes: bounded_vec![Note::create(
 			1000,
-			NoteType::EscrowHold { recipient: Bob.to_account_id(), data_domain_hash: None }
+			NoteType::EscrowHold {
+				recipient: Bob.to_account_id(),
+				data_domain_hash: None,
+				delegated_signer: None
+			}
 		)],
 		signature: empty_signature(),
 	}
@@ -711,7 +715,11 @@ fn test_cannot_remove_lock_between_changesets_in_a_notebook() {
 			escrow_hold_note: None,
 			notes: bounded_vec![Note::create(
 				1000,
-				NoteType::EscrowHold { recipient: Ferdie.to_account_id(), data_domain_hash: None }
+				NoteType::EscrowHold {
+					recipient: Ferdie.to_account_id(),
+					data_domain_hash: None,
+					delegated_signer: None
+				}
 			)],
 			signature: empty_signature(),
 		}
@@ -755,7 +763,11 @@ fn test_cannot_remove_lock_between_changesets_in_a_notebook() {
 			}),
 			escrow_hold_note: Some(Note::create(
 				1000,
-				NoteType::EscrowHold { recipient: Bob.to_account_id(), data_domain_hash: None },
+				NoteType::EscrowHold {
+					recipient: Bob.to_account_id(),
+					data_domain_hash: None,
+					delegated_signer: None,
+				},
 			)),
 			notes: bounded_vec![Note::create(0, NoteType::EscrowSettle)],
 			signature: empty_signature(),
@@ -808,6 +820,7 @@ fn test_votes_must_add_up() {
 				NoteType::EscrowHold {
 					recipient: Alice.to_account_id(),
 					data_domain_hash: Some(data_domain.hash()),
+					delegated_signer: None,
 				},
 			)),
 			balance: 500,
@@ -822,6 +835,7 @@ fn test_votes_must_add_up() {
 				NoteType::EscrowHold {
 					recipient: Alice.to_account_id(),
 					data_domain_hash: Some(data_domain.hash()),
+					delegated_signer: None,
 				},
 			)),
 			balance: 500,
@@ -860,7 +874,8 @@ fn test_votes_must_add_up() {
 						500,
 						NoteType::EscrowHold {
 							recipient: Alice.to_account_id(),
-							data_domain_hash: Some(data_domain.hash())
+							data_domain_hash: Some(data_domain.hash()),
+							delegated_signer: None
 						}
 					)),
 					account_type: AccountType::Deposit,
@@ -885,7 +900,8 @@ fn test_votes_must_add_up() {
 						500,
 						NoteType::EscrowHold {
 							recipient: Alice.to_account_id(),
-							data_domain_hash: Some(data_domain.hash())
+							data_domain_hash: Some(data_domain.hash()),
+							delegated_signer: None
 						}
 					)),
 					account_type: AccountType::Deposit,

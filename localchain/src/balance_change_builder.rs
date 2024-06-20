@@ -221,10 +221,16 @@ impl BalanceChangeBuilder {
     amount: Balance,
     data_domain: String,
     data_domain_address: String,
+    delegated_signer_address: Option<String>,
   ) -> Result<()> {
     let domain: DataDomain = DataDomain::parse(data_domain)?;
     self
-      .internal_create_escrow_hold(amount, Some(domain.hash()), data_domain_address)
+      .internal_create_escrow_hold(
+        amount,
+        Some(domain.hash()),
+        data_domain_address,
+        delegated_signer_address,
+      )
       .await
   }
 
@@ -232,9 +238,10 @@ impl BalanceChangeBuilder {
     &self,
     amount: Balance,
     payment_address: String,
+    delegated_signer_address: Option<String>,
   ) -> Result<()> {
     self
-      .internal_create_escrow_hold(amount, None, payment_address)
+      .internal_create_escrow_hold(amount, None, payment_address, delegated_signer_address)
       .await
   }
 
@@ -243,6 +250,7 @@ impl BalanceChangeBuilder {
     amount: Balance,
     data_domain_hash: Option<DataDomainHash>,
     payment_address: String,
+    delegated_signer_address: Option<String>,
   ) -> Result<()> {
     let mut balance_change = self.balance_change.lock().await;
     if balance_change.account_type != AccountType::Deposit {
@@ -274,6 +282,10 @@ impl BalanceChangeBuilder {
       NoteType::EscrowHold {
         data_domain_hash,
         recipient: AccountStore::parse_address(&payment_address)?,
+        delegated_signer: match delegated_signer_address {
+          Some(address) => Some(AccountStore::parse_address(&address)?),
+          None => None,
+        },
       },
     );
     Ok(())
@@ -331,7 +343,7 @@ pub mod napi_ext {
   use crate::error::NapiOk;
   use crate::mainchain_client::napi_ext::LocalchainTransfer;
   use napi::bindgen_prelude::*;
-  use ulx_primitives::AccountType;
+  use ulx_primitives::{AccountType, BalanceChange};
 
   #[napi(object, js_name = "ClaimResult")]
   pub struct ClaimResult {
@@ -436,9 +448,15 @@ pub mod napi_ext {
       amount: BigInt,
       data_domain: String,
       data_domain_address: String,
+      delegated_signer_address: Option<String>,
     ) -> napi::Result<()> {
       self
-        .create_escrow_hold(amount.get_u128().1, data_domain, data_domain_address)
+        .create_escrow_hold(
+          amount.get_u128().1,
+          data_domain,
+          data_domain_address,
+          delegated_signer_address,
+        )
         .await
         .napi_ok()
     }
@@ -448,9 +466,14 @@ pub mod napi_ext {
       &self,
       amount: BigInt,
       payment_address: String,
+      delegated_signer_address: Option<String>,
     ) -> napi::Result<()> {
       self
-        .create_private_server_escrow_hold(amount.get_u128().1, payment_address)
+        .create_private_server_escrow_hold(
+          amount.get_u128().1,
+          payment_address,
+          delegated_signer_address,
+        )
         .await
         .napi_ok()
     }
@@ -464,6 +487,13 @@ pub mod napi_ext {
     #[napi(js_name = "leaseDataDomain")]
     pub async fn lease_data_domain_napi(&self) -> napi::Result<BigInt> {
       self.lease_data_domain().await.map(Into::into).napi_ok()
+    }
+
+    /// Create scale encoded signature message for the balance change.
+    #[napi(js_name = "toSigningMessage")]
+    pub fn to_signing_message_napi(balance_change_json: String) -> napi::Result<Uint8Array> {
+      let balance_change: BalanceChange = serde_json::from_str(&balance_change_json)?;
+      Ok(balance_change.hash().0.into())
     }
   }
 }
@@ -572,6 +602,7 @@ mod test {
         1_000u128,
         "test.flights".to_string(),
         data_domain_author.clone(),
+        None,
       )
       .await?;
 
@@ -586,6 +617,7 @@ mod test {
       NoteType::EscrowHold {
         data_domain_hash: _,
         recipient,
+        ..
       } => assert_eq!(recipient, &alice),
       _ => unreachable!(),
     };

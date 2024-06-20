@@ -388,6 +388,7 @@ module.exports.OverviewStore = nativeBinding.OverviewStore
 module.exports.TickerRef = nativeBinding.TickerRef
 module.exports.Transactions = nativeBinding.Transactions
 module.exports.AccountType = nativeBinding.AccountType
+module.exports.ADDRESS_PREFIX = nativeBinding.ADDRESS_PREFIX
 module.exports.ARGON_FILE_VERSION = nativeBinding.ARGON_FILE_VERSION
 module.exports.ArgonFileType = nativeBinding.ArgonFileType
 module.exports.BalanceChangeStatus = nativeBinding.BalanceChangeStatus

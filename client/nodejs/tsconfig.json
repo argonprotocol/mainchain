@@ -1,17 +1,23 @@
 {
   "compilerOptions": {
-    // this is specific with augmented overrides
     "paths": {
-      // this is the package name we use (in the interface imports, --package for generators)
-      "@ulixee/mainchain/*": ["src/*"],
-      "@polkadot/api/augment": ["src/interfaces/augment-api.ts"],
-      "@polkadot/types/lookup": ["src/interfaces/types-lookup.ts"],
-      "@polkadot/types/augment": ["src/interfaces/augment-types.ts"]
+      "@ulixee/mainchain/*": [
+        "src/*"
+      ],
+      "@polkadot/api/augment": [
+        "src/interfaces/augment-api.ts"
+      ],
+      "@polkadot/types/lookup": [
+        "src/interfaces/types-lookup.ts"
+      ],
+      "@polkadot/types/augment": [
+        "src/interfaces/augment-types.ts"
+      ]
     },
-    // some other options, whatever you want for your environment
     "target": "es2022",
     "module": "es2022",
     "declaration": false,
+    "composite": true,
     "noImplicitAny": true,
     "noUnusedLocals": true,
     "noImplicitReturns": true,
@@ -20,7 +26,9 @@
     "forceConsistentCasingInFileNames": true,
     "strict": true,
     "noImplicitOverride": true,
-    "types": ["node"],
+    "types": [
+      "node"
+    ],
     "skipLibCheck": true,
     "allowSyntheticDefaultImports": true,
     "baseUrl": ".",
@@ -30,10 +38,13 @@
     "skipDefaultLibCheck": true,
     "outDir": "./lib/esm"
   },
-  "include": ["./src/**/*"],
+  "include": [
+    "./src/**/*"
+  ],
   "exclude": [
     "build/**/*",
-    "node_modules"
+    "node_modules",
+    "target"
   ],
   "ts-node": {
     "experimentalSpecifierResolution": "node"

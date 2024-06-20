@@ -227,12 +227,6 @@ mod tests {
 	use subxt_signer::sr25519::{dev, Keypair};
 	use tokio::{spawn, sync::Mutex};
 
-	use crate::{
-		block_watch::track_blocks,
-		notebook_closer::NOTARY_KEYID,
-		stores::{notarizations::NotarizationsStore, notebook_status::NotebookStatusStore},
-		NotaryServer,
-	};
 	use ulixee_client::{
 		api,
 		api::{
@@ -246,11 +240,12 @@ mod tests {
 			},
 			storage, tx,
 		},
-		UlxConfig, UlxOnlineClient,
+		ReconnectingClient, UlxConfig, UlxOnlineClient,
 	};
 	use ulx_notary_apis::localchain::BalanceChangeResult;
 	use ulx_notary_audit::VerifyError;
 	use ulx_primitives::{
+		host::Host,
 		tick::Tick,
 		AccountId, AccountOrigin,
 		AccountType::{Deposit, Tax},
@@ -262,10 +257,14 @@ mod tests {
 	};
 	use ulx_testing::start_ulx_test_node;
 
+	use crate::{
+		block_watch::track_blocks,
+		notebook_closer::NOTARY_KEYID,
+		stores::{notarizations::NotarizationsStore, notebook_status::NotebookStatusStore},
+		NotaryServer,
+	};
+
 	use super::*;
-	use ulixee_client::ReconnectingClient;
-	use ulx_notary_apis::Client;
-	use ulx_primitives::host::Host;
 
 	#[sqlx::test]
 	async fn test_chain_to_chain(pool: PgPool) -> anyhow::Result<()> {
@@ -823,7 +822,11 @@ mod tests {
 	) -> anyhow::Result<(Note, BalanceChangeResult)> {
 		let hold_note = Note::create(
 			amount,
-			NoteType::EscrowHold { recipient: domain_account, data_domain_hash: Some(domain_hash) },
+			NoteType::EscrowHold {
+				recipient: domain_account,
+				data_domain_hash: Some(domain_hash),
+				delegated_signer: None,
+			},
 		);
 		let changes = vec![BalanceChange {
 			account_id: Bob.to_account_id(),
@@ -856,7 +859,8 @@ mod tests {
 		bob_balance_proof: BalanceProof,
 	) -> anyhow::Result<BalanceChangeResult> {
 		let (data_domain_hash, recipient) = match hold_note.note_type.clone() {
-			NoteType::EscrowHold { recipient, data_domain_hash } => (data_domain_hash, recipient),
+			NoteType::EscrowHold { recipient, data_domain_hash, delegated_signer: None } =>
+				(data_domain_hash, recipient),
 			_ => panic!("Should be an escrow hold note"),
 		};
 		let tax = (hold_note.milligons as f64 * 0.2f64) as u128;
@@ -931,7 +935,7 @@ mod tests {
 		account: Keypair,
 		amount: u32,
 	) -> anyhow::Result<(TransferToLocalchainId, u32, Keypair)> {
-		let in_block = Client::client
+		let in_block = client
 			.tx()
 			.sign_and_submit_then_watch_default(
 				&tx().chain_transfer().send_to_localchain(amount.into(), 1),
@@ -940,7 +944,7 @@ mod tests {
 			.await?
 			.wait_for_finalized_success()
 			.await?;
-		let events = in_block.fetch_events().await?;
+		let events = in_block.all_events_in_block();
 
 		for event in events.iter() {
 			if let Ok(event) = event {

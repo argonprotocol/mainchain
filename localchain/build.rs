@@ -5,6 +5,9 @@ use std::env;
 use std::process::Command;
 
 fn main() {
+  println!("cargo:rerun-if-changed=Cargo.toml");
+  println!("Building localchain... {:?}", env::vars());
+
   let offline = option_env!("SQLX_OFFLINE").unwrap_or("false");
   if offline != "1" && offline != "true" {
     dotenv().ok();
@@ -36,8 +39,9 @@ fn main() {
       panic!("Error setting up {}: {}", database_url, stderr);
     }
   }
-  if cfg!(feature = "napi") {
+
+  if env::var("CARGO_FEATURE_NAPI").is_ok() {
+    println!("setting up napi build...");
     napi_build::setup();
   }
-  println!("cargo:rerun-if-changed=Cargo.toml");
 }

@@ -1,8 +1,8 @@
 {
   "compilerOptions": {
-    // some other options, whatever you want for your environment
     "target": "es2022",
     "module": "es2022",
+    "composite": true,
     "declaration": false,
     "noImplicitAny": true,
     "noUnusedLocals": true,
@@ -13,18 +13,28 @@
     "strict": false,
     "noImplicitOverride": true,
     "strictBindCallApply": true,
-    "types": ["node", "jest"],
+    "types": [
+      "node",
+      "jest"
+    ],
     "skipLibCheck": true,
     "allowSyntheticDefaultImports": true,
     "baseUrl": ".",
     "sourceMap": true,
     "importHelpers": true,
     "skipDefaultLibCheck": true,
-    "typeRoots": ["./index.d.ts", "./node_modules/@types"]
+    "typeRoots": [
+      "./index.d.ts",
+      "./node_modules/@types"
+    ]
   },
-  "include": ["__test__", "./"],
+  "include": [
+    "__test__",
+    "./"
+  ],
   "exclude": [
     "build/**/*",
-    "node_modules"
+    "node_modules",
+    "target"
   ]
 }

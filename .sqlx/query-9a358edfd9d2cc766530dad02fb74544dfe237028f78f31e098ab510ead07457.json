@@ -1,6 +1,6 @@
 {
   "db_name": "PostgreSQL",
-  "query": "\n\t\t\t\tSELECT * FROM notebook_status \n\t\t\t\tWHERE step = $1 AND end_time <= $2\n\t\t\t\tORDER BY open_time ASC \n\t\t\t\tLIMIT 1\n\t\t\t",
+  "query": "\n\t\t\t\tSELECT * FROM notebook_status\n\t\t\t\tWHERE step = $1 AND end_time <= $2\n\t\t\t\tORDER BY open_time ASC\n\t\t\t\tLIMIT 1\n\t\t\t",
   "describe": {
     "columns": [
       {
@@ -61,5 +61,5 @@
       true
     ]
   },
-  "hash": "ae3dc337fd536f37a8a3fc0e3a0873b2529ade67b4987ec44bd2e97e2e01ad80"
+  "hash": "9a358edfd9d2cc766530dad02fb74544dfe237028f78f31e098ab510ead07457"
 }

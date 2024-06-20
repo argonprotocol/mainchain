@@ -87,6 +87,7 @@ CREATE TABLE IF NOT EXISTS open_escrows
     initial_balance_change_json TEXT     NOT NULL,
     balance_change_number       INT      NOT NULL,
     from_address                TEXT     NOT NULL,
+    delegated_signer_address    TEXT     NULL,
     expiration_tick             INT      NOT NULL,
     settled_amount              TEXT     NOT NULL,             -- write the latest amount settled to this field. Only information that needs to be updated
     settled_signature           BLOB     NOT NULL,             -- store latest signature here. Only information that needs to be updated
