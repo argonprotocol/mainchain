@@ -3,6 +3,7 @@ use std::collections::BTreeMap;
 use frame_support::{assert_err, assert_ok};
 use sp_core::{bounded_vec, sr25519::Signature, H256};
 use sp_keyring::{
+	AccountKeyring::Charlie,
 	Ed25519Keyring::{Dave, Ferdie},
 	Sr25519Keyring::{Alice, Bob},
 };
@@ -267,7 +268,11 @@ fn test_sending_to_mainchain() {
 fn test_can_lock_with_a_escrow_note() -> anyhow::Result<()> {
 	let escrow_note = Note::create(
 		250,
-		NoteType::EscrowHold { recipient: Alice.to_account_id(), data_domain_hash: None },
+		NoteType::EscrowHold {
+			recipient: Alice.to_account_id(),
+			data_domain_hash: None,
+			delegated_signer: None,
+		},
 	);
 	let balance_change = BalanceChange {
 		account_id: Bob.to_account_id(),
@@ -440,7 +445,11 @@ fn test_with_note_claim_signatures() {
 	};
 	balance_change.push_note(
 		250,
-		NoteType::EscrowHold { recipient: Alice.to_account_id(), data_domain_hash: None },
+		NoteType::EscrowHold {
+			recipient: Alice.to_account_id(),
+			data_domain_hash: None,
+			delegated_signer: None,
+		},
 	);
 	balance_change.sign(Bob.pair());
 
@@ -475,6 +484,32 @@ fn test_with_note_claim_signatures() {
 		verify_changeset_signatures(&vec![balance_change2.clone()]),
 		VerifyError::InvalidBalanceChangeSignature { change_index: 0 }
 	);
+}
+
+#[test]
+fn test_with_delegated_note_claim_signatures() {
+	let mut balance_change = BalanceChange {
+		account_id: Bob.to_account_id(),
+		account_type: AccountType::Deposit,
+		change_number: 5,
+		previous_balance_proof: empty_proof(250),
+		balance: 0,
+		notes: bounded_vec![Note::create(250, NoteType::EscrowSettle,)],
+		escrow_hold_note: Some(Note::create(
+			250,
+			NoteType::EscrowHold {
+				recipient: Alice.to_account_id(),
+				data_domain_hash: None,
+				delegated_signer: Some(Charlie.to_account_id()),
+			},
+		)),
+		signature: empty_signature(),
+	};
+	balance_change.sign(Bob.pair());
+
+	assert_ok!(verify_changeset_signatures(&vec![balance_change.clone()]));
+	balance_change.sign(Charlie.pair());
+	assert_ok!(verify_changeset_signatures(&vec![balance_change.clone()]));
 }
 
 #[test]

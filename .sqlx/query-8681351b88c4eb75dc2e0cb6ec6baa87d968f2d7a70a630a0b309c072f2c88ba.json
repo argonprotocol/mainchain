@@ -1,0 +1,28 @@
+{
+  "db_name": "PostgreSQL",
+  "query": "\n\t\t\t\tSELECT notebook_number, tick FROM notebook_status\n\t\t\t\tWHERE step=$1\n\t\t\t\tORDER BY notebook_number ASC\n\t\t\t\tLIMIT 1\n\t\t\t",
+  "describe": {
+    "columns": [
+      {
+        "ordinal": 0,
+        "name": "notebook_number",
+        "type_info": "Int4"
+      },
+      {
+        "ordinal": 1,
+        "name": "tick",
+        "type_info": "Int4"
+      }
+    ],
+    "parameters": {
+      "Left": [
+        "Int4"
+      ]
+    },
+    "nullable": [
+      false,
+      false
+    ]
+  },
+  "hash": "8681351b88c4eb75dc2e0cb6ec6baa87d968f2d7a70a630a0b309c072f2c88ba"
+}

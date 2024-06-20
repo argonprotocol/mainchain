@@ -117,6 +117,7 @@ impl Transactions {
     recipient_address: String,
     data_domain: Option<String>,
     notary_id: Option<u32>,
+    delegated_signer_address: Option<String>,
   ) -> Result<OpenEscrow> {
     let jump_notarization = self.new_notarization();
     if let Some(notary_id) = notary_id {
@@ -139,11 +140,20 @@ impl Transactions {
 
     if let Some(data_domain) = data_domain {
       balance_change
-        .create_escrow_hold(escrow_milligons, data_domain, recipient_address)
+        .create_escrow_hold(
+          escrow_milligons,
+          data_domain,
+          recipient_address,
+          delegated_signer_address,
+        )
         .await?;
     } else {
       balance_change
-        .create_private_server_escrow_hold(escrow_milligons, recipient_address)
+        .create_private_server_escrow_hold(
+          escrow_milligons,
+          recipient_address,
+          delegated_signer_address,
+        )
         .await?;
     }
     escrow_notarization.notarize().await?;
@@ -238,6 +248,7 @@ pub mod napi_ext {
       recipient_address: String,
       data_domain: Option<String>,
       notary_id: Option<u32>,
+      delegated_signer_address: Option<String>,
     ) -> napi::Result<OpenEscrow> {
       self
         .create_escrow(
@@ -245,6 +256,7 @@ pub mod napi_ext {
           recipient_address,
           data_domain,
           notary_id,
+          delegated_signer_address,
         )
         .await
         .napi_ok()

@@ -150,6 +150,10 @@ impl NotarizationBuilder {
     result
   }
 
+  pub async fn add_escrow(&self, escrow: &OpenEscrow) {
+    self.escrows.lock().await.push(escrow.clone());
+  }
+
   pub async fn accounts(&self) -> Vec<LocalAccount> {
     let accounts = self.loaded_accounts.lock().await;
     (*accounts).values().cloned().collect::<Vec<_>>()

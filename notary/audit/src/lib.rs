@@ -273,15 +273,14 @@ fn verify_balance_sources<T: NotebookHistoryLookup>(
 				NoteType::EscrowSettle => {
 					if let Some(hold_note) = &change.escrow_hold_note {
 						match &hold_note.note_type {
-							NoteType::EscrowHold { data_domain_hash, recipient } => {
+							NoteType::EscrowHold { data_domain_hash, recipient, .. } =>
 								if let Some(data_domain_hash) = data_domain_hash {
 									let count = state
 										.escrow_data_domains
 										.entry((*data_domain_hash, recipient.clone()))
 										.or_insert(0);
 									*count += 1u32;
-								}
-							},
+								},
 							_ => return Err(VerifyError::InvalidEscrowHoldNote),
 						}
 					}

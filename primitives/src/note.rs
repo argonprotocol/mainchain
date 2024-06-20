@@ -132,6 +132,8 @@ pub enum NoteType {
 		recipient: AccountId,
 		/// The data domain that this escrow is created for
 		data_domain_hash: Option<DataDomainHash>,
+		/// Delegate signing permissions to another account
+		delegated_signer: Option<AccountId>,
 	},
 	/// Escrow settlement note - applied to escrow hold creator balance
 	EscrowSettle,
@@ -176,12 +178,16 @@ impl Display for NoteType {
 			NoteType::SendToVote => {
 				write!(f, "SendToVote")
 			},
-			NoteType::EscrowHold { data_domain_hash, recipient } => {
+			NoteType::EscrowHold { data_domain_hash, recipient, delegated_signer } => {
 				write!(
 					f,
-					"EscrowHold(data_domain_hash: {:?}, recipient: {:?})",
+					"EscrowHold(data_domain_hash: {:?}, recipient: {:?}, delegated_signer: {:?})",
 					data_domain_hash,
-					recipient.to_ss58check_with_version(Ss58AddressFormat::from(ADDRESS_PREFIX))
+					recipient.to_ss58check_with_version(Ss58AddressFormat::from(ADDRESS_PREFIX)),
+					delegated_signer
+						.as_ref()
+						.map(|a| a
+							.to_ss58check_with_version(Ss58AddressFormat::from(ADDRESS_PREFIX)))
 				)
 			},
 			NoteType::EscrowSettle => {

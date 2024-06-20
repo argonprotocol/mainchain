@@ -33,6 +33,7 @@ struct EscrowRow {
   id: String,
   initial_balance_change_json: String,
   from_address: String,
+  delegated_signer_address: Option<String>,
   balance_change_number: i64,
   expiration_tick: i64,
   settled_amount: String,
@@ -52,6 +53,7 @@ pub struct Escrow {
   pub notary_id: u32,
   hold_amount: u128,
   pub from_address: String,
+  pub delegated_signer_address: Option<String>,
   pub to_address: String,
   pub data_domain_hash: Option<Vec<u8>>,
   pub expiration_tick: u32,
@@ -88,6 +90,12 @@ impl Escrow {
     let mut balance_change = balance_change.clone();
     // set to minimum for id
     balance_change.notes[0].milligons = MINIMUM_ESCROW_SETTLEMENT;
+    balance_change.balance = balance_change
+      .previous_balance_proof
+      .as_ref()
+      .map(|a| a.balance.clone())
+      .unwrap_or_default()
+      .saturating_sub(MINIMUM_ESCROW_SETTLEMENT);
     let Ok(hrp) = Hrp::parse("esc") else {
       bail!("Failed to parse internal bech32 encoding hrp");
     };
@@ -109,11 +117,12 @@ impl Escrow {
       );
     }
 
-    let (recipient, data_domain_hash) = match &escrow_hold_note.note_type {
+    let (recipient, data_domain_hash, delegated_signer) = match &escrow_hold_note.note_type {
       NoteType::EscrowHold {
         recipient,
         data_domain_hash,
-      } => (recipient, data_domain_hash),
+        delegated_signer,
+      } => (recipient, data_domain_hash, delegated_signer),
       _ => {
         bail!(
           "Balance change has invalid escrow hold note type {:?}",
@@ -155,6 +164,10 @@ impl Escrow {
       hold_amount: escrow_hold_note.milligons,
       from_address: AccountStore::to_address(&balance_change.account_id),
       to_address: AccountStore::to_address(recipient),
+      delegated_signer_address: match delegated_signer {
+        Some(address) => Some(AccountStore::to_address(address)),
+        None => None,
+      },
       balance_change_number: balance_change.change_number,
       data_domain_hash: data_domain_hash.map(|h| h.0.to_vec()).clone(),
       notary_id: proof.notary_id,
@@ -335,10 +348,7 @@ impl OpenEscrow {
 
     let signature = self
       .keystore
-      .sign(
-        AccountStore::to_address(&balance_change.account_id),
-        bytes.as_bytes().to_vec(),
-      )
+      .sign(escrow.from_address.clone(), bytes.as_bytes().to_vec())
       .await?;
 
     escrow
@@ -388,6 +398,17 @@ impl OpenEscrow {
   pub async fn inner(&self) -> Escrow {
     self.escrow.lock().await.clone()
   }
+
+  pub async fn reload(&self) -> Result<()> {
+    let id = self.escrow.lock().await.id.clone();
+    let escrow = Escrow::try_from(
+      sqlx::query_as!(EscrowRow, "SELECT * FROM open_escrows WHERE id = ?", id)
+        .fetch_one(&self.db)
+        .await?,
+    )?;
+    *self.escrow.lock().await = escrow;
+    Ok(())
+  }
 }
 
 #[cfg_attr(feature = "napi", napi)]
@@ -433,10 +454,12 @@ impl OpenEscrowsStore {
     notarization_id: i64,
   ) -> Result<()> {
     let address = AccountStore::to_address(&balance_change.account_id);
+    let settled_amount = balance_change.notes[0].milligons.to_string();
     let res = sqlx::query!(
-      r#"UPDATE open_escrows SET notarization_id = ?, updated_at = CURRENT_TIMESTAMP
+      r#"UPDATE open_escrows SET notarization_id = ?, settled_amount = ?, updated_at = CURRENT_TIMESTAMP
        WHERE from_address = ? AND balance_change_number = ?"#,
       notarization_id,
+      settled_amount,
       address,
       balance_change.change_number,
     )
@@ -532,11 +555,12 @@ impl OpenEscrowsStore {
       account.address
     ))?;
 
-    let (data_domain_hash, recipient) = match &hold_note.note_type {
+    let (data_domain_hash, recipient, delegated_signer) = match &hold_note.note_type {
       NoteType::EscrowHold {
         recipient,
         data_domain_hash,
-      } => (data_domain_hash, recipient),
+        delegated_signer,
+      } => (data_domain_hash, recipient, delegated_signer),
       _ => {
         bail!(
           "Balance change has invalid escrow hold note type {:?}",
@@ -564,6 +588,10 @@ impl OpenEscrowsStore {
       balance_change_number: balance_tip.change_number,
       hold_amount: hold_note.milligons,
       from_address: account.address,
+      delegated_signer_address: match delegated_signer {
+        Some(address) => Some(AccountStore::to_address(address)),
+        None => None,
+      },
       to_address: AccountStore::to_address(recipient),
       data_domain_hash: data_domain_hash.map(|h| h.0.to_vec()).clone(),
       notary_id: *notary_id,
@@ -636,6 +664,7 @@ pub mod napi_ext {
     pub async fn export_for_send_napi(&self) -> napi::Result<String> {
       self.export_for_send().await.napi_ok()
     }
+
     #[napi(js_name = "recordUpdatedSettlement")]
     pub async fn record_updated_settlement_napi(
       &self,
@@ -686,7 +715,8 @@ mod tests {
   use crate::transactions::Transactions;
   use crate::*;
   use serde_json::json;
-  use sp_keyring::AccountKeyring::Alice;
+  use sp_core::Pair;
+  use sp_keyring::AccountKeyring::{Alice, Charlie};
   use sp_keyring::Ed25519Keyring::Bob;
   use sp_keyring::Ed25519Keyring::Ferdie;
   use ulx_primitives::tick::Tick;
@@ -715,6 +745,7 @@ mod tests {
     recipient: String,
     notebook_number: NotebookNumber,
     tick: Tick,
+    delegated_signer: Option<String>,
   ) -> Result<BalanceChangeRow> {
     let mut tx = pool.begin().await?;
     let (balance_tip, status) = BalanceChangeStore::db_build_for_account(&mut tx, account).await?;
@@ -729,7 +760,12 @@ mod tests {
       })
       .await?;
     builder
-      .create_escrow_hold(hold_amount, data_domain, recipient.clone())
+      .create_escrow_hold(
+        hold_amount,
+        data_domain,
+        recipient.clone(),
+        delegated_signer,
+      )
       .await?;
 
     let balance_change = builder.inner().await;
@@ -794,6 +830,7 @@ mod tests {
       alice_address.clone(),
       1,
       1,
+      None,
     )
     .await?;
 
@@ -839,6 +876,83 @@ mod tests {
   }
 
   #[sqlx::test]
+  async fn test_open_escrow_with_delegated_signer(pool: SqlitePool) -> Result<()> {
+    let mock_notary = create_mock_notary().await?;
+    let notary_clients = mock_notary_clients(&mock_notary, Ferdie).await?;
+
+    let alice_address = AccountStore::to_address(&Alice.to_account_id());
+    let mut db = pool.acquire().await?;
+    let bob_account = register_account(&mut db, Bob.to_account_id(), 1, 1).await?;
+    let signer_address = AccountStore::to_address(&Charlie.to_account_id());
+
+    let bob_hold = create_escrow_hold(
+      &pool,
+      &bob_account,
+      20_000,
+      1_000,
+      "delta.flights".to_string(),
+      alice_address.clone(),
+      1,
+      1,
+      Some(signer_address.clone()),
+    )
+    .await?;
+
+    let ticker = TickerRef::new(Ticker::start(Duration::from_secs(60)));
+
+    let keystore = Keystore::new(pool.clone());
+    let _ = keystore
+      .import_suri(Bob.to_seed(), CryptoScheme::Ed25519, None)
+      .await?;
+    let store = OpenEscrowsStore::new(pool, ticker.clone(), &notary_clients, &keystore);
+    let open_escrow = store.open_client_escrow(bob_account.id).await?;
+    let escrow = open_escrow.inner().await;
+    assert_eq!(
+      escrow.delegated_signer_address,
+      Some(signer_address.clone())
+    );
+
+    let json = open_escrow.export_for_send().await?;
+
+    let alice_pool = SqlitePool::connect(":memory:").await?;
+    sqlx::migrate!()
+      .run(&alice_pool)
+      .await
+      .map_err(|e| anyhow!("Error migrating database {:?}", e))?;
+    let mut alice_db = alice_pool.acquire().await?;
+
+    let alice_store = OpenEscrowsStore::new(alice_pool, ticker, &notary_clients, &keystore);
+    let _alice_account = register_account(&mut alice_db, Alice.to_account_id(), 1, 1).await?;
+    // before registered with notary, should fail
+    register_balance_tip(&bob_account, &mock_notary, &bob_hold, 1, 1).await?;
+
+    let alice_escrow = alice_store.import_escrow(json.clone()).await?;
+    let imported_escrow = alice_escrow.inner().await;
+    assert_eq!(
+      imported_escrow.delegated_signer_address,
+      Some(signer_address.clone())
+    );
+
+    // simulate signing
+    let (updated_signature, updated_total) = {
+      let mut balance_change: BalanceChange = serde_json::from_str(&json)?;
+      balance_change.balance -= 100;
+      assert_eq!(balance_change.notes[0].note_type, NoteType::EscrowSettle);
+      balance_change.notes[0].milligons += 100;
+      let encoded = balance_change.hash().0;
+      let charlie_pair = sp_core::sr25519::Pair::from_string(&Charlie.to_seed(), None)?;
+      let signature = charlie_pair.sign(&encoded);
+      balance_change.signature = signature.into();
+      (balance_change.signature, balance_change.notes[0].milligons)
+    };
+    assert!(alice_escrow
+      .record_updated_settlement(updated_total, updated_signature.encode())
+      .await
+      .is_ok());
+
+    Ok(())
+  }
+  #[sqlx::test]
   async fn test_importing_escrow(bob_pool: SqlitePool) -> Result<()> {
     let mock_notary = create_mock_notary().await?;
     let notary_clients = mock_notary_clients(&mock_notary, Ferdie).await?;
@@ -864,6 +978,7 @@ mod tests {
       alice_address.clone(),
       1,
       1,
+      None,
     )
     .await?;
 
@@ -981,6 +1096,7 @@ mod tests {
         800u128,
         not_alice.clone(),
         Some("delta.flights".to_string()),
+        None,
         None,
       )
       .await?;

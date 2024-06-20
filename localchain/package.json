@@ -4,7 +4,7 @@
   "bin": "cli.js",
   "scripts": {
     "artifacts": "napi artifacts",
-    "build": "napi build --platform --release --no-const-enum --features=napi -p ulx-localchain --strip",
+    "build": "napi build --platform --release --no-const-enum --features=napi -p ulx-localchain",
     "build:debug": "napi build --platform --no-const-enum --features=fast-runtime,napi -p ulx-localchain",
     "prepublishOnly": "napi prepublish -t npm",
     "pretest": "npm run build:debug",
@@ -26,7 +26,7 @@
     ]
   },
   "devDependencies": {
-    "@napi-rs/cli": "^3.0.0-alpha.46",
+    "@napi-rs/cli": "^3.0.0-alpha.55",
     "@polkadot/util": "^12.6.2",
     "@polkadot/util-crypto": "^12.6.2",
     "@polkadot/wasm-crypto": "^7.3.2",

@@ -1,12 +1,10 @@
 import {customAlphabet} from "nanoid";
 import {Client} from 'pg';
 import * as child_process from "node:child_process";
-import {checkForExtrinsicSuccess, Keyring, KeyringPair, UlxClient} from "@ulixee/mainchain";
+import {Keyring, KeyringPair} from "@ulixee/mainchain";
 import fs from "node:fs";
 import * as readline from "node:readline";
-import {
-    addTeardown, cleanHostForDocker, getDockerPortMapping, getProxy, ITeardownable,
-} from "./testHelpers";
+import {addTeardown, cleanHostForDocker, getDockerPortMapping, getProxy, ITeardownable,} from "./testHelpers";
 import * as process from "node:process";
 
 const nanoid = customAlphabet('0123456789abcdefghijklmnopqrstuvwxyz', 4);
@@ -131,30 +129,6 @@ export default class TestNotary implements ITeardownable {
         }
 
         return this.address;
-    }
-
-    public async register(client: UlxClient): Promise<void> {
-        let address = new URL(this.address);
-
-        await new Promise<void>(async (resolve, reject) => {
-            await client.tx.notaries.propose({
-                public: this.registeredPublicKey,
-                hosts: [address.href]
-            }).signAndSend(this.operator, ({events, status}) => {
-                if (status.isInBlock) {
-                    void checkForExtrinsicSuccess(events, client).then(() => {
-                        console.log(
-                            `Successful proposal of notary in block ${status.asInBlock.toHex()}`,
-                            status.type,
-                        );
-                        resolve();
-                        return null;
-                    }, reject);
-                } else {
-                    console.log('Status of notary proposal: ' + status.type);
-                }
-            });
-        });
     }
 
     public async teardown(): Promise<void> {

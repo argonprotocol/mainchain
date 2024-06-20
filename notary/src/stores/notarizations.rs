@@ -337,7 +337,7 @@ impl NotarizationsStore {
 						escrow_hold_note = None;
 						if let Some(hold_note) = &prev_escrow_hold_note {
 							match &hold_note.note_type {
-								NoteType::EscrowHold { data_domain_hash, recipient } =>
+NoteType::EscrowHold { data_domain_hash, recipient, .. } =>
 									if let Some(data_domain_hash) = data_domain_hash {
 										let count = escrow_data_domains
 											.entry((*data_domain_hash, recipient.clone()))

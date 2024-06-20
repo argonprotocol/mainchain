@@ -45,7 +45,7 @@ use smallvec::smallvec;
 use sp_api::impl_runtime_apis;
 use sp_arithmetic::{traits::Zero, FixedPointNumber};
 use sp_consensus_grandpa::AuthorityId as GrandpaId;
-use sp_core::{crypto::KeyTypeId, OpaqueMetadata, H256, U256};
+use sp_core::{crypto::KeyTypeId, ConstU16, OpaqueMetadata, H256, U256};
 use sp_debug_derive::RuntimeDebug;
 #[cfg(any(feature = "std", test))]
 pub use sp_runtime::BuildStorage;
@@ -171,7 +171,6 @@ parameter_types! {
 		);
 	pub BlockLength: frame_system::limits::BlockLength = frame_system::limits::BlockLength
 		::max_with_normal_ratio(5 * 1024 * 1024, NORMAL_DISPATCH_RATIO);
-	pub const SS58Prefix: u8 = 42;
 }
 /// Calls that cannot be paused by the tx-pause pallet.
 pub struct TxPauseWhitelistedCalls;
@@ -225,7 +224,7 @@ impl frame_system::Config for Runtime {
 	/// The data to be stored in an account.
 	type AccountData = pallet_balances::AccountData<Balance>;
 	/// This is used as an identifier of the chain. 42 is the generic substrate prefix.
-	type SS58Prefix = SS58Prefix;
+	type SS58Prefix = ConstU16<ulx_primitives::ADDRESS_PREFIX>;
 	type MaxConsumers = frame_support::traits::ConstU32<16>;
 }
 
