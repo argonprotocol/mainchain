@@ -53,6 +53,7 @@ pub struct BalanceChange {
 }
 #[derive(Encode)]
 struct BalanceChangeHashMessage {
+	pub prefix: &'static str,
 	pub account_id: AccountId,
 	pub account_type: AccountType,
 	pub change_number: u32,
@@ -91,7 +92,9 @@ impl BalanceChange {
 	}
 
 	pub fn hash(&self) -> H256 {
+		const PREFIX: &str = "BalanceChange";
 		let hash = BalanceChangeHashMessage {
+			prefix: PREFIX,
 			account_id: self.account_id.clone(),
 			account_type: self.account_type,
 			change_number: self.change_number,

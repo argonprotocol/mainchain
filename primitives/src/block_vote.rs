@@ -50,6 +50,7 @@ pub struct BlockVoteT<Hash: Codec = H256> {
 
 #[derive(Encode)]
 struct BlockVoteHashMessage<Hash: Codec> {
+	prefix: &'static str,
 	account_id: AccountId,
 	block_hash: Hash,
 	index: u32,
@@ -64,7 +65,9 @@ pub type VotingKey = H256;
 
 impl<Hash: Codec + Clone> BlockVoteT<Hash> {
 	pub fn hash(&self) -> H256 {
+		const PREFIX: &str = "BlockVote";
 		BlockVoteHashMessage {
+			prefix: PREFIX,
 			account_id: self.account_id.clone(),
 			block_hash: self.block_hash.clone(),
 			index: self.index,
@@ -95,7 +98,8 @@ impl<Hash: Codec + Clone> BlockVoteT<Hash> {
 	}
 
 	pub fn seal_signature_message<H: Codec>(block_hash: &H, seal_strength: U256) -> [u8; 32] {
-		let message = &[&block_hash.encode()[..], &seal_strength.encode()[..]].concat();
+		const PREFIX: &[u8] = b"BlockVoteSeal";
+		let message = &[PREFIX, &block_hash.encode()[..], &seal_strength.encode()[..]].concat();
 		message.using_encoded(blake2_256)
 	}
 

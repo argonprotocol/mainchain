@@ -491,7 +491,8 @@ pub mod pallet {
 			let fee = amount
 				.saturating_mul(annual_percentage_rate)
 				.saturating_mul(block_ratio)
-				.into_inner() / FixedU128::accuracy();
+				.into_inner() /
+				FixedU128::accuracy();
 			fee.unique_saturated_into()
 		}
 	}
