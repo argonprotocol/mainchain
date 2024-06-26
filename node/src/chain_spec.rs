@@ -130,6 +130,7 @@ pub fn local_testnet_config() -> Result<ChainSpec, String> {
 			account_id: get_account_id_from_seed::<sr25519::Public>("Ferdie"),
 			public: get_from_seed::<NotaryPublic>("Ferdie//notary"),
 			hosts: vec![notary_host],
+			name: "FerdieStamp".into(),
 		}],
 	))
 	.build())

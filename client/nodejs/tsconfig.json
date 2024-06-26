@@ -16,7 +16,7 @@
     },
     "target": "es2022",
     "module": "es2022",
-    "declaration": false,
+    "declaration": true,
     "composite": true,
     "noImplicitAny": true,
     "noUnusedLocals": true,
@@ -39,9 +39,11 @@
     "outDir": "./lib/esm"
   },
   "include": [
-    "./src/**/*"
+    "./src/index.ts",
+    "./src/interfaces/*.ts"
   ],
   "exclude": [
+    "**/rm localchain",
     "build/**/*",
     "node_modules",
     "target"

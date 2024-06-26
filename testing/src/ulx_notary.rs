@@ -14,7 +14,10 @@ use sqlx::postgres::PgPoolOptions;
 
 use ulixee_client::{
 	api::{
-		runtime_types::ulx_primitives::{host::Host, notary::NotaryMeta},
+		runtime_types::ulx_primitives::{
+			host::Host,
+			notary::{NotaryMeta, NotaryName},
+		},
 		tx,
 	},
 	signer::Ed25519Signer,
@@ -122,6 +125,7 @@ impl UlxTestNotary {
 
 		let host: ulx_primitives::host::Host = self.ws_url.clone().into();
 		let notary_proposal = tx().notaries().propose(NotaryMeta {
+			name: NotaryName("test".as_bytes().to_vec().into()),
 			hosts: vec![Host(host.0.into())].into(),
 			public: operator.public().0,
 		});

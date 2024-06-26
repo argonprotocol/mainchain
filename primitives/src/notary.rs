@@ -1,4 +1,5 @@
 use codec::{Codec, Decode, Encode, MaxEncodedLen};
+use frame_support::pallet_prelude::ConstU32;
 use frame_support_procedural::{CloneNoBound, PartialEqNoBound, RuntimeDebugNoBound};
 use scale_info::TypeInfo;
 use serde::{Deserialize, Serialize};
@@ -30,8 +31,53 @@ pub trait NotaryProvider<B: BlockT> {
 )]
 #[scale_info(skip_type_params(MaxHosts))]
 pub struct NotaryMeta<MaxHosts: Get<u32>> {
+	pub name: NotaryName,
 	pub public: NotaryPublic,
 	pub hosts: BoundedVec<Host, MaxHosts>,
+}
+
+#[derive(
+	PartialEq,
+	Eq,
+	Clone,
+	Encode,
+	Decode,
+	RuntimeDebug,
+	TypeInfo,
+	MaxEncodedLen,
+	Deserialize,
+	Serialize,
+)]
+#[serde(transparent)]
+#[repr(transparent)]
+pub struct NotaryName(pub BoundedVec<u8, ConstU32<55>>);
+
+#[cfg(feature = "std")]
+impl From<String> for NotaryName {
+	fn from(name: String) -> Self {
+		name.into_bytes().to_vec().into()
+	}
+}
+
+#[cfg(feature = "std")]
+impl From<&str> for NotaryName {
+	fn from(name: &str) -> Self {
+		name.as_bytes().to_vec().into()
+	}
+}
+impl From<Vec<u8>> for NotaryName {
+	fn from(name: Vec<u8>) -> Self {
+		Self(BoundedVec::truncate_from(name))
+	}
+}
+
+#[cfg(feature = "std")]
+impl TryInto<String> for NotaryName {
+	type Error = String;
+
+	fn try_into(self) -> Result<String, Self::Error> {
+		String::from_utf8(self.0.into_inner()).map_err(|_| "Invalid UTF-8".to_string())
+	}
 }
 
 #[derive(Serialize, Deserialize)]
@@ -39,6 +85,7 @@ pub struct GenesisNotary<AccountId> {
 	pub account_id: AccountId,
 	pub public: NotaryPublic,
 	pub hosts: Vec<Host>,
+	pub name: NotaryName,
 }
 
 #[derive(

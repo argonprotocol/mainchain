@@ -72,7 +72,7 @@ fn it_calculates_per_miner_mint() {
 }
 
 #[test]
-fn it_does_not_mint_bitcoin_with_negative_cpi() {
+fn it_does_not_mint_bitcoin_with_cpi_ge_zero() {
 	new_test_ext().execute_with(|| {
 		let utxo_id = 1;
 		let account_id = 1;
@@ -84,9 +84,16 @@ fn it_does_not_mint_bitcoin_with_negative_cpi() {
 		// nothing to mint
 		MintedUlixeeArgons::<Test>::set(1000);
 		MintedBitcoinArgons::<Test>::set(0);
-		ArgonCPI::set(Some(FixedI128::from_float(-1.0)));
+		ArgonCPI::set(Some(FixedI128::from_float(0.0)));
 
 		UlixeeMint::on_initialize(1);
+		// should not mint
+		assert_eq!(PendingMintUtxos::<Test>::get().to_vec(), vec![(utxo_id, account_id, amount)]);
+		assert!(System::events().is_empty());
+
+		ArgonCPI::set(Some(FixedI128::from_float(0.1)));
+
+		UlixeeMint::on_initialize(2);
 		// should not mint
 		assert_eq!(PendingMintUtxos::<Test>::get().to_vec(), vec![(utxo_id, account_id, amount)]);
 		assert!(System::events().is_empty());
@@ -120,6 +127,8 @@ fn it_pays_bitcoin_mints() {
 
 		System::set_block_number(2);
 		MintedUlixeeArgons::<Test>::set(100);
+		ArgonCPI::set(Some(FixedI128::from_float(-0.1)));
+
 		UlixeeMint::on_initialize(2);
 		assert_eq!(
 			PendingMintUtxos::<Test>::get().to_vec(),

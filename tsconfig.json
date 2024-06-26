@@ -5,7 +5,9 @@
   },
   "exclude": [
     "node_modules",
-    "target"
+    "target",
+    "client/nodejs",
+    "localchain"
   ],
   "references": [
     {

@@ -169,6 +169,7 @@ pub mod pallet {
 				Pallet::<T>::activate_notary(
 					notary.account_id.clone(),
 					NotaryMeta {
+						name: notary.name.clone(),
 						public: notary.public,
 						hosts: BoundedVec::truncate_from(notary.hosts.clone()),
 					},
