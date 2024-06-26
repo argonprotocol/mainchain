@@ -8,10 +8,7 @@ use subxt::{
 use tracing::info;
 
 pub use ulixee_client;
-use ulixee_client::{
-	api, api::runtime_types::bounded_collections::bounded_vec::BoundedVec, try_until_connected,
-	UlxClient, UlxConfig,
-};
+use ulixee_client::{api, MainchainClient, UlxConfig, UlxOnlineClient};
 use ulx_primitives::{tick::Ticker, AccountId, NotaryId, NotebookDigest};
 
 use crate::{
@@ -64,16 +61,11 @@ async fn sync_finalized_blocks(
 	pool: PgPool,
 	ticker: Ticker,
 ) -> anyhow::Result<()> {
-	let client = try_until_connected(url, 2500, 120_000).await?;
+	let client = MainchainClient::try_until_connected(url.as_str(), 2500, 120_000).await?;
 	let notaries_query = api::storage().notaries().active_notaries();
 
-	let active_notaries = client
-		.storage()
-		.at_latest()
-		.await?
-		.fetch(&notaries_query)
-		.await?
-		.unwrap_or(BoundedVec(vec![]));
+	let active_notaries =
+		client.fetch_storage(&notaries_query, None).await?.unwrap_or(vec![].into());
 
 	let Some(notary) = active_notaries.0.iter().find(|notary| notary.notary_id == notary_id) else {
 		info!("NOTE: Notary {} is not active", notary_id);
@@ -100,12 +92,12 @@ async fn sync_finalized_blocks(
 
 	let last_synched_block = BlocksStore::get_latest_finalized_block_number(&mut *tx).await?;
 
-	let latest_finalized_hash = client.backend().latest_finalized_block_ref().await?;
+	let latest_finalized_hash = client.latest_finalized_block_hash().await?;
 
 	let mut block_hash = latest_finalized_hash;
 	let mut missing_blocks: Vec<Block<UlxConfig, _>> = vec![];
 	loop {
-		let block = client.blocks().at(block_hash.clone()).await?;
+		let block = client.live.blocks().at(block_hash.clone()).await?;
 		if block.number() <= last_synched_block || block.number() <= oldest_block_to_sync {
 			break;
 		}
@@ -120,7 +112,7 @@ async fn sync_finalized_blocks(
 	);
 
 	for block in missing_blocks.into_iter() {
-		process_block(&mut *tx, &client, &block, notary_id).await?;
+		process_block(&mut *tx, &client.live, &block, notary_id).await?;
 		process_finalized_block(&mut *tx, block, notary_id, &ticker).await?;
 	}
 	tx.commit().await?;
@@ -129,8 +121,8 @@ async fn sync_finalized_blocks(
 
 async fn process_block(
 	db: &mut PgConnection,
-	client: &UlxClient,
-	block: &Block<UlxConfig, UlxClient>,
+	client: &UlxOnlineClient,
+	block: &Block<UlxConfig, UlxOnlineClient>,
 	notary_id: NotaryId,
 ) -> anyhow::Result<()> {
 	let next_vote_minimum = client
@@ -172,9 +164,9 @@ async fn process_block(
 
 async fn find_missing_blocks(
 	db: &mut PgConnection,
-	client: &UlxClient,
+	client: &UlxOnlineClient,
 	block_hash: H256,
-) -> anyhow::Result<Vec<Block<UlxConfig, UlxClient>>> {
+) -> anyhow::Result<Vec<Block<UlxConfig, UlxOnlineClient>>> {
 	let mut blocks = vec![];
 	let mut block_hash = block_hash;
 	while !BlocksStore::has_block(db, block_hash).await? {
@@ -193,8 +185,8 @@ async fn find_missing_blocks(
 
 async fn process_fork(
 	db: &mut PgConnection,
-	client: &UlxClient,
-	block: &Block<UlxConfig, UlxClient>,
+	client: &UlxOnlineClient,
+	block: &Block<UlxConfig, UlxOnlineClient>,
 	notary_id: NotaryId,
 ) -> anyhow::Result<()> {
 	info!("Processing fork {} ({})", block.hash(), block.number());
@@ -223,7 +215,7 @@ async fn activate_notebook_processing(
 
 async fn process_finalized_block(
 	db: &mut PgConnection,
-	block: Block<UlxConfig, UlxClient>,
+	block: Block<UlxConfig, UlxOnlineClient>,
 	notary_id: NotaryId,
 	ticker: &Ticker,
 ) -> anyhow::Result<()> {
@@ -314,7 +306,9 @@ async fn subscribe_to_blocks(
 	pool: &PgPool,
 	ticker: &Ticker,
 ) -> anyhow::Result<bool> {
-	let client = try_until_connected(url, 2500, 120_000).await?;
+	let mainchain_client =
+		MainchainClient::try_until_connected(url.as_str(), 2500, 120_000).await?;
+	let client = mainchain_client.live.clone();
 	let mut blocks_sub = client.blocks().subscribe_all().await?;
 	let mut finalized_sub = client.blocks().subscribe_finalized().await?;
 

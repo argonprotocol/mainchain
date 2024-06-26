@@ -1,9 +1,10 @@
+use std::collections::BTreeSet;
+
 use chrono::{DateTime, TimeZone, Utc};
 use codec::Encode;
 use serde_json::{from_value, json};
 use sp_core::{bounded::BoundedVec, H256};
 use sqlx::{query, types::JsonValue, FromRow, PgConnection};
-use std::collections::BTreeSet;
 
 use ulx_primitives::{
 	ensure, notary::NotarySignature, tick::Tick, AccountId, AccountOrigin, BlockVotingPower,
@@ -94,7 +95,7 @@ impl NotebookHeaderStore {
 	) -> anyhow::Result<(), Error> {
 		let res = query!(
 			r#"
-			INSERT INTO notebook_secrets (notebook_number, secret) 
+			INSERT INTO notebook_secrets (notebook_number, secret)
 			VALUES ($1, $2)
 			"#,
 			notebook_number as i32,
@@ -121,8 +122,8 @@ impl NotebookHeaderStore {
 
 		let res = query!(
 			r#"
-			INSERT INTO notebook_headers (version, notary_id, tick, notebook_number, chain_transfers, 
-				changed_account_origins, changed_accounts_root, secret_hash, block_votes_root, 
+			INSERT INTO notebook_headers (version, notary_id, tick, notebook_number, chain_transfers,
+				changed_account_origins, changed_accounts_root, secret_hash, block_votes_root,
 				block_voting_power, block_votes_count, blocks_with_votes, data_domains)
 			VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13)
 			"#,
@@ -132,9 +133,9 @@ impl NotebookHeaderStore {
 			notebook_number as i32,
 			empty.clone(),
 			empty.clone(),
-			[0u8; 32].as_ref(),
-			[0u8; 32].as_ref(),
-			[0u8; 32].as_ref(),
+			&[0u8; 32],
+			&[0u8; 32],
+			&[0u8; 32],
 			0.to_string(),
 			0,
 			&[],
@@ -407,15 +408,15 @@ impl NotebookHeaderStore {
 
 			let res = sqlx::query!(
 				r#"
-				UPDATE notebook_headers 
-				SET hash = $1, 
-					changed_accounts_root = $2, 
-					changed_account_origins = $3, 
-					chain_transfers = $4, 
-					tax=$5, 
+				UPDATE notebook_headers
+				SET hash = $1,
+					changed_accounts_root = $2,
+					changed_account_origins = $3,
+					chain_transfers = $4,
+					tax=$5,
 					block_voting_power=$6,
-					block_votes_root=$7, 
-					block_votes_count=$8, 
+					block_votes_root=$7,
+					block_votes_count=$8,
 					finalized_block_number=$9,
 					blocks_with_votes=$10,
 					secret_hash=$11,
@@ -443,7 +444,7 @@ impl NotebookHeaderStore {
 					let data = a.clone();
 					data.as_bytes().to_vec()
 				}),
-				&signature.0.as_ref()[..],
+				&signature.0,
 				json!(header.data_domains.to_vec()),
 				header.notebook_number as i32,
 			)

@@ -86,6 +86,7 @@ pub mod pallet {
 	use ulx_primitives::{
 		block_seal::{MiningRegistration, RewardDestination},
 		bond::{BondError, BondProvider},
+		BondId, VaultId,
 	};
 
 	use super::*;
@@ -93,11 +94,8 @@ pub mod pallet {
 	#[pallet::pallet]
 	pub struct Pallet<T>(_);
 
-	pub type Registration<T> = MiningRegistration<
-		<T as frame_system::Config>::AccountId,
-		<T as Config>::BondId,
-		<T as Config>::Balance,
-	>;
+	pub type Registration<T> =
+		MiningRegistration<<T as frame_system::Config>::AccountId, <T as Config>::Balance>;
 
 	/// Configure the pallet by specifying the parameters and types on which it depends.
 	#[pallet::config]
@@ -139,14 +137,6 @@ pub mod pallet {
 			+ TypeInfo
 			+ MaxEncodedLen;
 
-		type BondId: Parameter
-			+ Copy
-			+ AtLeast32BitUnsigned
-			+ codec::FullCodec
-			+ TypeInfo
-			+ MaxEncodedLen
-			+ MaybeSerializeDeserialize;
-
 		/// The currency representing ownership in the network - aka, rights to validate
 		type OwnershipCurrency: MutateHold<Self::AccountId, Reason = Self::RuntimeHoldReason, Balance = Self::Balance>
 			+ Inspect<Self::AccountId, Balance = Self::Balance>;
@@ -156,7 +146,6 @@ pub mod pallet {
 
 		type BondProvider: BondProvider<
 			Balance = Self::Balance,
-			BondId = Self::BondId,
 			AccountId = Self::AccountId,
 			BlockNumber = BlockNumberFor<Self>,
 		>;
@@ -244,12 +233,12 @@ pub mod pallet {
 		},
 		SlotBidderReplaced {
 			account_id: T::AccountId,
-			bond_id: Option<T::BondId>,
+			bond_id: Option<BondId>,
 			kept_ownership_bond: bool,
 		},
 		UnbondedMiner {
 			account_id: T::AccountId,
-			bond_id: Option<T::BondId>,
+			bond_id: Option<BondId>,
 			kept_ownership_bond: bool,
 		},
 	}
@@ -258,69 +247,49 @@ pub mod pallet {
 	pub enum Error<T> {
 		SlotNotTakingBids,
 		TooManyBlockRegistrants,
-		UnableToRotateAuthority,
 		InsufficientOwnershipTokens,
-		InsufficientBalanceForBid,
 		BidTooLow,
-		/// Internal state has become somehow corrupted and the operation cannot continue.
-		BadInternalState,
-		/// You must register with rpc hosts so that your miner can be reached for block seal
-		/// auditing
-		RpcHostsAreRequired,
-		BidBondDurationTooShort,
-		CannotRegisteredOverlappingSessions,
+		/// A Non-Mining bond was submitted as part of a bid
+		CannotRegisterOverlappingSessions,
 		// copied from bond
-		BadState,
 		BondNotFound,
 		NoMoreBondIds,
-		BondFundClosed,
+		VaultClosed,
 		MinimumBondAmountNotMet,
-		LeaseUntilBlockTooSoon,
-		LeaseUntilPastFundExpiration,
 		/// There are too many bond or bond funds expiring in the given expiration block
 		ExpirationAtBlockOverflow,
 		InsufficientFunds,
-		InsufficientBondFunds,
+		InsufficientVaultFunds,
 		ExpirationTooSoon,
 		NoPermissions,
-		NoBondFundFound,
 		HoldUnexpectedlyModified,
-		BondFundMaximumBondsExceeded,
 		UnrecoverableHold,
-		BondFundNotFound,
+		VaultNotFound,
 		BondAlreadyClosed,
-		BondAlreadyLocked,
-		BondLockedCannotModify,
 		/// The fee for this bond exceeds the amount of the bond, which is unsafe
 		FeeExceedsBondAmount,
 		AccountWouldBeBelowMinimum,
+		GenericBondError(BondError),
 	}
 
 	impl<T> From<BondError> for Error<T> {
 		fn from(e: BondError) -> Error<T> {
 			match e {
-				BondError::BadState => Error::<T>::BadState,
 				BondError::BondNotFound => Error::<T>::BondNotFound,
 				BondError::NoMoreBondIds => Error::<T>::NoMoreBondIds,
 				BondError::MinimumBondAmountNotMet => Error::<T>::MinimumBondAmountNotMet,
 				BondError::ExpirationAtBlockOverflow => Error::<T>::ExpirationAtBlockOverflow,
 				BondError::InsufficientFunds => Error::<T>::InsufficientFunds,
-				BondError::InsufficientBondFunds => Error::<T>::InsufficientBondFunds,
+				BondError::InsufficientVaultFunds => Error::<T>::InsufficientVaultFunds,
 				BondError::ExpirationTooSoon => Error::<T>::ExpirationTooSoon,
 				BondError::NoPermissions => Error::<T>::NoPermissions,
-				BondError::BondFundClosed => Error::<T>::BondFundClosed,
-				BondError::NoBondFundFound => Error::<T>::NoBondFundFound,
+				BondError::VaultClosed => Error::<T>::VaultClosed,
 				BondError::HoldUnexpectedlyModified => Error::<T>::HoldUnexpectedlyModified,
-				BondError::BondFundMaximumBondsExceeded => Error::<T>::BondFundMaximumBondsExceeded,
 				BondError::UnrecoverableHold => Error::<T>::UnrecoverableHold,
-				BondError::BondFundNotFound => Error::<T>::BondFundNotFound,
-				BondError::BondAlreadyLocked => Error::<T>::BondAlreadyLocked,
-				BondError::BondLockedCannotModify => Error::<T>::BondLockedCannotModify,
+				BondError::VaultNotFound => Error::<T>::VaultNotFound,
 				BondError::FeeExceedsBondAmount => Error::<T>::FeeExceedsBondAmount,
-				BondError::LeaseUntilBlockTooSoon => Error::<T>::LeaseUntilBlockTooSoon,
-				BondError::LeaseUntilPastFundExpiration => Error::<T>::LeaseUntilPastFundExpiration,
-				BondError::BondAlreadyClosed => Error::<T>::BondLockedCannotModify,
 				BondError::AccountWouldBeBelowMinimum => Error::<T>::AccountWouldBeBelowMinimum,
+				_ => Error::<T>::GenericBondError(e),
 			}
 		}
 	}
@@ -429,7 +398,7 @@ pub mod pallet {
 		#[pallet::weight(0)] //T::WeightInfo::hold())]
 		pub fn bid(
 			origin: OriginFor<T>,
-			bond_id: Option<T::BondId>,
+			bond_info: Option<MiningSlotBid<VaultId, T::Balance>>,
 			reward_destination: RewardDestination<T::AccountId>,
 		) -> DispatchResult {
 			let who = ensure_signed(origin)?;
@@ -443,33 +412,24 @@ pub mod pallet {
 					current_index < (cohort_start_index + T::MaxCohortSize::get());
 
 				// current_index must be in the set of miners being replaced
-				ensure!(is_in_next_cohort, Error::<T>::CannotRegisteredOverlappingSessions);
+				ensure!(is_in_next_cohort, Error::<T>::CannotRegisterOverlappingSessions);
 			}
 
 			let current_registration = Self::get_active_registration(&who);
 
-			let mut bid: T::Balance = 0u32.into();
-			if let Some(bond_id) = bond_id {
-				let bond = T::BondProvider::get_bond(bond_id).map_err(Error::<T>::from)?;
-
-				ensure!(bond.bonded_account_id == who, Error::<T>::NoPermissions);
-
+			let (bond_id, bid) = if let Some(bond_info) = bond_info {
 				let bond_end_block = next_cohort_block_number + Self::get_mining_window_blocks();
-
-				ensure!(
-					bond.completion_block >= bond_end_block,
-					Error::<T>::BidBondDurationTooShort
-				);
-
-				bid = bond.amount;
-				let is_same_bond = current_registration
-					.as_ref()
-					.map(|x| x.bond_id == Some(bond_id))
-					.unwrap_or(false);
-				if !is_same_bond {
-					T::BondProvider::lock_bond(bond_id).map_err(Error::<T>::from)?;
-				}
-			}
+				let bond_id = T::BondProvider::bond_mining_slot(
+					bond_info.vault_id,
+					who.clone(),
+					bond_info.amount,
+					bond_end_block,
+				)
+				.map_err(Error::<T>::from)?;
+				(Some(bond_id), bond_info.amount)
+			} else {
+				(None, 0u128.into())
+			};
 
 			let ownership_tokens = Self::hold_ownership_bond(&who, current_registration)?;
 
@@ -479,17 +439,16 @@ pub mod pallet {
 				}
 
 				// sort to lowest position at bid
-				let pos = match cohort.binary_search_by(|x| {
-					let comp = bid.cmp(&x.bond_amount);
-					match comp {
-						Ordering::Equal => Ordering::Less,
-						Ordering::Greater => Ordering::Greater,
-						Ordering::Less => Ordering::Less,
-					}
-				}) {
-					Ok(pos) => pos,
-					Err(pos) => pos,
-				};
+				let pos = cohort
+					.binary_search_by(|x| {
+						let comp = bid.cmp(&x.bond_amount);
+						match comp {
+							Ordering::Equal => Ordering::Less,
+							Ordering::Greater => Ordering::Greater,
+							Ordering::Less => Ordering::Less,
+						}
+					})
+					.unwrap_or_else(|pos| pos);
 
 				ensure!(pos < T::MaxCohortSize::get() as usize, Error::<T>::BidTooLow);
 
@@ -498,7 +457,7 @@ pub mod pallet {
 				{
 					// need to pop-off the lowest bid
 					let entry = cohort.pop().unwrap();
-					Self::unlock_bond_for_next(entry)?;
+					Self::release_failed_bid(entry)?;
 				}
 
 				cohort
@@ -539,6 +498,15 @@ impl<T: Config> AuthorityProvider<BlockSealAuthorityId, T::Block, T::AccountId> 
 			RewardDestination::Owner => x.account_id,
 			RewardDestination::Account(reward_id) => reward_id,
 		})
+	}
+
+	fn get_all_rewards_accounts() -> Vec<T::AccountId> {
+		<ActiveMinersByIndex<T>>::iter()
+			.map(|(_, registration)| match registration.reward_destination {
+				RewardDestination::Owner => registration.account_id,
+				RewardDestination::Account(reward_id) => reward_id,
+			})
+			.collect()
 	}
 
 	fn xor_closest_authority(
@@ -655,8 +623,6 @@ impl<T: Config> Pallet<T> {
 				.map(|a| a.1.account_id)
 				.collect::<Vec<_>>();
 			if !no_key_miners.is_empty() {
-				// TODO: should we burn bond when this happens? Aka, user taken a slot, but
-				//	 no registered keys
 				log::warn!(
 					target: LOG_TARGET,
 					"The following registered miner accounts do not have session keys: {:?}",
@@ -691,7 +657,7 @@ impl<T: Config> Pallet<T> {
 		}
 
 		let hold_reason = HoldReason::RegisterAsMiner;
-		if T::OwnershipCurrency::balance_on_hold(&hold_reason.into(), who) != 0u32.into() {
+		if T::OwnershipCurrency::balance_on_hold(&hold_reason.into(), who) == 0u32.into() {
 			frame_system::Pallet::<T>::inc_providers(who);
 		}
 
@@ -700,12 +666,13 @@ impl<T: Config> Pallet<T> {
 		Ok(ownership_tokens)
 	}
 
-	pub(crate) fn unlock_bond_for_next(registration: Registration<T>) -> DispatchResult {
+	pub(crate) fn release_failed_bid(registration: Registration<T>) -> DispatchResult {
+		let account_id = registration.account_id;
+
 		if let Some(bond_id) = registration.bond_id {
-			T::BondProvider::unlock_bond(bond_id).map_err(Error::<T>::from)?;
+			T::BondProvider::cancel_bond(bond_id).map_err(Error::<T>::from)?;
 		}
 
-		let account_id = registration.account_id;
 		let mut kept_ownership_bond = false;
 		let mut amount_to_unhold: T::Balance = registration.ownership_tokens;
 		if let Some(active) = Self::get_active_registration(&account_id) {
@@ -746,32 +713,18 @@ impl<T: Config> Pallet<T> {
 	) -> DispatchResult {
 		let account_id = active_registration.account_id;
 		let active_bond_id = active_registration.bond_id;
-		match next_registration {
-			None => {
-				Self::release_ownership_hold(&account_id, active_registration.ownership_tokens)?;
 
-				if let Some(bond_id) = active_bond_id {
-					T::BondProvider::unlock_bond(bond_id).map_err(Error::<T>::from)?;
-				}
-
-				Self::deposit_event(Event::<T>::UnbondedMiner {
-					account_id: account_id.clone(),
-					bond_id: active_bond_id,
-					kept_ownership_bond: false,
-				});
-			},
-			Some(next) =>
-				if active_bond_id.is_some() && active_bond_id != next.bond_id {
-					T::BondProvider::unlock_bond(active_bond_id.unwrap())
-						.map_err(Error::<T>::from)?;
-
-					Self::deposit_event(Event::<T>::UnbondedMiner {
-						account_id: account_id.clone(),
-						bond_id: active_bond_id,
-						kept_ownership_bond: true,
-					});
-				},
+		let mut kept_ownership_bond = true;
+		if next_registration.is_none() {
+			Self::release_ownership_hold(&account_id, active_registration.ownership_tokens)?;
+			kept_ownership_bond = false;
 		}
+
+		Self::deposit_event(Event::<T>::UnbondedMiner {
+			account_id: account_id.clone(),
+			bond_id: active_bond_id,
+			kept_ownership_bond,
+		});
 
 		Ok(())
 	}
@@ -809,6 +762,12 @@ impl<T: Config> Convert<T::AccountId, Option<T::AccountId>> for ValidatorIdOf<T>
 #[derive(Clone, Encode, Decode, Eq, PartialEq, RuntimeDebug, TypeInfo)]
 pub struct MinerHistory {
 	pub authority_index: MinerIndex,
+}
+
+#[derive(Clone, Encode, Decode, Eq, PartialEq, RuntimeDebug, TypeInfo)]
+pub struct MiningSlotBid<VaultId: Codec, Balance: Codec> {
+	pub vault_id: VaultId,
+	pub amount: Balance,
 }
 
 /// What to track in history

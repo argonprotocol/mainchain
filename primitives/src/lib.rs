@@ -34,6 +34,7 @@ pub mod macros;
 pub mod notary;
 
 pub mod account;
+pub mod bitcoin;
 pub mod note;
 pub mod notebook;
 mod providers;
@@ -60,7 +61,7 @@ pub type Nonce = u32;
 pub type Moment = u64;
 
 pub type BondId = u64;
-pub type BondFundId = u32;
+pub type VaultId = u32;
 
 /// A hash of some data used by the chain.
 pub type HashOutput = H256;

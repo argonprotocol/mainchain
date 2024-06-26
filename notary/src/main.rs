@@ -10,7 +10,7 @@ use sp_core::{
 use sp_keystore::{testing::MemoryKeystore, Keystore, KeystorePtr};
 use sqlx::{migrate, postgres::PgPoolOptions};
 
-use ulixee_client::MultiurlClient;
+use ulixee_client::ReconnectingClient;
 use ulx_notary::{
 	block_watch::spawn_block_sync,
 	notebook_closer::{spawn_notebook_closer, NOTARY_KEYID},
@@ -30,7 +30,7 @@ struct Cli {
 enum Commands {
 	/// Starts a notary server
 	Run {
-		/// Start in dev mode (in memory keystore with a default key (//Ferdie)
+		/// Start in dev mode (in memory keystore with a default key (//Ferdie//notary)
 		#[clap(long)]
 		dev: bool,
 
@@ -141,8 +141,8 @@ async fn main() -> anyhow::Result<()> {
 					.map_err(|_| Error::KeystoreOperation)?;
 			}
 
-			let mut mainchain_client = MultiurlClient::new(vec![trusted_rpc_url.clone()]);
-			let ticker = mainchain_client.lookup_ticker().await?;
+			let mut mainchain_client = ReconnectingClient::new(vec![trusted_rpc_url.clone()]);
+			let ticker = mainchain_client.get().await?.lookup_ticker().await?;
 			let ticker = Ticker::new(ticker.tick_duration_millis, ticker.genesis_utc_time);
 
 			let server = NotaryServer::start(notary_id, pool.clone(), bind_addr).await?;

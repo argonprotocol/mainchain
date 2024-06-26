@@ -1,128 +1,241 @@
 use codec::{Codec, Decode, Encode, MaxEncodedLen};
 use frame_support::PalletError;
 use scale_info::TypeInfo;
+use sp_arithmetic::{traits::UniqueSaturatedInto, FixedPointNumber, FixedU128};
 use sp_debug_derive::RuntimeDebug;
+use sp_runtime::traits::AtLeast32BitUnsigned;
+
+use crate::{
+	bitcoin::{BitcoinCosignScriptPubkey, BitcoinHeight, BitcoinPubkeyHash, UtxoId},
+	BondId, VaultId,
+};
 
 pub trait BondProvider {
-	type BondFundId: Codec + MaxEncodedLen;
-	type BondId: Codec + MaxEncodedLen;
 	type Balance: Codec;
 	type AccountId: Codec;
 	type BlockNumber: Codec;
 
-	/// Access the details of a bond
-	fn get_bond(
-		bond_id: Self::BondId,
-	) -> Result<Bond<Self::AccountId, Self::Balance, Self::BlockNumber, Self::BondFundId>, BondError>;
-
-	/// Create a bone from one's own funds
-	fn bond_self(
+	/// Create a mining bond
+	fn bond_mining_slot(
+		vault_id: VaultId,
 		account_id: Self::AccountId,
 		amount: Self::Balance,
 		bond_until_block: Self::BlockNumber,
-	) -> Result<Self::BondId, BondError>;
-
-	/// Create a time-locked bond from a bond fund
-	fn lease(
-		bond_fund_id: Self::BondFundId,
-		account_id: Self::AccountId,
-		amount: Self::Balance,
-		lease_until_block: Self::BlockNumber,
-	) -> Result<Self::BondId, BondError>;
-
-	/// Add funding or time to a bond
-	fn extend_bond(
-		bond_id: Self::BondId,
-		account_id: Self::AccountId,
-		total_amount: Self::Balance,
-		lease_until: Self::BlockNumber,
-	) -> Result<(), BondError>;
+	) -> Result<BondId, BondError>;
 
 	/// Return the bond to the originator with a prorated refund
-	fn return_bond(bond_id: Self::BondId, account_id: Self::AccountId) -> Result<(), BondError>;
+	fn cancel_bond(bond_id: BondId) -> Result<(), BondError>;
+}
 
-	/// Lock the bond so that it cannot be modified (performed by other pallets)
-	fn lock_bond(bond_id: Self::BondId) -> Result<(), BondError>;
+pub trait VaultProvider {
+	type Balance: Codec + Copy + MaxEncodedLen + Default + AtLeast32BitUnsigned;
+	type AccountId: Codec;
+	type BlockNumber: Codec;
 
-	/// Free the bond to be used for other things (or extended)
-	fn unlock_bond(bond_id: Self::BondId) -> Result<(), BondError>;
+	fn get(vault_id: VaultId) -> Option<Vault<Self::AccountId, Self::Balance>>;
+
+	/// Recoup funds from the vault. This will be called if a vault does not move cosigned UTXOs in
+	/// the appropriate timeframe. Steps are taken to repay the bitcoin holder at the market rate.
+	///
+	/// This will make the bonded account whole via funds from the vault in the following order:
+	/// 1. From the bonded funds
+	/// 2. From the allocated funds
+	/// 3. From the securitized funds
+	/// 4. TODO: From the Ulixee shares
+	///
+	/// The funds will be returned to the bond.bonded_account_id
+	///
+	/// Returns the amount that was recouped
+	fn compensate_lost_bitcoin(
+		bond: &Bond<Self::AccountId, Self::Balance, Self::BlockNumber>,
+		market_rate: Self::Balance,
+	) -> Result<Self::Balance, BondError>;
+
+	/// Burn the funds from the vault. This will be called if a vault moves a bitcoin utxo outside
+	/// the system. It is assumed that the vault is in cahoots with the bonded account.
+	fn burn_vault_bitcoin_funds(
+		bond: &Bond<Self::AccountId, Self::Balance, Self::BlockNumber>,
+		amount_to_burn: Self::Balance,
+	) -> Result<(), BondError>;
+
+	/// Bonds the given amount of funds for the given vault. The fee is calculated based on the
+	/// amount and the duration of the bond.
+	fn bond_funds(
+		vault_id: VaultId,
+		amount: Self::Balance,
+		bond_type: BondType,
+		blocks: Self::BlockNumber,
+		bond_account_id: &Self::AccountId,
+	) -> Result<(Self::Balance, Self::Balance), BondError>;
+
+	/// Release the bonded funds for the given bond. This will be called when the bond is completed
+	/// or canceled. The remaining fee will be charged/returned based on the
+	/// `should_charge_remaining_fee` flag.
+	fn release_bonded_funds(
+		bond: &Bond<Self::AccountId, Self::Balance, Self::BlockNumber>,
+		should_charge_remaining_fee: bool,
+	) -> Result<Self::Balance, BondError>;
+
+	fn create_utxo_script_pubkey(
+		vault_id: VaultId,
+		utxo_id: UtxoId,
+		owner_pubkey_hash: BitcoinPubkeyHash,
+		vault_claim_height: BitcoinHeight,
+		open_claim_height: BitcoinHeight,
+	) -> Result<(BitcoinPubkeyHash, BitcoinCosignScriptPubkey), BondError>;
 }
 
 #[derive(Clone, PartialEq, Eq, Encode, Decode, RuntimeDebug, TypeInfo, PalletError)]
 pub enum BondError {
-	BadState,
 	BondNotFound,
 	NoMoreBondIds,
 	MinimumBondAmountNotMet,
-	LeaseUntilBlockTooSoon,
-	BondFundClosed,
-	LeaseUntilPastFundExpiration,
+	VaultClosed,
 	/// There are too many bond or bond funds expiring in the given expiration block
 	ExpirationAtBlockOverflow,
 	AccountWouldBeBelowMinimum,
 	InsufficientFunds,
-	InsufficientBondFunds,
+	InsufficientVaultFunds,
+	/// The vault does not have enough bitcoins to cover the mining bond
+	InsufficientBitcoinsForMining,
 	ExpirationTooSoon,
 	NoPermissions,
-	NoBondFundFound,
 	HoldUnexpectedlyModified,
-	BondFundMaximumBondsExceeded,
+	/// The hold could not be removed - it must have been modified
 	UnrecoverableHold,
-	BondFundNotFound,
-	BondAlreadyClosed,
-	BondAlreadyLocked,
-	BondLockedCannotModify,
+	VaultNotFound,
+	/// No Vault public keys are available
+	NoVaultBitcoinPubkeysAvailable,
 	/// The fee for this bond exceeds the amount of the bond, which is unsafe
 	FeeExceedsBondAmount,
+	/// Scripting for a bitcoin UTXO failed
+	InvalidBitcoinScript,
 }
 
 #[derive(Clone, PartialEq, Eq, Encode, Decode, RuntimeDebug, TypeInfo, MaxEncodedLen)]
-pub struct Fee<Balance: From<u32>> {
-	pub total_fee: Balance,
-	pub base_fee: Balance,
-	pub annual_percent_rate: u32,
-}
-
-#[derive(Clone, PartialEq, Eq, Encode, Decode, RuntimeDebug, TypeInfo, MaxEncodedLen)]
-pub struct BondFund<
+pub struct Vault<
 	AccountId: Codec,
-	Balance: Codec + MaxEncodedLen,
-	BlockNumber: Codec + MaxEncodedLen,
+	Balance: Codec + Copy + MaxEncodedLen + Default + AtLeast32BitUnsigned,
 > {
+	pub operator_account_id: AccountId,
+	pub bitcoin_argons: VaultArgons<Balance>,
+	pub securitization_percent: FixedU128, // Whole number as a perentage
+	pub securitized_argons: Balance,
+	pub mining_argons: VaultArgons<Balance>,
+	pub is_closed: bool,
+}
+
+impl<AccountId: Codec, Balance: Codec + Copy + MaxEncodedLen + Default + AtLeast32BitUnsigned>
+	Vault<AccountId, Balance>
+{
+	pub fn bonded(&self) -> Balance {
+		self.bitcoin_argons.bonded.saturating_add(self.mining_argons.bonded)
+	}
+
+	pub fn allocated(&self) -> Balance {
+		self.bitcoin_argons.allocated.saturating_add(self.mining_argons.allocated)
+	}
+
+	pub fn amount_eligible_for_mining(&self) -> Balance {
+		let allocated = self.mining_argons.free_balance();
+		let mut bitcoins_bonded = self.bitcoin_argons.bonded;
+		if self.securitized_argons > Balance::zero() {
+			let allowed_securities =
+				bitcoins_bonded.saturating_mul(2u32.into()).min(self.securitized_argons);
+			bitcoins_bonded = bitcoins_bonded.saturating_add(allowed_securities);
+		}
+		allocated.min(bitcoins_bonded)
+	}
+
+	pub fn get_minimum_securitization_needed(&self) -> Balance {
+		let argons =
+			if self.is_closed { self.bitcoin_argons.bonded } else { self.bitcoin_argons.allocated };
+
+		let argons = self
+			.securitization_percent
+			.saturating_mul_int::<u128>(argons.unique_saturated_into());
+
+		argons.unique_saturated_into()
+	}
+
+	pub fn mut_argons(&mut self, bond_type: &BondType) -> &mut VaultArgons<Balance> {
+		match bond_type {
+			&BondType::Mining => &mut self.mining_argons,
+			&BondType::Bitcoin => &mut self.bitcoin_argons,
+		}
+	}
+}
+
+#[derive(Clone, PartialEq, Eq, Encode, Decode, RuntimeDebug, TypeInfo, MaxEncodedLen, Default)]
+pub struct VaultArgons<Balance: Codec + Copy + MaxEncodedLen + Default + AtLeast32BitUnsigned> {
 	#[codec(compact)]
-	pub lease_annual_percent_rate: u32,
+	pub annual_percent_rate: FixedU128,
 	#[codec(compact)]
-	pub lease_base_fee: Balance,
-	pub offer_account_id: AccountId,
+	pub allocated: Balance,
 	#[codec(compact)]
-	pub amount_reserved: Balance,
-	pub offer_expiration_block: BlockNumber,
-	#[codec(compact)]
-	pub amount_bonded: Balance,
-	pub is_ended: bool,
+	pub bonded: Balance,
+}
+
+impl<Balance> VaultArgons<Balance>
+where
+	Balance: Codec + Copy + MaxEncodedLen + Default + AtLeast32BitUnsigned,
+{
+	pub fn destroy_bond_funds(&mut self, amount: Balance) -> Result<(), BondError> {
+		if self.bonded < amount {
+			return Err(BondError::InsufficientFunds);
+		}
+		self.reduce_allocated(amount);
+		self.reduce_bonded(amount);
+		Ok(())
+	}
+
+	pub fn destroy_allocated_funds(&mut self, amount: Balance) -> Result<(), BondError> {
+		if self.allocated < amount {
+			return Err(BondError::InsufficientFunds);
+		}
+		self.reduce_allocated(amount);
+		Ok(())
+	}
+
+	pub fn reduce_allocated(&mut self, amount: Balance) {
+		self.allocated = self.allocated.saturating_sub(amount);
+	}
+	pub fn reduce_bonded(&mut self, amount: Balance) {
+		self.bonded = self.bonded.saturating_sub(amount);
+	}
+}
+
+impl<Balance: Codec + Copy + MaxEncodedLen + Default + AtLeast32BitUnsigned> VaultArgons<Balance> {
+	pub fn free_balance(&self) -> Balance {
+		self.allocated.saturating_sub(self.bonded)
+	}
 }
 
 #[derive(Clone, PartialEq, Eq, Encode, Decode, RuntimeDebug, TypeInfo)]
-pub struct Bond<
-	AccountId: Codec,
-	Balance: Codec,
-	BlockNumber: Codec,
-	BondFundId: Codec + MaxEncodedLen,
-> {
-	pub bond_fund_id: Option<BondFundId>,
+pub struct Bond<AccountId: Codec, Balance: Codec, BlockNumber: Codec> {
+	pub bond_type: BondType,
+	pub vault_id: VaultId,
+	pub utxo_id: Option<UtxoId>,
 	pub bonded_account_id: AccountId,
 	#[codec(compact)]
-	pub annual_percent_rate: u32,
+	pub total_fee: Balance,
 	#[codec(compact)]
-	pub base_fee: Balance,
-	/// Full fee paid
-	#[codec(compact)]
-	pub fee: Balance,
+	pub prepaid_fee: Balance,
 	#[codec(compact)]
 	pub amount: Balance,
-	#[codec(compact)]
-	pub start_block: BlockNumber,
-	#[codec(compact)]
-	pub completion_block: BlockNumber,
-	pub is_locked: bool,
+	pub expiration: BondExpiration<BlockNumber>,
+}
+
+#[derive(Clone, PartialEq, Eq, Encode, Decode, RuntimeDebug, TypeInfo)]
+pub enum BondExpiration<BlockNumber: Codec> {
+	/// The bond will expire at the given block number
+	UlixeeBlock(BlockNumber),
+	/// The bond will expire at a bitcoin block height
+	BitcoinBlock(BitcoinHeight),
+}
+
+#[derive(Clone, PartialEq, Eq, Encode, Decode, RuntimeDebug, TypeInfo)]
+pub enum BondType {
+	Mining,
+	Bitcoin,
 }

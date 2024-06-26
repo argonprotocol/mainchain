@@ -72,9 +72,10 @@ rand = { workspace = true }
 ulx-node-consensus = { workspace = true }
 ulx-node-runtime = { workspace = true, features = ["default"] }
 ulx-primitives = { workspace = true, features = ["default"] }
+ulx-bitcoin-utxo-tracker = { workspace = true }
 
 # CLI-specific dependencies
-try-runtime-cli = { workspace = true, optional = true }
+url = { workspace = true }
 
 [build-dependencies]
 substrate-build-script-utils = { workspace = true }
@@ -96,7 +97,6 @@ try-runtime = [
 	"frame-system/try-runtime",
 	"pallet-transaction-payment/try-runtime",
 	"sp-runtime/try-runtime",
-	"try-runtime-cli/try-runtime",
 	"ulx-node-runtime/try-runtime",
 ]
 fast-runtime = [

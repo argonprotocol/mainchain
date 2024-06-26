@@ -1,22 +1,25 @@
+use std::collections::HashMap;
+use std::str::FromStr;
+use std::sync::Arc;
+
 use anyhow::anyhow;
 use sp_core::crypto::AccountId32;
 use sp_core::Decode;
 use sp_core::{ByteArray, H256};
-use std::collections::HashMap;
-use std::str::FromStr;
-use std::sync::Arc;
-use subxt::error::RpcError;
 use subxt::runtime_api::RuntimeApiPayload;
 use subxt::storage::address::Yes;
 use subxt::storage::StorageAddress;
-use subxt::tx::{TxInBlock, TxProgress, TxStatus};
+use subxt::tx::TxInBlock;
 use subxt::OnlineClient;
 use tokio::sync::Mutex;
 use tracing::warn;
+
 use ulixee_client::api::{constants, storage};
 use ulixee_client::api::{runtime_types, tx};
-use ulixee_client::{api, UlxConfig};
-use ulixee_client::{UlxExtrinsicParamsBuilder, UlxFullclient};
+
+use ulixee_client::{
+  api, MainchainClient as InnerMainchainClient, UlxConfig, UlxExtrinsicParamsBuilder,
+};
 use ulx_primitives::host::Host;
 use ulx_primitives::tick::Ticker;
 use ulx_primitives::{
@@ -30,8 +33,9 @@ use crate::{bail, Result};
 #[cfg_attr(feature = "napi", napi)]
 #[derive(Clone)]
 pub struct MainchainClient {
-  client: Arc<Mutex<Option<UlxFullclient>>>,
+  client: Arc<Mutex<Option<InnerMainchainClient>>>,
   pub host: String,
+  join_handles: Arc<Mutex<Option<(tokio::task::JoinHandle<()>, tokio::task::JoinHandle<()>)>>>,
 }
 
 #[cfg(test)]
@@ -40,12 +44,13 @@ impl MainchainClient {
     Self {
       host: "mock".to_string(),
       client: Arc::new(Mutex::new(None)),
+      join_handles: Arc::new(Mutex::new(None)),
     }
   }
 }
 
 impl MainchainClient {
-  async fn client(&self) -> Result<UlxFullclient> {
+  async fn client(&self) -> Result<InnerMainchainClient> {
     self.ensure_connected(10_000).await?;
     let client_lock = self.client.lock().await;
     let client_rpc = (*client_lock)
@@ -60,22 +65,44 @@ impl MainchainClient {
       return Ok(());
     }
 
-    let client =
-      UlxFullclient::try_until_connected(self.host.clone(), 5_000, timeout_millis as u64).await?;
+    if let Some((handle1, handle2)) = (*self.join_handles.lock().await).take() {
+      handle1.abort();
+      handle2.abort();
+    }
+
+    let mut client =
+      InnerMainchainClient::try_until_connected(self.host.as_str(), 5_000, timeout_millis as u64)
+        .await?;
+    let mut on_error = client.subscribe_client_error();
     let ws_client = client.ws_client.clone();
 
     *client_lock = Some(client);
     drop(client_lock);
 
-    let client_lock = self.client.clone();
-    let url = self.host.clone();
-    tokio::spawn(async move {
-      let client_lock = client_lock.clone();
+    let client_lock_1 = self.client.clone();
+    let client_lock_2 = self.client.clone();
+    let url_1 = self.host.clone();
+    let url_2 = self.host.clone();
+
+    let handle1 = tokio::spawn(async move {
+      let client_lock = client_lock_1.clone();
+      let url = url_1.clone();
+      let err = on_error.recv().await.unwrap_or_default();
+
+      warn!("Disconnected from mainchain at {url} with error {err}",);
+      *client_lock.lock().await = None;
+    });
+
+    let handle2 = tokio::spawn(async move {
+      let client_lock = client_lock_2.clone();
+      let url = url_2.clone();
       let _ = ws_client.on_disconnect().await;
 
       warn!("Disconnected from mainchain at {url}",);
       *client_lock.lock().await = None;
     });
+
+    *self.join_handles.lock().await = Some((handle1, handle2));
 
     Ok(())
   }
@@ -85,6 +112,10 @@ impl MainchainClient {
     if let Some(client) = (*client_lock).take() {
       drop(client);
     }
+    if let Some((handle1, handle2)) = (*self.join_handles.lock().await).take() {
+      handle1.abort();
+      handle2.abort();
+    }
     Ok(())
   }
 
@@ -92,30 +123,14 @@ impl MainchainClient {
     let instance = Self {
       host,
       client: Arc::new(Mutex::new(None)),
+      join_handles: Arc::new(Mutex::new(None)),
     };
     instance.ensure_connected(timeout_millis).await?;
     Ok(instance)
   }
 
   pub async fn call<Call: RuntimeApiPayload>(&self, payload: Call) -> Result<Call::ReturnType> {
-    let client = self.client().await?;
-
-    let api = client.live.runtime_api().at_latest().await?;
-    match api.call(payload).await {
-      Ok(result) => Ok(result),
-      Err(e) => {
-        match e {
-          subxt::Error::Rpc(ref rpc_error) => match rpc_error {
-            RpcError::ClientError(_) => {
-              *(self.client.lock().await) = None;
-            }
-            _ => {}
-          },
-          _ => {}
-        }
-        Err(e.into())
-      }
-    }
+    Ok(self.client().await?.call(payload, None).await?)
   }
 
   pub async fn fetch_storage<Address>(
@@ -126,50 +141,16 @@ impl MainchainClient {
   where
     Address: StorageAddress<IsFetchable = Yes>,
   {
-    let client = self.client().await?;
-    let client = client.live;
-    let storage = match at {
-      Some(at) => client.storage().at(at),
-      None => client.storage().at_latest().await?,
-    };
-
-    match storage.fetch(address).await {
-      Ok(result) => Ok(result),
-      Err(e) => {
-        match e {
-          subxt::Error::Rpc(ref rpc_error) => match rpc_error {
-            RpcError::ClientError(_) => {
-              *(self.client.lock().await) = None;
-            }
-            _ => {}
-          },
-          _ => {}
-        }
-        Err(e.into())
-      }
-    }
+    Ok(self.client().await?.fetch_storage(address, at).await?)
   }
 
   pub async fn get_ticker(&self) -> Result<Ticker> {
-    let ticker = self
-      .call(api::runtime_apis::tick_apis::TickApis.ticker())
-      .await?;
-
-    Ok(Ticker::new(
-      ticker.tick_duration_millis,
-      ticker.genesis_utc_time,
-    ))
+    let client = self.client().await?;
+    Ok(client.lookup_ticker().await?)
   }
 
   pub async fn get_best_block_hash(&self) -> Result<H256> {
-    let best_block_hash = &self
-      .client()
-      .await?
-      .methods
-      .chain_get_block_hash(None)
-      .await?
-      .ok_or_else(|| anyhow!("No best block found"))?;
-    Ok(H256::from_slice(best_block_hash.as_bytes()))
+    Ok(self.client().await?.best_block_hash().await?)
   }
 
   pub async fn get_vote_block_hash(&self, current_tick: u32) -> Result<Option<BestBlockForVote>> {
@@ -366,29 +347,6 @@ impl MainchainClient {
     Ok(nonce as u32)
   }
 
-  async fn wait_for_in_block(
-    mut tx_progress: TxProgress<UlxConfig, OnlineClient<UlxConfig>>,
-  ) -> Result<TxInBlock<UlxConfig, OnlineClient<UlxConfig>>> {
-    while let Some(status) = tx_progress.next().await {
-      match status? {
-        TxStatus::InBestBlock(tx_in_block) | TxStatus::InFinalizedBlock(tx_in_block) => {
-          // now, we can attempt to work with the block, eg:
-          tx_in_block.wait_for_success().await?;
-          return Ok(tx_in_block);
-        }
-        TxStatus::Error { message }
-        | TxStatus::Invalid { message }
-        | TxStatus::Dropped { message } => {
-          // Handle any errors:
-          bail!("Error submitting notebook to block: {}", message);
-        }
-        // Continue otherwise:
-        _ => continue,
-      }
-    }
-    bail!("No valid status encountered for notebook")
-  }
-
   pub async fn get_transfer_to_localchain_finalized_block(
     &self,
     transfer_id: TransferToLocalchainId,
@@ -464,7 +422,10 @@ impl MainchainClient {
 
     let tx_progress = submittable.submit_and_watch().await?;
 
-    let in_block = Self::wait_for_in_block(tx_progress).await?;
+    let in_block = InnerMainchainClient::wait_for_ext_in_block(tx_progress)
+      .await
+      .map_err(|e| anyhow!("Error submitting notebook to block: {:?}", e))?;
+
     let transfer = in_block.fetch_events().await?.iter().find_map(|event| {
       if let Ok(event) = event {
         if let Some(Ok(transfer)) = event
@@ -608,11 +569,7 @@ impl MainchainClient {
   }
 
   pub async fn latest_finalized_number(&self) -> Result<u32> {
-    let block_number = self
-      .fetch_storage(&storage().system().number(), None)
-      .await?
-      .unwrap_or_default();
-    Ok(block_number)
+    Ok(self.client().await?.latest_finalized_block().await?)
   }
 
   pub async fn wait_for_notebook_immortalized(
@@ -665,10 +622,12 @@ impl MainchainClient {
 
 #[cfg(feature = "napi")]
 pub mod napi_ext {
+  use napi::bindgen_prelude::*;
+
+  use ulx_primitives::DataTLD;
+
   use crate::error::NapiOk;
   use crate::{DataDomainRegistration, MainchainClient, ZoneRecord};
-  use napi::bindgen_prelude::*;
-  use ulx_primitives::DataTLD;
 
   #[napi(object)]
   pub struct LocalchainTransfer {

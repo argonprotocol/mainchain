@@ -3,9 +3,10 @@ use scale_info::TypeInfo;
 use sp_core::U256;
 use sp_inherents::{InherentData, InherentIdentifier, IsFatalError};
 use sp_runtime::RuntimeDebug;
-use sp_std::vec::Vec;
+use sp_std::{collections::btree_map::BTreeMap, vec::Vec};
 
 use crate::{
+	bitcoin::{BitcoinBlock, BitcoinHeight, BitcoinRejectedReason, UtxoId, UtxoRef},
 	BestBlockVoteSeal, BlockSealAuthoritySignature, BlockSealDigest, BlockVote, MerkleProof,
 	NotaryId, NotebookNumber, SignedNotebookHeader,
 };
@@ -14,6 +15,7 @@ pub const SEAL_INHERENT_IDENTIFIER: InherentIdentifier = *b"ulx_seal";
 pub const SEAL_INHERENT_VOTE_IDENTIFIER: InherentIdentifier = *b"seal_vot";
 pub const SEAL_INHERENT_DIGEST_IDENTIFIER: InherentIdentifier = *b"seal_dig";
 pub const NOTEBOOKS_INHERENT_IDENTIFIER: InherentIdentifier = *b"notebook";
+pub const BITCOIN_INHERENT_IDENTIFIER: InherentIdentifier = *b"bitcoin_";
 
 #[derive(Clone, PartialEq, Eq, Encode, Decode, RuntimeDebug, TypeInfo)]
 pub enum BlockSealInherent {
@@ -253,6 +255,80 @@ impl NotebookInherentError {
 	}
 }
 impl IsFatalError for NotebookInherentError {
+	fn is_fatal_error(&self) -> bool {
+		true
+	}
+}
+
+/////// BITCOIN INHERENT ///////
+
+pub trait BitcoinInherentData {
+	fn bitcoin_sync(&self) -> Result<Option<BitcoinUtxoSync>, sp_inherents::Error>;
+}
+
+impl BitcoinInherentData for InherentData {
+	fn bitcoin_sync(&self) -> Result<Option<BitcoinUtxoSync>, sp_inherents::Error> {
+		self.get_data(&BITCOIN_INHERENT_IDENTIFIER)
+	}
+}
+
+#[derive(Clone, PartialEq, Encode, Decode, RuntimeDebug, TypeInfo)]
+pub struct BitcoinUtxoSync {
+	pub spent: BTreeMap<UtxoId, BitcoinHeight>,
+	pub verified: BTreeMap<UtxoId, UtxoRef>,
+	pub invalid: BTreeMap<UtxoId, BitcoinRejectedReason>,
+	pub sync_to_block: BitcoinBlock,
+}
+
+#[cfg(feature = "std")]
+pub struct BitcoinInherentDataProvider {
+	pub bitcoin_utxo_sync: BitcoinUtxoSync,
+}
+#[cfg(feature = "std")]
+#[async_trait::async_trait]
+impl sp_inherents::InherentDataProvider for BitcoinInherentDataProvider {
+	async fn provide_inherent_data(
+		&self,
+		inherent_data: &mut InherentData,
+	) -> Result<(), sp_inherents::Error> {
+		inherent_data.put_data(BITCOIN_INHERENT_IDENTIFIER, &self.bitcoin_utxo_sync)?;
+		Ok(())
+	}
+
+	async fn try_handle_error(
+		&self,
+		identifier: &InherentIdentifier,
+		error: &[u8],
+	) -> Option<Result<(), sp_inherents::Error>> {
+		Some(Err(sp_inherents::Error::Application(Box::from(BitcoinInherentError::try_from(
+			identifier, error,
+		)?))))
+	}
+}
+
+#[derive(Encode, RuntimeDebug)]
+#[cfg_attr(feature = "std", derive(Decode, thiserror::Error))]
+pub enum BitcoinInherentError {
+	/// The inherent has a mismatch with the details coordinated between bitcoin and the block
+	#[cfg_attr(
+		feature = "std",
+		error("The bitcoin inherent does not match the bitcoin state compared to the block.")
+	)]
+	InvalidInherentData,
+}
+
+impl BitcoinInherentError {
+	/// Try to create an instance ouf of the given identifier and data.
+	#[cfg(feature = "std")]
+	pub fn try_from(id: &InherentIdentifier, mut data: &[u8]) -> Option<Self> {
+		if id == &BITCOIN_INHERENT_IDENTIFIER {
+			<BitcoinInherentError as codec::Decode>::decode(&mut data).ok()
+		} else {
+			None
+		}
+	}
+}
+impl IsFatalError for BitcoinInherentError {
 	fn is_fatal_error(&self) -> bool {
 		true
 	}

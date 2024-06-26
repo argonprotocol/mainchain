@@ -76,6 +76,9 @@ impl AuthorityProvider<BlockSealAuthorityId, Block, u64> for StaticAuthorityProv
 	fn xor_closest_authority(_: U256) -> Option<MiningAuthority<BlockSealAuthorityId, u64>> {
 		XorClosest::get().clone()
 	}
+	fn get_all_rewards_accounts() -> Vec<u64> {
+		vec![]
+	}
 }
 
 pub struct StaticBlockVotingProvider;

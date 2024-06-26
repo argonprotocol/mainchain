@@ -1,0 +1,38 @@
+[package]
+name = "ulx-bitcoin-utxo-tracker"
+version.workspace = true
+authors.workspace = true
+edition.workspace = true
+rust-version.workspace = true
+license.workspace = true
+repository.workspace = true
+documentation.workspace = true
+homepage.workspace = true
+publish = false
+
+[package.metadata.docs.rs]
+targets = ["x86_64-unknown-linux-gnu"]
+
+[dependencies]
+async-trait = { workspace = true }
+codec = { workspace = true }
+log = { workspace = true }
+anyhow = { workspace = true }
+parking_lot = { workspace = true }
+thiserror = { workspace = true }
+bitcoincore-rpc = { workspace = true }
+bitcoin = { workspace = true }
+ulx-primitives = { workspace = true, features = ["std", "bitcoin"] }
+sc-service = { workspace = true }
+sp-api = { workspace = true, features = ["std"] }
+sp-runtime = { workspace = true, features = ["std"] }
+sc-client-api = { workspace = true }
+hwi = { workspace = true }
+
+[dev-dependencies]
+bitcoind = { workspace = true }
+env_logger = { workspace = true }
+tokio = { workspace = true }
+rand = { workspace = true }
+lazy_static = { workspace = true }
+ulx-testing = { workspace = true }

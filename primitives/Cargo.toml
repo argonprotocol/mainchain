@@ -22,6 +22,7 @@ sp-runtime = { workspace = true }
 sp-inherents = { workspace = true }
 sp-api = { workspace = true }
 sp-application-crypto = { workspace = true }
+sp-arithmetic = { workspace = true }
 sp-debug-derive = { workspace = true }
 sp-core = { workspace = true }
 sp-std = { workspace = true }
@@ -36,6 +37,7 @@ rsntp = { workspace = true, optional = true }
 hex = { workspace = true, optional = true }
 clap = { workspace = true, optional = true }
 uniffi = { workspace = true, optional = true }
+bitcoin = { workspace = true, optional = true }
 
 [build-dependencies]
 uniffi = { workspace = true, features = ["build"] }
@@ -48,6 +50,7 @@ tokio = { workspace = true, features = ["test-util"] }
 default = [ "std" ]
 std = [
 	"async-trait",
+	"bitcoin?/std",
 	"clap",
 	"codec/derive",
 	"codec/std",
@@ -62,6 +65,7 @@ std = [
 	"sp-api/std",
 	"sp-application-crypto/full_crypto",
 	"sp-application-crypto/std",
+	"sp-arithmetic/std",
 	"sp-core/full_crypto",
 	"sp-core/std",
 	"sp-crypto-hashing/std",
@@ -74,3 +78,4 @@ std = [
 fast-runtime = [ "sp-debug-derive/force-debug" ]
 napi = [ "napi-derive/type-def", "napi/napi9", "napi/serde-json" ]
 uniffi = [ "dep:uniffi" ]
+bitcoin = [ "dep:bitcoin" ]

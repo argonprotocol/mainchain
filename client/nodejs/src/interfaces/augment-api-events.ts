@@ -6,10 +6,10 @@
 import '@polkadot/api-base/types/events';
 
 import type { ApiTypes, AugmentedEvent } from '@polkadot/api-base/types';
-import type { Bytes, Null, Option, Result, U8aFixed, Vec, bool, u128, u32, u64 } from '@polkadot/types-codec';
+import type { Bytes, Null, Option, Result, U8aFixed, Vec, bool, u128, u16, u32, u64 } from '@polkadot/types-codec';
 import type { ITuple } from '@polkadot/types-codec/types';
 import type { AccountId32, H256 } from '@polkadot/types/interfaces/runtime';
-import type { FrameSupportDispatchDispatchInfo, FrameSupportTokensMiscBalanceStatus, PalletBlockRewardsBlockPayout, PalletDataDomainDataDomainRegistration, SpConsensusGrandpaAppPublic, SpRuntimeDispatchError, UlxNotaryAuditErrorVerifyError, UlxPrimitivesBlockSealMiningRegistration, UlxPrimitivesDataDomainZoneRecord, UlxPrimitivesNotaryNotaryMeta, UlxPrimitivesNotaryNotaryRecord } from '@polkadot/types/lookup';
+import type { FrameSupportDispatchDispatchInfo, FrameSupportTokensMiscBalanceStatus, PalletDataDomainDataDomainRegistration, PalletMintMintType, SpConsensusGrandpaAppPublic, SpRuntimeDispatchError, UlxNodeRuntimeProxyType, UlxNotaryAuditErrorVerifyError, UlxPrimitivesBitcoinBitcoinRejectedReason, UlxPrimitivesBitcoinCompressedBitcoinPubkey, UlxPrimitivesBlockSealBlockPayout, UlxPrimitivesBlockSealMiningRegistration, UlxPrimitivesBondBondExpiration, UlxPrimitivesBondBondType, UlxPrimitivesDataDomainZoneRecord, UlxPrimitivesNotaryNotaryMeta, UlxPrimitivesNotaryNotaryRecord } from '@polkadot/types/lookup';
 
 export type __AugmentedEvent<ApiType extends ApiTypes> = AugmentedEvent<ApiType>;
 
@@ -107,26 +107,28 @@ declare module '@polkadot/api-base/types/events' {
        **/
       Withdraw: AugmentedEvent<ApiType, [who: AccountId32, amount: u128], { who: AccountId32, amount: u128 }>;
     };
+    bitcoinUtxos: {
+      UtxoRejected: AugmentedEvent<ApiType, [utxoId: u64, rejectedReason: UlxPrimitivesBitcoinBitcoinRejectedReason], { utxoId: u64, rejectedReason: UlxPrimitivesBitcoinBitcoinRejectedReason }>;
+      UtxoSpent: AugmentedEvent<ApiType, [utxoId: u64, blockHeight: u64], { utxoId: u64, blockHeight: u64 }>;
+      UtxoUnwatched: AugmentedEvent<ApiType, [utxoId: u64], { utxoId: u64 }>;
+      UtxoVerified: AugmentedEvent<ApiType, [utxoId: u64], { utxoId: u64 }>;
+    };
     blockRewards: {
-      RewardCreated: AugmentedEvent<ApiType, [maturationBlock: u32, rewards: Vec<PalletBlockRewardsBlockPayout>], { maturationBlock: u32, rewards: Vec<PalletBlockRewardsBlockPayout> }>;
-      RewardUnlocked: AugmentedEvent<ApiType, [rewards: Vec<PalletBlockRewardsBlockPayout>], { rewards: Vec<PalletBlockRewardsBlockPayout> }>;
+      RewardCreated: AugmentedEvent<ApiType, [maturationBlock: u32, rewards: Vec<UlxPrimitivesBlockSealBlockPayout>], { maturationBlock: u32, rewards: Vec<UlxPrimitivesBlockSealBlockPayout> }>;
+      RewardUnlocked: AugmentedEvent<ApiType, [rewards: Vec<UlxPrimitivesBlockSealBlockPayout>], { rewards: Vec<UlxPrimitivesBlockSealBlockPayout> }>;
     };
     blockSealSpec: {
       ComputeDifficultyAdjusted: AugmentedEvent<ApiType, [expectedBlockTime: u64, actualBlockTime: u64, startDifficulty: u128, newDifficulty: u128], { expectedBlockTime: u64, actualBlockTime: u64, startDifficulty: u128, newDifficulty: u128 }>;
       VoteMinimumAdjusted: AugmentedEvent<ApiType, [expectedBlockVotes: u128, actualBlockVotes: u128, startVoteMinimum: u128, newVoteMinimum: u128], { expectedBlockVotes: u128, actualBlockVotes: u128, startVoteMinimum: u128, newVoteMinimum: u128 }>;
     };
-    bond: {
-      BondCompleted: AugmentedEvent<ApiType, [bondFundId: Option<u32>, bondId: u64], { bondFundId: Option<u32>, bondId: u64 }>;
-      BondedSelf: AugmentedEvent<ApiType, [bondId: u64, bondedAccountId: AccountId32, amount: u128, completionBlock: u32], { bondId: u64, bondedAccountId: AccountId32, amount: u128, completionBlock: u32 }>;
-      BondExtended: AugmentedEvent<ApiType, [bondFundId: Option<u32>, bondId: u64, amount: u128, completionBlock: u32, feeChange: u128, annualPercentRate: u32], { bondFundId: Option<u32>, bondId: u64, amount: u128, completionBlock: u32, feeChange: u128, annualPercentRate: u32 }>;
-      BondFeeRefund: AugmentedEvent<ApiType, [bondFundId: u32, bondId: u64, bondedAccountId: AccountId32, bondFundReductionForPayment: u128, finalFee: u128, refundAmount: u128], { bondFundId: u32, bondId: u64, bondedAccountId: AccountId32, bondFundReductionForPayment: u128, finalFee: u128, refundAmount: u128 }>;
-      BondFundEnded: AugmentedEvent<ApiType, [bondFundId: u32, amountStillBonded: u128], { bondFundId: u32, amountStillBonded: u128 }>;
-      BondFundExpired: AugmentedEvent<ApiType, [bondFundId: u32, offerAccountId: AccountId32], { bondFundId: u32, offerAccountId: AccountId32 }>;
-      BondFundExtended: AugmentedEvent<ApiType, [bondFundId: u32, amountOffered: u128, expirationBlock: u32], { bondFundId: u32, amountOffered: u128, expirationBlock: u32 }>;
-      BondFundOffered: AugmentedEvent<ApiType, [bondFundId: u32, amountOffered: u128, expirationBlock: u32, offerAccountId: AccountId32], { bondFundId: u32, amountOffered: u128, expirationBlock: u32, offerAccountId: AccountId32 }>;
-      BondLeased: AugmentedEvent<ApiType, [bondFundId: u32, bondId: u64, bondedAccountId: AccountId32, amount: u128, totalFee: u128, annualPercentRate: u32, completionBlock: u32], { bondFundId: u32, bondId: u64, bondedAccountId: AccountId32, amount: u128, totalFee: u128, annualPercentRate: u32, completionBlock: u32 }>;
-      BondLocked: AugmentedEvent<ApiType, [bondId: u64, bondedAccountId: AccountId32], { bondId: u64, bondedAccountId: AccountId32 }>;
-      BondUnlocked: AugmentedEvent<ApiType, [bondId: u64, bondedAccountId: AccountId32], { bondId: u64, bondedAccountId: AccountId32 }>;
+    bonds: {
+      BitcoinBondBurned: AugmentedEvent<ApiType, [vaultId: u32, bondId: u64, utxoId: u64, amountBurned: u128, amountHeld: u128, wasUtxoSpent: bool], { vaultId: u32, bondId: u64, utxoId: u64, amountBurned: u128, amountHeld: u128, wasUtxoSpent: bool }>;
+      BitcoinCosignPastDue: AugmentedEvent<ApiType, [bondId: u64, vaultId: u32, utxoId: u64, compensationAmount: u128, compensationStillOwed: u128, compensatedAccountId: AccountId32], { bondId: u64, vaultId: u32, utxoId: u64, compensationAmount: u128, compensationStillOwed: u128, compensatedAccountId: AccountId32 }>;
+      BitcoinUtxoCosigned: AugmentedEvent<ApiType, [bondId: u64, vaultId: u32, utxoId: u64, pubkey: UlxPrimitivesBitcoinCompressedBitcoinPubkey, signature: Bytes], { bondId: u64, vaultId: u32, utxoId: u64, pubkey: UlxPrimitivesBitcoinCompressedBitcoinPubkey, signature: Bytes }>;
+      BitcoinUtxoCosignRequested: AugmentedEvent<ApiType, [bondId: u64, vaultId: u32, utxoId: u64], { bondId: u64, vaultId: u32, utxoId: u64 }>;
+      BondCanceled: AugmentedEvent<ApiType, [vaultId: u32, bondId: u64, bondedAccountId: AccountId32, bondType: UlxPrimitivesBondBondType, returnedFee: u128], { vaultId: u32, bondId: u64, bondedAccountId: AccountId32, bondType: UlxPrimitivesBondBondType, returnedFee: u128 }>;
+      BondCompleted: AugmentedEvent<ApiType, [vaultId: u32, bondId: u64], { vaultId: u32, bondId: u64 }>;
+      BondCreated: AugmentedEvent<ApiType, [vaultId: u32, bondId: u64, bondType: UlxPrimitivesBondBondType, bondedAccountId: AccountId32, utxoId: Option<u64>, amount: u128, expiration: UlxPrimitivesBondBondExpiration], { vaultId: u32, bondId: u64, bondType: UlxPrimitivesBondBondType, bondedAccountId: AccountId32, utxoId: Option<u64>, amount: u128, expiration: UlxPrimitivesBondBondExpiration }>;
     };
     chainTransfer: {
       TransferIn: AugmentedEvent<ApiType, [accountId: AccountId32, amount: u128, notaryId: u32], { accountId: AccountId32, amount: u128, notaryId: u32 }>;
@@ -177,6 +179,7 @@ declare module '@polkadot/api-base/types/events' {
       UnbondedMiner: AugmentedEvent<ApiType, [accountId: AccountId32, bondId: Option<u64>, keptOwnershipBond: bool], { accountId: AccountId32, bondId: Option<u64>, keptOwnershipBond: bool }>;
     };
     mint: {
+      ArgonsMinted: AugmentedEvent<ApiType, [mintType: PalletMintMintType, accountId: AccountId32, utxoId: Option<u64>, amount: u128], { mintType: PalletMintMintType, accountId: AccountId32, utxoId: Option<u64>, amount: u128 }>;
     };
     notaries: {
       /**
@@ -207,6 +210,36 @@ declare module '@polkadot/api-base/types/events' {
        * \[kind, timeslot\].
        **/
       Offence: AugmentedEvent<ApiType, [kind: U8aFixed, timeslot: Bytes], { kind: U8aFixed, timeslot: Bytes }>;
+    };
+    priceIndex: {
+      /**
+       * Event emitted when a new price index is submitted
+       **/
+      NewIndex: AugmentedEvent<ApiType, []>;
+      OperatorChanged: AugmentedEvent<ApiType, [operatorId: AccountId32], { operatorId: AccountId32 }>;
+    };
+    proxy: {
+      /**
+       * An announcement was placed to make a call in the future.
+       **/
+      Announced: AugmentedEvent<ApiType, [real: AccountId32, proxy: AccountId32, callHash: H256], { real: AccountId32, proxy: AccountId32, callHash: H256 }>;
+      /**
+       * A proxy was added.
+       **/
+      ProxyAdded: AugmentedEvent<ApiType, [delegator: AccountId32, delegatee: AccountId32, proxyType: UlxNodeRuntimeProxyType, delay: u32], { delegator: AccountId32, delegatee: AccountId32, proxyType: UlxNodeRuntimeProxyType, delay: u32 }>;
+      /**
+       * A proxy was executed correctly, with the given.
+       **/
+      ProxyExecuted: AugmentedEvent<ApiType, [result: Result<Null, SpRuntimeDispatchError>], { result: Result<Null, SpRuntimeDispatchError> }>;
+      /**
+       * A proxy was removed.
+       **/
+      ProxyRemoved: AugmentedEvent<ApiType, [delegator: AccountId32, delegatee: AccountId32, proxyType: UlxNodeRuntimeProxyType, delay: u32], { delegator: AccountId32, delegatee: AccountId32, proxyType: UlxNodeRuntimeProxyType, delay: u32 }>;
+      /**
+       * A pure account has been created by new proxy with given
+       * disambiguation index and proxy type.
+       **/
+      PureCreated: AugmentedEvent<ApiType, [pure: AccountId32, who: AccountId32, proxyType: UlxNodeRuntimeProxyType, disambiguationIndex: u16], { pure: AccountId32, who: AccountId32, proxyType: UlxNodeRuntimeProxyType, disambiguationIndex: u16 }>;
     };
     session: {
       /**
@@ -371,6 +404,11 @@ declare module '@polkadot/api-base/types/events' {
        * Some amount was withdrawn from the account (e.g. for transaction fees).
        **/
       Withdraw: AugmentedEvent<ApiType, [who: AccountId32, amount: u128], { who: AccountId32, amount: u128 }>;
+    };
+    vaults: {
+      VaultClosed: AugmentedEvent<ApiType, [vaultId: u32, bitcoinAmountStillBonded: u128, miningAmountStillBonded: u128, securitizationStillBonded: u128], { vaultId: u32, bitcoinAmountStillBonded: u128, miningAmountStillBonded: u128, securitizationStillBonded: u128 }>;
+      VaultCreated: AugmentedEvent<ApiType, [vaultId: u32, bitcoinArgons: u128, miningArgons: u128, securitizationPercent: u128, operatorAccountId: AccountId32], { vaultId: u32, bitcoinArgons: u128, miningArgons: u128, securitizationPercent: u128, operatorAccountId: AccountId32 }>;
+      VaultModified: AugmentedEvent<ApiType, [vaultId: u32, bitcoinArgons: u128, miningArgons: u128, securitizationPercent: u128], { vaultId: u32, bitcoinArgons: u128, miningArgons: u128, securitizationPercent: u128 }>;
     };
   } // AugmentedEvents
 } // declare module

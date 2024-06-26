@@ -369,7 +369,8 @@ impl NotarizationBuilder {
         added_accounts_needed -= 1;
       }
     }
-    balance_changes_by_account + added_accounts_needed + imports < MAX_BALANCE_CHANGES_PER_NOTARIZATION as usize
+    balance_changes_by_account + added_accounts_needed + imports
+      < MAX_BALANCE_CHANGES_PER_NOTARIZATION as usize
   }
 
   pub async fn cancel_escrow(&self, open_escrow: &OpenEscrow) -> Result<()> {
@@ -563,11 +564,7 @@ impl NotarizationBuilder {
       if !change.verify_signature() {
         bail!("Claimed balance change has an invalid signature");
       }
-      if let Some(balance_notary_id) = change
-        .previous_balance_proof
-        .as_ref()
-        .map(|x| x.notary_id)
-      {
+      if let Some(balance_notary_id) = change.previous_balance_proof.as_ref().map(|x| x.notary_id) {
         self.ensure_notary_id(balance_notary_id).await?;
       }
       if change.account_type == AccountType::Tax {
@@ -630,10 +627,7 @@ impl NotarizationBuilder {
         match &note.note_type {
           NoteType::Send { to } => {
             if let Some(to) = to {
-              let claim_addresses = to
-                .iter()
-                .map(AccountStore::to_address)
-                .collect::<Vec<_>>();
+              let claim_addresses = to.iter().map(AccountStore::to_address).collect::<Vec<_>>();
               if (balance_change.account_type == AccountType::Deposit
                 && !claim_addresses.contains(&deposit_account.address))
                 || (balance_change.account_type == AccountType::Tax
@@ -1622,7 +1616,7 @@ mod test {
       "changeNumber": 1,
       "balance": 1000,
       "previousBalanceProof": null,
-      "escrowHoldNote": null, 
+      "escrowHoldNote": null,
       "notes": [
         {
           "milligons": 1000,

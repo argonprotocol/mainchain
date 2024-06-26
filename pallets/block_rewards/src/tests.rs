@@ -8,11 +8,12 @@ use frame_support::{
 };
 use sp_runtime::{DispatchError, TokenError};
 
+use ulx_primitives::{block_seal::BlockPayout, BlockSealerInfo};
+
 use crate::{
 	mock::{ArgonBalances, BlockRewards, UlixeeBalances, *},
-	BlockPayout, Event,
+	Event,
 };
-use ulx_primitives::BlockSealerInfo;
 
 #[test]
 fn it_should_only_allow_a_single_seal() {

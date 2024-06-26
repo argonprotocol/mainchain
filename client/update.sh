@@ -17,7 +17,7 @@ cleanup() {
 
 trap cleanup EXIT SIGHUP SIGINT SIGTERM
 
-"$BASEDIR/../target/debug/ulx-node" --tmp --dev --alice --rpc-port=9944 --miners=1 > "$PIPE" 2>&1 &
+"$BASEDIR/../target/debug/ulx-node" --tmp --dev --alice --rpc-port=9944 --miners=1 --bitcoin-rpc-url="http://127.0.0.1:18443" > "$PIPE" 2>&1 &
 ULX_PID=$!
 
 while IFS= read -r line; do
@@ -31,6 +31,7 @@ done <"$PIPE"
 subxt codegen  --derive Clone \
   --derive-for-type bounded_collections::bounded_vec::BoundedVec=serde::Serialize \
   --attributes-for-type bounded_collections::bounded_vec::BoundedVec="#[serde(transparent)]" \
+  --substitute-type primitive_types::H256=::sp_core::H256 \
    | rustfmt > "$BASEDIR/src/spec.rs"
 
 curl -H "Content-Type: application/json" -d '{"id":"1", "jsonrpc":"2.0", "method": "state_getMetadata", "params":[]}' http://localhost:9944 > "$BASEDIR/nodejs/metadata.json"

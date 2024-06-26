@@ -13,7 +13,7 @@ use ulx_primitives::{
 	block_vote::VoteMinimum,
 	notary::{GenesisNotary, NotaryPublic},
 	tick::{Ticker, TICK_MILLIS},
-	BlockSealAuthorityId, BondId, ComputeDifficulty,
+	BlockSealAuthorityId, ComputeDifficulty,
 };
 
 // The URL for the telemetry server.
@@ -68,6 +68,10 @@ pub fn development_config() -> Result<ChainSpec, String> {
 		)],
 		// Sudo account
 		get_account_id_from_seed::<sr25519::Public>("Alice"),
+		// Bitcoin utxo tip operator
+		get_account_id_from_seed::<sr25519::Public>("Alice"),
+		// Price index operator
+		get_account_id_from_seed::<sr25519::Public>("Alice"),
 		// Pre-funded accounts
 		vec![
 			get_account_id_from_seed::<sr25519::Public>("Alice"),
@@ -106,6 +110,10 @@ pub fn local_testnet_config() -> Result<ChainSpec, String> {
 		)],
 		// Sudo account
 		get_account_id_from_seed::<sr25519::Public>("Alice"),
+		// Bitcoin utxo tip operator
+		get_account_id_from_seed::<sr25519::Public>("Alice"),
+		// Price index operator
+		get_account_id_from_seed::<sr25519::Public>("Alice"),
 		// Pre-funded accounts
 		vec![
 			get_account_id_from_seed::<sr25519::Public>("Alice"),
@@ -131,6 +139,8 @@ pub fn local_testnet_config() -> Result<ChainSpec, String> {
 fn testnet_genesis(
 	initial_authorities: Vec<(AccountId, (BlockSealAuthorityId, GrandpaId))>,
 	root_key: AccountId,
+	bitcoin_tip_operator: AccountId,
+	price_index_operator: AccountId,
 	endowed_accounts: Vec<AccountId>,
 	initial_vote_minimum: VoteMinimum,
 	initial_difficulty: ComputeDifficulty,
@@ -139,7 +149,7 @@ fn testnet_genesis(
 ) -> serde_json::Value {
 	let authority_zero = initial_authorities[0].clone();
 	let ticker = Ticker::start(Duration::from_millis(tick_millis));
-	let miner_zero = MiningRegistration::<AccountId, BondId, Balance> {
+	let miner_zero = MiningRegistration::<AccountId, Balance> {
 		account_id: authority_zero.0.clone(),
 		bond_id: None,
 		reward_destination: RewardDestination::Owner,
@@ -149,10 +159,16 @@ fn testnet_genesis(
 
 	serde_json::json!({
 		"argonBalances": {
-			"balances": endowed_accounts.iter().cloned().map(|k| (k, 10_000)).collect::<Vec<_>>(),
+			"balances": endowed_accounts.iter().cloned().map(|k| (k, 100_000_000)).collect::<Vec<_>>(),
 		},
 		"ulixeeBalances": {
 			"balances": endowed_accounts.iter().cloned().map(|k| (k, 10_000)).collect::<Vec<_>>(),
+		},
+		"priceIndex": {
+			"operator": Some(price_index_operator),
+		},
+		"bitcoinUtxos": {
+			"operator": Some(bitcoin_tip_operator),
 		},
 		"miningSlot":  {
 			"minerZero": Some(miner_zero),

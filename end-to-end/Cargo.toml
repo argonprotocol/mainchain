@@ -1,0 +1,27 @@
+[package]
+name = "end-to-end"
+version.workspace = true
+authors.workspace = true
+edition.workspace = true
+rust-version.workspace = true
+license.workspace = true
+repository.workspace = true
+documentation.workspace = true
+homepage.workspace = true
+publish = false
+
+
+[dev-dependencies]
+ulx-testing = { workspace = true }
+tokio = { workspace = true }
+bitcoind = { workspace = true }
+rand = { workspace = true }
+bitcoin = { workspace = true }
+lazy_static = { workspace = true }
+ulx-primitives = { workspace = true, features = ["default"] }
+ulx-bitcoin-utxo-tracker = { workspace = true }
+ulixee-client = { workspace = true }
+sp-arithmetic = { workspace = true }
+sp-core = { workspace = true }
+subxt = { workspace = true }
+subxt-signer = { workspace = true }

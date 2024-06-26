@@ -71,6 +71,9 @@ pub enum Error<B: BlockT> {
 	#[error("Missing consensus digest")]
 	MissingConsensusDigest,
 
+	#[error("Failed to sync Bitcoin Utxos")]
+	FailedToSyncBitcoinUtxos,
+
 	#[error(transparent)]
 	Client(sp_blockchain::Error),
 	#[error(transparent)]

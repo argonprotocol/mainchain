@@ -53,6 +53,7 @@ schnellru = { workspace = true }
 ulx-primitives = { workspace = true, features = ["default"] }
 ulx-notary-apis = { workspace = true }
 ulx-node-runtime = { workspace = true, features = ["default"] }
+ulx-bitcoin-utxo-tracker = { workspace = true }
 
 
 [dev-dependencies]
@@ -63,6 +64,7 @@ sp-tracing = { workspace = true }
 sc-client-db = { workspace = true }
 sc-keystore = { workspace = true }
 sc-network-test = { workspace = true }
+sc-network-types = { workspace = true }
 sc-utils = { workspace = true }
 sp-test-primitives = { workspace = true }
 substrate-test-runtime = { workspace = true }

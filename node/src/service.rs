@@ -10,7 +10,9 @@ use sc_service::{
 };
 use sc_telemetry::{log, Telemetry, TelemetryWorker};
 use sc_transaction_pool_api::OffchainTransactionPoolFactory;
+use url::Url;
 
+use ulx_bitcoin_utxo_tracker::UtxoTracker;
 use ulx_node_consensus::{
 	aux_client::UlxAux,
 	basic_queue::BasicQueue,
@@ -40,25 +42,25 @@ type UlxBlockImport = ulx_node_consensus::import_queue::UlxBlockImport<
 	AccountId,
 >;
 
-#[allow(clippy::type_complexity)]
+pub type Service = sc_service::PartialComponents<
+	FullClient,
+	FullBackend,
+	FullSelectChain,
+	BasicQueue<Block>,
+	sc_transaction_pool::FullPool<Block, FullClient>,
+	(
+		UlxBlockImport,
+		UlxAux<Block, FullClient>,
+		Arc<UtxoTracker>,
+		sc_consensus_grandpa::LinkHalf<Block, FullClient, FullSelectChain>,
+		Option<Telemetry>,
+	),
+>;
+
 pub fn new_partial(
 	config: &Configuration,
-) -> Result<
-	sc_service::PartialComponents<
-		FullClient,
-		FullBackend,
-		FullSelectChain,
-		BasicQueue<Block>,
-		sc_transaction_pool::FullPool<Block, FullClient>,
-		(
-			UlxBlockImport,
-			UlxAux<Block, FullClient>,
-			sc_consensus_grandpa::LinkHalf<Block, FullClient, FullSelectChain>,
-			Option<Telemetry>,
-		),
-	>,
-	ServiceError,
-> {
+	bitcoin_rpc_url: String,
+) -> Result<Service, ServiceError> {
 	let telemetry = config
 		.telemetry_endpoints
 		.clone()
@@ -102,12 +104,34 @@ pub fn new_partial(
 		telemetry.as_ref().map(|x| x.handle()),
 	)?;
 
+	let bitcoin_url = Url::parse(&bitcoin_rpc_url).map_err(|e| {
+		ServiceError::Other(format!(
+			"Unable to parse bitcoin rpc url ({}) {:?}",
+			bitcoin_rpc_url, e
+		))
+	})?;
+	let bitcoin_auth = match (bitcoin_url.username(), bitcoin_url.password()) {
+		(user, password) =>
+			if !user.is_empty() {
+				Some((user.to_string(), password.unwrap_or_default().to_string()))
+			} else {
+				None
+			},
+	};
+	let utxo_tracker = UtxoTracker::new(bitcoin_url.origin().unicode_serialization(), bitcoin_auth)
+		.map_err(|e| {
+			ServiceError::Other(format!("Failed to initialize bitcoin monitoring {:?}", e))
+		})?;
+
+	let utxo_tracker = Arc::new(utxo_tracker);
+
 	let aux_client = UlxAux::<Block, _>::new(client.clone());
 	let ulx_block_import = UlxBlockImport::new(
 		grandpa_block_import.clone(),
 		client.clone(),
 		aux_client.clone(),
 		select_chain.clone(),
+		utxo_tracker.clone(),
 	);
 
 	let import_queue = UlxImportQueue::<Block>::new(
@@ -127,15 +151,18 @@ pub fn new_partial(
 		keystore_container,
 		select_chain,
 		transaction_pool,
-		other: (ulx_block_import, aux_client, grandpa_link, telemetry),
+		other: (ulx_block_import, aux_client, utxo_tracker, grandpa_link, telemetry),
 	})
 }
 
 /// Builds a new service for a full client.
-pub fn new_full(
+pub fn new_full<
+	N: sc_network::NetworkBackend<Block, <Block as sp_runtime::traits::Block>::Hash>,
+>(
 	config: Configuration,
 	mining_account_id: Option<AccountId>,
 	mining_threads: Option<u32>,
+	bitcoin_rpc_url: String,
 ) -> Result<TaskManager, ServiceError> {
 	let sc_service::PartialComponents {
 		client,
@@ -145,16 +172,28 @@ pub fn new_full(
 		import_queue,
 		keystore_container,
 		select_chain,
-		other: (ulx_block_import, aux_client, grandpa_link, mut telemetry),
-	} = new_partial(&config)?;
+		other: (ulx_block_import, aux_client, utxo_tracker, grandpa_link, mut telemetry),
+	} = new_partial(&config, bitcoin_rpc_url)?;
 
-	let mut net_config = sc_network::config::FullNetworkConfiguration::new(&config.network);
+	let metrics = N::register_notification_metrics(config.prometheus_registry());
+	let mut net_config = sc_network::config::FullNetworkConfiguration::<
+		Block,
+		<Block as sp_runtime::traits::Block>::Hash,
+		N,
+	>::new(&config.network);
+	let peer_store_handle = net_config.peer_store_handle();
+
 	let grandpa_protocol_name = sc_consensus_grandpa::protocol_standard_name(
 		&client.block_hash(0).ok().flatten().expect("Genesis block exists; qed"),
 		&config.chain_spec,
 	);
+
 	let (grandpa_protocol_config, grandpa_notification_service) =
-		sc_consensus_grandpa::grandpa_peers_set_config(grandpa_protocol_name.clone());
+		sc_consensus_grandpa::grandpa_peers_set_config::<_, N>(
+			grandpa_protocol_name.clone(),
+			metrics.clone(),
+			Arc::clone(&peer_store_handle),
+		);
 	net_config.add_notification_protocol(grandpa_protocol_config);
 
 	let warp_sync = Arc::new(sc_consensus_grandpa::warp_proof::NetworkProvider::new(
@@ -173,6 +212,7 @@ pub fn new_full(
 			block_announce_validator_builder: None,
 			warp_sync_params: Some(WarpSyncParams::WithProvider(warp_sync)),
 			block_relay: None,
+			metrics,
 		})?;
 
 	if config.offchain_worker.enabled {
@@ -187,7 +227,7 @@ pub fn new_full(
 				transaction_pool: Some(OffchainTransactionPoolFactory::new(
 					transaction_pool.clone(),
 				)),
-				network_provider: network.clone(),
+				network_provider: Arc::new(network.clone()),
 				enable_http_requests: true,
 				custom_extensions: |_| vec![],
 			})
@@ -271,6 +311,7 @@ pub fn new_full(
 					sync_service.clone(),
 					block_author.clone(),
 					sync_service.clone(),
+					utxo_tracker.clone(),
 					block_seconds,
 				);
 
@@ -301,6 +342,7 @@ pub fn new_full(
 				sync_service.clone(),
 				block_seconds,
 				create_block_stream,
+				utxo_tracker.clone(),
 			);
 
 			task_manager.spawn_essential_handle().spawn_blocking(

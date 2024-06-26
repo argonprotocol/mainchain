@@ -68,6 +68,9 @@ impl AuthorityProvider<BlockSealAuthorityId, Block, AccountId32> for StaticAutho
 	fn get_rewards_account(_author: AccountId32) -> Option<AccountId32> {
 		None
 	}
+	fn get_all_rewards_accounts() -> Vec<AccountId32> {
+		vec![]
+	}
 }
 
 pub struct NotaryProviderImpl;

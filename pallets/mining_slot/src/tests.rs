@@ -2,7 +2,7 @@ use std::collections::HashMap;
 
 use frame_support::{
 	assert_err, assert_noop, assert_ok,
-	traits::{Currency, OnInitialize, OneSessionHandler},
+	traits::{fungible::InspectHold, Currency, OnInitialize, OneSessionHandler},
 };
 use pallet_balances::Event as UlixeeBalancesEvent;
 use sp_core::{bounded_vec, U256};
@@ -10,7 +10,6 @@ use sp_runtime::{testing::UintAuthorityId, BoundedVec};
 
 use ulx_primitives::{
 	block_seal::{MiningAuthority, MiningRegistration, RewardDestination},
-	bond::BondProvider,
 	AuthorityProvider, BlockSealAuthorityId,
 };
 
@@ -20,7 +19,7 @@ use crate::{
 		AccountIndexLookup, ActiveMinersByIndex, ActiveMinersCount, AuthoritiesByIndex,
 		IsNextSlotBiddingOpen, NextSlotCohort, OwnershipBondAmount,
 	},
-	Error, Event,
+	Error, Event, HoldReason, MiningSlotBid,
 };
 
 #[test]
@@ -288,25 +287,12 @@ fn it_unbonds_accounts_when_a_window_closes() {
 
 		System::set_block_number(7);
 
-		let mut bond_2: BondId = 0;
-		let mut bond_3: BondId = 0;
 		for i in 0..4u32 {
 			let account_id: u64 = (i).into();
 			set_ownership(account_id, 1000u32.into());
 			set_argons(account_id, 10_000u32.into());
 
 			let bond_amount = (1000u32 + i).into();
-			let bond_id = match <Bonds as BondProvider>::bond_self(account_id, bond_amount, 10) {
-				Ok(id) => id,
-				Err(_) => panic!("bond should exist"),
-			};
-			if account_id == 2u64 {
-				bond_2 = bond_id
-			}
-			if account_id == 3u64 {
-				bond_3 = bond_id
-			}
-			<Bonds as BondProvider>::lock_bond(bond_id).expect("bond should lock");
 			let ownership_tokens =
 				MiningSlots::hold_ownership_bond(&account_id, None).ok().unwrap();
 
@@ -314,8 +300,7 @@ fn it_unbonds_accounts_when_a_window_closes() {
 				i,
 				MiningRegistration {
 					account_id,
-
-					bond_id: Some(bond_id),
+					bond_id: None,
 					ownership_tokens,
 					bond_amount,
 					reward_destination: RewardDestination::Owner,
@@ -327,12 +312,7 @@ fn it_unbonds_accounts_when_a_window_closes() {
 		IsNextSlotBiddingOpen::<Test>::set(true);
 		assert_eq!(MiningSlots::get_slot_era(), (8, 8 + (2 * 3)));
 
-		<Bonds as BondProvider>::extend_bond(bond_2, 2, 1010, 16).expect("can increase bond");
-		assert_ok!(MiningSlots::bid(
-			RuntimeOrigin::signed(2),
-			Some(bond_2),
-			RewardDestination::Owner
-		));
+		assert_ok!(MiningSlots::bid(RuntimeOrigin::signed(2), None, RewardDestination::Owner));
 
 		System::set_block_number(8);
 
@@ -342,49 +322,36 @@ fn it_unbonds_accounts_when_a_window_closes() {
 			Event::NewMiners {
 				start_index: 2,
 				new_miners: BoundedVec::truncate_from(vec![MiningRegistration {
-					bond_id: Some(bond_2),
+					bond_id: None,
 					account_id: 2,
 					ownership_tokens: 1000u32.into(),
-					bond_amount: 1010,
+					bond_amount: 0,
 					reward_destination: RewardDestination::Owner,
 				}]),
 			}
 			.into(),
 		);
 
-		let events = frame_system::Pallet::<Test>::events();
-		// compare to the last event record
-		let events =
-			&events[events.len() - 4..].iter().map(|a| a.event.clone()).collect::<Vec<_>>();
-		assert_eq!(
-			events[0],
+		System::assert_has_event(
 			UlixeeBalancesEvent::<Test, UlixeeToken>::Endowed {
 				account: 3,
-				free_balance: 1000u32.into()
+				free_balance: 1000u32.into(),
 			}
-			.into()
+			.into(),
 		);
 
-		assert_eq!(
-			events[2],
+		System::assert_has_event(
 			Event::<Test>::UnbondedMiner {
 				account_id: 3,
-				bond_id: Some(bond_3),
-				kept_ownership_bond: false
+				bond_id: None,
+				kept_ownership_bond: false,
 			}
-			.into()
+			.into(),
 		);
 		assert_eq!(UlixeeBalances::free_balance(2), 0);
 		assert_eq!(UlixeeBalances::total_balance(&2), 1000);
-		assert_eq!(ArgonBalances::free_balance(2), 8990);
-
-		let bond2 = <Bonds as BondProvider>::get_bond(bond_2).expect("bond should exist");
-		assert!(bond2.is_locked);
 
 		assert_eq!(UlixeeBalances::free_balance(3), 1000);
-		assert_eq!(ArgonBalances::free_balance(3), 8997);
-		let bond3 = <Bonds as BondProvider>::get_bond(bond_3).expect("bond should exist");
-		assert!(!bond3.is_locked);
 
 		assert!(System::account_exists(&0));
 		assert!(System::account_exists(&1));
@@ -394,7 +361,7 @@ fn it_unbonds_accounts_when_a_window_closes() {
 }
 
 #[test]
-fn it_can_take_cohort_bids() {
+fn it_holds_ownership_shares_for_a_slot() {
 	BlocksBetweenSlots::set(3);
 	MaxMiners::set(6);
 	MaxCohortSize::set(2);
@@ -441,7 +408,7 @@ fn it_can_take_cohort_bids() {
 }
 
 #[test]
-fn it_wont_let_you_use_ownership_shares_for_two_bids() {
+fn it_wont_let_you_reuse_ownership_shares_for_two_bids() {
 	BlocksBetweenSlots::set(4);
 	MaxMiners::set(6);
 	MaxCohortSize::set(2);
@@ -485,7 +452,7 @@ fn it_wont_let_you_use_ownership_shares_for_two_bids() {
 
 		assert_err!(
 			MiningSlots::bid(RuntimeOrigin::signed(1), None, RewardDestination::Owner),
-			Error::<Test>::CannotRegisteredOverlappingSessions
+			Error::<Test>::CannotRegisterOverlappingSessions
 		);
 		assert!(System::account_exists(&1));
 		assert!(System::account_exists(&2));
@@ -509,26 +476,16 @@ fn it_will_order_bids_with_argon_bonds() {
 		IsNextSlotBiddingOpen::<Test>::set(true);
 
 		set_ownership(1, 1000u32.into());
-		set_argons(1, 10_000u32.into());
 		set_ownership(2, 1000u32.into());
-		set_argons(2, 10_000u32.into());
 		set_ownership(3, 1000u32.into());
-		set_argons(3, 10_000u32.into());
 
 		MiningSlots::on_initialize(3);
 		assert_eq!(OwnershipBondAmount::<Test>::get(), 400);
 
 		// 1. Account 1 bids
-		let bond_until_block = MiningSlots::get_slot_era().1;
-		let acc_1_bond_id =
-			match <Bonds as BondProvider>::bond_self(1, 1000u32.into(), bond_until_block) {
-				Ok(id) => id,
-				Err(_) => panic!("bond should exist"),
-			};
-
 		assert_ok!(MiningSlots::bid(
 			RuntimeOrigin::signed(1),
-			Some(acc_1_bond_id),
+			Some(MiningSlotBid { vault_id: 1, amount: 1000u32.into() }),
 			RewardDestination::Owner
 		));
 		System::assert_last_event(
@@ -536,17 +493,14 @@ fn it_will_order_bids_with_argon_bonds() {
 		);
 		assert_eq!(UlixeeBalances::free_balance(1), 600);
 
-		let bond = <Bonds as BondProvider>::get_bond(acc_1_bond_id).expect("bond should exist");
-		assert!(bond.is_locked);
+		assert_eq!(Bonds::get().len(), 1);
 
 		// 2. Account 2 bids highest and takes top slot
-		let acc_2_bond_id =
-			<Bonds as BondProvider>::bond_self(2, 1_001_u32.into(), bond_until_block).ok();
 
 		// should be able to re-register
 		assert_ok!(MiningSlots::bid(
 			RuntimeOrigin::signed(2),
-			acc_2_bond_id,
+			Some(MiningSlotBid { vault_id: 1, amount: 1001u32.into() }),
 			RewardDestination::Owner
 		));
 		System::assert_last_event(
@@ -559,13 +513,11 @@ fn it_will_order_bids_with_argon_bonds() {
 		);
 
 		// 3. Account 2 bids above 1
-		let acc_3_bond_id =
-			<Bonds as BondProvider>::bond_self(3, 1_001_u32.into(), bond_until_block).ok();
 
 		// should be able to re-register
 		assert_ok!(MiningSlots::bid(
 			RuntimeOrigin::signed(3),
-			acc_3_bond_id,
+			Some(MiningSlotBid { vault_id: 1, amount: 1001u32.into() }),
 			RewardDestination::Owner
 		));
 		System::assert_last_event(
@@ -577,17 +529,31 @@ fn it_will_order_bids_with_argon_bonds() {
 			vec![2, 3]
 		);
 
-		let bond_1 = <Bonds as BondProvider>::get_bond(acc_1_bond_id).expect("bond should exist");
-		assert!(!bond_1.is_locked, "bond should be unlocked");
+		let bonds = Bonds::get();
+		let acc_3_bond_id = bonds.iter().find(|(_, _, a, _)| *a == 3).map(|a| a.0);
+		assert!(bonds.iter().find(|(_, _, a, _)| *a == 1).is_none());
+		assert_eq!(bonds.len(), 2);
+		{
+			let events = frame_system::Pallet::<Test>::events();
+			let frame_system::EventRecord { event, .. } = &events[events.len() - 2];
+			assert_eq!(
+				event,
+				&<Test as frame_system::Config>::RuntimeEvent::from(
+					Event::<Test>::SlotBidderReplaced {
+						bond_id: Some(1u64),
+						account_id: 1u64,
+						kept_ownership_bond: false,
+					}
+				)
+			);
+		}
 		assert_eq!(UlixeeBalances::free_balance(1), 1000);
-		assert_eq!(ArgonBalances::free_balance(1), 9000); // should still be locked up
+		assert_eq!(UlixeeBalances::hold_available(&HoldReason::RegisterAsMiner.into(), &1), true);
 
 		// 4. Account 1 increases bid and resubmits
-		<Bonds as BondProvider>::extend_bond(acc_1_bond_id, 1, 1002, bond_until_block)
-			.expect("can increse bond");
 		assert_ok!(MiningSlots::bid(
 			RuntimeOrigin::signed(1),
-			Some(acc_1_bond_id),
+			Some(MiningSlotBid { vault_id: 1, amount: 1002u32.into() }),
 			RewardDestination::Owner
 		));
 
@@ -604,7 +570,6 @@ fn it_will_order_bids_with_argon_bonds() {
 				}
 			)
 		);
-		assert_eq!(ArgonBalances::free_balance(1), 8998); // should still be locked up
 
 		System::assert_last_event(
 			Event::SlotBidderAdded { account_id: 1, bid_amount: 1002u32.into(), index: 0 }.into(),

@@ -8,12 +8,12 @@ use sp_runtime::{
 use ulx_node_runtime::{AccountId, NotebookVerifyError};
 use ulx_primitives::{
 	digests::{
-		BlockVoteDigest, FinalizedBlockNeededDigest, BLOCK_VOTES_DIGEST_ID,
-		FINALIZED_BLOCK_DIGEST_ID, NOTEBOOKS_DIGEST_ID, PARENT_VOTING_KEY_DIGEST, TICK_DIGEST_ID,
+		BlockVoteDigest, FinalizedBlockNeededDigest, AUTHOR_DIGEST_ID, BLOCK_SEAL_DIGEST_ID,
+		BLOCK_VOTES_DIGEST_ID, FINALIZED_BLOCK_DIGEST_ID, NOTEBOOKS_DIGEST_ID,
+		PARENT_VOTING_KEY_DIGEST, TICK_DIGEST_ID,
 	},
 	tick::Tick,
-	BlockSealDigest, NotebookDigest, ParentVotingKeyDigest, TickDigest, AUTHOR_DIGEST_ID,
-	BLOCK_SEAL_DIGEST_ID,
+	BlockSealDigest, NotebookDigest, ParentVotingKeyDigest, TickDigest,
 };
 
 use crate::error::Error;

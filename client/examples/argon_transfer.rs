@@ -1,12 +1,12 @@
 use subxt::{tx::TxStatus, Config, OnlineClient};
 use subxt_signer::sr25519::dev;
 
-use ulixee_client::{api, local_client, UlxConfig, UlxExtrinsicParamsBuilder};
+use ulixee_client::{api, UlxConfig, UlxExtrinsicParamsBuilder, UlxOnlineClient};
 
 #[tokio::main]
 async fn main() -> Result<(), Box<dyn std::error::Error>> {
 	// Create a client to use:
-	let client = local_client().await?;
+	let client = UlxOnlineClient::new().await?;
 
 	let account = dev::bob().public_key().into();
 

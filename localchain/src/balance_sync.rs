@@ -740,8 +740,7 @@ impl BalanceSync {
         .map(|a| a.unwrap());
 
     for balance_change in notarization.balance_changes.iter() {
-      let _ =
-        OpenEscrowsStore::db_record_notarized(&mut tx, balance_change, notarization_id).await;
+      let _ = OpenEscrowsStore::db_record_notarized(&mut tx, balance_change, notarization_id).await;
 
       BalanceChangeStore::tx_upsert_notarized(
         &mut tx,

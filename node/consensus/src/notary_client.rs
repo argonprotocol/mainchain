@@ -5,6 +5,7 @@ use log::{info, trace, warn};
 use sc_client_api::AuxStore;
 use sc_utils::mpsc::TracingUnboundedSender;
 use sp_api::ProvideRuntimeApi;
+use sp_blockchain::HeaderBackend;
 use sp_core::blake2_256;
 use sp_runtime::traits::Block as BlockT;
 use tokio::sync::Mutex;
@@ -444,7 +445,7 @@ pub async fn get_notebook_header_data<B: BlockT, C, AccountId: Codec>(
 	submitting_tick: Tick,
 ) -> Result<NotebookHeaderData<NotebookVerifyError, BlockNumber>, Error<B>>
 where
-	C: ProvideRuntimeApi<B> + AuxStore + 'static,
+	C: ProvideRuntimeApi<B> + HeaderBackend<B> + AuxStore + 'static,
 	C::Api: NotebookApis<B, NotebookVerifyError>
 		+ NotaryApis<B, NotaryRecordT>
 		+ BlockSealApis<B, AccountId, BlockSealAuthorityId>,
@@ -452,6 +453,7 @@ where
 	let latest_notebooks_in_runtime = client.runtime_api().latest_notebook_by_notary(*best_hash)?;
 	let mut headers = NotebookHeaderData::default();
 	let mut tick_notebooks = vec![];
+	let finalized_block = client.info().finalized_number;
 
 	let notaries = client.runtime_api().notaries(*best_hash)?;
 	for notary in notaries {
@@ -461,6 +463,7 @@ where
 			notary.notary_id,
 			*latest_runtime_notebook_number,
 			submitting_tick,
+			finalized_block,
 		)?;
 
 		let missing_notebooks =

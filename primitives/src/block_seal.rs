@@ -1,6 +1,6 @@
-use codec::{Decode, Encode, MaxEncodedLen};
-use frame_support::Parameter;
-use frame_support_procedural::{CloneNoBound, EqNoBound, PartialEqNoBound};
+use crate::BondId;
+use codec::{Codec, Decode, Encode, MaxEncodedLen};
+use frame_support::{CloneNoBound, EqNoBound, Parameter, PartialEqNoBound};
 use scale_info::TypeInfo;
 use serde::{Deserialize, Serialize};
 use sp_application_crypto::AppCrypto;
@@ -32,11 +32,7 @@ pub const BLOCK_SEAL_CRYPTO_ID: CryptoTypeId = <app::Public as AppCrypto>::CRYPT
 )]
 #[scale_info(skip_type_params(MaxHosts))]
 #[derive(Deserialize, Serialize)]
-pub struct MiningRegistration<
-	AccountId: Parameter,
-	BondId: Parameter,
-	Balance: Parameter + MaxEncodedLen,
-> {
+pub struct MiningRegistration<AccountId: Parameter, Balance: Parameter + MaxEncodedLen> {
 	pub account_id: AccountId,
 	pub reward_destination: RewardDestination<AccountId>,
 	pub bond_id: Option<BondId>,
@@ -85,4 +81,11 @@ pub struct MiningAuthority<AuthorityId, AccountId> {
 	pub authority_index: MinerIndex,
 	pub authority_id: AuthorityId,
 	pub account_id: AccountId,
+}
+
+#[derive(Encode, Decode, Clone, PartialEq, Eq, TypeInfo, MaxEncodedLen, RuntimeDebug)]
+pub struct BlockPayout<AccountId: Codec, Balance: Codec> {
+	pub account_id: AccountId,
+	pub ulixees: Balance,
+	pub argons: Balance,
 }

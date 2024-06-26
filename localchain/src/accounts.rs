@@ -564,7 +564,7 @@ mod test {
 
   #[sqlx::test]
   async fn can_update_an_origin(pool: SqlitePool) -> Result<()> {
-    let mut db = &mut *pool.acquire().await?;
+    let db = &mut *pool.acquire().await?;
     let account = AccountStore::db_insert(
       db,
       AccountStore::to_address(&Bob.to_account_id()),
@@ -579,9 +579,7 @@ mod test {
     AccountStore::db_update_origin(db, account.id, 1, 1).await?;
 
     assert_eq!(
-      AccountStore::db_get_by_id(db, account.id)
-        .await?
-        .origin,
+      AccountStore::db_get_by_id(db, account.id).await?.origin,
       Some(NotaryAccountOrigin {
         notary_id: 1,
         notebook_number: 1,

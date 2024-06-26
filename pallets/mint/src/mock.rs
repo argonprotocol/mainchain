@@ -1,7 +1,13 @@
 use env_logger::{Builder, Env};
-use frame_support::{derive_impl, parameter_types, traits::Currency};
-use sp_core::ConstU32;
+use frame_support::{derive_impl, parameter_types};
+use pallet_balances::AccountData;
+use sp_arithmetic::{FixedI128, FixedU128};
+use sp_core::U256;
 use sp_runtime::BuildStorage;
+
+use ulx_primitives::{
+	block_seal::MiningAuthority, AuthorityProvider, BlockSealAuthorityId, PriceProvider,
+};
 
 use crate as pallet_mint;
 
@@ -13,31 +19,30 @@ frame_support::construct_runtime!(
 	pub enum Test
 	{
 		System: frame_system,
-		Balances: pallet_balances::<Instance1>::{Pallet, Call, Storage, Config<T>, Event<T>},
-		Mint: pallet_mint
+		Balances: pallet_balances,
+		UlixeeMint: pallet_mint
 	}
 );
 
 #[derive_impl(frame_system::config_preludes::TestDefaultConfig as frame_system::DefaultConfig)]
 impl frame_system::Config for Test {
 	type Block = Block;
+	type AccountData = AccountData<Balance>;
 }
 
 parameter_types! {
-
 	pub static ExistentialDeposit: Balance = 10;
 }
 
-type UlixeeToken = pallet_balances::Instance1;
-impl pallet_balances::Config<UlixeeToken> for Test {
-	type MaxLocks = ConstU32<0>;
-	type MaxReserves = ConstU32<0>;
+impl pallet_balances::Config for Test {
+	type MaxLocks = ();
+	type MaxReserves = ();
 	type ReserveIdentifier = ();
 	type Balance = Balance;
 	type RuntimeEvent = RuntimeEvent;
 	type DustRemoval = ();
 	type ExistentialDeposit = ExistentialDeposit;
-	type AccountStore = Mint;
+	type AccountStore = System;
 	type WeightInfo = ();
 	type FreezeIdentifier = ();
 	type MaxFreezes = ();
@@ -45,18 +50,54 @@ impl pallet_balances::Config<UlixeeToken> for Test {
 	type RuntimeFreezeReason = RuntimeFreezeReason;
 }
 
-pub fn set_argons(account_id: u64, amount: Balance) {
-	let _ = Balances::make_free_balance_be(&account_id, amount);
-	drop(Balances::issue(amount));
+parameter_types! {
+	pub static MaxPendingMintUtxos: u32 = 10;
+	pub static BitcoinPricePerUsd: Option<FixedU128> = Some(FixedU128::from_float(62000.00));
+	pub static ArgonPricePerUsd: Option<FixedU128> = Some(FixedU128::from_float(1.00));
+	pub static ArgonCPI: Option<ulx_primitives::ArgonCPI> = Some(FixedI128::from_float(1.00));
+	pub static Miners: Vec<u64> = vec![];
+}
+
+pub struct StaticPriceProvider;
+impl PriceProvider<Balance> for StaticPriceProvider {
+	fn get_argon_cpi_price() -> Option<ulx_primitives::ArgonCPI> {
+		ArgonCPI::get()
+	}
+	fn get_latest_argon_price_in_us_cents() -> Option<FixedU128> {
+		ArgonPricePerUsd::get()
+	}
+	fn get_latest_btc_price_in_us_cents() -> Option<FixedU128> {
+		BitcoinPricePerUsd::get()
+	}
+}
+
+pub struct MiningProvider;
+impl AuthorityProvider<BlockSealAuthorityId, Block, u64> for MiningProvider {
+	fn get_authority(_author: u64) -> Option<BlockSealAuthorityId> {
+		todo!()
+	}
+
+	fn get_rewards_account(_author: u64) -> Option<u64> {
+		todo!()
+	}
+
+	fn xor_closest_authority(_author: U256) -> Option<MiningAuthority<BlockSealAuthorityId, u64>> {
+		todo!()
+	}
+
+	fn get_all_rewards_accounts() -> Vec<u64> {
+		Miners::get()
+	}
 }
 
 impl pallet_mint::Config for Test {
 	type RuntimeEvent = RuntimeEvent;
 	type WeightInfo = ();
 	type Currency = Balances;
-	type RuntimeHoldReason = RuntimeHoldReason;
 	type Balance = Balance;
-	type UlixeeTokenStorage = pallet_balances::Account<Test, UlixeeToken>;
+	type MaxPendingMintUtxos = MaxPendingMintUtxos;
+	type PriceProvider = StaticPriceProvider;
+	type MiningProvider = MiningProvider;
 }
 
 // Build genesis storage according to the mock runtime.

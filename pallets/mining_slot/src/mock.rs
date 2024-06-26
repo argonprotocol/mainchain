@@ -3,8 +3,13 @@ use frame_support::{
 	derive_impl, parameter_types,
 	traits::{Currency, StorageMapShim},
 };
-use sp_core::{ConstU32, ConstU64};
+use frame_system::pallet_prelude::BlockNumberFor;
+use sp_core::ConstU32;
 use sp_runtime::BuildStorage;
+use ulx_primitives::{
+	bond::{BondError, BondProvider},
+	VaultId,
+};
 
 use crate as pallet_mining_slot;
 use crate::Registration;
@@ -19,7 +24,6 @@ frame_support::construct_runtime!(
 		MiningSlots: pallet_mining_slot,
 		ArgonBalances: pallet_balances::<Instance1>,
 		UlixeeBalances: pallet_balances::<Instance2>,
-		Bonds: pallet_bond
 	}
 );
 
@@ -37,8 +41,6 @@ parameter_types! {
 	pub const OwnershipPercentDamper: u32 = 80;
 
 	pub static ExistentialDeposit: Balance = 1;
-	pub const BondReserveIdentifier:[u8; 8] = *b"bondfund";
-	pub const OwnershipReserveIdentifier:[u8; 8] = *b"bondownr";
 	pub const MinimumBondAmount:u128 = 1_000;
 }
 
@@ -93,18 +95,37 @@ impl pallet_balances::Config<UlixeeToken> for Test {
 	type RuntimeFreezeReason = RuntimeFreezeReason;
 }
 
-impl pallet_bond::Config for Test {
-	type RuntimeEvent = RuntimeEvent;
-	type WeightInfo = ();
-	type Currency = ArgonBalances;
-	type RuntimeHoldReason = RuntimeHoldReason;
-	type BondFundId = u32;
-	type BondId = BondId;
-	type MinimumBondAmount = MinimumBondAmount;
-	type MaxConcurrentlyExpiringBonds = ConstU32<10>;
-	type MaxConcurrentlyExpiringBondFunds = ConstU32<10>;
-	type BlocksPerYear = ConstU64<525_600>;
-	type Balance = u128;
+parameter_types! {
+	pub static Bonds: Vec<(BondId, VaultId, u64, Balance)> = vec![];
+	pub static NextBondId: u64 = 1;
+}
+
+pub struct StaticBondProvider;
+impl BondProvider for StaticBondProvider {
+	type Balance = Balance;
+	type AccountId = u64;
+	type BlockNumber = BlockNumberFor<Test>;
+
+	fn bond_mining_slot(
+		vault_id: VaultId,
+		account_id: Self::AccountId,
+		amount: Self::Balance,
+		_bond_until_block: Self::BlockNumber,
+	) -> Result<ulx_primitives::BondId, BondError> {
+		let bond_id = NextBondId::get();
+		NextBondId::set(bond_id + 1);
+		Bonds::mutate(|a| a.push((bond_id, vault_id, account_id, amount)));
+		Ok(bond_id)
+	}
+
+	fn cancel_bond(bond_id: ulx_primitives::BondId) -> Result<(), BondError> {
+		Bonds::mutate(|a| {
+			if let Some(pos) = a.iter().position(|(id, _, _, _)| *id == bond_id) {
+				a.remove(pos);
+			}
+		});
+		Ok(())
+	}
 }
 
 impl pallet_mining_slot::Config for Test {
@@ -119,8 +140,7 @@ impl pallet_mining_slot::Config for Test {
 	type OwnershipPercentDamper = OwnershipPercentDamper;
 	type BlocksBufferToStopAcceptingBids = BlocksBufferToStopAcceptingBids;
 	type Balance = Balance;
-	type BondId = BondId;
-	type BondProvider = Bonds;
+	type BondProvider = StaticBondProvider;
 }
 
 // Build genesis storage according to the mock runtime.

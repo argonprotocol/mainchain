@@ -172,8 +172,7 @@ fn it_requires_the_nonce_to_match() {
 		let block_vote = default_vote();
 		let parent_voting_key = H256::random();
 		ParentVotingKey::<Test>::set(Some(parent_voting_key));
-		let seal_strength =
-			block_vote.get_seal_strength(1, parent_voting_key) + U256::from(1u32);
+		let seal_strength = block_vote.get_seal_strength(1, parent_voting_key) + U256::from(1u32);
 		System::initialize(
 			&4,
 			&System::parent_hash(),
@@ -375,10 +374,7 @@ fn it_creates_the_next_parent_key() {
 
 		// add notebook 2/2 at tick 3
 		NotebooksAtTick::mutate(|a| {
-			a.insert(
-				3,
-				vec![(1, 2, Some(book1_secret)), (2, 2, Some(book2_secret))],
-			);
+			a.insert(3, vec![(1, 2, Some(book1_secret)), (2, 2, Some(book2_secret))]);
 		});
 
 		BlockSeal::on_finalize(3);

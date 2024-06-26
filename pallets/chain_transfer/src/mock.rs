@@ -109,6 +109,7 @@ impl NotebookProvider for StaticNotebookProvider {
 		false
 	}
 }
+
 impl pallet_chain_transfer::Config for Test {
 	type RuntimeEvent = RuntimeEvent;
 	type WeightInfo = ();
@@ -119,6 +120,7 @@ impl pallet_chain_transfer::Config for Test {
 	type PalletId = LocalchainPalletId;
 	type TransferExpirationBlocks = TransferExpirationBlocks;
 	type NotebookProvider = StaticNotebookProvider;
+	type EventHandler = ();
 }
 
 // Build genesis storage according to the mock runtime.

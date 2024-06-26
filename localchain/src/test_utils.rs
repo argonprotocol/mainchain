@@ -333,10 +333,7 @@ impl MockNotary {
       );
 
       notary_state.balance_tips.insert(
-        LocalchainAccountId::new(
-          balance_tip.account_id.clone(),
-          balance_tip.account_type,
-        ),
+        LocalchainAccountId::new(balance_tip.account_id.clone(), balance_tip.account_type),
         BalanceTipResult {
           tick: notebook_number,
           balance_tip: balance_tip.tip().into(),
@@ -445,8 +442,7 @@ impl LocalchainRpcServer for MockNotary {
     for change in balance_changeset {
       if change.change_number == 1 {
         let id = state.accounts.len() + 1;
-        let account_id =
-          LocalchainAccountId::new(change.account_id.clone(), change.account_type);
+        let account_id = LocalchainAccountId::new(change.account_id.clone(), change.account_type);
         let not = NewAccountOrigin {
           account_id: change.account_id,
           account_type: change.account_type,
@@ -575,17 +571,13 @@ impl NotebookRpcServer for MockNotary {
     notebook_number: NotebookNumber,
   ) -> Result<SignedNotebookHeader, ErrorObjectOwned> {
     let state = self.state.lock().await;
-    state
-      .headers
-      .get(&notebook_number)
-      .cloned()
-      .ok_or_else(|| {
-        ErrorObjectOwned::owned(
-          -32000,
-          "MockNotary header not set".to_string(),
-          None::<String>,
-        )
-      })
+    state.headers.get(&notebook_number).cloned().ok_or_else(|| {
+      ErrorObjectOwned::owned(
+        -32000,
+        "MockNotary header not set".to_string(),
+        None::<String>,
+      )
+    })
   }
 
   async fn get_raw_headers(

@@ -25,6 +25,9 @@ hex = { workspace = true }
 jsonrpsee = { workspace = true, features = ["server", "ws-client", "macros", "client-ws-transport-native-tls", "client-ws-transport-webpki-tls"] } # needs to be in sync with subxt
 tracing = { workspace = true }
 tracing-subscriber = { workspace = true }
+sp-core = { workspace = true, features = ["default"] }
+sp-arithmetic = { workspace = true, features = ["default"] }
+ulx-primitives = { workspace = true, features = ["default"] }
 
 anyhow = { workspace = true, features = ["default"] }
 tokio = { workspace = true }
@@ -32,6 +35,5 @@ tokio = { workspace = true }
 [dev-dependencies]
 sp-keyring = { workspace = true }
 tokio = { workspace = true, features = ["test-util"] }
-sp-core = { workspace = true, features = ["default"] }
 ulx-testing = { workspace = true }
 subxt-signer = { workspace = true }

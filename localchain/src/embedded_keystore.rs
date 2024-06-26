@@ -94,8 +94,7 @@ impl EmbeddedKeystore {
     password: Option<SecretString>,
   ) -> Result<String> {
     let mut pass_str = password.clone().map(|x| x.expose_secret().clone());
-    let (pair, phrase) =
-      PairWrapper::generate_with_phrase(pass_str.as_deref(), crypto_scheme);
+    let (pair, phrase) = PairWrapper::generate_with_phrase(pass_str.as_deref(), crypto_scheme);
 
     let address = pair.address();
     self

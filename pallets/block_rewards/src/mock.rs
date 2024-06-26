@@ -147,6 +147,7 @@ impl pallet_block_rewards::Config for Test {
 	type RuntimeFreezeReason = RuntimeFreezeReason;
 	type CurrentTick = CurrentTick;
 	type NotebookProvider = TestProvider;
+	type EventHandler = ();
 }
 
 // Build genesis storage according to the mock runtime.

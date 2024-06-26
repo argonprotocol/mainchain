@@ -1,451 +1,628 @@
 use frame_support::{
-	assert_noop, assert_ok,
-	traits::{
-		fungible::{Inspect, InspectHold, Mutate},
-		tokens::Preservation,
-		OnInitialize,
-	},
+	assert_err, assert_ok,
+	pallet_prelude::*,
+	traits::fungible::{Inspect, InspectHold, Mutate},
 };
-use ulx_primitives::bond::BondProvider;
+use sp_arithmetic::{traits::Zero, FixedI128, FixedPointNumber, FixedU128};
+use sp_core::H256;
+
+use ulx_primitives::{
+	bitcoin::{
+		BitcoinCosignScriptPubkey, BitcoinPubkeyHash, BitcoinRejectedReason, BitcoinScriptPubkey,
+		BitcoinSignature, CompressedBitcoinPubkey, Satoshis, SATOSHIS_PER_BITCOIN,
+	},
+	bond::{Bond, BondExpiration, BondProvider, BondType},
+	BitcoinUtxoEvents, BondId, PriceProvider,
+};
 
 use crate::{
-	mock::{Bonds, *},
+	mock::*,
 	pallet::{
-		BondCompletions, BondFundExpirations, BondFunds, Bonds as BondsStorage, NextBondFundId,
+		BitcoinBondCompletions, BondsById, MiningBondCompletions, OwedUtxoAggrieved, UtxosById,
+		UtxosPendingUnlock,
 	},
-	Error, Event, HoldReason,
+	Error, Event, HoldReason, UtxoCosignRequest, UtxoState,
 };
 
 #[test]
-fn it_can_offer_a_fund() {
+fn can_bond_a_bitcoin_utxo() {
+	BitcoinBlockHeight::set(12);
 	new_test_ext().execute_with(|| {
-		// Go past genesis block so events get deposited
 		System::set_block_number(1);
 
-		assert_noop!(
-			Bonds::offer_fund(RuntimeOrigin::signed(1), 10, 0, 100_000, 10),
-			Error::<Test>::InsufficientFunds
+		set_argons(2, 2_000);
+		let pubkey = BitcoinPubkeyHash([1; 20]);
+
+		assert_err!(
+			Bonds::bond_bitcoin(RuntimeOrigin::signed(2), 1, 1_000, pubkey),
+			Error::<Test>::InsufficientSatoshisBonded
+		);
+		assert_ok!(Bonds::bond_bitcoin(RuntimeOrigin::signed(2), 1, SATOSHIS_PER_BITCOIN, pubkey));
+		assert_eq!(UtxosById::<Test>::get(1).unwrap(), default_utxo_state(1, SATOSHIS_PER_BITCOIN));
+		assert_eq!(
+			BondsById::<Test>::get(1).unwrap().amount,
+			StaticPriceProvider::get_bitcoin_argon_price(SATOSHIS_PER_BITCOIN)
+				.expect("should have price")
+		);
+		assert_eq!(WatchedUtxosById::get().len(), 1);
+		assert_eq!(
+			BitcoinBondCompletions::<Test>::get(
+				BitcoinBlockHeight::get() + BitcoinBondDurationBlocks::get()
+			)
+			.to_vec(),
+			vec![1]
 		);
 
-		set_argons(1, 100_010);
-
-		assert_ok!(Bonds::offer_fund(RuntimeOrigin::signed(1), 10, 0, 100_000, 10));
-		System::assert_last_event(
-			Event::BondFundOffered {
-				bond_fund_id: 1,
-				expiration_block: 10,
-				amount_offered: 100_000,
-				offer_account_id: 1,
-			}
-			.into(),
-		);
-
-		Bonds::on_initialize(1);
-		assert!(System::account_exists(&1));
-
-		assert_eq!(Balances::reserved_balance(1), 100_000);
-		assert_eq!(Balances::free_balance(1), 10);
-
-		assert_eq!(NextBondFundId::<Test>::get(), Some(2u32));
-		assert_eq!(BondFunds::<Test>::get(1).unwrap().offer_account_id, 1);
-		assert_eq!(BondFundExpirations::<Test>::get(10).into_inner(), vec![1u32]);
-
-		System::set_block_number(10);
-		Bonds::on_initialize(10);
-		System::assert_last_event(
-			Event::BondFundExpired { offer_account_id: 1, bond_fund_id: 1 }.into(),
-		);
-		assert_eq!(BondFunds::<Test>::get(1), None);
-		assert!(!BondFundExpirations::<Test>::contains_key(10));
+		// should expire if nothing happens until bitcoin end
+		System::set_block_number(2);
+		BitcoinBlockHeight::set(12 + BitcoinBondDurationBlocks::get());
+		Bonds::on_initialize(2);
+		assert_eq!(UtxosById::<Test>::get(1), None);
+		assert_eq!(BondsById::<Test>::get(1), None);
+		assert_eq!(WatchedUtxosById::get().len(), 0);
 	});
 }
 
 #[test]
-fn it_can_extend_a_fund() {
+fn cleans_up_a_rejected_bitcoin() {
+	BitcoinBlockHeight::set(12);
 	new_test_ext().execute_with(|| {
-		// Go past genesis block so events get deposited
 		System::set_block_number(1);
 
-		set_argons(1, 2000);
-		assert_ok!(Bonds::offer_fund(RuntimeOrigin::signed(1), 10, 0, 1000, 10));
+		let who = 1;
+		set_argons(who, 2_000);
+		let pubkey = BitcoinPubkeyHash([1; 20]);
 
-		Bonds::on_initialize(1);
-		assert!(System::account_exists(&1));
-		assert_eq!(Balances::reserved_balance(1), 1000);
+		assert_ok!(Bonds::bond_bitcoin(
+			RuntimeOrigin::signed(who),
+			1,
+			SATOSHIS_PER_BITCOIN,
+			pubkey
+		));
+		let price = StaticPriceProvider::get_bitcoin_argon_price(SATOSHIS_PER_BITCOIN)
+			.expect("should have price");
+		assert_eq!(DefaultVault::get().bitcoin_argons.bonded, price);
 
-		assert_noop!(
-			Bonds::extend_fund(RuntimeOrigin::signed(2), 1, 1010, 11),
+		assert_ok!(Bonds::utxo_rejected(1, BitcoinRejectedReason::LookupExpired));
+		assert_eq!(UtxosById::<Test>::get(1), None);
+		assert_eq!(BondsById::<Test>::get(1), None);
+		assert_eq!(WatchedUtxosById::get().len(), 0);
+		assert_eq!(DefaultVault::get().bitcoin_argons.bonded, 0);
+	});
+}
+
+#[test]
+fn marks_a_verified_bitcoin() {
+	BitcoinBlockHeight::set(12);
+	new_test_ext().execute_with(|| {
+		System::set_block_number(1);
+
+		let who = 1;
+		set_argons(who, 2_000);
+		let pubkey = BitcoinPubkeyHash([1; 20]);
+
+		assert_ok!(Bonds::bond_bitcoin(
+			RuntimeOrigin::signed(who),
+			1,
+			SATOSHIS_PER_BITCOIN,
+			pubkey
+		));
+		let price = StaticPriceProvider::get_bitcoin_argon_price(SATOSHIS_PER_BITCOIN)
+			.expect("should have price");
+		assert_eq!(DefaultVault::get().bitcoin_argons.bonded, price);
+
+		assert_ok!(Bonds::utxo_verified(1));
+		assert_eq!(UtxosById::<Test>::get(1).unwrap().is_verified, true);
+		assert_eq!(WatchedUtxosById::get().len(), 1);
+		assert_eq!(LastBondEvent::get(), Some((1, who, price)));
+	});
+}
+
+#[test]
+fn calculates_redemption_prices() {
+	new_test_ext().execute_with(|| {
+		BitcoinPricePerUsd::set(Some(FixedU128::saturating_from_integer(50000)));
+		ArgonPricePerUsd::set(Some(FixedU128::saturating_from_integer(1)));
+		ArgonCPI::set(Some(FixedI128::zero()));
+		{
+			let new_price = Bonds::get_redemption_price(&100_000_000).expect("should have price");
+			assert_eq!(new_price, 50_000_000);
+		}
+		ArgonPricePerUsd::set(Some(FixedU128::from_float(1.01)));
+		{
+			let new_price = Bonds::get_redemption_price(&100_000_000).expect("should have price");
+			assert_eq!(new_price, (50_000_000f64 / 1.01f64) as u128);
+		}
+		ArgonCPI::set(Some(FixedI128::from_float(0.1)));
+		{
+			let new_price = Bonds::get_redemption_price(&100_000_000).expect("should have price");
+			// round to 3 digit precision for multiplier
+			let multiplier = 0.713 * 1.01 + 0.274;
+			// NOTE: floating point yields diffferent rounding, so need to subtract 1
+			assert_eq!(new_price, (multiplier * (50_000_000.0 / 1.01)) as u128 - 1);
+		}
+	});
+}
+
+#[test]
+fn burns_a_spent_bitcoin() {
+	BitcoinBlockHeight::set(12);
+	new_test_ext().execute_with(|| {
+		System::set_block_number(1);
+
+		let who = 1;
+		set_argons(who, 2_000);
+		let pubkey = BitcoinPubkeyHash([1; 20]);
+		let allocated = DefaultVault::get().bitcoin_argons.allocated;
+
+		assert_ok!(Bonds::bond_bitcoin(
+			RuntimeOrigin::signed(who),
+			1,
+			SATOSHIS_PER_BITCOIN,
+			pubkey
+		));
+		let expiration_block = BitcoinBlockHeight::get() + BitcoinBondDurationBlocks::get();
+
+		let price = StaticPriceProvider::get_bitcoin_argon_price(SATOSHIS_PER_BITCOIN)
+			.expect("should have price");
+		assert_eq!(DefaultVault::get().bitcoin_argons.bonded, price);
+		// first verify
+		assert_ok!(Bonds::utxo_verified(1));
+
+		BitcoinPricePerUsd::set(Some(FixedU128::saturating_from_integer(50000)));
+
+		let new_price =
+			Bonds::get_redemption_price(&SATOSHIS_PER_BITCOIN).expect("should have price");
+		// 50_000_000 milligons for a bitcoin
+		// 50m * 0.987 = 49,350,000
+		assert_eq!(new_price, 49_350_000);
+
+		assert_ok!(Bonds::utxo_spent(1));
+		assert_eq!(UtxosById::<Test>::get(1), None);
+		assert_eq!(
+			BondsById::<Test>::get(1),
+			Some(Bond {
+				amount: price - new_price,
+				utxo_id: Some(1),
+				bond_type: BondType::Bitcoin,
+				total_fee: 0,
+				prepaid_fee: 0,
+				vault_id: 1,
+				expiration: BondExpiration::BitcoinBlock(expiration_block),
+				bonded_account_id: who,
+			})
+		);
+		assert_eq!(WatchedUtxosById::get().len(), 0);
+		assert_eq!(DefaultVault::get().bitcoin_argons.bonded, price - new_price);
+		assert_eq!(DefaultVault::get().bitcoin_argons.allocated, allocated - new_price);
+		// should still exist in completions
+		assert_eq!(BitcoinBondCompletions::<Test>::get(expiration_block).to_vec(), vec![1]);
+
+		System::assert_last_event(
+			Event::<Test>::BitcoinBondBurned {
+				vault_id: 1,
+				bond_id: 1,
+				utxo_id: 1,
+				amount_burned: new_price,
+				amount_held: price - new_price,
+				was_utxo_spent: true,
+			}
+			.into(),
+		);
+		BitcoinBlockHeight::set(expiration_block);
+		Bonds::on_initialize(2);
+		assert!(BitcoinBondCompletions::<Test>::get(expiration_block).is_empty());
+		assert_eq!(BondsById::<Test>::get(1), None);
+		assert_eq!(DefaultVault::get().bitcoin_argons.bonded, 0);
+		assert_eq!(DefaultVault::get().bitcoin_argons.allocated, allocated - new_price);
+	});
+}
+
+#[test]
+fn cancels_an_unverified_spent_bitcoin() {
+	BitcoinBlockHeight::set(12);
+	new_test_ext().execute_with(|| {
+		System::set_block_number(1);
+
+		let who = 1;
+		set_argons(who, 2_000);
+		let pubkey = BitcoinPubkeyHash([1; 20]);
+		let allocated = DefaultVault::get().bitcoin_argons.allocated;
+
+		assert_ok!(Bonds::bond_bitcoin(
+			RuntimeOrigin::signed(who),
+			1,
+			SATOSHIS_PER_BITCOIN,
+			pubkey
+		));
+		let bond = BondsById::<Test>::get(1).unwrap();
+		let expiration_block = match bond.expiration {
+			BondExpiration::BitcoinBlock(block) => block,
+			_ => panic!("should be bitcoin block"),
+		};
+		// spend before verify
+		assert_ok!(Bonds::utxo_spent(1));
+
+		assert_eq!(WatchedUtxosById::get().len(), 0);
+		assert_eq!(DefaultVault::get().bitcoin_argons.bonded, 0);
+		assert_eq!(DefaultVault::get().bitcoin_argons.allocated, allocated);
+		assert_eq!(BondsById::<Test>::get(1), None);
+		assert!(BitcoinBondCompletions::<Test>::get(expiration_block).is_empty());
+
+		System::assert_last_event(
+			Event::<Test>::BondCanceled {
+				vault_id: 1,
+				bond_id: 1,
+				bonded_account_id: who,
+				bond_type: BondType::Bitcoin,
+				returned_fee: 0,
+			}
+			.into(),
+		);
+	});
+}
+
+#[test]
+fn can_unlock_a_bitcoin() {
+	new_test_ext().execute_with(|| {
+		BitcoinBlockHeight::set(1);
+		System::set_block_number(1);
+
+		let pubkey = BitcoinPubkeyHash([1; 20]);
+		let who = 1;
+		set_argons(who, 2_000);
+		assert_ok!(Bonds::bond_bitcoin(
+			RuntimeOrigin::signed(who),
+			1,
+			SATOSHIS_PER_BITCOIN,
+			pubkey
+		));
+		let bond = BondsById::<Test>::get(1).unwrap();
+		let expiration_block = match bond.expiration {
+			BondExpiration::BitcoinBlock(block) => block,
+			_ => panic!("should be bitcoin block"),
+		};
+		assert_eq!(DefaultVault::get().bitcoin_argons.bonded, bond.amount);
+		// first verify
+		assert_ok!(Bonds::utxo_verified(1));
+		// Mint the argons into account
+		assert_ok!(Balances::mint_into(&who, bond.amount));
+
+		BitcoinPricePerUsd::set(Some(FixedU128::from_float(65_000.00)));
+		// now the user goes to unlock
+		// 1. We would create a psbt and output address
+		let unlock_script_pubkey = make_script_pubkey(&[0; 32]);
+		// must be the right user!
+		assert_err!(
+			Bonds::unlock_bitcoin_bond(
+				RuntimeOrigin::signed(2),
+				1,
+				unlock_script_pubkey.clone(),
+				1000
+			),
 			Error::<Test>::NoPermissions
 		);
-
-		assert_ok!(Bonds::extend_fund(RuntimeOrigin::signed(1), 1, 1010, 11));
+		// must be before the cutoff
+		BitcoinBlockHeight::set(expiration_block - 1);
+		assert_err!(
+			Bonds::unlock_bitcoin_bond(
+				RuntimeOrigin::signed(who),
+				1,
+				unlock_script_pubkey.clone(),
+				1000
+			),
+			Error::<Test>::BitcoinUnlockInitiationDeadlinePassed
+		);
+		BitcoinBlockHeight::set(expiration_block - UtxoUnlockCosignDeadlineBlocks::get() - 1);
+		assert_ok!(Bonds::unlock_bitcoin_bond(
+			RuntimeOrigin::signed(who),
+			1,
+			unlock_script_pubkey.clone(),
+			1000
+		));
+		assert!(UtxosById::<Test>::get(1).is_some());
+		let redemption_price =
+			Bonds::get_redemption_price(&SATOSHIS_PER_BITCOIN).expect("should have price");
+		assert!(redemption_price > bond.amount);
+		// redemption price should be the bond price since current redemption price is above
+		assert_eq!(
+			UtxosPendingUnlock::<Test>::get().get(&1),
+			Some(UtxoCosignRequest {
+				cosign_due_block: BitcoinBlockHeight::get() + UtxoUnlockCosignDeadlineBlocks::get(),
+				redemption_price: bond.amount,
+				to_script_pubkey: unlock_script_pubkey,
+				bitcoin_network_fee: 1000
+			})
+			.as_ref()
+		);
+		assert!(BondsById::<Test>::get(1).is_some());
 		System::assert_last_event(
-			Event::BondFundExtended { bond_fund_id: 1, expiration_block: 11, amount_offered: 1010 }
+			Event::<Test>::BitcoinUtxoCosignRequested { bond_id: 1, vault_id: 1, utxo_id: 1 }
 				.into(),
 		);
-		assert!(System::account_exists(&1));
-		assert_eq!(Balances::reserved_balance(1), 1010);
-		assert_eq!(BondFundExpirations::<Test>::get(10), vec![]);
-		assert_eq!(BondFundExpirations::<Test>::get(11).into_inner(), vec![1u32]);
+
+		assert_eq!(Balances::free_balance(&who), 2_000);
+		assert_eq!(
+			Balances::balance_on_hold(&HoldReason::UnlockingBitcoin.into(), &who),
+			bond.amount
+		);
 	});
 }
 
 #[test]
-fn it_can_stop_offering_a_fund() {
+fn penalizes_vault_if_not_unlock_countersigned() {
 	new_test_ext().execute_with(|| {
-		// Go past genesis block so events get deposited
+		BitcoinBlockHeight::set(1);
 		System::set_block_number(1);
 
-		set_argons(1, 100_000);
-		assert_ok!(Bonds::offer_fund(RuntimeOrigin::signed(1), 10_000, 5, 50_000, 1440));
-		assert_eq!(Balances::free_balance(1), 50_000);
+		let pubkey = BitcoinPubkeyHash([1; 20]);
+		let who = 1;
+		let satoshis = SATOSHIS_PER_BITCOIN + 5000;
+		set_argons(who, 2_000);
+		assert_ok!(Bonds::bond_bitcoin(RuntimeOrigin::signed(who), 1, satoshis, pubkey));
+		let vault = DefaultVault::get();
+		let mut bond = BondsById::<Test>::get(1).unwrap();
+		assert_eq!(vault.bitcoin_argons.bonded, bond.amount);
+		// first verify
+		assert_ok!(Bonds::utxo_verified(1));
+		// Mint the argons into account
+		assert_ok!(Balances::mint_into(&who, bond.amount));
+		let unlock_script_pubkey = make_script_pubkey(&[0; 32]);
+		assert_ok!(Bonds::unlock_bitcoin_bond(
+			RuntimeOrigin::signed(who),
+			1,
+			unlock_script_pubkey.clone(),
+			2000
+		));
+		assert!(UtxosById::<Test>::get(1).is_some());
 
-		Bonds::on_initialize(1);
-
-		set_argons(2, 10_000);
-		assert_ok!(Bonds::lease(RuntimeOrigin::signed(2), 1, 10_000, 1440));
-		assert_ok!(Bonds::lease(RuntimeOrigin::signed(2), 1, 20_000, 1440));
-		assert_ok!(Bonds::end_fund(RuntimeOrigin::signed(1), 1));
-		// 9 blocks * 10 milligons per block per argon (rented 1 argon)
-		let fee1 = 5 + ((1f64 / 365f64) * 10_000f64 * 0.1f64) as u128; // 5 + 2
-		let fee2 = 5 + ((1f64 / 365f64) * 20_000f64 * 0.1f64) as u128; // 5 + 5
-		assert_eq!(Balances::free_balance(2), 10_000 - fee1 - fee2);
-
-		// got back 20_000
-		assert_eq!(Balances::free_balance(1), 50_000 + 20_000 + fee1 + fee2);
-		assert_eq!(Balances::balance_on_hold(&HoldReason::EnterBondFund.into(), &1u64), 30_000);
-
-		System::set_block_number(800);
-
-		assert_ok!(Bonds::return_bond(RuntimeOrigin::signed(2), 1));
-		assert_eq!(BondFunds::<Test>::get(1).unwrap().amount_bonded, 20_000);
-		assert_eq!(BondFunds::<Test>::get(1).unwrap().amount_reserved, 20_000);
-		assert_eq!(BondFundExpirations::<Test>::get(1440), vec![1]);
-
-		let final_fee1 = 5 + ((799f64 / (365f64 * 1440f64)) * 10_000f64 * 0.1f64) as u128;
-		System::assert_has_event(
-			Event::BondFeeRefund {
-				bonded_account_id: 2,
-				bond_fund_reduction_for_payment: 0u32.into(),
-				bond_fund_id: 1,
-				final_fee: final_fee1,
-				refund_amount: fee1 - final_fee1,
-				bond_id: 1,
-			}
-			.into(),
-		);
-		assert_eq!(Balances::free_balance(2), 10_000 - final_fee1 - fee2);
-
-		assert_eq!(Balances::free_balance(1), 100_000 - 20_000 + final_fee1 + fee2);
-
-		System::set_block_number(1000);
-		assert_ok!(Bonds::return_bond(RuntimeOrigin::signed(2), 2));
-		let final_fee2 = 5 + ((999f64 / (365f64 * 1440f64)) * 20_000f64 * 0.1f64) as u128;
-
-		System::assert_has_event(
-			Event::BondFeeRefund {
-				bonded_account_id: 2,
-				bond_fund_reduction_for_payment: 0u32.into(),
-				bond_fund_id: 1,
-				final_fee: final_fee2,
-				refund_amount: fee2 - final_fee2,
-				bond_id: 2,
-			}
-			.into(),
-		);
-		assert!(!BondFunds::<Test>::contains_key(1));
-		assert_eq!(BondFundExpirations::<Test>::get(1440), vec![]);
-
-		assert_eq!(Balances::free_balance(2), 10_000 - final_fee1 - final_fee2);
-		assert_eq!(Balances::free_balance(1), 100_000 + final_fee1 + final_fee2);
-	});
-}
-
-#[test]
-fn it_can_lease_a_bond() {
-	new_test_ext().execute_with(|| {
-		// Go past genesis block so events get deposited
-		System::set_block_number(5);
-
-		set_argons(1, 1_000_000);
-		assert_ok!(Bonds::offer_fund(RuntimeOrigin::signed(1), 1000, 25, 500_000, 2880));
-		assert_eq!(Balances::free_balance(1), 500_000);
-
-		Bonds::on_initialize(1);
-
-		set_argons(2, 2_000);
-		assert_ok!(Bonds::lease(RuntimeOrigin::signed(2), 1, 500_000, 2440));
-
-		// fee is 9 milligons per block per argon (rented 5 argons)
-		let fee = (25f64 + (0.01f64 * 500_000f64 * (2440f64 / (365f64 * 1440f64)))) as u128;
-		System::assert_last_event(
-			Event::BondLeased {
-				bond_fund_id: 1,
-				bond_id: 1,
-				bonded_account_id: 2,
-				amount: 500_000,
-				completion_block: 2440,
-				annual_percent_rate: 1000,
-				total_fee: fee,
-			}
-			.into(),
-		);
-		assert_eq!(Balances::free_balance(2), 2_000 - fee);
-		assert_eq!(Balances::free_balance(1), 500_000 + fee);
-
-		System::set_block_number(2440);
-		Bonds::on_initialize(2440);
-		assert!(!BondsStorage::<Test>::contains_key(1));
-		assert!(!BondCompletions::<Test>::contains_key(2440));
-	});
-}
-
-#[test]
-fn it_can_bond_from_self() {
-	new_test_ext().execute_with(|| {
-		// Go past genesis block so events get deposited
-		System::set_block_number(5);
-
-		set_argons(2, 2_000);
-
-		assert_noop!(
-			Bonds::bond_self(RuntimeOrigin::signed(2), 2000, 100),
-			Error::<Test>::TransactionWouldTakeAccountBelowMinimumBalance
-		);
-		// add existential deposit
-		set_argons(2, 2_100);
-		assert_ok!(Bonds::bond_self(RuntimeOrigin::signed(2), 2000, 100));
-		System::assert_last_event(
-			Event::BondedSelf {
-				bond_id: 1,
-				bonded_account_id: 2,
-				amount: 2000,
-				completion_block: 100,
-			}
-			.into(),
-		);
-		assert_eq!(BondsStorage::<Test>::get(1).unwrap().amount, 2000);
-		assert_eq!(BondsStorage::<Test>::get(1).unwrap().bonded_account_id, 2);
-		assert_eq!(BondsStorage::<Test>::get(1).unwrap().bond_fund_id, None);
-		assert_eq!(BondCompletions::<Test>::get(100).into_inner(), vec![1]);
-		// ensure no death
-		assert!(System::account_exists(&2));
-
-		assert_eq!(Balances::free_balance(2), 100);
-
-		System::set_block_number(100);
-		Bonds::on_initialize(100);
-		assert!(!BondFunds::<Test>::contains_key(1));
-		assert!(!BondCompletions::<Test>::contains_key(100));
-		assert_eq!(Balances::free_balance(2), 2100);
-		assert!(System::account_exists(&2));
-	});
-}
-
-#[test]
-fn it_can_recoup_funds_from_a_bond_fund_if_spent() {
-	new_test_ext().execute_with(|| {
-		// Go past genesis block so events get deposited
-		System::set_block_number(5);
-
-		set_argons(2, 2_000);
-
-		set_argons(1, 100_100);
-		const BASE_FEE: Balance = 4u128;
-		const APR: u32 = 2_115;
-
-		assert_ok!(Bonds::offer_fund(RuntimeOrigin::signed(1), APR, BASE_FEE, 100_000, 1440));
-		assert_eq!(Balances::free_balance(1), 100);
-
-		Bonds::on_initialize(1);
-
-		set_argons(2, 2_000);
-		assert_ok!(Bonds::lease(RuntimeOrigin::signed(2), 1, 50_000, 1440));
-		// fee is 9 milligons per block per argon (rented 5 argons)
-		let fee: Balance = BASE_FEE + ((1f64 / 365f64) * 0.02115f64 * 50_000f64) as u128;
-		System::assert_has_event(
-			Event::BondLeased {
-				bond_fund_id: 1,
-				bond_id: 1,
-				bonded_account_id: 2,
-				amount: 50_000,
-				completion_block: 1440,
-				total_fee: fee,
-				annual_percent_rate: APR,
-			}
-			.into(),
-		);
-		let bond = BondsStorage::<Test>::get(1);
-		assert_eq!(bond.unwrap().fee, fee);
-		assert_eq!(Balances::free_balance(2), 2_000 - fee);
-		assert_eq!(Balances::free_balance(1), fee + 100);
-
-		assert_ok!(Balances::transfer(&1, &10, 100 + fee, Preservation::Expendable));
-		assert_eq!(Balances::free_balance(1), 0);
-		assert!(System::account_exists(&1));
-
-		System::set_block_number(500);
-		Bonds::on_initialize(500);
-		let original_fee = fee;
-		let fee: Balance =
-			BASE_FEE + ((495f64 / (365f64 * 1440f64)) * 0.02115f64 * 50_000f64) as u128;
-
-		assert_ok!(Bonds::return_bond(RuntimeOrigin::signed(2), 1));
-		assert!(System::account_exists(&1));
-
-		assert_eq!(BondFunds::<Test>::get(1).unwrap().amount_bonded, 0);
-		let recoverable_fee = original_fee - fee;
-		System::assert_has_event(
-			Event::BondFeeRefund {
-				bond_fund_id: 1,
-				bond_id: 1,
-				bonded_account_id: 2,
-				refund_amount: recoverable_fee,
-				// had to pull in additional funds because it went below minimum balance
-				bond_fund_reduction_for_payment: recoverable_fee + Balances::minimum_balance(),
-				final_fee: fee,
-			}
-			.into(),
-		);
-		System::assert_has_event(Event::BondCompleted { bond_fund_id: Some(1), bond_id: 1 }.into());
+		let redemption_price = Bonds::get_redemption_price(&satoshis).expect("should have price");
+		let cosign_due = BitcoinBlockHeight::get() + UtxoUnlockCosignDeadlineBlocks::get();
 		assert_eq!(
-			BondFunds::<Test>::get(1).unwrap().amount_reserved,
-			100_000 - recoverable_fee - Balances::minimum_balance()
+			UtxosPendingUnlock::<Test>::get().get(&1),
+			Some(UtxoCosignRequest {
+				cosign_due_block: cosign_due,
+				redemption_price,
+				to_script_pubkey: unlock_script_pubkey,
+				bitcoin_network_fee: 2000
+			})
+			.as_ref()
 		);
-		assert_eq!(Balances::free_balance(1), Balances::minimum_balance());
+
+		BitcoinBlockHeight::set(cosign_due);
+		System::set_block_number(2);
+		Bonds::on_initialize(2);
+
+		// should pay back at market price (not the discounted rate)
+		let market_price =
+			StaticPriceProvider::get_bitcoin_argon_price(satoshis).expect("should have price");
+		assert_eq!(UtxosPendingUnlock::<Test>::get().get(&1), None);
+		assert_eq!(UtxosById::<Test>::get(1), None);
+		assert_eq!(OwedUtxoAggrieved::<Test>::get(1), None);
+		System::assert_last_event(
+			Event::<Test>::BitcoinCosignPastDue {
+				bond_id: 1,
+				vault_id: 1,
+				utxo_id: 1,
+				compensation_amount: market_price,
+				compensation_still_owed: 0,
+				compensated_account_id: who,
+			}
+			.into(),
+		);
+		let original_bond_amount = bond.amount;
+		bond.amount = original_bond_amount - market_price;
+		assert_eq!(BondsById::<Test>::get(1), Some(bond));
+		assert_eq!(DefaultVault::get().bitcoin_argons.bonded, original_bond_amount - market_price);
 		assert_eq!(
-			Balances::balance_on_hold(&HoldReason::EnterBondFund.into(), &1),
-			100_000 - recoverable_fee - Balances::minimum_balance()
+			DefaultVault::get().bitcoin_argons.allocated,
+			vault.bitcoin_argons.allocated.saturating_sub(market_price)
 		);
-		assert!(!BondsStorage::<Test>::contains_key(1));
-		assert_eq!(BondCompletions::<Test>::get(103), vec![]);
+
+		assert_eq!(Balances::balance_on_hold(&HoldReason::UnlockingBitcoin.into(), &who), 0);
+		assert_eq!(Balances::balance(&who), 2000 + market_price);
 	});
 }
 
 #[test]
-fn it_can_extend_a_bond_from_self() {
+fn clears_unlocked_bitcoin_bonds() {
 	new_test_ext().execute_with(|| {
-		// Go past genesis block so events get deposited
-		System::set_block_number(5);
-
-		set_argons(2, 2_100);
-		assert_ok!(Bonds::bond_self(RuntimeOrigin::signed(2), 2000, 100));
-		assert_eq!(BondsStorage::<Test>::get(1).unwrap().amount, 2000);
-		assert_eq!(BondCompletions::<Test>::get(100).into_inner(), vec![1]);
-		assert_eq!(Balances::free_balance(2), 100);
-
-		System::set_block_number(99);
-		assert_ok!(Bonds::extend_bond(RuntimeOrigin::signed(2), 1, 2000, 200));
-		assert_eq!(Balances::free_balance(2), 100);
-		assert_eq!(BondCompletions::<Test>::get(100).into_inner(), Vec::<u64>::new());
-		assert_eq!(BondCompletions::<Test>::get(200).into_inner(), vec![1]);
-
-		assert_noop!(
-			Bonds::extend_bond(RuntimeOrigin::signed(2), 1, 3000, 200),
-			Error::<Test>::InsufficientFunds
-		);
-		set_argons(2, 1_000);
-		assert_ok!(Bonds::extend_bond(RuntimeOrigin::signed(2), 1, 3000, 201));
-		assert_eq!(Balances::free_balance(2), 0);
-		assert_eq!(Balances::reserved_balance(2), 3000);
-		assert_eq!(BondCompletions::<Test>::get(200).into_inner(), Vec::<u64>::new());
-		assert_eq!(BondCompletions::<Test>::get(201).into_inner(), vec![1]);
-	});
-}
-
-#[test]
-fn it_can_calculate_apr() {
-	new_test_ext().execute_with(|| {
-		assert_eq!(Bonds::calculate_fees(1000, 0, 1000, 1440, 1440 * 365), 0);
-		assert_eq!(Bonds::calculate_fees(1000, 0, 100, 1440 * 365, 1440 * 365), 1);
-		assert_eq!(Bonds::calculate_fees(1000, 0, 99, 1440 * 365, 1440 * 365), 0);
-		assert_eq!(Bonds::calculate_fees(1000, 0, 365000, 1440 * 365, 1440 * 365), 3650);
-		assert_eq!(Bonds::calculate_fees(1000, 0, 365000, 1440, 1440 * 365), 10);
-		// minimum argons for a day that will charge anything
-		assert_eq!(Bonds::calculate_fees(1000, 0, 36500, 1440, 1440 * 365), 1);
-	})
-}
-
-#[test]
-fn it_can_send_minimum_balance_transfers() {
-	new_test_ext().execute_with(|| {
-		set_argons(1, 1060);
-		assert_ok!(Balances::transfer(&1, &2, 1000, Preservation::Preserve));
-		assert_ok!(Balances::transfer(&1, &2, 50, Preservation::Preserve));
-		assert_eq!(Balances::free_balance(1), 10);
-		assert_ok!(Balances::transfer(&1, &2, 4, Preservation::Expendable));
-		// dusted! will remove anything below ED
-		assert_eq!(Balances::free_balance(1), 0);
-	})
-}
-#[test]
-fn it_can_extend_a_bond_from_lease() {
-	new_test_ext().execute_with(|| {
-		// Go past genesis block so events get deposited
+		BitcoinBlockHeight::set(1);
 		System::set_block_number(1);
-		Bonds::on_initialize(1);
 
-		set_argons(1, 500_100);
-		const BASE_FEE: Balance = 4u128;
-		const APR: u32 = 10000u32; // 1 percent apr for the year
+		let pubkey = BitcoinPubkeyHash([1; 20]);
+		let who = 2;
+		let satoshis = SATOSHIS_PER_BITCOIN + 25000;
+		set_argons(who, 2_000);
+		assert_ok!(Bonds::bond_bitcoin(RuntimeOrigin::signed(who), 1, satoshis, pubkey));
+		let vault = DefaultVault::get();
+		let bond = BondsById::<Test>::get(1).unwrap();
+		assert_eq!(vault.bitcoin_argons.bonded, bond.amount);
+		// first verify
+		assert_ok!(Bonds::utxo_verified(1));
+		// Mint the argons into account
+		assert_ok!(Balances::mint_into(&who, bond.amount));
+		let unlock_script_pubkey = make_script_pubkey(&[0; 32]);
+		assert_ok!(Bonds::unlock_bitcoin_bond(
+			RuntimeOrigin::signed(who),
+			1,
+			unlock_script_pubkey.clone(),
+			11
+		));
+		assert!(UtxosById::<Test>::get(1).is_some());
 
-		assert_ok!(Bonds::offer_fund(RuntimeOrigin::signed(1), APR, BASE_FEE, 500_000, 5000));
-		assert_eq!(Balances::free_balance(1), 100);
-		set_argons(2, 3_000);
-		assert_ok!(Bonds::lease(RuntimeOrigin::signed(2), 1, 200_000, 1440));
-		assert_eq!(BondsStorage::<Test>::get(1).unwrap().amount, 200_000);
-		assert_eq!(BondCompletions::<Test>::get(1440).into_inner(), vec![1]);
-
-		let fee: Balance = BASE_FEE + (200_000u128 / 10u128 / 365);
-		assert_eq!(BondsStorage::<Test>::get(1).unwrap().fee, fee);
-		assert_eq!(Balances::free_balance(2), 3_000 - fee);
-		assert_eq!(Balances::free_balance(1), 100 + fee);
-
-		// extend the amount
-		assert_ok!(Bonds::extend_bond(RuntimeOrigin::signed(2), 1, 200_000u128, 2880));
-		let fee: Balance = BASE_FEE + (2 * 200_000u128 / 10u128 / 365);
-		assert_eq!(Balances::free_balance(2), 3000 - fee);
-		assert_eq!(BondCompletions::<Test>::get(1440).into_inner(), Vec::<u64>::new());
-		assert_eq!(BondCompletions::<Test>::get(2880).into_inner(), vec![1]);
-
-		Balances::transfer(&2, &10, 2800, Preservation::Preserve).unwrap();
-
-		assert_noop!(
-			Bonds::extend_bond(RuntimeOrigin::signed(2), 1, 400_000u128, 2880),
-			Error::<Test>::InsufficientFunds
+		let redemption_price = Bonds::get_redemption_price(&satoshis).expect("should have price");
+		let cosign_due_block = BitcoinBlockHeight::get() + UtxoUnlockCosignDeadlineBlocks::get();
+		assert_eq!(
+			UtxosPendingUnlock::<Test>::get().get(&1),
+			Some(UtxoCosignRequest {
+				cosign_due_block,
+				redemption_price,
+				to_script_pubkey: unlock_script_pubkey,
+				bitcoin_network_fee: 11
+			})
+			.as_ref()
 		);
-		Balances::transfer(&10, &2, 2800, Preservation::Expendable).unwrap();
-		assert_ok!(Bonds::extend_bond(RuntimeOrigin::signed(2), 1, 200_000u128, 3000));
-		let fee = BASE_FEE + (3000 * 200_000u128 / 10u128 / 365 / 1440);
-		assert_eq!(Balances::free_balance(2), 3000 - fee);
-		assert_eq!(Balances::free_balance(1), 100 + fee);
-		assert_eq!(BondCompletions::<Test>::get(2880).into_inner(), Vec::<u64>::new());
-		assert_eq!(BondCompletions::<Test>::get(3000).into_inner(), vec![1]);
+		assert_err!(
+			Bonds::cosign_bitcoin_unlock(
+				RuntimeOrigin::signed(2),
+				1,
+				CompressedBitcoinPubkey([0; 33]),
+				BitcoinSignature(BoundedVec::truncate_from([0u8; 73].to_vec()))
+			),
+			Error::<Test>::NoPermissions
+		);
+		assert_ok!(Bonds::cosign_bitcoin_unlock(
+			RuntimeOrigin::signed(1),
+			1,
+			CompressedBitcoinPubkey([0; 33]),
+			BitcoinSignature(BoundedVec::truncate_from([0u8; 73].to_vec()))
+		));
+		assert_eq!(UtxosPendingUnlock::<Test>::get().get(&1), None);
+		assert_eq!(UtxosById::<Test>::get(1), None);
+		assert_eq!(OwedUtxoAggrieved::<Test>::get(1), None);
+		// should keep bond for the year
+		assert_eq!(BondsById::<Test>::get(1), Some(bond.clone()));
+		assert_eq!(DefaultVault::get().bitcoin_argons.bonded, bond.amount);
+		assert_eq!(DefaultVault::get().bitcoin_argons.allocated, vault.bitcoin_argons.allocated);
+		assert_eq!(WatchedUtxosById::get().len(), 0);
+
+		System::assert_last_event(
+			Event::<Test>::BitcoinUtxoCosigned {
+				bond_id: 1,
+				vault_id: 1,
+				utxo_id: 1,
+				pubkey: CompressedBitcoinPubkey([0; 33]),
+				signature: BitcoinSignature(BoundedVec::truncate_from([0u8; 73].to_vec())),
+			}
+			.into(),
+		);
+
+		assert_eq!(Balances::balance_on_hold(&HoldReason::UnlockingBitcoin.into(), &who), 0);
+		assert_eq!(Balances::balance(&who), 2000 + bond.amount - redemption_price);
+		assert_eq!(Balances::total_issuance(), 2000 + bond.amount - redemption_price);
+
+		// should keep bond for the year
+		System::set_block_number(2);
+		match bond.expiration {
+			BondExpiration::BitcoinBlock(h) => {
+				BitcoinBlockHeight::set(h);
+			},
+			_ => panic!("should be bitcoin block"),
+		};
+		Bonds::on_initialize(2);
+		assert_eq!(BondsById::<Test>::get(1), None);
+		assert_eq!(DefaultVault::get().bitcoin_argons.bonded, 0);
+		assert_eq!(DefaultVault::get().bitcoin_argons.allocated, vault.bitcoin_argons.allocated);
 	});
 }
 
 #[test]
-fn it_can_lock_and_unlock_bonds() {
+fn it_should_aggregate_holds_for_a_second_unlock() {
 	new_test_ext().execute_with(|| {
-		// Go past genesis block so events get deposited
-		System::set_block_number(5);
+		BitcoinBlockHeight::set(1);
+		System::set_block_number(1);
 
-		set_argons(2, 2_100);
-		assert_ok!(Bonds::bond_self(RuntimeOrigin::signed(2), 2000, 100));
-		assert_ok!(<Bonds as BondProvider>::lock_bond(1u64));
-		System::assert_last_event(Event::BondLocked { bond_id: 1, bonded_account_id: 2 }.into());
-		assert_noop!(
-			Bonds::extend_bond(RuntimeOrigin::signed(2), 1, 2000, 95),
-			Error::<Test>::BondLockedCannotModify
+		let pubkey = BitcoinPubkeyHash([1; 20]);
+		let who = 1;
+		let satoshis = 2 * SATOSHIS_PER_BITCOIN;
+		set_argons(who, 2_000);
+		assert_ok!(Bonds::bond_bitcoin(RuntimeOrigin::signed(who), 1, satoshis, pubkey));
+		assert_ok!(Bonds::bond_bitcoin(RuntimeOrigin::signed(who), 1, satoshis, pubkey));
+		let bond = BondsById::<Test>::get(1).unwrap();
+		assert_ok!(Bonds::utxo_verified(1));
+		assert_ok!(Bonds::utxo_verified(2));
+		// Mint the argons into account
+		assert_ok!(Balances::mint_into(&who, bond.amount * 2));
+		let redemption_price = Bonds::get_redemption_price(&satoshis).expect("should have price");
+
+		assert_ok!(Bonds::unlock_bitcoin_bond(
+			RuntimeOrigin::signed(who),
+			1,
+			make_script_pubkey(&[0; 32]),
+			10
+		));
+		assert_ok!(Bonds::unlock_bitcoin_bond(
+			RuntimeOrigin::signed(who),
+			2,
+			make_script_pubkey(&[0; 32]),
+			10
+		));
+		assert_eq!(Balances::free_balance(&who), 2_000 + (2 * (bond.amount - redemption_price)));
+		assert_eq!(
+			Balances::balance_on_hold(&HoldReason::UnlockingBitcoin.into(), &who),
+			redemption_price * 2
 		);
-		// can extend locked!
-		assert_ok!(Bonds::extend_bond(RuntimeOrigin::signed(2), 1, 2000, 101),);
-		assert_noop!(
-			Bonds::return_bond(RuntimeOrigin::signed(2), 1),
-			Error::<Test>::BondLockedCannotModify
-		);
-		assert_ok!(<Bonds as BondProvider>::unlock_bond(1u64));
-		System::assert_last_event(Event::BondUnlocked { bond_id: 1, bonded_account_id: 2 }.into());
-		assert_ok!(Bonds::return_bond(RuntimeOrigin::signed(2), 1));
 	});
+}
+
+#[test]
+fn it_can_create_a_mining_bond() {
+	new_test_ext().execute_with(|| {
+		System::set_block_number(1);
+		let who = 1;
+		set_argons(who, 2_000);
+		let amount = 1_000;
+		let vault = DefaultVault::get();
+		assert_ok!(Bonds::bond_mining_slot(1, who, amount, 10));
+		assert_eq!(
+			BondsById::<Test>::get(1).unwrap(),
+			Bond {
+				amount,
+				utxo_id: None,
+				bond_type: BondType::Mining,
+				total_fee: 0,
+				prepaid_fee: 0,
+				vault_id: 1,
+				expiration: BondExpiration::UlixeeBlock(10),
+				bonded_account_id: who,
+			}
+		);
+		assert_eq!(DefaultVault::get().mining_argons.bonded, amount);
+		assert_eq!(DefaultVault::get().mining_argons.allocated, vault.mining_argons.allocated);
+		assert_eq!(MiningBondCompletions::<Test>::get(10).to_vec(), vec![1]);
+		System::assert_last_event(
+			Event::<Test>::BondCreated {
+				vault_id: 1,
+				bond_id: 1,
+				amount,
+				bond_type: BondType::Mining,
+				expiration: BondExpiration::UlixeeBlock(10),
+				bonded_account_id: who,
+				utxo_id: None,
+			}
+			.into(),
+		);
+
+		// expire it
+		System::set_block_number(10);
+		Bonds::on_initialize(10);
+		assert_eq!(BondsById::<Test>::get(1), None);
+		assert_eq!(DefaultVault::get().mining_argons.bonded, 0);
+	});
+}
+
+fn default_utxo_state(bond_id: BondId, satoshis: Satoshis) -> UtxoState {
+	let current_height = BitcoinBlockHeight::get();
+	UtxoState {
+		bond_id,
+		satoshis,
+		vault_claim_height: current_height + BitcoinBondDurationBlocks::get(),
+		open_claim_height: current_height +
+			BitcoinBondDurationBlocks::get() +
+			BitcoinBondReclamationBlocks::get(),
+		is_verified: false,
+		utxo_script_pubkey: make_cosign_pubkey([0; 32]),
+		owner_pubkey_hash: BitcoinPubkeyHash([1; 20]),
+		vault_pubkey_hash: BitcoinPubkeyHash([0; 20]),
+		register_block: current_height,
+	}
+}
+
+fn make_cosign_pubkey(hash: [u8; 32]) -> BitcoinCosignScriptPubkey {
+	BitcoinCosignScriptPubkey::P2WSH { wscript_hash: H256::from(hash) }
+}
+
+fn make_script_pubkey(vec: &[u8]) -> BitcoinScriptPubkey {
+	BitcoinScriptPubkey(BoundedVec::try_from(vec.to_vec()).unwrap())
 }

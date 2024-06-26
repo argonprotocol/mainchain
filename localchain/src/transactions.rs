@@ -127,8 +127,7 @@ impl Transactions {
 
     let escrow_milligons = escrow_milligons.max(ESCROW_MINIMUM_SETTLEMENT);
 
-    let amount_plus_tax =
-      jump_notarization.get_total_for_after_tax_balance(escrow_milligons);
+    let amount_plus_tax = jump_notarization.get_total_for_after_tax_balance(escrow_milligons);
     let jump_account = jump_notarization.fund_jump_account(amount_plus_tax).await?;
     let _ = jump_notarization.notarize().await?;
 
@@ -369,10 +368,7 @@ mod tests {
 
     let alice_json = alice_localchain
       .transactions()
-      .send(
-        3500_u128,
-        Some(vec![bob_localchain.address().await?]),
-      )
+      .send(3500_u128, Some(vec![bob_localchain.address().await?]))
       .await?;
 
     let bob_builder = bob_localchain.begin_change();
@@ -541,10 +537,7 @@ mod tests {
       .await?;
 
     println!("Bob requesting");
-    let bob_request_json = bob_localchain
-      .transactions()
-      .request(3500_u128)
-      .await?;
+    let bob_request_json = bob_localchain.transactions().request(3500_u128).await?;
 
     let alice_builder = alice_localchain.begin_change();
     alice_builder

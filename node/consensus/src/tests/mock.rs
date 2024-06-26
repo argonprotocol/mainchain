@@ -29,14 +29,16 @@ use sp_runtime::{
 };
 use substrate_test_runtime::{AccountId, BlockNumber, Executive, Hash, Header};
 use substrate_test_runtime_client::Backend;
+use ulx_bitcoin_utxo_tracker::UtxoTracker;
 
 use ulx_node_runtime::{NotaryRecordT, NotebookVerifyError};
 use ulx_primitives::{
+	bitcoin::{BitcoinSyncStatus, Satoshis, UtxoRef, UtxoValue},
 	block_seal::BlockSealAuthorityId,
 	digests::BlockVoteDigest,
 	notary::{NotaryNotebookVoteDetails, NotaryNotebookVoteDigestDetails},
 	tick::{Tick, Ticker},
-	BestBlockVoteSeal, ComputeDifficulty, HashOutput, NotaryId, NotaryNotebookVotes,
+	Balance, BestBlockVoteSeal, ComputeDifficulty, HashOutput, NotaryId, NotaryNotebookVotes,
 	NotebookAuditResult, NotebookAuditSummary, NotebookNumber, VoteMinimum,
 };
 
@@ -102,6 +104,7 @@ pub(crate) struct PeerData {
 	pub block_import: UlxBlockImport,
 	pub api: Arc<TestApi>,
 	pub aux_client: UlxAux<Block, TestApi>,
+	pub utxo_tracker: Arc<UtxoTracker>,
 }
 pub(crate) type UlxPeer = Peer<Option<PeerData>, UlxBlockImport>;
 
@@ -303,6 +306,18 @@ sp_api::mock_impl_runtime_apis! {
 		}
 	}
 
+	impl ulx_primitives::BitcoinApis<Block, Balance> for RuntimeApi {
+		fn get_sync_status() -> Option<BitcoinSyncStatus> {
+			None
+		}
+		fn active_utxos() -> Vec<(Option<UtxoRef>, UtxoValue)> {
+			vec![]
+		}
+		fn redemption_rate(_satoshis: Satoshis) -> Option<Balance> {
+			None
+		}
+	}
+
 	impl sp_block_builder::BlockBuilder<Block> for RuntimeApi {
 		fn apply_extrinsic(extrinsic: <Block as BlockT>::Extrinsic) -> ApplyExtrinsicResult {
 			Executive::apply_extrinsic(extrinsic)
@@ -384,17 +399,20 @@ impl TestNetFactory for UlxTestNet {
 		let api = TestApi { client: Some(client.as_client().clone()), config: self.config.clone() };
 		let api = Arc::new(api);
 		let aux_client = UlxAux::new(api.clone());
+		let utxo_tracker = UtxoTracker::new("http://127.0.0.1:39998".to_string(), None).unwrap();
+		let utxo_tracker = Arc::new(utxo_tracker);
 		let block_import = PanickingBlockImport(import_queue::UlxBlockImport::new(
 			inner,
 			api.clone(),
 			aux_client.clone(),
 			select_chain,
+			utxo_tracker.clone(),
 		));
 
 		(
 			BlockImportAdapter::new(block_import.clone()),
 			None,
-			Some(PeerData { block_import, api, aux_client }),
+			Some(PeerData { block_import, api, aux_client, utxo_tracker }),
 		)
 	}
 }

@@ -143,8 +143,7 @@ fn it_registers_zone_records() {
 			vec![(Bob.to_account_id(), 2 as Tick)]
 		);
 		System::assert_last_event(
-			Event::ZoneRecordUpdated { domain_hash: domain, zone_record: zone.clone() }
-				.into(),
+			Event::ZoneRecordUpdated { domain_hash: domain, zone_record: zone.clone() }.into(),
 		);
 		assert_err!(
 			DataDomainPallet::set_zone_record(
@@ -205,19 +204,21 @@ fn it_tracks_historical_payment() {
 			DomainPaymentAddressHistory::<Test>::get(domain).to_vec(),
 			vec![(Bob.to_account_id(), 2 as Tick), (Alice.to_account_id(), 4 as Tick)]
 		);
-		assert!(
-			DataDomainPallet::is_registered_payment_account(&domain, &Bob.to_account_id(), (2, 3))
-		);
-		assert!(
-			!DataDomainPallet::is_registered_payment_account(&domain, &Bob.to_account_id(), (4, 5))
-		);
-		assert!(
-			DataDomainPallet::is_registered_payment_account(
-				&domain,
-				&Alice.to_account_id(),
-				(4, 5)
-			)
-		);
+		assert!(DataDomainPallet::is_registered_payment_account(
+			&domain,
+			&Bob.to_account_id(),
+			(2, 3)
+		));
+		assert!(!DataDomainPallet::is_registered_payment_account(
+			&domain,
+			&Bob.to_account_id(),
+			(4, 5)
+		));
+		assert!(DataDomainPallet::is_registered_payment_account(
+			&domain,
+			&Alice.to_account_id(),
+			(4, 5)
+		));
 	});
 }
 

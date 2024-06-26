@@ -250,30 +250,24 @@ fn it_verifies_notary_signatures_matching_block_heights() {
 		Notaries::on_initialize(4);
 		let hash: H256 = [1u8; 32].into();
 
-		assert!(
-			!<Notaries as NotaryProvider<Block>>::verify_signature(
-				1,
-				4,
-				&hash,
-				&Ed25519Keyring::Alice.sign(&hash[..]),
-			)
-		);
-		assert!(
-			<Notaries as NotaryProvider<Block>>::verify_signature(
-				1,
-				2,
-				&hash,
-				&Ed25519Keyring::Alice.sign(&hash[..]),
-			)
-		);
-		assert!(
-			<Notaries as NotaryProvider<Block>>::verify_signature(
-				1,
-				4,
-				&hash,
-				&Ed25519Keyring::Bob.sign(&hash[..]),
-			)
-		);
+		assert!(!<Notaries as NotaryProvider<Block>>::verify_signature(
+			1,
+			4,
+			&hash,
+			&Ed25519Keyring::Alice.sign(&hash[..]),
+		));
+		assert!(<Notaries as NotaryProvider<Block>>::verify_signature(
+			1,
+			2,
+			&hash,
+			&Ed25519Keyring::Alice.sign(&hash[..]),
+		));
+		assert!(<Notaries as NotaryProvider<Block>>::verify_signature(
+			1,
+			4,
+			&hash,
+			&Ed25519Keyring::Bob.sign(&hash[..]),
+		));
 	});
 }
 

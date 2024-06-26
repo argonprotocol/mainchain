@@ -39,7 +39,7 @@ pub mod pallet {
 
 	use ulx_primitives::{
 		notebook::{ChainTransfer, NotebookHeader},
-		ChainTransferLookup, NotebookEventHandler, NotebookProvider,
+		BurnEventHandler, ChainTransferLookup, NotebookEventHandler, NotebookProvider,
 	};
 
 	use super::*;
@@ -72,6 +72,7 @@ pub mod pallet {
 		type NotaryProvider: NotaryProvider<<Self as frame_system::Config>::Block>;
 
 		type NotebookProvider: NotebookProvider;
+		type EventHandler: BurnEventHandler<Self::Balance>;
 		#[pallet::constant]
 		type PalletId: Get<PalletId>;
 
@@ -298,9 +299,11 @@ pub mod pallet {
 				T::Currency::burn_from(
 					&notary_pallet_account_id,
 					header.tax.into(),
+					Preservation::Preserve,
 					Precision::Exact,
 					Fortitude::Force,
 				)?;
+				T::EventHandler::on_argon_burn(&header.tax.into())?;
 			}
 
 			Ok(())

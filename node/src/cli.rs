@@ -18,6 +18,11 @@ pub struct Cli {
 	/// How many mining threads to run
 	#[arg(long)]
 	pub miners: Option<u32>,
+
+	/// Bitcoin node to verify minted bitcoins using compact filters. Should be a hosted/trusted
+	/// full node. Include optional auth inline
+	#[arg(long)]
+	pub bitcoin_rpc_url: String,
 }
 
 impl Cli {
@@ -67,14 +72,6 @@ pub enum Subcommand {
 	/// Sub-commands concerned with benchmarking.
 	#[command(subcommand)]
 	Benchmark(frame_benchmarking_cli::BenchmarkCmd),
-
-	/// Try some command against runtime state.
-	#[cfg(feature = "try-runtime")]
-	TryRuntime(try_runtime_cli::TryRuntimeCmd),
-
-	/// Try some command against runtime state. Note: `try-runtime` feature must be enabled.
-	#[cfg(not(feature = "try-runtime"))]
-	TryRuntime,
 
 	/// Db meta columns information.
 	ChainInfo(sc_cli::ChainInfoCmd),

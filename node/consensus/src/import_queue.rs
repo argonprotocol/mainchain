@@ -15,9 +15,11 @@ use sp_runtime::{
 	generic::DigestItem,
 	traits::{Block as BlockT, Header as HeaderT},
 };
+use ulx_bitcoin_utxo_tracker::{get_bitcoin_inherent, UtxoTracker};
 
 use ulx_primitives::{
-	inherents::BlockSealInherentDataProvider, BlockSealApis, BlockSealAuthorityId, BlockSealDigest,
+	inherents::{BitcoinInherentDataProvider, BlockSealInherentDataProvider},
+	Balance, BitcoinApis, BlockSealApis, BlockSealAuthorityId, BlockSealDigest,
 	BLOCK_SEAL_DIGEST_ID,
 };
 
@@ -36,6 +38,7 @@ pub struct UlxBlockImport<B: BlockT, I, C: AuxStore, S, AC> {
 	select_chain: S,
 	client: Arc<C>,
 	aux_client: UlxAux<B, C>,
+	utxo_tracker: Arc<UtxoTracker>,
 	_block: PhantomData<AC>,
 }
 
@@ -48,6 +51,7 @@ impl<B: BlockT, I: Clone, C: AuxStore, S: Clone, AC: Codec> Clone
 			select_chain: self.select_chain.clone(),
 			client: self.client.clone(),
 			aux_client: self.aux_client.clone(),
+			utxo_tracker: self.utxo_tracker.clone(),
 			_block: PhantomData,
 		}
 	}
@@ -69,8 +73,14 @@ where
 	AC: Codec,
 {
 	/// Create a new block import suitable to be used in Ulx
-	pub fn new(inner: I, client: Arc<C>, aux_client: UlxAux<B, C>, select_chain: S) -> Self {
-		Self { inner, client, select_chain, aux_client, _block: PhantomData }
+	pub fn new(
+		inner: I,
+		client: Arc<C>,
+		aux_client: UlxAux<B, C>,
+		select_chain: S,
+		utxo_tracker: Arc<UtxoTracker>,
+	) -> Self {
+		Self { inner, client, select_chain, aux_client, utxo_tracker, _block: PhantomData }
 	}
 }
 
@@ -89,8 +99,9 @@ where
 		+ AuxStore
 		+ BlockOf
 		+ 'static,
-	C::Api: BlockBuilderApi<B> + BlockSealApis<B, AC, BlockSealAuthorityId>,
-	AC: Codec + Send + Sync,
+	C::Api:
+		BlockBuilderApi<B> + BlockSealApis<B, AC, BlockSealAuthorityId> + BitcoinApis<B, Balance>,
+	AC: Codec + Clone + Send + Sync,
 {
 	type Error = ConsensusError;
 
@@ -140,10 +151,19 @@ where
 					BlockSealInherentDataProvider { seal: None, digest: Some(seal_digest.clone()) };
 				let inherent_data_providers = (timestamp, seal);
 
-				let inherent_data = inherent_data_providers
+				let mut inherent_data = inherent_data_providers
 					.create_inherent_data()
 					.await
 					.map_err(|e| Error::<B>::CreateInherents(e))?;
+
+				if let Ok(Some(bitcoin_utxo_sync)) =
+					get_bitcoin_inherent(&self.utxo_tracker, &self.client, &parent_hash)
+				{
+					BitcoinInherentDataProvider { bitcoin_utxo_sync }
+						.provide_inherent_data(&mut inherent_data)
+						.await
+						.map_err(|e| Error::<B>::CreateInherents(e))?;
+				}
 
 				// inherent data passed in is what we would have generated...
 				let inherent_res = self

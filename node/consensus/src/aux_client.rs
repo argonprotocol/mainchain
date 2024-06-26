@@ -12,8 +12,9 @@ use parking_lot::RwLock;
 use sc_client_api::{self, backend::AuxStore};
 use sc_consensus::BlockImportParams;
 use schnellru::{ByLength, LruMap};
+use sp_arithmetic::traits::UniqueSaturatedInto;
 use sp_core::{H256, U256};
-use sp_runtime::traits::{Block as BlockT, Header};
+use sp_runtime::traits::{Block as BlockT, Header, NumberFor};
 
 use ulx_node_runtime::{AccountId, BlockNumber, NotebookVerifyError};
 use ulx_primitives::{
@@ -197,6 +198,7 @@ impl<B: BlockT, C: AuxStore + 'static> UlxAux<B, C> {
 		notary_id: NotaryId,
 		latest_runtime_notebook_number: NotebookNumber,
 		submitting_tick: Tick,
+		latest_known_finalized_block: NumberFor<B>,
 	) -> Result<
 		(
 			NotebookHeaderData<NotebookVerifyError, BlockNumber>,
@@ -217,6 +219,21 @@ impl<B: BlockT, C: AuxStore + 'static> UlxAux<B, C> {
 			let tick = notebook.tick;
 
 			let state = self.get_notebook_tick_state(tick)?.get();
+
+			if state.latest_finalized_block_needed >
+				latest_known_finalized_block.unique_saturated_into()
+			{
+				log::warn!(
+					"Skipping notebook #{} for notary {} at tick {} because it requires a finalized block {} past our latest {}",
+					notebook.notebook_number,
+					notary_id,
+					tick,
+					state.latest_finalized_block_needed,
+					latest_known_finalized_block
+				);
+				break;
+			}
+
 			if tick == submitting_tick {
 				let details =
 					state.notebook_key_details_by_notary.get(&notary_id).ok_or_else(|| {
@@ -255,6 +272,7 @@ impl<B: BlockT, C: AuxStore + 'static> UlxAux<B, C> {
 		self.get_or_insert_state(key)
 	}
 
+	/// Keeps a manually truncated vec of the last 2000 notary audit results
 	pub fn get_notary_audit_history(
 		&self,
 		notary_id: NotaryId,
@@ -342,7 +360,19 @@ impl<B: BlockT, C: AuxStore + 'static> UlxAux<B, C> {
 
 		self.get_notary_audit_history(notary_id)?.mutate(|notebooks| {
 			if !notebooks.iter().any(|n| n.notebook_number == audit_result.notebook_number) {
-				notebooks.push(audit_result.clone());
+				// look backwards for the first index where the notebook number is less than the
+				// current
+				let mut index = notebooks.len();
+				for (i, n) in notebooks.iter().enumerate().rev() {
+					if n.notebook_number < audit_result.notebook_number {
+						index = i + 1;
+						break;
+					}
+				}
+				notebooks.insert(index, audit_result.clone());
+				if notebooks.len() > 2000 {
+					notebooks.remove(0);
+				}
 			}
 		})?;
 		Ok(notary_state)
