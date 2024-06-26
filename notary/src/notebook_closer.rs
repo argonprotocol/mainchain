@@ -668,6 +668,9 @@ mod tests {
 		};
 		let host: Host = format!("ws://{}:{}", ip, addr.port()).into();
 		let notary_proposal = tx().notaries().propose(NotaryMeta {
+			name: runtime_types::ulx_primitives::notary::NotaryName(
+				"test".as_bytes().to_vec().into(),
+			),
 			hosts: vec![runtime_types::ulx_primitives::host::Host(host.0.into())].into(),
 			public: notary_key.0,
 		});

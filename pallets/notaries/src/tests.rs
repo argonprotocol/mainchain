@@ -28,6 +28,7 @@ fn it_can_propose_a_notary() {
 		assert_ok!(Notaries::propose(
 			RuntimeOrigin::signed(1),
 			NotaryMeta::<MaxNotaryHosts> {
+				name: "TestNotary".into(),
 				public: Ed25519Keyring::Alice.public(),
 				hosts: rpc_hosts("ws://localhost:9945"),
 			}
@@ -37,6 +38,7 @@ fn it_can_propose_a_notary() {
 			Event::NotaryProposed {
 				operator_account: 1,
 				meta: NotaryMeta::<MaxNotaryHosts> {
+					name: "TestNotary".into(),
 					public: Ed25519Keyring::Alice.public(),
 					hosts: rpc_hosts("ws://localhost:9945"),
 				},
@@ -57,6 +59,7 @@ fn it_cleans_up_proposals() {
 		assert_ok!(Notaries::propose(
 			RuntimeOrigin::signed(1),
 			NotaryMeta::<MaxNotaryHosts> {
+				name: "TestNotary".into(),
 				public: Ed25519Keyring::Alice.public(),
 				hosts: rpc_hosts("ws://localhost:9945"),
 			}
@@ -77,6 +80,7 @@ fn it_only_allows_one_proposal_per_account_at_a_time() {
 		assert_ok!(Notaries::propose(
 			RuntimeOrigin::signed(1),
 			NotaryMeta::<MaxNotaryHosts> {
+				name: "TestNotary".into(),
 				public: Ed25519Keyring::Alice.public(),
 				hosts: rpc_hosts("ws://localhost:9945"),
 			}
@@ -85,6 +89,7 @@ fn it_only_allows_one_proposal_per_account_at_a_time() {
 		assert_ok!(Notaries::propose(
 			RuntimeOrigin::signed(1),
 			NotaryMeta::<MaxNotaryHosts> {
+				name: "TestNotary".into(),
 				public: Ed25519Keyring::Alice.public(),
 				hosts: rpc_hosts("ws://localhost:9944"),
 			}
@@ -100,8 +105,8 @@ fn it_allows_proposal_activation() {
 		assert_ok!(Notaries::propose(
 			RuntimeOrigin::signed(1),
 			NotaryMeta::<MaxNotaryHosts> {
-				public: Ed25519Keyring::Alice.public(),
-				hosts: rpc_hosts("ws://localhost:9945"),
+				name: "TestNotary".into(),
+public: Ed25519Keyring::Alice.public(),										hosts: rpc_hosts("ws://localhost:9945"),
 			}
 		));
 		System::set_block_number(2);
@@ -115,8 +120,8 @@ fn it_allows_proposal_activation() {
 				operator_account_id: 1,
 				meta: {
 					NotaryMeta::<MaxNotaryHosts> {
-						public: Ed25519Keyring::Alice.public(),
-						hosts: rpc_hosts("ws://localhost:9945"),
+						name: "TestNotary".into(),
+public: Ed25519Keyring::Alice.public(),												hosts: rpc_hosts("ws://localhost:9945"),
 					}
 				},
 				activated_block: 2,
@@ -148,6 +153,7 @@ fn it_allows_a_notary_to_update_meta() {
 		assert_ok!(Notaries::propose(
 			RuntimeOrigin::signed(1),
 			NotaryMeta::<MaxNotaryHosts> {
+				name: "TestNotary".into(),
 				public: Ed25519Keyring::Alice.public(),
 				hosts: rpc_hosts("ws://localhost:9945"),
 			}
@@ -166,6 +172,7 @@ fn it_allows_a_notary_to_update_meta() {
 				RuntimeOrigin::signed(2),
 				1,
 				NotaryMeta::<MaxNotaryHosts> {
+					name: "TestNotary".into(),
 					public: Ed25519Keyring::Alice.public(),
 					hosts: rpc_hosts("ws://localhost:9946"),
 				},
@@ -178,6 +185,7 @@ fn it_allows_a_notary_to_update_meta() {
 				RuntimeOrigin::signed(1),
 				1,
 				NotaryMeta::<MaxNotaryHosts> {
+					name: "BobNotary".into(),
 					public: Ed25519Keyring::Bob.public(),
 					hosts: rpc_hosts("ws://localhost:9946"),
 				},
@@ -189,6 +197,7 @@ fn it_allows_a_notary_to_update_meta() {
 			RuntimeOrigin::signed(1),
 			1,
 			NotaryMeta::<MaxNotaryHosts> {
+				name: "BobNotary".into(),
 				public: Ed25519Keyring::Bob.public(),
 				hosts: rpc_hosts("ws://localhost:9946"),
 			},
@@ -203,6 +212,7 @@ fn it_allows_a_notary_to_update_meta() {
 			Event::NotaryMetaUpdateQueued {
 				notary_id: 1,
 				meta: NotaryMeta::<MaxNotaryHosts> {
+					name: "BobNotary".into(),
 					public: Ed25519Keyring::Bob.public(),
 					hosts: rpc_hosts("ws://localhost:9946"),
 				},
@@ -223,6 +233,7 @@ fn it_allows_a_notary_to_update_meta() {
 			Event::NotaryMetaUpdated {
 				notary_id: 1,
 				meta: NotaryMeta::<MaxNotaryHosts> {
+					name: "BobNotary".into(),
 					public: Ed25519Keyring::Bob.public(),
 					hosts: rpc_hosts("ws://localhost:9946"),
 				},
@@ -246,6 +257,7 @@ fn it_verifies_notary_signatures_matching_block_heights() {
 		assert_ok!(Notaries::propose(
 			RuntimeOrigin::signed(1),
 			NotaryMeta::<MaxNotaryHosts> {
+				name: "TestNotary".into(),
 				public: Ed25519Keyring::Alice.public(),
 				hosts: rpc_hosts("ws://localhost:9945"),
 			}
@@ -263,6 +275,7 @@ fn it_verifies_notary_signatures_matching_block_heights() {
 			RuntimeOrigin::signed(1),
 			1,
 			NotaryMeta::<MaxNotaryHosts> {
+				name: "BobNotary".into(),
 				public: Ed25519Keyring::Bob.public(),
 				hosts: rpc_hosts("ws://localhost:9946"),
 			},

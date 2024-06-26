@@ -90,7 +90,15 @@ description = "Update metadata"
 script = "client/update.sh"
 dependencies = ["build"]
 
+
 [tasks.test]
+description = "Run tests with nextest,"
+command = "cargo"
+args = ["test", "--features", "fast-runtime", "--no-fail-fast"]
+dependencies = ["build"]
+env = { "RUSTC_WRAPPER" = "sccache" }
+
+[tasks.nextest]
 description = "Run tests with nextest,"
 command = "cargo"
 args = ["nextest", "run", "--features", "fast-runtime"]
@@ -98,7 +106,7 @@ dependencies = ["build"]
 env = { "RUSTC_WRAPPER" = "sccache" }
 install_crate_args = ["--no-confirm"]
 
-[tasks.test.install_crate]
+[tasks.nextest.install_crate]
 crate_name = "cargo-nextest"
 binary = "nextest"
 test_arg = "--version"

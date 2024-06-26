@@ -242,7 +242,6 @@ pub fn new_full<
 	let (rpc_extensions_builder, shared_voter_state) = {
 		let client = client.clone();
 		let pool = transaction_pool.clone();
-		let rpc_backend = backend.clone();
 		let justification_stream = grandpa_link.justification_stream();
 		let shared_authority_set = grandpa_link.shared_authority_set().clone();
 		let shared_voter_state = SharedVoterState::empty();
@@ -264,7 +263,6 @@ pub fn new_full<
 					subscription_executor,
 					finality_provider: finality_proof_provider.clone(),
 				},
-				backend: rpc_backend.clone(),
 			};
 			rpc::create_full(deps).map_err(Into::into)
 		});

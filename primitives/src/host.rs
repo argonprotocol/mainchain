@@ -3,6 +3,7 @@ use scale_info::TypeInfo;
 use serde::{Deserialize, Serialize};
 use sp_debug_derive::RuntimeDebug;
 use sp_runtime::{traits::ConstU32, BoundedVec};
+use sp_std::vec::Vec;
 
 #[derive(
 	PartialEq,
@@ -34,7 +35,6 @@ impl From<&str> for Host {
 	}
 }
 
-#[cfg(feature = "std")]
 impl From<Vec<u8>> for Host {
 	fn from(host: Vec<u8>) -> Self {
 		Self(BoundedVec::truncate_from(host))

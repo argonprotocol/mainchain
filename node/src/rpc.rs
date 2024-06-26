@@ -46,8 +46,6 @@ pub struct FullDeps<C, P, B> {
 	pub deny_unsafe: DenyUnsafe,
 	/// GRANDPA specific dependencies.
 	pub grandpa: GrandpaDeps<B>,
-	/// The backend used by the node.
-	pub backend: Arc<B>,
 }
 
 /// Instantiate all full RPC extensions.
@@ -70,7 +68,7 @@ where
 	use substrate_frame_rpc_system::{System, SystemApiServer};
 
 	let mut module = RpcModule::new(());
-	let FullDeps { client, pool, deny_unsafe, grandpa, backend: _ } = deps;
+	let FullDeps { client, pool, deny_unsafe, grandpa } = deps;
 	let GrandpaDeps {
 		shared_voter_state,
 		shared_authority_set,

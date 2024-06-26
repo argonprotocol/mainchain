@@ -3,7 +3,7 @@
     "target": "es2022",
     "module": "es2022",
     "composite": true,
-    "declaration": false,
+    "declaration": true,
     "noImplicitAny": true,
     "noUnusedLocals": true,
     "noImplicitReturns": true,
