@@ -4,7 +4,7 @@ use std::{cmp::max, sync::Arc, time::Duration};
 
 use futures::FutureExt;
 use sc_client_api::{Backend, BlockBackend};
-use sc_consensus_grandpa::{FinalityProofProvider, GrandpaBlockImport, SharedVoterState};
+use sc_consensus_grandpa::{GrandpaBlockImport, SharedVoterState};
 use sc_service::{
 	config::Configuration, error::Error as ServiceError, TaskManager, WarpSyncParams,
 };
@@ -241,36 +241,18 @@ pub fn new_full<
 	let prometheus_registry = config.prometheus_registry().cloned();
 	let keystore = keystore_container.keystore();
 
-	let (rpc_extensions_builder, shared_voter_state) = {
+	let rpc_extensions_builder = {
 		let client = client.clone();
 		let pool = transaction_pool.clone();
-		let rpc_backend = backend.clone();
-		let justification_stream = grandpa_link.justification_stream();
-		let shared_authority_set = grandpa_link.shared_authority_set().clone();
-		let shared_voter_state = SharedVoterState::empty();
-		let shared_voter_state2 = shared_voter_state.clone();
-		let finality_proof_provider = FinalityProofProvider::new_for_service(
-			backend.clone(),
-			Some(shared_authority_set.clone()),
-		);
 
-		let rpc_extensions_builder = Box::new(move |deny_unsafe, subscription_executor| {
-			let deps = rpc::FullDeps {
+		Box::new(move |deny_unsafe, _| {
+			rpc::create_full(rpc::FullDeps {
 				client: client.clone(),
 				pool: pool.clone(),
 				deny_unsafe,
-				grandpa: rpc::GrandpaDeps {
-					shared_voter_state: shared_voter_state.clone(),
-					shared_authority_set: shared_authority_set.clone(),
-					justification_stream: justification_stream.clone(),
-					subscription_executor,
-					finality_provider: finality_proof_provider.clone(),
-				},
-				backend: rpc_backend.clone(),
-			};
-			rpc::create_full(deps).map_err(Into::into)
-		});
-		(rpc_extensions_builder, shared_voter_state2)
+			})
+			.map_err(Into::into)
+		})
 	};
 
 	let _rpc_handlers = sc_service::spawn_tasks(sc_service::SpawnTasksParams {
@@ -382,7 +364,7 @@ pub fn new_full<
 				notification_service: grandpa_notification_service,
 				voting_rule: sc_consensus_grandpa::VotingRulesBuilder::default().build(),
 				prometheus_registry,
-				shared_voter_state,
+				shared_voter_state: SharedVoterState::empty(),
 				telemetry: telemetry.as_ref().map(|x| x.handle()),
 				offchain_tx_pool_factory: OffchainTransactionPoolFactory::new(transaction_pool),
 			};

@@ -149,7 +149,8 @@ pub mod api {
 				#[doc = " Returns the version of the runtime."]
 				pub fn version(
 					&self,
-				) -> ::subxt::runtime_api::Payload<types::Version, types::version::output::Output> {
+				) -> ::subxt::runtime_api::Payload<types::Version, types::version::output::Output>
+				{
 					::subxt::runtime_api::Payload::new_static(
 						"Core",
 						"version",
@@ -1791,7 +1792,8 @@ pub mod api {
 				}
 				pub fn ticker(
 					&self,
-				) -> ::subxt::runtime_api::Payload<types::Ticker, types::ticker::output::Output> {
+				) -> ::subxt::runtime_api::Payload<types::Ticker, types::ticker::output::Output>
+				{
 					::subxt::runtime_api::Payload::new_static(
 						"TickApis",
 						"ticker",
@@ -3915,7 +3917,8 @@ pub mod api {
 				#[doc = " The maximum length of a block (in bytes)."]
 				pub fn block_length(
 					&self,
-				) -> ::subxt::constants::Address<runtime_types::frame_system::limits::BlockLength> {
+				) -> ::subxt::constants::Address<runtime_types::frame_system::limits::BlockLength>
+				{
 					::subxt::constants::Address::new_static(
 						"System",
 						"BlockLength",
