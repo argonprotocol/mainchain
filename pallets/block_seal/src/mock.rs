@@ -121,6 +121,7 @@ impl pallet_block_seal::Config for Test {
 	type BlockVotingProvider = StaticBlockVotingProvider;
 	type TickProvider = StaticTickProvider;
 	type DataDomainProvider = StaticDataDomainProvider;
+	type EventHandler = ();
 }
 
 // Build genesis storage according to the mock runtime.

@@ -37,7 +37,7 @@ parameter_types! {
 	pub static BlocksBetweenSlots: u32 = 1;
 	pub static MaxCohortSize: u32 = 5;
 	pub static MaxMiners: u32 = 10;
-	pub static BlocksBufferToStopAcceptingBids: u32 = 0;
+	pub static BlocksBeforeBidEndForVrfClose: u32 = 0;
 	pub const OwnershipPercentDamper: u32 = 80;
 
 	pub static ExistentialDeposit: Balance = 1;
@@ -138,7 +138,7 @@ impl pallet_mining_slot::Config for Test {
 	type OwnershipCurrency = UlixeeBalances;
 	type RuntimeHoldReason = RuntimeHoldReason;
 	type OwnershipPercentDamper = OwnershipPercentDamper;
-	type BlocksBufferToStopAcceptingBids = BlocksBufferToStopAcceptingBids;
+	type BlocksBeforeBidEndForVrfClose = BlocksBeforeBidEndForVrfClose;
 	type Balance = Balance;
 	type BondProvider = StaticBondProvider;
 }

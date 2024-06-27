@@ -308,7 +308,7 @@ parameter_types! {
 	pub const Offset: u32 = 0;
 	pub const OwnershipPercentDamper: u32 = 80;
 
-	pub const BlocksBufferToStopAcceptingBids: u32 = prod_or_fast!(10, 1);
+	pub const BlocksBeforeBidEndForVrfClose: u32 = prod_or_fast!(200, 1);
 
 	pub const MaxConcurrentlyExpiringBonds: u32 = 1000;
 	pub const MinimumBondAmount:u128 = 1_000;
@@ -375,7 +375,7 @@ impl pallet_mining_slot::Config for Runtime {
 	type MaxMiners = MaxMiners;
 	type OwnershipCurrency = UlixeeBalances;
 	type OwnershipPercentDamper = OwnershipPercentDamper;
-	type BlocksBufferToStopAcceptingBids = BlocksBufferToStopAcceptingBids;
+	type BlocksBeforeBidEndForVrfClose = BlocksBeforeBidEndForVrfClose;
 	type RuntimeHoldReason = RuntimeHoldReason;
 	type MaxCohortSize = MaxCohortSize;
 	type SessionIndicesToKeepInHistory = SessionIndicesToKeepInHistory;
@@ -392,6 +392,7 @@ impl pallet_block_seal::Config for Runtime {
 	type BlockVotingProvider = BlockSealSpec;
 	type TickProvider = Ticks;
 	type DataDomainProvider = DataDomain;
+	type EventHandler = MiningSlot;
 }
 
 impl pallet_session::Config for Runtime {
@@ -812,7 +813,7 @@ mod runtime {
 	pub type DataDomain = pallet_data_domain;
 	#[runtime::pallet_index(14)]
 	pub type PriceIndex = pallet_price_index;
-	// Authorship must be before session
+	// NOTE: Authorship must be before session
 	#[runtime::pallet_index(15)]
 	pub type Authorship = pallet_authorship;
 	#[runtime::pallet_index(16)]
@@ -821,7 +822,7 @@ mod runtime {
 	pub type Session = pallet_session;
 	#[runtime::pallet_index(18)]
 	pub type BlockSeal = pallet_block_seal;
-	// BlockRewards must come after seal
+	// NOTE: BlockRewards must come after seal (on_finalize uses seal info)
 	#[runtime::pallet_index(19)]
 	pub type BlockRewards = pallet_block_rewards;
 	#[runtime::pallet_index(20)]

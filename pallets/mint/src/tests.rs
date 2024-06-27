@@ -57,17 +57,17 @@ fn it_calculates_per_miner_mint() {
 		Balances::set_total_issuance(1000);
 		// zero conditions
 		assert_eq!(UlixeeMint::get_argons_to_print_per_miner(FixedI128::from_float(0.0), 0), 0);
-		assert_eq!(UlixeeMint::get_argons_to_print_per_miner(FixedI128::from_float(-1.0), 100), 0);
+		assert_eq!(UlixeeMint::get_argons_to_print_per_miner(FixedI128::from_float(1.0), 100), 0);
 		assert_eq!(UlixeeMint::get_argons_to_print_per_miner(FixedI128::from_float(0.01), 0), 0);
 		assert_eq!(UlixeeMint::get_argons_to_print_per_miner(FixedI128::from_float(0.0), 1), 0);
 
 		// divides cleanly
-		assert_eq!(UlixeeMint::get_argons_to_print_per_miner(FixedI128::from_float(0.01), 1), 10);
-		assert_eq!(UlixeeMint::get_argons_to_print_per_miner(FixedI128::from_float(0.01), 2), 5);
-		assert_eq!(UlixeeMint::get_argons_to_print_per_miner(FixedI128::from_float(0.02), 2), 10);
+		assert_eq!(UlixeeMint::get_argons_to_print_per_miner(FixedI128::from_float(-0.01), 1), 10);
+		assert_eq!(UlixeeMint::get_argons_to_print_per_miner(FixedI128::from_float(-0.01), 2), 5);
+		assert_eq!(UlixeeMint::get_argons_to_print_per_miner(FixedI128::from_float(-0.02), 2), 10);
 
 		// handles uneven splits
-		assert_eq!(UlixeeMint::get_argons_to_print_per_miner(FixedI128::from_float(0.01), 3), 3);
+		assert_eq!(UlixeeMint::get_argons_to_print_per_miner(FixedI128::from_float(-0.01), 3), 3);
 	});
 }
 

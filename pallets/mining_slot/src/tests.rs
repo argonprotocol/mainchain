@@ -1,16 +1,17 @@
-use std::collections::HashMap;
+use std::{collections::HashMap, env};
 
 use frame_support::{
 	assert_err, assert_noop, assert_ok,
 	traits::{fungible::InspectHold, Currency, OnInitialize, OneSessionHandler},
 };
 use pallet_balances::Event as UlixeeBalancesEvent;
-use sp_core::{bounded_vec, U256};
+use sp_core::{bounded_vec, crypto::AccountId32, ByteArray, H256, U256};
 use sp_runtime::{testing::UintAuthorityId, BoundedVec};
 
 use ulx_primitives::{
 	block_seal::{MiningAuthority, MiningRegistration, RewardDestination},
-	AuthorityProvider, BlockSealAuthorityId,
+	inherents::BlockSealInherent,
+	AuthorityProvider, BlockSealAuthorityId, BlockVote, DataDomain, DataTLD, MerkleProof,
 };
 
 use crate::{
@@ -720,4 +721,74 @@ fn it_can_replace_authority_keys() {
 			"should not have index 11"
 		);
 	});
+}
+
+#[test]
+fn it_will_end_auctions_if_a_seal_qualifies() {
+	BlocksBetweenSlots::set(100);
+	MaxMiners::set(6);
+	MaxCohortSize::set(2);
+	BlocksBeforeBidEndForVrfClose::set(10);
+
+	new_test_ext(None).execute_with(|| {
+		System::set_block_number(89);
+
+		IsNextSlotBiddingOpen::<Test>::set(true);
+
+		let seal = BlockSealInherent::Compute;
+		// it's too soon
+		assert_eq!(MiningSlots::check_for_bidding_close(&seal), false);
+
+		// This seal strength was generated using the commented out loop below
+		let seal_strength = U256::from_dec_str(
+			"55660301883345363905660969606306034026269601808931936101802154266730817045052",
+		)
+		.expect("can read seal strength u256");
+
+		let seal = create_block_vote_seal(seal_strength);
+		assert_eq!(MiningSlots::check_for_bidding_close(&seal), false);
+
+		// now we're the right block
+		System::set_block_number(90);
+		assert_eq!(MiningSlots::check_for_bidding_close(&seal), true);
+		assert_eq!(MiningSlots::check_for_bidding_close(&BlockSealInherent::Compute), false);
+
+		let invalid_strength = U256::from(1);
+		let seal = create_block_vote_seal(invalid_strength);
+		assert_eq!(MiningSlots::check_for_bidding_close(&seal), false);
+
+		if env::var("TEST_DISTRO").unwrap_or("false".to_string()) == "true" {
+			let mut valid_seals = vec![];
+			for _ in 0..10u32 {
+				let seal_strength = U256::from_big_endian(H256::random().as_ref());
+				let seal = create_block_vote_seal(seal_strength);
+
+				if MiningSlots::check_for_bidding_close(&seal) {
+					valid_seals.push(seal_strength);
+				}
+			}
+			assert!(valid_seals.len() > 0, "Should have found at least one valid seal");
+			println!("Valid seals: {:?}", valid_seals);
+		}
+	})
+}
+
+fn create_block_vote_seal(seal_strength: U256) -> BlockSealInherent {
+	BlockSealInherent::Vote {
+		seal_strength,
+		notary_id: 1,
+		block_vote: BlockVote {
+			block_hash: System::block_hash(System::block_number().saturating_sub(4)),
+			data_domain_hash: DataDomain::new("test", DataTLD::Bikes).hash(),
+			data_domain_account: AccountId32::from_slice(&[0u8; 32]).expect("32 bytes"),
+			account_id: AccountId32::from_slice(&[2u8; 32]).expect("32 bytes"),
+			index: 1,
+			power: 500,
+			block_rewards_account_id: AccountId32::from_slice(&[3u8; 32]).expect("32 bytes"),
+			signature: sp_core::sr25519::Signature::from_raw([0u8; 64]).into(),
+		},
+		miner_signature: sp_core::ed25519::Signature::from_raw([0u8; 64]).into(),
+		source_notebook_number: 1,
+		source_notebook_proof: MerkleProof::default(),
+	}
 }

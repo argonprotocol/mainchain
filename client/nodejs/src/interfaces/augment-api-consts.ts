@@ -162,13 +162,13 @@ declare module '@polkadot/api-base/types/consts' {
     };
     miningSlot: {
       /**
+       * How many blocks before the end of a slot can the bid close
+       **/
+      blocksBeforeBidEndForVrfClose: u32 & AugmentedConst<ApiType>;
+      /**
        * How many blocks transpire between slots
        **/
       blocksBetweenSlots: u32 & AugmentedConst<ApiType>;
-      /**
-       * How many blocks buffer shall we use to stop accepting bids for the next period
-       **/
-      blocksBufferToStopAcceptingBids: u32 & AugmentedConst<ApiType>;
       /**
        * How many new miners can be in the cohort for each slot
        **/

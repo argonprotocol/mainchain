@@ -206,7 +206,7 @@ async fn test_bitcoin_minting_e2e() -> anyhow::Result<()> {
 		.sign_and_submit_then_watch_default(
 			&tx().price_index().submit(Index {
 				btc_usd_price: FixedU128Ext(FixedU128::from_rational(6_200_000, 1_00).into_inner()),
-				argon_cpi: FixedI128Ext(FixedI128::from_float(0.1).into_inner()),
+				argon_cpi: FixedI128Ext(FixedI128::from_float(-0.1).into_inner()),
 				argon_usd_price: FixedU128Ext(FixedU128::from_rational(1_00, 1_00).into_inner()),
 				timestamp: SystemTime::now()
 					.duration_since(SystemTime::UNIX_EPOCH)
