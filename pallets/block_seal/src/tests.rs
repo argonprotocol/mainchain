@@ -105,7 +105,7 @@ fn it_should_read_the_digests() {
 
 		TempSealInherent::<Test>::put(BlockSealInherent::Compute);
 		LastBlockSealerInfo::<Test>::put(BlockSealerInfo {
-			block_vote_rewards_account: 1,
+			block_vote_rewards_account: Some(1),
 			miner_rewards_account: 1,
 		});
 		BlockSeal::on_finalize(42);

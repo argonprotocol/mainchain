@@ -266,7 +266,7 @@ pub mod pallet {
 				BlockSealInherent::Compute => {
 					// NOTE: the compute nonce is checked in the node
 					<LastBlockSealerInfo<T>>::put(BlockSealerInfo {
-						block_vote_rewards_account: miner_rewards_account.clone(),
+						block_vote_rewards_account: None,
 						miner_rewards_account,
 					});
 				},
@@ -312,7 +312,7 @@ pub mod pallet {
 					)?;
 					<LastBlockSealerInfo<T>>::put(BlockSealerInfo {
 						miner_rewards_account,
-						block_vote_rewards_account,
+						block_vote_rewards_account: Some(block_vote_rewards_account),
 					});
 				},
 			}

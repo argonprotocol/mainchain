@@ -89,7 +89,7 @@ parameter_types! {
 	pub static NotebooksInBlock: Vec<(NotaryId, NotebookNumber, Tick)> = vec![];
 
 	pub static BlockSealer:BlockSealerInfo<u64> = BlockSealerInfo {
-		block_vote_rewards_account: 1,
+		block_vote_rewards_account: Some(1),
 		miner_rewards_account: 1,
 	};
 }
