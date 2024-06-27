@@ -193,8 +193,7 @@ where
 				&vote.closest_miner.1,
 				vote.seal_strength,
 			) else {
-				// can't sign, not an error
-				return Ok(());
+				continue;
 			};
 
 			let mut sender = self.sender.clone();
