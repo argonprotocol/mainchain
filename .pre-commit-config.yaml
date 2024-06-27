@@ -25,3 +25,11 @@ repos:
         types: [ rust ]
         pass_filenames: false
         stages: [ commit, push ]
+      - id: lint
+        name: Run clippy
+        args: [ "make", "lint" ]
+        entry: cargo
+        language: system
+        types: [ rust ]
+        pass_filenames: false
+        stages: [ push ]

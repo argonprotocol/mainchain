@@ -1,6 +1,6 @@
 {
   "db_name": "PostgreSQL",
-  "query": "\n\t\t\tSELECT new_account_origins, notebook_number FROM notebooks\n\t\t\tWHERE new_account_origins @> $1::jsonb \n\t\t\tORDER BY notebook_number DESC LIMIT 1\n\t\t\t",
+  "query": "\n\t\t\tSELECT new_account_origins, notebook_number FROM notebooks\n\t\t\tWHERE new_account_origins @> $1::jsonb\n\t\t\tORDER BY notebook_number DESC LIMIT 1\n\t\t\t",
   "describe": {
     "columns": [
       {
@@ -24,5 +24,5 @@
       false
     ]
   },
-  "hash": "047b897b7ea1024b75d3dc5e69a2d3c2ce1a1967f538f35beebc0144d53e3e41"
+  "hash": "d684a17dd4dcc2812e65035ea1f69cac96312a9c5bd4bfba6e1ecd977bca0a25"
 }

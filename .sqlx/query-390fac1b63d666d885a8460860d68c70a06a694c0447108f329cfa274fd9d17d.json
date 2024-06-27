@@ -1,0 +1,18 @@
+{
+  "db_name": "PostgreSQL",
+  "query": "\n\t\t\tINSERT INTO balance_tips (key, value, last_changed_notebook, last_changed_tick) VALUES ($1, $2, $3, $4)\n\t\t\tON CONFLICT (key)\n\t\t\tDO UPDATE SET value = $2, last_changed_notebook = $3, last_changed_tick = $4\n\t\t\t\tWHERE balance_tips.value = $5;\n\t\t\t",
+  "describe": {
+    "columns": [],
+    "parameters": {
+      "Left": [
+        "Bytea",
+        "Bytea",
+        "Int4",
+        "Int4",
+        "Bytea"
+      ]
+    },
+    "nullable": []
+  },
+  "hash": "390fac1b63d666d885a8460860d68c70a06a694c0447108f329cfa274fd9d17d"
+}
