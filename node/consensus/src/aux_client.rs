@@ -154,7 +154,7 @@ impl<B: BlockT, C: AuxStore + 'static> UlxAux<B, C> {
 			self.authors_by_voting_key_at_height(block_number)?
 				.mutate(|authors_at_height| {
 					if !authors_at_height.entry(voting_key).or_default().insert(author.clone()) {
-						return Err(Error::DuplicateAuthoredBlock(author).into());
+						return Err(Error::DuplicateAuthoredBlock(author));
 					}
 					Ok::<(), Error>(())
 				})??;
@@ -335,7 +335,7 @@ impl<B: BlockT, C: AuxStore + 'static> UlxAux<B, C> {
 		raw_signed_header: Vec<u8>,
 		vote_details: &NotaryNotebookVoteDetails<B::Hash>,
 	) -> Result<NotaryNotebookTickState, Error> {
-		let notary_state = self.update_tick_state(raw_signed_header, &vote_details)?;
+		let notary_state = self.update_tick_state(raw_signed_header, vote_details)?;
 
 		self.get_notary_audit_history(notary_id)?.mutate(|notebooks| {
 			if !notebooks.iter().any(|n| n.notebook_number == audit_result.notebook_number) {
@@ -393,7 +393,7 @@ impl<B: BlockT, C: AuxStore + 'static> UlxAux<B, C> {
 	) -> Result<Arc<AuxData<T, C>>, Error> {
 		let mut state = self.state.write();
 		let entry = state
-			.get_or_insert(key.clone(), || key.default_state(self.client.clone()).into())
+			.get_or_insert(key.clone(), || key.default_state(self.client.clone()))
 			.ok_or(Error::StringError(format!("Error unlocking notary state for {key:?}")))?;
 		if let Some(data) = entry.as_any().downcast_ref::<Arc<AuxData<T, C>>>() {
 			Ok(data.clone())

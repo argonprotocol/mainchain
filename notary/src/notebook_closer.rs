@@ -148,15 +148,14 @@ impl NotebookCloser {
 			let mut tx = self.pool.begin().await?;
 			let step = NotebookFinalizationStep::ReadyForClose;
 			let (notebook_number, tick) =
-				match NotebookStatusStore::find_and_lock_ready_for_close(&mut *tx).await? {
+				match NotebookStatusStore::find_and_lock_ready_for_close(&mut tx).await? {
 					Some(notebook_number) => notebook_number,
 					None => return Ok(()),
 				};
 
 			let public = RegisteredKeyStore::get_valid_public(&mut *tx, tick).await?;
 
-			NotebookStore::close_notebook(&mut *tx, notebook_number, public, &self.keystore)
-				.await?;
+			NotebookStore::close_notebook(&mut tx, notebook_number, public, &self.keystore).await?;
 
 			NotebookStatusStore::next_step(&mut *tx, notebook_number, step).await?;
 			tx.commit().await?;

@@ -7,12 +7,11 @@ use sp_runtime::BuildStorage;
 
 use ulx_primitives::{
 	block_seal::MiningAuthority,
-	block_vote::VoteMinimum,
 	inherents::BlockSealInherent,
 	notebook::NotebookNumber,
 	tick::{Tick, Ticker},
-	AuthorityProvider, BlockSealAuthorityId, BlockVotingProvider, NotaryId, NotebookProvider,
-	NotebookSecret, TickProvider,
+	AuthorityProvider, BlockSealAuthorityId, NotaryId, NotebookProvider, NotebookSecret,
+	TickProvider,
 };
 
 use crate as pallet_block_seal_spec;
@@ -48,7 +47,6 @@ parameter_types! {
 	pub static XorClosest: Option<MiningAuthority<BlockSealAuthorityId, u64>> = None;
 	pub static VotingRoots: BTreeMap<(NotaryId, Tick), (H256, NotebookNumber)> = BTreeMap::new();
 	pub static ParentVotingKey: Option<H256> = None;
-	pub static GrandpaVoteMinimum: Option<VoteMinimum> = None;
 	pub static MinerZero: Option<(u64, MiningAuthority<BlockSealAuthorityId, u64>)> = None;
 	pub static MiningSlotsInitiatingTaxProof: u32 = 10;
 	pub static CurrentSeal: BlockSealInherent = BlockSealInherent::Compute;
@@ -81,12 +79,6 @@ impl AuthorityProvider<BlockSealAuthorityId, Block, u64> for StaticAuthorityProv
 	}
 }
 
-pub struct StaticBlockVotingProvider;
-impl BlockVotingProvider<Block> for StaticBlockVotingProvider {
-	fn grandparent_vote_minimum() -> Option<VoteMinimum> {
-		GrandpaVoteMinimum::get()
-	}
-}
 pub struct StaticNotebookProvider;
 
 impl NotebookProvider for StaticNotebookProvider {

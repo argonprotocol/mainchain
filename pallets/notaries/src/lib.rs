@@ -187,7 +187,7 @@ pub mod pallet {
 			let meta_changes = QueuedNotaryMetaChanges::<T>::take(current_tick);
 			if meta_changes.len() > 0 {
 				let old_block_to_preserve =
-					current_tick.saturating_sub(T::MaxTicksForKeyHistory::get().into());
+					current_tick.saturating_sub(T::MaxTicksForKeyHistory::get());
 				let _ = <ActiveNotaries<T>>::try_mutate(|active| -> DispatchResult {
 					for (notary_id, meta) in meta_changes.into_iter() {
 						if let Some(pos) = active.iter().position(|n| n.notary_id == notary_id) {

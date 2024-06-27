@@ -31,7 +31,7 @@ impl BlockComputeNonce {
 		key_block_hash: &H256,
 		difficulty: ComputeDifficulty,
 	) -> bool {
-		let hash = Self { nonce: nonce.clone(), pre_hash }
+		let hash = Self { nonce: *nonce, pre_hash }
 			.using_encoded(|x| calculate_hash(key_block_hash, x, false));
 		let Ok(hash) = hash else {
 			return false;
@@ -79,7 +79,7 @@ impl ComputeSolver {
 		let payload = &mut self.wip_nonce_hash;
 		payload.splice(payload.len() - nonce_bytes.len().., nonce_bytes);
 
-		let hash = calculate_hash(&self.key_block_hash, &payload, true)?;
+		let hash = calculate_hash(&self.key_block_hash, payload, true)?;
 		if BlockComputeNonce::meets_threshold(hash.as_fixed_bytes(), self.threshold) {
 			return Ok(Some(self.wip_nonce.clone()));
 		}
@@ -106,15 +106,14 @@ mod tests {
 
 		let key_block_hash = H256::from_slice(&[1u8; 32]);
 
-		assert_eq!(
-			BlockComputeNonce::is_valid(&U256::from(1), bytes.to_vec(), &key_block_hash, 1),
-			true
-		);
+		assert!(BlockComputeNonce::is_valid(&U256::from(1), bytes.to_vec(), &key_block_hash, 1));
 
-		assert_eq!(
-			BlockComputeNonce::is_valid(&U256::from(1), bytes.to_vec(), &key_block_hash, 10_000),
-			false
-		);
+		assert!(!BlockComputeNonce::is_valid(
+			&U256::from(1),
+			bytes.to_vec(),
+			&key_block_hash,
+			10_000
+		));
 	}
 
 	#[test]

@@ -12,18 +12,13 @@ pub use randomx_rs::RandomXError;
 use randomx_rs::{RandomXCache, RandomXDataset, RandomXFlag, RandomXVM};
 use sp_core::H256;
 
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, Default)]
 pub struct Config {
 	/// Recommended optimization: decreases the number of pages the system needs to manage, which
 	/// in turn reduces TLB (Translation Lookaside Buffer) misses and improves memory access speed
 	pub large_pages: bool,
 	/// Prevent side channel/timing attacks, but slower; also clears out memory after use
 	pub secure: bool,
-}
-impl Default for Config {
-	fn default() -> Self {
-		Self { large_pages: false, secure: false }
-	}
 }
 // Caches are shared cross threads
 lazy_static! {
@@ -36,9 +31,9 @@ lazy_static! {
 // VMs are stored in thread local storage to avoid locking
 thread_local! {
 	// FULL uses a dataset (4gb of storage) but solves way faster
-	static FULL_VM: RefCell<Option<(H256, RandomXVM)>> = RefCell::new(None);
+	static FULL_VM: RefCell<Option<(H256, RandomXVM)>> = const { RefCell::new(None) };
 	// LIGHT uses a cache (256mb of storage) but solves slower (appropriate for verification)
-	static LIGHT_VM: RefCell<Option<(H256, RandomXVM)>> = RefCell::new(None);
+	static LIGHT_VM: RefCell<Option<(H256, RandomXVM)>> = const { RefCell::new(None) };
 }
 
 pub fn calculate_hash(
@@ -49,13 +44,10 @@ pub fn calculate_hash(
 	alloc_vm_if_needed(key_hash, is_mining)?;
 
 	let ms = if is_mining { &FULL_VM } else { &LIGHT_VM };
-	match ms.with_borrow_mut(|vm| {
+	ms.with_borrow_mut(|vm| {
 		let (_, vm) = vm.as_mut().expect("Local VMS always set to Some above; qed");
-		vm.calculate_hash(pre_hash)
-	}) {
-		Err(e) => Err(e),
-		Ok(hash) => Ok(H256::from_slice(hash.as_ref())),
-	}
+		vm.calculate_hash(pre_hash).map(|e| H256::from_slice(e.as_ref()))
+	})
 }
 
 fn set_vm_data(is_mining: bool, data: &VMData, key_hash: &H256) -> Result<(), RandomXError> {
@@ -104,7 +96,7 @@ fn alloc_vm_if_needed(key_hash: &H256, is_mining: bool) -> Result<(), RandomXErr
 		let key_to_replace = (*shared_caches)
 			.iter()
 			.find(|&(_, cache)| Arc::strong_count(cache) == 1)
-			.and_then(|(key, _)| Some(*key))
+			.map(|(key, _)| *key)
 			.ok_or(RandomXError::Other("Cache space not available".to_string()))?;
 
 		// we'll use the previous entry and just update it
@@ -139,14 +131,14 @@ impl VMData {
 		let mut flags = RandomXFlag::get_recommended_flags();
 
 		if use_dataset {
-			flags = flags | RandomXFlag::FLAG_FULL_MEM;
+			flags |= RandomXFlag::FLAG_FULL_MEM;
 			if config.large_pages {
-				flags = flags | RandomXFlag::FLAG_LARGE_PAGES
+				flags |= RandomXFlag::FLAG_LARGE_PAGES
 			}
 		}
 
 		if config.secure {
-			flags = flags | RandomXFlag::FLAG_SECURE
+			flags |= RandomXFlag::FLAG_SECURE
 		}
 
 		let cache = RandomXCache::new(flags, key)?;
@@ -187,7 +179,6 @@ impl VMData {
 		let mut start_ticker = 0;
 		let dataset_arc = Arc::new(dataset);
 		let spawned = (0..cpus_to_use)
-			.into_iter()
 			.map(|i| {
 				let dataset = dataset_arc.clone();
 

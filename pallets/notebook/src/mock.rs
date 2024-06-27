@@ -1,15 +1,13 @@
 use env_logger::{Builder, Env};
 use frame_support::{derive_impl, parameter_types, traits::Currency};
-use sp_core::{crypto::AccountId32, ConstU32, H256, U256};
+use sp_core::{crypto::AccountId32, ConstU32, H256};
 use sp_runtime::{traits::IdentityLookup, BuildStorage};
 
 use ulx_primitives::{
-	block_seal::MiningAuthority,
 	block_vote::VoteMinimum,
 	notary::{NotaryId, NotaryProvider, NotarySignature},
 	tick::{Tick, Ticker},
-	AuthorityProvider, BlockSealAuthorityId, BlockVotingProvider, ChainTransferLookup,
-	TickProvider, TransferToLocalchainId,
+	BlockVotingProvider, ChainTransferLookup, TickProvider, TransferToLocalchainId,
 };
 
 use crate as pallet_notebook;
@@ -40,34 +38,6 @@ parameter_types! {
 
 	pub static ExistentialDeposit: Balance = 10;
 	pub static IsProofOfCompute: bool = false;
-}
-
-parameter_types! {
-	pub static AuthorityList: Vec<(AccountId32, BlockSealAuthorityId)> = vec![];
-	pub static XorClosest: Option<MiningAuthority<BlockSealAuthorityId, AccountId32>> = None;
-}
-pub struct StaticAuthorityProvider;
-impl AuthorityProvider<BlockSealAuthorityId, Block, AccountId32> for StaticAuthorityProvider {
-	fn get_authority(author: AccountId32) -> Option<BlockSealAuthorityId> {
-		AuthorityList::get().iter().find_map(|(account, id)| {
-			if *account == author {
-				Some(id.clone())
-			} else {
-				None
-			}
-		})
-	}
-	fn xor_closest_authority(
-		_: U256,
-	) -> Option<MiningAuthority<BlockSealAuthorityId, AccountId32>> {
-		XorClosest::get().clone()
-	}
-	fn get_rewards_account(_author: AccountId32) -> Option<AccountId32> {
-		None
-	}
-	fn get_all_rewards_accounts() -> Vec<AccountId32> {
-		vec![]
-	}
 }
 
 pub struct NotaryProviderImpl;

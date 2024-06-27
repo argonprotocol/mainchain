@@ -301,10 +301,10 @@ impl pallet_ticks::Config for Runtime {
 }
 
 parameter_types! {
-	pub const MaxCohortSize: u32 = 1_000; // this means mining_slot last 10 days
+	pub const MaxCohortSize: u32 = 1_000; // this means mining_slots last 10 days
 	pub const BlocksBetweenSlots: u32 = prod_or_fast!(1440, 4); // going to add a cohort every day
 	pub const MaxMiners: u32 = 10_000; // must multiply cleanly by MaxCohortSize
-	pub const SessionRotationPeriod: u32 = prod_or_fast!(120, 2); // must be cleanly divisible by BlocksBetweenSlots
+	pub const SessionRotationPeriod: u32 = prod_or_fast!(125, 2); // must be cleanly divisible by BlocksBetweenSlots
 	pub const Offset: u32 = 0;
 	pub const OwnershipPercentDamper: u32 = 80;
 

@@ -311,7 +311,7 @@ mod tests {
 			NotebookStatusStore::create(&mut *tx, 1, 1, Utc::now()).await?;
 			let _ = NotebookStatusStore::step_up_expired_open(&mut tx).await?;
 			assert_eq!(
-				NotebookStatusStore::find_and_lock_ready_for_close(&mut *tx,).await?,
+				NotebookStatusStore::find_and_lock_ready_for_close(&mut tx,).await?,
 				Some((1, 1))
 			);
 
@@ -320,7 +320,7 @@ mod tests {
 
 		let mut tx = pool.begin().await?;
 		assert_eq!(
-			NotebookStatusStore::find_and_lock_ready_for_close(&mut *tx).await?,
+			NotebookStatusStore::find_and_lock_ready_for_close(&mut tx).await?,
 			Some((1, 1))
 		);
 		{

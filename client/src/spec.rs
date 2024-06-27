@@ -6606,7 +6606,7 @@ pub mod api {
 				) -> ::subxt::constants::Address<::core::primitive::u32> {
 					::subxt::constants::Address::new_static(
 						"MiningSlot",
-						"BlocksBeforeBidEndForVrfClose",
+						"BlocksBufferToStopAcceptingBids",
 						[
 							98u8, 252u8, 116u8, 72u8, 26u8, 180u8, 225u8, 83u8, 200u8, 157u8,
 							125u8, 151u8, 53u8, 76u8, 168u8, 26u8, 10u8, 9u8, 98u8, 68u8, 9u8,

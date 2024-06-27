@@ -93,7 +93,7 @@ impl Escrow {
     balance_change.balance = balance_change
       .previous_balance_proof
       .as_ref()
-      .map(|a| a.balance.clone())
+      .map(|a| a.balance)
       .unwrap_or_default()
       .saturating_sub(MINIMUM_ESCROW_SETTLEMENT);
     let Ok(hrp) = Hrp::parse("esc") else {
@@ -164,10 +164,7 @@ impl Escrow {
       hold_amount: escrow_hold_note.milligons,
       from_address: AccountStore::to_address(&balance_change.account_id),
       to_address: AccountStore::to_address(recipient),
-      delegated_signer_address: match delegated_signer {
-        Some(address) => Some(AccountStore::to_address(address)),
-        None => None,
-      },
+      delegated_signer_address: delegated_signer.as_ref().map(AccountStore::to_address),
       balance_change_number: balance_change.change_number,
       data_domain_hash: data_domain_hash.map(|h| h.0.to_vec()).clone(),
       notary_id: proof.notary_id,
@@ -588,10 +585,7 @@ impl OpenEscrowsStore {
       balance_change_number: balance_tip.change_number,
       hold_amount: hold_note.milligons,
       from_address: account.address,
-      delegated_signer_address: match delegated_signer {
-        Some(address) => Some(AccountStore::to_address(address)),
-        None => None,
-      },
+      delegated_signer_address: delegated_signer.as_ref().map(AccountStore::to_address),
       to_address: AccountStore::to_address(recipient),
       data_domain_hash: data_domain_hash.map(|h| h.0.to_vec()).clone(),
       notary_id: *notary_id,

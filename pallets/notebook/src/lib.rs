@@ -547,7 +547,7 @@ pub mod pallet {
 			ensure!(
 				T::NotaryProvider::verify_signature(
 					notary_id,
-					notebook_number.into(),
+					notebook_number,
 					&notebook.hash,
 					&notebook.signature
 				),

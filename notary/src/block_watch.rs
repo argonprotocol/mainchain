@@ -78,7 +78,7 @@ async fn sync_finalized_blocks(
 
 		let public = Ed25519Public::from_raw(notary.meta.public);
 		let _ = activate_notebook_processing(
-			&mut *db,
+			&mut db,
 			notary_id,
 			public,
 			notary.meta_updated_tick,
@@ -238,70 +238,27 @@ async fn process_finalized_block(
 		.unwrap_or(ticker.current());
 
 	let events = block.events().await?;
-	for event in events.iter() {
-		if let Ok(event) = event {
-			if let Some(Ok(meta_change)) =
-				event.as_event::<api::notaries::events::NotaryMetaUpdated>().transpose()
-			{
-				if meta_change.notary_id == notary_id {
-					RegisteredKeyStore::store_public(
-						&mut *db,
-						Ed25519Public::from_raw(meta_change.meta.public),
-						tick,
-					)
-					.await?;
-				}
-				continue;
+	for event in events.iter().flatten() {
+		if let Some(Ok(meta_change)) =
+			event.as_event::<api::notaries::events::NotaryMetaUpdated>().transpose()
+		{
+			if meta_change.notary_id == notary_id {
+				RegisteredKeyStore::store_public(
+					&mut *db,
+					Ed25519Public::from_raw(meta_change.meta.public),
+					tick,
+				)
+				.await?;
 			}
-			if let Some(Ok(activated_event)) =
-				event.as_event::<api::notaries::events::NotaryActivated>().transpose()
-			{
-				info!("Notary activated: {:?}", activated_event);
-				if activated_event.notary.notary_id == notary_id {
-					let public = Ed25519Public::from_raw(activated_event.notary.meta.public);
-					activate_notebook_processing(&mut *db, notary_id, public, block_height, ticker)
-						.await?;
-				}
-				continue;
-			}
-
-			if let Some(Ok(notebook)) =
-				event.as_event::<api::notebook::events::NotebookSubmitted>().transpose()
-			{
-				if notebook.notary_id == notary_id {
-					info!("Notebook finalized: {:?}", notebook);
-					NotebookStatusStore::next_step(
-						&mut *db,
-						notebook.notebook_number,
-						NotebookFinalizationStep::Closed,
-					)
-					.await?;
-				}
-				continue;
-			}
-
-			if let Some(Ok(notebook)) =
-				event.as_event::<api::notebook::events::NotebookAuditFailure>().transpose()
-			{
-				if notebook.notary_id == notary_id {
-					panic!("Notebook audit failed! Need to shut down {:?}", notebook);
-				}
-				continue;
-			}
-
-			if let Some(Ok(to_localchain)) = event
-				.as_event::<api::chain_transfer::events::TransferToLocalchain>()
-				.transpose()
-			{
-				if to_localchain.notary_id == notary_id {
-					info!("Transfer to localchain: {:?}", to_localchain);
-					ChainTransferStore::record_transfer_to_local_from_block(
-						&mut *db,
-						block_height,
-						&AccountId::from(to_localchain.account_id.0),
-						to_localchain.transfer_id,
-						to_localchain.amount,
-					)
+			continue;
+		}
+		if let Some(Ok(activated_event)) =
+			event.as_event::<api::notaries::events::NotaryActivated>().transpose()
+		{
+			info!("Notary activated: {:?}", activated_event);
+			if activated_event.notary.notary_id == notary_id {
+				let public = Ed25519Public::from_raw(activated_event.notary.meta.public);
+				activate_notebook_processing(&mut *db, notary_id, public, block_height, ticker)
 					.await?;
 			}
 			continue;

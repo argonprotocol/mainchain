@@ -506,7 +506,7 @@ mod tests {
 		tx.commit().await?;
 
 		let mut tx = pool.begin().await?;
-		NotebookStore::close_notebook(&mut *tx, 1, public, &keystore.into()).await?;
+		NotebookStore::close_notebook(&mut tx, 1, public, &keystore.into()).await?;
 		tx.commit().await?;
 
 		let balance_tip = BalanceTip {

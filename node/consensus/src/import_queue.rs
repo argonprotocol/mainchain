@@ -142,7 +142,7 @@ where
 				let mut inherent_data = inherent_data_providers
 					.create_inherent_data()
 					.await
-					.map_err(|e| Error::CreateInherents(e))?;
+					.map_err(Error::CreateInherents)?;
 
 				if let Ok(Some(bitcoin_utxo_sync)) =
 					get_bitcoin_inherent(&self.utxo_tracker, &self.client, &parent_hash)
@@ -150,7 +150,7 @@ where
 					BitcoinInherentDataProvider { bitcoin_utxo_sync }
 						.provide_inherent_data(&mut inherent_data)
 						.await
-						.map_err(|e| Error::CreateInherents(e))?;
+						.map_err(Error::CreateInherents)?;
 				}
 
 				// inherent data passed in is what we would have generated...
@@ -179,27 +179,24 @@ where
 
 		// NOTE: we verify compute nonce in import queue because we use the pre-hash, which we'd
 		// have to inject into the runtime
-		match &seal_digest {
-			BlockSealDigest::Compute { nonce } => {
-				// verify compute effort
-				let difficulty =
-					self.client.runtime_api().compute_difficulty(parent_hash).map_err(|e| {
-						Error::MissingRuntimeData(
-							format!("Failed to get difficulty from runtime: {}", e).to_string(),
-						)
-					})?;
-				let key_block_hash = randomx_key_block(&self.client, &parent_hash)?;
-				if !BlockComputeNonce::is_valid(
-					nonce,
-					pre_hash.as_ref().to_vec(),
-					&key_block_hash,
-					difficulty,
-				) {
-					return Err(Error::InvalidComputeNonce.into());
-				}
-				compute_difficulty = Some(difficulty);
-			},
-			_ => {},
+		if let BlockSealDigest::Compute { nonce } = &seal_digest {
+			// verify compute effort
+			let difficulty =
+				self.client.runtime_api().compute_difficulty(parent_hash).map_err(|e| {
+					Error::MissingRuntimeData(
+						format!("Failed to get difficulty from runtime: {}", e).to_string(),
+					)
+				})?;
+			let key_block_hash = randomx_key_block(&self.client, &parent_hash)?;
+			if !BlockComputeNonce::is_valid(
+				nonce,
+				pre_hash.as_ref().to_vec(),
+				&key_block_hash,
+				difficulty,
+			) {
+				return Err(Error::InvalidComputeNonce.into());
+			}
+			compute_difficulty = Some(difficulty);
 		}
 
 		let best_header = self
