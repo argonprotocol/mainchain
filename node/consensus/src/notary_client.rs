@@ -63,7 +63,7 @@ where
 	pub async fn update_notaries(&self, block_hash: &B::Hash) -> Result<(), Error<B>> {
 		let mut needs_connect = vec![];
 		{
-			let notaries = self.client.runtime_api().notaries(block_hash.clone())?;
+			let notaries = self.client.runtime_api().notaries(*block_hash)?;
 			let mut clients = self.notary_client_by_id.lock().await;
 			let mut notaries_by_id = self.notaries_by_id.lock().await;
 			let next_notaries_by_id =
@@ -89,7 +89,7 @@ where
 						return true;
 					}
 
-					subscriptions_by_id.remove(&id);
+					subscriptions_by_id.remove(id);
 					false
 				});
 				*notaries_by_id = next_notaries_by_id;
@@ -110,21 +110,13 @@ where
 		}
 
 		for id in needs_connect {
-			match self.sync_notebooks(id).await {
-				Err(e) => {
-					self.disconnect(&id, Some(format!("Notary {} sync failed. {:?}", id, e))).await;
-				},
-				_ => {},
+			if let Err(e) = self.sync_notebooks(id).await {
+				self.disconnect(&id, Some(format!("Notary {} sync failed. {:?}", id, e))).await;
 			}
-			match self.subscribe_to_notebooks(id).await {
-				Err(e) => {
-					self.disconnect(
-						&id,
-						Some(format!("Notary {} subscription failed. {:?}", id, e)),
-					)
+
+			if let Err(e) = self.subscribe_to_notebooks(id).await {
+				self.disconnect(&id, Some(format!("Notary {} subscription failed. {:?}", id, e)))
 					.await;
-				},
-				_ => {},
 			}
 		}
 
@@ -210,9 +202,9 @@ where
 		if !clients.contains_key(notary_id) {
 			return;
 		}
-		clients.remove(&notary_id);
+		clients.remove(notary_id);
 		let mut subs = self.subscriptions_by_id.lock().await;
-		drop(subs.remove(&notary_id));
+		drop(subs.remove(notary_id));
 	}
 
 	async fn subscribe_to_notebooks(&self, id: NotaryId) -> Result<(), Error<B>> {
@@ -236,7 +228,7 @@ where
 
 		// load the audit history for the notary
 		let latest_notebook_by_notary =
-			self.client.runtime_api().latest_notebook_by_notary(best_hash.clone())?;
+			self.client.runtime_api().latest_notebook_by_notary(*best_hash)?;
 		let mut notebook_dependencies = vec![];
 		let latest_notebook =
 			latest_notebook_by_notary.get(&notary_id).map(|a| a.0).unwrap_or_default();
@@ -277,8 +269,8 @@ where
 		let mut vote_minimums = BTreeMap::new();
 		for block_hash in &vote_details.blocks_with_votes {
 			vote_minimums.insert(
-				block_hash.clone(),
-				self.client.runtime_api().vote_minimum(block_hash.clone()).map_err(|e| {
+				*block_hash,
+				self.client.runtime_api().vote_minimum(*block_hash).map_err(|e| {
 					let message = format!(
 						"Error getting vote minimums for block {}. Notary {}, notebook {}. {:?}",
 						block_hash, notary_id, notebook_number, e
@@ -297,20 +289,20 @@ where
 		};
 
 		let latest_finalized_notebook_by_notary =
-			self.client.runtime_api().latest_notebook_by_notary(finalized_hash.clone())?;
+			self.client.runtime_api().latest_notebook_by_notary(*finalized_hash)?;
 		let oldest_tick_to_keep = latest_finalized_notebook_by_notary
 			.get(&notary_id)
-			.map(|(_, t)| t.clone())
+			.map(|(_, t)| *t)
 			.unwrap_or_default();
 
 		let mut vote_count = 0;
 		// audit on the best block at the height of the notebook
 		match self.client.runtime_api().audit_notebook_and_get_votes(
-			best_hash.clone(),
+			*best_hash,
 			vote_details.version,
 			notary_id,
 			notebook_number,
-			vote_details.header_hash.clone(),
+			vote_details.header_hash,
 			&vote_minimums,
 			&full_notebook,
 			notebook_dependencies,
@@ -347,12 +339,12 @@ where
 		notary_id: NotaryId,
 	) -> Result<Arc<ulx_notary_apis::Client>, Error<B>> {
 		let mut clients = self.notary_client_by_id.lock().await;
-		if !clients.contains_key(&notary_id) {
+		if let std::collections::btree_map::Entry::Vacant(e) = clients.entry(notary_id) {
 			let notaries = self.notaries_by_id.lock().await;
 			let record = notaries.get(&notary_id).ok_or_else(|| {
 				Error::NotaryError("No rpc endpoints found for notary".to_string())
 			})?;
-			let host = record.meta.hosts.get(0).ok_or_else(|| {
+			let host = record.meta.hosts.first().ok_or_else(|| {
 				Error::NotaryError("No rpc endpoint found for notary".to_string())
 			})?;
 			let host_str: String = host.clone().try_into().map_err(|e| {
@@ -368,7 +360,7 @@ where
 				))
 			})?;
 			let c = Arc::new(c);
-			clients.insert(notary_id, c.clone());
+			e.insert(c.clone());
 		}
 		let client = clients.get(&notary_id).ok_or_else(|| {
 			Error::NotaryError("Could not connect to notary for audit".to_string())
@@ -387,7 +379,7 @@ where
 			Err(err) => {
 				self.disconnect(&notary_id, Some(format!("Error downloading notebook: {}", err)))
 					.await;
-				return Err(Error::NotaryError(format!("Error downloading notebook: {}", err)));
+				Err(Error::NotaryError(format!("Error downloading notebook: {}", err)))
 			},
 			Ok(body) => Ok(body),
 		}

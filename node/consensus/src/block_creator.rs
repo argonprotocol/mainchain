@@ -79,7 +79,7 @@ where
 		let mut to_remove: Vec<(NotaryId, Option<String>)> = Vec::new();
 
 		loop {
-			let _ = {
+			{
 				let mut subscriptions_by_id = notary_client.subscriptions_by_id.lock().await;
 
 				tokio::select! {biased;
@@ -88,7 +88,7 @@ where
 							let sub = Pin::new(sub);
 							match sub.poll_next(cx) {
 								Pending => None,
-								Ready(e) => Some((notary_id.clone(), e)),
+								Ready(e) => Some((*notary_id, e)),
 							}
 						});
 						match item {
@@ -96,7 +96,7 @@ where
 							None => Pending,
 						}
 					}) => {
-						match notebook.into() {
+						match notebook {
 							(notary_id, Some(Ok((notebook_number, header)))) => {
 								match header_tx.unbounded_send((notary_id, notebook_number, header)) {
 									Ok(_) => (),
@@ -118,7 +118,7 @@ where
 						}
 					},
 					header = header_rx.next() => {
-						if let Some((notary_id, notebook_number, raw_data)) = header.into() {
+						if let Some((notary_id, notebook_number, raw_data)) = header {
 							info!(target: LOG_TARGET, "Processing notebook for notary {}, #{}", notary_id, notebook_number);
 							let _ = notebook_watch.on_notebook(
 								notary_id,
@@ -152,7 +152,7 @@ where
 			}
 
 			for (notary_id, reason) in &to_remove {
-				notary_client.disconnect(&notary_id, reason.clone()).await;
+				notary_client.disconnect(notary_id, reason.clone()).await;
 			}
 			to_remove.clear();
 			update_notaries_with_hash = None;
@@ -162,6 +162,7 @@ where
 	(task, receiver)
 }
 
+#[allow(clippy::too_many_arguments)]
 pub async fn tax_block_creator<B, C, E, L, CS, A>(
 	mut block_import: BoxBlockImport<B>,
 	client: Arc<C>,
@@ -221,6 +222,7 @@ pub async fn tax_block_creator<B, C, E, L, CS, A>(
 	}
 }
 
+#[allow(clippy::too_many_arguments)]
 pub async fn propose<B, C, E, A>(
 	client: Arc<C>,
 	aux_client: UlxAux<B, C>,
@@ -266,7 +268,7 @@ where
 					target: LOG_TARGET,
 					"Unable to pull new block for compute miner. No notebook header data found!! {}", err
 				);
-				return Err(err.into());
+				return Err(err);
 			},
 		};
 
@@ -350,8 +352,8 @@ pub(crate) async fn submit_block<Block, L, Proof>(
 	L: sc_consensus::JustificationSyncLink<Block>,
 {
 	let (header, body) = proposal.block.deconstruct();
-	let parent_hash = header.parent_hash().clone();
-	let block_number = header.number().clone();
+	let parent_hash = *header.parent_hash();
+	let block_number = *header.number();
 
 	let mut block_import_params = BlockImportParams::new(BlockOrigin::Own, header);
 

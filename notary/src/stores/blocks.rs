@@ -207,7 +207,7 @@ mod tests {
 		{
 			let mut tx = pool.begin().await?;
 			BlocksStore::record(
-				&mut *tx,
+				&mut tx,
 				0,
 				H256::from_slice(&[1u8; 32]),
 				H256::zero(),
@@ -216,7 +216,7 @@ mod tests {
 			)
 			.await?;
 			BlocksStore::record(
-				&mut *tx,
+				&mut tx,
 				1,
 				H256::from_slice(&[2u8; 32]),
 				H256::from_slice(&[1u8; 32]),
@@ -230,7 +230,7 @@ mod tests {
 			)
 			.await?;
 			BlocksStore::record(
-				&mut *tx,
+				&mut tx,
 				2,
 				H256::from_slice(&[3u8; 32]),
 				H256::from_slice(&[2u8; 32]),
@@ -238,12 +238,12 @@ mod tests {
 				vec![],
 			)
 			.await?;
-			BlocksStore::record_finalized(&mut *tx, H256::from_slice(&[3u8; 32])).await?;
+			BlocksStore::record_finalized(&mut tx, H256::from_slice(&[3u8; 32])).await?;
 			tx.commit().await?;
 		}
 		{
 			let mut tx = pool.begin().await?;
-			let result = BlocksStore::get_latest_finalized_block_number(&mut *tx).await?;
+			let result = BlocksStore::get_latest_finalized_block_number(&mut tx).await?;
 			assert_eq!(result, 2);
 			tx.commit().await?;
 		}
@@ -253,10 +253,10 @@ mod tests {
 	#[sqlx::test]
 	async fn test_cannot_overwrite(pool: PgPool) -> anyhow::Result<()> {
 		let mut tx = pool.begin().await?;
-		BlocksStore::record(&mut *tx, 1, H256::from_slice(&[1u8; 32]), H256::zero(), 100, vec![])
+		BlocksStore::record(&mut tx, 1, H256::from_slice(&[1u8; 32]), H256::zero(), 100, vec![])
 			.await?;
 		assert!(BlocksStore::record(
-			&mut *tx,
+			&mut tx,
 			1,
 			H256::from_slice(&[1u8; 32]),
 			H256::from_slice(&[1u8; 32]),

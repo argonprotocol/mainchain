@@ -207,7 +207,7 @@ impl MainchainClient {
 				_ => continue,
 			}
 		}
-		Err(Error::from(format!("No valid status encountered for transaction")))
+		Err(Error::from("No valid status encountered for transaction".to_string()))
 	}
 	pub async fn lookup_ticker(&self) -> anyhow::Result<ulx_primitives::tick::Ticker> {
 		let ticker_data = self
@@ -266,7 +266,7 @@ impl MainchainClient {
 	}
 
 	async fn create_ws_client(url: &str) -> Result<WsClient, Error> {
-		let url = Url::parse(&url)
+		let url = Url::parse(url)
 			.map_err(|e| Error::Other(format!("Invalid Mainchain URL: {} -> {}", url, e)))?;
 		let builder = {
 			#[allow(clippy::let_and_return)]

@@ -101,8 +101,8 @@ impl NotebookStatusStore {
 	) -> anyhow::Result<Option<u32>, Error> {
 		let result = sqlx::query!(
 			r#"
-				SELECT notebook_number FROM notebook_status 
-				WHERE step=$1  
+				SELECT notebook_number FROM notebook_status
+				WHERE step=$1
 				ORDER BY notebook_number ASC
 				LIMIT 1
 			"#,
@@ -148,9 +148,9 @@ impl NotebookStatusStore {
 	) -> anyhow::Result<Option<u32>, Error> {
 		let result = sqlx::query!(
 			r#"
-				SELECT * FROM notebook_status 
+				SELECT * FROM notebook_status
 				WHERE step = $1 AND end_time <= $2
-				ORDER BY open_time ASC 
+				ORDER BY open_time ASC
 				LIMIT 1
 			"#,
 			NotebookFinalizationStep::Open as i32,
@@ -182,7 +182,7 @@ impl NotebookStatusStore {
 			NotebookFinalizationStep::Finalized => return Ok(()),
 		};
 
-		let res = sqlx::query(&*format!(
+		let res = sqlx::query(&format!(
 			r#"
 				UPDATE notebook_status SET step=$1, {time_field}=$2 WHERE notebook_number=$3 AND step=$4
 			"#,
@@ -225,7 +225,7 @@ mod tests {
 		{
 			let mut tx = pool.begin().await?;
 
-			let _ = NotebookStatusStore::create(
+			NotebookStatusStore::create(
 				&mut *tx,
 				1,
 				1,
@@ -239,16 +239,16 @@ mod tests {
 			let mut tx1 = pool.begin().await?;
 			let mut tx2 = pool.begin().await?;
 			assert_eq!(
-				NotebookStatusStore::lock_open_for_appending(&mut *tx1).await?.0,
+				NotebookStatusStore::lock_open_for_appending(&mut tx1).await?.0,
 				notebook_number
 			);
 			assert_eq!(
-				NotebookStatusStore::lock_open_for_appending(&mut *tx2).await?.0,
+				NotebookStatusStore::lock_open_for_appending(&mut tx2).await?.0,
 				notebook_number
 			);
 
 			let mut fail_tx = pool.begin().await?;
-			assert!(NotebookStatusStore::lock_to_stop_appends(&mut *fail_tx, notebook_number)
+			assert!(NotebookStatusStore::lock_to_stop_appends(&mut fail_tx, notebook_number)
 				.await
 				.is_err());
 			fail_tx.commit().await?;
@@ -262,7 +262,7 @@ mod tests {
 			let task1 = tokio::spawn(async move {
 				let mut tx = cloned.begin().await?;
 				assert_ok!(
-					NotebookStatusStore::lock_to_stop_appends(&mut *tx, notebook_number).await
+					NotebookStatusStore::lock_to_stop_appends(&mut tx, notebook_number).await
 				);
 				let _ = rx.send(0);
 				// wait for 500 ms
@@ -288,7 +288,7 @@ mod tests {
 			let task2 = tokio::spawn(async move {
 				let mut tx = cloned2.begin().await?;
 				let _ = txer.await;
-				let next_notebook = NotebookStatusStore::lock_open_for_appending(&mut *tx).await?;
+				let next_notebook = NotebookStatusStore::lock_open_for_appending(&mut tx).await?;
 				tx.commit().await?;
 				Result::<u32, Error>::Ok(next_notebook.0)
 			});
@@ -308,10 +308,10 @@ mod tests {
 		{
 			let mut tx = pool.begin().await?;
 
-			let _ = NotebookStatusStore::create(&mut *tx, 1, 1, Utc::now()).await?;
-			let _ = NotebookStatusStore::step_up_expired_open(&mut *tx).await?;
+			NotebookStatusStore::create(&mut *tx, 1, 1, Utc::now()).await?;
+			let _ = NotebookStatusStore::step_up_expired_open(&mut tx).await?;
 			assert_eq!(
-				NotebookStatusStore::find_and_lock_ready_for_close(&mut *tx,).await?,
+				NotebookStatusStore::find_and_lock_ready_for_close(&mut tx,).await?,
 				Some(1)
 			);
 
@@ -319,13 +319,10 @@ mod tests {
 		}
 
 		let mut tx = pool.begin().await?;
-		assert_eq!(NotebookStatusStore::find_and_lock_ready_for_close(&mut *tx).await?, Some(1));
+		assert_eq!(NotebookStatusStore::find_and_lock_ready_for_close(&mut tx).await?, Some(1));
 		{
 			let mut tx2 = pool.begin().await?;
-			assert!(matches!(
-				NotebookStatusStore::find_and_lock_ready_for_close(&mut *tx2).await,
-				Err(_)
-			));
+			assert!(NotebookStatusStore::find_and_lock_ready_for_close(&mut tx2).await.is_err());
 			tx2.rollback().await?;
 		}
 
@@ -344,14 +341,14 @@ mod tests {
 			.await?;
 		let mut tx = pool.begin().await?;
 
-		let _ = NotebookStatusStore::create(
+		NotebookStatusStore::create(
 			&mut *tx,
 			1,
 			1,
 			Utc::now().add(Duration::try_minutes(1).unwrap()),
 		)
 		.await?;
-		assert_eq!(NotebookStatusStore::step_up_expired_open(&mut *tx).await?, None);
+		assert_eq!(NotebookStatusStore::step_up_expired_open(&mut tx).await?, None);
 		tx.commit().await?;
 
 		sqlx::query("update notebook_status set end_time = now() where notebook_number = 1")
@@ -359,7 +356,7 @@ mod tests {
 			.await?;
 
 		let mut tx = pool.begin().await?;
-		assert_eq!(NotebookStatusStore::step_up_expired_open(&mut *tx).await?, Some(1));
+		assert_eq!(NotebookStatusStore::step_up_expired_open(&mut tx).await?, Some(1));
 
 		Ok(())
 	}

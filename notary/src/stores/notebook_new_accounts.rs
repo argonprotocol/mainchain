@@ -34,7 +34,7 @@ impl TryInto<NotebookNewAccount> for NotebookOriginsRow {
 		Ok(NotebookNewAccount {
 			notebook_number: self.notebook_number as u32,
 			account_uid: self.uid as u32,
-			account_id: AccountId::from_slice(&self.account_id.as_slice()).map_err(|_| {
+			account_id: AccountId::from_slice(self.account_id.as_slice()).map_err(|_| {
 				Error::InternalError(format!(
 					"Unable to read account id from db {:?}",
 					self.account_id
@@ -88,7 +88,7 @@ impl NotebookNewAccountsStore {
 		let entries: Result<Vec<NotebookNewAccount>, Error> =
 			rows.into_iter().map(TryInto::try_into).collect();
 
-		Ok(entries?)
+		entries
 	}
 	pub async fn reset_seq<'a>(
 		db: impl sqlx::PgExecutor<'a> + 'a,

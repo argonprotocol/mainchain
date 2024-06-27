@@ -702,7 +702,7 @@ impl NotarizationBuilder {
     let balance_changes_by_account = self.balance_changes_by_account.lock().await;
 
     let mut balance_changes = 0;
-    for (_key, balance_change_tx) in &*balance_changes_by_account {
+    for balance_change_tx in (*balance_changes_by_account).values() {
       let balance_change = balance_change_tx.inner().await;
       if balance_change.notes.len() > 0 {
         balance_changes += 1;

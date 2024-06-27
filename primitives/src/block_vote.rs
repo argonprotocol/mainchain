@@ -31,7 +31,7 @@ pub struct BlockVoteT<Hash: Codec = H256> {
 	pub account_id: AccountId,
 	/// The block hash being voted on. Must be in last 2 ticks.
 	pub block_hash: Hash,
-	/// A unique index per account for this notebook
+	/// A user chosen index per account for this notebook
 	#[codec(compact)]
 	pub index: u32,
 	/// The voting power of this vote, determined from the amount of tax

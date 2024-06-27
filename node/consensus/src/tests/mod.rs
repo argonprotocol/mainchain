@@ -1,3 +1,5 @@
+#![allow(clippy::await_holding_lock)]
+
 use std::{future::Future, sync::Arc, task::Context, time::Duration};
 
 use env_logger::{Builder, Env};
@@ -75,7 +77,7 @@ impl Miner {
 			select_chain.clone(),
 			environ,
 			DummyOracle,
-			node.account_id.clone().into(),
+			node.account_id,
 			(),
 			uxto_tracker,
 			// how long to take to actually build the block (i.e. executing extrinsics)
@@ -169,10 +171,10 @@ struct NodeIdentity {
 
 impl NodeIdentity {
 	fn new(keyring: Keyring, peer_id: usize) -> Self {
-		let keystore = create_keystore(keyring.clone());
+		let keystore = create_keystore(keyring);
 		let authority_id: BlockSealAuthorityId =
 			keystore.ed25519_public_keys(BLOCK_SEAL_KEY_TYPE)[0].into();
-		NodeIdentity { peer_id, keystore, authority_id, account_id: keyring.public().into() }
+		NodeIdentity { peer_id, keystore, authority_id, account_id: keyring.public() }
 	}
 }
 
@@ -180,7 +182,7 @@ fn create_node_identities() -> Vec<NodeIdentity> {
 	[(Keyring::Alice), (Keyring::Bob), (Keyring::Charlie)]
 		.iter()
 		.enumerate()
-		.map(|(i, keyring)| NodeIdentity::new(keyring.clone(), i))
+		.map(|(i, keyring)| NodeIdentity::new(*keyring, i))
 		.collect::<Vec<_>>()
 }
 
@@ -191,7 +193,7 @@ async fn mine_one(
 	miner3: &mut Miner,
 	net: Arc<Mutex<UlxTestNet>>,
 ) {
-	if i % 1 == 0 {
+	if i % 3 == 0 {
 		miner1.mine_block(&net).await;
 	} else if i % 2 == 0 {
 		miner2.mine_block(&net).await;
@@ -228,7 +230,7 @@ async fn can_build_compute_blocks() {
 		Config {
 			difficulty: 10_000,
 			tax_minimum: 1,
-			tick_duration: tick_duration.clone(),
+			tick_duration,
 			genesis_utc_time: Ticker::start(tick_duration).genesis_utc_time,
 		},
 	);
@@ -261,7 +263,7 @@ async fn can_run_proof_of_tax() {
 		Config {
 			tax_minimum: 5,
 			difficulty: 1,
-			tick_duration: tick_duration.clone(),
+			tick_duration,
 			genesis_utc_time: Ticker::start(tick_duration).genesis_utc_time,
 		},
 	);
@@ -332,7 +334,7 @@ async fn can_run_proof_of_tax() {
 			parent_hash,
 			tick: current_tick + 1,
 			vote: BestBlockVoteSeal {
-				closest_miner: (closest_miner_id.account_id.clone(), closest_miner_id.authority_id),
+				closest_miner: (closest_miner_id.account_id, closest_miner_id.authority_id),
 				seal_strength,
 				notary_id: 1,
 				block_vote_bytes: vec![],
@@ -388,7 +390,7 @@ impl ReusableFuture {
 	fn poll_future(&mut self, cx: &mut Context<'_>) -> Poll<()> {
 		if let Some(future) = self.future.as_mut() {
 			let poll = future.as_mut().poll(cx);
-			if let Poll::Ready(_) = poll {
+			if poll.is_ready() {
 				self.future.take();
 			}
 			poll

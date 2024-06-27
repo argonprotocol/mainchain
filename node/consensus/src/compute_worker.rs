@@ -64,7 +64,7 @@ pub struct MiningHandle<Block: BlockT, L: sc_consensus::JustificationSyncLink<Bl
 	justification_sync_link: Arc<L>,
 	metadata: Arc<Mutex<Option<MiningMetadata<Block::Hash>>>>,
 	build: Arc<Mutex<Option<MiningBuild<Block, Proof>>>>,
-	block_import: Arc<Mutex<BoxBlockImport<Block>>>,
+	block_import: Arc<tokio::sync::Mutex<BoxBlockImport<Block>>>,
 }
 
 impl<B, L, Proof> MiningHandle<B, L, Proof>
@@ -82,7 +82,7 @@ where
 			version: Arc::new(AtomicUsize::new(0)),
 			justification_sync_link: Arc::new(justification_sync_link),
 			build: Arc::new(Mutex::new(None)),
-			block_import: Arc::new(Mutex::new(block_import)),
+			block_import: Arc::new(tokio::sync::Mutex::new(block_import)),
 			metadata: Arc::new(Mutex::new(None)),
 		}
 	}
@@ -119,7 +119,7 @@ where
 		}
 
 		let mut build = self.build.lock();
-		*build = Some(MiningBuild { pre_hash: pre_hash.clone(), difficulty, proposal });
+		*build = Some(MiningBuild { pre_hash, difficulty, proposal });
 	}
 	/// Get the version of the mining worker.
 	///
@@ -176,21 +176,20 @@ where
 	}
 
 	pub async fn submit(&mut self, nonce: U256) -> Result<(), Error<B>> {
-		let build = match {
+		let build = {
 			let mut build = self.build.lock();
 			// try to take out of option. if not exists, we've moved on
 			build.take()
-		} {
-			Some(x) => x,
-			_ => {
-				trace!(target: LOG_TARGET, "Unable to submit mined block in compute worker: internal build does not exist",);
-				return Ok(());
-			},
+		};
+
+		let Some(build) = build else {
+			trace!(target: LOG_TARGET, "Unable to submit mined block in compute worker: internal build does not exist",);
+			return Ok(());
 		};
 
 		self.increment_version();
 
-		let mut block_import = self.block_import.lock();
+		let mut block_import = self.block_import.lock().await;
 
 		block_creator::submit_block::<B, L, Proof>(
 			&mut block_import,
@@ -266,6 +265,7 @@ pub fn run_compute_solver_threads<B, L, Proof>(
 	}
 }
 
+#[allow(clippy::too_many_arguments)]
 pub fn create_compute_miner<B, C, S, E, SO, L, AccountId>(
 	block_import: BoxBlockImport<B>,
 	client: Arc<C>,

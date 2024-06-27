@@ -87,12 +87,11 @@ impl Oracle {
 	}
 }
 async fn mine_and_report_block(bitcoind: &BitcoinD, oracle: &Oracle) -> anyhow::Result<()> {
-	let block_address = add_wallet_address(&bitcoind);
+	let block_address = add_wallet_address(bitcoind);
 	add_blocks(bitcoind, 1, &block_address);
 	let oracle = oracle.clone();
-	match oracle.check_block().await {
-		Err(err) => println!("error synching bitcoin: {:#?}", err),
-		_ => {},
+	if let Err(err) = oracle.check_block().await {
+		println!("error synching bitcoin: {:#?}", err);
 	}
 	Ok(())
 }
@@ -101,7 +100,7 @@ async fn mine_and_report_block(bitcoind: &BitcoinD, oracle: &Oracle) -> anyhow::
 async fn test_bitcoin_minting_e2e() -> anyhow::Result<()> {
 	let test_node = start_ulx_test_node().await;
 	let bitcoind = test_node.bitcoind.as_ref().expect("bitcoind");
-	let rpc_url = format!("http://{}", bitcoind.params.rpc_socket.to_string());
+	let rpc_url = format!("http://{}", bitcoind.params.rpc_socket);
 	let cookie = bitcoind
 		.params
 		.get_cookie_values()
@@ -148,7 +147,7 @@ async fn test_bitcoin_minting_e2e() -> anyhow::Result<()> {
 		Oracle::new(alice_sr25519.clone(), bitcoin_client.clone(), client.clone())
 	};
 
-	mine_and_report_block(&bitcoind, &oracle).await?;
+	mine_and_report_block(bitcoind, &oracle).await?;
 
 	let mut finalized_sub = client.live.blocks().subscribe_finalized().await?;
 	let vault_owner = sr25519::Pair::from_string("//Alice", None).unwrap();
@@ -206,7 +205,7 @@ async fn test_bitcoin_minting_e2e() -> anyhow::Result<()> {
 		.tx()
 		.sign_and_submit_then_watch_default(
 			&tx().price_index().submit(Index {
-				btc_usd_price: FixedU128Ext(FixedU128::from_rational(62_000_00, 1_00).into_inner()),
+				btc_usd_price: FixedU128Ext(FixedU128::from_rational(6_200_000, 1_00).into_inner()),
 				argon_cpi: FixedI128Ext(FixedI128::from_float(0.1).into_inner()),
 				argon_usd_price: FixedU128Ext(FixedU128::from_rational(1_00, 1_00).into_inner()),
 				timestamp: SystemTime::now()
@@ -257,11 +256,11 @@ async fn test_bitcoin_minting_e2e() -> anyhow::Result<()> {
 		cosign_script.get_script_address(Network::Regtest)
 	};
 
-	let block_address = add_wallet_address(&bitcoind);
+	let block_address = add_wallet_address(bitcoind);
 	let (txid, vout, _raw_tx) =
-		fund_script_address(&bitcoind, &script_address, utxo_satoshis, &block_address);
+		fund_script_address(bitcoind, &script_address, utxo_satoshis, &block_address);
 	for _ in 0..6 {
-		mine_and_report_block(&bitcoind, &oracle).await?;
+		mine_and_report_block(bitcoind, &oracle).await?;
 	}
 
 	while let Some(block) = finalized_sub.next().await {
@@ -292,7 +291,7 @@ async fn test_bitcoin_minting_e2e() -> anyhow::Result<()> {
 		.get_argons(owner_account_id32.clone())
 		.await
 		.expect("pending mint balance");
-	if pending_mint.0.len() == 0 {
+	if pending_mint.0.is_empty() {
 		assert!(balance.free >= bond_amount as u128);
 	} else {
 		assert_eq!(pending_mint.0.len(), 1);
@@ -312,7 +311,7 @@ async fn test_bitcoin_minting_e2e() -> anyhow::Result<()> {
 				.fetch_storage(&storage().mint().pending_mint_utxos(), None)
 				.await?
 				.expect("pending mint");
-			if pending_mint.0.len() == 0 {
+			if pending_mint.0.is_empty() {
 				break;
 			}
 		}
@@ -373,7 +372,7 @@ async fn test_bitcoin_minting_e2e() -> anyhow::Result<()> {
 		)
 		.expect("unlocker");
 
-		let vault_pubkey_hash = BitcoinPubkeyHash(utxo.vault_pubkey_hash.0.clone());
+		let vault_pubkey_hash = BitcoinPubkeyHash(utxo.vault_pubkey_hash.0);
 
 		let vault_hd_path = vault_mappings.get(&vault_pubkey_hash).unwrap();
 		let (vault_signature, vault_pubkey) = unlocker
@@ -448,7 +447,7 @@ fn fund_script_address(
 	let txid = bitcoind
 		.client
 		.send_to_address(
-			&script_address,
+			script_address,
 			Amount::from_sat(amount),
 			None,
 			None,
@@ -458,7 +457,7 @@ fn fund_script_address(
 			None,
 		)
 		.unwrap();
-	let tx = wait_for_txid(&bitcoind, &txid, &block_address);
+	let tx = wait_for_txid(bitcoind, &txid, block_address);
 	let vout = tx
 		.vout
 		.iter()
@@ -485,7 +484,7 @@ fn wait_for_txid(
 			}
 		}
 		std::thread::sleep(std::time::Duration::from_secs(1));
-		add_blocks(&bitcoind, 1, block_address);
+		add_blocks(bitcoind, 1, block_address);
 	}
 }
 

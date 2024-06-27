@@ -205,7 +205,7 @@ impl BalanceTip {
 	}
 
 	pub fn create_key(account_id: &AccountId, account_type: &AccountType) -> [u8; 32] {
-		blake2_256(&[&account_id.as_ref(), &account_type.encode()[..]].concat())
+		blake2_256(&[account_id.as_ref(), &account_type.encode()[..]].concat())
 	}
 }
 

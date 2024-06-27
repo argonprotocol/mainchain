@@ -43,7 +43,7 @@ impl UlxTestNotary {
 		node: &UlxTestNode,
 		operator: Option<ed25519::Pair>,
 	) -> anyhow::Result<Self> {
-		let rust_log = format!("{}", env::var("RUST_LOG").unwrap_or("warn".to_string()));
+		let rust_log = env::var("RUST_LOG").unwrap_or("warn".to_string());
 
 		let target_dir = {
 			let project_dir = PathBuf::from(env!("CARGO_MANIFEST_DIR"));
@@ -118,7 +118,7 @@ impl UlxTestNotary {
 	}
 
 	pub async fn register_operator(&self, ulx_test_node: &UlxTestNode) -> anyhow::Result<()> {
-		let operator = self.operator.clone();
+		let operator = self.operator;
 
 		let host: ulx_primitives::host::Host = self.ws_url.clone().into();
 		let notary_proposal = tx().notaries().propose(NotaryMeta {

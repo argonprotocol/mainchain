@@ -31,6 +31,7 @@ use crate::Keystore;
 use crate::{bail, Result};
 
 #[cfg_attr(feature = "napi", napi)]
+#[allow(clippy::type_complexity)]
 #[derive(Clone)]
 pub struct MainchainClient {
   client: Arc<Mutex<Option<InnerMainchainClient>>>,

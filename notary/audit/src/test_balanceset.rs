@@ -50,8 +50,8 @@ fn test_balance_change_allocation_errs_non_zero() {
 			}
 			.sign(Alice.pair())
 			.clone()],
-			&vec![],
-			&vec![],
+			&[],
+			&[],
 			None
 		),
 		VerifyError::BalanceChangeNotNetZero { sent: 0, claimed: 100 }
@@ -72,7 +72,7 @@ fn must_supply_zero_balance_on_first_nonce() {
 	}];
 
 	assert_err!(
-		verify_notarization_allocation(&balance_change, &vec![], &vec![], None),
+		verify_notarization_allocation(&balance_change, &[], &[], None),
 		VerifyError::MissingBalanceProof
 	);
 }
@@ -105,7 +105,7 @@ fn test_balance_change_allocation_must_be_zero() {
 		},
 	];
 
-	assert_ok!(verify_notarization_allocation(&balance_change, &vec![], &vec![], None));
+	assert_ok!(verify_notarization_allocation(&balance_change, &[], &[], None));
 }
 
 #[test]
@@ -143,7 +143,7 @@ fn test_notes_must_add_up() {
 		},
 	];
 	assert_err!(
-		verify_notarization_allocation(&balance_change, &vec![], &vec![], None),
+		verify_notarization_allocation(&balance_change, &[], &[], None),
 		VerifyError::BalanceChangeMismatch {
 			change_index: 2,
 			provided_balance: 100,
@@ -152,7 +152,7 @@ fn test_notes_must_add_up() {
 	);
 
 	balance_change[2].balance = 150;
-	assert_ok!(verify_notarization_allocation(&balance_change, &vec![], &vec![], None));
+	assert_ok!(verify_notarization_allocation(&balance_change, &[], &[], None));
 }
 
 #[test]
@@ -196,14 +196,14 @@ fn test_recipients() {
 		},
 	];
 	assert_err!(
-		verify_notarization_allocation(&balance_change, &vec![], &vec![], None),
+		verify_notarization_allocation(&balance_change, &[], &[], None),
 		VerifyError::InvalidNoteRecipients
 	);
 
 	balance_change[1].balance = 250;
 	balance_change[1].notes[0].milligons = 250;
 	balance_change.pop();
-	assert_ok!(verify_notarization_allocation(&balance_change, &vec![], &vec![], None));
+	assert_ok!(verify_notarization_allocation(&balance_change, &[], &[], None));
 }
 
 #[test]
@@ -223,7 +223,7 @@ fn test_sending_to_localchain() {
 		signature: empty_signature(),
 	}];
 
-	assert_ok!(verify_notarization_allocation(&balance_change, &vec![], &vec![], None),);
+	assert_ok!(verify_notarization_allocation(&balance_change, &[], &[], None),);
 }
 
 #[test]
@@ -260,7 +260,7 @@ fn test_sending_to_mainchain() {
 		},
 	];
 
-	assert_ok!(verify_notarization_allocation(&balance_change, &vec![], &vec![], None));
+	assert_ok!(verify_notarization_allocation(&balance_change, &[], &[], None));
 }
 
 #[test]
@@ -280,7 +280,7 @@ fn test_can_lock_with_a_escrow_note() -> anyhow::Result<()> {
 		signature: empty_signature(),
 	};
 	{
-		let res = verify_notarization_allocation(&vec![balance_change], &vec![], &vec![], Some(1))
+		let res = verify_notarization_allocation(&vec![balance_change], &[], &[], Some(1))
 			.expect("should be ok");
 		assert!(!res.needs_escrow_settle_followup);
 		assert_eq!(res.unclaimed_escrow_balances.len(), 0);
@@ -300,8 +300,8 @@ fn test_can_lock_with_a_escrow_note() -> anyhow::Result<()> {
 				notes: bounded_vec![Note::create(250, NoteType::Send { to: None })],
 				signature: empty_signature(),
 			}],
-			&vec![],
-			&vec![],
+			&[],
+			&[],
 			Some(2)
 		),
 		VerifyError::AccountLocked
@@ -319,7 +319,7 @@ fn test_can_lock_with_a_escrow_note() -> anyhow::Result<()> {
 	};
 
 	assert!(matches!(
-		verify_notarization_allocation(&vec![escrow_settle.clone()], &vec![], &vec![], Some(2)),
+		verify_notarization_allocation(&vec![escrow_settle.clone()], &[], &[], Some(2)),
 		Err(VerifyError::EscrowHoldNotReadyForClaim { .. })
 	));
 
@@ -333,8 +333,8 @@ fn test_can_lock_with_a_escrow_note() -> anyhow::Result<()> {
 	assert_err!(
 		verify_notarization_allocation(
 			&vec![escrow_settle.clone()],
-			&vec![],
-			&vec![],
+			&[],
+			&[],
 			Some(ESCROW_EXPIRATION_TICKS + proof_tick)
 		),
 		VerifyError::InvalidEscrowClaimers
@@ -344,8 +344,8 @@ fn test_can_lock_with_a_escrow_note() -> anyhow::Result<()> {
 	{
 		let res = verify_notarization_allocation(
 			&vec![escrow_settle.clone()],
-			&vec![],
-			&vec![],
+			&[],
+			&[],
 			Some(1 + ESCROW_CLAWBACK_TICKS + ESCROW_EXPIRATION_TICKS),
 		)
 		.expect("should be ok");
@@ -378,14 +378,11 @@ fn test_can_lock_with_a_escrow_note() -> anyhow::Result<()> {
 		},
 	];
 
-	assert!(
-		verify_notarization_allocation(&changes, &vec![], &vec![], None)?
-			.needs_escrow_settle_followup
-	);
+	assert!(verify_notarization_allocation(&changes, &[], &[], None)?.needs_escrow_settle_followup);
 	// a valid claim is also acceptable
 	{
-		let res = verify_notarization_allocation(&changes, &vec![], &vec![], Some(61))
-			.expect("should be ok");
+		let res =
+			verify_notarization_allocation(&changes, &[], &[], Some(61)).expect("should be ok");
 		assert!(!res.needs_escrow_settle_followup);
 		assert_eq!(res.unclaimed_escrow_balances.len(), 0);
 		assert_eq!(res.claimed_escrow_deposits_per_account.len(), 1);
@@ -513,7 +510,7 @@ fn test_tax_must_be_claimed_on_tax_account() {
 	];
 
 	assert_err!(
-		verify_notarization_allocation(&set, &vec![], &vec![], Some(1)),
+		verify_notarization_allocation(&set, &[], &[], Some(1)),
 		VerifyError::TaxBalanceChangeNotNetZero { sent: 200, claimed: 0 }
 	);
 
@@ -533,7 +530,7 @@ fn test_tax_must_be_claimed_on_tax_account() {
 		.clone(),
 	);
 	assert_err!(
-		verify_notarization_allocation(&claim_tax_on_deposit, &vec![], &vec![], Some(1)),
+		verify_notarization_allocation(&claim_tax_on_deposit, &[], &[], Some(1)),
 		VerifyError::BalanceChangeNotNetZero { sent: 1000, claimed: 1200 }
 	);
 
@@ -553,7 +550,7 @@ fn test_tax_must_be_claimed_on_tax_account() {
 		.clone(),
 	);
 
-	let result = verify_notarization_allocation(&claim_tax_on_deposit, &vec![], &vec![], Some(1))
+	let result = verify_notarization_allocation(&claim_tax_on_deposit, &[], &[], Some(1))
 		.expect("should unwrap");
 	assert_eq!(result.claimed_deposits, 1000);
 	assert_eq!(result.sent_tax, 200);
@@ -574,7 +571,7 @@ fn test_can_transfer_tax() {
 	}];
 
 	assert_err!(
-		verify_notarization_allocation(&set, &vec![], &vec![], Some(1)),
+		verify_notarization_allocation(&set, &[], &[], Some(1)),
 		VerifyError::InvalidTaxOperation
 	);
 
@@ -616,8 +613,7 @@ fn test_can_transfer_tax() {
 		},
 	];
 
-	let result =
-		verify_notarization_allocation(&set, &vec![], &vec![], Some(1)).expect("should unwrap");
+	let result = verify_notarization_allocation(&set, &[], &[], Some(1)).expect("should unwrap");
 
 	assert_eq!(result.claimed_deposits, 0);
 	assert_eq!(result.claimed_tax, 20_000);
@@ -652,8 +648,8 @@ fn test_can_buy_data_domains() {
 
 	let result = verify_notarization_allocation(
 		&set,
-		&vec![],
-		&vec![(H256::random(), Alice.to_account_id())],
+		&[],
+		&[(H256::random(), Alice.to_account_id())],
 		Some(1),
 	)
 	.expect("should unwrap");
@@ -710,7 +706,7 @@ fn verify_tax_votes() {
 	}];
 
 	assert_err!(
-		verify_notarization_allocation(&set, &vec![], &vec![], Some(1)),
+		verify_notarization_allocation(&set, &[], &[], Some(1)),
 		VerifyError::InvalidBlockVoteAllocation
 	);
 
@@ -727,8 +723,7 @@ fn verify_tax_votes() {
 	.sign(Bob.pair())
 	.clone()];
 
-	let result =
-		verify_notarization_allocation(&set, &votes, &vec![], Some(1)).expect("should unwrap");
+	let result = verify_notarization_allocation(&set, &votes, &[], Some(1)).expect("should unwrap");
 
 	assert_eq!(result.claimed_deposits, 0);
 	assert_eq!(result.unclaimed_block_vote_tax_per_account.len(), 0);

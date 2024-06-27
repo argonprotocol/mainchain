@@ -140,7 +140,7 @@ impl UtxoTracker {
 			Default::default()
 		};
 
-		self.sync_to_block(&sync_status, &mut stored_filters)?;
+		self.sync_to_block(sync_status, &mut stored_filters)?;
 
 		let encoded = stored_filters.encode();
 		aux_store.insert_aux(&[(&UTXO_KEY[..], encoded.as_slice())], &[])?;

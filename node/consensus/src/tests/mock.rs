@@ -129,7 +129,7 @@ impl UlxTestNet {
 	pub(crate) fn check_errors(&mut self, cx: &mut Context) -> Poll<()> {
 		self.poll(cx);
 		for p in self.peers() {
-			for (h, e) in p.failed_verifications() {
+			if let Some((h, e)) = p.failed_verifications().into_iter().next() {
 				panic!("Verification failed for {:?}: {}", h, e);
 			}
 		}

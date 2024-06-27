@@ -46,7 +46,7 @@ impl NotarizationsStore {
 		account_type: &AccountType,
 		change_number: u32,
 	) -> Vec<u8> {
-		(account_id.clone(), account_type.clone(), change_number).encode()
+		(account_id.clone(), *account_type, change_number).encode()
 	}
 
 	pub async fn append_to_notebook<'a>(
@@ -187,7 +187,7 @@ impl NotarizationsStore {
 		let mut tx = pool.begin().await?;
 
 		let (current_notebook_number, tick) =
-			NotebookStatusStore::lock_open_for_appending(&mut *tx).await?;
+			NotebookStatusStore::lock_open_for_appending(&mut tx).await?;
 
 		if initial_allocation_result.needs_escrow_settle_followup {
 			verify_notarization_allocation(&changes, &block_votes, &data_domains, Some(tick))?;
@@ -203,14 +203,13 @@ impl NotarizationsStore {
 		let mut chain_transfers: u32 = 0;
 		for (change_index, change) in changes.into_iter().enumerate() {
 			let BalanceChange { account_id, account_type, change_number, balance, .. } = change;
-			let localchain_account_id =
-				LocalchainAccountId::new(account_id.clone(), account_type.clone());
+			let localchain_account_id = LocalchainAccountId::new(account_id.clone(), account_type);
 
 			let account_origin = change
 				.previous_balance_proof
 				.as_ref()
 				.map(|p| p.account_origin.clone())
-				.or_else(|| new_account_origins.get(&localchain_account_id).map(|a| a.clone()));
+				.or_else(|| new_account_origins.get(&localchain_account_id).cloned());
 
 			let account_origin = match account_origin {
 				Some(account_origin) => account_origin,
@@ -235,15 +234,15 @@ impl NotarizationsStore {
 				},
 			};
 			let previous_balance =
-				change.previous_balance_proof.as_ref().map(|p| p.balance.clone()).unwrap_or(0);
+				change.previous_balance_proof.as_ref().map(|p| p.balance).unwrap_or(0);
 
 			let prev_escrow_hold_note = change.escrow_hold_note;
 			BalanceTipStore::lock(
-				&mut *tx,
+				&mut tx,
 				&account_id,
-				account_type.clone(),
+				account_type,
 				change_number,
-				previous_balance.clone(),
+				previous_balance,
 				&account_origin,
 				change_index,
 				prev_escrow_hold_note.clone(),
@@ -254,7 +253,7 @@ impl NotarizationsStore {
 			if let Some(proof) = change.previous_balance_proof {
 				let proof_tip = BalanceTip {
 					account_id: account_id.clone(),
-					account_type: account_type.clone(),
+					account_type,
 					change_number: change_number - 1,
 					balance: previous_balance,
 					account_origin: account_origin.clone(),
@@ -293,7 +292,7 @@ impl NotarizationsStore {
 							&mut *tx,
 							&proof_tip,
 							proof.notebook_number,
-							&notebook_proof
+							notebook_proof
 						)
 						.await?,
 						Error::InvalidBalanceProof
@@ -303,13 +302,13 @@ impl NotarizationsStore {
 
 			let mut escrow_hold_note = None;
 			for (note_index, note) in change.notes.into_iter().enumerate() {
-				let _ = match note.note_type {
+				match note.note_type {
 					NoteType::ClaimFromMainchain { transfer_id, .. } => {
 						chain_transfers += 1;
 						// NOTE: transfers can expire. We need to ensure this can still get into a
 						// notebook
 						ChainTransferStore::take_and_record_transfer_local(
-							&mut *tx,
+							&mut tx,
 							current_notebook_number,
 							&account_id,
 							transfer_id,
@@ -322,7 +321,7 @@ impl NotarizationsStore {
 					NoteType::SendToMainchain => {
 						chain_transfers += 1;
 						ChainTransferStore::record_transfer_to_mainchain(
-							&mut *tx,
+							&mut tx,
 							current_notebook_number,
 							&account_id,
 							note.milligons,
@@ -338,10 +337,10 @@ impl NotarizationsStore {
 						escrow_hold_note = None;
 						if let Some(hold_note) = &prev_escrow_hold_note {
 							match &hold_note.note_type {
-								&NoteType::EscrowHold { ref data_domain_hash, ref recipient } =>
+								NoteType::EscrowHold { data_domain_hash, recipient } =>
 									if let Some(data_domain_hash) = data_domain_hash {
 										let count = escrow_data_domains
-											.entry((data_domain_hash.clone(), recipient.clone()))
+											.entry((*data_domain_hash, recipient.clone()))
 											.or_insert(0);
 										*count += 1;
 									},
@@ -360,7 +359,7 @@ impl NotarizationsStore {
 			}
 
 			BalanceTipStore::update(
-				&mut *tx,
+				&mut tx,
 				&account_id,
 				account_type,
 				change_number,
@@ -369,7 +368,7 @@ impl NotarizationsStore {
 				tick,
 				account_origin,
 				escrow_hold_note,
-				previous_balance.clone(),
+				previous_balance,
 				prev_escrow_hold_note,
 			)
 			.await?;
@@ -378,7 +377,7 @@ impl NotarizationsStore {
 		verify_voting_sources(&escrow_data_domains, &block_votes, &block_vote_specifications)?;
 
 		NotebookConstraintsStore::try_increment(
-			&mut *tx,
+			&mut tx,
 			current_notebook_number,
 			NotarizationCounts {
 				balance_changes: changes_with_proofs.len() as u32,
@@ -503,7 +502,7 @@ mod tests {
 		{
 			let mut tx = pool.begin().await?;
 			let result = NotarizationsStore::get_account_change(
-				&mut *tx,
+				&mut tx,
 				notebook_number,
 				Ferdie.to_account_id(),
 				AccountType::Deposit,
@@ -514,7 +513,7 @@ mod tests {
 			assert_eq!(result, notarization.clone());
 
 			assert!(NotarizationsStore::get_account_change(
-				&mut *tx,
+				&mut tx,
 				notebook_number,
 				Ferdie.to_account_id(),
 				AccountType::Deposit,

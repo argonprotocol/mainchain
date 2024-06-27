@@ -184,7 +184,7 @@ mod test {
       top_level_domain: DataTLD::Cars,
     };
     let js_domain: JsDataDomain = domain.clone().into();
-    let domain2: DataDomain = js_domain.try_into()?;
+    let domain2: DataDomain = js_domain.into();
     assert_eq!(domain, domain2);
     Ok(())
   }

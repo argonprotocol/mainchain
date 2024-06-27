@@ -112,7 +112,7 @@ fn marks_a_verified_bitcoin() {
 		assert_eq!(DefaultVault::get().bitcoin_argons.bonded, price);
 
 		assert_ok!(Bonds::utxo_verified(1));
-		assert_eq!(UtxosById::<Test>::get(1).unwrap().is_verified, true);
+		assert!(UtxosById::<Test>::get(1).unwrap().is_verified);
 		assert_eq!(WatchedUtxosById::get().len(), 1);
 		assert_eq!(LastBondEvent::get(), Some((1, who, price)));
 	});
@@ -341,7 +341,7 @@ fn can_unlock_a_bitcoin() {
 				.into(),
 		);
 
-		assert_eq!(Balances::free_balance(&who), 2_000);
+		assert_eq!(Balances::free_balance(who), 2_000);
 		assert_eq!(
 			Balances::balance_on_hold(&HoldReason::UnlockingBitcoin.into(), &who),
 			bond.amount
@@ -548,7 +548,7 @@ fn it_should_aggregate_holds_for_a_second_unlock() {
 			make_script_pubkey(&[0; 32]),
 			10
 		));
-		assert_eq!(Balances::free_balance(&who), 2_000 + (2 * (bond.amount - redemption_price)));
+		assert_eq!(Balances::free_balance(who), 2_000 + (2 * (bond.amount - redemption_price)));
 		assert_eq!(
 			Balances::balance_on_hold(&HoldReason::UnlockingBitcoin.into(), &who),
 			redemption_price * 2

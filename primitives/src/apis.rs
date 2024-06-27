@@ -1,3 +1,6 @@
+#![allow(clippy::ptr_arg)]
+#![allow(clippy::too_many_arguments)]
+
 use codec::{Codec, Decode, Encode, MaxEncodedLen};
 use scale_info::TypeInfo;
 use sp_core::{ConstU32, RuntimeDebug, H256, U256};
@@ -42,7 +45,7 @@ sp_api::decl_runtime_apis! {
 }
 
 sp_api::decl_runtime_apis! {
-	pub trait MiningApis<AccountId:Codec, BlockSealAuthorityId:Codec>{
+	pub trait MiningApis<AccountId, BlockSealAuthorityId> where BlockSealAuthorityId: Codec, AccountId: Codec {
 		fn get_authority_id(account_id: &AccountId) -> Option<MiningAuthority<BlockSealAuthorityId,AccountId>>;
 	}
 }

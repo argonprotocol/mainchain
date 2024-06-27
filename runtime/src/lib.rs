@@ -177,11 +177,12 @@ parameter_types! {
 pub struct TxPauseWhitelistedCalls;
 /// All calls are pausable.
 impl Contains<RuntimeCallNameOf<Runtime>> for TxPauseWhitelistedCalls {
-	fn contains(full_name: &RuntimeCallNameOf<Runtime>) -> bool {
-		match (full_name.0.as_slice(), full_name.1.as_slice()) {
-			// (b"Balances", b"transfer_keep_alive") => true,
-			_ => false,
-		}
+	fn contains(_full_name: &RuntimeCallNameOf<Runtime>) -> bool {
+		false
+		// match (full_name.0.as_slice(), full_name.1.as_slice()) {
+		// 	(b"Balances", b"transfer_keep_alive") => true,
+		// 	_ => false,
+		// }
 	}
 }
 
@@ -539,8 +540,8 @@ where
 				tips.merge_into(&mut fees);
 			}
 			if let Some(author) = pallet_authorship::Pallet::<R>::author() {
-				let _ = <pallet_balances::Pallet<R, ArgonToken>>::resolve(&author, fees)
-					.map_err(|c| drop(c));
+				let _ =
+					<pallet_balances::Pallet<R, ArgonToken>>::resolve(&author, fees).map_err(drop);
 			}
 		}
 	}

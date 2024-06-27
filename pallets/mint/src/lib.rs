@@ -1,7 +1,6 @@
 #![cfg_attr(not(feature = "std"), no_std)]
 
 use sp_runtime::{traits::Zero, Saturating};
-use sp_std::vec::Vec;
 
 pub use pallet::*;
 use ulx_primitives::{block_seal::BlockPayout, BlockRewardsEventHandler};
@@ -113,7 +112,7 @@ pub mod pallet {
 				Self::get_argons_to_print_per_miner(argon_cpi, active_miners.len() as u128);
 			if argons_to_print_per_miner > T::Balance::zero() {
 				for miner in active_miners {
-					match T::Currency::mint_into(&miner, argons_to_print_per_miner.into()) {
+					match T::Currency::mint_into(&miner, argons_to_print_per_miner) {
 						Ok(_) => {
 							ulixee_mint += argons_to_print_per_miner;
 							Self::deposit_event(Event::<T>::ArgonsMinted {
@@ -249,7 +248,7 @@ pub mod pallet {
 
 	impl<T: Config> BurnEventHandler<T::Balance> for Pallet<T> {
 		fn on_argon_burn(milligons: &T::Balance) -> sp_runtime::DispatchResult {
-			Self::on_argon_burn(milligons.clone());
+			Self::on_argon_burn(*milligons);
 			Ok(())
 		}
 	}
@@ -262,7 +261,7 @@ pub mod pallet {
 }
 
 impl<T: Config> BlockRewardsEventHandler<T::AccountId, T::Balance> for Pallet<T> {
-	fn rewards_created(payout: &Vec<BlockPayout<T::AccountId, T::Balance>>) {
+	fn rewards_created(payout: &[BlockPayout<T::AccountId, T::Balance>]) {
 		let mut argons = T::Balance::zero();
 		for reward in payout {
 			argons = argons.saturating_add(reward.argons);

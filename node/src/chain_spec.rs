@@ -135,6 +135,7 @@ pub fn local_testnet_config() -> Result<ChainSpec, String> {
 	.build())
 }
 
+#[allow(clippy::too_many_arguments)]
 /// Configure initial storage state for FRAME modules.
 fn testnet_genesis(
 	initial_authorities: Vec<(AccountId, (BlockSealAuthorityId, GrandpaId))>,

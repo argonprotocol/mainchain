@@ -159,9 +159,9 @@ impl<AccountId: Codec, Balance: Codec + Copy + MaxEncodedLen + Default + AtLeast
 	}
 
 	pub fn mut_argons(&mut self, bond_type: &BondType) -> &mut VaultArgons<Balance> {
-		match bond_type {
-			&BondType::Mining => &mut self.mining_argons,
-			&BondType::Bitcoin => &mut self.bitcoin_argons,
+		match *bond_type {
+			BondType::Mining => &mut self.mining_argons,
+			BondType::Bitcoin => &mut self.bitcoin_argons,
 		}
 	}
 }

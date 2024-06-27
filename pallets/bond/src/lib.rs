@@ -479,7 +479,7 @@ pub mod pallet {
 			let (vault_pubkey_hash, script_pubkey) = T::VaultProvider::create_utxo_script_pubkey(
 				vault_id,
 				utxo_id,
-				bitcoin_pubkey_hash.clone(),
+				bitcoin_pubkey_hash,
 				vault_claim_height,
 				open_claim_height,
 			)
@@ -487,7 +487,7 @@ pub mod pallet {
 
 			T::BitcoinUtxoTracker::watch_for_utxo(
 				utxo_id,
-				script_pubkey.clone(),
+				script_pubkey,
 				satoshis,
 				// translate back into a time with millis
 				vault_claim_height,
@@ -694,6 +694,7 @@ pub mod pallet {
 	}
 
 	impl<T: Config> Pallet<T> {
+		#[allow(clippy::too_many_arguments)]
 		fn create_bond(
 			vault_id: VaultId,
 			account_id: T::AccountId,

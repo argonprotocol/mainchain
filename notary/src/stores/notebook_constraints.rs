@@ -89,15 +89,15 @@ impl NotebookConstraintsStore {
 
 		let result = sqlx::query!(
 			r#"
-				UPDATE notebook_constraints SET 
-					block_votes = block_votes + $2, 
-					balance_changes = balance_changes + $3, 
+				UPDATE notebook_constraints SET
+					block_votes = block_votes + $2,
+					balance_changes = balance_changes + $3,
 					data_domains = data_domains + $4,
 					chain_transfers = chain_transfers + $5,
 					notarizations = notarizations + 1
-				WHERE notebook_number = $1 
+				WHERE notebook_number = $1
 					AND block_votes + $2 <= $6
-					AND balance_changes + $3 <= $7 
+					AND balance_changes + $3 <= $7
 					AND data_domains + $4 <= $8
 					AND chain_transfers + $5 <= $9
 					AND notarizations < $10
@@ -134,7 +134,7 @@ mod tests {
 	async fn test_max_chain_transfers(pool: PgPool) -> anyhow::Result<()> {
 		let mut tx = pool.begin().await?;
 
-		let _ = NotebookHeaderStore::create(&mut *tx, 1, 1, 1, 1).await?;
+		NotebookHeaderStore::create(&mut tx, 1, 1, 1, 1).await?;
 		let constraints = MaxNotebookCounts::new(1, 1, 1, 3, 3);
 		let counts = NotarizationCounts {
 			block_votes: 0,
@@ -144,7 +144,7 @@ mod tests {
 		};
 		assert_ok!(
 			NotebookConstraintsStore::try_increment(
-				&mut *tx,
+				&mut tx,
 				1,
 				counts.clone(),
 				constraints.clone()
@@ -155,7 +155,7 @@ mod tests {
 		let mut tx = pool.begin().await?;
 		assert_ok!(
 			NotebookConstraintsStore::try_increment(
-				&mut *tx,
+				&mut tx,
 				1,
 				counts.clone(),
 				constraints.clone()
@@ -166,7 +166,7 @@ mod tests {
 		let mut tx = pool.begin().await?;
 		assert_ok!(
 			NotebookConstraintsStore::try_increment(
-				&mut *tx,
+				&mut tx,
 				1,
 				counts.clone(),
 				constraints.clone()
@@ -178,7 +178,7 @@ mod tests {
 
 		assert!(matches!(
 			NotebookConstraintsStore::try_increment(
-				&mut *tx,
+				&mut tx,
 				1,
 				counts.clone(),
 				constraints.clone()

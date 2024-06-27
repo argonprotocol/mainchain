@@ -52,10 +52,7 @@ pub struct TickDigest {
 
 impl BlockSealDigest {
 	pub fn is_tax(&self) -> bool {
-		match self {
-			BlockSealDigest::Vote { .. } => true,
-			_ => false,
-		}
+		matches!(self, BlockSealDigest::Vote { .. })
 	}
 }
 

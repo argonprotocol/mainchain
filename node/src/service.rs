@@ -110,14 +110,14 @@ pub fn new_partial(
 			bitcoin_rpc_url, e
 		))
 	})?;
-	let bitcoin_auth = match (bitcoin_url.username(), bitcoin_url.password()) {
-		(user, password) =>
-			if !user.is_empty() {
-				Some((user.to_string(), password.unwrap_or_default().to_string()))
-			} else {
-				None
-			},
+	let (user, password) = (bitcoin_url.username(), bitcoin_url.password());
+
+	let bitcoin_auth = if !user.is_empty() {
+		Some((user.to_string(), password.unwrap_or_default().to_string()))
+	} else {
+		None
 	};
+
 	let utxo_tracker = UtxoTracker::new(bitcoin_url.origin().unicode_serialization(), bitcoin_auth)
 		.map_err(|e| {
 			ServiceError::Other(format!("Failed to initialize bitcoin monitoring {:?}", e))
@@ -383,7 +383,7 @@ pub fn new_full<
 				max(num_cpus::get() - 1, 1)
 			};
 			log::info!("Mining is enabled, {} threads", mining_threads);
-			run_compute_solver_threads(&mut task_manager, compute_miner, mining_threads);
+			run_compute_solver_threads(&task_manager, compute_miner, mining_threads);
 		} else {
 			log::info!("Mining is disabled");
 		}

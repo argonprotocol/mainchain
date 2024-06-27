@@ -122,7 +122,7 @@ impl<T: frame_system::Config> WeightInfo for SubstrateWeight<T> {
 	}
 	fn on_finalize() -> Weight {
 		Weight::from_parts(3_000_000, 0)
-			.saturating_add(RocksDbWeight::get().writes(1 as u64))
+			.saturating_add(RocksDbWeight::get().writes(1_u64))
 	}
 }
 
@@ -203,6 +203,6 @@ impl WeightInfo for () {
 	}
 	fn on_finalize() -> Weight {
 		Weight::from_parts(3_000_000, 0)
-			.saturating_add(RocksDbWeight::get().writes(1 as u64))
+			.saturating_add(RocksDbWeight::get().writes(1_u64))
 	}
 }

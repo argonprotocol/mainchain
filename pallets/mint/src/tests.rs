@@ -41,7 +41,7 @@ fn it_records_burnt_argons_by_prorata() {
 #[test]
 fn it_tracks_block_rewards() {
 	new_test_ext().execute_with(|| {
-		<UlixeeMint as BlockRewardsEventHandler<_, _>>::rewards_created(&vec![
+		<UlixeeMint as BlockRewardsEventHandler<_, _>>::rewards_created(&[
 			BlockPayout { account_id: 1, argons: 100, ulixees: 100 },
 			BlockPayout { account_id: 1, argons: 1, ulixees: 1 },
 			BlockPayout { account_id: 2, argons: 5, ulixees: 5 },
@@ -76,10 +76,10 @@ fn it_does_not_mint_bitcoin_with_negative_cpi() {
 	new_test_ext().execute_with(|| {
 		let utxo_id = 1;
 		let account_id = 1;
-		let amount = 1000u128.into();
+		let amount = 1000u128;
 		assert_ok!(UlixeeMint::utxo_bonded(utxo_id, &account_id, amount));
 
-		assert_eq!(Balances::total_issuance(), 0u128.into());
+		assert_eq!(Balances::total_issuance(), 0u128);
 
 		// nothing to mint
 		MintedUlixeeArgons::<Test>::set(1000);
@@ -97,7 +97,7 @@ fn it_pays_bitcoin_mints() {
 	new_test_ext().execute_with(|| {
 		let utxo_id = 1;
 		let account_id = 1;
-		let amount = 62_000_000u128.into();
+		let amount = 62_000_000u128;
 		assert_ok!(UlixeeMint::utxo_bonded(utxo_id, &account_id, amount));
 		assert_ok!(UlixeeMint::utxo_bonded(2, &2, 500));
 		assert_eq!(
@@ -105,7 +105,7 @@ fn it_pays_bitcoin_mints() {
 			vec![(utxo_id, account_id, amount), (2, 2, 500)]
 		);
 
-		assert_eq!(Balances::total_issuance(), 0u128.into());
+		assert_eq!(Balances::total_issuance(), 0u128);
 
 		// nothing to mint
 		MintedUlixeeArgons::<Test>::set(0);
@@ -135,7 +135,7 @@ fn it_pays_bitcoin_mints() {
 			.into(),
 		);
 		assert_eq!(MintedBitcoinArgons::<Test>::get(), 100);
-		assert_eq!(Balances::total_issuance(), 100u128.into());
+		assert_eq!(Balances::total_issuance(), 100u128);
 
 		// now allow whole
 
@@ -163,6 +163,6 @@ fn it_pays_bitcoin_mints() {
 		);
 		// should equal ulixee argons
 		assert_eq!(MintedBitcoinArgons::<Test>::get(), 62_000_100);
-		assert_eq!(Balances::total_issuance(), 62_000_100u128.into());
+		assert_eq!(Balances::total_issuance(), 62_000_100u128);
 	});
 }

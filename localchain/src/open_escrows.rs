@@ -192,8 +192,8 @@ impl Escrow {
     let from_address = self.from_address.clone();
 
     let res = sqlx::query!(
-      r#"INSERT INTO open_escrows 
-      (id, initial_balance_change_json, from_address, balance_change_number, expiration_tick, settled_amount, settled_signature, is_client) 
+      r#"INSERT INTO open_escrows
+      (id, initial_balance_change_json, from_address, balance_change_number, expiration_tick, settled_amount, settled_signature, is_client)
       VALUES (?, ?, ?, ?, ?, ?, ?, ?)"#,
       self.id,
       self.initial_balance_change_json,
@@ -705,6 +705,7 @@ mod tests {
     Ok(account)
   }
 
+  #[allow(clippy::too_many_arguments)]
   async fn create_escrow_hold(
     pool: &SqlitePool,
     account: &LocalAccount,

@@ -343,16 +343,13 @@ pub mod pallet {
 					active_miners -= 1;
 
 					let next = slot_cohort.iter().find(|x| x.account_id == account_id).cloned();
-					match Self::unbond_account(entry, next) {
-						Err(err) => {
-							log::error!(
-								target: LOG_TARGET,
-								"Failed to unbond account {:?}. {:?}",
-								account_id,
-								err,
-							);
-						},
-						_ => (),
+					if let Err(err) = Self::unbond_account(entry, next) {
+						log::error!(
+							target: LOG_TARGET,
+							"Failed to unbond account {:?}. {:?}",
+							account_id,
+							err,
+						);
 					}
 				}
 
@@ -529,9 +526,7 @@ impl<T: Config> Pallet<T> {
 	pub fn get_mining_authority(
 		account_id: &T::AccountId,
 	) -> Option<MiningAuthority<BlockSealAuthorityId, T::AccountId>> {
-		let Some(index) = <AccountIndexLookup<T>>::get(account_id) else {
-			return None;
-		};
+		let index = <AccountIndexLookup<T>>::get(account_id)?;
 		AuthoritiesByIndex::<T>::get()
 			.get(&index)
 			.map(|(authority_id, _)| MiningAuthority {
@@ -840,16 +835,18 @@ where
 impl<T: Config> OneSessionHandler<T::AccountId> for Pallet<T> {
 	type Key = BlockSealAuthorityId;
 
-	fn on_genesis_session<'a, I: 'a>(miners: I)
+	fn on_genesis_session<'a, I>(miners: I)
 	where
+		I: 'a,
 		I: Iterator<Item = (&'a T::AccountId, Self::Key)>,
 		T::AccountId: 'a,
 	{
 		Self::load_session_keys(miners);
 	}
 
-	fn on_new_session<'a, I: 'a>(changed: bool, miners_with_keys: I, _queued_miners: I)
+	fn on_new_session<'a, I>(changed: bool, miners_with_keys: I, _queued_miners: I)
 	where
+		I: 'a,
 		I: Iterator<Item = (&'a T::AccountId, BlockSealAuthorityId)>,
 	{
 		if changed {

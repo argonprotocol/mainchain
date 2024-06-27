@@ -44,7 +44,7 @@ uniffi = { workspace = true, features = ["build"] }
 
 [dev-dependencies]
 chrono = { workspace = true }
-tokio = { workspace = true, features = ["test-util"] }
+tokio = { workspace = true, features = ["full"] }
 
 [features]
 default = [ "std" ]

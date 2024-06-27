@@ -60,9 +60,7 @@ impl NotebookStore {
 			let proof = merkle_proof::<Blake2Hasher, _, _>(&merkle_leafs, index);
 
 			Ok(MerkleProof {
-				proof: BoundedVec::truncate_from(
-					proof.proof.into_iter().map(|p| p.into()).collect(),
-				),
+				proof: BoundedVec::truncate_from(proof.proof.into_iter().collect()),
 				leaf_index: index as u32,
 				number_of_leaves: merkle_leafs.len() as u32,
 			})
@@ -83,7 +81,7 @@ impl NotebookStore {
 		let result = sqlx::query!(
 			r#"
 			SELECT new_account_origins, notebook_number FROM notebooks
-			WHERE new_account_origins @> $1::jsonb 
+			WHERE new_account_origins @> $1::jsonb
 			ORDER BY notebook_number DESC LIMIT 1
 			"#,
 			origin
@@ -239,10 +237,7 @@ impl NotebookStore {
 		let new_account_origin_map =
 			BTreeMap::from_iter(new_account_origins.iter().map(|origin| {
 				(
-					LocalchainAccountId::new(
-						origin.account_id.clone(),
-						origin.account_type.clone(),
-					),
+					LocalchainAccountId::new(origin.account_id.clone(), origin.account_type),
 					AccountOrigin { notebook_number, account_uid: origin.account_uid },
 				)
 			}));
@@ -298,8 +293,8 @@ impl NotebookStore {
 				}
 			}
 			for vote in change.block_votes {
-				let block_hash = vote.block_hash.clone();
-				let key = (vote.account_id.clone(), vote.index.clone());
+				let block_hash = vote.block_hash;
+				let key = (vote.account_id.clone(), vote.index);
 				voting_power += vote.power;
 				block_votes.insert(key, vote);
 				blocks_with_votes.insert(block_hash);
@@ -331,7 +326,7 @@ impl NotebookStore {
 		let final_votes = block_votes.clone();
 
 		let votes_merkle_leafs =
-			block_votes.into_iter().map(|(_, vote)| vote.encode()).collect::<Vec<_>>();
+			block_votes.into_values().map(|vote| vote.encode()).collect::<Vec<_>>();
 		let votes_root = merkle_root::<Blake2Hasher, _>(&votes_merkle_leafs);
 
 		let _ = ChainTransferStore::take_for_notebook(&mut *db, notebook_number).await?;
@@ -350,7 +345,7 @@ impl NotebookStore {
 			blocks_with_votes,
 			voting_power,
 			|hash| {
-				notary_sign(&keystore, &public, &hash)
+				notary_sign(keystore, &public, hash)
 					.map_err(|e| Error::InternalError(format!("Unable to sign notebook: {:?}", e)))
 			},
 		)
@@ -360,7 +355,7 @@ impl NotebookStore {
 			.iter()
 			.map(|a| NewAccountOrigin {
 				account_id: a.account_id.clone(),
-				account_type: a.account_type.clone(),
+				account_type: a.account_type,
 				account_uid: a.account_uid,
 			})
 			.collect::<Vec<NewAccountOrigin>>();
@@ -370,15 +365,15 @@ impl NotebookStore {
 
 		let mut full_notebook = Notebook::build(final_header, notarizations, new_account_origins);
 		let hash = full_notebook.hash;
-		full_notebook.signature = notary_sign(&keystore, &public, &hash)?;
+		full_notebook.signature = notary_sign(keystore, &public, &hash)?;
 
 		let raw_body = full_notebook.encode();
 		Self::save_raw(db, notebook_number, raw_body).await?;
-		let votes_json = json!(final_votes.values().into_iter().collect::<Vec<_>>());
+		let votes_json = json!(final_votes.values().collect::<Vec<_>>());
 
 		let res = sqlx::query!(
 			r#"
-				INSERT INTO notebooks (notebook_number, change_merkle_leafs, new_account_origins, block_votes, hash, signature) 
+				INSERT INTO notebooks (notebook_number, change_merkle_leafs, new_account_origins, block_votes, hash, signature)
 				VALUES ($1, $2, $3, $4, $5, $6)
 			"#,
 			notebook_number as i32,
@@ -440,7 +435,7 @@ mod tests {
 		let mut tx = pool.begin().await?;
 		RegisteredKeyStore::store_public(&mut *tx, public, 1).await?;
 		NotebookHeaderStore::create(
-			&mut *tx,
+			&mut tx,
 			1,
 			1,
 			1,
@@ -456,7 +451,7 @@ mod tests {
 		)
 		.await?;
 		ChainTransferStore::take_and_record_transfer_local(
-			&mut *tx,
+			&mut tx,
 			1,
 			&Bob.to_account_id(),
 			1,
@@ -513,7 +508,7 @@ mod tests {
 		tx.commit().await?;
 
 		let mut tx = pool.begin().await?;
-		NotebookStore::close_notebook(&mut *tx, 1, 1, public, &keystore.into()).await?;
+		NotebookStore::close_notebook(&mut tx, 1, 1, public, &keystore.into()).await?;
 		tx.commit().await?;
 
 		let balance_tip = BalanceTip {
@@ -528,7 +523,7 @@ mod tests {
 
 		assert_eq!(proof.number_of_leaves, 3);
 
-		assert_eq!(NotebookStore::is_valid_proof(&pool, &balance_tip, 1, &proof).await?, true);
+		assert!(NotebookStore::is_valid_proof(&pool, &balance_tip, 1, &proof).await?);
 
 		assert_eq!(
 			NotebookStore::get_account_origins(&pool, 1).await?.into_inner(),

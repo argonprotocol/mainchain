@@ -94,14 +94,10 @@ impl BalanceChangeBuilder {
   }
 
   pub async fn is_pending_claim(&self) -> bool {
-    if let Some(status) = &self.sync_status {
-      match status {
-        &BalanceChangeStatus::WaitingForSendClaim => true,
-        _ => false,
-      }
-    } else {
-      false
-    }
+    matches!(
+      self.sync_status,
+      Some(BalanceChangeStatus::WaitingForSendClaim)
+    )
   }
 
   pub async fn send(

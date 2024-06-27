@@ -203,7 +203,7 @@ fn vault_can_claim_the_timelock_script() {
 			cosign_script.clone(),
 			Amount::ONE_BTC.to_sat(),
 			txid,
-			vout as u32,
+			vout,
 			UnlockStep::VaultClaim,
 			fee,
 			pay_to_script_pubkey.clone(),
@@ -219,7 +219,7 @@ fn vault_can_claim_the_timelock_script() {
 		let acceptance = bitcoind.client.test_mempool_accept(&[tx.raw_hex()]).expect("checked");
 		let did_accept = acceptance.first().unwrap();
 		println!("{:?}", did_accept);
-		assert_eq!(did_accept.allowed, false);
+		assert!(!did_accept.allowed);
 		let reject = did_accept.reject_reason.as_ref().unwrap();
 		assert!(reject.contains("Locktime requirement not satisfied"));
 	}
@@ -228,7 +228,7 @@ fn vault_can_claim_the_timelock_script() {
 		cosign_script.clone(),
 		Amount::ONE_BTC.to_sat(),
 		txid,
-		vout as u32,
+		vout,
 		UnlockStep::VaultClaim,
 		fee,
 		pay_to_script_pubkey.clone(),
@@ -247,7 +247,7 @@ fn vault_can_claim_the_timelock_script() {
 		let acceptance = bitcoind.client.test_mempool_accept(&[tx_hex.clone()]).expect("checked");
 
 		println!("{:?}", acceptance[0]);
-		assert_eq!(acceptance[0].allowed, false);
+		assert!(!acceptance[0].allowed);
 		let reject = acceptance[0].reject_reason.as_ref().unwrap();
 		assert!(reject.contains("non-final"));
 	}
@@ -256,7 +256,7 @@ fn vault_can_claim_the_timelock_script() {
 	let mut block_height = block_height;
 	while block_height < vault_claim_height {
 		let acceptance = bitcoind.client.test_mempool_accept(&[tx_hex.clone()]).expect("checked");
-		assert_eq!(acceptance[0].allowed, false);
+		assert!(!acceptance[0].allowed);
 		add_blocks(&bitcoind, 1, &block_address);
 		block_height = bitcoind.client.get_block_count().unwrap();
 	}
@@ -278,7 +278,7 @@ fn vault_can_claim_the_timelock_script() {
 		tx_hex.as_str(),
 		&tracker,
 		&bitcoind,
-		UtxoRef { txid: txid.into(), output_index: vout as u32 },
+		UtxoRef { txid: txid.into(), output_index: vout },
 		UtxoValue {
 			utxo_id: 1,
 			satoshis: Amount::ONE_BTC.to_sat(),
@@ -310,7 +310,7 @@ fn owner_can_reclaim_the_timelock_script() {
 	let register_height = block_height;
 	let mut cosign_script = CosignScript::new(
 		vault_compressed_pubkey.pubkey_hash().into(),
-		owner_pubkey_hash.clone(),
+		owner_pubkey_hash,
 		vault_claim_height,
 		open_claim_height,
 		register_height,
@@ -355,7 +355,7 @@ fn owner_can_reclaim_the_timelock_script() {
 		let acceptance = bitcoind.client.test_mempool_accept(&[tx.raw_hex()]).expect("checked");
 		let did_accept = acceptance.first().unwrap();
 		println!("{} {:?}", block_height, did_accept);
-		assert_eq!(did_accept.allowed, false);
+		assert!(!did_accept.allowed);
 		let reject = did_accept.reject_reason.as_ref().unwrap();
 		if reject.contains("Script failed") {
 			println!(
@@ -438,8 +438,8 @@ fn vault_and_owner_can_cosign() {
 	// 3. Owner recreates the script from the details and submits to blockchain
 	let script_address = {
 		let cosign_script = CosignScript::new(
-			vault_pubkey_hash.clone(),
-			owner_pubkey_hash.clone(),
+			vault_pubkey_hash,
+			owner_pubkey_hash,
 			vault_claim_height,
 			open_claim_height,
 			block_height,
@@ -469,7 +469,7 @@ fn vault_and_owner_can_cosign() {
 				UtxoValue {
 					utxo_id: 1,
 					satoshis: amount,
-					script_pubkey: utxo_script_pubkey.clone(),
+					script_pubkey: utxo_script_pubkey,
 					submitted_at_height: block_height,
 					watch_for_spent_until_height: open_claim_height,
 				},
@@ -486,8 +486,8 @@ fn vault_and_owner_can_cosign() {
 		owner_compressed_pubkey.p2wpkh_script_code().unwrap().try_into().unwrap();
 	let feerate = FeeRate::from_sat_per_vb(15).expect("cant translate fee");
 	let user_cosign_script = CosignScript::new(
-		vault_pubkey_hash.clone(),
-		owner_pubkey_hash.clone(),
+		vault_pubkey_hash,
+		owner_pubkey_hash,
 		vault_claim_height,
 		open_claim_height,
 		register_height,
@@ -500,8 +500,8 @@ fn vault_and_owner_can_cosign() {
 	// 5. vault sees unlock request (outaddress, fee) and creates a transaction
 	let (vault_signature, vault_pubkey) = {
 		let mut unlocker = UtxoUnlocker::new(
-			vault_pubkey_hash.clone().into(),
-			owner_pubkey_hash.clone().into(),
+			vault_pubkey_hash.into(),
+			owner_pubkey_hash.into(),
 			register_height,
 			vault_claim_height,
 			open_claim_height,
@@ -531,7 +531,7 @@ fn vault_and_owner_can_cosign() {
 			out_script_pubkey.clone().into(),
 		)
 		.unwrap();
-		unlocker.add_signature(vault_pubkey, vault_signature.into());
+		unlocker.add_signature(vault_pubkey, vault_signature);
 		unlocker.sign(owner_keypair).expect("sign");
 		unlocker.extract_tx().expect("tx")
 	};
@@ -553,7 +553,7 @@ fn vault_and_owner_can_cosign() {
 		UtxoValue {
 			utxo_id: 1,
 			satoshis: amount,
-			script_pubkey: utxo_script_pubkey.clone(),
+			script_pubkey: utxo_script_pubkey,
 			submitted_at_height: register_height,
 			watch_for_spent_until_height: open_claim_height,
 		},
@@ -570,7 +570,7 @@ fn check_spent(
 	block_address: &Address,
 ) {
 	let final_txid = bitcoind.client.send_raw_transaction(tx_hex).expect("sent");
-	let tx_result = wait_for_txid(&bitcoind, &final_txid, block_address);
+	let tx_result = wait_for_txid(bitcoind, &final_txid, block_address);
 	let tx_block_height = bitcoind
 		.client
 		.get_block_header_info(&tx_result.blockhash.unwrap())
@@ -604,7 +604,7 @@ fn fund_script_address(
 	let txid = bitcoind
 		.client
 		.send_to_address(
-			&script_address,
+			script_address,
 			Amount::from_sat(amount),
 			None,
 			None,
@@ -614,7 +614,7 @@ fn fund_script_address(
 			None,
 		)
 		.unwrap();
-	let tx = wait_for_txid(&bitcoind, &txid, &block_address);
+	let tx = wait_for_txid(bitcoind, &txid, block_address);
 	let vout = tx
 		.vout
 		.iter()
@@ -635,14 +635,14 @@ fn start_bitcoind() -> (BitcoinD, UtxoTracker, Address) {
 	let block_address = add_wallet_address(&bitcoind);
 	add_blocks(&bitcoind, NUM_BLOCKS as u64, &block_address);
 
-	let auth = if rpc_url.username().len() > 0 {
+	let auth = if !rpc_url.username().is_empty() {
 		Some((rpc_url.username().to_string(), rpc_url.password().unwrap_or_default().to_string()))
 	} else {
 		None
 	};
 
 	let tracker = UtxoTracker::new(rpc_url.origin().unicode_serialization(), auth).unwrap();
-	(bitcoind, tracker, block_address.into())
+	(bitcoind, tracker, block_address)
 }
 
 fn wait_for_txid(
@@ -663,7 +663,7 @@ fn wait_for_txid(
 			}
 		}
 		std::thread::sleep(std::time::Duration::from_secs(1));
-		add_blocks(&bitcoind, 1, block_address);
+		add_blocks(bitcoind, 1, block_address);
 	}
 }
 

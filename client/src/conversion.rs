@@ -39,9 +39,9 @@ impl From<runtime_types::ulx_primitives::bitcoin::H256Le> for ulx_primitives::bi
 	}
 }
 
-impl Into<runtime_types::ulx_primitives::bitcoin::H256Le> for ulx_primitives::bitcoin::H256Le {
-	fn into(self) -> runtime_types::ulx_primitives::bitcoin::H256Le {
-		runtime_types::ulx_primitives::bitcoin::H256Le(self.0)
+impl From<ulx_primitives::bitcoin::H256Le> for runtime_types::ulx_primitives::bitcoin::H256Le {
+	fn from(value: ulx_primitives::bitcoin::H256Le) -> Self {
+		Self(value.0)
 	}
 }
 
@@ -51,12 +51,9 @@ impl From<runtime_types::ulx_primitives::bitcoin::UtxoRef> for ulx_primitives::b
 	}
 }
 
-impl Into<runtime_types::ulx_primitives::bitcoin::UtxoRef> for ulx_primitives::bitcoin::UtxoRef {
-	fn into(self) -> runtime_types::ulx_primitives::bitcoin::UtxoRef {
-		runtime_types::ulx_primitives::bitcoin::UtxoRef {
-			txid: self.txid.into(),
-			output_index: self.output_index,
-		}
+impl From<ulx_primitives::bitcoin::UtxoRef> for runtime_types::ulx_primitives::bitcoin::UtxoRef {
+	fn from(value: ulx_primitives::bitcoin::UtxoRef) -> Self {
+		Self { txid: value.txid.into(), output_index: value.output_index }
 	}
 }
 
@@ -68,11 +65,11 @@ impl From<runtime_types::ulx_primitives::bitcoin::BitcoinPubkeyHash>
 	}
 }
 
-impl Into<runtime_types::ulx_primitives::bitcoin::BitcoinPubkeyHash>
-	for ulx_primitives::bitcoin::BitcoinPubkeyHash
+impl From<ulx_primitives::bitcoin::BitcoinPubkeyHash>
+	for runtime_types::ulx_primitives::bitcoin::BitcoinPubkeyHash
 {
-	fn into(self) -> runtime_types::ulx_primitives::bitcoin::BitcoinPubkeyHash {
-		runtime_types::ulx_primitives::bitcoin::BitcoinPubkeyHash(self.0)
+	fn from(value: ulx_primitives::bitcoin::BitcoinPubkeyHash) -> Self {
+		Self(value.0)
 	}
 }
 
@@ -87,11 +84,11 @@ impl TryFrom<runtime_types::ulx_primitives::bitcoin::BitcoinSignature>
 	}
 }
 
-impl Into<runtime_types::ulx_primitives::bitcoin::BitcoinSignature>
-	for ulx_primitives::bitcoin::BitcoinSignature
+impl From<ulx_primitives::bitcoin::BitcoinSignature>
+	for runtime_types::ulx_primitives::bitcoin::BitcoinSignature
 {
-	fn into(self) -> runtime_types::ulx_primitives::bitcoin::BitcoinSignature {
-		runtime_types::ulx_primitives::bitcoin::BitcoinSignature(self.0.into())
+	fn from(value: ulx_primitives::bitcoin::BitcoinSignature) -> Self {
+		Self(value.0.into())
 	}
 }
 
@@ -106,19 +103,19 @@ impl TryFrom<runtime_types::ulx_primitives::bitcoin::BitcoinScriptPubkey>
 	}
 }
 
-impl Into<runtime_types::ulx_primitives::bitcoin::BitcoinScriptPubkey>
-	for ulx_primitives::bitcoin::BitcoinScriptPubkey
+impl From<ulx_primitives::bitcoin::BitcoinScriptPubkey>
+	for runtime_types::ulx_primitives::bitcoin::BitcoinScriptPubkey
 {
-	fn into(self) -> runtime_types::ulx_primitives::bitcoin::BitcoinScriptPubkey {
-		runtime_types::ulx_primitives::bitcoin::BitcoinScriptPubkey(self.0.into())
+	fn from(value: ulx_primitives::bitcoin::BitcoinScriptPubkey) -> Self {
+		Self(value.0.into())
 	}
 }
 
-impl Into<runtime_types::ulx_primitives::bitcoin::CompressedBitcoinPubkey>
-	for ulx_primitives::bitcoin::CompressedBitcoinPubkey
+impl From<ulx_primitives::bitcoin::CompressedBitcoinPubkey>
+	for runtime_types::ulx_primitives::bitcoin::CompressedBitcoinPubkey
 {
-	fn into(self) -> runtime_types::ulx_primitives::bitcoin::CompressedBitcoinPubkey {
-		runtime_types::ulx_primitives::bitcoin::CompressedBitcoinPubkey(self.0)
+	fn from(value: ulx_primitives::bitcoin::CompressedBitcoinPubkey) -> Self {
+		Self(value.0)
 	}
 }
 
@@ -126,6 +123,6 @@ impl From<runtime_types::ulx_primitives::bitcoin::CompressedBitcoinPubkey>
 	for ulx_primitives::bitcoin::CompressedBitcoinPubkey
 {
 	fn from(value: runtime_types::ulx_primitives::bitcoin::CompressedBitcoinPubkey) -> Self {
-		Self(value.0.into())
+		Self(value.0)
 	}
 }

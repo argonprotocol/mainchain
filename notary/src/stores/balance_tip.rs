@@ -1,3 +1,4 @@
+#![allow(clippy::too_many_arguments)]
 use std::default::Default;
 
 use sp_core::H256;
@@ -63,7 +64,7 @@ impl BalanceTipStore {
 
 			let tip = if let Some(value) = value {
 				let vec = value.value;
-				let tip = H256::from_slice(&vec.as_slice());
+				let tip = H256::from_slice(vec.as_slice());
 				Some(tip)
 			} else {
 				None
@@ -129,8 +130,8 @@ impl BalanceTipStore {
 		Box::pin(async move {
 			let res = sqlx::query!(
 				r#"
-			INSERT INTO balance_tips (key, value, last_changed_notebook, last_changed_tick) VALUES ($1, $2, $3, $4) 
-			ON CONFLICT (key) 
+			INSERT INTO balance_tips (key, value, last_changed_notebook, last_changed_tick) VALUES ($1, $2, $3, $4)
+			ON CONFLICT (key)
 			DO UPDATE SET value = $2, last_changed_notebook = $3, last_changed_tick = $4
 				WHERE balance_tips.value = $5;
 			"#,
@@ -185,7 +186,7 @@ mod tests {
 				None
 			);
 			BalanceTipStore::update(
-				&mut *tx1,
+				&mut tx1,
 				&Bob.to_account_id(),
 				Deposit,
 				1,
@@ -228,7 +229,7 @@ mod tests {
 
 		let mut tx3 = pool.begin().await?;
 		assert!(BalanceTipStore::lock(
-			&mut *tx3,
+			&mut tx3,
 			&Bob.to_account_id(),
 			Deposit,
 			2,
@@ -245,7 +246,7 @@ mod tests {
 
 		assert_ok!(
 			BalanceTipStore::update(
-				&mut *tx2,
+				&mut tx2,
 				&Bob.to_account_id(),
 				Deposit,
 				2,

@@ -45,8 +45,8 @@ fn can_set_a_price_index() {
 	new_test_ext(Some(1)).execute_with(|| {
 		System::set_block_number(1);
 		let entry = create_index();
-		assert_ok!(PriceIndex::submit(RuntimeOrigin::signed(1), entry.clone()),);
-		assert_eq!(Current::<Test>::get(), Some(entry.clone()));
+		assert_ok!(PriceIndex::submit(RuntimeOrigin::signed(1), entry),);
+		assert_eq!(Current::<Test>::get(), Some(entry));
 
 		System::assert_last_event(Event::NewIndex.into());
 	});
@@ -60,21 +60,21 @@ fn uses_latest_as_current() {
 		let start = now();
 		let mut entry = create_index();
 		entry.timestamp = start;
-		assert_ok!(PriceIndex::submit(RuntimeOrigin::signed(1), entry.clone()),);
-		assert_eq!(Current::<Test>::get(), Some(entry.clone()));
+		assert_ok!(PriceIndex::submit(RuntimeOrigin::signed(1), entry),);
+		assert_eq!(Current::<Test>::get(), Some(entry));
 		System::assert_last_event(Event::NewIndex.into());
 
-		let mut entry2 = entry.clone();
+		let mut entry2 = entry;
 		entry2.argon_cpi = ArgonCPI::from_float(1.0);
 		entry2.timestamp = start + 4;
-		assert_ok!(PriceIndex::submit(RuntimeOrigin::signed(1), entry2.clone()),);
-		assert_eq!(Current::<Test>::get(), Some(entry2.clone()));
+		assert_ok!(PriceIndex::submit(RuntimeOrigin::signed(1), entry2),);
+		assert_eq!(Current::<Test>::get(), Some(entry2));
 
-		let mut entry_backwards = entry.clone();
+		let mut entry_backwards = entry;
 		entry_backwards.argon_cpi = ArgonCPI::from_float(2.0);
 		entry_backwards.timestamp = start + 1;
-		assert_ok!(PriceIndex::submit(RuntimeOrigin::signed(1), entry_backwards.clone()),);
-		assert_eq!(Current::<Test>::get(), Some(entry2.clone()));
+		assert_ok!(PriceIndex::submit(RuntimeOrigin::signed(1), entry_backwards),);
+		assert_eq!(Current::<Test>::get(), Some(entry2));
 	});
 }
 
@@ -85,10 +85,7 @@ fn doesnt_use_expired_values() {
 		OldestHistoryToKeep::set(10);
 		let mut entry = create_index();
 		entry.timestamp = now() - 11;
-		assert_err!(
-			PriceIndex::submit(RuntimeOrigin::signed(1), entry.clone()),
-			Error::PricesTooOld
-		);
+		assert_err!(PriceIndex::submit(RuntimeOrigin::signed(1), entry), Error::PricesTooOld);
 		assert_eq!(Current::<Test>::get(), None);
 	});
 }

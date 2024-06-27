@@ -353,7 +353,7 @@ pub mod pallet {
 			let mut utxos = vec![];
 			// TODO: This is not efficient, but we don't have a better way to do this right now
 			for (utxo, entry) in <LockedUtxos<T>>::iter() {
-				utxos.push((Some(utxo), entry.into()));
+				utxos.push((Some(utxo), entry));
 			}
 			for (_, entry) in <UtxosPendingConfirmation<T>>::get() {
 				utxos.push((None, entry));
@@ -372,7 +372,7 @@ pub mod pallet {
 				return Ok(());
 			};
 
-			if let Some(_) = <LockedUtxos<T>>::get(&utxo_ref) {
+			if <LockedUtxos<T>>::contains_key(&utxo_ref) {
 				Self::reject_utxo(utxo_id, BitcoinRejectedReason::DuplicateUtxo)?;
 				return Ok(());
 			}
@@ -441,9 +441,7 @@ pub mod pallet {
 		{
 			let utxo_sync = data.bitcoin_sync().expect("Could not decode bitcoin inherent data");
 
-			let Some(utxo_sync) = utxo_sync else {
-				return None;
-			};
+			let utxo_sync = utxo_sync?;
 
 			Some(Call::sync { utxo_sync })
 		}

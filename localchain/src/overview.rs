@@ -97,8 +97,10 @@ impl OverviewStore {
   }
 
   pub async fn get(&self) -> Result<LocalchainOverview> {
-    let mut overview = LocalchainOverview::default();
-    overview.name = self.name.clone();
+    let mut overview = LocalchainOverview {
+      name: self.name.clone(),
+      ..Default::default()
+    };
 
     let transactions_by_id: BTreeMap<i64, TransactionType> =
       sqlx::query!("SELECT * from transactions")
@@ -288,7 +290,7 @@ impl OverviewStore {
         .unwrap_or(group.balance_changes.first().unwrap());
 
       group.status = change.status;
-      group.notes = change.notes.clone();
+      group.notes.clone_from(&change.notes);
     }
 
     Ok(overview)

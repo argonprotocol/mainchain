@@ -1,4 +1,5 @@
 #![cfg_attr(not(feature = "std"), no_std)]
+#![allow(clippy::large_enum_variant)]
 
 pub use pallet::*;
 pub use weights::*;
@@ -89,6 +90,14 @@ pub mod pallet {
 	#[pallet::storage]
 	pub(super) type TempVotingKeyDigest<T: Config> =
 		StorageValue<_, ParentVotingKeyDigest, OptionQuery>;
+
+	type FindBlockVoteSealResult<T> = BoundedVec<
+		BestBlockVoteSeal<
+			<T as frame_system::Config>::AccountId,
+			<T as pallet::Config>::AuthorityId,
+		>,
+		ConstU32<2>,
+	>;
 
 	#[pallet::error]
 	pub enum Error<T> {
@@ -219,7 +228,6 @@ pub mod pallet {
 			}
 		}
 	}
-
 	#[pallet::call]
 	impl<T: Config> Pallet<T> {
 		#[pallet::call_index(0)]
@@ -400,10 +408,7 @@ pub mod pallet {
 		pub fn find_vote_block_seals(
 			notebook_votes: Vec<NotaryNotebookVotes>,
 			with_better_strength: U256,
-		) -> Result<
-			BoundedVec<BestBlockVoteSeal<T::AccountId, T::AuthorityId>, ConstU32<2>>,
-			Error<T>,
-		> {
+		) -> Result<FindBlockVoteSealResult<T>, Error<T>> {
 			let Some(parent_key) = <ParentVotingKey<T>>::get() else {
 				return Ok(BoundedVec::new());
 			};

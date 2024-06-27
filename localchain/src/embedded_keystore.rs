@@ -152,15 +152,15 @@ impl EmbeddedKeystore {
     let derived_pair = match parent_pair {
       PairWrapper::Ed25519(parent) => {
         let (pair, _seed) = parent.derive(junctions.into_iter(), None)?;
-        PairWrapper::Ed25519(pair)
+        PairWrapper::Ed25519(Box::new(pair))
       }
       PairWrapper::Sr25519(parent) => {
         let (pair, _seed) = parent.derive(junctions.into_iter(), None)?;
-        PairWrapper::Sr25519(pair)
+        PairWrapper::Sr25519(Box::new(pair))
       }
       PairWrapper::Ecdsa(parent) => {
         let (pair, _seed) = parent.derive(junctions.into_iter(), None)?;
-        PairWrapper::Ecdsa(pair)
+        PairWrapper::Ecdsa(Box::new(pair))
       }
     };
     let address = derived_pair.address();
@@ -267,9 +267,9 @@ impl From<i64> for CryptoScheme {
 
 #[derive(Clone)]
 pub enum PairWrapper {
-  Ed25519(ed25519::Pair),
-  Sr25519(sr25519::Pair),
-  Ecdsa(ecdsa::Pair),
+  Ed25519(Box<ed25519::Pair>),
+  Sr25519(Box<sr25519::Pair>),
+  Ecdsa(Box<ecdsa::Pair>),
 }
 
 #[derive(Clone)]
@@ -315,15 +315,15 @@ impl PairWrapper {
     match crypto_scheme {
       CryptoScheme::Ed25519 => {
         let (pair, phrase, _seed) = ed25519::Pair::generate_with_phrase(password);
-        (PairWrapper::Ed25519(pair), phrase)
+        (PairWrapper::Ed25519(Box::new(pair)), phrase)
       }
       CryptoScheme::Sr25519 => {
         let (pair, phrase, _seed) = sr25519::Pair::generate_with_phrase(password);
-        (PairWrapper::Sr25519(pair), phrase)
+        (PairWrapper::Sr25519(Box::new(pair)), phrase)
       }
       CryptoScheme::Ecdsa => {
         let (pair, phrase, _seed) = ecdsa::Pair::generate_with_phrase(password);
-        (PairWrapper::Ecdsa(pair), phrase)
+        (PairWrapper::Ecdsa(Box::new(pair)), phrase)
       }
     }
   }
@@ -332,15 +332,15 @@ impl PairWrapper {
     match crypto_scheme {
       CryptoScheme::Ed25519 => {
         let pair = ed25519::Pair::from_string(suri, password)?;
-        Ok(PairWrapper::Ed25519(pair))
+        Ok(PairWrapper::Ed25519(Box::new(pair)))
       }
       CryptoScheme::Sr25519 => {
         let pair = sr25519::Pair::from_string(suri, password)?;
-        Ok(PairWrapper::Sr25519(pair))
+        Ok(PairWrapper::Sr25519(Box::new(pair)))
       }
       CryptoScheme::Ecdsa => {
         let pair = ecdsa::Pair::from_string(suri, password)?;
-        Ok(PairWrapper::Ecdsa(pair))
+        Ok(PairWrapper::Ecdsa(Box::new(pair)))
       }
     }
   }

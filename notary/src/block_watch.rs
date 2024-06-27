@@ -28,10 +28,10 @@ pub async fn spawn_block_sync(
 	pool: PgPool,
 	ticker: Ticker,
 ) -> anyhow::Result<(), Error> {
-	sync_finalized_blocks(rpc_url.clone(), notary_id, pool.clone(), ticker.clone())
+	sync_finalized_blocks(rpc_url.clone(), notary_id, pool.clone(), ticker)
 		.await
 		.map_err(|e| Error::BlockSyncError(e.to_string()))?;
-	track_blocks(rpc_url.clone(), notary_id, pool.clone(), ticker.clone());
+	track_blocks(rpc_url.clone(), notary_id, pool.clone(), ticker);
 
 	Ok(())
 }
@@ -43,11 +43,9 @@ pub(crate) fn track_blocks(
 	ticker: Ticker,
 ) -> tokio::task::JoinHandle<()> {
 	tokio::task::spawn(async move {
-		let ticker = ticker.clone();
+		let ticker = ticker;
 		loop {
-			match subscribe_to_blocks(rpc_url.clone(), notary_id.clone(), &pool.clone(), &ticker)
-				.await
-			{
+			match subscribe_to_blocks(rpc_url.clone(), notary_id, &pool.clone(), &ticker).await {
 				Ok(_) => break,
 				Err(e) => tracing::error!("Error polling mainchain blocks: {:?}", e),
 			}
@@ -76,21 +74,16 @@ async fn sync_finalized_blocks(
 		let mut db = pool.acquire().await?;
 
 		let public = Ed25519Public::from_raw(notary.meta.public);
-		let _ = activate_notebook_processing(
-			&mut *db,
-			notary_id,
-			public,
-			oldest_block_to_sync,
-			&ticker,
-		)
-		.await
-		.ok();
+		let _ =
+			activate_notebook_processing(&mut db, notary_id, public, oldest_block_to_sync, &ticker)
+				.await
+				.ok();
 	}
 
 	let mut tx = pool.begin().await?;
 	BlocksStore::lock(&mut tx).await?;
 
-	let last_synched_block = BlocksStore::get_latest_finalized_block_number(&mut *tx).await?;
+	let last_synched_block = BlocksStore::get_latest_finalized_block_number(&mut tx).await?;
 
 	let latest_finalized_hash = client.latest_finalized_block_hash().await?;
 
@@ -112,8 +105,8 @@ async fn sync_finalized_blocks(
 	);
 
 	for block in missing_blocks.into_iter() {
-		process_block(&mut *tx, &client.live, &block, notary_id).await?;
-		process_finalized_block(&mut *tx, block, notary_id, &ticker).await?;
+		process_block(&mut tx, &client.live, &block, notary_id).await?;
+		process_finalized_block(&mut tx, block, notary_id, &ticker).await?;
 	}
 	tx.commit().await?;
 	Ok(())
@@ -153,7 +146,7 @@ async fn process_block(
 		db,
 		block.number(),
 		block.hash(),
-		parent_hash.clone(),
+		parent_hash,
 		next_vote_minimum,
 		notebooks,
 	)
@@ -170,10 +163,10 @@ async fn find_missing_blocks(
 	let mut blocks = vec![];
 	let mut block_hash = block_hash;
 	while !BlocksStore::has_block(db, block_hash).await? {
-		let block = client.blocks().at(block_hash.clone()).await?;
+		let block = client.blocks().at(block_hash).await?;
 		let is_genesis = block.header().number == 0;
 
-		block_hash = block.header().parent_hash.clone();
+		block_hash = block.header().parent_hash;
 		blocks.insert(0, block);
 		// can't get a parent of genesis block
 		if is_genesis {
@@ -193,7 +186,7 @@ async fn process_fork(
 
 	let missing_blocks = find_missing_blocks(db, client, block.hash()).await?;
 	for missing_block in missing_blocks {
-		process_block(db, &client, &missing_block, notary_id).await?;
+		process_block(db, client, &missing_block, notary_id).await?;
 	}
 	Ok(())
 }
@@ -225,74 +218,72 @@ async fn process_finalized_block(
 	let block_height = block.number();
 
 	let events = block.events().await?;
-	for event in events.iter() {
-		if let Ok(event) = event {
-			if let Some(Ok(meta_change)) =
-				event.as_event::<api::notaries::events::NotaryMetaUpdated>().transpose()
-			{
-				if meta_change.notary_id == notary_id {
-					RegisteredKeyStore::store_public(
-						&mut *db,
-						Ed25519Public::from_raw(meta_change.meta.public),
-						block_height,
-					)
+	for event in events.iter().flatten() {
+		if let Some(Ok(meta_change)) =
+			event.as_event::<api::notaries::events::NotaryMetaUpdated>().transpose()
+		{
+			if meta_change.notary_id == notary_id {
+				RegisteredKeyStore::store_public(
+					&mut *db,
+					Ed25519Public::from_raw(meta_change.meta.public),
+					block_height,
+				)
+				.await?;
+			}
+			continue;
+		}
+		if let Some(Ok(activated_event)) =
+			event.as_event::<api::notaries::events::NotaryActivated>().transpose()
+		{
+			info!("Notary activated: {:?}", activated_event);
+			if activated_event.notary.notary_id == notary_id {
+				let public = Ed25519Public::from_raw(activated_event.notary.meta.public);
+				activate_notebook_processing(&mut *db, notary_id, public, block_height, ticker)
 					.await?;
-				}
-				continue;
 			}
-			if let Some(Ok(activated_event)) =
-				event.as_event::<api::notaries::events::NotaryActivated>().transpose()
-			{
-				info!("Notary activated: {:?}", activated_event);
-				if activated_event.notary.notary_id == notary_id {
-					let public = Ed25519Public::from_raw(activated_event.notary.meta.public);
-					activate_notebook_processing(&mut *db, notary_id, public, block_height, ticker)
-						.await?;
-				}
-				continue;
-			}
+			continue;
+		}
 
-			if let Some(Ok(notebook)) =
-				event.as_event::<api::notebook::events::NotebookSubmitted>().transpose()
-			{
-				if notebook.notary_id == notary_id {
-					info!("Notebook finalized: {:?}", notebook);
-					NotebookStatusStore::next_step(
-						&mut *db,
-						notebook.notebook_number,
-						NotebookFinalizationStep::Closed,
-					)
-					.await?;
-				}
-				continue;
+		if let Some(Ok(notebook)) =
+			event.as_event::<api::notebook::events::NotebookSubmitted>().transpose()
+		{
+			if notebook.notary_id == notary_id {
+				info!("Notebook finalized: {:?}", notebook);
+				NotebookStatusStore::next_step(
+					&mut *db,
+					notebook.notebook_number,
+					NotebookFinalizationStep::Closed,
+				)
+				.await?;
 			}
+			continue;
+		}
 
-			if let Some(Ok(notebook)) =
-				event.as_event::<api::notebook::events::NotebookAuditFailure>().transpose()
-			{
-				if notebook.notary_id == notary_id {
-					panic!("Notebook audit failed! Need to shut down {:?}", notebook);
-				}
-				continue;
+		if let Some(Ok(notebook)) =
+			event.as_event::<api::notebook::events::NotebookAuditFailure>().transpose()
+		{
+			if notebook.notary_id == notary_id {
+				panic!("Notebook audit failed! Need to shut down {:?}", notebook);
 			}
+			continue;
+		}
 
-			if let Some(Ok(to_localchain)) = event
-				.as_event::<api::chain_transfer::events::TransferToLocalchain>()
-				.transpose()
-			{
-				if to_localchain.notary_id == notary_id {
-					info!("Transfer to localchain: {:?}", to_localchain);
-					ChainTransferStore::record_transfer_to_local_from_block(
-						&mut *db,
-						block_height,
-						&AccountId::from(to_localchain.account_id.0),
-						to_localchain.transfer_id,
-						to_localchain.amount,
-					)
-					.await?;
-				}
-				continue;
+		if let Some(Ok(to_localchain)) = event
+			.as_event::<api::chain_transfer::events::TransferToLocalchain>()
+			.transpose()
+		{
+			if to_localchain.notary_id == notary_id {
+				info!("Transfer to localchain: {:?}", to_localchain);
+				ChainTransferStore::record_transfer_to_local_from_block(
+					&mut *db,
+					block_height,
+					&AccountId::from(to_localchain.account_id.0),
+					to_localchain.transfer_id,
+					to_localchain.amount,
+				)
+				.await?;
 			}
+			continue;
 		}
 	}
 
@@ -319,7 +310,7 @@ async fn subscribe_to_blocks(
 				match block_next {
 					Some(Ok(block)) => {
 						let mut tx = pool.begin().await?;
-						process_fork(&mut *tx, &client, &block, notary_id).await?;
+						process_fork(&mut tx, &client, &block, notary_id).await?;
 						tx.commit().await?;
 					},
 					Some(Err(e)) => {
@@ -333,10 +324,10 @@ async fn subscribe_to_blocks(
 				match block_next {
 					Some(Ok(block)) => {
 						let mut tx = pool.begin().await?;
-						if !BlocksStore::has_block(&mut *tx, block.hash()).await? {
-							process_block(&mut *tx, &client, &block, notary_id).await?;
+						if !BlocksStore::has_block(&mut tx, block.hash()).await? {
+							process_block(&mut tx, &client, &block, notary_id).await?;
 						}
-						process_finalized_block(&mut *tx, block, notary_id, &ticker).await?;
+						process_finalized_block(&mut tx, block, notary_id, ticker).await?;
 						tx.commit().await?;
 					},
 					Some(Err(e)) => {

@@ -329,13 +329,14 @@ pub mod pallet {
 				balance_to_i128::<T>(vault.securitized_argons);
 			vault.securitized_argons = total_securities;
 
+			#[allow(clippy::comparison_chain)]
 			if amount_to_hold > 0 {
 				Self::hold(&who, (amount_to_hold as u128).into(), HoldReason::EnterVault)
 					.map_err(Error::<T>::from)?;
 			} else if amount_to_hold < 0 {
 				Self::release_hold(
 					&who,
-					(amount_to_hold.abs() as u128).into(),
+					amount_to_hold.unsigned_abs().into(),
 					HoldReason::EnterVault,
 				)?;
 			}
@@ -539,7 +540,7 @@ pub mod pallet {
 			let apr = vault_argons.annual_percent_rate;
 
 			let fee = Self::calculate_fees(apr, amount, blocks);
-			ensure!(fee <= amount.into(), BondError::FeeExceedsBondAmount);
+			ensure!(fee <= amount, BondError::FeeExceedsBondAmount);
 
 			let base_fee = Self::calculate_fees(apr, amount, T::BlocksPerDay::get());
 
@@ -613,7 +614,7 @@ pub mod pallet {
 
 			// the remaining fee is not paid
 			if remaining_fee > 0u128.into() {
-				Self::release_hold(&bonded_account_id, remaining_fee, HoldReason::BondFee)
+				Self::release_hold(bonded_account_id, remaining_fee, HoldReason::BondFee)
 					.map_err(|_| BondError::UnrecoverableHold)?;
 			}
 			// 1. take away from the vault first
@@ -642,7 +643,7 @@ pub mod pallet {
 			T::Currency::transfer_on_hold(
 				&HoldReason::EnterVault.into(),
 				&vault_operator,
-				&bonded_account_id,
+				bonded_account_id,
 				market_rate - still_owed,
 				Precision::Exact,
 				Restriction::Free,
@@ -723,7 +724,7 @@ pub mod pallet {
 			.ok_or(BondError::NoVaultBitcoinPubkeysAvailable)?;
 
 			let script_pubkey = create_timelock_multisig_script(
-				vault_pubkey_hash.clone(),
+				vault_pubkey_hash,
 				owner_pubkey_hash,
 				vault_claim_height,
 				open_claim_height,

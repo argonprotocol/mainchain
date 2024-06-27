@@ -228,9 +228,10 @@ mod bitcoin_compat {
 			H256Le(inner)
 		}
 	}
-	impl Into<bitcoin::Txid> for H256Le {
-		fn into(self) -> bitcoin::Txid {
-			let hash = bitcoin::hashes::sha256d::Hash::from_bytes_ref(&self.0);
+
+	impl From<H256Le> for bitcoin::Txid {
+		fn from(h: H256Le) -> Self {
+			let hash = bitcoin::hashes::sha256d::Hash::from_bytes_ref(&h.0);
 			bitcoin::Txid::from_raw_hash(*hash)
 		}
 	}
@@ -257,9 +258,9 @@ mod bitcoin_compat {
 		}
 	}
 
-	impl Into<bitcoin::PubkeyHash> for BitcoinPubkeyHash {
-		fn into(self) -> bitcoin::PubkeyHash {
-			let hash = bitcoin::hashes::hash160::Hash::from_bytes_ref(&self.0);
+	impl From<BitcoinPubkeyHash> for bitcoin::PubkeyHash {
+		fn from(h: BitcoinPubkeyHash) -> Self {
+			let hash = bitcoin::hashes::hash160::Hash::from_bytes_ref(&h.0);
 			bitcoin::PubkeyHash::from_raw_hash(*hash)
 		}
 	}
@@ -267,7 +268,7 @@ mod bitcoin_compat {
 	impl TryInto<bitcoin::ecdsa::Signature> for BitcoinSignature {
 		type Error = bitcoin::ecdsa::Error;
 		fn try_into(self) -> Result<bitcoin::ecdsa::Signature, Self::Error> {
-			bitcoin::ecdsa::Signature::from_slice(&self.0.as_slice())
+			bitcoin::ecdsa::Signature::from_slice(self.0.as_slice())
 		}
 	}
 
@@ -287,7 +288,7 @@ mod bitcoin_compat {
 
 	impl From<bitcoin::CompressedPublicKey> for CompressedBitcoinPubkey {
 		fn from(pubkey: bitcoin::CompressedPublicKey) -> Self {
-			Self(pubkey.to_bytes().into())
+			Self(pubkey.to_bytes())
 		}
 	}
 
@@ -333,9 +334,9 @@ mod bitcoin_compat {
 		}
 	}
 
-	impl Into<bitcoin::ScriptBuf> for BitcoinScriptPubkey {
-		fn into(self) -> bitcoin::ScriptBuf {
-			bitcoin::ScriptBuf::from_bytes(self.0.into_inner())
+	impl From<BitcoinScriptPubkey> for bitcoin::ScriptBuf {
+		fn from(val: BitcoinScriptPubkey) -> Self {
+			bitcoin::ScriptBuf::from_bytes(val.0.into_inner())
 		}
 	}
 
@@ -346,9 +347,9 @@ mod bitcoin_compat {
 		}
 	}
 
-	impl Into<bitcoin::ScriptBuf> for BitcoinCosignScriptPubkey {
-		fn into(self) -> bitcoin::ScriptBuf {
-			match self {
+	impl From<BitcoinCosignScriptPubkey> for bitcoin::ScriptBuf {
+		fn from(val: BitcoinCosignScriptPubkey) -> Self {
+			match val {
 				BitcoinCosignScriptPubkey::P2WSH { wscript_hash } => {
 					let bytes = wscript_hash.to_fixed_bytes();
 					let raw_hash = bitcoin::hashes::sha256::Hash::from_bytes_ref(&bytes);

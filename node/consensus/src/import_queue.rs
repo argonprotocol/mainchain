@@ -191,21 +191,19 @@ where
 
 		// NOTE: we verify compute nonce in import queue because we use the pre-hash, which we'd
 		// have to inject into the runtime
-		match &seal_digest {
-			BlockSealDigest::Compute { nonce } => {
-				// verify compute effort
-				let difficulty =
-					self.client.runtime_api().compute_difficulty(parent_hash).map_err(|e| {
-						Error::<B>::MissingRuntimeData(
-							format!("Failed to get difficulty from runtime: {}", e).to_string(),
-						)
-					})?;
-				if !BlockComputeNonce::is_valid(nonce, pre_hash.as_ref().to_vec(), difficulty) {
-					return Err(Error::<B>::InvalidComputeNonce.into());
-				}
-				compute_difficulty = Some(difficulty);
-			},
-			_ => {},
+
+		if let BlockSealDigest::Compute { nonce } = &seal_digest {
+			// verify compute effort
+			let difficulty =
+				self.client.runtime_api().compute_difficulty(parent_hash).map_err(|e| {
+					Error::<B>::MissingRuntimeData(
+						format!("Failed to get difficulty from runtime: {}", e).to_string(),
+					)
+				})?;
+			if !BlockComputeNonce::is_valid(nonce, pre_hash.as_ref().to_vec(), difficulty) {
+				return Err(Error::<B>::InvalidComputeNonce.into());
+			}
+			compute_difficulty = Some(difficulty);
 		}
 
 		let best_header = self
@@ -244,6 +242,12 @@ where
 
 pub struct UlxVerifier<B: BlockT> {
 	_marker: PhantomData<B>,
+}
+
+impl<B: BlockT> Default for UlxVerifier<B> {
+	fn default() -> Self {
+		Self::new()
+	}
 }
 
 impl<B: BlockT> UlxVerifier<B> {

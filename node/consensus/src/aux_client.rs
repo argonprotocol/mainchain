@@ -1,3 +1,4 @@
+#![allow(clippy::type_complexity)]
 use std::{
 	any::Any,
 	cmp::Ordering,
@@ -130,6 +131,7 @@ impl<B: BlockT, C: AuxStore> UlxAux<B, C> {
 /// - `AuthorsAtHeight` - the authors at a given height for every voting key. A block will only be
 ///   accepted once per author per key
 impl<B: BlockT, C: AuxStore + 'static> UlxAux<B, C> {
+	#[allow(clippy::too_many_arguments)]
 	pub fn record_block(
 		&self,
 		best_header: B::Header,
@@ -143,7 +145,7 @@ impl<B: BlockT, C: AuxStore + 'static> UlxAux<B, C> {
 		compute_difficulty: Option<ComputeDifficulty>,
 	) -> Result<(ForkPower, ForkPower), Error<B>> {
 		let _lock = self.lock.write();
-		let block_number = convert_u32::<B>(&block.header.number());
+		let block_number = convert_u32::<B>(block.header.number());
 		let strongest_at_height = self.strongest_fork_at_tick(tick)?.get();
 
 		// add author to voting key
@@ -151,14 +153,14 @@ impl<B: BlockT, C: AuxStore + 'static> UlxAux<B, C> {
 			self.authors_by_voting_key_at_height(block_number)?
 				.mutate(|authors_at_height| {
 					if !authors_at_height.entry(voting_key).or_default().insert(author.clone()) {
-						return Err(Error::<B>::DuplicateAuthoredBlock(author).into());
+						return Err(Error::<B>::DuplicateAuthoredBlock(author));
 					}
 					Ok::<(), Error<B>>(())
 				})??;
 		}
 
 		let parent_hash = block.header.parent_hash();
-		let mut fork_power = self.get_fork_voting_power(&parent_hash)?.get();
+		let mut fork_power = self.get_fork_voting_power(parent_hash)?.get();
 		fork_power.add(block_voting_power, notebooks, seal_digest, compute_difficulty);
 
 		if fork_power > strongest_at_height {
@@ -356,7 +358,7 @@ impl<B: BlockT, C: AuxStore + 'static> UlxAux<B, C> {
 		raw_signed_header: Vec<u8>,
 		vote_details: &NotaryNotebookVoteDetails<B::Hash>,
 	) -> Result<NotaryNotebookTickState, Error<B>> {
-		let notary_state = self.update_tick_state(raw_signed_header, &vote_details)?;
+		let notary_state = self.update_tick_state(raw_signed_header, vote_details)?;
 
 		self.get_notary_audit_history(notary_id)?.mutate(|notebooks| {
 			if !notebooks.iter().any(|n| n.notebook_number == audit_result.notebook_number) {
@@ -417,7 +419,7 @@ impl<B: BlockT, C: AuxStore + 'static> UlxAux<B, C> {
 	) -> Result<Arc<AuxData<T, C>>, Error<B>> {
 		let mut state = self.state.write();
 		let entry = state
-			.get_or_insert(key.clone(), || key.default_state(self.client.clone()).into())
+			.get_or_insert(key.clone(), || key.default_state(self.client.clone()))
 			.ok_or(Error::<B>::StringError(format!("Error unlocking notary state for {key:?}")))?;
 		if let Some(data) = entry.as_any().downcast_ref::<Arc<AuxData<T, C>>>() {
 			Ok(data.clone())

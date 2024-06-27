@@ -27,7 +27,7 @@ impl TryInto<ChainTransfer> for ChainTransferRow {
 			})
 		} else {
 			Ok(ChainTransfer::ToMainchain {
-				account_id: AccountId::from_slice(&self.account_id.as_slice()).map_err(|_| {
+				account_id: AccountId::from_slice(self.account_id.as_slice()).map_err(|_| {
 					Error::InternalError(format!(
 						"Unable to read account id from db {:?}",
 						self.account_id
@@ -92,7 +92,7 @@ impl ChainTransferStore {
 		.map_err(|_| Error::TransferToLocalchainNotFound { change_index, note_index })?;
 
 		let amount = stored_amount.amount.parse::<u128>().map_err(|e| {
-			Error::InternalError(format!("Failed to parse amount from mainchain {}", e.to_string()))
+			Error::InternalError(format!("Failed to parse amount from mainchain {}", e))
 		})?;
 		ensure!(
 			proposed_amount == amount,
@@ -171,9 +171,9 @@ mod tests {
 
 	#[sqlx::test]
 	async fn test_transfer_to_localchain_flow(pool: PgPool) -> anyhow::Result<()> {
-		let mut db = &mut pool.acquire().await?;
+		let db = &mut pool.acquire().await?;
 		NotebookHeaderStore::create(
-			&mut db,
+			db,
 			1,
 			1,
 			1,
@@ -205,7 +205,7 @@ mod tests {
 			let mut tx = pool.begin().await?;
 			assert_ok!(
 				ChainTransferStore::take_and_record_transfer_local(
-					&mut *tx,
+					&mut tx,
 					notebook_number,
 					&account_id,
 					transfer_id,
@@ -221,7 +221,7 @@ mod tests {
 			let mut tx = pool.begin().await?;
 			let result = ChainTransferStore::take_for_notebook(&mut *tx, notebook_number).await?;
 			assert_eq!(result.len(), 1);
-			if let Some(ChainTransfer::ToLocalchain { transfer_id: t_transfer_id }) = result.get(0)
+			if let Some(ChainTransfer::ToLocalchain { transfer_id: t_transfer_id }) = result.first()
 			{
 				assert_eq!(*t_transfer_id, transfer_id);
 			} else {
@@ -235,9 +235,9 @@ mod tests {
 	#[sqlx::test]
 	async fn test_transfer_can_only_be_in_one_notebook(pool: PgPool) -> anyhow::Result<()> {
 		logger();
-		let mut db = &mut pool.acquire().await?;
+		let db = &mut pool.acquire().await?;
 		NotebookHeaderStore::create(
-			&mut db,
+			db,
 			1,
 			1,
 			1,
@@ -264,7 +264,7 @@ mod tests {
 		);
 		assert_ok!(
 			ChainTransferStore::take_and_record_transfer_local(
-				&mut *tx,
+				&mut tx,
 				notebook_number,
 				&account_id,
 				transfer_id,
@@ -276,7 +276,7 @@ mod tests {
 		);
 
 		assert!(ChainTransferStore::take_and_record_transfer_local(
-			&mut *tx,
+			&mut tx,
 			notebook_number,
 			&account_id,
 			transfer_id,

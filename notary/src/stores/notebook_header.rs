@@ -213,7 +213,7 @@ impl NotebookHeaderStore {
 		.fetch_one(db)
 		.await?;
 
-		Ok(record.try_into()?)
+		record.try_into()
 	}
 
 	pub async fn load_raw_signed_headers<'a>(
@@ -361,6 +361,7 @@ impl NotebookHeaderStore {
 		Ok(())
 	}
 
+	#[allow(clippy::too_many_arguments)]
 	pub fn complete_notebook<'a>(
 		db: &'a mut PgConnection,
 		notebook_number: NotebookNumber,
@@ -485,8 +486,8 @@ mod tests {
 		{
 			let mut tx = pool.begin().await?;
 
-			let _ = NotebookHeaderStore::create(
-				&mut *tx,
+			NotebookHeaderStore::create(
+				&mut tx,
 				1,
 				notebook_number,
 				1,
@@ -518,8 +519,8 @@ mod tests {
 		{
 			let mut tx = pool.begin().await?;
 
-			let _ = NotebookHeaderStore::create(
-				&mut *tx,
+			NotebookHeaderStore::create(
+				&mut tx,
 				1,
 				notebook_number,
 				1,
@@ -544,8 +545,8 @@ mod tests {
 		{
 			let mut tx = pool.begin().await?;
 
-			let _ = NotebookHeaderStore::create(
-				&mut *tx,
+			NotebookHeaderStore::create(
+				&mut tx,
 				1,
 				notebook_number,
 				1,
@@ -559,7 +560,7 @@ mod tests {
 		{
 			let mut tx = pool.begin().await?;
 			NotebookHeaderStore::complete_notebook(
-				&mut *tx,
+				&mut tx,
 				notebook_number,
 				notebook_number,
 				vec![

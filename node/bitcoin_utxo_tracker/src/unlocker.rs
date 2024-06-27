@@ -37,8 +37,8 @@ impl CosignScript {
 		created_at_height: BitcoinHeight,
 	) -> anyhow::Result<Self> {
 		let script = create_timelock_multisig_script(
-			vault_pubkey_hash.clone(),
-			owner_pubkey_hash.clone(),
+			vault_pubkey_hash,
+			owner_pubkey_hash,
 			vault_claim_height,
 			open_claim_height,
 		)
@@ -66,12 +66,11 @@ impl CosignScript {
 	}
 
 	pub fn unlock_height(&self, unlock_step: UnlockStep) -> u32 {
-		let height = match unlock_step {
+		(match unlock_step {
 			UnlockStep::OwnerCosign | UnlockStep::VaultCosign => self.created_at_height,
 			UnlockStep::VaultClaim => self.vault_claim_height,
 			UnlockStep::OwnerClaim => self.open_claim_height,
-		} as u32;
-		height
+		}) as u32
 	}
 	pub fn calculate_fee(
 		&self,
@@ -136,7 +135,7 @@ impl UtxoUnlocker {
 			lock_time: LockTime::from_height(lock_time)
 				.map_err(|_| anyhow!("Invalid lock time"))?,
 			input: vec![TxIn {
-				previous_output: out_point.clone(),
+				previous_output: out_point,
 				sequence: Sequence::ENABLE_LOCKTIME_NO_RBF,
 				..TxIn::default()
 			}],
@@ -162,6 +161,8 @@ impl UtxoUnlocker {
 
 		Ok(Self { cosign_script, unlock_step, psbt })
 	}
+
+	#[allow(clippy::too_many_arguments)]
 	pub fn new(
 		vault_pubkey_hash: PubkeyHash,
 		owner_pubkey_hash: PubkeyHash,
@@ -222,7 +223,7 @@ impl UtxoUnlocker {
 		psbt.inputs[0].bip32_derivation.insert(pubkey.inner, key_source);
 
 		match psbt.sign(&master_xpriv, &secp) {
-			Ok(_) => ensure!(psbt.inputs[0].partial_sigs.len() >= 1, "Expected 1 signature"),
+			Ok(_) => ensure!(!psbt.inputs[0].partial_sigs.is_empty(), "Expected 1 signature"),
 			Err((_, errs)) => bail!("Error signing Partially Signed Bitcoin script {:?}", errs),
 		};
 
@@ -232,7 +233,7 @@ impl UtxoUnlocker {
 			bail!("Could not sign with derived key");
 		};
 
-		Ok((signature.clone(), pubkey))
+		Ok((*signature, pubkey))
 	}
 
 	pub fn sign_hwi(
@@ -246,14 +247,9 @@ impl UtxoUnlocker {
 		if device.is_none() {
 			let devices = HWIClient::enumerate()
 				.map_err(|e| anyhow!("Error enumerating devices: {:?}", e))?;
-			for d in devices {
-				match d {
-					Ok(x) => {
-						device = Some(x);
-						break;
-					},
-					Err(_) => {},
-				}
+
+			for d in devices.into_iter().flatten() {
+				device = Some(d);
 			}
 		};
 		let device = device.ok_or(anyhow!("No device found"))?;
@@ -271,7 +267,7 @@ impl UtxoUnlocker {
 			bail!("Could not sign with hardware wallet");
 		};
 
-		Ok((signature.clone(), pubkey.into()))
+		Ok((*signature, pubkey.into()))
 	}
 
 	pub fn extract_tx(&mut self) -> anyhow::Result<Transaction> {

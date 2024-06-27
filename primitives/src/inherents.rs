@@ -17,6 +17,7 @@ pub const SEAL_INHERENT_DIGEST_IDENTIFIER: InherentIdentifier = *b"seal_dig";
 pub const NOTEBOOKS_INHERENT_IDENTIFIER: InherentIdentifier = *b"notebook";
 pub const BITCOIN_INHERENT_IDENTIFIER: InherentIdentifier = *b"bitcoin_";
 
+#[allow(clippy::large_enum_variant)]
 #[derive(Clone, PartialEq, Eq, Encode, Decode, RuntimeDebug, TypeInfo)]
 pub enum BlockSealInherent {
 	Vote {
@@ -71,10 +72,7 @@ impl BlockSealInherent {
 					seal_strength == &included_seal_strength,
 				_ => false,
 			},
-			Self::Compute => match seal_digest {
-				BlockSealDigest::Compute { .. } => true,
-				_ => false,
-			},
+			Self::Compute => matches!(seal_digest, BlockSealDigest::Compute { .. }),
 		}
 	}
 }

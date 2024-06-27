@@ -110,7 +110,7 @@ where
 		let Some(vote_details) = self
 			.client
 			.runtime_api()
-			.decode_signed_raw_notebook_header(best_hash.clone(), raw_data.clone())?
+			.decode_signed_raw_notebook_header(best_hash, raw_data.clone())?
 			.ok()
 		else {
 			return Err(Error::NotaryError(format!(
@@ -120,7 +120,7 @@ where
 		};
 
 		let mut lookup_tick = vote_details.tick.saturating_sub(1);
-		let mut audit_at_block_hash = best_hash.clone();
+		let mut audit_at_block_hash = best_hash;
 
 		while lookup_tick > 0 {
 			if let Some(hash) = get_block_descendent_with_tick(&self.client, best_hash, lookup_tick)

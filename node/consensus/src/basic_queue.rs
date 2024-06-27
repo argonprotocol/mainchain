@@ -1,3 +1,4 @@
+#![allow(clippy::type_complexity)]
 ///
 ///
 /// NOTE - BAB: This file is copied only to modify a few functions because it is all crate
@@ -93,7 +94,7 @@ impl<B: BlockT> BasicQueue<B> {
 				.ok()
 		});
 
-		let (future, justification_sender, block_import_sender) = BlockImportWorker::new(
+		let (future, justification_sender, block_import_sender) = BlockImportWorker::create_task(
 			result_sender,
 			verifier,
 			block_import,
@@ -206,7 +207,7 @@ impl<B: BlockT> ImportQueue<B> for BasicQueue<B> {
 	/// influece the synchronization process.
 	async fn run(mut self, mut link: Box<dyn Link<B>>) {
 		loop {
-			if let Err(_) = self.result_port.next_action(&mut *link).await {
+			if self.result_port.next_action(&mut *link).await.is_err() {
 				log::error!(target: "sync", "poll_actions: Background import task is no longer alive");
 				return;
 			}
@@ -239,6 +240,7 @@ mod worker_messages {
 /// We are going to add a stream to listen for finality notifications. This will allow us to
 /// hold onto blocks that need processing dependent on finalization receipt, which can come from
 /// notaries submitting notebook.
+#[allow(clippy::too_many_arguments)]
 async fn block_import_process<B: BlockT, S: 'static + Send + BlockchainEvents<B>>(
 	mut block_import: BoxBlockImport<B>,
 	mut verifier: impl Verifier<B>,
@@ -394,7 +396,7 @@ struct BlockImportWorker<B: BlockT> {
 }
 
 impl<B: BlockT> BlockImportWorker<B> {
-	fn new<V: 'static + Verifier<B>, S: 'static + Send + Sync + BlockchainEvents<B>>(
+	fn create_task<V: 'static + Verifier<B>, S: 'static + Send + Sync + BlockchainEvents<B>>(
 		result_sender: BufferedLinkSender<B>,
 		verifier: V,
 		block_import: BoxBlockImport<B>,
@@ -717,7 +719,7 @@ mod tests {
 			block: BlockImportParams<Block>,
 		) -> Result<ImportResult, Self::Error> {
 			if let Some((hash, number)) =
-				self.pending_justification_error.lock().remove(&block.header.number())
+				self.pending_justification_error.lock().remove(block.header.number())
 			{
 				Err(Error::<Block>::PendingFinalizedBlockDigest(hash, number).into())
 			} else {
@@ -844,7 +846,7 @@ mod tests {
 		let client = Arc::new(Client { finality_notification_sinks: Default::default() });
 		let test = Test { pending_justification_error: Default::default() };
 
-		let (worker, finality_sender, block_import_sender) = BlockImportWorker::new(
+		let (worker, finality_sender, block_import_sender) = BlockImportWorker::create_task(
 			result_sender,
 			test.clone(),
 			Box::new(test.clone()),
@@ -950,7 +952,7 @@ mod tests {
 
 		let client = Arc::new(Client { finality_notification_sinks: Default::default() });
 		let test = Test { pending_justification_error: Default::default() };
-		let (worker, finality_sender, block_import_sender) = BlockImportWorker::new(
+		let (worker, finality_sender, block_import_sender) = BlockImportWorker::create_task(
 			result_sender,
 			test.clone(),
 			Box::new(test.clone()),

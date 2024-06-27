@@ -25,7 +25,7 @@ impl BlockComputeNonce {
 	}
 
 	pub fn is_valid(nonce: &U256, pre_hash: Vec<u8>, difficulty: ComputeDifficulty) -> bool {
-		let hash = Self { nonce: nonce.clone(), pre_hash }.using_encoded(blake2_256);
+		let hash = Self { nonce: *nonce, pre_hash }.using_encoded(blake2_256);
 		let threshold = Self::threshold(difficulty);
 		Self::meets_threshold(hash, threshold)
 	}
@@ -59,7 +59,7 @@ impl ComputeSolver {
 		let payload = &mut self.wip_nonce_hash;
 		payload.splice(payload.len() - nonce_bytes.len().., nonce_bytes);
 
-		let hash = blake2_256(&payload);
+		let hash = blake2_256(payload);
 		if BlockComputeNonce::meets_threshold(hash, self.threshold) {
 			return Some(self.wip_nonce.clone());
 		}
@@ -85,8 +85,8 @@ mod tests {
 		let mut bytes = [0u8; 32];
 		bytes[31] = 1;
 
-		assert_eq!(BlockComputeNonce::is_valid(&U256::from(1), bytes.to_vec(), 1), true);
-		assert_eq!(BlockComputeNonce::is_valid(&U256::from(1), bytes.to_vec(), 10_000), false);
+		assert!(BlockComputeNonce::is_valid(&U256::from(1), bytes.to_vec(), 1));
+		assert!(!BlockComputeNonce::is_valid(&U256::from(1), bytes.to_vec(), 10_000));
 	}
 
 	#[test]

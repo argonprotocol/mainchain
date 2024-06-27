@@ -293,7 +293,7 @@ fn it_can_close_a_vault() {
 			Balances::free_balance(1),
 			vault_owner_balance - (bond_amount * 2) - bond_amount - mining_bond + 1
 		);
-		assert_eq!(VaultsById::<Test>::get(1).unwrap().is_closed, true);
+		assert!(VaultsById::<Test>::get(1).unwrap().is_closed);
 
 		// now when we complete a bond, it should return the funds to the vault
 		assert_ok!(Vaults::release_bonded_funds(
@@ -467,7 +467,7 @@ fn it_can_recoup_reduced_value_bitcoins_from_bond_funds() {
 		// should keep the rest on hold
 		assert_eq!(Balances::balance_on_hold(&HoldReason::EnterVault.into(), &1), 150_000);
 		// returns the fee
-		assert_eq!(Balances::free_balance(&2), 2_000 + 50_000);
+		assert_eq!(Balances::free_balance(2), 2_000 + 50_000);
 		assert_eq!(VaultsById::<Test>::get(1).unwrap().bitcoin_argons.bonded, 50_000);
 		assert_eq!(VaultsById::<Test>::get(1).unwrap().bitcoin_argons.allocated, 50_000);
 	});
@@ -500,7 +500,7 @@ fn it_can_recoup_increased_value_bitcoins_from_securitizations() {
 			.expect("bonding failed");
 		assert_eq!(total_fee, 50);
 		assert_eq!(paid, 0);
-		assert_eq!(Balances::free_balance(&2), 2_000 - 50);
+		assert_eq!(Balances::free_balance(2), 2_000 - 50);
 
 		assert_eq!(
 			Vaults::compensate_lost_bitcoin(
@@ -527,7 +527,7 @@ fn it_can_recoup_increased_value_bitcoins_from_securitizations() {
 			350_000 - 200_000
 		);
 		// returns the fee
-		assert_eq!(Balances::free_balance(&2), 2_000 + 200_000);
+		assert_eq!(Balances::free_balance(2), 2_000 + 200_000);
 		assert_eq!(VaultsById::<Test>::get(1).unwrap().bitcoin_argons.bonded, 0);
 		assert_eq!(VaultsById::<Test>::get(1).unwrap().bitcoin_argons.allocated, 0);
 	});

@@ -127,7 +127,7 @@ impl NotebookRpcServer for NotaryServer {
 		.await
 		.map_err(from_crate_error)?;
 
-		let tick = NotebookHeaderStore::get_notebook_tick(&mut *db, notebook_number)
+		let tick = NotebookHeaderStore::get_notebook_tick(&mut db, notebook_number)
 			.await
 			.map_err(from_crate_error)?;
 		Ok(BalanceProof {
@@ -153,7 +153,7 @@ impl NotebookRpcServer for NotaryServer {
 			.await
 			.map_err(|e| from_crate_error(Error::Database(e.to_string())))?;
 		let notarization = NotarizationsStore::get_account_change(
-			&mut *db,
+			&mut db,
 			notebook_number,
 			account_id,
 			account_type,
@@ -198,7 +198,7 @@ impl NotebookRpcServer for NotaryServer {
 			.await
 			.map_err(|e| from_crate_error(Error::Database(e.to_string())))?;
 
-		Ok(NotebookStore::load_finalized(&mut *db, notebook_number)
+		Ok(NotebookStore::load_finalized(&mut db, notebook_number)
 			.await
 			.map_err(from_crate_error)?)
 	}
@@ -213,7 +213,7 @@ impl NotebookRpcServer for NotaryServer {
 			.await
 			.map_err(|e| from_crate_error(Error::Database(e.to_string())))?;
 
-		Ok(NotebookStore::load_raw(&mut *db, notebook_number)
+		Ok(NotebookStore::load_raw(&mut db, notebook_number)
 			.await
 			.map_err(from_crate_error)?)
 	}
@@ -361,9 +361,9 @@ mod tests {
 		assert!(notary.addr.port() > 0);
 
 		let mut db = notary.pool.acquire().await?;
-		BlocksStore::record(&mut *db, 0, [1u8; 32].into(), [0u8; 32].into(), 100, vec![]).await?;
-		BlocksStore::record_finalized(&mut *db, [1u8; 32].into()).await?;
-		NotebookHeaderStore::create(&mut *db, notary.notary_id, 1, 1, ticker.time_for_tick(1))
+		BlocksStore::record(&mut db, 0, [1u8; 32].into(), [0u8; 32].into(), 100, vec![]).await?;
+		BlocksStore::record_finalized(&mut db, [1u8; 32].into()).await?;
+		NotebookHeaderStore::create(&mut db, notary.notary_id, 1, 1, ticker.time_for_tick(1))
 			.await?;
 		ChainTransferStore::record_transfer_to_local_from_block(
 			&mut *db,
@@ -415,7 +415,7 @@ mod tests {
 			pool: pool.clone(),
 			notary_id: notary.notary_id,
 			keystore: keystore.clone(),
-			ticker: ticker.clone(),
+			ticker,
 		};
 		let mut header_listener = FinalizedNotebookHeaderListener::connect(
 			pool.clone(),

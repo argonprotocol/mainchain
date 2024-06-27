@@ -1,3 +1,5 @@
+#![allow(clippy::await_holding_lock)]
+
 use std::{
 	env,
 	io::{BufRead, BufReader},
@@ -36,6 +38,7 @@ lazy_static! {
 }
 impl UlxTestNode {
 	pub async fn start(authority: String) -> anyhow::Result<Self> {
+		#[allow(clippy::await_holding_lock)]
 		let _lock = CONTEXT_LOCK.lock().unwrap();
 		let project_dir = PathBuf::from(env!("CARGO_MANIFEST_DIR"));
 

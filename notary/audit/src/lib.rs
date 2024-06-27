@@ -239,11 +239,11 @@ fn track_block_votes(
 	Ok(())
 }
 
-fn verify_balance_sources<'a, T: NotebookHistoryLookup>(
+fn verify_balance_sources<T: NotebookHistoryLookup>(
 	lookup: &T,
 	state: &mut NotebookVerifyState,
 	header: &NotebookHeader,
-	changeset: &Vec<BalanceChange>,
+	changeset: &[BalanceChange],
 ) -> anyhow::Result<(), VerifyError> {
 	let notary_id = header.notary_id;
 	for change in changeset.iter() {
@@ -359,7 +359,7 @@ pub fn verify_voting_sources(
 	Ok(())
 }
 
-fn verify_previous_balance_proof<'a, T: NotebookHistoryLookup>(
+fn verify_previous_balance_proof<T: NotebookHistoryLookup>(
 	lookup: &T,
 	proof: &BalanceProof,
 	notebook_number: NotebookNumber,
@@ -426,9 +426,7 @@ fn verify_previous_balance_proof<'a, T: NotebookHistoryLookup>(
 	Ok(true)
 }
 
-pub fn verify_changeset_signatures(
-	changeset: &Vec<BalanceChange>,
-) -> anyhow::Result<(), VerifyError> {
+pub fn verify_changeset_signatures(changeset: &[BalanceChange]) -> anyhow::Result<(), VerifyError> {
 	// Since this is a little more expensive, confirm signatures in a second pass
 	for (index, change) in changeset.iter().enumerate() {
 		// check that note id is valid for a hold note
@@ -725,24 +723,22 @@ impl BalanceChangesetState {
 ///
 /// Does NOT: lookup anything in storage, verify signatures, or confirm the merkle proofs
 pub fn verify_notarization_allocation(
-	changes: &Vec<BalanceChange>,
-	block_votes: &Vec<BlockVote>,
-	data_domains: &Vec<(DataDomainHash, AccountId)>,
+	changes: &[BalanceChange],
+	block_votes: &[BlockVote],
+	data_domains: &[(DataDomainHash, AccountId)],
 	notebook_tick: Option<Tick>,
 ) -> anyhow::Result<BalanceChangesetState, VerifyError> {
 	let mut state = BalanceChangesetState::default();
 
-	let mut change_index = 0;
-	for change in changes {
+	for (change_index, change) in changes.iter().enumerate() {
 		let localchain_account_id =
 			LocalchainAccountId::new(change.account_id.clone(), change.account_type);
 		state.verify_change_number(change, &localchain_account_id)?;
 
 		let mut balance =
 			change.previous_balance_proof.as_ref().map(|a| a.balance).unwrap_or_default() as i128;
-		let mut note_index = 0;
 
-		for note in &change.notes {
+		for (note_index, note) in (&change.notes).into_iter().enumerate() {
 			if change.escrow_hold_note.is_some() &&
 				!matches!(note.note_type, NoteType::EscrowSettle)
 			{
@@ -833,8 +829,8 @@ pub fn verify_notarization_allocation(
 						return Err(VerifyError::ExceededMaxBalance {
 							balance: balance as u128,
 							amount: note.milligons,
-							note_index,
-							change_index,
+							note_index: note_index as u16,
+							change_index: change_index as u16,
 						});
 					}
 				},
@@ -846,18 +842,16 @@ pub fn verify_notarization_allocation(
 				NoteType::SendToVote => balance -= note.milligons as i128,
 				_ => {},
 			};
-			note_index += 1;
 		}
 
 		ensure!(
 			balance == change.balance as i128,
 			VerifyError::BalanceChangeMismatch {
-				change_index,
+				change_index: change_index as u16,
 				provided_balance: change.balance,
 				calculated_balance: balance,
 			}
 		);
-		change_index += 1;
 	}
 
 	ensure!(

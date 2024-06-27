@@ -1,5 +1,3 @@
-use std::future::Future;
-
 use futures::FutureExt;
 use sc_utils::notification::NotificationSender;
 use sp_core::{ed25519, H256};
@@ -49,12 +47,8 @@ impl FinalizedNotebookHeaderListener {
 	pub async fn next(&mut self) -> anyhow::Result<SignedNotebookHeader> {
 		let notification = &self.listener.recv().await?;
 		let header = match notification.payload().parse() {
-			Ok(notebook_number) => {
-				let header =
-					NotebookHeaderStore::load_with_signature(&self.pool, notebook_number).await?;
-
-				header
-			},
+			Ok(notebook_number) =>
+				NotebookHeaderStore::load_with_signature(&self.pool, notebook_number).await?,
 			Err(e) => return Err(anyhow::anyhow!("Error parsing notified notebook number {:?}", e)),
 		};
 
@@ -66,30 +60,29 @@ impl FinalizedNotebookHeaderListener {
 		Ok(header)
 	}
 
-	pub fn create_task(&'_ mut self) -> impl Future<Output = anyhow::Result<()>> + Send + '_ {
-		async move {
-			loop {
-				match self.next().await {
-					Ok(_) => (),
-					Err(e) => {
-						tracing::error!("Error listening for finalized notebook header {:?}", e);
-						if e.to_string().contains("closed pool") {
-							return Err(e.into());
-						}
-					},
-				}
+	pub async fn create_task(&'_ mut self) -> anyhow::Result<()> {
+		loop {
+			match self.next().await {
+				Ok(_) => (),
+				Err(e) => {
+					tracing::error!("Error listening for finalized notebook header {:?}", e);
+					if e.to_string().contains("closed pool") {
+						return Err(e);
+					}
+				},
 			}
 		}
 	}
 }
 
+type NotebookCloserHandles = (JoinHandle<anyhow::Result<()>>, JoinHandle<anyhow::Result<()>>);
 pub fn spawn_notebook_closer(
 	pool: PgPool,
 	notary_id: NotaryId,
 	keystore: KeystorePtr,
 	ticker: Ticker,
 	completed_notebook_sender: NotificationSender<SignedNotebookHeader>,
-) -> anyhow::Result<(JoinHandle<anyhow::Result<()>>, JoinHandle<anyhow::Result<()>>)> {
+) -> anyhow::Result<NotebookCloserHandles> {
 	let pool1 = pool.clone();
 	let handle_1 = tokio::spawn(async move {
 		let mut notebook_closer = NotebookCloser { pool: pool1, notary_id, keystore, ticker };
@@ -109,18 +102,14 @@ pub fn spawn_notebook_closer(
 const LOOP_MILLIS: u64 = prod_or_fast!(1000, 200);
 
 impl NotebookCloser {
-	pub fn create_task(
-		&'_ mut self,
-	) -> impl Future<Output = anyhow::Result<(), Error>> + Send + '_ {
-		async move {
-			loop {
-				let _ = self.iterate_notebook_close_loop().await;
-				let tick = self.ticker.current();
-				let next_tick = self.ticker.time_for_tick(tick + 1);
-				let sleep = next_tick.min(LOOP_MILLIS) + 1;
-				// wait before resuming
-				tokio::time::sleep(tokio::time::Duration::from_millis(sleep)).await;
-			}
+	pub async fn create_task(&'_ mut self) -> anyhow::Result<(), Error> {
+		loop {
+			let _ = self.iterate_notebook_close_loop().await;
+			let tick = self.ticker.current();
+			let next_tick = self.ticker.time_for_tick(tick + 1);
+			let sleep = next_tick.min(LOOP_MILLIS) + 1;
+			// wait before resuming
+			tokio::time::sleep(tokio::time::Duration::from_millis(sleep)).await;
 		}
 	}
 
@@ -138,7 +127,7 @@ impl NotebookCloser {
 			let mut tx = self.pool.begin().await?;
 			// NOTE: must rotate existing first. The db has a constraint to only allow a single open
 			// notebook at a time.
-			let notebook_number = match NotebookStatusStore::step_up_expired_open(&mut *tx).await? {
+			let notebook_number = match NotebookStatusStore::step_up_expired_open(&mut tx).await? {
 				Some(notebook_number) => notebook_number,
 				None => return Ok(()),
 			};
@@ -146,7 +135,7 @@ impl NotebookCloser {
 			let tick = self.ticker.current();
 			let end_time = self.ticker.time_for_tick(tick + 1);
 
-			NotebookHeaderStore::create(&mut *tx, self.notary_id, next_notebook, tick, end_time)
+			NotebookHeaderStore::create(&mut tx, self.notary_id, next_notebook, tick, end_time)
 				.await?;
 
 			tx.commit().await?;
@@ -160,18 +149,18 @@ impl NotebookCloser {
 			let mut tx = self.pool.begin().await?;
 			let step = NotebookFinalizationStep::ReadyForClose;
 			let notebook_number =
-				match NotebookStatusStore::find_and_lock_ready_for_close(&mut *tx).await? {
+				match NotebookStatusStore::find_and_lock_ready_for_close(&mut tx).await? {
 					Some(notebook_number) => notebook_number,
 					None => return Ok(()),
 				};
 
 			// TODO: we can potentially improve mainchain intake speed by only referencing the
 			// 	latest finalized block needed by the chain transfers/keys
-			let finalized_block = BlocksStore::get_latest_finalized_block_number(&mut *tx).await?;
+			let finalized_block = BlocksStore::get_latest_finalized_block_number(&mut tx).await?;
 			let public = RegisteredKeyStore::get_valid_public(&mut *tx, finalized_block).await?;
 
 			NotebookStore::close_notebook(
-				&mut *tx,
+				&mut tx,
 				notebook_number,
 				finalized_block,
 				public,
@@ -194,14 +183,14 @@ pub fn notary_sign(
 	hash: &H256,
 ) -> anyhow::Result<ed25519::Signature, Error> {
 	let sig = keystore
-		.ed25519_sign(NOTARY_KEYID, &public, &hash[..])
+		.ed25519_sign(NOTARY_KEYID, public, &hash[..])
 		.map_err(|e| {
 			Error::InternalError(format!(
 				"Unable to sign notebook header for submission to mainchain {}",
 				e
 			))
 		})?
-		.expect(format!("Could not sign the notebook header. Ensure the notary key {:?} is installed in the keystore", public).as_str());
+		.unwrap_or_else(|| panic!("Could not sign the notebook header. Ensure the notary key {:?} is installed in the keystore", public));
 	Ok(sig)
 }
 
@@ -213,6 +202,7 @@ struct NotebookAuditResponse {
 #[cfg(test)]
 mod tests {
 	use std::{
+		future::Future,
 		net::{IpAddr, SocketAddr},
 		pin::Pin,
 		sync::Arc,
@@ -292,7 +282,7 @@ mod tests {
 		let ticker = client.get().await?.lookup_ticker().await?;
 		let ticker = Ticker::new(ticker.tick_duration_millis, ticker.genesis_utc_time);
 		let server = NotaryServer::create_http_server("127.0.0.1:0").await?;
-		let block_tracker = track_blocks(ws_url.clone(), 1, pool.clone(), ticker.clone());
+		let block_tracker = track_blocks(ws_url.clone(), 1, pool.clone(), ticker);
 		let block_tracker = Arc::new(Mutex::new(Some(block_tracker)));
 
 		propose_bob_as_notary(&ctx.client.live, notary_key, server.local_addr()?).await?;
@@ -304,7 +294,7 @@ mod tests {
 		{
 			let mut tx = pool.begin().await?;
 			assert_eq!(
-				NotebookStatusStore::lock_open_for_appending(&mut *tx).await?.0,
+				NotebookStatusStore::lock_open_for_appending(&mut tx).await?.0,
 				1,
 				"There should be a notebook active now"
 			);
@@ -316,12 +306,8 @@ mod tests {
 		// Record the balance change
 		submit_balance_change_to_notary(&pool, bob_transfer).await?;
 
-		let mut closer = NotebookCloser {
-			pool: pool.clone(),
-			keystore: keystore.clone(),
-			notary_id: 1,
-			ticker: ticker.clone(),
-		};
+		let mut closer =
+			NotebookCloser { pool: pool.clone(), keystore: keystore.clone(), notary_id: 1, ticker };
 		let mut listener = FinalizedNotebookHeaderListener::connect(
 			pool.clone(),
 			notary_server.completed_notebook_sender.clone(),
@@ -330,11 +316,8 @@ mod tests {
 		let mut subscription = notary_server.completed_notebook_stream.subscribe(100);
 
 		let listen_handle = spawn(async move {
-			loop {
-				match listener.next().await {
-					Ok(n) => println!("Notebook finalized {}", n.header.notebook_number),
-					Err(_) => break,
-				}
+			while let Ok(n) = listener.next().await {
+				println!("Notebook finalized {}", n.header.notebook_number);
 			}
 		});
 
@@ -350,7 +333,7 @@ mod tests {
 		}
 
 		let next_header = subscription.next().await;
-		assert_eq!(next_header.is_some(), true);
+		assert!(next_header.is_some());
 		let next_header = next_header.expect("Should have a header");
 
 		assert_eq!(
@@ -405,7 +388,7 @@ mod tests {
 
 		let server = NotaryServer::create_http_server("127.0.0.1:0").await?;
 		let addr = server.local_addr()?;
-		let block_tracker = track_blocks(ws_url.clone(), 1, pool.clone(), ticker.clone());
+		let block_tracker = track_blocks(ws_url.clone(), 1, pool.clone(), ticker);
 		let block_tracker = Arc::new(Mutex::new(Some(block_tracker)));
 
 		let mut notary_server = NotaryServer::start_with(server, notary_id, pool.clone()).await?;
@@ -413,7 +396,7 @@ mod tests {
 			pool.clone(),
 			notary_id,
 			keystore.clone(),
-			ticker.clone(),
+			ticker,
 			notary_server.completed_notebook_sender.clone(),
 		)?;
 
@@ -435,7 +418,7 @@ mod tests {
 		let result = submit_balance_change_to_notary_and_create_domain(
 			&pool,
 			ferdie_transfer,
-			domain_hash.clone(),
+			domain_hash,
 			Alice.to_account_id(),
 		)
 		.await?;
@@ -450,8 +433,7 @@ mod tests {
 			tokio::time::sleep(tokio::time::Duration::from_millis(50)).await;
 			check_block_watch_status(block_tracker.clone()).await?;
 		}
-		let zone_block =
-			set_zone_record(&ctx.client.live, domain_hash.clone(), dev::alice()).await?;
+		let zone_block = set_zone_record(&ctx.client.live, domain_hash, dev::alice()).await?;
 		println!("set zone record");
 		assert_eq!(
 			ctx.client
@@ -479,7 +461,7 @@ mod tests {
 			5000,
 			result.tick,
 			origin.clone(),
-			domain_hash.clone(),
+			domain_hash,
 			Alice.to_account_id(),
 		)
 		.await?;
@@ -564,7 +546,7 @@ mod tests {
 		let escrow_result = settle_escrow_and_vote(
 			&pool,
 			hold_note,
-			best_grandparent.clone(),
+			*best_grandparent,
 			BalanceProof {
 				balance: bob_balance as u128,
 				notebook_number: hold_result.notebook_number,
@@ -582,7 +564,7 @@ mod tests {
 			match block {
 				Ok(block) => {
 					let (tick, votes, seal, key, notebooks) = get_digests(block);
-					if let Some(notebook) = notebooks.notebooks.get(0) {
+					if let Some(notebook) = notebooks.notebooks.first() {
 						assert_eq!(notebook.audit_first_failure, None);
 						if notebook.notebook_number == escrow_result.notebook_number {
 							assert_eq!(votes.votes_count, 1, "Should have votes");
@@ -620,7 +602,7 @@ mod tests {
 		let mut block_tracker_lock = block_tracker.lock().await;
 		if let Some(mut block_tracker_inner) = block_tracker_lock.take() {
 			let waker = noop_waker_ref();
-			let mut cx = Context::from_waker(&waker);
+			let mut cx = Context::from_waker(waker);
 			match Pin::new(&mut block_tracker_inner).poll(&mut cx) {
 				Poll::Ready(Err(e)) => {
 					tracing::error!("Error tracking blocks {:?}", e);
@@ -710,7 +692,7 @@ mod tests {
 			Ferdie.pair()
 		};
 		let result = NotarizationsStore::apply(
-			&pool,
+			pool,
 			1,
 			vec![BalanceChange {
 				account_id: keypair.public().into(),
@@ -754,7 +736,7 @@ mod tests {
 			Ferdie.pair()
 		};
 		let result = NotarizationsStore::apply(
-			&pool,
+			pool,
 			1,
 			vec![
 				BalanceChange {
@@ -854,7 +836,7 @@ mod tests {
 		.sign(Bob.pair())
 		.clone()];
 
-		let result = NotarizationsStore::apply(&pool, 1, changes, vec![], vec![]).await?;
+		let result = NotarizationsStore::apply(pool, 1, changes, vec![], vec![]).await?;
 		Ok((hold_note.clone(), result))
 	}
 
@@ -914,11 +896,11 @@ mod tests {
 			.clone(),
 		];
 		let result = NotarizationsStore::apply(
-			&pool,
+			pool,
 			1,
 			changes,
 			vec![BlockVote {
-				data_domain_hash: data_domain_hash.unwrap().clone(),
+				data_domain_hash: data_domain_hash.unwrap(),
 				data_domain_account: recipient,
 				account_id: Alice.to_account_id(),
 				index: 1,
@@ -952,19 +934,17 @@ mod tests {
 		in_block.wait_for_success().await?;
 		let events = in_block.fetch_events().await?;
 
-		for event in events.iter() {
-			if let Ok(event) = event {
-				if let Some(Ok(transfer)) = event
-					.as_event::<api::chain_transfer::events::TransferToLocalchain>()
-					.transpose()
-				{
-					if transfer.account_id == account.public_key().to_account_id() {
-						return Ok((transfer.transfer_id, transfer.amount as u32, account.clone()));
-					}
+		for event in events.iter().flatten() {
+			if let Some(Ok(transfer)) = event
+				.as_event::<api::chain_transfer::events::TransferToLocalchain>()
+				.transpose()
+			{
+				if transfer.account_id == account.public_key().to_account_id() {
+					return Ok((transfer.transfer_id, transfer.amount as u32, account.clone()));
 				}
 			}
 		}
-		return Err(anyhow!("Should have found the chain transfer in events"));
+		Err(anyhow!("Should have found the chain transfer in events"))
 	}
 
 	async fn wait_for_transfers(
@@ -994,7 +974,7 @@ mod tests {
 			// wait for 500 ms
 			tokio::time::sleep(tokio::time::Duration::from_millis(500)).await;
 		}
-		assert_eq!(found, true, "Should have recorded a chain transfer");
+		assert!(found, "Should have recorded a chain transfer");
 
 		Ok(())
 	}
@@ -1026,14 +1006,14 @@ mod tests {
 			let meta = sqlx::query!("select * from blocks where block_hash=$1", &block_hash)
 				.fetch_optional(pool)
 				.await?;
-			if let Some(_) = meta {
+			if meta.is_some() {
 				found = true;
 				break;
 			}
 			// wait for 500 ms
 			tokio::time::sleep(tokio::time::Duration::from_millis(500)).await;
 		}
-		assert_eq!(found, true, "Should have found the finalized block");
+		assert!(found, "Should have found the finalized block");
 		Ok(())
 	}
 
@@ -1059,6 +1039,6 @@ mod tests {
 				_ => continue,
 			}
 		}
-		Err(Error::InternalError(format!("No valid status encountered for notebook")))
+		Err(Error::InternalError("No valid status encountered for notebook".to_string()))
 	}
 }

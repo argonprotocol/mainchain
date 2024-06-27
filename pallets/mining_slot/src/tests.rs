@@ -531,7 +531,7 @@ fn it_will_order_bids_with_argon_bonds() {
 
 		let bonds = Bonds::get();
 		let acc_3_bond_id = bonds.iter().find(|(_, _, a, _)| *a == 3).map(|a| a.0);
-		assert!(bonds.iter().find(|(_, _, a, _)| *a == 1).is_none());
+		assert!(!bonds.iter().any(|(_, _, a, _)| *a == 1));
 		assert_eq!(bonds.len(), 2);
 		{
 			let events = frame_system::Pallet::<Test>::events();
@@ -548,7 +548,7 @@ fn it_will_order_bids_with_argon_bonds() {
 			);
 		}
 		assert_eq!(UlixeeBalances::free_balance(1), 1000);
-		assert_eq!(UlixeeBalances::hold_available(&HoldReason::RegisterAsMiner.into(), &1), true);
+		assert!(UlixeeBalances::hold_available(&HoldReason::RegisterAsMiner.into(), &1));
 
 		// 4. Account 1 increases bid and resubmits
 		assert_ok!(MiningSlots::bid(
@@ -706,10 +706,10 @@ fn it_can_replace_authority_keys() {
 			.collect::<Vec<(u64, BlockSealAuthorityId)>>();
 
 		let with_keys: Box<dyn Iterator<Item = _>> =
-			Box::new(account_keys.iter().filter_map(|k| Some((&k.0, k.clone().1))));
+			Box::new(account_keys.iter().map(|k| (&k.0, k.clone().1)));
 
 		let queued_keys: Box<dyn Iterator<Item = _>> =
-			Box::new(account_keys.iter().filter_map(|k| Some((&k.0, k.clone().1))));
+			Box::new(account_keys.iter().map(|k| (&k.0, k.clone().1)));
 
 		assert_eq!(AuthoritiesByIndex::<Test>::get().len(), 1);
 		MiningSlots::on_new_session(true, with_keys, queued_keys);

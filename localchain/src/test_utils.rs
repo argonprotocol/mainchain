@@ -223,7 +223,7 @@ impl MockNotary {
     let notebook_number = self.next_notebook_number().await;
     let change_builder = notarization_builder
       .claim_from_mainchain(LocalchainTransfer {
-        amount: amount,
+        amount,
         notary_id: 1,
         expiration_block: 1,
         address: AccountStore::to_address(&account_id),
@@ -273,7 +273,7 @@ impl MockNotary {
       if *notebook_number == next_notebook_number {
         let key = LocalchainAccountId::new(account_id.clone(), *account_type);
         let should_use = match change_by_account.get(&key) {
-          Some(x) => x < &change_number,
+          Some(x) => x < change_number,
           None => true,
         };
         if should_use {
@@ -410,7 +410,7 @@ pub fn get_balance_tip(
 
 pub fn mock_mainchain_transfer(address: &str, amount: u128) -> LocalchainTransfer {
   LocalchainTransfer {
-    amount: amount,
+    amount,
     notary_id: 1,
     expiration_block: 1,
     address: address.to_string(),
@@ -451,7 +451,7 @@ impl LocalchainRpcServer for MockNotary {
         state.accounts.insert(
           account_id,
           AccountOrigin {
-            notebook_number: notebook_number,
+            notebook_number,
             account_uid: id as u32,
           },
         );
@@ -461,7 +461,7 @@ impl LocalchainRpcServer for MockNotary {
 
     Ok(BalanceChangeResult {
       new_account_origins: new_origins,
-      notebook_number: notebook_number,
+      notebook_number,
       tick: state
         .headers
         .get(&notebook_number)

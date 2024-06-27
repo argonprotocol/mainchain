@@ -32,17 +32,17 @@ impl DataDomain {
 
 impl PartialOrd for DataDomain {
 	fn partial_cmp(&self, other: &Self) -> Option<Ordering> {
-		if self.top_level_domain != other.top_level_domain {
-			return self.top_level_domain.partial_cmp(&other.top_level_domain);
-		}
-
-		Some(self.domain_name.as_ref().cmp(other.domain_name.as_ref()))
+		Some(self.cmp(other))
 	}
 }
 
 impl Ord for DataDomain {
 	fn cmp(&self, other: &Self) -> Ordering {
-		self.partial_cmp(other).unwrap()
+		if self.top_level_domain != other.top_level_domain {
+			return self.top_level_domain.cmp(&other.top_level_domain);
+		}
+
+		self.domain_name.as_ref().cmp(other.domain_name.as_ref())
 	}
 }
 
@@ -153,18 +153,18 @@ impl Semver {
 
 impl PartialOrd for Semver {
 	fn partial_cmp(&self, other: &Self) -> Option<Ordering> {
-		if self.major != other.major {
-			return self.major.partial_cmp(&other.major);
-		}
-		if self.minor != other.minor {
-			return self.minor.partial_cmp(&other.minor);
-		}
-		self.patch.partial_cmp(&other.patch)
+		Some(self.cmp(other))
 	}
 }
 
 impl Ord for Semver {
 	fn cmp(&self, other: &Self) -> Ordering {
-		self.partial_cmp(other).unwrap()
+		if self.major != other.major {
+			return self.major.cmp(&other.major);
+		}
+		if self.minor != other.minor {
+			return self.minor.cmp(&other.minor);
+		}
+		self.patch.cmp(&other.patch)
 	}
 }

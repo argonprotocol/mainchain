@@ -196,12 +196,12 @@ impl<Balance> BurnEventHandler<Balance> for Tuple {
 }
 
 pub trait BlockRewardsEventHandler<AccountId: Codec, Balance: Codec> {
-	fn rewards_created(payout: &Vec<BlockPayout<AccountId, Balance>>);
+	fn rewards_created(payout: &[BlockPayout<AccountId, Balance>]);
 }
 
 #[impl_trait_for_tuples::impl_for_tuples(5)]
 impl<AccountId: Codec, Balance: Codec> BlockRewardsEventHandler<AccountId, Balance> for Tuple {
-	fn rewards_created(payout: &Vec<BlockPayout<AccountId, Balance>>) {
+	fn rewards_created(payout: &[BlockPayout<AccountId, Balance>]) {
 		for_tuples!( #( Tuple::rewards_created(&payout); )* );
 	}
 }

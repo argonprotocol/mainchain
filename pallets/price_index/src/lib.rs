@@ -177,7 +177,7 @@ pub mod pallet {
 				should_use_as_current = index.timestamp > current.timestamp;
 			}
 			if should_use_as_current {
-				<Current<T>>::put(index.clone());
+				<Current<T>>::put(index);
 				Self::deposit_event(Event::<T>::NewIndex);
 			}
 
