@@ -271,9 +271,17 @@ declare module '@polkadot/api-base/types/storage' {
        **/
       authoritiesByIndex: AugmentedQuery<ApiType, () => Observable<BTreeMap<u32, ITuple<[UlxPrimitivesBlockSealAppPublic, U256]>>>, []>;
       /**
+       * The number of bids per slot for the last 10 slots (newest first)
+       **/
+      historicalBidsPerSlot: AugmentedQuery<ApiType, () => Observable<Vec<u32>>, []>;
+      /**
        * Is the next slot still open for bids
        **/
       isNextSlotBiddingOpen: AugmentedQuery<ApiType, () => Observable<bool>, []>;
+      /**
+       * The last percentage adjustment to the ownership bond amount
+       **/
+      lastOwnershipPercentAdjustment: AugmentedQuery<ApiType, () => Observable<Option<u128>>, []>;
       /**
        * The configuration for a miner to supply if there are no registered miners
        **/

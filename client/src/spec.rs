@@ -12,7 +12,6 @@ pub mod api {
 		"Multisig",
 		"Proxy",
 		"Ticks",
-		"BlockSeal",
 		"MiningSlot",
 		"BitcoinUtxos",
 		"Vaults",
@@ -26,6 +25,7 @@ pub mod api {
 		"Authorship",
 		"Historical",
 		"Session",
+		"BlockSeal",
 		"BlockRewards",
 		"Grandpa",
 		"Offences",
@@ -2473,9 +2473,6 @@ pub mod api {
 		pub fn ticks(&self) -> ticks::storage::StorageApi {
 			ticks::storage::StorageApi
 		}
-		pub fn block_seal(&self) -> block_seal::storage::StorageApi {
-			block_seal::storage::StorageApi
-		}
 		pub fn mining_slot(&self) -> mining_slot::storage::StorageApi {
 			mining_slot::storage::StorageApi
 		}
@@ -2514,6 +2511,9 @@ pub mod api {
 		}
 		pub fn session(&self) -> session::storage::StorageApi {
 			session::storage::StorageApi
+		}
+		pub fn block_seal(&self) -> block_seal::storage::StorageApi {
+			block_seal::storage::StorageApi
 		}
 		pub fn block_rewards(&self) -> block_rewards::storage::StorageApi {
 			block_rewards::storage::StorageApi
@@ -2560,9 +2560,6 @@ pub mod api {
 		pub fn ticks(&self) -> ticks::calls::TransactionApi {
 			ticks::calls::TransactionApi
 		}
-		pub fn block_seal(&self) -> block_seal::calls::TransactionApi {
-			block_seal::calls::TransactionApi
-		}
 		pub fn mining_slot(&self) -> mining_slot::calls::TransactionApi {
 			mining_slot::calls::TransactionApi
 		}
@@ -2596,6 +2593,9 @@ pub mod api {
 		pub fn session(&self) -> session::calls::TransactionApi {
 			session::calls::TransactionApi
 		}
+		pub fn block_seal(&self) -> block_seal::calls::TransactionApi {
+			block_seal::calls::TransactionApi
+		}
 		pub fn block_rewards(&self) -> block_rewards::calls::TransactionApi {
 			block_rewards::calls::TransactionApi
 		}
@@ -2627,9 +2627,9 @@ pub mod api {
 			.hash();
 		runtime_metadata_hash ==
 			[
-				205u8, 188u8, 197u8, 231u8, 204u8, 153u8, 202u8, 246u8, 96u8, 203u8, 226u8, 121u8,
-				167u8, 220u8, 138u8, 71u8, 33u8, 58u8, 69u8, 71u8, 26u8, 45u8, 138u8, 197u8, 212u8,
-				21u8, 76u8, 168u8, 165u8, 63u8, 136u8, 10u8,
+				116u8, 60u8, 68u8, 61u8, 230u8, 123u8, 41u8, 72u8, 64u8, 65u8, 71u8, 218u8, 69u8,
+				58u8, 116u8, 173u8, 116u8, 248u8, 24u8, 137u8, 121u8, 255u8, 161u8, 32u8, 179u8,
+				165u8, 9u8, 66u8, 193u8, 80u8, 106u8, 88u8,
 			]
 	}
 	pub mod system {
@@ -6074,203 +6074,6 @@ pub mod api {
 			}
 		}
 	}
-	pub mod block_seal {
-		use super::{root_mod, runtime_types};
-		#[doc = "The `Error` enum of this pallet."]
-		pub type Error = runtime_types::pallet_block_seal::pallet::Error;
-		#[doc = "Contains a variant per dispatchable extrinsic that this pallet has."]
-		pub type Call = runtime_types::pallet_block_seal::pallet::Call;
-		pub mod calls {
-			use super::{root_mod, runtime_types};
-			type DispatchError = runtime_types::sp_runtime::DispatchError;
-			pub mod types {
-				use super::runtime_types;
-				#[derive(
-					:: subxt :: ext :: codec :: Decode,
-					:: subxt :: ext :: codec :: Encode,
-					:: subxt :: ext :: scale_decode :: DecodeAsType,
-					:: subxt :: ext :: scale_encode :: EncodeAsType,
-					Clone,
-					Debug,
-				)]
-				# [codec (crate = :: subxt :: ext :: codec)]
-				#[decode_as_type(crate_path = ":: subxt :: ext :: scale_decode")]
-				#[encode_as_type(crate_path = ":: subxt :: ext :: scale_encode")]
-				pub struct Apply {
-					pub seal: apply::Seal,
-				}
-				pub mod apply {
-					use super::runtime_types;
-					pub type Seal = runtime_types::ulx_primitives::inherents::BlockSealInherent;
-				}
-				impl ::subxt::blocks::StaticExtrinsic for Apply {
-					const PALLET: &'static str = "BlockSeal";
-					const CALL: &'static str = "apply";
-				}
-			}
-			pub struct TransactionApi;
-			impl TransactionApi {
-				pub fn apply(
-					&self,
-					seal: types::apply::Seal,
-				) -> ::subxt::tx::Payload<types::Apply> {
-					::subxt::tx::Payload::new_static(
-						"BlockSeal",
-						"apply",
-						types::Apply { seal },
-						[
-							219u8, 28u8, 137u8, 83u8, 119u8, 114u8, 20u8, 229u8, 253u8, 233u8,
-							140u8, 58u8, 32u8, 228u8, 139u8, 84u8, 9u8, 93u8, 54u8, 8u8, 96u8, 8u8,
-							97u8, 25u8, 73u8, 9u8, 55u8, 175u8, 198u8, 182u8, 196u8, 85u8,
-						],
-					)
-				}
-			}
-		}
-		pub mod storage {
-			use super::runtime_types;
-			pub mod types {
-				use super::runtime_types;
-				pub mod last_block_sealer_info {
-					use super::runtime_types;
-					pub type LastBlockSealerInfo =
-						runtime_types::ulx_primitives::providers::BlockSealerInfo<
-							::subxt::utils::AccountId32,
-						>;
-				}
-				pub mod parent_voting_key {
-					use super::runtime_types;
-					pub type ParentVotingKey = ::core::option::Option<::sp_core::H256>;
-				}
-				pub mod temp_author {
-					use super::runtime_types;
-					pub type TempAuthor = ::subxt::utils::AccountId32;
-				}
-				pub mod temp_seal_inherent {
-					use super::runtime_types;
-					pub type TempSealInherent =
-						runtime_types::ulx_primitives::inherents::BlockSealInherent;
-				}
-				pub mod temp_voting_key_digest {
-					use super::runtime_types;
-					pub type TempVotingKeyDigest =
-						runtime_types::ulx_primitives::digests::ParentVotingKeyDigest;
-				}
-			}
-			pub struct StorageApi;
-			impl StorageApi {
-				pub fn last_block_sealer_info(
-					&self,
-				) -> ::subxt::storage::address::Address<
-					(),
-					types::last_block_sealer_info::LastBlockSealerInfo,
-					::subxt::storage::address::Yes,
-					(),
-					(),
-				> {
-					::subxt::storage::address::Address::new_static(
-						"BlockSeal",
-						"LastBlockSealerInfo",
-						(),
-						[
-							183u8, 123u8, 138u8, 26u8, 2u8, 100u8, 188u8, 93u8, 198u8, 55u8, 216u8,
-							104u8, 120u8, 208u8, 46u8, 37u8, 191u8, 239u8, 154u8, 151u8, 18u8,
-							108u8, 235u8, 176u8, 46u8, 183u8, 25u8, 195u8, 224u8, 202u8, 248u8,
-							67u8,
-						],
-					)
-				}
-				#[doc = " The calculated parent voting key for a block. Refers to the Notebook BlockVote Revealed"]
-				#[doc = " Secret + VotesMerkleRoot of the parent block notebooks."]
-				pub fn parent_voting_key(
-					&self,
-				) -> ::subxt::storage::address::Address<
-					(),
-					types::parent_voting_key::ParentVotingKey,
-					::subxt::storage::address::Yes,
-					::subxt::storage::address::Yes,
-					(),
-				> {
-					::subxt::storage::address::Address::new_static(
-						"BlockSeal",
-						"ParentVotingKey",
-						(),
-						[
-							12u8, 73u8, 52u8, 154u8, 15u8, 127u8, 150u8, 214u8, 178u8, 186u8,
-							231u8, 204u8, 104u8, 196u8, 141u8, 55u8, 198u8, 11u8, 23u8, 252u8,
-							108u8, 65u8, 42u8, 124u8, 77u8, 77u8, 88u8, 35u8, 154u8, 241u8, 50u8,
-							216u8,
-						],
-					)
-				}
-				#[doc = " Author of current block (temporary storage)."]
-				pub fn temp_author(
-					&self,
-				) -> ::subxt::storage::address::Address<
-					(),
-					types::temp_author::TempAuthor,
-					::subxt::storage::address::Yes,
-					(),
-					(),
-				> {
-					::subxt::storage::address::Address::new_static(
-						"BlockSeal",
-						"TempAuthor",
-						(),
-						[
-							29u8, 149u8, 234u8, 74u8, 206u8, 138u8, 152u8, 92u8, 28u8, 103u8, 4u8,
-							236u8, 161u8, 51u8, 52u8, 196u8, 28u8, 242u8, 250u8, 210u8, 187u8,
-							78u8, 217u8, 251u8, 157u8, 143u8, 91u8, 60u8, 246u8, 218u8, 227u8,
-							114u8,
-						],
-					)
-				}
-				#[doc = " Ensures only a single inherent is applied"]
-				pub fn temp_seal_inherent(
-					&self,
-				) -> ::subxt::storage::address::Address<
-					(),
-					types::temp_seal_inherent::TempSealInherent,
-					::subxt::storage::address::Yes,
-					(),
-					(),
-				> {
-					::subxt::storage::address::Address::new_static(
-						"BlockSeal",
-						"TempSealInherent",
-						(),
-						[
-							155u8, 198u8, 152u8, 193u8, 160u8, 65u8, 79u8, 57u8, 173u8, 165u8,
-							225u8, 42u8, 102u8, 64u8, 210u8, 78u8, 243u8, 181u8, 84u8, 156u8,
-							139u8, 238u8, 34u8, 129u8, 199u8, 138u8, 84u8, 136u8, 156u8, 115u8,
-							10u8, 107u8,
-						],
-					)
-				}
-				#[doc = " Temporarily track the parent voting key digest"]
-				pub fn temp_voting_key_digest(
-					&self,
-				) -> ::subxt::storage::address::Address<
-					(),
-					types::temp_voting_key_digest::TempVotingKeyDigest,
-					::subxt::storage::address::Yes,
-					(),
-					(),
-				> {
-					::subxt::storage::address::Address::new_static(
-						"BlockSeal",
-						"TempVotingKeyDigest",
-						(),
-						[
-							62u8, 236u8, 18u8, 31u8, 216u8, 143u8, 7u8, 128u8, 99u8, 129u8, 168u8,
-							182u8, 205u8, 207u8, 253u8, 199u8, 82u8, 185u8, 26u8, 190u8, 222u8,
-							160u8, 10u8, 186u8, 150u8, 3u8, 192u8, 56u8, 145u8, 106u8, 159u8, 73u8,
-						],
-					)
-				}
-			}
-		}
-	}
 	pub mod mining_slot {
 		use super::{root_mod, runtime_types};
 		#[doc = "The `Error` enum of this pallet."]
@@ -6293,6 +6096,33 @@ pub mod api {
 				# [codec (crate = :: subxt :: ext :: codec)]
 				#[decode_as_type(crate_path = ":: subxt :: ext :: scale_decode")]
 				#[encode_as_type(crate_path = ":: subxt :: ext :: scale_encode")]
+				#[doc = "Submit a bid for a mining slot in the next cohort. Once all spots are filled in a slot,"]
+				#[doc = "a slot can be supplanted by supplying a higher mining bond amount. Bond terms can be"]
+				#[doc = "found in the `vaults` pallet. You will supply the bond amount and the vault id to bond"]
+				#[doc = "with."]
+				#[doc = ""]
+				#[doc = "Each slot has `MaxCohortSize` spots available."]
+				#[doc = ""]
+				#[doc = "To be eligible for a slot, you must have the required ownership tokens in this account."]
+				#[doc = "The required amount is calculated as a percentage of the total ownership tokens in the"]
+				#[doc = "network. This percentage is adjusted before the beginning of each slot."]
+				#[doc = ""]
+				#[doc = "If your bid is replaced, a `SlotBidderReplaced` event will be emitted. By monitoring for"]
+				#[doc = "this event, you will be able to ensure your bid is accepted."]
+				#[doc = ""]
+				#[doc = "NOTE: bidding for each slot will be closed at a random block within"]
+				#[doc = "`BlocksBeforeBidEndForVrfClose` blocks of the slot end time."]
+				#[doc = ""]
+				#[doc = "The slot duration can be calculated as `BlocksBetweenSlots * MaxMiners / MaxCohortSize`."]
+				#[doc = ""]
+				#[doc = "Parameters:"]
+				#[doc = "- `bond_info`: The bond information to submit for the bid. If `None`, the bid will be"]
+				#[doc = " considered a zero-bid."]
+				#[doc = "\t- `vault_id`: The vault id to bond with. Terms are taken from the vault at time of bid"]
+				#[doc = "   inclusion in the block."]
+				#[doc = "  \t- `amount`: The amount to bond with the vault."]
+				#[doc = "- `reward_destination`: The account_id for the mining rewards, or `Owner` for the"]
+				#[doc = "  submitting user."]
 				pub struct Bid {
 					pub bond_info: bid::BondInfo,
 					pub reward_destination: bid::RewardDestination,
@@ -6317,6 +6147,33 @@ pub mod api {
 			}
 			pub struct TransactionApi;
 			impl TransactionApi {
+				#[doc = "Submit a bid for a mining slot in the next cohort. Once all spots are filled in a slot,"]
+				#[doc = "a slot can be supplanted by supplying a higher mining bond amount. Bond terms can be"]
+				#[doc = "found in the `vaults` pallet. You will supply the bond amount and the vault id to bond"]
+				#[doc = "with."]
+				#[doc = ""]
+				#[doc = "Each slot has `MaxCohortSize` spots available."]
+				#[doc = ""]
+				#[doc = "To be eligible for a slot, you must have the required ownership tokens in this account."]
+				#[doc = "The required amount is calculated as a percentage of the total ownership tokens in the"]
+				#[doc = "network. This percentage is adjusted before the beginning of each slot."]
+				#[doc = ""]
+				#[doc = "If your bid is replaced, a `SlotBidderReplaced` event will be emitted. By monitoring for"]
+				#[doc = "this event, you will be able to ensure your bid is accepted."]
+				#[doc = ""]
+				#[doc = "NOTE: bidding for each slot will be closed at a random block within"]
+				#[doc = "`BlocksBeforeBidEndForVrfClose` blocks of the slot end time."]
+				#[doc = ""]
+				#[doc = "The slot duration can be calculated as `BlocksBetweenSlots * MaxMiners / MaxCohortSize`."]
+				#[doc = ""]
+				#[doc = "Parameters:"]
+				#[doc = "- `bond_info`: The bond information to submit for the bid. If `None`, the bid will be"]
+				#[doc = " considered a zero-bid."]
+				#[doc = "\t- `vault_id`: The vault id to bond with. Terms are taken from the vault at time of bid"]
+				#[doc = "   inclusion in the block."]
+				#[doc = "  \t- `amount`: The amount to bond with the vault."]
+				#[doc = "- `reward_destination`: The account_id for the mining rewards, or `Owner` for the"]
+				#[doc = "  submitting user."]
 				pub fn bid(
 					&self,
 					bond_info: types::bid::BondInfo,
@@ -6479,6 +6336,11 @@ pub mod api {
 					use super::runtime_types;
 					pub type OwnershipBondAmount = ::core::primitive::u128;
 				}
+				pub mod last_ownership_percent_adjustment {
+					use super::runtime_types;
+					pub type LastOwnershipPercentAdjustment =
+						runtime_types::sp_arithmetic::fixed_point::FixedU128;
+				}
 				pub mod account_index_lookup {
 					use super::runtime_types;
 					pub type AccountIndexLookup = ::core::primitive::u32;
@@ -6504,6 +6366,13 @@ pub mod api {
 						runtime_types::ulx_primitives::block_seal::MiningRegistration<
 							::subxt::utils::AccountId32,
 							::core::primitive::u128,
+						>;
+				}
+				pub mod historical_bids_per_slot {
+					use super::runtime_types;
+					pub type HistoricalBidsPerSlot =
+						runtime_types::bounded_collections::bounded_vec::BoundedVec<
+							::core::primitive::u32,
 						>;
 				}
 			}
@@ -6620,6 +6489,27 @@ pub mod api {
 						],
 					)
 				}
+				#[doc = " The last percentage adjustment to the ownership bond amount"]
+				pub fn last_ownership_percent_adjustment(
+					&self,
+				) -> ::subxt::storage::address::Address<
+					(),
+					types::last_ownership_percent_adjustment::LastOwnershipPercentAdjustment,
+					::subxt::storage::address::Yes,
+					(),
+					(),
+				> {
+					::subxt::storage::address::Address::new_static(
+						"MiningSlot",
+						"LastOwnershipPercentAdjustment",
+						(),
+						[
+							22u8, 170u8, 117u8, 90u8, 112u8, 170u8, 183u8, 3u8, 63u8, 34u8, 26u8,
+							138u8, 147u8, 135u8, 3u8, 37u8, 74u8, 195u8, 167u8, 141u8, 156u8, 49u8,
+							161u8, 236u8, 21u8, 84u8, 10u8, 187u8, 29u8, 162u8, 44u8, 175u8,
+						],
+					)
+				}
 				#[doc = " Lookup by account id to the corresponding index in ActiveMinersByIndex and Authorities"]
 				pub fn account_index_lookup_iter(
 					&self,
@@ -6733,6 +6623,27 @@ pub mod api {
 						],
 					)
 				}
+				#[doc = " The number of bids per slot for the last 10 slots (newest first)"]
+				pub fn historical_bids_per_slot(
+					&self,
+				) -> ::subxt::storage::address::Address<
+					(),
+					types::historical_bids_per_slot::HistoricalBidsPerSlot,
+					::subxt::storage::address::Yes,
+					::subxt::storage::address::Yes,
+					(),
+				> {
+					::subxt::storage::address::Address::new_static(
+						"MiningSlot",
+						"HistoricalBidsPerSlot",
+						(),
+						[
+							136u8, 148u8, 91u8, 191u8, 165u8, 59u8, 132u8, 128u8, 139u8, 150u8,
+							116u8, 76u8, 241u8, 30u8, 112u8, 65u8, 17u8, 155u8, 66u8, 130u8, 163u8,
+							97u8, 253u8, 37u8, 13u8, 91u8, 82u8, 221u8, 123u8, 191u8, 104u8, 7u8,
+						],
+					)
+				}
 			}
 		}
 		pub mod constants {
@@ -6812,13 +6723,45 @@ pub mod api {
 						],
 					)
 				}
-				#[doc = " The reduction in percent of ownership currency required to secure a slot"]
-				pub fn ownership_percent_damper(
+				#[doc = " The block number when bidding will start (eg, Slot \"1\")"]
+				pub fn slot_bidding_start_block(
 					&self,
 				) -> ::subxt::constants::Address<::core::primitive::u32> {
 					::subxt::constants::Address::new_static(
 						"MiningSlot",
-						"OwnershipPercentDamper",
+						"SlotBiddingStartBlock",
+						[
+							98u8, 252u8, 116u8, 72u8, 26u8, 180u8, 225u8, 83u8, 200u8, 157u8,
+							125u8, 151u8, 53u8, 76u8, 168u8, 26u8, 10u8, 9u8, 98u8, 68u8, 9u8,
+							178u8, 197u8, 113u8, 31u8, 79u8, 200u8, 90u8, 203u8, 100u8, 41u8,
+							145u8,
+						],
+					)
+				}
+				#[doc = " The max percent swing for the ownership bond amount per slot (from the last percent"]
+				pub fn ownership_percent_adjustment_damper(
+					&self,
+				) -> ::subxt::constants::Address<runtime_types::sp_arithmetic::fixed_point::FixedU128>
+				{
+					::subxt::constants::Address::new_static(
+						"MiningSlot",
+						"OwnershipPercentAdjustmentDamper",
+						[
+							62u8, 145u8, 102u8, 227u8, 159u8, 92u8, 27u8, 54u8, 159u8, 228u8,
+							193u8, 99u8, 75u8, 196u8, 26u8, 250u8, 229u8, 230u8, 88u8, 109u8,
+							246u8, 100u8, 152u8, 158u8, 14u8, 25u8, 224u8, 173u8, 224u8, 41u8,
+							105u8, 231u8,
+						],
+					)
+				}
+				#[doc = " The target number of bids per slot. This will adjust the ownership bond amount up or"]
+				#[doc = " down to ensure mining slots are filled."]
+				pub fn target_bids_per_slot(
+					&self,
+				) -> ::subxt::constants::Address<::core::primitive::u32> {
+					::subxt::constants::Address::new_static(
+						"MiningSlot",
+						"TargetBidsPerSlot",
 						[
 							98u8, 252u8, 116u8, 72u8, 26u8, 180u8, 225u8, 83u8, 200u8, 157u8,
 							125u8, 151u8, 53u8, 76u8, 168u8, 26u8, 10u8, 9u8, 98u8, 68u8, 9u8,
@@ -11818,6 +11761,203 @@ pub mod api {
 							253u8, 253u8, 248u8, 90u8, 12u8, 202u8, 195u8, 25u8, 18u8, 100u8,
 							253u8, 109u8, 88u8, 77u8, 217u8, 140u8, 51u8, 40u8, 118u8, 35u8, 107u8,
 							206u8,
+						],
+					)
+				}
+			}
+		}
+	}
+	pub mod block_seal {
+		use super::{root_mod, runtime_types};
+		#[doc = "The `Error` enum of this pallet."]
+		pub type Error = runtime_types::pallet_block_seal::pallet::Error;
+		#[doc = "Contains a variant per dispatchable extrinsic that this pallet has."]
+		pub type Call = runtime_types::pallet_block_seal::pallet::Call;
+		pub mod calls {
+			use super::{root_mod, runtime_types};
+			type DispatchError = runtime_types::sp_runtime::DispatchError;
+			pub mod types {
+				use super::runtime_types;
+				#[derive(
+					:: subxt :: ext :: codec :: Decode,
+					:: subxt :: ext :: codec :: Encode,
+					:: subxt :: ext :: scale_decode :: DecodeAsType,
+					:: subxt :: ext :: scale_encode :: EncodeAsType,
+					Clone,
+					Debug,
+				)]
+				# [codec (crate = :: subxt :: ext :: codec)]
+				#[decode_as_type(crate_path = ":: subxt :: ext :: scale_decode")]
+				#[encode_as_type(crate_path = ":: subxt :: ext :: scale_encode")]
+				pub struct Apply {
+					pub seal: apply::Seal,
+				}
+				pub mod apply {
+					use super::runtime_types;
+					pub type Seal = runtime_types::ulx_primitives::inherents::BlockSealInherent;
+				}
+				impl ::subxt::blocks::StaticExtrinsic for Apply {
+					const PALLET: &'static str = "BlockSeal";
+					const CALL: &'static str = "apply";
+				}
+			}
+			pub struct TransactionApi;
+			impl TransactionApi {
+				pub fn apply(
+					&self,
+					seal: types::apply::Seal,
+				) -> ::subxt::tx::Payload<types::Apply> {
+					::subxt::tx::Payload::new_static(
+						"BlockSeal",
+						"apply",
+						types::Apply { seal },
+						[
+							219u8, 28u8, 137u8, 83u8, 119u8, 114u8, 20u8, 229u8, 253u8, 233u8,
+							140u8, 58u8, 32u8, 228u8, 139u8, 84u8, 9u8, 93u8, 54u8, 8u8, 96u8, 8u8,
+							97u8, 25u8, 73u8, 9u8, 55u8, 175u8, 198u8, 182u8, 196u8, 85u8,
+						],
+					)
+				}
+			}
+		}
+		pub mod storage {
+			use super::runtime_types;
+			pub mod types {
+				use super::runtime_types;
+				pub mod last_block_sealer_info {
+					use super::runtime_types;
+					pub type LastBlockSealerInfo =
+						runtime_types::ulx_primitives::providers::BlockSealerInfo<
+							::subxt::utils::AccountId32,
+						>;
+				}
+				pub mod parent_voting_key {
+					use super::runtime_types;
+					pub type ParentVotingKey = ::core::option::Option<::sp_core::H256>;
+				}
+				pub mod temp_author {
+					use super::runtime_types;
+					pub type TempAuthor = ::subxt::utils::AccountId32;
+				}
+				pub mod temp_seal_inherent {
+					use super::runtime_types;
+					pub type TempSealInherent =
+						runtime_types::ulx_primitives::inherents::BlockSealInherent;
+				}
+				pub mod temp_voting_key_digest {
+					use super::runtime_types;
+					pub type TempVotingKeyDigest =
+						runtime_types::ulx_primitives::digests::ParentVotingKeyDigest;
+				}
+			}
+			pub struct StorageApi;
+			impl StorageApi {
+				pub fn last_block_sealer_info(
+					&self,
+				) -> ::subxt::storage::address::Address<
+					(),
+					types::last_block_sealer_info::LastBlockSealerInfo,
+					::subxt::storage::address::Yes,
+					(),
+					(),
+				> {
+					::subxt::storage::address::Address::new_static(
+						"BlockSeal",
+						"LastBlockSealerInfo",
+						(),
+						[
+							183u8, 123u8, 138u8, 26u8, 2u8, 100u8, 188u8, 93u8, 198u8, 55u8, 216u8,
+							104u8, 120u8, 208u8, 46u8, 37u8, 191u8, 239u8, 154u8, 151u8, 18u8,
+							108u8, 235u8, 176u8, 46u8, 183u8, 25u8, 195u8, 224u8, 202u8, 248u8,
+							67u8,
+						],
+					)
+				}
+				#[doc = " The calculated parent voting key for a block. Refers to the Notebook BlockVote Revealed"]
+				#[doc = " Secret + VotesMerkleRoot of the parent block notebooks."]
+				pub fn parent_voting_key(
+					&self,
+				) -> ::subxt::storage::address::Address<
+					(),
+					types::parent_voting_key::ParentVotingKey,
+					::subxt::storage::address::Yes,
+					::subxt::storage::address::Yes,
+					(),
+				> {
+					::subxt::storage::address::Address::new_static(
+						"BlockSeal",
+						"ParentVotingKey",
+						(),
+						[
+							12u8, 73u8, 52u8, 154u8, 15u8, 127u8, 150u8, 214u8, 178u8, 186u8,
+							231u8, 204u8, 104u8, 196u8, 141u8, 55u8, 198u8, 11u8, 23u8, 252u8,
+							108u8, 65u8, 42u8, 124u8, 77u8, 77u8, 88u8, 35u8, 154u8, 241u8, 50u8,
+							216u8,
+						],
+					)
+				}
+				#[doc = " Author of current block (temporary storage)."]
+				pub fn temp_author(
+					&self,
+				) -> ::subxt::storage::address::Address<
+					(),
+					types::temp_author::TempAuthor,
+					::subxt::storage::address::Yes,
+					(),
+					(),
+				> {
+					::subxt::storage::address::Address::new_static(
+						"BlockSeal",
+						"TempAuthor",
+						(),
+						[
+							29u8, 149u8, 234u8, 74u8, 206u8, 138u8, 152u8, 92u8, 28u8, 103u8, 4u8,
+							236u8, 161u8, 51u8, 52u8, 196u8, 28u8, 242u8, 250u8, 210u8, 187u8,
+							78u8, 217u8, 251u8, 157u8, 143u8, 91u8, 60u8, 246u8, 218u8, 227u8,
+							114u8,
+						],
+					)
+				}
+				#[doc = " Ensures only a single inherent is applied"]
+				pub fn temp_seal_inherent(
+					&self,
+				) -> ::subxt::storage::address::Address<
+					(),
+					types::temp_seal_inherent::TempSealInherent,
+					::subxt::storage::address::Yes,
+					(),
+					(),
+				> {
+					::subxt::storage::address::Address::new_static(
+						"BlockSeal",
+						"TempSealInherent",
+						(),
+						[
+							155u8, 198u8, 152u8, 193u8, 160u8, 65u8, 79u8, 57u8, 173u8, 165u8,
+							225u8, 42u8, 102u8, 64u8, 210u8, 78u8, 243u8, 181u8, 84u8, 156u8,
+							139u8, 238u8, 34u8, 129u8, 199u8, 138u8, 84u8, 136u8, 156u8, 115u8,
+							10u8, 107u8,
+						],
+					)
+				}
+				#[doc = " Temporarily track the parent voting key digest"]
+				pub fn temp_voting_key_digest(
+					&self,
+				) -> ::subxt::storage::address::Address<
+					(),
+					types::temp_voting_key_digest::TempVotingKeyDigest,
+					::subxt::storage::address::Yes,
+					(),
+					(),
+				> {
+					::subxt::storage::address::Address::new_static(
+						"BlockSeal",
+						"TempVotingKeyDigest",
+						(),
+						[
+							62u8, 236u8, 18u8, 31u8, 216u8, 143u8, 7u8, 128u8, 99u8, 129u8, 168u8,
+							182u8, 205u8, 207u8, 253u8, 199u8, 82u8, 185u8, 26u8, 190u8, 222u8,
+							160u8, 10u8, 186u8, 150u8, 3u8, 192u8, 56u8, 145u8, 106u8, 159u8, 73u8,
 						],
 					)
 				}
@@ -19097,6 +19237,33 @@ pub mod api {
 				#[doc = "Contains a variant per dispatchable extrinsic that this pallet has."]
 				pub enum Call {
 					#[codec(index = 0)]
+					#[doc = "Submit a bid for a mining slot in the next cohort. Once all spots are filled in a slot,"]
+					#[doc = "a slot can be supplanted by supplying a higher mining bond amount. Bond terms can be"]
+					#[doc = "found in the `vaults` pallet. You will supply the bond amount and the vault id to bond"]
+					#[doc = "with."]
+					#[doc = ""]
+					#[doc = "Each slot has `MaxCohortSize` spots available."]
+					#[doc = ""]
+					#[doc = "To be eligible for a slot, you must have the required ownership tokens in this account."]
+					#[doc = "The required amount is calculated as a percentage of the total ownership tokens in the"]
+					#[doc = "network. This percentage is adjusted before the beginning of each slot."]
+					#[doc = ""]
+					#[doc = "If your bid is replaced, a `SlotBidderReplaced` event will be emitted. By monitoring for"]
+					#[doc = "this event, you will be able to ensure your bid is accepted."]
+					#[doc = ""]
+					#[doc = "NOTE: bidding for each slot will be closed at a random block within"]
+					#[doc = "`BlocksBeforeBidEndForVrfClose` blocks of the slot end time."]
+					#[doc = ""]
+					#[doc = "The slot duration can be calculated as `BlocksBetweenSlots * MaxMiners / MaxCohortSize`."]
+					#[doc = ""]
+					#[doc = "Parameters:"]
+					#[doc = "- `bond_info`: The bond information to submit for the bid. If `None`, the bid will be"]
+					#[doc = " considered a zero-bid."]
+					#[doc = "\t- `vault_id`: The vault id to bond with. Terms are taken from the vault at time of bid"]
+					#[doc = "   inclusion in the block."]
+					#[doc = "  \t- `amount`: The amount to bond with the vault."]
+					#[doc = "- `reward_destination`: The account_id for the mining rewards, or `Owner` for the"]
+					#[doc = "  submitting user."]
 					bid {
 						bond_info: ::core::option::Option<
 							runtime_types::pallet_mining_slot::MiningSlotBid<
@@ -22233,29 +22400,29 @@ pub mod api {
 				#[codec(index = 4)]
 				Ticks(runtime_types::pallet_ticks::pallet::Call),
 				#[codec(index = 5)]
-				BlockSeal(runtime_types::pallet_block_seal::pallet::Call),
-				#[codec(index = 6)]
 				MiningSlot(runtime_types::pallet_mining_slot::pallet::Call),
-				#[codec(index = 7)]
+				#[codec(index = 6)]
 				BitcoinUtxos(runtime_types::pallet_bitcoin_utxos::pallet::Call),
-				#[codec(index = 8)]
+				#[codec(index = 7)]
 				Vaults(runtime_types::pallet_vaults::pallet::Call),
-				#[codec(index = 9)]
+				#[codec(index = 8)]
 				Bonds(runtime_types::pallet_bond::pallet::Call),
-				#[codec(index = 10)]
+				#[codec(index = 9)]
 				Notaries(runtime_types::pallet_notaries::pallet::Call),
-				#[codec(index = 11)]
+				#[codec(index = 10)]
 				Notebook(runtime_types::pallet_notebook::pallet::Call),
-				#[codec(index = 12)]
+				#[codec(index = 11)]
 				ChainTransfer(runtime_types::pallet_chain_transfer::pallet::Call),
-				#[codec(index = 13)]
+				#[codec(index = 12)]
 				BlockSealSpec(runtime_types::pallet_block_seal_spec::pallet::Call),
-				#[codec(index = 14)]
+				#[codec(index = 13)]
 				DataDomain(runtime_types::pallet_data_domain::pallet::Call),
-				#[codec(index = 15)]
+				#[codec(index = 14)]
 				PriceIndex(runtime_types::pallet_price_index::pallet::Call),
-				#[codec(index = 18)]
+				#[codec(index = 17)]
 				Session(runtime_types::pallet_session::pallet::Call),
+				#[codec(index = 18)]
+				BlockSeal(runtime_types::pallet_block_seal::pallet::Call),
 				#[codec(index = 19)]
 				BlockRewards(runtime_types::pallet_block_rewards::pallet::Call),
 				#[codec(index = 20)]
@@ -22292,29 +22459,29 @@ pub mod api {
 				#[codec(index = 4)]
 				Ticks(runtime_types::pallet_ticks::pallet::Error),
 				#[codec(index = 5)]
-				BlockSeal(runtime_types::pallet_block_seal::pallet::Error),
-				#[codec(index = 6)]
 				MiningSlot(runtime_types::pallet_mining_slot::pallet::Error),
-				#[codec(index = 7)]
+				#[codec(index = 6)]
 				BitcoinUtxos(runtime_types::pallet_bitcoin_utxos::pallet::Error),
-				#[codec(index = 8)]
+				#[codec(index = 7)]
 				Vaults(runtime_types::pallet_vaults::pallet::Error),
-				#[codec(index = 9)]
+				#[codec(index = 8)]
 				Bonds(runtime_types::pallet_bond::pallet::Error),
-				#[codec(index = 10)]
+				#[codec(index = 9)]
 				Notaries(runtime_types::pallet_notaries::pallet::Error),
-				#[codec(index = 11)]
+				#[codec(index = 10)]
 				Notebook(runtime_types::pallet_notebook::pallet::Error),
-				#[codec(index = 12)]
+				#[codec(index = 11)]
 				ChainTransfer(runtime_types::pallet_chain_transfer::pallet::Error),
-				#[codec(index = 13)]
+				#[codec(index = 12)]
 				BlockSealSpec(runtime_types::pallet_block_seal_spec::pallet::Error),
-				#[codec(index = 14)]
+				#[codec(index = 13)]
 				DataDomain(runtime_types::pallet_data_domain::pallet::Error),
-				#[codec(index = 15)]
+				#[codec(index = 14)]
 				PriceIndex(runtime_types::pallet_price_index::pallet::Error),
-				#[codec(index = 18)]
+				#[codec(index = 17)]
 				Session(runtime_types::pallet_session::pallet::Error),
+				#[codec(index = 18)]
+				BlockSeal(runtime_types::pallet_block_seal::pallet::Error),
 				#[codec(index = 19)]
 				BlockRewards(runtime_types::pallet_block_rewards::pallet::Error),
 				#[codec(index = 20)]
@@ -22348,27 +22515,27 @@ pub mod api {
 				Multisig(runtime_types::pallet_multisig::pallet::Event),
 				#[codec(index = 3)]
 				Proxy(runtime_types::pallet_proxy::pallet::Event),
-				#[codec(index = 6)]
+				#[codec(index = 5)]
 				MiningSlot(runtime_types::pallet_mining_slot::pallet::Event),
-				#[codec(index = 7)]
+				#[codec(index = 6)]
 				BitcoinUtxos(runtime_types::pallet_bitcoin_utxos::pallet::Event),
-				#[codec(index = 8)]
+				#[codec(index = 7)]
 				Vaults(runtime_types::pallet_vaults::pallet::Event),
-				#[codec(index = 9)]
+				#[codec(index = 8)]
 				Bonds(runtime_types::pallet_bond::pallet::Event),
-				#[codec(index = 10)]
+				#[codec(index = 9)]
 				Notaries(runtime_types::pallet_notaries::pallet::Event),
-				#[codec(index = 11)]
+				#[codec(index = 10)]
 				Notebook(runtime_types::pallet_notebook::pallet::Event),
-				#[codec(index = 12)]
+				#[codec(index = 11)]
 				ChainTransfer(runtime_types::pallet_chain_transfer::pallet::Event),
-				#[codec(index = 13)]
+				#[codec(index = 12)]
 				BlockSealSpec(runtime_types::pallet_block_seal_spec::pallet::Event),
-				#[codec(index = 14)]
+				#[codec(index = 13)]
 				DataDomain(runtime_types::pallet_data_domain::pallet::Event),
-				#[codec(index = 15)]
+				#[codec(index = 14)]
 				PriceIndex(runtime_types::pallet_price_index::pallet::Event),
-				#[codec(index = 18)]
+				#[codec(index = 17)]
 				Session(runtime_types::pallet_session::pallet::Event),
 				#[codec(index = 19)]
 				BlockRewards(runtime_types::pallet_block_rewards::pallet::Event),
@@ -22416,11 +22583,11 @@ pub mod api {
 			#[decode_as_type(crate_path = ":: subxt :: ext :: scale_decode")]
 			#[encode_as_type(crate_path = ":: subxt :: ext :: scale_encode")]
 			pub enum RuntimeHoldReason {
-				#[codec(index = 6)]
+				#[codec(index = 5)]
 				MiningSlot(runtime_types::pallet_mining_slot::pallet::HoldReason),
-				#[codec(index = 8)]
+				#[codec(index = 7)]
 				Vaults(runtime_types::pallet_vaults::pallet::HoldReason),
-				#[codec(index = 9)]
+				#[codec(index = 8)]
 				Bonds(runtime_types::pallet_bond::pallet::HoldReason),
 				#[codec(index = 19)]
 				BlockRewards(runtime_types::pallet_block_rewards::pallet::HoldReason),

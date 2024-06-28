@@ -201,6 +201,35 @@ declare module '@polkadot/api-base/types/submittable' {
       reportEquivocationUnsigned: AugmentedSubmittable<(equivocationProof: SpConsensusGrandpaEquivocationProof | { setId?: any; equivocation?: any } | string | Uint8Array, keyOwnerProof: SpSessionMembershipProof | { session?: any; trieNodes?: any; validatorCount?: any } | string | Uint8Array) => SubmittableExtrinsic<ApiType>, [SpConsensusGrandpaEquivocationProof, SpSessionMembershipProof]>;
     };
     miningSlot: {
+      /**
+       * Submit a bid for a mining slot in the next cohort. Once all spots are filled in a slot,
+       * a slot can be supplanted by supplying a higher mining bond amount. Bond terms can be
+       * found in the `vaults` pallet. You will supply the bond amount and the vault id to bond
+       * with.
+       *
+       * Each slot has `MaxCohortSize` spots available.
+       *
+       * To be eligible for a slot, you must have the required ownership tokens in this account.
+       * The required amount is calculated as a percentage of the total ownership tokens in the
+       * network. This percentage is adjusted before the beginning of each slot.
+       *
+       * If your bid is replaced, a `SlotBidderReplaced` event will be emitted. By monitoring for
+       * this event, you will be able to ensure your bid is accepted.
+       *
+       * NOTE: bidding for each slot will be closed at a random block within
+       * `BlocksBeforeBidEndForVrfClose` blocks of the slot end time.
+       *
+       * The slot duration can be calculated as `BlocksBetweenSlots * MaxMiners / MaxCohortSize`.
+       *
+       * Parameters:
+       * - `bond_info`: The bond information to submit for the bid. If `None`, the bid will be
+       * considered a zero-bid.
+       * - `vault_id`: The vault id to bond with. Terms are taken from the vault at time of bid
+       * inclusion in the block.
+       * - `amount`: The amount to bond with the vault.
+       * - `reward_destination`: The account_id for the mining rewards, or `Owner` for the
+       * submitting user.
+       **/
       bid: AugmentedSubmittable<(bondInfo: Option<PalletMiningSlotMiningSlotBid> | null | Uint8Array | PalletMiningSlotMiningSlotBid | { vaultId?: any; amount?: any } | string, rewardDestination: UlxPrimitivesBlockSealRewardDestination | { Owner: any } | { Account: any } | string | Uint8Array) => SubmittableExtrinsic<ApiType>, [Option<PalletMiningSlotMiningSlotBid>, UlxPrimitivesBlockSealRewardDestination]>;
     };
     mint: {

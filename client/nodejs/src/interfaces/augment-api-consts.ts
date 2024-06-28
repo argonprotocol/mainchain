@@ -178,13 +178,22 @@ declare module '@polkadot/api-base/types/consts' {
        **/
       maxMiners: u32 & AugmentedConst<ApiType>;
       /**
-       * The reduction in percent of ownership currency required to secure a slot
+       * The max percent swing for the ownership bond amount per slot (from the last percent
        **/
-      ownershipPercentDamper: u32 & AugmentedConst<ApiType>;
+      ownershipPercentAdjustmentDamper: u128 & AugmentedConst<ApiType>;
       /**
        * How many session indexes to keep session history
        **/
       sessionIndicesToKeepInHistory: u32 & AugmentedConst<ApiType>;
+      /**
+       * The block number when bidding will start (eg, Slot "1")
+       **/
+      slotBiddingStartBlock: u32 & AugmentedConst<ApiType>;
+      /**
+       * The target number of bids per slot. This will adjust the ownership bond amount up or
+       * down to ensure mining slots are filled.
+       **/
+      targetBidsPerSlot: u32 & AugmentedConst<ApiType>;
     };
     mint: {
       /**

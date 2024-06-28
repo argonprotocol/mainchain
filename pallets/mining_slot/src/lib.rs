@@ -15,7 +15,7 @@ use sp_core::{Get, U256};
 use sp_io::hashing::blake2_256;
 use sp_runtime::{
 	traits::{Convert, UniqueSaturatedInto},
-	BoundedBTreeMap, SaturatedConversion, Saturating,
+	BoundedBTreeMap, FixedI128, FixedPointNumber, FixedU128, SaturatedConversion, Saturating,
 };
 use sp_std::{cmp::max, marker::PhantomData, vec::Vec};
 
@@ -51,8 +51,9 @@ const LOG_TARGET: &str = "runtime::mining_slot";
 ///
 /// To be eligible for mining, you must bond a percent of the total supply of Ulixee tokens. A
 /// `MiningBond` of locked Argons will allow operators to out-bid others for cohort membership. The
-/// percent is configured with `OwnershipPercentDamper`. This percent automatically adjusts to
-/// generate 20% more bids than slots.
+/// percent is configured to aim for `TargetBidsPerSlot`, with a maximum change in ownership
+/// shares needed per slot capped at `OwnershipPercentAdjustmentDamper` (NOTE: this percent is the
+/// max increase or reduction in the amount of shares issued).
 ///
 /// Options are provided to lease a bond from a fund (see the bond pallet).
 ///
@@ -122,9 +123,14 @@ pub mod pallet {
 		#[pallet::constant]
 		type SlotBiddingStartBlock: Get<BlockNumberFor<Self>>;
 
-		/// The reduction in percent of ownership currency required to secure a slot
+		/// The max percent swing for the ownership bond amount per slot (from the last percent
 		#[pallet::constant]
-		type OwnershipPercentDamper: Get<u32>;
+		type OwnershipPercentAdjustmentDamper: Get<FixedU128>;
+
+		/// The target number of bids per slot. This will adjust the ownership bond amount up or
+		/// down to ensure mining slots are filled.
+		#[pallet::constant]
+		type TargetBidsPerSlot: Get<u32>;
 
 		/// The balance type
 		type Balance: AtLeast32BitUnsigned
@@ -161,7 +167,6 @@ pub mod pallet {
 
 	/// Miners that are active in the current block (post initialize)
 	#[pallet::storage]
-	#[pallet::getter(fn active_miners_by_index)]
 	pub(super) type ActiveMinersByIndex<T: Config> =
 		StorageMap<_, Blake2_128Concat, MinerIndex, Registration<T>, OptionQuery>;
 	#[pallet::storage]
@@ -178,12 +183,15 @@ pub mod pallet {
 
 	/// Tokens that must be bonded to take a Miner role
 	#[pallet::storage]
-	#[pallet::getter(fn ownership_bond_amount)]
 	pub(super) type OwnershipBondAmount<T: Config> = StorageValue<_, T::Balance, ValueQuery>;
+
+	/// The last percentage adjustment to the ownership bond amount
+	#[pallet::storage]
+	pub(super) type LastOwnershipPercentAdjustment<T: Config> =
+		StorageValue<_, FixedU128, OptionQuery>;
 
 	/// Lookup by account id to the corresponding index in ActiveMinersByIndex and Authorities
 	#[pallet::storage]
-	#[pallet::getter(fn account_indices)]
 	pub(super) type AccountIndexLookup<T: Config> =
 		StorageMap<_, Blake2_128Concat, T::AccountId, MinerIndex, OptionQuery>;
 
@@ -199,8 +207,12 @@ pub mod pallet {
 
 	/// The configuration for a miner to supply if there are no registered miners
 	#[pallet::storage]
-	#[pallet::getter(fn rescue_miner)]
 	pub(super) type MinerZero<T: Config> = StorageValue<_, Registration<T>, OptionQuery>;
+
+	/// The number of bids per slot for the last 10 slots (newest first)
+	#[pallet::storage]
+	pub(super) type HistoricalBidsPerSlot<T: Config> =
+		StorageValue<_, BoundedVec<u32, ConstU32<10>>, ValueQuery>;
 
 	#[pallet::genesis_config]
 	#[derive(frame_support::DefaultNoBound)]
@@ -300,14 +312,13 @@ pub mod pallet {
 	#[pallet::hooks]
 	impl<T: Config> Hooks<BlockNumberFor<T>> for Pallet<T> {
 		fn on_initialize(block_number: BlockNumberFor<T>) -> Weight {
-			Self::adjust_ownership_bond_amount();
-
 			let block_number_u32: u32 =
 				UniqueSaturatedInto::<u32>::unique_saturated_into(block_number);
 			let blocks_between_slots = T::BlocksBetweenSlots::get();
 			if block_number >= T::SlotBiddingStartBlock::get() &&
 				block_number_u32 % blocks_between_slots == 0
 			{
+				Self::adjust_ownership_bond_amount();
 				Self::start_new_slot(block_number_u32);
 				return T::DbWeight::get().reads_writes(0, 2);
 			}
@@ -318,6 +329,33 @@ pub mod pallet {
 
 	#[pallet::call]
 	impl<T: Config> Pallet<T> {
+		/// Submit a bid for a mining slot in the next cohort. Once all spots are filled in a slot,
+		/// a slot can be supplanted by supplying a higher mining bond amount. Bond terms can be
+		/// found in the `vaults` pallet. You will supply the bond amount and the vault id to bond
+		/// with.
+		///
+		/// Each slot has `MaxCohortSize` spots available.
+		///
+		/// To be eligible for a slot, you must have the required ownership tokens in this account.
+		/// The required amount is calculated as a percentage of the total ownership tokens in the
+		/// network. This percentage is adjusted before the beginning of each slot.
+		///
+		/// If your bid is replaced, a `SlotBidderReplaced` event will be emitted. By monitoring for
+		/// this event, you will be able to ensure your bid is accepted.
+		///
+		/// NOTE: bidding for each slot will be closed at a random block within
+		/// `BlocksBeforeBidEndForVrfClose` blocks of the slot end time.
+		///
+		/// The slot duration can be calculated as `BlocksBetweenSlots * MaxMiners / MaxCohortSize`.
+		///
+		/// Parameters:
+		/// - `bond_info`: The bond information to submit for the bid. If `None`, the bid will be
+		///  considered a zero-bid.
+		/// 	- `vault_id`: The vault id to bond with. Terms are taken from the vault at time of bid
+		///    inclusion in the block.
+		///   	- `amount`: The amount to bond with the vault.
+		/// - `reward_destination`: The account_id for the mining rewards, or `Owner` for the
+		///   submitting user.
 		#[pallet::call_index(0)]
 		#[pallet::weight(0)] //T::WeightInfo::hold())]
 		pub fn bid(
@@ -397,6 +435,9 @@ pub mod pallet {
 					)
 					.map_err(|_| Error::<T>::TooManyBlockRegistrants)?;
 
+				HistoricalBidsPerSlot::<T>::mutate(|bids| {
+					bids.get_mut(0).map(|x| *x += 1);
+				});
 				Self::deposit_event(Event::<T>::SlotBidderAdded {
 					account_id: who.clone(),
 					bid_amount: bid,
@@ -436,15 +477,16 @@ impl<T: Config> AuthorityProvider<BlockSealAuthorityId, T::Block, T::AccountId> 
 	fn xor_closest_authority(
 		nonce: U256,
 	) -> Option<MiningAuthority<BlockSealAuthorityId, T::AccountId>> {
-		let closest = find_xor_closest(<AuthoritiesByIndex<T>>::get(), nonce);
+		let Some((authority_id, index)) = find_xor_closest(<AuthoritiesByIndex<T>>::get(), nonce)
+		else {
+			return None;
+		};
 
-		closest.map(|(authority_id, index)| {
-			let registration = Self::active_miners_by_index(index).unwrap();
-			MiningAuthority {
-				authority_id,
-				account_id: registration.account_id.clone(),
-				authority_index: index.unique_saturated_into(),
-			}
+		let registration = ActiveMinersByIndex::<T>::get(index)?;
+		Some(MiningAuthority {
+			authority_id,
+			account_id: registration.account_id.clone(),
+			authority_index: index.unique_saturated_into(),
 		})
 	}
 }
@@ -467,6 +509,12 @@ impl<T: Config> Pallet<T> {
 		let blocks_between_slots = T::BlocksBetweenSlots::get();
 		let max_miners = T::MaxMiners::get();
 		let cohort_size = T::MaxCohortSize::get();
+		HistoricalBidsPerSlot::<T>::mutate(|bids| {
+			if bids.len() == bids.capacity() {
+				bids.pop();
+			}
+			let _ = bids.try_insert(0, 0);
+		});
 
 		let start_index_to_replace_miners = Self::get_slot_starting_index(
 			block_number_u32,
@@ -522,17 +570,56 @@ impl<T: Config> Pallet<T> {
 		});
 	}
 
+	/// Adjust the ownership bond amount based on a rolling 10 slot average of bids.
+	///
+	/// This should be called before starting a new slot. It will adjust the ownership bond amount
+	/// based on the number of bids in the last 10 slots to reach the target number of bids per
+	/// slot. The amount must also be adjusted based on the total ownership tokens in the network,
+	/// which will increase in every block.
+	///
+	/// The max percent swing is 20% over the previous adjustment to the ownership bond amount.
+
 	pub(crate) fn adjust_ownership_bond_amount() {
-		// calculate the new ownership bond amount
 		let ownership_circulation: u128 = T::OwnershipCurrency::total_issuance().saturated_into();
 
-		let ownership_needed: u128 = ownership_circulation
-			.checked_div(T::MaxMiners::get().into())
-			.unwrap_or(0u128)
-			.saturating_mul(T::OwnershipPercentDamper::get().into())
-			.checked_div(100u128)
-			.unwrap_or(0u128);
+		let historical_bids = HistoricalBidsPerSlot::<T>::get();
+		let total_bids: u32 = historical_bids.iter().sum();
+		let slots = historical_bids.len() as u32;
+		let expected_bids_for_period = slots.saturating_mul(T::TargetBidsPerSlot::get());
+		let previous_adjustment =
+			LastOwnershipPercentAdjustment::<T>::get().unwrap_or(FixedU128::from_u32(1));
 
+		if ownership_circulation == 0 {
+			return;
+		}
+
+		let base_ownership_tokens: u128 = ownership_circulation
+			.checked_div(T::MaxMiners::get().into())
+			.unwrap_or_default();
+
+		let new_adjustment = if expected_bids_for_period == 0 {
+			FixedI128::from_u32(1)
+		} else {
+			FixedI128::from_rational(total_bids as u128, expected_bids_for_period as u128)
+		};
+
+		let percent_change = new_adjustment.saturating_sub(FixedI128::from_u32(1));
+
+		// Apply a 20% swing limit to the change
+		let max_swing =
+			FixedI128::from_inner(T::OwnershipPercentAdjustmentDamper::get().into_inner() as i128);
+		let limited_change = percent_change.min(max_swing).max(-max_swing);
+
+		let adjustment_percent = FixedU128::from_inner(
+			FixedI128::from_inner(previous_adjustment.into_inner() as i128)
+				.saturating_add(limited_change)
+				.max(FixedI128::from_u32(0))
+				.into_inner() as u128,
+		);
+
+		LastOwnershipPercentAdjustment::<T>::put(adjustment_percent);
+
+		let ownership_needed = adjustment_percent.saturating_mul_int(base_ownership_tokens);
 		OwnershipBondAmount::<T>::put(max::<T::Balance>(
 			ownership_needed.saturated_into(),
 			1u128.into(),
@@ -612,13 +699,13 @@ impl<T: Config> Pallet<T> {
 			<frame_system::Pallet<T>>::block_number(),
 		);
 		let cohort_size = T::MaxCohortSize::get();
-		cohort_size +
-			Self::get_slot_starting_index(
-				block_number,
-				T::BlocksBetweenSlots::get(),
-				T::MaxMiners::get(),
-				cohort_size,
-			)
+
+		Self::get_slot_starting_index(
+			block_number + 1,
+			T::BlocksBetweenSlots::get(),
+			T::MaxMiners::get(),
+			cohort_size,
+		)
 	}
 
 	pub(crate) fn get_mining_window_blocks() -> BlockNumberFor<T> {
