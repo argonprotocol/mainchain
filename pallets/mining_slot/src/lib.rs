@@ -118,6 +118,10 @@ pub mod pallet {
 		#[pallet::constant]
 		type BlocksBeforeBidEndForVrfClose: Get<u32>;
 
+		/// The block number when bidding will start (eg, Slot "1")
+		#[pallet::constant]
+		type SlotBiddingStartBlock: Get<BlockNumberFor<Self>>;
+
 		/// The reduction in percent of ownership currency required to secure a slot
 		#[pallet::constant]
 		type OwnershipPercentDamper: Get<u32>;
@@ -210,8 +214,10 @@ pub mod pallet {
 	impl<T: Config> BuildGenesisConfig for GenesisConfig<T> {
 		fn build(&self) {
 			if let Some(miner) = &self.miner_zero {
-				<MinerZero<T>>::put(miner);
-				Pallet::<T>::on_initialize(0u32.into());
+				<MinerZero<T>>::put(miner.clone());
+				AccountIndexLookup::<T>::insert(&miner.account_id, 0);
+				ActiveMinersByIndex::<T>::insert(0, miner.clone());
+				ActiveMinersCount::<T>::put(1);
 			}
 		}
 	}
@@ -299,7 +305,9 @@ pub mod pallet {
 			let block_number_u32: u32 =
 				UniqueSaturatedInto::<u32>::unique_saturated_into(block_number);
 			let blocks_between_slots = T::BlocksBetweenSlots::get();
-			if block_number_u32 % blocks_between_slots == 0 {
+			if block_number >= T::SlotBiddingStartBlock::get() &&
+				block_number_u32 % blocks_between_slots == 0
+			{
 				Self::start_new_slot(block_number_u32);
 				return T::DbWeight::get().reads_writes(0, 2);
 			}

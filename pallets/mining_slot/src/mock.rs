@@ -38,6 +38,7 @@ parameter_types! {
 	pub static MaxCohortSize: u32 = 5;
 	pub static MaxMiners: u32 = 10;
 	pub static BlocksBeforeBidEndForVrfClose: u32 = 0;
+	pub static SlotBiddingStartBlock: u32 = 3;
 	pub const OwnershipPercentDamper: u32 = 80;
 
 	pub static ExistentialDeposit: Balance = 1;
@@ -141,6 +142,7 @@ impl pallet_mining_slot::Config for Test {
 	type BlocksBeforeBidEndForVrfClose = BlocksBeforeBidEndForVrfClose;
 	type Balance = Balance;
 	type BondProvider = StaticBondProvider;
+	type SlotBiddingStartBlock = SlotBiddingStartBlock;
 }
 
 // Build genesis storage according to the mock runtime.

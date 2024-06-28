@@ -159,6 +159,7 @@ fn it_activates_miner_zero_if_no_miners() {
 	BlocksBetweenSlots::set(2);
 	MaxMiners::set(6);
 	MaxCohortSize::set(2);
+	SlotBiddingStartBlock::set(0);
 
 	new_test_ext(Some(MiningRegistration {
 		account_id: 1,
@@ -179,6 +180,7 @@ fn it_activates_miner_zero_if_upcoming_miners_will_empty() {
 	BlocksBetweenSlots::set(2);
 	MaxMiners::set(6);
 	MaxCohortSize::set(2);
+	SlotBiddingStartBlock::set(0);
 
 	new_test_ext(Some(MiningRegistration {
 		account_id: 1,
@@ -366,6 +368,7 @@ fn it_holds_ownership_shares_for_a_slot() {
 	BlocksBetweenSlots::set(3);
 	MaxMiners::set(6);
 	MaxCohortSize::set(2);
+	SlotBiddingStartBlock::set(0);
 
 	new_test_ext(None).execute_with(|| {
 		System::set_block_number(3);
@@ -409,10 +412,37 @@ fn it_holds_ownership_shares_for_a_slot() {
 }
 
 #[test]
+fn it_wont_accept_bids_until_bidding_starts() {
+	BlocksBetweenSlots::set(4);
+	MaxMiners::set(6);
+	MaxCohortSize::set(2);
+	SlotBiddingStartBlock::set(12);
+
+	new_test_ext(None).execute_with(|| {
+		set_ownership(2, 100u32.into());
+		for i in 1..11u64 {
+			System::set_block_number(i);
+
+			MiningSlots::on_initialize(i);
+			assert_err!(
+				MiningSlots::bid(RuntimeOrigin::signed(2), None, RewardDestination::Owner),
+				Error::<Test>::SlotNotTakingBids
+			);
+		}
+
+		System::set_block_number(12);
+		MiningSlots::on_initialize(12);
+
+		assert!(IsNextSlotBiddingOpen::<Test>::get(), "bidding should now be open");
+		assert_ok!(MiningSlots::bid(RuntimeOrigin::signed(2), None, RewardDestination::Owner));
+	});
+}
+#[test]
 fn it_wont_let_you_reuse_ownership_shares_for_two_bids() {
 	BlocksBetweenSlots::set(4);
 	MaxMiners::set(6);
 	MaxCohortSize::set(2);
+	SlotBiddingStartBlock::set(0);
 
 	new_test_ext(None).execute_with(|| {
 		System::set_block_number(3);
@@ -465,6 +495,7 @@ fn it_will_order_bids_with_argon_bonds() {
 	BlocksBetweenSlots::set(3);
 	MaxMiners::set(6);
 	MaxCohortSize::set(2);
+	SlotBiddingStartBlock::set(0);
 
 	new_test_ext(None).execute_with(|| {
 		System::set_block_number(3);
@@ -729,6 +760,7 @@ fn it_will_end_auctions_if_a_seal_qualifies() {
 	MaxMiners::set(6);
 	MaxCohortSize::set(2);
 	BlocksBeforeBidEndForVrfClose::set(10);
+	SlotBiddingStartBlock::set(0);
 
 	new_test_ext(None).execute_with(|| {
 		System::set_block_number(89);

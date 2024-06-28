@@ -307,6 +307,7 @@ parameter_types! {
 	pub const SessionRotationPeriod: u32 = prod_or_fast!(125, 2); // must be cleanly divisible by BlocksBetweenSlots
 	pub const Offset: u32 = 0;
 	pub const OwnershipPercentDamper: u32 = 80;
+	pub const SlotBiddingStartBlock: u32 = prod_or_fast!(14_400, 4);
 
 	pub const BlocksBeforeBidEndForVrfClose: u32 = prod_or_fast!(200, 1);
 
@@ -375,6 +376,7 @@ impl pallet_mining_slot::Config for Runtime {
 	type MaxMiners = MaxMiners;
 	type OwnershipCurrency = UlixeeBalances;
 	type OwnershipPercentDamper = OwnershipPercentDamper;
+	type SlotBiddingStartBlock = SlotBiddingStartBlock;
 	type BlocksBeforeBidEndForVrfClose = BlocksBeforeBidEndForVrfClose;
 	type RuntimeHoldReason = RuntimeHoldReason;
 	type MaxCohortSize = MaxCohortSize;
