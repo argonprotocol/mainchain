@@ -718,6 +718,7 @@ pub mod pallet {
 				amount,
 				expiration: expiration.clone(),
 				total_fee,
+				start_block: frame_system::Pallet::<T>::block_number(),
 				prepaid_fee,
 			};
 			BondsById::<T>::set(bond_id, Some(bond));
@@ -761,7 +762,7 @@ pub mod pallet {
 			}
 			// reload bond
 			let bond = BondsById::<T>::get(bond_id).ok_or(Error::<T>::BondNotFound)?;
-			T::VaultProvider::release_bonded_funds(&bond, true).map_err(Error::<T>::from)?;
+			T::VaultProvider::release_bonded_funds(&bond).map_err(Error::<T>::from)?;
 			Self::deposit_event(Event::BondCompleted { vault_id: bond.vault_id, bond_id });
 			BondsById::<T>::remove(bond_id);
 			Ok(())
@@ -942,7 +943,7 @@ pub mod pallet {
 		fn cancel_bond(bond_id: BondId) -> Result<(), BondError> {
 			let bond = BondsById::<T>::take(bond_id).ok_or(BondError::BondNotFound)?;
 
-			let returned_fee = T::VaultProvider::release_bonded_funds(&bond, false)?;
+			let returned_fee = T::VaultProvider::release_bonded_funds(&bond)?;
 
 			Self::deposit_event(Event::BondCanceled {
 				vault_id: bond.vault_id,

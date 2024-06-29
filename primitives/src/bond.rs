@@ -69,11 +69,9 @@ pub trait VaultProvider {
 	) -> Result<(Self::Balance, Self::Balance), BondError>;
 
 	/// Release the bonded funds for the given bond. This will be called when the bond is completed
-	/// or canceled. The remaining fee will be charged/returned based on the
-	/// `should_charge_remaining_fee` flag.
+	/// or canceled. The remaining fee will be charged/returned based on the pro-rata owed
 	fn release_bonded_funds(
 		bond: &Bond<Self::AccountId, Self::Balance, Self::BlockNumber>,
-		should_charge_remaining_fee: bool,
 	) -> Result<Self::Balance, BondError>;
 
 	fn create_utxo_script_pubkey(
@@ -119,9 +117,13 @@ pub struct Vault<
 > {
 	pub operator_account_id: AccountId,
 	pub bitcoin_argons: VaultArgons<Balance>,
-	pub securitization_percent: FixedU128, // Whole number as a perentage
+	#[codec(compact)]
+	pub securitization_percent: FixedU128,
+	#[codec(compact)]
 	pub securitized_argons: Balance,
 	pub mining_argons: VaultArgons<Balance>,
+	#[codec(compact)]
+	pub mining_mint_sharing_percent: FixedU128,
 	pub is_closed: bool,
 }
 
@@ -164,6 +166,13 @@ impl<AccountId: Codec, Balance: Codec + Copy + MaxEncodedLen + Default + AtLeast
 			BondType::Bitcoin => &mut self.bitcoin_argons,
 		}
 	}
+
+	pub fn argons(&self, bond_type: &BondType) -> &VaultArgons<Balance> {
+		match *bond_type {
+			BondType::Mining => &self.mining_argons,
+			BondType::Bitcoin => &self.bitcoin_argons,
+		}
+	}
 }
 
 #[derive(Clone, PartialEq, Eq, Encode, Decode, RuntimeDebug, TypeInfo, MaxEncodedLen, Default)]
@@ -174,6 +183,8 @@ pub struct VaultArgons<Balance: Codec + Copy + MaxEncodedLen + Default + AtLeast
 	pub allocated: Balance,
 	#[codec(compact)]
 	pub bonded: Balance,
+	#[codec(compact)]
+	pub base_fee: Balance,
 }
 
 impl<Balance> VaultArgons<Balance>
@@ -214,6 +225,7 @@ impl<Balance: Codec + Copy + MaxEncodedLen + Default + AtLeast32BitUnsigned> Vau
 #[derive(Clone, PartialEq, Eq, Encode, Decode, RuntimeDebug, TypeInfo)]
 pub struct Bond<AccountId: Codec, Balance: Codec, BlockNumber: Codec> {
 	pub bond_type: BondType,
+	#[codec(compact)]
 	pub vault_id: VaultId,
 	pub utxo_id: Option<UtxoId>,
 	pub bonded_account_id: AccountId,
@@ -223,15 +235,17 @@ pub struct Bond<AccountId: Codec, Balance: Codec, BlockNumber: Codec> {
 	pub prepaid_fee: Balance,
 	#[codec(compact)]
 	pub amount: Balance,
+	#[codec(compact)]
+	pub start_block: BlockNumber,
 	pub expiration: BondExpiration<BlockNumber>,
 }
 
 #[derive(Clone, PartialEq, Eq, Encode, Decode, RuntimeDebug, TypeInfo)]
 pub enum BondExpiration<BlockNumber: Codec> {
 	/// The bond will expire at the given block number
-	UlixeeBlock(BlockNumber),
+	UlixeeBlock(#[codec(compact)] BlockNumber),
 	/// The bond will expire at a bitcoin block height
-	BitcoinBlock(BitcoinHeight),
+	BitcoinBlock(#[codec(compact)] BitcoinHeight),
 }
 
 #[derive(Clone, PartialEq, Eq, Encode, Decode, RuntimeDebug, TypeInfo)]

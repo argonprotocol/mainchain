@@ -1,4 +1,4 @@
-use codec::{Decode, Encode};
+use codec::{Decode, Encode, MaxEncodedLen};
 use frame_support::pallet_prelude::TypeInfo;
 use sp_core::{ConstU32, H256};
 use sp_debug_derive::RuntimeDebug;
@@ -34,11 +34,23 @@ pub enum BitcoinError {
 	InvalidByteLength,
 }
 
-#[derive(Clone, Copy, PartialEq, Eq, Ord, PartialOrd, Encode, Decode, TypeInfo, RuntimeDebug)]
+#[derive(
+	Clone,
+	Copy,
+	PartialEq,
+	Eq,
+	Ord,
+	PartialOrd,
+	Encode,
+	Decode,
+	TypeInfo,
+	RuntimeDebug,
+	MaxEncodedLen,
+)]
 #[repr(transparent)]
 pub struct BitcoinPubkeyHash(pub [u8; 20]);
 
-#[derive(Clone, Copy, PartialEq, Eq, Encode, Decode, TypeInfo, RuntimeDebug)]
+#[derive(Clone, Copy, PartialEq, Eq, Encode, Decode, TypeInfo, RuntimeDebug, MaxEncodedLen)]
 #[repr(transparent)]
 pub struct CompressedBitcoinPubkey(pub [u8; 33]);
 impl From<[u8; 33]> for CompressedBitcoinPubkey {
@@ -47,7 +59,7 @@ impl From<[u8; 33]> for CompressedBitcoinPubkey {
 	}
 }
 
-#[derive(Clone, PartialEq, Eq, Encode, Decode, TypeInfo, RuntimeDebug)]
+#[derive(Clone, PartialEq, Eq, Encode, Decode, TypeInfo, RuntimeDebug, MaxEncodedLen)]
 #[repr(transparent)]
 pub struct BitcoinSignature(pub BoundedVec<u8, ConstU32<73>>);
 
