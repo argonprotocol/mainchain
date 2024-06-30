@@ -24,8 +24,9 @@ use ulixee_client::{
 	api,
 	api::{
 		price_index::calls::types::submit::Index,
-		runtime_types::sp_arithmetic::fixed_point::{
-			FixedI128 as FixedI128Ext, FixedU128 as FixedU128Ext,
+		runtime_types::{
+			pallet_vaults::pallet::VaultConfig,
+			sp_arithmetic::fixed_point::{FixedI128 as FixedI128Ext, FixedU128 as FixedU128Ext},
 		},
 		storage, tx,
 	},
@@ -178,14 +179,27 @@ async fn test_bitcoin_minting_e2e() -> anyhow::Result<()> {
 			.live
 			.tx()
 			.sign_and_submit_then_watch(
-				&tx().vaults().create(
-					FixedU128Ext(FixedU128::from_float(0.01).into_inner()),
-					FixedU128Ext(FixedU128::from_float(0.01).into_inner()),
-					100_000_000,
-					0,
-					FixedU128Ext(FixedU128::from_float(0.0).into_inner()),
-					pubkey_hashes.into_iter().map(Into::into).collect::<Vec<_>>().into(),
-				),
+				&tx().vaults().create(VaultConfig {
+					mining_mint_sharing_percent: FixedU128Ext(
+						FixedU128::from_float(0.0).into_inner(),
+					),
+					mining_amount_allocated: 0,
+					mining_annual_percent_rate: FixedU128Ext(
+						FixedU128::from_float(0.01).into_inner(),
+					),
+					mining_base_fee: 0,
+					bitcoin_amount_allocated: 100_000_000,
+					bitcoin_annual_percent_rate: FixedU128Ext(
+						FixedU128::from_float(0.01).into_inner(),
+					),
+					bitcoin_base_fee: 0,
+					bitcoin_pubkey_hashes: pubkey_hashes
+						.into_iter()
+						.map(Into::into)
+						.collect::<Vec<_>>()
+						.into(),
+					securitization_percent: FixedU128Ext(FixedU128::from_float(0.0).into_inner()),
+				}),
 				&vault_signer,
 				params.build(),
 			)
@@ -206,7 +220,7 @@ async fn test_bitcoin_minting_e2e() -> anyhow::Result<()> {
 		.sign_and_submit_then_watch_default(
 			&tx().price_index().submit(Index {
 				btc_usd_price: FixedU128Ext(FixedU128::from_rational(6_200_000, 1_00).into_inner()),
-				argon_cpi: FixedI128Ext(FixedI128::from_float(0.1).into_inner()),
+				argon_cpi: FixedI128Ext(FixedI128::from_float(-0.1).into_inner()),
 				argon_usd_price: FixedU128Ext(FixedU128::from_rational(1_00, 1_00).into_inner()),
 				timestamp: SystemTime::now()
 					.duration_since(SystemTime::UNIX_EPOCH)

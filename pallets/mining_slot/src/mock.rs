@@ -5,7 +5,7 @@ use frame_support::{
 };
 use frame_system::pallet_prelude::BlockNumberFor;
 use sp_core::ConstU32;
-use sp_runtime::BuildStorage;
+use sp_runtime::{BuildStorage, FixedU128};
 use ulx_primitives::{
 	bond::{BondError, BondProvider},
 	VaultId,
@@ -37,8 +37,10 @@ parameter_types! {
 	pub static BlocksBetweenSlots: u32 = 1;
 	pub static MaxCohortSize: u32 = 5;
 	pub static MaxMiners: u32 = 10;
-	pub static BlocksBufferToStopAcceptingBids: u32 = 0;
-	pub const OwnershipPercentDamper: u32 = 80;
+	pub static BlocksBeforeBidEndForVrfClose: u32 = 0;
+	pub static SlotBiddingStartBlock: u32 = 3;
+	pub static TargetBidsPerSlot: u32 = 5;
+	pub const OwnershipPercentAdjustmentDamper: FixedU128 = FixedU128::from_rational(20, 100);
 
 	pub static ExistentialDeposit: Balance = 1;
 	pub const MinimumBondAmount:u128 = 1_000;
@@ -134,13 +136,15 @@ impl pallet_mining_slot::Config for Test {
 	type SessionIndicesToKeepInHistory = ConstU32<10>;
 	type BlocksBetweenSlots = BlocksBetweenSlots;
 	type MaxCohortSize = MaxCohortSize;
+	type TargetBidsPerSlot = TargetBidsPerSlot;
 	type MaxMiners = MaxMiners;
 	type OwnershipCurrency = UlixeeBalances;
 	type RuntimeHoldReason = RuntimeHoldReason;
-	type OwnershipPercentDamper = OwnershipPercentDamper;
-	type BlocksBufferToStopAcceptingBids = BlocksBufferToStopAcceptingBids;
+	type OwnershipPercentAdjustmentDamper = OwnershipPercentAdjustmentDamper;
+	type BlocksBeforeBidEndForVrfClose = BlocksBeforeBidEndForVrfClose;
 	type Balance = Balance;
 	type BondProvider = StaticBondProvider;
+	type SlotBiddingStartBlock = SlotBiddingStartBlock;
 }
 
 // Build genesis storage according to the mock runtime.

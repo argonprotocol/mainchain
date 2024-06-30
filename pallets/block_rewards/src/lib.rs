@@ -214,7 +214,11 @@ pub mod pallet {
 			};
 
 			let block_vote_reward = BlockPayout {
-				account_id: authors.block_vote_rewards_account.clone(),
+				// block vote rewards account is the miner if not set
+				account_id: authors
+					.block_vote_rewards_account
+					.unwrap_or(authors.miner_rewards_account.clone())
+					.clone(),
 				ulixees: block_ulixees.saturating_sub(miner_ulixees).into(),
 				argons: block_argons.saturating_sub(miner_argons).into(),
 			};

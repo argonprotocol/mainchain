@@ -9,7 +9,7 @@ import type { ApiTypes, AugmentedSubmittable, SubmittableExtrinsic, SubmittableE
 import type { Bytes, Compact, Option, U8aFixed, Vec, bool, u128, u16, u32, u64 } from '@polkadot/types-codec';
 import type { AnyNumber, IMethod, ITuple } from '@polkadot/types-codec/types';
 import type { AccountId32, Call, H256, MultiAddress } from '@polkadot/types/interfaces/runtime';
-import type { PalletBalancesAdjustmentDirection, PalletMiningSlotMiningSlotBid, PalletMultisigTimepoint, PalletPriceIndexPriceIndex, SpConsensusGrandpaEquivocationProof, SpSessionMembershipProof, SpWeightsWeightV2Weight, UlxNodeRuntimeOpaqueSessionKeys, UlxNodeRuntimeProxyType, UlxPrimitivesBitcoinBitcoinPubkeyHash, UlxPrimitivesBitcoinCompressedBitcoinPubkey, UlxPrimitivesBitcoinH256Le, UlxPrimitivesBlockSealRewardDestination, UlxPrimitivesDataDomainZoneRecord, UlxPrimitivesInherentsBitcoinUtxoSync, UlxPrimitivesInherentsBlockSealInherent, UlxPrimitivesNotaryNotaryMeta, UlxPrimitivesNotebookSignedNotebookHeader } from '@polkadot/types/lookup';
+import type { PalletBalancesAdjustmentDirection, PalletMiningSlotMiningSlotBid, PalletMultisigTimepoint, PalletPriceIndexPriceIndex, PalletVaultsVaultConfig, SpConsensusGrandpaEquivocationProof, SpSessionMembershipProof, SpWeightsWeightV2Weight, UlxNodeRuntimeOpaqueSessionKeys, UlxNodeRuntimeProxyType, UlxPrimitivesBitcoinBitcoinPubkeyHash, UlxPrimitivesBitcoinCompressedBitcoinPubkey, UlxPrimitivesBitcoinH256Le, UlxPrimitivesBlockSealRewardDestination, UlxPrimitivesDataDomainZoneRecord, UlxPrimitivesInherentsBitcoinUtxoSync, UlxPrimitivesInherentsBlockSealInherent, UlxPrimitivesNotaryNotaryMeta, UlxPrimitivesNotebookSignedNotebookHeader } from '@polkadot/types/lookup';
 
 export type __AugmentedSubmittable = AugmentedSubmittable<() => unknown>;
 export type __SubmittableExtrinsic<ApiType extends ApiTypes> = SubmittableExtrinsic<ApiType>;
@@ -201,6 +201,35 @@ declare module '@polkadot/api-base/types/submittable' {
       reportEquivocationUnsigned: AugmentedSubmittable<(equivocationProof: SpConsensusGrandpaEquivocationProof | { setId?: any; equivocation?: any } | string | Uint8Array, keyOwnerProof: SpSessionMembershipProof | { session?: any; trieNodes?: any; validatorCount?: any } | string | Uint8Array) => SubmittableExtrinsic<ApiType>, [SpConsensusGrandpaEquivocationProof, SpSessionMembershipProof]>;
     };
     miningSlot: {
+      /**
+       * Submit a bid for a mining slot in the next cohort. Once all spots are filled in a slot,
+       * a slot can be supplanted by supplying a higher mining bond amount. Bond terms can be
+       * found in the `vaults` pallet. You will supply the bond amount and the vault id to bond
+       * with.
+       *
+       * Each slot has `MaxCohortSize` spots available.
+       *
+       * To be eligible for a slot, you must have the required ownership tokens in this account.
+       * The required amount is calculated as a percentage of the total ownership tokens in the
+       * network. This percentage is adjusted before the beginning of each slot.
+       *
+       * If your bid is replaced, a `SlotBidderReplaced` event will be emitted. By monitoring for
+       * this event, you will be able to ensure your bid is accepted.
+       *
+       * NOTE: bidding for each slot will be closed at a random block within
+       * `BlocksBeforeBidEndForVrfClose` blocks of the slot end time.
+       *
+       * The slot duration can be calculated as `BlocksBetweenSlots * MaxMiners / MaxCohortSize`.
+       *
+       * Parameters:
+       * - `bond_info`: The bond information to submit for the bid. If `None`, the bid will be
+       * considered a zero-bid.
+       * - `vault_id`: The vault id to bond with. Terms are taken from the vault at time of bid
+       * inclusion in the block.
+       * - `amount`: The amount to bond with the vault.
+       * - `reward_destination`: The account_id for the mining rewards, or `Owner` for the
+       * submitting user.
+       **/
       bid: AugmentedSubmittable<(bondInfo: Option<PalletMiningSlotMiningSlotBid> | null | Uint8Array | PalletMiningSlotMiningSlotBid | { vaultId?: any; amount?: any } | string, rewardDestination: UlxPrimitivesBlockSealRewardDestination | { Owner: any } | { Account: any } | string | Uint8Array) => SubmittableExtrinsic<ApiType>, [Option<PalletMiningSlotMiningSlotBid>, UlxPrimitivesBlockSealRewardDestination]>;
     };
     mint: {
@@ -759,11 +788,18 @@ declare module '@polkadot/api-base/types/submittable' {
        * As funds are returned, they will be released to the vault owner.
        **/
       close: AugmentedSubmittable<(vaultId: u32 | AnyNumber | Uint8Array) => SubmittableExtrinsic<ApiType>, [u32]>;
-      create: AugmentedSubmittable<(bitcoinAnnualPercentRate: Compact<u128> | AnyNumber | Uint8Array, miningAnnualPercentRate: Compact<u128> | AnyNumber | Uint8Array, bitcoinAmountAllocated: Compact<u128> | AnyNumber | Uint8Array, miningAmountAllocated: Compact<u128> | AnyNumber | Uint8Array, securitizationPercent: Compact<u128> | AnyNumber | Uint8Array, bitcoinPubkeyHashes: Vec<UlxPrimitivesBitcoinBitcoinPubkeyHash> | (UlxPrimitivesBitcoinBitcoinPubkeyHash | string | Uint8Array)[]) => SubmittableExtrinsic<ApiType>, [Compact<u128>, Compact<u128>, Compact<u128>, Compact<u128>, Compact<u128>, Vec<UlxPrimitivesBitcoinBitcoinPubkeyHash>]>;
+      create: AugmentedSubmittable<(vaultConfig: PalletVaultsVaultConfig | { bitcoinAnnualPercentRate?: any; bitcoinAmountAllocated?: any; bitcoinPubkeyHashes?: any; bitcoinBaseFee?: any; miningAnnualPercentRate?: any; miningAmountAllocated?: any; miningBaseFee?: any; miningMintSharingPercent?: any; securitizationPercent?: any } | string | Uint8Array) => SubmittableExtrinsic<ApiType>, [PalletVaultsVaultConfig]>;
       /**
-       * Add additional funds to the vault
+       * Modify funds offered by the vault. This will not affect existing bonds, but will affect
+       * the amount of funds available for new bonds.
+       *
+       * The securitization percent must be maintained or increased.
+       *
+       * The amount offered may not go below the existing bonded amounts, but you can release
+       * funds in this vault as bonds are released. To stop issuing any more bonds, use the
+       * `close` api.
        **/
-      modify: AugmentedSubmittable<(vaultId: u32 | AnyNumber | Uint8Array, totalMiningAmountOffered: u128 | AnyNumber | Uint8Array, totalBitcoinAmountOffered: u128 | AnyNumber | Uint8Array, securitizationPercent: u128 | AnyNumber | Uint8Array) => SubmittableExtrinsic<ApiType>, [u32, u128, u128, u128]>;
+      modifyFunding: AugmentedSubmittable<(vaultId: u32 | AnyNumber | Uint8Array, totalMiningAmountOffered: u128 | AnyNumber | Uint8Array, totalBitcoinAmountOffered: u128 | AnyNumber | Uint8Array, securitizationPercent: u128 | AnyNumber | Uint8Array) => SubmittableExtrinsic<ApiType>, [u32, u128, u128, u128]>;
     };
   } // AugmentedSubmittables
 } // declare module

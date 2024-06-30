@@ -92,9 +92,9 @@ dependencies = ["build"]
 
 
 [tasks.test]
-description = "Run tests with nextest,"
+description = "Run tests with cargo,"
 command = "cargo"
-args = ["test", "--features", "fast-runtime", "--no-fail-fast"]
+args = ["test", "--features", "fast-runtime", "--no-fail-fast", "${@}"]
 dependencies = ["build"]
 env = { "RUSTC_WRAPPER" = "sccache" }
 

@@ -195,14 +195,15 @@ pub mod pallet {
 			argon_cpi: ArgonCPI,
 			active_miners: u128,
 		) -> T::Balance {
-			if argon_cpi.is_negative() || active_miners == 0 {
+			if !argon_cpi.is_negative() || active_miners == 0 {
 				return T::Balance::zero();
 			}
 			let circulation: u128 =
 				UniqueSaturatedInto::<u128>::unique_saturated_into(T::Currency::total_issuance());
 			let circulation = FixedI128::saturating_from_integer(circulation);
 			let argons_to_print =
-				argon_cpi.saturating_mul(circulation).into_inner() / ArgonCPI::accuracy();
+				argon_cpi.saturating_abs().saturating_mul(circulation).into_inner() /
+					ArgonCPI::accuracy();
 			if argons_to_print <= 0 {
 				return T::Balance::zero();
 			}

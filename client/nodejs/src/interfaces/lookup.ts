@@ -407,16 +407,16 @@ export default {
    **/
   UlxPrimitivesBondBondExpiration: {
     _enum: {
-      UlixeeBlock: 'u32',
-      BitcoinBlock: 'u64'
+      UlixeeBlock: 'Compact<u32>',
+      BitcoinBlock: 'Compact<u64>'
     }
   },
   /**
-   * Lookup52: ulx_primitives::bitcoin::CompressedBitcoinPubkey
+   * Lookup53: ulx_primitives::bitcoin::CompressedBitcoinPubkey
    **/
   UlxPrimitivesBitcoinCompressedBitcoinPubkey: '[u8;33]',
   /**
-   * Lookup56: pallet_notaries::pallet::Event<T>
+   * Lookup57: pallet_notaries::pallet::Event<T>
    **/
   PalletNotariesEvent: {
     _enum: {
@@ -440,7 +440,7 @@ export default {
     }
   },
   /**
-   * Lookup57: ulx_primitives::notary::NotaryMeta<MaxHosts>
+   * Lookup58: ulx_primitives::notary::NotaryMeta<MaxHosts>
    **/
   UlxPrimitivesNotaryNotaryMeta: {
     name: 'Bytes',
@@ -448,7 +448,7 @@ export default {
     hosts: 'Vec<Bytes>'
   },
   /**
-   * Lookup64: ulx_primitives::notary::NotaryRecord<sp_core::crypto::AccountId32, BlockNumber, MaxHosts>
+   * Lookup65: ulx_primitives::notary::NotaryRecord<sp_core::crypto::AccountId32, BlockNumber, MaxHosts>
    **/
   UlxPrimitivesNotaryNotaryRecord: {
     notaryId: 'Compact<u32>',
@@ -1232,14 +1232,9 @@ export default {
   PalletVaultsCall: {
     _enum: {
       create: {
-        bitcoinAnnualPercentRate: 'Compact<u128>',
-        miningAnnualPercentRate: 'Compact<u128>',
-        bitcoinAmountAllocated: 'Compact<u128>',
-        miningAmountAllocated: 'Compact<u128>',
-        securitizationPercent: 'Compact<u128>',
-        bitcoinPubkeyHashes: 'Vec<UlxPrimitivesBitcoinBitcoinPubkeyHash>',
+        vaultConfig: 'PalletVaultsVaultConfig',
       },
-      modify: {
+      modify_funding: {
         vaultId: 'u32',
         totalMiningAmountOffered: 'u128',
         totalBitcoinAmountOffered: 'u128',
@@ -1255,11 +1250,25 @@ export default {
     }
   },
   /**
-   * Lookup161: ulx_primitives::bitcoin::BitcoinPubkeyHash
+   * Lookup159: pallet_vaults::pallet::VaultConfig<Balance, MaxPendingVaultBitcoinPubkeys>
+   **/
+  PalletVaultsVaultConfig: {
+    bitcoinAnnualPercentRate: 'Compact<u128>',
+    bitcoinAmountAllocated: 'Compact<u128>',
+    bitcoinPubkeyHashes: 'Vec<UlxPrimitivesBitcoinBitcoinPubkeyHash>',
+    bitcoinBaseFee: 'Compact<u128>',
+    miningAnnualPercentRate: 'Compact<u128>',
+    miningAmountAllocated: 'Compact<u128>',
+    miningBaseFee: 'Compact<u128>',
+    miningMintSharingPercent: 'Compact<u128>',
+    securitizationPercent: 'Compact<u128>'
+  },
+  /**
+   * Lookup162: ulx_primitives::bitcoin::BitcoinPubkeyHash
    **/
   UlxPrimitivesBitcoinBitcoinPubkeyHash: '[u8;20]',
   /**
-   * Lookup163: pallet_bond::pallet::Call<T>
+   * Lookup164: pallet_bond::pallet::Call<T>
    **/
   PalletBondCall: {
     _enum: {
@@ -1284,7 +1293,7 @@ export default {
     }
   },
   /**
-   * Lookup166: pallet_notaries::pallet::Call<T>
+   * Lookup167: pallet_notaries::pallet::Call<T>
    **/
   PalletNotariesCall: {
     _enum: {
@@ -1302,7 +1311,7 @@ export default {
     }
   },
   /**
-   * Lookup167: pallet_notebook::pallet::Call<T>
+   * Lookup168: pallet_notebook::pallet::Call<T>
    **/
   PalletNotebookCall: {
     _enum: {
@@ -1312,14 +1321,14 @@ export default {
     }
   },
   /**
-   * Lookup169: ulx_primitives::notebook::SignedNotebookHeader
+   * Lookup170: ulx_primitives::notebook::SignedNotebookHeader
    **/
   UlxPrimitivesNotebookSignedNotebookHeader: {
     header: 'UlxPrimitivesNotebookNotebookHeader',
     signature: '[u8;64]'
   },
   /**
-   * Lookup170: ulx_primitives::notebook::NotebookHeader
+   * Lookup171: ulx_primitives::notebook::NotebookHeader
    **/
   UlxPrimitivesNotebookNotebookHeader: {
     version: 'Compact<u16>',
@@ -1339,7 +1348,7 @@ export default {
     dataDomains: 'Vec<(H256,AccountId32)>'
   },
   /**
-   * Lookup173: ulx_primitives::notebook::ChainTransfer
+   * Lookup174: ulx_primitives::notebook::ChainTransfer
    **/
   UlxPrimitivesNotebookChainTransfer: {
     _enum: {
@@ -1353,14 +1362,14 @@ export default {
     }
   },
   /**
-   * Lookup176: ulx_primitives::balance_change::AccountOrigin
+   * Lookup177: ulx_primitives::balance_change::AccountOrigin
    **/
   UlxPrimitivesBalanceChangeAccountOrigin: {
     notebookNumber: 'Compact<u32>',
     accountUid: 'Compact<u32>'
   },
   /**
-   * Lookup184: pallet_chain_transfer::pallet::Call<T>
+   * Lookup185: pallet_chain_transfer::pallet::Call<T>
    **/
   PalletChainTransferCall: {
     _enum: {
@@ -1371,7 +1380,7 @@ export default {
     }
   },
   /**
-   * Lookup185: pallet_block_seal_spec::pallet::Call<T>
+   * Lookup186: pallet_block_seal_spec::pallet::Call<T>
    **/
   PalletBlockSealSpecCall: {
     _enum: {
@@ -1382,7 +1391,7 @@ export default {
     }
   },
   /**
-   * Lookup187: pallet_data_domain::pallet::Call<T>
+   * Lookup188: pallet_data_domain::pallet::Call<T>
    **/
   PalletDataDomainCall: {
     _enum: {
@@ -1393,7 +1402,7 @@ export default {
     }
   },
   /**
-   * Lookup188: pallet_price_index::pallet::Call<T>
+   * Lookup189: pallet_price_index::pallet::Call<T>
    **/
   PalletPriceIndexCall: {
     _enum: {
@@ -1406,7 +1415,7 @@ export default {
     }
   },
   /**
-   * Lookup189: pallet_price_index::PriceIndex<Moment>
+   * Lookup190: pallet_price_index::PriceIndex<Moment>
    **/
   PalletPriceIndexPriceIndex: {
     btcUsdPrice: 'Compact<u128>',
@@ -1415,7 +1424,7 @@ export default {
     timestamp: 'Compact<u64>'
   },
   /**
-   * Lookup191: pallet_session::pallet::Call<T>
+   * Lookup192: pallet_session::pallet::Call<T>
    **/
   PalletSessionCall: {
     _enum: {
@@ -1430,18 +1439,18 @@ export default {
     }
   },
   /**
-   * Lookup192: ulx_node_runtime::opaque::SessionKeys
+   * Lookup193: ulx_node_runtime::opaque::SessionKeys
    **/
   UlxNodeRuntimeOpaqueSessionKeys: {
     grandpa: 'SpConsensusGrandpaAppPublic',
     blockSealAuthority: 'UlxPrimitivesBlockSealAppPublic'
   },
   /**
-   * Lookup193: ulx_primitives::block_seal::app::Public
+   * Lookup194: ulx_primitives::block_seal::app::Public
    **/
   UlxPrimitivesBlockSealAppPublic: '[u8;32]',
   /**
-   * Lookup194: pallet_block_seal::pallet::Call<T>
+   * Lookup195: pallet_block_seal::pallet::Call<T>
    **/
   PalletBlockSealCall: {
     _enum: {
@@ -1451,7 +1460,7 @@ export default {
     }
   },
   /**
-   * Lookup195: ulx_primitives::inherents::BlockSealInherent
+   * Lookup196: ulx_primitives::inherents::BlockSealInherent
    **/
   UlxPrimitivesInherentsBlockSealInherent: {
     _enum: {
@@ -1467,7 +1476,7 @@ export default {
     }
   },
   /**
-   * Lookup198: ulx_primitives::balance_change::MerkleProof
+   * Lookup199: ulx_primitives::balance_change::MerkleProof
    **/
   UlxPrimitivesBalanceChangeMerkleProof: {
     proof: 'Vec<H256>',
@@ -1475,7 +1484,7 @@ export default {
     leafIndex: 'Compact<u32>'
   },
   /**
-   * Lookup200: ulx_primitives::block_vote::BlockVoteT<primitive_types::H256>
+   * Lookup201: ulx_primitives::block_vote::BlockVoteT<primitive_types::H256>
    **/
   UlxPrimitivesBlockVoteBlockVoteT: {
     accountId: 'AccountId32',
@@ -1488,7 +1497,7 @@ export default {
     blockRewardsAccountId: 'AccountId32'
   },
   /**
-   * Lookup201: sp_runtime::MultiSignature
+   * Lookup202: sp_runtime::MultiSignature
    **/
   SpRuntimeMultiSignature: {
     _enum: {
@@ -1498,15 +1507,15 @@ export default {
     }
   },
   /**
-   * Lookup203: ulx_primitives::block_seal::app::Signature
+   * Lookup204: ulx_primitives::block_seal::app::Signature
    **/
   UlxPrimitivesBlockSealAppSignature: '[u8;64]',
   /**
-   * Lookup204: pallet_block_rewards::pallet::Call<T>
+   * Lookup205: pallet_block_rewards::pallet::Call<T>
    **/
   PalletBlockRewardsCall: 'Null',
   /**
-   * Lookup205: pallet_grandpa::pallet::Call<T>
+   * Lookup206: pallet_grandpa::pallet::Call<T>
    **/
   PalletGrandpaCall: {
     _enum: {
@@ -1525,14 +1534,14 @@ export default {
     }
   },
   /**
-   * Lookup206: sp_consensus_grandpa::EquivocationProof<primitive_types::H256, N>
+   * Lookup207: sp_consensus_grandpa::EquivocationProof<primitive_types::H256, N>
    **/
   SpConsensusGrandpaEquivocationProof: {
     setId: 'u64',
     equivocation: 'SpConsensusGrandpaEquivocation'
   },
   /**
-   * Lookup207: sp_consensus_grandpa::Equivocation<primitive_types::H256, N>
+   * Lookup208: sp_consensus_grandpa::Equivocation<primitive_types::H256, N>
    **/
   SpConsensusGrandpaEquivocation: {
     _enum: {
@@ -1541,7 +1550,7 @@ export default {
     }
   },
   /**
-   * Lookup208: finality_grandpa::Equivocation<sp_consensus_grandpa::app::Public, finality_grandpa::Prevote<primitive_types::H256, N>, sp_consensus_grandpa::app::Signature>
+   * Lookup209: finality_grandpa::Equivocation<sp_consensus_grandpa::app::Public, finality_grandpa::Prevote<primitive_types::H256, N>, sp_consensus_grandpa::app::Signature>
    **/
   FinalityGrandpaEquivocationPrevote: {
     roundNumber: 'u64',
@@ -1550,18 +1559,18 @@ export default {
     second: '(FinalityGrandpaPrevote,SpConsensusGrandpaAppSignature)'
   },
   /**
-   * Lookup209: finality_grandpa::Prevote<primitive_types::H256, N>
+   * Lookup210: finality_grandpa::Prevote<primitive_types::H256, N>
    **/
   FinalityGrandpaPrevote: {
     targetHash: 'H256',
     targetNumber: 'u32'
   },
   /**
-   * Lookup210: sp_consensus_grandpa::app::Signature
+   * Lookup211: sp_consensus_grandpa::app::Signature
    **/
   SpConsensusGrandpaAppSignature: '[u8;64]',
   /**
-   * Lookup212: finality_grandpa::Equivocation<sp_consensus_grandpa::app::Public, finality_grandpa::Precommit<primitive_types::H256, N>, sp_consensus_grandpa::app::Signature>
+   * Lookup213: finality_grandpa::Equivocation<sp_consensus_grandpa::app::Public, finality_grandpa::Precommit<primitive_types::H256, N>, sp_consensus_grandpa::app::Signature>
    **/
   FinalityGrandpaEquivocationPrecommit: {
     roundNumber: 'u64',
@@ -1570,14 +1579,14 @@ export default {
     second: '(FinalityGrandpaPrecommit,SpConsensusGrandpaAppSignature)'
   },
   /**
-   * Lookup213: finality_grandpa::Precommit<primitive_types::H256, N>
+   * Lookup214: finality_grandpa::Precommit<primitive_types::H256, N>
    **/
   FinalityGrandpaPrecommit: {
     targetHash: 'H256',
     targetNumber: 'u32'
   },
   /**
-   * Lookup215: sp_session::MembershipProof
+   * Lookup216: sp_session::MembershipProof
    **/
   SpSessionMembershipProof: {
     session: 'u32',
@@ -1585,11 +1594,11 @@ export default {
     validatorCount: 'u32'
   },
   /**
-   * Lookup216: pallet_mint::pallet::Call<T>
+   * Lookup217: pallet_mint::pallet::Call<T>
    **/
   PalletMintCall: 'Null',
   /**
-   * Lookup217: pallet_balances::pallet::Call<T, I>
+   * Lookup218: pallet_balances::pallet::Call<T, I>
    **/
   PalletBalancesCall: {
     _enum: {
@@ -1634,13 +1643,13 @@ export default {
     }
   },
   /**
-   * Lookup218: pallet_balances::types::AdjustmentDirection
+   * Lookup219: pallet_balances::types::AdjustmentDirection
    **/
   PalletBalancesAdjustmentDirection: {
     _enum: ['Increase', 'Decrease']
   },
   /**
-   * Lookup220: pallet_tx_pause::pallet::Call<T>
+   * Lookup221: pallet_tx_pause::pallet::Call<T>
    **/
   PalletTxPauseCall: {
     _enum: {
@@ -1653,7 +1662,7 @@ export default {
     }
   },
   /**
-   * Lookup221: pallet_sudo::pallet::Call<T>
+   * Lookup222: pallet_sudo::pallet::Call<T>
    **/
   PalletSudoCall: {
     _enum: {
@@ -1678,13 +1687,13 @@ export default {
     }
   },
   /**
-   * Lookup223: pallet_multisig::pallet::Error<T>
+   * Lookup224: pallet_multisig::pallet::Error<T>
    **/
   PalletMultisigError: {
     _enum: ['MinimumThreshold', 'AlreadyApproved', 'NoApprovalsNeeded', 'TooFewSignatories', 'TooManySignatories', 'SignatoriesOutOfOrder', 'SenderInSignatories', 'NotFound', 'NotOwner', 'NoTimepoint', 'WrongTimepoint', 'UnexpectedTimepoint', 'MaxWeightTooLow', 'AlreadyStored']
   },
   /**
-   * Lookup226: pallet_proxy::ProxyDefinition<sp_core::crypto::AccountId32, ulx_node_runtime::ProxyType, BlockNumber>
+   * Lookup227: pallet_proxy::ProxyDefinition<sp_core::crypto::AccountId32, ulx_node_runtime::ProxyType, BlockNumber>
    **/
   PalletProxyProxyDefinition: {
     delegate: 'AccountId32',
@@ -1692,7 +1701,7 @@ export default {
     delay: 'u32'
   },
   /**
-   * Lookup230: pallet_proxy::Announcement<sp_core::crypto::AccountId32, primitive_types::H256, BlockNumber>
+   * Lookup231: pallet_proxy::Announcement<sp_core::crypto::AccountId32, primitive_types::H256, BlockNumber>
    **/
   PalletProxyAnnouncement: {
     real: 'AccountId32',
@@ -1700,17 +1709,17 @@ export default {
     height: 'u32'
   },
   /**
-   * Lookup232: pallet_proxy::pallet::Error<T>
+   * Lookup233: pallet_proxy::pallet::Error<T>
    **/
   PalletProxyError: {
     _enum: ['TooMany', 'NotFound', 'NotProxy', 'Unproxyable', 'Duplicate', 'NoPermission', 'Unannounced', 'NoSelfProxy']
   },
   /**
-   * Lookup234: pallet_ticks::pallet::Error<T>
+   * Lookup235: pallet_ticks::pallet::Error<T>
    **/
   PalletTicksError: 'Null',
   /**
-   * Lookup240: pallet_mining_slot::pallet::Error<T>
+   * Lookup243: pallet_mining_slot::pallet::Error<T>
    **/
   PalletMiningSlotError: {
     _enum: {
@@ -1738,13 +1747,13 @@ export default {
     }
   },
   /**
-   * Lookup241: ulx_primitives::bond::BondError
+   * Lookup244: ulx_primitives::bond::BondError
    **/
   UlxPrimitivesBondBondError: {
     _enum: ['BondNotFound', 'NoMoreBondIds', 'MinimumBondAmountNotMet', 'VaultClosed', 'ExpirationAtBlockOverflow', 'AccountWouldBeBelowMinimum', 'InsufficientFunds', 'InsufficientVaultFunds', 'InsufficientBitcoinsForMining', 'ExpirationTooSoon', 'NoPermissions', 'HoldUnexpectedlyModified', 'UnrecoverableHold', 'VaultNotFound', 'NoVaultBitcoinPubkeysAvailable', 'FeeExceedsBondAmount', 'InvalidBitcoinScript']
   },
   /**
-   * Lookup242: ulx_primitives::bitcoin::UtxoValue
+   * Lookup245: ulx_primitives::bitcoin::UtxoValue
    **/
   UlxPrimitivesBitcoinUtxoValue: {
     utxoId: 'u64',
@@ -1754,7 +1763,7 @@ export default {
     watchForSpentUntilHeight: 'Compact<u64>'
   },
   /**
-   * Lookup243: ulx_primitives::bitcoin::BitcoinCosignScriptPubkey
+   * Lookup246: ulx_primitives::bitcoin::BitcoinCosignScriptPubkey
    **/
   UlxPrimitivesBitcoinBitcoinCosignScriptPubkey: {
     _enum: {
@@ -1764,51 +1773,54 @@ export default {
     }
   },
   /**
-   * Lookup250: pallet_bitcoin_utxos::pallet::Error<T>
+   * Lookup253: pallet_bitcoin_utxos::pallet::Error<T>
    **/
   PalletBitcoinUtxosError: {
     _enum: ['NoPermissions', 'NoBitcoinConfirmedBlock', 'InsufficientBitcoinAmount', 'NoBitcoinPricesAvailable', 'ScriptPubkeyConflict', 'UtxoNotLocked', 'RedemptionsUnavailable', 'InvalidBitcoinSyncHeight', 'BitcoinHeightNotConfirmed', 'MaxUtxosExceeded', 'InvalidBitcoinScript']
   },
   /**
-   * Lookup251: ulx_primitives::bond::Vault<sp_core::crypto::AccountId32, Balance>
+   * Lookup254: ulx_primitives::bond::Vault<sp_core::crypto::AccountId32, Balance>
    **/
   UlxPrimitivesBondVault: {
     operatorAccountId: 'AccountId32',
     bitcoinArgons: 'UlxPrimitivesBondVaultArgons',
-    securitizationPercent: 'u128',
-    securitizedArgons: 'u128',
+    securitizationPercent: 'Compact<u128>',
+    securitizedArgons: 'Compact<u128>',
     miningArgons: 'UlxPrimitivesBondVaultArgons',
+    miningMintSharingPercent: 'Compact<u128>',
     isClosed: 'bool'
   },
   /**
-   * Lookup252: ulx_primitives::bond::VaultArgons<Balance>
+   * Lookup255: ulx_primitives::bond::VaultArgons<Balance>
    **/
   UlxPrimitivesBondVaultArgons: {
     annualPercentRate: 'Compact<u128>',
     allocated: 'Compact<u128>',
-    bonded: 'Compact<u128>'
+    bonded: 'Compact<u128>',
+    baseFee: 'Compact<u128>'
   },
   /**
-   * Lookup253: pallet_vaults::pallet::Error<T>
+   * Lookup256: pallet_vaults::pallet::Error<T>
    **/
   PalletVaultsError: {
     _enum: ['BondNotFound', 'NoMoreVaultIds', 'NoMoreBondIds', 'MinimumBondAmountNotMet', 'ExpirationAtBlockOverflow', 'InsufficientFunds', 'InsufficientVaultFunds', 'InsufficientBitcoinsForMining', 'AccountBelowMinimumBalance', 'VaultClosed', 'InvalidVaultAmount', 'VaultReductionBelowAllocatedFunds', 'InvalidSecuritization', 'MaxPendingVaultBitcoinPubkeys', 'MaxSecuritizationPercentExceeded', 'InvalidBondType', 'BitcoinUtxoNotFound', 'InsufficientSatoshisBonded', 'NoBitcoinPricesAvailable', 'InvalidBitcoinScript', 'ExpirationTooSoon', 'NoPermissions', 'HoldUnexpectedlyModified', 'UnrecoverableHold', 'VaultNotFound', 'FeeExceedsBondAmount', 'NoVaultBitcoinPubkeysAvailable']
   },
   /**
-   * Lookup254: ulx_primitives::bond::Bond<sp_core::crypto::AccountId32, Balance, BlockNumber>
+   * Lookup257: ulx_primitives::bond::Bond<sp_core::crypto::AccountId32, Balance, BlockNumber>
    **/
   UlxPrimitivesBond: {
     bondType: 'UlxPrimitivesBondBondType',
-    vaultId: 'u32',
+    vaultId: 'Compact<u32>',
     utxoId: 'Option<u64>',
     bondedAccountId: 'AccountId32',
     totalFee: 'Compact<u128>',
     prepaidFee: 'Compact<u128>',
     amount: 'Compact<u128>',
+    startBlock: 'Compact<u32>',
     expiration: 'UlxPrimitivesBondBondExpiration'
   },
   /**
-   * Lookup257: pallet_bond::pallet::UtxoState
+   * Lookup260: pallet_bond::pallet::UtxoState
    **/
   PalletBondUtxoState: {
     bondId: 'u64',
@@ -1822,7 +1834,7 @@ export default {
     isVerified: 'bool'
   },
   /**
-   * Lookup260: pallet_bond::pallet::UtxoCosignRequest<Balance>
+   * Lookup263: pallet_bond::pallet::UtxoCosignRequest<Balance>
    **/
   PalletBondUtxoCosignRequest: {
     bitcoinNetworkFee: 'u64',
@@ -1831,7 +1843,7 @@ export default {
     redemptionPrice: 'u128'
   },
   /**
-   * Lookup264: pallet_bond::pallet::Error<T>
+   * Lookup267: pallet_bond::pallet::Error<T>
    **/
   PalletBondError: {
     _enum: {
@@ -1863,13 +1875,13 @@ export default {
     }
   },
   /**
-   * Lookup276: pallet_notaries::pallet::Error<T>
+   * Lookup279: pallet_notaries::pallet::Error<T>
    **/
   PalletNotariesError: {
     _enum: ['ProposalNotFound', 'MaxNotariesExceeded', 'MaxProposalsPerBlockExceeded', 'NotAnActiveNotary', 'InvalidNotaryOperator', 'NoMoreNotaryIds', 'EffectiveTickTooSoon']
   },
   /**
-   * Lookup280: ulx_primitives::notary::NotaryNotebookKeyDetails
+   * Lookup283: ulx_primitives::notary::NotaryNotebookKeyDetails
    **/
   UlxPrimitivesNotaryNotaryNotebookKeyDetails: {
     notebookNumber: 'Compact<u32>',
@@ -1879,13 +1891,13 @@ export default {
     parentSecret: 'Option<H256>'
   },
   /**
-   * Lookup282: ulx_primitives::digests::NotebookDigest<ulx_notary_audit::error::VerifyError>
+   * Lookup285: ulx_primitives::digests::NotebookDigest<ulx_notary_audit::error::VerifyError>
    **/
   UlxPrimitivesDigestsNotebookDigest: {
     notebooks: 'Vec<UlxPrimitivesDigestsNotebookDigestRecord>'
   },
   /**
-   * Lookup284: ulx_primitives::digests::NotebookDigestRecord<ulx_notary_audit::error::VerifyError>
+   * Lookup287: ulx_primitives::digests::NotebookDigestRecord<ulx_notary_audit::error::VerifyError>
    **/
   UlxPrimitivesDigestsNotebookDigestRecord: {
     notaryId: 'Compact<u32>',
@@ -1894,13 +1906,13 @@ export default {
     auditFirstFailure: 'Option<UlxNotaryAuditErrorVerifyError>'
   },
   /**
-   * Lookup287: pallet_notebook::pallet::Error<T>
+   * Lookup290: pallet_notebook::pallet::Error<T>
    **/
   PalletNotebookError: {
     _enum: ['DuplicateNotebookNumber', 'MissingNotebookNumber', 'NotebookTickAlreadyUsed', 'InvalidNotebookSignature', 'InvalidSecretProvided', 'CouldNotDecodeNotebook', 'DuplicateNotebookDigest', 'MissingNotebookDigest', 'InvalidNotebookDigest', 'MultipleNotebookInherentsProvided', 'InternalError']
   },
   /**
-   * Lookup288: pallet_chain_transfer::QueuedTransferOut<sp_core::crypto::AccountId32, Balance, BlockNumber>
+   * Lookup291: pallet_chain_transfer::QueuedTransferOut<sp_core::crypto::AccountId32, Balance, BlockNumber>
    **/
   PalletChainTransferQueuedTransferOut: {
     accountId: 'AccountId32',
@@ -1909,17 +1921,17 @@ export default {
     notaryId: 'u32'
   },
   /**
-   * Lookup294: frame_support::PalletId
+   * Lookup296: frame_support::PalletId
    **/
   FrameSupportPalletId: '[u8;8]',
   /**
-   * Lookup295: pallet_chain_transfer::pallet::Error<T>
+   * Lookup297: pallet_chain_transfer::pallet::Error<T>
    **/
   PalletChainTransferError: {
     _enum: ['MaxBlockTransfersExceeded', 'InsufficientFunds', 'InsufficientNotarizedFunds', 'InvalidOrDuplicatedLocalchainTransfer', 'NotebookIncludesExpiredLocalchainTransfer', 'InvalidNotaryUsedForTransfer']
   },
   /**
-   * Lookup300: ulx_primitives::notary::NotaryNotebookVoteDigestDetails
+   * Lookup302: ulx_primitives::notary::NotaryNotebookVoteDigestDetails
    **/
   UlxPrimitivesNotaryNotaryNotebookVoteDigestDetails: {
     notaryId: 'Compact<u32>',
@@ -1929,65 +1941,65 @@ export default {
     blockVotingPower: 'Compact<u128>'
   },
   /**
-   * Lookup302: ulx_primitives::digests::BlockVoteDigest
+   * Lookup304: ulx_primitives::digests::BlockVoteDigest
    **/
   UlxPrimitivesDigestsBlockVoteDigest: {
     votingPower: 'Compact<u128>',
     votesCount: 'Compact<u32>'
   },
   /**
-   * Lookup306: pallet_block_seal_spec::pallet::Error<T>
+   * Lookup308: pallet_block_seal_spec::pallet::Error<T>
    **/
   PalletBlockSealSpecError: {
     _enum: ['MaxNotebooksAtTickExceeded']
   },
   /**
-   * Lookup309: pallet_data_domain::pallet::Error<T>
+   * Lookup311: pallet_data_domain::pallet::Error<T>
    **/
   PalletDataDomainError: {
     _enum: ['DomainNotRegistered', 'NotDomainOwner']
   },
   /**
-   * Lookup310: pallet_price_index::pallet::Error<T>
+   * Lookup312: pallet_price_index::pallet::Error<T>
    **/
   PalletPriceIndexError: {
     _enum: ['NotAuthorizedOperator', 'MissingValue', 'PricesTooOld']
   },
   /**
-   * Lookup315: sp_core::crypto::KeyTypeId
+   * Lookup317: sp_core::crypto::KeyTypeId
    **/
   SpCoreCryptoKeyTypeId: '[u8;4]',
   /**
-   * Lookup316: pallet_session::pallet::Error<T>
+   * Lookup318: pallet_session::pallet::Error<T>
    **/
   PalletSessionError: {
     _enum: ['InvalidProof', 'NoAssociatedValidatorId', 'DuplicatedKey', 'NoKeys', 'NoAccount']
   },
   /**
-   * Lookup317: ulx_primitives::providers::BlockSealerInfo<sp_core::crypto::AccountId32>
+   * Lookup319: ulx_primitives::providers::BlockSealerInfo<sp_core::crypto::AccountId32>
    **/
   UlxPrimitivesProvidersBlockSealerInfo: {
     minerRewardsAccount: 'AccountId32',
-    blockVoteRewardsAccount: 'AccountId32'
+    blockVoteRewardsAccount: 'Option<AccountId32>'
   },
   /**
-   * Lookup318: ulx_primitives::digests::ParentVotingKeyDigest
+   * Lookup320: ulx_primitives::digests::ParentVotingKeyDigest
    **/
   UlxPrimitivesDigestsParentVotingKeyDigest: {
     parentVotingKey: 'Option<H256>'
   },
   /**
-   * Lookup319: pallet_block_seal::pallet::Error<T>
+   * Lookup321: pallet_block_seal::pallet::Error<T>
    **/
   PalletBlockSealError: {
     _enum: ['InvalidVoteSealStrength', 'InvalidSubmitter', 'UnableToDecodeVoteAccount', 'UnregisteredBlockAuthor', 'InvalidBlockVoteProof', 'NoGrandparentVoteMinimum', 'DuplicateBlockSealProvided', 'InsufficientVotingPower', 'ParentVotingKeyNotFound', 'InvalidVoteGrandparentHash', 'IneligibleNotebookUsed', 'NoEligibleVotingRoot', 'UnregisteredDataDomain', 'InvalidDataDomainAccount', 'InvalidAuthoritySignature', 'CouldNotDecodeVote', 'MaxNotebooksAtTickExceeded', 'NoClosestMinerFoundForVote', 'BlockVoteInvalidSignature']
   },
   /**
-   * Lookup321: pallet_block_rewards::pallet::Error<T>
+   * Lookup323: pallet_block_rewards::pallet::Error<T>
    **/
   PalletBlockRewardsError: 'Null',
   /**
-   * Lookup322: pallet_grandpa::StoredState<N>
+   * Lookup324: pallet_grandpa::StoredState<N>
    **/
   PalletGrandpaStoredState: {
     _enum: {
@@ -2004,7 +2016,7 @@ export default {
     }
   },
   /**
-   * Lookup323: pallet_grandpa::StoredPendingChange<N, Limit>
+   * Lookup325: pallet_grandpa::StoredPendingChange<N, Limit>
    **/
   PalletGrandpaStoredPendingChange: {
     scheduledAt: 'u32',
@@ -2013,32 +2025,32 @@ export default {
     forced: 'Option<u32>'
   },
   /**
-   * Lookup326: pallet_grandpa::pallet::Error<T>
+   * Lookup328: pallet_grandpa::pallet::Error<T>
    **/
   PalletGrandpaError: {
     _enum: ['PauseFailed', 'ResumeFailed', 'ChangePending', 'TooSoon', 'InvalidKeyOwnershipProof', 'InvalidEquivocationProof', 'DuplicateOffenceReport']
   },
   /**
-   * Lookup327: sp_staking::offence::OffenceDetails<sp_core::crypto::AccountId32, Offender>
+   * Lookup329: sp_staking::offence::OffenceDetails<sp_core::crypto::AccountId32, Offender>
    **/
   SpStakingOffenceOffenceDetails: {
     offender: '(AccountId32,PalletMiningSlotMinerHistory)',
     reporters: 'Vec<AccountId32>'
   },
   /**
-   * Lookup329: pallet_mining_slot::MinerHistory
+   * Lookup331: pallet_mining_slot::MinerHistory
    **/
   PalletMiningSlotMinerHistory: {
     authorityIndex: 'u32'
   },
   /**
-   * Lookup334: pallet_mint::pallet::Error<T>
+   * Lookup336: pallet_mint::pallet::Error<T>
    **/
   PalletMintError: {
     _enum: ['TooManyPendingMints']
   },
   /**
-   * Lookup336: pallet_balances::types::BalanceLock<Balance>
+   * Lookup338: pallet_balances::types::BalanceLock<Balance>
    **/
   PalletBalancesBalanceLock: {
     id: '[u8;8]',
@@ -2046,27 +2058,27 @@ export default {
     reasons: 'PalletBalancesReasons'
   },
   /**
-   * Lookup337: pallet_balances::types::Reasons
+   * Lookup339: pallet_balances::types::Reasons
    **/
   PalletBalancesReasons: {
     _enum: ['Fee', 'Misc', 'All']
   },
   /**
-   * Lookup340: pallet_balances::types::ReserveData<ReserveIdentifier, Balance>
+   * Lookup342: pallet_balances::types::ReserveData<ReserveIdentifier, Balance>
    **/
   PalletBalancesReserveData: {
     id: '[u8;8]',
     amount: 'u128'
   },
   /**
-   * Lookup343: pallet_balances::types::IdAmount<ulx_node_runtime::RuntimeHoldReason, Balance>
+   * Lookup345: pallet_balances::types::IdAmount<ulx_node_runtime::RuntimeHoldReason, Balance>
    **/
   PalletBalancesIdAmountRuntimeHoldReason: {
     id: 'UlxNodeRuntimeRuntimeHoldReason',
     amount: 'u128'
   },
   /**
-   * Lookup344: ulx_node_runtime::RuntimeHoldReason
+   * Lookup346: ulx_node_runtime::RuntimeHoldReason
    **/
   UlxNodeRuntimeRuntimeHoldReason: {
     _enum: {
@@ -2093,38 +2105,38 @@ export default {
     }
   },
   /**
-   * Lookup345: pallet_mining_slot::pallet::HoldReason
+   * Lookup347: pallet_mining_slot::pallet::HoldReason
    **/
   PalletMiningSlotHoldReason: {
     _enum: ['RegisterAsMiner']
   },
   /**
-   * Lookup346: pallet_vaults::pallet::HoldReason
+   * Lookup348: pallet_vaults::pallet::HoldReason
    **/
   PalletVaultsHoldReason: {
     _enum: ['EnterVault', 'BondFee']
   },
   /**
-   * Lookup347: pallet_bond::pallet::HoldReason
+   * Lookup349: pallet_bond::pallet::HoldReason
    **/
   PalletBondHoldReason: {
     _enum: ['UnlockingBitcoin']
   },
   /**
-   * Lookup348: pallet_block_rewards::pallet::HoldReason
+   * Lookup350: pallet_block_rewards::pallet::HoldReason
    **/
   PalletBlockRewardsHoldReason: {
     _enum: ['MaturationPeriod']
   },
   /**
-   * Lookup351: pallet_balances::types::IdAmount<ulx_node_runtime::RuntimeFreezeReason, Balance>
+   * Lookup353: pallet_balances::types::IdAmount<ulx_node_runtime::RuntimeFreezeReason, Balance>
    **/
   PalletBalancesIdAmountRuntimeFreezeReason: {
     id: 'UlxNodeRuntimeRuntimeFreezeReason',
     amount: 'u128'
   },
   /**
-   * Lookup352: ulx_node_runtime::RuntimeFreezeReason
+   * Lookup354: ulx_node_runtime::RuntimeFreezeReason
    **/
   UlxNodeRuntimeRuntimeFreezeReason: {
     _enum: {
@@ -2151,65 +2163,65 @@ export default {
     }
   },
   /**
-   * Lookup353: pallet_block_rewards::pallet::FreezeReason
+   * Lookup355: pallet_block_rewards::pallet::FreezeReason
    **/
   PalletBlockRewardsFreezeReason: {
     _enum: ['MaturationPeriod']
   },
   /**
-   * Lookup355: pallet_balances::pallet::Error<T, I>
+   * Lookup357: pallet_balances::pallet::Error<T, I>
    **/
   PalletBalancesError: {
     _enum: ['VestingBalance', 'LiquidityRestrictions', 'InsufficientBalance', 'ExistentialDeposit', 'Expendability', 'ExistingVestingSchedule', 'DeadAccount', 'TooManyReserves', 'TooManyHolds', 'TooManyFreezes', 'IssuanceDeactivated', 'DeltaZero']
   },
   /**
-   * Lookup357: pallet_tx_pause::pallet::Error<T>
+   * Lookup359: pallet_tx_pause::pallet::Error<T>
    **/
   PalletTxPauseError: {
     _enum: ['IsPaused', 'IsUnpaused', 'Unpausable', 'NotFound']
   },
   /**
-   * Lookup358: pallet_transaction_payment::Releases
+   * Lookup360: pallet_transaction_payment::Releases
    **/
   PalletTransactionPaymentReleases: {
     _enum: ['V1Ancient', 'V2']
   },
   /**
-   * Lookup359: pallet_sudo::pallet::Error<T>
+   * Lookup361: pallet_sudo::pallet::Error<T>
    **/
   PalletSudoError: {
     _enum: ['RequireSudo']
   },
   /**
-   * Lookup362: frame_system::extensions::check_non_zero_sender::CheckNonZeroSender<T>
+   * Lookup364: frame_system::extensions::check_non_zero_sender::CheckNonZeroSender<T>
    **/
   FrameSystemExtensionsCheckNonZeroSender: 'Null',
   /**
-   * Lookup363: frame_system::extensions::check_spec_version::CheckSpecVersion<T>
+   * Lookup365: frame_system::extensions::check_spec_version::CheckSpecVersion<T>
    **/
   FrameSystemExtensionsCheckSpecVersion: 'Null',
   /**
-   * Lookup364: frame_system::extensions::check_tx_version::CheckTxVersion<T>
+   * Lookup366: frame_system::extensions::check_tx_version::CheckTxVersion<T>
    **/
   FrameSystemExtensionsCheckTxVersion: 'Null',
   /**
-   * Lookup365: frame_system::extensions::check_genesis::CheckGenesis<T>
+   * Lookup367: frame_system::extensions::check_genesis::CheckGenesis<T>
    **/
   FrameSystemExtensionsCheckGenesis: 'Null',
   /**
-   * Lookup368: frame_system::extensions::check_nonce::CheckNonce<T>
+   * Lookup370: frame_system::extensions::check_nonce::CheckNonce<T>
    **/
   FrameSystemExtensionsCheckNonce: 'Compact<u32>',
   /**
-   * Lookup369: frame_system::extensions::check_weight::CheckWeight<T>
+   * Lookup371: frame_system::extensions::check_weight::CheckWeight<T>
    **/
   FrameSystemExtensionsCheckWeight: 'Null',
   /**
-   * Lookup370: pallet_transaction_payment::ChargeTransactionPayment<T>
+   * Lookup372: pallet_transaction_payment::ChargeTransactionPayment<T>
    **/
   PalletTransactionPaymentChargeTransactionPayment: 'Compact<u128>',
   /**
-   * Lookup371: ulx_node_runtime::Runtime
+   * Lookup373: ulx_node_runtime::Runtime
    **/
   UlxNodeRuntimeRuntime: 'Null'
 };

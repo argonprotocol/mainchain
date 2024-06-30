@@ -77,14 +77,17 @@ parameter_types! {
 			allocated: 100_000_000,
 			bonded: 0,
 			annual_percent_rate: FixedU128::from_float(10.0),
+			base_fee: 0,
 		},
 		bitcoin_argons: VaultArgons {
 			allocated: 200_000_000,
 			bonded: 0,
 			annual_percent_rate: FixedU128::from_float(10.0),
+			base_fee: 0,
 		},
 		operator_account_id: 1,
 		securitization_percent: FixedU128::from_float(0.0),
+		mining_mint_sharing_percent: FixedU128::from_float(0.0),
 		securitized_argons: 0,
 		is_closed: false,
 	};
@@ -173,7 +176,6 @@ impl VaultProvider for StaticVaultProvider {
 
 	fn release_bonded_funds(
 		bond: &Bond<Self::AccountId, Self::Balance, Self::BlockNumber>,
-		_should_charge_remaining_fee: bool,
 	) -> Result<Self::Balance, BondError> {
 		DefaultVault::mutate(|a| a.mut_argons(&bond.bond_type).reduce_bonded(bond.amount));
 		Ok(bond.total_fee.saturating_sub(bond.prepaid_fee))

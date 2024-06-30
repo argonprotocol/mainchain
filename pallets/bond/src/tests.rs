@@ -190,6 +190,7 @@ fn burns_a_spent_bitcoin() {
 				vault_id: 1,
 				expiration: BondExpiration::BitcoinBlock(expiration_block),
 				bonded_account_id: who,
+				start_block: 1,
 			})
 		);
 		assert_eq!(WatchedUtxosById::get().len(), 0);
@@ -576,6 +577,7 @@ fn it_can_create_a_mining_bond() {
 				vault_id: 1,
 				expiration: BondExpiration::UlixeeBlock(10),
 				bonded_account_id: who,
+				start_block: 1,
 			}
 		);
 		assert_eq!(DefaultVault::get().mining_argons.bonded, amount);

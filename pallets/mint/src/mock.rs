@@ -54,7 +54,7 @@ parameter_types! {
 	pub static MaxPendingMintUtxos: u32 = 10;
 	pub static BitcoinPricePerUsd: Option<FixedU128> = Some(FixedU128::from_float(62000.00));
 	pub static ArgonPricePerUsd: Option<FixedU128> = Some(FixedU128::from_float(1.00));
-	pub static ArgonCPI: Option<ulx_primitives::ArgonCPI> = Some(FixedI128::from_float(1.00));
+	pub static ArgonCPI: Option<ulx_primitives::ArgonCPI> = Some(FixedI128::from_float(-1.00));
 	pub static Miners: Vec<u64> = vec![];
 }
 

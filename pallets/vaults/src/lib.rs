@@ -24,6 +24,7 @@ pub mod weights;
 /// on unlock.
 #[frame_support::pallet(dev_mode)]
 pub mod pallet {
+	use codec::Codec;
 	use frame_support::{
 		pallet_prelude::*,
 		traits::{
@@ -40,7 +41,7 @@ pub mod pallet {
 		DispatchError::Token,
 		FixedPointNumber, FixedU128, Saturating, TokenError,
 	};
-	use sp_std::vec;
+	use sp_std::{fmt::Debug, vec};
 
 	use ulx_primitives::{
 		bitcoin::{
@@ -210,20 +211,69 @@ pub mod pallet {
 		}
 	}
 
+	#[derive(
+		Encode,
+		Decode,
+		CloneNoBound,
+		PartialEqNoBound,
+		EqNoBound,
+		RuntimeDebugNoBound,
+		TypeInfo,
+		MaxEncodedLen,
+	)]
+	#[scale_info(skip_type_params(MaxPendingVaultBitcoinPubkeys))]
+	pub struct VaultConfig<
+		Balance: Codec + MaxEncodedLen + Clone + TypeInfo + PartialEq + Eq + Debug,
+		MaxPendingVaultBitcoinPubkeys: Get<u32>,
+	> {
+		/// The annual percent rate per argon vaulted for bitcoin bonds
+		#[codec(compact)]
+		pub bitcoin_annual_percent_rate: FixedU128,
+		/// The amount of argons to be vaulted for bitcoin bonds
+		#[codec(compact)]
+		pub bitcoin_amount_allocated: Balance,
+		/// An initial set of public keys to be used for bitcoin bonds
+		pub bitcoin_pubkey_hashes: BoundedVec<BitcoinPubkeyHash, MaxPendingVaultBitcoinPubkeys>,
+		/// The base fee for a bitcoin bond
+		#[codec(compact)]
+		pub bitcoin_base_fee: Balance,
+		/// The annual percent rate per argon vaulted for mining bonds
+		#[codec(compact)]
+		pub mining_annual_percent_rate: FixedU128,
+		/// The amount of argons to be vaulted for mining bonds
+		#[codec(compact)]
+		pub mining_amount_allocated: Balance,
+		/// A base fee for mining bonds
+		#[codec(compact)]
+		pub mining_base_fee: Balance,
+		/// The optional sharing of any argons minted for stabilization or mined from blocks
+		#[codec(compact)]
+		pub mining_mint_sharing_percent: FixedU128,
+		/// The securitization percent for the vault (must be maintained going forward)
+		#[codec(compact)]
+		pub securitization_percent: FixedU128,
+	}
+
 	#[pallet::call]
 	impl<T: Config> Pallet<T> {
 		#[pallet::call_index(0)]
 		#[pallet::weight(0)]
 		pub fn create(
 			origin: OriginFor<T>,
-			#[pallet::compact] bitcoin_annual_percent_rate: FixedU128,
-			#[pallet::compact] mining_annual_percent_rate: FixedU128,
-			#[pallet::compact] bitcoin_amount_allocated: T::Balance,
-			#[pallet::compact] mining_amount_allocated: T::Balance,
-			#[pallet::compact] securitization_percent: FixedU128,
-			bitcoin_pubkey_hashes: BoundedVec<BitcoinPubkeyHash, T::MaxPendingVaultBitcoinPubkeys>,
+			vault_config: VaultConfig<T::Balance, T::MaxPendingVaultBitcoinPubkeys>,
 		) -> DispatchResult {
 			let who = ensure_signed(origin)?;
+			let VaultConfig {
+				securitization_percent,
+				mining_annual_percent_rate,
+				bitcoin_annual_percent_rate,
+				bitcoin_amount_allocated,
+				mining_amount_allocated,
+				bitcoin_base_fee,
+				bitcoin_pubkey_hashes,
+				mining_mint_sharing_percent,
+				mining_base_fee,
+			} = vault_config;
 
 			ensure!(
 				securitization_percent <= FixedU128::from_rational(2, 1),
@@ -244,12 +294,15 @@ pub mod pallet {
 					annual_percent_rate: bitcoin_annual_percent_rate,
 					allocated: bitcoin_amount_allocated,
 					bonded: 0u32.into(),
+					base_fee: bitcoin_base_fee,
 				},
 				mining_argons: VaultArgons {
 					annual_percent_rate: mining_annual_percent_rate,
 					allocated: mining_amount_allocated,
 					bonded: 0u32.into(),
+					base_fee: mining_base_fee,
 				},
+				mining_mint_sharing_percent,
 				securitization_percent,
 				securitized_argons: 0u32.into(),
 				is_closed: false,
@@ -277,10 +330,20 @@ pub mod pallet {
 			Ok(())
 		}
 
-		/// Add additional funds to the vault
+		/// Modify funds offered by the vault. This will not affect existing bonds, but will affect
+		/// the amount of funds available for new bonds.
+		///
+		/// The securitization percent must be maintained or increased.
+		///
+		/// The amount offered may not go below the existing bonded amounts, but you can release
+		/// funds in this vault as bonds are released. To stop issuing any more bonds, use the
+		/// `close` api.
+		// NOTE to developers: This api does not allow users to modify APRs so that users don't
+		// submit bond requests that have a different APR by the time their bond request is
+		// accepted
 		#[pallet::call_index(1)]
 		#[pallet::weight(0)]
-		pub fn modify(
+		pub fn modify_funding(
 			origin: OriginFor<T>,
 			vault_id: VaultId,
 			total_mining_amount_offered: T::Balance,
@@ -472,7 +535,7 @@ pub mod pallet {
 			T::Currency::release(&reason.into(), who, amount, Precision::Exact)
 		}
 
-		pub(crate) fn calculate_fees(
+		pub(crate) fn calculate_block_fees(
 			annual_percentage_rate: FixedU128,
 			amount: T::Balance,
 			blocks: BlockNumberFor<T>,
@@ -482,11 +545,8 @@ pub mod pallet {
 			let blocks_per_year = blocks_per_day * FixedU128::saturating_from_integer(365);
 			let blocks = FixedU128::saturating_from_integer(blocks);
 
-			// min of 1 day
-			let blocks = blocks.max(blocks_per_day);
 			let block_ratio = blocks.checked_div(&blocks_per_year).unwrap_or_default();
 
-			let amount: u128 = amount.unique_saturated_into();
 			let amount = FixedU128::saturating_from_integer(amount);
 
 			let fee = amount
@@ -538,11 +598,10 @@ pub mod pallet {
 			};
 
 			let apr = vault_argons.annual_percent_rate;
+			let base_fee = vault_argons.base_fee;
 
-			let fee = Self::calculate_fees(apr, amount, blocks);
+			let fee = Self::calculate_block_fees(apr, amount, blocks).saturating_add(base_fee);
 			ensure!(fee <= amount, BondError::FeeExceedsBondAmount);
-
-			let base_fee = Self::calculate_fees(apr, amount, T::BlocksPerDay::get());
 
 			T::Currency::transfer(
 				bond_account_id,
@@ -658,7 +717,6 @@ pub mod pallet {
 
 		fn release_bonded_funds(
 			bond: &Bond<T::AccountId, T::Balance, BlockNumberFor<T>>,
-			should_charge_fee: bool,
 		) -> Result<T::Balance, BondError> {
 			let vault_id = bond.vault_id;
 			let vault = {
@@ -666,6 +724,7 @@ pub mod pallet {
 				vault.mut_argons(&bond.bond_type).reduce_bonded(bond.amount);
 				vault
 			};
+
 			// after reducing the bonded, we can check the minimum securitization needed (can't be
 			// mut)
 			let minimum_securitization = vault.get_minimum_securitization_needed();
@@ -685,26 +744,34 @@ pub mod pallet {
 				vault.securitized_argons = minimum_securitization;
 				vault.mut_argons(&bond.bond_type).reduce_allocated(bond.amount);
 			}
-			let remaining_fee = bond.total_fee.saturating_sub(bond.prepaid_fee);
-			if should_charge_fee {
-				if remaining_fee > 0u128.into() {
-					T::Currency::transfer_on_hold(
-						&HoldReason::BondFee.into(),
-						&bond.bonded_account_id,
-						&vault.operator_account_id,
-						remaining_fee,
-						Precision::Exact,
-						Restriction::Free,
-						Fortitude::Force,
-					)
-					.map_err(|_| BondError::UnrecoverableHold)?;
-				}
-			} else {
-				Self::release_hold(&bond.bonded_account_id, remaining_fee, HoldReason::BondFee)
+
+			let apr = vault.argons(&bond.bond_type).annual_percent_rate;
+
+			let current_block = frame_system::Pallet::<T>::block_number();
+			let blocks = current_block.saturating_sub(bond.start_block);
+			let remaining_fee = Self::calculate_block_fees(apr, bond.amount, blocks);
+			if remaining_fee > 0u128.into() {
+				T::Currency::transfer_on_hold(
+					&HoldReason::BondFee.into(),
+					&bond.bonded_account_id,
+					&vault.operator_account_id,
+					remaining_fee,
+					Precision::Exact,
+					Restriction::Free,
+					Fortitude::Force,
+				)
+				.map_err(|_| BondError::UnrecoverableHold)?;
+			}
+			let amount_on_hold = bond.total_fee.saturating_sub(bond.prepaid_fee);
+			let to_return = amount_on_hold.saturating_sub(remaining_fee);
+
+			if to_return > 0u128.into() {
+				Self::release_hold(&bond.bonded_account_id, to_return, HoldReason::BondFee)
 					.map_err(|_| BondError::UnrecoverableHold)?;
 			}
+
 			VaultsById::<T>::insert(vault_id, vault);
-			Ok(remaining_fee)
+			Ok(to_return)
 		}
 
 		fn create_utxo_script_pubkey(

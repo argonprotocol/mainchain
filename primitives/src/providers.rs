@@ -14,6 +14,7 @@ use crate::{
 		SATOSHIS_PER_BITCOIN,
 	},
 	block_seal::{BlockPayout, MiningAuthority},
+	inherents::BlockSealInherent,
 	tick::{Tick, Ticker},
 	DataDomainHash, NotaryId, NotebookHeader, NotebookNumber, NotebookSecret,
 	TransferToLocalchainId, VoteMinimum,
@@ -146,7 +147,8 @@ pub trait BlockVotingProvider<Block: BlockT> {
 #[derive(Encode, Decode, Clone, PartialEq, Eq, TypeInfo, MaxEncodedLen, RuntimeDebug)]
 pub struct BlockSealerInfo<AccountId: FullCodec> {
 	pub miner_rewards_account: AccountId,
-	pub block_vote_rewards_account: AccountId,
+	/// The voting account, if a block seal
+	pub block_vote_rewards_account: Option<AccountId>,
 }
 
 pub trait BlockSealerProvider<AccountId: FullCodec> {
@@ -179,6 +181,18 @@ impl NotebookEventHandler for Tuple {
 	fn notebook_submitted(header: &NotebookHeader) -> DispatchResult {
 		for_tuples!( #( Tuple::notebook_submitted(&header); )* );
 		Ok(())
+	}
+}
+
+/// An event handler to listen for submitted block seals
+pub trait BlockSealEventHandler {
+	fn block_seal_read(seal: &BlockSealInherent);
+}
+
+#[impl_trait_for_tuples::impl_for_tuples(5)]
+impl BlockSealEventHandler for Tuple {
+	fn block_seal_read(seal: &BlockSealInherent) {
+		for_tuples!( #( Tuple::block_seal_read(seal); )* );
 	}
 }
 

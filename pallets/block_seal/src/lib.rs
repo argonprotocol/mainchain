@@ -33,10 +33,11 @@ pub mod pallet {
 		localchain::{BestBlockVoteSeal, BlockVote, BlockVoteT},
 		notebook::NotebookNumber,
 		tick::Tick,
-		AuthorityProvider, BlockSealAuthoritySignature, BlockSealerInfo, BlockSealerProvider,
-		BlockVotingKey, BlockVotingProvider, DataDomainProvider, MerkleProof, NotaryId,
-		NotaryNotebookVotes, NotebookProvider, ParentVotingKeyDigest, TickProvider, VotingKey,
-		AUTHOR_DIGEST_ID, ESCROW_CLAWBACK_TICKS, ESCROW_EXPIRATION_TICKS, PARENT_VOTING_KEY_DIGEST,
+		AuthorityProvider, BlockSealAuthoritySignature, BlockSealEventHandler, BlockSealerInfo,
+		BlockSealerProvider, BlockVotingKey, BlockVotingProvider, DataDomainProvider, MerkleProof,
+		NotaryId, NotaryNotebookVotes, NotebookProvider, ParentVotingKeyDigest, TickProvider,
+		VotingKey, AUTHOR_DIGEST_ID, ESCROW_CLAWBACK_TICKS, ESCROW_EXPIRATION_TICKS,
+		PARENT_VOTING_KEY_DIGEST,
 	};
 
 	use super::*;
@@ -66,6 +67,9 @@ pub mod pallet {
 		type TickProvider: TickProvider<Self::Block>;
 
 		type DataDomainProvider: DataDomainProvider<Self::AccountId>;
+
+		/// Emit events when a block seal is read
+		type EventHandler: BlockSealEventHandler;
 	}
 
 	#[pallet::storage]
@@ -266,17 +270,17 @@ pub mod pallet {
 				BlockSealInherent::Compute => {
 					// NOTE: the compute nonce is checked in the node
 					<LastBlockSealerInfo<T>>::put(BlockSealerInfo {
-						block_vote_rewards_account: miner_rewards_account.clone(),
+						block_vote_rewards_account: None,
 						miner_rewards_account,
 					});
 				},
 				BlockSealInherent::Vote {
 					seal_strength,
-					block_vote,
+					ref block_vote,
 					notary_id,
-					source_notebook_proof,
+					ref source_notebook_proof,
 					source_notebook_number,
-					miner_signature,
+					ref miner_signature,
 				} => {
 					let current_tick = T::TickProvider::current_tick();
 
@@ -298,31 +302,32 @@ pub mod pallet {
 					.map_err(|_| Error::<T>::UnableToDecodeVoteAccount)?;
 					Self::verify_block_vote(
 						seal_strength,
-						&block_vote,
+						block_vote,
 						&block_author,
 						votes_from_tick,
-						miner_signature,
+						miner_signature.clone(),
 					)?;
 					Self::verify_vote_source(
 						notary_id,
 						votes_from_tick,
-						&block_vote,
+						block_vote,
 						source_notebook_proof,
 						source_notebook_number,
 					)?;
 					<LastBlockSealerInfo<T>>::put(BlockSealerInfo {
 						miner_rewards_account,
-						block_vote_rewards_account,
+						block_vote_rewards_account: Some(block_vote_rewards_account),
 					});
 				},
 			}
+			T::EventHandler::block_seal_read(&seal);
 			Ok(())
 		}
 		pub fn verify_vote_source(
 			notary_id: NotaryId,
 			votes_from_tick: Tick,
 			block_vote: &BlockVote,
-			source_notebook_proof: MerkleProof,
+			source_notebook_proof: &MerkleProof,
 			source_notebook_number: NotebookNumber,
 		) -> DispatchResult {
 			let (notebook_votes_root, notebook_number) =
@@ -332,7 +337,7 @@ pub mod pallet {
 			ensure!(
 				verify_proof::<'_, BlakeTwo256, _, _>(
 					&notebook_votes_root,
-					source_notebook_proof.proof,
+					source_notebook_proof.proof.clone(),
 					source_notebook_proof.number_of_leaves as usize,
 					source_notebook_proof.leaf_index as usize,
 					&block_vote.encode(),

@@ -43,7 +43,7 @@ use pallet_tx_pause::RuntimeCallNameOf;
 use scale_info::TypeInfo;
 use smallvec::smallvec;
 use sp_api::impl_runtime_apis;
-use sp_arithmetic::{traits::Zero, FixedPointNumber};
+use sp_arithmetic::{traits::Zero, FixedPointNumber, FixedU128};
 use sp_consensus_grandpa::AuthorityId as GrandpaId;
 use sp_core::{crypto::KeyTypeId, ConstU16, OpaqueMetadata, H256, U256};
 use sp_debug_derive::RuntimeDebug;
@@ -306,9 +306,11 @@ parameter_types! {
 	pub const MaxMiners: u32 = 10_000; // must multiply cleanly by MaxCohortSize
 	pub const SessionRotationPeriod: u32 = prod_or_fast!(125, 2); // must be cleanly divisible by BlocksBetweenSlots
 	pub const Offset: u32 = 0;
-	pub const OwnershipPercentDamper: u32 = 80;
+	pub const OwnershipPercentAdjustmentDamper: FixedU128 = FixedU128::from_rational(20, 100);
+	pub const TargetBidsPerSlot: u32 = 1_200; // 20% extra bids
+	pub const SlotBiddingStartBlock: u32 = prod_or_fast!(14_400, 4);
 
-	pub const BlocksBufferToStopAcceptingBids: u32 = prod_or_fast!(10, 1);
+	pub const BlocksBeforeBidEndForVrfClose: u32 = prod_or_fast!(200, 1);
 
 	pub const MaxConcurrentlyExpiringBonds: u32 = 1000;
 	pub const MinimumBondAmount:u128 = 1_000;
@@ -374,8 +376,10 @@ impl pallet_mining_slot::Config for Runtime {
 	type WeightInfo = pallet_mining_slot::weights::SubstrateWeight<Runtime>;
 	type MaxMiners = MaxMiners;
 	type OwnershipCurrency = UlixeeBalances;
-	type OwnershipPercentDamper = OwnershipPercentDamper;
-	type BlocksBufferToStopAcceptingBids = BlocksBufferToStopAcceptingBids;
+	type OwnershipPercentAdjustmentDamper = OwnershipPercentAdjustmentDamper;
+	type TargetBidsPerSlot = TargetBidsPerSlot;
+	type SlotBiddingStartBlock = SlotBiddingStartBlock;
+	type BlocksBeforeBidEndForVrfClose = BlocksBeforeBidEndForVrfClose;
 	type RuntimeHoldReason = RuntimeHoldReason;
 	type MaxCohortSize = MaxCohortSize;
 	type SessionIndicesToKeepInHistory = SessionIndicesToKeepInHistory;
@@ -392,6 +396,7 @@ impl pallet_block_seal::Config for Runtime {
 	type BlockVotingProvider = BlockSealSpec;
 	type TickProvider = Ticks;
 	type DataDomainProvider = DataDomain;
+	type EventHandler = MiningSlot;
 }
 
 impl pallet_session::Config for Runtime {
@@ -812,7 +817,7 @@ mod runtime {
 	pub type DataDomain = pallet_data_domain;
 	#[runtime::pallet_index(14)]
 	pub type PriceIndex = pallet_price_index;
-	// Authorship must be before session
+	// NOTE: Authorship must be before session
 	#[runtime::pallet_index(15)]
 	pub type Authorship = pallet_authorship;
 	#[runtime::pallet_index(16)]
@@ -821,7 +826,7 @@ mod runtime {
 	pub type Session = pallet_session;
 	#[runtime::pallet_index(18)]
 	pub type BlockSeal = pallet_block_seal;
-	// BlockRewards must come after seal
+	// NOTE: BlockRewards must come after seal (on_finalize uses seal info)
 	#[runtime::pallet_index(19)]
 	pub type BlockRewards = pallet_block_rewards;
 	#[runtime::pallet_index(20)]

@@ -105,7 +105,7 @@ fn it_should_read_the_digests() {
 
 		TempSealInherent::<Test>::put(BlockSealInherent::Compute);
 		LastBlockSealerInfo::<Test>::put(BlockSealerInfo {
-			block_vote_rewards_account: 1,
+			block_vote_rewards_account: Some(1),
 			miner_rewards_account: 1,
 		});
 		BlockSeal::on_finalize(42);
@@ -283,26 +283,20 @@ fn it_requires_vote_notebook_proof() {
 
 		// set block to 2 - not in the history
 		assert_err!(
-			BlockSeal::verify_vote_source(1, 2, &block_vote, source_notebook_proof.clone(), 1,),
+			BlockSeal::verify_vote_source(1, 2, &block_vote, &source_notebook_proof, 1,),
 			Error::<Test>::NoEligibleVotingRoot
 		);
 
 		// notebook number i mismatched
 		assert_err!(
-			BlockSeal::verify_vote_source(1, 1, &block_vote, source_notebook_proof.clone(), 1,),
+			BlockSeal::verify_vote_source(1, 1, &block_vote, &source_notebook_proof, 1,),
 			Error::<Test>::IneligibleNotebookUsed
 		);
-		assert_ok!(BlockSeal::verify_vote_source(
-			1,
-			1,
-			&block_vote,
-			source_notebook_proof.clone(),
-			2,
-		),);
+		assert_ok!(BlockSeal::verify_vote_source(1, 1, &block_vote, &source_notebook_proof, 2,),);
 
 		block_vote.power = 100;
 		assert_err!(
-			BlockSeal::verify_vote_source(1, 1, &block_vote, source_notebook_proof.clone(), 2,),
+			BlockSeal::verify_vote_source(1, 1, &block_vote, &source_notebook_proof, 2,),
 			Error::<Test>::InvalidBlockVoteProof
 		);
 	});
