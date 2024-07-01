@@ -114,6 +114,8 @@ declare module '@polkadot/api-base/types/events' {
       UtxoVerified: AugmentedEvent<ApiType, [utxoId: u64], { utxoId: u64 }>;
     };
     blockRewards: {
+      FailedToMintReward: AugmentedEvent<ApiType, [accountId: AccountId32, argons: Option<u128>, ulixees: Option<u128>, error: SpRuntimeDispatchError], { accountId: AccountId32, argons: Option<u128>, ulixees: Option<u128>, error: SpRuntimeDispatchError }>;
+      FailedToUnfreezeReward: AugmentedEvent<ApiType, [accountId: AccountId32, argons: Option<u128>, ulixees: Option<u128>, error: SpRuntimeDispatchError], { accountId: AccountId32, argons: Option<u128>, ulixees: Option<u128>, error: SpRuntimeDispatchError }>;
       RewardCreated: AugmentedEvent<ApiType, [maturationBlock: u32, rewards: Vec<UlxPrimitivesBlockSealBlockPayout>], { maturationBlock: u32, rewards: Vec<UlxPrimitivesBlockSealBlockPayout> }>;
       RewardUnlocked: AugmentedEvent<ApiType, [rewards: Vec<UlxPrimitivesBlockSealBlockPayout>], { rewards: Vec<UlxPrimitivesBlockSealBlockPayout> }>;
     };
@@ -173,6 +175,7 @@ declare module '@polkadot/api-base/types/events' {
       Resumed: AugmentedEvent<ApiType, []>;
     };
     miningSlot: {
+      FailedToUnbondMiner: AugmentedEvent<ApiType, [accountId: AccountId32, bondId: Option<u64>, error: SpRuntimeDispatchError], { accountId: AccountId32, bondId: Option<u64>, error: SpRuntimeDispatchError }>;
       NewMiners: AugmentedEvent<ApiType, [startIndex: u32, newMiners: Vec<UlxPrimitivesBlockSealMiningRegistration>], { startIndex: u32, newMiners: Vec<UlxPrimitivesBlockSealMiningRegistration> }>;
       SlotBidderAdded: AugmentedEvent<ApiType, [accountId: AccountId32, bidAmount: u128, index: u32], { accountId: AccountId32, bidAmount: u128, index: u32 }>;
       SlotBidderReplaced: AugmentedEvent<ApiType, [accountId: AccountId32, bondId: Option<u64>, keptOwnershipBond: bool], { accountId: AccountId32, bondId: Option<u64>, keptOwnershipBond: bool }>;
@@ -180,6 +183,7 @@ declare module '@polkadot/api-base/types/events' {
     };
     mint: {
       ArgonsMinted: AugmentedEvent<ApiType, [mintType: PalletMintMintType, accountId: AccountId32, utxoId: Option<u64>, amount: u128], { mintType: PalletMintMintType, accountId: AccountId32, utxoId: Option<u64>, amount: u128 }>;
+      FailedToMint: AugmentedEvent<ApiType, [mintType: PalletMintMintType, accountId: AccountId32, utxoId: Option<u64>, amount: u128, error: SpRuntimeDispatchError], { mintType: PalletMintMintType, accountId: AccountId32, utxoId: Option<u64>, amount: u128, error: SpRuntimeDispatchError }>;
     };
     multisig: {
       /**

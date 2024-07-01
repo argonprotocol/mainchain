@@ -788,7 +788,7 @@ declare module '@polkadot/api-base/types/submittable' {
        * As funds are returned, they will be released to the vault owner.
        **/
       close: AugmentedSubmittable<(vaultId: u32 | AnyNumber | Uint8Array) => SubmittableExtrinsic<ApiType>, [u32]>;
-      create: AugmentedSubmittable<(vaultConfig: PalletVaultsVaultConfig | { bitcoinAnnualPercentRate?: any; bitcoinAmountAllocated?: any; bitcoinPubkeyHashes?: any; bitcoinBaseFee?: any; miningAnnualPercentRate?: any; miningAmountAllocated?: any; miningBaseFee?: any; miningMintSharingPercent?: any; securitizationPercent?: any } | string | Uint8Array) => SubmittableExtrinsic<ApiType>, [PalletVaultsVaultConfig]>;
+      create: AugmentedSubmittable<(vaultConfig: PalletVaultsVaultConfig | { bitcoinAnnualPercentRate?: any; bitcoinAmountAllocated?: any; bitcoinPubkeyHashes?: any; bitcoinBaseFee?: any; miningAnnualPercentRate?: any; miningAmountAllocated?: any; miningBaseFee?: any; miningRewardSharingPercentTake?: any; securitizationPercent?: any } | string | Uint8Array) => SubmittableExtrinsic<ApiType>, [PalletVaultsVaultConfig]>;
       /**
        * Modify funds offered by the vault. This will not affect existing bonds, but will affect
        * the amount of funds available for new bonds.

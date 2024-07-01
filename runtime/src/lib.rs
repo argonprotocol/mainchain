@@ -43,7 +43,7 @@ use pallet_tx_pause::RuntimeCallNameOf;
 use scale_info::TypeInfo;
 use smallvec::smallvec;
 use sp_api::impl_runtime_apis;
-use sp_arithmetic::{traits::Zero, FixedPointNumber, FixedU128};
+use sp_arithmetic::{traits::Zero, FixedPointNumber, FixedU128, Percent};
 use sp_consensus_grandpa::AuthorityId as GrandpaId;
 use sp_core::{crypto::KeyTypeId, ConstU16, OpaqueMetadata, H256, U256};
 use sp_debug_derive::RuntimeDebug;
@@ -238,7 +238,7 @@ parameter_types! {
 	pub const StartingUlixeesPerBlock: u32 = 5_000;
 	pub const HalvingBlocks: u32 = 2_100_000; // based on bitcoin, but 10x since we're block per minute
 	pub const MaturationBlocks: u32 = 5;
-	pub const MinerPayoutPercent: u32 = 75;
+	pub const MinerPayoutPercent: Percent = Percent::from_percent(75);
 	pub const DomainExpirationTicks: u32 = 60 * 24 * 365; // 1 year
 	pub const HistoricalPaymentAddressTicksToKeep: u32 = ESCROW_EXPIRATION_TICKS + ESCROW_CLAWBACK_TICKS + 10;
 }
@@ -273,6 +273,7 @@ impl pallet_block_rewards::Config for Runtime {
 	type MaturationBlocks = MaturationBlocks;
 	type RuntimeFreezeReason = RuntimeFreezeReason;
 	type EventHandler = Mint;
+	type BlockRewardAccountsProvider = MiningSlot;
 }
 
 impl pallet_data_domain::Config for Runtime {
@@ -699,7 +700,7 @@ impl pallet_mint::Config for Runtime {
 	type Balance = Balance;
 	type PriceProvider = PriceIndex;
 	type MaxPendingMintUtxos = MaxPendingMintUtxos;
-	type MiningProvider = MiningSlot;
+	type BlockRewardAccountsProvider = MiningSlot;
 }
 
 type UlixeeToken = pallet_balances::Instance2;

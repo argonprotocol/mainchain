@@ -106,7 +106,7 @@ fn it_should_read_the_digests() {
 		TempSealInherent::<Test>::put(BlockSealInherent::Compute);
 		LastBlockSealerInfo::<Test>::put(BlockSealerInfo {
 			block_vote_rewards_account: Some(1),
-			miner_rewards_account: 1,
+			block_author_account_id: 1,
 		});
 		BlockSeal::on_finalize(42);
 
@@ -253,7 +253,7 @@ fn it_should_be_able_to_submit_a_seal() {
 
 		assert_ok!(BlockSeal::apply(RuntimeOrigin::none(), inherent.clone()));
 
-		assert_eq!(LastBlockSealerInfo::<Test>::get().unwrap().miner_rewards_account, 10);
+		assert_eq!(LastBlockSealerInfo::<Test>::get().unwrap().block_author_account_id, 10);
 
 		// the vote sealer will be a u64 conversion of a an account32
 		assert_eq!(TempSealInherent::<Test>::get(), Some(inherent.clone()));

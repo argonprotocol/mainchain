@@ -101,8 +101,10 @@ pub mod pallet {
 			BitcoinCosignScriptPubkey, BitcoinHeight, BitcoinPubkeyHash, BitcoinRejectedReason,
 			BitcoinScriptPubkey, BitcoinSignature, CompressedBitcoinPubkey, Satoshis, UtxoId,
 		},
+		block_seal::RewardSharing,
 		bond::{Bond, BondError, BondExpiration, BondProvider, BondType, VaultProvider},
-		BitcoinUtxoEvents, BitcoinUtxoTracker, BondId, PriceProvider, UtxoBondedEvents, VaultId,
+		BitcoinUtxoEvents, BitcoinUtxoTracker, BondId, PriceProvider, RewardShare,
+		UtxoBondedEvents, VaultId,
 	};
 
 	#[pallet::pallet]
@@ -914,7 +916,7 @@ pub mod pallet {
 			account_id: Self::AccountId,
 			amount: Self::Balance,
 			bond_until_block: Self::BlockNumber,
-		) -> Result<BondId, BondError> {
+		) -> Result<(BondId, Option<RewardSharing<Self::AccountId>>), BondError> {
 			ensure!(amount >= T::MinimumBondAmount::get(), BondError::MinimumBondAmountNotMet);
 
 			let block_number = frame_system::Pallet::<T>::block_number();
@@ -928,7 +930,7 @@ pub mod pallet {
 				&account_id,
 			)?;
 
-			Self::create_bond(
+			let bond_id = Self::create_bond(
 				vault_id,
 				account_id,
 				BondType::Mining,
@@ -937,7 +939,19 @@ pub mod pallet {
 				total_fee,
 				prepaid_fee,
 				None,
-			)
+			)?;
+			let vault = T::VaultProvider::get(vault_id).ok_or(BondError::VaultNotFound)?;
+			Ok((
+				bond_id,
+				if vault.mining_reward_sharing_percent_take > RewardShare::zero() {
+					Some(RewardSharing {
+						percent_take: vault.mining_reward_sharing_percent_take,
+						account_id: vault.operator_account_id.clone(),
+					})
+				} else {
+					None
+				},
+			))
 		}
 
 		fn cancel_bond(bond_id: BondId) -> Result<(), BondError> {

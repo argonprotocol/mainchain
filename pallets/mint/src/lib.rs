@@ -30,8 +30,8 @@ pub mod pallet {
 	};
 
 	use ulx_primitives::{
-		bitcoin::UtxoId, ArgonCPI, AuthorityProvider, BlockSealAuthorityId, BurnEventHandler,
-		PriceProvider, UtxoBondedEvents,
+		bitcoin::UtxoId, ArgonCPI, BlockRewardAccountsProvider, BurnEventHandler, PriceProvider,
+		UtxoBondedEvents,
 	};
 
 	use super::*;
@@ -61,8 +61,8 @@ pub mod pallet {
 		#[pallet::constant]
 		type MaxPendingMintUtxos: Get<u32>;
 
-		/// The mining provider
-		type MiningProvider: AuthorityProvider<BlockSealAuthorityId, Self::Block, Self::AccountId>;
+		/// The provider of reward account ids
+		type BlockRewardAccountsProvider: BlockRewardAccountsProvider<Self::AccountId>;
 	}
 
 	/// Bitcoin UTXOs that have been submitted for minting. This list is FIFO for minting whenever
@@ -90,6 +90,13 @@ pub mod pallet {
 			utxo_id: Option<UtxoId>,
 			amount: T::Balance,
 		},
+		FailedToMint {
+			mint_type: MintType,
+			account_id: T::AccountId,
+			utxo_id: Option<UtxoId>,
+			amount: T::Balance,
+			error: DispatchError,
+		},
 	}
 
 	#[pallet::error]
@@ -108,26 +115,39 @@ pub mod pallet {
 			let mut bitcoin_utxos = MintedBitcoinArgons::<T>::get();
 			let mut ulixee_mint = MintedUlixeeArgons::<T>::get();
 
-			let active_miners = T::MiningProvider::get_all_rewards_accounts();
+			let reward_accounts = T::BlockRewardAccountsProvider::get_all_rewards_accounts();
 			let argons_to_print_per_miner =
-				Self::get_argons_to_print_per_miner(argon_cpi, active_miners.len() as u128);
+				Self::get_argons_to_print_per_miner(argon_cpi, reward_accounts.len() as u128);
+
 			if argons_to_print_per_miner > T::Balance::zero() {
-				for miner in active_miners {
-					match T::Currency::mint_into(&miner, argons_to_print_per_miner) {
+				for (miner, share) in reward_accounts {
+					let amount = if let Some(share) = share {
+						share.mul_floor(argons_to_print_per_miner)
+					} else {
+						argons_to_print_per_miner
+					};
+					match T::Currency::mint_into(&miner, amount) {
 						Ok(_) => {
-							ulixee_mint += argons_to_print_per_miner;
+							ulixee_mint += amount;
 							Self::deposit_event(Event::<T>::ArgonsMinted {
 								mint_type: MintType::Ulixee,
 								account_id: miner.clone(),
 								utxo_id: None,
-								amount: argons_to_print_per_miner,
+								amount,
 							});
 						},
 						Err(e) => {
 							warn!(
 								target: LOG_TARGET,
-								"Failed to mint {:?} argons for miner {:?}: {:?}", argons_to_print_per_miner, &miner, e
+								"Failed to mint {:?} argons for miner {:?}: {:?}", amount, &miner, e
 							);
+							Self::deposit_event(Event::<T>::FailedToMint {
+								mint_type: MintType::Ulixee,
+								account_id: miner.clone(),
+								utxo_id: None,
+								amount,
+								error: e,
+							});
 						},
 					};
 				}
@@ -167,20 +187,19 @@ pub mod pallet {
 									target: LOG_TARGET,
 									"Failed to mint {:?} argons for bitcoin UTXO {:?}: {:?}", amount_to_mint, &utxo_id, e
 								);
+								Self::deposit_event(Event::<T>::FailedToMint {
+									mint_type: MintType::Bitcoin,
+									account_id: account_id.clone(),
+									utxo_id: Some(*utxo_id),
+									amount: amount_to_mint,
+									error: e,
+								});
 							},
 						};
 						*remaining_account_mint > T::Balance::zero()
 					});
 				});
-
-				match updated {
-					Some(pending_mint_utxos) => {
-						<PendingMintUtxos<T>>::put(pending_mint_utxos);
-					},
-					None => {
-						warn!(target: LOG_TARGET, "Failed to mint argons for bitcoin UTXOs");
-					},
-				}
+				PendingMintUtxos::<T>::put(updated.expect("cannot fail, but should be handled"));
 			}
 			MintedBitcoinArgons::<T>::put(bitcoin_utxos);
 			T::DbWeight::get().reads_writes(1, 1)

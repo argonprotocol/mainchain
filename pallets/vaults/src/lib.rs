@@ -39,7 +39,7 @@ pub mod pallet {
 			AtLeast32BitUnsigned, CheckedAdd, CheckedDiv, CheckedSub, UniqueSaturatedInto, Zero,
 		},
 		DispatchError::Token,
-		FixedPointNumber, FixedU128, Saturating, TokenError,
+		FixedPointNumber, FixedU128, Percent, Saturating, TokenError,
 	};
 	use sp_std::{fmt::Debug, vec};
 
@@ -248,7 +248,7 @@ pub mod pallet {
 		pub mining_base_fee: Balance,
 		/// The optional sharing of any argons minted for stabilization or mined from blocks
 		#[codec(compact)]
-		pub mining_mint_sharing_percent: FixedU128,
+		pub mining_reward_sharing_percent_take: Percent, // max 100, actual percent
 		/// The securitization percent for the vault (must be maintained going forward)
 		#[codec(compact)]
 		pub securitization_percent: FixedU128,
@@ -271,7 +271,7 @@ pub mod pallet {
 				mining_amount_allocated,
 				bitcoin_base_fee,
 				bitcoin_pubkey_hashes,
-				mining_mint_sharing_percent,
+				mining_reward_sharing_percent_take,
 				mining_base_fee,
 			} = vault_config;
 
@@ -302,7 +302,7 @@ pub mod pallet {
 					bonded: 0u32.into(),
 					base_fee: mining_base_fee,
 				},
-				mining_mint_sharing_percent,
+				mining_reward_sharing_percent_take,
 				securitization_percent,
 				securitized_argons: 0u32.into(),
 				is_closed: false,

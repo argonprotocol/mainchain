@@ -2,7 +2,8 @@ use frame_support::{
 	assert_ok,
 	traits::{fungible::Unbalanced, OnInitialize},
 };
-use sp_arithmetic::FixedI128;
+use sp_arithmetic::{FixedI128, Percent};
+use sp_runtime::{DispatchError, TokenError};
 use ulx_primitives::{block_seal::BlockPayout, BlockRewardsEventHandler, UtxoBondedEvents};
 
 use crate::{
@@ -68,6 +69,126 @@ fn it_calculates_per_miner_mint() {
 
 		// handles uneven splits
 		assert_eq!(UlixeeMint::get_argons_to_print_per_miner(FixedI128::from_float(-0.01), 3), 3);
+	});
+}
+
+#[test]
+fn it_can_mint() {
+	ArgonCPI::set(Some(FixedI128::from_float(-1.0)));
+
+	MinerRewardsAccounts::set(vec![(1, None)]);
+
+	new_test_ext().execute_with(|| {
+		System::set_block_number(1);
+		Balances::set_total_issuance(25_000);
+
+		// nothing to mint
+		MintedUlixeeArgons::<Test>::set(500);
+		MintedBitcoinArgons::<Test>::set(0);
+
+		UlixeeMint::on_initialize(1);
+		System::assert_last_event(
+			Event::ArgonsMinted {
+				mint_type: MintType::Ulixee,
+				account_id: 1,
+				utxo_id: None,
+				amount: 25_000,
+			}
+			.into(),
+		);
+
+		assert_eq!(MintedUlixeeArgons::<Test>::get(), 25_500);
+		assert_eq!(Balances::total_issuance(), 25_000 + 25_000);
+		assert_eq!(Balances::free_balance(&1), 25_000);
+	});
+}
+#[test]
+fn it_records_failed_mints() {
+	ArgonCPI::set(Some(FixedI128::from_float(-1.0)));
+
+	MinerRewardsAccounts::set(vec![(1, None)]);
+
+	new_test_ext().execute_with(|| {
+		System::set_block_number(1);
+		let amount = ExistentialDeposit::get() - 1;
+		Balances::set_total_issuance(amount);
+
+		// nothing to mint
+		MintedUlixeeArgons::<Test>::set(0);
+
+		UlixeeMint::on_initialize(1);
+		System::assert_last_event(
+			Event::FailedToMint {
+				mint_type: MintType::Ulixee,
+				account_id: 1,
+				utxo_id: None,
+				error: DispatchError::Token(TokenError::BelowMinimum),
+				amount,
+			}
+			.into(),
+		);
+
+		assert_eq!(MintedUlixeeArgons::<Test>::get(), 0);
+		assert_eq!(Balances::total_issuance(), amount);
+	});
+}
+
+#[test]
+fn it_can_mint_profit_sharing() {
+	ArgonCPI::set(Some(FixedI128::from_float(-1.0)));
+
+	MinerRewardsAccounts::set(vec![
+		(1, Some(Percent::from_percent(30))),
+		(2, Some(Percent::from_percent(70))),
+		(3, None),
+	]);
+
+	let per_miner = (1000 / 3) as u128;
+
+	let amount_for_sharer = (per_miner as f64 * 0.3) as u128;
+	let amount_for_share_lender = (per_miner as f64 * 0.7) as u128;
+	new_test_ext().execute_with(|| {
+		System::set_block_number(1);
+		Balances::set_total_issuance(1000);
+
+		// nothing to mint
+		MintedUlixeeArgons::<Test>::set(0);
+		MintedBitcoinArgons::<Test>::set(0);
+
+		UlixeeMint::on_initialize(1);
+		System::assert_last_event(
+			Event::ArgonsMinted {
+				mint_type: MintType::Ulixee,
+				account_id: 3,
+				utxo_id: None,
+				amount: per_miner,
+			}
+			.into(),
+		);
+		System::assert_has_event(
+			Event::ArgonsMinted {
+				mint_type: MintType::Ulixee,
+				account_id: 1,
+				utxo_id: None,
+				amount: amount_for_sharer,
+			}
+			.into(),
+		);
+		System::assert_has_event(
+			Event::ArgonsMinted {
+				mint_type: MintType::Ulixee,
+				account_id: 2,
+				utxo_id: None,
+				amount: amount_for_share_lender,
+			}
+			.into(),
+		);
+		let amount_minted = per_miner + amount_for_sharer + amount_for_share_lender;
+		assert_eq!(MintedUlixeeArgons::<Test>::get(), amount_minted);
+		assert_eq!(Balances::total_issuance(), 1000 + amount_minted);
+		assert_eq!(Balances::free_balance(&1), amount_for_sharer);
+		assert_eq!(Balances::free_balance(&2), amount_for_share_lender);
+		assert_eq!(Balances::free_balance(&3), per_miner);
 	});
 }
 

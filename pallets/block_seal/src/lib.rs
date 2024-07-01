@@ -258,20 +258,12 @@ pub mod pallet {
 			let block_author =
 				<TempAuthor<T>>::get().expect("already unwrapped, should not be possible");
 
-			let mut miner_rewards_account = block_author.clone();
-
-			if let Some(rewards_account) =
-				T::AuthorityProvider::get_rewards_account(block_author.clone())
-			{
-				miner_rewards_account = rewards_account;
-			}
-
 			match seal {
 				BlockSealInherent::Compute => {
 					// NOTE: the compute nonce is checked in the node
 					<LastBlockSealerInfo<T>>::put(BlockSealerInfo {
 						block_vote_rewards_account: None,
-						miner_rewards_account,
+						block_author_account_id: block_author,
 					});
 				},
 				BlockSealInherent::Vote {
@@ -315,7 +307,7 @@ pub mod pallet {
 						source_notebook_number,
 					)?;
 					<LastBlockSealerInfo<T>>::put(BlockSealerInfo {
-						miner_rewards_account,
+						block_author_account_id: block_author,
 						block_vote_rewards_account: Some(block_vote_rewards_account),
 					});
 				},

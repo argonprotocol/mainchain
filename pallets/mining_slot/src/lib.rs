@@ -15,16 +15,19 @@ use sp_core::{Get, U256};
 use sp_io::hashing::blake2_256;
 use sp_runtime::{
 	traits::{Convert, UniqueSaturatedInto},
-	BoundedBTreeMap, FixedI128, FixedPointNumber, FixedU128, SaturatedConversion, Saturating,
+	BoundedBTreeMap, FixedI128, FixedPointNumber, FixedU128, Percent, SaturatedConversion,
+	Saturating,
 };
-use sp_std::{cmp::max, marker::PhantomData, vec::Vec};
+use sp_std::{cmp::max, marker::PhantomData, vec, vec::Vec};
 
 pub use pallet::*;
 use ulx_primitives::{
-	block_seal::{BlockSealAuthorityId, MinerIndex, MiningAuthority, RewardDestination},
+	block_seal::{
+		BlockSealAuthorityId, MinerIndex, MiningAuthority, RewardDestination, RewardSharing,
+	},
 	bond::BondProvider,
 	inherents::BlockSealInherent,
-	AuthorityProvider, BlockSealEventHandler,
+	AuthorityProvider, BlockRewardAccountsProvider, BlockSealEventHandler, RewardShare,
 };
 pub use weights::*;
 
@@ -256,6 +259,11 @@ pub mod pallet {
 			bond_id: Option<BondId>,
 			kept_ownership_bond: bool,
 		},
+		FailedToUnbondMiner {
+			account_id: T::AccountId,
+			bond_id: Option<BondId>,
+			error: DispatchError,
+		},
 	}
 
 	#[pallet::error]
@@ -379,16 +387,16 @@ pub mod pallet {
 
 			let current_registration = Self::get_active_registration(&who);
 
-			let (bond_id, bid) = if let Some(bond_info) = bond_info {
+			let (bond, bid) = if let Some(bond_info) = bond_info {
 				let bond_end_block = next_cohort_block_number + Self::get_mining_window_blocks();
-				let bond_id = T::BondProvider::bond_mining_slot(
+				let bond = T::BondProvider::bond_mining_slot(
 					bond_info.vault_id,
 					who.clone(),
 					bond_info.amount,
 					bond_end_block,
 				)
 				.map_err(Error::<T>::from)?;
-				(Some(bond_id), bond_info.amount)
+				(Some(bond), bond_info.amount)
 			} else {
 				(None, 0u128.into())
 			};
@@ -428,9 +436,13 @@ pub mod pallet {
 						MiningRegistration {
 							account_id: who.clone(),
 							reward_destination,
-							bond_id,
+							bond_id: bond.as_ref().map(|(bond_id, _)| bond_id).copied(),
 							bond_amount: bid,
 							ownership_tokens,
+							reward_sharing: match bond {
+								Some((_, reward_sharing)) => reward_sharing,
+								None => None,
+							},
 						},
 					)
 					.map_err(|_| Error::<T>::TooManyBlockRegistrants)?;
@@ -451,27 +463,45 @@ pub mod pallet {
 		}
 	}
 }
+impl<T: Config> BlockRewardAccountsProvider<T::AccountId> for Pallet<T> {
+	fn get_rewards_account(
+		author: &T::AccountId,
+	) -> (Option<T::AccountId>, Option<RewardSharing<T::AccountId>>) {
+		let Some(registration) = Self::get_active_registration(author) else {
+			return (None, None);
+		};
 
+		let reward_account = match registration.reward_destination {
+			RewardDestination::Owner => registration.account_id,
+			RewardDestination::Account(reward_id) => reward_id,
+		};
+		(Some(reward_account), registration.reward_sharing.clone())
+	}
+
+	fn get_all_rewards_accounts() -> Vec<(T::AccountId, Option<RewardShare>)> {
+		let mut result = vec![];
+		for (_, registration) in <ActiveMinersByIndex<T>>::iter() {
+			let account = match registration.reward_destination {
+				RewardDestination::Owner => registration.account_id,
+				RewardDestination::Account(reward_id) => reward_id,
+			};
+			if let Some(reward_sharing) = registration.reward_sharing {
+				result.push((
+					account,
+					Some(Percent::from_percent(100).saturating_sub(reward_sharing.percent_take)),
+				));
+				result.push((reward_sharing.account_id, Some(reward_sharing.percent_take)));
+			} else {
+				result.push((account, None));
+			}
+		}
+		result
+	}
+}
 impl<T: Config> AuthorityProvider<BlockSealAuthorityId, T::Block, T::AccountId> for Pallet<T> {
 	fn get_authority(author: T::AccountId) -> Option<BlockSealAuthorityId> {
 		<AccountIndexLookup<T>>::get(&author)
 			.and_then(|index| AuthoritiesByIndex::<T>::get().get(&index).map(|x| x.0.clone()))
-	}
-
-	fn get_rewards_account(author: T::AccountId) -> Option<T::AccountId> {
-		Self::get_active_registration(&author).map(|x| match x.reward_destination {
-			RewardDestination::Owner => x.account_id,
-			RewardDestination::Account(reward_id) => reward_id,
-		})
-	}
-
-	fn get_all_rewards_accounts() -> Vec<T::AccountId> {
-		<ActiveMinersByIndex<T>>::iter()
-			.map(|(_, registration)| match registration.reward_destination {
-				RewardDestination::Owner => registration.account_id,
-				RewardDestination::Account(reward_id) => reward_id,
-			})
-			.collect()
 	}
 
 	fn xor_closest_authority(
@@ -535,15 +565,8 @@ impl<T: Config> Pallet<T> {
 				AccountIndexLookup::<T>::remove(&account_id);
 				active_miners -= 1;
 
-				let next = slot_cohort.iter().find(|x| x.account_id == account_id).cloned();
-				if let Err(err) = Self::unbond_account(entry, next) {
-					log::error!(
-						target: LOG_TARGET,
-						"Failed to unbond account {:?}. {:?}",
-						account_id,
-						err,
-					);
-				}
+				let registered_for_next = slot_cohort.iter().any(|x| x.account_id == account_id);
+				Self::unbond_account(entry, registered_for_next);
 			}
 
 			if let Some(registration) = slot_cohort.get(i as usize) {
@@ -578,7 +601,6 @@ impl<T: Config> Pallet<T> {
 	/// which will increase in every block.
 	///
 	/// The max percent swing is 20% over the previous adjustment to the ownership bond amount.
-
 	pub(crate) fn adjust_ownership_bond_amount() {
 		let ownership_circulation: u128 = T::OwnershipCurrency::total_issuance().saturated_into();
 
@@ -839,15 +861,31 @@ impl<T: Config> Pallet<T> {
 	/// it
 	pub(crate) fn unbond_account(
 		active_registration: Registration<T>,
-		next_registration: Option<Registration<T>>,
-	) -> DispatchResult {
+		is_registered_for_next: bool,
+	) {
 		let account_id = active_registration.account_id;
 		let active_bond_id = active_registration.bond_id;
 
 		let mut kept_ownership_bond = true;
-		if next_registration.is_none() {
-			Self::release_ownership_hold(&account_id, active_registration.ownership_tokens)?;
+		if !is_registered_for_next {
 			kept_ownership_bond = false;
+
+			if let Err(e) =
+				Self::release_ownership_hold(&account_id, active_registration.ownership_tokens)
+			{
+				log::error!(
+					target: LOG_TARGET,
+					"Failed to unbond account {:?}. {:?}",
+					account_id,
+					e,
+				);
+				Self::deposit_event(Event::<T>::FailedToUnbondMiner {
+					account_id: account_id.clone(),
+					bond_id: active_bond_id,
+					error: e,
+				});
+				return;
+			}
 		}
 
 		Self::deposit_event(Event::<T>::UnbondedMiner {
@@ -855,8 +893,6 @@ impl<T: Config> Pallet<T> {
 			bond_id: active_bond_id,
 			kept_ownership_bond,
 		});
-
-		Ok(())
 	}
 }
 

@@ -1,14 +1,16 @@
-use crate::BondId;
 use codec::{Codec, Decode, Encode, MaxEncodedLen};
 use frame_support::{CloneNoBound, EqNoBound, Parameter, PartialEqNoBound};
 use scale_info::TypeInfo;
 use serde::{Deserialize, Serialize};
 use sp_application_crypto::AppCrypto;
+use sp_arithmetic::Percent;
 use sp_core::{
 	crypto::{CryptoTypeId, KeyTypeId},
 	OpaquePeerId,
 };
 use sp_debug_derive::RuntimeDebug;
+
+use crate::BondId;
 
 pub const BLOCK_SEAL_KEY_TYPE: KeyTypeId = KeyTypeId(*b"seal");
 
@@ -40,6 +42,27 @@ pub struct MiningRegistration<AccountId: Parameter, Balance: Parameter + MaxEnco
 	pub bond_amount: Balance,
 	#[codec(compact)]
 	pub ownership_tokens: Balance,
+	pub reward_sharing: Option<RewardSharing<AccountId>>,
+}
+
+/// An struct to define a reward sharing split with another account
+#[derive(
+	PartialEq,
+	Eq,
+	Copy,
+	Clone,
+	Encode,
+	Decode,
+	RuntimeDebug,
+	TypeInfo,
+	MaxEncodedLen,
+	Deserialize,
+	Serialize,
+)]
+pub struct RewardSharing<AccountId> {
+	pub account_id: AccountId,
+	#[codec(compact)]
+	pub percent_take: Percent,
 }
 
 /// A destination account for validator rewards
@@ -84,8 +107,10 @@ pub struct MiningAuthority<AuthorityId, AccountId> {
 }
 
 #[derive(Encode, Decode, Clone, PartialEq, Eq, TypeInfo, MaxEncodedLen, RuntimeDebug)]
-pub struct BlockPayout<AccountId: Codec, Balance: Codec> {
+pub struct BlockPayout<AccountId: Codec, Balance: Codec + MaxEncodedLen> {
 	pub account_id: AccountId,
+	#[codec(compact)]
 	pub ulixees: Balance,
+	#[codec(compact)]
 	pub argons: Balance,
 }

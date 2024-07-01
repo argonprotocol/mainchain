@@ -7,7 +7,8 @@ use sp_runtime::traits::AtLeast32BitUnsigned;
 
 use crate::{
 	bitcoin::{BitcoinCosignScriptPubkey, BitcoinHeight, BitcoinPubkeyHash, UtxoId},
-	BondId, VaultId,
+	block_seal::RewardSharing,
+	BondId, RewardShare, VaultId,
 };
 
 pub trait BondProvider {
@@ -21,7 +22,7 @@ pub trait BondProvider {
 		account_id: Self::AccountId,
 		amount: Self::Balance,
 		bond_until_block: Self::BlockNumber,
-	) -> Result<BondId, BondError>;
+	) -> Result<(BondId, Option<RewardSharing<Self::AccountId>>), BondError>;
 
 	/// Return the bond to the originator with a prorated refund
 	fn cancel_bond(bond_id: BondId) -> Result<(), BondError>;
@@ -123,7 +124,7 @@ pub struct Vault<
 	pub securitized_argons: Balance,
 	pub mining_argons: VaultArgons<Balance>,
 	#[codec(compact)]
-	pub mining_mint_sharing_percent: FixedU128,
+	pub mining_reward_sharing_percent_take: RewardShare,
 	pub is_closed: bool,
 }
 

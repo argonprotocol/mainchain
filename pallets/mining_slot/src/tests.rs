@@ -9,13 +9,7 @@ use frame_support::{
 };
 use pallet_balances::Event as UlixeeBalancesEvent;
 use sp_core::{bounded_vec, crypto::AccountId32, ByteArray, H256, U256};
-use sp_runtime::{testing::UintAuthorityId, BoundedVec, FixedU128};
-
-use ulx_primitives::{
-	block_seal::{MiningAuthority, MiningRegistration, RewardDestination},
-	inherents::BlockSealInherent,
-	AuthorityProvider, BlockSealAuthorityId, BlockVote, DataDomain, DataTLD, MerkleProof,
-};
+use sp_runtime::{testing::UintAuthorityId, BoundedVec, FixedU128, Percent};
 
 use crate::{
 	mock::{MiningSlots, UlixeeBalances, *},
@@ -25,6 +19,12 @@ use crate::{
 		NextSlotCohort, OwnershipBondAmount,
 	},
 	Error, Event, HoldReason, MiningSlotBid,
+};
+use ulx_primitives::{
+	block_seal::{MiningAuthority, MiningRegistration, RewardDestination, RewardSharing},
+	inherents::BlockSealInherent,
+	AuthorityProvider, BlockRewardAccountsProvider, BlockSealAuthorityId, BlockVote, DataDomain,
+	DataTLD, MerkleProof,
 };
 
 #[test]
@@ -40,6 +40,7 @@ fn it_doesnt_add_cohorts_until_time() {
 			ownership_tokens: 0,
 			bond_amount: 0,
 			reward_destination: RewardDestination::Owner,
+			reward_sharing: None,
 		}]);
 
 		MiningSlots::on_initialize(1);
@@ -171,6 +172,7 @@ fn it_activates_miner_zero_if_no_miners() {
 		ownership_tokens: 0,
 		bond_amount: 0,
 		reward_destination: RewardDestination::Owner,
+		reward_sharing: None,
 	}))
 	.execute_with(|| {
 		MiningSlots::on_initialize(1);
@@ -192,6 +194,7 @@ fn it_activates_miner_zero_if_upcoming_miners_will_empty() {
 		ownership_tokens: 0,
 		bond_amount: 0,
 		reward_destination: RewardDestination::Owner,
+		reward_sharing: None,
 	}))
 	.execute_with(|| {
 		ActiveMinersByIndex::<Test>::insert(
@@ -202,6 +205,7 @@ fn it_activates_miner_zero_if_upcoming_miners_will_empty() {
 				ownership_tokens: 0,
 				bond_amount: 0,
 				reward_destination: RewardDestination::Owner,
+				reward_sharing: None,
 			},
 		);
 		AccountIndexLookup::<Test>::insert(10, 5);
@@ -232,6 +236,7 @@ fn it_adds_new_cohorts_on_block() {
 					ownership_tokens: 0,
 					bond_amount: 0,
 					reward_destination: RewardDestination::Owner,
+					reward_sharing: None,
 				},
 			);
 			AccountIndexLookup::<Test>::insert(account_id, i);
@@ -244,6 +249,7 @@ fn it_adds_new_cohorts_on_block() {
 			ownership_tokens: 0,
 			bond_amount: 0,
 			reward_destination: RewardDestination::Owner,
+			reward_sharing: None,
 		}]);
 
 		NextSlotCohort::<Test>::set(cohort.clone());
@@ -311,6 +317,7 @@ fn it_unbonds_accounts_when_a_window_closes() {
 					ownership_tokens,
 					bond_amount,
 					reward_destination: RewardDestination::Owner,
+					reward_sharing: None,
 				},
 			);
 			AccountIndexLookup::<Test>::insert(account_id, i);
@@ -334,6 +341,7 @@ fn it_unbonds_accounts_when_a_window_closes() {
 					ownership_tokens: 1000u32.into(),
 					bond_amount: 0,
 					reward_destination: RewardDestination::Owner,
+					reward_sharing: None,
 				}]),
 			}
 			.into(),
@@ -479,6 +487,7 @@ fn it_wont_let_you_reuse_ownership_shares_for_two_bids() {
 					ownership_tokens: shares.into(),
 					bond_amount: 0,
 					reward_destination: RewardDestination::Owner,
+					reward_sharing: None,
 				}]),
 			}
 			.into(),
@@ -631,6 +640,7 @@ fn it_will_order_bids_with_argon_bonds() {
 		assert!(System::account_exists(&3));
 	});
 }
+
 #[test]
 fn handles_a_max_of_bids_per_block() {
 	BlocksBetweenSlots::set(1);
@@ -672,6 +682,56 @@ fn handles_a_max_of_bids_per_block() {
 }
 
 #[test]
+fn records_profit_sharing_if_applicable() {
+	BlocksBetweenSlots::set(1);
+	MaxMiners::set(4);
+	MaxCohortSize::set(2);
+	VaultSharing::set(Some(RewardSharing {
+		account_id: 30,
+		percent_take: Percent::from_percent(90),
+	}));
+
+	new_test_ext(None).execute_with(|| {
+		System::set_block_number(4);
+		MiningSlots::on_initialize(4);
+		IsNextSlotBiddingOpen::<Test>::set(true);
+
+		set_ownership(1, 1000u32.into());
+
+		assert_ok!(MiningSlots::bid(
+			RuntimeOrigin::signed(1),
+			Some(MiningSlotBid { vault_id: 1, amount: 1000u32.into() }),
+			RewardDestination::Account(25)
+		));
+		assert_eq!(HistoricalBidsPerSlot::<Test>::get().into_inner()[0], 1);
+
+		System::assert_last_event(
+			Event::SlotBidderAdded { account_id: 1, bid_amount: 1000u32.into(), index: 0 }.into(),
+		);
+		assert_eq!(
+			NextSlotCohort::<Test>::get()[0].reward_sharing,
+			Some(RewardSharing { account_id: 30, percent_take: Percent::from_percent(90) })
+		);
+
+		MiningSlots::on_initialize(6);
+		assert_eq!(HistoricalBidsPerSlot::<Test>::get().into_inner()[0], 0);
+		assert_eq!(NextSlotCohort::<Test>::get().len(), 0);
+		let rewards_accounts = MiningSlots::get_all_rewards_accounts();
+		assert_eq!(rewards_accounts.len(), 2);
+		assert_eq!(rewards_accounts[0], (25, Some(Percent::from_percent(10))));
+		assert_eq!(rewards_accounts[1], (30, Some(Percent::from_percent(90))));
+
+		assert_eq!(
+			MiningSlots::get_rewards_account(&1),
+			(
+				Some(25),
+				Some(RewardSharing { account_id: 30, percent_take: Percent::from_percent(90) })
+			)
+		);
+	});
+}
+
+#[test]
 fn it_handles_null_authority() {
 	new_test_ext(None).execute_with(|| {
 		assert_eq!(MiningSlots::get_authority(1), None);
@@ -694,6 +754,7 @@ fn it_can_get_closest_authority() {
 					ownership_tokens: 0,
 					bond_amount: 0,
 					reward_destination: RewardDestination::Owner,
+					reward_sharing: None,
 				},
 			);
 			AccountIndexLookup::<Test>::insert(account_id, i);
@@ -737,6 +798,7 @@ fn it_can_replace_authority_keys() {
 					ownership_tokens: 0,
 					bond_amount: 0,
 					reward_destination: RewardDestination::Owner,
+					reward_sharing: None,
 				},
 			);
 			AccountIndexLookup::<Test>::insert(account_id, i);

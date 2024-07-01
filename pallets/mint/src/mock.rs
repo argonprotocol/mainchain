@@ -2,14 +2,12 @@ use env_logger::{Builder, Env};
 use frame_support::{derive_impl, parameter_types};
 use pallet_balances::AccountData;
 use sp_arithmetic::{FixedI128, FixedU128};
-use sp_core::U256;
 use sp_runtime::BuildStorage;
 
-use ulx_primitives::{
-	block_seal::MiningAuthority, AuthorityProvider, BlockSealAuthorityId, PriceProvider,
-};
-
 use crate as pallet_mint;
+use ulx_primitives::{
+	block_seal::RewardSharing, BlockRewardAccountsProvider, PriceProvider, RewardShare,
+};
 
 pub type Balance = u128;
 type Block = frame_system::mocking::MockBlock<Test>;
@@ -55,7 +53,7 @@ parameter_types! {
 	pub static BitcoinPricePerUsd: Option<FixedU128> = Some(FixedU128::from_float(62000.00));
 	pub static ArgonPricePerUsd: Option<FixedU128> = Some(FixedU128::from_float(1.00));
 	pub static ArgonCPI: Option<ulx_primitives::ArgonCPI> = Some(FixedI128::from_float(-1.00));
-	pub static Miners: Vec<u64> = vec![];
+	pub static MinerRewardsAccounts: Vec<(u64, Option<RewardShare>)> = vec![];
 }
 
 pub struct StaticPriceProvider;
@@ -71,22 +69,14 @@ impl PriceProvider<Balance> for StaticPriceProvider {
 	}
 }
 
-pub struct MiningProvider;
-impl AuthorityProvider<BlockSealAuthorityId, Block, u64> for MiningProvider {
-	fn get_authority(_author: u64) -> Option<BlockSealAuthorityId> {
-		todo!()
+pub struct StaticBlockRewardAccountsProvider;
+impl BlockRewardAccountsProvider<u64> for StaticBlockRewardAccountsProvider {
+	fn get_rewards_account(_author: &u64) -> (Option<u64>, Option<RewardSharing<u64>>) {
+		todo!("not used by mint")
 	}
 
-	fn get_rewards_account(_author: u64) -> Option<u64> {
-		todo!()
-	}
-
-	fn xor_closest_authority(_author: U256) -> Option<MiningAuthority<BlockSealAuthorityId, u64>> {
-		todo!()
-	}
-
-	fn get_all_rewards_accounts() -> Vec<u64> {
-		Miners::get()
+	fn get_all_rewards_accounts() -> Vec<(u64, Option<RewardShare>)> {
+		MinerRewardsAccounts::get()
 	}
 }
 
@@ -97,7 +87,7 @@ impl pallet_mint::Config for Test {
 	type Balance = Balance;
 	type MaxPendingMintUtxos = MaxPendingMintUtxos;
 	type PriceProvider = StaticPriceProvider;
-	type MiningProvider = MiningProvider;
+	type BlockRewardAccountsProvider = StaticBlockRewardAccountsProvider;
 }
 
 // Build genesis storage according to the mock runtime.

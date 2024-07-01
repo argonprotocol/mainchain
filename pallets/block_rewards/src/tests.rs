@@ -1,24 +1,26 @@
 use frame_support::{
 	assert_err, assert_ok,
 	traits::{
-		fungible::{Inspect, Mutate},
+		fungible::{Inspect, InspectFreeze, Mutate},
 		tokens::{Fortitude, Preservation},
 		OnFinalize, OnInitialize,
 	},
 };
-use sp_runtime::{DispatchError, TokenError};
-
-use ulx_primitives::{block_seal::BlockPayout, BlockSealerInfo};
+use sp_runtime::{DispatchError, Percent, TokenError};
 
 use crate::{
 	mock::{ArgonBalances, BlockRewards, UlixeeBalances, *},
-	Event,
+	Event, FreezeReason,
+};
+use ulx_primitives::{
+	block_seal::{BlockPayout, RewardSharing},
+	BlockSealerInfo,
 };
 
 #[test]
 fn it_should_only_allow_a_single_seal() {
 	BlockSealer::set(BlockSealerInfo {
-		miner_rewards_account: 1,
+		block_author_account_id: 1,
 		block_vote_rewards_account: Some(2),
 	});
 	NotebooksInBlock::set(vec![(1, 1, 1)]);
@@ -83,7 +85,7 @@ fn it_should_only_allow_a_single_seal() {
 #[test]
 fn it_should_unlock_rewards() {
 	BlockSealer::set(BlockSealerInfo {
-		miner_rewards_account: 1,
+		block_author_account_id: 1,
 		block_vote_rewards_account: Some(2),
 	});
 	new_test_ext().execute_with(|| {
@@ -104,6 +106,11 @@ fn it_should_unlock_rewards() {
 			}
 			.into(),
 		);
+		let freeze_id = FreezeReason::MaturationPeriod.into();
+		assert_eq!(ArgonBalances::balance_frozen(&freeze_id, &1), 3750);
+		assert_eq!(UlixeeBalances::balance_frozen(&freeze_id, &1), 3750);
+		assert_eq!(ArgonBalances::balance_frozen(&freeze_id, &2), 1250);
+		assert_eq!(UlixeeBalances::balance_frozen(&freeze_id, &2), 1250);
 
 		System::set_block_number(maturation_block);
 		BlockRewards::on_initialize(maturation_block);
@@ -116,17 +123,17 @@ fn it_should_unlock_rewards() {
 			}
 			.into(),
 		);
-		assert_eq!(
-			ArgonBalances::reducible_balance(&1, Preservation::Expendable, Fortitude::Polite),
-			3750
-		);
+		assert_eq!(ArgonBalances::free_balance(&1), 3750);
+		assert_eq!(UlixeeBalances::free_balance(&1), 3750);
+		assert_eq!(ArgonBalances::free_balance(&2), 1250);
+		assert_eq!(UlixeeBalances::free_balance(&2), 1250);
 	});
 }
 
 #[test]
 fn it_should_payout_block_vote_to_miner() {
 	BlockSealer::set(BlockSealerInfo {
-		miner_rewards_account: 1,
+		block_author_account_id: 1,
 		block_vote_rewards_account: None,
 	});
 	new_test_ext().execute_with(|| {
@@ -154,7 +161,7 @@ fn it_should_payout_block_vote_to_miner() {
 #[test]
 fn it_should_halve_rewards() {
 	BlockSealer::set(BlockSealerInfo {
-		miner_rewards_account: 1,
+		block_author_account_id: 1,
 		block_vote_rewards_account: Some(2),
 	});
 	new_test_ext().execute_with(|| {
@@ -182,7 +189,7 @@ fn it_should_halve_rewards() {
 fn it_should_scale_rewards_based_on_notaries() {
 	ActiveNotaries::set(vec![1, 2]);
 	BlockSealer::set(BlockSealerInfo {
-		miner_rewards_account: 1,
+		block_author_account_id: 1,
 		block_vote_rewards_account: Some(2),
 	});
 	NotebooksInBlock::set(vec![(1, 1, 1)]);
@@ -209,7 +216,7 @@ fn it_should_scale_rewards_based_on_notaries() {
 fn it_should_not_fail_with_no_notebooks() {
 	ActiveNotaries::set(vec![1, 2]);
 	BlockSealer::set(BlockSealerInfo {
-		miner_rewards_account: 1,
+		block_author_account_id: 1,
 		block_vote_rewards_account: Some(2),
 	});
 	NotebooksInBlock::set(vec![]);
@@ -229,6 +236,15 @@ fn it_should_not_fail_with_no_notebooks() {
 			}
 			.into(),
 		);
+		System::assert_has_event(
+			Event::FailedToMintReward {
+				account_id: 1,
+				ulixees: 0u128.into(),
+				argons: None,
+				error: DispatchError::Token(TokenError::BelowMinimum),
+			}
+			.into(),
+		);
 		assert_eq!(
 			ArgonBalances::reducible_balance(&1, Preservation::Expendable, Fortitude::Polite),
 			0
@@ -240,7 +256,7 @@ fn it_should_not_fail_with_no_notebooks() {
 fn it_should_not_fail_with_no_notaries() {
 	ActiveNotaries::set(vec![]);
 	BlockSealer::set(BlockSealerInfo {
-		miner_rewards_account: 1,
+		block_author_account_id: 1,
 		block_vote_rewards_account: Some(2),
 	});
 	NotebooksInBlock::set(vec![]);
@@ -260,5 +276,41 @@ fn it_should_not_fail_with_no_notaries() {
 			}
 			.into(),
 		);
+	});
+}
+
+#[test]
+fn it_should_support_profit_sharing() {
+	ActiveNotaries::set(vec![1, 2]);
+	BlockSealer::set(BlockSealerInfo {
+		block_author_account_id: 1,
+		block_vote_rewards_account: Some(2),
+	});
+	GetRewardSharing::set(Some(RewardSharing {
+		account_id: 3,
+		percent_take: Percent::from_percent(40),
+	}));
+	NotebooksInBlock::set(vec![(1, 1, 1), (2, 1, 1)]);
+	CurrentTick::set(1);
+	new_test_ext().execute_with(|| {
+		System::set_block_number(1);
+		BlockRewards::on_initialize(1);
+		BlockRewards::on_finalize(1);
+		let maturation_block = (1 + MaturationBlocks::get()).into();
+		let share_amount = (3750.0 * 0.4) as u128;
+		System::assert_last_event(
+			Event::RewardCreated {
+				maturation_block,
+				rewards: vec![
+					BlockPayout { account_id: 1, ulixees: 3750, argons: 3750 - share_amount },
+					BlockPayout { account_id: 3, ulixees: 0, argons: share_amount },
+					BlockPayout { account_id: 2, ulixees: 1250, argons: 1250 },
+				],
+			}
+			.into(),
+		);
+		let freeze_id = FreezeReason::MaturationPeriod.into();
+
+		assert_eq!(ArgonBalances::balance_frozen(&freeze_id, &3), share_amount);
 	});
 }

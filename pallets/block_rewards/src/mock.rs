@@ -1,16 +1,16 @@
 use env_logger::{Builder, Env};
 use frame_support::{derive_impl, parameter_types, traits::StorageMapShim};
 use sp_core::{ConstU32, H256};
-use sp_runtime::{traits::IdentityLookup, BuildStorage};
-
-use ulx_primitives::{
-	notary::{NotaryProvider, NotarySignature},
-	tick::Tick,
-	BlockSealerInfo, BlockSealerProvider, NotaryId, NotebookNumber, NotebookProvider,
-	NotebookSecret,
-};
+use sp_runtime::{traits::IdentityLookup, BuildStorage, Percent};
 
 use crate as pallet_block_rewards;
+use ulx_primitives::{
+	block_seal::RewardSharing,
+	notary::{NotaryProvider, NotarySignature},
+	tick::Tick,
+	BlockRewardAccountsProvider, BlockSealerInfo, BlockSealerProvider, NotaryId, NotebookNumber,
+	NotebookProvider, NotebookSecret, RewardShare,
+};
 
 type Block = frame_system::mocking::MockBlock<Test>;
 pub(crate) type AccountId = u64;
@@ -82,15 +82,16 @@ parameter_types! {
 	pub static StartingUlixeesPerBlock :u32 = 5_000;
 	pub static HalvingBlocks :u32 = 100;
 	pub static MaturationBlocks :u32 = 5;
-	pub static MinerPayoutPercent :u32 = 75;
+	pub static MinerPayoutPercent :Percent = Percent::from_percent(75);
 	pub static ActiveNotaries: Vec<NotaryId> = vec![1];
 	pub static CurrentTick: Tick = 0;
 
+	pub static GetRewardSharing: Option<RewardSharing<u64>> = None;
 	pub static NotebooksInBlock: Vec<(NotaryId, NotebookNumber, Tick)> = vec![];
 
 	pub static BlockSealer:BlockSealerInfo<u64> = BlockSealerInfo {
 		block_vote_rewards_account: Some(1),
-		miner_rewards_account: 1,
+		block_author_account_id: 1,
 	};
 }
 
@@ -128,6 +129,22 @@ impl NotebookProvider for TestProvider {
 	}
 }
 
+pub struct StaticBlockRewardAccountsProvider;
+impl BlockRewardAccountsProvider<u64> for StaticBlockRewardAccountsProvider {
+	fn get_rewards_account(author: &u64) -> (Option<u64>, Option<RewardSharing<u64>>) {
+		let res = GetRewardSharing::get();
+		if let Some(delegate) = res {
+			(Some(*author), Some(delegate))
+		} else {
+			(None, None)
+		}
+	}
+
+	fn get_all_rewards_accounts() -> Vec<(u64, Option<RewardShare>)> {
+		todo!("not used by rewards")
+	}
+}
+
 impl pallet_block_rewards::Config for Test {
 	type RuntimeEvent = RuntimeEvent;
 	type WeightInfo = ();
@@ -145,6 +162,7 @@ impl pallet_block_rewards::Config for Test {
 	type CurrentTick = CurrentTick;
 	type NotebookProvider = TestProvider;
 	type EventHandler = ();
+	type BlockRewardAccountsProvider = StaticBlockRewardAccountsProvider;
 }
 
 // Build genesis storage according to the mock runtime.
