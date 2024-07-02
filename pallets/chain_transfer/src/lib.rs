@@ -9,6 +9,7 @@ pub use pallet::*;
 pub use ulx_notary_audit::VerifyError as NotebookVerifyError;
 use ulx_primitives::{
 	notary::{NotaryId, NotaryProvider},
+	tick::Tick,
 	TransferToLocalchainId,
 };
 pub use weights::*;
@@ -37,12 +38,13 @@ pub mod pallet {
 	use sp_core::{crypto::AccountId32, H256};
 	use sp_runtime::traits::{AccountIdConversion, AtLeast32BitUnsigned};
 
+	use super::*;
 	use ulx_primitives::{
 		notebook::{ChainTransfer, NotebookHeader},
-		BurnEventHandler, ChainTransferLookup, NotebookEventHandler, NotebookProvider,
+		tick::Tick,
+		BurnEventHandler, ChainTransferLookup, NotebookEventHandler, NotebookNumber,
+		NotebookProvider,
 	};
-
-	use super::*;
 
 	#[pallet::pallet]
 	pub struct Pallet<T>(_);
@@ -72,13 +74,15 @@ pub mod pallet {
 		type NotaryProvider: NotaryProvider<<Self as frame_system::Config>::Block>;
 
 		type NotebookProvider: NotebookProvider;
+		type CurrentTick: Get<Tick>;
 		type EventHandler: BurnEventHandler<Self::Balance>;
 		#[pallet::constant]
 		type PalletId: Get<PalletId>;
 
-		/// How long a transfer should remain in storage before returning.
+		/// How long a transfer should remain in storage before returning. NOTE: there is a 2 tick
+		/// grace period where we will still allow a transfer
 		#[pallet::constant]
-		type TransferExpirationBlocks: Get<u32>;
+		type TransferExpirationTicks: Get<u32>;
 
 		/// How many transfers out can be queued per block
 		#[pallet::constant]
@@ -94,17 +98,18 @@ pub mod pallet {
 		_,
 		Blake2_128Concat,
 		TransferToLocalchainId,
-		QueuedTransferOut<T::AccountId, T::Balance, BlockNumberFor<T>>,
+		QueuedTransferOut<T::AccountId, T::Balance>,
 		OptionQuery,
 	>;
 
 	#[pallet::storage]
-	pub(super) type ExpiringTransfersOut<T: Config> = StorageMap<
-		_,
-		Twox64Concat,
-		BlockNumberFor<T>,
-		BoundedVec<TransferToLocalchainId, T::MaxPendingTransfersOutPerBlock>,
-		ValueQuery,
+	pub(super) type ExpiringTransfersOutByNotary<T: Config> = StorageDoubleMap<
+		Hasher1 = Twox64Concat,
+		Hasher2 = Twox64Concat,
+		Key1 = NotaryId,
+		Key2 = Tick,
+		Value = BoundedVec<TransferToLocalchainId, T::MaxPendingTransfersOutPerBlock>,
+		QueryKind = ValueQuery,
 	>;
 
 	#[pallet::storage]
@@ -124,7 +129,7 @@ pub mod pallet {
 			amount: T::Balance,
 			transfer_id: TransferToLocalchainId,
 			notary_id: NotaryId,
-			expiration_block: BlockNumberFor<T>,
+			expiration_tick: Tick,
 		},
 		TransferToLocalchainExpired {
 			account_id: T::AccountId,
@@ -135,6 +140,36 @@ pub mod pallet {
 			account_id: T::AccountId,
 			amount: T::Balance,
 			notary_id: NotaryId,
+		},
+		/// A transfer into the mainchain failed
+		TransferInError {
+			account_id: T::AccountId,
+			amount: T::Balance,
+			notary_id: NotaryId,
+			notebook_number: NotebookNumber,
+			error: DispatchError,
+		},
+		/// An expired transfer to localchain failed to be refunded
+		TransferToLocalchainRefundError {
+			account_id: T::AccountId,
+			transfer_id: TransferToLocalchainId,
+			notary_id: NotaryId,
+			notebook_number: NotebookNumber,
+			error: DispatchError,
+		},
+		/// A localchain transfer could not be cleaned up properly. Possible invalid transfer
+		/// needing investigation.
+		PossibleInvalidTransferAllowed {
+			transfer_id: TransferToLocalchainId,
+			notary_id: NotaryId,
+			notebook_number: NotebookNumber,
+		},
+		/// Taxation failed
+		TaxationError {
+			notary_id: NotaryId,
+			notebook_number: NotebookNumber,
+			tax: T::Balance,
+			error: DispatchError,
 		},
 	}
 
@@ -151,43 +186,8 @@ pub mod pallet {
 		NotebookIncludesExpiredLocalchainTransfer,
 		/// The notary id is not registered
 		InvalidNotaryUsedForTransfer,
-	}
-
-	#[pallet::hooks]
-	impl<T: Config> Hooks<BlockNumberFor<T>> for Pallet<T> {
-		fn on_initialize(block_number: BlockNumberFor<T>) -> Weight {
-			let expiring = <ExpiringTransfersOut<T>>::take(block_number);
-			for transfer_id in expiring.into_iter() {
-				if let Some(transfer) = <PendingTransfersOut<T>>::take(transfer_id) {
-					let _ = T::Currency::transfer(
-						&Self::notary_account_id(transfer.notary_id),
-						&transfer.account_id,
-						transfer.amount,
-						Preservation::Expendable,
-					)
-					.map_err(|e| {
-						// can't panic here or chain will get stuck
-						log::warn!(
-							target: LOG_TARGET,
-							"Failed to return pending Localchain transfer to account {:?} (amount={:?}): {:?}",
-							&transfer.account_id,
-							transfer.amount,
-							e
-						);
-					});
-					Self::deposit_event(Event::TransferToLocalchainExpired {
-						account_id: transfer.account_id.clone(),
-						transfer_id,
-						notary_id: transfer.notary_id,
-					});
-				}
-			}
-			T::DbWeight::get().reads_writes(2, 1)
-		}
-
-		fn on_finalize(_: BlockNumberFor<T>) {
-			// nothing to do
-		}
+		/// The notary is locked (likey due to failed audits)
+		NotaryLocked,
 	}
 
 	#[pallet::call]
@@ -217,14 +217,13 @@ pub mod pallet {
 				Preservation::Expendable,
 			)?;
 
-			let expiration_block: BlockNumberFor<T> = <frame_system::Pallet<T>>::block_number() +
-				T::TransferExpirationBlocks::get().into();
+			let expiration_tick: Tick = T::CurrentTick::get() + T::TransferExpirationTicks::get();
 
 			PendingTransfersOut::<T>::insert(
 				transfer_id,
-				QueuedTransferOut { account_id: who.clone(), amount, expiration_block, notary_id },
+				QueuedTransferOut { account_id: who.clone(), amount, expiration_tick, notary_id },
 			);
-			ExpiringTransfersOut::<T>::try_append(expiration_block, transfer_id)
+			ExpiringTransfersOutByNotary::<T>::try_append(notary_id, expiration_tick, transfer_id)
 				.map_err(|_| Error::<T>::MaxBlockTransfersExceeded)?;
 
 			Self::deposit_event(Event::TransferToLocalchain {
@@ -232,14 +231,14 @@ pub mod pallet {
 				amount,
 				transfer_id,
 				notary_id,
-				expiration_block,
+				expiration_tick,
 			});
 			Ok(())
 		}
 	}
 
 	impl<T: Config> NotebookEventHandler for Pallet<T> {
-		fn notebook_submitted(header: &NotebookHeader) -> sp_runtime::DispatchResult {
+		fn notebook_submitted(header: &NotebookHeader) {
 			let notary_id = header.notary_id;
 
 			let is_locked = T::NotebookProvider::is_notary_locked_at_tick(notary_id, header.tick);
@@ -249,64 +248,110 @@ pub mod pallet {
 			for transfer in header.chain_transfers.iter() {
 				match transfer {
 					ChainTransfer::ToMainchain { account_id, amount } => {
-						if is_locked {
-							continue;
-						}
 						let amount = (*amount).into();
-						ensure!(
-							T::Currency::reducible_balance(
-								&notary_pallet_account_id,
-								Preservation::Expendable,
-								Fortitude::Force,
-							) >= amount,
-							Error::<T>::InsufficientNotarizedFunds
-						);
-						T::Currency::transfer(
+						if let Err(e) = Self::transfer_funds_to_mainchain(
+							is_locked,
 							&notary_pallet_account_id,
 							account_id,
 							amount,
-							Preservation::Expendable,
-						)?;
-						Self::deposit_event(Event::TransferIn {
-							notary_id,
-							account_id: account_id.clone(),
-							amount,
-						});
+						) {
+							Self::deposit_event(Event::TransferInError {
+								notary_id,
+								notebook_number: header.notebook_number,
+								account_id: account_id.clone(),
+								amount,
+								error: e.into(),
+							});
+						} else {
+							Self::deposit_event(Event::TransferIn {
+								notary_id,
+								account_id: account_id.clone(),
+								amount,
+							});
+						}
 					},
 					ChainTransfer::ToLocalchain { transfer_id } => {
-						let transfer = <PendingTransfersOut<T>>::take(transfer_id)
-							.ok_or(Error::<T>::InvalidOrDuplicatedLocalchainTransfer)?;
-						ensure!(
-							transfer.expiration_block > <frame_system::Pallet<T>>::block_number(),
-							Error::<T>::NotebookIncludesExpiredLocalchainTransfer
-						);
-						ensure!(
-							transfer.notary_id == notary_id,
-							Error::<T>::InvalidNotaryUsedForTransfer
-						);
-						let _ =
-							<ExpiringTransfersOut<T>>::try_mutate(transfer.expiration_block, |e| {
-								if let Some(pos) = e.iter().position(|x| x == transfer_id) {
-									e.remove(pos);
-								}
-								Ok::<_, Error<T>>(())
+						if let Some(transfer) = <PendingTransfersOut<T>>::take(transfer_id) {
+							<ExpiringTransfersOutByNotary<T>>::mutate(
+								transfer.notary_id,
+								transfer.expiration_tick,
+								|e| {
+									if let Some(pos) = e.iter().position(|x| x == transfer_id) {
+										e.remove(pos);
+									}
+								},
+							);
+						} else {
+							Self::deposit_event(Event::PossibleInvalidTransferAllowed {
+								transfer_id: *transfer_id,
+								notebook_number: header.notebook_number,
+								notary_id,
 							});
+						}
 					},
 				}
 			}
 
 			if header.tax > 0 && !is_locked {
-				T::Currency::burn_from(
+				if let Err(e) = T::Currency::burn_from(
 					&notary_pallet_account_id,
 					header.tax.into(),
 					Preservation::Preserve,
 					Precision::Exact,
 					Fortitude::Force,
-				)?;
-				T::EventHandler::on_argon_burn(&header.tax.into())?;
+				) {
+					Self::deposit_event(Event::TaxationError {
+						notary_id,
+						notebook_number: header.notebook_number,
+						tax: header.tax.into(),
+						error: e.into(),
+					});
+				}
+				T::EventHandler::on_argon_burn(&header.tax.into());
+			} else if header.tax > 0 {
+				Self::deposit_event(Event::TaxationError {
+					notary_id,
+					notebook_number: header.notebook_number,
+					tax: header.tax.into(),
+					error: Error::<T>::NotaryLocked.into(),
+				});
 			}
 
-			Ok(())
+			let expiring = <ExpiringTransfersOutByNotary<T>>::take(notary_id, header.tick);
+			for transfer_id in expiring.into_iter() {
+				let Some(transfer) = <PendingTransfersOut<T>>::take(transfer_id) else { continue };
+				match T::Currency::transfer(
+					&Self::notary_account_id(transfer.notary_id),
+					&transfer.account_id,
+					transfer.amount,
+					Preservation::Expendable,
+				) {
+					Ok(_) => {
+						Self::deposit_event(Event::TransferToLocalchainExpired {
+							account_id: transfer.account_id,
+							transfer_id,
+							notary_id: transfer.notary_id,
+						});
+					},
+					Err(e) => {
+						// can't panic here or chain will get stuck
+						log::warn!(
+							target: LOG_TARGET,
+							"Failed to return pending Localchain transfer to account {:?} (amount={:?}): {:?}",
+							&transfer.account_id,
+							transfer.amount,
+							e
+						);
+						Self::deposit_event(Event::TransferToLocalchainRefundError {
+							account_id: transfer.account_id,
+							notebook_number: header.notebook_number,
+							transfer_id,
+							notary_id: transfer.notary_id,
+							error: e.into(),
+						});
+					},
+				}
+			}
 		}
 	}
 
@@ -316,12 +361,14 @@ pub mod pallet {
 			transfer_id: TransferToLocalchainId,
 			account_id: &T::AccountId,
 			milligons: T::Balance,
+			at_tick: Tick,
 		) -> bool {
 			let result = <PendingTransfersOut<T>>::get(transfer_id);
 			if let Some(transfer) = result {
 				return transfer.notary_id == notary_id &&
 					transfer.amount == milligons &&
-					transfer.account_id == *account_id;
+					transfer.account_id == *account_id &&
+					transfer.expiration_tick >= at_tick;
 			}
 
 			false
@@ -329,6 +376,31 @@ pub mod pallet {
 	}
 
 	impl<T: Config> Pallet<T> {
+		pub fn transfer_funds_to_mainchain(
+			is_locked: bool,
+			notary_pallet_account_id: &T::AccountId,
+			account_id: &T::AccountId,
+			amount: T::Balance,
+		) -> DispatchResult {
+			ensure!(!is_locked, Error::<T>::NotaryLocked);
+
+			ensure!(
+				T::Currency::reducible_balance(
+					&notary_pallet_account_id,
+					Preservation::Expendable,
+					Fortitude::Force,
+				) >= amount,
+				Error::<T>::InsufficientNotarizedFunds
+			);
+			T::Currency::transfer(
+				&notary_pallet_account_id,
+				account_id,
+				amount,
+				Preservation::Expendable,
+			)?;
+			Ok(())
+		}
+
 		pub fn notary_account_id(notary_id: NotaryId) -> T::AccountId {
 			T::PalletId::get().into_sub_account_truncating(notary_id)
 		}
@@ -343,9 +415,9 @@ pub mod pallet {
 
 #[derive(Clone, PartialEq, Eq, Encode, Decode, RuntimeDebug, TypeInfo)]
 #[codec(mel_bound(Balance: MaxEncodedLen, BlockNumber: MaxEncodedLen))]
-pub struct QueuedTransferOut<AccountId, Balance, BlockNumber> {
+pub struct QueuedTransferOut<AccountId, Balance> {
 	pub account_id: AccountId,
 	pub amount: Balance,
-	pub expiration_block: BlockNumber,
+	pub expiration_tick: Tick,
 	pub notary_id: NotaryId,
 }

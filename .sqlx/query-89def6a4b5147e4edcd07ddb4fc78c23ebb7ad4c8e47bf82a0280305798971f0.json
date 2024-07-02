@@ -1,0 +1,25 @@
+{
+  "db_name": "PostgreSQL",
+  "query": "\n\t\t\t\tUPDATE chain_transfers SET included_in_notebook_number = $1\n\t\t\t\tWHERE account_id = $2 AND transfer_id = $3 AND expiration_tick >= $4\n\t\t\t\tAND included_in_notebook_number IS NULL\n\t\t\t\tRETURNING amount\n\t\t\t\t",
+  "describe": {
+    "columns": [
+      {
+        "ordinal": 0,
+        "name": "amount",
+        "type_info": "Varchar"
+      }
+    ],
+    "parameters": {
+      "Left": [
+        "Int4",
+        "Bytea",
+        "Int4",
+        "Int4"
+      ]
+    },
+    "nullable": [
+      false
+    ]
+  },
+  "hash": "89def6a4b5147e4edcd07ddb4fc78c23ebb7ad4c8e47bf82a0280305798971f0"
+}

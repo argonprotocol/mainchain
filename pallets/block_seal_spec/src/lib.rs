@@ -236,7 +236,7 @@ pub mod pallet {
 			Self::update_vote_minimum(tick, block_votes.votes_count, block_votes.voting_power);
 
 			<VoteMinimumHistory<T>>::mutate(|specs| {
-				if specs.len() >= VOTE_MINIMUM_HISTORY_LEN as usize {
+				if specs.is_full() {
 					specs.pop();
 				}
 				specs.try_insert(0, Self::vote_minimum())
@@ -433,14 +433,15 @@ pub mod pallet {
 	}
 
 	impl<T: Config> NotebookEventHandler for Pallet<T> {
-		fn notebook_submitted(header: &NotebookHeader) -> DispatchResult {
+		fn notebook_submitted(header: &NotebookHeader) {
 			let current_tick = T::TickProvider::current_tick();
 			if header.tick == current_tick {
 				let digest_details = header.into();
 				<TempCurrentTickNotebooksInBlock<T>>::try_mutate(|a| a.try_push(digest_details))
-					.map_err(|_| Error::<T>::MaxNotebooksAtTickExceeded)?;
+					.expect(
+						"MaxActiveNotaries is a bound. If this is exceeded, something is wrong.",
+					);
 			}
-			Ok(())
 		}
 	}
 

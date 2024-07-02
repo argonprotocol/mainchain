@@ -137,6 +137,7 @@ pub trait ChainTransferLookup<AccountId, Balance> {
 		transfer_to_localchain_id: TransferToLocalchainId,
 		account_id: &AccountId,
 		milligons: Balance,
+		for_notebook_tick: Tick,
 	) -> bool;
 }
 
@@ -180,14 +181,13 @@ pub trait TickProvider<B: BlockT> {
 
 /// An event handler to listen for submitted notebook
 pub trait NotebookEventHandler {
-	fn notebook_submitted(header: &NotebookHeader) -> DispatchResult;
+	fn notebook_submitted(header: &NotebookHeader);
 }
 
 #[impl_trait_for_tuples::impl_for_tuples(5)]
 impl NotebookEventHandler for Tuple {
-	fn notebook_submitted(header: &NotebookHeader) -> DispatchResult {
+	fn notebook_submitted(header: &NotebookHeader) {
 		for_tuples!( #( Tuple::notebook_submitted(&header); )* );
-		Ok(())
 	}
 }
 
@@ -205,14 +205,13 @@ impl BlockSealEventHandler for Tuple {
 
 /// An event handler to listen for submitted notebook
 pub trait BurnEventHandler<Balance> {
-	fn on_argon_burn(milligons: &Balance) -> DispatchResult;
+	fn on_argon_burn(milligons: &Balance);
 }
 
 #[impl_trait_for_tuples::impl_for_tuples(5)]
 impl<Balance> BurnEventHandler<Balance> for Tuple {
-	fn on_argon_burn(milligons: &Balance) -> DispatchResult {
+	fn on_argon_burn(milligons: &Balance) {
 		for_tuples!( #( Tuple::on_argon_burn(milligons); )* );
-		Ok(())
 	}
 }
 

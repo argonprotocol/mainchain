@@ -157,8 +157,8 @@ fn it_checks_the_vote_digest() {
 			&System::parent_hash(),
 			&Digest { logs: vec![DigestItem::PreRuntime(BLOCK_VOTES_DIGEST_ID, digest.encode())] },
 		);
-		assert_ok!(SealMinimums::notebook_submitted(&book1));
-		assert_ok!(SealMinimums::notebook_submitted(&book2));
+		SealMinimums::notebook_submitted(&book1);
+		SealMinimums::notebook_submitted(&book2);
 
 		SealMinimums::on_timestamp_set(2);
 		SealMinimums::on_initialize(2);

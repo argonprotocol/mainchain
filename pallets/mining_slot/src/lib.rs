@@ -259,7 +259,7 @@ pub mod pallet {
 			bond_id: Option<BondId>,
 			kept_ownership_bond: bool,
 		},
-		FailedToUnbondMiner {
+		UnbondMinerError {
 			account_id: T::AccountId,
 			bond_id: Option<BondId>,
 			error: DispatchError,
@@ -422,11 +422,9 @@ pub mod pallet {
 
 				ensure!(pos < T::MaxCohortSize::get() as usize, Error::<T>::BidTooLow);
 
-				if UniqueSaturatedInto::<u32>::unique_saturated_into(cohort.len()) >=
-					T::MaxCohortSize::get()
-				{
+				if cohort.is_full() {
 					// need to pop-off the lowest bid
-					let entry = cohort.pop().unwrap();
+					let entry = cohort.pop().expect("should exist, just checked");
 					Self::release_failed_bid(entry)?;
 				}
 
@@ -540,7 +538,7 @@ impl<T: Config> Pallet<T> {
 		let max_miners = T::MaxMiners::get();
 		let cohort_size = T::MaxCohortSize::get();
 		HistoricalBidsPerSlot::<T>::mutate(|bids| {
-			if bids.len() == bids.capacity() {
+			if bids.is_full() {
 				bids.pop();
 			}
 			let _ = bids.try_insert(0, 0);
@@ -879,7 +877,7 @@ impl<T: Config> Pallet<T> {
 					account_id,
 					e,
 				);
-				Self::deposit_event(Event::<T>::FailedToUnbondMiner {
+				Self::deposit_event(Event::<T>::UnbondMinerError {
 					account_id: account_id.clone(),
 					bond_id: active_bond_id,
 					error: e,

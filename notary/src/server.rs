@@ -368,6 +368,7 @@ mod tests {
 		ChainTransferStore::record_transfer_to_local_from_block(
 			&mut *db,
 			0,
+			10,
 			&Bob.to_account_id(),
 			1,
 			1000,

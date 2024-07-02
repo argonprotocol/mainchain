@@ -1631,10 +1631,9 @@ pub mod api {
 							audit_dependency_summaries,
 						},
 						[
-							216u8, 94u8, 202u8, 134u8, 38u8, 173u8, 164u8, 235u8, 124u8, 165u8,
-							206u8, 40u8, 249u8, 40u8, 205u8, 200u8, 78u8, 240u8, 67u8, 83u8, 24u8,
-							131u8, 172u8, 216u8, 146u8, 47u8, 70u8, 219u8, 219u8, 199u8, 37u8,
-							22u8,
+							12u8, 0u8, 42u8, 2u8, 96u8, 188u8, 239u8, 75u8, 246u8, 170u8, 18u8,
+							213u8, 30u8, 73u8, 197u8, 224u8, 83u8, 70u8, 126u8, 80u8, 28u8, 147u8,
+							238u8, 83u8, 25u8, 45u8, 150u8, 240u8, 31u8, 71u8, 241u8, 50u8,
 						],
 					)
 				}
@@ -2627,9 +2626,9 @@ pub mod api {
 			.hash();
 		runtime_metadata_hash ==
 			[
-				131u8, 205u8, 25u8, 185u8, 25u8, 223u8, 93u8, 11u8, 118u8, 140u8, 17u8, 214u8,
-				145u8, 24u8, 162u8, 126u8, 21u8, 167u8, 48u8, 53u8, 194u8, 139u8, 34u8, 20u8, 6u8,
-				196u8, 219u8, 2u8, 187u8, 94u8, 64u8, 202u8,
+				203u8, 166u8, 178u8, 78u8, 14u8, 6u8, 81u8, 241u8, 116u8, 187u8, 161u8, 227u8,
+				96u8, 13u8, 74u8, 40u8, 38u8, 104u8, 1u8, 78u8, 185u8, 252u8, 7u8, 123u8, 46u8,
+				221u8, 205u8, 124u8, 196u8, 252u8, 172u8, 44u8,
 			]
 	}
 	pub mod system {
@@ -3706,10 +3705,9 @@ pub mod api {
 						"Events",
 						(),
 						[
-							166u8, 160u8, 61u8, 55u8, 50u8, 209u8, 34u8, 109u8, 153u8, 65u8, 121u8,
-							236u8, 158u8, 173u8, 152u8, 117u8, 255u8, 202u8, 234u8, 111u8, 10u8,
-							204u8, 24u8, 129u8, 107u8, 202u8, 50u8, 132u8, 225u8, 55u8, 38u8,
-							234u8,
+							50u8, 232u8, 203u8, 21u8, 23u8, 34u8, 239u8, 148u8, 187u8, 9u8, 188u8,
+							51u8, 166u8, 90u8, 101u8, 253u8, 56u8, 53u8, 133u8, 232u8, 29u8, 2u8,
+							44u8, 221u8, 237u8, 50u8, 217u8, 206u8, 218u8, 22u8, 46u8, 56u8,
 						],
 					)
 				}
@@ -6313,20 +6311,20 @@ pub mod api {
 			# [codec (crate = :: subxt :: ext :: codec)]
 			#[decode_as_type(crate_path = ":: subxt :: ext :: scale_decode")]
 			#[encode_as_type(crate_path = ":: subxt :: ext :: scale_encode")]
-			pub struct FailedToUnbondMiner {
-				pub account_id: failed_to_unbond_miner::AccountId,
-				pub bond_id: failed_to_unbond_miner::BondId,
-				pub error: failed_to_unbond_miner::Error,
+			pub struct UnbondMinerError {
+				pub account_id: unbond_miner_error::AccountId,
+				pub bond_id: unbond_miner_error::BondId,
+				pub error: unbond_miner_error::Error,
 			}
-			pub mod failed_to_unbond_miner {
+			pub mod unbond_miner_error {
 				use super::runtime_types;
 				pub type AccountId = ::subxt::utils::AccountId32;
 				pub type BondId = ::core::option::Option<::core::primitive::u64>;
 				pub type Error = runtime_types::sp_runtime::DispatchError;
 			}
-			impl ::subxt::events::StaticEvent for FailedToUnbondMiner {
+			impl ::subxt::events::StaticEvent for UnbondMinerError {
 				const PALLET: &'static str = "MiningSlot";
-				const EVENT: &'static str = "FailedToUnbondMiner";
+				const EVENT: &'static str = "UnbondMinerError";
 			}
 		}
 		pub mod storage {
@@ -7043,6 +7041,102 @@ pub mod api {
 			impl ::subxt::events::StaticEvent for UtxoUnwatched {
 				const PALLET: &'static str = "BitcoinUtxos";
 				const EVENT: &'static str = "UtxoUnwatched";
+			}
+			#[derive(
+				:: subxt :: ext :: codec :: Decode,
+				:: subxt :: ext :: codec :: Encode,
+				:: subxt :: ext :: scale_decode :: DecodeAsType,
+				:: subxt :: ext :: scale_encode :: EncodeAsType,
+				Clone,
+				Debug,
+			)]
+			# [codec (crate = :: subxt :: ext :: codec)]
+			#[decode_as_type(crate_path = ":: subxt :: ext :: scale_decode")]
+			#[encode_as_type(crate_path = ":: subxt :: ext :: scale_encode")]
+			pub struct UtxoSpentError {
+				pub utxo_id: utxo_spent_error::UtxoId,
+				pub error: utxo_spent_error::Error,
+			}
+			pub mod utxo_spent_error {
+				use super::runtime_types;
+				pub type UtxoId = ::core::primitive::u64;
+				pub type Error = runtime_types::sp_runtime::DispatchError;
+			}
+			impl ::subxt::events::StaticEvent for UtxoSpentError {
+				const PALLET: &'static str = "BitcoinUtxos";
+				const EVENT: &'static str = "UtxoSpentError";
+			}
+			#[derive(
+				:: subxt :: ext :: codec :: Decode,
+				:: subxt :: ext :: codec :: Encode,
+				:: subxt :: ext :: scale_decode :: DecodeAsType,
+				:: subxt :: ext :: scale_encode :: EncodeAsType,
+				Clone,
+				Debug,
+			)]
+			# [codec (crate = :: subxt :: ext :: codec)]
+			#[decode_as_type(crate_path = ":: subxt :: ext :: scale_decode")]
+			#[encode_as_type(crate_path = ":: subxt :: ext :: scale_encode")]
+			pub struct UtxoVerifiedError {
+				pub utxo_id: utxo_verified_error::UtxoId,
+				pub error: utxo_verified_error::Error,
+			}
+			pub mod utxo_verified_error {
+				use super::runtime_types;
+				pub type UtxoId = ::core::primitive::u64;
+				pub type Error = runtime_types::sp_runtime::DispatchError;
+			}
+			impl ::subxt::events::StaticEvent for UtxoVerifiedError {
+				const PALLET: &'static str = "BitcoinUtxos";
+				const EVENT: &'static str = "UtxoVerifiedError";
+			}
+			#[derive(
+				:: subxt :: ext :: codec :: Decode,
+				:: subxt :: ext :: codec :: Encode,
+				:: subxt :: ext :: scale_decode :: DecodeAsType,
+				:: subxt :: ext :: scale_encode :: EncodeAsType,
+				Clone,
+				Debug,
+			)]
+			# [codec (crate = :: subxt :: ext :: codec)]
+			#[decode_as_type(crate_path = ":: subxt :: ext :: scale_decode")]
+			#[encode_as_type(crate_path = ":: subxt :: ext :: scale_encode")]
+			pub struct UtxoRejectedError {
+				pub utxo_id: utxo_rejected_error::UtxoId,
+				pub error: utxo_rejected_error::Error,
+			}
+			pub mod utxo_rejected_error {
+				use super::runtime_types;
+				pub type UtxoId = ::core::primitive::u64;
+				pub type Error = runtime_types::sp_runtime::DispatchError;
+			}
+			impl ::subxt::events::StaticEvent for UtxoRejectedError {
+				const PALLET: &'static str = "BitcoinUtxos";
+				const EVENT: &'static str = "UtxoRejectedError";
+			}
+			#[derive(
+				:: subxt :: ext :: codec :: Decode,
+				:: subxt :: ext :: codec :: Encode,
+				:: subxt :: ext :: scale_decode :: DecodeAsType,
+				:: subxt :: ext :: scale_encode :: EncodeAsType,
+				Clone,
+				Debug,
+			)]
+			# [codec (crate = :: subxt :: ext :: codec)]
+			#[decode_as_type(crate_path = ":: subxt :: ext :: scale_decode")]
+			#[encode_as_type(crate_path = ":: subxt :: ext :: scale_encode")]
+			pub struct UtxoExpiredError {
+				pub utxo_ref: utxo_expired_error::UtxoRef,
+				pub error: utxo_expired_error::Error,
+			}
+			pub mod utxo_expired_error {
+				use super::runtime_types;
+				pub type UtxoRef = runtime_types::ulx_primitives::bitcoin::UtxoRef;
+				pub type Error = runtime_types::sp_runtime::DispatchError;
+			}
+			impl ::subxt::events::StaticEvent for UtxoExpiredError {
+				const PALLET: &'static str = "BitcoinUtxos";
+				const EVENT: &'static str = "UtxoExpiredError";
 			}
 		}
 		pub mod storage {
@@ -8280,6 +8374,56 @@ pub mod api {
 				const PALLET: &'static str = "Bonds";
 				const EVENT: &'static str = "BitcoinCosignPastDue";
 			}
+			#[derive(
+				:: subxt :: ext :: codec :: Decode,
+				:: subxt :: ext :: codec :: Encode,
+				:: subxt :: ext :: scale_decode :: DecodeAsType,
+				:: subxt :: ext :: scale_encode :: EncodeAsType,
+				Clone,
+				Debug,
+			)]
+			# [codec (crate = :: subxt :: ext :: codec)]
+			#[decode_as_type(crate_path = ":: subxt :: ext :: scale_decode")]
+			#[encode_as_type(crate_path = ":: subxt :: ext :: scale_encode")]
+			#[doc = "An error occurred while completing a bond"]
+			pub struct BondCompletionError {
+				pub bond_id: bond_completion_error::BondId,
+				pub error: bond_completion_error::Error,
+			}
+			pub mod bond_completion_error {
+				use super::runtime_types;
+				pub type BondId = ::core::primitive::u64;
+				pub type Error = runtime_types::sp_runtime::DispatchError;
+			}
+			impl ::subxt::events::StaticEvent for BondCompletionError {
+				const PALLET: &'static str = "Bonds";
+				const EVENT: &'static str = "BondCompletionError";
+			}
+			#[derive(
+				:: subxt :: ext :: codec :: Decode,
+				:: subxt :: ext :: codec :: Encode,
+				:: subxt :: ext :: scale_decode :: DecodeAsType,
+				:: subxt :: ext :: scale_encode :: EncodeAsType,
+				Clone,
+				Debug,
+			)]
+			# [codec (crate = :: subxt :: ext :: codec)]
+			#[decode_as_type(crate_path = ":: subxt :: ext :: scale_decode")]
+			#[encode_as_type(crate_path = ":: subxt :: ext :: scale_encode")]
+			#[doc = "An error occurred while refunding an overdue cosigned bitcoin bond"]
+			pub struct CosignOverdueError {
+				pub utxo_id: cosign_overdue_error::UtxoId,
+				pub error: cosign_overdue_error::Error,
+			}
+			pub mod cosign_overdue_error {
+				use super::runtime_types;
+				pub type UtxoId = ::core::primitive::u64;
+				pub type Error = runtime_types::sp_runtime::DispatchError;
+			}
+			impl ::subxt::events::StaticEvent for CosignOverdueError {
+				const PALLET: &'static str = "Bonds";
+				const EVENT: &'static str = "CosignOverdueError";
+			}
 		}
 		pub mod storage {
 			use super::runtime_types;
@@ -8992,6 +9136,33 @@ pub mod api {
 				const PALLET: &'static str = "Notaries";
 				const EVENT: &'static str = "NotaryMetaUpdated";
 			}
+			#[derive(
+				:: subxt :: ext :: codec :: Decode,
+				:: subxt :: ext :: codec :: Encode,
+				:: subxt :: ext :: scale_decode :: DecodeAsType,
+				:: subxt :: ext :: scale_encode :: EncodeAsType,
+				Clone,
+				Debug,
+			)]
+			# [codec (crate = :: subxt :: ext :: codec)]
+			#[decode_as_type(crate_path = ":: subxt :: ext :: scale_decode")]
+			#[encode_as_type(crate_path = ":: subxt :: ext :: scale_encode")]
+			#[doc = "Error updating queued notary info"]
+			pub struct NotaryMetaUpdateError {
+				pub notary_id: notary_meta_update_error::NotaryId,
+				pub error: notary_meta_update_error::Error,
+				pub meta: notary_meta_update_error::Meta,
+			}
+			pub mod notary_meta_update_error {
+				use super::runtime_types;
+				pub type NotaryId = ::core::primitive::u32;
+				pub type Error = runtime_types::sp_runtime::DispatchError;
+				pub type Meta = runtime_types::ulx_primitives::notary::NotaryMeta;
+			}
+			impl ::subxt::events::StaticEvent for NotaryMetaUpdateError {
+				const PALLET: &'static str = "Notaries";
+				const EVENT: &'static str = "NotaryMetaUpdateError";
+			}
 		}
 		pub mod storage {
 			use super::runtime_types;
@@ -9674,9 +9845,10 @@ pub mod api {
 						"BlockNotebooks",
 						(),
 						[
-							49u8, 228u8, 149u8, 219u8, 185u8, 33u8, 88u8, 126u8, 221u8, 3u8, 103u8,
-							137u8, 211u8, 36u8, 191u8, 71u8, 47u8, 28u8, 37u8, 151u8, 132u8, 152u8,
-							211u8, 110u8, 11u8, 164u8, 92u8, 199u8, 227u8, 148u8, 88u8, 101u8,
+							195u8, 186u8, 187u8, 231u8, 93u8, 224u8, 232u8, 100u8, 244u8, 111u8,
+							168u8, 152u8, 59u8, 65u8, 156u8, 150u8, 181u8, 118u8, 106u8, 250u8,
+							219u8, 224u8, 211u8, 34u8, 236u8, 168u8, 231u8, 190u8, 45u8, 69u8,
+							91u8, 136u8,
 						],
 					)
 				}
@@ -9695,10 +9867,9 @@ pub mod api {
 						"TempNotebookDigest",
 						(),
 						[
-							232u8, 193u8, 240u8, 248u8, 108u8, 120u8, 24u8, 147u8, 255u8, 99u8,
-							49u8, 179u8, 58u8, 139u8, 162u8, 234u8, 127u8, 5u8, 70u8, 11u8, 250u8,
-							162u8, 229u8, 3u8, 216u8, 29u8, 239u8, 104u8, 135u8, 169u8, 73u8,
-							111u8,
+							163u8, 174u8, 68u8, 196u8, 172u8, 0u8, 5u8, 180u8, 244u8, 60u8, 114u8,
+							38u8, 197u8, 134u8, 94u8, 115u8, 5u8, 240u8, 229u8, 11u8, 21u8, 88u8,
+							151u8, 105u8, 216u8, 109u8, 56u8, 236u8, 239u8, 230u8, 183u8, 168u8,
 						],
 					)
 				}
@@ -9718,10 +9889,10 @@ pub mod api {
 						"NotariesLockedForFailedAudit",
 						(),
 						[
-							90u8, 59u8, 51u8, 110u8, 190u8, 10u8, 201u8, 252u8, 144u8, 248u8,
-							136u8, 115u8, 219u8, 69u8, 32u8, 210u8, 127u8, 135u8, 168u8, 180u8,
-							229u8, 2u8, 181u8, 228u8, 22u8, 155u8, 66u8, 218u8, 215u8, 111u8,
-							164u8, 224u8,
+							190u8, 65u8, 197u8, 240u8, 114u8, 105u8, 88u8, 238u8, 11u8, 127u8,
+							30u8, 196u8, 222u8, 73u8, 184u8, 173u8, 4u8, 54u8, 40u8, 99u8, 92u8,
+							181u8, 2u8, 196u8, 235u8, 157u8, 199u8, 153u8, 125u8, 139u8, 223u8,
+							203u8,
 						],
 					)
 				}
@@ -9744,10 +9915,10 @@ pub mod api {
 						"NotariesLockedForFailedAudit",
 						::subxt::storage::address::StaticStorageKey::new(_0.borrow()),
 						[
-							90u8, 59u8, 51u8, 110u8, 190u8, 10u8, 201u8, 252u8, 144u8, 248u8,
-							136u8, 115u8, 219u8, 69u8, 32u8, 210u8, 127u8, 135u8, 168u8, 180u8,
-							229u8, 2u8, 181u8, 228u8, 22u8, 155u8, 66u8, 218u8, 215u8, 111u8,
-							164u8, 224u8,
+							190u8, 65u8, 197u8, 240u8, 114u8, 105u8, 88u8, 238u8, 11u8, 127u8,
+							30u8, 196u8, 222u8, 73u8, 184u8, 173u8, 4u8, 54u8, 40u8, 99u8, 92u8,
+							181u8, 2u8, 196u8, 235u8, 157u8, 199u8, 153u8, 125u8, 139u8, 223u8,
+							203u8,
 						],
 					)
 				}
@@ -9831,7 +10002,7 @@ pub mod api {
 				pub amount: transfer_to_localchain::Amount,
 				pub transfer_id: transfer_to_localchain::TransferId,
 				pub notary_id: transfer_to_localchain::NotaryId,
-				pub expiration_block: transfer_to_localchain::ExpirationBlock,
+				pub expiration_tick: transfer_to_localchain::ExpirationTick,
 			}
 			pub mod transfer_to_localchain {
 				use super::runtime_types;
@@ -9839,7 +10010,7 @@ pub mod api {
 				pub type Amount = ::core::primitive::u128;
 				pub type TransferId = ::core::primitive::u32;
 				pub type NotaryId = ::core::primitive::u32;
-				pub type ExpirationBlock = ::core::primitive::u32;
+				pub type ExpirationTick = ::core::primitive::u32;
 			}
 			impl ::subxt::events::StaticEvent for TransferToLocalchain {
 				const PALLET: &'static str = "ChainTransfer";
@@ -9897,6 +10068,125 @@ pub mod api {
 				const PALLET: &'static str = "ChainTransfer";
 				const EVENT: &'static str = "TransferIn";
 			}
+			#[derive(
+				:: subxt :: ext :: codec :: Decode,
+				:: subxt :: ext :: codec :: Encode,
+				:: subxt :: ext :: scale_decode :: DecodeAsType,
+				:: subxt :: ext :: scale_encode :: EncodeAsType,
+				Clone,
+				Debug,
+			)]
+			# [codec (crate = :: subxt :: ext :: codec)]
+			#[decode_as_type(crate_path = ":: subxt :: ext :: scale_decode")]
+			#[encode_as_type(crate_path = ":: subxt :: ext :: scale_encode")]
+			#[doc = "A transfer into the mainchain failed"]
+			pub struct TransferInError {
+				pub account_id: transfer_in_error::AccountId,
+				pub amount: transfer_in_error::Amount,
+				pub notary_id: transfer_in_error::NotaryId,
+				pub notebook_number: transfer_in_error::NotebookNumber,
+				pub error: transfer_in_error::Error,
+			}
+			pub mod transfer_in_error {
+				use super::runtime_types;
+				pub type AccountId = ::subxt::utils::AccountId32;
+				pub type Amount = ::core::primitive::u128;
+				pub type NotaryId = ::core::primitive::u32;
+				pub type NotebookNumber = ::core::primitive::u32;
+				pub type Error = runtime_types::sp_runtime::DispatchError;
+			}
+			impl ::subxt::events::StaticEvent for TransferInError {
+				const PALLET: &'static str = "ChainTransfer";
+				const EVENT: &'static str = "TransferInError";
+			}
+			#[derive(
+				:: subxt :: ext :: codec :: Decode,
+				:: subxt :: ext :: codec :: Encode,
+				:: subxt :: ext :: scale_decode :: DecodeAsType,
+				:: subxt :: ext :: scale_encode :: EncodeAsType,
+				Clone,
+				Debug,
+			)]
+			# [codec (crate = :: subxt :: ext :: codec)]
+			#[decode_as_type(crate_path = ":: subxt :: ext :: scale_decode")]
+			#[encode_as_type(crate_path = ":: subxt :: ext :: scale_encode")]
+			#[doc = "An expired transfer to localchain failed to be refunded"]
+			pub struct TransferToLocalchainRefundError {
+				pub account_id: transfer_to_localchain_refund_error::AccountId,
+				pub transfer_id: transfer_to_localchain_refund_error::TransferId,
+				pub notary_id: transfer_to_localchain_refund_error::NotaryId,
+				pub notebook_number: transfer_to_localchain_refund_error::NotebookNumber,
+				pub error: transfer_to_localchain_refund_error::Error,
+			}
+			pub mod transfer_to_localchain_refund_error {
+				use super::runtime_types;
+				pub type AccountId = ::subxt::utils::AccountId32;
+				pub type TransferId = ::core::primitive::u32;
+				pub type NotaryId = ::core::primitive::u32;
+				pub type NotebookNumber = ::core::primitive::u32;
+				pub type Error = runtime_types::sp_runtime::DispatchError;
+			}
+			impl ::subxt::events::StaticEvent for TransferToLocalchainRefundError {
+				const PALLET: &'static str = "ChainTransfer";
+				const EVENT: &'static str = "TransferToLocalchainRefundError";
+			}
+			#[derive(
+				:: subxt :: ext :: codec :: Decode,
+				:: subxt :: ext :: codec :: Encode,
+				:: subxt :: ext :: scale_decode :: DecodeAsType,
+				:: subxt :: ext :: scale_encode :: EncodeAsType,
+				Clone,
+				Debug,
+			)]
+			# [codec (crate = :: subxt :: ext :: codec)]
+			#[decode_as_type(crate_path = ":: subxt :: ext :: scale_decode")]
+			#[encode_as_type(crate_path = ":: subxt :: ext :: scale_encode")]
+			#[doc = "A localchain transfer could not be cleaned up properly. Possible invalid transfer"]
+			#[doc = "needing investigation."]
+			pub struct PossibleInvalidTransferAllowed {
+				pub transfer_id: possible_invalid_transfer_allowed::TransferId,
+				pub notary_id: possible_invalid_transfer_allowed::NotaryId,
+				pub notebook_number: possible_invalid_transfer_allowed::NotebookNumber,
+			}
+			pub mod possible_invalid_transfer_allowed {
+				use super::runtime_types;
+				pub type TransferId = ::core::primitive::u32;
+				pub type NotaryId = ::core::primitive::u32;
+				pub type NotebookNumber = ::core::primitive::u32;
+			}
+			impl ::subxt::events::StaticEvent for PossibleInvalidTransferAllowed {
+				const PALLET: &'static str = "ChainTransfer";
+				const EVENT: &'static str = "PossibleInvalidTransferAllowed";
+			}
+			#[derive(
+				:: subxt :: ext :: codec :: Decode,
+				:: subxt :: ext :: codec :: Encode,
+				:: subxt :: ext :: scale_decode :: DecodeAsType,
+				:: subxt :: ext :: scale_encode :: EncodeAsType,
+				Clone,
+				Debug,
+			)]
+			# [codec (crate = :: subxt :: ext :: codec)]
+			#[decode_as_type(crate_path = ":: subxt :: ext :: scale_decode")]
+			#[encode_as_type(crate_path = ":: subxt :: ext :: scale_encode")]
+			#[doc = "Taxation failed"]
+			pub struct TaxationError {
+				pub notary_id: taxation_error::NotaryId,
+				pub notebook_number: taxation_error::NotebookNumber,
+				pub tax: taxation_error::Tax,
+				pub error: taxation_error::Error,
+			}
+			pub mod taxation_error {
+				use super::runtime_types;
+				pub type NotaryId = ::core::primitive::u32;
+				pub type NotebookNumber = ::core::primitive::u32;
+				pub type Tax = ::core::primitive::u128;
+				pub type Error = runtime_types::sp_runtime::DispatchError;
+			}
+			impl ::subxt::events::StaticEvent for TaxationError {
+				const PALLET: &'static str = "ChainTransfer";
+				const EVENT: &'static str = "TaxationError";
+			}
 		}
 		pub mod storage {
 			use super::runtime_types;
@@ -9912,17 +10202,17 @@ pub mod api {
 						runtime_types::pallet_chain_transfer::QueuedTransferOut<
 							::subxt::utils::AccountId32,
 							::core::primitive::u128,
-							::core::primitive::u32,
 						>;
 					pub type Param0 = ::core::primitive::u32;
 				}
-				pub mod expiring_transfers_out {
+				pub mod expiring_transfers_out_by_notary {
 					use super::runtime_types;
-					pub type ExpiringTransfersOut =
+					pub type ExpiringTransfersOutByNotary =
 						runtime_types::bounded_collections::bounded_vec::BoundedVec<
 							::core::primitive::u32,
 						>;
 					pub type Param0 = ::core::primitive::u32;
+					pub type Param1 = ::core::primitive::u32;
 				}
 				pub mod transfers_used_in_block_notebooks {
 					use super::runtime_types;
@@ -9970,10 +10260,10 @@ pub mod api {
 						"PendingTransfersOut",
 						(),
 						[
-							223u8, 189u8, 59u8, 156u8, 136u8, 151u8, 67u8, 225u8, 88u8, 60u8,
-							232u8, 104u8, 79u8, 111u8, 193u8, 250u8, 174u8, 81u8, 143u8, 242u8,
-							36u8, 44u8, 229u8, 26u8, 9u8, 216u8, 94u8, 175u8, 246u8, 239u8, 233u8,
-							61u8,
+							140u8, 69u8, 183u8, 224u8, 241u8, 38u8, 50u8, 205u8, 168u8, 146u8,
+							113u8, 111u8, 247u8, 46u8, 126u8, 64u8, 166u8, 208u8, 70u8, 80u8,
+							231u8, 104u8, 230u8, 67u8, 186u8, 147u8, 19u8, 226u8, 117u8, 177u8,
+							155u8, 138u8,
 						],
 					)
 				}
@@ -9994,53 +10284,88 @@ pub mod api {
 						"PendingTransfersOut",
 						::subxt::storage::address::StaticStorageKey::new(_0.borrow()),
 						[
-							223u8, 189u8, 59u8, 156u8, 136u8, 151u8, 67u8, 225u8, 88u8, 60u8,
-							232u8, 104u8, 79u8, 111u8, 193u8, 250u8, 174u8, 81u8, 143u8, 242u8,
-							36u8, 44u8, 229u8, 26u8, 9u8, 216u8, 94u8, 175u8, 246u8, 239u8, 233u8,
-							61u8,
+							140u8, 69u8, 183u8, 224u8, 241u8, 38u8, 50u8, 205u8, 168u8, 146u8,
+							113u8, 111u8, 247u8, 46u8, 126u8, 64u8, 166u8, 208u8, 70u8, 80u8,
+							231u8, 104u8, 230u8, 67u8, 186u8, 147u8, 19u8, 226u8, 117u8, 177u8,
+							155u8, 138u8,
 						],
 					)
 				}
-				pub fn expiring_transfers_out_iter(
+				pub fn expiring_transfers_out_by_notary_iter(
 					&self,
 				) -> ::subxt::storage::address::Address<
 					(),
-					types::expiring_transfers_out::ExpiringTransfersOut,
+					types::expiring_transfers_out_by_notary::ExpiringTransfersOutByNotary,
 					(),
 					::subxt::storage::address::Yes,
 					::subxt::storage::address::Yes,
 				> {
 					::subxt::storage::address::Address::new_static(
 						"ChainTransfer",
-						"ExpiringTransfersOut",
+						"ExpiringTransfersOutByNotary",
 						(),
 						[
-							161u8, 143u8, 145u8, 104u8, 64u8, 15u8, 148u8, 90u8, 103u8, 166u8,
-							253u8, 126u8, 219u8, 219u8, 39u8, 75u8, 19u8, 60u8, 73u8, 41u8, 88u8,
-							198u8, 7u8, 23u8, 156u8, 239u8, 49u8, 245u8, 173u8, 198u8, 57u8, 223u8,
+							71u8, 202u8, 250u8, 213u8, 80u8, 177u8, 45u8, 234u8, 239u8, 244u8,
+							48u8, 170u8, 79u8, 174u8, 219u8, 77u8, 149u8, 123u8, 98u8, 218u8,
+							105u8, 105u8, 236u8, 104u8, 144u8, 237u8, 242u8, 209u8, 133u8, 16u8,
+							189u8, 36u8,
 						],
 					)
 				}
-				pub fn expiring_transfers_out(
+				pub fn expiring_transfers_out_by_notary_iter1(
 					&self,
-					_0: impl ::std::borrow::Borrow<types::expiring_transfers_out::Param0>,
+					_0: impl ::std::borrow::Borrow<types::expiring_transfers_out_by_notary::Param0>,
 				) -> ::subxt::storage::address::Address<
 					::subxt::storage::address::StaticStorageKey<
-						types::expiring_transfers_out::Param0,
+						types::expiring_transfers_out_by_notary::Param0,
 					>,
-					types::expiring_transfers_out::ExpiringTransfersOut,
+					types::expiring_transfers_out_by_notary::ExpiringTransfersOutByNotary,
+					(),
+					::subxt::storage::address::Yes,
+					::subxt::storage::address::Yes,
+				> {
+					::subxt::storage::address::Address::new_static(
+						"ChainTransfer",
+						"ExpiringTransfersOutByNotary",
+						::subxt::storage::address::StaticStorageKey::new(_0.borrow()),
+						[
+							71u8, 202u8, 250u8, 213u8, 80u8, 177u8, 45u8, 234u8, 239u8, 244u8,
+							48u8, 170u8, 79u8, 174u8, 219u8, 77u8, 149u8, 123u8, 98u8, 218u8,
+							105u8, 105u8, 236u8, 104u8, 144u8, 237u8, 242u8, 209u8, 133u8, 16u8,
+							189u8, 36u8,
+						],
+					)
+				}
+				pub fn expiring_transfers_out_by_notary(
+					&self,
+					_0: impl ::std::borrow::Borrow<types::expiring_transfers_out_by_notary::Param0>,
+					_1: impl ::std::borrow::Borrow<types::expiring_transfers_out_by_notary::Param1>,
+				) -> ::subxt::storage::address::Address<
+					(
+						::subxt::storage::address::StaticStorageKey<
+							types::expiring_transfers_out_by_notary::Param0,
+						>,
+						::subxt::storage::address::StaticStorageKey<
+							types::expiring_transfers_out_by_notary::Param1,
+						>,
+					),
+					types::expiring_transfers_out_by_notary::ExpiringTransfersOutByNotary,
 					::subxt::storage::address::Yes,
 					::subxt::storage::address::Yes,
 					(),
 				> {
 					::subxt::storage::address::Address::new_static(
 						"ChainTransfer",
-						"ExpiringTransfersOut",
-						::subxt::storage::address::StaticStorageKey::new(_0.borrow()),
+						"ExpiringTransfersOutByNotary",
+						(
+							::subxt::storage::address::StaticStorageKey::new(_0.borrow()),
+							::subxt::storage::address::StaticStorageKey::new(_1.borrow()),
+						),
 						[
-							161u8, 143u8, 145u8, 104u8, 64u8, 15u8, 148u8, 90u8, 103u8, 166u8,
-							253u8, 126u8, 219u8, 219u8, 39u8, 75u8, 19u8, 60u8, 73u8, 41u8, 88u8,
-							198u8, 7u8, 23u8, 156u8, 239u8, 49u8, 245u8, 173u8, 198u8, 57u8, 223u8,
+							71u8, 202u8, 250u8, 213u8, 80u8, 177u8, 45u8, 234u8, 239u8, 244u8,
+							48u8, 170u8, 79u8, 174u8, 219u8, 77u8, 149u8, 123u8, 98u8, 218u8,
+							105u8, 105u8, 236u8, 104u8, 144u8, 237u8, 242u8, 209u8, 133u8, 16u8,
+							189u8, 36u8,
 						],
 					)
 				}
@@ -10106,13 +10431,14 @@ pub mod api {
 						],
 					)
 				}
-				#[doc = " How long a transfer should remain in storage before returning."]
-				pub fn transfer_expiration_blocks(
+				#[doc = " How long a transfer should remain in storage before returning. NOTE: there is a 2 tick"]
+				#[doc = " grace period where we will still allow a transfer"]
+				pub fn transfer_expiration_ticks(
 					&self,
 				) -> ::subxt::constants::Address<::core::primitive::u32> {
 					::subxt::constants::Address::new_static(
 						"ChainTransfer",
-						"TransferExpirationBlocks",
+						"TransferExpirationTicks",
 						[
 							98u8, 252u8, 116u8, 72u8, 26u8, 180u8, 225u8, 83u8, 200u8, 157u8,
 							125u8, 151u8, 53u8, 76u8, 168u8, 26u8, 10u8, 9u8, 98u8, 68u8, 9u8,
@@ -10748,6 +11074,33 @@ pub mod api {
 			impl ::subxt::events::StaticEvent for DataDomainRegistrationCanceled {
 				const PALLET: &'static str = "DataDomain";
 				const EVENT: &'static str = "DataDomainRegistrationCanceled";
+			}
+			#[derive(
+				:: subxt :: ext :: codec :: Decode,
+				:: subxt :: ext :: codec :: Encode,
+				:: subxt :: ext :: scale_decode :: DecodeAsType,
+				:: subxt :: ext :: scale_encode :: EncodeAsType,
+				Clone,
+				Debug,
+			)]
+			# [codec (crate = :: subxt :: ext :: codec)]
+			#[decode_as_type(crate_path = ":: subxt :: ext :: scale_decode")]
+			#[encode_as_type(crate_path = ":: subxt :: ext :: scale_encode")]
+			#[doc = "A data domain registration failed due to an error"]
+			pub struct DataDomainRegistrationError {
+				pub domain_hash: data_domain_registration_error::DomainHash,
+				pub account_id: data_domain_registration_error::AccountId,
+				pub error: data_domain_registration_error::Error,
+			}
+			pub mod data_domain_registration_error {
+				use super::runtime_types;
+				pub type DomainHash = ::sp_core::H256;
+				pub type AccountId = ::subxt::utils::AccountId32;
+				pub type Error = runtime_types::sp_runtime::DispatchError;
+			}
+			impl ::subxt::events::StaticEvent for DataDomainRegistrationError {
+				const PALLET: &'static str = "DataDomain";
+				const EVENT: &'static str = "DataDomainRegistrationError";
 			}
 		}
 		pub mod storage {
@@ -12057,22 +12410,22 @@ pub mod api {
 			# [codec (crate = :: subxt :: ext :: codec)]
 			#[decode_as_type(crate_path = ":: subxt :: ext :: scale_decode")]
 			#[encode_as_type(crate_path = ":: subxt :: ext :: scale_encode")]
-			pub struct FailedToUnfreezeReward {
-				pub account_id: failed_to_unfreeze_reward::AccountId,
-				pub argons: failed_to_unfreeze_reward::Argons,
-				pub ulixees: failed_to_unfreeze_reward::Ulixees,
-				pub error: failed_to_unfreeze_reward::Error,
+			pub struct RewardUnlockError {
+				pub account_id: reward_unlock_error::AccountId,
+				pub argons: reward_unlock_error::Argons,
+				pub ulixees: reward_unlock_error::Ulixees,
+				pub error: reward_unlock_error::Error,
 			}
-			pub mod failed_to_unfreeze_reward {
+			pub mod reward_unlock_error {
 				use super::runtime_types;
 				pub type AccountId = ::subxt::utils::AccountId32;
 				pub type Argons = ::core::option::Option<::core::primitive::u128>;
 				pub type Ulixees = ::core::option::Option<::core::primitive::u128>;
 				pub type Error = runtime_types::sp_runtime::DispatchError;
 			}
-			impl ::subxt::events::StaticEvent for FailedToUnfreezeReward {
+			impl ::subxt::events::StaticEvent for RewardUnlockError {
 				const PALLET: &'static str = "BlockRewards";
-				const EVENT: &'static str = "FailedToUnfreezeReward";
+				const EVENT: &'static str = "RewardUnlockError";
 			}
 			#[derive(
 				:: subxt :: ext :: codec :: Decode,
@@ -12085,22 +12438,22 @@ pub mod api {
 			# [codec (crate = :: subxt :: ext :: codec)]
 			#[decode_as_type(crate_path = ":: subxt :: ext :: scale_decode")]
 			#[encode_as_type(crate_path = ":: subxt :: ext :: scale_encode")]
-			pub struct FailedToMintReward {
-				pub account_id: failed_to_mint_reward::AccountId,
-				pub argons: failed_to_mint_reward::Argons,
-				pub ulixees: failed_to_mint_reward::Ulixees,
-				pub error: failed_to_mint_reward::Error,
+			pub struct RewardCreateError {
+				pub account_id: reward_create_error::AccountId,
+				pub argons: reward_create_error::Argons,
+				pub ulixees: reward_create_error::Ulixees,
+				pub error: reward_create_error::Error,
 			}
-			pub mod failed_to_mint_reward {
+			pub mod reward_create_error {
 				use super::runtime_types;
 				pub type AccountId = ::subxt::utils::AccountId32;
 				pub type Argons = ::core::option::Option<::core::primitive::u128>;
 				pub type Ulixees = ::core::option::Option<::core::primitive::u128>;
 				pub type Error = runtime_types::sp_runtime::DispatchError;
 			}
-			impl ::subxt::events::StaticEvent for FailedToMintReward {
+			impl ::subxt::events::StaticEvent for RewardCreateError {
 				const PALLET: &'static str = "BlockRewards";
-				const EVENT: &'static str = "FailedToMintReward";
+				const EVENT: &'static str = "RewardCreateError";
 			}
 		}
 		pub mod storage {
@@ -13050,14 +13403,14 @@ pub mod api {
 			# [codec (crate = :: subxt :: ext :: codec)]
 			#[decode_as_type(crate_path = ":: subxt :: ext :: scale_decode")]
 			#[encode_as_type(crate_path = ":: subxt :: ext :: scale_encode")]
-			pub struct FailedToMint {
-				pub mint_type: failed_to_mint::MintType,
-				pub account_id: failed_to_mint::AccountId,
-				pub utxo_id: failed_to_mint::UtxoId,
-				pub amount: failed_to_mint::Amount,
-				pub error: failed_to_mint::Error,
+			pub struct MintError {
+				pub mint_type: mint_error::MintType,
+				pub account_id: mint_error::AccountId,
+				pub utxo_id: mint_error::UtxoId,
+				pub amount: mint_error::Amount,
+				pub error: mint_error::Error,
 			}
-			pub mod failed_to_mint {
+			pub mod mint_error {
 				use super::runtime_types;
 				pub type MintType = runtime_types::pallet_mint::pallet::MintType;
 				pub type AccountId = ::subxt::utils::AccountId32;
@@ -13065,9 +13418,9 @@ pub mod api {
 				pub type Amount = ::core::primitive::u128;
 				pub type Error = runtime_types::sp_runtime::DispatchError;
 			}
-			impl ::subxt::events::StaticEvent for FailedToMint {
+			impl ::subxt::events::StaticEvent for MintError {
 				const PALLET: &'static str = "Mint";
-				const EVENT: &'static str = "FailedToMint";
+				const EVENT: &'static str = "MintError";
 			}
 		}
 		pub mod storage {
@@ -18346,7 +18699,7 @@ pub mod api {
 					#[doc = "Only an Oracle Operator can perform this action"]
 					NoPermissions,
 					#[codec(index = 1)]
-					#[doc = "No Oraclized bitcoin block has been provided to the network"]
+					#[doc = "No Oracle-provided bitcoin block has been provided to the network"]
 					NoBitcoinConfirmedBlock,
 					#[codec(index = 2)]
 					#[doc = "Insufficient bitcoin amount"]
@@ -18404,6 +18757,26 @@ pub mod api {
 					},
 					#[codec(index = 3)]
 					UtxoUnwatched { utxo_id: ::core::primitive::u64 },
+					#[codec(index = 4)]
+					UtxoSpentError {
+						utxo_id: ::core::primitive::u64,
+						error: runtime_types::sp_runtime::DispatchError,
+					},
+					#[codec(index = 5)]
+					UtxoVerifiedError {
+						utxo_id: ::core::primitive::u64,
+						error: runtime_types::sp_runtime::DispatchError,
+					},
+					#[codec(index = 6)]
+					UtxoRejectedError {
+						utxo_id: ::core::primitive::u64,
+						error: runtime_types::sp_runtime::DispatchError,
+					},
+					#[codec(index = 7)]
+					UtxoExpiredError {
+						utxo_ref: runtime_types::ulx_primitives::bitcoin::UtxoRef,
+						error: runtime_types::sp_runtime::DispatchError,
+					},
 				}
 			}
 		}
@@ -18470,14 +18843,14 @@ pub mod api {
 						>,
 					},
 					#[codec(index = 2)]
-					FailedToUnfreezeReward {
+					RewardUnlockError {
 						account_id: ::subxt::utils::AccountId32,
 						argons: ::core::option::Option<::core::primitive::u128>,
 						ulixees: ::core::option::Option<::core::primitive::u128>,
 						error: runtime_types::sp_runtime::DispatchError,
 					},
 					#[codec(index = 3)]
-					FailedToMintReward {
+					RewardCreateError {
 						account_id: ::subxt::utils::AccountId32,
 						argons: ::core::option::Option<::core::primitive::u128>,
 						ulixees: ::core::option::Option<::core::primitive::u128>,
@@ -18877,6 +19250,18 @@ pub mod api {
 						compensation_still_owed: ::core::primitive::u128,
 						compensated_account_id: ::subxt::utils::AccountId32,
 					},
+					#[codec(index = 7)]
+					#[doc = "An error occurred while completing a bond"]
+					BondCompletionError {
+						bond_id: ::core::primitive::u64,
+						error: runtime_types::sp_runtime::DispatchError,
+					},
+					#[codec(index = 8)]
+					#[doc = "An error occurred while refunding an overdue cosigned bitcoin bond"]
+					CosignOverdueError {
+						utxo_id: ::core::primitive::u64,
+						error: runtime_types::sp_runtime::DispatchError,
+					},
 				}
 				#[derive(
 					:: subxt :: ext :: codec :: Decode,
@@ -18992,6 +19377,9 @@ pub mod api {
 					#[codec(index = 5)]
 					#[doc = "The notary id is not registered"]
 					InvalidNotaryUsedForTransfer,
+					#[codec(index = 6)]
+					#[doc = "The notary is locked (likey due to failed audits)"]
+					NotaryLocked,
 				}
 				#[derive(
 					:: subxt :: ext :: codec :: Decode,
@@ -19012,7 +19400,7 @@ pub mod api {
 						amount: ::core::primitive::u128,
 						transfer_id: ::core::primitive::u32,
 						notary_id: ::core::primitive::u32,
-						expiration_block: ::core::primitive::u32,
+						expiration_tick: ::core::primitive::u32,
 					},
 					#[codec(index = 1)]
 					TransferToLocalchainExpired {
@@ -19025,6 +19413,40 @@ pub mod api {
 						account_id: ::subxt::utils::AccountId32,
 						amount: ::core::primitive::u128,
 						notary_id: ::core::primitive::u32,
+					},
+					#[codec(index = 3)]
+					#[doc = "A transfer into the mainchain failed"]
+					TransferInError {
+						account_id: ::subxt::utils::AccountId32,
+						amount: ::core::primitive::u128,
+						notary_id: ::core::primitive::u32,
+						notebook_number: ::core::primitive::u32,
+						error: runtime_types::sp_runtime::DispatchError,
+					},
+					#[codec(index = 4)]
+					#[doc = "An expired transfer to localchain failed to be refunded"]
+					TransferToLocalchainRefundError {
+						account_id: ::subxt::utils::AccountId32,
+						transfer_id: ::core::primitive::u32,
+						notary_id: ::core::primitive::u32,
+						notebook_number: ::core::primitive::u32,
+						error: runtime_types::sp_runtime::DispatchError,
+					},
+					#[codec(index = 5)]
+					#[doc = "A localchain transfer could not be cleaned up properly. Possible invalid transfer"]
+					#[doc = "needing investigation."]
+					PossibleInvalidTransferAllowed {
+						transfer_id: ::core::primitive::u32,
+						notary_id: ::core::primitive::u32,
+						notebook_number: ::core::primitive::u32,
+					},
+					#[codec(index = 6)]
+					#[doc = "Taxation failed"]
+					TaxationError {
+						notary_id: ::core::primitive::u32,
+						notebook_number: ::core::primitive::u32,
+						tax: ::core::primitive::u128,
+						error: runtime_types::sp_runtime::DispatchError,
 					},
 				}
 			}
@@ -19039,10 +19461,10 @@ pub mod api {
 			# [codec (crate = :: subxt :: ext :: codec)]
 			#[decode_as_type(crate_path = ":: subxt :: ext :: scale_decode")]
 			#[encode_as_type(crate_path = ":: subxt :: ext :: scale_encode")]
-			pub struct QueuedTransferOut<_0, _1, _2> {
+			pub struct QueuedTransferOut<_0, _1> {
 				pub account_id: _0,
 				pub amount: _1,
-				pub expiration_block: _2,
+				pub expiration_tick: ::core::primitive::u32,
 				pub notary_id: ::core::primitive::u32,
 			}
 		}
@@ -19090,6 +19512,15 @@ pub mod api {
 					#[codec(index = 1)]
 					#[doc = "The sender is not the owner of the domain."]
 					NotDomainOwner,
+					#[codec(index = 2)]
+					#[doc = "Failed to add to the address history."]
+					FailedToAddToAddressHistory,
+					#[codec(index = 3)]
+					#[doc = "Failed to add to the expiring domain list"]
+					FailedToAddExpiringDomain,
+					#[codec(index = 4)]
+					#[doc = "Error decoding account from notary"]
+					AccountDecodingError,
 				}
 				#[derive(
 					:: subxt :: ext :: codec :: Decode,
@@ -19134,6 +19565,13 @@ pub mod api {
 						registration: runtime_types::pallet_data_domain::DataDomainRegistration<
 							::subxt::utils::AccountId32,
 						>,
+					},
+					#[codec(index = 5)]
+					#[doc = "A data domain registration failed due to an error"]
+					DataDomainRegistrationError {
+						domain_hash: ::sp_core::H256,
+						account_id: ::subxt::utils::AccountId32,
+						error: runtime_types::sp_runtime::DispatchError,
 					},
 				}
 			}
@@ -19489,7 +19927,7 @@ pub mod api {
 						kept_ownership_bond: ::core::primitive::bool,
 					},
 					#[codec(index = 4)]
-					FailedToUnbondMiner {
+					UnbondMinerError {
 						account_id: ::subxt::utils::AccountId32,
 						bond_id: ::core::option::Option<::core::primitive::u64>,
 						error: runtime_types::sp_runtime::DispatchError,
@@ -19596,7 +20034,7 @@ pub mod api {
 						amount: ::core::primitive::u128,
 					},
 					#[codec(index = 1)]
-					FailedToMint {
+					MintError {
 						mint_type: runtime_types::pallet_mint::pallet::MintType,
 						account_id: ::subxt::utils::AccountId32,
 						utxo_id: ::core::option::Option<::core::primitive::u64>,
@@ -19982,6 +20420,12 @@ pub mod api {
 					#[codec(index = 6)]
 					#[doc = "The proposed effective tick is too soon"]
 					EffectiveTickTooSoon,
+					#[codec(index = 7)]
+					#[doc = "Too many internal keys"]
+					TooManyKeys,
+					#[codec(index = 8)]
+					#[doc = "The notary is invalid"]
+					InvalidNotary,
 				}
 				#[derive(
 					:: subxt :: ext :: codec :: Decode,
@@ -20022,6 +20466,13 @@ pub mod api {
 					#[doc = "Notary metadata updated"]
 					NotaryMetaUpdated {
 						notary_id: ::core::primitive::u32,
+						meta: runtime_types::ulx_primitives::notary::NotaryMeta,
+					},
+					#[codec(index = 4)]
+					#[doc = "Error updating queued notary info"]
+					NotaryMetaUpdateError {
+						notary_id: ::core::primitive::u32,
+						error: runtime_types::sp_runtime::DispatchError,
 						meta: runtime_types::ulx_primitives::notary::NotaryMeta,
 					},
 				}
@@ -22866,65 +23317,67 @@ pub mod api {
 					#[codec(index = 27)]
 					InvalidNotarySignature,
 					#[codec(index = 28)]
-					NotebookTooOld,
+					InvalidSecretProvided,
 					#[codec(index = 29)]
-					CatchupNotebooksMissing,
+					NotebookTooOld,
 					#[codec(index = 30)]
-					DecodeError,
+					CatchupNotebooksMissing,
 					#[codec(index = 31)]
-					AccountEscrowHoldDoesntExist,
+					DecodeError,
 					#[codec(index = 32)]
-					AccountAlreadyHasEscrowHold,
+					AccountEscrowHoldDoesntExist,
 					#[codec(index = 33)]
+					AccountAlreadyHasEscrowHold,
+					#[codec(index = 34)]
 					EscrowHoldNotReadyForClaim {
 						current_tick: ::core::primitive::u32,
 						claim_tick: ::core::primitive::u32,
 					},
-					#[codec(index = 34)]
-					AccountLocked,
 					#[codec(index = 35)]
-					MissingEscrowHoldNote,
+					AccountLocked,
 					#[codec(index = 36)]
-					InvalidEscrowHoldNote,
+					MissingEscrowHoldNote,
 					#[codec(index = 37)]
-					InvalidEscrowClaimers,
+					InvalidEscrowHoldNote,
 					#[codec(index = 38)]
-					EscrowNoteBelowMinimum,
+					InvalidEscrowClaimers,
 					#[codec(index = 39)]
-					InvalidTaxNoteAccount,
+					EscrowNoteBelowMinimum,
 					#[codec(index = 40)]
-					InvalidTaxOperation,
+					InvalidTaxNoteAccount,
 					#[codec(index = 41)]
+					InvalidTaxOperation,
+					#[codec(index = 42)]
 					InsufficientTaxIncluded {
 						tax_sent: ::core::primitive::u128,
 						tax_owed: ::core::primitive::u128,
 						account_id: ::subxt::utils::AccountId32,
 					},
-					#[codec(index = 42)]
-					InsufficientBlockVoteTax,
 					#[codec(index = 43)]
-					IneligibleTaxVoter,
+					InsufficientBlockVoteTax,
 					#[codec(index = 44)]
-					BlockVoteInvalidSignature,
+					IneligibleTaxVoter,
 					#[codec(index = 45)]
-					InvalidBlockVoteAllocation,
+					BlockVoteInvalidSignature,
 					#[codec(index = 46)]
-					InvalidBlockVoteRoot,
+					InvalidBlockVoteAllocation,
 					#[codec(index = 47)]
-					InvalidBlockVotesCount,
+					InvalidBlockVoteRoot,
 					#[codec(index = 48)]
-					InvalidBlockVotingPower,
+					InvalidBlockVotesCount,
 					#[codec(index = 49)]
-					InvalidBlockVoteList,
+					InvalidBlockVotingPower,
 					#[codec(index = 50)]
-					InvalidComputeProof,
+					InvalidBlockVoteList,
 					#[codec(index = 51)]
-					InvalidBlockVoteSource,
+					InvalidComputeProof,
 					#[codec(index = 52)]
-					InsufficientBlockVoteMinimum,
+					InvalidBlockVoteSource,
 					#[codec(index = 53)]
-					BlockVoteDataDomainMismatch,
+					InsufficientBlockVoteMinimum,
 					#[codec(index = 54)]
+					BlockVoteDataDomainMismatch,
+					#[codec(index = 55)]
 					BlockVoteEscrowReused,
 				}
 			}
@@ -23022,6 +23475,8 @@ pub mod api {
 						runtime_types::ulx_primitives::balance_change::AccountOrigin,
 					>,
 					pub used_transfers_to_localchain: ::std::vec::Vec<::core::primitive::u32>,
+					pub secret_hash: ::sp_core::H256,
+					pub block_votes_root: ::sp_core::H256,
 				}
 				#[derive(
 					:: subxt :: ext :: codec :: Decode,
@@ -23046,6 +23501,8 @@ pub mod api {
 						runtime_types::ulx_primitives::balance_change::AccountOrigin,
 					>,
 					pub used_transfers_to_localchain: ::std::vec::Vec<::core::primitive::u32>,
+					pub secret_hash: ::sp_core::H256,
+					pub block_votes_root: ::sp_core::H256,
 				}
 			}
 			pub mod balance_change {

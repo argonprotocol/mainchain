@@ -1,18 +1,18 @@
-use frame_support::{assert_err, assert_noop, assert_ok, traits::OnInitialize};
-use frame_system::pallet_prelude::BlockNumberFor;
+use frame_support::{assert_noop, assert_ok};
 use sp_core::bounded_vec;
 use sp_keyring::AccountKeyring::Bob;
 use sp_runtime::testing::H256;
 
 use ulx_primitives::{
 	notebook::{AccountOrigin, ChainTransfer, NotebookHeader},
+	tick::Tick,
 	NotebookEventHandler,
 };
 
 use crate::{
 	mock::{ChainTransfer as ChainTransferPallet, *},
-	pallet::{ExpiringTransfersOut, NextTransferId, PendingTransfersOut},
-	Error, QueuedTransferOut,
+	pallet::{ExpiringTransfersOutByNotary, NextTransferId},
+	Error, Event,
 };
 
 #[test]
@@ -28,8 +28,8 @@ fn it_can_send_funds_to_localchain() {
 			1,
 		));
 		assert_eq!(Balances::free_balance(&who), 4000);
-		let expires_block: BlockNumberFor<Test> = (1u32 + TransferExpirationBlocks::get()).into();
-		assert_eq!(ExpiringTransfersOut::<Test>::get(expires_block)[0], 1);
+		let expires_tick: Tick = 1u32 + TransferExpirationTicks::get();
+		assert_eq!(ExpiringTransfersOutByNotary::<Test>::get(1, expires_tick)[0], 1);
 		assert_eq!(NextTransferId::<Test>::get(), Some(2));
 	});
 }
@@ -53,7 +53,7 @@ fn it_allows_you_to_transfer_full_balance() {
 }
 
 #[test]
-fn it_can_recreate_a_killed_account() {
+fn it_expires_transfers_on_notebook_tick() {
 	new_test_ext().execute_with(|| {
 		let who = Bob.to_account_id();
 		// Go past genesis block so events get deposited
@@ -66,10 +66,27 @@ fn it_can_recreate_a_killed_account() {
 		));
 		assert_eq!(Balances::free_balance(&who), 0);
 		assert!(!System::account_exists(&who));
-		let expires_block: BlockNumberFor<Test> = (1u32 + TransferExpirationBlocks::get()).into();
-		assert_eq!(ExpiringTransfersOut::<Test>::get(expires_block)[0], 1);
-		System::set_block_number(expires_block);
-		ChainTransferPallet::on_initialize(expires_block);
+		let expires_tick: Tick = (1u32 + TransferExpirationTicks::get()).into();
+		assert_eq!(ExpiringTransfersOutByNotary::<Test>::get(1, expires_tick)[0], 1);
+
+		ChainTransferPallet::notebook_submitted(&NotebookHeader {
+			notary_id: 1,
+			notebook_number: 10,
+			tick: expires_tick,
+			chain_transfers: Default::default(),
+			changed_accounts_root: Default::default(),
+			changed_account_origins: Default::default(),
+			version: 1,
+			tax: 0,
+			block_voting_power: 0,
+			blocks_with_votes: Default::default(),
+			block_votes_root: H256::random(),
+			secret_hash: H256::random(),
+
+			parent_secret: None,
+			block_votes_count: 0,
+			data_domains: Default::default(),
+		});
 		assert!(System::account_exists(&who));
 		assert_eq!(Balances::free_balance(&who), 2000);
 	});
@@ -95,8 +112,8 @@ fn it_can_handle_multiple_transfer() {
 			1,
 		),);
 		assert_eq!(Balances::free_balance(&who), 3300);
-		let expires_block: BlockNumberFor<Test> = (1u32 + TransferExpirationBlocks::get()).into();
-		assert_eq!(ExpiringTransfersOut::<Test>::get(expires_block), vec![1, 2]);
+		let expires_tick: Tick = (1u32 + TransferExpirationTicks::get()).into();
+		assert_eq!(ExpiringTransfersOutByNotary::<Test>::get(1, expires_tick), vec![1, 2]);
 
 		System::inc_account_nonce(&who);
 		// We have a max number of transfers out per block
@@ -120,14 +137,11 @@ fn it_can_handle_transfers_in() {
 			5000,
 			1,
 		));
-		let expires_block: BlockNumberFor<Test> = (1u32 + TransferExpirationBlocks::get()).into();
-		assert_eq!(ExpiringTransfersOut::<Test>::get(expires_block)[0], 1);
+		let expires_tick: Tick = (1u32 + TransferExpirationTicks::get()).into();
+		assert_eq!(ExpiringTransfersOutByNotary::<Test>::get(1, expires_tick)[0], 1);
 
-		System::set_block_number(2);
-		System::on_initialize(2);
-		ChainTransferPallet::on_initialize(2);
 		let changed_accounts_root = H256::random();
-		assert_ok!(ChainTransferPallet::notebook_submitted(&NotebookHeader {
+		ChainTransferPallet::notebook_submitted(&NotebookHeader {
 			notary_id: 1,
 			notebook_number: 1,
 			tick: 1,
@@ -147,16 +161,13 @@ fn it_can_handle_transfers_in() {
 			parent_secret: None,
 			block_votes_count: 0,
 			data_domains: Default::default(),
-		},),);
+		});
 
-		System::set_block_number(3);
-		System::on_initialize(3);
-		ChainTransferPallet::on_initialize(3);
-		assert_eq!(ExpiringTransfersOut::<Test>::get(expires_block).len(), 0);
+		assert_eq!(ExpiringTransfersOutByNotary::<Test>::get(1, expires_tick).len(), 0);
 		assert_eq!(Balances::free_balance(&who), 0);
 
 		let change_root_2 = H256::random();
-		assert_ok!(ChainTransferPallet::notebook_submitted(&NotebookHeader {
+		ChainTransferPallet::notebook_submitted(&NotebookHeader {
 			notary_id: 1,
 			notebook_number: 2,
 			tick: 2,
@@ -178,7 +189,7 @@ fn it_can_handle_transfers_in() {
 			parent_secret: None,
 			block_votes_count: 0,
 			data_domains: Default::default(),
-		}));
+		});
 		assert_eq!(Balances::free_balance(&who), 5000);
 	});
 }
@@ -193,8 +204,7 @@ fn it_reduces_circulation_on_tax() {
 		set_argons(&who, 25000);
 		assert_eq!(Balances::total_issuance(), 25_000);
 
-		ChainTransferPallet::on_initialize(2);
-		assert_ok!(ChainTransferPallet::notebook_submitted(&NotebookHeader {
+		ChainTransferPallet::notebook_submitted(&NotebookHeader {
 			notary_id: 1,
 			notebook_number: 1,
 			tick: 1,
@@ -210,7 +220,7 @@ fn it_reduces_circulation_on_tax() {
 			parent_secret: None,
 			block_votes_count: 0,
 			data_domains: Default::default(),
-		}),);
+		});
 
 		assert_eq!(Balances::total_issuance(), 23_000);
 		assert_eq!(Balances::free_balance(&who), 23_000);
@@ -228,8 +238,7 @@ fn it_does_not_alter_tax_if_notary_locked() {
 		assert_eq!(Balances::total_issuance(), 25_000);
 		LockedNotaries::mutate(|locks| locks.insert(1, 2));
 
-		ChainTransferPallet::on_initialize(2);
-		assert_ok!(ChainTransferPallet::notebook_submitted(&NotebookHeader {
+		ChainTransferPallet::notebook_submitted(&NotebookHeader {
 			notary_id: 1,
 			notebook_number: 1,
 			tick: 2,
@@ -245,11 +254,20 @@ fn it_does_not_alter_tax_if_notary_locked() {
 			parent_secret: None,
 			block_votes_count: 0,
 			data_domains: Default::default(),
-		}),);
+		});
 
 		// does not change!
 		assert_eq!(Balances::total_issuance(), 25_000);
 		assert_eq!(Balances::free_balance(&who), 25_000);
+		System::assert_last_event(
+			Event::<Test>::TaxationError {
+				notary_id: 1,
+				notebook_number: 1,
+				tax: 3000,
+				error: Error::<Test>::NotaryLocked.into(),
+			}
+			.into(),
+		);
 	})
 }
 
@@ -258,28 +276,36 @@ fn it_doesnt_allow_a_notary_balance_to_go_negative() {
 	new_test_ext().execute_with(|| {
 		// Go past genesis block so events get deposited
 		System::set_block_number(2);
-		assert_noop!(
-			ChainTransferPallet::notebook_submitted(&NotebookHeader {
+
+		ChainTransferPallet::notebook_submitted(&NotebookHeader {
+			notary_id: 1,
+			notebook_number: 1,
+			tick: 0,
+			chain_transfers: bounded_vec![ChainTransfer::ToMainchain {
+				account_id: Bob.to_account_id(),
+				amount: 5000
+			}],
+			changed_accounts_root: H256::random(),
+			changed_account_origins: bounded_vec![],
+			version: 1,
+			tax: 0,
+			block_voting_power: 0,
+			blocks_with_votes: Default::default(),
+			block_votes_root: H256::random(),
+			secret_hash: H256::random(),
+			parent_secret: None,
+			block_votes_count: 0,
+			data_domains: Default::default(),
+		});
+		System::assert_last_event(
+			Event::<Test>::TransferInError {
 				notary_id: 1,
 				notebook_number: 1,
-				tick: 0,
-				chain_transfers: bounded_vec![ChainTransfer::ToMainchain {
-					account_id: Bob.to_account_id(),
-					amount: 5000
-				}],
-				changed_accounts_root: H256::random(),
-				changed_account_origins: bounded_vec![],
-				version: 1,
-				tax: 0,
-				block_voting_power: 0,
-				blocks_with_votes: Default::default(),
-				block_votes_root: H256::random(),
-				secret_hash: H256::random(),
-				parent_secret: None,
-				block_votes_count: 0,
-				data_domains: Default::default(),
-			}),
-			Error::<Test>::InsufficientNotarizedFunds
+				amount: 5000,
+				account_id: Bob.to_account_id(),
+				error: Error::<Test>::InsufficientNotarizedFunds.into(),
+			}
+			.into(),
 		);
 	});
 }
@@ -294,7 +320,7 @@ fn it_skips_transfers_to_mainchain_if_notary_locked() {
 		set_argons(&pallet_balance, 25000);
 		assert_eq!(Balances::total_issuance(), 30_000);
 		System::set_block_number(2);
-		assert_ok!(ChainTransferPallet::notebook_submitted(&NotebookHeader {
+		ChainTransferPallet::notebook_submitted(&NotebookHeader {
 			notary_id: 1,
 			notebook_number: 1,
 			tick: 2,
@@ -313,55 +339,19 @@ fn it_skips_transfers_to_mainchain_if_notary_locked() {
 			parent_secret: None,
 			block_votes_count: 0,
 			data_domains: Default::default(),
-		}),);
+		});
 
 		assert_eq!(Balances::total_issuance(), 30_000);
 		assert_eq!(Balances::free_balance(&who), 5_000);
-	});
-}
-
-#[test]
-fn it_expires_transfers_if_not_committed() {
-	new_test_ext().execute_with(|| {
-		let who = Bob.to_account_id();
-		// Go past genesis block so events get deposited
-		System::set_block_number(1);
-		set_argons(&who, 5000);
-		assert_ok!(ChainTransferPallet::send_to_localchain(
-			RuntimeOrigin::signed(who.clone()),
-			1000,
-			1,
-		));
-		assert_eq!(
-			PendingTransfersOut::<Test>::get(1).unwrap(),
-			QueuedTransferOut {
-				account_id: who,
-				amount: 1000u128,
-				notary_id: 1u32,
-				expiration_block: (1u32 + TransferExpirationBlocks::get()).into(),
-			}
-		);
-
-		System::set_block_number((1u32 + TransferExpirationBlocks::get()).into());
-		assert_err!(
-			ChainTransferPallet::notebook_submitted(&NotebookHeader {
+		System::assert_last_event(
+			Event::<Test>::TransferInError {
 				notary_id: 1,
 				notebook_number: 1,
-				tick: 0,
-				chain_transfers: bounded_vec![ChainTransfer::ToLocalchain { transfer_id: 1 }],
-				changed_accounts_root: H256::random(),
-				changed_account_origins: bounded_vec![],
-				version: 1,
-				tax: 0,
-				block_voting_power: 0,
-				blocks_with_votes: Default::default(),
-				block_votes_root: H256::random(),
-				secret_hash: H256::random(),
-				parent_secret: None,
-				block_votes_count: 0,
-				data_domains: Default::default(),
-			}),
-			Error::<Test>::NotebookIncludesExpiredLocalchainTransfer
-		)
+				amount: 5000,
+				account_id: Bob.to_account_id(),
+				error: Error::<Test>::NotaryLocked.into(),
+			}
+			.into(),
+		);
 	});
 }

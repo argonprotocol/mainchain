@@ -29,7 +29,7 @@ use crate::{
 		AccountOriginLastChangedNotebookByNotary, LastNotebookDetailsByNotary,
 		NotebookChangedAccountsRootByNotary,
 	},
-	Error,
+	Error, Event,
 };
 
 fn notebook_digest(books: Vec<(NotaryId, NotebookNumber, Tick, bool)>) -> DigestItem {
@@ -158,11 +158,11 @@ fn it_tracks_notebooks_at_tick() {
 	new_test_ext().execute_with(|| {
 		CurrentTick::set(1);
 		let header1 = make_header(1, 1);
-		assert_ok!(Notebook::process_notebook(header1, true),);
+		Notebook::process_notebook(header1, true);
 
 		let mut header2 = make_header(1, 1);
 		header2.notary_id = 2;
-		assert_ok!(Notebook::process_notebook(header2, true),);
+		Notebook::process_notebook(header2, true);
 
 		assert_eq!(Notebook::notebooks_at_tick(1), vec![(2, 1, None), (1, 1, None),]);
 
@@ -174,7 +174,7 @@ fn it_tracks_notebooks_at_tick() {
 
 		let mut header3 = make_header(2, 4);
 		header3.notary_id = 2;
-		assert_ok!(Notebook::process_notebook(header3, true),);
+		Notebook::process_notebook(header3, true);
 		assert_eq!(Notebook::notebooks_at_tick(4), vec![(2, 2, None)]);
 	});
 }
@@ -245,7 +245,7 @@ fn it_tracks_changed_accounts() {
 		secret_hashes.push(header.secret_hash);
 		let first_votes = header.block_votes_root;
 		CurrentTick::set(2);
-		assert_ok!(Notebook::process_notebook(header.clone(), true));
+		Notebook::process_notebook(header.clone(), true);
 
 		assert_eq!(
 			NotebookChangedAccountsRootByNotary::<Test>::get(1, 1),
@@ -273,15 +273,11 @@ fn it_tracks_changed_accounts() {
 		header.secret_hash =
 			NotebookHeader::create_secret_hash(secrets[1], header.block_votes_root, 2);
 		secret_hashes.push(header.secret_hash);
-		// wrong secret hash
-		header.parent_secret = Some(secrets[1]);
-
-		assert_err!(Notebook::verify_notebook_order(&header), Error::<Test>::InvalidSecretProvided);
 		header.parent_secret = Some(secrets[0]);
 		let second_votes = header.block_votes_root;
 		CurrentTick::set(3);
 		assert_ok!(Notebook::verify_notebook_order(&header),);
-		assert_ok!(Notebook::process_notebook(header, true),);
+		Notebook::process_notebook(header, true);
 		assert_eq!(Balances::free_balance(&who), 5000);
 		assert_eq!(
 			NotebookChangedAccountsRootByNotary::<Test>::get(1, 1),
@@ -330,7 +326,7 @@ fn it_tracks_changed_accounts() {
 		secret_hashes.push(header.secret_hash);
 
 		CurrentTick::set(4);
-		assert_ok!(Notebook::process_notebook(header.clone(), true),);
+		Notebook::process_notebook(header.clone(), true);
 		assert_eq!(
 			LastNotebookDetailsByNotary::<Test>::get(1),
 			vec![
@@ -390,13 +386,14 @@ fn it_tracks_notebooks_received_out_of_tick() {
 			NotebookHeader::create_secret_hash(secrets[0], header1.block_votes_root, 1);
 		secret_hashes.push(header1.secret_hash);
 		CurrentTick::set(3);
-		assert_ok!(Notebook::process_notebook(header1.clone(), true),);
+		Notebook::process_notebook(header1.clone(), true);
+
 		let mut header2 = make_header(2, 3);
 		header2.parent_secret = Some(secrets[0]);
 		header2.secret_hash =
 			NotebookHeader::create_secret_hash(secrets[1], header2.block_votes_root, 2);
 		secret_hashes.push(header2.secret_hash);
-		assert_ok!(Notebook::process_notebook(header2.clone(), true),);
+		Notebook::process_notebook(header2.clone(), true);
 
 		let last_details = LastNotebookDetailsByNotary::<Test>::get(1);
 
@@ -501,6 +498,66 @@ fn it_can_audit_notebooks() {
 			vec![]
 		));
 	});
+}
+
+#[test]
+fn it_handles_bad_secrets() {
+	new_test_ext().execute_with(|| {
+		new_test_ext().execute_with(|| {
+			// Go past genesis block so events get deposited
+			System::set_block_number(1);
+
+			System::set_block_number(3);
+			System::on_initialize(3);
+
+			let secrets = [H256::random(), H256::random(), H256::random()];
+			let mut secret_hashes = vec![];
+			// block number must be 1 prior to the current block number
+			let mut header = make_header(1, 2);
+			header.secret_hash =
+				NotebookHeader::create_secret_hash(secrets[0], header.block_votes_root, 1);
+			secret_hashes.push(header.secret_hash);
+			CurrentTick::set(2);
+			Notebook::process_notebook(header.clone(), true);
+
+			System::set_block_number(4);
+			System::on_initialize(4);
+
+			let mut header = make_header(2, 3);
+			header.secret_hash =
+				NotebookHeader::create_secret_hash(secrets[1], header.block_votes_root, 2);
+			secret_hashes.push(header.secret_hash);
+			// wrong secret hash
+			header.parent_secret = Some(secrets[1]);
+
+			assert_eq!(
+				Notebook::check_audit_result(
+					1,
+					header.notebook_number,
+					header.tick,
+					&NotebookDigest {
+						notebooks: vec![NotebookDigestRecord {
+							notary_id: 1,
+							notebook_number: header.notebook_number,
+							tick: header.tick,
+							audit_first_failure: None
+						}]
+					},
+					header.parent_secret
+				)
+				.expect("shouldn't throw an error "),
+				false
+			);
+			System::assert_last_event(
+				Event::<Test>::NotebookAuditFailure {
+					notary_id: 1,
+					notebook_number: 2,
+					first_failure_reason: VerifyError::InvalidSecretProvided.into(),
+				}
+				.into(),
+			);
+		});
+	})
 }
 
 #[test]
@@ -616,6 +673,8 @@ fn it_can_audit_notebooks_with_history() {
 					changed_accounts_root: H256::random(),
 					account_changelist: vec![],
 					used_transfers_to_localchain: vec![1],
+					block_votes_root: H256::random(),
+					secret_hash: H256::random(),
 				}]
 			),
 			VerifyError::HistoryLookupError {
@@ -636,6 +695,8 @@ fn it_can_audit_notebooks_with_history() {
 				changed_accounts_root: H256::random(),
 				account_changelist: vec![],
 				used_transfers_to_localchain: vec![],
+				block_votes_root: H256::random(),
+				secret_hash: H256::random(),
 			}]
 		),);
 
@@ -787,6 +848,8 @@ fn it_can_audit_notebooks_with_history() {
 					changed_accounts_root: H256::random(),
 					account_changelist: vec![AccountOrigin { notebook_number: 5, account_uid: 1 }],
 					used_transfers_to_localchain: vec![],
+					block_votes_root: H256::random(),
+					secret_hash: H256::random(),
 				}]
 			),
 			VerifyError::InvalidPreviousBalanceChangeNotebook
@@ -805,6 +868,8 @@ fn it_can_audit_notebooks_with_history() {
 				changed_accounts_root: H256::random(),
 				account_changelist: vec![],
 				used_transfers_to_localchain: vec![],
+				block_votes_root: H256::random(),
+				secret_hash: H256::random(),
 			}]
 		),);
 	});

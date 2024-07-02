@@ -225,7 +225,7 @@ impl MockNotary {
       .claim_from_mainchain(LocalchainTransfer {
         amount,
         notary_id: 1,
-        expiration_block: 1,
+        expiration_tick: 1,
         address: AccountStore::to_address(&account_id),
         transfer_id: 1,
       })
@@ -411,7 +411,7 @@ pub fn mock_mainchain_transfer(address: &str, amount: u128) -> LocalchainTransfe
   LocalchainTransfer {
     amount,
     notary_id: 1,
-    expiration_block: 1,
+    expiration_tick: 1,
     address: address.to_string(),
     transfer_id: 1,
   }

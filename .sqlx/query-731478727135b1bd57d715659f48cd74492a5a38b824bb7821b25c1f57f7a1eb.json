@@ -24,7 +24,7 @@
         "type_info": "Int64"
       },
       {
-        "name": "expiration_block",
+        "name": "expiration_tick",
         "ordinal": 4,
         "type_info": "Int64"
       },

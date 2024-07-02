@@ -17,7 +17,7 @@ pub struct MainchainTransferIn {
   pub transfer_id: i64,
   pub notary_id: i64,
   pub first_block_hash: String,
-  pub expiration_block: Option<i64>,
+  pub expiration_tick: Option<i64>,
   pub balance_change_id: Option<i64>,
   pub extrinsic_hash: String,
   pub finalized_block_number: Option<i64>,
@@ -67,12 +67,12 @@ impl MainchainTransferStore {
     let ext_hash = hex::encode(block.extrinsic_hash().as_ref());
     let amount_str = amount.to_string();
     let res = sqlx::query!(
-      "INSERT INTO mainchain_transfers_in (address, amount, transfer_id, notary_id, expiration_block, first_block_hash, extrinsic_hash) VALUES (?, ?, ?, ?, ?, ?, ?)",
+      "INSERT INTO mainchain_transfers_in (address, amount, transfer_id, notary_id, expiration_tick, first_block_hash, extrinsic_hash) VALUES (?, ?, ?, ?, ?, ?, ?)",
       account.address,
       amount_str,
       transfer.transfer_id,
       account.notary_id,
-      transfer.expiration_block,
+      transfer.expiration_tick,
       block_hash,
       ext_hash
     )
@@ -172,7 +172,7 @@ pub mod napi_ext {
         address: transfer.address,
         amount: transfer.amount.into(),
         notary_id: transfer.notary_id,
-        expiration_block: transfer.expiration_block,
+        expiration_tick: transfer.expiration_tick,
         transfer_id: transfer.transfer_id,
       })
     }

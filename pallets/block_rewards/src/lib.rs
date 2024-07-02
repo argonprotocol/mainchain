@@ -118,13 +118,13 @@ pub mod pallet {
 			rewards: Vec<BlockPayout<T::AccountId, T::Balance>>,
 		},
 
-		FailedToUnfreezeReward {
+		RewardUnlockError {
 			account_id: T::AccountId,
 			argons: Option<T::Balance>,
 			ulixees: Option<T::Balance>,
 			error: DispatchError,
 		},
-		FailedToMintReward {
+		RewardCreateError {
 			account_id: T::AccountId,
 			argons: Option<T::Balance>,
 			ulixees: Option<T::Balance>,
@@ -153,7 +153,7 @@ pub mod pallet {
 					Self::unfreeze_amount::<T::ArgonCurrency>(&reward.account_id, reward.argons)
 				{
 					log::error!(target: LOG_TARGET, "Failed to unfreeze argons for reward: {:?}, {:?}", reward, e);
-					Self::deposit_event(Event::FailedToUnfreezeReward {
+					Self::deposit_event(Event::RewardUnlockError {
 						account_id: reward.account_id.clone(),
 						argons: Some(reward.argons),
 						ulixees: None,
@@ -165,7 +165,7 @@ pub mod pallet {
 					Self::unfreeze_amount::<T::UlixeeCurrency>(&reward.account_id, reward.ulixees)
 				{
 					log::error!(target: LOG_TARGET, "Failed to unfreeze ulixees for reward: {:?}, {:?}", reward, e);
-					Self::deposit_event(Event::FailedToUnfreezeReward {
+					Self::deposit_event(Event::RewardUnlockError {
 						account_id: reward.account_id.clone(),
 						argons: None,
 						ulixees: Some(reward.ulixees),
@@ -257,7 +257,7 @@ pub mod pallet {
 			for reward in rewards.iter_mut() {
 				if let Err(e) = Self::mint_and_freeze::<T::ArgonCurrency>(reward) {
 					log::error!(target: LOG_TARGET, "Failed to mint argons for reward: {:?}, {:?}", reward, e);
-					Self::deposit_event(Event::FailedToMintReward {
+					Self::deposit_event(Event::RewardCreateError {
 						account_id: reward.account_id.clone(),
 						argons: Some(reward.argons),
 						ulixees: None,
@@ -266,7 +266,7 @@ pub mod pallet {
 				}
 				if let Err(e) = Self::mint_and_freeze::<T::UlixeeCurrency>(reward) {
 					log::error!(target: LOG_TARGET, "Failed to mint ulixees for reward: {:?}, {:?}", reward, e);
-					Self::deposit_event(Event::FailedToMintReward {
+					Self::deposit_event(Event::RewardCreateError {
 						account_id: reward.account_id.clone(),
 						argons: None,
 						ulixees: Some(reward.ulixees),

@@ -118,7 +118,7 @@ fn it_records_failed_mints() {
 
 		UlixeeMint::on_initialize(1);
 		System::assert_last_event(
-			Event::FailedToMint {
+			Event::MintError {
 				mint_type: MintType::Ulixee,
 				account_id: 1,
 				utxo_id: None,

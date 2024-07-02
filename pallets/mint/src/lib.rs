@@ -90,7 +90,7 @@ pub mod pallet {
 			utxo_id: Option<UtxoId>,
 			amount: T::Balance,
 		},
-		FailedToMint {
+		MintError {
 			mint_type: MintType,
 			account_id: T::AccountId,
 			utxo_id: Option<UtxoId>,
@@ -141,7 +141,7 @@ pub mod pallet {
 								target: LOG_TARGET,
 								"Failed to mint {:?} argons for miner {:?}: {:?}", amount, &miner, e
 							);
-							Self::deposit_event(Event::<T>::FailedToMint {
+							Self::deposit_event(Event::<T>::MintError {
 								mint_type: MintType::Ulixee,
 								account_id: miner.clone(),
 								utxo_id: None,
@@ -187,7 +187,7 @@ pub mod pallet {
 									target: LOG_TARGET,
 									"Failed to mint {:?} argons for bitcoin UTXO {:?}: {:?}", amount_to_mint, &utxo_id, e
 								);
-								Self::deposit_event(Event::<T>::FailedToMint {
+								Self::deposit_event(Event::<T>::MintError {
 									mint_type: MintType::Bitcoin,
 									account_id: account_id.clone(),
 									utxo_id: Some(*utxo_id),
@@ -268,9 +268,8 @@ pub mod pallet {
 	}
 
 	impl<T: Config> BurnEventHandler<T::Balance> for Pallet<T> {
-		fn on_argon_burn(milligons: &T::Balance) -> sp_runtime::DispatchResult {
+		fn on_argon_burn(milligons: &T::Balance) {
 			Self::on_argon_burn(*milligons);
-			Ok(())
 		}
 	}
 

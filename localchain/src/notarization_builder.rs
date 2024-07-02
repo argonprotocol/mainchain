@@ -1157,7 +1157,7 @@ pub mod napi_ext {
         amount: transfer.amount.get_u128().1,
         notary_id: transfer.notary_id,
         transfer_id: transfer.transfer_id,
-        expiration_block: transfer.expiration_block,
+        expiration_tick: transfer.expiration_tick,
       };
       self.claim_from_mainchain(transfer).await.napi_ok()
     }

@@ -40,8 +40,8 @@ pub mod pallet {
 		tick::Tick,
 		AccountOriginUid, Balance, BlockVotingProvider, ChainTransfer, ChainTransferLookup,
 		NotebookAuditResult, NotebookAuditSummary, NotebookDigest as NotebookDigestT,
-		NotebookEventHandler, NotebookProvider, NotebookSecret, SignedNotebookHeader, TickProvider,
-		TransferToLocalchainId, NOTEBOOKS_DIGEST_ID,
+		NotebookEventHandler, NotebookProvider, NotebookSecret, NotebookSecretHash,
+		SignedNotebookHeader, TickProvider, TransferToLocalchainId, NOTEBOOKS_DIGEST_ID,
 	};
 
 	use super::*;
@@ -199,6 +199,10 @@ pub mod pallet {
 				"Notebook inherent submitted with {} notebooks", notebooks.len()
 			);
 
+			// CRITICAL NOTE: very important to only have dispatch errors that are from the assembly
+			// of the notebooks, not the notebooks themselves. Otherwise we will stall here as
+			// the node doesn't know.
+
 			// Take this value the first time. should reject a second time
 			let notebook_digest = <TempNotebookDigest<T>>::take()
 				.ok_or(Error::<T>::MultipleNotebookInherentsProvided)?;
@@ -213,25 +217,27 @@ pub mod pallet {
 
 			for SignedNotebookHeader { header, signature } in notebooks {
 				let notebook_number = header.notebook_number;
-				info!(
-					target: LOG_TARGET,
-					"Auditing {}", notebook_number
-				);
+				let notary_id = header.notary_id;
+				// Failure case(s): audit not in digest (created by node)
 				let did_pass_audit = Self::check_audit_result(
-					header.notary_id,
-					header.notebook_number,
+					notary_id,
+					notebook_number,
 					header.tick,
 					&notebook_digest,
+					header.parent_secret,
 				)?;
 				info!(
 					target: LOG_TARGET,
-					"Audit ok for {}? {}", notebook_number, did_pass_audit
+					"Audit result for {}, {}: {}", notary_id, notebook_number, did_pass_audit
 				);
 
+				// Failure cases: all based on nodebooks not in order of runtime state; controllable
+				// by node
 				Self::verify_notebook_order(&header)?;
+				// Failure case: invalid signature is not possible without bypassing audit
 				ensure!(
 					T::NotaryProvider::verify_signature(
-						header.notary_id,
+						notary_id,
 						// we validate signatures based on the latest tick
 						header.tick,
 						&header.hash(),
@@ -240,24 +246,12 @@ pub mod pallet {
 					Error::<T>::InvalidNotebookSignature
 				);
 
-				T::EventHandler::notebook_submitted(&header)?;
+				T::EventHandler::notebook_submitted(&header);
 
-				info!(
-					target: LOG_TARGET,
-					"Processing {}", notebook_number
-				);
-				Self::process_notebook(header, did_pass_audit)?;
-				info!(
-					target: LOG_TARGET,
-					"Processed {}", notebook_number,
-				);
+				Self::process_notebook(header, did_pass_audit);
 			}
 
 			<BlockNotebooks<T>>::put(notebook_digest);
-			info!(
-				target: LOG_TARGET,
-				"Done processing notebooks",
-			);
 			Ok(())
 		}
 	}
@@ -354,6 +348,7 @@ pub mod pallet {
 			transfer_id: TransferToLocalchainId,
 			account_id: &AccountId32,
 			amount: Balance,
+			for_notebook_tick: Tick,
 		) -> Result<bool, AccountHistoryLookupError> {
 			if self.used_transfers_to_localchain.contains(&transfer_id) {
 				return Err(AccountHistoryLookupError::InvalidTransferToLocalchain);
@@ -363,6 +358,7 @@ pub mod pallet {
 				transfer_id,
 				account_id,
 				amount,
+				for_notebook_tick,
 			) {
 				Ok(true)
 			} else {
@@ -372,6 +368,8 @@ pub mod pallet {
 	}
 
 	impl<T: Config> Pallet<T> {
+		/// Verify the notebook order is correct compared to the block state. This can fail as it is
+		/// up to the node to do this correctly
 		pub(crate) fn verify_notebook_order(header: &NotebookHeader) -> Result<(), DispatchError> {
 			let notebook_number = header.notebook_number;
 			let notary_notebook_details = <LastNotebookDetailsByNotary<T>>::get(header.notary_id);
@@ -386,27 +384,22 @@ pub mod pallet {
 					Error::<T>::MissingNotebookNumber
 				);
 				ensure!(parent.tick < header.tick, Error::<T>::NotebookTickAlreadyUsed);
-
-				// check secret
-				if let Some(secret) = header.parent_secret {
-					let secret_hash = NotebookHeader::create_secret_hash(
-						secret,
-						parent.block_votes_root,
-						parent.notebook_number,
-					);
-					ensure!(secret_hash == parent.secret_hash, Error::<T>::InvalidSecretProvided);
-				}
 			} else {
 				ensure!(notebook_number == 1, Error::<T>::MissingNotebookNumber);
 			}
 			Ok(())
 		}
 
+		/// Look up the audit result in the given digest and check if the audit passed. If it did
+		/// not pass, lock the notary and return false.
+		///
+		/// NOTE: this must ONLY fail for things that are the node's responsibility to check.
 		pub(crate) fn check_audit_result(
 			notary_id: NotaryId,
 			notebook_number: NotebookNumber,
 			tick: Tick,
 			notebook_digest: &NotebookDigest,
+			parent_secret: Option<NotebookSecret>,
 		) -> Result<bool, DispatchError> {
 			let digest = notebook_digest
 				.notebooks
@@ -418,7 +411,24 @@ pub mod pallet {
 				})
 				.ok_or(Error::<T>::InvalidNotebookDigest)?;
 
-			if let Some(first_failure_reason) = &digest.audit_first_failure {
+			let mut verify_error = digest.audit_first_failure.clone();
+			if verify_error.is_none() {
+				let notary_notebook_details = <LastNotebookDetailsByNotary<T>>::get(notary_id);
+				if let Some((parent, _)) = notary_notebook_details.first() {
+					// check secret
+					if let Some(secret) = parent_secret {
+						let secret_hash = NotebookHeader::create_secret_hash(
+							secret,
+							parent.block_votes_root,
+							parent.notebook_number,
+						);
+						if secret_hash != parent.secret_hash {
+							verify_error = Some(NotebookVerifyError::InvalidSecretProvided);
+						}
+					}
+				}
+			}
+			if let Some(first_failure_reason) = verify_error {
 				Self::deposit_event(Event::<T>::NotebookAuditFailure {
 					notary_id,
 					notebook_number,
@@ -436,16 +446,13 @@ pub mod pallet {
 			Ok(true)
 		}
 
-		pub(crate) fn process_notebook(
-			header: NotebookHeader,
-			did_pass_audit: bool,
-		) -> Result<(), DispatchError> {
+		pub(crate) fn process_notebook(header: NotebookHeader, did_pass_audit: bool) {
 			let notary_id = header.notary_id;
 			let notebook_number = header.notebook_number;
 			let current_tick = T::TickProvider::current_tick();
 
 			<LastNotebookDetailsByNotary<T>>::try_mutate(notary_id, |x| {
-				if x.len() >= MAX_NOTEBOOK_DETAILS_PER_NOTARY as usize {
+				if x.is_full() {
 					x.pop();
 				}
 
@@ -464,7 +471,7 @@ pub mod pallet {
 					),
 				)
 			})
-			.map_err(|_| Error::<T>::InternalError)?;
+			.expect("we've pruned this list, so should not be possible to fail");
 
 			<NotebookChangedAccountsRootByNotary<T>>::insert(
 				notary_id,
@@ -484,7 +491,6 @@ pub mod pallet {
 				notary_id,
 				notebook_number: header.notebook_number,
 			});
-			Ok(())
 		}
 
 		pub fn audit_notebook(
@@ -507,10 +513,19 @@ pub mod pallet {
 				a.notebook_number.cmp(&b.notebook_number)
 			});
 
+			let mut parent_secret_hash = NotebookSecretHash::zero();
+			let mut parent_block_votes_root = H256::zero();
+			let parent_block_number = notebook_number.saturating_sub(1);
 			let mut last_notebook_processed: NotebookNumber =
 				<LastNotebookDetailsByNotary<T>>::get(notary_id)
 					.first()
-					.map(|(details, _)| details.notebook_number)
+					.map(|(details, _)| {
+						if details.notebook_number == parent_block_number {
+							parent_secret_hash = details.secret_hash;
+							parent_block_votes_root = details.block_votes_root;
+						}
+						details.notebook_number
+					})
 					.unwrap_or_default();
 
 			for audit_summary in audit_dependency_summaries {
@@ -518,6 +533,11 @@ pub mod pallet {
 					audit_summary.notebook_number == last_notebook_processed + 1,
 					NotebookVerifyError::CatchupNotebooksMissing
 				);
+				if audit_summary.notebook_number == parent_block_number {
+					parent_secret_hash = audit_summary.secret_hash;
+					parent_block_votes_root = audit_summary.block_votes_root.clone();
+				}
+
 				last_notebook_processed = audit_summary.notebook_number;
 				history_lookup.add_audit_summary(audit_summary);
 			}
@@ -554,6 +574,18 @@ pub mod pallet {
 				NotebookVerifyError::InvalidNotarySignature
 			);
 
+			if let Some(secret) = notebook.header.parent_secret {
+				let secret_hash = NotebookHeader::create_secret_hash(
+					secret,
+					parent_block_votes_root,
+					notebook.header.notebook_number.saturating_sub(1),
+				);
+				ensure!(
+					secret_hash == parent_secret_hash,
+					NotebookVerifyError::InvalidSecretProvided
+				);
+			}
+
 			notebook_verify(&history_lookup, &notebook, block_vote_minimums).map_err(|e| {
 				info!(
 					target: LOG_TARGET,
@@ -584,6 +616,8 @@ pub mod pallet {
 						notarization.block_votes.iter().map(|vote| (vote.encode(), vote.power))
 					})
 					.collect::<Vec<_>>(),
+				secret_hash: notebook.header.secret_hash.clone(),
+				block_votes_root: notebook.header.block_votes_root.clone(),
 			};
 			Ok(audit_result)
 		}

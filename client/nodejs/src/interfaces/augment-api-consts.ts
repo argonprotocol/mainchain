@@ -138,9 +138,10 @@ declare module '@polkadot/api-base/types/consts' {
       maxPendingTransfersOutPerBlock: u32 & AugmentedConst<ApiType>;
       palletId: FrameSupportPalletId & AugmentedConst<ApiType>;
       /**
-       * How long a transfer should remain in storage before returning.
+       * How long a transfer should remain in storage before returning. NOTE: there is a 2 tick
+       * grace period where we will still allow a transfer
        **/
-      transferExpirationBlocks: u32 & AugmentedConst<ApiType>;
+      transferExpirationTicks: u32 & AugmentedConst<ApiType>;
     };
     grandpa: {
       /**

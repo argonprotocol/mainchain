@@ -18,10 +18,10 @@ fn it_can_register_domains() {
 		System::set_block_number(1);
 		let domain =
 			DataDomain { top_level_domain: DataTLD::Analytics, domain_name: "test".into() }.hash();
-		assert_ok!(DataDomainPallet::notebook_submitted(&create_notebook(
+		DataDomainPallet::notebook_submitted(&create_notebook(
 			1,
-			vec![(domain, Bob.to_account_id(),),]
-		)));
+			vec![(domain, Bob.to_account_id())],
+		));
 		assert_eq!(
 			RegisteredDataDomains::<Test>::get(domain),
 			Some(DataDomainRegistration { account_id: Bob.to_account_id(), registered_at_tick: 1 })
@@ -45,10 +45,10 @@ fn it_cancels_conflicting_domains() {
 		System::set_block_number(1);
 		let domain =
 			DataDomain { top_level_domain: DataTLD::Analytics, domain_name: "test".into() }.hash();
-		assert_ok!(DataDomainPallet::notebook_submitted(&create_notebook(
+		DataDomainPallet::notebook_submitted(&create_notebook(
 			1,
-			vec![(domain, Bob.to_account_id(),), (domain, Alice.to_account_id(),),]
-		)));
+			vec![(domain, Bob.to_account_id()), (domain, Alice.to_account_id())],
+		));
 		assert_eq!(RegisteredDataDomains::<Test>::get(domain), None);
 		assert_eq!(ExpiringDomainsByBlock::<Test>::get(1001).len(), 0);
 		System::assert_last_event(
@@ -69,18 +69,18 @@ fn it_renews_domains() {
 		System::set_block_number(1);
 		let domain =
 			DataDomain { top_level_domain: DataTLD::Analytics, domain_name: "test".into() }.hash();
-		assert_ok!(DataDomainPallet::notebook_submitted(&create_notebook(
+		DataDomainPallet::notebook_submitted(&create_notebook(
 			1,
-			vec![(domain, Bob.to_account_id(),)]
-		)));
+			vec![(domain, Bob.to_account_id())],
+		));
 		assert_eq!(ExpiringDomainsByBlock::<Test>::get(1001).len(), 1);
 
 		System::set_block_number(100);
 		CurrentTick::set(100);
-		assert_ok!(DataDomainPallet::notebook_submitted(&create_notebook(
+		DataDomainPallet::notebook_submitted(&create_notebook(
 			100,
-			vec![(domain, Bob.to_account_id(),)]
-		)));
+			vec![(domain, Bob.to_account_id())],
+		));
 		assert_eq!(ExpiringDomainsByBlock::<Test>::get(1001).len(), 0);
 		assert_eq!(ExpiringDomainsByBlock::<Test>::get(1100).len(), 1);
 		System::assert_last_event(Event::DataDomainRenewed { domain_hash: domain }.into());
@@ -92,20 +92,20 @@ fn it_ignores_duplicated_domains() {
 		System::set_block_number(1);
 		let domain =
 			DataDomain { top_level_domain: DataTLD::Analytics, domain_name: "test".into() }.hash();
-		assert_ok!(DataDomainPallet::notebook_submitted(&create_notebook(
+		DataDomainPallet::notebook_submitted(&create_notebook(
 			1,
-			vec![(domain, Bob.to_account_id(),)]
-		)));
+			vec![(domain, Bob.to_account_id())],
+		));
 		let registered_to_bob =
 			DataDomainRegistration { account_id: Bob.to_account_id(), registered_at_tick: 1 };
 		assert_eq!(RegisteredDataDomains::<Test>::get(domain), Some(registered_to_bob.clone()));
 
 		System::set_block_number(2);
 		CurrentTick::set(2);
-		assert_ok!(DataDomainPallet::notebook_submitted(&create_notebook(
+		DataDomainPallet::notebook_submitted(&create_notebook(
 			2,
-			vec![(domain, Alice.to_account_id(),)]
-		)));
+			vec![(domain, Alice.to_account_id())],
+		));
 		assert_eq!(RegisteredDataDomains::<Test>::get(domain), Some(registered_to_bob));
 	});
 }
@@ -116,10 +116,10 @@ fn it_registers_zone_records() {
 		CurrentTick::set(2);
 		let domain =
 			DataDomain { top_level_domain: DataTLD::Analytics, domain_name: "test".into() }.hash();
-		assert_ok!(DataDomainPallet::notebook_submitted(&create_notebook(
+		DataDomainPallet::notebook_submitted(&create_notebook(
 			1,
-			vec![(domain, Bob.to_account_id(),)]
-		)));
+			vec![(domain, Bob.to_account_id())],
+		));
 
 		let zone = ZoneRecord {
 			payment_account: Bob.to_account_id(),
@@ -173,10 +173,10 @@ fn it_tracks_historical_payment() {
 		CurrentTick::set(2);
 		let domain =
 			DataDomain { top_level_domain: DataTLD::Analytics, domain_name: "test".into() }.hash();
-		assert_ok!(DataDomainPallet::notebook_submitted(&create_notebook(
+		DataDomainPallet::notebook_submitted(&create_notebook(
 			1,
-			vec![(domain, Bob.to_account_id(),)]
-		)));
+			vec![(domain, Bob.to_account_id())],
+		));
 
 		let mut zone = ZoneRecord {
 			payment_account: Bob.to_account_id(),
@@ -228,10 +228,10 @@ fn it_expires_domains() {
 		System::set_block_number(1);
 		let domain =
 			DataDomain { top_level_domain: DataTLD::Analytics, domain_name: "test".into() }.hash();
-		assert_ok!(DataDomainPallet::notebook_submitted(&create_notebook(
+		DataDomainPallet::notebook_submitted(&create_notebook(
 			1,
-			vec![(domain, Bob.to_account_id(),)]
-		)));
+			vec![(domain, Bob.to_account_id())],
+		));
 
 		System::set_block_number(1001);
 		CurrentTick::set(1001);

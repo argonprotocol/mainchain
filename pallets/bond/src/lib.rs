@@ -321,6 +321,16 @@ pub mod pallet {
 			compensation_still_owed: T::Balance,
 			compensated_account_id: T::AccountId,
 		},
+		/// An error occurred while completing a bond
+		BondCompletionError {
+			bond_id: BondId,
+			error: DispatchError,
+		},
+		/// An error occurred while refunding an overdue cosigned bitcoin bond
+		CosignOverdueError {
+			utxo_id: UtxoId,
+			error: DispatchError,
+		},
 	}
 
 	#[pallet::error]
@@ -392,12 +402,14 @@ pub mod pallet {
 		fn on_initialize(block_number: BlockNumberFor<T>) -> Weight {
 			let bond_completions = MiningBondCompletions::<T>::take(block_number);
 			for bond_id in bond_completions {
-				let _ = with_storage_layer(|| {
-					Self::bond_completed(bond_id).map_err(|e| {
-						warn!( target: LOG_TARGET, "Mining bond id {:?} failed to `complete` {:?}", bond_id, e);
-						e
-					})
-				});
+				let res = with_storage_layer(|| Self::bond_completed(bond_id));
+				if let Err(e) = res {
+					log::error!( target: LOG_TARGET, "Mining bond id {:?} failed to `complete` {:?}", bond_id, e);
+					Self::deposit_event(Event::<T>::BondCompletionError {
+						bond_id,
+						error: e.into(),
+					});
+				}
 			}
 
 			let mut overdue = vec![];
@@ -413,22 +425,27 @@ pub mod pallet {
 			});
 
 			for (utxo_id, redemption_amount) in overdue {
-				let _ = with_storage_layer(|| {
-					Self::cosign_bitcoin_overdue(utxo_id,redemption_amount).map_err(|e| {
-						warn!( target: LOG_TARGET, "Utxo id {:?} was not cosigned by vault. Claiming funds {:?}", utxo_id, e);
-						e
-					})
-				});
+				let res =
+					with_storage_layer(|| Self::cosign_bitcoin_overdue(utxo_id, redemption_amount));
+				if let Err(e) = res {
+					log::error!( target: LOG_TARGET, "Bitcoin utxo id {:?} failed to `cosign` {:?}", utxo_id, e);
+					Self::deposit_event(Event::<T>::CosignOverdueError {
+						utxo_id,
+						error: e.into(),
+					});
+				}
 			}
 
 			let bitcoin_bond_completions = BitcoinBondCompletions::<T>::take(bitcoin_block_height);
 			for bond_id in bitcoin_bond_completions {
-				let _ = with_storage_layer(|| {
-					Self::bond_completed(bond_id).map_err(|e| {
-						warn!( target: LOG_TARGET, "Bitcoin bond id {:?} failed to `complete` {:?}", bond_id, e);
-						e
-					})
-				});
+				let res = with_storage_layer(|| Self::bond_completed(bond_id));
+				if let Err(e) = res {
+					log::error!( target: LOG_TARGET, "Bitcoin bond id {:?} failed to `complete` {:?}", bond_id, e);
+					Self::deposit_event(Event::<T>::BondCompletionError {
+						bond_id,
+						error: e.into(),
+					});
+				}
 			}
 			T::DbWeight::get().reads_writes(2, 1)
 		}

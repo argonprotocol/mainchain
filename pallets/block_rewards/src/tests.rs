@@ -237,7 +237,7 @@ fn it_should_not_fail_with_no_notebooks() {
 			.into(),
 		);
 		System::assert_has_event(
-			Event::FailedToMintReward {
+			Event::RewardCreateError {
 				account_id: 1,
 				ulixees: 0u128.into(),
 				argons: None,

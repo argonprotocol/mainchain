@@ -310,6 +310,7 @@ impl NotarizationsStore {
 						ChainTransferStore::take_and_record_transfer_local(
 							&mut tx,
 							current_notebook_number,
+							tick,
 							&account_id,
 							transfer_id,
 							note.milligons,

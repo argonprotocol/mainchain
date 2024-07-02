@@ -452,7 +452,7 @@ parameter_types! {
 	pub const ChainTransferPalletId: PalletId = PalletId(*b"transfer");
 
 	/// How long a transfer should remain in storage before returning.
-	pub const TransferExpirationBlocks: u32 = 1400 * 10;
+	pub const TransferExpirationTicks: u32 = 1400 * 10;
 
 	/// How many transfers out can be queued per block
 	pub const MaxPendingTransfersOutPerBlock: u32 = 1000;
@@ -467,10 +467,11 @@ impl pallet_chain_transfer::Config for Runtime {
 	type Balance = Balance;
 	type NotaryProvider = Notaries;
 	type PalletId = ChainTransferPalletId;
-	type TransferExpirationBlocks = TransferExpirationBlocks;
+	type TransferExpirationTicks = TransferExpirationTicks;
 	type MaxPendingTransfersOutPerBlock = MaxPendingTransfersOutPerBlock;
 	type NotebookProvider = Notebook;
 	type EventHandler = Mint;
+	type CurrentTick = Ticks;
 }
 
 impl pallet_notebook::Config for Runtime {

@@ -194,7 +194,7 @@ declare module '@polkadot/api-base/types/storage' {
       utxosPendingUnlock: AugmentedQuery<ApiType, () => Observable<BTreeMap<u64, PalletBondUtxoCosignRequest>>, []>;
     };
     chainTransfer: {
-      expiringTransfersOut: AugmentedQuery<ApiType, (arg: u32 | AnyNumber | Uint8Array) => Observable<Vec<u32>>, [u32]>;
+      expiringTransfersOutByNotary: AugmentedQuery<ApiType, (arg1: u32 | AnyNumber | Uint8Array, arg2: u32 | AnyNumber | Uint8Array) => Observable<Vec<u32>>, [u32, u32]>;
       nextTransferId: AugmentedQuery<ApiType, () => Observable<Option<u32>>, []>;
       pendingTransfersOut: AugmentedQuery<ApiType, (arg: u32 | AnyNumber | Uint8Array) => Observable<Option<PalletChainTransferQueuedTransferOut>>, [u32]>;
       transfersUsedInBlockNotebooks: AugmentedQuery<ApiType, (arg: u32 | AnyNumber | Uint8Array) => Observable<Vec<ITuple<[AccountId32, u32]>>>, [u32]>;

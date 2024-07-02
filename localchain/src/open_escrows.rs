@@ -749,7 +749,7 @@ mod tests {
         address: account.address.clone(),
         notary_id: 1,
         amount: localchain_transfer_amount,
-        expiration_block: 100,
+        expiration_tick: 100,
         transfer_id: 1,
       })
       .await?;
@@ -1065,7 +1065,7 @@ mod tests {
         address: bob_address.clone(),
         notary_id: 1,
         amount: 2_000u128,
-        expiration_block: 100,
+        expiration_tick: 100,
         transfer_id: 1,
       })
       .await?;

@@ -28,7 +28,7 @@ pub mod weights;
 pub mod pallet {
 	use frame_support::{pallet_prelude::*, traits::Len};
 	use frame_system::pallet_prelude::*;
-
+	use sp_core::crypto::AccountId32;
 	use ulx_primitives::{
 		notebook::NotebookHeader, DataDomainHash, DataDomainProvider, NotebookEventHandler,
 		TickProvider, ZoneRecord, MAX_DOMAINS_PER_NOTEBOOK, MAX_NOTARIES,
@@ -100,6 +100,12 @@ pub mod pallet {
 			domain_hash: DataDomainHash,
 			registration: DataDomainRegistration<T::AccountId>,
 		},
+		/// A data domain registration failed due to an error
+		DataDomainRegistrationError {
+			domain_hash: DataDomainHash,
+			account_id: AccountId32,
+			error: DispatchError,
+		},
 	}
 
 	#[pallet::error]
@@ -108,6 +114,12 @@ pub mod pallet {
 		DomainNotRegistered,
 		/// The sender is not the owner of the domain.
 		NotDomainOwner,
+		/// Failed to add to the address history.
+		FailedToAddToAddressHistory,
+		/// Failed to add to the expiring domain list
+		FailedToAddExpiringDomain,
+		/// Error decoding account from notary
+		AccountDecodingError,
 	}
 
 	#[pallet::hooks]
@@ -149,7 +161,7 @@ pub mod pallet {
 			DomainPaymentAddressHistory::<T>::try_mutate(domain_hash, |entry| {
 				entry.try_push((zone_record.payment_account.clone(), tick))
 			})
-			.map_err(|_| DispatchError::Other("Failed to add payment address to history"))?;
+			.map_err(|_| Error::<T>::FailedToAddToAddressHistory)?;
 			Self::deposit_event(Event::ZoneRecordUpdated { domain_hash, zone_record });
 
 			Ok(())
@@ -157,12 +169,22 @@ pub mod pallet {
 	}
 
 	impl<T: Config> NotebookEventHandler for Pallet<T> {
-		fn notebook_submitted(header: &NotebookHeader) -> sp_runtime::DispatchResult {
+		fn notebook_submitted(header: &NotebookHeader) {
 			let expiration_ticks = T::DomainExpirationTicks::get();
 			for (domain_hash, account) in header.data_domains.iter() {
 				let mut is_renewal = false;
-				let account_id = T::AccountId::decode(&mut account.encode().as_slice())
-					.map_err(|_| DispatchError::Other("Failed to decode account id"))?;
+				let account_id = match T::AccountId::decode(&mut account.encode().as_slice()) {
+					Ok(account_id) => account_id,
+					Err(_) => {
+						Self::deposit_event(Event::DataDomainRegistrationError {
+							domain_hash: *domain_hash,
+							account_id: account.clone(),
+							error: Error::<T>::AccountDecodingError.into(),
+						});
+						continue;
+					},
+				};
+
 				// if previous registration is at same tick, need to cancel it out
 				if let Some(registration) = <RegisteredDataDomains<T>>::get(domain_hash) {
 					let original_expiration = registration.registered_at_tick + expiration_ticks;
@@ -194,10 +216,18 @@ pub mod pallet {
 				let registration =
 					DataDomainRegistration { account_id, registered_at_tick: header.tick };
 				<RegisteredDataDomains<T>>::insert(domain_hash, registration.clone());
-				<ExpiringDomainsByBlock<T>>::mutate(header.tick + expiration_ticks, |domains| {
+				if <ExpiringDomainsByBlock<T>>::mutate(header.tick + expiration_ticks, |domains| {
 					domains.try_push(*domain_hash)
 				})
-				.map_err(|_| DispatchError::Other("Failed to add domain to expiration list"))?;
+				.is_err()
+				{
+					Self::deposit_event(Event::DataDomainRegistrationError {
+						domain_hash: *domain_hash,
+						account_id: account.clone(),
+						error: Error::<T>::FailedToAddExpiringDomain.into(),
+					});
+					continue;
+				}
 
 				if is_renewal {
 					Self::deposit_event(Event::DataDomainRenewed { domain_hash: *domain_hash });
@@ -208,8 +238,6 @@ pub mod pallet {
 					});
 				}
 			}
-
-			Ok(())
 		}
 	}
 

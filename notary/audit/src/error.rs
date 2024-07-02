@@ -91,6 +91,9 @@ pub enum VerifyError {
 	#[snafu(display("Invalid notary signature"))]
 	InvalidNotarySignature,
 
+	#[snafu(display("Invalid secret revealed"))]
+	InvalidSecretProvided,
+
 	#[snafu(display("Submitted notebook older than most recent in storage"))]
 	NotebookTooOld,
 

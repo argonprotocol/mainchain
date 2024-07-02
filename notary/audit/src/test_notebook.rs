@@ -14,16 +14,16 @@ use sp_keyring::{
 };
 use sp_runtime::traits::BlakeTwo256;
 
+use crate::{
+	verify_previous_balance_proof, AccountHistoryLookupError, NotebookHistoryLookup, VerifyError,
+};
 use ulx_primitives::{
 	balance_change::{AccountOrigin, BalanceChange, BalanceProof},
 	note::{Note, NoteType},
+	tick::Tick,
 	AccountType, Balance, BalanceTip, BlockVote, ChainTransfer, DataDomain, DataTLD,
 	LocalchainAccountId, MerkleProof, MultiSignatureBytes, NewAccountOrigin, Notarization,
 	Notebook, NotebookHeader, NotebookNumber, TransferToLocalchainId, ESCROW_EXPIRATION_TICKS,
-};
-
-use crate::{
-	verify_previous_balance_proof, AccountHistoryLookupError, NotebookHistoryLookup, VerifyError,
 };
 
 use super::notebook_verify;
@@ -67,6 +67,7 @@ impl NotebookHistoryLookup for TestLookup {
 		transfer_to_localchain_id: TransferToLocalchainId,
 		account_id: &AccountId32,
 		_milligons: Balance,
+		_at_tick: Tick,
 	) -> Result<bool, AccountHistoryLookupError> {
 		ValidLocalchainTransfers::get()
 			.get(&(account_id.clone(), transfer_to_localchain_id))

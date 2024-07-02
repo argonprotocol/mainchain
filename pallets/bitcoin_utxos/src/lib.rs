@@ -106,13 +106,18 @@ pub mod pallet {
 		UtxoRejected { utxo_id: UtxoId, rejected_reason: BitcoinRejectedReason },
 		UtxoSpent { utxo_id: UtxoId, block_height: BitcoinHeight },
 		UtxoUnwatched { utxo_id: UtxoId },
+
+		UtxoSpentError { utxo_id: UtxoId, error: DispatchError },
+		UtxoVerifiedError { utxo_id: UtxoId, error: DispatchError },
+		UtxoRejectedError { utxo_id: UtxoId, error: DispatchError },
+		UtxoExpiredError { utxo_ref: UtxoRef, error: DispatchError },
 	}
 
 	#[pallet::error]
 	pub enum Error<T> {
 		/// Only an Oracle Operator can perform this action
 		NoPermissions,
-		/// No Oraclized bitcoin block has been provided to the network
+		/// No Oracle-provided bitcoin block has been provided to the network
 		NoBitcoinConfirmedBlock,
 		/// Insufficient bitcoin amount
 		InsufficientBitcoinAmount,
@@ -176,30 +181,27 @@ pub mod pallet {
 
 			// watch for spent first, so we don't verify and then burn
 			for (utxo_id, block_height) in utxo_sync.spent.into_iter() {
-				let _ = with_storage_layer(|| {
-					Self::utxo_spent(utxo_id, block_height).map_err(|e| {
-						warn!(target: LOG_TARGET, "Failed to mark UTXO {} as spent: {:?}", utxo_id, e);
-						e
-					})
-				});
+				let err = with_storage_layer(|| Self::utxo_spent(utxo_id, block_height));
+				if let Err(e) = err {
+					warn!(target: LOG_TARGET, "Failed to mark UTXO {} as spent: {:?}", utxo_id, e);
+					Self::deposit_event(Event::UtxoSpentError { utxo_id, error: e });
+				}
 			}
 
 			for (utxo_id, utxo_ref) in utxo_sync.verified.into_iter() {
-				let _ = with_storage_layer(|| {
-					Self::utxo_verified(utxo_id, utxo_ref).map_err(|e| {
-						warn!(target: LOG_TARGET, "Failed to verify UTXO {}: {:?}", utxo_id, e);
-						e
-					})
-				});
+				let res = with_storage_layer(|| Self::utxo_verified(utxo_id, utxo_ref));
+				if let Err(e) = res {
+					warn!(target: LOG_TARGET, "Failed to verify UTXO {}: {:?}", utxo_id, e);
+					Self::deposit_event(Event::UtxoVerifiedError { utxo_id, error: e });
+				}
 			}
 
 			for (utxo_id, rejected_reason) in utxo_sync.invalid.into_iter() {
-				let _ = with_storage_layer(|| {
-					Self::utxo_rejected(utxo_id, rejected_reason).map_err(|e| {
-						warn!(target: LOG_TARGET, "Failed to reject UTXO {}: {:?}", utxo_id, e);
-						e
-					})
-				});
+				let res = with_storage_layer(|| Self::utxo_rejected(utxo_id, rejected_reason));
+				if let Err(e) = res {
+					warn!(target: LOG_TARGET, "Failed to reject UTXO {}: {:?}", utxo_id, e);
+					Self::deposit_event(Event::UtxoRejectedError { utxo_id, error: e });
+				}
 			}
 
 			let oldest_allowed_bitcoin_confirmation = current_confirmed
@@ -208,17 +210,16 @@ pub mod pallet {
 			let pending_confirmation = <UtxosPendingConfirmation<T>>::get();
 			for (utxo_id, utxo_value) in pending_confirmation.into_iter() {
 				if utxo_value.submitted_at_height < oldest_allowed_bitcoin_confirmation {
-					let _ = with_storage_layer(|| {
-						Self::utxo_rejected(utxo_id, BitcoinRejectedReason::LookupExpired).map_err(
-							|e| {
-								warn!(
-									target: LOG_TARGET,
-									"Failed to clear out expired UTXO {}: {:?}", utxo_id, e
-								);
-								e
-							},
-						)
+					let res = with_storage_layer(|| {
+						Self::utxo_rejected(utxo_id, BitcoinRejectedReason::LookupExpired)
 					});
+					if let Err(e) = res {
+						warn!(
+							target: LOG_TARGET,
+							"Failed to reject UTXO {:?} due to lookup expiration: {:?}", utxo_id, e
+						);
+						Self::deposit_event(Event::UtxoRejectedError { utxo_id, error: e });
+					}
 				}
 			}
 
@@ -230,15 +231,14 @@ pub mod pallet {
 			for i in last_synched_block..=utxo_sync.sync_to_block.block_height {
 				let utxos = <LockedUtxoExpirationsByBlock<T>>::take(i);
 				for utxo_ref in utxos.into_iter() {
-					let _ = with_storage_layer(|| {
-						Self::utxo_expired(utxo_ref.clone()).map_err(|e| {
-							warn!(
-								target: LOG_TARGET,
-								"Failed to expire UTXO {:?}: {:?}", utxo_ref, e
-							);
-							e
-						})
-					});
+					let res = with_storage_layer(|| Self::utxo_expired(utxo_ref.clone()));
+					if let Err(e) = res {
+						warn!(
+							target: LOG_TARGET,
+							"Failed to expire UTXO {:?}: {:?}", utxo_ref, e
+						);
+						Self::deposit_event(Event::UtxoExpiredError { utxo_ref, error: e });
+					}
 				}
 			}
 			<SynchedBitcoinBlock<T>>::set(Some(utxo_sync.sync_to_block));

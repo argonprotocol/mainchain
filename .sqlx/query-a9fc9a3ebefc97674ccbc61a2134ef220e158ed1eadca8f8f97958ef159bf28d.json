@@ -30,6 +30,11 @@
       },
       {
         "ordinal": 5,
+        "name": "expiration_tick",
+        "type_info": "Int4"
+      },
+      {
+        "ordinal": 6,
         "name": "included_in_notebook_number",
         "type_info": "Int4"
       }
@@ -44,6 +49,7 @@
       false,
       true,
       false,
+      true,
       true,
       true
     ]

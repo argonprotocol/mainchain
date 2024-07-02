@@ -297,6 +297,7 @@ async fn process_finalized_block(
 				ChainTransferStore::record_transfer_to_local_from_block(
 					&mut *db,
 					block_height,
+					to_localchain.expiration_tick,
 					&AccountId::from(to_localchain.account_id.0),
 					to_localchain.transfer_id,
 					to_localchain.amount,

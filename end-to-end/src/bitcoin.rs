@@ -20,13 +20,17 @@ use rand::{rngs::OsRng, RngCore};
 use sp_arithmetic::{FixedI128, FixedU128};
 use sp_core::{crypto::AccountId32, sr25519, Pair};
 
+use sp_arithmetic::per_things::Percent;
 use ulixee_client::{
 	api,
 	api::{
 		price_index::calls::types::submit::Index,
 		runtime_types::{
 			pallet_vaults::pallet::VaultConfig,
-			sp_arithmetic::fixed_point::{FixedI128 as FixedI128Ext, FixedU128 as FixedU128Ext},
+			sp_arithmetic::{
+				fixed_point::{FixedI128 as FixedI128Ext, FixedU128 as FixedU128Ext},
+				per_things::Percent as PercentExt,
+			},
 		},
 		storage, tx,
 	},
@@ -180,8 +184,8 @@ async fn test_bitcoin_minting_e2e() -> anyhow::Result<()> {
 			.tx()
 			.sign_and_submit_then_watch(
 				&tx().vaults().create(VaultConfig {
-					mining_mint_sharing_percent: FixedU128Ext(
-						FixedU128::from_float(0.0).into_inner(),
+					mining_reward_sharing_percent_take: PercentExt(
+						Percent::from_percent(0).deconstruct(),
 					),
 					mining_amount_allocated: 0,
 					mining_annual_percent_rate: FixedU128Ext(
