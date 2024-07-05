@@ -12,7 +12,6 @@ use bitcoin::{
 	Address, Amount, EcdsaSighashType, FeeRate, Network, OutPoint, PrivateKey, Psbt, PubkeyHash,
 	PublicKey, ScriptBuf, Sequence, Transaction, TxIn, TxOut, Witness,
 };
-use hwi::{types::HWIDevice, HWIClient};
 
 use ulx_primitives::bitcoin::{
 	create_timelock_multisig_script, BitcoinHeight, BitcoinPubkeyHash, Satoshis,
@@ -236,40 +235,6 @@ impl UtxoUnlocker {
 		Ok((*signature, pubkey))
 	}
 
-	pub fn sign_hwi(
-		&mut self,
-		key_source: KeySource,
-		device: Option<HWIDevice>,
-		network: Network,
-	) -> anyhow::Result<(Signature, PublicKey)> {
-		let psbt = &mut self.psbt;
-		let mut device = device;
-		if device.is_none() {
-			let devices = HWIClient::enumerate()
-				.map_err(|e| anyhow!("Error enumerating devices: {:?}", e))?;
-
-			for d in devices.into_iter().flatten() {
-				device = Some(d);
-			}
-		};
-		let device = device.ok_or(anyhow!("No device found"))?;
-
-		let client = HWIClient::get_client(&device, false, network.into())?;
-		let x_pubkey = client.get_xpub(&key_source.1, false)?;
-		let pubkey = x_pubkey.public_key;
-
-		psbt.inputs[0].bip32_derivation.insert(pubkey, key_source);
-
-		psbt.combine(client.sign_tx(psbt)?.psbt)?;
-		let Some((_, signature)) =
-			psbt.inputs[0].partial_sigs.iter().find(|(k, _)| k.inner == pubkey)
-		else {
-			bail!("Could not sign with hardware wallet");
-		};
-
-		Ok((*signature, pubkey.into()))
-	}
-
 	pub fn extract_tx(&mut self) -> anyhow::Result<Transaction> {
 		let mut witness = Witness::new();
 		let psbt = &mut self.psbt;
@@ -308,5 +273,44 @@ impl UtxoUnlocker {
 
 		let tx = psbt.clone().extract_tx()?;
 		Ok(tx)
+	}
+}
+#[cfg(feature = "hwif")]
+mod hwi {
+	use hwi::{types::HWIDevice, HWIClient};
+	impl UtxoUnlocker {
+		pub fn sign_hwi(
+			&mut self,
+			key_source: KeySource,
+			device: Option<HWIDevice>,
+			network: Network,
+		) -> anyhow::Result<(Signature, PublicKey)> {
+			let psbt = &mut self.psbt;
+			let mut device = device;
+			if device.is_none() {
+				let devices = HWIClient::enumerate()
+					.map_err(|e| anyhow!("Error enumerating devices: {:?}", e))?;
+
+				for d in devices.into_iter().flatten() {
+					device = Some(d);
+				}
+			};
+			let device = device.ok_or(anyhow!("No device found"))?;
+
+			let client = HWIClient::get_client(&device, false, network.into())?;
+			let x_pubkey = client.get_xpub(&key_source.1, false)?;
+			let pubkey = x_pubkey.public_key;
+
+			psbt.inputs[0].bip32_derivation.insert(pubkey, key_source);
+
+			psbt.combine(client.sign_tx(psbt)?.psbt)?;
+			let Some((_, signature)) =
+				psbt.inputs[0].partial_sigs.iter().find(|(k, _)| k.inner == pubkey)
+			else {
+				bail!("Could not sign with hardware wallet");
+			};
+
+			Ok((*signature, pubkey.into()))
+		}
 	}
 }

@@ -34,12 +34,6 @@ FROM ubuntu:22.04 AS base_ubuntu
 # Update and install dependencies
 RUN apt-get update \
     && apt-get upgrade -y \
-    && apt-get install -y --no-install-recommends \
-       libssl-dev \
-       libudev-dev \
-       pkg-config \
-       python3.10 \
-       python3.10-dev \
     && apt-get autoremove -y \
     && apt-get clean \
     && rm -rf /var/lib/apt/lists/*

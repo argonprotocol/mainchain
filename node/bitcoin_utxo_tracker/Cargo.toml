@@ -27,7 +27,7 @@ sc-service = { workspace = true }
 sp-api = { workspace = true, features = ["std"] }
 sp-runtime = { workspace = true, features = ["std"] }
 sc-client-api = { workspace = true }
-hwi = { workspace = true }
+hwi = { workspace = true, optional = true }
 
 [dev-dependencies]
 bitcoind = { workspace = true }
@@ -36,3 +36,7 @@ tokio = { workspace = true }
 rand = { workspace = true }
 lazy_static = { workspace = true }
 ulx-testing = { workspace = true }
+
+[features]
+default = []
+hwi = [ "dep:hwi" ]
