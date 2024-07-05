@@ -57,6 +57,7 @@ CREATE TABLE IF NOT EXISTS chain_transfers
     transfer_id                 integer NULL,
     amount                      varchar NOT NULL,
     finalized_block_number      integer NULL,
+    expiration_tick             integer NULL,
     included_in_notebook_number integer NULL REFERENCES notebook_headers (notebook_number)
 );
 

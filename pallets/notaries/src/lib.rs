@@ -16,7 +16,6 @@ pub mod weights;
 pub mod pallet {
 	use frame_support::pallet_prelude::*;
 	use frame_system::pallet_prelude::*;
-	use log::warn;
 	use sp_core::H256;
 	use sp_runtime::{app_crypto::RuntimePublic, BoundedBTreeMap};
 	use sp_std::vec::Vec;
@@ -136,6 +135,8 @@ pub mod pallet {
 		NotaryMetaUpdateQueued { notary_id: NotaryId, meta: NotaryMetaOf<T>, effective_tick: Tick },
 		/// Notary metadata updated
 		NotaryMetaUpdated { notary_id: NotaryId, meta: NotaryMetaOf<T> },
+		/// Error updating queued notary info
+		NotaryMetaUpdateError { notary_id: NotaryId, error: DispatchError, meta: NotaryMetaOf<T> },
 	}
 
 	#[pallet::error]
@@ -154,6 +155,10 @@ pub mod pallet {
 		NoMoreNotaryIds,
 		/// The proposed effective tick is too soon
 		EffectiveTickTooSoon,
+		/// Too many internal keys
+		TooManyKeys,
+		/// The notary is invalid
+		InvalidNotary,
 	}
 
 	#[pallet::genesis_config]
@@ -188,31 +193,34 @@ pub mod pallet {
 			if meta_changes.len() > 0 {
 				let old_block_to_preserve =
 					current_tick.saturating_sub(T::MaxTicksForKeyHistory::get());
-				let _ = <ActiveNotaries<T>>::try_mutate(|active| -> DispatchResult {
+				<ActiveNotaries<T>>::mutate(|active| {
 					for (notary_id, meta) in meta_changes.into_iter() {
 						if let Some(pos) = active.iter().position(|n| n.notary_id == notary_id) {
 							active[pos].meta = meta.clone();
 							active[pos].meta_updated_block = n;
 							active[pos].meta_updated_tick = current_tick;
-							if let Err(e) =
+							if let Err(_) =
 								<NotaryKeyHistory<T>>::try_mutate(notary_id, |history| {
 									history.retain(|(tick, _)| *tick >= old_block_to_preserve);
 									history.try_push((current_tick, meta.public))
 								}) {
-								warn!("Failed to update notary key history: {:?} {notary_id:?}", e);
+								Self::deposit_event(Event::NotaryMetaUpdateError {
+									notary_id,
+									error: Error::<T>::TooManyKeys.into(),
+									meta,
+								});
 							} else {
 								Self::deposit_event(Event::NotaryMetaUpdated { notary_id, meta });
 							}
 						} else {
-							warn!(
-								"Invalid notary meta queued (id={:?}) at block {:?}",
-								notary_id, n
-							);
+							Self::deposit_event(Event::NotaryMetaUpdateError {
+								notary_id,
+								error: Error::<T>::InvalidNotary.into(),
+								meta,
+							});
 						}
 					}
-					Ok(())
-				})
-				.map_err(|err| warn!("Failed to update notary meta: {:?} at block {:?}", err, n));
+				});
 			}
 			T::DbWeight::get().reads_writes(2, 1)
 		}

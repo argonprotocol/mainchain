@@ -324,7 +324,7 @@ impl BalanceSync {
         amount: x.amount.parse::<u128>().unwrap_or_default(),
         transfer_id: x.transfer_id as u32,
         notary_id: x.notary_id as u32,
-        expiration_block: 0,
+        expiration_tick: x.expiration_tick.unwrap_or_default() as u32,
       };
       notarization.claim_from_mainchain(transfer).await?;
     }

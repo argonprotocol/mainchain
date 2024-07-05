@@ -14,14 +14,14 @@ use subxt::OnlineClient;
 use tokio::sync::Mutex;
 use tracing::warn;
 
-use ulixee_client::api::{constants, storage};
+use ulixee_client::api::storage;
 use ulixee_client::api::{runtime_types, tx};
 
 use ulixee_client::{
   api, MainchainClient as InnerMainchainClient, UlxConfig, UlxExtrinsicParamsBuilder,
 };
 use ulx_primitives::host::Host;
-use ulx_primitives::tick::Ticker;
+use ulx_primitives::tick::{Tick, Ticker};
 use ulx_primitives::{
   Balance, DataDomain, DataTLD, NotaryId, NotebookNumber, TransferToLocalchainId,
 };
@@ -352,7 +352,7 @@ impl MainchainClient {
     &self,
     transfer_id: TransferToLocalchainId,
   ) -> Result<Option<u32>> {
-    let Ok(Some(transfer)) = self
+    let Ok(Some(_)) = self
       .fetch_storage(
         &storage()
           .chain_transfer()
@@ -364,10 +364,8 @@ impl MainchainClient {
       return Ok(None);
     };
 
-    let constant_query = constants().chain_transfer().transfer_expiration_blocks();
-    let expiration_blocks = self.client().await?.live.constants().at(&constant_query)?;
-
-    Ok(Some(transfer.expiration_block - expiration_blocks))
+    let finalized = self.latest_finalized_number().await?;
+    return Ok(Some(finalized));
   }
 
   pub async fn create_transfer_to_localchain(
@@ -449,7 +447,7 @@ impl MainchainClient {
         address,
         amount,
         notary_id,
-        expiration_block: transfer.expiration_block,
+        expiration_tick: transfer.expiration_tick,
         transfer_id: transfer.transfer_id,
       },
       in_block,
@@ -482,7 +480,7 @@ impl MainchainClient {
         address: self.subxt_account_to_address(transfer.account_id)?,
         amount: transfer.amount,
         notary_id: transfer.notary_id,
-        expiration_block: transfer.expiration_block,
+        expiration_tick: transfer.expiration_tick,
         transfer_id,
       }));
     }
@@ -513,7 +511,7 @@ impl MainchainClient {
               address: self.subxt_account_to_address(transfer.account_id)?,
               amount: transfer.amount,
               notary_id: transfer.notary_id,
-              expiration_block: transfer.expiration_block,
+              expiration_tick: transfer.expiration_tick,
               transfer_id,
             }));
           }
@@ -635,7 +633,7 @@ pub mod napi_ext {
     pub address: String,
     pub amount: BigInt,
     pub notary_id: u32,
-    pub expiration_block: u32,
+    pub expiration_tick: u32,
     pub transfer_id: u32,
   }
 
@@ -815,7 +813,7 @@ pub mod napi_ext {
         address: result.address,
         amount: result.amount.into(),
         notary_id: result.notary_id,
-        expiration_block: result.expiration_block,
+        expiration_tick: result.expiration_tick,
         transfer_id,
       }))
     }
@@ -855,8 +853,8 @@ pub mod napi_ext {
 pub struct LocalchainTransfer {
   pub address: String,
   pub amount: Balance,
-  pub notary_id: u32,
-  pub expiration_block: u32,
+  pub notary_id: NotaryId,
+  pub expiration_tick: Tick,
   pub transfer_id: TransferToLocalchainId,
 }
 

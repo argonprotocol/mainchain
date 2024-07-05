@@ -1,9 +1,10 @@
 use sp_core::ByteArray;
 use sqlx::{query, FromRow, PgConnection};
 
-use ulx_primitives::{ensure, AccountId, ChainTransfer, NotebookNumber, TransferToLocalchainId};
-
 use crate::Error;
+use ulx_primitives::{
+	ensure, tick::Tick, AccountId, ChainTransfer, NotebookNumber, TransferToLocalchainId,
+};
 
 pub struct ChainTransferStore;
 
@@ -14,6 +15,7 @@ struct ChainTransferRow {
 	pub amount: String,
 	pub account_id: Vec<u8>,
 	pub transfer_id: Option<i32>,
+	pub expiration_tick: Option<i32>,
 	pub finalized_block_number: Option<i32>,
 	pub included_in_notebook_number: Option<i32>,
 }
@@ -70,6 +72,7 @@ impl ChainTransferStore {
 	pub async fn take_and_record_transfer_local(
 		db: &mut PgConnection,
 		notebook_number: NotebookNumber,
+		notebook_tick: Tick,
 		account_id: &AccountId,
 		transfer_id: TransferToLocalchainId,
 		proposed_amount: u128,
@@ -79,13 +82,14 @@ impl ChainTransferStore {
 		let stored_amount = query!(
 			r#"
 				UPDATE chain_transfers SET included_in_notebook_number = $1
-				WHERE account_id = $2 AND transfer_id = $3
+				WHERE account_id = $2 AND transfer_id = $3 AND expiration_tick >= $4
 				AND included_in_notebook_number IS NULL
 				RETURNING amount
 				"#,
 			notebook_number as i32,
 			account_id.as_slice(),
 			transfer_id as i64,
+			notebook_tick as i32,
 		)
 		.fetch_one(db)
 		.await
@@ -126,19 +130,21 @@ impl ChainTransferStore {
 	pub async fn record_transfer_to_local_from_block<'a>(
 		db: impl sqlx::PgExecutor<'a> + 'a,
 		finalized_block_number: u32,
+		expiration_tick: Tick,
 		account_id: &AccountId,
 		transfer_id: TransferToLocalchainId,
 		milligons: u128,
 	) -> anyhow::Result<()> {
 		let res = query!(
 			r#"
-			INSERT INTO chain_transfers (to_localchain, amount, account_id, transfer_id, finalized_block_number) VALUES ($1, $2, $3, $4, $5)
+			INSERT INTO chain_transfers (to_localchain, amount, account_id, transfer_id, finalized_block_number, expiration_tick) VALUES ($1, $2, $3, $4, $5, $6)
 			"#,
 			true,
 			milligons.to_string(),
 			account_id.as_slice(),
 			transfer_id as i32,
 			finalized_block_number as i32,
+			expiration_tick as i32,
 		)
 		.execute(db)
 		.await?;
@@ -193,6 +199,7 @@ mod tests {
 				ChainTransferStore::record_transfer_to_local_from_block(
 					&mut *tx,
 					100,
+					100,
 					&account_id,
 					transfer_id,
 					milligons
@@ -207,6 +214,7 @@ mod tests {
 				ChainTransferStore::take_and_record_transfer_local(
 					&mut tx,
 					notebook_number,
+					10,
 					&account_id,
 					transfer_id,
 					milligons,
@@ -256,6 +264,7 @@ mod tests {
 			ChainTransferStore::record_transfer_to_local_from_block(
 				&mut *tx,
 				100,
+				100,
 				&account_id,
 				transfer_id,
 				milligons
@@ -266,6 +275,7 @@ mod tests {
 			ChainTransferStore::take_and_record_transfer_local(
 				&mut tx,
 				notebook_number,
+				1,
 				&account_id,
 				transfer_id,
 				milligons,
@@ -278,6 +288,7 @@ mod tests {
 		assert!(ChainTransferStore::take_and_record_transfer_local(
 			&mut tx,
 			notebook_number,
+			1,
 			&account_id,
 			transfer_id,
 			milligons,
@@ -287,7 +298,58 @@ mod tests {
 		.await
 		.unwrap_err()
 		.to_string()
-		.contains("Transfer not found (or already applied)"));
+		.contains("Invalid transfer to localchain"));
+		tx.commit().await?;
+
+		Ok(())
+	}
+
+	#[sqlx::test]
+	async fn test_cannot_use_expired_transer(pool: PgPool) -> anyhow::Result<()> {
+		logger();
+		let db = &mut pool.acquire().await?;
+		NotebookHeaderStore::create(
+			db,
+			1,
+			1,
+			1,
+			Utc::now().add(Duration::try_minutes(1).unwrap()).timestamp_millis() as u64,
+		)
+		.await?;
+		let notebook_number = 1;
+		let account_id = Bob.to_account_id();
+		let transfer_id = 1;
+		let milligons = 1000;
+		let change_index = 0;
+		let note_index = 0;
+
+		let mut tx = pool.begin().await?;
+		assert_ok!(
+			ChainTransferStore::record_transfer_to_local_from_block(
+				&mut *tx,
+				100,
+				10,
+				&account_id,
+				transfer_id,
+				milligons
+			)
+			.await
+		);
+
+		assert!(ChainTransferStore::take_and_record_transfer_local(
+			&mut tx,
+			notebook_number,
+			11,
+			&account_id,
+			transfer_id,
+			milligons,
+			change_index,
+			note_index,
+		)
+		.await
+		.unwrap_err()
+		.to_string()
+		.contains("expired"));
 		tx.commit().await?;
 
 		Ok(())

@@ -9,7 +9,7 @@ import type { ApiTypes, AugmentedEvent } from '@polkadot/api-base/types';
 import type { Bytes, Null, Option, Result, U8aFixed, Vec, bool, u128, u16, u32, u64 } from '@polkadot/types-codec';
 import type { ITuple } from '@polkadot/types-codec/types';
 import type { AccountId32, H256 } from '@polkadot/types/interfaces/runtime';
-import type { FrameSupportDispatchDispatchInfo, FrameSupportTokensMiscBalanceStatus, PalletDataDomainDataDomainRegistration, PalletMintMintType, PalletMultisigTimepoint, SpConsensusGrandpaAppPublic, SpRuntimeDispatchError, UlxNodeRuntimeProxyType, UlxNotaryAuditErrorVerifyError, UlxPrimitivesBitcoinBitcoinRejectedReason, UlxPrimitivesBitcoinCompressedBitcoinPubkey, UlxPrimitivesBlockSealBlockPayout, UlxPrimitivesBlockSealMiningRegistration, UlxPrimitivesBondBondExpiration, UlxPrimitivesBondBondType, UlxPrimitivesDataDomainZoneRecord, UlxPrimitivesNotaryNotaryMeta, UlxPrimitivesNotaryNotaryRecord } from '@polkadot/types/lookup';
+import type { FrameSupportDispatchDispatchInfo, FrameSupportTokensMiscBalanceStatus, PalletDataDomainDataDomainRegistration, PalletMintMintType, PalletMultisigTimepoint, SpConsensusGrandpaAppPublic, SpRuntimeDispatchError, UlxNodeRuntimeProxyType, UlxNotaryAuditErrorVerifyError, UlxPrimitivesBitcoinBitcoinRejectedReason, UlxPrimitivesBitcoinCompressedBitcoinPubkey, UlxPrimitivesBitcoinUtxoRef, UlxPrimitivesBlockSealBlockPayout, UlxPrimitivesBlockSealMiningRegistration, UlxPrimitivesBondBondExpiration, UlxPrimitivesBondBondType, UlxPrimitivesDataDomainZoneRecord, UlxPrimitivesNotaryNotaryMeta, UlxPrimitivesNotaryNotaryRecord } from '@polkadot/types/lookup';
 
 export type __AugmentedEvent<ApiType extends ApiTypes> = AugmentedEvent<ApiType>;
 
@@ -108,14 +108,20 @@ declare module '@polkadot/api-base/types/events' {
       Withdraw: AugmentedEvent<ApiType, [who: AccountId32, amount: u128], { who: AccountId32, amount: u128 }>;
     };
     bitcoinUtxos: {
+      UtxoExpiredError: AugmentedEvent<ApiType, [utxoRef: UlxPrimitivesBitcoinUtxoRef, error: SpRuntimeDispatchError], { utxoRef: UlxPrimitivesBitcoinUtxoRef, error: SpRuntimeDispatchError }>;
       UtxoRejected: AugmentedEvent<ApiType, [utxoId: u64, rejectedReason: UlxPrimitivesBitcoinBitcoinRejectedReason], { utxoId: u64, rejectedReason: UlxPrimitivesBitcoinBitcoinRejectedReason }>;
+      UtxoRejectedError: AugmentedEvent<ApiType, [utxoId: u64, error: SpRuntimeDispatchError], { utxoId: u64, error: SpRuntimeDispatchError }>;
       UtxoSpent: AugmentedEvent<ApiType, [utxoId: u64, blockHeight: u64], { utxoId: u64, blockHeight: u64 }>;
+      UtxoSpentError: AugmentedEvent<ApiType, [utxoId: u64, error: SpRuntimeDispatchError], { utxoId: u64, error: SpRuntimeDispatchError }>;
       UtxoUnwatched: AugmentedEvent<ApiType, [utxoId: u64], { utxoId: u64 }>;
       UtxoVerified: AugmentedEvent<ApiType, [utxoId: u64], { utxoId: u64 }>;
+      UtxoVerifiedError: AugmentedEvent<ApiType, [utxoId: u64, error: SpRuntimeDispatchError], { utxoId: u64, error: SpRuntimeDispatchError }>;
     };
     blockRewards: {
       RewardCreated: AugmentedEvent<ApiType, [maturationBlock: u32, rewards: Vec<UlxPrimitivesBlockSealBlockPayout>], { maturationBlock: u32, rewards: Vec<UlxPrimitivesBlockSealBlockPayout> }>;
+      RewardCreateError: AugmentedEvent<ApiType, [accountId: AccountId32, argons: Option<u128>, ulixees: Option<u128>, error: SpRuntimeDispatchError], { accountId: AccountId32, argons: Option<u128>, ulixees: Option<u128>, error: SpRuntimeDispatchError }>;
       RewardUnlocked: AugmentedEvent<ApiType, [rewards: Vec<UlxPrimitivesBlockSealBlockPayout>], { rewards: Vec<UlxPrimitivesBlockSealBlockPayout> }>;
+      RewardUnlockError: AugmentedEvent<ApiType, [accountId: AccountId32, argons: Option<u128>, ulixees: Option<u128>, error: SpRuntimeDispatchError], { accountId: AccountId32, argons: Option<u128>, ulixees: Option<u128>, error: SpRuntimeDispatchError }>;
     };
     blockSealSpec: {
       ComputeDifficultyAdjusted: AugmentedEvent<ApiType, [expectedBlockTime: u64, actualBlockTime: u64, startDifficulty: u128, newDifficulty: u128], { expectedBlockTime: u64, actualBlockTime: u64, startDifficulty: u128, newDifficulty: u128 }>;
@@ -128,12 +134,37 @@ declare module '@polkadot/api-base/types/events' {
       BitcoinUtxoCosignRequested: AugmentedEvent<ApiType, [bondId: u64, vaultId: u32, utxoId: u64], { bondId: u64, vaultId: u32, utxoId: u64 }>;
       BondCanceled: AugmentedEvent<ApiType, [vaultId: u32, bondId: u64, bondedAccountId: AccountId32, bondType: UlxPrimitivesBondBondType, returnedFee: u128], { vaultId: u32, bondId: u64, bondedAccountId: AccountId32, bondType: UlxPrimitivesBondBondType, returnedFee: u128 }>;
       BondCompleted: AugmentedEvent<ApiType, [vaultId: u32, bondId: u64], { vaultId: u32, bondId: u64 }>;
+      /**
+       * An error occurred while completing a bond
+       **/
+      BondCompletionError: AugmentedEvent<ApiType, [bondId: u64, error: SpRuntimeDispatchError], { bondId: u64, error: SpRuntimeDispatchError }>;
       BondCreated: AugmentedEvent<ApiType, [vaultId: u32, bondId: u64, bondType: UlxPrimitivesBondBondType, bondedAccountId: AccountId32, utxoId: Option<u64>, amount: u128, expiration: UlxPrimitivesBondBondExpiration], { vaultId: u32, bondId: u64, bondType: UlxPrimitivesBondBondType, bondedAccountId: AccountId32, utxoId: Option<u64>, amount: u128, expiration: UlxPrimitivesBondBondExpiration }>;
+      /**
+       * An error occurred while refunding an overdue cosigned bitcoin bond
+       **/
+      CosignOverdueError: AugmentedEvent<ApiType, [utxoId: u64, error: SpRuntimeDispatchError], { utxoId: u64, error: SpRuntimeDispatchError }>;
     };
     chainTransfer: {
+      /**
+       * A localchain transfer could not be cleaned up properly. Possible invalid transfer
+       * needing investigation.
+       **/
+      PossibleInvalidTransferAllowed: AugmentedEvent<ApiType, [transferId: u32, notaryId: u32, notebookNumber: u32], { transferId: u32, notaryId: u32, notebookNumber: u32 }>;
+      /**
+       * Taxation failed
+       **/
+      TaxationError: AugmentedEvent<ApiType, [notaryId: u32, notebookNumber: u32, tax: u128, error: SpRuntimeDispatchError], { notaryId: u32, notebookNumber: u32, tax: u128, error: SpRuntimeDispatchError }>;
       TransferIn: AugmentedEvent<ApiType, [accountId: AccountId32, amount: u128, notaryId: u32], { accountId: AccountId32, amount: u128, notaryId: u32 }>;
-      TransferToLocalchain: AugmentedEvent<ApiType, [accountId: AccountId32, amount: u128, transferId: u32, notaryId: u32, expirationBlock: u32], { accountId: AccountId32, amount: u128, transferId: u32, notaryId: u32, expirationBlock: u32 }>;
+      /**
+       * A transfer into the mainchain failed
+       **/
+      TransferInError: AugmentedEvent<ApiType, [accountId: AccountId32, amount: u128, notaryId: u32, notebookNumber: u32, error: SpRuntimeDispatchError], { accountId: AccountId32, amount: u128, notaryId: u32, notebookNumber: u32, error: SpRuntimeDispatchError }>;
+      TransferToLocalchain: AugmentedEvent<ApiType, [accountId: AccountId32, amount: u128, transferId: u32, notaryId: u32, expirationTick: u32], { accountId: AccountId32, amount: u128, transferId: u32, notaryId: u32, expirationTick: u32 }>;
       TransferToLocalchainExpired: AugmentedEvent<ApiType, [accountId: AccountId32, transferId: u32, notaryId: u32], { accountId: AccountId32, transferId: u32, notaryId: u32 }>;
+      /**
+       * An expired transfer to localchain failed to be refunded
+       **/
+      TransferToLocalchainRefundError: AugmentedEvent<ApiType, [accountId: AccountId32, transferId: u32, notaryId: u32, notebookNumber: u32, error: SpRuntimeDispatchError], { accountId: AccountId32, transferId: u32, notaryId: u32, notebookNumber: u32, error: SpRuntimeDispatchError }>;
     };
     dataDomain: {
       /**
@@ -149,6 +180,10 @@ declare module '@polkadot/api-base/types/events' {
        * tick
        **/
       DataDomainRegistrationCanceled: AugmentedEvent<ApiType, [domainHash: H256, registration: PalletDataDomainDataDomainRegistration], { domainHash: H256, registration: PalletDataDomainDataDomainRegistration }>;
+      /**
+       * A data domain registration failed due to an error
+       **/
+      DataDomainRegistrationError: AugmentedEvent<ApiType, [domainHash: H256, accountId: AccountId32, error: SpRuntimeDispatchError], { domainHash: H256, accountId: AccountId32, error: SpRuntimeDispatchError }>;
       /**
        * A data domain was registered
        **/
@@ -177,9 +212,11 @@ declare module '@polkadot/api-base/types/events' {
       SlotBidderAdded: AugmentedEvent<ApiType, [accountId: AccountId32, bidAmount: u128, index: u32], { accountId: AccountId32, bidAmount: u128, index: u32 }>;
       SlotBidderReplaced: AugmentedEvent<ApiType, [accountId: AccountId32, bondId: Option<u64>, keptOwnershipBond: bool], { accountId: AccountId32, bondId: Option<u64>, keptOwnershipBond: bool }>;
       UnbondedMiner: AugmentedEvent<ApiType, [accountId: AccountId32, bondId: Option<u64>, keptOwnershipBond: bool], { accountId: AccountId32, bondId: Option<u64>, keptOwnershipBond: bool }>;
+      UnbondMinerError: AugmentedEvent<ApiType, [accountId: AccountId32, bondId: Option<u64>, error: SpRuntimeDispatchError], { accountId: AccountId32, bondId: Option<u64>, error: SpRuntimeDispatchError }>;
     };
     mint: {
       ArgonsMinted: AugmentedEvent<ApiType, [mintType: PalletMintMintType, accountId: AccountId32, utxoId: Option<u64>, amount: u128], { mintType: PalletMintMintType, accountId: AccountId32, utxoId: Option<u64>, amount: u128 }>;
+      MintError: AugmentedEvent<ApiType, [mintType: PalletMintMintType, accountId: AccountId32, utxoId: Option<u64>, amount: u128, error: SpRuntimeDispatchError], { mintType: PalletMintMintType, accountId: AccountId32, utxoId: Option<u64>, amount: u128, error: SpRuntimeDispatchError }>;
     };
     multisig: {
       /**
@@ -208,6 +245,10 @@ declare module '@polkadot/api-base/types/events' {
        * Notary metadata updated
        **/
       NotaryMetaUpdated: AugmentedEvent<ApiType, [notaryId: u32, meta: UlxPrimitivesNotaryNotaryMeta], { notaryId: u32, meta: UlxPrimitivesNotaryNotaryMeta }>;
+      /**
+       * Error updating queued notary info
+       **/
+      NotaryMetaUpdateError: AugmentedEvent<ApiType, [notaryId: u32, error: SpRuntimeDispatchError, meta: UlxPrimitivesNotaryNotaryMeta], { notaryId: u32, error: SpRuntimeDispatchError, meta: UlxPrimitivesNotaryNotaryMeta }>;
       /**
        * Notary metadata queued for update
        **/

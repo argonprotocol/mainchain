@@ -60,6 +60,7 @@ pub trait NotebookHistoryLookup {
 		transfer_id: TransferToLocalchainId,
 		account_id: &AccountId,
 		milligons: Balance,
+		for_notebook_tick: Tick,
 	) -> Result<bool, AccountHistoryLookupError>;
 }
 
@@ -263,6 +264,7 @@ fn verify_balance_sources<T: NotebookHistoryLookup>(
 						*transfer_id,
 						account_id,
 						note.milligons,
+						header.tick,
 					)?;
 					state.track_chain_transfer(account_id.clone(), note)?;
 				},

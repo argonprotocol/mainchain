@@ -443,6 +443,7 @@ mod tests {
 		ChainTransferStore::record_transfer_to_local_from_block(
 			&mut *tx,
 			100,
+			100,
 			&Bob.to_account_id(),
 			1,
 			1000,
@@ -450,6 +451,7 @@ mod tests {
 		.await?;
 		ChainTransferStore::take_and_record_transfer_local(
 			&mut tx,
+			1,
 			1,
 			&Bob.to_account_id(),
 			1,

@@ -5,6 +5,7 @@ use frame_support::{derive_impl, parameter_types};
 use sp_core::{ConstU64, H256, U256};
 use sp_runtime::BuildStorage;
 
+use crate as pallet_block_seal_spec;
 use ulx_primitives::{
 	block_seal::MiningAuthority,
 	inherents::BlockSealInherent,
@@ -13,8 +14,6 @@ use ulx_primitives::{
 	AuthorityProvider, BlockSealAuthorityId, NotaryId, NotebookProvider, NotebookSecret,
 	TickProvider,
 };
-
-use crate as pallet_block_seal_spec;
 
 type Block = frame_system::mocking::MockBlock<Test>;
 
@@ -68,14 +67,8 @@ impl AuthorityProvider<BlockSealAuthorityId, Block, u64> for StaticAuthorityProv
 			}
 		})
 	}
-	fn get_rewards_account(author: u64) -> Option<u64> {
-		Some(author)
-	}
 	fn xor_closest_authority(_: U256) -> Option<MiningAuthority<BlockSealAuthorityId, u64>> {
 		XorClosest::get().clone()
-	}
-	fn get_all_rewards_accounts() -> Vec<u64> {
-		vec![]
 	}
 }
 

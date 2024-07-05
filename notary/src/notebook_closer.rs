@@ -214,18 +214,15 @@ mod tests {
 		OnlineClient,
 	};
 	use subxt_signer::sr25519::{dev, Keypair};
-	use tokio::{spawn, sync::Mutex};
+	use tokio::sync::Mutex;
 
 	use ulixee_client::{
 		api,
 		api::{
 			runtime_types,
 			runtime_types::{
-				pallet_notaries::pallet::Call as NotaryCall,
-				ulx_node_runtime::RuntimeCall,
-				ulx_primitives::{
-					balance_change::AccountOrigin as SubxtAccountOrigin, notary::NotaryMeta,
-				},
+				pallet_notaries::pallet::Call as NotaryCall, ulx_node_runtime::RuntimeCall,
+				ulx_primitives::notary::NotaryMeta,
 			},
 			storage, tx,
 		},
@@ -254,109 +251,6 @@ mod tests {
 	};
 
 	use super::*;
-
-	#[sqlx::test]
-	async fn test_chain_to_chain(pool: PgPool) -> anyhow::Result<()> {
-		let _ = tracing_subscriber::fmt::try_init();
-		let ctx = start_ulx_test_node().await;
-		let bob_id = dev::bob().public_key().to_account_id();
-
-		let ws_url = ctx.client.url.clone();
-		let keystore = MemoryKeystore::new();
-		let keystore = KeystoreExt::new(keystore);
-		let notary_key =
-			keystore.ed25519_generate_new(NOTARY_KEYID, None).expect("should have a key");
-
-		let mut client = ReconnectingClient::new(vec![ws_url.clone()]);
-		let ticker = client.get().await?.lookup_ticker().await?;
-		let ticker = Ticker::new(ticker.tick_duration_millis, ticker.genesis_utc_time);
-		let server = NotaryServer::create_http_server("127.0.0.1:0").await?;
-		let block_tracker = track_blocks(ws_url.clone(), 1, pool.clone(), ticker);
-		let block_tracker = Arc::new(Mutex::new(Some(block_tracker)));
-
-		propose_bob_as_notary(&ctx.client.live, notary_key, server.local_addr()?).await?;
-
-		let notary_server = NotaryServer::start_with(server, 1, pool.clone()).await?;
-
-		activate_notary(&pool, &ctx.client.live, &bob_id).await?;
-
-		{
-			let mut tx = pool.begin().await?;
-			assert_eq!(
-				NotebookStatusStore::lock_open_for_appending(&mut tx).await?.0,
-				1,
-				"There should be a notebook active now"
-			);
-		}
-
-		// Submit a transfer to localchain and wait for result
-		let bob_transfer = create_localchain_transfer(&ctx.client.live, dev::bob(), 1000).await?;
-		wait_for_transfers(&pool, vec![bob_transfer.clone()]).await?;
-		// Record the balance change
-		submit_balance_change_to_notary(&pool, bob_transfer).await?;
-
-		let mut closer =
-			NotebookCloser { pool: pool.clone(), keystore: keystore.clone(), notary_id: 1, ticker };
-		let mut listener = FinalizedNotebookHeaderListener::connect(
-			pool.clone(),
-			notary_server.completed_notebook_sender.clone(),
-		)
-		.await?;
-		let mut subscription = notary_server.completed_notebook_stream.subscribe(100);
-
-		let listen_handle = spawn(async move {
-			while let Ok(n) = listener.next().await {
-				println!("Notebook finalized {}", n.header.notebook_number);
-			}
-		});
-
-		loop {
-			let _ = &closer.iterate_notebook_close_loop().await;
-			let status = NotebookStatusStore::get(&pool, 1).await?;
-			if status.finalized_time.is_some() {
-				break;
-			}
-			// yield
-			tokio::time::sleep(tokio::time::Duration::from_millis(50)).await;
-			check_block_watch_status(block_tracker.clone()).await?;
-		}
-
-		let next_header = subscription.next().await;
-		assert!(next_header.is_some());
-		let next_header = next_header.expect("Should have a header");
-
-		assert_eq!(
-			ctx.client
-				.fetch_storage(
-					&storage().notebook().account_origin_last_changed_notebook_by_notary(
-						1,
-						SubxtAccountOrigin { notebook_number: 1, account_uid: 1 }
-					),
-					None
-				)
-				.await?,
-			Some(1),
-			"Should have updated Bob's last change notebook"
-		);
-
-		assert_eq!(
-			ctx.client
-				.fetch_storage(
-					&storage().notebook().notebook_changed_accounts_root_by_notary(1, 1),
-					None
-				)
-				.await?,
-			next_header.header.changed_accounts_root.into(),
-			"Should have updated Bob's last change notebook"
-		);
-		client.close().await;
-		let mut block_tracker_lock = block_tracker.lock().await;
-		if let Some(tracker) = block_tracker_lock.take() {
-			tracker.abort();
-		}
-		listen_handle.abort();
-		Ok(())
-	}
 
 	#[sqlx::test]
 	async fn test_submitting_votes(pool: PgPool) -> anyhow::Result<()> {

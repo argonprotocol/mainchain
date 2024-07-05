@@ -1,3 +1,5 @@
+use crate as pallet_mining_slot;
+use crate::Registration;
 use env_logger::{Builder, Env};
 use frame_support::{
 	derive_impl, parameter_types,
@@ -7,12 +9,10 @@ use frame_system::pallet_prelude::BlockNumberFor;
 use sp_core::ConstU32;
 use sp_runtime::{BuildStorage, FixedU128};
 use ulx_primitives::{
+	block_seal::RewardSharing,
 	bond::{BondError, BondProvider},
 	VaultId,
 };
-
-use crate as pallet_mining_slot;
-use crate::Registration;
 
 type Block = frame_system::mocking::MockBlock<Test>;
 
@@ -100,6 +100,7 @@ impl pallet_balances::Config<UlixeeToken> for Test {
 parameter_types! {
 	pub static Bonds: Vec<(BondId, VaultId, u64, Balance)> = vec![];
 	pub static NextBondId: u64 = 1;
+	pub static VaultSharing: Option<RewardSharing<u64>> = None;
 }
 
 pub struct StaticBondProvider;
@@ -113,11 +114,11 @@ impl BondProvider for StaticBondProvider {
 		account_id: Self::AccountId,
 		amount: Self::Balance,
 		_bond_until_block: Self::BlockNumber,
-	) -> Result<ulx_primitives::BondId, BondError> {
+	) -> Result<(ulx_primitives::BondId, Option<RewardSharing<u64>>), BondError> {
 		let bond_id = NextBondId::get();
 		NextBondId::set(bond_id + 1);
 		Bonds::mutate(|a| a.push((bond_id, vault_id, account_id, amount)));
-		Ok(bond_id)
+		Ok((bond_id, VaultSharing::get()))
 	}
 
 	fn cancel_bond(bond_id: ulx_primitives::BondId) -> Result<(), BondError> {

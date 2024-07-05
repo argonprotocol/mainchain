@@ -1,6 +1,6 @@
 use codec::{Codec, Decode, Encode, FullCodec, MaxEncodedLen};
 use scale_info::TypeInfo;
-use sp_arithmetic::{FixedI128, FixedPointNumber};
+use sp_arithmetic::{FixedI128, FixedPointNumber, Percent};
 use sp_core::{RuntimeDebug, H256, U256};
 use sp_runtime::{
 	traits::{AtLeast32BitUnsigned, Block as BlockT, CheckedDiv, UniqueSaturatedInto},
@@ -13,7 +13,7 @@ use crate::{
 		BitcoinCosignScriptPubkey, BitcoinHeight, BitcoinRejectedReason, Satoshis, UtxoId,
 		SATOSHIS_PER_BITCOIN,
 	},
-	block_seal::{BlockPayout, MiningAuthority},
+	block_seal::{BlockPayout, MiningAuthority, RewardSharing},
 	inherents::BlockSealInherent,
 	tick::{Tick, Ticker},
 	DataDomainHash, NotaryId, NotebookHeader, NotebookNumber, NotebookSecret,
@@ -137,6 +137,7 @@ pub trait ChainTransferLookup<AccountId, Balance> {
 		transfer_to_localchain_id: TransferToLocalchainId,
 		account_id: &AccountId,
 		milligons: Balance,
+		for_notebook_tick: Tick,
 	) -> bool;
 }
 
@@ -146,7 +147,7 @@ pub trait BlockVotingProvider<Block: BlockT> {
 
 #[derive(Encode, Decode, Clone, PartialEq, Eq, TypeInfo, MaxEncodedLen, RuntimeDebug)]
 pub struct BlockSealerInfo<AccountId: FullCodec> {
-	pub miner_rewards_account: AccountId,
+	pub block_author_account_id: AccountId,
 	/// The voting account, if a block seal
 	pub block_vote_rewards_account: Option<AccountId>,
 }
@@ -155,14 +156,21 @@ pub trait BlockSealerProvider<AccountId: FullCodec> {
 	fn get_sealer_info() -> BlockSealerInfo<AccountId>;
 }
 
+pub trait BlockRewardAccountsProvider<AccountId: FullCodec> {
+	fn get_rewards_account(
+		author: &AccountId,
+	) -> (Option<AccountId>, Option<RewardSharing<AccountId>>);
+	/// Returns all rewards accounts and the share they receive
+	fn get_all_rewards_accounts() -> Vec<(AccountId, Option<RewardShare>)>;
+}
+
+pub type RewardShare = Percent;
 pub trait AuthorityProvider<AuthorityId, Block, AccountId>
 where
 	Block: BlockT,
 {
 	fn get_authority(author: AccountId) -> Option<AuthorityId>;
-	fn get_rewards_account(author: AccountId) -> Option<AccountId>;
 	fn xor_closest_authority(nonce: U256) -> Option<MiningAuthority<AuthorityId, AccountId>>;
-	fn get_all_rewards_accounts() -> Vec<AccountId>;
 }
 
 pub trait TickProvider<B: BlockT> {
@@ -173,14 +181,13 @@ pub trait TickProvider<B: BlockT> {
 
 /// An event handler to listen for submitted notebook
 pub trait NotebookEventHandler {
-	fn notebook_submitted(header: &NotebookHeader) -> DispatchResult;
+	fn notebook_submitted(header: &NotebookHeader);
 }
 
 #[impl_trait_for_tuples::impl_for_tuples(5)]
 impl NotebookEventHandler for Tuple {
-	fn notebook_submitted(header: &NotebookHeader) -> DispatchResult {
+	fn notebook_submitted(header: &NotebookHeader) {
 		for_tuples!( #( Tuple::notebook_submitted(&header); )* );
-		Ok(())
 	}
 }
 
@@ -198,23 +205,24 @@ impl BlockSealEventHandler for Tuple {
 
 /// An event handler to listen for submitted notebook
 pub trait BurnEventHandler<Balance> {
-	fn on_argon_burn(milligons: &Balance) -> DispatchResult;
+	fn on_argon_burn(milligons: &Balance);
 }
 
 #[impl_trait_for_tuples::impl_for_tuples(5)]
 impl<Balance> BurnEventHandler<Balance> for Tuple {
-	fn on_argon_burn(milligons: &Balance) -> DispatchResult {
+	fn on_argon_burn(milligons: &Balance) {
 		for_tuples!( #( Tuple::on_argon_burn(milligons); )* );
-		Ok(())
 	}
 }
 
-pub trait BlockRewardsEventHandler<AccountId: Codec, Balance: Codec> {
+pub trait BlockRewardsEventHandler<AccountId: Codec, Balance: Codec + MaxEncodedLen> {
 	fn rewards_created(payout: &[BlockPayout<AccountId, Balance>]);
 }
 
 #[impl_trait_for_tuples::impl_for_tuples(5)]
-impl<AccountId: Codec, Balance: Codec> BlockRewardsEventHandler<AccountId, Balance> for Tuple {
+impl<AccountId: Codec, Balance: Codec + MaxEncodedLen> BlockRewardsEventHandler<AccountId, Balance>
+	for Tuple
+{
 	fn rewards_created(payout: &[BlockPayout<AccountId, Balance>]) {
 		for_tuples!( #( Tuple::rewards_created(&payout); )* );
 	}

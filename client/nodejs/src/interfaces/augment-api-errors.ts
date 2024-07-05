@@ -83,7 +83,7 @@ declare module '@polkadot/api-base/types/errors' {
        **/
       MaxUtxosExceeded: AugmentedError<ApiType>;
       /**
-       * No Oraclized bitcoin block has been provided to the network
+       * No Oracle-provided bitcoin block has been provided to the network
        **/
       NoBitcoinConfirmedBlock: AugmentedError<ApiType>;
       /**
@@ -266,15 +266,31 @@ declare module '@polkadot/api-base/types/errors' {
       InvalidOrDuplicatedLocalchainTransfer: AugmentedError<ApiType>;
       MaxBlockTransfersExceeded: AugmentedError<ApiType>;
       /**
+       * The notary is locked (likey due to failed audits)
+       **/
+      NotaryLocked: AugmentedError<ApiType>;
+      /**
        * A transfer was submitted in a previous block but the expiration block has passed
        **/
       NotebookIncludesExpiredLocalchainTransfer: AugmentedError<ApiType>;
     };
     dataDomain: {
       /**
+       * Error decoding account from notary
+       **/
+      AccountDecodingError: AugmentedError<ApiType>;
+      /**
        * The domain is not registered.
        **/
       DomainNotRegistered: AugmentedError<ApiType>;
+      /**
+       * Failed to add to the expiring domain list
+       **/
+      FailedToAddExpiringDomain: AugmentedError<ApiType>;
+      /**
+       * Failed to add to the address history.
+       **/
+      FailedToAddToAddressHistory: AugmentedError<ApiType>;
       /**
        * The sender is not the owner of the domain.
        **/
@@ -411,6 +427,10 @@ declare module '@polkadot/api-base/types/errors' {
        **/
       EffectiveTickTooSoon: AugmentedError<ApiType>;
       /**
+       * The notary is invalid
+       **/
+      InvalidNotary: AugmentedError<ApiType>;
+      /**
        * Invalid notary operator for this operation
        **/
       InvalidNotaryOperator: AugmentedError<ApiType>;
@@ -434,6 +454,10 @@ declare module '@polkadot/api-base/types/errors' {
        * The proposal to activate was not found
        **/
       ProposalNotFound: AugmentedError<ApiType>;
+      /**
+       * Too many internal keys
+       **/
+      TooManyKeys: AugmentedError<ApiType>;
     };
     notebook: {
       /**

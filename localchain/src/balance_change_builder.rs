@@ -426,7 +426,7 @@ pub mod napi_ext {
           address: transfer.address,
           amount: transfer.amount.get_u128().1,
           notary_id: transfer.notary_id,
-          expiration_block: transfer.expiration_block,
+          expiration_tick: transfer.expiration_tick,
           transfer_id: transfer.transfer_id,
         })
         .await
@@ -520,7 +520,7 @@ mod test {
         address,
         amount: 100u128,
         notary_id: 1,
-        expiration_block: 500,
+        expiration_tick: 500,
         transfer_id: 1,
       })
       .await?;
@@ -545,7 +545,7 @@ mod test {
         address,
         amount: 100u128,
         notary_id: 1,
-        expiration_block: 500,
+        expiration_tick: 500,
         transfer_id: 1,
       })
       .await?;
@@ -588,7 +588,7 @@ mod test {
         address,
         amount: 20_000u128,
         notary_id: 1,
-        expiration_block: 500,
+        expiration_tick: 500,
         transfer_id: 1,
       })
       .await?;

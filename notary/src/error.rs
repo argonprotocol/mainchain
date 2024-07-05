@@ -16,7 +16,7 @@ pub enum Error {
 	)]
 	BalanceTipMismatch { change_index: usize, stored_tip: Option<H256>, provided_tip: Option<H256> },
 	#[error(
-		"Transfer not found (or already applied) for account (change: {change_index}.{note_index})"
+		"Invalid transfer to localchain (expired, already applied, or invalid) for account (change: {change_index}.{note_index})"
 	)]
 	TransferToLocalchainNotFound { note_index: usize, change_index: usize },
 	#[error("Invalid amount claimed for Localchain transfer. (change: {change_index}.{note_index}; expected: {amount}, provided: {provided})" )]

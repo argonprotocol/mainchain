@@ -13,7 +13,7 @@ use crate::{
 	notary::{NotaryId, NotaryNotebookVoteDetails, NotaryNotebookVoteDigestDetails},
 	tick::{Tick, Ticker},
 	AccountOrigin, BestBlockVoteSeal, BlockVoteDigest, BlockVotingPower, NotebookNumber,
-	TransferToLocalchainId, VoteMinimum,
+	NotebookSecretHash, TransferToLocalchainId, VoteMinimum,
 };
 
 sp_api::decl_runtime_apis! {
@@ -97,6 +97,8 @@ pub struct NotebookAuditSummary {
 	pub changed_accounts_root: H256,
 	pub account_changelist: Vec<AccountOrigin>,
 	pub used_transfers_to_localchain: Vec<TransferToLocalchainId>,
+	pub secret_hash: NotebookSecretHash,
+	pub block_votes_root: H256,
 }
 
 #[derive(Encode, Decode, Clone, PartialEq, Eq, TypeInfo, RuntimeDebug)]
@@ -111,6 +113,8 @@ pub struct NotebookAuditResult {
 	pub changed_accounts_root: H256,
 	pub account_changelist: Vec<AccountOrigin>,
 	pub used_transfers_to_localchain: Vec<TransferToLocalchainId>,
+	pub secret_hash: NotebookSecretHash,
+	pub block_votes_root: H256,
 }
 
 impl From<NotebookAuditResult> for (NotebookAuditSummary, NotaryNotebookVotes) {
@@ -123,6 +127,8 @@ impl From<NotebookAuditResult> for (NotebookAuditSummary, NotaryNotebookVotes) {
 				changed_accounts_root: val.changed_accounts_root,
 				account_changelist: val.account_changelist,
 				used_transfers_to_localchain: val.used_transfers_to_localchain,
+				secret_hash: val.secret_hash,
+				block_votes_root: val.block_votes_root,
 			},
 			NotaryNotebookVotes {
 				notary_id: val.notary_id,

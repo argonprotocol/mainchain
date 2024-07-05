@@ -7,6 +7,7 @@ import '@polkadot/api-base/types/consts';
 
 import type { ApiTypes, AugmentedConst } from '@polkadot/api-base/types';
 import type { u128, u16, u32, u64, u8 } from '@polkadot/types-codec';
+import type { Percent } from '@polkadot/types/interfaces/runtime';
 import type { FrameSupportPalletId, FrameSystemLimitsBlockLength, FrameSystemLimitsBlockWeights, SpVersionRuntimeVersion, SpWeightsRuntimeDbWeight } from '@polkadot/types/lookup';
 
 export type __AugmentedConst<ApiType extends ApiTypes> = AugmentedConst<ApiType>;
@@ -74,7 +75,7 @@ declare module '@polkadot/api-base/types/consts' {
       /**
        * Percent as a number out of 100 of the block reward that goes to the miner.
        **/
-      minerPayoutPercent: u32 & AugmentedConst<ApiType>;
+      minerPayoutPercent: Percent & AugmentedConst<ApiType>;
       /**
        * Number of ulixees minted per block
        **/
@@ -137,9 +138,10 @@ declare module '@polkadot/api-base/types/consts' {
       maxPendingTransfersOutPerBlock: u32 & AugmentedConst<ApiType>;
       palletId: FrameSupportPalletId & AugmentedConst<ApiType>;
       /**
-       * How long a transfer should remain in storage before returning.
+       * How long a transfer should remain in storage before returning. NOTE: there is a 2 tick
+       * grace period where we will still allow a transfer
        **/
-      transferExpirationBlocks: u32 & AugmentedConst<ApiType>;
+      transferExpirationTicks: u32 & AugmentedConst<ApiType>;
     };
     grandpa: {
       /**

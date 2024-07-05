@@ -157,6 +157,7 @@ fn testnet_genesis(
 		reward_destination: RewardDestination::Owner,
 		bond_amount: 0u32.into(),
 		ownership_tokens: 0u32.into(),
+		reward_sharing: None,
 	};
 
 	serde_json::json!({

@@ -101,8 +101,10 @@ pub mod pallet {
 			BitcoinCosignScriptPubkey, BitcoinHeight, BitcoinPubkeyHash, BitcoinRejectedReason,
 			BitcoinScriptPubkey, BitcoinSignature, CompressedBitcoinPubkey, Satoshis, UtxoId,
 		},
+		block_seal::RewardSharing,
 		bond::{Bond, BondError, BondExpiration, BondProvider, BondType, VaultProvider},
-		BitcoinUtxoEvents, BitcoinUtxoTracker, BondId, PriceProvider, UtxoBondedEvents, VaultId,
+		BitcoinUtxoEvents, BitcoinUtxoTracker, BondId, PriceProvider, RewardShare,
+		UtxoBondedEvents, VaultId,
 	};
 
 	#[pallet::pallet]
@@ -319,6 +321,16 @@ pub mod pallet {
 			compensation_still_owed: T::Balance,
 			compensated_account_id: T::AccountId,
 		},
+		/// An error occurred while completing a bond
+		BondCompletionError {
+			bond_id: BondId,
+			error: DispatchError,
+		},
+		/// An error occurred while refunding an overdue cosigned bitcoin bond
+		CosignOverdueError {
+			utxo_id: UtxoId,
+			error: DispatchError,
+		},
 	}
 
 	#[pallet::error]
@@ -390,12 +402,14 @@ pub mod pallet {
 		fn on_initialize(block_number: BlockNumberFor<T>) -> Weight {
 			let bond_completions = MiningBondCompletions::<T>::take(block_number);
 			for bond_id in bond_completions {
-				let _ = with_storage_layer(|| {
-					Self::bond_completed(bond_id).map_err(|e| {
-						warn!( target: LOG_TARGET, "Mining bond id {:?} failed to `complete` {:?}", bond_id, e);
-						e
-					})
-				});
+				let res = with_storage_layer(|| Self::bond_completed(bond_id));
+				if let Err(e) = res {
+					log::error!( target: LOG_TARGET, "Mining bond id {:?} failed to `complete` {:?}", bond_id, e);
+					Self::deposit_event(Event::<T>::BondCompletionError {
+						bond_id,
+						error: e.into(),
+					});
+				}
 			}
 
 			let mut overdue = vec![];
@@ -411,22 +425,27 @@ pub mod pallet {
 			});
 
 			for (utxo_id, redemption_amount) in overdue {
-				let _ = with_storage_layer(|| {
-					Self::cosign_bitcoin_overdue(utxo_id,redemption_amount).map_err(|e| {
-						warn!( target: LOG_TARGET, "Utxo id {:?} was not cosigned by vault. Claiming funds {:?}", utxo_id, e);
-						e
-					})
-				});
+				let res =
+					with_storage_layer(|| Self::cosign_bitcoin_overdue(utxo_id, redemption_amount));
+				if let Err(e) = res {
+					log::error!( target: LOG_TARGET, "Bitcoin utxo id {:?} failed to `cosign` {:?}", utxo_id, e);
+					Self::deposit_event(Event::<T>::CosignOverdueError {
+						utxo_id,
+						error: e.into(),
+					});
+				}
 			}
 
 			let bitcoin_bond_completions = BitcoinBondCompletions::<T>::take(bitcoin_block_height);
 			for bond_id in bitcoin_bond_completions {
-				let _ = with_storage_layer(|| {
-					Self::bond_completed(bond_id).map_err(|e| {
-						warn!( target: LOG_TARGET, "Bitcoin bond id {:?} failed to `complete` {:?}", bond_id, e);
-						e
-					})
-				});
+				let res = with_storage_layer(|| Self::bond_completed(bond_id));
+				if let Err(e) = res {
+					log::error!( target: LOG_TARGET, "Bitcoin bond id {:?} failed to `complete` {:?}", bond_id, e);
+					Self::deposit_event(Event::<T>::BondCompletionError {
+						bond_id,
+						error: e.into(),
+					});
+				}
 			}
 			T::DbWeight::get().reads_writes(2, 1)
 		}
@@ -914,7 +933,7 @@ pub mod pallet {
 			account_id: Self::AccountId,
 			amount: Self::Balance,
 			bond_until_block: Self::BlockNumber,
-		) -> Result<BondId, BondError> {
+		) -> Result<(BondId, Option<RewardSharing<Self::AccountId>>), BondError> {
 			ensure!(amount >= T::MinimumBondAmount::get(), BondError::MinimumBondAmountNotMet);
 
 			let block_number = frame_system::Pallet::<T>::block_number();
@@ -928,7 +947,7 @@ pub mod pallet {
 				&account_id,
 			)?;
 
-			Self::create_bond(
+			let bond_id = Self::create_bond(
 				vault_id,
 				account_id,
 				BondType::Mining,
@@ -937,7 +956,19 @@ pub mod pallet {
 				total_fee,
 				prepaid_fee,
 				None,
-			)
+			)?;
+			let vault = T::VaultProvider::get(vault_id).ok_or(BondError::VaultNotFound)?;
+			Ok((
+				bond_id,
+				if vault.mining_reward_sharing_percent_take > RewardShare::zero() {
+					Some(RewardSharing {
+						percent_take: vault.mining_reward_sharing_percent_take,
+						account_id: vault.operator_account_id.clone(),
+					})
+				} else {
+					None
+				},
+			))
 		}
 
 		fn cancel_bond(bond_id: BondId) -> Result<(), BondError> {

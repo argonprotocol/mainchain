@@ -30,7 +30,7 @@ serde = { workspace = true }
 [dev-dependencies]
 sp-io = { workspace = true }
 env_logger = { workspace = true }
-sp-keyring = { workspace = true }
+sp-keyring = { workspace = true, features = ["std"] }
 
 [features]
 default = [ "std" ]

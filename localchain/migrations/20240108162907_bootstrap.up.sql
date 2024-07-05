@@ -69,7 +69,7 @@ CREATE TABLE IF NOT EXISTS mainchain_transfers_in
     address                TEXT     NOT NULL,
     amount                 TEXT     NOT NULL,
     transfer_id            INT      NOT NULL,
-    expiration_block       INT      NOT NULL,
+    expiration_tick       INT      NOT NULL,
     notary_id              INT      NOT NULL,
     balance_change_id      INT,
     first_block_hash       TEXT     NOT NULL,

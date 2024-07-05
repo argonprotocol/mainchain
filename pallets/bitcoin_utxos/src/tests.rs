@@ -2,7 +2,7 @@ use std::collections::BTreeMap;
 
 use frame_support::{assert_err, assert_noop, assert_ok};
 use sp_core::H256;
-
+use sp_runtime::DispatchError;
 use ulx_primitives::{
 	bitcoin::{
 		BitcoinBlock, BitcoinCosignScriptPubkey, BitcoinHeight, BitcoinRejectedReason, H256Le,
@@ -272,7 +272,12 @@ fn it_should_preserve_storage_if_one_sync_fails() {
 				sync_to_block: BitcoinBlock { block_height: 1, block_hash: H256Le([0; 32]) },
 			}
 		),);
-		System::assert_last_event(Event::UtxoVerified { utxo_id: 1 }.into());
+		System::assert_has_event(Event::UtxoVerified { utxo_id: 1 }.into());
+		let match_error: DispatchError = Error::<Test>::NoPermissions.into();
+		System::assert_has_event(
+			Event::UtxoVerifiedError { utxo_id: 2, error: match_error.stripped() }.into(),
+		);
+
 		assert_eq!(
 			LockedUtxos::<Test>::get(&utxo_ref),
 			Some(UtxoValue {
