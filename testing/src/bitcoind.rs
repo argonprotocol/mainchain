@@ -33,6 +33,11 @@ pub fn start_bitcoind() -> anyhow::Result<(BitcoinD, url::Url)> {
 	};
 	drop(lock);
 	file.unlock().expect("Failed to unlock file");
+	let url = read_rpc_url(&bitcoind)?;
+	Ok((bitcoind, url))
+}
+
+pub fn read_rpc_url(bitcoind: &BitcoinD) -> anyhow::Result<url::Url> {
 	let rpc_url = bitcoind.params.rpc_socket.to_string();
 	let cookie = bitcoind.params.get_cookie_values().expect("cookie");
 
@@ -41,5 +46,5 @@ pub fn start_bitcoind() -> anyhow::Result<(BitcoinD, url::Url)> {
 		url.set_username(&cookie.user).expect("username");
 		url.set_password(Some(&cookie.password)).expect("password");
 	}
-	Ok((bitcoind, url))
+	Ok(url)
 }

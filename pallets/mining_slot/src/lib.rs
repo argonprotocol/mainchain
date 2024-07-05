@@ -628,7 +628,7 @@ impl<T: Config> Pallet<T> {
 		// Apply a 20% swing limit to the change
 		let max_swing =
 			FixedI128::from_inner(T::OwnershipPercentAdjustmentDamper::get().into_inner() as i128);
-		let limited_change = percent_change.min(max_swing).max(-max_swing);
+		let limited_change = percent_change.clamp(-max_swing, max_swing);
 
 		let adjustment_percent = FixedU128::from_inner(
 			FixedI128::from_inner(previous_adjustment.into_inner() as i128)

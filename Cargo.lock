@@ -12089,6 +12089,7 @@ dependencies = [
  "sp-arithmetic",
  "sp-core",
  "sp-keyring",
+ "sp-keystore",
  "subxt",
  "subxt-signer",
  "thiserror",
@@ -12372,8 +12373,6 @@ dependencies = [
  "jsonrpsee",
  "parity-scale-codec",
  "parking_lot 0.12.3",
- "rpassword",
- "sc-keystore",
  "sc-utils",
  "scale-info",
  "serde",
@@ -12436,6 +12435,7 @@ dependencies = [
 name = "ulx-primitives"
 version = "0.0.1"
 dependencies = [
+ "anyhow",
  "async-trait",
  "bitcoin",
  "chrono",
@@ -12447,7 +12447,9 @@ dependencies = [
  "napi",
  "napi-derive",
  "parity-scale-codec",
+ "rpassword",
  "rsntp",
+ "sc-keystore",
  "scale-info",
  "serde",
  "serde_json",
@@ -12458,6 +12460,7 @@ dependencies = [
  "sp-crypto-hashing 0.1.0 (git+https://github.com/paritytech/polkadot-sdk.git?branch=release-polkadot-v1.12.0)",
  "sp-debug-derive 14.0.0 (git+https://github.com/paritytech/polkadot-sdk.git?branch=release-polkadot-v1.12.0)",
  "sp-inherents",
+ "sp-keystore",
  "sp-runtime",
  "sp-std 14.0.0 (git+https://github.com/paritytech/polkadot-sdk.git?branch=release-polkadot-v1.12.0)",
  "thiserror",

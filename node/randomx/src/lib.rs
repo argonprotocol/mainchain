@@ -170,7 +170,7 @@ impl VMData {
 			return Ok(());
 		};
 
-		let cpus_to_use = num_cpus::get() as u32 - 2;
+		let cpus_to_use = num_cpus::get().saturating_sub(2).max(1) as u32;
 		let dataset_count = RandomXDataset::count()?;
 		let init_per_thread = dataset_count / cpus_to_use;
 		let remainder = dataset_count % cpus_to_use;

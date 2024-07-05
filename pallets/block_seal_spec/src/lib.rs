@@ -396,7 +396,7 @@ pub mod pallet {
 				.unwrap_or(0.into())
 				.unique_saturated_into();
 
-			next_vote_minimum = next_vote_minimum.min(max_vote_minimum).max(min_vote_minimum);
+			next_vote_minimum = next_vote_minimum.clamp(min_vote_minimum, max_vote_minimum);
 			next_vote_minimum
 		}
 
@@ -427,7 +427,7 @@ pub mod pallet {
 				U256::from(adjusted_timespan))
 			.unique_saturated_into();
 
-			next_difficulty = next_difficulty.min(max_difficulty).max(min_difficulty);
+			next_difficulty = next_difficulty.clamp(min_difficulty, max_difficulty);
 			next_difficulty
 		}
 	}

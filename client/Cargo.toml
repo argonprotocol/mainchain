@@ -27,6 +27,7 @@ tracing = { workspace = true }
 tracing-subscriber = { workspace = true }
 sp-core = { workspace = true, features = ["default"] }
 sp-arithmetic = { workspace = true, features = ["default"] }
+sp-keystore = { workspace = true, features = ["default"] }
 ulx-primitives = { workspace = true, features = ["default"] }
 
 anyhow = { workspace = true, features = ["default"] }

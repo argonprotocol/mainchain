@@ -30,7 +30,6 @@ jsonrpsee = { workspace = true, features = ["server"] }
 sp-runtime = { workspace = true, features = ["default"] }
 sp-core = { workspace = true, features = ["default"] }
 sc-utils = { workspace = true }
-sc-keystore = { workspace = true }
 sp-keystore = { workspace = true, features = ["default"] }
 binary-merkle-tree = { workspace = true, features = ["default"] }
 tracing = { workspace = true }
@@ -38,7 +37,6 @@ tracing-subscriber = { workspace = true }
 sqlx = { workspace = true, features = ["runtime-tokio-native-tls", "postgres", "macros", "chrono"] }
 chrono = { workspace = true }
 clap = { workspace = true }
-rpassword = { workspace = true }
 
 ulixee-client = { workspace = true }
 ulx-notary-audit = { workspace = true, features = ["default"] }

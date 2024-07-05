@@ -1,6 +1,12 @@
 use crate::UlxConfig;
-use sp_core::{ed25519, sr25519, Pair};
-use subxt::{tx::Signer, Config};
+use sp_core::{
+	crypto::{key_types::ACCOUNT, AccountId32},
+	ed25519, sr25519, Pair,
+};
+use sp_keystore::Keystore;
+pub use subxt::tx::Signer;
+use subxt::Config;
+use ulx_primitives::{AccountId, CryptoType};
 
 pub struct Ed25519Signer {
 	pub keypair: ed25519::Pair,
@@ -45,5 +51,56 @@ impl Signer<UlxConfig> for Sr25519Signer {
 
 	fn sign(&self, data: &[u8]) -> <UlxConfig as Config>::Signature {
 		<UlxConfig as Config>::Signature::Sr25519(self.keypair.sign(data).0)
+	}
+}
+
+pub struct KeystoreSigner {
+	pub keystore: sp_keystore::KeystorePtr,
+	pub account_id: AccountId,
+	pub crypto_type: CryptoType,
+}
+
+impl KeystoreSigner {
+	pub fn new(
+		keystore: sp_keystore::KeystorePtr,
+		account_id: AccountId,
+		crypto_type: CryptoType,
+	) -> Self {
+		Self { keystore, account_id, crypto_type }
+	}
+}
+impl Signer<UlxConfig> for KeystoreSigner {
+	fn account_id(&self) -> <UlxConfig as Config>::AccountId {
+		let account_id32: AccountId32 = self.account_id.clone().into();
+		let account_id = subxt::utils::AccountId32(account_id32.into());
+		account_id
+	}
+
+	fn address(&self) -> <UlxConfig as Config>::Address {
+		<UlxConfig as Config>::Address::Id(self.account_id())
+	}
+
+	fn sign(&self, data: &[u8]) -> <UlxConfig as Config>::Signature {
+		let account_id = self.account_id().0;
+		match self.crypto_type {
+			CryptoType::Sr25519 => {
+				let signature = self
+					.keystore
+					.sr25519_sign(ACCOUNT, &account_id.into(), data)
+					.expect("Failed to sign with sr25519")
+					.expect("Failed to create signature");
+
+				<UlxConfig as Config>::Signature::Sr25519(signature.0)
+			},
+			CryptoType::Ed25519 => {
+				let signature = self
+					.keystore
+					.ed25519_sign(ACCOUNT, &account_id.into(), data)
+					.expect("Failed to sign with ed25519")
+					.expect("Failed to create signature");
+
+				<UlxConfig as Config>::Signature::Ed25519(signature.0)
+			},
+		}
 	}
 }

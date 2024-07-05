@@ -40,6 +40,11 @@ pub mod notebook;
 mod providers;
 pub mod tick;
 
+#[cfg(feature = "std")]
+pub mod keystore_helper;
+#[cfg(feature = "std")]
+pub use keystore_helper::*;
+
 /// An index to a block.
 pub type BlockNumber = u32;
 

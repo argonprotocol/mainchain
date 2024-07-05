@@ -1,5 +1,8 @@
 #![allow(clippy::await_holding_lock)]
 
+use crate::{bitcoind::read_rpc_url, start_bitcoind};
+use bitcoind::{bitcoincore_rpc::Auth, BitcoinD};
+use lazy_static::lazy_static;
 use std::{
 	env,
 	io::{BufRead, BufReader},
@@ -7,19 +10,15 @@ use std::{
 	process,
 	process::Command,
 };
-
-use bitcoind::BitcoinD;
-use lazy_static::lazy_static;
-
 use ulixee_client::MainchainClient;
-
-use crate::start_bitcoind;
+use url::Url;
 
 pub struct UlxTestNode {
 	// Keep a handle to the node; once it's dropped the node is killed.
 	proc: Option<process::Child>,
 	pub client: MainchainClient,
 	pub bitcoind: Option<BitcoinD>,
+	bitcoin_rpc_url: Option<Url>,
 }
 
 impl Drop for UlxTestNode {
@@ -99,13 +98,35 @@ impl UlxTestNode {
 		let client =
 			MainchainClient::from_url(format!("ws://127.0.0.1:{}", ws_port).as_str()).await?;
 
-		Ok(UlxTestNode { proc: Some(proc), client, bitcoind: Some(bitcoin) })
+		Ok(UlxTestNode {
+			proc: Some(proc),
+			client,
+			bitcoind: Some(bitcoin),
+			bitcoin_rpc_url: Some(rpc_url),
+		})
 	}
 
 	pub async fn from_url(url: String, bitcoind: Option<BitcoinD>) -> Self {
 		let client = MainchainClient::from_url(url.as_str())
 			.await
 			.expect("Failed to connect to node at {url}: {e}");
-		UlxTestNode { proc: None, client, bitcoind }
+
+		let bitcoin_rpc_url = bitcoind.as_ref().map(|b| read_rpc_url(b).unwrap());
+		UlxTestNode { proc: None, client, bitcoind, bitcoin_rpc_url }
+	}
+
+	pub fn get_bitcoin_url(&self) -> (String, Auth) {
+		let rpc_url = self.bitcoin_rpc_url.clone().unwrap();
+
+		println!("rpc_url: {:?}", rpc_url);
+		let auth = if !rpc_url.username().is_empty() {
+			Auth::UserPass(
+				rpc_url.username().to_string(),
+				rpc_url.password().unwrap_or_default().to_string(),
+			)
+		} else {
+			Auth::None
+		};
+		(rpc_url.to_string(), auth)
 	}
 }

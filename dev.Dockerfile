@@ -29,15 +29,30 @@ RUN --mount=type=cache,target=/usr/local/cargo/git \
     sccache --start-server && cargo build --locked --bin=ulx-node --bin=ulx-notary --features=fast-runtime
 RUN  ls /app/target/debug && sccache --show-stats
 
+FROM ubuntu:22.04 AS base_ubuntu
+
+# Update and install dependencies
+RUN apt-get update \
+    && apt-get upgrade -y \
+    && apt-get install -y --no-install-recommends \
+       libssl-dev \
+       libudev-dev \
+       pkg-config \
+       python3.10 \
+       python3.10-dev \
+    && apt-get autoremove -y \
+    && apt-get clean \
+    && rm -rf /var/lib/apt/lists/*
+
 # We do not need the Rust toolchain to run the binary!
 # Runtime image for ulx-node
-FROM docker.io/library/ubuntu:22.04 AS ulx-node
+FROM base_ubuntu AS ulx-node
 WORKDIR /app
 COPY --from=base /app/target/debug/ulx-node /usr/local/bin/ulx-node
 ENTRYPOINT ["/usr/local/bin/ulx-node"]
 
 # Runtime image for ulx-notary
-FROM docker.io/library/ubuntu:22.04 AS ulx-notary
+FROM base_ubuntu AS ulx-notary
 WORKDIR /app
 COPY --from=base /app/target/debug/ulx-notary /usr/local/bin/ulx-notary
 ENTRYPOINT ["/usr/local/bin/ulx-notary"]
