@@ -1,7 +1,7 @@
 import {customAlphabet} from "nanoid";
 import {Client} from 'pg';
 import * as child_process from "node:child_process";
-import {Keyring, KeyringPair} from "@ulixee/mainchain";
+import {checkForExtrinsicSuccess, Keyring, KeyringPair, UlxClient} from "@ulixee/mainchain";
 import fs from "node:fs";
 import * as readline from "node:readline";
 import {addTeardown, cleanHostForDocker, getDockerPortMapping, getProxy, ITeardownable,} from "./testHelpers";
@@ -129,6 +129,32 @@ export default class TestNotary implements ITeardownable {
         }
 
         return this.address;
+    }
+
+    public async register(client: UlxClient): Promise<void> {
+        let address = new URL(this.address);
+
+        await new Promise<void>(async (resolve, reject) => {
+            await client.tx.notaries.propose({
+                public: this.registeredPublicKey,
+                hosts: [address.href],
+                name: 'Test Notary',
+            }).signAndSend(this.operator, ({events, status}) => {
+                console.log(status, events)
+                if (status.isInBlock) {
+                    void checkForExtrinsicSuccess(events, client).then(() => {
+                        console.log(
+                            `Successful proposal of notary in block ${status.asInBlock.toHex()}`,
+                            status.type,
+                        );
+                        resolve();
+                        return null;
+                    }, reject);
+                } else {
+                    console.log('Status of notary proposal: %s', JSON.stringify(status, null, 2));
+                }
+            });
+        });
     }
 
     public async teardown(): Promise<void> {

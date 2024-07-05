@@ -18,7 +18,7 @@ it('can sign a message from javscript', async () => {
     await balanceChange.claimFromMainchain({
         address: bob.address,
         amount: 5000n,
-        expirationBlock: 1,
+        expirationTick: 1,
         notaryId: 1,
         transferId: 1
     });
@@ -40,7 +40,7 @@ it('can sign using built-in', async () => {
     await balanceChange.claimFromMainchain({
         address: await bobchain.address,
         amount: 5000n,
-        expirationBlock: 1,
+        expirationTick: 1,
         notaryId: 1,
         transferId: 1
     });

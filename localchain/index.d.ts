@@ -540,7 +540,7 @@ export interface LocalchainTransfer {
   address: string
   amount: bigint
   notaryId: number
-  expirationBlock: number
+  expirationTick: number
   transferId: number
 }
 
