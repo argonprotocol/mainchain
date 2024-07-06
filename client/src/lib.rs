@@ -162,7 +162,13 @@ impl MainchainClient {
 
 	pub async fn get_account_nonce(&self, account_id: AccountId32) -> anyhow::Result<Nonce> {
 		let account_id32 = account_id_to_subxt(&account_id);
-		let nonce = self.methods.system_account_next_index(&account_id32).await?;
+		self.get_account_nonce_subxt(&account_id32).await
+	}
+	pub async fn get_account_nonce_subxt(
+		&self,
+		account_id32: &subxt::utils::AccountId32,
+	) -> anyhow::Result<Nonce> {
+		let nonce = self.methods.system_account_next_index(account_id32).await?;
 		Ok(nonce as Nonce)
 	}
 

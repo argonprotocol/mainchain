@@ -28,7 +28,7 @@ members = [
     "notary/audit",
     "notary/apis",
     "testing",
-    "testing/bitcoin",
+    "testing/bitcoin", "oracle",
 ]
 resolver = "2"
 
@@ -139,6 +139,8 @@ smallvec = { version = "1.13" }
 hex = { version = "0.4" }
 url = "2.5.0"
 num_cpus = "1.16"
+reqwest = { version = "0.12", features = ["json"] }
+scraper = { version = "0.19" }
 
 codec = { default-features = false, package = "parity-scale-codec", version = "3.6", features = ["derive", "max-encoded-len"] }
 serde = { default-features = false, version = "1.0", features = ["derive"] }

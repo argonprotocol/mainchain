@@ -1,9 +1,9 @@
-use env_logger::{Builder, Env};
-use frame_support::{derive_impl, parameter_types, traits::Time};
-use sp_runtime::{traits::IdentityLookup, BuildStorage};
-use std::time::SystemTime;
-
 use crate as pallet_price_index;
+use env_logger::{Builder, Env};
+use frame_support::{derive_impl, parameter_types};
+use sp_arithmetic::FixedU128;
+use sp_runtime::{traits::IdentityLookup, BuildStorage};
+use ulx_primitives::tick::Tick;
 
 pub(crate) type Block = frame_system::mocking::MockBlock<Test>;
 
@@ -23,31 +23,24 @@ impl frame_system::Config for Test {
 	type AccountData = ();
 }
 
-type Moment = u64;
-
 parameter_types! {
-	pub const MaxDowntimeBeforeReset: Moment = 60 * 60 * 1000; // 1 hour
-	pub static OldestHistoryToKeep: Moment = 24 * 60 * 60 * 1000; // 1 day
-	pub static Now: Moment = SystemTime::now().duration_since(SystemTime::UNIX_EPOCH).unwrap().as_millis() as Moment;
-}
-
-pub struct Timestamp;
-
-impl Time for Timestamp {
-	type Moment = Moment;
-
-	fn now() -> Self::Moment {
-		Now::get()
-	}
+	pub const MaxDowntimeBeforeReset: Tick = 60; // 1 hour
+	pub static MaxPriceAgeInTicks: Tick = 1440; // 1 day
+	pub static CurrentTick:Tick = 0;
+	pub const MaxArgonChangePerTickAwayFromTarget: FixedU128 = FixedU128::from_rational(1, 100);
+	pub const MaxArgonTargetChangePerTick: FixedU128 = FixedU128::from_rational(1, 100);
 }
 
 impl pallet_price_index::Config for Test {
 	type RuntimeEvent = RuntimeEvent;
-	type Time = Timestamp;
+
+	type CurrentTick = CurrentTick;
 	type WeightInfo = ();
 	type Balance = u128;
-	type MaxDowntimeBeforeReset = MaxDowntimeBeforeReset;
-	type OldestPriceAllowed = OldestHistoryToKeep;
+	type MaxDowntimeTicksBeforeReset = MaxDowntimeBeforeReset;
+	type MaxPriceAgeInTicks = MaxPriceAgeInTicks;
+	type MaxArgonChangePerTickAwayFromTarget = MaxArgonChangePerTickAwayFromTarget;
+	type MaxArgonTargetChangePerTick = MaxArgonTargetChangePerTick;
 }
 
 pub fn new_test_ext(operator: Option<u64>) -> sp_io::TestExternalities {

@@ -666,9 +666,11 @@ parameter_types! {
 	pub const MaxPendingMintUtxos: u32 = 10_000;
 	pub const MaxTrackedUtxos: u32 = 18_000_000;
 
-	pub const MaxDowntimeBeforeReset: Moment = 60 * 60 * 1000; // 1 hour
+	pub const MaxDowntimeTicksBeforeReset: Tick = 60; // 1 hour
 	pub const MaxHistoryToKeep: u32 = 24 * 60; // 1 day worth of prices
-	pub const OldestHistoryToKeep: Moment = 24 * 60 * 60 * 1000; // 1 day
+	pub const MaxPriceAgeInTicks: Tick = 24 * 60; // 1 day
+	pub const MaxArgonChangePerTickAwayFromTarget: FixedU128 = FixedU128::from_rational(1, 100); // 1 centagon
+	pub const MaxArgonTargetChangePerTick: FixedU128 = FixedU128::from_rational(1, 100); // 1 centagon
 
 	pub const MaxPendingConfirmationBlocks: BitcoinHeight = 10 * (6 * 24); // 10 days of bitcoin blocks
 
@@ -678,11 +680,14 @@ parameter_types! {
 
 impl pallet_price_index::Config for Runtime {
 	type RuntimeEvent = RuntimeEvent;
-	type Time = Timestamp;
+
+	type CurrentTick = Ticks;
 	type WeightInfo = pallet_price_index::weights::SubstrateWeight<Runtime>;
 	type Balance = Balance;
-	type MaxDowntimeBeforeReset = MaxDowntimeBeforeReset;
-	type OldestPriceAllowed = OldestHistoryToKeep;
+	type MaxDowntimeTicksBeforeReset = MaxDowntimeTicksBeforeReset;
+	type MaxPriceAgeInTicks = MaxPriceAgeInTicks;
+	type MaxArgonChangePerTickAwayFromTarget = MaxArgonChangePerTickAwayFromTarget;
+	type MaxArgonTargetChangePerTick = MaxArgonTargetChangePerTick;
 }
 
 impl pallet_bitcoin_utxos::Config for Runtime {

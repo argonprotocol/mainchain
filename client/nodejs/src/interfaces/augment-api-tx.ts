@@ -373,7 +373,7 @@ declare module '@polkadot/api-base/types/submittable' {
       /**
        * Submit the latest price index. Only valid for the configured operator account
        **/
-      submit: AugmentedSubmittable<(index: PalletPriceIndexPriceIndex | { btcUsdPrice?: any; argonUsdPrice?: any; argonCpi?: any; timestamp?: any } | string | Uint8Array) => SubmittableExtrinsic<ApiType>, [PalletPriceIndexPriceIndex]>;
+      submit: AugmentedSubmittable<(index: PalletPriceIndexPriceIndex | { btcUsdPrice?: any; argonUsdPrice?: any; argonUsdTargetPrice?: any; tick?: any } | string | Uint8Array) => SubmittableExtrinsic<ApiType>, [PalletPriceIndexPriceIndex]>;
     };
     proxy: {
       /**

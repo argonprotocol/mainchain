@@ -251,13 +251,19 @@ declare module '@polkadot/api-base/types/consts' {
     };
     priceIndex: {
       /**
-       * The maximum number of oracle operators that can be authorized
+       * The max price difference dropping below target or raising above target per tick. There's
+       * no corresponding constant for time to recovery to target
        **/
-      maxDowntimeBeforeReset: u64 & AugmentedConst<ApiType>;
+      maxArgonChangePerTickAwayFromTarget: u128 & AugmentedConst<ApiType>;
+      maxArgonTargetChangePerTick: u128 & AugmentedConst<ApiType>;
+      /**
+       * The maximum number of ticks to preserve a price index
+       **/
+      maxDowntimeTicksBeforeReset: u32 & AugmentedConst<ApiType>;
       /**
        * The oldest history to keep
        **/
-      oldestPriceAllowed: u64 & AugmentedConst<ApiType>;
+      maxPriceAgeInTicks: u32 & AugmentedConst<ApiType>;
     };
     proxy: {
       /**

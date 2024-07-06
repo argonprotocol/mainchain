@@ -507,6 +507,10 @@ declare module '@polkadot/api-base/types/errors' {
     };
     priceIndex: {
       /**
+       * Change in argon price is too large
+       **/
+      MaxPriceChangePerTickExceeded: AugmentedError<ApiType>;
+      /**
        * Missing value
        **/
       MissingValue: AugmentedError<ApiType>;

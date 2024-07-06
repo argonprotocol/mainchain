@@ -260,6 +260,11 @@ pub mod pallet {
 		) -> DispatchResultWithPostInfo {
 			let who = ensure_signed(origin)?;
 			ensure!(Some(who) == <OracleOperatorAccount<T>>::get(), Error::<T>::NoPermissions);
+			if let Some(current) = <ConfirmedBitcoinBlockTip<T>>::get() {
+				if bitcoin_height < current.block_height {
+					return Ok(Pays::No.into());
+				}
+			}
 			<ConfirmedBitcoinBlockTip<T>>::put(BitcoinBlock {
 				block_height: bitcoin_height,
 				block_hash: bitcoin_block_hash,

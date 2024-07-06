@@ -18,7 +18,7 @@ pub struct UlxTestNode {
 	proc: Option<process::Child>,
 	pub client: MainchainClient,
 	pub bitcoind: Option<BitcoinD>,
-	bitcoin_rpc_url: Option<Url>,
+	pub bitcoin_rpc_url: Option<Url>,
 }
 
 impl Drop for UlxTestNode {
