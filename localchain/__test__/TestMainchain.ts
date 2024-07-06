@@ -9,7 +9,6 @@ import {
     getProxy,
     ITeardownable,
 } from "./testHelpers";
-import child_process from "node:child_process";
 import {customAlphabet} from "nanoid";
 
 const nanoid = customAlphabet('0123456789abcdefghijklmnopqrstuvwxyz', 4);
