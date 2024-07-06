@@ -20,7 +20,6 @@ export default class TestMainchain implements ITeardownable {
     public loglevel = 'warn';
     #binPath: string;
     #process: ChildProcess;
-    #bitcoind: ChildProcess;
     #interfaces: readline.Interface[] = [];
     containerName?: string;
     proxy?: string;
