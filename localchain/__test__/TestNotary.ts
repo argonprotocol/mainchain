@@ -47,7 +47,7 @@ export default class TestNotary implements ITeardownable {
             this.containerName = "notary_" + nanoid();
             const addHost = process.env.ADD_DOCKER_HOST ? ` --add-host=host.docker.internal:host-gateway` : '';
 
-            notaryPath = `docker run --rm -p=0:9925${addHost} --name=${this.containerName} -e RUST_LOG=warn ghcr.io/ulixee/ulixee-notary:dev`;
+            notaryPath = `docker run --rm -p=0:9925${addHost} --name=${this.containerName} --platform=linux/amd64 -e RUST_LOG=warn ghcr.io/ulixee/ulixee-notary:dev`;
 
 
             this.#dbConnectionString = cleanHostForDocker(this.#dbConnectionString);
@@ -140,7 +140,6 @@ export default class TestNotary implements ITeardownable {
                 hosts: [address.href],
                 name: 'Test Notary',
             }).signAndSend(this.operator, ({events, status}) => {
-                console.log(status, events)
                 if (status.isInBlock) {
                     void checkForExtrinsicSuccess(events, client).then(() => {
                         console.log(

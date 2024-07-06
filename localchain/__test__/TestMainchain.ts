@@ -1,5 +1,5 @@
 import * as fs from "node:fs";
-import {ChildProcess, spawn} from "node:child_process";
+import {execSync, ChildProcess, spawn} from 'node:child_process';
 import * as path from "node:path";
 import * as readline from "node:readline";
 import {
@@ -9,7 +9,6 @@ import {
     getProxy,
     ITeardownable,
 } from "./testHelpers";
-import process from "node:process";
 import child_process from "node:child_process";
 import {customAlphabet} from "nanoid";
 
@@ -57,9 +56,9 @@ export default class TestMainchain implements ITeardownable {
             containerName = "miner_" + nanoid();
             this.containerName = containerName;
             this.#binPath = 'docker';
-            port = 9944;
-            rpcPort = 33344;
-            execArgs = ['run', '--rm', `--name=${containerName}`, `-p=0:${port}`, `-p=0:${rpcPort}`, '-e', `RUST_LOG=${this.loglevel},sc_rpc_server=info`,
+            port = 33344;
+            rpcPort = 9944;
+            execArgs = ['run', '--rm', `--name=${containerName}`, `--platform=linux/amd64`, `-p=0:${port}`, `-p=0:${rpcPort}`, '-e', `RUST_LOG=${this.loglevel},sc_rpc_server=info`,
                 'ghcr.io/ulixee/ulixee-miner:dev'];
 
             if (process.env.ADD_DOCKER_HOST) {
@@ -101,7 +100,7 @@ export default class TestMainchain implements ITeardownable {
             this.#interfaces.push(int2);
         });
         if (this.containerName) {
-            this.port = await getDockerPortMapping(this.containerName, 9944);
+            this.port = await getDockerPortMapping(this.containerName, rpcPort);
             this.proxy = cleanHostForDocker(await getProxy());
         }
 
@@ -112,11 +111,20 @@ export default class TestMainchain implements ITeardownable {
     public async teardown(): Promise<void> {
         if (process.env.ULX_USE_DOCKER_BINS) {
             try {
-                child_process.execSync(`docker rm -f ${this.containerName}`)
+                execSync(`docker rm -f ${this.containerName}`)
             } catch {
             }
         }
-        this.#bitcoind?.kill();
+        const launchedProcess = this.#process;
+        if (launchedProcess) {
+            launchedProcess?.kill();
+            try {
+                launchedProcess.stdio.forEach(io => io?.destroy());
+            } catch {
+            }
+            launchedProcess.unref();
+        }
+
         this.#process?.kill();
         for (const i of this.#interfaces) {
             i.close();
