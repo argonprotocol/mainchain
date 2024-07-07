@@ -314,7 +314,7 @@ jobs:
       #          run-id: 8755170162
 
       - name: Test bindings
-        run: yarn test:js-only --testTimeout=30000 --forceExit --verbose
+        run: yarn test:js-only --testTimeout=30000 --forceExit --verbose --runInBand
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
           SKIP_E2E: true
