@@ -145,12 +145,14 @@ jobs:
 
       - name: UlxNode
         uses: ./.github/templates/docker
+        if: ${{ !vars.BUILD_ASSET_RUNID }}
         with:
           image: ghcr.io/ulixee/ulixee-miner
           bin: ulx-node
           github-token: ${{ secrets.GITHUB_TOKEN }}
       - name: Notary
         uses: ./.github/templates/docker
+        if: ${{ !vars.BUILD_ASSET_RUNID }}
         with:
           image: ghcr.io/ulixee/ulixee-notary
           bin: ulx-notary
