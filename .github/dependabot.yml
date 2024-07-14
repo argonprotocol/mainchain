@@ -5,9 +5,13 @@ updates:
     schedule:
       interval: "daily"
     security-updates-only: true
+    allow:
+      - dependency-type: "security"
 
   - package-ecosystem: "github-actions"
     directory: "/"
     schedule:
       interval: "daily"
     security-updates-only: true
+    allow:
+      - dependency-type: "security"
