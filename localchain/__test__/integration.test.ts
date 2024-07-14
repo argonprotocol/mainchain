@@ -5,6 +5,7 @@ import {Keyring} from "@ulixee/mainchain";
 import {describeIntegration, teardown} from "./testHelpers";
 
 
+afterEach(teardown);
 afterAll(teardown);
 
 describeIntegration("Integration tests", () => {

@@ -13,7 +13,9 @@ import {
 } from "./testHelpers";
 
 
+afterEach(teardown);
 afterAll(teardown);
+
 describeIntegration("Transfer Localchain <-> Mainchain", () => {
     it('can transfer from mainchain to local', async () => {
         const mainchain = new TestMainchain();

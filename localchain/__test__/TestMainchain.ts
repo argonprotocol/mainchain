@@ -10,6 +10,7 @@ import {
     ITeardownable,
 } from "./testHelpers";
 import {customAlphabet} from "nanoid";
+import * as os from "node:os";
 
 const nanoid = customAlphabet('0123456789abcdefghijklmnopqrstuvwxyz', 4);
 
@@ -45,7 +46,7 @@ export default class TestMainchain implements ITeardownable {
      * Launch and return the localhost url. NOTE: this url will not work cross-docker. You need to use the containerAddress property
      * @param miningThreads
      */
-    public async launch(miningThreads = 4): Promise<string> {
+    public async launch(miningThreads = os.cpus().length): Promise<string> {
         let port = 0;
         let rpcPort = 0;
         let execArgs: string[] = [];

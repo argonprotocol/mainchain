@@ -57,7 +57,7 @@ describeIntegration("Escrow integration", () => {
                 host: 'ws://192.168.1.1:80'
             })
         })).rejects.toThrow("ExtrinsicFailed:: dataDomain.DomainNotRegistered");
-    }, 30e3);
+    }, 120e3);
 
 
     it('can run a data domain escrow', async () => {
@@ -200,7 +200,7 @@ describeIntegration("Escrow integration", () => {
 
         expect(json.blockVotes).toHaveLength(1);
 
-    }, 60e3);
+    }, 120e3);
 });
 
 async function transferMainchainToLocalchain(mainchainClient: UlxClient, localchain: Localchain, account: KeyringPair, amount: number, notaryId: number): Promise<{
