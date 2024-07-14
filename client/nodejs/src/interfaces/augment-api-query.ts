@@ -610,6 +610,11 @@ declare module '@polkadot/api-base/types/storage' {
     vaults: {
       nextVaultId: AugmentedQuery<ApiType, () => Observable<Option<u32>>, []>;
       /**
+       * Pending terms that will be committed at the given block number (must be a minimum of 1 slot
+       * change away)
+       **/
+      pendingTermsModificationsByBlock: AugmentedQuery<ApiType, (arg: u32 | AnyNumber | Uint8Array) => Observable<Vec<u32>>, [u32]>;
+      /**
        * Vault Bitcoin Pubkeys by VaultId
        **/
       vaultPubkeysById: AugmentedQuery<ApiType, (arg: u32 | AnyNumber | Uint8Array) => Observable<Option<Vec<UlxPrimitivesBitcoinBitcoinPubkeyHash>>>, [u32]>;

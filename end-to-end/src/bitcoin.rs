@@ -24,6 +24,7 @@ use ulixee_client::{
 			sp_arithmetic::{
 				fixed_point::FixedU128 as FixedU128Ext, per_things::Percent as PercentExt,
 			},
+			ulx_primitives::bond::VaultTerms,
 		},
 		storage, tx,
 	},
@@ -99,19 +100,21 @@ async fn test_bitcoin_minting_e2e() -> anyhow::Result<()> {
 			.tx()
 			.sign_and_submit_then_watch(
 				&tx().vaults().create(VaultConfig {
-					mining_reward_sharing_percent_take: PercentExt(
-						Percent::from_percent(0).deconstruct(),
-					),
+					terms: VaultTerms {
+						mining_reward_sharing_percent_take: PercentExt(
+							Percent::from_percent(0).deconstruct(),
+						),
+						mining_annual_percent_rate: FixedU128Ext(
+							FixedU128::from_float(0.01).into_inner(),
+						),
+						mining_base_fee: 0,
+						bitcoin_annual_percent_rate: FixedU128Ext(
+							FixedU128::from_float(0.01).into_inner(),
+						),
+						bitcoin_base_fee: 0,
+					},
 					mining_amount_allocated: 0,
-					mining_annual_percent_rate: FixedU128Ext(
-						FixedU128::from_float(0.01).into_inner(),
-					),
-					mining_base_fee: 0,
 					bitcoin_amount_allocated: 100_000_000,
-					bitcoin_annual_percent_rate: FixedU128Ext(
-						FixedU128::from_float(0.01).into_inner(),
-					),
-					bitcoin_base_fee: 0,
 					bitcoin_pubkey_hashes: pubkey_hashes
 						.into_iter()
 						.map(Into::into)
@@ -140,7 +143,7 @@ async fn test_bitcoin_minting_e2e() -> anyhow::Result<()> {
 		.sign_and_submit_then_watch_default(
 			&tx().price_index().submit(Index {
 				btc_usd_price: FixedU128Ext(FixedU128::from_rational(6_200_000, 1_00).into_inner()),
-				argon_usd_target_price: FixedU128Ext(FixedU128::from_float(0.99).into_inner()),
+				argon_usd_target_price: FixedU128Ext(FixedU128::from_float(0.90).into_inner()),
 				argon_usd_price: FixedU128Ext(FixedU128::from_rational(1_00, 1_00).into_inner()),
 				tick: ticker.current(),
 			}),

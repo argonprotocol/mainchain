@@ -415,6 +415,10 @@ declare module '@polkadot/api-base/types/consts' {
        **/
       blocksPerDay: u32 & AugmentedConst<ApiType>;
       /**
+       * The max pending vault term changes per block
+       **/
+      maxPendingTermModificationsPerBlock: u32 & AugmentedConst<ApiType>;
+      /**
        * The max amount of pending bitcoin pubkey hashes allowed
        **/
       maxPendingVaultBitcoinPubkeys: u32 & AugmentedConst<ApiType>;
@@ -422,6 +426,12 @@ declare module '@polkadot/api-base/types/consts' {
        * Minimum amount for a bond
        **/
       minimumBondAmount: u128 & AugmentedConst<ApiType>;
+      /**
+       * The number of blocks that a change in terms will take before applying. Terms only apply
+       * on a slot changeover, so this setting is the minimum blocks that must pass, in
+       * addition to the time to the next slot after that
+       **/
+      minTermsModificationBlockDelay: u32 & AugmentedConst<ApiType>;
     };
   } // AugmentedConsts
 } // declare module
