@@ -11,3 +11,13 @@ yarn.lock
 .yarn
 __test__
 renovate.json
+uniffi-bindgen
+apple
+android
+tsconfig*
+*.rs
+*.toml
+scripts
+migrations
+package.build.json
+.env

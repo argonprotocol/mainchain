@@ -1,6 +1,9 @@
 {
   "name": "@ulixee/localchain-darwin-arm64",
-  "version": "2.0.0-alpha.28",
+  "version": "2.0.0-alpha.29",
+  "publishConfig": {
+    "access": "public"
+  },
   "os": [
     "darwin"
   ],
@@ -13,6 +16,6 @@
   ],
   "license": "MIT",
   "engines": {
-    "node": ">= 10"
+    "node": ">= 18"
   }
 }

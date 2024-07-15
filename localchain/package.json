@@ -1,7 +1,18 @@
 {
   "name": "@ulixee/localchain",
-  "version": "2.0.0-alpha.28",
-  "bin": "cli.js",
+  "version": "2.0.0-alpha.29",
+  "description": "A nodejs binding to the Ulixee Localchain",
+  "bin": {
+    "localchain": "cli.js"
+  },
+  "publishConfig": {
+    "access": "public"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/ulixee/mainchain.git"
+  },
+  "homepage": "https://ulixee.org",
   "scripts": {
     "artifacts": "napi artifacts",
     "build": "napi build --platform --release --no-const-enum --features=napi -p ulx-localchain",
@@ -48,5 +59,12 @@
   "engines": {
     "node": ">= 18"
   },
-  "packageManager": "yarn@4.1.0"
+  "packageManager": "yarn@4.1.0",
+  "optionalDependencies": {
+    "@ulixee/localchain-darwin-x64": "2.0.0-alpha.29",
+    "@ulixee/localchain-darwin-arm64": "2.0.0-alpha.29",
+    "@ulixee/localchain-win32-x64-msvc": "2.0.0-alpha.29",
+    "@ulixee/localchain-linux-x64-gnu": "2.0.0-alpha.29",
+    "@ulixee/localchain-linux-arm64-gnu": "2.0.0-alpha.29"
+  }
 }
