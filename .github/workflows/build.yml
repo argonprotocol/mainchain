@@ -44,7 +44,7 @@ jobs:
     steps:
       - uses: actions/checkout@v4
       - name: Free Disk Space
-        if: ${{startsWith(matrix.os, 'ubuntu') && !vars.SKIP_REBUILD_DOCKER}}
+        if: ${{startsWith(matrix.os, 'ubuntu') && (github.event.inputs.SKIP_REBUILD_DOCKER != 'true')}}
         uses: ./.github/templates/clear-space
 
       - name: Set Localchain Db Url
@@ -52,7 +52,7 @@ jobs:
         run: echo "DATABASE_URL=sqlite://${{ runner.temp }}/temp.db" > .env
 
       - name: Install linux dependencies
-        if: ${{startsWith(matrix.os, 'ubuntu') && !vars.SKIP_REBUILD_DOCKER}}
+        if: ${{startsWith(matrix.os, 'ubuntu') && (github.event.inputs.SKIP_REBUILD_DOCKER != 'true')}}
         run: sudo apt-get install -y clang libssl-dev llvm libudev-dev protobuf-compiler pkg-config
 
       - name: Install mac dependencies
@@ -60,7 +60,7 @@ jobs:
         run: brew install protobuf
 
       - name: Start sccache
-        if: ${{!vars.SKIP_REBUILD_DOCKER}}
+        if: ${{(github.event.inputs.SKIP_REBUILD_DOCKER != 'true')}}
         uses: hendrikmuhs/ccache-action@v1.2
         with:
           variant: sccache
@@ -72,14 +72,14 @@ jobs:
       - uses: rui314/setup-mold@v1
 
       - name: Install
-        if: ${{!vars.SKIP_REBUILD_DOCKER}}
+        if: ${{(github.event.inputs.SKIP_REBUILD_DOCKER != 'true')}}
         uses: dtolnay/rust-toolchain@stable
         with:
           toolchain: stable
           targets: ${{ matrix.target }},wasm32-unknown-unknown
       #
       #      - name: Cache cargo
-      #        if: ${{!vars.SKIP_REBUILD_DOCKER}}
+      #        if: ${{(github.event.inputs.SKIP_REBUILD_DOCKER != 'true')}}
       #        uses: actions/cache@v4
       #        with:
       #          path: |
@@ -92,22 +92,22 @@ jobs:
       #          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
 
       - uses: taiki-e/install-action@v2
-        if: ${{!vars.SKIP_REBUILD_DOCKER}}
+        if: ${{(github.event.inputs.SKIP_REBUILD_DOCKER != 'true')}}
         with:
           tool: cargo-make,sqlx-cli
 
       - name: Migrate Notary Db
-        if: ${{!vars.SKIP_REBUILD_DOCKER}}
+        if: ${{(github.event.inputs.SKIP_REBUILD_DOCKER != 'true')}}
         working-directory: notary
         run: cargo sqlx database setup
 
       - name: Migrate Localchain Db
-        if: ${{!vars.SKIP_REBUILD_DOCKER}}
+        if: ${{(github.event.inputs.SKIP_REBUILD_DOCKER != 'true')}}
         working-directory: localchain
         run: cargo sqlx database setup
 
       - name: Test
-        if: ${{!vars.SKIP_REBUILD_DOCKER}}
+        if: ${{(github.event.inputs.SKIP_REBUILD_DOCKER != 'true')}}
         run: cargo build --features=fast-runtime && cargo test --features=fast-runtime --no-fail-fast
         env:
           RUSTC_WRAPPER: "sccache"
@@ -117,7 +117,7 @@ jobs:
         continue-on-error: true
 
       - name: Upload Debug Assets
-        if: ${{!vars.SKIP_REBUILD_DOCKER}}
+        if: ${{(github.event.inputs.SKIP_REBUILD_DOCKER != 'true')}}
         uses: actions/upload-artifact@v4
         with:
           name: bins-${{ matrix.target }}
@@ -131,19 +131,19 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
-        if: ${{ !vars.SKIP_REBUILD_DOCKER }}
+        if: ${{ (github.event.inputs.SKIP_REBUILD_DOCKER != 'true') }}
 
       - name: Set up QEMU
-        if: ${{ !vars.SKIP_REBUILD_DOCKER }}
+        if: ${{ (github.event.inputs.SKIP_REBUILD_DOCKER != 'true') }}
         uses: docker/setup-qemu-action@v3
 
       - name: Set up Docker Buildx
-        if: ${{ !vars.SKIP_REBUILD_DOCKER }}
+        if: ${{ (github.event.inputs.SKIP_REBUILD_DOCKER != 'true') }}
         uses: docker/setup-buildx-action@v3
 
       - name: Download artifacts
         uses: actions/download-artifact@v4
-        if: ${{ !vars.SKIP_REBUILD_DOCKER }}
+        if: ${{ (github.event.inputs.SKIP_REBUILD_DOCKER != 'true') }}
         with:
           name: bins-x86_64-unknown-linux-gnu
           github-token: ${{ secrets.GITHUB_TOKEN }}
@@ -155,14 +155,14 @@ jobs:
 
       - name: UlxNode
         uses: ./.github/templates/docker
-        if: ${{ !vars.SKIP_REBUILD_DOCKER }}
+        if: ${{ (github.event.inputs.SKIP_REBUILD_DOCKER != 'true') }}
         with:
           image: ghcr.io/ulixee/ulixee-miner
           bin: ulx-node
           github-token: ${{ secrets.GITHUB_TOKEN }}
       - name: Notary
         uses: ./.github/templates/docker
-        if: ${{ !vars.SKIP_REBUILD_DOCKER }}
+        if: ${{ (github.event.inputs.SKIP_REBUILD_DOCKER != 'true') }}
         with:
           image: ghcr.io/ulixee/ulixee-notary
           bin: ulx-notary
@@ -177,7 +177,7 @@ jobs:
             target: x86_64-apple-darwin
             build: |
               export RUSTFLAGS="-C link-args=-Wl,-undefined,dynamic_lookup"
-              yarn build:debug
+              yarn build:debug --target x86_64-apple-darwin
               strip -x *.node
           - os: macos-latest
             target: aarch64-apple-darwin
@@ -197,16 +197,18 @@ jobs:
               export DEBUG=napi:*
               cd localchain
               yarn build:debug -- --lib
+              strip -x *.node
           - os: ubuntu-latest
             target: aarch64-unknown-linux-gnu
             docker: ghcr.io/napi-rs/napi-rs/nodejs-rust:lts-debian-aarch64
             build: |
               cd localchain
               yarn build:debug --target aarch64-unknown-linux-gnu -- --lib
+              aarch64-unknown-linux-gnu-strip -x *.node
           - os: windows-latest
             target: x86_64-pc-windows-msvc
             build: |
-              yarn build --target x86_64-pc-windows-msvc
+              yarn build:debug --target x86_64-pc-windows-msvc
               strip -x *.node
     name: localchain - ${{ matrix.target }} - node@20
     runs-on: ${{matrix.os}}
@@ -294,7 +296,7 @@ jobs:
           - windows-latest
         include:
           - os: macos-latest
-            target: x86_64-apple-darwin
+            target: aarch64-apple-darwin
           - os: windows-latest
             target: x86_64-pc-windows-msvc
         node: [ 18, 20 ]
@@ -326,7 +328,7 @@ jobs:
       #          run-id: 8755170162
 
       - name: Test bindings
-        run: yarn test:js-only --testTimeout=30000 --forceExit --verbose --runInBand
+        run: yarn test:js-only --testTimeout=30000 --forceExit --verbose --runInBand --target=${{ matrix.target }}
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
           SKIP_E2E: true
