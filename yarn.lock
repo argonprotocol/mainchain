@@ -2067,6 +2067,13 @@ __metadata:
   languageName: node
   linkType: hard
 
+"@substrate/ss58-registry@npm:^1.49.0":
+  version: 1.49.0
+  resolution: "@substrate/ss58-registry@npm:1.49.0"
+  checksum: 10c0/b50f32e2f4632b31b3e09cec026fef557b1b72f61b6811673f5b0fbe311c5394c2f19fc4c23f97b014c77eb2d0f535a8f079dfd3fb22d5a1d7b043ceeac0d9ac
+  languageName: node
+  linkType: hard
+
 "@tsconfig/node10@npm:^1.0.7":
   version: 1.0.11
   resolution: "@tsconfig/node10@npm:1.0.11"
@@ -2259,6 +2266,41 @@ __metadata:
   languageName: node
   linkType: hard
 
+"@ulixee/localchain-darwin-arm64@npm:2.0.0-alpha.29":
+  version: 2.0.0-alpha.29
+  resolution: "@ulixee/localchain-darwin-arm64@npm:2.0.0-alpha.29"
+  conditions: os=darwin & cpu=arm64
+  languageName: node
+  linkType: hard
+
+"@ulixee/localchain-darwin-x64@npm:2.0.0-alpha.29":
+  version: 2.0.0-alpha.29
+  resolution: "@ulixee/localchain-darwin-x64@npm:2.0.0-alpha.29"
+  conditions: os=darwin & cpu=x64
+  languageName: node
+  linkType: hard
+
+"@ulixee/localchain-linux-arm64-gnu@npm:2.0.0-alpha.29":
+  version: 2.0.0-alpha.29
+  resolution: "@ulixee/localchain-linux-arm64-gnu@npm:2.0.0-alpha.29"
+  conditions: os=linux & cpu=arm64 & libc=glibc
+  languageName: node
+  linkType: hard
+
+"@ulixee/localchain-linux-x64-gnu@npm:2.0.0-alpha.29":
+  version: 2.0.0-alpha.29
+  resolution: "@ulixee/localchain-linux-x64-gnu@npm:2.0.0-alpha.29"
+  conditions: os=linux & cpu=x64 & libc=glibc
+  languageName: node
+  linkType: hard
+
+"@ulixee/localchain-win32-x64-msvc@npm:2.0.0-alpha.29":
+  version: 2.0.0-alpha.29
+  resolution: "@ulixee/localchain-win32-x64-msvc@npm:2.0.0-alpha.29"
+  conditions: os=win32 & cpu=x64
+  languageName: node
+  linkType: hard
+
 "@ulixee/localchain@workspace:localchain":
   version: 0.0.0-use.local
   resolution: "@ulixee/localchain@workspace:localchain"
@@ -2271,7 +2313,12 @@ __metadata:
     "@types/jest": "npm:^29.5.11"
     "@types/node": "npm:^18.19.6"
     "@types/pg": "npm:^8.10.9"
-    "@ulixee/mainchain": "npm:2.0.0-alpha.28"
+    "@ulixee/localchain-darwin-arm64": "npm:2.0.0-alpha.29"
+    "@ulixee/localchain-darwin-x64": "npm:2.0.0-alpha.29"
+    "@ulixee/localchain-linux-arm64-gnu": "npm:2.0.0-alpha.29"
+    "@ulixee/localchain-linux-x64-gnu": "npm:2.0.0-alpha.29"
+    "@ulixee/localchain-win32-x64-msvc": "npm:2.0.0-alpha.29"
+    "@ulixee/mainchain": "npm:2.0.0-alpha.29"
     http-proxy: "npm:^1.18.1"
     jest: "npm:^29.7.0"
     nanoid: "npm:^3.3.7"
@@ -2281,6 +2328,17 @@ __metadata:
     ts-jest: "npm:^29.1.2"
     tslib: "npm:^2.6.2"
     typescript: "npm:^5.3.3"
+  dependenciesMeta:
+    "@ulixee/localchain-darwin-arm64":
+      optional: true
+    "@ulixee/localchain-darwin-x64":
+      optional: true
+    "@ulixee/localchain-linux-arm64-gnu":
+      optional: true
+    "@ulixee/localchain-linux-x64-gnu":
+      optional: true
+    "@ulixee/localchain-win32-x64-msvc":
+      optional: true
   bin:
     localchain: cli.js
   languageName: unknown
@@ -2299,12 +2357,15 @@ __metadata:
   languageName: unknown
   linkType: soft
 
-"@ulixee/mainchain@npm:2.0.0-alpha.28, @ulixee/mainchain@workspace:client/nodejs":
+"@ulixee/mainchain@npm:2.0.0-alpha.29, @ulixee/mainchain@workspace:client/nodejs":
   version: 0.0.0-use.local
   resolution: "@ulixee/mainchain@workspace:client/nodejs"
   dependencies:
     "@polkadot/api": "npm:^10.11.2"
+    "@polkadot/keyring": "npm:^12.6.2"
     "@polkadot/typegen": "npm:^10.11.2"
+    "@polkadot/util-crypto": "npm:^12.6.2"
+    "@substrate/ss58-registry": "npm:^1.49.0"
     ts-node: "npm:^10.9.2"
     tslib: "npm:^2.6.2"
     typescript: "npm:^5.3.3"

@@ -62,7 +62,7 @@ impl UlxTestNode {
 			.stderr(process::Stdio::piped())
 			.arg("--dev")
 			.arg(format!("--{}", authority.to_lowercase()))
-			.arg("--miners=4")
+			.arg("--compute-miners=4")
 			.arg("--port=0")
 			.arg("--rpc-port=0")
 			.arg(format!("--bitcoin-rpc-url={}", rpc_url))

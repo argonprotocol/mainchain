@@ -16,15 +16,21 @@ pub struct Cli {
 	#[arg(long, value_name = "SS58_ADDRESS", value_parser = parse_ss58_account_id)]
 	pub author: Option<AccountId>,
 
-	/// How many mining threads to run
+	/// How many permissionless compute mining threads to run
+	///
+	/// NOTE: once mining slots are active, compute miners are given lower priority for block
+	/// acceptance.
 	#[arg(long)]
-	pub miners: Option<u32>,
+	pub compute_miners: Option<u32>,
 
 	/// Bitcoin node to verify minted bitcoins using compact filters. Should be a hosted/trusted
 	/// full node. Include optional auth inline
 	#[arg(long)]
 	pub bitcoin_rpc_url: String,
 
+	/// Flags to control the randomx compute challenge. Can be specified multiple times.
+	/// - LargePages: use large memory pages for the randomx dataset (default active)
+	/// - Secure: use secure memory for the randomx dataset (default active)
 	#[arg(long)]
 	pub randomx_flags: Vec<RandomxFlag>,
 }

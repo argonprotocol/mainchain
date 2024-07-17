@@ -380,8 +380,12 @@ pub fn new_full<
 			} else {
 				max(num_cpus::get() - 1, 1)
 			};
-			log::info!("Mining is enabled, {} threads", mining_threads);
-			run_compute_solver_threads(&task_manager, compute_miner, mining_threads);
+			if mining_threads > 0 {
+				log::info!("Mining is enabled, {} threads", mining_threads);
+				run_compute_solver_threads(&task_manager, compute_miner, mining_threads)
+			} else {
+				log::info!("Mining is disabled");
+			}
 		} else {
 			log::info!("Mining is disabled");
 		}

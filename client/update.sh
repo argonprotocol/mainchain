@@ -17,7 +17,7 @@ cleanup() {
 
 trap cleanup EXIT SIGHUP SIGINT SIGTERM
 
-"$BASEDIR/../target/debug/ulx-node" --tmp --dev --alice --rpc-port=9944 --miners=1 --bitcoin-rpc-url="http://127.0.0.1:18443" > "$PIPE" 2>&1 &
+"$BASEDIR/../target/debug/ulx-node" --tmp --dev --alice --rpc-port=9944 --compute-miners=1 --bitcoin-rpc-url="http://127.0.0.1:18443" > "$PIPE" 2>&1 &
 ULX_PID=$!
 
 while IFS= read -r line; do

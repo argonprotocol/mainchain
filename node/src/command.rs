@@ -204,7 +204,7 @@ pub fn run() -> sc_cli::Result<()> {
 					>(
 						config,
 						cli.block_author(),
-						cli.miners,
+						cli.compute_miners,
 						cli.bitcoin_rpc_url,
 					)
 					.map_err(sc_cli::Error::Service),
@@ -212,7 +212,7 @@ pub fn run() -> sc_cli::Result<()> {
 						service::new_full::<sc_network::Litep2pNetworkBackend>(
 							config,
 							cli.block_author(),
-							cli.miners,
+							cli.compute_miners,
 							cli.bitcoin_rpc_url,
 						)
 						.map_err(sc_cli::Error::Service),

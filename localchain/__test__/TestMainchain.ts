@@ -66,7 +66,7 @@ export default class TestMainchain implements ITeardownable {
         }
 
         const bitcoinRpcUrl = await this.startBitcoin();
-        execArgs.push('--dev', '--alice', `--miners=${miningThreads}`, `--port=${port}`, `--rpc-port=${rpcPort}`, '--rpc-external', `--bitcoin-rpc-url=${bitcoinRpcUrl}`)
+        execArgs.push('--dev', '--alice', `--compute-miners=${miningThreads}`, `--port=${port}`, `--rpc-port=${rpcPort}`, '--rpc-external', `--bitcoin-rpc-url=${bitcoinRpcUrl}`)
         this.#process = spawn(this.#binPath, execArgs, {
             stdio: ['ignore', 'pipe', 'pipe', "ignore"],
             env: {...process.env, RUST_LOG: `${this.loglevel},sc_rpc_server=info`}
