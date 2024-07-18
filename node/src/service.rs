@@ -242,12 +242,14 @@ pub fn new_full<
 	let rpc_extensions_builder = {
 		let client = client.clone();
 		let pool = transaction_pool.clone();
+		let chain_spec = config.chain_spec.cloned_box();
 
 		Box::new(move |deny_unsafe, _| {
 			rpc::create_full(rpc::FullDeps {
 				client: client.clone(),
 				pool: pool.clone(),
 				deny_unsafe,
+				chain_spec: chain_spec.cloned_box(),
 			})
 			.map_err(Into::into)
 		})

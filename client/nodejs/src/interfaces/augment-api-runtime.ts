@@ -6,17 +6,19 @@
 import '@polkadot/api-base/types/calls';
 
 import type { ApiTypes, AugmentedCall, DecoratedCallBase } from '@polkadot/api-base/types';
-import type { Bytes, Null, Option, Vec, u32 } from '@polkadot/types-codec';
+import type { Bytes, Null, Option, Result, Vec, u32 } from '@polkadot/types-codec';
 import type { AnyNumber, IMethod, ITuple } from '@polkadot/types-codec/types';
 import type { OpaqueKeyOwnershipProof } from '@polkadot/types/interfaces/babe';
 import type { CheckInherentsResult, InherentData } from '@polkadot/types/interfaces/blockbuilder';
 import type { BlockHash } from '@polkadot/types/interfaces/chain';
 import type { AuthorityId } from '@polkadot/types/interfaces/consensus';
 import type { Extrinsic } from '@polkadot/types/interfaces/extrinsics';
+import type { GenesisBuildErr } from '@polkadot/types/interfaces/genesisBuilder';
 import type { AuthorityList, GrandpaEquivocationProof, SetId } from '@polkadot/types/interfaces/grandpa';
 import type { OpaqueMetadata } from '@polkadot/types/interfaces/metadata';
 import type { FeeDetails, RuntimeDispatchInfo } from '@polkadot/types/interfaces/payment';
-import type { AccountId, Balance, Block, Call, Header, Index, KeyTypeId, Weight } from '@polkadot/types/interfaces/runtime';
+import type { AccountId, Balance, Block, Call, ExtrinsicInclusionMode, Header, Index, KeyTypeId, Weight } from '@polkadot/types/interfaces/runtime';
+import type { RuntimeVersion } from '@polkadot/types/interfaces/state';
 import type { ApplyExtrinsicResult } from '@polkadot/types/interfaces/system';
 import type { TransactionSource, TransactionValidity } from '@polkadot/types/interfaces/txqueue';
 import type { IExtrinsic, Observable } from '@polkadot/types/types';
@@ -51,6 +53,32 @@ declare module '@polkadot/api-base/types/calls' {
        * Generate inherent extrinsics.
        **/
       inherentExtrinsics: AugmentedCall<ApiType, (inherent: InherentData | { data?: any } | string | Uint8Array) => Observable<Vec<Extrinsic>>>;
+    };
+    /** 0xdf6acb689907609b/5 */
+    core: {
+      /**
+       * Execute the given block.
+       **/
+      executeBlock: AugmentedCall<ApiType, (block: Block | { header?: any; extrinsics?: any } | string | Uint8Array) => Observable<Null>>;
+      /**
+       * Initialize a block with the given header.
+       **/
+      initializeBlock: AugmentedCall<ApiType, (header: Header | { parentHash?: any; number?: any; stateRoot?: any; extrinsicsRoot?: any; digest?: any } | string | Uint8Array) => Observable<ExtrinsicInclusionMode>>;
+      /**
+       * Returns the version of the runtime.
+       **/
+      version: AugmentedCall<ApiType, () => Observable<RuntimeVersion>>;
+    };
+    /** 0xfbc577b9d747efd6/1 */
+    genesisBuilder: {
+      /**
+       * Build `RuntimeGenesisConfig` from a JSON blob not using any defaults and store it in the storage.
+       **/
+      buildConfig: AugmentedCall<ApiType, (json: Bytes | string | Uint8Array) => Observable<Result<ITuple<[]>, GenesisBuildErr>>>;
+      /**
+       * Creates the default `RuntimeGenesisConfig` and returns it as a JSON blob.
+       **/
+      createDefaultConfig: AugmentedCall<ApiType, () => Observable<Bytes>>;
     };
     /** 0xed99c5acb25eedf5/3 */
     grandpaApi: {

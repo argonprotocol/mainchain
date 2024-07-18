@@ -874,7 +874,7 @@ mod tests {
 		client: &UlxOnlineClient,
 		bob_id: &AccountId32,
 	) -> anyhow::Result<()> {
-		let notary_activated_finalized_block = client
+		let notary_activated_finalizesd_block = client
 			.tx()
 			.sign_and_submit_then_watch_default(
 				&tx().sudo().sudo(RuntimeCall::Notaries(NotaryCall::activate {
@@ -883,12 +883,13 @@ mod tests {
 				&dev::alice(),
 			)
 			.await?
-			.wait_for_finalized_success()
-			.await;
+			.wait_for_finalized()
+			.await?;
+
+		let events = notary_activated_finalized_block.wait_for_success().await;
 
 		println!("notary activated");
-		assert_ok!(&notary_activated_finalized_block);
-		let notary_activated_finalized_block = notary_activated_finalized_block.unwrap();
+		assert_ok!(&events);
 		let block_hash = notary_activated_finalized_block.block_hash().0;
 
 		let mut found = false;

@@ -11,9 +11,10 @@ use subxt::{
 	backend::{legacy::LegacyRpcMethods, rpc::RpcClient, BlockRef},
 	config::{Config, DefaultExtrinsicParams, DefaultExtrinsicParamsBuilder},
 	error::{Error, RpcError},
-	runtime_api::RuntimeApiPayload,
-	storage::{address::Yes, StorageAddress},
+	runtime_api::Payload as RuntimeApiPayload,
+	storage::Address as StorageAddress,
 	tx::{TxInBlock, TxProgress, TxStatus},
+	utils::Yes,
 	OnlineClient,
 };
 use tokio::{

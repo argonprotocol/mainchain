@@ -232,6 +232,7 @@ where
 		let latest_notebook =
 			latest_notebook_by_notary.get(&notary_id).map(|a| a.0).unwrap_or_default();
 
+		let mut missing_notebooks = vec![];
 		if latest_notebook < notebook_number - 1 {
 			let notary_notebooks = self.aux_client.get_audit_summaries(notary_id)?.get();
 			for notebook_number_needed in latest_notebook + 1..notebook_number {
@@ -240,13 +241,26 @@ where
 				{
 					notebook_dependencies.push(summary.clone());
 				} else {
-					return Err(Error::NotaryError(format!(
-						"Missing notebook #{} for notary {}",
-						notebook_number_needed, notary_id
-					)));
+					missing_notebooks.push(notebook_number_needed);
 				}
 			}
 		}
+
+		if !missing_notebooks.is_empty() {
+			let msg = format!(
+				"Missing notebooks #{:?} to audit {} for notary {}",
+				missing_notebooks, notebook_number, notary_id
+			);
+			self.aux_client.get_missing_notebooks(notary_id)?.mutate(|a| {
+				for notebook_number in missing_notebooks {
+					a.insert(notebook_number);
+				}
+				// process self afterwards
+				a.insert(notebook_number);
+			})?;
+			return Err(Error::NotaryError(msg));
+		}
+
 		// for all other notaries, load the history we have?
 		// TODO: what do we need for cross-notary transfers?
 

@@ -51,6 +51,7 @@ sp-genesis-builder = { workspace = true }
 sp-consensus-grandpa = { workspace = true }
 frame-system-rpc-runtime-api = { workspace = true }
 pallet-transaction-payment-rpc-runtime-api = { workspace = true }
+frame-metadata-hash-extension = { workspace = true }
 
 # Used for runtime benchmarking
 frame-benchmarking = { workspace = true, optional = true }
@@ -83,6 +84,7 @@ std = [
 	"codec/std",
 	"frame-benchmarking?/std",
 	"frame-executive/std",
+	"frame-metadata-hash-extension/std",
 	"frame-support/std",
 	"frame-system-benchmarking?/std",
 	"frame-system-rpc-runtime-api/std",

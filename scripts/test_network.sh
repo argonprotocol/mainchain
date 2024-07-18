@@ -54,9 +54,9 @@ export ULX_LOCAL_TESTNET_NOTARY_URL="wss://$ULX_LOCAL_TESTNET_NOTARY_URL"
 
 
 # start a temporary node with alice and bob funded
-for i in {0..0} ; do
-  echo -e "(\"$BASEDIR/target/debug/ulx-node\" --tmp --${validators[$i]} --chain local --rpc-port=994$((i+4))  --port 3033$((i+4)) --compute-miners 1 --unsafe-rpc-external --rpc-methods=unsafe --rpc-cors=all  --bitcoin-rpc-url=http://bitcoin:bitcoin@localhost:18444  &)\n\n"
-  RUST_LOG=info "$BASEDIR/target/debug/ulx-node" --dev --${validators[$i]} --chain local --name=${validators[$i]}  --rpc-port=994$((i+4))  --port 3033$((i+4)) --compute-miners 1 --unsafe-rpc-external --rpc-methods=unsafe --rpc-cors=all  --bitcoin-rpc-url=http://bitcoin:bitcoin@localhost:18444 &
+for i in {0..1} ; do
+  echo -e "Starting Node ${i}: (\"$BASEDIR/target/debug/ulx-node\" --tmp --${validators[$i]} --chain local --rpc-port=994$((i+4))  --port 3033$((i+4)) --compute-miners 1  --unsafe-force-node-key-generation --unsafe-rpc-external --rpc-methods=unsafe --rpc-cors=all  --bitcoin-rpc-url=http://bitcoin:bitcoin@localhost:18444  &)\n\n"
+  RUST_LOG=info "$BASEDIR/target/debug/ulx-node" --tmp --${validators[$i]} --chain local --name=${validators[$i]}  --rpc-port=994$((i+4))  --port 3033$((i+4)) --compute-miners 1 --unsafe-force-node-key-generation --unsafe-rpc-external --rpc-methods=unsafe --rpc-cors=all  --bitcoin-rpc-url=http://bitcoin:bitcoin@localhost:18444 &
 done
 
 # Function to check if the Substrate node is ready
@@ -76,7 +76,10 @@ echo -e "(\"$BASEDIR/target/debug/ulx-notary\" insert-key --keystore-path /tmp/n
 echo -e "(\"$BASEDIR/target/debug/ulx-notary\" migrate --db-url ${DBPATH})\n\n"
 "$BASEDIR/target/debug/ulx-notary" migrate --db-url ${DBPATH};
 
-echo "(\"$BASEDIR/target/debug/ulx-notary\" run --db-url ${DBPATH} -t ws://127.0.0.1:9944 --keystore-path /tmp/notary_keystore -b 0.0.0.0:9925)"
+echo -e "Starting Notary: (\"$BASEDIR/target/debug/ulx-notary\" run --db-url ${DBPATH} -t ws://127.0.0.1:9944 --keystore-path /tmp/notary_keystore -b 0.0.0.0:9925)\n\n"
 RUST_LOG=info "$BASEDIR/target/debug/ulx-notary" run --db-url ${DBPATH} -t ws://127.0.0.1:9944 --keystore-path /tmp/notary_keystore -b "0.0.0.0:9925" &
+
+#echo -e "Starting a bitcoin oracle...\n\n"
+#RUST_LOG=info "$BASEDIR/target/debug/ulx-oracle" --dev -t ws://127.0.0.1:9944 bitcoin --bitcoin-rpc-url=http://bitcoin:bitcoin@localhost:18444 &
 
 wait

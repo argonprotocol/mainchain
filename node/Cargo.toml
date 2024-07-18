@@ -39,6 +39,8 @@ sc-offchain = { workspace = true }
 sc-consensus = { workspace = true }
 sp-consensus = { workspace = true }
 sc-client-api = { workspace = true }
+sc-chain-spec = { workspace = true }
+sc-rpc-spec-v2 = { workspace = true }
 sp-runtime = { workspace = true, features = ["default"] }
 sp-arithmetic = { workspace = true, features = ["default"] }
 sp-statement-store = { workspace = true, features = ["default"] }
@@ -49,7 +51,7 @@ sp-keystore = { workspace = true, features = ["default"] }
 sp-keyring = { workspace = true, features = ["default"] }
 frame-system = { workspace = true, features = ["default"] }
 pallet-transaction-payment = { workspace = true, features = ["default"] }
-
+frame-metadata-hash-extension = { workspace = true, features = ["default"] }
 jsonrpsee = { workspace = true, features = ["server"] }
 sp-api = { workspace = true, features = ["default"] }
 sc-rpc = { workspace = true }

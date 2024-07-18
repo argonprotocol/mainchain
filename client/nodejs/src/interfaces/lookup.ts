@@ -2313,7 +2313,19 @@ export default {
    **/
   PalletTransactionPaymentChargeTransactionPayment: 'Compact<u128>',
   /**
-   * Lookup377: ulx_node_runtime::Runtime
+   * Lookup377: frame_metadata_hash_extension::CheckMetadataHash<T>
+   **/
+  FrameMetadataHashExtensionCheckMetadataHash: {
+    mode: 'FrameMetadataHashExtensionMode'
+  },
+  /**
+   * Lookup378: frame_metadata_hash_extension::Mode
+   **/
+  FrameMetadataHashExtensionMode: {
+    _enum: ['Disabled', 'Enabled']
+  },
+  /**
+   * Lookup380: ulx_node_runtime::Runtime
    **/
   UlxNodeRuntimeRuntime: 'Null'
 };

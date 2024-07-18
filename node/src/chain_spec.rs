@@ -13,7 +13,7 @@ use ulx_primitives::{
 	block_vote::VoteMinimum,
 	notary::{GenesisNotary, NotaryPublic},
 	tick::{Ticker, TICK_MILLIS},
-	BlockSealAuthorityId, ComputeDifficulty,
+	BlockSealAuthorityId, ComputeDifficulty, ADDRESS_PREFIX,
 };
 
 // The URL for the telemetry server.
@@ -49,6 +49,8 @@ where
 pub fn development_config() -> Result<ChainSpec, String> {
 	let mut properties = Properties::new();
 	properties.insert("tokenDecimals".into(), 3.into());
+	properties.insert("tokenSymbol".into(), "ARG".into());
+	properties.insert("ss58Format".into(), ADDRESS_PREFIX.into());
 
 	const HASHES_PER_SECOND: u64 = 100;
 
