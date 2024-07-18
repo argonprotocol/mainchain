@@ -2340,8 +2340,8 @@ declare module '@polkadot/types/lookup' {
     readonly amount: u128;
   }
 
-  /** @name PalletBalancesIdAmountRuntimeHoldReason (352) */
-  interface PalletBalancesIdAmountRuntimeHoldReason extends Struct {
+  /** @name FrameSupportTokensMiscIdAmountRuntimeHoldReason (352) */
+  interface FrameSupportTokensMiscIdAmountRuntimeHoldReason extends Struct {
     readonly id: UlxNodeRuntimeRuntimeHoldReason;
     readonly amount: u128;
   }
@@ -2384,8 +2384,8 @@ declare module '@polkadot/types/lookup' {
     readonly type: 'MaturationPeriod';
   }
 
-  /** @name PalletBalancesIdAmountRuntimeFreezeReason (360) */
-  interface PalletBalancesIdAmountRuntimeFreezeReason extends Struct {
+  /** @name FrameSupportTokensMiscIdAmountRuntimeFreezeReason (360) */
+  interface FrameSupportTokensMiscIdAmountRuntimeFreezeReason extends Struct {
     readonly id: UlxNodeRuntimeRuntimeFreezeReason;
     readonly amount: u128;
   }
@@ -2463,7 +2463,19 @@ declare module '@polkadot/types/lookup' {
   /** @name PalletTransactionPaymentChargeTransactionPayment (379) */
   interface PalletTransactionPaymentChargeTransactionPayment extends Compact<u128> {}
 
-  /** @name UlxNodeRuntimeRuntime (380) */
+  /** @name FrameMetadataHashExtensionCheckMetadataHash (380) */
+  interface FrameMetadataHashExtensionCheckMetadataHash extends Struct {
+    readonly mode: FrameMetadataHashExtensionMode;
+  }
+
+  /** @name FrameMetadataHashExtensionMode (381) */
+  interface FrameMetadataHashExtensionMode extends Enum {
+    readonly isDisabled: boolean;
+    readonly isEnabled: boolean;
+    readonly type: 'Disabled' | 'Enabled';
+  }
+
+  /** @name UlxNodeRuntimeRuntime (383) */
   type UlxNodeRuntimeRuntime = Null;
 
 } // declare module

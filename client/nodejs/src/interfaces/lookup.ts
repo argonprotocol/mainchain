@@ -2181,9 +2181,9 @@ export default {
     amount: 'u128'
   },
   /**
-   * Lookup352: pallet_balances::types::IdAmount<ulx_node_runtime::RuntimeHoldReason, Balance>
+   * Lookup352: frame_support::traits::tokens::misc::IdAmount<ulx_node_runtime::RuntimeHoldReason, Balance>
    **/
-  PalletBalancesIdAmountRuntimeHoldReason: {
+  FrameSupportTokensMiscIdAmountRuntimeHoldReason: {
     id: 'UlxNodeRuntimeRuntimeHoldReason',
     amount: 'u128'
   },
@@ -2239,9 +2239,9 @@ export default {
     _enum: ['MaturationPeriod']
   },
   /**
-   * Lookup360: pallet_balances::types::IdAmount<ulx_node_runtime::RuntimeFreezeReason, Balance>
+   * Lookup360: frame_support::traits::tokens::misc::IdAmount<ulx_node_runtime::RuntimeFreezeReason, Balance>
    **/
-  PalletBalancesIdAmountRuntimeFreezeReason: {
+  FrameSupportTokensMiscIdAmountRuntimeFreezeReason: {
     id: 'UlxNodeRuntimeRuntimeFreezeReason',
     amount: 'u128'
   },
@@ -2331,7 +2331,19 @@ export default {
    **/
   PalletTransactionPaymentChargeTransactionPayment: 'Compact<u128>',
   /**
-   * Lookup380: ulx_node_runtime::Runtime
+   * Lookup380: frame_metadata_hash_extension::CheckMetadataHash<T>
+   **/
+  FrameMetadataHashExtensionCheckMetadataHash: {
+    mode: 'FrameMetadataHashExtensionMode'
+  },
+  /**
+   * Lookup381: frame_metadata_hash_extension::Mode
+   **/
+  FrameMetadataHashExtensionMode: {
+    _enum: ['Disabled', 'Enabled']
+  },
+  /**
+   * Lookup383: ulx_node_runtime::Runtime
    **/
   UlxNodeRuntimeRuntime: 'Null'
 };

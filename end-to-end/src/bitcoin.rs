@@ -142,9 +142,9 @@ async fn test_bitcoin_minting_e2e() -> anyhow::Result<()> {
 		.tx()
 		.sign_and_submit_then_watch_default(
 			&tx().price_index().submit(Index {
-				btc_usd_price: FixedU128Ext(FixedU128::from_rational(6_200_000, 1_00).into_inner()),
-				argon_usd_target_price: FixedU128Ext(FixedU128::from_float(0.90).into_inner()),
-				argon_usd_price: FixedU128Ext(FixedU128::from_rational(1_00, 1_00).into_inner()),
+				btc_usd_price: FixedU128Ext(FixedU128::from_float(62_000.0).into_inner()),
+				argon_usd_target_price: FixedU128Ext(FixedU128::from_float(1.0).into_inner()),
+				argon_usd_price: FixedU128Ext(FixedU128::from_float(1.1).into_inner()),
 				tick: ticker.current(),
 			}),
 			&Sr25519Signer::new(alice_sr25519.clone()),
@@ -206,6 +206,10 @@ async fn test_bitcoin_minting_e2e() -> anyhow::Result<()> {
 				break;
 			}
 		}
+	}
+	// load 2 more blocks
+	for _ in 0..2 {
+		let _ = finalized_sub.next().await;
 	}
 	let utxo_ref = client
 		.fetch_storage(&storage().bitcoin_utxos().utxo_id_to_ref(utxo_id), None)

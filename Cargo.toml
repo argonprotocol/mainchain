@@ -152,7 +152,7 @@ thiserror = { version = "1.0" }
 snafu = { version = "0.8", default-features = false }
 
 
-jsonrpsee = { version = "0.22", features = ["http-client", "ws-client", "macros", "client-ws-transport-native-tls", "client-ws-transport-webpki-tls"] }
+jsonrpsee = { version = "0.23", features = ["http-client", "ws-client", "macros", "client-ws-transport-tls"] }
 
 tracing = { version = "0.1" }
 tracing-subscriber = { version = "0.3", features = ["env-filter"] }
@@ -284,8 +284,8 @@ cmake = { version = "0.1" }
 
 dotenv = { version = "0.15" }
 
-subxt = { version = "0.37" }
-subxt-signer = { version = "0.37" }
+subxt = { version = "0.37", git = "https://github.com/paritytech/subxt", branch = "master" }
+subxt-signer = { version = "0.37", git = "https://github.com/paritytech/subxt", branch = "master" }
 
 ulx-testing = { path = "testing" }
 ulx-localchain = { path = "localchain" }

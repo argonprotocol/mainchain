@@ -275,14 +275,7 @@ impl MainchainClient {
 	async fn create_ws_client(url: &str) -> Result<WsClient, Error> {
 		let url = Url::parse(url)
 			.map_err(|e| Error::Other(format!("Invalid Mainchain URL: {} -> {}", url, e)))?;
-		let builder = {
-			#[allow(clippy::let_and_return)]
-			let transport_builder = WsTransportClientBuilder::default();
-			#[cfg(any(target_os = "ios", target_os = "android"))]
-			let transport_builder = transport_builder.use_webpki_rustls();
-
-			transport_builder
-		};
+		let builder = WsTransportClientBuilder::default();
 		let (sender, receiver) = builder
 			.build(url)
 			.await

@@ -7,14 +7,17 @@ use sp_runtime::{
 	FixedU128,
 };
 use std::collections::HashMap;
-use tokio::join;
+use tokio::{join, time::Instant};
 
 pub struct BtcPriceLookup {
 	pub client: Client,
+	pub last_refresh: Option<(Instant, FixedU128)>,
 }
 
 #[cfg(test)]
 use std::sync::{Arc, Mutex};
+use std::time::Duration;
+
 #[cfg(test)]
 lazy_static::lazy_static! {
 	static ref MOCK_BTC_PRICE: Arc<Mutex<Option<FixedU128>>> = Arc::new(Mutex::new(None));
@@ -22,10 +25,10 @@ lazy_static::lazy_static! {
 
 impl BtcPriceLookup {
 	pub fn new() -> Self {
-		Self { client: Client::new() }
+		Self { client: Client::new(), last_refresh: None }
 	}
 
-	pub async fn get_btc_price(&self) -> Result<FixedU128> {
+	pub async fn get_btc_price(&mut self) -> Result<FixedU128> {
 		#[cfg(test)]
 		{
 			let mut mock = MOCK_BTC_PRICE.lock().unwrap();
@@ -34,6 +37,15 @@ impl BtcPriceLookup {
 				return Ok(x.clone())
 			}
 		}
+
+		const MIN_REFRESH: Duration = Duration::from_secs(60);
+
+		if let Some((last_refresh, value)) = self.last_refresh {
+			if last_refresh.elapsed() < MIN_REFRESH {
+				return Ok(value);
+			}
+		}
+
 		let (a, b, c, d) = join![
 			self.get_coinbase_price(),
 			self.get_coindesk_price(),
@@ -56,6 +68,7 @@ impl BtcPriceLookup {
 		}
 
 		let average = total.div(count);
+		self.last_refresh = Some((Instant::now(), average));
 
 		Ok(average)
 	}

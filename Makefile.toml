@@ -85,11 +85,17 @@ args = ["build", "--features", "fast-runtime"]
 env = { "RUSTC_WRAPPER" = "sccache" }
 dependencies = ["sqlx-setup"]
 
+[tasks.build-node]
+description = "Compiles the project"
+command = "cargo"
+args = ["build", "--bin", "ulx-node", "--features", "fast-runtime"]
+env = { "RUSTC_WRAPPER" = "sccache" }
+dependencies = ["sqlx-setup"]
+
 [tasks.update-metadata]
 description = "Update metadata"
 script = "client/update.sh"
-dependencies = ["build"]
-
+dependencies = ["build-node"]
 
 [tasks.test]
 description = "Run tests with cargo,"

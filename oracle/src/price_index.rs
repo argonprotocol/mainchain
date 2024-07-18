@@ -63,7 +63,7 @@ pub async fn price_index_loop(
 		.max(Duration::from_secs(5));
 
 	let mut us_cpi = UsCpiRetriever::new(&ticker).await?;
-	let btc_price_lookup = btc_price::BtcPriceLookup::new();
+	let mut btc_price_lookup = btc_price::BtcPriceLookup::new();
 	let mut argon_price_lookup =
 		argon_price::ArgonPriceLookup::new(use_simulated_schedule, &ticker, last_price);
 
