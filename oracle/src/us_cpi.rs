@@ -198,7 +198,7 @@ async fn get_raw_cpis() -> Result<Vec<RawCpiValue>> {
 		let mut mock = MOCK_RAW_CPIS.lock().unwrap();
 		if let Some(results) = mock.take() {
 			*mock = Some(results.clone());
-			return Ok(results.clone())
+			return Ok(results.clone());
 		}
 	}
 	let request_url = "https://api.bls.gov/publicAPI/v2/timeseries/data/CUUR0000SA0";
@@ -235,7 +235,7 @@ async fn get_raw_cpi() -> Result<RawCpiValue> {
 		let mut mock = MOCK_RAW_CPIS.lock().unwrap();
 		if let Some(results) = mock.take() {
 			*mock = Some(results.clone());
-			return Ok(results[0].clone())
+			return Ok(results[0].clone());
 		}
 	}
 	let request_url = "https://api.bls.gov/publicAPI/v2/timeseries/data/CUUR0000SA0?latest=true";

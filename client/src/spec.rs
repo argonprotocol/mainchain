@@ -2114,6 +2114,25 @@ pub mod api {
 						],
 					)
 				}
+				pub fn market_rate(
+					&self,
+					satoshis: types::market_rate::Satoshis,
+				) -> ::subxt::ext::subxt_core::runtime_api::payload::StaticPayload<
+					types::MarketRate,
+					types::market_rate::output::Output,
+				> {
+					::subxt::ext::subxt_core::runtime_api::payload::StaticPayload::new_static(
+						"BitcoinApis",
+						"market_rate",
+						types::MarketRate { satoshis },
+						[
+							28u8, 249u8, 41u8, 232u8, 162u8, 16u8, 212u8, 43u8, 4u8, 78u8, 236u8,
+							107u8, 101u8, 250u8, 131u8, 44u8, 157u8, 200u8, 17u8, 18u8, 13u8,
+							249u8, 161u8, 160u8, 199u8, 143u8, 123u8, 233u8, 100u8, 87u8, 83u8,
+							194u8,
+						],
+					)
+				}
 			}
 			pub mod types {
 				use super::runtime_types;
@@ -2193,6 +2212,32 @@ pub mod api {
 				)]
 				pub struct RedemptionRate {
 					pub satoshis: redemption_rate::Satoshis,
+				}
+				pub mod market_rate {
+					use super::runtime_types;
+					pub type Satoshis = ::core::primitive::u64;
+					pub mod output {
+						use super::runtime_types;
+						pub type Output = ::core::option::Option<::core::primitive::u128>;
+					}
+				}
+				#[derive(
+					:: subxt :: ext :: subxt_core :: ext :: codec :: Decode,
+					:: subxt :: ext :: subxt_core :: ext :: codec :: Encode,
+					:: subxt :: ext :: subxt_core :: ext :: scale_decode :: DecodeAsType,
+					:: subxt :: ext :: subxt_core :: ext :: scale_encode :: EncodeAsType,
+					Clone,
+					Debug,
+				)]
+				# [codec (crate = :: subxt :: ext :: subxt_core :: ext :: codec)]
+				#[decode_as_type(
+					crate_path = ":: subxt :: ext :: subxt_core :: ext :: scale_decode"
+				)]
+				#[encode_as_type(
+					crate_path = ":: subxt :: ext :: subxt_core :: ext :: scale_encode"
+				)]
+				pub struct MarketRate {
+					pub satoshis: market_rate::Satoshis,
 				}
 			}
 		}
@@ -2841,9 +2886,9 @@ pub mod api {
 			.hash();
 		runtime_metadata_hash ==
 			[
-				186u8, 226u8, 45u8, 48u8, 40u8, 219u8, 22u8, 86u8, 14u8, 65u8, 207u8, 129u8, 209u8,
-				6u8, 8u8, 176u8, 59u8, 8u8, 227u8, 216u8, 92u8, 109u8, 178u8, 213u8, 14u8, 104u8,
-				129u8, 186u8, 51u8, 193u8, 145u8, 139u8,
+				115u8, 147u8, 135u8, 240u8, 233u8, 84u8, 51u8, 242u8, 5u8, 55u8, 94u8, 60u8, 182u8,
+				14u8, 10u8, 84u8, 91u8, 146u8, 87u8, 20u8, 147u8, 130u8, 178u8, 62u8, 145u8, 32u8,
+				173u8, 221u8, 39u8, 194u8, 225u8, 246u8,
 			]
 	}
 	pub mod system {

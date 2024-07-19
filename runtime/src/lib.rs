@@ -62,6 +62,7 @@ use sp_version::NativeVersion;
 use sp_version::RuntimeVersion;
 
 pub use currency::*;
+use pallet_bond::BitcoinVerifier;
 pub use pallet_notebook::NotebookVerifyError;
 use ulx_primitives::{
 	bitcoin::{BitcoinHeight, BitcoinSyncStatus, Satoshis, UtxoRef, UtxoValue},
@@ -356,6 +357,8 @@ impl pallet_vaults::Config for Runtime {
 	type MinTermsModificationBlockDelay = MinTermsModificationBlockDelay;
 }
 
+pub struct BitcoinSignatureVerifier;
+impl BitcoinVerifier<Runtime> for BitcoinSignatureVerifier {}
 impl pallet_bond::Config for Runtime {
 	type RuntimeEvent = RuntimeEvent;
 	type WeightInfo = pallet_bond::weights::SubstrateWeight<Runtime>;
@@ -375,6 +378,7 @@ impl pallet_bond::Config for Runtime {
 	type MinimumBitcoinBondSatoshis = MinBitcoinSatoshiAmount;
 	type UlixeeBlocksPerDay = BlocksPerDay;
 	type UtxoUnlockCosignDeadlineBlocks = UtxoUnlockCosignDeadlineBlocks;
+	type BitcoinSignatureVerifier = BitcoinSignatureVerifier;
 }
 
 impl pallet_mining_slot::Config for Runtime {
@@ -750,7 +754,7 @@ impl WeightToFeePolynomial for WageProtectorFee {
 	/// This function attempts to add some weight to larger transactions, but given the 3 digits of
 	/// milligons to work with, it can be difficult to scale this properly.
 	fn polynomial() -> WeightToFeeCoefficients<Self::Balance> {
-		let cpi = PriceIndex::get_argon_cpi_price().unwrap_or(ArgonCPI::zero());
+		let cpi = PriceIndex::get_argon_cpi().unwrap_or(ArgonCPI::zero());
 		let mut p = 1_000; // milligons
 		if cpi.is_positive() {
 			let cpi = cpi.into_inner() / ArgonCPI::accuracy();
@@ -1114,6 +1118,10 @@ impl_runtime_apis! {
 
 		fn redemption_rate(satoshis: Satoshis) -> Option<Balance> {
 			Bonds::get_redemption_price(&satoshis).ok()
+		}
+
+		fn market_rate(satoshis: Satoshis) -> Option<Balance> {
+			PriceIndex::get_bitcoin_argon_price(satoshis)
 		}
 	}
 

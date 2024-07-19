@@ -106,7 +106,7 @@ pub mod pallet {
 	#[pallet::hooks]
 	impl<T: Config> Hooks<BlockNumberFor<T>> for Pallet<T> {
 		fn on_initialize(_: BlockNumberFor<T>) -> Weight {
-			let argon_cpi = T::PriceProvider::get_argon_cpi_price().unwrap_or_default();
+			let argon_cpi = T::PriceProvider::get_argon_cpi().unwrap_or_default();
 			// only mint when cpi is negative
 			if !argon_cpi.is_negative() {
 				return T::DbWeight::get().reads(1);

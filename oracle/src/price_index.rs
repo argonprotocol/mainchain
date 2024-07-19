@@ -1,16 +1,14 @@
-use std::{thread::spawn, time::Duration};
+use std::time::Duration;
 
 use anyhow::anyhow;
-use sp_runtime::Saturating;
+use sp_runtime::{traits::One, FixedU128, Saturating};
 use tokio::{join, time::sleep};
 use tracing::info;
 
 use crate::{argon_price, btc_price, us_cpi::UsCpiRetriever};
 use ulixee_client::{
-	api::{
-		constants, price_index::calls::types::submit::Index,
-		runtime_types::sp_arithmetic::fixed_point::FixedU128, storage, tx,
-	},
+	api::{constants, price_index::calls::types::submit::Index, storage, tx},
+	conversion::{from_api_fixed_u128, to_api_fixed_u128},
 	signer::{KeystoreSigner, Signer},
 	MainchainClient, ReconnectingClient,
 };
@@ -20,43 +18,37 @@ pub async fn price_index_loop(
 	signer: KeystoreSigner,
 	use_simulated_schedule: bool,
 ) -> anyhow::Result<()> {
-	let mut mainchain_client = ReconnectingClient::new(vec![trusted_rpc_url.clone()]);
-	let mut ticker = mainchain_client.get().await?.lookup_ticker().await?;
+	let mut reconnecting_client = ReconnectingClient::new(vec![trusted_rpc_url.clone()]);
+	let mainchain_client = reconnecting_client.get().await?;
+	let mut ticker = mainchain_client.lookup_ticker().await?;
 	if !cfg!(test) {
 		ticker
 			.lookup_ntp_offset("pool.ntp.org")
 			.await
 			.map_err(|e| anyhow!("Unable to synchronize time {e:?}"))?;
 	}
-	let best_block = mainchain_client.get().await?.best_block_hash().await?;
+
+	let best_block = mainchain_client.best_block_hash().await?;
 	let last_price = mainchain_client
-		.get()
-		.await?
 		.fetch_storage(&storage().price_index().current(), Some(best_block))
 		.await?;
 
-	let max_argon_change_per_tick_away_from_target = mainchain_client
-		.get()
-		.await?
-		.live
-		.constants()
-		.at(&constants().price_index().max_argon_change_per_tick_away_from_target())?;
-	let max_argon_change_per_tick_away_from_target =
-		sp_runtime::FixedU128::from_inner(max_argon_change_per_tick_away_from_target.0);
-	let max_argon_target_change_per_tick = mainchain_client
-		.get()
-		.await?
-		.live
-		.constants()
-		.at(&constants().price_index().max_argon_target_change_per_tick())?;
-	let max_argon_target_change_per_tick =
-		sp_runtime::FixedU128::from_inner(max_argon_target_change_per_tick.0);
+	let constants_client = mainchain_client.live.constants();
+
+	let max_argon_change_per_tick_away_from_target = from_api_fixed_u128(
+		constants_client
+			.at(&constants().price_index().max_argon_change_per_tick_away_from_target())?,
+	);
+
+	let max_argon_target_change_per_tick = from_api_fixed_u128(
+		constants_client.at(&constants().price_index().max_argon_target_change_per_tick())?,
+	);
 
 	let mut last_submitted_tick = last_price.as_ref().map(|a| a.tick).unwrap_or(0);
 	let mut last_target_price = last_price
 		.as_ref()
-		.map(|a| sp_runtime::FixedU128::from_inner(a.argon_usd_target_price.0))
-		.unwrap_or_default();
+		.map(|a| from_api_fixed_u128(a.argon_usd_target_price.clone()))
+		.unwrap_or(FixedU128::one());
 
 	let min_sleep_duration = Duration::from_millis(ticker.tick_duration_millis)
 		.saturating_sub(Duration::from_secs(10))
@@ -108,14 +100,13 @@ pub async fn price_index_loop(
 		);
 
 		let price_index = tx().price_index().submit(Index {
-			argon_usd_target_price: FixedU128(target_price.into_inner()),
+			argon_usd_target_price: to_api_fixed_u128(target_price),
 			tick,
-			argon_usd_price: FixedU128(argon_usd_price.into_inner()),
-			btc_usd_price: FixedU128(btc_price.into_inner()),
+			argon_usd_price: to_api_fixed_u128(argon_usd_price),
+			btc_usd_price: to_api_fixed_u128(btc_price),
 		});
 		{
-			let client = mainchain_client.get().await?;
-
+			let client = reconnecting_client.get().await?;
 			let nonce = client.get_account_nonce_subxt(&account_id).await?;
 			let params = MainchainClient::ext_params_builder().nonce(nonce.into()).build();
 			let progress = client
@@ -127,13 +118,17 @@ pub async fn price_index_loop(
 			last_target_price = target_price;
 
 			info!("Submitted price index with progress: {:?}", progress);
-			spawn(move || {
-				if let Err(res) =
-					futures::executor::block_on(MainchainClient::wait_for_ext_in_block(progress))
-				{
-					panic!("Error processing price index!! {:?}", res)
-				}
-			});
+			MainchainClient::wait_for_ext_in_block(progress).await.map_err(|e| {
+				tracing::warn!("Error processing price index!! {:?}", e);
+				e
+			})?;
+			// spawn(move || {
+			// 	if let Err(res) =
+			// 		futures::executor::block_on(MainchainClient::wait_for_ext_in_block(progress))
+			// 	{
+			// 		panic!("Error processing price index!! {:?}", res)
+			// 	}
+			// });
 		}
 
 		let sleep_time = ticker.duration_to_next_tick().min(min_sleep_duration);

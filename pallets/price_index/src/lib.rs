@@ -189,13 +189,13 @@ pub mod pallet {
 			let oldest_age = T::CurrentTick::get().saturating_sub(T::MaxPriceAgeInTicks::get());
 
 			if index.tick < oldest_age {
-				return Ok(Pays::No.into())
+				return Ok(Pays::No.into());
 			}
 
 			let mut index = index;
 			if let Some(current) = <Current<T>>::get() {
 				if index.tick <= current.tick {
-					return Ok(Pays::No.into())
+					return Ok(Pays::No.into());
 				}
 				Self::clamp_argon_prices(&current, &mut index);
 			}
@@ -274,7 +274,7 @@ pub mod pallet {
 	}
 
 	impl<T: Config> PriceProvider<T::Balance> for Pallet<T> {
-		fn get_argon_cpi_price() -> Option<ArgonCPI> {
+		fn get_argon_cpi() -> Option<ArgonCPI> {
 			Self::get_current().map(|a| a.argon_cpi())
 		}
 		fn get_latest_argon_price_in_us_cents() -> Option<FixedU128> {

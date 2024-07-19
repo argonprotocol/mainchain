@@ -1,4 +1,4 @@
-use std::fs;
+use std::{env, fs};
 
 use anyhow::{anyhow, Result};
 use chrono::{DateTime, Utc};
@@ -15,9 +15,13 @@ pub async fn load_cpi_schedule() -> Result<Vec<CpiSchedule>> {
 	// 	.text()
 	// 	.await?;
 	// println!("{:?}", page);
-	let schedule = fs::read("cpi_schedule.html")?;
-	let page = String::from_utf8(schedule)?;
-	parse_schedule(page)
+	if let Ok(path) = env::var("CPI_SCHEDULE_PATH") {
+		let schedule = fs::read_to_string(path)?;
+		return parse_schedule(schedule);
+	}
+
+	let schedule = include_str!("../cpi_schedule.html");
+	parse_schedule(schedule.to_string())
 }
 
 fn parse_schedule(html: String) -> Result<Vec<CpiSchedule>> {

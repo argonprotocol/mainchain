@@ -43,11 +43,9 @@ pub mod pallet {
 	};
 	use sp_std::{fmt::Debug, vec};
 
+	use ulx_bitcoin::CosignScript;
 	use ulx_primitives::{
-		bitcoin::{
-			create_timelock_multisig_script, BitcoinCosignScriptPubkey, BitcoinHeight,
-			BitcoinPubkeyHash, UtxoId,
-		},
+		bitcoin::{BitcoinCosignScriptPubkey, BitcoinHeight, BitcoinPubkeyHash, UtxoId},
 		bond::{Bond, BondError, BondType, Vault, VaultArgons, VaultProvider, VaultTerms},
 		MiningSlotProvider, VaultId,
 	};
@@ -221,6 +219,8 @@ pub mod pallet {
 		TermsModificationOverflow,
 		/// Terms are already scheduled to be changed
 		TermsChangeAlreadyScheduled,
+		/// An internal processing error occurred
+		InternalError,
 	}
 
 	impl<T> From<BondError> for Error<T> {
@@ -245,6 +245,7 @@ pub mod pallet {
 				BondError::InvalidBitcoinScript => Error::<T>::InvalidBitcoinScript,
 				BondError::NoVaultBitcoinPubkeysAvailable =>
 					Error::<T>::NoVaultBitcoinPubkeysAvailable,
+				BondError::InternalError => Error::<T>::InternalError,
 			}
 		}
 	}
@@ -496,7 +497,7 @@ pub mod pallet {
 
 			PendingTermsModificationsByBlock::<T>::mutate(terms_change_block, |a| {
 				if !a.iter().any(|x| *x == vault_id) {
-					return a.try_push(vault_id)
+					return a.try_push(vault_id);
 				}
 				Ok(())
 			})
@@ -786,24 +787,30 @@ pub mod pallet {
 			if still_owed > zero && vault.bitcoin_argons.free_balance() >= zero {
 				let amount_to_pull = still_owed.min(vault.bitcoin_argons.free_balance());
 				vault.bitcoin_argons.destroy_allocated_funds(amount_to_pull)?;
-				still_owed -= amount_to_pull;
+				still_owed =
+					still_owed.checked_sub(&amount_to_pull).ok_or(BondError::InternalError)?;
 			}
 
 			// 3. Use securitized argons
 			if still_owed > zero && vault.securitized_argons >= zero {
 				let amount_to_pull = still_owed.min(vault.securitized_argons);
-				vault.securitized_argons -= amount_to_pull;
-				still_owed -= amount_to_pull;
+				vault.securitized_argons = vault
+					.securitized_argons
+					.checked_sub(&amount_to_pull)
+					.ok_or(BondError::InternalError)?;
+				still_owed =
+					still_owed.checked_sub(&amount_to_pull).ok_or(BondError::InternalError)?;
 			}
 
 			// 3. Use ulixee shares at current value
 			// TODO
 
+			let recouped = market_rate.saturating_sub(still_owed);
 			T::Currency::transfer_on_hold(
 				&HoldReason::EnterVault.into(),
 				&vault_operator,
 				bonded_account_id,
-				market_rate - still_owed,
+				recouped,
 				Precision::Exact,
 				Restriction::Free,
 				Fortitude::Force,
@@ -812,7 +819,7 @@ pub mod pallet {
 
 			VaultsById::<T>::insert(vault_id, vault);
 
-			Ok(market_rate - still_owed)
+			Ok(recouped)
 		}
 
 		fn release_bonded_funds(
@@ -836,7 +843,7 @@ pub mod pallet {
 
 				Self::release_hold(
 					&vault.operator_account_id,
-					bond.amount + free_securitization,
+					bond.amount.saturating_add(free_securitization),
 					HoldReason::EnterVault,
 				)
 				.map_err(|_| BondError::UnrecoverableHold)?;
@@ -890,7 +897,7 @@ pub mod pallet {
 			})?
 			.ok_or(BondError::NoVaultBitcoinPubkeysAvailable)?;
 
-			let script_pubkey = create_timelock_multisig_script(
+			let script_pubkey = CosignScript::create_script(
 				vault_pubkey_hash,
 				owner_pubkey_hash,
 				vault_claim_height,

@@ -326,6 +326,10 @@ pub mod pallet {
 			Ok(())
 		}
 
+		fn get(utxo_id: UtxoId) -> Option<UtxoRef> {
+			<UtxoIdToRef<T>>::get(utxo_id)
+		}
+
 		fn unwatch(utxo_id: UtxoId) {
 			if let Some(utxo_ref) = <UtxoIdToRef<T>>::take(utxo_id) {
 				if let Some(utxo_value) = <LockedUtxos<T>>::take(utxo_ref.clone()) {

@@ -1,19 +1,22 @@
 use std::collections::BTreeMap;
 
+use crate as pallet_bond;
+use crate::BitcoinVerifier;
 use env_logger::{Builder, Env};
 use frame_support::{derive_impl, parameter_types, traits::Currency};
 use frame_system::pallet_prelude::BlockNumberFor;
 use sp_arithmetic::{FixedI128, FixedU128, Percent};
 use sp_core::{ConstU32, ConstU64, H256};
 use sp_runtime::{BuildStorage, DispatchError};
-
+use ulx_bitcoin::UtxoUnlocker;
 use ulx_primitives::{
-	bitcoin::{BitcoinCosignScriptPubkey, BitcoinHeight, BitcoinPubkeyHash, Satoshis, UtxoId},
+	bitcoin::{
+		BitcoinCosignScriptPubkey, BitcoinHeight, BitcoinPubkeyHash, BitcoinSignature,
+		CompressedBitcoinPubkey, Satoshis, UtxoId, UtxoRef,
+	},
 	bond::{Bond, BondError, BondType, Vault, VaultArgons, VaultProvider},
 	ensure, BitcoinUtxoTracker, PriceProvider, UtxoBondedEvents, VaultId,
 };
-
-use crate as pallet_bond;
 
 pub type Balance = u128;
 type Block = frame_system::mocking::MockBlock<Test>;
@@ -96,6 +99,8 @@ parameter_types! {
 	pub static NextUtxoId: UtxoId = 1;
 	pub static WatchedUtxosById: BTreeMap<UtxoId, (BitcoinCosignScriptPubkey, Satoshis, BitcoinHeight)> = BTreeMap::new();
 
+	pub static GetUtxoRef: Option<UtxoRef> = None;
+
 	pub static LastBondEvent: Option<(UtxoId, u64, Balance)> = None;
 }
 
@@ -113,7 +118,7 @@ impl UtxoBondedEvents<u64, Balance> for EventHandler {
 
 pub struct StaticPriceProvider;
 impl PriceProvider<Balance> for StaticPriceProvider {
-	fn get_argon_cpi_price() -> Option<ulx_primitives::ArgonCPI> {
+	fn get_argon_cpi() -> Option<ulx_primitives::ArgonCPI> {
 		ArgonCPI::get()
 	}
 	fn get_latest_argon_price_in_us_cents() -> Option<FixedU128> {
@@ -196,12 +201,27 @@ impl VaultProvider for StaticVaultProvider {
 	}
 }
 
+pub struct StaticBitcoinVerifier;
+impl BitcoinVerifier<Test> for StaticBitcoinVerifier {
+	fn verify_signature(
+		_utxo_unlocker: UtxoUnlocker,
+		_pubkey: CompressedBitcoinPubkey,
+		_signature: &BitcoinSignature,
+	) -> Result<bool, DispatchError> {
+		Ok(true)
+	}
+}
+
 pub struct StaticBitcoinUtxoTracker;
 impl BitcoinUtxoTracker for StaticBitcoinUtxoTracker {
 	fn new_utxo_id() -> UtxoId {
 		let id = NextUtxoId::get();
 		NextUtxoId::set(id + 1);
 		id
+	}
+
+	fn get(_utxo_id: UtxoId) -> Option<UtxoRef> {
+		GetUtxoRef::get()
 	}
 
 	fn watch_for_utxo(
@@ -242,6 +262,7 @@ impl pallet_bond::Config for Test {
 	type BitcoinBondDurationBlocks = BitcoinBondDurationBlocks;
 	type BitcoinBlockHeight = BitcoinBlockHeight;
 	type MinimumBitcoinBondSatoshis = MinimumBondSatoshis;
+	type BitcoinSignatureVerifier = StaticBitcoinVerifier;
 }
 
 // Build genesis storage according to the mock runtime.

@@ -6,6 +6,7 @@ mod ulx_node;
 mod ulx_notary;
 mod ulx_oracle;
 
+pub use bitcoind::*;
 pub use ulx_node::UlxTestNode;
 pub use ulx_notary::UlxTestNotary;
 pub use ulx_oracle::UlxTestOracle;

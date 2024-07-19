@@ -29,8 +29,9 @@ use ulixee_client::{
 		storage, tx,
 	},
 	signer::Sr25519Signer,
+	MainchainClient,
 };
-use ulx_bitcoin_utxo_tracker::{CosignScript, UnlockStep, UtxoUnlocker};
+use ulx_bitcoin::{CosignScript, UnlockStep, UtxoUnlocker};
 use ulx_primitives::bitcoin::{
 	BitcoinPubkeyHash, BitcoinScriptPubkey, BitcoinSignature, CompressedBitcoinPubkey, Satoshis,
 };
@@ -318,10 +319,10 @@ async fn test_bitcoin_minting_e2e() -> anyhow::Result<()> {
 		let vault_signature: BitcoinSignature = vault_signature.try_into().unwrap();
 		let vault_pubkey: CompressedBitcoinPubkey = vault_pubkey.into();
 
-		client
+		let progress = client
 			.live
 			.tx()
-			.sign_and_submit_default(
+			.sign_and_submit_then_watch_default(
 				&tx().bonds().cosign_bitcoin_unlock(
 					unlock_event.bond_id,
 					vault_pubkey.into(),
@@ -330,8 +331,10 @@ async fn test_bitcoin_minting_e2e() -> anyhow::Result<()> {
 				&vault_signer,
 			)
 			.await?;
+		MainchainClient::wait_for_ext_in_block(progress).await.expect("finalized");
 	};
 
+	println!("User sees the transaction and cosigns");
 	// 6. User sees the transaction and cosigns
 	let tx = {
 		let mut unlocker = UtxoUnlocker::from_script(

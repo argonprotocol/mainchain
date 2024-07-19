@@ -1,4 +1,5 @@
 use crate::api::runtime_types;
+use sp_arithmetic::FixedU128;
 
 impl<T, X: sp_core::Get<u32>> From<sp_core::bounded_vec::BoundedVec<T, X>>
 	for runtime_types::bounded_collections::bounded_vec::BoundedVec<T>
@@ -125,4 +126,14 @@ impl From<runtime_types::ulx_primitives::bitcoin::CompressedBitcoinPubkey>
 	fn from(value: runtime_types::ulx_primitives::bitcoin::CompressedBitcoinPubkey) -> Self {
 		Self(value.0)
 	}
+}
+
+pub fn to_api_fixed_u128(value: FixedU128) -> runtime_types::sp_arithmetic::fixed_point::FixedU128 {
+	runtime_types::sp_arithmetic::fixed_point::FixedU128(value.into_inner())
+}
+
+pub fn from_api_fixed_u128(
+	value: runtime_types::sp_arithmetic::fixed_point::FixedU128,
+) -> FixedU128 {
+	FixedU128::from_inner(value.0)
 }

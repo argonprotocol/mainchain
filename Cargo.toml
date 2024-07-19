@@ -28,7 +28,10 @@ members = [
     "notary/audit",
     "notary/apis",
     "testing",
-    "testing/bitcoin", "oracle",
+    "testing/bitcoin",
+    "oracle",
+    "bitcoin",
+    "bitcoin/cli"
 ]
 resolver = "2"
 
@@ -265,7 +268,8 @@ bitcoincore-rpc = { version = "0.19" }
 bitcoin = { version = "0.32.0", default-features = false }
 hwi = { git = "https://github.com/ulixee/rust-hwi", branch = "master" }
 bitcoind = { version = "0.36", features = ["25_0"] }
-secp256k1 = { version = "0.29" }
+secp256k1 = { version = "0.29.0" }
+k256 = { version = "0.13.3", default-features = false }
 napi-derive = { version = "2.16" }
 napi = { version = "2.16", features = ["napi9", "async", "error_anyhow"] }
 napi-build = { version = "2.1" }
@@ -291,6 +295,7 @@ ulx-testing = { path = "testing" }
 ulx-localchain = { path = "localchain" }
 ulixee-client = { path = "client" }
 ulx-node-consensus = { path = "node/consensus" }
+ulx-bitcoin = { path = "bitcoin", default-features = false }
 ulx-bitcoin-utxo-tracker = { path = "node/bitcoin_utxo_tracker" }
 ulx-node = { path = "node" }
 ulx-node-runtime = { path = "runtime" }

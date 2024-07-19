@@ -109,6 +109,8 @@ pub enum BondError {
 	FeeExceedsBondAmount,
 	/// Scripting for a bitcoin UTXO failed
 	InvalidBitcoinScript,
+	/// An internal processing error occurred that is too technical to be useful to the user
+	InternalError,
 }
 
 #[derive(Clone, PartialEq, Eq, Encode, Decode, RuntimeDebug, TypeInfo, MaxEncodedLen)]

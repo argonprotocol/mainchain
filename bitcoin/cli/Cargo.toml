@@ -1,0 +1,33 @@
+[package]
+name = "ulx-bitcoin-cli"
+description = "A cli used to bond bitcoins, create and manage Vaults"
+version.workspace = true
+edition.workspace = true
+authors.workspace = true
+homepage.workspace = true
+license.workspace = true
+rust-version.workspace = true
+repository.workspace = true
+documentation.workspace = true
+
+[dependencies]
+anyhow = { workspace = true }
+codec = { workspace = true, features = ["default"] }
+sp-runtime = { workspace = true, features = ["default"] }
+
+subxt = { workspace = true }
+tokio = { workspace = true }
+
+tracing = { workspace = true }
+tracing-subscriber = { workspace = true }
+
+clap = { workspace = true }
+comfy-table = { workspace = true }
+
+ulixee-client = { workspace = true }
+ulx-primitives = { workspace = true, features = ["default"] }
+ulx-bitcoin = { workspace = true, features = ["default"] }
+
+[features]
+default = []
+hwi = [ "ulx-bitcoin/hwi" ]

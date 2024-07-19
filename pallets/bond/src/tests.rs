@@ -6,15 +6,6 @@ use frame_support::{
 use sp_arithmetic::{traits::Zero, FixedI128, FixedPointNumber, FixedU128};
 use sp_core::H256;
 
-use ulx_primitives::{
-	bitcoin::{
-		BitcoinCosignScriptPubkey, BitcoinPubkeyHash, BitcoinRejectedReason, BitcoinScriptPubkey,
-		BitcoinSignature, CompressedBitcoinPubkey, Satoshis, SATOSHIS_PER_BITCOIN,
-	},
-	bond::{Bond, BondExpiration, BondProvider, BondType},
-	BitcoinUtxoEvents, BondId, PriceProvider,
-};
-
 use crate::{
 	mock::*,
 	pallet::{
@@ -22,6 +13,14 @@ use crate::{
 		UtxosPendingUnlock,
 	},
 	Error, Event, HoldReason, UtxoCosignRequest, UtxoState,
+};
+use ulx_primitives::{
+	bitcoin::{
+		BitcoinCosignScriptPubkey, BitcoinPubkeyHash, BitcoinRejectedReason, BitcoinScriptPubkey,
+		BitcoinSignature, CompressedBitcoinPubkey, H256Le, Satoshis, UtxoRef, SATOSHIS_PER_BITCOIN,
+	},
+	bond::{Bond, BondExpiration, BondProvider, BondType},
+	BitcoinUtxoEvents, BondId, PriceProvider,
 };
 
 #[test]
@@ -473,6 +472,8 @@ fn clears_unlocked_bitcoin_bonds() {
 			),
 			Error::<Test>::NoPermissions
 		);
+		GetUtxoRef::set(Some(UtxoRef { txid: H256Le([0; 32]), output_index: 0 }));
+
 		assert_ok!(Bonds::cosign_bitcoin_unlock(
 			RuntimeOrigin::signed(1),
 			1,

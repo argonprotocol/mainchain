@@ -1409,9 +1409,9 @@ dependencies = [
 
 [[package]]
 name = "cc"
-version = "1.1.5"
+version = "1.1.6"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "324c74f2155653c90b04f25b2a47a8a631360cb908f92a772695f430c7e31052"
+checksum = "2aba8f4e9906c7ce3c73463f62a7f0c65183ada1a2d47e397cc8810827f9694f"
 dependencies = [
  "jobserver",
  "libc",
@@ -2659,6 +2659,7 @@ dependencies = [
  "subxt-signer",
  "tokio",
  "ulixee-client",
+ "ulx-bitcoin",
  "ulx-bitcoin-utxo-tracker",
  "ulx-primitives",
  "ulx-testing",
@@ -6515,6 +6516,7 @@ dependencies = [
  "sp-io",
  "sp-runtime",
  "sp-std 14.0.0 (git+https://github.com/paritytech/polkadot-sdk.git?branch=release-polkadot-v1.14.0)",
+ "ulx-bitcoin",
  "ulx-primitives",
 ]
 
@@ -6909,6 +6911,7 @@ dependencies = [
  "sp-io",
  "sp-runtime",
  "sp-std 14.0.0 (git+https://github.com/paritytech/polkadot-sdk.git?branch=release-polkadot-v1.14.0)",
+ "ulx-bitcoin",
  "ulx-primitives",
 ]
 
@@ -10752,7 +10755,7 @@ dependencies = [
 [[package]]
 name = "sp-crypto-ec-utils"
 version = "0.10.0"
-source = "git+https://github.com/paritytech/polkadot-sdk#d05cd9a55de64318f0ea16a47b21a0af4204c522"
+source = "git+https://github.com/paritytech/polkadot-sdk#394ea70d2ad8d37b1a41854659d989e750758705"
 dependencies = [
  "ark-bls12-377",
  "ark-bls12-377-ext",
@@ -10828,7 +10831,7 @@ dependencies = [
 [[package]]
 name = "sp-debug-derive"
 version = "14.0.0"
-source = "git+https://github.com/paritytech/polkadot-sdk#d05cd9a55de64318f0ea16a47b21a0af4204c522"
+source = "git+https://github.com/paritytech/polkadot-sdk#394ea70d2ad8d37b1a41854659d989e750758705"
 dependencies = [
  "proc-macro2",
  "quote",
@@ -10848,7 +10851,7 @@ dependencies = [
 [[package]]
 name = "sp-externalities"
 version = "0.25.0"
-source = "git+https://github.com/paritytech/polkadot-sdk#d05cd9a55de64318f0ea16a47b21a0af4204c522"
+source = "git+https://github.com/paritytech/polkadot-sdk#394ea70d2ad8d37b1a41854659d989e750758705"
 dependencies = [
  "environmental",
  "parity-scale-codec",
@@ -11035,7 +11038,7 @@ dependencies = [
 [[package]]
 name = "sp-runtime-interface"
 version = "24.0.0"
-source = "git+https://github.com/paritytech/polkadot-sdk#d05cd9a55de64318f0ea16a47b21a0af4204c522"
+source = "git+https://github.com/paritytech/polkadot-sdk#394ea70d2ad8d37b1a41854659d989e750758705"
 dependencies = [
  "bytes",
  "impl-trait-for-tuples",
@@ -11067,7 +11070,7 @@ dependencies = [
 [[package]]
 name = "sp-runtime-interface-proc-macro"
 version = "17.0.0"
-source = "git+https://github.com/paritytech/polkadot-sdk#d05cd9a55de64318f0ea16a47b21a0af4204c522"
+source = "git+https://github.com/paritytech/polkadot-sdk#394ea70d2ad8d37b1a41854659d989e750758705"
 dependencies = [
  "Inflector",
  "expander",
@@ -11156,7 +11159,7 @@ source = "git+https://github.com/paritytech/polkadot-sdk.git?branch=release-polk
 [[package]]
 name = "sp-std"
 version = "14.0.0"
-source = "git+https://github.com/paritytech/polkadot-sdk#d05cd9a55de64318f0ea16a47b21a0af4204c522"
+source = "git+https://github.com/paritytech/polkadot-sdk#394ea70d2ad8d37b1a41854659d989e750758705"
 
 [[package]]
 name = "sp-storage"
@@ -11173,7 +11176,7 @@ dependencies = [
 [[package]]
 name = "sp-storage"
 version = "19.0.0"
-source = "git+https://github.com/paritytech/polkadot-sdk#d05cd9a55de64318f0ea16a47b21a0af4204c522"
+source = "git+https://github.com/paritytech/polkadot-sdk#394ea70d2ad8d37b1a41854659d989e750758705"
 dependencies = [
  "impl-serde",
  "parity-scale-codec",
@@ -11221,7 +11224,7 @@ dependencies = [
 [[package]]
 name = "sp-tracing"
 version = "16.0.0"
-source = "git+https://github.com/paritytech/polkadot-sdk#d05cd9a55de64318f0ea16a47b21a0af4204c522"
+source = "git+https://github.com/paritytech/polkadot-sdk#394ea70d2ad8d37b1a41854659d989e750758705"
 dependencies = [
  "parity-scale-codec",
  "tracing",
@@ -11318,7 +11321,7 @@ dependencies = [
 [[package]]
 name = "sp-wasm-interface"
 version = "20.0.0"
-source = "git+https://github.com/paritytech/polkadot-sdk#d05cd9a55de64318f0ea16a47b21a0af4204c522"
+source = "git+https://github.com/paritytech/polkadot-sdk#394ea70d2ad8d37b1a41854659d989e750758705"
 dependencies = [
  "impl-trait-for-tuples",
  "log",
@@ -12485,7 +12488,7 @@ dependencies = [
  "serde",
  "serde_spanned",
  "toml_datetime",
- "winnow 0.6.13",
+ "winnow 0.6.14",
 ]
 
 [[package]]
@@ -12794,6 +12797,49 @@ dependencies = [
 ]
 
 [[package]]
+name = "ulx-bitcoin"
+version = "0.0.1"
+dependencies = [
+ "anyhow",
+ "bitcoin",
+ "bitcoincore-rpc",
+ "bitcoind",
+ "env_logger 0.11.3",
+ "frame-support",
+ "hwi",
+ "k256",
+ "parity-scale-codec",
+ "parking_lot 0.12.3",
+ "rand",
+ "sp-core",
+ "sp-io",
+ "sp-keyring",
+ "sp-runtime",
+ "sp-std 14.0.0 (git+https://github.com/paritytech/polkadot-sdk.git?branch=release-polkadot-v1.14.0)",
+ "thiserror",
+ "ulx-primitives",
+ "ulx-testing",
+]
+
+[[package]]
+name = "ulx-bitcoin-cli"
+version = "0.0.1"
+dependencies = [
+ "anyhow",
+ "clap",
+ "comfy-table",
+ "parity-scale-codec",
+ "sp-runtime",
+ "subxt",
+ "tokio",
+ "tracing",
+ "tracing-subscriber",
+ "ulixee-client",
+ "ulx-bitcoin",
+ "ulx-primitives",
+]
+
+[[package]]
 name = "ulx-bitcoin-utxo-tracker"
 version = "0.0.1"
 dependencies = [
@@ -12803,7 +12849,6 @@ dependencies = [
  "bitcoincore-rpc",
  "bitcoind",
  "env_logger 0.11.3",
- "hwi",
  "lazy_static",
  "log",
  "parity-scale-codec",
@@ -12815,6 +12860,7 @@ dependencies = [
  "sp-runtime",
  "thiserror",
  "tokio",
+ "ulx-bitcoin",
  "ulx-primitives",
  "ulx-testing",
 ]
@@ -13223,6 +13269,8 @@ name = "ulx-testing"
 version = "0.0.1"
 dependencies = [
  "anyhow",
+ "bitcoin",
+ "bitcoincore-rpc",
  "bitcoind",
  "env_logger 0.11.3",
  "fs2",
@@ -14351,9 +14399,9 @@ dependencies = [
 
 [[package]]
 name = "winnow"
-version = "0.6.13"
+version = "0.6.14"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "59b5e5f6c299a3c7890b876a2a587f3115162487e704907d9b6cd29473052ba1"
+checksum = "374ec40a2d767a3c1b4972d9475ecd557356637be906f2cb3f7fe17a6eb5e22f"
 dependencies = [
  "memchr",
 ]

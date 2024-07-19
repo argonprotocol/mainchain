@@ -28,7 +28,7 @@ use ulx_primitives::{AccountId, Nonce};
 
 use crate::api::{storage, system, ulixee_balances};
 
-mod conversion;
+pub mod conversion;
 pub mod signer;
 mod spec;
 
