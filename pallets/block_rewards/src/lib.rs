@@ -1,4 +1,5 @@
 #![cfg_attr(not(feature = "std"), no_std)]
+extern crate alloc;
 
 pub use pallet::*;
 pub use weights::*;
@@ -16,6 +17,8 @@ pub mod weights;
 const LOG_TARGET: &str = "runtime::block_rewards";
 #[frame_support::pallet(dev_mode)]
 pub mod pallet {
+	use alloc::{vec, vec::Vec};
+	use core::any::TypeId;
 	use frame_support::{
 		pallet_prelude::*,
 		traits::fungible::{InspectFreeze, Mutate, MutateFreeze},
@@ -25,7 +28,6 @@ pub mod pallet {
 		traits::{AtLeast32BitUnsigned, UniqueSaturatedInto},
 		Percent, Saturating,
 	};
-	use sp_std::{any::TypeId, vec, vec::Vec};
 
 	use super::*;
 	use ulx_primitives::{
@@ -62,7 +64,7 @@ pub mod pallet {
 			+ codec::FullCodec
 			+ Copy
 			+ MaybeSerializeDeserialize
-			+ sp_std::fmt::Debug
+			+ core::fmt::Debug
 			+ Default
 			+ From<u128>
 			+ TryInto<u128>

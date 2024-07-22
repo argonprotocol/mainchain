@@ -1,6 +1,5 @@
 #![cfg_attr(not(feature = "std"), no_std)]
-
-use sp_std::prelude::*;
+extern crate alloc;
 
 pub use pallet::*;
 pub use ulx_notary_audit::VerifyError as NotebookVerifyError;
@@ -19,17 +18,17 @@ const LOG_TARGET: &str = "runtime::notebook";
 
 #[frame_support::pallet(dev_mode)]
 pub mod pallet {
+	use alloc::{
+		collections::{btree_map::BTreeMap, btree_set::BTreeSet},
+		vec,
+		vec::Vec,
+	};
 	use codec::alloc::string::ToString;
 	use frame_support::{pallet_prelude::*, DefaultNoBound};
 	use frame_system::pallet_prelude::*;
 	use log::info;
 	use sp_core::{crypto::AccountId32, H256};
 	use sp_runtime::traits::Block as BlockT;
-	use sp_std::{
-		collections::{btree_map::BTreeMap, btree_set::BTreeSet},
-		vec,
-		vec::Vec,
-	};
 
 	use ulx_notary_audit::{notebook_verify, AccountHistoryLookupError, NotebookHistoryLookup};
 	use ulx_primitives::{
@@ -507,7 +506,7 @@ pub mod pallet {
 			let mut audit_dependency_summaries = audit_dependency_summaries;
 			audit_dependency_summaries.sort_by(|a, b| {
 				let tick_cmp = a.tick.cmp(&b.tick);
-				if tick_cmp != sp_std::cmp::Ordering::Equal {
+				if tick_cmp != core::cmp::Ordering::Equal {
 					return tick_cmp;
 				}
 				a.notebook_number.cmp(&b.notebook_number)

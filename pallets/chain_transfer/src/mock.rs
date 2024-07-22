@@ -1,9 +1,9 @@
+use alloc::collections::btree_map::BTreeMap;
 use env_logger::{Builder, Env};
 use frame_support::{derive_impl, parameter_types, traits::Currency, PalletId};
 use frame_system::pallet_prelude::BlockNumberFor;
 use sp_core::{crypto::AccountId32, ConstU32, H256};
 use sp_runtime::{traits::IdentityLookup, BuildStorage};
-use sp_std::collections::btree_map::BTreeMap;
 
 use crate as pallet_chain_transfer;
 use ulx_primitives::{

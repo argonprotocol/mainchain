@@ -1,8 +1,8 @@
+use alloc::vec;
 use bitcoin::{
 	transaction::{predict_weight, InputWeightPrediction},
 	Address, FeeRate, Network, ScriptBuf,
 };
-use sp_std::vec;
 
 use ulx_primitives::bitcoin::{BitcoinError, BitcoinHeight, BitcoinPubkeyHash};
 

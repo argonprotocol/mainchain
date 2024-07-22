@@ -1,9 +1,9 @@
+use alloc::{collections::btree_map::BTreeMap, vec::Vec};
 use codec::{Codec, Decode, Encode};
 use scale_info::TypeInfo;
 use sp_core::U256;
 use sp_inherents::{InherentData, InherentIdentifier, IsFatalError};
 use sp_runtime::RuntimeDebug;
-use sp_std::{collections::btree_map::BTreeMap, vec::Vec};
 
 use crate::{
 	bitcoin::{BitcoinBlock, BitcoinHeight, BitcoinRejectedReason, UtxoId, UtxoRef},

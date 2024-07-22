@@ -1,4 +1,5 @@
 #![cfg_attr(not(feature = "std"), no_std)]
+extern crate alloc;
 
 pub use pallet::*;
 pub use weights::*;
@@ -24,7 +25,9 @@ pub mod weights;
 /// on unlock.
 #[frame_support::pallet(dev_mode)]
 pub mod pallet {
+	use alloc::vec;
 	use codec::Codec;
+	use core::fmt::Debug;
 	use frame_support::{
 		pallet_prelude::*,
 		traits::{
@@ -41,7 +44,6 @@ pub mod pallet {
 		DispatchError::Token,
 		FixedPointNumber, FixedU128, Saturating, TokenError,
 	};
-	use sp_std::{fmt::Debug, vec};
 
 	use ulx_bitcoin::CosignScript;
 	use ulx_primitives::{
@@ -68,7 +70,7 @@ pub mod pallet {
 			+ codec::FullCodec
 			+ Copy
 			+ MaybeSerializeDeserialize
-			+ sp_std::fmt::Debug
+			+ core::fmt::Debug
 			+ Default
 			+ From<u128>
 			+ TryInto<u128>

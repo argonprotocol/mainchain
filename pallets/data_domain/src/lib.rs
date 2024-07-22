@@ -1,9 +1,9 @@
 #![cfg_attr(not(feature = "std"), no_std)]
+extern crate alloc;
 
 use codec::{Decode, Encode};
 use scale_info::TypeInfo;
 use sp_runtime::RuntimeDebug;
-use sp_std::prelude::*;
 
 pub use pallet::*;
 use ulx_primitives::tick::Tick;

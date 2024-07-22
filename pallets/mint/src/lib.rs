@@ -1,4 +1,5 @@
 #![cfg_attr(not(feature = "std"), no_std)]
+extern crate alloc;
 
 use sp_runtime::{traits::Zero, Saturating};
 
@@ -50,7 +51,7 @@ pub mod pallet {
 			+ codec::FullCodec
 			+ Copy
 			+ MaybeSerializeDeserialize
-			+ sp_std::fmt::Debug
+			+ core::fmt::Debug
 			+ Default
 			+ From<u128>
 			+ TryInto<u128>

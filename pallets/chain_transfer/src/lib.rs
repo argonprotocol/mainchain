@@ -1,9 +1,10 @@
 #![cfg_attr(not(feature = "std"), no_std)]
+extern crate alloc;
 
 use codec::{Decode, Encode};
+use core::fmt::Debug;
 use scale_info::TypeInfo;
 use sp_runtime::RuntimeDebug;
-use sp_std::{fmt::Debug, prelude::*};
 
 pub use pallet::*;
 pub use ulx_notary_audit::VerifyError as NotebookVerifyError;

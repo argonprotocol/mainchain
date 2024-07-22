@@ -1,11 +1,12 @@
+use alloc::collections::btree_map::BTreeMap;
 use codec::{Codec, Decode, Encode, MaxEncodedLen};
+use core::{cmp::Ordering, str};
 use scale_info::TypeInfo;
 use serde::{Deserialize, Serialize};
 use sp_core::{ConstU32, H256};
 use sp_crypto_hashing::blake2_256;
 use sp_debug_derive::RuntimeDebug;
 use sp_runtime::{BoundedBTreeMap, BoundedVec, RuntimeString};
-use sp_std::{cmp::Ordering, collections::btree_map::BTreeMap, str};
 
 use crate::{data_tld::DataTLD, host::Host, NotaryId};
 

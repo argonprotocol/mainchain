@@ -17,7 +17,6 @@ serde = { workspace = true }
 scale-info = { workspace = true }
 sp-core = { workspace = true }
 sp-runtime = { workspace = true }
-sp-std = { workspace = true }
 snafu = { workspace = true }
 binary-merkle-tree = { workspace = true }
 
@@ -40,7 +39,6 @@ std = [
 	"snafu/std",
 	"sp-core/std",
 	"sp-runtime/std",
-	"sp-std/std",
 	"ulx-primitives/std",
 ]
 fast-runtime = [ "ulx-primitives/fast-runtime" ]

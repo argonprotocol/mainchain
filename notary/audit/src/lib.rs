@@ -1,5 +1,10 @@
 #![cfg_attr(not(feature = "std"), no_std)]
+extern crate alloc;
 
+use alloc::{
+	collections::{btree_map::BTreeMap, btree_set::BTreeSet},
+	vec::Vec,
+};
 use binary_merkle_tree::{merkle_root, verify_proof, Leaf};
 use codec::{Decode, Encode};
 use serde::{Deserialize, Serialize};
@@ -8,10 +13,6 @@ use sp_core::H256;
 use sp_runtime::{
 	scale_info::TypeInfo,
 	traits::{BlakeTwo256, Verify},
-};
-use sp_std::{
-	collections::{btree_map::BTreeMap, btree_set::BTreeSet},
-	vec::Vec,
 };
 
 use ulx_primitives::{

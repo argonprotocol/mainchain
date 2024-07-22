@@ -1,4 +1,5 @@
 #![cfg_attr(not(feature = "std"), no_std)]
+extern crate alloc;
 
 extern crate core;
 
@@ -35,11 +36,11 @@ const MIN_TAX_MINIMUM: u128 = 500;
 /// - To pass the difficulty test: `big endian(hash with nonce) <= U256::max_value / difficulty`.
 #[frame_support::pallet(dev_mode)]
 pub mod pallet {
+	use alloc::{vec, vec::Vec};
 	use frame_support::pallet_prelude::*;
 	use frame_system::pallet_prelude::*;
 	use sp_core::U256;
 	use sp_runtime::{traits::UniqueSaturatedInto, DigestItem};
-	use sp_std::{vec, vec::Vec};
 
 	use ulx_primitives::{
 		block_vote::VoteMinimum,

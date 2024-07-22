@@ -1,3 +1,4 @@
+use alloc::{vec, vec::Vec};
 use bitcoin::{
 	absolute::LockTime,
 	bip32::{KeySource, Xpriv},
@@ -10,7 +11,6 @@ use bitcoin::{
 	Sequence, Transaction, TxIn, TxOut, Witness,
 };
 use k256::ecdsa::signature::Verifier;
-use sp_std::{vec, vec::Vec};
 
 use ulx_primitives::{
 	bitcoin::{

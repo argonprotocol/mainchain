@@ -8,7 +8,7 @@ use crate::prod_or_fast;
 use rsntp::SntpClient;
 
 #[cfg(feature = "std")]
-use sp_std::time::Duration;
+use core::time::Duration;
 
 pub type Tick = u32;
 

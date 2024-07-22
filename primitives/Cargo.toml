@@ -27,7 +27,6 @@ sc-keystore = { workspace = true, optional = true }
 sp-keystore = { workspace = true, optional = true }
 sp-debug-derive = { workspace = true }
 sp-core = { workspace = true }
-sp-std = { workspace = true }
 sp-crypto-hashing = { workspace = true }
 frame-support-procedural = { workspace = true }
 frame-support = { workspace = true }
@@ -82,7 +81,6 @@ std = [
 	"sp-keystore",
 	"sp-keystore?/std",
 	"sp-runtime/std",
-	"sp-std/std",
 	"thiserror",
 ]
 fast-runtime = [ "sp-debug-derive/force-debug" ]

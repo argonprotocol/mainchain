@@ -1,10 +1,11 @@
 #![cfg_attr(not(feature = "std"), no_std)]
+extern crate alloc;
 
 use frame_support::traits::OnTimestampSet;
 use sp_runtime::traits::UniqueSaturatedInto;
 
+use alloc::vec::Vec;
 pub use pallet::*;
-use sp_std::vec::Vec;
 use ulx_primitives::TickProvider;
 pub use weights::*;
 

@@ -6434,7 +6434,6 @@ dependencies = [
  "sp-core",
  "sp-io",
  "sp-runtime",
- "sp-std 14.0.0 (git+https://github.com/paritytech/polkadot-sdk.git?branch=release-polkadot-v1.14.0)",
  "ulx-primitives",
 ]
 
@@ -6453,7 +6452,6 @@ dependencies = [
  "sp-core",
  "sp-io",
  "sp-runtime",
- "sp-std 14.0.0 (git+https://github.com/paritytech/polkadot-sdk.git?branch=release-polkadot-v1.14.0)",
  "ulx-primitives",
 ]
 
@@ -6475,7 +6473,6 @@ dependencies = [
  "sp-io",
  "sp-keyring",
  "sp-runtime",
- "sp-std 14.0.0 (git+https://github.com/paritytech/polkadot-sdk.git?branch=release-polkadot-v1.14.0)",
  "ulx-primitives",
 ]
 
@@ -6495,7 +6492,6 @@ dependencies = [
  "sp-core",
  "sp-io",
  "sp-runtime",
- "sp-std 14.0.0 (git+https://github.com/paritytech/polkadot-sdk.git?branch=release-polkadot-v1.14.0)",
  "ulx-primitives",
 ]
 
@@ -6515,7 +6511,6 @@ dependencies = [
  "sp-core",
  "sp-io",
  "sp-runtime",
- "sp-std 14.0.0 (git+https://github.com/paritytech/polkadot-sdk.git?branch=release-polkadot-v1.14.0)",
  "ulx-bitcoin",
  "ulx-primitives",
 ]
@@ -6538,7 +6533,6 @@ dependencies = [
  "sp-io",
  "sp-keyring",
  "sp-runtime",
- "sp-std 14.0.0 (git+https://github.com/paritytech/polkadot-sdk.git?branch=release-polkadot-v1.14.0)",
  "ulx-notary-audit",
  "ulx-primitives",
 ]
@@ -6559,7 +6553,6 @@ dependencies = [
  "sp-io",
  "sp-keyring",
  "sp-runtime",
- "sp-std 14.0.0 (git+https://github.com/paritytech/polkadot-sdk.git?branch=release-polkadot-v1.14.0)",
  "ulx-primitives",
 ]
 
@@ -6603,7 +6596,6 @@ dependencies = [
  "sp-core",
  "sp-io",
  "sp-runtime",
- "sp-std 14.0.0 (git+https://github.com/paritytech/polkadot-sdk.git?branch=release-polkadot-v1.14.0)",
  "ulx-primitives",
 ]
 
@@ -6624,7 +6616,6 @@ dependencies = [
  "sp-core",
  "sp-io",
  "sp-runtime",
- "sp-std 14.0.0 (git+https://github.com/paritytech/polkadot-sdk.git?branch=release-polkadot-v1.14.0)",
  "ulx-primitives",
 ]
 
@@ -6660,7 +6651,6 @@ dependencies = [
  "sp-io",
  "sp-keyring",
  "sp-runtime",
- "sp-std 14.0.0 (git+https://github.com/paritytech/polkadot-sdk.git?branch=release-polkadot-v1.14.0)",
  "ulx-primitives",
 ]
 
@@ -6682,7 +6672,6 @@ dependencies = [
  "sp-io",
  "sp-keyring",
  "sp-runtime",
- "sp-std 14.0.0 (git+https://github.com/paritytech/polkadot-sdk.git?branch=release-polkadot-v1.14.0)",
  "ulx-notary-audit",
  "ulx-primitives",
 ]
@@ -6720,7 +6709,6 @@ dependencies = [
  "sp-core",
  "sp-io",
  "sp-runtime",
- "sp-std 14.0.0 (git+https://github.com/paritytech/polkadot-sdk.git?branch=release-polkadot-v1.14.0)",
  "ulx-primitives",
 ]
 
@@ -6793,7 +6781,6 @@ dependencies = [
  "sp-core",
  "sp-io",
  "sp-runtime",
- "sp-std 14.0.0 (git+https://github.com/paritytech/polkadot-sdk.git?branch=release-polkadot-v1.14.0)",
  "ulx-primitives",
 ]
 
@@ -6910,7 +6897,6 @@ dependencies = [
  "sp-core",
  "sp-io",
  "sp-runtime",
- "sp-std 14.0.0 (git+https://github.com/paritytech/polkadot-sdk.git?branch=release-polkadot-v1.14.0)",
  "ulx-bitcoin",
  "ulx-primitives",
 ]
@@ -12815,7 +12801,6 @@ dependencies = [
  "sp-io",
  "sp-keyring",
  "sp-runtime",
- "sp-std 14.0.0 (git+https://github.com/paritytech/polkadot-sdk.git?branch=release-polkadot-v1.14.0)",
  "thiserror",
  "ulx-primitives",
  "ulx-testing",
@@ -13092,7 +13077,6 @@ dependencies = [
  "sp-offchain",
  "sp-runtime",
  "sp-session",
- "sp-std 14.0.0 (git+https://github.com/paritytech/polkadot-sdk.git?branch=release-polkadot-v1.14.0)",
  "sp-transaction-pool",
  "sp-version",
  "substrate-wasm-builder",
@@ -13170,7 +13154,6 @@ dependencies = [
  "sp-core",
  "sp-keyring",
  "sp-runtime",
- "sp-std 14.0.0 (git+https://github.com/paritytech/polkadot-sdk.git?branch=release-polkadot-v1.14.0)",
  "ulx-primitives",
 ]
 
@@ -13240,7 +13223,6 @@ dependencies = [
  "sp-inherents",
  "sp-keystore",
  "sp-runtime",
- "sp-std 14.0.0 (git+https://github.com/paritytech/polkadot-sdk.git?branch=release-polkadot-v1.14.0)",
  "thiserror",
  "tokio",
  "uniffi",

@@ -1,5 +1,6 @@
 #![deny(warnings)]
 #![cfg_attr(not(feature = "std"), no_std)]
+extern crate alloc;
 
 pub use pallet::*;
 pub use weights::*;
@@ -15,10 +16,10 @@ const LOG_TARGET: &str = "runtime::bitcoin_utxos";
 
 #[frame_support::pallet(dev_mode)]
 pub mod pallet {
+	use alloc::{vec, vec::Vec};
 	use frame_support::{pallet_prelude::*, storage::with_storage_layer};
 	use frame_system::pallet_prelude::*;
 	use log::{info, warn};
-	use sp_std::{vec, vec::Vec};
 
 	use ulx_primitives::{
 		bitcoin::{

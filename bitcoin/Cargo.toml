@@ -15,7 +15,6 @@ thiserror = { workspace = true, optional = true }
 codec = { workspace = true, default-features = false }
 
 sp-runtime = { workspace = true, default-features = false }
-sp-std = { workspace = true, default-features = false }
 sp-core = { workspace = true, default-features = false }
 sp-io = { workspace = true, default-features = false }
 bitcoin = { workspace = true, default-features = false }
@@ -50,7 +49,6 @@ std = [
 	"sp-core/std",
 	"sp-io/std",
 	"sp-runtime/std",
-	"sp-std/std",
 	"thiserror",
 	"ulx-primitives/bitcoin",
 	"ulx-primitives/std",

@@ -1,13 +1,14 @@
 #![cfg_attr(not(feature = "std"), no_std)]
 // `construct_runtime!` does a lot of recursion and requires us to increase the limit to 256.
 #![recursion_limit = "256"]
-
-extern crate alloc;
 #[cfg(feature = "runtime-benchmarks")]
 #[macro_use]
 extern crate frame_benchmarking;
+extern crate alloc;
 
+use alloc::{boxed::Box, collections::btree_map::BTreeMap, vec, vec::Vec};
 use codec::{Decode, Encode, MaxEncodedLen};
+use core::marker::PhantomData;
 pub use frame_support::{
 	construct_runtime, parameter_types,
 	traits::{
@@ -28,7 +29,6 @@ use frame_support::{
 	traits::{Contains, Currency, InsideBoth, OnUnbalanced},
 	PalletId,
 };
-use sp_std::marker::PhantomData;
 // Configure FRAME pallets to include in runtime.
 use frame_support::{
 	traits::{fungible, fungible::Balanced, Everything, Imbalance, InstanceFilter, StorageMapShim},
@@ -56,7 +56,7 @@ use sp_runtime::{
 	ApplyExtrinsicResult, BoundedVec, DispatchError,
 };
 pub use sp_runtime::{Perbill, Permill};
-use sp_std::{collections::btree_map::BTreeMap, prelude::*, vec::Vec};
+
 #[cfg(feature = "std")]
 use sp_version::NativeVersion;
 use sp_version::RuntimeVersion;
@@ -926,7 +926,7 @@ impl_runtime_apis! {
 			Runtime::metadata_at_version(version)
 		}
 
-		fn metadata_versions() -> sp_std::vec::Vec<u32> {
+		fn metadata_versions() -> alloc::vec::Vec<u32> {
 			Runtime::metadata_versions()
 		}
 	}

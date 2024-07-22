@@ -1,6 +1,7 @@
 #![cfg_attr(not(feature = "std"), no_std)]
 #![allow(clippy::large_enum_variant)]
 
+extern crate alloc;
 pub use pallet::*;
 pub use weights::*;
 
@@ -17,6 +18,8 @@ pub mod weights;
 
 #[frame_support::pallet(dev_mode)]
 pub mod pallet {
+	use alloc::{collections::btree_map::BTreeMap, vec, vec::Vec};
+
 	use binary_merkle_tree::{merkle_proof, verify_proof};
 	use frame_support::{pallet_prelude::*, traits::FindAuthor};
 	use frame_system::pallet_prelude::*;
@@ -26,7 +29,6 @@ pub mod pallet {
 		traits::{BlakeTwo256, Block as BlockT, Verify},
 		ConsensusEngineId, DigestItem, RuntimeAppPublic,
 	};
-	use sp_std::{collections::btree_map::BTreeMap, vec, vec::Vec};
 
 	use ulx_primitives::{
 		inherents::{BlockSealInherent, BlockSealInherentData, SealInherentError},

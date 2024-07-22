@@ -1,3 +1,4 @@
+use alloc::vec::Vec;
 use codec::{Codec, Decode, Encode, FullCodec, MaxEncodedLen};
 use scale_info::TypeInfo;
 use sp_arithmetic::{FixedI128, FixedPointNumber, Percent};
@@ -6,7 +7,6 @@ use sp_runtime::{
 	traits::{AtLeast32BitUnsigned, Block as BlockT, CheckedDiv, UniqueSaturatedInto},
 	DispatchError, DispatchResult, FixedU128, Saturating,
 };
-use sp_std::vec::Vec;
 
 use crate::{
 	bitcoin::{

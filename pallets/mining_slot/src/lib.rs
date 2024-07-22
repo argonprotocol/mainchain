@@ -1,6 +1,9 @@
 #![cfg_attr(not(feature = "std"), no_std)]
+extern crate alloc;
 
+use alloc::{vec, vec::Vec};
 use codec::Codec;
+use core::{cmp::max, marker::PhantomData};
 use frame_support::{
 	pallet_prelude::*,
 	traits::{
@@ -18,7 +21,6 @@ use sp_runtime::{
 	BoundedBTreeMap, FixedI128, FixedPointNumber, FixedU128, Percent, SaturatedConversion,
 	Saturating,
 };
-use sp_std::{cmp::max, marker::PhantomData, vec, vec::Vec};
 
 pub use pallet::*;
 use ulx_primitives::{
@@ -73,6 +75,7 @@ const LOG_TARGET: &str = "runtime::mining_slot";
 /// authorityIds matching registered "controller" accounts.
 #[frame_support::pallet(dev_mode)]
 pub mod pallet {
+	use core::cmp::Ordering;
 	use frame_support::{
 		pallet_prelude::*,
 		traits::fungible::{Inspect, MutateHold},
@@ -83,7 +86,6 @@ pub mod pallet {
 		traits::{AtLeast32BitUnsigned, UniqueSaturatedInto},
 		BoundedBTreeMap,
 	};
-	use sp_std::cmp::Ordering;
 
 	use ulx_primitives::{
 		block_seal::{MiningRegistration, RewardDestination},
@@ -141,7 +143,7 @@ pub mod pallet {
 			+ codec::FullCodec
 			+ Copy
 			+ MaybeSerializeDeserialize
-			+ sp_std::fmt::Debug
+			+ core::fmt::Debug
 			+ Default
 			+ From<u128>
 			+ TryInto<u128>

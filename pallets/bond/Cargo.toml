@@ -24,7 +24,6 @@ frame-system = { workspace = true }
 sp-arithmetic = { workspace = true }
 sp-runtime = { workspace = true }
 sp-core = { workspace = true }
-sp-std = { workspace = true }
 ulx-primitives = { workspace = true, features = ["bitcoin"] }
 ulx-bitcoin = { workspace = true, default-features = false }
 
@@ -47,7 +46,6 @@ std = [
 	"sp-core/std",
 	"sp-io/std",
 	"sp-runtime/std",
-	"sp-std/std",
 	"ulx-bitcoin/std",
 	"ulx-primitives/bitcoin",
 	"ulx-primitives/std",

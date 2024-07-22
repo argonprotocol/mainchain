@@ -1,8 +1,9 @@
+use alloc::format;
 use codec::{Decode, Encode, MaxEncodedLen};
 use scale_info::TypeInfo;
 use serde::{Deserialize, Serialize};
 use sp_debug_derive::RuntimeDebug;
-use sp_runtime::{format_runtime_string, RuntimeString};
+use sp_runtime::RuntimeString;
 
 use crate::AccountId;
 
@@ -40,8 +41,8 @@ impl LocalchainAccountId {
 	}
 }
 
-impl sp_std::hash::Hash for LocalchainAccountId {
-	fn hash<H: sp_std::hash::Hasher>(&self, state: &mut H) {
+impl core::hash::Hash for LocalchainAccountId {
+	fn hash<H: core::hash::Hasher>(&self, state: &mut H) {
 		state.write(self.account_id.as_ref());
 		state.write_i32(self.account_type as i32);
 	}
@@ -86,7 +87,17 @@ impl TryFrom<i32> for AccountType {
 		match value {
 			0 => Ok(AccountType::Tax),
 			1 => Ok(AccountType::Deposit),
-			_ => Err(format_runtime_string!("Invalid account_type value {}", value)),
+			_ => {
+				let str = format!("Invalid account_type value {}", value);
+				#[cfg(feature = "std")]
+				{
+					Err(RuntimeString::Owned(str))
+				}
+				#[cfg(not(feature = "std"))]
+				{
+					Err(RuntimeString::Owned(str.as_bytes().to_vec()))
+				}
+			},
 		}
 	}
 }

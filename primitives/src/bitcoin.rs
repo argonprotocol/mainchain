@@ -1,12 +1,10 @@
+use alloc::vec::Vec;
 use codec::{Decode, Encode, MaxEncodedLen};
+use core::convert::{TryFrom, TryInto};
 use frame_support::pallet_prelude::TypeInfo;
 use sp_core::{ConstU32, H256};
 use sp_debug_derive::RuntimeDebug;
 use sp_runtime::BoundedVec;
-use sp_std::{
-	convert::{TryFrom, TryInto},
-	vec::Vec,
-};
 
 #[derive(Encode, Decode, Clone, PartialEq, Eq, TypeInfo, RuntimeDebug)]
 pub struct BitcoinSyncStatus {
@@ -129,10 +127,10 @@ pub enum BitcoinRejectedReason {
 pub type BitcoinBlockHash = H256Le;
 #[cfg(feature = "bitcoin")]
 mod bitcoin_compat {
+	use alloc::vec::Vec;
 	use bitcoin::hashes::{FromSliceError, Hash};
 	use sp_core::H256;
 	use sp_runtime::BoundedVec;
-	use sp_std::vec::Vec;
 
 	use crate::bitcoin::{
 		BitcoinCosignScriptPubkey, BitcoinPubkeyHash, BitcoinScriptPubkey, BitcoinSignature,

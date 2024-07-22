@@ -1,10 +1,10 @@
+use alloc::vec::Vec;
 use codec::{Decode, Encode, MaxEncodedLen};
 use scale_info::TypeInfo;
 use serde::{Deserialize, Serialize};
 use sp_core::{bounded::BoundedVec, ed25519::Signature, ConstU32, H256};
 use sp_crypto_hashing::blake2_256;
 use sp_debug_derive::RuntimeDebug;
-use sp_std::vec::Vec;
 
 use crate::{
 	balance_change::BalanceChange, block_vote::BlockVote, notary::NotarySignature, tick::Tick,

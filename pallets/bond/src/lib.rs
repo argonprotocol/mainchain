@@ -1,5 +1,7 @@
 #![cfg_attr(not(feature = "std"), no_std)]
 
+extern crate alloc;
+
 pub use pallet::*;
 use sp_runtime::DispatchError;
 use ulx_bitcoin::UtxoUnlocker;
@@ -77,6 +79,7 @@ const LOG_TARGET: &str = "runtime::bond";
 /// the duration of the bitcoin bonds, and will be taken in the case of bitcoins not being returned.
 #[frame_support::pallet(dev_mode)]
 pub mod pallet {
+	use alloc::vec;
 	use codec::Codec;
 	use frame_support::{
 		pallet_prelude::*,
@@ -95,7 +98,6 @@ pub mod pallet {
 		DispatchError::Token,
 		FixedPointNumber, Saturating, TokenError,
 	};
-	use sp_std::vec;
 
 	use super::*;
 	use sp_arithmetic::FixedU128;
@@ -129,7 +131,7 @@ pub mod pallet {
 			+ codec::FullCodec
 			+ Copy
 			+ MaybeSerializeDeserialize
-			+ sp_std::fmt::Debug
+			+ core::fmt::Debug
 			+ Default
 			+ From<u128>
 			+ TryInto<u128>

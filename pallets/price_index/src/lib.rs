@@ -1,12 +1,13 @@
 #![deny(warnings)]
 #![cfg_attr(not(feature = "std"), no_std)]
+extern crate alloc;
 
 use codec::{Decode, Encode, MaxEncodedLen};
+use core::convert::TryInto;
 use scale_info::TypeInfo;
 use sp_arithmetic::{FixedI128, FixedU128};
 use sp_core::RuntimeDebug;
 use sp_runtime::traits::{CheckedDiv, One, Zero};
-use sp_std::convert::TryInto;
 
 pub use pallet::*;
 use ulx_primitives::{tick::Tick, ArgonCPI};
@@ -60,10 +61,11 @@ impl PriceIndex {
 
 #[frame_support::pallet(dev_mode)]
 pub mod pallet {
+	use alloc::vec;
+	use core::fmt::Debug;
 	use frame_support::pallet_prelude::*;
 	use frame_system::pallet_prelude::*;
 	use sp_arithmetic::{traits::AtLeast32BitUnsigned, FixedPointNumber};
-	use sp_std::{fmt::Debug, vec};
 
 	use ulx_primitives::PriceProvider;
 

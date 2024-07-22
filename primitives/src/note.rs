@@ -1,3 +1,7 @@
+use alloc::{
+	fmt::{Display, Formatter, Result},
+	vec::Vec,
+};
 use codec::{Decode, Encode, MaxEncodedLen};
 use scale_info::TypeInfo;
 use serde::{Deserialize, Serialize};
@@ -6,10 +10,6 @@ use sp_core::{
 	ConstU32, RuntimeDebug,
 };
 use sp_runtime::BoundedVec;
-use sp_std::{
-	fmt::{Display, Formatter, Result},
-	vec::Vec,
-};
 
 #[cfg(feature = "std")]
 use crate::serialize_unsafe_u128_as_string;
