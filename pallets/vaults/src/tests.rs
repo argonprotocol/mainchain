@@ -1,5 +1,6 @@
 use frame_support::{
 	assert_err, assert_noop, assert_ok,
+	pallet_prelude::Hooks,
 	traits::{
 		fungible::{Inspect, InspectHold, Mutate},
 		tokens::Preservation,
@@ -10,12 +11,12 @@ use sp_runtime::{traits::Zero, BoundedVec, FixedU128, Percent};
 
 use ulx_primitives::{
 	bitcoin::BitcoinPubkeyHash,
-	bond::{Bond, BondError, BondExpiration, BondType, VaultProvider},
+	bond::{Bond, BondError, BondExpiration, BondType, VaultProvider, VaultTerms},
 };
 
 use crate::{
 	mock::{Vaults, *},
-	pallet::{NextVaultId, VaultsById},
+	pallet::{NextVaultId, PendingTermsModificationsByBlock, VaultsById},
 	Error, Event, HoldReason, VaultConfig,
 };
 
@@ -25,15 +26,21 @@ fn keys() -> BoundedVec<BitcoinPubkeyHash, MaxPendingVaultBitcoinPubkeys> {
 	bounded_vec![BitcoinPubkeyHash([0u8; 20])]
 }
 
-fn default_vault() -> VaultConfig<Balance, MaxPendingVaultBitcoinPubkeys> {
-	VaultConfig {
-		bitcoin_annual_percent_rate: TEN_PCT,
-		mining_annual_percent_rate: TEN_PCT,
-		bitcoin_pubkey_hashes: keys(),
-		mining_reward_sharing_percent_take: Percent::zero(),
-		bitcoin_amount_allocated: 50_000,
+fn default_terms(pct: FixedU128) -> VaultTerms<Balance> {
+	VaultTerms {
+		bitcoin_annual_percent_rate: pct,
+		mining_annual_percent_rate: pct,
 		bitcoin_base_fee: 0,
 		mining_base_fee: 0,
+		mining_reward_sharing_percent_take: Percent::zero(),
+	}
+}
+
+fn default_vault() -> VaultConfig<Balance, MaxPendingVaultBitcoinPubkeys> {
+	VaultConfig {
+		terms: default_terms(TEN_PCT),
+		bitcoin_pubkey_hashes: keys(),
+		bitcoin_amount_allocated: 50_000,
 		mining_amount_allocated: 50_000,
 		securitization_percent: FixedU128::zero(),
 	}
@@ -173,13 +180,9 @@ fn it_can_reduce_vault_funds_down_to_bonded() {
 		assert_ok!(Vaults::create(
 			RuntimeOrigin::signed(1),
 			VaultConfig {
-				bitcoin_annual_percent_rate: TEN_PCT,
-				mining_annual_percent_rate: TEN_PCT,
+				terms: default_terms(TEN_PCT),
 				bitcoin_pubkey_hashes: keys(),
-				mining_reward_sharing_percent_take: Percent::zero(),
 				bitcoin_amount_allocated: 1000,
-				bitcoin_base_fee: 0,
-				mining_base_fee: 0,
 				mining_amount_allocated: 1000,
 				securitization_percent: FixedU128::from_float(2.0),
 			}
@@ -263,16 +266,15 @@ fn it_can_close_a_vault() {
 		let vault_owner_balance = 201_000;
 		set_argons(1, vault_owner_balance);
 		set_argons(2, 100_000);
+		let mut terms = default_terms(FixedU128::from_float(0.01));
+		terms.bitcoin_base_fee = 1;
+		terms.mining_base_fee = 1;
 		assert_ok!(Vaults::create(
 			RuntimeOrigin::signed(1),
 			VaultConfig {
-				bitcoin_annual_percent_rate: FixedU128::from_float(0.01),
-				mining_annual_percent_rate: FixedU128::from_float(0.01),
+				terms,
 				bitcoin_pubkey_hashes: keys(),
-				mining_reward_sharing_percent_take: Percent::from_float(0.0),
 				bitcoin_amount_allocated: 50_000,
-				bitcoin_base_fee: 1,
-				mining_base_fee: 1,
 				mining_amount_allocated: 50_000,
 				securitization_percent: FixedU128::from_float(2.0),
 			}
@@ -340,16 +342,16 @@ fn it_can_bond_funds() {
 		System::set_block_number(5);
 
 		set_argons(1, 1_000_000);
+		let mut terms = default_terms(FixedU128::from_float(0.01));
+		terms.bitcoin_base_fee = 1000;
+		terms.mining_annual_percent_rate = FixedU128::zero();
+		terms.mining_reward_sharing_percent_take = Percent::from_float(2.0);
 		assert_ok!(Vaults::create(
 			RuntimeOrigin::signed(1),
 			VaultConfig {
-				bitcoin_annual_percent_rate: FixedU128::from_float(0.01),
-				mining_annual_percent_rate: FixedU128::zero(),
+				terms,
 				bitcoin_pubkey_hashes: keys(),
-				mining_reward_sharing_percent_take: Percent::from_float(2.0),
 				bitcoin_amount_allocated: 500_000,
-				bitcoin_base_fee: 1000,
-				mining_base_fee: 0,
 				mining_amount_allocated: 0,
 				securitization_percent: FixedU128::zero(),
 			}
@@ -393,16 +395,16 @@ fn it_can_charge_prorated_bond_funds() {
 		System::set_block_number(5);
 
 		set_argons(1, 1_000_000);
+		let mut terms = default_terms(FixedU128::from_float(0.1));
+		terms.bitcoin_base_fee = 123;
+		terms.mining_annual_percent_rate = FixedU128::from_float(0.001);
+
 		assert_ok!(Vaults::create(
 			RuntimeOrigin::signed(1),
 			VaultConfig {
-				bitcoin_annual_percent_rate: FixedU128::from_float(0.1),
-				mining_annual_percent_rate: FixedU128::from_float(0.001),
+				terms,
 				bitcoin_pubkey_hashes: keys(),
-				mining_reward_sharing_percent_take: Percent::from_float(0.0),
 				bitcoin_amount_allocated: 500_000,
-				bitcoin_base_fee: 123,
-				mining_base_fee: 0,
 				mining_amount_allocated: 0,
 				securitization_percent: FixedU128::zero(),
 			}
@@ -454,16 +456,14 @@ fn it_can_burn_a_bond() {
 		System::set_block_number(5);
 
 		set_argons(1, 1_000_000);
+		let mut terms = default_terms(FixedU128::zero());
+		terms.mining_reward_sharing_percent_take = Percent::from_float(2.0);
 		assert_ok!(Vaults::create(
 			RuntimeOrigin::signed(1),
 			VaultConfig {
-				bitcoin_annual_percent_rate: FixedU128::zero(),
-				mining_annual_percent_rate: FixedU128::zero(),
+				terms,
 				bitcoin_pubkey_hashes: keys(),
-				mining_reward_sharing_percent_take: Percent::from_float(2.0),
 				bitcoin_amount_allocated: 100_000,
-				bitcoin_base_fee: 0,
-				mining_base_fee: 0,
 				mining_amount_allocated: 100_000,
 				securitization_percent: FixedU128::zero(),
 			}
@@ -511,16 +511,14 @@ fn it_can_recoup_reduced_value_bitcoins_from_bond_funds() {
 
 		set_argons(1, 200_200);
 
+		let mut terms = default_terms(FixedU128::from_float(0.001));
+		terms.mining_reward_sharing_percent_take = Percent::from_float(2.0);
 		assert_ok!(Vaults::create(
 			RuntimeOrigin::signed(1),
 			VaultConfig {
-				bitcoin_annual_percent_rate: FixedU128::from_float(0.001),
-				mining_annual_percent_rate: FixedU128::from_float(0.001),
+				terms,
 				bitcoin_pubkey_hashes: keys(),
-				mining_reward_sharing_percent_take: Percent::from_float(2.0),
 				bitcoin_amount_allocated: 100_000,
-				bitcoin_base_fee: 0,
-				mining_base_fee: 0,
 				mining_amount_allocated: 100_000,
 				securitization_percent: FixedU128::zero(),
 			}
@@ -572,16 +570,14 @@ fn it_can_recoup_increased_value_bitcoins_from_securitizations() {
 
 		set_argons(1, 350_200);
 
+		let mut terms = default_terms(FixedU128::from_float(0.001));
+		terms.mining_reward_sharing_percent_take = Percent::from_float(2.0);
 		assert_ok!(Vaults::create(
 			RuntimeOrigin::signed(1),
 			VaultConfig {
-				bitcoin_annual_percent_rate: FixedU128::from_float(0.001),
-				mining_annual_percent_rate: FixedU128::from_float(0.001),
+				terms,
 				bitcoin_pubkey_hashes: keys(),
-				mining_reward_sharing_percent_take: Percent::from_float(2.0),
 				bitcoin_amount_allocated: 100_000,
-				bitcoin_base_fee: 0,
-				mining_base_fee: 0,
 				mining_amount_allocated: 50_000,
 				securitization_percent: FixedU128::from_float(2.0),
 			}
@@ -639,16 +635,15 @@ fn it_should_allow_vaults_to_add_public_keys() {
 		for i in 0..10 {
 			let _ = keys.try_push(BitcoinPubkeyHash([i as u8; 20]));
 		}
+
+		let terms = default_terms(TEN_PCT);
+
 		assert_ok!(Vaults::create(
 			RuntimeOrigin::signed(1),
 			VaultConfig {
-				bitcoin_annual_percent_rate: TEN_PCT,
-				mining_annual_percent_rate: TEN_PCT,
+				terms,
 				bitcoin_pubkey_hashes: keys.clone(),
-				mining_reward_sharing_percent_take: Percent::zero(),
 				bitcoin_amount_allocated: 100_000,
-				bitcoin_base_fee: 0,
-				mining_base_fee: 0,
 				mining_amount_allocated: 100_000,
 				securitization_percent: FixedU128::zero(),
 			}
@@ -690,14 +685,11 @@ fn it_should_allow_multiple_vaults_per_account() {
 		// Go past genesis block so events get deposited
 		System::set_block_number(5);
 
+		let terms = default_terms(TEN_PCT);
 		let config = VaultConfig {
-			bitcoin_annual_percent_rate: TEN_PCT,
-			mining_annual_percent_rate: TEN_PCT,
+			terms,
 			bitcoin_pubkey_hashes: keys(),
-			mining_reward_sharing_percent_take: Percent::zero(),
 			bitcoin_amount_allocated: 100_000,
-			bitcoin_base_fee: 0,
-			mining_base_fee: 0,
 			mining_amount_allocated: 100_000,
 			securitization_percent: FixedU128::zero(),
 		};
@@ -713,6 +705,61 @@ fn it_should_allow_multiple_vaults_per_account() {
 	});
 }
 
+#[test]
+fn it_can_schedule_term_changes() {
+	new_test_ext().execute_with(|| {
+		System::set_block_number(1);
+
+		let mut terms = default_terms(TEN_PCT);
+		let config = VaultConfig {
+			terms: terms.clone(),
+			bitcoin_pubkey_hashes: keys(),
+			bitcoin_amount_allocated: 100_000,
+			mining_amount_allocated: 100_000,
+			securitization_percent: FixedU128::zero(),
+		};
+		set_argons(1, 1_000_000);
+		assert_ok!(Vaults::create(RuntimeOrigin::signed(1), config.clone()));
+
+		System::set_block_number(10);
+		Vaults::on_finalize(10);
+
+		terms.mining_reward_sharing_percent_take = Percent::from_float(3.0);
+		assert_ok!(Vaults::modify_terms(RuntimeOrigin::signed(1), 1, terms.clone()));
+		assert_ne!(
+			VaultsById::<Test>::get(1).unwrap().mining_reward_sharing_percent_take,
+			Percent::from_float(3.0)
+		);
+		assert_eq!(
+			VaultsById::<Test>::get(1)
+				.unwrap()
+				.pending_terms
+				.unwrap()
+				.1
+				.mining_reward_sharing_percent_take,
+			Percent::from_float(3.0)
+		);
+		System::assert_last_event(
+			Event::VaultTermsChangeScheduled { vault_id: 1, change_block: 100 }.into(),
+		);
+		assert_eq!(PendingTermsModificationsByBlock::<Test>::get(100).first().unwrap().clone(), 1);
+
+		// should not be able to schedule another change
+		assert_err!(
+			Vaults::modify_terms(RuntimeOrigin::signed(1), 1, terms.clone()),
+			Error::<Test>::TermsChangeAlreadyScheduled
+		);
+
+		System::set_block_number(100);
+		Vaults::on_finalize(100);
+		assert_eq!(
+			VaultsById::<Test>::get(1).unwrap().mining_reward_sharing_percent_take,
+			Percent::from_float(3.0)
+		);
+		assert_eq!(VaultsById::<Test>::get(1).unwrap().pending_terms, None);
+		assert_eq!(PendingTermsModificationsByBlock::<Test>::get(100).first(), None);
+	});
+}
 #[test]
 fn it_can_calculate_apr() {
 	new_test_ext().execute_with(|| {

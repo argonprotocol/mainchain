@@ -1,14 +1,15 @@
 #![deny(warnings)]
 #![cfg_attr(not(feature = "std"), no_std)]
 
-use codec::{Codec, Decode, Encode, MaxEncodedLen};
+use codec::{Decode, Encode, MaxEncodedLen};
 use scale_info::TypeInfo;
-use sp_arithmetic::FixedU128;
+use sp_arithmetic::{FixedI128, FixedU128};
 use sp_core::RuntimeDebug;
+use sp_runtime::traits::{CheckedDiv, One, Zero};
 use sp_std::convert::TryInto;
 
 pub use pallet::*;
-use ulx_primitives::ArgonCPI;
+use ulx_primitives::{tick::Tick, ArgonCPI};
 pub use weights::WeightInfo;
 
 #[cfg(feature = "runtime-benchmarks")]
@@ -34,32 +35,39 @@ mod mock;
 	TypeInfo,
 	MaxEncodedLen,
 )]
-pub struct PriceIndex<Moment: Codec + Clone + MaxEncodedLen> {
+pub struct PriceIndex {
 	/// Bitcoin to usd price in cents
 	#[codec(compact)]
 	pub btc_usd_price: FixedU128,
 	/// Argon to usd price in cents
 	#[codec(compact)]
 	pub argon_usd_price: FixedU128,
-	/// Argon CPI calculated using consumer price index + argon price vs a base year
-	pub argon_cpi: ArgonCPI,
-	/// User created timestamp of submission
+	/// The target price for argon based on inflation since start
+	pub argon_usd_target_price: FixedU128,
+	/// Tick of price index
 	#[codec(compact)]
-	pub timestamp: Moment,
+	pub tick: Tick,
+}
+impl PriceIndex {
+	pub fn argon_cpi(&self) -> ArgonCPI {
+		let ratio = self
+			.argon_usd_target_price
+			.checked_div(&self.argon_usd_price)
+			.unwrap_or(FixedU128::zero());
+		ArgonCPI::from_inner(ratio.into_inner() as i128) - FixedI128::one()
+	}
 }
 
 #[frame_support::pallet(dev_mode)]
 pub mod pallet {
-	use frame_support::{pallet_prelude::*, traits::Time};
+	use frame_support::pallet_prelude::*;
 	use frame_system::pallet_prelude::*;
-	use sp_arithmetic::traits::AtLeast32BitUnsigned;
+	use sp_arithmetic::{traits::AtLeast32BitUnsigned, FixedPointNumber};
 	use sp_std::{fmt::Debug, vec};
 
 	use ulx_primitives::PriceProvider;
 
 	use super::*;
-
-	type PriceIndexOf<T> = PriceIndex<<<T as Config>::Time as Time>::Moment>;
 
 	#[pallet::pallet]
 	pub struct Pallet<T>(_);
@@ -85,16 +93,24 @@ pub mod pallet {
 			+ TryInto<u128>
 			+ TypeInfo
 			+ MaxEncodedLen;
-		/// A time provider
-		type Time: Time;
 
-		/// The maximum number of oracle operators that can be authorized
+		/// The maximum number of ticks to preserve a price index
 		#[pallet::constant]
-		type MaxDowntimeBeforeReset: Get<<Self::Time as Time>::Moment>;
+		type MaxDowntimeTicksBeforeReset: Get<Tick>;
 
 		/// The oldest history to keep
 		#[pallet::constant]
-		type OldestPriceAllowed: Get<<Self::Time as Time>::Moment>;
+		type MaxPriceAgeInTicks: Get<Tick>;
+
+		/// The current tick
+		type CurrentTick: Get<Tick>;
+
+		/// The max price difference dropping below target or raising above target per tick. There's
+		/// no corresponding constant for time to recovery to target
+		#[pallet::constant]
+		type MaxArgonChangePerTickAwayFromTarget: Get<FixedU128>;
+		#[pallet::constant]
+		type MaxArgonTargetChangePerTick: Get<FixedU128>;
 	}
 
 	#[pallet::event]
@@ -115,11 +131,13 @@ pub mod pallet {
 		MissingValue,
 		/// The submitted prices are too old
 		PricesTooOld,
+		/// Change in argon price is too large
+		MaxPriceChangePerTickExceeded,
 	}
 
 	/// Stores the active price index
 	#[pallet::storage]
-	pub type Current<T: Config> = StorageValue<_, PriceIndexOf<T>>;
+	pub type Current<T: Config> = StorageValue<_, PriceIndex>;
 
 	/// The price index operator account
 	#[pallet::storage]
@@ -150,8 +168,8 @@ pub mod pallet {
 			let Some(current) = Current::<T>::get() else {
 				return;
 			};
-			let now = T::Time::now();
-			if current.timestamp < now - T::MaxDowntimeBeforeReset::get() {
+			let current_tick = T::CurrentTick::get();
+			if current.tick < current_tick.saturating_sub(T::MaxDowntimeTicksBeforeReset::get()) {
 				Current::<T>::take();
 			}
 		}
@@ -162,24 +180,28 @@ pub mod pallet {
 		/// Submit the latest price index. Only valid for the configured operator account
 		#[pallet::call_index(0)]
 		#[pallet::weight((0, DispatchClass::Operational))]
-		pub fn submit(origin: OriginFor<T>, index: PriceIndexOf<T>) -> DispatchResultWithPostInfo {
+		pub fn submit(origin: OriginFor<T>, index: PriceIndex) -> DispatchResultWithPostInfo {
 			let who = ensure_signed(origin)?;
 
 			let operator = <Operator<T>>::get().ok_or(Error::<T>::NotAuthorizedOperator)?;
 			ensure!(operator == who, Error::<T>::NotAuthorizedOperator);
 
-			let oldest_age = T::Time::now() - T::OldestPriceAllowed::get();
+			let oldest_age = T::CurrentTick::get().saturating_sub(T::MaxPriceAgeInTicks::get());
 
-			ensure!(oldest_age < index.timestamp, Error::<T>::PricesTooOld);
+			if index.tick < oldest_age {
+				return Ok(Pays::No.into())
+			}
 
-			let mut should_use_as_current = true;
+			let mut index = index;
 			if let Some(current) = <Current<T>>::get() {
-				should_use_as_current = index.timestamp > current.timestamp;
+				if index.tick <= current.tick {
+					return Ok(Pays::No.into())
+				}
+				Self::clamp_argon_prices(&current, &mut index);
 			}
-			if should_use_as_current {
-				<Current<T>>::put(index);
-				Self::deposit_event(Event::<T>::NewIndex);
-			}
+
+			<Current<T>>::put(index);
+			Self::deposit_event(Event::<T>::NewIndex);
 
 			Ok(Pays::No.into())
 		}
@@ -199,18 +221,61 @@ pub mod pallet {
 	}
 
 	impl<T: Config> Pallet<T> {
-		fn get_current() -> Option<PriceIndexOf<T>> {
+		fn get_current() -> Option<PriceIndex> {
 			let price = <Current<T>>::get()?;
-			if price.timestamp < T::Time::now() - T::OldestPriceAllowed::get() {
+			if price.tick < T::CurrentTick::get().saturating_sub(T::MaxPriceAgeInTicks::get()) {
 				return None;
 			}
 			Some(price)
+		}
+
+		pub(crate) fn clamp_argon_prices(current: &PriceIndex, next: &mut PriceIndex) {
+			let max_diff = T::MaxArgonChangePerTickAwayFromTarget::get() *
+				FixedU128::from_u32(next.tick - current.tick);
+			let argon_cpi = next.argon_cpi();
+			if next.argon_usd_price <= current.argon_usd_price {
+				// If the argon cpi is negative, then we're in inflation. We will allow price to
+				// come back to target without restraint.
+				//
+				// However, if it's positive (deflation), for security, we are going to limit
+				// the allowed price change per tick.
+				if argon_cpi.is_positive() {
+					let diff = current.argon_usd_price - next.argon_usd_price;
+					if diff > max_diff {
+						next.argon_usd_price = current.argon_usd_price - max_diff;
+					}
+				}
+			} else {
+				// if the price is increasing, we will allow it to go up without restraint only
+				// when we are in a deflationary period
+				if argon_cpi.is_negative() {
+					let diff = next.argon_usd_price - current.argon_usd_price;
+					if diff > max_diff {
+						next.argon_usd_price = current.argon_usd_price + max_diff;
+					}
+				}
+			}
+
+			// clamp change for target price
+			let max_target_diff = T::MaxArgonTargetChangePerTick::get() *
+				FixedU128::from_u32(next.tick - current.tick);
+			if current.argon_usd_target_price > next.argon_usd_target_price {
+				let diff = current.argon_usd_target_price - next.argon_usd_target_price;
+				if diff > max_target_diff {
+					next.argon_usd_target_price = current.argon_usd_target_price - max_target_diff;
+				}
+			} else {
+				let diff = next.argon_usd_target_price - current.argon_usd_target_price;
+				if diff > max_target_diff {
+					next.argon_usd_target_price = current.argon_usd_target_price + max_target_diff;
+				}
+			}
 		}
 	}
 
 	impl<T: Config> PriceProvider<T::Balance> for Pallet<T> {
 		fn get_argon_cpi_price() -> Option<ArgonCPI> {
-			Self::get_current().map(|a| a.argon_cpi)
+			Self::get_current().map(|a| a.argon_cpi())
 		}
 		fn get_latest_argon_price_in_us_cents() -> Option<FixedU128> {
 			Self::get_current().map(|a| a.argon_usd_price)

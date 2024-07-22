@@ -1,7 +1,7 @@
 use codec::{Codec, Decode, Encode, MaxEncodedLen};
 use frame_support::PalletError;
 use scale_info::TypeInfo;
-use sp_arithmetic::{traits::UniqueSaturatedInto, FixedPointNumber, FixedU128};
+use sp_arithmetic::{traits::UniqueSaturatedInto, FixedPointNumber, FixedU128, Percent};
 use sp_debug_derive::RuntimeDebug;
 use sp_runtime::traits::AtLeast32BitUnsigned;
 
@@ -29,11 +29,11 @@ pub trait BondProvider {
 }
 
 pub trait VaultProvider {
-	type Balance: Codec + Copy + MaxEncodedLen + Default + AtLeast32BitUnsigned;
+	type Balance: Codec + Copy + TypeInfo + MaxEncodedLen + Default + AtLeast32BitUnsigned;
 	type AccountId: Codec;
-	type BlockNumber: Codec;
+	type BlockNumber: Codec + MaxEncodedLen + Clone + TypeInfo + PartialEq + Eq;
 
-	fn get(vault_id: VaultId) -> Option<Vault<Self::AccountId, Self::Balance>>;
+	fn get(vault_id: VaultId) -> Option<Vault<Self::AccountId, Self::Balance, Self::BlockNumber>>;
 
 	/// Recoup funds from the vault. This will be called if a vault does not move cosigned UTXOs in
 	/// the appropriate timeframe. Steps are taken to repay the bitcoin holder at the market rate.
@@ -114,22 +114,64 @@ pub enum BondError {
 #[derive(Clone, PartialEq, Eq, Encode, Decode, RuntimeDebug, TypeInfo, MaxEncodedLen)]
 pub struct Vault<
 	AccountId: Codec,
-	Balance: Codec + Copy + MaxEncodedLen + Default + AtLeast32BitUnsigned,
+	Balance: Codec + Copy + MaxEncodedLen + Default + AtLeast32BitUnsigned + TypeInfo,
+	BlockNumber: Codec + MaxEncodedLen + Clone + TypeInfo + PartialEq + Eq,
 > {
+	/// The account assigned to operate this vault
 	pub operator_account_id: AccountId,
+	/// The assignment and allocation of bitcoin bonds
 	pub bitcoin_argons: VaultArgons<Balance>,
+	/// The additional securitization percent that has been added to the vault (recoverable by
+	/// bonder in case of fraud or theft)
 	#[codec(compact)]
 	pub securitization_percent: FixedU128,
+	/// The amount of argons that have been securitized
 	#[codec(compact)]
 	pub securitized_argons: Balance,
+	/// The assignment and allocation of mining bonds
 	pub mining_argons: VaultArgons<Balance>,
+	/// The percent of argon mining rewards (minted and mined, not including fees) that this vault
+	/// "charges"
 	#[codec(compact)]
 	pub mining_reward_sharing_percent_take: RewardShare,
+	/// If the vault is closed, no new bonds can be issued
 	pub is_closed: bool,
+	/// The terms that are pending to be applied to this vault at the given block number
+	pub pending_terms: Option<(BlockNumber, VaultTerms<Balance>)>,
+}
+#[derive(Encode, Decode, Clone, PartialEq, Eq, RuntimeDebug, TypeInfo, MaxEncodedLen)]
+pub struct VaultTerms<Balance: Codec + MaxEncodedLen + Clone + TypeInfo + PartialEq + Eq> {
+	/// The annual percent rate per argon vaulted for bitcoin bonds
+	#[codec(compact)]
+	pub bitcoin_annual_percent_rate: FixedU128,
+	/// The base fee for a bitcoin bond
+	#[codec(compact)]
+	pub bitcoin_base_fee: Balance,
+	/// The annual percent rate per argon vaulted for mining bonds
+	#[codec(compact)]
+	pub mining_annual_percent_rate: FixedU128,
+	/// A base fee for mining bonds
+	#[codec(compact)]
+	pub mining_base_fee: Balance,
+	/// The optional sharing of any argons minted for stabilization or mined from blocks
+	#[codec(compact)]
+	pub mining_reward_sharing_percent_take: Percent, // max 100, actual percent
 }
 
-impl<AccountId: Codec, Balance: Codec + Copy + MaxEncodedLen + Default + AtLeast32BitUnsigned>
-	Vault<AccountId, Balance>
+impl<
+		AccountId: Codec,
+		Balance: Codec
+			+ Copy
+			+ MaxEncodedLen
+			+ Default
+			+ AtLeast32BitUnsigned
+			+ MaxEncodedLen
+			+ Clone
+			+ TypeInfo
+			+ PartialEq
+			+ Eq,
+		BlockNumber: Codec + MaxEncodedLen + Clone + TypeInfo + PartialEq + Eq,
+	> Vault<AccountId, Balance, BlockNumber>
 {
 	pub fn bonded(&self) -> Balance {
 		self.bitcoin_argons.bonded.saturating_add(self.mining_argons.bonded)

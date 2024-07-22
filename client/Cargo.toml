@@ -22,7 +22,7 @@ scale-info = { workspace = true, features = ["default"] }
 thiserror = { workspace = true }
 subxt = { workspace = true }
 hex = { workspace = true }
-jsonrpsee = { workspace = true, features = ["server", "ws-client", "macros", "client-ws-transport-native-tls", "client-ws-transport-webpki-tls"] } # needs to be in sync with subxt
+jsonrpsee = { workspace = true, features = ["server", "ws-client", "macros", "client-ws-transport-tls"] } # needs to be in sync with subxt
 tracing = { workspace = true }
 tracing-subscriber = { workspace = true }
 sp-core = { workspace = true, features = ["default"] }

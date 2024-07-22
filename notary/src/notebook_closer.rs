@@ -874,7 +874,7 @@ mod tests {
 		client: &UlxOnlineClient,
 		bob_id: &AccountId32,
 	) -> anyhow::Result<()> {
-		let notary_activated_finalizesd_block = client
+		let notary_activated_finalized_block = client
 			.tx()
 			.sign_and_submit_then_watch_default(
 				&tx().sudo().sudo(RuntimeCall::Notaries(NotaryCall::activate {

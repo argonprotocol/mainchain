@@ -27,7 +27,8 @@ use ulx_primitives::{
 	},
 	bond::BondProvider,
 	inherents::BlockSealInherent,
-	AuthorityProvider, BlockRewardAccountsProvider, BlockSealEventHandler, RewardShare,
+	AuthorityProvider, BlockRewardAccountsProvider, BlockSealEventHandler, MiningSlotProvider,
+	RewardShare,
 };
 pub use weights::*;
 
@@ -891,6 +892,15 @@ impl<T: Config> Pallet<T> {
 			bond_id: active_bond_id,
 			kept_ownership_bond,
 		});
+	}
+}
+impl<T: Config> MiningSlotProvider<BlockNumberFor<T>> for Pallet<T> {
+	fn get_next_slot_block_number() -> BlockNumberFor<T> {
+		Self::get_next_slot_block_number()
+	}
+
+	fn mining_window_blocks() -> BlockNumberFor<T> {
+		Self::get_mining_window_blocks()
 	}
 }
 

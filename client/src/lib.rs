@@ -162,7 +162,13 @@ impl MainchainClient {
 
 	pub async fn get_account_nonce(&self, account_id: AccountId32) -> anyhow::Result<Nonce> {
 		let account_id32 = account_id_to_subxt(&account_id);
-		let nonce = self.methods.system_account_next_index(&account_id32).await?;
+		self.get_account_nonce_subxt(&account_id32).await
+	}
+	pub async fn get_account_nonce_subxt(
+		&self,
+		account_id32: &subxt::utils::AccountId32,
+	) -> anyhow::Result<Nonce> {
+		let nonce = self.methods.system_account_next_index(account_id32).await?;
 		Ok(nonce as Nonce)
 	}
 
@@ -269,14 +275,7 @@ impl MainchainClient {
 	async fn create_ws_client(url: &str) -> Result<WsClient, Error> {
 		let url = Url::parse(url)
 			.map_err(|e| Error::Other(format!("Invalid Mainchain URL: {} -> {}", url, e)))?;
-		let builder = {
-			#[allow(clippy::let_and_return)]
-			let transport_builder = WsTransportClientBuilder::default();
-			#[cfg(any(target_os = "ios", target_os = "android"))]
-			let transport_builder = transport_builder.use_webpki_rustls();
-
-			transport_builder
-		};
+		let builder = WsTransportClientBuilder::default();
 		let (sender, receiver) = builder
 			.build(url)
 			.await

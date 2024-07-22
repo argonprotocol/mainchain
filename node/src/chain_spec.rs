@@ -5,9 +5,7 @@ use sp_consensus_grandpa::AuthorityId as GrandpaId;
 use sp_core::{sr25519, Pair, Public};
 use sp_runtime::traits::{IdentifyAccount, Verify};
 
-use ulx_node_runtime::{
-	opaque::SessionKeys, AccountId, Balance, RuntimeGenesisConfig, Signature, WASM_BINARY,
-};
+use ulx_node_runtime::{opaque::SessionKeys, AccountId, Balance, Signature, WASM_BINARY};
 use ulx_primitives::{
 	block_seal::{MiningRegistration, RewardDestination},
 	block_vote::VoteMinimum,
@@ -20,7 +18,7 @@ use ulx_primitives::{
 // const STAGING_TELEMETRY_URL: &str = "wss://telemetry.polkadot.io/submit/";
 
 /// Specialized `ChainSpec`. This is a specialization of the general Substrate ChainSpec type.
-pub type ChainSpec = sc_service::GenericChainSpec<RuntimeGenesisConfig>;
+pub type ChainSpec = sc_service::GenericChainSpec;
 
 /// Generate a crypto pair from seed.
 pub fn get_from_seed<TPublic: Public>(seed: &str) -> <TPublic::Pair as Pair>::Public {

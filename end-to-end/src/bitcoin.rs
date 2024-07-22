@@ -1,9 +1,4 @@
-use std::{
-	collections::BTreeMap,
-	str::FromStr,
-	sync::{Arc, Mutex},
-	time::SystemTime,
-};
+use std::{collections::BTreeMap, str::FromStr, sync::Arc};
 
 use bitcoin::{
 	bip32::{DerivationPath, Fingerprint, Xpriv, Xpub},
@@ -13,14 +8,13 @@ use bitcoin::{
 };
 use bitcoind::{
 	anyhow,
-	bitcoincore_rpc::{json::GetRawTransactionResult, Auth, RawTx, RpcApi},
+	bitcoincore_rpc::{json::GetRawTransactionResult, RawTx, RpcApi},
 	BitcoinD,
 };
 use rand::{rngs::OsRng, RngCore};
-use sp_arithmetic::{FixedI128, FixedU128};
+use sp_arithmetic::{per_things::Percent, FixedU128};
 use sp_core::{crypto::AccountId32, sr25519, Pair};
 
-use sp_arithmetic::per_things::Percent;
 use ulixee_client::{
 	api,
 	api::{
@@ -28,99 +22,26 @@ use ulixee_client::{
 		runtime_types::{
 			pallet_vaults::pallet::VaultConfig,
 			sp_arithmetic::{
-				fixed_point::{FixedI128 as FixedI128Ext, FixedU128 as FixedU128Ext},
-				per_things::Percent as PercentExt,
+				fixed_point::FixedU128 as FixedU128Ext, per_things::Percent as PercentExt,
 			},
+			ulx_primitives::bond::VaultTerms,
 		},
 		storage, tx,
 	},
 	signer::Sr25519Signer,
-	MainchainClient,
 };
 use ulx_bitcoin_utxo_tracker::{CosignScript, UnlockStep, UtxoUnlocker};
 use ulx_primitives::bitcoin::{
-	BitcoinBlock, BitcoinBlockHash, BitcoinPubkeyHash, BitcoinScriptPubkey, BitcoinSignature,
-	CompressedBitcoinPubkey, Satoshis,
+	BitcoinPubkeyHash, BitcoinScriptPubkey, BitcoinSignature, CompressedBitcoinPubkey, Satoshis,
 };
-use ulx_testing::start_ulx_test_node;
-
-#[derive(Clone)]
-struct Oracle {
-	operator: sr25519::Pair,
-	bitcoin_client: Arc<bitcoind::bitcoincore_rpc::Client>,
-	last_block: Arc<Mutex<Option<BitcoinBlock>>>,
-	ulixee_client: Arc<MainchainClient>,
-}
-
-impl Oracle {
-	fn new(
-		operator: sr25519::Pair,
-		bitcoin_client: Arc<bitcoind::bitcoincore_rpc::Client>,
-		ulixee_client: Arc<MainchainClient>,
-	) -> Self {
-		Self { operator, bitcoin_client, last_block: Arc::new(Mutex::new(None)), ulixee_client }
-	}
-
-	async fn check_block(&self) -> anyhow::Result<()> {
-		let last_block: BitcoinBlockHash =
-			self.bitcoin_client.get_best_block_hash().unwrap().into();
-		let block_height = self.bitcoin_client.get_block_count().unwrap();
-
-		let existing: Option<BitcoinBlockHash> =
-			self.last_block.lock().unwrap().as_ref().map(|a| a.block_hash.clone());
-		if existing != Some(last_block.clone()) {
-			let block = BitcoinBlock::new(block_height, last_block.clone());
-			*self.last_block.lock().unwrap() = Some(block);
-			println!("submitting next bitcoin block {}", block_height);
-			let signer = Sr25519Signer::new(self.operator.clone());
-			let account_id32: AccountId32 = self.operator.public().into();
-			let ext = self
-				.ulixee_client
-				.live
-				.tx()
-				.sign_and_submit_then_watch(
-					&tx().bitcoin_utxos().set_confirmed_block(block_height, last_block.into()),
-					&signer,
-					self.ulixee_client.params_with_best_nonce(account_id32).await?.build(),
-				)
-				.await?;
-			println!("Bitcoin tx submitted");
-			MainchainClient::wait_for_ext_in_block(ext).await?;
-			println!("Bitcoin tx in block");
-		}
-		Ok(())
-	}
-}
-async fn mine_and_report_block(bitcoind: &BitcoinD, oracle: &Oracle) -> anyhow::Result<()> {
-	let block_address = add_wallet_address(bitcoind);
-	add_blocks(bitcoind, 1, &block_address);
-	let oracle = oracle.clone();
-	if let Err(err) = oracle.check_block().await {
-		println!("error synching bitcoin: {:#?}", err);
-	}
-	Ok(())
-}
+use ulx_testing::{start_ulx_test_node, UlxTestOracle};
 
 #[tokio::test]
 async fn test_bitcoin_minting_e2e() -> anyhow::Result<()> {
 	let test_node = start_ulx_test_node().await;
 	let bitcoind = test_node.bitcoind.as_ref().expect("bitcoind");
-	let rpc_url = format!("http://{}", bitcoind.params.rpc_socket);
-	let cookie = bitcoind
-		.params
-		.get_cookie_values()
-		.expect("cookie")
-		.map(|x| Auth::UserPass(x.user, x.password))
-		.unwrap_or(Auth::None);
-	{
-		let block_creator = bitcoind
-			.client
-			.get_new_address(None, None)
-			.unwrap()
-			.require_network(Network::Regtest)
-			.unwrap();
-		bitcoind.client.generate_to_address(101, &block_creator).unwrap();
-	}
+	let block_creator = add_wallet_address(bitcoind);
+	bitcoind.client.generate_to_address(101, &block_creator).unwrap();
 
 	// 1. Owner creates a new pubkey and submits to blockchain
 	let secp = Secp256k1::new();
@@ -145,14 +66,9 @@ async fn test_bitcoin_minting_e2e() -> anyhow::Result<()> {
 	}
 	let vault_signer = Sr25519Signer::new(alice_sr25519.clone());
 
-	let oracle = {
-		let bitcoin_client =
-			bitcoind::bitcoincore_rpc::Client::new(rpc_url.as_str(), cookie).expect("client");
-		let bitcoin_client = Arc::new(bitcoin_client);
-		Oracle::new(alice_sr25519.clone(), bitcoin_client.clone(), client.clone())
-	};
+	let _oracle = UlxTestOracle::bitcoin_tip(&test_node).await?;
 
-	mine_and_report_block(bitcoind, &oracle).await?;
+	add_blocks(bitcoind, 1, &block_creator);
 
 	let mut finalized_sub = client.live.blocks().subscribe_finalized().await?;
 	let vault_owner = sr25519::Pair::from_string("//Alice", None).unwrap();
@@ -184,19 +100,21 @@ async fn test_bitcoin_minting_e2e() -> anyhow::Result<()> {
 			.tx()
 			.sign_and_submit_then_watch(
 				&tx().vaults().create(VaultConfig {
-					mining_reward_sharing_percent_take: PercentExt(
-						Percent::from_percent(0).deconstruct(),
-					),
+					terms: VaultTerms {
+						mining_reward_sharing_percent_take: PercentExt(
+							Percent::from_percent(0).deconstruct(),
+						),
+						mining_annual_percent_rate: FixedU128Ext(
+							FixedU128::from_float(0.01).into_inner(),
+						),
+						mining_base_fee: 0,
+						bitcoin_annual_percent_rate: FixedU128Ext(
+							FixedU128::from_float(0.01).into_inner(),
+						),
+						bitcoin_base_fee: 0,
+					},
 					mining_amount_allocated: 0,
-					mining_annual_percent_rate: FixedU128Ext(
-						FixedU128::from_float(0.01).into_inner(),
-					),
-					mining_base_fee: 0,
 					bitcoin_amount_allocated: 100_000_000,
-					bitcoin_annual_percent_rate: FixedU128Ext(
-						FixedU128::from_float(0.01).into_inner(),
-					),
-					bitcoin_base_fee: 0,
 					bitcoin_pubkey_hashes: pubkey_hashes
 						.into_iter()
 						.map(Into::into)
@@ -218,18 +136,16 @@ async fn test_bitcoin_minting_e2e() -> anyhow::Result<()> {
 		creation.vault_id
 	};
 
+	let ticker = client.lookup_ticker().await.expect("ticker");
 	client
 		.live
 		.tx()
 		.sign_and_submit_then_watch_default(
 			&tx().price_index().submit(Index {
-				btc_usd_price: FixedU128Ext(FixedU128::from_rational(6_200_000, 1_00).into_inner()),
-				argon_cpi: FixedI128Ext(FixedI128::from_float(-0.1).into_inner()),
-				argon_usd_price: FixedU128Ext(FixedU128::from_rational(1_00, 1_00).into_inner()),
-				timestamp: SystemTime::now()
-					.duration_since(SystemTime::UNIX_EPOCH)
-					.unwrap()
-					.as_millis() as u64,
+				btc_usd_price: FixedU128Ext(FixedU128::from_float(62_000.0).into_inner()),
+				argon_usd_target_price: FixedU128Ext(FixedU128::from_float(1.0).into_inner()),
+				argon_usd_price: FixedU128Ext(FixedU128::from_float(1.1).into_inner()),
+				tick: ticker.current(),
 			}),
 			&Sr25519Signer::new(alice_sr25519.clone()),
 		)
@@ -274,12 +190,11 @@ async fn test_bitcoin_minting_e2e() -> anyhow::Result<()> {
 		cosign_script.get_script_address(Network::Regtest)
 	};
 
-	let block_address = add_wallet_address(bitcoind);
+	let block_creator = add_wallet_address(bitcoind);
 	let (txid, vout, _raw_tx) =
-		fund_script_address(bitcoind, &script_address, utxo_satoshis, &block_address);
-	for _ in 0..6 {
-		mine_and_report_block(bitcoind, &oracle).await?;
-	}
+		fund_script_address(bitcoind, &script_address, utxo_satoshis, &block_creator);
+
+	add_blocks(bitcoind, 5, &block_creator);
 
 	while let Some(block) = finalized_sub.next().await {
 		let block = block?;
@@ -291,6 +206,10 @@ async fn test_bitcoin_minting_e2e() -> anyhow::Result<()> {
 				break;
 			}
 		}
+	}
+	// load 2 more blocks
+	for _ in 0..2 {
+		let _ = finalized_sub.next().await;
 	}
 	let utxo_ref = client
 		.fetch_storage(&storage().bitcoin_utxos().utxo_id_to_ref(utxo_id), None)

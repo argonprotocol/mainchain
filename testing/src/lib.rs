@@ -4,9 +4,11 @@ use std::env;
 mod bitcoind;
 mod ulx_node;
 mod ulx_notary;
+mod ulx_oracle;
 
 pub use ulx_node::UlxTestNode;
 pub use ulx_notary::UlxTestNotary;
+pub use ulx_oracle::UlxTestOracle;
 
 pub async fn start_ulx_test_node() -> UlxTestNode {
 	let use_live = env::var("USE_LIVE")

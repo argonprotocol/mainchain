@@ -507,6 +507,10 @@ declare module '@polkadot/api-base/types/errors' {
     };
     priceIndex: {
       /**
+       * Change in argon price is too large
+       **/
+      MaxPriceChangePerTickExceeded: AugmentedError<ApiType>;
+      /**
        * Missing value
        **/
       MissingValue: AugmentedError<ApiType>;
@@ -745,6 +749,14 @@ declare module '@polkadot/api-base/types/errors' {
        * No Vault public keys are available
        **/
       NoVaultBitcoinPubkeysAvailable: AugmentedError<ApiType>;
+      /**
+       * Terms are already scheduled to be changed
+       **/
+      TermsChangeAlreadyScheduled: AugmentedError<ApiType>;
+      /**
+       * The terms modification list could not handle any more items
+       **/
+      TermsModificationOverflow: AugmentedError<ApiType>;
       UnrecoverableHold: AugmentedError<ApiType>;
       VaultClosed: AugmentedError<ApiType>;
       VaultNotFound: AugmentedError<ApiType>;

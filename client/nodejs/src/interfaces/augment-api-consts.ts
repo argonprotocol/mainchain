@@ -251,13 +251,19 @@ declare module '@polkadot/api-base/types/consts' {
     };
     priceIndex: {
       /**
-       * The maximum number of oracle operators that can be authorized
+       * The max price difference dropping below target or raising above target per tick. There's
+       * no corresponding constant for time to recovery to target
        **/
-      maxDowntimeBeforeReset: u64 & AugmentedConst<ApiType>;
+      maxArgonChangePerTickAwayFromTarget: u128 & AugmentedConst<ApiType>;
+      maxArgonTargetChangePerTick: u128 & AugmentedConst<ApiType>;
+      /**
+       * The maximum number of ticks to preserve a price index
+       **/
+      maxDowntimeTicksBeforeReset: u32 & AugmentedConst<ApiType>;
       /**
        * The oldest history to keep
        **/
-      oldestPriceAllowed: u64 & AugmentedConst<ApiType>;
+      maxPriceAgeInTicks: u32 & AugmentedConst<ApiType>;
     };
     proxy: {
       /**
@@ -409,6 +415,10 @@ declare module '@polkadot/api-base/types/consts' {
        **/
       blocksPerDay: u32 & AugmentedConst<ApiType>;
       /**
+       * The max pending vault term changes per block
+       **/
+      maxPendingTermModificationsPerBlock: u32 & AugmentedConst<ApiType>;
+      /**
        * The max amount of pending bitcoin pubkey hashes allowed
        **/
       maxPendingVaultBitcoinPubkeys: u32 & AugmentedConst<ApiType>;
@@ -416,6 +426,12 @@ declare module '@polkadot/api-base/types/consts' {
        * Minimum amount for a bond
        **/
       minimumBondAmount: u128 & AugmentedConst<ApiType>;
+      /**
+       * The number of blocks that a change in terms will take before applying. Terms only apply
+       * on a slot changeover, so this setting is the minimum blocks that must pass, in
+       * addition to the time to the next slot after that
+       **/
+      minTermsModificationBlockDelay: u32 & AugmentedConst<ApiType>;
     };
   } // AugmentedConsts
 } // declare module

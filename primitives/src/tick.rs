@@ -55,6 +55,11 @@ impl Ticker {
 	}
 
 	#[cfg(feature = "std")]
+	pub fn ticks_for_duration(&self, duration: Duration) -> Tick {
+		(duration.as_millis() / self.tick_duration_millis as u128) as Tick
+	}
+
+	#[cfg(feature = "std")]
 	pub fn current(&self) -> Tick {
 		self.tick_for_time(now())
 	}
@@ -63,7 +68,7 @@ impl Ticker {
 		let now = timestamp_millis
 			.checked_add_signed(self.ntp_offset_millis)
 			.unwrap_or(timestamp_millis);
-		let offset = now - self.genesis_utc_time;
+		let offset = now.saturating_sub(self.genesis_utc_time);
 		let tick = offset / self.tick_duration_millis;
 		tick as Tick
 	}

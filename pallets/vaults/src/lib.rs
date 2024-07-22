@@ -39,7 +39,7 @@ pub mod pallet {
 			AtLeast32BitUnsigned, CheckedAdd, CheckedDiv, CheckedSub, UniqueSaturatedInto, Zero,
 		},
 		DispatchError::Token,
-		FixedPointNumber, FixedU128, Percent, Saturating, TokenError,
+		FixedPointNumber, FixedU128, Saturating, TokenError,
 	};
 	use sp_std::{fmt::Debug, vec};
 
@@ -48,8 +48,8 @@ pub mod pallet {
 			create_timelock_multisig_script, BitcoinCosignScriptPubkey, BitcoinHeight,
 			BitcoinPubkeyHash, UtxoId,
 		},
-		bond::{Bond, BondError, BondType, Vault, VaultArgons, VaultProvider},
-		VaultId,
+		bond::{Bond, BondError, BondType, Vault, VaultArgons, VaultProvider, VaultTerms},
+		MiningSlotProvider, VaultId,
 	};
 
 	use super::*;
@@ -91,6 +91,18 @@ pub mod pallet {
 		/// The max amount of pending bitcoin pubkey hashes allowed
 		#[pallet::constant]
 		type MaxPendingVaultBitcoinPubkeys: Get<u32>;
+		/// The max pending vault term changes per block
+		#[pallet::constant]
+		type MaxPendingTermModificationsPerBlock: Get<u32>;
+
+		/// The number of blocks that a change in terms will take before applying. Terms only apply
+		/// on a slot changeover, so this setting is the minimum blocks that must pass, in
+		/// addition to the time to the next slot after that
+		#[pallet::constant]
+		type MinTermsModificationBlockDelay: Get<BlockNumberFor<Self>>;
+
+		/// A provider of mining slot information
+		type MiningSlotProvider: MiningSlotProvider<BlockNumberFor<Self>>;
 	}
 
 	/// A reason for the pallet placing a hold on funds.
@@ -105,8 +117,13 @@ pub mod pallet {
 
 	/// Vaults by id
 	#[pallet::storage]
-	pub(super) type VaultsById<T: Config> =
-		StorageMap<_, Twox64Concat, VaultId, Vault<T::AccountId, T::Balance>, OptionQuery>;
+	pub(super) type VaultsById<T: Config> = StorageMap<
+		_,
+		Twox64Concat,
+		VaultId,
+		Vault<T::AccountId, T::Balance, BlockNumberFor<T>>,
+		OptionQuery,
+	>;
 
 	/// Vault Bitcoin Pubkeys by VaultId
 	#[pallet::storage]
@@ -116,6 +133,16 @@ pub mod pallet {
 		VaultId,
 		BoundedVec<BitcoinPubkeyHash, T::MaxPendingVaultBitcoinPubkeys>,
 		OptionQuery,
+	>;
+	/// Pending terms that will be committed at the given block number (must be a minimum of 1 slot
+	/// change away)
+	#[pallet::storage]
+	pub(super) type PendingTermsModificationsByBlock<T: Config> = StorageMap<
+		_,
+		Twox64Concat,
+		BlockNumberFor<T>,
+		BoundedVec<VaultId, T::MaxPendingTermModificationsPerBlock>,
+		ValueQuery,
 	>;
 
 	#[pallet::event]
@@ -133,6 +160,13 @@ pub mod pallet {
 			bitcoin_argons: T::Balance,
 			mining_argons: T::Balance,
 			securitization_percent: FixedU128,
+		},
+		VaultTermsChangeScheduled {
+			vault_id: VaultId,
+			change_block: BlockNumberFor<T>,
+		},
+		VaultTermsChanged {
+			vault_id: VaultId,
 		},
 		VaultClosed {
 			vault_id: VaultId,
@@ -183,6 +217,10 @@ pub mod pallet {
 		FeeExceedsBondAmount,
 		/// No Vault public keys are available
 		NoVaultBitcoinPubkeysAvailable,
+		/// The terms modification list could not handle any more items
+		TermsModificationOverflow,
+		/// Terms are already scheduled to be changed
+		TermsChangeAlreadyScheduled,
 	}
 
 	impl<T> From<BondError> for Error<T> {
@@ -226,34 +264,47 @@ pub mod pallet {
 		Balance: Codec + MaxEncodedLen + Clone + TypeInfo + PartialEq + Eq + Debug,
 		MaxPendingVaultBitcoinPubkeys: Get<u32>,
 	> {
-		/// The annual percent rate per argon vaulted for bitcoin bonds
-		#[codec(compact)]
-		pub bitcoin_annual_percent_rate: FixedU128,
+		/// Terms of this vault configuration
+		pub terms: VaultTerms<Balance>,
 		/// The amount of argons to be vaulted for bitcoin bonds
 		#[codec(compact)]
 		pub bitcoin_amount_allocated: Balance,
 		/// An initial set of public keys to be used for bitcoin bonds
 		pub bitcoin_pubkey_hashes: BoundedVec<BitcoinPubkeyHash, MaxPendingVaultBitcoinPubkeys>,
-		/// The base fee for a bitcoin bond
-		#[codec(compact)]
-		pub bitcoin_base_fee: Balance,
-		/// The annual percent rate per argon vaulted for mining bonds
-		#[codec(compact)]
-		pub mining_annual_percent_rate: FixedU128,
 		/// The amount of argons to be vaulted for mining bonds
 		#[codec(compact)]
 		pub mining_amount_allocated: Balance,
-		/// A base fee for mining bonds
-		#[codec(compact)]
-		pub mining_base_fee: Balance,
-		/// The optional sharing of any argons minted for stabilization or mined from blocks
-		#[codec(compact)]
-		pub mining_reward_sharing_percent_take: Percent, // max 100, actual percent
 		/// The securitization percent for the vault (must be maintained going forward)
 		#[codec(compact)]
 		pub securitization_percent: FixedU128,
 	}
 
+	#[pallet::hooks]
+	impl<T: Config> Hooks<BlockNumberFor<T>> for Pallet<T> {
+		fn on_initialize(_n: BlockNumberFor<T>) -> Weight {
+			T::DbWeight::get().reads_writes(0, 0)
+		}
+		fn on_finalize(n: BlockNumberFor<T>) {
+			let terms = PendingTermsModificationsByBlock::<T>::take(n);
+			for vault_id in terms {
+				VaultsById::<T>::mutate(vault_id, |vault| {
+					let Some(vault) = vault else {
+						return;
+					};
+					if let Some((_, terms)) = vault.pending_terms.take() {
+						vault.bitcoin_argons.annual_percent_rate =
+							terms.bitcoin_annual_percent_rate;
+						vault.bitcoin_argons.base_fee = terms.bitcoin_base_fee;
+						vault.mining_argons.annual_percent_rate = terms.mining_annual_percent_rate;
+						vault.mining_argons.base_fee = terms.mining_base_fee;
+						vault.mining_reward_sharing_percent_take =
+							terms.mining_reward_sharing_percent_take;
+						Self::deposit_event(Event::VaultTermsChanged { vault_id });
+					}
+				});
+			}
+		}
+	}
 	#[pallet::call]
 	impl<T: Config> Pallet<T> {
 		#[pallet::call_index(0)]
@@ -265,15 +316,18 @@ pub mod pallet {
 			let who = ensure_signed(origin)?;
 			let VaultConfig {
 				securitization_percent,
-				mining_annual_percent_rate,
-				bitcoin_annual_percent_rate,
+				terms,
 				bitcoin_amount_allocated,
 				mining_amount_allocated,
-				bitcoin_base_fee,
 				bitcoin_pubkey_hashes,
-				mining_reward_sharing_percent_take,
-				mining_base_fee,
 			} = vault_config;
+			let VaultTerms {
+				bitcoin_annual_percent_rate,
+				bitcoin_base_fee,
+				mining_base_fee,
+				mining_annual_percent_rate,
+				mining_reward_sharing_percent_take,
+			} = terms;
 
 			ensure!(
 				securitization_percent <= FixedU128::from_rational(2, 1),
@@ -306,6 +360,7 @@ pub mod pallet {
 				securitization_percent,
 				securitized_argons: 0u32.into(),
 				is_closed: false,
+				pending_terms: None,
 			};
 			VaultPubkeysById::<T>::insert(vault_id, bitcoin_pubkey_hashes);
 
@@ -338,9 +393,6 @@ pub mod pallet {
 		/// The amount offered may not go below the existing bonded amounts, but you can release
 		/// funds in this vault as bonds are released. To stop issuing any more bonds, use the
 		/// `close` api.
-		// NOTE to developers: This api does not allow users to modify APRs so that users don't
-		// submit bond requests that have a different APR by the time their bond request is
-		// accepted
 		#[pallet::call_index(1)]
 		#[pallet::weight(0)]
 		pub fn modify_funding(
@@ -415,9 +467,55 @@ pub mod pallet {
 			Ok(())
 		}
 
+		/// Change the terms of this vault. The change will be applied at the next mining slot
+		/// change that is at least `MinTermsModificationBlockDelay` blocks away.
+		#[pallet::call_index(2)]
+		#[pallet::weight(0)]
+		pub fn modify_terms(
+			origin: OriginFor<T>,
+			vault_id: VaultId,
+			terms: VaultTerms<T::Balance>,
+		) -> DispatchResult {
+			let who = ensure_signed(origin)?;
+			let mut vault =
+				VaultsById::<T>::get(vault_id).ok_or::<Error<T>>(Error::<T>::VaultNotFound)?;
+
+			ensure!(vault.operator_account_id == who, Error::<T>::NoPermissions);
+			ensure!(vault.pending_terms.is_none(), Error::<T>::TermsChangeAlreadyScheduled);
+
+			let block_number = frame_system::Pallet::<T>::block_number();
+			let mut terms_change_block = T::MiningSlotProvider::get_next_slot_block_number();
+
+			if terms_change_block.saturating_sub(block_number) <
+				T::MinTermsModificationBlockDelay::get()
+			{
+				// delay until next slot
+				let window = T::MiningSlotProvider::mining_window_blocks();
+				terms_change_block = terms_change_block.saturating_add(window);
+			}
+
+			PendingTermsModificationsByBlock::<T>::mutate(terms_change_block, |a| {
+				if !a.iter().any(|x| *x == vault_id) {
+					return a.try_push(vault_id)
+				}
+				Ok(())
+			})
+			.map_err(|_| Error::<T>::TermsModificationOverflow)?;
+
+			vault.pending_terms = Some((terms_change_block, terms));
+			VaultsById::<T>::insert(vault_id, vault);
+
+			Self::deposit_event(Event::VaultTermsChangeScheduled {
+				vault_id,
+				change_block: terms_change_block,
+			});
+
+			Ok(())
+		}
+
 		/// Stop offering additional bonds from this vault. Will not affect existing bond.
 		/// As funds are returned, they will be released to the vault owner.
-		#[pallet::call_index(2)]
+		#[pallet::call_index(3)]
 		#[pallet::weight(0)]
 		pub fn close(origin: OriginFor<T>, vault_id: VaultId) -> DispatchResult {
 			let who = ensure_signed(origin)?;
@@ -459,7 +557,7 @@ pub mod pallet {
 		}
 
 		/// Add public key hashes to the vault. Will be inserted at the beginning of the list.
-		#[pallet::call_index(3)]
+		#[pallet::call_index(4)]
 		#[pallet::weight(0)]
 		pub fn add_bitcoin_pubkey_hashes(
 			origin: OriginFor<T>,
@@ -563,7 +661,9 @@ pub mod pallet {
 		type Balance = T::Balance;
 		type BlockNumber = BlockNumberFor<T>;
 
-		fn get(vault_id: VaultId) -> Option<Vault<Self::AccountId, Self::Balance>> {
+		fn get(
+			vault_id: VaultId,
+		) -> Option<Vault<Self::AccountId, Self::Balance, Self::BlockNumber>> {
 			VaultsById::<T>::get(vault_id)
 		}
 

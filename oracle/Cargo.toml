@@ -1,0 +1,48 @@
+[package]
+name = "ulx-oracle"
+version.workspace = true
+authors.workspace = true
+edition.workspace = true
+rust-version.workspace = true
+license.workspace = true
+repository.workspace = true
+documentation.workspace = true
+homepage.workspace = true
+
+[dependencies]
+anyhow = { workspace = true, features = ["default"] }
+parking_lot = { workspace = true }
+futures = { workspace = true }
+thiserror = { workspace = true }
+tokio = { workspace = true }
+serde = { workspace = true, features = ["default"] }
+serde_json = { workspace = true, features = ["default"] }
+reqwest = { workspace = true, features = ["default"] }
+scraper = { workspace = true }
+hex = { workspace = true }
+sp-runtime = { workspace = true, features = ["default"] }
+sp-core = { workspace = true, features = ["default"] }
+tracing = { workspace = true }
+tracing-subscriber = { workspace = true }
+clap = { workspace = true }
+chrono = { workspace = true }
+rand = { workspace = true }
+
+ulixee-client = { workspace = true }
+ulx-primitives = { workspace = true, features = ["default", "bitcoin"] }
+url = { workspace = true }
+
+bitcoincore-rpc = { workspace = true }
+bitcoin = { workspace = true }
+dotenv = { workspace = true }
+lazy_static = { workspace = true }
+
+[dev-dependencies]
+env_logger = { workspace = true }
+sp-keyring = { workspace = true }
+sp-keystore = { workspace = true }
+ulx-testing = { workspace = true }
+subxt-signer = { workspace = true }
+
+[features]
+fast-runtime = [ "ulx-primitives/fast-runtime" ]

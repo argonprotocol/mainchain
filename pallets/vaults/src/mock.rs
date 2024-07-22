@@ -1,9 +1,10 @@
+use crate as pallet_vaults;
 use env_logger::{Builder, Env};
 use frame_support::{derive_impl, parameter_types, traits::Currency};
+use frame_system::pallet_prelude::BlockNumberFor;
 use sp_core::{ConstU32, ConstU64};
 use sp_runtime::BuildStorage;
-
-use crate as pallet_vaults;
+use ulx_primitives::MiningSlotProvider;
 
 pub type Balance = u128;
 type Block = frame_system::mocking::MockBlock<Test>;
@@ -54,6 +55,19 @@ pub fn set_argons(account_id: u64, amount: Balance) {
 
 parameter_types! {
 	pub static MaxPendingVaultBitcoinPubkeys: u32 = 10;
+	pub static NextSlot: BlockNumberFor<Test> = 100;
+	pub static MiningWindowBlocks: BlockNumberFor<Test> = 100;
+	pub const MinTermsModificationBlockDelay: BlockNumberFor<Test> = 25;
+}
+pub struct StaticMiningSlotProvider;
+impl MiningSlotProvider<BlockNumberFor<Test>> for StaticMiningSlotProvider {
+	fn get_next_slot_block_number() -> BlockNumberFor<Test> {
+		NextSlot::get()
+	}
+
+	fn mining_window_blocks() -> BlockNumberFor<Test> {
+		MiningWindowBlocks::get()
+	}
 }
 impl pallet_vaults::Config for Test {
 	type RuntimeEvent = RuntimeEvent;
@@ -64,6 +78,9 @@ impl pallet_vaults::Config for Test {
 	type BlocksPerDay = ConstU64<1440>;
 	type MinimumBondAmount = MinimumBondAmount;
 	type MaxPendingVaultBitcoinPubkeys = MaxPendingVaultBitcoinPubkeys;
+	type MiningSlotProvider = StaticMiningSlotProvider;
+	type MaxPendingTermModificationsPerBlock = ConstU32<100>;
+	type MinTermsModificationBlockDelay = MinTermsModificationBlockDelay;
 }
 
 // Build genesis storage according to the mock runtime.

@@ -72,7 +72,7 @@ parameter_types! {
 	pub static BitcoinBondDurationBlocks: BitcoinHeight = 365;
 	pub static BitcoinBlockHeight: BitcoinHeight = 0;
 	pub static MinimumBondSatoshis: Satoshis = 10_000_000;
-	pub static DefaultVault: Vault<u64, Balance> = Vault {
+	pub static DefaultVault: Vault<u64, Balance, BlockNumberFor<Test>> = Vault {
 		mining_argons: VaultArgons {
 			allocated: 100_000_000,
 			bonded: 0,
@@ -90,6 +90,7 @@ parameter_types! {
 		mining_reward_sharing_percent_take: Percent::from_percent(0),
 		securitized_argons: 0,
 		is_closed: false,
+		pending_terms: None,
 	};
 
 	pub static NextUtxoId: UtxoId = 1;
@@ -130,7 +131,7 @@ impl VaultProvider for StaticVaultProvider {
 	type AccountId = u64;
 	type BlockNumber = BlockNumberFor<Test>;
 
-	fn get(vault_id: VaultId) -> Option<Vault<Self::AccountId, Self::Balance>> {
+	fn get(vault_id: VaultId) -> Option<Vault<Self::AccountId, Self::Balance, Self::BlockNumber>> {
 		if vault_id == 1 {
 			Some(DefaultVault::get())
 		} else {

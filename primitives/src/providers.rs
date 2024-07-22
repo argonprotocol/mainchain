@@ -164,6 +164,11 @@ pub trait BlockRewardAccountsProvider<AccountId: FullCodec> {
 	fn get_all_rewards_accounts() -> Vec<(AccountId, Option<RewardShare>)>;
 }
 
+pub trait MiningSlotProvider<BlockNumber> {
+	fn get_next_slot_block_number() -> BlockNumber;
+	fn mining_window_blocks() -> BlockNumber;
+}
+
 pub type RewardShare = Percent;
 pub trait AuthorityProvider<AuthorityId, Block, AccountId>
 where

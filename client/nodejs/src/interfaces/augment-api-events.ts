@@ -468,6 +468,8 @@ declare module '@polkadot/api-base/types/events' {
       VaultClosed: AugmentedEvent<ApiType, [vaultId: u32, bitcoinAmountStillBonded: u128, miningAmountStillBonded: u128, securitizationStillBonded: u128], { vaultId: u32, bitcoinAmountStillBonded: u128, miningAmountStillBonded: u128, securitizationStillBonded: u128 }>;
       VaultCreated: AugmentedEvent<ApiType, [vaultId: u32, bitcoinArgons: u128, miningArgons: u128, securitizationPercent: u128, operatorAccountId: AccountId32], { vaultId: u32, bitcoinArgons: u128, miningArgons: u128, securitizationPercent: u128, operatorAccountId: AccountId32 }>;
       VaultModified: AugmentedEvent<ApiType, [vaultId: u32, bitcoinArgons: u128, miningArgons: u128, securitizationPercent: u128], { vaultId: u32, bitcoinArgons: u128, miningArgons: u128, securitizationPercent: u128 }>;
+      VaultTermsChanged: AugmentedEvent<ApiType, [vaultId: u32], { vaultId: u32 }>;
+      VaultTermsChangeScheduled: AugmentedEvent<ApiType, [vaultId: u32, changeBlock: u32], { vaultId: u32, changeBlock: u32 }>;
     };
   } // AugmentedEvents
 } // declare module

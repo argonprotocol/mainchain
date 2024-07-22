@@ -342,7 +342,7 @@ pub struct PanickingBlockImport<B>(B);
 #[async_trait::async_trait]
 impl<B: BlockImport<Block>> BlockImport<Block> for PanickingBlockImport<B>
 where
-	B: Send,
+	B: BlockImport<Block> + Send + Sync,
 {
 	type Error = B::Error;
 
@@ -354,7 +354,7 @@ where
 	}
 
 	async fn check_block(
-		&mut self,
+		&self,
 		block: BlockCheckParams<Block>,
 	) -> Result<ImportResult, Self::Error> {
 		Ok(self.0.check_block(block).await.expect("checking block failed"))
