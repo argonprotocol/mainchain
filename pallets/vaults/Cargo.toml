@@ -25,19 +25,24 @@ sp-runtime = { workspace = true }
 sp-core = { workspace = true }
 ulx-primitives = { workspace = true, features = ["bitcoin"] }
 ulx-bitcoin = { workspace = true, default-features = false }
+k256 = { workspace = true }
+bip32 = { workspace = true, features = ["secp256k1"] }
 
 [dev-dependencies]
 pallet-balances = { workspace = true }
 sp-io = { workspace = true }
+bitcoin = { workspace = true }
 env_logger = { workspace = true }
 
 [features]
 default = [ "std" ]
 std = [
+	"bip32/std",
 	"codec/std",
 	"frame-benchmarking?/std",
 	"frame-support/std",
 	"frame-system/std",
+	"k256/std",
 	"log/std",
 	"pallet-balances/std",
 	"scale-info/std",

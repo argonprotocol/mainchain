@@ -1,15 +1,14 @@
-use std::{collections::BTreeMap, str::FromStr, sync::Arc};
+use std::sync::Arc;
 
 use bitcoin::{
-	bip32::{DerivationPath, Fingerprint, Xpriv, Xpub},
+	bip32::{ChildNumber, DerivationPath, Fingerprint, Xpriv, Xpub},
 	hashes::Hash,
 	secp256k1::Secp256k1,
-	Address, Amount, CompressedPublicKey, FeeRate, Network, PrivateKey, Txid,
+	Amount, FeeRate, Network, PrivateKey, Txid,
 };
 use bitcoind::{
 	anyhow,
-	bitcoincore_rpc::{json::GetRawTransactionResult, RawTx, RpcApi},
-	BitcoinD,
+	bitcoincore_rpc::{RawTx, RpcApi},
 };
 use rand::{rngs::OsRng, RngCore};
 use sp_arithmetic::{per_things::Percent, FixedU128};
@@ -33,9 +32,11 @@ use ulixee_client::{
 };
 use ulx_bitcoin::{CosignScript, UnlockStep, UtxoUnlocker};
 use ulx_primitives::bitcoin::{
-	BitcoinPubkeyHash, BitcoinScriptPubkey, BitcoinSignature, CompressedBitcoinPubkey, Satoshis,
+	BitcoinScriptPubkey, BitcoinSignature, CompressedBitcoinPubkey, Satoshis,
 };
-use ulx_testing::{start_ulx_test_node, UlxTestOracle};
+use ulx_testing::{
+	add_blocks, add_wallet_address, fund_script_address, start_ulx_test_node, UlxTestOracle,
+};
 
 #[tokio::test]
 async fn test_bitcoin_minting_e2e() -> anyhow::Result<()> {
@@ -48,23 +49,14 @@ async fn test_bitcoin_minting_e2e() -> anyhow::Result<()> {
 	let secp = Secp256k1::new();
 	let owner_keypair = PrivateKey::generate(Network::Regtest);
 	let owner_compressed_pubkey = owner_keypair.public_key(&secp);
-	let owner_pubkey_hash: BitcoinPubkeyHash = owner_compressed_pubkey.pubkey_hash().into();
 	let utxo_satoshis: Satoshis = Amount::ONE_BTC.to_sat() + 500;
 	let alice_sr25519 = sr25519::Pair::from_string("//Alice", None).unwrap();
 	let bob_sr25519 = sr25519::Pair::from_string("//Bob", None).unwrap();
 
-	let (vault_master_xpriv, vault_fingerprint) = create_xpriv();
+	let vault_master_xpriv = create_xpriv();
 	let client = test_node.client.clone();
 	let client = Arc::new(client);
-	let mut pubkey_hashes = vec![];
-	let mut vault_mappings = BTreeMap::new();
-	for i in 0..100 {
-		let (vault_compressed_pubkey, vault_hd_path) =
-			derive(&vault_master_xpriv, format!("m/48'/0'/0'/0/{i}").as_str());
-		let vault_pubkey_hash: BitcoinPubkeyHash = vault_compressed_pubkey.pubkey_hash().into();
-		pubkey_hashes.push(vault_pubkey_hash);
-		vault_mappings.insert(vault_pubkey_hash, vault_hd_path);
-	}
+	let xpubkey = Xpub::from_priv(&secp, &vault_master_xpriv);
 	let vault_signer = Sr25519Signer::new(alice_sr25519.clone());
 
 	let _oracle = UlxTestOracle::bitcoin_tip(&test_node).await?;
@@ -116,11 +108,7 @@ async fn test_bitcoin_minting_e2e() -> anyhow::Result<()> {
 					},
 					mining_amount_allocated: 0,
 					bitcoin_amount_allocated: 100_000_000,
-					bitcoin_pubkey_hashes: pubkey_hashes
-						.into_iter()
-						.map(Into::into)
-						.collect::<Vec<_>>()
-						.into(),
+					bitcoin_xpubkey: xpubkey.encode().into(),
 					securitization_percent: FixedU128Ext(FixedU128::from_float(0.0).into_inner()),
 				}),
 				&vault_signer,
@@ -155,12 +143,15 @@ async fn test_bitcoin_minting_e2e() -> anyhow::Result<()> {
 		.await?;
 	println!("bitcoin prices submitted");
 
+	let ulx_owner_compressed_pubkey: CompressedBitcoinPubkey = owner_compressed_pubkey.into();
 	// 3. User calls bond api to start a bitcoin bond
 	let bond_tx = client
 		.live
 		.tx()
 		.sign_and_submit_then_watch_default(
-			&tx().bonds().bond_bitcoin(vault_id, utxo_satoshis, owner_pubkey_hash.into()),
+			&tx()
+				.bonds()
+				.bond_bitcoin(vault_id, utxo_satoshis, ulx_owner_compressed_pubkey.into()),
 			&Sr25519Signer::new(bob_sr25519.clone()),
 		)
 		.await?
@@ -176,13 +167,13 @@ async fn test_bitcoin_minting_e2e() -> anyhow::Result<()> {
 		.await?
 		.expect("utxo");
 
-	assert_eq!(utxo.owner_pubkey_hash.0, owner_pubkey_hash.0);
+	assert_eq!(utxo.owner_pubkey.0.to_vec(), owner_compressed_pubkey.to_bytes());
 
 	// 3. Owner recreates the script from the details and submits to blockchain
 	let script_address = {
 		let cosign_script = CosignScript::new(
-			BitcoinPubkeyHash(utxo.vault_pubkey_hash.0),
-			BitcoinPubkeyHash(utxo.owner_pubkey_hash.0),
+			utxo.vault_pubkey.clone().into(),
+			utxo.owner_pubkey.clone().into(),
 			utxo.vault_claim_height,
 			utxo.open_claim_height,
 			utxo.register_block,
@@ -262,8 +253,8 @@ async fn test_bitcoin_minting_e2e() -> anyhow::Result<()> {
 	let feerate = FeeRate::from_sat_per_vb(15).expect("cant translate fee");
 
 	let user_cosign_script = CosignScript::new(
-		BitcoinPubkeyHash(utxo.vault_pubkey_hash.0),
-		BitcoinPubkeyHash(utxo.owner_pubkey_hash.0),
+		utxo.vault_pubkey.clone().into(),
+		utxo.owner_pubkey.clone().into(),
 		utxo.vault_claim_height,
 		utxo.open_claim_height,
 		utxo.register_block,
@@ -309,25 +300,28 @@ async fn test_bitcoin_minting_e2e() -> anyhow::Result<()> {
 			out_script_pubkey.clone().into(),
 		)
 		.expect("unlocker");
+		let utxo = client
+			.fetch_storage(&storage().bonds().utxos_by_id(utxo_id), None)
+			.await?
+			.expect("utxo");
 
-		let vault_pubkey_hash = BitcoinPubkeyHash(utxo.vault_pubkey_hash.0);
+		let child_number = ChildNumber::from(utxo.vault_xpub_source.1);
+		assert_eq!(child_number, ChildNumber::from_normal_idx(1).expect("child number"));
+		let fingerprint = Fingerprint::from(utxo.vault_xpub_source.0);
+		let derivation_path = DerivationPath::from(vec![child_number]);
+		assert_eq!(fingerprint, xpubkey.fingerprint());
 
-		let vault_hd_path = vault_mappings.get(&vault_pubkey_hash).unwrap();
 		let (vault_signature, vault_pubkey) = unlocker
-			.sign_derived(vault_master_xpriv, (vault_fingerprint, vault_hd_path.clone()))
+			.sign_derived(vault_master_xpriv, (fingerprint, derivation_path))
 			.expect("sign");
+		assert_eq!(vault_pubkey.to_bytes(), utxo.vault_pubkey.0.to_vec());
 		let vault_signature: BitcoinSignature = vault_signature.try_into().unwrap();
-		let vault_pubkey: CompressedBitcoinPubkey = vault_pubkey.into();
 
 		let progress = client
 			.live
 			.tx()
 			.sign_and_submit_then_watch_default(
-				&tx().bonds().cosign_bitcoin_unlock(
-					unlock_event.bond_id,
-					vault_pubkey.into(),
-					vault_signature.into(),
-				),
+				&tx().bonds().cosign_bitcoin_unlock(unlock_event.bond_id, vault_signature.into()),
 				&vault_signer,
 			)
 			.await?;
@@ -348,6 +342,11 @@ async fn test_bitcoin_minting_e2e() -> anyhow::Result<()> {
 		)
 		.unwrap();
 
+		let utxo = client
+			.fetch_storage(&storage().bonds().utxos_by_id(utxo_id), None)
+			.await?
+			.expect("utxo");
+
 		while let Some(block) = finalized_sub.next().await {
 			let block = block?;
 			let utxo_unlock =
@@ -355,7 +354,7 @@ async fn test_bitcoin_minting_e2e() -> anyhow::Result<()> {
 			if let Some(utxo_unlock) = utxo_unlock {
 				if utxo_unlock.bond_id == bond_event.bond_id {
 					unlocker.add_signature(
-						CompressedBitcoinPubkey::from(utxo_unlock.pubkey).try_into().unwrap(),
+						CompressedBitcoinPubkey::from(utxo.vault_pubkey).try_into().unwrap(),
 						BitcoinSignature::try_from(utxo_unlock.signature)
 							.unwrap()
 							.try_into()
@@ -378,82 +377,8 @@ async fn test_bitcoin_minting_e2e() -> anyhow::Result<()> {
 	Ok(())
 }
 
-fn fund_script_address(
-	bitcoind: &BitcoinD,
-	script_address: &Address,
-	amount: Satoshis,
-	block_address: &Address,
-) -> (Txid, u32, GetRawTransactionResult) {
-	let txid = bitcoind
-		.client
-		.send_to_address(
-			script_address,
-			Amount::from_sat(amount),
-			None,
-			None,
-			None,
-			None,
-			None,
-			None,
-		)
-		.unwrap();
-	let tx = wait_for_txid(bitcoind, &txid, block_address);
-	let vout = tx
-		.vout
-		.iter()
-		.position(|o| o.script_pub_key.script().unwrap() == script_address.script_pubkey())
-		.unwrap() as u32;
-	(txid, vout, tx)
-}
-
-fn wait_for_txid(
-	bitcoind: &BitcoinD,
-	txid: &Txid,
-	block_address: &Address,
-) -> GetRawTransactionResult {
-	loop {
-		// Attempt to get the raw transaction with verbose output
-		let result = bitcoind.client.call::<GetRawTransactionResult>(
-			"getrawtransaction",
-			&[txid.to_string().into(), 1.into()],
-		);
-
-		if let Ok(tx) = result {
-			if tx.confirmations.unwrap_or_default() > 1 {
-				return tx;
-			}
-		}
-		std::thread::sleep(std::time::Duration::from_secs(1));
-		add_blocks(bitcoind, 1, block_address);
-	}
-}
-
-fn create_xpriv() -> (Xpriv, Fingerprint) {
-	let secp = Secp256k1::new();
+fn create_xpriv() -> Xpriv {
 	let mut seed = [0u8; 32];
 	OsRng.fill_bytes(&mut seed);
-	let master_xpriv = Xpriv::new_master(Network::Regtest, &seed).unwrap();
-	let master_xpub = Xpub::from_priv(&secp, &master_xpriv);
-	let fingerprint = master_xpub.fingerprint();
-	(master_xpriv, fingerprint)
-}
-
-fn derive(master_xpriv: &Xpriv, path: &str) -> (CompressedPublicKey, DerivationPath) {
-	let secp = Secp256k1::new();
-	let path = DerivationPath::from_str(path).expect("Invalid derivation path");
-	let child_xpriv = master_xpriv.derive_priv(&secp, &path).expect("Unable to derive child key");
-
-	let vault_privkey = child_xpriv.to_priv();
-	let vault_compressed_pubkey = CompressedPublicKey::from_private_key(&secp, &vault_privkey)
-		.expect("Unable to derive pubkey");
-	(vault_compressed_pubkey, path)
-}
-
-fn add_wallet_address(bitcoind: &BitcoinD) -> Address {
-	let address = bitcoind.client.get_new_address(None, None).unwrap();
-	address.require_network(Network::Regtest).unwrap()
-}
-
-fn add_blocks(bitcoind: &BitcoinD, count: u64, grant_to_address: &Address) {
-	bitcoind.client.generate_to_address(count, grant_to_address).unwrap();
+	Xpriv::new_master(Network::Regtest, &seed).unwrap()
 }

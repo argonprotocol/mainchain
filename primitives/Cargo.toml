@@ -42,6 +42,10 @@ bitcoin = { workspace = true, optional = true }
 rpassword = { workspace = true, optional = true }
 anyhow = { workspace = true, optional = true }
 
+k256 = { workspace = true, optional = true }
+bip32 = { workspace = true, optional = true, features = ["secp256k1"] }
+base58 = { workspace = true, optional = true }
+
 [build-dependencies]
 uniffi = { workspace = true, features = ["build"] }
 
@@ -55,6 +59,7 @@ std = [
 	"anyhow",
 	"anyhow?/std",
 	"async-trait",
+	"bip32?/std",
 	"bitcoin?/std",
 	"clap",
 	"codec/derive",
@@ -62,6 +67,7 @@ std = [
 	"frame-support-procedural/std",
 	"frame-support/std",
 	"hex",
+	"k256?/std",
 	"rpassword",
 	"rsntp",
 	"sc-keystore",
@@ -86,4 +92,4 @@ std = [
 fast-runtime = [ "sp-debug-derive/force-debug" ]
 napi = [ "napi-derive/type-def", "napi/napi9", "napi/serde-json" ]
 uniffi = [ "dep:uniffi" ]
-bitcoin = [ "dep:bitcoin" ]
+bitcoin = [ "base58", "bip32", "dep:bitcoin", "k256" ]

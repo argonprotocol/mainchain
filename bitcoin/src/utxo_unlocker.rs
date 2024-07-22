@@ -7,16 +7,13 @@ use bitcoin::{
 	psbt::Input,
 	sighash::SighashCache,
 	transaction::Version,
-	Amount, EcdsaSighashType, OutPoint, PrivateKey, Psbt, PubkeyHash, PublicKey, ScriptBuf,
-	Sequence, Transaction, TxIn, TxOut, Witness,
+	Amount, EcdsaSighashType, OutPoint, PrivateKey, Psbt, PublicKey, ScriptBuf, Sequence,
+	Transaction, TxIn, TxOut, Witness,
 };
 use k256::ecdsa::signature::Verifier;
 
 use ulx_primitives::{
-	bitcoin::{
-		BitcoinError, BitcoinHeight, BitcoinPubkeyHash, BitcoinSignature, CompressedBitcoinPubkey,
-		Satoshis,
-	},
+	bitcoin::{BitcoinError, BitcoinHeight, BitcoinSignature, CompressedBitcoinPubkey, Satoshis},
 	ensure,
 };
 
@@ -77,8 +74,8 @@ impl UtxoUnlocker {
 
 	#[allow(clippy::too_many_arguments)]
 	pub fn new(
-		vault_pubkey_hash: PubkeyHash,
-		owner_pubkey_hash: PubkeyHash,
+		vault_pubkey: PublicKey,
+		owner_pubkey: PublicKey,
 		created_at_height: BitcoinHeight,
 		vault_claim_height: BitcoinHeight,
 		open_claim_height: BitcoinHeight,
@@ -91,8 +88,8 @@ impl UtxoUnlocker {
 	) -> Result<Self, Error> {
 		Self::from_script(
 			CosignScript::new(
-				vault_pubkey_hash.into(),
-				owner_pubkey_hash.into(),
+				vault_pubkey.into(),
+				owner_pubkey.into(),
 				vault_claim_height,
 				open_claim_height,
 				created_at_height,
@@ -183,14 +180,12 @@ impl UtxoUnlocker {
 		let psbt = &mut self.psbt;
 		let mut sigs: Vec<Vec<u8>> = vec![];
 		for (pubkey, sig) in psbt.inputs[0].partial_sigs.iter() {
-			let pubkey_hash: BitcoinPubkeyHash = pubkey.pubkey_hash().into();
+			let compressed: CompressedBitcoinPubkey = (*pubkey).into();
 			// vault is verified on stack first
-			if pubkey_hash == self.cosign_script.vault_pubkey_hash {
+			if compressed == self.cosign_script.vault_pubkey {
 				sigs.push(sig.to_vec());
-				sigs.push(pubkey.to_bytes());
-			} else if pubkey_hash == self.cosign_script.owner_pubkey_hash {
+			} else if compressed == self.cosign_script.owner_pubkey {
 				sigs.insert(0, sig.to_vec());
-				sigs.insert(1, pubkey.to_bytes());
 			} else {
 				return Err(Error::UnknownPubkeyHash);
 			}

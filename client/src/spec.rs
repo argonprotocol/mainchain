@@ -1145,9 +1145,10 @@ pub mod api {
 						"query_call_info",
 						types::QueryCallInfo { call, len },
 						[
-							76u8, 34u8, 186u8, 69u8, 156u8, 43u8, 133u8, 175u8, 14u8, 38u8, 151u8,
-							94u8, 115u8, 42u8, 182u8, 245u8, 144u8, 98u8, 14u8, 68u8, 174u8, 64u8,
-							239u8, 47u8, 147u8, 5u8, 20u8, 187u8, 195u8, 177u8, 176u8, 177u8,
+							196u8, 216u8, 178u8, 194u8, 123u8, 12u8, 120u8, 172u8, 162u8, 93u8,
+							169u8, 166u8, 128u8, 36u8, 77u8, 67u8, 213u8, 97u8, 170u8, 206u8,
+							210u8, 71u8, 249u8, 81u8, 3u8, 144u8, 137u8, 210u8, 232u8, 0u8, 134u8,
+							90u8,
 						],
 					)
 				}
@@ -1165,10 +1166,9 @@ pub mod api {
 						"query_call_fee_details",
 						types::QueryCallFeeDetails { call, len },
 						[
-							153u8, 1u8, 167u8, 207u8, 103u8, 142u8, 128u8, 54u8, 201u8, 198u8,
-							227u8, 45u8, 43u8, 136u8, 162u8, 48u8, 239u8, 132u8, 121u8, 171u8,
-							169u8, 149u8, 124u8, 88u8, 48u8, 87u8, 18u8, 134u8, 48u8, 96u8, 248u8,
-							246u8,
+							196u8, 99u8, 79u8, 154u8, 85u8, 232u8, 119u8, 137u8, 205u8, 107u8,
+							60u8, 69u8, 4u8, 191u8, 7u8, 245u8, 21u8, 136u8, 200u8, 186u8, 198u8,
+							57u8, 232u8, 231u8, 150u8, 8u8, 181u8, 74u8, 84u8, 210u8, 24u8, 57u8,
 						],
 					)
 				}
@@ -2886,9 +2886,9 @@ pub mod api {
 			.hash();
 		runtime_metadata_hash ==
 			[
-				115u8, 147u8, 135u8, 240u8, 233u8, 84u8, 51u8, 242u8, 5u8, 55u8, 94u8, 60u8, 182u8,
-				14u8, 10u8, 84u8, 91u8, 146u8, 87u8, 20u8, 147u8, 130u8, 178u8, 62u8, 145u8, 32u8,
-				173u8, 221u8, 39u8, 194u8, 225u8, 246u8,
+				18u8, 145u8, 115u8, 67u8, 201u8, 28u8, 152u8, 68u8, 78u8, 110u8, 47u8, 4u8, 79u8,
+				25u8, 219u8, 93u8, 248u8, 114u8, 64u8, 174u8, 232u8, 41u8, 61u8, 33u8, 13u8, 27u8,
+				29u8, 228u8, 46u8, 94u8, 171u8, 66u8,
 			]
 	}
 	pub mod system {
@@ -4039,10 +4039,9 @@ pub mod api {
 						"Events",
 						(),
 						[
-							135u8, 123u8, 56u8, 141u8, 189u8, 44u8, 135u8, 192u8, 236u8, 87u8,
-							255u8, 188u8, 232u8, 178u8, 199u8, 187u8, 19u8, 173u8, 203u8, 157u8,
-							32u8, 19u8, 244u8, 251u8, 15u8, 242u8, 176u8, 48u8, 190u8, 151u8,
-							223u8, 232u8,
+							95u8, 235u8, 146u8, 147u8, 94u8, 33u8, 193u8, 189u8, 64u8, 156u8, 46u8,
+							151u8, 158u8, 245u8, 175u8, 210u8, 231u8, 154u8, 254u8, 134u8, 94u8,
+							88u8, 102u8, 190u8, 45u8, 47u8, 8u8, 32u8, 36u8, 128u8, 131u8, 65u8,
 						],
 					)
 				}
@@ -4822,10 +4821,9 @@ pub mod api {
 							call: ::subxt::ext::subxt_core::alloc::boxed::Box::new(call),
 						},
 						[
-							104u8, 178u8, 157u8, 234u8, 74u8, 228u8, 122u8, 90u8, 5u8, 211u8,
-							221u8, 232u8, 165u8, 220u8, 246u8, 255u8, 116u8, 174u8, 231u8, 92u8,
-							27u8, 83u8, 214u8, 3u8, 218u8, 134u8, 133u8, 13u8, 234u8, 230u8, 122u8,
-							177u8,
+							203u8, 124u8, 235u8, 127u8, 112u8, 154u8, 142u8, 202u8, 39u8, 172u8,
+							218u8, 79u8, 79u8, 60u8, 153u8, 65u8, 75u8, 87u8, 47u8, 79u8, 75u8,
+							250u8, 45u8, 147u8, 78u8, 65u8, 19u8, 30u8, 191u8, 226u8, 146u8, 183u8,
 						],
 					)
 				}
@@ -4887,9 +4885,10 @@ pub mod api {
 							max_weight,
 						},
 						[
-							195u8, 186u8, 95u8, 254u8, 134u8, 178u8, 216u8, 255u8, 179u8, 116u8,
-							243u8, 9u8, 46u8, 210u8, 79u8, 150u8, 195u8, 200u8, 0u8, 94u8, 115u8,
-							202u8, 159u8, 34u8, 206u8, 79u8, 205u8, 60u8, 154u8, 242u8, 41u8, 28u8,
+							193u8, 147u8, 23u8, 229u8, 165u8, 248u8, 45u8, 105u8, 147u8, 127u8,
+							222u8, 90u8, 36u8, 184u8, 89u8, 186u8, 201u8, 36u8, 241u8, 133u8,
+							228u8, 138u8, 52u8, 95u8, 208u8, 83u8, 101u8, 227u8, 249u8, 124u8,
+							142u8, 19u8,
 						],
 					)
 				}
@@ -5752,9 +5751,10 @@ pub mod api {
 							call: ::subxt::ext::subxt_core::alloc::boxed::Box::new(call),
 						},
 						[
-							6u8, 50u8, 70u8, 143u8, 13u8, 199u8, 21u8, 53u8, 232u8, 135u8, 102u8,
-							120u8, 36u8, 181u8, 146u8, 125u8, 33u8, 215u8, 219u8, 26u8, 199u8,
-							244u8, 57u8, 222u8, 83u8, 89u8, 136u8, 204u8, 246u8, 31u8, 104u8, 30u8,
+							139u8, 176u8, 152u8, 94u8, 236u8, 123u8, 254u8, 196u8, 139u8, 130u8,
+							84u8, 174u8, 175u8, 117u8, 84u8, 240u8, 194u8, 5u8, 181u8, 116u8,
+							187u8, 243u8, 168u8, 60u8, 75u8, 26u8, 163u8, 126u8, 236u8, 43u8,
+							159u8, 88u8,
 						],
 					)
 				}
@@ -6016,10 +6016,10 @@ pub mod api {
 							call: ::subxt::ext::subxt_core::alloc::boxed::Box::new(call),
 						},
 						[
-							249u8, 198u8, 158u8, 55u8, 114u8, 143u8, 171u8, 218u8, 128u8, 199u8,
-							202u8, 22u8, 149u8, 180u8, 76u8, 233u8, 103u8, 1u8, 42u8, 164u8, 206u8,
-							41u8, 130u8, 142u8, 107u8, 90u8, 224u8, 172u8, 153u8, 244u8, 215u8,
-							188u8,
+							187u8, 156u8, 37u8, 226u8, 31u8, 80u8, 188u8, 145u8, 118u8, 169u8,
+							213u8, 28u8, 200u8, 160u8, 174u8, 4u8, 145u8, 238u8, 197u8, 200u8,
+							112u8, 86u8, 195u8, 139u8, 193u8, 167u8, 143u8, 219u8, 104u8, 134u8,
+							152u8, 34u8,
 						],
 					)
 				}
@@ -8201,21 +8201,19 @@ pub mod api {
 					crate_path = ":: subxt :: ext :: subxt_core :: ext :: scale_encode"
 				)]
 				#[doc = "Add public key hashes to the vault. Will be inserted at the beginning of the list."]
-				pub struct AddBitcoinPubkeyHashes {
-					pub vault_id: add_bitcoin_pubkey_hashes::VaultId,
-					pub bitcoin_pubkey_hashes: add_bitcoin_pubkey_hashes::BitcoinPubkeyHashes,
+				pub struct ReplaceBitcoinXpub {
+					pub vault_id: replace_bitcoin_xpub::VaultId,
+					pub bitcoin_xpub: replace_bitcoin_xpub::BitcoinXpub,
 				}
-				pub mod add_bitcoin_pubkey_hashes {
+				pub mod replace_bitcoin_xpub {
 					use super::runtime_types;
 					pub type VaultId = ::core::primitive::u32;
-					pub type BitcoinPubkeyHashes =
-						runtime_types::bounded_collections::bounded_vec::BoundedVec<
-							runtime_types::ulx_primitives::bitcoin::BitcoinPubkeyHash,
-						>;
+					pub type BitcoinXpub =
+						runtime_types::ulx_primitives::bitcoin::OpaqueBitcoinXpub;
 				}
-				impl ::subxt::ext::subxt_core::blocks::StaticExtrinsic for AddBitcoinPubkeyHashes {
+				impl ::subxt::ext::subxt_core::blocks::StaticExtrinsic for ReplaceBitcoinXpub {
 					const PALLET: &'static str = "Vaults";
-					const CALL: &'static str = "add_bitcoin_pubkey_hashes";
+					const CALL: &'static str = "replace_bitcoin_xpub";
 				}
 			}
 			pub struct TransactionApi;
@@ -8229,10 +8227,9 @@ pub mod api {
 						"create",
 						types::Create { vault_config },
 						[
-							235u8, 145u8, 136u8, 106u8, 204u8, 107u8, 30u8, 11u8, 91u8, 240u8,
-							119u8, 130u8, 174u8, 29u8, 65u8, 8u8, 60u8, 191u8, 184u8, 116u8, 255u8,
-							53u8, 216u8, 120u8, 204u8, 249u8, 129u8, 87u8, 255u8, 186u8, 160u8,
-							90u8,
+							188u8, 197u8, 171u8, 201u8, 40u8, 235u8, 74u8, 194u8, 243u8, 5u8,
+							237u8, 170u8, 188u8, 43u8, 25u8, 207u8, 49u8, 7u8, 247u8, 91u8, 101u8,
+							238u8, 50u8, 174u8, 231u8, 9u8, 165u8, 193u8, 29u8, 37u8, 153u8, 137u8,
 						],
 					)
 				}
@@ -8304,21 +8301,20 @@ pub mod api {
 					)
 				}
 				#[doc = "Add public key hashes to the vault. Will be inserted at the beginning of the list."]
-				pub fn add_bitcoin_pubkey_hashes(
+				pub fn replace_bitcoin_xpub(
 					&self,
-					vault_id: types::add_bitcoin_pubkey_hashes::VaultId,
-					bitcoin_pubkey_hashes: types::add_bitcoin_pubkey_hashes::BitcoinPubkeyHashes,
-				) -> ::subxt::ext::subxt_core::tx::payload::StaticPayload<
-					types::AddBitcoinPubkeyHashes,
-				> {
+					vault_id: types::replace_bitcoin_xpub::VaultId,
+					bitcoin_xpub: types::replace_bitcoin_xpub::BitcoinXpub,
+				) -> ::subxt::ext::subxt_core::tx::payload::StaticPayload<types::ReplaceBitcoinXpub>
+				{
 					::subxt::ext::subxt_core::tx::payload::StaticPayload::new_static(
 						"Vaults",
-						"add_bitcoin_pubkey_hashes",
-						types::AddBitcoinPubkeyHashes { vault_id, bitcoin_pubkey_hashes },
+						"replace_bitcoin_xpub",
+						types::ReplaceBitcoinXpub { vault_id, bitcoin_xpub },
 						[
-							207u8, 241u8, 132u8, 96u8, 1u8, 62u8, 232u8, 135u8, 0u8, 67u8, 180u8,
-							11u8, 49u8, 145u8, 211u8, 29u8, 88u8, 103u8, 254u8, 176u8, 83u8, 207u8,
-							10u8, 144u8, 71u8, 6u8, 81u8, 40u8, 143u8, 224u8, 85u8, 39u8,
+							141u8, 31u8, 5u8, 51u8, 41u8, 130u8, 247u8, 227u8, 15u8, 23u8, 191u8,
+							41u8, 13u8, 125u8, 201u8, 93u8, 241u8, 16u8, 192u8, 200u8, 36u8, 41u8,
+							137u8, 34u8, 97u8, 235u8, 250u8, 130u8, 146u8, 211u8, 36u8, 198u8,
 						],
 					)
 				}
@@ -8462,6 +8458,28 @@ pub mod api {
 				const PALLET: &'static str = "Vaults";
 				const EVENT: &'static str = "VaultClosed";
 			}
+			#[derive(
+				:: subxt :: ext :: subxt_core :: ext :: codec :: Decode,
+				:: subxt :: ext :: subxt_core :: ext :: codec :: Encode,
+				:: subxt :: ext :: subxt_core :: ext :: scale_decode :: DecodeAsType,
+				:: subxt :: ext :: subxt_core :: ext :: scale_encode :: EncodeAsType,
+				Clone,
+				Debug,
+			)]
+			# [codec (crate = :: subxt :: ext :: subxt_core :: ext :: codec)]
+			#[decode_as_type(crate_path = ":: subxt :: ext :: subxt_core :: ext :: scale_decode")]
+			#[encode_as_type(crate_path = ":: subxt :: ext :: subxt_core :: ext :: scale_encode")]
+			pub struct VaultBitcoinXpubChange {
+				pub vault_id: vault_bitcoin_xpub_change::VaultId,
+			}
+			pub mod vault_bitcoin_xpub_change {
+				use super::runtime_types;
+				pub type VaultId = ::core::primitive::u32;
+			}
+			impl ::subxt::ext::subxt_core::events::StaticEvent for VaultBitcoinXpubChange {
+				const PALLET: &'static str = "Vaults";
+				const EVENT: &'static str = "VaultBitcoinXpubChange";
+			}
 		}
 		pub mod storage {
 			use super::runtime_types;
@@ -8480,12 +8498,12 @@ pub mod api {
 					>;
 					pub type Param0 = ::core::primitive::u32;
 				}
-				pub mod vault_pubkeys_by_id {
+				pub mod vault_x_pub_by_id {
 					use super::runtime_types;
-					pub type VaultPubkeysById =
-						runtime_types::bounded_collections::bounded_vec::BoundedVec<
-							runtime_types::ulx_primitives::bitcoin::BitcoinPubkeyHash,
-						>;
+					pub type VaultXPubById = (
+						runtime_types::ulx_primitives::bitcoin::BitcoinXPub,
+						::core::primitive::u32,
+					);
 					pub type Param0 = ::core::primitive::u32;
 				}
 				pub mod pending_terms_modifications_by_block {
@@ -8567,52 +8585,52 @@ pub mod api {
 						],
 					)
 				}
-				#[doc = " Vault Bitcoin Pubkeys by VaultId"]
-				pub fn vault_pubkeys_by_id_iter(
+				#[doc = " Vault Bitcoin Xpub and current child counter by VaultId"]
+				pub fn vault_x_pub_by_id_iter(
 					&self,
 				) -> ::subxt::ext::subxt_core::storage::address::StaticAddress<
 					(),
-					types::vault_pubkeys_by_id::VaultPubkeysById,
+					types::vault_x_pub_by_id::VaultXPubById,
 					(),
 					(),
 					::subxt::ext::subxt_core::utils::Yes,
 				> {
 					::subxt::ext::subxt_core::storage::address::StaticAddress::new_static(
 						"Vaults",
-						"VaultPubkeysById",
+						"VaultXPubById",
 						(),
 						[
-							49u8, 205u8, 205u8, 110u8, 184u8, 91u8, 25u8, 215u8, 178u8, 118u8,
-							235u8, 217u8, 79u8, 148u8, 30u8, 112u8, 64u8, 218u8, 237u8, 138u8,
-							79u8, 21u8, 17u8, 143u8, 17u8, 230u8, 143u8, 69u8, 16u8, 179u8, 24u8,
-							177u8,
+							150u8, 175u8, 248u8, 26u8, 129u8, 151u8, 36u8, 165u8, 12u8, 157u8,
+							129u8, 4u8, 86u8, 221u8, 204u8, 163u8, 173u8, 238u8, 253u8, 210u8,
+							199u8, 43u8, 103u8, 171u8, 205u8, 165u8, 94u8, 188u8, 106u8, 135u8,
+							110u8, 158u8,
 						],
 					)
 				}
-				#[doc = " Vault Bitcoin Pubkeys by VaultId"]
-				pub fn vault_pubkeys_by_id(
+				#[doc = " Vault Bitcoin Xpub and current child counter by VaultId"]
+				pub fn vault_x_pub_by_id(
 					&self,
-					_0: impl ::core::borrow::Borrow<types::vault_pubkeys_by_id::Param0>,
+					_0: impl ::core::borrow::Borrow<types::vault_x_pub_by_id::Param0>,
 				) -> ::subxt::ext::subxt_core::storage::address::StaticAddress<
 					::subxt::ext::subxt_core::storage::address::StaticStorageKey<
-						types::vault_pubkeys_by_id::Param0,
+						types::vault_x_pub_by_id::Param0,
 					>,
-					types::vault_pubkeys_by_id::VaultPubkeysById,
+					types::vault_x_pub_by_id::VaultXPubById,
 					::subxt::ext::subxt_core::utils::Yes,
 					(),
 					(),
 				> {
 					::subxt::ext::subxt_core::storage::address::StaticAddress::new_static(
 						"Vaults",
-						"VaultPubkeysById",
+						"VaultXPubById",
 						::subxt::ext::subxt_core::storage::address::StaticStorageKey::new(
 							_0.borrow(),
 						),
 						[
-							49u8, 205u8, 205u8, 110u8, 184u8, 91u8, 25u8, 215u8, 178u8, 118u8,
-							235u8, 217u8, 79u8, 148u8, 30u8, 112u8, 64u8, 218u8, 237u8, 138u8,
-							79u8, 21u8, 17u8, 143u8, 17u8, 230u8, 143u8, 69u8, 16u8, 179u8, 24u8,
-							177u8,
+							150u8, 175u8, 248u8, 26u8, 129u8, 151u8, 36u8, 165u8, 12u8, 157u8,
+							129u8, 4u8, 86u8, 221u8, 204u8, 163u8, 173u8, 238u8, 253u8, 210u8,
+							199u8, 43u8, 103u8, 171u8, 205u8, 165u8, 94u8, 188u8, 106u8, 135u8,
+							110u8, 158u8,
 						],
 					)
 				}
@@ -8704,23 +8722,6 @@ pub mod api {
 						],
 					)
 				}
-				#[doc = " The max amount of pending bitcoin pubkey hashes allowed"]
-				pub fn max_pending_vault_bitcoin_pubkeys(
-					&self,
-				) -> ::subxt::ext::subxt_core::constants::address::StaticAddress<
-					::core::primitive::u32,
-				> {
-					::subxt::ext::subxt_core::constants::address::StaticAddress::new_static(
-						"Vaults",
-						"MaxPendingVaultBitcoinPubkeys",
-						[
-							98u8, 252u8, 116u8, 72u8, 26u8, 180u8, 225u8, 83u8, 200u8, 157u8,
-							125u8, 151u8, 53u8, 76u8, 168u8, 26u8, 10u8, 9u8, 98u8, 68u8, 9u8,
-							178u8, 197u8, 113u8, 31u8, 79u8, 200u8, 90u8, 203u8, 100u8, 41u8,
-							145u8,
-						],
-					)
-				}
 				#[doc = " The max pending vault term changes per block"]
 				pub fn max_pending_term_modifications_per_block(
 					&self,
@@ -8790,19 +8791,20 @@ pub mod api {
 				#[doc = "Script hash to Events. A bondee must create the UTXO in order to be added to the Bitcoin"]
 				#[doc = "Mint line."]
 				#[doc = ""]
-				#[doc = "NOTE: The script"]
+				#[doc = "The pubkey submitted here will be used to create a script pubkey that will be used in a"]
+				#[doc = "timelock multisig script to lock the bitcoin."]
 				pub struct BondBitcoin {
 					pub vault_id: bond_bitcoin::VaultId,
 					#[codec(compact)]
 					pub satoshis: bond_bitcoin::Satoshis,
-					pub bitcoin_pubkey_hash: bond_bitcoin::BitcoinPubkeyHash,
+					pub bitcoin_pubkey: bond_bitcoin::BitcoinPubkey,
 				}
 				pub mod bond_bitcoin {
 					use super::runtime_types;
 					pub type VaultId = ::core::primitive::u32;
 					pub type Satoshis = ::core::primitive::u64;
-					pub type BitcoinPubkeyHash =
-						runtime_types::ulx_primitives::bitcoin::BitcoinPubkeyHash;
+					pub type BitcoinPubkey =
+						runtime_types::ulx_primitives::bitcoin::CompressedBitcoinPubkey;
 				}
 				impl ::subxt::ext::subxt_core::blocks::StaticExtrinsic for BondBitcoin {
 					const PALLET: &'static str = "Bonds";
@@ -8867,14 +8869,11 @@ pub mod api {
 				#[doc = "wallets."]
 				pub struct CosignBitcoinUnlock {
 					pub bond_id: cosign_bitcoin_unlock::BondId,
-					pub pubkey: cosign_bitcoin_unlock::Pubkey,
 					pub signature: cosign_bitcoin_unlock::Signature,
 				}
 				pub mod cosign_bitcoin_unlock {
 					use super::runtime_types;
 					pub type BondId = ::core::primitive::u64;
-					pub type Pubkey =
-						runtime_types::ulx_primitives::bitcoin::CompressedBitcoinPubkey;
 					pub type Signature = runtime_types::ulx_primitives::bitcoin::BitcoinSignature;
 				}
 				impl ::subxt::ext::subxt_core::blocks::StaticExtrinsic for CosignBitcoinUnlock {
@@ -8888,21 +8887,23 @@ pub mod api {
 				#[doc = "Script hash to Events. A bondee must create the UTXO in order to be added to the Bitcoin"]
 				#[doc = "Mint line."]
 				#[doc = ""]
-				#[doc = "NOTE: The script"]
+				#[doc = "The pubkey submitted here will be used to create a script pubkey that will be used in a"]
+				#[doc = "timelock multisig script to lock the bitcoin."]
 				pub fn bond_bitcoin(
 					&self,
 					vault_id: types::bond_bitcoin::VaultId,
 					satoshis: types::bond_bitcoin::Satoshis,
-					bitcoin_pubkey_hash: types::bond_bitcoin::BitcoinPubkeyHash,
+					bitcoin_pubkey: types::bond_bitcoin::BitcoinPubkey,
 				) -> ::subxt::ext::subxt_core::tx::payload::StaticPayload<types::BondBitcoin> {
 					::subxt::ext::subxt_core::tx::payload::StaticPayload::new_static(
 						"Bonds",
 						"bond_bitcoin",
-						types::BondBitcoin { vault_id, satoshis, bitcoin_pubkey_hash },
+						types::BondBitcoin { vault_id, satoshis, bitcoin_pubkey },
 						[
-							11u8, 123u8, 223u8, 173u8, 244u8, 36u8, 76u8, 151u8, 235u8, 70u8, 25u8,
-							119u8, 13u8, 201u8, 225u8, 4u8, 247u8, 155u8, 238u8, 234u8, 250u8,
-							126u8, 248u8, 167u8, 205u8, 65u8, 151u8, 97u8, 31u8, 87u8, 233u8, 89u8,
+							133u8, 147u8, 88u8, 107u8, 144u8, 191u8, 47u8, 21u8, 211u8, 25u8,
+							140u8, 8u8, 128u8, 26u8, 71u8, 117u8, 142u8, 32u8, 213u8, 79u8, 4u8,
+							40u8, 105u8, 30u8, 110u8, 124u8, 227u8, 70u8, 218u8, 114u8, 72u8,
+							161u8,
 						],
 					)
 				}
@@ -8939,18 +8940,17 @@ pub mod api {
 				pub fn cosign_bitcoin_unlock(
 					&self,
 					bond_id: types::cosign_bitcoin_unlock::BondId,
-					pubkey: types::cosign_bitcoin_unlock::Pubkey,
 					signature: types::cosign_bitcoin_unlock::Signature,
 				) -> ::subxt::ext::subxt_core::tx::payload::StaticPayload<types::CosignBitcoinUnlock>
 				{
 					::subxt::ext::subxt_core::tx::payload::StaticPayload::new_static(
 						"Bonds",
 						"cosign_bitcoin_unlock",
-						types::CosignBitcoinUnlock { bond_id, pubkey, signature },
+						types::CosignBitcoinUnlock { bond_id, signature },
 						[
-							78u8, 158u8, 114u8, 130u8, 161u8, 11u8, 26u8, 4u8, 32u8, 206u8, 184u8,
-							156u8, 191u8, 87u8, 201u8, 120u8, 53u8, 68u8, 56u8, 231u8, 249u8, 60u8,
-							101u8, 110u8, 247u8, 8u8, 172u8, 145u8, 95u8, 223u8, 254u8, 44u8,
+							115u8, 117u8, 222u8, 47u8, 88u8, 2u8, 246u8, 84u8, 48u8, 108u8, 146u8,
+							207u8, 157u8, 33u8, 9u8, 130u8, 106u8, 123u8, 36u8, 3u8, 208u8, 133u8,
+							98u8, 71u8, 78u8, 232u8, 175u8, 3u8, 156u8, 236u8, 201u8, 112u8,
 						],
 					)
 				}
@@ -9122,7 +9122,6 @@ pub mod api {
 				pub bond_id: bitcoin_utxo_cosigned::BondId,
 				pub vault_id: bitcoin_utxo_cosigned::VaultId,
 				pub utxo_id: bitcoin_utxo_cosigned::UtxoId,
-				pub pubkey: bitcoin_utxo_cosigned::Pubkey,
 				pub signature: bitcoin_utxo_cosigned::Signature,
 			}
 			pub mod bitcoin_utxo_cosigned {
@@ -9130,7 +9129,6 @@ pub mod api {
 				pub type BondId = ::core::primitive::u64;
 				pub type VaultId = ::core::primitive::u32;
 				pub type UtxoId = ::core::primitive::u64;
-				pub type Pubkey = runtime_types::ulx_primitives::bitcoin::CompressedBitcoinPubkey;
 				pub type Signature = runtime_types::ulx_primitives::bitcoin::BitcoinSignature;
 			}
 			impl ::subxt::ext::subxt_core::events::StaticEvent for BitcoinUtxoCosigned {
@@ -9462,10 +9460,9 @@ pub mod api {
 						"UtxosById",
 						(),
 						[
-							17u8, 124u8, 131u8, 220u8, 113u8, 106u8, 219u8, 50u8, 117u8, 84u8,
-							148u8, 193u8, 223u8, 88u8, 67u8, 94u8, 51u8, 255u8, 82u8, 40u8, 3u8,
-							225u8, 215u8, 55u8, 189u8, 61u8, 254u8, 153u8, 235u8, 147u8, 232u8,
-							240u8,
+							45u8, 50u8, 146u8, 119u8, 202u8, 192u8, 100u8, 246u8, 25u8, 104u8,
+							151u8, 75u8, 193u8, 249u8, 113u8, 23u8, 87u8, 17u8, 217u8, 176u8, 38u8,
+							224u8, 113u8, 82u8, 41u8, 43u8, 144u8, 112u8, 39u8, 89u8, 81u8, 106u8,
 						],
 					)
 				}
@@ -9489,10 +9486,9 @@ pub mod api {
 							_0.borrow(),
 						),
 						[
-							17u8, 124u8, 131u8, 220u8, 113u8, 106u8, 219u8, 50u8, 117u8, 84u8,
-							148u8, 193u8, 223u8, 88u8, 67u8, 94u8, 51u8, 255u8, 82u8, 40u8, 3u8,
-							225u8, 215u8, 55u8, 189u8, 61u8, 254u8, 153u8, 235u8, 147u8, 232u8,
-							240u8,
+							45u8, 50u8, 146u8, 119u8, 202u8, 192u8, 100u8, 246u8, 25u8, 104u8,
+							151u8, 75u8, 193u8, 249u8, 113u8, 23u8, 87u8, 17u8, 217u8, 176u8, 38u8,
+							224u8, 113u8, 82u8, 41u8, 43u8, 144u8, 112u8, 39u8, 89u8, 81u8, 106u8,
 						],
 					)
 				}
@@ -9513,9 +9509,9 @@ pub mod api {
 						"OwedUtxoAggrieved",
 						(),
 						[
-							64u8, 170u8, 57u8, 192u8, 109u8, 155u8, 247u8, 215u8, 67u8, 120u8,
-							218u8, 195u8, 226u8, 202u8, 4u8, 69u8, 191u8, 150u8, 108u8, 54u8, 11u8,
-							173u8, 251u8, 7u8, 92u8, 4u8, 53u8, 234u8, 213u8, 47u8, 41u8, 217u8,
+							130u8, 97u8, 15u8, 177u8, 201u8, 8u8, 217u8, 145u8, 98u8, 244u8, 0u8,
+							75u8, 18u8, 195u8, 253u8, 44u8, 69u8, 188u8, 15u8, 61u8, 44u8, 185u8,
+							124u8, 129u8, 98u8, 225u8, 150u8, 102u8, 101u8, 240u8, 45u8, 221u8,
 						],
 					)
 				}
@@ -9541,9 +9537,9 @@ pub mod api {
 							_0.borrow(),
 						),
 						[
-							64u8, 170u8, 57u8, 192u8, 109u8, 155u8, 247u8, 215u8, 67u8, 120u8,
-							218u8, 195u8, 226u8, 202u8, 4u8, 69u8, 191u8, 150u8, 108u8, 54u8, 11u8,
-							173u8, 251u8, 7u8, 92u8, 4u8, 53u8, 234u8, 213u8, 47u8, 41u8, 217u8,
+							130u8, 97u8, 15u8, 177u8, 201u8, 8u8, 217u8, 145u8, 98u8, 244u8, 0u8,
+							75u8, 18u8, 195u8, 253u8, 44u8, 69u8, 188u8, 15u8, 61u8, 44u8, 185u8,
+							124u8, 129u8, 98u8, 225u8, 150u8, 102u8, 101u8, 240u8, 45u8, 221u8,
 						],
 					)
 				}
@@ -9659,7 +9655,7 @@ pub mod api {
 						],
 					)
 				}
-				#[doc = " The number of blocks a bitcoin bond is locked for"]
+				#[doc = " The number of bitcoin blocks a bitcoin bond is locked for"]
 				pub fn bitcoin_bond_duration_blocks(
 					&self,
 				) -> ::subxt::ext::subxt_core::constants::address::StaticAddress<
@@ -18462,9 +18458,10 @@ pub mod api {
 							call: ::subxt::ext::subxt_core::alloc::boxed::Box::new(call),
 						},
 						[
-							55u8, 119u8, 99u8, 57u8, 192u8, 92u8, 231u8, 244u8, 244u8, 237u8, 59u8,
-							218u8, 145u8, 106u8, 68u8, 100u8, 74u8, 15u8, 227u8, 213u8, 241u8,
-							188u8, 247u8, 0u8, 251u8, 212u8, 55u8, 82u8, 225u8, 183u8, 124u8, 91u8,
+							236u8, 147u8, 81u8, 140u8, 234u8, 30u8, 170u8, 53u8, 10u8, 205u8,
+							145u8, 232u8, 189u8, 238u8, 197u8, 239u8, 108u8, 246u8, 205u8, 47u8,
+							176u8, 236u8, 52u8, 123u8, 179u8, 50u8, 4u8, 96u8, 245u8, 236u8, 51u8,
+							231u8,
 						],
 					)
 				}
@@ -18487,10 +18484,10 @@ pub mod api {
 							weight,
 						},
 						[
-							149u8, 249u8, 27u8, 221u8, 145u8, 150u8, 192u8, 54u8, 211u8, 87u8,
-							244u8, 250u8, 116u8, 210u8, 169u8, 46u8, 98u8, 58u8, 65u8, 145u8,
-							202u8, 74u8, 236u8, 114u8, 181u8, 12u8, 38u8, 37u8, 161u8, 12u8, 149u8,
-							11u8,
+							114u8, 184u8, 123u8, 89u8, 126u8, 56u8, 62u8, 156u8, 245u8, 146u8,
+							222u8, 55u8, 170u8, 201u8, 171u8, 151u8, 29u8, 128u8, 82u8, 111u8,
+							125u8, 112u8, 175u8, 162u8, 46u8, 20u8, 3u8, 248u8, 53u8, 199u8, 14u8,
+							218u8,
 						],
 					)
 				}
@@ -18528,9 +18525,10 @@ pub mod api {
 							call: ::subxt::ext::subxt_core::alloc::boxed::Box::new(call),
 						},
 						[
-							92u8, 21u8, 242u8, 42u8, 8u8, 193u8, 113u8, 165u8, 23u8, 209u8, 102u8,
-							126u8, 74u8, 100u8, 9u8, 163u8, 15u8, 56u8, 140u8, 22u8, 46u8, 72u8,
-							146u8, 188u8, 107u8, 103u8, 78u8, 69u8, 43u8, 143u8, 101u8, 70u8,
+							30u8, 161u8, 184u8, 51u8, 141u8, 62u8, 13u8, 108u8, 230u8, 231u8,
+							143u8, 148u8, 93u8, 159u8, 101u8, 143u8, 4u8, 99u8, 142u8, 199u8,
+							102u8, 161u8, 73u8, 210u8, 140u8, 60u8, 220u8, 33u8, 253u8, 146u8,
+							240u8, 135u8,
 						],
 					)
 				}
@@ -20442,13 +20440,14 @@ pub mod api {
 					#[doc = "Script hash to Events. A bondee must create the UTXO in order to be added to the Bitcoin"]
 					#[doc = "Mint line."]
 					#[doc = ""]
-					#[doc = "NOTE: The script"]
+					#[doc = "The pubkey submitted here will be used to create a script pubkey that will be used in a"]
+					#[doc = "timelock multisig script to lock the bitcoin."]
 					bond_bitcoin {
 						vault_id: ::core::primitive::u32,
 						#[codec(compact)]
 						satoshis: ::core::primitive::u64,
-						bitcoin_pubkey_hash:
-							runtime_types::ulx_primitives::bitcoin::BitcoinPubkeyHash,
+						bitcoin_pubkey:
+							runtime_types::ulx_primitives::bitcoin::CompressedBitcoinPubkey,
 					},
 					#[codec(index = 4)]
 					#[doc = "Submitted by a Bitcoin holder to trigger the unlock of their Bitcoin. A transaction"]
@@ -20471,7 +20470,6 @@ pub mod api {
 					#[doc = "wallets."]
 					cosign_bitcoin_unlock {
 						bond_id: ::core::primitive::u64,
-						pubkey: runtime_types::ulx_primitives::bitcoin::CompressedBitcoinPubkey,
 						signature: runtime_types::ulx_primitives::bitcoin::BitcoinSignature,
 					},
 				}
@@ -20530,26 +20528,38 @@ pub mod api {
 					#[codec(index = 14)]
 					BitcoinUtxoNotFound,
 					#[codec(index = 15)]
-					InsufficientSatoshisBonded,
+					#[doc = "This bitcoin cosign script couldn't be decoded for unlock"]
+					BitcoinUnableToBeDecodedForUnlock,
 					#[codec(index = 16)]
-					NoBitcoinPricesAvailable,
+					#[doc = "This bitcoin signature couldn't be decoded for unlock"]
+					BitcoinSignatureUnableToBeDecoded,
 					#[codec(index = 17)]
+					#[doc = "This bitcoin pubkey couldn't be decoded for unlock"]
+					BitcoinPubkeyUnableToBeDecoded,
+					#[codec(index = 18)]
+					#[doc = "The cosign signature is not valid for the bitcoin unlock"]
+					BitcoinInvalidCosignature,
+					#[codec(index = 19)]
+					InsufficientSatoshisBonded,
+					#[codec(index = 20)]
+					NoBitcoinPricesAvailable,
+					#[codec(index = 21)]
 					#[doc = "The bitcoin script to lock this bitcoin has errors"]
 					InvalidBitcoinScript,
-					#[codec(index = 18)]
-					ExpirationTooSoon,
-					#[codec(index = 19)]
-					NoPermissions,
-					#[codec(index = 20)]
-					HoldUnexpectedlyModified,
-					#[codec(index = 21)]
-					UnrecoverableHold,
 					#[codec(index = 22)]
-					VaultNotFound,
+					ExpirationTooSoon,
 					#[codec(index = 23)]
+					NoPermissions,
+					#[codec(index = 24)]
+					HoldUnexpectedlyModified,
+					#[codec(index = 25)]
+					UnrecoverableHold,
+					#[codec(index = 26)]
+					VaultNotFound,
+					#[codec(index = 27)]
 					#[doc = "The fee for this bond exceeds the amount of the bond, which is unsafe"]
 					FeeExceedsBondAmount,
-					#[codec(index = 24)]
+					#[codec(index = 28)]
 					GenericBondError(runtime_types::ulx_primitives::bond::BondError),
 				}
 				#[derive(
@@ -20614,7 +20624,6 @@ pub mod api {
 						bond_id: ::core::primitive::u64,
 						vault_id: ::core::primitive::u32,
 						utxo_id: ::core::primitive::u64,
-						pubkey: runtime_types::ulx_primitives::bitcoin::CompressedBitcoinPubkey,
 						signature: runtime_types::ulx_primitives::bitcoin::BitcoinSignature,
 					},
 					#[codec(index = 6)]
@@ -20698,10 +20707,12 @@ pub mod api {
 				pub struct UtxoState {
 					pub bond_id: ::core::primitive::u64,
 					pub satoshis: ::core::primitive::u64,
-					pub vault_pubkey_hash:
-						runtime_types::ulx_primitives::bitcoin::BitcoinPubkeyHash,
-					pub owner_pubkey_hash:
-						runtime_types::ulx_primitives::bitcoin::BitcoinPubkeyHash,
+					pub vault_pubkey:
+						runtime_types::ulx_primitives::bitcoin::CompressedBitcoinPubkey,
+					pub vault_xpub_source:
+						([::core::primitive::u8; 4usize], ::core::primitive::u32),
+					pub owner_pubkey:
+						runtime_types::ulx_primitives::bitcoin::CompressedBitcoinPubkey,
 					pub vault_claim_height: ::core::primitive::u64,
 					pub open_claim_height: ::core::primitive::u64,
 					pub register_block: ::core::primitive::u64,
@@ -23208,12 +23219,9 @@ pub mod api {
 					close { vault_id: ::core::primitive::u32 },
 					#[codec(index = 4)]
 					#[doc = "Add public key hashes to the vault. Will be inserted at the beginning of the list."]
-					add_bitcoin_pubkey_hashes {
+					replace_bitcoin_xpub {
 						vault_id: ::core::primitive::u32,
-						bitcoin_pubkey_hashes:
-							runtime_types::bounded_collections::bounded_vec::BoundedVec<
-								runtime_types::ulx_primitives::bitcoin::BitcoinPubkeyHash,
-							>,
+						bitcoin_xpub: runtime_types::ulx_primitives::bitcoin::OpaqueBitcoinXpub,
 					},
 				}
 				#[derive(
@@ -23284,27 +23292,45 @@ pub mod api {
 					#[doc = "The bitcoin script to lock this bitcoin has errors"]
 					InvalidBitcoinScript,
 					#[codec(index = 20)]
-					ExpirationTooSoon,
+					#[doc = "Unable to decode xpubkey"]
+					InvalidXpubkey,
 					#[codec(index = 21)]
-					NoPermissions,
+					#[doc = "Unable to derive xpubkey child"]
+					InvalidXpubkeyChild,
 					#[codec(index = 22)]
-					HoldUnexpectedlyModified,
+					#[doc = "Bitcoin conversion to compressed pubkey failed"]
+					BitcoinConversionFailed,
 					#[codec(index = 23)]
-					UnrecoverableHold,
+					ExpirationTooSoon,
 					#[codec(index = 24)]
-					VaultNotFound,
+					NoPermissions,
 					#[codec(index = 25)]
+					HoldUnexpectedlyModified,
+					#[codec(index = 26)]
+					UnrecoverableHold,
+					#[codec(index = 27)]
+					VaultNotFound,
+					#[codec(index = 28)]
 					#[doc = "The fee for this bond exceeds the amount of the bond, which is unsafe"]
 					FeeExceedsBondAmount,
-					#[codec(index = 26)]
+					#[codec(index = 29)]
 					#[doc = "No Vault public keys are available"]
 					NoVaultBitcoinPubkeysAvailable,
-					#[codec(index = 27)]
+					#[codec(index = 30)]
 					#[doc = "The terms modification list could not handle any more items"]
 					TermsModificationOverflow,
-					#[codec(index = 28)]
+					#[codec(index = 31)]
 					#[doc = "Terms are already scheduled to be changed"]
 					TermsChangeAlreadyScheduled,
+					#[codec(index = 32)]
+					#[doc = "An internal processing error occurred"]
+					InternalError,
+					#[codec(index = 33)]
+					#[doc = "Unable to generate a new vault bitcoin pubkey"]
+					UnableToGenerateVaultBitcoinPubkey,
+					#[codec(index = 34)]
+					#[doc = "Unable to decode vault bitcoin pubkey"]
+					UnableToDecodeVaultBitcoinPubkey,
 				}
 				#[derive(
 					:: subxt :: ext :: subxt_core :: ext :: codec :: Decode,
@@ -23354,6 +23380,8 @@ pub mod api {
 						mining_amount_still_bonded: ::core::primitive::u128,
 						securitization_still_bonded: ::core::primitive::u128,
 					},
+					#[codec(index = 5)]
+					VaultBitcoinXpubChange { vault_id: ::core::primitive::u32 },
 				}
 				#[derive(
 					:: subxt :: ext :: subxt_core :: ext :: codec :: Decode,
@@ -23395,10 +23423,7 @@ pub mod api {
 					pub terms: runtime_types::ulx_primitives::bond::VaultTerms<_0>,
 					#[codec(compact)]
 					pub bitcoin_amount_allocated: _0,
-					pub bitcoin_pubkey_hashes:
-						runtime_types::bounded_collections::bounded_vec::BoundedVec<
-							runtime_types::ulx_primitives::bitcoin::BitcoinPubkeyHash,
-						>,
+					pub bitcoin_xpubkey: runtime_types::ulx_primitives::bitcoin::OpaqueBitcoinXpub,
 					#[codec(compact)]
 					pub mining_amount_allocated: _0,
 					#[codec(compact)]
@@ -25377,22 +25402,6 @@ pub mod api {
 				#[encode_as_type(
 					crate_path = ":: subxt :: ext :: subxt_core :: ext :: scale_encode"
 				)]
-				pub struct BitcoinPubkeyHash(pub [::core::primitive::u8; 20usize]);
-				#[derive(
-					:: subxt :: ext :: subxt_core :: ext :: codec :: Decode,
-					:: subxt :: ext :: subxt_core :: ext :: codec :: Encode,
-					:: subxt :: ext :: subxt_core :: ext :: scale_decode :: DecodeAsType,
-					:: subxt :: ext :: subxt_core :: ext :: scale_encode :: EncodeAsType,
-					Clone,
-					Debug,
-				)]
-				# [codec (crate = :: subxt :: ext :: subxt_core :: ext :: codec)]
-				#[decode_as_type(
-					crate_path = ":: subxt :: ext :: subxt_core :: ext :: scale_decode"
-				)]
-				#[encode_as_type(
-					crate_path = ":: subxt :: ext :: subxt_core :: ext :: scale_encode"
-				)]
 				pub enum BitcoinRejectedReason {
 					#[codec(index = 0)]
 					SatoshisMismatch,
@@ -25480,6 +25489,31 @@ pub mod api {
 				#[encode_as_type(
 					crate_path = ":: subxt :: ext :: subxt_core :: ext :: scale_encode"
 				)]
+				pub struct BitcoinXPub {
+					pub public_key: runtime_types::ulx_primitives::bitcoin::CompressedBitcoinPubkey,
+					#[codec(compact)]
+					pub depth: ::core::primitive::u8,
+					pub parent_fingerprint: [::core::primitive::u8; 4usize],
+					#[codec(compact)]
+					pub child_number: ::core::primitive::u32,
+					pub chain_code: [::core::primitive::u8; 32usize],
+					pub network: runtime_types::ulx_primitives::bitcoin::NetworkKind,
+				}
+				#[derive(
+					:: subxt :: ext :: subxt_core :: ext :: codec :: Decode,
+					:: subxt :: ext :: subxt_core :: ext :: codec :: Encode,
+					:: subxt :: ext :: subxt_core :: ext :: scale_decode :: DecodeAsType,
+					:: subxt :: ext :: subxt_core :: ext :: scale_encode :: EncodeAsType,
+					Clone,
+					Debug,
+				)]
+				# [codec (crate = :: subxt :: ext :: subxt_core :: ext :: codec)]
+				#[decode_as_type(
+					crate_path = ":: subxt :: ext :: subxt_core :: ext :: scale_decode"
+				)]
+				#[encode_as_type(
+					crate_path = ":: subxt :: ext :: subxt_core :: ext :: scale_encode"
+				)]
 				pub struct CompressedBitcoinPubkey(pub [::core::primitive::u8; 33usize]);
 				#[derive(
 					:: subxt :: ext :: subxt_core :: ext :: codec :: Decode,
@@ -25497,6 +25531,43 @@ pub mod api {
 					crate_path = ":: subxt :: ext :: subxt_core :: ext :: scale_encode"
 				)]
 				pub struct H256Le(pub [::core::primitive::u8; 32usize]);
+				#[derive(
+					:: subxt :: ext :: subxt_core :: ext :: codec :: Decode,
+					:: subxt :: ext :: subxt_core :: ext :: codec :: Encode,
+					:: subxt :: ext :: subxt_core :: ext :: scale_decode :: DecodeAsType,
+					:: subxt :: ext :: subxt_core :: ext :: scale_encode :: EncodeAsType,
+					Clone,
+					Debug,
+				)]
+				# [codec (crate = :: subxt :: ext :: subxt_core :: ext :: codec)]
+				#[decode_as_type(
+					crate_path = ":: subxt :: ext :: subxt_core :: ext :: scale_decode"
+				)]
+				#[encode_as_type(
+					crate_path = ":: subxt :: ext :: subxt_core :: ext :: scale_encode"
+				)]
+				pub enum NetworkKind {
+					#[codec(index = 0)]
+					Main,
+					#[codec(index = 1)]
+					Test,
+				}
+				#[derive(
+					:: subxt :: ext :: subxt_core :: ext :: codec :: Decode,
+					:: subxt :: ext :: subxt_core :: ext :: codec :: Encode,
+					:: subxt :: ext :: subxt_core :: ext :: scale_decode :: DecodeAsType,
+					:: subxt :: ext :: subxt_core :: ext :: scale_encode :: EncodeAsType,
+					Clone,
+					Debug,
+				)]
+				# [codec (crate = :: subxt :: ext :: subxt_core :: ext :: codec)]
+				#[decode_as_type(
+					crate_path = ":: subxt :: ext :: subxt_core :: ext :: scale_decode"
+				)]
+				#[encode_as_type(
+					crate_path = ":: subxt :: ext :: subxt_core :: ext :: scale_encode"
+				)]
+				pub struct OpaqueBitcoinXpub(pub [::core::primitive::u8; 78usize]);
 				#[derive(
 					:: subxt :: ext :: subxt_core :: ext :: codec :: Decode,
 					:: subxt :: ext :: subxt_core :: ext :: codec :: Encode,
@@ -25831,9 +25902,15 @@ pub mod api {
 					#[codec(index = 14)]
 					NoVaultBitcoinPubkeysAvailable,
 					#[codec(index = 15)]
-					FeeExceedsBondAmount,
+					UnableToGenerateVaultBitcoinPubkey,
 					#[codec(index = 16)]
+					UnableToDecodeVaultBitcoinPubkey,
+					#[codec(index = 17)]
+					FeeExceedsBondAmount,
+					#[codec(index = 18)]
 					InvalidBitcoinScript,
+					#[codec(index = 19)]
+					InternalError,
 				}
 				#[derive(
 					:: subxt :: ext :: subxt_core :: ext :: codec :: Decode,

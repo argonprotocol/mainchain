@@ -1,22 +1,25 @@
 use std::collections::BTreeMap;
 
-use crate as pallet_bond;
-use crate::BitcoinVerifier;
+use bitcoin::PublicKey;
 use env_logger::{Builder, Env};
 use frame_support::{derive_impl, parameter_types, traits::Currency};
 use frame_system::pallet_prelude::BlockNumberFor;
 use sp_arithmetic::{FixedI128, FixedU128, Percent};
 use sp_core::{ConstU32, ConstU64, H256};
 use sp_runtime::{BuildStorage, DispatchError};
+
 use ulx_bitcoin::UtxoUnlocker;
 use ulx_primitives::{
 	bitcoin::{
-		BitcoinCosignScriptPubkey, BitcoinHeight, BitcoinPubkeyHash, BitcoinSignature,
-		CompressedBitcoinPubkey, Satoshis, UtxoId, UtxoRef,
+		BitcoinCosignScriptPubkey, BitcoinHeight, BitcoinSignature, BitcoinXPub,
+		CompressedBitcoinPubkey, NetworkKind, Satoshis, UtxoId, UtxoRef,
 	},
 	bond::{Bond, BondError, BondType, Vault, VaultArgons, VaultProvider},
 	ensure, BitcoinUtxoTracker, PriceProvider, UtxoBondedEvents, VaultId,
 };
+
+use crate as pallet_bond;
+use crate::BitcoinVerifier;
 
 pub type Balance = u128;
 type Block = frame_system::mocking::MockBlock<Test>;
@@ -102,6 +105,8 @@ parameter_types! {
 	pub static GetUtxoRef: Option<UtxoRef> = None;
 
 	pub static LastBondEvent: Option<(UtxoId, u64, Balance)> = None;
+
+	pub static DefaultVaultBitcoinPubkey: PublicKey = "02e3af28965693b9ce1228f9d468149b831d6a0540b25e8a9900f71372c11fb277".parse::<PublicKey>().unwrap();
 }
 
 pub struct EventHandler;
@@ -190,12 +195,19 @@ impl VaultProvider for StaticVaultProvider {
 	fn create_utxo_script_pubkey(
 		_vault_id: VaultId,
 		_utxo_id: UtxoId,
-		_owner_pubkey_hash: BitcoinPubkeyHash,
+		_owner_pubkey: CompressedBitcoinPubkey,
 		_vault_claim_height: BitcoinHeight,
 		_open_claim_height: BitcoinHeight,
-	) -> Result<(BitcoinPubkeyHash, BitcoinCosignScriptPubkey), BondError> {
+	) -> Result<(BitcoinXPub, BitcoinCosignScriptPubkey), BondError> {
 		Ok((
-			BitcoinPubkeyHash([0; 20]),
+			BitcoinXPub {
+				public_key: DefaultVaultBitcoinPubkey::get().into(),
+				chain_code: [0; 32],
+				depth: 0,
+				parent_fingerprint: [0; 4],
+				child_number: 0,
+				network: NetworkKind::Test,
+			},
 			BitcoinCosignScriptPubkey::P2WSH { wscript_hash: H256::from([0; 32]) },
 		))
 	}

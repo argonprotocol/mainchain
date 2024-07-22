@@ -97,7 +97,7 @@ declare module '@polkadot/api-base/types/consts' {
     };
     bonds: {
       /**
-       * The number of blocks a bitcoin bond is locked for
+       * The number of bitcoin blocks a bitcoin bond is locked for
        **/
       bitcoinBondDurationBlocks: u64 & AugmentedConst<ApiType>;
       /**
@@ -418,10 +418,6 @@ declare module '@polkadot/api-base/types/consts' {
        * The max pending vault term changes per block
        **/
       maxPendingTermModificationsPerBlock: u32 & AugmentedConst<ApiType>;
-      /**
-       * The max amount of pending bitcoin pubkey hashes allowed
-       **/
-      maxPendingVaultBitcoinPubkeys: u32 & AugmentedConst<ApiType>;
       /**
        * Minimum amount for a bond
        **/

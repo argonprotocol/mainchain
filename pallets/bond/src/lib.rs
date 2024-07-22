@@ -1,6 +1,7 @@
 #![cfg_attr(not(feature = "std"), no_std)]
 
 extern crate alloc;
+extern crate core;
 
 pub use pallet::*;
 use sp_runtime::DispatchError;
@@ -104,8 +105,9 @@ pub mod pallet {
 	use ulx_bitcoin::{Amount, UnlockStep, UtxoUnlocker};
 	use ulx_primitives::{
 		bitcoin::{
-			BitcoinCosignScriptPubkey, BitcoinHeight, BitcoinPubkeyHash, BitcoinRejectedReason,
-			BitcoinScriptPubkey, BitcoinSignature, CompressedBitcoinPubkey, Satoshis, UtxoId,
+			BitcoinCosignScriptPubkey, BitcoinHeight, BitcoinRejectedReason, BitcoinScriptPubkey,
+			BitcoinSignature, CompressedBitcoinPubkey, Satoshis, UtxoId, XPubChildNumber,
+			XPubFingerprint,
 		},
 		block_seal::RewardSharing,
 		bond::{Bond, BondError, BondExpiration, BondProvider, BondType, VaultProvider},
@@ -261,8 +263,9 @@ pub mod pallet {
 	pub struct UtxoState {
 		pub bond_id: BondId,
 		pub satoshis: Satoshis,
-		pub vault_pubkey_hash: BitcoinPubkeyHash,
-		pub owner_pubkey_hash: BitcoinPubkeyHash,
+		pub vault_pubkey: CompressedBitcoinPubkey,
+		pub vault_xpub_source: (XPubFingerprint, XPubChildNumber),
+		pub owner_pubkey: CompressedBitcoinPubkey,
 		pub vault_claim_height: BitcoinHeight,
 		pub open_claim_height: BitcoinHeight,
 		pub register_block: BitcoinHeight,
@@ -318,7 +321,6 @@ pub mod pallet {
 			bond_id: BondId,
 			vault_id: VaultId,
 			utxo_id: UtxoId,
-			pubkey: CompressedBitcoinPubkey,
 			signature: BitcoinSignature,
 		},
 		BitcoinCosignPastDue {
@@ -475,14 +477,15 @@ pub mod pallet {
 		/// Script hash to Events. A bondee must create the UTXO in order to be added to the Bitcoin
 		/// Mint line.
 		///
-		/// NOTE: The script
+		/// The pubkey submitted here will be used to create a script pubkey that will be used in a
+		/// timelock multisig script to lock the bitcoin.
 		#[pallet::call_index(0)]
 		#[pallet::weight(0)]
 		pub fn bond_bitcoin(
 			origin: OriginFor<T>,
 			vault_id: VaultId,
 			#[pallet::compact] satoshis: Satoshis,
-			bitcoin_pubkey_hash: BitcoinPubkeyHash,
+			bitcoin_pubkey: CompressedBitcoinPubkey,
 		) -> DispatchResult {
 			let account_id = ensure_signed(origin)?;
 
@@ -511,14 +514,17 @@ pub mod pallet {
 
 			let utxo_id = T::BitcoinUtxoTracker::new_utxo_id();
 
-			let (vault_pubkey_hash, script_pubkey) = T::VaultProvider::create_utxo_script_pubkey(
+			let (vault_xpub, script_pubkey) = T::VaultProvider::create_utxo_script_pubkey(
 				vault_id,
 				utxo_id,
-				bitcoin_pubkey_hash,
+				bitcoin_pubkey,
 				vault_claim_height,
 				open_claim_height,
 			)
 			.map_err(|_| Error::<T>::InvalidBitcoinScript)?;
+
+			let vault_pubkey = vault_xpub.public_key;
+			let vault_xpub_source = (vault_xpub.parent_fingerprint, vault_xpub.child_number);
 
 			T::BitcoinUtxoTracker::watch_for_utxo(
 				utxo_id,
@@ -545,8 +551,9 @@ pub mod pallet {
 				UtxoState {
 					bond_id,
 					satoshis,
-					vault_pubkey_hash,
-					owner_pubkey_hash: bitcoin_pubkey_hash,
+					vault_pubkey,
+					vault_xpub_source,
+					owner_pubkey: bitcoin_pubkey,
 					vault_claim_height,
 					open_claim_height,
 					register_block: T::BitcoinBlockHeight::get(),
@@ -646,7 +653,6 @@ pub mod pallet {
 		pub fn cosign_bitcoin_unlock(
 			origin: OriginFor<T>,
 			bond_id: BondId,
-			pubkey: CompressedBitcoinPubkey,
 			signature: BitcoinSignature,
 		) -> DispatchResultWithPostInfo {
 			let who = ensure_signed(origin)?;
@@ -666,8 +672,14 @@ pub mod pallet {
 				T::BitcoinUtxoTracker::get(utxo_id).ok_or(Error::<T>::BitcoinUtxoNotFound)?;
 
 			let unlocker = UtxoUnlocker::new(
-				utxo_state.vault_pubkey_hash.clone().into(),
-				utxo_state.owner_pubkey_hash.clone().into(),
+				utxo_state
+					.vault_pubkey
+					.try_into()
+					.map_err(|_| Error::<T>::BitcoinPubkeyUnableToBeDecoded)?,
+				utxo_state
+					.owner_pubkey
+					.try_into()
+					.map_err(|_| Error::<T>::BitcoinPubkeyUnableToBeDecoded)?,
 				utxo_state.register_block,
 				utxo_state.vault_claim_height,
 				utxo_state.open_claim_height,
@@ -680,7 +692,11 @@ pub mod pallet {
 			)
 			.map_err(|_| Error::<T>::BitcoinUnableToBeDecodedForUnlock)?;
 
-			T::BitcoinSignatureVerifier::verify_signature(unlocker, pubkey, &signature)?;
+			T::BitcoinSignatureVerifier::verify_signature(
+				unlocker,
+				utxo_state.vault_pubkey,
+				&signature,
+			)?;
 
 			// burn the owner's held funds
 			let _ = T::Currency::burn_held(
@@ -699,7 +715,6 @@ pub mod pallet {
 				bond_id,
 				vault_id,
 				utxo_id,
-				pubkey,
 				signature,
 			});
 

@@ -203,6 +203,22 @@ declare module '@polkadot/api-base/types/errors' {
        **/
       BitcoinFeeTooHigh: AugmentedError<ApiType>;
       /**
+       * The cosign signature is not valid for the bitcoin unlock
+       **/
+      BitcoinInvalidCosignature: AugmentedError<ApiType>;
+      /**
+       * This bitcoin pubkey couldn't be decoded for unlock
+       **/
+      BitcoinPubkeyUnableToBeDecoded: AugmentedError<ApiType>;
+      /**
+       * This bitcoin signature couldn't be decoded for unlock
+       **/
+      BitcoinSignatureUnableToBeDecoded: AugmentedError<ApiType>;
+      /**
+       * This bitcoin cosign script couldn't be decoded for unlock
+       **/
+      BitcoinUnableToBeDecodedForUnlock: AugmentedError<ApiType>;
+      /**
        * The bitcoin has passed the deadline to unlock it
        **/
       BitcoinUnlockInitiationDeadlinePassed: AugmentedError<ApiType>;
@@ -699,6 +715,10 @@ declare module '@polkadot/api-base/types/errors' {
        * The proposed transaction would take the account below the minimum (existential) balance
        **/
       AccountBelowMinimumBalance: AugmentedError<ApiType>;
+      /**
+       * Bitcoin conversion to compressed pubkey failed
+       **/
+      BitcoinConversionFailed: AugmentedError<ApiType>;
       BitcoinUtxoNotFound: AugmentedError<ApiType>;
       BondNotFound: AugmentedError<ApiType>;
       /**
@@ -719,6 +739,10 @@ declare module '@polkadot/api-base/types/errors' {
       InsufficientSatoshisBonded: AugmentedError<ApiType>;
       InsufficientVaultFunds: AugmentedError<ApiType>;
       /**
+       * An internal processing error occurred
+       **/
+      InternalError: AugmentedError<ApiType>;
+      /**
        * The bitcoin script to lock this bitcoin has errors
        **/
       InvalidBitcoinScript: AugmentedError<ApiType>;
@@ -732,6 +756,14 @@ declare module '@polkadot/api-base/types/errors' {
        * Funding would result in an overflow of the balance type
        **/
       InvalidVaultAmount: AugmentedError<ApiType>;
+      /**
+       * Unable to decode xpubkey
+       **/
+      InvalidXpubkey: AugmentedError<ApiType>;
+      /**
+       * Unable to derive xpubkey child
+       **/
+      InvalidXpubkeyChild: AugmentedError<ApiType>;
       /**
        * The maximum number of bitcoin pubkeys for a vault has been exceeded
        **/
@@ -757,6 +789,14 @@ declare module '@polkadot/api-base/types/errors' {
        * The terms modification list could not handle any more items
        **/
       TermsModificationOverflow: AugmentedError<ApiType>;
+      /**
+       * Unable to decode vault bitcoin pubkey
+       **/
+      UnableToDecodeVaultBitcoinPubkey: AugmentedError<ApiType>;
+      /**
+       * Unable to generate a new vault bitcoin pubkey
+       **/
+      UnableToGenerateVaultBitcoinPubkey: AugmentedError<ApiType>;
       UnrecoverableHold: AugmentedError<ApiType>;
       VaultClosed: AugmentedError<ApiType>;
       VaultNotFound: AugmentedError<ApiType>;

@@ -4,7 +4,7 @@ use bitcoin::{
 	Address, FeeRate, Network, ScriptBuf,
 };
 
-use ulx_primitives::bitcoin::{BitcoinError, BitcoinHeight, BitcoinPubkeyHash};
+use ulx_primitives::bitcoin::{BitcoinError, BitcoinHeight, CompressedBitcoinPubkey};
 
 use crate::errors::Error;
 pub use bitcoin::Amount;
@@ -23,8 +23,8 @@ pub enum UnlockStep {
 
 #[derive(Clone, Debug, Eq, PartialEq)]
 pub struct CosignScript {
-	pub vault_pubkey_hash: BitcoinPubkeyHash,
-	pub owner_pubkey_hash: BitcoinPubkeyHash,
+	pub vault_pubkey: CompressedBitcoinPubkey,
+	pub owner_pubkey: CompressedBitcoinPubkey,
 	pub vault_claim_height: BitcoinHeight,
 	pub open_claim_height: BitcoinHeight,
 	pub created_at_height: BitcoinHeight,
@@ -33,22 +33,18 @@ pub struct CosignScript {
 
 impl CosignScript {
 	pub fn new(
-		vault_pubkey_hash: BitcoinPubkeyHash,
-		owner_pubkey_hash: BitcoinPubkeyHash,
+		vault_pubkey: CompressedBitcoinPubkey,
+		owner_pubkey: CompressedBitcoinPubkey,
 		vault_claim_height: BitcoinHeight,
 		open_claim_height: BitcoinHeight,
 		created_at_height: BitcoinHeight,
 	) -> Result<Self, Error> {
-		let script = Self::create_script(
-			vault_pubkey_hash,
-			owner_pubkey_hash,
-			vault_claim_height,
-			open_claim_height,
-		)
-		.map_err(|e| Error::TimelockScriptError(e))?;
+		let script =
+			Self::create_script(vault_pubkey, owner_pubkey, vault_claim_height, open_claim_height)
+				.map_err(|e| Error::TimelockScriptError(e))?;
 		Ok(Self {
-			vault_pubkey_hash,
-			owner_pubkey_hash,
+			vault_pubkey,
+			owner_pubkey,
 			vault_claim_height,
 			open_claim_height,
 			created_at_height,
@@ -107,11 +103,11 @@ impl CosignScript {
 	/// - After `open_claim_hei
 	#[rustfmt::skip]
 	pub fn create_script(
-		vault_pubkey_hash: BitcoinPubkeyHash,
-		owner_pubkey_hash: BitcoinPubkeyHash,
+		vault_pubkey: CompressedBitcoinPubkey,
+		owner_pubkey: CompressedBitcoinPubkey,
 		vault_claim_height: BitcoinHeight,
 		open_claim_height: BitcoinHeight,
-	) -> Result<bitcoin::ScriptBuf, BitcoinError> {
+	) -> Result<ScriptBuf, BitcoinError> {
 		use bitcoin::blockdata::{opcodes::all::*, script::Builder};
 		use bitcoin::absolute::LockTime;
 
@@ -121,53 +117,35 @@ impl CosignScript {
 			.push_int(COSIGN_CODE as i64)
 			.push_opcode(OP_EQUAL)
 			.push_opcode(OP_IF)
-			.push_opcode(OP_DROP)
-			.push_opcode(OP_DUP)
-			.push_opcode(OP_HASH160)
-			.push_slice(vault_pubkey_hash.0)
-			// set 1 to stack if this is the vault
-			.push_opcode(OP_EQUALVERIFY)
-			.push_opcode(OP_CHECKSIGVERIFY)
-
-			// now consume user key
-			.push_opcode(OP_DUP)
-			.push_opcode(OP_HASH160)
-			.push_slice(owner_pubkey_hash.0)
-			//  OP_EQUALVERIFY OP_CHECKSIG at end
+				.push_opcode(OP_DROP)
+				.push_slice(vault_pubkey.0)
+				.push_opcode(OP_CHECKSIGVERIFY)
+				.push_slice(owner_pubkey.0)
+				.push_opcode(OP_CHECKSIG)
 
 			.push_opcode(OP_ELSE)
-			.push_int(VAULT_CLAIM_CODE as i64)
-			.push_opcode(OP_EQUAL)
-			// code 2 is vault claim
-			.push_opcode(OP_IF)
-			.push_lock_time(LockTime::from_height(vault_claim_height as u32).map_err(|_| BitcoinError::InvalidLockTime)?)
-			.push_opcode(OP_CLTV)
-			.push_opcode(OP_DROP)
+				.push_int(VAULT_CLAIM_CODE as i64)
+				.push_opcode(OP_EQUAL)
+				// code 2 is vault claim
+				.push_opcode(OP_IF)
+					.push_lock_time(LockTime::from_height(vault_claim_height as u32).map_err(|_| BitcoinError::InvalidLockTime)?)
+					.push_opcode(OP_CLTV)
+					.push_opcode(OP_DROP)
 
-			.push_opcode(OP_DUP)
-			.push_opcode(OP_HASH160)
-			.push_slice(vault_pubkey_hash.0)
-			//  OP_EQUALVERIFY OP_CHECKSIG at end
+					.push_slice(vault_pubkey.0)
+					.push_opcode(OP_CHECKSIG)
 
-			// code 3 is owner claim
-			.push_opcode(OP_ELSE)
-			.push_lock_time(LockTime::from_height(open_claim_height as u32).map_err(|_| BitcoinError::InvalidLockTime)?)
-			.push_opcode(OP_CLTV)
-			.push_opcode(OP_DROP)
+				// code 3 is owner claim
+				.push_opcode(OP_ELSE)
+					.push_lock_time(LockTime::from_height(open_claim_height as u32).map_err(|_| BitcoinError::InvalidLockTime)?)
+					.push_opcode(OP_CLTV)
+					.push_opcode(OP_DROP)
 
-			.push_opcode(OP_DUP)
-			.push_opcode(OP_HASH160)
-			.push_slice(owner_pubkey_hash.0)
-			//  OP_EQUALVERIFY OP_CHECKSIG at end
+					.push_slice(owner_pubkey.0)
+					.push_opcode(OP_CHECKSIG)
+				.push_opcode(OP_ENDIF)
 			.push_opcode(OP_ENDIF)
-			.push_opcode(OP_ENDIF)
-
-
-			.push_opcode(OP_EQUALVERIFY)
-			.push_opcode(OP_CHECKSIG)
-
-
-			.into_script();
+		.into_script();
 		Ok(script)
 	}
 }
@@ -182,9 +160,8 @@ mod test {
 	use bitcoind::BitcoinD;
 
 	use ulx_primitives::bitcoin::{
-		BitcoinBlock, BitcoinCosignScriptPubkey, BitcoinHeight, BitcoinPubkeyHash,
-		BitcoinScriptPubkey, BitcoinSignature, BitcoinSyncStatus, CompressedBitcoinPubkey,
-		Satoshis, UtxoRef, UtxoValue,
+		BitcoinBlock, BitcoinCosignScriptPubkey, BitcoinHeight, BitcoinScriptPubkey,
+		BitcoinSignature, BitcoinSyncStatus, CompressedBitcoinPubkey, Satoshis, UtxoRef, UtxoValue,
 	};
 	use ulx_testing::*;
 
@@ -231,8 +208,8 @@ mod test {
 		let vault_claim_height = block_height + 4;
 
 		let script = CosignScript::create_script(
-			vault_compressed_pubkey.pubkey_hash().into(),
-			owner_compressed_pubkey.pubkey_hash().into(),
+			vault_compressed_pubkey.into(),
+			owner_compressed_pubkey.into(),
 			vault_claim_height,
 			open_claim_height,
 		)
@@ -257,8 +234,8 @@ mod test {
 
 		let fee_rate = FeeRate::from_sat_per_vb(15).expect("cant translate fee");
 		let cosign_script = CosignScript::new(
-			vault_compressed_pubkey.pubkey_hash().into(),
-			owner_compressed_pubkey.pubkey_hash().into(),
+			vault_compressed_pubkey.into(),
+			owner_compressed_pubkey.into(),
 			vault_claim_height,
 			open_claim_height,
 			register_height,
@@ -378,15 +355,15 @@ mod test {
 		let secp = Secp256k1::new();
 		let owner_keypair = PrivateKey::generate(Network::Regtest);
 		let owner_compressed_pubkey = owner_keypair.public_key(&secp);
-		let owner_pubkey_hash: BitcoinPubkeyHash = owner_compressed_pubkey.pubkey_hash().into();
+		let owner_pubkey: CompressedBitcoinPubkey = owner_compressed_pubkey.into();
 		let amount: Satoshis = Amount::ONE_BTC.to_sat() * 5;
 
 		let open_claim_height = block_height + 10;
 		let vault_claim_height = block_height + 5;
 		let register_height = block_height;
 		let mut cosign_script = CosignScript::new(
-			vault_compressed_pubkey.pubkey_hash().into(),
-			owner_pubkey_hash,
+			vault_compressed_pubkey.into(),
+			owner_pubkey,
 			vault_claim_height,
 			open_claim_height,
 			register_height,
@@ -497,13 +474,13 @@ mod test {
 		let secp = Secp256k1::new();
 		let owner_keypair = PrivateKey::generate(Network::Regtest);
 		let owner_compressed_pubkey = owner_keypair.public_key(&secp);
-		let owner_pubkey_hash: BitcoinPubkeyHash = owner_compressed_pubkey.pubkey_hash().into();
+		let owner_pubkey: CompressedBitcoinPubkey = owner_compressed_pubkey.into();
 		let amount: Satoshis = Amount::ONE_BTC.to_sat() * 5;
 
 		let (vault_master_xpriv, vault_fingerprint) = create_xpriv();
 		let (vault_compressed_pubkey, vault_hd_path) =
 			derive(&vault_master_xpriv, "m/48'/0'/0'/0/1");
-		let vault_pubkey_hash: BitcoinPubkeyHash = vault_compressed_pubkey.pubkey_hash().into();
+		let vault_pubkey: CompressedBitcoinPubkey = vault_compressed_pubkey.into();
 
 		let block_height = bitcoind.client.get_block_count().unwrap();
 
@@ -515,8 +492,8 @@ mod test {
 		// 3. Owner recreates the script from the details and submits to blockchain
 		let script_address = {
 			let cosign_script = CosignScript::new(
-				vault_pubkey_hash,
-				owner_pubkey_hash,
+				vault_pubkey,
+				owner_pubkey,
 				vault_claim_height,
 				open_claim_height,
 				block_height,
@@ -565,8 +542,8 @@ mod test {
 			owner_compressed_pubkey.p2wpkh_script_code().unwrap().try_into().unwrap();
 		let feerate = FeeRate::from_sat_per_vb(15).expect("cant translate fee");
 		let user_cosign_script = CosignScript::new(
-			vault_pubkey_hash,
-			owner_pubkey_hash,
+			vault_pubkey,
+			owner_pubkey,
 			vault_claim_height,
 			open_claim_height,
 			register_height,
@@ -579,8 +556,8 @@ mod test {
 		// 5. vault sees unlock request (outaddress, fee) and creates a transaction
 		let (vault_signature, vault_pubkey) = {
 			let mut unlocker = UtxoUnlocker::new(
-				vault_pubkey_hash.into(),
-				owner_pubkey_hash.into(),
+				vault_pubkey.try_into().unwrap(),
+				owner_pubkey.try_into().unwrap(),
 				register_height,
 				vault_claim_height,
 				open_claim_height,

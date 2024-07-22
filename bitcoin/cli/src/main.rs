@@ -1,12 +1,10 @@
+#[allow(dead_code, unused_imports)]
 use std::{env, fmt};
 
 use anyhow::Context;
 use clap::{crate_version, Parser, Subcommand};
 use codec::Decode;
-use comfy_table::{
-	modifiers::UTF8_ROUND_CORNERS, presets::UTF8_FULL, Cell, CellAlignment, ContentArrangement,
-	Table,
-};
+use comfy_table::{modifiers::UTF8_ROUND_CORNERS, presets::UTF8_FULL, ContentArrangement, Table};
 use sp_runtime::{FixedPointNumber, FixedU128};
 use ulixee_client::{
 	api::{apis, bonds::events::bond_created::VaultId, storage},

@@ -338,7 +338,6 @@ parameter_types! {
 
 	pub const MaxUnlockingUtxos: u32 = 1000;
 	pub const MinBitcoinSatoshiAmount: Satoshis = 10_000_000; // 1/10th bitcoin minimum
-	pub const MaxPendingBitcoinPubkeysPerVault: u32 = 100;
 	pub const MaxPendingTermModificationsPerBlock: u32 = 100;
 	pub const MinTermsModificationBlockDelay: u32 = 1439; // must be at least one slot (day)
 }
@@ -351,7 +350,6 @@ impl pallet_vaults::Config for Runtime {
 	type RuntimeHoldReason = RuntimeHoldReason;
 	type MinimumBondAmount = MinimumBondAmount;
 	type BlocksPerDay = BlocksPerDay;
-	type MaxPendingVaultBitcoinPubkeys = MaxPendingBitcoinPubkeysPerVault;
 	type MaxPendingTermModificationsPerBlock = MaxPendingTermModificationsPerBlock;
 	type MiningSlotProvider = MiningSlot;
 	type MinTermsModificationBlockDelay = MinTermsModificationBlockDelay;

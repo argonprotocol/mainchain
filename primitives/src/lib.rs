@@ -1,5 +1,6 @@
 #![cfg_attr(not(feature = "std"), no_std)]
 extern crate alloc;
+extern crate core;
 
 use sp_core::{crypto::Ss58AddressFormatRegistry, H256};
 use sp_runtime::{

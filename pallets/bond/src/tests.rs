@@ -16,8 +16,8 @@ use crate::{
 };
 use ulx_primitives::{
 	bitcoin::{
-		BitcoinCosignScriptPubkey, BitcoinPubkeyHash, BitcoinRejectedReason, BitcoinScriptPubkey,
-		BitcoinSignature, CompressedBitcoinPubkey, H256Le, Satoshis, UtxoRef, SATOSHIS_PER_BITCOIN,
+		BitcoinCosignScriptPubkey, BitcoinRejectedReason, BitcoinScriptPubkey, BitcoinSignature,
+		CompressedBitcoinPubkey, H256Le, Satoshis, UtxoRef, SATOSHIS_PER_BITCOIN,
 	},
 	bond::{Bond, BondExpiration, BondProvider, BondType},
 	BitcoinUtxoEvents, BondId, PriceProvider,
@@ -30,7 +30,7 @@ fn can_bond_a_bitcoin_utxo() {
 		System::set_block_number(1);
 
 		set_argons(2, 2_000);
-		let pubkey = BitcoinPubkeyHash([1; 20]);
+		let pubkey = CompressedBitcoinPubkey([1; 33]);
 
 		assert_err!(
 			Bonds::bond_bitcoin(RuntimeOrigin::signed(2), 1, 1_000, pubkey),
@@ -70,7 +70,7 @@ fn cleans_up_a_rejected_bitcoin() {
 
 		let who = 1;
 		set_argons(who, 2_000);
-		let pubkey = BitcoinPubkeyHash([1; 20]);
+		let pubkey = CompressedBitcoinPubkey([1; 33]);
 
 		assert_ok!(Bonds::bond_bitcoin(
 			RuntimeOrigin::signed(who),
@@ -98,7 +98,7 @@ fn marks_a_verified_bitcoin() {
 
 		let who = 1;
 		set_argons(who, 2_000);
-		let pubkey = BitcoinPubkeyHash([1; 20]);
+		let pubkey = CompressedBitcoinPubkey([1; 33]);
 
 		assert_ok!(Bonds::bond_bitcoin(
 			RuntimeOrigin::signed(who),
@@ -151,7 +151,7 @@ fn burns_a_spent_bitcoin() {
 
 		let who = 1;
 		set_argons(who, 2_000);
-		let pubkey = BitcoinPubkeyHash([1; 20]);
+		let pubkey = CompressedBitcoinPubkey([1; 33]);
 		let allocated = DefaultVault::get().bitcoin_argons.allocated;
 
 		assert_ok!(Bonds::bond_bitcoin(
@@ -226,7 +226,7 @@ fn cancels_an_unverified_spent_bitcoin() {
 
 		let who = 1;
 		set_argons(who, 2_000);
-		let pubkey = BitcoinPubkeyHash([1; 20]);
+		let pubkey = CompressedBitcoinPubkey([1; 33]);
 		let allocated = DefaultVault::get().bitcoin_argons.allocated;
 
 		assert_ok!(Bonds::bond_bitcoin(
@@ -268,7 +268,7 @@ fn can_unlock_a_bitcoin() {
 		BitcoinBlockHeight::set(1);
 		System::set_block_number(1);
 
-		let pubkey = BitcoinPubkeyHash([1; 20]);
+		let pubkey = CompressedBitcoinPubkey([1; 33]);
 		let who = 1;
 		set_argons(who, 2_000);
 		assert_ok!(Bonds::bond_bitcoin(
@@ -355,7 +355,7 @@ fn penalizes_vault_if_not_unlock_countersigned() {
 		BitcoinBlockHeight::set(1);
 		System::set_block_number(1);
 
-		let pubkey = BitcoinPubkeyHash([1; 20]);
+		let pubkey = CompressedBitcoinPubkey([1; 33]);
 		let who = 1;
 		let satoshis = SATOSHIS_PER_BITCOIN + 5000;
 		set_argons(who, 2_000);
@@ -430,11 +430,14 @@ fn clears_unlocked_bitcoin_bonds() {
 		BitcoinBlockHeight::set(1);
 		System::set_block_number(1);
 
-		let pubkey = BitcoinPubkeyHash([1; 20]);
+		let secp = bitcoin::secp256k1::Secp256k1::new();
+		let rng = &mut rand::thread_rng();
+		let keypair = bitcoin::secp256k1::SecretKey::new(rng);
+		let pubkey = keypair.public_key(&secp).serialize();
 		let who = 2;
 		let satoshis = SATOSHIS_PER_BITCOIN + 25000;
 		set_argons(who, 2_000);
-		assert_ok!(Bonds::bond_bitcoin(RuntimeOrigin::signed(who), 1, satoshis, pubkey));
+		assert_ok!(Bonds::bond_bitcoin(RuntimeOrigin::signed(who), 1, satoshis, pubkey.into()));
 		let vault = DefaultVault::get();
 		let bond = BondsById::<Test>::get(1).unwrap();
 		assert_eq!(vault.bitcoin_argons.bonded, bond.amount);
@@ -467,7 +470,6 @@ fn clears_unlocked_bitcoin_bonds() {
 			Bonds::cosign_bitcoin_unlock(
 				RuntimeOrigin::signed(2),
 				1,
-				CompressedBitcoinPubkey([0; 33]),
 				BitcoinSignature(BoundedVec::truncate_from([0u8; 73].to_vec()))
 			),
 			Error::<Test>::NoPermissions
@@ -477,7 +479,6 @@ fn clears_unlocked_bitcoin_bonds() {
 		assert_ok!(Bonds::cosign_bitcoin_unlock(
 			RuntimeOrigin::signed(1),
 			1,
-			CompressedBitcoinPubkey([0; 33]),
 			BitcoinSignature(BoundedVec::truncate_from([0u8; 73].to_vec()))
 		));
 		assert_eq!(UtxosPendingUnlock::<Test>::get().get(&1), None);
@@ -494,7 +495,6 @@ fn clears_unlocked_bitcoin_bonds() {
 				bond_id: 1,
 				vault_id: 1,
 				utxo_id: 1,
-				pubkey: CompressedBitcoinPubkey([0; 33]),
 				signature: BitcoinSignature(BoundedVec::truncate_from([0u8; 73].to_vec())),
 			}
 			.into(),
@@ -525,7 +525,7 @@ fn it_should_aggregate_holds_for_a_second_unlock() {
 		BitcoinBlockHeight::set(1);
 		System::set_block_number(1);
 
-		let pubkey = BitcoinPubkeyHash([1; 20]);
+		let pubkey = CompressedBitcoinPubkey([1; 33]);
 		let who = 1;
 		let satoshis = 2 * SATOSHIS_PER_BITCOIN;
 		set_argons(who, 2_000);
@@ -616,9 +616,10 @@ fn default_utxo_state(bond_id: BondId, satoshis: Satoshis) -> UtxoState {
 			BitcoinBondReclamationBlocks::get(),
 		is_verified: false,
 		utxo_script_pubkey: make_cosign_pubkey([0; 32]),
-		owner_pubkey_hash: BitcoinPubkeyHash([1; 20]),
-		vault_pubkey_hash: BitcoinPubkeyHash([0; 20]),
+		owner_pubkey: CompressedBitcoinPubkey([1; 33]),
+		vault_pubkey: DefaultVaultBitcoinPubkey::get().into(),
 		register_block: current_height,
+		vault_xpub_source: ([0; 4], 0),
 	}
 }
 

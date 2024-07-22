@@ -1,3 +1,8 @@
+use bitcoin::{
+	bip32::{Xpriv, Xpub},
+	key::Secp256k1,
+	Network,
+};
 use frame_support::{
 	assert_err, assert_noop, assert_ok,
 	pallet_prelude::Hooks,
@@ -6,24 +11,27 @@ use frame_support::{
 		tokens::Preservation,
 	},
 };
-use sp_core::bounded_vec;
-use sp_runtime::{traits::Zero, BoundedVec, FixedU128, Percent};
-
-use ulx_primitives::{
-	bitcoin::BitcoinPubkeyHash,
-	bond::{Bond, BondError, BondExpiration, BondType, VaultProvider, VaultTerms},
-};
+use k256::elliptic_curve::rand_core::{OsRng, RngCore};
+use sp_runtime::{traits::Zero, FixedU128, Percent};
 
 use crate::{
 	mock::{Vaults, *},
-	pallet::{NextVaultId, PendingTermsModificationsByBlock, VaultsById},
+	pallet::{NextVaultId, PendingTermsModificationsByBlock, VaultXPubById, VaultsById},
 	Error, Event, HoldReason, VaultConfig,
+};
+use ulx_primitives::{
+	bitcoin::{CompressedBitcoinPubkey, OpaqueBitcoinXpub},
+	bond::{Bond, BondError, BondExpiration, BondType, VaultProvider, VaultTerms},
 };
 
 const TEN_PCT: FixedU128 = FixedU128::from_rational(10, 100);
 
-fn keys() -> BoundedVec<BitcoinPubkeyHash, MaxPendingVaultBitcoinPubkeys> {
-	bounded_vec![BitcoinPubkeyHash([0u8; 20])]
+fn keys() -> OpaqueBitcoinXpub {
+	let mut seed = [0u8; 32];
+	OsRng.fill_bytes(&mut seed);
+	let xpriv = Xpriv::new_master(Network::Regtest, &seed).unwrap();
+	let xpub = Xpub::from_priv(&Secp256k1::new(), &xpriv);
+	OpaqueBitcoinXpub { 0: xpub.encode() }
 }
 
 fn default_terms(pct: FixedU128) -> VaultTerms<Balance> {
@@ -36,10 +44,10 @@ fn default_terms(pct: FixedU128) -> VaultTerms<Balance> {
 	}
 }
 
-fn default_vault() -> VaultConfig<Balance, MaxPendingVaultBitcoinPubkeys> {
+fn default_vault() -> VaultConfig<Balance> {
 	VaultConfig {
 		terms: default_terms(TEN_PCT),
-		bitcoin_pubkey_hashes: keys(),
+		bitcoin_xpubkey: keys(),
 		bitcoin_amount_allocated: 50_000,
 		mining_amount_allocated: 50_000,
 		securitization_percent: FixedU128::zero(),
@@ -181,7 +189,7 @@ fn it_can_reduce_vault_funds_down_to_bonded() {
 			RuntimeOrigin::signed(1),
 			VaultConfig {
 				terms: default_terms(TEN_PCT),
-				bitcoin_pubkey_hashes: keys(),
+				bitcoin_xpubkey: keys(),
 				bitcoin_amount_allocated: 1000,
 				mining_amount_allocated: 1000,
 				securitization_percent: FixedU128::from_float(2.0),
@@ -273,7 +281,7 @@ fn it_can_close_a_vault() {
 			RuntimeOrigin::signed(1),
 			VaultConfig {
 				terms,
-				bitcoin_pubkey_hashes: keys(),
+				bitcoin_xpubkey: keys(),
 				bitcoin_amount_allocated: 50_000,
 				mining_amount_allocated: 50_000,
 				securitization_percent: FixedU128::from_float(2.0),
@@ -350,7 +358,7 @@ fn it_can_bond_funds() {
 			RuntimeOrigin::signed(1),
 			VaultConfig {
 				terms,
-				bitcoin_pubkey_hashes: keys(),
+				bitcoin_xpubkey: keys(),
 				bitcoin_amount_allocated: 500_000,
 				mining_amount_allocated: 0,
 				securitization_percent: FixedU128::zero(),
@@ -403,7 +411,7 @@ fn it_can_charge_prorated_bond_funds() {
 			RuntimeOrigin::signed(1),
 			VaultConfig {
 				terms,
-				bitcoin_pubkey_hashes: keys(),
+				bitcoin_xpubkey: keys(),
 				bitcoin_amount_allocated: 500_000,
 				mining_amount_allocated: 0,
 				securitization_percent: FixedU128::zero(),
@@ -462,7 +470,7 @@ fn it_can_burn_a_bond() {
 			RuntimeOrigin::signed(1),
 			VaultConfig {
 				terms,
-				bitcoin_pubkey_hashes: keys(),
+				bitcoin_xpubkey: keys(),
 				bitcoin_amount_allocated: 100_000,
 				mining_amount_allocated: 100_000,
 				securitization_percent: FixedU128::zero(),
@@ -517,7 +525,7 @@ fn it_can_recoup_reduced_value_bitcoins_from_bond_funds() {
 			RuntimeOrigin::signed(1),
 			VaultConfig {
 				terms,
-				bitcoin_pubkey_hashes: keys(),
+				bitcoin_xpubkey: keys(),
 				bitcoin_amount_allocated: 100_000,
 				mining_amount_allocated: 100_000,
 				securitization_percent: FixedU128::zero(),
@@ -576,7 +584,7 @@ fn it_can_recoup_increased_value_bitcoins_from_securitizations() {
 			RuntimeOrigin::signed(1),
 			VaultConfig {
 				terms,
-				bitcoin_pubkey_hashes: keys(),
+				bitcoin_xpubkey: keys(),
 				bitcoin_amount_allocated: 100_000,
 				mining_amount_allocated: 50_000,
 				securitization_percent: FixedU128::from_float(2.0),
@@ -625,57 +633,48 @@ fn it_can_recoup_increased_value_bitcoins_from_securitizations() {
 }
 
 #[test]
-fn it_should_allow_vaults_to_add_public_keys() {
+fn it_should_allow_vaults_to_rotate_xpubs() {
 	new_test_ext().execute_with(|| {
 		// Go past genesis block so events get deposited
 		System::set_block_number(5);
 
 		set_argons(1, 1_000_000);
-		let mut keys = BoundedVec::<BitcoinPubkeyHash, MaxPendingVaultBitcoinPubkeys>::new();
-		for i in 0..10 {
-			let _ = keys.try_push(BitcoinPubkeyHash([i as u8; 20]));
-		}
-
 		let terms = default_terms(TEN_PCT);
-
 		assert_ok!(Vaults::create(
 			RuntimeOrigin::signed(1),
 			VaultConfig {
 				terms,
-				bitcoin_pubkey_hashes: keys.clone(),
+				bitcoin_xpubkey: keys(),
 				bitcoin_amount_allocated: 100_000,
 				mining_amount_allocated: 100_000,
 				securitization_percent: FixedU128::zero(),
 			}
 		));
-		assert_eq!(
-			Vaults::create_utxo_script_pubkey(1, 1, BitcoinPubkeyHash([0u8; 20]), 1, 2)
-				.expect("")
-				.0,
-			keys[9]
-		);
-		assert_eq!(
-			Vaults::create_utxo_script_pubkey(1, 1, BitcoinPubkeyHash([0u8; 20]), 1, 2)
-				.expect("")
-				.0,
-			keys[8]
-		);
 
-		assert_err!(
-			Vaults::add_bitcoin_pubkey_hashes(RuntimeOrigin::signed(1), 1, keys.clone()),
-			Error::<Test>::MaxPendingVaultBitcoinPubkeys
-		);
-		assert_ok!(Vaults::add_bitcoin_pubkey_hashes(
-			RuntimeOrigin::signed(1),
-			1,
-			bounded_vec!(BitcoinPubkeyHash([11; 20]), BitcoinPubkeyHash([12; 20]))
-		),);
-		assert_eq!(
-			Vaults::create_utxo_script_pubkey(1, 1, BitcoinPubkeyHash([0u8; 20]), 1, 2)
-				.expect("")
-				.0,
-			keys[7]
-		);
+		let first_keyset = VaultXPubById::<Test>::get(1).unwrap();
+		assert_eq!(first_keyset.1, 0);
+
+		let mut seed = [0u8; 32];
+		OsRng.fill_bytes(&mut seed);
+		let owner_xpriv = Xpriv::new_master(Network::Regtest, &seed).unwrap();
+		let owner_pubkey = Xpub::from_priv(&Secp256k1::new(), &owner_xpriv);
+		let owner_pubkey: CompressedBitcoinPubkey = owner_pubkey.public_key.serialize().into();
+
+		let key1 = Vaults::create_utxo_script_pubkey(1, 1, owner_pubkey, 100, 120);
+		assert!(key1.is_ok());
+		let key1 = key1.unwrap();
+
+		let key2 = Vaults::create_utxo_script_pubkey(1, 2, owner_pubkey, 100, 120);
+		assert!(key2.is_ok());
+		let key2 = key2.unwrap();
+		assert_ne!(key1.0.public_key, key2.0.public_key);
+		assert_eq!(key1.0.child_number, 1);
+		assert_eq!(key2.0.child_number, 2);
+
+		let new_xpub = keys();
+		assert_ok!(Vaults::replace_bitcoin_xpub(RuntimeOrigin::signed(1), 1, new_xpub));
+		let new_keyset = VaultXPubById::<Test>::get(1).unwrap();
+		assert_eq!(new_keyset.1, 0);
 	});
 }
 
@@ -688,7 +687,7 @@ fn it_should_allow_multiple_vaults_per_account() {
 		let terms = default_terms(TEN_PCT);
 		let config = VaultConfig {
 			terms,
-			bitcoin_pubkey_hashes: keys(),
+			bitcoin_xpubkey: keys(),
 			bitcoin_amount_allocated: 100_000,
 			mining_amount_allocated: 100_000,
 			securitization_percent: FixedU128::zero(),
@@ -713,7 +712,7 @@ fn it_can_schedule_term_changes() {
 		let mut terms = default_terms(TEN_PCT);
 		let config = VaultConfig {
 			terms: terms.clone(),
-			bitcoin_pubkey_hashes: keys(),
+			bitcoin_xpubkey: keys(),
 			bitcoin_amount_allocated: 100_000,
 			mining_amount_allocated: 100_000,
 			securitization_percent: FixedU128::zero(),

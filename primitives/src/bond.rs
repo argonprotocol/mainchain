@@ -6,7 +6,9 @@ use sp_debug_derive::RuntimeDebug;
 use sp_runtime::traits::AtLeast32BitUnsigned;
 
 use crate::{
-	bitcoin::{BitcoinCosignScriptPubkey, BitcoinHeight, BitcoinPubkeyHash, UtxoId},
+	bitcoin::{
+		BitcoinCosignScriptPubkey, BitcoinHeight, BitcoinXPub, CompressedBitcoinPubkey, UtxoId,
+	},
 	block_seal::RewardSharing,
 	BondId, RewardShare, VaultId,
 };
@@ -78,10 +80,10 @@ pub trait VaultProvider {
 	fn create_utxo_script_pubkey(
 		vault_id: VaultId,
 		utxo_id: UtxoId,
-		owner_pubkey_hash: BitcoinPubkeyHash,
+		owner_pubkey: CompressedBitcoinPubkey,
 		vault_claim_height: BitcoinHeight,
 		open_claim_height: BitcoinHeight,
-	) -> Result<(BitcoinPubkeyHash, BitcoinCosignScriptPubkey), BondError>;
+	) -> Result<(BitcoinXPub, BitcoinCosignScriptPubkey), BondError>;
 }
 
 #[derive(Clone, PartialEq, Eq, Encode, Decode, RuntimeDebug, TypeInfo, PalletError)]
@@ -105,6 +107,10 @@ pub enum BondError {
 	VaultNotFound,
 	/// No Vault public keys are available
 	NoVaultBitcoinPubkeysAvailable,
+	/// Unable to generate a new vault public key
+	UnableToGenerateVaultBitcoinPubkey,
+	/// Unable to decode the vault public key
+	UnableToDecodeVaultBitcoinPubkey,
 	/// The fee for this bond exceeds the amount of the bond, which is unsafe
 	FeeExceedsBondAmount,
 	/// Scripting for a bitcoin UTXO failed

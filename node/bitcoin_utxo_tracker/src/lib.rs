@@ -116,8 +116,8 @@ mod test {
 			.unwrap();
 
 		let script = CosignScript::create_script(
-			key1.pubkey_hash().into(),
-			key2.pubkey_hash().into(),
+			key1.into(),
+			key2.into(),
 			block_height + 100,
 			block_height + 200,
 		)

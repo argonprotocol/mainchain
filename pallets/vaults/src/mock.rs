@@ -54,7 +54,6 @@ pub fn set_argons(account_id: u64, amount: Balance) {
 }
 
 parameter_types! {
-	pub static MaxPendingVaultBitcoinPubkeys: u32 = 10;
 	pub static NextSlot: BlockNumberFor<Test> = 100;
 	pub static MiningWindowBlocks: BlockNumberFor<Test> = 100;
 	pub const MinTermsModificationBlockDelay: BlockNumberFor<Test> = 25;
@@ -77,7 +76,6 @@ impl pallet_vaults::Config for Test {
 	type Balance = Balance;
 	type BlocksPerDay = ConstU64<1440>;
 	type MinimumBondAmount = MinimumBondAmount;
-	type MaxPendingVaultBitcoinPubkeys = MaxPendingVaultBitcoinPubkeys;
 	type MiningSlotProvider = StaticMiningSlotProvider;
 	type MaxPendingTermModificationsPerBlock = ConstU32<100>;
 	type MinTermsModificationBlockDelay = MinTermsModificationBlockDelay;
