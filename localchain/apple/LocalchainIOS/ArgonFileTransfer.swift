@@ -7,7 +7,9 @@
 
 import BigNumber
 import Foundation
+import LinkPresentation
 import SwiftUI
+import UIKit
 import UniformTypeIdentifiers
 
 extension UTType {
@@ -79,6 +81,69 @@ struct ArgonFileTransfer: Transferable, Identifiable {
     FileRepresentation(importedContentType: .argonFile) { file in
       try Self.fromFile(fileUrl: file.file)
     }
+  }
+}
+
+class ArgonFileItemSource: NSObject, UIActivityItemSource {
+  let file: ArgonFileTransfer
+
+  init(_ file: ArgonFileTransfer) {
+    self.file = file
+  }
+
+  func activityViewControllerPlaceholderItem(_: UIActivityViewController) -> Any {
+    return file.json
+  }
+
+  func activityViewController(
+    _: UIActivityViewController,
+    itemForActivityType _: UIActivity.ActivityType?
+  ) -> Any? {
+    do {
+      return try createTempFile()
+    } catch {
+      print("Error creating temporary file: \(error)")
+      return nil
+    }
+  }
+
+  func activityViewController(
+    _: UIActivityViewController,
+    subjectForActivityType _: UIActivity.ActivityType?
+  ) -> String {
+    return file.name
+  }
+
+  func activityViewController(
+    _: UIActivityViewController,
+    dataTypeIdentifierForActivityType _: UIActivity.ActivityType?
+  ) -> String {
+    return UTType.argonFile.identifier
+  }
+
+  func activityViewController(
+    _: UIActivityViewController,
+    thumbnailImageForActivityType _: UIActivity.ActivityType?,
+    suggestedSize _: CGSize
+  ) -> UIImage? {
+    return UIImage(named: "argfile")
+  }
+
+  func activityViewController(
+    _: UIActivityViewController,
+    linkMetadataForActivityType _: UIActivity.ActivityType?
+  ) -> LPLinkMetadata? {
+    let metadata = LPLinkMetadata()
+    metadata.title = file.name
+    metadata.originalURL = URL(string: "https://ulixee.org")!
+    return metadata
+  }
+
+  private func createTempFile() throws -> URL {
+    let tempDirectory = FileManager.default.temporaryDirectory
+    let fileURL = tempDirectory.appendingPathComponent(file.name).appendingPathExtension("arg")
+    try Data(file.json.utf8).write(to: fileURL)
+    return fileURL
   }
 }
 

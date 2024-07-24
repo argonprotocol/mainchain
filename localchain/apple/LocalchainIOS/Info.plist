@@ -2,17 +2,13 @@
 <!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
 <plist version="1.0">
 <dict>
-	<key>NSCameraUsageDescription</key>
-	<string>Import Argon Files via QR Code</string>
+	<key>UIViewControllerBasedStatusBarAppearance</key>
+	<true/>
 	<key>CFBundleDocumentTypes</key>
 	<array>
 		<dict>
 			<key>CFBundleTypeIconFile</key>
 			<string>argfile.icns</string>
-			<key>UTTypeIconFiles</key>
-			<array>
-				<string>argfile.png</string>
-			</array>
 			<key>CFBundleTypeName</key>
 			<string>Argon File</string>
 			<key>LSHandlerRank</key>
@@ -21,6 +17,10 @@
 			<array>
 				<string>org.ulixee.argon</string>
 			</array>
+			<key>UTTypeIconFiles</key>
+			<array>
+				<string>argfile.png</string>
+			</array>
 		</dict>
 	</array>
 	<key>UTExportedTypeDeclarations</key>
@@ -28,16 +28,16 @@
 		<dict>
 			<key>CFBundleTypeIconFile</key>
 			<string>argfile.icns</string>
-			<key>UTTypeIconFiles</key>
-			<array>
-				<string>argfile.png</string>
-			</array>
 			<key>UTTypeConformsTo</key>
 			<array>
 				<string>public.json</string>
 			</array>
 			<key>UTTypeDescription</key>
 			<string>Argon File</string>
+			<key>UTTypeIconFiles</key>
+			<array>
+				<string>argfile.png</string>
+			</array>
 			<key>UTTypeIdentifier</key>
 			<string>org.ulixee.argon</string>
 			<key>UTTypeTagSpecification</key>

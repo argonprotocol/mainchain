@@ -27,6 +27,7 @@ public struct CurrencyTextField: UIViewRepresentable {
   private var autocorrection: UITextAutocorrectionType
   private var autocapitalization: UITextAutocapitalizationType
   private var keyboardType: UIKeyboardType
+  private var keyboardAppearance: UIKeyboardAppearance
   private var returnKeyType: UIReturnKeyType
 
   private var isSecure: Bool
@@ -55,6 +56,7 @@ public struct CurrencyTextField: UIViewRepresentable {
     autocorrection: UITextAutocorrectionType = .default,
     autocapitalization: UITextAutocapitalizationType = .sentences,
     keyboardType: UIKeyboardType = .decimalPad,
+    keyboardAppearance: UIKeyboardAppearance = .light,
     returnKeyType: UIReturnKeyType = .default,
     isSecure: Bool = false,
     isUserInteractionEnabled: Bool = true,
@@ -79,6 +81,7 @@ public struct CurrencyTextField: UIViewRepresentable {
     self.autocapitalization = autocapitalization
     self.keyboardType = keyboardType
     self.returnKeyType = returnKeyType
+    self.keyboardAppearance = keyboardAppearance
     self.isSecure = isSecure
     self.isUserInteractionEnabled = isUserInteractionEnabled
     self.clearsOnBeginEditing = clearsOnBeginEditing
@@ -112,6 +115,8 @@ public struct CurrencyTextField: UIViewRepresentable {
 
     // tag
     textField.tag = tag
+
+    textField.keyboardAppearance = keyboardAppearance
 
     // font
     if let f = context.environment.font {

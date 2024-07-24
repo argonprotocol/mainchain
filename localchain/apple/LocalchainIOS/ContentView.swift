@@ -49,6 +49,8 @@ struct CurvedBackground: Shape {
 let lightpurple = Color("lightpurple")
 let magenta = Color(UIColor(red: 147.0 / 255.0, green: 33 / 255.0, blue: 166 / 255.0, alpha: 1))
 let bgray = Color(#colorLiteral(red: 0.9365568161, green: 0.9451275468, blue: 0.9492741227, alpha: 1))
+let darkbutton = Color(#colorLiteral(red: 0.6335534453, green: 0.3463019729, blue: 0.7147291303, alpha: 1))
+let fadedbutton = Color(UIColor(red: 153 / 255.0, green: 68 / 255.0, blue: 176 / 255.0, alpha: 1))
 
 struct ContentView: View {
   @StateObject var localchainLoader = LocalchainBridge()
@@ -56,9 +58,11 @@ struct ContentView: View {
   @State var errorText: String?
   @State var showError = false
   @State var showArgonRequestModalView: Bool = false
+  @State var showSettingsModalView: Bool = false
   @State var showArgonFileModalView: Bool = false
   @State var argonFileTransfer: ArgonFileTransfer?
   @State var showQrScanner: Bool = false
+  @State var showBuyingPower: Bool = false
   @State var toggle = "dashboard"
 
   let dollarsFormatter = currencyFormatter("$", digits: 0)
@@ -66,184 +70,193 @@ struct ContentView: View {
   var body: some View {
     NavigationStack {
       VStack(alignment: .center, spacing: 10) {
-        ZStack {
-          CurvedBackground()
-            .stroke(bgray, lineWidth: 0.5)
-            .fill(bgray)
-            .shadow(radius: 1)
+        HStack {
+          Spacer()
 
-          Picker("Toggle to transactions", selection: $toggle) {
-            Text("Dashboard").tag("dashboard")
-            Text("Transactions").tag("transactions")
+          Button(action: {
+            showSettingsModalView = true
+          }) {
+            Image("settings")
+              .resizable()
+              .frame(width: 20, height: 20)
+              .foregroundColor(.white)
           }
-          .pickerStyle(.segmented)
-          .padding(.horizontal, 60)
-          .padding(.top, 10)
-        }.frame(height: 50)
-          .padding(.bottom, 30)
-          .padding(.top, -20)
-          .padding(.horizontal, -30)
+          .padding(.trailing, 20)
+          .padding(.top, 5)
+        }
 
-        Text("Argon is an inflation-proof stablecoin that uses sound money principles to ensure long-term stability.")
-          .font(.caption)
-          .foregroundColor(.gray)
-          .multilineTextAlignment(.center)
-          .padding(.bottom, 30)
+        Spacer()
+        Text("Your Balance")
+          .font(.headline)
+          .fontWeight(.thin)
+          .foregroundColor(.white.opacity(0.9))
+          .padding(.bottom, 0)
 
         HStack(spacing: 2) {
           Text("\(formatArgons(localchainLoader.balance, digits: 0))")
             .fontWeight(.heavy)
-            .font(.system(size: 40.0))
-            .foregroundColor(.accentColor)
+            .font(.system(size: 80.0))
+            .foregroundColor(.white)
           Text(
             "\(formatCents(localchainLoader.balance))"
           )
           .bold()
-          .font(.system(size: 18.0))
-          .foregroundColor(.accentColor)
-          .baselineOffset(16.0)
+          .font(.system(size: 42.0))
+          .foregroundColor(.white)
+          .baselineOffset(28.0)
         }
 
-        Button {
-          showArgonRequestModalView = true
-        } label: {
-          Label("Send", systemImage: "paperplane")
-            .frame(maxWidth: .infinity)
-        }
-        .buttonStyle(.borderedProminent)
-        .foregroundColor(.white)
-        .fontWeight(.bold)
-        .padding(.horizontal, 20)
-
-        Button {
-          showQrScanner = true
-        } label: {
-          Label("Accept", systemImage: "qrcode")
-            .frame(maxWidth: .infinity)
-        }
-        .buttonStyle(.bordered)
-        .padding(.horizontal, 20)
-
-        Divider()
+        CustomDivider()
           .padding(.vertical, 20)
 
-        Text("Current Buying Power")
-          .foregroundColor(.accent)
+        Text("Argon is an inflation-proof stablecoin that uses sound money principles to ensure long-term stability.")
+          .font(.subheadline)
           .fontWeight(.light)
-          .padding(.bottom, -10)
+          .foregroundColor(.white.opacity(0.7))
+          .multilineTextAlignment(.center)
+          .padding(.horizontal, 15)
+          .padding(.bottom, 15)
+          .padding(.top, 15)
 
-        HStack(spacing: 2) {
-          Text(
-            "\((localchainLoader.currentBuyingPower.toDecimal() / Decimal(1_000.0)).formatted(dollarsFormatter) ?? "Err")"
-          )
-          .fontWeight(.bold)
-          .font(.system(size: 40.0))
-          .foregroundColor(.accentColor)
-          Text(
-            "\(formatCents(localchainLoader.currentBuyingPower))"
-          )
-          .bold()
-          .font(.system(size: 18.0))
-          .foregroundColor(.accentColor)
-          .baselineOffset(16.0)
+        if self.showBuyingPower == true {
+          HStack {
+            Spacer()
+            Spacer()
+
+            Button {
+              showBuyingPower = false
+            } label: {
+              Label("", systemImage: "xmark")
+            }
+            .foregroundColor(.white)
+            .padding(.trailing, 5)
+          }.padding(.bottom, -15)
+
+          Text("Future Buying Power*")
+            .foregroundColor(Color.white)
+            .fontWeight(.light)
+            .padding(.bottom, -10)
+
+          HStack(spacing: 2) {
+            Text(
+              "\((localchainLoader.futureBuyingPower.toDecimal() / Decimal(1_000.0)).formatted(dollarsFormatter) ?? "Err")"
+            )
+            .fontWeight(.bold)
+            .font(.system(size: 40.0))
+            .foregroundColor(.white)
+            Text(
+              "\(formatCents(localchainLoader.futureBuyingPower))"
+            )
+            .bold()
+            .font(.system(size: 18.0))
+            .foregroundColor(.white)
+            .baselineOffset(16.0)
+          }
+
+          HStack {
+            Button {}
+              label: { Text("Calculator")
+                .frame(maxWidth: .infinity)
+                .foregroundColor(.white)
+                .padding(.horizontal, 10)
+                .padding(.vertical, 4)
+              }
+              .background(
+                RoundedRectangle(cornerRadius: 3, style: .continuous)
+                  .stroke(.lightpurple, lineWidth: 1)
+              )
+
+            Button {}
+              label: { Text("Learn More")
+                .frame(maxWidth: .infinity)
+                .foregroundColor(.white)
+                .padding(.horizontal, 10)
+                .padding(.vertical, 4)
+              }
+              .background(
+                RoundedRectangle(cornerRadius: 3, style: .continuous)
+                  .stroke(.lightpurple, lineWidth: 1)
+              )
+          }
+          .padding(.horizontal, 25)
+        } else {
+          Button {
+            self.showBuyingPower = true
+          }
+          label: { Text("View My Buying Power")
+            .font(.subheadline)
+            .fontWeight(.light)
+            .foregroundColor(.white)
+            .background(
+              VStack {
+                Spacer()
+                DashedUnderline()
+                  .frame(height: 1)
+                  .offset(y: 5)
+              }
+            )
+          }
+          .padding(.bottom, 10)
+          .padding(.horizontal, 20)
         }
 
-        HStack {
-          Button {}
-            label: { Text("Liquidate")
-              .frame(maxWidth: .infinity)
-              .foregroundColor(.lightpurple)
-              .padding(.horizontal, 10)
-              .padding(.vertical, 4)
-            }
-            .background(
-              RoundedRectangle(cornerRadius: 3, style: .continuous)
-                .stroke(.lightpurple, lineWidth: 1)
-            )
-
-          Button {}
-            label: { Text("Learn More")
-              .frame(maxWidth: .infinity)
-              .foregroundColor(.lightpurple)
-              .padding(.horizontal, 10)
-              .padding(.vertical, 4)
-            }
-            .background(
-              RoundedRectangle(cornerRadius: 3, style: .continuous)
-                .stroke(.lightpurple, lineWidth: 1)
-            )
-        }
-        .padding(.horizontal, 25)
-
-        Divider()
+        CustomDivider()
           .padding(.vertical, 20)
-
-        Text("Future Buying Power*")
-          .foregroundColor(.accent)
-          .fontWeight(.light)
-          .padding(.bottom, -10)
-
-        HStack(spacing: 2) {
-          Text(
-            "\((localchainLoader.futureBuyingPower.toDecimal() / Decimal(1_000.0)).formatted(dollarsFormatter) ?? "Err")"
-          )
-          .fontWeight(.bold)
-          .font(.system(size: 40.0))
-          .foregroundColor(.accentColor)
-          Text(
-            "\(formatCents(localchainLoader.futureBuyingPower))"
-          )
-          .bold()
-          .font(.system(size: 18.0))
-          .foregroundColor(.accentColor)
-          .baselineOffset(16.0)
-        }
-
-        HStack {
-          Button {}
-            label: { Text("Calculator")
-              .frame(maxWidth: .infinity)
-              .foregroundColor(.lightpurple)
-              .padding(.horizontal, 10)
-              .padding(.vertical, 4)
-            }
-            .background(
-              RoundedRectangle(cornerRadius: 3, style: .continuous)
-                .stroke(.lightpurple, lineWidth: 1)
-            )
-
-          Button {}
-            label: { Text("Learn More")
-              .frame(maxWidth: .infinity)
-              .foregroundColor(.lightpurple)
-              .padding(.horizontal, 10)
-              .padding(.vertical, 4)
-            }
-            .background(
-              RoundedRectangle(cornerRadius: 3, style: .continuous)
-                .stroke(.lightpurple, lineWidth: 1)
-            )
-        }
-        .padding(.horizontal, 25)
 
         Spacer()
-      }
-      .toolbar {
-        ToolbarItem(placement: .topBarLeading) {
-          HStack {
-            Image("logo")
-              .foregroundColor(magenta)
-            Text("Argon by Ulixee")
-              .font(.system(size: 18, weight: .bold))
-              .foregroundColor(magenta)
+
+        HStack(spacing: 2) {
+          Button {
+            showArgonRequestModalView = true
+          } label: {
+            Label("Send", image: "send")
+              .frame(maxWidth: .infinity)
+              .fontWeight(.bold)
+              .font(.headline)
+              .padding(.vertical, 10)
           }
-        }
-        ToolbarItem(placement: .topBarTrailing) {
-          Image(systemName: "menu")
-        }
+          .background(.lightpurple)
+          .cornerRadius(8)
+          .overlay(
+            RoundedRectangle(cornerRadius: 8)
+              .stroke(Color.black.opacity(0.8), lineWidth: 0.6)
+          )
+          .foregroundColor(.white)
+          .fontWeight(.bold)
+
+          Spacer()
+
+          Button {
+            showQrScanner = true
+          } label: {
+            Label("Receive", image: "receive")
+              .frame(maxWidth: .infinity)
+              .fontWeight(.bold)
+              .padding(.vertical, 10)
+          }
+          .background(darkbutton)
+          .cornerRadius(8)
+          .overlay(
+            RoundedRectangle(cornerRadius: 8)
+              .stroke(Color.black.opacity(0.8), lineWidth: 0.6)
+          )
+          .foregroundColor(.white)
+        }.padding(.horizontal, 10)
+          .padding(.bottom, 20)
+        //
+        //        Button {}
+        //          label: { Text("Open Transaction History")
+        //            .frame(maxWidth: .infinity)
+        //            .foregroundColor(.white)
+        //            .font(.subheadline)
+        //            .fontWeight(.light)
+        //          }
+        //
+        //        Spacer()
       }
-      .toolbarBackground(.visible, for: .navigationBar)
-      .padding()
+      .padding(.horizontal, 10)
+      .background(gradientBackground)
+      .preferredColorScheme(.dark)
     }
     .task {
       do {
@@ -264,6 +277,7 @@ struct ContentView: View {
       ArgonSendSheet(
         isPresented: $showArgonRequestModalView
       )
+      .preferredColorScheme(.light)
     }
     .sheet(isPresented: $showArgonFileModalView) {
       ArgonReceivedSheet(
@@ -273,6 +287,7 @@ struct ContentView: View {
       .onDisappear {
         argonFileTransfer = nil
       }
+      .preferredColorScheme(.light)
     }
     .sheet(isPresented: $showQrScanner) {
       NavigationView {
@@ -290,6 +305,7 @@ struct ContentView: View {
           Button("", systemImage: "xmark.circle") { showQrScanner = false }
         }
         .toolbarBackground(.visible, for: .navigationBar)
+        .preferredColorScheme(.light)
       }
     }
     .onOpenURL { url in
@@ -311,6 +327,74 @@ struct ContentView: View {
     message: {
       Text(errorText ?? "Unknown error")
     }
+  }
+
+  var gradientBackground: some View {
+    LinearGradient(
+      gradient: Gradient(colors: [
+        Color(uiColor: hexStringToUIColor(hex: "#AD4EC7")),
+        Color(uiColor: hexStringToUIColor(hex: "#8C2FA6"))
+      ]),
+      startPoint: .topLeading,
+      endPoint: .bottomTrailing
+    )
+    .edgesIgnoringSafeArea(.all)
+  }
+}
+
+func hexStringToUIColor(hex: String) -> UIColor {
+  var cString: String = hex.trimmingCharacters(in: .whitespacesAndNewlines).uppercased()
+
+  if cString.hasPrefix("#") {
+    cString.remove(at: cString.startIndex)
+  }
+
+  if (cString.count) != 6 {
+    return UIColor.gray
+  }
+
+  var rgbValue: UInt64 = 0
+  Scanner(string: cString).scanHexInt64(&rgbValue)
+
+  return UIColor(
+    red: CGFloat((rgbValue & 0xFF0000) >> 16) / 255.0,
+    green: CGFloat((rgbValue & 0x00FF00) >> 8) / 255.0,
+    blue: CGFloat(rgbValue & 0x0000FF) / 255.0,
+    alpha: CGFloat(1.0)
+  )
+}
+
+struct DashedUnderline: View {
+  var body: some View {
+    GeometryReader { geometry in
+      Path { path in
+        let dashWidth: CGFloat = 5
+        let dashSpacing: CGFloat = 5
+        let totalWidth = geometry.size.width
+        var currentX: CGFloat = 0
+
+        while currentX < totalWidth {
+          path.move(to: CGPoint(x: currentX, y: 0))
+          path.addLine(to: CGPoint(x: currentX + dashWidth, y: 0))
+          currentX += dashWidth + dashSpacing
+        }
+      }
+      .stroke(Color.white.opacity(0.7), lineWidth: 1)
+    }
+  }
+}
+
+struct CustomDivider: View {
+  var body: some View {
+    VStack(spacing: 0) {
+      Rectangle()
+        .fill(Color.black.opacity(0.7))
+        .frame(height: 0.8)
+      Rectangle()
+        .fill(Color.white.opacity(0.5))
+        .frame(height: 0.5)
+    }
+    .frame(height: 2)
   }
 }
 

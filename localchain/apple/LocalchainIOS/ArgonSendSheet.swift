@@ -16,118 +16,176 @@ struct ArgonSendSheet: View {
   }
 
   @Binding var isPresented: Bool
-  @State var argonRequestType = "Send"
   @State var argons: Double?
-  @FocusState var focusField: FocusedField?
   @EnvironmentObject var localchain: LocalchainBridge
   @State var errorMessage: String?
   @State var argonFile: ArgonFileTransfer?
+  @State private var isShareSheetPresented = false
+  @State private var itemsToShare: [Any] = []
 
   var body: some View {
     NavigationView {
       GeometryReader { geo in
         VStack {
-          if let argonFile = argonFile {
+          HStack {
+            Spacer()
+            Button(action: { isPresented = false }) {
+              Image(systemName: "xmark.circle")
+                .resizable()
+                .tint(.gray)
+                .frame(width: 25, height: 25)
+            }
+          }
+
+          Text("Send Money")
+            .fontWeight(.bold)
+            .font(.title)
+            .foregroundColor(.accentColor)
+            .padding(.bottom, 10)
+
+          if let argonFile = argonFile, !isShareSheetPresented {
             QRCodeDocumentUIView(document: getQr(json: argonFile.json))
               .frame(width: geo.size.width * 0.85, height: geo.size.width * 0.85, alignment: .center)
 
             Text("\(argonFile.name)")
               .font(.footnote)
 
-            ShareLink(
-              item: argonFile,
-              preview: SharePreview(
-                argonFile.name,
-                icon: Image("argfile")
-              )
-            ) {
-              Label("Send File", systemImage: "square.and.arrow.up")
-            }
           } else {
-            Picker("Do you want to send or receive funds?", selection: $argonRequestType) {
-              Text("Send Money").tag("Send")
-              Text("Ask for Money").tag("Request")
-            }
-            .pickerStyle(.segmented)
-
             if errorMessage != nil {
               Text("\(errorMessage ?? "An error occurred")")
+                .font(.footnote)
+                .fontWeight(.thin)
                 .foregroundColor(.red)
+            } else {
+              Text("Enter the amount to send.")
+                .font(.footnote)
+                .fontWeight(.thin)
+                .foregroundStyle(.black)
             }
             CurrencyTextField(
               "₳0.00",
               value: $argons,
+              isResponder: $isPresented,
               alwaysShowFractions: false,
               numberOfDecimalPlaces: 2,
               currencySymbol: "₳"
             )
             .font(.largeTitle)
             .multilineTextAlignment(TextAlignment.center)
-            .frame(height: 60)
+            .frame(height: 50)
             .padding()
             .textFieldStyle(.roundedBorder)
             .border(.secondary)
-            .focused($focusField, equals: .argons)
+            .padding(.bottom, 20)
 
             Button {
-              guard let argons = argons else {
-                errorMessage = "Please input the amount"
-                return
-              }
-              let milligons = UInt64(argons * 1_000)
-              let isRequest = argonRequestType == "Request"
-              let localchain = localchain
               Task {
-                do {
-                  let file = try await localchain.createArgonFile(
-                    isRequesting: isRequest,
-                    milligons: milligons
-                  )
-                  await MainActor.run {
-                    argonFile = file
-                  }
-
-                } catch let AppError.insufficientBalance(balance) {
-                  await MainActor.run {
-                    errorMessage = "You only have \(balance)"
-                  }
-                } catch let UniffiError.Generic(message) {
-                  await MainActor.run {
-                    errorMessage = message
-                  }
-                } catch {
-                  await MainActor.run {
-                    errorMessage = "\(error)"
-                  }
+                let file = await createArgonFile()
+                await MainActor.run {
+                  argonFile = file
                 }
               }
             } label: {
-              Label("Send", systemImage: "paperplane")
+              Label("Transfer Physically", image: "send")
                 .frame(maxWidth: .infinity)
+                .fontWeight(.bold)
+                .font(.headline)
+                .padding(.vertical, 10)
+                .tint(.accentColor)
             }
-            .buttonStyle(.borderedProminent)
+            .background(.white)
+            .cornerRadius(8)
+            .overlay(
+              RoundedRectangle(cornerRadius: 8)
+                .stroke(Color.black.opacity(0.8), lineWidth: 0.6)
+            )
+            .foregroundColor(.accentColor)
+
+            Text("OR")
+              .foregroundColor(.gray)
+
+            Button {
+              Task {
+                let file = await createArgonFile()
+                await MainActor.run {
+                  if let file = file {
+                    isShareSheetPresented = true
+                    itemsToShare = [ArgonFileItemSource(file)]
+                  }
+                }
+              }
+
+            } label: {
+              Label("Send Using...", systemImage: "paperplane")
+                .frame(maxWidth: .infinity)
+                .fontWeight(.bold)
+                .font(.headline)
+                .padding(.vertical, 10)
+            }
+            .background(Color.accentColor)
+            .cornerRadius(8)
+            .overlay(
+              RoundedRectangle(cornerRadius: 8)
+                .stroke(Color.accentColor, lineWidth: 0.6)
+            )
             .foregroundColor(.white)
-            .fontWeight(.bold)
           }
         }
-
-        .navigationBarTitle("\(argonRequestType) Money", displayMode: .inline)
-        .toolbar {
-          Button("", systemImage: "xmark.circle") { isPresented = false }
-        }
-        .toolbarBackground(.visible, for: .navigationBar)
         .frame(maxWidth: .infinity, alignment: .center)
-        .padding()
+        .padding(.horizontal, 20)
+        .padding(.vertical, 20)
       }
     }
-    .onAppear {
-      DispatchQueue.main.asyncAfter(deadline: .now() + 0.1) {
-        focusField = .argons
-      }
+    .sheet(isPresented: $isShareSheetPresented) {
+      ShareSheet(items: itemsToShare)
+        .preferredColorScheme(.light)
+        .ignoresSafeArea()
     }
     .onDisappear {
       errorMessage = nil
     }
+  }
+
+  struct ShareSheet: UIViewControllerRepresentable {
+    var items: [Any]
+
+    func makeUIViewController(context _: Context) -> UIActivityViewController {
+      let controller = UIActivityViewController(activityItems: items, applicationActivities: nil)
+
+      return controller
+    }
+
+    func updateUIViewController(_: UIActivityViewController, context _: Context) {}
+  }
+
+  func createArgonFile() async -> ArgonFileTransfer? {
+    guard let argons = argons else {
+      errorMessage = "Please input the amount"
+      return nil
+    }
+    let milligons = UInt64(argons * 1_000)
+    let localchain = localchain
+    do {
+      let file = try await localchain.createArgonFile(
+        isRequesting: false,
+        milligons: milligons
+      )
+
+      return file
+    } catch let AppError.insufficientBalance(balance) {
+      await MainActor.run {
+        errorMessage = "You only have \(balance)"
+      }
+    } catch let UniffiError.Generic(message) {
+      await MainActor.run {
+        errorMessage = message
+      }
+    } catch {
+      await MainActor.run {
+        errorMessage = "\(error)"
+      }
+    }
+    return nil
   }
 }
 

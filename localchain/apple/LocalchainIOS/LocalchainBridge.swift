@@ -14,13 +14,9 @@ class LocalchainBridge: ObservableObject {
   @Published var accountOverview: LocalchainOverview?
   @Published var balance: BInt = .init(0)
   @Published var futureBuyingPower: BInt = .init(0)
-  @Published var currentBuyingPower: BInt = .init(0)
 
   private var timer: Timer?
   var localchain: Localchain?
-  let cpiFeb2020 = 258.678
-  // https://data.bls.gov/pdq/SurveyOutputServlet
-  let currentCpiFeb2024 = 310.326
 
   func load() async throws {
     if localchain != nil {
@@ -104,7 +100,6 @@ class LocalchainBridge: ObservableObject {
       self.accountOverview = accountOverview
       self.balance = .init(accountOverview.balance) ?? BInt(0)
       self.futureBuyingPower = calculateAnnualCompoundInterest(principal: self.balance, rate: 3.0, years: 100)
-      self.currentBuyingPower = BInt(Double(self.balance.description)! * (currentCpiFeb2024 / cpiFeb2020))
     }
   }
 
