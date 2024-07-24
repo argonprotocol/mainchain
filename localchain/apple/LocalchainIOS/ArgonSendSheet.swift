@@ -86,7 +86,7 @@ struct ArgonSendSheet: View {
                 }
               }
             } label: {
-              Label("Transfer Physically", image: "send")
+              Label("Transfer Physically", image: "user")
                 .frame(maxWidth: .infinity)
                 .fontWeight(.bold)
                 .font(.headline)
