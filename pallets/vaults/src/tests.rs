@@ -12,16 +12,17 @@ use frame_support::{
 	},
 };
 use k256::elliptic_curve::rand_core::{OsRng, RngCore};
-use sp_runtime::{traits::Zero, FixedU128, Percent};
+use sp_runtime::{traits::Zero, FixedU128};
+
+use ulx_primitives::{
+	bitcoin::{CompressedBitcoinPubkey, OpaqueBitcoinXpub},
+	bond::{Bond, BondError, BondExpiration, BondType, VaultProvider, VaultTerms},
+};
 
 use crate::{
 	mock::{Vaults, *},
 	pallet::{NextVaultId, PendingTermsModificationsByBlock, VaultXPubById, VaultsById},
 	Error, Event, HoldReason, VaultConfig,
-};
-use ulx_primitives::{
-	bitcoin::{CompressedBitcoinPubkey, OpaqueBitcoinXpub},
-	bond::{Bond, BondError, BondExpiration, BondType, VaultProvider, VaultTerms},
 };
 
 const TEN_PCT: FixedU128 = FixedU128::from_rational(10, 100);
@@ -40,7 +41,7 @@ fn default_terms(pct: FixedU128) -> VaultTerms<Balance> {
 		mining_annual_percent_rate: pct,
 		bitcoin_base_fee: 0,
 		mining_base_fee: 0,
-		mining_reward_sharing_percent_take: Percent::zero(),
+		mining_reward_sharing_percent_take: FixedU128::zero(),
 	}
 }
 
@@ -113,15 +114,6 @@ fn it_can_add_securitization_to_a_vault() {
 		assert!(System::account_exists(&1));
 		let bitcoin_securitization = 50_000 * 10 / 100;
 		assert_eq!(Balances::reserved_balance(1), 100_000 + bitcoin_securitization);
-
-		config.bitcoin_amount_allocated = 1;
-		config.mining_amount_allocated = 1;
-		config.securitization_percent = FixedU128::from_float(2.1);
-		// can only go up to 200% (2x)
-		assert_err!(
-			Vaults::create(RuntimeOrigin::signed(2), config),
-			Error::<Test>::MaxSecuritizationPercentExceeded
-		);
 	});
 }
 
@@ -353,7 +345,7 @@ fn it_can_bond_funds() {
 		let mut terms = default_terms(FixedU128::from_float(0.01));
 		terms.bitcoin_base_fee = 1000;
 		terms.mining_annual_percent_rate = FixedU128::zero();
-		terms.mining_reward_sharing_percent_take = Percent::from_float(2.0);
+		terms.mining_reward_sharing_percent_take = FixedU128::from_float(0.02);
 		assert_ok!(Vaults::create(
 			RuntimeOrigin::signed(1),
 			VaultConfig {
@@ -465,7 +457,7 @@ fn it_can_burn_a_bond() {
 
 		set_argons(1, 1_000_000);
 		let mut terms = default_terms(FixedU128::zero());
-		terms.mining_reward_sharing_percent_take = Percent::from_float(2.0);
+		terms.mining_reward_sharing_percent_take = FixedU128::from_float(0.02);
 		assert_ok!(Vaults::create(
 			RuntimeOrigin::signed(1),
 			VaultConfig {
@@ -520,7 +512,7 @@ fn it_can_recoup_reduced_value_bitcoins_from_bond_funds() {
 		set_argons(1, 200_200);
 
 		let mut terms = default_terms(FixedU128::from_float(0.001));
-		terms.mining_reward_sharing_percent_take = Percent::from_float(2.0);
+		terms.mining_reward_sharing_percent_take = FixedU128::from_float(0.02);
 		assert_ok!(Vaults::create(
 			RuntimeOrigin::signed(1),
 			VaultConfig {
@@ -579,7 +571,7 @@ fn it_can_recoup_increased_value_bitcoins_from_securitizations() {
 		set_argons(1, 350_200);
 
 		let mut terms = default_terms(FixedU128::from_float(0.001));
-		terms.mining_reward_sharing_percent_take = Percent::from_float(2.0);
+		terms.mining_reward_sharing_percent_take = FixedU128::from_float(0.02);
 		assert_ok!(Vaults::create(
 			RuntimeOrigin::signed(1),
 			VaultConfig {
@@ -723,11 +715,11 @@ fn it_can_schedule_term_changes() {
 		System::set_block_number(10);
 		Vaults::on_finalize(10);
 
-		terms.mining_reward_sharing_percent_take = Percent::from_float(3.0);
+		terms.mining_reward_sharing_percent_take = FixedU128::from_float(0.03);
 		assert_ok!(Vaults::modify_terms(RuntimeOrigin::signed(1), 1, terms.clone()));
 		assert_ne!(
 			VaultsById::<Test>::get(1).unwrap().mining_reward_sharing_percent_take,
-			Percent::from_float(3.0)
+			FixedU128::from_float(0.03)
 		);
 		assert_eq!(
 			VaultsById::<Test>::get(1)
@@ -736,7 +728,7 @@ fn it_can_schedule_term_changes() {
 				.unwrap()
 				.1
 				.mining_reward_sharing_percent_take,
-			Percent::from_float(3.0)
+			FixedU128::from_float(0.03)
 		);
 		System::assert_last_event(
 			Event::VaultTermsChangeScheduled { vault_id: 1, change_block: 100 }.into(),
@@ -753,7 +745,7 @@ fn it_can_schedule_term_changes() {
 		Vaults::on_finalize(100);
 		assert_eq!(
 			VaultsById::<Test>::get(1).unwrap().mining_reward_sharing_percent_take,
-			Percent::from_float(3.0)
+			FixedU128::from_float(0.03)
 		);
 		assert_eq!(VaultsById::<Test>::get(1).unwrap().pending_terms, None);
 		assert_eq!(PendingTermsModificationsByBlock::<Test>::get(100).first(), None);

@@ -1,3 +1,5 @@
+mod create_vault;
+
 #[allow(dead_code, unused_imports)]
 use std::{env, fmt};
 
@@ -7,7 +9,7 @@ use codec::Decode;
 use comfy_table::{modifiers::UTF8_ROUND_CORNERS, presets::UTF8_FULL, ContentArrangement, Table};
 use sp_runtime::{FixedPointNumber, FixedU128};
 use ulixee_client::{
-	api::{apis, bonds::events::bond_created::VaultId, storage},
+	api::{apis, bonds::events::bond_created::VaultId, storage, tx},
 	conversion::from_api_fixed_u128,
 	MainchainClient,
 };
@@ -40,6 +42,11 @@ enum VaultCommands {
 		/// The amount of btc to bond
 		#[clap(short, long, default_value = "1.0")]
 		btc: f32,
+	},
+	/// Create a new vault
+	Create {
+		#[clap(flatten)]
+		config: create_vault::VaultConfig,
 	},
 }
 
@@ -122,6 +129,20 @@ async fn main() -> anyhow::Result<()> {
 				} else {
 					println!("{table}");
 				}
+			},
+			VaultCommands::Create { config } => {
+				let mut config = config;
+				if !config.complete_prompt().await {
+					return Ok(());
+				}
+				let client = MainchainClient::from_url(&rpc_url)
+					.await
+					.context("Failed to connect to ulixee node")?;
+				let call = tx().vaults().create(config.as_call_data());
+				let ext_params = MainchainClient::ext_params_builder().build();
+				let ext_data = client.live.tx().create_partial_signed_offline(&call, ext_params)?;
+
+				println!("Vault creation call\n\n0x{}", hex::encode(ext_data.call_data()));
 			},
 		},
 	};

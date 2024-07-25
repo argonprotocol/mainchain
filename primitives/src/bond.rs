@@ -1,7 +1,7 @@
 use codec::{Codec, Decode, Encode, MaxEncodedLen};
 use frame_support::PalletError;
 use scale_info::TypeInfo;
-use sp_arithmetic::{traits::UniqueSaturatedInto, FixedPointNumber, FixedU128, Percent};
+use sp_arithmetic::{traits::UniqueSaturatedInto, FixedPointNumber, FixedU128};
 use sp_debug_derive::RuntimeDebug;
 use sp_runtime::traits::AtLeast32BitUnsigned;
 
@@ -163,7 +163,7 @@ pub struct VaultTerms<Balance: Codec + MaxEncodedLen + Clone + TypeInfo + Partia
 	pub mining_base_fee: Balance,
 	/// The optional sharing of any argons minted for stabilization or mined from blocks
 	#[codec(compact)]
-	pub mining_reward_sharing_percent_take: Percent, // max 100, actual percent
+	pub mining_reward_sharing_percent_take: FixedU128, // max 100, actual percent
 }
 
 impl<

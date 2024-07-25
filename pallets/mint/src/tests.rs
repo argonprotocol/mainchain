@@ -2,7 +2,7 @@ use frame_support::{
 	assert_ok,
 	traits::{fungible::Unbalanced, OnInitialize},
 };
-use sp_arithmetic::{FixedI128, Percent};
+use sp_arithmetic::{FixedI128, FixedU128};
 use sp_runtime::{DispatchError, TokenError};
 use ulx_primitives::{block_seal::BlockPayout, BlockRewardsEventHandler, UtxoBondedEvents};
 
@@ -138,8 +138,8 @@ fn it_can_mint_profit_sharing() {
 	ArgonCPI::set(Some(FixedI128::from_float(-1.0)));
 
 	MinerRewardsAccounts::set(vec![
-		(1, Some(Percent::from_percent(30))),
-		(2, Some(Percent::from_percent(70))),
+		(1, Some(FixedU128::from_rational(30, 100))),
+		(2, Some(FixedU128::from_rational(70, 100))),
 		(3, None),
 	]);
 

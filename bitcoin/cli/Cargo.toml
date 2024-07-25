@@ -22,11 +22,15 @@ tracing = { workspace = true }
 tracing-subscriber = { workspace = true }
 
 clap = { workspace = true }
+inquire = { workspace = true }
 comfy-table = { workspace = true }
+hex = { workspace = true }
+bitcoin = { workspace = true }
 
 ulixee-client = { workspace = true }
 ulx-primitives = { workspace = true, features = ["default"] }
 ulx-bitcoin = { workspace = true, features = ["default"] }
+ulx-bitcoin-cli-macros = { workspace = true }
 
 [features]
 default = []

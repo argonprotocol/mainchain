@@ -196,7 +196,7 @@ pub mod pallet {
 		/// This reduction in bond funds offered goes below the amount that is already committed to
 		VaultReductionBelowAllocatedFunds,
 		/// An invalid securitization percent was provided for the vault. NOTE: it cannot be
-		/// decreased
+		/// decreased (or negative)
 		InvalidSecuritization,
 		/// The maximum number of bitcoin pubkeys for a vault has been exceeded
 		MaxPendingVaultBitcoinPubkeys,
@@ -344,10 +344,6 @@ pub mod pallet {
 				mining_reward_sharing_percent_take,
 			} = terms;
 
-			ensure!(
-				securitization_percent <= FixedU128::from_rational(2, 1),
-				Error::<T>::MaxSecuritizationPercentExceeded
-			);
 			ensure!(
 				bitcoin_amount_allocated.checked_add(&mining_amount_allocated).is_some(),
 				Error::<T>::InvalidVaultAmount

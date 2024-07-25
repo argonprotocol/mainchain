@@ -3,8 +3,9 @@
 extern crate alloc;
 extern crate core;
 
-pub use pallet::*;
 use sp_runtime::DispatchError;
+
+pub use pallet::*;
 use ulx_bitcoin::UtxoUnlocker;
 use ulx_primitives::bitcoin::{BitcoinSignature, CompressedBitcoinPubkey};
 pub use weights::*;
@@ -81,6 +82,7 @@ const LOG_TARGET: &str = "runtime::bond";
 #[frame_support::pallet(dev_mode)]
 pub mod pallet {
 	use alloc::vec;
+
 	use codec::Codec;
 	use frame_support::{
 		pallet_prelude::*,
@@ -94,14 +96,13 @@ pub mod pallet {
 	};
 	use frame_system::pallet_prelude::*;
 	use log::warn;
+	use sp_arithmetic::FixedU128;
 	use sp_runtime::{
-		traits::{AtLeast32BitUnsigned, UniqueSaturatedInto},
+		traits::{AtLeast32BitUnsigned, UniqueSaturatedInto, Zero},
 		DispatchError::Token,
 		FixedPointNumber, Saturating, TokenError,
 	};
 
-	use super::*;
-	use sp_arithmetic::FixedU128;
 	use ulx_bitcoin::{Amount, UnlockStep, UtxoUnlocker};
 	use ulx_primitives::{
 		bitcoin::{
@@ -114,6 +115,8 @@ pub mod pallet {
 		BitcoinUtxoEvents, BitcoinUtxoTracker, BondId, PriceProvider, RewardShare,
 		UtxoBondedEvents, VaultId,
 	};
+
+	use super::*;
 
 	#[pallet::pallet]
 	pub struct Pallet<T>(_);

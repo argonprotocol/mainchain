@@ -4,7 +4,7 @@ use bitcoin::PublicKey;
 use env_logger::{Builder, Env};
 use frame_support::{derive_impl, parameter_types, traits::Currency};
 use frame_system::pallet_prelude::BlockNumberFor;
-use sp_arithmetic::{FixedI128, FixedU128, Percent};
+use sp_arithmetic::{FixedI128, FixedU128};
 use sp_core::{ConstU32, ConstU64, H256};
 use sp_runtime::{BuildStorage, DispatchError};
 
@@ -93,7 +93,7 @@ parameter_types! {
 		},
 		operator_account_id: 1,
 		securitization_percent: FixedU128::from_float(0.0),
-		mining_reward_sharing_percent_take: Percent::from_percent(0),
+		mining_reward_sharing_percent_take: FixedU128::from_float(0.0),
 		securitized_argons: 0,
 		is_closed: false,
 		pending_terms: None,

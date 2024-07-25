@@ -13,16 +13,14 @@ use frame_support::{
 	},
 };
 use frame_system::pallet_prelude::BlockNumberFor;
+pub use pallet::*;
 use pallet_session::SessionManager;
 use sp_core::{Get, U256};
 use sp_io::hashing::blake2_256;
 use sp_runtime::{
-	traits::{Convert, UniqueSaturatedInto},
-	BoundedBTreeMap, FixedI128, FixedPointNumber, FixedU128, Percent, SaturatedConversion,
-	Saturating,
+	traits::{Convert, One, UniqueSaturatedInto},
+	BoundedBTreeMap, FixedI128, FixedPointNumber, FixedU128, SaturatedConversion, Saturating,
 };
-
-pub use pallet::*;
 use ulx_primitives::{
 	block_seal::{
 		BlockSealAuthorityId, MinerIndex, MiningAuthority, RewardDestination, RewardSharing,
@@ -489,7 +487,7 @@ impl<T: Config> BlockRewardAccountsProvider<T::AccountId> for Pallet<T> {
 			if let Some(reward_sharing) = registration.reward_sharing {
 				result.push((
 					account,
-					Some(Percent::from_percent(100).saturating_sub(reward_sharing.percent_take)),
+					Some(FixedU128::one().saturating_sub(reward_sharing.percent_take)),
 				));
 				result.push((reward_sharing.account_id, Some(reward_sharing.percent_take)));
 			} else {

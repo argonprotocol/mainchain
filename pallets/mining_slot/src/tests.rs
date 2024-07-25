@@ -9,7 +9,7 @@ use frame_support::{
 };
 use pallet_balances::Event as UlixeeBalancesEvent;
 use sp_core::{bounded_vec, crypto::AccountId32, ByteArray, H256, U256};
-use sp_runtime::{testing::UintAuthorityId, BoundedVec, FixedU128, Percent};
+use sp_runtime::{testing::UintAuthorityId, BoundedVec, FixedU128};
 
 use crate::{
 	mock::{MiningSlots, UlixeeBalances, *},
@@ -688,7 +688,7 @@ fn records_profit_sharing_if_applicable() {
 	MaxCohortSize::set(2);
 	VaultSharing::set(Some(RewardSharing {
 		account_id: 30,
-		percent_take: Percent::from_percent(90),
+		percent_take: FixedU128::from_rational(90, 100),
 	}));
 
 	new_test_ext(None).execute_with(|| {
@@ -710,7 +710,7 @@ fn records_profit_sharing_if_applicable() {
 		);
 		assert_eq!(
 			NextSlotCohort::<Test>::get()[0].reward_sharing,
-			Some(RewardSharing { account_id: 30, percent_take: Percent::from_percent(90) })
+			Some(RewardSharing { account_id: 30, percent_take: FixedU128::from_rational(90, 100) })
 		);
 
 		MiningSlots::on_initialize(6);
@@ -718,14 +718,17 @@ fn records_profit_sharing_if_applicable() {
 		assert_eq!(NextSlotCohort::<Test>::get().len(), 0);
 		let rewards_accounts = MiningSlots::get_all_rewards_accounts();
 		assert_eq!(rewards_accounts.len(), 2);
-		assert_eq!(rewards_accounts[0], (25, Some(Percent::from_percent(10))));
-		assert_eq!(rewards_accounts[1], (30, Some(Percent::from_percent(90))));
+		assert_eq!(rewards_accounts[0], (25, Some(FixedU128::from_rational(10, 100))));
+		assert_eq!(rewards_accounts[1], (30, Some(FixedU128::from_rational(90, 100))));
 
 		assert_eq!(
 			MiningSlots::get_rewards_account(&1),
 			(
 				Some(25),
-				Some(RewardSharing { account_id: 30, percent_take: Percent::from_percent(90) })
+				Some(RewardSharing {
+					account_id: 30,
+					percent_take: FixedU128::from_rational(90, 100)
+				})
 			)
 		);
 	});

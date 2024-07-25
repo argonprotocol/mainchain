@@ -761,10 +761,6 @@ declare module '@polkadot/api-base/types/errors' {
        **/
       InvalidXpubkey: AugmentedError<ApiType>;
       /**
-       * Unable to derive xpubkey child
-       **/
-      InvalidXpubkeyChild: AugmentedError<ApiType>;
-      /**
        * The maximum number of bitcoin pubkeys for a vault has been exceeded
        **/
       MaxPendingVaultBitcoinPubkeys: AugmentedError<ApiType>;
@@ -793,6 +789,10 @@ declare module '@polkadot/api-base/types/errors' {
        * Unable to decode vault bitcoin pubkey
        **/
       UnableToDecodeVaultBitcoinPubkey: AugmentedError<ApiType>;
+      /**
+       * Unable to derive xpubkey child
+       **/
+      UnableToDeriveVaultXpubChild: AugmentedError<ApiType>;
       /**
        * Unable to generate a new vault bitcoin pubkey
        **/

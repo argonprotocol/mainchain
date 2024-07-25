@@ -31,7 +31,8 @@ members = [
     "testing/bitcoin",
     "oracle",
     "bitcoin",
-    "bitcoin/cli"
+    "bitcoin/cli",
+    "bitcoin/cli/macros",
 ]
 resolver = "2"
 
@@ -278,11 +279,16 @@ uniffi = { version = "0.27", features = ["tokio"] }
 randomx-rs = { git = "https://github.com/ulixee/randomx-rs", branch = "main" }
 
 clap = { version = "4.5", features = ["derive", "cargo", "env"] }
+quote = { version = "1.0" }
+inquire = { version = "0.7" }
 rpassword = { version = "7.3" }
 comfy-table = { version = "7.1" }
 bech32 = { version = "0.11.0" }
 array-bytes = { version = "6.1" }
 directories = { version = "5.0" }
+syn = { version = "2.0" }
+proc-macro2 = { version = "1.0" }
+ctrlc = { version = "3.4" }
 
 bindgen = { version = "0.69" }
 cmake = { version = "0.1" }
@@ -305,6 +311,7 @@ ulx-notary = { path = "notary" }
 ulx-notary-apis = { path = "notary/apis" }
 ulx-notary-audit = { path = "notary/audit", default-features = false }
 ulx-primitives = { path = "primitives", default-features = false }
+ulx-bitcoin-cli-macros = { path = "bitcoin/cli/macros" }
 
 pallet-block-seal = { path = "pallets/block_seal", default-features = false }
 pallet-block-seal-spec = { path = "pallets/block_seal_spec", default-features = false }

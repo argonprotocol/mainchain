@@ -123,7 +123,7 @@ pub mod pallet {
 			if argons_to_print_per_miner > T::Balance::zero() {
 				for (miner, share) in reward_accounts {
 					let amount = if let Some(share) = share {
-						share.mul_floor(argons_to_print_per_miner)
+						share.saturating_mul_int(argons_to_print_per_miner)
 					} else {
 						argons_to_print_per_miner
 					};

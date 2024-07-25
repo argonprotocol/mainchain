@@ -1,7 +1,8 @@
 use alloc::vec::Vec;
+
 use codec::{Codec, Decode, Encode, FullCodec, MaxEncodedLen};
 use scale_info::TypeInfo;
-use sp_arithmetic::{FixedI128, FixedPointNumber, Percent};
+use sp_arithmetic::{FixedI128, FixedPointNumber};
 use sp_core::{RuntimeDebug, H256, U256};
 use sp_runtime::{
 	traits::{AtLeast32BitUnsigned, Block as BlockT, CheckedDiv, UniqueSaturatedInto},
@@ -169,7 +170,7 @@ pub trait MiningSlotProvider<BlockNumber> {
 	fn mining_window_blocks() -> BlockNumber;
 }
 
-pub type RewardShare = Percent;
+pub type RewardShare = FixedU128;
 pub trait AuthorityProvider<AuthorityId, Block, AccountId>
 where
 	Block: BlockT,
