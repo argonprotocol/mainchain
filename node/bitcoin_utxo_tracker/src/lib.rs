@@ -104,7 +104,7 @@ mod test {
 
 	#[test]
 	fn can_track_blocks_and_verify_utxos() {
-		let (bitcoind, tracker, block_address) = start_bitcoind();
+		let (bitcoind, tracker, block_address, network) = start_bitcoind();
 
 		let block_height = bitcoind.client.get_block_count().unwrap();
 
@@ -122,7 +122,7 @@ mod test {
 			block_height + 200,
 		)
 		.expect("script");
-		let script_address = Address::p2wsh(script.as_script(), Network::Regtest);
+		let script_address = Address::p2wsh(script.as_script(), network);
 
 		let submitted_at_height = block_height + 1;
 
@@ -183,10 +183,10 @@ mod test {
 	lazy_static! {
 		static ref BITCOIND_LOCK: std::sync::Mutex<()> = std::sync::Mutex::new(());
 	}
-	fn start_bitcoind() -> (BitcoinD, UtxoTracker, Address) {
+	fn start_bitcoind() -> (BitcoinD, UtxoTracker, Address, Network) {
 		// bitcoin will get in a fight with ulixee for ports, so lock here too
 		let _lock = BITCOIND_LOCK.lock().unwrap();
-		let (bitcoind, rpc_url) = ulx_testing::start_bitcoind().expect("start_bitcoin");
+		let (bitcoind, rpc_url, network) = ulx_testing::start_bitcoind().expect("start_bitcoin");
 		let _ = env_logger::builder().is_test(true).try_init();
 
 		let block_address = add_wallet_address(&bitcoind);
@@ -202,7 +202,7 @@ mod test {
 		};
 
 		let tracker = UtxoTracker::new(rpc_url.origin().unicode_serialization(), auth).unwrap();
-		(bitcoind, tracker, block_address)
+		(bitcoind, tracker, block_address, network)
 	}
 
 	struct TestAuxStore {

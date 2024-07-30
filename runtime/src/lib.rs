@@ -353,6 +353,7 @@ impl pallet_vaults::Config for Runtime {
 	type MaxPendingTermModificationsPerBlock = MaxPendingTermModificationsPerBlock;
 	type MiningSlotProvider = MiningSlot;
 	type MinTermsModificationBlockDelay = MinTermsModificationBlockDelay;
+	type GetBitcoinNetwork = BitcoinUtxos;
 }
 
 pub struct BitcoinSignatureVerifier;

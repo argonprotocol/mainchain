@@ -24,7 +24,7 @@ use tokio::{
 use tracing::warn;
 
 pub use spec::api;
-use ulx_primitives::{AccountId, Nonce};
+use ulx_primitives::{AccountId, BlockNumber, Nonce};
 
 use crate::api::{storage, system, ulixee_balances};
 
@@ -170,6 +170,23 @@ impl MainchainClient {
 	) -> anyhow::Result<Nonce> {
 		let nonce = self.methods.system_account_next_index(account_id32).await?;
 		Ok(nonce as Nonce)
+	}
+
+	pub async fn block_at_height(&self, height: BlockNumber) -> anyhow::Result<Option<H256>> {
+		let block_hash = self.fetch_storage(&storage().system().block_hash(height), None).await?;
+		Ok(block_hash)
+	}
+
+	pub async fn block_number(
+		&self,
+		hash: <UlxConfig as Config>::Hash,
+	) -> anyhow::Result<BlockNumber> {
+		self.live
+			.backend()
+			.block_header(hash)
+			.await?
+			.map(|a| a.number)
+			.ok_or_else(|| anyhow!("Block header not found for block hash"))
 	}
 
 	pub async fn best_block_hash(&self) -> anyhow::Result<H256> {

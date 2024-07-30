@@ -18,7 +18,7 @@ lazy_static! {
 	static ref BITCOIND_LOCK: std::sync::Mutex<()> = std::sync::Mutex::new(());
 }
 
-pub fn start_bitcoind() -> anyhow::Result<(BitcoinD, url::Url)> {
+pub fn start_bitcoind() -> anyhow::Result<(BitcoinD, url::Url, bitcoin::Network)> {
 	let path = env::temp_dir().join("ulx_bitcoind_testing.lock");
 	let file = File::create_new(&path).or_else(|_| File::open(&path))?;
 	// Acquire the lock
@@ -43,7 +43,8 @@ pub fn start_bitcoind() -> anyhow::Result<(BitcoinD, url::Url)> {
 	drop(lock);
 	file.unlock().expect("Failed to unlock file");
 	let url = read_rpc_url(&bitcoind)?;
-	Ok((bitcoind, url))
+	let network = bitcoind.client.get_blockchain_info().unwrap().chain;
+	Ok((bitcoind, url, network))
 }
 
 pub fn read_rpc_url(bitcoind: &BitcoinD) -> anyhow::Result<url::Url> {
@@ -80,11 +81,11 @@ pub fn wait_for_txid(
 	}
 }
 
-pub fn create_xpriv() -> (Xpriv, Fingerprint) {
+pub fn create_xpriv(network: Network) -> (Xpriv, Fingerprint) {
 	let secp = Secp256k1::new();
 	let mut seed = [0u8; 32];
 	OsRng.fill_bytes(&mut seed);
-	let master_xpriv = Xpriv::new_master(Network::Regtest, &seed).unwrap();
+	let master_xpriv = Xpriv::new_master(network, &seed).unwrap();
 	let master_xpub = Xpub::from_priv(&secp, &master_xpriv);
 	let fingerprint = master_xpub.fingerprint();
 	(master_xpriv, fingerprint)
@@ -103,7 +104,8 @@ pub fn derive(master_xpriv: &Xpriv, path: &str) -> (CompressedPublicKey, Derivat
 
 pub fn add_wallet_address(bitcoind: &BitcoinD) -> Address {
 	let address = bitcoind.client.get_new_address(None, None).unwrap();
-	address.require_network(Network::Regtest).unwrap()
+	let network = bitcoind.client.get_blockchain_info().unwrap().chain;
+	address.require_network(network).unwrap()
 }
 
 pub fn add_blocks(bitcoind: &BitcoinD, count: u64, grant_to_address: &Address) {

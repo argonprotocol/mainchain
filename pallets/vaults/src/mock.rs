@@ -4,7 +4,7 @@ use frame_support::{derive_impl, parameter_types, traits::Currency};
 use frame_system::pallet_prelude::BlockNumberFor;
 use sp_core::{ConstU32, ConstU64};
 use sp_runtime::BuildStorage;
-use ulx_primitives::MiningSlotProvider;
+use ulx_primitives::{bitcoin::BitcoinNetwork, MiningSlotProvider};
 
 pub type Balance = u128;
 type Block = frame_system::mocking::MockBlock<Test>;
@@ -30,6 +30,7 @@ parameter_types! {
 	pub static ExistentialDeposit: Balance = 10;
 	pub const MinimumBondAmount:u128 = 1_000;
 	pub const BlocksPerYear:u32 = 1440*365;
+	pub static GetBitcoinNetwork: BitcoinNetwork = BitcoinNetwork::Regtest;
 }
 
 impl pallet_balances::Config for Test {
@@ -79,6 +80,7 @@ impl pallet_vaults::Config for Test {
 	type MiningSlotProvider = StaticMiningSlotProvider;
 	type MaxPendingTermModificationsPerBlock = ConstU32<100>;
 	type MinTermsModificationBlockDelay = MinTermsModificationBlockDelay;
+	type GetBitcoinNetwork = GetBitcoinNetwork;
 }
 
 // Build genesis storage according to the mock runtime.

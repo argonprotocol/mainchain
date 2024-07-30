@@ -46,17 +46,16 @@ pub mod pallet {
 		FixedPointNumber, FixedU128, Saturating, TokenError,
 	};
 
+	use super::*;
 	use ulx_bitcoin::CosignScript;
 	use ulx_primitives::{
 		bitcoin::{
-			BitcoinCosignScriptPubkey, BitcoinHeight, BitcoinXPub, CompressedBitcoinPubkey,
-			OpaqueBitcoinXpub, UtxoId,
+			BitcoinCosignScriptPubkey, BitcoinHeight, BitcoinNetwork, BitcoinXPub,
+			CompressedBitcoinPubkey, OpaqueBitcoinXpub, UtxoId,
 		},
 		bond::{Bond, BondError, BondType, Vault, VaultArgons, VaultProvider, VaultTerms},
 		MiningSlotProvider, VaultId,
 	};
-
-	use super::*;
 
 	#[pallet::pallet]
 	pub struct Pallet<T>(_);
@@ -104,6 +103,9 @@ pub mod pallet {
 
 		/// A provider of mining slot information
 		type MiningSlotProvider: MiningSlotProvider<BlockNumberFor<Self>>;
+
+		/// Provides the bitcoin network this blockchain is connected to
+		type GetBitcoinNetwork: Get<BitcoinNetwork>;
 	}
 
 	/// A reason for the pallet placing a hold on funds.
@@ -210,6 +212,8 @@ pub mod pallet {
 		InvalidBitcoinScript,
 		/// Unable to decode xpubkey
 		InvalidXpubkey,
+		/// Wrong Xpub Network
+		WrongXpubNetwork,
 		/// The XPub is unsafe to use in a public blockchain (aka, unhardened)
 		UnsafeXpubkey,
 		/// Unable to derive xpubkey child
@@ -356,6 +360,10 @@ pub mod pallet {
 				Error::<T>::InvalidXpubkey
 			})?;
 			ensure!(xpub.is_hardened(), Error::<T>::UnsafeXpubkey);
+			ensure!(
+				xpub.matches_network(T::GetBitcoinNetwork::get()),
+				Error::<T>::WrongXpubNetwork
+			);
 			// make sure we can derive
 			let _xpub =
 				xpub.derive_pubkey(0).map_err(|_| Error::<T>::UnableToDeriveVaultXpubChild)?;
@@ -599,6 +607,10 @@ pub mod pallet {
 				ensure!(existing.0 != xpub, Error::<T>::ReusedVaultBitcoinXpub);
 			}
 			ensure!(xpub.is_hardened(), Error::<T>::UnsafeXpubkey);
+			ensure!(
+				xpub.matches_network(T::GetBitcoinNetwork::get()),
+				Error::<T>::WrongXpubNetwork
+			);
 			let _try_derive =
 				xpub.derive_pubkey(0).map_err(|_| Error::<T>::UnableToDeriveVaultXpubChild)?;
 			VaultXPubById::<T>::insert(vault_id, (xpub, 0));

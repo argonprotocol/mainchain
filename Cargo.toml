@@ -272,6 +272,7 @@ secp256k1 = { version = "0.29.0" }
 k256 = { version = "0.13.3", default-features = false }
 bip32 = { version = "0.5.1", default-features = false }
 base58 = { version = "0.2.0", default-features = false }
+base64 = { version = "0.22", default-features = false }
 napi-derive = { version = "2.16" }
 napi = { version = "2.16", features = ["napi9", "async", "error_anyhow"] }
 napi-build = { version = "2.1" }

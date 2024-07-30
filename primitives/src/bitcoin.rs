@@ -3,6 +3,7 @@ use core::convert::{TryFrom, TryInto};
 
 use codec::{Decode, Encode, MaxEncodedLen};
 use frame_support::pallet_prelude::TypeInfo;
+use serde::{Deserialize, Serialize};
 use sp_core::{ConstU32, H256};
 use sp_debug_derive::RuntimeDebug;
 use sp_runtime::BoundedVec;
@@ -155,6 +156,21 @@ pub enum NetworkKind {
 	Test,
 }
 
+#[derive(
+	Encode, Decode, TypeInfo, Serialize, Deserialize, Clone, PartialEq, Eq, RuntimeDebug, Default,
+)]
+pub enum BitcoinNetwork {
+	/// Mainnet Bitcoin.
+	Bitcoin,
+	/// Bitcoin's testnet network.
+	Testnet,
+	/// Bitcoin's signet network
+	Signet,
+	/// Bitcoin's regtest network.
+	#[default]
+	Regtest,
+}
+
 pub type XPubFingerprint = [u8; 4];
 pub type XPubChildNumber = u32;
 
@@ -177,19 +193,34 @@ pub struct BitcoinXPub {
 	pub network: NetworkKind,
 }
 
+impl BitcoinXPub {
+	pub fn matches_network(&self, network: BitcoinNetwork) -> bool {
+		match network {
+			BitcoinNetwork::Bitcoin => self.network == NetworkKind::Main,
+			BitcoinNetwork::Testnet => self.network == NetworkKind::Test,
+			BitcoinNetwork::Signet => self.network == NetworkKind::Test,
+			BitcoinNetwork::Regtest => self.network == NetworkKind::Test,
+		}
+	}
+}
+
 #[cfg(feature = "bitcoin")]
 mod bitcoin_compat {
 	use alloc::vec::Vec;
 
 	use bip32::{ChildNumber, ExtendedKeyAttrs, XPub};
-	use bitcoin::hashes::{FromSliceError, Hash};
+	use bitcoin::{
+		hashes::{FromSliceError, Hash},
+		Network,
+	};
 	use k256::ecdsa::VerifyingKey;
 	use sp_core::H256;
 	use sp_runtime::BoundedVec;
 
 	use crate::bitcoin::{
-		BitcoinCosignScriptPubkey, BitcoinScriptPubkey, BitcoinSignature, BitcoinXPub,
-		CompressedBitcoinPubkey, H256Le, NetworkKind, OpaqueBitcoinXpub, UtxoRef, XpubErrors,
+		BitcoinCosignScriptPubkey, BitcoinNetwork, BitcoinScriptPubkey, BitcoinSignature,
+		BitcoinXPub, CompressedBitcoinPubkey, H256Le, NetworkKind, OpaqueBitcoinXpub, UtxoRef,
+		XpubErrors,
 	};
 
 	/// Version bytes for extended public keys on the Bitcoin network.
@@ -317,6 +348,38 @@ mod bitcoin_compat {
 		fn from(h: H256Le) -> Self {
 			let hash = bitcoin::hashes::sha256d::Hash::from_bytes_ref(&h.0);
 			bitcoin::Txid::from_raw_hash(*hash)
+		}
+	}
+	impl From<Network> for BitcoinNetwork {
+		fn from(network: Network) -> Self {
+			match network {
+				Network::Bitcoin => BitcoinNetwork::Bitcoin,
+				Network::Testnet => BitcoinNetwork::Testnet,
+				Network::Signet => BitcoinNetwork::Signet,
+				Network::Regtest => BitcoinNetwork::Regtest,
+				_ => unimplemented!(),
+			}
+		}
+	}
+
+	impl From<BitcoinNetwork> for bitcoin::network::NetworkKind {
+		fn from(value: BitcoinNetwork) -> Self {
+			match value {
+				BitcoinNetwork::Bitcoin => bitcoin::network::NetworkKind::Main,
+				BitcoinNetwork::Testnet | BitcoinNetwork::Signet | BitcoinNetwork::Regtest =>
+					bitcoin::network::NetworkKind::Test,
+			}
+		}
+	}
+
+	impl From<BitcoinNetwork> for Network {
+		fn from(network: BitcoinNetwork) -> Self {
+			match network {
+				BitcoinNetwork::Bitcoin => Network::Bitcoin,
+				BitcoinNetwork::Testnet => Network::Testnet,
+				BitcoinNetwork::Signet => Network::Signet,
+				BitcoinNetwork::Regtest => Network::Regtest,
+			}
 		}
 	}
 

@@ -77,6 +77,11 @@ pub mod pallet {
 		ValueQuery,
 	>;
 
+	/// The genesis set bitcoin network that this chain is tied to
+	#[pallet::storage]
+	pub(super) type BitcoinNetwork<T: Config> =
+		StorageValue<_, ulx_primitives::bitcoin::BitcoinNetwork, ValueQuery>;
+
 	/// An oracle-provided confirmed bitcoin block (eg, 6 blocks back)
 	#[pallet::storage]
 	pub(super) type ConfirmedBitcoinBlockTip<T: Config> =
@@ -144,6 +149,7 @@ pub mod pallet {
 	#[derive(frame_support::DefaultNoBound)]
 	pub struct GenesisConfig<T: Config> {
 		pub operator: Option<T::AccountId>,
+		pub network: ulx_primitives::bitcoin::BitcoinNetwork,
 	}
 
 	#[pallet::genesis_build]
@@ -152,6 +158,7 @@ pub mod pallet {
 			if let Some(operator) = &self.operator {
 				<OracleOperatorAccount<T>>::put(operator);
 			}
+			<BitcoinNetwork<T>>::put(self.network.clone());
 		}
 	}
 
@@ -478,6 +485,12 @@ pub mod pallet {
 
 		fn is_inherent(call: &Self::Call) -> bool {
 			matches!(call, Call::sync { .. })
+		}
+	}
+
+	impl<T: Config> Get<ulx_primitives::bitcoin::BitcoinNetwork> for Pallet<T> {
+		fn get() -> ulx_primitives::bitcoin::BitcoinNetwork {
+			<BitcoinNetwork<T>>::get()
 		}
 	}
 

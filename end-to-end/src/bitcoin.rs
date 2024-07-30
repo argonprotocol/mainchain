@@ -8,6 +8,7 @@ use bitcoin::{
 };
 use bitcoind::{
 	anyhow,
+	anyhow::anyhow,
 	bitcoincore_rpc::{RawTx, RpcApi},
 };
 use rand::{rngs::OsRng, RngCore};
@@ -30,7 +31,7 @@ use ulixee_client::{
 };
 use ulx_bitcoin::{CosignScript, UnlockStep, UtxoUnlocker};
 use ulx_primitives::bitcoin::{
-	BitcoinScriptPubkey, BitcoinSignature, CompressedBitcoinPubkey, Satoshis,
+	BitcoinNetwork, BitcoinScriptPubkey, BitcoinSignature, CompressedBitcoinPubkey, Satoshis,
 };
 use ulx_testing::{
 	add_blocks, add_wallet_address, fund_script_address, start_ulx_test_node, UlxTestOracle,
@@ -44,15 +45,22 @@ async fn test_bitcoin_minting_e2e() -> anyhow::Result<()> {
 	bitcoind.client.generate_to_address(101, &block_creator).unwrap();
 
 	// 1. Owner creates a new pubkey and submits to blockchain
+	let network: BitcoinNetwork = test_node
+		.client
+		.fetch_storage(&storage().bitcoin_utxos().bitcoin_network(), None)
+		.await?
+		.ok_or(anyhow!("No bitcoin network found"))?
+		.into();
+	let network: Network = network.into();
 	let secp = Secp256k1::new();
-	let owner_keypair = PrivateKey::generate(Network::Regtest);
+	let owner_keypair = PrivateKey::generate(network);
 	let owner_compressed_pubkey = owner_keypair.public_key(&secp);
 	let utxo_satoshis: Satoshis = Amount::ONE_BTC.to_sat() + 500;
 	let alice_sr25519 = sr25519::Pair::from_string("//Alice", None).unwrap();
 	let price_index_operator = sr25519::Pair::from_string("//Eve", None).unwrap();
 	let bob_sr25519 = sr25519::Pair::from_string("//Bob", None).unwrap();
 
-	let vault_master_xpriv = create_xpriv();
+	let vault_master_xpriv = create_xpriv(network);
 	let client = test_node.client.clone();
 	let client = Arc::new(client);
 
@@ -179,10 +187,10 @@ async fn test_bitcoin_minting_e2e() -> anyhow::Result<()> {
 			utxo.owner_pubkey.clone().into(),
 			utxo.vault_claim_height,
 			utxo.open_claim_height,
-			utxo.register_block,
+			utxo.created_at_height,
 		)
 		.expect("script address");
-		cosign_script.get_script_address(Network::Regtest)
+		cosign_script.get_script_address(network.into())
 	};
 
 	let block_creator = add_wallet_address(bitcoind);
@@ -260,7 +268,7 @@ async fn test_bitcoin_minting_e2e() -> anyhow::Result<()> {
 		utxo.owner_pubkey.clone().into(),
 		utxo.vault_claim_height,
 		utxo.open_claim_height,
-		utxo.register_block,
+		utxo.created_at_height,
 	)
 	.unwrap();
 	let fee = user_cosign_script
@@ -380,8 +388,8 @@ async fn test_bitcoin_minting_e2e() -> anyhow::Result<()> {
 	Ok(())
 }
 
-fn create_xpriv() -> Xpriv {
+fn create_xpriv(network: Network) -> Xpriv {
 	let mut seed = [0u8; 32];
 	OsRng.fill_bytes(&mut seed);
-	Xpriv::new_master(Network::Regtest, &seed).unwrap()
+	Xpriv::new_master(network, &seed).unwrap()
 }

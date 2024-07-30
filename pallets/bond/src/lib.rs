@@ -242,6 +242,11 @@ pub mod pallet {
 	pub(super) type UtxosById<T: Config> =
 		StorageMap<_, Twox64Concat, UtxoId, UtxoState, OptionQuery>;
 
+	/// Stores the block number where the utxo was unlocked
+	#[pallet::storage]
+	pub(super) type UtxosCosignReleaseHeightById<T: Config> =
+		StorageMap<_, Twox64Concat, UtxoId, BlockNumberFor<T>, OptionQuery>;
+
 	/// Stores Utxos that were not paid back in full
 	///
 	/// Tuple stores Account, Vault, Still Owed, State
@@ -276,7 +281,7 @@ pub mod pallet {
 		#[codec(compact)]
 		pub open_claim_height: BitcoinHeight,
 		#[codec(compact)]
-		pub register_block: BitcoinHeight,
+		pub created_at_height: BitcoinHeight,
 		pub utxo_script_pubkey: BitcoinCosignScriptPubkey,
 		pub is_verified: bool,
 	}
@@ -571,7 +576,7 @@ pub mod pallet {
 					owner_pubkey: bitcoin_pubkey,
 					vault_claim_height,
 					open_claim_height,
-					register_block: T::BitcoinBlockHeight::get(),
+					created_at_height: T::BitcoinBlockHeight::get(),
 					utxo_script_pubkey: script_pubkey,
 					is_verified: false,
 				},
@@ -697,7 +702,7 @@ pub mod pallet {
 					.owner_pubkey
 					.try_into()
 					.map_err(|_| Error::<T>::BitcoinPubkeyUnableToBeDecoded)?,
-				utxo_state.register_block,
+				utxo_state.created_at_height,
 				utxo_state.vault_claim_height,
 				utxo_state.open_claim_height,
 				utxo_state.satoshis,
@@ -725,8 +730,11 @@ pub mod pallet {
 			)?;
 			frame_system::Pallet::<T>::dec_providers(&who)?;
 
-			T::BitcoinUtxoTracker::unwatch(utxo_id);
 			<UtxosById<T>>::take(utxo_id);
+			<UtxosCosignReleaseHeightById<T>>::insert(
+				utxo_id,
+				frame_system::Pallet::<T>::block_number(),
+			);
 
 			Self::deposit_event(Event::BitcoinUtxoCosigned {
 				bond_id,
@@ -763,6 +771,7 @@ pub mod pallet {
 		}
 
 		fn utxo_spent(utxo_id: UtxoId) -> DispatchResult {
+			UtxosCosignReleaseHeightById::<T>::remove(utxo_id);
 			if let Some(utxo) = UtxosById::<T>::take(utxo_id) {
 				Self::burn_bitcoin_bond(utxo_id, utxo, true)
 			} else {
@@ -771,6 +780,7 @@ pub mod pallet {
 		}
 
 		fn utxo_expired(utxo_id: UtxoId) -> DispatchResult {
+			UtxosCosignReleaseHeightById::<T>::remove(utxo_id);
 			if let Some(utxo) = UtxosById::<T>::take(utxo_id) {
 				Self::burn_bitcoin_bond(utxo_id, utxo, false)
 			} else {
@@ -840,6 +850,7 @@ pub mod pallet {
 
 			if bond.bond_type == BondType::Bitcoin {
 				let utxo_id = bond.utxo_id.ok_or(Error::<T>::InvalidBondType)?;
+				UtxosCosignReleaseHeightById::<T>::remove(utxo_id);
 				if let Some(utxo) = <UtxosById<T>>::take(utxo_id) {
 					Self::burn_bitcoin_bond(utxo_id, utxo, false)?;
 					BondsById::<T>::remove(bond_id);
@@ -931,6 +942,7 @@ pub mod pallet {
 			});
 			T::BitcoinUtxoTracker::unwatch(utxo_id);
 			BondsById::<T>::insert(bond_id, bond);
+			UtxosCosignReleaseHeightById::<T>::remove(utxo_id);
 
 			Ok(())
 		}

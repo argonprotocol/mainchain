@@ -1,7 +1,6 @@
 use bitcoin::{
 	bip32::{ChildNumber, Xpriv, Xpub},
 	key::Secp256k1,
-	Network,
 };
 use frame_support::{
 	assert_err, assert_noop, assert_ok,
@@ -14,15 +13,14 @@ use frame_support::{
 use k256::elliptic_curve::rand_core::{OsRng, RngCore};
 use sp_runtime::{traits::Zero, FixedU128};
 
-use ulx_primitives::{
-	bitcoin::{CompressedBitcoinPubkey, OpaqueBitcoinXpub},
-	bond::{Bond, BondError, BondExpiration, BondType, VaultProvider, VaultTerms},
-};
-
 use crate::{
 	mock::{Vaults, *},
 	pallet::{NextVaultId, PendingTermsModificationsByBlock, VaultXPubById, VaultsById},
 	Error, Event, HoldReason, VaultConfig,
+};
+use ulx_primitives::{
+	bitcoin::{CompressedBitcoinPubkey, OpaqueBitcoinXpub},
+	bond::{Bond, BondError, BondExpiration, BondType, VaultProvider, VaultTerms},
 };
 
 const TEN_PCT: FixedU128 = FixedU128::from_rational(10, 100);
@@ -30,7 +28,8 @@ const TEN_PCT: FixedU128 = FixedU128::from_rational(10, 100);
 fn keys() -> OpaqueBitcoinXpub {
 	let mut seed = [0u8; 32];
 	OsRng.fill_bytes(&mut seed);
-	let xpriv = Xpriv::new_master(Network::Regtest, &seed).unwrap();
+
+	let xpriv = Xpriv::new_master(GetBitcoinNetwork::get(), &seed).unwrap();
 	let child = xpriv
 		.derive_priv(
 			&Secp256k1::new(),
@@ -132,7 +131,8 @@ fn it_will_reject_non_hardened_xpubs() {
 		let mut config = default_vault();
 		let mut seed = [0u8; 32];
 		OsRng.fill_bytes(&mut seed);
-		let xpriv = Xpriv::new_master(Network::Regtest, &seed).unwrap();
+		let network = GetBitcoinNetwork::get();
+		let xpriv = Xpriv::new_master(network, &seed).unwrap();
 		let child = xpriv
 			.derive_priv(&Secp256k1::new(), &[ChildNumber::from_normal_idx(0).unwrap()])
 			.unwrap();
@@ -678,7 +678,8 @@ fn it_should_allow_vaults_to_rotate_xpubs() {
 
 		let mut seed = [0u8; 32];
 		OsRng.fill_bytes(&mut seed);
-		let owner_xpriv = Xpriv::new_master(Network::Regtest, &seed).unwrap();
+		let network = GetBitcoinNetwork::get();
+		let owner_xpriv = Xpriv::new_master(network, &seed).unwrap();
 		let owner_pubkey = Xpub::from_priv(&Secp256k1::new(), &owner_xpriv);
 		let owner_pubkey: CompressedBitcoinPubkey = owner_pubkey.public_key.serialize().into();
 

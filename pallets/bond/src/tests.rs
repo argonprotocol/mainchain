@@ -10,7 +10,7 @@ use crate::{
 	mock::*,
 	pallet::{
 		BitcoinBondCompletions, BondsById, MiningBondCompletions, OwedUtxoAggrieved, UtxosById,
-		UtxosPendingUnlockByUtxoId,
+		UtxosCosignReleaseHeightById, UtxosPendingUnlockByUtxoId,
 	},
 	Error, Event, HoldReason, UtxoCosignRequest, UtxoState,
 };
@@ -494,7 +494,7 @@ fn clears_unlocked_bitcoin_bonds() {
 		assert_eq!(BondsById::<Test>::get(1), Some(bond.clone()));
 		assert_eq!(DefaultVault::get().bitcoin_argons.bonded, bond.amount);
 		assert_eq!(DefaultVault::get().bitcoin_argons.allocated, vault.bitcoin_argons.allocated);
-		assert_eq!(WatchedUtxosById::get().len(), 0);
+		assert_eq!(UtxosCosignReleaseHeightById::<Test>::get(&1), Some(1));
 
 		System::assert_last_event(
 			Event::<Test>::BitcoinUtxoCosigned {
@@ -522,6 +522,7 @@ fn clears_unlocked_bitcoin_bonds() {
 		assert_eq!(BondsById::<Test>::get(1), None);
 		assert_eq!(DefaultVault::get().bitcoin_argons.bonded, 0);
 		assert_eq!(DefaultVault::get().bitcoin_argons.allocated, vault.bitcoin_argons.allocated);
+		assert_ok!(Bonds::utxo_spent(1));
 	});
 }
 
@@ -624,7 +625,7 @@ fn default_utxo_state(bond_id: BondId, satoshis: Satoshis) -> UtxoState {
 		utxo_script_pubkey: make_cosign_pubkey([0; 32]),
 		owner_pubkey: CompressedBitcoinPubkey([1; 33]),
 		vault_pubkey: DefaultVaultBitcoinPubkey::get().into(),
-		register_block: current_height,
+		created_at_height: current_height,
 		vault_xpub_source: ([0; 4], 0),
 	}
 }

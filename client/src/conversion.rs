@@ -9,6 +9,32 @@ impl<T, X: sp_core::Get<u32>> From<sp_core::bounded_vec::BoundedVec<T, X>>
 	}
 }
 
+impl From<runtime_types::ulx_primitives::bitcoin::BitcoinNetwork>
+	for ulx_primitives::bitcoin::BitcoinNetwork
+{
+	fn from(value: runtime_types::ulx_primitives::bitcoin::BitcoinNetwork) -> Self {
+		match value {
+			runtime_types::ulx_primitives::bitcoin::BitcoinNetwork::Bitcoin => Self::Bitcoin,
+			runtime_types::ulx_primitives::bitcoin::BitcoinNetwork::Testnet => Self::Testnet,
+			runtime_types::ulx_primitives::bitcoin::BitcoinNetwork::Signet => Self::Signet,
+			runtime_types::ulx_primitives::bitcoin::BitcoinNetwork::Regtest => Self::Regtest,
+		}
+	}
+}
+
+impl From<ulx_primitives::bitcoin::BitcoinNetwork>
+	for runtime_types::ulx_primitives::bitcoin::BitcoinNetwork
+{
+	fn from(value: ulx_primitives::bitcoin::BitcoinNetwork) -> Self {
+		match value {
+			ulx_primitives::bitcoin::BitcoinNetwork::Bitcoin => Self::Bitcoin,
+			ulx_primitives::bitcoin::BitcoinNetwork::Testnet => Self::Testnet,
+			ulx_primitives::bitcoin::BitcoinNetwork::Signet => Self::Signet,
+			ulx_primitives::bitcoin::BitcoinNetwork::Regtest => Self::Regtest,
+		}
+	}
+}
+
 impl<T> From<Vec<T>> for runtime_types::bounded_collections::bounded_vec::BoundedVec<T> {
 	fn from(value: Vec<T>) -> Self {
 		runtime_types::bounded_collections::bounded_vec::BoundedVec(value)
