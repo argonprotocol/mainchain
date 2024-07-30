@@ -49,6 +49,7 @@ async fn test_bitcoin_minting_e2e() -> anyhow::Result<()> {
 	let owner_compressed_pubkey = owner_keypair.public_key(&secp);
 	let utxo_satoshis: Satoshis = Amount::ONE_BTC.to_sat() + 500;
 	let alice_sr25519 = sr25519::Pair::from_string("//Alice", None).unwrap();
+	let price_index_operator = sr25519::Pair::from_string("//Eve", None).unwrap();
 	let bob_sr25519 = sr25519::Pair::from_string("//Bob", None).unwrap();
 
 	let vault_master_xpriv = create_xpriv();
@@ -134,7 +135,7 @@ async fn test_bitcoin_minting_e2e() -> anyhow::Result<()> {
 				argon_usd_price: FixedU128Ext(FixedU128::from_float(1.1).into_inner()),
 				tick: ticker.current(),
 			}),
-			&Sr25519Signer::new(alice_sr25519.clone()),
+			&Sr25519Signer::new(price_index_operator.clone()),
 		)
 		.await?
 		.wait_for_finalized_success()

@@ -75,7 +75,7 @@ mod tests {
 	async fn test_bitcoin_loop() {
 		let _ = env_logger::builder().is_test(true).try_init();
 
-		let alice = sr25519::Pair::from_string("//Alice", None).unwrap();
+		let alice = sr25519::Pair::from_string("//Dave", None).unwrap();
 
 		let signer = Sr25519Signer::new(alice);
 		let ulx_node = UlxTestNode::start("alice".into()).await.expect("Failed to start ulx-node");

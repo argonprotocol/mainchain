@@ -156,8 +156,8 @@ mod tests {
 	async fn can_submit_multiple_price_indices() {
 		let node = start_ulx_test_node().await;
 		let keystore = MemoryKeystore::new();
-		let keypair = sr25519::Pair::from_string("//Alice", None).unwrap();
-		keystore.insert(ACCOUNT, "//Alice", &keypair.public().0).unwrap();
+		let keypair = sr25519::Pair::from_string("//Eve", None).unwrap();
+		keystore.insert(ACCOUNT, "//Eve", &keypair.public().0).unwrap();
 		let account_id: AccountId32 = keypair.public().into();
 
 		let signer = KeystoreSigner::new(keystore.into(), account_id, CryptoType::Sr25519);

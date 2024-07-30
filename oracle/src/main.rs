@@ -30,7 +30,7 @@ struct Cli {
 	#[command(subcommand)]
 	pub subcommand: Subcommand,
 
-	/// Start in dev mode (using default //Alice as operator)
+	/// Start in dev mode (using default //Dave or //Eve as operator)
 	#[clap(global = true, long)]
 	dev: bool,
 
@@ -87,6 +87,7 @@ async fn main() -> anyhow::Result<()> {
 		.try_init();
 	env::set_var("RUST_BACKTRACE", "1");
 	dotenv().ok();
+	dotenv::from_filename("oracle/.env").ok();
 
 	let Cli { trusted_rpc_url, keystore_params, dev, signer_address, signer_crypto, subcommand } =
 		Cli::parse();
@@ -98,8 +99,20 @@ async fn main() -> anyhow::Result<()> {
 		if dev { "Dev Mode" } else { "" }
 	);
 
+	let mut signer_address = signer_address;
+	let mut signer_crypto = signer_crypto;
+
 	let keystore = if dev {
-		keystore_params.open_dev("//Alice", CryptoType::Sr25519, ACCOUNT)?
+		let suri = match subcommand {
+			Subcommand::PriceIndex => "//Eve",
+			Subcommand::Bitcoin { .. } => "//Dave",
+		};
+		let pair = sr25519::Pair::from_string(suri, None)?;
+		let account_id = pair.public().into_account();
+
+		signer_address = Some(account_id.to_ss58check_with_version(ADDRESS_PREFIX.into()));
+		signer_crypto = Some(OracleCryptoType::Sr25519);
+		keystore_params.open_dev(suri, CryptoType::Sr25519, ACCOUNT)?
 	} else {
 		keystore_params.open()?
 	};
@@ -109,15 +122,6 @@ async fn main() -> anyhow::Result<()> {
 			let (signer_account, format) = AccountId::from_ss58check_with_version(&signer_address)?;
 			ensure!(format.prefix() == ADDRESS_PREFIX, "Invalid address format");
 			Ok::<_, anyhow::Error>((signer_account, signer_crypto))
-		},
-		(None, None) => {
-			if !dev {
-				bail!("Signer address and crypto type must be provided")
-			}
-
-			let pair = sr25519::Pair::from_string("//Alice", None)?;
-			let account_id = pair.public().into_account();
-			Ok::<_, anyhow::Error>((account_id.into(), OracleCryptoType::Sr25519))
 		},
 		_ => bail!("Signer address and crypto type must be provided"),
 	}?;

@@ -8,10 +8,12 @@ use lazy_static::lazy_static;
 use reqwest::Client;
 use serde::{Deserialize, Serialize};
 use sp_runtime::{traits::One, FixedI128, FixedU128};
+use std::env;
 #[cfg(test)]
 use std::sync::{Arc, Mutex};
 use tokio::time::{Duration, Instant};
 use ulx_primitives::tick::{Tick, Ticker};
+use url::Url;
 
 const MAX_SCHEDULE_DAYS: u32 = 35;
 const MIN_SCHEDULE_DAYS: u32 = 28;
@@ -201,7 +203,12 @@ async fn get_raw_cpis() -> Result<Vec<RawCpiValue>> {
 			return Ok(results.clone());
 		}
 	}
-	let request_url = "https://api.bls.gov/publicAPI/v2/timeseries/data/CUUR0000SA0";
+	let mut request_url =
+		Url::parse("https://api.bls.gov/publicAPI/v2/timeseries/data/CUUR0000SA0")?;
+
+	if let Some(key) = env::var("BLS_API_KEY").ok() {
+		request_url.query_pairs_mut().append_pair("registrationkey", &key);
+	}
 
 	let client = Client::new();
 	let resp_price = client
@@ -238,7 +245,12 @@ async fn get_raw_cpi() -> Result<RawCpiValue> {
 			return Ok(results[0].clone());
 		}
 	}
-	let request_url = "https://api.bls.gov/publicAPI/v2/timeseries/data/CUUR0000SA0?latest=true";
+	let mut request_url =
+		Url::parse("https://api.bls.gov/publicAPI/v2/timeseries/data/CUUR0000SA0?latest=true")?;
+
+	if let Some(key) = env::var("BLS_API_KEY").ok() {
+		request_url.query_pairs_mut().append_pair("registrationkey", &key);
+	}
 
 	let client = Client::new();
 	let resp_price = client
