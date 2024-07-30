@@ -21,3 +21,4 @@ node_modules
 /client/nodejs/**/*.js.map
 /client/nodejs/**/*.*js
 /client/nodejs/**/*.d.ts
+/oracle/.env

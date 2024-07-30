@@ -198,8 +198,8 @@ pub mod pallet {
 		/// An invalid securitization percent was provided for the vault. NOTE: it cannot be
 		/// decreased (or negative)
 		InvalidSecuritization,
-		/// The maximum number of bitcoin pubkeys for a vault has been exceeded
-		MaxPendingVaultBitcoinPubkeys,
+		/// The vault bitcoin xpubkey has already been used
+		ReusedVaultBitcoinXpub,
 		/// Securitization percent would exceed the maximum allowed
 		MaxSecuritizationPercentExceeded,
 		InvalidBondType,
@@ -210,6 +210,8 @@ pub mod pallet {
 		InvalidBitcoinScript,
 		/// Unable to decode xpubkey
 		InvalidXpubkey,
+		/// The XPub is unsafe to use in a public blockchain (aka, unhardened)
+		UnsafeXpubkey,
 		/// Unable to derive xpubkey child
 		UnableToDeriveVaultXpubChild,
 		/// Bitcoin conversion to compressed pubkey failed
@@ -284,7 +286,7 @@ pub mod pallet {
 		/// The amount of argons to be vaulted for bitcoin bonds
 		#[codec(compact)]
 		pub bitcoin_amount_allocated: Balance,
-		/// An initial set of public keys to be used for bitcoin bonds
+		/// Bytes for a hardened XPub. Will be used to generate child public keys
 		pub bitcoin_xpubkey: OpaqueBitcoinXpub,
 		/// The amount of argons to be vaulted for mining bonds
 		#[codec(compact)]
@@ -353,6 +355,7 @@ pub mod pallet {
 				log::error!("Unable to decode xpubkey: {:?}", e);
 				Error::<T>::InvalidXpubkey
 			})?;
+			ensure!(xpub.is_hardened(), Error::<T>::UnsafeXpubkey);
 			// make sure we can derive
 			let _xpub =
 				xpub.derive_pubkey(0).map_err(|_| Error::<T>::UnableToDeriveVaultXpubChild)?;
@@ -574,7 +577,8 @@ pub mod pallet {
 			Ok(())
 		}
 
-		/// Add public key hashes to the vault. Will be inserted at the beginning of the list.
+		/// Replace the bitcoin xpubkey for this vault. This will not affect existing bonds, but
+		/// will be used for any bonds after this point. Will be rejected if already used.
 		#[pallet::call_index(4)]
 		#[pallet::weight(0)]
 		pub fn replace_bitcoin_xpub(
@@ -591,6 +595,10 @@ pub mod pallet {
 
 			let xpub =
 				BitcoinXPub::try_from(bitcoin_xpub).map_err(|_| Error::<T>::InvalidXpubkey)?;
+			if let Some(existing) = VaultXPubById::<T>::get(vault_id) {
+				ensure!(existing.0 != xpub, Error::<T>::ReusedVaultBitcoinXpub);
+			}
+			ensure!(xpub.is_hardened(), Error::<T>::UnsafeXpubkey);
 			let _try_derive =
 				xpub.derive_pubkey(0).map_err(|_| Error::<T>::UnableToDeriveVaultXpubChild)?;
 			VaultXPubById::<T>::insert(vault_id, (xpub, 0));

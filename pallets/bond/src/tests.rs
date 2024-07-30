@@ -10,7 +10,7 @@ use crate::{
 	mock::*,
 	pallet::{
 		BitcoinBondCompletions, BondsById, MiningBondCompletions, OwedUtxoAggrieved, UtxosById,
-		UtxosPendingUnlock,
+		UtxosPendingUnlockByUtxoId,
 	},
 	Error, Event, HoldReason, UtxoCosignRequest, UtxoState,
 };
@@ -326,8 +326,10 @@ fn can_unlock_a_bitcoin() {
 		assert!(redemption_price > bond.amount);
 		// redemption price should be the bond price since current redemption price is above
 		assert_eq!(
-			UtxosPendingUnlock::<Test>::get().get(&1),
+			UtxosPendingUnlockByUtxoId::<Test>::get().get(&1),
 			Some(UtxoCosignRequest {
+				vault_id: 1,
+				bond_id: 1,
 				cosign_due_block: BitcoinBlockHeight::get() + UtxoUnlockCosignDeadlineBlocks::get(),
 				redemption_price: bond.amount,
 				to_script_pubkey: unlock_script_pubkey,
@@ -379,8 +381,10 @@ fn penalizes_vault_if_not_unlock_countersigned() {
 		let redemption_price = Bonds::get_redemption_price(&satoshis).expect("should have price");
 		let cosign_due = BitcoinBlockHeight::get() + UtxoUnlockCosignDeadlineBlocks::get();
 		assert_eq!(
-			UtxosPendingUnlock::<Test>::get().get(&1),
+			UtxosPendingUnlockByUtxoId::<Test>::get().get(&1),
 			Some(UtxoCosignRequest {
+				vault_id: 1,
+				bond_id: 1,
 				cosign_due_block: cosign_due,
 				redemption_price,
 				to_script_pubkey: unlock_script_pubkey,
@@ -396,7 +400,7 @@ fn penalizes_vault_if_not_unlock_countersigned() {
 		// should pay back at market price (not the discounted rate)
 		let market_price =
 			StaticPriceProvider::get_bitcoin_argon_price(satoshis).expect("should have price");
-		assert_eq!(UtxosPendingUnlock::<Test>::get().get(&1), None);
+		assert_eq!(UtxosPendingUnlockByUtxoId::<Test>::get().get(&1), None);
 		assert_eq!(UtxosById::<Test>::get(1), None);
 		assert_eq!(OwedUtxoAggrieved::<Test>::get(1), None);
 		System::assert_last_event(
@@ -457,8 +461,10 @@ fn clears_unlocked_bitcoin_bonds() {
 		let redemption_price = Bonds::get_redemption_price(&satoshis).expect("should have price");
 		let cosign_due_block = BitcoinBlockHeight::get() + UtxoUnlockCosignDeadlineBlocks::get();
 		assert_eq!(
-			UtxosPendingUnlock::<Test>::get().get(&1),
+			UtxosPendingUnlockByUtxoId::<Test>::get().get(&1),
 			Some(UtxoCosignRequest {
+				vault_id: 1,
+				bond_id: 1,
 				cosign_due_block,
 				redemption_price,
 				to_script_pubkey: unlock_script_pubkey,
@@ -481,7 +487,7 @@ fn clears_unlocked_bitcoin_bonds() {
 			1,
 			BitcoinSignature(BoundedVec::truncate_from([0u8; 73].to_vec()))
 		));
-		assert_eq!(UtxosPendingUnlock::<Test>::get().get(&1), None);
+		assert_eq!(UtxosPendingUnlockByUtxoId::<Test>::get().get(&1), None);
 		assert_eq!(UtxosById::<Test>::get(1), None);
 		assert_eq!(OwedUtxoAggrieved::<Test>::get(1), None);
 		// should keep bond for the year

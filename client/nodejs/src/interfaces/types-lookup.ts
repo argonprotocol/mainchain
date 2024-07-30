@@ -2037,7 +2037,7 @@ declare module '@polkadot/types/lookup' {
     readonly isInvalidVaultAmount: boolean;
     readonly isVaultReductionBelowAllocatedFunds: boolean;
     readonly isInvalidSecuritization: boolean;
-    readonly isMaxPendingVaultBitcoinPubkeys: boolean;
+    readonly isReusedVaultBitcoinXpub: boolean;
     readonly isMaxSecuritizationPercentExceeded: boolean;
     readonly isInvalidBondType: boolean;
     readonly isBitcoinUtxoNotFound: boolean;
@@ -2045,6 +2045,7 @@ declare module '@polkadot/types/lookup' {
     readonly isNoBitcoinPricesAvailable: boolean;
     readonly isInvalidBitcoinScript: boolean;
     readonly isInvalidXpubkey: boolean;
+    readonly isUnsafeXpubkey: boolean;
     readonly isUnableToDeriveVaultXpubChild: boolean;
     readonly isBitcoinConversionFailed: boolean;
     readonly isExpirationTooSoon: boolean;
@@ -2059,7 +2060,7 @@ declare module '@polkadot/types/lookup' {
     readonly isInternalError: boolean;
     readonly isUnableToGenerateVaultBitcoinPubkey: boolean;
     readonly isUnableToDecodeVaultBitcoinPubkey: boolean;
-    readonly type: 'BondNotFound' | 'NoMoreVaultIds' | 'NoMoreBondIds' | 'MinimumBondAmountNotMet' | 'ExpirationAtBlockOverflow' | 'InsufficientFunds' | 'InsufficientVaultFunds' | 'InsufficientBitcoinsForMining' | 'AccountBelowMinimumBalance' | 'VaultClosed' | 'InvalidVaultAmount' | 'VaultReductionBelowAllocatedFunds' | 'InvalidSecuritization' | 'MaxPendingVaultBitcoinPubkeys' | 'MaxSecuritizationPercentExceeded' | 'InvalidBondType' | 'BitcoinUtxoNotFound' | 'InsufficientSatoshisBonded' | 'NoBitcoinPricesAvailable' | 'InvalidBitcoinScript' | 'InvalidXpubkey' | 'UnableToDeriveVaultXpubChild' | 'BitcoinConversionFailed' | 'ExpirationTooSoon' | 'NoPermissions' | 'HoldUnexpectedlyModified' | 'UnrecoverableHold' | 'VaultNotFound' | 'FeeExceedsBondAmount' | 'NoVaultBitcoinPubkeysAvailable' | 'TermsModificationOverflow' | 'TermsChangeAlreadyScheduled' | 'InternalError' | 'UnableToGenerateVaultBitcoinPubkey' | 'UnableToDecodeVaultBitcoinPubkey';
+    readonly type: 'BondNotFound' | 'NoMoreVaultIds' | 'NoMoreBondIds' | 'MinimumBondAmountNotMet' | 'ExpirationAtBlockOverflow' | 'InsufficientFunds' | 'InsufficientVaultFunds' | 'InsufficientBitcoinsForMining' | 'AccountBelowMinimumBalance' | 'VaultClosed' | 'InvalidVaultAmount' | 'VaultReductionBelowAllocatedFunds' | 'InvalidSecuritization' | 'ReusedVaultBitcoinXpub' | 'MaxSecuritizationPercentExceeded' | 'InvalidBondType' | 'BitcoinUtxoNotFound' | 'InsufficientSatoshisBonded' | 'NoBitcoinPricesAvailable' | 'InvalidBitcoinScript' | 'InvalidXpubkey' | 'UnsafeXpubkey' | 'UnableToDeriveVaultXpubChild' | 'BitcoinConversionFailed' | 'ExpirationTooSoon' | 'NoPermissions' | 'HoldUnexpectedlyModified' | 'UnrecoverableHold' | 'VaultNotFound' | 'FeeExceedsBondAmount' | 'NoVaultBitcoinPubkeysAvailable' | 'TermsModificationOverflow' | 'TermsChangeAlreadyScheduled' | 'InternalError' | 'UnableToGenerateVaultBitcoinPubkey' | 'UnableToDecodeVaultBitcoinPubkey';
   }
 
   /** @name UlxPrimitivesBond (265) */
@@ -2077,24 +2078,26 @@ declare module '@polkadot/types/lookup' {
 
   /** @name PalletBondUtxoState (268) */
   interface PalletBondUtxoState extends Struct {
-    readonly bondId: u64;
-    readonly satoshis: u64;
+    readonly bondId: Compact<u64>;
+    readonly satoshis: Compact<u64>;
     readonly vaultPubkey: UlxPrimitivesBitcoinCompressedBitcoinPubkey;
     readonly vaultXpubSource: ITuple<[U8aFixed, u32]>;
     readonly ownerPubkey: UlxPrimitivesBitcoinCompressedBitcoinPubkey;
-    readonly vaultClaimHeight: u64;
-    readonly openClaimHeight: u64;
-    readonly registerBlock: u64;
+    readonly vaultClaimHeight: Compact<u64>;
+    readonly openClaimHeight: Compact<u64>;
+    readonly registerBlock: Compact<u64>;
     readonly utxoScriptPubkey: UlxPrimitivesBitcoinBitcoinCosignScriptPubkey;
     readonly isVerified: bool;
   }
 
   /** @name PalletBondUtxoCosignRequest (272) */
   interface PalletBondUtxoCosignRequest extends Struct {
-    readonly bitcoinNetworkFee: u64;
-    readonly cosignDueBlock: u64;
+    readonly bondId: Compact<u64>;
+    readonly vaultId: Compact<u32>;
+    readonly bitcoinNetworkFee: Compact<u64>;
+    readonly cosignDueBlock: Compact<u64>;
     readonly toScriptPubkey: Bytes;
-    readonly redemptionPrice: u128;
+    readonly redemptionPrice: Compact<u128>;
   }
 
   /** @name PalletBondError (276) */

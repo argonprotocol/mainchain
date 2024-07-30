@@ -55,7 +55,11 @@ async fn test_bitcoin_minting_e2e() -> anyhow::Result<()> {
 	let vault_master_xpriv = create_xpriv();
 	let client = test_node.client.clone();
 	let client = Arc::new(client);
-	let xpubkey = Xpub::from_priv(&secp, &vault_master_xpriv);
+
+	let vault_child_xpriv =
+		vault_master_xpriv.derive_priv(&Secp256k1::new(), &[ChildNumber::from_hardened_idx(0)?])?;
+
+	let xpubkey = Xpub::from_priv(&secp, &vault_child_xpriv);
 	let vault_signer = Sr25519Signer::new(alice_sr25519.clone());
 
 	let _oracle = UlxTestOracle::bitcoin_tip(&test_node).await?;
@@ -311,7 +315,7 @@ async fn test_bitcoin_minting_e2e() -> anyhow::Result<()> {
 		assert_eq!(fingerprint, xpubkey.fingerprint());
 
 		let (vault_signature, vault_pubkey) = unlocker
-			.sign_derived(vault_master_xpriv, (fingerprint, derivation_path))
+			.sign_derived(vault_child_xpriv, (fingerprint, derivation_path))
 			.expect("sign");
 		assert_eq!(vault_pubkey.to_bytes(), utxo.vault_pubkey.0.to_vec());
 		let vault_signature: BitcoinSignature = vault_signature.try_into().unwrap();

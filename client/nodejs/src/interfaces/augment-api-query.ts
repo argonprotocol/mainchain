@@ -191,7 +191,7 @@ declare module '@polkadot/api-base/types/storage' {
       /**
        * Utxos that have been requested to be cosigned for unlocking
        **/
-      utxosPendingUnlock: AugmentedQuery<ApiType, () => Observable<BTreeMap<u64, PalletBondUtxoCosignRequest>>, []>;
+      utxosPendingUnlockByUtxoId: AugmentedQuery<ApiType, () => Observable<BTreeMap<u64, PalletBondUtxoCosignRequest>>, []>;
     };
     chainTransfer: {
       expiringTransfersOutByNotary: AugmentedQuery<ApiType, (arg1: u32 | AnyNumber | Uint8Array, arg2: u32 | AnyNumber | Uint8Array) => Observable<Vec<u32>>, [u32, u32]>;

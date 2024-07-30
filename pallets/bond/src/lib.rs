@@ -256,7 +256,7 @@ pub mod pallet {
 
 	/// Utxos that have been requested to be cosigned for unlocking
 	#[pallet::storage]
-	pub(super) type UtxosPendingUnlock<T: Config> = StorageValue<
+	pub(super) type UtxosPendingUnlockByUtxoId<T: Config> = StorageValue<
 		_,
 		BoundedBTreeMap<UtxoId, UtxoCosignRequest<T::Balance>, T::MaxUnlockingUtxos>,
 		ValueQuery,
@@ -264,13 +264,18 @@ pub mod pallet {
 
 	#[derive(Decode, Encode, Clone, PartialEq, Eq, RuntimeDebug, TypeInfo)]
 	pub struct UtxoState {
+		#[codec(compact)]
 		pub bond_id: BondId,
+		#[codec(compact)]
 		pub satoshis: Satoshis,
 		pub vault_pubkey: CompressedBitcoinPubkey,
 		pub vault_xpub_source: (XPubFingerprint, XPubChildNumber),
 		pub owner_pubkey: CompressedBitcoinPubkey,
+		#[codec(compact)]
 		pub vault_claim_height: BitcoinHeight,
+		#[codec(compact)]
 		pub open_claim_height: BitcoinHeight,
+		#[codec(compact)]
 		pub register_block: BitcoinHeight,
 		pub utxo_script_pubkey: BitcoinCosignScriptPubkey,
 		pub is_verified: bool,
@@ -278,9 +283,16 @@ pub mod pallet {
 
 	#[derive(Decode, Encode, CloneNoBound, PartialEqNoBound, EqNoBound, RuntimeDebug, TypeInfo)]
 	pub struct UtxoCosignRequest<Balance: Clone + Eq + PartialEq + TypeInfo + Codec> {
+		#[codec(compact)]
+		pub bond_id: BondId,
+		#[codec(compact)]
+		pub vault_id: VaultId,
+		#[codec(compact)]
 		pub bitcoin_network_fee: Satoshis,
+		#[codec(compact)]
 		pub cosign_due_block: BitcoinHeight,
 		pub to_script_pubkey: BitcoinScriptPubkey,
+		#[codec(compact)]
 		pub redemption_price: Balance,
 	}
 
@@ -435,7 +447,7 @@ pub mod pallet {
 
 			let mut overdue = vec![];
 			let bitcoin_block_height = T::BitcoinBlockHeight::get();
-			<UtxosPendingUnlock<T>>::mutate(|pending| {
+			<UtxosPendingUnlockByUtxoId<T>>::mutate(|pending| {
 				pending.retain(|id, x| {
 					if x.cosign_due_block > bitcoin_block_height {
 						return true;
@@ -622,10 +634,12 @@ pub mod pallet {
 					})?;
 				frame_system::Pallet::<T>::inc_providers(&who);
 
-				<UtxosPendingUnlock<T>>::try_mutate(|a| {
+				<UtxosPendingUnlockByUtxoId<T>>::try_mutate(|a| {
 					a.try_insert(
 						utxo_id,
 						UtxoCosignRequest {
+							bond_id,
+							vault_id: bond.vault_id,
 							bitcoin_network_fee,
 							cosign_due_block,
 							to_script_pubkey,
@@ -667,7 +681,7 @@ pub mod pallet {
 
 			let vault = T::VaultProvider::get(vault_id).ok_or(Error::<T>::VaultNotFound)?;
 			ensure!(vault.operator_account_id == who, Error::<T>::NoPermissions);
-			let request = UtxosPendingUnlock::<T>::mutate(|a| a.remove(&utxo_id))
+			let request = UtxosPendingUnlockByUtxoId::<T>::mutate(|a| a.remove(&utxo_id))
 				.ok_or(Error::<T>::BondRedemptionNotLocked)?;
 
 			let utxo_state = <UtxosById<T>>::get(utxo_id).ok_or(Error::<T>::BitcoinUtxoNotFound)?;

@@ -749,7 +749,7 @@ declare module '@polkadot/api-base/types/errors' {
       InvalidBondType: AugmentedError<ApiType>;
       /**
        * An invalid securitization percent was provided for the vault. NOTE: it cannot be
-       * decreased
+       * decreased (or negative)
        **/
       InvalidSecuritization: AugmentedError<ApiType>;
       /**
@@ -760,10 +760,6 @@ declare module '@polkadot/api-base/types/errors' {
        * Unable to decode xpubkey
        **/
       InvalidXpubkey: AugmentedError<ApiType>;
-      /**
-       * The maximum number of bitcoin pubkeys for a vault has been exceeded
-       **/
-      MaxPendingVaultBitcoinPubkeys: AugmentedError<ApiType>;
       /**
        * Securitization percent would exceed the maximum allowed
        **/
@@ -777,6 +773,10 @@ declare module '@polkadot/api-base/types/errors' {
        * No Vault public keys are available
        **/
       NoVaultBitcoinPubkeysAvailable: AugmentedError<ApiType>;
+      /**
+       * The vault bitcoin xpubkey has already been used
+       **/
+      ReusedVaultBitcoinXpub: AugmentedError<ApiType>;
       /**
        * Terms are already scheduled to be changed
        **/
@@ -798,6 +798,10 @@ declare module '@polkadot/api-base/types/errors' {
        **/
       UnableToGenerateVaultBitcoinPubkey: AugmentedError<ApiType>;
       UnrecoverableHold: AugmentedError<ApiType>;
+      /**
+       * The XPub is unsafe to use in a public blockchain (aka, unhardened)
+       **/
+      UnsafeXpubkey: AugmentedError<ApiType>;
       VaultClosed: AugmentedError<ApiType>;
       VaultNotFound: AugmentedError<ApiType>;
       /**

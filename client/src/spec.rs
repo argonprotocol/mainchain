@@ -2885,9 +2885,9 @@ pub mod api {
 			.hash();
 		runtime_metadata_hash ==
 			[
-				171u8, 32u8, 7u8, 240u8, 240u8, 157u8, 93u8, 47u8, 187u8, 193u8, 48u8, 221u8, 21u8,
-				238u8, 74u8, 63u8, 14u8, 55u8, 153u8, 12u8, 4u8, 141u8, 206u8, 211u8, 173u8, 136u8,
-				227u8, 43u8, 39u8, 18u8, 136u8, 124u8,
+				81u8, 18u8, 45u8, 12u8, 172u8, 59u8, 150u8, 57u8, 240u8, 164u8, 56u8, 214u8, 85u8,
+				31u8, 195u8, 115u8, 45u8, 222u8, 66u8, 176u8, 172u8, 80u8, 92u8, 192u8, 121u8,
+				210u8, 98u8, 95u8, 174u8, 232u8, 74u8, 231u8,
 			]
 	}
 	pub mod system {
@@ -8197,7 +8197,8 @@ pub mod api {
 				#[encode_as_type(
 					crate_path = ":: subxt :: ext :: subxt_core :: ext :: scale_encode"
 				)]
-				#[doc = "Add public key hashes to the vault. Will be inserted at the beginning of the list."]
+				#[doc = "Replace the bitcoin xpubkey for this vault. This will not affect existing bonds, but"]
+				#[doc = "will be used for any bonds after this point. Will be rejected if already used."]
 				pub struct ReplaceBitcoinXpub {
 					pub vault_id: replace_bitcoin_xpub::VaultId,
 					pub bitcoin_xpub: replace_bitcoin_xpub::BitcoinXpub,
@@ -8298,7 +8299,8 @@ pub mod api {
 						],
 					)
 				}
-				#[doc = "Add public key hashes to the vault. Will be inserted at the beginning of the list."]
+				#[doc = "Replace the bitcoin xpubkey for this vault. This will not affect existing bonds, but"]
+				#[doc = "will be used for any bonds after this point. Will be rejected if already used."]
 				pub fn replace_bitcoin_xpub(
 					&self,
 					vault_id: types::replace_bitcoin_xpub::VaultId,
@@ -9266,9 +9268,9 @@ pub mod api {
 					);
 					pub type Param0 = ::core::primitive::u64;
 				}
-				pub mod utxos_pending_unlock {
+				pub mod utxos_pending_unlock_by_utxo_id {
 					use super::runtime_types;
-					pub type UtxosPendingUnlock =
+					pub type UtxosPendingUnlockByUtxoId =
 						runtime_types::bounded_collections::bounded_btree_map::BoundedBTreeMap<
 							::core::primitive::u64,
 							runtime_types::pallet_bond::pallet::UtxoCosignRequest<
@@ -9460,9 +9462,10 @@ pub mod api {
 						"UtxosById",
 						(),
 						[
-							45u8, 50u8, 146u8, 119u8, 202u8, 192u8, 100u8, 246u8, 25u8, 104u8,
-							151u8, 75u8, 193u8, 249u8, 113u8, 23u8, 87u8, 17u8, 217u8, 176u8, 38u8,
-							224u8, 113u8, 82u8, 41u8, 43u8, 144u8, 112u8, 39u8, 89u8, 81u8, 106u8,
+							116u8, 192u8, 250u8, 205u8, 213u8, 150u8, 234u8, 90u8, 15u8, 202u8,
+							132u8, 226u8, 49u8, 13u8, 26u8, 139u8, 14u8, 188u8, 53u8, 93u8, 155u8,
+							52u8, 246u8, 145u8, 57u8, 153u8, 42u8, 89u8, 138u8, 132u8, 179u8,
+							155u8,
 						],
 					)
 				}
@@ -9486,9 +9489,10 @@ pub mod api {
 							_0.borrow(),
 						),
 						[
-							45u8, 50u8, 146u8, 119u8, 202u8, 192u8, 100u8, 246u8, 25u8, 104u8,
-							151u8, 75u8, 193u8, 249u8, 113u8, 23u8, 87u8, 17u8, 217u8, 176u8, 38u8,
-							224u8, 113u8, 82u8, 41u8, 43u8, 144u8, 112u8, 39u8, 89u8, 81u8, 106u8,
+							116u8, 192u8, 250u8, 205u8, 213u8, 150u8, 234u8, 90u8, 15u8, 202u8,
+							132u8, 226u8, 49u8, 13u8, 26u8, 139u8, 14u8, 188u8, 53u8, 93u8, 155u8,
+							52u8, 246u8, 145u8, 57u8, 153u8, 42u8, 89u8, 138u8, 132u8, 179u8,
+							155u8,
 						],
 					)
 				}
@@ -9509,9 +9513,10 @@ pub mod api {
 						"OwedUtxoAggrieved",
 						(),
 						[
-							130u8, 97u8, 15u8, 177u8, 201u8, 8u8, 217u8, 145u8, 98u8, 244u8, 0u8,
-							75u8, 18u8, 195u8, 253u8, 44u8, 69u8, 188u8, 15u8, 61u8, 44u8, 185u8,
-							124u8, 129u8, 98u8, 225u8, 150u8, 102u8, 101u8, 240u8, 45u8, 221u8,
+							87u8, 67u8, 98u8, 127u8, 63u8, 119u8, 53u8, 98u8, 84u8, 32u8, 184u8,
+							113u8, 170u8, 70u8, 225u8, 134u8, 19u8, 201u8, 181u8, 110u8, 210u8,
+							156u8, 228u8, 102u8, 166u8, 195u8, 50u8, 213u8, 249u8, 28u8, 242u8,
+							186u8,
 						],
 					)
 				}
@@ -9537,30 +9542,32 @@ pub mod api {
 							_0.borrow(),
 						),
 						[
-							130u8, 97u8, 15u8, 177u8, 201u8, 8u8, 217u8, 145u8, 98u8, 244u8, 0u8,
-							75u8, 18u8, 195u8, 253u8, 44u8, 69u8, 188u8, 15u8, 61u8, 44u8, 185u8,
-							124u8, 129u8, 98u8, 225u8, 150u8, 102u8, 101u8, 240u8, 45u8, 221u8,
+							87u8, 67u8, 98u8, 127u8, 63u8, 119u8, 53u8, 98u8, 84u8, 32u8, 184u8,
+							113u8, 170u8, 70u8, 225u8, 134u8, 19u8, 201u8, 181u8, 110u8, 210u8,
+							156u8, 228u8, 102u8, 166u8, 195u8, 50u8, 213u8, 249u8, 28u8, 242u8,
+							186u8,
 						],
 					)
 				}
 				#[doc = " Utxos that have been requested to be cosigned for unlocking"]
-				pub fn utxos_pending_unlock(
+				pub fn utxos_pending_unlock_by_utxo_id(
 					&self,
 				) -> ::subxt::ext::subxt_core::storage::address::StaticAddress<
 					(),
-					types::utxos_pending_unlock::UtxosPendingUnlock,
+					types::utxos_pending_unlock_by_utxo_id::UtxosPendingUnlockByUtxoId,
 					::subxt::ext::subxt_core::utils::Yes,
 					::subxt::ext::subxt_core::utils::Yes,
 					(),
 				> {
 					::subxt::ext::subxt_core::storage::address::StaticAddress::new_static(
 						"Bonds",
-						"UtxosPendingUnlock",
+						"UtxosPendingUnlockByUtxoId",
 						(),
 						[
-							26u8, 163u8, 85u8, 23u8, 237u8, 214u8, 97u8, 34u8, 215u8, 148u8, 76u8,
-							76u8, 100u8, 12u8, 220u8, 213u8, 140u8, 170u8, 112u8, 250u8, 181u8,
-							222u8, 3u8, 36u8, 182u8, 253u8, 73u8, 45u8, 100u8, 115u8, 175u8, 9u8,
+							120u8, 160u8, 226u8, 88u8, 146u8, 176u8, 195u8, 217u8, 131u8, 50u8,
+							117u8, 247u8, 132u8, 104u8, 55u8, 210u8, 42u8, 165u8, 25u8, 68u8, 74u8,
+							183u8, 208u8, 100u8, 203u8, 63u8, 128u8, 169u8, 64u8, 175u8, 188u8,
+							204u8,
 						],
 					)
 				}
@@ -20682,10 +20689,17 @@ pub mod api {
 					crate_path = ":: subxt :: ext :: subxt_core :: ext :: scale_encode"
 				)]
 				pub struct UtxoCosignRequest<_0> {
+					#[codec(compact)]
+					pub bond_id: ::core::primitive::u64,
+					#[codec(compact)]
+					pub vault_id: ::core::primitive::u32,
+					#[codec(compact)]
 					pub bitcoin_network_fee: ::core::primitive::u64,
+					#[codec(compact)]
 					pub cosign_due_block: ::core::primitive::u64,
 					pub to_script_pubkey:
 						runtime_types::ulx_primitives::bitcoin::BitcoinScriptPubkey,
+					#[codec(compact)]
 					pub redemption_price: _0,
 				}
 				#[derive(
@@ -20704,7 +20718,9 @@ pub mod api {
 					crate_path = ":: subxt :: ext :: subxt_core :: ext :: scale_encode"
 				)]
 				pub struct UtxoState {
+					#[codec(compact)]
 					pub bond_id: ::core::primitive::u64,
+					#[codec(compact)]
 					pub satoshis: ::core::primitive::u64,
 					pub vault_pubkey:
 						runtime_types::ulx_primitives::bitcoin::CompressedBitcoinPubkey,
@@ -20712,8 +20728,11 @@ pub mod api {
 						([::core::primitive::u8; 4usize], ::core::primitive::u32),
 					pub owner_pubkey:
 						runtime_types::ulx_primitives::bitcoin::CompressedBitcoinPubkey,
+					#[codec(compact)]
 					pub vault_claim_height: ::core::primitive::u64,
+					#[codec(compact)]
 					pub open_claim_height: ::core::primitive::u64,
+					#[codec(compact)]
 					pub register_block: ::core::primitive::u64,
 					pub utxo_script_pubkey:
 						runtime_types::ulx_primitives::bitcoin::BitcoinCosignScriptPubkey,
@@ -23217,7 +23236,8 @@ pub mod api {
 					#[doc = "As funds are returned, they will be released to the vault owner."]
 					close { vault_id: ::core::primitive::u32 },
 					#[codec(index = 4)]
-					#[doc = "Add public key hashes to the vault. Will be inserted at the beginning of the list."]
+					#[doc = "Replace the bitcoin xpubkey for this vault. This will not affect existing bonds, but"]
+					#[doc = "will be used for any bonds after this point. Will be rejected if already used."]
 					replace_bitcoin_xpub {
 						vault_id: ::core::primitive::u32,
 						bitcoin_xpub: runtime_types::ulx_primitives::bitcoin::OpaqueBitcoinXpub,
@@ -23271,11 +23291,11 @@ pub mod api {
 					VaultReductionBelowAllocatedFunds,
 					#[codec(index = 12)]
 					#[doc = "An invalid securitization percent was provided for the vault. NOTE: it cannot be"]
-					#[doc = "decreased"]
+					#[doc = "decreased (or negative)"]
 					InvalidSecuritization,
 					#[codec(index = 13)]
-					#[doc = "The maximum number of bitcoin pubkeys for a vault has been exceeded"]
-					MaxPendingVaultBitcoinPubkeys,
+					#[doc = "The vault bitcoin xpubkey has already been used"]
+					ReusedVaultBitcoinXpub,
 					#[codec(index = 14)]
 					#[doc = "Securitization percent would exceed the maximum allowed"]
 					MaxSecuritizationPercentExceeded,
@@ -23294,40 +23314,43 @@ pub mod api {
 					#[doc = "Unable to decode xpubkey"]
 					InvalidXpubkey,
 					#[codec(index = 21)]
+					#[doc = "The XPub is unsafe to use in a public blockchain (aka, unhardened)"]
+					UnsafeXpubkey,
+					#[codec(index = 22)]
 					#[doc = "Unable to derive xpubkey child"]
 					UnableToDeriveVaultXpubChild,
-					#[codec(index = 22)]
+					#[codec(index = 23)]
 					#[doc = "Bitcoin conversion to compressed pubkey failed"]
 					BitcoinConversionFailed,
-					#[codec(index = 23)]
-					ExpirationTooSoon,
 					#[codec(index = 24)]
-					NoPermissions,
+					ExpirationTooSoon,
 					#[codec(index = 25)]
-					HoldUnexpectedlyModified,
+					NoPermissions,
 					#[codec(index = 26)]
-					UnrecoverableHold,
+					HoldUnexpectedlyModified,
 					#[codec(index = 27)]
-					VaultNotFound,
+					UnrecoverableHold,
 					#[codec(index = 28)]
+					VaultNotFound,
+					#[codec(index = 29)]
 					#[doc = "The fee for this bond exceeds the amount of the bond, which is unsafe"]
 					FeeExceedsBondAmount,
-					#[codec(index = 29)]
+					#[codec(index = 30)]
 					#[doc = "No Vault public keys are available"]
 					NoVaultBitcoinPubkeysAvailable,
-					#[codec(index = 30)]
+					#[codec(index = 31)]
 					#[doc = "The terms modification list could not handle any more items"]
 					TermsModificationOverflow,
-					#[codec(index = 31)]
+					#[codec(index = 32)]
 					#[doc = "Terms are already scheduled to be changed"]
 					TermsChangeAlreadyScheduled,
-					#[codec(index = 32)]
+					#[codec(index = 33)]
 					#[doc = "An internal processing error occurred"]
 					InternalError,
-					#[codec(index = 33)]
+					#[codec(index = 34)]
 					#[doc = "Unable to generate a new vault bitcoin pubkey"]
 					UnableToGenerateVaultBitcoinPubkey,
-					#[codec(index = 34)]
+					#[codec(index = 35)]
 					#[doc = "Unable to decode vault bitcoin pubkey"]
 					UnableToDecodeVaultBitcoinPubkey,
 				}

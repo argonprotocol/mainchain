@@ -803,7 +803,8 @@ declare module '@polkadot/api-base/types/submittable' {
        **/
       modifyTerms: AugmentedSubmittable<(vaultId: u32 | AnyNumber | Uint8Array, terms: UlxPrimitivesBondVaultTerms | { bitcoinAnnualPercentRate?: any; bitcoinBaseFee?: any; miningAnnualPercentRate?: any; miningBaseFee?: any; miningRewardSharingPercentTake?: any } | string | Uint8Array) => SubmittableExtrinsic<ApiType>, [u32, UlxPrimitivesBondVaultTerms]>;
       /**
-       * Add public key hashes to the vault. Will be inserted at the beginning of the list.
+       * Replace the bitcoin xpubkey for this vault. This will not affect existing bonds, but
+       * will be used for any bonds after this point. Will be rejected if already used.
        **/
       replaceBitcoinXpub: AugmentedSubmittable<(vaultId: u32 | AnyNumber | Uint8Array, bitcoinXpub: UlxPrimitivesBitcoinOpaqueBitcoinXpub | string | Uint8Array) => SubmittableExtrinsic<ApiType>, [u32, UlxPrimitivesBitcoinOpaqueBitcoinXpub]>;
     };

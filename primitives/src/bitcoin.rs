@@ -197,6 +197,9 @@ mod bitcoin_compat {
 	/// Version bytes for extended public keys on any of the testnet networks.
 	const VERSION_BYTES_TESTNETS_PUBLIC: [u8; 4] = [0x04, 0x35, 0x87, 0xCF];
 
+	const VERSION_BYTES_MAINNET_ZPUB: [u8; 4] = [0x04, 0xB2, 0x47, 0x46];
+	const VERSION_BYTES_TESTNETS_ZPUB: [u8; 4] = [0x04, 0x5F, 0x1C, 0xF6];
+
 	impl BitcoinXPub {
 		pub fn get_xpub(&self) -> Result<XPub, XpubErrors> {
 			let attrs = ExtendedKeyAttrs {
@@ -209,6 +212,11 @@ mod bitcoin_compat {
 			let verifying_key = VerifyingKey::from_sec1_bytes(&pubkey.0)
 				.map_err(|_| XpubErrors::BitcoinConversionFailed)?;
 			Ok(XPub::new(verifying_key, attrs))
+		}
+
+		pub fn is_hardened(&self) -> bool {
+			let child_number = ChildNumber::from(self.child_number);
+			child_number.is_hardened()
 		}
 
 		pub fn derive_pubkey(&self, index: u32) -> Result<BitcoinXPub, XpubErrors> {
@@ -234,13 +242,14 @@ mod bitcoin_compat {
 		type Error = XpubErrors;
 		fn try_from(xpub: OpaqueBitcoinXpub) -> Result<Self, XpubErrors> {
 			let data = xpub.0;
-			if data.len() != 78 {
-				return Err(XpubErrors::WrongExtendedKeyLength(data.len()));
-			}
 
-			let network = if data.starts_with(&VERSION_BYTES_MAINNET_PUBLIC) {
+			let network = if data.starts_with(&VERSION_BYTES_MAINNET_PUBLIC) ||
+				data.starts_with(&VERSION_BYTES_MAINNET_ZPUB)
+			{
 				NetworkKind::Main
-			} else if data.starts_with(&VERSION_BYTES_TESTNETS_PUBLIC) {
+			} else if data.starts_with(&VERSION_BYTES_TESTNETS_PUBLIC) ||
+				data.starts_with(&VERSION_BYTES_TESTNETS_ZPUB)
+			{
 				NetworkKind::Test
 			} else {
 				let (b0, b1, b2, b3) = (data[0], data[1], data[2], data[3]);

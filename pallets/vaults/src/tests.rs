@@ -1,5 +1,5 @@
 use bitcoin::{
-	bip32::{Xpriv, Xpub},
+	bip32::{ChildNumber, Xpriv, Xpub},
 	key::Secp256k1,
 	Network,
 };
@@ -31,7 +31,13 @@ fn keys() -> OpaqueBitcoinXpub {
 	let mut seed = [0u8; 32];
 	OsRng.fill_bytes(&mut seed);
 	let xpriv = Xpriv::new_master(Network::Regtest, &seed).unwrap();
-	let xpub = Xpub::from_priv(&Secp256k1::new(), &xpriv);
+	let child = xpriv
+		.derive_priv(
+			&Secp256k1::new(),
+			&[ChildNumber::from_normal_idx(0).unwrap(), ChildNumber::from_hardened_idx(1).unwrap()],
+		)
+		.unwrap();
+	let xpub = Xpub::from_priv(&Secp256k1::new(), &child);
 	OpaqueBitcoinXpub { 0: xpub.encode() }
 }
 
@@ -114,6 +120,30 @@ fn it_can_add_securitization_to_a_vault() {
 		assert!(System::account_exists(&1));
 		let bitcoin_securitization = 50_000 * 10 / 100;
 		assert_eq!(Balances::reserved_balance(1), 100_000 + bitcoin_securitization);
+	});
+}
+
+#[test]
+fn it_will_reject_non_hardened_xpubs() {
+	new_test_ext().execute_with(|| {
+		// Go past genesis block so events get deposited
+		System::set_block_number(1);
+
+		let mut config = default_vault();
+		let mut seed = [0u8; 32];
+		OsRng.fill_bytes(&mut seed);
+		let xpriv = Xpriv::new_master(Network::Regtest, &seed).unwrap();
+		let child = xpriv
+			.derive_priv(&Secp256k1::new(), &[ChildNumber::from_normal_idx(0).unwrap()])
+			.unwrap();
+		let xpub = Xpub::from_priv(&Secp256k1::new(), &child);
+
+		config.bitcoin_xpubkey = OpaqueBitcoinXpub { 0: xpub.encode() };
+		set_argons(1, 110_010);
+		assert_noop!(
+			Vaults::create(RuntimeOrigin::signed(1), config),
+			Error::<Test>::UnsafeXpubkey
+		);
 	});
 }
 

@@ -1931,7 +1931,7 @@ export default {
    * Lookup264: pallet_vaults::pallet::Error<T>
    **/
   PalletVaultsError: {
-    _enum: ['BondNotFound', 'NoMoreVaultIds', 'NoMoreBondIds', 'MinimumBondAmountNotMet', 'ExpirationAtBlockOverflow', 'InsufficientFunds', 'InsufficientVaultFunds', 'InsufficientBitcoinsForMining', 'AccountBelowMinimumBalance', 'VaultClosed', 'InvalidVaultAmount', 'VaultReductionBelowAllocatedFunds', 'InvalidSecuritization', 'MaxPendingVaultBitcoinPubkeys', 'MaxSecuritizationPercentExceeded', 'InvalidBondType', 'BitcoinUtxoNotFound', 'InsufficientSatoshisBonded', 'NoBitcoinPricesAvailable', 'InvalidBitcoinScript', 'InvalidXpubkey', 'UnableToDeriveVaultXpubChild', 'BitcoinConversionFailed', 'ExpirationTooSoon', 'NoPermissions', 'HoldUnexpectedlyModified', 'UnrecoverableHold', 'VaultNotFound', 'FeeExceedsBondAmount', 'NoVaultBitcoinPubkeysAvailable', 'TermsModificationOverflow', 'TermsChangeAlreadyScheduled', 'InternalError', 'UnableToGenerateVaultBitcoinPubkey', 'UnableToDecodeVaultBitcoinPubkey']
+    _enum: ['BondNotFound', 'NoMoreVaultIds', 'NoMoreBondIds', 'MinimumBondAmountNotMet', 'ExpirationAtBlockOverflow', 'InsufficientFunds', 'InsufficientVaultFunds', 'InsufficientBitcoinsForMining', 'AccountBelowMinimumBalance', 'VaultClosed', 'InvalidVaultAmount', 'VaultReductionBelowAllocatedFunds', 'InvalidSecuritization', 'ReusedVaultBitcoinXpub', 'MaxSecuritizationPercentExceeded', 'InvalidBondType', 'BitcoinUtxoNotFound', 'InsufficientSatoshisBonded', 'NoBitcoinPricesAvailable', 'InvalidBitcoinScript', 'InvalidXpubkey', 'UnsafeXpubkey', 'UnableToDeriveVaultXpubChild', 'BitcoinConversionFailed', 'ExpirationTooSoon', 'NoPermissions', 'HoldUnexpectedlyModified', 'UnrecoverableHold', 'VaultNotFound', 'FeeExceedsBondAmount', 'NoVaultBitcoinPubkeysAvailable', 'TermsModificationOverflow', 'TermsChangeAlreadyScheduled', 'InternalError', 'UnableToGenerateVaultBitcoinPubkey', 'UnableToDecodeVaultBitcoinPubkey']
   },
   /**
    * Lookup265: ulx_primitives::bond::Bond<sp_core::crypto::AccountId32, Balance, BlockNumber>
@@ -1951,14 +1951,14 @@ export default {
    * Lookup268: pallet_bond::pallet::UtxoState
    **/
   PalletBondUtxoState: {
-    bondId: 'u64',
-    satoshis: 'u64',
+    bondId: 'Compact<u64>',
+    satoshis: 'Compact<u64>',
     vaultPubkey: 'UlxPrimitivesBitcoinCompressedBitcoinPubkey',
     vaultXpubSource: '([u8;4],u32)',
     ownerPubkey: 'UlxPrimitivesBitcoinCompressedBitcoinPubkey',
-    vaultClaimHeight: 'u64',
-    openClaimHeight: 'u64',
-    registerBlock: 'u64',
+    vaultClaimHeight: 'Compact<u64>',
+    openClaimHeight: 'Compact<u64>',
+    registerBlock: 'Compact<u64>',
     utxoScriptPubkey: 'UlxPrimitivesBitcoinBitcoinCosignScriptPubkey',
     isVerified: 'bool'
   },
@@ -1966,10 +1966,12 @@ export default {
    * Lookup272: pallet_bond::pallet::UtxoCosignRequest<Balance>
    **/
   PalletBondUtxoCosignRequest: {
-    bitcoinNetworkFee: 'u64',
-    cosignDueBlock: 'u64',
+    bondId: 'Compact<u64>',
+    vaultId: 'Compact<u32>',
+    bitcoinNetworkFee: 'Compact<u64>',
+    cosignDueBlock: 'Compact<u64>',
     toScriptPubkey: 'Bytes',
-    redemptionPrice: 'u128'
+    redemptionPrice: 'Compact<u128>'
   },
   /**
    * Lookup276: pallet_bond::pallet::Error<T>
