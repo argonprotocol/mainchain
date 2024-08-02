@@ -808,6 +808,10 @@ declare module '@polkadot/api-base/types/errors' {
        * This reduction in bond funds offered goes below the amount that is already committed to
        **/
       VaultReductionBelowAllocatedFunds: AugmentedError<ApiType>;
+      /**
+       * Wrong Xpub Network
+       **/
+      WrongXpubNetwork: AugmentedError<ApiType>;
     };
   } // AugmentedErrors
 } // declare module

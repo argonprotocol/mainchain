@@ -8,18 +8,17 @@ use sp_arithmetic::{FixedI128, FixedU128};
 use sp_core::{ConstU32, ConstU64, H256};
 use sp_runtime::{BuildStorage, DispatchError};
 
+use crate as pallet_bond;
+use crate::BitcoinVerifier;
 use ulx_bitcoin::UtxoUnlocker;
 use ulx_primitives::{
 	bitcoin::{
-		BitcoinCosignScriptPubkey, BitcoinHeight, BitcoinSignature, BitcoinXPub,
+		BitcoinCosignScriptPubkey, BitcoinHeight, BitcoinNetwork, BitcoinSignature, BitcoinXPub,
 		CompressedBitcoinPubkey, NetworkKind, Satoshis, UtxoId, UtxoRef,
 	},
 	bond::{Bond, BondError, BondType, Vault, VaultArgons, VaultProvider},
 	ensure, BitcoinUtxoTracker, PriceProvider, UtxoBondedEvents, VaultId,
 };
-
-use crate as pallet_bond;
-use crate::BitcoinVerifier;
 
 pub type Balance = u128;
 type Block = frame_system::mocking::MockBlock<Test>;
@@ -106,7 +105,10 @@ parameter_types! {
 
 	pub static LastBondEvent: Option<(UtxoId, u64, Balance)> = None;
 
+	pub static GetBitcoinNetwork: BitcoinNetwork = BitcoinNetwork::Regtest;
+
 	pub static DefaultVaultBitcoinPubkey: PublicKey = "02e3af28965693b9ce1228f9d468149b831d6a0540b25e8a9900f71372c11fb277".parse::<PublicKey>().unwrap();
+	pub static DefaultVaultReclaimBitcoinPubkey: PublicKey = "026c468be64d22761c30cd2f12cbc7de255d592d7904b1bab07236897cc4c2e766".parse::<PublicKey>().unwrap();
 }
 
 pub struct EventHandler;
@@ -198,7 +200,8 @@ impl VaultProvider for StaticVaultProvider {
 		_owner_pubkey: CompressedBitcoinPubkey,
 		_vault_claim_height: BitcoinHeight,
 		_open_claim_height: BitcoinHeight,
-	) -> Result<(BitcoinXPub, BitcoinCosignScriptPubkey), BondError> {
+		_current_height: BitcoinHeight,
+	) -> Result<(BitcoinXPub, BitcoinXPub, BitcoinCosignScriptPubkey), BondError> {
 		Ok((
 			BitcoinXPub {
 				public_key: DefaultVaultBitcoinPubkey::get().into(),
@@ -206,6 +209,14 @@ impl VaultProvider for StaticVaultProvider {
 				depth: 0,
 				parent_fingerprint: [0; 4],
 				child_number: 0,
+				network: NetworkKind::Test,
+			},
+			BitcoinXPub {
+				public_key: DefaultVaultReclaimBitcoinPubkey::get().into(),
+				chain_code: [0; 32],
+				depth: 0,
+				parent_fingerprint: [0; 4],
+				child_number: 1,
 				network: NetworkKind::Test,
 			},
 			BitcoinCosignScriptPubkey::P2WSH { wscript_hash: H256::from([0; 32]) },
@@ -275,6 +286,7 @@ impl pallet_bond::Config for Test {
 	type BitcoinBlockHeight = BitcoinBlockHeight;
 	type MinimumBitcoinBondSatoshis = MinimumBondSatoshis;
 	type BitcoinSignatureVerifier = StaticBitcoinVerifier;
+	type GetBitcoinNetwork = GetBitcoinNetwork;
 }
 
 // Build genesis storage according to the mock runtime.

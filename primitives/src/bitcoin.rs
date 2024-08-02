@@ -32,6 +32,9 @@ impl BitcoinBlock {
 pub enum BitcoinError {
 	InvalidLockTime,
 	InvalidByteLength,
+	InvalidPolicy,
+	UnsafePolicy,
+	InvalidPubkey,
 }
 
 #[derive(Clone, Copy, PartialEq, Eq, Encode, Decode, TypeInfo, RuntimeDebug, MaxEncodedLen)]
@@ -208,6 +211,11 @@ impl BitcoinXPub {
 mod bitcoin_compat {
 	use alloc::vec::Vec;
 
+	use crate::bitcoin::{
+		BitcoinCosignScriptPubkey, BitcoinNetwork, BitcoinScriptPubkey, BitcoinSignature,
+		BitcoinXPub, CompressedBitcoinPubkey, H256Le, NetworkKind, OpaqueBitcoinXpub, UtxoRef,
+		XpubErrors,
+	};
 	use bip32::{ChildNumber, ExtendedKeyAttrs, XPub};
 	use bitcoin::{
 		hashes::{FromSliceError, Hash},
@@ -216,12 +224,6 @@ mod bitcoin_compat {
 	use k256::ecdsa::VerifyingKey;
 	use sp_core::H256;
 	use sp_runtime::BoundedVec;
-
-	use crate::bitcoin::{
-		BitcoinCosignScriptPubkey, BitcoinNetwork, BitcoinScriptPubkey, BitcoinSignature,
-		BitcoinXPub, CompressedBitcoinPubkey, H256Le, NetworkKind, OpaqueBitcoinXpub, UtxoRef,
-		XpubErrors,
-	};
 
 	/// Version bytes for extended public keys on the Bitcoin network.
 	const VERSION_BYTES_MAINNET_PUBLIC: [u8; 4] = [0x04, 0x88, 0xB2, 0x1E];
@@ -465,16 +467,15 @@ mod bitcoin_compat {
 		}
 	}
 
-	impl TryInto<BitcoinScriptPubkey> for bitcoin::ScriptBuf {
-		type Error = Vec<u8>;
-		fn try_into(self) -> Result<BitcoinScriptPubkey, Self::Error> {
-			Ok(BitcoinScriptPubkey(BoundedVec::try_from(self.to_bytes())?))
-		}
-	}
-
 	impl From<BitcoinScriptPubkey> for bitcoin::ScriptBuf {
 		fn from(val: BitcoinScriptPubkey) -> Self {
 			bitcoin::ScriptBuf::from_bytes(val.0.into_inner())
+		}
+	}
+
+	impl From<bitcoin::ScriptBuf> for BitcoinScriptPubkey {
+		fn from(val: bitcoin::ScriptBuf) -> Self {
+			Self(BoundedVec::truncate_from(val.to_bytes()))
 		}
 	}
 

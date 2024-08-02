@@ -2885,9 +2885,9 @@ pub mod api {
 			.hash();
 		runtime_metadata_hash ==
 			[
-				255u8, 218u8, 188u8, 160u8, 57u8, 174u8, 248u8, 209u8, 73u8, 122u8, 238u8, 216u8,
-				45u8, 130u8, 14u8, 64u8, 234u8, 54u8, 112u8, 254u8, 25u8, 134u8, 74u8, 158u8, 80u8,
-				81u8, 216u8, 216u8, 155u8, 199u8, 254u8, 14u8,
+				80u8, 117u8, 235u8, 171u8, 190u8, 233u8, 50u8, 97u8, 112u8, 216u8, 252u8, 103u8,
+				79u8, 225u8, 181u8, 109u8, 5u8, 159u8, 52u8, 73u8, 65u8, 28u8, 142u8, 246u8, 249u8,
+				139u8, 226u8, 91u8, 248u8, 205u8, 64u8, 195u8,
 			]
 	}
 	pub mod system {
@@ -9493,10 +9493,10 @@ pub mod api {
 						"UtxosById",
 						(),
 						[
-							210u8, 149u8, 219u8, 157u8, 25u8, 22u8, 51u8, 28u8, 251u8, 63u8, 50u8,
-							75u8, 80u8, 115u8, 176u8, 189u8, 4u8, 139u8, 141u8, 166u8, 156u8,
-							188u8, 21u8, 229u8, 219u8, 169u8, 111u8, 118u8, 84u8, 150u8, 136u8,
-							87u8,
+							104u8, 227u8, 68u8, 226u8, 28u8, 141u8, 152u8, 244u8, 185u8, 59u8,
+							46u8, 1u8, 245u8, 149u8, 113u8, 221u8, 168u8, 67u8, 117u8, 8u8, 78u8,
+							65u8, 83u8, 238u8, 211u8, 117u8, 250u8, 144u8, 155u8, 209u8, 180u8,
+							179u8,
 						],
 					)
 				}
@@ -9520,10 +9520,10 @@ pub mod api {
 							_0.borrow(),
 						),
 						[
-							210u8, 149u8, 219u8, 157u8, 25u8, 22u8, 51u8, 28u8, 251u8, 63u8, 50u8,
-							75u8, 80u8, 115u8, 176u8, 189u8, 4u8, 139u8, 141u8, 166u8, 156u8,
-							188u8, 21u8, 229u8, 219u8, 169u8, 111u8, 118u8, 84u8, 150u8, 136u8,
-							87u8,
+							104u8, 227u8, 68u8, 226u8, 28u8, 141u8, 152u8, 244u8, 185u8, 59u8,
+							46u8, 1u8, 245u8, 149u8, 113u8, 221u8, 168u8, 67u8, 117u8, 8u8, 78u8,
+							65u8, 83u8, 238u8, 211u8, 117u8, 250u8, 144u8, 155u8, 209u8, 180u8,
+							179u8,
 						],
 					)
 				}
@@ -9591,9 +9591,10 @@ pub mod api {
 						"OwedUtxoAggrieved",
 						(),
 						[
-							11u8, 66u8, 189u8, 152u8, 249u8, 187u8, 37u8, 13u8, 65u8, 224u8, 68u8,
-							73u8, 46u8, 70u8, 165u8, 194u8, 45u8, 101u8, 203u8, 126u8, 72u8, 237u8,
-							66u8, 96u8, 24u8, 19u8, 235u8, 219u8, 53u8, 237u8, 228u8, 65u8,
+							49u8, 111u8, 142u8, 210u8, 243u8, 201u8, 117u8, 183u8, 200u8, 230u8,
+							173u8, 74u8, 40u8, 74u8, 241u8, 204u8, 154u8, 6u8, 84u8, 63u8, 233u8,
+							171u8, 192u8, 114u8, 75u8, 162u8, 16u8, 173u8, 149u8, 12u8, 231u8,
+							133u8,
 						],
 					)
 				}
@@ -9619,9 +9620,10 @@ pub mod api {
 							_0.borrow(),
 						),
 						[
-							11u8, 66u8, 189u8, 152u8, 249u8, 187u8, 37u8, 13u8, 65u8, 224u8, 68u8,
-							73u8, 46u8, 70u8, 165u8, 194u8, 45u8, 101u8, 203u8, 126u8, 72u8, 237u8,
-							66u8, 96u8, 24u8, 19u8, 235u8, 219u8, 53u8, 237u8, 228u8, 65u8,
+							49u8, 111u8, 142u8, 210u8, 243u8, 201u8, 117u8, 183u8, 200u8, 230u8,
+							173u8, 74u8, 40u8, 74u8, 241u8, 204u8, 154u8, 6u8, 84u8, 63u8, 233u8,
+							171u8, 192u8, 114u8, 75u8, 162u8, 16u8, 173u8, 149u8, 12u8, 231u8,
+							133u8,
 						],
 					)
 				}
@@ -20800,8 +20802,13 @@ pub mod api {
 					pub satoshis: ::core::primitive::u64,
 					pub vault_pubkey:
 						runtime_types::ulx_primitives::bitcoin::CompressedBitcoinPubkey,
-					pub vault_xpub_source:
-						([::core::primitive::u8; 4usize], ::core::primitive::u32),
+					pub vault_claim_pubkey:
+						runtime_types::ulx_primitives::bitcoin::CompressedBitcoinPubkey,
+					pub vault_xpub_sources: (
+						[::core::primitive::u8; 4usize],
+						::core::primitive::u32,
+						::core::primitive::u32,
+					),
 					pub owner_pubkey:
 						runtime_types::ulx_primitives::bitcoin::CompressedBitcoinPubkey,
 					#[codec(compact)]
@@ -23390,43 +23397,46 @@ pub mod api {
 					#[doc = "Unable to decode xpubkey"]
 					InvalidXpubkey,
 					#[codec(index = 21)]
+					#[doc = "Wrong Xpub Network"]
+					WrongXpubNetwork,
+					#[codec(index = 22)]
 					#[doc = "The XPub is unsafe to use in a public blockchain (aka, unhardened)"]
 					UnsafeXpubkey,
-					#[codec(index = 22)]
+					#[codec(index = 23)]
 					#[doc = "Unable to derive xpubkey child"]
 					UnableToDeriveVaultXpubChild,
-					#[codec(index = 23)]
+					#[codec(index = 24)]
 					#[doc = "Bitcoin conversion to compressed pubkey failed"]
 					BitcoinConversionFailed,
-					#[codec(index = 24)]
-					ExpirationTooSoon,
 					#[codec(index = 25)]
-					NoPermissions,
+					ExpirationTooSoon,
 					#[codec(index = 26)]
-					HoldUnexpectedlyModified,
+					NoPermissions,
 					#[codec(index = 27)]
-					UnrecoverableHold,
+					HoldUnexpectedlyModified,
 					#[codec(index = 28)]
-					VaultNotFound,
+					UnrecoverableHold,
 					#[codec(index = 29)]
+					VaultNotFound,
+					#[codec(index = 30)]
 					#[doc = "The fee for this bond exceeds the amount of the bond, which is unsafe"]
 					FeeExceedsBondAmount,
-					#[codec(index = 30)]
+					#[codec(index = 31)]
 					#[doc = "No Vault public keys are available"]
 					NoVaultBitcoinPubkeysAvailable,
-					#[codec(index = 31)]
+					#[codec(index = 32)]
 					#[doc = "The terms modification list could not handle any more items"]
 					TermsModificationOverflow,
-					#[codec(index = 32)]
+					#[codec(index = 33)]
 					#[doc = "Terms are already scheduled to be changed"]
 					TermsChangeAlreadyScheduled,
-					#[codec(index = 33)]
+					#[codec(index = 34)]
 					#[doc = "An internal processing error occurred"]
 					InternalError,
-					#[codec(index = 34)]
+					#[codec(index = 35)]
 					#[doc = "Unable to generate a new vault bitcoin pubkey"]
 					UnableToGenerateVaultBitcoinPubkey,
-					#[codec(index = 35)]
+					#[codec(index = 36)]
 					#[doc = "Unable to decode vault bitcoin pubkey"]
 					UnableToDecodeVaultBitcoinPubkey,
 				}

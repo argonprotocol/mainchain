@@ -47,7 +47,7 @@ pub mod pallet {
 	};
 
 	use super::*;
-	use ulx_bitcoin::CosignScript;
+	use ulx_bitcoin::{CosignScript, CosignScriptArgs};
 	use ulx_primitives::{
 		bitcoin::{
 			BitcoinCosignScriptPubkey, BitcoinHeight, BitcoinNetwork, BitcoinXPub,
@@ -918,30 +918,45 @@ pub mod pallet {
 			owner_pubkey: CompressedBitcoinPubkey,
 			vault_claim_height: BitcoinHeight,
 			open_claim_height: BitcoinHeight,
-		) -> Result<(BitcoinXPub, BitcoinCosignScriptPubkey), BondError> {
-			let vault_xpubkey = VaultXPubById::<T>::mutate(vault_id, |a| {
+			current_height: BitcoinHeight,
+		) -> Result<(BitcoinXPub, BitcoinXPub, BitcoinCosignScriptPubkey), BondError> {
+			let (vault_xpubkey, vault_claim_pubkey) = VaultXPubById::<T>::mutate(vault_id, |a| {
 				let (xpub, counter) =
 					a.as_mut().ok_or(BondError::NoVaultBitcoinPubkeysAvailable)?;
 
-				let next = *counter + 1;
+				let mut next =
+					counter.checked_add(1).ok_or(BondError::UnableToGenerateVaultBitcoinPubkey)?;
 				let pubkey = xpub
 					.derive_pubkey(next)
 					.map_err(|_| BondError::UnableToGenerateVaultBitcoinPubkey)?;
+
+				next = next.checked_add(1).ok_or(BondError::UnableToGenerateVaultBitcoinPubkey)?;
+				let pubkey2 = xpub
+					.derive_pubkey(next)
+					.map_err(|_| BondError::UnableToGenerateVaultBitcoinPubkey)?;
+
 				*a = Some((xpub.clone(), next));
-				Ok(pubkey)
+				Ok((pubkey, pubkey2))
 			})?;
 
-			let script_pubkey = CosignScript::create_script(
-				vault_xpubkey.public_key.clone(),
+			let script_args = CosignScriptArgs {
+				vault_pubkey: vault_xpubkey.public_key,
+				vault_claim_pubkey: vault_claim_pubkey.public_key,
 				owner_pubkey,
 				vault_claim_height,
 				open_claim_height,
-			)
-			.map_err(|_| BondError::InvalidBitcoinScript)?;
+				created_at_height: current_height,
+			};
+
+			let network = T::GetBitcoinNetwork::get();
+			let script_pubkey = CosignScript::new(script_args, network.into())
+				.map_err(|_| BondError::InvalidBitcoinScript)?;
 
 			Ok((
 				vault_xpubkey,
+				vault_claim_pubkey,
 				script_pubkey
+					.script
 					.to_p2wsh()
 					.try_into()
 					.map_err(|_| BondError::InvalidBitcoinScript)?,

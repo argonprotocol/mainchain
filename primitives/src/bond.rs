@@ -83,7 +83,8 @@ pub trait VaultProvider {
 		owner_pubkey: CompressedBitcoinPubkey,
 		vault_claim_height: BitcoinHeight,
 		open_claim_height: BitcoinHeight,
-	) -> Result<(BitcoinXPub, BitcoinCosignScriptPubkey), BondError>;
+		current_height: BitcoinHeight,
+	) -> Result<(BitcoinXPub, BitcoinXPub, BitcoinCosignScriptPubkey), BondError>;
 }
 
 #[derive(Clone, PartialEq, Eq, Encode, Decode, RuntimeDebug, TypeInfo, PalletError)]

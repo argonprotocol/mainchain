@@ -7,7 +7,7 @@ use sp_runtime::DispatchError;
 
 pub use pallet::*;
 use ulx_bitcoin::UtxoUnlocker;
-use ulx_primitives::bitcoin::{BitcoinSignature, CompressedBitcoinPubkey};
+use ulx_primitives::bitcoin::{BitcoinNetwork, BitcoinSignature, CompressedBitcoinPubkey};
 pub use weights::*;
 
 #[cfg(test)]
@@ -103,7 +103,7 @@ pub mod pallet {
 		FixedPointNumber, Saturating, TokenError,
 	};
 
-	use ulx_bitcoin::{Amount, UnlockStep, UtxoUnlocker};
+	use ulx_bitcoin::{Amount, CosignScriptArgs, UnlockStep, UtxoUnlocker};
 	use ulx_primitives::{
 		bitcoin::{
 			BitcoinCosignScriptPubkey, BitcoinHeight, BitcoinRejectedReason, BitcoinScriptPubkey,
@@ -157,6 +157,8 @@ pub mod pallet {
 
 		/// Bitcoin time provider
 		type BitcoinBlockHeight: Get<BitcoinHeight>;
+
+		type GetBitcoinNetwork: Get<BitcoinNetwork>;
 
 		type VaultProvider: VaultProvider<
 			AccountId = Self::AccountId,
@@ -274,7 +276,9 @@ pub mod pallet {
 		#[codec(compact)]
 		pub satoshis: Satoshis,
 		pub vault_pubkey: CompressedBitcoinPubkey,
-		pub vault_xpub_source: (XPubFingerprint, XPubChildNumber),
+		pub vault_claim_pubkey: CompressedBitcoinPubkey,
+		/// The vault xpub sources. First is the cosign number, second is the claim number
+		pub vault_xpub_sources: (XPubFingerprint, XPubChildNumber, XPubChildNumber),
 		pub owner_pubkey: CompressedBitcoinPubkey,
 		#[codec(compact)]
 		pub vault_claim_height: BitcoinHeight,
@@ -514,8 +518,8 @@ pub mod pallet {
 				Error::<T>::InsufficientSatoshisBonded
 			);
 
-			let vault_claim_height =
-				T::BitcoinBlockHeight::get() + T::BitcoinBondDurationBlocks::get();
+			let current_bitcoin_height = T::BitcoinBlockHeight::get();
+			let vault_claim_height = current_bitcoin_height + T::BitcoinBondDurationBlocks::get();
 			let open_claim_height = vault_claim_height + T::BitcoinBondReclamationBlocks::get();
 
 			let amount = T::PriceProvider::get_bitcoin_argon_price(satoshis)
@@ -534,17 +538,24 @@ pub mod pallet {
 
 			let utxo_id = T::BitcoinUtxoTracker::new_utxo_id();
 
-			let (vault_xpub, script_pubkey) = T::VaultProvider::create_utxo_script_pubkey(
-				vault_id,
-				utxo_id,
-				bitcoin_pubkey,
-				vault_claim_height,
-				open_claim_height,
-			)
-			.map_err(|_| Error::<T>::InvalidBitcoinScript)?;
+			let (vault_xpub, vault_claim_xpub, script_pubkey) =
+				T::VaultProvider::create_utxo_script_pubkey(
+					vault_id,
+					utxo_id,
+					bitcoin_pubkey,
+					vault_claim_height,
+					open_claim_height,
+					current_bitcoin_height,
+				)
+				.map_err(|_| Error::<T>::InvalidBitcoinScript)?;
 
 			let vault_pubkey = vault_xpub.public_key;
-			let vault_xpub_source = (vault_xpub.parent_fingerprint, vault_xpub.child_number);
+			let vault_claim_pubkey = vault_claim_xpub.public_key;
+			let vault_xpub_sources = (
+				vault_xpub.parent_fingerprint,
+				vault_xpub.child_number,
+				vault_claim_xpub.child_number,
+			);
 
 			T::BitcoinUtxoTracker::watch_for_utxo(
 				utxo_id,
@@ -572,7 +583,8 @@ pub mod pallet {
 					bond_id,
 					satoshis,
 					vault_pubkey,
-					vault_xpub_source,
+					vault_claim_pubkey,
+					vault_xpub_sources,
 					owner_pubkey: bitcoin_pubkey,
 					vault_claim_height,
 					open_claim_height,
@@ -693,24 +705,32 @@ pub mod pallet {
 			let utxo_ref =
 				T::BitcoinUtxoTracker::get(utxo_id).ok_or(Error::<T>::BitcoinUtxoNotFound)?;
 
-			let unlocker = UtxoUnlocker::new(
-				utxo_state
+			let script_args = CosignScriptArgs {
+				vault_pubkey: utxo_state
 					.vault_pubkey
 					.try_into()
 					.map_err(|_| Error::<T>::BitcoinPubkeyUnableToBeDecoded)?,
-				utxo_state
+				owner_pubkey: utxo_state
 					.owner_pubkey
 					.try_into()
 					.map_err(|_| Error::<T>::BitcoinPubkeyUnableToBeDecoded)?,
-				utxo_state.created_at_height,
-				utxo_state.vault_claim_height,
-				utxo_state.open_claim_height,
+				vault_claim_pubkey: utxo_state
+					.vault_claim_pubkey
+					.try_into()
+					.map_err(|_| Error::<T>::BitcoinPubkeyUnableToBeDecoded)?,
+				created_at_height: utxo_state.created_at_height,
+				vault_claim_height: utxo_state.vault_claim_height,
+				open_claim_height: utxo_state.open_claim_height,
+			};
+			let unlocker = UtxoUnlocker::new(
+				script_args,
 				utxo_state.satoshis,
 				utxo_ref.txid.into(),
 				utxo_ref.output_index,
 				UnlockStep::VaultCosign,
 				Amount::from_sat(request.bitcoin_network_fee),
 				request.to_script_pubkey.into(),
+				T::GetBitcoinNetwork::get().into(),
 			)
 			.map_err(|_| Error::<T>::BitcoinUnableToBeDecodedForUnlock)?;
 

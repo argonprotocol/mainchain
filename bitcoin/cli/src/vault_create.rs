@@ -1,16 +1,19 @@
-use std::{fmt, io, io::Write, iter::Iterator, str::FromStr, string::ToString};
+use std::{fmt, io, io::Write, iter::Iterator, string::ToString};
 
-use bitcoin::bip32::Xpub;
 use clap::Args;
 use inquire::{
 	error::InquireResult,
 	validator::{StringValidator, Validation},
-	CustomUserError, Select, Text,
+	CustomUserError, InquireError, Select, Text,
 };
-use sp_runtime::FixedU128;
-use ulixee_client::{api, api::runtime_types, conversion::to_api_fixed_u128};
 
+use crate::{
+	formatters::{parse_number, Argons, Pct},
+	helpers::{read_bitcoin_xpub, read_percent_to_fixed_128},
+};
+use ulixee_client::{api, api::runtime_types, conversion::to_api_fixed_u128};
 use ulx_bitcoin_cli_macros::ReadDocs;
+use ulx_primitives::bitcoin::BitcoinXPub;
 
 #[derive(Debug, Args, ReadDocs)]
 pub struct VaultConfig {
@@ -70,7 +73,7 @@ fn label(field: &str) -> &str {
 }
 
 impl VaultConfig {
-	pub async fn complete_prompt(&mut self) -> bool {
+	pub async fn complete_prompt(&mut self, has_keypair: bool) -> bool {
 		self.sanitize_bad_values();
 
 		if self.next_incomplete_field().is_none() {
@@ -78,7 +81,7 @@ impl VaultConfig {
 		}
 
 		loop {
-			match self.update_state() {
+			match self.update_state(has_keypair) {
 				Ok(false) => continue,
 				Ok(true) => return true,
 				Err(_) => return false,
@@ -87,38 +90,40 @@ impl VaultConfig {
 	}
 
 	pub fn as_call_data(&self) -> api::vaults::calls::types::create::VaultConfig {
-		let xpub = Xpub::from_str(&self.bitcoin_xpub.clone().unwrap()).expect("Invalid xpub");
+		let opaque_xpub = read_bitcoin_xpub(&self.bitcoin_xpub.clone().unwrap_or_default())
+			.expect("Invalid xpub");
 
 		api::vaults::calls::types::create::VaultConfig {
-			bitcoin_xpubkey: runtime_types::ulx_primitives::bitcoin::OpaqueBitcoinXpub(
-				xpub.encode(),
-			),
+			bitcoin_xpubkey: opaque_xpub.0.into(),
 			terms: runtime_types::ulx_primitives::bond::VaultTerms::<u128> {
 				bitcoin_base_fee: (self.bitcoin_base_fee.unwrap_or(0.0) * 1000.0) as u128,
-				bitcoin_annual_percent_rate: to_api_fixed_u128(FixedU128::from_rational(
-					(self.bitcoin_apr.unwrap_or(0.0) as f64 * 1000.0) as u128,
-					100 * 1000,
+				bitcoin_annual_percent_rate: to_api_fixed_u128(read_percent_to_fixed_128(
+					self.bitcoin_apr.unwrap_or(0.0),
 				)),
 				mining_base_fee: (self.mining_base_fee.unwrap_or(0.0) * 1000.0) as u128,
-				mining_annual_percent_rate: to_api_fixed_u128(FixedU128::from_rational(
-					(self.mining_apr.unwrap_or(0.0) as f64 * 1000.0) as u128,
-					100 * 1000,
+				mining_annual_percent_rate: to_api_fixed_u128(read_percent_to_fixed_128(
+					self.mining_apr.unwrap_or(0.0),
 				)),
-				mining_reward_sharing_percent_take: to_api_fixed_u128(FixedU128::from_rational(
-					(self.mining_reward_sharing_percent_take.unwrap_or(0.0) as f64 * 1000.0)
-						as u128,
-					100 * 1000,
+				mining_reward_sharing_percent_take: to_api_fixed_u128(read_percent_to_fixed_128(
+					self.mining_reward_sharing_percent_take.unwrap_or(0.0),
 				)),
 			},
-			securitization_percent: to_api_fixed_u128(FixedU128::from_float(
-				self.securitization_percent.unwrap_or(0.0) as f64,
+			securitization_percent: to_api_fixed_u128(read_percent_to_fixed_128(
+				self.securitization_percent.unwrap_or(0.0),
 			)),
 			bitcoin_amount_allocated: (self.bitcoin_argons.unwrap_or(0.0) * 1000.0) as u128,
 			mining_amount_allocated: (self.mining_argons.unwrap_or(0.0) * 1000.0) as u128,
 		}
 	}
 
-	fn update_state(&mut self) -> Result<bool, String> {
+	pub fn argons_needed(&self) -> String {
+		let mut argons_needed = self.bitcoin_argons.unwrap_or(0.0);
+		argons_needed += (self.securitization_percent.unwrap_or(0.0) / 100.0) * argons_needed;
+		argons_needed += self.mining_argons.unwrap_or(0.0);
+		Argons(argons_needed).to_string()
+	}
+
+	fn update_state(&mut self, has_keypair: bool) -> Result<bool, String> {
 		print!("{esc}[2J{esc}[1;1H", esc = 27 as char);
 		io::stdout().flush().unwrap();
 
@@ -132,7 +137,11 @@ impl VaultConfig {
 				})
 				.collect::<Vec<_>>();
 
-			fields.push("Submit".to_string());
+			if has_keypair {
+				fields.push("Submit".to_string());
+			} else {
+				fields.push("Generate".to_string());
+			}
 
 			let choice = Select::new("Review your Configuration:", fields.clone())
 				.with_starting_cursor(fields.len() - 1)
@@ -176,24 +185,36 @@ impl VaultConfig {
 	}
 
 	fn prompt_bitcoin_xpub(&mut self) -> Result<(), String> {
-		self.bitcoin_xpub = Some(
-			self.text_field("bitcoin_xpub", "")
-				.with_placeholder("xpub...")
-				.with_validator(|input: &str| {
-					if input.len() != 111 {
-						return Ok(Validation::Invalid("xpub must be 111 characters long".into()))
-					}
-					if !input.starts_with("xpub") {
-						return Ok(Validation::Invalid("xpub must start with 'xpub'".into()))
-					}
-					match Xpub::from_str(input) {
-						Ok(_) => Ok(Validation::Valid),
-						Err(e) => Ok(Validation::Invalid(format!("Invalid xpub: {}", e).into())),
-					}
-				})
-				.prompt()
-				.map_err(|e| e.to_string())?,
-		);
+		let result = self
+			.text_field("bitcoin_xpub", "")
+			.with_placeholder("xpub...")
+			.with_validator(|input: &str| {
+				let data = match read_bitcoin_xpub(input) {
+					Ok(x) => x,
+					Err(e) => return Ok(Validation::Invalid(e.into())),
+				};
+
+				match TryInto::<BitcoinXPub>::try_into(data) {
+					Ok(x) => {
+						if !x.is_hardened() {
+							return Ok(Validation::Invalid("xpub must be hardened".into()))
+						}
+						Ok(Validation::Valid)
+					},
+					Err(e) => Ok(Validation::Invalid(format!("Invalid xpub: {:?}", e).into())),
+				}
+			})
+			.prompt();
+		if let Err(err) = result {
+			if matches!(err, InquireError::OperationCanceled) {
+				if self.bitcoin_xpub.is_none() {}
+				self.bitcoin_xpub = None;
+				self.prompt_bitcoin_xpub()?;
+				return Ok(())
+			}
+			return Err(err.to_string());
+		}
+		self.bitcoin_xpub = result.ok();
 		Ok(())
 	}
 
@@ -236,7 +257,7 @@ impl VaultConfig {
 
 	fn prompt_bitcoin_argons(&mut self) -> Result<(), String> {
 		self.bitcoin_argons = Some(
-			self.text_field("bitcoin_argons", "100,000")
+			self.text_field("bitcoin_argons", "0.00")
 				.with_positive_f32()
 				.prompt_with_f32()?,
 		);
@@ -244,11 +265,8 @@ impl VaultConfig {
 	}
 
 	fn prompt_mining_argons(&mut self) -> Result<(), String> {
-		self.mining_argons = Some(
-			self.text_field("mining_argons", "100,000")
-				.with_positive_f32()
-				.prompt_with_f32()?,
-		);
+		self.mining_argons =
+			Some(self.text_field("mining_argons", "0.00").with_positive_f32().prompt_with_f32()?);
 		Ok(())
 	}
 
@@ -263,7 +281,7 @@ impl VaultConfig {
 
 	fn prompt_mining_apr(&mut self) -> Result<(), String> {
 		self.mining_apr =
-			Some(self.text_field("mining_apr", "1.0").with_positive_f32().prompt_with_f32()?);
+			Some(self.text_field("mining_apr", "0.0").with_positive_f32().prompt_with_f32()?);
 		Ok(())
 	}
 
@@ -336,16 +354,39 @@ impl VaultConfig {
 
 	fn formatted_value(&self, field: &str) -> Option<String> {
 		match field {
-			"bitcoin_argons" => self.bitcoin_argons.map(|a| Argons(a).to_string()),
+			"bitcoin_argons" => self.format_type(field, &self.bitcoin_argons),
 			"bitcoin_xpub" => self.bitcoin_xpub.clone(),
-			"bitcoin_base_fee" => self.bitcoin_base_fee.map(|a| Argons(a).to_string()),
-			"bitcoin_apr" => self.bitcoin_apr.map(|a| Pct(a).to_string()),
-			"mining_apr" => self.mining_apr.map(|a| Pct(a).to_string()),
-			"mining_base_fee" => self.mining_base_fee.map(|a| Argons(a).to_string()),
+			"bitcoin_base_fee" => self.format_type(field, &self.bitcoin_base_fee),
+			"bitcoin_apr" => self.format_type(field, &self.bitcoin_apr),
+			"mining_apr" => self.format_type(field, &self.mining_apr),
+			"mining_base_fee" => self.format_type(field, &self.mining_base_fee),
 			"mining_reward_sharing_percent_take" =>
-				self.mining_reward_sharing_percent_take.map(|a| Pct(a).to_string()),
-			"mining_argons" => self.mining_argons.map(|a| Argons(a).to_string()),
-			"securitization_percent" => self.securitization_percent.map(|a| Pct(a).to_string()),
+				self.format_type(field, &self.mining_reward_sharing_percent_take),
+			"mining_argons" => self.format_type(field, &self.mining_argons),
+			"securitization_percent" => self.format_type(field, &self.securitization_percent),
+			_ => None,
+		}
+	}
+
+	fn format_type(&self, field: &str, value: &Option<impl fmt::Display>) -> Option<String> {
+		let Some(value) = value else { return None };
+		let value = value.to_string();
+		if value.is_empty() {
+			return None;
+		}
+
+		match field {
+			"bitcoin_argons" | "mining_argons" | "bitcoin_base_fee" | "mining_base_fee" => {
+				let argons = parse_number(&value).unwrap();
+				Some(Argons(argons).to_string())
+			},
+			"bitcoin_apr" |
+			"mining_apr" |
+			"mining_reward_sharing_percent_take" |
+			"securitization_percent" => {
+				let pct = parse_number(&value).unwrap();
+				Some(Pct(pct).to_string())
+			},
 			_ => None,
 		}
 	}
@@ -353,8 +394,10 @@ impl VaultConfig {
 	fn text_field(&self, field: &'static str, default: &'static str) -> TextField {
 		let text = label(field);
 		let docs = VaultConfig::get_docs(field).unwrap();
+
+		let formatted_default = self.format_type(field, &Some(default)).unwrap_or_default();
 		let existing_value = self.formatted_value(field);
-		TextField::new(text, docs, default, existing_value)
+		TextField::new(text, docs, formatted_default, existing_value)
 	}
 }
 
@@ -365,19 +408,10 @@ struct TextField<'a> {
 }
 
 impl<'a> TextField<'a> {
-	fn new(
-		label: &'a str,
-		docs: &'a str,
-		default: &'a str,
-		existing_value: Option<String>,
-	) -> Self {
+	fn new(label: &'a str, docs: &'a str, default: String, existing_value: Option<String>) -> Self {
 		let text_field = Text::new(label).with_help_message(docs);
 
-		Self {
-			existing_value: existing_value.clone(),
-			default: default.to_string(),
-			text: text_field,
-		}
+		Self { existing_value: existing_value.clone(), default, text: text_field }
 	}
 
 	fn with_positive_f32(mut self) -> Self {
@@ -429,62 +463,4 @@ impl StringValidator for F32Validator {
 			Err(_) => Ok(Validation::Invalid("Invalid number".into())),
 		}
 	}
-}
-fn parse_number(s: &str) -> Result<f32, String> {
-	// Remove commas from the string
-	let cleaned: String = s.chars().filter(|&c| c.is_digit(10) || c == '.').collect();
-
-	// Ensure there's a decimal point for integer numbers by appending ".0" if needed
-	let cleaned = if !cleaned.contains('.') { format!("{}.0", cleaned) } else { cleaned };
-
-	// Parse the cleaned string as an f32
-	let number: f32 = cleaned.parse().map_err(|_| "Invalid number".to_string())?;
-	Ok(number)
-}
-
-struct Argons(f32);
-
-impl fmt::Display for Argons {
-	fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-		let value = self.0;
-		let whole_part = value.floor(); // Extract the whole part
-		let whole_part_str = insert_commas(whole_part as u128);
-
-		let decimal_part = (value.fract() * 100.0).round(); // Extract and round the decimal part
-
-		if decimal_part == 0.0 {
-			write!(f, "₳ {}", whole_part_str)
-		} else {
-			write!(f, "₳ {}.{:02}", whole_part_str, decimal_part as u32)
-		}
-	}
-}
-
-struct Pct(f32);
-
-impl fmt::Display for Pct {
-	fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-		let value = self.0;
-		let mut value_str = &*format!("{}", value);
-
-		if value_str.contains('.') {
-			value_str = value_str.trim_end_matches('0').trim_end_matches('.');
-		}
-
-		write!(f, "{}%", value_str)
-	}
-}
-fn insert_commas(n: u128) -> String {
-	let whole_part = n.to_string();
-	let chars: Vec<char> = whole_part.chars().rev().collect();
-	let mut result = String::new();
-
-	for (i, c) in chars.iter().enumerate() {
-		if i > 0 && i % 3 == 0 {
-			result.push(',');
-		}
-		result.push(*c);
-	}
-
-	result.chars().rev().collect()
 }

@@ -56,7 +56,6 @@ impl UlxTestNotary {
 			let workspace_cargo_path = workspace_cargo_path.as_path().join("target/debug");
 			workspace_cargo_path
 		};
-		println!("run from {}", target_dir.to_str().unwrap_or(""));
 
 		let operator = operator
 			.unwrap_or_else(|| ed25519::Pair::from_string("//Ferdie//notary", None).unwrap());

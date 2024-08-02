@@ -624,9 +624,10 @@ fn default_utxo_state(bond_id: BondId, satoshis: Satoshis) -> UtxoState {
 		is_verified: false,
 		utxo_script_pubkey: make_cosign_pubkey([0; 32]),
 		owner_pubkey: CompressedBitcoinPubkey([1; 33]),
+		vault_claim_pubkey: DefaultVaultReclaimBitcoinPubkey::get().into(),
 		vault_pubkey: DefaultVaultBitcoinPubkey::get().into(),
 		created_at_height: current_height,
-		vault_xpub_source: ([0; 4], 0),
+		vault_xpub_sources: ([0; 4], 0, 1),
 	}
 }
 

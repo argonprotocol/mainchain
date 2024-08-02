@@ -369,6 +369,7 @@ impl pallet_bond::Config for Runtime {
 	type VaultProvider = Vaults;
 	type PriceProvider = PriceIndex;
 	type BitcoinBlockHeight = BitcoinUtxos;
+	type GetBitcoinNetwork = BitcoinUtxos;
 	type BitcoinBondDurationBlocks = BitcoinBondDurationBlocks;
 	type BitcoinBondReclamationBlocks = BitcoinBondReclamationBlocks;
 	type BitcoinUtxoTracker = BitcoinUtxos;

@@ -1,4 +1,5 @@
-use alloc::{vec, vec::Vec};
+use alloc::vec;
+
 use bitcoin::{
 	absolute::LockTime,
 	bip32::{KeySource, Xpriv},
@@ -7,18 +8,18 @@ use bitcoin::{
 	psbt::Input,
 	sighash::SighashCache,
 	transaction::Version,
-	Amount, EcdsaSighashType, OutPoint, PrivateKey, Psbt, PublicKey, ScriptBuf, Sequence,
+	Amount, EcdsaSighashType, Network, OutPoint, PrivateKey, Psbt, PublicKey, ScriptBuf, Sequence,
 	Transaction, TxIn, TxOut, Witness,
 };
 use k256::ecdsa::signature::Verifier;
-
+use miniscript::psbt::PsbtExt;
 use ulx_primitives::{
-	bitcoin::{BitcoinError, BitcoinHeight, BitcoinSignature, CompressedBitcoinPubkey, Satoshis},
+	bitcoin::{BitcoinError, BitcoinSignature, CompressedBitcoinPubkey, Satoshis},
 	ensure,
 };
 
 use crate::{
-	cosign_script::{CosignScript, UnlockStep, COSIGN_CODE, OPEN_CLAIM_CODE, VAULT_CLAIM_CODE},
+	cosign_script::{CosignScript, CosignScriptArgs, UnlockStep},
 	errors::Error,
 };
 
@@ -68,32 +69,27 @@ impl UtxoUnlocker {
 			sighash_type: Some(EcdsaSighashType::All.into()),
 			..Input::default()
 		};
+		let descriptor = cosign_script.create_descriptor()?;
+		psbt.update_input_with_descriptor(0, &descriptor).map_err(|_| {
+			log::error!("Error updating PSBT with descriptor: {:#?}", descriptor);
+			Error::PsbtFinalizeError
+		})?;
 
 		Ok(Self { cosign_script, unlock_step, psbt })
 	}
 
-	#[allow(clippy::too_many_arguments)]
 	pub fn new(
-		vault_pubkey: PublicKey,
-		owner_pubkey: PublicKey,
-		created_at_height: BitcoinHeight,
-		vault_claim_height: BitcoinHeight,
-		open_claim_height: BitcoinHeight,
+		cosign_script_args: CosignScriptArgs,
 		utxo_satoshis: Satoshis,
 		utxo_txid: bitcoin::Txid,
 		utxo_vout: u32,
 		unlock_step: UnlockStep,
 		fee: Amount,
 		pay_to_script_pubkey: ScriptBuf,
+		network: Network,
 	) -> Result<Self, Error> {
 		Self::from_script(
-			CosignScript::new(
-				vault_pubkey.into(),
-				owner_pubkey.into(),
-				vault_claim_height,
-				open_claim_height,
-				created_at_height,
-			)?,
+			CosignScript::new(cosign_script_args, network)?,
 			utxo_satoshis,
 			utxo_txid,
 			utxo_vout,
@@ -175,41 +171,52 @@ impl UtxoUnlocker {
 		Ok((*signature, pubkey))
 	}
 
-	pub fn extract_tx(&mut self) -> Result<Transaction, Error> {
+	pub fn create_witness(&mut self) -> Result<(), Error> {
 		let mut witness = Witness::new();
 		let psbt = &mut self.psbt;
-		let mut sigs: Vec<Vec<u8>> = vec![];
-		for (pubkey, sig) in psbt.inputs[0].partial_sigs.iter() {
-			let compressed: CompressedBitcoinPubkey = (*pubkey).into();
-			// vault is verified on stack first
-			if compressed == self.cosign_script.vault_pubkey {
-				sigs.push(sig.to_vec());
-			} else if compressed == self.cosign_script.owner_pubkey {
-				sigs.insert(0, sig.to_vec());
-			} else {
-				return Err(Error::UnknownPubkeyHash);
-			}
+		let partial_sigs = &psbt.inputs[0].partial_sigs;
+		let owner_pubkey = self.cosign_script.script_args.bitcoin_owner_pubkey()?;
+
+		let vault_pubkey = self.cosign_script.script_args.bitcoin_vault_pubkey()?;
+
+		let vault_claim_pubkey = self.cosign_script.script_args.bitcoin_vault_claim_pubkey()?;
+
+		if let Some(sig) = partial_sigs.get(&vault_pubkey) {
+			witness.push(sig.to_vec());
 		}
-		for sig in sigs {
-			witness.push(sig);
+		if let Some(sig) = partial_sigs.get(&vault_claim_pubkey) {
+			witness.push(sig.to_vec());
 		}
-		match self.unlock_step {
-			UnlockStep::VaultCosign | UnlockStep::OwnerCosign => witness.push([COSIGN_CODE]),
-			UnlockStep::VaultClaim => witness.push([VAULT_CLAIM_CODE]),
-			UnlockStep::OwnerClaim => witness.push([OPEN_CLAIM_CODE]),
+
+		if let Some(sig) = partial_sigs.get(&owner_pubkey) {
+			witness.push(sig.to_vec());
 		}
 		witness.push(self.cosign_script.script.clone());
 
 		psbt.inputs[0].final_script_witness = Some(witness);
+		Ok(())
+	}
+
+	pub fn extract_tx(&mut self) -> Result<Transaction, Error> {
+		let tx = {
+			let mut psbt = self.psbt.clone();
+			psbt = psbt.finalize(&Secp256k1::new()).map_err(|(_, e)| {
+				log::error!("Error finalizing PSBT: {:#?}", e);
+				Error::PsbtFinalizeError
+			})?;
+			psbt.extract_tx().map_err(|e| Error::ExtractTxError(e))?
+		};
 
 		// Clear all the data fields as per the spec.
-		psbt.inputs[0].partial_sigs.clear();
-		psbt.inputs[0].sighash_type = None;
-		psbt.inputs[0].redeem_script = None;
-		psbt.inputs[0].witness_script = None;
-		psbt.inputs[0].bip32_derivation.clear();
+		{
+			let psbt = &mut self.psbt;
+			psbt.inputs[0].partial_sigs.clear();
+			psbt.inputs[0].sighash_type = None;
+			psbt.inputs[0].redeem_script = None;
+			psbt.inputs[0].witness_script = None;
+			psbt.inputs[0].bip32_derivation.clear();
+		}
 
-		let tx = psbt.clone().extract_tx().map_err(|e| Error::ExtractTxError(e))?;
 		Ok(tx)
 	}
 }

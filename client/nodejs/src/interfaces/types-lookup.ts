@@ -2054,6 +2054,7 @@ declare module '@polkadot/types/lookup' {
     readonly isNoBitcoinPricesAvailable: boolean;
     readonly isInvalidBitcoinScript: boolean;
     readonly isInvalidXpubkey: boolean;
+    readonly isWrongXpubNetwork: boolean;
     readonly isUnsafeXpubkey: boolean;
     readonly isUnableToDeriveVaultXpubChild: boolean;
     readonly isBitcoinConversionFailed: boolean;
@@ -2069,7 +2070,7 @@ declare module '@polkadot/types/lookup' {
     readonly isInternalError: boolean;
     readonly isUnableToGenerateVaultBitcoinPubkey: boolean;
     readonly isUnableToDecodeVaultBitcoinPubkey: boolean;
-    readonly type: 'BondNotFound' | 'NoMoreVaultIds' | 'NoMoreBondIds' | 'MinimumBondAmountNotMet' | 'ExpirationAtBlockOverflow' | 'InsufficientFunds' | 'InsufficientVaultFunds' | 'InsufficientBitcoinsForMining' | 'AccountBelowMinimumBalance' | 'VaultClosed' | 'InvalidVaultAmount' | 'VaultReductionBelowAllocatedFunds' | 'InvalidSecuritization' | 'ReusedVaultBitcoinXpub' | 'MaxSecuritizationPercentExceeded' | 'InvalidBondType' | 'BitcoinUtxoNotFound' | 'InsufficientSatoshisBonded' | 'NoBitcoinPricesAvailable' | 'InvalidBitcoinScript' | 'InvalidXpubkey' | 'UnsafeXpubkey' | 'UnableToDeriveVaultXpubChild' | 'BitcoinConversionFailed' | 'ExpirationTooSoon' | 'NoPermissions' | 'HoldUnexpectedlyModified' | 'UnrecoverableHold' | 'VaultNotFound' | 'FeeExceedsBondAmount' | 'NoVaultBitcoinPubkeysAvailable' | 'TermsModificationOverflow' | 'TermsChangeAlreadyScheduled' | 'InternalError' | 'UnableToGenerateVaultBitcoinPubkey' | 'UnableToDecodeVaultBitcoinPubkey';
+    readonly type: 'BondNotFound' | 'NoMoreVaultIds' | 'NoMoreBondIds' | 'MinimumBondAmountNotMet' | 'ExpirationAtBlockOverflow' | 'InsufficientFunds' | 'InsufficientVaultFunds' | 'InsufficientBitcoinsForMining' | 'AccountBelowMinimumBalance' | 'VaultClosed' | 'InvalidVaultAmount' | 'VaultReductionBelowAllocatedFunds' | 'InvalidSecuritization' | 'ReusedVaultBitcoinXpub' | 'MaxSecuritizationPercentExceeded' | 'InvalidBondType' | 'BitcoinUtxoNotFound' | 'InsufficientSatoshisBonded' | 'NoBitcoinPricesAvailable' | 'InvalidBitcoinScript' | 'InvalidXpubkey' | 'WrongXpubNetwork' | 'UnsafeXpubkey' | 'UnableToDeriveVaultXpubChild' | 'BitcoinConversionFailed' | 'ExpirationTooSoon' | 'NoPermissions' | 'HoldUnexpectedlyModified' | 'UnrecoverableHold' | 'VaultNotFound' | 'FeeExceedsBondAmount' | 'NoVaultBitcoinPubkeysAvailable' | 'TermsModificationOverflow' | 'TermsChangeAlreadyScheduled' | 'InternalError' | 'UnableToGenerateVaultBitcoinPubkey' | 'UnableToDecodeVaultBitcoinPubkey';
   }
 
   /** @name UlxPrimitivesBond (266) */
@@ -2090,7 +2091,8 @@ declare module '@polkadot/types/lookup' {
     readonly bondId: Compact<u64>;
     readonly satoshis: Compact<u64>;
     readonly vaultPubkey: UlxPrimitivesBitcoinCompressedBitcoinPubkey;
-    readonly vaultXpubSource: ITuple<[U8aFixed, u32]>;
+    readonly vaultClaimPubkey: UlxPrimitivesBitcoinCompressedBitcoinPubkey;
+    readonly vaultXpubSources: ITuple<[U8aFixed, u32, u32]>;
     readonly ownerPubkey: UlxPrimitivesBitcoinCompressedBitcoinPubkey;
     readonly vaultClaimHeight: Compact<u64>;
     readonly openClaimHeight: Compact<u64>;

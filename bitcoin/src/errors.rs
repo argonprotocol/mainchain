@@ -24,6 +24,10 @@ pub enum Error {
 	)]
 	TimelockScriptError(BitcoinError),
 
+	/// Could not create an address
+	#[cfg_attr(feature = "std", error("Could not create an address."))]
+	AddressError,
+
 	/// Could not sign with derived key
 	#[cfg_attr(feature = "std", error("Could not sign with derived key."))]
 	DerivedKeySignError,
@@ -55,6 +59,10 @@ pub enum Error {
 	/// Partially Signed Bitcoin Transaction Error
 	#[cfg_attr(feature = "std", error("Partially Signed Bitcoin Transaction Error {0:?}"))]
 	PsbtError(psbt::Error),
+
+	/// Psbt Finalize Error
+	#[cfg_attr(feature = "std", error("Psbt Finalize Error"))]
+	PsbtFinalizeError,
 
 	/// Invalid Signature Bytes
 	#[cfg_attr(feature = "std", error("Invalid Signature Bytes"))]

@@ -683,16 +683,16 @@ fn it_should_allow_vaults_to_rotate_xpubs() {
 		let owner_pubkey = Xpub::from_priv(&Secp256k1::new(), &owner_xpriv);
 		let owner_pubkey: CompressedBitcoinPubkey = owner_pubkey.public_key.serialize().into();
 
-		let key1 = Vaults::create_utxo_script_pubkey(1, 1, owner_pubkey, 100, 120);
+		let key1 = Vaults::create_utxo_script_pubkey(1, 1, owner_pubkey, 100, 120, 80);
 		assert!(key1.is_ok());
 		let key1 = key1.unwrap();
 
-		let key2 = Vaults::create_utxo_script_pubkey(1, 2, owner_pubkey, 100, 120);
+		let key2 = Vaults::create_utxo_script_pubkey(1, 2, owner_pubkey, 100, 120, 80);
 		assert!(key2.is_ok());
 		let key2 = key2.unwrap();
 		assert_ne!(key1.0.public_key, key2.0.public_key);
 		assert_eq!(key1.0.child_number, 1);
-		assert_eq!(key2.0.child_number, 2);
+		assert_eq!(key2.0.child_number, 3);
 
 		let new_xpub = keys();
 		assert_ok!(Vaults::replace_bitcoin_xpub(RuntimeOrigin::signed(1), 1, new_xpub));

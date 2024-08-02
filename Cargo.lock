@@ -2682,8 +2682,10 @@ dependencies = [
 name = "end-to-end"
 version = "0.0.1"
 dependencies = [
+ "base64 0.22.1",
  "bitcoin",
  "bitcoind",
+ "hex",
  "lazy_static",
  "rand",
  "sp-arithmetic",
@@ -5670,6 +5672,16 @@ name = "minimal-lexical"
 version = "0.2.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "68354c5c6bd36d73ff3feceb05efa59b6acb7626617f4962be322a825e61f79a"
+
+[[package]]
+name = "miniscript"
+version = "12.1.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "64b01e2f1e8e4a5037b61f97de1619c7b2d3f6398aeaddbea9dd16ce9f5a9b33"
+dependencies = [
+ "bech32",
+ "bitcoin",
+]
 
 [[package]]
 name = "miniz_oxide"
@@ -12892,6 +12904,7 @@ name = "ulx-bitcoin"
 version = "0.0.1"
 dependencies = [
  "anyhow",
+ "base64 0.22.1",
  "bitcoin",
  "bitcoincore-rpc",
  "bitcoind",
@@ -12899,9 +12912,12 @@ dependencies = [
  "frame-support",
  "hwi",
  "k256",
+ "log",
+ "miniscript",
  "parity-scale-codec",
  "parking_lot 0.12.3",
  "rand",
+ "serde_json",
  "sp-core",
  "sp-io",
  "sp-keyring",
@@ -12916,6 +12932,8 @@ name = "ulx-bitcoin-cli"
 version = "0.0.1"
 dependencies = [
  "anyhow",
+ "base58",
+ "base64 0.22.1",
  "bitcoin",
  "clap",
  "comfy-table",
@@ -12931,6 +12949,7 @@ dependencies = [
  "ulx-bitcoin",
  "ulx-bitcoin-cli-macros",
  "ulx-primitives",
+ "url",
 ]
 
 [[package]]

@@ -21,6 +21,17 @@ impl From<runtime_types::ulx_primitives::bitcoin::BitcoinNetwork>
 		}
 	}
 }
+impl From<runtime_types::ulx_primitives::bitcoin::BitcoinCosignScriptPubkey>
+	for ulx_primitives::bitcoin::BitcoinCosignScriptPubkey
+{
+	fn from(value: runtime_types::ulx_primitives::bitcoin::BitcoinCosignScriptPubkey) -> Self {
+		return match value {
+			runtime_types::ulx_primitives::bitcoin::BitcoinCosignScriptPubkey::P2WSH {
+				wscript_hash,
+			} => ulx_primitives::bitcoin::BitcoinCosignScriptPubkey::P2WSH { wscript_hash },
+		}
+	}
+}
 
 impl From<ulx_primitives::bitcoin::BitcoinNetwork>
 	for runtime_types::ulx_primitives::bitcoin::BitcoinNetwork

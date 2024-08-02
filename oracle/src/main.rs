@@ -1,5 +1,3 @@
-use std::env;
-
 use anyhow::{anyhow, bail, ensure};
 use clap::{crate_version, Parser, ValueEnum};
 use dotenv::dotenv;
@@ -8,6 +6,7 @@ use sp_core::{
 	sr25519, Pair as PairT,
 };
 use sp_runtime::traits::IdentifyAccount;
+use std::env;
 use ulixee_client::signer::KeystoreSigner;
 use ulx_primitives::{AccountId, CryptoType, KeystoreParams, ADDRESS_PREFIX};
 use url::Url;
@@ -88,6 +87,12 @@ async fn main() -> anyhow::Result<()> {
 	env::set_var("RUST_BACKTRACE", "1");
 	dotenv().ok();
 	dotenv::from_filename("oracle/.env").ok();
+
+	let binary_path = std::env::current_exe()?;
+	if binary_path.ends_with("debug/ulx-oracle") {
+		let from_workspace_root = binary_path.join("../../oracle/.env");
+		dotenv::from_filename(from_workspace_root).ok();
+	}
 
 	let Cli { trusted_rpc_url, keystore_params, dev, signer_address, signer_crypto, subcommand } =
 		Cli::parse();

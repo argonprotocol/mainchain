@@ -94,7 +94,7 @@ mod test {
 	use parking_lot::Mutex;
 	use sc_client_api::backend::AuxStore;
 
-	use ulx_bitcoin::CosignScript;
+	use ulx_bitcoin::{CosignScript, CosignScriptArgs};
 	use ulx_primitives::bitcoin::{
 		BitcoinBlock, BitcoinRejectedReason, BitcoinSyncStatus, H256Le, UtxoRef, UtxoValue,
 	};
@@ -107,6 +107,8 @@ mod test {
 		let (bitcoind, tracker, block_address, network) = start_bitcoind();
 
 		let block_height = bitcoind.client.get_block_count().unwrap();
+		let vault_claim_pubkey =
+			bitcoind.client.get_address_info(&block_address).unwrap().pubkey.unwrap();
 
 		let key1 = "033bc8c83c52df5712229a2f72206d90192366c36428cb0c12b6af98324d97bfbc"
 			.parse::<CompressedPublicKey>()
@@ -115,14 +117,19 @@ mod test {
 			.parse::<CompressedPublicKey>()
 			.unwrap();
 
-		let script = CosignScript::create_script(
-			key1.into(),
-			key2.into(),
-			block_height + 100,
-			block_height + 200,
+		let script = CosignScript::new(
+			CosignScriptArgs {
+				vault_pubkey: key1.into(),
+				owner_pubkey: key2.into(),
+				vault_claim_pubkey: vault_claim_pubkey.into(),
+				vault_claim_height: block_height + 100,
+				open_claim_height: block_height + 200,
+				created_at_height: block_height,
+			},
+			network,
 		)
 		.expect("script");
-		let script_address = Address::p2wsh(script.as_script(), network);
+		let script_address = script.address;
 
 		let submitted_at_height = block_height + 1;
 

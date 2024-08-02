@@ -38,7 +38,6 @@ impl UlxTestOracle {
 			let workspace_cargo_path = workspace_cargo_path.as_path().join("target/debug");
 			workspace_cargo_path
 		};
-		println!("run from {}", target_dir.to_str().unwrap_or(""));
 
 		let mut proc = Command::new("./ulx-oracle")
 			.current_dir(&target_dir)
