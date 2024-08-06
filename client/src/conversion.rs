@@ -1,10 +1,48 @@
 use crate::api::runtime_types;
+use sp_arithmetic::FixedU128;
 
 impl<T, X: sp_core::Get<u32>> From<sp_core::bounded_vec::BoundedVec<T, X>>
 	for runtime_types::bounded_collections::bounded_vec::BoundedVec<T>
 {
 	fn from(value: sp_core::bounded_vec::BoundedVec<T, X>) -> Self {
 		runtime_types::bounded_collections::bounded_vec::BoundedVec(value.into())
+	}
+}
+
+impl From<runtime_types::ulx_primitives::bitcoin::BitcoinNetwork>
+	for ulx_primitives::bitcoin::BitcoinNetwork
+{
+	fn from(value: runtime_types::ulx_primitives::bitcoin::BitcoinNetwork) -> Self {
+		match value {
+			runtime_types::ulx_primitives::bitcoin::BitcoinNetwork::Bitcoin => Self::Bitcoin,
+			runtime_types::ulx_primitives::bitcoin::BitcoinNetwork::Testnet => Self::Testnet,
+			runtime_types::ulx_primitives::bitcoin::BitcoinNetwork::Signet => Self::Signet,
+			runtime_types::ulx_primitives::bitcoin::BitcoinNetwork::Regtest => Self::Regtest,
+		}
+	}
+}
+impl From<runtime_types::ulx_primitives::bitcoin::BitcoinCosignScriptPubkey>
+	for ulx_primitives::bitcoin::BitcoinCosignScriptPubkey
+{
+	fn from(value: runtime_types::ulx_primitives::bitcoin::BitcoinCosignScriptPubkey) -> Self {
+		return match value {
+			runtime_types::ulx_primitives::bitcoin::BitcoinCosignScriptPubkey::P2WSH {
+				wscript_hash,
+			} => ulx_primitives::bitcoin::BitcoinCosignScriptPubkey::P2WSH { wscript_hash },
+		}
+	}
+}
+
+impl From<ulx_primitives::bitcoin::BitcoinNetwork>
+	for runtime_types::ulx_primitives::bitcoin::BitcoinNetwork
+{
+	fn from(value: ulx_primitives::bitcoin::BitcoinNetwork) -> Self {
+		match value {
+			ulx_primitives::bitcoin::BitcoinNetwork::Bitcoin => Self::Bitcoin,
+			ulx_primitives::bitcoin::BitcoinNetwork::Testnet => Self::Testnet,
+			ulx_primitives::bitcoin::BitcoinNetwork::Signet => Self::Signet,
+			ulx_primitives::bitcoin::BitcoinNetwork::Regtest => Self::Regtest,
+		}
 	}
 }
 
@@ -57,18 +95,18 @@ impl From<ulx_primitives::bitcoin::UtxoRef> for runtime_types::ulx_primitives::b
 	}
 }
 
-impl From<runtime_types::ulx_primitives::bitcoin::BitcoinPubkeyHash>
-	for ulx_primitives::bitcoin::BitcoinPubkeyHash
+impl From<runtime_types::ulx_primitives::bitcoin::CompressedBitcoinPubkey>
+	for ulx_primitives::bitcoin::CompressedBitcoinPubkey
 {
-	fn from(value: runtime_types::ulx_primitives::bitcoin::BitcoinPubkeyHash) -> Self {
+	fn from(value: runtime_types::ulx_primitives::bitcoin::CompressedBitcoinPubkey) -> Self {
 		Self(value.0)
 	}
 }
 
-impl From<ulx_primitives::bitcoin::BitcoinPubkeyHash>
-	for runtime_types::ulx_primitives::bitcoin::BitcoinPubkeyHash
+impl From<ulx_primitives::bitcoin::CompressedBitcoinPubkey>
+	for runtime_types::ulx_primitives::bitcoin::CompressedBitcoinPubkey
 {
-	fn from(value: ulx_primitives::bitcoin::BitcoinPubkeyHash) -> Self {
+	fn from(value: ulx_primitives::bitcoin::CompressedBitcoinPubkey) -> Self {
 		Self(value.0)
 	}
 }
@@ -111,18 +149,18 @@ impl From<ulx_primitives::bitcoin::BitcoinScriptPubkey>
 	}
 }
 
-impl From<ulx_primitives::bitcoin::CompressedBitcoinPubkey>
-	for runtime_types::ulx_primitives::bitcoin::CompressedBitcoinPubkey
-{
-	fn from(value: ulx_primitives::bitcoin::CompressedBitcoinPubkey) -> Self {
-		Self(value.0)
+impl From<[u8; 78]> for runtime_types::ulx_primitives::bitcoin::OpaqueBitcoinXpub {
+	fn from(value: [u8; 78]) -> Self {
+		Self(value.into())
 	}
 }
 
-impl From<runtime_types::ulx_primitives::bitcoin::CompressedBitcoinPubkey>
-	for ulx_primitives::bitcoin::CompressedBitcoinPubkey
-{
-	fn from(value: runtime_types::ulx_primitives::bitcoin::CompressedBitcoinPubkey) -> Self {
-		Self(value.0)
-	}
+pub fn to_api_fixed_u128(value: FixedU128) -> runtime_types::sp_arithmetic::fixed_point::FixedU128 {
+	runtime_types::sp_arithmetic::fixed_point::FixedU128(value.into_inner())
+}
+
+pub fn from_api_fixed_u128(
+	value: runtime_types::sp_arithmetic::fixed_point::FixedU128,
+) -> FixedU128 {
+	FixedU128::from_inner(value.0)
 }

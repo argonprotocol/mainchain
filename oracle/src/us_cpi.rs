@@ -8,10 +8,12 @@ use lazy_static::lazy_static;
 use reqwest::Client;
 use serde::{Deserialize, Serialize};
 use sp_runtime::{traits::One, FixedI128, FixedU128};
+use std::env;
 #[cfg(test)]
 use std::sync::{Arc, Mutex};
 use tokio::time::{Duration, Instant};
 use ulx_primitives::tick::{Tick, Ticker};
+use url::Url;
 
 const MAX_SCHEDULE_DAYS: u32 = 35;
 const MIN_SCHEDULE_DAYS: u32 = 28;
@@ -198,10 +200,15 @@ async fn get_raw_cpis() -> Result<Vec<RawCpiValue>> {
 		let mut mock = MOCK_RAW_CPIS.lock().unwrap();
 		if let Some(results) = mock.take() {
 			*mock = Some(results.clone());
-			return Ok(results.clone())
+			return Ok(results.clone());
 		}
 	}
-	let request_url = "https://api.bls.gov/publicAPI/v2/timeseries/data/CUUR0000SA0";
+	let mut request_url =
+		Url::parse("https://api.bls.gov/publicAPI/v2/timeseries/data/CUUR0000SA0")?;
+
+	if let Some(key) = env::var("BLS_API_KEY").ok() {
+		request_url.query_pairs_mut().append_pair("registrationkey", &key);
+	}
 
 	let client = Client::new();
 	let resp_price = client
@@ -212,11 +219,14 @@ async fn get_raw_cpis() -> Result<Vec<RawCpiValue>> {
 		.text()
 		.await?;
 
-	parse_cpi_results(resp_price)
+	parse_cpi_results(&resp_price).map_err(|e| {
+		tracing::error!("Failed to get CPI data: {:?}. JSON is {}", e, resp_price);
+		e
+	})
 }
 
-fn parse_cpi_results(resp_price: String) -> Result<Vec<RawCpiValue>> {
-	let resp_price: CpiResult = serde_json::from_str(&resp_price)?;
+fn parse_cpi_results(resp_price: &str) -> Result<Vec<RawCpiValue>> {
+	let resp_price: CpiResult = serde_json::from_str(resp_price)?;
 	ensure!(resp_price.status == "REQUEST_SUCCEEDED", "Failed to get CPI data");
 	let resp_price = resp_price.results.series.first().ok_or(anyhow!("No series data"))?;
 	ensure!(resp_price.data.len() > 0, "Failed to get CPI data");
@@ -235,10 +245,15 @@ async fn get_raw_cpi() -> Result<RawCpiValue> {
 		let mut mock = MOCK_RAW_CPIS.lock().unwrap();
 		if let Some(results) = mock.take() {
 			*mock = Some(results.clone());
-			return Ok(results[0].clone())
+			return Ok(results[0].clone());
 		}
 	}
-	let request_url = "https://api.bls.gov/publicAPI/v2/timeseries/data/CUUR0000SA0?latest=true";
+	let mut request_url =
+		Url::parse("https://api.bls.gov/publicAPI/v2/timeseries/data/CUUR0000SA0?latest=true")?;
+
+	if let Some(key) = env::var("BLS_API_KEY").ok() {
+		request_url.query_pairs_mut().append_pair("registrationkey", &key);
+	}
 
 	let client = Client::new();
 	let resp_price = client
@@ -248,7 +263,7 @@ async fn get_raw_cpi() -> Result<RawCpiValue> {
 		.await?
 		.text()
 		.await?;
-	let result = parse_cpi_results(resp_price)?;
+	let result = parse_cpi_results(&resp_price)?;
 	Ok(result.first().ok_or(anyhow!("No CPI data"))?.clone())
 }
 
@@ -321,7 +336,7 @@ mod tests {
 "series":
 [{"seriesID":"CUUR0000SA0","data":[{"year":"2024","period":"M05","periodName":"May","latest":"true","value":"314.069","footnotes":[{}]},{"year":"2024","period":"M04","periodName":"April","value":"313.548","footnotes":[{}]},{"year":"2024","period":"M03","periodName":"March","value":"312.332","footnotes":[{}]},{"year":"2024","period":"M02","periodName":"February","value":"310.326","footnotes":[{}]},{"year":"2024","period":"M01","periodName":"January","value":"308.417","footnotes":[{}]},{"year":"2023","period":"M12","periodName":"December","value":"306.746","footnotes":[{}]},{"year":"2023","period":"M11","periodName":"November","value":"307.051","footnotes":[{}]},{"year":"2023","period":"M10","periodName":"October","value":"307.671","footnotes":[{}]},{"year":"2023","period":"M09","periodName":"September","value":"307.789","footnotes":[{}]},{"year":"2023","period":"M08","periodName":"August","value":"307.026","footnotes":[{}]},{"year":"2023","period":"M07","periodName":"July","value":"305.691","footnotes":[{}]},{"year":"2023","period":"M06","periodName":"June","value":"305.109","footnotes":[{}]},{"year":"2023","period":"M05","periodName":"May","value":"304.127","footnotes":[{}]},{"year":"2023","period":"M04","periodName":"April","value":"303.363","footnotes":[{}]},{"year":"2023","period":"M03","periodName":"March","value":"301.836","footnotes":[{}]},{"year":"2023","period":"M02","periodName":"February","value":"300.840","footnotes":[{}]},{"year":"2023","period":"M01","periodName":"January","value":"299.170","footnotes":[{}]},{"year":"2022","period":"M12","periodName":"December","value":"296.797","footnotes":[{}]},{"year":"2022","period":"M11","periodName":"November","value":"297.711","footnotes":[{}]},{"year":"2022","period":"M10","periodName":"October","value":"298.012","footnotes":[{}]},{"year":"2022","period":"M09","periodName":"September","value":"296.808","footnotes":[{}]},{"year":"2022","period":"M08","periodName":"August","value":"296.171","footnotes":[{}]},{"year":"2022","period":"M07","periodName":"July","value":"296.276","footnotes":[{}]},{"year":"2022","period":"M06","periodName":"June","value":"296.311","footnotes":[{}]},{"year":"2022","period":"M05","periodName":"May","value":"292.296","footnotes":[{}]},{"year":"2022","period":"M04","periodName":"April","value":"289.109","footnotes":[{}]},{"year":"2022","period":"M03","periodName":"March","value":"287.504","footnotes":[{}]},{"year":"2022","period":"M02","periodName":"February","value":"283.716","footnotes":[{}]},{"year":"2022","period":"M01","periodName":"January","value":"281.148","footnotes":[{}]}]}]
 }}"#;
-		let cpis = parse_cpi_results(json.to_string()).unwrap();
+		let cpis = parse_cpi_results(json).unwrap();
 		assert_eq!(cpis.len(), 29);
 		assert!(cpis[0].value >= FixedU128::from_u32(200));
 		assert!(cpis[0].ref_month > cpis[1].ref_month);

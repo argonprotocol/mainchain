@@ -1,4 +1,5 @@
 #![cfg_attr(not(feature = "std"), no_std)]
+extern crate alloc;
 
 use sp_runtime::{traits::Zero, Saturating};
 
@@ -50,7 +51,7 @@ pub mod pallet {
 			+ codec::FullCodec
 			+ Copy
 			+ MaybeSerializeDeserialize
-			+ sp_std::fmt::Debug
+			+ core::fmt::Debug
 			+ Default
 			+ From<u128>
 			+ TryInto<u128>
@@ -106,7 +107,7 @@ pub mod pallet {
 	#[pallet::hooks]
 	impl<T: Config> Hooks<BlockNumberFor<T>> for Pallet<T> {
 		fn on_initialize(_: BlockNumberFor<T>) -> Weight {
-			let argon_cpi = T::PriceProvider::get_argon_cpi_price().unwrap_or_default();
+			let argon_cpi = T::PriceProvider::get_argon_cpi().unwrap_or_default();
 			// only mint when cpi is negative
 			if !argon_cpi.is_negative() {
 				return T::DbWeight::get().reads(1);
@@ -122,7 +123,7 @@ pub mod pallet {
 			if argons_to_print_per_miner > T::Balance::zero() {
 				for (miner, share) in reward_accounts {
 					let amount = if let Some(share) = share {
-						share.mul_floor(argons_to_print_per_miner)
+						share.saturating_mul_int(argons_to_print_per_miner)
 					} else {
 						argons_to_print_per_miner
 					};

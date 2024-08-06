@@ -1,6 +1,9 @@
 #![cfg_attr(not(feature = "std"), no_std)]
+extern crate alloc;
 
+use alloc::{vec, vec::Vec};
 use codec::Codec;
+use core::{cmp::max, marker::PhantomData};
 use frame_support::{
 	pallet_prelude::*,
 	traits::{
@@ -10,17 +13,14 @@ use frame_support::{
 	},
 };
 use frame_system::pallet_prelude::BlockNumberFor;
+pub use pallet::*;
 use pallet_session::SessionManager;
 use sp_core::{Get, U256};
 use sp_io::hashing::blake2_256;
 use sp_runtime::{
-	traits::{Convert, UniqueSaturatedInto},
-	BoundedBTreeMap, FixedI128, FixedPointNumber, FixedU128, Percent, SaturatedConversion,
-	Saturating,
+	traits::{Convert, One, UniqueSaturatedInto},
+	BoundedBTreeMap, FixedI128, FixedPointNumber, FixedU128, SaturatedConversion, Saturating,
 };
-use sp_std::{cmp::max, marker::PhantomData, vec, vec::Vec};
-
-pub use pallet::*;
 use ulx_primitives::{
 	block_seal::{
 		BlockSealAuthorityId, MinerIndex, MiningAuthority, RewardDestination, RewardSharing,
@@ -73,6 +73,7 @@ const LOG_TARGET: &str = "runtime::mining_slot";
 /// authorityIds matching registered "controller" accounts.
 #[frame_support::pallet(dev_mode)]
 pub mod pallet {
+	use core::cmp::Ordering;
 	use frame_support::{
 		pallet_prelude::*,
 		traits::fungible::{Inspect, MutateHold},
@@ -83,7 +84,6 @@ pub mod pallet {
 		traits::{AtLeast32BitUnsigned, UniqueSaturatedInto},
 		BoundedBTreeMap,
 	};
-	use sp_std::cmp::Ordering;
 
 	use ulx_primitives::{
 		block_seal::{MiningRegistration, RewardDestination},
@@ -141,7 +141,7 @@ pub mod pallet {
 			+ codec::FullCodec
 			+ Copy
 			+ MaybeSerializeDeserialize
-			+ sp_std::fmt::Debug
+			+ core::fmt::Debug
 			+ Default
 			+ From<u128>
 			+ TryInto<u128>
@@ -487,7 +487,7 @@ impl<T: Config> BlockRewardAccountsProvider<T::AccountId> for Pallet<T> {
 			if let Some(reward_sharing) = registration.reward_sharing {
 				result.push((
 					account,
-					Some(Percent::from_percent(100).saturating_sub(reward_sharing.percent_take)),
+					Some(FixedU128::one().saturating_sub(reward_sharing.percent_take)),
 				));
 				result.push((reward_sharing.account_id, Some(reward_sharing.percent_take)));
 			} else {

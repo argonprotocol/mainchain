@@ -1,30 +1,19 @@
 #![allow(dead_code)]
 
-use std::{collections::BTreeMap, sync::Arc};
+use std::sync::Arc;
 
-use anyhow::bail;
-use bitcoin::{bip158, hashes::Hash};
-use bitcoincore_rpc::{Auth, Client, RpcApi};
 use codec::{Decode, Encode};
 use parking_lot::Mutex;
 use sc_client_api::backend::AuxStore;
 use sp_api::ProvideRuntimeApi;
-use sp_runtime::{traits::Block as BlockT, RuntimeDebug};
+use sp_runtime::traits::Block as BlockT;
 
+use ulx_bitcoin::{BlockFilter, UtxoSpendFilter};
 use ulx_primitives::{
-	bitcoin::{
-		BitcoinBlock, BitcoinHeight, BitcoinRejectedReason, BitcoinSyncStatus, H256Le, UtxoRef,
-		UtxoValue,
-	},
+	bitcoin::{BitcoinSyncStatus, UtxoRef, UtxoValue},
 	inherents::BitcoinUtxoSync,
 	Balance, BitcoinApis,
 };
-
-#[cfg(test)]
-mod test;
-mod unlocker;
-
-pub use unlocker::*;
 
 pub fn get_bitcoin_inherent<C, B>(
 	tracker: &Arc<UtxoTracker>,
@@ -46,105 +35,39 @@ where
 }
 
 pub struct UtxoTracker {
-	client: Client,
-	sync_lock: Mutex<()>,
-}
-
-#[derive(Clone, Decode, Encode, PartialEq, Eq, RuntimeDebug)]
-pub struct BlockFilter {
-	pub block_hash: H256Le,
-	pub previous_block_hash: Option<H256Le>,
-	pub block_height: u64,
-	pub filter: Vec<u8>,
-}
-
-impl BlockFilter {
-	pub fn to_filter(&self) -> bip158::BlockFilter {
-		bip158::BlockFilter::new(&self.filter)
-	}
-
-	pub fn to_block(&self) -> BitcoinBlock {
-		BitcoinBlock { block_hash: self.block_hash.clone(), block_height: self.block_height }
-	}
+	pub(crate) filter: Arc<Mutex<UtxoSpendFilter>>,
 }
 
 impl UtxoTracker {
 	pub fn new(rpc_url: String, auth: Option<(String, String)>) -> anyhow::Result<Self> {
-		let auth = if let Some((username, password)) = auth {
-			Auth::UserPass(username, password)
-		} else {
-			Auth::None
-		};
-		let client = Client::new(&rpc_url, auth)?;
+		let filter = UtxoSpendFilter::new(rpc_url, auth)?;
 
-		Ok(Self { client, sync_lock: Mutex::new(()) })
-	}
-
-	fn get_header_and_filter(&self, block_hash: &H256Le) -> anyhow::Result<BlockFilter> {
-		let hash = bitcoin::BlockHash::from_slice(&block_hash.0)?;
-		let header = self.client.get_block_header_info(&hash)?;
-		let filter = self.client.get_block_filter(&hash)?;
-		Ok(BlockFilter {
-			block_height: header.height as u64,
-			block_hash: block_hash.clone(),
-			previous_block_hash: header.previous_block_hash.map(Into::into),
-			filter: filter.filter,
-		})
-	}
-
-	fn sync_to_block(
-		&self,
-		sync_status: &BitcoinSyncStatus,
-		stored_filters: &mut Vec<BlockFilter>,
-	) -> anyhow::Result<()> {
-		let latest_block_hash = &sync_status.confirmed_block.block_hash;
-		if stored_filters.last().map(|a| a.block_hash.clone()) != Some(latest_block_hash.clone()) {
-			let entry = self.get_header_and_filter(latest_block_hash)?;
-			stored_filters.push(entry);
-		}
-
-		let mut keep_sync_back_to = sync_status.oldest_allowed_block_height;
-		// make sure we don't have a gap in the blocks
-		if let Some(synched_block) = &sync_status.synched_block {
-			if synched_block.block_height < keep_sync_back_to {
-				keep_sync_back_to = synched_block.block_height;
-			}
-		}
-
-		Self::prune_filters(keep_sync_back_to, stored_filters);
-		while stored_filters.first().map(|x| x.block_height) > Some(keep_sync_back_to) {
-			let Some(first) = stored_filters.first() else {
-				break;
-			};
-			if let Some(prev_hash) = &first.previous_block_hash {
-				let entry = self.get_header_and_filter(prev_hash)?;
-				stored_filters.insert(0, entry);
-			} else {
-				break;
-			}
-		}
-		Ok(())
+		Ok(Self { filter: Arc::new(Mutex::new(filter)) })
 	}
 
 	fn update_filters(
 		&self,
 		sync_status: &BitcoinSyncStatus,
 		aux_store: &Arc<impl AuxStore>,
-	) -> anyhow::Result<Vec<BlockFilter>> {
-		let _lock = self.sync_lock.lock();
+	) -> anyhow::Result<()> {
+		let filter = self.filter.lock();
 		const UTXO_KEY: &[u8; 28] = b"bitcoin_utxo_tracker_filters";
 
-		let mut stored_filters = if let Ok(Some(bytes)) = aux_store.get_aux(&UTXO_KEY[..]) {
-			<Vec<BlockFilter>>::decode(&mut &bytes[..]).ok().unwrap_or_default()
-		} else {
-			Default::default()
-		};
+		{
+			let synched_filters = filter.get_stored_filters();
+			if synched_filters.is_empty() {
+				if let Ok(Some(bytes)) = aux_store.get_aux(&UTXO_KEY[..]) {
+					let synched_filters =
+						<Vec<BlockFilter>>::decode(&mut &bytes[..]).ok().unwrap_or_default();
+					filter.load_filters(synched_filters);
+				}
+			}
+		}
+		filter.sync_to_block(sync_status)?;
 
-		self.sync_to_block(sync_status, &mut stored_filters)?;
-
-		let encoded = stored_filters.encode();
+		let encoded = filter.get_stored_filters().encode();
 		aux_store.insert_aux(&[(&UTXO_KEY[..], encoded.as_slice())], &[])?;
-		Ok(stored_filters)
+		Ok(())
 	}
 
 	/// Synchronize with the latest blocks on the network.
@@ -154,93 +77,175 @@ impl UtxoTracker {
 		tracked_utxos: Vec<(Option<UtxoRef>, UtxoValue)>,
 		aux_store: &Arc<impl AuxStore>,
 	) -> anyhow::Result<BitcoinUtxoSync> {
-		let mut scripts: Vec<Vec<u8>> = vec![];
-		let mut utxos_by_ref = BTreeMap::new();
-		let mut pending_confirmation_by_script = BTreeMap::new();
+		self.update_filters(&sync_status, aux_store)?;
 
-		for (utxo_ref, lookup) in tracked_utxos {
-			scripts.push(lookup.script_pubkey.to_script_bytes());
-			if let Some(utxo_ref) = utxo_ref {
-				utxos_by_ref.insert(utxo_ref, lookup.clone());
-			} else {
-				pending_confirmation_by_script
-					.insert(lookup.script_pubkey.to_script_bytes(), lookup);
-			}
-		}
-		let scripts = scripts.into_iter();
+		self.filter.lock().refresh_utxo_status(tracked_utxos)
+	}
+}
 
-		let stored_filters = self.update_filters(&sync_status, aux_store)?;
-		let Some(latest) = stored_filters.last() else {
-			bail!("Could not find latest block filter")
+#[cfg(test)]
+mod test {
+	use std::{collections::BTreeMap, sync::Arc};
+
+	use bitcoin::{hashes::Hash, Address, Amount, CompressedPublicKey, Network};
+	use bitcoincore_rpc::RpcApi;
+	use bitcoind::BitcoinD;
+	use lazy_static::lazy_static;
+	use parking_lot::Mutex;
+	use sc_client_api::backend::AuxStore;
+
+	use ulx_bitcoin::{CosignScript, CosignScriptArgs};
+	use ulx_primitives::bitcoin::{
+		BitcoinBlock, BitcoinRejectedReason, BitcoinSyncStatus, H256Le, UtxoRef, UtxoValue,
+	};
+	use ulx_testing::{add_blocks, add_wallet_address, fund_script_address};
+
+	use super::*;
+
+	#[test]
+	fn can_track_blocks_and_verify_utxos() {
+		let (bitcoind, tracker, block_address, network) = start_bitcoind();
+
+		let block_height = bitcoind.client.get_block_count().unwrap();
+		let vault_claim_pubkey =
+			bitcoind.client.get_address_info(&block_address).unwrap().pubkey.unwrap();
+
+		let key1 = "033bc8c83c52df5712229a2f72206d90192366c36428cb0c12b6af98324d97bfbc"
+			.parse::<CompressedPublicKey>()
+			.unwrap();
+		let key2 = "026c468be64d22761c30cd2f12cbc7de255d592d7904b1bab07236897cc4c2e766"
+			.parse::<CompressedPublicKey>()
+			.unwrap();
+
+		let script = CosignScript::new(
+			CosignScriptArgs {
+				vault_pubkey: key1.into(),
+				owner_pubkey: key2.into(),
+				vault_claim_pubkey: vault_claim_pubkey.into(),
+				vault_claim_height: block_height + 100,
+				open_claim_height: block_height + 200,
+				created_at_height: block_height,
+			},
+			network,
+		)
+		.expect("script");
+		let script_address = script.address;
+
+		let submitted_at_height = block_height + 1;
+
+		let (txid, vout, _tx) = fund_script_address(
+			&bitcoind,
+			&script_address,
+			Amount::ONE_BTC.to_sat(),
+			&block_address,
+		);
+
+		add_blocks(&bitcoind, 6, &block_address);
+		let confirmed = bitcoind.client.get_best_block_hash().unwrap();
+		let block_height = bitcoind.client.get_block_count().unwrap();
+
+		let aux = Arc::new(TestAuxStore::new());
+		let sync_status = BitcoinSyncStatus {
+			confirmed_block: BitcoinBlock {
+				block_hash: H256Le(confirmed.to_byte_array()),
+				block_height,
+			},
+			synched_block: None,
+			oldest_allowed_block_height: block_height - 10,
 		};
-		let mut result = BitcoinUtxoSync {
-			sync_to_block: latest.to_block(),
-			verified: BTreeMap::new(),
-			invalid: BTreeMap::new(),
-			spent: BTreeMap::new(),
+		tracker.update_filters(&sync_status, &aux).unwrap();
+
+		let updated_filters = tracker.filter.lock().get_stored_filters();
+		assert_eq!(updated_filters.len(), 11);
+		assert_eq!(updated_filters[0].block_height, block_height - 10);
+		assert_eq!(updated_filters[10].block_height, block_height);
+		assert_eq!(updated_filters[10].block_hash, sync_status.confirmed_block.block_hash);
+
+		let tracked = UtxoValue {
+			utxo_id: 1,
+			satoshis: Amount::ONE_BTC.to_sat(),
+			script_pubkey: script_address.try_into().expect("can convert address to script"),
+			submitted_at_height,
+			watch_for_spent_until_height: 150,
 		};
-
-		for filter in stored_filters {
-			let block_hash = bitcoin::BlockHash::from_slice(&filter.block_hash.0)?;
-			if !filter.to_filter().match_any(&block_hash, scripts.clone())? {
-				continue;
-			}
-
-			let block = self.client.get_block(&block_hash)?;
-			let height = filter.block_height;
-			for tx in block.txdata {
-				for input in &tx.input {
-					let utxo_ref = input.previous_output.into();
-					// If we're tracking the UTXO, it has been spent
-					if let Some(value) = utxos_by_ref.get(&utxo_ref) {
-						// TODO: should we figure out who spent it here?
-						result.spent.insert(value.utxo_id, height);
-					}
-				}
-
-				for (idx, output) in tx.output.iter().enumerate() {
-					let Some(pending) =
-						pending_confirmation_by_script.remove(output.script_pubkey.as_bytes())
-					else {
-						continue;
-					};
-
-					let utxo_id = pending.utxo_id;
-
-					if output.value.to_sat() != pending.satoshis {
-						result.invalid.insert(utxo_id, BitcoinRejectedReason::SatoshisMismatch);
-					} else {
-						let tx_id = tx.compute_txid().into();
-						result
-							.verified
-							.insert(utxo_id, UtxoRef { txid: tx_id, output_index: idx as u32 });
-					};
-				}
-			}
+		{
+			let result =
+				tracker.sync(sync_status.clone(), vec![(None, tracked.clone())], &aux).unwrap();
+			assert_eq!(result.verified.len(), 1);
+			assert_eq!(
+				result.verified.get(&1),
+				Some(&UtxoRef { txid: txid.into(), output_index: vout })
+			);
 		}
-
-		Ok(result)
+		{
+			let mut tracked = tracked.clone();
+			tracked.satoshis = Amount::from_int_btc(2).to_sat();
+			let result =
+				tracker.sync(sync_status.clone(), vec![(None, tracked.clone())], &aux).unwrap();
+			assert_eq!(result.verified.len(), 0);
+			assert_eq!(result.invalid.get(&1), Some(&BitcoinRejectedReason::SatoshisMismatch));
+		}
 	}
 
-	fn prune_filters(oldest_allowed_block_height: BitcoinHeight, filters: &mut Vec<BlockFilter>) {
-		let mut drain_to = 0;
-		// make sure the blocks link together with prev_hash
-		for (i, header) in filters.iter().enumerate().rev() {
-			if i == 0 {
-				break;
+	lazy_static! {
+		static ref BITCOIND_LOCK: std::sync::Mutex<()> = std::sync::Mutex::new(());
+	}
+	fn start_bitcoind() -> (BitcoinD, UtxoTracker, Address, Network) {
+		// bitcoin will get in a fight with ulixee for ports, so lock here too
+		let _lock = BITCOIND_LOCK.lock().unwrap();
+		let (bitcoind, rpc_url, network) = ulx_testing::start_bitcoind().expect("start_bitcoin");
+		let _ = env_logger::builder().is_test(true).try_init();
+
+		let block_address = add_wallet_address(&bitcoind);
+		add_blocks(&bitcoind, 101, &block_address);
+
+		let auth = if !rpc_url.username().is_empty() {
+			Some((
+				rpc_url.username().to_string(),
+				rpc_url.password().unwrap_or_default().to_string(),
+			))
+		} else {
+			None
+		};
+
+		let tracker = UtxoTracker::new(rpc_url.origin().unicode_serialization(), auth).unwrap();
+		(bitcoind, tracker, block_address, network)
+	}
+
+	struct TestAuxStore {
+		aux: Mutex<BTreeMap<Vec<u8>, Vec<u8>>>,
+	}
+	impl TestAuxStore {
+		fn new() -> Self {
+			Self { aux: Mutex::new(BTreeMap::new()) }
+		}
+	}
+
+	impl AuxStore for TestAuxStore {
+		fn insert_aux<
+			'a,
+			'b: 'a,
+			'c: 'a,
+			I: IntoIterator<Item = &'a (&'c [u8], &'c [u8])>,
+			D: IntoIterator<Item = &'a &'b [u8]>,
+		>(
+			&self,
+			insert: I,
+			delete: D,
+		) -> sc_client_api::blockchain::Result<()> {
+			let mut aux = self.aux.lock();
+			for (k, v) in insert {
+				aux.insert(k.to_vec(), v.to_vec());
 			}
-			let prev_header = &filters[i - 1];
-			if let Some(prev_hash) = &header.previous_block_hash {
-				if prev_hash != &prev_header.block_hash {
-					drain_to = i;
-					break;
-				}
+			for k in delete {
+				aux.remove(*k);
 			}
+			Ok(())
 		}
 
-		if drain_to > 0 {
-			filters.drain(..drain_to);
+		fn get_aux(&self, key: &[u8]) -> sc_client_api::blockchain::Result<Option<Vec<u8>>> {
+			let aux = self.aux.lock();
+			Ok(aux.get(key).cloned())
 		}
-		filters.retain(|f| f.block_height >= oldest_allowed_block_height);
 	}
 }

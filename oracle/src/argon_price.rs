@@ -64,7 +64,7 @@ impl ArgonPriceLookup {
 					target_price,
 					tick,
 					max_argon_change_per_tick_away_from_target,
-				))
+				));
 			}
 		}
 

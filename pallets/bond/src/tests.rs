@@ -6,22 +6,21 @@ use frame_support::{
 use sp_arithmetic::{traits::Zero, FixedI128, FixedPointNumber, FixedU128};
 use sp_core::H256;
 
-use ulx_primitives::{
-	bitcoin::{
-		BitcoinCosignScriptPubkey, BitcoinPubkeyHash, BitcoinRejectedReason, BitcoinScriptPubkey,
-		BitcoinSignature, CompressedBitcoinPubkey, Satoshis, SATOSHIS_PER_BITCOIN,
-	},
-	bond::{Bond, BondExpiration, BondProvider, BondType},
-	BitcoinUtxoEvents, BondId, PriceProvider,
-};
-
 use crate::{
 	mock::*,
 	pallet::{
 		BitcoinBondCompletions, BondsById, MiningBondCompletions, OwedUtxoAggrieved, UtxosById,
-		UtxosPendingUnlock,
+		UtxosCosignReleaseHeightById, UtxosPendingUnlockByUtxoId,
 	},
 	Error, Event, HoldReason, UtxoCosignRequest, UtxoState,
+};
+use ulx_primitives::{
+	bitcoin::{
+		BitcoinCosignScriptPubkey, BitcoinRejectedReason, BitcoinScriptPubkey, BitcoinSignature,
+		CompressedBitcoinPubkey, H256Le, Satoshis, UtxoRef, SATOSHIS_PER_BITCOIN,
+	},
+	bond::{Bond, BondExpiration, BondProvider, BondType},
+	BitcoinUtxoEvents, BondId, PriceProvider,
 };
 
 #[test]
@@ -31,7 +30,7 @@ fn can_bond_a_bitcoin_utxo() {
 		System::set_block_number(1);
 
 		set_argons(2, 2_000);
-		let pubkey = BitcoinPubkeyHash([1; 20]);
+		let pubkey = CompressedBitcoinPubkey([1; 33]);
 
 		assert_err!(
 			Bonds::bond_bitcoin(RuntimeOrigin::signed(2), 1, 1_000, pubkey),
@@ -71,7 +70,7 @@ fn cleans_up_a_rejected_bitcoin() {
 
 		let who = 1;
 		set_argons(who, 2_000);
-		let pubkey = BitcoinPubkeyHash([1; 20]);
+		let pubkey = CompressedBitcoinPubkey([1; 33]);
 
 		assert_ok!(Bonds::bond_bitcoin(
 			RuntimeOrigin::signed(who),
@@ -99,7 +98,7 @@ fn marks_a_verified_bitcoin() {
 
 		let who = 1;
 		set_argons(who, 2_000);
-		let pubkey = BitcoinPubkeyHash([1; 20]);
+		let pubkey = CompressedBitcoinPubkey([1; 33]);
 
 		assert_ok!(Bonds::bond_bitcoin(
 			RuntimeOrigin::signed(who),
@@ -152,7 +151,7 @@ fn burns_a_spent_bitcoin() {
 
 		let who = 1;
 		set_argons(who, 2_000);
-		let pubkey = BitcoinPubkeyHash([1; 20]);
+		let pubkey = CompressedBitcoinPubkey([1; 33]);
 		let allocated = DefaultVault::get().bitcoin_argons.allocated;
 
 		assert_ok!(Bonds::bond_bitcoin(
@@ -227,7 +226,7 @@ fn cancels_an_unverified_spent_bitcoin() {
 
 		let who = 1;
 		set_argons(who, 2_000);
-		let pubkey = BitcoinPubkeyHash([1; 20]);
+		let pubkey = CompressedBitcoinPubkey([1; 33]);
 		let allocated = DefaultVault::get().bitcoin_argons.allocated;
 
 		assert_ok!(Bonds::bond_bitcoin(
@@ -269,7 +268,7 @@ fn can_unlock_a_bitcoin() {
 		BitcoinBlockHeight::set(1);
 		System::set_block_number(1);
 
-		let pubkey = BitcoinPubkeyHash([1; 20]);
+		let pubkey = CompressedBitcoinPubkey([1; 33]);
 		let who = 1;
 		set_argons(who, 2_000);
 		assert_ok!(Bonds::bond_bitcoin(
@@ -327,8 +326,10 @@ fn can_unlock_a_bitcoin() {
 		assert!(redemption_price > bond.amount);
 		// redemption price should be the bond price since current redemption price is above
 		assert_eq!(
-			UtxosPendingUnlock::<Test>::get().get(&1),
+			UtxosPendingUnlockByUtxoId::<Test>::get().get(&1),
 			Some(UtxoCosignRequest {
+				vault_id: 1,
+				bond_id: 1,
 				cosign_due_block: BitcoinBlockHeight::get() + UtxoUnlockCosignDeadlineBlocks::get(),
 				redemption_price: bond.amount,
 				to_script_pubkey: unlock_script_pubkey,
@@ -356,7 +357,7 @@ fn penalizes_vault_if_not_unlock_countersigned() {
 		BitcoinBlockHeight::set(1);
 		System::set_block_number(1);
 
-		let pubkey = BitcoinPubkeyHash([1; 20]);
+		let pubkey = CompressedBitcoinPubkey([1; 33]);
 		let who = 1;
 		let satoshis = SATOSHIS_PER_BITCOIN + 5000;
 		set_argons(who, 2_000);
@@ -380,8 +381,10 @@ fn penalizes_vault_if_not_unlock_countersigned() {
 		let redemption_price = Bonds::get_redemption_price(&satoshis).expect("should have price");
 		let cosign_due = BitcoinBlockHeight::get() + UtxoUnlockCosignDeadlineBlocks::get();
 		assert_eq!(
-			UtxosPendingUnlock::<Test>::get().get(&1),
+			UtxosPendingUnlockByUtxoId::<Test>::get().get(&1),
 			Some(UtxoCosignRequest {
+				vault_id: 1,
+				bond_id: 1,
 				cosign_due_block: cosign_due,
 				redemption_price,
 				to_script_pubkey: unlock_script_pubkey,
@@ -397,7 +400,7 @@ fn penalizes_vault_if_not_unlock_countersigned() {
 		// should pay back at market price (not the discounted rate)
 		let market_price =
 			StaticPriceProvider::get_bitcoin_argon_price(satoshis).expect("should have price");
-		assert_eq!(UtxosPendingUnlock::<Test>::get().get(&1), None);
+		assert_eq!(UtxosPendingUnlockByUtxoId::<Test>::get().get(&1), None);
 		assert_eq!(UtxosById::<Test>::get(1), None);
 		assert_eq!(OwedUtxoAggrieved::<Test>::get(1), None);
 		System::assert_last_event(
@@ -431,11 +434,14 @@ fn clears_unlocked_bitcoin_bonds() {
 		BitcoinBlockHeight::set(1);
 		System::set_block_number(1);
 
-		let pubkey = BitcoinPubkeyHash([1; 20]);
+		let secp = bitcoin::secp256k1::Secp256k1::new();
+		let rng = &mut rand::thread_rng();
+		let keypair = bitcoin::secp256k1::SecretKey::new(rng);
+		let pubkey = keypair.public_key(&secp).serialize();
 		let who = 2;
 		let satoshis = SATOSHIS_PER_BITCOIN + 25000;
 		set_argons(who, 2_000);
-		assert_ok!(Bonds::bond_bitcoin(RuntimeOrigin::signed(who), 1, satoshis, pubkey));
+		assert_ok!(Bonds::bond_bitcoin(RuntimeOrigin::signed(who), 1, satoshis, pubkey.into()));
 		let vault = DefaultVault::get();
 		let bond = BondsById::<Test>::get(1).unwrap();
 		assert_eq!(vault.bitcoin_argons.bonded, bond.amount);
@@ -455,8 +461,10 @@ fn clears_unlocked_bitcoin_bonds() {
 		let redemption_price = Bonds::get_redemption_price(&satoshis).expect("should have price");
 		let cosign_due_block = BitcoinBlockHeight::get() + UtxoUnlockCosignDeadlineBlocks::get();
 		assert_eq!(
-			UtxosPendingUnlock::<Test>::get().get(&1),
+			UtxosPendingUnlockByUtxoId::<Test>::get().get(&1),
 			Some(UtxoCosignRequest {
+				vault_id: 1,
+				bond_id: 1,
 				cosign_due_block,
 				redemption_price,
 				to_script_pubkey: unlock_script_pubkey,
@@ -468,32 +476,31 @@ fn clears_unlocked_bitcoin_bonds() {
 			Bonds::cosign_bitcoin_unlock(
 				RuntimeOrigin::signed(2),
 				1,
-				CompressedBitcoinPubkey([0; 33]),
 				BitcoinSignature(BoundedVec::truncate_from([0u8; 73].to_vec()))
 			),
 			Error::<Test>::NoPermissions
 		);
+		GetUtxoRef::set(Some(UtxoRef { txid: H256Le([0; 32]), output_index: 0 }));
+
 		assert_ok!(Bonds::cosign_bitcoin_unlock(
 			RuntimeOrigin::signed(1),
 			1,
-			CompressedBitcoinPubkey([0; 33]),
 			BitcoinSignature(BoundedVec::truncate_from([0u8; 73].to_vec()))
 		));
-		assert_eq!(UtxosPendingUnlock::<Test>::get().get(&1), None);
+		assert_eq!(UtxosPendingUnlockByUtxoId::<Test>::get().get(&1), None);
 		assert_eq!(UtxosById::<Test>::get(1), None);
 		assert_eq!(OwedUtxoAggrieved::<Test>::get(1), None);
 		// should keep bond for the year
 		assert_eq!(BondsById::<Test>::get(1), Some(bond.clone()));
 		assert_eq!(DefaultVault::get().bitcoin_argons.bonded, bond.amount);
 		assert_eq!(DefaultVault::get().bitcoin_argons.allocated, vault.bitcoin_argons.allocated);
-		assert_eq!(WatchedUtxosById::get().len(), 0);
+		assert_eq!(UtxosCosignReleaseHeightById::<Test>::get(&1), Some(1));
 
 		System::assert_last_event(
 			Event::<Test>::BitcoinUtxoCosigned {
 				bond_id: 1,
 				vault_id: 1,
 				utxo_id: 1,
-				pubkey: CompressedBitcoinPubkey([0; 33]),
 				signature: BitcoinSignature(BoundedVec::truncate_from([0u8; 73].to_vec())),
 			}
 			.into(),
@@ -515,6 +522,7 @@ fn clears_unlocked_bitcoin_bonds() {
 		assert_eq!(BondsById::<Test>::get(1), None);
 		assert_eq!(DefaultVault::get().bitcoin_argons.bonded, 0);
 		assert_eq!(DefaultVault::get().bitcoin_argons.allocated, vault.bitcoin_argons.allocated);
+		assert_ok!(Bonds::utxo_spent(1));
 	});
 }
 
@@ -524,7 +532,7 @@ fn it_should_aggregate_holds_for_a_second_unlock() {
 		BitcoinBlockHeight::set(1);
 		System::set_block_number(1);
 
-		let pubkey = BitcoinPubkeyHash([1; 20]);
+		let pubkey = CompressedBitcoinPubkey([1; 33]);
 		let who = 1;
 		let satoshis = 2 * SATOSHIS_PER_BITCOIN;
 		set_argons(who, 2_000);
@@ -615,9 +623,11 @@ fn default_utxo_state(bond_id: BondId, satoshis: Satoshis) -> UtxoState {
 			BitcoinBondReclamationBlocks::get(),
 		is_verified: false,
 		utxo_script_pubkey: make_cosign_pubkey([0; 32]),
-		owner_pubkey_hash: BitcoinPubkeyHash([1; 20]),
-		vault_pubkey_hash: BitcoinPubkeyHash([0; 20]),
-		register_block: current_height,
+		owner_pubkey: CompressedBitcoinPubkey([1; 33]),
+		vault_claim_pubkey: DefaultVaultReclaimBitcoinPubkey::get().into(),
+		vault_pubkey: DefaultVaultBitcoinPubkey::get().into(),
+		created_at_height: current_height,
+		vault_xpub_sources: ([0; 4], 0, 1),
 	}
 }
 

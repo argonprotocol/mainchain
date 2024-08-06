@@ -8,7 +8,7 @@ use crate::prod_or_fast;
 use rsntp::SntpClient;
 
 #[cfg(feature = "std")]
-use sp_std::time::Duration;
+use core::time::Duration;
 
 pub type Tick = u32;
 
@@ -83,7 +83,7 @@ impl Ticker {
 		let now = now();
 		let current_tick = self.current();
 		let next_tick_time = self.time_for_tick(current_tick + 1);
-		let duration_to_next_tick = next_tick_time - now;
+		let duration_to_next_tick = next_tick_time.saturating_sub(now);
 		Duration::from_millis(duration_to_next_tick)
 	}
 

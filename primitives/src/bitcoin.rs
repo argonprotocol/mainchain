@@ -1,12 +1,12 @@
+use alloc::vec::Vec;
+use core::convert::{TryFrom, TryInto};
+
 use codec::{Decode, Encode, MaxEncodedLen};
 use frame_support::pallet_prelude::TypeInfo;
+use serde::{Deserialize, Serialize};
 use sp_core::{ConstU32, H256};
 use sp_debug_derive::RuntimeDebug;
 use sp_runtime::BoundedVec;
-use sp_std::{
-	convert::{TryFrom, TryInto},
-	vec::Vec,
-};
 
 #[derive(Encode, Decode, Clone, PartialEq, Eq, TypeInfo, RuntimeDebug)]
 pub struct BitcoinSyncStatus {
@@ -32,23 +32,10 @@ impl BitcoinBlock {
 pub enum BitcoinError {
 	InvalidLockTime,
 	InvalidByteLength,
+	InvalidPolicy,
+	UnsafePolicy,
+	InvalidPubkey,
 }
-
-#[derive(
-	Clone,
-	Copy,
-	PartialEq,
-	Eq,
-	Ord,
-	PartialOrd,
-	Encode,
-	Decode,
-	TypeInfo,
-	RuntimeDebug,
-	MaxEncodedLen,
-)]
-#[repr(transparent)]
-pub struct BitcoinPubkeyHash(pub [u8; 20]);
 
 #[derive(Clone, Copy, PartialEq, Eq, Encode, Decode, TypeInfo, RuntimeDebug, MaxEncodedLen)]
 #[repr(transparent)]
@@ -70,77 +57,6 @@ impl TryFrom<Vec<u8>> for BitcoinSignature {
 	}
 }
 
-/// Creates a bitcoin script the does the following:
-/// - Until `vault_claim_height`, multisig requires both public keys and signatures to be revealed
-/// - Between `vault_claim_height` and `open_claim_height`, only the vault can claim the funds
-/// - After `open_claim_height`, either party can claim the funds
-#[cfg(feature = "bitcoin")]
-#[rustfmt::skip]
-pub fn create_timelock_multisig_script(
-	vault_pubkey_hash: BitcoinPubkeyHash,
-	owner_pubkey_hash: BitcoinPubkeyHash,
-	vault_claim_height: BitcoinHeight,
-	open_claim_height: BitcoinHeight,
-) -> Result<bitcoin::ScriptBuf, BitcoinError> {
-	use bitcoin::blockdata::{opcodes::all::*, script::Builder};
-	use bitcoin::absolute::LockTime;
-
-	let script = Builder::new()
-		// code 1 is unlock
-		.push_opcode(OP_DUP)
-		.push_int(1)
-		.push_opcode(OP_EQUAL)
-		.push_opcode(OP_IF)
-			.push_opcode(OP_DROP)
-			.push_opcode(OP_DUP)
-			.push_opcode(OP_HASH160)
-			.push_slice(vault_pubkey_hash.0)
-			// set 1 to stack if this is the vault
-			.push_opcode(OP_EQUALVERIFY)
-			.push_opcode(OP_CHECKSIGVERIFY)
-
-			// now consume user key
-			.push_opcode(OP_DUP)
-			.push_opcode(OP_HASH160)
-			.push_slice(owner_pubkey_hash.0)
-			//  OP_EQUALVERIFY OP_CHECKSIG at end
-
-		.push_opcode(OP_ELSE)
-			.push_int(2)
-			.push_opcode(OP_EQUAL)
-		    // code 2 is vault claim
-			.push_opcode(OP_IF)
-				.push_lock_time(LockTime::from_height(vault_claim_height as u32).map_err(|_| BitcoinError::InvalidLockTime)?)
-				.push_opcode(OP_CLTV)
-				.push_opcode(OP_DROP)
-
-				.push_opcode(OP_DUP)
-				.push_opcode(OP_HASH160)
-				.push_slice(vault_pubkey_hash.0)
-				//  OP_EQUALVERIFY OP_CHECKSIG at end
-
-			// code 3 is owner claim
-			.push_opcode(OP_ELSE)
-				.push_lock_time(LockTime::from_height(open_claim_height as u32).map_err(|_| BitcoinError::InvalidLockTime)?)
-				.push_opcode(OP_CLTV)
-				.push_opcode(OP_DROP)
-
-				.push_opcode(OP_DUP)
-				.push_opcode(OP_HASH160)
-				.push_slice(owner_pubkey_hash.0)
-				//  OP_EQUALVERIFY OP_CHECKSIG at end
-			.push_opcode(OP_ENDIF)
-		.push_opcode(OP_ENDIF)
-
-
-		.push_opcode(OP_EQUALVERIFY)
-		.push_opcode(OP_CHECKSIG)
-
-
-		.into_script();
-	Ok(script)
-}
-
 /// A Script Pubkey for a Bitcoin UTXO. Supported types are:
 /// - P2WSH (Pay to Witness Script Hash)
 #[derive(Clone, PartialEq, Eq, Encode, Decode, TypeInfo, RuntimeDebug, Copy)]
@@ -154,6 +70,15 @@ pub enum BitcoinCosignScriptPubkey {
 #[repr(transparent)]
 pub struct BitcoinScriptPubkey(pub BoundedVec<u8, ConstU32<34>>); // allow p2wsh, p2tr max
 impl TryFrom<Vec<u8>> for BitcoinScriptPubkey {
+	type Error = Vec<u8>;
+	fn try_from(value: Vec<u8>) -> Result<Self, Self::Error> {
+		Ok(Self(value.try_into()?))
+	}
+}
+#[derive(Clone, PartialEq, Eq, Encode, Decode, TypeInfo, RuntimeDebug, Copy, MaxEncodedLen)]
+#[repr(transparent)]
+pub struct OpaqueBitcoinXpub(pub [u8; 78]);
+impl TryFrom<Vec<u8>> for OpaqueBitcoinXpub {
 	type Error = Vec<u8>;
 	fn try_from(value: Vec<u8>) -> Result<Self, Self::Error> {
 		Ok(Self(value.try_into()?))
@@ -197,18 +122,198 @@ pub enum BitcoinRejectedReason {
 	DuplicateUtxo,
 }
 
+#[derive(Clone, PartialEq, Eq, RuntimeDebug)]
+pub enum XpubErrors {
+	InvalidXpubkey,
+	InvalidXpubkeyChild,
+	BitcoinConversionFailed,
+	WrongExtendedKeyLength(usize),
+	UnknownVersion([u8; 4]),
+	WrongNetwork,
+	DecodeFingerprintError,
+	DecodeChildNumberError,
+	DecodeChainCodeError,
+	DecodePubkeyError,
+}
+
 pub type BitcoinBlockHash = H256Le;
+
+#[derive(
+	Encode,
+	Decode,
+	TypeInfo,
+	MaxEncodedLen,
+	Debug,
+	Copy,
+	Clone,
+	PartialEq,
+	Eq,
+	PartialOrd,
+	Ord,
+	Hash,
+)]
+pub enum NetworkKind {
+	/// The Bitcoin mainnet network.
+	Main,
+	/// Some kind of testnet network.
+	Test,
+}
+
+#[derive(
+	Encode, Decode, TypeInfo, Serialize, Deserialize, Clone, PartialEq, Eq, RuntimeDebug, Default,
+)]
+pub enum BitcoinNetwork {
+	/// Mainnet Bitcoin.
+	Bitcoin,
+	/// Bitcoin's testnet network.
+	Testnet,
+	/// Bitcoin's signet network
+	Signet,
+	/// Bitcoin's regtest network.
+	#[default]
+	Regtest,
+}
+
+pub type XPubFingerprint = [u8; 4];
+pub type XPubChildNumber = u32;
+
+#[derive(Encode, Decode, MaxEncodedLen, TypeInfo, Clone, PartialEq, Eq, RuntimeDebug)]
+pub struct BitcoinXPub {
+	pub public_key: CompressedBitcoinPubkey,
+	/// Depth in the key derivation hierarchy.
+	#[codec(compact)]
+	pub depth: u8,
+
+	/// Parent fingerprint.
+	pub parent_fingerprint: XPubFingerprint,
+
+	/// Child number.
+	#[codec(compact)]
+	pub child_number: XPubChildNumber,
+
+	/// Chain code.
+	pub chain_code: [u8; 32],
+	pub network: NetworkKind,
+}
+
+impl BitcoinXPub {
+	pub fn matches_network(&self, network: BitcoinNetwork) -> bool {
+		match network {
+			BitcoinNetwork::Bitcoin => self.network == NetworkKind::Main,
+			BitcoinNetwork::Testnet => self.network == NetworkKind::Test,
+			BitcoinNetwork::Signet => self.network == NetworkKind::Test,
+			BitcoinNetwork::Regtest => self.network == NetworkKind::Test,
+		}
+	}
+}
+
 #[cfg(feature = "bitcoin")]
 mod bitcoin_compat {
-	use bitcoin::hashes::{FromSliceError, Hash};
-	use sp_core::H256;
-	use sp_runtime::BoundedVec;
-	use sp_std::vec::Vec;
+	use alloc::vec::Vec;
 
 	use crate::bitcoin::{
-		BitcoinCosignScriptPubkey, BitcoinPubkeyHash, BitcoinScriptPubkey, BitcoinSignature,
-		CompressedBitcoinPubkey, H256Le, UtxoRef,
+		BitcoinCosignScriptPubkey, BitcoinNetwork, BitcoinScriptPubkey, BitcoinSignature,
+		BitcoinXPub, CompressedBitcoinPubkey, H256Le, NetworkKind, OpaqueBitcoinXpub, UtxoRef,
+		XpubErrors,
 	};
+	use bip32::{ChildNumber, ExtendedKeyAttrs, XPub};
+	use bitcoin::{
+		hashes::{FromSliceError, Hash},
+		Network,
+	};
+	use k256::ecdsa::VerifyingKey;
+	use sp_core::H256;
+	use sp_runtime::BoundedVec;
+
+	/// Version bytes for extended public keys on the Bitcoin network.
+	const VERSION_BYTES_MAINNET_PUBLIC: [u8; 4] = [0x04, 0x88, 0xB2, 0x1E];
+	/// Version bytes for extended public keys on any of the testnet networks.
+	const VERSION_BYTES_TESTNETS_PUBLIC: [u8; 4] = [0x04, 0x35, 0x87, 0xCF];
+
+	const VERSION_BYTES_MAINNET_ZPUB: [u8; 4] = [0x04, 0xB2, 0x47, 0x46];
+	const VERSION_BYTES_TESTNETS_ZPUB: [u8; 4] = [0x04, 0x5F, 0x1C, 0xF6];
+
+	impl BitcoinXPub {
+		pub fn get_xpub(&self) -> Result<XPub, XpubErrors> {
+			let attrs = ExtendedKeyAttrs {
+				depth: self.depth,
+				parent_fingerprint: self.parent_fingerprint,
+				child_number: ChildNumber::from(self.child_number),
+				chain_code: self.chain_code,
+			};
+			let pubkey = self.public_key;
+			let verifying_key = VerifyingKey::from_sec1_bytes(&pubkey.0)
+				.map_err(|_| XpubErrors::BitcoinConversionFailed)?;
+			Ok(XPub::new(verifying_key, attrs))
+		}
+
+		pub fn is_hardened(&self) -> bool {
+			let child_number = ChildNumber::from(self.child_number);
+			child_number.is_hardened()
+		}
+
+		pub fn derive_pubkey(&self, index: u32) -> Result<BitcoinXPub, XpubErrors> {
+			let child_number =
+				ChildNumber::new(index, false).map_err(|_| XpubErrors::InvalidXpubkeyChild)?;
+			let xpub_child = self
+				.get_xpub()?
+				.derive_child(child_number)
+				.map_err(|_| XpubErrors::InvalidXpubkeyChild)?;
+
+			Ok(BitcoinXPub {
+				public_key: CompressedBitcoinPubkey(xpub_child.to_bytes()),
+				depth: xpub_child.attrs().depth,
+				parent_fingerprint: xpub_child.attrs().parent_fingerprint,
+				child_number: u32::from(xpub_child.attrs().child_number),
+				chain_code: xpub_child.attrs().chain_code,
+				network: self.network,
+			})
+		}
+	}
+
+	impl TryFrom<OpaqueBitcoinXpub> for BitcoinXPub {
+		type Error = XpubErrors;
+		fn try_from(xpub: OpaqueBitcoinXpub) -> Result<Self, XpubErrors> {
+			let data = xpub.0;
+
+			let network = if data.starts_with(&VERSION_BYTES_MAINNET_PUBLIC) ||
+				data.starts_with(&VERSION_BYTES_MAINNET_ZPUB)
+			{
+				NetworkKind::Main
+			} else if data.starts_with(&VERSION_BYTES_TESTNETS_PUBLIC) ||
+				data.starts_with(&VERSION_BYTES_TESTNETS_ZPUB)
+			{
+				NetworkKind::Test
+			} else {
+				let (b0, b1, b2, b3) = (data[0], data[1], data[2], data[3]);
+				return Err(XpubErrors::UnknownVersion([b0, b1, b2, b3]));
+			};
+
+			let attrs = ExtendedKeyAttrs {
+				depth: data[4],
+				parent_fingerprint: data[5..9]
+					.try_into()
+					.map_err(|_| XpubErrors::DecodeFingerprintError)?,
+				child_number: u32::from_be_bytes(
+					data[9..13].try_into().map_err(|_| XpubErrors::DecodeChildNumberError)?,
+				)
+				.into(),
+				chain_code: data[13..45]
+					.try_into()
+					.map_err(|_| XpubErrors::DecodeChainCodeError)?,
+			};
+			let pubkey = data[45..78].try_into().map_err(|_| XpubErrors::DecodePubkeyError)?;
+
+			Ok(Self {
+				network,
+				depth: attrs.depth,
+				parent_fingerprint: attrs.parent_fingerprint,
+				child_number: u32::from(attrs.child_number),
+				chain_code: attrs.chain_code,
+				public_key: CompressedBitcoinPubkey(pubkey),
+			})
+		}
+	}
 
 	impl From<bitcoin::BlockHash> for H256Le {
 		fn from(h: bitcoin::BlockHash) -> Self {
@@ -247,6 +352,38 @@ mod bitcoin_compat {
 			bitcoin::Txid::from_raw_hash(*hash)
 		}
 	}
+	impl From<Network> for BitcoinNetwork {
+		fn from(network: Network) -> Self {
+			match network {
+				Network::Bitcoin => BitcoinNetwork::Bitcoin,
+				Network::Testnet => BitcoinNetwork::Testnet,
+				Network::Signet => BitcoinNetwork::Signet,
+				Network::Regtest => BitcoinNetwork::Regtest,
+				_ => unimplemented!(),
+			}
+		}
+	}
+
+	impl From<BitcoinNetwork> for bitcoin::network::NetworkKind {
+		fn from(value: BitcoinNetwork) -> Self {
+			match value {
+				BitcoinNetwork::Bitcoin => bitcoin::network::NetworkKind::Main,
+				BitcoinNetwork::Testnet | BitcoinNetwork::Signet | BitcoinNetwork::Regtest =>
+					bitcoin::network::NetworkKind::Test,
+			}
+		}
+	}
+
+	impl From<BitcoinNetwork> for Network {
+		fn from(network: BitcoinNetwork) -> Self {
+			match network {
+				BitcoinNetwork::Bitcoin => Network::Bitcoin,
+				BitcoinNetwork::Testnet => Network::Testnet,
+				BitcoinNetwork::Signet => Network::Signet,
+				BitcoinNetwork::Regtest => Network::Regtest,
+			}
+		}
+	}
 
 	impl From<bitcoin::FilterHeader> for H256Le {
 		fn from(h: bitcoin::FilterHeader) -> Self {
@@ -262,18 +399,9 @@ mod bitcoin_compat {
 		}
 	}
 
-	impl From<bitcoin::PubkeyHash> for BitcoinPubkeyHash {
-		fn from(h: bitcoin::PubkeyHash) -> Self {
-			let mut inner = [0u8; 20];
-			inner.copy_from_slice(&h.to_raw_hash()[..]);
-			BitcoinPubkeyHash(inner)
-		}
-	}
-
-	impl From<BitcoinPubkeyHash> for bitcoin::PubkeyHash {
-		fn from(h: BitcoinPubkeyHash) -> Self {
-			let hash = bitcoin::hashes::hash160::Hash::from_bytes_ref(&h.0);
-			bitcoin::PubkeyHash::from_raw_hash(*hash)
+	impl From<bitcoin::bip32::Xpub> for OpaqueBitcoinXpub {
+		fn from(xpub: bitcoin::bip32::Xpub) -> Self {
+			OpaqueBitcoinXpub(xpub.encode())
 		}
 	}
 
@@ -339,16 +467,15 @@ mod bitcoin_compat {
 		}
 	}
 
-	impl TryInto<BitcoinScriptPubkey> for bitcoin::ScriptBuf {
-		type Error = Vec<u8>;
-		fn try_into(self) -> Result<BitcoinScriptPubkey, Self::Error> {
-			Ok(BitcoinScriptPubkey(BoundedVec::try_from(self.to_bytes())?))
-		}
-	}
-
 	impl From<BitcoinScriptPubkey> for bitcoin::ScriptBuf {
 		fn from(val: BitcoinScriptPubkey) -> Self {
 			bitcoin::ScriptBuf::from_bytes(val.0.into_inner())
+		}
+	}
+
+	impl From<bitcoin::ScriptBuf> for BitcoinScriptPubkey {
+		fn from(val: bitcoin::ScriptBuf) -> Self {
+			Self(BoundedVec::truncate_from(val.to_bytes()))
 		}
 	}
 

@@ -16,6 +16,8 @@ tracing = { workspace = true }
 subxt = { workspace = true }
 anyhow = { workspace = true, features = ["default"] }
 bitcoind = { workspace = true }
+bitcoincore-rpc = { workspace = true }
+bitcoin = { workspace = true }
 lazy_static = { workspace = true }
 url = { workspace = true }
 env_logger = { workspace = true }

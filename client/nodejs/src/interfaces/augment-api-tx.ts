@@ -9,7 +9,7 @@ import type { ApiTypes, AugmentedSubmittable, SubmittableExtrinsic, SubmittableE
 import type { Bytes, Compact, Option, U8aFixed, Vec, bool, u128, u16, u32, u64 } from '@polkadot/types-codec';
 import type { AnyNumber, IMethod, ITuple } from '@polkadot/types-codec/types';
 import type { AccountId32, Call, H256, MultiAddress } from '@polkadot/types/interfaces/runtime';
-import type { PalletBalancesAdjustmentDirection, PalletMiningSlotMiningSlotBid, PalletMultisigTimepoint, PalletPriceIndexPriceIndex, PalletVaultsVaultConfig, SpConsensusGrandpaEquivocationProof, SpSessionMembershipProof, SpWeightsWeightV2Weight, UlxNodeRuntimeOpaqueSessionKeys, UlxNodeRuntimeProxyType, UlxPrimitivesBitcoinBitcoinPubkeyHash, UlxPrimitivesBitcoinCompressedBitcoinPubkey, UlxPrimitivesBitcoinH256Le, UlxPrimitivesBlockSealRewardDestination, UlxPrimitivesBondVaultTerms, UlxPrimitivesDataDomainZoneRecord, UlxPrimitivesInherentsBitcoinUtxoSync, UlxPrimitivesInherentsBlockSealInherent, UlxPrimitivesNotaryNotaryMeta, UlxPrimitivesNotebookSignedNotebookHeader } from '@polkadot/types/lookup';
+import type { PalletBalancesAdjustmentDirection, PalletMiningSlotMiningSlotBid, PalletMultisigTimepoint, PalletPriceIndexPriceIndex, PalletVaultsVaultConfig, SpConsensusGrandpaEquivocationProof, SpSessionMembershipProof, SpWeightsWeightV2Weight, UlxNodeRuntimeOpaqueSessionKeys, UlxNodeRuntimeProxyType, UlxPrimitivesBitcoinCompressedBitcoinPubkey, UlxPrimitivesBitcoinH256Le, UlxPrimitivesBitcoinOpaqueBitcoinXpub, UlxPrimitivesBlockSealRewardDestination, UlxPrimitivesBondVaultTerms, UlxPrimitivesDataDomainZoneRecord, UlxPrimitivesInherentsBitcoinUtxoSync, UlxPrimitivesInherentsBlockSealInherent, UlxPrimitivesNotaryNotaryMeta, UlxPrimitivesNotebookSignedNotebookHeader } from '@polkadot/types/lookup';
 
 export type __AugmentedSubmittable = AugmentedSubmittable<() => unknown>;
 export type __SubmittableExtrinsic<ApiType extends ApiTypes> = SubmittableExtrinsic<ApiType>;
@@ -137,9 +137,10 @@ declare module '@polkadot/api-base/types/submittable' {
        * Script hash to Events. A bondee must create the UTXO in order to be added to the Bitcoin
        * Mint line.
        *
-       * NOTE: The script
+       * The pubkey submitted here will be used to create a script pubkey that will be used in a
+       * timelock multisig script to lock the bitcoin.
        **/
-      bondBitcoin: AugmentedSubmittable<(vaultId: u32 | AnyNumber | Uint8Array, satoshis: Compact<u64> | AnyNumber | Uint8Array, bitcoinPubkeyHash: UlxPrimitivesBitcoinBitcoinPubkeyHash | string | Uint8Array) => SubmittableExtrinsic<ApiType>, [u32, Compact<u64>, UlxPrimitivesBitcoinBitcoinPubkeyHash]>;
+      bondBitcoin: AugmentedSubmittable<(vaultId: u32 | AnyNumber | Uint8Array, satoshis: Compact<u64> | AnyNumber | Uint8Array, bitcoinPubkey: UlxPrimitivesBitcoinCompressedBitcoinPubkey | string | Uint8Array) => SubmittableExtrinsic<ApiType>, [u32, Compact<u64>, UlxPrimitivesBitcoinCompressedBitcoinPubkey]>;
       /**
        * Submitted by a Vault operator to cosign the unlock of a bitcoin utxo. The Bitcoin owner
        * unlock fee will be burned, and the bond will be allowed to expire without penalty.
@@ -147,7 +148,7 @@ declare module '@polkadot/api-base/types/submittable' {
        * This is submitted as a no-fee transaction off chain to allow keys to remain in cold
        * wallets.
        **/
-      cosignBitcoinUnlock: AugmentedSubmittable<(bondId: u64 | AnyNumber | Uint8Array, pubkey: UlxPrimitivesBitcoinCompressedBitcoinPubkey | string | Uint8Array, signature: Bytes | string | Uint8Array) => SubmittableExtrinsic<ApiType>, [u64, UlxPrimitivesBitcoinCompressedBitcoinPubkey, Bytes]>;
+      cosignBitcoinUnlock: AugmentedSubmittable<(bondId: u64 | AnyNumber | Uint8Array, signature: Bytes | string | Uint8Array) => SubmittableExtrinsic<ApiType>, [u64, Bytes]>;
       /**
        * Submitted by a Bitcoin holder to trigger the unlock of their Bitcoin. A transaction
        * spending the UTXO from the given bond should be pre-created so that the sighash can be
@@ -780,15 +781,11 @@ declare module '@polkadot/api-base/types/submittable' {
     };
     vaults: {
       /**
-       * Add public key hashes to the vault. Will be inserted at the beginning of the list.
-       **/
-      addBitcoinPubkeyHashes: AugmentedSubmittable<(vaultId: u32 | AnyNumber | Uint8Array, bitcoinPubkeyHashes: Vec<UlxPrimitivesBitcoinBitcoinPubkeyHash> | (UlxPrimitivesBitcoinBitcoinPubkeyHash | string | Uint8Array)[]) => SubmittableExtrinsic<ApiType>, [u32, Vec<UlxPrimitivesBitcoinBitcoinPubkeyHash>]>;
-      /**
        * Stop offering additional bonds from this vault. Will not affect existing bond.
        * As funds are returned, they will be released to the vault owner.
        **/
       close: AugmentedSubmittable<(vaultId: u32 | AnyNumber | Uint8Array) => SubmittableExtrinsic<ApiType>, [u32]>;
-      create: AugmentedSubmittable<(vaultConfig: PalletVaultsVaultConfig | { terms?: any; bitcoinAmountAllocated?: any; bitcoinPubkeyHashes?: any; miningAmountAllocated?: any; securitizationPercent?: any } | string | Uint8Array) => SubmittableExtrinsic<ApiType>, [PalletVaultsVaultConfig]>;
+      create: AugmentedSubmittable<(vaultConfig: PalletVaultsVaultConfig | { terms?: any; bitcoinAmountAllocated?: any; bitcoinXpubkey?: any; miningAmountAllocated?: any; securitizationPercent?: any } | string | Uint8Array) => SubmittableExtrinsic<ApiType>, [PalletVaultsVaultConfig]>;
       /**
        * Modify funds offered by the vault. This will not affect existing bonds, but will affect
        * the amount of funds available for new bonds.
@@ -805,6 +802,11 @@ declare module '@polkadot/api-base/types/submittable' {
        * change that is at least `MinTermsModificationBlockDelay` blocks away.
        **/
       modifyTerms: AugmentedSubmittable<(vaultId: u32 | AnyNumber | Uint8Array, terms: UlxPrimitivesBondVaultTerms | { bitcoinAnnualPercentRate?: any; bitcoinBaseFee?: any; miningAnnualPercentRate?: any; miningBaseFee?: any; miningRewardSharingPercentTake?: any } | string | Uint8Array) => SubmittableExtrinsic<ApiType>, [u32, UlxPrimitivesBondVaultTerms]>;
+      /**
+       * Replace the bitcoin xpubkey for this vault. This will not affect existing bonds, but
+       * will be used for any bonds after this point. Will be rejected if already used.
+       **/
+      replaceBitcoinXpub: AugmentedSubmittable<(vaultId: u32 | AnyNumber | Uint8Array, bitcoinXpub: UlxPrimitivesBitcoinOpaqueBitcoinXpub | string | Uint8Array) => SubmittableExtrinsic<ApiType>, [u32, UlxPrimitivesBitcoinOpaqueBitcoinXpub]>;
     };
   } // AugmentedSubmittables
 } // declare module

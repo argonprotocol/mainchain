@@ -1,9 +1,9 @@
+use alloc::vec::Vec;
 use codec::{Decode, Encode, MaxEncodedLen};
 use scale_info::TypeInfo;
 use serde::{Deserialize, Serialize};
 use sp_debug_derive::RuntimeDebug;
 use sp_runtime::{traits::ConstU32, BoundedVec};
-use sp_std::vec::Vec;
 
 #[derive(
 	PartialEq,

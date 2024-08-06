@@ -1,12 +1,14 @@
 use codec::{Codec, Decode, Encode, MaxEncodedLen};
 use frame_support::PalletError;
 use scale_info::TypeInfo;
-use sp_arithmetic::{traits::UniqueSaturatedInto, FixedPointNumber, FixedU128, Percent};
+use sp_arithmetic::{traits::UniqueSaturatedInto, FixedPointNumber, FixedU128};
 use sp_debug_derive::RuntimeDebug;
 use sp_runtime::traits::AtLeast32BitUnsigned;
 
 use crate::{
-	bitcoin::{BitcoinCosignScriptPubkey, BitcoinHeight, BitcoinPubkeyHash, UtxoId},
+	bitcoin::{
+		BitcoinCosignScriptPubkey, BitcoinHeight, BitcoinXPub, CompressedBitcoinPubkey, UtxoId,
+	},
 	block_seal::RewardSharing,
 	BondId, RewardShare, VaultId,
 };
@@ -78,10 +80,11 @@ pub trait VaultProvider {
 	fn create_utxo_script_pubkey(
 		vault_id: VaultId,
 		utxo_id: UtxoId,
-		owner_pubkey_hash: BitcoinPubkeyHash,
+		owner_pubkey: CompressedBitcoinPubkey,
 		vault_claim_height: BitcoinHeight,
 		open_claim_height: BitcoinHeight,
-	) -> Result<(BitcoinPubkeyHash, BitcoinCosignScriptPubkey), BondError>;
+		current_height: BitcoinHeight,
+	) -> Result<(BitcoinXPub, BitcoinXPub, BitcoinCosignScriptPubkey), BondError>;
 }
 
 #[derive(Clone, PartialEq, Eq, Encode, Decode, RuntimeDebug, TypeInfo, PalletError)]
@@ -105,10 +108,16 @@ pub enum BondError {
 	VaultNotFound,
 	/// No Vault public keys are available
 	NoVaultBitcoinPubkeysAvailable,
+	/// Unable to generate a new vault public key
+	UnableToGenerateVaultBitcoinPubkey,
+	/// Unable to decode the vault public key
+	UnableToDecodeVaultBitcoinPubkey,
 	/// The fee for this bond exceeds the amount of the bond, which is unsafe
 	FeeExceedsBondAmount,
 	/// Scripting for a bitcoin UTXO failed
 	InvalidBitcoinScript,
+	/// An internal processing error occurred that is too technical to be useful to the user
+	InternalError,
 }
 
 #[derive(Clone, PartialEq, Eq, Encode, Decode, RuntimeDebug, TypeInfo, MaxEncodedLen)]
@@ -155,7 +164,7 @@ pub struct VaultTerms<Balance: Codec + MaxEncodedLen + Clone + TypeInfo + Partia
 	pub mining_base_fee: Balance,
 	/// The optional sharing of any argons minted for stabilization or mined from blocks
 	#[codec(compact)]
-	pub mining_reward_sharing_percent_take: Percent, // max 100, actual percent
+	pub mining_reward_sharing_percent_take: FixedU128, // max 100, actual percent
 }
 
 impl<

@@ -1,10 +1,10 @@
+use alloc::vec::Vec;
 use codec::{Codec, Decode, Encode, MaxEncodedLen};
 use frame_support_procedural::DefaultNoBound;
 use scale_info::TypeInfo;
 use serde::{Deserialize, Serialize};
 use sp_core::{RuntimeDebug, U256};
 use sp_runtime::ConsensusEngineId;
-use sp_std::vec::Vec;
 
 use crate::{tick::Tick, BlockVotingPower, NotaryId, NotebookNumber, VotingKey};
 

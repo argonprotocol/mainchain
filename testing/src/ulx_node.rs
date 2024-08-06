@@ -41,7 +41,7 @@ impl UlxTestNode {
 		let _lock = CONTEXT_LOCK.lock().unwrap();
 		let project_dir = PathBuf::from(env!("CARGO_MANIFEST_DIR"));
 
-		let (bitcoin, rpc_url) = start_bitcoind().map_err(|e| {
+		let (bitcoin, rpc_url, _) = start_bitcoind().map_err(|e| {
 			eprintln!("ERROR starting bitcoind {:#?}", e);
 			e
 		})?;

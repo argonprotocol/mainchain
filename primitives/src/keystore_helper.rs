@@ -13,18 +13,19 @@ use sp_keystore::{testing::MemoryKeystore, KeystorePtr};
 #[derive(Debug, Clone, Args)]
 pub struct KeystoreParams {
 	/// Specify custom keystore path.
-	#[arg(long, value_name = "PATH")]
+	#[arg(global = true, long, value_name = "PATH")]
 	pub keystore_path: Option<PathBuf>,
 
 	/// Use interactive shell for entering the password used by the keystore.
-	#[arg(long, conflicts_with_all = & ["password", "password_filename"])]
+	#[arg(global = true,long, conflicts_with_all = & ["password", "password_filename"])]
 	pub password_interactive: bool,
 
 	/// Password used by the keystore.
 	///
 	/// This allows appending an extra user-defined secret to the seed.
 	#[arg(
-        long,
+		global = true,
+		long,
         value_parser = secret_string_from_str,
         conflicts_with_all = & ["password_interactive", "password_filename"]
     )]
@@ -32,7 +33,8 @@ pub struct KeystoreParams {
 
 	/// File that contains the password used by the keystore.
 	#[arg(
-        long,
+		global = true,
+		long,
         value_name = "PATH",
         conflicts_with_all = & ["password_interactive", "password"]
     )]

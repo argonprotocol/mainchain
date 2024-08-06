@@ -1,4 +1,5 @@
 #![cfg_attr(not(feature = "std"), no_std)]
+extern crate alloc;
 
 pub use pallet::*;
 pub use weights::*;
@@ -14,11 +15,11 @@ pub mod weights;
 
 #[frame_support::pallet(dev_mode)]
 pub mod pallet {
+	use alloc::vec::Vec;
 	use frame_support::pallet_prelude::*;
 	use frame_system::pallet_prelude::*;
 	use sp_core::H256;
 	use sp_runtime::{app_crypto::RuntimePublic, BoundedBTreeMap};
-	use sp_std::vec::Vec;
 
 	use ulx_primitives::{
 		notary::{

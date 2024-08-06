@@ -203,6 +203,22 @@ declare module '@polkadot/api-base/types/errors' {
        **/
       BitcoinFeeTooHigh: AugmentedError<ApiType>;
       /**
+       * The cosign signature is not valid for the bitcoin unlock
+       **/
+      BitcoinInvalidCosignature: AugmentedError<ApiType>;
+      /**
+       * This bitcoin pubkey couldn't be decoded for unlock
+       **/
+      BitcoinPubkeyUnableToBeDecoded: AugmentedError<ApiType>;
+      /**
+       * This bitcoin signature couldn't be decoded for unlock
+       **/
+      BitcoinSignatureUnableToBeDecoded: AugmentedError<ApiType>;
+      /**
+       * This bitcoin cosign script couldn't be decoded for unlock
+       **/
+      BitcoinUnableToBeDecodedForUnlock: AugmentedError<ApiType>;
+      /**
        * The bitcoin has passed the deadline to unlock it
        **/
       BitcoinUnlockInitiationDeadlinePassed: AugmentedError<ApiType>;
@@ -699,6 +715,10 @@ declare module '@polkadot/api-base/types/errors' {
        * The proposed transaction would take the account below the minimum (existential) balance
        **/
       AccountBelowMinimumBalance: AugmentedError<ApiType>;
+      /**
+       * Bitcoin conversion to compressed pubkey failed
+       **/
+      BitcoinConversionFailed: AugmentedError<ApiType>;
       BitcoinUtxoNotFound: AugmentedError<ApiType>;
       BondNotFound: AugmentedError<ApiType>;
       /**
@@ -719,13 +739,17 @@ declare module '@polkadot/api-base/types/errors' {
       InsufficientSatoshisBonded: AugmentedError<ApiType>;
       InsufficientVaultFunds: AugmentedError<ApiType>;
       /**
+       * An internal processing error occurred
+       **/
+      InternalError: AugmentedError<ApiType>;
+      /**
        * The bitcoin script to lock this bitcoin has errors
        **/
       InvalidBitcoinScript: AugmentedError<ApiType>;
       InvalidBondType: AugmentedError<ApiType>;
       /**
        * An invalid securitization percent was provided for the vault. NOTE: it cannot be
-       * decreased
+       * decreased (or negative)
        **/
       InvalidSecuritization: AugmentedError<ApiType>;
       /**
@@ -733,9 +757,9 @@ declare module '@polkadot/api-base/types/errors' {
        **/
       InvalidVaultAmount: AugmentedError<ApiType>;
       /**
-       * The maximum number of bitcoin pubkeys for a vault has been exceeded
+       * Unable to decode xpubkey
        **/
-      MaxPendingVaultBitcoinPubkeys: AugmentedError<ApiType>;
+      InvalidXpubkey: AugmentedError<ApiType>;
       /**
        * Securitization percent would exceed the maximum allowed
        **/
@@ -750,6 +774,10 @@ declare module '@polkadot/api-base/types/errors' {
        **/
       NoVaultBitcoinPubkeysAvailable: AugmentedError<ApiType>;
       /**
+       * The vault bitcoin xpubkey has already been used
+       **/
+      ReusedVaultBitcoinXpub: AugmentedError<ApiType>;
+      /**
        * Terms are already scheduled to be changed
        **/
       TermsChangeAlreadyScheduled: AugmentedError<ApiType>;
@@ -757,13 +785,33 @@ declare module '@polkadot/api-base/types/errors' {
        * The terms modification list could not handle any more items
        **/
       TermsModificationOverflow: AugmentedError<ApiType>;
+      /**
+       * Unable to decode vault bitcoin pubkey
+       **/
+      UnableToDecodeVaultBitcoinPubkey: AugmentedError<ApiType>;
+      /**
+       * Unable to derive xpubkey child
+       **/
+      UnableToDeriveVaultXpubChild: AugmentedError<ApiType>;
+      /**
+       * Unable to generate a new vault bitcoin pubkey
+       **/
+      UnableToGenerateVaultBitcoinPubkey: AugmentedError<ApiType>;
       UnrecoverableHold: AugmentedError<ApiType>;
+      /**
+       * The XPub is unsafe to use in a public blockchain (aka, unhardened)
+       **/
+      UnsafeXpubkey: AugmentedError<ApiType>;
       VaultClosed: AugmentedError<ApiType>;
       VaultNotFound: AugmentedError<ApiType>;
       /**
        * This reduction in bond funds offered goes below the amount that is already committed to
        **/
       VaultReductionBelowAllocatedFunds: AugmentedError<ApiType>;
+      /**
+       * Wrong Xpub Network
+       **/
+      WrongXpubNetwork: AugmentedError<ApiType>;
     };
   } // AugmentedErrors
 } // declare module

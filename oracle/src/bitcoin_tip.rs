@@ -67,6 +67,7 @@ mod tests {
 		},
 		signer::Sr25519Signer,
 	};
+	use ulx_primitives::bitcoin::BitcoinNetwork;
 	use ulx_testing::UlxTestNode;
 
 	use super::*;
@@ -75,16 +76,25 @@ mod tests {
 	async fn test_bitcoin_loop() {
 		let _ = env_logger::builder().is_test(true).try_init();
 
-		let alice = sr25519::Pair::from_string("//Alice", None).unwrap();
+		let alice = sr25519::Pair::from_string("//Dave", None).unwrap();
 
 		let signer = Sr25519Signer::new(alice);
 		let ulx_node = UlxTestNode::start("alice".into()).await.expect("Failed to start ulx-node");
 		let bitcoind = ulx_node.bitcoind.as_ref().expect("Bitcoind not started");
+		let network: BitcoinNetwork = ulx_node
+			.client
+			.fetch_storage(&storage().bitcoin_utxos().bitcoin_network(), None)
+			.await
+			.unwrap()
+			.expect("Expected network")
+			.into();
+		let network: Network = network.into();
+
 		let address = bitcoind
 			.client
 			.get_new_address(None, None)
 			.unwrap()
-			.require_network(Network::Regtest)
+			.require_network(network)
 			.unwrap();
 		bitcoind.client.generate_to_address(5, &address).unwrap();
 

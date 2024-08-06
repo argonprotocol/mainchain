@@ -1,16 +1,17 @@
+use alloc::vec::Vec;
+
 use codec::{Codec, Decode, Encode, FullCodec, MaxEncodedLen};
 use scale_info::TypeInfo;
-use sp_arithmetic::{FixedI128, FixedPointNumber, Percent};
+use sp_arithmetic::{FixedI128, FixedPointNumber};
 use sp_core::{RuntimeDebug, H256, U256};
 use sp_runtime::{
 	traits::{AtLeast32BitUnsigned, Block as BlockT, CheckedDiv, UniqueSaturatedInto},
 	DispatchError, DispatchResult, FixedU128, Saturating,
 };
-use sp_std::vec::Vec;
 
 use crate::{
 	bitcoin::{
-		BitcoinCosignScriptPubkey, BitcoinHeight, BitcoinRejectedReason, Satoshis, UtxoId,
+		BitcoinCosignScriptPubkey, BitcoinHeight, BitcoinRejectedReason, Satoshis, UtxoId, UtxoRef,
 		SATOSHIS_PER_BITCOIN,
 	},
 	block_seal::{BlockPayout, MiningAuthority, RewardSharing},
@@ -69,8 +70,7 @@ pub trait PriceProvider<Balance: Codec + AtLeast32BitUnsigned> {
 	fn get_latest_argon_price_in_us_cents() -> Option<FixedU128>;
 
 	/// The argon CPI is the US CPI deconstructed by the Argon market price in Dollars.
-	/// This value has 3 decimal places of precision in a whole number (eg, 1 = 1_000, -1 = -1_000)
-	fn get_argon_cpi_price() -> Option<ArgonCPI>;
+	fn get_argon_cpi() -> Option<ArgonCPI>;
 }
 
 pub trait BitcoinUtxoTracker {
@@ -81,6 +81,7 @@ pub trait BitcoinUtxoTracker {
 		satoshis: Satoshis,
 		watch_for_spent_until: BitcoinHeight,
 	) -> Result<(), DispatchError>;
+	fn get(utxo_id: UtxoId) -> Option<UtxoRef>;
 	fn unwatch(utxo_id: UtxoId);
 }
 
@@ -169,7 +170,7 @@ pub trait MiningSlotProvider<BlockNumber> {
 	fn mining_window_blocks() -> BlockNumber;
 }
 
-pub type RewardShare = Percent;
+pub type RewardShare = FixedU128;
 pub trait AuthorityProvider<AuthorityId, Block, AccountId>
 where
 	Block: BlockT,

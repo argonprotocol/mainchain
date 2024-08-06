@@ -7,13 +7,13 @@ use sp_runtime::traits::{IdentifyAccount, Verify};
 
 use ulx_node_runtime::{opaque::SessionKeys, AccountId, Balance, Signature, WASM_BINARY};
 use ulx_primitives::{
+	bitcoin::BitcoinNetwork,
 	block_seal::{MiningRegistration, RewardDestination},
 	block_vote::VoteMinimum,
 	notary::{GenesisNotary, NotaryPublic},
 	tick::{Ticker, TICK_MILLIS},
 	BlockSealAuthorityId, ComputeDifficulty, ADDRESS_PREFIX,
 };
-
 // The URL for the telemetry server.
 // const STAGING_TELEMETRY_URL: &str = "wss://telemetry.polkadot.io/submit/";
 
@@ -68,15 +68,18 @@ pub fn development_config() -> Result<ChainSpec, String> {
 		)],
 		// Sudo account
 		get_account_id_from_seed::<sr25519::Public>("Alice"),
+		BitcoinNetwork::Regtest,
 		// Bitcoin utxo tip operator
-		get_account_id_from_seed::<sr25519::Public>("Alice"),
+		get_account_id_from_seed::<sr25519::Public>("Dave"),
 		// Price index operator
-		get_account_id_from_seed::<sr25519::Public>("Alice"),
+		get_account_id_from_seed::<sr25519::Public>("Eve"),
 		// Pre-funded accounts
 		vec![
 			get_account_id_from_seed::<sr25519::Public>("Alice"),
 			get_account_id_from_seed::<sr25519::Public>("Bob"),
 			get_account_id_from_seed::<sr25519::Public>("Ferdie"),
+			get_account_id_from_seed::<sr25519::Public>("Eve"),
+			get_account_id_from_seed::<sr25519::Public>("Dave"),
 		],
 		500,
 		(TICK_MILLIS * HASHES_PER_SECOND / 1_000) as ComputeDifficulty,
@@ -110,10 +113,11 @@ pub fn local_testnet_config() -> Result<ChainSpec, String> {
 		)],
 		// Sudo account
 		get_account_id_from_seed::<sr25519::Public>("Alice"),
+		BitcoinNetwork::Regtest,
 		// Bitcoin utxo tip operator
-		get_account_id_from_seed::<sr25519::Public>("Alice"),
+		get_account_id_from_seed::<sr25519::Public>("Dave"),
 		// Price index operator
-		get_account_id_from_seed::<sr25519::Public>("Alice"),
+		get_account_id_from_seed::<sr25519::Public>("Eve"),
 		// Pre-funded accounts
 		vec![
 			get_account_id_from_seed::<sr25519::Public>("Alice"),
@@ -141,6 +145,7 @@ pub fn local_testnet_config() -> Result<ChainSpec, String> {
 fn testnet_genesis(
 	initial_authorities: Vec<(AccountId, (BlockSealAuthorityId, GrandpaId))>,
 	root_key: AccountId,
+	bitcoin_network: BitcoinNetwork,
 	bitcoin_tip_operator: AccountId,
 	price_index_operator: AccountId,
 	endowed_accounts: Vec<AccountId>,
@@ -172,6 +177,7 @@ fn testnet_genesis(
 		},
 		"bitcoinUtxos": {
 			"operator": Some(bitcoin_tip_operator),
+			"network": bitcoin_network,
 		},
 		"miningSlot":  {
 			"minerZero": Some(miner_zero),

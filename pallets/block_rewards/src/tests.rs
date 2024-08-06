@@ -6,7 +6,7 @@ use frame_support::{
 		OnFinalize, OnInitialize,
 	},
 };
-use sp_runtime::{DispatchError, Percent, TokenError};
+use sp_runtime::{DispatchError, FixedU128, TokenError};
 
 use crate::{
 	mock::{ArgonBalances, BlockRewards, UlixeeBalances, *},
@@ -238,15 +238,15 @@ fn it_should_not_fail_with_no_notebooks() {
 		);
 		System::assert_has_event(
 			Event::RewardCreateError {
-				account_id: 1,
-				ulixees: 0u128.into(),
+				account_id: 2,
+				ulixees: 1u128.into(),
 				argons: None,
 				error: DispatchError::Token(TokenError::BelowMinimum),
 			}
 			.into(),
 		);
 		assert_eq!(
-			ArgonBalances::reducible_balance(&1, Preservation::Expendable, Fortitude::Polite),
+			ArgonBalances::reducible_balance(&2, Preservation::Expendable, Fortitude::Polite),
 			0
 		);
 	});
@@ -288,7 +288,7 @@ fn it_should_support_profit_sharing() {
 	});
 	GetRewardSharing::set(Some(RewardSharing {
 		account_id: 3,
-		percent_take: Percent::from_percent(40),
+		percent_take: FixedU128::from_rational(40, 100),
 	}));
 	NotebooksInBlock::set(vec![(1, 1, 1), (2, 1, 1)]);
 	CurrentTick::set(1);

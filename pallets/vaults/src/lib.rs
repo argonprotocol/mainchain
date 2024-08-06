@@ -1,4 +1,5 @@
 #![cfg_attr(not(feature = "std"), no_std)]
+extern crate alloc;
 
 pub use pallet::*;
 pub use weights::*;
@@ -24,6 +25,9 @@ pub mod weights;
 /// on unlock.
 #[frame_support::pallet(dev_mode)]
 pub mod pallet {
+	use alloc::vec;
+	use core::fmt::Debug;
+
 	use codec::Codec;
 	use frame_support::{
 		pallet_prelude::*,
@@ -41,18 +45,17 @@ pub mod pallet {
 		DispatchError::Token,
 		FixedPointNumber, FixedU128, Saturating, TokenError,
 	};
-	use sp_std::{fmt::Debug, vec};
 
+	use super::*;
+	use ulx_bitcoin::{CosignScript, CosignScriptArgs};
 	use ulx_primitives::{
 		bitcoin::{
-			create_timelock_multisig_script, BitcoinCosignScriptPubkey, BitcoinHeight,
-			BitcoinPubkeyHash, UtxoId,
+			BitcoinCosignScriptPubkey, BitcoinHeight, BitcoinNetwork, BitcoinXPub,
+			CompressedBitcoinPubkey, OpaqueBitcoinXpub, UtxoId,
 		},
 		bond::{Bond, BondError, BondType, Vault, VaultArgons, VaultProvider, VaultTerms},
 		MiningSlotProvider, VaultId,
 	};
-
-	use super::*;
 
 	#[pallet::pallet]
 	pub struct Pallet<T>(_);
@@ -70,7 +73,7 @@ pub mod pallet {
 			+ codec::FullCodec
 			+ Copy
 			+ MaybeSerializeDeserialize
-			+ sp_std::fmt::Debug
+			+ core::fmt::Debug
 			+ Default
 			+ From<u128>
 			+ TryInto<u128>
@@ -88,9 +91,6 @@ pub mod pallet {
 		#[pallet::constant]
 		type BlocksPerDay: Get<BlockNumberFor<Self>>;
 
-		/// The max amount of pending bitcoin pubkey hashes allowed
-		#[pallet::constant]
-		type MaxPendingVaultBitcoinPubkeys: Get<u32>;
 		/// The max pending vault term changes per block
 		#[pallet::constant]
 		type MaxPendingTermModificationsPerBlock: Get<u32>;
@@ -103,6 +103,9 @@ pub mod pallet {
 
 		/// A provider of mining slot information
 		type MiningSlotProvider: MiningSlotProvider<BlockNumberFor<Self>>;
+
+		/// Provides the bitcoin network this blockchain is connected to
+		type GetBitcoinNetwork: Get<BitcoinNetwork>;
 	}
 
 	/// A reason for the pallet placing a hold on funds.
@@ -125,15 +128,11 @@ pub mod pallet {
 		OptionQuery,
 	>;
 
-	/// Vault Bitcoin Pubkeys by VaultId
+	/// Vault Bitcoin Xpub and current child counter by VaultId
 	#[pallet::storage]
-	pub(super) type VaultPubkeysById<T: Config> = StorageMap<
-		_,
-		Twox64Concat,
-		VaultId,
-		BoundedVec<BitcoinPubkeyHash, T::MaxPendingVaultBitcoinPubkeys>,
-		OptionQuery,
-	>;
+	pub(super) type VaultXPubById<T: Config> =
+		StorageMap<_, Twox64Concat, VaultId, (BitcoinXPub, u32), OptionQuery>;
+
 	/// Pending terms that will be committed at the given block number (must be a minimum of 1 slot
 	/// change away)
 	#[pallet::storage]
@@ -174,6 +173,9 @@ pub mod pallet {
 			mining_amount_still_bonded: T::Balance,
 			securitization_still_bonded: T::Balance,
 		},
+		VaultBitcoinXpubChange {
+			vault_id: VaultId,
+		},
 	}
 
 	#[pallet::error]
@@ -196,10 +198,10 @@ pub mod pallet {
 		/// This reduction in bond funds offered goes below the amount that is already committed to
 		VaultReductionBelowAllocatedFunds,
 		/// An invalid securitization percent was provided for the vault. NOTE: it cannot be
-		/// decreased
+		/// decreased (or negative)
 		InvalidSecuritization,
-		/// The maximum number of bitcoin pubkeys for a vault has been exceeded
-		MaxPendingVaultBitcoinPubkeys,
+		/// The vault bitcoin xpubkey has already been used
+		ReusedVaultBitcoinXpub,
 		/// Securitization percent would exceed the maximum allowed
 		MaxSecuritizationPercentExceeded,
 		InvalidBondType,
@@ -208,6 +210,16 @@ pub mod pallet {
 		NoBitcoinPricesAvailable,
 		/// The bitcoin script to lock this bitcoin has errors
 		InvalidBitcoinScript,
+		/// Unable to decode xpubkey
+		InvalidXpubkey,
+		/// Wrong Xpub Network
+		WrongXpubNetwork,
+		/// The XPub is unsafe to use in a public blockchain (aka, unhardened)
+		UnsafeXpubkey,
+		/// Unable to derive xpubkey child
+		UnableToDeriveVaultXpubChild,
+		/// Bitcoin conversion to compressed pubkey failed
+		BitcoinConversionFailed,
 		ExpirationTooSoon,
 		NoPermissions,
 		HoldUnexpectedlyModified,
@@ -221,6 +233,12 @@ pub mod pallet {
 		TermsModificationOverflow,
 		/// Terms are already scheduled to be changed
 		TermsChangeAlreadyScheduled,
+		/// An internal processing error occurred
+		InternalError,
+		/// Unable to generate a new vault bitcoin pubkey
+		UnableToGenerateVaultBitcoinPubkey,
+		/// Unable to decode vault bitcoin pubkey
+		UnableToDecodeVaultBitcoinPubkey,
 	}
 
 	impl<T> From<BondError> for Error<T> {
@@ -245,6 +263,11 @@ pub mod pallet {
 				BondError::InvalidBitcoinScript => Error::<T>::InvalidBitcoinScript,
 				BondError::NoVaultBitcoinPubkeysAvailable =>
 					Error::<T>::NoVaultBitcoinPubkeysAvailable,
+				BondError::InternalError => Error::<T>::InternalError,
+				BondError::UnableToGenerateVaultBitcoinPubkey =>
+					Error::<T>::UnableToGenerateVaultBitcoinPubkey,
+				BondError::UnableToDecodeVaultBitcoinPubkey =>
+					Error::<T>::UnableToDecodeVaultBitcoinPubkey,
 			}
 		}
 	}
@@ -259,18 +282,16 @@ pub mod pallet {
 		TypeInfo,
 		MaxEncodedLen,
 	)]
-	#[scale_info(skip_type_params(MaxPendingVaultBitcoinPubkeys))]
 	pub struct VaultConfig<
 		Balance: Codec + MaxEncodedLen + Clone + TypeInfo + PartialEq + Eq + Debug,
-		MaxPendingVaultBitcoinPubkeys: Get<u32>,
 	> {
 		/// Terms of this vault configuration
 		pub terms: VaultTerms<Balance>,
 		/// The amount of argons to be vaulted for bitcoin bonds
 		#[codec(compact)]
 		pub bitcoin_amount_allocated: Balance,
-		/// An initial set of public keys to be used for bitcoin bonds
-		pub bitcoin_pubkey_hashes: BoundedVec<BitcoinPubkeyHash, MaxPendingVaultBitcoinPubkeys>,
+		/// Bytes for a hardened XPub. Will be used to generate child public keys
+		pub bitcoin_xpubkey: OpaqueBitcoinXpub,
 		/// The amount of argons to be vaulted for mining bonds
 		#[codec(compact)]
 		pub mining_amount_allocated: Balance,
@@ -311,7 +332,7 @@ pub mod pallet {
 		#[pallet::weight(0)]
 		pub fn create(
 			origin: OriginFor<T>,
-			vault_config: VaultConfig<T::Balance, T::MaxPendingVaultBitcoinPubkeys>,
+			vault_config: VaultConfig<T::Balance>,
 		) -> DispatchResult {
 			let who = ensure_signed(origin)?;
 			let VaultConfig {
@@ -319,7 +340,7 @@ pub mod pallet {
 				terms,
 				bitcoin_amount_allocated,
 				mining_amount_allocated,
-				bitcoin_pubkey_hashes,
+				bitcoin_xpubkey,
 			} = vault_config;
 			let VaultTerms {
 				bitcoin_annual_percent_rate,
@@ -330,13 +351,22 @@ pub mod pallet {
 			} = terms;
 
 			ensure!(
-				securitization_percent <= FixedU128::from_rational(2, 1),
-				Error::<T>::MaxSecuritizationPercentExceeded
-			);
-			ensure!(
 				bitcoin_amount_allocated.checked_add(&mining_amount_allocated).is_some(),
 				Error::<T>::InvalidVaultAmount
 			);
+
+			let xpub: BitcoinXPub = bitcoin_xpubkey.try_into().map_err(|e| {
+				log::error!("Unable to decode xpubkey: {:?}", e);
+				Error::<T>::InvalidXpubkey
+			})?;
+			ensure!(xpub.is_hardened(), Error::<T>::UnsafeXpubkey);
+			ensure!(
+				xpub.matches_network(T::GetBitcoinNetwork::get()),
+				Error::<T>::WrongXpubNetwork
+			);
+			// make sure we can derive
+			let _xpub =
+				xpub.derive_pubkey(0).map_err(|_| Error::<T>::UnableToDeriveVaultXpubChild)?;
 
 			let vault_id = NextVaultId::<T>::get().unwrap_or(1);
 			let next_vault_id = vault_id.increment().ok_or(Error::<T>::NoMoreVaultIds)?;
@@ -362,9 +392,8 @@ pub mod pallet {
 				is_closed: false,
 				pending_terms: None,
 			};
-			VaultPubkeysById::<T>::insert(vault_id, bitcoin_pubkey_hashes);
-
 			vault.securitized_argons = vault.get_minimum_securitization_needed();
+			VaultXPubById::<T>::insert(vault_id, (xpub, 0));
 
 			Self::hold(
 				&who,
@@ -496,7 +525,7 @@ pub mod pallet {
 
 			PendingTermsModificationsByBlock::<T>::mutate(terms_change_block, |a| {
 				if !a.iter().any(|x| *x == vault_id) {
-					return a.try_push(vault_id)
+					return a.try_push(vault_id);
 				}
 				Ok(())
 			})
@@ -556,13 +585,14 @@ pub mod pallet {
 			Ok(())
 		}
 
-		/// Add public key hashes to the vault. Will be inserted at the beginning of the list.
+		/// Replace the bitcoin xpubkey for this vault. This will not affect existing bonds, but
+		/// will be used for any bonds after this point. Will be rejected if already used.
 		#[pallet::call_index(4)]
 		#[pallet::weight(0)]
-		pub fn add_bitcoin_pubkey_hashes(
+		pub fn replace_bitcoin_xpub(
 			origin: OriginFor<T>,
 			vault_id: VaultId,
-			bitcoin_pubkey_hashes: BoundedVec<BitcoinPubkeyHash, T::MaxPendingVaultBitcoinPubkeys>,
+			bitcoin_xpub: OpaqueBitcoinXpub,
 		) -> DispatchResult {
 			let who = ensure_signed(origin)?;
 
@@ -571,18 +601,20 @@ pub mod pallet {
 
 			ensure!(vault.operator_account_id == who, Error::<T>::NoPermissions);
 
-			VaultPubkeysById::<T>::try_mutate(vault_id, |x| {
-				if let Some(x) = x {
-					let mut bitcoin_pubkey_hashes = bitcoin_pubkey_hashes;
-					bitcoin_pubkey_hashes
-						.try_append(&mut x.to_vec())
-						.map_err(|_| Error::<T>::MaxPendingVaultBitcoinPubkeys)?;
-					*x = bitcoin_pubkey_hashes;
-				} else {
-					*x = Some(bitcoin_pubkey_hashes);
-				}
-				Ok::<(), Error<T>>(())
-			})?;
+			let xpub =
+				BitcoinXPub::try_from(bitcoin_xpub).map_err(|_| Error::<T>::InvalidXpubkey)?;
+			if let Some(existing) = VaultXPubById::<T>::get(vault_id) {
+				ensure!(existing.0 != xpub, Error::<T>::ReusedVaultBitcoinXpub);
+			}
+			ensure!(xpub.is_hardened(), Error::<T>::UnsafeXpubkey);
+			ensure!(
+				xpub.matches_network(T::GetBitcoinNetwork::get()),
+				Error::<T>::WrongXpubNetwork
+			);
+			let _try_derive =
+				xpub.derive_pubkey(0).map_err(|_| Error::<T>::UnableToDeriveVaultXpubChild)?;
+			VaultXPubById::<T>::insert(vault_id, (xpub, 0));
+			Self::deposit_event(Event::VaultBitcoinXpubChange { vault_id });
 
 			Ok(())
 		}
@@ -786,24 +818,30 @@ pub mod pallet {
 			if still_owed > zero && vault.bitcoin_argons.free_balance() >= zero {
 				let amount_to_pull = still_owed.min(vault.bitcoin_argons.free_balance());
 				vault.bitcoin_argons.destroy_allocated_funds(amount_to_pull)?;
-				still_owed -= amount_to_pull;
+				still_owed =
+					still_owed.checked_sub(&amount_to_pull).ok_or(BondError::InternalError)?;
 			}
 
 			// 3. Use securitized argons
 			if still_owed > zero && vault.securitized_argons >= zero {
 				let amount_to_pull = still_owed.min(vault.securitized_argons);
-				vault.securitized_argons -= amount_to_pull;
-				still_owed -= amount_to_pull;
+				vault.securitized_argons = vault
+					.securitized_argons
+					.checked_sub(&amount_to_pull)
+					.ok_or(BondError::InternalError)?;
+				still_owed =
+					still_owed.checked_sub(&amount_to_pull).ok_or(BondError::InternalError)?;
 			}
 
 			// 3. Use ulixee shares at current value
 			// TODO
 
+			let recouped = market_rate.saturating_sub(still_owed);
 			T::Currency::transfer_on_hold(
 				&HoldReason::EnterVault.into(),
 				&vault_operator,
 				bonded_account_id,
-				market_rate - still_owed,
+				recouped,
 				Precision::Exact,
 				Restriction::Free,
 				Fortitude::Force,
@@ -812,7 +850,7 @@ pub mod pallet {
 
 			VaultsById::<T>::insert(vault_id, vault);
 
-			Ok(market_rate - still_owed)
+			Ok(recouped)
 		}
 
 		fn release_bonded_funds(
@@ -836,7 +874,7 @@ pub mod pallet {
 
 				Self::release_hold(
 					&vault.operator_account_id,
-					bond.amount + free_securitization,
+					bond.amount.saturating_add(free_securitization),
 					HoldReason::EnterVault,
 				)
 				.map_err(|_| BondError::UnrecoverableHold)?;
@@ -877,30 +915,48 @@ pub mod pallet {
 		fn create_utxo_script_pubkey(
 			vault_id: VaultId,
 			_utxo_id: UtxoId,
-			owner_pubkey_hash: BitcoinPubkeyHash,
+			owner_pubkey: CompressedBitcoinPubkey,
 			vault_claim_height: BitcoinHeight,
 			open_claim_height: BitcoinHeight,
-		) -> Result<(BitcoinPubkeyHash, BitcoinCosignScriptPubkey), BondError> {
-			let vault_pubkey_hash = VaultPubkeysById::<T>::mutate(vault_id, |a| {
-				if let Some(a) = a {
-					Ok(a.pop())
-				} else {
-					Err(BondError::VaultNotFound)
-				}
-			})?
-			.ok_or(BondError::NoVaultBitcoinPubkeysAvailable)?;
+			current_height: BitcoinHeight,
+		) -> Result<(BitcoinXPub, BitcoinXPub, BitcoinCosignScriptPubkey), BondError> {
+			let (vault_xpubkey, vault_claim_pubkey) = VaultXPubById::<T>::mutate(vault_id, |a| {
+				let (xpub, counter) =
+					a.as_mut().ok_or(BondError::NoVaultBitcoinPubkeysAvailable)?;
 
-			let script_pubkey = create_timelock_multisig_script(
-				vault_pubkey_hash,
-				owner_pubkey_hash,
+				let mut next =
+					counter.checked_add(1).ok_or(BondError::UnableToGenerateVaultBitcoinPubkey)?;
+				let pubkey = xpub
+					.derive_pubkey(next)
+					.map_err(|_| BondError::UnableToGenerateVaultBitcoinPubkey)?;
+
+				next = next.checked_add(1).ok_or(BondError::UnableToGenerateVaultBitcoinPubkey)?;
+				let pubkey2 = xpub
+					.derive_pubkey(next)
+					.map_err(|_| BondError::UnableToGenerateVaultBitcoinPubkey)?;
+
+				*a = Some((xpub.clone(), next));
+				Ok((pubkey, pubkey2))
+			})?;
+
+			let script_args = CosignScriptArgs {
+				vault_pubkey: vault_xpubkey.public_key,
+				vault_claim_pubkey: vault_claim_pubkey.public_key,
+				owner_pubkey,
 				vault_claim_height,
 				open_claim_height,
-			)
-			.map_err(|_| BondError::InvalidBitcoinScript)?;
+				created_at_height: current_height,
+			};
+
+			let network = T::GetBitcoinNetwork::get();
+			let script_pubkey = CosignScript::new(script_args, network.into())
+				.map_err(|_| BondError::InvalidBitcoinScript)?;
 
 			Ok((
-				vault_pubkey_hash,
+				vault_xpubkey,
+				vault_claim_pubkey,
 				script_pubkey
+					.script
 					.to_p2wsh()
 					.try_into()
 					.map_err(|_| BondError::InvalidBitcoinScript)?,

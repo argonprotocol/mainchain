@@ -3,7 +3,7 @@ use frame_support::{CloneNoBound, EqNoBound, Parameter, PartialEqNoBound};
 use scale_info::TypeInfo;
 use serde::{Deserialize, Serialize};
 use sp_application_crypto::AppCrypto;
-use sp_arithmetic::Percent;
+use sp_arithmetic::FixedU128;
 use sp_core::{
 	crypto::{CryptoTypeId, KeyTypeId},
 	OpaquePeerId,
@@ -62,7 +62,7 @@ pub struct MiningRegistration<AccountId: Parameter, Balance: Parameter + MaxEnco
 pub struct RewardSharing<AccountId> {
 	pub account_id: AccountId,
 	#[codec(compact)]
-	pub percent_take: Percent,
+	pub percent_take: FixedU128,
 }
 
 /// A destination account for validator rewards

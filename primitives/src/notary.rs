@@ -1,11 +1,12 @@
+use alloc::{collections::btree_map::BTreeMap, vec::Vec};
 use codec::{Codec, Decode, Encode, MaxEncodedLen};
+use core::fmt::Debug;
 use frame_support::pallet_prelude::ConstU32;
 use frame_support_procedural::{CloneNoBound, PartialEqNoBound, RuntimeDebugNoBound};
 use scale_info::TypeInfo;
 use serde::{Deserialize, Serialize};
 use sp_core::{ed25519, Get, RuntimeDebug, H256};
 use sp_runtime::{traits::Block as BlockT, BoundedVec};
-use sp_std::{collections::btree_map::BTreeMap, fmt::Debug, vec::Vec};
 
 use crate::{
 	host::Host, tick::Tick, BlockVotingPower, NotebookHeader, NotebookNumber, NotebookSecret,

@@ -6,7 +6,6 @@ use frame_system::RawOrigin;
 use pallet_timestamp::Pallet as Timestamp;
 use primitives::{CurrencyId::Token, TokenSymbol::*};
 use sp_runtime::FixedPointNumber;
-use sp_std::prelude::*;
 
 type MomentOf<T> = <T as pallet_timestamp::Config>::Moment;
 

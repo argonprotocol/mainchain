@@ -1,4 +1,4 @@
-use std::sync::Arc;
+use std::{io::Write, sync::Arc};
 
 use anyhow::anyhow;
 use jsonrpsee::{
@@ -9,13 +9,14 @@ use jsonrpsee::{
 use sp_core::{crypto::AccountId32, H256};
 use subxt::{
 	backend::{legacy::LegacyRpcMethods, rpc::RpcClient, BlockRef},
-	config::{Config, DefaultExtrinsicParams, DefaultExtrinsicParamsBuilder},
+	config::{Config, DefaultExtrinsicParams, DefaultExtrinsicParamsBuilder, ExtrinsicParams},
 	error::{Error, RpcError},
+	ext::subxt_core::tx::payload::ValidationDetails,
 	runtime_api::Payload as RuntimeApiPayload,
 	storage::Address as StorageAddress,
-	tx::{TxInBlock, TxProgress, TxStatus},
+	tx::{Payload, Signer, TxInBlock, TxProgress, TxStatus},
 	utils::Yes,
-	OnlineClient,
+	Metadata, OnlineClient,
 };
 use tokio::{
 	sync::{mpsc, Mutex, RwLock},
@@ -24,11 +25,11 @@ use tokio::{
 use tracing::warn;
 
 pub use spec::api;
-use ulx_primitives::{AccountId, Nonce};
+use ulx_primitives::{AccountId, BlockNumber, Nonce};
 
 use crate::api::{storage, system, ulixee_balances};
 
-mod conversion;
+pub mod conversion;
 pub mod signer;
 mod spec;
 
@@ -102,6 +103,50 @@ impl MainchainClient {
 		Self::new(ws_client, url.to_string()).await
 	}
 
+	pub fn create_polkadotjs_deeplink<Call: Payload>(&self, call: &Call) -> anyhow::Result<String> {
+		let ext_data = self.live.tx().call_data(call)?;
+		let mut url = Url::parse(&format!(
+			"https://polkadot.js.org/apps/#/extrinsics/decode/0x{}",
+			hex::encode(ext_data)
+		))?;
+		url.set_query(Some(&format!("rpc={}", self.url)));
+		Ok(url.to_string())
+	}
+
+	pub fn extract_call_data(&self, cli_text: &str) -> anyhow::Result<Vec<u8>> {
+		let Some(ext_str) = cli_text.split("/extrinsics/decode/0x").last() else {
+			return Err(anyhow!("Invalid cli text"));
+		};
+
+		let ext_data = hex::decode(ext_str.trim())?;
+		Ok(ext_data)
+	}
+
+	pub async fn submit_from_polkadot_url(
+		&self,
+		message: &str,
+		signer: &impl Signer<UlxConfig>,
+		params: Option<<UlxExtrinsicParams<UlxConfig> as ExtrinsicParams<UlxConfig>>::Params>,
+	) -> anyhow::Result<TxProgress<UlxConfig, OnlineClient<UlxConfig>>> {
+		let ext_data = self.extract_call_data(message)?;
+		self.submit_raw(ext_data, signer, params).await
+	}
+
+	pub async fn submit_raw(
+		&self,
+		payload: Vec<u8>,
+		signer: &impl Signer<UlxConfig>,
+		params: Option<<UlxExtrinsicParams<UlxConfig> as ExtrinsicParams<UlxConfig>>::Params>,
+	) -> anyhow::Result<TxProgress<UlxConfig, OnlineClient<UlxConfig>>> {
+		let payload = RawPayload(payload);
+		let tx_progress = self
+			.live
+			.tx()
+			.sign_and_submit_then_watch(&payload, signer, params.unwrap_or_default())
+			.await?;
+		Ok(tx_progress)
+	}
+
 	pub async fn try_until_connected(
 		url: &str,
 		retry_delay_millis: u64,
@@ -170,6 +215,26 @@ impl MainchainClient {
 	) -> anyhow::Result<Nonce> {
 		let nonce = self.methods.system_account_next_index(account_id32).await?;
 		Ok(nonce as Nonce)
+	}
+
+	pub async fn block_at_height(&self, height: BlockNumber) -> anyhow::Result<Option<H256>> {
+		let best_block = self.best_block_hash().await?;
+		let block_hash = self
+			.fetch_storage(&storage().system().block_hash(height), Some(best_block))
+			.await?;
+		Ok(block_hash)
+	}
+
+	pub async fn block_number(
+		&self,
+		hash: <UlxConfig as Config>::Hash,
+	) -> anyhow::Result<BlockNumber> {
+		self.live
+			.backend()
+			.block_header(hash)
+			.await?
+			.map(|a| a.number)
+			.ok_or_else(|| anyhow!("Block header not found for block hash"))
 	}
 
 	pub async fn best_block_hash(&self) -> anyhow::Result<H256> {
@@ -284,6 +349,21 @@ impl MainchainClient {
 			.enable_ws_ping(PingConfig::default())
 			.build_with_tokio(sender, receiver);
 		Ok(client)
+	}
+}
+
+struct RawPayload(Vec<u8>);
+impl Payload for RawPayload {
+	fn encode_call_data_to(
+		&self,
+		_metadata: &Metadata,
+		out: &mut Vec<u8>,
+	) -> Result<(), subxt::ext::subxt_core::Error> {
+		out.write(&self.0).map_err(|_| codec::Error::from("Failed to write"))?;
+		Ok(())
+	}
+	fn validation_details(&self) -> Option<ValidationDetails<'_>> {
+		None
 	}
 }
 

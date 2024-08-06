@@ -1,13 +1,14 @@
 #![cfg_attr(not(feature = "std"), no_std)]
 // `construct_runtime!` does a lot of recursion and requires us to increase the limit to 256.
 #![recursion_limit = "256"]
-
-extern crate alloc;
 #[cfg(feature = "runtime-benchmarks")]
 #[macro_use]
 extern crate frame_benchmarking;
+extern crate alloc;
 
+use alloc::{boxed::Box, collections::btree_map::BTreeMap, vec, vec::Vec};
 use codec::{Decode, Encode, MaxEncodedLen};
+use core::marker::PhantomData;
 pub use frame_support::{
 	construct_runtime, parameter_types,
 	traits::{
@@ -28,7 +29,6 @@ use frame_support::{
 	traits::{Contains, Currency, InsideBoth, OnUnbalanced},
 	PalletId,
 };
-use sp_std::marker::PhantomData;
 // Configure FRAME pallets to include in runtime.
 use frame_support::{
 	traits::{fungible, fungible::Balanced, Everything, Imbalance, InstanceFilter, StorageMapShim},
@@ -43,7 +43,7 @@ use pallet_tx_pause::RuntimeCallNameOf;
 use scale_info::TypeInfo;
 use smallvec::smallvec;
 use sp_api::impl_runtime_apis;
-use sp_arithmetic::{traits::Zero, FixedPointNumber, FixedU128, Percent};
+use sp_arithmetic::{traits::Zero, FixedPointNumber, FixedU128};
 use sp_consensus_grandpa::AuthorityId as GrandpaId;
 use sp_core::{crypto::KeyTypeId, ConstU16, OpaqueMetadata, H256, U256};
 use sp_debug_derive::RuntimeDebug;
@@ -56,12 +56,13 @@ use sp_runtime::{
 	ApplyExtrinsicResult, BoundedVec, DispatchError,
 };
 pub use sp_runtime::{Perbill, Permill};
-use sp_std::{collections::btree_map::BTreeMap, prelude::*, vec::Vec};
+
 #[cfg(feature = "std")]
 use sp_version::NativeVersion;
 use sp_version::RuntimeVersion;
 
 pub use currency::*;
+use pallet_bond::BitcoinVerifier;
 pub use pallet_notebook::NotebookVerifyError;
 use ulx_primitives::{
 	bitcoin::{BitcoinHeight, BitcoinSyncStatus, Satoshis, UtxoRef, UtxoValue},
@@ -238,7 +239,7 @@ parameter_types! {
 	pub const StartingUlixeesPerBlock: u32 = 5_000;
 	pub const HalvingBlocks: u32 = 2_100_000; // based on bitcoin, but 10x since we're block per minute
 	pub const MaturationBlocks: u32 = 5;
-	pub const MinerPayoutPercent: Percent = Percent::from_percent(75);
+	pub const MinerPayoutPercent: FixedU128 = FixedU128::from_rational(75, 100);
 	pub const DomainExpirationTicks: u32 = 60 * 24 * 365; // 1 year
 	pub const HistoricalPaymentAddressTicksToKeep: u32 = ESCROW_EXPIRATION_TICKS + ESCROW_CLAWBACK_TICKS + 10;
 }
@@ -337,7 +338,6 @@ parameter_types! {
 
 	pub const MaxUnlockingUtxos: u32 = 1000;
 	pub const MinBitcoinSatoshiAmount: Satoshis = 10_000_000; // 1/10th bitcoin minimum
-	pub const MaxPendingBitcoinPubkeysPerVault: u32 = 100;
 	pub const MaxPendingTermModificationsPerBlock: u32 = 100;
 	pub const MinTermsModificationBlockDelay: u32 = 1439; // must be at least one slot (day)
 }
@@ -350,12 +350,14 @@ impl pallet_vaults::Config for Runtime {
 	type RuntimeHoldReason = RuntimeHoldReason;
 	type MinimumBondAmount = MinimumBondAmount;
 	type BlocksPerDay = BlocksPerDay;
-	type MaxPendingVaultBitcoinPubkeys = MaxPendingBitcoinPubkeysPerVault;
 	type MaxPendingTermModificationsPerBlock = MaxPendingTermModificationsPerBlock;
 	type MiningSlotProvider = MiningSlot;
 	type MinTermsModificationBlockDelay = MinTermsModificationBlockDelay;
+	type GetBitcoinNetwork = BitcoinUtxos;
 }
 
+pub struct BitcoinSignatureVerifier;
+impl BitcoinVerifier<Runtime> for BitcoinSignatureVerifier {}
 impl pallet_bond::Config for Runtime {
 	type RuntimeEvent = RuntimeEvent;
 	type WeightInfo = pallet_bond::weights::SubstrateWeight<Runtime>;
@@ -367,6 +369,7 @@ impl pallet_bond::Config for Runtime {
 	type VaultProvider = Vaults;
 	type PriceProvider = PriceIndex;
 	type BitcoinBlockHeight = BitcoinUtxos;
+	type GetBitcoinNetwork = BitcoinUtxos;
 	type BitcoinBondDurationBlocks = BitcoinBondDurationBlocks;
 	type BitcoinBondReclamationBlocks = BitcoinBondReclamationBlocks;
 	type BitcoinUtxoTracker = BitcoinUtxos;
@@ -375,6 +378,7 @@ impl pallet_bond::Config for Runtime {
 	type MinimumBitcoinBondSatoshis = MinBitcoinSatoshiAmount;
 	type UlixeeBlocksPerDay = BlocksPerDay;
 	type UtxoUnlockCosignDeadlineBlocks = UtxoUnlockCosignDeadlineBlocks;
+	type BitcoinSignatureVerifier = BitcoinSignatureVerifier;
 }
 
 impl pallet_mining_slot::Config for Runtime {
@@ -750,7 +754,7 @@ impl WeightToFeePolynomial for WageProtectorFee {
 	/// This function attempts to add some weight to larger transactions, but given the 3 digits of
 	/// milligons to work with, it can be difficult to scale this properly.
 	fn polynomial() -> WeightToFeeCoefficients<Self::Balance> {
-		let cpi = PriceIndex::get_argon_cpi_price().unwrap_or(ArgonCPI::zero());
+		let cpi = PriceIndex::get_argon_cpi().unwrap_or(ArgonCPI::zero());
 		let mut p = 1_000; // milligons
 		if cpi.is_positive() {
 			let cpi = cpi.into_inner() / ArgonCPI::accuracy();
@@ -922,7 +926,7 @@ impl_runtime_apis! {
 			Runtime::metadata_at_version(version)
 		}
 
-		fn metadata_versions() -> sp_std::vec::Vec<u32> {
+		fn metadata_versions() -> alloc::vec::Vec<u32> {
 			Runtime::metadata_versions()
 		}
 	}
@@ -1114,6 +1118,10 @@ impl_runtime_apis! {
 
 		fn redemption_rate(satoshis: Satoshis) -> Option<Balance> {
 			Bonds::get_redemption_price(&satoshis).ok()
+		}
+
+		fn market_rate(satoshis: Satoshis) -> Option<Balance> {
+			PriceIndex::get_bitcoin_argon_price(satoshis)
 		}
 	}
 

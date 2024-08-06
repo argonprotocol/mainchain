@@ -1,4 +1,5 @@
 #![cfg_attr(not(feature = "std"), no_std)]
+extern crate alloc;
 
 pub use pallet::*;
 pub use weights::*;
@@ -16,22 +17,26 @@ pub mod weights;
 const LOG_TARGET: &str = "runtime::block_rewards";
 #[frame_support::pallet(dev_mode)]
 pub mod pallet {
+	use alloc::{vec, vec::Vec};
+	use core::any::TypeId;
+
 	use frame_support::{
 		pallet_prelude::*,
 		traits::fungible::{InspectFreeze, Mutate, MutateFreeze},
 	};
 	use frame_system::pallet_prelude::*;
 	use sp_runtime::{
-		traits::{AtLeast32BitUnsigned, UniqueSaturatedInto},
-		Percent, Saturating,
+		traits::{AtLeast32BitUnsigned, One, UniqueSaturatedInto},
+		FixedPointNumber, FixedU128, Saturating,
 	};
-	use sp_std::{any::TypeId, vec, vec::Vec};
 
-	use super::*;
+	use sp_arithmetic::per_things::SignedRounding;
 	use ulx_primitives::{
 		block_seal::BlockPayout, notary::NotaryProvider, tick::Tick, BlockRewardAccountsProvider,
 		BlockRewardsEventHandler, BlockSealerProvider, NotebookProvider,
 	};
+
+	use super::*;
 
 	/// A reason for the pallet placing a hold on funds.
 	#[pallet::composite_enum]
@@ -62,7 +67,7 @@ pub mod pallet {
 			+ codec::FullCodec
 			+ Copy
 			+ MaybeSerializeDeserialize
-			+ sp_std::fmt::Debug
+			+ core::fmt::Debug
 			+ Default
 			+ From<u128>
 			+ TryInto<u128>
@@ -88,7 +93,7 @@ pub mod pallet {
 
 		/// Percent as a number out of 100 of the block reward that goes to the miner.
 		#[pallet::constant]
-		type MinerPayoutPercent: Get<Percent>;
+		type MinerPayoutPercent: Get<FixedU128>;
 
 		/// Blocks until a block reward is mature
 		#[pallet::constant]
@@ -218,8 +223,8 @@ pub mod pallet {
 
 			let miner_percent = T::MinerPayoutPercent::get();
 
-			let miner_ulixees: T::Balance = miner_percent.mul_ceil(block_ulixees);
-			let miner_argons: T::Balance = miner_percent.mul_ceil(block_argons);
+			let miner_ulixees: T::Balance = Self::saturating_mul_ceil(miner_percent, block_ulixees);
+			let miner_argons: T::Balance = Self::saturating_mul_ceil(miner_percent, block_argons);
 
 			let (assigned_rewards_account, reward_sharing) =
 				T::BlockRewardAccountsProvider::get_rewards_account(
@@ -234,7 +239,8 @@ pub mod pallet {
 				argons: miner_argons,
 			}];
 			if let Some(sharing) = reward_sharing {
-				let sharing_amount: T::Balance = sharing.percent_take.mul_ceil(miner_argons);
+				let sharing_amount: T::Balance =
+					Self::saturating_mul_ceil(sharing.percent_take, miner_argons);
 				rewards[0].argons = miner_argons.saturating_sub(sharing_amount);
 				rewards.push(BlockPayout {
 					account_id: sharing.account_id,
@@ -255,11 +261,13 @@ pub mod pallet {
 
 			let reward_height = n.saturating_add(T::MaturationBlocks::get().into());
 			for reward in rewards.iter_mut() {
+				let start_argons = reward.argons.clone();
+				let start_ulixees = reward.ulixees.clone();
 				if let Err(e) = Self::mint_and_freeze::<T::ArgonCurrency>(reward) {
 					log::error!(target: LOG_TARGET, "Failed to mint argons for reward: {:?}, {:?}", reward, e);
 					Self::deposit_event(Event::RewardCreateError {
 						account_id: reward.account_id.clone(),
-						argons: Some(reward.argons),
+						argons: Some(start_argons),
 						ulixees: None,
 						error: e,
 					});
@@ -269,7 +277,7 @@ pub mod pallet {
 					Self::deposit_event(Event::RewardCreateError {
 						account_id: reward.account_id.clone(),
 						argons: None,
-						ulixees: Some(reward.ulixees),
+						ulixees: Some(start_ulixees),
 						error: e,
 					});
 				}
@@ -328,6 +336,16 @@ pub mod pallet {
 			let frozen = C::balance_frozen(&freeze_id, account);
 			C::set_freeze(&freeze_id, account, frozen.saturating_sub(amount))?;
 			Ok(())
+		}
+
+		fn saturating_mul_ceil(percent: FixedU128, balance: T::Balance) -> T::Balance {
+			let other =
+				FixedU128::from_u32(UniqueSaturatedInto::<u32>::unique_saturated_into(balance));
+
+			percent
+				.const_checked_mul_with_rounding(other, SignedRounding::High)
+				.unwrap_or_default()
+				.saturating_mul_int(T::Balance::one())
 		}
 	}
 }

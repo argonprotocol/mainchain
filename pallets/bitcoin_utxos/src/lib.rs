@@ -1,5 +1,6 @@
 #![deny(warnings)]
 #![cfg_attr(not(feature = "std"), no_std)]
+extern crate alloc;
 
 pub use pallet::*;
 pub use weights::*;
@@ -15,10 +16,10 @@ const LOG_TARGET: &str = "runtime::bitcoin_utxos";
 
 #[frame_support::pallet(dev_mode)]
 pub mod pallet {
+	use alloc::{vec, vec::Vec};
 	use frame_support::{pallet_prelude::*, storage::with_storage_layer};
 	use frame_system::pallet_prelude::*;
 	use log::{info, warn};
-	use sp_std::{vec, vec::Vec};
 
 	use ulx_primitives::{
 		bitcoin::{
@@ -75,6 +76,11 @@ pub mod pallet {
 		BoundedBTreeMap<UtxoId, UtxoValue, T::MaxPendingConfirmationUtxos>,
 		ValueQuery,
 	>;
+
+	/// The genesis set bitcoin network that this chain is tied to
+	#[pallet::storage]
+	pub(super) type BitcoinNetwork<T: Config> =
+		StorageValue<_, ulx_primitives::bitcoin::BitcoinNetwork, ValueQuery>;
 
 	/// An oracle-provided confirmed bitcoin block (eg, 6 blocks back)
 	#[pallet::storage]
@@ -143,6 +149,7 @@ pub mod pallet {
 	#[derive(frame_support::DefaultNoBound)]
 	pub struct GenesisConfig<T: Config> {
 		pub operator: Option<T::AccountId>,
+		pub network: ulx_primitives::bitcoin::BitcoinNetwork,
 	}
 
 	#[pallet::genesis_build]
@@ -151,6 +158,7 @@ pub mod pallet {
 			if let Some(operator) = &self.operator {
 				<OracleOperatorAccount<T>>::put(operator);
 			}
+			<BitcoinNetwork<T>>::put(self.network.clone());
 		}
 	}
 
@@ -326,6 +334,10 @@ pub mod pallet {
 			Ok(())
 		}
 
+		fn get(utxo_id: UtxoId) -> Option<UtxoRef> {
+			<UtxoIdToRef<T>>::get(utxo_id)
+		}
+
 		fn unwatch(utxo_id: UtxoId) {
 			if let Some(utxo_ref) = <UtxoIdToRef<T>>::take(utxo_id) {
 				if let Some(utxo_value) = <LockedUtxos<T>>::take(utxo_ref.clone()) {
@@ -473,6 +485,12 @@ pub mod pallet {
 
 		fn is_inherent(call: &Self::Call) -> bool {
 			matches!(call, Call::sync { .. })
+		}
+	}
+
+	impl<T: Config> Get<ulx_primitives::bitcoin::BitcoinNetwork> for Pallet<T> {
+		fn get() -> ulx_primitives::bitcoin::BitcoinNetwork {
+			<BitcoinNetwork<T>>::get()
 		}
 	}
 

@@ -7,7 +7,6 @@ import '@polkadot/api-base/types/consts';
 
 import type { ApiTypes, AugmentedConst } from '@polkadot/api-base/types';
 import type { u128, u16, u32, u64, u8 } from '@polkadot/types-codec';
-import type { Percent } from '@polkadot/types/interfaces/runtime';
 import type { FrameSupportPalletId, FrameSystemLimitsBlockLength, FrameSystemLimitsBlockWeights, SpVersionRuntimeVersion, SpWeightsRuntimeDbWeight } from '@polkadot/types/lookup';
 
 export type __AugmentedConst<ApiType extends ApiTypes> = AugmentedConst<ApiType>;
@@ -75,7 +74,7 @@ declare module '@polkadot/api-base/types/consts' {
       /**
        * Percent as a number out of 100 of the block reward that goes to the miner.
        **/
-      minerPayoutPercent: Percent & AugmentedConst<ApiType>;
+      minerPayoutPercent: u128 & AugmentedConst<ApiType>;
       /**
        * Number of ulixees minted per block
        **/
@@ -97,7 +96,7 @@ declare module '@polkadot/api-base/types/consts' {
     };
     bonds: {
       /**
-       * The number of blocks a bitcoin bond is locked for
+       * The number of bitcoin blocks a bitcoin bond is locked for
        **/
       bitcoinBondDurationBlocks: u64 & AugmentedConst<ApiType>;
       /**
@@ -418,10 +417,6 @@ declare module '@polkadot/api-base/types/consts' {
        * The max pending vault term changes per block
        **/
       maxPendingTermModificationsPerBlock: u32 & AugmentedConst<ApiType>;
-      /**
-       * The max amount of pending bitcoin pubkey hashes allowed
-       **/
-      maxPendingVaultBitcoinPubkeys: u32 & AugmentedConst<ApiType>;
       /**
        * Minimum amount for a bond
        **/

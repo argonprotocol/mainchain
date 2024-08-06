@@ -1,5 +1,3 @@
-use std::env;
-
 use anyhow::{anyhow, bail, ensure};
 use clap::{crate_version, Parser, ValueEnum};
 use dotenv::dotenv;
@@ -8,7 +6,7 @@ use sp_core::{
 	sr25519, Pair as PairT,
 };
 use sp_runtime::traits::IdentifyAccount;
-use tracing::warn;
+use std::env;
 use ulixee_client::signer::KeystoreSigner;
 use ulx_primitives::{AccountId, CryptoType, KeystoreParams, ADDRESS_PREFIX};
 use url::Url;
@@ -26,13 +24,17 @@ pub(crate) mod utils;
 #[derive(Parser, Debug)]
 #[clap(version = crate_version!())]
 #[command(author, version, about, arg_required_else_help = true, long_about = None)]
+#[clap(arg_required_else_help = true)]
 struct Cli {
-	/// Start in dev mode (using default //Alice as operator)
-	#[clap(long)]
+	#[command(subcommand)]
+	pub subcommand: Subcommand,
+
+	/// Start in dev mode (using default //Dave or //Eve as operator)
+	#[clap(global = true, long)]
 	dev: bool,
 
 	/// What mainchain RPC websocket url do you want to reach out use to sync blocks?
-	#[clap(short, long, env, default_value = "ws://127.0.0.1:9944")]
+	#[clap(global = true, short, long, env, default_value = "ws://127.0.0.1:9944")]
 	trusted_rpc_url: String,
 
 	#[allow(missing_docs)]
@@ -40,15 +42,12 @@ struct Cli {
 	keystore_params: KeystoreParams,
 
 	/// The signer to use from the keystore (Required if not in dev mode)
-	#[clap(long, env)]
+	#[clap(global = true, long, env)]
 	signer_address: Option<String>,
 
 	/// What type of crypto to use for the signer (Required if not in dev mode)
-	#[clap(long, env)]
+	#[clap(global = true, long, env)]
 	signer_crypto: Option<OracleCryptoType>,
-
-	#[command(subcommand)]
-	pub subcommand: Option<Subcommand>,
 }
 #[derive(Debug, Clone, clap::Subcommand, Default)]
 #[allow(clippy::large_enum_variant)]
@@ -80,10 +79,20 @@ impl From<OracleCryptoType> for CryptoType {
 #[tokio::main]
 async fn main() -> anyhow::Result<()> {
 	let _ = tracing_subscriber::FmtSubscriber::builder()
-		.with_env_filter(tracing_subscriber::EnvFilter::from("debug"))
+		.with_env_filter(
+			tracing_subscriber::EnvFilter::try_from_default_env()
+				.unwrap_or(tracing_subscriber::EnvFilter::from("info")),
+		)
 		.try_init();
 	env::set_var("RUST_BACKTRACE", "1");
 	dotenv().ok();
+	dotenv::from_filename("oracle/.env").ok();
+
+	let binary_path = std::env::current_exe()?;
+	if binary_path.ends_with("debug/ulx-oracle") {
+		let from_workspace_root = binary_path.join("../../oracle/.env");
+		dotenv::from_filename(from_workspace_root).ok();
+	}
 
 	let Cli { trusted_rpc_url, keystore_params, dev, signer_address, signer_crypto, subcommand } =
 		Cli::parse();
@@ -94,12 +103,21 @@ async fn main() -> anyhow::Result<()> {
 		trusted_rpc_url,
 		if dev { "Dev Mode" } else { "" }
 	);
-	if subcommand.is_none() {
-		warn!("No subcommand provided, defaulting to price index. NOTE: the bitcoin oracle must be activated somewhere else.");
-	}
+
+	let mut signer_address = signer_address;
+	let mut signer_crypto = signer_crypto;
 
 	let keystore = if dev {
-		keystore_params.open_dev("//Alice", CryptoType::Sr25519, ACCOUNT)?
+		let suri = match subcommand {
+			Subcommand::PriceIndex => "//Eve",
+			Subcommand::Bitcoin { .. } => "//Dave",
+		};
+		let pair = sr25519::Pair::from_string(suri, None)?;
+		let account_id = pair.public().into_account();
+
+		signer_address = Some(account_id.to_ss58check_with_version(ADDRESS_PREFIX.into()));
+		signer_crypto = Some(OracleCryptoType::Sr25519);
+		keystore_params.open_dev(suri, CryptoType::Sr25519, ACCOUNT)?
 	} else {
 		keystore_params.open()?
 	};
@@ -110,23 +128,13 @@ async fn main() -> anyhow::Result<()> {
 			ensure!(format.prefix() == ADDRESS_PREFIX, "Invalid address format");
 			Ok::<_, anyhow::Error>((signer_account, signer_crypto))
 		},
-		(None, None) => {
-			if !dev {
-				bail!("Signer address and crypto type must be provided")
-			}
-
-			let pair = sr25519::Pair::from_string("//Alice", None)?;
-			let account_id = pair.public().into_account();
-			Ok::<_, anyhow::Error>((account_id.into(), OracleCryptoType::Sr25519))
-		},
 		_ => bail!("Signer address and crypto type must be provided"),
 	}?;
 
 	let signer = KeystoreSigner::new(keystore, signer_account, signer_crypto.into());
 	match subcommand {
-		Some(Subcommand::PriceIndex) | None =>
-			price_index_loop(trusted_rpc_url, signer, dev).await?,
-		Some(Subcommand::Bitcoin { bitcoin_rpc_url }) => {
+		Subcommand::PriceIndex => price_index_loop(trusted_rpc_url, signer, dev).await?,
+		Subcommand::Bitcoin { bitcoin_rpc_url } => {
 			let bitcoin_url = Url::parse(&bitcoin_rpc_url).map_err(|e| {
 				anyhow!("Unable to parse bitcoin rpc url ({}) {:?}", bitcoin_rpc_url, e)
 			})?;

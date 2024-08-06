@@ -2,10 +2,13 @@ pub use bitcoind::start_bitcoind;
 use std::env;
 
 mod bitcoind;
+mod ulx_bitcoin;
 mod ulx_node;
 mod ulx_notary;
 mod ulx_oracle;
 
+pub use bitcoind::*;
+pub use ulx_bitcoin::run_bitcoin_cli;
 pub use ulx_node::UlxTestNode;
 pub use ulx_notary::UlxTestNotary;
 pub use ulx_oracle::UlxTestOracle;

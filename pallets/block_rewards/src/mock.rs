@@ -1,7 +1,7 @@
 use env_logger::{Builder, Env};
 use frame_support::{derive_impl, parameter_types, traits::StorageMapShim};
 use sp_core::{ConstU32, H256};
-use sp_runtime::{traits::IdentityLookup, BuildStorage, Percent};
+use sp_runtime::{traits::IdentityLookup, BuildStorage, FixedU128};
 
 use crate as pallet_block_rewards;
 use ulx_primitives::{
@@ -82,7 +82,7 @@ parameter_types! {
 	pub static StartingUlixeesPerBlock :u32 = 5_000;
 	pub static HalvingBlocks :u32 = 100;
 	pub static MaturationBlocks :u32 = 5;
-	pub static MinerPayoutPercent :Percent = Percent::from_percent(75);
+	pub static MinerPayoutPercent :FixedU128 = FixedU128::from_rational(75, 100);
 	pub static ActiveNotaries: Vec<NotaryId> = vec![1];
 	pub static CurrentTick: Tick = 0;
 

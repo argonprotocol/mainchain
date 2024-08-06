@@ -1,11 +1,11 @@
 #![allow(clippy::ptr_arg)]
 #![allow(clippy::too_many_arguments)]
 
+use alloc::{collections::btree_map::BTreeMap, vec::Vec};
 use codec::{Codec, Decode, Encode, MaxEncodedLen};
 use scale_info::TypeInfo;
 use sp_core::{ConstU32, RuntimeDebug, H256, U256};
 use sp_runtime::{BoundedVec, DispatchError};
-use sp_std::{collections::btree_map::BTreeMap, vec::Vec};
 
 use crate::{
 	bitcoin::{BitcoinSyncStatus, Satoshis, UtxoRef, UtxoValue},
@@ -74,6 +74,7 @@ sp_api::decl_runtime_apis! {
 		fn get_sync_status() -> Option<BitcoinSyncStatus>;
 		fn active_utxos() -> Vec<(Option<UtxoRef>, UtxoValue)>;
 		fn redemption_rate(satoshis: Satoshis) -> Option<Balance>;
+		fn market_rate(satoshis: Satoshis) -> Option<Balance>;
 	}
 }
 

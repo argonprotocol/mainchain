@@ -23,7 +23,7 @@ frame-support = { workspace = true }
 frame-system = { workspace = true }
 sp-runtime = { workspace = true }
 sp-core = { workspace = true }
-sp-std = { workspace = true }
+
 ulx-primitives = { workspace = true }
 serde = { workspace = true }
 
@@ -45,7 +45,6 @@ std = [
 	"sp-core/std",
 	"sp-io/std",
 	"sp-runtime/std",
-	"sp-std/std",
 	"ulx-primitives/std",
 ]
 runtime-benchmarks = [

@@ -1,6 +1,13 @@
 #![cfg_attr(not(feature = "std"), no_std)]
 
+extern crate alloc;
+extern crate core;
+
+use sp_runtime::DispatchError;
+
 pub use pallet::*;
+use ulx_bitcoin::UtxoUnlocker;
+use ulx_primitives::bitcoin::{BitcoinNetwork, BitcoinSignature, CompressedBitcoinPubkey};
 pub use weights::*;
 
 #[cfg(test)]
@@ -74,6 +81,8 @@ const LOG_TARGET: &str = "runtime::bond";
 /// the duration of the bitcoin bonds, and will be taken in the case of bitcoins not being returned.
 #[frame_support::pallet(dev_mode)]
 pub mod pallet {
+	use alloc::vec;
+
 	use codec::Codec;
 	use frame_support::{
 		pallet_prelude::*,
@@ -87,25 +96,27 @@ pub mod pallet {
 	};
 	use frame_system::pallet_prelude::*;
 	use log::warn;
+	use sp_arithmetic::FixedU128;
 	use sp_runtime::{
-		traits::{AtLeast32BitUnsigned, UniqueSaturatedInto},
+		traits::{AtLeast32BitUnsigned, UniqueSaturatedInto, Zero},
 		DispatchError::Token,
 		FixedPointNumber, Saturating, TokenError,
 	};
-	use sp_std::vec;
 
-	use super::*;
-	use sp_arithmetic::FixedU128;
+	use ulx_bitcoin::{Amount, CosignScriptArgs, UnlockStep, UtxoUnlocker};
 	use ulx_primitives::{
 		bitcoin::{
-			BitcoinCosignScriptPubkey, BitcoinHeight, BitcoinPubkeyHash, BitcoinRejectedReason,
-			BitcoinScriptPubkey, BitcoinSignature, CompressedBitcoinPubkey, Satoshis, UtxoId,
+			BitcoinCosignScriptPubkey, BitcoinHeight, BitcoinRejectedReason, BitcoinScriptPubkey,
+			BitcoinSignature, CompressedBitcoinPubkey, Satoshis, UtxoId, XPubChildNumber,
+			XPubFingerprint,
 		},
 		block_seal::RewardSharing,
 		bond::{Bond, BondError, BondExpiration, BondProvider, BondType, VaultProvider},
 		BitcoinUtxoEvents, BitcoinUtxoTracker, BondId, PriceProvider, RewardShare,
 		UtxoBondedEvents, VaultId,
 	};
+
+	use super::*;
 
 	#[pallet::pallet]
 	pub struct Pallet<T>(_);
@@ -125,7 +136,7 @@ pub mod pallet {
 			+ codec::FullCodec
 			+ Copy
 			+ MaybeSerializeDeserialize
-			+ sp_std::fmt::Debug
+			+ core::fmt::Debug
 			+ Default
 			+ From<u128>
 			+ TryInto<u128>
@@ -142,8 +153,12 @@ pub mod pallet {
 
 		type PriceProvider: PriceProvider<Self::Balance>;
 
+		type BitcoinSignatureVerifier: BitcoinVerifier<Self>;
+
 		/// Bitcoin time provider
 		type BitcoinBlockHeight: Get<BitcoinHeight>;
+
+		type GetBitcoinNetwork: Get<BitcoinNetwork>;
 
 		type VaultProvider: VaultProvider<
 			AccountId = Self::AccountId,
@@ -171,7 +186,7 @@ pub mod pallet {
 		#[pallet::constant]
 		type MinimumBitcoinBondSatoshis: Get<Satoshis>;
 
-		/// The number of blocks a bitcoin bond is locked for
+		/// The number of bitcoin blocks a bitcoin bond is locked for
 		#[pallet::constant]
 		type BitcoinBondDurationBlocks: Get<BitcoinHeight>;
 
@@ -229,6 +244,11 @@ pub mod pallet {
 	pub(super) type UtxosById<T: Config> =
 		StorageMap<_, Twox64Concat, UtxoId, UtxoState, OptionQuery>;
 
+	/// Stores the block number where the utxo was unlocked
+	#[pallet::storage]
+	pub(super) type UtxosCosignReleaseHeightById<T: Config> =
+		StorageMap<_, Twox64Concat, UtxoId, BlockNumberFor<T>, OptionQuery>;
+
 	/// Stores Utxos that were not paid back in full
 	///
 	/// Tuple stores Account, Vault, Still Owed, State
@@ -243,7 +263,7 @@ pub mod pallet {
 
 	/// Utxos that have been requested to be cosigned for unlocking
 	#[pallet::storage]
-	pub(super) type UtxosPendingUnlock<T: Config> = StorageValue<
+	pub(super) type UtxosPendingUnlockByUtxoId<T: Config> = StorageValue<
 		_,
 		BoundedBTreeMap<UtxoId, UtxoCosignRequest<T::Balance>, T::MaxUnlockingUtxos>,
 		ValueQuery,
@@ -251,22 +271,37 @@ pub mod pallet {
 
 	#[derive(Decode, Encode, Clone, PartialEq, Eq, RuntimeDebug, TypeInfo)]
 	pub struct UtxoState {
+		#[codec(compact)]
 		pub bond_id: BondId,
+		#[codec(compact)]
 		pub satoshis: Satoshis,
-		pub vault_pubkey_hash: BitcoinPubkeyHash,
-		pub owner_pubkey_hash: BitcoinPubkeyHash,
+		pub vault_pubkey: CompressedBitcoinPubkey,
+		pub vault_claim_pubkey: CompressedBitcoinPubkey,
+		/// The vault xpub sources. First is the cosign number, second is the claim number
+		pub vault_xpub_sources: (XPubFingerprint, XPubChildNumber, XPubChildNumber),
+		pub owner_pubkey: CompressedBitcoinPubkey,
+		#[codec(compact)]
 		pub vault_claim_height: BitcoinHeight,
+		#[codec(compact)]
 		pub open_claim_height: BitcoinHeight,
-		pub register_block: BitcoinHeight,
+		#[codec(compact)]
+		pub created_at_height: BitcoinHeight,
 		pub utxo_script_pubkey: BitcoinCosignScriptPubkey,
 		pub is_verified: bool,
 	}
 
 	#[derive(Decode, Encode, CloneNoBound, PartialEqNoBound, EqNoBound, RuntimeDebug, TypeInfo)]
 	pub struct UtxoCosignRequest<Balance: Clone + Eq + PartialEq + TypeInfo + Codec> {
+		#[codec(compact)]
+		pub bond_id: BondId,
+		#[codec(compact)]
+		pub vault_id: VaultId,
+		#[codec(compact)]
 		pub bitcoin_network_fee: Satoshis,
+		#[codec(compact)]
 		pub cosign_due_block: BitcoinHeight,
 		pub to_script_pubkey: BitcoinScriptPubkey,
+		#[codec(compact)]
 		pub redemption_price: Balance,
 	}
 
@@ -310,7 +345,6 @@ pub mod pallet {
 			bond_id: BondId,
 			vault_id: VaultId,
 			utxo_id: UtxoId,
-			pubkey: CompressedBitcoinPubkey,
 			signature: BitcoinSignature,
 		},
 		BitcoinCosignPastDue {
@@ -357,6 +391,14 @@ pub mod pallet {
 		BitcoinFeeTooHigh,
 		InvalidBondType,
 		BitcoinUtxoNotFound,
+		/// This bitcoin cosign script couldn't be decoded for unlock
+		BitcoinUnableToBeDecodedForUnlock,
+		/// This bitcoin signature couldn't be decoded for unlock
+		BitcoinSignatureUnableToBeDecoded,
+		/// This bitcoin pubkey couldn't be decoded for unlock
+		BitcoinPubkeyUnableToBeDecoded,
+		/// The cosign signature is not valid for the bitcoin unlock
+		BitcoinInvalidCosignature,
 		InsufficientSatoshisBonded,
 		NoBitcoinPricesAvailable,
 		/// The bitcoin script to lock this bitcoin has errors
@@ -414,7 +456,7 @@ pub mod pallet {
 
 			let mut overdue = vec![];
 			let bitcoin_block_height = T::BitcoinBlockHeight::get();
-			<UtxosPendingUnlock<T>>::mutate(|pending| {
+			<UtxosPendingUnlockByUtxoId<T>>::mutate(|pending| {
 				pending.retain(|id, x| {
 					if x.cosign_due_block > bitcoin_block_height {
 						return true;
@@ -459,14 +501,15 @@ pub mod pallet {
 		/// Script hash to Events. A bondee must create the UTXO in order to be added to the Bitcoin
 		/// Mint line.
 		///
-		/// NOTE: The script
+		/// The pubkey submitted here will be used to create a script pubkey that will be used in a
+		/// timelock multisig script to lock the bitcoin.
 		#[pallet::call_index(0)]
 		#[pallet::weight(0)]
 		pub fn bond_bitcoin(
 			origin: OriginFor<T>,
 			vault_id: VaultId,
 			#[pallet::compact] satoshis: Satoshis,
-			bitcoin_pubkey_hash: BitcoinPubkeyHash,
+			bitcoin_pubkey: CompressedBitcoinPubkey,
 		) -> DispatchResult {
 			let account_id = ensure_signed(origin)?;
 
@@ -475,8 +518,8 @@ pub mod pallet {
 				Error::<T>::InsufficientSatoshisBonded
 			);
 
-			let vault_claim_height =
-				T::BitcoinBlockHeight::get() + T::BitcoinBondDurationBlocks::get();
+			let current_bitcoin_height = T::BitcoinBlockHeight::get();
+			let vault_claim_height = current_bitcoin_height + T::BitcoinBondDurationBlocks::get();
 			let open_claim_height = vault_claim_height + T::BitcoinBondReclamationBlocks::get();
 
 			let amount = T::PriceProvider::get_bitcoin_argon_price(satoshis)
@@ -495,14 +538,24 @@ pub mod pallet {
 
 			let utxo_id = T::BitcoinUtxoTracker::new_utxo_id();
 
-			let (vault_pubkey_hash, script_pubkey) = T::VaultProvider::create_utxo_script_pubkey(
-				vault_id,
-				utxo_id,
-				bitcoin_pubkey_hash,
-				vault_claim_height,
-				open_claim_height,
-			)
-			.map_err(|_| Error::<T>::InvalidBitcoinScript)?;
+			let (vault_xpub, vault_claim_xpub, script_pubkey) =
+				T::VaultProvider::create_utxo_script_pubkey(
+					vault_id,
+					utxo_id,
+					bitcoin_pubkey,
+					vault_claim_height,
+					open_claim_height,
+					current_bitcoin_height,
+				)
+				.map_err(|_| Error::<T>::InvalidBitcoinScript)?;
+
+			let vault_pubkey = vault_xpub.public_key;
+			let vault_claim_pubkey = vault_claim_xpub.public_key;
+			let vault_xpub_sources = (
+				vault_xpub.parent_fingerprint,
+				vault_xpub.child_number,
+				vault_claim_xpub.child_number,
+			);
 
 			T::BitcoinUtxoTracker::watch_for_utxo(
 				utxo_id,
@@ -529,11 +582,13 @@ pub mod pallet {
 				UtxoState {
 					bond_id,
 					satoshis,
-					vault_pubkey_hash,
-					owner_pubkey_hash: bitcoin_pubkey_hash,
+					vault_pubkey,
+					vault_claim_pubkey,
+					vault_xpub_sources,
+					owner_pubkey: bitcoin_pubkey,
 					vault_claim_height,
 					open_claim_height,
-					register_block: T::BitcoinBlockHeight::get(),
+					created_at_height: T::BitcoinBlockHeight::get(),
 					utxo_script_pubkey: script_pubkey,
 					is_verified: false,
 				},
@@ -596,10 +651,12 @@ pub mod pallet {
 					})?;
 				frame_system::Pallet::<T>::inc_providers(&who);
 
-				<UtxosPendingUnlock<T>>::try_mutate(|a| {
+				<UtxosPendingUnlockByUtxoId<T>>::try_mutate(|a| {
 					a.try_insert(
 						utxo_id,
 						UtxoCosignRequest {
+							bond_id,
+							vault_id: bond.vault_id,
 							bitcoin_network_fee,
 							cosign_due_block,
 							to_script_pubkey,
@@ -630,7 +687,6 @@ pub mod pallet {
 		pub fn cosign_bitcoin_unlock(
 			origin: OriginFor<T>,
 			bond_id: BondId,
-			pubkey: CompressedBitcoinPubkey,
 			signature: BitcoinSignature,
 		) -> DispatchResultWithPostInfo {
 			let who = ensure_signed(origin)?;
@@ -642,10 +698,47 @@ pub mod pallet {
 
 			let vault = T::VaultProvider::get(vault_id).ok_or(Error::<T>::VaultNotFound)?;
 			ensure!(vault.operator_account_id == who, Error::<T>::NoPermissions);
-			let request = UtxosPendingUnlock::<T>::mutate(|a| a.remove(&utxo_id))
+			let request = UtxosPendingUnlockByUtxoId::<T>::mutate(|a| a.remove(&utxo_id))
 				.ok_or(Error::<T>::BondRedemptionNotLocked)?;
 
-			// TODO: check that the signature is valid
+			let utxo_state = <UtxosById<T>>::get(utxo_id).ok_or(Error::<T>::BitcoinUtxoNotFound)?;
+			let utxo_ref =
+				T::BitcoinUtxoTracker::get(utxo_id).ok_or(Error::<T>::BitcoinUtxoNotFound)?;
+
+			let script_args = CosignScriptArgs {
+				vault_pubkey: utxo_state
+					.vault_pubkey
+					.try_into()
+					.map_err(|_| Error::<T>::BitcoinPubkeyUnableToBeDecoded)?,
+				owner_pubkey: utxo_state
+					.owner_pubkey
+					.try_into()
+					.map_err(|_| Error::<T>::BitcoinPubkeyUnableToBeDecoded)?,
+				vault_claim_pubkey: utxo_state
+					.vault_claim_pubkey
+					.try_into()
+					.map_err(|_| Error::<T>::BitcoinPubkeyUnableToBeDecoded)?,
+				created_at_height: utxo_state.created_at_height,
+				vault_claim_height: utxo_state.vault_claim_height,
+				open_claim_height: utxo_state.open_claim_height,
+			};
+			let unlocker = UtxoUnlocker::new(
+				script_args,
+				utxo_state.satoshis,
+				utxo_ref.txid.into(),
+				utxo_ref.output_index,
+				UnlockStep::VaultCosign,
+				Amount::from_sat(request.bitcoin_network_fee),
+				request.to_script_pubkey.into(),
+				T::GetBitcoinNetwork::get().into(),
+			)
+			.map_err(|_| Error::<T>::BitcoinUnableToBeDecodedForUnlock)?;
+
+			T::BitcoinSignatureVerifier::verify_signature(
+				unlocker,
+				utxo_state.vault_pubkey,
+				&signature,
+			)?;
 
 			// burn the owner's held funds
 			let _ = T::Currency::burn_held(
@@ -657,14 +750,16 @@ pub mod pallet {
 			)?;
 			frame_system::Pallet::<T>::dec_providers(&who)?;
 
-			T::BitcoinUtxoTracker::unwatch(utxo_id);
 			<UtxosById<T>>::take(utxo_id);
+			<UtxosCosignReleaseHeightById<T>>::insert(
+				utxo_id,
+				frame_system::Pallet::<T>::block_number(),
+			);
 
 			Self::deposit_event(Event::BitcoinUtxoCosigned {
 				bond_id,
 				vault_id,
 				utxo_id,
-				pubkey,
 				signature,
 			});
 
@@ -696,6 +791,7 @@ pub mod pallet {
 		}
 
 		fn utxo_spent(utxo_id: UtxoId) -> DispatchResult {
+			UtxosCosignReleaseHeightById::<T>::remove(utxo_id);
 			if let Some(utxo) = UtxosById::<T>::take(utxo_id) {
 				Self::burn_bitcoin_bond(utxo_id, utxo, true)
 			} else {
@@ -704,6 +800,7 @@ pub mod pallet {
 		}
 
 		fn utxo_expired(utxo_id: UtxoId) -> DispatchResult {
+			UtxosCosignReleaseHeightById::<T>::remove(utxo_id);
 			if let Some(utxo) = UtxosById::<T>::take(utxo_id) {
 				Self::burn_bitcoin_bond(utxo_id, utxo, false)
 			} else {
@@ -773,6 +870,7 @@ pub mod pallet {
 
 			if bond.bond_type == BondType::Bitcoin {
 				let utxo_id = bond.utxo_id.ok_or(Error::<T>::InvalidBondType)?;
+				UtxosCosignReleaseHeightById::<T>::remove(utxo_id);
 				if let Some(utxo) = <UtxosById<T>>::take(utxo_id) {
 					Self::burn_bitcoin_bond(utxo_id, utxo, false)?;
 					BondsById::<T>::remove(bond_id);
@@ -864,6 +962,7 @@ pub mod pallet {
 			});
 			T::BitcoinUtxoTracker::unwatch(utxo_id);
 			BondsById::<T>::insert(bond_id, bond);
+			UtxosCosignReleaseHeightById::<T>::remove(utxo_id);
 
 			Ok(())
 		}
@@ -898,7 +997,7 @@ pub mod pallet {
 			let mut price: u128 = T::PriceProvider::get_bitcoin_argon_price(*satoshis)
 				.ok_or(Error::<T>::NoBitcoinPricesAvailable)?
 				.unique_saturated_into();
-			let cpi = T::PriceProvider::get_argon_cpi_price().unwrap_or_default();
+			let cpi = T::PriceProvider::get_argon_cpi().unwrap_or_default();
 
 			if cpi.is_positive() {
 				let argon_price =
@@ -991,5 +1090,22 @@ pub mod pallet {
 
 			Ok(())
 		}
+	}
+}
+
+pub trait BitcoinVerifier<T: Config> {
+	fn verify_signature(
+		utxo_unlocker: UtxoUnlocker,
+		pubkey: CompressedBitcoinPubkey,
+		signature: &BitcoinSignature,
+	) -> Result<bool, DispatchError> {
+		let is_ok = utxo_unlocker.verify_signature_raw(pubkey, signature).map_err(|e| match e {
+			ulx_bitcoin::Error::InvalidCompressPubkeyBytes =>
+				Error::<T>::BitcoinPubkeyUnableToBeDecoded,
+			ulx_bitcoin::Error::InvalidSignatureBytes =>
+				Error::<T>::BitcoinSignatureUnableToBeDecoded,
+			_ => Error::<T>::BitcoinInvalidCosignature,
+		})?;
+		Ok(is_ok)
 	}
 }

@@ -58,7 +58,7 @@ parameter_types! {
 
 pub struct StaticPriceProvider;
 impl PriceProvider<Balance> for StaticPriceProvider {
-	fn get_argon_cpi_price() -> Option<ulx_primitives::ArgonCPI> {
+	fn get_argon_cpi() -> Option<ulx_primitives::ArgonCPI> {
 		ArgonCPI::get()
 	}
 	fn get_latest_argon_price_in_us_cents() -> Option<FixedU128> {

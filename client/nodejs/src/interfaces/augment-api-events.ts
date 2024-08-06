@@ -9,7 +9,7 @@ import type { ApiTypes, AugmentedEvent } from '@polkadot/api-base/types';
 import type { Bytes, Null, Option, Result, U8aFixed, Vec, bool, u128, u16, u32, u64 } from '@polkadot/types-codec';
 import type { ITuple } from '@polkadot/types-codec/types';
 import type { AccountId32, H256 } from '@polkadot/types/interfaces/runtime';
-import type { FrameSupportDispatchDispatchInfo, FrameSupportTokensMiscBalanceStatus, PalletDataDomainDataDomainRegistration, PalletMintMintType, PalletMultisigTimepoint, SpConsensusGrandpaAppPublic, SpRuntimeDispatchError, UlxNodeRuntimeProxyType, UlxNotaryAuditErrorVerifyError, UlxPrimitivesBitcoinBitcoinRejectedReason, UlxPrimitivesBitcoinCompressedBitcoinPubkey, UlxPrimitivesBitcoinUtxoRef, UlxPrimitivesBlockSealBlockPayout, UlxPrimitivesBlockSealMiningRegistration, UlxPrimitivesBondBondExpiration, UlxPrimitivesBondBondType, UlxPrimitivesDataDomainZoneRecord, UlxPrimitivesNotaryNotaryMeta, UlxPrimitivesNotaryNotaryRecord } from '@polkadot/types/lookup';
+import type { FrameSupportDispatchDispatchInfo, FrameSupportTokensMiscBalanceStatus, PalletDataDomainDataDomainRegistration, PalletMintMintType, PalletMultisigTimepoint, SpConsensusGrandpaAppPublic, SpRuntimeDispatchError, UlxNodeRuntimeProxyType, UlxNotaryAuditErrorVerifyError, UlxPrimitivesBitcoinBitcoinRejectedReason, UlxPrimitivesBitcoinUtxoRef, UlxPrimitivesBlockSealBlockPayout, UlxPrimitivesBlockSealMiningRegistration, UlxPrimitivesBondBondExpiration, UlxPrimitivesBondBondType, UlxPrimitivesDataDomainZoneRecord, UlxPrimitivesNotaryNotaryMeta, UlxPrimitivesNotaryNotaryRecord } from '@polkadot/types/lookup';
 
 export type __AugmentedEvent<ApiType extends ApiTypes> = AugmentedEvent<ApiType>;
 
@@ -130,7 +130,7 @@ declare module '@polkadot/api-base/types/events' {
     bonds: {
       BitcoinBondBurned: AugmentedEvent<ApiType, [vaultId: u32, bondId: u64, utxoId: u64, amountBurned: u128, amountHeld: u128, wasUtxoSpent: bool], { vaultId: u32, bondId: u64, utxoId: u64, amountBurned: u128, amountHeld: u128, wasUtxoSpent: bool }>;
       BitcoinCosignPastDue: AugmentedEvent<ApiType, [bondId: u64, vaultId: u32, utxoId: u64, compensationAmount: u128, compensationStillOwed: u128, compensatedAccountId: AccountId32], { bondId: u64, vaultId: u32, utxoId: u64, compensationAmount: u128, compensationStillOwed: u128, compensatedAccountId: AccountId32 }>;
-      BitcoinUtxoCosigned: AugmentedEvent<ApiType, [bondId: u64, vaultId: u32, utxoId: u64, pubkey: UlxPrimitivesBitcoinCompressedBitcoinPubkey, signature: Bytes], { bondId: u64, vaultId: u32, utxoId: u64, pubkey: UlxPrimitivesBitcoinCompressedBitcoinPubkey, signature: Bytes }>;
+      BitcoinUtxoCosigned: AugmentedEvent<ApiType, [bondId: u64, vaultId: u32, utxoId: u64, signature: Bytes], { bondId: u64, vaultId: u32, utxoId: u64, signature: Bytes }>;
       BitcoinUtxoCosignRequested: AugmentedEvent<ApiType, [bondId: u64, vaultId: u32, utxoId: u64], { bondId: u64, vaultId: u32, utxoId: u64 }>;
       BondCanceled: AugmentedEvent<ApiType, [vaultId: u32, bondId: u64, bondedAccountId: AccountId32, bondType: UlxPrimitivesBondBondType, returnedFee: u128], { vaultId: u32, bondId: u64, bondedAccountId: AccountId32, bondType: UlxPrimitivesBondBondType, returnedFee: u128 }>;
       BondCompleted: AugmentedEvent<ApiType, [vaultId: u32, bondId: u64], { vaultId: u32, bondId: u64 }>;
@@ -465,6 +465,7 @@ declare module '@polkadot/api-base/types/events' {
       Withdraw: AugmentedEvent<ApiType, [who: AccountId32, amount: u128], { who: AccountId32, amount: u128 }>;
     };
     vaults: {
+      VaultBitcoinXpubChange: AugmentedEvent<ApiType, [vaultId: u32], { vaultId: u32 }>;
       VaultClosed: AugmentedEvent<ApiType, [vaultId: u32, bitcoinAmountStillBonded: u128, miningAmountStillBonded: u128, securitizationStillBonded: u128], { vaultId: u32, bitcoinAmountStillBonded: u128, miningAmountStillBonded: u128, securitizationStillBonded: u128 }>;
       VaultCreated: AugmentedEvent<ApiType, [vaultId: u32, bitcoinArgons: u128, miningArgons: u128, securitizationPercent: u128, operatorAccountId: AccountId32], { vaultId: u32, bitcoinArgons: u128, miningArgons: u128, securitizationPercent: u128, operatorAccountId: AccountId32 }>;
       VaultModified: AugmentedEvent<ApiType, [vaultId: u32, bitcoinArgons: u128, miningArgons: u128, securitizationPercent: u128], { vaultId: u32, bitcoinArgons: u128, miningArgons: u128, securitizationPercent: u128 }>;
