@@ -4,7 +4,7 @@ use comfy_table::{modifiers::UTF8_ROUND_CORNERS, presets::UTF8_FULL, ContentArra
 use sp_runtime::{FixedPointNumber, FixedU128};
 use subxt::dynamic::Value;
 
-use ulixee_client::{
+use argon_client::{
 	api::{
 		apis, bonds::events::bond_created::VaultId, storage, tx,
 		vaults::storage::types::vaults_by_id::VaultsById,
@@ -12,7 +12,7 @@ use ulixee_client::{
 	conversion::from_api_fixed_u128,
 	MainchainClient,
 };
-use ulx_primitives::{bitcoin::SATOSHIS_PER_BITCOIN, KeystoreParams};
+use argon_primitives::{bitcoin::SATOSHIS_PER_BITCOIN, KeystoreParams};
 
 use crate::{formatters::ArgonFormatter, vault_create};
 
@@ -46,7 +46,7 @@ impl VaultCommands {
 			VaultCommands::List { btc } => {
 				let client = MainchainClient::from_url(&rpc_url)
 					.await
-					.context("Failed to connect to ulixee node")?;
+					.context("Failed to connect to argon node")?;
 
 				let best_block = client.best_block_hash().await?;
 
@@ -119,7 +119,7 @@ impl VaultCommands {
 				}
 				let client = MainchainClient::from_url(&rpc_url)
 					.await
-					.context("Failed to connect to ulixee node")?;
+					.context("Failed to connect to argon node")?;
 				let call = tx().vaults().create(config.as_call_data());
 
 				let url = client.create_polkadotjs_deeplink(&call)?;
@@ -129,7 +129,7 @@ impl VaultCommands {
 			VaultCommands::PendingUnlock { vault_id, keypair: _ } => {
 				let client = MainchainClient::from_url(&rpc_url)
 					.await
-					.context("Failed to connect to ulixee node")?;
+					.context("Failed to connect to argon node")?;
 				let call = storage().bonds().utxos_pending_unlock_by_utxo_id();
 				let Some(pending) = client.fetch_storage(&call, None).await? else {
 					println!("No pending unlock requests found");

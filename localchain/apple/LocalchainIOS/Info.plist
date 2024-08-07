@@ -15,7 +15,7 @@
 			<string>Owner</string>
 			<key>LSItemContentTypes</key>
 			<array>
-				<string>org.ulixee.argon</string>
+				<string>org.argon.localchain</string>
 			</array>
 			<key>UTTypeIconFiles</key>
 			<array>
@@ -39,7 +39,7 @@
 				<string>argfile.png</string>
 			</array>
 			<key>UTTypeIdentifier</key>
-			<string>org.ulixee.argon</string>
+			<string>org.argon.localchain</string>
 			<key>UTTypeTagSpecification</key>
 			<dict>
 				<key>public.filename-extension</key>

@@ -5,8 +5,8 @@ use sp_consensus_grandpa::AuthorityId as GrandpaId;
 use sp_core::{sr25519, Pair, Public};
 use sp_runtime::traits::{IdentifyAccount, Verify};
 
-use ulx_node_runtime::{opaque::SessionKeys, AccountId, Balance, Signature, WASM_BINARY};
-use ulx_primitives::{
+use argon_node_runtime::{opaque::SessionKeys, AccountId, Balance, Signature, WASM_BINARY};
+use argon_primitives::{
 	bitcoin::BitcoinNetwork,
 	block_seal::{MiningRegistration, RewardDestination},
 	block_vote::VoteMinimum,
@@ -93,7 +93,7 @@ pub fn local_testnet_config() -> Result<ChainSpec, String> {
 	let mut properties = Properties::new();
 	properties.insert("tokenDecimals".into(), 3.into());
 
-	let notary_host = env::var("ULX_LOCAL_TESTNET_NOTARY_URL")
+	let notary_host = env::var("argon_LOCAL_TESTNET_NOTARY_URL")
 		.unwrap_or("ws://127.0.0.1:9925".to_string())
 		.into();
 	const HASHES_PER_SECOND: u64 = 1_000;
@@ -169,7 +169,7 @@ fn testnet_genesis(
 		"argonBalances": {
 			"balances": endowed_accounts.iter().cloned().map(|k| (k, 100_000_000)).collect::<Vec<_>>(),
 		},
-		"ulixeeBalances": {
+		"shareBalances": {
 			"balances": endowed_accounts.iter().cloned().map(|k| (k, 10_000)).collect::<Vec<_>>(),
 		},
 		"priceIndex": {

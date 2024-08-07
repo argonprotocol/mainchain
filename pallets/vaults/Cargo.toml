@@ -23,8 +23,8 @@ frame-support = { workspace = true }
 frame-system = { workspace = true }
 sp-runtime = { workspace = true }
 sp-core = { workspace = true }
-ulx-primitives = { workspace = true, features = ["bitcoin"] }
-ulx-bitcoin = { workspace = true, default-features = false }
+argon-primitives = { workspace = true, features = ["bitcoin"] }
+argon-bitcoin = { workspace = true, default-features = false }
 k256 = { workspace = true }
 bip32 = { workspace = true, features = ["secp256k1"] }
 
@@ -37,6 +37,8 @@ env_logger = { workspace = true }
 [features]
 default = [ "std" ]
 std = [
+	"argon-bitcoin/std",
+	"argon-primitives/std",
 	"bip32/std",
 	"codec/std",
 	"frame-benchmarking?/std",
@@ -49,8 +51,6 @@ std = [
 	"sp-core/std",
 	"sp-io/std",
 	"sp-runtime/std",
-	"ulx-bitcoin/std",
-	"ulx-primitives/std",
 ]
 runtime-benchmarks = [
 	"frame-benchmarking/runtime-benchmarks",

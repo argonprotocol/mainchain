@@ -3,7 +3,7 @@
 set -e
 
 BASEDIR=$(dirname "$0")
-PIPE="/tmp/ulx-node-output"
+PIPE="/tmp/argon-node-output"
 rm -f "$PIPE"
 mkfifo "$PIPE"
 
@@ -11,14 +11,14 @@ mkfifo "$PIPE"
 cleanup() {
     echo "Cleaning up..."
     rm -f "$PIPE"
-    kill $ULX_PID
-    wait $ULX_PID 2>/dev/null
+    kill $argon_PID
+    wait $argon_PID 2>/dev/null
 }
 
 trap cleanup EXIT SIGHUP SIGINT SIGTERM
 
-"$BASEDIR/../target/debug/ulx-node" --tmp --dev --alice --rpc-port=9944 --compute-miners=1 --bitcoin-rpc-url="http://127.0.0.1:18443" > "$PIPE" 2>&1 &
-ULX_PID=$!
+"$BASEDIR/../target/debug/argon-node" --tmp --dev --alice --rpc-port=9944 --compute-miners=1 --bitcoin-rpc-url="http://127.0.0.1:18443" > "$PIPE" 2>&1 &
+argon_PID=$!
 
 while IFS= read -r line; do
     echo "$line"

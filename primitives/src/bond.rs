@@ -44,7 +44,7 @@ pub trait VaultProvider {
 	/// 1. From the bonded funds
 	/// 2. From the allocated funds
 	/// 3. From the securitized funds
-	/// 4. TODO: From the Ulixee shares
+	/// 4. TODO: From the ownership shares
 	///
 	/// The funds will be returned to the bond.bonded_account_id
 	///
@@ -295,7 +295,7 @@ pub struct Bond<AccountId: Codec, Balance: Codec, BlockNumber: Codec> {
 #[derive(Clone, PartialEq, Eq, Encode, Decode, RuntimeDebug, TypeInfo)]
 pub enum BondExpiration<BlockNumber: Codec> {
 	/// The bond will expire at the given block number
-	UlixeeBlock(#[codec(compact)] BlockNumber),
+	ArgonBlock(#[codec(compact)] BlockNumber),
 	/// The bond will expire at a bitcoin block height
 	BitcoinBlock(#[codec(compact)] BitcoinHeight),
 }

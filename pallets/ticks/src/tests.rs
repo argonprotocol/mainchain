@@ -1,7 +1,7 @@
+use argon_primitives::{digests::TICK_DIGEST_ID, tick::Ticker, TickDigest, TickProvider};
 use frame_support::{pallet_prelude::*, traits::OnTimestampSet};
 use sp_runtime::{Digest, DigestItem};
 use std::panic::catch_unwind;
-use ulx_primitives::{digests::TICK_DIGEST_ID, tick::Ticker, TickDigest, TickProvider};
 
 use crate::{
 	mock::{System, Ticks, *},

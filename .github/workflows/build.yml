@@ -1,6 +1,8 @@
 name: Build and Test
 'on':
   push:
+    branches:
+      - main
     tags:
       - v[0-9]+.*
   workflow_dispatch:
@@ -22,9 +24,8 @@ jobs:
         include:
           - os: ubuntu-22.04
             target: x86_64-unknown-linux-gnu
-    #          - os: macos-latest
-    #            target: x86_64-apple-darwin
-
+          - os: ubuntu-22.04
+            target: aarch64-unknown-linux-gnu
 
     services:
       postgres:
@@ -96,19 +97,13 @@ jobs:
         with:
           tool: cargo-make,sqlx-cli
 
-      - name: Migrate Notary Db
+      - name: Migrate Dbs
         if: ${{(github.event.inputs.SKIP_REBUILD_DOCKER != 'true')}}
-        working-directory: notary
-        run: cargo sqlx database setup
-
-      - name: Migrate Localchain Db
-        if: ${{(github.event.inputs.SKIP_REBUILD_DOCKER != 'true')}}
-        working-directory: localchain
-        run: cargo sqlx database setup
+        run: cargo make sqlx-setup
 
       - name: Test
         if: ${{(github.event.inputs.SKIP_REBUILD_DOCKER != 'true')}}
-        run: cargo build --features=fast-runtime && cargo test --features=fast-runtime --no-fail-fast
+        run: cargo make test
         env:
           RUSTC_WRAPPER: "sccache"
           CARGO_INCREMENTAL: 0
@@ -121,7 +116,7 @@ jobs:
         uses: actions/upload-artifact@v4
         with:
           name: bins-${{ matrix.target }}
-          path: target/debug/ulx-*
+          path: target/debug/argon-*
           if-no-files-found: error
 
   docker:
@@ -147,25 +142,33 @@ jobs:
         with:
           name: bins-x86_64-unknown-linux-gnu
           github-token: ${{ secrets.GITHUB_TOKEN }}
-          path: .
+          path: ./amd64
+
+      - name: Download amd artifacts
+        uses: actions/download-artifact@v4
+        if: ${{ (github.event.inputs.SKIP_REBUILD_DOCKER != 'true') }}
+        with:
+          name: bins-aarch64-unknown-linux-gnu
+          github-token: ${{ secrets.GITHUB_TOKEN }}
+          path: ./arm64
 
       - name: List assets in root
         run: ls
         shell: bash
 
-      - name: UlxNode
+      - name: Argon Node
         uses: ./.github/templates/docker
         if: ${{ (github.event.inputs.SKIP_REBUILD_DOCKER != 'true') }}
         with:
-          image: ghcr.io/ulixee/ulixee-miner
-          bin: ulx-node
+          image: ghcr.io/argonprotocol/argon-miner
+          bin: argon-node
           github-token: ${{ secrets.GITHUB_TOKEN }}
       - name: Notary
         uses: ./.github/templates/docker
         if: ${{ (github.event.inputs.SKIP_REBUILD_DOCKER != 'true') }}
         with:
-          image: ghcr.io/ulixee/ulixee-notary
-          bin: ulx-notary
+          image: ghcr.io/argonprotocol/argon-notary
+          bin: argon-notary
           github-token: ${{ secrets.GITHUB_TOKEN }}
 
   localchain:
@@ -390,7 +393,7 @@ jobs:
           echo "127.0.0.1 host.docker.internal" | sudo tee -a /etc/hosts
 
       - name: Pull Miner
-        run: docker pull ghcr.io/ulixee/ulixee-miner:dev && docker pull ghcr.io/ulixee/ulixee-notary:dev
+        run: docker pull ghcr.io/argon/argon-miner:dev && docker pull ghcr.io/argon/argon-notary:dev
 
       - name: Download artifacts
         uses: actions/download-artifact@v4

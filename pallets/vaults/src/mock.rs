@@ -1,10 +1,10 @@
 use crate as pallet_vaults;
+use argon_primitives::{bitcoin::BitcoinNetwork, MiningSlotProvider};
 use env_logger::{Builder, Env};
 use frame_support::{derive_impl, parameter_types, traits::Currency};
 use frame_system::pallet_prelude::BlockNumberFor;
 use sp_core::{ConstU32, ConstU64};
 use sp_runtime::BuildStorage;
-use ulx_primitives::{bitcoin::BitcoinNetwork, MiningSlotProvider};
 
 pub type Balance = u128;
 type Block = frame_system::mocking::MockBlock<Test>;

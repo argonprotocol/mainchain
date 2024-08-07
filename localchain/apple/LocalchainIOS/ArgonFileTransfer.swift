@@ -13,7 +13,7 @@ import UIKit
 import UniformTypeIdentifiers
 
 extension UTType {
-  static var argonFile: UTType = .init(exportedAs: "org.ulixee.argon")
+  static var argonFile: UTType = .init(exportedAs: "org.argon.localchain")
 }
 
 struct ArgonFileTransfer: Transferable, Identifiable {
@@ -135,7 +135,7 @@ class ArgonFileItemSource: NSObject, UIActivityItemSource {
   ) -> LPLinkMetadata? {
     let metadata = LPLinkMetadata()
     metadata.title = file.name
-    metadata.originalURL = URL(string: "https://ulixee.org")!
+    metadata.originalURL = URL(string: "https://argonprotocol.org")!
     return metadata
   }
 

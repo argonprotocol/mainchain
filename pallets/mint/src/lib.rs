@@ -3,8 +3,8 @@ extern crate alloc;
 
 use sp_runtime::{traits::Zero, Saturating};
 
+use argon_primitives::{block_seal::BlockPayout, BlockRewardsEventHandler};
 pub use pallet::*;
-use ulx_primitives::{block_seal::BlockPayout, BlockRewardsEventHandler};
 pub use weights::*;
 
 #[cfg(test)]
@@ -30,7 +30,7 @@ pub mod pallet {
 		FixedPointNumber,
 	};
 
-	use ulx_primitives::{
+	use argon_primitives::{
 		bitcoin::UtxoId, ArgonCPI, BlockRewardAccountsProvider, BurnEventHandler, PriceProvider,
 		UtxoBondedEvents,
 	};
@@ -68,7 +68,7 @@ pub mod pallet {
 
 	/// Bitcoin UTXOs that have been submitted for minting. This list is FIFO for minting whenever
 	/// a) CPI >= 0 and
-	/// b) the aggregate minted Bitcoins <= the aggregate minted Argons from Ulixee Shares
+	/// b) the aggregate minted Bitcoins <= the aggregate minted Argons from mining
 	#[pallet::storage]
 	pub(super) type PendingMintUtxos<T: Config> = StorageValue<
 		_,
@@ -77,7 +77,7 @@ pub mod pallet {
 	>;
 
 	#[pallet::storage]
-	pub(super) type MintedUlixeeArgons<T: Config> = StorageValue<_, T::Balance, ValueQuery>;
+	pub(super) type MintedMiningArgons<T: Config> = StorageValue<_, T::Balance, ValueQuery>;
 
 	#[pallet::storage]
 	pub(super) type MintedBitcoinArgons<T: Config> = StorageValue<_, T::Balance, ValueQuery>;
@@ -114,7 +114,7 @@ pub mod pallet {
 			}
 
 			let mut bitcoin_utxos = MintedBitcoinArgons::<T>::get();
-			let mut ulixee_mint = MintedUlixeeArgons::<T>::get();
+			let mut mining_mint = MintedMiningArgons::<T>::get();
 
 			let reward_accounts = T::BlockRewardAccountsProvider::get_all_rewards_accounts();
 			let argons_to_print_per_miner =
@@ -129,9 +129,9 @@ pub mod pallet {
 					};
 					match T::Currency::mint_into(&miner, amount) {
 						Ok(_) => {
-							ulixee_mint += amount;
+							mining_mint += amount;
 							Self::deposit_event(Event::<T>::ArgonsMinted {
-								mint_type: MintType::Ulixee,
+								mint_type: MintType::Mining,
 								account_id: miner.clone(),
 								utxo_id: None,
 								amount,
@@ -143,7 +143,7 @@ pub mod pallet {
 								"Failed to mint {:?} argons for miner {:?}: {:?}", amount, &miner, e
 							);
 							Self::deposit_event(Event::<T>::MintError {
-								mint_type: MintType::Ulixee,
+								mint_type: MintType::Mining,
 								account_id: miner.clone(),
 								utxo_id: None,
 								amount,
@@ -152,10 +152,10 @@ pub mod pallet {
 						},
 					};
 				}
-				MintedUlixeeArgons::<T>::put(ulixee_mint);
+				MintedMiningArgons::<T>::put(mining_mint);
 			}
 
-			let mut available_bitcoin_to_mint = ulixee_mint.saturating_sub(bitcoin_utxos);
+			let mut available_bitcoin_to_mint = mining_mint.saturating_sub(bitcoin_utxos);
 			if available_bitcoin_to_mint > T::Balance::zero() {
 				let updated = <PendingMintUtxos<T>>::get().try_mutate(|pending| {
 					pending.retain_mut(|(utxo_id, account_id, remaining_account_mint)| {
@@ -234,17 +234,17 @@ pub mod pallet {
 			per_miner.unique_saturated_into()
 		}
 		pub fn track_block_mint(amount: T::Balance) {
-			MintedUlixeeArgons::<T>::mutate(|mint| *mint += amount);
+			MintedMiningArgons::<T>::mutate(|mint| *mint += amount);
 		}
 
 		pub fn on_argon_burn(amount: T::Balance) {
 			let bitcoin_utxos = MintedBitcoinArgons::<T>::get();
 
-			let ulixee_mint = MintedUlixeeArgons::<T>::get();
-			let total_minted = ulixee_mint + bitcoin_utxos;
-			let ulixee_prorata = (amount * ulixee_mint).checked_div(&total_minted);
-			if let Some(milligons) = ulixee_prorata {
-				MintedUlixeeArgons::<T>::mutate(|mint| *mint -= milligons);
+			let mining_mint = MintedMiningArgons::<T>::get();
+			let total_minted = mining_mint + bitcoin_utxos;
+			let mining_prorata = (amount * mining_mint).checked_div(&total_minted);
+			if let Some(milligons) = mining_prorata {
+				MintedMiningArgons::<T>::mutate(|mint| *mint -= milligons);
 			}
 
 			let bitcoin_prorata = (amount * bitcoin_utxos).checked_div(&total_minted);
@@ -277,7 +277,7 @@ pub mod pallet {
 	#[derive(Debug, Clone, PartialEq, Eq, Encode, Decode, TypeInfo)]
 	pub enum MintType {
 		Bitcoin,
-		Ulixee,
+		Mining,
 	}
 }
 

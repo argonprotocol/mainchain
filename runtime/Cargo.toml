@@ -1,5 +1,5 @@
 [package]
-name = "ulx-node-runtime"
+name = "argon-node-runtime"
 version.workspace = true
 authors.workspace = true
 edition.workspace = true
@@ -71,7 +71,7 @@ pallet-price-index = { workspace = true }
 pallet-ticks = { workspace = true }
 pallet-mint = { workspace = true }
 pallet-vaults = { workspace = true }
-ulx-primitives = { workspace = true }
+argon-primitives = { workspace = true }
 
 
 [build-dependencies]
@@ -80,6 +80,7 @@ substrate-wasm-builder = { workspace = true, optional = true }
 [features]
 default = [ "std" ]
 std = [
+	"argon-primitives/std",
 	"codec/std",
 	"frame-benchmarking?/std",
 	"frame-executive/std",
@@ -132,7 +133,6 @@ std = [
 	"sp-transaction-pool/std",
 	"sp-version/std",
 	"substrate-wasm-builder",
-	"ulx-primitives/std",
 ]
 runtime-benchmarks = [
 	"frame-benchmarking/runtime-benchmarks",
@@ -196,4 +196,7 @@ try-runtime = [
 	"sp-runtime/try-runtime",
 ]
 # Set timing constants (e.g. session period) to faster versions to speed up testing.
-fast-runtime = [ "sp-debug-derive/force-debug", "ulx-primitives/fast-runtime" ]
+fast-runtime = [
+	"argon-primitives/fast-runtime",
+	"sp-debug-derive/force-debug",
+]

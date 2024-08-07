@@ -30,7 +30,7 @@ pub mod pallet {
 		ConsensusEngineId, DigestItem, RuntimeAppPublic,
 	};
 
-	use ulx_primitives::{
+	use argon_primitives::{
 		inherents::{BlockSealInherent, BlockSealInherentData, SealInherentError},
 		localchain::{BestBlockVoteSeal, BlockVote, BlockVoteT},
 		notebook::NotebookNumber,
@@ -506,7 +506,7 @@ pub mod pallet {
 		type Call = Call<T>;
 		type Error = SealInherentError;
 		const INHERENT_IDENTIFIER: InherentIdentifier =
-			ulx_primitives::inherents::SEAL_INHERENT_IDENTIFIER;
+			argon_primitives::inherents::SEAL_INHERENT_IDENTIFIER;
 
 		fn create_inherent(data: &InherentData) -> Option<Self::Call>
 		where

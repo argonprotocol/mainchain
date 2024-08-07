@@ -30,11 +30,11 @@ pub mod pallet {
 		FixedPointNumber, FixedU128, Saturating,
 	};
 
-	use sp_arithmetic::per_things::SignedRounding;
-	use ulx_primitives::{
+	use argon_primitives::{
 		block_seal::BlockPayout, notary::NotaryProvider, tick::Tick, BlockRewardAccountsProvider,
 		BlockRewardsEventHandler, BlockSealerProvider, NotebookProvider,
 	};
+	use sp_arithmetic::per_things::SignedRounding;
 
 	use super::*;
 
@@ -58,7 +58,7 @@ pub mod pallet {
 		type ArgonCurrency: MutateFreeze<Self::AccountId, Balance = Self::Balance>
 			+ Mutate<Self::AccountId, Balance = Self::Balance>
 			+ InspectFreeze<Self::AccountId, Balance = Self::Balance, Id = Self::RuntimeFreezeReason>;
-		type UlixeeCurrency: MutateFreeze<Self::AccountId, Balance = Self::Balance>
+		type SharesCurrency: MutateFreeze<Self::AccountId, Balance = Self::Balance>
 			+ Mutate<Self::AccountId, Balance = Self::Balance>
 			+ InspectFreeze<Self::AccountId, Balance = Self::Balance, Id = Self::RuntimeFreezeReason>;
 
@@ -83,11 +83,11 @@ pub mod pallet {
 		#[pallet::constant]
 		type ArgonsPerBlock: Get<Self::Balance>;
 
-		/// Number of ulixees minted per block
+		/// Number of shares minted per block
 		#[pallet::constant]
-		type StartingUlixeesPerBlock: Get<Self::Balance>;
+		type StartingSharesPerBlock: Get<Self::Balance>;
 
-		/// Number of blocks for halving of ulixee rewards
+		/// Number of blocks for halving of ownership share rewards
 		#[pallet::constant]
 		type HalvingBlocks: Get<u32>;
 
@@ -126,13 +126,13 @@ pub mod pallet {
 		RewardUnlockError {
 			account_id: T::AccountId,
 			argons: Option<T::Balance>,
-			ulixees: Option<T::Balance>,
+			shares: Option<T::Balance>,
 			error: DispatchError,
 		},
 		RewardCreateError {
 			account_id: T::AccountId,
 			argons: Option<T::Balance>,
-			ulixees: Option<T::Balance>,
+			shares: Option<T::Balance>,
 			error: DispatchError,
 		},
 	}
@@ -161,19 +161,19 @@ pub mod pallet {
 					Self::deposit_event(Event::RewardUnlockError {
 						account_id: reward.account_id.clone(),
 						argons: Some(reward.argons),
-						ulixees: None,
+						shares: None,
 						error: e,
 					});
 				}
 
 				if let Err(e) =
-					Self::unfreeze_amount::<T::UlixeeCurrency>(&reward.account_id, reward.ulixees)
+					Self::unfreeze_amount::<T::SharesCurrency>(&reward.account_id, reward.shares)
 				{
-					log::error!(target: LOG_TARGET, "Failed to unfreeze ulixees for reward: {:?}, {:?}", reward, e);
+					log::error!(target: LOG_TARGET, "Failed to unfreeze shares for reward: {:?}, {:?}", reward, e);
 					Self::deposit_event(Event::RewardUnlockError {
 						account_id: reward.account_id.clone(),
 						argons: None,
-						ulixees: Some(reward.ulixees),
+						shares: Some(reward.shares),
 						error: e,
 					});
 				}
@@ -192,11 +192,11 @@ pub mod pallet {
 
 			let mut block_argons =
 				UniqueSaturatedInto::<u128>::unique_saturated_into(T::ArgonsPerBlock::get());
-			let block_ulixees = UniqueSaturatedInto::<u128>::unique_saturated_into(
-				T::StartingUlixeesPerBlock::get(),
+			let block_shares = UniqueSaturatedInto::<u128>::unique_saturated_into(
+				T::StartingSharesPerBlock::get(),
 			);
 
-			let mut block_ulixees = block_ulixees.saturating_div(halvings + 1u128);
+			let mut block_shares = block_shares.saturating_div(halvings + 1u128);
 			let active_notaries = T::NotaryProvider::active_notaries().len() as u128;
 			let block_notebooks = T::NotebookProvider::notebooks_in_block();
 			let current_tick = T::CurrentTick::get();
@@ -210,20 +210,20 @@ pub mod pallet {
 
 			if active_notaries > tick_notebooks {
 				if tick_notebooks == 0 {
-					block_ulixees = 1u128;
+					block_shares = 1u128;
 					block_argons = 1u128;
 				} else {
-					block_ulixees = block_ulixees.saturating_mul(tick_notebooks) / active_notaries;
+					block_shares = block_shares.saturating_mul(tick_notebooks) / active_notaries;
 					block_argons = block_argons.saturating_mul(tick_notebooks) / active_notaries;
 				}
 			}
 
-			let block_ulixees: T::Balance = block_ulixees.into();
+			let block_shares: T::Balance = block_shares.into();
 			let block_argons: T::Balance = block_argons.into();
 
 			let miner_percent = T::MinerPayoutPercent::get();
 
-			let miner_ulixees: T::Balance = Self::saturating_mul_ceil(miner_percent, block_ulixees);
+			let miner_shares: T::Balance = Self::saturating_mul_ceil(miner_percent, block_shares);
 			let miner_argons: T::Balance = Self::saturating_mul_ceil(miner_percent, block_argons);
 
 			let (assigned_rewards_account, reward_sharing) =
@@ -235,7 +235,7 @@ pub mod pallet {
 
 			let mut rewards: Vec<BlockPayout<T::AccountId, T::Balance>> = vec![BlockPayout {
 				account_id: miner_reward_account.clone(),
-				ulixees: miner_ulixees,
+				shares: miner_shares,
 				argons: miner_argons,
 			}];
 			if let Some(sharing) = reward_sharing {
@@ -244,7 +244,7 @@ pub mod pallet {
 				rewards[0].argons = miner_argons.saturating_sub(sharing_amount);
 				rewards.push(BlockPayout {
 					account_id: sharing.account_id,
-					ulixees: 0u128.into(),
+					shares: 0u128.into(),
 					argons: sharing_amount,
 				});
 			}
@@ -255,29 +255,29 @@ pub mod pallet {
 					.block_vote_rewards_account
 					.unwrap_or(authors.block_author_account_id.clone())
 					.clone(),
-				ulixees: block_ulixees.saturating_sub(miner_ulixees),
+				shares: block_shares.saturating_sub(miner_shares),
 				argons: block_argons.saturating_sub(miner_argons),
 			});
 
 			let reward_height = n.saturating_add(T::MaturationBlocks::get().into());
 			for reward in rewards.iter_mut() {
 				let start_argons = reward.argons.clone();
-				let start_ulixees = reward.ulixees.clone();
+				let start_shares = reward.shares.clone();
 				if let Err(e) = Self::mint_and_freeze::<T::ArgonCurrency>(reward) {
 					log::error!(target: LOG_TARGET, "Failed to mint argons for reward: {:?}, {:?}", reward, e);
 					Self::deposit_event(Event::RewardCreateError {
 						account_id: reward.account_id.clone(),
 						argons: Some(start_argons),
-						ulixees: None,
+						shares: None,
 						error: e,
 					});
 				}
-				if let Err(e) = Self::mint_and_freeze::<T::UlixeeCurrency>(reward) {
-					log::error!(target: LOG_TARGET, "Failed to mint ulixees for reward: {:?}, {:?}", reward, e);
+				if let Err(e) = Self::mint_and_freeze::<T::SharesCurrency>(reward) {
+					log::error!(target: LOG_TARGET, "Failed to mint shares for reward: {:?}, {:?}", reward, e);
 					Self::deposit_event(Event::RewardCreateError {
 						account_id: reward.account_id.clone(),
 						argons: None,
-						ulixees: Some(start_ulixees),
+						shares: Some(start_shares),
 						error: e,
 					});
 				}
@@ -305,15 +305,15 @@ pub mod pallet {
 			reward: &mut BlockPayout<T::AccountId, T::Balance>,
 		) -> DispatchResult {
 			let freeze_id = FreezeReason::MaturationPeriod.into();
-			let is_ulixees = TypeId::of::<C>() == TypeId::of::<T::UlixeeCurrency>();
-			let amount = if is_ulixees { reward.ulixees } else { reward.argons };
+			let is_shares = TypeId::of::<C>() == TypeId::of::<T::SharesCurrency>();
+			let amount = if is_shares { reward.shares } else { reward.argons };
 			if amount == 0u128.into() {
 				return Ok(());
 			}
 
 			C::mint_into(&reward.account_id, amount).map_err(|e| {
-				if is_ulixees {
-					reward.ulixees = 0u128.into();
+				if is_shares {
+					reward.shares = 0u128.into();
 				} else {
 					reward.argons = 0u128.into();
 				}

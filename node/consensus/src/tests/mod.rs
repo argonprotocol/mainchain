@@ -16,7 +16,7 @@ use sp_keystore::{testing::MemoryKeystore, Keystore, KeystorePtr};
 use sp_timestamp::Timestamp;
 use substrate_test_runtime::AccountId;
 
-use ulx_primitives::{
+use argon_primitives::{
 	block_seal::{BlockSealAuthorityId, BLOCK_SEAL_KEY_TYPE},
 	localchain::BlockVote,
 	tick::Ticker,
@@ -26,7 +26,7 @@ use ulx_primitives::{
 use crate::{
 	block_creator::CreateTaxVoteBlock,
 	compute_worker::{create_compute_miner, create_compute_solver_task, MiningHandle},
-	tests::mock::{Config, DummyFactory, UlxBlockImport, UlxTestNet},
+	tests::mock::{ArgonBlockImport, ArgonTestNet, Config, DummyFactory},
 };
 
 use super::tax_block_creator;
@@ -53,25 +53,25 @@ struct Miner {
 	node_identity: NodeIdentity,
 	compute_handle: MiningHandle<TestBlock, (), ()>,
 	compute_task: ReusableFuture,
-	block_import: UlxBlockImport,
+	block_import: ArgonBlockImport,
 	client: Arc<PeersFullClient>,
 }
 #[allow(dead_code)]
 impl Miner {
-	fn new(node: NodeIdentity, net: Arc<Mutex<UlxTestNet>>) -> Self {
+	fn new(node: NodeIdentity, net: Arc<Mutex<ArgonTestNet>>) -> Self {
 		let mut net = net.lock();
 
 		let peer = net.peer(node.peer_id);
 		let client = peer.client().as_client();
 		let select_chain = peer.select_chain().expect("full client has a select chain");
-		let data = peer.data.as_ref().expect("ulx test net data");
-		let ulx_block_import = data.block_import.clone();
+		let data = peer.data.as_ref().expect("argon test net data");
+		let argon_block_import = data.block_import.clone();
 		let environ = DummyFactory(client.clone());
 		let api = data.api.clone();
 		let aux_client = data.aux_client.clone();
 		let uxto_tracker = data.utxo_tracker.clone();
 		let (compute_handle, task) = create_compute_miner(
-			Box::new(ulx_block_import.clone()),
+			Box::new(argon_block_import.clone()),
 			api.clone(),
 			aux_client.clone(),
 			select_chain.clone(),
@@ -87,7 +87,7 @@ impl Miner {
 		let compute_task = ReusableFuture::new(task.boxed());
 
 		Self {
-			block_import: ulx_block_import,
+			block_import: argon_block_import,
 			node_identity: node,
 			compute_handle,
 			client,
@@ -95,7 +95,7 @@ impl Miner {
 		}
 	}
 
-	async fn mine_block(&mut self, net: &Arc<Mutex<UlxTestNet>>) {
+	async fn mine_block(&mut self, net: &Arc<Mutex<ArgonTestNet>>) {
 		let solver = create_compute_solver_task(self.compute_handle.clone());
 
 		println!("start mining for a block");
@@ -112,7 +112,7 @@ impl Miner {
 
 	fn check_state<'a>(
 		&'a mut self,
-		net: &'a Arc<Mutex<UlxTestNet>>,
+		net: &'a Arc<Mutex<ArgonTestNet>>,
 	) -> impl Future<Output = ()> + '_ {
 		let compute_future = &mut self.compute_task;
 		futures::future::poll_fn(move |cx| {
@@ -122,7 +122,7 @@ impl Miner {
 		})
 	}
 
-	async fn wait_for_external_block(&mut self, net: &Arc<Mutex<UlxTestNet>>) {
+	async fn wait_for_external_block(&mut self, net: &Arc<Mutex<ArgonTestNet>>) {
 		let id = self.node_identity.peer_id;
 		println!("waiting for external block. Id={}", id);
 		let stream = self
@@ -139,7 +139,7 @@ impl Miner {
 		println!("waited for external block. Id={}", id);
 	}
 
-	async fn wait_for_block_number(&mut self, net: &Arc<Mutex<UlxTestNet>>, block_number: u64) {
+	async fn wait_for_block_number(&mut self, net: &Arc<Mutex<ArgonTestNet>>, block_number: u64) {
 		let id = self.node_identity.peer_id;
 		println!("waiting for block #{}. id={}", block_number, id);
 		{
@@ -191,7 +191,7 @@ async fn mine_one(
 	miner1: &mut Miner,
 	miner2: &mut Miner,
 	miner3: &mut Miner,
-	net: Arc<Mutex<UlxTestNet>>,
+	net: Arc<Mutex<ArgonTestNet>>,
 ) {
 	if i % 3 == 0 {
 		miner1.mine_block(&net).await;
@@ -207,7 +207,7 @@ async fn wait_for_sync(
 	miner1: &mut Miner,
 	miner2: &mut Miner,
 	miner3: &mut Miner,
-	net: Arc<Mutex<UlxTestNet>>,
+	net: Arc<Mutex<ArgonTestNet>>,
 ) {
 	future::join_all(vec![
 		miner1.wait_for_block_number(&net, block_number),
@@ -225,7 +225,7 @@ async fn can_build_compute_blocks() {
 
 	let node_identities = create_node_identities();
 	let tick_duration = Duration::from_millis(1000);
-	let net = UlxTestNet::new(
+	let net = ArgonTestNet::new(
 		3,
 		Config {
 			difficulty: 200,
@@ -258,7 +258,7 @@ async fn can_run_proof_of_tax() {
 	let node_identities = create_node_identities();
 
 	let tick_duration = Duration::from_millis(1000);
-	let net = UlxTestNet::new(
+	let net = ArgonTestNet::new(
 		node_identities.len(),
 		Config {
 			tax_minimum: 5,

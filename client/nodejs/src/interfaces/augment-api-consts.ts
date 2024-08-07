@@ -64,7 +64,7 @@ declare module '@polkadot/api-base/types/consts' {
        **/
       argonsPerBlock: u128 & AugmentedConst<ApiType>;
       /**
-       * Number of blocks for halving of ulixee rewards
+       * Number of blocks for halving of ownership share rewards
        **/
       halvingBlocks: u32 & AugmentedConst<ApiType>;
       /**
@@ -76,9 +76,9 @@ declare module '@polkadot/api-base/types/consts' {
        **/
       minerPayoutPercent: u128 & AugmentedConst<ApiType>;
       /**
-       * Number of ulixees minted per block
+       * Number of shares minted per block
        **/
-      startingUlixeesPerBlock: u128 & AugmentedConst<ApiType>;
+      startingSharesPerBlock: u128 & AugmentedConst<ApiType>;
     };
     blockSealSpec: {
       /**
@@ -95,6 +95,10 @@ declare module '@polkadot/api-base/types/consts' {
       targetBlockVotes: u128 & AugmentedConst<ApiType>;
     };
     bonds: {
+      /**
+       * Argon blocks per day
+       **/
+      argonBlocksPerDay: u32 & AugmentedConst<ApiType>;
       /**
        * The number of bitcoin blocks a bitcoin bond is locked for
        **/
@@ -121,10 +125,6 @@ declare module '@polkadot/api-base/types/consts' {
        * Minimum amount for a bond
        **/
       minimumBondAmount: u128 & AugmentedConst<ApiType>;
-      /**
-       * Ulixee blocks per day
-       **/
-      ulixeeBlocksPerDay: u32 & AugmentedConst<ApiType>;
       /**
        * Number of bitcoin blocks a vault has to counter-sign a bitcoin unlock
        **/
@@ -303,6 +303,36 @@ declare module '@polkadot/api-base/types/consts' {
        **/
       proxyDepositFactor: u128 & AugmentedConst<ApiType>;
     };
+    shareBalances: {
+      /**
+       * The minimum amount required to keep an account open. MUST BE GREATER THAN ZERO!
+       *
+       * If you *really* need it to be zero, you can enable the feature `insecure_zero_ed` for
+       * this pallet. However, you do so at your own risk: this will open up a major DoS vector.
+       * In case you have multiple sources of provider references, you may also get unexpected
+       * behaviour if you set this to zero.
+       *
+       * Bottom line: Do yourself a favour and make it at least one!
+       **/
+      existentialDeposit: u128 & AugmentedConst<ApiType>;
+      /**
+       * The maximum number of individual freeze locks that can exist on an account at any time.
+       **/
+      maxFreezes: u32 & AugmentedConst<ApiType>;
+      /**
+       * The maximum number of locks that should exist on an account.
+       * Not strictly enforced, but used for weight estimation.
+       *
+       * Use of locks is deprecated in favour of freezes. See `https://github.com/paritytech/substrate/pull/12951/`
+       **/
+      maxLocks: u32 & AugmentedConst<ApiType>;
+      /**
+       * The maximum number of named reserves that can exist on an account.
+       *
+       * Use of reserves is deprecated in favour of holds. See `https://github.com/paritytech/substrate/pull/12951/`
+       **/
+      maxReserves: u32 & AugmentedConst<ApiType>;
+    };
     system: {
       /**
        * Maximum number of block number to block hash mappings to keep (oldest pruned first).
@@ -378,39 +408,9 @@ declare module '@polkadot/api-base/types/consts' {
        **/
       maxNameLen: u32 & AugmentedConst<ApiType>;
     };
-    ulixeeBalances: {
-      /**
-       * The minimum amount required to keep an account open. MUST BE GREATER THAN ZERO!
-       *
-       * If you *really* need it to be zero, you can enable the feature `insecure_zero_ed` for
-       * this pallet. However, you do so at your own risk: this will open up a major DoS vector.
-       * In case you have multiple sources of provider references, you may also get unexpected
-       * behaviour if you set this to zero.
-       *
-       * Bottom line: Do yourself a favour and make it at least one!
-       **/
-      existentialDeposit: u128 & AugmentedConst<ApiType>;
-      /**
-       * The maximum number of individual freeze locks that can exist on an account at any time.
-       **/
-      maxFreezes: u32 & AugmentedConst<ApiType>;
-      /**
-       * The maximum number of locks that should exist on an account.
-       * Not strictly enforced, but used for weight estimation.
-       *
-       * Use of locks is deprecated in favour of freezes. See `https://github.com/paritytech/substrate/pull/12951/`
-       **/
-      maxLocks: u32 & AugmentedConst<ApiType>;
-      /**
-       * The maximum number of named reserves that can exist on an account.
-       *
-       * Use of reserves is deprecated in favour of holds. See `https://github.com/paritytech/substrate/pull/12951/`
-       **/
-      maxReserves: u32 & AugmentedConst<ApiType>;
-    };
     vaults: {
       /**
-       * Ulixee blocks per day
+       * Argon blocks per day
        **/
       blocksPerDay: u32 & AugmentedConst<ApiType>;
       /**

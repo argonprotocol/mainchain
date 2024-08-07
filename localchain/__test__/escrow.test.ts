@@ -14,9 +14,9 @@ import {
     getClient,
     Keyring,
     KeyringPair,
-    UlxClient,
-    UlxPrimitivesDataDomainVersionHost
-} from "@ulixee/mainchain";
+    ArgonClient,
+    argonPrimitivesDataDomainVersionHost
+} from "@argonprotocol/mainchain";
 import {
     activateNotary,
     createLocalchain, describeIntegration,
@@ -52,7 +52,7 @@ describeIntegration("Escrow integration", () => {
         const ferdie = new Keyring({type: 'sr25519'}).createFromUri('//Ferdie');
 
         await expect(registerZoneRecord(mainchainClient, dataDomainHash, ferdie, ferdieDomainAddress.publicKey, 1, {
-            "1.0.0": mainchainClient.createType('UlxPrimitivesDataDomainVersionHost', {
+            "1.0.0": mainchainClient.createType('argonPrimitivesDataDomainVersionHost', {
                 datastoreId: mainchainClient.createType('Bytes', 'default'),
                 host: 'ws://192.168.1.1:80'
             })
@@ -115,7 +115,7 @@ describeIntegration("Escrow integration", () => {
         }
 
         await registerZoneRecord(mainchainClient, dataDomainHash, ferdiekeys.defaultPair, ferdiekeys.defaultPair.publicKey, 1, {
-            "1.0.0": mainchainClient.createType('UlxPrimitivesDataDomainVersionHost', {
+            "1.0.0": mainchainClient.createType('argonPrimitivesDataDomainVersionHost', {
                 datastoreId: mainchainClient.createType('Bytes', 'default'),
                 host: 'ws://192.168.1.1:80'
             })
@@ -203,7 +203,7 @@ describeIntegration("Escrow integration", () => {
     }, 120e3);
 });
 
-async function transferMainchainToLocalchain(mainchainClient: UlxClient, localchain: Localchain, account: KeyringPair, amount: number, notaryId: number): Promise<{
+async function transferMainchainToLocalchain(mainchainClient: ArgonClient, localchain: Localchain, account: KeyringPair, amount: number, notaryId: number): Promise<{
     notarization: NotarizationBuilder,
     balanceChange: BalanceChangeBuilder
 }> {
@@ -215,17 +215,17 @@ async function transferMainchainToLocalchain(mainchainClient: UlxClient, localch
     return {notarization, balanceChange};
 }
 
-async function registerZoneRecord(client: UlxClient, dataDomainHash: Uint8Array, owner: KeyringPair, paymentAccount: Uint8Array, notaryId: number, versions: Record<string, UlxPrimitivesDataDomainVersionHost>) {
+async function registerZoneRecord(client: ArgonClient, dataDomainHash: Uint8Array, owner: KeyringPair, paymentAccount: Uint8Array, notaryId: number, versions: Record<string, argonPrimitivesDataDomainVersionHost>) {
 
     const codecVersions = new Map();
     for (const [version, host] of Object.entries(versions)) {
         const [major, minor, patch] = version.split('.');
-        const versionCodec = client.createType('UlxPrimitivesDataDomainSemver', {
+        const versionCodec = client.createType('argonPrimitivesDataDomainSemver', {
             major,
             minor,
             patch,
         });
-        codecVersions.set(versionCodec, client.createType('UlxPrimitivesDataDomainVersionHost', host));
+        codecVersions.set(versionCodec, client.createType('argonPrimitivesDataDomainVersionHost', host));
     }
 
     await new Promise((resolve, reject) => client.tx.dataDomain.setZoneRecord(dataDomainHash, {

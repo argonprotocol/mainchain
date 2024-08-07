@@ -47,8 +47,8 @@ pub mod pallet {
 	};
 
 	use super::*;
-	use ulx_bitcoin::{CosignScript, CosignScriptArgs};
-	use ulx_primitives::{
+	use argon_bitcoin::{CosignScript, CosignScriptArgs};
+	use argon_primitives::{
 		bitcoin::{
 			BitcoinCosignScriptPubkey, BitcoinHeight, BitcoinNetwork, BitcoinXPub,
 			CompressedBitcoinPubkey, OpaqueBitcoinXpub, UtxoId,
@@ -87,7 +87,7 @@ pub mod pallet {
 		#[pallet::constant]
 		type MinimumBondAmount: Get<Self::Balance>;
 
-		/// Ulixee blocks per day
+		/// Argon blocks per day
 		#[pallet::constant]
 		type BlocksPerDay: Get<BlockNumberFor<Self>>;
 
@@ -786,7 +786,7 @@ pub mod pallet {
 		/// 1. From the bonded funds
 		/// 2. From the allocated funds
 		/// 3. From the securitized funds
-		/// 4. TODO: From the Ulixee shares
+		/// 4. TODO: From the ownership shares
 		///
 		/// The funds will be returned to the owed_to_account_id
 		///
@@ -833,7 +833,7 @@ pub mod pallet {
 					still_owed.checked_sub(&amount_to_pull).ok_or(BondError::InternalError)?;
 			}
 
-			// 3. Use ulixee shares at current value
+			// 3. Use ownership shares at current value
 			// TODO
 
 			let recouped = market_rate.saturating_sub(still_owed);

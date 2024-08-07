@@ -1,6 +1,6 @@
 use sqlx::{SqliteConnection, SqlitePool};
 
-use ulx_primitives::{AccountType, Balance, Note};
+use argon_primitives::{AccountType, Balance, Note};
 
 use crate::argon_file::ArgonFileType;
 use crate::keystore::Keystore;
@@ -353,7 +353,7 @@ mod tests {
   use sp_keyring::Ed25519Keyring;
   use sp_keyring::Ed25519Keyring::Ferdie;
 
-  use ulx_primitives::AccountType;
+  use argon_primitives::AccountType;
 
   use crate::test_utils::{create_mock_notary, create_pool, mock_localchain, mock_notary_clients};
   use crate::CryptoScheme::{Ed25519, Sr25519};

@@ -6,7 +6,7 @@ use sp_core::H256;
 use sqlx::SqlitePool;
 use tokio::sync::Mutex;
 
-use ulx_primitives::{AccountType, Balance, BalanceChange, BalanceTip, Notarization};
+use argon_primitives::{AccountType, Balance, BalanceChange, BalanceTip, Notarization};
 
 use crate::accounts::LocalAccount;
 use crate::balance_changes::{BalanceChangeRow, BalanceChangeStatus};
@@ -185,7 +185,7 @@ pub struct NotebookProof {
 
 #[cfg(feature = "uniffi")]
 pub mod uniffi_ext {
-  use ulx_primitives::AccountType;
+  use argon_primitives::AccountType;
 
   use crate::error::UniffiResult;
   use crate::BalanceChangeStatus;
@@ -317,7 +317,7 @@ pub mod napi_ext {
 
   use napi::bindgen_prelude::{BigInt, Uint8Array};
 
-  use ulx_primitives::AccountType;
+  use argon_primitives::AccountType;
 
   use crate::error::NapiOk;
   use crate::BalanceChangeRow;

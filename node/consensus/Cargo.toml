@@ -1,5 +1,5 @@
 [package]
-name = "ulx-node-consensus"
+name = "argon-node-consensus"
 version.workspace = true
 authors.workspace = true
 edition.workspace = true
@@ -51,11 +51,11 @@ schnellru = { workspace = true }
 humantime = { workspace = true }
 
 # Local Dependencies
-ulx-primitives = { workspace = true, features = ["default"] }
-ulx-notary-apis = { workspace = true }
-ulx-node-runtime = { workspace = true, features = ["default"] }
-ulx-bitcoin-utxo-tracker = { workspace = true }
-ulx-randomx = { workspace = true }
+argon-primitives = { workspace = true, features = ["default"] }
+argon-notary-apis = { workspace = true }
+argon-node-runtime = { workspace = true, features = ["default"] }
+argon-bitcoin-utxo-tracker = { workspace = true }
+argon-randomx = { workspace = true }
 
 [dev-dependencies]
 env_logger = { workspace = true }
@@ -73,4 +73,4 @@ substrate-test-runtime-client = { workspace = true }
 sp-keyring = { workspace = true }
 sc-network = { workspace = true }
 pallet-mining-slot = { workspace = true, features = ["default"] }
-ulx-notary = { workspace = true }
+argon-notary = { workspace = true }

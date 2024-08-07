@@ -15,7 +15,7 @@ use sp_runtime::{
 	traits::{BlakeTwo256, Verify},
 };
 
-use ulx_primitives::{
+use argon_primitives::{
 	ensure, round_up, tick::Tick, AccountId, AccountOrigin, AccountOriginUid, AccountType, Balance,
 	BalanceChange, BalanceProof, BalanceTip, BlockVote, ChainTransfer, DataDomainHash,
 	LocalchainAccountId, NewAccountOrigin, NotaryId, Note, NoteType, Notebook, NotebookHeader,

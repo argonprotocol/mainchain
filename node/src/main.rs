@@ -1,4 +1,4 @@
-//! Ulixee node implementation.
+//! Argon node implementation.
 #![warn(missing_docs)]
 
 mod chain_spec;

@@ -6,20 +6,20 @@ use fs2::FileExt;
 use lazy_static::lazy_static;
 use rand::{rngs::OsRng, RngCore};
 
+use argon_primitives::bitcoin::Satoshis;
 use bitcoin::{
 	bip32::{DerivationPath, Fingerprint, Xpriv, Xpub},
 	secp256k1::Secp256k1,
 	Address, Amount, CompressedPublicKey, Network, Txid,
 };
 use bitcoincore_rpc::{json::GetRawTransactionResult, RpcApi};
-use ulx_primitives::bitcoin::Satoshis;
 
 lazy_static! {
 	static ref BITCOIND_LOCK: std::sync::Mutex<()> = std::sync::Mutex::new(());
 }
 
 pub fn start_bitcoind() -> anyhow::Result<(BitcoinD, url::Url, bitcoin::Network)> {
-	let path = env::temp_dir().join("ulx_bitcoind_testing.lock");
+	let path = env::temp_dir().join("argon_bitcoind_testing.lock");
 	let file = File::create_new(&path).or_else(|_| File::open(&path))?;
 	// Acquire the lock
 	file.lock_exclusive().expect("Failed to acquire lock");

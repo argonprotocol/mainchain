@@ -1,11 +1,11 @@
 {
-  "name": "@ulixee/mainchain-monorepo",
+  "name": "@argonprotocol/mainchain-monorepo",
   "version": "2.0.0-alpha.21",
   "scripts": {
     "build": "yarn workspaces foreach --all run build",
-    "pretest": "yarn workspace @ulixee/localchain pretest",
+    "pretest": "yarn workspace @argonprotocol/localchain pretest",
     "test": "yarn pretest && jest",
-    "test:js-only": "ULX_USE_DOCKER_BINS=1 jest"
+    "test:js-only": "argon_USE_DOCKER_BINS=1 jest"
   },
   "private": true,
   "engines": {

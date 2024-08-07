@@ -1,7 +1,7 @@
 import {AccountType, MainchainClient, NotaryClient} from "../index";
 import TestMainchain from "./TestMainchain";
 import TestNotary from "./TestNotary";
-import {Keyring} from "@ulixee/mainchain";
+import {Keyring} from "@argonprotocol/mainchain";
 import {describeIntegration, teardown} from "./testHelpers";
 
 

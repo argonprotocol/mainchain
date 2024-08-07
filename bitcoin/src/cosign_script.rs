@@ -15,7 +15,7 @@ use miniscript::{
 	Descriptor, FromStrKey, MiniscriptKey, Segwitv0,
 };
 
-use ulx_primitives::bitcoin::{BitcoinError, BitcoinHeight, CompressedBitcoinPubkey};
+use argon_primitives::bitcoin::{BitcoinError, BitcoinHeight, CompressedBitcoinPubkey};
 
 use crate::errors::Error;
 
@@ -239,11 +239,11 @@ mod test {
 	use bitcoincore_rpc::{jsonrpc::base64, RawTx, RpcApi};
 	use bitcoind::BitcoinD;
 
-	use ulx_primitives::bitcoin::{
+	use argon_primitives::bitcoin::{
 		BitcoinBlock, BitcoinCosignScriptPubkey, BitcoinHeight, BitcoinScriptPubkey,
 		BitcoinSignature, BitcoinSyncStatus, CompressedBitcoinPubkey, Satoshis, UtxoRef, UtxoValue,
 	};
-	use ulx_testing::*;
+	use argon_testing::*;
 
 	use crate::{UnlockStep, UtxoSpendFilter, UtxoUnlocker};
 
@@ -252,7 +252,7 @@ mod test {
 	const NUM_BLOCKS: u32 = 101;
 
 	fn start_bitcoind() -> (BitcoinD, UtxoSpendFilter, Address, Network) {
-		let (bitcoind, rpc_url, network) = ulx_testing::start_bitcoind().expect("start_bitcoin");
+		let (bitcoind, rpc_url, network) = argon_testing::start_bitcoind().expect("start_bitcoin");
 
 		let block_address = add_wallet_address(&bitcoind);
 		add_blocks(&bitcoind, NUM_BLOCKS as u64, &block_address);

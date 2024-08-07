@@ -1,12 +1,12 @@
 use subxt::{tx::TxStatus, Config, OnlineClient};
 use subxt_signer::sr25519::dev;
 
-use ulixee_client::{api, UlxConfig, UlxExtrinsicParamsBuilder, UlxOnlineClient};
+use argon_client::{api, ArgonConfig, ArgonExtrinsicParamsBuilder, ArgonOnlineClient};
 
 #[tokio::main]
 async fn main() -> Result<(), Box<dyn std::error::Error>> {
 	// Create a client to use:
-	let client = UlxOnlineClient::new().await?;
+	let client = ArgonOnlineClient::new().await?;
 
 	let account = dev::bob().public_key().into();
 
@@ -22,7 +22,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
 	let latest_block = client.blocks().at_latest().await?;
 
 	// transaction to live for 32 blocks from the `latest_block` above.
-	let tx_params = UlxExtrinsicParamsBuilder::<UlxConfig>::new()
+	let tx_params = ArgonExtrinsicParamsBuilder::<ArgonConfig>::new()
 		.tip(100)
 		.mortal(latest_block.header(), 32)
 		.build();
@@ -72,8 +72,8 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
 }
 
 async fn get_block_number(
-	client: OnlineClient<UlxConfig>,
-	hash: <UlxConfig as Config>::Hash,
+	client: OnlineClient<ArgonConfig>,
+	hash: <ArgonConfig as Config>::Hash,
 ) -> Result<u32, subxt::Error> {
 	client
 		.backend()

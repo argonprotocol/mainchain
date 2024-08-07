@@ -1,5 +1,5 @@
 [package]
-name = "ulx-notary"
+name = "argon-notary"
 version.workspace = true
 authors.workspace = true
 edition.workspace = true
@@ -38,20 +38,20 @@ sqlx = { workspace = true, features = ["runtime-tokio-native-tls", "postgres", "
 chrono = { workspace = true }
 clap = { workspace = true }
 
-ulixee-client = { workspace = true }
-ulx-notary-audit = { workspace = true, features = ["default"] }
-ulx-primitives = { workspace = true, features = ["default"] }
-ulx-notary-apis = { workspace = true }
+argon-client = { workspace = true }
+argon-notary-audit = { workspace = true, features = ["default"] }
+argon-primitives = { workspace = true, features = ["default"] }
+argon-notary-apis = { workspace = true }
 url = { workspace = true }
 
 [dev-dependencies]
 frame-support = { workspace = true }
 sp-keyring = { workspace = true }
-ulx-testing = { workspace = true }
+argon-testing = { workspace = true }
 subxt-signer = { workspace = true }
 
 [build-dependencies]
 dotenv = { workspace = true }
 
 [features]
-fast-runtime = [ "ulx-primitives/fast-runtime" ]
+fast-runtime = [ "argon-primitives/fast-runtime" ]

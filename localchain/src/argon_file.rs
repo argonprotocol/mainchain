@@ -1,7 +1,7 @@
 use crate::Result;
+use argon_primitives::{BalanceChange, Notarization};
 use clap::crate_version;
 use serde::{Deserialize, Serialize};
-use ulx_primitives::{BalanceChange, Notarization};
 /// The version of the Argon file format.
 #[cfg_attr(feature = "napi", napi)]
 pub const ARGON_FILE_VERSION: &str = crate_version!();

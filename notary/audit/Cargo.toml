@@ -1,5 +1,5 @@
 [package]
-name = "ulx-notary-audit"
+name = "argon-notary-audit"
 version.workspace = true
 authors.workspace = true
 edition.workspace = true
@@ -20,7 +20,7 @@ sp-runtime = { workspace = true }
 snafu = { workspace = true }
 binary-merkle-tree = { workspace = true }
 
-ulx-primitives = { workspace = true }
+argon-primitives = { workspace = true }
 
 [dev-dependencies]
 frame-support = { workspace = true }
@@ -31,6 +31,7 @@ chrono = { workspace = true }
 default = [ "std" ]
 std = [
 	"anyhow/std",
+	"argon-primitives/std",
 	"binary-merkle-tree/std",
 	"codec/std",
 	"log/std",
@@ -39,6 +40,5 @@ std = [
 	"snafu/std",
 	"sp-core/std",
 	"sp-runtime/std",
-	"ulx-primitives/std",
 ]
-fast-runtime = [ "ulx-primitives/fast-runtime" ]
+fast-runtime = [ "argon-primitives/fast-runtime" ]

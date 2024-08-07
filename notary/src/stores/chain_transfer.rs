@@ -2,7 +2,7 @@ use sp_core::ByteArray;
 use sqlx::{query, FromRow, PgConnection};
 
 use crate::Error;
-use ulx_primitives::{
+use argon_primitives::{
 	ensure, tick::Tick, AccountId, ChainTransfer, NotebookNumber, TransferToLocalchainId,
 };
 

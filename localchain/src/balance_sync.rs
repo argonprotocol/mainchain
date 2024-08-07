@@ -10,8 +10,8 @@ use sqlx::{Sqlite, SqlitePool, Transaction};
 use tokio::sync::Mutex;
 
 use crate::{bail, Result};
-use ulx_primitives::tick::Tick;
-use ulx_primitives::{AccountType, BlockVote, NotaryId, NotebookNumber};
+use argon_primitives::tick::Tick;
+use argon_primitives::{AccountType, BlockVote, NotaryId, NotebookNumber};
 
 use crate::accounts::AccountStore;
 use crate::balance_changes::{BalanceChangeRow, BalanceChangeStatus, BalanceChangeStore};

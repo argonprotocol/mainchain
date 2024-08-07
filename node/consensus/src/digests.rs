@@ -5,8 +5,8 @@ use sp_runtime::{
 	Digest,
 };
 
-use ulx_node_runtime::{AccountId, NotebookVerifyError};
-use ulx_primitives::{
+use argon_node_runtime::{AccountId, NotebookVerifyError};
+use argon_primitives::{
 	digests::{
 		BlockVoteDigest, AUTHOR_DIGEST_ID, BLOCK_SEAL_DIGEST_ID, BLOCK_VOTES_DIGEST_ID,
 		NOTEBOOKS_DIGEST_ID, PARENT_VOTING_KEY_DIGEST, TICK_DIGEST_ID,

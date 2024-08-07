@@ -1,6 +1,6 @@
 use jsonrpsee::{core::SubscriptionResult, proc_macros::rpc, types::ErrorObjectOwned};
 
-use ulx_primitives::{
+use argon_primitives::{
 	AccountId, AccountType, BalanceProof, BalanceTip, Notarization, Notebook, NotebookMeta,
 	NotebookNumber, SignedNotebookHeader,
 };

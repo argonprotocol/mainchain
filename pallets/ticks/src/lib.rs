@@ -5,8 +5,8 @@ use frame_support::traits::OnTimestampSet;
 use sp_runtime::traits::UniqueSaturatedInto;
 
 use alloc::vec::Vec;
+use argon_primitives::TickProvider;
 pub use pallet::*;
-use ulx_primitives::TickProvider;
 pub use weights::*;
 
 #[cfg(test)]
@@ -22,14 +22,14 @@ pub mod weights;
 /// This pallet tracks the current tick of the system
 #[frame_support::pallet(dev_mode)]
 pub mod pallet {
-	use frame_support::pallet_prelude::*;
-	use frame_system::pallet_prelude::*;
-	use sp_runtime::traits::Block as BlockT;
-	use ulx_primitives::{
+	use argon_primitives::{
 		digests::TICK_DIGEST_ID,
 		tick::{Tick, Ticker},
 		TickDigest, TickProvider,
 	};
+	use frame_support::pallet_prelude::*;
+	use frame_system::pallet_prelude::*;
+	use sp_runtime::traits::Block as BlockT;
 
 	use super::*;
 

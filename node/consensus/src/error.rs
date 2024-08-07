@@ -1,11 +1,11 @@
+use argon_node_runtime::AccountId;
+use argon_primitives::{tick::Tick, NotaryId, NotebookNumber};
 use sc_consensus::ImportResult;
 use sp_api::ApiError;
 use sp_blockchain::Error as BlockchainError;
 use sp_consensus::Error as ConsensusError;
 use sp_inherents::Error as InherentsError;
 use sp_runtime::RuntimeString;
-use ulx_node_runtime::AccountId;
-use ulx_primitives::{tick::Tick, NotaryId, NotebookNumber};
 
 #[derive(thiserror::Error, std::fmt::Debug)]
 pub enum Error {

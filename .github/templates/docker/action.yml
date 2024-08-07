@@ -11,7 +11,7 @@ inputs:
     required: false
     default: Containerfile
   bin:
-    description: 'Path to the bin file to copy'
+    description: 'The bin name file to copy'
     required: true
   github-token:
     description: 'The github token'
@@ -27,11 +27,17 @@ runs:
         images: ${{ inputs.image }}
         labels: |
           org.opencontainers.image.licenses=MIT
-          org.opencontainers.image.vendor=ulixee
+          org.opencontainers.image.vendor=argon
         flavor: latest=false
         tags: |
           type=raw,dev
           type=sha
+
+    - name: Set up QEMU
+      uses: docker/setup-qemu-action@v3
+      with:
+        platforms: all
+
     - name: Login to container registry
       uses: docker/login-action@v3
       with:
@@ -42,9 +48,10 @@ runs:
     - name: Build and push image to container registry
       uses: docker/build-push-action@v5
       with:
+        platforms: linux/amd64,linux/arm64
         context: .
         file: ${{ inputs.dockerfile }}
-        build-args: BIN=${{ inputs.bin }}
+        bin: ${{ inputs.bin }}
         push: true
         tags: ${{ steps.meta.outputs.tags }}
         labels: ${{ steps.meta.outputs.labels }}

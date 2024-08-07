@@ -8,6 +8,7 @@ use std::{
 	time::{Duration, Instant},
 };
 
+use argon_bitcoin_utxo_tracker::UtxoTracker;
 use codec::Codec;
 use futures::{
 	executor::block_on,
@@ -28,14 +29,13 @@ use sp_consensus::{Environment, Proposal, Proposer, SelectChain, SyncOracle};
 use sp_core::{traits::SpawnEssentialNamed, RuntimeDebug, H256, U256};
 use sp_runtime::traits::{Block as BlockT, Header as HeaderT};
 use sp_timestamp::Timestamp;
-use ulx_bitcoin_utxo_tracker::UtxoTracker;
 
-use ulx_node_runtime::{NotaryRecordT, NotebookVerifyError};
-use ulx_primitives::{inherents::BlockSealInherentNodeSide, tick::Tick, *};
-use ulx_randomx::RandomXError;
+use argon_node_runtime::{NotaryRecordT, NotebookVerifyError};
+use argon_primitives::{inherents::BlockSealInherentNodeSide, tick::Tick, *};
+use argon_randomx::RandomXError;
 
 use crate::{
-	aux_client::UlxAux, block_creator, block_creator::propose, compute_solver::ComputeSolver,
+	aux_client::ArgonAux, block_creator, block_creator::propose, compute_solver::ComputeSolver,
 	digests::get_tick_digest, error::Error, notebook_watch::has_votes_at_tick,
 };
 
@@ -306,7 +306,7 @@ pub fn run_compute_solver_threads<B, L, Proof>(
 pub fn create_compute_miner<B, C, S, E, SO, L, AccountId>(
 	block_import: BoxBlockImport<B>,
 	client: Arc<C>,
-	aux_client: UlxAux<B, C>,
+	aux_client: ArgonAux<B, C>,
 	select_chain: S,
 	mut env: E,
 	sync_oracle: SO,

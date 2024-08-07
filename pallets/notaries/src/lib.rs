@@ -21,7 +21,7 @@ pub mod pallet {
 	use sp_core::H256;
 	use sp_runtime::{app_crypto::RuntimePublic, BoundedBTreeMap};
 
-	use ulx_primitives::{
+	use argon_primitives::{
 		notary::{
 			GenesisNotary, NotaryId, NotaryMeta, NotaryProvider, NotaryPublic, NotaryRecord,
 			NotarySignature,

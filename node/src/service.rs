@@ -12,13 +12,13 @@ use sc_telemetry::{log, Telemetry, TelemetryWorker};
 use sc_transaction_pool_api::OffchainTransactionPoolFactory;
 use url::Url;
 
-use ulx_bitcoin_utxo_tracker::UtxoTracker;
-use ulx_node_consensus::{
-	aux_client::UlxAux,
+use argon_bitcoin_utxo_tracker::UtxoTracker;
+use argon_node_consensus::{
+	aux_client::ArgonAux,
 	compute_worker::run_compute_solver_threads,
-	import_queue::{UlxImportQueue, UlxVerifier},
+	import_queue::{ArgonImportQueue, ArgonVerifier},
 };
-use ulx_node_runtime::{self, opaque::Block, AccountId, RuntimeApi};
+use argon_node_runtime::{self, opaque::Block, AccountId, RuntimeApi};
 
 use crate::rpc;
 
@@ -33,7 +33,7 @@ type FullSelectChain = sc_consensus::LongestChain<FullBackend, Block>;
 /// imported and generated.
 const GRANDPA_JUSTIFICATION_PERIOD: u32 = 512;
 
-type UlxBlockImport = ulx_node_consensus::import_queue::UlxBlockImport<
+type ArgonBlockImport = argon_node_consensus::import_queue::ArgonBlockImport<
 	Block,
 	GrandpaBlockImport<FullBackend, Block, FullClient, FullSelectChain>,
 	FullClient,
@@ -45,11 +45,11 @@ pub type Service = sc_service::PartialComponents<
 	FullClient,
 	FullBackend,
 	FullSelectChain,
-	UlxImportQueue<Block>,
+	ArgonImportQueue<Block>,
 	sc_transaction_pool::FullPool<Block, FullClient>,
 	(
-		UlxBlockImport,
-		UlxAux<Block, FullClient>,
+		ArgonBlockImport,
+		ArgonAux<Block, FullClient>,
 		Arc<UtxoTracker>,
 		sc_consensus_grandpa::LinkHalf<Block, FullClient, FullSelectChain>,
 		Option<Telemetry>,
@@ -124,8 +124,8 @@ pub fn new_partial(
 
 	let utxo_tracker = Arc::new(utxo_tracker);
 
-	let aux_client = UlxAux::<Block, _>::new(client.clone());
-	let ulx_block_import = UlxBlockImport::new(
+	let aux_client = ArgonAux::<Block, _>::new(client.clone());
+	let argon_block_import = ArgonBlockImport::new(
 		grandpa_block_import.clone(),
 		client.clone(),
 		aux_client.clone(),
@@ -133,9 +133,9 @@ pub fn new_partial(
 		utxo_tracker.clone(),
 	);
 
-	let import_queue = UlxImportQueue::<Block>::new(
-		UlxVerifier::new(),
-		Box::new(ulx_block_import.clone()),
+	let import_queue = ArgonImportQueue::<Block>::new(
+		ArgonVerifier::new(),
+		Box::new(argon_block_import.clone()),
 		Some(Box::new(grandpa_block_import.clone())),
 		&task_manager.spawn_essential_handle(),
 		config.prometheus_registry(),
@@ -149,7 +149,7 @@ pub fn new_partial(
 		keystore_container,
 		select_chain,
 		transaction_pool,
-		other: (ulx_block_import, aux_client, utxo_tracker, grandpa_link, telemetry),
+		other: (argon_block_import, aux_client, utxo_tracker, grandpa_link, telemetry),
 	})
 }
 
@@ -170,7 +170,7 @@ pub fn new_full<
 		import_queue,
 		keystore_container,
 		select_chain,
-		other: (ulx_block_import, aux_client, utxo_tracker, grandpa_link, mut telemetry),
+		other: (argon_block_import, aux_client, utxo_tracker, grandpa_link, mut telemetry),
 	} = new_partial(&config, bitcoin_rpc_url)?;
 
 	let metrics = N::register_notification_metrics(config.prometheus_registry());
@@ -284,8 +284,8 @@ pub fn new_full<
 			let block_seconds = Duration::from_secs(10);
 
 			let (compute_miner, compute_task) =
-				ulx_node_consensus::compute_worker::create_compute_miner(
-					Box::new(ulx_block_import.clone()),
+				argon_node_consensus::compute_worker::create_compute_miner(
+					Box::new(argon_block_import.clone()),
 					client.clone(),
 					aux_client.clone(),
 					select_chain.clone(),
@@ -298,12 +298,12 @@ pub fn new_full<
 				);
 
 			task_manager.spawn_essential_handle().spawn_blocking(
-				"ulx-compute-miner",
+				"argon-compute-miner",
 				Some("block-authoring"),
 				compute_task,
 			);
 
-			let (vote_watch_task, create_block_stream) = ulx_node_consensus::notary_client_task(
+			let (vote_watch_task, create_block_stream) = argon_node_consensus::notary_client_task(
 				client.clone(),
 				select_chain,
 				aux_client.clone(),
@@ -316,8 +316,8 @@ pub fn new_full<
 				prometheus_registry.as_ref(),
 				telemetry.as_ref().map(|x| x.handle()),
 			);
-			let block_create_task = ulx_node_consensus::tax_block_creator(
-				Box::new(ulx_block_import),
+			let block_create_task = argon_node_consensus::tax_block_creator(
+				Box::new(argon_block_import),
 				client.clone(),
 				aux_client.clone(),
 				proposer_factory_tax,
@@ -328,12 +328,12 @@ pub fn new_full<
 			);
 
 			task_manager.spawn_essential_handle().spawn_blocking(
-				"ulx-vote-blocks-watch",
+				"argon-vote-blocks-watch",
 				Some("block-authoring"),
 				vote_watch_task,
 			);
 			task_manager.spawn_essential_handle().spawn_blocking(
-				"ulx-blocks",
+				"argon-blocks",
 				Some("block-authoring"),
 				block_create_task,
 			);

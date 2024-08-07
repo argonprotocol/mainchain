@@ -4,7 +4,7 @@ use sp_core::{ConstU32, H256};
 use sp_runtime::{traits::IdentityLookup, BuildStorage, FixedU128};
 
 use crate as pallet_block_rewards;
-use ulx_primitives::{
+use argon_primitives::{
 	block_seal::RewardSharing,
 	notary::{NotaryProvider, NotarySignature},
 	tick::Tick,
@@ -22,7 +22,7 @@ frame_support::construct_runtime!(
 		System: frame_system,
 		BlockRewards: pallet_block_rewards,
 		ArgonBalances: pallet_balances::<Instance1>::{Pallet, Call, Storage, Config<T>, Event<T>},
-		UlixeeBalances: pallet_balances::<Instance2>::{Pallet, Call, Storage, Config<T>, Event<T>},
+		ShareBalances: pallet_balances::<Instance2>::{Pallet, Call, Storage, Config<T>, Event<T>},
 	}
 );
 #[derive_impl(frame_system::config_preludes::TestDefaultConfig as frame_system::DefaultConfig)]
@@ -56,8 +56,8 @@ impl pallet_balances::Config<ArgonToken> for Test {
 	type RuntimeFreezeReason = RuntimeFreezeReason;
 }
 
-type UlixeeToken = pallet_balances::Instance2;
-impl pallet_balances::Config<UlixeeToken> for Test {
+type SharesToken = pallet_balances::Instance2;
+impl pallet_balances::Config<SharesToken> for Test {
 	type MaxLocks = ConstU32<0>;
 	type MaxReserves = ConstU32<0>;
 	type ReserveIdentifier = ();
@@ -66,7 +66,7 @@ impl pallet_balances::Config<UlixeeToken> for Test {
 	type DustRemoval = ();
 	type ExistentialDeposit = ExistentialDeposit;
 	type AccountStore = StorageMapShim<
-		pallet_balances::Account<Test, UlixeeToken>,
+		pallet_balances::Account<Test, SharesToken>,
 		AccountId,
 		pallet_balances::AccountData<Balance>,
 	>;
@@ -79,7 +79,7 @@ impl pallet_balances::Config<UlixeeToken> for Test {
 
 parameter_types! {
 	pub static ArgonsPerBlock :u32 = 5_000;
-	pub static StartingUlixeesPerBlock :u32 = 5_000;
+	pub static StartingSharesPerBlock :u32 = 5_000;
 	pub static HalvingBlocks :u32 = 100;
 	pub static MaturationBlocks :u32 = 5;
 	pub static MinerPayoutPercent :FixedU128 = FixedU128::from_rational(75, 100);
@@ -149,9 +149,9 @@ impl pallet_block_rewards::Config for Test {
 	type RuntimeEvent = RuntimeEvent;
 	type WeightInfo = ();
 	type ArgonCurrency = ArgonBalances;
-	type UlixeeCurrency = UlixeeBalances;
+	type SharesCurrency = ShareBalances;
 	type ArgonsPerBlock = ArgonsPerBlock;
-	type StartingUlixeesPerBlock = StartingUlixeesPerBlock;
+	type StartingSharesPerBlock = StartingSharesPerBlock;
 	type MaturationBlocks = MaturationBlocks;
 	type Balance = Balance;
 	type HalvingBlocks = HalvingBlocks;

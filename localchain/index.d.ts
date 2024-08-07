@@ -188,7 +188,7 @@ export class MainchainClient {
   getDataDomainZoneRecord(domainName: string, tld: DataTLD): Promise<ZoneRecord | null>
   getNotaryDetails(notaryId: number): Promise<NotaryDetails | null>
   getAccount(address: string): Promise<AccountInfo>
-  getUlixees(address: string): Promise<BalancesAccountData>
+  getShares(address: string): Promise<BalancesAccountData>
   getTransferToLocalchainFinalizedBlock(transferId: number): Promise<number | null>
   waitForLocalchainTransfer(transferId: number): Promise<LocalchainTransfer | null>
   getAccountChangesRoot(notaryId: number, notebookNumber: number): Promise<Uint8Array>
@@ -585,7 +585,7 @@ export interface NotebookProof {
   proof: Array<Uint8Array>
 }
 
-export function runCli(): Promise<void>
+export declare function runCli(): Promise<void>
 
 export interface SignatureResult {
   signature: Uint8Array

@@ -4,13 +4,13 @@ use anyhow::Context;
 use clap::{crate_version, Parser, Subcommand};
 use sqlx::{migrate, postgres::PgPoolOptions};
 
-use ulixee_client::ReconnectingClient;
-use ulx_notary::{
+use argon_client::ReconnectingClient;
+use argon_notary::{
 	block_watch::spawn_block_sync,
 	notebook_closer::{spawn_notebook_closer, NOTARY_KEYID},
 	NotaryServer,
 };
-use ulx_primitives::{tick::Ticker, CryptoType, KeystoreParams, NotaryId};
+use argon_primitives::{tick::Ticker, CryptoType, KeystoreParams, NotaryId};
 
 #[derive(Parser, Debug)]
 #[clap(version = crate_version!())]
@@ -37,7 +37,7 @@ enum Commands {
 		trusted_rpc_url: String,
 
 		/// Required notary id you are running
-		#[clap(short, long, env = "ULX_NOTARY_ID", default_value = "1")]
+		#[clap(short, long, env = "argon_NOTARY_ID", default_value = "1")]
 		notary_id: NotaryId,
 
 		#[allow(missing_docs)]

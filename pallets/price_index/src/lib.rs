@@ -9,8 +9,8 @@ use sp_arithmetic::{FixedI128, FixedU128};
 use sp_core::RuntimeDebug;
 use sp_runtime::traits::{CheckedDiv, One, Zero};
 
+use argon_primitives::{tick::Tick, ArgonCPI};
 pub use pallet::*;
-use ulx_primitives::{tick::Tick, ArgonCPI};
 pub use weights::WeightInfo;
 
 #[cfg(feature = "runtime-benchmarks")]
@@ -67,7 +67,7 @@ pub mod pallet {
 	use frame_system::pallet_prelude::*;
 	use sp_arithmetic::{traits::AtLeast32BitUnsigned, FixedPointNumber};
 
-	use ulx_primitives::PriceProvider;
+	use argon_primitives::PriceProvider;
 
 	use super::*;
 

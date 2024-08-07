@@ -200,8 +200,8 @@ CREATE SEQUENCE IF NOT EXISTS uid_seq_3;
 CREATE SEQUENCE IF NOT EXISTS uid_seq_4;
 
 -- TODO: need to know the roles
--- GRANT USAGE ON SEQUENCE uid_seq_0 TO ulx;
--- GRANT USAGE ON SEQUENCE uid_seq_1 TO ulx;
--- GRANT USAGE ON SEQUENCE uid_seq_2 TO ulx;
--- GRANT USAGE ON SEQUENCE uid_seq_3 TO ulx;
--- GRANT USAGE ON SEQUENCE uid_seq_4 TO ulx;
+-- GRANT USAGE ON SEQUENCE uid_seq_0 TO argon;
+-- GRANT USAGE ON SEQUENCE uid_seq_1 TO argon;
+-- GRANT USAGE ON SEQUENCE uid_seq_2 TO argon;
+-- GRANT USAGE ON SEQUENCE uid_seq_3 TO argon;
+-- GRANT USAGE ON SEQUENCE uid_seq_4 TO argon;

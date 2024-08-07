@@ -1,4 +1,11 @@
 use anyhow::anyhow;
+use argon_notary_audit::{verify_changeset_signatures, verify_notarization_allocation};
+use argon_primitives::{
+  AccountType, Balance, BalanceChange, BlockVote, DataDomain, Notarization, NotaryId, Note,
+  NoteType, DATA_DOMAIN_LEASE_COST, MAX_BALANCE_CHANGES_PER_NOTARIZATION,
+  MAX_BLOCK_VOTES_PER_NOTARIZATION, MAX_DOMAINS_PER_NOTARIZATION, TAX_PERCENT_BASE,
+  TRANSFER_TAX_CAP,
+};
 use codec::Decode;
 use serde_json::json;
 use sp_core::crypto::AccountId32;
@@ -9,13 +16,6 @@ use sqlx::SqlitePool;
 use std::collections::{BTreeMap, HashMap};
 use std::sync::Arc;
 use tokio::sync::Mutex;
-use ulx_notary_audit::{verify_changeset_signatures, verify_notarization_allocation};
-use ulx_primitives::{
-  AccountType, Balance, BalanceChange, BlockVote, DataDomain, Notarization, NotaryId, Note,
-  NoteType, DATA_DOMAIN_LEASE_COST, MAX_BALANCE_CHANGES_PER_NOTARIZATION,
-  MAX_BLOCK_VOTES_PER_NOTARIZATION, MAX_DOMAINS_PER_NOTARIZATION, TAX_PERCENT_BASE,
-  TRANSFER_TAX_CAP,
-};
 
 use crate::accounts::AccountStore;
 use crate::accounts::LocalAccount;
@@ -974,11 +974,11 @@ pub mod napi_ext {
   use crate::Escrow;
   use crate::LocalAccount;
   use crate::{notarization_tracker::NotarizationTracker, AccountStore};
+  use argon_primitives::{AccountType, BlockVote};
   use codec::Decode;
   use napi::bindgen_prelude::BigInt;
   use sp_core::H256;
   use sp_runtime::MultiSignature;
-  use ulx_primitives::{AccountType, BlockVote};
 
   #[napi]
   impl NotarizationBuilder {
@@ -1279,6 +1279,7 @@ pub mod napi_ext {
 
 #[cfg(test)]
 mod test {
+  use argon_primitives::{AccountOrigin, BalanceProof, ChainTransfer, MerkleProof, Note};
   use frame_support::assert_ok;
   use sp_core::bounded_vec;
   use sp_core::ed25519::Signature;
@@ -1286,7 +1287,6 @@ mod test {
   use sp_keyring::Sr25519Keyring::Alice;
   use sp_keyring::Sr25519Keyring::Bob;
   use sqlx::SqlitePool;
-  use ulx_primitives::{AccountOrigin, BalanceProof, ChainTransfer, MerkleProof, Note};
 
   use crate::test_utils::{
     create_mock_notary, create_pool, get_balance_tip, mock_mainchain_transfer, mock_notary_clients,

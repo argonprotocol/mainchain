@@ -1,5 +1,5 @@
 [package]
-name = "ulx-localchain"
+name = "argon-localchain"
 version.workspace = true
 edition.workspace = true
 authors.workspace = true
@@ -47,10 +47,10 @@ bech32 = { workspace = true }
 array-bytes = { workspace = true }
 directories = { workspace = true }
 rpassword = { workspace = true }
-ulixee-client = { workspace = true }
-ulx-primitives = { workspace = true, features = ["default"] }
-ulx-notary-apis = { workspace = true }
-ulx-notary-audit = { workspace = true, features = ["default"] }
+argon-client = { workspace = true }
+argon-primitives = { workspace = true, features = ["default"] }
+argon-notary-apis = { workspace = true }
+argon-notary-audit = { workspace = true, features = ["default"] }
 uniffi = { workspace = true, optional = true }
 jsonrpsee = { workspace = true }
 
@@ -58,9 +58,9 @@ jsonrpsee = { workspace = true }
 [dev-dependencies]
 frame-support = { workspace = true }
 sp-keyring = { workspace = true }
-ulx-testing = { workspace = true }
+argon-testing = { workspace = true }
 sc-utils = { workspace = true }
-ulx-notary = { workspace = true }
+argon-notary = { workspace = true }
 subxt-signer = { workspace = true }
 
 [build-dependencies]
@@ -70,6 +70,6 @@ uniffi = { workspace = true, features = ["build"] }
 
 [features]
 default = []
-napi = [ "dep:napi", "napi-derive", "ulx-primitives/napi" ]
-fast-runtime = [ "ulx-primitives/fast-runtime" ]
-uniffi = [ "dep:uniffi", "ulx-primitives/uniffi" ]
+napi = [ "argon-primitives/napi", "dep:napi", "napi-derive" ]
+fast-runtime = [ "argon-primitives/fast-runtime" ]
+uniffi = [ "argon-primitives/uniffi", "dep:uniffi" ]

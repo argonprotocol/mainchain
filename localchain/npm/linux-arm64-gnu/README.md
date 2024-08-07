@@ -1,3 +1,3 @@
-# `@ulixee/localchain-linux-arm64-gnu`
+# `@argonprotocol/localchain-linux-arm64-gnu`
 
-This is the **aarch64-unknown-linux-gnu** binary for `@ulixee/localchain`
+This is the **aarch64-unknown-linux-gnu** binary for `@argonprotocol/localchain`

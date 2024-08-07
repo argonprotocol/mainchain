@@ -1,3 +1,3 @@
-# `@ulixee/localchain-darwin-arm64`
+# `@argonprotocol/localchain-darwin-arm64`
 
-This is the **aarch64-apple-darwin** binary for `@ulixee/localchain`
+This is the **aarch64-apple-darwin** binary for `@argonprotocol/localchain`

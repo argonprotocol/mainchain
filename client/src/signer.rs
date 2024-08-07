@@ -1,4 +1,5 @@
-use crate::UlxConfig;
+use crate::ArgonConfig;
+use argon_primitives::{AccountId, CryptoType};
 use sp_core::{
 	crypto::{key_types::ACCOUNT, AccountId32},
 	ed25519, sr25519, Pair,
@@ -6,7 +7,6 @@ use sp_core::{
 use sp_keystore::Keystore;
 pub use subxt::tx::Signer;
 use subxt::Config;
-use ulx_primitives::{AccountId, CryptoType};
 
 pub struct Ed25519Signer {
 	pub keypair: ed25519::Pair,
@@ -18,17 +18,17 @@ impl Ed25519Signer {
 	}
 }
 
-impl Signer<UlxConfig> for Ed25519Signer {
-	fn account_id(&self) -> <UlxConfig as Config>::AccountId {
-		<UlxConfig as Config>::AccountId::from(self.keypair.public().0)
+impl Signer<ArgonConfig> for Ed25519Signer {
+	fn account_id(&self) -> <ArgonConfig as Config>::AccountId {
+		<ArgonConfig as Config>::AccountId::from(self.keypair.public().0)
 	}
 
-	fn address(&self) -> <UlxConfig as Config>::Address {
+	fn address(&self) -> <ArgonConfig as Config>::Address {
 		self.account_id().into()
 	}
 
-	fn sign(&self, data: &[u8]) -> <UlxConfig as Config>::Signature {
-		<UlxConfig as Config>::Signature::Ed25519(self.keypair.sign(data).0)
+	fn sign(&self, data: &[u8]) -> <ArgonConfig as Config>::Signature {
+		<ArgonConfig as Config>::Signature::Ed25519(self.keypair.sign(data).0)
 	}
 }
 
@@ -40,17 +40,17 @@ impl Sr25519Signer {
 		Self { keypair }
 	}
 }
-impl Signer<UlxConfig> for Sr25519Signer {
-	fn account_id(&self) -> <UlxConfig as Config>::AccountId {
-		<UlxConfig as Config>::AccountId::from(self.keypair.public().0)
+impl Signer<ArgonConfig> for Sr25519Signer {
+	fn account_id(&self) -> <ArgonConfig as Config>::AccountId {
+		<ArgonConfig as Config>::AccountId::from(self.keypair.public().0)
 	}
 
-	fn address(&self) -> <UlxConfig as Config>::Address {
+	fn address(&self) -> <ArgonConfig as Config>::Address {
 		self.account_id().into()
 	}
 
-	fn sign(&self, data: &[u8]) -> <UlxConfig as Config>::Signature {
-		<UlxConfig as Config>::Signature::Sr25519(self.keypair.sign(data).0)
+	fn sign(&self, data: &[u8]) -> <ArgonConfig as Config>::Signature {
+		<ArgonConfig as Config>::Signature::Sr25519(self.keypair.sign(data).0)
 	}
 }
 
@@ -69,18 +69,18 @@ impl KeystoreSigner {
 		Self { keystore, account_id, crypto_type }
 	}
 }
-impl Signer<UlxConfig> for KeystoreSigner {
-	fn account_id(&self) -> <UlxConfig as Config>::AccountId {
+impl Signer<ArgonConfig> for KeystoreSigner {
+	fn account_id(&self) -> <ArgonConfig as Config>::AccountId {
 		let account_id32: AccountId32 = self.account_id.clone().into();
 		let account_id = subxt::utils::AccountId32(account_id32.into());
 		account_id
 	}
 
-	fn address(&self) -> <UlxConfig as Config>::Address {
-		<UlxConfig as Config>::Address::Id(self.account_id())
+	fn address(&self) -> <ArgonConfig as Config>::Address {
+		<ArgonConfig as Config>::Address::Id(self.account_id())
 	}
 
-	fn sign(&self, data: &[u8]) -> <UlxConfig as Config>::Signature {
+	fn sign(&self, data: &[u8]) -> <ArgonConfig as Config>::Signature {
 		let account_id = self.account_id().0;
 		match self.crypto_type {
 			CryptoType::Sr25519 => {
@@ -90,7 +90,7 @@ impl Signer<UlxConfig> for KeystoreSigner {
 					.expect("Failed to sign with sr25519")
 					.expect("Failed to create signature");
 
-				<UlxConfig as Config>::Signature::Sr25519(signature.0)
+				<ArgonConfig as Config>::Signature::Sr25519(signature.0)
 			},
 			CryptoType::Ed25519 => {
 				let signature = self
@@ -99,7 +99,7 @@ impl Signer<UlxConfig> for KeystoreSigner {
 					.expect("Failed to sign with ed25519")
 					.expect("Failed to create signature");
 
-				<UlxConfig as Config>::Signature::Ed25519(signature.0)
+				<ArgonConfig as Config>::Signature::Ed25519(signature.0)
 			},
 		}
 	}

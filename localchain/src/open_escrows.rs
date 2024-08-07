@@ -5,6 +5,11 @@ use crate::notary_client::NotaryClients;
 use crate::{bail, BalanceChangeStatus, Error, Result};
 use crate::{TickerRef, ESCROW_MINIMUM_SETTLEMENT};
 use anyhow::anyhow;
+use argon_notary_audit::verify_changeset_signatures;
+use argon_primitives::{
+  AccountType, Balance, BalanceChange, BalanceTip, MultiSignatureBytes, NoteType, NotebookNumber,
+  ESCROW_CLAWBACK_TICKS, ESCROW_EXPIRATION_TICKS, MINIMUM_ESCROW_SETTLEMENT,
+};
 use bech32::{Bech32m, Hrp};
 use chrono::NaiveDateTime;
 use codec::Encode;
@@ -15,11 +20,6 @@ use sp_runtime::MultiSignature;
 use sqlx::{FromRow, SqliteConnection, SqlitePool};
 use std::sync::Arc;
 use tokio::sync::Mutex;
-use ulx_notary_audit::verify_changeset_signatures;
-use ulx_primitives::{
-  AccountType, Balance, BalanceChange, BalanceTip, MultiSignatureBytes, NoteType, NotebookNumber,
-  ESCROW_CLAWBACK_TICKS, ESCROW_EXPIRATION_TICKS, MINIMUM_ESCROW_SETTLEMENT,
-};
 
 lazy_static! {
   pub static ref EMPTY_SIGNATURE: Vec<u8> = MultiSignature::from(Signature::from_raw([0; 64]))
@@ -708,13 +708,13 @@ mod tests {
   use crate::test_utils::{create_mock_notary, mock_notary_clients, MockNotary};
   use crate::transactions::Transactions;
   use crate::*;
+  use argon_primitives::tick::Tick;
+  use argon_primitives::{AccountId, LocalchainAccountId, Notarization};
   use serde_json::json;
   use sp_core::Pair;
   use sp_keyring::AccountKeyring::{Alice, Charlie};
   use sp_keyring::Ed25519Keyring::Bob;
   use sp_keyring::Ed25519Keyring::Ferdie;
-  use ulx_primitives::tick::Tick;
-  use ulx_primitives::{AccountId, LocalchainAccountId, Notarization};
 
   async fn register_account(
     db: &mut SqliteConnection,
@@ -797,7 +797,7 @@ mod tests {
     let mut state = mock_notary.state.lock().await;
     state.balance_tips.insert(
       LocalchainAccountId::new(account.get_account_id32()?, account.account_type),
-      ulx_notary_apis::localchain::BalanceTipResult {
+      argon_notary_apis::localchain::BalanceTipResult {
         tick,
         balance_tip: balance_tip.tip().into(),
         notebook_number,

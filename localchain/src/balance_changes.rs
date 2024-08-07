@@ -1,3 +1,7 @@
+use argon_primitives::tick::Tick;
+use argon_primitives::{
+  BalanceChange, BalanceProof, BalanceTip, MerkleProof, NotaryId, NotebookNumber,
+};
 use binary_merkle_tree::{verify_proof, Leaf};
 use chrono::NaiveDateTime;
 use codec::Encode;
@@ -5,10 +9,6 @@ use serde_json::{from_value, json};
 use sp_core::{bounded_vec, ed25519, H256};
 use sp_runtime::traits::BlakeTwo256;
 use sqlx::{FromRow, Sqlite, SqliteConnection, SqlitePool, Transaction};
-use ulx_primitives::tick::Tick;
-use ulx_primitives::{
-  BalanceChange, BalanceProof, BalanceTip, MerkleProof, NotaryId, NotebookNumber,
-};
 
 use crate::accounts::{AccountStore, LocalAccount};
 use crate::{bail, Result};
@@ -327,7 +327,10 @@ impl BalanceChangeStore {
   ) -> Result<i64> {
     let mut hold_note_json = None;
     for note in balance_change.notes.iter() {
-      if matches!(note.note_type, ulx_primitives::NoteType::EscrowHold { .. }) {
+      if matches!(
+        note.note_type,
+        argon_primitives::NoteType::EscrowHold { .. }
+      ) {
         hold_note_json = Some(json!(note));
       }
     }
@@ -370,7 +373,10 @@ impl BalanceChangeStore {
   ) -> Result<i64> {
     let mut hold_note_json = None;
     for note in balance_change.notes.iter() {
-      if matches!(note.note_type, ulx_primitives::NoteType::EscrowHold { .. }) {
+      if matches!(
+        note.note_type,
+        argon_primitives::NoteType::EscrowHold { .. }
+      ) {
         hold_note_json = Some(json!(note));
       }
     }
@@ -538,9 +544,9 @@ pub mod napi_ext {
 
 #[cfg(test)]
 mod test {
+  use argon_primitives::{AccountOrigin, AccountType, Note, NoteType};
   use sp_keyring::AccountKeyring::Ferdie;
   use sqlx::sqlite::{SqliteConnectOptions, SqlitePoolOptions};
-  use ulx_primitives::{AccountOrigin, AccountType, Note, NoteType};
 
   use crate::test_utils::connect_with_logs;
   use crate::*;

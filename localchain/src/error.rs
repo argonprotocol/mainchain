@@ -1,5 +1,5 @@
+use argon_notary_audit::VerifyError;
 use sp_core::crypto::{DeriveError, SecretStringError};
-use ulx_notary_audit::VerifyError;
 
 #[derive(thiserror::Error, Debug)]
 pub enum Error {

@@ -4,7 +4,7 @@ use scale_info::TypeInfo;
 use serde::{Deserialize, Serialize};
 use sp_core::{RuntimeDebug, H256};
 
-use ulx_primitives::{
+use argon_primitives::{
 	tick::Tick, AccountId, AccountOrigin, AccountType, NewAccountOrigin,
 	NotarizationBalanceChangeset, NotarizationBlockVotes, NotarizationDataDomains, NotebookNumber,
 };

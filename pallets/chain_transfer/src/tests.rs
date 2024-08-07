@@ -3,7 +3,7 @@ use sp_core::bounded_vec;
 use sp_keyring::AccountKeyring::Bob;
 use sp_runtime::testing::H256;
 
-use ulx_primitives::{
+use argon_primitives::{
 	notebook::{AccountOrigin, ChainTransfer, NotebookHeader},
 	tick::Tick,
 	NotebookEventHandler,

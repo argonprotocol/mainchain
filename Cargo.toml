@@ -40,13 +40,13 @@ resolver = "2"
 [workspace.package]
 version = "0.0.1"
 edition = "2021"
-authors = ["Ulixee <https://github.com/ulixee>"]
-description = "A Ulixee miner node using the substrate platform."
-homepage = "https://ulixee.org"
+authors = ["Argon <https://github.com/argonprotocol>"]
+description = "An argon miner node using the substrate platform."
+homepage = "https://argonprotocol.org"
 license = "MIT-0"
-rust-version = "1.77.0"
-repository = "https://github.com/ulixee/mainchain"
-documentation = "https://ulixee.org/docs"
+rust-version = "1.79.0"
+repository = "https://github.com/argonprotocol/mainchain"
+documentation = "https://argonprotocol.org/docs"
 
 [profile.release]
 lto = true
@@ -267,7 +267,7 @@ rsntp = { version = "4.0" }
 bitcoincore-rpc = { version = "0.19" }
 bitcoin = { version = "0.32.0", default-features = false }
 miniscript = { version = "12.0.0", default-features = false }
-hwi = { git = "https://github.com/ulixee/rust-hwi", branch = "master" }
+hwi = { version = "0.9.0", default-features = false }
 bitcoind = { version = "0.36", features = ["25_0"] }
 secp256k1 = { version = "0.29.0" }
 k256 = { version = "0.13.3", default-features = false }
@@ -278,7 +278,7 @@ napi-derive = { version = "2.16" }
 napi = { version = "2.16", features = ["napi9", "async", "error_anyhow"] }
 napi-build = { version = "2.1" }
 uniffi = { version = "0.27", features = ["tokio"] }
-randomx-rs = { git = "https://github.com/ulixee/randomx-rs", branch = "main" }
+randomx-rs = { git = "https://github.com/argonprotocol/randomx-rs", branch = "main" }
 
 clap = { version = "4.5", features = ["derive", "cargo", "env"] }
 quote = { version = "1.0" }
@@ -300,20 +300,20 @@ dotenv = { version = "0.15" }
 subxt = { version = "0.37", git = "https://github.com/paritytech/subxt", branch = "master" }
 subxt-signer = { version = "0.37", git = "https://github.com/paritytech/subxt", branch = "master" }
 
-ulx-testing = { path = "testing" }
-ulx-localchain = { path = "localchain" }
-ulixee-client = { path = "client" }
-ulx-node-consensus = { path = "node/consensus" }
-ulx-bitcoin = { path = "bitcoin", default-features = false }
-ulx-bitcoin-utxo-tracker = { path = "node/bitcoin_utxo_tracker" }
-ulx-node = { path = "node" }
-ulx-node-runtime = { path = "runtime" }
-ulx-randomx = { path = "node/randomx" }
-ulx-notary = { path = "notary" }
-ulx-notary-apis = { path = "notary/apis" }
-ulx-notary-audit = { path = "notary/audit", default-features = false }
-ulx-primitives = { path = "primitives", default-features = false }
-ulx-bitcoin-cli-macros = { path = "bitcoin/cli/macros" }
+argon-testing = { path = "testing" }
+argon-localchain = { path = "localchain" }
+argon-client = { path = "client" }
+argon-node-consensus = { path = "node/consensus" }
+argon-bitcoin = { path = "bitcoin", default-features = false }
+argon-bitcoin-utxo-tracker = { path = "node/bitcoin_utxo_tracker" }
+argon-node = { path = "node" }
+argon-node-runtime = { path = "runtime" }
+argon-randomx = { path = "node/randomx" }
+argon-notary = { path = "notary" }
+argon-notary-apis = { path = "notary/apis" }
+argon-notary-audit = { path = "notary/audit", default-features = false }
+argon-primitives = { path = "primitives", default-features = false }
+argon-bitcoin-cli-macros = { path = "bitcoin/cli/macros" }
 
 pallet-block-seal = { path = "pallets/block_seal", default-features = false }
 pallet-block-seal-spec = { path = "pallets/block_seal_spec", default-features = false }

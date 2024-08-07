@@ -1,9 +1,9 @@
 use std::{env, path::PathBuf, process, process::Command};
 
-use crate::UlxTestNode;
+use crate::ArgonTestNode;
 
 pub async fn run_bitcoin_cli(
-	node: &UlxTestNode,
+	node: &ArgonTestNode,
 	args: Vec<impl ToString>,
 ) -> anyhow::Result<String> {
 	let rust_log = env::var("RUST_LOG").unwrap_or("info".to_string());
@@ -17,7 +17,7 @@ pub async fn run_bitcoin_cli(
 		workspace_cargo_path
 	};
 
-	let output = Command::new("./ulx-bitcoin-cli")
+	let output = Command::new("./argon-bitcoin-cli")
 		.current_dir(&target_dir)
 		.env("RUST_LOG", rust_log)
 		.stdout(process::Stdio::piped())
@@ -37,6 +37,6 @@ pub async fn run_bitcoin_cli(
 	} else {
 		// Print the error
 		let stderr = String::from_utf8_lossy(&output.stderr);
-		Err(anyhow::anyhow!("Failed to run ulx-bitcoin: {:?}", stderr))
+		Err(anyhow::anyhow!("Failed to run argon-bitcoin: {:?}", stderr))
 	}
 }

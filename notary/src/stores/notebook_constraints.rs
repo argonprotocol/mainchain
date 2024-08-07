@@ -1,6 +1,6 @@
 use sqlx::PgConnection;
 
-use ulx_primitives::{
+use argon_primitives::{
 	NotebookNumber, MAX_BALANCE_CHANGES_PER_NOTARIZATION, MAX_BLOCK_VOTES_PER_NOTEBOOK,
 	MAX_DOMAINS_PER_NOTEBOOK, MAX_NOTARIZATIONS_PER_NOTEBOOK, MAX_NOTEBOOK_TRANSFERS,
 };

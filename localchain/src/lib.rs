@@ -19,6 +19,7 @@ use sqlx::{migrate::MigrateDatabase, SqlitePool};
 use tokio::sync::Mutex;
 
 pub use accounts::*;
+use argon_primitives::tick::Ticker;
 pub use balance_changes::*;
 pub use balance_sync::*;
 pub use constants::*;
@@ -29,7 +30,6 @@ pub use keystore::Keystore;
 pub use mainchain_client::*;
 pub use notary_client::*;
 pub use open_escrows::*;
-use ulx_primitives::tick::Ticker;
 
 use crate::cli::EmbeddedKeyPassword;
 use crate::mainchain_transfer::MainchainTransferStore;
@@ -37,7 +37,7 @@ use crate::mainchain_transfer::MainchainTransferStore;
 #[cfg(feature = "uniffi")]
 uniffi::setup_scaffolding!();
 #[cfg(feature = "uniffi")]
-ulx_primitives::uniffi_reexport_scaffolding!();
+argon_primitives::uniffi_reexport_scaffolding!();
 
 mod accounts;
 mod balance_change_builder;
@@ -69,7 +69,7 @@ lazy_static! {
     let base_dirs = BaseDirs::new().unwrap();
     let data_local_dir = base_dirs.data_local_dir();
     let path = PathBuf::from(data_local_dir)
-      .join("ulixee")
+      .join("argon")
       .join("localchain")
       .to_str()
       .unwrap()

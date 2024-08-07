@@ -26,7 +26,7 @@ COPY . .
 RUN --mount=type=cache,target=/usr/local/cargo/git \
     --mount=type=cache,target=/usr/local/cargo/registry \
     --mount=type=cache,mode=0777,target=/home/root/.cache/sccache \
-    sccache --start-server && cargo build --locked --bin=ulx-node --bin=ulx-notary --features=fast-runtime
+    sccache --start-server && cargo build --locked --bin=argon-node --bin=argon-notary --features=fast-runtime
 RUN  ls /app/target/debug && sccache --show-stats
 
 FROM ubuntu:22.04 AS base_ubuntu
@@ -39,14 +39,14 @@ RUN apt-get update \
     && rm -rf /var/lib/apt/lists/*
 
 # We do not need the Rust toolchain to run the binary!
-# Runtime image for ulx-node
-FROM base_ubuntu AS ulx-node
+# Runtime image for argon-node
+FROM base_ubuntu AS argon-node
 WORKDIR /app
-COPY --from=base /app/target/debug/ulx-node /usr/local/bin/ulx-node
-ENTRYPOINT ["/usr/local/bin/ulx-node"]
+COPY --from=base /app/target/debug/argon-node /usr/local/bin/argon-node
+ENTRYPOINT ["/usr/local/bin/argon-node"]
 
-# Runtime image for ulx-notary
-FROM base_ubuntu AS ulx-notary
+# Runtime image for argon-notary
+FROM base_ubuntu AS argon-notary
 WORKDIR /app
-COPY --from=base /app/target/debug/ulx-notary /usr/local/bin/ulx-notary
-ENTRYPOINT ["/usr/local/bin/ulx-notary"]
+COPY --from=base /app/target/debug/argon-notary /usr/local/bin/argon-notary
+ENTRYPOINT ["/usr/local/bin/argon-notary"]

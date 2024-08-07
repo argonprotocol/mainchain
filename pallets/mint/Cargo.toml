@@ -27,7 +27,7 @@ sp-arithmetic = { workspace = true }
 sp-api = { workspace = true }
 pallet-balances = { workspace = true }
 
-ulx-primitives = { workspace = true }
+argon-primitives = { workspace = true }
 
 [dev-dependencies]
 sp-io = { workspace = true }
@@ -36,6 +36,7 @@ env_logger = { workspace = true }
 [features]
 default = [ "std" ]
 std = [
+	"argon-primitives/std",
 	"codec/std",
 	"frame-benchmarking?/std",
 	"frame-support/std",
@@ -48,7 +49,6 @@ std = [
 	"sp-core/std",
 	"sp-io/std",
 	"sp-runtime/std",
-	"ulx-primitives/std",
 ]
 runtime-benchmarks = [
 	"frame-benchmarking/runtime-benchmarks",

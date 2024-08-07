@@ -25,8 +25,8 @@ env:
   RUSTFLAGS: -D warnings
   RUSTUP_MAX_RETRIES: 10
   CARGO_TERM_COLOR: always
-  # Set an environment variable (that can be overriden) for the Docker Repo
-  DOCKER_REPO: ulixee/ulixee-miner
+  # Set an environment variable (that can be overridden) for the Docker Repo
+  DOCKER_REPO: ulixee/argon-miner
 
 defaults:
   run:
@@ -105,7 +105,7 @@ jobs:
       # Build and upload the binary to the new release
       - uses: taiki-e/upload-rust-binary-action@v1
         with:
-          bin: ulx-node
+          bin: argon-node
           checksum: sha256,sha512,sha1,md5
           target: ${{ matrix.target }}
           archive: $bin-$tag-$target
@@ -113,7 +113,7 @@ jobs:
 
       - uses: taiki-e/upload-rust-binary-action@v1
         with:
-          bin: ulx-notary
+          bin: argon-notary
           checksum: sha256,sha512,sha1,md5
           target: ${{ matrix.target }}
           archive: $bin-$tag-$target
@@ -121,7 +121,7 @@ jobs:
 
       - uses: taiki-e/upload-rust-binary-action@v1
         with:
-          bin: ulx-localchain
+          bin: argon-localchain
           checksum: sha256,sha512,sha1,md5
           target: ${{ matrix.target }}
           archive: $bin-$tag-$target
@@ -131,8 +131,8 @@ jobs:
         if: (matrix.target == 'x86_64-unknown-linux-gnu')
         uses: actions/upload-artifact@v4
         with:
-          name: ulx-node
-          path: ${{ github.workspace }}/target/x86_64-unknown-linux-gnu/release/ulx-node
+          name: argon-node
+          path: ${{ github.workspace }}/target/x86_64-unknown-linux-gnu/release/argon-node
 
   build-image:
     # The type of runner that the job will run on
@@ -156,7 +156,7 @@ jobs:
       - name: Download x86_64 linux binary
         uses: actions/download-artifact@v4
         with:
-          name: ulx-node
+          name: argon-node
           path: ${{ github.workspace }}
 
       # Build and push 2 images, One with the version tag and the other with latest tag

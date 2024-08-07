@@ -9,8 +9,8 @@ validators=(alice bob dave)
 
 dropdb --if-exists -f notary;
 createdb notary;
-rm -rf /tmp/ulixee;
-mkdir -p /tmp/ulixee/bitcoin;
+rm -rf /tmp/argon;
+mkdir -p /tmp/argon/bitcoin;
 
 # listen for sighup and kill all child processes
 trap 'kill $(jobs -p)' SIGHUP SIGINT SIGTERM
@@ -19,8 +19,8 @@ trap 'kill $(jobs -p)' SIGHUP SIGINT SIGTERM
 xcrun simctl shutdown all
 xcrun simctl erase all
 
-echo -e "(\"$BASEDIR/target/debug/ulx-testing-bitcoin\" -regtest -fallbackfee=0.0001 -listen=0 -datadir=/tmp/ulixee/bitcoin -blockfilterindex -txindex -rpcport=18444 -rpcuser=bitcoin -rpcpassword=bitcoin &)\n\n"
-$("$BASEDIR/target/debug/ulx-testing-bitcoin") -regtest -fallbackfee=0.0001 -listen=0 -datadir=/tmp/ulixee/bitcoin -blockfilterindex -txindex -rpcport=18444 -rpcuser=bitcoin -rpcpassword=bitcoin &
+echo -e "(\"$BASEDIR/target/debug/argon-testing-bitcoin\" -regtest -fallbackfee=0.0001 -listen=0 -datadir=/tmp/argon/bitcoin -blockfilterindex -txindex -rpcport=18444 -rpcuser=bitcoin -rpcpassword=bitcoin &)\n\n"
+$("$BASEDIR/target/debug/argon-testing-bitcoin") -regtest -fallbackfee=0.0001 -listen=0 -datadir=/tmp/argon/bitcoin -blockfilterindex -txindex -rpcport=18444 -rpcuser=bitcoin -rpcpassword=bitcoin &
 
 # Function to check if the Bitcoin node is ready
 is_node_ready() {
@@ -47,16 +47,16 @@ until is_ngrok_ready; do
   sleep 1
 done
 
-ULX_LOCAL_TESTNET_NOTARY_URL=$(curl -s http://localhost:4040/api/tunnels/notary | jq -r '.public_url' | sed 's/https:\/\///' | sed 's/http:\/\///');
+argon_LOCAL_TESTNET_NOTARY_URL=$(curl -s http://localhost:4040/api/tunnels/notary | jq -r '.public_url' | sed 's/https:\/\///' | sed 's/http:\/\///');
 
-echo -e "export ULX_LOCAL_TESTNET_NOTARY_URL=\"wss://$ULX_LOCAL_TESTNET_NOTARY_URL\"\n\n"
-export ULX_LOCAL_TESTNET_NOTARY_URL="wss://$ULX_LOCAL_TESTNET_NOTARY_URL"
+echo -e "export argon_LOCAL_TESTNET_NOTARY_URL=\"wss://$argon_LOCAL_TESTNET_NOTARY_URL\"\n\n"
+export argon_LOCAL_TESTNET_NOTARY_URL="wss://$argon_LOCAL_TESTNET_NOTARY_URL"
 
 
 # start a temporary node with alice and bob funded
 for i in {0..1} ; do
-  echo -e "Starting Node ${i}: (\"$BASEDIR/target/debug/ulx-node\" --tmp --${validators[$i]} --chain local --rpc-port=994$((i+4))  --port 3033$((i+4)) --compute-miners 1  --unsafe-force-node-key-generation --unsafe-rpc-external --rpc-methods=unsafe --rpc-cors=all  --bitcoin-rpc-url=http://bitcoin:bitcoin@localhost:18444  &)\n\n"
-  RUST_LOG=info "$BASEDIR/target/debug/ulx-node" --tmp --${validators[$i]} --chain local --name=${validators[$i]}  --rpc-port=994$((i+4))  --port 3033$((i+4)) --compute-miners 1 --unsafe-force-node-key-generation --unsafe-rpc-external --rpc-methods=unsafe --rpc-cors=all  --bitcoin-rpc-url=http://bitcoin:bitcoin@localhost:18444 &
+  echo -e "Starting Node ${i}: (\"$BASEDIR/target/debug/argon-node\" --tmp --${validators[$i]} --chain local --rpc-port=994$((i+4))  --port 3033$((i+4)) --compute-miners 1  --unsafe-force-node-key-generation --unsafe-rpc-external --rpc-methods=unsafe --rpc-cors=all  --bitcoin-rpc-url=http://bitcoin:bitcoin@localhost:18444  &)\n\n"
+  RUST_LOG=info "$BASEDIR/target/debug/argon-node" --tmp --${validators[$i]} --chain local --name=${validators[$i]}  --rpc-port=994$((i+4))  --port 3033$((i+4)) --compute-miners 1 --unsafe-force-node-key-generation --unsafe-rpc-external --rpc-methods=unsafe --rpc-cors=all  --bitcoin-rpc-url=http://bitcoin:bitcoin@localhost:18444 &
 done
 
 # Function to check if the Substrate node is ready
@@ -70,19 +70,19 @@ until is_node_ready; do
   sleep 1
 done
 
-echo -e "(\"$BASEDIR/target/debug/ulx-notary\" insert-key --keystore-path /tmp/notary_keystore --suri //Ferdie//notary)\n\n"
-"$BASEDIR/target/debug/ulx-notary" insert-key --keystore-path /tmp/notary_keystore --suri //Ferdie//notary;
+echo -e "(\"$BASEDIR/target/debug/argon-notary\" insert-key --keystore-path /tmp/notary_keystore --suri //Ferdie//notary)\n\n"
+"$BASEDIR/target/debug/argon-notary" insert-key --keystore-path /tmp/notary_keystore --suri //Ferdie//notary;
 
-echo -e "(\"$BASEDIR/target/debug/ulx-notary\" migrate --db-url ${DBPATH})\n\n"
-"$BASEDIR/target/debug/ulx-notary" migrate --db-url ${DBPATH};
+echo -e "(\"$BASEDIR/target/debug/argon-notary\" migrate --db-url ${DBPATH})\n\n"
+"$BASEDIR/target/debug/argon-notary" migrate --db-url ${DBPATH};
 
-echo -e "Starting Notary: (\"$BASEDIR/target/debug/ulx-notary\" run --db-url ${DBPATH} -t ws://127.0.0.1:9944 --keystore-path /tmp/notary_keystore -b 0.0.0.0:9925)\n\n"
-RUST_LOG=info "$BASEDIR/target/debug/ulx-notary" run --db-url ${DBPATH} -t ws://127.0.0.1:9944 --keystore-path /tmp/notary_keystore -b "0.0.0.0:9925" &
+echo -e "Starting Notary: (\"$BASEDIR/target/debug/argon-notary\" run --db-url ${DBPATH} -t ws://127.0.0.1:9944 --keystore-path /tmp/notary_keystore -b 0.0.0.0:9925)\n\n"
+RUST_LOG=info "$BASEDIR/target/debug/argon-notary" run --db-url ${DBPATH} -t ws://127.0.0.1:9944 --keystore-path /tmp/notary_keystore -b "0.0.0.0:9925" &
 
 echo -e "Starting a bitcoin oracle...\n\n"
-RUST_LOG=info "$BASEDIR/target/debug/ulx-oracle" --dev -t ws://127.0.0.1:9944 bitcoin --bitcoin-rpc-url=http://bitcoin:bitcoin@localhost:18444 &
+RUST_LOG=info "$BASEDIR/target/debug/argon-oracle" --dev -t ws://127.0.0.1:9944 bitcoin --bitcoin-rpc-url=http://bitcoin:bitcoin@localhost:18444 &
 
 echo -e "Starting a pricing oracle...\n\n"
-RUST_LOG=info "$BASEDIR/target/debug/ulx-oracle" --dev -t ws://127.0.0.1:9944 price-index &
+RUST_LOG=info "$BASEDIR/target/debug/argon-oracle" --dev -t ws://127.0.0.1:9944 price-index &
 
 wait

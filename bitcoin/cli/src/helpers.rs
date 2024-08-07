@@ -1,7 +1,7 @@
 use base58::FromBase58;
 use sp_runtime::FixedU128;
 
-use ulx_primitives::bitcoin::OpaqueBitcoinXpub;
+use argon_primitives::bitcoin::OpaqueBitcoinXpub;
 
 pub fn read_bitcoin_xpub(xpub: &str) -> Result<OpaqueBitcoinXpub, String> {
 	let mut vpub_bytes = xpub.from_base58().map_err(|_| "Invalid Base58 string")?;

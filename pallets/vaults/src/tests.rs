@@ -18,7 +18,7 @@ use crate::{
 	pallet::{NextVaultId, PendingTermsModificationsByBlock, VaultXPubById, VaultsById},
 	Error, Event, HoldReason, VaultConfig,
 };
-use ulx_primitives::{
+use argon_primitives::{
 	bitcoin::{CompressedBitcoinPubkey, OpaqueBitcoinXpub},
 	bond::{Bond, BondError, BondExpiration, BondType, VaultProvider, VaultTerms},
 };

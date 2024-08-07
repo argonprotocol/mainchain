@@ -1,5 +1,5 @@
 [package]
-name = "ulx-bitcoin-utxo-tracker"
+name = "argon-bitcoin-utxo-tracker"
 version.workspace = true
 authors.workspace = true
 edition.workspace = true
@@ -22,8 +22,8 @@ parking_lot = { workspace = true }
 thiserror = { workspace = true }
 bitcoincore-rpc = { workspace = true }
 bitcoin = { workspace = true }
-ulx-primitives = { workspace = true, features = ["std", "bitcoin"] }
-ulx-bitcoin = { workspace = true, features = ["std"] }
+argon-primitives = { workspace = true, features = ["std", "bitcoin"] }
+argon-bitcoin = { workspace = true, features = ["std"] }
 sc-service = { workspace = true }
 sp-api = { workspace = true, features = ["std"] }
 sp-runtime = { workspace = true, features = ["std"] }
@@ -35,4 +35,4 @@ env_logger = { workspace = true }
 tokio = { workspace = true }
 rand = { workspace = true }
 lazy_static = { workspace = true }
-ulx-testing = { workspace = true }
+argon-testing = { workspace = true }

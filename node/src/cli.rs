@@ -1,6 +1,6 @@
+use argon_node_runtime::AccountId;
 use clap::ValueEnum;
 use sc_cli::RunCmd;
-use ulx_node_runtime::AccountId;
 
 #[derive(Debug, clap::Parser)]
 pub struct Cli {

@@ -20,7 +20,7 @@ use sp_runtime::{
 	BoundedVec, Digest, DigestItem, MultiSignature,
 };
 
-use ulx_primitives::{
+use argon_primitives::{
 	block_seal::MiningAuthority,
 	digests::{BlockVoteDigest, BLOCK_VOTES_DIGEST_ID},
 	inherents::{BlockSealInherent, BlockSealInherentDataProvider, SealInherentError},

@@ -13,7 +13,7 @@ use sp_core::{
 use sp_keystore::KeystorePtr;
 use sqlx::PgConnection;
 
-use ulx_primitives::{
+use argon_primitives::{
 	ensure, AccountId, AccountOrigin, AccountType, Balance, BalanceTip, BlockVote, ChainTransfer,
 	LocalchainAccountId, MaxNotebookNotarizations, MerkleProof, NewAccountOrigin, NotaryId, Note,
 	NoteType, Notebook, NotebookNumber,
@@ -410,7 +410,7 @@ mod tests {
 	use sp_keystore::{testing::MemoryKeystore, Keystore};
 	use sqlx::PgPool;
 
-	use ulx_primitives::{
+	use argon_primitives::{
 		AccountOrigin, AccountType::Deposit, BalanceChange, BalanceTip, NewAccountOrigin,
 	};
 

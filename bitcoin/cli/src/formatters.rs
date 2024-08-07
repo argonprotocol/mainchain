@@ -1,5 +1,5 @@
+use argon_primitives::bitcoin::SATOSHIS_PER_BITCOIN;
 use std::fmt;
-use ulx_primitives::bitcoin::SATOSHIS_PER_BITCOIN;
 
 pub fn parse_number(s: &str) -> Result<f32, String> {
 	// Remove commas from the string

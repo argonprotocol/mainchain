@@ -3,7 +3,7 @@ use sc_cli::SubstrateCli;
 use sc_service::PartialComponents;
 use sp_keyring::Sr25519Keyring;
 
-use ulx_node_runtime::{Block, EXISTENTIAL_DEPOSIT};
+use argon_node_runtime::{Block, EXISTENTIAL_DEPOSIT};
 
 use crate::{
 	benchmarking::{inherent_benchmark_data, RemarkBuilder, TransferKeepAliveBuilder},
@@ -185,21 +185,21 @@ pub fn run() -> sc_cli::Result<()> {
 		None => {
 			let runner = cli.create_runner(&cli.run)?;
 
-			let mut randomx_config = ulx_randomx::Config::default();
+			let mut randomx_config = argon_randomx::Config::default();
 			if cli.randomx_flags.contains(&RandomxFlag::LargePages) {
 				randomx_config.large_pages = true;
 			}
 			if cli.randomx_flags.contains(&RandomxFlag::Secure) {
 				randomx_config.secure = true;
 			}
-			let _ = ulx_randomx::set_global_config(randomx_config);
+			let _ = argon_randomx::set_global_config(randomx_config);
 
 			runner.run_node_until_exit(|config| async move {
 				match config.network.network_backend {
 					sc_network::config::NetworkBackendType::Libp2p => service::new_full::<
 						sc_network::NetworkWorker<
-							ulx_node_runtime::opaque::Block,
-							<ulx_node_runtime::opaque::Block as sp_runtime::traits::Block>::Hash,
+							argon_node_runtime::opaque::Block,
+							<argon_node_runtime::opaque::Block as sp_runtime::traits::Block>::Hash,
 						>,
 					>(
 						config,

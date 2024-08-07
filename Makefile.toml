@@ -47,8 +47,8 @@ dependencies = ["zepter", "fmt"]
 [tasks.docker]
 description = "Build docker image"
 script = [
-    "docker buildx build -t ghcr.io/ulixee/ulixee-miner:dev . -f dev.Dockerfile --target ulx-node",
-    "docker buildx build -t ghcr.io/ulixee/ulixee-notary:dev . -f dev.Dockerfile --target ulx-notary",
+    "docker buildx build -t ghcr.io/argonprotocol/argon-miner:dev . -f dev.Dockerfile --target argon-node",
+    "docker buildx build -t ghcr.io/argonprotocol/argon-notary:dev . -f dev.Dockerfile --target argon-notary",
 ]
 
 [tasks.sqlx-setup]
@@ -88,7 +88,7 @@ dependencies = ["sqlx-setup"]
 [tasks.build-node]
 description = "Compiles the project"
 command = "cargo"
-args = ["build", "--bin", "ulx-node", "--features", "fast-runtime"]
+args = ["build", "--bin", "argon-node", "--features", "fast-runtime"]
 env = { "RUSTC_WRAPPER" = "sccache" }
 dependencies = ["sqlx-setup"]
 

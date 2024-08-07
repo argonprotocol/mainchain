@@ -1,5 +1,5 @@
 [package]
-name = "ulx-node"
+name = "argon-node"
 version.workspace = true
 authors.workspace = true
 edition.workspace = true
@@ -71,11 +71,11 @@ frame-benchmarking-cli = { workspace = true }
 rand = { workspace = true }
 
 # Local Dependencies
-ulx-node-consensus = { workspace = true }
-ulx-node-runtime = { workspace = true, features = ["default"] }
-ulx-primitives = { workspace = true, features = ["default"] }
-ulx-bitcoin-utxo-tracker = { workspace = true }
-ulx-randomx = { workspace = true }
+argon-node-consensus = { workspace = true }
+argon-node-runtime = { workspace = true, features = ["default"] }
+argon-primitives = { workspace = true, features = ["default"] }
+argon-bitcoin-utxo-tracker = { workspace = true }
+argon-randomx = { workspace = true }
 
 # CLI-specific dependencies
 url = { workspace = true }
@@ -87,22 +87,22 @@ substrate-build-script-utils = { workspace = true }
 default = []
 # Dependencies that are only required if runtime benchmarking should be built
 runtime-benchmarks = [
+	"argon-node-runtime/runtime-benchmarks",
 	"frame-benchmarking-cli/runtime-benchmarks",
 	"frame-benchmarking/runtime-benchmarks",
 	"frame-system/runtime-benchmarks",
 	"sc-service/runtime-benchmarks",
 	"sp-runtime/runtime-benchmarks",
-	"ulx-node-runtime/runtime-benchmarks",
 ]
 # Enable features that allow the runtime to be tried and debugged. Name might be subject to change
 # in the near future.
 try-runtime = [
+	"argon-node-runtime/try-runtime",
 	"frame-system/try-runtime",
 	"pallet-transaction-payment/try-runtime",
 	"sp-runtime/try-runtime",
-	"ulx-node-runtime/try-runtime",
 ]
 fast-runtime = [
-	"ulx-node-runtime/fast-runtime",
-	"ulx-primitives/fast-runtime",
+	"argon-node-runtime/fast-runtime",
+	"argon-primitives/fast-runtime",
 ]

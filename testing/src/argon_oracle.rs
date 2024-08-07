@@ -11,14 +11,14 @@ use std::{
 	thread,
 };
 
-use crate::UlxTestNode;
+use crate::ArgonTestNode;
 
-pub struct UlxTestOracle {
+pub struct ArgonTestOracle {
 	// Keep a handle to the node; once it's dropped the node is killed.
 	proc: Option<process::Child>,
 }
 
-impl Drop for UlxTestOracle {
+impl Drop for ArgonTestOracle {
 	fn drop(&mut self) {
 		if let Some(mut proc) = self.proc.take() {
 			let _ = proc.kill();
@@ -26,8 +26,8 @@ impl Drop for UlxTestOracle {
 	}
 }
 
-impl UlxTestOracle {
-	pub async fn bitcoin_tip(node: &UlxTestNode) -> anyhow::Result<Self> {
+impl ArgonTestOracle {
+	pub async fn bitcoin_tip(node: &ArgonTestNode) -> anyhow::Result<Self> {
 		let rust_log = env::var("RUST_LOG").unwrap_or("info".to_string());
 
 		let target_dir = {
@@ -39,7 +39,7 @@ impl UlxTestOracle {
 			workspace_cargo_path
 		};
 
-		let mut proc = Command::new("./ulx-oracle")
+		let mut proc = Command::new("./argon-oracle")
 			.current_dir(&target_dir)
 			.env("RUST_LOG", rust_log)
 			.stdout(process::Stdio::piped())

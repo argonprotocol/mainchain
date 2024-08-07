@@ -42,7 +42,7 @@ pub mod pallet {
 	use sp_core::U256;
 	use sp_runtime::{traits::UniqueSaturatedInto, DigestItem};
 
-	use ulx_primitives::{
+	use argon_primitives::{
 		block_vote::VoteMinimum,
 		digests::{BlockVoteDigest, BLOCK_VOTES_DIGEST_ID},
 		inherents::BlockSealInherent,
@@ -54,7 +54,7 @@ pub mod pallet {
 	};
 
 	use super::*;
-	use ulx_primitives::TickProvider;
+	use argon_primitives::TickProvider;
 	#[pallet::pallet]
 	pub struct Pallet<T>(_);
 

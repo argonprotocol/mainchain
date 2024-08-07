@@ -1,5 +1,5 @@
 [package]
-name = "ulx-notary-apis"
+name = "argon-notary-apis"
 
 version.workspace = true
 authors.workspace = true
@@ -20,4 +20,4 @@ sp-runtime = { workspace = true }
 sp-core = { workspace = true }
 jsonrpsee = { workspace = true, features = ["server", "async-client"] }
 
-ulx-primitives = { workspace = true }
+argon-primitives = { workspace = true }

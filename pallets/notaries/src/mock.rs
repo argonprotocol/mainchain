@@ -1,11 +1,11 @@
+use argon_primitives::{
+	tick::{Tick, Ticker},
+	TickProvider,
+};
 use env_logger::{Builder, Env};
 use frame_support::{derive_impl, parameter_types, traits::ConstU16};
 use sp_core::{ConstU32, H256};
 use sp_runtime::{traits::IdentityLookup, BuildStorage};
-use ulx_primitives::{
-	tick::{Tick, Ticker},
-	TickProvider,
-};
 
 use crate as pallet_notaries;
 

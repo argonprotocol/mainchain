@@ -1,8 +1,8 @@
 use codec::Encode;
 use sp_core::{H256, U256};
 
-use ulx_primitives::*;
-use ulx_randomx::{calculate_hash, RandomXError};
+use argon_primitives::*;
+use argon_randomx::{calculate_hash, RandomXError};
 
 use crate::compute_worker::Version;
 

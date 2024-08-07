@@ -1,6 +1,7 @@
 use codec::Codec;
 use std::{marker::PhantomData, sync::Arc};
 
+use argon_bitcoin_utxo_tracker::{get_bitcoin_inherent, UtxoTracker};
 use log::info;
 use sc_client_api::{self, backend::AuxStore, BlockOf, BlockchainEvents};
 use sc_consensus::{
@@ -16,16 +17,15 @@ use sp_runtime::{
 	generic::DigestItem,
 	traits::{Block as BlockT, Header as HeaderT},
 };
-use ulx_bitcoin_utxo_tracker::{get_bitcoin_inherent, UtxoTracker};
 
-use ulx_primitives::{
+use argon_primitives::{
 	inherents::{BitcoinInherentDataProvider, BlockSealInherentDataProvider},
 	Balance, BitcoinApis, BlockSealApis, BlockSealAuthorityId, BlockSealDigest,
 	BLOCK_SEAL_DIGEST_ID,
 };
 
 use crate::{
-	aux_client::UlxAux,
+	aux_client::ArgonAux,
 	compute_solver::BlockComputeNonce,
 	compute_worker::randomx_key_block,
 	digests::{load_digests, read_seal_digest},
@@ -33,18 +33,18 @@ use crate::{
 	notary_client::verify_notebook_audits,
 };
 
-/// A block importer for Ulx.
-pub struct UlxBlockImport<B: BlockT, I, C: AuxStore, S, AC> {
+/// A block importer for argon.
+pub struct ArgonBlockImport<B: BlockT, I, C: AuxStore, S, AC> {
 	inner: I,
 	select_chain: S,
 	client: Arc<C>,
-	aux_client: UlxAux<B, C>,
+	aux_client: ArgonAux<B, C>,
 	utxo_tracker: Arc<UtxoTracker>,
 	_block: PhantomData<AC>,
 }
 
 impl<B: BlockT, I: Clone, C: AuxStore, S: Clone, AC: Codec> Clone
-	for UlxBlockImport<B, I, C, S, AC>
+	for ArgonBlockImport<B, I, C, S, AC>
 {
 	fn clone(&self) -> Self {
 		Self {
@@ -58,7 +58,7 @@ impl<B: BlockT, I: Clone, C: AuxStore, S: Clone, AC: Codec> Clone
 	}
 }
 
-impl<B, I, C, S, AC> UlxBlockImport<B, I, C, S, AC>
+impl<B, I, C, S, AC> ArgonBlockImport<B, I, C, S, AC>
 where
 	B: BlockT,
 	I: BlockImport<B> + Send + Sync,
@@ -73,11 +73,11 @@ where
 	C::Api: BlockBuilderApi<B>,
 	AC: Codec,
 {
-	/// Create a new block import suitable to be used in Ulx
+	/// Create a new block import suitable to be used in argon
 	pub fn new(
 		inner: I,
 		client: Arc<C>,
-		aux_client: UlxAux<B, C>,
+		aux_client: ArgonAux<B, C>,
 		select_chain: S,
 		utxo_tracker: Arc<UtxoTracker>,
 	) -> Self {
@@ -86,7 +86,7 @@ where
 }
 
 #[async_trait::async_trait]
-impl<B, I, C, S, AC> BlockImport<B> for UlxBlockImport<B, I, C, S, AC>
+impl<B, I, C, S, AC> BlockImport<B> for ArgonBlockImport<B, I, C, S, AC>
 where
 	B: BlockT,
 	I: BlockImport<B> + Send + Sync,
@@ -118,7 +118,8 @@ where
 		let digests = load_digests::<B>(&block.header)?;
 
 		// if we're importing a non-finalized block from someone else, verify the notebook audits
-		if block.origin != BlockOrigin::Own {
+		let latest_verified_finalized = self.client.info().finalized_number;
+		if block.origin != BlockOrigin::Own && block.header.number() > &latest_verified_finalized {
 			verify_notebook_audits(&self.aux_client, &digests.notebooks).await?;
 		}
 
@@ -230,24 +231,24 @@ where
 	}
 }
 
-pub struct UlxVerifier<B: BlockT> {
+pub struct ArgonVerifier<B: BlockT> {
 	_marker: PhantomData<B>,
 }
 
-impl<B: BlockT> Default for UlxVerifier<B> {
+impl<B: BlockT> Default for ArgonVerifier<B> {
 	fn default() -> Self {
 		Self::new()
 	}
 }
 
-impl<B: BlockT> UlxVerifier<B> {
+impl<B: BlockT> ArgonVerifier<B> {
 	pub fn new() -> Self {
 		Self { _marker: PhantomData }
 	}
 }
 
 #[async_trait::async_trait]
-impl<B: BlockT> Verifier<B> for UlxVerifier<B> {
+impl<B: BlockT> Verifier<B> for ArgonVerifier<B> {
 	async fn verify(
 		&self,
 		mut block: BlockImportParams<B>,
@@ -273,5 +274,5 @@ impl<B: BlockT> Verifier<B> for UlxVerifier<B> {
 	}
 }
 
-/// The Ulx import queue type.
-pub type UlxImportQueue<B> = BasicQueue<B>;
+/// The argon import queue type.
+pub type ArgonImportQueue<B> = BasicQueue<B>;

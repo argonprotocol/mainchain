@@ -13,15 +13,15 @@ export * from "@polkadot/types";
 export * from '@polkadot/types/lookup';
 export {InterfaceTypes as interfaces};
 
-export type UlxClient = ApiPromise;
+export type ArgonClient = ApiPromise;
 
 
-export async function getClient(host: string): Promise<UlxClient> {
+export async function getClient(host: string): Promise<ArgonClient> {
     const provider = new WsProvider(host);
     return await ApiPromise.create({provider, noInitWarn: true});
 }
 
-export function checkForExtrinsicSuccess(events: EventRecord[], client: UlxClient): Promise<void> {
+export function checkForExtrinsicSuccess(events: EventRecord[], client: ArgonClient): Promise<void> {
     return new Promise((resolve, reject) => {
         for (const {event} of events) {
             if (client.events.system.ExtrinsicSuccess.is(event)) {

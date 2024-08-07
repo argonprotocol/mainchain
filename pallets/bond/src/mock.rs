@@ -10,8 +10,8 @@ use sp_runtime::{BuildStorage, DispatchError};
 
 use crate as pallet_bond;
 use crate::BitcoinVerifier;
-use ulx_bitcoin::UtxoUnlocker;
-use ulx_primitives::{
+use argon_bitcoin::UtxoUnlocker;
+use argon_primitives::{
 	bitcoin::{
 		BitcoinCosignScriptPubkey, BitcoinHeight, BitcoinNetwork, BitcoinSignature, BitcoinXPub,
 		CompressedBitcoinPubkey, NetworkKind, Satoshis, UtxoId, UtxoRef,
@@ -71,7 +71,7 @@ parameter_types! {
 	pub static MaxUnlockingUtxos: u32 = 10;
 	pub static BitcoinPricePerUsd: Option<FixedU128> = Some(FixedU128::from_float(62000.00));
 	pub static ArgonPricePerUsd: Option<FixedU128> = Some(FixedU128::from_float(1.00));
-	pub static ArgonCPI: Option<ulx_primitives::ArgonCPI> = Some(FixedI128::from_float(0.1));
+	pub static ArgonCPI: Option<argon_primitives::ArgonCPI> = Some(FixedI128::from_float(0.1));
 	pub static UtxoUnlockCosignDeadlineBlocks: BitcoinHeight = 5;
 	pub static BitcoinBondReclamationBlocks: BitcoinHeight = 30;
 	pub static BitcoinBondDurationBlocks: BitcoinHeight = 365;
@@ -125,7 +125,7 @@ impl UtxoBondedEvents<u64, Balance> for EventHandler {
 
 pub struct StaticPriceProvider;
 impl PriceProvider<Balance> for StaticPriceProvider {
-	fn get_argon_cpi() -> Option<ulx_primitives::ArgonCPI> {
+	fn get_argon_cpi() -> Option<argon_primitives::ArgonCPI> {
 		ArgonCPI::get()
 	}
 	fn get_latest_argon_price_in_us_cents() -> Option<FixedU128> {
@@ -272,7 +272,7 @@ impl pallet_bond::Config for Test {
 	type Currency = Balances;
 	type RuntimeHoldReason = RuntimeHoldReason;
 	type Balance = Balance;
-	type UlixeeBlocksPerDay = ConstU64<1440>;
+	type ArgonBlocksPerDay = ConstU64<1440>;
 	type MinimumBondAmount = MinimumBondAmount;
 	type MaxConcurrentlyExpiringBonds = ConstU32<10>;
 	type BondEvents = EventHandler;

@@ -61,10 +61,7 @@ pub use sp_runtime::{Perbill, Permill};
 use sp_version::NativeVersion;
 use sp_version::RuntimeVersion;
 
-pub use currency::*;
-use pallet_bond::BitcoinVerifier;
-pub use pallet_notebook::NotebookVerifyError;
-use ulx_primitives::{
+use argon_primitives::{
 	bitcoin::{BitcoinHeight, BitcoinSyncStatus, Satoshis, UtxoRef, UtxoValue},
 	block_seal::MiningAuthority,
 	block_vote::VoteMinimum,
@@ -77,9 +74,12 @@ use ulx_primitives::{
 	ArgonCPI, BlockSealAuthorityId, NotaryNotebookVotes, NotebookAuditResult, NotebookAuditSummary,
 	PriceProvider, TickProvider, ESCROW_CLAWBACK_TICKS, ESCROW_EXPIRATION_TICKS,
 };
-pub use ulx_primitives::{
+pub use argon_primitives::{
 	AccountId, Balance, BlockHash, BlockNumber, HashOutput, Moment, Nonce, Signature,
 };
+pub use currency::*;
+use pallet_bond::BitcoinVerifier;
+pub use pallet_notebook::NotebookVerifyError;
 
 use crate::opaque::SessionKeys;
 
@@ -117,7 +117,7 @@ pub mod opaque {
 
 /// Money matters.
 pub mod currency {
-	use ulx_primitives::Balance;
+	use argon_primitives::Balance;
 
 	/// The existential deposit.
 	pub const EXISTENTIAL_DEPOSIT: Balance = 500;
@@ -138,8 +138,8 @@ pub type ArgonBalancesCall = pallet_balances::Call<Runtime, ArgonToken>;
 // https://docs.substrate.io/main-docs/build/upgrade#runtime-versioning
 #[sp_version::runtime_version]
 pub const VERSION: RuntimeVersion = RuntimeVersion {
-	spec_name: create_runtime_str!("ulixee"),
-	impl_name: create_runtime_str!("ulixee"),
+	spec_name: create_runtime_str!("argon"),
+	impl_name: create_runtime_str!("argon"),
 	authoring_version: 1,
 	// The version of the runtime specification. A full node will not attempt to use its native
 	//   runtime in substitute for the on-chain Wasm runtime unless all of `spec_name`,
@@ -225,7 +225,7 @@ impl frame_system::Config for Runtime {
 	/// The data to be stored in an account.
 	type AccountData = pallet_balances::AccountData<Balance>;
 	/// This is used as an identifier of the chain. 42 is the generic substrate prefix.
-	type SS58Prefix = ConstU16<{ ulx_primitives::ADDRESS_PREFIX }>;
+	type SS58Prefix = ConstU16<{ argon_primitives::ADDRESS_PREFIX }>;
 	type MaxConsumers = frame_support::traits::ConstU32<16>;
 }
 
@@ -236,7 +236,7 @@ parameter_types! {
 
 
 	pub const ArgonsPerBlock: u32 = 5_000;
-	pub const StartingUlixeesPerBlock: u32 = 5_000;
+	pub const StartingSharesPerBlock: u32 = 5_000;
 	pub const HalvingBlocks: u32 = 2_100_000; // based on bitcoin, but 10x since we're block per minute
 	pub const MaturationBlocks: u32 = 5;
 	pub const MinerPayoutPercent: FixedU128 = FixedU128::from_rational(75, 100);
@@ -261,14 +261,14 @@ impl pallet_block_rewards::Config for Runtime {
 	type RuntimeEvent = RuntimeEvent;
 	type WeightInfo = pallet_block_rewards::weights::SubstrateWeight<Runtime>;
 	type ArgonCurrency = ArgonBalances;
-	type UlixeeCurrency = UlixeeBalances;
+	type SharesCurrency = ShareBalances;
 	type Balance = Balance;
 	type BlockSealerProvider = BlockSeal;
 	type NotaryProvider = Notaries;
 	type NotebookProvider = Notebook;
 	type CurrentTick = Ticks;
 	type ArgonsPerBlock = ArgonsPerBlock;
-	type StartingUlixeesPerBlock = StartingUlixeesPerBlock;
+	type StartingSharesPerBlock = StartingSharesPerBlock;
 	type HalvingBlocks = HalvingBlocks;
 	type MinerPayoutPercent = MinerPayoutPercent;
 	type MaturationBlocks = MaturationBlocks;
@@ -376,7 +376,7 @@ impl pallet_bond::Config for Runtime {
 	type MaxUnlockingUtxos = MaxUnlockingUtxos;
 	type BondEvents = Mint;
 	type MinimumBitcoinBondSatoshis = MinBitcoinSatoshiAmount;
-	type UlixeeBlocksPerDay = BlocksPerDay;
+	type ArgonBlocksPerDay = BlocksPerDay;
 	type UtxoUnlockCosignDeadlineBlocks = UtxoUnlockCosignDeadlineBlocks;
 	type BitcoinSignatureVerifier = BitcoinSignatureVerifier;
 }
@@ -385,7 +385,7 @@ impl pallet_mining_slot::Config for Runtime {
 	type RuntimeEvent = RuntimeEvent;
 	type WeightInfo = pallet_mining_slot::weights::SubstrateWeight<Runtime>;
 	type MaxMiners = MaxMiners;
-	type OwnershipCurrency = UlixeeBalances;
+	type OwnershipCurrency = ShareBalances;
 	type OwnershipPercentAdjustmentDamper = OwnershipPercentAdjustmentDamper;
 	type TargetBidsPerSlot = TargetBidsPerSlot;
 	type SlotBiddingStartBlock = SlotBiddingStartBlock;
@@ -623,7 +623,7 @@ impl InstanceFilter<RuntimeCall> for ProxyType {
 		match self {
 			ProxyType::Any => true,
 			ProxyType::NonTransfer =>
-				!matches!(c, RuntimeCall::ArgonBalances(..) | RuntimeCall::UlixeeBalances(..)),
+				!matches!(c, RuntimeCall::ArgonBalances(..) | RuntimeCall::ShareBalances(..)),
 			ProxyType::PriceIndex => matches!(c, RuntimeCall::PriceIndex(..)),
 		}
 	}
@@ -718,8 +718,8 @@ impl pallet_mint::Config for Runtime {
 	type BlockRewardAccountsProvider = MiningSlot;
 }
 
-type UlixeeToken = pallet_balances::Instance2;
-impl pallet_balances::Config<UlixeeToken> for Runtime {
+type SharesToken = pallet_balances::Instance2;
+impl pallet_balances::Config<SharesToken> for Runtime {
 	type MaxLocks = ConstU32<50>;
 	type MaxReserves = ();
 	type ReserveIdentifier = [u8; 8];
@@ -730,7 +730,7 @@ impl pallet_balances::Config<UlixeeToken> for Runtime {
 	type DustRemoval = ();
 	type ExistentialDeposit = ConstU128<EXISTENTIAL_DEPOSIT>;
 	type AccountStore = StorageMapShim<
-		pallet_balances::Account<Runtime, UlixeeToken>,
+		pallet_balances::Account<Runtime, SharesToken>,
 		AccountId,
 		pallet_balances::AccountData<Balance>,
 	>;
@@ -854,7 +854,7 @@ mod runtime {
 	#[runtime::pallet_index(23)]
 	pub type ArgonBalances = pallet_balances<Instance1>;
 	#[runtime::pallet_index(24)]
-	pub type UlixeeBalances = pallet_balances<Instance2>;
+	pub type ShareBalances = pallet_balances<Instance2>;
 	#[runtime::pallet_index(25)]
 	pub type TxPause = pallet_tx_pause;
 	#[runtime::pallet_index(26)]
@@ -1030,13 +1030,13 @@ impl_runtime_apis! {
 		}
 	}
 
-	impl ulx_primitives::MiningApis<Block, AccountId, BlockSealAuthorityId> for Runtime {
+	impl argon_primitives::MiningApis<Block, AccountId, BlockSealAuthorityId> for Runtime {
 		fn get_authority_id(account_id: &AccountId) -> Option<MiningAuthority< BlockSealAuthorityId, AccountId>> {
 			MiningSlot::get_mining_authority(account_id)
 		}
 	}
 
-	impl ulx_primitives::BlockSealApis<Block, AccountId, BlockSealAuthorityId> for Runtime {
+	impl argon_primitives::BlockSealApis<Block, AccountId, BlockSealAuthorityId> for Runtime {
 		fn vote_minimum() -> VoteMinimum {
 			BlockSealSpec::vote_minimum()
 		}
@@ -1058,7 +1058,7 @@ impl_runtime_apis! {
 
 	}
 
-	impl ulx_primitives::NotaryApis<Block, NotaryRecordT> for Runtime {
+	impl argon_primitives::NotaryApis<Block, NotaryRecordT> for Runtime {
 		fn notary_by_id(notary_id: NotaryId) -> Option<NotaryRecordT> {
 			Notaries::notaries().iter().find(|a| a.notary_id == notary_id).cloned()
 		}
@@ -1073,7 +1073,7 @@ impl_runtime_apis! {
 		}
 	}
 
-	impl ulx_primitives::NotebookApis<Block, NotebookVerifyError> for Runtime {
+	impl argon_primitives::NotebookApis<Block, NotebookVerifyError> for Runtime {
 		fn audit_notebook_and_get_votes(
 			version: u32,
 			notary_id: NotaryId,
@@ -1095,7 +1095,7 @@ impl_runtime_apis! {
 		}
 	}
 
-	impl ulx_primitives::TickApis<Block> for Runtime {
+	impl argon_primitives::TickApis<Block> for Runtime {
 		fn current_tick() -> Tick {
 			Ticks::current_tick()
 		}
@@ -1107,7 +1107,7 @@ impl_runtime_apis! {
 		}
 	}
 
-	impl ulx_primitives::BitcoinApis<Block,Balance> for Runtime {
+	impl argon_primitives::BitcoinApis<Block,Balance> for Runtime {
 		fn get_sync_status() -> Option<BitcoinSyncStatus> {
 			BitcoinUtxos::get_sync_status()
 		}
@@ -1245,7 +1245,7 @@ mod benches {
 		[frame_benchmarking, BaselineBench::<Runtime>]
 		[frame_system, SystemBench::<Runtime>]
 		[pallet_balances, ArgonTokens]
-		[pallet_balances, UlixeeTokens]
+		[pallet_balances, SharesTokens]
 		[pallet_timestamp, Timestamp]
 		[pallet_ticks, Ticks]
 		[pallet_data_domain, DataDomain]

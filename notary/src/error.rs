@@ -1,7 +1,7 @@
+use argon_notary_audit::VerifyError;
 use scale_info::scale;
 use sp_core::H256;
 use tracing::error;
-use ulx_notary_audit::VerifyError;
 
 #[derive(Debug, PartialEq, Clone, thiserror::Error)]
 pub enum Error {

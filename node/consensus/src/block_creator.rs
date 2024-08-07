@@ -1,5 +1,6 @@
 use std::{convert::Into, sync::Arc, time::Duration};
 
+use argon_bitcoin_utxo_tracker::{get_bitcoin_inherent, UtxoTracker};
 use codec::Codec;
 use futures::{channel::mpsc::*, prelude::*};
 use log::*;
@@ -15,10 +16,9 @@ use sp_inherents::InherentDataProvider;
 use sp_keystore::KeystorePtr;
 use sp_runtime::traits::{Block as BlockT, Header as HeaderT};
 use sp_timestamp::Timestamp;
-use ulx_bitcoin_utxo_tracker::{get_bitcoin_inherent, UtxoTracker};
 
-use ulx_node_runtime::{NotaryRecordT, NotebookVerifyError};
-use ulx_primitives::{
+use argon_node_runtime::{NotaryRecordT, NotebookVerifyError};
+use argon_primitives::{
 	inherents::{
 		BitcoinInherentDataProvider, BlockSealInherentDataProvider, BlockSealInherentNodeSide,
 		NotebooksInherentDataProvider,
@@ -29,7 +29,7 @@ use ulx_primitives::{
 };
 
 use crate::{
-	aux_client::UlxAux,
+	aux_client::ArgonAux,
 	digests::{create_pre_runtime_digests, create_seal_digest},
 	error::Error,
 	notary_client::{get_notebook_header_data, NotaryClient},
@@ -49,7 +49,7 @@ pub struct CreateTaxVoteBlock<Block: BlockT, AccountId: Clone + Codec> {
 pub fn notary_client_task<B, C, SC, AC>(
 	client: Arc<C>,
 	select_chain: SC,
-	aux_client: UlxAux<B, C>,
+	aux_client: ArgonAux<B, C>,
 	keystore: KeystorePtr,
 ) -> (impl Future<Output = ()>, Receiver<CreateTaxVoteBlock<B, AC>>)
 where
@@ -165,7 +165,7 @@ where
 pub async fn tax_block_creator<B, C, E, L, CS, A>(
 	mut block_import: BoxBlockImport<B>,
 	client: Arc<C>,
-	aux_client: UlxAux<B, C>,
+	aux_client: ArgonAux<B, C>,
 	mut env: E,
 	justification_sync_link: L,
 	max_time_to_build_block: Duration,
@@ -224,7 +224,7 @@ pub async fn tax_block_creator<B, C, E, L, CS, A>(
 #[allow(clippy::too_many_arguments)]
 pub async fn propose<B, C, E, A>(
 	client: Arc<C>,
-	aux_client: UlxAux<B, C>,
+	aux_client: ArgonAux<B, C>,
 	env: &mut E,
 	author: A,
 	tick: Tick,

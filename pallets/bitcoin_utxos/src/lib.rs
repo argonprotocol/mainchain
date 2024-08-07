@@ -21,7 +21,7 @@ pub mod pallet {
 	use frame_system::pallet_prelude::*;
 	use log::{info, warn};
 
-	use ulx_primitives::{
+	use argon_primitives::{
 		bitcoin::{
 			BitcoinBlock, BitcoinBlockHash, BitcoinCosignScriptPubkey, BitcoinHeight,
 			BitcoinRejectedReason, BitcoinSyncStatus, Satoshis, UtxoId, UtxoRef, UtxoValue,
@@ -80,7 +80,7 @@ pub mod pallet {
 	/// The genesis set bitcoin network that this chain is tied to
 	#[pallet::storage]
 	pub(super) type BitcoinNetwork<T: Config> =
-		StorageValue<_, ulx_primitives::bitcoin::BitcoinNetwork, ValueQuery>;
+		StorageValue<_, argon_primitives::bitcoin::BitcoinNetwork, ValueQuery>;
 
 	/// An oracle-provided confirmed bitcoin block (eg, 6 blocks back)
 	#[pallet::storage]
@@ -149,7 +149,7 @@ pub mod pallet {
 	#[derive(frame_support::DefaultNoBound)]
 	pub struct GenesisConfig<T: Config> {
 		pub operator: Option<T::AccountId>,
-		pub network: ulx_primitives::bitcoin::BitcoinNetwork,
+		pub network: argon_primitives::bitcoin::BitcoinNetwork,
 	}
 
 	#[pallet::genesis_build]
@@ -450,7 +450,7 @@ pub mod pallet {
 		type Call = Call<T>;
 		type Error = BitcoinInherentError;
 		const INHERENT_IDENTIFIER: InherentIdentifier =
-			ulx_primitives::inherents::BITCOIN_INHERENT_IDENTIFIER;
+			argon_primitives::inherents::BITCOIN_INHERENT_IDENTIFIER;
 
 		fn create_inherent(data: &InherentData) -> Option<Self::Call>
 		where
@@ -488,8 +488,8 @@ pub mod pallet {
 		}
 	}
 
-	impl<T: Config> Get<ulx_primitives::bitcoin::BitcoinNetwork> for Pallet<T> {
-		fn get() -> ulx_primitives::bitcoin::BitcoinNetwork {
+	impl<T: Config> Get<argon_primitives::bitcoin::BitcoinNetwork> for Pallet<T> {
+		fn get() -> argon_primitives::bitcoin::BitcoinNetwork {
 			<BitcoinNetwork<T>>::get()
 		}
 	}

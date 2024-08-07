@@ -65,7 +65,7 @@ function requireNative() {
         loadErrors.push(e)
       }
       try {
-        return require('@ulixee/localchain-android-arm64')
+        return require('@argonprotocol/localchain-android-arm64')
       } catch (e) {
         loadErrors.push(e)
       }
@@ -77,7 +77,7 @@ function requireNative() {
         loadErrors.push(e)
       }
       try {
-        return require('@ulixee/localchain-android-arm-eabi')
+        return require('@argonprotocol/localchain-android-arm-eabi')
       } catch (e) {
         loadErrors.push(e)
       }
@@ -93,7 +93,7 @@ function requireNative() {
         loadErrors.push(e)
       }
       try {
-        return require('@ulixee/localchain-win32-x64-msvc')
+        return require('@argonprotocol/localchain-win32-x64-msvc')
       } catch (e) {
         loadErrors.push(e)
       }
@@ -105,7 +105,7 @@ function requireNative() {
         loadErrors.push(e)
       }
       try {
-        return require('@ulixee/localchain-win32-ia32-msvc')
+        return require('@argonprotocol/localchain-win32-ia32-msvc')
       } catch (e) {
         loadErrors.push(e)
       }
@@ -117,7 +117,7 @@ function requireNative() {
         loadErrors.push(e)
       }
       try {
-        return require('@ulixee/localchain-win32-arm64-msvc')
+        return require('@argonprotocol/localchain-win32-arm64-msvc')
       } catch (e) {
         loadErrors.push(e)
       }
@@ -132,7 +132,7 @@ function requireNative() {
         loadErrors.push(e)
       }
       try {
-        return require('@ulixee/localchain-darwin-universal')
+        return require('@argonprotocol/localchain-darwin-universal')
       } catch (e) {
         loadErrors.push(e)
       }
@@ -144,7 +144,7 @@ function requireNative() {
         loadErrors.push(e)
       }
       try {
-        return require('@ulixee/localchain-darwin-x64')
+        return require('@argonprotocol/localchain-darwin-x64')
       } catch (e) {
         loadErrors.push(e)
       }
@@ -156,7 +156,7 @@ function requireNative() {
         loadErrors.push(e)
       }
       try {
-        return require('@ulixee/localchain-darwin-arm64')
+        return require('@argonprotocol/localchain-darwin-arm64')
       } catch (e) {
         loadErrors.push(e)
       }
@@ -172,7 +172,7 @@ function requireNative() {
         loadErrors.push(e)
       }
       try {
-        return require('@ulixee/localchain-freebsd-x64')
+        return require('@argonprotocol/localchain-freebsd-x64')
       } catch (e) {
         loadErrors.push(e)
       }
@@ -184,7 +184,7 @@ function requireNative() {
         loadErrors.push(e)
       }
       try {
-        return require('@ulixee/localchain-freebsd-arm64')
+        return require('@argonprotocol/localchain-freebsd-arm64')
       } catch (e) {
         loadErrors.push(e)
       }
@@ -201,7 +201,7 @@ function requireNative() {
         loadErrors.push(e)
       }
       try {
-        return require('@ulixee/localchain-linux-x64-musl')
+        return require('@argonprotocol/localchain-linux-x64-musl')
       } catch (e) {
         loadErrors.push(e)
       }
@@ -213,7 +213,7 @@ function requireNative() {
         loadErrors.push(e)
       }
       try {
-        return require('@ulixee/localchain-linux-x64-gnu')
+        return require('@argonprotocol/localchain-linux-x64-gnu')
       } catch (e) {
         loadErrors.push(e)
       }
@@ -227,7 +227,7 @@ function requireNative() {
         loadErrors.push(e)
       }
       try {
-        return require('@ulixee/localchain-linux-arm64-musl')
+        return require('@argonprotocol/localchain-linux-arm64-musl')
       } catch (e) {
         loadErrors.push(e)
       }
@@ -239,7 +239,7 @@ function requireNative() {
         loadErrors.push(e)
       }
       try {
-        return require('@ulixee/localchain-linux-arm64-gnu')
+        return require('@argonprotocol/localchain-linux-arm64-gnu')
       } catch (e) {
         loadErrors.push(e)
       }
@@ -253,7 +253,7 @@ function requireNative() {
         loadErrors.push(e)
       }
       try {
-        return require('@ulixee/localchain-linux-arm-musleabihf')
+        return require('@argonprotocol/localchain-linux-arm-musleabihf')
       } catch (e) {
         loadErrors.push(e)
       }
@@ -265,7 +265,7 @@ function requireNative() {
         loadErrors.push(e)
       }
       try {
-        return require('@ulixee/localchain-linux-arm-gnueabihf')
+        return require('@argonprotocol/localchain-linux-arm-gnueabihf')
       } catch (e) {
         loadErrors.push(e)
       }
@@ -279,7 +279,7 @@ function requireNative() {
         loadErrors.push(e)
       }
       try {
-        return require('@ulixee/localchain-linux-riscv64-musl')
+        return require('@argonprotocol/localchain-linux-riscv64-musl')
       } catch (e) {
         loadErrors.push(e)
       }
@@ -291,7 +291,7 @@ function requireNative() {
         loadErrors.push(e)
       }
       try {
-        return require('@ulixee/localchain-linux-riscv64-gnu')
+        return require('@argonprotocol/localchain-linux-riscv64-gnu')
       } catch (e) {
         loadErrors.push(e)
       }
@@ -304,7 +304,7 @@ function requireNative() {
         loadErrors.push(e)
       }
       try {
-        return require('@ulixee/localchain-linux-ppc64-gnu')
+        return require('@argonprotocol/localchain-linux-ppc64-gnu')
       } catch (e) {
         loadErrors.push(e)
       }
@@ -316,7 +316,7 @@ function requireNative() {
         loadErrors.push(e)
       }
       try {
-        return require('@ulixee/localchain-linux-s390x-gnu')
+        return require('@argonprotocol/localchain-linux-s390x-gnu')
       } catch (e) {
         loadErrors.push(e)
       }
@@ -341,7 +341,7 @@ if (!nativeBinding || process.env.NAPI_RS_FORCE_WASI) {
   }
   if (!nativeBinding) {
     try {
-      nativeBinding = require('@ulixee/localchain-wasm32-wasi')
+      nativeBinding = require('@argonprotocol/localchain-wasm32-wasi')
     } catch (err) {
       if (process.env.NAPI_RS_FORCE_WASI) {
         console.error(err)

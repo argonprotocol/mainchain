@@ -17,11 +17,11 @@ use crate::{
 		notebook_status::NotebookStatusStore,
 	},
 };
-use ulx_notary_apis::localchain::BalanceChangeResult;
-use ulx_notary_audit::{
+use argon_notary_apis::localchain::BalanceChangeResult;
+use argon_notary_audit::{
 	verify_changeset_signatures, verify_notarization_allocation, verify_voting_sources, VerifyError,
 };
-use ulx_primitives::{
+use argon_primitives::{
 	ensure, AccountId, AccountOrigin, AccountType, BalanceChange, BalanceProof, BalanceTip,
 	BlockVote, DataDomainHash, LocalchainAccountId, NewAccountOrigin, Notarization, NotaryId,
 	NoteType, NotebookNumber,
@@ -138,8 +138,8 @@ impl NotarizationsStore {
 	}
 
 	/// ## Basic Mainchain -> Localchain flow:
-	/// 1. Funds transfer to localchain via mainchain relay transactions ("LocalchainRelay" in
-	///    Ulixee Mainchain)
+	/// 1. Funds transfer to localchain via mainchain relay transactions ("LocalchainRelay" in Argon
+	///    Mainchain)
 	/// 2. Localchain wallet submits a balance change including Note referencing the mainchain nonce
 	///    used for the transfer "in"
 	/// 3. Balance change is applied to account directly
@@ -423,7 +423,7 @@ mod tests {
 	use sp_keyring::{AccountKeyring::Ferdie, Sr25519Keyring::Bob};
 	use sqlx::PgPool;
 
-	use ulx_primitives::{
+	use argon_primitives::{
 		AccountType, AccountType::Deposit, BalanceChange, BlockVote, DataDomain, DataTLD,
 		Notarization, Note, NoteType,
 	};

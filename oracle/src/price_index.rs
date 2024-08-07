@@ -6,7 +6,7 @@ use tokio::{join, time::sleep};
 use tracing::info;
 
 use crate::{argon_price, btc_price, us_cpi::UsCpiRetriever};
-use ulixee_client::{
+use argon_client::{
 	api::{constants, price_index::calls::types::submit::Index, storage, tx},
 	conversion::{from_api_fixed_u128, to_api_fixed_u128},
 	signer::{KeystoreSigner, Signer},
@@ -146,15 +146,15 @@ mod tests {
 	use sp_runtime::FixedU128;
 	use tokio::spawn;
 
-	use ulixee_client::{api, signer::KeystoreSigner};
-	use ulx_primitives::CryptoType;
-	use ulx_testing::start_ulx_test_node;
+	use argon_client::{api, signer::KeystoreSigner};
+	use argon_primitives::CryptoType;
+	use argon_testing::start_argon_test_node;
 
 	use crate::{btc_price::use_mock_btc_price, price_index_loop, us_cpi::use_mock_cpi_values};
 
 	#[tokio::test]
 	async fn can_submit_multiple_price_indices() {
-		let node = start_ulx_test_node().await;
+		let node = start_argon_test_node().await;
 		let keystore = MemoryKeystore::new();
 		let keypair = sr25519::Pair::from_string("//Eve", None).unwrap();
 		keystore.insert(ACCOUNT, "//Eve", &keypair.public().0).unwrap();

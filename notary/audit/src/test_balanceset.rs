@@ -8,7 +8,7 @@ use sp_keyring::{
 	Sr25519Keyring::{Alice, Bob},
 };
 
-use ulx_primitives::{
+use argon_primitives::{
 	balance_change::{AccountOrigin, BalanceChange, BalanceProof},
 	note::{Note, NoteType},
 	AccountType, BlockVote, DataDomain, DataTLD, LocalchainAccountId, MultiSignatureBytes,

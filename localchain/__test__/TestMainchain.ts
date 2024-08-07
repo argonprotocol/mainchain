@@ -34,9 +34,9 @@ export default class TestMainchain implements ITeardownable {
     }
 
     constructor(binPath?: string) {
-        this.#binPath = binPath ?? `${__dirname}/../../target/debug/ulx-node`;
+        this.#binPath = binPath ?? `${__dirname}/../../target/debug/argon-node`;
         this.#binPath = path.resolve(this.#binPath);
-        if (!process.env.ULX_USE_DOCKER_BINS && !fs.existsSync(this.#binPath)) {
+        if (!process.env.argon_USE_DOCKER_BINS && !fs.existsSync(this.#binPath)) {
             throw new Error(`Mainchain binary not found at ${this.#binPath}`);
         }
         addTeardown(this);
@@ -51,14 +51,14 @@ export default class TestMainchain implements ITeardownable {
         let rpcPort = 0;
         let execArgs: string[] = [];
         let containerName: string;
-        if (process.env.ULX_USE_DOCKER_BINS) {
+        if (process.env.argon_USE_DOCKER_BINS) {
             containerName = "miner_" + nanoid();
             this.containerName = containerName;
             this.#binPath = 'docker';
             port = 33344;
             rpcPort = 9944;
             execArgs = ['run', '--rm', `--name=${containerName}`, `--platform=linux/amd64`, `-p=0:${port}`, `-p=0:${rpcPort}`, '-e', `RUST_LOG=${this.loglevel},sc_rpc_server=info`,
-                'ghcr.io/ulixee/ulixee-miner:dev'];
+                'ghcr.io/argonprotocol/argon-miner:dev'];
 
             if (process.env.ADD_DOCKER_HOST) {
                 execArgs.splice(2, 0, `--add-host=host.docker.internal:host-gateway`);
@@ -103,12 +103,12 @@ export default class TestMainchain implements ITeardownable {
             this.proxy = cleanHostForDocker(await getProxy());
         }
 
-        console.log(`Ulx Node listening at ${this.address}`);
+        console.log(`argon Node listening at ${this.address}`);
         return this.address;
     }
 
     public async teardown(): Promise<void> {
-        if (process.env.ULX_USE_DOCKER_BINS) {
+        if (process.env.argon_USE_DOCKER_BINS) {
             try {
                 execSync(`docker rm -f ${this.containerName}`)
             } catch {
@@ -134,9 +134,9 @@ export default class TestMainchain implements ITeardownable {
         const rpcPort = 14338;
         // const rpcPort = await PortFinder.getPortPromise();
         //
-        // const path = child_process.execSync(`${__dirname}/../../target/debug/ulx-testing-bitcoin`, {encoding: 'utf8'}).trim();
+        // const path = child_process.execSync(`${__dirname}/../../target/debug/argon-testing-bitcoin`, {encoding: 'utf8'}).trim();
         //
-        // const tmpDir = fs.mkdtempSync('/tmp/ulx-bitcoin-');
+        // const tmpDir = fs.mkdtempSync('/tmp/argon-bitcoin-');
         //
         // this.#bitcoind = spawn(path, ['-regtest', '-fallbackfee=0.0001', '-listen=0', `-datadir=${tmpDir}`, '-blockfilterindex', '-txindex', `-rpcport=${rpcPort}`, '-rpcuser=bitcoin', '-rpcpassword=bitcoin'], {
         //     stdio: ['ignore', 'inherit', 'inherit', "ignore"],

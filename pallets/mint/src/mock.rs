@@ -5,7 +5,7 @@ use sp_arithmetic::{FixedI128, FixedU128};
 use sp_runtime::BuildStorage;
 
 use crate as pallet_mint;
-use ulx_primitives::{
+use argon_primitives::{
 	block_seal::RewardSharing, BlockRewardAccountsProvider, PriceProvider, RewardShare,
 };
 
@@ -18,7 +18,7 @@ frame_support::construct_runtime!(
 	{
 		System: frame_system,
 		Balances: pallet_balances,
-		UlixeeMint: pallet_mint
+		Mint: pallet_mint
 	}
 );
 
@@ -52,13 +52,13 @@ parameter_types! {
 	pub static MaxPendingMintUtxos: u32 = 10;
 	pub static BitcoinPricePerUsd: Option<FixedU128> = Some(FixedU128::from_float(62000.00));
 	pub static ArgonPricePerUsd: Option<FixedU128> = Some(FixedU128::from_float(1.00));
-	pub static ArgonCPI: Option<ulx_primitives::ArgonCPI> = Some(FixedI128::from_float(-1.00));
+	pub static ArgonCPI: Option<argon_primitives::ArgonCPI> = Some(FixedI128::from_float(-1.00));
 	pub static MinerRewardsAccounts: Vec<(u64, Option<RewardShare>)> = vec![];
 }
 
 pub struct StaticPriceProvider;
 impl PriceProvider<Balance> for StaticPriceProvider {
-	fn get_argon_cpi() -> Option<ulx_primitives::ArgonCPI> {
+	fn get_argon_cpi() -> Option<argon_primitives::ArgonCPI> {
 		ArgonCPI::get()
 	}
 	fn get_latest_argon_price_in_us_cents() -> Option<FixedU128> {

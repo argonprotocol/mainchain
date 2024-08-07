@@ -1,9 +1,6 @@
 use std::collections::BTreeMap;
 
-use frame_support::{assert_err, assert_noop, assert_ok};
-use sp_core::H256;
-use sp_runtime::DispatchError;
-use ulx_primitives::{
+use argon_primitives::{
 	bitcoin::{
 		BitcoinBlock, BitcoinCosignScriptPubkey, BitcoinHeight, BitcoinRejectedReason, H256Le,
 		UtxoRef, UtxoValue,
@@ -11,6 +8,9 @@ use ulx_primitives::{
 	inherents::BitcoinUtxoSync,
 	BitcoinUtxoTracker,
 };
+use frame_support::{assert_err, assert_noop, assert_ok};
+use sp_core::H256;
+use sp_runtime::DispatchError;
 
 use crate::{
 	mock::{System, *},

@@ -6,7 +6,7 @@ use sp_core::{crypto::AccountId32, ConstU32, H256};
 use sp_runtime::{traits::IdentityLookup, BuildStorage};
 
 use crate as pallet_chain_transfer;
-use ulx_primitives::{
+use argon_primitives::{
 	notary::{NotaryId, NotaryProvider, NotarySignature},
 	tick::Tick,
 	BlockSealAuthorityId, NotebookNumber, NotebookProvider, NotebookSecret,

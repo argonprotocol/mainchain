@@ -9,7 +9,7 @@ use codec::{Decode, Encode};
 use parking_lot::Mutex;
 use sp_runtime::RuntimeDebug;
 
-use ulx_primitives::{
+use argon_primitives::{
 	bitcoin::{
 		BitcoinBlock, BitcoinHeight, BitcoinRejectedReason, BitcoinSyncStatus, H256Le, UtxoRef,
 		UtxoValue,
@@ -202,7 +202,7 @@ impl UtxoSpendFilter {
 #[cfg(test)]
 mod test {
 	use crate::{BlockFilter, UtxoSpendFilter};
-	use ulx_primitives::bitcoin::H256Le;
+	use argon_primitives::bitcoin::H256Le;
 
 	#[test]
 	fn test_prune_filters() {

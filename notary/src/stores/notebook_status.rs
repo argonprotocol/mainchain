@@ -1,7 +1,7 @@
 use chrono::{DateTime, Utc};
 use sqlx::{query, Executor, FromRow, PgConnection};
 
-use ulx_primitives::{tick::Tick, NotebookNumber};
+use argon_primitives::{tick::Tick, NotebookNumber};
 
 use crate::{ensure, error::Error};
 

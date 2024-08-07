@@ -10,25 +10,25 @@ use sp_core::blake2_256;
 use sp_runtime::traits::Block as BlockT;
 use tokio::sync::Mutex;
 
-use ulx_node_runtime::{NotaryRecordT, NotebookVerifyError};
-use ulx_notary_apis::notebook::{NotebookRpcClient, RawHeadersSubscription};
-use ulx_primitives::{
+use argon_node_runtime::{NotaryRecordT, NotebookVerifyError};
+use argon_notary_apis::notebook::{NotebookRpcClient, RawHeadersSubscription};
+use argon_primitives::{
 	notary::NotaryNotebookVoteDetails, notebook::NotebookNumber, tick::Tick, BlockSealApis,
 	BlockSealAuthorityId, NotaryApis, NotaryId, NotebookApis, NotebookDigest, NotebookHeaderData,
 };
 
 use crate::{
-	aux_client::{NotebookAuditResult, UlxAux},
+	aux_client::{ArgonAux, NotebookAuditResult},
 	error::Error,
 };
 
 pub struct NotaryClient<B: BlockT, C: AuxStore, AC> {
 	client: Arc<C>,
-	pub notary_client_by_id: Arc<Mutex<BTreeMap<NotaryId, Arc<ulx_notary_apis::Client>>>>,
+	pub notary_client_by_id: Arc<Mutex<BTreeMap<NotaryId, Arc<argon_notary_apis::Client>>>>,
 	pub notaries_by_id: Arc<Mutex<BTreeMap<NotaryId, NotaryRecordT>>>,
 	pub subscriptions_by_id: Arc<Mutex<BTreeMap<NotaryId, RawHeadersSubscription>>>,
 	header_stream: TracingUnboundedSender<(NotaryId, NotebookNumber, Vec<u8>)>,
-	aux_client: UlxAux<B, C>,
+	aux_client: ArgonAux<B, C>,
 	_block: PhantomData<AC>,
 }
 
@@ -45,7 +45,7 @@ where
 {
 	pub fn new(
 		client: Arc<C>,
-		aux_client: UlxAux<B, C>,
+		aux_client: ArgonAux<B, C>,
 		header_stream: TracingUnboundedSender<(NotaryId, NotebookNumber, Vec<u8>)>,
 	) -> Self {
 		Self {
@@ -347,7 +347,10 @@ where
 		Ok(audit_result)
 	}
 
-	async fn get_client(&self, notary_id: NotaryId) -> Result<Arc<ulx_notary_apis::Client>, Error> {
+	async fn get_client(
+		&self,
+		notary_id: NotaryId,
+	) -> Result<Arc<argon_notary_apis::Client>, Error> {
 		let mut clients = self.notary_client_by_id.lock().await;
 		if let std::collections::btree_map::Entry::Vacant(e) = clients.entry(notary_id) {
 			let notaries = self.notaries_by_id.lock().await;
@@ -363,7 +366,7 @@ where
 					notary_id, e
 				))
 			})?;
-			let c = ulx_notary_apis::create_client(&host_str).await.map_err(|e| {
+			let c = argon_notary_apis::create_client(&host_str).await.map_err(|e| {
 				Error::NotaryError(format!(
 					"Could not connect to notary {} ({}) for audit - {:?}",
 					notary_id, host_str, e
@@ -397,7 +400,7 @@ where
 }
 
 pub async fn verify_notebook_audits<B: BlockT, C>(
-	aux_client: &UlxAux<B, C>,
+	aux_client: &ArgonAux<B, C>,
 	notebook_digest: &NotebookDigest<NotebookVerifyError>,
 ) -> Result<(), Error>
 where
@@ -442,7 +445,7 @@ where
 
 pub async fn get_notebook_header_data<B: BlockT, C, AccountId: Codec>(
 	client: &Arc<C>,
-	aux_client: &UlxAux<B, C>,
+	aux_client: &ArgonAux<B, C>,
 	best_hash: &B::Hash,
 	submitting_tick: Tick,
 ) -> Result<NotebookHeaderData<NotebookVerifyError>, Error>

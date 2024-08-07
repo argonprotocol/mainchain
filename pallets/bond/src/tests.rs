@@ -14,7 +14,7 @@ use crate::{
 	},
 	Error, Event, HoldReason, UtxoCosignRequest, UtxoState,
 };
-use ulx_primitives::{
+use argon_primitives::{
 	bitcoin::{
 		BitcoinCosignScriptPubkey, BitcoinRejectedReason, BitcoinScriptPubkey, BitcoinSignature,
 		CompressedBitcoinPubkey, H256Le, Satoshis, UtxoRef, SATOSHIS_PER_BITCOIN,
@@ -583,7 +583,7 @@ fn it_can_create_a_mining_bond() {
 				total_fee: 0,
 				prepaid_fee: 0,
 				vault_id: 1,
-				expiration: BondExpiration::UlixeeBlock(10),
+				expiration: BondExpiration::ArgonBlock(10),
 				bonded_account_id: who,
 				start_block: 1,
 			}
@@ -597,7 +597,7 @@ fn it_can_create_a_mining_bond() {
 				bond_id: 1,
 				amount,
 				bond_type: BondType::Mining,
-				expiration: BondExpiration::UlixeeBlock(10),
+				expiration: BondExpiration::ArgonBlock(10),
 				bonded_account_id: who,
 				utxo_id: None,
 			}

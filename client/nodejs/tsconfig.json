@@ -1,7 +1,7 @@
 {
   "compilerOptions": {
     "paths": {
-      "@ulixee/mainchain/*": [
+      "@argonprotocol/mainchain/*": [
         "src/*"
       ],
       "@polkadot/api/augment": [

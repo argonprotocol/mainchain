@@ -6,7 +6,7 @@ use serde_json::{from_value, json};
 use sp_core::{bounded::BoundedVec, H256};
 use sqlx::{query, types::JsonValue, FromRow, PgConnection};
 
-use ulx_primitives::{
+use argon_primitives::{
 	ensure, notary::NotarySignature, tick::Tick, AccountId, AccountOrigin, BlockVotingPower,
 	ChainTransfer, DataDomainHash, NotaryId, NotebookHeader, NotebookMeta, NotebookNumber,
 	SignedNotebookHeader, NOTEBOOK_VERSION,
@@ -464,7 +464,7 @@ mod tests {
 	use sp_runtime::traits::Verify;
 	use sqlx::PgPool;
 
-	use ulx_primitives::{AccountOrigin, ChainTransfer, NOTEBOOK_VERSION};
+	use argon_primitives::{AccountOrigin, ChainTransfer, NOTEBOOK_VERSION};
 
 	use crate::{
 		notebook_closer::{notary_sign, NOTARY_KEYID},

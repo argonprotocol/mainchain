@@ -1,5 +1,5 @@
 [package]
-name = "ulx-oracle"
+name = "argon-oracle"
 version.workspace = true
 authors.workspace = true
 edition.workspace = true
@@ -28,8 +28,8 @@ clap = { workspace = true }
 chrono = { workspace = true }
 rand = { workspace = true }
 
-ulixee-client = { workspace = true }
-ulx-primitives = { workspace = true, features = ["default", "bitcoin"] }
+argon-client = { workspace = true }
+argon-primitives = { workspace = true, features = ["default", "bitcoin"] }
 url = { workspace = true }
 
 bitcoincore-rpc = { workspace = true }
@@ -41,8 +41,8 @@ lazy_static = { workspace = true }
 env_logger = { workspace = true }
 sp-keyring = { workspace = true }
 sp-keystore = { workspace = true }
-ulx-testing = { workspace = true }
+argon-testing = { workspace = true }
 subxt-signer = { workspace = true }
 
 [features]
-fast-runtime = [ "ulx-primitives/fast-runtime" ]
+fast-runtime = [ "argon-primitives/fast-runtime" ]

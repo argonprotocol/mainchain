@@ -1,5 +1,5 @@
 [package]
-name = "ulx-bitcoin-cli"
+name = "argon-bitcoin-cli"
 description = "A cli used to bond bitcoins, create and manage Vaults"
 version.workspace = true
 edition.workspace = true
@@ -31,11 +31,11 @@ bitcoin = { workspace = true, features = ["base64"] }
 
 url = { workspace = true, features = [] }
 
-ulixee-client = { workspace = true }
-ulx-primitives = { workspace = true, features = ["default"] }
-ulx-bitcoin = { workspace = true, features = ["default"] }
-ulx-bitcoin-cli-macros = { workspace = true }
+argon-client = { workspace = true }
+argon-primitives = { workspace = true, features = ["default"] }
+argon-bitcoin = { workspace = true, features = ["default"] }
+argon-bitcoin-cli-macros = { workspace = true }
 
 [features]
 default = []
-hwi = [ "ulx-bitcoin/hwi" ]
+hwi = [ "argon-bitcoin/hwi" ]

@@ -14,15 +14,15 @@ use subxt::OnlineClient;
 use tokio::sync::Mutex;
 use tracing::warn;
 
-use ulixee_client::api::storage;
-use ulixee_client::api::{runtime_types, tx};
+use argon_client::api::storage;
+use argon_client::api::{runtime_types, tx};
 
-use ulixee_client::{
-  api, MainchainClient as InnerMainchainClient, UlxConfig, UlxExtrinsicParamsBuilder,
+use argon_client::{
+  api, ArgonConfig, ArgonExtrinsicParamsBuilder, MainchainClient as InnerMainchainClient,
 };
-use ulx_primitives::host::Host;
-use ulx_primitives::tick::{Tick, Ticker};
-use ulx_primitives::{
+use argon_primitives::host::Host;
+use argon_primitives::tick::{Tick, Ticker};
+use argon_primitives::{
   Balance, DataDomain, DataTLD, NotaryId, NotebookNumber, TransferToLocalchainId,
 };
 
@@ -323,10 +323,10 @@ impl MainchainClient {
     })
   }
 
-  pub async fn get_ulixees(&self, address: String) -> Result<BalancesAccountData> {
+  pub async fn get_shares(&self, address: String) -> Result<BalancesAccountData> {
     let account_id32 = subxt::utils::AccountId32::from_str(&address).map_err(|e| anyhow!(e))?;
     let balance = self
-      .fetch_storage(&storage().ulixee_balances().account(account_id32), None)
+      .fetch_storage(&storage().share_balances().account(account_id32), None)
       .await?
       .ok_or_else(|| anyhow!("No record found for address {}", address))?;
     Ok(BalancesAccountData {
@@ -376,7 +376,7 @@ impl MainchainClient {
     keystore: &Keystore,
   ) -> Result<(
     LocalchainTransfer,
-    TxInBlock<UlxConfig, OnlineClient<UlxConfig>>,
+    TxInBlock<ArgonConfig, OnlineClient<ArgonConfig>>,
   )> {
     let current_nonce = self.get_account_nonce(address.clone()).await?;
     let best_block = H256::from_slice(self.get_best_block_hash().await?.as_ref());
@@ -389,7 +389,7 @@ impl MainchainClient {
     let latest_block = client.live.blocks().at(best_block).await?;
 
     let payload = {
-      let params = UlxExtrinsicParamsBuilder::<UlxConfig>::new()
+      let params = ArgonExtrinsicParamsBuilder::<ArgonConfig>::new()
         .nonce(current_nonce as u64)
         .mortal(latest_block.header(), mortality)
         .build();
@@ -411,7 +411,7 @@ impl MainchainClient {
         .tx()
         .create_partial_signed_offline(
           &tx().chain_transfer().send_to_localchain(amount, notary_id),
-          UlxExtrinsicParamsBuilder::<UlxConfig>::new()
+          ArgonExtrinsicParamsBuilder::<ArgonConfig>::new()
             .nonce(current_nonce as u64)
             .mortal(latest_block.header(), mortality)
             .build(),
@@ -524,7 +524,7 @@ impl MainchainClient {
   pub async fn get_latest_notebook(
     &self,
     notary_id: u32,
-  ) -> Result<runtime_types::ulx_primitives::notary::NotaryNotebookKeyDetails> {
+  ) -> Result<runtime_types::argon_primitives::notary::NotaryNotebookKeyDetails> {
     let best_block = self.get_best_block_hash().await?;
     if let Some((details, _did_receive_at_tick)) = self
       .fetch_storage(
@@ -623,7 +623,7 @@ impl MainchainClient {
 pub mod napi_ext {
   use napi::bindgen_prelude::*;
 
-  use ulx_primitives::DataTLD;
+  use argon_primitives::DataTLD;
 
   use crate::error::NapiOk;
   use crate::{DataDomainRegistration, MainchainClient, ZoneRecord};
@@ -774,9 +774,9 @@ pub mod napi_ext {
       })
     }
 
-    #[napi(js_name = "getUlixees")]
-    pub async fn get_ulixees_napi(&self, address: String) -> napi::Result<BalancesAccountData> {
-      let account = self.get_ulixees(address).await.napi_ok()?;
+    #[napi(js_name = "getShares")]
+    pub async fn get_shares_napi(&self, address: String) -> napi::Result<BalancesAccountData> {
+      let account = self.get_shares(address).await.napi_ok()?;
       Ok(BalancesAccountData {
         free: account.free.into(),
         reserved: account.reserved.into(),

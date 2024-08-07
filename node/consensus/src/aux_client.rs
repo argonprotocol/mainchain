@@ -17,8 +17,8 @@ use sp_arithmetic::traits::UniqueSaturatedInto;
 use sp_core::{H256, U256};
 use sp_runtime::traits::{Block as BlockT, Header};
 
-use ulx_node_runtime::{AccountId, BlockNumber, NotebookVerifyError};
-use ulx_primitives::{
+use argon_node_runtime::{AccountId, BlockNumber, NotebookVerifyError};
+use argon_primitives::{
 	notary::{NotaryNotebookTickState, NotaryNotebookVoteDetails, NotaryNotebookVoteDigestDetails},
 	tick::Tick,
 	BlockSealDigest, BlockVotingPower, ComputeDifficulty, NotaryId, NotaryNotebookVotes,
@@ -90,14 +90,14 @@ impl AuxKey {
 	}
 }
 
-pub struct UlxAux<B: BlockT, C: AuxStore> {
+pub struct ArgonAux<B: BlockT, C: AuxStore> {
 	pub lock: Arc<RwLock<()>>,
 	client: Arc<C>,
 	state: Arc<RwLock<LruMap<AuxKey, AuxState<C>>>>,
 	_block: std::marker::PhantomData<B>,
 }
 
-impl<B: BlockT, C: AuxStore> Clone for UlxAux<B, C> {
+impl<B: BlockT, C: AuxStore> Clone for ArgonAux<B, C> {
 	fn clone(&self) -> Self {
 		Self {
 			client: self.client.clone(),
@@ -108,7 +108,7 @@ impl<B: BlockT, C: AuxStore> Clone for UlxAux<B, C> {
 	}
 }
 
-impl<B: BlockT, C: AuxStore> UlxAux<B, C> {
+impl<B: BlockT, C: AuxStore> ArgonAux<B, C> {
 	pub fn new(client: Arc<C>) -> Self {
 		Self {
 			client,
@@ -120,7 +120,7 @@ impl<B: BlockT, C: AuxStore> UlxAux<B, C> {
 }
 
 ///
-/// Stores auxiliary data for Ulx consensus (eg - cross block data)
+/// Stores auxiliary data for argon consensus (eg - cross block data)
 ///
 /// We store several types of data
 /// - `ForkPower` - stored at each block to determine the aggregate voting power for a fork
@@ -130,7 +130,7 @@ impl<B: BlockT, C: AuxStore> UlxAux<B, C> {
 ///   create a block
 /// - `AuthorsAtHeight` - the authors at a given height for every voting key. A block will only be
 ///   accepted once per author per key
-impl<B: BlockT, C: AuxStore + 'static> UlxAux<B, C> {
+impl<B: BlockT, C: AuxStore + 'static> ArgonAux<B, C> {
 	#[allow(clippy::too_many_arguments)]
 	pub fn record_block(
 		&self,

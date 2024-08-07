@@ -12,9 +12,9 @@ use rand::seq::SliceRandom;
 use sp_core::{crypto::Pair, ed25519};
 use sqlx::postgres::PgPoolOptions;
 
-use ulixee_client::{
+use argon_client::{
 	api::{
-		runtime_types::ulx_primitives::{
+		runtime_types::argon_primitives::{
 			host::Host,
 			notary::{NotaryMeta, NotaryName},
 		},
@@ -23,17 +23,17 @@ use ulixee_client::{
 	signer::Ed25519Signer,
 };
 
-use crate::UlxTestNode;
+use crate::ArgonTestNode;
 
-pub struct UlxTestNotary {
+pub struct ArgonTestNotary {
 	// Keep a handle to the node; once it's dropped the node is killed.
 	proc: Option<process::Child>,
-	pub client: Arc<ulx_notary_apis::Client>,
+	pub client: Arc<argon_notary_apis::Client>,
 	pub ws_url: String,
 	pub operator: ed25519::Pair,
 }
 
-impl Drop for UlxTestNotary {
+impl Drop for ArgonTestNotary {
 	fn drop(&mut self) {
 		if let Some(mut proc) = self.proc.take() {
 			let _ = proc.kill();
@@ -41,9 +41,9 @@ impl Drop for UlxTestNotary {
 	}
 }
 
-impl UlxTestNotary {
+impl ArgonTestNotary {
 	pub async fn start(
-		node: &UlxTestNode,
+		node: &ArgonTestNode,
 		operator: Option<ed25519::Pair>,
 	) -> anyhow::Result<Self> {
 		let rust_log = env::var("RUST_LOG").unwrap_or("warn".to_string());
@@ -85,13 +85,13 @@ impl UlxTestNotary {
 		let db_url = format!("{}/{}", db_base_url, db_name);
 		sqlx::query(&format!("CREATE DATABASE \"{}\"", db_name)).execute(&pool).await?;
 		// migrate from notary project path
-		let output = Command::new("./ulx-notary")
+		let output = Command::new("./argon-notary")
 			.current_dir(&target_dir)
 			.args(vec!["migrate", "--db-url", &db_url])
 			.output()?;
 		println!("Migrated db {}: {:?}", db_name, output.stdout);
 
-		let mut proc = Command::new("./ulx-notary")
+		let mut proc = Command::new("./argon-notary")
 			.current_dir(&target_dir)
 			.env("RUST_LOG", rust_log)
 			.stdout(process::Stdio::piped())
@@ -115,14 +115,14 @@ impl UlxTestNotary {
 		}
 
 		let ws_url = ws_url.expect("Failed to find ws port");
-		let client = ulx_notary_apis::create_client(&ws_url).await?;
+		let client = argon_notary_apis::create_client(&ws_url).await?;
 		Ok(Self { proc: Some(proc), client: Arc::new(client), ws_url, operator })
 	}
 
-	pub async fn register_operator(&self, ulx_test_node: &UlxTestNode) -> anyhow::Result<()> {
+	pub async fn register_operator(&self, argon_test_node: &ArgonTestNode) -> anyhow::Result<()> {
 		let operator = self.operator;
 
-		let host: ulx_primitives::host::Host = self.ws_url.clone().into();
+		let host: argon_primitives::host::Host = self.ws_url.clone().into();
 		let notary_proposal = tx().notaries().propose(NotaryMeta {
 			name: NotaryName("test".as_bytes().to_vec().into()),
 			hosts: vec![Host(host.0.into())].into(),
@@ -130,7 +130,7 @@ impl UlxTestNotary {
 		});
 		println!("notary proposal {:?}", notary_proposal.call_data());
 		let signer = Ed25519Signer::new(operator);
-		ulx_test_node
+		argon_test_node
 			.client
 			.live
 			.tx()

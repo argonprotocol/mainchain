@@ -1,6 +1,7 @@
 #![allow(clippy::await_holding_lock)]
 
 use crate::{bitcoind::read_rpc_url, start_bitcoind};
+use argon_client::MainchainClient;
 use bitcoind::{bitcoincore_rpc::Auth, BitcoinD};
 use lazy_static::lazy_static;
 use std::{
@@ -10,10 +11,9 @@ use std::{
 	process,
 	process::Command,
 };
-use ulixee_client::MainchainClient;
 use url::Url;
 
-pub struct UlxTestNode {
+pub struct ArgonTestNode {
 	// Keep a handle to the node; once it's dropped the node is killed.
 	proc: Option<process::Child>,
 	pub client: MainchainClient,
@@ -21,7 +21,7 @@ pub struct UlxTestNode {
 	pub bitcoin_rpc_url: Option<Url>,
 }
 
-impl Drop for UlxTestNode {
+impl Drop for ArgonTestNode {
 	fn drop(&mut self) {
 		if let Some(mut proc) = self.proc.take() {
 			let _ = proc.kill();
@@ -35,7 +35,7 @@ impl Drop for UlxTestNode {
 lazy_static! {
 	static ref CONTEXT_LOCK: std::sync::Mutex<()> = std::sync::Mutex::new(());
 }
-impl UlxTestNode {
+impl ArgonTestNode {
 	pub async fn start(authority: String) -> anyhow::Result<Self> {
 		#[allow(clippy::await_holding_lock)]
 		let _lock = CONTEXT_LOCK.lock().unwrap();
@@ -54,9 +54,9 @@ impl UlxTestNode {
 		let workspace_cargo_path = workspace_cargo_path.as_path().join("target/debug");
 		let root = workspace_cargo_path.as_os_str();
 
-		println!("Starting ulx-node with bitcoin rpc url: {}", rpc_url);
+		println!("Starting argon-node with bitcoin rpc url: {}", rpc_url);
 
-		let mut proc = Command::new("./ulx-node")
+		let mut proc = Command::new("./argon-node")
 			.current_dir(root)
 			.env("RUST_LOG", rust_log)
 			.stderr(process::Stdio::piped())
@@ -98,7 +98,7 @@ impl UlxTestNode {
 		let client =
 			MainchainClient::from_url(format!("ws://127.0.0.1:{}", ws_port).as_str()).await?;
 
-		Ok(UlxTestNode {
+		Ok(ArgonTestNode {
 			proc: Some(proc),
 			client,
 			bitcoind: Some(bitcoin),
@@ -112,7 +112,7 @@ impl UlxTestNode {
 			.expect("Failed to connect to node at {url}: {e}");
 
 		let bitcoin_rpc_url = bitcoind.as_ref().map(|b| read_rpc_url(b).unwrap());
-		UlxTestNode { proc: None, client, bitcoind, bitcoin_rpc_url }
+		ArgonTestNode { proc: None, client, bitcoind, bitcoin_rpc_url }
 	}
 
 	pub fn get_bitcoin_url(&self) -> (String, Auth) {

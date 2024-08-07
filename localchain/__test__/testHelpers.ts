@@ -1,4 +1,4 @@
-import {checkForExtrinsicSuccess, Keyring, KeyringPair, UlxClient} from "@ulixee/mainchain";
+import {checkForExtrinsicSuccess, Keyring, KeyringPair, ArgonClient} from "@argonprotocol/mainchain";
 import {Localchain} from "../index";
 import TestNotary from "./TestNotary";
 import type {KeypairType} from "@polkadot/util-crypto/types";
@@ -81,7 +81,7 @@ export async function teardown() {
 }
 
 export function cleanHostForDocker(host: string, replacer = 'host.docker.internal'): string {
-    if (process.env.ULX_USE_DOCKER_BINS) {
+    if (process.env.argon_USE_DOCKER_BINS) {
         return host.replace('localhost', replacer).replace('127.0.0.1', replacer).replace('0.0.0.0', replacer);
     }
     return host
@@ -132,7 +132,7 @@ export function disconnectOnTeardown<T extends { disconnect(): Promise<void> }>(
     return closeable;
 }
 
-export async function getMainchainBalance(client: UlxClient, address: string): Promise<bigint> {
+export async function getMainchainBalance(client: ArgonClient, address: string): Promise<bigint> {
     const {data} = await client.query.system.account(address);
     return data.free.toBigInt();
 }
@@ -146,7 +146,7 @@ export async function createLocalchain(mainchainUrl: string): Promise<Localchain
     return localchain;
 }
 
-export async function transferToLocalchain(account: KeyringPair, amount: number, viaNotaryId: number, client: UlxClient): Promise<number> {
+export async function transferToLocalchain(account: KeyringPair, amount: number, viaNotaryId: number, client: ArgonClient): Promise<number> {
     return new Promise<number>((resolve, reject) => {
         client.tx.chainTransfer.sendToLocalchain(amount, viaNotaryId).signAndSend(account, ({events, status}) => {
             if (status.isFinalized) {
@@ -169,7 +169,7 @@ export async function transferToLocalchain(account: KeyringPair, amount: number,
     });
 }
 
-export async function activateNotary(sudo: KeyringPair, client: UlxClient, notary: TestNotary) {
+export async function activateNotary(sudo: KeyringPair, client: ArgonClient, notary: TestNotary) {
     await notary.register(client);
     await new Promise<void>((resolve, reject) => {
         client.tx.sudo.sudo(client.tx.notaries.activate(notary.operator.publicKey)).signAndSend(sudo, ({

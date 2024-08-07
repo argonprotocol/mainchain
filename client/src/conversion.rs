@@ -9,39 +9,39 @@ impl<T, X: sp_core::Get<u32>> From<sp_core::bounded_vec::BoundedVec<T, X>>
 	}
 }
 
-impl From<runtime_types::ulx_primitives::bitcoin::BitcoinNetwork>
-	for ulx_primitives::bitcoin::BitcoinNetwork
+impl From<runtime_types::argon_primitives::bitcoin::BitcoinNetwork>
+	for argon_primitives::bitcoin::BitcoinNetwork
 {
-	fn from(value: runtime_types::ulx_primitives::bitcoin::BitcoinNetwork) -> Self {
+	fn from(value: runtime_types::argon_primitives::bitcoin::BitcoinNetwork) -> Self {
 		match value {
-			runtime_types::ulx_primitives::bitcoin::BitcoinNetwork::Bitcoin => Self::Bitcoin,
-			runtime_types::ulx_primitives::bitcoin::BitcoinNetwork::Testnet => Self::Testnet,
-			runtime_types::ulx_primitives::bitcoin::BitcoinNetwork::Signet => Self::Signet,
-			runtime_types::ulx_primitives::bitcoin::BitcoinNetwork::Regtest => Self::Regtest,
+			runtime_types::argon_primitives::bitcoin::BitcoinNetwork::Bitcoin => Self::Bitcoin,
+			runtime_types::argon_primitives::bitcoin::BitcoinNetwork::Testnet => Self::Testnet,
+			runtime_types::argon_primitives::bitcoin::BitcoinNetwork::Signet => Self::Signet,
+			runtime_types::argon_primitives::bitcoin::BitcoinNetwork::Regtest => Self::Regtest,
 		}
 	}
 }
-impl From<runtime_types::ulx_primitives::bitcoin::BitcoinCosignScriptPubkey>
-	for ulx_primitives::bitcoin::BitcoinCosignScriptPubkey
+impl From<runtime_types::argon_primitives::bitcoin::BitcoinCosignScriptPubkey>
+	for argon_primitives::bitcoin::BitcoinCosignScriptPubkey
 {
-	fn from(value: runtime_types::ulx_primitives::bitcoin::BitcoinCosignScriptPubkey) -> Self {
+	fn from(value: runtime_types::argon_primitives::bitcoin::BitcoinCosignScriptPubkey) -> Self {
 		return match value {
-			runtime_types::ulx_primitives::bitcoin::BitcoinCosignScriptPubkey::P2WSH {
+			runtime_types::argon_primitives::bitcoin::BitcoinCosignScriptPubkey::P2WSH {
 				wscript_hash,
-			} => ulx_primitives::bitcoin::BitcoinCosignScriptPubkey::P2WSH { wscript_hash },
+			} => argon_primitives::bitcoin::BitcoinCosignScriptPubkey::P2WSH { wscript_hash },
 		}
 	}
 }
 
-impl From<ulx_primitives::bitcoin::BitcoinNetwork>
-	for runtime_types::ulx_primitives::bitcoin::BitcoinNetwork
+impl From<argon_primitives::bitcoin::BitcoinNetwork>
+	for runtime_types::argon_primitives::bitcoin::BitcoinNetwork
 {
-	fn from(value: ulx_primitives::bitcoin::BitcoinNetwork) -> Self {
+	fn from(value: argon_primitives::bitcoin::BitcoinNetwork) -> Self {
 		match value {
-			ulx_primitives::bitcoin::BitcoinNetwork::Bitcoin => Self::Bitcoin,
-			ulx_primitives::bitcoin::BitcoinNetwork::Testnet => Self::Testnet,
-			ulx_primitives::bitcoin::BitcoinNetwork::Signet => Self::Signet,
-			ulx_primitives::bitcoin::BitcoinNetwork::Regtest => Self::Regtest,
+			argon_primitives::bitcoin::BitcoinNetwork::Bitcoin => Self::Bitcoin,
+			argon_primitives::bitcoin::BitcoinNetwork::Testnet => Self::Testnet,
+			argon_primitives::bitcoin::BitcoinNetwork::Signet => Self::Signet,
+			argon_primitives::bitcoin::BitcoinNetwork::Regtest => Self::Regtest,
 		}
 	}
 }
@@ -64,92 +64,96 @@ impl<T, X: sp_core::Get<u32>>
 	}
 }
 
-impl From<runtime_types::ulx_primitives::tick::Ticker> for ulx_primitives::tick::Ticker {
-	fn from(value: runtime_types::ulx_primitives::tick::Ticker) -> Self {
+impl From<runtime_types::argon_primitives::tick::Ticker> for argon_primitives::tick::Ticker {
+	fn from(value: runtime_types::argon_primitives::tick::Ticker) -> Self {
 		Self::new(value.tick_duration_millis, value.genesis_utc_time)
 	}
 }
 
 // ----- bitcoin -----
-impl From<runtime_types::ulx_primitives::bitcoin::H256Le> for ulx_primitives::bitcoin::H256Le {
-	fn from(value: runtime_types::ulx_primitives::bitcoin::H256Le) -> Self {
+impl From<runtime_types::argon_primitives::bitcoin::H256Le> for argon_primitives::bitcoin::H256Le {
+	fn from(value: runtime_types::argon_primitives::bitcoin::H256Le) -> Self {
 		Self(value.0)
 	}
 }
 
-impl From<ulx_primitives::bitcoin::H256Le> for runtime_types::ulx_primitives::bitcoin::H256Le {
-	fn from(value: ulx_primitives::bitcoin::H256Le) -> Self {
+impl From<argon_primitives::bitcoin::H256Le> for runtime_types::argon_primitives::bitcoin::H256Le {
+	fn from(value: argon_primitives::bitcoin::H256Le) -> Self {
 		Self(value.0)
 	}
 }
 
-impl From<runtime_types::ulx_primitives::bitcoin::UtxoRef> for ulx_primitives::bitcoin::UtxoRef {
-	fn from(value: runtime_types::ulx_primitives::bitcoin::UtxoRef) -> Self {
+impl From<runtime_types::argon_primitives::bitcoin::UtxoRef>
+	for argon_primitives::bitcoin::UtxoRef
+{
+	fn from(value: runtime_types::argon_primitives::bitcoin::UtxoRef) -> Self {
 		Self { txid: value.txid.into(), output_index: value.output_index }
 	}
 }
 
-impl From<ulx_primitives::bitcoin::UtxoRef> for runtime_types::ulx_primitives::bitcoin::UtxoRef {
-	fn from(value: ulx_primitives::bitcoin::UtxoRef) -> Self {
+impl From<argon_primitives::bitcoin::UtxoRef>
+	for runtime_types::argon_primitives::bitcoin::UtxoRef
+{
+	fn from(value: argon_primitives::bitcoin::UtxoRef) -> Self {
 		Self { txid: value.txid.into(), output_index: value.output_index }
 	}
 }
 
-impl From<runtime_types::ulx_primitives::bitcoin::CompressedBitcoinPubkey>
-	for ulx_primitives::bitcoin::CompressedBitcoinPubkey
+impl From<runtime_types::argon_primitives::bitcoin::CompressedBitcoinPubkey>
+	for argon_primitives::bitcoin::CompressedBitcoinPubkey
 {
-	fn from(value: runtime_types::ulx_primitives::bitcoin::CompressedBitcoinPubkey) -> Self {
+	fn from(value: runtime_types::argon_primitives::bitcoin::CompressedBitcoinPubkey) -> Self {
 		Self(value.0)
 	}
 }
 
-impl From<ulx_primitives::bitcoin::CompressedBitcoinPubkey>
-	for runtime_types::ulx_primitives::bitcoin::CompressedBitcoinPubkey
+impl From<argon_primitives::bitcoin::CompressedBitcoinPubkey>
+	for runtime_types::argon_primitives::bitcoin::CompressedBitcoinPubkey
 {
-	fn from(value: ulx_primitives::bitcoin::CompressedBitcoinPubkey) -> Self {
+	fn from(value: argon_primitives::bitcoin::CompressedBitcoinPubkey) -> Self {
 		Self(value.0)
 	}
 }
 
-impl TryFrom<runtime_types::ulx_primitives::bitcoin::BitcoinSignature>
-	for ulx_primitives::bitcoin::BitcoinSignature
+impl TryFrom<runtime_types::argon_primitives::bitcoin::BitcoinSignature>
+	for argon_primitives::bitcoin::BitcoinSignature
 {
 	type Error = Vec<u8>;
 	fn try_from(
-		value: runtime_types::ulx_primitives::bitcoin::BitcoinSignature,
+		value: runtime_types::argon_primitives::bitcoin::BitcoinSignature,
 	) -> Result<Self, Self::Error> {
 		value.0 .0.try_into()
 	}
 }
 
-impl From<ulx_primitives::bitcoin::BitcoinSignature>
-	for runtime_types::ulx_primitives::bitcoin::BitcoinSignature
+impl From<argon_primitives::bitcoin::BitcoinSignature>
+	for runtime_types::argon_primitives::bitcoin::BitcoinSignature
 {
-	fn from(value: ulx_primitives::bitcoin::BitcoinSignature) -> Self {
+	fn from(value: argon_primitives::bitcoin::BitcoinSignature) -> Self {
 		Self(value.0.into())
 	}
 }
 
-impl TryFrom<runtime_types::ulx_primitives::bitcoin::BitcoinScriptPubkey>
-	for ulx_primitives::bitcoin::BitcoinScriptPubkey
+impl TryFrom<runtime_types::argon_primitives::bitcoin::BitcoinScriptPubkey>
+	for argon_primitives::bitcoin::BitcoinScriptPubkey
 {
 	type Error = Vec<u8>;
 	fn try_from(
-		value: runtime_types::ulx_primitives::bitcoin::BitcoinScriptPubkey,
+		value: runtime_types::argon_primitives::bitcoin::BitcoinScriptPubkey,
 	) -> Result<Self, Self::Error> {
 		value.0 .0.try_into()
 	}
 }
 
-impl From<ulx_primitives::bitcoin::BitcoinScriptPubkey>
-	for runtime_types::ulx_primitives::bitcoin::BitcoinScriptPubkey
+impl From<argon_primitives::bitcoin::BitcoinScriptPubkey>
+	for runtime_types::argon_primitives::bitcoin::BitcoinScriptPubkey
 {
-	fn from(value: ulx_primitives::bitcoin::BitcoinScriptPubkey) -> Self {
+	fn from(value: argon_primitives::bitcoin::BitcoinScriptPubkey) -> Self {
 		Self(value.0.into())
 	}
 }
 
-impl From<[u8; 78]> for runtime_types::ulx_primitives::bitcoin::OpaqueBitcoinXpub {
+impl From<[u8; 78]> for runtime_types::argon_primitives::bitcoin::OpaqueBitcoinXpub {
 	fn from(value: [u8; 78]) -> Self {
 		Self(value.into())
 	}

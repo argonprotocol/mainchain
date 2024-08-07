@@ -4,7 +4,7 @@ use std::sync::Arc;
 use sqlx::SqlitePool;
 use tokio::sync::Mutex;
 
-use ulx_primitives::{AccountType, Note, NoteType};
+use argon_primitives::{AccountType, Note, NoteType};
 
 use crate::mainchain_transfer::MainchainTransferIn;
 use crate::transactions::TransactionType;
@@ -301,7 +301,7 @@ impl OverviewStore {
 pub mod uniffi_ext {
   use crate::transactions::TransactionType;
   use crate::BalanceChangeStatus;
-  use ulx_primitives::AccountType;
+  use argon_primitives::AccountType;
 
   #[derive(uniffi::Record, Clone, Debug)]
   pub struct LocalchainOverview {
@@ -424,7 +424,7 @@ pub mod napi_ext {
   use crate::error::NapiOk;
   use crate::transactions::TransactionType;
   use crate::BalanceChangeStatus;
-  use ulx_primitives::AccountType;
+  use argon_primitives::AccountType;
 
   #[napi(object)]
   #[derive(Clone, Debug)]

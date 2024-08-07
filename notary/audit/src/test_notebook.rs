@@ -17,7 +17,7 @@ use sp_runtime::traits::BlakeTwo256;
 use crate::{
 	verify_previous_balance_proof, AccountHistoryLookupError, NotebookHistoryLookup, VerifyError,
 };
-use ulx_primitives::{
+use argon_primitives::{
 	balance_change::{AccountOrigin, BalanceChange, BalanceProof},
 	note::{Note, NoteType},
 	tick::Tick,

@@ -1,6 +1,6 @@
 use crate::ensure;
+use argon_primitives::tick::Tick;
 use sp_core::{ed25519, ByteArray};
-use ulx_primitives::tick::Tick;
 
 use crate::error::Error;
 

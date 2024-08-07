@@ -2,6 +2,15 @@
 extern crate alloc;
 
 use alloc::{vec, vec::Vec};
+use argon_primitives::{
+	block_seal::{
+		BlockSealAuthorityId, MinerIndex, MiningAuthority, RewardDestination, RewardSharing,
+	},
+	bond::BondProvider,
+	inherents::BlockSealInherent,
+	AuthorityProvider, BlockRewardAccountsProvider, BlockSealEventHandler, MiningSlotProvider,
+	RewardShare,
+};
 use codec::Codec;
 use core::{cmp::max, marker::PhantomData};
 use frame_support::{
@@ -20,15 +29,6 @@ use sp_io::hashing::blake2_256;
 use sp_runtime::{
 	traits::{Convert, One, UniqueSaturatedInto},
 	BoundedBTreeMap, FixedI128, FixedPointNumber, FixedU128, SaturatedConversion, Saturating,
-};
-use ulx_primitives::{
-	block_seal::{
-		BlockSealAuthorityId, MinerIndex, MiningAuthority, RewardDestination, RewardSharing,
-	},
-	bond::BondProvider,
-	inherents::BlockSealInherent,
-	AuthorityProvider, BlockRewardAccountsProvider, BlockSealEventHandler, MiningSlotProvider,
-	RewardShare,
 };
 pub use weights::*;
 
@@ -53,7 +53,7 @@ const LOG_TARGET: &str = "runtime::mining_slot";
 /// When a new Slot begins, the Miners with the corresponding Slot indices will be replaced with
 /// the new cohort members (or emptied out).
 ///
-/// To be eligible for mining, you must bond a percent of the total supply of Ulixee tokens. A
+/// To be eligible for mining, you must bond a percent of the total supply of ownership shares. A
 /// `MiningBond` of locked Argons will allow operators to out-bid others for cohort membership. The
 /// percent is configured to aim for `TargetBidsPerSlot`, with a maximum change in ownership
 /// shares needed per slot capped at `OwnershipPercentAdjustmentDamper` (NOTE: this percent is the
@@ -85,7 +85,7 @@ pub mod pallet {
 		BoundedBTreeMap,
 	};
 
-	use ulx_primitives::{
+	use argon_primitives::{
 		block_seal::{MiningRegistration, RewardDestination},
 		bond::{BondError, BondProvider},
 		BondId, VaultId,

@@ -5,7 +5,7 @@ use sp_keystore::KeystorePtr;
 use sqlx::{postgres::PgListener, PgPool};
 use tokio::task::JoinHandle;
 
-use ulx_primitives::{prod_or_fast, tick::Ticker, NotaryId, SignedNotebookHeader};
+use argon_primitives::{prod_or_fast, tick::Ticker, NotaryId, SignedNotebookHeader};
 
 use crate::{
 	error::Error,
@@ -216,21 +216,21 @@ mod tests {
 	use subxt_signer::sr25519::{dev, Keypair};
 	use tokio::sync::Mutex;
 
-	use ulixee_client::{
+	use argon_client::{
 		api,
 		api::{
 			runtime_types,
 			runtime_types::{
-				pallet_notaries::pallet::Call as NotaryCall, ulx_node_runtime::RuntimeCall,
-				ulx_primitives::notary::NotaryMeta,
+				argon_node_runtime::RuntimeCall, argon_primitives::notary::NotaryMeta,
+				pallet_notaries::pallet::Call as NotaryCall,
 			},
 			storage, tx,
 		},
-		ReconnectingClient, UlxConfig, UlxOnlineClient,
+		ArgonConfig, ArgonOnlineClient, ReconnectingClient,
 	};
-	use ulx_notary_apis::localchain::BalanceChangeResult;
-	use ulx_notary_audit::VerifyError;
-	use ulx_primitives::{
+	use argon_notary_apis::localchain::BalanceChangeResult;
+	use argon_notary_audit::VerifyError;
+	use argon_primitives::{
 		host::Host,
 		tick::Tick,
 		AccountId, AccountOrigin,
@@ -241,7 +241,7 @@ mod tests {
 		NotebookDigest, ParentVotingKeyDigest, TickDigest, TransferToLocalchainId,
 		DATA_DOMAIN_LEASE_COST, ESCROW_EXPIRATION_TICKS,
 	};
-	use ulx_testing::start_ulx_test_node;
+	use argon_testing::start_argon_test_node;
 
 	use crate::{
 		block_watch::track_blocks,
@@ -255,7 +255,7 @@ mod tests {
 	#[sqlx::test]
 	async fn test_submitting_votes(pool: PgPool) -> anyhow::Result<()> {
 		let _ = tracing_subscriber::fmt::try_init();
-		let ctx = start_ulx_test_node().await;
+		let ctx = start_argon_test_node().await;
 		let bob_id = dev::bob().public_key().to_account_id();
 
 		let notary_id = 1;
@@ -500,7 +500,7 @@ mod tests {
 	}
 
 	fn get_digests(
-		block: Block<UlxConfig, OnlineClient<UlxConfig>>,
+		block: Block<ArgonConfig, OnlineClient<ArgonConfig>>,
 	) -> (Tick, BlockVoteDigest, BlockSealDigest, ParentVotingKeyDigest, NotebookDigest<VerifyError>)
 	{
 		let mut tick = None;
@@ -510,15 +510,15 @@ mod tests {
 		let mut parent_voting_key = None;
 		for log in block.header().digest.logs.iter() {
 			match log {
-				DigestItem::PreRuntime(ulx_primitives::TICK_DIGEST_ID, data) =>
+				DigestItem::PreRuntime(argon_primitives::TICK_DIGEST_ID, data) =>
 					tick = TickDigest::decode(&mut &data[..]).ok(),
-				DigestItem::PreRuntime(ulx_primitives::BLOCK_VOTES_DIGEST_ID, data) =>
+				DigestItem::PreRuntime(argon_primitives::BLOCK_VOTES_DIGEST_ID, data) =>
 					votes = BlockVoteDigest::decode(&mut &data[..]).ok(),
-				DigestItem::PreRuntime(ulx_primitives::NOTEBOOKS_DIGEST_ID, data) =>
+				DigestItem::PreRuntime(argon_primitives::NOTEBOOKS_DIGEST_ID, data) =>
 					notebook_digest = NotebookDigest::decode(&mut &data[..]).ok(),
-				DigestItem::Seal(ulx_primitives::BLOCK_SEAL_DIGEST_ID, data) =>
+				DigestItem::Seal(argon_primitives::BLOCK_SEAL_DIGEST_ID, data) =>
 					block_seal = BlockSealDigest::decode(&mut &data[..]).ok(),
-				DigestItem::Consensus(ulx_primitives::PARENT_VOTING_KEY_DIGEST, data) =>
+				DigestItem::Consensus(argon_primitives::PARENT_VOTING_KEY_DIGEST, data) =>
 					parent_voting_key = ParentVotingKeyDigest::decode(&mut &data[..]).ok(),
 				_ => (),
 			}
@@ -533,7 +533,7 @@ mod tests {
 	}
 
 	async fn propose_bob_as_notary(
-		client: &UlxOnlineClient,
+		client: &ArgonOnlineClient,
 		notary_key: Public,
 		addr: SocketAddr,
 	) -> anyhow::Result<()> {
@@ -543,10 +543,10 @@ mod tests {
 		};
 		let host: Host = format!("ws://{}:{}", ip, addr.port()).into();
 		let notary_proposal = tx().notaries().propose(NotaryMeta {
-			name: runtime_types::ulx_primitives::notary::NotaryName(
+			name: runtime_types::argon_primitives::notary::NotaryName(
 				"test".as_bytes().to_vec().into(),
 			),
-			hosts: vec![runtime_types::ulx_primitives::host::Host(host.0.into())].into(),
+			hosts: vec![runtime_types::argon_primitives::host::Host(host.0.into())].into(),
 			public: notary_key.0,
 		});
 		println!("notary proposal {:?}", notary_proposal.call_data());
@@ -666,7 +666,7 @@ mod tests {
 	}
 
 	async fn set_zone_record(
-		client: &UlxOnlineClient,
+		client: &ArgonOnlineClient,
 		data_domain_hash: DataDomainHash,
 		account: Keypair,
 	) -> anyhow::Result<H256> {
@@ -675,7 +675,7 @@ mod tests {
 			.sign_and_submit_then_watch_default(
 				&tx().data_domain().set_zone_record(
 					data_domain_hash,
-					runtime_types::ulx_primitives::data_domain::ZoneRecord {
+					runtime_types::argon_primitives::data_domain::ZoneRecord {
 						payment_account: AccountId32::from(account.public_key()),
 						notary_id: 1,
 						versions: subxt::utils::KeyedVec::new(),
@@ -809,7 +809,7 @@ mod tests {
 	}
 
 	async fn create_localchain_transfer(
-		client: &UlxOnlineClient,
+		client: &ArgonOnlineClient,
 		account: Keypair,
 		amount: u32,
 	) -> anyhow::Result<(TransferToLocalchainId, u32, Keypair)> {
@@ -871,7 +871,7 @@ mod tests {
 
 	async fn activate_notary(
 		pool: &PgPool,
-		client: &UlxOnlineClient,
+		client: &ArgonOnlineClient,
 		bob_id: &AccountId32,
 	) -> anyhow::Result<()> {
 		let notary_activated_finalized_block = client
@@ -909,8 +909,8 @@ mod tests {
 	}
 
 	async fn wait_for_in_block(
-		mut tx_progress: TxProgress<UlxConfig, OnlineClient<UlxConfig>>,
-	) -> anyhow::Result<TxInBlock<UlxConfig, OnlineClient<UlxConfig>>, Error> {
+		mut tx_progress: TxProgress<ArgonConfig, OnlineClient<ArgonConfig>>,
+	) -> anyhow::Result<TxInBlock<ArgonConfig, OnlineClient<ArgonConfig>>, Error> {
 		while let Some(status) = tx_progress.next().await {
 			match status? {
 				TxStatus::InBestBlock(tx_in_block) | TxStatus::InFinalizedBlock(tx_in_block) => {

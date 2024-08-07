@@ -1,8 +1,8 @@
+use argon_primitives::{DataDomain, DataDomainHash, DataTLD};
 use chrono::NaiveDateTime;
 use serde_json::json;
 use sp_runtime::RuntimeString;
 use sqlx::{FromRow, SqliteConnection, SqlitePool};
-use ulx_primitives::{DataDomain, DataDomainHash, DataTLD};
 
 use crate::{bail, Result};
 
@@ -107,8 +107,8 @@ pub mod napi_ext {
   use super::*;
   use crate::error::NapiOk;
   use crate::{DataDomainStore, JsDataDomain};
+  use argon_primitives::DataTLD;
   use napi::bindgen_prelude::*;
-  use ulx_primitives::DataTLD;
 
   #[napi]
   impl DataDomainStore {

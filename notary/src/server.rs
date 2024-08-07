@@ -20,11 +20,11 @@ use crate::{
 	},
 	Error,
 };
-use ulx_notary_apis::{
+use argon_notary_apis::{
 	localchain::{BalanceChangeResult, BalanceTipResult, LocalchainRpcServer},
 	notebook::NotebookRpcServer,
 };
-use ulx_primitives::{
+use argon_primitives::{
 	AccountId, AccountOrigin, AccountType, BalanceProof, BalanceTip, Notarization,
 	NotarizationBalanceChangeset, NotarizationBlockVotes, NotarizationDataDomains, NotaryId,
 	Notebook, NotebookMeta, NotebookNumber, SignedNotebookHeader,
@@ -334,7 +334,7 @@ mod tests {
 	use sp_keystore::{testing::MemoryKeystore, Keystore, KeystoreExt};
 	use sqlx::PgPool;
 
-	use ulx_primitives::{
+	use argon_primitives::{
 		tick::Ticker, AccountOrigin, AccountType::Deposit, BalanceChange, BalanceTip,
 		ChainTransfer, NewAccountOrigin, Note, NoteType,
 	};
@@ -346,7 +346,7 @@ mod tests {
 			notebook_header::NotebookHeaderStore, registered_key::RegisteredKeyStore,
 		},
 	};
-	use ulx_notary_apis::{
+	use argon_notary_apis::{
 		localchain::{BalanceChangeResult, LocalchainRpcClient},
 		notebook::NotebookRpcClient,
 	};

@@ -1,9 +1,9 @@
+use argon_primitives::{tick::Tick, AccountType, MINIMUM_ESCROW_SETTLEMENT};
 use codec::{Decode, Encode};
 use serde::{Deserialize, Serialize};
 use snafu::Snafu;
 use sp_core::crypto::AccountId32;
 use sp_runtime::{scale_info::TypeInfo, RuntimeString};
-use ulx_primitives::{tick::Tick, AccountType, MINIMUM_ESCROW_SETTLEMENT};
 
 use crate::AccountHistoryLookupError;
 

@@ -6,7 +6,7 @@ use sp_core::{ConstU64, H256, U256};
 use sp_runtime::BuildStorage;
 
 use crate as pallet_block_seal_spec;
-use ulx_primitives::{
+use argon_primitives::{
 	block_seal::MiningAuthority,
 	inherents::BlockSealInherent,
 	notebook::NotebookNumber,

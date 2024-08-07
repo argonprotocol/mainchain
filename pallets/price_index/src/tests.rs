@@ -1,7 +1,7 @@
 use frame_support::{assert_err, assert_ok};
 use sp_arithmetic::{FixedPointNumber, FixedU128};
 
-use ulx_primitives::{bitcoin::SATOSHIS_PER_BITCOIN, ArgonCPI, PriceProvider};
+use argon_primitives::{bitcoin::SATOSHIS_PER_BITCOIN, ArgonCPI, PriceProvider};
 
 use crate::{mock::*, Current, Operator, PriceIndex as PriceIndexEntry};
 

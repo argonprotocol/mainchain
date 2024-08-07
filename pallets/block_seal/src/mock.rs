@@ -6,7 +6,7 @@ use sp_core::{H256, U256};
 use sp_runtime::BuildStorage;
 
 use crate as pallet_block_seal;
-use ulx_primitives::{
+use argon_primitives::{
 	block_seal::{BlockSealAuthorityId, MiningAuthority},
 	block_vote::VoteMinimum,
 	notebook::NotebookNumber,

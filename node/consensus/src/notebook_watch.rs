@@ -12,8 +12,8 @@ use sp_keystore::{Keystore, KeystorePtr};
 use sp_runtime::traits::{Block as BlockT, Header as HeaderT};
 use sp_timestamp::Timestamp;
 
-use ulx_node_runtime::{NotaryRecordT, NotebookVerifyError};
-use ulx_primitives::{
+use argon_node_runtime::{NotaryRecordT, NotebookVerifyError};
+use argon_primitives::{
 	block_seal::BLOCK_SEAL_CRYPTO_ID,
 	digests::{BlockVoteDigest, BLOCK_VOTES_DIGEST_ID},
 	localchain::BlockVote,
@@ -24,7 +24,7 @@ use ulx_primitives::{
 };
 
 use crate::{
-	aux_client::{ForkPower, UlxAux},
+	aux_client::{ArgonAux, ForkPower},
 	block_creator::CreateTaxVoteBlock,
 	error::Error,
 	notary_client::NotaryClient,
@@ -36,7 +36,7 @@ pub struct NotebookWatch<B: BlockT, C: AuxStore, SC, AC: Clone + Codec> {
 	select_chain: Arc<SC>,
 	keystore: KeystorePtr,
 	sender: Sender<CreateTaxVoteBlock<B, AC>>,
-	aux_client: UlxAux<B, C>,
+	aux_client: ArgonAux<B, C>,
 	_phantom: PhantomData<B>,
 }
 
@@ -77,7 +77,7 @@ where
 		client: Arc<C>,
 		select_chain: SC,
 		keystore: KeystorePtr,
-		aux_client: UlxAux<B, C>,
+		aux_client: ArgonAux<B, C>,
 		sender: Sender<CreateTaxVoteBlock<B, AC>>,
 	) -> Self {
 		Self {
@@ -341,7 +341,7 @@ mod tests {
 	use sp_keyring::Ed25519Keyring;
 	use sp_keystore::{testing::MemoryKeystore, Keystore};
 
-	use ulx_primitives::block_seal::BLOCK_SEAL_KEY_TYPE;
+	use argon_primitives::block_seal::BLOCK_SEAL_KEY_TYPE;
 
 	use crate::tests::setup_logs;
 

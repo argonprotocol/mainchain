@@ -58,7 +58,7 @@ jobs:
           echo "127.0.0.1 host.docker.internal" | sudo tee -a /etc/hosts
 
       - name: Pull Miner
-        run: docker pull ghcr.io/ulixee/ulixee-miner:dev && docker pull ghcr.io/ulixee/ulixee-notary:dev
+        run: docker pull ghcr.io/argonprotocol/argon-miner:dev && docker pull ghcr.io/argonprotocol/argon-notary:dev
 
       - name: Download artifacts
         uses: actions/download-artifact@v4

@@ -3,18 +3,18 @@ use std::time::Duration;
 use bitcoincore_rpc::{Auth, Client, RpcApi};
 use tokio::time::sleep;
 
-use ulixee_client::{
-	api::{runtime_types::ulx_primitives::bitcoin as bitcoin_primitives_subxt, tx},
+use argon_client::{
+	api::{runtime_types::argon_primitives::bitcoin as bitcoin_primitives_subxt, tx},
 	signer::Signer,
-	MainchainClient, ReconnectingClient, UlxConfig,
+	ArgonConfig, MainchainClient, ReconnectingClient,
 };
-use ulx_primitives::bitcoin::H256Le;
+use argon_primitives::bitcoin::H256Le;
 
 pub async fn bitcoin_loop(
 	bitcoin_rpc_url: String,
 	bitcoin_rpc_auth: Option<(String, String)>,
 	mainchain_rpc_url: String,
-	signer: impl Signer<UlxConfig> + Send + Sync + 'static,
+	signer: impl Signer<ArgonConfig> + Send + Sync + 'static,
 ) -> anyhow::Result<()> {
 	let mut mainchain_client = ReconnectingClient::new(vec![mainchain_rpc_url.clone()]);
 	let auth = if let Some((username, password)) = bitcoin_rpc_auth {
@@ -58,17 +58,17 @@ pub async fn bitcoin_loop(
 
 #[cfg(test)]
 mod tests {
-	use bitcoin::Network;
-	use sp_core::{sr25519, Pair};
-	use ulixee_client::{
+	use argon_client::{
 		api::{
 			bitcoin_utxos::storage::types::confirmed_bitcoin_block_tip::ConfirmedBitcoinBlockTip,
 			storage,
 		},
 		signer::Sr25519Signer,
 	};
-	use ulx_primitives::bitcoin::BitcoinNetwork;
-	use ulx_testing::UlxTestNode;
+	use argon_primitives::bitcoin::BitcoinNetwork;
+	use argon_testing::ArgonTestNode;
+	use bitcoin::Network;
+	use sp_core::{sr25519, Pair};
 
 	use super::*;
 
@@ -79,9 +79,10 @@ mod tests {
 		let alice = sr25519::Pair::from_string("//Dave", None).unwrap();
 
 		let signer = Sr25519Signer::new(alice);
-		let ulx_node = UlxTestNode::start("alice".into()).await.expect("Failed to start ulx-node");
-		let bitcoind = ulx_node.bitcoind.as_ref().expect("Bitcoind not started");
-		let network: BitcoinNetwork = ulx_node
+		let argon_node =
+			ArgonTestNode::start("alice".into()).await.expect("Failed to start argon-node");
+		let bitcoind = argon_node.bitcoind.as_ref().expect("Bitcoind not started");
+		let network: BitcoinNetwork = argon_node
 			.client
 			.fetch_storage(&storage().bitcoin_utxos().bitcoin_network(), None)
 			.await
@@ -98,27 +99,27 @@ mod tests {
 			.unwrap();
 		bitcoind.client.generate_to_address(5, &address).unwrap();
 
-		let (rpc_url, auth) = ulx_node.get_bitcoin_url();
+		let (rpc_url, auth) = argon_node.get_bitcoin_url();
 		let auth = match auth {
 			Auth::None => None,
 			Auth::UserPass(u, p) => Some((u, p)),
 			Auth::CookieFile(_) => None,
 		};
-		assert!(get_confirmed_block(&ulx_node.client).await.is_none());
-		let task = bitcoin_loop(rpc_url.to_string(), auth, ulx_node.client.url.clone(), signer);
+		assert!(get_confirmed_block(&argon_node.client).await.is_none());
+		let task = bitcoin_loop(rpc_url.to_string(), auth, argon_node.client.url.clone(), signer);
 		let handle = tokio::spawn(task);
 
-		let mut block_watch = ulx_node.client.live.blocks().subscribe_best().await.unwrap();
+		let mut block_watch = argon_node.client.live.blocks().subscribe_best().await.unwrap();
 		while let Some(Ok(block)) = block_watch.next().await {
 			if block.number() == 5 {
-				assert!(get_confirmed_block(&ulx_node.client).await.is_some());
+				assert!(get_confirmed_block(&argon_node.client).await.is_some());
 				break;
 			}
 		}
 
-		assert_eq!(get_confirmed_block(&ulx_node.client).await.unwrap().block_height, 5);
+		assert_eq!(get_confirmed_block(&argon_node.client).await.unwrap().block_height, 5);
 		assert_eq!(
-			get_confirmed_block(&ulx_node.client).await.unwrap().block_hash.0,
+			get_confirmed_block(&argon_node.client).await.unwrap().block_hash.0,
 			bitcoind.client.get_best_block_hash().unwrap().as_raw_hash().as_ref()
 		);
 

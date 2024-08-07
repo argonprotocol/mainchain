@@ -4,8 +4,8 @@ use std::default::Default;
 use sp_core::H256;
 use sqlx::PgConnection;
 
-use ulx_notary_apis::localchain::BalanceTipResult;
-use ulx_primitives::{
+use argon_notary_apis::localchain::BalanceTipResult;
+use argon_primitives::{
 	ensure, tick::Tick, AccountId, AccountOrigin, AccountType, BalanceTip, Note, NotebookNumber,
 };
 
@@ -159,7 +159,7 @@ mod tests {
 	use sp_keyring::Sr25519Keyring::Bob;
 	use sqlx::PgPool;
 
-	use ulx_primitives::{AccountOrigin, AccountType::Deposit, BalanceTip};
+	use argon_primitives::{AccountOrigin, AccountType::Deposit, BalanceTip};
 
 	use crate::stores::balance_tip::BalanceTipStore;
 

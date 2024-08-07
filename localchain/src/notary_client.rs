@@ -1,4 +1,11 @@
 use anyhow::anyhow;
+use argon_notary_apis::localchain::{BalanceChangeResult, BalanceTipResult};
+use argon_notary_apis::LocalchainRpcClient;
+use argon_notary_apis::NotebookRpcClient;
+use argon_primitives::{
+  AccountId, AccountOrigin, AccountType, BalanceProof, BalanceTip, Notarization, NotebookNumber,
+  SignedNotebookHeader,
+};
 use futures::stream::TryStreamExt;
 use futures::StreamExt;
 use sp_core::ed25519;
@@ -6,13 +13,6 @@ use sp_runtime::traits::Verify;
 use std::collections::HashMap;
 use std::sync::Arc;
 use tokio::sync::Mutex;
-use ulx_notary_apis::localchain::{BalanceChangeResult, BalanceTipResult};
-use ulx_notary_apis::LocalchainRpcClient;
-use ulx_notary_apis::NotebookRpcClient;
-use ulx_primitives::{
-  AccountId, AccountOrigin, AccountType, BalanceProof, BalanceTip, Notarization, NotebookNumber,
-  SignedNotebookHeader,
-};
 
 use crate::mainchain_client::MainchainClient;
 use crate::{bail, AccountStore, Result};
@@ -91,8 +91,8 @@ impl NotaryClients {
 pub struct NotaryClient {
   pub notary_id: u32,
   public: ed25519::Public,
-  client: Arc<Mutex<ulx_notary_apis::Client>>,
-  last_metadata: Arc<Mutex<Option<ulx_primitives::NotebookMeta>>>,
+  client: Arc<Mutex<argon_notary_apis::Client>>,
+  last_metadata: Arc<Mutex<Option<argon_primitives::NotebookMeta>>>,
   pub auto_verify_header_signatures: bool,
 }
 
@@ -116,7 +116,7 @@ impl NotaryClient {
       public: ed25519::Public::from_raw(public),
       auto_verify_header_signatures,
       last_metadata: Arc::new(Mutex::new(None)),
-      client: Arc::new(Mutex::new(ulx_notary_apis::create_client(&host).await?)),
+      client: Arc::new(Mutex::new(argon_notary_apis::create_client(&host).await?)),
     })
   }
 
@@ -239,7 +239,7 @@ impl NotaryClient {
     while let Some(header) = subscription_stream.next().await {
       let header = header?;
       let mut last_metadata = self.last_metadata.lock().await;
-      *last_metadata = Some(ulx_primitives::NotebookMeta {
+      *last_metadata = Some(argon_primitives::NotebookMeta {
         finalized_tick: header.header.tick,
         finalized_notebook_number: header.header.notebook_number,
       });
@@ -258,8 +258,8 @@ impl NotaryClient {
 pub mod napi_ext {
   use crate::error::NapiOk;
   use crate::{MainchainClient, NotebookMeta};
+  use argon_primitives::AccountType;
   use napi::bindgen_prelude::*;
-  use ulx_primitives::AccountType;
 
   use super::NotaryClient;
   use super::NotaryClients;

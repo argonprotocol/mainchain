@@ -8,8 +8,8 @@ use sc_client_api::backend::AuxStore;
 use sp_api::ProvideRuntimeApi;
 use sp_runtime::traits::Block as BlockT;
 
-use ulx_bitcoin::{BlockFilter, UtxoSpendFilter};
-use ulx_primitives::{
+use argon_bitcoin::{BlockFilter, UtxoSpendFilter};
+use argon_primitives::{
 	bitcoin::{BitcoinSyncStatus, UtxoRef, UtxoValue},
 	inherents::BitcoinUtxoSync,
 	Balance, BitcoinApis,
@@ -94,11 +94,11 @@ mod test {
 	use parking_lot::Mutex;
 	use sc_client_api::backend::AuxStore;
 
-	use ulx_bitcoin::{CosignScript, CosignScriptArgs};
-	use ulx_primitives::bitcoin::{
+	use argon_bitcoin::{CosignScript, CosignScriptArgs};
+	use argon_primitives::bitcoin::{
 		BitcoinBlock, BitcoinRejectedReason, BitcoinSyncStatus, H256Le, UtxoRef, UtxoValue,
 	};
-	use ulx_testing::{add_blocks, add_wallet_address, fund_script_address};
+	use argon_testing::{add_blocks, add_wallet_address, fund_script_address};
 
 	use super::*;
 
@@ -191,9 +191,9 @@ mod test {
 		static ref BITCOIND_LOCK: std::sync::Mutex<()> = std::sync::Mutex::new(());
 	}
 	fn start_bitcoind() -> (BitcoinD, UtxoTracker, Address, Network) {
-		// bitcoin will get in a fight with ulixee for ports, so lock here too
+		// bitcoin will get in a fight with argon for ports, so lock here too
 		let _lock = BITCOIND_LOCK.lock().unwrap();
-		let (bitcoind, rpc_url, network) = ulx_testing::start_bitcoind().expect("start_bitcoin");
+		let (bitcoind, rpc_url, network) = argon_testing::start_bitcoind().expect("start_bitcoin");
 		let _ = env_logger::builder().is_test(true).try_init();
 
 		let block_address = add_wallet_address(&bitcoind);

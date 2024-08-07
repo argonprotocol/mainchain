@@ -1,9 +1,9 @@
 #![cfg_attr(not(feature = "std"), no_std)]
 extern crate alloc;
 
+pub use argon_notary_audit::VerifyError as NotebookVerifyError;
+use argon_primitives::{notary::NotaryProvider, notebook::NotebookNumber};
 pub use pallet::*;
-pub use ulx_notary_audit::VerifyError as NotebookVerifyError;
-use ulx_primitives::{notary::NotaryProvider, notebook::NotebookNumber};
 pub use weights::*;
 
 #[cfg(test)]
@@ -30,8 +30,8 @@ pub mod pallet {
 	use sp_core::{crypto::AccountId32, H256};
 	use sp_runtime::traits::Block as BlockT;
 
-	use ulx_notary_audit::{notebook_verify, AccountHistoryLookupError, NotebookHistoryLookup};
-	use ulx_primitives::{
+	use argon_notary_audit::{notebook_verify, AccountHistoryLookupError, NotebookHistoryLookup};
+	use argon_primitives::{
 		block_vote::VoteMinimum,
 		inherents::{NotebookInherentData, NotebookInherentError},
 		notary::{NotaryId, NotaryNotebookKeyDetails, NotaryNotebookVoteDetails},
@@ -259,7 +259,7 @@ pub mod pallet {
 		type Call = Call<T>;
 		type Error = NotebookInherentError;
 		const INHERENT_IDENTIFIER: InherentIdentifier =
-			ulx_primitives::inherents::NOTEBOOKS_INHERENT_IDENTIFIER;
+			argon_primitives::inherents::NOTEBOOKS_INHERENT_IDENTIFIER;
 
 		fn create_inherent(data: &InherentData) -> Option<Self::Call>
 		where

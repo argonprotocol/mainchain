@@ -13,14 +13,14 @@ use clap::{Subcommand, ValueEnum};
 use comfy_table::{modifiers::UTF8_ROUND_CORNERS, presets::UTF8_FULL, ContentArrangement, Table};
 use sp_runtime::{testing::H256, FixedPointNumber, FixedU128};
 
-use ulixee_client::{
+use argon_bitcoin::{Amount, CosignScript, CosignScriptArgs, Error, UnlockStep, UtxoUnlocker};
+use argon_client::{
 	api,
 	api::{apis, runtime_types::pallet_bond::pallet::UtxoCosignRequest, storage, tx},
 	conversion::from_api_fixed_u128,
 	MainchainClient,
 };
-use ulx_bitcoin::{Amount, CosignScript, CosignScriptArgs, Error, UnlockStep, UtxoUnlocker};
-use ulx_primitives::{
+use argon_primitives::{
 	bitcoin::{
 		BitcoinNetwork, BitcoinScriptPubkey, BitcoinSignature, CompressedBitcoinPubkey, H256Le,
 		UtxoId, SATOSHIS_PER_BITCOIN,
@@ -99,7 +99,7 @@ pub enum BondCommands {
 	},
 	/// Create an unlock psbt to submit to bitcoin
 	OwnerCosignPsbt {
-		/// The utxo id in Ulixee. NOTE: bonds are cleaned up on release, so you need this id. You
+		/// The utxo id in Argon. NOTE: bonds are cleaned up on release, so you need this id. You
 		/// can use the `bond get` command at a previous block to look this up.
 		#[clap(short, long)]
 		utxo_id: UtxoId,
@@ -118,7 +118,7 @@ pub enum BondCommands {
 	},
 	/// Create a psbt to claim back the utxo
 	ClaimUtxoPsbt {
-		/// The bond id that held this bitcoin utxo in Ulixee.
+		/// The bond id that held this bitcoin utxo in Argon.
 		#[clap(short, long)]
 		bond_id: BondId,
 
@@ -161,7 +161,7 @@ impl BondCommands {
 			BondCommands::Apply { vault_id, keypair: _, owner_pubkey, btc } => {
 				let client = MainchainClient::from_url(&rpc_url)
 					.await
-					.context("Failed to connect to ulixee node")?;
+					.context("Failed to connect to argon node")?;
 
 				let owner_pubkey: CompressedBitcoinPubkey =
 					CompressedPublicKey::from_str(&owner_pubkey)?.into();
@@ -180,7 +180,7 @@ impl BondCommands {
 				let fee = vault.bitcoin_argons.base_fee +
 					from_api_fixed_u128(vault.bitcoin_argons.annual_percent_rate)
 						.saturating_mul_int(argons_minted);
-				println!("You're bonding {} sats in exchange for {}. Your Ulixee account needs {} for the bond cost",
+				println!("You're bonding {} sats in exchange for {}. Your Argon account needs {} for the bond cost",
 						 satoshis, ArgonFormatter(argons_minted), ArgonFormatter(fee));
 
 				let call = tx().bonds().bond_bitcoin(vault_id, satoshis, owner_pubkey.into());
@@ -190,7 +190,7 @@ impl BondCommands {
 			BondCommands::CreatePsbt { bond_id } => {
 				let client = MainchainClient::from_url(&rpc_url)
 					.await
-					.context("Failed to connect to ulixee node")?;
+					.context("Failed to connect to argon node")?;
 
 				let (_utxo_id, utxo, _) = get_utxo_from_bond_id(&client, bond_id, None).await?;
 				let network = get_bitcoin_network(&client, None).await?;
@@ -224,7 +224,7 @@ impl BondCommands {
 			BondCommands::Get { bond_id, at_block } => {
 				let client = MainchainClient::from_url(&rpc_url)
 					.await
-					.context("Failed to connect to ulixee node")?;
+					.context("Failed to connect to argon node")?;
 				let at_block = if let Some(at_block) = at_block {
 					let block_chash = client
 						.fetch_storage(&storage().system().block_hash(at_block), None)
@@ -335,7 +335,7 @@ impl BondCommands {
 			BondCommands::RequestUnlock { bond_id, dest_pubkey, fee_rate_per_sats, keypair: _ } => {
 				let client = MainchainClient::from_url(&rpc_url)
 					.await
-					.context("Failed to connect to ulixee node")?;
+					.context("Failed to connect to argon node")?;
 				let latest_block = client.latest_finalized_block_hash().await?;
 				let at_block = Some(latest_block.hash());
 				let network = get_bitcoin_network(&client, at_block).await?;
@@ -369,10 +369,10 @@ impl BondCommands {
 					ArgonFormatter(redemption_price),
 					network_fee
 				);
-				let ulx_bitcoin_script_pubkey: BitcoinScriptPubkey = bitcoin_dest_pubkey.into();
+				let argon_bitcoin_script_pubkey: BitcoinScriptPubkey = bitcoin_dest_pubkey.into();
 				let call = tx().bonds().unlock_bitcoin_bond(
 					bond_id,
-					ulx_bitcoin_script_pubkey.into(),
+					argon_bitcoin_script_pubkey.into(),
 					network_fee.to_sat(),
 				);
 				let url = client.create_polkadotjs_deeplink(&call)?;
@@ -381,7 +381,7 @@ impl BondCommands {
 			BondCommands::VaultCosignPsbt { bond_id } => {
 				let client = MainchainClient::from_url(&rpc_url)
 					.await
-					.context("Failed to connect to ulixee node")?;
+					.context("Failed to connect to argon node")?;
 				let latest_block = client.latest_finalized_block_hash().await?;
 				let at_block = Some(latest_block.hash());
 
@@ -406,7 +406,7 @@ impl BondCommands {
 			BondCommands::VaultCosignSubmit { bond_id, psbt } => {
 				let client = MainchainClient::from_url(&rpc_url)
 					.await
-					.context("Failed to connect to ulixee node")?;
+					.context("Failed to connect to argon node")?;
 				let latest_block = client.latest_finalized_block_hash().await?;
 				let at_block = Some(latest_block.hash());
 
@@ -433,7 +433,7 @@ impl BondCommands {
 			BondCommands::OwnerCosignPsbt { utxo_id, parent_fingerprint, hd_path, wait } => {
 				let client = MainchainClient::from_url(&rpc_url)
 					.await
-					.context("Failed to connect to ulixee node")?;
+					.context("Failed to connect to argon node")?;
 				let latest_block = client.latest_finalized_block_hash().await?;
 				let at_block = Some(latest_block.hash());
 
@@ -574,7 +574,7 @@ impl BondCommands {
 			} => {
 				let client = MainchainClient::from_url(&rpc_url)
 					.await
-					.context("Failed to connect to ulixee node")?;
+					.context("Failed to connect to argon node")?;
 				let block_hash = client
 					.fetch_storage(&storage().system().block_hash(block_number), None)
 					.await?

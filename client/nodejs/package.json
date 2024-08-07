@@ -1,20 +1,20 @@
 {
-  "name": "@ulixee/mainchain",
+  "name": "@argonprotocol/mainchain",
   "version": "2.0.0-alpha.29",
-  "description": "A client for accessing the Ulixee mainchain apis.",
+  "description": "A client for accessing the Argon mainchain apis.",
   "repository": {
     "type": "git",
-    "url": "git+https://github.com/ulixee/mainchain.git"
+    "url": "git+https://github.com/argonprotocol/mainchain.git"
   },
   "author": "",
   "license": "MIT",
   "bugs": {
-    "url": "https://github.com/ulixee/mainchain/issues"
+    "url": "https://github.com/argonprotocol/mainchain/issues"
   },
-  "homepage": "https://github.com/ulixee/mainchain#readme",
+  "homepage": "https://github.com/argonprotocol/mainchain#readme",
   "scripts": {
     "build": "yarn generate:defs && yarn generate:meta && rm ./src/interfaces/index.ts && rm ./src/interfaces/types.ts && yarn tsc",
-    "generate:defs": "node --loader ts-node/esm node_modules/.bin/polkadot-types-from-defs --endpoint metadata.json --input ./src/interfaces --package @ulixee/mainchain/interfaces",
+    "generate:defs": "node --loader ts-node/esm node_modules/.bin/polkadot-types-from-defs --endpoint metadata.json --input ./src/interfaces --package @argonprotocol/mainchain/interfaces",
     "generate:meta": "node --loader ts-node/esm node_modules/.bin/polkadot-types-from-chain --endpoint metadata.json --output ./src/interfaces --strict",
     "lint": "tsc --noEmit --pretty",
     "tsc": "tsc -p tsconfig.json && tsc -p tsconfig-cjs.json && tsc -p tsconfig-types.json"

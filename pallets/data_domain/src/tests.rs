@@ -3,14 +3,14 @@ use crate::{
 	pallet::{DomainPaymentAddressHistory, ExpiringDomainsByBlock, RegisteredDataDomains},
 	DataDomainRegistration, Error, Event,
 };
+use argon_primitives::{
+	notebook::NotebookHeader, tick::Tick, AccountId, DataDomain, DataDomainHash,
+	DataDomainProvider, DataTLD, NotebookEventHandler, Semver, VersionHost, ZoneRecord,
+};
 use frame_support::{assert_err, assert_ok, traits::Hooks};
 use sp_keyring::AccountKeyring::{Alice, Bob};
 use sp_runtime::{testing::H256, BoundedVec};
 use std::collections::BTreeMap;
-use ulx_primitives::{
-	notebook::NotebookHeader, tick::Tick, AccountId, DataDomain, DataDomainHash,
-	DataDomainProvider, DataTLD, NotebookEventHandler, Semver, VersionHost, ZoneRecord,
-};
 
 #[test]
 fn it_can_register_domains() {

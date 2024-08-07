@@ -11,9 +11,9 @@ use crate::{
 	formatters::{parse_number, Argons, Pct},
 	helpers::{read_bitcoin_xpub, read_percent_to_fixed_128},
 };
-use ulixee_client::{api, api::runtime_types, conversion::to_api_fixed_u128};
-use ulx_bitcoin_cli_macros::ReadDocs;
-use ulx_primitives::bitcoin::BitcoinXPub;
+use argon_bitcoin_cli_macros::ReadDocs;
+use argon_client::{api, api::runtime_types, conversion::to_api_fixed_u128};
+use argon_primitives::bitcoin::BitcoinXPub;
 
 #[derive(Debug, Args, ReadDocs)]
 pub struct VaultConfig {
@@ -95,7 +95,7 @@ impl VaultConfig {
 
 		api::vaults::calls::types::create::VaultConfig {
 			bitcoin_xpubkey: opaque_xpub.0.into(),
-			terms: runtime_types::ulx_primitives::bond::VaultTerms::<u128> {
+			terms: runtime_types::argon_primitives::bond::VaultTerms::<u128> {
 				bitcoin_base_fee: (self.bitcoin_base_fee.unwrap_or(0.0) * 1000.0) as u128,
 				bitcoin_annual_percent_rate: to_api_fixed_u128(read_percent_to_fixed_128(
 					self.bitcoin_apr.unwrap_or(0.0),

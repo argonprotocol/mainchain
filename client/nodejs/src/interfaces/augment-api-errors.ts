@@ -595,6 +595,56 @@ declare module '@polkadot/api-base/types/errors' {
        **/
       NoKeys: AugmentedError<ApiType>;
     };
+    shareBalances: {
+      /**
+       * Beneficiary account must pre-exist.
+       **/
+      DeadAccount: AugmentedError<ApiType>;
+      /**
+       * The delta cannot be zero.
+       **/
+      DeltaZero: AugmentedError<ApiType>;
+      /**
+       * Value too low to create account due to existential deposit.
+       **/
+      ExistentialDeposit: AugmentedError<ApiType>;
+      /**
+       * A vesting schedule already exists for this account.
+       **/
+      ExistingVestingSchedule: AugmentedError<ApiType>;
+      /**
+       * Transfer/payment would kill account.
+       **/
+      Expendability: AugmentedError<ApiType>;
+      /**
+       * Balance too low to send value.
+       **/
+      InsufficientBalance: AugmentedError<ApiType>;
+      /**
+       * The issuance cannot be modified since it is already deactivated.
+       **/
+      IssuanceDeactivated: AugmentedError<ApiType>;
+      /**
+       * Account liquidity restrictions prevent withdrawal.
+       **/
+      LiquidityRestrictions: AugmentedError<ApiType>;
+      /**
+       * Number of freezes exceed `MaxFreezes`.
+       **/
+      TooManyFreezes: AugmentedError<ApiType>;
+      /**
+       * Number of holds exceed `VariantCountOf<T::RuntimeHoldReason>`.
+       **/
+      TooManyHolds: AugmentedError<ApiType>;
+      /**
+       * Number of named reserves exceed `MaxReserves`.
+       **/
+      TooManyReserves: AugmentedError<ApiType>;
+      /**
+       * Vesting balance too high to send value.
+       **/
+      VestingBalance: AugmentedError<ApiType>;
+    };
     sudo: {
       /**
        * Sender must be the Sudo account.
@@ -659,56 +709,6 @@ declare module '@polkadot/api-base/types/errors' {
        * The call is whitelisted and cannot be paused.
        **/
       Unpausable: AugmentedError<ApiType>;
-    };
-    ulixeeBalances: {
-      /**
-       * Beneficiary account must pre-exist.
-       **/
-      DeadAccount: AugmentedError<ApiType>;
-      /**
-       * The delta cannot be zero.
-       **/
-      DeltaZero: AugmentedError<ApiType>;
-      /**
-       * Value too low to create account due to existential deposit.
-       **/
-      ExistentialDeposit: AugmentedError<ApiType>;
-      /**
-       * A vesting schedule already exists for this account.
-       **/
-      ExistingVestingSchedule: AugmentedError<ApiType>;
-      /**
-       * Transfer/payment would kill account.
-       **/
-      Expendability: AugmentedError<ApiType>;
-      /**
-       * Balance too low to send value.
-       **/
-      InsufficientBalance: AugmentedError<ApiType>;
-      /**
-       * The issuance cannot be modified since it is already deactivated.
-       **/
-      IssuanceDeactivated: AugmentedError<ApiType>;
-      /**
-       * Account liquidity restrictions prevent withdrawal.
-       **/
-      LiquidityRestrictions: AugmentedError<ApiType>;
-      /**
-       * Number of freezes exceed `MaxFreezes`.
-       **/
-      TooManyFreezes: AugmentedError<ApiType>;
-      /**
-       * Number of holds exceed `VariantCountOf<T::RuntimeHoldReason>`.
-       **/
-      TooManyHolds: AugmentedError<ApiType>;
-      /**
-       * Number of named reserves exceed `MaxReserves`.
-       **/
-      TooManyReserves: AugmentedError<ApiType>;
-      /**
-       * Vesting balance too high to send value.
-       **/
-      VestingBalance: AugmentedError<ApiType>;
     };
     vaults: {
       /**

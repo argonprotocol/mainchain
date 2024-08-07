@@ -16,28 +16,28 @@ use rand::{rngs::OsRng, RngCore};
 use sp_arithmetic::FixedU128;
 use sp_core::{crypto::AccountId32, sr25519, Pair};
 
-use ulixee_client::{
+use argon_bitcoin::{CosignScript, CosignScriptArgs};
+use argon_client::{
 	api,
 	api::{
 		price_index::calls::types::submit::Index,
 		runtime_types::sp_arithmetic::fixed_point::FixedU128 as FixedU128Ext, storage, tx,
 	},
 	signer::{Signer, Sr25519Signer},
-	MainchainClient, UlxConfig,
+	ArgonConfig, MainchainClient,
 };
-use ulx_bitcoin::{CosignScript, CosignScriptArgs};
-use ulx_primitives::{
+use argon_primitives::{
 	bitcoin::{BitcoinCosignScriptPubkey, BitcoinNetwork, Satoshis, UtxoId, SATOSHIS_PER_BITCOIN},
 	Balance, BondId, VaultId,
 };
-use ulx_testing::{
-	add_blocks, add_wallet_address, fund_script_address, run_bitcoin_cli, start_ulx_test_node,
-	UlxTestNode, UlxTestOracle,
+use argon_testing::{
+	add_blocks, add_wallet_address, fund_script_address, run_bitcoin_cli, start_argon_test_node,
+	ArgonTestNode, ArgonTestOracle,
 };
 
 #[tokio::test]
 async fn test_bitcoin_minting_e2e() -> anyhow::Result<()> {
-	let test_node = start_ulx_test_node().await;
+	let test_node = start_argon_test_node().await;
 	let bitcoind = test_node.bitcoind.as_ref().expect("bitcoind");
 	let block_creator = add_wallet_address(bitcoind);
 	bitcoind.client.generate_to_address(101, &block_creator).unwrap();
@@ -82,7 +82,7 @@ async fn test_bitcoin_minting_e2e() -> anyhow::Result<()> {
 	let xpubkey = Xpub::from_priv(&secp, &vault_child_xpriv);
 	let vault_signer = Sr25519Signer::new(alice_sr25519.clone());
 
-	let _oracle = UlxTestOracle::bitcoin_tip(&test_node).await?;
+	let _oracle = ArgonTestOracle::bitcoin_tip(&test_node).await?;
 
 	add_blocks(bitcoind, 1, &block_creator);
 
@@ -226,10 +226,10 @@ fn get_parent_fingerprint(bitcoind: &BitcoinD, owner_hd_key_path: &DerivationPat
 }
 
 async fn create_vault(
-	test_node: &UlxTestNode,
+	test_node: &ArgonTestNode,
 	xpubkey: &Xpub,
 	vault_owner_account_id32: &AccountId32,
-	vault_signer: &impl Signer<UlxConfig>,
+	vault_signer: &impl Signer<ArgonConfig>,
 ) -> anyhow::Result<VaultId> {
 	let client = test_node.client.clone();
 	// wait for alice to have enough argons
@@ -297,7 +297,7 @@ async fn create_vault(
 }
 
 async fn create_bond(
-	test_node: &UlxTestNode,
+	test_node: &ArgonTestNode,
 	vault_id: VaultId,
 	utxo_btc: f64,
 	owner_compressed_pubkey: &bitcoin::PublicKey,
@@ -333,7 +333,7 @@ async fn create_bond(
 }
 
 async fn confirm_bond(
-	test_node: &UlxTestNode,
+	test_node: &ArgonTestNode,
 	secp: &Secp256k1<All>,
 	owner_compressed_pubkey: PublicKey,
 	utxo_satoshis: Satoshis,
@@ -413,7 +413,7 @@ async fn wait_for_mint(
 			block.events().await?.find_first::<api::bitcoin_utxos::events::UtxoVerified>()?;
 		if let Some(utxo_verified) = utxo_verified {
 			if utxo_verified.utxo_id == 1 {
-				println!("Utxo verified in Ulixee mainchain");
+				println!("Utxo verified in Argon mainchain");
 				break;
 			}
 		}
@@ -468,7 +468,7 @@ async fn wait_for_mint(
 }
 
 async fn owner_requests_unlock(
-	test_node: &UlxTestNode,
+	test_node: &ArgonTestNode,
 	bitcoind: &BitcoinD,
 	network: Network,
 	bob_sr25519: &sr25519::Pair,
@@ -515,7 +515,7 @@ async fn owner_requests_unlock(
 }
 
 async fn vault_cosigns_unlock(
-	test_node: &UlxTestNode,
+	test_node: &ArgonTestNode,
 	secp: &Secp256k1<All>,
 	client: Arc<MainchainClient>,
 	vault_child_xpriv: &Xpriv,
@@ -569,7 +569,7 @@ async fn vault_cosigns_unlock(
 }
 
 async fn owner_sees_signature_and_unlocks(
-	test_node: &UlxTestNode,
+	test_node: &ArgonTestNode,
 	bitcoind: &BitcoinD,
 	utxo_id: &UtxoId,
 	hd_path: &str,

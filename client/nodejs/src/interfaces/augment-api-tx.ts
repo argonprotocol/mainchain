@@ -9,7 +9,7 @@ import type { ApiTypes, AugmentedSubmittable, SubmittableExtrinsic, SubmittableE
 import type { Bytes, Compact, Option, U8aFixed, Vec, bool, u128, u16, u32, u64 } from '@polkadot/types-codec';
 import type { AnyNumber, IMethod, ITuple } from '@polkadot/types-codec/types';
 import type { AccountId32, Call, H256, MultiAddress } from '@polkadot/types/interfaces/runtime';
-import type { PalletBalancesAdjustmentDirection, PalletMiningSlotMiningSlotBid, PalletMultisigTimepoint, PalletPriceIndexPriceIndex, PalletVaultsVaultConfig, SpConsensusGrandpaEquivocationProof, SpSessionMembershipProof, SpWeightsWeightV2Weight, UlxNodeRuntimeOpaqueSessionKeys, UlxNodeRuntimeProxyType, UlxPrimitivesBitcoinCompressedBitcoinPubkey, UlxPrimitivesBitcoinH256Le, UlxPrimitivesBitcoinOpaqueBitcoinXpub, UlxPrimitivesBlockSealRewardDestination, UlxPrimitivesBondVaultTerms, UlxPrimitivesDataDomainZoneRecord, UlxPrimitivesInherentsBitcoinUtxoSync, UlxPrimitivesInherentsBlockSealInherent, UlxPrimitivesNotaryNotaryMeta, UlxPrimitivesNotebookSignedNotebookHeader } from '@polkadot/types/lookup';
+import type { ArgonNodeRuntimeOpaqueSessionKeys, ArgonNodeRuntimeProxyType, ArgonPrimitivesBitcoinCompressedBitcoinPubkey, ArgonPrimitivesBitcoinH256Le, ArgonPrimitivesBitcoinOpaqueBitcoinXpub, ArgonPrimitivesBlockSealRewardDestination, ArgonPrimitivesBondVaultTerms, ArgonPrimitivesDataDomainZoneRecord, ArgonPrimitivesInherentsBitcoinUtxoSync, ArgonPrimitivesInherentsBlockSealInherent, ArgonPrimitivesNotaryNotaryMeta, ArgonPrimitivesNotebookSignedNotebookHeader, PalletBalancesAdjustmentDirection, PalletMiningSlotMiningSlotBid, PalletMultisigTimepoint, PalletPriceIndexPriceIndex, PalletVaultsVaultConfig, SpConsensusGrandpaEquivocationProof, SpSessionMembershipProof, SpWeightsWeightV2Weight } from '@polkadot/types/lookup';
 
 export type __AugmentedSubmittable = AugmentedSubmittable<() => unknown>;
 export type __SubmittableExtrinsic<ApiType extends ApiTypes> = SubmittableExtrinsic<ApiType>;
@@ -110,7 +110,7 @@ declare module '@polkadot/api-base/types/submittable' {
        * # Arguments
        * * `bitcoin_height` - the latest bitcoin block height to be confirmed
        **/
-      setConfirmedBlock: AugmentedSubmittable<(bitcoinHeight: u64 | AnyNumber | Uint8Array, bitcoinBlockHash: UlxPrimitivesBitcoinH256Le | string | Uint8Array) => SubmittableExtrinsic<ApiType>, [u64, UlxPrimitivesBitcoinH256Le]>;
+      setConfirmedBlock: AugmentedSubmittable<(bitcoinHeight: u64 | AnyNumber | Uint8Array, bitcoinBlockHash: ArgonPrimitivesBitcoinH256Le | string | Uint8Array) => SubmittableExtrinsic<ApiType>, [u64, ArgonPrimitivesBitcoinH256Le]>;
       /**
        * Sets the oracle operator account id (only executable by the Root account)
        *
@@ -121,12 +121,12 @@ declare module '@polkadot/api-base/types/submittable' {
       /**
        * Submitted when a bitcoin UTXO has been moved or confirmed
        **/
-      sync: AugmentedSubmittable<(utxoSync: UlxPrimitivesInherentsBitcoinUtxoSync | { spent?: any; verified?: any; invalid?: any; syncToBlock?: any } | string | Uint8Array) => SubmittableExtrinsic<ApiType>, [UlxPrimitivesInherentsBitcoinUtxoSync]>;
+      sync: AugmentedSubmittable<(utxoSync: ArgonPrimitivesInherentsBitcoinUtxoSync | { spent?: any; verified?: any; invalid?: any; syncToBlock?: any } | string | Uint8Array) => SubmittableExtrinsic<ApiType>, [ArgonPrimitivesInherentsBitcoinUtxoSync]>;
     };
     blockRewards: {
     };
     blockSeal: {
-      apply: AugmentedSubmittable<(seal: UlxPrimitivesInherentsBlockSealInherent | { Vote: any } | { Compute: any } | string | Uint8Array) => SubmittableExtrinsic<ApiType>, [UlxPrimitivesInherentsBlockSealInherent]>;
+      apply: AugmentedSubmittable<(seal: ArgonPrimitivesInherentsBlockSealInherent | { Vote: any } | { Compute: any } | string | Uint8Array) => SubmittableExtrinsic<ApiType>, [ArgonPrimitivesInherentsBlockSealInherent]>;
     };
     blockSealSpec: {
       configure: AugmentedSubmittable<(voteMinimum: Option<u128> | null | Uint8Array | u128 | AnyNumber, computeDifficulty: Option<u128> | null | Uint8Array | u128 | AnyNumber) => SubmittableExtrinsic<ApiType>, [Option<u128>, Option<u128>]>;
@@ -140,7 +140,7 @@ declare module '@polkadot/api-base/types/submittable' {
        * The pubkey submitted here will be used to create a script pubkey that will be used in a
        * timelock multisig script to lock the bitcoin.
        **/
-      bondBitcoin: AugmentedSubmittable<(vaultId: u32 | AnyNumber | Uint8Array, satoshis: Compact<u64> | AnyNumber | Uint8Array, bitcoinPubkey: UlxPrimitivesBitcoinCompressedBitcoinPubkey | string | Uint8Array) => SubmittableExtrinsic<ApiType>, [u32, Compact<u64>, UlxPrimitivesBitcoinCompressedBitcoinPubkey]>;
+      bondBitcoin: AugmentedSubmittable<(vaultId: u32 | AnyNumber | Uint8Array, satoshis: Compact<u64> | AnyNumber | Uint8Array, bitcoinPubkey: ArgonPrimitivesBitcoinCompressedBitcoinPubkey | string | Uint8Array) => SubmittableExtrinsic<ApiType>, [u32, Compact<u64>, ArgonPrimitivesBitcoinCompressedBitcoinPubkey]>;
       /**
        * Submitted by a Vault operator to cosign the unlock of a bitcoin utxo. The Bitcoin owner
        * unlock fee will be burned, and the bond will be allowed to expire without penalty.
@@ -163,7 +163,7 @@ declare module '@polkadot/api-base/types/submittable' {
       sendToLocalchain: AugmentedSubmittable<(amount: Compact<u128> | AnyNumber | Uint8Array, notaryId: u32 | AnyNumber | Uint8Array) => SubmittableExtrinsic<ApiType>, [Compact<u128>, u32]>;
     };
     dataDomain: {
-      setZoneRecord: AugmentedSubmittable<(domainHash: H256 | string | Uint8Array, zoneRecord: UlxPrimitivesDataDomainZoneRecord | { paymentAccount?: any; notaryId?: any; versions?: any } | string | Uint8Array) => SubmittableExtrinsic<ApiType>, [H256, UlxPrimitivesDataDomainZoneRecord]>;
+      setZoneRecord: AugmentedSubmittable<(domainHash: H256 | string | Uint8Array, zoneRecord: ArgonPrimitivesDataDomainZoneRecord | { paymentAccount?: any; notaryId?: any; versions?: any } | string | Uint8Array) => SubmittableExtrinsic<ApiType>, [H256, ArgonPrimitivesDataDomainZoneRecord]>;
     };
     grandpa: {
       /**
@@ -231,7 +231,7 @@ declare module '@polkadot/api-base/types/submittable' {
        * - `reward_destination`: The account_id for the mining rewards, or `Owner` for the
        * submitting user.
        **/
-      bid: AugmentedSubmittable<(bondInfo: Option<PalletMiningSlotMiningSlotBid> | null | Uint8Array | PalletMiningSlotMiningSlotBid | { vaultId?: any; amount?: any } | string, rewardDestination: UlxPrimitivesBlockSealRewardDestination | { Owner: any } | { Account: any } | string | Uint8Array) => SubmittableExtrinsic<ApiType>, [Option<PalletMiningSlotMiningSlotBid>, UlxPrimitivesBlockSealRewardDestination]>;
+      bid: AugmentedSubmittable<(bondInfo: Option<PalletMiningSlotMiningSlotBid> | null | Uint8Array | PalletMiningSlotMiningSlotBid | { vaultId?: any; amount?: any } | string, rewardDestination: ArgonPrimitivesBlockSealRewardDestination | { Owner: any } | { Account: any } | string | Uint8Array) => SubmittableExtrinsic<ApiType>, [Option<PalletMiningSlotMiningSlotBid>, ArgonPrimitivesBlockSealRewardDestination]>;
     };
     mint: {
     };
@@ -353,15 +353,15 @@ declare module '@polkadot/api-base/types/submittable' {
     };
     notaries: {
       activate: AugmentedSubmittable<(operatorAccount: AccountId32 | string | Uint8Array) => SubmittableExtrinsic<ApiType>, [AccountId32]>;
-      propose: AugmentedSubmittable<(meta: UlxPrimitivesNotaryNotaryMeta | { name?: any; public?: any; hosts?: any } | string | Uint8Array) => SubmittableExtrinsic<ApiType>, [UlxPrimitivesNotaryNotaryMeta]>;
+      propose: AugmentedSubmittable<(meta: ArgonPrimitivesNotaryNotaryMeta | { name?: any; public?: any; hosts?: any } | string | Uint8Array) => SubmittableExtrinsic<ApiType>, [ArgonPrimitivesNotaryNotaryMeta]>;
       /**
        * Update the metadata of a notary, to be effective at the given tick height, which must be
        * >= MetaChangesTickDelay ticks in the future.
        **/
-      update: AugmentedSubmittable<(notaryId: Compact<u32> | AnyNumber | Uint8Array, meta: UlxPrimitivesNotaryNotaryMeta | { name?: any; public?: any; hosts?: any } | string | Uint8Array, effectiveTick: Compact<u32> | AnyNumber | Uint8Array) => SubmittableExtrinsic<ApiType>, [Compact<u32>, UlxPrimitivesNotaryNotaryMeta, Compact<u32>]>;
+      update: AugmentedSubmittable<(notaryId: Compact<u32> | AnyNumber | Uint8Array, meta: ArgonPrimitivesNotaryNotaryMeta | { name?: any; public?: any; hosts?: any } | string | Uint8Array, effectiveTick: Compact<u32> | AnyNumber | Uint8Array) => SubmittableExtrinsic<ApiType>, [Compact<u32>, ArgonPrimitivesNotaryNotaryMeta, Compact<u32>]>;
     };
     notebook: {
-      submit: AugmentedSubmittable<(notebooks: Vec<UlxPrimitivesNotebookSignedNotebookHeader> | (UlxPrimitivesNotebookSignedNotebookHeader | { header?: any; signature?: any } | string | Uint8Array)[]) => SubmittableExtrinsic<ApiType>, [Vec<UlxPrimitivesNotebookSignedNotebookHeader>]>;
+      submit: AugmentedSubmittable<(notebooks: Vec<ArgonPrimitivesNotebookSignedNotebookHeader> | (ArgonPrimitivesNotebookSignedNotebookHeader | { header?: any; signature?: any } | string | Uint8Array)[]) => SubmittableExtrinsic<ApiType>, [Vec<ArgonPrimitivesNotebookSignedNotebookHeader>]>;
     };
     priceIndex: {
       /**
@@ -388,7 +388,7 @@ declare module '@polkadot/api-base/types/submittable' {
        * - `delay`: The announcement period required of the initial proxy. Will generally be
        * zero.
        **/
-      addProxy: AugmentedSubmittable<(delegate: MultiAddress | { Id: any } | { Index: any } | { Raw: any } | { Address32: any } | { Address20: any } | string | Uint8Array, proxyType: UlxNodeRuntimeProxyType | 'Any' | 'NonTransfer' | 'PriceIndex' | number | Uint8Array, delay: u32 | AnyNumber | Uint8Array) => SubmittableExtrinsic<ApiType>, [MultiAddress, UlxNodeRuntimeProxyType, u32]>;
+      addProxy: AugmentedSubmittable<(delegate: MultiAddress | { Id: any } | { Index: any } | { Raw: any } | { Address32: any } | { Address20: any } | string | Uint8Array, proxyType: ArgonNodeRuntimeProxyType | 'Any' | 'NonTransfer' | 'PriceIndex' | number | Uint8Array, delay: u32 | AnyNumber | Uint8Array) => SubmittableExtrinsic<ApiType>, [MultiAddress, ArgonNodeRuntimeProxyType, u32]>;
       /**
        * Publish the hash of a proxy-call that will be made in the future.
        *
@@ -427,7 +427,7 @@ declare module '@polkadot/api-base/types/submittable' {
        *
        * Fails if there are insufficient funds to pay for deposit.
        **/
-      createPure: AugmentedSubmittable<(proxyType: UlxNodeRuntimeProxyType | 'Any' | 'NonTransfer' | 'PriceIndex' | number | Uint8Array, delay: u32 | AnyNumber | Uint8Array, index: u16 | AnyNumber | Uint8Array) => SubmittableExtrinsic<ApiType>, [UlxNodeRuntimeProxyType, u32, u16]>;
+      createPure: AugmentedSubmittable<(proxyType: ArgonNodeRuntimeProxyType | 'Any' | 'NonTransfer' | 'PriceIndex' | number | Uint8Array, delay: u32 | AnyNumber | Uint8Array, index: u16 | AnyNumber | Uint8Array) => SubmittableExtrinsic<ApiType>, [ArgonNodeRuntimeProxyType, u32, u16]>;
       /**
        * Removes a previously spawned pure proxy.
        *
@@ -446,7 +446,7 @@ declare module '@polkadot/api-base/types/submittable' {
        * Fails with `NoPermission` in case the caller is not a previously created pure
        * account whose `pure` call has corresponding parameters.
        **/
-      killPure: AugmentedSubmittable<(spawner: MultiAddress | { Id: any } | { Index: any } | { Raw: any } | { Address32: any } | { Address20: any } | string | Uint8Array, proxyType: UlxNodeRuntimeProxyType | 'Any' | 'NonTransfer' | 'PriceIndex' | number | Uint8Array, index: u16 | AnyNumber | Uint8Array, height: Compact<u32> | AnyNumber | Uint8Array, extIndex: Compact<u32> | AnyNumber | Uint8Array) => SubmittableExtrinsic<ApiType>, [MultiAddress, UlxNodeRuntimeProxyType, u16, Compact<u32>, Compact<u32>]>;
+      killPure: AugmentedSubmittable<(spawner: MultiAddress | { Id: any } | { Index: any } | { Raw: any } | { Address32: any } | { Address20: any } | string | Uint8Array, proxyType: ArgonNodeRuntimeProxyType | 'Any' | 'NonTransfer' | 'PriceIndex' | number | Uint8Array, index: u16 | AnyNumber | Uint8Array, height: Compact<u32> | AnyNumber | Uint8Array, extIndex: Compact<u32> | AnyNumber | Uint8Array) => SubmittableExtrinsic<ApiType>, [MultiAddress, ArgonNodeRuntimeProxyType, u16, Compact<u32>, Compact<u32>]>;
       /**
        * Dispatch the given `call` from an account that the sender is authorised for through
        * `add_proxy`.
@@ -458,7 +458,7 @@ declare module '@polkadot/api-base/types/submittable' {
        * - `force_proxy_type`: Specify the exact proxy type to be used and checked for this call.
        * - `call`: The call to be made by the `real` account.
        **/
-      proxy: AugmentedSubmittable<(real: MultiAddress | { Id: any } | { Index: any } | { Raw: any } | { Address32: any } | { Address20: any } | string | Uint8Array, forceProxyType: Option<UlxNodeRuntimeProxyType> | null | Uint8Array | UlxNodeRuntimeProxyType | 'Any' | 'NonTransfer' | 'PriceIndex' | number, call: Call | IMethod | string | Uint8Array) => SubmittableExtrinsic<ApiType>, [MultiAddress, Option<UlxNodeRuntimeProxyType>, Call]>;
+      proxy: AugmentedSubmittable<(real: MultiAddress | { Id: any } | { Index: any } | { Raw: any } | { Address32: any } | { Address20: any } | string | Uint8Array, forceProxyType: Option<ArgonNodeRuntimeProxyType> | null | Uint8Array | ArgonNodeRuntimeProxyType | 'Any' | 'NonTransfer' | 'PriceIndex' | number, call: Call | IMethod | string | Uint8Array) => SubmittableExtrinsic<ApiType>, [MultiAddress, Option<ArgonNodeRuntimeProxyType>, Call]>;
       /**
        * Dispatch the given `call` from an account that the sender is authorized for through
        * `add_proxy`.
@@ -472,7 +472,7 @@ declare module '@polkadot/api-base/types/submittable' {
        * - `force_proxy_type`: Specify the exact proxy type to be used and checked for this call.
        * - `call`: The call to be made by the `real` account.
        **/
-      proxyAnnounced: AugmentedSubmittable<(delegate: MultiAddress | { Id: any } | { Index: any } | { Raw: any } | { Address32: any } | { Address20: any } | string | Uint8Array, real: MultiAddress | { Id: any } | { Index: any } | { Raw: any } | { Address32: any } | { Address20: any } | string | Uint8Array, forceProxyType: Option<UlxNodeRuntimeProxyType> | null | Uint8Array | UlxNodeRuntimeProxyType | 'Any' | 'NonTransfer' | 'PriceIndex' | number, call: Call | IMethod | string | Uint8Array) => SubmittableExtrinsic<ApiType>, [MultiAddress, MultiAddress, Option<UlxNodeRuntimeProxyType>, Call]>;
+      proxyAnnounced: AugmentedSubmittable<(delegate: MultiAddress | { Id: any } | { Index: any } | { Raw: any } | { Address32: any } | { Address20: any } | string | Uint8Array, real: MultiAddress | { Id: any } | { Index: any } | { Raw: any } | { Address32: any } | { Address20: any } | string | Uint8Array, forceProxyType: Option<ArgonNodeRuntimeProxyType> | null | Uint8Array | ArgonNodeRuntimeProxyType | 'Any' | 'NonTransfer' | 'PriceIndex' | number, call: Call | IMethod | string | Uint8Array) => SubmittableExtrinsic<ApiType>, [MultiAddress, MultiAddress, Option<ArgonNodeRuntimeProxyType>, Call]>;
       /**
        * Remove the given announcement of a delegate.
        *
@@ -517,7 +517,7 @@ declare module '@polkadot/api-base/types/submittable' {
        * - `proxy`: The account that the `caller` would like to remove as a proxy.
        * - `proxy_type`: The permissions currently enabled for the removed proxy account.
        **/
-      removeProxy: AugmentedSubmittable<(delegate: MultiAddress | { Id: any } | { Index: any } | { Raw: any } | { Address32: any } | { Address20: any } | string | Uint8Array, proxyType: UlxNodeRuntimeProxyType | 'Any' | 'NonTransfer' | 'PriceIndex' | number | Uint8Array, delay: u32 | AnyNumber | Uint8Array) => SubmittableExtrinsic<ApiType>, [MultiAddress, UlxNodeRuntimeProxyType, u32]>;
+      removeProxy: AugmentedSubmittable<(delegate: MultiAddress | { Id: any } | { Index: any } | { Raw: any } | { Address32: any } | { Address20: any } | string | Uint8Array, proxyType: ArgonNodeRuntimeProxyType | 'Any' | 'NonTransfer' | 'PriceIndex' | number | Uint8Array, delay: u32 | AnyNumber | Uint8Array) => SubmittableExtrinsic<ApiType>, [MultiAddress, ArgonNodeRuntimeProxyType, u32]>;
     };
     session: {
       /**
@@ -546,7 +546,92 @@ declare module '@polkadot/api-base/types/submittable' {
        * - `O(1)`. Actual cost depends on the number of length of `T::Keys::key_ids()` which is
        * fixed.
        **/
-      setKeys: AugmentedSubmittable<(keys: UlxNodeRuntimeOpaqueSessionKeys | { grandpa?: any; blockSealAuthority?: any } | string | Uint8Array, proof: Bytes | string | Uint8Array) => SubmittableExtrinsic<ApiType>, [UlxNodeRuntimeOpaqueSessionKeys, Bytes]>;
+      setKeys: AugmentedSubmittable<(keys: ArgonNodeRuntimeOpaqueSessionKeys | { grandpa?: any; blockSealAuthority?: any } | string | Uint8Array, proof: Bytes | string | Uint8Array) => SubmittableExtrinsic<ApiType>, [ArgonNodeRuntimeOpaqueSessionKeys, Bytes]>;
+    };
+    shareBalances: {
+      /**
+       * Burn the specified liquid free balance from the origin account.
+       *
+       * If the origin's account ends up below the existential deposit as a result
+       * of the burn and `keep_alive` is false, the account will be reaped.
+       *
+       * Unlike sending funds to a _burn_ address, which merely makes the funds inaccessible,
+       * this `burn` operation will reduce total issuance by the amount _burned_.
+       **/
+      burn: AugmentedSubmittable<(value: Compact<u128> | AnyNumber | Uint8Array, keepAlive: bool | boolean | Uint8Array) => SubmittableExtrinsic<ApiType>, [Compact<u128>, bool]>;
+      /**
+       * Adjust the total issuance in a saturating way.
+       *
+       * Can only be called by root and always needs a positive `delta`.
+       *
+       * # Example
+       **/
+      forceAdjustTotalIssuance: AugmentedSubmittable<(direction: PalletBalancesAdjustmentDirection | 'Increase' | 'Decrease' | number | Uint8Array, delta: Compact<u128> | AnyNumber | Uint8Array) => SubmittableExtrinsic<ApiType>, [PalletBalancesAdjustmentDirection, Compact<u128>]>;
+      /**
+       * Set the regular balance of a given account.
+       *
+       * The dispatch origin for this call is `root`.
+       **/
+      forceSetBalance: AugmentedSubmittable<(who: MultiAddress | { Id: any } | { Index: any } | { Raw: any } | { Address32: any } | { Address20: any } | string | Uint8Array, newFree: Compact<u128> | AnyNumber | Uint8Array) => SubmittableExtrinsic<ApiType>, [MultiAddress, Compact<u128>]>;
+      /**
+       * Exactly as `transfer_allow_death`, except the origin must be root and the source account
+       * may be specified.
+       **/
+      forceTransfer: AugmentedSubmittable<(source: MultiAddress | { Id: any } | { Index: any } | { Raw: any } | { Address32: any } | { Address20: any } | string | Uint8Array, dest: MultiAddress | { Id: any } | { Index: any } | { Raw: any } | { Address32: any } | { Address20: any } | string | Uint8Array, value: Compact<u128> | AnyNumber | Uint8Array) => SubmittableExtrinsic<ApiType>, [MultiAddress, MultiAddress, Compact<u128>]>;
+      /**
+       * Unreserve some balance from a user by force.
+       *
+       * Can only be called by ROOT.
+       **/
+      forceUnreserve: AugmentedSubmittable<(who: MultiAddress | { Id: any } | { Index: any } | { Raw: any } | { Address32: any } | { Address20: any } | string | Uint8Array, amount: u128 | AnyNumber | Uint8Array) => SubmittableExtrinsic<ApiType>, [MultiAddress, u128]>;
+      /**
+       * Transfer the entire transferable balance from the caller account.
+       *
+       * NOTE: This function only attempts to transfer _transferable_ balances. This means that
+       * any locked, reserved, or existential deposits (when `keep_alive` is `true`), will not be
+       * transferred by this function. To ensure that this function results in a killed account,
+       * you might need to prepare the account by removing any reference counters, storage
+       * deposits, etc...
+       *
+       * The dispatch origin of this call must be Signed.
+       *
+       * - `dest`: The recipient of the transfer.
+       * - `keep_alive`: A boolean to determine if the `transfer_all` operation should send all
+       * of the funds the account has, causing the sender account to be killed (false), or
+       * transfer everything except at least the existential deposit, which will guarantee to
+       * keep the sender account alive (true).
+       **/
+      transferAll: AugmentedSubmittable<(dest: MultiAddress | { Id: any } | { Index: any } | { Raw: any } | { Address32: any } | { Address20: any } | string | Uint8Array, keepAlive: bool | boolean | Uint8Array) => SubmittableExtrinsic<ApiType>, [MultiAddress, bool]>;
+      /**
+       * Transfer some liquid free balance to another account.
+       *
+       * `transfer_allow_death` will set the `FreeBalance` of the sender and receiver.
+       * If the sender's account is below the existential deposit as a result
+       * of the transfer, the account will be reaped.
+       *
+       * The dispatch origin for this call must be `Signed` by the transactor.
+       **/
+      transferAllowDeath: AugmentedSubmittable<(dest: MultiAddress | { Id: any } | { Index: any } | { Raw: any } | { Address32: any } | { Address20: any } | string | Uint8Array, value: Compact<u128> | AnyNumber | Uint8Array) => SubmittableExtrinsic<ApiType>, [MultiAddress, Compact<u128>]>;
+      /**
+       * Same as the [`transfer_allow_death`] call, but with a check that the transfer will not
+       * kill the origin account.
+       *
+       * 99% of the time you want [`transfer_allow_death`] instead.
+       *
+       * [`transfer_allow_death`]: struct.Pallet.html#method.transfer
+       **/
+      transferKeepAlive: AugmentedSubmittable<(dest: MultiAddress | { Id: any } | { Index: any } | { Raw: any } | { Address32: any } | { Address20: any } | string | Uint8Array, value: Compact<u128> | AnyNumber | Uint8Array) => SubmittableExtrinsic<ApiType>, [MultiAddress, Compact<u128>]>;
+      /**
+       * Upgrade a specified account.
+       *
+       * - `origin`: Must be `Signed`.
+       * - `who`: The account to be upgraded.
+       *
+       * This will waive the transaction fee if at least all but 10% of the accounts needed to
+       * be upgraded. (We let some not have to be upgraded just in order to allow for the
+       * possibility of churn).
+       **/
+      upgradeAccounts: AugmentedSubmittable<(who: Vec<AccountId32> | (AccountId32 | string | Uint8Array)[]) => SubmittableExtrinsic<ApiType>, [Vec<AccountId32>]>;
     };
     sudo: {
       /**
@@ -694,91 +779,6 @@ declare module '@polkadot/api-base/types/submittable' {
        **/
       unpause: AugmentedSubmittable<(ident: ITuple<[Bytes, Bytes]> | [Bytes | string | Uint8Array, Bytes | string | Uint8Array]) => SubmittableExtrinsic<ApiType>, [ITuple<[Bytes, Bytes]>]>;
     };
-    ulixeeBalances: {
-      /**
-       * Burn the specified liquid free balance from the origin account.
-       *
-       * If the origin's account ends up below the existential deposit as a result
-       * of the burn and `keep_alive` is false, the account will be reaped.
-       *
-       * Unlike sending funds to a _burn_ address, which merely makes the funds inaccessible,
-       * this `burn` operation will reduce total issuance by the amount _burned_.
-       **/
-      burn: AugmentedSubmittable<(value: Compact<u128> | AnyNumber | Uint8Array, keepAlive: bool | boolean | Uint8Array) => SubmittableExtrinsic<ApiType>, [Compact<u128>, bool]>;
-      /**
-       * Adjust the total issuance in a saturating way.
-       *
-       * Can only be called by root and always needs a positive `delta`.
-       *
-       * # Example
-       **/
-      forceAdjustTotalIssuance: AugmentedSubmittable<(direction: PalletBalancesAdjustmentDirection | 'Increase' | 'Decrease' | number | Uint8Array, delta: Compact<u128> | AnyNumber | Uint8Array) => SubmittableExtrinsic<ApiType>, [PalletBalancesAdjustmentDirection, Compact<u128>]>;
-      /**
-       * Set the regular balance of a given account.
-       *
-       * The dispatch origin for this call is `root`.
-       **/
-      forceSetBalance: AugmentedSubmittable<(who: MultiAddress | { Id: any } | { Index: any } | { Raw: any } | { Address32: any } | { Address20: any } | string | Uint8Array, newFree: Compact<u128> | AnyNumber | Uint8Array) => SubmittableExtrinsic<ApiType>, [MultiAddress, Compact<u128>]>;
-      /**
-       * Exactly as `transfer_allow_death`, except the origin must be root and the source account
-       * may be specified.
-       **/
-      forceTransfer: AugmentedSubmittable<(source: MultiAddress | { Id: any } | { Index: any } | { Raw: any } | { Address32: any } | { Address20: any } | string | Uint8Array, dest: MultiAddress | { Id: any } | { Index: any } | { Raw: any } | { Address32: any } | { Address20: any } | string | Uint8Array, value: Compact<u128> | AnyNumber | Uint8Array) => SubmittableExtrinsic<ApiType>, [MultiAddress, MultiAddress, Compact<u128>]>;
-      /**
-       * Unreserve some balance from a user by force.
-       *
-       * Can only be called by ROOT.
-       **/
-      forceUnreserve: AugmentedSubmittable<(who: MultiAddress | { Id: any } | { Index: any } | { Raw: any } | { Address32: any } | { Address20: any } | string | Uint8Array, amount: u128 | AnyNumber | Uint8Array) => SubmittableExtrinsic<ApiType>, [MultiAddress, u128]>;
-      /**
-       * Transfer the entire transferable balance from the caller account.
-       *
-       * NOTE: This function only attempts to transfer _transferable_ balances. This means that
-       * any locked, reserved, or existential deposits (when `keep_alive` is `true`), will not be
-       * transferred by this function. To ensure that this function results in a killed account,
-       * you might need to prepare the account by removing any reference counters, storage
-       * deposits, etc...
-       *
-       * The dispatch origin of this call must be Signed.
-       *
-       * - `dest`: The recipient of the transfer.
-       * - `keep_alive`: A boolean to determine if the `transfer_all` operation should send all
-       * of the funds the account has, causing the sender account to be killed (false), or
-       * transfer everything except at least the existential deposit, which will guarantee to
-       * keep the sender account alive (true).
-       **/
-      transferAll: AugmentedSubmittable<(dest: MultiAddress | { Id: any } | { Index: any } | { Raw: any } | { Address32: any } | { Address20: any } | string | Uint8Array, keepAlive: bool | boolean | Uint8Array) => SubmittableExtrinsic<ApiType>, [MultiAddress, bool]>;
-      /**
-       * Transfer some liquid free balance to another account.
-       *
-       * `transfer_allow_death` will set the `FreeBalance` of the sender and receiver.
-       * If the sender's account is below the existential deposit as a result
-       * of the transfer, the account will be reaped.
-       *
-       * The dispatch origin for this call must be `Signed` by the transactor.
-       **/
-      transferAllowDeath: AugmentedSubmittable<(dest: MultiAddress | { Id: any } | { Index: any } | { Raw: any } | { Address32: any } | { Address20: any } | string | Uint8Array, value: Compact<u128> | AnyNumber | Uint8Array) => SubmittableExtrinsic<ApiType>, [MultiAddress, Compact<u128>]>;
-      /**
-       * Same as the [`transfer_allow_death`] call, but with a check that the transfer will not
-       * kill the origin account.
-       *
-       * 99% of the time you want [`transfer_allow_death`] instead.
-       *
-       * [`transfer_allow_death`]: struct.Pallet.html#method.transfer
-       **/
-      transferKeepAlive: AugmentedSubmittable<(dest: MultiAddress | { Id: any } | { Index: any } | { Raw: any } | { Address32: any } | { Address20: any } | string | Uint8Array, value: Compact<u128> | AnyNumber | Uint8Array) => SubmittableExtrinsic<ApiType>, [MultiAddress, Compact<u128>]>;
-      /**
-       * Upgrade a specified account.
-       *
-       * - `origin`: Must be `Signed`.
-       * - `who`: The account to be upgraded.
-       *
-       * This will waive the transaction fee if at least all but 10% of the accounts needed to
-       * be upgraded. (We let some not have to be upgraded just in order to allow for the
-       * possibility of churn).
-       **/
-      upgradeAccounts: AugmentedSubmittable<(who: Vec<AccountId32> | (AccountId32 | string | Uint8Array)[]) => SubmittableExtrinsic<ApiType>, [Vec<AccountId32>]>;
-    };
     vaults: {
       /**
        * Stop offering additional bonds from this vault. Will not affect existing bond.
@@ -801,12 +801,12 @@ declare module '@polkadot/api-base/types/submittable' {
        * Change the terms of this vault. The change will be applied at the next mining slot
        * change that is at least `MinTermsModificationBlockDelay` blocks away.
        **/
-      modifyTerms: AugmentedSubmittable<(vaultId: u32 | AnyNumber | Uint8Array, terms: UlxPrimitivesBondVaultTerms | { bitcoinAnnualPercentRate?: any; bitcoinBaseFee?: any; miningAnnualPercentRate?: any; miningBaseFee?: any; miningRewardSharingPercentTake?: any } | string | Uint8Array) => SubmittableExtrinsic<ApiType>, [u32, UlxPrimitivesBondVaultTerms]>;
+      modifyTerms: AugmentedSubmittable<(vaultId: u32 | AnyNumber | Uint8Array, terms: ArgonPrimitivesBondVaultTerms | { bitcoinAnnualPercentRate?: any; bitcoinBaseFee?: any; miningAnnualPercentRate?: any; miningBaseFee?: any; miningRewardSharingPercentTake?: any } | string | Uint8Array) => SubmittableExtrinsic<ApiType>, [u32, ArgonPrimitivesBondVaultTerms]>;
       /**
        * Replace the bitcoin xpubkey for this vault. This will not affect existing bonds, but
        * will be used for any bonds after this point. Will be rejected if already used.
        **/
-      replaceBitcoinXpub: AugmentedSubmittable<(vaultId: u32 | AnyNumber | Uint8Array, bitcoinXpub: UlxPrimitivesBitcoinOpaqueBitcoinXpub | string | Uint8Array) => SubmittableExtrinsic<ApiType>, [u32, UlxPrimitivesBitcoinOpaqueBitcoinXpub]>;
+      replaceBitcoinXpub: AugmentedSubmittable<(vaultId: u32 | AnyNumber | Uint8Array, bitcoinXpub: ArgonPrimitivesBitcoinOpaqueBitcoinXpub | string | Uint8Array) => SubmittableExtrinsic<ApiType>, [u32, ArgonPrimitivesBitcoinOpaqueBitcoinXpub]>;
     };
   } // AugmentedSubmittables
 } // declare module

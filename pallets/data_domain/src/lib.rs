@@ -5,8 +5,8 @@ use codec::{Decode, Encode};
 use scale_info::TypeInfo;
 use sp_runtime::RuntimeDebug;
 
+use argon_primitives::tick::Tick;
 pub use pallet::*;
-use ulx_primitives::tick::Tick;
 pub use weights::*;
 
 #[cfg(test)]
@@ -26,13 +26,13 @@ pub mod weights;
 /// If more than one data domain registration is received in a tick, they are canceled out.
 #[frame_support::pallet(dev_mode)]
 pub mod pallet {
-	use frame_support::{pallet_prelude::*, traits::Len};
-	use frame_system::pallet_prelude::*;
-	use sp_core::crypto::AccountId32;
-	use ulx_primitives::{
+	use argon_primitives::{
 		notebook::NotebookHeader, DataDomainHash, DataDomainProvider, NotebookEventHandler,
 		TickProvider, ZoneRecord, MAX_DOMAINS_PER_NOTEBOOK, MAX_NOTARIES,
 	};
+	use frame_support::{pallet_prelude::*, traits::Len};
+	use frame_system::pallet_prelude::*;
+	use sp_core::crypto::AccountId32;
 
 	use super::*;
 

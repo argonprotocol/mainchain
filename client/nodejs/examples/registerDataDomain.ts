@@ -4,17 +4,20 @@ import {Keyring} from "@polkadot/api";
 async function main() {
     let api = await getClient("ws://127.0.0.1:9944");
     console.log("got api");
-    let domainTld = api.createType("UlxPrimitivesDataTLD", "Analytics");
+    let domainTld = api.createType("argonPrimitivesDataTLD", "Analytics");
 
-    let result = await api.query.dataDomain.registeredDataDomains({ domainName: "test", topLevelDomain: domainTld });
+    let result = await api.query.dataDomain.registeredDataDomains({domainName: "test", topLevelDomain: domainTld});
     console.log("got a registered data domain", result.isSome);
 
     console.log('current tick', (await api.query.ticks.currentTick()).toPrimitive());
 
     let account = api.createType("AccountId32", "5FHneW46xGXgs5mUiveU4sbTyGBzmstUspZC92UhjJM694ty");
-    let aliceKeyring = new Keyring({ type: 'sr25519' });
+    let aliceKeyring = new Keyring({type: 'sr25519'});
     let alice = aliceKeyring.addFromUri('//Alice');
-    await new Promise<void>(resolve => api.tx.miningSlot.bid(null, { Account: account }).signAndSend(alice, ({ events = [], status }) => {
+    await new Promise<void>(resolve => api.tx.miningSlot.bid(null, {Account: account}).signAndSend(alice, ({
+                                                                                                               events = [],
+                                                                                                               status
+                                                                                                           }) => {
 
         if (status.isInBlock) {
             console.log('Successful bid in block ' + status.asInBlock.toHex(), status.type);

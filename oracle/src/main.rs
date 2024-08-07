@@ -1,4 +1,6 @@
 use anyhow::{anyhow, bail, ensure};
+use argon_client::signer::KeystoreSigner;
+use argon_primitives::{AccountId, CryptoType, KeystoreParams, ADDRESS_PREFIX};
 use clap::{crate_version, Parser, ValueEnum};
 use dotenv::dotenv;
 use sp_core::{
@@ -7,8 +9,6 @@ use sp_core::{
 };
 use sp_runtime::traits::IdentifyAccount;
 use std::env;
-use ulixee_client::signer::KeystoreSigner;
-use ulx_primitives::{AccountId, CryptoType, KeystoreParams, ADDRESS_PREFIX};
 use url::Url;
 
 use crate::{bitcoin_tip::bitcoin_loop, price_index::price_index_loop};
@@ -89,7 +89,7 @@ async fn main() -> anyhow::Result<()> {
 	dotenv::from_filename("oracle/.env").ok();
 
 	let binary_path = std::env::current_exe()?;
-	if binary_path.ends_with("debug/ulx-oracle") {
+	if binary_path.ends_with("debug/argon-oracle") {
 		let from_workspace_root = binary_path.join("../../oracle/.env");
 		dotenv::from_filename(from_workspace_root).ok();
 	}

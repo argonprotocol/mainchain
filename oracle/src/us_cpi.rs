@@ -3,6 +3,7 @@ use crate::{
 	utils::{parse_date, parse_f64, to_fixed_i128},
 };
 use anyhow::{anyhow, ensure, Result};
+use argon_primitives::tick::{Tick, Ticker};
 use chrono::{DateTime, Utc};
 use lazy_static::lazy_static;
 use reqwest::Client;
@@ -12,7 +13,6 @@ use std::env;
 #[cfg(test)]
 use std::sync::{Arc, Mutex};
 use tokio::time::{Duration, Instant};
-use ulx_primitives::tick::{Tick, Ticker};
 use url::Url;
 
 const MAX_SCHEDULE_DAYS: u32 = 35;

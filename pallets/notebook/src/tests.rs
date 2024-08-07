@@ -10,8 +10,8 @@ use sp_keyring::{
 };
 use sp_runtime::{testing::H256, BoundedVec, Digest, DigestItem};
 
-use ulx_notary_audit::{AccountHistoryLookupError, VerifyError};
-use ulx_primitives::{
+use argon_notary_audit::{AccountHistoryLookupError, VerifyError};
+use argon_primitives::{
 	localchain::{AccountType, BalanceChange, Note, NoteType},
 	notary::NotaryNotebookKeyDetails,
 	notebook::{
@@ -455,7 +455,7 @@ fn it_can_audit_notebooks() {
 		};
 		let header_hash = header.hash();
 
-		let mut notebook = ulx_primitives::notebook::Notebook {
+		let mut notebook = argon_primitives::notebook::Notebook {
 			header,
 			new_account_origins: bounded_vec![NewAccountOrigin::new(
 				who.clone(),
@@ -595,7 +595,7 @@ fn it_can_audit_notebooks_with_history() {
 		let merkle_leaves = vec![account_root.tip()];
 		let account_1_proof = merkle_proof::<Blake2Hasher, _, _>(&merkle_leaves, 0);
 
-		let mut notebook = ulx_primitives::notebook::Notebook {
+		let mut notebook = argon_primitives::notebook::Notebook {
 			header: header.clone(),
 			new_account_origins: bounded_vec![NewAccountOrigin::new(
 				who.clone(),
@@ -768,7 +768,7 @@ fn it_can_audit_notebooks_with_history() {
 		header.tax = 200;
 		let header_hash = header.hash();
 
-		let mut notebook = ulx_primitives::notebook::Notebook {
+		let mut notebook = argon_primitives::notebook::Notebook {
 			header,
 			new_account_origins: bounded_vec![
 				NewAccountOrigin::new(Alice.to_account_id(), AccountType::Deposit, 1),

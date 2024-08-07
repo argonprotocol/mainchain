@@ -1,9 +1,9 @@
 use crate as pallet_price_index;
+use argon_primitives::tick::Tick;
 use env_logger::{Builder, Env};
 use frame_support::{derive_impl, parameter_types};
 use sp_arithmetic::FixedU128;
 use sp_runtime::{traits::IdentityLookup, BuildStorage};
-use ulx_primitives::tick::Tick;
 
 pub(crate) type Block = frame_system::mocking::MockBlock<Test>;
 

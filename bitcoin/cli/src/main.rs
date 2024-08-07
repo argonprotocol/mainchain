@@ -19,7 +19,7 @@ mod vault_create;
 #[clap(version = crate_version!())]
 #[command(author, version, about, arg_required_else_help = true, long_about = None)]
 struct Cli {
-	/// The ulixee rpc url to connect to
+	/// The argon rpc url to connect to
 	#[clap(short, long, env, global = true, default_value = "ws://127.0.0.1:9944")]
 	trusted_rpc_url: String,
 
@@ -39,7 +39,7 @@ enum Commands {
 		#[clap(subcommand)]
 		subcommand: BondCommands,
 	},
-	/// Utilities for working with Bitcoin and Ulixee primitives
+	/// Utilities for working with Bitcoin and Argon primitives
 	Utils {
 		#[clap(subcommand)]
 		subcommand: UtilCommands,

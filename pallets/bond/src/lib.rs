@@ -5,9 +5,9 @@ extern crate core;
 
 use sp_runtime::DispatchError;
 
+use argon_bitcoin::UtxoUnlocker;
+use argon_primitives::bitcoin::{BitcoinNetwork, BitcoinSignature, CompressedBitcoinPubkey};
 pub use pallet::*;
-use ulx_bitcoin::UtxoUnlocker;
-use ulx_primitives::bitcoin::{BitcoinNetwork, BitcoinSignature, CompressedBitcoinPubkey};
 pub use weights::*;
 
 #[cfg(test)]
@@ -50,14 +50,14 @@ const LOG_TARGET: &str = "runtime::bond";
 /// _Unlocking a Bitcoin_
 /// A bitcoin owner will pre-create a transaction to unlock their UTXO and submit the sighash to
 /// this pallet. The vault operator has 10 days to publish a counter signature along with the public
-/// key. If the vault operator fails to do so, they will lose their Ulixee shares and all underlying
-/// Bitcoin bonds. A user will be made whole via a governance vote.
+/// key. If the vault operator fails to do so, they will lose their ownership shares and all
+/// underlying Bitcoin bonds. A user will be made whole via a governance vote.
 ///
 /// _Penalties_
 /// 1. If a UTXO is found to have moved before a bond expiration via the bitcoin network, the vault
 ///    will be penalized by the amount of the UTXOs' current value.
 /// 2. If a vault operator fails to counter-sign a transaction within 10 days, they will lose their
-///    Ulixee shares and all underlying Bitcoin bonds.
+///    ownership shares and all underlying Bitcoin bonds.
 ///
 /// ** Mining Bonds: **
 ///
@@ -103,8 +103,8 @@ pub mod pallet {
 		FixedPointNumber, Saturating, TokenError,
 	};
 
-	use ulx_bitcoin::{Amount, CosignScriptArgs, UnlockStep, UtxoUnlocker};
-	use ulx_primitives::{
+	use argon_bitcoin::{Amount, CosignScriptArgs, UnlockStep, UtxoUnlocker};
+	use argon_primitives::{
 		bitcoin::{
 			BitcoinCosignScriptPubkey, BitcoinHeight, BitcoinRejectedReason, BitcoinScriptPubkey,
 			BitcoinSignature, CompressedBitcoinPubkey, Satoshis, UtxoId, XPubChildNumber,
@@ -170,9 +170,9 @@ pub mod pallet {
 		#[pallet::constant]
 		type MinimumBondAmount: Get<Self::Balance>;
 
-		/// Ulixee blocks per day
+		/// Argon blocks per day
 		#[pallet::constant]
-		type UlixeeBlocksPerDay: Get<BlockNumberFor<Self>>;
+		type ArgonBlocksPerDay: Get<BlockNumberFor<Self>>;
 
 		/// Maximum unlocking utxos at a time
 		#[pallet::constant]
@@ -530,7 +530,7 @@ pub mod pallet {
 				amount,
 				BondType::Bitcoin,
 				// charge in 1 year of blocks (even though we'll expire off bitcoin time)
-				T::UlixeeBlocksPerDay::get() * 365u32.into(),
+				T::ArgonBlocksPerDay::get() * 365u32.into(),
 				&account_id,
 			)
 			.map_err(Error::<T>::from)?;
@@ -839,7 +839,7 @@ pub mod pallet {
 			};
 			BondsById::<T>::set(bond_id, Some(bond));
 			match expiration {
-				BondExpiration::UlixeeBlock(block) => {
+				BondExpiration::ArgonBlock(block) => {
 					MiningBondCompletions::<T>::try_mutate(block, |a| {
 						a.try_push(bond_id).map_err(|_| BondError::ExpirationAtBlockOverflow)
 					})?;
@@ -978,7 +978,7 @@ pub mod pallet {
 						}
 					});
 				},
-				BondExpiration::UlixeeBlock(completion_block) => {
+				BondExpiration::ArgonBlock(completion_block) => {
 					if !MiningBondCompletions::<T>::contains_key(completion_block) {
 						return;
 					}
@@ -1051,7 +1051,7 @@ pub mod pallet {
 				account_id,
 				BondType::Mining,
 				amount,
-				BondExpiration::UlixeeBlock(bond_until_block),
+				BondExpiration::ArgonBlock(bond_until_block),
 				total_fee,
 				prepaid_fee,
 				None,
@@ -1100,9 +1100,9 @@ pub trait BitcoinVerifier<T: Config> {
 		signature: &BitcoinSignature,
 	) -> Result<bool, DispatchError> {
 		let is_ok = utxo_unlocker.verify_signature_raw(pubkey, signature).map_err(|e| match e {
-			ulx_bitcoin::Error::InvalidCompressPubkeyBytes =>
+			argon_bitcoin::Error::InvalidCompressPubkeyBytes =>
 				Error::<T>::BitcoinPubkeyUnableToBeDecoded,
-			ulx_bitcoin::Error::InvalidSignatureBytes =>
+			argon_bitcoin::Error::InvalidSignatureBytes =>
 				Error::<T>::BitcoinSignatureUnableToBeDecoded,
 			_ => Error::<T>::BitcoinInvalidCosignature,
 		})?;

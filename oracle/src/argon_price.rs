@@ -1,7 +1,7 @@
 use anyhow::Result;
+use argon_client::api::runtime_types::pallet_price_index::PriceIndex;
+use argon_primitives::tick::{Tick, Ticker};
 use sp_runtime::{traits::One, FixedI128, FixedU128};
-use ulixee_client::api::runtime_types::pallet_price_index::PriceIndex;
-use ulx_primitives::tick::{Tick, Ticker};
 
 #[allow(dead_code)]
 pub struct ArgonPriceLookup {
@@ -77,10 +77,10 @@ impl ArgonPriceLookup {
 #[cfg(feature = "fast-runtime")]
 mod dev {
 	use crate::argon_price::ArgonPriceLookup;
+	use argon_primitives::tick::Tick;
 	use chrono::{TimeZone, Timelike};
 	use rand::Rng;
 	use sp_runtime::{FixedU128, Saturating};
-	use ulx_primitives::tick::Tick;
 
 	impl ArgonPriceLookup {
 		pub(crate) fn simulate_price_change(

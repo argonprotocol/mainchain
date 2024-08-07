@@ -7,9 +7,9 @@ use subxt::{
 };
 use tracing::info;
 
-pub use ulixee_client;
-use ulixee_client::{api, MainchainClient, UlxConfig, UlxOnlineClient};
-use ulx_primitives::{
+pub use argon_client;
+use argon_client::{api, ArgonConfig, ArgonOnlineClient, MainchainClient};
+use argon_primitives::{
 	tick::{Tick, Ticker},
 	AccountId, NotaryId, NotebookDigest, TickDigest,
 };
@@ -96,7 +96,7 @@ async fn sync_finalized_blocks(
 	let latest_finalized_hash = client.latest_finalized_block_hash().await?;
 
 	let mut block_hash = latest_finalized_hash;
-	let mut missing_blocks: Vec<Block<UlxConfig, _>> = vec![];
+	let mut missing_blocks: Vec<Block<ArgonConfig, _>> = vec![];
 	loop {
 		let block = client.live.blocks().at(block_hash.clone()).await?;
 		if block.number() <= last_synched_block || block.number() <= oldest_block_to_sync {
@@ -122,8 +122,8 @@ async fn sync_finalized_blocks(
 
 async fn process_block(
 	db: &mut PgConnection,
-	client: &UlxOnlineClient,
-	block: &Block<UlxConfig, UlxOnlineClient>,
+	client: &ArgonOnlineClient,
+	block: &Block<ArgonConfig, ArgonOnlineClient>,
 	notary_id: NotaryId,
 ) -> anyhow::Result<()> {
 	let next_vote_minimum = client
@@ -134,7 +134,7 @@ async fn process_block(
 		.unwrap_or_default();
 
 	let notebooks_header = block.header().digest.logs.iter().find_map(|log| match log {
-		DigestItem::PreRuntime(ulx_primitives::NOTEBOOKS_DIGEST_ID, data) =>
+		DigestItem::PreRuntime(argon_primitives::NOTEBOOKS_DIGEST_ID, data) =>
 			NotebookDigest::decode(&mut &data[..]).ok(),
 		_ => None,
 	});
@@ -165,9 +165,9 @@ async fn process_block(
 
 async fn find_missing_blocks(
 	db: &mut PgConnection,
-	client: &UlxOnlineClient,
+	client: &ArgonOnlineClient,
 	block_hash: H256,
-) -> anyhow::Result<Vec<Block<UlxConfig, UlxOnlineClient>>> {
+) -> anyhow::Result<Vec<Block<ArgonConfig, ArgonOnlineClient>>> {
 	let mut blocks = vec![];
 	let mut block_hash = block_hash;
 	while !BlocksStore::has_block(db, block_hash).await? {
@@ -186,8 +186,8 @@ async fn find_missing_blocks(
 
 async fn process_fork(
 	db: &mut PgConnection,
-	client: &UlxOnlineClient,
-	block: &Block<UlxConfig, UlxOnlineClient>,
+	client: &ArgonOnlineClient,
+	block: &Block<ArgonConfig, ArgonOnlineClient>,
 	notary_id: NotaryId,
 ) -> anyhow::Result<()> {
 	info!("Processing fork {} ({})", block.hash(), block.number());
@@ -216,7 +216,7 @@ async fn activate_notebook_processing(
 
 async fn process_finalized_block(
 	db: &mut PgConnection,
-	block: Block<UlxConfig, UlxOnlineClient>,
+	block: Block<ArgonConfig, ArgonOnlineClient>,
 	notary_id: NotaryId,
 	ticker: &Ticker,
 ) -> anyhow::Result<()> {
@@ -230,7 +230,7 @@ async fn process_finalized_block(
 		.logs
 		.iter()
 		.find_map(|log| match log {
-			DigestItem::PreRuntime(ulx_primitives::TICK_DIGEST_ID, data) =>
+			DigestItem::PreRuntime(argon_primitives::TICK_DIGEST_ID, data) =>
 				TickDigest::decode(&mut &data[..]).ok(),
 			_ => None,
 		})

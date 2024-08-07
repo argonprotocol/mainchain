@@ -1,5 +1,5 @@
 [package]
-name = "ulx-testing-bitcoin"
+name = "argon-testing-bitcoin"
 version.workspace = true
 authors.workspace = true
 edition.workspace = true

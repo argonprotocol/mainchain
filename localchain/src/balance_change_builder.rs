@@ -1,12 +1,12 @@
+use argon_primitives::{
+  AccountId, AccountType, Balance, BalanceChange, DataDomain, DataDomainHash, MultiSignatureBytes,
+  Note, NoteType, DATA_DOMAIN_LEASE_COST, MINIMUM_ESCROW_SETTLEMENT,
+};
 use lazy_static::lazy_static;
 use sp_core::bounded_vec::BoundedVec;
 use sp_core::{ed25519::Signature as EdSignature, ByteArray};
 use std::sync::Arc;
 use tokio::sync::Mutex;
-use ulx_primitives::{
-  AccountId, AccountType, Balance, BalanceChange, DataDomain, DataDomainHash, MultiSignatureBytes,
-  Note, NoteType, DATA_DOMAIN_LEASE_COST, MINIMUM_ESCROW_SETTLEMENT,
-};
 
 use crate::bail;
 use crate::Result;
@@ -338,8 +338,8 @@ pub mod napi_ext {
   use crate::balance_change_builder::BalanceChangeBuilder;
   use crate::error::NapiOk;
   use crate::mainchain_client::napi_ext::LocalchainTransfer;
+  use argon_primitives::{AccountType, BalanceChange};
   use napi::bindgen_prelude::*;
-  use ulx_primitives::{AccountType, BalanceChange};
 
   #[napi(object, js_name = "ClaimResult")]
   pub struct ClaimResult {

@@ -1,7 +1,7 @@
 import {AccountType, CryptoScheme, NotarizationTracker} from "../index";
 import TestMainchain from "./TestMainchain";
 import TestNotary from "./TestNotary";
-import {getClient, Keyring} from "@ulixee/mainchain";
+import {getClient, Keyring} from "@argonprotocol/mainchain";
 import {
     activateNotary,
     createLocalchain, describeIntegration,

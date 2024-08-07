@@ -2,7 +2,7 @@ FROM docker.io/library/ubuntu:22.04
 
 # show backtraces
 ENV RUST_BACKTRACE 1
-ARG BIN=ulx-node
+ARG BIN=argon-node
 ENV BIN=${BIN}
 # install tools and dependencies
 RUN apt-get update && \
@@ -12,15 +12,15 @@ RUN apt-get update && \
 	apt-get autoremove -y && \
 	apt-get clean && \
 	find /var/lib/apt/lists/ -type f -not -name lock -delete; \
-# add user and link ~/.local/share/ulixee to /data
-	useradd -m -u 1000 -U -s /bin/sh -d /ulixee ulixee && \
-	mkdir -p /data /ulixee/.local/share && \
-	chown -R ulixee:ulixee /data && \
-    ln -s /data /ulixee/.local/share/${BIN}
+# add user and link ~/.local/share/argon to /data
+	useradd -m -u 1000 -U -s /bin/sh -d /argon argon && \
+	mkdir -p /data /argon/.local/share && \
+	chown -R argon:argon /data && \
+    ln -s /data /argon/.local/share/${BIN}
 
-USER ulixee
+USER argon
 # copy the compiled binary to the container
-COPY --chown=ulixee:ulixee --chmod=774 ${BIN} /usr/bin/${BIN}
+COPY --chown=argon:argon --chmod=774 ${TARGETARCH}/${BIN} /usr/bin/${BIN}
 
 # check if executable works in this container
 RUN /usr/bin/${BIN} --version

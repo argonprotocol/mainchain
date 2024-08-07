@@ -63,4 +63,4 @@ RUN rustup target add wasm32-unknown-unknown
 
 RUN cargo build --target=x86_64-unknown-linux-gnu
 RUN yarn install
-RUN cd localchain && yarn workspace @ulixee/localchain build --target x86_64-unknown-linux-gnu --use-napi-cross
+RUN cd localchain && yarn workspace @argonprotocol/localchain build --target x86_64-unknown-linux-gnu --use-napi-cross

@@ -202,6 +202,550 @@ dependencies = [
 ]
 
 [[package]]
+name = "argon-bitcoin"
+version = "0.0.1"
+dependencies = [
+ "anyhow",
+ "argon-primitives",
+ "argon-testing",
+ "base64 0.22.1",
+ "bitcoin",
+ "bitcoincore-rpc",
+ "bitcoind",
+ "env_logger 0.11.3",
+ "frame-support",
+ "hwi",
+ "k256",
+ "log",
+ "miniscript",
+ "parity-scale-codec",
+ "parking_lot 0.12.3",
+ "rand",
+ "serde_json",
+ "sp-core",
+ "sp-io",
+ "sp-keyring",
+ "sp-runtime",
+ "thiserror",
+]
+
+[[package]]
+name = "argon-bitcoin-cli"
+version = "0.0.1"
+dependencies = [
+ "anyhow",
+ "argon-bitcoin",
+ "argon-bitcoin-cli-macros",
+ "argon-client",
+ "argon-primitives",
+ "base58",
+ "base64 0.22.1",
+ "bitcoin",
+ "clap",
+ "comfy-table",
+ "hex",
+ "inquire",
+ "parity-scale-codec",
+ "sp-runtime",
+ "subxt",
+ "tokio",
+ "tracing",
+ "tracing-subscriber",
+ "url",
+]
+
+[[package]]
+name = "argon-bitcoin-cli-macros"
+version = "0.0.1"
+dependencies = [
+ "proc-macro2",
+ "quote",
+ "syn 2.0.71",
+]
+
+[[package]]
+name = "argon-bitcoin-utxo-tracker"
+version = "0.0.1"
+dependencies = [
+ "anyhow",
+ "argon-bitcoin",
+ "argon-primitives",
+ "argon-testing",
+ "async-trait",
+ "bitcoin",
+ "bitcoincore-rpc",
+ "bitcoind",
+ "env_logger 0.11.3",
+ "lazy_static",
+ "log",
+ "parity-scale-codec",
+ "parking_lot 0.12.3",
+ "rand",
+ "sc-client-api",
+ "sc-service",
+ "sp-api",
+ "sp-runtime",
+ "thiserror",
+ "tokio",
+]
+
+[[package]]
+name = "argon-client"
+version = "0.0.1"
+dependencies = [
+ "anyhow",
+ "argon-primitives",
+ "argon-testing",
+ "async-trait",
+ "futures",
+ "hex",
+ "jsonrpsee",
+ "parity-scale-codec",
+ "scale-info",
+ "serde",
+ "serde_json",
+ "sp-arithmetic",
+ "sp-core",
+ "sp-keyring",
+ "sp-keystore",
+ "subxt",
+ "subxt-signer",
+ "thiserror",
+ "tokio",
+ "tracing",
+ "tracing-subscriber",
+]
+
+[[package]]
+name = "argon-localchain"
+version = "0.0.1"
+dependencies = [
+ "anyhow",
+ "argon-client",
+ "argon-notary",
+ "argon-notary-apis",
+ "argon-notary-audit",
+ "argon-primitives",
+ "argon-testing",
+ "array-bytes",
+ "async-trait",
+ "bech32",
+ "binary-merkle-tree",
+ "chrono",
+ "clap",
+ "comfy-table",
+ "directories",
+ "dotenv",
+ "frame-support",
+ "futures",
+ "getrandom",
+ "hex",
+ "jsonrpsee",
+ "lazy_static",
+ "napi",
+ "napi-build",
+ "napi-derive",
+ "parity-scale-codec",
+ "parking_lot 0.12.3",
+ "rpassword",
+ "sc-utils",
+ "scale-info",
+ "serde",
+ "serde_json",
+ "sp-core",
+ "sp-keyring",
+ "sp-runtime",
+ "sqlx",
+ "subxt",
+ "subxt-signer",
+ "thiserror",
+ "tokio",
+ "tracing",
+ "tracing-subscriber",
+ "uniffi",
+]
+
+[[package]]
+name = "argon-node"
+version = "0.0.1"
+dependencies = [
+ "argon-bitcoin-utxo-tracker",
+ "argon-node-consensus",
+ "argon-node-runtime",
+ "argon-primitives",
+ "argon-randomx",
+ "async-trait",
+ "clap",
+ "frame-benchmarking",
+ "frame-benchmarking-cli",
+ "frame-metadata-hash-extension",
+ "frame-system",
+ "futures",
+ "futures-timer",
+ "jsonrpsee",
+ "num_cpus",
+ "pallet-transaction-payment",
+ "pallet-transaction-payment-rpc",
+ "parity-scale-codec",
+ "rand",
+ "sc-basic-authorship",
+ "sc-chain-spec",
+ "sc-cli",
+ "sc-client-api",
+ "sc-consensus",
+ "sc-consensus-grandpa",
+ "sc-consensus-grandpa-rpc",
+ "sc-executor",
+ "sc-network",
+ "sc-offchain",
+ "sc-rpc",
+ "sc-rpc-api",
+ "sc-rpc-spec-v2",
+ "sc-service",
+ "sc-telemetry",
+ "sc-transaction-pool",
+ "sc-transaction-pool-api",
+ "serde",
+ "serde_json",
+ "sp-api",
+ "sp-arithmetic",
+ "sp-block-builder",
+ "sp-blockchain",
+ "sp-consensus",
+ "sp-consensus-grandpa",
+ "sp-core",
+ "sp-inherents",
+ "sp-io",
+ "sp-keyring",
+ "sp-keystore",
+ "sp-runtime",
+ "sp-statement-store",
+ "sp-timestamp",
+ "substrate-build-script-utils",
+ "substrate-frame-rpc-system",
+ "substrate-prometheus-endpoint",
+ "thiserror",
+ "url",
+]
+
+[[package]]
+name = "argon-node-consensus"
+version = "0.0.1"
+dependencies = [
+ "argon-bitcoin-utxo-tracker",
+ "argon-node-runtime",
+ "argon-notary",
+ "argon-notary-apis",
+ "argon-primitives",
+ "argon-randomx",
+ "async-trait",
+ "env_logger 0.11.3",
+ "frame-support",
+ "futures",
+ "futures-timer",
+ "humantime",
+ "jsonrpsee",
+ "lazy_static",
+ "log",
+ "pallet-mining-slot",
+ "parity-scale-codec",
+ "parking_lot 0.12.3",
+ "rand",
+ "sc-block-builder",
+ "sc-client-api",
+ "sc-client-db",
+ "sc-consensus",
+ "sc-executor",
+ "sc-keystore",
+ "sc-network",
+ "sc-network-test",
+ "sc-network-types",
+ "sc-service",
+ "sc-telemetry",
+ "sc-transaction-pool",
+ "sc-transaction-pool-api",
+ "sc-utils",
+ "schnellru",
+ "serde",
+ "sp-api",
+ "sp-application-crypto",
+ "sp-arithmetic",
+ "sp-block-builder",
+ "sp-blockchain",
+ "sp-consensus",
+ "sp-core",
+ "sp-inherents",
+ "sp-io",
+ "sp-keyring",
+ "sp-keystore",
+ "sp-runtime",
+ "sp-test-primitives",
+ "sp-timestamp",
+ "sp-tracing 16.0.0 (git+https://github.com/paritytech/polkadot-sdk.git?branch=release-polkadot-v1.14.0)",
+ "substrate-prometheus-endpoint",
+ "substrate-test-runtime",
+ "substrate-test-runtime-client",
+ "thiserror",
+ "tokio",
+]
+
+[[package]]
+name = "argon-node-runtime"
+version = "0.0.1"
+dependencies = [
+ "argon-primitives",
+ "frame-benchmarking",
+ "frame-executive",
+ "frame-metadata-hash-extension",
+ "frame-support",
+ "frame-system",
+ "frame-system-benchmarking",
+ "frame-system-rpc-runtime-api",
+ "frame-try-runtime",
+ "log",
+ "pallet-authorship",
+ "pallet-balances",
+ "pallet-bitcoin-utxos",
+ "pallet-block-rewards",
+ "pallet-block-seal",
+ "pallet-block-seal-spec",
+ "pallet-bond",
+ "pallet-chain-transfer",
+ "pallet-data-domain",
+ "pallet-grandpa",
+ "pallet-mining-slot",
+ "pallet-mint",
+ "pallet-multisig",
+ "pallet-notaries",
+ "pallet-notebook",
+ "pallet-offences",
+ "pallet-price-index",
+ "pallet-proxy",
+ "pallet-session",
+ "pallet-sudo",
+ "pallet-ticks",
+ "pallet-timestamp",
+ "pallet-transaction-payment",
+ "pallet-transaction-payment-rpc-runtime-api",
+ "pallet-tx-pause",
+ "pallet-vaults",
+ "parity-scale-codec",
+ "scale-info",
+ "serde_json",
+ "smallvec",
+ "sp-api",
+ "sp-arithmetic",
+ "sp-block-builder",
+ "sp-consensus-grandpa",
+ "sp-core",
+ "sp-debug-derive 14.0.0 (git+https://github.com/paritytech/polkadot-sdk.git?branch=release-polkadot-v1.14.0)",
+ "sp-genesis-builder",
+ "sp-inherents",
+ "sp-offchain",
+ "sp-runtime",
+ "sp-session",
+ "sp-transaction-pool",
+ "sp-version",
+ "substrate-wasm-builder",
+]
+
+[[package]]
+name = "argon-notary"
+version = "0.0.1"
+dependencies = [
+ "anyhow",
+ "argon-client",
+ "argon-notary-apis",
+ "argon-notary-audit",
+ "argon-primitives",
+ "argon-testing",
+ "async-trait",
+ "binary-merkle-tree",
+ "chrono",
+ "clap",
+ "dotenv",
+ "frame-support",
+ "futures",
+ "getrandom",
+ "hex",
+ "jsonrpsee",
+ "parity-scale-codec",
+ "parking_lot 0.12.3",
+ "sc-utils",
+ "scale-info",
+ "serde",
+ "serde_json",
+ "sp-core",
+ "sp-keyring",
+ "sp-keystore",
+ "sp-runtime",
+ "sqlx",
+ "subxt",
+ "subxt-signer",
+ "thiserror",
+ "tokio",
+ "tracing",
+ "tracing-subscriber",
+ "url",
+]
+
+[[package]]
+name = "argon-notary-apis"
+version = "0.0.1"
+dependencies = [
+ "anyhow",
+ "argon-primitives",
+ "jsonrpsee",
+ "parity-scale-codec",
+ "scale-info",
+ "serde",
+ "serde_json",
+ "sp-core",
+ "sp-runtime",
+]
+
+[[package]]
+name = "argon-notary-audit"
+version = "0.0.1"
+dependencies = [
+ "anyhow",
+ "argon-primitives",
+ "binary-merkle-tree",
+ "chrono",
+ "frame-support",
+ "log",
+ "parity-scale-codec",
+ "scale-info",
+ "serde",
+ "snafu",
+ "sp-core",
+ "sp-keyring",
+ "sp-runtime",
+]
+
+[[package]]
+name = "argon-oracle"
+version = "0.0.1"
+dependencies = [
+ "anyhow",
+ "argon-client",
+ "argon-primitives",
+ "argon-testing",
+ "bitcoin",
+ "bitcoincore-rpc",
+ "chrono",
+ "clap",
+ "dotenv",
+ "env_logger 0.11.3",
+ "futures",
+ "hex",
+ "lazy_static",
+ "parking_lot 0.12.3",
+ "rand",
+ "reqwest",
+ "scraper",
+ "serde",
+ "serde_json",
+ "sp-core",
+ "sp-keyring",
+ "sp-keystore",
+ "sp-runtime",
+ "subxt-signer",
+ "thiserror",
+ "tokio",
+ "tracing",
+ "tracing-subscriber",
+ "url",
+]
+
+[[package]]
+name = "argon-primitives"
+version = "0.0.1"
+dependencies = [
+ "anyhow",
+ "async-trait",
+ "base58",
+ "bip32",
+ "bitcoin",
+ "chrono",
+ "clap",
+ "frame-support",
+ "frame-support-procedural",
+ "hex",
+ "impl-trait-for-tuples",
+ "k256",
+ "napi",
+ "napi-derive",
+ "parity-scale-codec",
+ "rpassword",
+ "rsntp",
+ "sc-keystore",
+ "scale-info",
+ "serde",
+ "serde_json",
+ "sp-api",
+ "sp-application-crypto",
+ "sp-arithmetic",
+ "sp-core",
+ "sp-crypto-hashing 0.1.0 (git+https://github.com/paritytech/polkadot-sdk.git?branch=release-polkadot-v1.14.0)",
+ "sp-debug-derive 14.0.0 (git+https://github.com/paritytech/polkadot-sdk.git?branch=release-polkadot-v1.14.0)",
+ "sp-inherents",
+ "sp-keystore",
+ "sp-runtime",
+ "thiserror",
+ "tokio",
+ "uniffi",
+]
+
+[[package]]
+name = "argon-randomx"
+version = "0.0.1"
+dependencies = [
+ "bindgen 0.69.4",
+ "cmake",
+ "futures",
+ "hex",
+ "lazy_static",
+ "log",
+ "lru-cache",
+ "num_cpus",
+ "parking_lot 0.12.3",
+ "randomx-rs",
+ "sp-core",
+ "thiserror",
+]
+
+[[package]]
+name = "argon-testing"
+version = "0.0.1"
+dependencies = [
+ "anyhow",
+ "argon-client",
+ "argon-notary-apis",
+ "argon-primitives",
+ "bitcoin",
+ "bitcoincore-rpc",
+ "bitcoind",
+ "env_logger 0.11.3",
+ "fs2",
+ "lazy_static",
+ "rand",
+ "sp-core",
+ "sp-keyring",
+ "sqlx",
+ "subxt",
+ "tracing",
+ "url",
+]
+
+[[package]]
+name = "argon-testing-bitcoin"
+version = "0.0.1"
+dependencies = [
+ "bitcoind",
+]
+
+[[package]]
 name = "ark-bls12-377"
 version = "0.4.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -2682,6 +3226,11 @@ dependencies = [
 name = "end-to-end"
 version = "0.0.1"
 dependencies = [
+ "argon-bitcoin",
+ "argon-bitcoin-utxo-tracker",
+ "argon-client",
+ "argon-primitives",
+ "argon-testing",
  "base64 0.22.1",
  "bitcoin",
  "bitcoind",
@@ -2693,11 +3242,6 @@ dependencies = [
  "subxt",
  "subxt-signer",
  "tokio",
- "ulixee-client",
- "ulx-bitcoin",
- "ulx-bitcoin-utxo-tracker",
- "ulx-primitives",
- "ulx-testing",
 ]
 
 [[package]]
@@ -3991,8 +4535,9 @@ checksum = "9a3a5bfb195931eeb336b2a7b4d761daec841b97f947d34394601737a7bba5e4"
 
 [[package]]
 name = "hwi"
-version = "0.8.0"
-source = "git+https://github.com/ulixee/rust-hwi?branch=master#556219ef0e15d349f290852d90b13b094c08fef5"
+version = "0.9.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "3e5b4f049f6b2f1b3ada5ec0ef3a07f3be2841a175d81700b7cd0ea780c59e84"
 dependencies = [
  "bitcoin",
  "pyo3",
@@ -6504,6 +7049,7 @@ dependencies = [
 name = "pallet-bitcoin-utxos"
 version = "0.0.1"
 dependencies = [
+ "argon-primitives",
  "env_logger 0.11.3",
  "frame-benchmarking",
  "frame-support",
@@ -6515,13 +7061,13 @@ dependencies = [
  "sp-core",
  "sp-io",
  "sp-runtime",
- "ulx-primitives",
 ]
 
 [[package]]
 name = "pallet-block-rewards"
 version = "0.0.1"
 dependencies = [
+ "argon-primitives",
  "env_logger 0.11.3",
  "frame-benchmarking",
  "frame-support",
@@ -6534,13 +7080,13 @@ dependencies = [
  "sp-core",
  "sp-io",
  "sp-runtime",
- "ulx-primitives",
 ]
 
 [[package]]
 name = "pallet-block-seal"
 version = "0.0.1"
 dependencies = [
+ "argon-primitives",
  "binary-merkle-tree",
  "env_logger 0.11.3",
  "frame-benchmarking",
@@ -6555,13 +7101,13 @@ dependencies = [
  "sp-io",
  "sp-keyring",
  "sp-runtime",
- "ulx-primitives",
 ]
 
 [[package]]
 name = "pallet-block-seal-spec"
 version = "0.0.1"
 dependencies = [
+ "argon-primitives",
  "env_logger 0.11.3",
  "frame-benchmarking",
  "frame-support",
@@ -6574,13 +7120,14 @@ dependencies = [
  "sp-core",
  "sp-io",
  "sp-runtime",
- "ulx-primitives",
 ]
 
 [[package]]
 name = "pallet-bond"
 version = "0.0.1"
 dependencies = [
+ "argon-bitcoin",
+ "argon-primitives",
  "bitcoin",
  "env_logger 0.11.3",
  "frame-benchmarking",
@@ -6595,14 +7142,14 @@ dependencies = [
  "sp-core",
  "sp-io",
  "sp-runtime",
- "ulx-bitcoin",
- "ulx-primitives",
 ]
 
 [[package]]
 name = "pallet-chain-transfer"
 version = "0.0.1"
 dependencies = [
+ "argon-notary-audit",
+ "argon-primitives",
  "binary-merkle-tree",
  "env_logger 0.11.3",
  "frame-benchmarking",
@@ -6617,14 +7164,13 @@ dependencies = [
  "sp-io",
  "sp-keyring",
  "sp-runtime",
- "ulx-notary-audit",
- "ulx-primitives",
 ]
 
 [[package]]
 name = "pallet-data-domain"
 version = "0.0.1"
 dependencies = [
+ "argon-primitives",
  "env_logger 0.11.3",
  "frame-benchmarking",
  "frame-support",
@@ -6637,7 +7183,6 @@ dependencies = [
  "sp-io",
  "sp-keyring",
  "sp-runtime",
- "ulx-primitives",
 ]
 
 [[package]]
@@ -6667,6 +7212,7 @@ dependencies = [
 name = "pallet-mining-slot"
 version = "0.0.1"
 dependencies = [
+ "argon-primitives",
  "env_logger 0.11.3",
  "frame-benchmarking",
  "frame-support",
@@ -6680,13 +7226,13 @@ dependencies = [
  "sp-core",
  "sp-io",
  "sp-runtime",
- "ulx-primitives",
 ]
 
 [[package]]
 name = "pallet-mint"
 version = "0.0.1"
 dependencies = [
+ "argon-primitives",
  "env_logger 0.11.3",
  "frame-benchmarking",
  "frame-support",
@@ -6700,7 +7246,6 @@ dependencies = [
  "sp-core",
  "sp-io",
  "sp-runtime",
- "ulx-primitives",
 ]
 
 [[package]]
@@ -6723,6 +7268,7 @@ dependencies = [
 name = "pallet-notaries"
 version = "0.0.1"
 dependencies = [
+ "argon-primitives",
  "env_logger 0.11.3",
  "frame-benchmarking",
  "frame-support",
@@ -6735,13 +7281,14 @@ dependencies = [
  "sp-io",
  "sp-keyring",
  "sp-runtime",
- "ulx-primitives",
 ]
 
 [[package]]
 name = "pallet-notebook"
 version = "0.0.1"
 dependencies = [
+ "argon-notary-audit",
+ "argon-primitives",
  "binary-merkle-tree",
  "env_logger 0.11.3",
  "frame-benchmarking",
@@ -6756,8 +7303,6 @@ dependencies = [
  "sp-io",
  "sp-keyring",
  "sp-runtime",
- "ulx-notary-audit",
- "ulx-primitives",
 ]
 
 [[package]]
@@ -6781,6 +7326,7 @@ dependencies = [
 name = "pallet-price-index"
 version = "0.0.1"
 dependencies = [
+ "argon-primitives",
  "env_logger 0.11.3",
  "frame-benchmarking",
  "frame-support",
@@ -6793,7 +7339,6 @@ dependencies = [
  "sp-core",
  "sp-io",
  "sp-runtime",
- "ulx-primitives",
 ]
 
 [[package]]
@@ -6853,6 +7398,7 @@ dependencies = [
 name = "pallet-ticks"
 version = "0.0.1"
 dependencies = [
+ "argon-primitives",
  "env_logger 0.11.3",
  "frame-benchmarking",
  "frame-support",
@@ -6865,7 +7411,6 @@ dependencies = [
  "sp-core",
  "sp-io",
  "sp-runtime",
- "ulx-primitives",
 ]
 
 [[package]]
@@ -6970,6 +7515,8 @@ dependencies = [
 name = "pallet-vaults"
 version = "0.0.1"
 dependencies = [
+ "argon-bitcoin",
+ "argon-primitives",
  "bip32",
  "bitcoin",
  "env_logger 0.11.3",
@@ -6984,8 +7531,6 @@ dependencies = [
  "sp-core",
  "sp-io",
  "sp-runtime",
- "ulx-bitcoin",
- "ulx-primitives",
 ]
 
 [[package]]
@@ -8131,7 +8676,7 @@ dependencies = [
 [[package]]
 name = "randomx-rs"
 version = "1.3.0"
-source = "git+https://github.com/ulixee/randomx-rs?branch=main#32c42f1440adc8e5f08b983dc0c884580dbb1667"
+source = "git+https://github.com/argonprotocol/randomx-rs?branch=main#32c42f1440adc8e5f08b983dc0c884580dbb1667"
 dependencies = [
  "bitflags 1.3.2",
  "libc",
@@ -12870,550 +13415,6 @@ dependencies = [
  "crunchy",
  "hex",
  "static_assertions",
-]
-
-[[package]]
-name = "ulixee-client"
-version = "0.0.1"
-dependencies = [
- "anyhow",
- "async-trait",
- "futures",
- "hex",
- "jsonrpsee",
- "parity-scale-codec",
- "scale-info",
- "serde",
- "serde_json",
- "sp-arithmetic",
- "sp-core",
- "sp-keyring",
- "sp-keystore",
- "subxt",
- "subxt-signer",
- "thiserror",
- "tokio",
- "tracing",
- "tracing-subscriber",
- "ulx-primitives",
- "ulx-testing",
-]
-
-[[package]]
-name = "ulx-bitcoin"
-version = "0.0.1"
-dependencies = [
- "anyhow",
- "base64 0.22.1",
- "bitcoin",
- "bitcoincore-rpc",
- "bitcoind",
- "env_logger 0.11.3",
- "frame-support",
- "hwi",
- "k256",
- "log",
- "miniscript",
- "parity-scale-codec",
- "parking_lot 0.12.3",
- "rand",
- "serde_json",
- "sp-core",
- "sp-io",
- "sp-keyring",
- "sp-runtime",
- "thiserror",
- "ulx-primitives",
- "ulx-testing",
-]
-
-[[package]]
-name = "ulx-bitcoin-cli"
-version = "0.0.1"
-dependencies = [
- "anyhow",
- "base58",
- "base64 0.22.1",
- "bitcoin",
- "clap",
- "comfy-table",
- "hex",
- "inquire",
- "parity-scale-codec",
- "sp-runtime",
- "subxt",
- "tokio",
- "tracing",
- "tracing-subscriber",
- "ulixee-client",
- "ulx-bitcoin",
- "ulx-bitcoin-cli-macros",
- "ulx-primitives",
- "url",
-]
-
-[[package]]
-name = "ulx-bitcoin-cli-macros"
-version = "0.0.1"
-dependencies = [
- "proc-macro2",
- "quote",
- "syn 2.0.71",
-]
-
-[[package]]
-name = "ulx-bitcoin-utxo-tracker"
-version = "0.0.1"
-dependencies = [
- "anyhow",
- "async-trait",
- "bitcoin",
- "bitcoincore-rpc",
- "bitcoind",
- "env_logger 0.11.3",
- "lazy_static",
- "log",
- "parity-scale-codec",
- "parking_lot 0.12.3",
- "rand",
- "sc-client-api",
- "sc-service",
- "sp-api",
- "sp-runtime",
- "thiserror",
- "tokio",
- "ulx-bitcoin",
- "ulx-primitives",
- "ulx-testing",
-]
-
-[[package]]
-name = "ulx-localchain"
-version = "0.0.1"
-dependencies = [
- "anyhow",
- "array-bytes",
- "async-trait",
- "bech32",
- "binary-merkle-tree",
- "chrono",
- "clap",
- "comfy-table",
- "directories",
- "dotenv",
- "frame-support",
- "futures",
- "getrandom",
- "hex",
- "jsonrpsee",
- "lazy_static",
- "napi",
- "napi-build",
- "napi-derive",
- "parity-scale-codec",
- "parking_lot 0.12.3",
- "rpassword",
- "sc-utils",
- "scale-info",
- "serde",
- "serde_json",
- "sp-core",
- "sp-keyring",
- "sp-runtime",
- "sqlx",
- "subxt",
- "subxt-signer",
- "thiserror",
- "tokio",
- "tracing",
- "tracing-subscriber",
- "ulixee-client",
- "ulx-notary",
- "ulx-notary-apis",
- "ulx-notary-audit",
- "ulx-primitives",
- "ulx-testing",
- "uniffi",
-]
-
-[[package]]
-name = "ulx-node"
-version = "0.0.1"
-dependencies = [
- "async-trait",
- "clap",
- "frame-benchmarking",
- "frame-benchmarking-cli",
- "frame-metadata-hash-extension",
- "frame-system",
- "futures",
- "futures-timer",
- "jsonrpsee",
- "num_cpus",
- "pallet-transaction-payment",
- "pallet-transaction-payment-rpc",
- "parity-scale-codec",
- "rand",
- "sc-basic-authorship",
- "sc-chain-spec",
- "sc-cli",
- "sc-client-api",
- "sc-consensus",
- "sc-consensus-grandpa",
- "sc-consensus-grandpa-rpc",
- "sc-executor",
- "sc-network",
- "sc-offchain",
- "sc-rpc",
- "sc-rpc-api",
- "sc-rpc-spec-v2",
- "sc-service",
- "sc-telemetry",
- "sc-transaction-pool",
- "sc-transaction-pool-api",
- "serde",
- "serde_json",
- "sp-api",
- "sp-arithmetic",
- "sp-block-builder",
- "sp-blockchain",
- "sp-consensus",
- "sp-consensus-grandpa",
- "sp-core",
- "sp-inherents",
- "sp-io",
- "sp-keyring",
- "sp-keystore",
- "sp-runtime",
- "sp-statement-store",
- "sp-timestamp",
- "substrate-build-script-utils",
- "substrate-frame-rpc-system",
- "substrate-prometheus-endpoint",
- "thiserror",
- "ulx-bitcoin-utxo-tracker",
- "ulx-node-consensus",
- "ulx-node-runtime",
- "ulx-primitives",
- "ulx-randomx",
- "url",
-]
-
-[[package]]
-name = "ulx-node-consensus"
-version = "0.0.1"
-dependencies = [
- "async-trait",
- "env_logger 0.11.3",
- "frame-support",
- "futures",
- "futures-timer",
- "humantime",
- "jsonrpsee",
- "lazy_static",
- "log",
- "pallet-mining-slot",
- "parity-scale-codec",
- "parking_lot 0.12.3",
- "rand",
- "sc-block-builder",
- "sc-client-api",
- "sc-client-db",
- "sc-consensus",
- "sc-executor",
- "sc-keystore",
- "sc-network",
- "sc-network-test",
- "sc-network-types",
- "sc-service",
- "sc-telemetry",
- "sc-transaction-pool",
- "sc-transaction-pool-api",
- "sc-utils",
- "schnellru",
- "serde",
- "sp-api",
- "sp-application-crypto",
- "sp-arithmetic",
- "sp-block-builder",
- "sp-blockchain",
- "sp-consensus",
- "sp-core",
- "sp-inherents",
- "sp-io",
- "sp-keyring",
- "sp-keystore",
- "sp-runtime",
- "sp-test-primitives",
- "sp-timestamp",
- "sp-tracing 16.0.0 (git+https://github.com/paritytech/polkadot-sdk.git?branch=release-polkadot-v1.14.0)",
- "substrate-prometheus-endpoint",
- "substrate-test-runtime",
- "substrate-test-runtime-client",
- "thiserror",
- "tokio",
- "ulx-bitcoin-utxo-tracker",
- "ulx-node-runtime",
- "ulx-notary",
- "ulx-notary-apis",
- "ulx-primitives",
- "ulx-randomx",
-]
-
-[[package]]
-name = "ulx-node-runtime"
-version = "0.0.1"
-dependencies = [
- "frame-benchmarking",
- "frame-executive",
- "frame-metadata-hash-extension",
- "frame-support",
- "frame-system",
- "frame-system-benchmarking",
- "frame-system-rpc-runtime-api",
- "frame-try-runtime",
- "log",
- "pallet-authorship",
- "pallet-balances",
- "pallet-bitcoin-utxos",
- "pallet-block-rewards",
- "pallet-block-seal",
- "pallet-block-seal-spec",
- "pallet-bond",
- "pallet-chain-transfer",
- "pallet-data-domain",
- "pallet-grandpa",
- "pallet-mining-slot",
- "pallet-mint",
- "pallet-multisig",
- "pallet-notaries",
- "pallet-notebook",
- "pallet-offences",
- "pallet-price-index",
- "pallet-proxy",
- "pallet-session",
- "pallet-sudo",
- "pallet-ticks",
- "pallet-timestamp",
- "pallet-transaction-payment",
- "pallet-transaction-payment-rpc-runtime-api",
- "pallet-tx-pause",
- "pallet-vaults",
- "parity-scale-codec",
- "scale-info",
- "serde_json",
- "smallvec",
- "sp-api",
- "sp-arithmetic",
- "sp-block-builder",
- "sp-consensus-grandpa",
- "sp-core",
- "sp-debug-derive 14.0.0 (git+https://github.com/paritytech/polkadot-sdk.git?branch=release-polkadot-v1.14.0)",
- "sp-genesis-builder",
- "sp-inherents",
- "sp-offchain",
- "sp-runtime",
- "sp-session",
- "sp-transaction-pool",
- "sp-version",
- "substrate-wasm-builder",
- "ulx-primitives",
-]
-
-[[package]]
-name = "ulx-notary"
-version = "0.0.1"
-dependencies = [
- "anyhow",
- "async-trait",
- "binary-merkle-tree",
- "chrono",
- "clap",
- "dotenv",
- "frame-support",
- "futures",
- "getrandom",
- "hex",
- "jsonrpsee",
- "parity-scale-codec",
- "parking_lot 0.12.3",
- "sc-utils",
- "scale-info",
- "serde",
- "serde_json",
- "sp-core",
- "sp-keyring",
- "sp-keystore",
- "sp-runtime",
- "sqlx",
- "subxt",
- "subxt-signer",
- "thiserror",
- "tokio",
- "tracing",
- "tracing-subscriber",
- "ulixee-client",
- "ulx-notary-apis",
- "ulx-notary-audit",
- "ulx-primitives",
- "ulx-testing",
- "url",
-]
-
-[[package]]
-name = "ulx-notary-apis"
-version = "0.0.1"
-dependencies = [
- "anyhow",
- "jsonrpsee",
- "parity-scale-codec",
- "scale-info",
- "serde",
- "serde_json",
- "sp-core",
- "sp-runtime",
- "ulx-primitives",
-]
-
-[[package]]
-name = "ulx-notary-audit"
-version = "0.0.1"
-dependencies = [
- "anyhow",
- "binary-merkle-tree",
- "chrono",
- "frame-support",
- "log",
- "parity-scale-codec",
- "scale-info",
- "serde",
- "snafu",
- "sp-core",
- "sp-keyring",
- "sp-runtime",
- "ulx-primitives",
-]
-
-[[package]]
-name = "ulx-oracle"
-version = "0.0.1"
-dependencies = [
- "anyhow",
- "bitcoin",
- "bitcoincore-rpc",
- "chrono",
- "clap",
- "dotenv",
- "env_logger 0.11.3",
- "futures",
- "hex",
- "lazy_static",
- "parking_lot 0.12.3",
- "rand",
- "reqwest",
- "scraper",
- "serde",
- "serde_json",
- "sp-core",
- "sp-keyring",
- "sp-keystore",
- "sp-runtime",
- "subxt-signer",
- "thiserror",
- "tokio",
- "tracing",
- "tracing-subscriber",
- "ulixee-client",
- "ulx-primitives",
- "ulx-testing",
- "url",
-]
-
-[[package]]
-name = "ulx-primitives"
-version = "0.0.1"
-dependencies = [
- "anyhow",
- "async-trait",
- "base58",
- "bip32",
- "bitcoin",
- "chrono",
- "clap",
- "frame-support",
- "frame-support-procedural",
- "hex",
- "impl-trait-for-tuples",
- "k256",
- "napi",
- "napi-derive",
- "parity-scale-codec",
- "rpassword",
- "rsntp",
- "sc-keystore",
- "scale-info",
- "serde",
- "serde_json",
- "sp-api",
- "sp-application-crypto",
- "sp-arithmetic",
- "sp-core",
- "sp-crypto-hashing 0.1.0 (git+https://github.com/paritytech/polkadot-sdk.git?branch=release-polkadot-v1.14.0)",
- "sp-debug-derive 14.0.0 (git+https://github.com/paritytech/polkadot-sdk.git?branch=release-polkadot-v1.14.0)",
- "sp-inherents",
- "sp-keystore",
- "sp-runtime",
- "thiserror",
- "tokio",
- "uniffi",
-]
-
-[[package]]
-name = "ulx-randomx"
-version = "0.0.1"
-dependencies = [
- "bindgen 0.69.4",
- "cmake",
- "futures",
- "hex",
- "lazy_static",
- "log",
- "lru-cache",
- "num_cpus",
- "parking_lot 0.12.3",
- "randomx-rs",
- "sp-core",
- "thiserror",
-]
-
-[[package]]
-name = "ulx-testing"
-version = "0.0.1"
-dependencies = [
- "anyhow",
- "bitcoin",
- "bitcoincore-rpc",
- "bitcoind",
- "env_logger 0.11.3",
- "fs2",
- "lazy_static",
- "rand",
- "sp-core",
- "sp-keyring",
- "sqlx",
- "subxt",
- "tracing",
- "ulixee-client",
- "ulx-notary-apis",
- "ulx-primitives",
- "url",
-]
-
-[[package]]
-name = "ulx-testing-bitcoin"
-version = "0.0.1"
-dependencies = [
- "bitcoind",
 ]
 
 [[package]]

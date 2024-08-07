@@ -11,7 +11,7 @@ use crate::{
 	NotaryId, NotebookNumber, SignedNotebookHeader,
 };
 
-pub const SEAL_INHERENT_IDENTIFIER: InherentIdentifier = *b"ulx_seal";
+pub const SEAL_INHERENT_IDENTIFIER: InherentIdentifier = *b"seal_arg";
 pub const SEAL_INHERENT_VOTE_IDENTIFIER: InherentIdentifier = *b"seal_vot";
 pub const SEAL_INHERENT_DIGEST_IDENTIFIER: InherentIdentifier = *b"seal_dig";
 pub const NOTEBOOKS_INHERENT_IDENTIFIER: InherentIdentifier = *b"notebook";

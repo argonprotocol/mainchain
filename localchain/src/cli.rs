@@ -8,7 +8,7 @@ use comfy_table::modifiers::UTF8_ROUND_CORNERS;
 use comfy_table::presets::UTF8_FULL;
 use comfy_table::{Cell, CellAlignment, ContentArrangement, Table};
 
-use ulx_primitives::DataDomain;
+use argon_primitives::DataDomain;
 
 use crate::keystore::Keystore;
 use crate::{
@@ -33,10 +33,10 @@ enum Commands {
     name: String,
 
     /// Where is your localchain? Defaults to a project-specific directory based on OS.
-    ///    Linux:   /home/alice/.config/ulixee/localchain
-    ///    Windows: C:\Users\Alice\AppData\Roaming\ulixee\localchain
-    ///    macOS:   /Users/Alice/Library/Application Support/ulixee/localchain
-    #[clap(long, env = "ULX_LOCALCHAIN_BASE_PATH", value_hint = ValueHint::DirPath)]
+    ///    Linux:   /home/alice/.config/argon/localchain
+    ///    Windows: C:\Users\Alice\AppData\Roaming\argon\localchain
+    ///    macOS:   /Users/Alice/Library/Application Support/argon/localchain
+    #[clap(long, env = "argon_LOCALCHAIN_BASE_PATH", value_hint = ValueHint::DirPath)]
     base_dir: Option<PathBuf>,
 
     /// What mainchain RPC websocket url do you want to reach out use to sync blocks and submit
@@ -44,7 +44,7 @@ enum Commands {
     #[clap(
       short,
       long,
-      env = "ULX_MAINCHAIN_URL",
+      env = "argon_MAINCHAIN_URL",
       default_value = "ws://127.0.0.1:9944"
     )]
     mainchain_url: String,
@@ -83,10 +83,10 @@ enum DataDomainsSubcommand {
     name: String,
 
     /// Where is your localchain? Defaults to a project-specific directory based on OS.
-    ///    Linux:   /home/alice/.config/ulixee/localchain
-    ///    Windows: C:\Users\Alice\AppData\Roaming\ulixee\localchain
-    ///    macOS:   /Users/Alice/Library/Application Support/ulixee/localchain
-    #[clap(long, env = "ULX_LOCALCHAIN_BASE_PATH", value_hint = ValueHint::DirPath)]
+    ///    Linux:   /home/alice/.config/argon/localchain
+    ///    Windows: C:\Users\Alice\AppData\Roaming\argon\localchain
+    ///    macOS:   /Users/Alice/Library/Application Support/argon/localchain
+    #[clap(long, env = "argon_LOCALCHAIN_BASE_PATH", value_hint = ValueHint::DirPath)]
     base_dir: Option<PathBuf>,
   },
   /// Generate the hash for a data domain
@@ -105,7 +105,7 @@ enum DataDomainsSubcommand {
     #[clap(
       short,
       long,
-      env = "ULX_MAINCHAIN_URL",
+      env = "argon_MAINCHAIN_URL",
       value_name = "URL",
       default_value = "ws://127.0.0.1:9944"
     )]
@@ -121,10 +121,10 @@ enum DataDomainsSubcommand {
     name: String,
 
     /// Where is your localchain? Defaults to a project-specific directory based on OS.
-    ///    Linux:   /home/alice/.config/ulixee/localchain
-    ///    Windows: C:\Users\Alice\AppData\Roaming\ulixee\localchain
-    ///    macOS:   /Users/Alice/Library/Application Support/ulixee/localchain
-    #[clap(long, env = "ULX_LOCALCHAIN_BASE_PATH", value_hint = ValueHint::DirPath)]
+    ///    Linux:   /home/alice/.config/argon/localchain
+    ///    Windows: C:\Users\Alice\AppData\Roaming\argon\localchain
+    ///    macOS:   /Users/Alice/Library/Application Support/argon/localchain
+    #[clap(long, env = "argon_LOCALCHAIN_BASE_PATH", value_hint = ValueHint::DirPath)]
     base_dir: Option<PathBuf>,
 
     /// Password to unlock the embedded keystore
@@ -142,10 +142,10 @@ enum AccountsSubcommand {
   /// List all localchains you have access to
   List {
     /// Where is your localchain? Defaults to a project-specific directory based on OS.
-    ///    Linux:   /home/alice/.config/ulixee/localchain
-    ///    Windows: C:\Users\Alice\AppData\Roaming\ulixee\localchain
-    ///    macOS:   /Users/Alice/Library/Application Support/ulixee/localchain
-    #[clap(long, env = "ULX_LOCALCHAIN_BASE_PATH", value_hint = ValueHint::DirPath)]
+    ///    Linux:   /home/alice/.config/argon/localchain
+    ///    Windows: C:\Users\Alice\AppData\Roaming\argon\localchain
+    ///    macOS:   /Users/Alice/Library/Application Support/argon/localchain
+    #[clap(long, env = "argon_LOCALCHAIN_BASE_PATH", value_hint = ValueHint::DirPath)]
     base_dir: Option<PathBuf>,
   },
 
@@ -155,10 +155,10 @@ enum AccountsSubcommand {
     name: String,
 
     /// Where is your localchain? Defaults to a project-specific directory based on OS.
-    ///    Linux:   /home/alice/.config/ulixee/localchain
-    ///    Windows: C:\Users\Alice\AppData\Roaming\ulixee\localchain
-    ///    macOS:   /Users/Alice/Library/Application Support/ulixee/localchain
-    #[clap(long, env = "ULX_LOCALCHAIN_BASE_PATH", value_hint = ValueHint::DirPath)]
+    ///    Linux:   /home/alice/.config/argon/localchain
+    ///    Windows: C:\Users\Alice\AppData\Roaming\argon\localchain
+    ///    macOS:   /Users/Alice/Library/Application Support/argon/localchain
+    #[clap(long, env = "argon_LOCALCHAIN_BASE_PATH", value_hint = ValueHint::DirPath)]
     base_dir: Option<PathBuf>,
 
     /// The secret key URI.

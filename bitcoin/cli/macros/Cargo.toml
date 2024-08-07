@@ -1,5 +1,5 @@
 [package]
-name = "ulx-bitcoin-cli-macros"
+name = "argon-bitcoin-cli-macros"
 description = "Doc readg macros"
 version.workspace = true
 edition.workspace = true

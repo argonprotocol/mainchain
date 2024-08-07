@@ -61,7 +61,7 @@ export default {
     }
   },
   /**
-   * Lookup20: frame_system::EventRecord<ulx_node_runtime::RuntimeEvent, primitive_types::H256>
+   * Lookup20: frame_system::EventRecord<argon_node_runtime::RuntimeEvent, primitive_types::H256>
    **/
   FrameSystemEventRecord: {
     phase: 'FrameSystemPhase',
@@ -215,7 +215,7 @@ export default {
       PureCreated: {
         pure: 'AccountId32',
         who: 'AccountId32',
-        proxyType: 'UlxNodeRuntimeProxyType',
+        proxyType: 'ArgonNodeRuntimeProxyType',
         disambiguationIndex: 'u16',
       },
       Announced: {
@@ -226,21 +226,21 @@ export default {
       ProxyAdded: {
         delegator: 'AccountId32',
         delegatee: 'AccountId32',
-        proxyType: 'UlxNodeRuntimeProxyType',
+        proxyType: 'ArgonNodeRuntimeProxyType',
         delay: 'u32',
       },
       ProxyRemoved: {
         delegator: 'AccountId32',
         delegatee: 'AccountId32',
-        proxyType: 'UlxNodeRuntimeProxyType',
+        proxyType: 'ArgonNodeRuntimeProxyType',
         delay: 'u32'
       }
     }
   },
   /**
-   * Lookup36: ulx_node_runtime::ProxyType
+   * Lookup36: argon_node_runtime::ProxyType
    **/
-  UlxNodeRuntimeProxyType: {
+  ArgonNodeRuntimeProxyType: {
     _enum: ['Any', 'NonTransfer', 'PriceIndex']
   },
   /**
@@ -250,7 +250,7 @@ export default {
     _enum: {
       NewMiners: {
         startIndex: 'u32',
-        newMiners: 'Vec<UlxPrimitivesBlockSealMiningRegistration>',
+        newMiners: 'Vec<ArgonPrimitivesBlockSealMiningRegistration>',
       },
       SlotBidderAdded: {
         accountId: 'AccountId32',
@@ -275,29 +275,29 @@ export default {
     }
   },
   /**
-   * Lookup40: ulx_primitives::block_seal::MiningRegistration<sp_core::crypto::AccountId32, Balance>
+   * Lookup40: argon_primitives::block_seal::MiningRegistration<sp_core::crypto::AccountId32, Balance>
    **/
-  UlxPrimitivesBlockSealMiningRegistration: {
+  ArgonPrimitivesBlockSealMiningRegistration: {
     accountId: 'AccountId32',
-    rewardDestination: 'UlxPrimitivesBlockSealRewardDestination',
+    rewardDestination: 'ArgonPrimitivesBlockSealRewardDestination',
     bondId: 'Option<u64>',
     bondAmount: 'Compact<u128>',
     ownershipTokens: 'Compact<u128>',
-    rewardSharing: 'Option<UlxPrimitivesBlockSealRewardSharing>'
+    rewardSharing: 'Option<ArgonPrimitivesBlockSealRewardSharing>'
   },
   /**
-   * Lookup41: ulx_primitives::block_seal::RewardDestination<sp_core::crypto::AccountId32>
+   * Lookup41: argon_primitives::block_seal::RewardDestination<sp_core::crypto::AccountId32>
    **/
-  UlxPrimitivesBlockSealRewardDestination: {
+  ArgonPrimitivesBlockSealRewardDestination: {
     _enum: {
       Owner: 'Null',
       Account: 'AccountId32'
     }
   },
   /**
-   * Lookup45: ulx_primitives::block_seal::RewardSharing<sp_core::crypto::AccountId32>
+   * Lookup45: argon_primitives::block_seal::RewardSharing<sp_core::crypto::AccountId32>
    **/
-  UlxPrimitivesBlockSealRewardSharing: {
+  ArgonPrimitivesBlockSealRewardSharing: {
     accountId: 'AccountId32',
     percentTake: 'Compact<u128>'
   },
@@ -311,7 +311,7 @@ export default {
       },
       UtxoRejected: {
         utxoId: 'u64',
-        rejectedReason: 'UlxPrimitivesBitcoinBitcoinRejectedReason',
+        rejectedReason: 'ArgonPrimitivesBitcoinBitcoinRejectedReason',
       },
       UtxoSpent: {
         utxoId: 'u64',
@@ -333,28 +333,28 @@ export default {
         error: 'SpRuntimeDispatchError',
       },
       UtxoExpiredError: {
-        utxoRef: 'UlxPrimitivesBitcoinUtxoRef',
+        utxoRef: 'ArgonPrimitivesBitcoinUtxoRef',
         error: 'SpRuntimeDispatchError'
       }
     }
   },
   /**
-   * Lookup50: ulx_primitives::bitcoin::BitcoinRejectedReason
+   * Lookup50: argon_primitives::bitcoin::BitcoinRejectedReason
    **/
-  UlxPrimitivesBitcoinBitcoinRejectedReason: {
+  ArgonPrimitivesBitcoinBitcoinRejectedReason: {
     _enum: ['SatoshisMismatch', 'Spent', 'LookupExpired', 'DuplicateUtxo']
   },
   /**
-   * Lookup51: ulx_primitives::bitcoin::UtxoRef
+   * Lookup51: argon_primitives::bitcoin::UtxoRef
    **/
-  UlxPrimitivesBitcoinUtxoRef: {
-    txid: 'UlxPrimitivesBitcoinH256Le',
+  ArgonPrimitivesBitcoinUtxoRef: {
+    txid: 'ArgonPrimitivesBitcoinH256Le',
     outputIndex: 'Compact<u32>'
   },
   /**
-   * Lookup52: ulx_primitives::bitcoin::H256Le
+   * Lookup52: argon_primitives::bitcoin::H256Le
    **/
-  UlxPrimitivesBitcoinH256Le: '[u8;32]',
+  ArgonPrimitivesBitcoinH256Le: '[u8;32]',
   /**
    * Lookup54: pallet_vaults::pallet::Event<T>
    **/
@@ -399,11 +399,11 @@ export default {
       BondCreated: {
         vaultId: 'u32',
         bondId: 'u64',
-        bondType: 'UlxPrimitivesBondBondType',
+        bondType: 'ArgonPrimitivesBondBondType',
         bondedAccountId: 'AccountId32',
         utxoId: 'Option<u64>',
         amount: 'u128',
-        expiration: 'UlxPrimitivesBondBondExpiration',
+        expiration: 'ArgonPrimitivesBondBondExpiration',
       },
       BondCompleted: {
         vaultId: 'u32',
@@ -413,7 +413,7 @@ export default {
         vaultId: 'u32',
         bondId: 'u64',
         bondedAccountId: 'AccountId32',
-        bondType: 'UlxPrimitivesBondBondType',
+        bondType: 'ArgonPrimitivesBondBondType',
         returnedFee: 'u128',
       },
       BitcoinBondBurned: {
@@ -454,17 +454,17 @@ export default {
     }
   },
   /**
-   * Lookup56: ulx_primitives::bond::BondType
+   * Lookup56: argon_primitives::bond::BondType
    **/
-  UlxPrimitivesBondBondType: {
+  ArgonPrimitivesBondBondType: {
     _enum: ['Mining', 'Bitcoin']
   },
   /**
-   * Lookup57: ulx_primitives::bond::BondExpiration<BlockNumber>
+   * Lookup57: argon_primitives::bond::BondExpiration<BlockNumber>
    **/
-  UlxPrimitivesBondBondExpiration: {
+  ArgonPrimitivesBondBondExpiration: {
     _enum: {
-      UlixeeBlock: 'Compact<u32>',
+      ArgonBlock: 'Compact<u32>',
       BitcoinBlock: 'Compact<u64>'
     }
   },
@@ -475,46 +475,46 @@ export default {
     _enum: {
       NotaryProposed: {
         operatorAccount: 'AccountId32',
-        meta: 'UlxPrimitivesNotaryNotaryMeta',
+        meta: 'ArgonPrimitivesNotaryNotaryMeta',
         expires: 'u32',
       },
       NotaryActivated: {
-        notary: 'UlxPrimitivesNotaryNotaryRecord',
+        notary: 'ArgonPrimitivesNotaryNotaryRecord',
       },
       NotaryMetaUpdateQueued: {
         notaryId: 'u32',
-        meta: 'UlxPrimitivesNotaryNotaryMeta',
+        meta: 'ArgonPrimitivesNotaryNotaryMeta',
         effectiveTick: 'u32',
       },
       NotaryMetaUpdated: {
         notaryId: 'u32',
-        meta: 'UlxPrimitivesNotaryNotaryMeta',
+        meta: 'ArgonPrimitivesNotaryNotaryMeta',
       },
       NotaryMetaUpdateError: {
         notaryId: 'u32',
         error: 'SpRuntimeDispatchError',
-        meta: 'UlxPrimitivesNotaryNotaryMeta'
+        meta: 'ArgonPrimitivesNotaryNotaryMeta'
       }
     }
   },
   /**
-   * Lookup61: ulx_primitives::notary::NotaryMeta<MaxHosts>
+   * Lookup61: argon_primitives::notary::NotaryMeta<MaxHosts>
    **/
-  UlxPrimitivesNotaryNotaryMeta: {
+  ArgonPrimitivesNotaryNotaryMeta: {
     name: 'Bytes',
     public: '[u8;32]',
     hosts: 'Vec<Bytes>'
   },
   /**
-   * Lookup68: ulx_primitives::notary::NotaryRecord<sp_core::crypto::AccountId32, BlockNumber, MaxHosts>
+   * Lookup68: argon_primitives::notary::NotaryRecord<sp_core::crypto::AccountId32, BlockNumber, MaxHosts>
    **/
-  UlxPrimitivesNotaryNotaryRecord: {
+  ArgonPrimitivesNotaryNotaryRecord: {
     notaryId: 'Compact<u32>',
     operatorAccountId: 'AccountId32',
     activatedBlock: 'Compact<u32>',
     metaUpdatedBlock: 'Compact<u32>',
     metaUpdatedTick: 'Compact<u32>',
-    meta: 'UlxPrimitivesNotaryNotaryMeta'
+    meta: 'ArgonPrimitivesNotaryNotaryMeta'
   },
   /**
    * Lookup69: pallet_notebook::pallet::Event<T>
@@ -528,21 +528,21 @@ export default {
       NotebookAuditFailure: {
         notaryId: 'u32',
         notebookNumber: 'u32',
-        firstFailureReason: 'UlxNotaryAuditErrorVerifyError'
+        firstFailureReason: 'ArgonNotaryAuditErrorVerifyError'
       }
     }
   },
   /**
-   * Lookup70: ulx_notary_audit::error::VerifyError
+   * Lookup70: argon_notary_audit::error::VerifyError
    **/
-  UlxNotaryAuditErrorVerifyError: {
+  ArgonNotaryAuditErrorVerifyError: {
     _enum: {
       MissingAccountOrigin: {
         accountId: 'AccountId32',
-        accountType: 'UlxPrimitivesAccountAccountType',
+        accountType: 'ArgonPrimitivesAccountAccountType',
       },
       HistoryLookupError: {
-        source: 'UlxNotaryAuditAccountHistoryLookupError',
+        source: 'ArgonNotaryAuditAccountHistoryLookupError',
       },
       InvalidAccountChangelist: 'Null',
       InvalidChainTransfersList: 'Null',
@@ -634,15 +634,15 @@ export default {
     }
   },
   /**
-   * Lookup71: ulx_primitives::account::AccountType
+   * Lookup71: argon_primitives::account::AccountType
    **/
-  UlxPrimitivesAccountAccountType: {
+  ArgonPrimitivesAccountAccountType: {
     _enum: ['Tax', 'Deposit']
   },
   /**
-   * Lookup72: ulx_notary_audit::AccountHistoryLookupError
+   * Lookup72: argon_notary_audit::AccountHistoryLookupError
    **/
-  UlxNotaryAuditAccountHistoryLookupError: {
+  ArgonNotaryAuditAccountHistoryLookupError: {
     _enum: ['RootNotFound', 'LastChangeNotFound', 'InvalidTransferToLocalchain', 'BlockSpecificationNotFound']
   },
   /**
@@ -720,7 +720,7 @@ export default {
     _enum: {
       ZoneRecordUpdated: {
         domainHash: 'H256',
-        zoneRecord: 'UlxPrimitivesDataDomainZoneRecord',
+        zoneRecord: 'ArgonPrimitivesDataDomainZoneRecord',
       },
       DataDomainRegistered: {
         domainHash: 'H256',
@@ -744,25 +744,25 @@ export default {
     }
   },
   /**
-   * Lookup78: ulx_primitives::data_domain::ZoneRecord<sp_core::crypto::AccountId32>
+   * Lookup78: argon_primitives::data_domain::ZoneRecord<sp_core::crypto::AccountId32>
    **/
-  UlxPrimitivesDataDomainZoneRecord: {
+  ArgonPrimitivesDataDomainZoneRecord: {
     paymentAccount: 'AccountId32',
     notaryId: 'u32',
-    versions: 'BTreeMap<UlxPrimitivesDataDomainSemver, UlxPrimitivesDataDomainVersionHost>'
+    versions: 'BTreeMap<ArgonPrimitivesDataDomainSemver, ArgonPrimitivesDataDomainVersionHost>'
   },
   /**
-   * Lookup80: ulx_primitives::data_domain::Semver
+   * Lookup80: argon_primitives::data_domain::Semver
    **/
-  UlxPrimitivesDataDomainSemver: {
+  ArgonPrimitivesDataDomainSemver: {
     major: 'u32',
     minor: 'u32',
     patch: 'u32'
   },
   /**
-   * Lookup81: ulx_primitives::data_domain::VersionHost
+   * Lookup81: argon_primitives::data_domain::VersionHost
    **/
-  UlxPrimitivesDataDomainVersionHost: {
+  ArgonPrimitivesDataDomainVersionHost: {
     datastoreId: 'Bytes',
     host: 'Bytes'
   },
@@ -801,31 +801,31 @@ export default {
     _enum: {
       RewardCreated: {
         maturationBlock: 'u32',
-        rewards: 'Vec<UlxPrimitivesBlockSealBlockPayout>',
+        rewards: 'Vec<ArgonPrimitivesBlockSealBlockPayout>',
       },
       RewardUnlocked: {
-        rewards: 'Vec<UlxPrimitivesBlockSealBlockPayout>',
+        rewards: 'Vec<ArgonPrimitivesBlockSealBlockPayout>',
       },
       RewardUnlockError: {
         accountId: 'AccountId32',
         argons: 'Option<u128>',
-        ulixees: 'Option<u128>',
+        shares: 'Option<u128>',
         error: 'SpRuntimeDispatchError',
       },
       RewardCreateError: {
         accountId: 'AccountId32',
         argons: 'Option<u128>',
-        ulixees: 'Option<u128>',
+        shares: 'Option<u128>',
         error: 'SpRuntimeDispatchError'
       }
     }
   },
   /**
-   * Lookup90: ulx_primitives::block_seal::BlockPayout<sp_core::crypto::AccountId32, Balance>
+   * Lookup90: argon_primitives::block_seal::BlockPayout<sp_core::crypto::AccountId32, Balance>
    **/
-  UlxPrimitivesBlockSealBlockPayout: {
+  ArgonPrimitivesBlockSealBlockPayout: {
     accountId: 'AccountId32',
-    ulixees: 'Compact<u128>',
+    shares: 'Compact<u128>',
     argons: 'Compact<u128>'
   },
   /**
@@ -879,7 +879,7 @@ export default {
    * Lookup99: pallet_mint::pallet::MintType
    **/
   PalletMintMintType: {
-    _enum: ['Bitcoin', 'Ulixee']
+    _enum: ['Bitcoin', 'Mining']
   },
   /**
    * Lookup100: pallet_balances::pallet::Event<T, I>
@@ -1222,28 +1222,28 @@ export default {
     _enum: {
       proxy: {
         real: 'MultiAddress',
-        forceProxyType: 'Option<UlxNodeRuntimeProxyType>',
+        forceProxyType: 'Option<ArgonNodeRuntimeProxyType>',
         call: 'Call',
       },
       add_proxy: {
         delegate: 'MultiAddress',
-        proxyType: 'UlxNodeRuntimeProxyType',
+        proxyType: 'ArgonNodeRuntimeProxyType',
         delay: 'u32',
       },
       remove_proxy: {
         delegate: 'MultiAddress',
-        proxyType: 'UlxNodeRuntimeProxyType',
+        proxyType: 'ArgonNodeRuntimeProxyType',
         delay: 'u32',
       },
       remove_proxies: 'Null',
       create_pure: {
-        proxyType: 'UlxNodeRuntimeProxyType',
+        proxyType: 'ArgonNodeRuntimeProxyType',
         delay: 'u32',
         index: 'u16',
       },
       kill_pure: {
         spawner: 'MultiAddress',
-        proxyType: 'UlxNodeRuntimeProxyType',
+        proxyType: 'ArgonNodeRuntimeProxyType',
         index: 'u16',
         height: 'Compact<u32>',
         extIndex: 'Compact<u32>',
@@ -1263,7 +1263,7 @@ export default {
       proxy_announced: {
         delegate: 'MultiAddress',
         real: 'MultiAddress',
-        forceProxyType: 'Option<UlxNodeRuntimeProxyType>',
+        forceProxyType: 'Option<ArgonNodeRuntimeProxyType>',
         call: 'Call'
       }
     }
@@ -1279,7 +1279,7 @@ export default {
     _enum: {
       bid: {
         bondInfo: 'Option<PalletMiningSlotMiningSlotBid>',
-        rewardDestination: 'UlxPrimitivesBlockSealRewardDestination'
+        rewardDestination: 'ArgonPrimitivesBlockSealRewardDestination'
       }
     }
   },
@@ -1296,11 +1296,11 @@ export default {
   PalletBitcoinUtxosCall: {
     _enum: {
       sync: {
-        utxoSync: 'UlxPrimitivesInherentsBitcoinUtxoSync',
+        utxoSync: 'ArgonPrimitivesInherentsBitcoinUtxoSync',
       },
       set_confirmed_block: {
         bitcoinHeight: 'u64',
-        bitcoinBlockHash: 'UlxPrimitivesBitcoinH256Le',
+        bitcoinBlockHash: 'ArgonPrimitivesBitcoinH256Le',
       },
       set_operator: {
         accountId: 'AccountId32'
@@ -1308,20 +1308,20 @@ export default {
     }
   },
   /**
-   * Lookup149: ulx_primitives::inherents::BitcoinUtxoSync
+   * Lookup149: argon_primitives::inherents::BitcoinUtxoSync
    **/
-  UlxPrimitivesInherentsBitcoinUtxoSync: {
+  ArgonPrimitivesInherentsBitcoinUtxoSync: {
     spent: 'BTreeMap<u64, u64>',
-    verified: 'BTreeMap<u64, UlxPrimitivesBitcoinUtxoRef>',
-    invalid: 'BTreeMap<u64, UlxPrimitivesBitcoinBitcoinRejectedReason>',
-    syncToBlock: 'UlxPrimitivesBitcoinBitcoinBlock'
+    verified: 'BTreeMap<u64, ArgonPrimitivesBitcoinUtxoRef>',
+    invalid: 'BTreeMap<u64, ArgonPrimitivesBitcoinBitcoinRejectedReason>',
+    syncToBlock: 'ArgonPrimitivesBitcoinBitcoinBlock'
   },
   /**
-   * Lookup159: ulx_primitives::bitcoin::BitcoinBlock
+   * Lookup159: argon_primitives::bitcoin::BitcoinBlock
    **/
-  UlxPrimitivesBitcoinBitcoinBlock: {
+  ArgonPrimitivesBitcoinBitcoinBlock: {
     blockHeight: 'Compact<u64>',
-    blockHash: 'UlxPrimitivesBitcoinH256Le'
+    blockHash: 'ArgonPrimitivesBitcoinH256Le'
   },
   /**
    * Lookup160: pallet_vaults::pallet::Call<T>
@@ -1339,14 +1339,14 @@ export default {
       },
       modify_terms: {
         vaultId: 'u32',
-        terms: 'UlxPrimitivesBondVaultTerms',
+        terms: 'ArgonPrimitivesBondVaultTerms',
       },
       close: {
         vaultId: 'u32',
       },
       replace_bitcoin_xpub: {
         vaultId: 'u32',
-        bitcoinXpub: 'UlxPrimitivesBitcoinOpaqueBitcoinXpub'
+        bitcoinXpub: 'ArgonPrimitivesBitcoinOpaqueBitcoinXpub'
       }
     }
   },
@@ -1354,16 +1354,16 @@ export default {
    * Lookup161: pallet_vaults::pallet::VaultConfig<Balance>
    **/
   PalletVaultsVaultConfig: {
-    terms: 'UlxPrimitivesBondVaultTerms',
+    terms: 'ArgonPrimitivesBondVaultTerms',
     bitcoinAmountAllocated: 'Compact<u128>',
-    bitcoinXpubkey: 'UlxPrimitivesBitcoinOpaqueBitcoinXpub',
+    bitcoinXpubkey: 'ArgonPrimitivesBitcoinOpaqueBitcoinXpub',
     miningAmountAllocated: 'Compact<u128>',
     securitizationPercent: 'Compact<u128>'
   },
   /**
-   * Lookup162: ulx_primitives::bond::VaultTerms<Balance>
+   * Lookup162: argon_primitives::bond::VaultTerms<Balance>
    **/
-  UlxPrimitivesBondVaultTerms: {
+  ArgonPrimitivesBondVaultTerms: {
     bitcoinAnnualPercentRate: 'Compact<u128>',
     bitcoinBaseFee: 'Compact<u128>',
     miningAnnualPercentRate: 'Compact<u128>',
@@ -1371,9 +1371,9 @@ export default {
     miningRewardSharingPercentTake: 'Compact<u128>'
   },
   /**
-   * Lookup163: ulx_primitives::bitcoin::OpaqueBitcoinXpub
+   * Lookup163: argon_primitives::bitcoin::OpaqueBitcoinXpub
    **/
-  UlxPrimitivesBitcoinOpaqueBitcoinXpub: '[u8;78]',
+  ArgonPrimitivesBitcoinOpaqueBitcoinXpub: '[u8;78]',
   /**
    * Lookup165: pallet_bond::pallet::Call<T>
    **/
@@ -1382,7 +1382,7 @@ export default {
       bond_bitcoin: {
         vaultId: 'u32',
         satoshis: 'Compact<u64>',
-        bitcoinPubkey: 'UlxPrimitivesBitcoinCompressedBitcoinPubkey',
+        bitcoinPubkey: 'ArgonPrimitivesBitcoinCompressedBitcoinPubkey',
       },
       __Unused1: 'Null',
       __Unused2: 'Null',
@@ -1399,23 +1399,23 @@ export default {
     }
   },
   /**
-   * Lookup166: ulx_primitives::bitcoin::CompressedBitcoinPubkey
+   * Lookup166: argon_primitives::bitcoin::CompressedBitcoinPubkey
    **/
-  UlxPrimitivesBitcoinCompressedBitcoinPubkey: '[u8;33]',
+  ArgonPrimitivesBitcoinCompressedBitcoinPubkey: '[u8;33]',
   /**
    * Lookup170: pallet_notaries::pallet::Call<T>
    **/
   PalletNotariesCall: {
     _enum: {
       propose: {
-        meta: 'UlxPrimitivesNotaryNotaryMeta',
+        meta: 'ArgonPrimitivesNotaryNotaryMeta',
       },
       activate: {
         operatorAccount: 'AccountId32',
       },
       update: {
         notaryId: 'Compact<u32>',
-        meta: 'UlxPrimitivesNotaryNotaryMeta',
+        meta: 'ArgonPrimitivesNotaryNotaryMeta',
         effectiveTick: 'Compact<u32>'
       }
     }
@@ -1426,29 +1426,29 @@ export default {
   PalletNotebookCall: {
     _enum: {
       submit: {
-        notebooks: 'Vec<UlxPrimitivesNotebookSignedNotebookHeader>'
+        notebooks: 'Vec<ArgonPrimitivesNotebookSignedNotebookHeader>'
       }
     }
   },
   /**
-   * Lookup173: ulx_primitives::notebook::SignedNotebookHeader
+   * Lookup173: argon_primitives::notebook::SignedNotebookHeader
    **/
-  UlxPrimitivesNotebookSignedNotebookHeader: {
-    header: 'UlxPrimitivesNotebookNotebookHeader',
+  ArgonPrimitivesNotebookSignedNotebookHeader: {
+    header: 'ArgonPrimitivesNotebookNotebookHeader',
     signature: '[u8;64]'
   },
   /**
-   * Lookup174: ulx_primitives::notebook::NotebookHeader
+   * Lookup174: argon_primitives::notebook::NotebookHeader
    **/
-  UlxPrimitivesNotebookNotebookHeader: {
+  ArgonPrimitivesNotebookNotebookHeader: {
     version: 'Compact<u16>',
     notebookNumber: 'Compact<u32>',
     tick: 'Compact<u32>',
     tax: 'Compact<u128>',
     notaryId: 'Compact<u32>',
-    chainTransfers: 'Vec<UlxPrimitivesNotebookChainTransfer>',
+    chainTransfers: 'Vec<ArgonPrimitivesNotebookChainTransfer>',
     changedAccountsRoot: 'H256',
-    changedAccountOrigins: 'Vec<UlxPrimitivesBalanceChangeAccountOrigin>',
+    changedAccountOrigins: 'Vec<ArgonPrimitivesBalanceChangeAccountOrigin>',
     blockVotesRoot: 'H256',
     blockVotesCount: 'Compact<u32>',
     blocksWithVotes: 'Vec<H256>',
@@ -1458,9 +1458,9 @@ export default {
     dataDomains: 'Vec<(H256,AccountId32)>'
   },
   /**
-   * Lookup177: ulx_primitives::notebook::ChainTransfer
+   * Lookup177: argon_primitives::notebook::ChainTransfer
    **/
-  UlxPrimitivesNotebookChainTransfer: {
+  ArgonPrimitivesNotebookChainTransfer: {
     _enum: {
       ToMainchain: {
         accountId: 'AccountId32',
@@ -1472,9 +1472,9 @@ export default {
     }
   },
   /**
-   * Lookup180: ulx_primitives::balance_change::AccountOrigin
+   * Lookup180: argon_primitives::balance_change::AccountOrigin
    **/
-  UlxPrimitivesBalanceChangeAccountOrigin: {
+  ArgonPrimitivesBalanceChangeAccountOrigin: {
     notebookNumber: 'Compact<u32>',
     accountUid: 'Compact<u32>'
   },
@@ -1507,7 +1507,7 @@ export default {
     _enum: {
       set_zone_record: {
         domainHash: 'H256',
-        zoneRecord: 'UlxPrimitivesDataDomainZoneRecord'
+        zoneRecord: 'ArgonPrimitivesDataDomainZoneRecord'
       }
     }
   },
@@ -1542,61 +1542,61 @@ export default {
         _alias: {
           keys_: 'keys',
         },
-        keys_: 'UlxNodeRuntimeOpaqueSessionKeys',
+        keys_: 'ArgonNodeRuntimeOpaqueSessionKeys',
         proof: 'Bytes',
       },
       purge_keys: 'Null'
     }
   },
   /**
-   * Lookup194: ulx_node_runtime::opaque::SessionKeys
+   * Lookup194: argon_node_runtime::opaque::SessionKeys
    **/
-  UlxNodeRuntimeOpaqueSessionKeys: {
+  ArgonNodeRuntimeOpaqueSessionKeys: {
     grandpa: 'SpConsensusGrandpaAppPublic',
-    blockSealAuthority: 'UlxPrimitivesBlockSealAppPublic'
+    blockSealAuthority: 'ArgonPrimitivesBlockSealAppPublic'
   },
   /**
-   * Lookup195: ulx_primitives::block_seal::app::Public
+   * Lookup195: argon_primitives::block_seal::app::Public
    **/
-  UlxPrimitivesBlockSealAppPublic: '[u8;32]',
+  ArgonPrimitivesBlockSealAppPublic: '[u8;32]',
   /**
    * Lookup196: pallet_block_seal::pallet::Call<T>
    **/
   PalletBlockSealCall: {
     _enum: {
       apply: {
-        seal: 'UlxPrimitivesInherentsBlockSealInherent'
+        seal: 'ArgonPrimitivesInherentsBlockSealInherent'
       }
     }
   },
   /**
-   * Lookup197: ulx_primitives::inherents::BlockSealInherent
+   * Lookup197: argon_primitives::inherents::BlockSealInherent
    **/
-  UlxPrimitivesInherentsBlockSealInherent: {
+  ArgonPrimitivesInherentsBlockSealInherent: {
     _enum: {
       Vote: {
         sealStrength: 'U256',
         notaryId: 'Compact<u32>',
         sourceNotebookNumber: 'Compact<u32>',
-        sourceNotebookProof: 'UlxPrimitivesBalanceChangeMerkleProof',
-        blockVote: 'UlxPrimitivesBlockVoteBlockVoteT',
-        minerSignature: 'UlxPrimitivesBlockSealAppSignature',
+        sourceNotebookProof: 'ArgonPrimitivesBalanceChangeMerkleProof',
+        blockVote: 'ArgonPrimitivesBlockVoteBlockVoteT',
+        minerSignature: 'ArgonPrimitivesBlockSealAppSignature',
       },
       Compute: 'Null'
     }
   },
   /**
-   * Lookup200: ulx_primitives::balance_change::MerkleProof
+   * Lookup200: argon_primitives::balance_change::MerkleProof
    **/
-  UlxPrimitivesBalanceChangeMerkleProof: {
+  ArgonPrimitivesBalanceChangeMerkleProof: {
     proof: 'Vec<H256>',
     numberOfLeaves: 'Compact<u32>',
     leafIndex: 'Compact<u32>'
   },
   /**
-   * Lookup202: ulx_primitives::block_vote::BlockVoteT<primitive_types::H256>
+   * Lookup202: argon_primitives::block_vote::BlockVoteT<primitive_types::H256>
    **/
-  UlxPrimitivesBlockVoteBlockVoteT: {
+  ArgonPrimitivesBlockVoteBlockVoteT: {
     accountId: 'AccountId32',
     blockHash: 'H256',
     index: 'Compact<u32>',
@@ -1617,9 +1617,9 @@ export default {
     }
   },
   /**
-   * Lookup205: ulx_primitives::block_seal::app::Signature
+   * Lookup205: argon_primitives::block_seal::app::Signature
    **/
-  UlxPrimitivesBlockSealAppSignature: '[u8;64]',
+  ArgonPrimitivesBlockSealAppSignature: '[u8;64]',
   /**
    * Lookup206: pallet_block_rewards::pallet::Call<T>
    **/
@@ -1803,11 +1803,11 @@ export default {
     _enum: ['MinimumThreshold', 'AlreadyApproved', 'NoApprovalsNeeded', 'TooFewSignatories', 'TooManySignatories', 'SignatoriesOutOfOrder', 'SenderInSignatories', 'NotFound', 'NotOwner', 'NoTimepoint', 'WrongTimepoint', 'UnexpectedTimepoint', 'MaxWeightTooLow', 'AlreadyStored']
   },
   /**
-   * Lookup228: pallet_proxy::ProxyDefinition<sp_core::crypto::AccountId32, ulx_node_runtime::ProxyType, BlockNumber>
+   * Lookup228: pallet_proxy::ProxyDefinition<sp_core::crypto::AccountId32, argon_node_runtime::ProxyType, BlockNumber>
    **/
   PalletProxyProxyDefinition: {
     delegate: 'AccountId32',
-    proxyType: 'UlxNodeRuntimeProxyType',
+    proxyType: 'ArgonNodeRuntimeProxyType',
     delay: 'u32'
   },
   /**
@@ -1853,29 +1853,29 @@ export default {
       BondAlreadyClosed: 'Null',
       FeeExceedsBondAmount: 'Null',
       AccountWouldBeBelowMinimum: 'Null',
-      GenericBondError: 'UlxPrimitivesBondBondError'
+      GenericBondError: 'ArgonPrimitivesBondBondError'
     }
   },
   /**
-   * Lookup245: ulx_primitives::bond::BondError
+   * Lookup245: argon_primitives::bond::BondError
    **/
-  UlxPrimitivesBondBondError: {
+  ArgonPrimitivesBondBondError: {
     _enum: ['BondNotFound', 'NoMoreBondIds', 'MinimumBondAmountNotMet', 'VaultClosed', 'ExpirationAtBlockOverflow', 'AccountWouldBeBelowMinimum', 'InsufficientFunds', 'InsufficientVaultFunds', 'InsufficientBitcoinsForMining', 'ExpirationTooSoon', 'NoPermissions', 'HoldUnexpectedlyModified', 'UnrecoverableHold', 'VaultNotFound', 'NoVaultBitcoinPubkeysAvailable', 'UnableToGenerateVaultBitcoinPubkey', 'UnableToDecodeVaultBitcoinPubkey', 'FeeExceedsBondAmount', 'InvalidBitcoinScript', 'InternalError']
   },
   /**
-   * Lookup246: ulx_primitives::bitcoin::UtxoValue
+   * Lookup246: argon_primitives::bitcoin::UtxoValue
    **/
-  UlxPrimitivesBitcoinUtxoValue: {
+  ArgonPrimitivesBitcoinUtxoValue: {
     utxoId: 'u64',
-    scriptPubkey: 'UlxPrimitivesBitcoinBitcoinCosignScriptPubkey',
+    scriptPubkey: 'ArgonPrimitivesBitcoinBitcoinCosignScriptPubkey',
     satoshis: 'Compact<u64>',
     submittedAtHeight: 'Compact<u64>',
     watchForSpentUntilHeight: 'Compact<u64>'
   },
   /**
-   * Lookup247: ulx_primitives::bitcoin::BitcoinCosignScriptPubkey
+   * Lookup247: argon_primitives::bitcoin::BitcoinCosignScriptPubkey
    **/
-  UlxPrimitivesBitcoinBitcoinCosignScriptPubkey: {
+  ArgonPrimitivesBitcoinBitcoinCosignScriptPubkey: {
     _enum: {
       P2WSH: {
         wscriptHash: 'H256'
@@ -1883,9 +1883,9 @@ export default {
     }
   },
   /**
-   * Lookup252: ulx_primitives::bitcoin::BitcoinNetwork
+   * Lookup252: argon_primitives::bitcoin::BitcoinNetwork
    **/
-  UlxPrimitivesBitcoinBitcoinNetwork: {
+  ArgonPrimitivesBitcoinBitcoinNetwork: {
     _enum: ['Bitcoin', 'Testnet', 'Signet', 'Regtest']
   },
   /**
@@ -1895,42 +1895,42 @@ export default {
     _enum: ['NoPermissions', 'NoBitcoinConfirmedBlock', 'InsufficientBitcoinAmount', 'NoBitcoinPricesAvailable', 'ScriptPubkeyConflict', 'UtxoNotLocked', 'RedemptionsUnavailable', 'InvalidBitcoinSyncHeight', 'BitcoinHeightNotConfirmed', 'MaxUtxosExceeded', 'InvalidBitcoinScript']
   },
   /**
-   * Lookup256: ulx_primitives::bond::Vault<sp_core::crypto::AccountId32, Balance, BlockNumber>
+   * Lookup256: argon_primitives::bond::Vault<sp_core::crypto::AccountId32, Balance, BlockNumber>
    **/
-  UlxPrimitivesBondVault: {
+  ArgonPrimitivesBondVault: {
     operatorAccountId: 'AccountId32',
-    bitcoinArgons: 'UlxPrimitivesBondVaultArgons',
+    bitcoinArgons: 'ArgonPrimitivesBondVaultArgons',
     securitizationPercent: 'Compact<u128>',
     securitizedArgons: 'Compact<u128>',
-    miningArgons: 'UlxPrimitivesBondVaultArgons',
+    miningArgons: 'ArgonPrimitivesBondVaultArgons',
     miningRewardSharingPercentTake: 'Compact<u128>',
     isClosed: 'bool',
-    pendingTerms: 'Option<(u32,UlxPrimitivesBondVaultTerms)>'
+    pendingTerms: 'Option<(u32,ArgonPrimitivesBondVaultTerms)>'
   },
   /**
-   * Lookup257: ulx_primitives::bond::VaultArgons<Balance>
+   * Lookup257: argon_primitives::bond::VaultArgons<Balance>
    **/
-  UlxPrimitivesBondVaultArgons: {
+  ArgonPrimitivesBondVaultArgons: {
     annualPercentRate: 'Compact<u128>',
     allocated: 'Compact<u128>',
     bonded: 'Compact<u128>',
     baseFee: 'Compact<u128>'
   },
   /**
-   * Lookup261: ulx_primitives::bitcoin::BitcoinXPub
+   * Lookup261: argon_primitives::bitcoin::BitcoinXPub
    **/
-  UlxPrimitivesBitcoinBitcoinXPub: {
-    publicKey: 'UlxPrimitivesBitcoinCompressedBitcoinPubkey',
+  ArgonPrimitivesBitcoinBitcoinXPub: {
+    publicKey: 'ArgonPrimitivesBitcoinCompressedBitcoinPubkey',
     depth: 'Compact<u8>',
     parentFingerprint: '[u8;4]',
     childNumber: 'Compact<u32>',
     chainCode: '[u8;32]',
-    network: 'UlxPrimitivesBitcoinNetworkKind'
+    network: 'ArgonPrimitivesBitcoinNetworkKind'
   },
   /**
-   * Lookup263: ulx_primitives::bitcoin::NetworkKind
+   * Lookup263: argon_primitives::bitcoin::NetworkKind
    **/
-  UlxPrimitivesBitcoinNetworkKind: {
+  ArgonPrimitivesBitcoinNetworkKind: {
     _enum: ['Main', 'Test']
   },
   /**
@@ -1940,10 +1940,10 @@ export default {
     _enum: ['BondNotFound', 'NoMoreVaultIds', 'NoMoreBondIds', 'MinimumBondAmountNotMet', 'ExpirationAtBlockOverflow', 'InsufficientFunds', 'InsufficientVaultFunds', 'InsufficientBitcoinsForMining', 'AccountBelowMinimumBalance', 'VaultClosed', 'InvalidVaultAmount', 'VaultReductionBelowAllocatedFunds', 'InvalidSecuritization', 'ReusedVaultBitcoinXpub', 'MaxSecuritizationPercentExceeded', 'InvalidBondType', 'BitcoinUtxoNotFound', 'InsufficientSatoshisBonded', 'NoBitcoinPricesAvailable', 'InvalidBitcoinScript', 'InvalidXpubkey', 'WrongXpubNetwork', 'UnsafeXpubkey', 'UnableToDeriveVaultXpubChild', 'BitcoinConversionFailed', 'ExpirationTooSoon', 'NoPermissions', 'HoldUnexpectedlyModified', 'UnrecoverableHold', 'VaultNotFound', 'FeeExceedsBondAmount', 'NoVaultBitcoinPubkeysAvailable', 'TermsModificationOverflow', 'TermsChangeAlreadyScheduled', 'InternalError', 'UnableToGenerateVaultBitcoinPubkey', 'UnableToDecodeVaultBitcoinPubkey']
   },
   /**
-   * Lookup266: ulx_primitives::bond::Bond<sp_core::crypto::AccountId32, Balance, BlockNumber>
+   * Lookup266: argon_primitives::bond::Bond<sp_core::crypto::AccountId32, Balance, BlockNumber>
    **/
-  UlxPrimitivesBond: {
-    bondType: 'UlxPrimitivesBondBondType',
+  ArgonPrimitivesBond: {
+    bondType: 'ArgonPrimitivesBondBondType',
     vaultId: 'Compact<u32>',
     utxoId: 'Option<u64>',
     bondedAccountId: 'AccountId32',
@@ -1951,7 +1951,7 @@ export default {
     prepaidFee: 'Compact<u128>',
     amount: 'Compact<u128>',
     startBlock: 'Compact<u32>',
-    expiration: 'UlxPrimitivesBondBondExpiration'
+    expiration: 'ArgonPrimitivesBondBondExpiration'
   },
   /**
    * Lookup269: pallet_bond::pallet::UtxoState
@@ -1959,14 +1959,14 @@ export default {
   PalletBondUtxoState: {
     bondId: 'Compact<u64>',
     satoshis: 'Compact<u64>',
-    vaultPubkey: 'UlxPrimitivesBitcoinCompressedBitcoinPubkey',
-    vaultClaimPubkey: 'UlxPrimitivesBitcoinCompressedBitcoinPubkey',
+    vaultPubkey: 'ArgonPrimitivesBitcoinCompressedBitcoinPubkey',
+    vaultClaimPubkey: 'ArgonPrimitivesBitcoinCompressedBitcoinPubkey',
     vaultXpubSources: '([u8;4],u32,u32)',
-    ownerPubkey: 'UlxPrimitivesBitcoinCompressedBitcoinPubkey',
+    ownerPubkey: 'ArgonPrimitivesBitcoinCompressedBitcoinPubkey',
     vaultClaimHeight: 'Compact<u64>',
     openClaimHeight: 'Compact<u64>',
     createdAtHeight: 'Compact<u64>',
-    utxoScriptPubkey: 'UlxPrimitivesBitcoinBitcoinCosignScriptPubkey',
+    utxoScriptPubkey: 'ArgonPrimitivesBitcoinBitcoinCosignScriptPubkey',
     isVerified: 'bool'
   },
   /**
@@ -2013,7 +2013,7 @@ export default {
       UnrecoverableHold: 'Null',
       VaultNotFound: 'Null',
       FeeExceedsBondAmount: 'Null',
-      GenericBondError: 'UlxPrimitivesBondBondError'
+      GenericBondError: 'ArgonPrimitivesBondBondError'
     }
   },
   /**
@@ -2023,9 +2023,9 @@ export default {
     _enum: ['ProposalNotFound', 'MaxNotariesExceeded', 'MaxProposalsPerBlockExceeded', 'NotAnActiveNotary', 'InvalidNotaryOperator', 'NoMoreNotaryIds', 'EffectiveTickTooSoon', 'TooManyKeys', 'InvalidNotary']
   },
   /**
-   * Lookup293: ulx_primitives::notary::NotaryNotebookKeyDetails
+   * Lookup293: argon_primitives::notary::NotaryNotebookKeyDetails
    **/
-  UlxPrimitivesNotaryNotaryNotebookKeyDetails: {
+  ArgonPrimitivesNotaryNotaryNotebookKeyDetails: {
     notebookNumber: 'Compact<u32>',
     tick: 'Compact<u32>',
     blockVotesRoot: 'H256',
@@ -2033,19 +2033,19 @@ export default {
     parentSecret: 'Option<H256>'
   },
   /**
-   * Lookup295: ulx_primitives::digests::NotebookDigest<ulx_notary_audit::error::VerifyError>
+   * Lookup295: argon_primitives::digests::NotebookDigest<argon_notary_audit::error::VerifyError>
    **/
-  UlxPrimitivesDigestsNotebookDigest: {
-    notebooks: 'Vec<UlxPrimitivesDigestsNotebookDigestRecord>'
+  ArgonPrimitivesDigestsNotebookDigest: {
+    notebooks: 'Vec<ArgonPrimitivesDigestsNotebookDigestRecord>'
   },
   /**
-   * Lookup297: ulx_primitives::digests::NotebookDigestRecord<ulx_notary_audit::error::VerifyError>
+   * Lookup297: argon_primitives::digests::NotebookDigestRecord<argon_notary_audit::error::VerifyError>
    **/
-  UlxPrimitivesDigestsNotebookDigestRecord: {
+  ArgonPrimitivesDigestsNotebookDigestRecord: {
     notaryId: 'Compact<u32>',
     notebookNumber: 'Compact<u32>',
     tick: 'Compact<u32>',
-    auditFirstFailure: 'Option<UlxNotaryAuditErrorVerifyError>'
+    auditFirstFailure: 'Option<ArgonNotaryAuditErrorVerifyError>'
   },
   /**
    * Lookup300: pallet_notebook::pallet::Error<T>
@@ -2073,9 +2073,9 @@ export default {
     _enum: ['MaxBlockTransfersExceeded', 'InsufficientFunds', 'InsufficientNotarizedFunds', 'InvalidOrDuplicatedLocalchainTransfer', 'NotebookIncludesExpiredLocalchainTransfer', 'InvalidNotaryUsedForTransfer', 'NotaryLocked']
   },
   /**
-   * Lookup312: ulx_primitives::notary::NotaryNotebookVoteDigestDetails
+   * Lookup312: argon_primitives::notary::NotaryNotebookVoteDigestDetails
    **/
-  UlxPrimitivesNotaryNotaryNotebookVoteDigestDetails: {
+  ArgonPrimitivesNotaryNotaryNotebookVoteDigestDetails: {
     notaryId: 'Compact<u32>',
     notebookNumber: 'Compact<u32>',
     tick: 'Compact<u32>',
@@ -2083,9 +2083,9 @@ export default {
     blockVotingPower: 'Compact<u128>'
   },
   /**
-   * Lookup314: ulx_primitives::digests::BlockVoteDigest
+   * Lookup314: argon_primitives::digests::BlockVoteDigest
    **/
-  UlxPrimitivesDigestsBlockVoteDigest: {
+  ArgonPrimitivesDigestsBlockVoteDigest: {
     votingPower: 'Compact<u128>',
     votesCount: 'Compact<u32>'
   },
@@ -2118,16 +2118,16 @@ export default {
     _enum: ['InvalidProof', 'NoAssociatedValidatorId', 'DuplicatedKey', 'NoKeys', 'NoAccount']
   },
   /**
-   * Lookup329: ulx_primitives::providers::BlockSealerInfo<sp_core::crypto::AccountId32>
+   * Lookup329: argon_primitives::providers::BlockSealerInfo<sp_core::crypto::AccountId32>
    **/
-  UlxPrimitivesProvidersBlockSealerInfo: {
+  ArgonPrimitivesProvidersBlockSealerInfo: {
     blockAuthorAccountId: 'AccountId32',
     blockVoteRewardsAccount: 'Option<AccountId32>'
   },
   /**
-   * Lookup330: ulx_primitives::digests::ParentVotingKeyDigest
+   * Lookup330: argon_primitives::digests::ParentVotingKeyDigest
    **/
-  UlxPrimitivesDigestsParentVotingKeyDigest: {
+  ArgonPrimitivesDigestsParentVotingKeyDigest: {
     parentVotingKey: 'Option<H256>'
   },
   /**
@@ -2213,16 +2213,16 @@ export default {
     amount: 'u128'
   },
   /**
-   * Lookup355: frame_support::traits::tokens::misc::IdAmount<ulx_node_runtime::RuntimeHoldReason, Balance>
+   * Lookup355: frame_support::traits::tokens::misc::IdAmount<argon_node_runtime::RuntimeHoldReason, Balance>
    **/
   FrameSupportTokensMiscIdAmountRuntimeHoldReason: {
-    id: 'UlxNodeRuntimeRuntimeHoldReason',
+    id: 'ArgonNodeRuntimeRuntimeHoldReason',
     amount: 'u128'
   },
   /**
-   * Lookup356: ulx_node_runtime::RuntimeHoldReason
+   * Lookup356: argon_node_runtime::RuntimeHoldReason
    **/
-  UlxNodeRuntimeRuntimeHoldReason: {
+  ArgonNodeRuntimeRuntimeHoldReason: {
     _enum: {
       __Unused0: 'Null',
       __Unused1: 'Null',
@@ -2271,16 +2271,16 @@ export default {
     _enum: ['MaturationPeriod']
   },
   /**
-   * Lookup363: frame_support::traits::tokens::misc::IdAmount<ulx_node_runtime::RuntimeFreezeReason, Balance>
+   * Lookup363: frame_support::traits::tokens::misc::IdAmount<argon_node_runtime::RuntimeFreezeReason, Balance>
    **/
   FrameSupportTokensMiscIdAmountRuntimeFreezeReason: {
-    id: 'UlxNodeRuntimeRuntimeFreezeReason',
+    id: 'ArgonNodeRuntimeRuntimeFreezeReason',
     amount: 'u128'
   },
   /**
-   * Lookup364: ulx_node_runtime::RuntimeFreezeReason
+   * Lookup364: argon_node_runtime::RuntimeFreezeReason
    **/
-  UlxNodeRuntimeRuntimeFreezeReason: {
+  ArgonNodeRuntimeRuntimeFreezeReason: {
     _enum: {
       __Unused0: 'Null',
       __Unused1: 'Null',
@@ -2375,7 +2375,7 @@ export default {
     _enum: ['Disabled', 'Enabled']
   },
   /**
-   * Lookup386: ulx_node_runtime::Runtime
+   * Lookup386: argon_node_runtime::Runtime
    **/
-  UlxNodeRuntimeRuntime: 'Null'
+  ArgonNodeRuntimeRuntime: 'Null'
 };

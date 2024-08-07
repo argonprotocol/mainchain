@@ -59,7 +59,7 @@ fn set_vm_data(is_mining: bool, data: &VMData, key_hash: &H256) -> Result<(), Ra
 			*entry = Some((*key_hash, vm));
 		} else {
 			let new_vm = data.new_vm()?;
-			info!(target:"ulx-randomx", "Created new Randomx VM for key: {:?}", hex::encode(key_hash));
+			info!(target:"argon-randomx", "Created new Randomx VM for key: {:?}", hex::encode(key_hash));
 			*entry = Some((*key_hash, new_vm));
 		};
 

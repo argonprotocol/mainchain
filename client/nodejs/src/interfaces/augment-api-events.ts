@@ -9,7 +9,7 @@ import type { ApiTypes, AugmentedEvent } from '@polkadot/api-base/types';
 import type { Bytes, Null, Option, Result, U8aFixed, Vec, bool, u128, u16, u32, u64 } from '@polkadot/types-codec';
 import type { ITuple } from '@polkadot/types-codec/types';
 import type { AccountId32, H256 } from '@polkadot/types/interfaces/runtime';
-import type { FrameSupportDispatchDispatchInfo, FrameSupportTokensMiscBalanceStatus, PalletDataDomainDataDomainRegistration, PalletMintMintType, PalletMultisigTimepoint, SpConsensusGrandpaAppPublic, SpRuntimeDispatchError, UlxNodeRuntimeProxyType, UlxNotaryAuditErrorVerifyError, UlxPrimitivesBitcoinBitcoinRejectedReason, UlxPrimitivesBitcoinUtxoRef, UlxPrimitivesBlockSealBlockPayout, UlxPrimitivesBlockSealMiningRegistration, UlxPrimitivesBondBondExpiration, UlxPrimitivesBondBondType, UlxPrimitivesDataDomainZoneRecord, UlxPrimitivesNotaryNotaryMeta, UlxPrimitivesNotaryNotaryRecord } from '@polkadot/types/lookup';
+import type { ArgonNodeRuntimeProxyType, ArgonNotaryAuditErrorVerifyError, ArgonPrimitivesBitcoinBitcoinRejectedReason, ArgonPrimitivesBitcoinUtxoRef, ArgonPrimitivesBlockSealBlockPayout, ArgonPrimitivesBlockSealMiningRegistration, ArgonPrimitivesBondBondExpiration, ArgonPrimitivesBondBondType, ArgonPrimitivesDataDomainZoneRecord, ArgonPrimitivesNotaryNotaryMeta, ArgonPrimitivesNotaryNotaryRecord, FrameSupportDispatchDispatchInfo, FrameSupportTokensMiscBalanceStatus, PalletDataDomainDataDomainRegistration, PalletMintMintType, PalletMultisigTimepoint, SpConsensusGrandpaAppPublic, SpRuntimeDispatchError } from '@polkadot/types/lookup';
 
 export type __AugmentedEvent<ApiType extends ApiTypes> = AugmentedEvent<ApiType>;
 
@@ -108,8 +108,8 @@ declare module '@polkadot/api-base/types/events' {
       Withdraw: AugmentedEvent<ApiType, [who: AccountId32, amount: u128], { who: AccountId32, amount: u128 }>;
     };
     bitcoinUtxos: {
-      UtxoExpiredError: AugmentedEvent<ApiType, [utxoRef: UlxPrimitivesBitcoinUtxoRef, error: SpRuntimeDispatchError], { utxoRef: UlxPrimitivesBitcoinUtxoRef, error: SpRuntimeDispatchError }>;
-      UtxoRejected: AugmentedEvent<ApiType, [utxoId: u64, rejectedReason: UlxPrimitivesBitcoinBitcoinRejectedReason], { utxoId: u64, rejectedReason: UlxPrimitivesBitcoinBitcoinRejectedReason }>;
+      UtxoExpiredError: AugmentedEvent<ApiType, [utxoRef: ArgonPrimitivesBitcoinUtxoRef, error: SpRuntimeDispatchError], { utxoRef: ArgonPrimitivesBitcoinUtxoRef, error: SpRuntimeDispatchError }>;
+      UtxoRejected: AugmentedEvent<ApiType, [utxoId: u64, rejectedReason: ArgonPrimitivesBitcoinBitcoinRejectedReason], { utxoId: u64, rejectedReason: ArgonPrimitivesBitcoinBitcoinRejectedReason }>;
       UtxoRejectedError: AugmentedEvent<ApiType, [utxoId: u64, error: SpRuntimeDispatchError], { utxoId: u64, error: SpRuntimeDispatchError }>;
       UtxoSpent: AugmentedEvent<ApiType, [utxoId: u64, blockHeight: u64], { utxoId: u64, blockHeight: u64 }>;
       UtxoSpentError: AugmentedEvent<ApiType, [utxoId: u64, error: SpRuntimeDispatchError], { utxoId: u64, error: SpRuntimeDispatchError }>;
@@ -118,10 +118,10 @@ declare module '@polkadot/api-base/types/events' {
       UtxoVerifiedError: AugmentedEvent<ApiType, [utxoId: u64, error: SpRuntimeDispatchError], { utxoId: u64, error: SpRuntimeDispatchError }>;
     };
     blockRewards: {
-      RewardCreated: AugmentedEvent<ApiType, [maturationBlock: u32, rewards: Vec<UlxPrimitivesBlockSealBlockPayout>], { maturationBlock: u32, rewards: Vec<UlxPrimitivesBlockSealBlockPayout> }>;
-      RewardCreateError: AugmentedEvent<ApiType, [accountId: AccountId32, argons: Option<u128>, ulixees: Option<u128>, error: SpRuntimeDispatchError], { accountId: AccountId32, argons: Option<u128>, ulixees: Option<u128>, error: SpRuntimeDispatchError }>;
-      RewardUnlocked: AugmentedEvent<ApiType, [rewards: Vec<UlxPrimitivesBlockSealBlockPayout>], { rewards: Vec<UlxPrimitivesBlockSealBlockPayout> }>;
-      RewardUnlockError: AugmentedEvent<ApiType, [accountId: AccountId32, argons: Option<u128>, ulixees: Option<u128>, error: SpRuntimeDispatchError], { accountId: AccountId32, argons: Option<u128>, ulixees: Option<u128>, error: SpRuntimeDispatchError }>;
+      RewardCreated: AugmentedEvent<ApiType, [maturationBlock: u32, rewards: Vec<ArgonPrimitivesBlockSealBlockPayout>], { maturationBlock: u32, rewards: Vec<ArgonPrimitivesBlockSealBlockPayout> }>;
+      RewardCreateError: AugmentedEvent<ApiType, [accountId: AccountId32, argons: Option<u128>, shares: Option<u128>, error: SpRuntimeDispatchError], { accountId: AccountId32, argons: Option<u128>, shares: Option<u128>, error: SpRuntimeDispatchError }>;
+      RewardUnlocked: AugmentedEvent<ApiType, [rewards: Vec<ArgonPrimitivesBlockSealBlockPayout>], { rewards: Vec<ArgonPrimitivesBlockSealBlockPayout> }>;
+      RewardUnlockError: AugmentedEvent<ApiType, [accountId: AccountId32, argons: Option<u128>, shares: Option<u128>, error: SpRuntimeDispatchError], { accountId: AccountId32, argons: Option<u128>, shares: Option<u128>, error: SpRuntimeDispatchError }>;
     };
     blockSealSpec: {
       ComputeDifficultyAdjusted: AugmentedEvent<ApiType, [expectedBlockTime: u64, actualBlockTime: u64, startDifficulty: u128, newDifficulty: u128], { expectedBlockTime: u64, actualBlockTime: u64, startDifficulty: u128, newDifficulty: u128 }>;
@@ -132,13 +132,13 @@ declare module '@polkadot/api-base/types/events' {
       BitcoinCosignPastDue: AugmentedEvent<ApiType, [bondId: u64, vaultId: u32, utxoId: u64, compensationAmount: u128, compensationStillOwed: u128, compensatedAccountId: AccountId32], { bondId: u64, vaultId: u32, utxoId: u64, compensationAmount: u128, compensationStillOwed: u128, compensatedAccountId: AccountId32 }>;
       BitcoinUtxoCosigned: AugmentedEvent<ApiType, [bondId: u64, vaultId: u32, utxoId: u64, signature: Bytes], { bondId: u64, vaultId: u32, utxoId: u64, signature: Bytes }>;
       BitcoinUtxoCosignRequested: AugmentedEvent<ApiType, [bondId: u64, vaultId: u32, utxoId: u64], { bondId: u64, vaultId: u32, utxoId: u64 }>;
-      BondCanceled: AugmentedEvent<ApiType, [vaultId: u32, bondId: u64, bondedAccountId: AccountId32, bondType: UlxPrimitivesBondBondType, returnedFee: u128], { vaultId: u32, bondId: u64, bondedAccountId: AccountId32, bondType: UlxPrimitivesBondBondType, returnedFee: u128 }>;
+      BondCanceled: AugmentedEvent<ApiType, [vaultId: u32, bondId: u64, bondedAccountId: AccountId32, bondType: ArgonPrimitivesBondBondType, returnedFee: u128], { vaultId: u32, bondId: u64, bondedAccountId: AccountId32, bondType: ArgonPrimitivesBondBondType, returnedFee: u128 }>;
       BondCompleted: AugmentedEvent<ApiType, [vaultId: u32, bondId: u64], { vaultId: u32, bondId: u64 }>;
       /**
        * An error occurred while completing a bond
        **/
       BondCompletionError: AugmentedEvent<ApiType, [bondId: u64, error: SpRuntimeDispatchError], { bondId: u64, error: SpRuntimeDispatchError }>;
-      BondCreated: AugmentedEvent<ApiType, [vaultId: u32, bondId: u64, bondType: UlxPrimitivesBondBondType, bondedAccountId: AccountId32, utxoId: Option<u64>, amount: u128, expiration: UlxPrimitivesBondBondExpiration], { vaultId: u32, bondId: u64, bondType: UlxPrimitivesBondBondType, bondedAccountId: AccountId32, utxoId: Option<u64>, amount: u128, expiration: UlxPrimitivesBondBondExpiration }>;
+      BondCreated: AugmentedEvent<ApiType, [vaultId: u32, bondId: u64, bondType: ArgonPrimitivesBondBondType, bondedAccountId: AccountId32, utxoId: Option<u64>, amount: u128, expiration: ArgonPrimitivesBondBondExpiration], { vaultId: u32, bondId: u64, bondType: ArgonPrimitivesBondBondType, bondedAccountId: AccountId32, utxoId: Option<u64>, amount: u128, expiration: ArgonPrimitivesBondBondExpiration }>;
       /**
        * An error occurred while refunding an overdue cosigned bitcoin bond
        **/
@@ -191,7 +191,7 @@ declare module '@polkadot/api-base/types/events' {
       /**
        * A data domain zone record was updated
        **/
-      ZoneRecordUpdated: AugmentedEvent<ApiType, [domainHash: H256, zoneRecord: UlxPrimitivesDataDomainZoneRecord], { domainHash: H256, zoneRecord: UlxPrimitivesDataDomainZoneRecord }>;
+      ZoneRecordUpdated: AugmentedEvent<ApiType, [domainHash: H256, zoneRecord: ArgonPrimitivesDataDomainZoneRecord], { domainHash: H256, zoneRecord: ArgonPrimitivesDataDomainZoneRecord }>;
     };
     grandpa: {
       /**
@@ -208,7 +208,7 @@ declare module '@polkadot/api-base/types/events' {
       Resumed: AugmentedEvent<ApiType, []>;
     };
     miningSlot: {
-      NewMiners: AugmentedEvent<ApiType, [startIndex: u32, newMiners: Vec<UlxPrimitivesBlockSealMiningRegistration>], { startIndex: u32, newMiners: Vec<UlxPrimitivesBlockSealMiningRegistration> }>;
+      NewMiners: AugmentedEvent<ApiType, [startIndex: u32, newMiners: Vec<ArgonPrimitivesBlockSealMiningRegistration>], { startIndex: u32, newMiners: Vec<ArgonPrimitivesBlockSealMiningRegistration> }>;
       SlotBidderAdded: AugmentedEvent<ApiType, [accountId: AccountId32, bidAmount: u128, index: u32], { accountId: AccountId32, bidAmount: u128, index: u32 }>;
       SlotBidderReplaced: AugmentedEvent<ApiType, [accountId: AccountId32, bondId: Option<u64>, keptOwnershipBond: bool], { accountId: AccountId32, bondId: Option<u64>, keptOwnershipBond: bool }>;
       UnbondedMiner: AugmentedEvent<ApiType, [accountId: AccountId32, bondId: Option<u64>, keptOwnershipBond: bool], { accountId: AccountId32, bondId: Option<u64>, keptOwnershipBond: bool }>;
@@ -240,26 +240,26 @@ declare module '@polkadot/api-base/types/events' {
       /**
        * A notary proposal has been accepted
        **/
-      NotaryActivated: AugmentedEvent<ApiType, [notary: UlxPrimitivesNotaryNotaryRecord], { notary: UlxPrimitivesNotaryNotaryRecord }>;
+      NotaryActivated: AugmentedEvent<ApiType, [notary: ArgonPrimitivesNotaryNotaryRecord], { notary: ArgonPrimitivesNotaryNotaryRecord }>;
       /**
        * Notary metadata updated
        **/
-      NotaryMetaUpdated: AugmentedEvent<ApiType, [notaryId: u32, meta: UlxPrimitivesNotaryNotaryMeta], { notaryId: u32, meta: UlxPrimitivesNotaryNotaryMeta }>;
+      NotaryMetaUpdated: AugmentedEvent<ApiType, [notaryId: u32, meta: ArgonPrimitivesNotaryNotaryMeta], { notaryId: u32, meta: ArgonPrimitivesNotaryNotaryMeta }>;
       /**
        * Error updating queued notary info
        **/
-      NotaryMetaUpdateError: AugmentedEvent<ApiType, [notaryId: u32, error: SpRuntimeDispatchError, meta: UlxPrimitivesNotaryNotaryMeta], { notaryId: u32, error: SpRuntimeDispatchError, meta: UlxPrimitivesNotaryNotaryMeta }>;
+      NotaryMetaUpdateError: AugmentedEvent<ApiType, [notaryId: u32, error: SpRuntimeDispatchError, meta: ArgonPrimitivesNotaryNotaryMeta], { notaryId: u32, error: SpRuntimeDispatchError, meta: ArgonPrimitivesNotaryNotaryMeta }>;
       /**
        * Notary metadata queued for update
        **/
-      NotaryMetaUpdateQueued: AugmentedEvent<ApiType, [notaryId: u32, meta: UlxPrimitivesNotaryNotaryMeta, effectiveTick: u32], { notaryId: u32, meta: UlxPrimitivesNotaryNotaryMeta, effectiveTick: u32 }>;
+      NotaryMetaUpdateQueued: AugmentedEvent<ApiType, [notaryId: u32, meta: ArgonPrimitivesNotaryNotaryMeta, effectiveTick: u32], { notaryId: u32, meta: ArgonPrimitivesNotaryNotaryMeta, effectiveTick: u32 }>;
       /**
        * A user has proposed operating as a notary
        **/
-      NotaryProposed: AugmentedEvent<ApiType, [operatorAccount: AccountId32, meta: UlxPrimitivesNotaryNotaryMeta, expires: u32], { operatorAccount: AccountId32, meta: UlxPrimitivesNotaryNotaryMeta, expires: u32 }>;
+      NotaryProposed: AugmentedEvent<ApiType, [operatorAccount: AccountId32, meta: ArgonPrimitivesNotaryNotaryMeta, expires: u32], { operatorAccount: AccountId32, meta: ArgonPrimitivesNotaryNotaryMeta, expires: u32 }>;
     };
     notebook: {
-      NotebookAuditFailure: AugmentedEvent<ApiType, [notaryId: u32, notebookNumber: u32, firstFailureReason: UlxNotaryAuditErrorVerifyError], { notaryId: u32, notebookNumber: u32, firstFailureReason: UlxNotaryAuditErrorVerifyError }>;
+      NotebookAuditFailure: AugmentedEvent<ApiType, [notaryId: u32, notebookNumber: u32, firstFailureReason: ArgonNotaryAuditErrorVerifyError], { notaryId: u32, notebookNumber: u32, firstFailureReason: ArgonNotaryAuditErrorVerifyError }>;
       NotebookSubmitted: AugmentedEvent<ApiType, [notaryId: u32, notebookNumber: u32], { notaryId: u32, notebookNumber: u32 }>;
     };
     offences: {
@@ -285,7 +285,7 @@ declare module '@polkadot/api-base/types/events' {
       /**
        * A proxy was added.
        **/
-      ProxyAdded: AugmentedEvent<ApiType, [delegator: AccountId32, delegatee: AccountId32, proxyType: UlxNodeRuntimeProxyType, delay: u32], { delegator: AccountId32, delegatee: AccountId32, proxyType: UlxNodeRuntimeProxyType, delay: u32 }>;
+      ProxyAdded: AugmentedEvent<ApiType, [delegator: AccountId32, delegatee: AccountId32, proxyType: ArgonNodeRuntimeProxyType, delay: u32], { delegator: AccountId32, delegatee: AccountId32, proxyType: ArgonNodeRuntimeProxyType, delay: u32 }>;
       /**
        * A proxy was executed correctly, with the given.
        **/
@@ -293,12 +293,12 @@ declare module '@polkadot/api-base/types/events' {
       /**
        * A proxy was removed.
        **/
-      ProxyRemoved: AugmentedEvent<ApiType, [delegator: AccountId32, delegatee: AccountId32, proxyType: UlxNodeRuntimeProxyType, delay: u32], { delegator: AccountId32, delegatee: AccountId32, proxyType: UlxNodeRuntimeProxyType, delay: u32 }>;
+      ProxyRemoved: AugmentedEvent<ApiType, [delegator: AccountId32, delegatee: AccountId32, proxyType: ArgonNodeRuntimeProxyType, delay: u32], { delegator: AccountId32, delegatee: AccountId32, proxyType: ArgonNodeRuntimeProxyType, delay: u32 }>;
       /**
        * A pure account has been created by new proxy with given
        * disambiguation index and proxy type.
        **/
-      PureCreated: AugmentedEvent<ApiType, [pure: AccountId32, who: AccountId32, proxyType: UlxNodeRuntimeProxyType, disambiguationIndex: u16], { pure: AccountId32, who: AccountId32, proxyType: UlxNodeRuntimeProxyType, disambiguationIndex: u16 }>;
+      PureCreated: AugmentedEvent<ApiType, [pure: AccountId32, who: AccountId32, proxyType: ArgonNodeRuntimeProxyType, disambiguationIndex: u16], { pure: AccountId32, who: AccountId32, proxyType: ArgonNodeRuntimeProxyType, disambiguationIndex: u16 }>;
     };
     session: {
       /**
@@ -307,72 +307,7 @@ declare module '@polkadot/api-base/types/events' {
        **/
       NewSession: AugmentedEvent<ApiType, [sessionIndex: u32], { sessionIndex: u32 }>;
     };
-    sudo: {
-      /**
-       * The sudo key has been updated.
-       **/
-      KeyChanged: AugmentedEvent<ApiType, [old: Option<AccountId32>, new_: AccountId32], { old: Option<AccountId32>, new_: AccountId32 }>;
-      /**
-       * The key was permanently removed.
-       **/
-      KeyRemoved: AugmentedEvent<ApiType, []>;
-      /**
-       * A sudo call just took place.
-       **/
-      Sudid: AugmentedEvent<ApiType, [sudoResult: Result<Null, SpRuntimeDispatchError>], { sudoResult: Result<Null, SpRuntimeDispatchError> }>;
-      /**
-       * A [sudo_as](Pallet::sudo_as) call just took place.
-       **/
-      SudoAsDone: AugmentedEvent<ApiType, [sudoResult: Result<Null, SpRuntimeDispatchError>], { sudoResult: Result<Null, SpRuntimeDispatchError> }>;
-    };
-    system: {
-      /**
-       * `:code` was updated.
-       **/
-      CodeUpdated: AugmentedEvent<ApiType, []>;
-      /**
-       * An extrinsic failed.
-       **/
-      ExtrinsicFailed: AugmentedEvent<ApiType, [dispatchError: SpRuntimeDispatchError, dispatchInfo: FrameSupportDispatchDispatchInfo], { dispatchError: SpRuntimeDispatchError, dispatchInfo: FrameSupportDispatchDispatchInfo }>;
-      /**
-       * An extrinsic completed successfully.
-       **/
-      ExtrinsicSuccess: AugmentedEvent<ApiType, [dispatchInfo: FrameSupportDispatchDispatchInfo], { dispatchInfo: FrameSupportDispatchDispatchInfo }>;
-      /**
-       * An account was reaped.
-       **/
-      KilledAccount: AugmentedEvent<ApiType, [account: AccountId32], { account: AccountId32 }>;
-      /**
-       * A new account was created.
-       **/
-      NewAccount: AugmentedEvent<ApiType, [account: AccountId32], { account: AccountId32 }>;
-      /**
-       * On on-chain remark happened.
-       **/
-      Remarked: AugmentedEvent<ApiType, [sender: AccountId32, hash_: H256], { sender: AccountId32, hash_: H256 }>;
-      /**
-       * An upgrade was authorized.
-       **/
-      UpgradeAuthorized: AugmentedEvent<ApiType, [codeHash: H256, checkVersion: bool], { codeHash: H256, checkVersion: bool }>;
-    };
-    transactionPayment: {
-      /**
-       * A transaction fee `actual_fee`, of which `tip` was added to the minimum inclusion fee,
-       * has been paid by `who`.
-       **/
-      TransactionFeePaid: AugmentedEvent<ApiType, [who: AccountId32, actualFee: u128, tip: u128], { who: AccountId32, actualFee: u128, tip: u128 }>;
-    };
-    txPause: {
-      /**
-       * This pallet, or a specific call is now paused.
-       **/
-      CallPaused: AugmentedEvent<ApiType, [fullName: ITuple<[Bytes, Bytes]>], { fullName: ITuple<[Bytes, Bytes]> }>;
-      /**
-       * This pallet, or a specific call is now unpaused.
-       **/
-      CallUnpaused: AugmentedEvent<ApiType, [fullName: ITuple<[Bytes, Bytes]>], { fullName: ITuple<[Bytes, Bytes]> }>;
-    };
-    ulixeeBalances: {
+    shareBalances: {
       /**
        * A balance was set by root.
        **/
@@ -463,6 +398,71 @@ declare module '@polkadot/api-base/types/events' {
        * Some amount was withdrawn from the account (e.g. for transaction fees).
        **/
       Withdraw: AugmentedEvent<ApiType, [who: AccountId32, amount: u128], { who: AccountId32, amount: u128 }>;
+    };
+    sudo: {
+      /**
+       * The sudo key has been updated.
+       **/
+      KeyChanged: AugmentedEvent<ApiType, [old: Option<AccountId32>, new_: AccountId32], { old: Option<AccountId32>, new_: AccountId32 }>;
+      /**
+       * The key was permanently removed.
+       **/
+      KeyRemoved: AugmentedEvent<ApiType, []>;
+      /**
+       * A sudo call just took place.
+       **/
+      Sudid: AugmentedEvent<ApiType, [sudoResult: Result<Null, SpRuntimeDispatchError>], { sudoResult: Result<Null, SpRuntimeDispatchError> }>;
+      /**
+       * A [sudo_as](Pallet::sudo_as) call just took place.
+       **/
+      SudoAsDone: AugmentedEvent<ApiType, [sudoResult: Result<Null, SpRuntimeDispatchError>], { sudoResult: Result<Null, SpRuntimeDispatchError> }>;
+    };
+    system: {
+      /**
+       * `:code` was updated.
+       **/
+      CodeUpdated: AugmentedEvent<ApiType, []>;
+      /**
+       * An extrinsic failed.
+       **/
+      ExtrinsicFailed: AugmentedEvent<ApiType, [dispatchError: SpRuntimeDispatchError, dispatchInfo: FrameSupportDispatchDispatchInfo], { dispatchError: SpRuntimeDispatchError, dispatchInfo: FrameSupportDispatchDispatchInfo }>;
+      /**
+       * An extrinsic completed successfully.
+       **/
+      ExtrinsicSuccess: AugmentedEvent<ApiType, [dispatchInfo: FrameSupportDispatchDispatchInfo], { dispatchInfo: FrameSupportDispatchDispatchInfo }>;
+      /**
+       * An account was reaped.
+       **/
+      KilledAccount: AugmentedEvent<ApiType, [account: AccountId32], { account: AccountId32 }>;
+      /**
+       * A new account was created.
+       **/
+      NewAccount: AugmentedEvent<ApiType, [account: AccountId32], { account: AccountId32 }>;
+      /**
+       * On on-chain remark happened.
+       **/
+      Remarked: AugmentedEvent<ApiType, [sender: AccountId32, hash_: H256], { sender: AccountId32, hash_: H256 }>;
+      /**
+       * An upgrade was authorized.
+       **/
+      UpgradeAuthorized: AugmentedEvent<ApiType, [codeHash: H256, checkVersion: bool], { codeHash: H256, checkVersion: bool }>;
+    };
+    transactionPayment: {
+      /**
+       * A transaction fee `actual_fee`, of which `tip` was added to the minimum inclusion fee,
+       * has been paid by `who`.
+       **/
+      TransactionFeePaid: AugmentedEvent<ApiType, [who: AccountId32, actualFee: u128, tip: u128], { who: AccountId32, actualFee: u128, tip: u128 }>;
+    };
+    txPause: {
+      /**
+       * This pallet, or a specific call is now paused.
+       **/
+      CallPaused: AugmentedEvent<ApiType, [fullName: ITuple<[Bytes, Bytes]>], { fullName: ITuple<[Bytes, Bytes]> }>;
+      /**
+       * This pallet, or a specific call is now unpaused.
+       **/
+      CallUnpaused: AugmentedEvent<ApiType, [fullName: ITuple<[Bytes, Bytes]>], { fullName: ITuple<[Bytes, Bytes]> }>;
     };
     vaults: {
       VaultBitcoinXpubChange: AugmentedEvent<ApiType, [vaultId: u32], { vaultId: u32 }>;

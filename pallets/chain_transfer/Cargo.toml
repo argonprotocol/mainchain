@@ -25,8 +25,8 @@ sp-runtime = { workspace = true }
 sp-core = { workspace = true }
 sp-api = { workspace = true }
 
-ulx-primitives = { workspace = true }
-ulx-notary-audit = { workspace = true }
+argon-primitives = { workspace = true }
+argon-notary-audit = { workspace = true }
 
 [dev-dependencies]
 pallet-balances = { workspace = true }
@@ -38,6 +38,8 @@ binary-merkle-tree = { workspace = true }
 [features]
 default = [ "std" ]
 std = [
+	"argon-notary-audit/std",
+	"argon-primitives/std",
 	"codec/std",
 	"frame-benchmarking?/std",
 	"frame-support/std",
@@ -49,8 +51,6 @@ std = [
 	"sp-core/std",
 	"sp-io/std",
 	"sp-runtime/std",
-	"ulx-notary-audit/std",
-	"ulx-primitives/std",
 ]
 runtime-benchmarks = [
 	"frame-benchmarking/runtime-benchmarks",

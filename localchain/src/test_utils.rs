@@ -21,12 +21,12 @@ use sqlx::sqlite::{SqliteConnectOptions, SqlitePoolOptions};
 use sqlx::{ConnectOptions, SqlitePool};
 use tokio::sync::Mutex;
 
-use ulx_notary::server::pipe_from_stream_and_drop;
-use ulx_notary::server::NotebookHeaderStream;
-use ulx_notary_apis::localchain::{BalanceChangeResult, BalanceTipResult, LocalchainRpcServer};
-use ulx_notary_apis::notebook::NotebookRpcServer;
-use ulx_primitives::tick::Ticker;
-use ulx_primitives::{
+use argon_notary::server::pipe_from_stream_and_drop;
+use argon_notary::server::NotebookHeaderStream;
+use argon_notary_apis::localchain::{BalanceChangeResult, BalanceTipResult, LocalchainRpcServer};
+use argon_notary_apis::notebook::NotebookRpcServer;
+use argon_primitives::tick::Ticker;
+use argon_primitives::{
   AccountId, AccountOrigin, AccountOriginUid, AccountType, BalanceChange, BalanceProof, BalanceTip,
   ChainTransfer, LocalchainAccountId, MerkleProof, NewAccountOrigin, Notarization,
   NotarizationBalanceChangeset, NotarizationBlockVotes, NotarizationDataDomains, NoteType,

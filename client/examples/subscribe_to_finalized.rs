@@ -1,10 +1,10 @@
-use ulixee_client::{api, UlxOnlineClient};
+use argon_client::{api, ArgonOnlineClient};
 
 #[tokio::main]
 async fn main() -> Result<(), Box<dyn std::error::Error>> {
 	// Create a client to use:
 
-	let client = UlxOnlineClient::new().await?;
+	let client = ArgonOnlineClient::new().await?;
 
 	// Subscribe to all finalized blocks:
 	let mut blocks_sub = client.blocks().subscribe_finalized().await?;

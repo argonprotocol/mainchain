@@ -1,6 +1,6 @@
 import {CryptoScheme, Localchain} from "../index";
 import {closeOnTeardown, KeyringSigner, teardown} from "./testHelpers";
-import {Keyring} from "@ulixee/mainchain";
+import {Keyring} from "@argonprotocol/mainchain";
 
 
 afterAll(teardown);

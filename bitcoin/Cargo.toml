@@ -1,5 +1,5 @@
 [package]
-name = "ulx-bitcoin"
+name = "argon-bitcoin"
 description = "Modules for creating an unlocking timeline scripts for bitcoin vaults"
 version.workspace = true
 edition.workspace = true
@@ -27,13 +27,13 @@ anyhow = { workspace = true, optional = true }
 parking_lot = { workspace = true, optional = true }
 hwi = { workspace = true, optional = true }
 
-ulx-primitives = { workspace = true, default-features = false, features = ["bitcoin"] }
+argon-primitives = { workspace = true, default-features = false, features = ["bitcoin"] }
 log = "0.4.22"
 
 [dev-dependencies]
 frame-support = { workspace = true }
 sp-keyring = { workspace = true }
-ulx-testing = { workspace = true }
+argon-testing = { workspace = true }
 bitcoind = { workspace = true }
 env_logger = { workspace = true }
 rand = { workspace = true }
@@ -45,6 +45,8 @@ serde_json = { workspace = true }
 default = [ "std" ]
 std = [
 	"anyhow/std",
+	"argon-primitives/bitcoin",
+	"argon-primitives/std",
 	"bitcoin/std",
 	"bitcoincore-rpc/default",
 	"codec/std",
@@ -56,8 +58,6 @@ std = [
 	"sp-io/std",
 	"sp-runtime/std",
 	"thiserror",
-	"ulx-primitives/bitcoin",
-	"ulx-primitives/std",
 ]
-fast-runtime = [ "ulx-primitives/fast-runtime" ]
+fast-runtime = [ "argon-primitives/fast-runtime" ]
 hwi = [ "dep:hwi" ]

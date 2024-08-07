@@ -1,5 +1,5 @@
 [package]
-name = "ulixee-client"
+name = "argon-client"
 version.workspace = true
 authors.workspace = true
 edition.workspace = true
@@ -28,7 +28,7 @@ tracing-subscriber = { workspace = true }
 sp-core = { workspace = true, features = ["default"] }
 sp-arithmetic = { workspace = true, features = ["default"] }
 sp-keystore = { workspace = true, features = ["default"] }
-ulx-primitives = { workspace = true, features = ["default"] }
+argon-primitives = { workspace = true, features = ["default"] }
 
 anyhow = { workspace = true, features = ["default"] }
 tokio = { workspace = true }
@@ -36,5 +36,5 @@ tokio = { workspace = true }
 [dev-dependencies]
 sp-keyring = { workspace = true }
 tokio = { workspace = true, features = ["test-util"] }
-ulx-testing = { workspace = true }
+argon-testing = { workspace = true }
 subxt-signer = { workspace = true }

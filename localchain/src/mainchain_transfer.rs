@@ -4,7 +4,7 @@ use chrono::NaiveDateTime;
 use sqlx::{FromRow, SqlitePool};
 use tokio::sync::Mutex;
 
-use ulx_primitives::Balance;
+use argon_primitives::Balance;
 
 use crate::{bail, AccountStore, Keystore, LocalchainTransfer, MainchainClient, Result};
 

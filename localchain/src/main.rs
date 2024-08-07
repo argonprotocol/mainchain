@@ -1,5 +1,5 @@
+use argon_localchain::cli;
 use std::env;
-use ulx_localchain::cli;
 
 #[tokio::main]
 async fn main() -> anyhow::Result<()> {

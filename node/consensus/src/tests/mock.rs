@@ -5,6 +5,7 @@ use std::{
 	time::Duration,
 };
 
+use argon_bitcoin_utxo_tracker::UtxoTracker;
 use futures::future;
 use log::trace;
 use sc_block_builder::BlockBuilderBuilder;
@@ -29,10 +30,9 @@ use sp_runtime::{
 };
 use substrate_test_runtime::{AccountId, BlockNumber, Executive, Hash, Header};
 use substrate_test_runtime_client::Backend;
-use ulx_bitcoin_utxo_tracker::UtxoTracker;
 
-use ulx_node_runtime::{NotaryRecordT, NotebookVerifyError};
-use ulx_primitives::{
+use argon_node_runtime::{NotaryRecordT, NotebookVerifyError};
+use argon_primitives::{
 	bitcoin::{BitcoinSyncStatus, Satoshis, UtxoRef, UtxoValue},
 	block_seal::BlockSealAuthorityId,
 	digests::BlockVoteDigest,
@@ -42,7 +42,7 @@ use ulx_primitives::{
 	NotebookAuditResult, NotebookAuditSummary, NotebookNumber, VoteMinimum,
 };
 
-use crate::{aux_client::UlxAux, import_queue};
+use crate::{aux_client::ArgonAux, import_queue};
 
 type Error = sp_blockchain::Error;
 
@@ -90,9 +90,9 @@ impl Proposer<Block> for DummyProposer {
 	}
 }
 
-pub(crate) type UlxVerifier = import_queue::UlxVerifier<Block>;
-pub(crate) type UlxBlockImport = PanickingBlockImport<
-	import_queue::UlxBlockImport<
+pub(crate) type ArgonVerifier = import_queue::ArgonVerifier<Block>;
+pub(crate) type ArgonBlockImport = PanickingBlockImport<
+	import_queue::ArgonBlockImport<
 		Block,
 		BlockImportAdapter<PeersClient>,
 		TestApi,
@@ -101,23 +101,23 @@ pub(crate) type UlxBlockImport = PanickingBlockImport<
 	>,
 >;
 pub(crate) struct PeerData {
-	pub block_import: UlxBlockImport,
+	pub block_import: ArgonBlockImport,
 	pub api: Arc<TestApi>,
-	pub aux_client: UlxAux<Block, TestApi>,
+	pub aux_client: ArgonAux<Block, TestApi>,
 	pub utxo_tracker: Arc<UtxoTracker>,
 }
-pub(crate) type UlxPeer = Peer<Option<PeerData>, UlxBlockImport>;
+pub(crate) type argonPeer = Peer<Option<PeerData>, ArgonBlockImport>;
 
 #[derive(Default)]
-pub(crate) struct UlxTestNet {
-	pub peers: Vec<UlxPeer>,
+pub(crate) struct ArgonTestNet {
+	pub peers: Vec<argonPeer>,
 	pub config: Config,
 }
 
-impl UlxTestNet {
+impl ArgonTestNet {
 	pub(crate) fn new(n_authority: usize, config: Config) -> Self {
 		trace!("Creating test network");
-		let mut net = UlxTestNet { peers: Vec::with_capacity(n_authority), config };
+		let mut net = ArgonTestNet { peers: Vec::with_capacity(n_authority), config };
 
 		for i in 0..n_authority {
 			trace!("Adding peer {}", i);
@@ -235,7 +235,7 @@ impl BlockchainEvents<Block> for TestApi {
 }
 
 sp_api::mock_impl_runtime_apis! {
-	impl ulx_primitives::BlockSealApis<Block, AccountId, BlockSealAuthorityId> for RuntimeApi {
+	impl argon_primitives::BlockSealApis<Block, AccountId, BlockSealAuthorityId> for RuntimeApi {
 		fn vote_minimum() -> VoteMinimum {
 			self.inner.config.tax_minimum
 		}
@@ -263,7 +263,7 @@ sp_api::mock_impl_runtime_apis! {
 		}
 	}
 
-	impl ulx_primitives::NotaryApis<Block, NotaryRecordT> for RuntimeApi {
+	impl argon_primitives::NotaryApis<Block, NotaryRecordT> for RuntimeApi {
 		fn notary_by_id(_notary_id: NotaryId) -> Option<NotaryRecordT> {
 			None
 		}
@@ -272,7 +272,7 @@ sp_api::mock_impl_runtime_apis! {
 		}
 	}
 
-	impl ulx_primitives::NotebookApis<Block, NotebookVerifyError> for RuntimeApi {
+	impl argon_primitives::NotebookApis<Block, NotebookVerifyError> for RuntimeApi {
 		fn audit_notebook_and_get_votes(
 			_version: u32,
 			_notary_id: NotaryId,
@@ -294,7 +294,7 @@ sp_api::mock_impl_runtime_apis! {
 		}
 	}
 
-	impl ulx_primitives::TickApis<Block> for RuntimeApi {
+	impl argon_primitives::TickApis<Block> for RuntimeApi {
 		fn current_tick() -> Tick {
 			Ticker::new(self.inner.config.tick_duration.as_millis() as u64, self.inner.config.genesis_utc_time).current() -1
 		}
@@ -306,7 +306,7 @@ sp_api::mock_impl_runtime_apis! {
 		}
 	}
 
-	impl ulx_primitives::BitcoinApis<Block, Balance> for RuntimeApi {
+	impl argon_primitives::BitcoinApis<Block, Balance> for RuntimeApi {
 		fn get_sync_status() -> Option<BitcoinSyncStatus> {
 			None
 		}
@@ -361,28 +361,28 @@ where
 	}
 }
 
-impl TestNetFactory for UlxTestNet {
-	type Verifier = UlxVerifier;
-	type BlockImport = UlxBlockImport;
+impl TestNetFactory for ArgonTestNet {
+	type Verifier = ArgonVerifier;
+	type BlockImport = ArgonBlockImport;
 	type PeerData = Option<PeerData>;
 
 	fn make_verifier(&self, _client: PeersClient, _peer_data: &Self::PeerData) -> Self::Verifier {
-		UlxVerifier::new()
+		ArgonVerifier::new()
 	}
 
-	fn peer(&mut self, i: usize) -> &mut UlxPeer {
+	fn peer(&mut self, i: usize) -> &mut argonPeer {
 		&mut self.peers[i]
 	}
 
-	fn peers(&self) -> &Vec<UlxPeer> {
+	fn peers(&self) -> &Vec<argonPeer> {
 		&self.peers
 	}
 
-	fn peers_mut(&mut self) -> &mut Vec<UlxPeer> {
+	fn peers_mut(&mut self) -> &mut Vec<argonPeer> {
 		&mut self.peers
 	}
 
-	fn mut_peers<F: FnOnce(&mut Vec<UlxPeer>)>(&mut self, closure: F) {
+	fn mut_peers<F: FnOnce(&mut Vec<argonPeer>)>(&mut self, closure: F) {
 		closure(&mut self.peers);
 	}
 
@@ -398,10 +398,10 @@ impl TestNetFactory for UlxTestNet {
 		let select_chain = LongestChain::new(client.as_backend());
 		let api = TestApi { client: Some(client.as_client().clone()), config: self.config.clone() };
 		let api = Arc::new(api);
-		let aux_client = UlxAux::new(api.clone());
+		let aux_client = ArgonAux::new(api.clone());
 		let utxo_tracker = UtxoTracker::new("http://127.0.0.1:39998".to_string(), None).unwrap();
 		let utxo_tracker = Arc::new(utxo_tracker);
-		let block_import = PanickingBlockImport(import_queue::UlxBlockImport::new(
+		let block_import = PanickingBlockImport(import_queue::ArgonBlockImport::new(
 			inner,
 			api.clone(),
 			aux_client.clone(),

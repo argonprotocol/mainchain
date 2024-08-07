@@ -6,13 +6,13 @@ use core::fmt::Debug;
 use scale_info::TypeInfo;
 use sp_runtime::RuntimeDebug;
 
-pub use pallet::*;
-pub use ulx_notary_audit::VerifyError as NotebookVerifyError;
-use ulx_primitives::{
+pub use argon_notary_audit::VerifyError as NotebookVerifyError;
+use argon_primitives::{
 	notary::{NotaryId, NotaryProvider},
 	tick::Tick,
 	TransferToLocalchainId,
 };
+pub use pallet::*;
 pub use weights::*;
 
 #[cfg(test)]
@@ -40,7 +40,7 @@ pub mod pallet {
 	use sp_runtime::traits::{AccountIdConversion, AtLeast32BitUnsigned};
 
 	use super::*;
-	use ulx_primitives::{
+	use argon_primitives::{
 		notebook::{ChainTransfer, NotebookHeader},
 		tick::Tick,
 		BurnEventHandler, ChainTransferLookup, NotebookEventHandler, NotebookNumber,

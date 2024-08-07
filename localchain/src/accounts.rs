@@ -4,10 +4,10 @@ use sp_core::crypto::{AccountId32, PublicError, Ss58AddressFormat, Ss58Codec};
 use sp_core::ByteArray;
 use sqlx::{FromRow, SqliteConnection, SqlitePool};
 
-use ulx_primitives::AccountOriginUid;
-use ulx_primitives::NotaryId;
-use ulx_primitives::NotebookNumber;
-use ulx_primitives::{AccountOrigin, AccountType, ADDRESS_PREFIX};
+use argon_primitives::AccountOriginUid;
+use argon_primitives::NotaryId;
+use argon_primitives::NotebookNumber;
+use argon_primitives::{AccountOrigin, AccountType, ADDRESS_PREFIX};
 
 use crate::{bail, BalanceChangeStatus, BalanceChangeStore, Result};
 
@@ -440,7 +440,7 @@ pub mod napi_ext {
   use super::*;
   use crate::error::NapiOk;
   use crate::LocalAccount;
-  use ulx_primitives::AccountType;
+  use argon_primitives::AccountType;
 
   #[napi]
   impl AccountStore {

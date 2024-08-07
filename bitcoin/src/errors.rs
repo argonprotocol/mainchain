@@ -4,7 +4,7 @@ use bitcoin::{
 };
 use sp_runtime::RuntimeDebug;
 
-use ulx_primitives::bitcoin::BitcoinError;
+use argon_primitives::bitcoin::BitcoinError;
 
 #[derive(RuntimeDebug)]
 #[cfg_attr(feature = "std", derive(thiserror::Error))]

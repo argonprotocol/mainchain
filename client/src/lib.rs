@@ -24,37 +24,37 @@ use tokio::{
 };
 use tracing::warn;
 
+use argon_primitives::{AccountId, BlockNumber, Nonce};
 pub use spec::api;
-use ulx_primitives::{AccountId, BlockNumber, Nonce};
 
-use crate::api::{storage, system, ulixee_balances};
+use crate::api::{share_balances, storage, system};
 
 pub mod conversion;
 pub mod signer;
 mod spec;
 
-pub enum UlxConfig {}
+pub enum ArgonConfig {}
 
-pub type UlxOnlineClient = OnlineClient<UlxConfig>;
+pub type ArgonOnlineClient = OnlineClient<ArgonConfig>;
 
-impl Config for UlxConfig {
+impl Config for ArgonConfig {
 	type Hash = subxt::utils::H256;
 	type AccountId = subxt::utils::AccountId32;
 	type Address = subxt::utils::MultiAddress<Self::AccountId, ()>;
 	type Signature = subxt::utils::MultiSignature;
 	type Hasher = subxt::config::substrate::BlakeTwo256;
 	type Header = subxt::config::substrate::SubstrateHeader<u32, Self::Hasher>;
-	type ExtrinsicParams = UlxExtrinsicParams<Self>;
+	type ExtrinsicParams = ArgonExtrinsicParams<Self>;
 	type AssetId = ();
 }
 
 /// A struct representing the signed extra and additional parameters required
-/// to construct a transaction for a Ulx node.
-pub type UlxExtrinsicParams<T> = DefaultExtrinsicParams<T>;
+/// to construct a transaction for a argon node.
+pub type ArgonExtrinsicParams<T> = DefaultExtrinsicParams<T>;
 
-/// A builder which leads to [`UlxExtrinsicParams`] being constructed.
+/// A builder which leads to [`ArgonExtrinsicParams`] being constructed.
 /// This is what you provide to methods like `sign_and_submit()`.
-pub type UlxExtrinsicParamsBuilder<T> = DefaultExtrinsicParamsBuilder<T>;
+pub type ArgonExtrinsicParamsBuilder<T> = DefaultExtrinsicParamsBuilder<T>;
 
 pub fn account_id_to_subxt(account_id: &AccountId) -> subxt::utils::AccountId32 {
 	let bytes: [u8; 32] = *account_id.as_ref();
@@ -63,23 +63,23 @@ pub fn account_id_to_subxt(account_id: &AccountId) -> subxt::utils::AccountId32 
 
 #[derive(Clone)]
 pub struct MainchainClient {
-	pub live: UlxOnlineClient,
+	pub live: ArgonOnlineClient,
 	pub rpc: RpcClient,
 	pub ws_client: Arc<WsClient>,
-	pub methods: LegacyRpcMethods<UlxConfig>,
+	pub methods: LegacyRpcMethods<ArgonConfig>,
 	pub url: String,
 	on_client_error: Option<mpsc::Sender<String>>,
 }
 
 impl MainchainClient {
-	pub fn ext_params_builder() -> UlxExtrinsicParamsBuilder<UlxConfig> {
-		UlxExtrinsicParamsBuilder::<UlxConfig>::new()
+	pub fn ext_params_builder() -> ArgonExtrinsicParamsBuilder<ArgonConfig> {
+		ArgonExtrinsicParamsBuilder::<ArgonConfig>::new()
 	}
 
 	pub async fn params_with_best_nonce(
 		&self,
 		account_id: AccountId32,
-	) -> anyhow::Result<UlxExtrinsicParamsBuilder<UlxConfig>> {
+	) -> anyhow::Result<ArgonExtrinsicParamsBuilder<ArgonConfig>> {
 		let nonce = self.get_account_nonce(account_id).await?;
 		Ok(Self::ext_params_builder().nonce(nonce.into()))
 	}
@@ -93,7 +93,7 @@ impl MainchainClient {
 	pub async fn new(ws_client: WsClient, url: String) -> Result<Self, Error> {
 		let ws_client = Arc::new(ws_client);
 		let rpc = RpcClient::new(ws_client.clone());
-		let live = UlxOnlineClient::from_rpc_client(rpc.clone()).await?;
+		let live = ArgonOnlineClient::from_rpc_client(rpc.clone()).await?;
 		let methods = LegacyRpcMethods::new(rpc.clone());
 		Ok(Self { rpc, live, methods, ws_client, url, on_client_error: Default::default() })
 	}
@@ -125,9 +125,9 @@ impl MainchainClient {
 	pub async fn submit_from_polkadot_url(
 		&self,
 		message: &str,
-		signer: &impl Signer<UlxConfig>,
-		params: Option<<UlxExtrinsicParams<UlxConfig> as ExtrinsicParams<UlxConfig>>::Params>,
-	) -> anyhow::Result<TxProgress<UlxConfig, OnlineClient<UlxConfig>>> {
+		signer: &impl Signer<ArgonConfig>,
+		params: Option<<ArgonExtrinsicParams<ArgonConfig> as ExtrinsicParams<ArgonConfig>>::Params>,
+	) -> anyhow::Result<TxProgress<ArgonConfig, OnlineClient<ArgonConfig>>> {
 		let ext_data = self.extract_call_data(message)?;
 		self.submit_raw(ext_data, signer, params).await
 	}
@@ -135,9 +135,9 @@ impl MainchainClient {
 	pub async fn submit_raw(
 		&self,
 		payload: Vec<u8>,
-		signer: &impl Signer<UlxConfig>,
-		params: Option<<UlxExtrinsicParams<UlxConfig> as ExtrinsicParams<UlxConfig>>::Params>,
-	) -> anyhow::Result<TxProgress<UlxConfig, OnlineClient<UlxConfig>>> {
+		signer: &impl Signer<ArgonConfig>,
+		params: Option<<ArgonExtrinsicParams<ArgonConfig> as ExtrinsicParams<ArgonConfig>>::Params>,
+	) -> anyhow::Result<TxProgress<ArgonConfig, OnlineClient<ArgonConfig>>> {
 		let payload = RawPayload(payload);
 		let tx_progress = self
 			.live
@@ -164,7 +164,7 @@ impl MainchainClient {
 						));
 					}
 					warn!(
-						"UlxFullClient: failed to connect client to {} - {:?}, retrying soon..",
+						"argonFullClient: failed to connect client to {} - {:?}, retrying soon..",
 						url, why
 					);
 					tokio::time::sleep(std::time::Duration::from_millis(retry_delay_millis)).await;
@@ -188,18 +188,18 @@ impl MainchainClient {
 	pub async fn get_argons(
 		&self,
 		account_id: AccountId32,
-	) -> anyhow::Result<ulixee_balances::storage::types::account::Account> {
+	) -> anyhow::Result<share_balances::storage::types::account::Account> {
 		let account = self.get_account(account_id).await?;
 		Ok(account.data)
 	}
 
-	pub async fn get_ulixees(
+	pub async fn get_shares(
 		&self,
 		account_id: AccountId32,
-	) -> anyhow::Result<ulixee_balances::storage::types::account::Account> {
+	) -> anyhow::Result<share_balances::storage::types::account::Account> {
 		let account_id32 = account_id_to_subxt(&account_id);
 		let balance = self
-			.fetch_storage(&storage().ulixee_balances().account(account_id32), None)
+			.fetch_storage(&storage().share_balances().account(account_id32), None)
 			.await?
 			.ok_or_else(|| anyhow!("No record found for account {:?}", &account_id))?;
 		Ok(balance)
@@ -227,7 +227,7 @@ impl MainchainClient {
 
 	pub async fn block_number(
 		&self,
-		hash: <UlxConfig as Config>::Hash,
+		hash: <ArgonConfig as Config>::Hash,
 	) -> anyhow::Result<BlockNumber> {
 		self.live
 			.backend()
@@ -258,8 +258,8 @@ impl MainchainClient {
 	}
 
 	pub async fn wait_for_ext_in_block(
-		mut tx_progress: TxProgress<UlxConfig, OnlineClient<UlxConfig>>,
-	) -> anyhow::Result<TxInBlock<UlxConfig, OnlineClient<UlxConfig>>, Error> {
+		mut tx_progress: TxProgress<ArgonConfig, OnlineClient<ArgonConfig>>,
+	) -> anyhow::Result<TxInBlock<ArgonConfig, OnlineClient<ArgonConfig>>, Error> {
 		while let Some(status) = tx_progress.next().await {
 			match status? {
 				TxStatus::InBestBlock(tx_in_block) | TxStatus::InFinalizedBlock(tx_in_block) => {
@@ -281,7 +281,7 @@ impl MainchainClient {
 		}
 		Err(Error::from("No valid status encountered for transaction".to_string()))
 	}
-	pub async fn lookup_ticker(&self) -> anyhow::Result<ulx_primitives::tick::Ticker> {
+	pub async fn lookup_ticker(&self) -> anyhow::Result<argon_primitives::tick::Ticker> {
 		let ticker_data = self
 			.call(api::runtime_apis::tick_apis::TickApis.ticker(), Some(self.live.genesis_hash()))
 			.await?;
@@ -409,11 +409,11 @@ impl ReconnectingClient {
 		let mut lock = self.client.write().await;
 		let client_lock = self.client.clone();
 
-		let ulx_client =
+		let argon_client =
 			MainchainClient::try_until_connected(url.as_str(), 1_000u64, 10_000u64).await?;
-		*lock = Some(ulx_client.clone());
+		*lock = Some(argon_client.clone());
 		drop(lock);
-		let ws_client = ulx_client.ws_client.clone();
+		let ws_client = argon_client.ws_client.clone();
 
 		let handle_mutex = self.handle.clone();
 		let handle = tokio::spawn(async move {
@@ -428,20 +428,20 @@ impl ReconnectingClient {
 		});
 		*(self.handle.lock().await) = Some(handle);
 
-		Ok(ulx_client)
+		Ok(argon_client)
 	}
 }
 
 #[cfg(test)]
 mod test {
-	use ulx_testing::start_ulx_test_node;
+	use argon_testing::start_argon_test_node;
 
 	use super::*;
 
 	#[tokio::test]
 	async fn test_getting_ticker() -> anyhow::Result<()> {
 		let _ = tracing_subscriber::fmt::try_init();
-		let ctx = start_ulx_test_node().await;
+		let ctx = start_argon_test_node().await;
 
 		let ws_url = ctx.client.url.clone();
 
@@ -457,7 +457,7 @@ mod test {
 		let _ = tracing_subscriber::fmt::try_init();
 
 		let client =
-			UlxOnlineClient::from_insecure_url("wss://husky-witty-highly.ngrok-free.app").await?;
+			ArgonOnlineClient::from_insecure_url("wss://husky-witty-highly.ngrok-free.app").await?;
 		let ticker = client
 			.runtime_api()
 			.at(client.genesis_hash())

@@ -1,12 +1,12 @@
 use std::collections::{BTreeMap, BTreeSet};
 
+use argon_notary_audit::VerifyError;
 use chrono::Utc;
 use serde_json::json;
 use sp_core::H256;
 use sqlx::{FromRow, PgConnection};
-use ulx_notary_audit::VerifyError;
 
-use ulx_primitives::{ensure, NotebookDigestRecord, VoteMinimum};
+use argon_primitives::{ensure, NotebookDigestRecord, VoteMinimum};
 
 use crate::Error;
 
@@ -195,10 +195,10 @@ impl BlocksStore {
 
 #[cfg(test)]
 mod tests {
+	use argon_notary_audit::VerifyError;
+	use argon_primitives::NotebookDigestRecord;
 	use sp_core::H256;
 	use sqlx::PgPool;
-	use ulx_notary_audit::VerifyError;
-	use ulx_primitives::NotebookDigestRecord;
 
 	use crate::stores::blocks::BlocksStore;
 

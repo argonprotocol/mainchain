@@ -1,7 +1,7 @@
 import {customAlphabet} from "nanoid";
 import {Client} from 'pg';
 import * as child_process from "node:child_process";
-import {checkForExtrinsicSuccess, Keyring, KeyringPair, UlxClient} from "@ulixee/mainchain";
+import {checkForExtrinsicSuccess, Keyring, KeyringPair, ArgonClient} from "@argonprotocol/mainchain";
 import fs from "node:fs";
 import * as readline from "node:readline";
 import {addTeardown, cleanHostForDocker, getDockerPortMapping, getProxy, ITeardownable,} from "./testHelpers";
@@ -42,12 +42,12 @@ export default class TestNotary implements ITeardownable {
         this.operator = new Keyring({type: 'sr25519'}).createFromUri('//Bob');
         this.registeredPublicKey = new Keyring({type: 'ed25519'}).createFromUri('//Ferdie//notary').publicKey;
 
-        let notaryPath = pathToNotaryBin ?? `${__dirname}/../../target/debug/ulx-notary`;
-        if (process.env.ULX_USE_DOCKER_BINS) {
+        let notaryPath = pathToNotaryBin ?? `${__dirname}/../../target/debug/argon-notary`;
+        if (process.env.argon_USE_DOCKER_BINS) {
             this.containerName = "notary_" + nanoid();
             const addHost = process.env.ADD_DOCKER_HOST ? ` --add-host=host.docker.internal:host-gateway` : '';
 
-            notaryPath = `docker run --rm -p=0:9925${addHost} --name=${this.containerName} --platform=linux/amd64 -e RUST_LOG=warn ghcr.io/ulixee/ulixee-notary:dev`;
+            notaryPath = `docker run --rm -p=0:9925${addHost} --name=${this.containerName} --platform=linux/amd64 -e RUST_LOG=warn ghcr.io/argonprotocol/argon-notary:dev`;
 
 
             this.#dbConnectionString = cleanHostForDocker(this.#dbConnectionString);
@@ -88,7 +88,7 @@ export default class TestNotary implements ITeardownable {
 
 
         const execArgs = ['run', `--db-url=${this.#dbConnectionString}/${this.#dbName}`, `--dev`, `-t ${mainchainUrl}`];
-        if (process.env.ULX_USE_DOCKER_BINS) {
+        if (process.env.argon_USE_DOCKER_BINS) {
             execArgs.unshift(...notaryPath.replace("docker run", "run").split(' '));
             execArgs.push('-b=0.0.0.0:9925')
 
@@ -131,7 +131,7 @@ export default class TestNotary implements ITeardownable {
         return this.address;
     }
 
-    public async register(client: UlxClient): Promise<void> {
+    public async register(client: ArgonClient): Promise<void> {
         let address = new URL(this.address);
 
         await new Promise<void>(async (resolve, reject) => {

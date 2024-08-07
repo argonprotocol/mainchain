@@ -6,7 +6,7 @@ use frame_support::{
 use sp_core::{crypto::AccountId32, ed25519::Signature, H256};
 use sp_runtime::{Digest, DigestItem};
 
-use ulx_primitives::{
+use argon_primitives::{
 	digests::{BlockVoteDigest, BLOCK_VOTES_DIGEST_ID},
 	inherents::BlockSealInherent,
 	localchain::BlockVote,
