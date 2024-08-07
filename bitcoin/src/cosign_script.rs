@@ -73,7 +73,7 @@ pub struct CosignScript {
 impl CosignScript {
 	pub fn new(cosign_script_args: CosignScriptArgs, network: Network) -> Result<Self, Error> {
 		let policy =
-			Self::create_policy(&cosign_script_args).map_err(|e| Error::TimelockScriptError(e))?;
+			Self::create_policy(&cosign_script_args).map_err(Error::TimelockScriptError)?;
 		let descriptor = Self::build_descriptor(&cosign_script_args, &policy)?;
 		let script = descriptor.script_code().map_err(|_| BitcoinError::InvalidPolicy)?;
 		let address = descriptor.address(network).map_err(|_| Error::AddressError)?;
@@ -463,7 +463,7 @@ mod test {
 		let script_args = CosignScriptArgs {
 			vault_pubkey: vault_compressed_pubkey.into(),
 			vault_claim_pubkey: vault_claim_pubkey.into(),
-			owner_pubkey: owner_pubkey.into(),
+			owner_pubkey,
 			vault_claim_height,
 			open_claim_height,
 			created_at_height: register_height,
@@ -540,7 +540,7 @@ mod test {
 			check_spent(
 				&tx.raw_hex(),
 				&tracker,
-				&&bitcoind,
+				&bitcoind,
 				UtxoRef { txid: txid.into(), output_index: vout },
 				UtxoValue {
 					utxo_id: 1,
@@ -666,7 +666,7 @@ mod test {
 			check_spent(
 				&tx_hex,
 				&tracker,
-				&&bitcoind,
+				&bitcoind,
 				UtxoRef { txid: txid.into(), output_index: vout },
 				UtxoValue {
 					utxo_id: 1,
@@ -706,9 +706,9 @@ mod test {
 		// 3. Owner recreates the script from the details and submits to blockchain
 		let script_address = {
 			let script_args = CosignScriptArgs {
-				vault_pubkey: vault_pubkey.into(),
+				vault_pubkey,
 				vault_claim_pubkey: vault_claim_pubkey.into(),
-				owner_pubkey: owner_pubkey.into(),
+				owner_pubkey,
 				vault_claim_height,
 				open_claim_height,
 				created_at_height: block_height,
@@ -754,12 +754,12 @@ mod test {
 
 		// 4. User submits the out address
 		let out_script_pubkey: BitcoinScriptPubkey =
-			owner_compressed_pubkey.p2wpkh_script_code().unwrap().try_into().unwrap();
+			owner_compressed_pubkey.p2wpkh_script_code().unwrap().into();
 		let feerate = FeeRate::from_sat_per_vb(15).expect("cant translate fee");
 		let script_args = CosignScriptArgs {
-			vault_pubkey: vault_pubkey.into(),
+			vault_pubkey,
 			vault_claim_pubkey: vault_claim_pubkey.into(),
-			owner_pubkey: owner_pubkey.into(),
+			owner_pubkey,
 			vault_claim_height,
 			open_claim_height,
 			created_at_height: register_height,
@@ -772,9 +772,9 @@ mod test {
 		// 5. vault sees unlock request (outaddress, fee) and creates a transaction
 		let (vault_signature, vault_pubkey) = {
 			let script_args = CosignScriptArgs {
-				vault_pubkey: vault_pubkey.into(),
+				vault_pubkey,
 				vault_claim_pubkey: vault_claim_pubkey.into(),
-				owner_pubkey: owner_pubkey.into(),
+				owner_pubkey,
 				vault_claim_height,
 				open_claim_height,
 				created_at_height: register_height,
@@ -796,8 +796,8 @@ mod test {
 				.expect("sign");
 
 			// test can verify signature
-			let vault_signature_api: BitcoinSignature = vault_signature.clone().try_into().unwrap();
-			let vault_pubkey_api: CompressedBitcoinPubkey = vault_pubkey.clone().into();
+			let vault_signature_api: BitcoinSignature = vault_signature.try_into().unwrap();
+			let vault_pubkey_api: CompressedBitcoinPubkey = vault_pubkey.into();
 			assert!(unlocker.verify_signature_raw(vault_pubkey_api, &vault_signature_api).is_ok());
 			(vault_signature, vault_pubkey)
 		};

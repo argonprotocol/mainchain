@@ -128,7 +128,7 @@ fn clamps_argon_price_changes_away_from_target() {
 		Current::<Test>::put(base_entry);
 		MaxPriceAgeInTicks::set(10);
 		CurrentTick::set(12);
-		let mut next = base_entry.clone();
+		let mut next = base_entry;
 		next.tick = 2;
 		// if we're in inflation, price can't go up 2 cents per tick
 		next.argon_usd_target_price = FixedU128::from_float(1.00);
@@ -171,7 +171,7 @@ fn clamps_argon_target_price_changes() {
 		Current::<Test>::put(base_entry);
 		MaxPriceAgeInTicks::set(10);
 		CurrentTick::set(12);
-		let mut next = base_entry.clone();
+		let mut next = base_entry;
 		next.tick = 2;
 		next.argon_usd_target_price = FixedU128::from_float(1.05);
 		PriceIndex::clamp_argon_prices(&base_entry, &mut next);

@@ -22,7 +22,7 @@ pub async fn run_bitcoin_cli(
 		.env("RUST_LOG", rust_log)
 		.stdout(process::Stdio::piped())
 		.args(
-			vec![
+			[
 				&args.into_iter().map(|a| a.to_string()).collect::<Vec<String>>()[..],
 				&["--trusted-rpc-url".to_string(), node.client.url.to_string()][..],
 			]

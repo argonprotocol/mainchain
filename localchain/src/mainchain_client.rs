@@ -365,7 +365,7 @@ impl MainchainClient {
     };
 
     let finalized = self.latest_finalized_number().await?;
-    return Ok(Some(finalized));
+    Ok(Some(finalized))
   }
 
   pub async fn create_transfer_to_localchain(

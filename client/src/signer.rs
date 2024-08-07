@@ -71,9 +71,9 @@ impl KeystoreSigner {
 }
 impl Signer<ArgonConfig> for KeystoreSigner {
 	fn account_id(&self) -> <ArgonConfig as Config>::AccountId {
-		let account_id32: AccountId32 = self.account_id.clone().into();
-		let account_id = subxt::utils::AccountId32(account_id32.into());
-		account_id
+		let account_id32: AccountId32 = self.account_id.clone();
+
+		subxt::utils::AccountId32(account_id32.into())
 	}
 
 	fn address(&self) -> <ArgonConfig as Config>::Address {

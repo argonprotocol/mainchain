@@ -530,29 +530,26 @@ fn it_handles_bad_secrets() {
 			// wrong secret hash
 			header.parent_secret = Some(secrets[1]);
 
-			assert_eq!(
-				Notebook::check_audit_result(
-					1,
-					header.notebook_number,
-					header.tick,
-					&NotebookDigest {
-						notebooks: vec![NotebookDigestRecord {
-							notary_id: 1,
-							notebook_number: header.notebook_number,
-							tick: header.tick,
-							audit_first_failure: None
-						}]
-					},
-					header.parent_secret
-				)
-				.expect("shouldn't throw an error "),
-				false
-			);
+			assert!(!Notebook::check_audit_result(
+				1,
+				header.notebook_number,
+				header.tick,
+				&NotebookDigest {
+					notebooks: vec![NotebookDigestRecord {
+						notary_id: 1,
+						notebook_number: header.notebook_number,
+						tick: header.tick,
+						audit_first_failure: None
+					}]
+				},
+				header.parent_secret
+			)
+			.expect("shouldn't throw an error "));
 			System::assert_last_event(
 				Event::<Test>::NotebookAuditFailure {
 					notary_id: 1,
 					notebook_number: 2,
-					first_failure_reason: VerifyError::InvalidSecretProvided.into(),
+					first_failure_reason: VerifyError::InvalidSecretProvided,
 				}
 				.into(),
 			);

@@ -37,7 +37,7 @@ fn keys() -> OpaqueBitcoinXpub {
 		)
 		.unwrap();
 	let xpub = Xpub::from_priv(&Secp256k1::new(), &child);
-	OpaqueBitcoinXpub { 0: xpub.encode() }
+	OpaqueBitcoinXpub(xpub.encode())
 }
 
 fn default_terms(pct: FixedU128) -> VaultTerms<Balance> {
@@ -138,7 +138,7 @@ fn it_will_reject_non_hardened_xpubs() {
 			.unwrap();
 		let xpub = Xpub::from_priv(&Secp256k1::new(), &child);
 
-		config.bitcoin_xpubkey = OpaqueBitcoinXpub { 0: xpub.encode() };
+		config.bitcoin_xpubkey = OpaqueBitcoinXpub(xpub.encode());
 		set_argons(1, 110_010);
 		assert_noop!(
 			Vaults::create(RuntimeOrigin::signed(1), config),

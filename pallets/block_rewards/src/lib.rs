@@ -261,8 +261,8 @@ pub mod pallet {
 
 			let reward_height = n.saturating_add(T::MaturationBlocks::get().into());
 			for reward in rewards.iter_mut() {
-				let start_argons = reward.argons.clone();
-				let start_shares = reward.shares.clone();
+				let start_argons = reward.argons;
+				let start_shares = reward.shares;
 				if let Err(e) = Self::mint_and_freeze::<T::ArgonCurrency>(reward) {
 					log::error!(target: LOG_TARGET, "Failed to mint argons for reward: {:?}, {:?}", reward, e);
 					Self::deposit_event(Event::RewardCreateError {
@@ -321,7 +321,7 @@ pub mod pallet {
 			})?;
 
 			let frozen = C::balance_frozen(&freeze_id, &reward.account_id);
-			let _ = C::set_freeze(&freeze_id, &reward.account_id, amount + frozen)?;
+			C::set_freeze(&freeze_id, &reward.account_id, amount + frozen)?;
 			Ok(())
 		}
 

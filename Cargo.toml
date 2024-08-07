@@ -164,7 +164,7 @@ log = { version = "0.4", default-features = false }
 env_logger = "0.11"
 humantime = { version = "2.1" }
 
-sqlx = { version = "0.7", features = ["macros"] }
+sqlx = { version = "0.8", features = ["macros"] }
 chrono = { version = "0.4", features = ["serde"] }
 mockall = "0.12"
 

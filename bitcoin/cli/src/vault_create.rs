@@ -207,7 +207,6 @@ impl VaultConfig {
 			.prompt();
 		if let Err(err) = result {
 			if matches!(err, InquireError::OperationCanceled) {
-				if self.bitcoin_xpub.is_none() {}
 				self.bitcoin_xpub = None;
 				self.prompt_bitcoin_xpub()?;
 				return Ok(())
@@ -223,7 +222,7 @@ impl VaultConfig {
 			self.text_field("mining_reward_sharing_percent_take", "0.0")
 				.with_validator(|input: &str| {
 					if let Ok(x) = parse_number(input) {
-						if x <= 100.0 && x >= 0.0 {
+						if (0.0..=100.0).contains(&x) {
 							Ok(Validation::Valid)
 						} else {
 							Ok(Validation::Invalid("Must be 0-100".into()))
@@ -344,12 +343,10 @@ impl VaultConfig {
 	}
 
 	fn next_incomplete_field(&self) -> Option<&'static str> {
-		for field in FIELD_TO_LABEL.iter().map(|(f, _)| *f) {
-			if self.formatted_value(field).is_none() {
-				return Some(field);
-			}
-		}
-		None
+		FIELD_TO_LABEL
+			.iter()
+			.map(|(f, _)| *f)
+			.find(|&field| self.formatted_value(field).is_none())
 	}
 
 	fn formatted_value(&self, field: &str) -> Option<String> {
@@ -453,9 +450,7 @@ impl StringValidator for F32Validator {
 	fn validate(&self, input: &str) -> Result<Validation, CustomUserError> {
 		match parse_number(input) {
 			Ok(x) =>
-				if self.0 == false {
-					Ok(Validation::Valid)
-				} else if x >= 0.0 {
+				if x >= 0.0 || !self.0 {
 					Ok(Validation::Valid)
 				} else {
 					Ok(Validation::Invalid("Must not be negative".into()))

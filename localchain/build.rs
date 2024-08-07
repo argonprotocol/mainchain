@@ -15,7 +15,7 @@ fn main() {
 
     match Command::new("cargo").args(["sqlx", "--version"]).output() {
       Ok(output) if output.status.success() => {
-        println!("`sqlx-cli` is already installed.");
+        println!("Noop `sqlx-cli` is already installed.");
       }
       _ => {
         println!("Installing `sqlx-cli`...");

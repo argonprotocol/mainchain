@@ -69,6 +69,7 @@ impl ChainTransferStore {
 		Ok(())
 	}
 
+	#[allow(clippy::too_many_arguments)]
 	pub async fn take_and_record_transfer_local(
 		db: &mut PgConnection,
 		notebook_number: NotebookNumber,

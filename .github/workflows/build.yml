@@ -46,10 +46,6 @@ jobs:
         if: ${{startsWith(matrix.os, 'ubuntu') && (github.event.inputs.SKIP_REBUILD_DOCKER != 'true')}}
         uses: ./.github/templates/clear-space
 
-      - name: Set Localchain Db Url
-        working-directory: localchain
-        run: rm .env && echo "DATABASE_URL=sqlite://${{ runner.temp }}/temp.db" > .env
-
       - name: Install linux dependencies
         if: ${{startsWith(matrix.os, 'ubuntu') && (github.event.inputs.SKIP_REBUILD_DOCKER != 'true')}}
         run: sudo apt-get install -y clang libssl-dev llvm libudev-dev protobuf-compiler pkg-config
@@ -93,23 +89,25 @@ jobs:
       - uses: taiki-e/install-action@v2
         if: ${{(github.event.inputs.SKIP_REBUILD_DOCKER != 'true')}}
         with:
-          tool: sqlx-cli
+          tool: sqlx-cli@0.8
 
       - name: Migrate Notary Db
         if: ${{(github.event.inputs.SKIP_REBUILD_DOCKER != 'true')}}
         working-directory: notary
         run: cargo sqlx database setup
 
-      - name: Debug Temp Directory
-        run: ls -lah ${{ runner.temp }} && mkdir -p ${{ runner.temp }} # Debugging step to list temp directory contents
+      - name: Create and Set Database URL
+        working-directory: localchain
+        run: |
+          touch ${{ runner.temp }}/temp.db
+          chmod 777 ${{ runner.temp }}/temp.db
+          echo "DATABASE_URL=sqlite://${{ runner.temp }}/temp.db" > .env
+          cat .env
 
       - name: Migrate Localchain Db
         if: ${{(github.event.inputs.SKIP_REBUILD_DOCKER != 'true')}}
         working-directory: localchain
         run: cargo sqlx database setup
-        env:
-          DATABASE_URL: sqlite://${{ runner.temp }}/temp.db
-          RUST_LOG: sqlx=debug
 
       - name: Test
         if: ${{(github.event.inputs.SKIP_REBUILD_DOCKER != 'true')}}

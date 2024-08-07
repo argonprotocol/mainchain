@@ -534,7 +534,7 @@ pub mod pallet {
 				);
 				if audit_summary.notebook_number == parent_block_number {
 					parent_secret_hash = audit_summary.secret_hash;
-					parent_block_votes_root = audit_summary.block_votes_root.clone();
+					parent_block_votes_root = audit_summary.block_votes_root;
 				}
 
 				last_notebook_processed = audit_summary.notebook_number;
@@ -615,8 +615,8 @@ pub mod pallet {
 						notarization.block_votes.iter().map(|vote| (vote.encode(), vote.power))
 					})
 					.collect::<Vec<_>>(),
-				secret_hash: notebook.header.secret_hash.clone(),
-				block_votes_root: notebook.header.block_votes_root.clone(),
+				secret_hash: notebook.header.secret_hash,
+				block_votes_root: notebook.header.block_votes_root,
 			};
 			Ok(audit_result)
 		}

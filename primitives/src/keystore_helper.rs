@@ -88,7 +88,7 @@ impl KeystoreParams {
 		let public_bytes = match crypto_type {
 			CryptoType::Sr25519 => {
 				let pair = match password {
-					Some(pass) => sr25519::Pair::from_string(&suri, Some(&pass.expose_secret()))?,
+					Some(pass) => sr25519::Pair::from_string(&suri, Some(pass.expose_secret()))?,
 					None => sr25519::Pair::from_string(&suri, None)?,
 				};
 				pair.public().0
@@ -96,7 +96,7 @@ impl KeystoreParams {
 			CryptoType::Ed25519 => {
 				let pair = match password {
 					Some(ref pass) =>
-						ed25519::Pair::from_string(&suri, Some(&pass.expose_secret()))?,
+						ed25519::Pair::from_string(&suri, Some(pass.expose_secret()))?,
 					None => ed25519::Pair::from_string(&suri, None)?,
 				};
 				pair.public().0

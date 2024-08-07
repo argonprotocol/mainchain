@@ -261,7 +261,7 @@ pub mod pallet {
 								notebook_number: header.notebook_number,
 								account_id: account_id.clone(),
 								amount,
-								error: e.into(),
+								error: e,
 							});
 						} else {
 							Self::deposit_event(Event::TransferIn {
@@ -305,7 +305,7 @@ pub mod pallet {
 						notary_id,
 						notebook_number: header.notebook_number,
 						tax: header.tax.into(),
-						error: e.into(),
+						error: e,
 					});
 				}
 				T::EventHandler::on_argon_burn(&header.tax.into());
@@ -348,7 +348,7 @@ pub mod pallet {
 							notebook_number: header.notebook_number,
 							transfer_id,
 							notary_id: transfer.notary_id,
-							error: e.into(),
+							error: e,
 						});
 					},
 				}
@@ -387,14 +387,14 @@ pub mod pallet {
 
 			ensure!(
 				T::Currency::reducible_balance(
-					&notary_pallet_account_id,
+					notary_pallet_account_id,
 					Preservation::Expendable,
 					Fortitude::Force,
 				) >= amount,
 				Error::<T>::InsufficientNotarizedFunds
 			);
 			T::Currency::transfer(
-				&notary_pallet_account_id,
+				notary_pallet_account_id,
 				account_id,
 				amount,
 				Preservation::Expendable,

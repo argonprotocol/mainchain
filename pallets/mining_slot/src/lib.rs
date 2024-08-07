@@ -429,25 +429,27 @@ pub mod pallet {
 					Self::release_failed_bid(entry)?;
 				}
 
+				let (bond_id, reward_sharing) =
+					bond.map(|x| (Some(x.0), x.1)).unwrap_or((None, None));
+
 				cohort
 					.try_insert(
 						pos,
 						MiningRegistration {
 							account_id: who.clone(),
 							reward_destination,
-							bond_id: bond.as_ref().map(|(bond_id, _)| bond_id).copied(),
+							bond_id,
 							bond_amount: bid,
 							ownership_tokens,
-							reward_sharing: match bond {
-								Some((_, reward_sharing)) => reward_sharing,
-								None => None,
-							},
+							reward_sharing,
 						},
 					)
 					.map_err(|_| Error::<T>::TooManyBlockRegistrants)?;
 
 				HistoricalBidsPerSlot::<T>::mutate(|bids| {
-					bids.get_mut(0).map(|x| *x += 1);
+					if let Some(bids) = bids.get_mut(0) {
+						*bids += 1;
+					}
 				});
 				Self::deposit_event(Event::<T>::SlotBidderAdded {
 					account_id: who.clone(),
@@ -506,10 +508,7 @@ impl<T: Config> AuthorityProvider<BlockSealAuthorityId, T::Block, T::AccountId> 
 	fn xor_closest_authority(
 		nonce: U256,
 	) -> Option<MiningAuthority<BlockSealAuthorityId, T::AccountId>> {
-		let Some((authority_id, index)) = find_xor_closest(<AuthoritiesByIndex<T>>::get(), nonce)
-		else {
-			return None;
-		};
+		let (authority_id, index) = find_xor_closest(<AuthoritiesByIndex<T>>::get(), nonce)?;
 
 		let registration = ActiveMinersByIndex::<T>::get(index)?;
 		Some(MiningAuthority {

@@ -195,7 +195,7 @@ impl BondCommands {
 				let (_utxo_id, utxo, _) = get_utxo_from_bond_id(&client, bond_id, None).await?;
 				let network = get_bitcoin_network(&client, None).await?;
 
-				let unlocker = get_cosign_script(&utxo, network.into())?;
+				let unlocker = get_cosign_script(&utxo, network)?;
 
 				let tx_out = TxOut {
 					value: Amount::from_sat(utxo.satoshis),
@@ -286,10 +286,10 @@ impl BondCommands {
 					})
 					.unwrap_or("-".to_string());
 
-				let vault_pubkey: CompressedBitcoinPubkey = utxo.vault_pubkey.try_into()?;
+				let vault_pubkey: CompressedBitcoinPubkey = utxo.vault_pubkey.into();
 				let vault_bitcoin_pubkey: bitcoin::CompressedPublicKey = vault_pubkey.try_into()?;
 
-				let owner_pubkey: CompressedBitcoinPubkey = utxo.owner_pubkey.try_into()?;
+				let owner_pubkey: CompressedBitcoinPubkey = utxo.owner_pubkey.into();
 				let owner_bitcoin_pubkey: bitcoin::CompressedPublicKey = owner_pubkey.try_into()?;
 
 				let mut rows = vec![
@@ -353,7 +353,7 @@ impl BondCommands {
 
 				let bitcoin_dest_pubkey = Address::from_str(&dest_pubkey)
 					.map_err(|e| anyhow!("Unable to parse bitcoin destination pubkey: {e:?}"))?
-					.require_network(network.into())?
+					.require_network(network)?
 					.script_pubkey();
 				let cosign = get_cosign_script(&utxo, network)?;
 
@@ -389,11 +389,10 @@ impl BondCommands {
 				let mut unlocker = load_unlocker(&client, utxo_id, &utxo, at_block).await?;
 				let owner_pubkey: CompressedPublicKey =
 					unlocker.cosign_script.script_args.owner_pubkey.try_into()?;
-				let compressed: CompressedPublicKey = owner_pubkey.try_into()?;
-				let fingerprint = Fingerprint::from(utxo.vault_xpub_sources.0.clone());
-				let hd_path = DerivationPath::from(vec![ChildNumber::from(
-					utxo.vault_xpub_sources.1.clone(),
-				)]);
+				let compressed: CompressedPublicKey = owner_pubkey;
+				let fingerprint = Fingerprint::from(utxo.vault_xpub_sources.0);
+				let hd_path =
+					DerivationPath::from(vec![ChildNumber::from(utxo.vault_xpub_sources.1)]);
 				unlocker.psbt.inputs[0]
 					.bip32_derivation
 					.insert(compressed.0, (fingerprint, hd_path));
@@ -413,20 +412,17 @@ impl BondCommands {
 				let (_, utxo, _) = get_utxo_from_bond_id(&client, bond_id, at_block).await?;
 
 				let psbt = Psbt::from_str(&psbt)?;
-				let compressed_pubkey: CompressedBitcoinPubkey =
-					utxo.vault_pubkey.clone().try_into()?;
+				let compressed_pubkey: CompressedBitcoinPubkey = utxo.vault_pubkey.clone().into();
 				let compressed_pubkey: CompressedPublicKey = compressed_pubkey.try_into()?;
 
-				let signature: BitcoinSignature = psbt.inputs[0]
+				let signature: BitcoinSignature = (*psbt.inputs[0]
 					.partial_sigs
 					.get(&compressed_pubkey.into())
-					.ok_or(anyhow!("No signature found"))?
-					.clone()
-					.try_into()
-					.map_err(|_| anyhow!("Unable to translate signature to bytes"))?;
+					.ok_or(anyhow!("No signature found"))?)
+				.try_into()
+				.map_err(|_| anyhow!("Unable to translate signature to bytes"))?;
 
-				let unlock_fulfill =
-					tx().bonds().cosign_bitcoin_unlock(bond_id, signature.try_into()?);
+				let unlock_fulfill = tx().bonds().cosign_bitcoin_unlock(bond_id, signature.into());
 				let url = client.create_polkadotjs_deeplink(&unlock_fulfill)?;
 				println!("Link to create transaction:\n\t{}", url);
 			},
@@ -524,36 +520,32 @@ impl BondCommands {
 						.map_err(|e| anyhow!("Could not convert the vault pubkey {:?}", e))?,
 					signature.try_into()?,
 				);
-				let vault_fingerprint = Fingerprint::from(utxo.vault_xpub_sources.0.clone());
-				let vault_hd_path = DerivationPath::from(vec![ChildNumber::from(
-					utxo.vault_xpub_sources.1.clone(),
-				)]);
+				let vault_fingerprint = Fingerprint::from(utxo.vault_xpub_sources.0);
+				let vault_hd_path =
+					DerivationPath::from(vec![ChildNumber::from(utxo.vault_xpub_sources.1)]);
 				let vault_pubkey: CompressedBitcoinPubkey = utxo.vault_pubkey.into();
 				let vault_pubkey: CompressedPublicKey = vault_pubkey.try_into()?;
 				unlocker.psbt.inputs[0]
 					.bip32_derivation
 					.insert(vault_pubkey.0, (vault_fingerprint, vault_hd_path));
-				match (hd_path, parent_fingerprint) {
-					(Some(hd_path), Some(parent_fingerprint)) => {
-						let fingerprint = Fingerprint::from_str(&parent_fingerprint)?;
-						let hd_path = DerivationPath::from_str(&hd_path)?;
-						let keysource = (fingerprint, hd_path);
-						let owner_pubkey = unlocker
-							.cosign_script
-							.script_args
-							.bitcoin_owner_pubkey()
-							.map_err(|e| anyhow!("Could not convert owner pubkey {:?}", e))?;
-						println!(
-							"Adding owner pubkey to psbt bip32 derivation: {:?}, {:?}",
-							owner_pubkey, keysource
-						);
-						unlocker.psbt.inputs[0].bip32_derivation.insert(
-							secp256k1::PublicKey::from_slice(&owner_pubkey.to_bytes()[..])?,
-							keysource,
-						);
-					},
-					_ => {},
-				};
+				if let (Some(hd_path), Some(parent_fingerprint)) = (hd_path, parent_fingerprint) {
+					let fingerprint = Fingerprint::from_str(&parent_fingerprint)?;
+					let hd_path = DerivationPath::from_str(&hd_path)?;
+					let keysource = (fingerprint, hd_path);
+					let owner_pubkey = unlocker
+						.cosign_script
+						.script_args
+						.bitcoin_owner_pubkey()
+						.map_err(|e| anyhow!("Could not convert owner pubkey {:?}", e))?;
+					println!(
+						"Adding owner pubkey to psbt bip32 derivation: {:?}, {:?}",
+						owner_pubkey, keysource
+					);
+					unlocker.psbt.inputs[0].bip32_derivation.insert(
+						secp256k1::PublicKey::from_slice(&owner_pubkey.to_bytes()[..])?,
+						keysource,
+					);
+				}
 
 				let psbt = unlocker.psbt;
 
@@ -595,7 +587,7 @@ impl BondCommands {
 
 				let pay_scriptpub: BitcoinScriptPubkey = Address::from_str(&dest_pubkey)
 					.map_err(|e| anyhow!("Unable to parse bitcoin destination pubkey: {e:?}"))?
-					.require_network(network.into())?
+					.require_network(network)?
 					.script_pubkey()
 					.into();
 
@@ -605,7 +597,7 @@ impl BondCommands {
 				let mut unlocker = UtxoUnlocker::from_script(
 					cosign_script,
 					utxo.satoshis,
-					txid.into(),
+					txid,
 					utxo_ref.output_index,
 					match claimer {
 						BitcoinClaimer::Owner => UnlockStep::OwnerClaim,
@@ -614,27 +606,23 @@ impl BondCommands {
 					fee,
 					pay_scriptpub.into(),
 				)?;
-				let vault_fingerprint = Fingerprint::from(utxo.vault_xpub_sources.0.clone());
-				let vault_hd_path = DerivationPath::from(vec![ChildNumber::from(
-					utxo.vault_xpub_sources.2.clone(),
-				)]);
+				let vault_fingerprint = Fingerprint::from(utxo.vault_xpub_sources.0);
+				let vault_hd_path =
+					DerivationPath::from(vec![ChildNumber::from(utxo.vault_xpub_sources.2)]);
 				let vault_pubkey: CompressedBitcoinPubkey = utxo.vault_claim_pubkey.into();
 				let vault_pubkey: CompressedPublicKey = vault_pubkey.try_into()?;
 				unlocker.psbt.inputs[0]
 					.bip32_derivation
 					.insert(vault_pubkey.0, (vault_fingerprint, vault_hd_path));
 
-				match (hd_path, parent_fingerprint) {
-					(Some(hd_path), Some(parent_fingerprint)) => {
-						let owner_pubkey: CompressedPublicKey =
-							unlocker.cosign_script.script_args.owner_pubkey.try_into()?;
-						let fingerprint = Fingerprint::from_str(&parent_fingerprint)?;
-						let hd_path = DerivationPath::from_str(&hd_path)?;
-						unlocker.psbt.inputs[0]
-							.bip32_derivation
-							.insert(owner_pubkey.0, (fingerprint, hd_path));
-					},
-					_ => {},
+				if let (Some(hd_path), Some(parent_fingerprint)) = (hd_path, parent_fingerprint) {
+					let owner_pubkey: CompressedPublicKey =
+						unlocker.cosign_script.script_args.owner_pubkey.try_into()?;
+					let fingerprint = Fingerprint::from_str(&parent_fingerprint)?;
+					let hd_path = DerivationPath::from_str(&hd_path)?;
+					unlocker.psbt.inputs[0]
+						.bip32_derivation
+						.insert(owner_pubkey.0, (fingerprint, hd_path));
 				}
 				let psbt = unlocker.psbt;
 
@@ -670,10 +658,10 @@ async fn load_unlocker(
 		.fetch_storage(&storage().bitcoin_utxos().utxo_id_to_ref(utxo_id), at_block)
 		.await?
 		.ok_or(anyhow::anyhow!("No utxo ref found for bond"))?;
-	let unlock_info = find_unlock_request(&client, at_block, utxo_id)
+	let unlock_info = find_unlock_request(client, at_block, utxo_id)
 		.await?
 		.ok_or(anyhow!("No unlock request found"))?;
-	let network = get_bitcoin_network(&client, at_block).await?;
+	let network = get_bitcoin_network(client, at_block).await?;
 
 	let txid: Txid = H256Le(utxo_ref.txid.0).into();
 	let pay_scriptpub: BitcoinScriptPubkey = unlock_info
@@ -681,13 +669,13 @@ async fn load_unlocker(
 		.try_into()
 		.map_err(|_| anyhow!("Unable to decode the destination pubkey"))?;
 	let unlocker = UtxoUnlocker::from_script(
-		get_cosign_script(&utxo, network)?,
+		get_cosign_script(utxo, network)?,
 		utxo.satoshis,
-		txid.into(),
+		txid,
 		utxo_ref.output_index,
 		UnlockStep::VaultCosign,
 		Amount::from_sat(unlock_info.bitcoin_network_fee),
-		pay_scriptpub.try_into()?,
+		pay_scriptpub.into(),
 	)?;
 	Ok(unlocker)
 }
@@ -741,9 +729,9 @@ fn get_cosign_script(
 	network: Network,
 ) -> anyhow::Result<CosignScript> {
 	let script_args = CosignScriptArgs {
-		vault_pubkey: utxo.vault_pubkey.clone().try_into()?,
-		vault_claim_pubkey: utxo.vault_claim_pubkey.clone().try_into()?,
-		owner_pubkey: utxo.owner_pubkey.clone().try_into()?,
+		vault_pubkey: utxo.vault_pubkey.clone().into(),
+		vault_claim_pubkey: utxo.vault_claim_pubkey.clone().into(),
+		owner_pubkey: utxo.owner_pubkey.clone().into(),
 		vault_claim_height: utxo.vault_claim_height,
 		open_claim_height: utxo.open_claim_height,
 		created_at_height: utxo.created_at_height,
