@@ -43,11 +43,11 @@ export default class TestNotary implements ITeardownable {
         this.registeredPublicKey = new Keyring({type: 'ed25519'}).createFromUri('//Ferdie//notary').publicKey;
 
         let notaryPath = pathToNotaryBin ?? `${__dirname}/../../target/debug/argon-notary`;
-        if (process.env.argon_USE_DOCKER_BINS) {
+        if (process.env.ARGON_USE_DOCKER_BINS) {
             this.containerName = "notary_" + nanoid();
             const addHost = process.env.ADD_DOCKER_HOST ? ` --add-host=host.docker.internal:host-gateway` : '';
 
-            notaryPath = `docker run --rm -p=0:9925${addHost} --name=${this.containerName} --platform=linux/amd64 -e RUST_LOG=warn ghcr.io/argonprotocol/argon-notary:dev`;
+            notaryPath = `docker run --rm -p=0:9925${addHost} --name=${this.containerName} -e RUST_LOG=warn ghcr.io/argonprotocol/argon-notary:dev`;
 
 
             this.#dbConnectionString = cleanHostForDocker(this.#dbConnectionString);
@@ -88,7 +88,7 @@ export default class TestNotary implements ITeardownable {
 
 
         const execArgs = ['run', `--db-url=${this.#dbConnectionString}/${this.#dbName}`, `--dev`, `-t ${mainchainUrl}`];
-        if (process.env.argon_USE_DOCKER_BINS) {
+        if (process.env.ARGON_USE_DOCKER_BINS) {
             execArgs.unshift(...notaryPath.replace("docker run", "run").split(' '));
             execArgs.push('-b=0.0.0.0:9925')
 

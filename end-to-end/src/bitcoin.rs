@@ -8,7 +8,6 @@ use bitcoin::{
 };
 use bitcoind::{
 	anyhow,
-	anyhow::anyhow,
 	bitcoincore_rpc::{bitcoincore_rpc_json::AddressType, jsonrpc::serde_json, RpcApi},
 	BitcoinD,
 };
@@ -16,6 +15,7 @@ use rand::{rngs::OsRng, RngCore};
 use sp_arithmetic::FixedU128;
 use sp_core::{crypto::AccountId32, sr25519, Pair};
 
+use anyhow::anyhow;
 use argon_bitcoin::{CosignScript, CosignScriptArgs};
 use argon_client::{
 	api,
@@ -37,7 +37,7 @@ use argon_testing::{
 };
 
 #[tokio::test]
-async fn test_bitcoin_minting_e2e() -> anyhow::Result<()> {
+async fn test_bitcoin_minting_e2e() {
 	let test_node = start_argon_test_node().await;
 	let bitcoind = test_node.bitcoind.as_ref().expect("bitcoind");
 	let block_creator = add_wallet_address(bitcoind);
@@ -47,8 +47,10 @@ async fn test_bitcoin_minting_e2e() -> anyhow::Result<()> {
 	let network: BitcoinNetwork = test_node
 		.client
 		.fetch_storage(&storage().bitcoin_utxos().bitcoin_network(), None)
-		.await?
-		.ok_or(anyhow!("No bitcoin network found"))?
+		.await
+		.unwrap()
+		.ok_or(anyhow!("No bitcoin network found"))
+		.unwrap()
 		.into();
 	let network: Network = network.into();
 	let secp = Secp256k1::new();
@@ -57,7 +59,8 @@ async fn test_bitcoin_minting_e2e() -> anyhow::Result<()> {
 		.client
 		.get_new_address(Some("owner"), None)
 		.unwrap()
-		.require_network(network)?;
+		.require_network(network)
+		.unwrap();
 	println!("Owner address: {:#?}", bitcoind.client.get_address_info(&owner_address).unwrap());
 	let owner_address_info = bitcoind.client.get_address_info(&owner_address).unwrap();
 	let owner_compressed_pubkey = owner_address_info.pubkey.unwrap();
@@ -77,13 +80,14 @@ async fn test_bitcoin_minting_e2e() -> anyhow::Result<()> {
 	let client = Arc::new(client);
 
 	let vault_master_xpriv = create_xpriv(network);
-	let vault_child_xpriv =
-		vault_master_xpriv.derive_priv(&Secp256k1::new(), &[ChildNumber::from_hardened_idx(0)?])?;
+	let vault_child_xpriv = vault_master_xpriv
+		.derive_priv(&Secp256k1::new(), &[ChildNumber::from_hardened_idx(0).unwrap()])
+		.unwrap();
 
 	let xpubkey = Xpub::from_priv(&secp, &vault_child_xpriv);
 	let vault_signer = Sr25519Signer::new(alice_sr25519.clone());
 
-	let _oracle = ArgonTestOracle::bitcoin_tip(&test_node).await?;
+	let _oracle = ArgonTestOracle::bitcoin_tip(&test_node).await.unwrap();
 
 	add_blocks(bitcoind, 1, &block_creator);
 
@@ -91,8 +95,9 @@ async fn test_bitcoin_minting_e2e() -> anyhow::Result<()> {
 	let vault_owner_account_id32: AccountId32 = vault_owner.public().into();
 
 	// 2. A vault is setup with enough funds
-	let vault_id =
-		create_vault(&test_node, &xpubkey, &vault_owner_account_id32, &vault_signer).await?;
+	let vault_id = create_vault(&test_node, &xpubkey, &vault_owner_account_id32, &vault_signer)
+		.await
+		.unwrap();
 
 	let ticker = client.lookup_ticker().await.expect("ticker");
 	client
@@ -107,22 +112,29 @@ async fn test_bitcoin_minting_e2e() -> anyhow::Result<()> {
 			}),
 			&Sr25519Signer::new(price_index_operator.clone()),
 		)
-		.await?
+		.await
+		.unwrap()
 		.wait_for_finalized_success()
-		.await?;
+		.await
+		.unwrap();
 	println!("bitcoin prices submitted");
 
 	let available_vaults =
-		run_bitcoin_cli(&test_node, vec!["vault", "list", "--btc", &utxo_btc.to_string()]).await?;
+		run_bitcoin_cli(&test_node, vec!["vault", "list", "--btc", &utxo_btc.to_string()])
+			.await
+			.unwrap();
 	println!("{}", available_vaults);
 
 	// 3. Owner calls bond api to start a bitcoin bond
 	let (utxo_id, bond_id) =
-		create_bond(&test_node, vault_id, utxo_btc, &owner_compressed_pubkey, &bob_sr25519).await?;
+		create_bond(&test_node, vault_id, utxo_btc, &owner_compressed_pubkey, &bob_sr25519)
+			.await
+			.unwrap();
 
 	let psbt_cli =
 		run_bitcoin_cli(&test_node, vec!["bond", "create-psbt", "--bond-id", &bond_id.to_string()])
-			.await?;
+			.await
+			.unwrap();
 	println!("{}", psbt_cli);
 
 	let (script_address, bond_amount) = confirm_bond(
@@ -136,11 +148,12 @@ async fn test_bitcoin_minting_e2e() -> anyhow::Result<()> {
 		vault_id,
 		&bond_id,
 	)
-	.await?;
+	.await
+	.unwrap();
 
 	// 4. Owner funds the bond utxo and submits it
 	let scriptbuf: ScriptBuf = script_address.into();
-	let scriptaddress = bitcoin::Address::from_script(scriptbuf.as_script(), network)?;
+	let scriptaddress = bitcoin::Address::from_script(scriptbuf.as_script(), network).unwrap();
 	println!("Checking for {} sats, to {}", utxo_satoshis, scriptaddress);
 	assert!(psbt_cli.contains(&format!("{} sats", utxo_satoshis)));
 	assert!(psbt_cli.contains(&format!("to {}", scriptaddress)));
@@ -150,16 +163,21 @@ async fn test_bitcoin_minting_e2e() -> anyhow::Result<()> {
 
 	add_blocks(bitcoind, 5, &block_creator);
 
-	wait_for_mint(&bob_sr25519, &client, &utxo_id, bond_amount, txid, vout).await?;
+	wait_for_mint(&bob_sr25519, &client, &utxo_id, bond_amount, txid, vout)
+		.await
+		.unwrap();
 
 	let bond_cli_get =
-		run_bitcoin_cli(&test_node, vec!["bond", "get", "--bond-id", &bond_id.to_string()]).await?;
+		run_bitcoin_cli(&test_node, vec!["bond", "get", "--bond-id", &bond_id.to_string()])
+			.await
+			.unwrap();
 	println!("Owner has been minted\n{}", bond_cli_get);
 
 	// 5. Ask for the bitcoin to be unlocked
 	println!("\nOwner requests unlock");
 	owner_requests_unlock(&test_node, bitcoind, network, &bob_sr25519, &client, vault_id, bond_id)
-		.await?;
+		.await
+		.unwrap();
 
 	// 5. vault sees unlock request (outaddress, fee) and creates a transaction
 	println!("\nVault publishes cosign tx");
@@ -172,7 +190,8 @@ async fn test_bitcoin_minting_e2e() -> anyhow::Result<()> {
 		&vault_id,
 		&bond_id,
 	)
-	.await?;
+	.await
+	.unwrap();
 
 	println!("\nOwner sees the transaction and cosigns");
 	// 6. Owner sees the transaction and can submit it
@@ -183,9 +202,9 @@ async fn test_bitcoin_minting_e2e() -> anyhow::Result<()> {
 		&owner_hd_key_path.to_string(),
 		&owner_hd_fingerprint.to_string(),
 	)
-	.await?;
-
-	Ok(())
+	.await
+	.unwrap();
+	drop(test_node);
 }
 
 fn get_parent_fingerprint(bitcoind: &BitcoinD, owner_hd_key_path: &DerivationPath) -> Fingerprint {
@@ -433,10 +452,7 @@ async fn wait_for_mint(
 		.expect("pending mint");
 
 	let owner_account_id32: AccountId32 = bob_sr25519.clone().public().into();
-	let balance = client
-		.get_argons(owner_account_id32.clone())
-		.await
-		.expect("pending mint balance");
+	let balance = client.get_argons(owner_account_id32).await.expect("pending mint balance");
 	if pending_mint.0.is_empty() {
 		assert!(balance.free >= bond_amount);
 	} else {

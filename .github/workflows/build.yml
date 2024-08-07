@@ -1,8 +1,10 @@
 name: Build and Test
 'on':
   push:
-  #    tags:
-  #      - v[0-9]+.*
+    branches:
+      - main
+    tags:
+      - v[0-9]+.*
   workflow_dispatch:
     inputs:
       SKIP_REBUILD_DOCKER:
@@ -71,20 +73,12 @@ jobs:
         uses: dtolnay/rust-toolchain@stable
         with:
           toolchain: stable
-          targets: ${{ matrix.target }},wasm32-unknown-unknown
-      #
-      #      - name: Cache cargo
-      #        if: ${{(github.event.inputs.SKIP_REBUILD_DOCKER != 'true')}}
-      #        uses: actions/cache@v4
-      #        with:
-      #          path: |
-      #            ~/.cargo/registry/index/
-      #            ~/.cargo/registry/cache/
-      #            ~/.cargo/git/db/
-      #            .cargo-cache
-      #          key: cargo-${{github.job}}-${{ matrix.target }}
-      #        env:
-      #          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          targets: wasm32-unknown-unknown
+
+      - uses: taiki-e/setup-cross-toolchain-action@v1
+        if: ${{(github.event.inputs.SKIP_REBUILD_DOCKER != 'true')}}
+        with:
+          target: ${{ matrix.target }}
 
       - uses: taiki-e/install-action@v2
         if: ${{(github.event.inputs.SKIP_REBUILD_DOCKER != 'true')}}
@@ -124,7 +118,7 @@ jobs:
         uses: actions/upload-artifact@v4
         with:
           name: bins-${{ matrix.target }}
-          path: target/debug/argon-*
+          path: target/${{ matrix.target }}/debug/argon-*
           if-no-files-found: error
 
   docker:
@@ -401,7 +395,7 @@ jobs:
           echo "127.0.0.1 host.docker.internal" | sudo tee -a /etc/hosts
 
       - name: Pull Miner
-        run: docker pull ghcr.io/argon/argon-miner:dev && docker pull ghcr.io/argon/argon-notary:dev
+        run: docker pull ghcr.io/argonprotocol/argon-miner:dev && docker pull ghcr.io/argonprotocol/argon-notary:dev
 
       - name: Download artifacts
         uses: actions/download-artifact@v4

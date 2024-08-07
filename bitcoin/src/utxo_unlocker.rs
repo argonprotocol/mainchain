@@ -221,7 +221,7 @@ impl UtxoUnlocker {
 	}
 }
 
-#[cfg(feature = "hwif")]
+#[cfg(feature = "hwi")]
 mod hwi {
 	use hwi::{types::HWIDevice, HWIClient};
 

@@ -1,17 +1,22 @@
 #![allow(clippy::await_holding_lock)]
 
-use crate::{bitcoind::read_rpc_url, start_bitcoind};
-use argon_client::MainchainClient;
-use bitcoind::{bitcoincore_rpc::Auth, BitcoinD};
-use lazy_static::lazy_static;
 use std::{
 	env,
 	io::{BufRead, BufReader},
-	path::PathBuf,
 	process,
 	process::Command,
+	sync::mpsc,
 };
+
+use bitcoind::{bitcoincore_rpc::Auth, BitcoinD};
+use lazy_static::lazy_static;
+use strip_ansi_escapes::strip;
+use tokio::task::spawn_blocking;
 use url::Url;
+
+use argon_client::MainchainClient;
+
+use crate::{bitcoind::read_rpc_url, get_target_dir, start_bitcoind};
 
 pub struct ArgonTestNode {
 	// Keep a handle to the node; once it's dropped the node is killed.
@@ -39,7 +44,6 @@ impl ArgonTestNode {
 	pub async fn start(authority: String) -> anyhow::Result<Self> {
 		#[allow(clippy::await_holding_lock)]
 		let _lock = CONTEXT_LOCK.lock().unwrap();
-		let project_dir = PathBuf::from(env!("CARGO_MANIFEST_DIR"));
 
 		let (bitcoin, rpc_url, _) = start_bitcoind().map_err(|e| {
 			eprintln!("ERROR starting bitcoind {:#?}", e);
@@ -48,16 +52,16 @@ impl ArgonTestNode {
 		let rust_log =
 			format!("{},sc_rpc_server=info", env::var("RUST_LOG").unwrap_or("warn".to_string()));
 
-		let workspace_cargo_path = project_dir.join("..");
-		let workspace_cargo_path =
-			workspace_cargo_path.canonicalize().expect("Failed to canonicalize path");
-		let workspace_cargo_path = workspace_cargo_path.as_path().join("target/debug");
-		let root = workspace_cargo_path.as_os_str();
+		let target_dir = get_target_dir();
 
-		println!("Starting argon-node with bitcoin rpc url: {}", rpc_url);
+		println!(
+			"Starting argon-node with bitcoin rpc url: {} at {}",
+			rpc_url,
+			target_dir.display()
+		);
 
 		let mut proc = Command::new("./argon-node")
-			.current_dir(root)
+			.current_dir(target_dir)
 			.env("RUST_LOG", rust_log)
 			.stderr(process::Stdio::piped())
 			.arg("--dev")
@@ -70,33 +74,39 @@ impl ArgonTestNode {
 
 		// Wait for RPC port to be logged (it's logged to stderr).
 		let stderr = proc.stderr.take().unwrap();
+		let stderr_reader = BufReader::new(stderr);
+		let (tx, rx) = mpsc::channel();
 
-		let mut ws_port = None;
-		for line in BufReader::new(stderr).lines().take(500) {
-			let line = line.expect("failed to obtain next line from stdout for port discovery");
+		let tx_clone = tx.clone();
 
-			let line_port = line
-				.rsplit_once("Running JSON-RPC server: addr=127.0.0.1:")
-				.map(|(_, port)| port);
+		spawn_blocking(move || {
+			for line in stderr_reader.lines() {
+				let line = line.expect("failed to obtain next line from stdout");
+				let cleaned_log = strip(&line);
+				println!("NODE>> {}", String::from_utf8_lossy(&cleaned_log));
 
-			if let Some(line_port) = line_port {
-				// trim non-numeric chars from the end of the port part of the line.
-				let port_str = line_port.trim_end_matches(|b: char| !b.is_ascii_digit());
+				let line_port = line
+					.rsplit_once("Running JSON-RPC server: addr=127.0.0.1:")
+					.map(|(_, port)| port);
 
-				// expect to have a number here (the chars after '127.0.0.1:') and parse them into a
-				// u16.
-				let port_num: u16 = port_str.parse().unwrap_or_else(|_| {
-					panic!("valid port expected for log line, got '{port_str}'")
-				});
-				ws_port = Some(port_num);
-				break;
+				if let Some(line_port) = line_port {
+					// trim non-numeric chars from the end of the port part of the line.
+					let port_str = line_port.trim_end_matches(|b: char| !b.is_ascii_digit());
+
+					// expect to have a number here (the chars after '127.0.0.1:') and parse them
+					// into a u16.
+					let port_num: u16 = port_str.parse().unwrap_or_else(|_| {
+						panic!("valid port expected for log line, got '{port_str}'")
+					});
+					let ws_url = format!("ws://127.0.0.1:{}", port_num);
+					tx_clone.send(ws_url).unwrap();
+				}
 			}
-		}
+		});
 
-		let ws_port = ws_port.expect("Failed to find ws port");
+		let ws_url = rx.recv().expect("Failed to start node");
 
-		let client =
-			MainchainClient::from_url(format!("ws://127.0.0.1:{}", ws_port).as_str()).await?;
+		let client = MainchainClient::from_url(ws_url.as_str()).await?;
 
 		Ok(ArgonTestNode {
 			proc: Some(proc),

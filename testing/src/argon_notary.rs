@@ -1,17 +1,13 @@
 use std::{
 	env,
 	io::{BufRead, BufReader},
-	path::PathBuf,
 	process,
 	process::Command,
-	sync::Arc,
+	sync::{mpsc, Arc},
+	thread,
 };
 
 use anyhow::Context;
-use rand::seq::SliceRandom;
-use sp_core::{crypto::Pair, ed25519};
-use sqlx::postgres::PgPoolOptions;
-
 use argon_client::{
 	api::{
 		runtime_types::argon_primitives::{
@@ -21,16 +17,24 @@ use argon_client::{
 		tx,
 	},
 	signer::Ed25519Signer,
+	MainchainClient,
 };
+use rand::seq::SliceRandom;
+use sp_core::{crypto::Pair, ed25519};
+use sqlx::{postgres::PgPoolOptions, PgPool};
+use strip_ansi_escapes::strip;
+use tokio::{runtime::Runtime, task::spawn_blocking};
 
-use crate::ArgonTestNode;
+use crate::{get_target_dir, ArgonTestNode};
 
 pub struct ArgonTestNotary {
 	// Keep a handle to the node; once it's dropped the node is killed.
-	proc: Option<process::Child>,
+	pub proc: Option<process::Child>,
 	pub client: Arc<argon_notary_apis::Client>,
 	pub ws_url: String,
 	pub operator: ed25519::Pair,
+	pub db_name: String,
+	pub db_url: String,
 }
 
 impl Drop for ArgonTestNotary {
@@ -38,6 +42,22 @@ impl Drop for ArgonTestNotary {
 		if let Some(mut proc) = self.proc.take() {
 			let _ = proc.kill();
 		}
+		let db_url = self.db_url.clone();
+		let db_name = self.db_name.clone();
+		thread::spawn(move || {
+			let handle = Runtime::new().unwrap();
+			handle.block_on(async {
+				let pool =
+					PgPool::connect(&db_url).await.context("failed to connect to db").unwrap();
+				sqlx::query(&format!("DROP DATABASE \"{}\" WITH(FORCE)", db_name))
+					.execute(&pool)
+					.await
+					.map_err(|e| eprintln!("Failed to drop db: {:?}", e))
+					.ok();
+			});
+		})
+		.join()
+		.expect("Failed to drop db");
 	}
 }
 
@@ -48,14 +68,7 @@ impl ArgonTestNotary {
 	) -> anyhow::Result<Self> {
 		let rust_log = env::var("RUST_LOG").unwrap_or("warn".to_string());
 
-		let target_dir = {
-			let project_dir = PathBuf::from(env!("CARGO_MANIFEST_DIR"));
-			let workspace_cargo_path = project_dir.join("..");
-			let workspace_cargo_path =
-				workspace_cargo_path.canonicalize().expect("Failed to canonicalize path");
-			let workspace_cargo_path = workspace_cargo_path.as_path().join("target/debug");
-			workspace_cargo_path
-		};
+		let target_dir = get_target_dir();
 
 		let operator = operator
 			.unwrap_or_else(|| ed25519::Pair::from_string("//Ferdie//notary", None).unwrap());
@@ -89,7 +102,7 @@ impl ArgonTestNotary {
 			.current_dir(&target_dir)
 			.args(vec!["migrate", "--db-url", &db_url])
 			.output()?;
-		println!("Migrated db {}: {:?}", db_name, output.stdout);
+		println!("Migrated notary db {}: {:?}", db_name, output.stdout);
 
 		let mut proc = Command::new("./argon-notary")
 			.current_dir(&target_dir)
@@ -98,25 +111,39 @@ impl ArgonTestNotary {
 			.args(vec!["run", "--db-url", &db_url, "--dev", "-t", &node.client.url])
 			.spawn()?;
 
-		// Wait for RPC port to be logged (it's logged to stderr).
+		// Wait for RPC port to be logged (it's logged to stdout).
 		let stdout = proc.stdout.take().unwrap();
+		let stdout_reader = BufReader::new(stdout);
+		let (tx, rx) = mpsc::channel();
 
-		let mut ws_url = None;
-		for line in BufReader::new(stdout).lines().take(500) {
-			let line = line.expect("failed to obtain next line from stdout for port discovery");
+		let tx_clone = tx.clone();
 
-			let line_port = line.rsplit_once("Listening on ws://").map(|(_, port)| port);
+		spawn_blocking(move || {
+			for line in stdout_reader.lines() {
+				let line = line.expect("failed to obtain next line from stdout");
+				let cleaned_log = strip(&line);
+				println!("NOTARY>> {}", String::from_utf8_lossy(&cleaned_log));
 
-			if let Some(line_port) = line_port {
-				let line_port = line_port.trim_end_matches(|b: char| !b.is_ascii_digit());
-				ws_url = Some(format!("ws://{}", line_port));
-				break;
+				let line_port = line.rsplit_once("Listening on ws://").map(|(_, port)| port);
+
+				if let Some(line_port) = line_port {
+					let line_port = line_port.trim_end_matches(|b: char| !b.is_ascii_digit());
+					let ws_url = format!("ws://{}", line_port);
+					tx_clone.send(ws_url).unwrap();
+				}
 			}
-		}
+		});
 
-		let ws_url = ws_url.expect("Failed to find ws port");
+		let ws_url = rx.recv().expect("Failed to start notary");
 		let client = argon_notary_apis::create_client(&ws_url).await?;
-		Ok(Self { proc: Some(proc), client: Arc::new(client), ws_url, operator })
+		Ok(Self {
+			proc: Some(proc),
+			client: Arc::new(client),
+			ws_url,
+			operator,
+			db_name,
+			db_url: db_base_url,
+		})
 	}
 
 	pub async fn register_operator(&self, argon_test_node: &ArgonTestNode) -> anyhow::Result<()> {
@@ -130,14 +157,14 @@ impl ArgonTestNotary {
 		});
 		println!("notary proposal {:?}", notary_proposal.call_data());
 		let signer = Ed25519Signer::new(operator);
-		argon_test_node
+		let ext = argon_test_node
 			.client
 			.live
 			.tx()
 			.sign_and_submit_then_watch_default(&notary_proposal, &signer)
-			.await?
-			.wait_for_finalized_success()
 			.await?;
+
+		MainchainClient::wait_for_ext_in_block(ext).await?;
 
 		Ok(())
 	}
