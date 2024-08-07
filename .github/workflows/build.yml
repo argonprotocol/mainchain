@@ -103,7 +103,7 @@ jobs:
 
       - name: Test
         if: ${{(github.event.inputs.SKIP_REBUILD_DOCKER != 'true')}}
-        run: cargo make test
+        run: cargo build --features=fast-runtime && cargo test --features=fast-runtime --no-fail-fast
         env:
           RUSTC_WRAPPER: "sccache"
           CARGO_INCREMENTAL: 0

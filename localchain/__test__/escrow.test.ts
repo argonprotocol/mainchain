@@ -15,7 +15,7 @@ import {
     Keyring,
     KeyringPair,
     ArgonClient,
-    argonPrimitivesDataDomainVersionHost
+    ArgonPrimitivesDataDomainVersionHost
 } from "@argonprotocol/mainchain";
 import {
     activateNotary,
@@ -52,7 +52,7 @@ describeIntegration("Escrow integration", () => {
         const ferdie = new Keyring({type: 'sr25519'}).createFromUri('//Ferdie');
 
         await expect(registerZoneRecord(mainchainClient, dataDomainHash, ferdie, ferdieDomainAddress.publicKey, 1, {
-            "1.0.0": mainchainClient.createType('argonPrimitivesDataDomainVersionHost', {
+            "1.0.0": mainchainClient.createType('ArgonPrimitivesDataDomainVersionHost', {
                 datastoreId: mainchainClient.createType('Bytes', 'default'),
                 host: 'ws://192.168.1.1:80'
             })
@@ -115,7 +115,7 @@ describeIntegration("Escrow integration", () => {
         }
 
         await registerZoneRecord(mainchainClient, dataDomainHash, ferdiekeys.defaultPair, ferdiekeys.defaultPair.publicKey, 1, {
-            "1.0.0": mainchainClient.createType('argonPrimitivesDataDomainVersionHost', {
+            "1.0.0": mainchainClient.createType('ArgonPrimitivesDataDomainVersionHost', {
                 datastoreId: mainchainClient.createType('Bytes', 'default'),
                 host: 'ws://192.168.1.1:80'
             })
@@ -215,17 +215,17 @@ async function transferMainchainToLocalchain(mainchainClient: ArgonClient, local
     return {notarization, balanceChange};
 }
 
-async function registerZoneRecord(client: ArgonClient, dataDomainHash: Uint8Array, owner: KeyringPair, paymentAccount: Uint8Array, notaryId: number, versions: Record<string, argonPrimitivesDataDomainVersionHost>) {
+async function registerZoneRecord(client: ArgonClient, dataDomainHash: Uint8Array, owner: KeyringPair, paymentAccount: Uint8Array, notaryId: number, versions: Record<string, ArgonPrimitivesDataDomainVersionHost>) {
 
     const codecVersions = new Map();
     for (const [version, host] of Object.entries(versions)) {
         const [major, minor, patch] = version.split('.');
-        const versionCodec = client.createType('argonPrimitivesDataDomainSemver', {
+        const versionCodec = client.createType('ArgonPrimitivesDataDomainSemver', {
             major,
             minor,
             patch,
         });
-        codecVersions.set(versionCodec, client.createType('argonPrimitivesDataDomainVersionHost', host));
+        codecVersions.set(versionCodec, client.createType('ArgonPrimitivesDataDomainVersionHost', host));
     }
 
     await new Promise((resolve, reject) => client.tx.dataDomain.setZoneRecord(dataDomainHash, {

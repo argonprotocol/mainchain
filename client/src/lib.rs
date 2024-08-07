@@ -164,7 +164,7 @@ impl MainchainClient {
 						));
 					}
 					warn!(
-						"argonFullClient: failed to connect client to {} - {:?}, retrying soon..",
+						"ArgonFullClient: failed to connect client to {} - {:?}, retrying soon..",
 						url, why
 					);
 					tokio::time::sleep(std::time::Duration::from_millis(retry_delay_millis)).await;

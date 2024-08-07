@@ -4,7 +4,7 @@ import {Keyring} from "@polkadot/api";
 async function main() {
     let api = await getClient("ws://127.0.0.1:9944");
     console.log("got api");
-    let domainTld = api.createType("argonPrimitivesDataTLD", "Analytics");
+    let domainTld = api.createType("ArgonPrimitivesDataTLD", "Analytics");
 
     let result = await api.query.dataDomain.registeredDataDomains({domainName: "test", topLevelDomain: domainTld});
     console.log("got a registered data domain", result.isSome);

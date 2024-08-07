@@ -106,11 +106,11 @@ pub(crate) struct PeerData {
 	pub aux_client: ArgonAux<Block, TestApi>,
 	pub utxo_tracker: Arc<UtxoTracker>,
 }
-pub(crate) type argonPeer = Peer<Option<PeerData>, ArgonBlockImport>;
+pub(crate) type ArgonPeer = Peer<Option<PeerData>, ArgonBlockImport>;
 
 #[derive(Default)]
 pub(crate) struct ArgonTestNet {
-	pub peers: Vec<argonPeer>,
+	pub peers: Vec<ArgonPeer>,
 	pub config: Config,
 }
 
@@ -370,19 +370,19 @@ impl TestNetFactory for ArgonTestNet {
 		ArgonVerifier::new()
 	}
 
-	fn peer(&mut self, i: usize) -> &mut argonPeer {
+	fn peer(&mut self, i: usize) -> &mut ArgonPeer {
 		&mut self.peers[i]
 	}
 
-	fn peers(&self) -> &Vec<argonPeer> {
+	fn peers(&self) -> &Vec<ArgonPeer> {
 		&self.peers
 	}
 
-	fn peers_mut(&mut self) -> &mut Vec<argonPeer> {
+	fn peers_mut(&mut self) -> &mut Vec<ArgonPeer> {
 		&mut self.peers
 	}
 
-	fn mut_peers<F: FnOnce(&mut Vec<argonPeer>)>(&mut self, closure: F) {
+	fn mut_peers<F: FnOnce(&mut Vec<ArgonPeer>)>(&mut self, closure: F) {
 		closure(&mut self.peers);
 	}
 
