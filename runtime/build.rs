@@ -6,7 +6,7 @@ fn main() {
 	#[cfg(all(feature = "std", feature = "metadata-hash"))]
 	{
 		substrate_wasm_builder::WasmBuilder::init_with_defaults()
-			.enable_metadata_hash("ARG", 3)
+			.enable_metadata_hash("ARGON", 3)
 			.build()
 	}
 }

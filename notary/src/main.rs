@@ -37,7 +37,7 @@ enum Commands {
 		trusted_rpc_url: String,
 
 		/// Required notary id you are running
-		#[clap(short, long, env = "argon_NOTARY_ID", default_value = "1")]
+		#[clap(short, long, env = "ARGON_NOTARY_ID", default_value = "1")]
 		notary_id: NotaryId,
 
 		#[allow(missing_docs)]

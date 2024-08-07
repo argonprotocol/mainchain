@@ -56,7 +56,7 @@ jobs:
       - create-release
     strategy:
       matrix:
-        # The list of architechture and OS to build for
+        # The list of architecture and OS to build for
         # You can add or remove targets here if you want
         #
         # When updating this list, remember to update the target list in tests too
@@ -64,9 +64,9 @@ jobs:
           - target: aarch64-unknown-linux-gnu
           - target: x86_64-unknown-linux-gnu
           - target: aarch64-apple-darwin
-            os: macos-11
+            os: macos-latest
           - target: x86_64-apple-darwin
-            os: macos-11
+            os: macos-latest
           - os: windows-latest
           # - target: universal-apple-darwin
           #   os: macos-11
@@ -97,6 +97,7 @@ jobs:
       - name: Install mac dependencies
         if: startsWith(matrix.os, 'macos')
         run: brew install protobuf
+
       - uses: taiki-e/setup-cross-toolchain-action@v1
         if: (matrix.os == '' || startsWith(matrix.os, 'ubuntu'))
         with:
@@ -107,6 +108,7 @@ jobs:
         with:
           bin: argon-node
           checksum: sha256,sha512,sha1,md5
+          features: metadata-hash
           target: ${{ matrix.target }}
           archive: $bin-$tag-$target
           token: ${{ secrets.GITHUB_TOKEN }}
@@ -127,12 +129,13 @@ jobs:
           archive: $bin-$tag-$target
           token: ${{ secrets.GITHUB_TOKEN }}
 
-      - name: Upload x86_64 linux binary to workflow
-        if: (matrix.target == 'x86_64-unknown-linux-gnu')
+      - name: Upload linux binaries to workflow
+        if: (matrix.target == 'x86_64-unknown-linux-gnu' || matrix.target == 'aarch64-unknown-linux-gnu')
         uses: actions/upload-artifact@v4
         with:
-          name: argon-node
-          path: ${{ github.workspace }}/target/x86_64-unknown-linux-gnu/release/argon-node
+          name: bins-${{ matrix.target }}
+          path: target/${{matrix.target}}/release/argon-*
+          if-no-files-found: error
 
   build-image:
     # The type of runner that the job will run on
@@ -157,17 +160,42 @@ jobs:
         uses: actions/download-artifact@v4
         with:
           name: argon-node
-          path: ${{ github.workspace }}
+          path: ./amd64
 
-      # Build and push 2 images, One with the version tag and the other with latest tag
-      - name: Build and push Docker images
-        uses: docker/build-push-action@v6
+      - name: Download artifacts
+        uses: actions/download-artifact@v4
         with:
-          context: .
-          file: ./Containerfile
-          push: true
-          build-args: |
-            DOCKER_REPO=${{ env.DOCKER_REPO }}
+          name: bins-x86_64-unknown-linux-gnu
+          github-token: ${{ secrets.GITHUB_TOKEN }}
+          path: ./amd64
+
+      - name: Download amd artifacts
+        uses: actions/download-artifact@v4
+        with:
+          name: bins-aarch64-unknown-linux-gnu
+          github-token: ${{ secrets.GITHUB_TOKEN }}
+          path: ./arm64
+
+      - name: Argon Node
+        uses: ./.github/templates/docker
+        with:
+          image: ghcr.io/argonprotocol/argon-miner
+          bin: argon-node
+          github-token: ${{ secrets.GITHUB_TOKEN }}
+          flavor: latest=true
           tags: |
-            ${{ env.DOCKER_REPO }}:${{ github.ref_name }}
-            ${{ env.DOCKER_REPO }}:latest
+            type=semver,pattern={{version}}
+            type=semver,pattern={{major}}.{{minor}}
+            type=sha
+
+      - name: Notary
+        uses: ./.github/templates/docker
+        with:
+          image: ghcr.io/argonprotocol/argon-notary
+          bin: argon-notary
+          github-token: ${{ secrets.GITHUB_TOKEN }}
+          flavor: latest=true
+          tags: |
+            type=semver,pattern={{version}}
+            type=semver,pattern={{major}}.{{minor}}
+            type=sha

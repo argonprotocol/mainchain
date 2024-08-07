@@ -47,7 +47,7 @@ where
 pub fn development_config() -> Result<ChainSpec, String> {
 	let mut properties = Properties::new();
 	properties.insert("tokenDecimals".into(), 3.into());
-	properties.insert("tokenSymbol".into(), "ARG".into());
+	properties.insert("tokenSymbol".into(), "ARGON".into());
 	properties.insert("ss58Format".into(), ADDRESS_PREFIX.into());
 
 	const HASHES_PER_SECOND: u64 = 100;
@@ -93,7 +93,7 @@ pub fn local_testnet_config() -> Result<ChainSpec, String> {
 	let mut properties = Properties::new();
 	properties.insert("tokenDecimals".into(), 3.into());
 
-	let notary_host = env::var("argon_LOCAL_TESTNET_NOTARY_URL")
+	let notary_host = env::var("ARGON_LOCAL_TESTNET_NOTARY_URL")
 		.unwrap_or("ws://127.0.0.1:9925".to_string())
 		.into();
 	const HASHES_PER_SECOND: u64 = 1_000;

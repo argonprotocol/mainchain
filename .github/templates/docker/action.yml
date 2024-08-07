@@ -16,6 +16,16 @@ inputs:
   github-token:
     description: 'The github token'
     required: true
+  flavor:
+    description: 'The flavor of the image'
+    required: false
+    default: latest=false
+  tags:
+    description: 'The tags to apply to the image'
+    required: false
+    default: |
+      type=raw,dev
+      type=sha
 
 runs:
   using: "composite"
@@ -28,10 +38,8 @@ runs:
         labels: |
           org.opencontainers.image.licenses=MIT
           org.opencontainers.image.vendor=argon
-        flavor: latest=false
-        tags: |
-          type=raw,dev
-          type=sha
+        flavor: ${{ inputs.flavor }}
+        tags: ${{ inputs.tags }}
 
     - name: Set up QEMU
       uses: docker/setup-qemu-action@v3

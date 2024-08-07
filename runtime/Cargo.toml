@@ -195,6 +195,7 @@ try-runtime = [
 	"pallet-vaults/try-runtime",
 	"sp-runtime/try-runtime",
 ]
+metadata-hash = [ "substrate-wasm-builder/metadata-hash" ]
 # Set timing constants (e.g. session period) to faster versions to speed up testing.
 fast-runtime = [
 	"argon-primitives/fast-runtime",
