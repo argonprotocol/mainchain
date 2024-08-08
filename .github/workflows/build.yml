@@ -103,7 +103,7 @@ jobs:
         working-directory: localchain
         run: cargo sqlx database setup
 
-      - name: Test
+      - name: Build
         if: ${{(github.event.inputs.SKIP_REBUILD_DOCKER != 'true')}}
         run: cargo build --features=fast-runtime
         env:
@@ -333,7 +333,7 @@ jobs:
       #          run-id: 8755170162
 
       - name: Test bindings
-        run: yarn test:js-only --testTimeout=30000 --forceExit --verbose --runInBand --target=${{ matrix.target }}
+        run: yarn test:js-only --forceExit --verbose --runInBand --target=${{ matrix.target }}
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
           SKIP_E2E: true
@@ -406,7 +406,7 @@ jobs:
       #          run-id: 8755170162
 
       - name: Test bindings
-        run: yarn test:js-only --testTimeout=90000 --forceExit --verbose --runInBand
+        run: yarn test:js-only --forceExit --verbose --runInBand
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
           ADD_DOCKER_HOST: true
@@ -453,14 +453,16 @@ jobs:
         run: ls -R ./npm
         shell: bash
         working-directory: ./localchain
+
       - name: Publish
+        if: ${{ env.NPM_ENABLED != 'true' }}
         working-directory: ./localchain
         run: |
-          if git log -1 --pretty=%B | grep "^[0-9]\+\.[0-9]\+\.[0-9]\+";
+          if git log -1 --pretty=%B | grep "^v[0-9]\+\.[0-9]\+\.[0-9]\+$";
           then
           echo "//registry.npmjs.org/:_authToken=$NPM_TOKEN" >> ~/.npmrc
           npm publish --provenance --access public
-          elif git log -1 --pretty=%B | grep "^[0-9]\+\.[0-9]\+\.[0-9]\+";
+          elif git log -1 --pretty=%B | grep "^v[0-9]\+\.[0-9]\+\.[0-9]\+";
           then
           echo "//registry.npmjs.org/:_authToken=$NPM_TOKEN" >> ~/.npmrc
           npm publish --provenance --tag next --access public
