@@ -37,6 +37,7 @@ tracing-subscriber = { workspace = true }
 sqlx = { workspace = true, features = ["runtime-tokio-native-tls", "postgres", "macros", "chrono"] }
 chrono = { workspace = true }
 clap = { workspace = true }
+tower = { workspace = true }
 
 argon-client = { workspace = true }
 argon-notary-audit = { workspace = true, features = ["default"] }

@@ -1,19 +1,10 @@
-# This is an example GitHub action that will build and publish the binaries and a Docker image
-# You need to add the following secrets to your GitHub Repository or Organization to make this work
-# - DOCKERHUB_USERNAME: The username of the DockerHub account. E.g. parity
-# - DOCKERHUB_TOKEN: Access token for DockerHub, see https://docs.docker.com/docker-hub/access-tokens/.
-# The following is set up as an environment variable below
-# - DOCKER_REPO: The unique name of the DockerHub repository. E.g. parity/polkadot
-
 name: Release
 
 permissions:
   contents: read
 
-# Controls when the action will run.
 on:
   push:
-    # Triggers the workflow on tag push events
     tags:
       - v[0-9]+.*
 
@@ -25,8 +16,6 @@ env:
   RUSTFLAGS: -D warnings
   RUSTUP_MAX_RETRIES: 10
   CARGO_TERM_COLOR: always
-  # Set an environment variable (that can be overridden) for the Docker Repo
-  DOCKER_REPO: ulixee/argon-miner
 
 defaults:
   run:
@@ -35,9 +24,7 @@ defaults:
 
 jobs:
   create-release:
-    # The type of runner that the job will run on
     runs-on: ubuntu-22.04
-    timeout-minutes: 60
     permissions:
       contents: write
     steps:
@@ -56,10 +43,6 @@ jobs:
       - create-release
     strategy:
       matrix:
-        # The list of architecture and OS to build for
-        # You can add or remove targets here if you want
-        #
-        # When updating this list, remember to update the target list in tests too
         include:
           - target: aarch64-unknown-linux-gnu
           - target: x86_64-unknown-linux-gnu
@@ -71,14 +54,11 @@ jobs:
           # - target: universal-apple-darwin
           #   os: macos-11
 
-    # The type of runner that the job will run on
-    # Runs on Ubuntu if other os is not specified above
     runs-on: ${{ matrix.os || 'ubuntu-22.04' }}
     timeout-minutes: 90
     permissions:
       contents: write
     steps:
-      # Checks-out your repository under $GITHUB_WORKSPACE, so your job can access it
       - uses: actions/checkout@v4
         with:
           persist-credentials: false
@@ -92,7 +72,7 @@ jobs:
         if: (matrix.os == '' || startsWith(matrix.os, 'ubuntu'))
         run: |
           sudo apt-get -qq update
-          sudo apt-get install -y protobuf-compiler
+          sudo apt-get install -y clang libssl-dev llvm libudev-dev protobuf-compiler pkg-config
 
       - name: Install mac dependencies
         if: startsWith(matrix.os, 'macos')
@@ -103,7 +83,6 @@ jobs:
         with:
           target: ${{ matrix.target }}
 
-      # Build and upload the binary to the new release
       - uses: taiki-e/upload-rust-binary-action@v1
         with:
           bin: argon-node
@@ -129,6 +108,15 @@ jobs:
           archive: $bin-$tag-$target
           token: ${{ secrets.GITHUB_TOKEN }}
 
+      - uses: taiki-e/upload-rust-binary-action@v1
+        if: (matrix.target == 'x86_64-unknown-linux-gnu')
+        with:
+          bin: argon-oracle
+          checksum: sha256,sha512,sha1,md5
+          target: ${{ matrix.target }}
+          archive: $bin-$tag-$target
+          token: ${{ secrets.GITHUB_TOKEN }}
+
       - name: Upload linux binaries to workflow
         if: (matrix.target == 'x86_64-unknown-linux-gnu' || matrix.target == 'aarch64-unknown-linux-gnu')
         uses: actions/upload-artifact@v4
@@ -138,29 +126,18 @@ jobs:
           if-no-files-found: error
 
   build-image:
-    # The type of runner that the job will run on
     needs:
       - upload-assets
-    runs-on: ubuntu-22.04
-    # Steps represent a sequence of tasks that will be executed as part of the job
+    runs-on: ubuntu-latest
     steps:
-      # Login to Docker hub using the credentials stored in the repository secrets
       - name: Log in to Docker Hub
         uses: docker/login-action@v3.2.0
         with:
           username: ${{ secrets.DOCKERHUB_USERNAME }}
           password: ${{ secrets.DOCKERHUB_TOKEN }}
 
-      # Checks-out your repository under $GITHUB_WORKSPACE, so your job can access it
       - name: Check out the repo
         uses: actions/checkout@v4
-
-      # Download the binary from the previous job
-      - name: Download x86_64 linux binary
-        uses: actions/download-artifact@v4
-        with:
-          name: argon-node
-          path: ./amd64
 
       - name: Download artifacts
         uses: actions/download-artifact@v4

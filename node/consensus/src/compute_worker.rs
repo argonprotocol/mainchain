@@ -340,7 +340,7 @@ where
 
 	let handle_to_return = mining_handle.clone();
 
-	let ticker = match client.runtime_api().ticker(client.info().genesis_hash) {
+	let ticker = match client.runtime_api().ticker(client.info().finalized_hash) {
 		Ok(x) => x,
 		Err(err) => {
 			panic!("Unable to pull ticker from runtime api: {}", err)

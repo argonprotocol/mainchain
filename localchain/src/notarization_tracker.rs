@@ -135,7 +135,8 @@ impl NotarizationTracker {
       .await?;
     let account_change_root = mainchain_client
       .get_account_changes_root(self.notary_id, self.notebook_number)
-      .await?;
+      .await?
+      .ok_or(anyhow!("Account changes root not found"))?;
     let change_root = H256::from_slice(account_change_root.as_ref());
 
     let mut balance_changes = self.balance_changes_by_account.lock().await;

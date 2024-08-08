@@ -584,6 +584,7 @@ dependencies = [
  "subxt-signer",
  "thiserror",
  "tokio",
+ "tower",
  "tracing",
  "tracing-subscriber",
  "url",

@@ -4,13 +4,13 @@ use std::sync::Arc;
 use sqlx::SqlitePool;
 use tokio::sync::Mutex;
 
-use argon_primitives::{AccountType, Note, NoteType};
-
 use crate::mainchain_transfer::MainchainTransferIn;
 use crate::transactions::TransactionType;
 use crate::Result;
 use crate::{AccountStore, BalanceChangeRow};
 use crate::{BalanceChangeStatus, LocalAccount, MainchainClient};
+use argon_primitives::argon_utils::format_argons;
+use argon_primitives::{AccountType, Note, NoteType};
 
 #[derive(Clone, Debug, Default)]
 pub struct LocalchainOverview {
@@ -34,6 +34,60 @@ pub struct LocalchainOverview {
   pub mainchain_balance: i128,
   /// The net pending mainchain balance pending movement in/out of the localchain
   pub processing_mainchain_balance_change: i128,
+}
+
+impl LocalchainOverview {
+  pub fn balance_with_pending(&self) -> String {
+    let mut balance = format_argons(self.balance as u128);
+    let sign = match self.pending_balance_change.signum() {
+      1 => "+",
+      -1 => "-",
+      _ => "",
+    };
+    let mut did_open_parens = false;
+    if !sign.is_empty() {
+      did_open_parens = true;
+      balance += format!(
+        " ({sign}{} pending",
+        format_argons(self.pending_balance_change.unsigned_abs())
+      )
+      .as_str();
+    }
+    if self.processing_mainchain_balance_change != 0 {
+      if !did_open_parens {
+        balance += " (";
+      } else {
+        balance += ", ";
+      }
+      did_open_parens = true;
+      balance += format!(
+        "{} processing from mainchain",
+        format_argons(self.processing_mainchain_balance_change.unsigned_abs())
+      )
+      .as_str();
+    }
+    if did_open_parens {
+      balance += ")";
+    }
+    balance.to_string()
+  }
+
+  pub fn tax_with_pending(&self) -> String {
+    let mut tax = format_argons(self.tax as u128);
+    let sign = match self.pending_tax_change.signum() {
+      1 => "+",
+      -1 => "-",
+      _ => "",
+    };
+    if !sign.is_empty() {
+      tax += format!(
+        " ({sign}{} pending)",
+        format_argons(self.pending_tax_change.unsigned_abs())
+      )
+      .as_str();
+    }
+    tax.to_string()
+  }
 }
 
 #[derive(Clone, Debug)]

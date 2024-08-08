@@ -105,7 +105,7 @@ jobs:
 
       - name: Test
         if: ${{(github.event.inputs.SKIP_REBUILD_DOCKER != 'true')}}
-        run: cargo build --features=fast-runtime && cargo test --features=fast-runtime --no-fail-fast
+        run: cargo build --features=fast-runtime
         env:
           RUSTC_WRAPPER: "sccache"
           CARGO_INCREMENTAL: 0

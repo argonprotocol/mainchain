@@ -175,9 +175,9 @@ impl MainchainClient {
 
 	pub async fn get_account(
 		&self,
-		account_id: AccountId32,
+		account_id: &AccountId32,
 	) -> anyhow::Result<system::storage::types::account::Account> {
-		let account_id32 = account_id_to_subxt(&account_id);
+		let account_id32 = account_id_to_subxt(account_id);
 		let info = self
 			.fetch_storage(&storage().system().account(account_id32), None)
 			.await?
@@ -187,7 +187,7 @@ impl MainchainClient {
 
 	pub async fn get_argons(
 		&self,
-		account_id: AccountId32,
+		account_id: &AccountId32,
 	) -> anyhow::Result<share_balances::storage::types::account::Account> {
 		let account = self.get_account(account_id).await?;
 		Ok(account.data)
@@ -195,9 +195,9 @@ impl MainchainClient {
 
 	pub async fn get_shares(
 		&self,
-		account_id: AccountId32,
+		account_id: &AccountId32,
 	) -> anyhow::Result<share_balances::storage::types::account::Account> {
-		let account_id32 = account_id_to_subxt(&account_id);
+		let account_id32 = account_id_to_subxt(account_id);
 		let balance = self
 			.fetch_storage(&storage().share_balances().account(account_id32), None)
 			.await?
@@ -282,9 +282,7 @@ impl MainchainClient {
 		Err(Error::from("No valid status encountered for transaction".to_string()))
 	}
 	pub async fn lookup_ticker(&self) -> anyhow::Result<argon_primitives::tick::Ticker> {
-		let ticker_data = self
-			.call(api::runtime_apis::tick_apis::TickApis.ticker(), Some(self.live.genesis_hash()))
-			.await?;
+		let ticker_data = self.call(api::runtime_apis::tick_apis::TickApis.ticker(), None).await?;
 
 		Ok(ticker_data.into())
 	}
@@ -439,31 +437,31 @@ mod test {
 	use super::*;
 
 	#[tokio::test]
-	async fn test_getting_ticker() -> anyhow::Result<()> {
+	async fn test_getting_ticker() {
 		let _ = tracing_subscriber::fmt::try_init();
 		let ctx = start_argon_test_node().await;
 
 		let ws_url = ctx.client.url.clone();
 
 		let mut client = ReconnectingClient::new(vec![ws_url.clone()]);
-		let ticker = client.get().await?.lookup_ticker().await;
+		let ticker = client.get().await.unwrap().lookup_ticker().await;
 		assert!(ticker.is_ok());
-		Ok(())
 	}
 
 	#[ignore]
 	#[tokio::test]
-	async fn test_redirecting_client() -> anyhow::Result<()> {
+	async fn test_redirecting_client() {
 		let _ = tracing_subscriber::fmt::try_init();
 
 		let client =
-			ArgonOnlineClient::from_insecure_url("wss://husky-witty-highly.ngrok-free.app").await?;
+			ArgonOnlineClient::from_insecure_url("wss://husky-witty-highly.ngrok-free.app")
+				.await
+				.unwrap();
 		let ticker = client
 			.runtime_api()
 			.at(client.genesis_hash())
 			.call(api::runtime_apis::tick_apis::TickApis.ticker())
 			.await;
 		assert!(ticker.is_ok());
-		Ok(())
 	}
 }
