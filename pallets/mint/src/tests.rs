@@ -99,7 +99,7 @@ fn it_can_mint() {
 
 		assert_eq!(MintedMiningArgons::<Test>::get(), 25_500);
 		assert_eq!(Balances::total_issuance(), 25_000 + 25_000);
-		assert_eq!(Balances::free_balance(&1), 25_000);
+		assert_eq!(Balances::free_balance(1), 25_000);
 	});
 }
 #[test]
@@ -186,9 +186,9 @@ fn it_can_mint_profit_sharing() {
 		let amount_minted = per_miner + amount_for_sharer + amount_for_share_lender;
 		assert_eq!(MintedMiningArgons::<Test>::get(), amount_minted);
 		assert_eq!(Balances::total_issuance(), 1000 + amount_minted);
-		assert_eq!(Balances::free_balance(&1), amount_for_sharer);
-		assert_eq!(Balances::free_balance(&2), amount_for_share_lender);
-		assert_eq!(Balances::free_balance(&3), per_miner);
+		assert_eq!(Balances::free_balance(1), amount_for_sharer);
+		assert_eq!(Balances::free_balance(2), amount_for_share_lender);
+		assert_eq!(Balances::free_balance(3), per_miner);
 	});
 }
 

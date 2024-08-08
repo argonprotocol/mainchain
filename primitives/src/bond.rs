@@ -18,6 +18,7 @@ pub trait BondProvider {
 	type AccountId: Codec;
 	type BlockNumber: Codec;
 
+	#[allow(clippy::type_complexity)]
 	/// Create a mining bond
 	fn bond_mining_slot(
 		vault_id: VaultId,

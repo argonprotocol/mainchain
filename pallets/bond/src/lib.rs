@@ -447,10 +447,7 @@ pub mod pallet {
 				let res = with_storage_layer(|| Self::bond_completed(bond_id));
 				if let Err(e) = res {
 					log::error!( target: LOG_TARGET, "Mining bond id {:?} failed to `complete` {:?}", bond_id, e);
-					Self::deposit_event(Event::<T>::BondCompletionError {
-						bond_id,
-						error: e.into(),
-					});
+					Self::deposit_event(Event::<T>::BondCompletionError { bond_id, error: e });
 				}
 			}
 
@@ -471,10 +468,7 @@ pub mod pallet {
 					with_storage_layer(|| Self::cosign_bitcoin_overdue(utxo_id, redemption_amount));
 				if let Err(e) = res {
 					log::error!( target: LOG_TARGET, "Bitcoin utxo id {:?} failed to `cosign` {:?}", utxo_id, e);
-					Self::deposit_event(Event::<T>::CosignOverdueError {
-						utxo_id,
-						error: e.into(),
-					});
+					Self::deposit_event(Event::<T>::CosignOverdueError { utxo_id, error: e });
 				}
 			}
 
@@ -483,10 +477,7 @@ pub mod pallet {
 				let res = with_storage_layer(|| Self::bond_completed(bond_id));
 				if let Err(e) = res {
 					log::error!( target: LOG_TARGET, "Bitcoin bond id {:?} failed to `complete` {:?}", bond_id, e);
-					Self::deposit_event(Event::<T>::BondCompletionError {
-						bond_id,
-						error: e.into(),
-					});
+					Self::deposit_event(Event::<T>::BondCompletionError { bond_id, error: e });
 				}
 			}
 			T::DbWeight::get().reads_writes(2, 1)
@@ -706,18 +697,9 @@ pub mod pallet {
 				T::BitcoinUtxoTracker::get(utxo_id).ok_or(Error::<T>::BitcoinUtxoNotFound)?;
 
 			let script_args = CosignScriptArgs {
-				vault_pubkey: utxo_state
-					.vault_pubkey
-					.try_into()
-					.map_err(|_| Error::<T>::BitcoinPubkeyUnableToBeDecoded)?,
-				owner_pubkey: utxo_state
-					.owner_pubkey
-					.try_into()
-					.map_err(|_| Error::<T>::BitcoinPubkeyUnableToBeDecoded)?,
-				vault_claim_pubkey: utxo_state
-					.vault_claim_pubkey
-					.try_into()
-					.map_err(|_| Error::<T>::BitcoinPubkeyUnableToBeDecoded)?,
+				vault_pubkey: utxo_state.vault_pubkey,
+				owner_pubkey: utxo_state.owner_pubkey,
+				vault_claim_pubkey: utxo_state.vault_claim_pubkey,
 				created_at_height: utxo_state.created_at_height,
 				vault_claim_height: utxo_state.vault_claim_height,
 				open_claim_height: utxo_state.open_claim_height,

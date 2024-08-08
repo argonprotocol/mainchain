@@ -33,8 +33,8 @@ impl BtcPriceLookup {
 		{
 			let mut mock = MOCK_BTC_PRICE.lock().unwrap();
 			if let Some(x) = mock.take() {
-				*mock = Some(x.clone());
-				return Ok(x.clone());
+				*mock = Some(x);
+				return Ok(x);
 			}
 		}
 

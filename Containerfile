@@ -3,6 +3,7 @@ FROM docker.io/library/ubuntu:22.04
 # show backtraces
 ENV RUST_BACKTRACE 1
 ARG BIN=argon-node
+ARG TARGETARCH
 ENV BIN=${BIN}
 # install tools and dependencies
 RUN apt-get update && \

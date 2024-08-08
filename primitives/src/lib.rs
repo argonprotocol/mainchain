@@ -15,6 +15,8 @@ pub use block_vote::*;
 pub use data_domain::*;
 pub use data_tld::DataTLD;
 pub use digests::{BlockSealDigest, AUTHOR_DIGEST_ID, BLOCK_SEAL_DIGEST_ID, *};
+#[cfg(feature = "std")]
+pub use keystore_helper::*;
 
 pub use crate::{apis::*, notary::NotaryId, note::*, notebook::*, providers::*};
 
@@ -42,10 +44,10 @@ pub mod notebook;
 mod providers;
 pub mod tick;
 
+pub mod argon_utils;
+
 #[cfg(feature = "std")]
 pub mod keystore_helper;
-#[cfg(feature = "std")]
-pub use keystore_helper::*;
 
 /// An index to a block.
 pub type BlockNumber = u32;

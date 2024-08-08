@@ -1,9 +1,9 @@
-use argon_primitives::bitcoin::SATOSHIS_PER_BITCOIN;
+use argon_primitives::{argon_utils::format_argons, bitcoin::SATOSHIS_PER_BITCOIN};
 use std::fmt;
 
 pub fn parse_number(s: &str) -> Result<f32, String> {
 	// Remove commas from the string
-	let cleaned: String = s.chars().filter(|&c| c.is_digit(10) || c == '.').collect();
+	let cleaned: String = s.chars().filter(|&c| c.is_ascii_digit() || c == '.').collect();
 
 	// Ensure there's a decimal point for integer numbers by appending ".0" if needed
 	let cleaned = if !cleaned.contains('.') { format!("{}.0", cleaned) } else { cleaned };
@@ -24,9 +24,9 @@ impl fmt::Display for Argons {
 		let decimal_part = (value.fract() * 100.0).round(); // Extract and round the decimal part
 
 		if decimal_part == 0.0 {
-			write!(f, "₳ {}", whole_part_str)
+			write!(f, "₳{}", whole_part_str)
 		} else {
-			write!(f, "₳ {}.{:02}", whole_part_str, decimal_part as u32)
+			write!(f, "₳{}.{:02}", whole_part_str, decimal_part as u32)
 		}
 	}
 }
@@ -36,14 +36,7 @@ pub struct ArgonFormatter(pub u128);
 impl fmt::Display for ArgonFormatter {
 	fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
 		let value = self.0;
-		let whole_part = value / 1_000; // Extract the whole part
-		let decimal_part = (value % 1_000) / 10; // Extract the decimal part, considering only 2 decimal places
-		let whole_part_str = insert_commas(whole_part);
-
-		if decimal_part == 0 {
-			return write!(f, "₳ {}", whole_part_str);
-		}
-		write!(f, "₳ {}.{:02}", whole_part_str, decimal_part)
+		format_argons(value).fmt(f)
 	}
 }
 

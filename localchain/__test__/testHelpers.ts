@@ -81,7 +81,7 @@ export async function teardown() {
 }
 
 export function cleanHostForDocker(host: string, replacer = 'host.docker.internal'): string {
-    if (process.env.argon_USE_DOCKER_BINS) {
+    if (process.env.ARGON_USE_DOCKER_BINS) {
         return host.replace('localhost', replacer).replace('127.0.0.1', replacer).replace('0.0.0.0', replacer);
     }
     return host

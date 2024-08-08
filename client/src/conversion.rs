@@ -25,7 +25,7 @@ impl From<runtime_types::argon_primitives::bitcoin::BitcoinCosignScriptPubkey>
 	for argon_primitives::bitcoin::BitcoinCosignScriptPubkey
 {
 	fn from(value: runtime_types::argon_primitives::bitcoin::BitcoinCosignScriptPubkey) -> Self {
-		return match value {
+		match value {
 			runtime_types::argon_primitives::bitcoin::BitcoinCosignScriptPubkey::P2WSH {
 				wscript_hash,
 			} => argon_primitives::bitcoin::BitcoinCosignScriptPubkey::P2WSH { wscript_hash },
@@ -155,7 +155,7 @@ impl From<argon_primitives::bitcoin::BitcoinScriptPubkey>
 
 impl From<[u8; 78]> for runtime_types::argon_primitives::bitcoin::OpaqueBitcoinXpub {
 	fn from(value: [u8; 78]) -> Self {
-		Self(value.into())
+		Self(value)
 	}
 }
 

@@ -59,7 +59,7 @@ impl UsCpiRetriever {
 		let current = cpis.first().ok_or(anyhow!("No CPI data"))?;
 		let previous = cpis.get(1).ok_or(anyhow!("No previous CPI data"))?;
 		let current_cpi_release_tick =
-			Self::get_release_date_tick(&ticker, &schedule, current.ref_month)
+			Self::get_release_date_tick(ticker, &schedule, current.ref_month)
 				.ok_or(anyhow!("No release date found for current CPI"))?;
 		let current_cpi_duration_ticks =
 			Self::ticks_to_next_cpi(ticker, &schedule, current.ref_month);
@@ -72,7 +72,7 @@ impl UsCpiRetriever {
 			current_cpi_ref_month: current.ref_month,
 			previous_us_cpi: previous.value,
 			last_schedule_check: Instant::now(),
-			ticker: ticker.clone(),
+			ticker: *ticker,
 			last_cpi_check: Instant::now(),
 			cpi_change_per_tick: FixedI128::from_u32(0),
 		};
@@ -102,8 +102,7 @@ impl UsCpiRetriever {
 				&self.schedule,
 				self.current_cpi_ref_month,
 			)
-			.ok_or(anyhow!("No release date found for current CPI"))?
-			.clone();
+			.ok_or(anyhow!("No release date found for current CPI"))?;
 			self.last_cpi_check = now;
 			self.cpi_change_per_tick = self.calculate_cpi_change_per_tick();
 		}
@@ -114,8 +113,8 @@ impl UsCpiRetriever {
 	pub fn get_us_cpi_ratio(&self, tick: Tick) -> FixedI128 {
 		let current_cpi = self.calculate_smoothed_us_cpi_ratio(tick);
 		let baseline = to_fixed_i128(*BASELINE_CPI);
-		let cpi_ratio = (current_cpi / baseline) - FixedI128::one();
-		cpi_ratio
+
+		(current_cpi / baseline) - FixedI128::one()
 	}
 
 	fn calculate_smoothed_us_cpi_ratio(&self, tick: Tick) -> FixedI128 {
@@ -180,9 +179,7 @@ impl UsCpiRetriever {
 		schedule: &[CpiSchedule],
 		ref_month: DateTime<Utc>,
 	) -> Option<Tick> {
-		let Some(index) = schedule.iter().position(|s| s.ref_month == ref_month) else {
-			return None;
-		};
+		let index = schedule.iter().position(|s| s.ref_month == ref_month)?;
 		let date = schedule[index].release_date;
 		let millis = date.timestamp_millis() as u64;
 		Some(ticker.tick_for_time(millis))
@@ -206,7 +203,7 @@ async fn get_raw_cpis() -> Result<Vec<RawCpiValue>> {
 	let mut request_url =
 		Url::parse("https://api.bls.gov/publicAPI/v2/timeseries/data/CUUR0000SA0")?;
 
-	if let Some(key) = env::var("BLS_API_KEY").ok() {
+	if let Ok(key) = env::var("BLS_API_KEY") {
 		request_url.query_pairs_mut().append_pair("registrationkey", &key);
 	}
 
@@ -229,7 +226,7 @@ fn parse_cpi_results(resp_price: &str) -> Result<Vec<RawCpiValue>> {
 	let resp_price: CpiResult = serde_json::from_str(resp_price)?;
 	ensure!(resp_price.status == "REQUEST_SUCCEEDED", "Failed to get CPI data");
 	let resp_price = resp_price.results.series.first().ok_or(anyhow!("No series data"))?;
-	ensure!(resp_price.data.len() > 0, "Failed to get CPI data");
+	ensure!(!resp_price.data.is_empty(), "Failed to get CPI data");
 
 	let mut cpis = vec![];
 	for data in &resp_price.data {
@@ -251,7 +248,7 @@ async fn get_raw_cpi() -> Result<RawCpiValue> {
 	let mut request_url =
 		Url::parse("https://api.bls.gov/publicAPI/v2/timeseries/data/CUUR0000SA0?latest=true")?;
 
-	if let Some(key) = env::var("BLS_API_KEY").ok() {
+	if let Ok(key) = env::var("BLS_API_KEY") {
 		request_url.query_pairs_mut().append_pair("registrationkey", &key);
 	}
 
@@ -370,7 +367,7 @@ mod tests {
 			cpi_change_per_tick: FixedI128::from_u32(0),
 			last_schedule_check: Instant::now(),
 			last_cpi_check: Instant::now(),
-			ticker: ticker.clone(),
+			ticker,
 		};
 		retriever.schedule = vec![
 			CpiSchedule {
@@ -450,7 +447,7 @@ mod tests {
 			cpi_change_per_tick: FixedI128::from_u32(0),
 			last_schedule_check: Instant::now(),
 			last_cpi_check: Instant::now(),
-			ticker: ticker.clone(),
+			ticker,
 		};
 		let timestamp =
 			parse_date("15 May 2024", vec!["%d %B %Y"]).unwrap().timestamp_millis() as u64;

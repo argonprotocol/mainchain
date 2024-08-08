@@ -512,9 +512,10 @@ mod test {
   use super::*;
 
   #[tokio::test]
-  async fn test_building_balance_change() -> anyhow::Result<()> {
+  async fn test_building_balance_change() {
     let address = AccountStore::to_address(&Bob.to_account_id());
-    let builder = BalanceChangeBuilder::new_account(address.clone(), 1, AccountType::Deposit)?;
+    let builder =
+      BalanceChangeBuilder::new_account(address.clone(), 1, AccountType::Deposit).unwrap();
     builder
       .claim_from_mainchain(LocalchainTransfer {
         address,
@@ -523,23 +524,23 @@ mod test {
         expiration_tick: 500,
         transfer_id: 1,
       })
-      .await?;
+      .await
+      .unwrap();
 
     let balance_change = builder.inner().await;
 
     assert_eq!(balance_change.balance, 100);
     assert_eq!(balance_change.notes.len(), 1);
 
-    builder.send(55u128, None).await?;
+    builder.send(55u128, None).await.unwrap();
     assert_eq!(builder.inner().await.balance, 45);
-
-    Ok(())
   }
 
   #[tokio::test]
-  async fn test_building_balance_change_with_restrict_to_addresses() -> anyhow::Result<()> {
+  async fn test_building_balance_change_with_restrict_to_addresses() {
     let address = AccountStore::to_address(&Bob.to_account_id());
-    let builder = BalanceChangeBuilder::new_account(address.clone(), 1, AccountType::Deposit)?;
+    let builder =
+      BalanceChangeBuilder::new_account(address.clone(), 1, AccountType::Deposit).unwrap();
     builder
       .claim_from_mainchain(LocalchainTransfer {
         address,
@@ -548,7 +549,8 @@ mod test {
         expiration_tick: 500,
         transfer_id: 1,
       })
-      .await?;
+      .await
+      .unwrap();
 
     let balance_change = builder.inner().await;
 
@@ -560,7 +562,8 @@ mod test {
         55u128,
         Some(vec![AccountStore::to_address(&Bob.to_account_id())]),
       )
-      .await?;
+      .await
+      .unwrap();
     let balance_change = builder.inner().await;
     assert_eq!(balance_change.balance, 45);
     assert_eq!(balance_change.notes.len(), 2);
@@ -574,15 +577,14 @@ mod test {
     };
     assert_eq!(to.len(), 1);
     assert_eq!(to[0], Bob.to_account_id());
-
-    Ok(())
   }
 
   #[tokio::test]
-  async fn test_escrow_hold() -> anyhow::Result<()> {
+  async fn test_escrow_hold() {
     let address = AccountStore::to_address(&Bob.to_account_id());
     let data_domain_author = AccountStore::to_address(&Alice.to_account_id());
-    let builder = BalanceChangeBuilder::new_account(address.clone(), 1, AccountType::Deposit)?;
+    let builder =
+      BalanceChangeBuilder::new_account(address.clone(), 1, AccountType::Deposit).unwrap();
     builder
       .claim_from_mainchain(LocalchainTransfer {
         address,
@@ -591,7 +593,8 @@ mod test {
         expiration_tick: 500,
         transfer_id: 1,
       })
-      .await?;
+      .await
+      .unwrap();
 
     builder
       .create_escrow_hold(
@@ -600,7 +603,8 @@ mod test {
         data_domain_author.clone(),
         None,
       )
-      .await?;
+      .await
+      .unwrap();
 
     let balance_change = builder.inner().await;
     // no funds move yet
@@ -617,7 +621,5 @@ mod test {
       } => assert_eq!(recipient, &alice),
       _ => unreachable!(),
     };
-
-    Ok(())
   }
 }

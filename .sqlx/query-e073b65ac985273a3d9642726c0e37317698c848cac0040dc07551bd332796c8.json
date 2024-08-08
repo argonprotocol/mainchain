@@ -6,7 +6,7 @@
       {
         "name": "id",
         "ordinal": 0,
-        "type_info": "Int64"
+        "type_info": "Integer"
       },
       {
         "name": "address",
@@ -21,22 +21,22 @@
       {
         "name": "transfer_id",
         "ordinal": 3,
-        "type_info": "Int64"
+        "type_info": "Integer"
       },
       {
         "name": "expiration_tick",
         "ordinal": 4,
-        "type_info": "Int64"
+        "type_info": "Integer"
       },
       {
         "name": "notary_id",
         "ordinal": 5,
-        "type_info": "Int64"
+        "type_info": "Integer"
       },
       {
         "name": "balance_change_id",
         "ordinal": 6,
-        "type_info": "Int64"
+        "type_info": "Integer"
       },
       {
         "name": "first_block_hash",
@@ -51,7 +51,7 @@
       {
         "name": "finalized_block_number",
         "ordinal": 9,
-        "type_info": "Int64"
+        "type_info": "Integer"
       },
       {
         "name": "created_at",

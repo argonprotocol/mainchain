@@ -155,8 +155,8 @@ anyhow = { version = "1", default-features = false }
 thiserror = { version = "1.0" }
 snafu = { version = "0.8", default-features = false }
 
-
 jsonrpsee = { version = "0.23", features = ["http-client", "ws-client", "macros", "client-ws-transport-tls"] }
+tower = { version = "0.4" }
 
 tracing = { version = "0.1" }
 tracing-subscriber = { version = "0.3", features = ["env-filter"] }
@@ -164,7 +164,7 @@ log = { version = "0.4", default-features = false }
 env_logger = "0.11"
 humantime = { version = "2.1" }
 
-sqlx = { version = "0.7", features = ["macros"] }
+sqlx = { version = "0.8", features = ["macros"] }
 chrono = { version = "0.4", features = ["serde"] }
 mockall = "0.12"
 
@@ -225,6 +225,8 @@ sp-test-primitives = { git = "https://github.com/paritytech/polkadot-sdk.git", b
 substrate-test-runtime = { git = "https://github.com/paritytech/polkadot-sdk.git", branch = "release-polkadot-v1.14.0" }
 substrate-test-runtime-client = { git = "https://github.com/paritytech/polkadot-sdk.git", branch = "release-polkadot-v1.14.0" }
 fs2 = { version = "0.4" }
+strip-ansi-escapes = { version = "0.2" }
+current_platform = { version = "0.2" }
 
 substrate-wasm-builder = { git = "https://github.com/paritytech/polkadot-sdk.git", branch = "release-polkadot-v1.14.0" }
 

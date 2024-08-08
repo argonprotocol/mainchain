@@ -200,11 +200,13 @@ pub mod pallet {
 							active[pos].meta = meta.clone();
 							active[pos].meta_updated_block = n;
 							active[pos].meta_updated_tick = current_tick;
-							if let Err(_) =
+							let did_insert =
 								<NotaryKeyHistory<T>>::try_mutate(notary_id, |history| {
 									history.retain(|(tick, _)| *tick >= old_block_to_preserve);
 									history.try_push((current_tick, meta.public))
-								}) {
+								});
+
+							if did_insert.is_err() {
 								Self::deposit_event(Event::NotaryMetaUpdateError {
 									notary_id,
 									error: Error::<T>::TooManyKeys.into(),

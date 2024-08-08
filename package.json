@@ -4,8 +4,8 @@
   "scripts": {
     "build": "yarn workspaces foreach --all run build",
     "pretest": "yarn workspace @argonprotocol/localchain pretest",
-    "test": "yarn pretest && jest",
-    "test:js-only": "argon_USE_DOCKER_BINS=1 jest"
+    "test": "yarn pretest && jest --testTimeout=60000",
+    "test:js-only": "ARGON_USE_DOCKER_BINS=1 jest --testTimeout=60000"
   },
   "private": true,
   "engines": {

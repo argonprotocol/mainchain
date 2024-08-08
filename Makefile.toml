@@ -33,12 +33,11 @@ args = ["run", "default"]
 install_crate_args = ["--no-confirm"]
 
 [tasks.zepter.install_crate]
-crate_name = "zepter"
+crate_name = "zepter@0.15"
 binary = "zepter"
 test_arg = "--version"
 install_command = "binstall"
 force = false
-version = "^0.15"
 
 [tasks.format]
 description = "Run zepter and fmt"
@@ -61,17 +60,17 @@ script = [
 install_crate_args = ["--no-confirm"]
 
 [tasks.sqlx-setup.install_crate]
-crate_name = "sqlx-cli"
+crate_name = "sqlx-cli@0.8.0"
 binary = "sqlx"
 test_arg = "--version"
-install_command = "binstall --no-confirm"
-version = "^0.7"
+install_command = "binstall"
 
 [tasks.sqlx]
 description = "Run sqlx prepare"
 command = "cargo"
 args = ["sqlx", "prepare", "--workspace", "--", "--profile=test"]
 dependencies = ["sqlx-setup"]
+install_crate_args = ["--no-confirm"]
 
 [tasks.stat]
 description = "Show sccache stats"
@@ -113,11 +112,10 @@ env = { "RUSTC_WRAPPER" = "sccache" }
 install_crate_args = ["--no-confirm"]
 
 [tasks.nextest.install_crate]
-crate_name = "cargo-nextest"
+crate_name = "cargo-nextest@0.9"
 binary = "nextest"
 test_arg = "--version"
 install_command = "binstall"
-version = "^0.9"
 
 [tasks.watch]
 description = "Watch for changes and rebuild"
@@ -128,8 +126,7 @@ install_crate_args = ["--no-confirm"]
 dependencies = ["sqlx-setup"]
 
 [tasks.watch.install_crate]
-crate_name = "cargo-watch"
-version = "7.8"
+crate_name = "cargo-watch@7.8"
 binary = "cargo-watch"
 test_arg = "--version"
 force = false

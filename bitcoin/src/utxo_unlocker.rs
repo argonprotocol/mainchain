@@ -78,6 +78,7 @@ impl UtxoUnlocker {
 		Ok(Self { cosign_script, unlock_step, psbt })
 	}
 
+	#[allow(clippy::too_many_arguments)]
 	pub fn new(
 		cosign_script_args: CosignScriptArgs,
 		utxo_satoshis: Satoshis,
@@ -149,9 +150,8 @@ impl UtxoUnlocker {
 	) -> Result<(Signature, PublicKey), Error> {
 		let psbt = &mut self.psbt;
 		let secp = Secp256k1::new();
-		let child_xpriv = master_xpriv
-			.derive_priv(&secp, &key_source.1)
-			.map_err(|e| Error::Bip32Error(e))?;
+		let child_xpriv =
+			master_xpriv.derive_priv(&secp, &key_source.1).map_err(Error::Bip32Error)?;
 		let child_priv = child_xpriv.to_priv();
 		let pubkey = child_priv.public_key(&secp);
 
@@ -204,7 +204,7 @@ impl UtxoUnlocker {
 				log::error!("Error finalizing PSBT: {:#?}", e);
 				Error::PsbtFinalizeError
 			})?;
-			psbt.extract_tx().map_err(|e| Error::ExtractTxError(e))?
+			psbt.extract_tx().map_err(Error::ExtractTxError)?
 		};
 
 		// Clear all the data fields as per the spec.
@@ -221,7 +221,7 @@ impl UtxoUnlocker {
 	}
 }
 
-#[cfg(feature = "hwif")]
+#[cfg(feature = "hwi")]
 mod hwi {
 	use hwi::{types::HWIDevice, HWIClient};
 

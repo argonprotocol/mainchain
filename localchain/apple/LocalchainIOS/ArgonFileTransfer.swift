@@ -72,7 +72,7 @@ struct ArgonFileTransfer: Transferable, Identifiable {
   static var transferRepresentation: some TransferRepresentation {
     FileRepresentation(exportedContentType: .argonFile) { file in
       let fileURL = FileManager.default.temporaryDirectory.appendingPathComponent(file.name)
-        .appendingPathExtension("arg")
+        .appendingPathExtension("argon")
 
       try Data(file.json.utf8).write(to: fileURL)
       return SentTransferredFile(fileURL)
@@ -141,7 +141,7 @@ class ArgonFileItemSource: NSObject, UIActivityItemSource {
 
   private func createTempFile() throws -> URL {
     let tempDirectory = FileManager.default.temporaryDirectory
-    let fileURL = tempDirectory.appendingPathComponent(file.name).appendingPathExtension("arg")
+    let fileURL = tempDirectory.appendingPathComponent(file.name).appendingPathExtension("argon")
     try Data(file.json.utf8).write(to: fileURL)
     return fileURL
   }

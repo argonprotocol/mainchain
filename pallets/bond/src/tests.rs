@@ -494,7 +494,7 @@ fn clears_unlocked_bitcoin_bonds() {
 		assert_eq!(BondsById::<Test>::get(1), Some(bond.clone()));
 		assert_eq!(DefaultVault::get().bitcoin_argons.bonded, bond.amount);
 		assert_eq!(DefaultVault::get().bitcoin_argons.allocated, vault.bitcoin_argons.allocated);
-		assert_eq!(UtxosCosignReleaseHeightById::<Test>::get(&1), Some(1));
+		assert_eq!(UtxosCosignReleaseHeightById::<Test>::get(1), Some(1));
 
 		System::assert_last_event(
 			Event::<Test>::BitcoinUtxoCosigned {

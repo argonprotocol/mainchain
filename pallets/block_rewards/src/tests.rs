@@ -123,10 +123,10 @@ fn it_should_unlock_rewards() {
 			}
 			.into(),
 		);
-		assert_eq!(ArgonBalances::free_balance(&1), 3750);
-		assert_eq!(ShareBalances::free_balance(&1), 3750);
-		assert_eq!(ArgonBalances::free_balance(&2), 1250);
-		assert_eq!(ShareBalances::free_balance(&2), 1250);
+		assert_eq!(ArgonBalances::free_balance(1), 3750);
+		assert_eq!(ShareBalances::free_balance(1), 3750);
+		assert_eq!(ArgonBalances::free_balance(2), 1250);
+		assert_eq!(ShareBalances::free_balance(2), 1250);
 	});
 }
 

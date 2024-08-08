@@ -1,6 +1,6 @@
-use std::{env, path::PathBuf, process, process::Command};
+use std::{env, process, process::Command};
 
-use crate::ArgonTestNode;
+use crate::{get_target_dir, ArgonTestNode};
 
 pub async fn run_bitcoin_cli(
 	node: &ArgonTestNode,
@@ -8,21 +8,14 @@ pub async fn run_bitcoin_cli(
 ) -> anyhow::Result<String> {
 	let rust_log = env::var("RUST_LOG").unwrap_or("info".to_string());
 
-	let target_dir = {
-		let project_dir = PathBuf::from(env!("CARGO_MANIFEST_DIR"));
-		let workspace_cargo_path = project_dir.join("..");
-		let workspace_cargo_path =
-			workspace_cargo_path.canonicalize().expect("Failed to canonicalize path");
-		let workspace_cargo_path = workspace_cargo_path.as_path().join("target/debug");
-		workspace_cargo_path
-	};
+	let target_dir = get_target_dir();
 
 	let output = Command::new("./argon-bitcoin-cli")
 		.current_dir(&target_dir)
 		.env("RUST_LOG", rust_log)
 		.stdout(process::Stdio::piped())
 		.args(
-			vec![
+			[
 				&args.into_iter().map(|a| a.to_string()).collect::<Vec<String>>()[..],
 				&["--trusted-rpc-url".to_string(), node.client.url.to_string()][..],
 			]

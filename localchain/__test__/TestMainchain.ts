@@ -36,7 +36,7 @@ export default class TestMainchain implements ITeardownable {
     constructor(binPath?: string) {
         this.#binPath = binPath ?? `${__dirname}/../../target/debug/argon-node`;
         this.#binPath = path.resolve(this.#binPath);
-        if (!process.env.argon_USE_DOCKER_BINS && !fs.existsSync(this.#binPath)) {
+        if (!process.env.ARGON_USE_DOCKER_BINS && !fs.existsSync(this.#binPath)) {
             throw new Error(`Mainchain binary not found at ${this.#binPath}`);
         }
         addTeardown(this);
@@ -51,13 +51,13 @@ export default class TestMainchain implements ITeardownable {
         let rpcPort = 0;
         let execArgs: string[] = [];
         let containerName: string;
-        if (process.env.argon_USE_DOCKER_BINS) {
+        if (process.env.ARGON_USE_DOCKER_BINS) {
             containerName = "miner_" + nanoid();
             this.containerName = containerName;
             this.#binPath = 'docker';
             port = 33344;
             rpcPort = 9944;
-            execArgs = ['run', '--rm', `--name=${containerName}`, `--platform=linux/amd64`, `-p=0:${port}`, `-p=0:${rpcPort}`, '-e', `RUST_LOG=${this.loglevel},sc_rpc_server=info`,
+            execArgs = ['run', '--rm', `--name=${containerName}`, `-p=0:${port}`, `-p=0:${rpcPort}`, '-e', `RUST_LOG=${this.loglevel},sc_rpc_server=info`,
                 'ghcr.io/argonprotocol/argon-miner:dev'];
 
             if (process.env.ADD_DOCKER_HOST) {
@@ -108,7 +108,7 @@ export default class TestMainchain implements ITeardownable {
     }
 
     public async teardown(): Promise<void> {
-        if (process.env.argon_USE_DOCKER_BINS) {
+        if (process.env.ARGON_USE_DOCKER_BINS) {
             try {
                 execSync(`docker rm -f ${this.containerName}`)
             } catch {

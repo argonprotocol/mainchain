@@ -12,16 +12,17 @@ publish = false
 
 
 [dev-dependencies]
-argon-testing = { workspace = true }
+anyhow = { workspace = true }
 tokio = { workspace = true }
 bitcoind = { workspace = true }
 rand = { workspace = true }
 bitcoin = { workspace = true, features = ["base64"] }
 lazy_static = { workspace = true }
+argon-client = { workspace = true }
+argon-testing = { workspace = true }
 argon-primitives = { workspace = true, features = ["default"] }
 argon-bitcoin-utxo-tracker = { workspace = true }
 argon-bitcoin = { workspace = true }
-argon-client = { workspace = true }
 hex = { workspace = true }
 base64 = { workspace = true }
 sp-arithmetic = { workspace = true }

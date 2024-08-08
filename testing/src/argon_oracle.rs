@@ -1,17 +1,18 @@
 use std::{
 	env,
 	io::{BufRead, BufReader},
-	path::PathBuf,
 	process,
 	process::Command,
 	sync::{
 		mpsc,
 		mpsc::{Receiver, Sender},
 	},
-	thread,
 };
 
-use crate::ArgonTestNode;
+use strip_ansi_escapes::strip;
+use tokio::task::spawn_blocking;
+
+use crate::{get_target_dir, ArgonTestNode};
 
 pub struct ArgonTestOracle {
 	// Keep a handle to the node; once it's dropped the node is killed.
@@ -30,14 +31,7 @@ impl ArgonTestOracle {
 	pub async fn bitcoin_tip(node: &ArgonTestNode) -> anyhow::Result<Self> {
 		let rust_log = env::var("RUST_LOG").unwrap_or("info".to_string());
 
-		let target_dir = {
-			let project_dir = PathBuf::from(env!("CARGO_MANIFEST_DIR"));
-			let workspace_cargo_path = project_dir.join("..");
-			let workspace_cargo_path =
-				workspace_cargo_path.canonicalize().expect("Failed to canonicalize path");
-			let workspace_cargo_path = workspace_cargo_path.as_path().join("target/debug");
-			workspace_cargo_path
-		};
+		let target_dir = get_target_dir();
 
 		let mut proc = Command::new("./argon-oracle")
 			.current_dir(&target_dir)
@@ -60,10 +54,12 @@ impl ArgonTestOracle {
 
 		let tx_clone = tx.clone();
 
-		thread::spawn(move || {
+		spawn_blocking(move || {
 			for line in stdout_reader.lines() {
 				let line = line.expect("failed to obtain next line from stdout");
-				println!("{}", line);
+				let cleaned_log = strip(&line);
+				println!("ORACLE>> {}", String::from_utf8_lossy(&cleaned_log));
+
 				if line.contains("Oracle Started.") {
 					tx_clone.send(()).unwrap();
 				}

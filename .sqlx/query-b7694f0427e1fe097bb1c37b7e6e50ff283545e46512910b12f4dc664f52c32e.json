@@ -1,6 +1,6 @@
 {
   "db_name": "SQLite",
-  "query": "SELECT * from accounts WHERE id = $1",
+  "query": "SELECT * FROM mainchain_transfers_in WHERE id = ?",
   "describe": {
     "columns": [
       {
@@ -14,17 +14,17 @@
         "type_info": "Text"
       },
       {
-        "name": "hd_path",
+        "name": "amount",
         "ordinal": 2,
         "type_info": "Text"
       },
       {
-        "name": "account_id32",
+        "name": "transfer_id",
         "ordinal": 3,
-        "type_info": "Blob"
+        "type_info": "Integer"
       },
       {
-        "name": "account_type",
+        "name": "expiration_tick",
         "ordinal": 4,
         "type_info": "Integer"
       },
@@ -34,23 +34,28 @@
         "type_info": "Integer"
       },
       {
-        "name": "origin_notebook_number",
+        "name": "balance_change_id",
         "ordinal": 6,
         "type_info": "Integer"
       },
       {
-        "name": "origin_uid",
+        "name": "first_block_hash",
         "ordinal": 7,
+        "type_info": "Text"
+      },
+      {
+        "name": "extrinsic_hash",
+        "ordinal": 8,
+        "type_info": "Text"
+      },
+      {
+        "name": "finalized_block_number",
+        "ordinal": 9,
         "type_info": "Integer"
       },
       {
         "name": "created_at",
-        "ordinal": 8,
-        "type_info": "Datetime"
-      },
-      {
-        "name": "updated_at",
-        "ordinal": 9,
+        "ordinal": 10,
         "type_info": "Datetime"
       }
     ],
@@ -60,15 +65,16 @@
     "nullable": [
       false,
       false,
+      false,
+      false,
+      false,
+      false,
       true,
       false,
       false,
-      false,
       true,
-      true,
-      false,
       false
     ]
   },
-  "hash": "c6e0bdd5be0f588a807f400f537a010d11e10b2244e78b4022a2955dfdbb7162"
+  "hash": "b7694f0427e1fe097bb1c37b7e6e50ff283545e46512910b12f4dc664f52c32e"
 }

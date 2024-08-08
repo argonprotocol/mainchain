@@ -21,7 +21,7 @@
       {
         "name": "balance_change_number",
         "ordinal": 3,
-        "type_info": "Int64"
+        "type_info": "Integer"
       },
       {
         "name": "from_address",
@@ -36,7 +36,7 @@
       {
         "name": "expiration_tick",
         "ordinal": 6,
-        "type_info": "Int64"
+        "type_info": "Integer"
       },
       {
         "name": "settled_amount",
@@ -56,7 +56,7 @@
       {
         "name": "notarization_id",
         "ordinal": 10,
-        "type_info": "Int64"
+        "type_info": "Integer"
       },
       {
         "name": "missed_claim_window",

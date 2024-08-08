@@ -20,7 +20,7 @@ pub struct Cli {
 	///
 	/// NOTE: once mining slots are active, compute miners are given lower priority for block
 	/// acceptance.
-	#[arg(long)]
+	#[arg(long, verbatim_doc_comment)]
 	pub compute_miners: Option<u32>,
 
 	/// Bitcoin node to verify minted bitcoins using compact filters. Should be a hosted/trusted
@@ -31,7 +31,7 @@ pub struct Cli {
 	/// Flags to control the randomx compute challenge. Can be specified multiple times.
 	/// - LargePages: use large memory pages for the randomx dataset (default active)
 	/// - Secure: use secure memory for the randomx dataset (default active)
-	#[arg(long)]
+	#[arg(long, verbatim_doc_comment)]
 	pub randomx_flags: Vec<RandomxFlag>,
 }
 

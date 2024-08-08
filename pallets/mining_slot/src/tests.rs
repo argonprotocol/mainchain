@@ -484,7 +484,7 @@ fn it_wont_let_you_reuse_ownership_shares_for_two_bids() {
 				new_miners: BoundedVec::truncate_from(vec![MiningRegistration {
 					account_id: 1,
 					bond_id: None,
-					ownership_tokens: shares.into(),
+					ownership_tokens: shares,
 					bond_amount: 0,
 					reward_destination: RewardDestination::Owner,
 					reward_sharing: None,
@@ -852,7 +852,7 @@ fn it_will_end_auctions_if_a_seal_qualifies() {
 
 		let seal = BlockSealInherent::Compute;
 		// it's too soon
-		assert_eq!(MiningSlots::check_for_bidding_close(&seal), false);
+		assert!(!MiningSlots::check_for_bidding_close(&seal));
 
 		// This seal strength was generated using the commented out loop below
 		let seal_strength = U256::from_dec_str(
@@ -861,16 +861,16 @@ fn it_will_end_auctions_if_a_seal_qualifies() {
 		.expect("can read seal strength u256");
 
 		let seal = create_block_vote_seal(seal_strength);
-		assert_eq!(MiningSlots::check_for_bidding_close(&seal), false);
+		assert!(!MiningSlots::check_for_bidding_close(&seal));
 
 		// now we're the right block
 		System::set_block_number(90);
-		assert_eq!(MiningSlots::check_for_bidding_close(&seal), true);
-		assert_eq!(MiningSlots::check_for_bidding_close(&BlockSealInherent::Compute), false);
+		assert!(MiningSlots::check_for_bidding_close(&seal));
+		assert!(!MiningSlots::check_for_bidding_close(&BlockSealInherent::Compute));
 
 		let invalid_strength = U256::from(1);
 		let seal = create_block_vote_seal(invalid_strength);
-		assert_eq!(MiningSlots::check_for_bidding_close(&seal), false);
+		assert!(!MiningSlots::check_for_bidding_close(&seal));
 
 		if env::var("TEST_DISTRO").unwrap_or("false".to_string()) == "true" {
 			let mut valid_seals = vec![];
@@ -882,7 +882,7 @@ fn it_will_end_auctions_if_a_seal_qualifies() {
 					valid_seals.push(seal_strength);
 				}
 			}
-			assert!(valid_seals.len() > 0, "Should have found at least one valid seal");
+			assert!(!valid_seals.is_empty(), "Should have found at least one valid seal");
 			println!("Valid seals: {:?}", valid_seals);
 		}
 	})

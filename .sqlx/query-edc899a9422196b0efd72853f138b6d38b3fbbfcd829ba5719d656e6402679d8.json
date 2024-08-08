@@ -6,17 +6,17 @@
       {
         "name": "id",
         "ordinal": 0,
-        "type_info": "Int64"
+        "type_info": "Integer"
       },
       {
         "name": "account_id",
         "ordinal": 1,
-        "type_info": "Int64"
+        "type_info": "Integer"
       },
       {
         "name": "change_number",
         "ordinal": 2,
-        "type_info": "Int64"
+        "type_info": "Integer"
       },
       {
         "name": "balance",
@@ -36,7 +36,7 @@
       {
         "name": "notary_id",
         "ordinal": 6,
-        "type_info": "Int64"
+        "type_info": "Integer"
       },
       {
         "name": "notes_json",
@@ -46,12 +46,12 @@
       {
         "name": "status",
         "ordinal": 8,
-        "type_info": "Int64"
+        "type_info": "Integer"
       },
       {
         "name": "transaction_id",
         "ordinal": 9,
-        "type_info": "Int64"
+        "type_info": "Integer"
       },
       {
         "name": "proof_json",
@@ -61,12 +61,12 @@
       {
         "name": "finalized_block_number",
         "ordinal": 11,
-        "type_info": "Int64"
+        "type_info": "Integer"
       },
       {
         "name": "notarization_id",
         "ordinal": 12,
-        "type_info": "Int64"
+        "type_info": "Integer"
       },
       {
         "name": "timestamp",

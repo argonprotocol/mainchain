@@ -19,7 +19,7 @@ impl ArgonPriceLookup {
 	) -> Self {
 		Self {
 			use_simulated_schedule,
-			ticker: ticker.clone(),
+			ticker: *ticker,
 			last_price: last_price
 				.as_ref()
 				.map(|a| FixedU128::from_inner(a.argon_usd_price.0))

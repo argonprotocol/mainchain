@@ -9,7 +9,7 @@ pub fn read_bitcoin_xpub(xpub: &str) -> Result<OpaqueBitcoinXpub, String> {
 		vpub_bytes = vpub_bytes[0..78].to_vec();
 	}
 	if vpub_bytes.len() != 78 {
-		return Err(format!("Invalid byte length ({} should be 78)", vpub_bytes.len()).into())
+		return Err(format!("Invalid byte length ({} should be 78)", vpub_bytes.len()))
 	}
 	let raw_bytes: [u8; 78] = vpub_bytes.try_into().unwrap();
 	Ok(OpaqueBitcoinXpub(raw_bytes))
