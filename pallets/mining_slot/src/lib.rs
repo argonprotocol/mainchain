@@ -649,8 +649,8 @@ impl<T: Config> Pallet<T> {
 	/// Check if the current block is in the closing window for the next slot
 	///
 	/// This is determined by looking at the block seal vote and using the following VRF formula:
-	///  - VRF = blake2(seal_strength)
-	///  if VRF < threshold, then the auction will be ended
+	///  `VRF = blake2(seal_strength)`
+	/// If VRF < threshold, then the auction will be ended
 	///
 	/// The random seal strength is used to ensure that the VRF is unique for each block:
 	///  - the block votes was submitted in a previous notebook

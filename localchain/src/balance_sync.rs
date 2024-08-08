@@ -975,9 +975,12 @@ impl BalanceSync {
       return Ok(());
     }
 
-    let account_change_root = mainchain_client
+    let Some(account_change_root) = mainchain_client
       .get_account_changes_root(notary_id, notebook_number)
-      .await?;
+      .await?
+    else {
+      return Ok(()); // not yet finalized
+    };
 
     let account = AccountStore::db_get_by_id(&mut tx, balance_change.account_id).await?;
     let change_root = H256::from_slice(account_change_root.as_ref());

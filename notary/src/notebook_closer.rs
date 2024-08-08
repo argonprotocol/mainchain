@@ -209,7 +209,7 @@ mod tests {
 	use subxt::{
 		blocks::Block,
 		config::substrate::DigestItem,
-		tx::{TxInBlock, TxProgress, TxStatus},
+		tx::{TxInBlock, TxProgress},
 		utils::AccountId32,
 		OnlineClient,
 	};
@@ -226,7 +226,7 @@ mod tests {
 			},
 			storage, tx,
 		},
-		ArgonConfig, ArgonOnlineClient, ReconnectingClient,
+		ArgonConfig, ArgonOnlineClient, MainchainClient, ReconnectingClient,
 	};
 	use argon_notary_apis::localchain::BalanceChangeResult;
 	use argon_notary_audit::VerifyError;
@@ -909,27 +909,9 @@ mod tests {
 	}
 
 	async fn wait_for_in_block(
-		mut tx_progress: TxProgress<ArgonConfig, OnlineClient<ArgonConfig>>,
+		tx_progress: TxProgress<ArgonConfig, OnlineClient<ArgonConfig>>,
 	) -> anyhow::Result<TxInBlock<ArgonConfig, OnlineClient<ArgonConfig>>, Error> {
-		while let Some(status) = tx_progress.next().await {
-			match status? {
-				TxStatus::InBestBlock(tx_in_block) | TxStatus::InFinalizedBlock(tx_in_block) => {
-					// now, we can attempt to work with the block, eg:
-					tx_in_block.wait_for_success().await?;
-					return Ok(tx_in_block);
-				},
-				TxStatus::Error { message } |
-				TxStatus::Invalid { message } |
-				TxStatus::Dropped { message } => {
-					// Handle any errors:
-					return Err(Error::InternalError(format!(
-						"Error submitting notebook to block: {message}"
-					)));
-				},
-				// Continue otherwise:
-				_ => continue,
-			}
-		}
-		Err(Error::InternalError("No valid status encountered for notebook".to_string()))
+		let res = MainchainClient::wait_for_ext_in_block(tx_progress).await?;
+		Ok(res)
 	}
 }

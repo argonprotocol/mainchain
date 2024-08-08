@@ -85,6 +85,18 @@ impl MainchainTransferStore {
     Ok(transfer)
   }
 
+  pub async fn get(&self, transfer_id: i64) -> Result<MainchainTransferIn> {
+    let mut db = self.db.acquire().await?;
+    let transfer = sqlx::query_as!(
+      MainchainTransferIn,
+      "SELECT * FROM mainchain_transfers_in WHERE id = ?",
+      transfer_id
+    )
+    .fetch_one(&mut *db)
+    .await?;
+    Ok(transfer)
+  }
+
   pub async fn update_finalization(&self) -> Result<()> {
     let Some(ref mainchain_client) = *(self.mainchain_client.lock().await) else {
       bail!("Mainchain client not initialized");

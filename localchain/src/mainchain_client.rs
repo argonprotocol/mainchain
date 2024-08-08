@@ -547,7 +547,7 @@ impl MainchainClient {
     &self,
     notary_id: u32,
     notebook_number: u32,
-  ) -> Result<H256> {
+  ) -> Result<Option<H256>> {
     let result = self
       .fetch_storage(
         &storage()
@@ -558,13 +558,7 @@ impl MainchainClient {
       .await?
       .map(|a| H256::from_slice(a.as_bytes()));
 
-    Ok(result.ok_or_else(|| {
-      anyhow!(
-        "No submitted notebook found for notary {} with notebook {}",
-        notary_id,
-        notebook_number
-      )
-    })?)
+    Ok(result)
   }
 
   pub async fn latest_finalized_number(&self) -> Result<u32> {
@@ -823,11 +817,11 @@ pub mod napi_ext {
       &self,
       notary_id: u32,
       notebook_number: u32,
-    ) -> napi::Result<Uint8Array> {
+    ) -> napi::Result<Option<Uint8Array>> {
       self
         .get_account_changes_root(notary_id, notebook_number)
         .await
-        .map(|a| a.as_ref().into())
+        .map(|a| a.map(|x| x.as_ref().into()))
         .napi_ok()
     }
 

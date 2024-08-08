@@ -1,18 +1,5 @@
 use std::net::SocketAddr;
 
-use codec::Encode;
-use futures::{Stream, StreamExt};
-use jsonrpsee::{
-	core::{async_trait, SubscriptionResult},
-	server::{PendingSubscriptionSink, Server, ServerHandle, SubscriptionMessage},
-	types::ErrorObjectOwned,
-	RpcModule, TrySendError,
-};
-use sc_utils::notification::{NotificationSender, NotificationStream, TracingKeyStr};
-use serde::Serialize;
-use sqlx::PgPool;
-use tokio::net::ToSocketAddrs;
-
 use crate::{
 	stores::{
 		balance_tip::BalanceTipStore, notarizations::NotarizationsStore, notebook::NotebookStore,
@@ -29,6 +16,22 @@ use argon_primitives::{
 	NotarizationBalanceChangeset, NotarizationBlockVotes, NotarizationDataDomains, NotaryId,
 	Notebook, NotebookMeta, NotebookNumber, SignedNotebookHeader,
 };
+use codec::Encode;
+use futures::{Stream, StreamExt};
+use jsonrpsee::{
+	core::{async_trait, SubscriptionResult},
+	server::{
+		middleware::rpc::RpcLoggerLayer, PendingSubscriptionSink, PingConfig, RpcServiceBuilder,
+		Server, ServerHandle, SubscriptionMessage,
+	},
+	types::ErrorObjectOwned,
+	RpcModule, TrySendError,
+};
+use sc_utils::notification::{NotificationSender, NotificationStream, TracingKeyStr};
+use serde::Serialize;
+use sqlx::PgPool;
+use tokio::net::ToSocketAddrs;
+use tower::layer::util::{Identity, Stack};
 
 pub type NotebookHeaderStream = NotificationStream<SignedNotebookHeader, NotebookHeaderTracingKey>;
 
@@ -49,8 +52,16 @@ pub struct NotaryServer {
 }
 
 impl NotaryServer {
-	pub async fn create_http_server(addrs: impl ToSocketAddrs) -> anyhow::Result<Server> {
-		let server = Server::builder().build(addrs).await?;
+	pub async fn create_http_server(
+		addrs: impl ToSocketAddrs,
+	) -> anyhow::Result<Server<Identity, Stack<RpcLoggerLayer, Identity>>> {
+		let rpc_middleware = RpcServiceBuilder::new().rpc_logger(1024);
+
+		let server = Server::builder()
+			.set_rpc_middleware(rpc_middleware)
+			.enable_ws_ping(PingConfig::default())
+			.build(addrs)
+			.await?;
 		Ok(server)
 	}
 
@@ -62,7 +73,7 @@ impl NotaryServer {
 	}
 
 	pub async fn start_with(
-		server: Server,
+		server: Server<Identity, Stack<RpcLoggerLayer, Identity>>,
 		notary_id: NotaryId,
 		pool: PgPool,
 	) -> anyhow::Result<Self> {

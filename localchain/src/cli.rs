@@ -1,25 +1,51 @@
-use std::ffi::OsString;
-use std::fmt::Debug;
-use std::{env, fs, path::PathBuf};
-
+use crate::keystore::Keystore;
+use crate::overview::LocalchainOverview;
+use crate::{
+  overview, AccountStore, CryptoScheme, DataDomainStore, EscrowCloseOptions, Localchain,
+  LocalchainConfig, MainchainClient, TickerConfig,
+};
 use anyhow::anyhow;
+use argon_primitives::argon_utils::format_argons;
+use argon_primitives::DataDomain;
 use clap::{crate_version, Args, Parser, Subcommand, ValueHint};
 use comfy_table::modifiers::UTF8_ROUND_CORNERS;
 use comfy_table::presets::UTF8_FULL;
 use comfy_table::{Cell, CellAlignment, ContentArrangement, Table};
-
-use argon_primitives::DataDomain;
-
-use crate::keystore::Keystore;
-use crate::{
-  AccountStore, BalanceChangeRow, BalanceChangeStore, CryptoScheme, DataDomainStore,
-  EscrowCloseOptions, LocalAccount, Localchain, LocalchainConfig, MainchainClient, TickerConfig,
-};
+use std::ffi::OsString;
+use std::fmt::Debug;
+use std::path::Path;
+use std::{env, fs, path::PathBuf};
 
 #[derive(Parser, Debug)]
 #[clap(version = crate_version!())]
 #[command(author, version, about, arg_required_else_help = true, long_about = None)]
 struct Cli {
+  /// Where is your localchain? Defaults to a project-specific directory based on OS.
+  ///    Linux:   /home/alice/.config/argon/localchain
+  ///    Windows: C:\Users\Alice\AppData\Roaming\argon\localchain
+  ///    macOS:   /Users/Alice/Library/Application Support/argon/localchain
+  #[clap(short, long, env = "ARGON_LOCALCHAIN_BASE_PATH", global=true, value_hint = ValueHint::DirPath, verbatim_doc_comment)]
+  base_dir: Option<PathBuf>,
+  /// The localchain name you'd like to use
+  #[clap(
+    short,
+    default_value = "primary",
+    long,
+    global = true,
+    env = "ARGON_LOCALCHAIN_NAME"
+  )]
+  name: String,
+
+  /// The mainchain to connect to (this is how a notary url is looked up)
+  #[clap(
+    short,
+    long,
+    env = "ARGON_MAINCHAIN_URL",
+    default_value = "ws://127.0.0.1:9944",
+    global = true
+  )]
+  mainchain_url: String,
+
   #[command(subcommand)]
   command: Commands,
 }
@@ -28,27 +54,6 @@ struct Cli {
 enum Commands {
   /// Sync the localchain proofs with the latest notebooks. This will also submit votes and close/claim escrows as needed.
   Sync {
-    /// Which localchain are you synching?
-    #[clap(default_value = "primary")]
-    name: String,
-
-    /// Where is your localchain? Defaults to a project-specific directory based on OS.
-    ///    Linux:   /home/alice/.config/argon/localchain
-    ///    Windows: C:\Users\Alice\AppData\Roaming\argon\localchain
-    ///    macOS:   /Users/Alice/Library/Application Support/argon/localchain
-    #[clap(long, env = "argon_LOCALCHAIN_BASE_PATH", value_hint = ValueHint::DirPath)]
-    base_dir: Option<PathBuf>,
-
-    /// What mainchain RPC websocket url do you want to reach out use to sync blocks and submit
-    /// notebook?
-    #[clap(
-      short,
-      long,
-      env = "argon_MAINCHAIN_URL",
-      default_value = "ws://127.0.0.1:9944"
-    )]
-    mainchain_url: String,
-
     /// What address should be used for votes (only relevant if claiming escrows)
     #[clap(long, value_name = "SS58_ADDRESS")]
     vote_address: Option<String>,
@@ -73,22 +78,18 @@ enum Commands {
     #[clap(subcommand)]
     subcommand: AccountsSubcommand,
   },
+
+  /// Create and receive transactions
+  Transactions {
+    #[clap(subcommand)]
+    subcommand: TransactionsSubcommand,
+  },
 }
 
 #[derive(Subcommand, Debug)]
 enum DataDomainsSubcommand {
   /// List all installed data domains
-  List {
-    #[clap(long, value_name = "LOCALCHAIN_NAME", default_value = "primary")]
-    name: String,
-
-    /// Where is your localchain? Defaults to a project-specific directory based on OS.
-    ///    Linux:   /home/alice/.config/argon/localchain
-    ///    Windows: C:\Users\Alice\AppData\Roaming\argon\localchain
-    ///    macOS:   /Users/Alice/Library/Application Support/argon/localchain
-    #[clap(long, env = "argon_LOCALCHAIN_BASE_PATH", value_hint = ValueHint::DirPath)]
-    base_dir: Option<PathBuf>,
-  },
+  List,
   /// Generate the hash for a data domain
   Hash {
     /// The data domain name
@@ -100,32 +101,12 @@ enum DataDomainsSubcommand {
     /// The data domain name
     #[clap()]
     data_domain: String,
-
-    /// What mainchain RPC websocket url do you want to use to check registrations
-    #[clap(
-      short,
-      long,
-      env = "argon_MAINCHAIN_URL",
-      value_name = "URL",
-      default_value = "ws://127.0.0.1:9944"
-    )]
-    mainchain_url: String,
   },
   /// Lease a data domain
   Lease {
     /// The data domain name
     #[clap()]
     data_domain: String,
-
-    #[clap(long, value_name = "LOCALCHAIN_NAME", default_value = "primary")]
-    name: String,
-
-    /// Where is your localchain? Defaults to a project-specific directory based on OS.
-    ///    Linux:   /home/alice/.config/argon/localchain
-    ///    Windows: C:\Users\Alice\AppData\Roaming\argon\localchain
-    ///    macOS:   /Users/Alice/Library/Application Support/argon/localchain
-    #[clap(long, env = "argon_LOCALCHAIN_BASE_PATH", value_hint = ValueHint::DirPath)]
-    base_dir: Option<PathBuf>,
 
     /// Password to unlock the embedded keystore
     #[clap(flatten)]
@@ -140,27 +121,9 @@ enum DataDomainsSubcommand {
 #[derive(Subcommand, Debug)]
 enum AccountsSubcommand {
   /// List all localchains you have access to
-  List {
-    /// Where is your localchain? Defaults to a project-specific directory based on OS.
-    ///    Linux:   /home/alice/.config/argon/localchain
-    ///    Windows: C:\Users\Alice\AppData\Roaming\argon\localchain
-    ///    macOS:   /Users/Alice/Library/Application Support/argon/localchain
-    #[clap(long, env = "argon_LOCALCHAIN_BASE_PATH", value_hint = ValueHint::DirPath)]
-    base_dir: Option<PathBuf>,
-  },
-
+  List,
   /// Create a new localchain
   Create {
-    #[clap(default_value = "primary")]
-    name: String,
-
-    /// Where is your localchain? Defaults to a project-specific directory based on OS.
-    ///    Linux:   /home/alice/.config/argon/localchain
-    ///    Windows: C:\Users\Alice\AppData\Roaming\argon\localchain
-    ///    macOS:   /Users/Alice/Library/Application Support/argon/localchain
-    #[clap(long, env = "argon_LOCALCHAIN_BASE_PATH", value_hint = ValueHint::DirPath)]
-    base_dir: Option<PathBuf>,
-
     /// The secret key URI.
     /// If the value is a file, the file content is used as URI.
     /// If not given, a key will be autogenerated
@@ -176,6 +139,85 @@ enum AccountsSubcommand {
     #[clap(long, default_value = "sr25519")]
     scheme: CryptoScheme,
   },
+
+  /// Get the current account information
+  Info {
+    /// Should we sync the latest changes before showing the account info
+    #[clap(long)]
+    sync_latest: bool,
+    #[clap(flatten)]
+    keystore_password: EmbeddedKeyPassword,
+  },
+}
+
+#[derive(Subcommand, Debug)]
+enum TransactionsSubcommand {
+  /// Create an argon file to send funds to another account
+  Send {
+    #[clap(flatten)]
+    send_argon_file: SendArgonFileArgs,
+
+    /// The path to save the argon file to. Defaults to a file in the OS tmp directory.
+    #[clap(long, value_hint = ValueHint::DirPath)]
+    save_to_path: Option<String>,
+
+    /// The password to unlock the keystore
+    #[clap(flatten)]
+    keystore_password: EmbeddedKeyPassword,
+  },
+  /// Receive an argon file from another account
+  Receive {
+    #[clap(flatten)]
+    receive_argon_file: ReceiveArgonFileArgs,
+
+    /// The password to unlock the keystore
+    #[clap(flatten)]
+    keystore_password: EmbeddedKeyPassword,
+  },
+  /// Transfer funds from the corresponding account on the mainchain to this localchain
+  FromMainchain {
+    #[clap(flatten)]
+    transfer_args: TransferArgs,
+
+    /// The password to unlock the keystore
+    #[clap(flatten)]
+    keystore_password: EmbeddedKeyPassword,
+  },
+  /// Transfer funds from to the corresponding account on the mainchain
+  ToMainchain {
+    #[clap(flatten)]
+    transfer_args: TransferArgs,
+
+    /// Wait for this transaction to be in a notebook recorded to the mainchain
+    #[clap(long, default_value_t = false)]
+    wait_for_immortalized: bool,
+
+    /// The password to unlock the keystore
+    #[clap(flatten)]
+    keystore_password: EmbeddedKeyPassword,
+  },
+}
+
+#[derive(Debug, Args)]
+struct ReceiveArgonFileArgs {
+  /// The argon file text or path
+  argon_file: String,
+}
+
+#[derive(Debug, Args)]
+struct SendArgonFileArgs {
+  /// The number of argons to send
+  argons: f32,
+
+  /// The account to send to. If omitted, this should be treated like cash sent in the mail (can be stolen).
+  #[clap(value_name = "SS58_ADDRESS")]
+  to: Option<String>,
+}
+
+#[derive(Debug, Args)]
+struct TransferArgs {
+  /// The number of argons to transfer
+  argons: f32,
 }
 
 #[cfg(feature = "napi")]
@@ -203,16 +245,17 @@ where
 {
   let cli = Cli::parse_from(itr);
 
+  let base_dir = cli.base_dir.clone();
+  let name = cli.name.clone();
+  let mainchain_url = cli.mainchain_url.clone();
+  let path = get_path(base_dir.clone(), name.clone());
+
   match cli.command {
     Commands::Sync {
-      base_dir,
-      mainchain_url,
       vote_address,
       keystore_password,
       minimum_vote_amount,
-      name,
     } => {
-      let path = get_path(base_dir.clone(), name.clone());
       let localchain = Localchain::load(LocalchainConfig {
         path,
         mainchain_url,
@@ -235,8 +278,8 @@ where
       );
     }
     Commands::DataDomains { subcommand } => match subcommand {
-      DataDomainsSubcommand::List { base_dir, name } => {
-        let db = Localchain::create_db(get_path(base_dir, name)).await?;
+      DataDomainsSubcommand::List => {
+        let db = Localchain::create_db(path).await?;
         let domains = DataDomainStore::new(db);
         let data_domains = domains.list().await?;
 
@@ -275,10 +318,7 @@ where
           DataDomain::parse(data_domain).map_err(|_| anyhow!("Not a valid data domain"))?;
         println!("Hash: {:?}", domain.hash());
       }
-      DataDomainsSubcommand::Check {
-        data_domain,
-        mainchain_url,
-      } => {
+      DataDomainsSubcommand::Check { data_domain } => {
         let domain =
           DataDomain::parse(data_domain.clone()).map_err(|_| anyhow!("Not a valid data domain"))?;
         let mainchain = MainchainClient::connect(mainchain_url, 5_000).await?;
@@ -306,15 +346,12 @@ where
         println!("{table}");
       }
       DataDomainsSubcommand::Lease {
-        name,
-        base_dir,
         keystore_password,
         data_domain,
         owner_address,
       } => {
         let domain =
           DataDomain::parse(data_domain.clone()).map_err(|_| anyhow!("Not a valid data domain"))?;
-        let path = get_path(base_dir.clone(), name);
         let localchain = Localchain::load_without_mainchain(
           path,
           TickerConfig {
@@ -353,14 +390,51 @@ where
     },
 
     Commands::Accounts { subcommand } => match subcommand {
+      AccountsSubcommand::Info {
+        sync_latest,
+        keystore_password,
+      } => {
+        if !Path::new(&path).exists() {
+          return Err(anyhow!("Localchain does not exist at {:?}", path));
+        }
+        let account_overview: LocalchainOverview = if sync_latest {
+          let localchain = Localchain::load(LocalchainConfig {
+            path: path.clone(),
+            mainchain_url,
+            ntp_pool_url: None,
+            keystore_password: Some(keystore_password),
+          })
+          .await?;
+          localchain.balance_sync().sync(None).await?;
+          localchain.account_overview().await?
+        } else {
+          let db = Localchain::create_db(path.clone()).await?;
+
+          overview::OverviewStore::new(db, name, Default::default())
+            .get()
+            .await?
+        };
+
+        let mut table = Table::new();
+        table
+          .load_preset(UTF8_FULL)
+          .apply_modifier(UTF8_ROUND_CORNERS)
+          .set_content_arrangement(ContentArrangement::Dynamic)
+          .set_header(vec!["Address", "Balance", "Tax"]);
+
+        table.add_row(vec![
+          account_overview.address.clone(),
+          account_overview.balance_with_pending(),
+          account_overview.tax_with_pending(),
+        ]);
+
+        println!("Account at {path}:\n{table}");
+      }
       AccountsSubcommand::Create {
-        name,
         scheme,
-        base_dir,
         suri,
         keystore_password,
       } => {
-        let path = get_path(base_dir.clone(), name.clone());
         if fs::metadata(&path).is_ok() {
           return Err(anyhow!("Localchain already exists at {:?}", path));
         }
@@ -391,8 +465,8 @@ where
         println!("Account created at:\n{table}");
       }
 
-      AccountsSubcommand::List { base_dir } => {
-        let dir = base_dir.unwrap_or_else(|| PathBuf::from(Localchain::get_default_dir()));
+      AccountsSubcommand::List => {
+        let dir = base_dir.unwrap_or(PathBuf::from(Localchain::get_default_dir()));
 
         let mut table = Table::new();
 
@@ -418,17 +492,134 @@ where
           if name.ends_with(".db") {
             let path = get_path(Some(dir.clone()), name.clone());
             let db = Localchain::create_db(path).await?;
-            let mut conn = db.acquire().await?;
-            let accounts = AccountStore::db_list(&mut conn, false).await?;
-            for account in accounts {
-              let balance_change =
-                BalanceChangeStore::db_get_latest_for_account(&mut conn, account.id).await?;
-              table.add_row(format_account_record(&name, account, balance_change));
-            }
+            let account_overview: LocalchainOverview =
+              overview::OverviewStore::new(db, name, Default::default())
+                .get()
+                .await?;
+            table.add_row(format_account_record(
+              &account_overview.name,
+              account_overview.address.clone(),
+              account_overview.balance_with_pending(),
+              account_overview.tax_with_pending(),
+            ));
           }
         }
 
         println!("{table}");
+      }
+    },
+    Commands::Transactions { subcommand } => match subcommand {
+      TransactionsSubcommand::Send {
+        send_argon_file: SendArgonFileArgs { argons, to },
+        save_to_path,
+        keystore_password,
+      } => {
+        let localchain = Localchain::load(LocalchainConfig {
+          path,
+          mainchain_url,
+          ntp_pool_url: None,
+          keystore_password: Some(keystore_password),
+        })
+        .await?;
+        let transactions = localchain.transactions();
+        let milligons = (argons * 1_000.0) as u128;
+
+        let result = transactions.send(milligons, to.map(|a| vec![a])).await?;
+        let filename = save_to_path.unwrap_or_else(|| {
+          let mut path = env::temp_dir();
+          let argons = format_argons(milligons);
+          path.push(format!("Send {}.argon", argons));
+          path
+            .to_str()
+            .expect("Path should convert to a string")
+            .to_string()
+        });
+        fs::write(&filename, result)?;
+
+        println!("Argon file saved to: {:?}", filename);
+      }
+      TransactionsSubcommand::Receive {
+        receive_argon_file: ReceiveArgonFileArgs { argon_file },
+        keystore_password,
+      } => {
+        let localchain = Localchain::load(LocalchainConfig {
+          path,
+          mainchain_url,
+          ntp_pool_url: None,
+          keystore_password: Some(keystore_password),
+        })
+        .await?;
+        let transactions = localchain.transactions();
+        // if argon file is a path, read it
+        let argon_json = if argon_file.starts_with('{') {
+          argon_file
+        } else {
+          fs::read_to_string(argon_file)?
+        };
+        let result = transactions.import_argons(argon_json).await?;
+        let added = result.imports[0].net_balance_change();
+        println!("Imported {} argons", format_argons(added.unsigned_abs()));
+      }
+      TransactionsSubcommand::FromMainchain {
+        transfer_args: TransferArgs { argons },
+        keystore_password,
+      } => {
+        let milligons = (argons * 1_000.0) as u128;
+        let localchain = Localchain::load(LocalchainConfig {
+          path,
+          mainchain_url,
+          ntp_pool_url: None,
+          keystore_password: Some(keystore_password),
+        })
+        .await?;
+        let mainchain_transfers = localchain.mainchain_transfers();
+        let transfer = mainchain_transfers
+          .send_to_localchain(milligons, None)
+          .await?;
+        localchain.balance_sync().sync(None).await?;
+        let details = mainchain_transfers.get(transfer.transfer_id as i64).await?;
+        println!(
+          "Transfer details:\n\tblock_hash: {}\n\text_hash: {}",
+          details.first_block_hash, details.extrinsic_hash
+        );
+      }
+      TransactionsSubcommand::ToMainchain {
+        transfer_args: TransferArgs { argons },
+        wait_for_immortalized,
+        keystore_password,
+      } => {
+        let milligons = (argons * 1_000.0) as u128;
+        let localchain = Localchain::load(LocalchainConfig {
+          path,
+          mainchain_url,
+          ntp_pool_url: None,
+          keystore_password: Some(keystore_password),
+        })
+        .await?;
+        let change = localchain.begin_change();
+        let mainchain_client = localchain.mainchain_client().await.ok_or(anyhow!(
+          "Mainchain client not available. Ensure a mainchain url was provided."
+        ))?;
+        let main_account = change.default_deposit_account().await?;
+        main_account.send_to_mainchain(milligons).await?;
+        let notarization_tracker = change.notarize().await?;
+        localchain.balance_sync().sync(None).await?;
+        if wait_for_immortalized {
+          notarization_tracker
+            .wait_for_immortalized(&mainchain_client)
+            .await?;
+          println!(
+            "Sent {} argons to mainchain. Immortalized in notebook {}",
+            format_argons(milligons),
+            notarization_tracker.notebook_number
+          );
+        } else {
+          println!(
+            "Sent {} argons to mainchain. Will be included in notebook {}",
+            format_argons(milligons),
+            notarization_tracker.notebook_number
+          );
+        }
       }
     },
   }
@@ -436,36 +627,14 @@ where
 }
 
 fn account_columns() -> Vec<&'static str> {
-  vec![
-    "Name", "Address", "Type", "NotaryId", "Change #", "Balance", "Status",
-  ]
+  vec!["Name", "Address", "Balance", "Tax"]
 }
-fn format_account_record(
-  name: &str,
-  account: LocalAccount,
-  balance_change: Option<BalanceChangeRow>,
-) -> Vec<String> {
-  vec![
-    name.replace(".db", ""),
-    account.address,
-    account.account_type.as_str().to_string(),
-    account.notary_id.to_string(),
-    balance_change
-      .clone()
-      .map(|x| x.change_number.to_string())
-      .unwrap_or("0".to_string()),
-    balance_change
-      .clone()
-      .map(|x| x.balance.to_string())
-      .unwrap_or("0".to_string()),
-    balance_change
-      .map(|x| format!("{:?}", x.status))
-      .unwrap_or("-".to_string()),
-  ]
+fn format_account_record(name: &str, address: String, balance: String, tax: String) -> Vec<String> {
+  vec![name.replace(".db", ""), address, balance, tax]
 }
 
 fn get_path(base_dir: Option<PathBuf>, name: String) -> String {
-  let base_dir = base_dir.unwrap_or(PathBuf::from(Localchain::get_default_path()));
+  let base_dir = base_dir.unwrap_or(PathBuf::from(Localchain::get_default_dir()));
   base_dir
     .join(format!("{}.db", name.replace(".db", "")))
     .to_str()

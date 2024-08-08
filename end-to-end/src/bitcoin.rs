@@ -452,7 +452,7 @@ async fn wait_for_mint(
 		.expect("pending mint");
 
 	let owner_account_id32: AccountId32 = bob_sr25519.clone().public().into();
-	let balance = client.get_argons(owner_account_id32).await.expect("pending mint balance");
+	let balance = client.get_argons(&owner_account_id32).await.expect("pending mint balance");
 	if pending_mint.0.is_empty() {
 		assert!(balance.free >= bond_amount);
 	} else {

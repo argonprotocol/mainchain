@@ -20,6 +20,11 @@ description = "Run clippy"
 command = "cargo"
 args = ["clippy", "--workspace", "--fix", "--allow-dirty", "--", "-Dwarnings"]
 
+[tasks.lint-check]
+description = "Run clippy without fixing"
+command = "cargo"
+args = ["clippy", "--workspace", "--", "-Dwarnings"]
+
 [tasks.fmt]
 description = "Run rustfmt"
 toolchain = "nightly"

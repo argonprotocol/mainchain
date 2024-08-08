@@ -208,7 +208,10 @@ async fn activate_notebook_processing(
 ) -> anyhow::Result<()> {
 	// it might already be stored
 	let _ = RegisteredKeyStore::store_public(&mut *db, public, active_at_tick).await.ok();
-	let tick = ticker.current();
+	let mut tick = ticker.current();
+	if tick <= active_at_tick {
+		tick = active_at_tick + 1;
+	}
 	NotebookHeaderStore::create(&mut *db, notary_id, 1, tick, ticker.time_for_tick(tick + 1))
 		.await?;
 	Ok(())

@@ -191,7 +191,7 @@ export class MainchainClient {
   getShares(address: string): Promise<BalancesAccountData>
   getTransferToLocalchainFinalizedBlock(transferId: number): Promise<number | null>
   waitForLocalchainTransfer(transferId: number): Promise<LocalchainTransfer | null>
-  getAccountChangesRoot(notaryId: number, notebookNumber: number): Promise<Uint8Array>
+  getAccountChangesRoot(notaryId: number, notebookNumber: number): Promise<Uint8Array | null>
   latestFinalizedNumber(): Promise<number>
   waitForNotebookImmortalized(notaryId: number, notebookNumber: number): Promise<number>
 }

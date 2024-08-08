@@ -1,6 +1,6 @@
 {
   "name": "@argonprotocol/localchain",
-  "version": "2.0.0-alpha.29",
+  "version": "0.0.1",
   "description": "A nodejs binding to the Argon Localchain",
   "bin": "cli.js",
   "publishConfig": {
@@ -17,7 +17,7 @@
     "build:debug": "napi build --platform --no-const-enum --features=fast-runtime,napi -p argon-localchain",
     "prepublishOnly": "napi prepublish -t npm",
     "pretest": "npm run build:debug",
-    "test": "npm run pretest && cd .. && jest",
+    "test": "npm run pretest && cd .. && jest --testTimeout=60000",
     "version": "napi version"
   },
   "license": "MIT",
@@ -35,10 +35,10 @@
     ]
   },
   "devDependencies": {
-    "@argonprotocol/mainchain": "2.0.0-alpha.29",
+    "@argonprotocol/mainchain": "0.0.1",
     "@napi-rs/cli": "^3.0.0-alpha.55",
-    "@polkadot/util": "^12.6.2",
-    "@polkadot/util-crypto": "^12.6.2",
+    "@polkadot/util": "^13.0.2",
+    "@polkadot/util-crypto": "^13.0.2",
     "@polkadot/wasm-crypto": "^7.3.2",
     "@types/http-proxy": "^1.17.14",
     "@types/jest": "^29.5.11",

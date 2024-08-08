@@ -1,0 +1,89 @@
+name: Check
+on:
+  push:
+    branches:
+      - main
+  pull_request:
+    types:
+      - opened
+      - synchronize
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  test:
+    if: ${{ github.event.pull_request.head.repo.fork == true }}
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - os: ubuntu-22.04
+            target: x86_64-unknown-linux-gnu
+          - os: macos-latest
+            target: aarch64-apple-darwin
+
+    name: Build
+    runs-on: ${{ matrix.os }}
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: ikalnytskyi/action-setup-postgres@v6
+
+      - name: Install linux dependencies
+        if: ${{startsWith(matrix.os, 'ubuntu')}}
+        run: sudo apt-get install -y clang libssl-dev llvm libudev-dev protobuf-compiler pkg-config
+
+      - name: Install mac dependencies
+        if: startsWith(matrix.os, 'macos')
+        run: brew install protobuf
+
+      - name: Start sccache
+        uses: hendrikmuhs/ccache-action@v1.2
+        with:
+          variant: sccache
+          key: sccache-build-and-test-${{ runner.target }}
+          max-size: 10G
+          append-timestamp: false
+
+      - uses: rui314/setup-mold@v1
+
+      - name: Install
+        uses: dtolnay/rust-toolchain@stable
+        with:
+          toolchain: stable
+          targets: ${{runner.target}},wasm32-unknown-unknown
+
+      - uses: taiki-e/install-action@v2
+        with:
+          tool: sqlx-cli@0.8
+
+      - name: Migrate Notary Db
+        working-directory: notary
+        run: cargo sqlx database setup
+
+      - name: Create and Set Database URL
+        working-directory: localchain
+        run: |
+          touch ${{ runner.temp }}/temp.db
+          chmod 777 ${{ runner.temp }}/temp.db
+          echo "DATABASE_URL=sqlite://${{ runner.temp }}/temp.db" > .env
+          cat .env
+
+      - name: Migrate Localchain Db
+        working-directory: localchain
+        run: cargo sqlx database setup
+
+      - name: Clippy
+        if: ${{startsWith(matrix.os, 'ubuntu')}}
+        run: cargo clippy --workspace -- -Dwarnings
+
+      - name: Run tests
+        run: cargo build --features=fast-runtime && cargo test --features=fast-runtime --no-fail-fast
+        env:
+          RUSTC_WRAPPER: "sccache"
+          CARGO_INCREMENTAL: 0
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          RUST_LOG: info
+          SQLX_OFFLINE: ${{ startsWith(matrix.os, 'macos') }}
