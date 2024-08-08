@@ -28,7 +28,7 @@ parking_lot = { workspace = true, optional = true }
 hwi = { workspace = true, optional = true }
 
 argon-primitives = { workspace = true, default-features = false, features = ["bitcoin"] }
-log = "0.4.22"
+log = { workspace = true }
 
 [dev-dependencies]
 frame-support = { workspace = true }
@@ -42,22 +42,22 @@ bitcoin = { workspace = true, features = ["base64"] }
 serde_json = { workspace = true }
 
 [features]
-default = [ "std" ]
+default = ["std"]
 std = [
-	"anyhow/std",
-	"argon-primitives/bitcoin",
-	"argon-primitives/std",
-	"bitcoin/std",
-	"bitcoincore-rpc/default",
-	"codec/std",
-	"k256/std",
-	"log/std",
-	"miniscript/std",
-	"parking_lot/default",
-	"sp-core/std",
-	"sp-io/std",
-	"sp-runtime/std",
-	"thiserror",
+    "anyhow/std",
+    "argon-primitives/bitcoin",
+    "argon-primitives/std",
+    "bitcoin/std",
+    "bitcoincore-rpc/default",
+    "codec/std",
+    "k256/std",
+    "log/std",
+    "miniscript/std",
+    "parking_lot/default",
+    "sp-core/std",
+    "sp-io/std",
+    "sp-runtime/std",
+    "thiserror",
 ]
-fast-runtime = [ "argon-primitives/fast-runtime" ]
-hwi = [ "dep:hwi" ]
+fast-runtime = ["argon-primitives/fast-runtime"]
+hwi = ["dep:hwi"]
