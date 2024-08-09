@@ -15,7 +15,7 @@ use std::sync::Arc;
 use tokio::sync::Mutex;
 
 use crate::mainchain_client::MainchainClient;
-use crate::{bail, AccountStore, Result};
+use crate::{bail, AccountStore, Error, Result};
 
 #[cfg_attr(feature = "napi", napi)]
 #[derive(Clone)]
@@ -160,20 +160,39 @@ impl NotaryClient {
   }
 
   pub async fn notarize(&self, notarization: Notarization) -> Result<BalanceChangeResult> {
-    let client = self.client.lock().await;
     let json = serde_json::to_string_pretty(&notarization).unwrap();
-    let res = (*client)
-      .notarize(
-        notarization.balance_changes,
-        notarization.block_votes,
-        notarization.data_domains,
-      )
-      .await
-      .map_err(|e| {
-        tracing::error!("Error sending notarization: {:?} {}", e, json);
-        e
-      })?;
-    Ok(res)
+    for i in 0..5 {
+      let client = self.client.lock().await;
+
+      let res = (*client)
+        .notarize(
+          notarization.balance_changes.clone(),
+          notarization.block_votes.clone(),
+          notarization.data_domains.clone(),
+        )
+        .await;
+
+      return match res {
+        Ok(x) => Ok(x),
+        Err(e) => {
+          let e: Error = e.into();
+          // this error only occurs mid-processing of the notebook, but we don't want to try forever
+          if matches!(
+            e,
+            Error::NotaryApiError(argon_notary_apis::Error::NotebookNotFinalized)
+          ) {
+            tokio::time::sleep(std::time::Duration::from_secs(
+              1 + (1.5f32.powf(i as f32)) as u64,
+            ))
+            .await;
+            continue;
+          }
+          tracing::error!("Error sending notarization: {:?} {}", e, json);
+          Err(e)
+        }
+      };
+    }
+    bail!("Failed to send notarization")
   }
 
   pub async fn metadata(&self) -> Result<NotebookMeta> {

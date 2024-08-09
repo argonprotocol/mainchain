@@ -1,5 +1,7 @@
-use argon_notary_audit::VerifyError;
+use jsonrpsee::core::client::error::Error as JsonrpseeError;
 use sp_core::crypto::{DeriveError, SecretStringError};
+
+use argon_notary_audit::VerifyError;
 
 #[derive(thiserror::Error, Debug)]
 pub enum Error {
@@ -40,7 +42,10 @@ pub enum Error {
   DecodingError(#[from] codec::Error),
 
   #[error("Notary API Error {0}")]
-  NotaryApiError(#[from] jsonrpsee::core::client::error::Error),
+  NotaryApiError(argon_notary_apis::Error),
+
+  #[error("Notary Internal API Error {0}")]
+  NotaryInternalApiError(JsonrpseeError),
 
   #[cfg(feature = "napi")]
   #[error(transparent)]
@@ -85,5 +90,19 @@ impl<T> NapiOk<T> for Result<T, Error> {
 impl From<String> for Error {
   fn from(e: String) -> Self {
     Error::Generic(e)
+  }
+}
+impl From<JsonrpseeError> for Error {
+  fn from(e: JsonrpseeError) -> Self {
+    return match e {
+      JsonrpseeError::Call(ref err) => {
+        if let Ok(e) = err.clone().try_into() {
+          return Error::NotaryApiError(e);
+        }
+
+        Error::NotaryInternalApiError(e)
+      }
+      _ => Error::NotaryInternalApiError(e),
+    };
   }
 }

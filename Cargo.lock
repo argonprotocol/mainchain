@@ -595,7 +595,9 @@ name = "argon-notary-apis"
 version = "0.0.1"
 dependencies = [
  "anyhow",
+ "argon-notary-audit",
  "argon-primitives",
+ "hex",
  "jsonrpsee",
  "parity-scale-codec",
  "scale-info",
@@ -603,6 +605,10 @@ dependencies = [
  "serde_json",
  "sp-core",
  "sp-runtime",
+ "sqlx",
+ "subxt",
+ "thiserror",
+ "tracing",
 ]
 
 [[package]]

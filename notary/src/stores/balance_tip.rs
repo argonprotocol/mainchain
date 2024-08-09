@@ -32,7 +32,7 @@ impl BalanceTipStore {
 		proposed_change_number: u32,
 		previous_balance: u128,
 		account_origin: &AccountOrigin,
-		change_index: usize,
+		change_index: u32,
 		escrow_hold_note: Option<Note>,
 		timeout_millis: u32,
 	) -> BoxFutureResult<'a, Option<H256>> {

@@ -1,3 +1,5 @@
+use argon_notary_apis::error::Error;
+use argon_primitives::{prod_or_fast, tick::Ticker, NotaryId, SignedNotebookHeader};
 use futures::FutureExt;
 use sc_utils::notification::NotificationSender;
 use sp_core::{ed25519, H256};
@@ -5,17 +7,12 @@ use sp_keystore::KeystorePtr;
 use sqlx::{postgres::PgListener, PgPool};
 use tokio::task::JoinHandle;
 
-use argon_primitives::{prod_or_fast, tick::Ticker, NotaryId, SignedNotebookHeader};
-
-use crate::{
-	error::Error,
-	stores::{
-		notebook::NotebookStore,
-		notebook_header::NotebookHeaderStore,
-		notebook_status::{NotebookFinalizationStep, NotebookStatusStore},
-		registered_key::RegisteredKeyStore,
-		BoxFutureResult,
-	},
+use crate::stores::{
+	notebook::NotebookStore,
+	notebook_header::NotebookHeaderStore,
+	notebook_status::{NotebookFinalizationStep, NotebookStatusStore},
+	registered_key::RegisteredKeyStore,
+	BoxFutureResult,
 };
 
 pub const NOTARY_KEYID: sp_core::crypto::KeyTypeId = sp_core::crypto::KeyTypeId(*b"unot");

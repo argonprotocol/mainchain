@@ -18,6 +18,11 @@ serde_json = { workspace = true, features = ["default"] }
 scale-info = { workspace = true, features = ["default"] }
 sp-runtime = { workspace = true }
 sp-core = { workspace = true }
+thiserror = { workspace = true }
+subxt = { workspace = true, features = ["default"] }
+tracing = { workspace = true }
+sqlx = { workspace = true, features = [] }
+hex = { workspace = true }
 jsonrpsee = { workspace = true, features = ["server", "async-client"] }
-
+argon-notary-audit = { workspace = true }
 argon-primitives = { workspace = true }

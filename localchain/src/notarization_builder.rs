@@ -770,9 +770,7 @@ impl NotarizationBuilder {
   }
 
   pub async fn notarize(&self) -> Result<NotarizationTracker> {
-    let is_verified = self.is_verified.lock().await;
-    if !*is_verified {
-      drop(is_verified);
+    if !*self.is_verified.lock().await {
       self.sign().await?;
       self.verify().await?;
     }

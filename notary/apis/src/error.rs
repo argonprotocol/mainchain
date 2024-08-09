@@ -1,29 +1,56 @@
-use argon_notary_audit::VerifyError;
+use codec::{Decode, Encode};
+use jsonrpsee::types::ErrorObjectOwned;
 use scale_info::scale;
 use sp_core::H256;
 use tracing::error;
 
-#[derive(Debug, PartialEq, Clone, thiserror::Error)]
+use argon_notary_audit::VerifyError;
+
+#[derive(Debug, PartialEq, Decode, Encode, Clone, thiserror::Error)]
 pub enum Error {
 	#[error("Notary not found")]
 	NotaryNotFound,
 	#[error("Empty Notarization Proposed")]
 	EmptyNotarizationProposed,
 	#[error("An invalid balance change was submitted ({change_index}.{note_index}): {message}")]
-	BalanceChangeError { change_index: usize, note_index: usize, message: String },
+	BalanceChangeError {
+		#[codec(compact)]
+		change_index: u32,
+		#[codec(compact)]
+		note_index: u32,
+		message: String,
+	},
 	#[error(
-    	"Account balance tip invalid (change: {change_index}, expected previous: {stored_tip:?} vs provided: {provided_tip:?})",
+	"Account balance tip invalid (change: {change_index}, expected previous: {stored_tip:?} vs provided: {provided_tip:?})",
 	)]
-	BalanceTipMismatch { change_index: usize, stored_tip: Option<H256>, provided_tip: Option<H256> },
+	BalanceTipMismatch {
+		#[codec(compact)]
+		change_index: u32,
+		stored_tip: Option<H256>,
+		provided_tip: Option<H256>,
+	},
 	#[error(
-		"Invalid transfer to localchain (expired, already applied, or invalid) for account (change: {change_index}.{note_index})"
+	"Invalid transfer to localchain (expired, already applied, or invalid) for account (change: {change_index}.{note_index})"
 	)]
-	TransferToLocalchainNotFound { note_index: usize, change_index: usize },
-	#[error("Invalid amount claimed for Localchain transfer. (change: {change_index}.{note_index}; expected: {amount}, provided: {provided})" )]
+	TransferToLocalchainNotFound {
+		#[codec(compact)]
+		note_index: u32,
+		#[codec(compact)]
+		change_index: u32,
+	},
+	#[error("Invalid amount claimed for Localchain transfer. (change: {change_index}.{note_index}; expected: {amount}, provided: {provided})"
+	)]
 	TransferToLocalchainInvalidAmount {
-		note_index: usize,
-		change_index: usize,
+		#[codec(compact)]
+		note_index: u32,
+
+		#[codec(compact)]
+		change_index: u32,
+
+		#[codec(compact)]
 		provided: u128,
+
+		#[codec(compact)]
 		amount: u128,
 	},
 
@@ -52,12 +79,16 @@ pub enum Error {
 	MainchainApiError(String),
 
 	#[error("Error verifying balance change: {0}")]
-	BalanceChangeVerifyError(#[from] VerifyError),
+	BalanceChangeVerifyError(VerifyError),
 
 	#[error("Error encoding/decoding: {0}")]
-	EncodingError(#[from] scale::Error),
+	EncodingError(String),
 
-	#[error("The current notebook has reached the maximum number of transfers it can include. Please wait for the next notebook.")]
+	#[error("Error serializing to/from json: {0}")]
+	JsonError(String),
+
+	#[error("The current notebook has reached the maximum number of transfers it can include. Please wait for the next notebook."
+	)]
 	MaxNotebookChainTransfersReached,
 
 	#[error("Cross-notary proofs are not implemented yet!!!")]
@@ -89,6 +120,7 @@ impl From<Error> for i32 {
 			Error::CrossNotaryProofsNotImplemented => 16,
 			Error::UnsignedNotebookHeader => 17,
 			Error::EmptyNotarizationProposed => 18,
+			Error::JsonError(_) => 19,
 		}
 	}
 }
@@ -96,6 +128,12 @@ impl From<Error> for i32 {
 impl From<sqlx::Error> for Error {
 	fn from(e: sqlx::Error) -> Self {
 		Self::Database(e.to_string())
+	}
+}
+
+impl From<scale::Error> for Error {
+	fn from(e: scale::Error) -> Self {
+		Self::EncodingError(e.to_string())
 	}
 }
 impl From<subxt::Error> for Error {
@@ -106,6 +144,43 @@ impl From<subxt::Error> for Error {
 
 impl From<serde_json::Error> for Error {
 	fn from(e: serde_json::Error) -> Self {
-		Self::InternalError(e.to_string())
+		Self::JsonError(e.to_string())
+	}
+}
+
+impl From<VerifyError> for Error {
+	fn from(e: VerifyError) -> Self {
+		Self::BalanceChangeVerifyError(e)
+	}
+}
+impl From<&VerifyError> for Error {
+	fn from(e: &VerifyError) -> Self {
+		Self::BalanceChangeVerifyError(e.clone())
+	}
+}
+
+impl From<Error> for ErrorObjectOwned {
+	fn from(e: Error) -> Self {
+		let data = hex::encode(e.encode());
+		let message = e.to_string();
+		let code = i32::from(e);
+
+		ErrorObjectOwned::owned(code, message, Some(data))
+	}
+}
+
+impl TryFrom<ErrorObjectOwned> for Error {
+	type Error = ErrorObjectOwned;
+
+	fn try_from(value: ErrorObjectOwned) -> Result<Self, Self::Error> {
+		if let Some(data) = value.data() {
+			let raw_str: String = serde_json::from_str(data.get()).map_err(|_| value.clone())?;
+			let data = hex::decode(raw_str.as_str()).map_err(|_| value.clone())?;
+
+			if let Ok(e) = Self::decode(&mut &data[..]) {
+				return Ok(e)
+			}
+		}
+		Err(value.clone())
 	}
 }

@@ -1,23 +1,15 @@
 use std::collections::{BTreeMap, BTreeSet};
 
-use codec::Encode;
-use serde_json::{from_value, json};
-use sp_runtime::BoundedVec;
-use sqlx::{query, types::Json, FromRow, PgConnection, PgPool};
-
-use crate::{
-	error::Error,
-	stores::{
-		balance_tip::BalanceTipStore,
-		blocks::BlocksStore,
-		chain_transfer::ChainTransferStore,
-		notebook::NotebookStore,
-		notebook_constraints::{MaxNotebookCounts, NotarizationCounts, NotebookConstraintsStore},
-		notebook_new_accounts::NotebookNewAccountsStore,
-		notebook_status::NotebookStatusStore,
-	},
+use crate::stores::{
+	balance_tip::BalanceTipStore,
+	blocks::BlocksStore,
+	chain_transfer::ChainTransferStore,
+	notebook::NotebookStore,
+	notebook_constraints::{MaxNotebookCounts, NotarizationCounts, NotebookConstraintsStore},
+	notebook_new_accounts::NotebookNewAccountsStore,
+	notebook_status::NotebookStatusStore,
 };
-use argon_notary_apis::localchain::BalanceChangeResult;
+use argon_notary_apis::{error::Error, localchain::BalanceChangeResult};
 use argon_notary_audit::{
 	verify_changeset_signatures, verify_notarization_allocation, verify_voting_sources, VerifyError,
 };
@@ -26,6 +18,10 @@ use argon_primitives::{
 	BlockVote, DataDomainHash, LocalchainAccountId, NewAccountOrigin, Notarization, NotaryId,
 	NoteType, NotebookNumber,
 };
+use codec::Encode;
+use serde_json::{from_value, json};
+use sp_runtime::BoundedVec;
+use sqlx::{query, types::Json, FromRow, PgConnection, PgPool};
 
 #[derive(FromRow)]
 #[allow(dead_code)]
@@ -202,6 +198,7 @@ impl NotarizationsStore {
 		let mut escrow_data_domains = BTreeMap::new();
 		let mut chain_transfers: u32 = 0;
 		for (change_index, change) in changes.into_iter().enumerate() {
+			let change_index = change_index as u32;
 			let BalanceChange { account_id, account_type, change_number, balance, .. } = change;
 			let localchain_account_id = LocalchainAccountId::new(account_id.clone(), account_type);
 
@@ -276,14 +273,15 @@ impl NotarizationsStore {
 					.await?;
 
 					// record into the final changeset
-					changes_with_proofs[change_index].previous_balance_proof = Some(BalanceProof {
-						balance: proof.balance,
-						notary_id: proof.notary_id,
-						notebook_number: proof.notebook_number,
-						account_origin: proof.account_origin.clone(),
-						notebook_proof: Some(notebook_proof),
-						tick: proof.tick,
-					});
+					changes_with_proofs[change_index as usize].previous_balance_proof =
+						Some(BalanceProof {
+							balance: proof.balance,
+							notary_id: proof.notary_id,
+							notebook_number: proof.notebook_number,
+							account_origin: proof.account_origin.clone(),
+							notebook_proof: Some(notebook_proof),
+							tick: proof.tick,
+						});
 				}
 
 				if let Some(notebook_proof) = &proof.notebook_proof {
@@ -302,6 +300,7 @@ impl NotarizationsStore {
 
 			let mut escrow_hold_note = None;
 			for (note_index, note) in change.notes.into_iter().enumerate() {
+				let note_index = note_index as u32;
 				match note.note_type {
 					NoteType::ClaimFromMainchain { transfer_id, .. } => {
 						chain_transfers += 1;
