@@ -1,8 +1,8 @@
+use crate as pallet_ticks;
+use argon_primitives::tick::Ticker;
 use env_logger::{Builder, Env};
 use frame_support::{derive_impl, traits::ConstU64};
 use sp_runtime::BuildStorage;
-
-use crate as pallet_ticks;
 
 type Block = frame_system::mocking::MockBlock<Test>;
 
@@ -39,8 +39,7 @@ pub fn new_test_ext(tick_duration_millis: u64, genesis_utc_time: u64) -> sp_io::
 	let mut t = frame_system::GenesisConfig::<Test>::default().build_storage().unwrap();
 
 	pallet_ticks::GenesisConfig::<Test> {
-		tick_duration_millis,
-		genesis_utc_time,
+		ticker: Ticker::new(tick_duration_millis, genesis_utc_time, 2),
 		_phantom: Default::default(),
 	}
 	.assimilate_storage(&mut t)

@@ -56,33 +56,39 @@ fn get_validation_window_blocks() {
 	MaxMiners::set(10);
 	BlocksBetweenSlots::set(1);
 
-	assert_eq!(MiningSlots::get_mining_window_blocks(), 5);
+	new_test_ext(None).execute_with(|| {
+		assert_eq!(MiningSlots::get_mining_window_blocks(), 5);
+	});
 
 	MaxCohortSize::set(5);
 	MaxMiners::set(10);
 	BlocksBetweenSlots::set(10);
 
-	assert_eq!(MiningSlots::get_mining_window_blocks(), 2 * 10);
+	new_test_ext(None).execute_with(|| {
+		assert_eq!(MiningSlots::get_mining_window_blocks(), 2 * 10);
+	});
 }
 
 #[test]
 fn get_slot_era() {
+	MaxCohortSize::set(2);
+	MaxMiners::set(10);
+	BlocksBetweenSlots::set(140);
 	new_test_ext(None).execute_with(|| {
 		System::set_block_number(8);
 
-		MaxCohortSize::set(2);
-		MaxMiners::set(10);
-		BlocksBetweenSlots::set(140);
 		let window = 140 * 5;
 
 		assert_eq!(MiningSlots::get_slot_era(), (140, 140 + window));
+	});
 
-		MaxCohortSize::set(5);
-		MaxMiners::set(10);
-		BlocksBetweenSlots::set(10);
+	MaxCohortSize::set(5);
+	MaxMiners::set(10);
+	BlocksBetweenSlots::set(10);
+	new_test_ext(None).execute_with(|| {
+		System::set_block_number(8);
 
 		assert_eq!(MiningSlots::get_slot_era(), (10, 10 + (10 * 2)));
-
 		// on block, should start showing next period
 		System::set_block_number(10);
 		assert_eq!(MiningSlots::get_slot_era(), (20, 20 + (10 * 2)));
@@ -92,10 +98,13 @@ fn get_slot_era() {
 
 		System::set_block_number(20);
 		assert_eq!(MiningSlots::get_slot_era(), (30, 30 + (10 * 2)));
+	});
 
-		BlocksBetweenSlots::set(4);
-		MaxMiners::set(6);
-		MaxCohortSize::set(2);
+	MaxCohortSize::set(2);
+	MaxMiners::set(6);
+	BlocksBetweenSlots::set(4);
+
+	new_test_ext(None).execute_with(|| {
 		System::set_block_number(3);
 		assert_eq!(MiningSlots::get_slot_era(), (4, 4 + (4 * 3)));
 		System::set_block_number(4);

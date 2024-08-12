@@ -19,7 +19,7 @@ use sqlx::{migrate::MigrateDatabase, SqlitePool};
 use tokio::sync::Mutex;
 
 pub use accounts::*;
-use argon_primitives::tick::Ticker;
+use argon_primitives::tick::{Tick, Ticker};
 pub use balance_changes::*;
 pub use balance_sync::*;
 pub use constants::*;
@@ -178,6 +178,7 @@ impl Localchain {
     let mut ticker = Ticker::new(
       ticker_config.tick_duration_millis as u64,
       ticker_config.genesis_utc_time as u64,
+      ticker_config.escrow_expiration_ticks as Tick,
     );
     if let Some(ntp_pool_url) = ticker_config.ntp_pool_url {
       ticker.lookup_ntp_offset(&ntp_pool_url).await?;
@@ -342,6 +343,7 @@ impl Localchain {
       self.db.clone(),
       self.notary_clients.clone(),
       self.keystore.clone(),
+      self.ticker.clone(),
     )
   }
 
@@ -711,6 +713,11 @@ pub mod napi_ext {
     pub fn millis_to_next_tick_napi(&self) -> u64 {
       self.millis_to_next_tick()
     }
+
+    #[napi(js_name = "escrowExpirationTicks", getter)]
+    pub fn escrow_expiration_ticks_napi(&self) -> Tick {
+      self.escrow_expiration_ticks()
+    }
   }
 }
 
@@ -718,6 +725,12 @@ pub mod napi_ext {
 #[cfg_attr(feature = "napi", napi)]
 pub struct TickerRef {
   pub(crate) ticker: Arc<RwLock<Ticker>>,
+}
+
+impl From<Ticker> for TickerRef {
+  fn from(ticker: Ticker) -> Self {
+    Self::new(ticker)
+  }
 }
 
 impl TickerRef {
@@ -750,6 +763,10 @@ impl TickerRef {
   pub fn duration_to_next_tick(&self) -> Duration {
     self.ticker.read().duration_to_next_tick()
   }
+
+  pub fn escrow_expiration_ticks(&self) -> Tick {
+    self.ticker.read().escrow_expiration_ticks
+  }
 }
 
 #[cfg_attr(feature = "napi", napi(object))]
@@ -757,5 +774,6 @@ impl TickerRef {
 pub struct TickerConfig {
   pub tick_duration_millis: i64,
   pub genesis_utc_time: i64,
+  pub escrow_expiration_ticks: i64,
   pub ntp_pool_url: Option<String>,
 }

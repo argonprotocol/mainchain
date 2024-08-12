@@ -231,7 +231,7 @@ async fn can_build_compute_blocks() {
 			difficulty: 200,
 			tax_minimum: 1,
 			tick_duration,
-			genesis_utc_time: Ticker::start(tick_duration).genesis_utc_time,
+			genesis_utc_time: Ticker::start(tick_duration, 2).genesis_utc_time,
 		},
 	);
 
@@ -264,7 +264,7 @@ async fn can_run_proof_of_tax() {
 			tax_minimum: 5,
 			difficulty: 1,
 			tick_duration,
-			genesis_utc_time: Ticker::start(tick_duration).genesis_utc_time,
+			genesis_utc_time: Ticker::start(tick_duration, 2).genesis_utc_time,
 		},
 	);
 

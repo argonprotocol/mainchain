@@ -14,9 +14,9 @@ use argon_notary_audit::{
 	verify_changeset_signatures, verify_notarization_allocation, verify_voting_sources, VerifyError,
 };
 use argon_primitives::{
-	ensure, AccountId, AccountOrigin, AccountType, BalanceChange, BalanceProof, BalanceTip,
-	BlockVote, DataDomainHash, LocalchainAccountId, NewAccountOrigin, Notarization, NotaryId,
-	NoteType, NotebookNumber,
+	ensure, tick::Ticker, AccountId, AccountOrigin, AccountType, BalanceChange, BalanceProof,
+	BalanceTip, BlockVote, DataDomainHash, LocalchainAccountId, NewAccountOrigin, Notarization,
+	NotaryId, NoteType, NotebookNumber,
 };
 use codec::Encode;
 use serde_json::{from_value, json};
@@ -162,6 +162,7 @@ impl NotarizationsStore {
 	pub async fn apply(
 		pool: &PgPool,
 		notary_id: NotaryId,
+		ticker: &Ticker,
 		changes: Vec<BalanceChange>,
 		block_votes: Vec<BlockVote>,
 		data_domains: Vec<(DataDomainHash, AccountId)>,
@@ -170,8 +171,13 @@ impl NotarizationsStore {
 			return Err(Error::EmptyNotarizationProposed);
 		}
 		// Before we use db resources, let's confirm these are valid transactions
-		let initial_allocation_result =
-			verify_notarization_allocation(&changes, &block_votes, &data_domains, None)?;
+		let initial_allocation_result = verify_notarization_allocation(
+			&changes,
+			&block_votes,
+			&data_domains,
+			None,
+			ticker.escrow_expiration_ticks,
+		)?;
 		verify_changeset_signatures(&changes)?;
 
 		let mut voted_blocks = BTreeSet::new();
@@ -186,7 +192,13 @@ impl NotarizationsStore {
 			NotebookStatusStore::lock_open_for_appending(&mut tx).await?;
 
 		if initial_allocation_result.needs_escrow_settle_followup {
-			verify_notarization_allocation(&changes, &block_votes, &data_domains, Some(tick))?;
+			verify_notarization_allocation(
+				&changes,
+				&block_votes,
+				&data_domains,
+				Some(tick),
+				ticker.escrow_expiration_ticks,
+			)?;
 		}
 
 		let block_vote_specifications =

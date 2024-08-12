@@ -129,10 +129,10 @@ async fn main() -> anyhow::Result<()> {
 			};
 
 			let mut mainchain_client = ReconnectingClient::new(vec![trusted_rpc_url.clone()]);
-			let ticker = mainchain_client.get().await?.lookup_ticker().await?;
-			let ticker = Ticker::new(ticker.tick_duration_millis, ticker.genesis_utc_time);
+			let ticker: Ticker = mainchain_client.get().await?.lookup_ticker().await?.into();
 
-			let server = NotaryServer::start(notary_id, pool.clone(), bind_addr).await?;
+			let server =
+				NotaryServer::start(notary_id, pool.clone(), ticker.clone(), bind_addr).await?;
 
 			if sync_blocks {
 				spawn_block_sync(trusted_rpc_url.clone(), notary_id, pool.clone(), ticker).await?;

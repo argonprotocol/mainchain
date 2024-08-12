@@ -1,4 +1,8 @@
-use alloc::{collections::btree_map::BTreeMap, vec::Vec};
+use alloc::{
+	collections::btree_map::BTreeMap,
+	string::{String, ToString},
+	vec::Vec,
+};
 use codec::{Codec, Decode, Encode, MaxEncodedLen};
 use core::fmt::Debug;
 use frame_support::pallet_prelude::ConstU32;
@@ -37,30 +41,16 @@ pub struct NotaryMeta<MaxHosts: Get<u32>> {
 	pub hosts: BoundedVec<Host, MaxHosts>,
 }
 
-#[derive(
-	PartialEq,
-	Eq,
-	Clone,
-	Encode,
-	Decode,
-	RuntimeDebug,
-	TypeInfo,
-	MaxEncodedLen,
-	Deserialize,
-	Serialize,
-)]
-#[serde(transparent)]
+#[derive(PartialEq, Eq, Clone, Encode, Decode, RuntimeDebug, TypeInfo, MaxEncodedLen)]
 #[repr(transparent)]
 pub struct NotaryName(pub BoundedVec<u8, ConstU32<55>>);
 
-#[cfg(feature = "std")]
 impl From<String> for NotaryName {
 	fn from(name: String) -> Self {
 		name.into_bytes().to_vec().into()
 	}
 }
 
-#[cfg(feature = "std")]
 impl From<&str> for NotaryName {
 	fn from(name: &str) -> Self {
 		name.as_bytes().to_vec().into()
@@ -72,7 +62,6 @@ impl From<Vec<u8>> for NotaryName {
 	}
 }
 
-#[cfg(feature = "std")]
 impl TryInto<String> for NotaryName {
 	type Error = String;
 
@@ -81,7 +70,28 @@ impl TryInto<String> for NotaryName {
 	}
 }
 
+impl Serialize for NotaryName {
+	fn serialize<S>(&self, serializer: S) -> Result<S::Ok, S::Error>
+	where
+		S: serde::Serializer,
+	{
+		let string_value: String = self.clone().try_into().map_err(serde::ser::Error::custom)?;
+		serializer.serialize_str(&string_value)
+	}
+}
+
+impl<'de> Deserialize<'de> for NotaryName {
+	fn deserialize<D>(deserializer: D) -> Result<Self, D::Error>
+	where
+		D: serde::Deserializer<'de>,
+	{
+		let s = String::deserialize(deserializer)?;
+		Ok(NotaryName::from(s))
+	}
+}
+
 #[derive(Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
 pub struct GenesisNotary<AccountId> {
 	pub account_id: AccountId,
 	pub public: NotaryPublic,

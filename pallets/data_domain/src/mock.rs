@@ -42,7 +42,7 @@ impl TickProvider<Block> for StaticTickProvider {
 		CurrentTick::get()
 	}
 	fn ticker() -> Ticker {
-		Ticker::new(1, 1)
+		Ticker::new(1, 1, 2)
 	}
 	fn blocks_at_tick(_: Tick) -> Vec<H256> {
 		todo!()

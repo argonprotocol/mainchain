@@ -58,7 +58,7 @@ impl ArgonPriceLookup {
 		max_argon_change_per_tick_away_from_target: FixedU128,
 	) -> Result<FixedU128> {
 		if self.use_simulated_schedule {
-			#[cfg(feature = "fast-runtime")]
+			#[cfg(feature = "simulated-prices")]
 			{
 				return Ok(self.simulate_price_change(
 					target_price,
@@ -74,7 +74,7 @@ impl ArgonPriceLookup {
 	}
 }
 
-#[cfg(feature = "fast-runtime")]
+#[cfg(feature = "simulated-prices")]
 mod dev {
 	use crate::argon_price::ArgonPriceLookup;
 	use argon_primitives::tick::Tick;
@@ -191,7 +191,7 @@ mod test {
 
 	#[test]
 	fn test_get_target_price() {
-		let ticker = Ticker::start(Duration::from_secs(60));
+		let ticker = Ticker::start(Duration::from_secs(60), 2);
 		let argon_price_lookup = ArgonPriceLookup::new(false, &ticker, None);
 		let us_cpi_ratio = FixedI128::from_float(0.00);
 		assert_eq!(argon_price_lookup.get_target_price(us_cpi_ratio), FixedU128::from_u32(1));
@@ -199,16 +199,16 @@ mod test {
 
 	#[test]
 	fn test_get_target_price_with_cpi() {
-		let ticker = Ticker::start(Duration::from_secs(60));
+		let ticker = Ticker::start(Duration::from_secs(60), 2);
 		let argon_price_lookup = ArgonPriceLookup::new(false, &ticker, None);
 		let us_cpi_ratio = FixedI128::from_float(0.1);
 		assert_eq!(argon_price_lookup.get_target_price(us_cpi_ratio).to_float(), 1.1);
 	}
 
 	#[test]
-	#[cfg(feature = "fast-runtime")]
+	#[cfg(feature = "simulated-prices")]
 	fn can_use_simulated_schedule() {
-		let ticker = Ticker::start(Duration::from_secs(60));
+		let ticker = Ticker::start(Duration::from_secs(60), 2);
 		let mut argon_price_lookup = ArgonPriceLookup::new(true, &ticker, None);
 
 		argon_price_lookup.last_price = FixedU128::from_float(1.01);

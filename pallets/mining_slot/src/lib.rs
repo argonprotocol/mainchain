@@ -2,17 +2,9 @@
 extern crate alloc;
 
 use alloc::{vec, vec::Vec};
-use argon_primitives::{
-	block_seal::{
-		BlockSealAuthorityId, MinerIndex, MiningAuthority, RewardDestination, RewardSharing,
-	},
-	bond::BondProvider,
-	inherents::BlockSealInherent,
-	AuthorityProvider, BlockRewardAccountsProvider, BlockSealEventHandler, MiningSlotProvider,
-	RewardShare,
-};
-use codec::Codec;
 use core::{cmp::max, marker::PhantomData};
+
+use codec::Codec;
 use frame_support::{
 	pallet_prelude::*,
 	traits::{
@@ -22,14 +14,26 @@ use frame_support::{
 	},
 };
 use frame_system::pallet_prelude::BlockNumberFor;
-pub use pallet::*;
 use pallet_session::SessionManager;
 use sp_core::{Get, U256};
 use sp_io::hashing::blake2_256;
 use sp_runtime::{
-	traits::{Convert, One, UniqueSaturatedInto},
-	BoundedBTreeMap, FixedI128, FixedPointNumber, FixedU128, SaturatedConversion, Saturating,
+	traits::{Convert, One, UniqueSaturatedInto, Zero},
+	BoundedBTreeMap, FixedI128, FixedPointNumber, FixedU128, Permill, SaturatedConversion,
+	Saturating,
 };
+
+use argon_primitives::{
+	block_seal::{
+		BlockSealAuthorityId, MinerIndex, MiningAuthority, MiningSlotConfig, RewardDestination,
+		RewardSharing,
+	},
+	bond::BondProvider,
+	inherents::BlockSealInherent,
+	AuthorityProvider, BlockRewardAccountsProvider, BlockSealEventHandler, MiningSlotProvider,
+	RewardShare,
+};
+pub use pallet::*;
 pub use weights::*;
 
 #[cfg(test)]
@@ -47,8 +51,8 @@ const LOG_TARGET: &str = "runtime::mining_slot";
 /// To register as a Slot 1+ miner, operators must `Bid` on a `Slot`. Each `Slot` allows a
 /// `Cohort` of miners to operate for a given number of blocks (an `Era`).
 ///
-/// New miner slots are rotated in every `BlocksBetweenSlots` blocks. Each cohort will have
-/// `MaxCohortSize` members. A maximum of `MaxMiners` will be active at any given time.
+/// New miner slots are rotated in every `mining_config.blocks_between_slots` blocks. Each cohort
+/// will have `MaxCohortSize` members. A maximum of `MaxMiners` will be active at any given time.
 ///
 /// When a new Slot begins, the Miners with the corresponding Slot indices will be replaced with
 /// the new cohort members (or emptied out).
@@ -74,6 +78,7 @@ const LOG_TARGET: &str = "runtime::mining_slot";
 #[frame_support::pallet(dev_mode)]
 pub mod pallet {
 	use core::cmp::Ordering;
+
 	use frame_support::{
 		pallet_prelude::*,
 		traits::fungible::{Inspect, MutateHold},
@@ -112,20 +117,13 @@ pub mod pallet {
 		/// How many new miners can be in the cohort for each slot
 		#[pallet::constant]
 		type MaxCohortSize: Get<u32>;
-		/// How many blocks transpire between slots
-		#[pallet::constant]
-		type BlocksBetweenSlots: Get<u32>;
 		/// How many session indexes to keep session history
 		#[pallet::constant]
-		type SessionIndicesToKeepInHistory: Get<u32>;
+		type SessionWindowsToKeepInHistory: Get<u32>;
 
-		/// How many blocks before the end of a slot can the bid close
+		/// The number of session rotations per slot (one will align with the start of the session)
 		#[pallet::constant]
-		type BlocksBeforeBidEndForVrfClose: Get<u32>;
-
-		/// The block number when bidding will start (eg, Slot "1")
-		#[pallet::constant]
-		type SlotBiddingStartBlock: Get<BlockNumberFor<Self>>;
+		type SessionRotationsPerMiningWindow: Get<u32>;
 
 		/// The max percent swing for the ownership bond amount per slot (from the last percent
 		#[pallet::constant]
@@ -218,10 +216,16 @@ pub mod pallet {
 	pub(super) type HistoricalBidsPerSlot<T: Config> =
 		StorageValue<_, BoundedVec<u32, ConstU32<10>>, ValueQuery>;
 
+	/// The mining slot configuration set in genesis
+	#[pallet::storage]
+	pub(super) type MiningConfig<T: Config> =
+		StorageValue<_, MiningSlotConfig<BlockNumberFor<T>>, ValueQuery>;
+
 	#[pallet::genesis_config]
 	#[derive(frame_support::DefaultNoBound)]
 	pub struct GenesisConfig<T: Config> {
 		pub miner_zero: Option<Registration<T>>,
+		pub mining_config: MiningSlotConfig<BlockNumberFor<T>>,
 		#[serde(skip)]
 		pub _phantom: PhantomData<T>,
 	}
@@ -235,6 +239,7 @@ pub mod pallet {
 				ActiveMinersByIndex::<T>::insert(0, miner.clone());
 				ActiveMinersCount::<T>::put(1);
 			}
+			MiningConfig::<T>::put(self.mining_config.clone());
 		}
 	}
 
@@ -323,8 +328,10 @@ pub mod pallet {
 		fn on_initialize(block_number: BlockNumberFor<T>) -> Weight {
 			let block_number_u32: u32 =
 				UniqueSaturatedInto::<u32>::unique_saturated_into(block_number);
-			let blocks_between_slots = T::BlocksBetweenSlots::get();
-			if block_number >= T::SlotBiddingStartBlock::get() &&
+			let blocks_between_slots = Self::blocks_between_slots();
+			let mining_config = MiningConfig::<T>::get();
+
+			if block_number >= mining_config.slot_bidding_start_block &&
 				block_number_u32 % blocks_between_slots == 0
 			{
 				Self::adjust_ownership_bond_amount();
@@ -534,7 +541,7 @@ impl<T: Config> Pallet<T> {
 	}
 
 	pub(crate) fn start_new_slot(block_number_u32: u32) {
-		let blocks_between_slots = T::BlocksBetweenSlots::get();
+		let blocks_between_slots = Self::blocks_between_slots();
 		let max_miners = T::MaxMiners::get();
 		let cohort_size = T::MaxCohortSize::get();
 		HistoricalBidsPerSlot::<T>::mutate(|bids| {
@@ -659,15 +666,16 @@ impl<T: Config> Pallet<T> {
 	///  - this seal strength must be cryptographically secure and unique for each block for the
 	///    overall network security
 	///
-	/// Threshold is calculated so that it should be true 1 in `BlocksBeforeBidEndForVrfClose`
-	/// times.
+	/// Threshold is calculated so that it should be true 1 in
+	/// `MiningConfig.blocks_before_bid_end_for_vrf_close` times.
 	pub(crate) fn check_for_bidding_close(seal: &BlockSealInherent) -> bool {
 		let block_number = <frame_system::Pallet<T>>::block_number();
 		let next_slot_block_number = Self::calculate_next_slot_block_number(block_number);
+		let mining_config = MiningConfig::<T>::get();
 
 		// Are we in the closing eligibility window?
 		if next_slot_block_number.saturating_sub(block_number) >
-			T::BlocksBeforeBidEndForVrfClose::get().into()
+			mining_config.blocks_before_bid_end_for_vrf_close
 		{
 			return false;
 		}
@@ -676,9 +684,12 @@ impl<T: Config> Pallet<T> {
 			BlockSealInherent::Vote { seal_strength, .. } => {
 				let vrf_hash = blake2_256(seal_strength.encode().as_ref());
 				let vrf = U256::from_big_endian(&vrf_hash);
+				let block_close: u32 = UniqueSaturatedInto::<u32>::unique_saturated_into(
+					mining_config.blocks_before_bid_end_for_vrf_close,
+				);
 				// Calculate the threshold for VRF comparison to achieve a probability of 1 in
-				// `BlocksBeforeBidEndForVrfClose`
-				let threshold = U256::MAX / U256::from(T::BlocksBeforeBidEndForVrfClose::get());
+				// `MiningConfig.blocks_before_bid_end_for_vrf_close`
+				let threshold = U256::MAX / U256::from(block_close);
 
 				vrf < threshold
 			},
@@ -695,8 +706,8 @@ impl<T: Config> Pallet<T> {
 		block_number: BlockNumberFor<T>,
 	) -> BlockNumberFor<T> {
 		let block_number = UniqueSaturatedInto::<u32>::unique_saturated_into(block_number);
-		let offset_blocks = block_number % T::BlocksBetweenSlots::get();
-		(block_number + (T::BlocksBetweenSlots::get() - offset_blocks)).into()
+		let offset_blocks = block_number % Self::blocks_between_slots();
+		(block_number + (Self::blocks_between_slots() - offset_blocks)).into()
 	}
 
 	pub fn get_slot_era() -> (BlockNumberFor<T>, BlockNumberFor<T>) {
@@ -722,15 +733,15 @@ impl<T: Config> Pallet<T> {
 
 		Self::get_slot_starting_index(
 			block_number + 1,
-			T::BlocksBetweenSlots::get(),
+			Self::blocks_between_slots(),
 			T::MaxMiners::get(),
 			cohort_size,
 		)
 	}
 
-	pub(crate) fn get_mining_window_blocks() -> BlockNumberFor<T> {
+	pub fn get_mining_window_blocks() -> BlockNumberFor<T> {
 		let miners = T::MaxMiners::get();
-		let blocks_between_slots = T::BlocksBetweenSlots::get();
+		let blocks_between_slots = Self::blocks_between_slots();
 		let cohort_size = T::MaxCohortSize::get();
 
 		let blocks_per_miner = miners.saturating_mul(blocks_between_slots) / cohort_size;
@@ -892,7 +903,30 @@ impl<T: Config> Pallet<T> {
 			kept_ownership_bond,
 		});
 	}
+
+	fn blocks_between_slots() -> u32 {
+		UniqueSaturatedInto::<u32>::unique_saturated_into(
+			MiningConfig::<T>::get().blocks_between_slots,
+		)
+	}
+
+	fn session_rotation_blocks() -> BlockNumberFor<T> {
+		let blocks_between_slots = Self::blocks_between_slots();
+		let session_rotations = T::SessionRotationsPerMiningWindow::get();
+		let blocks_per_rotation = blocks_between_slots.saturating_div(session_rotations);
+		blocks_per_rotation.into()
+	}
+
+	pub fn sessions_per_window() -> u32 {
+		let mining_window_blocks =
+			UniqueSaturatedInto::<u32>::unique_saturated_into(Self::get_mining_window_blocks());
+		let session_rotation_blocks =
+			UniqueSaturatedInto::<u32>::unique_saturated_into(Self::session_rotation_blocks());
+		let sessions_per_window = mining_window_blocks.saturating_div(session_rotation_blocks);
+		sessions_per_window
+	}
 }
+
 impl<T: Config> MiningSlotProvider<BlockNumberFor<T>> for Pallet<T> {
 	fn get_next_slot_block_number() -> BlockNumberFor<T> {
 		Self::get_next_slot_block_number()
@@ -975,9 +1009,14 @@ impl<T: Config> SessionManager<T::AccountId> for Pallet<T> {
 		let block_number_u32: u32 = UniqueSaturatedInto::<u32>::unique_saturated_into(
 			<frame_system::Pallet<T>>::block_number(),
 		);
+
+		if Self::blocks_between_slots() == 0 {
+			return None;
+		}
+
 		// only rotate miners on cohort changeover. The keys representing the authority ids will
 		// auto-change
-		if block_number_u32 % T::BlocksBetweenSlots::get() != 0 {
+		if block_number_u32 % Self::blocks_between_slots() != 0 {
 			return None;
 		}
 		Some(Self::get_miner_accounts())
@@ -987,6 +1026,54 @@ impl<T: Config> SessionManager<T::AccountId> for Pallet<T> {
 	}
 	fn end_session(_: u32) {}
 	fn start_session(_: u32) {}
+}
+
+impl<T: Config> pallet_session::ShouldEndSession<BlockNumberFor<T>> for Pallet<T> {
+	fn should_end_session(now: BlockNumberFor<T>) -> bool {
+		let block_number_u32: u32 = UniqueSaturatedInto::<u32>::unique_saturated_into(now);
+		let rotation_blocks =
+			UniqueSaturatedInto::<u32>::unique_saturated_into(Self::session_rotation_blocks());
+		block_number_u32 % rotation_blocks == 0
+	}
+}
+
+impl<T: Config> frame_support::traits::EstimateNextSessionRotation<BlockNumberFor<T>>
+	for Pallet<T>
+{
+	fn average_session_length() -> BlockNumberFor<T> {
+		Self::session_rotation_blocks()
+	}
+
+	fn estimate_current_session_progress(now: BlockNumberFor<T>) -> (Option<Permill>, Weight) {
+		let period = Self::session_rotation_blocks();
+
+		// NOTE: we add one since we assume that the current block has already elapsed,
+		// i.e. when evaluating the last block in the session the progress should be 100%
+		// (0% is never returned).
+		let current = now % period.clone() + One::one();
+		let progress = Some(Permill::from_rational(current, period));
+
+		(progress, Zero::zero())
+	}
+
+	fn estimate_next_session_rotation(
+		now: BlockNumberFor<T>,
+	) -> (Option<BlockNumberFor<T>>, Weight) {
+		let period = Self::session_rotation_blocks();
+
+		let block_after_last_session = now % period;
+		let next_session = if block_after_last_session > Zero::zero() {
+			now.saturating_add(period.saturating_sub(block_after_last_session))
+		} else {
+			// this branch happens when the session is already rotated or will rotate in this
+			// block (depending on being called before or after `session::on_initialize`). Here,
+			// we assume the latter, namely that this is called after `session::on_initialize`,
+			// and thus we add period to it as well.
+			now + period
+		};
+
+		(Some(next_session), Zero::zero())
+	}
 }
 
 impl<T: Config> pallet_session::historical::SessionManager<T::AccountId, MinerHistory> for Pallet<T>
@@ -1016,8 +1103,12 @@ where
 
 	fn start_session(_: u32) {}
 	fn end_session(index: u32) {
-		let first_session = index.saturating_sub(T::SessionIndicesToKeepInHistory::get());
-		<pallet_session::historical::Pallet<T>>::prune_up_to(first_session);
+		let sessions_per_window = Self::sessions_per_window();
+		let sessions_to_keep = sessions_per_window * T::SessionWindowsToKeepInHistory::get();
+
+		<pallet_session::historical::Pallet<T>>::prune_up_to(
+			index.saturating_sub(sessions_to_keep),
+		);
 	}
 }
 

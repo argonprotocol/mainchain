@@ -1955,9 +1955,10 @@ pub mod api {
 						"ticker",
 						types::Ticker {},
 						[
-							242u8, 50u8, 78u8, 194u8, 192u8, 155u8, 42u8, 156u8, 182u8, 142u8, 8u8,
-							147u8, 11u8, 233u8, 105u8, 22u8, 191u8, 183u8, 38u8, 35u8, 161u8, 21u8,
-							187u8, 143u8, 253u8, 24u8, 219u8, 219u8, 215u8, 48u8, 217u8, 18u8,
+							95u8, 123u8, 127u8, 14u8, 3u8, 213u8, 90u8, 210u8, 249u8, 251u8, 46u8,
+							232u8, 203u8, 10u8, 108u8, 113u8, 232u8, 148u8, 223u8, 80u8, 236u8,
+							134u8, 48u8, 75u8, 150u8, 136u8, 185u8, 51u8, 247u8, 86u8, 234u8,
+							165u8,
 						],
 					)
 				}
@@ -2889,9 +2890,9 @@ pub mod api {
 			.hash();
 		runtime_metadata_hash ==
 			[
-				125u8, 95u8, 35u8, 153u8, 120u8, 237u8, 231u8, 66u8, 9u8, 177u8, 198u8, 11u8,
-				110u8, 37u8, 78u8, 67u8, 168u8, 73u8, 251u8, 126u8, 73u8, 84u8, 73u8, 59u8, 202u8,
-				85u8, 186u8, 193u8, 140u8, 179u8, 117u8, 43u8,
+				23u8, 122u8, 71u8, 108u8, 42u8, 190u8, 9u8, 195u8, 145u8, 65u8, 144u8, 98u8, 217u8,
+				161u8, 42u8, 238u8, 221u8, 64u8, 49u8, 217u8, 37u8, 252u8, 163u8, 214u8, 231u8,
+				41u8, 32u8, 102u8, 99u8, 197u8, 64u8, 135u8,
 			]
 	}
 	pub mod system {
@@ -6448,13 +6449,9 @@ pub mod api {
 					use super::runtime_types;
 					pub type CurrentTick = ::core::primitive::u32;
 				}
-				pub mod tick_duration {
+				pub mod genesis_ticker {
 					use super::runtime_types;
-					pub type TickDuration = ::core::primitive::u64;
-				}
-				pub mod genesis_tick_utc_timestamp {
-					use super::runtime_types;
-					pub type GenesisTickUtcTimestamp = ::core::primitive::u64;
+					pub type GenesisTicker = runtime_types::argon_primitives::tick::Ticker;
 				}
 				pub mod recent_blocks_at_ticks {
 					use super::runtime_types;
@@ -6487,45 +6484,24 @@ pub mod api {
 						],
 					)
 				}
-				pub fn tick_duration(
+				pub fn genesis_ticker(
 					&self,
 				) -> ::subxt::ext::subxt_core::storage::address::StaticAddress<
 					(),
-					types::tick_duration::TickDuration,
+					types::genesis_ticker::GenesisTicker,
 					::subxt::ext::subxt_core::utils::Yes,
 					::subxt::ext::subxt_core::utils::Yes,
 					(),
 				> {
 					::subxt::ext::subxt_core::storage::address::StaticAddress::new_static(
 						"Ticks",
-						"TickDuration",
+						"GenesisTicker",
 						(),
 						[
-							55u8, 52u8, 212u8, 174u8, 70u8, 95u8, 106u8, 159u8, 188u8, 126u8,
-							123u8, 167u8, 200u8, 162u8, 123u8, 151u8, 208u8, 141u8, 238u8, 30u8,
-							2u8, 249u8, 59u8, 144u8, 88u8, 239u8, 82u8, 32u8, 171u8, 142u8, 241u8,
-							130u8,
-						],
-					)
-				}
-				pub fn genesis_tick_utc_timestamp(
-					&self,
-				) -> ::subxt::ext::subxt_core::storage::address::StaticAddress<
-					(),
-					types::genesis_tick_utc_timestamp::GenesisTickUtcTimestamp,
-					::subxt::ext::subxt_core::utils::Yes,
-					::subxt::ext::subxt_core::utils::Yes,
-					(),
-				> {
-					::subxt::ext::subxt_core::storage::address::StaticAddress::new_static(
-						"Ticks",
-						"GenesisTickUtcTimestamp",
-						(),
-						[
-							237u8, 236u8, 104u8, 247u8, 108u8, 221u8, 147u8, 133u8, 46u8, 84u8,
-							173u8, 103u8, 141u8, 162u8, 59u8, 108u8, 39u8, 245u8, 68u8, 84u8,
-							216u8, 141u8, 150u8, 23u8, 36u8, 174u8, 131u8, 175u8, 249u8, 139u8,
-							213u8, 248u8,
+							207u8, 46u8, 88u8, 181u8, 124u8, 159u8, 186u8, 221u8, 77u8, 18u8,
+							119u8, 183u8, 252u8, 133u8, 211u8, 18u8, 42u8, 225u8, 126u8, 166u8,
+							150u8, 15u8, 219u8, 142u8, 120u8, 219u8, 17u8, 24u8, 107u8, 248u8,
+							144u8, 35u8,
 						],
 					)
 				}
@@ -6912,6 +6888,13 @@ pub mod api {
 							::core::primitive::u32,
 						>;
 				}
+				pub mod mining_config {
+					use super::runtime_types;
+					pub type MiningConfig =
+						runtime_types::argon_primitives::block_seal::MiningSlotConfig<
+							::core::primitive::u32,
+						>;
+				}
 			}
 			pub struct StorageApi;
 			impl StorageApi {
@@ -7184,6 +7167,27 @@ pub mod api {
 						],
 					)
 				}
+				#[doc = " The mining slot configuration set in genesis"]
+				pub fn mining_config(
+					&self,
+				) -> ::subxt::ext::subxt_core::storage::address::StaticAddress<
+					(),
+					types::mining_config::MiningConfig,
+					::subxt::ext::subxt_core::utils::Yes,
+					::subxt::ext::subxt_core::utils::Yes,
+					(),
+				> {
+					::subxt::ext::subxt_core::storage::address::StaticAddress::new_static(
+						"MiningSlot",
+						"MiningConfig",
+						(),
+						[
+							9u8, 176u8, 93u8, 144u8, 176u8, 129u8, 91u8, 246u8, 71u8, 148u8, 82u8,
+							41u8, 206u8, 40u8, 12u8, 179u8, 241u8, 61u8, 101u8, 164u8, 21u8, 91u8,
+							122u8, 75u8, 221u8, 240u8, 42u8, 254u8, 155u8, 64u8, 194u8, 238u8,
+						],
+					)
+				}
 			}
 		}
 		pub mod constants {
@@ -7224,32 +7228,15 @@ pub mod api {
 						],
 					)
 				}
-				#[doc = " How many blocks transpire between slots"]
-				pub fn blocks_between_slots(
-					&self,
-				) -> ::subxt::ext::subxt_core::constants::address::StaticAddress<
-					::core::primitive::u32,
-				> {
-					::subxt::ext::subxt_core::constants::address::StaticAddress::new_static(
-						"MiningSlot",
-						"BlocksBetweenSlots",
-						[
-							98u8, 252u8, 116u8, 72u8, 26u8, 180u8, 225u8, 83u8, 200u8, 157u8,
-							125u8, 151u8, 53u8, 76u8, 168u8, 26u8, 10u8, 9u8, 98u8, 68u8, 9u8,
-							178u8, 197u8, 113u8, 31u8, 79u8, 200u8, 90u8, 203u8, 100u8, 41u8,
-							145u8,
-						],
-					)
-				}
 				#[doc = " How many session indexes to keep session history"]
-				pub fn session_indices_to_keep_in_history(
+				pub fn session_windows_to_keep_in_history(
 					&self,
 				) -> ::subxt::ext::subxt_core::constants::address::StaticAddress<
 					::core::primitive::u32,
 				> {
 					::subxt::ext::subxt_core::constants::address::StaticAddress::new_static(
 						"MiningSlot",
-						"SessionIndicesToKeepInHistory",
+						"SessionWindowsToKeepInHistory",
 						[
 							98u8, 252u8, 116u8, 72u8, 26u8, 180u8, 225u8, 83u8, 200u8, 157u8,
 							125u8, 151u8, 53u8, 76u8, 168u8, 26u8, 10u8, 9u8, 98u8, 68u8, 9u8,
@@ -7258,32 +7245,15 @@ pub mod api {
 						],
 					)
 				}
-				#[doc = " How many blocks before the end of a slot can the bid close"]
-				pub fn blocks_before_bid_end_for_vrf_close(
+				#[doc = " The number of session rotations per slot (one will align with the start of the session)"]
+				pub fn session_rotations_per_mining_window(
 					&self,
 				) -> ::subxt::ext::subxt_core::constants::address::StaticAddress<
 					::core::primitive::u32,
 				> {
 					::subxt::ext::subxt_core::constants::address::StaticAddress::new_static(
 						"MiningSlot",
-						"BlocksBeforeBidEndForVrfClose",
-						[
-							98u8, 252u8, 116u8, 72u8, 26u8, 180u8, 225u8, 83u8, 200u8, 157u8,
-							125u8, 151u8, 53u8, 76u8, 168u8, 26u8, 10u8, 9u8, 98u8, 68u8, 9u8,
-							178u8, 197u8, 113u8, 31u8, 79u8, 200u8, 90u8, 203u8, 100u8, 41u8,
-							145u8,
-						],
-					)
-				}
-				#[doc = " The block number when bidding will start (eg, Slot \"1\")"]
-				pub fn slot_bidding_start_block(
-					&self,
-				) -> ::subxt::ext::subxt_core::constants::address::StaticAddress<
-					::core::primitive::u32,
-				> {
-					::subxt::ext::subxt_core::constants::address::StaticAddress::new_static(
-						"MiningSlot",
-						"SlotBiddingStartBlock",
+						"SessionRotationsPerMiningWindow",
 						[
 							98u8, 252u8, 116u8, 72u8, 26u8, 180u8, 225u8, 83u8, 200u8, 157u8,
 							125u8, 151u8, 53u8, 76u8, 168u8, 26u8, 10u8, 9u8, 98u8, 68u8, 9u8,
@@ -19824,6 +19794,29 @@ pub mod api {
 				#[encode_as_type(
 					crate_path = ":: subxt :: ext :: subxt_core :: ext :: scale_encode"
 				)]
+				pub struct MiningSlotConfig<_0> {
+					#[codec(compact)]
+					pub blocks_before_bid_end_for_vrf_close: _0,
+					#[codec(compact)]
+					pub blocks_between_slots: _0,
+					#[codec(compact)]
+					pub slot_bidding_start_block: _0,
+				}
+				#[derive(
+					:: subxt :: ext :: subxt_core :: ext :: codec :: Decode,
+					:: subxt :: ext :: subxt_core :: ext :: codec :: Encode,
+					:: subxt :: ext :: subxt_core :: ext :: scale_decode :: DecodeAsType,
+					:: subxt :: ext :: subxt_core :: ext :: scale_encode :: EncodeAsType,
+					Clone,
+					Debug,
+				)]
+				# [codec (crate = :: subxt :: ext :: subxt_core :: ext :: codec)]
+				#[decode_as_type(
+					crate_path = ":: subxt :: ext :: subxt_core :: ext :: scale_decode"
+				)]
+				#[encode_as_type(
+					crate_path = ":: subxt :: ext :: subxt_core :: ext :: scale_encode"
+				)]
 				pub enum RewardDestination<_0> {
 					#[codec(index = 0)]
 					Owner,
@@ -20666,9 +20659,12 @@ pub mod api {
 					crate_path = ":: subxt :: ext :: subxt_core :: ext :: scale_encode"
 				)]
 				pub struct Ticker {
+					#[codec(compact)]
 					pub tick_duration_millis: ::core::primitive::u64,
+					#[codec(compact)]
 					pub genesis_utc_time: ::core::primitive::u64,
-					pub ntp_offset_millis: ::core::primitive::i64,
+					#[codec(compact)]
+					pub escrow_expiration_ticks: ::core::primitive::u32,
 				}
 			}
 		}

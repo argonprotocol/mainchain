@@ -2,6 +2,7 @@ use alloc::{
 	fmt::{Display, Formatter, Result},
 	vec::Vec,
 };
+
 use codec::{Decode, Encode, MaxEncodedLen};
 use scale_info::TypeInfo;
 use serde::{Deserialize, Serialize};
@@ -13,7 +14,7 @@ use sp_runtime::BoundedVec;
 
 #[cfg(feature = "std")]
 use crate::serialize_unsafe_u128_as_string;
-use crate::{prod_or_fast, AccountId, DataDomainHash, TransferToLocalchainId, ADDRESS_PREFIX};
+use crate::{AccountId, DataDomainHash, TransferToLocalchainId, ADDRESS_PREFIX};
 
 #[derive(
 	Clone,
@@ -76,7 +77,6 @@ pub fn round_up(value: u128, percentage: u128) -> u128 {
 	numerator.saturating_div(100) + round
 }
 
-pub const ESCROW_EXPIRATION_TICKS: u32 = prod_or_fast!(60, 2);
 pub const ESCROW_CLAWBACK_TICKS: u32 = 15;
 // 15 after expiration
 pub const MINIMUM_ESCROW_SETTLEMENT: u128 = 5u128;

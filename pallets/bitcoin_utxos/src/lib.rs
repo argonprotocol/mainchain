@@ -148,14 +148,14 @@ pub mod pallet {
 	#[pallet::genesis_config]
 	#[derive(frame_support::DefaultNoBound)]
 	pub struct GenesisConfig<T: Config> {
-		pub operator: Option<T::AccountId>,
+		pub tip_oracle_operator: Option<T::AccountId>,
 		pub network: argon_primitives::bitcoin::BitcoinNetwork,
 	}
 
 	#[pallet::genesis_build]
 	impl<T: Config> BuildGenesisConfig for GenesisConfig<T> {
 		fn build(&self) {
-			if let Some(operator) = &self.operator {
+			if let Some(operator) = &self.tip_oracle_operator {
 				<OracleOperatorAccount<T>>::put(operator);
 			}
 			<BitcoinNetwork<T>>::put(self.network.clone());

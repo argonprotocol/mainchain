@@ -1,11 +1,12 @@
-use argon_notary_apis::error::Error;
-use argon_primitives::{prod_or_fast, tick::Ticker, NotaryId, SignedNotebookHeader};
 use futures::FutureExt;
 use sc_utils::notification::NotificationSender;
 use sp_core::{ed25519, H256};
 use sp_keystore::KeystorePtr;
 use sqlx::{postgres::PgListener, PgPool};
 use tokio::task::JoinHandle;
+
+use argon_notary_apis::error::Error;
+use argon_primitives::{tick::Ticker, NotaryId, SignedNotebookHeader};
 
 use crate::stores::{
 	notebook::NotebookStore,
@@ -95,15 +96,14 @@ pub fn spawn_notebook_closer(
 	Ok((handle_1, handle_2))
 }
 
-const LOOP_MILLIS: u64 = prod_or_fast!(1000, 200);
-
 impl NotebookCloser {
 	pub async fn create_task(&'_ mut self) -> anyhow::Result<(), Error> {
 		loop {
 			let _ = self.iterate_notebook_close_loop().await;
 			let tick = self.ticker.current();
 			let next_tick = self.ticker.time_for_tick(tick + 1);
-			let sleep = next_tick.min(LOOP_MILLIS) + 1;
+			let loop_millis = if self.ticker.tick_duration_millis <= 2000 { 200 } else { 1000 };
+			let sleep = next_tick.min(loop_millis) + 1;
 			// wait before resuming
 			tokio::time::sleep(tokio::time::Duration::from_millis(sleep)).await;
 		}
@@ -236,7 +236,7 @@ mod tests {
 		DataDomain, DataDomainHash, DataTLD, HashOutput, MerkleProof, Note, NoteType,
 		NoteType::{EscrowClaim, EscrowSettle},
 		NotebookDigest, ParentVotingKeyDigest, TickDigest, TransferToLocalchainId,
-		DATA_DOMAIN_LEASE_COST, ESCROW_EXPIRATION_TICKS,
+		DATA_DOMAIN_LEASE_COST,
 	};
 	use argon_testing::start_argon_test_node;
 
@@ -263,15 +263,15 @@ mod tests {
 			keystore.ed25519_generate_new(NOTARY_KEYID, None).expect("should have a key");
 
 		let mut client = ReconnectingClient::new(vec![ws_url.clone()]);
-		let ticker = client.get().await?.lookup_ticker().await?;
-		let ticker = Ticker::new(ticker.tick_duration_millis, ticker.genesis_utc_time);
+		let ticker: Ticker = client.get().await?.lookup_ticker().await?.into();
 
 		let server = NotaryServer::create_http_server("127.0.0.1:0").await?;
 		let addr = server.local_addr()?;
 		let block_tracker = track_blocks(ws_url.clone(), 1, pool.clone(), ticker);
 		let block_tracker = Arc::new(Mutex::new(Some(block_tracker)));
 
-		let mut notary_server = NotaryServer::start_with(server, notary_id, pool.clone()).await?;
+		let mut notary_server =
+			NotaryServer::start_with(server, notary_id, ticker.clone(), pool.clone()).await?;
 		let watches = spawn_notebook_closer(
 			pool.clone(),
 			notary_id,
@@ -297,6 +297,7 @@ mod tests {
 		let domain_hash = DataDomain::new("HelloWorld", DataTLD::Entertainment).hash();
 		let result = submit_balance_change_to_notary_and_create_domain(
 			&pool,
+			&ticker,
 			ferdie_transfer,
 			domain_hash,
 			Alice.to_account_id(),
@@ -329,7 +330,7 @@ mod tests {
 		);
 
 		// Record the balance change
-		let result = submit_balance_change_to_notary(&pool, bob_transfer).await?;
+		let result = submit_balance_change_to_notary(&pool, &ticker, bob_transfer).await?;
 		let origin = AccountOrigin {
 			account_uid: result.new_account_origins[0].account_uid,
 			notebook_number: result.notebook_number,
@@ -339,6 +340,7 @@ mod tests {
 			&pool,
 			bob_balance as u128,
 			5000,
+			&ticker,
 			result.tick,
 			origin.clone(),
 			domain_hash,
@@ -346,8 +348,10 @@ mod tests {
 		)
 		.await?;
 
-		assert_eq!(ESCROW_EXPIRATION_TICKS, 2, "Should have a short expiration");
 		println!("created escrow hold. Waiting for notebook {}", hold_result.notebook_number);
+
+		// TODO: use api once we update
+		let escrow_expiration_ticks = 2;
 
 		let mut header_sub = notary_server.completed_notebook_stream.subscribe(100);
 		let mut notebook_proof: Option<MerkleProof> = None;
@@ -375,7 +379,7 @@ mod tests {
 									.await?,
 								);
 							}
-							if header.notebook_number >= hold_result.notebook_number + ESCROW_EXPIRATION_TICKS
+							if header.notebook_number >= hold_result.notebook_number + escrow_expiration_ticks
 							{
 								println!("Expiration of escrow ready");
 								break;
@@ -425,6 +429,7 @@ mod tests {
 
 		let escrow_result = settle_escrow_and_vote(
 			&pool,
+			&ticker,
 			hold_note,
 			*best_grandparent,
 			BalanceProof {
@@ -561,6 +566,7 @@ mod tests {
 
 	async fn submit_balance_change_to_notary(
 		pool: &PgPool,
+		ticker: &Ticker,
 		transfer: (TransferToLocalchainId, u32, Keypair),
 	) -> anyhow::Result<BalanceChangeResult> {
 		let (transfer_id, amount, keypair) = transfer;
@@ -577,6 +583,7 @@ mod tests {
 		let result = NotarizationsStore::apply(
 			pool,
 			1,
+			&ticker,
 			vec![BalanceChange {
 				account_id: keypair.public().into(),
 				account_type: Deposit,
@@ -603,6 +610,7 @@ mod tests {
 	}
 	async fn submit_balance_change_to_notary_and_create_domain(
 		pool: &PgPool,
+		ticker: &Ticker,
 		transfer: (TransferToLocalchainId, u32, Keypair),
 		domain_hash: DataDomainHash,
 		register_domain_to: AccountId,
@@ -621,6 +629,7 @@ mod tests {
 		let result = NotarizationsStore::apply(
 			pool,
 			1,
+			ticker,
 			vec![
 				BalanceChange {
 					account_id: keypair.public().into(),
@@ -690,6 +699,7 @@ mod tests {
 		pool: &PgPool,
 		balance: u128,
 		amount: u128,
+		ticker: &Ticker,
 		tick: Tick,
 		account_origin: AccountOrigin,
 		domain_hash: DataDomainHash,
@@ -723,12 +733,13 @@ mod tests {
 		.sign(Bob.pair())
 		.clone()];
 
-		let result = NotarizationsStore::apply(pool, 1, changes, vec![], vec![]).await?;
+		let result = NotarizationsStore::apply(pool, 1, ticker, changes, vec![], vec![]).await?;
 		Ok((hold_note.clone(), result))
 	}
 
 	async fn settle_escrow_and_vote(
 		pool: &PgPool,
+		ticker: &Ticker,
 		hold_note: Note,
 		vote_block_hash: HashOutput,
 		bob_balance_proof: BalanceProof,
@@ -786,6 +797,7 @@ mod tests {
 		let result = NotarizationsStore::apply(
 			pool,
 			1,
+			ticker,
 			changes,
 			vec![BlockVote {
 				data_domain_hash: data_domain_hash.unwrap(),

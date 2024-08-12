@@ -44,7 +44,7 @@ pub(crate) fn get_target_dir() -> PathBuf {
 		.join("target")
 		.join(CURRENT_PLATFORM)
 		.join("debug");
-	if Path::exists(triple_target.as_path()) {
+	if Path::is_dir(triple_target.as_path()) {
 		return triple_target;
 	}
 	workspace_cargo_path.as_path().join("target/debug")

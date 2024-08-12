@@ -223,6 +223,7 @@ impl BalanceSync {
       self.db.clone(),
       self.notary_clients.clone(),
       self.keystore.clone(),
+      self.ticker.clone(),
     );
     for jump_account in all_accounts {
       let latest = BalanceChangeStore::db_get_latest_for_account(&mut db, jump_account.id).await?;
@@ -256,6 +257,7 @@ impl BalanceSync {
               self.db.clone(),
               self.notary_clients.clone(),
               self.keystore.clone(),
+              self.ticker.clone(),
             );
             let transaction =
               Transactions::create_static(&mut db, TransactionType::Consolidation).await?;
@@ -315,6 +317,7 @@ impl BalanceSync {
       self.db.clone(),
       self.notary_clients.clone(),
       self.keystore.clone(),
+      self.ticker.clone(),
     );
     let mut notarizations = vec![];
 
@@ -436,6 +439,7 @@ impl BalanceSync {
           self.db.clone(),
           self.notary_clients.clone(),
           self.keystore.clone(),
+          self.ticker.clone(),
         )
       });
 

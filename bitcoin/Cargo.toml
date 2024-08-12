@@ -42,22 +42,21 @@ bitcoin = { workspace = true, features = ["base64"] }
 serde_json = { workspace = true }
 
 [features]
-default = ["std"]
+default = [ "std" ]
 std = [
-    "anyhow/std",
-    "argon-primitives/bitcoin",
-    "argon-primitives/std",
-    "bitcoin/std",
-    "bitcoincore-rpc/default",
-    "codec/std",
-    "k256/std",
-    "log/std",
-    "miniscript/std",
-    "parking_lot/default",
-    "sp-core/std",
-    "sp-io/std",
-    "sp-runtime/std",
-    "thiserror",
+	"anyhow/std",
+	"argon-primitives/bitcoin",
+	"argon-primitives/std",
+	"bitcoin/std",
+	"bitcoincore-rpc/default",
+	"codec/std",
+	"k256/std",
+	"log/std",
+	"miniscript/std",
+	"parking_lot/default",
+	"sp-core/std",
+	"sp-io/std",
+	"sp-runtime/std",
+	"thiserror",
 ]
-fast-runtime = ["argon-primitives/fast-runtime"]
-hwi = ["dep:hwi"]
+hwi = [ "dep:hwi" ]

@@ -25,7 +25,7 @@ SRC_ROOT=${1}
 # buildvariant from our xcconfigs
 BUILDVARIANT=$(echo "${2}" | tr '[:upper:]' '[:lower:]')
 
-FEATURES=uniffi,fast-runtime
+FEATURES=uniffi
 RELFLAG=
 if [[ "${BUILDVARIANT}" != "debug" ]]; then
     RELFLAG=--release

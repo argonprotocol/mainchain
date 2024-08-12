@@ -163,14 +163,6 @@ declare module '@polkadot/api-base/types/consts' {
     };
     miningSlot: {
       /**
-       * How many blocks before the end of a slot can the bid close
-       **/
-      blocksBeforeBidEndForVrfClose: u32 & AugmentedConst<ApiType>;
-      /**
-       * How many blocks transpire between slots
-       **/
-      blocksBetweenSlots: u32 & AugmentedConst<ApiType>;
-      /**
        * How many new miners can be in the cohort for each slot
        **/
       maxCohortSize: u32 & AugmentedConst<ApiType>;
@@ -183,13 +175,13 @@ declare module '@polkadot/api-base/types/consts' {
        **/
       ownershipPercentAdjustmentDamper: u128 & AugmentedConst<ApiType>;
       /**
+       * The number of session rotations per slot (one will align with the start of the session)
+       **/
+      sessionRotationsPerMiningWindow: u32 & AugmentedConst<ApiType>;
+      /**
        * How many session indexes to keep session history
        **/
-      sessionIndicesToKeepInHistory: u32 & AugmentedConst<ApiType>;
-      /**
-       * The block number when bidding will start (eg, Slot "1")
-       **/
-      slotBiddingStartBlock: u32 & AugmentedConst<ApiType>;
+      sessionWindowsToKeepInHistory: u32 & AugmentedConst<ApiType>;
       /**
        * The target number of bids per slot. This will adjust the ownership bond amount up or
        * down to ensure mining slots are filled.

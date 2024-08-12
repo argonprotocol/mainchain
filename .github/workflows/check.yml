@@ -79,7 +79,7 @@ jobs:
         run: cargo clippy --workspace -- -Dwarnings
 
       - name: Run tests
-        run: cargo build --features=fast-runtime && cargo test --features=fast-runtime --no-fail-fast
+        run: cargo build && cargo test --no-fail-fast
         env:
           RUSTC_WRAPPER: "sccache"
           CARGO_INCREMENTAL: 0

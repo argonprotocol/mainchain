@@ -3,7 +3,7 @@ use std::collections::BTreeMap;
 use env_logger::{Builder, Env};
 use frame_support::{derive_impl, parameter_types};
 use sp_core::{ConstU64, H256, U256};
-use sp_runtime::BuildStorage;
+use sp_runtime::{BuildStorage, Percent};
 
 use crate as pallet_block_seal_spec;
 use argon_primitives::{
@@ -49,7 +49,7 @@ parameter_types! {
 	pub static MinerZero: Option<(u64, MiningAuthority<BlockSealAuthorityId, u64>)> = None;
 	pub static MiningSlotsInitiatingTaxProof: u32 = 10;
 	pub static CurrentSeal: BlockSealInherent = BlockSealInherent::Compute;
-	pub static TargetComputeBlockTime: u64 = 100;
+	pub static TargetComputeBlockPercent: Percent = Percent::from_percent(50);
 	pub const MaxNotaries: u32 = 100;
 	pub static LockedNotaries: Vec<(NotaryId, Tick)> = vec![];
 
@@ -98,7 +98,7 @@ impl TickProvider<Block> for StaticTickProvider {
 		CurrentTick::get()
 	}
 	fn ticker() -> Ticker {
-		Ticker::new(1, 1)
+		Ticker::new(200, 1, 2)
 	}
 	fn blocks_at_tick(_: Tick) -> Vec<H256> {
 		vec![]
@@ -113,7 +113,7 @@ impl pallet_block_seal_spec::Config for Test {
 	type AuthorityProvider = StaticAuthorityProvider;
 	type NotebookProvider = StaticNotebookProvider;
 	type SealInherent = CurrentSeal;
-	type TargetComputeBlockTime = TargetComputeBlockTime;
+	type TargetComputeBlockPercent = TargetComputeBlockPercent;
 	type TickProvider = StaticTickProvider;
 	type MaxActiveNotaries = MaxNotaries;
 }

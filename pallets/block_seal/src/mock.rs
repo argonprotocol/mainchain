@@ -84,7 +84,7 @@ impl TickProvider<Block> for StaticTickProvider {
 		CurrentTick::get()
 	}
 	fn ticker() -> Ticker {
-		Ticker::new(1, 1)
+		Ticker::new(1, 1, 2)
 	}
 	fn blocks_at_tick(tick: Tick) -> Vec<HashOutput> {
 		BlocksAtTick::get().get(&tick).cloned().unwrap_or_default()

@@ -105,7 +105,7 @@ jobs:
 
       - name: Build
         if: ${{(github.event.inputs.SKIP_REBUILD_DOCKER != 'true')}}
-        run: cargo build --features=fast-runtime
+        run: cargo build
         env:
           RUSTC_WRAPPER: "sccache"
           CARGO_INCREMENTAL: 0

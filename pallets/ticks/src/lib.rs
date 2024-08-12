@@ -48,10 +48,7 @@ pub mod pallet {
 	pub(super) type CurrentTick<T: Config> = StorageValue<_, Tick, ValueQuery>;
 
 	#[pallet::storage]
-	pub(super) type TickDuration<T: Config> = StorageValue<_, u64, ValueQuery>;
-
-	#[pallet::storage]
-	pub(super) type GenesisTickUtcTimestamp<T: Config> = StorageValue<_, u64, ValueQuery>;
+	pub(super) type GenesisTicker<T: Config> = StorageValue<_, Ticker, ValueQuery>;
 
 	/// Blocks from the last 100 ticks. Trimmed in on_initialize.
 	/// NOTE: cannot include the current block hash until next block
@@ -67,8 +64,7 @@ pub mod pallet {
 	#[pallet::genesis_config]
 	#[derive(frame_support::DefaultNoBound)]
 	pub struct GenesisConfig<T: Config> {
-		pub tick_duration_millis: u64,
-		pub genesis_utc_time: u64,
+		pub ticker: Ticker,
 
 		#[serde(skip)]
 		pub _phantom: PhantomData<T>,
@@ -77,8 +73,7 @@ pub mod pallet {
 	#[pallet::genesis_build]
 	impl<T: Config> BuildGenesisConfig for GenesisConfig<T> {
 		fn build(&self) {
-			TickDuration::<T>::put(self.tick_duration_millis);
-			GenesisTickUtcTimestamp::<T>::put(self.genesis_utc_time);
+			GenesisTicker::<T>::put(self.ticker.clone());
 		}
 	}
 
@@ -122,9 +117,7 @@ pub mod pallet {
 		}
 
 		fn ticker() -> Ticker {
-			let tick_duration = <TickDuration<T>>::get();
-			let genesis_utc_time = <GenesisTickUtcTimestamp<T>>::get();
-			Ticker::new(tick_duration, genesis_utc_time)
+			<GenesisTicker<T>>::get()
 		}
 
 		fn blocks_at_tick(tick: Tick) -> Vec<<T::Block as BlockT>::Hash> {

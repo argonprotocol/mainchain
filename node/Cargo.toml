@@ -102,7 +102,3 @@ try-runtime = [
 	"pallet-transaction-payment/try-runtime",
 	"sp-runtime/try-runtime",
 ]
-fast-runtime = [
-	"argon-node-runtime/fast-runtime",
-	"argon-primitives/fast-runtime",
-]

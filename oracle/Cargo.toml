@@ -45,4 +45,4 @@ argon-testing = { workspace = true }
 subxt-signer = { workspace = true }
 
 [features]
-fast-runtime = [ "argon-primitives/fast-runtime" ]
+simulated-prices = []

@@ -124,6 +124,7 @@ std = [
 	"sp-block-builder/std",
 	"sp-consensus-grandpa/std",
 	"sp-core/std",
+	"sp-debug-derive/force-debug",
 	"sp-debug-derive/std",
 	"sp-genesis-builder/std",
 	"sp-inherents/std",
@@ -204,8 +205,3 @@ try-runtime = [
 # `RUNTIME_METADATA_HASH` environment variable set for the `CheckMetadataHash`
 # extension.
 metadata-hash = [ "substrate-wasm-builder/metadata-hash" ]
-# Set timing constants (e.g. session period) to faster versions to speed up testing.
-fast-runtime = [
-	"argon-primitives/fast-runtime",
-	"sp-debug-derive/force-debug",
-]

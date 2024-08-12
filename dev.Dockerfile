@@ -26,7 +26,7 @@ COPY . .
 RUN --mount=type=cache,target=/usr/local/cargo/git \
     --mount=type=cache,target=/usr/local/cargo/registry \
     --mount=type=cache,mode=0777,target=/home/root/.cache/sccache \
-    sccache --start-server && cargo build --locked --bin=argon-node --bin=argon-notary --features=fast-runtime
+    sccache --start-server && cargo build --locked --bin=argon-node --bin=argon-notary
 RUN  ls /app/target/debug && sccache --show-stats
 
 FROM ubuntu:22.04 AS base_ubuntu

@@ -71,5 +71,4 @@ uniffi = { workspace = true, features = ["build"] }
 [features]
 default = []
 napi = [ "argon-primitives/napi", "dep:napi", "napi-derive" ]
-fast-runtime = [ "argon-primitives/fast-runtime" ]
 uniffi = [ "argon-primitives/uniffi", "dep:uniffi" ]

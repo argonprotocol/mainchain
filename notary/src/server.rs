@@ -12,7 +12,7 @@ use argon_notary_apis::{
 	notebook::NotebookRpcServer,
 };
 use argon_primitives::{
-	AccountId, AccountOrigin, AccountType, BalanceProof, BalanceTip, Notarization,
+	tick::Ticker, AccountId, AccountOrigin, AccountType, BalanceProof, BalanceTip, Notarization,
 	NotarizationBalanceChangeset, NotarizationBlockVotes, NotarizationDataDomains, NotaryId,
 	Notebook, NotebookMeta, NotebookNumber, SignedNotebookHeader,
 };
@@ -46,6 +46,7 @@ pub struct NotaryServer {
 	pub addr: SocketAddr,
 	notary_id: NotaryId,
 	pool: PgPool,
+	ticker: Ticker,
 	pub(crate) completed_notebook_stream: NotebookHeaderStream,
 	pub completed_notebook_sender: NotificationSender<SignedNotebookHeader>,
 	server_handle: Option<ServerHandle>,
@@ -75,6 +76,7 @@ impl NotaryServer {
 	pub async fn start_with(
 		server: Server<Identity, Stack<RpcLoggerLayer, Identity>>,
 		notary_id: NotaryId,
+		ticker: Ticker,
 		pool: PgPool,
 	) -> anyhow::Result<Self> {
 		let (completed_notebook_sender, completed_notebook_stream) =
@@ -83,6 +85,7 @@ impl NotaryServer {
 		let addr = server.local_addr()?;
 		let mut notary_server = Self {
 			notary_id,
+			ticker,
 			completed_notebook_sender,
 			completed_notebook_stream,
 			pool,
@@ -109,10 +112,11 @@ impl NotaryServer {
 	pub async fn start(
 		notary_id: NotaryId,
 		pool: PgPool,
+		ticker: Ticker,
 		addrs: impl ToSocketAddrs,
 	) -> anyhow::Result<Self> {
 		let server = Self::create_http_server(addrs).await?;
-		Self::start_with(server, notary_id, pool).await
+		Self::start_with(server, notary_id, ticker, pool).await
 	}
 
 	async fn get_conn(&self) -> Result<PoolConnection<Postgres>, ErrorObjectOwned> {
@@ -240,6 +244,7 @@ impl LocalchainRpcServer for NotaryServer {
 		Ok(NotarizationsStore::apply(
 			&self.pool,
 			self.notary_id,
+			&self.ticker,
 			balance_changeset.into_inner(),
 			block_votes.into_inner(),
 			data_domains.into_inner(),
@@ -326,8 +331,8 @@ mod tests {
 	#[sqlx::test]
 	async fn test_balance_change_and_get_proof(pool: PgPool) -> anyhow::Result<()> {
 		let _ = tracing_subscriber::fmt::try_init();
-		let ticker = Ticker::new(60_000, Utc::now().timestamp_millis() as u64);
-		let notary = NotaryServer::start(1, pool.clone(), "127.0.0.1:0").await?;
+		let ticker = Ticker::new(60_000, Utc::now().timestamp_millis() as u64, 2);
+		let notary = NotaryServer::start(1, pool.clone(), ticker.clone(), "127.0.0.1:0").await?;
 		assert!(notary.addr.port() > 0);
 
 		let mut db = notary.pool.acquire().await?;

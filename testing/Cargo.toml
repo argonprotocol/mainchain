@@ -27,7 +27,7 @@ sp-keyring = { workspace = true }
 sp-core = { workspace = true }
 sqlx = { workspace = true, features = ["postgres", "macros", "runtime-tokio-native-tls"] }
 rand = { workspace = true }
-argon-primitives = { workspace = true, features = ["fast-runtime", "default"] }
+argon-primitives = { workspace = true, features = ["default"] }
 strip-ansi-escapes = { workspace = true }
 current_platform = { workspace = true }
 tokio = { workspace = true }

@@ -350,7 +350,7 @@ mod tests {
 	fn test_can_smooth_out_cpi() {
 		let previous_cpi = *BASELINE_CPI;
 		let start_time = parse_date("1 April 2024", vec!["%d %B %Y"]).unwrap();
-		let ticker = Ticker::new(60_000, start_time.timestamp_millis() as u64);
+		let ticker = Ticker::new(60_000, start_time.timestamp_millis() as u64, 2);
 
 		let mut retriever = UsCpiRetriever {
 			schedule: vec![],
@@ -431,7 +431,7 @@ mod tests {
 	#[test]
 	fn calculates_intervals_elapsed() {
 		let start_time = parse_date("1 April 2024", vec!["%d %B %Y"]).unwrap();
-		let ticker = Ticker::new(60_000, start_time.timestamp_millis() as u64);
+		let ticker = Ticker::new(60_000, start_time.timestamp_millis() as u64, 2);
 		let retriever = UsCpiRetriever {
 			schedule: vec![],
 			current_cpi_end_value: FixedU128::from_u32(300),

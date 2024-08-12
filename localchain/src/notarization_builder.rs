@@ -28,9 +28,9 @@ use crate::notarization_tracker::NotarizationTracker;
 use crate::notary_client::NotaryClients;
 use crate::open_escrows::OpenEscrow;
 use crate::transactions::LocalchainTransaction;
-use crate::Result;
 use crate::{bail, Error};
 use crate::{DataDomainStore, Escrow, LocalchainTransfer, NotaryAccountOrigin};
+use crate::{Result, TickerRef};
 
 #[cfg_attr(feature = "napi", napi)]
 #[derive(Clone)]
@@ -49,10 +49,16 @@ pub struct NotarizationBuilder {
   notary_id: Arc<Mutex<Option<u32>>>,
   transaction: Arc<Mutex<Option<LocalchainTransaction>>>,
   keystore: Keystore,
+  ticker: TickerRef,
 }
 
 impl NotarizationBuilder {
-  pub(crate) fn new(db: SqlitePool, notary_clients: NotaryClients, keystore: Keystore) -> Self {
+  pub(crate) fn new(
+    db: SqlitePool,
+    notary_clients: NotaryClients,
+    keystore: Keystore,
+    ticker: TickerRef,
+  ) -> Self {
     NotarizationBuilder {
       notary_clients,
       db,
@@ -67,6 +73,7 @@ impl NotarizationBuilder {
       notary_id: Arc::new(Mutex::new(Some(1))),
       transaction: Default::default(),
       keystore,
+      ticker,
     }
   }
 
@@ -914,6 +921,7 @@ impl NotarizationBuilder {
       &notarization.block_votes,
       &notarization.data_domains,
       None,
+      self.ticker.escrow_expiration_ticks(),
     )?;
     verify_changeset_signatures(&notarization.balance_changes)?;
 
@@ -1304,8 +1312,14 @@ mod test {
     let alice_address = alice_signer
       .import_suri(Alice.to_seed(), Sr25519, None)
       .await?;
+    let ticker = Ticker::start(Duration::from_secs(1), 2);
 
-    let alice_builder = NotarizationBuilder::new(pool, notary_clients.clone(), alice_signer);
+    let alice_builder = NotarizationBuilder::new(
+      pool,
+      notary_clients.clone(),
+      alice_signer,
+      TickerRef::new(ticker),
+    );
     let default_account = alice_builder.default_deposit_account().await?;
     assert_eq!(default_account.address, alice_address.clone());
     assert_eq!(default_account.change_number, 0);
@@ -1338,6 +1352,8 @@ mod test {
     let mock_notary = create_mock_notary().await?;
     let notary_clients = mock_notary_clients(&mock_notary, Ferdie).await?;
     let bob_address = AccountStore::to_address(&Bob.to_account_id());
+    let ticker = Ticker::start(Duration::from_secs(1), 2);
+    let ticker = TickerRef::new(ticker);
 
     let alice_pool = create_pool().await?;
     let alice_signer = Keystore::new(alice_pool.clone());
@@ -1352,6 +1368,7 @@ mod test {
         alice_pool.clone(),
         notary_clients.clone(),
         alice_signer.clone(),
+        ticker.clone(),
       );
       let alice_account = alice_builder
         .claim_from_mainchain(mock_mainchain_transfer(&alice_address, 10_000u128))
@@ -1386,8 +1403,12 @@ mod test {
 
     // 2. Load up funds to send for alice
     let alice_balance_changes = {
-      let notarization =
-        NotarizationBuilder::new(alice_pool.clone(), notary_clients.clone(), alice_signer);
+      let notarization = NotarizationBuilder::new(
+        alice_pool.clone(),
+        notary_clients.clone(),
+        alice_signer,
+        ticker.clone(),
+      );
       notarization
         .default_deposit_account()
         .await?
@@ -1399,8 +1420,12 @@ mod test {
 
     let bob_signer = Keystore::new(bob_pool.clone());
     bob_signer.import_suri(Bob.to_seed(), Sr25519, None).await?;
-    let bob_builder =
-      NotarizationBuilder::new(bob_pool.clone(), notary_clients.clone(), bob_signer);
+    let bob_builder = NotarizationBuilder::new(
+      bob_pool.clone(),
+      notary_clients.clone(),
+      bob_signer,
+      ticker.clone(),
+    );
     println!("Bob importing the balance change");
     bob_builder.import_argon_file(alice_balance_changes).await?;
     println!("Bob claimed the balance change");
@@ -1503,6 +1528,8 @@ mod test {
   async fn it_cannot_accept_funds_sent_to_another_address(pool: SqlitePool) -> anyhow::Result<()> {
     let mock_notary = create_mock_notary().await?;
     let notary_clients = mock_notary_clients(&mock_notary, Ferdie).await?;
+    let ticker = Ticker::start(Duration::from_secs(1), 2);
+    let ticker = TickerRef::new(ticker);
 
     let mut balance_change = BalanceChange {
       account_id: Bob.to_account_id(),
@@ -1532,7 +1559,12 @@ mod test {
     let balance_change = balance_change.sign(Bob.pair()).clone();
     let keystore = Keystore::new(pool.clone());
     let _ = keystore.import_suri(Alice.to_seed(), Ed25519, None).await?;
-    let builder = NotarizationBuilder::new(pool.clone(), notary_clients.clone(), keystore.clone());
+    let builder = NotarizationBuilder::new(
+      pool.clone(),
+      notary_clients.clone(),
+      keystore.clone(),
+      ticker.clone(),
+    );
     let res = builder
       .import_argon_file(ArgonFile::create(vec![balance_change], ArgonFileType::Send).to_json()?)
       .await;
@@ -1546,6 +1578,8 @@ mod test {
   async fn it_informs_user_if_not_setup(pool: SqlitePool) -> anyhow::Result<()> {
     let mock_notary = create_mock_notary().await?;
     let notary_clients = mock_notary_clients(&mock_notary, Ferdie).await?;
+    let ticker = Ticker::start(Duration::from_secs(1), 2);
+    let ticker = TickerRef::new(ticker);
 
     let mut balance_change = BalanceChange {
       account_id: Bob.to_account_id(),
@@ -1574,7 +1608,12 @@ mod test {
     };
     let balance_change = balance_change.sign(Bob.pair()).clone();
     let keystore = Keystore::new(pool.clone());
-    let builder = NotarizationBuilder::new(pool.clone(), notary_clients.clone(), keystore.clone());
+    let builder = NotarizationBuilder::new(
+      pool.clone(),
+      notary_clients.clone(),
+      keystore.clone(),
+      ticker.clone(),
+    );
     let res = builder
       .import_argon_file(
         ArgonFile::create(vec![balance_change.clone()], ArgonFileType::Send).to_json()?,
@@ -1644,6 +1683,7 @@ mod test {
       &balance_change.block_votes,
       &balance_change.data_domains,
       None,
+      2,
     ));
     Ok(())
   }

@@ -358,6 +358,7 @@ where
             ntp_pool_url: None,
             genesis_utc_time: 0,
             tick_duration_millis: 0,
+            escrow_expiration_ticks: 0,
           },
           Some(keystore_password),
         )

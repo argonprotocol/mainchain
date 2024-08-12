@@ -2,7 +2,6 @@ import {
     BalanceChangeBuilder,
     DataDomainStore,
     DataTLD,
-    ESCROW_EXPIRATION_TICKS,
     Localchain,
     NotarizationBuilder,
 } from "../index";
@@ -167,7 +166,8 @@ describeIntegration("Escrow integration", () => {
 
         const insideEscrow = await ferdieEscrowRecord.escrow;
         const currentTick = ferdiechain.currentTick;
-        expect(insideEscrow.expirationTick).toBe(holdTracker.tick + ESCROW_EXPIRATION_TICKS);
+        const ticker = ferdiechain.ticker;
+        expect(insideEscrow.expirationTick).toBe(holdTracker.tick + ticker.escrowExpirationTicks);
         const timeForExpired = new Date(Number(ferdiechain.ticker.timeForTick(insideEscrow.expirationTick)));
         console.log('Escrow expires in %s seconds. Current Tick=%s, expiration=%s', (timeForExpired.getTime() - Date.now()) / 1000, currentTick, insideEscrow.expirationTick);
         expect(timeForExpired.getTime() - Date.now()).toBeLessThan(30e3);
