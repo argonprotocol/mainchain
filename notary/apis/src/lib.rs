@@ -6,8 +6,11 @@ use jsonrpsee::{
 
 pub use crate::{localchain::LocalchainRpcClient, notebook::NotebookRpcClient};
 
+pub mod error;
 pub mod localchain;
 pub mod notebook;
+
+pub use error::Error;
 
 pub type Client = jsonrpsee::core::client::Client;
 

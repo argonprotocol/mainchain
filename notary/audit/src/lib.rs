@@ -20,7 +20,7 @@ use argon_primitives::{
 	BalanceChange, BalanceProof, BalanceTip, BlockVote, ChainTransfer, DataDomainHash,
 	LocalchainAccountId, NewAccountOrigin, NotaryId, Note, NoteType, Notebook, NotebookHeader,
 	NotebookNumber, TransferToLocalchainId, VoteMinimum, DATA_DOMAIN_LEASE_COST,
-	ESCROW_CLAWBACK_TICKS, ESCROW_EXPIRATION_TICKS, MINIMUM_ESCROW_SETTLEMENT, TAX_PERCENT_BASE,
+	ESCROW_CLAWBACK_TICKS, MINIMUM_ESCROW_SETTLEMENT, TAX_PERCENT_BASE,
 };
 
 pub use crate::error::VerifyError;
@@ -69,6 +69,7 @@ pub fn notebook_verify<T: NotebookHistoryLookup>(
 	lookup: &T,
 	notebook: &Notebook,
 	vote_minimums: &BTreeMap<H256, VoteMinimum>,
+	escrow_expiration_ticks: Tick,
 ) -> anyhow::Result<bool, VerifyError> {
 	let mut state = NotebookVerifyState::default();
 
@@ -85,6 +86,7 @@ pub fn notebook_verify<T: NotebookHistoryLookup>(
 			block_votes,
 			data_domains,
 			Some(notebook.header.tick),
+			escrow_expiration_ticks,
 		)?;
 		result.verify_taxes()?;
 		state.record_tax(result)?;
@@ -674,14 +676,13 @@ impl BalanceChangesetState {
 		localchain_account_id: &LocalchainAccountId,
 		milligons: i128,
 		escrow_hold_note: &Note,
-		source_change_tick: Tick,
+		expiration_tick: Tick,
 		notebook_tick: Option<Tick>,
 	) -> anyhow::Result<(), VerifyError> {
 		let mut recipients = BTreeSet::new();
 
 		// only add the recipient restrictions once we know what notebook we're in
 		if let Some(tick) = notebook_tick {
-			let expiration_tick = source_change_tick + ESCROW_EXPIRATION_TICKS;
 			ensure!(
 				tick >= expiration_tick,
 				VerifyError::EscrowHoldNotReadyForClaim {
@@ -729,6 +730,7 @@ pub fn verify_notarization_allocation(
 	block_votes: &[BlockVote],
 	data_domains: &[(DataDomainHash, AccountId)],
 	notebook_tick: Option<Tick>,
+	escrow_expiration_ticks: Tick,
 ) -> anyhow::Result<BalanceChangesetState, VerifyError> {
 	let mut state = BalanceChangesetState::default();
 
@@ -799,7 +801,7 @@ pub fn verify_notarization_allocation(
 						&localchain_account_id,
 						note.milligons as i128,
 						escrow_hold_note,
-						source_change_tick,
+						source_change_tick + escrow_expiration_ticks,
 						notebook_tick,
 					)?;
 				},

@@ -38,7 +38,7 @@ rsntp = { workspace = true, optional = true }
 hex = { workspace = true, optional = true }
 clap = { workspace = true, optional = true }
 uniffi = { workspace = true, optional = true }
-bitcoin = { workspace = true, optional = true }
+bitcoin = { workspace = true, optional = true, default-features = false }
 rpassword = { workspace = true, optional = true }
 anyhow = { workspace = true, optional = true }
 
@@ -82,6 +82,7 @@ std = [
 	"sp-core/full_crypto",
 	"sp-core/std",
 	"sp-crypto-hashing/std",
+	"sp-debug-derive/force-debug",
 	"sp-debug-derive/std",
 	"sp-inherents/std",
 	"sp-keystore",
@@ -89,7 +90,6 @@ std = [
 	"sp-runtime/std",
 	"thiserror",
 ]
-fast-runtime = [ "sp-debug-derive/force-debug" ]
 napi = [ "napi-derive/type-def", "napi/napi9", "napi/serde-json" ]
 uniffi = [ "dep:uniffi" ]
 bitcoin = [ "base58", "bip32", "dep:bitcoin", "k256" ]

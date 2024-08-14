@@ -8,7 +8,7 @@ use anyhow::anyhow;
 use argon_notary_audit::verify_changeset_signatures;
 use argon_primitives::{
   AccountType, Balance, BalanceChange, BalanceTip, MultiSignatureBytes, NoteType, NotebookNumber,
-  ESCROW_CLAWBACK_TICKS, ESCROW_EXPIRATION_TICKS, MINIMUM_ESCROW_SETTLEMENT,
+  ESCROW_CLAWBACK_TICKS, MINIMUM_ESCROW_SETTLEMENT,
 };
 use bech32::{Bech32m, Hrp};
 use chrono::NaiveDateTime;
@@ -528,7 +528,7 @@ impl OpenEscrowsStore {
         current_tip
       );
     }
-    escrow.expiration_tick = balance_tip.tick + ESCROW_EXPIRATION_TICKS;
+    escrow.expiration_tick = balance_tip.tick + self.ticker.escrow_expiration_ticks();
     escrow.db_insert(&mut db).await?;
     Ok(OpenEscrow::new(self.db.clone(), escrow, &self.keystore))
   }
@@ -589,7 +589,7 @@ impl OpenEscrowsStore {
       to_address: AccountStore::to_address(recipient),
       data_domain_hash: data_domain_hash.map(|h| h.0.to_vec()).clone(),
       notary_id: *notary_id,
-      expiration_tick: tick + ESCROW_EXPIRATION_TICKS,
+      expiration_tick: tick + self.ticker.escrow_expiration_ticks(),
       settled_amount: MINIMUM_ESCROW_SETTLEMENT,
       settled_signature: EMPTY_SIGNATURE.clone(),
       notarization_id: None,
@@ -828,18 +828,23 @@ mod tests {
     )
     .await?;
 
-    let ticker = TickerRef::new(Ticker::start(Duration::from_secs(60)));
+    let escrow_expiration_ticks: u32 = 2;
+    let ticker = TickerRef::new(Ticker::start(
+      Duration::from_secs(60),
+      escrow_expiration_ticks,
+    ));
     println!("about to open escrow");
     let keystore = Keystore::new(pool.clone());
     let _ = keystore
       .import_suri(Bob.to_seed(), CryptoScheme::Ed25519, None)
       .await?;
+
     let store = OpenEscrowsStore::new(pool, ticker, &notary_clients, &keystore);
     let open_escrow = store.open_client_escrow(bob_account.id).await?;
     println!("opened escrow");
     let escrow = open_escrow.inner().await;
     assert_eq!(escrow.to_address.clone(), alice_address);
-    assert_eq!(escrow.expiration_tick, 1 + crate::ESCROW_EXPIRATION_TICKS);
+    assert_eq!(escrow.expiration_tick, 1 + escrow_expiration_ticks);
 
     assert_eq!(store.get_claimable().await?.len(), 0);
     let json = open_escrow.export_for_send().await?;
@@ -892,7 +897,7 @@ mod tests {
     )
     .await?;
 
-    let ticker = TickerRef::new(Ticker::start(Duration::from_secs(60)));
+    let ticker = TickerRef::new(Ticker::start(Duration::from_secs(60), 2));
 
     let keystore = Keystore::new(pool.clone());
     let _ = keystore
@@ -976,7 +981,8 @@ mod tests {
     )
     .await?;
 
-    let ticker = TickerRef::new(Ticker::start(Duration::from_secs(60)));
+    let escrow_expiration_ticks: u32 = 2;
+    let ticker: TickerRef = Ticker::start(Duration::from_secs(60), escrow_expiration_ticks).into();
     let keystore = Keystore::new(bob_pool.clone());
     keystore
       .import_suri("//Bob".to_string(), CryptoScheme::Ed25519, None)
@@ -986,7 +992,7 @@ mod tests {
 
     let json = open_escrow.export_for_send().await?;
 
-    let alice_store = OpenEscrowsStore::new(alice_pool, ticker, &notary_clients, &keystore);
+    let alice_store = OpenEscrowsStore::new(alice_pool, ticker.clone(), &notary_clients, &keystore);
     // before registered with notary, should fail
     match alice_store.import_escrow(json.clone()).await {
       Err(e) => {
@@ -1023,10 +1029,7 @@ mod tests {
       sent_escrow.balance_change_number
     );
 
-    assert_eq!(
-      imported_escrow.expiration_tick,
-      1 + crate::ESCROW_EXPIRATION_TICKS
-    );
+    assert_eq!(imported_escrow.expiration_tick, 1 + escrow_expiration_ticks);
     assert_eq!(imported_escrow.settled_amount, MINIMUM_ESCROW_SETTLEMENT);
     assert_eq!(imported_escrow.id, sent_escrow.id);
 
@@ -1057,9 +1060,13 @@ mod tests {
       .import_suri("//Bob".to_string(), CryptoScheme::Ed25519, None)
       .await?;
 
-    let ticker = TickerRef::new(Ticker::start(Duration::from_secs(1)));
-    let builder =
-      NotarizationBuilder::new(bob_pool.clone(), notary_clients.clone(), bob_signer.clone());
+    let ticker = TickerRef::new(Ticker::start(Duration::from_secs(1), 2));
+    let builder = NotarizationBuilder::new(
+      bob_pool.clone(),
+      notary_clients.clone(),
+      bob_signer.clone(),
+      ticker.clone(),
+    );
     builder
       .claim_from_mainchain(LocalchainTransfer {
         address: bob_address.clone(),

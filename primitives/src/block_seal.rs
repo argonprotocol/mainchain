@@ -1,4 +1,4 @@
-use codec::{Codec, Decode, Encode, MaxEncodedLen};
+use codec::{Codec, Decode, Encode, HasCompact, MaxEncodedLen};
 use frame_support::{CloneNoBound, EqNoBound, Parameter, PartialEqNoBound};
 use scale_info::TypeInfo;
 use serde::{Deserialize, Serialize};
@@ -34,6 +34,7 @@ pub const BLOCK_SEAL_CRYPTO_ID: CryptoTypeId = <app::Public as AppCrypto>::CRYPT
 )]
 #[scale_info(skip_type_params(MaxHosts))]
 #[derive(Deserialize, Serialize)]
+#[serde(rename_all = "camelCase")]
 pub struct MiningRegistration<AccountId: Parameter, Balance: Parameter + MaxEncodedLen> {
 	pub account_id: AccountId,
 	pub reward_destination: RewardDestination<AccountId>,
@@ -43,6 +44,22 @@ pub struct MiningRegistration<AccountId: Parameter, Balance: Parameter + MaxEnco
 	#[codec(compact)]
 	pub ownership_tokens: Balance,
 	pub reward_sharing: Option<RewardSharing<AccountId>>,
+}
+
+#[derive(
+	Clone, Serialize, Deserialize, Encode, Decode, Eq, PartialEq, RuntimeDebug, Default, TypeInfo,
+)]
+#[serde(rename_all = "camelCase")]
+pub struct MiningSlotConfig<BlockNumber: Codec + HasCompact> {
+	/// How many blocks before the end of a slot can the bid close
+	#[codec(compact)]
+	pub blocks_before_bid_end_for_vrf_close: BlockNumber,
+	/// How many blocks transpire between slots
+	#[codec(compact)]
+	pub blocks_between_slots: BlockNumber,
+	/// The block number when bidding will start (eg, Slot "1")
+	#[codec(compact)]
+	pub slot_bidding_start_block: BlockNumber,
 }
 
 /// An struct to define a reward sharing split with another account

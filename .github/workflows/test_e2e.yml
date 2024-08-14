@@ -69,7 +69,7 @@ jobs:
           run-id: ${{ github.event.inputs.runIdForBindings }}
 
       - name: Test bindings
-        run: yarn test:js-only --testTimeout=90000 --forceExit --verbose --runInBand
+        run: yarn test:js-only --forceExit --verbose --runInBand
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
           ADD_DOCKER_HOST: true

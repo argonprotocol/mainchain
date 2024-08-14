@@ -212,6 +212,7 @@ impl Transactions {
       self.db.clone(),
       self.notary_clients.clone(),
       self.keystore.clone(),
+      self.ticker.clone(),
     )
   }
 }

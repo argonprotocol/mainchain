@@ -77,8 +77,8 @@ impl ChainTransferStore {
 		account_id: &AccountId,
 		transfer_id: TransferToLocalchainId,
 		proposed_amount: u128,
-		change_index: usize,
-		note_index: usize,
+		change_index: u32,
+		note_index: u32,
 	) -> anyhow::Result<(), Error> {
 		let stored_amount = query!(
 			r#"

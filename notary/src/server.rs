@@ -12,7 +12,7 @@ use argon_notary_apis::{
 	notebook::NotebookRpcServer,
 };
 use argon_primitives::{
-	AccountId, AccountOrigin, AccountType, BalanceProof, BalanceTip, Notarization,
+	tick::Ticker, AccountId, AccountOrigin, AccountType, BalanceProof, BalanceTip, Notarization,
 	NotarizationBalanceChangeset, NotarizationBlockVotes, NotarizationDataDomains, NotaryId,
 	Notebook, NotebookMeta, NotebookNumber, SignedNotebookHeader,
 };
@@ -29,7 +29,7 @@ use jsonrpsee::{
 };
 use sc_utils::notification::{NotificationSender, NotificationStream, TracingKeyStr};
 use serde::Serialize;
-use sqlx::PgPool;
+use sqlx::{pool::PoolConnection, PgPool, Postgres};
 use tokio::net::ToSocketAddrs;
 use tower::layer::util::{Identity, Stack};
 
@@ -46,6 +46,7 @@ pub struct NotaryServer {
 	pub addr: SocketAddr,
 	notary_id: NotaryId,
 	pool: PgPool,
+	ticker: Ticker,
 	pub(crate) completed_notebook_stream: NotebookHeaderStream,
 	pub completed_notebook_sender: NotificationSender<SignedNotebookHeader>,
 	server_handle: Option<ServerHandle>,
@@ -75,6 +76,7 @@ impl NotaryServer {
 	pub async fn start_with(
 		server: Server<Identity, Stack<RpcLoggerLayer, Identity>>,
 		notary_id: NotaryId,
+		ticker: Ticker,
 		pool: PgPool,
 	) -> anyhow::Result<Self> {
 		let (completed_notebook_sender, completed_notebook_stream) =
@@ -83,6 +85,7 @@ impl NotaryServer {
 		let addr = server.local_addr()?;
 		let mut notary_server = Self {
 			notary_id,
+			ticker,
 			completed_notebook_sender,
 			completed_notebook_stream,
 			pool,
@@ -109,10 +112,16 @@ impl NotaryServer {
 	pub async fn start(
 		notary_id: NotaryId,
 		pool: PgPool,
+		ticker: Ticker,
 		addrs: impl ToSocketAddrs,
 	) -> anyhow::Result<Self> {
 		let server = Self::create_http_server(addrs).await?;
-		Self::start_with(server, notary_id, pool).await
+		Self::start_with(server, notary_id, ticker, pool).await
+	}
+
+	async fn get_conn(&self) -> Result<PoolConnection<Postgres>, ErrorObjectOwned> {
+		let conn = self.pool.acquire().await.map_err(|e| Error::Database(e.to_string()))?;
+		Ok(conn)
 	}
 }
 
@@ -123,11 +132,7 @@ impl NotebookRpcServer for NotaryServer {
 		notebook_number: NotebookNumber,
 		balance_tip: BalanceTip,
 	) -> Result<BalanceProof, ErrorObjectOwned> {
-		let mut db = self
-			.pool
-			.acquire()
-			.await
-			.map_err(|e| from_crate_error(Error::Database(e.to_string())))?;
+		let mut db = self.get_conn().await?;
 
 		let merkle_proof = NotebookStore::get_balance_proof(
 			&mut *db,
@@ -135,12 +140,9 @@ impl NotebookRpcServer for NotaryServer {
 			notebook_number,
 			&balance_tip,
 		)
-		.await
-		.map_err(from_crate_error)?;
+		.await?;
 
-		let tick = NotebookHeaderStore::get_notebook_tick(&mut db, notebook_number)
-			.await
-			.map_err(from_crate_error)?;
+		let tick = NotebookHeaderStore::get_notebook_tick(&mut db, notebook_number).await?;
 		Ok(BalanceProof {
 			notebook_number,
 			notary_id: self.notary_id,
@@ -158,11 +160,7 @@ impl NotebookRpcServer for NotaryServer {
 		notebook_number: NotebookNumber,
 		change_number: u32,
 	) -> Result<Notarization, ErrorObjectOwned> {
-		let mut db = self
-			.pool
-			.acquire()
-			.await
-			.map_err(|e| from_crate_error(Error::Database(e.to_string())))?;
+		let mut db = self.get_conn().await?;
 		let notarization = NotarizationsStore::get_account_change(
 			&mut db,
 			notebook_number,
@@ -170,8 +168,7 @@ impl NotebookRpcServer for NotaryServer {
 			account_type,
 			change_number,
 		)
-		.await
-		.map_err(from_crate_error)?;
+		.await?;
 		Ok(notarization)
 	}
 
@@ -179,9 +176,7 @@ impl NotebookRpcServer for NotaryServer {
 		&self,
 		notebook_number: NotebookNumber,
 	) -> Result<SignedNotebookHeader, ErrorObjectOwned> {
-		NotebookHeaderStore::load_with_signature(&self.pool, notebook_number)
-			.await
-			.map_err(from_crate_error)
+		Ok(NotebookHeaderStore::load_with_signature(&self.pool, notebook_number).await?)
 	}
 
 	async fn get_raw_headers(
@@ -189,44 +184,31 @@ impl NotebookRpcServer for NotaryServer {
 		since_notebook: Option<NotebookNumber>,
 		or_specific_notebooks: Option<Vec<NotebookNumber>>,
 	) -> Result<Vec<(NotebookNumber, Vec<u8>)>, ErrorObjectOwned> {
-		NotebookHeaderStore::load_raw_signed_headers(
+		Ok(NotebookHeaderStore::load_raw_signed_headers(
 			&self.pool,
 			since_notebook,
 			or_specific_notebooks,
 		)
-		.await
-		.map_err(from_crate_error)
+		.await?)
 	}
 
 	async fn metadata(&self) -> Result<NotebookMeta, ErrorObjectOwned> {
-		NotebookHeaderStore::latest(&self.pool).await.map_err(from_crate_error)
+		Ok(NotebookHeaderStore::latest(&self.pool).await?)
 	}
 
 	async fn get(&self, notebook_number: NotebookNumber) -> Result<Notebook, ErrorObjectOwned> {
-		let mut db = self
-			.pool
-			.acquire()
-			.await
-			.map_err(|e| from_crate_error(Error::Database(e.to_string())))?;
+		let mut db = self.get_conn().await?;
 
-		Ok(NotebookStore::load_finalized(&mut db, notebook_number)
-			.await
-			.map_err(from_crate_error)?)
+		Ok(NotebookStore::load_finalized(&mut db, notebook_number).await?)
 	}
 
 	async fn get_raw_body(
 		&self,
 		notebook_number: NotebookNumber,
 	) -> Result<Vec<u8>, ErrorObjectOwned> {
-		let mut db = self
-			.pool
-			.acquire()
-			.await
-			.map_err(|e| from_crate_error(Error::Database(e.to_string())))?;
+		let mut db = self.get_conn().await?;
 
-		Ok(NotebookStore::load_raw(&mut db, notebook_number)
-			.await
-			.map_err(from_crate_error)?)
+		Ok(NotebookStore::load_raw(&mut db, notebook_number).await?)
 	}
 
 	async fn subscribe_headers(&self, pending: PendingSubscriptionSink) -> SubscriptionResult {
@@ -259,15 +241,15 @@ impl LocalchainRpcServer for NotaryServer {
 		block_votes: NotarizationBlockVotes,
 		data_domains: NotarizationDataDomains,
 	) -> Result<BalanceChangeResult, ErrorObjectOwned> {
-		NotarizationsStore::apply(
+		Ok(NotarizationsStore::apply(
 			&self.pool,
 			self.notary_id,
+			&self.ticker,
 			balance_changeset.into_inner(),
 			block_votes.into_inner(),
 			data_domains.into_inner(),
 		)
-		.await
-		.map_err(from_crate_error)
+		.await?)
 	}
 
 	async fn get_tip(
@@ -275,14 +257,8 @@ impl LocalchainRpcServer for NotaryServer {
 		account_id: AccountId,
 		account_type: AccountType,
 	) -> Result<BalanceTipResult, ErrorObjectOwned> {
-		let mut db = self
-			.pool
-			.acquire()
-			.await
-			.map_err(|e| from_crate_error(Error::Database(e.to_string())))?;
-		Ok(BalanceTipStore::get_tip(&mut db, &account_id, account_type)
-			.await
-			.map_err(from_crate_error)?)
+		let mut db = self.get_conn().await?;
+		Ok(BalanceTipStore::get_tip(&mut db, &account_id, account_type).await?)
 	}
 
 	async fn get_origin(
@@ -290,14 +266,8 @@ impl LocalchainRpcServer for NotaryServer {
 		account_id: AccountId,
 		account_type: AccountType,
 	) -> Result<AccountOrigin, ErrorObjectOwned> {
-		let mut db = self
-			.pool
-			.acquire()
-			.await
-			.map_err(|e| from_crate_error(Error::Database(e.to_string())))?;
-		Ok(NotebookStore::get_account_origin(&mut db, account_id.clone(), account_type)
-			.await
-			.map_err(from_crate_error)?)
+		let mut db = self.get_conn().await?;
+		Ok(NotebookStore::get_account_origin(&mut db, account_id.clone(), account_type).await?)
 	}
 }
 
@@ -325,12 +295,6 @@ pub async fn pipe_from_stream_and_drop<T: Serialize>(
 			}
 		}
 	}
-}
-
-fn from_crate_error(e: crate::Error) -> ErrorObjectOwned {
-	let msg = e.to_string();
-	let code: i32 = Into::<i32>::into(e);
-	ErrorObjectOwned::owned(code, msg, None::<String>)
 }
 
 #[cfg(test)]
@@ -367,8 +331,8 @@ mod tests {
 	#[sqlx::test]
 	async fn test_balance_change_and_get_proof(pool: PgPool) -> anyhow::Result<()> {
 		let _ = tracing_subscriber::fmt::try_init();
-		let ticker = Ticker::new(60_000, Utc::now().timestamp_millis() as u64);
-		let notary = NotaryServer::start(1, pool.clone(), "127.0.0.1:0").await?;
+		let ticker = Ticker::new(60_000, Utc::now().timestamp_millis() as u64, 2);
+		let notary = NotaryServer::start(1, pool.clone(), ticker.clone(), "127.0.0.1:0").await?;
 		assert!(notary.addr.port() > 0);
 
 		let mut db = notary.pool.acquire().await?;

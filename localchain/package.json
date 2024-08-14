@@ -14,7 +14,7 @@
   "scripts": {
     "artifacts": "napi artifacts",
     "build": "napi build --platform --release --no-const-enum --features=napi -p argon-localchain",
-    "build:debug": "napi build --platform --no-const-enum --features=fast-runtime,napi -p argon-localchain",
+    "build:debug": "napi build --platform --no-const-enum --features=napi -p argon-localchain",
     "prepublishOnly": "napi prepublish -t npm",
     "pretest": "npm run build:debug",
     "test": "npm run pretest && cd .. && jest --testTimeout=60000",

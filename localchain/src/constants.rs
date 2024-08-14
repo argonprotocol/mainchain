@@ -9,9 +9,6 @@ pub const NOTARIZATION_MAX_DOMAINS: u32 = argon_primitives::MAX_DOMAINS_PER_NOTA
 /// Max notarizations that can be in a single notarization
 #[cfg_attr(feature = "napi", napi)]
 pub const NOTARIZATION_MAX_BLOCK_VOTES: u32 = argon_primitives::MAX_BLOCK_VOTES_PER_NOTARIZATION;
-/// Number of ticks past the notarization of an escrow hold that an escrow can be claimed (and no longer used)
-#[cfg_attr(feature = "napi", napi)]
-pub const ESCROW_EXPIRATION_TICKS: u32 = argon_primitives::ESCROW_EXPIRATION_TICKS;
 /// Number of ticks past the expiration of an escrow that a recipient has to claim. After this point, sender can recoup the escrowed funds
 #[cfg_attr(feature = "napi", napi)]
 pub const ESCROW_CLAWBACK_TICKS: u32 = argon_primitives::ESCROW_CLAWBACK_TICKS;

@@ -1,37 +1,50 @@
+#[cfg(feature = "std")]
+use core::time::Duration;
+
 use codec::{Decode, Encode};
+#[cfg(feature = "std")]
+use rsntp::SntpClient;
 use scale_info::TypeInfo;
 use serde::{Deserialize, Serialize};
 use sp_core::RuntimeDebug;
 
-use crate::prod_or_fast;
-#[cfg(feature = "std")]
-use rsntp::SntpClient;
-
-#[cfg(feature = "std")]
-use core::time::Duration;
-
 pub type Tick = u32;
 
 #[derive(
-	Encode, Decode, Serialize, Deserialize, RuntimeDebug, TypeInfo, Clone, Copy, PartialEq, Eq,
+	Encode,
+	Decode,
+	Serialize,
+	Deserialize,
+	RuntimeDebug,
+	TypeInfo,
+	Default,
+	Clone,
+	Copy,
+	PartialEq,
+	Eq,
 )]
+#[serde(rename_all = "camelCase")]
 pub struct Ticker {
+	#[codec(compact)]
 	pub tick_duration_millis: u64,
+	#[codec(compact)]
 	pub genesis_utc_time: u64,
+	#[codec(compact)]
+	pub escrow_expiration_ticks: Tick,
+	#[codec(skip)]
 	ntp_offset_millis: i64,
 }
 
-pub const TICK_MILLIS: u64 = prod_or_fast!(60_000, 2_000);
-
 impl Ticker {
 	#[cfg(feature = "std")]
-	pub fn start(tick_duration: Duration) -> Self {
+	pub fn start(tick_duration: Duration, escrow_expiration_ticks: Tick) -> Self {
 		let current_time = now();
 		let offset = current_time % tick_duration.as_millis() as u64;
 		let genesis_utc_time = current_time - offset;
 		Self {
 			tick_duration_millis: tick_duration.as_millis() as u64,
 			genesis_utc_time,
+			escrow_expiration_ticks,
 			ntp_offset_millis: 0,
 		}
 	}
@@ -50,8 +63,17 @@ impl Ticker {
 		Ok(())
 	}
 
-	pub fn new(tick_duration_millis: u64, genesis_utc_time: u64) -> Self {
-		Self { tick_duration_millis, genesis_utc_time, ntp_offset_millis: 0 }
+	pub fn new(
+		tick_duration_millis: u64,
+		genesis_utc_time: u64,
+		escrow_expiration_ticks: Tick,
+	) -> Self {
+		Self {
+			tick_duration_millis,
+			genesis_utc_time,
+			escrow_expiration_ticks,
+			ntp_offset_millis: 0,
+		}
 	}
 
 	#[cfg(feature = "std")]
@@ -106,19 +128,20 @@ fn now() -> u64 {
 
 #[cfg(test)]
 mod test {
-	use crate::tick::Ticker;
 	use std::time::Duration;
+
+	use crate::tick::Ticker;
 
 	#[test]
 	fn it_should_calculate_genesis() {
 		use chrono::{DurationRound, Utc};
 
-		let ticker = Ticker::start(Duration::from_secs(1));
+		let ticker = Ticker::start(Duration::from_secs(1), 2);
 		let beginning_of_second =
 			Utc::now().duration_trunc(chrono::Duration::try_seconds(1).unwrap()).unwrap();
 		assert_eq!(ticker.genesis_utc_time, beginning_of_second.timestamp_millis() as u64);
 
-		let ticker = Ticker::start(Duration::from_secs(60));
+		let ticker = Ticker::start(Duration::from_secs(60), 2);
 		let beginning_of_minute =
 			Utc::now().duration_trunc(chrono::Duration::try_minutes(1).unwrap()).unwrap();
 		assert_eq!(ticker.genesis_utc_time, beginning_of_minute.timestamp_millis() as u64);
@@ -126,7 +149,7 @@ mod test {
 
 	#[test]
 	fn it_should_create_next_ticks() {
-		let ticker = Ticker::start(Duration::from_secs(30));
+		let ticker = Ticker::start(Duration::from_secs(30), 2);
 
 		let start = ticker.genesis_utc_time;
 		let current_tick = ticker.current();
@@ -139,7 +162,7 @@ mod test {
 	#[tokio::test]
 	#[ignore]
 	async fn it_should_calculate_ntp_offset() {
-		let mut ticker = Ticker::start(Duration::from_secs(30));
+		let mut ticker = Ticker::start(Duration::from_secs(30), 2);
 
 		let time_for_next_tick = ticker.time_for_tick(2);
 		ticker.lookup_ntp_offset("pool.ntp.org").await.expect("should not die");

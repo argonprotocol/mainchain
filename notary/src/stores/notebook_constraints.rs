@@ -1,11 +1,11 @@
-use sqlx::PgConnection;
-
+use argon_notary_apis::error::Error;
 use argon_primitives::{
 	NotebookNumber, MAX_BALANCE_CHANGES_PER_NOTARIZATION, MAX_BLOCK_VOTES_PER_NOTEBOOK,
 	MAX_DOMAINS_PER_NOTEBOOK, MAX_NOTARIZATIONS_PER_NOTEBOOK, MAX_NOTEBOOK_TRANSFERS,
 };
+use sqlx::PgConnection;
 
-use crate::{ensure, error::Error};
+use crate::ensure;
 
 #[derive(Default, Clone, Debug)]
 pub struct NotarizationCounts {
@@ -123,10 +123,10 @@ impl NotebookConstraintsStore {
 
 #[cfg(test)]
 mod tests {
+	use crate::stores::notebook_header::NotebookHeaderStore;
+	use argon_notary_apis::error::Error;
 	use frame_support::assert_ok;
 	use sqlx::PgPool;
-
-	use crate::{error::Error, stores::notebook_header::NotebookHeaderStore};
 
 	use super::*;
 

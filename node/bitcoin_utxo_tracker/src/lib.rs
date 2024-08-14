@@ -185,6 +185,7 @@ mod test {
 			assert_eq!(result.verified.len(), 0);
 			assert_eq!(result.invalid.get(&1), Some(&BitcoinRejectedReason::SatoshisMismatch));
 		}
+		drop(bitcoind);
 	}
 
 	lazy_static! {

@@ -1,6 +1,6 @@
 use std::time::Duration;
 
-use anyhow::anyhow;
+use anyhow::{anyhow, ensure};
 use sp_runtime::{traits::One, FixedU128, Saturating};
 use tokio::{join, time::sleep};
 use tracing::info;
@@ -20,6 +20,15 @@ pub async fn price_index_loop(
 ) -> anyhow::Result<()> {
 	let mut reconnecting_client = ReconnectingClient::new(vec![trusted_rpc_url.clone()]);
 	let mainchain_client = reconnecting_client.get().await?;
+
+	if use_simulated_schedule == true {
+		let chain_info = mainchain_client.methods.system_chain().await?;
+		ensure!(
+			chain_info == "Development" || chain_info.contains("Testnet"),
+			"Simulated schedule can only be used on development chain"
+		);
+	}
+
 	let mut ticker = mainchain_client.lookup_ticker().await?;
 	if !cfg!(test) {
 		ticker

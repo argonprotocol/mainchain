@@ -585,7 +585,15 @@ pub mod pallet {
 				);
 			}
 
-			notebook_verify(&history_lookup, &notebook, block_vote_minimums).map_err(|e| {
+			let escrow_expiration_ticks = T::TickProvider::ticker().escrow_expiration_ticks;
+
+			notebook_verify(
+				&history_lookup,
+				&notebook,
+				block_vote_minimums,
+				escrow_expiration_ticks,
+			)
+			.map_err(|e| {
 				info!(
 					target: LOG_TARGET,
 					"Notebook audit failed for notary {notary_id}, notebook {notebook_number}: {:?}", e.to_string()

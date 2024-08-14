@@ -1,4 +1,4 @@
-use crate::error::Error;
+use argon_notary_apis::error::Error;
 use std::{future::Future, pin::Pin};
 
 pub mod balance_tip;

@@ -296,10 +296,10 @@ sp_api::mock_impl_runtime_apis! {
 
 	impl argon_primitives::TickApis<Block> for RuntimeApi {
 		fn current_tick() -> Tick {
-			Ticker::new(self.inner.config.tick_duration.as_millis() as u64, self.inner.config.genesis_utc_time).current() -1
+			Ticker::new(self.inner.config.tick_duration.as_millis() as u64, self.inner.config.genesis_utc_time, 2).current() -1
 		}
 		fn ticker() -> Ticker {
-			Ticker::new(self.inner.config.tick_duration.as_millis() as u64, self.inner.config.genesis_utc_time)
+			Ticker::new(self.inner.config.tick_duration.as_millis() as u64, self.inner.config.genesis_utc_time, 2)
 		}
 		fn blocks_at_tick(_: Tick) -> Vec<<Block as BlockT>::Hash> {
 			vec![]

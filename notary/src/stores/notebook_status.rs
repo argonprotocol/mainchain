@@ -1,9 +1,9 @@
+use argon_notary_apis::error::Error;
+use argon_primitives::{tick::Tick, NotebookNumber};
 use chrono::{DateTime, Utc};
 use sqlx::{query, Executor, FromRow, PgConnection};
 
-use argon_primitives::{tick::Tick, NotebookNumber};
-
-use crate::{ensure, error::Error};
+use crate::ensure;
 
 #[cfg(not(test))]
 pub const NOTEBOOK_DURATION_MS: i64 = 60_000;
@@ -205,15 +205,12 @@ impl NotebookStatusStore {
 mod tests {
 	use std::ops::Add;
 
+	use crate::stores::notebook_status::{NotebookFinalizationStep, NotebookStatusStore};
+	use argon_notary_apis::error::Error;
 	use chrono::{Duration, Utc};
 	use frame_support::assert_ok;
 	use futures::future::try_join;
 	use sqlx::PgPool;
-
-	use crate::{
-		error::Error,
-		stores::notebook_status::{NotebookFinalizationStep, NotebookStatusStore},
-	};
 
 	#[sqlx::test]
 	async fn test_locks(pool: PgPool) -> anyhow::Result<()> {

@@ -1,31 +1,27 @@
 use std::collections::{BTreeMap, BTreeSet};
 
-use codec::Encode;
-use serde_json::{from_value, json};
-use sp_runtime::BoundedVec;
-use sqlx::{query, types::Json, FromRow, PgConnection, PgPool};
-
-use crate::{
-	error::Error,
-	stores::{
-		balance_tip::BalanceTipStore,
-		blocks::BlocksStore,
-		chain_transfer::ChainTransferStore,
-		notebook::NotebookStore,
-		notebook_constraints::{MaxNotebookCounts, NotarizationCounts, NotebookConstraintsStore},
-		notebook_new_accounts::NotebookNewAccountsStore,
-		notebook_status::NotebookStatusStore,
-	},
+use crate::stores::{
+	balance_tip::BalanceTipStore,
+	blocks::BlocksStore,
+	chain_transfer::ChainTransferStore,
+	notebook::NotebookStore,
+	notebook_constraints::{MaxNotebookCounts, NotarizationCounts, NotebookConstraintsStore},
+	notebook_new_accounts::NotebookNewAccountsStore,
+	notebook_status::NotebookStatusStore,
 };
-use argon_notary_apis::localchain::BalanceChangeResult;
+use argon_notary_apis::{error::Error, localchain::BalanceChangeResult};
 use argon_notary_audit::{
 	verify_changeset_signatures, verify_notarization_allocation, verify_voting_sources, VerifyError,
 };
 use argon_primitives::{
-	ensure, AccountId, AccountOrigin, AccountType, BalanceChange, BalanceProof, BalanceTip,
-	BlockVote, DataDomainHash, LocalchainAccountId, NewAccountOrigin, Notarization, NotaryId,
-	NoteType, NotebookNumber,
+	ensure, tick::Ticker, AccountId, AccountOrigin, AccountType, BalanceChange, BalanceProof,
+	BalanceTip, BlockVote, DataDomainHash, LocalchainAccountId, NewAccountOrigin, Notarization,
+	NotaryId, NoteType, NotebookNumber,
 };
+use codec::Encode;
+use serde_json::{from_value, json};
+use sp_runtime::BoundedVec;
+use sqlx::{query, types::Json, FromRow, PgConnection, PgPool};
 
 #[derive(FromRow)]
 #[allow(dead_code)]
@@ -166,6 +162,7 @@ impl NotarizationsStore {
 	pub async fn apply(
 		pool: &PgPool,
 		notary_id: NotaryId,
+		ticker: &Ticker,
 		changes: Vec<BalanceChange>,
 		block_votes: Vec<BlockVote>,
 		data_domains: Vec<(DataDomainHash, AccountId)>,
@@ -174,8 +171,13 @@ impl NotarizationsStore {
 			return Err(Error::EmptyNotarizationProposed);
 		}
 		// Before we use db resources, let's confirm these are valid transactions
-		let initial_allocation_result =
-			verify_notarization_allocation(&changes, &block_votes, &data_domains, None)?;
+		let initial_allocation_result = verify_notarization_allocation(
+			&changes,
+			&block_votes,
+			&data_domains,
+			None,
+			ticker.escrow_expiration_ticks,
+		)?;
 		verify_changeset_signatures(&changes)?;
 
 		let mut voted_blocks = BTreeSet::new();
@@ -190,7 +192,13 @@ impl NotarizationsStore {
 			NotebookStatusStore::lock_open_for_appending(&mut tx).await?;
 
 		if initial_allocation_result.needs_escrow_settle_followup {
-			verify_notarization_allocation(&changes, &block_votes, &data_domains, Some(tick))?;
+			verify_notarization_allocation(
+				&changes,
+				&block_votes,
+				&data_domains,
+				Some(tick),
+				ticker.escrow_expiration_ticks,
+			)?;
 		}
 
 		let block_vote_specifications =
@@ -202,6 +210,7 @@ impl NotarizationsStore {
 		let mut escrow_data_domains = BTreeMap::new();
 		let mut chain_transfers: u32 = 0;
 		for (change_index, change) in changes.into_iter().enumerate() {
+			let change_index = change_index as u32;
 			let BalanceChange { account_id, account_type, change_number, balance, .. } = change;
 			let localchain_account_id = LocalchainAccountId::new(account_id.clone(), account_type);
 
@@ -276,14 +285,15 @@ impl NotarizationsStore {
 					.await?;
 
 					// record into the final changeset
-					changes_with_proofs[change_index].previous_balance_proof = Some(BalanceProof {
-						balance: proof.balance,
-						notary_id: proof.notary_id,
-						notebook_number: proof.notebook_number,
-						account_origin: proof.account_origin.clone(),
-						notebook_proof: Some(notebook_proof),
-						tick: proof.tick,
-					});
+					changes_with_proofs[change_index as usize].previous_balance_proof =
+						Some(BalanceProof {
+							balance: proof.balance,
+							notary_id: proof.notary_id,
+							notebook_number: proof.notebook_number,
+							account_origin: proof.account_origin.clone(),
+							notebook_proof: Some(notebook_proof),
+							tick: proof.tick,
+						});
 				}
 
 				if let Some(notebook_proof) = &proof.notebook_proof {
@@ -302,6 +312,7 @@ impl NotarizationsStore {
 
 			let mut escrow_hold_note = None;
 			for (note_index, note) in change.notes.into_iter().enumerate() {
+				let note_index = note_index as u32;
 				match note.note_type {
 					NoteType::ClaimFromMainchain { transfer_id, .. } => {
 						chain_transfers += 1;

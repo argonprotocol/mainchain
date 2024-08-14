@@ -1,5 +1,5 @@
 use argon_node_runtime::AccountId;
-use clap::ValueEnum;
+use clap::{Parser, ValueEnum};
 use sc_cli::RunCmd;
 
 #[derive(Debug, clap::Parser)]
@@ -8,7 +8,18 @@ pub struct Cli {
 	pub subcommand: Option<Subcommand>,
 
 	#[clap(flatten)]
-	pub run: RunCmd,
+	pub run: ArgonRunCmd,
+
+	/// Bitcoin node to verify minted bitcoins using compact filters. Should be a hosted/trusted
+	/// full node. Include optional auth inline
+	#[arg(long)]
+	pub bitcoin_rpc_url: Option<String>,
+}
+
+#[derive(Debug, Clone, Parser)]
+pub struct ArgonRunCmd {
+	#[clap(flatten)]
+	pub inner: RunCmd,
 
 	/// Enable an account to author blocks
 	///
@@ -22,11 +33,6 @@ pub struct Cli {
 	/// acceptance.
 	#[arg(long, verbatim_doc_comment)]
 	pub compute_miners: Option<u32>,
-
-	/// Bitcoin node to verify minted bitcoins using compact filters. Should be a hosted/trusted
-	/// full node. Include optional auth inline
-	#[arg(long)]
-	pub bitcoin_rpc_url: String,
 
 	/// Flags to control the randomx compute challenge. Can be specified multiple times.
 	/// - LargePages: use large memory pages for the randomx dataset (default active)
@@ -43,11 +49,11 @@ pub enum RandomxFlag {
 
 impl Cli {
 	pub fn block_author(&self) -> Option<AccountId> {
-		if let Some(block_author) = &self.author {
+		if let Some(block_author) = &self.run.author {
 			Some(block_author.clone())
-		} else if let Some(account) = self.run.get_keyring() {
+		} else if let Some(account) = self.run.inner.get_keyring() {
 			Some(account.to_account_id())
-		} else if self.run.shared_params.dev {
+		} else if self.run.inner.shared_params.dev {
 			use sp_core::crypto::Pair;
 			let block_author = sp_core::sr25519::Pair::from_string("//Alice", None).unwrap();
 			Some(AccountId::from(block_author.public()))

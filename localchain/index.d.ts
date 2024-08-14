@@ -305,6 +305,7 @@ export class TickerRef {
   tickForTime(timestampMillis: number): number
   timeForTick(tick: number): bigint
   millisToNextTick(): bigint
+  get escrowExpirationTicks(): Tick
 }
 
 export class Transactions {
@@ -471,9 +472,6 @@ export enum DataTLD {
 /** Number of ticks past the expiration of an escrow that a recipient has to claim. After this point, sender can recoup the escrowed funds */
 export const ESCROW_CLAWBACK_TICKS: number
 
-/** Number of ticks past the notarization of an escrow hold that an escrow can be claimed (and no longer used) */
-export const ESCROW_EXPIRATION_TICKS: number
-
 /** Minimum milligons that can be settled in an escrow */
 export const ESCROW_MINIMUM_SETTLEMENT: bigint
 
@@ -600,6 +598,7 @@ export interface Ticker {
 export interface TickerConfig {
   tickDurationMillis: number
   genesisUtcTime: number
+  escrowExpirationTicks: number
   ntpPoolUrl?: string
 }
 

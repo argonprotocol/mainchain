@@ -79,7 +79,7 @@ pub(crate) async fn mock_localchain(
   crypto_scheme: CryptoScheme,
   notary_clients: &NotaryClients,
 ) -> Localchain {
-  let ticker = TickerRef::new(Ticker::start(Duration::from_secs(60)));
+  let ticker = TickerRef::new(Ticker::start(Duration::from_secs(60), 2));
   let keystore = Keystore::new(pool.clone());
   let _ = keystore
     .import_suri(suri.to_string(), crypto_scheme, None)

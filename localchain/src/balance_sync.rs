@@ -9,7 +9,7 @@ use sp_runtime::MultiSignature;
 use sqlx::{Sqlite, SqlitePool, Transaction};
 use tokio::sync::Mutex;
 
-use crate::{bail, Result};
+use crate::{bail, Error, Result};
 use argon_primitives::tick::Tick;
 use argon_primitives::{AccountType, BlockVote, NotaryId, NotebookNumber};
 
@@ -223,6 +223,7 @@ impl BalanceSync {
       self.db.clone(),
       self.notary_clients.clone(),
       self.keystore.clone(),
+      self.ticker.clone(),
     );
     for jump_account in all_accounts {
       let latest = BalanceChangeStore::db_get_latest_for_account(&mut db, jump_account.id).await?;
@@ -256,6 +257,7 @@ impl BalanceSync {
               self.db.clone(),
               self.notary_clients.clone(),
               self.keystore.clone(),
+              self.ticker.clone(),
             );
             let transaction =
               Transactions::create_static(&mut db, TransactionType::Consolidation).await?;
@@ -315,6 +317,7 @@ impl BalanceSync {
       self.db.clone(),
       self.notary_clients.clone(),
       self.keystore.clone(),
+      self.ticker.clone(),
     );
     let mut notarizations = vec![];
 
@@ -377,6 +380,10 @@ impl BalanceSync {
         match Self::sync_notebook_proof(&self.db, &mut change, &self.notary_clients).await {
           Ok(x) => x,
           Err(e) => {
+            if is_notebook_finalization_error(&e) {
+              return Ok(change);
+            }
+
             tracing::warn!("Error syncing notebook proof (#{}): {:?}", change.id, e);
             true
           }
@@ -387,7 +394,9 @@ impl BalanceSync {
       match Self::check_notary(&self.db, &mut change, &self.notary_clients).await {
         Ok(_) => {}
         Err(e) => {
-          tracing::warn!("Error checking notary (#{}): {:?}", change.id, e);
+          if !is_notebook_finalization_error(&e) {
+            tracing::warn!("Error checking notary (#{}): {:?}", change.id, e);
+          }
         }
       }
     }
@@ -396,7 +405,9 @@ impl BalanceSync {
       match self.check_finalized(&mut change).await {
         Ok(_) => {}
         Err(e) => {
-          tracing::warn!("Error checking finalized (#{}): {:?}", change.id, e);
+          if !is_notebook_finalization_error(&e) {
+            tracing::warn!("Error checking finalized (#{}): {:?}", change.id, e);
+          }
         }
       }
     }
@@ -428,6 +439,7 @@ impl BalanceSync {
           self.db.clone(),
           self.notary_clients.clone(),
           self.keystore.clone(),
+          self.ticker.clone(),
         )
       });
 
@@ -608,7 +620,14 @@ impl BalanceSync {
           break;
         }
         Err(e) => {
-          if e.to_string().contains("Escrow hold not ready for claim") {
+          if is_notebook_finalization_error(&e)
+            || matches!(
+              e,
+              Error::NotaryApiError(argon_notary_apis::Error::BalanceChangeVerifyError(
+                argon_notary_audit::VerifyError::EscrowHoldNotReadyForClaim { .. }
+              ))
+            )
+          {
             let delay = (2 + i) ^ 5;
             tracing::debug!("Escrow hold not ready for claim. Waiting {delay} seconds.");
             tokio::time::sleep(tokio::time::Duration::from_secs(delay)).await;
@@ -1001,4 +1020,11 @@ impl BalanceSync {
 
     Ok(())
   }
+}
+
+fn is_notebook_finalization_error(e: &Error) -> bool {
+  matches!(
+    e,
+    Error::NotaryApiError(argon_notary_apis::Error::NotebookNotFinalized)
+  )
 }

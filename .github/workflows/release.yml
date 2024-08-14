@@ -16,6 +16,7 @@ env:
   RUSTFLAGS: -D warnings
   RUSTUP_MAX_RETRIES: 10
   CARGO_TERM_COLOR: always
+  SQLX_OFFLINE: true
 
 defaults:
   run:
@@ -34,7 +35,7 @@ jobs:
       - uses: taiki-e/create-gh-release-action@v1
         with:
           title: $version
-          branch: main
+          draft: true
           token: ${{ secrets.GITHUB_TOKEN }}
 
   upload-assets:
@@ -42,17 +43,21 @@ jobs:
     needs:
       - create-release
     strategy:
+      fail-fast: false
       matrix:
         include:
           - target: aarch64-unknown-linux-gnu
+            bins: argon-node,argon-notary,argon-localchain,argon-bitcoin-cli,argon-oracle
           - target: x86_64-unknown-linux-gnu
+            bins: argon-node,argon-notary,argon-localchain,argon-bitcoin-cli,argon-oracle
           - target: aarch64-apple-darwin
             os: macos-latest
+            bins: argon-node,argon-notary,argon-localchain,argon-bitcoin-cli,argon-oracle
           - target: x86_64-apple-darwin
             os: macos-latest
+            bins: argon-node,argon-notary,argon-localchain,argon-bitcoin-cli,argon-oracle
           - os: windows-latest
-          # - target: universal-apple-darwin
-          #   os: macos-11
+            target: x86_64-pc-windows-msvc
 
     runs-on: ${{ matrix.os || 'ubuntu-22.04' }}
     timeout-minutes: 90
@@ -63,39 +68,40 @@ jobs:
         with:
           persist-credentials: false
 
-      - name: Install Rust
-        run: |
-          rustup update stable --no-self-update
-          rustup target add wasm32-unknown-unknown
-
       - name: Install linux dependencies
         if: (matrix.os == '' || startsWith(matrix.os, 'ubuntu'))
         run: |
-          sudo apt-get -qq update
           sudo apt-get install -y clang libssl-dev llvm libudev-dev protobuf-compiler pkg-config
 
       - name: Install mac dependencies
         if: startsWith(matrix.os, 'macos')
         run: brew install protobuf
 
+      - uses: rui314/setup-mold@v1
+
+      - name: Install
+        uses: dtolnay/rust-toolchain@stable
+        with:
+          toolchain: stable
+          targets: wasm32-unknown-unknown
+
       - uses: taiki-e/setup-cross-toolchain-action@v1
-        if: (matrix.os == '' || startsWith(matrix.os, 'ubuntu'))
         with:
           target: ${{ matrix.target }}
 
       - uses: taiki-e/upload-rust-binary-action@v1
+        if: (matrix.os == '' || startsWith(matrix.os, 'ubuntu'))
         with:
           bin: argon-node
-          checksum: sha256,sha512,sha1,md5
           features: metadata-hash
           target: ${{ matrix.target }}
           archive: $bin-$tag-$target
           token: ${{ secrets.GITHUB_TOKEN }}
 
       - uses: taiki-e/upload-rust-binary-action@v1
+        if: (!startsWith(matrix.os, 'windows'))
         with:
           bin: argon-notary
-          checksum: sha256,sha512,sha1,md5
           target: ${{ matrix.target }}
           archive: $bin-$tag-$target
           token: ${{ secrets.GITHUB_TOKEN }}
@@ -103,7 +109,6 @@ jobs:
       - uses: taiki-e/upload-rust-binary-action@v1
         with:
           bin: argon-localchain
-          checksum: sha256,sha512,sha1,md5
           target: ${{ matrix.target }}
           archive: $bin-$tag-$target
           token: ${{ secrets.GITHUB_TOKEN }}
@@ -112,13 +117,21 @@ jobs:
         if: (matrix.target == 'x86_64-unknown-linux-gnu')
         with:
           bin: argon-oracle
-          checksum: sha256,sha512,sha1,md5
+          # TODO: deactivate this feature when we have price liquidity
+          features: simulated-prices
+          target: ${{ matrix.target }}
+          archive: $bin-$tag-$target
+          token: ${{ secrets.GITHUB_TOKEN }}
+
+      - uses: taiki-e/upload-rust-binary-action@v1
+        with:
+          bin: argon-bitcoin-cli
           target: ${{ matrix.target }}
           archive: $bin-$tag-$target
           token: ${{ secrets.GITHUB_TOKEN }}
 
       - name: Upload linux binaries to workflow
-        if: (matrix.target == 'x86_64-unknown-linux-gnu' || matrix.target == 'aarch64-unknown-linux-gnu')
+        if: (matrix.os == '' || startsWith(matrix.os, 'ubuntu'))
         uses: actions/upload-artifact@v4
         with:
           name: bins-${{ matrix.target }}
@@ -129,13 +142,10 @@ jobs:
     needs:
       - upload-assets
     runs-on: ubuntu-latest
+    permissions:
+      contents: write
+      packages: write
     steps:
-      - name: Log in to Docker Hub
-        uses: docker/login-action@v3.2.0
-        with:
-          username: ${{ secrets.DOCKERHUB_USERNAME }}
-          password: ${{ secrets.DOCKERHUB_TOKEN }}
-
       - name: Check out the repo
         uses: actions/checkout@v4
 

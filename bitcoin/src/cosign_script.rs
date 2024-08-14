@@ -196,38 +196,6 @@ impl CosignScript {
 			Self::get_descriptor(cosign_script_args)
 		}
 	}
-
-	// #[rustfmt::skip]
-	// pub fn create_script(
-	// 	descriptor: Descriptor<PublicKey>
-	// ) -> Result<ScriptBuf>, BitcoinError> {
-	// 	let policy = Self::create_policy(cosign_script_args)?;
-	// 	let descriptor  = Self::get_descriptor(cosign_script_args, policy)?;
-	// 	let script = descriptor.script_code().map_err(|_| BitcoinError::InvalidPolicy)?;
-	// 	// use bitcoin::blockdata::{opcodes::all::*, script::Builder};
-	// 	// use bitcoin::absolute::LockTime;
-	// 	// let script = Builder::new()
-	// 	// 	.push_slice(vault_pubkey.0)
-	// 	// 	.push_opcode(OP_CHECKSIG)
-	// 	// 	.push_opcode(OP_NOTIF)
-	// 	// 		.push_lock_time(LockTime::from_height(open_claim_height as u32).map_err(|_|
-	// BitcoinError::InvalidLockTime)?) 	// 		.push_opcode(OP_CLTV)
-	// 	// 		.push_opcode(OP_DROP)
-	// 	// 	.push_opcode(OP_ENDIF)
-	// 	// 	.push_slice(owner_pubkey.0)
-	// 	// 	.push_opcode(OP_CHECKSIG)
-	// 	// 	.push_opcode(OP_IFDUP)
-	// 	// 	.push_opcode(OP_NOTIF)
-	// 	// 		// if only vault, needs to be post vault claim height
-	// 	// 		.push_lock_time(LockTime::from_height(vault_claim_height as u32).map_err(|_|
-	// BitcoinError::InvalidLockTime)?) 	// 		.push_opcode(OP_CLTV)
-	// 	// 		.push_opcode(OP_DROP)
-	// 	// 		.push_opcode(OP_TRUE)
-	// 	// 	.push_opcode(OP_ENDIF)
-	// 	// 	.into_script();
-	// 	//  Ok(script)
-	// 	Ok((script, descriptor))
-	// }
 }
 
 #[cfg(test)]
@@ -439,6 +407,7 @@ mod test {
 			},
 			&block_address,
 		);
+		drop(bitcoind);
 	}
 
 	#[test]
@@ -552,6 +521,7 @@ mod test {
 				&block_address,
 			);
 		}
+		drop(bitcoind);
 	}
 
 	#[test]
@@ -678,6 +648,7 @@ mod test {
 				&block_address,
 			);
 		}
+		drop(bitcoind);
 	}
 
 	#[test]
@@ -842,6 +813,7 @@ mod test {
 			},
 			&block_address,
 		);
+		drop(bitcoind);
 	}
 
 	fn check_spent(

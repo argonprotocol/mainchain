@@ -85,14 +85,14 @@ args = ["--show-stats"]
 [tasks.build]
 description = "Compiles the project"
 command = "cargo"
-args = ["build", "--features", "fast-runtime"]
+args = ["build"]
 env = { "RUSTC_WRAPPER" = "sccache" }
 dependencies = ["sqlx-setup"]
 
 [tasks.build-node]
 description = "Compiles the project"
 command = "cargo"
-args = ["build", "--bin", "argon-node", "--features", "fast-runtime"]
+args = ["build", "--bin", "argon-node"]
 env = { "RUSTC_WRAPPER" = "sccache" }
 dependencies = ["sqlx-setup"]
 
@@ -104,14 +104,14 @@ dependencies = ["build-node"]
 [tasks.test]
 description = "Run tests with cargo,"
 command = "cargo"
-args = ["test", "--features", "fast-runtime", "--no-fail-fast", "${@}"]
+args = ["test", "--no-fail-fast", "${@}"]
 dependencies = ["build"]
 env = { "RUSTC_WRAPPER" = "sccache" }
 
 [tasks.nextest]
 description = "Run tests with nextest,"
 command = "cargo"
-args = ["nextest", "run", "--features", "fast-runtime"]
+args = ["nextest", "run"]
 dependencies = ["build"]
 env = { "RUSTC_WRAPPER" = "sccache" }
 install_crate_args = ["--no-confirm"]
@@ -125,7 +125,7 @@ install_command = "binstall"
 [tasks.watch]
 description = "Watch for changes and rebuild"
 command = "cargo"
-args = ["watch", "-x", "build", "--features", "fast-runtime"]
+args = ["watch", "-x", "build"]
 env = { "RUSTC_WRAPPER" = "sccache" }
 install_crate_args = ["--no-confirm"]
 dependencies = ["sqlx-setup"]

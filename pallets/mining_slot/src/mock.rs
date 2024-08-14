@@ -1,7 +1,7 @@
 use crate as pallet_mining_slot;
 use crate::Registration;
 use argon_primitives::{
-	block_seal::RewardSharing,
+	block_seal::{MiningSlotConfig, RewardSharing},
 	bond::{BondError, BondProvider},
 	VaultId,
 };
@@ -34,11 +34,11 @@ impl frame_system::Config for Test {
 }
 
 parameter_types! {
-	pub static BlocksBetweenSlots: u32 = 1;
+	pub static BlocksBetweenSlots: u64 = 1;
 	pub static MaxCohortSize: u32 = 5;
 	pub static MaxMiners: u32 = 10;
-	pub static BlocksBeforeBidEndForVrfClose: u32 = 0;
-	pub static SlotBiddingStartBlock: u32 = 3;
+	pub static BlocksBeforeBidEndForVrfClose: u64 = 0;
+	pub static SlotBiddingStartBlock: u64 = 3;
 	pub static TargetBidsPerSlot: u32 = 5;
 	pub const OwnershipPercentAdjustmentDamper: FixedU128 = FixedU128::from_rational(20, 100);
 
@@ -134,18 +134,16 @@ impl BondProvider for StaticBondProvider {
 impl pallet_mining_slot::Config for Test {
 	type RuntimeEvent = RuntimeEvent;
 	type WeightInfo = ();
-	type SessionIndicesToKeepInHistory = ConstU32<10>;
-	type BlocksBetweenSlots = BlocksBetweenSlots;
+	type SessionWindowsToKeepInHistory = ConstU32<10>;
 	type MaxCohortSize = MaxCohortSize;
 	type TargetBidsPerSlot = TargetBidsPerSlot;
 	type MaxMiners = MaxMiners;
 	type OwnershipCurrency = ShareBalances;
 	type RuntimeHoldReason = RuntimeHoldReason;
 	type OwnershipPercentAdjustmentDamper = OwnershipPercentAdjustmentDamper;
-	type BlocksBeforeBidEndForVrfClose = BlocksBeforeBidEndForVrfClose;
 	type Balance = Balance;
 	type BondProvider = StaticBondProvider;
-	type SlotBiddingStartBlock = SlotBiddingStartBlock;
+	type SessionRotationsPerMiningWindow = ConstU32<2>;
 }
 
 // Build genesis storage according to the mock runtime.
@@ -153,10 +151,20 @@ pub fn new_test_ext(miner_zero: Option<Registration<Test>>) -> sp_io::TestExtern
 	let env = Env::new().default_filter_or("debug");
 	let _ = Builder::from_env(env).is_test(true).try_init();
 
+	let mining_config = MiningSlotConfig::<BlockNumberFor<Test>> {
+		slot_bidding_start_block: SlotBiddingStartBlock::get(),
+		blocks_between_slots: BlocksBetweenSlots::get(),
+		blocks_before_bid_end_for_vrf_close: BlocksBeforeBidEndForVrfClose::get(),
+	};
+
 	let mut t = frame_system::GenesisConfig::<Test>::default().build_storage().unwrap();
-	pallet_mining_slot::GenesisConfig::<Test> { miner_zero, _phantom: Default::default() }
-		.assimilate_storage(&mut t)
-		.unwrap();
+	pallet_mining_slot::GenesisConfig::<Test> {
+		miner_zero,
+		mining_config,
+		_phantom: Default::default(),
+	}
+	.assimilate_storage(&mut t)
+	.unwrap();
 
 	sp_io::TestExternalities::new(t)
 }

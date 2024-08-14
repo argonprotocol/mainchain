@@ -8,7 +8,8 @@ afterAll(teardown);
 it('can sign a message from javscript', async () => {
     const bobchain = await Localchain.loadWithoutMainchain(':memory:', {
         genesisUtcTime: Date.now(),
-        tickDurationMillis: 1000
+        tickDurationMillis: 1000,
+        escrowExpirationTicks: 2,
     });
     closeOnTeardown(bobchain);
     const bob = await KeyringSigner.load("//Bob");
@@ -28,7 +29,8 @@ it('can sign a message from javscript', async () => {
 it('can sign using built-in', async () => {
     const bobchain = await Localchain.loadWithoutMainchain(':memory:', {
         genesisUtcTime: Date.now(),
-        tickDurationMillis: 1000
+        tickDurationMillis: 1000,
+        escrowExpirationTicks: 2,
     });
     closeOnTeardown(bobchain);
 

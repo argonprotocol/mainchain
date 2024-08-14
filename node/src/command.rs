@@ -14,7 +14,7 @@ use crate::{
 
 impl SubstrateCli for Cli {
 	fn impl_name() -> String {
-		"Substrate Node".into()
+		"Argon Node".into()
 	}
 
 	fn impl_version() -> String {
@@ -30,7 +30,7 @@ impl SubstrateCli for Cli {
 	}
 
 	fn support_url() -> String {
-		"support.anonymous.an".into()
+		"https://github.com/argonprotocol/mainchain/issues".into()
 	}
 
 	fn copyright_start_year() -> i32 {
@@ -41,6 +41,7 @@ impl SubstrateCli for Cli {
 		Ok(match id {
 			"dev" => Box::new(chain_spec::development_config()?),
 			"" | "local" => Box::new(chain_spec::local_testnet_config()?),
+			"testnet" => Box::new(chain_spec::testnet_config()?),
 			path =>
 				Box::new(chain_spec::ChainSpec::from_json_file(std::path::PathBuf::from(path))?),
 		})
@@ -50,6 +51,16 @@ impl SubstrateCli for Cli {
 /// Parse and run command line arguments
 pub fn run() -> sc_cli::Result<()> {
 	let cli = Cli::from_args();
+
+	let bitcoin_rpc_url = cli.bitcoin_rpc_url.clone().unwrap_or_default();
+	if matches!(cli.subcommand, None) ||
+		!matches!(cli.subcommand, Some(Subcommand::Key(_)) | Some(Subcommand::BuildSpec(_)))
+	{
+		if cli.bitcoin_rpc_url.is_none() {
+			eprintln!("Error: --bitcoin-rpc-url is required unless using the 'Key' or 'BuildSpec' subcommands.");
+			std::process::exit(1);
+		}
+	}
 
 	match &cli.subcommand {
 		Some(Subcommand::Key(cmd)) => cmd.run(&cli),
@@ -61,7 +72,7 @@ pub fn run() -> sc_cli::Result<()> {
 			let runner = cli.create_runner(cmd)?;
 			runner.async_run(|config| {
 				let PartialComponents { client, task_manager, import_queue, .. } =
-					service::new_partial(&config, cli.bitcoin_rpc_url)?;
+					service::new_partial(&config, bitcoin_rpc_url)?;
 				Ok((cmd.run(client, import_queue), task_manager))
 			})
 		},
@@ -69,7 +80,7 @@ pub fn run() -> sc_cli::Result<()> {
 			let runner = cli.create_runner(cmd)?;
 			runner.async_run(|config| {
 				let PartialComponents { client, task_manager, .. } =
-					service::new_partial(&config, cli.bitcoin_rpc_url)?;
+					service::new_partial(&config, bitcoin_rpc_url)?;
 				Ok((cmd.run(client, config.database), task_manager))
 			})
 		},
@@ -77,7 +88,7 @@ pub fn run() -> sc_cli::Result<()> {
 			let runner = cli.create_runner(cmd)?;
 			runner.async_run(|config| {
 				let PartialComponents { client, task_manager, .. } =
-					service::new_partial(&config, cli.bitcoin_rpc_url)?;
+					service::new_partial(&config, bitcoin_rpc_url)?;
 				Ok((cmd.run(client, config.chain_spec), task_manager))
 			})
 		},
@@ -85,7 +96,7 @@ pub fn run() -> sc_cli::Result<()> {
 			let runner = cli.create_runner(cmd)?;
 			runner.async_run(|config| {
 				let PartialComponents { client, task_manager, import_queue, .. } =
-					service::new_partial(&config, cli.bitcoin_rpc_url)?;
+					service::new_partial(&config, bitcoin_rpc_url)?;
 				Ok((cmd.run(client, import_queue), task_manager))
 			})
 		},
@@ -97,7 +108,7 @@ pub fn run() -> sc_cli::Result<()> {
 			let runner = cli.create_runner(cmd)?;
 			runner.async_run(|config| {
 				let PartialComponents { client, task_manager, backend, .. } =
-					service::new_partial(&config, cli.bitcoin_rpc_url)?;
+					service::new_partial(&config, bitcoin_rpc_url)?;
 				let aux_revert = Box::new(|client, _, blocks| {
 					sc_consensus_grandpa::revert(client, blocks)?;
 					Ok(())
@@ -107,7 +118,7 @@ pub fn run() -> sc_cli::Result<()> {
 		},
 		Some(Subcommand::Benchmark(cmd)) => {
 			let runner = cli.create_runner(cmd)?;
-			let bitcoin_rpc_url = cli.bitcoin_rpc_url;
+			let bitcoin_rpc_url = bitcoin_rpc_url;
 
 			runner.sync_run(|config| {
 				// This switch needs to be in the client, since the client decides
@@ -139,7 +150,7 @@ pub fn run() -> sc_cli::Result<()> {
 					#[cfg(feature = "runtime-benchmarks")]
 					BenchmarkCmd::Storage(cmd) => {
 						let PartialComponents { client, backend, .. } =
-							service::new_partial(&config)?;
+							service::new_partial(&config, bitcoin_rpc_url)?;
 						let db = backend.expose_db();
 						let storage = backend.expose_storage();
 
@@ -183,13 +194,13 @@ pub fn run() -> sc_cli::Result<()> {
 			runner.sync_run(|config| cmd.run::<Block>(&config))
 		},
 		None => {
-			let runner = cli.create_runner(&cli.run)?;
+			let runner = cli.create_runner(&cli.run.inner)?;
 
 			let mut randomx_config = argon_randomx::Config::default();
-			if cli.randomx_flags.contains(&RandomxFlag::LargePages) {
+			if cli.run.randomx_flags.contains(&RandomxFlag::LargePages) {
 				randomx_config.large_pages = true;
 			}
-			if cli.randomx_flags.contains(&RandomxFlag::Secure) {
+			if cli.run.randomx_flags.contains(&RandomxFlag::Secure) {
 				randomx_config.secure = true;
 			}
 			let _ = argon_randomx::set_global_config(randomx_config);
@@ -204,16 +215,16 @@ pub fn run() -> sc_cli::Result<()> {
 					>(
 						config,
 						cli.block_author(),
-						cli.compute_miners,
-						cli.bitcoin_rpc_url,
+						cli.run.compute_miners,
+						bitcoin_rpc_url,
 					)
 					.map_err(sc_cli::Error::Service),
 					sc_network::config::NetworkBackendType::Litep2p =>
 						service::new_full::<sc_network::Litep2pNetworkBackend>(
 							config,
 							cli.block_author(),
-							cli.compute_miners,
-							cli.bitcoin_rpc_url,
+							cli.run.compute_miners,
+							bitcoin_rpc_url,
 						)
 						.map_err(sc_cli::Error::Service),
 				}

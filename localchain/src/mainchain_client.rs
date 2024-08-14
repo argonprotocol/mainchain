@@ -17,6 +17,7 @@ use tracing::warn;
 use argon_client::api::storage;
 use argon_client::api::{runtime_types, tx};
 
+use argon_client::api::runtime_types::bounded_collections::bounded_vec::BoundedVec;
 use argon_client::{
   api, ArgonConfig, ArgonExtrinsicParamsBuilder, MainchainClient as InnerMainchainClient,
 };
@@ -534,13 +535,13 @@ impl MainchainClient {
         Some(best_block),
       )
       .await?
-      .ok_or_else(|| anyhow!("No notebook found for notary {}", notary_id))?
+      .unwrap_or(BoundedVec(Vec::new()))
       .0
       .last()
     {
       return Ok(details.clone());
     }
-    bail!("No notebook found for notary {}", notary_id)
+    bail!("No immortalized notebook found for notary {}", notary_id)
   }
 
   pub async fn get_account_changes_root(

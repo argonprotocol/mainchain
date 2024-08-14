@@ -2,7 +2,7 @@ use crate::ensure;
 use argon_primitives::tick::Tick;
 use sp_core::{ed25519, ByteArray};
 
-use crate::error::Error;
+use argon_notary_apis::error::Error;
 
 pub struct RegisteredKeyStore {
 	pub public: ed25519::Public,

@@ -26,13 +26,12 @@ pub use frame_support::{
 use frame_support::{
 	derive_impl,
 	genesis_builder_helper::{build_state, get_preset},
-	traits::{Contains, Currency, InsideBoth, OnUnbalanced},
-	PalletId,
-};
-// Configure FRAME pallets to include in runtime.
-use frame_support::{
-	traits::{fungible, fungible::Balanced, Everything, Imbalance, InstanceFilter, StorageMapShim},
+	traits::{
+		fungible, fungible::Balanced, Contains, Currency, Everything, Imbalance, InsideBoth,
+		InstanceFilter, OnUnbalanced, StorageMapShim,
+	},
 	weights::{WeightToFeeCoefficient, WeightToFeeCoefficients},
+	PalletId,
 };
 pub use frame_system::Call as SystemCall;
 use frame_system::EnsureRoot;
@@ -43,7 +42,7 @@ use pallet_tx_pause::RuntimeCallNameOf;
 use scale_info::TypeInfo;
 use smallvec::smallvec;
 use sp_api::impl_runtime_apis;
-use sp_arithmetic::{traits::Zero, FixedPointNumber, FixedU128};
+use sp_arithmetic::{traits::Zero, FixedPointNumber, FixedU128, Percent};
 use sp_consensus_grandpa::AuthorityId as GrandpaId;
 use sp_core::{crypto::KeyTypeId, ConstU16, OpaqueMetadata, H256, U256};
 use sp_debug_derive::RuntimeDebug;
@@ -69,10 +68,9 @@ use argon_primitives::{
 	localchain::BestBlockVoteSeal,
 	notary::{NotaryId, NotaryNotebookVoteDetails, NotaryNotebookVoteDigestDetails, NotaryRecord},
 	notebook::NotebookNumber,
-	prod_or_fast,
-	tick::{Tick, Ticker, TICK_MILLIS},
+	tick::{Tick, Ticker},
 	ArgonCPI, BlockSealAuthorityId, NotaryNotebookVotes, NotebookAuditResult, NotebookAuditSummary,
-	PriceProvider, TickProvider, ESCROW_CLAWBACK_TICKS, ESCROW_EXPIRATION_TICKS,
+	PriceProvider, TickProvider, ESCROW_CLAWBACK_TICKS,
 };
 pub use argon_primitives::{
 	AccountId, Balance, BlockHash, BlockNumber, HashOutput, Moment, Nonce, Signature,
@@ -230,23 +228,24 @@ impl frame_system::Config for Runtime {
 }
 
 parameter_types! {
-	pub const TargetComputeBlockTime: u64 = TICK_MILLIS / 2u64; // aim for compute to take half of vote time
+	pub const TargetComputeBlockPercent: Percent = Percent::from_percent(50); // aim for compute to take half of vote time
 	pub const TargetBlockVotes: u32 = 50_000;
 	pub const MinimumsChangePeriod: u32 = 60 * 24; // change block_seal_spec once a day
 
+	pub const DefaultEscrowDuration: Tick = 60;
+	pub const HistoricalPaymentAddressTicksToKeep: Tick = DefaultEscrowDuration::get() + ESCROW_CLAWBACK_TICKS + 10;
 
 	pub const ArgonsPerBlock: u32 = 5_000;
 	pub const StartingSharesPerBlock: u32 = 5_000;
 	pub const HalvingBlocks: u32 = 2_100_000; // based on bitcoin, but 10x since we're block per minute
 	pub const MaturationBlocks: u32 = 5;
 	pub const MinerPayoutPercent: FixedU128 = FixedU128::from_rational(75, 100);
-	pub const DomainExpirationTicks: u32 = 60 * 24 * 365; // 1 year
-	pub const HistoricalPaymentAddressTicksToKeep: u32 = ESCROW_EXPIRATION_TICKS + ESCROW_CLAWBACK_TICKS + 10;
+	pub const DomainExpirationTicks: Tick = 60 * 24 * 365; // 1 year
 }
 
 impl pallet_block_seal_spec::Config for Runtime {
 	type RuntimeEvent = RuntimeEvent;
-	type TargetComputeBlockTime = TargetComputeBlockTime;
+	type TargetComputeBlockPercent = TargetComputeBlockPercent;
 	type AuthorityProvider = MiningSlot;
 	type NotebookProvider = Notebook;
 	type WeightInfo = pallet_block_seal_spec::weights::SubstrateWeight<Runtime>;
@@ -304,37 +303,29 @@ impl pallet_ticks::Config for Runtime {
 
 parameter_types! {
 	pub const MaxCohortSize: u32 = 1_000; // this means mining_slots last 10 days
-	pub const BlocksBetweenSlots: u32 = prod_or_fast!(1440, 4); // going to add a cohort every day
 	pub const MaxMiners: u32 = 10_000; // must multiply cleanly by MaxCohortSize
-	pub const SessionRotationPeriod: u32 = prod_or_fast!(125, 2); // must be cleanly divisible by BlocksBetweenSlots
-	pub const Offset: u32 = 0;
 	pub const OwnershipPercentAdjustmentDamper: FixedU128 = FixedU128::from_rational(20, 100);
 	pub const TargetBidsPerSlot: u32 = 1_200; // 20% extra bids
-	pub const SlotBiddingStartBlock: u32 = prod_or_fast!(14_400, 4);
-
-	pub const BlocksBeforeBidEndForVrfClose: u32 = prod_or_fast!(200, 1);
 
 	pub const MaxConcurrentlyExpiringBonds: u32 = 1000;
-	pub const MinimumBondAmount:u128 = 1_000;
-	pub const BlocksPerDay:u32 = 1440;
-	pub const BlocksPerYear:u32 = 1440 * 365;
+	pub const MinimumBondAmount: u128 = 1_000;
+	pub const BlocksPerDay: u32 = 1440;
+	pub const BlocksPerYear: u32 = 1440 * 365;
 
-	const ValidatorWindow: u32 = (MaxMiners::get() / MaxCohortSize::get()) * BlocksBetweenSlots::get();
-	const SessionsPerWindow: u32 = ValidatorWindow::get() / SessionRotationPeriod::get();
 	// Arbitrarily chosen. We keep these around for equivocation reporting in grandpa, and for
 	// notary auditing using validators of finalized blocks.
-	pub const SessionIndicesToKeepInHistory: u32 = SessionsPerWindow::get() * 10;
+	pub const SessionWindowsToKeepInHistory: u32 = 10;
 
-	// How long to keep grandpa set ids around for equivocations
-	pub const MaxSetIdSessionEntries: u32 = SessionsPerWindow::get() * 2u32;
-	pub const ReportLongevity: u64 = ValidatorWindow::get() as u64 * 2;
-	pub const HistoricalBlockSealersToKeep: u32 = BlocksBetweenSlots::get();
-
-
-	const BitcoinBlocksPerDay:BitcoinHeight = 6  *24;
+	const BitcoinBlocksPerDay: BitcoinHeight = 6 * 24;
 	pub const BitcoinBondDurationBlocks: BitcoinHeight = BitcoinBlocksPerDay::get() * 365; // 1 year
 	pub const BitcoinBondReclamationBlocks: BitcoinHeight = BitcoinBlocksPerDay::get() * 30; // 30 days
 	pub const UtxoUnlockCosignDeadlineBlocks: BitcoinHeight = BitcoinBlocksPerDay::get() * 5; // 5 days
+
+	pub const SessionsPerMiningWindow: u32 = 2;
+
+	pub const MaxSetIdSessionEntries: u32 = SessionsPerMiningWindow::get() * 2u32;
+	// keep around for 2
+	pub const ReportLongevity: u64 = BlocksPerDay::get() as u64 * 10;
 
 	pub const MaxUnlockingUtxos: u32 = 1000;
 	pub const MinBitcoinSatoshiAmount: Satoshis = 10_000_000; // 1/10th bitcoin minimum
@@ -388,14 +379,12 @@ impl pallet_mining_slot::Config for Runtime {
 	type OwnershipCurrency = ShareBalances;
 	type OwnershipPercentAdjustmentDamper = OwnershipPercentAdjustmentDamper;
 	type TargetBidsPerSlot = TargetBidsPerSlot;
-	type SlotBiddingStartBlock = SlotBiddingStartBlock;
-	type BlocksBeforeBidEndForVrfClose = BlocksBeforeBidEndForVrfClose;
 	type RuntimeHoldReason = RuntimeHoldReason;
 	type MaxCohortSize = MaxCohortSize;
-	type SessionIndicesToKeepInHistory = SessionIndicesToKeepInHistory;
-	type BlocksBetweenSlots = BlocksBetweenSlots;
+	type SessionWindowsToKeepInHistory = SessionWindowsToKeepInHistory;
 	type Balance = Balance;
 	type BondProvider = Bonds;
+	type SessionRotationsPerMiningWindow = SessionsPerMiningWindow;
 }
 
 impl pallet_block_seal::Config for Runtime {
@@ -413,8 +402,8 @@ impl pallet_session::Config for Runtime {
 	type RuntimeEvent = RuntimeEvent;
 	type ValidatorId = <Self as frame_system::Config>::AccountId;
 	type ValidatorIdOf = pallet_mining_slot::ValidatorIdOf<Self>;
-	type ShouldEndSession = pallet_session::PeriodicSessions<SessionRotationPeriod, Offset>;
-	type NextSessionRotation = pallet_session::PeriodicSessions<SessionRotationPeriod, Offset>;
+	type ShouldEndSession = MiningSlot;
+	type NextSessionRotation = MiningSlot;
 	type SessionManager = pallet_session_historical::NoteHistoricalRoot<Self, MiningSlot>;
 	type SessionHandler = <SessionKeys as OpaqueKeys>::KeyTypeIdProviders;
 	type Keys = SessionKeys;

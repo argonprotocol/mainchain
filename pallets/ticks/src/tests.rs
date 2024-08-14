@@ -65,7 +65,7 @@ fn it_should_track_blocks_at_tick() {
 	new_test_ext(5, 500).execute_with(|| {
 		// Go past genesis block so events get deposited
 		System::set_block_number(2);
-		let ticker = Ticker::new(5, 500);
+		let ticker = Ticker::new(5, 500, 2);
 		let mut parent_hash = System::parent_hash();
 		let mut last_block_tick = 0;
 		for i in 0..=501 {

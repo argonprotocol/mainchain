@@ -7,7 +7,8 @@ afterAll(teardown);
 it('can create and reload a localchain', async () => {
     const ticker = {
         genesisUtcTime: Date.now(),
-        tickDurationMillis: 1000
+        tickDurationMillis: 1000,
+        escrowExpirationTicks: 2,
     };
     const localchain = await Localchain.loadWithoutMainchain(':memory:', ticker);
     closeOnTeardown(localchain);
