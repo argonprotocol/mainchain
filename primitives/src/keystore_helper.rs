@@ -12,12 +12,12 @@ use sp_keystore::{testing::MemoryKeystore, KeystorePtr};
 /// Parameters of the keystore
 #[derive(Debug, Clone, Args)]
 pub struct KeystoreParams {
-	/// Specify custom keystore path.
+	/// Specify the keystore path. Required for a disk keystore.
 	#[arg(global = true, long, value_name = "PATH")]
 	pub keystore_path: Option<PathBuf>,
 
 	/// Use interactive shell for entering the password used by the keystore.
-	#[arg(global = true,long, conflicts_with_all = & ["password", "password_filename"])]
+	#[arg(global = true, long, conflicts_with_all = & ["password", "password_filename"])]
 	pub password_interactive: bool,
 
 	/// Password used by the keystore.
@@ -78,12 +78,18 @@ impl KeystoreParams {
 		suri_or_prompt: Option<&String>,
 		crypto_type: CryptoType,
 		key_type_id: KeyTypeId,
+		allow_in_memory: bool,
 	) -> anyhow::Result<KeystorePtr> {
 		let suri = Self::read_uri(suri_or_prompt)?;
 		let password = self.read_password()?;
 		let keystore: KeystorePtr = match &self.keystore_path {
 			Some(r) => LocalKeystore::open(r, password.clone())?.into(),
-			None => MemoryKeystore::new().into(),
+			None =>
+				if allow_in_memory {
+					MemoryKeystore::new().into()
+				} else {
+					bail!("No keystore path provided");
+				},
 		};
 		let public_bytes = match crypto_type {
 			CryptoType::Sr25519 => {
@@ -108,13 +114,13 @@ impl KeystoreParams {
 		Ok(keystore)
 	}
 
-	pub fn open_dev(
+	pub fn open_in_memory(
 		&self,
 		suri: &str,
 		crypto_type: CryptoType,
 		key_type_id: KeyTypeId,
 	) -> anyhow::Result<KeystorePtr> {
-		self.open_with_account(Some(&suri.to_string()), crypto_type, key_type_id)
+		self.open_with_account(Some(&suri.to_string()), crypto_type, key_type_id, true)
 	}
 
 	pub fn read_uri(uri: Option<&String>) -> anyhow::Result<String> {

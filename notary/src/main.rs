@@ -55,7 +55,8 @@ enum Commands {
 		#[clap(short, long, env, default_value = "true")]
 		finalize_notebooks: bool,
 	},
-	/// Inserts a Notary compatible key into the keystore. NOTE: you still need to register it
+	/// Inserts a Notary compatible key into the keystore. NOTE: you still need to register it in
+	/// mainchain
 	InsertKey {
 		#[allow(missing_docs)]
 		#[clap(flatten)]
@@ -63,7 +64,7 @@ enum Commands {
 		/// The secret key URI.
 		/// If the value is a file, the file content is used as URI.
 		/// If not given, you will be prompted for the URI.
-		#[arg(long)]
+		#[arg(long, verbatim_doc_comment)]
 		suri: Option<String>,
 	},
 	/// Migrate a notary database
@@ -123,16 +124,19 @@ async fn main() -> anyhow::Result<()> {
 				.await
 				.context("failed to connect to db")?;
 			let keystore = if dev {
-				keystore_params.open_dev("//Ferdie//notary", CryptoType::Ed25519, NOTARY_KEYID)?
+				keystore_params.open_in_memory(
+					"//Ferdie//notary",
+					CryptoType::Ed25519,
+					NOTARY_KEYID,
+				)?
 			} else {
 				keystore_params.open()?
 			};
 
 			let mut mainchain_client = ReconnectingClient::new(vec![trusted_rpc_url.clone()]);
-			let ticker: Ticker = mainchain_client.get().await?.lookup_ticker().await?.into();
+			let ticker: Ticker = mainchain_client.get().await?.lookup_ticker().await?;
 
-			let server =
-				NotaryServer::start(notary_id, pool.clone(), ticker.clone(), bind_addr).await?;
+			let server = NotaryServer::start(notary_id, pool.clone(), ticker, bind_addr).await?;
 
 			if sync_blocks {
 				spawn_block_sync(trusted_rpc_url.clone(), notary_id, pool.clone(), ticker).await?;
@@ -155,7 +159,7 @@ async fn main() -> anyhow::Result<()> {
 		},
 		Commands::InsertKey { suri, keystore_params } => {
 			keystore_params
-				.open_with_account(suri.as_ref(), CryptoType::Ed25519, NOTARY_KEYID)
+				.open_with_account(suri.as_ref(), CryptoType::Ed25519, NOTARY_KEYID, false)
 				.map_err(|_| Error::KeystoreOperation)?;
 		},
 		Commands::Migrate { db_url } => {

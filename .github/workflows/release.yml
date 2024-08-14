@@ -75,7 +75,14 @@ jobs:
 
       - name: Install mac dependencies
         if: startsWith(matrix.os, 'macos')
-        run: brew install protobuf
+        run: |
+          brew install protobuf llvm
+          # need to use more modern llvm than what is on mac to build secp256k1 for wasm
+          echo "LDFLAGS=-L/opt/homebrew/opt/llvm/lib" >> $GITHUB_ENV
+          echo "CPPFLAGS=-I/opt/homebrew/opt/llvm/include" >> $GITHUB_ENV
+          echo "RUSTFLAGS=-C linker=/opt/homebrew/opt/llvm/bin/clang" >> $GITHUB_ENV
+          echo "CC=/opt/homebrew/opt/llvm/bin/clang" >> $GITHUB_ENV
+          echo "CXX=/opt/homebrew/opt/llvm/bin/clang++" >> $GITHUB_ENV
 
       - uses: rui314/setup-mold@v1
 
@@ -84,13 +91,14 @@ jobs:
         with:
           toolchain: stable
           targets: wasm32-unknown-unknown
+          components: rust-src
 
       - uses: taiki-e/setup-cross-toolchain-action@v1
         with:
           target: ${{ matrix.target }}
 
       - uses: taiki-e/upload-rust-binary-action@v1
-        if: (matrix.os == '' || startsWith(matrix.os, 'ubuntu'))
+        if: (!startsWith(matrix.os, 'windows') && matrix.target != 'x86_64-apple-darwin') # macos not working for randomx build
         with:
           bin: argon-node
           features: metadata-hash

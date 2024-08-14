@@ -53,13 +53,12 @@ pub fn run() -> sc_cli::Result<()> {
 	let cli = Cli::from_args();
 
 	let bitcoin_rpc_url = cli.bitcoin_rpc_url.clone().unwrap_or_default();
-	if matches!(cli.subcommand, None) ||
-		!matches!(cli.subcommand, Some(Subcommand::Key(_)) | Some(Subcommand::BuildSpec(_)))
+	if (cli.subcommand.is_none() ||
+		!matches!(cli.subcommand, Some(Subcommand::Key(_)) | Some(Subcommand::BuildSpec(_)))) &&
+		cli.bitcoin_rpc_url.is_none()
 	{
-		if cli.bitcoin_rpc_url.is_none() {
-			eprintln!("Error: --bitcoin-rpc-url is required unless using the 'Key' or 'BuildSpec' subcommands.");
-			std::process::exit(1);
-		}
+		eprintln!("Error: --bitcoin-rpc-url is required unless using the 'Key' or 'BuildSpec' subcommands.");
+		std::process::exit(1);
 	}
 
 	match &cli.subcommand {
@@ -118,7 +117,6 @@ pub fn run() -> sc_cli::Result<()> {
 		},
 		Some(Subcommand::Benchmark(cmd)) => {
 			let runner = cli.create_runner(cmd)?;
-			let bitcoin_rpc_url = bitcoin_rpc_url;
 
 			runner.sync_run(|config| {
 				// This switch needs to be in the client, since the client decides

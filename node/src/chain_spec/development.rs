@@ -23,8 +23,8 @@ pub fn development_config() -> Result<ChainSpec, String> {
 		WASM_BINARY.ok_or_else(|| "Development wasm not available".to_string())?,
 		None,
 	)
-	.with_name("Development")
-	.with_id("dev")
+	.with_name("Argon Development")
+	.with_id("argon-dev")
 	.with_chain_type(ChainType::Development)
 	.with_properties(properties)
 	.with_genesis_config_patch(testnet_genesis(

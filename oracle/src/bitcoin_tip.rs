@@ -10,6 +10,8 @@ use argon_client::{
 };
 use argon_primitives::bitcoin::H256Le;
 
+const CONFIRMATIONS: u64 = 6;
+
 pub async fn bitcoin_loop(
 	bitcoin_rpc_url: String,
 	bitcoin_rpc_auth: Option<(String, String)>,
@@ -25,23 +27,25 @@ pub async fn bitcoin_loop(
 	let client = Client::new(&bitcoin_rpc_url, auth)?;
 	tracing::info!("Oracle Started. Connected to bitcoin at {}", bitcoin_rpc_url);
 
-	let mut last_tip = None;
+	let mut last_confirmed_tip = None;
 	let account_id = signer.account_id();
 	loop {
-		let bitcoin_tip = client.get_best_block_hash()?;
-		if Some(bitcoin_tip) == last_tip {
+		let blockchain_info = client.get_block_count()?;
+		let bitcoin_confirmed_height = blockchain_info.saturating_sub(CONFIRMATIONS);
+
+		let bitcoin_tip = client.get_block_hash(bitcoin_confirmed_height)?;
+		if Some(bitcoin_tip) == last_confirmed_tip {
 			sleep(Duration::from_secs(10)).await;
 			continue;
 		}
-		last_tip = Some(bitcoin_tip);
-		let header = client.get_block_header_info(&bitcoin_tip)?;
-		tracing::info!("New bitcoin tip: {} {:?}", header.height, bitcoin_tip);
-		let bitcoin_height = header.height as u64;
+		last_confirmed_tip = Some(bitcoin_tip);
+
 		let bitcoin_tip: H256Le = bitcoin_tip.into();
 
-		let latest_block = tx()
-			.bitcoin_utxos()
-			.set_confirmed_block(bitcoin_height, bitcoin_primitives_subxt::H256Le(bitcoin_tip.0));
+		let latest_block = tx().bitcoin_utxos().set_confirmed_block(
+			bitcoin_confirmed_height,
+			bitcoin_primitives_subxt::H256Le(bitcoin_tip.0),
+		);
 
 		let client = mainchain_client.get().await?;
 		let nonce = client.get_account_nonce_subxt(&account_id).await?;
@@ -51,7 +55,10 @@ pub async fn bitcoin_loop(
 			.tx()
 			.sign_and_submit_then_watch(&latest_block, &signer, params)
 			.await?;
-		tracing::info!("Submitted bitcoin tip {bitcoin_height} with progress: {:?}", progress);
+		tracing::info!(
+			"Submitted bitcoin tip {bitcoin_confirmed_height} with progress: {:?}",
+			progress
+		);
 		MainchainClient::wait_for_ext_in_block(progress).await?;
 	}
 }

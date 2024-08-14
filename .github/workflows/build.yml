@@ -111,7 +111,6 @@ jobs:
           CARGO_INCREMENTAL: 0
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
           RUST_LOG: info
-        continue-on-error: true
 
       - name: Upload Debug Assets
         if: ${{(github.event.inputs.SKIP_REBUILD_DOCKER != 'true')}}

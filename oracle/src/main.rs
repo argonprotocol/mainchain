@@ -107,7 +107,7 @@ async fn main() -> anyhow::Result<()> {
 	let mut signer_address = signer_address;
 	let mut signer_crypto = signer_crypto;
 
-	let keystore = if dev {
+	let keystore = if dev && signer_address.is_none() {
 		let suri = match subcommand {
 			Subcommand::PriceIndex => "//Eve",
 			Subcommand::Bitcoin { .. } => "//Dave",
@@ -117,7 +117,7 @@ async fn main() -> anyhow::Result<()> {
 
 		signer_address = Some(account_id.to_ss58check_with_version(ADDRESS_PREFIX.into()));
 		signer_crypto = Some(OracleCryptoType::Sr25519);
-		keystore_params.open_dev(suri, CryptoType::Sr25519, ACCOUNT)?
+		keystore_params.open_in_memory(suri, CryptoType::Sr25519, ACCOUNT)?
 	} else {
 		keystore_params.open()?
 	};
@@ -132,6 +132,7 @@ async fn main() -> anyhow::Result<()> {
 	}?;
 
 	let signer = KeystoreSigner::new(keystore, signer_account, signer_crypto.into());
+
 	match subcommand {
 		Subcommand::PriceIndex => price_index_loop(trusted_rpc_url, signer, dev).await?,
 		Subcommand::Bitcoin { bitcoin_rpc_url } => {

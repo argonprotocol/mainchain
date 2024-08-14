@@ -77,6 +77,9 @@ jobs:
       - name: Clippy
         if: ${{startsWith(matrix.os, 'ubuntu')}}
         run: cargo clippy --workspace -- -Dwarnings
+        env:
+          RUSTC_WRAPPER: "sccache"
+          SKIP_WASM_BUILD: 1
 
       - name: Run tests
         run: cargo build && cargo test --no-fail-fast

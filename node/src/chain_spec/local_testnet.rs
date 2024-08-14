@@ -28,8 +28,8 @@ pub fn local_testnet_config() -> Result<ChainSpec, String> {
 		WASM_BINARY.ok_or_else(|| "Development wasm not available".to_string())?,
 		None,
 	)
-	.with_name("Local Testnet")
-	.with_id("local_testnet")
+	.with_name("Argon Local Testnet")
+	.with_id("argon-local")
 	.with_chain_type(ChainType::Local)
 	.with_properties(properties)
 	.with_genesis_config_patch(testnet_genesis(

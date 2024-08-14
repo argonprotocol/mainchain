@@ -1,5 +1,3 @@
-use std::env;
-
 use sc_service::{ChainType, Properties};
 use sp_core::sr25519;
 
@@ -20,23 +18,19 @@ pub fn testnet_config() -> Result<ChainSpec, String> {
 	properties.insert("tokenDecimals".into(), 3.into());
 	properties.insert("ss58Format".into(), ADDRESS_PREFIX.into());
 
-	let notary_host = env::var("ARGON_LOCAL_TESTNET_NOTARY_URL")
-		.unwrap_or("ws://127.0.0.1:9925".to_string())
-		.into();
 	const HASHES_PER_SECOND: u64 = 10_000;
 	const TICK_MILLIS: u64 = 60_000;
 	Ok(ChainSpec::builder(
-		WASM_BINARY.ok_or_else(|| "Development wasm not available".to_string())?,
+		WASM_BINARY.ok_or_else(|| "Wasm not available".to_string())?,
 		None,
 	)
-	.with_name("Testnet")
-	.with_id("testnet")
-	.with_protocol_id("t-argon")
+	.with_name("Argon Testnet")
+	.with_id("argon-testnet")
 	.with_chain_type(ChainType::Custom("Testnet".into()))
 	.with_properties(properties)
-	// .with_boot_nodes(vec![
-	//
-	// ])
+	.with_boot_nodes(vec![
+		"/dns/bootnode0.testnet.argonprotocol.org/tcp/30333/ws/p2p/12D3KooWHY6UgabjbYJ8xZN4xae3tPHhx6BdwtB6Fh9VjkmErkCF".parse().map_err(|e| format!("Unable to parse multiaddr {e:?}"))?
+	])
 	.with_genesis_config_patch(testnet_genesis(
 		// Initial BlockSeal authorities
 		vec![(
@@ -66,8 +60,8 @@ pub fn testnet_config() -> Result<ChainSpec, String> {
 		vec![GenesisNotary {
 			account_id: get_account_id_from_seed::<sr25519::Public>("Ferdie"),
 			public: get_from_seed::<NotaryPublic>("Ferdie//notary"),
-			hosts: vec![notary_host],
-			name: "FerdieStamp".into(),
+			hosts: vec!["wss://notary1.testnet.argonprotocol.org".to_string().into()],
+			name: "Argon Foundation".into(),
 		}],
 		60,
 		MiningSlotConfig {

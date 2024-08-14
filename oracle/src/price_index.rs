@@ -21,7 +21,7 @@ pub async fn price_index_loop(
 	let mut reconnecting_client = ReconnectingClient::new(vec![trusted_rpc_url.clone()]);
 	let mainchain_client = reconnecting_client.get().await?;
 
-	if use_simulated_schedule == true {
+	if use_simulated_schedule {
 		let chain_info = mainchain_client.methods.system_chain().await?;
 		ensure!(
 			chain_info == "Development" || chain_info.contains("Testnet"),

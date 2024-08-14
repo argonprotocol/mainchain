@@ -16,7 +16,7 @@ use crate::stores::{
 	BoxFutureResult,
 };
 
-pub const NOTARY_KEYID: sp_core::crypto::KeyTypeId = sp_core::crypto::KeyTypeId(*b"unot");
+pub const NOTARY_KEYID: sp_core::crypto::KeyTypeId = sp_core::crypto::KeyTypeId(*b"nota");
 
 #[derive(Clone)]
 pub struct NotebookCloser {
@@ -263,7 +263,7 @@ mod tests {
 			keystore.ed25519_generate_new(NOTARY_KEYID, None).expect("should have a key");
 
 		let mut client = ReconnectingClient::new(vec![ws_url.clone()]);
-		let ticker: Ticker = client.get().await?.lookup_ticker().await?.into();
+		let ticker: Ticker = client.get().await?.lookup_ticker().await?;
 
 		let server = NotaryServer::create_http_server("127.0.0.1:0").await?;
 		let addr = server.local_addr()?;
@@ -271,7 +271,7 @@ mod tests {
 		let block_tracker = Arc::new(Mutex::new(Some(block_tracker)));
 
 		let mut notary_server =
-			NotaryServer::start_with(server, notary_id, ticker.clone(), pool.clone()).await?;
+			NotaryServer::start_with(server, notary_id, ticker, pool.clone()).await?;
 		let watches = spawn_notebook_closer(
 			pool.clone(),
 			notary_id,
@@ -583,7 +583,7 @@ mod tests {
 		let result = NotarizationsStore::apply(
 			pool,
 			1,
-			&ticker,
+			ticker,
 			vec![BalanceChange {
 				account_id: keypair.public().into(),
 				account_type: Deposit,
@@ -695,6 +695,7 @@ mod tests {
 		Ok(result.unwrap().block_hash())
 	}
 
+	#[allow(clippy::too_many_arguments)]
 	async fn create_escrow_hold(
 		pool: &PgPool,
 		balance: u128,
