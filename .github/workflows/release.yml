@@ -98,7 +98,7 @@ jobs:
           target: ${{ matrix.target }}
 
       - uses: taiki-e/upload-rust-binary-action@v1
-        if: (!startsWith(matrix.os, 'windows') && matrix.target != 'x86_64-apple-darwin') # macos not working for randomx build
+        if: (matrix.os == '' || startsWith(matrix.os, 'ubuntu'))
         with:
           bin: argon-node
           features: metadata-hash
@@ -107,7 +107,7 @@ jobs:
           token: ${{ secrets.GITHUB_TOKEN }}
 
       - uses: taiki-e/upload-rust-binary-action@v1
-        if: (!startsWith(matrix.os, 'windows'))
+        if: (matrix.os == '' || startsWith(matrix.os, 'ubuntu'))
         with:
           bin: argon-notary
           target: ${{ matrix.target }}
@@ -125,7 +125,7 @@ jobs:
         if: (matrix.target == 'x86_64-unknown-linux-gnu')
         with:
           bin: argon-oracle
-          # TODO: deactivate this feature when we have price liquidity
+          # TODO: deactivate building in this feature when we have price liquidity
           features: simulated-prices
           target: ${{ matrix.target }}
           archive: $bin-$tag-$target

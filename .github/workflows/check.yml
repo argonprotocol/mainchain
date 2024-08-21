@@ -1,12 +1,6 @@
 name: Check
 on:
   push:
-    branches:
-      - main
-  pull_request:
-    types:
-      - opened
-      - synchronize
 
 concurrency:
   group: ${{ github.workflow }}-${{ github.ref }}
@@ -36,7 +30,14 @@ jobs:
 
       - name: Install mac dependencies
         if: startsWith(matrix.os, 'macos')
-        run: brew install protobuf
+        run: |
+          brew install protobuf llvm
+          # need to use more modern llvm than what is on mac to build secp256k1 for wasm
+          echo "LDFLAGS=-L/opt/homebrew/opt/llvm/lib" >> $GITHUB_ENV
+          echo "CPPFLAGS=-I/opt/homebrew/opt/llvm/include" >> $GITHUB_ENV
+          echo "RUSTFLAGS=-C linker=/opt/homebrew/opt/llvm/bin/clang" >> $GITHUB_ENV
+          echo "CC=/opt/homebrew/opt/llvm/bin/clang" >> $GITHUB_ENV
+          echo "CXX=/opt/homebrew/opt/llvm/bin/clang++" >> $GITHUB_ENV
 
       - name: Start sccache
         uses: hendrikmuhs/ccache-action@v1.2
