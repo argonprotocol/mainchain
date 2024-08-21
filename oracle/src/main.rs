@@ -1,7 +1,7 @@
 use anyhow::{anyhow, bail, ensure};
 use argon_client::signer::KeystoreSigner;
 use argon_primitives::{AccountId, CryptoType, KeystoreParams, ADDRESS_PREFIX};
-use clap::{crate_version, Parser, ValueEnum};
+use clap::{Parser, ValueEnum};
 use dotenv::dotenv;
 use sp_core::{
 	crypto::{key_types::ACCOUNT, Ss58Codec},
@@ -22,8 +22,7 @@ mod us_cpi_schedule;
 pub(crate) mod utils;
 
 #[derive(Parser, Debug)]
-#[clap(version = crate_version!())]
-#[command(author, version, about, arg_required_else_help = true, long_about = None)]
+#[command(author, version = env!("IMPL_VERSION"), about, arg_required_else_help = true, long_about = None)]
 #[clap(arg_required_else_help = true)]
 struct Cli {
 	#[command(subcommand)]

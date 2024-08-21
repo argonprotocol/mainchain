@@ -7,7 +7,7 @@ use crate::{
 use anyhow::anyhow;
 use argon_primitives::argon_utils::format_argons;
 use argon_primitives::DataDomain;
-use clap::{crate_version, Args, Parser, Subcommand, ValueHint};
+use clap::{Args, Parser, Subcommand, ValueHint};
 use comfy_table::modifiers::UTF8_ROUND_CORNERS;
 use comfy_table::presets::UTF8_FULL;
 use comfy_table::{Cell, CellAlignment, ContentArrangement, Table};
@@ -17,8 +17,7 @@ use std::path::Path;
 use std::{env, fs, path::PathBuf};
 
 #[derive(Parser, Debug)]
-#[clap(version = crate_version!())]
-#[command(author, version, about, arg_required_else_help = true, long_about = None)]
+#[command(author, version = env!("IMPL_VERSION"), about, arg_required_else_help = true, long_about = None)]
 struct Cli {
   /// Where is your localchain? Defaults to a project-specific directory based on OS.
   ///    Linux:   /home/alice/.config/argon/localchain

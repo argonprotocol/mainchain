@@ -1,5 +1,6 @@
 [package]
 name = "argon-notary"
+description = "The Argon Notary is a service the confirms and rolls-up localchain balance changes."
 version.workspace = true
 authors.workspace = true
 edition.workspace = true
@@ -52,4 +53,5 @@ argon-testing = { workspace = true }
 subxt-signer = { workspace = true }
 
 [build-dependencies]
+argon-primitives = { workspace = true, features = ["std"] }
 dotenv = { workspace = true }

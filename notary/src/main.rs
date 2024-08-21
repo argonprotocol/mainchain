@@ -1,7 +1,7 @@
 use std::env;
 
 use anyhow::Context;
-use clap::{crate_version, Parser, Subcommand};
+use clap::{Parser, Subcommand};
 use sqlx::{migrate, postgres::PgPoolOptions};
 
 use argon_client::ReconnectingClient;
@@ -13,8 +13,7 @@ use argon_notary::{
 use argon_primitives::{tick::Ticker, CryptoType, KeystoreParams, NotaryId};
 
 #[derive(Parser, Debug)]
-#[clap(version = crate_version!())]
-#[command(author, version, about, arg_required_else_help = true, long_about = None)]
+#[command(version = env!("IMPL_VERSION"), about, author, arg_required_else_help = true, long_about = None)]
 struct Cli {
 	#[command(subcommand)]
 	command: Commands,

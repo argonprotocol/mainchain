@@ -1,10 +1,13 @@
 extern crate napi_build;
+use argon_primitives::git_version::generate_git_cli_env_var;
 
 use dotenv::dotenv;
 use std::env;
 use std::process::Command;
 
 fn main() {
+  generate_git_cli_env_var();
+
   println!("cargo:rerun-if-changed=Cargo.toml");
   println!("Building localchain... {:?}", env::vars());
 

@@ -54,10 +54,15 @@ pub fn run() -> sc_cli::Result<()> {
 
 	let bitcoin_rpc_url = cli.bitcoin_rpc_url.clone().unwrap_or_default();
 	if (cli.subcommand.is_none() ||
-		!matches!(cli.subcommand, Some(Subcommand::Key(_)) | Some(Subcommand::BuildSpec(_)))) &&
-		cli.bitcoin_rpc_url.is_none()
+		!matches!(
+			cli.subcommand,
+			Some(Subcommand::Key(_)) |
+				Some(Subcommand::BuildSpec(_)) |
+				Some(Subcommand::ChainInfo(_)) |
+				Some(Subcommand::PurgeChain(_))
+		)) && cli.bitcoin_rpc_url.is_none()
 	{
-		eprintln!("Error: --bitcoin-rpc-url is required unless using the 'Key' or 'BuildSpec' subcommands.");
+		eprintln!("Error: --bitcoin-rpc-url is required unless using the 'Key', 'ChainInfo', 'PurgeChain' or 'BuildSpec' subcommands.");
 		std::process::exit(1);
 	}
 
