@@ -625,7 +625,7 @@ async fn owner_sees_signature_and_unlocks(
 	let import = bitcoind.client.wallet_process_psbt(
 		psbt_text,
 		Some(true),
-		Some(EcdsaSighashType::All.into()),
+		Some(EcdsaSighashType::AllPlusAnyoneCanPay.into()),
 		None,
 	)?;
 	println!("Processed with wallet {:?}", import);

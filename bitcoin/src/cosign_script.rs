@@ -608,7 +608,7 @@ mod test {
 				.wallet_process_psbt(
 					&psbt_text,
 					Some(true),
-					Some(EcdsaSighashType::All.into()),
+					Some(EcdsaSighashType::AllPlusAnyoneCanPay.into()),
 					None,
 				)
 				.unwrap();

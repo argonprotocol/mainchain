@@ -66,7 +66,7 @@ impl UtxoUnlocker {
 				script_pubkey: cosign_script.get_script_pubkey(),
 			}),
 			witness_script: Some(cosign_script.script.clone()),
-			sighash_type: Some(EcdsaSighashType::All.into()),
+			sighash_type: Some(EcdsaSighashType::AllPlusAnyoneCanPay.into()),
 			..Input::default()
 		};
 		let descriptor = cosign_script.create_descriptor()?;
