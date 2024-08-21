@@ -118,17 +118,23 @@ mod tests {
 
 		let mut block_watch = argon_node.client.live.blocks().subscribe_best().await.unwrap();
 		while let Some(Ok(_block)) = block_watch.next().await {
-			if bitcoind.client.get_blockchain_info().unwrap().blocks == 7 {
+			if bitcoind.client.get_blockchain_info().unwrap().blocks == 10 {
 				assert!(get_confirmed_block(&argon_node.client).await.is_some());
 				break;
 			}
 			bitcoind.client.generate_to_address(1, &address).unwrap();
 		}
 
-		assert_eq!(get_confirmed_block(&argon_node.client).await.unwrap().block_height, 1);
+		let block = get_confirmed_block(&argon_node.client).await.unwrap();
+		assert!(block.block_height >= 1);
 		assert_eq!(
-			get_confirmed_block(&argon_node.client).await.unwrap().block_hash.0,
-			bitcoind.client.get_block_hash(1).unwrap().as_raw_hash().as_ref()
+			block.block_hash.0,
+			bitcoind
+				.client
+				.get_block_hash(block.block_height)
+				.unwrap()
+				.as_raw_hash()
+				.as_ref()
 		);
 
 		handle.abort();

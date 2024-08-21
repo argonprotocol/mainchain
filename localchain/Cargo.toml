@@ -67,7 +67,6 @@ subxt-signer = { workspace = true }
 napi-build = { workspace = true }
 dotenv = { workspace = true }
 uniffi = { workspace = true, features = ["build"] }
-argon-primitives = { workspace = true, features = ["std"] }
 
 [features]
 default = []

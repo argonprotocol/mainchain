@@ -36,7 +36,7 @@
   },
   "devDependencies": {
     "@argonprotocol/mainchain": "0.0.1",
-    "@napi-rs/cli": "^3.0.0-alpha.55",
+    "@napi-rs/cli": "3.0.0-alpha.55",
     "@polkadot/util": "^13.0.2",
     "@polkadot/util-crypto": "^13.0.2",
     "@polkadot/wasm-crypto": "^7.3.2",
