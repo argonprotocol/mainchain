@@ -117,7 +117,7 @@ mod tests {
 		let handle = tokio::spawn(task);
 
 		let mut block_watch = argon_node.client.live.blocks().subscribe_best().await.unwrap();
-		while let Some(Ok(block)) = block_watch.next().await {
+		while let Some(Ok(_block)) = block_watch.next().await {
 			if bitcoind.client.get_blockchain_info().unwrap().blocks == 7 {
 				assert!(get_confirmed_block(&argon_node.client).await.is_some());
 				break;

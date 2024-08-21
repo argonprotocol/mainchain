@@ -2,7 +2,7 @@ use std::process::Command;
 
 pub fn generate_git_cli_env_var() {
 	let commit_hash = Command::new("git")
-		.args(&["rev-parse", "--short=11", "HEAD"])
+		.args(["rev-parse", "--short=11", "HEAD"])
 		.output()
 		.expect("Failed to execute git command")
 		.stdout;
