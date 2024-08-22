@@ -22,6 +22,9 @@ jobs:
     steps:
       - uses: actions/checkout@v4
 
+      - name: Free Disk Space
+        uses: ./.github/templates/clear-space
+
       - uses: ikalnytskyi/action-setup-postgres@v6
 
       - name: Install linux dependencies

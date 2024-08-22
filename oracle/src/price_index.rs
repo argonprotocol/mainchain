@@ -131,13 +131,6 @@ pub async fn price_index_loop(
 				tracing::warn!("Error processing price index!! {:?}", e);
 				e
 			})?;
-			// spawn(move || {
-			// 	if let Err(res) =
-			// 		futures::executor::block_on(MainchainClient::wait_for_ext_in_block(progress))
-			// 	{
-			// 		panic!("Error processing price index!! {:?}", res)
-			// 	}
-			// });
 		}
 
 		let sleep_time = ticker.duration_to_next_tick().min(min_sleep_duration);

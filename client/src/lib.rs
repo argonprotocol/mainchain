@@ -52,6 +52,8 @@ impl Config for ArgonConfig {
 /// to construct a transaction for a argon node.
 pub type ArgonExtrinsicParams<T> = DefaultExtrinsicParams<T>;
 
+pub type ArgonTxProgress = TxProgress<ArgonConfig, ArgonOnlineClient>;
+
 /// A builder which leads to [`ArgonExtrinsicParams`] being constructed.
 /// This is what you provide to methods like `sign_and_submit()`.
 pub type ArgonExtrinsicParamsBuilder<T> = DefaultExtrinsicParamsBuilder<T>;
@@ -127,7 +129,7 @@ impl MainchainClient {
 		message: &str,
 		signer: &impl Signer<ArgonConfig>,
 		params: Option<<ArgonExtrinsicParams<ArgonConfig> as ExtrinsicParams<ArgonConfig>>::Params>,
-	) -> anyhow::Result<TxProgress<ArgonConfig, OnlineClient<ArgonConfig>>> {
+	) -> anyhow::Result<ArgonTxProgress> {
 		let ext_data = self.extract_call_data(message)?;
 		self.submit_raw(ext_data, signer, params).await
 	}
@@ -137,7 +139,7 @@ impl MainchainClient {
 		payload: Vec<u8>,
 		signer: &impl Signer<ArgonConfig>,
 		params: Option<<ArgonExtrinsicParams<ArgonConfig> as ExtrinsicParams<ArgonConfig>>::Params>,
-	) -> anyhow::Result<TxProgress<ArgonConfig, OnlineClient<ArgonConfig>>> {
+	) -> anyhow::Result<ArgonTxProgress> {
 		let payload = RawPayload(payload);
 		let tx_progress = self
 			.live
@@ -258,7 +260,7 @@ impl MainchainClient {
 	}
 
 	pub async fn wait_for_ext_in_block(
-		mut tx_progress: TxProgress<ArgonConfig, OnlineClient<ArgonConfig>>,
+		mut tx_progress: ArgonTxProgress,
 	) -> anyhow::Result<TxInBlock<ArgonConfig, OnlineClient<ArgonConfig>>, Error> {
 		while let Some(status) = tx_progress.next().await {
 			match status? {
