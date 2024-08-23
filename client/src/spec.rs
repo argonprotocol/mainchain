@@ -2135,6 +2135,23 @@ pub mod api {
 						],
 					)
 				}
+				pub fn get_bitcoin_network(
+					&self,
+				) -> ::subxt::ext::subxt_core::runtime_api::payload::StaticPayload<
+					types::GetBitcoinNetwork,
+					types::get_bitcoin_network::output::Output,
+				> {
+					::subxt::ext::subxt_core::runtime_api::payload::StaticPayload::new_static(
+						"BitcoinApis",
+						"get_bitcoin_network",
+						types::GetBitcoinNetwork {},
+						[
+							99u8, 237u8, 165u8, 48u8, 80u8, 5u8, 189u8, 80u8, 97u8, 44u8, 176u8,
+							172u8, 208u8, 61u8, 253u8, 180u8, 80u8, 218u8, 193u8, 97u8, 121u8,
+							66u8, 19u8, 73u8, 155u8, 65u8, 170u8, 229u8, 178u8, 53u8, 118u8, 142u8,
+						],
+					)
+				}
 			}
 			pub mod types {
 				use super::runtime_types;
@@ -2243,6 +2260,29 @@ pub mod api {
 				pub struct MarketRate {
 					pub satoshis: market_rate::Satoshis,
 				}
+				pub mod get_bitcoin_network {
+					use super::runtime_types;
+					pub mod output {
+						use super::runtime_types;
+						pub type Output = runtime_types::argon_primitives::bitcoin::BitcoinNetwork;
+					}
+				}
+				#[derive(
+					:: subxt :: ext :: subxt_core :: ext :: codec :: Decode,
+					:: subxt :: ext :: subxt_core :: ext :: codec :: Encode,
+					:: subxt :: ext :: subxt_core :: ext :: scale_decode :: DecodeAsType,
+					:: subxt :: ext :: subxt_core :: ext :: scale_encode :: EncodeAsType,
+					Clone,
+					Debug,
+				)]
+				# [codec (crate = :: subxt :: ext :: subxt_core :: ext :: codec)]
+				#[decode_as_type(
+					crate_path = ":: subxt :: ext :: subxt_core :: ext :: scale_decode"
+				)]
+				#[encode_as_type(
+					crate_path = ":: subxt :: ext :: subxt_core :: ext :: scale_encode"
+				)]
+				pub struct GetBitcoinNetwork {}
 			}
 		}
 		pub mod grandpa_api {
@@ -2890,9 +2930,9 @@ pub mod api {
 			.hash();
 		runtime_metadata_hash ==
 			[
-				23u8, 122u8, 71u8, 108u8, 42u8, 190u8, 9u8, 195u8, 145u8, 65u8, 144u8, 98u8, 217u8,
-				161u8, 42u8, 238u8, 221u8, 64u8, 49u8, 217u8, 37u8, 252u8, 163u8, 214u8, 231u8,
-				41u8, 32u8, 102u8, 99u8, 197u8, 64u8, 135u8,
+				21u8, 89u8, 166u8, 109u8, 57u8, 58u8, 74u8, 85u8, 89u8, 39u8, 21u8, 249u8, 109u8,
+				220u8, 14u8, 145u8, 62u8, 141u8, 254u8, 180u8, 254u8, 59u8, 235u8, 38u8, 139u8,
+				174u8, 181u8, 58u8, 247u8, 145u8, 125u8, 123u8,
 			]
 	}
 	pub mod system {

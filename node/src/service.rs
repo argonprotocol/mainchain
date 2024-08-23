@@ -122,6 +122,13 @@ pub fn new_partial(
 			ServiceError::Other(format!("Failed to initialize bitcoin monitoring {:?}", e))
 		})?;
 
+	#[cfg(not(debug_assertions))]
+	{
+		utxo_tracker
+			.ensure_correct_network(&client)
+			.map_err(|e| ServiceError::Other(e.to_string()))?;
+	}
+
 	let utxo_tracker = Arc::new(utxo_tracker);
 
 	let aux_client = ArgonAux::<Block, _>::new(client.clone());

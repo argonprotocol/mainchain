@@ -2,9 +2,10 @@
 
 use std::sync::Arc;
 
+use anyhow::{anyhow, ensure};
 use codec::{Decode, Encode};
 use parking_lot::Mutex;
-use sc_client_api::backend::AuxStore;
+use sc_client_api::{backend::AuxStore, HeaderBackend};
 use sp_api::ProvideRuntimeApi;
 use sp_runtime::traits::Block as BlockT;
 
@@ -43,6 +44,27 @@ impl UtxoTracker {
 		let filter = UtxoSpendFilter::new(rpc_url, auth)?;
 
 		Ok(Self { filter: Arc::new(Mutex::new(filter)) })
+	}
+
+	pub fn ensure_correct_network<B, C>(&self, client: &Arc<C>) -> anyhow::Result<()>
+	where
+		B: BlockT,
+		C: ProvideRuntimeApi<B> + HeaderBackend<B> + 'static,
+		C::Api: BitcoinApis<B, Balance>,
+	{
+		let latest = client.info().finalized_hash;
+		let network = client.runtime_api().get_bitcoin_network(latest)?;
+		let filter = self.filter.lock();
+		let connected_network = filter.get_network()?;
+		ensure!(
+			connected_network == network,
+			anyhow!(
+				"Incorrect bitcoin network connected to. Should be {:?}, but is {:?}",
+				&network,
+				&connected_network,
+			)
+		);
+		Ok(())
 	}
 
 	fn update_filters(

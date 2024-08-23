@@ -8,7 +8,7 @@ use sp_core::{ConstU32, RuntimeDebug, H256, U256};
 use sp_runtime::{BoundedVec, DispatchError};
 
 use crate::{
-	bitcoin::{BitcoinSyncStatus, Satoshis, UtxoRef, UtxoValue},
+	bitcoin::{BitcoinNetwork, BitcoinSyncStatus, Satoshis, UtxoRef, UtxoValue},
 	block_seal::MiningAuthority,
 	notary::{NotaryId, NotaryNotebookVoteDetails, NotaryNotebookVoteDigestDetails},
 	tick::{Tick, Ticker},
@@ -75,6 +75,7 @@ sp_api::decl_runtime_apis! {
 		fn active_utxos() -> Vec<(Option<UtxoRef>, UtxoValue)>;
 		fn redemption_rate(satoshis: Satoshis) -> Option<Balance>;
 		fn market_rate(satoshis: Satoshis) -> Option<Balance>;
+		fn get_bitcoin_network() -> BitcoinNetwork;
 	}
 }
 

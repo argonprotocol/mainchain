@@ -1,10 +1,10 @@
 #![cfg_attr(not(feature = "std"), no_std)]
 // `construct_runtime!` does a lot of recursion and requires us to increase the limit to 256.
 #![recursion_limit = "256"]
+extern crate alloc;
 #[cfg(feature = "runtime-benchmarks")]
 #[macro_use]
 extern crate frame_benchmarking;
-extern crate alloc;
 
 use alloc::{boxed::Box, collections::btree_map::BTreeMap, vec, vec::Vec};
 use codec::{Decode, Encode, MaxEncodedLen};
@@ -56,12 +56,13 @@ use sp_runtime::{
 };
 pub use sp_runtime::{Perbill, Permill};
 
+use sp_runtime::traits::Get;
 #[cfg(feature = "std")]
 use sp_version::NativeVersion;
 use sp_version::RuntimeVersion;
 
 use argon_primitives::{
-	bitcoin::{BitcoinHeight, BitcoinSyncStatus, Satoshis, UtxoRef, UtxoValue},
+	bitcoin::{BitcoinHeight, BitcoinNetwork, BitcoinSyncStatus, Satoshis, UtxoRef, UtxoValue},
 	block_seal::MiningAuthority,
 	block_vote::VoteMinimum,
 	digests::BlockVoteDigest,
@@ -1111,6 +1112,10 @@ impl_runtime_apis! {
 
 		fn market_rate(satoshis: Satoshis) -> Option<Balance> {
 			PriceIndex::get_bitcoin_argon_price(satoshis)
+		}
+
+		fn get_bitcoin_network() -> BitcoinNetwork {
+			<BitcoinUtxos as Get<BitcoinNetwork>>::get()
 		}
 	}
 

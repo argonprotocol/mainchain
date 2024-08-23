@@ -59,9 +59,12 @@ pub async fn price_index_loop(
 		.map(|a| from_api_fixed_u128(a.argon_usd_target_price.clone()))
 		.unwrap_or(FixedU128::one());
 
-	let min_sleep_duration = Duration::from_millis(ticker.tick_duration_millis)
+	let mut min_sleep_duration = Duration::from_millis(ticker.tick_duration_millis)
 		.saturating_sub(Duration::from_secs(10))
 		.max(Duration::from_secs(5));
+	if cfg!(test) {
+		min_sleep_duration = Duration::from_millis(50);
+	}
 
 	let mut us_cpi = UsCpiRetriever::new(&ticker).await?;
 	let mut btc_price_lookup = btc_price::BtcPriceLookup::new();

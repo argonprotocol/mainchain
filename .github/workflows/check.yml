@@ -23,6 +23,7 @@ jobs:
       - uses: actions/checkout@v4
 
       - name: Free Disk Space
+        if: ${{startsWith(matrix.os, 'ubuntu')}}
         uses: ./.github/templates/clear-space
 
       - uses: ikalnytskyi/action-setup-postgres@v6

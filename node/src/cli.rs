@@ -35,8 +35,8 @@ pub struct ArgonRunCmd {
 	pub compute_miners: Option<u32>,
 
 	/// Flags to control the randomx compute challenge. Can be specified multiple times.
-	/// - LargePages: use large memory pages for the randomx dataset (default active)
-	/// - Secure: use secure memory for the randomx dataset (default active)
+	/// - LargePages: use large memory pages for the randomx dataset (default inactive)
+	/// - Secure: use secure memory for the randomx dataset (default inactive)
 	#[arg(long, verbatim_doc_comment)]
 	pub randomx_flags: Vec<RandomxFlag>,
 }

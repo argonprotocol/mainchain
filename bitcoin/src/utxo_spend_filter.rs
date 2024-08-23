@@ -11,8 +11,8 @@ use sp_runtime::RuntimeDebug;
 
 use argon_primitives::{
 	bitcoin::{
-		BitcoinBlock, BitcoinHeight, BitcoinRejectedReason, BitcoinSyncStatus, H256Le, UtxoRef,
-		UtxoValue,
+		BitcoinBlock, BitcoinHeight, BitcoinNetwork, BitcoinRejectedReason, BitcoinSyncStatus,
+		H256Le, UtxoRef, UtxoValue,
 	},
 	inherents::BitcoinUtxoSync,
 };
@@ -54,6 +54,10 @@ impl UtxoSpendFilter {
 
 	pub fn get_stored_filters(&self) -> Vec<BlockFilter> {
 		self.synched_filters.lock().clone()
+	}
+
+	pub fn get_network(&self) -> anyhow::Result<BitcoinNetwork> {
+		Ok(self.client.get_blockchain_info()?.chain.into())
 	}
 
 	pub fn load_filters(&self, filters: Vec<BlockFilter>) {
