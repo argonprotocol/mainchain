@@ -197,7 +197,7 @@ impl VaultConfig {
 				match TryInto::<BitcoinXPub>::try_into(data) {
 					Ok(x) => {
 						if !x.is_hardened() {
-							return Ok(Validation::Invalid("xpub must be hardened".into()))
+							return Ok(Validation::Invalid("xpub must be hardened".into()));
 						}
 						Ok(Validation::Valid)
 					},
@@ -209,7 +209,7 @@ impl VaultConfig {
 			if matches!(err, InquireError::OperationCanceled) {
 				self.bitcoin_xpub = None;
 				self.prompt_bitcoin_xpub()?;
-				return Ok(())
+				return Ok(());
 			}
 			return Err(err.to_string());
 		}

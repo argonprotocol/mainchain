@@ -178,7 +178,7 @@ impl TryFrom<ErrorObjectOwned> for Error {
 			let data = hex::decode(raw_str.as_str()).map_err(|_| value.clone())?;
 
 			if let Ok(e) = Self::decode(&mut &data[..]) {
-				return Ok(e)
+				return Ok(e);
 			}
 		}
 		Err(value.clone())

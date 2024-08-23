@@ -12,7 +12,7 @@ pub struct Cli {
 
 	/// Bitcoin node to verify minted bitcoins using compact filters. Should be a hosted/trusted
 	/// full node. Include optional auth inline
-	#[arg(long)]
+	#[arg(long, global = true)]
 	pub bitcoin_rpc_url: Option<String>,
 }
 

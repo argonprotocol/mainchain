@@ -122,13 +122,6 @@ pub fn new_partial(
 			ServiceError::Other(format!("Failed to initialize bitcoin monitoring {:?}", e))
 		})?;
 
-	#[cfg(not(debug_assertions))]
-	{
-		utxo_tracker
-			.ensure_correct_network(&client)
-			.map_err(|e| ServiceError::Other(e.to_string()))?;
-	}
-
 	let utxo_tracker = Arc::new(utxo_tracker);
 
 	let aux_client = ArgonAux::<Block, _>::new(client.clone());
@@ -245,6 +238,13 @@ pub fn new_full<
 	let name = config.network.node_name.clone();
 	let prometheus_registry = config.prometheus_registry().cloned();
 	let keystore = keystore_container.keystore();
+
+	#[cfg(not(debug_assertions))]
+	{
+		utxo_tracker.ensure_correct_network(&client).map_err(|e| {
+			ServiceError::Other(format!("Failed to get bitcoin network validated {:?}", e))
+		})?;
+	}
 
 	let rpc_extensions_builder = {
 		let client = client.clone();
@@ -390,7 +390,7 @@ pub fn new_full<
 				max(num_cpus::get() - 1, 1)
 			};
 			if mining_threads > 0 {
-				log::info!("Mining is enabled, {} threads", mining_threads);
+				log::info!("Mining is enabled as {:?}, {} threads", block_author, mining_threads);
 				run_compute_solver_threads(&task_manager, compute_miner, mining_threads)
 			} else {
 				log::info!("Mining is disabled");

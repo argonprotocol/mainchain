@@ -1,14 +1,14 @@
-use std::time::Duration;
-
+use anyhow::bail;
 use bitcoincore_rpc::{Auth, Client, RpcApi};
+use std::time::Duration;
 use tokio::time::sleep;
 
 use argon_client::{
-	api::{runtime_types::argon_primitives::bitcoin as bitcoin_primitives_subxt, tx},
+	api::{runtime_types::argon_primitives::bitcoin as bitcoin_primitives_subxt, storage, tx},
 	signer::Signer,
 	ArgonConfig, MainchainClient, ReconnectingClient,
 };
-use argon_primitives::bitcoin::H256Le;
+use argon_primitives::bitcoin::{BitcoinNetwork, H256Le};
 
 const CONFIRMATIONS: u64 = 6;
 
@@ -26,6 +26,22 @@ pub async fn bitcoin_loop(
 	};
 	let bitcoin_client = Client::new(&bitcoin_rpc_url, auth)?;
 	tracing::info!("Oracle Started. Connected to bitcoin at {}", bitcoin_rpc_url);
+
+	let required_bitcoin_network: BitcoinNetwork = mainchain_client
+		.get()
+		.await?
+		.fetch_storage(&storage().bitcoin_utxos().bitcoin_network(), None)
+		.await?
+		.expect("Expected network")
+		.into();
+	let connected_bitcoin_network = bitcoin_client.get_blockchain_info()?.chain.into();
+	if required_bitcoin_network != connected_bitcoin_network {
+		bail!(
+			"Connected to incorrect bitcoin network. Expected {:?}, but connected to {:?}",
+			required_bitcoin_network,
+			connected_bitcoin_network
+		);
+	}
 
 	let mut last_confirmed_tip = None;
 	let account_id = signer.account_id();

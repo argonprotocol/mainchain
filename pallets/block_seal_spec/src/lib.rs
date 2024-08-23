@@ -85,7 +85,8 @@ pub mod pallet {
 		/// The desired votes per block
 		#[pallet::constant]
 		type TargetBlockVotes: Get<u128>;
-		/// The frequency for changing the minimum
+		/// The number of historical compute times to use to calculate the rolling compute average
+		/// (for adjustment)
 		#[pallet::constant]
 		type ChangePeriod: Get<u32>;
 
@@ -337,7 +338,7 @@ pub mod pallet {
 
 			let _ = <PastComputeBlockTimes<T>>::try_mutate(|timestamps| {
 				timestamps.truncate(0);
-				timestamps.try_insert(0, now)
+				timestamps.try_insert(0, block_period)
 			});
 			if start_difficulty != difficulty {
 				<CurrentComputeDifficulty<T>>::put(difficulty);

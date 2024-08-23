@@ -2,8 +2,9 @@
 
 use std::sync::Arc;
 
-use anyhow::{anyhow, ensure};
+use anyhow::ensure;
 use codec::{Decode, Encode};
+use log::info;
 use parking_lot::Mutex;
 use sc_client_api::{backend::AuxStore, HeaderBackend};
 use sp_api::ProvideRuntimeApi;
@@ -58,12 +59,11 @@ impl UtxoTracker {
 		let connected_network = filter.get_network()?;
 		ensure!(
 			connected_network == network,
-			anyhow!(
-				"Incorrect bitcoin network connected to. Should be {:?}, but is {:?}",
-				&network,
-				&connected_network,
-			)
+			"Incorrect bitcoin network connected to. Should be {:?}, but is {:?}",
+			&network,
+			&connected_network,
 		);
+		info!(target: "node::bitcoin_utxo_tracker", "Connected to correct bitcoin network: {:?}", connected_network);
 		Ok(())
 	}
 
