@@ -24,16 +24,16 @@ pub async fn bitcoin_loop(
 	} else {
 		Auth::None
 	};
-	let client = Client::new(&bitcoin_rpc_url, auth)?;
+	let bitcoin_client = Client::new(&bitcoin_rpc_url, auth)?;
 	tracing::info!("Oracle Started. Connected to bitcoin at {}", bitcoin_rpc_url);
 
 	let mut last_confirmed_tip = None;
 	let account_id = signer.account_id();
 	loop {
-		let blockchain_info = client.get_block_count()?;
+		let blockchain_info = bitcoin_client.get_block_count()?;
 		let bitcoin_confirmed_height = blockchain_info.saturating_sub(CONFIRMATIONS);
 
-		let bitcoin_tip = client.get_block_hash(bitcoin_confirmed_height)?;
+		let bitcoin_tip = bitcoin_client.get_block_hash(bitcoin_confirmed_height)?;
 		if Some(bitcoin_tip) == last_confirmed_tip {
 			sleep(Duration::from_secs(10)).await;
 			continue;

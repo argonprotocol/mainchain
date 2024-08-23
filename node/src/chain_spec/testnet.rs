@@ -18,7 +18,7 @@ pub fn testnet_config() -> Result<ChainSpec, String> {
 	properties.insert("tokenDecimals".into(), 3.into());
 	properties.insert("ss58Format".into(), ADDRESS_PREFIX.into());
 
-	const HASHES_PER_SECOND: u64 = 10_000;
+	const HASHES_PER_SECOND: u64 = 200;
 	const TICK_MILLIS: u64 = 60_000;
 	Ok(ChainSpec::builder(
 		WASM_BINARY.ok_or_else(|| "Wasm not available".to_string())?,
@@ -59,7 +59,7 @@ pub fn testnet_config() -> Result<ChainSpec, String> {
 			get_account_id_from_seed::<sr25519::Public>("Ferdie//notary"),
 		],
 		500,
-		(TICK_MILLIS * HASHES_PER_SECOND / 1_000) as ComputeDifficulty,
+		((TICK_MILLIS / 2) * HASHES_PER_SECOND / 1_000) as ComputeDifficulty,
 		TICK_MILLIS,
 		vec![GenesisNotary {
 			account_id: get_account_id_from_seed::<sr25519::Public>("Ferdie"),
