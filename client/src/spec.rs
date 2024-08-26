@@ -2930,9 +2930,9 @@ pub mod api {
 			.hash();
 		runtime_metadata_hash ==
 			[
-				21u8, 89u8, 166u8, 109u8, 57u8, 58u8, 74u8, 85u8, 89u8, 39u8, 21u8, 249u8, 109u8,
-				220u8, 14u8, 145u8, 62u8, 141u8, 254u8, 180u8, 254u8, 59u8, 235u8, 38u8, 139u8,
-				174u8, 181u8, 58u8, 247u8, 145u8, 125u8, 123u8,
+				33u8, 135u8, 62u8, 110u8, 101u8, 22u8, 136u8, 185u8, 118u8, 26u8, 122u8, 158u8,
+				49u8, 11u8, 25u8, 180u8, 205u8, 122u8, 141u8, 63u8, 215u8, 228u8, 12u8, 89u8,
+				251u8, 212u8, 72u8, 119u8, 134u8, 62u8, 192u8, 4u8,
 			]
 	}
 	pub mod system {
@@ -8065,24 +8065,6 @@ pub mod api {
 						],
 					)
 				}
-				#[doc = " The number of blocks previous to the tip that a bitcoin UTXO will be allowed to be"]
-				#[doc = " locked"]
-				pub fn max_utxo_birth_blocks_old(
-					&self,
-				) -> ::subxt::ext::subxt_core::constants::address::StaticAddress<
-					::core::primitive::u64,
-				> {
-					::subxt::ext::subxt_core::constants::address::StaticAddress::new_static(
-						"BitcoinUtxos",
-						"MaxUtxoBirthBlocksOld",
-						[
-							128u8, 214u8, 205u8, 242u8, 181u8, 142u8, 124u8, 231u8, 190u8, 146u8,
-							59u8, 226u8, 157u8, 101u8, 103u8, 117u8, 249u8, 65u8, 18u8, 191u8,
-							103u8, 119u8, 53u8, 85u8, 81u8, 96u8, 220u8, 42u8, 184u8, 239u8, 42u8,
-							246u8,
-						],
-					)
-				}
 			}
 		}
 	}
@@ -11881,7 +11863,8 @@ pub mod api {
 						],
 					)
 				}
-				#[doc = " The frequency for changing the minimum"]
+				#[doc = " The number of historical compute times to use to calculate the rolling compute average"]
+				#[doc = " (for adjustment)"]
 				pub fn change_period(
 					&self,
 				) -> ::subxt::ext::subxt_core::constants::address::StaticAddress<

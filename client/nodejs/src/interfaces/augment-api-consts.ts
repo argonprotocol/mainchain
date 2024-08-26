@@ -52,11 +52,6 @@ declare module '@polkadot/api-base/types/consts' {
        * The maximum number of UTXOs that can be tracked in a block and/or expiring at same block
        **/
       maxPendingConfirmationUtxos: u32 & AugmentedConst<ApiType>;
-      /**
-       * The number of blocks previous to the tip that a bitcoin UTXO will be allowed to be
-       * locked
-       **/
-      maxUtxoBirthBlocksOld: u64 & AugmentedConst<ApiType>;
     };
     blockRewards: {
       /**
@@ -82,7 +77,8 @@ declare module '@polkadot/api-base/types/consts' {
     };
     blockSealSpec: {
       /**
-       * The frequency for changing the minimum
+       * The number of historical compute times to use to calculate the rolling compute average
+       * (for adjustment)
        **/
       changePeriod: u32 & AugmentedConst<ApiType>;
       /**

@@ -693,7 +693,6 @@ impl pallet_bitcoin_utxos::Config for Runtime {
 	type RuntimeEvent = RuntimeEvent;
 	type WeightInfo = pallet_bitcoin_utxos::weights::SubstrateWeight<Runtime>;
 	type EventHandler = Bonds;
-	type MaxUtxoBirthBlocksOld = MaxBitcoinBirthBlocksOld;
 	type MaxPendingConfirmationBlocks = MaxPendingConfirmationBlocks;
 	type MaxPendingConfirmationUtxos = MaxPendingConfirmationUtxos;
 }

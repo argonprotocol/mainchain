@@ -26,9 +26,8 @@ repos:
         stages: [ commit, push ]
       - id: lint
         name: Run clippy
-        args: [ "make", "lint" ]
-        entry: cargo
+        entry: cargo clippy --workspace --fix --allow-staged --allow-dirty -- -Dwarnings
         language: system
         types: [ rust ]
         pass_filenames: false
-        stages: [ push ]
+        stages: [ commit ]
