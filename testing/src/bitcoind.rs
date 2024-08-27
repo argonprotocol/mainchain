@@ -109,6 +109,9 @@ pub fn add_wallet_address(bitcoind: &BitcoinD) -> Address {
 }
 
 pub fn add_blocks(bitcoind: &BitcoinD, count: u64, grant_to_address: &Address) {
+	// NOTE: if you get errors here on a Mac M1/M*, you may need to run `brew install sqlite`.
+	// There's a weird history of sqlite having massive slowdowns with bitcoind. It will use
+	// built-in homebrew version if available
 	bitcoind.client.generate_to_address(count, grant_to_address).unwrap();
 }
 

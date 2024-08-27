@@ -329,7 +329,6 @@ parameter_types! {
 	pub const ReportLongevity: u64 = BlocksPerDay::get() as u64 * 10;
 
 	pub const MaxUnlockingUtxos: u32 = 1000;
-	pub const MinBitcoinSatoshiAmount: Satoshis = 10_000_000; // 1/10th bitcoin minimum
 	pub const MaxPendingTermModificationsPerBlock: u32 = 100;
 	pub const MinTermsModificationBlockDelay: u32 = 1439; // must be at least one slot (day)
 }
@@ -367,7 +366,6 @@ impl pallet_bond::Config for Runtime {
 	type BitcoinUtxoTracker = BitcoinUtxos;
 	type MaxUnlockingUtxos = MaxUnlockingUtxos;
 	type BondEvents = Mint;
-	type MinimumBitcoinBondSatoshis = MinBitcoinSatoshiAmount;
 	type ArgonBlocksPerDay = BlocksPerDay;
 	type UtxoUnlockCosignDeadlineBlocks = UtxoUnlockCosignDeadlineBlocks;
 	type BitcoinSignatureVerifier = BitcoinSignatureVerifier;

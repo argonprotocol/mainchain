@@ -6,7 +6,7 @@ use sp_runtime::traits::{IdentifyAccount, Verify};
 
 use argon_node_runtime::{opaque::SessionKeys, AccountId, Balance, Signature};
 use argon_primitives::{
-	bitcoin::BitcoinNetwork,
+	bitcoin::{BitcoinNetwork, Satoshis},
 	block_seal::{MiningRegistration, MiningSlotConfig, RewardDestination},
 	block_vote::VoteMinimum,
 	notary::GenesisNotary,
@@ -70,6 +70,7 @@ pub(crate) fn testnet_genesis(
 	initial_notaries: Vec<GenesisNotary<AccountId>>,
 	escrow_expiration_ticks: Tick,
 	mining_config: MiningSlotConfig<BlockNumber>,
+	minimum_bitcoin_bond_satoshis: Satoshis,
 ) -> serde_json::Value {
 	let authority_zero = initial_authorities[0].clone();
 	let ticker = Ticker::start(Duration::from_millis(tick_millis), escrow_expiration_ticks);
@@ -88,6 +89,9 @@ pub(crate) fn testnet_genesis(
 		},
 		"shareBalances": {
 			"balances": endowed_accounts.iter().cloned().map(|k| (k, 10_000)).collect::<Vec<_>>(),
+		},
+		"bonds": {
+			"minimumBitcoinBondSatoshis": minimum_bitcoin_bond_satoshis
 		},
 		"priceIndex": {
 			"operator": Some(price_index_operator),

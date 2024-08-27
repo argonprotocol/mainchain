@@ -114,10 +114,6 @@ declare module '@polkadot/api-base/types/consts' {
        **/
       maxUnlockingUtxos: u32 & AugmentedConst<ApiType>;
       /**
-       * The minimum number of satoshis that can be bonded
-       **/
-      minimumBitcoinBondSatoshis: u64 & AugmentedConst<ApiType>;
-      /**
        * Minimum amount for a bond
        **/
       minimumBondAmount: u128 & AugmentedConst<ApiType>;

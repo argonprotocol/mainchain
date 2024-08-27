@@ -73,6 +73,7 @@ pub fn testnet_config() -> Result<ChainSpec, String> {
 			blocks_between_slots: 1440,
 			slot_bidding_start_block: 14400,
 		},
+		5000, // 0.00006 avail in testnet faucet, need 1k for fees
 	))
 	.build())
 }

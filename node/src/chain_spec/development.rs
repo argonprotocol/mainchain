@@ -1,13 +1,14 @@
 use sc_service::{ChainType, Properties};
 use sp_core::sr25519;
 
-use argon_node_runtime::WASM_BINARY;
-use argon_primitives::{
-	bitcoin::BitcoinNetwork, block_seal::MiningSlotConfig, ComputeDifficulty, ADDRESS_PREFIX,
-};
-
 use crate::chain_spec::{
 	authority_keys_from_seed, get_account_id_from_seed, testnet_genesis, ChainSpec,
+};
+use argon_node_runtime::WASM_BINARY;
+use argon_primitives::{
+	bitcoin::{BitcoinNetwork, SATOSHIS_PER_BITCOIN},
+	block_seal::MiningSlotConfig,
+	ComputeDifficulty, ADDRESS_PREFIX,
 };
 
 pub fn development_config() -> Result<ChainSpec, String> {
@@ -58,6 +59,7 @@ pub fn development_config() -> Result<ChainSpec, String> {
 			blocks_between_slots: 4,
 			slot_bidding_start_block: 4,
 		},
+		SATOSHIS_PER_BITCOIN / 10,
 	))
 	.build())
 }

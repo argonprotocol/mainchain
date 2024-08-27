@@ -7,7 +7,7 @@ use crate::chain_spec::{
 };
 use argon_node_runtime::WASM_BINARY;
 use argon_primitives::{
-	bitcoin::BitcoinNetwork,
+	bitcoin::{BitcoinNetwork, SATOSHIS_PER_BITCOIN},
 	block_seal::MiningSlotConfig,
 	notary::{GenesisNotary, NotaryPublic},
 	ComputeDifficulty, ADDRESS_PREFIX,
@@ -70,6 +70,7 @@ pub fn local_testnet_config() -> Result<ChainSpec, String> {
 			blocks_between_slots: 4,
 			slot_bidding_start_block: 4,
 		},
+		SATOSHIS_PER_BITCOIN / 10,
 	))
 	.build())
 }

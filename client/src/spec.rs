@@ -2930,9 +2930,9 @@ pub mod api {
 			.hash();
 		runtime_metadata_hash ==
 			[
-				33u8, 135u8, 62u8, 110u8, 101u8, 22u8, 136u8, 185u8, 118u8, 26u8, 122u8, 158u8,
-				49u8, 11u8, 25u8, 180u8, 205u8, 122u8, 141u8, 63u8, 215u8, 228u8, 12u8, 89u8,
-				251u8, 212u8, 72u8, 119u8, 134u8, 62u8, 192u8, 4u8,
+				95u8, 233u8, 18u8, 239u8, 108u8, 193u8, 230u8, 79u8, 79u8, 243u8, 234u8, 209u8,
+				186u8, 183u8, 92u8, 2u8, 31u8, 215u8, 64u8, 169u8, 203u8, 122u8, 223u8, 89u8,
+				131u8, 167u8, 225u8, 215u8, 102u8, 105u8, 7u8, 14u8,
 			]
 	}
 	pub mod system {
@@ -9287,6 +9287,10 @@ pub mod api {
 					pub type UtxosCosignReleaseHeightById = ::core::primitive::u32;
 					pub type Param0 = ::core::primitive::u64;
 				}
+				pub mod minimum_bitcoin_bond_satoshis {
+					use super::runtime_types;
+					pub type MinimumBitcoinBondSatoshis = ::core::primitive::u64;
+				}
 				pub mod owed_utxo_aggrieved {
 					use super::runtime_types;
 					pub type OwedUtxoAggrieved = (
@@ -9574,6 +9578,28 @@ pub mod api {
 						],
 					)
 				}
+				#[doc = " The minimum number of satoshis that can be bonded"]
+				pub fn minimum_bitcoin_bond_satoshis(
+					&self,
+				) -> ::subxt::ext::subxt_core::storage::address::StaticAddress<
+					(),
+					types::minimum_bitcoin_bond_satoshis::MinimumBitcoinBondSatoshis,
+					::subxt::ext::subxt_core::utils::Yes,
+					::subxt::ext::subxt_core::utils::Yes,
+					(),
+				> {
+					::subxt::ext::subxt_core::storage::address::StaticAddress::new_static(
+						"Bonds",
+						"MinimumBitcoinBondSatoshis",
+						(),
+						[
+							201u8, 198u8, 105u8, 80u8, 18u8, 119u8, 254u8, 60u8, 182u8, 150u8,
+							64u8, 117u8, 112u8, 133u8, 157u8, 154u8, 77u8, 198u8, 209u8, 230u8,
+							51u8, 54u8, 53u8, 118u8, 91u8, 104u8, 168u8, 128u8, 47u8, 216u8, 104u8,
+							58u8,
+						],
+					)
+				}
 				#[doc = " Stores Utxos that were not paid back in full"]
 				#[doc = ""]
 				#[doc = " Tuple stores Account, Vault, Still Owed, State"]
@@ -9720,23 +9746,6 @@ pub mod api {
 							125u8, 151u8, 53u8, 76u8, 168u8, 26u8, 10u8, 9u8, 98u8, 68u8, 9u8,
 							178u8, 197u8, 113u8, 31u8, 79u8, 200u8, 90u8, 203u8, 100u8, 41u8,
 							145u8,
-						],
-					)
-				}
-				#[doc = " The minimum number of satoshis that can be bonded"]
-				pub fn minimum_bitcoin_bond_satoshis(
-					&self,
-				) -> ::subxt::ext::subxt_core::constants::address::StaticAddress<
-					::core::primitive::u64,
-				> {
-					::subxt::ext::subxt_core::constants::address::StaticAddress::new_static(
-						"Bonds",
-						"MinimumBitcoinBondSatoshis",
-						[
-							128u8, 214u8, 205u8, 242u8, 181u8, 142u8, 124u8, 231u8, 190u8, 146u8,
-							59u8, 226u8, 157u8, 101u8, 103u8, 117u8, 249u8, 65u8, 18u8, 191u8,
-							103u8, 119u8, 53u8, 85u8, 81u8, 96u8, 220u8, 42u8, 184u8, 239u8, 42u8,
-							246u8,
 						],
 					)
 				}

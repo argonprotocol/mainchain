@@ -178,6 +178,10 @@ declare module '@polkadot/api-base/types/storage' {
        **/
       bondsById: AugmentedQuery<ApiType, (arg: u64 | AnyNumber | Uint8Array) => Observable<Option<ArgonPrimitivesBond>>, [u64]>;
       /**
+       * The minimum number of satoshis that can be bonded
+       **/
+      minimumBitcoinBondSatoshis: AugmentedQuery<ApiType, () => Observable<u64>, []>;
+      /**
        * Completion of mining bonds, upon which funds are returned to the vault
        **/
       miningBondCompletions: AugmentedQuery<ApiType, (arg: u32 | AnyNumber | Uint8Array) => Observable<Vec<u64>>, [u32]>;

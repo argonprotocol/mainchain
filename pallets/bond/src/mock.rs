@@ -284,7 +284,6 @@ impl pallet_bond::Config for Test {
 	type BitcoinBondReclamationBlocks = BitcoinBondReclamationBlocks;
 	type BitcoinBondDurationBlocks = BitcoinBondDurationBlocks;
 	type BitcoinBlockHeight = BitcoinBlockHeight;
-	type MinimumBitcoinBondSatoshis = MinimumBondSatoshis;
 	type BitcoinSignatureVerifier = StaticBitcoinVerifier;
 	type GetBitcoinNetwork = GetBitcoinNetwork;
 }
@@ -293,5 +292,15 @@ impl pallet_bond::Config for Test {
 pub fn new_test_ext() -> sp_io::TestExternalities {
 	let env = Env::new().default_filter_or("debug");
 	let _ = Builder::from_env(env).is_test(true).try_init();
-	frame_system::GenesisConfig::<Test>::default().build_storage().unwrap().into()
+
+	let mut t = frame_system::GenesisConfig::<Test>::default().build_storage().unwrap();
+
+	pallet_bond::GenesisConfig::<Test> {
+		minimum_bitcoin_bond_satoshis: MinimumBondSatoshis::get(),
+		_phantom: Default::default(),
+	}
+	.assimilate_storage(&mut t)
+	.unwrap();
+
+	sp_io::TestExternalities::new(t)
 }
