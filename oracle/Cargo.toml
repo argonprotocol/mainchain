@@ -27,7 +27,7 @@ tracing-subscriber = { workspace = true }
 clap = { workspace = true }
 chrono = { workspace = true }
 rand = { workspace = true }
-
+directories = { workspace = true }
 argon-client = { workspace = true }
 argon-primitives = { workspace = true, features = ["default", "bitcoin"] }
 url = { workspace = true }

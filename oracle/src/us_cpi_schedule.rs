@@ -1,10 +1,10 @@
 use std::{env, fs};
 
+use crate::utils::parse_date;
 use anyhow::{anyhow, Result};
 use chrono::{DateTime, Utc};
 use scraper::{Html, Selector};
-
-use crate::utils::parse_date;
+use serde::{Deserialize, Serialize};
 
 pub async fn load_cpi_schedule() -> Result<Vec<CpiSchedule>> {
 	// let client = Client::new();
@@ -54,7 +54,7 @@ fn parse_schedule(html: String) -> Result<Vec<CpiSchedule>> {
 	Ok(cpi_schedule)
 }
 
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct CpiSchedule {
 	pub ref_month: DateTime<Utc>,
 	pub release_date: DateTime<Utc>,

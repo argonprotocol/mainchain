@@ -24,7 +24,7 @@ pub async fn price_index_loop(
 	if use_simulated_schedule {
 		let chain_info = mainchain_client.methods.system_chain().await?;
 		ensure!(
-			chain_info == "Development" || chain_info.contains("Testnet"),
+			chain_info.contains("Development") || chain_info.contains("Testnet"),
 			"Simulated schedule can only be used on development chain"
 		);
 	}
