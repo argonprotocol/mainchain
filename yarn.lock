@@ -19,7 +19,7 @@ __metadata:
   version: 0.0.0-use.local
   resolution: "@argonprotocol/localchain@workspace:localchain"
   dependencies:
-    "@argonprotocol/mainchain": "npm:0.0.1"
+    "@argonprotocol/mainchain": "npm:0.0.2"
     "@napi-rs/cli": "npm:3.0.0-alpha.55"
     "@polkadot/util": "npm:^13.0.2"
     "@polkadot/util-crypto": "npm:^13.0.2"
@@ -55,7 +55,7 @@ __metadata:
   languageName: unknown
   linkType: soft
 
-"@argonprotocol/mainchain@npm:0.0.1, @argonprotocol/mainchain@workspace:client/nodejs":
+"@argonprotocol/mainchain@npm:0.0.2, @argonprotocol/mainchain@workspace:client/nodejs":
   version: 0.0.0-use.local
   resolution: "@argonprotocol/mainchain@workspace:client/nodejs"
   dependencies:
