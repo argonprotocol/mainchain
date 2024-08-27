@@ -4,6 +4,10 @@
   "publishConfig": {
     "access": "public"
   },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/argonprotocol/mainchain.git"
+  },
   "os": [
     "darwin"
   ],
