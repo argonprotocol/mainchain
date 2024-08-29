@@ -6,7 +6,7 @@ extern crate alloc;
 #[macro_use]
 extern crate frame_benchmarking;
 
-use alloc::{boxed::Box, collections::btree_map::BTreeMap, vec, vec::Vec};
+use alloc::{collections::btree_map::BTreeMap, vec, vec::Vec};
 use codec::{Decode, Encode, MaxEncodedLen};
 use core::marker::PhantomData;
 pub use frame_support::{
@@ -131,7 +131,7 @@ pub mod currency {
 	}
 }
 
-pub type ArgonBalancesCall = pallet_balances::Call<Runtime, ArgonToken>;
+pub type BalancesCall = pallet_balances::Call<Runtime, ArgonToken>;
 
 // To learn more about runtime versioning, see:
 // https://docs.substrate.io/main-docs/build/upgrade#runtime-versioning
@@ -237,7 +237,7 @@ parameter_types! {
 	pub const HistoricalPaymentAddressTicksToKeep: Tick = DefaultEscrowDuration::get() + ESCROW_CLAWBACK_TICKS + 10;
 
 	pub const ArgonsPerBlock: u32 = 5_000;
-	pub const StartingSharesPerBlock: u32 = 5_000;
+	pub const StartingOwnershipTokensPerBlock: u32 = 5_000;
 	pub const HalvingBlocks: u32 = 2_100_000; // based on bitcoin, but 10x since we're block per minute
 	pub const MaturationBlocks: u32 = 5;
 	pub const MinerPayoutPercent: FixedU128 = FixedU128::from_rational(75, 100);
@@ -260,15 +260,15 @@ impl pallet_block_seal_spec::Config for Runtime {
 impl pallet_block_rewards::Config for Runtime {
 	type RuntimeEvent = RuntimeEvent;
 	type WeightInfo = pallet_block_rewards::weights::SubstrateWeight<Runtime>;
-	type ArgonCurrency = ArgonBalances;
-	type SharesCurrency = ShareBalances;
+	type ArgonCurrency = Balances;
+	type SharesCurrency = Ownership;
 	type Balance = Balance;
 	type BlockSealerProvider = BlockSeal;
 	type NotaryProvider = Notaries;
 	type NotebookProvider = Notebook;
 	type CurrentTick = Ticks;
 	type ArgonsPerBlock = ArgonsPerBlock;
-	type StartingSharesPerBlock = StartingSharesPerBlock;
+	type StartingOwnershipTokensPerBlock = StartingOwnershipTokensPerBlock;
 	type HalvingBlocks = HalvingBlocks;
 	type MinerPayoutPercent = MinerPayoutPercent;
 	type MaturationBlocks = MaturationBlocks;
@@ -336,7 +336,7 @@ parameter_types! {
 impl pallet_vaults::Config for Runtime {
 	type RuntimeEvent = RuntimeEvent;
 	type WeightInfo = pallet_vaults::weights::SubstrateWeight<Runtime>;
-	type Currency = ArgonBalances;
+	type Currency = Balances;
 	type Balance = Balance;
 	type RuntimeHoldReason = RuntimeHoldReason;
 	type MinimumBondAmount = MinimumBondAmount;
@@ -352,7 +352,7 @@ impl BitcoinVerifier<Runtime> for BitcoinSignatureVerifier {}
 impl pallet_bond::Config for Runtime {
 	type RuntimeEvent = RuntimeEvent;
 	type WeightInfo = pallet_bond::weights::SubstrateWeight<Runtime>;
-	type Currency = ArgonBalances;
+	type Currency = Balances;
 	type RuntimeHoldReason = RuntimeHoldReason;
 	type MinimumBondAmount = MinimumBondAmount;
 	type MaxConcurrentlyExpiringBonds = MaxConcurrentlyExpiringBonds;
@@ -375,7 +375,7 @@ impl pallet_mining_slot::Config for Runtime {
 	type RuntimeEvent = RuntimeEvent;
 	type WeightInfo = pallet_mining_slot::weights::SubstrateWeight<Runtime>;
 	type MaxMiners = MaxMiners;
-	type OwnershipCurrency = ShareBalances;
+	type OwnershipCurrency = Ownership;
 	type OwnershipPercentAdjustmentDamper = OwnershipPercentAdjustmentDamper;
 	type TargetBidsPerSlot = TargetBidsPerSlot;
 	type RuntimeHoldReason = RuntimeHoldReason;
@@ -460,7 +460,7 @@ parameter_types! {
 impl pallet_chain_transfer::Config for Runtime {
 	type RuntimeEvent = RuntimeEvent;
 	type WeightInfo = pallet_chain_transfer::weights::SubstrateWeight<Runtime>;
-	type Currency = ArgonBalances;
+	type Currency = Balances;
 	type Balance = Balance;
 	type NotaryProvider = Notaries;
 	type PalletId = ChainTransferPalletId;
@@ -611,7 +611,7 @@ impl InstanceFilter<RuntimeCall> for ProxyType {
 		match self {
 			ProxyType::Any => true,
 			ProxyType::NonTransfer =>
-				!matches!(c, RuntimeCall::ArgonBalances(..) | RuntimeCall::ShareBalances(..)),
+				!matches!(c, RuntimeCall::Balances(..) | RuntimeCall::Ownership(..)),
 			ProxyType::PriceIndex => matches!(c, RuntimeCall::PriceIndex(..)),
 		}
 	}
@@ -637,7 +637,7 @@ parameter_types! {
 impl pallet_multisig::Config for Runtime {
 	type RuntimeEvent = RuntimeEvent;
 	type RuntimeCall = RuntimeCall;
-	type Currency = ArgonBalances;
+	type Currency = Balances;
 	type DepositBase = DepositBase;
 	type DepositFactor = DepositFactor;
 	type MaxSignatories = MaxSignatories;
@@ -646,7 +646,7 @@ impl pallet_multisig::Config for Runtime {
 impl pallet_proxy::Config for Runtime {
 	type RuntimeEvent = RuntimeEvent;
 	type RuntimeCall = RuntimeCall;
-	type Currency = ArgonBalances;
+	type Currency = Balances;
 	type ProxyType = ProxyType;
 	type ProxyDepositBase = ProxyDepositBase;
 	type ProxyDepositFactor = ProxyDepositFactor;
@@ -698,7 +698,7 @@ impl pallet_bitcoin_utxos::Config for Runtime {
 impl pallet_mint::Config for Runtime {
 	type RuntimeEvent = RuntimeEvent;
 	type WeightInfo = pallet_mint::weights::SubstrateWeight<Runtime>;
-	type Currency = ArgonBalances;
+	type Currency = Balances;
 	type Balance = Balance;
 	type PriceProvider = PriceIndex;
 	type MaxPendingMintUtxos = MaxPendingMintUtxos;
@@ -761,7 +761,7 @@ impl WeightToFeePolynomial for WageProtectorFee {
 
 impl pallet_transaction_payment::Config for Runtime {
 	type RuntimeEvent = RuntimeEvent;
-	type OnChargeTransaction = FungibleAdapter<ArgonBalances, DealWithFees<Runtime>>;
+	type OnChargeTransaction = FungibleAdapter<Balances, DealWithFees<Runtime>>;
 	type OperationalFeeMultiplier = ConstU8<5>;
 	type WeightToFee = WageProtectorFee;
 	type LengthToFee = WageProtectorFee;
@@ -772,6 +772,13 @@ impl pallet_sudo::Config for Runtime {
 	type RuntimeEvent = RuntimeEvent;
 	type RuntimeCall = RuntimeCall;
 	type WeightInfo = pallet_sudo::weights::SubstrateWeight<Runtime>;
+}
+
+impl pallet_utility::Config for Runtime {
+	type RuntimeEvent = RuntimeEvent;
+	type RuntimeCall = RuntimeCall;
+	type WeightInfo = pallet_utility::weights::SubstrateWeight<Runtime>;
+	type PalletsOrigin = OriginCaller;
 }
 
 // Create the runtime by composing the FRAME pallets that were previously configured.
@@ -839,14 +846,16 @@ mod runtime {
 	#[runtime::pallet_index(22)]
 	pub type Mint = pallet_mint;
 	#[runtime::pallet_index(23)]
-	pub type ArgonBalances = pallet_balances<Instance1>;
+	pub type Balances = pallet_balances<Instance1>;
 	#[runtime::pallet_index(24)]
-	pub type ShareBalances = pallet_balances<Instance2>;
+	pub type Ownership = pallet_balances<Instance2>;
 	#[runtime::pallet_index(25)]
 	pub type TxPause = pallet_tx_pause;
 	#[runtime::pallet_index(26)]
 	pub type TransactionPayment = pallet_transaction_payment;
 	#[runtime::pallet_index(27)]
+	pub type Utility = pallet_utility;
+	#[runtime::pallet_index(28)]
 	pub type Sudo = pallet_sudo;
 }
 

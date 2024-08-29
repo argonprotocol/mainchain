@@ -82,6 +82,12 @@ description = "Show sccache stats"
 command = "sccache"
 args = ["--show-stats"]
 
+[tasks.testnet-spec]
+description = "Generate testnet spec"
+script = [
+    "cargo run --release --bin argon-node -- build-spec --chain fresh-testnet --raw > ./node/src/chain_spec/testnet1.json"
+]
+
 [tasks.build]
 description = "Compiles the project"
 command = "cargo"
@@ -93,6 +99,14 @@ dependencies = ["sqlx-setup"]
 description = "Compiles the project"
 command = "cargo"
 args = ["build", "--bin", "argon-node"]
+env = { "RUSTC_WRAPPER" = "sccache" }
+dependencies = ["sqlx-setup"]
+
+
+[tasks.build-node-release]
+description = "Compiles the project as a release"
+command = "cargo"
+args = ["build", "--release", "--bin", "argon-node"]
 env = { "RUSTC_WRAPPER" = "sccache" }
 dependencies = ["sqlx-setup"]
 

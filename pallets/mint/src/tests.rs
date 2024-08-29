@@ -43,9 +43,9 @@ fn it_records_burnt_argons_by_prorata() {
 fn it_tracks_block_rewards() {
 	new_test_ext().execute_with(|| {
 		<Mint as BlockRewardsEventHandler<_, _>>::rewards_created(&[
-			BlockPayout { account_id: 1, argons: 100, shares: 100 },
-			BlockPayout { account_id: 1, argons: 1, shares: 1 },
-			BlockPayout { account_id: 2, argons: 5, shares: 5 },
+			BlockPayout { account_id: 1, argons: 100, ownership: 100 },
+			BlockPayout { account_id: 1, argons: 1, ownership: 1 },
+			BlockPayout { account_id: 2, argons: 5, ownership: 5 },
 		]);
 
 		assert_eq!(MintedMiningArgons::<Test>::get(), 106);

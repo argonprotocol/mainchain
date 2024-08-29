@@ -1,6 +1,6 @@
 {
   "name": "@argonprotocol/mainchain",
-  "version": "0.0.2",
+  "version": "0.0.3",
   "description": "A client for accessing the Argon mainchain apis.",
   "repository": {
     "type": "git",
@@ -17,7 +17,7 @@
     "generate:defs": "node --loader ts-node/esm node_modules/.bin/polkadot-types-from-defs --endpoint metadata.json --input ./src/interfaces --package @argonprotocol/mainchain/interfaces",
     "generate:meta": "node --loader ts-node/esm node_modules/.bin/polkadot-types-from-chain --endpoint metadata.json --output ./src/interfaces --strict",
     "lint": "tsc --noEmit --pretty",
-    "tsc": "tsc -p tsconfig.json && tsc -p tsconfig-cjs.json && tsc -p tsconfig-types.json"
+    "tsc": "tsc -p tsconfig.json && tsc -p tsconfig-cjs.json && tsc -p tsconfig-types.json && shx cp package.cjs.json lib/cjs/package.json"
   },
   "type": "module",
   "types": "./lib/types/index.d.ts",
@@ -55,6 +55,7 @@
     "@polkadot/typegen": "^12.2.3",
     "@polkadot/util-crypto": "^13.0.2",
     "@substrate/ss58-registry": "^1.49.0",
+    "shx": "^0.3.4",
     "ts-node": "^10.9.2",
     "typescript": "^5.3.3"
   },

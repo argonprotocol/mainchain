@@ -50,14 +50,14 @@ const LOG_TARGET: &str = "runtime::bond";
 /// _Unlocking a Bitcoin_
 /// A bitcoin owner will pre-create a transaction to unlock their UTXO and submit the sighash to
 /// this pallet. The vault operator has 10 days to publish a counter signature along with the public
-/// key. If the vault operator fails to do so, they will lose their ownership shares and all
+/// key. If the vault operator fails to do so, they will lose their ownership tokens and all
 /// underlying Bitcoin bonds. A user will be made whole via a governance vote.
 ///
 /// _Penalties_
 /// 1. If a UTXO is found to have moved before a bond expiration via the bitcoin network, the vault
 ///    will be penalized by the amount of the UTXOs' current value.
 /// 2. If a vault operator fails to counter-sign a transaction within 10 days, they will lose their
-///    ownership shares and all underlying Bitcoin bonds.
+///    ownership tokens and all underlying Bitcoin bonds.
 ///
 /// ** Mining Bonds: **
 ///

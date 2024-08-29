@@ -23,7 +23,7 @@ async fn test_localchain_transfers_using_cli() {
 		.live
 		.tx()
 		.sign_and_submit_then_watch_default(
-			&tx().argon_balances().transfer_keep_alive(
+			&tx().balances().transfer_keep_alive(
 				subxt::utils::AccountId32(test_notary.operator.public().into()).into(),
 				10_000,
 			),

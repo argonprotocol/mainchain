@@ -786,7 +786,7 @@ pub mod pallet {
 		/// 1. From the bonded funds
 		/// 2. From the allocated funds
 		/// 3. From the securitized funds
-		/// 4. TODO: From the ownership shares
+		/// 4. TODO: From the ownership tokens
 		///
 		/// The funds will be returned to the owed_to_account_id
 		///
@@ -833,7 +833,7 @@ pub mod pallet {
 					still_owed.checked_sub(&amount_to_pull).ok_or(BondError::InternalError)?;
 			}
 
-			// 3. Use ownership shares at current value
+			// 3. Use ownership tokens at current value
 			// TODO
 
 			let recouped = market_rate.saturating_sub(still_owed);

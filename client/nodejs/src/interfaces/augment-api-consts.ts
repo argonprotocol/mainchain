@@ -13,7 +13,7 @@ export type __AugmentedConst<ApiType extends ApiTypes> = AugmentedConst<ApiType>
 
 declare module '@polkadot/api-base/types/consts' {
   interface AugmentedConsts<ApiType extends ApiTypes> {
-    argonBalances: {
+    balances: {
       /**
        * The minimum amount required to keep an account open. MUST BE GREATER THAN ZERO!
        *
@@ -71,9 +71,9 @@ declare module '@polkadot/api-base/types/consts' {
        **/
       minerPayoutPercent: u128 & AugmentedConst<ApiType>;
       /**
-       * Number of shares minted per block
+       * Number of ownership tokens minted per block
        **/
-      startingSharesPerBlock: u128 & AugmentedConst<ApiType>;
+      startingOwnershipTokensPerBlock: u128 & AugmentedConst<ApiType>;
     };
     blockSealSpec: {
       /**
@@ -232,6 +232,36 @@ declare module '@polkadot/api-base/types/consts' {
        **/
       metaChangesTickDelay: u32 & AugmentedConst<ApiType>;
     };
+    ownership: {
+      /**
+       * The minimum amount required to keep an account open. MUST BE GREATER THAN ZERO!
+       *
+       * If you *really* need it to be zero, you can enable the feature `insecure_zero_ed` for
+       * this pallet. However, you do so at your own risk: this will open up a major DoS vector.
+       * In case you have multiple sources of provider references, you may also get unexpected
+       * behaviour if you set this to zero.
+       *
+       * Bottom line: Do yourself a favour and make it at least one!
+       **/
+      existentialDeposit: u128 & AugmentedConst<ApiType>;
+      /**
+       * The maximum number of individual freeze locks that can exist on an account at any time.
+       **/
+      maxFreezes: u32 & AugmentedConst<ApiType>;
+      /**
+       * The maximum number of locks that should exist on an account.
+       * Not strictly enforced, but used for weight estimation.
+       *
+       * Use of locks is deprecated in favour of freezes. See `https://github.com/paritytech/substrate/pull/12951/`
+       **/
+      maxLocks: u32 & AugmentedConst<ApiType>;
+      /**
+       * The maximum number of named reserves that can exist on an account.
+       *
+       * Use of reserves is deprecated in favour of holds. See `https://github.com/paritytech/substrate/pull/12951/`
+       **/
+      maxReserves: u32 & AugmentedConst<ApiType>;
+    };
     priceIndex: {
       /**
        * The max price difference dropping below target or raising above target per tick. There's
@@ -286,36 +316,6 @@ declare module '@polkadot/api-base/types/consts' {
        * into account `32 + proxy_type.encode().len()` bytes of data.
        **/
       proxyDepositFactor: u128 & AugmentedConst<ApiType>;
-    };
-    shareBalances: {
-      /**
-       * The minimum amount required to keep an account open. MUST BE GREATER THAN ZERO!
-       *
-       * If you *really* need it to be zero, you can enable the feature `insecure_zero_ed` for
-       * this pallet. However, you do so at your own risk: this will open up a major DoS vector.
-       * In case you have multiple sources of provider references, you may also get unexpected
-       * behaviour if you set this to zero.
-       *
-       * Bottom line: Do yourself a favour and make it at least one!
-       **/
-      existentialDeposit: u128 & AugmentedConst<ApiType>;
-      /**
-       * The maximum number of individual freeze locks that can exist on an account at any time.
-       **/
-      maxFreezes: u32 & AugmentedConst<ApiType>;
-      /**
-       * The maximum number of locks that should exist on an account.
-       * Not strictly enforced, but used for weight estimation.
-       *
-       * Use of locks is deprecated in favour of freezes. See `https://github.com/paritytech/substrate/pull/12951/`
-       **/
-      maxLocks: u32 & AugmentedConst<ApiType>;
-      /**
-       * The maximum number of named reserves that can exist on an account.
-       *
-       * Use of reserves is deprecated in favour of holds. See `https://github.com/paritytech/substrate/pull/12951/`
-       **/
-      maxReserves: u32 & AugmentedConst<ApiType>;
     };
     system: {
       /**
@@ -391,6 +391,12 @@ declare module '@polkadot/api-base/types/consts' {
        * TOO LONG NAMES WILL BE TREATED AS PAUSED.
        **/
       maxNameLen: u32 & AugmentedConst<ApiType>;
+    };
+    utility: {
+      /**
+       * The limit on the number of batched calls.
+       **/
+      batchedCallsLimit: u32 & AugmentedConst<ApiType>;
     };
     vaults: {
       /**

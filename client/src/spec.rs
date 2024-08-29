@@ -6,7 +6,7 @@ pub mod api {
 	mod root_mod {
 		pub use super::*;
 	}
-	pub static PALLETS: [&str; 28usize] = [
+	pub static PALLETS: [&str; 29usize] = [
 		"System",
 		"Timestamp",
 		"Multisig",
@@ -30,10 +30,11 @@ pub mod api {
 		"Grandpa",
 		"Offences",
 		"Mint",
-		"ArgonBalances",
-		"ShareBalances",
+		"Balances",
+		"Ownership",
 		"TxPause",
 		"TransactionPayment",
+		"Utility",
 		"Sudo",
 	];
 	pub static RUNTIME_APIS: [&str; 18usize] = [
@@ -1145,10 +1146,9 @@ pub mod api {
 						"query_call_info",
 						types::QueryCallInfo { call, len },
 						[
-							74u8, 48u8, 161u8, 29u8, 4u8, 100u8, 175u8, 148u8, 136u8, 96u8, 192u8,
-							109u8, 216u8, 136u8, 60u8, 128u8, 151u8, 63u8, 244u8, 173u8, 143u8,
-							187u8, 154u8, 107u8, 240u8, 255u8, 64u8, 133u8, 35u8, 177u8, 108u8,
-							139u8,
+							11u8, 171u8, 185u8, 183u8, 93u8, 187u8, 196u8, 9u8, 188u8, 72u8, 114u8,
+							236u8, 46u8, 63u8, 194u8, 175u8, 12u8, 145u8, 76u8, 68u8, 250u8, 137u8,
+							68u8, 191u8, 73u8, 63u8, 16u8, 83u8, 37u8, 154u8, 30u8, 9u8,
 						],
 					)
 				}
@@ -1166,10 +1166,10 @@ pub mod api {
 						"query_call_fee_details",
 						types::QueryCallFeeDetails { call, len },
 						[
-							247u8, 5u8, 110u8, 2u8, 237u8, 237u8, 118u8, 117u8, 168u8, 192u8,
-							230u8, 164u8, 121u8, 176u8, 222u8, 166u8, 222u8, 145u8, 24u8, 101u8,
-							235u8, 241u8, 250u8, 6u8, 227u8, 244u8, 219u8, 78u8, 34u8, 218u8,
-							241u8, 23u8,
+							162u8, 138u8, 241u8, 123u8, 220u8, 39u8, 225u8, 163u8, 168u8, 124u8,
+							37u8, 151u8, 162u8, 107u8, 108u8, 125u8, 244u8, 187u8, 109u8, 59u8,
+							232u8, 23u8, 7u8, 217u8, 82u8, 132u8, 231u8, 156u8, 201u8, 88u8, 253u8,
+							56u8,
 						],
 					)
 				}
@@ -2746,17 +2746,20 @@ pub mod api {
 		pub fn mint(&self) -> mint::constants::ConstantsApi {
 			mint::constants::ConstantsApi
 		}
-		pub fn argon_balances(&self) -> argon_balances::constants::ConstantsApi {
-			argon_balances::constants::ConstantsApi
+		pub fn balances(&self) -> balances::constants::ConstantsApi {
+			balances::constants::ConstantsApi
 		}
-		pub fn share_balances(&self) -> share_balances::constants::ConstantsApi {
-			share_balances::constants::ConstantsApi
+		pub fn ownership(&self) -> ownership::constants::ConstantsApi {
+			ownership::constants::ConstantsApi
 		}
 		pub fn tx_pause(&self) -> tx_pause::constants::ConstantsApi {
 			tx_pause::constants::ConstantsApi
 		}
 		pub fn transaction_payment(&self) -> transaction_payment::constants::ConstantsApi {
 			transaction_payment::constants::ConstantsApi
+		}
+		pub fn utility(&self) -> utility::constants::ConstantsApi {
+			utility::constants::ConstantsApi
 		}
 	}
 	pub struct StorageApi;
@@ -2830,11 +2833,11 @@ pub mod api {
 		pub fn mint(&self) -> mint::storage::StorageApi {
 			mint::storage::StorageApi
 		}
-		pub fn argon_balances(&self) -> argon_balances::storage::StorageApi {
-			argon_balances::storage::StorageApi
+		pub fn balances(&self) -> balances::storage::StorageApi {
+			balances::storage::StorageApi
 		}
-		pub fn share_balances(&self) -> share_balances::storage::StorageApi {
-			share_balances::storage::StorageApi
+		pub fn ownership(&self) -> ownership::storage::StorageApi {
+			ownership::storage::StorageApi
 		}
 		pub fn tx_pause(&self) -> tx_pause::storage::StorageApi {
 			tx_pause::storage::StorageApi
@@ -2908,14 +2911,17 @@ pub mod api {
 		pub fn mint(&self) -> mint::calls::TransactionApi {
 			mint::calls::TransactionApi
 		}
-		pub fn argon_balances(&self) -> argon_balances::calls::TransactionApi {
-			argon_balances::calls::TransactionApi
+		pub fn balances(&self) -> balances::calls::TransactionApi {
+			balances::calls::TransactionApi
 		}
-		pub fn share_balances(&self) -> share_balances::calls::TransactionApi {
-			share_balances::calls::TransactionApi
+		pub fn ownership(&self) -> ownership::calls::TransactionApi {
+			ownership::calls::TransactionApi
 		}
 		pub fn tx_pause(&self) -> tx_pause::calls::TransactionApi {
 			tx_pause::calls::TransactionApi
+		}
+		pub fn utility(&self) -> utility::calls::TransactionApi {
+			utility::calls::TransactionApi
 		}
 		pub fn sudo(&self) -> sudo::calls::TransactionApi {
 			sudo::calls::TransactionApi
@@ -2930,9 +2936,9 @@ pub mod api {
 			.hash();
 		runtime_metadata_hash ==
 			[
-				95u8, 233u8, 18u8, 239u8, 108u8, 193u8, 230u8, 79u8, 79u8, 243u8, 234u8, 209u8,
-				186u8, 183u8, 92u8, 2u8, 31u8, 215u8, 64u8, 169u8, 203u8, 122u8, 223u8, 89u8,
-				131u8, 167u8, 225u8, 215u8, 102u8, 105u8, 7u8, 14u8,
+				216u8, 155u8, 80u8, 145u8, 193u8, 156u8, 224u8, 37u8, 184u8, 232u8, 244u8, 160u8,
+				56u8, 147u8, 23u8, 109u8, 38u8, 119u8, 93u8, 190u8, 145u8, 236u8, 252u8, 29u8,
+				12u8, 170u8, 170u8, 110u8, 204u8, 73u8, 19u8, 131u8,
 			]
 	}
 	pub mod system {
@@ -4083,10 +4089,10 @@ pub mod api {
 						"Events",
 						(),
 						[
-							239u8, 109u8, 54u8, 233u8, 119u8, 82u8, 11u8, 216u8, 163u8, 114u8,
-							158u8, 22u8, 207u8, 106u8, 254u8, 191u8, 25u8, 40u8, 168u8, 94u8,
-							153u8, 73u8, 146u8, 133u8, 187u8, 249u8, 89u8, 76u8, 240u8, 164u8,
-							24u8, 100u8,
+							111u8, 177u8, 98u8, 41u8, 174u8, 31u8, 36u8, 123u8, 64u8, 106u8, 135u8,
+							219u8, 74u8, 32u8, 145u8, 225u8, 147u8, 189u8, 205u8, 212u8, 125u8,
+							157u8, 101u8, 108u8, 182u8, 96u8, 139u8, 174u8, 160u8, 242u8, 89u8,
+							161u8,
 						],
 					)
 				}
@@ -4866,9 +4872,9 @@ pub mod api {
 							call: ::subxt::ext::subxt_core::alloc::boxed::Box::new(call),
 						},
 						[
-							88u8, 89u8, 68u8, 216u8, 126u8, 125u8, 233u8, 99u8, 9u8, 187u8, 197u8,
-							113u8, 144u8, 185u8, 193u8, 46u8, 73u8, 227u8, 171u8, 6u8, 43u8, 105u8,
-							239u8, 170u8, 54u8, 196u8, 203u8, 251u8, 16u8, 249u8, 126u8, 48u8,
+							42u8, 69u8, 20u8, 133u8, 136u8, 19u8, 0u8, 25u8, 27u8, 25u8, 229u8,
+							81u8, 206u8, 18u8, 53u8, 157u8, 212u8, 11u8, 202u8, 54u8, 113u8, 5u8,
+							106u8, 9u8, 200u8, 138u8, 113u8, 203u8, 17u8, 12u8, 91u8, 188u8,
 						],
 					)
 				}
@@ -4930,10 +4936,9 @@ pub mod api {
 							max_weight,
 						},
 						[
-							110u8, 178u8, 108u8, 210u8, 168u8, 9u8, 168u8, 228u8, 150u8, 107u8,
-							82u8, 238u8, 252u8, 208u8, 82u8, 74u8, 251u8, 164u8, 212u8, 253u8,
-							80u8, 163u8, 53u8, 162u8, 48u8, 84u8, 255u8, 44u8, 85u8, 168u8, 125u8,
-							105u8,
+							216u8, 179u8, 155u8, 49u8, 128u8, 244u8, 117u8, 182u8, 125u8, 92u8,
+							167u8, 82u8, 58u8, 90u8, 105u8, 85u8, 37u8, 55u8, 249u8, 167u8, 30u8,
+							155u8, 114u8, 18u8, 130u8, 129u8, 48u8, 29u8, 120u8, 78u8, 48u8, 185u8,
 						],
 					)
 				}
@@ -5796,10 +5801,10 @@ pub mod api {
 							call: ::subxt::ext::subxt_core::alloc::boxed::Box::new(call),
 						},
 						[
-							27u8, 121u8, 171u8, 201u8, 129u8, 48u8, 69u8, 211u8, 87u8, 220u8,
-							253u8, 228u8, 184u8, 98u8, 198u8, 214u8, 217u8, 67u8, 130u8, 122u8,
-							91u8, 198u8, 84u8, 138u8, 0u8, 238u8, 21u8, 119u8, 135u8, 141u8, 104u8,
-							119u8,
+							184u8, 100u8, 196u8, 18u8, 108u8, 192u8, 105u8, 226u8, 189u8, 98u8,
+							88u8, 46u8, 39u8, 95u8, 101u8, 56u8, 50u8, 120u8, 235u8, 11u8, 123u8,
+							167u8, 106u8, 184u8, 151u8, 217u8, 242u8, 79u8, 61u8, 36u8, 191u8,
+							52u8,
 						],
 					)
 				}
@@ -6061,9 +6066,9 @@ pub mod api {
 							call: ::subxt::ext::subxt_core::alloc::boxed::Box::new(call),
 						},
 						[
-							240u8, 69u8, 224u8, 74u8, 76u8, 253u8, 90u8, 150u8, 181u8, 152u8, 52u8,
-							109u8, 180u8, 183u8, 54u8, 186u8, 208u8, 68u8, 43u8, 36u8, 73u8, 216u8,
-							185u8, 15u8, 47u8, 199u8, 36u8, 203u8, 190u8, 62u8, 96u8, 9u8,
+							14u8, 74u8, 39u8, 255u8, 155u8, 178u8, 83u8, 191u8, 45u8, 135u8, 224u8,
+							1u8, 53u8, 134u8, 244u8, 4u8, 112u8, 174u8, 37u8, 7u8, 22u8, 86u8,
+							208u8, 129u8, 4u8, 38u8, 184u8, 226u8, 23u8, 184u8, 54u8, 138u8,
 						],
 					)
 				}
@@ -13516,14 +13521,14 @@ pub mod api {
 			pub struct RewardUnlockError {
 				pub account_id: reward_unlock_error::AccountId,
 				pub argons: reward_unlock_error::Argons,
-				pub shares: reward_unlock_error::Shares,
+				pub ownership: reward_unlock_error::Ownership,
 				pub error: reward_unlock_error::Error,
 			}
 			pub mod reward_unlock_error {
 				use super::runtime_types;
 				pub type AccountId = ::subxt::ext::subxt_core::utils::AccountId32;
 				pub type Argons = ::core::option::Option<::core::primitive::u128>;
-				pub type Shares = ::core::option::Option<::core::primitive::u128>;
+				pub type Ownership = ::core::option::Option<::core::primitive::u128>;
 				pub type Error = runtime_types::sp_runtime::DispatchError;
 			}
 			impl ::subxt::ext::subxt_core::events::StaticEvent for RewardUnlockError {
@@ -13544,14 +13549,14 @@ pub mod api {
 			pub struct RewardCreateError {
 				pub account_id: reward_create_error::AccountId,
 				pub argons: reward_create_error::Argons,
-				pub shares: reward_create_error::Shares,
+				pub ownership: reward_create_error::Ownership,
 				pub error: reward_create_error::Error,
 			}
 			pub mod reward_create_error {
 				use super::runtime_types;
 				pub type AccountId = ::subxt::ext::subxt_core::utils::AccountId32;
 				pub type Argons = ::core::option::Option<::core::primitive::u128>;
-				pub type Shares = ::core::option::Option<::core::primitive::u128>;
+				pub type Ownership = ::core::option::Option<::core::primitive::u128>;
 				pub type Error = runtime_types::sp_runtime::DispatchError;
 			}
 			impl ::subxt::ext::subxt_core::events::StaticEvent for RewardCreateError {
@@ -13591,9 +13596,9 @@ pub mod api {
 						"PayoutsByBlock",
 						(),
 						[
-							191u8, 107u8, 236u8, 23u8, 29u8, 37u8, 122u8, 1u8, 242u8, 199u8, 255u8,
-							153u8, 157u8, 56u8, 144u8, 45u8, 82u8, 211u8, 148u8, 88u8, 229u8, 1u8,
-							147u8, 96u8, 72u8, 154u8, 93u8, 78u8, 111u8, 89u8, 37u8, 59u8,
+							179u8, 203u8, 31u8, 14u8, 18u8, 54u8, 64u8, 151u8, 253u8, 148u8, 200u8,
+							240u8, 90u8, 207u8, 123u8, 228u8, 84u8, 190u8, 2u8, 204u8, 39u8, 228u8,
+							35u8, 158u8, 114u8, 42u8, 70u8, 94u8, 21u8, 93u8, 72u8, 247u8,
 						],
 					)
 				}
@@ -13616,9 +13621,9 @@ pub mod api {
 							_0.borrow(),
 						),
 						[
-							191u8, 107u8, 236u8, 23u8, 29u8, 37u8, 122u8, 1u8, 242u8, 199u8, 255u8,
-							153u8, 157u8, 56u8, 144u8, 45u8, 82u8, 211u8, 148u8, 88u8, 229u8, 1u8,
-							147u8, 96u8, 72u8, 154u8, 93u8, 78u8, 111u8, 89u8, 37u8, 59u8,
+							179u8, 203u8, 31u8, 14u8, 18u8, 54u8, 64u8, 151u8, 253u8, 148u8, 200u8,
+							240u8, 90u8, 207u8, 123u8, 228u8, 84u8, 190u8, 2u8, 204u8, 39u8, 228u8,
+							35u8, 158u8, 114u8, 42u8, 70u8, 94u8, 21u8, 93u8, 72u8, 247u8,
 						],
 					)
 				}
@@ -13644,15 +13649,15 @@ pub mod api {
 						],
 					)
 				}
-				#[doc = " Number of shares minted per block"]
-				pub fn starting_shares_per_block(
+				#[doc = " Number of ownership tokens minted per block"]
+				pub fn starting_ownership_tokens_per_block(
 					&self,
 				) -> ::subxt::ext::subxt_core::constants::address::StaticAddress<
 					::core::primitive::u128,
 				> {
 					::subxt::ext::subxt_core::constants::address::StaticAddress::new_static(
 						"BlockRewards",
-						"StartingSharesPerBlock",
+						"StartingOwnershipTokensPerBlock",
 						[
 							84u8, 157u8, 140u8, 4u8, 93u8, 57u8, 29u8, 133u8, 105u8, 200u8, 214u8,
 							27u8, 144u8, 208u8, 218u8, 160u8, 130u8, 109u8, 101u8, 54u8, 210u8,
@@ -14696,7 +14701,7 @@ pub mod api {
 			}
 		}
 	}
-	pub mod argon_balances {
+	pub mod balances {
 		use super::{root_mod, runtime_types};
 		#[doc = "The `Error` enum of this pallet."]
 		pub type Error = runtime_types::pallet_balances::pallet::Error;
@@ -14743,7 +14748,7 @@ pub mod api {
 					pub type Value = ::core::primitive::u128;
 				}
 				impl ::subxt::ext::subxt_core::blocks::StaticExtrinsic for TransferAllowDeath {
-					const PALLET: &'static str = "ArgonBalances";
+					const PALLET: &'static str = "Balances";
 					const CALL: &'static str = "transfer_allow_death";
 				}
 				#[derive(
@@ -14782,7 +14787,7 @@ pub mod api {
 					pub type Value = ::core::primitive::u128;
 				}
 				impl ::subxt::ext::subxt_core::blocks::StaticExtrinsic for ForceTransfer {
-					const PALLET: &'static str = "ArgonBalances";
+					const PALLET: &'static str = "Balances";
 					const CALL: &'static str = "force_transfer";
 				}
 				#[derive(
@@ -14820,7 +14825,7 @@ pub mod api {
 					pub type Value = ::core::primitive::u128;
 				}
 				impl ::subxt::ext::subxt_core::blocks::StaticExtrinsic for TransferKeepAlive {
-					const PALLET: &'static str = "ArgonBalances";
+					const PALLET: &'static str = "Balances";
 					const CALL: &'static str = "transfer_keep_alive";
 				}
 				#[derive(
@@ -14866,7 +14871,7 @@ pub mod api {
 					pub type KeepAlive = ::core::primitive::bool;
 				}
 				impl ::subxt::ext::subxt_core::blocks::StaticExtrinsic for TransferAll {
-					const PALLET: &'static str = "ArgonBalances";
+					const PALLET: &'static str = "Balances";
 					const CALL: &'static str = "transfer_all";
 				}
 				#[derive(
@@ -14900,7 +14905,7 @@ pub mod api {
 					pub type Amount = ::core::primitive::u128;
 				}
 				impl ::subxt::ext::subxt_core::blocks::StaticExtrinsic for ForceUnreserve {
-					const PALLET: &'static str = "ArgonBalances";
+					const PALLET: &'static str = "Balances";
 					const CALL: &'static str = "force_unreserve";
 				}
 				#[derive(
@@ -14936,7 +14941,7 @@ pub mod api {
 					>;
 				}
 				impl ::subxt::ext::subxt_core::blocks::StaticExtrinsic for UpgradeAccounts {
-					const PALLET: &'static str = "ArgonBalances";
+					const PALLET: &'static str = "Balances";
 					const CALL: &'static str = "upgrade_accounts";
 				}
 				#[derive(
@@ -14971,7 +14976,7 @@ pub mod api {
 					pub type NewFree = ::core::primitive::u128;
 				}
 				impl ::subxt::ext::subxt_core::blocks::StaticExtrinsic for ForceSetBalance {
-					const PALLET: &'static str = "ArgonBalances";
+					const PALLET: &'static str = "Balances";
 					const CALL: &'static str = "force_set_balance";
 				}
 				#[derive(
@@ -15005,7 +15010,7 @@ pub mod api {
 					pub type Delta = ::core::primitive::u128;
 				}
 				impl ::subxt::ext::subxt_core::blocks::StaticExtrinsic for ForceAdjustTotalIssuance {
-					const PALLET: &'static str = "ArgonBalances";
+					const PALLET: &'static str = "Balances";
 					const CALL: &'static str = "force_adjust_total_issuance";
 				}
 				#[derive(
@@ -15041,7 +15046,7 @@ pub mod api {
 					pub type KeepAlive = ::core::primitive::bool;
 				}
 				impl ::subxt::ext::subxt_core::blocks::StaticExtrinsic for Burn {
-					const PALLET: &'static str = "ArgonBalances";
+					const PALLET: &'static str = "Balances";
 					const CALL: &'static str = "burn";
 				}
 			}
@@ -15061,7 +15066,7 @@ pub mod api {
 				) -> ::subxt::ext::subxt_core::tx::payload::StaticPayload<types::TransferAllowDeath>
 				{
 					::subxt::ext::subxt_core::tx::payload::StaticPayload::new_static(
-						"ArgonBalances",
+						"Balances",
 						"transfer_allow_death",
 						types::TransferAllowDeath { dest, value },
 						[
@@ -15082,7 +15087,7 @@ pub mod api {
 				) -> ::subxt::ext::subxt_core::tx::payload::StaticPayload<types::ForceTransfer>
 				{
 					::subxt::ext::subxt_core::tx::payload::StaticPayload::new_static(
-						"ArgonBalances",
+						"Balances",
 						"force_transfer",
 						types::ForceTransfer { source, dest, value },
 						[
@@ -15105,7 +15110,7 @@ pub mod api {
 				) -> ::subxt::ext::subxt_core::tx::payload::StaticPayload<types::TransferKeepAlive>
 				{
 					::subxt::ext::subxt_core::tx::payload::StaticPayload::new_static(
-						"ArgonBalances",
+						"Balances",
 						"transfer_keep_alive",
 						types::TransferKeepAlive { dest, value },
 						[
@@ -15136,7 +15141,7 @@ pub mod api {
 					keep_alive: types::transfer_all::KeepAlive,
 				) -> ::subxt::ext::subxt_core::tx::payload::StaticPayload<types::TransferAll> {
 					::subxt::ext::subxt_core::tx::payload::StaticPayload::new_static(
-						"ArgonBalances",
+						"Balances",
 						"transfer_all",
 						types::TransferAll { dest, keep_alive },
 						[
@@ -15156,7 +15161,7 @@ pub mod api {
 				) -> ::subxt::ext::subxt_core::tx::payload::StaticPayload<types::ForceUnreserve>
 				{
 					::subxt::ext::subxt_core::tx::payload::StaticPayload::new_static(
-						"ArgonBalances",
+						"Balances",
 						"force_unreserve",
 						types::ForceUnreserve { who, amount },
 						[
@@ -15181,7 +15186,7 @@ pub mod api {
 				) -> ::subxt::ext::subxt_core::tx::payload::StaticPayload<types::UpgradeAccounts>
 				{
 					::subxt::ext::subxt_core::tx::payload::StaticPayload::new_static(
-						"ArgonBalances",
+						"Balances",
 						"upgrade_accounts",
 						types::UpgradeAccounts { who },
 						[
@@ -15201,7 +15206,7 @@ pub mod api {
 				) -> ::subxt::ext::subxt_core::tx::payload::StaticPayload<types::ForceSetBalance>
 				{
 					::subxt::ext::subxt_core::tx::payload::StaticPayload::new_static(
-						"ArgonBalances",
+						"Balances",
 						"force_set_balance",
 						types::ForceSetBalance { who, new_free },
 						[
@@ -15224,7 +15229,7 @@ pub mod api {
 					types::ForceAdjustTotalIssuance,
 				> {
 					::subxt::ext::subxt_core::tx::payload::StaticPayload::new_static(
-						"ArgonBalances",
+						"Balances",
 						"force_adjust_total_issuance",
 						types::ForceAdjustTotalIssuance { direction, delta },
 						[
@@ -15248,7 +15253,7 @@ pub mod api {
 					keep_alive: types::burn::KeepAlive,
 				) -> ::subxt::ext::subxt_core::tx::payload::StaticPayload<types::Burn> {
 					::subxt::ext::subxt_core::tx::payload::StaticPayload::new_static(
-						"ArgonBalances",
+						"Balances",
 						"burn",
 						types::Burn { value, keep_alive },
 						[
@@ -15286,7 +15291,7 @@ pub mod api {
 				pub type FreeBalance = ::core::primitive::u128;
 			}
 			impl ::subxt::ext::subxt_core::events::StaticEvent for Endowed {
-				const PALLET: &'static str = "ArgonBalances";
+				const PALLET: &'static str = "Balances";
 				const EVENT: &'static str = "Endowed";
 			}
 			#[derive(
@@ -15312,7 +15317,7 @@ pub mod api {
 				pub type Amount = ::core::primitive::u128;
 			}
 			impl ::subxt::ext::subxt_core::events::StaticEvent for DustLost {
-				const PALLET: &'static str = "ArgonBalances";
+				const PALLET: &'static str = "Balances";
 				const EVENT: &'static str = "DustLost";
 			}
 			#[derive(
@@ -15339,7 +15344,7 @@ pub mod api {
 				pub type Amount = ::core::primitive::u128;
 			}
 			impl ::subxt::ext::subxt_core::events::StaticEvent for Transfer {
-				const PALLET: &'static str = "ArgonBalances";
+				const PALLET: &'static str = "Balances";
 				const EVENT: &'static str = "Transfer";
 			}
 			#[derive(
@@ -15364,7 +15369,7 @@ pub mod api {
 				pub type Free = ::core::primitive::u128;
 			}
 			impl ::subxt::ext::subxt_core::events::StaticEvent for BalanceSet {
-				const PALLET: &'static str = "ArgonBalances";
+				const PALLET: &'static str = "Balances";
 				const EVENT: &'static str = "BalanceSet";
 			}
 			#[derive(
@@ -15389,7 +15394,7 @@ pub mod api {
 				pub type Amount = ::core::primitive::u128;
 			}
 			impl ::subxt::ext::subxt_core::events::StaticEvent for Reserved {
-				const PALLET: &'static str = "ArgonBalances";
+				const PALLET: &'static str = "Balances";
 				const EVENT: &'static str = "Reserved";
 			}
 			#[derive(
@@ -15414,7 +15419,7 @@ pub mod api {
 				pub type Amount = ::core::primitive::u128;
 			}
 			impl ::subxt::ext::subxt_core::events::StaticEvent for Unreserved {
-				const PALLET: &'static str = "ArgonBalances";
+				const PALLET: &'static str = "Balances";
 				const EVENT: &'static str = "Unreserved";
 			}
 			#[derive(
@@ -15445,7 +15450,7 @@ pub mod api {
 					runtime_types::frame_support::traits::tokens::misc::BalanceStatus;
 			}
 			impl ::subxt::ext::subxt_core::events::StaticEvent for ReserveRepatriated {
-				const PALLET: &'static str = "ArgonBalances";
+				const PALLET: &'static str = "Balances";
 				const EVENT: &'static str = "ReserveRepatriated";
 			}
 			#[derive(
@@ -15470,7 +15475,7 @@ pub mod api {
 				pub type Amount = ::core::primitive::u128;
 			}
 			impl ::subxt::ext::subxt_core::events::StaticEvent for Deposit {
-				const PALLET: &'static str = "ArgonBalances";
+				const PALLET: &'static str = "Balances";
 				const EVENT: &'static str = "Deposit";
 			}
 			#[derive(
@@ -15495,7 +15500,7 @@ pub mod api {
 				pub type Amount = ::core::primitive::u128;
 			}
 			impl ::subxt::ext::subxt_core::events::StaticEvent for Withdraw {
-				const PALLET: &'static str = "ArgonBalances";
+				const PALLET: &'static str = "Balances";
 				const EVENT: &'static str = "Withdraw";
 			}
 			#[derive(
@@ -15520,7 +15525,7 @@ pub mod api {
 				pub type Amount = ::core::primitive::u128;
 			}
 			impl ::subxt::ext::subxt_core::events::StaticEvent for Slashed {
-				const PALLET: &'static str = "ArgonBalances";
+				const PALLET: &'static str = "Balances";
 				const EVENT: &'static str = "Slashed";
 			}
 			#[derive(
@@ -15545,7 +15550,7 @@ pub mod api {
 				pub type Amount = ::core::primitive::u128;
 			}
 			impl ::subxt::ext::subxt_core::events::StaticEvent for Minted {
-				const PALLET: &'static str = "ArgonBalances";
+				const PALLET: &'static str = "Balances";
 				const EVENT: &'static str = "Minted";
 			}
 			#[derive(
@@ -15570,7 +15575,7 @@ pub mod api {
 				pub type Amount = ::core::primitive::u128;
 			}
 			impl ::subxt::ext::subxt_core::events::StaticEvent for Burned {
-				const PALLET: &'static str = "ArgonBalances";
+				const PALLET: &'static str = "Balances";
 				const EVENT: &'static str = "Burned";
 			}
 			#[derive(
@@ -15595,7 +15600,7 @@ pub mod api {
 				pub type Amount = ::core::primitive::u128;
 			}
 			impl ::subxt::ext::subxt_core::events::StaticEvent for Suspended {
-				const PALLET: &'static str = "ArgonBalances";
+				const PALLET: &'static str = "Balances";
 				const EVENT: &'static str = "Suspended";
 			}
 			#[derive(
@@ -15620,7 +15625,7 @@ pub mod api {
 				pub type Amount = ::core::primitive::u128;
 			}
 			impl ::subxt::ext::subxt_core::events::StaticEvent for Restored {
-				const PALLET: &'static str = "ArgonBalances";
+				const PALLET: &'static str = "Balances";
 				const EVENT: &'static str = "Restored";
 			}
 			#[derive(
@@ -15643,7 +15648,7 @@ pub mod api {
 				pub type Who = ::subxt::ext::subxt_core::utils::AccountId32;
 			}
 			impl ::subxt::ext::subxt_core::events::StaticEvent for Upgraded {
-				const PALLET: &'static str = "ArgonBalances";
+				const PALLET: &'static str = "Balances";
 				const EVENT: &'static str = "Upgraded";
 			}
 			#[derive(
@@ -15666,7 +15671,7 @@ pub mod api {
 				pub type Amount = ::core::primitive::u128;
 			}
 			impl ::subxt::ext::subxt_core::events::StaticEvent for Issued {
-				const PALLET: &'static str = "ArgonBalances";
+				const PALLET: &'static str = "Balances";
 				const EVENT: &'static str = "Issued";
 			}
 			#[derive(
@@ -15689,7 +15694,7 @@ pub mod api {
 				pub type Amount = ::core::primitive::u128;
 			}
 			impl ::subxt::ext::subxt_core::events::StaticEvent for Rescinded {
-				const PALLET: &'static str = "ArgonBalances";
+				const PALLET: &'static str = "Balances";
 				const EVENT: &'static str = "Rescinded";
 			}
 			#[derive(
@@ -15714,7 +15719,7 @@ pub mod api {
 				pub type Amount = ::core::primitive::u128;
 			}
 			impl ::subxt::ext::subxt_core::events::StaticEvent for Locked {
-				const PALLET: &'static str = "ArgonBalances";
+				const PALLET: &'static str = "Balances";
 				const EVENT: &'static str = "Locked";
 			}
 			#[derive(
@@ -15739,7 +15744,7 @@ pub mod api {
 				pub type Amount = ::core::primitive::u128;
 			}
 			impl ::subxt::ext::subxt_core::events::StaticEvent for Unlocked {
-				const PALLET: &'static str = "ArgonBalances";
+				const PALLET: &'static str = "Balances";
 				const EVENT: &'static str = "Unlocked";
 			}
 			#[derive(
@@ -15764,7 +15769,7 @@ pub mod api {
 				pub type Amount = ::core::primitive::u128;
 			}
 			impl ::subxt::ext::subxt_core::events::StaticEvent for Frozen {
-				const PALLET: &'static str = "ArgonBalances";
+				const PALLET: &'static str = "Balances";
 				const EVENT: &'static str = "Frozen";
 			}
 			#[derive(
@@ -15789,7 +15794,7 @@ pub mod api {
 				pub type Amount = ::core::primitive::u128;
 			}
 			impl ::subxt::ext::subxt_core::events::StaticEvent for Thawed {
-				const PALLET: &'static str = "ArgonBalances";
+				const PALLET: &'static str = "Balances";
 				const EVENT: &'static str = "Thawed";
 			}
 			#[derive(
@@ -15814,7 +15819,7 @@ pub mod api {
 				pub type New = ::core::primitive::u128;
 			}
 			impl ::subxt::ext::subxt_core::events::StaticEvent for TotalIssuanceForced {
-				const PALLET: &'static str = "ArgonBalances";
+				const PALLET: &'static str = "Balances";
 				const EVENT: &'static str = "TotalIssuanceForced";
 			}
 		}
@@ -15890,7 +15895,7 @@ pub mod api {
 					(),
 				> {
 					::subxt::ext::subxt_core::storage::address::StaticAddress::new_static(
-						"ArgonBalances",
+						"Balances",
 						"TotalIssuance",
 						(),
 						[
@@ -15912,7 +15917,7 @@ pub mod api {
 					(),
 				> {
 					::subxt::ext::subxt_core::storage::address::StaticAddress::new_static(
-						"ArgonBalances",
+						"Balances",
 						"InactiveIssuance",
 						(),
 						[
@@ -15956,7 +15961,7 @@ pub mod api {
 					::subxt::ext::subxt_core::utils::Yes,
 				> {
 					::subxt::ext::subxt_core::storage::address::StaticAddress::new_static(
-						"ArgonBalances",
+						"Balances",
 						"Account",
 						(),
 						[
@@ -16003,7 +16008,7 @@ pub mod api {
 					(),
 				> {
 					::subxt::ext::subxt_core::storage::address::StaticAddress::new_static(
-						"ArgonBalances",
+						"Balances",
 						"Account",
 						::subxt::ext::subxt_core::storage::address::StaticStorageKey::new(
 							_0.borrow(),
@@ -16029,7 +16034,7 @@ pub mod api {
 					::subxt::ext::subxt_core::utils::Yes,
 				> {
 					::subxt::ext::subxt_core::storage::address::StaticAddress::new_static(
-						"ArgonBalances",
+						"Balances",
 						"Locks",
 						(),
 						[
@@ -16056,7 +16061,7 @@ pub mod api {
 					(),
 				> {
 					::subxt::ext::subxt_core::storage::address::StaticAddress::new_static(
-						"ArgonBalances",
+						"Balances",
 						"Locks",
 						::subxt::ext::subxt_core::storage::address::StaticStorageKey::new(
 							_0.borrow(),
@@ -16081,7 +16086,7 @@ pub mod api {
 					::subxt::ext::subxt_core::utils::Yes,
 				> {
 					::subxt::ext::subxt_core::storage::address::StaticAddress::new_static(
-						"ArgonBalances",
+						"Balances",
 						"Reserves",
 						(),
 						[
@@ -16107,7 +16112,7 @@ pub mod api {
 					(),
 				> {
 					::subxt::ext::subxt_core::storage::address::StaticAddress::new_static(
-						"ArgonBalances",
+						"Balances",
 						"Reserves",
 						::subxt::ext::subxt_core::storage::address::StaticStorageKey::new(
 							_0.borrow(),
@@ -16130,7 +16135,7 @@ pub mod api {
 					::subxt::ext::subxt_core::utils::Yes,
 				> {
 					::subxt::ext::subxt_core::storage::address::StaticAddress::new_static(
-						"ArgonBalances",
+						"Balances",
 						"Holds",
 						(),
 						[
@@ -16155,7 +16160,7 @@ pub mod api {
 					(),
 				> {
 					::subxt::ext::subxt_core::storage::address::StaticAddress::new_static(
-						"ArgonBalances",
+						"Balances",
 						"Holds",
 						::subxt::ext::subxt_core::storage::address::StaticStorageKey::new(
 							_0.borrow(),
@@ -16179,7 +16184,7 @@ pub mod api {
 					::subxt::ext::subxt_core::utils::Yes,
 				> {
 					::subxt::ext::subxt_core::storage::address::StaticAddress::new_static(
-						"ArgonBalances",
+						"Balances",
 						"Freezes",
 						(),
 						[
@@ -16204,7 +16209,7 @@ pub mod api {
 					(),
 				> {
 					::subxt::ext::subxt_core::storage::address::StaticAddress::new_static(
-						"ArgonBalances",
+						"Balances",
 						"Freezes",
 						::subxt::ext::subxt_core::storage::address::StaticStorageKey::new(
 							_0.borrow(),
@@ -16237,7 +16242,7 @@ pub mod api {
 					::core::primitive::u128,
 				> {
 					::subxt::ext::subxt_core::constants::address::StaticAddress::new_static(
-						"ArgonBalances",
+						"Balances",
 						"ExistentialDeposit",
 						[
 							84u8, 157u8, 140u8, 4u8, 93u8, 57u8, 29u8, 133u8, 105u8, 200u8, 214u8,
@@ -16256,7 +16261,7 @@ pub mod api {
 					::core::primitive::u32,
 				> {
 					::subxt::ext::subxt_core::constants::address::StaticAddress::new_static(
-						"ArgonBalances",
+						"Balances",
 						"MaxLocks",
 						[
 							98u8, 252u8, 116u8, 72u8, 26u8, 180u8, 225u8, 83u8, 200u8, 157u8,
@@ -16275,7 +16280,7 @@ pub mod api {
 					::core::primitive::u32,
 				> {
 					::subxt::ext::subxt_core::constants::address::StaticAddress::new_static(
-						"ArgonBalances",
+						"Balances",
 						"MaxReserves",
 						[
 							98u8, 252u8, 116u8, 72u8, 26u8, 180u8, 225u8, 83u8, 200u8, 157u8,
@@ -16292,7 +16297,7 @@ pub mod api {
 					::core::primitive::u32,
 				> {
 					::subxt::ext::subxt_core::constants::address::StaticAddress::new_static(
-						"ArgonBalances",
+						"Balances",
 						"MaxFreezes",
 						[
 							98u8, 252u8, 116u8, 72u8, 26u8, 180u8, 225u8, 83u8, 200u8, 157u8,
@@ -16305,7 +16310,7 @@ pub mod api {
 			}
 		}
 	}
-	pub mod share_balances {
+	pub mod ownership {
 		use super::{root_mod, runtime_types};
 		#[doc = "The `Error` enum of this pallet."]
 		pub type Error = runtime_types::pallet_balances::pallet::Error;
@@ -16352,7 +16357,7 @@ pub mod api {
 					pub type Value = ::core::primitive::u128;
 				}
 				impl ::subxt::ext::subxt_core::blocks::StaticExtrinsic for TransferAllowDeath {
-					const PALLET: &'static str = "ShareBalances";
+					const PALLET: &'static str = "Ownership";
 					const CALL: &'static str = "transfer_allow_death";
 				}
 				#[derive(
@@ -16391,7 +16396,7 @@ pub mod api {
 					pub type Value = ::core::primitive::u128;
 				}
 				impl ::subxt::ext::subxt_core::blocks::StaticExtrinsic for ForceTransfer {
-					const PALLET: &'static str = "ShareBalances";
+					const PALLET: &'static str = "Ownership";
 					const CALL: &'static str = "force_transfer";
 				}
 				#[derive(
@@ -16429,7 +16434,7 @@ pub mod api {
 					pub type Value = ::core::primitive::u128;
 				}
 				impl ::subxt::ext::subxt_core::blocks::StaticExtrinsic for TransferKeepAlive {
-					const PALLET: &'static str = "ShareBalances";
+					const PALLET: &'static str = "Ownership";
 					const CALL: &'static str = "transfer_keep_alive";
 				}
 				#[derive(
@@ -16475,7 +16480,7 @@ pub mod api {
 					pub type KeepAlive = ::core::primitive::bool;
 				}
 				impl ::subxt::ext::subxt_core::blocks::StaticExtrinsic for TransferAll {
-					const PALLET: &'static str = "ShareBalances";
+					const PALLET: &'static str = "Ownership";
 					const CALL: &'static str = "transfer_all";
 				}
 				#[derive(
@@ -16509,7 +16514,7 @@ pub mod api {
 					pub type Amount = ::core::primitive::u128;
 				}
 				impl ::subxt::ext::subxt_core::blocks::StaticExtrinsic for ForceUnreserve {
-					const PALLET: &'static str = "ShareBalances";
+					const PALLET: &'static str = "Ownership";
 					const CALL: &'static str = "force_unreserve";
 				}
 				#[derive(
@@ -16545,7 +16550,7 @@ pub mod api {
 					>;
 				}
 				impl ::subxt::ext::subxt_core::blocks::StaticExtrinsic for UpgradeAccounts {
-					const PALLET: &'static str = "ShareBalances";
+					const PALLET: &'static str = "Ownership";
 					const CALL: &'static str = "upgrade_accounts";
 				}
 				#[derive(
@@ -16580,7 +16585,7 @@ pub mod api {
 					pub type NewFree = ::core::primitive::u128;
 				}
 				impl ::subxt::ext::subxt_core::blocks::StaticExtrinsic for ForceSetBalance {
-					const PALLET: &'static str = "ShareBalances";
+					const PALLET: &'static str = "Ownership";
 					const CALL: &'static str = "force_set_balance";
 				}
 				#[derive(
@@ -16614,7 +16619,7 @@ pub mod api {
 					pub type Delta = ::core::primitive::u128;
 				}
 				impl ::subxt::ext::subxt_core::blocks::StaticExtrinsic for ForceAdjustTotalIssuance {
-					const PALLET: &'static str = "ShareBalances";
+					const PALLET: &'static str = "Ownership";
 					const CALL: &'static str = "force_adjust_total_issuance";
 				}
 				#[derive(
@@ -16650,7 +16655,7 @@ pub mod api {
 					pub type KeepAlive = ::core::primitive::bool;
 				}
 				impl ::subxt::ext::subxt_core::blocks::StaticExtrinsic for Burn {
-					const PALLET: &'static str = "ShareBalances";
+					const PALLET: &'static str = "Ownership";
 					const CALL: &'static str = "burn";
 				}
 			}
@@ -16670,7 +16675,7 @@ pub mod api {
 				) -> ::subxt::ext::subxt_core::tx::payload::StaticPayload<types::TransferAllowDeath>
 				{
 					::subxt::ext::subxt_core::tx::payload::StaticPayload::new_static(
-						"ShareBalances",
+						"Ownership",
 						"transfer_allow_death",
 						types::TransferAllowDeath { dest, value },
 						[
@@ -16691,7 +16696,7 @@ pub mod api {
 				) -> ::subxt::ext::subxt_core::tx::payload::StaticPayload<types::ForceTransfer>
 				{
 					::subxt::ext::subxt_core::tx::payload::StaticPayload::new_static(
-						"ShareBalances",
+						"Ownership",
 						"force_transfer",
 						types::ForceTransfer { source, dest, value },
 						[
@@ -16714,7 +16719,7 @@ pub mod api {
 				) -> ::subxt::ext::subxt_core::tx::payload::StaticPayload<types::TransferKeepAlive>
 				{
 					::subxt::ext::subxt_core::tx::payload::StaticPayload::new_static(
-						"ShareBalances",
+						"Ownership",
 						"transfer_keep_alive",
 						types::TransferKeepAlive { dest, value },
 						[
@@ -16745,7 +16750,7 @@ pub mod api {
 					keep_alive: types::transfer_all::KeepAlive,
 				) -> ::subxt::ext::subxt_core::tx::payload::StaticPayload<types::TransferAll> {
 					::subxt::ext::subxt_core::tx::payload::StaticPayload::new_static(
-						"ShareBalances",
+						"Ownership",
 						"transfer_all",
 						types::TransferAll { dest, keep_alive },
 						[
@@ -16765,7 +16770,7 @@ pub mod api {
 				) -> ::subxt::ext::subxt_core::tx::payload::StaticPayload<types::ForceUnreserve>
 				{
 					::subxt::ext::subxt_core::tx::payload::StaticPayload::new_static(
-						"ShareBalances",
+						"Ownership",
 						"force_unreserve",
 						types::ForceUnreserve { who, amount },
 						[
@@ -16790,7 +16795,7 @@ pub mod api {
 				) -> ::subxt::ext::subxt_core::tx::payload::StaticPayload<types::UpgradeAccounts>
 				{
 					::subxt::ext::subxt_core::tx::payload::StaticPayload::new_static(
-						"ShareBalances",
+						"Ownership",
 						"upgrade_accounts",
 						types::UpgradeAccounts { who },
 						[
@@ -16810,7 +16815,7 @@ pub mod api {
 				) -> ::subxt::ext::subxt_core::tx::payload::StaticPayload<types::ForceSetBalance>
 				{
 					::subxt::ext::subxt_core::tx::payload::StaticPayload::new_static(
-						"ShareBalances",
+						"Ownership",
 						"force_set_balance",
 						types::ForceSetBalance { who, new_free },
 						[
@@ -16833,7 +16838,7 @@ pub mod api {
 					types::ForceAdjustTotalIssuance,
 				> {
 					::subxt::ext::subxt_core::tx::payload::StaticPayload::new_static(
-						"ShareBalances",
+						"Ownership",
 						"force_adjust_total_issuance",
 						types::ForceAdjustTotalIssuance { direction, delta },
 						[
@@ -16857,7 +16862,7 @@ pub mod api {
 					keep_alive: types::burn::KeepAlive,
 				) -> ::subxt::ext::subxt_core::tx::payload::StaticPayload<types::Burn> {
 					::subxt::ext::subxt_core::tx::payload::StaticPayload::new_static(
-						"ShareBalances",
+						"Ownership",
 						"burn",
 						types::Burn { value, keep_alive },
 						[
@@ -16895,7 +16900,7 @@ pub mod api {
 				pub type FreeBalance = ::core::primitive::u128;
 			}
 			impl ::subxt::ext::subxt_core::events::StaticEvent for Endowed {
-				const PALLET: &'static str = "ShareBalances";
+				const PALLET: &'static str = "Ownership";
 				const EVENT: &'static str = "Endowed";
 			}
 			#[derive(
@@ -16921,7 +16926,7 @@ pub mod api {
 				pub type Amount = ::core::primitive::u128;
 			}
 			impl ::subxt::ext::subxt_core::events::StaticEvent for DustLost {
-				const PALLET: &'static str = "ShareBalances";
+				const PALLET: &'static str = "Ownership";
 				const EVENT: &'static str = "DustLost";
 			}
 			#[derive(
@@ -16948,7 +16953,7 @@ pub mod api {
 				pub type Amount = ::core::primitive::u128;
 			}
 			impl ::subxt::ext::subxt_core::events::StaticEvent for Transfer {
-				const PALLET: &'static str = "ShareBalances";
+				const PALLET: &'static str = "Ownership";
 				const EVENT: &'static str = "Transfer";
 			}
 			#[derive(
@@ -16973,7 +16978,7 @@ pub mod api {
 				pub type Free = ::core::primitive::u128;
 			}
 			impl ::subxt::ext::subxt_core::events::StaticEvent for BalanceSet {
-				const PALLET: &'static str = "ShareBalances";
+				const PALLET: &'static str = "Ownership";
 				const EVENT: &'static str = "BalanceSet";
 			}
 			#[derive(
@@ -16998,7 +17003,7 @@ pub mod api {
 				pub type Amount = ::core::primitive::u128;
 			}
 			impl ::subxt::ext::subxt_core::events::StaticEvent for Reserved {
-				const PALLET: &'static str = "ShareBalances";
+				const PALLET: &'static str = "Ownership";
 				const EVENT: &'static str = "Reserved";
 			}
 			#[derive(
@@ -17023,7 +17028,7 @@ pub mod api {
 				pub type Amount = ::core::primitive::u128;
 			}
 			impl ::subxt::ext::subxt_core::events::StaticEvent for Unreserved {
-				const PALLET: &'static str = "ShareBalances";
+				const PALLET: &'static str = "Ownership";
 				const EVENT: &'static str = "Unreserved";
 			}
 			#[derive(
@@ -17054,7 +17059,7 @@ pub mod api {
 					runtime_types::frame_support::traits::tokens::misc::BalanceStatus;
 			}
 			impl ::subxt::ext::subxt_core::events::StaticEvent for ReserveRepatriated {
-				const PALLET: &'static str = "ShareBalances";
+				const PALLET: &'static str = "Ownership";
 				const EVENT: &'static str = "ReserveRepatriated";
 			}
 			#[derive(
@@ -17079,7 +17084,7 @@ pub mod api {
 				pub type Amount = ::core::primitive::u128;
 			}
 			impl ::subxt::ext::subxt_core::events::StaticEvent for Deposit {
-				const PALLET: &'static str = "ShareBalances";
+				const PALLET: &'static str = "Ownership";
 				const EVENT: &'static str = "Deposit";
 			}
 			#[derive(
@@ -17104,7 +17109,7 @@ pub mod api {
 				pub type Amount = ::core::primitive::u128;
 			}
 			impl ::subxt::ext::subxt_core::events::StaticEvent for Withdraw {
-				const PALLET: &'static str = "ShareBalances";
+				const PALLET: &'static str = "Ownership";
 				const EVENT: &'static str = "Withdraw";
 			}
 			#[derive(
@@ -17129,7 +17134,7 @@ pub mod api {
 				pub type Amount = ::core::primitive::u128;
 			}
 			impl ::subxt::ext::subxt_core::events::StaticEvent for Slashed {
-				const PALLET: &'static str = "ShareBalances";
+				const PALLET: &'static str = "Ownership";
 				const EVENT: &'static str = "Slashed";
 			}
 			#[derive(
@@ -17154,7 +17159,7 @@ pub mod api {
 				pub type Amount = ::core::primitive::u128;
 			}
 			impl ::subxt::ext::subxt_core::events::StaticEvent for Minted {
-				const PALLET: &'static str = "ShareBalances";
+				const PALLET: &'static str = "Ownership";
 				const EVENT: &'static str = "Minted";
 			}
 			#[derive(
@@ -17179,7 +17184,7 @@ pub mod api {
 				pub type Amount = ::core::primitive::u128;
 			}
 			impl ::subxt::ext::subxt_core::events::StaticEvent for Burned {
-				const PALLET: &'static str = "ShareBalances";
+				const PALLET: &'static str = "Ownership";
 				const EVENT: &'static str = "Burned";
 			}
 			#[derive(
@@ -17204,7 +17209,7 @@ pub mod api {
 				pub type Amount = ::core::primitive::u128;
 			}
 			impl ::subxt::ext::subxt_core::events::StaticEvent for Suspended {
-				const PALLET: &'static str = "ShareBalances";
+				const PALLET: &'static str = "Ownership";
 				const EVENT: &'static str = "Suspended";
 			}
 			#[derive(
@@ -17229,7 +17234,7 @@ pub mod api {
 				pub type Amount = ::core::primitive::u128;
 			}
 			impl ::subxt::ext::subxt_core::events::StaticEvent for Restored {
-				const PALLET: &'static str = "ShareBalances";
+				const PALLET: &'static str = "Ownership";
 				const EVENT: &'static str = "Restored";
 			}
 			#[derive(
@@ -17252,7 +17257,7 @@ pub mod api {
 				pub type Who = ::subxt::ext::subxt_core::utils::AccountId32;
 			}
 			impl ::subxt::ext::subxt_core::events::StaticEvent for Upgraded {
-				const PALLET: &'static str = "ShareBalances";
+				const PALLET: &'static str = "Ownership";
 				const EVENT: &'static str = "Upgraded";
 			}
 			#[derive(
@@ -17275,7 +17280,7 @@ pub mod api {
 				pub type Amount = ::core::primitive::u128;
 			}
 			impl ::subxt::ext::subxt_core::events::StaticEvent for Issued {
-				const PALLET: &'static str = "ShareBalances";
+				const PALLET: &'static str = "Ownership";
 				const EVENT: &'static str = "Issued";
 			}
 			#[derive(
@@ -17298,7 +17303,7 @@ pub mod api {
 				pub type Amount = ::core::primitive::u128;
 			}
 			impl ::subxt::ext::subxt_core::events::StaticEvent for Rescinded {
-				const PALLET: &'static str = "ShareBalances";
+				const PALLET: &'static str = "Ownership";
 				const EVENT: &'static str = "Rescinded";
 			}
 			#[derive(
@@ -17323,7 +17328,7 @@ pub mod api {
 				pub type Amount = ::core::primitive::u128;
 			}
 			impl ::subxt::ext::subxt_core::events::StaticEvent for Locked {
-				const PALLET: &'static str = "ShareBalances";
+				const PALLET: &'static str = "Ownership";
 				const EVENT: &'static str = "Locked";
 			}
 			#[derive(
@@ -17348,7 +17353,7 @@ pub mod api {
 				pub type Amount = ::core::primitive::u128;
 			}
 			impl ::subxt::ext::subxt_core::events::StaticEvent for Unlocked {
-				const PALLET: &'static str = "ShareBalances";
+				const PALLET: &'static str = "Ownership";
 				const EVENT: &'static str = "Unlocked";
 			}
 			#[derive(
@@ -17373,7 +17378,7 @@ pub mod api {
 				pub type Amount = ::core::primitive::u128;
 			}
 			impl ::subxt::ext::subxt_core::events::StaticEvent for Frozen {
-				const PALLET: &'static str = "ShareBalances";
+				const PALLET: &'static str = "Ownership";
 				const EVENT: &'static str = "Frozen";
 			}
 			#[derive(
@@ -17398,7 +17403,7 @@ pub mod api {
 				pub type Amount = ::core::primitive::u128;
 			}
 			impl ::subxt::ext::subxt_core::events::StaticEvent for Thawed {
-				const PALLET: &'static str = "ShareBalances";
+				const PALLET: &'static str = "Ownership";
 				const EVENT: &'static str = "Thawed";
 			}
 			#[derive(
@@ -17423,7 +17428,7 @@ pub mod api {
 				pub type New = ::core::primitive::u128;
 			}
 			impl ::subxt::ext::subxt_core::events::StaticEvent for TotalIssuanceForced {
-				const PALLET: &'static str = "ShareBalances";
+				const PALLET: &'static str = "Ownership";
 				const EVENT: &'static str = "TotalIssuanceForced";
 			}
 		}
@@ -17499,7 +17504,7 @@ pub mod api {
 					(),
 				> {
 					::subxt::ext::subxt_core::storage::address::StaticAddress::new_static(
-						"ShareBalances",
+						"Ownership",
 						"TotalIssuance",
 						(),
 						[
@@ -17521,7 +17526,7 @@ pub mod api {
 					(),
 				> {
 					::subxt::ext::subxt_core::storage::address::StaticAddress::new_static(
-						"ShareBalances",
+						"Ownership",
 						"InactiveIssuance",
 						(),
 						[
@@ -17565,7 +17570,7 @@ pub mod api {
 					::subxt::ext::subxt_core::utils::Yes,
 				> {
 					::subxt::ext::subxt_core::storage::address::StaticAddress::new_static(
-						"ShareBalances",
+						"Ownership",
 						"Account",
 						(),
 						[
@@ -17612,7 +17617,7 @@ pub mod api {
 					(),
 				> {
 					::subxt::ext::subxt_core::storage::address::StaticAddress::new_static(
-						"ShareBalances",
+						"Ownership",
 						"Account",
 						::subxt::ext::subxt_core::storage::address::StaticStorageKey::new(
 							_0.borrow(),
@@ -17638,7 +17643,7 @@ pub mod api {
 					::subxt::ext::subxt_core::utils::Yes,
 				> {
 					::subxt::ext::subxt_core::storage::address::StaticAddress::new_static(
-						"ShareBalances",
+						"Ownership",
 						"Locks",
 						(),
 						[
@@ -17665,7 +17670,7 @@ pub mod api {
 					(),
 				> {
 					::subxt::ext::subxt_core::storage::address::StaticAddress::new_static(
-						"ShareBalances",
+						"Ownership",
 						"Locks",
 						::subxt::ext::subxt_core::storage::address::StaticStorageKey::new(
 							_0.borrow(),
@@ -17690,7 +17695,7 @@ pub mod api {
 					::subxt::ext::subxt_core::utils::Yes,
 				> {
 					::subxt::ext::subxt_core::storage::address::StaticAddress::new_static(
-						"ShareBalances",
+						"Ownership",
 						"Reserves",
 						(),
 						[
@@ -17716,7 +17721,7 @@ pub mod api {
 					(),
 				> {
 					::subxt::ext::subxt_core::storage::address::StaticAddress::new_static(
-						"ShareBalances",
+						"Ownership",
 						"Reserves",
 						::subxt::ext::subxt_core::storage::address::StaticStorageKey::new(
 							_0.borrow(),
@@ -17739,7 +17744,7 @@ pub mod api {
 					::subxt::ext::subxt_core::utils::Yes,
 				> {
 					::subxt::ext::subxt_core::storage::address::StaticAddress::new_static(
-						"ShareBalances",
+						"Ownership",
 						"Holds",
 						(),
 						[
@@ -17764,7 +17769,7 @@ pub mod api {
 					(),
 				> {
 					::subxt::ext::subxt_core::storage::address::StaticAddress::new_static(
-						"ShareBalances",
+						"Ownership",
 						"Holds",
 						::subxt::ext::subxt_core::storage::address::StaticStorageKey::new(
 							_0.borrow(),
@@ -17788,7 +17793,7 @@ pub mod api {
 					::subxt::ext::subxt_core::utils::Yes,
 				> {
 					::subxt::ext::subxt_core::storage::address::StaticAddress::new_static(
-						"ShareBalances",
+						"Ownership",
 						"Freezes",
 						(),
 						[
@@ -17813,7 +17818,7 @@ pub mod api {
 					(),
 				> {
 					::subxt::ext::subxt_core::storage::address::StaticAddress::new_static(
-						"ShareBalances",
+						"Ownership",
 						"Freezes",
 						::subxt::ext::subxt_core::storage::address::StaticStorageKey::new(
 							_0.borrow(),
@@ -17846,7 +17851,7 @@ pub mod api {
 					::core::primitive::u128,
 				> {
 					::subxt::ext::subxt_core::constants::address::StaticAddress::new_static(
-						"ShareBalances",
+						"Ownership",
 						"ExistentialDeposit",
 						[
 							84u8, 157u8, 140u8, 4u8, 93u8, 57u8, 29u8, 133u8, 105u8, 200u8, 214u8,
@@ -17865,7 +17870,7 @@ pub mod api {
 					::core::primitive::u32,
 				> {
 					::subxt::ext::subxt_core::constants::address::StaticAddress::new_static(
-						"ShareBalances",
+						"Ownership",
 						"MaxLocks",
 						[
 							98u8, 252u8, 116u8, 72u8, 26u8, 180u8, 225u8, 83u8, 200u8, 157u8,
@@ -17884,7 +17889,7 @@ pub mod api {
 					::core::primitive::u32,
 				> {
 					::subxt::ext::subxt_core::constants::address::StaticAddress::new_static(
-						"ShareBalances",
+						"Ownership",
 						"MaxReserves",
 						[
 							98u8, 252u8, 116u8, 72u8, 26u8, 180u8, 225u8, 83u8, 200u8, 157u8,
@@ -17901,7 +17906,7 @@ pub mod api {
 					::core::primitive::u32,
 				> {
 					::subxt::ext::subxt_core::constants::address::StaticAddress::new_static(
-						"ShareBalances",
+						"Ownership",
 						"MaxFreezes",
 						[
 							98u8, 252u8, 116u8, 72u8, 26u8, 180u8, 225u8, 83u8, 200u8, 157u8,
@@ -18376,6 +18381,587 @@ pub mod api {
 			}
 		}
 	}
+	pub mod utility {
+		use super::{root_mod, runtime_types};
+		#[doc = "The `Error` enum of this pallet."]
+		pub type Error = runtime_types::pallet_utility::pallet::Error;
+		#[doc = "Contains a variant per dispatchable extrinsic that this pallet has."]
+		pub type Call = runtime_types::pallet_utility::pallet::Call;
+		pub mod calls {
+			use super::{root_mod, runtime_types};
+			type DispatchError = runtime_types::sp_runtime::DispatchError;
+			pub mod types {
+				use super::runtime_types;
+				#[derive(
+					:: subxt :: ext :: subxt_core :: ext :: codec :: Decode,
+					:: subxt :: ext :: subxt_core :: ext :: codec :: Encode,
+					:: subxt :: ext :: subxt_core :: ext :: scale_decode :: DecodeAsType,
+					:: subxt :: ext :: subxt_core :: ext :: scale_encode :: EncodeAsType,
+					Clone,
+					Debug,
+				)]
+				# [codec (crate = :: subxt :: ext :: subxt_core :: ext :: codec)]
+				#[decode_as_type(
+					crate_path = ":: subxt :: ext :: subxt_core :: ext :: scale_decode"
+				)]
+				#[encode_as_type(
+					crate_path = ":: subxt :: ext :: subxt_core :: ext :: scale_encode"
+				)]
+				#[doc = "Send a batch of dispatch calls."]
+				#[doc = ""]
+				#[doc = "May be called from any origin except `None`."]
+				#[doc = ""]
+				#[doc = "- `calls`: The calls to be dispatched from the same origin. The number of call must not"]
+				#[doc = "  exceed the constant: `batched_calls_limit` (available in constant metadata)."]
+				#[doc = ""]
+				#[doc = "If origin is root then the calls are dispatched without checking origin filter. (This"]
+				#[doc = "includes bypassing `frame_system::Config::BaseCallFilter`)."]
+				#[doc = ""]
+				#[doc = "## Complexity"]
+				#[doc = "- O(C) where C is the number of calls to be batched."]
+				#[doc = ""]
+				#[doc = "This will return `Ok` in all circumstances. To determine the success of the batch, an"]
+				#[doc = "event is deposited. If a call failed and the batch was interrupted, then the"]
+				#[doc = "`BatchInterrupted` event is deposited, along with the number of successful calls made"]
+				#[doc = "and the error of the failed call. If all were successful, then the `BatchCompleted`"]
+				#[doc = "event is deposited."]
+				pub struct Batch {
+					pub calls: batch::Calls,
+				}
+				pub mod batch {
+					use super::runtime_types;
+					pub type Calls = ::subxt::ext::subxt_core::alloc::vec::Vec<
+						runtime_types::argon_node_runtime::RuntimeCall,
+					>;
+				}
+				impl ::subxt::ext::subxt_core::blocks::StaticExtrinsic for Batch {
+					const PALLET: &'static str = "Utility";
+					const CALL: &'static str = "batch";
+				}
+				#[derive(
+					:: subxt :: ext :: subxt_core :: ext :: codec :: Decode,
+					:: subxt :: ext :: subxt_core :: ext :: codec :: Encode,
+					:: subxt :: ext :: subxt_core :: ext :: scale_decode :: DecodeAsType,
+					:: subxt :: ext :: subxt_core :: ext :: scale_encode :: EncodeAsType,
+					Clone,
+					Debug,
+				)]
+				# [codec (crate = :: subxt :: ext :: subxt_core :: ext :: codec)]
+				#[decode_as_type(
+					crate_path = ":: subxt :: ext :: subxt_core :: ext :: scale_decode"
+				)]
+				#[encode_as_type(
+					crate_path = ":: subxt :: ext :: subxt_core :: ext :: scale_encode"
+				)]
+				#[doc = "Send a call through an indexed pseudonym of the sender."]
+				#[doc = ""]
+				#[doc = "Filter from origin are passed along. The call will be dispatched with an origin which"]
+				#[doc = "use the same filter as the origin of this call."]
+				#[doc = ""]
+				#[doc = "NOTE: If you need to ensure that any account-based filtering is not honored (i.e."]
+				#[doc = "because you expect `proxy` to have been used prior in the call stack and you do not want"]
+				#[doc = "the call restrictions to apply to any sub-accounts), then use `as_multi_threshold_1`"]
+				#[doc = "in the Multisig pallet instead."]
+				#[doc = ""]
+				#[doc = "NOTE: Prior to version *12, this was called `as_limited_sub`."]
+				#[doc = ""]
+				#[doc = "The dispatch origin for this call must be _Signed_."]
+				pub struct AsDerivative {
+					pub index: as_derivative::Index,
+					pub call: ::subxt::ext::subxt_core::alloc::boxed::Box<as_derivative::Call>,
+				}
+				pub mod as_derivative {
+					use super::runtime_types;
+					pub type Index = ::core::primitive::u16;
+					pub type Call = runtime_types::argon_node_runtime::RuntimeCall;
+				}
+				impl ::subxt::ext::subxt_core::blocks::StaticExtrinsic for AsDerivative {
+					const PALLET: &'static str = "Utility";
+					const CALL: &'static str = "as_derivative";
+				}
+				#[derive(
+					:: subxt :: ext :: subxt_core :: ext :: codec :: Decode,
+					:: subxt :: ext :: subxt_core :: ext :: codec :: Encode,
+					:: subxt :: ext :: subxt_core :: ext :: scale_decode :: DecodeAsType,
+					:: subxt :: ext :: subxt_core :: ext :: scale_encode :: EncodeAsType,
+					Clone,
+					Debug,
+				)]
+				# [codec (crate = :: subxt :: ext :: subxt_core :: ext :: codec)]
+				#[decode_as_type(
+					crate_path = ":: subxt :: ext :: subxt_core :: ext :: scale_decode"
+				)]
+				#[encode_as_type(
+					crate_path = ":: subxt :: ext :: subxt_core :: ext :: scale_encode"
+				)]
+				#[doc = "Send a batch of dispatch calls and atomically execute them."]
+				#[doc = "The whole transaction will rollback and fail if any of the calls failed."]
+				#[doc = ""]
+				#[doc = "May be called from any origin except `None`."]
+				#[doc = ""]
+				#[doc = "- `calls`: The calls to be dispatched from the same origin. The number of call must not"]
+				#[doc = "  exceed the constant: `batched_calls_limit` (available in constant metadata)."]
+				#[doc = ""]
+				#[doc = "If origin is root then the calls are dispatched without checking origin filter. (This"]
+				#[doc = "includes bypassing `frame_system::Config::BaseCallFilter`)."]
+				#[doc = ""]
+				#[doc = "## Complexity"]
+				#[doc = "- O(C) where C is the number of calls to be batched."]
+				pub struct BatchAll {
+					pub calls: batch_all::Calls,
+				}
+				pub mod batch_all {
+					use super::runtime_types;
+					pub type Calls = ::subxt::ext::subxt_core::alloc::vec::Vec<
+						runtime_types::argon_node_runtime::RuntimeCall,
+					>;
+				}
+				impl ::subxt::ext::subxt_core::blocks::StaticExtrinsic for BatchAll {
+					const PALLET: &'static str = "Utility";
+					const CALL: &'static str = "batch_all";
+				}
+				#[derive(
+					:: subxt :: ext :: subxt_core :: ext :: codec :: Decode,
+					:: subxt :: ext :: subxt_core :: ext :: codec :: Encode,
+					:: subxt :: ext :: subxt_core :: ext :: scale_decode :: DecodeAsType,
+					:: subxt :: ext :: subxt_core :: ext :: scale_encode :: EncodeAsType,
+					Clone,
+					Debug,
+				)]
+				# [codec (crate = :: subxt :: ext :: subxt_core :: ext :: codec)]
+				#[decode_as_type(
+					crate_path = ":: subxt :: ext :: subxt_core :: ext :: scale_decode"
+				)]
+				#[encode_as_type(
+					crate_path = ":: subxt :: ext :: subxt_core :: ext :: scale_encode"
+				)]
+				#[doc = "Dispatches a function call with a provided origin."]
+				#[doc = ""]
+				#[doc = "The dispatch origin for this call must be _Root_."]
+				#[doc = ""]
+				#[doc = "## Complexity"]
+				#[doc = "- O(1)."]
+				pub struct DispatchAs {
+					pub as_origin:
+						::subxt::ext::subxt_core::alloc::boxed::Box<dispatch_as::AsOrigin>,
+					pub call: ::subxt::ext::subxt_core::alloc::boxed::Box<dispatch_as::Call>,
+				}
+				pub mod dispatch_as {
+					use super::runtime_types;
+					pub type AsOrigin = runtime_types::argon_node_runtime::OriginCaller;
+					pub type Call = runtime_types::argon_node_runtime::RuntimeCall;
+				}
+				impl ::subxt::ext::subxt_core::blocks::StaticExtrinsic for DispatchAs {
+					const PALLET: &'static str = "Utility";
+					const CALL: &'static str = "dispatch_as";
+				}
+				#[derive(
+					:: subxt :: ext :: subxt_core :: ext :: codec :: Decode,
+					:: subxt :: ext :: subxt_core :: ext :: codec :: Encode,
+					:: subxt :: ext :: subxt_core :: ext :: scale_decode :: DecodeAsType,
+					:: subxt :: ext :: subxt_core :: ext :: scale_encode :: EncodeAsType,
+					Clone,
+					Debug,
+				)]
+				# [codec (crate = :: subxt :: ext :: subxt_core :: ext :: codec)]
+				#[decode_as_type(
+					crate_path = ":: subxt :: ext :: subxt_core :: ext :: scale_decode"
+				)]
+				#[encode_as_type(
+					crate_path = ":: subxt :: ext :: subxt_core :: ext :: scale_encode"
+				)]
+				#[doc = "Send a batch of dispatch calls."]
+				#[doc = "Unlike `batch`, it allows errors and won't interrupt."]
+				#[doc = ""]
+				#[doc = "May be called from any origin except `None`."]
+				#[doc = ""]
+				#[doc = "- `calls`: The calls to be dispatched from the same origin. The number of call must not"]
+				#[doc = "  exceed the constant: `batched_calls_limit` (available in constant metadata)."]
+				#[doc = ""]
+				#[doc = "If origin is root then the calls are dispatch without checking origin filter. (This"]
+				#[doc = "includes bypassing `frame_system::Config::BaseCallFilter`)."]
+				#[doc = ""]
+				#[doc = "## Complexity"]
+				#[doc = "- O(C) where C is the number of calls to be batched."]
+				pub struct ForceBatch {
+					pub calls: force_batch::Calls,
+				}
+				pub mod force_batch {
+					use super::runtime_types;
+					pub type Calls = ::subxt::ext::subxt_core::alloc::vec::Vec<
+						runtime_types::argon_node_runtime::RuntimeCall,
+					>;
+				}
+				impl ::subxt::ext::subxt_core::blocks::StaticExtrinsic for ForceBatch {
+					const PALLET: &'static str = "Utility";
+					const CALL: &'static str = "force_batch";
+				}
+				#[derive(
+					:: subxt :: ext :: subxt_core :: ext :: codec :: Decode,
+					:: subxt :: ext :: subxt_core :: ext :: codec :: Encode,
+					:: subxt :: ext :: subxt_core :: ext :: scale_decode :: DecodeAsType,
+					:: subxt :: ext :: subxt_core :: ext :: scale_encode :: EncodeAsType,
+					Clone,
+					Debug,
+				)]
+				# [codec (crate = :: subxt :: ext :: subxt_core :: ext :: codec)]
+				#[decode_as_type(
+					crate_path = ":: subxt :: ext :: subxt_core :: ext :: scale_decode"
+				)]
+				#[encode_as_type(
+					crate_path = ":: subxt :: ext :: subxt_core :: ext :: scale_encode"
+				)]
+				#[doc = "Dispatch a function call with a specified weight."]
+				#[doc = ""]
+				#[doc = "This function does not check the weight of the call, and instead allows the"]
+				#[doc = "Root origin to specify the weight of the call."]
+				#[doc = ""]
+				#[doc = "The dispatch origin for this call must be _Root_."]
+				pub struct WithWeight {
+					pub call: ::subxt::ext::subxt_core::alloc::boxed::Box<with_weight::Call>,
+					pub weight: with_weight::Weight,
+				}
+				pub mod with_weight {
+					use super::runtime_types;
+					pub type Call = runtime_types::argon_node_runtime::RuntimeCall;
+					pub type Weight = runtime_types::sp_weights::weight_v2::Weight;
+				}
+				impl ::subxt::ext::subxt_core::blocks::StaticExtrinsic for WithWeight {
+					const PALLET: &'static str = "Utility";
+					const CALL: &'static str = "with_weight";
+				}
+			}
+			pub struct TransactionApi;
+			impl TransactionApi {
+				#[doc = "Send a batch of dispatch calls."]
+				#[doc = ""]
+				#[doc = "May be called from any origin except `None`."]
+				#[doc = ""]
+				#[doc = "- `calls`: The calls to be dispatched from the same origin. The number of call must not"]
+				#[doc = "  exceed the constant: `batched_calls_limit` (available in constant metadata)."]
+				#[doc = ""]
+				#[doc = "If origin is root then the calls are dispatched without checking origin filter. (This"]
+				#[doc = "includes bypassing `frame_system::Config::BaseCallFilter`)."]
+				#[doc = ""]
+				#[doc = "## Complexity"]
+				#[doc = "- O(C) where C is the number of calls to be batched."]
+				#[doc = ""]
+				#[doc = "This will return `Ok` in all circumstances. To determine the success of the batch, an"]
+				#[doc = "event is deposited. If a call failed and the batch was interrupted, then the"]
+				#[doc = "`BatchInterrupted` event is deposited, along with the number of successful calls made"]
+				#[doc = "and the error of the failed call. If all were successful, then the `BatchCompleted`"]
+				#[doc = "event is deposited."]
+				pub fn batch(
+					&self,
+					calls: types::batch::Calls,
+				) -> ::subxt::ext::subxt_core::tx::payload::StaticPayload<types::Batch> {
+					::subxt::ext::subxt_core::tx::payload::StaticPayload::new_static(
+						"Utility",
+						"batch",
+						types::Batch { calls },
+						[
+							82u8, 150u8, 246u8, 136u8, 52u8, 26u8, 2u8, 237u8, 106u8, 2u8, 84u8,
+							182u8, 29u8, 179u8, 147u8, 166u8, 139u8, 56u8, 205u8, 95u8, 83u8,
+							115u8, 83u8, 23u8, 161u8, 212u8, 225u8, 153u8, 153u8, 249u8, 49u8,
+							252u8,
+						],
+					)
+				}
+				#[doc = "Send a call through an indexed pseudonym of the sender."]
+				#[doc = ""]
+				#[doc = "Filter from origin are passed along. The call will be dispatched with an origin which"]
+				#[doc = "use the same filter as the origin of this call."]
+				#[doc = ""]
+				#[doc = "NOTE: If you need to ensure that any account-based filtering is not honored (i.e."]
+				#[doc = "because you expect `proxy` to have been used prior in the call stack and you do not want"]
+				#[doc = "the call restrictions to apply to any sub-accounts), then use `as_multi_threshold_1`"]
+				#[doc = "in the Multisig pallet instead."]
+				#[doc = ""]
+				#[doc = "NOTE: Prior to version *12, this was called `as_limited_sub`."]
+				#[doc = ""]
+				#[doc = "The dispatch origin for this call must be _Signed_."]
+				pub fn as_derivative(
+					&self,
+					index: types::as_derivative::Index,
+					call: types::as_derivative::Call,
+				) -> ::subxt::ext::subxt_core::tx::payload::StaticPayload<types::AsDerivative> {
+					::subxt::ext::subxt_core::tx::payload::StaticPayload::new_static(
+						"Utility",
+						"as_derivative",
+						types::AsDerivative {
+							index,
+							call: ::subxt::ext::subxt_core::alloc::boxed::Box::new(call),
+						},
+						[
+							112u8, 75u8, 127u8, 2u8, 10u8, 174u8, 22u8, 244u8, 152u8, 35u8, 26u8,
+							249u8, 173u8, 134u8, 19u8, 12u8, 168u8, 148u8, 232u8, 52u8, 122u8,
+							199u8, 218u8, 114u8, 134u8, 254u8, 236u8, 242u8, 251u8, 142u8, 113u8,
+							210u8,
+						],
+					)
+				}
+				#[doc = "Send a batch of dispatch calls and atomically execute them."]
+				#[doc = "The whole transaction will rollback and fail if any of the calls failed."]
+				#[doc = ""]
+				#[doc = "May be called from any origin except `None`."]
+				#[doc = ""]
+				#[doc = "- `calls`: The calls to be dispatched from the same origin. The number of call must not"]
+				#[doc = "  exceed the constant: `batched_calls_limit` (available in constant metadata)."]
+				#[doc = ""]
+				#[doc = "If origin is root then the calls are dispatched without checking origin filter. (This"]
+				#[doc = "includes bypassing `frame_system::Config::BaseCallFilter`)."]
+				#[doc = ""]
+				#[doc = "## Complexity"]
+				#[doc = "- O(C) where C is the number of calls to be batched."]
+				pub fn batch_all(
+					&self,
+					calls: types::batch_all::Calls,
+				) -> ::subxt::ext::subxt_core::tx::payload::StaticPayload<types::BatchAll> {
+					::subxt::ext::subxt_core::tx::payload::StaticPayload::new_static(
+						"Utility",
+						"batch_all",
+						types::BatchAll { calls },
+						[
+							129u8, 188u8, 151u8, 186u8, 39u8, 126u8, 22u8, 254u8, 19u8, 52u8,
+							246u8, 138u8, 69u8, 34u8, 211u8, 221u8, 189u8, 48u8, 4u8, 237u8, 151u8,
+							35u8, 237u8, 208u8, 251u8, 103u8, 163u8, 255u8, 146u8, 167u8, 118u8,
+							164u8,
+						],
+					)
+				}
+				#[doc = "Dispatches a function call with a provided origin."]
+				#[doc = ""]
+				#[doc = "The dispatch origin for this call must be _Root_."]
+				#[doc = ""]
+				#[doc = "## Complexity"]
+				#[doc = "- O(1)."]
+				pub fn dispatch_as(
+					&self,
+					as_origin: types::dispatch_as::AsOrigin,
+					call: types::dispatch_as::Call,
+				) -> ::subxt::ext::subxt_core::tx::payload::StaticPayload<types::DispatchAs> {
+					::subxt::ext::subxt_core::tx::payload::StaticPayload::new_static(
+						"Utility",
+						"dispatch_as",
+						types::DispatchAs {
+							as_origin: ::subxt::ext::subxt_core::alloc::boxed::Box::new(as_origin),
+							call: ::subxt::ext::subxt_core::alloc::boxed::Box::new(call),
+						},
+						[
+							215u8, 39u8, 47u8, 56u8, 251u8, 181u8, 235u8, 5u8, 147u8, 51u8, 155u8,
+							64u8, 44u8, 161u8, 104u8, 195u8, 177u8, 95u8, 117u8, 37u8, 194u8, 46u8,
+							108u8, 53u8, 243u8, 108u8, 220u8, 179u8, 201u8, 166u8, 201u8, 249u8,
+						],
+					)
+				}
+				#[doc = "Send a batch of dispatch calls."]
+				#[doc = "Unlike `batch`, it allows errors and won't interrupt."]
+				#[doc = ""]
+				#[doc = "May be called from any origin except `None`."]
+				#[doc = ""]
+				#[doc = "- `calls`: The calls to be dispatched from the same origin. The number of call must not"]
+				#[doc = "  exceed the constant: `batched_calls_limit` (available in constant metadata)."]
+				#[doc = ""]
+				#[doc = "If origin is root then the calls are dispatch without checking origin filter. (This"]
+				#[doc = "includes bypassing `frame_system::Config::BaseCallFilter`)."]
+				#[doc = ""]
+				#[doc = "## Complexity"]
+				#[doc = "- O(C) where C is the number of calls to be batched."]
+				pub fn force_batch(
+					&self,
+					calls: types::force_batch::Calls,
+				) -> ::subxt::ext::subxt_core::tx::payload::StaticPayload<types::ForceBatch> {
+					::subxt::ext::subxt_core::tx::payload::StaticPayload::new_static(
+						"Utility",
+						"force_batch",
+						types::ForceBatch { calls },
+						[
+							201u8, 59u8, 50u8, 15u8, 28u8, 88u8, 17u8, 199u8, 39u8, 253u8, 163u8,
+							144u8, 130u8, 38u8, 20u8, 38u8, 202u8, 19u8, 20u8, 209u8, 253u8, 70u8,
+							60u8, 13u8, 126u8, 57u8, 148u8, 115u8, 19u8, 244u8, 78u8, 34u8,
+						],
+					)
+				}
+				#[doc = "Dispatch a function call with a specified weight."]
+				#[doc = ""]
+				#[doc = "This function does not check the weight of the call, and instead allows the"]
+				#[doc = "Root origin to specify the weight of the call."]
+				#[doc = ""]
+				#[doc = "The dispatch origin for this call must be _Root_."]
+				pub fn with_weight(
+					&self,
+					call: types::with_weight::Call,
+					weight: types::with_weight::Weight,
+				) -> ::subxt::ext::subxt_core::tx::payload::StaticPayload<types::WithWeight> {
+					::subxt::ext::subxt_core::tx::payload::StaticPayload::new_static(
+						"Utility",
+						"with_weight",
+						types::WithWeight {
+							call: ::subxt::ext::subxt_core::alloc::boxed::Box::new(call),
+							weight,
+						},
+						[
+							232u8, 202u8, 218u8, 134u8, 180u8, 239u8, 238u8, 178u8, 80u8, 123u8,
+							245u8, 53u8, 77u8, 188u8, 93u8, 132u8, 93u8, 13u8, 37u8, 109u8, 108u8,
+							255u8, 101u8, 167u8, 8u8, 44u8, 87u8, 62u8, 15u8, 221u8, 116u8, 112u8,
+						],
+					)
+				}
+			}
+		}
+		#[doc = "The `Event` enum of this pallet"]
+		pub type Event = runtime_types::pallet_utility::pallet::Event;
+		pub mod events {
+			use super::runtime_types;
+			#[derive(
+				:: subxt :: ext :: subxt_core :: ext :: codec :: Decode,
+				:: subxt :: ext :: subxt_core :: ext :: codec :: Encode,
+				:: subxt :: ext :: subxt_core :: ext :: scale_decode :: DecodeAsType,
+				:: subxt :: ext :: subxt_core :: ext :: scale_encode :: EncodeAsType,
+				Clone,
+				Debug,
+			)]
+			# [codec (crate = :: subxt :: ext :: subxt_core :: ext :: codec)]
+			#[decode_as_type(crate_path = ":: subxt :: ext :: subxt_core :: ext :: scale_decode")]
+			#[encode_as_type(crate_path = ":: subxt :: ext :: subxt_core :: ext :: scale_encode")]
+			#[doc = "Batch of dispatches did not complete fully. Index of first failing dispatch given, as"]
+			#[doc = "well as the error."]
+			pub struct BatchInterrupted {
+				pub index: batch_interrupted::Index,
+				pub error: batch_interrupted::Error,
+			}
+			pub mod batch_interrupted {
+				use super::runtime_types;
+				pub type Index = ::core::primitive::u32;
+				pub type Error = runtime_types::sp_runtime::DispatchError;
+			}
+			impl ::subxt::ext::subxt_core::events::StaticEvent for BatchInterrupted {
+				const PALLET: &'static str = "Utility";
+				const EVENT: &'static str = "BatchInterrupted";
+			}
+			#[derive(
+				:: subxt :: ext :: subxt_core :: ext :: codec :: Decode,
+				:: subxt :: ext :: subxt_core :: ext :: codec :: Encode,
+				:: subxt :: ext :: subxt_core :: ext :: scale_decode :: DecodeAsType,
+				:: subxt :: ext :: subxt_core :: ext :: scale_encode :: EncodeAsType,
+				Clone,
+				Debug,
+			)]
+			# [codec (crate = :: subxt :: ext :: subxt_core :: ext :: codec)]
+			#[decode_as_type(crate_path = ":: subxt :: ext :: subxt_core :: ext :: scale_decode")]
+			#[encode_as_type(crate_path = ":: subxt :: ext :: subxt_core :: ext :: scale_encode")]
+			#[doc = "Batch of dispatches completed fully with no error."]
+			pub struct BatchCompleted;
+			impl ::subxt::ext::subxt_core::events::StaticEvent for BatchCompleted {
+				const PALLET: &'static str = "Utility";
+				const EVENT: &'static str = "BatchCompleted";
+			}
+			#[derive(
+				:: subxt :: ext :: subxt_core :: ext :: codec :: Decode,
+				:: subxt :: ext :: subxt_core :: ext :: codec :: Encode,
+				:: subxt :: ext :: subxt_core :: ext :: scale_decode :: DecodeAsType,
+				:: subxt :: ext :: subxt_core :: ext :: scale_encode :: EncodeAsType,
+				Clone,
+				Debug,
+			)]
+			# [codec (crate = :: subxt :: ext :: subxt_core :: ext :: codec)]
+			#[decode_as_type(crate_path = ":: subxt :: ext :: subxt_core :: ext :: scale_decode")]
+			#[encode_as_type(crate_path = ":: subxt :: ext :: subxt_core :: ext :: scale_encode")]
+			#[doc = "Batch of dispatches completed but has errors."]
+			pub struct BatchCompletedWithErrors;
+			impl ::subxt::ext::subxt_core::events::StaticEvent for BatchCompletedWithErrors {
+				const PALLET: &'static str = "Utility";
+				const EVENT: &'static str = "BatchCompletedWithErrors";
+			}
+			#[derive(
+				:: subxt :: ext :: subxt_core :: ext :: codec :: Decode,
+				:: subxt :: ext :: subxt_core :: ext :: codec :: Encode,
+				:: subxt :: ext :: subxt_core :: ext :: scale_decode :: DecodeAsType,
+				:: subxt :: ext :: subxt_core :: ext :: scale_encode :: EncodeAsType,
+				Clone,
+				Debug,
+			)]
+			# [codec (crate = :: subxt :: ext :: subxt_core :: ext :: codec)]
+			#[decode_as_type(crate_path = ":: subxt :: ext :: subxt_core :: ext :: scale_decode")]
+			#[encode_as_type(crate_path = ":: subxt :: ext :: subxt_core :: ext :: scale_encode")]
+			#[doc = "A single item within a Batch of dispatches has completed with no error."]
+			pub struct ItemCompleted;
+			impl ::subxt::ext::subxt_core::events::StaticEvent for ItemCompleted {
+				const PALLET: &'static str = "Utility";
+				const EVENT: &'static str = "ItemCompleted";
+			}
+			#[derive(
+				:: subxt :: ext :: subxt_core :: ext :: codec :: Decode,
+				:: subxt :: ext :: subxt_core :: ext :: codec :: Encode,
+				:: subxt :: ext :: subxt_core :: ext :: scale_decode :: DecodeAsType,
+				:: subxt :: ext :: subxt_core :: ext :: scale_encode :: EncodeAsType,
+				Clone,
+				Debug,
+			)]
+			# [codec (crate = :: subxt :: ext :: subxt_core :: ext :: codec)]
+			#[decode_as_type(crate_path = ":: subxt :: ext :: subxt_core :: ext :: scale_decode")]
+			#[encode_as_type(crate_path = ":: subxt :: ext :: subxt_core :: ext :: scale_encode")]
+			#[doc = "A single item within a Batch of dispatches has completed with error."]
+			pub struct ItemFailed {
+				pub error: item_failed::Error,
+			}
+			pub mod item_failed {
+				use super::runtime_types;
+				pub type Error = runtime_types::sp_runtime::DispatchError;
+			}
+			impl ::subxt::ext::subxt_core::events::StaticEvent for ItemFailed {
+				const PALLET: &'static str = "Utility";
+				const EVENT: &'static str = "ItemFailed";
+			}
+			#[derive(
+				:: subxt :: ext :: subxt_core :: ext :: codec :: Decode,
+				:: subxt :: ext :: subxt_core :: ext :: codec :: Encode,
+				:: subxt :: ext :: subxt_core :: ext :: scale_decode :: DecodeAsType,
+				:: subxt :: ext :: subxt_core :: ext :: scale_encode :: EncodeAsType,
+				Clone,
+				Debug,
+			)]
+			# [codec (crate = :: subxt :: ext :: subxt_core :: ext :: codec)]
+			#[decode_as_type(crate_path = ":: subxt :: ext :: subxt_core :: ext :: scale_decode")]
+			#[encode_as_type(crate_path = ":: subxt :: ext :: subxt_core :: ext :: scale_encode")]
+			#[doc = "A call was dispatched."]
+			pub struct DispatchedAs {
+				pub result: dispatched_as::Result,
+			}
+			pub mod dispatched_as {
+				use super::runtime_types;
+				pub type Result =
+					::core::result::Result<(), runtime_types::sp_runtime::DispatchError>;
+			}
+			impl ::subxt::ext::subxt_core::events::StaticEvent for DispatchedAs {
+				const PALLET: &'static str = "Utility";
+				const EVENT: &'static str = "DispatchedAs";
+			}
+		}
+		pub mod constants {
+			use super::runtime_types;
+			pub struct ConstantsApi;
+			impl ConstantsApi {
+				#[doc = " The limit on the number of batched calls."]
+				pub fn batched_calls_limit(
+					&self,
+				) -> ::subxt::ext::subxt_core::constants::address::StaticAddress<
+					::core::primitive::u32,
+				> {
+					::subxt::ext::subxt_core::constants::address::StaticAddress::new_static(
+						"Utility",
+						"batched_calls_limit",
+						[
+							98u8, 252u8, 116u8, 72u8, 26u8, 180u8, 225u8, 83u8, 200u8, 157u8,
+							125u8, 151u8, 53u8, 76u8, 168u8, 26u8, 10u8, 9u8, 98u8, 68u8, 9u8,
+							178u8, 197u8, 113u8, 31u8, 79u8, 200u8, 90u8, 203u8, 100u8, 41u8,
+							145u8,
+						],
+					)
+				}
+			}
+		}
+	}
 	pub mod sudo {
 		use super::{root_mod, runtime_types};
 		#[doc = "Error for the Sudo pallet."]
@@ -18552,9 +19138,9 @@ pub mod api {
 							call: ::subxt::ext::subxt_core::alloc::boxed::Box::new(call),
 						},
 						[
-							142u8, 249u8, 2u8, 95u8, 36u8, 138u8, 37u8, 107u8, 158u8, 169u8, 153u8,
-							249u8, 52u8, 226u8, 155u8, 133u8, 11u8, 29u8, 39u8, 247u8, 24u8, 191u8,
-							177u8, 193u8, 15u8, 149u8, 169u8, 49u8, 153u8, 214u8, 222u8, 131u8,
+							72u8, 92u8, 49u8, 130u8, 4u8, 73u8, 20u8, 210u8, 25u8, 217u8, 187u8,
+							36u8, 49u8, 29u8, 238u8, 43u8, 73u8, 88u8, 213u8, 144u8, 247u8, 134u8,
+							63u8, 231u8, 86u8, 249u8, 44u8, 116u8, 77u8, 166u8, 136u8, 20u8,
 						],
 					)
 				}
@@ -18577,9 +19163,10 @@ pub mod api {
 							weight,
 						},
 						[
-							118u8, 205u8, 169u8, 138u8, 142u8, 55u8, 91u8, 34u8, 160u8, 72u8, 1u8,
-							254u8, 209u8, 97u8, 51u8, 229u8, 234u8, 23u8, 63u8, 27u8, 135u8, 248u8,
-							11u8, 20u8, 242u8, 65u8, 188u8, 236u8, 175u8, 107u8, 49u8, 39u8,
+							199u8, 175u8, 48u8, 42u8, 140u8, 245u8, 236u8, 148u8, 236u8, 52u8,
+							117u8, 222u8, 100u8, 110u8, 40u8, 239u8, 187u8, 36u8, 241u8, 75u8,
+							240u8, 83u8, 202u8, 156u8, 102u8, 206u8, 231u8, 228u8, 178u8, 209u8,
+							103u8, 3u8,
 						],
 					)
 				}
@@ -18617,10 +19204,9 @@ pub mod api {
 							call: ::subxt::ext::subxt_core::alloc::boxed::Box::new(call),
 						},
 						[
-							66u8, 88u8, 162u8, 33u8, 53u8, 149u8, 6u8, 75u8, 114u8, 213u8, 254u8,
-							140u8, 136u8, 16u8, 251u8, 168u8, 199u8, 37u8, 209u8, 248u8, 68u8,
-							198u8, 253u8, 79u8, 189u8, 102u8, 112u8, 75u8, 70u8, 96u8, 181u8,
-							181u8,
+							227u8, 60u8, 0u8, 181u8, 111u8, 52u8, 205u8, 160u8, 86u8, 188u8, 2u8,
+							7u8, 8u8, 237u8, 112u8, 203u8, 53u8, 216u8, 189u8, 203u8, 83u8, 66u8,
+							148u8, 159u8, 230u8, 204u8, 135u8, 164u8, 205u8, 75u8, 42u8, 47u8,
 						],
 					)
 				}
@@ -18812,6 +19398,27 @@ pub mod api {
 			# [codec (crate = :: subxt :: ext :: subxt_core :: ext :: codec)]
 			#[decode_as_type(crate_path = ":: subxt :: ext :: subxt_core :: ext :: scale_decode")]
 			#[encode_as_type(crate_path = ":: subxt :: ext :: subxt_core :: ext :: scale_encode")]
+			pub enum OriginCaller {
+				#[codec(index = 0)]
+				system(
+					runtime_types::frame_support::dispatch::RawOrigin<
+						::subxt::ext::subxt_core::utils::AccountId32,
+					>,
+				),
+				#[codec(index = 1)]
+				Void(runtime_types::sp_core::Void),
+			}
+			#[derive(
+				:: subxt :: ext :: subxt_core :: ext :: codec :: Decode,
+				:: subxt :: ext :: subxt_core :: ext :: codec :: Encode,
+				:: subxt :: ext :: subxt_core :: ext :: scale_decode :: DecodeAsType,
+				:: subxt :: ext :: subxt_core :: ext :: scale_encode :: EncodeAsType,
+				Clone,
+				Debug,
+			)]
+			# [codec (crate = :: subxt :: ext :: subxt_core :: ext :: codec)]
+			#[decode_as_type(crate_path = ":: subxt :: ext :: subxt_core :: ext :: scale_decode")]
+			#[encode_as_type(crate_path = ":: subxt :: ext :: subxt_core :: ext :: scale_encode")]
 			pub enum ProxyType {
 				#[codec(index = 0)]
 				Any,
@@ -18885,12 +19492,14 @@ pub mod api {
 				#[codec(index = 22)]
 				Mint(runtime_types::pallet_mint::pallet::Call),
 				#[codec(index = 23)]
-				ArgonBalances(runtime_types::pallet_balances::pallet::Call),
+				Balances(runtime_types::pallet_balances::pallet::Call),
 				#[codec(index = 24)]
-				ShareBalances(runtime_types::pallet_balances::pallet::Call),
+				Ownership(runtime_types::pallet_balances::pallet::Call),
 				#[codec(index = 25)]
 				TxPause(runtime_types::pallet_tx_pause::pallet::Call),
 				#[codec(index = 27)]
+				Utility(runtime_types::pallet_utility::pallet::Call),
+				#[codec(index = 28)]
 				Sudo(runtime_types::pallet_sudo::pallet::Call),
 			}
 			#[derive(
@@ -18944,12 +19553,14 @@ pub mod api {
 				#[codec(index = 22)]
 				Mint(runtime_types::pallet_mint::pallet::Error),
 				#[codec(index = 23)]
-				ArgonBalances(runtime_types::pallet_balances::pallet::Error),
+				Balances(runtime_types::pallet_balances::pallet::Error),
 				#[codec(index = 24)]
-				ShareBalances(runtime_types::pallet_balances::pallet::Error),
+				Ownership(runtime_types::pallet_balances::pallet::Error),
 				#[codec(index = 25)]
 				TxPause(runtime_types::pallet_tx_pause::pallet::Error),
 				#[codec(index = 27)]
+				Utility(runtime_types::pallet_utility::pallet::Error),
+				#[codec(index = 28)]
 				Sudo(runtime_types::pallet_sudo::pallet::Error),
 			}
 			#[derive(
@@ -19001,14 +19612,16 @@ pub mod api {
 				#[codec(index = 22)]
 				Mint(runtime_types::pallet_mint::pallet::Event),
 				#[codec(index = 23)]
-				ArgonBalances(runtime_types::pallet_balances::pallet::Event),
+				Balances(runtime_types::pallet_balances::pallet::Event),
 				#[codec(index = 24)]
-				ShareBalances(runtime_types::pallet_balances::pallet::Event),
+				Ownership(runtime_types::pallet_balances::pallet::Event),
 				#[codec(index = 25)]
 				TxPause(runtime_types::pallet_tx_pause::pallet::Event),
 				#[codec(index = 26)]
 				TransactionPayment(runtime_types::pallet_transaction_payment::pallet::Event),
 				#[codec(index = 27)]
+				Utility(runtime_types::pallet_utility::pallet::Event),
+				#[codec(index = 28)]
 				Sudo(runtime_types::pallet_sudo::pallet::Event),
 			}
 			#[derive(
@@ -19758,7 +20371,7 @@ pub mod api {
 				pub struct BlockPayout<_0, _1> {
 					pub account_id: _0,
 					#[codec(compact)]
-					pub shares: _1,
+					pub ownership: _1,
 					#[codec(compact)]
 					pub argons: _1,
 				}
@@ -20935,6 +21548,29 @@ pub mod api {
 					pub normal: _0,
 					pub operational: _0,
 					pub mandatory: _0,
+				}
+				#[derive(
+					:: subxt :: ext :: subxt_core :: ext :: codec :: Decode,
+					:: subxt :: ext :: subxt_core :: ext :: codec :: Encode,
+					:: subxt :: ext :: subxt_core :: ext :: scale_decode :: DecodeAsType,
+					:: subxt :: ext :: subxt_core :: ext :: scale_encode :: EncodeAsType,
+					Clone,
+					Debug,
+				)]
+				# [codec (crate = :: subxt :: ext :: subxt_core :: ext :: codec)]
+				#[decode_as_type(
+					crate_path = ":: subxt :: ext :: subxt_core :: ext :: scale_decode"
+				)]
+				#[encode_as_type(
+					crate_path = ":: subxt :: ext :: subxt_core :: ext :: scale_encode"
+				)]
+				pub enum RawOrigin<_0> {
+					#[codec(index = 0)]
+					Root,
+					#[codec(index = 1)]
+					Signed(_0),
+					#[codec(index = 2)]
+					None,
 				}
 			}
 			pub mod traits {
@@ -22196,14 +22832,14 @@ pub mod api {
 					RewardUnlockError {
 						account_id: ::subxt::ext::subxt_core::utils::AccountId32,
 						argons: ::core::option::Option<::core::primitive::u128>,
-						shares: ::core::option::Option<::core::primitive::u128>,
+						ownership: ::core::option::Option<::core::primitive::u128>,
 						error: runtime_types::sp_runtime::DispatchError,
 					},
 					#[codec(index = 3)]
 					RewardCreateError {
 						account_id: ::subxt::ext::subxt_core::utils::AccountId32,
 						argons: ::core::option::Option<::core::primitive::u128>,
-						shares: ::core::option::Option<::core::primitive::u128>,
+						ownership: ::core::option::Option<::core::primitive::u128>,
 						error: runtime_types::sp_runtime::DispatchError,
 					},
 				}
@@ -25194,6 +25830,204 @@ pub mod api {
 				}
 			}
 		}
+		pub mod pallet_utility {
+			use super::runtime_types;
+			pub mod pallet {
+				use super::runtime_types;
+				#[derive(
+					:: subxt :: ext :: subxt_core :: ext :: codec :: Decode,
+					:: subxt :: ext :: subxt_core :: ext :: codec :: Encode,
+					:: subxt :: ext :: subxt_core :: ext :: scale_decode :: DecodeAsType,
+					:: subxt :: ext :: subxt_core :: ext :: scale_encode :: EncodeAsType,
+					Clone,
+					Debug,
+				)]
+				# [codec (crate = :: subxt :: ext :: subxt_core :: ext :: codec)]
+				#[decode_as_type(
+					crate_path = ":: subxt :: ext :: subxt_core :: ext :: scale_decode"
+				)]
+				#[encode_as_type(
+					crate_path = ":: subxt :: ext :: subxt_core :: ext :: scale_encode"
+				)]
+				#[doc = "Contains a variant per dispatchable extrinsic that this pallet has."]
+				pub enum Call {
+					#[codec(index = 0)]
+					#[doc = "Send a batch of dispatch calls."]
+					#[doc = ""]
+					#[doc = "May be called from any origin except `None`."]
+					#[doc = ""]
+					#[doc = "- `calls`: The calls to be dispatched from the same origin. The number of call must not"]
+					#[doc = "  exceed the constant: `batched_calls_limit` (available in constant metadata)."]
+					#[doc = ""]
+					#[doc = "If origin is root then the calls are dispatched without checking origin filter. (This"]
+					#[doc = "includes bypassing `frame_system::Config::BaseCallFilter`)."]
+					#[doc = ""]
+					#[doc = "## Complexity"]
+					#[doc = "- O(C) where C is the number of calls to be batched."]
+					#[doc = ""]
+					#[doc = "This will return `Ok` in all circumstances. To determine the success of the batch, an"]
+					#[doc = "event is deposited. If a call failed and the batch was interrupted, then the"]
+					#[doc = "`BatchInterrupted` event is deposited, along with the number of successful calls made"]
+					#[doc = "and the error of the failed call. If all were successful, then the `BatchCompleted`"]
+					#[doc = "event is deposited."]
+					batch {
+						calls: ::subxt::ext::subxt_core::alloc::vec::Vec<
+							runtime_types::argon_node_runtime::RuntimeCall,
+						>,
+					},
+					#[codec(index = 1)]
+					#[doc = "Send a call through an indexed pseudonym of the sender."]
+					#[doc = ""]
+					#[doc = "Filter from origin are passed along. The call will be dispatched with an origin which"]
+					#[doc = "use the same filter as the origin of this call."]
+					#[doc = ""]
+					#[doc = "NOTE: If you need to ensure that any account-based filtering is not honored (i.e."]
+					#[doc = "because you expect `proxy` to have been used prior in the call stack and you do not want"]
+					#[doc = "the call restrictions to apply to any sub-accounts), then use `as_multi_threshold_1`"]
+					#[doc = "in the Multisig pallet instead."]
+					#[doc = ""]
+					#[doc = "NOTE: Prior to version *12, this was called `as_limited_sub`."]
+					#[doc = ""]
+					#[doc = "The dispatch origin for this call must be _Signed_."]
+					as_derivative {
+						index: ::core::primitive::u16,
+						call: ::subxt::ext::subxt_core::alloc::boxed::Box<
+							runtime_types::argon_node_runtime::RuntimeCall,
+						>,
+					},
+					#[codec(index = 2)]
+					#[doc = "Send a batch of dispatch calls and atomically execute them."]
+					#[doc = "The whole transaction will rollback and fail if any of the calls failed."]
+					#[doc = ""]
+					#[doc = "May be called from any origin except `None`."]
+					#[doc = ""]
+					#[doc = "- `calls`: The calls to be dispatched from the same origin. The number of call must not"]
+					#[doc = "  exceed the constant: `batched_calls_limit` (available in constant metadata)."]
+					#[doc = ""]
+					#[doc = "If origin is root then the calls are dispatched without checking origin filter. (This"]
+					#[doc = "includes bypassing `frame_system::Config::BaseCallFilter`)."]
+					#[doc = ""]
+					#[doc = "## Complexity"]
+					#[doc = "- O(C) where C is the number of calls to be batched."]
+					batch_all {
+						calls: ::subxt::ext::subxt_core::alloc::vec::Vec<
+							runtime_types::argon_node_runtime::RuntimeCall,
+						>,
+					},
+					#[codec(index = 3)]
+					#[doc = "Dispatches a function call with a provided origin."]
+					#[doc = ""]
+					#[doc = "The dispatch origin for this call must be _Root_."]
+					#[doc = ""]
+					#[doc = "## Complexity"]
+					#[doc = "- O(1)."]
+					dispatch_as {
+						as_origin: ::subxt::ext::subxt_core::alloc::boxed::Box<
+							runtime_types::argon_node_runtime::OriginCaller,
+						>,
+						call: ::subxt::ext::subxt_core::alloc::boxed::Box<
+							runtime_types::argon_node_runtime::RuntimeCall,
+						>,
+					},
+					#[codec(index = 4)]
+					#[doc = "Send a batch of dispatch calls."]
+					#[doc = "Unlike `batch`, it allows errors and won't interrupt."]
+					#[doc = ""]
+					#[doc = "May be called from any origin except `None`."]
+					#[doc = ""]
+					#[doc = "- `calls`: The calls to be dispatched from the same origin. The number of call must not"]
+					#[doc = "  exceed the constant: `batched_calls_limit` (available in constant metadata)."]
+					#[doc = ""]
+					#[doc = "If origin is root then the calls are dispatch without checking origin filter. (This"]
+					#[doc = "includes bypassing `frame_system::Config::BaseCallFilter`)."]
+					#[doc = ""]
+					#[doc = "## Complexity"]
+					#[doc = "- O(C) where C is the number of calls to be batched."]
+					force_batch {
+						calls: ::subxt::ext::subxt_core::alloc::vec::Vec<
+							runtime_types::argon_node_runtime::RuntimeCall,
+						>,
+					},
+					#[codec(index = 5)]
+					#[doc = "Dispatch a function call with a specified weight."]
+					#[doc = ""]
+					#[doc = "This function does not check the weight of the call, and instead allows the"]
+					#[doc = "Root origin to specify the weight of the call."]
+					#[doc = ""]
+					#[doc = "The dispatch origin for this call must be _Root_."]
+					with_weight {
+						call: ::subxt::ext::subxt_core::alloc::boxed::Box<
+							runtime_types::argon_node_runtime::RuntimeCall,
+						>,
+						weight: runtime_types::sp_weights::weight_v2::Weight,
+					},
+				}
+				#[derive(
+					:: subxt :: ext :: subxt_core :: ext :: codec :: Decode,
+					:: subxt :: ext :: subxt_core :: ext :: codec :: Encode,
+					:: subxt :: ext :: subxt_core :: ext :: scale_decode :: DecodeAsType,
+					:: subxt :: ext :: subxt_core :: ext :: scale_encode :: EncodeAsType,
+					Clone,
+					Debug,
+				)]
+				# [codec (crate = :: subxt :: ext :: subxt_core :: ext :: codec)]
+				#[decode_as_type(
+					crate_path = ":: subxt :: ext :: subxt_core :: ext :: scale_decode"
+				)]
+				#[encode_as_type(
+					crate_path = ":: subxt :: ext :: subxt_core :: ext :: scale_encode"
+				)]
+				#[doc = "The `Error` enum of this pallet."]
+				pub enum Error {
+					#[codec(index = 0)]
+					#[doc = "Too many calls batched."]
+					TooManyCalls,
+				}
+				#[derive(
+					:: subxt :: ext :: subxt_core :: ext :: codec :: Decode,
+					:: subxt :: ext :: subxt_core :: ext :: codec :: Encode,
+					:: subxt :: ext :: subxt_core :: ext :: scale_decode :: DecodeAsType,
+					:: subxt :: ext :: subxt_core :: ext :: scale_encode :: EncodeAsType,
+					Clone,
+					Debug,
+				)]
+				# [codec (crate = :: subxt :: ext :: subxt_core :: ext :: codec)]
+				#[decode_as_type(
+					crate_path = ":: subxt :: ext :: subxt_core :: ext :: scale_decode"
+				)]
+				#[encode_as_type(
+					crate_path = ":: subxt :: ext :: subxt_core :: ext :: scale_encode"
+				)]
+				#[doc = "The `Event` enum of this pallet"]
+				pub enum Event {
+					#[codec(index = 0)]
+					#[doc = "Batch of dispatches did not complete fully. Index of first failing dispatch given, as"]
+					#[doc = "well as the error."]
+					BatchInterrupted {
+						index: ::core::primitive::u32,
+						error: runtime_types::sp_runtime::DispatchError,
+					},
+					#[codec(index = 1)]
+					#[doc = "Batch of dispatches completed fully with no error."]
+					BatchCompleted,
+					#[codec(index = 2)]
+					#[doc = "Batch of dispatches completed but has errors."]
+					BatchCompletedWithErrors,
+					#[codec(index = 3)]
+					#[doc = "A single item within a Batch of dispatches has completed with no error."]
+					ItemCompleted,
+					#[codec(index = 4)]
+					#[doc = "A single item within a Batch of dispatches has completed with error."]
+					ItemFailed { error: runtime_types::sp_runtime::DispatchError },
+					#[codec(index = 5)]
+					#[doc = "A call was dispatched."]
+					DispatchedAs {
+						result:
+							::core::result::Result<(), runtime_types::sp_runtime::DispatchError>,
+					},
+				}
+			}
+		}
 		pub mod pallet_vaults {
 			use super::runtime_types;
 			pub mod pallet {
@@ -25647,6 +26481,18 @@ pub mod api {
 			pub struct OpaqueMetadata(
 				pub ::subxt::ext::subxt_core::alloc::vec::Vec<::core::primitive::u8>,
 			);
+			#[derive(
+				:: subxt :: ext :: subxt_core :: ext :: codec :: Decode,
+				:: subxt :: ext :: subxt_core :: ext :: codec :: Encode,
+				:: subxt :: ext :: subxt_core :: ext :: scale_decode :: DecodeAsType,
+				:: subxt :: ext :: subxt_core :: ext :: scale_encode :: EncodeAsType,
+				Clone,
+				Debug,
+			)]
+			# [codec (crate = :: subxt :: ext :: subxt_core :: ext :: codec)]
+			#[decode_as_type(crate_path = ":: subxt :: ext :: subxt_core :: ext :: scale_decode")]
+			#[encode_as_type(crate_path = ":: subxt :: ext :: subxt_core :: ext :: scale_encode")]
+			pub enum Void {}
 		}
 		pub mod sp_inherents {
 			use super::runtime_types;

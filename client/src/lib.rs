@@ -27,7 +27,7 @@ use tracing::warn;
 use argon_primitives::{AccountId, BlockNumber, Nonce};
 pub use spec::api;
 
-use crate::api::{share_balances, storage, system};
+use crate::api::{ownership, storage, system};
 
 pub mod conversion;
 pub mod signer;
@@ -190,18 +190,18 @@ impl MainchainClient {
 	pub async fn get_argons(
 		&self,
 		account_id: &AccountId32,
-	) -> anyhow::Result<share_balances::storage::types::account::Account> {
+	) -> anyhow::Result<ownership::storage::types::account::Account> {
 		let account = self.get_account(account_id).await?;
 		Ok(account.data)
 	}
 
-	pub async fn get_shares(
+	pub async fn get_ownership(
 		&self,
 		account_id: &AccountId32,
-	) -> anyhow::Result<share_balances::storage::types::account::Account> {
+	) -> anyhow::Result<ownership::storage::types::account::Account> {
 		let account_id32 = account_id_to_subxt(account_id);
 		let balance = self
-			.fetch_storage(&storage().share_balances().account(account_id32), None)
+			.fetch_storage(&storage().ownership().account(account_id32), None)
 			.await?
 			.ok_or_else(|| anyhow!("No record found for account {:?}", &account_id))?;
 		Ok(balance)

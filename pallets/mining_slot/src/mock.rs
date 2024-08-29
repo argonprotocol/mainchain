@@ -22,8 +22,8 @@ frame_support::construct_runtime!(
 	{
 		System: frame_system,
 		MiningSlots: pallet_mining_slot,
-		ArgonBalances: pallet_balances::<Instance1>,
-		ShareBalances: pallet_balances::<Instance2>,
+		Balances: pallet_balances::<Instance1>,
+		Ownership: pallet_balances::<Instance2>,
 	}
 );
 
@@ -67,13 +67,13 @@ impl pallet_balances::Config<ArgonToken> for Test {
 }
 
 pub fn set_ownership(account_id: u64, amount: Balance) {
-	let _ = ShareBalances::make_free_balance_be(&account_id, amount);
-	drop(ShareBalances::issue(amount));
+	let _ = Ownership::make_free_balance_be(&account_id, amount);
+	drop(Ownership::issue(amount));
 }
 
 pub fn set_argons(account_id: u64, amount: Balance) {
-	let _ = ArgonBalances::make_free_balance_be(&account_id, amount);
-	drop(ArgonBalances::issue(amount));
+	let _ = Balances::make_free_balance_be(&account_id, amount);
+	drop(Balances::issue(amount));
 }
 
 pub(crate) type SharesToken = pallet_balances::Instance2;
@@ -138,7 +138,7 @@ impl pallet_mining_slot::Config for Test {
 	type MaxCohortSize = MaxCohortSize;
 	type TargetBidsPerSlot = TargetBidsPerSlot;
 	type MaxMiners = MaxMiners;
-	type OwnershipCurrency = ShareBalances;
+	type OwnershipCurrency = Ownership;
 	type RuntimeHoldReason = RuntimeHoldReason;
 	type OwnershipPercentAdjustmentDamper = OwnershipPercentAdjustmentDamper;
 	type Balance = Balance;

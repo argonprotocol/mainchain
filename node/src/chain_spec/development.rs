@@ -43,11 +43,11 @@ pub fn development_config() -> Result<ChainSpec, String> {
 		get_account_id_from_seed::<sr25519::Public>("Eve"),
 		// Pre-funded accounts
 		vec![
-			get_account_id_from_seed::<sr25519::Public>("Alice"),
-			get_account_id_from_seed::<sr25519::Public>("Bob"),
-			get_account_id_from_seed::<sr25519::Public>("Ferdie"),
-			get_account_id_from_seed::<sr25519::Public>("Eve"),
-			get_account_id_from_seed::<sr25519::Public>("Dave"),
+			(get_account_id_from_seed::<sr25519::Public>("Alice"), 100_000_000),
+			(get_account_id_from_seed::<sr25519::Public>("Bob"), 100_000_000),
+			(get_account_id_from_seed::<sr25519::Public>("Ferdie"), 100_000_000),
+			(get_account_id_from_seed::<sr25519::Public>("Eve"), 100_000_000),
+			(get_account_id_from_seed::<sr25519::Public>("Dave"), 100_000_000),
 		],
 		500,
 		(TICK_MILLIS * HASHES_PER_SECOND / 1_000) as ComputeDifficulty,

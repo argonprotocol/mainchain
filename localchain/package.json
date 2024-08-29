@@ -1,6 +1,6 @@
 {
   "name": "@argonprotocol/localchain",
-  "version": "0.0.2",
+  "version": "0.0.3",
   "description": "A nodejs binding to the Argon Localchain",
   "bin": "cli.js",
   "publishConfig": {
@@ -23,6 +23,11 @@
   "license": "MIT",
   "main": "index.js",
   "types": "index.d.ts",
+  "files": [
+    "index.js",
+    "index.d.ts",
+    "cli.js"
+  ],
   "napi": {
     "binaryName": "localchain",
     "packageName": "@argonprotocol/localchain",
@@ -35,7 +40,7 @@
     ]
   },
   "devDependencies": {
-    "@argonprotocol/mainchain": "0.0.2",
+    "@argonprotocol/mainchain": "0.0.3",
     "@napi-rs/cli": "3.0.0-alpha.55",
     "@polkadot/util": "^13.0.2",
     "@polkadot/util-crypto": "^13.0.2",

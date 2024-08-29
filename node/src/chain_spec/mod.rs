@@ -63,7 +63,7 @@ pub(crate) fn testnet_genesis(
 	bitcoin_network: BitcoinNetwork,
 	bitcoin_tip_operator: AccountId,
 	price_index_operator: AccountId,
-	endowed_accounts: Vec<AccountId>,
+	endowed_accounts: Vec<(AccountId, Balance)>,
 	initial_vote_minimum: VoteMinimum,
 	initial_difficulty: ComputeDifficulty,
 	tick_millis: u64,
@@ -84,11 +84,8 @@ pub(crate) fn testnet_genesis(
 	};
 
 	serde_json::json!({
-		"argonBalances": {
-			"balances": endowed_accounts.iter().cloned().map(|k| (k, 100_000_000)).collect::<Vec<_>>(),
-		},
-		"shareBalances": {
-			"balances": endowed_accounts.iter().cloned().map(|k| (k, 10_000)).collect::<Vec<_>>(),
+		"balances": {
+			"balances": endowed_accounts,
 		},
 		"bonds": {
 			"minimumBitcoinBondSatoshis": minimum_bitcoin_bond_satoshis

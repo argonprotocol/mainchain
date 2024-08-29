@@ -20,6 +20,16 @@ pub fn testnet_config() -> Result<ChainSpec, String> {
 
 	const HASHES_PER_SECOND: u64 = 200;
 	const TICK_MILLIS: u64 = 60_000;
+	let sudo_account = get_account_id_from_seed::<sr25519::Public>("Alice");
+	let bitcoin_oracle = get_account_id_from_seed::<sr25519::Public>("Dave");
+	let price_oracle = get_account_id_from_seed::<sr25519::Public>("Eve");
+
+	let notary_account = get_account_id_from_seed::<sr25519::Public>("Ferdie");
+	let notary_public = get_from_seed::<NotaryPublic>("Ferdie//notary");
+
+	let miner_zero = get_account_id_from_seed::<sr25519::Public>("Alice");
+	let miner_zero_keys = authority_keys_from_seed("Alice");
+
 	Ok(ChainSpec::builder(
 		WASM_BINARY.ok_or_else(|| "Wasm not available".to_string())?,
 		None,
@@ -37,33 +47,29 @@ pub fn testnet_config() -> Result<ChainSpec, String> {
 	])
 	.with_genesis_config_patch(testnet_genesis(
 		// Initial BlockSeal authorities
-		vec![(
-			get_account_id_from_seed::<sr25519::Public>("Alice"),
-			authority_keys_from_seed("Alice"),
-		)],
+		vec![(miner_zero, miner_zero_keys)],
 		// Sudo account
-		get_account_id_from_seed::<sr25519::Public>("Alice"),
+		sudo_account.clone(),
 		BitcoinNetwork::Testnet,
 		// Bitcoin utxo tip operator
-		get_account_id_from_seed::<sr25519::Public>("Dave"),
+		bitcoin_oracle.clone(),
 		// Price index operator
-		get_account_id_from_seed::<sr25519::Public>("Eve"),
+		price_oracle.clone(),
 		// Pre-funded accounts
 		vec![
-			get_account_id_from_seed::<sr25519::Public>("Alice"),
-			get_account_id_from_seed::<sr25519::Public>("Bob"),
-			get_account_id_from_seed::<sr25519::Public>("Charlie"),
-			get_account_id_from_seed::<sr25519::Public>("Dave"),
-			get_account_id_from_seed::<sr25519::Public>("Eve"),
-			get_account_id_from_seed::<sr25519::Public>("Ferdie"),
-			get_account_id_from_seed::<sr25519::Public>("Ferdie//notary"),
+			// funds for the sudo account
+			(sudo_account, 10_000),
+			// basic funds so an oracle can submit a price
+			(bitcoin_oracle, 1_000),
+			// oracle funds
+			(price_oracle, 1_000),
 		],
 		500,
 		((TICK_MILLIS / 2) * HASHES_PER_SECOND / 1_000) as ComputeDifficulty,
 		TICK_MILLIS,
 		vec![GenesisNotary {
-			account_id: get_account_id_from_seed::<sr25519::Public>("Ferdie"),
-			public: get_from_seed::<NotaryPublic>("Ferdie//notary"),
+			account_id: notary_account,
+			public: notary_public,
 			hosts: vec!["wss://notary1.testnet.argonprotocol.org".to_string().into()],
 			name: "Argon Foundation".into(),
 		}],
@@ -71,7 +77,7 @@ pub fn testnet_config() -> Result<ChainSpec, String> {
 		MiningSlotConfig {
 			blocks_before_bid_end_for_vrf_close: 200,
 			blocks_between_slots: 1440,
-			slot_bidding_start_block: 14400,
+			slot_bidding_start_block: 0,
 		},
 		5000, // 0.00006 avail in testnet faucet, need 1k for fees
 	))

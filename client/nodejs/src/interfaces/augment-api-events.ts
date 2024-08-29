@@ -15,7 +15,7 @@ export type __AugmentedEvent<ApiType extends ApiTypes> = AugmentedEvent<ApiType>
 
 declare module '@polkadot/api-base/types/events' {
   interface AugmentedEvents<ApiType extends ApiTypes> {
-    argonBalances: {
+    balances: {
       /**
        * A balance was set by root.
        **/
@@ -119,9 +119,9 @@ declare module '@polkadot/api-base/types/events' {
     };
     blockRewards: {
       RewardCreated: AugmentedEvent<ApiType, [maturationBlock: u32, rewards: Vec<ArgonPrimitivesBlockSealBlockPayout>], { maturationBlock: u32, rewards: Vec<ArgonPrimitivesBlockSealBlockPayout> }>;
-      RewardCreateError: AugmentedEvent<ApiType, [accountId: AccountId32, argons: Option<u128>, shares: Option<u128>, error: SpRuntimeDispatchError], { accountId: AccountId32, argons: Option<u128>, shares: Option<u128>, error: SpRuntimeDispatchError }>;
+      RewardCreateError: AugmentedEvent<ApiType, [accountId: AccountId32, argons: Option<u128>, ownership: Option<u128>, error: SpRuntimeDispatchError], { accountId: AccountId32, argons: Option<u128>, ownership: Option<u128>, error: SpRuntimeDispatchError }>;
       RewardUnlocked: AugmentedEvent<ApiType, [rewards: Vec<ArgonPrimitivesBlockSealBlockPayout>], { rewards: Vec<ArgonPrimitivesBlockSealBlockPayout> }>;
-      RewardUnlockError: AugmentedEvent<ApiType, [accountId: AccountId32, argons: Option<u128>, shares: Option<u128>, error: SpRuntimeDispatchError], { accountId: AccountId32, argons: Option<u128>, shares: Option<u128>, error: SpRuntimeDispatchError }>;
+      RewardUnlockError: AugmentedEvent<ApiType, [accountId: AccountId32, argons: Option<u128>, ownership: Option<u128>, error: SpRuntimeDispatchError], { accountId: AccountId32, argons: Option<u128>, ownership: Option<u128>, error: SpRuntimeDispatchError }>;
     };
     blockSealSpec: {
       ComputeDifficultyAdjusted: AugmentedEvent<ApiType, [expectedBlockTime: u64, actualBlockTime: u64, startDifficulty: u128, newDifficulty: u128], { expectedBlockTime: u64, actualBlockTime: u64, startDifficulty: u128, newDifficulty: u128 }>;
@@ -270,44 +270,7 @@ declare module '@polkadot/api-base/types/events' {
        **/
       Offence: AugmentedEvent<ApiType, [kind: U8aFixed, timeslot: Bytes], { kind: U8aFixed, timeslot: Bytes }>;
     };
-    priceIndex: {
-      /**
-       * Event emitted when a new price index is submitted
-       **/
-      NewIndex: AugmentedEvent<ApiType, []>;
-      OperatorChanged: AugmentedEvent<ApiType, [operatorId: AccountId32], { operatorId: AccountId32 }>;
-    };
-    proxy: {
-      /**
-       * An announcement was placed to make a call in the future.
-       **/
-      Announced: AugmentedEvent<ApiType, [real: AccountId32, proxy: AccountId32, callHash: H256], { real: AccountId32, proxy: AccountId32, callHash: H256 }>;
-      /**
-       * A proxy was added.
-       **/
-      ProxyAdded: AugmentedEvent<ApiType, [delegator: AccountId32, delegatee: AccountId32, proxyType: ArgonNodeRuntimeProxyType, delay: u32], { delegator: AccountId32, delegatee: AccountId32, proxyType: ArgonNodeRuntimeProxyType, delay: u32 }>;
-      /**
-       * A proxy was executed correctly, with the given.
-       **/
-      ProxyExecuted: AugmentedEvent<ApiType, [result: Result<Null, SpRuntimeDispatchError>], { result: Result<Null, SpRuntimeDispatchError> }>;
-      /**
-       * A proxy was removed.
-       **/
-      ProxyRemoved: AugmentedEvent<ApiType, [delegator: AccountId32, delegatee: AccountId32, proxyType: ArgonNodeRuntimeProxyType, delay: u32], { delegator: AccountId32, delegatee: AccountId32, proxyType: ArgonNodeRuntimeProxyType, delay: u32 }>;
-      /**
-       * A pure account has been created by new proxy with given
-       * disambiguation index and proxy type.
-       **/
-      PureCreated: AugmentedEvent<ApiType, [pure: AccountId32, who: AccountId32, proxyType: ArgonNodeRuntimeProxyType, disambiguationIndex: u16], { pure: AccountId32, who: AccountId32, proxyType: ArgonNodeRuntimeProxyType, disambiguationIndex: u16 }>;
-    };
-    session: {
-      /**
-       * New session has happened. Note that the argument is the session index, not the
-       * block number as the type might suggest.
-       **/
-      NewSession: AugmentedEvent<ApiType, [sessionIndex: u32], { sessionIndex: u32 }>;
-    };
-    shareBalances: {
+    ownership: {
       /**
        * A balance was set by root.
        **/
@@ -399,6 +362,43 @@ declare module '@polkadot/api-base/types/events' {
        **/
       Withdraw: AugmentedEvent<ApiType, [who: AccountId32, amount: u128], { who: AccountId32, amount: u128 }>;
     };
+    priceIndex: {
+      /**
+       * Event emitted when a new price index is submitted
+       **/
+      NewIndex: AugmentedEvent<ApiType, []>;
+      OperatorChanged: AugmentedEvent<ApiType, [operatorId: AccountId32], { operatorId: AccountId32 }>;
+    };
+    proxy: {
+      /**
+       * An announcement was placed to make a call in the future.
+       **/
+      Announced: AugmentedEvent<ApiType, [real: AccountId32, proxy: AccountId32, callHash: H256], { real: AccountId32, proxy: AccountId32, callHash: H256 }>;
+      /**
+       * A proxy was added.
+       **/
+      ProxyAdded: AugmentedEvent<ApiType, [delegator: AccountId32, delegatee: AccountId32, proxyType: ArgonNodeRuntimeProxyType, delay: u32], { delegator: AccountId32, delegatee: AccountId32, proxyType: ArgonNodeRuntimeProxyType, delay: u32 }>;
+      /**
+       * A proxy was executed correctly, with the given.
+       **/
+      ProxyExecuted: AugmentedEvent<ApiType, [result: Result<Null, SpRuntimeDispatchError>], { result: Result<Null, SpRuntimeDispatchError> }>;
+      /**
+       * A proxy was removed.
+       **/
+      ProxyRemoved: AugmentedEvent<ApiType, [delegator: AccountId32, delegatee: AccountId32, proxyType: ArgonNodeRuntimeProxyType, delay: u32], { delegator: AccountId32, delegatee: AccountId32, proxyType: ArgonNodeRuntimeProxyType, delay: u32 }>;
+      /**
+       * A pure account has been created by new proxy with given
+       * disambiguation index and proxy type.
+       **/
+      PureCreated: AugmentedEvent<ApiType, [pure: AccountId32, who: AccountId32, proxyType: ArgonNodeRuntimeProxyType, disambiguationIndex: u16], { pure: AccountId32, who: AccountId32, proxyType: ArgonNodeRuntimeProxyType, disambiguationIndex: u16 }>;
+    };
+    session: {
+      /**
+       * New session has happened. Note that the argument is the session index, not the
+       * block number as the type might suggest.
+       **/
+      NewSession: AugmentedEvent<ApiType, [sessionIndex: u32], { sessionIndex: u32 }>;
+    };
     sudo: {
       /**
        * The sudo key has been updated.
@@ -463,6 +463,33 @@ declare module '@polkadot/api-base/types/events' {
        * This pallet, or a specific call is now unpaused.
        **/
       CallUnpaused: AugmentedEvent<ApiType, [fullName: ITuple<[Bytes, Bytes]>], { fullName: ITuple<[Bytes, Bytes]> }>;
+    };
+    utility: {
+      /**
+       * Batch of dispatches completed fully with no error.
+       **/
+      BatchCompleted: AugmentedEvent<ApiType, []>;
+      /**
+       * Batch of dispatches completed but has errors.
+       **/
+      BatchCompletedWithErrors: AugmentedEvent<ApiType, []>;
+      /**
+       * Batch of dispatches did not complete fully. Index of first failing dispatch given, as
+       * well as the error.
+       **/
+      BatchInterrupted: AugmentedEvent<ApiType, [index: u32, error: SpRuntimeDispatchError], { index: u32, error: SpRuntimeDispatchError }>;
+      /**
+       * A call was dispatched.
+       **/
+      DispatchedAs: AugmentedEvent<ApiType, [result: Result<Null, SpRuntimeDispatchError>], { result: Result<Null, SpRuntimeDispatchError> }>;
+      /**
+       * A single item within a Batch of dispatches has completed with no error.
+       **/
+      ItemCompleted: AugmentedEvent<ApiType, []>;
+      /**
+       * A single item within a Batch of dispatches has completed with error.
+       **/
+      ItemFailed: AugmentedEvent<ApiType, [error: SpRuntimeDispatchError], { error: SpRuntimeDispatchError }>;
     };
     vaults: {
       VaultBitcoinXpubChange: AugmentedEvent<ApiType, [vaultId: u32], { vaultId: u32 }>;

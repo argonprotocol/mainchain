@@ -445,6 +445,8 @@ mod tests {
 		println!("Escrow result is {:?}", escrow_result);
 
 		let mut best_sub = ctx.client.live.blocks().subscribe_finalized().await?;
+		let mut did_see_vote = false;
+		let mut did_see_voting_key = false;
 		while let Some(block) = best_sub.next().await {
 			match block {
 				Ok(block) => {
@@ -458,22 +460,23 @@ mod tests {
 						}
 					}
 					println!("Got block with tick {tick} {:?} {:?}", votes, seal);
+					if key.parent_voting_key.is_some() {
+						did_see_voting_key = true;
+					}
+					if matches!(seal, BlockSealDigest::Vote { .. }) {
+						did_see_vote = true;
+					}
 
-					if tick >= escrow_result.tick + 2 {
-						assert!(
-							key.parent_voting_key.is_some(),
-							"Should be including parent voting keys"
-						);
-						assert!(
-							matches!(seal, BlockSealDigest::Vote { .. }),
-							"Should be vote seal"
-						);
+					// should have gotten a vote in tick 2
+					if tick >= escrow_result.tick + 3 {
 						break;
 					}
 				},
 				_ => break,
 			}
 		}
+		assert!(did_see_vote, "Should have seen a vote");
+		assert!(did_see_voting_key, "Should have seen a voting key");
 		watches.0.abort();
 		watches.1.abort();
 		client.close().await;

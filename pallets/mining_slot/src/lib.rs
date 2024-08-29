@@ -57,11 +57,11 @@ const LOG_TARGET: &str = "runtime::mining_slot";
 /// When a new Slot begins, the Miners with the corresponding Slot indices will be replaced with
 /// the new cohort members (or emptied out).
 ///
-/// To be eligible for mining, you must bond a percent of the total supply of ownership shares. A
+/// To be eligible for mining, you must bond a percent of the total supply of ownership tokens. A
 /// `MiningBond` of locked Argons will allow operators to out-bid others for cohort membership. The
 /// percent is configured to aim for `TargetBidsPerSlot`, with a maximum change in ownership
-/// shares needed per slot capped at `OwnershipPercentAdjustmentDamper` (NOTE: this percent is the
-/// max increase or reduction in the amount of shares issued).
+/// tokens needed per slot capped at `OwnershipPercentAdjustmentDamper` (NOTE: this percent is the
+/// max increase or reduction in the amount of ownership issued).
 ///
 /// Options are provided to lease a bond from a fund (see the bond pallet).
 ///
