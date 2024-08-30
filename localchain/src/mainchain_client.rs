@@ -324,10 +324,10 @@ impl MainchainClient {
     })
   }
 
-  pub async fn get_shares(&self, address: String) -> Result<BalancesAccountData> {
+  pub async fn get_ownership(&self, address: String) -> Result<BalancesAccountData> {
     let account_id32 = subxt::utils::AccountId32::from_str(&address).map_err(|e| anyhow!(e))?;
     let balance = self
-      .fetch_storage(&storage().share_balances().account(account_id32), None)
+      .fetch_storage(&storage().ownership().account(account_id32), None)
       .await?
       .ok_or_else(|| anyhow!("No record found for address {}", address))?;
     Ok(BalancesAccountData {
@@ -771,7 +771,7 @@ pub mod napi_ext {
 
     #[napi(js_name = "getShares")]
     pub async fn get_shares_napi(&self, address: String) -> napi::Result<BalancesAccountData> {
-      let account = self.get_shares(address).await.napi_ok()?;
+      let account = self.get_ownership(address).await.napi_ok()?;
       Ok(BalancesAccountData {
         free: account.free.into(),
         reserved: account.reserved.into(),

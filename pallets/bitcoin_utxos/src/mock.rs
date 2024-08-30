@@ -30,7 +30,6 @@ parameter_types! {
 	pub const MaxPendingConfirmationUtxos: u32 = 10;
 
 	pub const MaxPendingConfirmationBlocks: u32 = 10;
-	pub const MaxUtxoBirthBlocksOld: u32 = 10;
 	pub static UtxoVerifiedCallback: Option<fn(UtxoId) -> DispatchResult> = None;
 }
 
@@ -63,7 +62,6 @@ impl pallet_bitcoin_utxos::Config for Test {
 	type MaxPendingConfirmationUtxos = MaxPendingConfirmationUtxos;
 	type MaxPendingConfirmationBlocks = MaxPendingConfirmationBlocks;
 	type EventHandler = StaticEventHandler;
-	type MaxUtxoBirthBlocksOld = MaxUtxoBirthBlocksOld;
 }
 
 pub fn new_test_ext() -> sp_io::TestExternalities {

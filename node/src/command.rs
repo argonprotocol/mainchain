@@ -41,7 +41,11 @@ impl SubstrateCli for Cli {
 		Ok(match id {
 			"dev" => Box::new(chain_spec::development_config()?),
 			"" | "local" => Box::new(chain_spec::local_testnet_config()?),
-			"testnet" => Box::new(chain_spec::testnet_config()?),
+			// This creates a whole new, incompatible genesis, so label it as such
+			"fresh-testnet" => Box::new(chain_spec::testnet_config()?),
+			"testnet" => Box::new(chain_spec::ChainSpec::from_json_bytes(
+				&include_bytes!("./chain_spec/testnet1.json")[..],
+			)?),
 			path =>
 				Box::new(chain_spec::ChainSpec::from_json_file(std::path::PathBuf::from(path))?),
 		})
@@ -53,14 +57,6 @@ pub fn run() -> sc_cli::Result<()> {
 	let cli = Cli::from_args();
 
 	let bitcoin_rpc_url = cli.bitcoin_rpc_url.clone().unwrap_or_default();
-	if matches!(cli.subcommand, None) ||
-		!matches!(cli.subcommand, Some(Subcommand::Key(_)) | Some(Subcommand::BuildSpec(_)))
-	{
-		if cli.bitcoin_rpc_url.is_none() {
-			eprintln!("Error: --bitcoin-rpc-url is required unless using the 'Key' or 'BuildSpec' subcommands.");
-			std::process::exit(1);
-		}
-	}
 
 	match &cli.subcommand {
 		Some(Subcommand::Key(cmd)) => cmd.run(&cli),
@@ -71,6 +67,9 @@ pub fn run() -> sc_cli::Result<()> {
 		Some(Subcommand::CheckBlock(cmd)) => {
 			let runner = cli.create_runner(cmd)?;
 			runner.async_run(|config| {
+				if bitcoin_rpc_url.is_empty() {
+					return Err("Bitcoin RPC URL is required for block validation".into());
+				}
 				let PartialComponents { client, task_manager, import_queue, .. } =
 					service::new_partial(&config, bitcoin_rpc_url)?;
 				Ok((cmd.run(client, import_queue), task_manager))
@@ -95,6 +94,9 @@ pub fn run() -> sc_cli::Result<()> {
 		Some(Subcommand::ImportBlocks(cmd)) => {
 			let runner = cli.create_runner(cmd)?;
 			runner.async_run(|config| {
+				if bitcoin_rpc_url.is_empty() {
+					return Err("Bitcoin RPC URL is required for block validation".into());
+				}
 				let PartialComponents { client, task_manager, import_queue, .. } =
 					service::new_partial(&config, bitcoin_rpc_url)?;
 				Ok((cmd.run(client, import_queue), task_manager))
@@ -118,7 +120,6 @@ pub fn run() -> sc_cli::Result<()> {
 		},
 		Some(Subcommand::Benchmark(cmd)) => {
 			let runner = cli.create_runner(cmd)?;
-			let bitcoin_rpc_url = bitcoin_rpc_url;
 
 			runner.sync_run(|config| {
 				// This switch needs to be in the client, since the client decides
@@ -195,6 +196,9 @@ pub fn run() -> sc_cli::Result<()> {
 		},
 		None => {
 			let runner = cli.create_runner(&cli.run.inner)?;
+			if bitcoin_rpc_url.is_empty() {
+				return Err("Bitcoin RPC URL is required to run a node".into());
+			}
 
 			let mut randomx_config = argon_randomx::Config::default();
 			if cli.run.randomx_flags.contains(&RandomxFlag::LargePages) {

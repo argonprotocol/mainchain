@@ -49,6 +49,9 @@ pub mod argon_utils;
 #[cfg(feature = "std")]
 pub mod keystore_helper;
 
+#[cfg(feature = "std")]
+pub mod git_version;
+
 /// An index to a block.
 pub type BlockNumber = u32;
 

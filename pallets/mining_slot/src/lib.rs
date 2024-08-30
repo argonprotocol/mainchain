@@ -57,11 +57,11 @@ const LOG_TARGET: &str = "runtime::mining_slot";
 /// When a new Slot begins, the Miners with the corresponding Slot indices will be replaced with
 /// the new cohort members (or emptied out).
 ///
-/// To be eligible for mining, you must bond a percent of the total supply of ownership shares. A
+/// To be eligible for mining, you must bond a percent of the total supply of ownership tokens. A
 /// `MiningBond` of locked Argons will allow operators to out-bid others for cohort membership. The
 /// percent is configured to aim for `TargetBidsPerSlot`, with a maximum change in ownership
-/// shares needed per slot capped at `OwnershipPercentAdjustmentDamper` (NOTE: this percent is the
-/// max increase or reduction in the amount of shares issued).
+/// tokens needed per slot capped at `OwnershipPercentAdjustmentDamper` (NOTE: this percent is the
+/// max increase or reduction in the amount of ownership issued).
 ///
 /// Options are provided to lease a bond from a fund (see the bond pallet).
 ///
@@ -922,8 +922,7 @@ impl<T: Config> Pallet<T> {
 			UniqueSaturatedInto::<u32>::unique_saturated_into(Self::get_mining_window_blocks());
 		let session_rotation_blocks =
 			UniqueSaturatedInto::<u32>::unique_saturated_into(Self::session_rotation_blocks());
-		let sessions_per_window = mining_window_blocks.saturating_div(session_rotation_blocks);
-		sessions_per_window
+		mining_window_blocks.saturating_div(session_rotation_blocks)
 	}
 }
 
@@ -1050,7 +1049,7 @@ impl<T: Config> frame_support::traits::EstimateNextSessionRotation<BlockNumberFo
 		// NOTE: we add one since we assume that the current block has already elapsed,
 		// i.e. when evaluating the last block in the session the progress should be 100%
 		// (0% is never returned).
-		let current = now % period.clone() + One::one();
+		let current = now % period + One::one();
 		let progress = Some(Permill::from_rational(current, period));
 
 		(progress, Zero::zero())

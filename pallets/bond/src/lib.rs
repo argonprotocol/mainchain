@@ -50,14 +50,14 @@ const LOG_TARGET: &str = "runtime::bond";
 /// _Unlocking a Bitcoin_
 /// A bitcoin owner will pre-create a transaction to unlock their UTXO and submit the sighash to
 /// this pallet. The vault operator has 10 days to publish a counter signature along with the public
-/// key. If the vault operator fails to do so, they will lose their ownership shares and all
+/// key. If the vault operator fails to do so, they will lose their ownership tokens and all
 /// underlying Bitcoin bonds. A user will be made whole via a governance vote.
 ///
 /// _Penalties_
 /// 1. If a UTXO is found to have moved before a bond expiration via the bitcoin network, the vault
 ///    will be penalized by the amount of the UTXOs' current value.
 /// 2. If a vault operator fails to counter-sign a transaction within 10 days, they will lose their
-///    ownership shares and all underlying Bitcoin bonds.
+///    ownership tokens and all underlying Bitcoin bonds.
 ///
 /// ** Mining Bonds: **
 ///
@@ -103,6 +103,7 @@ pub mod pallet {
 		FixedPointNumber, Saturating, TokenError,
 	};
 
+	use super::*;
 	use argon_bitcoin::{Amount, CosignScriptArgs, UnlockStep, UtxoUnlocker};
 	use argon_primitives::{
 		bitcoin::{
@@ -115,8 +116,6 @@ pub mod pallet {
 		BitcoinUtxoEvents, BitcoinUtxoTracker, BondId, PriceProvider, RewardShare,
 		UtxoBondedEvents, VaultId,
 	};
-
-	use super::*;
 
 	#[pallet::pallet]
 	pub struct Pallet<T>(_);
@@ -182,10 +181,6 @@ pub mod pallet {
 		#[pallet::constant]
 		type MaxConcurrentlyExpiringBonds: Get<u32>;
 
-		/// The minimum number of satoshis that can be bonded
-		#[pallet::constant]
-		type MinimumBitcoinBondSatoshis: Get<Satoshis>;
-
 		/// The number of bitcoin blocks a bitcoin bond is locked for
 		#[pallet::constant]
 		type BitcoinBondDurationBlocks: Get<BitcoinHeight>;
@@ -248,6 +243,10 @@ pub mod pallet {
 	#[pallet::storage]
 	pub(super) type UtxosCosignReleaseHeightById<T: Config> =
 		StorageMap<_, Twox64Concat, UtxoId, BlockNumberFor<T>, OptionQuery>;
+
+	/// The minimum number of satoshis that can be bonded
+	#[pallet::storage]
+	pub(super) type MinimumBitcoinBondSatoshis<T: Config> = StorageValue<_, Satoshis, ValueQuery>;
 
 	/// Stores Utxos that were not paid back in full
 	///
@@ -439,6 +438,22 @@ pub mod pallet {
 		}
 	}
 
+	#[pallet::genesis_config]
+	#[derive(frame_support::DefaultNoBound)]
+	pub struct GenesisConfig<T: Config> {
+		/// The minimum number of satoshis that can be bonded
+		pub minimum_bitcoin_bond_satoshis: Satoshis,
+		#[serde(skip)]
+		pub _phantom: PhantomData<T>,
+	}
+
+	#[pallet::genesis_build]
+	impl<T: Config> BuildGenesisConfig for GenesisConfig<T> {
+		fn build(&self) {
+			MinimumBitcoinBondSatoshis::<T>::put(self.minimum_bitcoin_bond_satoshis);
+		}
+	}
+
 	#[pallet::hooks]
 	impl<T: Config> Hooks<BlockNumberFor<T>> for Pallet<T> {
 		fn on_initialize(block_number: BlockNumberFor<T>) -> Weight {
@@ -505,7 +520,7 @@ pub mod pallet {
 			let account_id = ensure_signed(origin)?;
 
 			ensure!(
-				satoshis >= T::MinimumBitcoinBondSatoshis::get(),
+				satoshis >= MinimumBitcoinBondSatoshis::<T>::get(),
 				Error::<T>::InsufficientSatoshisBonded
 			);
 

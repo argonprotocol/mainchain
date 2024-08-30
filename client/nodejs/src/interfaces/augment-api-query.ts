@@ -17,7 +17,13 @@ export type __QueryableStorageEntry<ApiType extends ApiTypes> = QueryableStorage
 
 declare module '@polkadot/api-base/types/storage' {
   interface AugmentedQueries<ApiType extends ApiTypes> {
-    argonBalances: {
+    authorship: {
+      /**
+       * Author of current block.
+       **/
+      author: AugmentedQuery<ApiType, () => Observable<Option<AccountId32>>, []>;
+    };
+    balances: {
       /**
        * The Balances pallet example of storing the balance of an account.
        *
@@ -74,12 +80,6 @@ declare module '@polkadot/api-base/types/storage' {
        * The total units issued in the system.
        **/
       totalIssuance: AugmentedQuery<ApiType, () => Observable<u128>, []>;
-    };
-    authorship: {
-      /**
-       * Author of current block.
-       **/
-      author: AugmentedQuery<ApiType, () => Observable<Option<AccountId32>>, []>;
     };
     bitcoinUtxos: {
       /**
@@ -177,6 +177,10 @@ declare module '@polkadot/api-base/types/storage' {
        * Bonds by id
        **/
       bondsById: AugmentedQuery<ApiType, (arg: u64 | AnyNumber | Uint8Array) => Observable<Option<ArgonPrimitivesBond>>, [u64]>;
+      /**
+       * The minimum number of satoshis that can be bonded
+       **/
+      minimumBitcoinBondSatoshis: AugmentedQuery<ApiType, () => Observable<u64>, []>;
       /**
        * Completion of mining bonds, upon which funds are returned to the vault
        **/
@@ -375,64 +379,7 @@ declare module '@polkadot/api-base/types/storage' {
        **/
       reports: AugmentedQuery<ApiType, (arg: H256 | string | Uint8Array) => Observable<Option<SpStakingOffenceOffenceDetails>>, [H256]>;
     };
-    priceIndex: {
-      /**
-       * Stores the active price index
-       **/
-      current: AugmentedQuery<ApiType, () => Observable<Option<PalletPriceIndexPriceIndex>>, []>;
-      /**
-       * The price index operator account
-       **/
-      operator: AugmentedQuery<ApiType, () => Observable<Option<AccountId32>>, []>;
-    };
-    proxy: {
-      /**
-       * The announcements made by the proxy (key).
-       **/
-      announcements: AugmentedQuery<ApiType, (arg: AccountId32 | string | Uint8Array) => Observable<ITuple<[Vec<PalletProxyAnnouncement>, u128]>>, [AccountId32]>;
-      /**
-       * The set of account proxies. Maps the account which has delegated to the accounts
-       * which are being delegated to, together with the amount held on deposit.
-       **/
-      proxies: AugmentedQuery<ApiType, (arg: AccountId32 | string | Uint8Array) => Observable<ITuple<[Vec<PalletProxyProxyDefinition>, u128]>>, [AccountId32]>;
-    };
-    session: {
-      /**
-       * Current index of the session.
-       **/
-      currentIndex: AugmentedQuery<ApiType, () => Observable<u32>, []>;
-      /**
-       * Indices of disabled validators.
-       *
-       * The vec is always kept sorted so that we can find whether a given validator is
-       * disabled using binary search. It gets cleared when `on_session_ending` returns
-       * a new set of identities.
-       **/
-      disabledValidators: AugmentedQuery<ApiType, () => Observable<Vec<u32>>, []>;
-      /**
-       * The owner of a key. The key is the `KeyTypeId` + the encoded key.
-       **/
-      keyOwner: AugmentedQuery<ApiType, (arg: ITuple<[SpCoreCryptoKeyTypeId, Bytes]> | [SpCoreCryptoKeyTypeId | string | Uint8Array, Bytes | string | Uint8Array]) => Observable<Option<AccountId32>>, [ITuple<[SpCoreCryptoKeyTypeId, Bytes]>]>;
-      /**
-       * The next session keys for a validator.
-       **/
-      nextKeys: AugmentedQuery<ApiType, (arg: AccountId32 | string | Uint8Array) => Observable<Option<ArgonNodeRuntimeOpaqueSessionKeys>>, [AccountId32]>;
-      /**
-       * True if the underlying economic identities or weighting behind the validators
-       * has changed in the queued validator set.
-       **/
-      queuedChanged: AugmentedQuery<ApiType, () => Observable<bool>, []>;
-      /**
-       * The queued keys for the next session. When the next session begins, these keys
-       * will be used to determine the validator's session keys.
-       **/
-      queuedKeys: AugmentedQuery<ApiType, () => Observable<Vec<ITuple<[AccountId32, ArgonNodeRuntimeOpaqueSessionKeys]>>>, []>;
-      /**
-       * The current set of validators.
-       **/
-      validators: AugmentedQuery<ApiType, () => Observable<Vec<AccountId32>>, []>;
-    };
-    shareBalances: {
+    ownership: {
       /**
        * The Balances pallet example of storing the balance of an account.
        *
@@ -489,6 +436,63 @@ declare module '@polkadot/api-base/types/storage' {
        * The total units issued in the system.
        **/
       totalIssuance: AugmentedQuery<ApiType, () => Observable<u128>, []>;
+    };
+    priceIndex: {
+      /**
+       * Stores the active price index
+       **/
+      current: AugmentedQuery<ApiType, () => Observable<Option<PalletPriceIndexPriceIndex>>, []>;
+      /**
+       * The price index operator account
+       **/
+      operator: AugmentedQuery<ApiType, () => Observable<Option<AccountId32>>, []>;
+    };
+    proxy: {
+      /**
+       * The announcements made by the proxy (key).
+       **/
+      announcements: AugmentedQuery<ApiType, (arg: AccountId32 | string | Uint8Array) => Observable<ITuple<[Vec<PalletProxyAnnouncement>, u128]>>, [AccountId32]>;
+      /**
+       * The set of account proxies. Maps the account which has delegated to the accounts
+       * which are being delegated to, together with the amount held on deposit.
+       **/
+      proxies: AugmentedQuery<ApiType, (arg: AccountId32 | string | Uint8Array) => Observable<ITuple<[Vec<PalletProxyProxyDefinition>, u128]>>, [AccountId32]>;
+    };
+    session: {
+      /**
+       * Current index of the session.
+       **/
+      currentIndex: AugmentedQuery<ApiType, () => Observable<u32>, []>;
+      /**
+       * Indices of disabled validators.
+       *
+       * The vec is always kept sorted so that we can find whether a given validator is
+       * disabled using binary search. It gets cleared when `on_session_ending` returns
+       * a new set of identities.
+       **/
+      disabledValidators: AugmentedQuery<ApiType, () => Observable<Vec<u32>>, []>;
+      /**
+       * The owner of a key. The key is the `KeyTypeId` + the encoded key.
+       **/
+      keyOwner: AugmentedQuery<ApiType, (arg: ITuple<[SpCoreCryptoKeyTypeId, Bytes]> | [SpCoreCryptoKeyTypeId | string | Uint8Array, Bytes | string | Uint8Array]) => Observable<Option<AccountId32>>, [ITuple<[SpCoreCryptoKeyTypeId, Bytes]>]>;
+      /**
+       * The next session keys for a validator.
+       **/
+      nextKeys: AugmentedQuery<ApiType, (arg: AccountId32 | string | Uint8Array) => Observable<Option<ArgonNodeRuntimeOpaqueSessionKeys>>, [AccountId32]>;
+      /**
+       * True if the underlying economic identities or weighting behind the validators
+       * has changed in the queued validator set.
+       **/
+      queuedChanged: AugmentedQuery<ApiType, () => Observable<bool>, []>;
+      /**
+       * The queued keys for the next session. When the next session begins, these keys
+       * will be used to determine the validator's session keys.
+       **/
+      queuedKeys: AugmentedQuery<ApiType, () => Observable<Vec<ITuple<[AccountId32, ArgonNodeRuntimeOpaqueSessionKeys]>>>, []>;
+      /**
+       * The current set of validators.
+       **/
+      validators: AugmentedQuery<ApiType, () => Observable<Vec<AccountId32>>, []>;
     };
     sudo: {
       /**

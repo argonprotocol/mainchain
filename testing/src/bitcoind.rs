@@ -19,6 +19,7 @@ lazy_static! {
 }
 
 pub fn start_bitcoind() -> anyhow::Result<(BitcoinD, url::Url, bitcoin::Network)> {
+	let lock = BITCOIND_LOCK.lock().unwrap();
 	let path = env::temp_dir().join("argon_bitcoind_testing.lock");
 	let file = File::create_new(&path).or_else(|_| File::open(&path))?;
 	// Acquire the lock
@@ -30,7 +31,6 @@ pub fn start_bitcoind() -> anyhow::Result<(BitcoinD, url::Url, bitcoin::Network)
 	conf.args.push("-blockfilterindex");
 	conf.args.push("-txindex");
 
-	let lock = BITCOIND_LOCK.lock().unwrap();
 	println!("Bitcoin path {}", downloaded_exe_path().unwrap());
 	let bitcoind = match BitcoinD::with_conf(downloaded_exe_path().unwrap(), &conf) {
 		Ok(bitcoind) => bitcoind,
@@ -40,9 +40,9 @@ pub fn start_bitcoind() -> anyhow::Result<(BitcoinD, url::Url, bitcoin::Network)
 			return Err(anyhow!("Failed to start bitcoind: {:#?}", e));
 		},
 	};
-	drop(lock);
-	file.unlock().expect("Failed to unlock file");
 	let url = read_rpc_url(&bitcoind)?;
+	file.unlock().expect("Failed to unlock file");
+	drop(lock);
 	let network = bitcoind.client.get_blockchain_info().unwrap().chain;
 	Ok((bitcoind, url, network))
 }
@@ -109,6 +109,9 @@ pub fn add_wallet_address(bitcoind: &BitcoinD) -> Address {
 }
 
 pub fn add_blocks(bitcoind: &BitcoinD, count: u64, grant_to_address: &Address) {
+	// NOTE: if you get errors here on a Mac M1/M*, you may need to run `brew install sqlite`.
+	// There's a weird history of sqlite having massive slowdowns with bitcoind. It will use
+	// built-in homebrew version if available
 	bitcoind.client.generate_to_address(count, grant_to_address).unwrap();
 }
 

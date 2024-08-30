@@ -1,14 +1,16 @@
-use std::time::Duration;
-
+use anyhow::bail;
 use bitcoincore_rpc::{Auth, Client, RpcApi};
+use std::time::Duration;
 use tokio::time::sleep;
 
 use argon_client::{
-	api::{runtime_types::argon_primitives::bitcoin as bitcoin_primitives_subxt, tx},
+	api::{runtime_types::argon_primitives::bitcoin as bitcoin_primitives_subxt, storage, tx},
 	signer::Signer,
 	ArgonConfig, MainchainClient, ReconnectingClient,
 };
-use argon_primitives::bitcoin::H256Le;
+use argon_primitives::bitcoin::{BitcoinNetwork, H256Le};
+
+const CONFIRMATIONS: u64 = 6;
 
 pub async fn bitcoin_loop(
 	bitcoin_rpc_url: String,
@@ -22,26 +24,44 @@ pub async fn bitcoin_loop(
 	} else {
 		Auth::None
 	};
-	let client = Client::new(&bitcoin_rpc_url, auth)?;
+	let bitcoin_client = Client::new(&bitcoin_rpc_url, auth)?;
 	tracing::info!("Oracle Started. Connected to bitcoin at {}", bitcoin_rpc_url);
 
-	let mut last_tip = None;
+	let required_bitcoin_network: BitcoinNetwork = mainchain_client
+		.get()
+		.await?
+		.fetch_storage(&storage().bitcoin_utxos().bitcoin_network(), None)
+		.await?
+		.expect("Expected network")
+		.into();
+	let connected_bitcoin_network = bitcoin_client.get_blockchain_info()?.chain.into();
+	if required_bitcoin_network != connected_bitcoin_network {
+		bail!(
+			"Connected to incorrect bitcoin network. Expected {:?}, but connected to {:?}",
+			required_bitcoin_network,
+			connected_bitcoin_network
+		);
+	}
+
+	let mut last_confirmed_tip = None;
 	let account_id = signer.account_id();
 	loop {
-		let bitcoin_tip = client.get_best_block_hash()?;
-		if Some(bitcoin_tip) == last_tip {
+		let blockchain_info = bitcoin_client.get_block_count()?;
+		let bitcoin_confirmed_height = blockchain_info.saturating_sub(CONFIRMATIONS);
+
+		let bitcoin_tip = bitcoin_client.get_block_hash(bitcoin_confirmed_height)?;
+		if Some(bitcoin_tip) == last_confirmed_tip {
 			sleep(Duration::from_secs(10)).await;
 			continue;
 		}
-		last_tip = Some(bitcoin_tip);
-		let header = client.get_block_header_info(&bitcoin_tip)?;
-		tracing::info!("New bitcoin tip: {} {:?}", header.height, bitcoin_tip);
-		let bitcoin_height = header.height as u64;
+		last_confirmed_tip = Some(bitcoin_tip);
+
 		let bitcoin_tip: H256Le = bitcoin_tip.into();
 
-		let latest_block = tx()
-			.bitcoin_utxos()
-			.set_confirmed_block(bitcoin_height, bitcoin_primitives_subxt::H256Le(bitcoin_tip.0));
+		let latest_block = tx().bitcoin_utxos().set_confirmed_block(
+			bitcoin_confirmed_height,
+			bitcoin_primitives_subxt::H256Le(bitcoin_tip.0),
+		);
 
 		let client = mainchain_client.get().await?;
 		let nonce = client.get_account_nonce_subxt(&account_id).await?;
@@ -51,7 +71,10 @@ pub async fn bitcoin_loop(
 			.tx()
 			.sign_and_submit_then_watch(&latest_block, &signer, params)
 			.await?;
-		tracing::info!("Submitted bitcoin tip {bitcoin_height} with progress: {:?}", progress);
+		tracing::info!(
+			"Submitted bitcoin tip {bitcoin_confirmed_height} with progress: {:?}",
+			progress
+		);
 		MainchainClient::wait_for_ext_in_block(progress).await?;
 	}
 }
@@ -110,17 +133,24 @@ mod tests {
 		let handle = tokio::spawn(task);
 
 		let mut block_watch = argon_node.client.live.blocks().subscribe_best().await.unwrap();
-		while let Some(Ok(block)) = block_watch.next().await {
-			if block.number() == 5 {
+		while let Some(Ok(_block)) = block_watch.next().await {
+			if bitcoind.client.get_blockchain_info().unwrap().blocks == 10 {
 				assert!(get_confirmed_block(&argon_node.client).await.is_some());
 				break;
 			}
+			bitcoind.client.generate_to_address(1, &address).unwrap();
 		}
 
-		assert_eq!(get_confirmed_block(&argon_node.client).await.unwrap().block_height, 5);
+		let block = get_confirmed_block(&argon_node.client).await.unwrap();
+		assert!(block.block_height >= 1);
 		assert_eq!(
-			get_confirmed_block(&argon_node.client).await.unwrap().block_hash.0,
-			bitcoind.client.get_best_block_hash().unwrap().as_raw_hash().as_ref()
+			block.block_hash.0,
+			bitcoind
+				.client
+				.get_block_hash(block.block_height)
+				.unwrap()
+				.as_raw_hash()
+				.as_ref()
 		);
 
 		handle.abort();

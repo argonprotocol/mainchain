@@ -5,7 +5,7 @@
 use crate::service::FullClient;
 
 use argon_node_runtime as runtime;
-use runtime::{AccountId, ArgonBalancesCall, Balance, SystemCall};
+use runtime::{AccountId, Balance, BalancesCall, SystemCall};
 use sc_cli::Result;
 use sc_client_api::BlockBackend;
 use sp_core::{Encode, Pair};
@@ -82,11 +82,8 @@ impl frame_benchmarking_cli::ExtrinsicBuilder for TransferKeepAliveBuilder {
 		let extrinsic: OpaqueExtrinsic = create_benchmark_extrinsic(
 			self.client.as_ref(),
 			acc,
-			ArgonBalancesCall::transfer_keep_alive {
-				dest: self.dest.clone().into(),
-				value: self.value,
-			}
-			.into(),
+			BalancesCall::transfer_keep_alive { dest: self.dest.clone().into(), value: self.value }
+				.into(),
 			nonce,
 		)
 		.into();

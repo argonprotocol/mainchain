@@ -332,7 +332,7 @@ mod tests {
 	async fn test_balance_change_and_get_proof(pool: PgPool) -> anyhow::Result<()> {
 		let _ = tracing_subscriber::fmt::try_init();
 		let ticker = Ticker::new(60_000, Utc::now().timestamp_millis() as u64, 2);
-		let notary = NotaryServer::start(1, pool.clone(), ticker.clone(), "127.0.0.1:0").await?;
+		let notary = NotaryServer::start(1, pool.clone(), ticker, "127.0.0.1:0").await?;
 		assert!(notary.addr.port() > 0);
 
 		let mut db = notary.pool.acquire().await?;

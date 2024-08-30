@@ -21,3 +21,4 @@ scripts
 migrations
 package.build.json
 .env
+artifacts

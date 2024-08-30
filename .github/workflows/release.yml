@@ -22,7 +22,6 @@ defaults:
   run:
     shell: bash
 
-
 jobs:
   create-release:
     runs-on: ubuntu-22.04
@@ -35,7 +34,7 @@ jobs:
       - uses: taiki-e/create-gh-release-action@v1
         with:
           title: $version
-          draft: true
+          draft: false
           token: ${{ secrets.GITHUB_TOKEN }}
 
   upload-assets:
@@ -75,7 +74,14 @@ jobs:
 
       - name: Install mac dependencies
         if: startsWith(matrix.os, 'macos')
-        run: brew install protobuf
+        run: |
+          brew install protobuf llvm
+          # need to use more modern llvm than what is on mac to build secp256k1 for wasm
+          echo "LDFLAGS=-L/opt/homebrew/opt/llvm/lib" >> $GITHUB_ENV
+          echo "CPPFLAGS=-I/opt/homebrew/opt/llvm/include" >> $GITHUB_ENV
+          echo "RUSTFLAGS=-C linker=/opt/homebrew/opt/llvm/bin/clang" >> $GITHUB_ENV
+          echo "CC=/opt/homebrew/opt/llvm/bin/clang" >> $GITHUB_ENV
+          echo "CXX=/opt/homebrew/opt/llvm/bin/clang++" >> $GITHUB_ENV
 
       - uses: rui314/setup-mold@v1
 
@@ -84,6 +90,7 @@ jobs:
         with:
           toolchain: stable
           targets: wasm32-unknown-unknown
+          components: rust-src
 
       - uses: taiki-e/setup-cross-toolchain-action@v1
         with:
@@ -99,7 +106,7 @@ jobs:
           token: ${{ secrets.GITHUB_TOKEN }}
 
       - uses: taiki-e/upload-rust-binary-action@v1
-        if: (!startsWith(matrix.os, 'windows'))
+        if: (matrix.os == '' || startsWith(matrix.os, 'ubuntu'))
         with:
           bin: argon-notary
           target: ${{ matrix.target }}
@@ -117,7 +124,7 @@ jobs:
         if: (matrix.target == 'x86_64-unknown-linux-gnu')
         with:
           bin: argon-oracle
-          # TODO: deactivate this feature when we have price liquidity
+          # TODO: deactivate building in this feature when we have price liquidity
           features: simulated-prices
           target: ${{ matrix.target }}
           archive: $bin-$tag-$target

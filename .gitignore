@@ -15,6 +15,7 @@ node_modules
 /localchain/test.db-wal
 /localchain/test.db
 /client/nodejs/lib
+!/client/nodejs/lib/cjs/package.json
 /.run/
 /localchain/apple/Localchain/*.a
 /.btcdeb_history

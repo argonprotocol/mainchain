@@ -1,13 +1,14 @@
 use sc_service::{ChainType, Properties};
 use sp_core::sr25519;
 
-use argon_node_runtime::WASM_BINARY;
-use argon_primitives::{
-	bitcoin::BitcoinNetwork, block_seal::MiningSlotConfig, ComputeDifficulty, ADDRESS_PREFIX,
-};
-
 use crate::chain_spec::{
 	authority_keys_from_seed, get_account_id_from_seed, testnet_genesis, ChainSpec,
+};
+use argon_node_runtime::WASM_BINARY;
+use argon_primitives::{
+	bitcoin::{BitcoinNetwork, SATOSHIS_PER_BITCOIN},
+	block_seal::MiningSlotConfig,
+	ComputeDifficulty, ADDRESS_PREFIX,
 };
 
 pub fn development_config() -> Result<ChainSpec, String> {
@@ -23,8 +24,8 @@ pub fn development_config() -> Result<ChainSpec, String> {
 		WASM_BINARY.ok_or_else(|| "Development wasm not available".to_string())?,
 		None,
 	)
-	.with_name("Development")
-	.with_id("dev")
+	.with_name("Argon Development")
+	.with_id("argon-dev")
 	.with_chain_type(ChainType::Development)
 	.with_properties(properties)
 	.with_genesis_config_patch(testnet_genesis(
@@ -42,11 +43,11 @@ pub fn development_config() -> Result<ChainSpec, String> {
 		get_account_id_from_seed::<sr25519::Public>("Eve"),
 		// Pre-funded accounts
 		vec![
-			get_account_id_from_seed::<sr25519::Public>("Alice"),
-			get_account_id_from_seed::<sr25519::Public>("Bob"),
-			get_account_id_from_seed::<sr25519::Public>("Ferdie"),
-			get_account_id_from_seed::<sr25519::Public>("Eve"),
-			get_account_id_from_seed::<sr25519::Public>("Dave"),
+			(get_account_id_from_seed::<sr25519::Public>("Alice"), 100_000_000),
+			(get_account_id_from_seed::<sr25519::Public>("Bob"), 100_000_000),
+			(get_account_id_from_seed::<sr25519::Public>("Ferdie"), 100_000_000),
+			(get_account_id_from_seed::<sr25519::Public>("Eve"), 100_000_000),
+			(get_account_id_from_seed::<sr25519::Public>("Dave"), 100_000_000),
 		],
 		500,
 		(TICK_MILLIS * HASHES_PER_SECOND / 1_000) as ComputeDifficulty,
@@ -58,6 +59,7 @@ pub fn development_config() -> Result<ChainSpec, String> {
 			blocks_between_slots: 4,
 			slot_bidding_start_block: 4,
 		},
+		SATOSHIS_PER_BITCOIN / 10,
 	))
 	.build())
 }

@@ -1,7 +1,7 @@
 use anyhow::{anyhow, bail, ensure};
 use argon_client::signer::KeystoreSigner;
 use argon_primitives::{AccountId, CryptoType, KeystoreParams, ADDRESS_PREFIX};
-use clap::{crate_version, Parser, ValueEnum};
+use clap::{Parser, ValueEnum};
 use dotenv::dotenv;
 use sp_core::{
 	crypto::{key_types::ACCOUNT, Ss58Codec},
@@ -22,8 +22,7 @@ mod us_cpi_schedule;
 pub(crate) mod utils;
 
 #[derive(Parser, Debug)]
-#[clap(version = crate_version!())]
-#[command(author, version, about, arg_required_else_help = true, long_about = None)]
+#[command(author, version = env!("IMPL_VERSION"), about, arg_required_else_help = true, long_about = None)]
 #[clap(arg_required_else_help = true)]
 struct Cli {
 	#[command(subcommand)]
@@ -107,7 +106,7 @@ async fn main() -> anyhow::Result<()> {
 	let mut signer_address = signer_address;
 	let mut signer_crypto = signer_crypto;
 
-	let keystore = if dev {
+	let keystore = if dev && signer_address.is_none() {
 		let suri = match subcommand {
 			Subcommand::PriceIndex => "//Eve",
 			Subcommand::Bitcoin { .. } => "//Dave",
@@ -117,7 +116,7 @@ async fn main() -> anyhow::Result<()> {
 
 		signer_address = Some(account_id.to_ss58check_with_version(ADDRESS_PREFIX.into()));
 		signer_crypto = Some(OracleCryptoType::Sr25519);
-		keystore_params.open_dev(suri, CryptoType::Sr25519, ACCOUNT)?
+		keystore_params.open_in_memory(suri, CryptoType::Sr25519, ACCOUNT)?
 	} else {
 		keystore_params.open()?
 	};
@@ -132,6 +131,7 @@ async fn main() -> anyhow::Result<()> {
 	}?;
 
 	let signer = KeystoreSigner::new(keystore, signer_account, signer_crypto.into());
+
 	match subcommand {
 		Subcommand::PriceIndex => price_index_loop(trusted_rpc_url, signer, dev).await?,
 		Subcommand::Bitcoin { bitcoin_rpc_url } => {

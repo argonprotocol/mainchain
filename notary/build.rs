@@ -1,8 +1,11 @@
+use argon_primitives::git_version::generate_git_cli_env_var;
 use std::{env, process::Command};
 
 use dotenv::dotenv;
 
 fn main() {
+	generate_git_cli_env_var();
+
 	let offline = option_env!("SQLX_OFFLINE").unwrap_or("false");
 	if offline != "1" && offline != "true" {
 		dotenv().ok();

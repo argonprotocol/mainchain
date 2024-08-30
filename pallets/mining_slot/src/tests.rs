@@ -7,12 +7,12 @@ use frame_support::{
 		Currency, OnInitialize, OneSessionHandler,
 	},
 };
-use pallet_balances::Event as ShareBalancesEvent;
+use pallet_balances::Event as SharesEvent;
 use sp_core::{bounded_vec, crypto::AccountId32, ByteArray, H256, U256};
 use sp_runtime::{testing::UintAuthorityId, BoundedVec, FixedU128};
 
 use crate::{
-	mock::{MiningSlots, ShareBalances, *},
+	mock::{MiningSlots, Ownership, *},
 	pallet::{
 		AccountIndexLookup, ActiveMinersByIndex, ActiveMinersCount, AuthoritiesByIndex,
 		HistoricalBidsPerSlot, IsNextSlotBiddingOpen, LastOwnershipPercentAdjustment,
@@ -357,11 +357,8 @@ fn it_unbonds_accounts_when_a_window_closes() {
 		);
 
 		System::assert_has_event(
-			ShareBalancesEvent::<Test, SharesToken>::Endowed {
-				account: 3,
-				free_balance: 1000u32.into(),
-			}
-			.into(),
+			SharesEvent::<Test, SharesToken>::Endowed { account: 3, free_balance: 1000u32.into() }
+				.into(),
 		);
 
 		System::assert_has_event(
@@ -372,10 +369,10 @@ fn it_unbonds_accounts_when_a_window_closes() {
 			}
 			.into(),
 		);
-		assert_eq!(ShareBalances::free_balance(2), 0);
-		assert_eq!(ShareBalances::total_balance(&2), 1000);
+		assert_eq!(Ownership::free_balance(2), 0);
+		assert_eq!(Ownership::total_balance(&2), 1000);
 
-		assert_eq!(ShareBalances::free_balance(3), 1000);
+		assert_eq!(Ownership::free_balance(3), 1000);
 
 		assert!(System::account_exists(&0));
 		assert!(System::account_exists(&1));
@@ -417,7 +414,7 @@ fn it_holds_ownership_shares_for_a_slot() {
 		System::assert_last_event(
 			Event::SlotBidderAdded { account_id: 1, bid_amount: 0u32.into(), index: 0 }.into(),
 		);
-		assert_eq!(ShareBalances::free_balance(1), 1000 - share_amount);
+		assert_eq!(Ownership::free_balance(1), 1000 - share_amount);
 
 		// should be able to re-register
 		assert_ok!(MiningSlots::bid(RuntimeOrigin::signed(1), None, RewardDestination::Owner));
@@ -426,11 +423,11 @@ fn it_holds_ownership_shares_for_a_slot() {
 			vec![1]
 		);
 		assert_eq!(
-			ShareBalances::free_balance(1),
+			Ownership::free_balance(1),
 			1000 - share_amount,
 			"should not alter reserved balance"
 		);
-		assert_eq!(ShareBalances::total_balance(&1), 1000, "should still have their full balance");
+		assert_eq!(Ownership::total_balance(&1), 1000, "should still have their full balance");
 
 		assert!(System::account_exists(&1));
 		assert!(System::account_exists(&3));
@@ -481,8 +478,8 @@ fn it_wont_let_you_reuse_ownership_shares_for_two_bids() {
 		set_ownership(1, 100u32.into());
 		MiningSlots::on_initialize(12);
 
-		let shares = (200 / 6) as u128;
-		assert_eq!(OwnershipBondAmount::<Test>::get(), shares);
+		let ownership = (200 / 6) as u128;
+		assert_eq!(OwnershipBondAmount::<Test>::get(), ownership);
 		assert_ok!(MiningSlots::bid(RuntimeOrigin::signed(1), None, RewardDestination::Owner));
 		System::set_block_number(16);
 		MiningSlots::on_initialize(16);
@@ -493,7 +490,7 @@ fn it_wont_let_you_reuse_ownership_shares_for_two_bids() {
 				new_miners: BoundedVec::truncate_from(vec![MiningRegistration {
 					account_id: 1,
 					bond_id: None,
-					ownership_tokens: shares,
+					ownership_tokens: ownership,
 					bond_amount: 0,
 					reward_destination: RewardDestination::Owner,
 					reward_sharing: None,
@@ -552,7 +549,7 @@ fn it_will_order_bids_with_argon_bonds() {
 		System::assert_last_event(
 			Event::SlotBidderAdded { account_id: 1, bid_amount: 1000u32.into(), index: 0 }.into(),
 		);
-		assert_eq!(ShareBalances::free_balance(1), 1000 - share_amount);
+		assert_eq!(Ownership::free_balance(1), 1000 - share_amount);
 		assert_eq!(HistoricalBidsPerSlot::<Test>::get().into_inner()[0], 1);
 		assert_eq!(Bonds::get().len(), 1);
 
@@ -610,8 +607,8 @@ fn it_will_order_bids_with_argon_bonds() {
 				)
 			);
 		}
-		assert_eq!(ShareBalances::free_balance(1), 1000);
-		assert!(ShareBalances::hold_available(&HoldReason::RegisterAsMiner.into(), &1));
+		assert_eq!(Ownership::free_balance(1), 1000);
+		assert!(Ownership::hold_available(&HoldReason::RegisterAsMiner.into(), &1));
 
 		// 4. Account 1 increases bid and resubmits
 		assert_ok!(MiningSlots::bid(
@@ -638,7 +635,7 @@ fn it_will_order_bids_with_argon_bonds() {
 		System::assert_last_event(
 			Event::SlotBidderAdded { account_id: 1, bid_amount: 1002u32.into(), index: 0 }.into(),
 		);
-		assert_eq!(ShareBalances::free_balance(3), 1000);
+		assert_eq!(Ownership::free_balance(3), 1000);
 
 		assert_eq!(
 			NextSlotCohort::<Test>::get().iter().map(|a| a.account_id).collect::<Vec<_>>(),
@@ -908,7 +905,7 @@ fn it_adjusts_ownership_bonds() {
 	new_test_ext(None).execute_with(|| {
 		System::set_block_number(10);
 
-		ShareBalances::set_total_issuance(1000);
+		Ownership::set_total_issuance(1000);
 		OwnershipBondAmount::<Test>::set(0);
 		LastOwnershipPercentAdjustment::<Test>::put(FixedU128::from_u32(1));
 		// should have 10 per slot, make it 12

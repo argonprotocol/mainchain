@@ -12,7 +12,7 @@ pub struct Cli {
 
 	/// Bitcoin node to verify minted bitcoins using compact filters. Should be a hosted/trusted
 	/// full node. Include optional auth inline
-	#[arg(long)]
+	#[arg(long, global = true)]
 	pub bitcoin_rpc_url: Option<String>,
 }
 
@@ -35,8 +35,8 @@ pub struct ArgonRunCmd {
 	pub compute_miners: Option<u32>,
 
 	/// Flags to control the randomx compute challenge. Can be specified multiple times.
-	/// - LargePages: use large memory pages for the randomx dataset (default active)
-	/// - Secure: use secure memory for the randomx dataset (default active)
+	/// - LargePages: use large memory pages for the randomx dataset (default inactive)
+	/// - Secure: use secure memory for the randomx dataset (default inactive)
 	#[arg(long, verbatim_doc_comment)]
 	pub randomx_flags: Vec<RandomxFlag>,
 }

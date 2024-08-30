@@ -213,7 +213,7 @@ fn get_parent_fingerprint(bitcoind: &BitcoinD, owner_hd_key_path: &DerivationPat
 	parent_hd_key_path.pop();
 	let parent_part = parent_hd_key_path.pop().unwrap();
 	let is_internal_hd = parent_part.ends_with('1');
-	let hardened_parent_hd_key_path = parent_hd_key_path.join("/");
+	let hardened_parent_hd_key_path = parent_hd_key_path.join("/").replace('\'', "h");
 	println!("Hardened Parent HD Key Path: {}", hardened_parent_hd_key_path);
 
 	let descriptors = bitcoind.client.call::<serde_json::Value>("listdescriptors", &[]).unwrap();
@@ -625,7 +625,7 @@ async fn owner_sees_signature_and_unlocks(
 	let import = bitcoind.client.wallet_process_psbt(
 		psbt_text,
 		Some(true),
-		Some(EcdsaSighashType::All.into()),
+		Some(EcdsaSighashType::AllPlusAnyoneCanPay.into()),
 		None,
 	)?;
 	println!("Processed with wallet {:?}", import);

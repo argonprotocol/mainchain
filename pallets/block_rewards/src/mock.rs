@@ -21,8 +21,8 @@ frame_support::construct_runtime!(
 	{
 		System: frame_system,
 		BlockRewards: pallet_block_rewards,
-		ArgonBalances: pallet_balances::<Instance1>::{Pallet, Call, Storage, Config<T>, Event<T>},
-		ShareBalances: pallet_balances::<Instance2>::{Pallet, Call, Storage, Config<T>, Event<T>},
+		Balances: pallet_balances::<Instance1>::{Pallet, Call, Storage, Config<T>, Event<T>},
+		Ownership: pallet_balances::<Instance2>::{Pallet, Call, Storage, Config<T>, Event<T>},
 	}
 );
 #[derive_impl(frame_system::config_preludes::TestDefaultConfig as frame_system::DefaultConfig)]
@@ -79,7 +79,7 @@ impl pallet_balances::Config<SharesToken> for Test {
 
 parameter_types! {
 	pub static ArgonsPerBlock :u32 = 5_000;
-	pub static StartingSharesPerBlock :u32 = 5_000;
+	pub static StartingOwnershipTokensPerBlock :u32 = 5_000;
 	pub static HalvingBlocks :u32 = 100;
 	pub static MaturationBlocks :u32 = 5;
 	pub static MinerPayoutPercent :FixedU128 = FixedU128::from_rational(75, 100);
@@ -148,10 +148,10 @@ impl BlockRewardAccountsProvider<u64> for StaticBlockRewardAccountsProvider {
 impl pallet_block_rewards::Config for Test {
 	type RuntimeEvent = RuntimeEvent;
 	type WeightInfo = ();
-	type ArgonCurrency = ArgonBalances;
-	type SharesCurrency = ShareBalances;
+	type ArgonCurrency = Balances;
+	type SharesCurrency = Ownership;
 	type ArgonsPerBlock = ArgonsPerBlock;
-	type StartingSharesPerBlock = StartingSharesPerBlock;
+	type StartingOwnershipTokensPerBlock = StartingOwnershipTokensPerBlock;
 	type MaturationBlocks = MaturationBlocks;
 	type Balance = Balance;
 	type HalvingBlocks = HalvingBlocks;

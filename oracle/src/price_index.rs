@@ -21,10 +21,10 @@ pub async fn price_index_loop(
 	let mut reconnecting_client = ReconnectingClient::new(vec![trusted_rpc_url.clone()]);
 	let mainchain_client = reconnecting_client.get().await?;
 
-	if use_simulated_schedule == true {
+	if use_simulated_schedule {
 		let chain_info = mainchain_client.methods.system_chain().await?;
 		ensure!(
-			chain_info == "Development" || chain_info.contains("Testnet"),
+			chain_info.contains("Development") || chain_info.contains("Testnet"),
 			"Simulated schedule can only be used on development chain"
 		);
 	}
@@ -59,9 +59,12 @@ pub async fn price_index_loop(
 		.map(|a| from_api_fixed_u128(a.argon_usd_target_price.clone()))
 		.unwrap_or(FixedU128::one());
 
-	let min_sleep_duration = Duration::from_millis(ticker.tick_duration_millis)
+	let mut min_sleep_duration = Duration::from_millis(ticker.tick_duration_millis)
 		.saturating_sub(Duration::from_secs(10))
 		.max(Duration::from_secs(5));
+	if cfg!(test) {
+		min_sleep_duration = Duration::from_millis(50);
+	}
 
 	let mut us_cpi = UsCpiRetriever::new(&ticker).await?;
 	let mut btc_price_lookup = btc_price::BtcPriceLookup::new();
@@ -131,13 +134,6 @@ pub async fn price_index_loop(
 				tracing::warn!("Error processing price index!! {:?}", e);
 				e
 			})?;
-			// spawn(move || {
-			// 	if let Err(res) =
-			// 		futures::executor::block_on(MainchainClient::wait_for_ext_in_block(progress))
-			// 	{
-			// 		panic!("Error processing price index!! {:?}", res)
-			// 	}
-			// });
 		}
 
 		let sleep_time = ticker.duration_to_next_tick().min(min_sleep_duration);

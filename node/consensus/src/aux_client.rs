@@ -219,13 +219,9 @@ impl<B: BlockT, C: AuxStore + 'static> ArgonAux<B, C> {
 
 			let state = self.get_notebook_tick_state(tick)?.get();
 			if tick == submitting_tick {
-				let details =
-					state.notebook_key_details_by_notary.get(&notary_id).ok_or_else(|| {
-						Error::NotebookHeaderBuildError(format!(
-							"Unable to find notebook  #{} key details for notary {} at tick {}",
-							notebook.notebook_number, notary_id, tick
-						))
-					})?;
+				let Some(details) = state.notebook_key_details_by_notary.get(&notary_id) else {
+					continue;
+				};
 				tick_notebook = Some(details.clone());
 			}
 			if let Some(raw_data) = state.raw_headers_by_notary.get(&notary_id) {
@@ -237,10 +233,7 @@ impl<B: BlockT, C: AuxStore + 'static> ArgonAux<B, C> {
 					audit_first_failure: notebook.first_error_reason.clone(),
 				});
 			} else {
-				return Err(Error::NotebookHeaderBuildError(format!(
-					"Unable to find notebook #{} for notary {} at tick {}",
-					notebook.notebook_number, notary_id, tick
-				)));
+				continue;
 			}
 		}
 		Ok((headers, tick_notebook))

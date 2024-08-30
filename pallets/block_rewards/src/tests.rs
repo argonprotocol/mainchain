@@ -9,7 +9,7 @@ use frame_support::{
 use sp_runtime::{DispatchError, FixedU128, TokenError};
 
 use crate::{
-	mock::{ArgonBalances, BlockRewards, ShareBalances, *},
+	mock::{Balances, BlockRewards, Ownership, *},
 	Event, FreezeReason,
 };
 use argon_primitives::{
@@ -34,46 +34,43 @@ fn it_should_only_allow_a_single_seal() {
 			Event::RewardCreated {
 				maturation_block: (1 + MaturationBlocks::get()).into(),
 				rewards: vec![
-					BlockPayout { account_id: 1, shares: 3750, argons: 3750 },
-					BlockPayout { account_id: 2, shares: 1250, argons: 1250 },
+					BlockPayout { account_id: 1, ownership: 3750, argons: 3750 },
+					BlockPayout { account_id: 2, ownership: 1250, argons: 1250 },
 				],
 			}
 			.into(),
 		);
+		assert_eq!(Balances::reducible_balance(&1, Preservation::Expendable, Fortitude::Polite), 0);
 		assert_eq!(
-			ArgonBalances::reducible_balance(&1, Preservation::Expendable, Fortitude::Polite),
-			0
-		);
-		assert_eq!(
-			ArgonBalances::reducible_balance(&1, Preservation::Expendable, Fortitude::Force),
+			Balances::reducible_balance(&1, Preservation::Expendable, Fortitude::Force),
 			3750
 		);
 		assert_eq!(
-			ShareBalances::reducible_balance(&1, Preservation::Expendable, Fortitude::Force),
+			Ownership::reducible_balance(&1, Preservation::Expendable, Fortitude::Force),
 			3750
 		);
 
 		assert_eq!(
-			ArgonBalances::reducible_balance(&2, Preservation::Expendable, Fortitude::Force),
+			Balances::reducible_balance(&2, Preservation::Expendable, Fortitude::Force),
 			1250
 		);
 		assert_eq!(
-			ShareBalances::reducible_balance(&2, Preservation::Expendable, Fortitude::Force),
+			Ownership::reducible_balance(&2, Preservation::Expendable, Fortitude::Force),
 			1250
 		);
 
 		assert_err!(
-			<ArgonBalances as Mutate<AccountId>>::transfer(&1, &2, 3000, Preservation::Expendable),
+			<Balances as Mutate<AccountId>>::transfer(&1, &2, 3000, Preservation::Expendable),
 			DispatchError::Token(TokenError::Frozen)
 		);
 
 		// test that we can transfer regular funds still
-		let _ = ArgonBalances::mint_into(&1, 3000);
+		let _ = Balances::mint_into(&1, 3000);
 		assert_err!(
-			<ArgonBalances as Mutate<AccountId>>::transfer(&1, &2, 3001, Preservation::Expendable),
+			<Balances as Mutate<AccountId>>::transfer(&1, &2, 3001, Preservation::Expendable),
 			DispatchError::Token(TokenError::Frozen)
 		);
-		assert_ok!(<ArgonBalances as Mutate<AccountId>>::transfer(
+		assert_ok!(<Balances as Mutate<AccountId>>::transfer(
 			&1,
 			&2,
 			3000,
@@ -100,33 +97,33 @@ fn it_should_unlock_rewards() {
 			Event::RewardCreated {
 				maturation_block,
 				rewards: vec![
-					BlockPayout { account_id: 1, shares: 3750, argons: 3750 },
-					BlockPayout { account_id: 2, shares: 1250, argons: 1250 },
+					BlockPayout { account_id: 1, ownership: 3750, argons: 3750 },
+					BlockPayout { account_id: 2, ownership: 1250, argons: 1250 },
 				],
 			}
 			.into(),
 		);
 		let freeze_id = FreezeReason::MaturationPeriod.into();
-		assert_eq!(ArgonBalances::balance_frozen(&freeze_id, &1), 3750);
-		assert_eq!(ShareBalances::balance_frozen(&freeze_id, &1), 3750);
-		assert_eq!(ArgonBalances::balance_frozen(&freeze_id, &2), 1250);
-		assert_eq!(ShareBalances::balance_frozen(&freeze_id, &2), 1250);
+		assert_eq!(Balances::balance_frozen(&freeze_id, &1), 3750);
+		assert_eq!(Ownership::balance_frozen(&freeze_id, &1), 3750);
+		assert_eq!(Balances::balance_frozen(&freeze_id, &2), 1250);
+		assert_eq!(Ownership::balance_frozen(&freeze_id, &2), 1250);
 
 		System::set_block_number(maturation_block);
 		BlockRewards::on_initialize(maturation_block);
 		System::assert_last_event(
 			Event::RewardUnlocked {
 				rewards: vec![
-					BlockPayout { account_id: 1, shares: 3750, argons: 3750 },
-					BlockPayout { account_id: 2, shares: 1250, argons: 1250 },
+					BlockPayout { account_id: 1, ownership: 3750, argons: 3750 },
+					BlockPayout { account_id: 2, ownership: 1250, argons: 1250 },
 				],
 			}
 			.into(),
 		);
-		assert_eq!(ArgonBalances::free_balance(1), 3750);
-		assert_eq!(ShareBalances::free_balance(1), 3750);
-		assert_eq!(ArgonBalances::free_balance(2), 1250);
-		assert_eq!(ShareBalances::free_balance(2), 1250);
+		assert_eq!(Balances::free_balance(1), 3750);
+		assert_eq!(Ownership::free_balance(1), 3750);
+		assert_eq!(Balances::free_balance(2), 1250);
+		assert_eq!(Ownership::free_balance(2), 1250);
 	});
 }
 
@@ -148,8 +145,8 @@ fn it_should_payout_block_vote_to_miner() {
 			Event::RewardCreated {
 				maturation_block,
 				rewards: vec![
-					BlockPayout { account_id: 1, shares: 3750, argons: 3750 },
-					BlockPayout { account_id: 1, shares: 1250, argons: 1250 },
+					BlockPayout { account_id: 1, ownership: 3750, argons: 3750 },
+					BlockPayout { account_id: 1, ownership: 1250, argons: 1250 },
 				],
 			}
 			.into(),
@@ -176,8 +173,8 @@ fn it_should_halve_rewards() {
 			Event::RewardCreated {
 				maturation_block,
 				rewards: vec![
-					BlockPayout { account_id: 1, shares: 1875, argons: 3750 },
-					BlockPayout { account_id: 2, shares: 625, argons: 1250 },
+					BlockPayout { account_id: 1, ownership: 1875, argons: 3750 },
+					BlockPayout { account_id: 2, ownership: 625, argons: 1250 },
 				],
 			}
 			.into(),
@@ -203,8 +200,8 @@ fn it_should_scale_rewards_based_on_notaries() {
 			Event::RewardCreated {
 				maturation_block,
 				rewards: vec![
-					BlockPayout { account_id: 1, shares: 3750 / 2, argons: 3750 / 2 },
-					BlockPayout { account_id: 2, shares: 1250 / 2, argons: 1250 / 2 },
+					BlockPayout { account_id: 1, ownership: 3750 / 2, argons: 3750 / 2 },
+					BlockPayout { account_id: 2, ownership: 1250 / 2, argons: 1250 / 2 },
 				],
 			}
 			.into(),
@@ -230,8 +227,8 @@ fn it_should_not_fail_with_no_notebooks() {
 			Event::RewardCreated {
 				maturation_block,
 				rewards: vec![
-					BlockPayout { account_id: 1, shares: 0, argons: 0 },
-					BlockPayout { account_id: 2, shares: 0, argons: 0 },
+					BlockPayout { account_id: 1, ownership: 0, argons: 0 },
+					BlockPayout { account_id: 2, ownership: 0, argons: 0 },
 				],
 			}
 			.into(),
@@ -239,16 +236,13 @@ fn it_should_not_fail_with_no_notebooks() {
 		System::assert_has_event(
 			Event::RewardCreateError {
 				account_id: 2,
-				shares: 1u128.into(),
+				ownership: 1u128.into(),
 				argons: None,
 				error: DispatchError::Token(TokenError::BelowMinimum),
 			}
 			.into(),
 		);
-		assert_eq!(
-			ArgonBalances::reducible_balance(&2, Preservation::Expendable, Fortitude::Polite),
-			0
-		);
+		assert_eq!(Balances::reducible_balance(&2, Preservation::Expendable, Fortitude::Polite), 0);
 	});
 }
 
@@ -270,8 +264,8 @@ fn it_should_not_fail_with_no_notaries() {
 			Event::RewardCreated {
 				maturation_block,
 				rewards: vec![
-					BlockPayout { account_id: 1, shares: 3750, argons: 3750 },
-					BlockPayout { account_id: 2, shares: 1250, argons: 1250 },
+					BlockPayout { account_id: 1, ownership: 3750, argons: 3750 },
+					BlockPayout { account_id: 2, ownership: 1250, argons: 1250 },
 				],
 			}
 			.into(),
@@ -302,15 +296,15 @@ fn it_should_support_profit_sharing() {
 			Event::RewardCreated {
 				maturation_block,
 				rewards: vec![
-					BlockPayout { account_id: 1, shares: 3750, argons: 3750 - share_amount },
-					BlockPayout { account_id: 3, shares: 0, argons: share_amount },
-					BlockPayout { account_id: 2, shares: 1250, argons: 1250 },
+					BlockPayout { account_id: 1, ownership: 3750, argons: 3750 - share_amount },
+					BlockPayout { account_id: 3, ownership: 0, argons: share_amount },
+					BlockPayout { account_id: 2, ownership: 1250, argons: 1250 },
 				],
 			}
 			.into(),
 		);
 		let freeze_id = FreezeReason::MaturationPeriod.into();
 
-		assert_eq!(ArgonBalances::balance_frozen(&freeze_id, &3), share_amount);
+		assert_eq!(Balances::balance_frozen(&freeze_id, &3), share_amount);
 	});
 }

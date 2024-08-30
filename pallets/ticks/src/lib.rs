@@ -73,7 +73,7 @@ pub mod pallet {
 	#[pallet::genesis_build]
 	impl<T: Config> BuildGenesisConfig for GenesisConfig<T> {
 		fn build(&self) {
-			GenesisTicker::<T>::put(self.ticker.clone());
+			GenesisTicker::<T>::put(self.ticker);
 		}
 	}
 

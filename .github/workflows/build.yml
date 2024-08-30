@@ -1,4 +1,4 @@
-name: Build and Test
+name: Build + Test Node Apis
 'on':
   push:
     branches:
@@ -83,7 +83,7 @@ jobs:
       - uses: taiki-e/install-action@v2
         if: ${{(github.event.inputs.SKIP_REBUILD_DOCKER != 'true')}}
         with:
-          tool: sqlx-cli@0.8
+          tool: sqlx-cli@0.8.0
 
       - name: Migrate Notary Db
         if: ${{(github.event.inputs.SKIP_REBUILD_DOCKER != 'true')}}
@@ -111,7 +111,6 @@ jobs:
           CARGO_INCREMENTAL: 0
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
           RUST_LOG: info
-        continue-on-error: true
 
       - name: Upload Debug Assets
         if: ${{(github.event.inputs.SKIP_REBUILD_DOCKER != 'true')}}
@@ -192,6 +191,7 @@ jobs:
             docker: ghcr.io/napi-rs/napi-rs/nodejs-rust:lts-debian
             build: |
               export DEBUG=napi:*
+              export RUSTFLAGS="-C link-args=-Wl,--warn-unresolved-symbols"
               cd localchain
               yarn build:debug -- --lib
               strip -x *.node
@@ -212,7 +212,7 @@ jobs:
     env:
       DEBUG: napi:*
       APP_NAME: localchain
-      MACOSX_DEPLOYMENT_TARGET: '10.13'
+      MACOSX_DEPLOYMENT_TARGET: '14.0'
     steps:
       - uses: actions/checkout@v4
 
@@ -404,6 +404,9 @@ jobs:
           ADD_DOCKER_HOST: true
   publish:
     name: Publish
+    permissions:
+      id-token: write  # Grant write access to the id-token permission for this job
+      contents: write
     runs-on: ubuntu-latest
     needs:
       - test-linux
@@ -413,19 +416,26 @@ jobs:
         with:
           ref: ${{ github.head_ref }}
           fetch-depth: 0
+
       - name: Setup node
         uses: actions/setup-node@v4
         with:
           node-version: 20
           cache: yarn
+          registry-url: 'https://registry.npmjs.org'
+
       - name: Install dependencies
         run: yarn install
+
+      - name: Build client
+        run: yarn tsc
+        working-directory: ./client/nodejs
+
       - name: Download all artifacts
         uses: actions/download-artifact@v4
         with:
           path: localchain/artifacts
           github-token: ${{ secrets.GITHUB_TOKEN }}
-      #          run-id: 8755170162
 
       - name: Move artifacts
         run: yarn artifacts
@@ -446,21 +456,11 @@ jobs:
         shell: bash
         working-directory: ./localchain
 
-      - name: Publish
-        if: ${{ env.NPM_ENABLED != 'true' }}
-        working-directory: ./localchain
+      - name: Publish mainchain
+        if: ${{ vars.NPM_ENABLED == 'true' && startsWith(github.ref, 'refs/tags/v') }}
         run: |
-          if git log -1 --pretty=%B | grep "^v[0-9]\+\.[0-9]\+\.[0-9]\+$";
-          then
-          echo "//registry.npmjs.org/:_authToken=$NPM_TOKEN" >> ~/.npmrc
-          npm publish --provenance --access public
-          elif git log -1 --pretty=%B | grep "^v[0-9]\+\.[0-9]\+\.[0-9]\+";
-          then
-          echo "//registry.npmjs.org/:_authToken=$NPM_TOKEN" >> ~/.npmrc
-          npm publish --provenance --tag next --access public
-          else
-          echo "Not a release, skipping publish"
-          fi
+          npm publish --provenance --access public --workspace=client/nodejs
+          npm publish --provenance --access public --workspace=localchain
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-          NPM_TOKEN: ${{ secrets.NPM_TOKEN }}
+          NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}

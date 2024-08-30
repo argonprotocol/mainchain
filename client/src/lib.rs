@@ -27,7 +27,7 @@ use tracing::warn;
 use argon_primitives::{AccountId, BlockNumber, Nonce};
 pub use spec::api;
 
-use crate::api::{share_balances, storage, system};
+use crate::api::{ownership, storage, system};
 
 pub mod conversion;
 pub mod signer;
@@ -51,6 +51,8 @@ impl Config for ArgonConfig {
 /// A struct representing the signed extra and additional parameters required
 /// to construct a transaction for a argon node.
 pub type ArgonExtrinsicParams<T> = DefaultExtrinsicParams<T>;
+
+pub type ArgonTxProgress = TxProgress<ArgonConfig, ArgonOnlineClient>;
 
 /// A builder which leads to [`ArgonExtrinsicParams`] being constructed.
 /// This is what you provide to methods like `sign_and_submit()`.
@@ -127,7 +129,7 @@ impl MainchainClient {
 		message: &str,
 		signer: &impl Signer<ArgonConfig>,
 		params: Option<<ArgonExtrinsicParams<ArgonConfig> as ExtrinsicParams<ArgonConfig>>::Params>,
-	) -> anyhow::Result<TxProgress<ArgonConfig, OnlineClient<ArgonConfig>>> {
+	) -> anyhow::Result<ArgonTxProgress> {
 		let ext_data = self.extract_call_data(message)?;
 		self.submit_raw(ext_data, signer, params).await
 	}
@@ -137,7 +139,7 @@ impl MainchainClient {
 		payload: Vec<u8>,
 		signer: &impl Signer<ArgonConfig>,
 		params: Option<<ArgonExtrinsicParams<ArgonConfig> as ExtrinsicParams<ArgonConfig>>::Params>,
-	) -> anyhow::Result<TxProgress<ArgonConfig, OnlineClient<ArgonConfig>>> {
+	) -> anyhow::Result<ArgonTxProgress> {
 		let payload = RawPayload(payload);
 		let tx_progress = self
 			.live
@@ -188,18 +190,18 @@ impl MainchainClient {
 	pub async fn get_argons(
 		&self,
 		account_id: &AccountId32,
-	) -> anyhow::Result<share_balances::storage::types::account::Account> {
+	) -> anyhow::Result<ownership::storage::types::account::Account> {
 		let account = self.get_account(account_id).await?;
 		Ok(account.data)
 	}
 
-	pub async fn get_shares(
+	pub async fn get_ownership(
 		&self,
 		account_id: &AccountId32,
-	) -> anyhow::Result<share_balances::storage::types::account::Account> {
+	) -> anyhow::Result<ownership::storage::types::account::Account> {
 		let account_id32 = account_id_to_subxt(account_id);
 		let balance = self
-			.fetch_storage(&storage().share_balances().account(account_id32), None)
+			.fetch_storage(&storage().ownership().account(account_id32), None)
 			.await?
 			.ok_or_else(|| anyhow!("No record found for account {:?}", &account_id))?;
 		Ok(balance)
@@ -258,7 +260,7 @@ impl MainchainClient {
 	}
 
 	pub async fn wait_for_ext_in_block(
-		mut tx_progress: TxProgress<ArgonConfig, OnlineClient<ArgonConfig>>,
+		mut tx_progress: ArgonTxProgress,
 	) -> anyhow::Result<TxInBlock<ArgonConfig, OnlineClient<ArgonConfig>>, Error> {
 		while let Some(status) = tx_progress.next().await {
 			match status? {

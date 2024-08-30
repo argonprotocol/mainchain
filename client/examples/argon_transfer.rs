@@ -16,7 +16,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
 	println!("Bob has free balance: {:?}, {}", result.unwrap().data.free, account);
 
 	let transfer_query = api::tx()
-		.argon_balances()
+		.balances()
 		.transfer_allow_death(dev::alice().public_key().into(), 1_000);
 
 	let latest_block = client.blocks().at_latest().await?;
@@ -37,8 +37,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
 			TxStatus::InBestBlock(in_block) => {
 				// Find a Transfer event and print it.
 				let events = in_block.fetch_events().await?;
-				let transfer_event =
-					events.find_first::<api::argon_balances::events::Transfer>()?;
+				let transfer_event = events.find_first::<api::balances::events::Transfer>()?;
 				if let Some(event) = transfer_event {
 					println!(
 						"Transaction {:?} is in best block {} ({:?}).\n{event:?}",

@@ -127,7 +127,7 @@ pub struct MiningAuthority<AuthorityId, AccountId> {
 pub struct BlockPayout<AccountId: Codec, Balance: Codec + MaxEncodedLen> {
 	pub account_id: AccountId,
 	#[codec(compact)]
-	pub shares: Balance,
+	pub ownership: Balance,
 	#[codec(compact)]
 	pub argons: Balance,
 }

@@ -31,6 +31,7 @@ pallet-offences = { workspace = true }
 pallet-proxy = { workspace = true }
 pallet-tx-pause = { workspace = true }
 pallet-transaction-payment = { workspace = true }
+pallet-utility = { workspace = true }
 frame-support = { workspace = true, features = ["experimental"] }
 frame-system = { workspace = true }
 frame-try-runtime = { workspace = true, optional = true }
@@ -116,6 +117,7 @@ std = [
 	"pallet-transaction-payment-rpc-runtime-api/std",
 	"pallet-transaction-payment/std",
 	"pallet-tx-pause/std",
+	"pallet-utility/std",
 	"pallet-vaults/std",
 	"scale-info/std",
 	"serde_json/std",
@@ -161,6 +163,7 @@ runtime-benchmarks = [
 	"pallet-ticks/runtime-benchmarks",
 	"pallet-timestamp/runtime-benchmarks",
 	"pallet-tx-pause/runtime-benchmarks",
+	"pallet-utility/runtime-benchmarks",
 	"pallet-vaults/runtime-benchmarks",
 	"sp-runtime/runtime-benchmarks",
 ]
@@ -193,6 +196,7 @@ try-runtime = [
 	"pallet-timestamp/try-runtime",
 	"pallet-transaction-payment/try-runtime",
 	"pallet-tx-pause/try-runtime",
+	"pallet-utility/try-runtime",
 	"pallet-vaults/try-runtime",
 	"sp-runtime/try-runtime",
 ]

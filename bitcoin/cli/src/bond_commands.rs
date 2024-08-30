@@ -264,7 +264,7 @@ impl BondCommands {
 					.into_iter()
 					.find_map(|(mint_utxo_id, _account_id, amount)| {
 						if mint_utxo_id == utxo_id {
-							return Some(amount)
+							return Some(amount);
 						}
 						None
 					})
@@ -553,7 +553,7 @@ impl BondCommands {
 					"Add this psbt to your wallet to fund the bitcoin:\n\n{}",
 					general_purpose::STANDARD.encode(&psbt.serialize()[..])
 				);
-				return Ok(())
+				return Ok(());
 			},
 			BondCommands::ClaimUtxoPsbt {
 				bond_id,
@@ -693,7 +693,7 @@ async fn find_unlock_request(
 		.into_iter()
 		.find_map(|(a, unlock)| {
 			if a == utxo_id {
-				return Some(unlock)
+				return Some(unlock);
 			}
 			None
 		});

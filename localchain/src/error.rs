@@ -94,7 +94,7 @@ impl From<String> for Error {
 }
 impl From<JsonrpseeError> for Error {
   fn from(e: JsonrpseeError) -> Self {
-    return match e {
+    match e {
       JsonrpseeError::Call(ref err) => {
         if let Ok(e) = err.clone().try_into() {
           return Error::NotaryApiError(e);
@@ -103,6 +103,6 @@ impl From<JsonrpseeError> for Error {
         Error::NotaryInternalApiError(e)
       }
       _ => Error::NotaryInternalApiError(e),
-    };
+    }
   }
 }

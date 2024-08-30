@@ -7,7 +7,7 @@ use crate::chain_spec::{
 };
 use argon_node_runtime::WASM_BINARY;
 use argon_primitives::{
-	bitcoin::BitcoinNetwork,
+	bitcoin::{BitcoinNetwork, SATOSHIS_PER_BITCOIN},
 	block_seal::MiningSlotConfig,
 	notary::{GenesisNotary, NotaryPublic},
 	ComputeDifficulty, ADDRESS_PREFIX,
@@ -28,8 +28,8 @@ pub fn local_testnet_config() -> Result<ChainSpec, String> {
 		WASM_BINARY.ok_or_else(|| "Development wasm not available".to_string())?,
 		None,
 	)
-	.with_name("Local Testnet")
-	.with_id("local_testnet")
+	.with_name("Argon Local Testnet")
+	.with_id("argon-local")
 	.with_chain_type(ChainType::Local)
 	.with_properties(properties)
 	.with_genesis_config_patch(testnet_genesis(
@@ -47,13 +47,13 @@ pub fn local_testnet_config() -> Result<ChainSpec, String> {
 		get_account_id_from_seed::<sr25519::Public>("Eve"),
 		// Pre-funded accounts
 		vec![
-			get_account_id_from_seed::<sr25519::Public>("Alice"),
-			get_account_id_from_seed::<sr25519::Public>("Bob"),
-			get_account_id_from_seed::<sr25519::Public>("Charlie"),
-			get_account_id_from_seed::<sr25519::Public>("Dave"),
-			get_account_id_from_seed::<sr25519::Public>("Eve"),
-			get_account_id_from_seed::<sr25519::Public>("Ferdie"),
-			get_account_id_from_seed::<sr25519::Public>("Ferdie//notary"),
+			(get_account_id_from_seed::<sr25519::Public>("Alice"), 100_000_000),
+			(get_account_id_from_seed::<sr25519::Public>("Bob"), 100_000_000),
+			(get_account_id_from_seed::<sr25519::Public>("Charline"), 100_000_000),
+			(get_account_id_from_seed::<sr25519::Public>("Dave"), 100_000_000),
+			(get_account_id_from_seed::<sr25519::Public>("Eve"), 100_000_000),
+			(get_account_id_from_seed::<sr25519::Public>("Ferdie"), 100_000_000),
+			(get_account_id_from_seed::<sr25519::Public>("Ferdie//notary"), 100_000_000),
 		],
 		500,
 		(TICK_MILLIS * HASHES_PER_SECOND / 1_000) as ComputeDifficulty,
@@ -70,6 +70,7 @@ pub fn local_testnet_config() -> Result<ChainSpec, String> {
 			blocks_between_slots: 4,
 			slot_bidding_start_block: 4,
 		},
+		SATOSHIS_PER_BITCOIN / 10,
 	))
 	.build())
 }

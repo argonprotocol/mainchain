@@ -5,14 +5,15 @@ use crate::{
 use anyhow::{anyhow, ensure, Result};
 use argon_primitives::tick::{Tick, Ticker};
 use chrono::{DateTime, Utc};
+use directories::BaseDirs;
 use lazy_static::lazy_static;
 use reqwest::Client;
 use serde::{Deserialize, Serialize};
 use sp_runtime::{traits::One, FixedI128, FixedU128};
-use std::env;
 #[cfg(test)]
 use std::sync::{Arc, Mutex};
-use tokio::time::{Duration, Instant};
+use std::{env, fs::File, path::PathBuf};
+use tokio::time::Duration;
 use url::Url;
 
 const MAX_SCHEDULE_DAYS: u32 = 35;
@@ -26,7 +27,7 @@ lazy_static! {
 	/// To analyze the cpi data, the full historical data was downloaded from the CPI here:
 	/// https://data.bls.gov/timeseries/CUUR0000SA0?years_option=all_years
 	///
-	/// These were loaded into excel, and then the a difference was made for each month from the
+	/// These were loaded into Excel, and then the difference for each month was calculated from the
 	/// previous (for Feb-Dec, `=((C2 - B2) / B2) * 100`, for Jan, `=((B3 - M2) /M2) * 100`)
 	///
 	/// The 5th and 95th percentile were calculated for all differences using the following (the
@@ -39,6 +40,7 @@ lazy_static! {
 	static ref BASELINE_CPI: FixedU128 = FixedU128::from_float(314.069);
 }
 
+#[derive(Serialize, Deserialize)]
 pub struct UsCpiRetriever {
 	pub schedule: Vec<CpiSchedule>,
 	pub current_cpi_release_tick: Tick,
@@ -47,13 +49,61 @@ pub struct UsCpiRetriever {
 	pub current_cpi_ref_month: DateTime<Utc>,
 	pub previous_us_cpi: FixedU128,
 	pub cpi_change_per_tick: FixedI128,
-	pub last_schedule_check: Instant,
-	pub last_cpi_check: Instant,
+	pub last_schedule_check: DateTime<Utc>,
+	pub last_cpi_check: DateTime<Utc>,
+	#[serde(skip)]
 	pub ticker: Ticker,
 }
 
 impl UsCpiRetriever {
+	fn get_state_file_path() -> Result<PathBuf> {
+		if let Ok(path) = env::var("ORACLE_CPI_CACHE_PATH") {
+			return Ok(PathBuf::from(path));
+		}
+
+		let state_file = BaseDirs::new()
+			.ok_or(anyhow!("No home directory"))?
+			.cache_dir()
+			.join("argon/oracle/cpi_state.json");
+		Ok(state_file)
+	}
+
+	pub fn save_state(&self) -> Result<()> {
+		let state_file = Self::get_state_file_path()?;
+		if !state_file.exists() {
+			let dir = state_file.parent().ok_or(anyhow!("No parent directory to build"))?;
+			std::fs::create_dir_all(dir)?;
+		}
+		let file = File::create(state_file)?;
+		serde_json::to_writer(file, &self)?;
+		Ok(())
+	}
+
+	pub fn load_state(ticker: &Ticker) -> Result<Self> {
+		match env::var("ORACLE_CPI_CACHE_DISABLED").unwrap_or_default().as_str() {
+			"1" | "true" => return Err(anyhow!("Cache disabled")),
+			_ => {},
+		}
+		if cfg!(test) {
+			return Err(anyhow!("Cache disabled in tests"));
+		}
+
+		let state_file = Self::get_state_file_path()?;
+		if state_file.exists() {
+			let file = File::open(state_file)?;
+			let mut retriever: Self = serde_json::from_reader(file)?;
+			retriever.ticker = *ticker;
+			Ok(retriever)
+		} else {
+			Err(anyhow!("State file not found"))
+		}
+	}
+
 	pub async fn new(ticker: &Ticker) -> Result<Self> {
+		if let Ok(retriever) = Self::load_state(ticker) {
+			return Ok(retriever);
+		}
+
 		let schedule = load_cpi_schedule().await?;
 		let cpis = get_raw_cpis().await?;
 		let current = cpis.first().ok_or(anyhow!("No CPI data"))?;
@@ -71,23 +121,26 @@ impl UsCpiRetriever {
 			current_cpi_end_value: current.value,
 			current_cpi_ref_month: current.ref_month,
 			previous_us_cpi: previous.value,
-			last_schedule_check: Instant::now(),
+			last_schedule_check: Utc::now(),
 			ticker: *ticker,
-			last_cpi_check: Instant::now(),
+			last_cpi_check: Utc::now(),
 			cpi_change_per_tick: FixedI128::from_u32(0),
 		};
 		entry.cpi_change_per_tick = entry.calculate_cpi_change_per_tick();
+		entry.save_state()?;
 
 		Ok(entry)
 	}
 
 	pub async fn refresh(&mut self) -> Result<()> {
-		let now = Instant::now();
-		if now.duration_since(self.last_schedule_check) > Duration::from_secs(10 * ONE_DAY) {
+		let now = Utc::now();
+		let mut should_save = false;
+		if now.signed_duration_since(self.last_schedule_check).num_seconds() as u64 > 10 * ONE_DAY {
 			self.schedule = load_cpi_schedule().await?;
 			self.last_schedule_check = now;
+			should_save = true;
 		}
-		if now.duration_since(self.last_cpi_check) > Duration::from_secs(ONE_HOUR) {
+		if now.signed_duration_since(self.last_cpi_check).num_seconds() as u64 > ONE_HOUR {
 			let next_cpi = get_raw_cpi().await?;
 			if next_cpi.ref_month == self.current_cpi_ref_month {
 				return Ok(());
@@ -105,6 +158,10 @@ impl UsCpiRetriever {
 			.ok_or(anyhow!("No release date found for current CPI"))?;
 			self.last_cpi_check = now;
 			self.cpi_change_per_tick = self.calculate_cpi_change_per_tick();
+			should_save = true;
+		}
+		if should_save {
+			self.save_state()?;
 		}
 		Ok(())
 	}
@@ -365,8 +422,8 @@ mod tests {
 			),
 			previous_us_cpi: previous_cpi,
 			cpi_change_per_tick: FixedI128::from_u32(0),
-			last_schedule_check: Instant::now(),
-			last_cpi_check: Instant::now(),
+			last_schedule_check: Utc::now(),
+			last_cpi_check: Utc::now(),
 			ticker,
 		};
 		retriever.schedule = vec![
@@ -445,8 +502,8 @@ mod tests {
 			current_cpi_ref_month: parse_date("1 April 2024", vec!["%d %B %Y"]).unwrap(),
 			previous_us_cpi: FixedU128::from_u32(200),
 			cpi_change_per_tick: FixedI128::from_u32(0),
-			last_schedule_check: Instant::now(),
-			last_cpi_check: Instant::now(),
+			last_schedule_check: Utc::now(),
+			last_cpi_check: Utc::now(),
 			ticker,
 		};
 		let timestamp =

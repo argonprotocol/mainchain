@@ -49,11 +49,6 @@ pub mod pallet {
 		/// Maximum bitcoin blocks to watch a Utxo for confirmation before canceling
 		#[pallet::constant]
 		type MaxPendingConfirmationBlocks: Get<BitcoinHeight>;
-
-		/// The number of blocks previous to the tip that a bitcoin UTXO will be allowed to be
-		/// locked
-		#[pallet::constant]
-		type MaxUtxoBirthBlocksOld: Get<BitcoinHeight>;
 	}
 
 	#[pallet::storage]
@@ -361,8 +356,18 @@ pub mod pallet {
 		pub fn get_sync_status() -> Option<BitcoinSyncStatus> {
 			let confirmed_block = ConfirmedBitcoinBlockTip::<T>::get()?;
 			let synched_block = SynchedBitcoinBlock::<T>::get();
-			let oldest_allowed_block_height =
-				confirmed_block.block_height.saturating_sub(T::MaxUtxoBirthBlocksOld::get());
+			// We have full visibility into everything up to the synched point
+			let oldest_allowed_block_height = if let Some(ref x) = synched_block {
+				x.block_height
+			} else {
+				let mut oldest = confirmed_block.block_height;
+				for (_, entry) in <UtxosPendingConfirmation<T>>::get() {
+					if entry.submitted_at_height < oldest {
+						oldest = entry.submitted_at_height;
+					}
+				}
+				oldest
+			};
 			Some(BitcoinSyncStatus { confirmed_block, synched_block, oldest_allowed_block_height })
 		}
 
