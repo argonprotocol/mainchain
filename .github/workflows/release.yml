@@ -22,7 +22,6 @@ defaults:
   run:
     shell: bash
 
-
 jobs:
   create-release:
     runs-on: ubuntu-22.04
@@ -35,7 +34,7 @@ jobs:
       - uses: taiki-e/create-gh-release-action@v1
         with:
           title: $version
-          draft: true
+          draft: false
           token: ${{ secrets.GITHUB_TOKEN }}
 
   upload-assets:

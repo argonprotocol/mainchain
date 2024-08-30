@@ -1,5 +1,6 @@
 # See https://pre-commit.com for more information
 # See https://pre-commit.com/hooks.html for more hooks
+default_stages: [ pre-commit, pre-push ]
 repos:
   - repo: https://github.com/pre-commit/pre-commit-hooks
     rev: v4.6.0
@@ -23,11 +24,12 @@ repos:
         language: system
         types: [ rust ]
         pass_filenames: false
-        stages: [ commit, push ]
+        stages: [ pre-commit, pre-push ]
       - id: lint
         name: Run clippy
         entry: cargo clippy --workspace --fix --allow-staged --allow-dirty -- -Dwarnings
         language: system
         types: [ rust ]
         pass_filenames: false
+        # don't automatically commit changes made by clippy
         stages: [ commit ]

@@ -150,3 +150,24 @@ binary = "cargo-watch"
 test_arg = "--version"
 force = false
 install_command = "binstall"
+
+[tasks.release]
+description = "Complete release process: install dependencies, version bump, changelogs, commit, and push"
+script = [
+    "brew install convco",
+    "cargo binstall cargo-edit --no-confirm",
+    "export VERSION=$(convco version --bump)",
+    "export COMMIT_MSG=\"chore(release): update changelogs and bump versions to ${VERSION}\"",
+    "echo $COMMIT_MSG",
+    "cargo set-version ${VERSION}",
+    "convco changelog --unreleased ${VERSION} > CHANGELOG.md",
+    "convco changelog --paths localchain --unreleased ${VERSION} > localchain/CHANGELOG.md",
+    "convco changelog --paths client/nodejs --unreleased ${VERSION} > client/nodejs/CHANGELOG.md",
+    "yarn",
+    "yarn version:bump",
+    "yarn", # re-link workspaces
+    "git add .",
+    # commit a second time in case there pre-commit hooks that modify files
+    "git commit -m \"$COMMIT_MSG\" || (git add . && git commit -m \"$COMMIT_MSG\")",
+    "git tag v${VERSION}"
+]
