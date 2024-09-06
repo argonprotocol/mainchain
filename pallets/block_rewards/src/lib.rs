@@ -314,13 +314,12 @@ pub mod pallet {
 				return Ok(());
 			}
 
-			C::mint_into(&reward.account_id, amount).map_err(|e| {
+			C::mint_into(&reward.account_id, amount).inspect_err(|_| {
 				if is_ownership {
 					reward.ownership = 0u128.into();
 				} else {
 					reward.argons = 0u128.into();
 				}
-				e
 			})?;
 
 			let frozen = C::balance_frozen(&freeze_id, &reward.account_id);

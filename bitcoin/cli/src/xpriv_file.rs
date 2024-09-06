@@ -6,9 +6,9 @@ use clap::Args;
 use directories::BaseDirs;
 use std::{
 	fs,
-	fs::{File, Permissions},
+	fs::File,
 	io::{BufReader, BufWriter, Read, Write},
-	path::PathBuf,
+	path::{Path, PathBuf},
 };
 
 /// A local file that can store an encrypted (or plaintext) xpriv.
@@ -88,7 +88,7 @@ impl XprivFile {
 
 		#[cfg(unix)]
 		{
-			use std::os::unix::fs::PermissionsExt;
+			use std::{fs::Permissions, os::unix::fs::PermissionsExt};
 			output_file
 				.set_permissions(Permissions::from_mode(0o600))
 				.map_err(|e| anyhow!("Failed to set permissions: {}", e))?;
@@ -134,7 +134,7 @@ pub fn secret_string_from_str(s: &str) -> Result<SecretString, String> {
 	std::str::FromStr::from_str(s).map_err(|_| "Could not get SecretString".to_string())
 }
 
-pub fn expand_path(path: &PathBuf) -> PathBuf {
+pub fn expand_path(path: &Path) -> PathBuf {
 	if let Some(str_path) = path.to_str() {
 		if str_path.starts_with('~') {
 			if let Some(dirs) = BaseDirs::new() {
@@ -142,5 +142,5 @@ pub fn expand_path(path: &PathBuf) -> PathBuf {
 			}
 		}
 	}
-	path.clone()
+	path.to_path_buf()
 }

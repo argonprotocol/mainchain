@@ -243,9 +243,8 @@ pub mod pallet {
 				target: LOG_TARGET,
 				"Block seal inherent submitted {:?}", seal
 			);
-			Self::apply_seal(seal).map_err(|e| {
+			Self::apply_seal(seal).inspect_err(|e| {
 				log::error!(target: LOG_TARGET, "Error applying block seal: {:?}", e);
-				e
 			})?;
 			Ok(())
 		}

@@ -556,6 +556,7 @@ async fn owner_requests_unlock(
 	Ok(())
 }
 
+#[allow(clippy::too_many_arguments)]
 async fn vault_cosigns_unlock(
 	test_node: &ArgonTestNode,
 	client: Arc<MainchainClient>,
