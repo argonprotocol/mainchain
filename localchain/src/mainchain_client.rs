@@ -769,8 +769,8 @@ pub mod napi_ext {
       })
     }
 
-    #[napi(js_name = "getShares")]
-    pub async fn get_shares_napi(&self, address: String) -> napi::Result<BalancesAccountData> {
+    #[napi(js_name = "getOwnership")]
+    pub async fn get_ownership_napi(&self, address: String) -> napi::Result<BalancesAccountData> {
       let account = self.get_ownership(address).await.napi_ok()?;
       Ok(BalancesAccountData {
         free: account.free.into(),

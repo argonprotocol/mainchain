@@ -76,8 +76,8 @@ pub fn set_argons(account_id: u64, amount: Balance) {
 	drop(Balances::issue(amount));
 }
 
-pub(crate) type SharesToken = pallet_balances::Instance2;
-impl pallet_balances::Config<SharesToken> for Test {
+pub(crate) type OwnershipToken = pallet_balances::Instance2;
+impl pallet_balances::Config<OwnershipToken> for Test {
 	type MaxLocks = ();
 	type MaxReserves = ();
 	type Balance = Balance;
@@ -86,7 +86,7 @@ impl pallet_balances::Config<SharesToken> for Test {
 	type DustRemoval = ();
 	type ExistentialDeposit = ExistentialDeposit;
 	type AccountStore = StorageMapShim<
-		pallet_balances::Account<Test, SharesToken>,
+		pallet_balances::Account<Test, OwnershipToken>,
 		Self::AccountId,
 		pallet_balances::AccountData<Balance>,
 	>;

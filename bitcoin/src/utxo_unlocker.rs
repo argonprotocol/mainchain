@@ -222,7 +222,9 @@ impl UtxoUnlocker {
 }
 
 #[cfg(feature = "hwi")]
-mod hwi {
+mod hwi_ext {
+	use super::*;
+	use anyhow::{anyhow, bail, Result};
 	use hwi::{types::HWIDevice, HWIClient};
 
 	impl UtxoUnlocker {

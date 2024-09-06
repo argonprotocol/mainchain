@@ -144,7 +144,7 @@ impl VaultCommands {
 					.set_header(vec![
 						"Bond Id",
 						"Utxo Id",
-						"Expiration Due Block",
+						"Cosign Due Block",
 						"Type",
 						"Redemption Price",
 					]);

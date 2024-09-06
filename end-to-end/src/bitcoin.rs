@@ -1,7 +1,7 @@
-use std::{str::FromStr, sync::Arc};
+use std::{env, str::FromStr, sync::Arc};
 
 use bitcoin::{
-	bip32::{ChildNumber, DerivationPath, Fingerprint, Xpriv, Xpub},
+	bip32::{ChildNumber, DerivationPath, Fingerprint, Xpub},
 	hashes::Hash,
 	secp256k1::{All, Secp256k1},
 	Amount, EcdsaSighashType, Network, Psbt, PublicKey, ScriptBuf, Txid,
@@ -11,7 +11,6 @@ use bitcoind::{
 	bitcoincore_rpc::{bitcoincore_rpc_json::AddressType, jsonrpc::serde_json, RpcApi},
 	BitcoinD,
 };
-use rand::{rngs::OsRng, RngCore};
 use sp_arithmetic::FixedU128;
 use sp_core::{crypto::AccountId32, sr25519, Pair};
 
@@ -35,6 +34,7 @@ use argon_testing::{
 	add_blocks, add_wallet_address, fund_script_address, run_bitcoin_cli, start_argon_test_node,
 	ArgonTestNode, ArgonTestOracle,
 };
+use tokio::fs;
 
 #[tokio::test]
 async fn test_bitcoin_minting_e2e() {
@@ -79,12 +79,8 @@ async fn test_bitcoin_minting_e2e() {
 	let client = test_node.client.clone();
 	let client = Arc::new(client);
 
-	let vault_master_xpriv = create_xpriv(network);
-	let vault_child_xpriv = vault_master_xpriv
-		.derive_priv(&Secp256k1::new(), &[ChildNumber::from_hardened_idx(0).unwrap()])
-		.unwrap();
-
-	let xpubkey = Xpub::from_priv(&secp, &vault_child_xpriv);
+	let (vault_xpriv_path, vault_xpriv_pwd, vault_xpub, vault_xpub_hd_path) =
+		create_xpriv(&test_node).await.unwrap();
 	let vault_signer = Sr25519Signer::new(alice_sr25519.clone());
 
 	let _oracle = ArgonTestOracle::bitcoin_tip(&test_node).await.unwrap();
@@ -95,7 +91,7 @@ async fn test_bitcoin_minting_e2e() {
 	let vault_owner_account_id32: AccountId32 = vault_owner.public().into();
 
 	// 2. A vault is setup with enough funds
-	let vault_id = create_vault(&test_node, &xpubkey, &vault_owner_account_id32, &vault_signer)
+	let vault_id = create_vault(&test_node, &vault_xpub, &vault_owner_account_id32, &vault_signer)
 		.await
 		.unwrap();
 
@@ -119,11 +115,9 @@ async fn test_bitcoin_minting_e2e() {
 		.unwrap();
 	println!("bitcoin prices submitted");
 
-	let available_vaults =
-		run_bitcoin_cli(&test_node, vec!["vault", "list", "--btc", &utxo_btc.to_string()])
-			.await
-			.unwrap();
-	println!("{}", available_vaults);
+	let _ = run_bitcoin_cli(&test_node, vec!["vault", "list", "--btc", &utxo_btc.to_string()])
+		.await
+		.unwrap();
 
 	// 3. Owner calls bond api to start a bitcoin bond
 	let (utxo_id, bond_id) =
@@ -131,11 +125,12 @@ async fn test_bitcoin_minting_e2e() {
 			.await
 			.unwrap();
 
-	let psbt_cli =
-		run_bitcoin_cli(&test_node, vec!["bond", "create-psbt", "--bond-id", &bond_id.to_string()])
-			.await
-			.unwrap();
-	println!("{}", psbt_cli);
+	let send_to_address = run_bitcoin_cli(
+		&test_node,
+		vec!["bond", "send-to-address", "--bond-id", &bond_id.to_string()],
+	)
+	.await
+	.unwrap();
 
 	let (script_address, bond_amount) = confirm_bond(
 		&test_node,
@@ -143,7 +138,7 @@ async fn test_bitcoin_minting_e2e() {
 		owner_compressed_pubkey,
 		utxo_satoshis,
 		&client,
-		xpubkey,
+		vault_xpub,
 		network,
 		vault_id,
 		&bond_id,
@@ -154,9 +149,8 @@ async fn test_bitcoin_minting_e2e() {
 	// 4. Owner funds the bond utxo and submits it
 	let scriptbuf: ScriptBuf = script_address.into();
 	let scriptaddress = bitcoin::Address::from_script(scriptbuf.as_script(), network).unwrap();
-	println!("Checking for {} sats, to {}", utxo_satoshis, scriptaddress);
-	assert!(psbt_cli.contains(&format!("{} sats", utxo_satoshis)));
-	assert!(psbt_cli.contains(&format!("to {}", scriptaddress)));
+	println!("Checking for {} satoshis to {}", utxo_satoshis, scriptaddress);
+	assert!(send_to_address.contains(&format!("{} satoshis to {}", utxo_satoshis, scriptaddress)));
 
 	let (txid, vout, _) =
 		fund_script_address(bitcoind, &scriptaddress, utxo_satoshis, &block_creator);
@@ -167,11 +161,9 @@ async fn test_bitcoin_minting_e2e() {
 		.await
 		.unwrap();
 
-	let bond_cli_get =
-		run_bitcoin_cli(&test_node, vec!["bond", "get", "--bond-id", &bond_id.to_string()])
-			.await
-			.unwrap();
-	println!("Owner has been minted\n{}", bond_cli_get);
+	let _ = run_bitcoin_cli(&test_node, vec!["bond", "get", "--bond-id", &bond_id.to_string()])
+		.await
+		.unwrap();
 
 	// 5. Ask for the bitcoin to be unlocked
 	println!("\nOwner requests unlock");
@@ -183,12 +175,13 @@ async fn test_bitcoin_minting_e2e() {
 	println!("\nVault publishes cosign tx");
 	vault_cosigns_unlock(
 		&test_node,
-		&secp,
 		client,
-		&vault_child_xpriv,
 		&vault_signer,
 		&vault_id,
 		&bond_id,
+		&vault_xpriv_path,
+		&vault_xpriv_pwd,
+		&vault_xpub_hd_path,
 	)
 	.await
 	.unwrap();
@@ -239,6 +232,44 @@ fn get_parent_fingerprint(bitcoind: &BitcoinD, owner_hd_key_path: &DerivationPat
 	let master_fingerprint = Fingerprint::from_hex(master_fingerprint).unwrap();
 	println!("Master Fingerprint: {}", master_fingerprint);
 	master_fingerprint
+}
+
+async fn create_xpriv(test_node: &ArgonTestNode) -> anyhow::Result<(String, String, Xpub, String)> {
+	let path = env::temp_dir().join("vault0.xpriv");
+	if path.is_file() {
+		fs::remove_file(&path).await?;
+	}
+	let password = "Password123";
+	let _ = run_bitcoin_cli(
+		test_node,
+		vec!["xpriv", "master", "--password", password, "--xpriv-path", path.to_str().unwrap()],
+	)
+	.await?;
+	let derivation_path = "m/0'";
+
+	let xpub_result = run_bitcoin_cli(
+		test_node,
+		vec![
+			"xpriv",
+			"derive-xpub",
+			"--xpriv-path",
+			path.to_str().unwrap(),
+			"--password",
+			password,
+			"--hd-path",
+			derivation_path,
+		],
+	)
+	.await?;
+	let xpub_hex = hex::decode(xpub_result.split("0x").last().unwrap().trim())?;
+
+	let xpub = Xpub::decode(xpub_hex.as_ref())?;
+	Ok((
+		path.to_str().unwrap().to_string(),
+		password.to_string(),
+		xpub,
+		derivation_path.to_string(),
+	))
 }
 
 async fn create_vault(
@@ -297,7 +328,6 @@ async fn create_vault(
 		],
 	)
 	.await?;
-	println!("Result of creation {}", result);
 
 	let vault_creation = client
 		.submit_from_polkadot_url(&result, vault_signer, Some(params.build()))
@@ -333,7 +363,6 @@ async fn create_bond(
 		],
 	)
 	.await?;
-	println!("{}", bond_cli_result);
 
 	let bond_tx = test_node
 		.client
@@ -362,7 +391,6 @@ async fn confirm_bond(
 ) -> anyhow::Result<(BitcoinCosignScriptPubkey, Balance)> {
 	let bond_cli_get =
 		run_bitcoin_cli(test_node, vec!["bond", "get", "--bond-id", &bond_id.to_string()]).await?;
-	println!("{}", bond_cli_get);
 
 	let bond_api = client
 		.fetch_storage(&storage().bonds().bonds_by_id(bond_id), None)
@@ -507,7 +535,7 @@ async fn owner_requests_unlock(
 		],
 	)
 	.await?;
-	println!("{}", unlock_request_cli);
+
 	let unlock_request_tx = client
 		.submit_from_polkadot_url(
 			&unlock_request_cli,
@@ -530,51 +558,42 @@ async fn owner_requests_unlock(
 
 async fn vault_cosigns_unlock(
 	test_node: &ArgonTestNode,
-	secp: &Secp256k1<All>,
 	client: Arc<MainchainClient>,
-	vault_child_xpriv: &Xpriv,
 	vault_signer: &Sr25519Signer,
 	vault_id: &VaultId,
 	bond_id: &BondId,
+	xpriv_path: &str,
+	xpriv_pwd: &str,
+	uploaded_xpub_hd_path: &str,
 ) -> anyhow::Result<()> {
 	let pending_unlock = run_bitcoin_cli(
 		test_node,
 		vec!["vault", "pending-unlock", "--vault-id", &vault_id.to_string()],
 	)
 	.await?;
-	println!("{}", pending_unlock);
+
 	assert!(pending_unlock.lines().count() > 3);
 	assert!(pending_unlock.contains('1'));
 
 	let unlock_fulfill_cli = run_bitcoin_cli(
 		test_node,
-		vec!["bond", "vault-cosign-psbt", "--bond-id", &bond_id.to_string()],
-	)
-	.await?;
-	println!("{}", unlock_fulfill_cli);
-
-	// TODO: send this to bitcoin cli
-	let psbt_hex = unlock_fulfill_cli.trim().split('\n').last().unwrap().trim();
-	let mut psbt = Psbt::from_str(psbt_hex).expect("psbt");
-
-	psbt.sign(vault_child_xpriv, secp).expect("sign");
-
-	let submit_cosign_cli = run_bitcoin_cli(
-		test_node,
 		vec![
 			"bond",
-			"vault-cosign-submit",
+			"vault-cosign",
 			"--bond-id",
 			&bond_id.to_string(),
-			"--psbt",
-			psbt.to_string().as_str(),
+			"--xpriv-path",
+			xpriv_path,
+			"--password",
+			xpriv_pwd,
+			"--master-xpub-hd-path",
+			uploaded_xpub_hd_path,
 		],
 	)
 	.await?;
-	println!("{}", submit_cosign_cli);
 
 	let _ = client
-		.submit_from_polkadot_url(&submit_cosign_cli, vault_signer, None)
+		.submit_from_polkadot_url(&unlock_fulfill_cli, vault_signer, None)
 		.await?
 		.wait_for_finalized_success()
 		.await?;
@@ -604,7 +623,7 @@ async fn owner_sees_signature_and_unlocks(
 		],
 	)
 	.await?;
-	println!("{}", owner_cosign_cli);
+
 	let psbt_text = owner_cosign_cli
 		.trim()
 		.split('\n')
@@ -649,10 +668,4 @@ async fn owner_sees_signature_and_unlocks(
 	assert!(did_accept.allowed);
 
 	Ok(())
-}
-
-fn create_xpriv(network: Network) -> Xpriv {
-	let mut seed = [0u8; 32];
-	OsRng.fill_bytes(&mut seed);
-	Xpriv::new_master(network, &seed).unwrap()
 }

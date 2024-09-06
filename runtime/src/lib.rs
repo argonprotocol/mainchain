@@ -261,7 +261,7 @@ impl pallet_block_rewards::Config for Runtime {
 	type RuntimeEvent = RuntimeEvent;
 	type WeightInfo = pallet_block_rewards::weights::SubstrateWeight<Runtime>;
 	type ArgonCurrency = Balances;
-	type SharesCurrency = Ownership;
+	type OwnershipCurrency = Ownership;
 	type Balance = Balance;
 	type BlockSealerProvider = BlockSeal;
 	type NotaryProvider = Notaries;
@@ -705,8 +705,8 @@ impl pallet_mint::Config for Runtime {
 	type BlockRewardAccountsProvider = MiningSlot;
 }
 
-type SharesToken = pallet_balances::Instance2;
-impl pallet_balances::Config<SharesToken> for Runtime {
+type OwnershipToken = pallet_balances::Instance2;
+impl pallet_balances::Config<OwnershipToken> for Runtime {
 	type MaxLocks = ConstU32<50>;
 	type MaxReserves = ();
 	type ReserveIdentifier = [u8; 8];
@@ -717,7 +717,7 @@ impl pallet_balances::Config<SharesToken> for Runtime {
 	type DustRemoval = ();
 	type ExistentialDeposit = ConstU128<EXISTENTIAL_DEPOSIT>;
 	type AccountStore = StorageMapShim<
-		pallet_balances::Account<Runtime, SharesToken>,
+		pallet_balances::Account<Runtime, OwnershipToken>,
 		AccountId,
 		pallet_balances::AccountData<Balance>,
 	>;
@@ -1245,7 +1245,7 @@ mod benches {
 		[frame_benchmarking, BaselineBench::<Runtime>]
 		[frame_system, SystemBench::<Runtime>]
 		[pallet_balances, ArgonTokens]
-		[pallet_balances, SharesTokens]
+		[pallet_balances, OwnershipTokens]
 		[pallet_timestamp, Timestamp]
 		[pallet_ticks, Ticks]
 		[pallet_data_domain, DataDomain]

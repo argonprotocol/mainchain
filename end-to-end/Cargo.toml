@@ -15,6 +15,7 @@ publish = false
 anyhow = { workspace = true }
 tokio = { workspace = true }
 bitcoind = { workspace = true }
+miniscript = { workspace = true }
 rand = { workspace = true }
 bitcoin = { workspace = true, features = ["base64"] }
 lazy_static = { workspace = true }

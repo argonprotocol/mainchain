@@ -7,7 +7,7 @@ use frame_support::{
 		Currency, OnInitialize, OneSessionHandler,
 	},
 };
-use pallet_balances::Event as SharesEvent;
+use pallet_balances::Event as OwnershipEvent;
 use sp_core::{bounded_vec, crypto::AccountId32, ByteArray, H256, U256};
 use sp_runtime::{testing::UintAuthorityId, BoundedVec, FixedU128};
 
@@ -357,8 +357,11 @@ fn it_unbonds_accounts_when_a_window_closes() {
 		);
 
 		System::assert_has_event(
-			SharesEvent::<Test, SharesToken>::Endowed { account: 3, free_balance: 1000u32.into() }
-				.into(),
+			OwnershipEvent::<Test, OwnershipToken>::Endowed {
+				account: 3,
+				free_balance: 1000u32.into(),
+			}
+			.into(),
 		);
 
 		System::assert_has_event(
@@ -382,7 +385,7 @@ fn it_unbonds_accounts_when_a_window_closes() {
 }
 
 #[test]
-fn it_holds_ownership_shares_for_a_slot() {
+fn it_holds_ownership_tokens_for_a_slot() {
 	BlocksBetweenSlots::set(3);
 	MaxMiners::set(6);
 	MaxCohortSize::set(2);
@@ -461,7 +464,7 @@ fn it_wont_accept_bids_until_bidding_starts() {
 	});
 }
 #[test]
-fn it_wont_let_you_reuse_ownership_shares_for_two_bids() {
+fn it_wont_let_you_reuse_ownership_tokens_for_two_bids() {
 	BlocksBetweenSlots::set(4);
 	MaxMiners::set(6);
 	MaxCohortSize::set(2);
