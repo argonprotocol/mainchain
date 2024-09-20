@@ -7,7 +7,7 @@ by "burning" the current market rate of your Bitcoins, but notably capped at the
 ## Why do I want this for my Bitcoin?
 
 The Argon Network produces an inflation-proof currency. If you are holding your Bitcoin, locking them into an Argon
-Vault allows you to continue holding, but unlock the liquid worth of your Bitcoin. Since you can redeem your Bitcoin at
+Vault allows you to continue holding but unlock the liquid worth of your Bitcoin. Since you can redeem your Bitcoin at
 the market rate at time of unlock, you can protect yourself against price decreases in Bitcoin, and since it is capped
 at the "lock price", you still benefit from price increases.
 

@@ -1,11 +1,13 @@
 # Localchains & Notaries
 
-The Argon has a built-in L2 driven by a person-to-person blockchain. Localchains are a personal "blockchain" that keeps
-a cryptographically linked list of balance changes (note: it's akin to a blockchain, but absent "blocks").
+The Argon has a built-in aggregator/rollup service called a Notary. Notaries rollup balance changes from
+personal "blockchains" called Localchains. Localchains run on a personal computer, mobile phone, or back a cloud
+machine. They maintain a cryptographically linked list of balance changes (note: it's akin to a blockchain, but absent "
+blocks").
 
 ### Balance Tip Proof
 
-Localchain track a balance as a linked history and proof of a current "tip" that has been submitted to a Notebook that
+Localchains track balances as a linked history and proof of a current "tip" that has been submitted to a Notebook that
 is in the Argon mainchain. The Localchain obtains proof that their tip is in the merkle root that is published in the
 notebook either by building it from the balance changes in a notebook, or requesting it from a provider (some Notaries
 will activate this option).

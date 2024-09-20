@@ -41,12 +41,12 @@ we'll show some of the high-level steps.
     server 3.pool.ntp.org iburst
     ```
 2. A Bitcoin node connected to the Signet that supports Compact Block Filters. You can reference
-   the [Bitcoin Core installation guide](https://bitcoin.org/en/full-node#linux-instructions) for Ubuntu. Your
+   the [Bitcoin Core installation guide](https://bitcoin.org/en/full-node#linux-instructions) for Ubuntu.
 
    > You can install this on the same machine, but do note it will take up a few GB of storage. If you install it on
    another machine, modify your bitcoin.conf as appropriate.
 
-   bitcoin.conf must include the following configs:
+   Your bitcoin.conf must include the following configs:
    ```bash
    chain=signet
    blockfilterindex=1
