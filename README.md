@@ -1,197 +1,193 @@
-# Substrate Node Template
+# Argon
 
-A fresh [Substrate](https://substrate.io/) node, ready for hacking :rocket:
+An inflation-proof stablecoin backed by [Bitcoin](https://bitcoin.org) and the [Ulixee](https://ulixee.org) data
+network. The Argon is built as a transactional
+currency that can scale to micropayments as low as 1 millionth of a dollar. It is built on the
+Polkadot [Substrate](https://substrate.dev) framework.
 
-A standalone version of this template is available for each release of Polkadot in
-the [Substrate Developer Hub Parachain Template](https://github.com/substrate-developer-hub/substrate-parachain-template/)
-repository.
-The parachain template is generated directly at each Polkadot release branch from
-the [Node Template in Substrate](https://github.com/paritytech/substrate/tree/master/bin/argon-node) upstream
+## Overview
 
-It is usually best to use the stand-alone version to start a new project.
-All bugs, suggestions, and feature requests should be made upstream in
-the [Substrate](https://github.com/paritytech/substrate/tree/master/bin/argon-node) repository.
+The Argon mainchain is the stabilization layer of the Argon network. Argon stabilizes the value of the Argon by removing
+excess currency from supply when the price of argon falls below target (ie, less is desired by the market) and minting
+new supply when price is above target (ie, more is in demand than exists).
 
-## Getting Started
+Minting can be done through two mechanisms. The first is via mining for the Argon, where miners are given permission to
+mint new Argons when the price is above target. The second is through a "Liquid Locking" offering for Bitcoins, where
+Bitcoins are able to mint liquidity equal to their Bitcoin's market value by committing to locking their Bitcoins and an
+equivalent amount of Argons for a year.
+
+The Bitcoin bonds transform into "options" that allow a holder to profit from the volatility of both the Bitcoin price
+and the Argon price. To call an option, a Bitcoin holder must issue a "system burn" of argons equivalent to the current
+market price of Bitcoin. This creates a dynamically adjusting "burn rate" to forcefully remove unwanted currency from
+the system (unwanted, meaning, the market price of the Argon is below target, ergo less desirable).
+
+The Argon's second layer of excess currency removal (ie, stabilization) occurs through the collection of a tax on
+all transactions that occur on the L2 of the Argon network, the Localchains. This second layer tax will dynamically
+adjust to the price of the Argon, ensuring sufficient supply can be removed quickly from the system.
+
+Localchains are the person-to-person Layer 2 of the Argon network. They are a personal "blockchain" that keeps a
+cryptographic proof of the "current balance" of each user, which can be signed and sent to another user for exchanging
+funds. Localchains are expected to be used for high-frequency transactions, such as micropayments, and for escrowing
+Ulixee Datastore payments. Localchains submit balance changes in "notarizations" to the Argon mainchain via Notaries,
+which are network approved entities that audit the balance changes and batch them to the mainchain.
+
+## Consensus
+
+The Argon mainchain uses a hybrid consensus model. The first form of consensus is
+a [Randomx](https://github.com/tevador/RandomX) proof-of-compute
+algorithm that is active during "Slot Zero" before miners register for slots. Randomx was developed as part of the
+Monero blockchain to create a proof of work that does not favor GPUs, allowing regular desktops to compete. The argon
+has no funds minted in the genesis block, so this period can be viewed as the bootstrapping period for the network.
+
+The second form of consensus is a registered mining phase, where miners bid for slots to mine blocks. They must bid by
+using bonded argons from a Vault in the system. All mining argons must have an equivalent amount of Bitcoin bonded,
+which will bring liquidity to the system. Miners are given priority to register blocks in the system over proof of
+compute blocks, so once this phase activates, the network will be secured by the miners and only use proof of compute
+when no miners are registered or active. Miners are matched to votes provided by Localchain users using an XOR closest
+algorithm (more details to come in the whitepaper).
+
+## Technology Brief
+
+The Argon mainchain is built using the [Substrate](https://substrate.dev) framework. Substrate is a modular blockchain
+framework that allows developers to build custom blockchains that operate independently, but can connect into a shared
+ecosystem called "Parachains". Substrate is built in Rust and has a WebAssembly runtime that allows for upgrades to the
+blockchain without forks. Argon runs as a "solochain", which means our consensus is not shared with other chains. It
+will gain integration through a "Transferchain" that allows for the transfer of Argons between chains.
+
+The Localchain is a Rust library that can be run in a standalone cli, within Node.js via bindings created
+using [napi-rs](https://napi.rs) or as a library in iOS/Android using [uniffi](https://github.com/mozilla/uniffi-rs). It
+uses a Sqlite database to store the balance changes and notarizations.
+
+The Notary is a Rust-based API that uses Json-RPC to communicate with the Localchains and the Argon mainchain. It uses a
+PostgresSQL database to keep track of its history and users' balance tips.
+
+## Repository Structure
+
+- `bitcoin`: This module has a cli for bitcoin bonds and vaults, and shared code around the Bitcoin miniscript used for
+  the vaulted bitcoins.
+- `client`: Mainchain client library in rust and for nodejs.
+- `end-to-end`: Tests intending to be run using the end-user tools.
+- `localchain`: Localchain is the layer 2 of Argon run by individual wallets. This repo includes bindings for nodejs, a
+  standalone cli, and code to run the localchain inside iOS/Android. More about the
+  localchain [here](./docs/localchain.md).
+- `node`: The node implementation is the entry point for the Argon blockchain. It is responsible for networking,
+  consensus, and running the blockchain.
+    - `randomx`: Argon has two forms of block consensus. The first is a randomx proof-of-work algorithm. It is eligible
+      for creating all blocks during "Slot 0", before miners register for slots.
+    - `consensus`: The second form of consensus comes from votes submitted by localchains to the notaries. This module
+      has logic for retrieving notebooks from notaries and prioritizing blocks.
+    - `bitcoin_utxo_tracker`: Each block created and validated by the Argon blockchain must track all Bitcoin UTXOs that
+      back the Argon via bonds. This is done by tracking BlockFilters in bitcoin against the bonded UTXOs.
+- `notary`: The notary validates localchain transactions and confirms they are operating on their latest tip. A notary
+  runs on a Postgres database. It must submit notebooks rolling up all the localchain balance changes, votes and
+  registered data domains. Notebooks are submitted for each system "tick".
+- `runtime`: The runtime implementation is the core logic of the blockchain. It defines the state transition function
+  and the blockchain's logic. The runtime is built as a wasm binary and can be upgraded without a hard fork.
+- `oracle`: The code for running the oracles that submit price data and the bitcoin confirmed tip to the blockchain.
+- `pallets`: The pallets are the various "tables" that make up the blockchain. They define the storage, dispatchables,
+  events, and errors of the blockchain.
+    - `bitcoin_utxos`: Tracks the Bitcoin UTXOs that back the Argon.
+    - `block_rewards`: Allocates and unlocks block rewards (they are frozen for a period before being allowed to be
+      spent).
+    - `block_seal`: Verifies the type of block seal used to secure the blockchain matches eligible work.
+    - `block_seal_spec`: Tracks and adjust difficulty of compute and vote "power" for block seals.
+    - `bond`: Allows users to lock and unlock bitcoin bonds, and tracks the mining bonds (pairs with the vaults pallet,
+      and the mining slots).
+    - `chain_transfer`: Allows users to transfer Argon between chains. Currently supports Localchain and Mainchain.
+    - `data_domain`: Registers and tracks data domains. Data domains are used as dns routing
+      for [Ulixee Datastores](https://ulixee.org/docs/datastore).
+    - `mining_slot`: Allows users to register for mining slots. Mining slots are used to determine who is eligible to
+      mine blocks created by the notebook commit reveal scheme.
+    - `mint`: Mints Argons to bonded bitcoins and miners when the Argon price is above target
+    - `notaries`: Registers the notaries and metadata to connect to them
+    - `notebook`: Tracks the recent notebooks submitted by the notaries, as well as the account change roots for each
+      notebook. Also tracks the last changed notebook per localchain.
+    - `price_index`: Tracks Argon-USD and Bitcoin USD pricing, as well as the current Argon Target price given CPI
+      inflation since the starting time.
+    - `ticks`: Tracks system-wide "ticks" or minutes since genesis as whole units.
+    - `vaults`: Register and manage vaults that offer bonded bitcoins to miners and bitcoin holders.
+- `primitives`: Shared models and types for the Argon mainchain, localchain and notaries.
+
+## Runtime Pallets
+
+Argon makes use of a few runtime pallets that are useful to know about as a user of the system.
+
+- `Balances`: This is an instance of
+  the [balances](https://paritytech.github.io/polkadot-sdk/master/pallet_balances/index.html) pallet that is used to
+  track the
+  balances of the Argon
+  currency. NOTE: balances are stored in the System Account, not the pallet. This can make some api calls confusing.
+- `Ownership`: This is an instance of
+  the [balances](https://paritytech.github.io/polkadot-sdk/master/pallet_balances/index.html) pallet that is used to
+  track the Ownership Tokens
+  of an account. Ownership tokens allow you to bid on mining slots.
+- `Sessions`: This is an instance of
+  the [session](https://paritytech.github.io/polkadot-sdk/master/pallet_session/index.html)
+  pallet that is used to track the session keys of active miners. You must submit session keys to activate your mining
+  slot. NOTE: this is usually done on your miner itself, not via rpc to a public rpc host.
+- `Grandpa`: Argon uses the [Grandpa](https://github.com/w3f/consensus/blob/master/pdf/grandpa.pdf) Finality gadget to
+  finalize blocks. This pallet is used to track the finality authorities (which correspond to the active miners) and
+  equivocations (which are penalties for not following grandpa rules).
+- `Multisig`: This [pallet](https://paritytech.github.io/polkadot-sdk/master/pallet_multisig/index.html) allows you to
+  create a multi-signature account. Substrate's multisig is a little different from other systems, as it requires each
+  party to submit their portion of the signature in a separate transaction.
+- `Proxy`: This [pallet](https://paritytech.github.io/polkadot-sdk/master/pallet_proxy/index.html) allows you to create
+  a proxy account that can submit transactions on behalf of another account. This is useful for creating a cold wallet
+  that can still submit transactions. The cold wallet will pay for the transaction fees but doesn't have to have keys
+  loaded into memory.
+
+## Using the Testnet
+
+The Argon testnet is a network that is intended to be used for testing and development. You can connect to
+the [Polkadot Developer Portal](https://polkadot.js.org/apps/#/explorer?rpc=wss://rpc.testnet.argonprotocol.org) to
+interact with the testnet. We are also publishing binary versions of the localchain and bitcoin cli that are useful to
+test out connecting to the testnet. Those versions can be found on
+the [releases page](https://github.com/argonprotocol/argon/releases/latest).
+
+Useful Urls:
+
+- RPC: `wss://rpc.testnet.argonprotocol.org`
+- Testnet Notary: `wss://notary1.testnet.argonprotocol.org`
+- Testnet Bootnode: `wss://bootnode0.testnet.argonprotocol.org`
+- [Polkadot/Substrate Portal](https://polkadot.js.org/apps/#/explorer?rpc=wss://rpc.testnet.argonprotocol.org)
+- [Argon Discord](https://discord.gg/ChyAhFtD)
+
+Here are some tutorials to get you started:
+
+- [How to set up an Account](./docs/account-setup)
+- [How to use the Argon Localchain CLI](./docs/localchain.md#command-line-interface)
+- [How to bond Bitcoins using the Argon Bitcoin CLI](./docs/bitcoin-bond.md)
+- [How to create and manage a Vault using the Argon Bitcoin CLI](./docs/running-a-vault)
+- [How to run a testnet miner](./docs/run-a-miner.md)
+
+## Running Locally
 
 Depending on your operating system and Rust version, there might be additional packages required to compile this
-template.
-Check the [Install](https://docs.substrate.io/install/) instructions for your platform for the most common dependencies.
-Alternatively, you can use one of the [alternative installation](#alternatives-installations) options.
+project.
+Check the [Substrate Install](https://docs.substrate.io/install/) instructions for your platform for the most common
+dependencies.
 
 ### Build
 
-Use the following command to build the node without launching it:
+Use the following command to build the tools without launching it:
 
 ```sh
 cargo build --release
 ```
 
-### Embedded Docs
+### Launch a local test network
 
-After you build the project, you can use the following command to explore its parameters and subcommands:
-
-```sh
-./target/release/argon-node -h
-```
-
-You can generate and view the [Rust Docs](https://doc.rust-lang.org/cargo/commands/cargo-doc.html) for this template
-with this command:
+The following command starts a local test network that will not persist state. NOTE: you need postgres sql installed and
+available.
 
 ```sh
-cargo +nightly doc --open
+./scripts/local_testnet.sh
 ```
 
-### Single-Node Development Chain
+### Connect with Polkadot-JS Developer Admin Front-End
 
-The following command starts a single-node development chain that doesn't persist state:
+After you start the network locally, you can interact with it using the hosted version of
+the [Polkadot/Substrate Portal](https://polkadot.js.org/apps/#/explorer?rpc=ws://localhost:9944).
 
-```sh
-./target/release/argon-node --dev
-```
-
-To purge the development chain's state, run the following command:
-
-```sh
-./target/release/argon-node purge-chain --dev
-```
-
-To start the development chain with detailed logging, run the following command:
-
-```sh
-RUST_BACKTRACE=1 ./target/release/argon-node -ldebug --dev
-```
-
-Development chains:
-
-- Maintain state in a `tmp` folder while the node is running.
-- Use the **Alice** and **Bob** accounts as default validator authorities.
-- Use the **Alice** account as the default `sudo` account.
-- Are preconfigured with a genesis state (`/node/src/chain_spec.rs`) that includes several prefunded development
-  accounts.
-
-To persist chain state between runs, specify a base path by running a command similar to the following:
-
-```sh
-// Create a folder to use as the db base path
-$ mkdir my-chain-state
-
-// Use of that folder to store the chain state
-$ ./target/release/argon-node --dev --base-path ./my-chain-state/
-
-// Check the folder structure created inside the base path after running the chain
-$ ls ./my-chain-state
-chains
-$ ls ./my-chain-state/chains/
-dev
-$ ls ./my-chain-state/chains/dev
-db keystore network
-```
-
-### Connect with Polkadot-JS Apps Front-End
-
-After you start the node template locally, you can interact with it using the hosted version of
-the [Polkadot/Substrate Portal](https://polkadot.js.org/apps/#/explorer?rpc=ws://localhost:9944) front-end by connecting
-to the local node endpoint.
-A hosted version is also available on [IPFS (redirect) here](https://dotapps.io/)
-or [IPNS (direct) here](ipns://dotapps.io/?rpc=ws%3A%2F%2F127.0.0.1%3A9944#/explorer).
 You can also find the source code and instructions for hosting your own instance on
 the [polkadot-js/apps](https://github.com/polkadot-js/apps) repository.
-
-### Multi-Node Local Testnet
-
-If you want to see the multi-node consensus algorithm in action,
-see [Simulate a network](https://docs.substrate.io/tutorials/build-a-blockchain/simulate-network/).
-
-## Template Structure
-
-A Substrate project such as this consists of a number of components that are spread across a few directories.
-
-### Node
-
-A blockchain node is an application that allows users to participate in a blockchain network.
-Substrate-based blockchain nodes expose a number of capabilities:
-
-- Networking: Substrate nodes use the [`libp2p`](https://libp2p.io/) networking stack to allow the
-  nodes in the network to communicate with one another.
-- Consensus: Blockchains must have a way to come to [consensus](https://docs.substrate.io/fundamentals/consensus/) on
-  the state of the network.
-  Substrate makes it possible to supply custom consensus engines and also ships with several consensus mechanisms that
-  have been built on top
-  of [Web3 Foundation research](https://research.web3.foundation/en/latest/polkadot/NPoS/index.html).
-- RPC Server: A remote procedure call (RPC) server is used to interact with Substrate nodes.
-
-There are several files in the `node` directory.
-Take special note of the following:
-
-- [`chain_spec.rs`](./node/src/chain_spec.rs): A [chain specification](https://docs.substrate.io/build/chain-spec/) is a
-  source code file that defines a Substrate chain's initial (genesis) state.
-  Chain specifications are useful for development and testing, and critical when architecting the launch of a production
-  chain.
-  Take note of the `development_config` and `testnet_genesis` functions,.
-  These functions are used to define the genesis state for the local development chain configuration.
-  These functions identify some [well-known accounts](https://docs.substrate.io/reference/command-line-tools/subkey/)
-  and use them to configure the blockchain's initial state.
-- [`service.rs`](./node/src/service.rs): This file defines the node implementation.
-  Take note of the libraries that this file imports and the names of the functions it invokes.
-  In particular, there are references to consensus-related topics, such as
-  the [block finalization and forks](https://docs.substrate.io/fundamentals/consensus/#finalization-and-forks) and
-  other [consensus mechanisms](https://docs.substrate.io/fundamentals/consensus/#default-consensus-models) such as Aura
-  for block authoring and GRANDPA for finality.
-
-### Runtime
-
-In Substrate, the terms "runtime" and "state transition function" are analogous.
-Both terms refer to the core logic of the blockchain that is responsible for validating blocks and executing the state
-changes they define.
-The Substrate project in this repository uses [FRAME](https://docs.substrate.io/learn/runtime-development/#frame) to
-construct a blockchain runtime.
-FRAME allows runtime developers to declare domain-specific logic in modules called "pallets".
-At the heart of FRAME is a helpful [macro language](https://docs.substrate.io/reference/frame-macros/) that makes it
-easy to create pallets and flexibly compose them to create blockchains that can
-address [a variety of needs](https://substrate.io/ecosystem/projects/).
-
-Review the [FRAME runtime implementation](./runtime/src/lib.rs) included in this template and note the following:
-
-- This file configures several pallets to include in the runtime.
-  Each pallet configuration is defined by a code block that begins with `impl $PALLET_NAME::Config for Runtime`.
-- The pallets are composed into a single runtime by way of
-  the [`construct_runtime!`](https://paritytech.github.io/substrate/master/frame_support/macro.construct_runtime.html)
-  macro, which is part of
-  the [core FRAME pallet library](https://docs.substrate.io/reference/frame-pallets/#system-pallets).
-
-### Pallets
-
-The runtime in this project is constructed using many FRAME pallets that ship
-with [the Substrate repository](https://github.com/paritytech/substrate/tree/master/frame) and a template pallet that
-is [defined in the `pallets`](./pallets/template/src/lib.rs) directory.
-
-A FRAME pallet is comprised of a number of blockchain primitives, including:
-
-- Storage: FRAME defines a rich set of powerful [storage abstractions](https://docs.substrate.io/build/runtime-storage/)
-  that makes it easy to use Substrate's efficient key-value database to manage the evolving state of a blockchain.
-- Dispatchables: FRAME pallets define special types of functions that can be invoked (dispatched) from outside of the
-  runtime in order to update its state.
-- Events: Substrate uses [events](https://docs.substrate.io/build/events-and-errors/) to notify users of significant
-  state changes.
-- Errors: When a dispatchable fails, it returns an error.
-
-Each pallet has its own `Config` trait which serves as a configuration interface to generically define the types and
-parameters it depends on.
-
-## Alternatives Installations
-
-Instead of installing dependencies and building this source directly, consider the following alternatives.
-
-### Nix
-
-Install [nix](https://nixos.org/) and
-[nix-direnv](https://github.com/nix-community/nix-direnv) for a fully plug-and-play
-experience for setting up the development environment.
-To get all the correct dependencies, activate direnv `direnv allow`.
-
-### Docker
-
-Please follow
-the [Substrate Docker instructions here](https://github.com/paritytech/substrate/blob/master/docker/README.md) to build
-the Docker container with the Substrate Node Template binary.
