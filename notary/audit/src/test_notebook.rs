@@ -220,7 +220,7 @@ fn test_verify_notebook() {
 		block_votes_root: H256::from_slice(&[0u8; 32]),
 		block_votes_count: 0,
 		blocks_with_votes: bounded_vec![],
-		data_domains: bounded_vec![],
+		domains: bounded_vec![],
 	};
 
 	ValidLocalchainTransfers::mutate(|a| a.insert((Alice.to_account_id(), 1)));
@@ -316,7 +316,7 @@ fn test_disallows_double_claim() {
 		block_votes_root: H256::from_slice(&[0u8; 32]),
 		block_votes_count: 0,
 		blocks_with_votes: bounded_vec![],
-		data_domains: bounded_vec![],
+		domains: bounded_vec![],
 	};
 
 	ValidLocalchainTransfers::mutate(|a| a.insert((Alice.to_account_id(), 1)));
@@ -452,7 +452,7 @@ fn test_multiple_changesets_in_a_notebook() {
 			block_votes_root: H256::from_slice(&[0u8; 32]),
 			block_votes_count: 0,
 			blocks_with_votes: bounded_vec![],
-			data_domains: bounded_vec![],
+			domains: bounded_vec![],
 		},
 		notarizations: bounded_vec![Notarization::new(
 			alice_balance_changeset.clone(),
@@ -657,7 +657,7 @@ fn test_cannot_remove_lock_between_changesets_in_a_notebook() {
 			block_votes_root: H256::from_slice(&[0u8; 32]),
 			block_votes_count: 0,
 			blocks_with_votes: bounded_vec![],
-			data_domains: bounded_vec![],
+			domains: bounded_vec![],
 		},
 		notarizations: bounded_vec![
 			Notarization::new(alice_balance_changeset.clone(), vec![], vec![]),
@@ -842,7 +842,7 @@ fn test_votes_must_add_up() {
 			block_votes_root: H256::from_slice(&[0u8; 32]),
 			block_votes_count: 3,
 			blocks_with_votes: bounded_vec![],
-			data_domains: bounded_vec![],
+			domains: bounded_vec![],
 		},
 		notarizations: bounded_vec![Notarization::new(
 			vec![

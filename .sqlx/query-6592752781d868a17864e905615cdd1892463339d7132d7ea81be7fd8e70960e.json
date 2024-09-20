@@ -1,6 +1,6 @@
 {
   "db_name": "PostgreSQL",
-  "query": "\n\t\t\tSELECT balance_changes, block_votes, data_domains FROM notarizations WHERE notebook_number = $1\n\t\t",
+  "query": "\n\t\t\tSELECT balance_changes, block_votes, domains FROM notarizations WHERE notebook_number = $1\n\t\t",
   "describe": {
     "columns": [
       {
@@ -15,7 +15,7 @@
       },
       {
         "ordinal": 2,
-        "name": "data_domains",
+        "name": "domains",
         "type_info": "Jsonb"
       }
     ],

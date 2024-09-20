@@ -655,7 +655,7 @@ fn test_can_transfer_tax() {
 }
 
 #[test]
-fn test_can_buy_data_domains() {
+fn test_can_buy_domains() {
 	let set = vec![
 		BalanceChange {
 			balance: 19_000,

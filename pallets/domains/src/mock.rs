@@ -8,7 +8,7 @@ use argon_primitives::{
 	TickProvider,
 };
 
-use crate as pallet_data_domain;
+use crate as pallet_domains;
 
 pub(crate) type Block = frame_system::mocking::MockBlock<Test>;
 
@@ -17,7 +17,7 @@ frame_support::construct_runtime!(
 	pub enum Test
 	{
 		System: frame_system,
-		DataDomain: pallet_data_domain
+		Domain: pallet_domains
 	}
 );
 
@@ -49,7 +49,7 @@ impl TickProvider<Block> for StaticTickProvider {
 	}
 }
 
-impl pallet_data_domain::Config for Test {
+impl pallet_domains::Config for Test {
 	type RuntimeEvent = RuntimeEvent;
 	type WeightInfo = ();
 	type TickProvider = StaticTickProvider;

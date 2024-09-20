@@ -80,7 +80,7 @@ PostgresSQL database to keep track of its history and users' balance tips.
       back the Argon via bonds. This is done by tracking BlockFilters in bitcoin against the bonded UTXOs.
 - `notary`: The notary validates localchain transactions and confirms they are operating on their latest tip. A notary
   runs on a Postgres database. It must submit notebooks rolling up all the localchain balance changes, votes and
-  registered data domains. Notebooks are submitted for each system "tick".
+  registered domains. Notebooks are submitted for each system "tick".
 - `runtime`: The runtime implementation is the core logic of the blockchain. It defines the state transition function
   and the blockchain's logic. The runtime is built as a wasm binary and can be upgraded without a hard fork.
 - `oracle`: The code for running the oracles that submit price data and the bitcoin confirmed tip to the blockchain.
@@ -94,8 +94,8 @@ PostgresSQL database to keep track of its history and users' balance tips.
     - `bond`: Allows users to lock and unlock bitcoin bonds, and tracks the mining bonds (pairs with the vaults pallet,
       and the mining slots).
     - `chain_transfer`: Allows users to transfer Argon between chains. Currently supports Localchain and Mainchain.
-    - `data_domain`: Registers and tracks data domains. Data domains are used as dns routing
-      for [Ulixee Datastores](https://ulixee.org/docs/datastore).
+    - `domains`: Registers and tracks domains. Domains are used to establish micropayment channel holds with ip routing
+      akin to a dns lookup. They're prominently used for [Ulixee Datastores](https://ulixee.org/docs/datastore).
     - `mining_slot`: Allows users to register for mining slots. Mining slots are used to determine who is eligible to
       mine blocks created by the notebook commit reveal scheme.
     - `mint`: Mints Argons to bonded bitcoins and miners when the Argon price is above target
@@ -154,10 +154,10 @@ Useful Urls:
 
 Here are some tutorials to get you started:
 
-- [How to set up an Account](./docs/account-setup)
+- [How to set up an Account](./docs/account-setup.md)
 - [How to use the Argon Localchain CLI](./docs/localchain.md#command-line-interface)
 - [How to bond Bitcoins using the Argon Bitcoin CLI](./docs/bitcoin-bond.md)
-- [How to create and manage a Vault using the Argon Bitcoin CLI](./docs/running-a-vault)
+- [How to create and manage a Vault using the Argon Bitcoin CLI](./docs/running-a-vault.md)
 - [How to run a testnet miner](./docs/run-a-miner.md)
 
 ## Running Locally

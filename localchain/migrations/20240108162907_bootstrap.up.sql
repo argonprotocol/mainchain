@@ -98,11 +98,11 @@ CREATE TABLE IF NOT EXISTS open_escrows
     FOREIGN KEY (notarization_id) REFERENCES notarizations (id)
 );
 
-CREATE TABLE IF NOT EXISTS data_domains
+CREATE TABLE IF NOT EXISTS domains
 (
     id                    INTEGER  NOT NULL PRIMARY KEY AUTOINCREMENT,
     name                  TEXT     NOT NULL,
-    tld                   TEXT     NOT NULL,
+    top_level                   TEXT     NOT NULL,
     registered_to_address TEXT     NOT NULL,
     registered_at_tick    INT      NOT NULL,
     notarization_id       INT      NOT NULL,

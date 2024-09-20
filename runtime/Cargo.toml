@@ -64,7 +64,7 @@ pallet-block-seal-spec = { workspace = true }
 pallet-block-rewards = { workspace = true }
 pallet-bond = { workspace = true }
 pallet-chain-transfer = { workspace = true }
-pallet-data-domain = { workspace = true }
+pallet-domains = { workspace = true }
 pallet-notebook = { workspace = true }
 pallet-notaries = { workspace = true }
 pallet-mining-slot = { workspace = true }
@@ -100,7 +100,7 @@ std = [
 	"pallet-block-seal/std",
 	"pallet-bond/std",
 	"pallet-chain-transfer/std",
-	"pallet-data-domain/std",
+	"pallet-domains/std",
 	"pallet-grandpa/std",
 	"pallet-mining-slot/std",
 	"pallet-mint/std",
@@ -149,7 +149,7 @@ runtime-benchmarks = [
 	"pallet-block-seal/runtime-benchmarks",
 	"pallet-bond/runtime-benchmarks",
 	"pallet-chain-transfer/runtime-benchmarks",
-	"pallet-data-domain/runtime-benchmarks",
+	"pallet-domains/runtime-benchmarks",
 	"pallet-grandpa/runtime-benchmarks",
 	"pallet-mining-slot/runtime-benchmarks",
 	"pallet-mint/runtime-benchmarks",
@@ -180,7 +180,7 @@ try-runtime = [
 	"pallet-block-seal/try-runtime",
 	"pallet-bond/try-runtime",
 	"pallet-chain-transfer/try-runtime",
-	"pallet-data-domain/try-runtime",
+	"pallet-domains/try-runtime",
 	"pallet-grandpa/try-runtime",
 	"pallet-mining-slot/try-runtime",
 	"pallet-mint/try-runtime",

@@ -85,7 +85,7 @@ fn it_expires_transfers_on_notebook_tick() {
 
 			parent_secret: None,
 			block_votes_count: 0,
-			data_domains: Default::default(),
+			domains: Default::default(),
 		});
 		assert!(System::account_exists(&who));
 		assert_eq!(Balances::free_balance(&who), 2000);
@@ -160,7 +160,7 @@ fn it_can_handle_transfers_in() {
 
 			parent_secret: None,
 			block_votes_count: 0,
-			data_domains: Default::default(),
+			domains: Default::default(),
 		});
 
 		assert_eq!(ExpiringTransfersOutByNotary::<Test>::get(1, expires_tick).len(), 0);
@@ -188,7 +188,7 @@ fn it_can_handle_transfers_in() {
 			secret_hash: H256::random(),
 			parent_secret: None,
 			block_votes_count: 0,
-			data_domains: Default::default(),
+			domains: Default::default(),
 		});
 		assert_eq!(Balances::free_balance(&who), 5000);
 	});
@@ -219,7 +219,7 @@ fn it_reduces_circulation_on_tax() {
 			secret_hash: H256::random(),
 			parent_secret: None,
 			block_votes_count: 0,
-			data_domains: Default::default(),
+			domains: Default::default(),
 		});
 
 		assert_eq!(Balances::total_issuance(), 23_000);
@@ -253,7 +253,7 @@ fn it_does_not_alter_tax_if_notary_locked() {
 			secret_hash: H256::random(),
 			parent_secret: None,
 			block_votes_count: 0,
-			data_domains: Default::default(),
+			domains: Default::default(),
 		});
 
 		// does not change!
@@ -295,7 +295,7 @@ fn it_doesnt_allow_a_notary_balance_to_go_negative() {
 			secret_hash: H256::random(),
 			parent_secret: None,
 			block_votes_count: 0,
-			data_domains: Default::default(),
+			domains: Default::default(),
 		});
 		System::assert_last_event(
 			Event::<Test>::TransferInError {
@@ -338,7 +338,7 @@ fn it_skips_transfers_to_mainchain_if_notary_locked() {
 			secret_hash: H256::random(),
 			parent_secret: None,
 			block_votes_count: 0,
-			data_domains: Default::default(),
+			domains: Default::default(),
 		});
 
 		assert_eq!(Balances::total_issuance(), 30_000);

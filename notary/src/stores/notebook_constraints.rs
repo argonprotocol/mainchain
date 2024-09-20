@@ -11,7 +11,7 @@ use crate::ensure;
 pub struct NotarizationCounts {
 	pub block_votes: u32,
 	pub balance_changes: u32,
-	pub data_domains: u32,
+	pub domains: u32,
 	pub chain_transfers: u32,
 }
 
@@ -19,7 +19,7 @@ pub struct NotarizationCounts {
 pub struct MaxNotebookCounts {
 	pub max_block_votes: u32,
 	pub max_balance_changes: u32,
-	pub max_data_domains: u32,
+	pub max_domains: u32,
 	pub max_notarizations: u32,
 	pub max_chain_transfers: u32,
 }
@@ -28,7 +28,7 @@ impl MaxNotebookCounts {
 	pub fn new(
 		max_block_votes: u32,
 		max_balance_changes: u32,
-		max_data_domains: u32,
+		max_domains: u32,
 		max_chain_transfers: u32,
 		max_notarizations: u32,
 	) -> Self {
@@ -36,7 +36,7 @@ impl MaxNotebookCounts {
 			max_notarizations,
 			max_block_votes,
 			max_balance_changes,
-			max_data_domains,
+			max_domains,
 			max_chain_transfers,
 		}
 	}
@@ -49,7 +49,7 @@ impl Default for MaxNotebookCounts {
 			max_block_votes: MAX_BLOCK_VOTES_PER_NOTEBOOK,
 			max_balance_changes: MAX_BALANCE_CHANGES_PER_NOTARIZATION *
 				MAX_NOTARIZATIONS_PER_NOTEBOOK,
-			max_data_domains: MAX_DOMAINS_PER_NOTEBOOK,
+			max_domains: MAX_DOMAINS_PER_NOTEBOOK,
 			max_chain_transfers: MAX_NOTEBOOK_TRANSFERS,
 		}
 	}
@@ -92,24 +92,24 @@ impl NotebookConstraintsStore {
 				UPDATE notebook_constraints SET
 					block_votes = block_votes + $2,
 					balance_changes = balance_changes + $3,
-					data_domains = data_domains + $4,
+					domains = domains + $4,
 					chain_transfers = chain_transfers + $5,
 					notarizations = notarizations + 1
 				WHERE notebook_number = $1
 					AND block_votes + $2 <= $6
 					AND balance_changes + $3 <= $7
-					AND data_domains + $4 <= $8
+					AND domains + $4 <= $8
 					AND chain_transfers + $5 <= $9
 					AND notarizations < $10
 			"#,
 			notebook_number as i32,
 			counts.block_votes as i32,
 			counts.balance_changes as i32,
-			counts.data_domains as i32,
+			counts.domains as i32,
 			counts.chain_transfers as i32,
 			max_notarization_counts.max_block_votes as i32,
 			max_notarization_counts.max_balance_changes as i32,
-			max_notarization_counts.max_data_domains as i32,
+			max_notarization_counts.max_domains as i32,
 			max_notarization_counts.max_chain_transfers as i32,
 			max_notarization_counts.max_notarizations as i32,
 		)
@@ -139,7 +139,7 @@ mod tests {
 		let counts = NotarizationCounts {
 			block_votes: 0,
 			balance_changes: 0,
-			data_domains: 0,
+			domains: 0,
 			chain_transfers: 1,
 		};
 		assert_ok!(

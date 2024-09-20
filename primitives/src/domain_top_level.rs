@@ -20,7 +20,7 @@ use sp_debug_derive::RuntimeDebug;
 #[cfg_attr(not(feature = "napi"), derive(Clone, Copy))]
 #[cfg_attr(feature = "napi", napi_derive::napi)]
 #[cfg_attr(feature = "uniffi", derive(uniffi::Enum))]
-pub enum DataTLD {
+pub enum DomainTopLevel {
 	Analytics,
 	Automotive,
 	Bikes,

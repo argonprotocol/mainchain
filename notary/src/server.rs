@@ -13,8 +13,8 @@ use argon_notary_apis::{
 };
 use argon_primitives::{
 	tick::Ticker, AccountId, AccountOrigin, AccountType, BalanceProof, BalanceTip, Notarization,
-	NotarizationBalanceChangeset, NotarizationBlockVotes, NotarizationDataDomains, NotaryId,
-	Notebook, NotebookMeta, NotebookNumber, SignedNotebookHeader,
+	NotarizationBalanceChangeset, NotarizationBlockVotes, NotarizationDomains, NotaryId, Notebook,
+	NotebookMeta, NotebookNumber, SignedNotebookHeader,
 };
 use codec::Encode;
 use futures::{Stream, StreamExt};
@@ -239,7 +239,7 @@ impl LocalchainRpcServer for NotaryServer {
 		&self,
 		balance_changeset: NotarizationBalanceChangeset,
 		block_votes: NotarizationBlockVotes,
-		data_domains: NotarizationDataDomains,
+		domains: NotarizationDomains,
 	) -> Result<BalanceChangeResult, ErrorObjectOwned> {
 		Ok(NotarizationsStore::apply(
 			&self.pool,
@@ -247,7 +247,7 @@ impl LocalchainRpcServer for NotaryServer {
 			&self.ticker,
 			balance_changeset.into_inner(),
 			block_votes.into_inner(),
-			data_domains.into_inner(),
+			domains.into_inner(),
 		)
 		.await?)
 	}

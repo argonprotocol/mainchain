@@ -1,6 +1,6 @@
 use argon_primitives::{
   AccountId, AccountType, Balance, BalanceChange, MultiSignatureBytes, Note, NoteType,
-  DATA_DOMAIN_LEASE_COST, MINIMUM_ESCROW_SETTLEMENT,
+  DOMAIN_LEASE_COST, MINIMUM_ESCROW_SETTLEMENT,
 };
 use lazy_static::lazy_static;
 use sp_core::bounded_vec::BoundedVec;
@@ -278,8 +278,8 @@ impl BalanceChangeBuilder {
     Ok(())
   }
 
-  /// Lease a data domain. DataDomain leases are converted in full to tax.
-  pub async fn lease_data_domain(&self) -> Result<Balance> {
+  /// Lease a data domain. Domain leases are converted in full to tax.
+  pub async fn lease_domain(&self) -> Result<Balance> {
     let mut balance_change = self.balance_change.lock().await;
     if balance_change.account_type != AccountType::Deposit {
       bail!(
@@ -287,7 +287,7 @@ impl BalanceChangeBuilder {
         balance_change.account_id
       );
     }
-    let amount = DATA_DOMAIN_LEASE_COST;
+    let amount = DOMAIN_LEASE_COST;
 
     if balance_change.balance < amount {
       bail!(
@@ -429,10 +429,10 @@ pub mod napi_ext {
       self.send_to_vote(amount.get_u128().1).await.napi_ok()
     }
 
-    /// Lease a data domain. DataDomain leases are converted in full to tax.
-    #[napi(js_name = "leaseDataDomain")]
-    pub async fn lease_data_domain_napi(&self) -> napi::Result<BigInt> {
-      self.lease_data_domain().await.map(Into::into).napi_ok()
+    /// Lease a data domain. Domain leases are converted in full to tax.
+    #[napi(js_name = "leaseDomain")]
+    pub async fn lease_domain_napi(&self) -> napi::Result<BigInt> {
+      self.lease_domain().await.map(Into::into).napi_ok()
     }
 
     /// Create scale encoded signature message for the balance change.

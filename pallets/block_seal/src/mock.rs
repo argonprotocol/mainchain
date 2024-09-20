@@ -11,7 +11,7 @@ use argon_primitives::{
 	block_vote::VoteMinimum,
 	notebook::NotebookNumber,
 	tick::{Tick, Ticker},
-	AuthorityProvider, BlockVotingProvider, DataDomainHash, HashOutput, NotaryId, NotebookProvider,
+	AuthorityProvider, BlockVotingProvider, DomainHash, HashOutput, NotaryId, NotebookProvider,
 	NotebookSecret, TickProvider,
 };
 
@@ -39,7 +39,7 @@ parameter_types! {
 	pub static NotebooksAtTick: BTreeMap<Tick, Vec<(NotaryId, NotebookNumber, Option<NotebookSecret>)>> = BTreeMap::new();
 	pub static CurrentTick: Tick = 0;
 	pub static BlocksAtTick: BTreeMap<Tick, Vec<HashOutput>> = BTreeMap::new();
-	pub static RegisteredDataDomains: BTreeSet<DataDomainHash> = BTreeSet::new();
+	pub static RegisteredDomains: BTreeSet<DomainHash> = BTreeSet::new();
 }
 
 pub struct StaticAuthorityProvider;

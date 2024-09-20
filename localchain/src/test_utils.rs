@@ -29,8 +29,8 @@ use argon_primitives::tick::Ticker;
 use argon_primitives::{
   AccountId, AccountOrigin, AccountOriginUid, AccountType, BalanceChange, BalanceProof, BalanceTip,
   ChainTransfer, LocalchainAccountId, MerkleProof, NewAccountOrigin, Notarization,
-  NotarizationBalanceChangeset, NotarizationBlockVotes, NotarizationDataDomains, NoteType,
-  Notebook, NotebookHeader, NotebookMeta, NotebookNumber, SignedNotebookHeader,
+  NotarizationBalanceChangeset, NotarizationBlockVotes, NotarizationDomains, NoteType, Notebook,
+  NotebookHeader, NotebookMeta, NotebookNumber, SignedNotebookHeader,
 };
 
 use crate::notarization_builder::NotarizationBuilder;
@@ -355,7 +355,7 @@ impl MockNotary {
       notebook_number,
       tick: 1,
       tax: 0,
-      data_domains: Default::default(),
+      domains: Default::default(),
       block_votes_count: 0,
       block_voting_power: 0,
       parent_secret: None,
@@ -422,14 +422,14 @@ impl LocalchainRpcServer for MockNotary {
     &self,
     balance_changeset: NotarizationBalanceChangeset,
     block_votes: NotarizationBlockVotes,
-    data_domains: NotarizationDataDomains,
+    domains: NotarizationDomains,
   ) -> Result<BalanceChangeResult, ErrorObjectOwned> {
     let notebook_number = self.next_notebook_number().await;
     self
       .add_notarization(
         notebook_number,
         Notarization {
-          data_domains,
+          domains,
           block_votes,
           balance_changes: balance_changeset.clone(),
         },

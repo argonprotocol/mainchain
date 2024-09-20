@@ -1,5 +1,5 @@
 [package]
-name = "pallet-data-domain"
+name = "pallet-domains"
 version.workspace = true
 authors.workspace = true
 edition.workspace = true

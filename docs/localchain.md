@@ -41,7 +41,8 @@ Localchains have 3 types of transactions they can submit:
    change from the recipient. All funds must be allocated.
 2. `Block Votes`: Votes created through aggregated tax funds. These are used to vote on which block to follow in the
    mainchain.
-3. `Data Domains`: Localchains can register data domains that are used to route data requests to Ulixee Datastores.
+3. `Domains`: Localchains can register domains that are used to establish micropayment channel holds. They're used in
+   the Ulixee Data network to facilitate data query payments.
 
 The current implementation of Localchain uses a Sqlite database to track the state of balance changes. It must have an
 external source run a "sync" operation to get the latest state and proofs.
@@ -59,7 +60,7 @@ Usage: argon-localchain [OPTIONS] <COMMAND>
 
 Commands:
   sync          Sync the localchain proofs with the latest notebooks. This will also submit votes and close/claim escrows as needed
-  data-domains  Explore and manage data domains
+  domains       Explore and manage Domains
   accounts      Manage local accounts
   transactions  Create and receive transactions
   help          Print this message or the help of the given subcommand(s)

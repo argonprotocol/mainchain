@@ -451,7 +451,7 @@ fn it_can_audit_notebooks() {
 			secret_hash: H256::random(),
 			parent_secret: None,
 			block_votes_count: 0,
-			data_domains: Default::default(),
+			domains: Default::default(),
 		};
 		let header_hash = header.hash();
 
@@ -888,6 +888,6 @@ fn make_header(notebook_number: NotebookNumber, tick: Tick) -> NotebookHeader {
 		secret_hash: H256::random(),
 		parent_secret: None,
 		block_votes_count: 0,
-		data_domains: Default::default(),
+		domains: Default::default(),
 	}
 }

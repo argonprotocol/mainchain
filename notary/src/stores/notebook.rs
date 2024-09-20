@@ -244,7 +244,7 @@ impl NotebookStore {
 		let mut voting_power = 0u128;
 		let mut tax = 0u128;
 		let mut blocks_with_votes = BTreeSet::new();
-		let mut data_domains = Vec::new();
+		let mut domains = Vec::new();
 		// NOTE: rebuild transfers list so it matches the final order
 		let mut transfers = vec![];
 		for change in notarizations.clone() {
@@ -298,8 +298,8 @@ impl NotebookStore {
 				block_votes.insert(key, vote);
 				blocks_with_votes.insert(block_hash);
 			}
-			for domain in change.data_domains {
-				data_domains.push(domain);
+			for domain in change.domains {
+				domains.push(domain);
 			}
 		}
 
@@ -334,7 +334,7 @@ impl NotebookStore {
 			&mut *db,
 			notebook_number,
 			transfers,
-			data_domains,
+			domains,
 			tax,
 			changes_root,
 			account_changelist,

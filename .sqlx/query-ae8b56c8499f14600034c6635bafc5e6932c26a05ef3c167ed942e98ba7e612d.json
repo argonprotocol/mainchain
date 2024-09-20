@@ -1,6 +1,6 @@
 {
   "db_name": "SQLite",
-  "query": "SELECT * FROM data_domains",
+  "query": "SELECT * FROM domains",
   "describe": {
     "columns": [
       {
@@ -14,7 +14,7 @@
         "type_info": "Text"
       },
       {
-        "name": "tld",
+        "name": "top_level",
         "ordinal": 2,
         "type_info": "Text"
       },

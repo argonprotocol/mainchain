@@ -233,10 +233,10 @@ mod tests {
 		AccountId, AccountOrigin,
 		AccountType::{Deposit, Tax},
 		BalanceChange, BalanceProof, BalanceTip, BlockSealDigest, BlockVote, BlockVoteDigest,
-		DataDomain, DataDomainHash, DataTLD, HashOutput, MerkleProof, Note, NoteType,
+		Domain, DomainHash, DomainTopLevel, HashOutput, MerkleProof, Note, NoteType,
 		NoteType::{EscrowClaim, EscrowSettle},
 		NotebookDigest, ParentVotingKeyDigest, TickDigest, TransferToLocalchainId,
-		DATA_DOMAIN_LEASE_COST,
+		DOMAIN_LEASE_COST,
 	};
 	use argon_testing::start_argon_test_node;
 
@@ -294,7 +294,7 @@ mod tests {
 		wait_for_transfers(&pool, vec![bob_transfer.clone(), ferdie_transfer.clone()]).await?;
 		println!("bob and ferdie transfers confirmed");
 
-		let domain_hash = DataDomain::new("HelloWorld", DataTLD::Entertainment).hash();
+		let domain_hash = Domain::new("HelloWorld", DomainTopLevel::Entertainment).hash();
 		let result = submit_balance_change_to_notary_and_create_domain(
 			&pool,
 			&ticker,
@@ -319,7 +319,7 @@ mod tests {
 		assert_eq!(
 			ctx.client
 				.fetch_storage(
-					&storage().data_domain().zone_records_by_domain(domain_hash),
+					&storage().domain().zone_records_by_domain(domain_hash),
 					Some(zone_block)
 				)
 				.await?
@@ -614,7 +614,7 @@ mod tests {
 		pool: &PgPool,
 		ticker: &Ticker,
 		transfer: (TransferToLocalchainId, u32, Keypair),
-		domain_hash: DataDomainHash,
+		domain_hash: DomainHash,
 		register_domain_to: AccountId,
 	) -> anyhow::Result<AccountOrigin> {
 		let (transfer_id, amount, keypair) = transfer;
@@ -637,11 +637,11 @@ mod tests {
 					account_id: keypair.public().into(),
 					account_type: Deposit,
 					change_number: 1,
-					balance: amount as u128 - DATA_DOMAIN_LEASE_COST,
+					balance: amount as u128 - DOMAIN_LEASE_COST,
 					previous_balance_proof: None,
 					notes: bounded_vec![
 						Note::create(amount as u128, NoteType::ClaimFromMainchain { transfer_id },),
-						Note::create(DATA_DOMAIN_LEASE_COST, NoteType::LeaseDomain,)
+						Note::create(DOMAIN_LEASE_COST, NoteType::LeaseDomain,)
 					],
 					escrow_hold_note: None,
 					signature: sp_core::ed25519::Signature::from_raw([0u8; 64]).into(),
@@ -652,9 +652,9 @@ mod tests {
 					account_id: keypair.public().into(),
 					account_type: Tax,
 					change_number: 1,
-					balance: DATA_DOMAIN_LEASE_COST,
+					balance: DOMAIN_LEASE_COST,
 					previous_balance_proof: None,
-					notes: bounded_vec![Note::create(DATA_DOMAIN_LEASE_COST, NoteType::Claim,)],
+					notes: bounded_vec![Note::create(DOMAIN_LEASE_COST, NoteType::Claim,)],
 					escrow_hold_note: None,
 					signature: sp_core::ed25519::Signature::from_raw([0u8; 64]).into(),
 				}
@@ -675,15 +675,15 @@ mod tests {
 
 	async fn set_zone_record(
 		client: &ArgonOnlineClient,
-		data_domain_hash: DataDomainHash,
+		domain_hash: DomainHash,
 		account: Keypair,
 	) -> anyhow::Result<H256> {
 		let tx_progress = client
 			.tx()
 			.sign_and_submit_then_watch_default(
-				&tx().data_domain().set_zone_record(
-					data_domain_hash,
-					runtime_types::argon_primitives::data_domain::ZoneRecord {
+				&tx().domain().set_zone_record(
+					domain_hash,
+					runtime_types::argon_primitives::domain::ZoneRecord {
 						payment_account: AccountId32::from(account.public_key()),
 						notary_id: 1,
 						versions: subxt::utils::KeyedVec::new(),

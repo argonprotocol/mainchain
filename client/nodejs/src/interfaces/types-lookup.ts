@@ -770,62 +770,62 @@ declare module '@polkadot/types/lookup' {
     readonly type: 'VoteMinimumAdjusted' | 'ComputeDifficultyAdjusted';
   }
 
-  /** @name PalletDataDomainEvent (77) */
-  interface PalletDataDomainEvent extends Enum {
+  /** @name PalletDomainsEvent (77) */
+  interface PalletDomainsEvent extends Enum {
     readonly isZoneRecordUpdated: boolean;
     readonly asZoneRecordUpdated: {
       readonly domainHash: H256;
-      readonly zoneRecord: ArgonPrimitivesDataDomainZoneRecord;
+      readonly zoneRecord: ArgonPrimitivesDomainZoneRecord;
     } & Struct;
-    readonly isDataDomainRegistered: boolean;
-    readonly asDataDomainRegistered: {
+    readonly isDomainRegistered: boolean;
+    readonly asDomainRegistered: {
       readonly domainHash: H256;
-      readonly registration: PalletDataDomainDataDomainRegistration;
+      readonly registration: PalletDomainsDomainRegistration;
     } & Struct;
-    readonly isDataDomainRenewed: boolean;
-    readonly asDataDomainRenewed: {
-      readonly domainHash: H256;
-    } & Struct;
-    readonly isDataDomainExpired: boolean;
-    readonly asDataDomainExpired: {
+    readonly isDomainRenewed: boolean;
+    readonly asDomainRenewed: {
       readonly domainHash: H256;
     } & Struct;
-    readonly isDataDomainRegistrationCanceled: boolean;
-    readonly asDataDomainRegistrationCanceled: {
+    readonly isDomainExpired: boolean;
+    readonly asDomainExpired: {
       readonly domainHash: H256;
-      readonly registration: PalletDataDomainDataDomainRegistration;
     } & Struct;
-    readonly isDataDomainRegistrationError: boolean;
-    readonly asDataDomainRegistrationError: {
+    readonly isDomainRegistrationCanceled: boolean;
+    readonly asDomainRegistrationCanceled: {
+      readonly domainHash: H256;
+      readonly registration: PalletDomainsDomainRegistration;
+    } & Struct;
+    readonly isDomainRegistrationError: boolean;
+    readonly asDomainRegistrationError: {
       readonly domainHash: H256;
       readonly accountId: AccountId32;
       readonly error: SpRuntimeDispatchError;
     } & Struct;
-    readonly type: 'ZoneRecordUpdated' | 'DataDomainRegistered' | 'DataDomainRenewed' | 'DataDomainExpired' | 'DataDomainRegistrationCanceled' | 'DataDomainRegistrationError';
+    readonly type: 'ZoneRecordUpdated' | 'DomainRegistered' | 'DomainRenewed' | 'DomainExpired' | 'DomainRegistrationCanceled' | 'DomainRegistrationError';
   }
 
-  /** @name ArgonPrimitivesDataDomainZoneRecord (78) */
-  interface ArgonPrimitivesDataDomainZoneRecord extends Struct {
+  /** @name ArgonPrimitivesDomainZoneRecord (78) */
+  interface ArgonPrimitivesDomainZoneRecord extends Struct {
     readonly paymentAccount: AccountId32;
     readonly notaryId: u32;
-    readonly versions: BTreeMap<ArgonPrimitivesDataDomainSemver, ArgonPrimitivesDataDomainVersionHost>;
+    readonly versions: BTreeMap<ArgonPrimitivesDomainSemver, ArgonPrimitivesDomainVersionHost>;
   }
 
-  /** @name ArgonPrimitivesDataDomainSemver (80) */
-  interface ArgonPrimitivesDataDomainSemver extends Struct {
+  /** @name ArgonPrimitivesDomainSemver (80) */
+  interface ArgonPrimitivesDomainSemver extends Struct {
     readonly major: u32;
     readonly minor: u32;
     readonly patch: u32;
   }
 
-  /** @name ArgonPrimitivesDataDomainVersionHost (81) */
-  interface ArgonPrimitivesDataDomainVersionHost extends Struct {
+  /** @name ArgonPrimitivesDomainVersionHost (81) */
+  interface ArgonPrimitivesDomainVersionHost extends Struct {
     readonly datastoreId: Bytes;
     readonly host: Bytes;
   }
 
-  /** @name PalletDataDomainDataDomainRegistration (85) */
-  interface PalletDataDomainDataDomainRegistration extends Struct {
+  /** @name PalletDomainsDomainRegistration (85) */
+  interface PalletDomainsDomainRegistration extends Struct {
     readonly accountId: AccountId32;
     readonly registeredAtTick: u32;
   }
@@ -1545,7 +1545,7 @@ declare module '@polkadot/types/lookup' {
     readonly blockVotingPower: Compact<u128>;
     readonly secretHash: H256;
     readonly parentSecret: Option<H256>;
-    readonly dataDomains: Vec<ITuple<[H256, AccountId32]>>;
+    readonly domains: Vec<ITuple<[H256, AccountId32]>>;
   }
 
   /** @name ArgonPrimitivesNotebookChainTransfer (178) */
@@ -1588,12 +1588,12 @@ declare module '@polkadot/types/lookup' {
     readonly type: 'Configure';
   }
 
-  /** @name PalletDataDomainCall (191) */
-  interface PalletDataDomainCall extends Enum {
+  /** @name PalletDomainsCall (191) */
+  interface PalletDomainsCall extends Enum {
     readonly isSetZoneRecord: boolean;
     readonly asSetZoneRecord: {
       readonly domainHash: H256;
-      readonly zoneRecord: ArgonPrimitivesDataDomainZoneRecord;
+      readonly zoneRecord: ArgonPrimitivesDomainZoneRecord;
     } & Struct;
     readonly type: 'SetZoneRecord';
   }
@@ -2325,8 +2325,8 @@ declare module '@polkadot/types/lookup' {
     readonly type: 'MaxNotebooksAtTickExceeded';
   }
 
-  /** @name PalletDataDomainError (328) */
-  interface PalletDataDomainError extends Enum {
+  /** @name PalletDomainsError (328) */
+  interface PalletDomainsError extends Enum {
     readonly isDomainNotRegistered: boolean;
     readonly isNotDomainOwner: boolean;
     readonly isFailedToAddToAddressHistory: boolean;
@@ -2382,14 +2382,12 @@ declare module '@polkadot/types/lookup' {
     readonly isInvalidVoteGrandparentHash: boolean;
     readonly isIneligibleNotebookUsed: boolean;
     readonly isNoEligibleVotingRoot: boolean;
-    readonly isUnregisteredDataDomain: boolean;
-    readonly isInvalidDataDomainAccount: boolean;
     readonly isInvalidAuthoritySignature: boolean;
     readonly isCouldNotDecodeVote: boolean;
     readonly isMaxNotebooksAtTickExceeded: boolean;
     readonly isNoClosestMinerFoundForVote: boolean;
     readonly isBlockVoteInvalidSignature: boolean;
-    readonly type: 'InvalidVoteSealStrength' | 'InvalidSubmitter' | 'UnableToDecodeVoteAccount' | 'UnregisteredBlockAuthor' | 'InvalidBlockVoteProof' | 'NoGrandparentVoteMinimum' | 'DuplicateBlockSealProvided' | 'InsufficientVotingPower' | 'ParentVotingKeyNotFound' | 'InvalidVoteGrandparentHash' | 'IneligibleNotebookUsed' | 'NoEligibleVotingRoot' | 'UnregisteredDataDomain' | 'InvalidDataDomainAccount' | 'InvalidAuthoritySignature' | 'CouldNotDecodeVote' | 'MaxNotebooksAtTickExceeded' | 'NoClosestMinerFoundForVote' | 'BlockVoteInvalidSignature';
+    readonly type: 'InvalidVoteSealStrength' | 'InvalidSubmitter' | 'UnableToDecodeVoteAccount' | 'UnregisteredBlockAuthor' | 'InvalidBlockVoteProof' | 'NoGrandparentVoteMinimum' | 'DuplicateBlockSealProvided' | 'InsufficientVotingPower' | 'ParentVotingKeyNotFound' | 'InvalidVoteGrandparentHash' | 'IneligibleNotebookUsed' | 'NoEligibleVotingRoot' | 'InvalidAuthoritySignature' | 'CouldNotDecodeVote' | 'MaxNotebooksAtTickExceeded' | 'NoClosestMinerFoundForVote' | 'BlockVoteInvalidSignature';
   }
 
   /** @name PalletBlockRewardsError (340) */

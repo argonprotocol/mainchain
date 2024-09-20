@@ -1,6 +1,6 @@
 {
   "db_name": "PostgreSQL",
-  "query": "\n\t\t\t\tUPDATE notebook_constraints SET\n\t\t\t\t\tblock_votes = block_votes + $2,\n\t\t\t\t\tbalance_changes = balance_changes + $3,\n\t\t\t\t\tdata_domains = data_domains + $4,\n\t\t\t\t\tchain_transfers = chain_transfers + $5,\n\t\t\t\t\tnotarizations = notarizations + 1\n\t\t\t\tWHERE notebook_number = $1\n\t\t\t\t\tAND block_votes + $2 <= $6\n\t\t\t\t\tAND balance_changes + $3 <= $7\n\t\t\t\t\tAND data_domains + $4 <= $8\n\t\t\t\t\tAND chain_transfers + $5 <= $9\n\t\t\t\t\tAND notarizations < $10\n\t\t\t",
+  "query": "\n\t\t\t\tUPDATE notebook_constraints SET\n\t\t\t\t\tblock_votes = block_votes + $2,\n\t\t\t\t\tbalance_changes = balance_changes + $3,\n\t\t\t\t\tdomains = domains + $4,\n\t\t\t\t\tchain_transfers = chain_transfers + $5,\n\t\t\t\t\tnotarizations = notarizations + 1\n\t\t\t\tWHERE notebook_number = $1\n\t\t\t\t\tAND block_votes + $2 <= $6\n\t\t\t\t\tAND balance_changes + $3 <= $7\n\t\t\t\t\tAND domains + $4 <= $8\n\t\t\t\t\tAND chain_transfers + $5 <= $9\n\t\t\t\t\tAND notarizations < $10\n\t\t\t",
   "describe": {
     "columns": [],
     "parameters": {

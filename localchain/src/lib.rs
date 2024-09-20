@@ -23,7 +23,7 @@ use argon_primitives::tick::{Tick, Ticker};
 pub use balance_changes::*;
 pub use balance_sync::*;
 pub use constants::*;
-pub use data_domain::*;
+pub use domain::*;
 pub use embedded_keystore::CryptoScheme;
 pub use error::Error;
 pub use keystore::Keystore;
@@ -43,7 +43,7 @@ mod accounts;
 mod balance_change_builder;
 mod balance_changes;
 mod balance_sync;
-mod data_domain;
+mod domain;
 pub mod keystore;
 mod mainchain_client;
 mod mainchain_transfer;
@@ -312,8 +312,8 @@ impl Localchain {
     balance_changes::BalanceChangeStore::new(self.db.clone())
   }
 
-  pub fn data_domains(&self) -> data_domain::DataDomainStore {
-    data_domain::DataDomainStore::new(self.db.clone())
+  pub fn domains(&self) -> domain::DomainStore {
+    domain::DomainStore::new(self.db.clone())
   }
 
   pub fn open_escrows(&self) -> open_escrows::OpenEscrowsStore {
@@ -666,9 +666,9 @@ pub mod napi_ext {
       self.balance_changes()
     }
 
-    #[napi(js_name = "dataDomains", getter)]
-    pub fn data_domains_napi(&self) -> data_domain::DataDomainStore {
-      self.data_domains()
+    #[napi(js_name = "domains", getter)]
+    pub fn domains_napi(&self) -> domain::DomainStore {
+      self.domains()
     }
 
     #[napi(js_name = "openEscrows", getter)]

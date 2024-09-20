@@ -1,6 +1,6 @@
 {
   "db_name": "PostgreSQL",
-  "query": "\n\t\t\tINSERT INTO notarizations (notebook_number, balance_changes, block_votes, data_domains, account_lookups) VALUES ($1, $2, $3, $4, $5)\n\t\t",
+  "query": "\n\t\t\tINSERT INTO notarizations (notebook_number, balance_changes, block_votes, domains, account_lookups) VALUES ($1, $2, $3, $4, $5)\n\t\t",
   "describe": {
     "columns": [],
     "parameters": {

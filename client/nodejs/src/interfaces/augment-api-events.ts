@@ -9,7 +9,7 @@ import type { ApiTypes, AugmentedEvent } from '@polkadot/api-base/types';
 import type { Bytes, Null, Option, Result, U8aFixed, Vec, bool, u128, u16, u32, u64 } from '@polkadot/types-codec';
 import type { ITuple } from '@polkadot/types-codec/types';
 import type { AccountId32, H256 } from '@polkadot/types/interfaces/runtime';
-import type { ArgonNodeRuntimeProxyType, ArgonNotaryAuditErrorVerifyError, ArgonPrimitivesBitcoinBitcoinRejectedReason, ArgonPrimitivesBitcoinUtxoRef, ArgonPrimitivesBlockSealBlockPayout, ArgonPrimitivesBlockSealMiningRegistration, ArgonPrimitivesBondBondExpiration, ArgonPrimitivesBondBondType, ArgonPrimitivesDataDomainZoneRecord, ArgonPrimitivesNotaryNotaryMeta, ArgonPrimitivesNotaryNotaryRecord, FrameSupportDispatchDispatchInfo, FrameSupportTokensMiscBalanceStatus, PalletDataDomainDataDomainRegistration, PalletMintMintType, PalletMultisigTimepoint, SpConsensusGrandpaAppPublic, SpRuntimeDispatchError } from '@polkadot/types/lookup';
+import type { ArgonNodeRuntimeProxyType, ArgonNotaryAuditErrorVerifyError, ArgonPrimitivesBitcoinBitcoinRejectedReason, ArgonPrimitivesBitcoinUtxoRef, ArgonPrimitivesBlockSealBlockPayout, ArgonPrimitivesBlockSealMiningRegistration, ArgonPrimitivesBondBondExpiration, ArgonPrimitivesBondBondType, ArgonPrimitivesDomainZoneRecord, ArgonPrimitivesNotaryNotaryMeta, ArgonPrimitivesNotaryNotaryRecord, FrameSupportDispatchDispatchInfo, FrameSupportTokensMiscBalanceStatus, PalletDomainsDomainRegistration, PalletMintMintType, PalletMultisigTimepoint, SpConsensusGrandpaAppPublic, SpRuntimeDispatchError } from '@polkadot/types/lookup';
 
 export type __AugmentedEvent<ApiType extends ApiTypes> = AugmentedEvent<ApiType>;
 
@@ -166,32 +166,32 @@ declare module '@polkadot/api-base/types/events' {
        **/
       TransferToLocalchainRefundError: AugmentedEvent<ApiType, [accountId: AccountId32, transferId: u32, notaryId: u32, notebookNumber: u32, error: SpRuntimeDispatchError], { accountId: AccountId32, transferId: u32, notaryId: u32, notebookNumber: u32, error: SpRuntimeDispatchError }>;
     };
-    dataDomain: {
+    domain: {
       /**
        * A data domain was expired
        **/
-      DataDomainExpired: AugmentedEvent<ApiType, [domainHash: H256], { domainHash: H256 }>;
+      DomainExpired: AugmentedEvent<ApiType, [domainHash: H256], { domainHash: H256 }>;
       /**
        * A data domain was registered
        **/
-      DataDomainRegistered: AugmentedEvent<ApiType, [domainHash: H256, registration: PalletDataDomainDataDomainRegistration], { domainHash: H256, registration: PalletDataDomainDataDomainRegistration }>;
+      DomainRegistered: AugmentedEvent<ApiType, [domainHash: H256, registration: PalletDomainsDomainRegistration], { domainHash: H256, registration: PalletDomainsDomainRegistration }>;
       /**
        * A data domain registration was canceled due to a conflicting registration in the same
        * tick
        **/
-      DataDomainRegistrationCanceled: AugmentedEvent<ApiType, [domainHash: H256, registration: PalletDataDomainDataDomainRegistration], { domainHash: H256, registration: PalletDataDomainDataDomainRegistration }>;
+      DomainRegistrationCanceled: AugmentedEvent<ApiType, [domainHash: H256, registration: PalletDomainsDomainRegistration], { domainHash: H256, registration: PalletDomainsDomainRegistration }>;
       /**
        * A data domain registration failed due to an error
        **/
-      DataDomainRegistrationError: AugmentedEvent<ApiType, [domainHash: H256, accountId: AccountId32, error: SpRuntimeDispatchError], { domainHash: H256, accountId: AccountId32, error: SpRuntimeDispatchError }>;
+      DomainRegistrationError: AugmentedEvent<ApiType, [domainHash: H256, accountId: AccountId32, error: SpRuntimeDispatchError], { domainHash: H256, accountId: AccountId32, error: SpRuntimeDispatchError }>;
       /**
        * A data domain was registered
        **/
-      DataDomainRenewed: AugmentedEvent<ApiType, [domainHash: H256], { domainHash: H256 }>;
+      DomainRenewed: AugmentedEvent<ApiType, [domainHash: H256], { domainHash: H256 }>;
       /**
        * A data domain zone record was updated
        **/
-      ZoneRecordUpdated: AugmentedEvent<ApiType, [domainHash: H256, zoneRecord: ArgonPrimitivesDataDomainZoneRecord], { domainHash: H256, zoneRecord: ArgonPrimitivesDataDomainZoneRecord }>;
+      ZoneRecordUpdated: AugmentedEvent<ApiType, [domainHash: H256, zoneRecord: ArgonPrimitivesDomainZoneRecord], { domainHash: H256, zoneRecord: ArgonPrimitivesDomainZoneRecord }>;
     };
     grandpa: {
       /**

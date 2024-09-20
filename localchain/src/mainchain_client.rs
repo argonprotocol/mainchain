@@ -24,7 +24,7 @@ use argon_client::{
 use argon_primitives::host::Host;
 use argon_primitives::tick::{Tick, Ticker};
 use argon_primitives::{
-  Balance, DataDomain, DataTLD, NotaryId, NotebookNumber, TransferToLocalchainId,
+  Balance, Domain, DomainTopLevel, NotaryId, NotebookNumber, TransferToLocalchainId,
 };
 
 use crate::AccountStore;
@@ -186,19 +186,17 @@ impl MainchainClient {
     }))
   }
 
-  pub async fn get_data_domain_registration(
+  pub async fn get_domain_registration(
     &self,
     domain_name: String,
-    tld: DataTLD,
-  ) -> Result<Option<DataDomainRegistration>> {
-    let data_domain_hash = DataDomain::from_string(domain_name, tld).hash();
+    top_level: DomainTopLevel,
+  ) -> Result<Option<DomainRegistration>> {
+    let domain_hash = Domain::from_string(domain_name, top_level).hash();
 
     let best_block_hash = &self.get_best_block_hash().await?.0.to_vec();
     if let Some(x) = self
       .fetch_storage(
-        &storage()
-          .data_domain()
-          .registered_data_domains(data_domain_hash),
+        &storage().domain().registered_domains(domain_hash),
         Some(H256::from_slice(best_block_hash)),
       )
       .await?
@@ -212,7 +210,7 @@ impl MainchainClient {
           );
         }
       };
-      Ok(Some(DataDomainRegistration {
+      Ok(Some(DomainRegistration {
         registered_to_address,
         registered_at_tick: x.registered_at_tick,
       }))
@@ -221,17 +219,14 @@ impl MainchainClient {
     }
   }
 
-  pub async fn get_data_domain_zone_record(
+  pub async fn get_domain_zone_record(
     &self,
     domain_name: String,
-    tld: DataTLD,
+    top_level: DomainTopLevel,
   ) -> Result<Option<ZoneRecord>> {
-    let domain = DataDomain::from_string(domain_name, tld).hash();
+    let domain = Domain::from_string(domain_name, top_level).hash();
     let Some(zone_record) = self
-      .fetch_storage(
-        &storage().data_domain().zone_records_by_domain(domain),
-        None,
-      )
+      .fetch_storage(&storage().domain().zone_records_by_domain(domain), None)
       .await?
     else {
       return Ok(None);
@@ -618,10 +613,10 @@ impl MainchainClient {
 pub mod napi_ext {
   use napi::bindgen_prelude::*;
 
-  use argon_primitives::DataTLD;
+  use argon_primitives::DomainTopLevel;
 
   use crate::error::NapiOk;
-  use crate::{DataDomainRegistration, MainchainClient, ZoneRecord};
+  use crate::{DomainRegistration, MainchainClient, ZoneRecord};
 
   #[napi(object)]
   pub struct LocalchainTransfer {
@@ -711,26 +706,26 @@ pub mod napi_ext {
       }))
     }
 
-    #[napi(js_name = "getDataDomainRegistration")]
-    pub async fn get_data_domain_registration_napi(
+    #[napi(js_name = "getDomainRegistration")]
+    pub async fn get_domain_registration_napi(
       &self,
       domain_name: String,
-      tld: DataTLD,
-    ) -> napi::Result<Option<DataDomainRegistration>> {
+      top_level: DomainTopLevel,
+    ) -> napi::Result<Option<DomainRegistration>> {
       self
-        .get_data_domain_registration(domain_name, tld)
+        .get_domain_registration(domain_name, top_level)
         .await
         .napi_ok()
     }
 
-    #[napi(js_name = "getDataDomainZoneRecord")]
-    pub async fn get_data_domain_zone_record_napi(
+    #[napi(js_name = "getDomainZoneRecord")]
+    pub async fn get_domain_zone_record_napi(
       &self,
       domain_name: String,
-      tld: DataTLD,
+      top_level: DomainTopLevel,
     ) -> napi::Result<Option<ZoneRecord>> {
       self
-        .get_data_domain_zone_record(domain_name, tld)
+        .get_domain_zone_record(domain_name, top_level)
         .await
         .napi_ok()
     }
@@ -891,7 +886,7 @@ pub struct NotaryDetails {
 }
 
 #[cfg_attr(feature = "napi", napi(object))]
-pub struct DataDomainRegistration {
+pub struct DomainRegistration {
   pub registered_to_address: String,
   pub registered_at_tick: u32,
 }

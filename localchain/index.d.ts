@@ -47,8 +47,8 @@ export class BalanceChangeBuilder {
   sendToMainchain(amount: bigint): Promise<void>
   createEscrowHold(amount: bigint, paymentAddress: string, delegatedSignerAddress?: string | undefined | null): Promise<void>
   sendToVote(amount: bigint): Promise<void>
-  /** Lease a data domain. DataDomain leases are converted in full to tax. */
-  leaseDataDomain(): Promise<bigint>
+  /** Lease a data domain. Domain leases are converted in full to tax. */
+  leaseDomain(): Promise<bigint>
   /** Create scale encoded signature message for the balance change. */
   static toSigningMessage(balanceChangeJson: string): Uint8Array
 }
@@ -84,23 +84,23 @@ export class BalanceTipResult {
   tick: number
 }
 
-export class DataDomainLease {
+export class DomainLease {
   id: number
   name: string
-  tld: string
+  topLevel: string
   registeredToAddress: string
   notarizationId: number
   registeredAtTick: number
 }
-export type DataDomainRow = DataDomainLease
+export type DomainRow = DomainLease
 
-export class DataDomainStore {
-  static tldFromString(tld: string): DataTLD
-  get list(): Promise<Array<DataDomainLease>>
-  hashDomain(domain: JsDataDomain): Uint8Array
+export class DomainStore {
+  static tldFromString(topLevel: string): DomainTopLevel
+  get list(): Promise<Array<DomainLease>>
+  hashDomain(domain: JsDomain): Uint8Array
   static getHash(domain: string): Uint8Array
-  static parse(domain: string): DataDomain
-  get(id: number): Promise<DataDomainLease>
+  static parse(domain: string): Domain
+  get(id: number): Promise<DomainLease>
 }
 
 export class Escrow {
@@ -168,7 +168,7 @@ export class Localchain {
   get notaryClients(): NotaryClients
   get accounts(): AccountStore
   get balanceChanges(): BalanceChangeStore
-  get dataDomains(): DataDomainStore
+  get domains(): DomainStore
   get openEscrows(): OpenEscrowsStore
   get balanceSync(): BalanceSync
   get transactions(): Transactions
@@ -182,8 +182,8 @@ export class MainchainClient {
   getTicker(): Promise<Ticker>
   getBestBlockHash(): Promise<Uint8Array>
   getVoteBlockHash(currentTick: number): Promise<BestBlockForVote | null>
-  getDataDomainRegistration(domainName: string, tld: DataTLD): Promise<DataDomainRegistration | null>
-  getDataDomainZoneRecord(domainName: string, tld: DataTLD): Promise<ZoneRecord | null>
+  getDomainRegistration(domainName: string, topLevel: DomainTopLevel): Promise<DomainRegistration | null>
+  getDomainZoneRecord(domainName: string, topLevel: DomainTopLevel): Promise<ZoneRecord | null>
   getNotaryDetails(notaryId: number): Promise<NotaryDetails | null>
   getAccount(address: string): Promise<AccountInfo>
   getOwnership(address: string): Promise<BalancesAccountData>
@@ -222,7 +222,7 @@ export class NotarizationBuilder {
   cancelEscrow(openEscrow: OpenEscrow): Promise<void>
   claimEscrow(openEscrow: OpenEscrow): Promise<void>
   addVote(vote: BlockVote): Promise<void>
-  leaseDataDomain(dataDomain: string, registerToAddress: string): Promise<void>
+  leaseDomain(domain: string, registerToAddress: string): Promise<void>
   /** Calculates the transfer tax on the given amount */
   getTransferTaxAmount(amount: bigint): bigint
   /** Calculates the total needed to end up with the given balance */
@@ -405,9 +405,9 @@ export interface BlockVote {
   /** The voting power of this vote, determined from the amount of tax */
   power: bigint
   /** The data domain used to create this vote */
-  dataDomainHash: Array<number>
+  domainHash: Array<number>
   /** The data domain payment address used to create this vote */
-  dataDomainAddress: string
+  domainAddress: string
   /** The mainchain address where rewards will be sent */
   blockRewardsAddress: string
   /** A signature of the vote by the account_id */
@@ -425,26 +425,26 @@ export enum CryptoScheme {
   Ecdsa = 2
 }
 
-/** Cost to lease a data domain for 1 year */
-export const DATA_DOMAIN_LEASE_COST: bigint
+/** Max versions that can be in a datastore zone record */
+export const DATASTORE_MAX_VERSIONS: number
 
-/** Minimum data domain name length */
-export const DATA_DOMAIN_MIN_NAME_LENGTH: number
-
-export interface DataDomain {
-  domainName: string
-  topLevelDomain: DataTLD
+export interface Domain {
+  name: string
+  topLevel: DomainTopLevel
 }
 
-export interface DataDomainRegistration {
+/** Cost to lease a data domain for 1 year */
+export const DOMAIN_LEASE_COST: bigint
+
+/** Minimum data domain name length */
+export const DOMAIN_MIN_NAME_LENGTH: number
+
+export interface DomainRegistration {
   registeredToAddress: string
   registeredAtTick: number
 }
 
-/** Max versions that can be in a datastore zone record */
-export const DATASTORE_MAX_VERSIONS: number
-
-export enum DataTLD {
+export enum DomainTopLevel {
   Analytics = 0,
   Automotive = 1,
   Bikes = 2,
@@ -546,7 +546,7 @@ export const NOTARIZATION_MAX_BALANCE_CHANGES: number
 /** Max notarizations that can be in a single notarization */
 export const NOTARIZATION_MAX_BLOCK_VOTES: number
 
-/** Max data domains that can be in a single notarization */
+/** Max domains that can be in a single notarization */
 export const NOTARIZATION_MAX_DOMAINS: number
 
 export interface NotaryAccountOrigin {

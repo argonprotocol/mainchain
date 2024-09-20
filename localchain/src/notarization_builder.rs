@@ -1,10 +1,9 @@
 use anyhow::anyhow;
 use argon_notary_audit::{verify_changeset_signatures, verify_notarization_allocation};
 use argon_primitives::{
-  AccountType, Balance, BalanceChange, BlockVote, DataDomain, Notarization, NotaryId, Note,
-  NoteType, DATA_DOMAIN_LEASE_COST, MAX_BALANCE_CHANGES_PER_NOTARIZATION,
-  MAX_BLOCK_VOTES_PER_NOTARIZATION, MAX_DOMAINS_PER_NOTARIZATION, TAX_PERCENT_BASE,
-  TRANSFER_TAX_CAP,
+  AccountType, Balance, BalanceChange, BlockVote, Domain, Notarization, NotaryId, Note, NoteType,
+  DOMAIN_LEASE_COST, MAX_BALANCE_CHANGES_PER_NOTARIZATION, MAX_BLOCK_VOTES_PER_NOTARIZATION,
+  MAX_DOMAINS_PER_NOTARIZATION, TAX_PERCENT_BASE, TRANSFER_TAX_CAP,
 };
 use codec::Decode;
 use serde_json::json;
@@ -22,14 +21,14 @@ use crate::accounts::LocalAccount;
 use crate::argon_file::{ArgonFile, ArgonFileType};
 use crate::balance_change_builder::BalanceChangeBuilder;
 use crate::balance_changes::BalanceChangeStore;
-use crate::data_domain::JsDataDomain;
+use crate::domain::JsDomain;
 use crate::keystore::Keystore;
 use crate::notarization_tracker::NotarizationTracker;
 use crate::notary_client::NotaryClients;
 use crate::open_escrows::OpenEscrow;
 use crate::transactions::LocalchainTransaction;
 use crate::{bail, Error};
-use crate::{DataDomainStore, Escrow, LocalchainTransfer, NotaryAccountOrigin};
+use crate::{DomainStore, Escrow, LocalchainTransfer, NotaryAccountOrigin};
 use crate::{Result, TickerRef};
 
 #[cfg_attr(feature = "napi", napi)]
@@ -38,8 +37,7 @@ pub struct NotarizationBuilder {
   imported_balance_changes: Arc<Mutex<Vec<BalanceChange>>>,
   balance_changes_by_account: Arc<Mutex<HashMap<i64, BalanceChangeBuilder>>>,
   votes: Arc<Mutex<BoundedVec<BlockVote, ConstU32<MAX_BLOCK_VOTES_PER_NOTARIZATION>>>>,
-  data_domains:
-    Arc<Mutex<BoundedVec<(DataDomain, AccountId32), ConstU32<MAX_DOMAINS_PER_NOTARIZATION>>>>,
+  domains: Arc<Mutex<BoundedVec<(Domain, AccountId32), ConstU32<MAX_DOMAINS_PER_NOTARIZATION>>>>,
   loaded_accounts: Arc<Mutex<BTreeMap<(String, AccountType), LocalAccount>>>,
   escrows: Arc<Mutex<Vec<OpenEscrow>>>,
   db: SqlitePool,
@@ -65,7 +63,7 @@ impl NotarizationBuilder {
       imported_balance_changes: Default::default(),
       balance_changes_by_account: Default::default(),
       votes: Default::default(),
-      data_domains: Default::default(),
+      domains: Default::default(),
       loaded_accounts: Default::default(),
       escrows: Default::default(),
       is_verified: Default::default(),
@@ -203,8 +201,8 @@ impl NotarizationBuilder {
       }
     }
 
-    let domains = notarization.data_domains.len() as i128;
-    balance -= domains * DATA_DOMAIN_LEASE_COST as i128;
+    let domains = notarization.domains.len() as i128;
+    balance -= domains * DOMAIN_LEASE_COST as i128;
 
     Ok(balance)
   }
@@ -459,25 +457,17 @@ impl NotarizationBuilder {
     Ok(())
   }
 
-  pub async fn lease_data_domain(
-    &self,
-    data_domain: String,
-    register_to_address: String,
-  ) -> Result<()> {
-    let lease = self
-      .default_deposit_account()
-      .await?
-      .lease_data_domain()
-      .await?;
+  pub async fn lease_domain(&self, domain: String, register_to_address: String) -> Result<()> {
+    let lease = self.default_deposit_account().await?.lease_domain().await?;
 
     self.default_tax_account().await?.claim(lease).await?;
 
     let register_to_account = AccountStore::parse_address(&register_to_address)?;
-    let domain = DataDomain::parse(data_domain)?;
-    let mut data_domains = self.data_domains.lock().await;
-    data_domains.try_push((domain, register_to_account)).map_err(|_| anyhow!(
+    let domain = Domain::parse(domain)?;
+    let mut domains = self.domains.lock().await;
+    domains.try_push((domain, register_to_account)).map_err(|_| anyhow!(
       "Max domains reached for this notarization. Move this domain to a new notarization! ({} domains + 1 > {} max)",
-      data_domains.len(),
+      domains.len(),
       MAX_DOMAINS_PER_NOTARIZATION
     ))?;
     Ok(())
@@ -725,11 +715,11 @@ impl NotarizationBuilder {
   pub(crate) async fn to_notarization(&self) -> Result<Notarization> {
     let imports = self.imported_balance_changes.lock().await;
     let block_votes = self.votes.lock().await;
-    let data_domains = self.data_domains.lock().await;
+    let domains = self.domains.lock().await;
     let mut notarization = Notarization::new(
       imports.clone(),
       (*block_votes).to_vec(),
-      (*data_domains)
+      (*domains)
         .iter()
         .map(|(d, a)| (d.hash(), a.clone()))
         .collect(),
@@ -891,13 +881,13 @@ impl NotarizationBuilder {
 
       tracker.accounts_by_id.insert(account_id, account);
     }
-    let data_domains = self.data_domains.lock().await;
-    for (domain, account) in &*data_domains {
-      DataDomainStore::db_insert(
+    let domains = self.domains.lock().await;
+    for (domain, account) in &*domains {
+      DomainStore::db_insert(
         &mut tx,
-        JsDataDomain {
-          domain_name: domain.domain_name.clone().into(),
-          top_level_domain: domain.top_level_domain,
+        JsDomain {
+          name: domain.name.clone().into(),
+          top_level: domain.top_level,
         },
         AccountStore::to_address(account),
         notarization_id,
@@ -919,7 +909,7 @@ impl NotarizationBuilder {
     verify_notarization_allocation(
       &notarization.balance_changes,
       &notarization.block_votes,
-      &notarization.data_domains,
+      &notarization.domains,
       None,
       self.ticker.escrow_expiration_ticks(),
     )?;
@@ -1122,14 +1112,14 @@ pub mod napi_ext {
       self.add_vote(vote).await.napi_ok()
     }
 
-    #[napi(js_name = "leaseDataDomain")]
-    pub async fn lease_data_domain_napi(
+    #[napi(js_name = "leaseDomain")]
+    pub async fn lease_domain_napi(
       &self,
-      data_domain: String,
+      domain: String,
       register_to_address: String,
     ) -> napi::Result<()> {
       self
-        .lease_data_domain(data_domain, register_to_address)
+        .lease_domain(domain, register_to_address)
         .await
         .napi_ok()
     }
@@ -1256,9 +1246,9 @@ pub mod napi_ext {
     /// The voting power of this vote, determined from the amount of tax
     pub power: BigInt,
     /// The data domain used to create this vote
-    pub data_domain_hash: Vec<u8>,
+    pub domain_hash: Vec<u8>,
     /// The data domain payment address used to create this vote
-    pub data_domain_address: String,
+    pub domain_address: String,
     /// The mainchain address where rewards will be sent
     pub block_rewards_address: String,
     /// A signature of the vote by the account_id
@@ -1668,7 +1658,7 @@ mod test {
     }
   ],
   "blockVotes": [],
-  "dataDomains": [
+  "domains": [
     [
       "0x653a9ab2d0648508094d117cff1dcb474a2c2cda8f5b94882678e9c447458fc1",
       "5CiPPseXPECbkjWCa6MnjNokrgYjMqmKndv2rSnekmSK2DjL"
@@ -1679,7 +1669,7 @@ mod test {
     assert_ok!(verify_notarization_allocation(
       &balance_change.balance_changes,
       &balance_change.block_votes,
-      &balance_change.data_domains,
+      &balance_change.domains,
       None,
       2,
     ));

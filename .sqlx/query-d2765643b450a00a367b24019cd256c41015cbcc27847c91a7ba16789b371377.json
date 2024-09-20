@@ -1,6 +1,6 @@
 {
   "db_name": "SQLite",
-  "query": "INSERT INTO data_domains (name, tld, registered_to_address, notarization_id, registered_at_tick) VALUES (?, ?, ?, ?, ?)",
+  "query": "INSERT INTO domains (name, top_level, registered_to_address, notarization_id, registered_at_tick) VALUES (?, ?, ?, ?, ?)",
   "describe": {
     "columns": [],
     "parameters": {

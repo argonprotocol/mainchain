@@ -242,7 +242,7 @@ fn create_default_notebook(
 		block_votes_root: H256::from_slice(&[0u8; 32]),
 		block_votes_count: 1,
 		blocks_with_votes: Default::default(),
-		data_domains: Default::default(),
+		domains: Default::default(),
 	}
 }
 

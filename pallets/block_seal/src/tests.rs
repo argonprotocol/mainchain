@@ -26,7 +26,7 @@ use argon_primitives::{
 	inherents::{BlockSealInherent, BlockSealInherentDataProvider, SealInherentError},
 	localchain::BlockVote,
 	BlockSealAuthorityId, BlockSealAuthoritySignature, BlockSealDigest, BlockSealerInfo,
-	BlockVoteT, BlockVotingKey, DataDomain, DataTLD, MerkleProof, NotaryNotebookVotes,
+	BlockVoteT, BlockVotingKey, Domain, DomainTopLevel, MerkleProof, NotaryNotebookVotes,
 	ParentVotingKeyDigest, AUTHOR_DIGEST_ID, PARENT_VOTING_KEY_DIGEST,
 };
 
@@ -218,8 +218,8 @@ fn it_should_be_able_to_submit_a_seal() {
 		BlocksAtTick::mutate(|a| {
 			a.insert(2, vec![System::block_hash(2)]);
 		});
-		RegisteredDataDomains::mutate(|a| {
-			a.insert(DataDomain::new("test", DataTLD::Bikes).hash());
+		RegisteredDomains::mutate(|a| {
+			a.insert(Domain::new("test", DomainTopLevel::Bikes).hash());
 		});
 
 		let block_vote = default_vote();

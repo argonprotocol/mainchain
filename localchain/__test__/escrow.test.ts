@@ -1,7 +1,7 @@
 import {
     BalanceChangeBuilder,
-    DataDomainStore,
-    DataTLD,
+    DomainStore,
+    DomainTopLevel,
     Localchain,
     NotarizationBuilder,
 } from "../index";
@@ -14,7 +14,7 @@ import {
     Keyring,
     KeyringPair,
     ArgonClient,
-    ArgonPrimitivesDataDomainVersionHost
+    ArgonPrimitivesDomainVersionHost
 } from "@argonprotocol/mainchain";
 import {
     activateNotary,
@@ -46,16 +46,16 @@ describeIntegration("Escrow integration", () => {
         const mainchainUrl = await mainchain.launch();
         const mainchainClient = await getClient(mainchainUrl);
         disconnectOnTeardown(mainchainClient);
-        const dataDomainHash = Crypto.createHash('sha256',).update('example.com').digest();
-        const ferdieDomainAddress = new Keyring({type: 'sr25519'}).createFromUri('//Ferdie//dataDomain//1');
+        const domainHash = Crypto.createHash('sha256',).update('example.com').digest();
+        const ferdieDomainAddress = new Keyring({type: 'sr25519'}).createFromUri('//Ferdie//domain//1');
         const ferdie = new Keyring({type: 'sr25519'}).createFromUri('//Ferdie');
 
-        await expect(registerZoneRecord(mainchainClient, dataDomainHash, ferdie, ferdieDomainAddress.publicKey, 1, {
-            "1.0.0": mainchainClient.createType('ArgonPrimitivesDataDomainVersionHost', {
+        await expect(registerZoneRecord(mainchainClient, domainHash, ferdie, ferdieDomainAddress.publicKey, 1, {
+            "1.0.0": mainchainClient.createType('ArgonPrimitivesDomainVersionHost', {
                 datastoreId: mainchainClient.createType('Bytes', 'default'),
                 host: 'ws://192.168.1.1:80'
             })
-        })).rejects.toThrow("ExtrinsicFailed:: dataDomain.DomainNotRegistered");
+        })).rejects.toThrow("ExtrinsicFailed:: domain.DomainNotRegistered");
     }, 120e3);
 
 
@@ -88,40 +88,40 @@ describeIntegration("Escrow integration", () => {
         const ferdiechain = await createLocalchain(mainchainUrl);
         await ferdiechain.keystore.useExternal(ferdiekeys.address, ferdiekeys.sign, ferdiekeys.derive);
 
-        const dataDomain = {
-            domainName: 'example',
-            topLevelDomain: DataTLD.Analytics
+        const domain = {
+            name: 'example',
+            topLevel: DomainTopLevel.Analytics
         };
-        const dataDomainHash = DataDomainStore.getHash("example.analytics");
+        const domainHash = DomainStore.getHash("example.analytics");
         {
             const [bobChange, ferdieChange] = await Promise.all([
                 transferMainchainToLocalchain(mainchainClient, bobchain, bob, 5200, 1),
                 transferMainchainToLocalchain(mainchainClient, ferdiechain, ferdiekeys.defaultPair, 5000, 1),
             ]);
-            await ferdieChange.notarization.leaseDataDomain("example.Analytics", ferdiekeys.address);
+            await ferdieChange.notarization.leaseDomain("example.Analytics", ferdiekeys.address);
             let [ferdieTracker] = await Promise.all([
                 bobChange.notarization.notarizeAndWaitForNotebook(),
                 ferdieChange.notarization.notarizeAndWaitForNotebook(),
             ]);
 
-            const domains = await ferdiechain.dataDomains.list;
-            expect(domains[0].name).toBe(dataDomain.domainName);
-            expect(domains[0].tld).toBe("analytics");
+            const domains = await ferdiechain.domains.list;
+            expect(domains[0].name).toBe(domain.name);
+            expect(domains[0].topLevel).toBe("analytics");
 
             const ferdieMainchainClient = await ferdiechain.mainchainClient;
             await ferdieTracker.waitForImmortalized(ferdieMainchainClient);
-            await expect(ferdieMainchainClient.getDataDomainRegistration(dataDomain.domainName, dataDomain.topLevelDomain)).resolves.toBeTruthy();
+            await expect(ferdieMainchainClient.getDomainRegistration(domain.name, domain.topLevel)).resolves.toBeTruthy();
         }
 
-        await registerZoneRecord(mainchainClient, dataDomainHash, ferdiekeys.defaultPair, ferdiekeys.defaultPair.publicKey, 1, {
-            "1.0.0": mainchainClient.createType('ArgonPrimitivesDataDomainVersionHost', {
+        await registerZoneRecord(mainchainClient, domainHash, ferdiekeys.defaultPair, ferdiekeys.defaultPair.publicKey, 1, {
+            "1.0.0": mainchainClient.createType('ArgonPrimitivesDomainVersionHost', {
                 datastoreId: mainchainClient.createType('Bytes', 'default'),
                 host: 'ws://192.168.1.1:80'
             })
         });
 
         const mainchainClientBob = await bobchain.mainchainClient;
-        const zoneRecord = await mainchainClientBob.getDataDomainZoneRecord(dataDomain.domainName, dataDomain.topLevelDomain);
+        const zoneRecord = await mainchainClientBob.getDomainZoneRecord(domain.name, domain.topLevel);
         expect(zoneRecord).toBeTruthy();
         expect(zoneRecord.notaryId).toBe(1);
         expect(zoneRecord.paymentAddress).toBe(ferdiekeys.address);
@@ -215,20 +215,20 @@ async function transferMainchainToLocalchain(mainchainClient: ArgonClient, local
     return {notarization, balanceChange};
 }
 
-async function registerZoneRecord(client: ArgonClient, dataDomainHash: Uint8Array, owner: KeyringPair, paymentAccount: Uint8Array, notaryId: number, versions: Record<string, ArgonPrimitivesDataDomainVersionHost>) {
+async function registerZoneRecord(client: ArgonClient, domainHash: Uint8Array, owner: KeyringPair, paymentAccount: Uint8Array, notaryId: number, versions: Record<string, ArgonPrimitivesDomainVersionHost>) {
 
     const codecVersions = new Map();
     for (const [version, host] of Object.entries(versions)) {
         const [major, minor, patch] = version.split('.');
-        const versionCodec = client.createType('ArgonPrimitivesDataDomainSemver', {
+        const versionCodec = client.createType('ArgonPrimitivesDomainSemver', {
             major,
             minor,
             patch,
         });
-        codecVersions.set(versionCodec, client.createType('ArgonPrimitivesDataDomainVersionHost', host));
+        codecVersions.set(versionCodec, client.createType('ArgonPrimitivesDomainVersionHost', host));
     }
 
-    await new Promise((resolve, reject) => client.tx.dataDomain.setZoneRecord(dataDomainHash, {
+    await new Promise((resolve, reject) => client.tx.domain.setZoneRecord(domainHash, {
         paymentAccount,
         notaryId,
         versions: codecVersions,

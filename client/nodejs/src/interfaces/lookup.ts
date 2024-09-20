@@ -712,29 +712,29 @@ export default {
     }
   },
   /**
-   * Lookup77: pallet_data_domain::pallet::Event<T>
+   * Lookup77: pallet_domains::pallet::Event<T>
    **/
-  PalletDataDomainEvent: {
+  PalletDomainsEvent: {
     _enum: {
       ZoneRecordUpdated: {
         domainHash: 'H256',
-        zoneRecord: 'ArgonPrimitivesDataDomainZoneRecord',
+        zoneRecord: 'ArgonPrimitivesDomainZoneRecord',
       },
-      DataDomainRegistered: {
+      DomainRegistered: {
         domainHash: 'H256',
-        registration: 'PalletDataDomainDataDomainRegistration',
+        registration: 'PalletDomainsDomainRegistration',
       },
-      DataDomainRenewed: {
-        domainHash: 'H256',
-      },
-      DataDomainExpired: {
+      DomainRenewed: {
         domainHash: 'H256',
       },
-      DataDomainRegistrationCanceled: {
+      DomainExpired: {
         domainHash: 'H256',
-        registration: 'PalletDataDomainDataDomainRegistration',
       },
-      DataDomainRegistrationError: {
+      DomainRegistrationCanceled: {
+        domainHash: 'H256',
+        registration: 'PalletDomainsDomainRegistration',
+      },
+      DomainRegistrationError: {
         domainHash: 'H256',
         accountId: 'AccountId32',
         error: 'SpRuntimeDispatchError'
@@ -742,32 +742,32 @@ export default {
     }
   },
   /**
-   * Lookup78: argon_primitives::data_domain::ZoneRecord<sp_core::crypto::AccountId32>
+   * Lookup78: argon_primitives::domain::ZoneRecord<sp_core::crypto::AccountId32>
    **/
-  ArgonPrimitivesDataDomainZoneRecord: {
+  ArgonPrimitivesDomainZoneRecord: {
     paymentAccount: 'AccountId32',
     notaryId: 'u32',
-    versions: 'BTreeMap<ArgonPrimitivesDataDomainSemver, ArgonPrimitivesDataDomainVersionHost>'
+    versions: 'BTreeMap<ArgonPrimitivesDomainSemver, ArgonPrimitivesDomainVersionHost>'
   },
   /**
-   * Lookup80: argon_primitives::data_domain::Semver
+   * Lookup80: argon_primitives::domain::Semver
    **/
-  ArgonPrimitivesDataDomainSemver: {
+  ArgonPrimitivesDomainSemver: {
     major: 'u32',
     minor: 'u32',
     patch: 'u32'
   },
   /**
-   * Lookup81: argon_primitives::data_domain::VersionHost
+   * Lookup81: argon_primitives::domain::VersionHost
    **/
-  ArgonPrimitivesDataDomainVersionHost: {
+  ArgonPrimitivesDomainVersionHost: {
     datastoreId: 'Bytes',
     host: 'Bytes'
   },
   /**
-   * Lookup85: pallet_data_domain::DataDomainRegistration<sp_core::crypto::AccountId32>
+   * Lookup85: pallet_domains::DomainRegistration<sp_core::crypto::AccountId32>
    **/
-  PalletDataDomainDataDomainRegistration: {
+  PalletDomainsDomainRegistration: {
     accountId: 'AccountId32',
     registeredAtTick: 'u32'
   },
@@ -1473,7 +1473,7 @@ export default {
     blockVotingPower: 'Compact<u128>',
     secretHash: 'H256',
     parentSecret: 'Option<H256>',
-    dataDomains: 'Vec<(H256,AccountId32)>'
+    domains: 'Vec<(H256,AccountId32)>'
   },
   /**
    * Lookup178: argon_primitives::notebook::ChainTransfer
@@ -1519,13 +1519,13 @@ export default {
     }
   },
   /**
-   * Lookup191: pallet_data_domain::pallet::Call<T>
+   * Lookup191: pallet_domains::pallet::Call<T>
    **/
-  PalletDataDomainCall: {
+  PalletDomainsCall: {
     _enum: {
       set_zone_record: {
         domainHash: 'H256',
-        zoneRecord: 'ArgonPrimitivesDataDomainZoneRecord'
+        zoneRecord: 'ArgonPrimitivesDomainZoneRecord'
       }
     }
   },
@@ -2179,9 +2179,9 @@ export default {
     _enum: ['MaxNotebooksAtTickExceeded']
   },
   /**
-   * Lookup328: pallet_data_domain::pallet::Error<T>
+   * Lookup328: pallet_domains::pallet::Error<T>
    **/
-  PalletDataDomainError: {
+  PalletDomainsError: {
     _enum: ['DomainNotRegistered', 'NotDomainOwner', 'FailedToAddToAddressHistory', 'FailedToAddExpiringDomain', 'AccountDecodingError']
   },
   /**
@@ -2217,7 +2217,7 @@ export default {
    * Lookup338: pallet_block_seal::pallet::Error<T>
    **/
   PalletBlockSealError: {
-    _enum: ['InvalidVoteSealStrength', 'InvalidSubmitter', 'UnableToDecodeVoteAccount', 'UnregisteredBlockAuthor', 'InvalidBlockVoteProof', 'NoGrandparentVoteMinimum', 'DuplicateBlockSealProvided', 'InsufficientVotingPower', 'ParentVotingKeyNotFound', 'InvalidVoteGrandparentHash', 'IneligibleNotebookUsed', 'NoEligibleVotingRoot', 'UnregisteredDataDomain', 'InvalidDataDomainAccount', 'InvalidAuthoritySignature', 'CouldNotDecodeVote', 'MaxNotebooksAtTickExceeded', 'NoClosestMinerFoundForVote', 'BlockVoteInvalidSignature']
+    _enum: ['InvalidVoteSealStrength', 'InvalidSubmitter', 'UnableToDecodeVoteAccount', 'UnregisteredBlockAuthor', 'InvalidBlockVoteProof', 'NoGrandparentVoteMinimum', 'DuplicateBlockSealProvided', 'InsufficientVotingPower', 'ParentVotingKeyNotFound', 'InvalidVoteGrandparentHash', 'IneligibleNotebookUsed', 'NoEligibleVotingRoot', 'InvalidAuthoritySignature', 'CouldNotDecodeVote', 'MaxNotebooksAtTickExceeded', 'NoClosestMinerFoundForVote', 'BlockVoteInvalidSignature']
   },
   /**
    * Lookup340: pallet_block_rewards::pallet::Error<T>

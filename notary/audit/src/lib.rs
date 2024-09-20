@@ -17,10 +17,10 @@ use sp_runtime::{
 
 use argon_primitives::{
 	ensure, round_up, tick::Tick, AccountId, AccountOrigin, AccountOriginUid, AccountType, Balance,
-	BalanceChange, BalanceProof, BalanceTip, BlockVote, ChainTransfer, DataDomainHash,
+	BalanceChange, BalanceProof, BalanceTip, BlockVote, ChainTransfer, DomainHash,
 	LocalchainAccountId, NewAccountOrigin, NotaryId, Note, NoteType, Notebook, NotebookHeader,
-	NotebookNumber, TransferToLocalchainId, VoteMinimum, DATA_DOMAIN_LEASE_COST,
-	ESCROW_CLAWBACK_TICKS, MINIMUM_ESCROW_SETTLEMENT, TAX_PERCENT_BASE,
+	NotebookNumber, TransferToLocalchainId, VoteMinimum, DOMAIN_LEASE_COST, ESCROW_CLAWBACK_TICKS,
+	MINIMUM_ESCROW_SETTLEMENT, TAX_PERCENT_BASE,
 };
 
 pub use crate::error::VerifyError;
@@ -79,12 +79,12 @@ pub fn notebook_verify<T: NotebookHistoryLookup>(
 	for notarization in notebook.notarizations.iter() {
 		let changeset = &notarization.balance_changes;
 		let block_votes = &notarization.block_votes;
-		let data_domains = &notarization.data_domains;
+		let domains = &notarization.domains;
 
 		let result = verify_notarization_allocation(
 			changeset,
 			block_votes,
-			data_domains,
+			domains,
 			Some(notebook.header.tick),
 			escrow_expiration_ticks,
 		)?;
@@ -707,7 +707,7 @@ impl BalanceChangesetState {
 pub fn verify_notarization_allocation(
 	changes: &[BalanceChange],
 	block_votes: &[BlockVote],
-	data_domains: &[(DataDomainHash, AccountId)],
+	domains: &[(DomainHash, AccountId)],
 	notebook_tick: Option<Tick>,
 	escrow_expiration_ticks: Tick,
 ) -> anyhow::Result<BalanceChangesetState, VerifyError> {
@@ -838,7 +838,7 @@ pub fn verify_notarization_allocation(
 	}
 
 	ensure!(
-		state.allocated_to_domains == DATA_DOMAIN_LEASE_COST * data_domains.len() as u128,
+		state.allocated_to_domains == DOMAIN_LEASE_COST * domains.len() as u128,
 		VerifyError::InvalidDomainLeaseAllocation
 	);
 

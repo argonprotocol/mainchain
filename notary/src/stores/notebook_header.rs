@@ -8,7 +8,7 @@ use sqlx::{query, types::JsonValue, FromRow, PgConnection};
 
 use argon_primitives::{
 	ensure, notary::NotarySignature, tick::Tick, AccountId, AccountOrigin, BlockVotingPower,
-	ChainTransfer, DataDomainHash, NotaryId, NotebookHeader, NotebookMeta, NotebookNumber,
+	ChainTransfer, DomainHash, NotaryId, NotebookHeader, NotebookMeta, NotebookNumber,
 	SignedNotebookHeader, NOTEBOOK_VERSION,
 };
 
@@ -41,7 +41,7 @@ struct NotebookHeaderRow {
 	pub secret_hash: Vec<u8>,
 	pub parent_secret: Option<Vec<u8>>,
 	pub last_updated: chrono::DateTime<Utc>,
-	pub data_domains: JsonValue,
+	pub domains: JsonValue,
 }
 
 impl TryInto<NotebookHeader> for NotebookHeaderRow {
@@ -75,7 +75,7 @@ impl TryInto<NotebookHeader> for NotebookHeaderRow {
 			),
 			secret_hash: H256::from_slice(&self.secret_hash[..]),
 			parent_secret: self.parent_secret.map(|a| H256::from_slice(&a[..])),
-			data_domains: BoundedVec::truncate_from(from_value(self.data_domains)?),
+			domains: BoundedVec::truncate_from(from_value(self.domains)?),
 		})
 	}
 }
@@ -119,7 +119,7 @@ impl NotebookHeaderStore {
 			r#"
 			INSERT INTO notebook_headers (version, notary_id, tick, notebook_number, chain_transfers,
 				changed_account_origins, changed_accounts_root, secret_hash, block_votes_root,
-				block_voting_power, block_votes_count, blocks_with_votes, data_domains)
+				block_voting_power, block_votes_count, blocks_with_votes, domains)
 			VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13)
 			"#,
 			version as i16,
@@ -361,7 +361,7 @@ impl NotebookHeaderStore {
 		db: &'a mut PgConnection,
 		notebook_number: NotebookNumber,
 		transfers: Vec<ChainTransfer>,
-		data_domains: Vec<(DataDomainHash, AccountId)>,
+		domains: Vec<(DomainHash, AccountId)>,
 		tax: u128,
 		changed_accounts_root: H256,
 		account_changelist: Vec<AccountOrigin>,
@@ -378,9 +378,9 @@ impl NotebookHeaderStore {
 					"Unable to bound chain transfers. Possibly exceeded max size.".to_string(),
 				)
 			})?;
-			header.data_domains = BoundedVec::try_from(data_domains).map_err(|_| {
+			header.domains = BoundedVec::try_from(domains).map_err(|_| {
 				Error::InternalError(
-					"Unable to bound data domains. Possibly exceeded max size.".to_string(),
+					"Unable to bound domains. Possibly exceeded max size.".to_string(),
 				)
 			})?;
 			header.changed_accounts_root = changed_accounts_root;
@@ -415,7 +415,7 @@ impl NotebookHeaderStore {
 					secret_hash=$10,
 					parent_secret=$11,
 					signature=$12,
-					data_domains=$13
+					domains=$13
 				WHERE notebook_number = $14
 			"#,
 				&hash,
@@ -437,7 +437,7 @@ impl NotebookHeaderStore {
 					data.as_bytes().to_vec()
 				}),
 				&signature.0,
-				json!(header.data_domains.to_vec()),
+				json!(header.domains.to_vec()),
 				header.notebook_number as i32,
 			)
 			.execute(db)

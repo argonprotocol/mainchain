@@ -8,7 +8,7 @@ members = [
     "pallets/block_rewards",
     "pallets/block_seal",
     "pallets/block_seal_spec",
-    "pallets/data_domain",
+    "pallets/domains",
     "pallets/bond",
     "pallets/chain_transfer",
     "pallets/mining_slot",
@@ -325,7 +325,7 @@ pallet-bitcoin-utxos = { path = "pallets/bitcoin_utxos", default-features = fals
 pallet-block-rewards = { path = "pallets/block_rewards", default-features = false }
 pallet-bond = { path = "pallets/bond", default-features = false }
 pallet-chain-transfer = { path = "pallets/chain_transfer", default-features = false }
-pallet-data-domain = { path = "pallets/data_domain", default-features = false }
+pallet-domains = { path = "pallets/domains", default-features = false }
 pallet-mining-slot = { path = "pallets/mining_slot", default-features = false }
 pallet-notebook = { path = "pallets/notebook", default-features = false }
 pallet-notaries = { path = "pallets/notaries", default-features = false }
