@@ -1,4 +1,4 @@
-use argon_primitives::{tick::Tick, AccountType, MINIMUM_ESCROW_SETTLEMENT};
+use argon_primitives::{tick::Tick, AccountType, MINIMUM_CHANNEL_HOLD_SETTLEMENT};
 use codec::{Decode, Encode};
 use serde::{Deserialize, Serialize};
 use snafu::Snafu;
@@ -103,33 +103,33 @@ pub enum VerifyError {
 	#[snafu(display("Error decoding notebook"))]
 	DecodeError,
 
-	#[snafu(display("Account does not have an escrow hold"))]
-	AccountEscrowHoldDoesntExist,
+	#[snafu(display("Account does not have a channel hold"))]
+	AccountChannelHoldDoesntExist,
 
-	#[snafu(display("Account already has an escrow hold"))]
-	AccountAlreadyHasEscrowHold,
+	#[snafu(display("Account already has a channel hold"))]
+	AccountAlreadyHasChannelHold,
 
 	#[snafu(display(
-		"Escrow hold not ready for claim. Current tick: {current_tick}, claim tick: {claim_tick}"
+		"Channel hold not ready for claim. Current tick: {current_tick}, claim tick: {claim_tick}"
 	))]
-	EscrowHoldNotReadyForClaim { current_tick: Tick, claim_tick: Tick },
+	ChannelHoldNotReadyForClaim { current_tick: Tick, claim_tick: Tick },
 
-	#[snafu(display("This account is locked with an escrow hold"))]
+	#[snafu(display("This account is locked with a channel hold"))]
 	AccountLocked,
 
-	#[snafu(display("An escrow hold note is required to unlock this account"))]
-	MissingEscrowHoldNote,
+	#[snafu(display("A channel hold note is required to unlock this account"))]
+	MissingChannelHoldNote,
 
-	#[snafu(display("Invalid escrow hold note"))]
-	InvalidEscrowHoldNote,
+	#[snafu(display("Invalid channel hold note"))]
+	InvalidChannelHoldNote,
 
-	#[snafu(display("Invalid escrow claimers"))]
-	InvalidEscrowClaimers,
+	#[snafu(display("Invalid channel_hold claimers"))]
+	InvalidChannelHoldClaimers,
 
 	#[snafu(display(
-		"This escrow note is below the minimum amount required ({MINIMUM_ESCROW_SETTLEMENT})"
+		"This channel hold note is below the minimum amount required ({MINIMUM_CHANNEL_HOLD_SETTLEMENT})"
 	))]
-	EscrowNoteBelowMinimum,
+	ChannelHoldNoteBelowMinimum,
 
 	#[snafu(display("Tax notes can only be created from deposit accounts"))]
 	InvalidTaxNoteAccount,

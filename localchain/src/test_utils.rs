@@ -293,10 +293,10 @@ impl MockNotary {
             account_origin: account.clone(),
             change_number: *change_number,
             balance: balance_change.balance,
-            escrow_hold_note: balance_change
+            channel_hold_note: balance_change
               .notes
               .iter()
-              .find(|a| matches!(a.note_type, NoteType::EscrowHold { .. }))
+              .find(|a| matches!(a.note_type, NoteType::ChannelHold { .. }))
               .cloned(),
           });
         }
@@ -397,7 +397,7 @@ pub fn get_balance_tip(
     account_type: balance_change.account_type,
     account_id: balance_change.account_id,
     balance: balance_change.balance,
-    escrow_hold_note: balance_change.escrow_hold_note.clone(),
+    channel_hold_note: balance_change.channel_hold_note.clone(),
     account_origin: AccountOrigin {
       account_uid: account_origin_uid,
       notebook_number: account_origin_notebook_number,

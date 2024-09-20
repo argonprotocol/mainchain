@@ -27,8 +27,9 @@ adjust to the price of the Argon, ensuring sufficient supply can be removed quic
 
 Localchains are the person-to-person Layer 2 of the Argon network. They are a personal "blockchain" that keeps a
 cryptographic proof of the "current balance" of each user, which can be signed and sent to another user for exchanging
-funds. Localchains are expected to be used for high-frequency transactions, such as micropayments, and for escrowing
-Ulixee Datastore payments. Localchains submit balance changes in "notarizations" to the Argon mainchain via Notaries,
+funds. Localchains are expected to be used for high-frequency transactions, such as micropayments for queries in
+[Ulixee Datastores](https://ulixee.org/docs/datastore). Localchains submit balance changes in "notarizations" to the
+Argon mainchain via Notaries,
 which are network approved entities that audit the balance changes and batch them to the mainchain.
 
 ## Consensus

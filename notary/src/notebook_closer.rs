@@ -234,7 +234,7 @@ mod tests {
 		AccountType::{Deposit, Tax},
 		BalanceChange, BalanceProof, BalanceTip, BlockSealDigest, BlockVote, BlockVoteDigest,
 		Domain, DomainHash, DomainTopLevel, HashOutput, MerkleProof, Note, NoteType,
-		NoteType::{EscrowClaim, EscrowSettle},
+		NoteType::{ChannelHoldClaim, ChannelHoldSettle},
 		NotebookDigest, ParentVotingKeyDigest, TickDigest, TransferToLocalchainId,
 		DOMAIN_LEASE_COST,
 	};
@@ -336,7 +336,7 @@ mod tests {
 			notebook_number: result.notebook_number,
 		};
 
-		let (hold_note, hold_result) = create_escrow_hold(
+		let (hold_note, hold_result) = create_channel_hold(
 			&pool,
 			bob_balance as u128,
 			5000,
@@ -347,10 +347,10 @@ mod tests {
 		)
 		.await?;
 
-		println!("created escrow hold. Waiting for notebook {}", hold_result.notebook_number);
+		println!("created channel hold. Waiting for notebook {}", hold_result.notebook_number);
 
 		// TODO: use api once we update
-		let escrow_expiration_ticks = 2;
+		let channel_hold_expiration_ticks = 2;
 
 		let mut header_sub = notary_server.completed_notebook_stream.subscribe(100);
 		let mut notebook_proof: Option<MerkleProof> = None;
@@ -370,7 +370,7 @@ mod tests {
 											account_origin: origin.clone(),
 											balance: bob_balance as u128,
 											account_id: Bob.to_account_id(),
-											escrow_hold_note: Some(hold_note.clone()),
+											channel_hold_note: Some(hold_note.clone()),
 											change_number: 2,
 											account_type: Deposit,
 										},
@@ -378,9 +378,9 @@ mod tests {
 									.await?,
 								);
 							}
-							if header.notebook_number >= hold_result.notebook_number + escrow_expiration_ticks
+							if header.notebook_number >= hold_result.notebook_number + channel_hold_expiration_ticks
 							{
-								println!("Expiration of escrow ready");
+								println!("Expiration of channel_hold ready");
 								break;
 							}
 						},
@@ -426,7 +426,7 @@ mod tests {
 
 		let vote_power = (hold_note.milligons as f64 * 0.2f64) as u128;
 
-		let escrow_result = settle_escrow_and_vote(
+		let channel_hold_result = settle_channel_hold_and_vote(
 			&pool,
 			&ticker,
 			hold_note,
@@ -441,7 +441,7 @@ mod tests {
 			},
 		)
 		.await?;
-		println!("Escrow result is {:?}", escrow_result);
+		println!("ChannelHold result is {:?}", channel_hold_result);
 
 		let mut best_sub = ctx.client.live.blocks().subscribe_finalized().await?;
 		let mut did_see_vote = false;
@@ -452,10 +452,10 @@ mod tests {
 					let (tick, votes, seal, key, notebooks) = get_digests(block);
 					if let Some(notebook) = notebooks.notebooks.first() {
 						assert_eq!(notebook.audit_first_failure, None);
-						if notebook.notebook_number == escrow_result.notebook_number {
+						if notebook.notebook_number == channel_hold_result.notebook_number {
 							assert_eq!(votes.votes_count, 1, "Should have votes");
 							assert_eq!(votes.voting_power, vote_power);
-							assert_eq!(tick, escrow_result.tick)
+							assert_eq!(tick, channel_hold_result.tick)
 						}
 					}
 					println!("Got block with tick {tick} {:?} {:?}", votes, seal);
@@ -467,7 +467,7 @@ mod tests {
 					}
 
 					// should have gotten a vote in tick 2
-					if tick >= escrow_result.tick + 3 {
+					if tick >= channel_hold_result.tick + 3 {
 						break;
 					}
 				},
@@ -596,7 +596,7 @@ mod tests {
 					amount as u128,
 					NoteType::ClaimFromMainchain { transfer_id },
 				)],
-				escrow_hold_note: None,
+				channel_hold_note: None,
 				signature: sp_core::ed25519::Signature::from_raw([0u8; 64]).into(),
 			}
 			.sign(keypair)
@@ -643,7 +643,7 @@ mod tests {
 						Note::create(amount as u128, NoteType::ClaimFromMainchain { transfer_id },),
 						Note::create(DOMAIN_LEASE_COST, NoteType::LeaseDomain,)
 					],
-					escrow_hold_note: None,
+					channel_hold_note: None,
 					signature: sp_core::ed25519::Signature::from_raw([0u8; 64]).into(),
 				}
 				.sign(keypair.clone())
@@ -655,7 +655,7 @@ mod tests {
 					balance: DOMAIN_LEASE_COST,
 					previous_balance_proof: None,
 					notes: bounded_vec![Note::create(DOMAIN_LEASE_COST, NoteType::Claim,)],
-					escrow_hold_note: None,
+					channel_hold_note: None,
 					signature: sp_core::ed25519::Signature::from_raw([0u8; 64]).into(),
 				}
 				.sign(keypair.clone())
@@ -698,7 +698,7 @@ mod tests {
 	}
 
 	#[allow(clippy::too_many_arguments)]
-	async fn create_escrow_hold(
+	async fn create_channel_hold(
 		pool: &PgPool,
 		balance: u128,
 		amount: u128,
@@ -709,7 +709,7 @@ mod tests {
 	) -> anyhow::Result<(Note, BalanceChangeResult)> {
 		let hold_note = Note::create(
 			amount,
-			NoteType::EscrowHold { recipient: domain_account, delegated_signer: None },
+			NoteType::ChannelHold { recipient: domain_account, delegated_signer: None },
 		);
 		let changes = vec![BalanceChange {
 			account_id: Bob.to_account_id(),
@@ -725,7 +725,7 @@ mod tests {
 				account_origin: account_origin.clone(),
 			}),
 			notes: bounded_vec![hold_note.clone()],
-			escrow_hold_note: None,
+			channel_hold_note: None,
 			signature: sp_core::sr25519::Signature::from_raw([0u8; 64]).into(),
 		}
 		.sign(Bob.pair())
@@ -735,7 +735,7 @@ mod tests {
 		Ok((hold_note.clone(), result))
 	}
 
-	async fn settle_escrow_and_vote(
+	async fn settle_channel_hold_and_vote(
 		pool: &PgPool,
 		ticker: &Ticker,
 		hold_note: Note,
@@ -750,8 +750,8 @@ mod tests {
 				change_number: 3,
 				balance: bob_balance_proof.balance - hold_note.milligons,
 				previous_balance_proof: Some(bob_balance_proof),
-				escrow_hold_note: Some(hold_note.clone()),
-				notes: bounded_vec![Note::create(hold_note.milligons, EscrowSettle)],
+				channel_hold_note: Some(hold_note.clone()),
+				notes: bounded_vec![Note::create(hold_note.milligons, ChannelHoldSettle)],
 				signature: sp_core::sr25519::Signature::from_raw([0u8; 64]).into(),
 			}
 			.sign(Bob.pair())
@@ -762,9 +762,9 @@ mod tests {
 				change_number: 1,
 				balance: hold_note.milligons - tax,
 				previous_balance_proof: None,
-				escrow_hold_note: None,
+				channel_hold_note: None,
 				notes: bounded_vec![
-					Note::create(hold_note.milligons, EscrowClaim),
+					Note::create(hold_note.milligons, ChannelHoldClaim),
 					Note::create(tax, NoteType::Tax)
 				],
 				signature: sp_core::sr25519::Signature::from_raw([0u8; 64]).into(),
@@ -777,7 +777,7 @@ mod tests {
 				change_number: 1,
 				balance: 0,
 				previous_balance_proof: None,
-				escrow_hold_note: None,
+				channel_hold_note: None,
 				notes: bounded_vec![
 					Note::create(tax, NoteType::Claim),
 					Note::create(tax, NoteType::SendToVote)

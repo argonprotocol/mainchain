@@ -68,12 +68,12 @@ pub(crate) fn testnet_genesis(
 	initial_difficulty: ComputeDifficulty,
 	tick_millis: u64,
 	initial_notaries: Vec<GenesisNotary<AccountId>>,
-	escrow_expiration_ticks: Tick,
+	channel_hold_expiration_ticks: Tick,
 	mining_config: MiningSlotConfig<BlockNumber>,
 	minimum_bitcoin_bond_satoshis: Satoshis,
 ) -> serde_json::Value {
 	let authority_zero = initial_authorities[0].clone();
-	let ticker = Ticker::start(Duration::from_millis(tick_millis), escrow_expiration_ticks);
+	let ticker = Ticker::start(Duration::from_millis(tick_millis), channel_hold_expiration_ticks);
 	let miner_zero = MiningRegistration::<AccountId, Balance> {
 		account_id: authority_zero.0.clone(),
 		bond_id: None,

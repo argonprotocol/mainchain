@@ -1,6 +1,6 @@
 {
   "db_name": "SQLite",
-  "query": "SELECT * FROM open_escrows WHERE id = ?",
+  "query": "SELECT * FROM open_channel_holds WHERE notarization_id IS NULL AND missed_claim_window = false AND expiration_tick <= $1",
   "describe": {
     "columns": [
       {
@@ -88,5 +88,5 @@
       false
     ]
   },
-  "hash": "744d2b2aaed1b02ca819eb7de20512692e9f05173a77de00a8caef06ee3dc78e"
+  "hash": "55342d5c13ed1739ed68ff933531763866a1d548b16b9b1eb8b6e5403e907d0f"
 }

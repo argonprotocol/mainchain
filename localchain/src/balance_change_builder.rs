@@ -1,6 +1,6 @@
 use argon_primitives::{
   AccountId, AccountType, Balance, BalanceChange, MultiSignatureBytes, Note, NoteType,
-  DOMAIN_LEASE_COST, MINIMUM_ESCROW_SETTLEMENT,
+  DOMAIN_LEASE_COST, MINIMUM_CHANNEL_HOLD_SETTLEMENT,
 };
 use lazy_static::lazy_static;
 use sp_core::bounded_vec::BoundedVec;
@@ -61,7 +61,7 @@ impl BalanceChangeBuilder {
         change_number: 0,
         previous_balance_proof: None,
         balance: 0,
-        escrow_hold_note: None,
+        channel_hold_note: None,
         notes: Default::default(),
         signature: EMPTY_SIGNATURE.clone(),
       },
@@ -146,7 +146,7 @@ impl BalanceChangeBuilder {
     Ok(ClaimResult::new(amount, tax_amount))
   }
 
-  pub async fn claim_escrow(&self, amount: Balance) -> Result<ClaimResult> {
+  pub async fn claim_channel_hold(&self, amount: Balance) -> Result<ClaimResult> {
     let mut balance_change = self.balance_change.lock().await;
     if balance_change.account_type != AccountType::Deposit {
       bail!(
@@ -155,9 +155,9 @@ impl BalanceChangeBuilder {
       );
     }
 
-    let tax_amount = Note::calculate_escrow_tax(amount);
+    let tax_amount = Note::calculate_channel_hold_tax(amount);
     balance_change.balance += amount - tax_amount;
-    balance_change.push_note(amount, NoteType::EscrowClaim);
+    balance_change.push_note(amount, NoteType::ChannelHoldClaim);
     balance_change.push_note(tax_amount, NoteType::Tax);
     Ok(ClaimResult::new(amount, tax_amount))
   }
@@ -212,7 +212,7 @@ impl BalanceChangeBuilder {
     Ok(())
   }
 
-  pub async fn create_escrow_hold(
+  pub async fn create_channel_hold(
     &self,
     amount: Balance,
     payment_address: String,
@@ -228,24 +228,24 @@ impl BalanceChangeBuilder {
 
     if balance_change.balance < amount {
       bail!(
-        "Insufficient balance to create an escrow (address={}, balance={}, amount={})",
+        "Insufficient balance to create a channel_hold (address={}, balance={}, amount={})",
         self.address,
         balance_change.balance,
         amount
       );
     }
-    if amount < MINIMUM_ESCROW_SETTLEMENT {
+    if amount < MINIMUM_CHANNEL_HOLD_SETTLEMENT {
       bail!(
-        "Escrow amount {} is less than minimum {}",
+        "ChannelHold amount {} is less than minimum {}",
         amount,
-        MINIMUM_ESCROW_SETTLEMENT
+        MINIMUM_CHANNEL_HOLD_SETTLEMENT
       );
     }
 
-    // NOTE: escrow hold doesn't manipulate balance
+    // NOTE: channel hold doesn't manipulate balance
     balance_change.push_note(
       amount,
-      NoteType::EscrowHold {
+      NoteType::ChannelHold {
         recipient: AccountStore::parse_address(&payment_address)?,
         delegated_signer: match delegated_signer_address {
           Some(address) => Some(AccountStore::parse_address(&address)?),
@@ -376,10 +376,10 @@ pub mod napi_ext {
         .napi_ok()
     }
 
-    #[napi(js_name = "claimEscrow")]
-    pub async fn claim_escrow_napi(&self, amount: BigInt) -> napi::Result<ClaimResult> {
+    #[napi(js_name = "claimChannelHold")]
+    pub async fn claim_channel_hold_napi(&self, amount: BigInt) -> napi::Result<ClaimResult> {
       self
-        .claim_escrow(amount.get_u128().1)
+        .claim_channel_hold(amount.get_u128().1)
         .await
         .map(Into::into)
         .napi_ok()
@@ -407,15 +407,15 @@ pub mod napi_ext {
       self.send_to_mainchain(amount.get_u128().1).await.napi_ok()
     }
 
-    #[napi(js_name = "createEscrowHold")]
-    pub async fn create_escrow_hold_napi(
+    #[napi(js_name = "createChannelHold")]
+    pub async fn create_channel_hold_napi(
       &self,
       amount: BigInt,
       payment_address: String,
       delegated_signer_address: Option<String>,
     ) -> napi::Result<()> {
       self
-        .create_escrow_hold(
+        .create_channel_hold(
           amount.get_u128().1,
           payment_address,
           delegated_signer_address,
@@ -530,7 +530,7 @@ mod test {
   }
 
   #[tokio::test]
-  async fn test_escrow_hold() {
+  async fn test_channel_hold() {
     let address = AccountStore::to_address(&Bob.to_account_id());
     let payment_address = AccountStore::to_address(&Alice.to_account_id());
     let builder =
@@ -547,7 +547,7 @@ mod test {
       .unwrap();
 
     builder
-      .create_escrow_hold(1_000u128, payment_address.clone(), None)
+      .create_channel_hold(1_000u128, payment_address.clone(), None)
       .await
       .unwrap();
 
@@ -559,7 +559,7 @@ mod test {
     let alice = Alice.to_account_id();
 
     match &balance_change.notes[1].note_type {
-      NoteType::EscrowHold { recipient, .. } => assert_eq!(recipient, &alice),
+      NoteType::ChannelHold { recipient, .. } => assert_eq!(recipient, &alice),
       _ => unreachable!(),
     };
   }

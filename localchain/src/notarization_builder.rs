@@ -25,10 +25,10 @@ use crate::domain::JsDomain;
 use crate::keystore::Keystore;
 use crate::notarization_tracker::NotarizationTracker;
 use crate::notary_client::NotaryClients;
-use crate::open_escrows::OpenEscrow;
+use crate::open_channel_holds::OpenChannelHold;
 use crate::transactions::LocalchainTransaction;
 use crate::{bail, Error};
-use crate::{DomainStore, Escrow, LocalchainTransfer, NotaryAccountOrigin};
+use crate::{ChannelHold, DomainStore, LocalchainTransfer, NotaryAccountOrigin};
 use crate::{Result, TickerRef};
 
 #[cfg_attr(feature = "napi", napi)]
@@ -39,7 +39,7 @@ pub struct NotarizationBuilder {
   votes: Arc<Mutex<BoundedVec<BlockVote, ConstU32<MAX_BLOCK_VOTES_PER_NOTARIZATION>>>>,
   domains: Arc<Mutex<BoundedVec<(Domain, AccountId32), ConstU32<MAX_DOMAINS_PER_NOTARIZATION>>>>,
   loaded_accounts: Arc<Mutex<BTreeMap<(String, AccountType), LocalAccount>>>,
-  escrows: Arc<Mutex<Vec<OpenEscrow>>>,
+  channel_holds: Arc<Mutex<Vec<OpenChannelHold>>>,
   db: SqlitePool,
   is_verified: Arc<Mutex<bool>>,
   is_finalized: Arc<Mutex<bool>>,
@@ -65,7 +65,7 @@ impl NotarizationBuilder {
       votes: Default::default(),
       domains: Default::default(),
       loaded_accounts: Default::default(),
-      escrows: Default::default(),
+      channel_holds: Default::default(),
       is_verified: Default::default(),
       is_finalized: Default::default(),
       notary_id: Arc::new(Mutex::new(Some(1))),
@@ -146,17 +146,17 @@ impl NotarizationBuilder {
     Ok(balance)
   }
 
-  pub async fn escrows(&self) -> Vec<Escrow> {
-    let escrows = self.escrows.lock().await;
+  pub async fn channel_holds(&self) -> Vec<ChannelHold> {
+    let channel_holds = self.channel_holds.lock().await;
     let mut result = vec![];
-    for escrow in &*escrows {
-      result.push(escrow.inner().await);
+    for channel_hold in &*channel_holds {
+      result.push(channel_hold.inner().await);
     }
     result
   }
 
-  pub async fn add_escrow(&self, escrow: &OpenEscrow) {
-    self.escrows.lock().await.push(escrow.clone());
+  pub async fn add_channel_hold(&self, channel_hold: &OpenChannelHold) {
+    self.channel_holds.lock().await.push(channel_hold.clone());
   }
 
   pub async fn accounts(&self) -> Vec<LocalAccount> {
@@ -217,8 +217,8 @@ impl NotarizationBuilder {
 
       for note in change.notes {
         match note.note_type {
-          NoteType::Claim { .. } | NoteType::EscrowClaim => balance -= note.milligons as i128,
-          NoteType::Send { .. } | NoteType::EscrowSettle => balance += note.milligons as i128,
+          NoteType::Claim { .. } | NoteType::ChannelHoldClaim => balance -= note.milligons as i128,
+          NoteType::Send { .. } | NoteType::ChannelHoldSettle => balance += note.milligons as i128,
           _ => {}
         };
       }
@@ -367,14 +367,14 @@ impl NotarizationBuilder {
     Ok(builder)
   }
 
-  pub async fn can_add_escrow(&self, escrow: &OpenEscrow) -> bool {
+  pub async fn can_add_channel_hold(&self, channel_hold: &OpenChannelHold) -> bool {
     let balance_changes_by_account = (*(self.balance_changes_by_account.lock().await)).len();
     let imports = (*(self.imported_balance_changes.lock().await)).len();
     let mut added_accounts_needed = 2;
-    let escrow = escrow.inner().await;
+    let channel_hold = channel_hold.inner().await;
     let accounts_by_id = self.loaded_accounts.lock().await;
     for (_, account) in accounts_by_id.iter() {
-      if account.address == escrow.to_address {
+      if account.address == channel_hold.to_address {
         added_accounts_needed -= 1;
       }
     }
@@ -382,49 +382,53 @@ impl NotarizationBuilder {
       < MAX_BALANCE_CHANGES_PER_NOTARIZATION as usize
   }
 
-  pub async fn cancel_escrow(&self, open_escrow: &OpenEscrow) -> Result<()> {
-    let escrow = open_escrow.inner().await;
-    (*self.escrows.lock().await).push(open_escrow.clone());
+  pub async fn cancel_channel_hold(&self, open_channel_hold: &OpenChannelHold) -> Result<()> {
+    let channel_hold = open_channel_hold.inner().await;
+    (*self.channel_holds.lock().await).push(open_channel_hold.clone());
     let balance_change_tx = self
-      .add_account(escrow.from_address, AccountType::Deposit, escrow.notary_id)
+      .add_account(
+        channel_hold.from_address,
+        AccountType::Deposit,
+        channel_hold.notary_id,
+      )
       .await?;
 
     let balance_lock = balance_change_tx.balance_change_lock();
     let mut balance_change = balance_lock.lock().await;
-    balance_change.push_note(0, NoteType::EscrowSettle);
+    balance_change.push_note(0, NoteType::ChannelHoldSettle);
 
     Ok(())
   }
 
-  pub async fn claim_escrow(&self, open_escrow: &OpenEscrow) -> Result<()> {
-    let escrow = open_escrow.inner().await;
+  pub async fn claim_channel_hold(&self, open_channel_hold: &OpenChannelHold) -> Result<()> {
+    let channel_hold = open_channel_hold.inner().await;
     {
       let mut notary_id = self.notary_id.lock().await;
       if let Some(notary_id) = *notary_id {
-        if escrow.notary_id != notary_id {
+        if channel_hold.notary_id != notary_id {
           bail!(
-            "Escrow is not using the same notary ({:?}) as this notarization ({:?})",
-            escrow.notary_id,
+            "ChannelHold is not using the same notary ({:?}) as this notarization ({:?})",
+            channel_hold.notary_id,
             self.notary_id
           );
         }
       } else {
-        *notary_id = Some(escrow.notary_id);
+        *notary_id = Some(channel_hold.notary_id);
       }
     }
 
-    (*self.escrows.lock().await).push(open_escrow.clone());
+    (*self.channel_holds.lock().await).push(open_channel_hold.clone());
 
-    let settle_balance_change = escrow.get_final().await?;
+    let settle_balance_change = channel_hold.get_final().await?;
     (*self.imported_balance_changes.lock().await).push(settle_balance_change);
 
     let default_deposit_account = self.default_deposit_account().await?;
-    if default_deposit_account.address != escrow.to_address {
-      bail!("Escrow claim address doesn't match this localchain address",)
+    if default_deposit_account.address != channel_hold.to_address {
+      bail!("ChannelHold claim address doesn't match this localchain address",)
     }
 
     let claim_result = default_deposit_account
-      .claim_escrow(escrow.settled_amount())
+      .claim_channel_hold(channel_hold.settled_amount())
       .await?;
 
     self
@@ -492,8 +496,8 @@ impl NotarizationBuilder {
     }
   }
 
-  pub fn get_escrow_tax_amount(&self, amount: Balance) -> Balance {
-    Note::calculate_escrow_tax(amount)
+  pub fn get_channel_hold_tax_amount(&self, amount: Balance) -> Balance {
+    Note::calculate_channel_hold_tax(amount)
   }
 
   pub async fn claim_from_mainchain(
@@ -799,10 +803,10 @@ impl NotarizationBuilder {
     .await
     ?;
 
-    let escrows = self.escrows.lock().await;
-    for escrow in (*escrows).iter() {
-      let mut escrow_inner = escrow.inner().await;
-      escrow_inner
+    let channel_holds = self.channel_holds.lock().await;
+    for channel_hold in (*channel_holds).iter() {
+      let mut channel_hold_inner = channel_hold.inner().await;
+      channel_hold_inner
         .db_mark_notarized(&mut tx, notarization_id)
         .await?;
     }
@@ -911,7 +915,7 @@ impl NotarizationBuilder {
       &notarization.block_votes,
       &notarization.domains,
       None,
-      self.ticker.escrow_expiration_ticks(),
+      self.ticker.channel_hold_expiration_ticks(),
     )?;
     verify_changeset_signatures(&notarization.balance_changes)?;
 
@@ -965,9 +969,9 @@ pub mod napi_ext {
   use crate::balance_change_builder::BalanceChangeBuilder;
   use crate::error::NapiOk;
   use crate::mainchain_client::napi_ext::LocalchainTransfer;
-  use crate::open_escrows::OpenEscrow;
+  use crate::open_channel_holds::OpenChannelHold;
   use crate::transactions::LocalchainTransaction;
-  use crate::Escrow;
+  use crate::ChannelHold;
   use crate::LocalAccount;
   use crate::{notarization_tracker::NotarizationTracker, AccountStore};
   use argon_primitives::{AccountType, BlockVote};
@@ -1006,9 +1010,9 @@ pub mod napi_ext {
       self.unclaimed_tax().await.map(Into::into).napi_ok()
     }
 
-    #[napi(getter, js_name = "escrows")]
-    pub async fn escrows_napi(&self) -> Vec<Escrow> {
-      self.escrows().await
+    #[napi(getter, js_name = "channelHolds")]
+    pub async fn channel_holds_napi(&self) -> Vec<ChannelHold> {
+      self.channel_holds().await
     }
 
     #[napi(getter, js_name = "accounts")]
@@ -1091,19 +1095,25 @@ pub mod napi_ext {
       self.load_account(account).await.napi_ok()
     }
 
-    #[napi(js_name = "canAddEscrow")]
-    pub async fn can_add_escrow_napi(&self, escrow: &OpenEscrow) -> bool {
-      self.can_add_escrow(escrow).await
+    #[napi(js_name = "canAddChannelHold")]
+    pub async fn can_add_channel_hold_napi(&self, channel_hold: &OpenChannelHold) -> bool {
+      self.can_add_channel_hold(channel_hold).await
     }
 
-    #[napi(js_name = "cancelEscrow")]
-    pub async fn cancel_escrow_napi(&self, open_escrow: &OpenEscrow) -> napi::Result<()> {
-      self.cancel_escrow(open_escrow).await.napi_ok()
+    #[napi(js_name = "cancelChannelHold")]
+    pub async fn cancel_channel_hold_napi(
+      &self,
+      open_channel_hold: &OpenChannelHold,
+    ) -> napi::Result<()> {
+      self.cancel_channel_hold(open_channel_hold).await.napi_ok()
     }
 
-    #[napi(js_name = "claimEscrow")]
-    pub async fn claim_escrow_napi(&self, open_escrow: &OpenEscrow) -> napi::Result<()> {
-      self.claim_escrow(open_escrow).await.napi_ok()
+    #[napi(js_name = "claimChannelHold")]
+    pub async fn claim_channel_hold_napi(
+      &self,
+      open_channel_hold: &OpenChannelHold,
+    ) -> napi::Result<()> {
+      self.claim_channel_hold(open_channel_hold).await.napi_ok()
     }
 
     #[napi(js_name = "addVote", ts_args_type = "vote: BlockVote")]
@@ -1138,9 +1148,9 @@ pub mod napi_ext {
         .into()
     }
 
-    #[napi(js_name = "getEscrowTaxAmount")]
-    pub fn get_escrow_tax_amount_napi(&self, amount: BigInt) -> BigInt {
-      self.get_escrow_tax_amount(amount.get_u128().1).into()
+    #[napi(js_name = "getChannelHoldTaxAmount")]
+    pub fn get_channel_hold_tax_amount_napi(&self, amount: BigInt) -> BigInt {
+      self.get_channel_hold_tax_amount(amount.get_u128().1).into()
     }
 
     #[napi(js_name = "claimFromMainchain")]
@@ -1542,7 +1552,7 @@ mod test {
       }],
       signature: Signature::from_raw([0u8; 64]).into(),
       change_number: 2,
-      escrow_hold_note: None,
+      channel_hold_note: None,
     };
     let balance_change = balance_change.sign(Bob.pair()).clone();
     let keystore = Keystore::new(pool.clone());
@@ -1592,7 +1602,7 @@ mod test {
       }],
       signature: Signature::from_raw([0u8; 64]).into(),
       change_number: 2,
-      escrow_hold_note: None,
+      channel_hold_note: None,
     };
     let balance_change = balance_change.sign(Bob.pair()).clone();
     let keystore = Keystore::new(pool.clone());
@@ -1621,7 +1631,7 @@ mod test {
       "changeNumber": 1,
       "balance": 4000,
       "previousBalanceProof": null,
-      "escrowHoldNote": null,
+      "channelHoldNote": null,
       "notes": [
         {
           "milligons": 5000,
@@ -1645,7 +1655,7 @@ mod test {
       "changeNumber": 1,
       "balance": 1000,
       "previousBalanceProof": null,
-      "escrowHoldNote": null,
+      "channelHoldNote": null,
       "notes": [
         {
           "milligons": 1000,

@@ -1,0 +1,12 @@
+{
+  "db_name": "SQLite",
+  "query": "UPDATE balance_changes SET notarization_id = ?, balance = ?, net_balance_change = ?, notes_json = ?, channel_hold_note_json = ?, status = ?, transaction_id = ? WHERE id = ?",
+  "describe": {
+    "columns": [],
+    "parameters": {
+      "Right": 8
+    },
+    "nullable": []
+  },
+  "hash": "12e03217a1da60588349e103d64c12ac24e6a0db6c19b159c9a0cb2ccbb16d5a"
+}

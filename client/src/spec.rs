@@ -1768,10 +1768,9 @@ pub mod api {
 							audit_dependency_summaries,
 						},
 						[
-							16u8, 172u8, 44u8, 64u8, 251u8, 72u8, 12u8, 7u8, 120u8, 252u8, 150u8,
-							146u8, 155u8, 228u8, 108u8, 81u8, 246u8, 151u8, 138u8, 232u8, 89u8,
-							203u8, 122u8, 218u8, 246u8, 160u8, 202u8, 227u8, 108u8, 163u8, 8u8,
-							50u8,
+							164u8, 165u8, 165u8, 251u8, 25u8, 194u8, 175u8, 78u8, 43u8, 31u8, 76u8,
+							202u8, 29u8, 236u8, 11u8, 42u8, 30u8, 174u8, 49u8, 175u8, 127u8, 182u8,
+							213u8, 124u8, 206u8, 73u8, 55u8, 255u8, 202u8, 124u8, 185u8, 175u8,
 						],
 					)
 				}
@@ -1955,10 +1954,9 @@ pub mod api {
 						"ticker",
 						types::Ticker {},
 						[
-							95u8, 123u8, 127u8, 14u8, 3u8, 213u8, 90u8, 210u8, 249u8, 251u8, 46u8,
-							232u8, 203u8, 10u8, 108u8, 113u8, 232u8, 148u8, 223u8, 80u8, 236u8,
-							134u8, 48u8, 75u8, 150u8, 136u8, 185u8, 51u8, 247u8, 86u8, 234u8,
-							165u8,
+							3u8, 56u8, 229u8, 216u8, 50u8, 84u8, 230u8, 217u8, 8u8, 242u8, 213u8,
+							95u8, 30u8, 97u8, 99u8, 88u8, 122u8, 11u8, 27u8, 118u8, 135u8, 139u8,
+							120u8, 163u8, 246u8, 54u8, 196u8, 238u8, 167u8, 211u8, 137u8, 151u8,
 						],
 					)
 				}
@@ -2936,9 +2934,9 @@ pub mod api {
 			.hash();
 		runtime_metadata_hash ==
 			[
-				50u8, 236u8, 87u8, 196u8, 53u8, 247u8, 213u8, 143u8, 239u8, 197u8, 121u8, 212u8,
-				19u8, 37u8, 153u8, 223u8, 59u8, 23u8, 242u8, 113u8, 88u8, 212u8, 160u8, 146u8,
-				124u8, 105u8, 133u8, 27u8, 128u8, 51u8, 242u8, 32u8,
+				67u8, 213u8, 95u8, 83u8, 55u8, 34u8, 215u8, 12u8, 41u8, 106u8, 77u8, 187u8, 39u8,
+				201u8, 5u8, 226u8, 219u8, 105u8, 22u8, 113u8, 231u8, 104u8, 143u8, 155u8, 82u8,
+				227u8, 246u8, 43u8, 10u8, 72u8, 66u8, 212u8,
 			]
 	}
 	pub mod system {
@@ -4089,10 +4087,9 @@ pub mod api {
 						"Events",
 						(),
 						[
-							248u8, 226u8, 136u8, 81u8, 144u8, 144u8, 166u8, 39u8, 165u8, 118u8,
-							245u8, 45u8, 255u8, 173u8, 94u8, 99u8, 22u8, 167u8, 190u8, 119u8,
-							144u8, 41u8, 123u8, 34u8, 31u8, 115u8, 236u8, 133u8, 58u8, 15u8, 54u8,
-							252u8,
+							215u8, 142u8, 101u8, 249u8, 154u8, 42u8, 195u8, 51u8, 39u8, 191u8,
+							72u8, 169u8, 41u8, 99u8, 1u8, 29u8, 172u8, 45u8, 27u8, 180u8, 76u8,
+							112u8, 197u8, 80u8, 120u8, 4u8, 221u8, 234u8, 118u8, 16u8, 103u8, 64u8,
 						],
 					)
 				}
@@ -6543,10 +6540,9 @@ pub mod api {
 						"GenesisTicker",
 						(),
 						[
-							207u8, 46u8, 88u8, 181u8, 124u8, 159u8, 186u8, 221u8, 77u8, 18u8,
-							119u8, 183u8, 252u8, 133u8, 211u8, 18u8, 42u8, 225u8, 126u8, 166u8,
-							150u8, 15u8, 219u8, 142u8, 120u8, 219u8, 17u8, 24u8, 107u8, 248u8,
-							144u8, 35u8,
+							20u8, 252u8, 9u8, 36u8, 16u8, 22u8, 115u8, 109u8, 170u8, 216u8, 99u8,
+							32u8, 210u8, 153u8, 72u8, 197u8, 241u8, 206u8, 14u8, 74u8, 144u8, 97u8,
+							68u8, 85u8, 201u8, 161u8, 151u8, 151u8, 35u8, 119u8, 204u8, 118u8,
 						],
 					)
 				}
@@ -10827,10 +10823,9 @@ pub mod api {
 						"BlockNotebooks",
 						(),
 						[
-							112u8, 14u8, 250u8, 248u8, 30u8, 76u8, 190u8, 163u8, 159u8, 174u8,
-							78u8, 145u8, 79u8, 150u8, 130u8, 2u8, 251u8, 163u8, 134u8, 241u8, 21u8,
-							11u8, 247u8, 104u8, 249u8, 13u8, 156u8, 48u8, 173u8, 162u8, 114u8,
-							180u8,
+							121u8, 183u8, 198u8, 65u8, 102u8, 83u8, 146u8, 209u8, 151u8, 96u8,
+							45u8, 23u8, 54u8, 83u8, 33u8, 156u8, 176u8, 17u8, 47u8, 166u8, 226u8,
+							59u8, 224u8, 252u8, 12u8, 0u8, 144u8, 221u8, 139u8, 245u8, 30u8, 127u8,
 						],
 					)
 				}
@@ -10849,9 +10844,9 @@ pub mod api {
 						"TempNotebookDigest",
 						(),
 						[
-							32u8, 74u8, 59u8, 146u8, 128u8, 183u8, 194u8, 146u8, 241u8, 24u8, 55u8,
-							59u8, 55u8, 173u8, 231u8, 130u8, 168u8, 139u8, 222u8, 57u8, 70u8, 67u8,
-							124u8, 151u8, 137u8, 250u8, 125u8, 171u8, 187u8, 61u8, 179u8, 145u8,
+							28u8, 31u8, 52u8, 2u8, 66u8, 194u8, 15u8, 96u8, 162u8, 241u8, 249u8,
+							20u8, 222u8, 235u8, 36u8, 156u8, 155u8, 221u8, 27u8, 32u8, 33u8, 8u8,
+							99u8, 179u8, 156u8, 53u8, 241u8, 186u8, 118u8, 43u8, 93u8, 105u8,
 						],
 					)
 				}
@@ -10871,10 +10866,9 @@ pub mod api {
 						"NotariesLockedForFailedAudit",
 						(),
 						[
-							43u8, 185u8, 18u8, 161u8, 76u8, 205u8, 227u8, 88u8, 26u8, 54u8, 138u8,
-							84u8, 230u8, 228u8, 153u8, 172u8, 174u8, 39u8, 145u8, 24u8, 238u8,
-							210u8, 176u8, 17u8, 186u8, 47u8, 158u8, 156u8, 136u8, 33u8, 188u8,
-							153u8,
+							115u8, 240u8, 19u8, 42u8, 98u8, 218u8, 83u8, 20u8, 162u8, 169u8, 32u8,
+							230u8, 216u8, 32u8, 222u8, 194u8, 184u8, 110u8, 103u8, 9u8, 153u8,
+							54u8, 92u8, 197u8, 38u8, 237u8, 50u8, 132u8, 210u8, 48u8, 12u8, 225u8,
 						],
 					)
 				}
@@ -10899,10 +10893,9 @@ pub mod api {
 							_0.borrow(),
 						),
 						[
-							43u8, 185u8, 18u8, 161u8, 76u8, 205u8, 227u8, 88u8, 26u8, 54u8, 138u8,
-							84u8, 230u8, 228u8, 153u8, 172u8, 174u8, 39u8, 145u8, 24u8, 238u8,
-							210u8, 176u8, 17u8, 186u8, 47u8, 158u8, 156u8, 136u8, 33u8, 188u8,
-							153u8,
+							115u8, 240u8, 19u8, 42u8, 98u8, 218u8, 83u8, 20u8, 162u8, 169u8, 32u8,
+							230u8, 216u8, 32u8, 222u8, 194u8, 184u8, 110u8, 103u8, 9u8, 153u8,
+							54u8, 92u8, 197u8, 38u8, 237u8, 50u8, 132u8, 210u8, 48u8, 12u8, 225u8,
 						],
 					)
 				}
@@ -19720,24 +19713,24 @@ pub mod api {
 					#[codec(index = 31)]
 					DecodeError,
 					#[codec(index = 32)]
-					AccountEscrowHoldDoesntExist,
+					AccountChannelHoldDoesntExist,
 					#[codec(index = 33)]
-					AccountAlreadyHasEscrowHold,
+					AccountAlreadyHasChannelHold,
 					#[codec(index = 34)]
-					EscrowHoldNotReadyForClaim {
+					ChannelHoldNotReadyForClaim {
 						current_tick: ::core::primitive::u32,
 						claim_tick: ::core::primitive::u32,
 					},
 					#[codec(index = 35)]
 					AccountLocked,
 					#[codec(index = 36)]
-					MissingEscrowHoldNote,
+					MissingChannelHoldNote,
 					#[codec(index = 37)]
-					InvalidEscrowHoldNote,
+					InvalidChannelHoldNote,
 					#[codec(index = 38)]
-					InvalidEscrowClaimers,
+					InvalidChannelHoldClaimers,
 					#[codec(index = 39)]
-					EscrowNoteBelowMinimum,
+					ChannelHoldNoteBelowMinimum,
 					#[codec(index = 40)]
 					InvalidTaxNoteAccount,
 					#[codec(index = 41)]
@@ -21249,7 +21242,7 @@ pub mod api {
 					#[codec(compact)]
 					pub genesis_utc_time: ::core::primitive::u64,
 					#[codec(compact)]
-					pub escrow_expiration_ticks: ::core::primitive::u32,
+					pub channel_hold_expiration_ticks: ::core::primitive::u32,
 				}
 			}
 		}

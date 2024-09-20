@@ -71,7 +71,7 @@ use argon_primitives::{
 	notebook::NotebookNumber,
 	tick::{Tick, Ticker},
 	ArgonCPI, BlockSealAuthorityId, NotaryNotebookVotes, NotebookAuditResult, NotebookAuditSummary,
-	PriceProvider, TickProvider, ESCROW_CLAWBACK_TICKS,
+	PriceProvider, TickProvider, CHANNEL_HOLD_CLAWBACK_TICKS,
 };
 pub use argon_primitives::{
 	AccountId, Balance, BlockHash, BlockNumber, HashOutput, Moment, Nonce, Signature,
@@ -233,8 +233,8 @@ parameter_types! {
 	pub const TargetBlockVotes: u32 = 50_000;
 	pub const MinimumsChangePeriod: u32 = 60 * 24; // change block_seal_spec once a day
 
-	pub const DefaultEscrowDuration: Tick = 60;
-	pub const HistoricalPaymentAddressTicksToKeep: Tick = DefaultEscrowDuration::get() + ESCROW_CLAWBACK_TICKS + 10;
+	pub const DefaultChannelHoldDuration: Tick = 60;
+	pub const HistoricalPaymentAddressTicksToKeep: Tick = DefaultChannelHoldDuration::get() + CHANNEL_HOLD_CLAWBACK_TICKS + 10;
 
 	pub const ArgonsPerBlock: u32 = 5_000;
 	pub const StartingOwnershipTokensPerBlock: u32 = 5_000;

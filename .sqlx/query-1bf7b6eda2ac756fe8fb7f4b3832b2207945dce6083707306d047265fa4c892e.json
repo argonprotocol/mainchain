@@ -1,0 +1,12 @@
+{
+  "db_name": "SQLite",
+  "query": "UPDATE open_channel_holds SET notarization_id = ?, settled_amount = ?, updated_at = CURRENT_TIMESTAMP\n       WHERE from_address = ? AND balance_change_number = ?",
+  "describe": {
+    "columns": [],
+    "parameters": {
+      "Right": 4
+    },
+    "nullable": []
+  },
+  "hash": "1bf7b6eda2ac756fe8fb7f4b3832b2207945dce6083707306d047265fa4c892e"
+}

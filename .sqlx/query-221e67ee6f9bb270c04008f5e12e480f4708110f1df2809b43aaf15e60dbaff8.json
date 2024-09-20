@@ -1,6 +1,6 @@
 {
   "db_name": "SQLite",
-  "query": "SELECT * FROM domains",
+  "query": "SELECT * FROM domains WHERE id = ?",
   "describe": {
     "columns": [
       {
@@ -40,7 +40,7 @@
       }
     ],
     "parameters": {
-      "Right": 0
+      "Right": 1
     },
     "nullable": [
       false,
@@ -52,5 +52,5 @@
       false
     ]
   },
-  "hash": "ae8b56c8499f14600034c6635bafc5e6932c26a05ef3c167ed942e98ba7e612d"
+  "hash": "221e67ee6f9bb270c04008f5e12e480f4708110f1df2809b43aaf15e60dbaff8"
 }

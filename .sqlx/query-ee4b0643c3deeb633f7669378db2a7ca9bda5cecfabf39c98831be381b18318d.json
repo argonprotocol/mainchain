@@ -1,0 +1,12 @@
+{
+  "db_name": "SQLite",
+  "query": "INSERT INTO balance_changes (account_id, change_number, balance, net_balance_change, status, channel_hold_note_json, notes_json, notary_id, transaction_id)\n        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)",
+  "describe": {
+    "columns": [],
+    "parameters": {
+      "Right": 9
+    },
+    "nullable": []
+  },
+  "hash": "ee4b0643c3deeb633f7669378db2a7ca9bda5cecfabf39c98831be381b18318d"
+}

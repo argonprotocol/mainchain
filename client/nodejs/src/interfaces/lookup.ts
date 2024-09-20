@@ -600,17 +600,17 @@ export default {
       NotebookTooOld: 'Null',
       CatchupNotebooksMissing: 'Null',
       DecodeError: 'Null',
-      AccountEscrowHoldDoesntExist: 'Null',
-      AccountAlreadyHasEscrowHold: 'Null',
-      EscrowHoldNotReadyForClaim: {
+      AccountChannelHoldDoesntExist: 'Null',
+      AccountAlreadyHasChannelHold: 'Null',
+      ChannelHoldNotReadyForClaim: {
         currentTick: 'u32',
         claimTick: 'u32',
       },
       AccountLocked: 'Null',
-      MissingEscrowHoldNote: 'Null',
-      InvalidEscrowHoldNote: 'Null',
-      InvalidEscrowClaimers: 'Null',
-      EscrowNoteBelowMinimum: 'Null',
+      MissingChannelHoldNote: 'Null',
+      InvalidChannelHoldNote: 'Null',
+      InvalidChannelHoldClaimers: 'Null',
+      ChannelHoldNoteBelowMinimum: 'Null',
       InvalidTaxNoteAccount: 'Null',
       InvalidTaxOperation: 'Null',
       InsufficientTaxIncluded: {
@@ -1897,7 +1897,7 @@ export default {
   ArgonPrimitivesTickTicker: {
     tickDurationMillis: 'Compact<u64>',
     genesisUtcTime: 'Compact<u64>',
-    escrowExpirationTicks: 'Compact<u32>'
+    channelHoldExpirationTicks: 'Compact<u32>'
   },
   /**
    * Lookup243: pallet_ticks::pallet::Error<T>

@@ -1,0 +1,12 @@
+{
+  "db_name": "SQLite",
+  "query": "UPDATE open_channel_holds SET missed_claim_window = true, updated_at = CURRENT_TIMESTAMP WHERE id = ?",
+  "describe": {
+    "columns": [],
+    "parameters": {
+      "Right": 1
+    },
+    "nullable": []
+  },
+  "hash": "a31dd98f753ea0fbf295b37f79e9d0320d0d03c66bbda0a87b1e5d2d78e9adcb"
+}

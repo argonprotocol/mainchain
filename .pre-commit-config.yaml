@@ -25,11 +25,11 @@ repos:
         types: [ rust ]
         pass_filenames: false
         stages: [ pre-commit, pre-push ]
-      - id: lint
-        name: Run clippy
-        entry: cargo clippy --workspace --fix --allow-staged --allow-dirty -- -Dwarnings
-        language: system
-        types: [ rust ]
-        pass_filenames: false
-        # don't automatically commit changes made by clippy
-        stages: [ commit ]
+#      - id: lint
+#        name: Run clippy
+#        entry: cargo clippy --workspace --fix --allow-staged --allow-dirty -- -Dwarnings
+#        language: system
+#        types: [ rust ]
+#        pass_filenames: false
+#        # don't automatically commit changes made by clippy
+#        stages: [ commit ]

@@ -647,18 +647,18 @@ declare module '@polkadot/types/lookup' {
     readonly isNotebookTooOld: boolean;
     readonly isCatchupNotebooksMissing: boolean;
     readonly isDecodeError: boolean;
-    readonly isAccountEscrowHoldDoesntExist: boolean;
-    readonly isAccountAlreadyHasEscrowHold: boolean;
-    readonly isEscrowHoldNotReadyForClaim: boolean;
-    readonly asEscrowHoldNotReadyForClaim: {
+    readonly isAccountChannelHoldDoesntExist: boolean;
+    readonly isAccountAlreadyHasChannelHold: boolean;
+    readonly isChannelHoldNotReadyForClaim: boolean;
+    readonly asChannelHoldNotReadyForClaim: {
       readonly currentTick: u32;
       readonly claimTick: u32;
     } & Struct;
     readonly isAccountLocked: boolean;
-    readonly isMissingEscrowHoldNote: boolean;
-    readonly isInvalidEscrowHoldNote: boolean;
-    readonly isInvalidEscrowClaimers: boolean;
-    readonly isEscrowNoteBelowMinimum: boolean;
+    readonly isMissingChannelHoldNote: boolean;
+    readonly isInvalidChannelHoldNote: boolean;
+    readonly isInvalidChannelHoldClaimers: boolean;
+    readonly isChannelHoldNoteBelowMinimum: boolean;
     readonly isInvalidTaxNoteAccount: boolean;
     readonly isInvalidTaxOperation: boolean;
     readonly isInsufficientTaxIncluded: boolean;
@@ -678,7 +678,7 @@ declare module '@polkadot/types/lookup' {
     readonly isInvalidComputeProof: boolean;
     readonly isInvalidBlockVoteSource: boolean;
     readonly isInsufficientBlockVoteMinimum: boolean;
-    readonly type: 'MissingAccountOrigin' | 'HistoryLookupError' | 'InvalidAccountChangelist' | 'InvalidChainTransfersList' | 'InvalidBalanceChangeRoot' | 'InvalidHeaderTaxRecorded' | 'InvalidPreviousNonce' | 'InvalidPreviousBalance' | 'InvalidPreviousAccountOrigin' | 'InvalidPreviousBalanceChangeNotebook' | 'InvalidBalanceChange' | 'InvalidBalanceChangeSignature' | 'InvalidNoteRecipients' | 'BalanceChangeError' | 'InvalidNetBalanceChangeset' | 'InsufficientBalance' | 'ExceededMaxBalance' | 'BalanceChangeMismatch' | 'BalanceChangeNotNetZero' | 'InvalidDomainLeaseAllocation' | 'TaxBalanceChangeNotNetZero' | 'MissingBalanceProof' | 'InvalidPreviousBalanceProof' | 'InvalidNotebookHash' | 'InvalidNotebookHeaderHash' | 'DuplicateChainTransfer' | 'DuplicatedAccountOriginUid' | 'InvalidNotarySignature' | 'InvalidSecretProvided' | 'NotebookTooOld' | 'CatchupNotebooksMissing' | 'DecodeError' | 'AccountEscrowHoldDoesntExist' | 'AccountAlreadyHasEscrowHold' | 'EscrowHoldNotReadyForClaim' | 'AccountLocked' | 'MissingEscrowHoldNote' | 'InvalidEscrowHoldNote' | 'InvalidEscrowClaimers' | 'EscrowNoteBelowMinimum' | 'InvalidTaxNoteAccount' | 'InvalidTaxOperation' | 'InsufficientTaxIncluded' | 'InsufficientBlockVoteTax' | 'IneligibleTaxVoter' | 'BlockVoteInvalidSignature' | 'InvalidBlockVoteAllocation' | 'InvalidBlockVoteRoot' | 'InvalidBlockVotesCount' | 'InvalidBlockVotingPower' | 'InvalidBlockVoteList' | 'InvalidComputeProof' | 'InvalidBlockVoteSource' | 'InsufficientBlockVoteMinimum';
+    readonly type: 'MissingAccountOrigin' | 'HistoryLookupError' | 'InvalidAccountChangelist' | 'InvalidChainTransfersList' | 'InvalidBalanceChangeRoot' | 'InvalidHeaderTaxRecorded' | 'InvalidPreviousNonce' | 'InvalidPreviousBalance' | 'InvalidPreviousAccountOrigin' | 'InvalidPreviousBalanceChangeNotebook' | 'InvalidBalanceChange' | 'InvalidBalanceChangeSignature' | 'InvalidNoteRecipients' | 'BalanceChangeError' | 'InvalidNetBalanceChangeset' | 'InsufficientBalance' | 'ExceededMaxBalance' | 'BalanceChangeMismatch' | 'BalanceChangeNotNetZero' | 'InvalidDomainLeaseAllocation' | 'TaxBalanceChangeNotNetZero' | 'MissingBalanceProof' | 'InvalidPreviousBalanceProof' | 'InvalidNotebookHash' | 'InvalidNotebookHeaderHash' | 'DuplicateChainTransfer' | 'DuplicatedAccountOriginUid' | 'InvalidNotarySignature' | 'InvalidSecretProvided' | 'NotebookTooOld' | 'CatchupNotebooksMissing' | 'DecodeError' | 'AccountChannelHoldDoesntExist' | 'AccountAlreadyHasChannelHold' | 'ChannelHoldNotReadyForClaim' | 'AccountLocked' | 'MissingChannelHoldNote' | 'InvalidChannelHoldNote' | 'InvalidChannelHoldClaimers' | 'ChannelHoldNoteBelowMinimum' | 'InvalidTaxNoteAccount' | 'InvalidTaxOperation' | 'InsufficientTaxIncluded' | 'InsufficientBlockVoteTax' | 'IneligibleTaxVoter' | 'BlockVoteInvalidSignature' | 'InvalidBlockVoteAllocation' | 'InvalidBlockVoteRoot' | 'InvalidBlockVotesCount' | 'InvalidBlockVotingPower' | 'InvalidBlockVoteList' | 'InvalidComputeProof' | 'InvalidBlockVoteSource' | 'InsufficientBlockVoteMinimum';
   }
 
   /** @name ArgonPrimitivesAccountAccountType (71) */
@@ -1969,7 +1969,7 @@ declare module '@polkadot/types/lookup' {
   interface ArgonPrimitivesTickTicker extends Struct {
     readonly tickDurationMillis: Compact<u64>;
     readonly genesisUtcTime: Compact<u64>;
-    readonly escrowExpirationTicks: Compact<u32>;
+    readonly channelHoldExpirationTicks: Compact<u32>;
   }
 
   /** @name PalletTicksError (243) */

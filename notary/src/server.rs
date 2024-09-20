@@ -362,7 +362,7 @@ mod tests {
 				1000,
 				NoteType::ClaimFromMainchain { transfer_id: 1 }
 			)],
-			escrow_hold_note: None,
+			channel_hold_note: None,
 			signature: Signature::from_raw([0; 64]).into(),
 		}
 		.sign(Bob.pair())
@@ -420,7 +420,7 @@ mod tests {
 			change_number: 1,
 			balance: 1000,
 			account_origin: AccountOrigin { notebook_number: 1, account_uid: 1 },
-			escrow_hold_note: None,
+			channel_hold_note: None,
 		};
 
 		let proof = client.get_balance_proof(header.notebook_number, tip.clone()).await?;

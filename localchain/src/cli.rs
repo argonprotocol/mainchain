@@ -1,7 +1,7 @@
 use crate::keystore::Keystore;
 use crate::overview::LocalchainOverview;
 use crate::{
-  overview, AccountStore, CryptoScheme, DomainStore, EscrowCloseOptions, Localchain,
+  overview, AccountStore, ChannelHoldCloseOptions, CryptoScheme, DomainStore, Localchain,
   LocalchainConfig, MainchainClient, TickerConfig,
 };
 use anyhow::anyhow;
@@ -51,9 +51,9 @@ struct Cli {
 
 #[derive(Subcommand, Debug)]
 enum Commands {
-  /// Sync the localchain proofs with the latest notebooks. This will also submit votes and close/claim escrows as needed.
+  /// Sync the localchain proofs with the latest notebooks. This will also submit votes and close/claim channel_holds as needed.
   Sync {
-    /// What address should be used for votes (only relevant if claiming escrows)
+    /// What address should be used for votes (only relevant if claiming channel_holds)
     #[clap(long, value_name = "SS58_ADDRESS")]
     vote_address: Option<String>,
 
@@ -264,16 +264,16 @@ where
       .await?;
 
       let balance_sync = localchain.balance_sync();
-      let sync_options = vote_address.map(|vote_address| EscrowCloseOptions {
+      let sync_options = vote_address.map(|vote_address| ChannelHoldCloseOptions {
         votes_address: Some(vote_address),
         minimum_vote_amount: minimum_vote_amount.map(|v| v as i64),
       });
 
       let sync = balance_sync.sync(sync_options.clone()).await?;
       println!(
-        "Synced {:?} balance changes. Escrows updated: {:?}",
+        "Synced {:?} balance changes. ChannelHolds updated: {:?}",
         sync.balance_changes().len(),
-        sync.escrow_notarizations().len()
+        sync.channel_hold_notarizations().len()
       );
     }
     Commands::Domains { subcommand } => match subcommand {
@@ -356,7 +356,7 @@ where
             ntp_pool_url: None,
             genesis_utc_time: 0,
             tick_duration_millis: 0,
-            escrow_expiration_ticks: 0,
+            channel_hold_expiration_ticks: 0,
           },
           Some(keystore_password),
         )

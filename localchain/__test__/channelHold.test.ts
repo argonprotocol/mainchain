@@ -40,7 +40,7 @@ beforeAll(() => {
     });
 })
 
-describeIntegration("Escrow integration", () => {
+describeIntegration("ChannelHold integration", () => {
     it('can create a zone record type', async () => {
         let mainchain = new TestMainchain();
         const mainchainUrl = await mainchain.launch();
@@ -59,7 +59,7 @@ describeIntegration("Escrow integration", () => {
     }, 120e3);
 
 
-    it('can create an escrow from a data domain registration', async () => {
+    it('can create an channelHold from a data domain registration', async () => {
         let mainchain = new TestMainchain();
         const mainchainUrl = await mainchain.launch();
         const notary = new TestNotary();
@@ -125,35 +125,35 @@ describeIntegration("Escrow integration", () => {
         expect(zoneRecord).toBeTruthy();
         expect(zoneRecord.notaryId).toBe(1);
         expect(zoneRecord.paymentAddress).toBe(ferdiekeys.address);
-        const escrowFunding = bobchain.beginChange();
-        const jumpAccount = await escrowFunding.fundJumpAccount(5200n);
-        await escrowFunding.notarize();
+        const channelHoldFunding = bobchain.beginChange();
+        const jumpAccount = await channelHoldFunding.fundJumpAccount(5200n);
+        await channelHoldFunding.notarize();
 
-        const bobEscrowHold = bobchain.beginChange();
-        const change = await bobEscrowHold.addAccountById(jumpAccount.localAccountId);
-        await change.createEscrowHold(5000n, zoneRecord.paymentAddress);
-        const holdTracker = await bobEscrowHold.notarizeAndWaitForNotebook();
+        const bobChannelHold = bobchain.beginChange();
+        const change = await bobChannelHold.addAccountById(jumpAccount.localAccountId);
+        await change.createChannelHold(5000n, zoneRecord.paymentAddress);
+        const holdTracker = await bobChannelHold.notarizeAndWaitForNotebook();
 
-        const clientEscrow = await bobchain.openEscrows.openClientEscrow(jumpAccount.localAccountId);
-        await clientEscrow.sign(5n);
-        const escrowJson = await clientEscrow.exportForSend();
+        const clientChannelHold = await bobchain.openChannelHolds.openClientChannelHold(jumpAccount.localAccountId);
+        await clientChannelHold.sign(5n);
+        const channelHoldJson = await clientChannelHold.exportForSend();
         {
-            const parsed = JSON.parse(escrowJson.toString());
+            const parsed = JSON.parse(channelHoldJson.toString());
             console.log(parsed)
             expect(parsed).toBeTruthy();
-            expect(parsed.escrowHoldNote).toBeTruthy();
-            expect(parsed.escrowHoldNote.milligons).toBe(5000);
+            expect(parsed.channelHoldNote).toBeTruthy();
+            expect(parsed.channelHoldNote.milligons).toBe(5000);
             expect(parsed.notes[0].milligons).toBe(5);
             expect(parsed.balance).toBe(parsed.previousBalanceProof.balance - 5);
         }
 
-        const ferdieEscrowRecord = await ferdiechain.openEscrows.importEscrow(escrowJson);
+        const ferdieChannelHoldRecord = await ferdiechain.openChannelHolds.importChannelHold(channelHoldJson);
 
-        // get to 2500 in escrow costs so that 20% is 500 (minimum vote)
+        // get to 2500 in channelHold costs so that 20% is 500 (minimum vote)
         for (let i = 0n; i <= 10n; i++) {
-            const next = await clientEscrow.sign(500n + i * 200n,);
+            const next = await clientChannelHold.sign(500n + i * 200n,);
             // now we would send to ferdie
-            await expect(ferdieEscrowRecord.recordUpdatedSettlement(next.milligons, next.signature)).resolves.toBeUndefined();
+            await expect(ferdieChannelHoldRecord.recordUpdatedSettlement(next.milligons, next.signature)).resolves.toBeUndefined();
         }
 
         // now ferdie goes to claim it
@@ -162,19 +162,19 @@ describeIntegration("Escrow integration", () => {
         },);
         expect(result).toBeTruthy();
         expect(result.balanceChanges).toHaveLength(2);
-        expect(result.escrowNotarizations).toHaveLength(0);
+        expect(result.channelHoldNotarizations).toHaveLength(0);
 
-        const insideEscrow = await ferdieEscrowRecord.escrow;
+        const insideChannelHold = await ferdieChannelHoldRecord.channelHold;
         const currentTick = ferdiechain.currentTick;
         const ticker = ferdiechain.ticker;
-        expect(insideEscrow.expirationTick).toBe(holdTracker.tick + ticker.escrowExpirationTicks);
-        const timeForExpired = new Date(Number(ferdiechain.ticker.timeForTick(insideEscrow.expirationTick)));
-        console.log('Escrow expires in %s seconds. Current Tick=%s, expiration=%s', (timeForExpired.getTime() - Date.now()) / 1000, currentTick, insideEscrow.expirationTick);
+        expect(insideChannelHold.expirationTick).toBe(holdTracker.tick + ticker.channelHoldExpirationTicks);
+        const timeForExpired = new Date(Number(ferdiechain.ticker.timeForTick(insideChannelHold.expirationTick)));
+        console.log('ChannelHold expires in %s seconds. Current Tick=%s, expiration=%s', (timeForExpired.getTime() - Date.now()) / 1000, currentTick, insideChannelHold.expirationTick);
         expect(timeForExpired.getTime() - Date.now()).toBeLessThan(30e3);
         await new Promise(resolve => setTimeout(resolve, timeForExpired.getTime() - Date.now() + 10));
 
         const ferdieMainchainClient = await ferdiechain.mainchainClient;
-        // in the balance sync, we'd normally just keep trying to vote with the latest expiring escrows, but in this test, we only have 1, so we need to wait for a grandparent hash
+        // in the balance sync, we'd normally just keep trying to vote with the latest expiring channelHolds, but in this test, we only have 1, so we need to wait for a grandparent hash
         for (let i = 0; i < 10; i += 1) {
             try {
                 const voteBlocks = await ferdieMainchainClient.getVoteBlockHash(ferdiechain.currentTick);
@@ -189,12 +189,12 @@ describeIntegration("Escrow integration", () => {
         const voteResult = await ferdiechain.balanceSync.sync({
             votesAddress: ferdieVotesAddress.address,
         },);
-        console.log("Result of balance sync notarization of escrow. Balance Changes=%s, Escrows=%s", voteResult.balanceChanges.length, voteResult.escrowNotarizations.length);
-        expect(voteResult.escrowNotarizations).toHaveLength(1);
-        const notarization = voteResult.escrowNotarizations[0];
-        const notarizationEscrows = await notarization.escrows;
-        expect(notarizationEscrows).toHaveLength(1);
-        expect(notarizationEscrows[0].id).toBe(insideEscrow.id);
+        console.log("Result of balance sync notarization of channelHold. Balance Changes=%s, ChannelHolds=%s", voteResult.balanceChanges.length, voteResult.channelHoldNotarizations.length);
+        expect(voteResult.channelHoldNotarizations).toHaveLength(1);
+        const notarization = voteResult.channelHoldNotarizations[0];
+        const notarizationChannelHolds = await notarization.channelHolds;
+        expect(notarizationChannelHolds).toHaveLength(1);
+        expect(notarizationChannelHolds[0].id).toBe(insideChannelHold.id);
         const json = JSON.parse(await notarization.toJSON());
         expect(json).toBeTruthy();
 

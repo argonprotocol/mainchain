@@ -8,7 +8,7 @@ use crate::notarization_builder::NotarizationBuilder;
 use crate::notarization_tracker::NotarizationTracker;
 use crate::notary_client::NotaryClients;
 use crate::Result;
-use crate::{OpenEscrow, OpenEscrowsStore, TickerRef, ESCROW_MINIMUM_SETTLEMENT};
+use crate::{OpenChannelHold, OpenChannelHoldsStore, TickerRef, CHANNEL_HOLD_MINIMUM_SETTLEMENT};
 
 #[derive(Debug, PartialOrd, PartialEq)]
 #[cfg_attr(feature = "napi", napi)]
@@ -17,7 +17,7 @@ use crate::{OpenEscrow, OpenEscrowsStore, TickerRef, ESCROW_MINIMUM_SETTLEMENT};
 pub enum TransactionType {
   Send = 0,
   Request = 1,
-  OpenEscrow = 2,
+  OpenChannelHold = 2,
   Consolidation = 3,
 }
 
@@ -26,7 +26,7 @@ impl From<i64> for TransactionType {
     match i {
       0 => TransactionType::Send,
       1 => TransactionType::Request,
-      2 => TransactionType::OpenEscrow,
+      2 => TransactionType::OpenChannelHold,
       3 => TransactionType::Consolidation,
       _ => panic!("Unknown transaction type {}", i),
     }
@@ -111,51 +111,51 @@ impl Transactions {
     Ok(json_file)
   }
 
-  pub async fn create_escrow(
+  pub async fn create_channel_hold(
     &self,
-    escrow_milligons: Balance,
+    channel_hold_milligons: Balance,
     recipient_address: String,
     notary_id: Option<u32>,
     delegated_signer_address: Option<String>,
-  ) -> Result<OpenEscrow> {
+  ) -> Result<OpenChannelHold> {
     let jump_notarization = self.new_notarization();
     if let Some(notary_id) = notary_id {
       jump_notarization.set_notary_id(notary_id).await;
     }
-    let transaction = self.create(TransactionType::OpenEscrow).await?;
+    let transaction = self.create(TransactionType::OpenChannelHold).await?;
     jump_notarization.set_transaction(transaction.clone()).await;
 
-    let escrow_milligons = escrow_milligons.max(ESCROW_MINIMUM_SETTLEMENT);
+    let channel_hold_milligons = channel_hold_milligons.max(CHANNEL_HOLD_MINIMUM_SETTLEMENT);
 
-    let amount_plus_tax = jump_notarization.get_total_for_after_tax_balance(escrow_milligons);
+    let amount_plus_tax = jump_notarization.get_total_for_after_tax_balance(channel_hold_milligons);
     let jump_account = jump_notarization.fund_jump_account(amount_plus_tax).await?;
     let _ = jump_notarization.notarize().await?;
 
-    let escrow_notarization = self.new_notarization();
-    escrow_notarization.set_transaction(transaction).await;
-    let balance_change = escrow_notarization
+    let channel_hold_notarization = self.new_notarization();
+    channel_hold_notarization.set_transaction(transaction).await;
+    let balance_change = channel_hold_notarization
       .add_account_by_id(jump_account.local_account_id)
       .await?;
 
     balance_change
-      .create_escrow_hold(
-        escrow_milligons,
+      .create_channel_hold(
+        channel_hold_milligons,
         recipient_address,
         delegated_signer_address,
       )
       .await?;
-    escrow_notarization.notarize().await?;
+    channel_hold_notarization.notarize().await?;
 
-    let escrow = OpenEscrowsStore::new(
+    let channel_hold = OpenChannelHoldsStore::new(
       self.db.clone(),
       self.ticker.clone(),
       &self.notary_clients,
       &self.keystore,
     );
-    let open_escrow = escrow
-      .open_client_escrow(jump_account.local_account_id)
+    let open_channel_hold = channel_hold
+      .open_client_channel_hold(jump_account.local_account_id)
       .await?;
-    Ok(open_escrow)
+    Ok(open_channel_hold)
   }
 
   pub async fn send(&self, milligons: u128, to: Option<Vec<String>>) -> Result<String> {
@@ -213,7 +213,7 @@ pub mod napi_ext {
   use super::Transactions;
   use super::{LocalchainTransaction, TransactionType};
   use crate::notarization_tracker::NotarizationTracker;
-  use crate::open_escrows::OpenEscrow;
+  use crate::open_channel_holds::OpenChannelHold;
 
   #[napi]
   impl Transactions {
@@ -230,17 +230,17 @@ pub mod napi_ext {
       self.request(milligons.get_u128().1).await.napi_ok()
     }
 
-    #[napi(js_name = "createEscrow")]
-    pub async fn create_escrow_napi(
+    #[napi(js_name = "createChannelHold")]
+    pub async fn create_channel_hold_napi(
       &self,
-      escrow_milligons: BigInt,
+      channel_hold_milligons: BigInt,
       recipient_address: String,
       notary_id: Option<u32>,
       delegated_signer_address: Option<String>,
-    ) -> napi::Result<OpenEscrow> {
+    ) -> napi::Result<OpenChannelHold> {
       self
-        .create_escrow(
-          escrow_milligons.get_u128().1,
+        .create_channel_hold(
+          channel_hold_milligons.get_u128().1,
           recipient_address,
           notary_id,
           delegated_signer_address,

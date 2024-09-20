@@ -173,7 +173,7 @@ struct BalanceChangeEntry: Codable {
   var changeNumber: UInt32
   @StringOrNumber var balance: String
   var balanceChangeProof: BalanceProof?
-  var escrowHoldNote: Note?
+  var channelHoldNote: Note?
   var notes: [Note]
   var signature: String
 }
@@ -211,9 +211,9 @@ enum NoteTypeAction: String, Codable {
   case leaseDomain
   case tax
   case sendToVote
-  case escrowHold
-  case escrowSettle
-  case escrowClaim
+  case channelHold
+  case channelHoldSettle
+  case channelHoldClaim
 }
 
 struct NoteType: Codable {

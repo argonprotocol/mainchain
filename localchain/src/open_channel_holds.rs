@@ -3,12 +3,12 @@ use crate::balance_changes::BalanceChangeStore;
 use crate::keystore::Keystore;
 use crate::notary_client::NotaryClients;
 use crate::{bail, BalanceChangeStatus, Error, Result};
-use crate::{TickerRef, ESCROW_MINIMUM_SETTLEMENT};
+use crate::{TickerRef, CHANNEL_HOLD_MINIMUM_SETTLEMENT};
 use anyhow::anyhow;
 use argon_notary_audit::verify_changeset_signatures;
 use argon_primitives::{
   AccountType, Balance, BalanceChange, BalanceTip, MultiSignatureBytes, NoteType, NotebookNumber,
-  ESCROW_CLAWBACK_TICKS, MINIMUM_ESCROW_SETTLEMENT,
+  CHANNEL_HOLD_CLAWBACK_TICKS, MINIMUM_CHANNEL_HOLD_SETTLEMENT,
 };
 use bech32::{Bech32m, Hrp};
 use chrono::NaiveDateTime;
@@ -29,7 +29,7 @@ lazy_static! {
 
 #[derive(FromRow, Clone)]
 #[allow(dead_code)]
-struct EscrowRow {
+struct ChannelHoldRow {
   id: String,
   initial_balance_change_json: String,
   from_address: String,
@@ -47,7 +47,7 @@ struct EscrowRow {
 
 #[cfg_attr(feature = "napi", napi)]
 #[derive(Clone, Debug, PartialEq)]
-pub struct Escrow {
+pub struct ChannelHold {
   pub id: String,
   pub initial_balance_change_json: String,
   pub notary_id: u32,
@@ -65,7 +65,7 @@ pub struct Escrow {
   balance_change: BalanceChange,
 }
 
-impl Escrow {
+impl ChannelHold {
   pub fn hold_amount(&self) -> u128 {
     self.hold_amount
   }
@@ -78,23 +78,23 @@ impl Escrow {
   }
 
   pub fn is_past_claim_period(&self, current_tick: u32) -> bool {
-    current_tick > self.expiration_tick + ESCROW_CLAWBACK_TICKS
+    current_tick > self.expiration_tick + CHANNEL_HOLD_CLAWBACK_TICKS
   }
 
   pub fn get_initial_balance_change(&self) -> BalanceChange {
     self.balance_change.clone()
   }
 
-  pub fn create_escrow_id(balance_change: &BalanceChange) -> Result<String> {
+  pub fn create_channel_hold_id(balance_change: &BalanceChange) -> Result<String> {
     let mut balance_change = balance_change.clone();
     // set to minimum for id
-    balance_change.notes[0].milligons = MINIMUM_ESCROW_SETTLEMENT;
+    balance_change.notes[0].milligons = MINIMUM_CHANNEL_HOLD_SETTLEMENT;
     balance_change.balance = balance_change
       .previous_balance_proof
       .as_ref()
       .map(|a| a.balance)
       .unwrap_or_default()
-      .saturating_sub(MINIMUM_ESCROW_SETTLEMENT);
+      .saturating_sub(MINIMUM_CHANNEL_HOLD_SETTLEMENT);
     let Ok(hrp) = Hrp::parse("esc") else {
       bail!("Failed to parse internal bech32 encoding hrp");
     };
@@ -103,28 +103,28 @@ impl Escrow {
     Ok(id)
   }
 
-  pub fn try_from_balance_change_json(balance_change_json: String) -> Result<Escrow> {
+  pub fn try_from_balance_change_json(balance_change_json: String) -> Result<ChannelHold> {
     let balance_change: BalanceChange = serde_json::from_str(&balance_change_json)?;
-    let Some(ref escrow_hold_note) = balance_change.escrow_hold_note else {
-      bail!("Balance change has no escrow hold note");
+    let Some(ref channel_hold_note) = balance_change.channel_hold_note else {
+      bail!("Balance change has no channel hold note");
     };
-    if escrow_hold_note.milligons < MINIMUM_ESCROW_SETTLEMENT {
+    if channel_hold_note.milligons < MINIMUM_CHANNEL_HOLD_SETTLEMENT {
       bail!(
-        "Escrow hold note {} is less than minimum settlement amount: {}",
-        escrow_hold_note.milligons,
-        MINIMUM_ESCROW_SETTLEMENT
+        "Channel hold note {} is less than minimum settlement amount: {}",
+        channel_hold_note.milligons,
+        MINIMUM_CHANNEL_HOLD_SETTLEMENT
       );
     }
 
-    let (recipient, delegated_signer) = match &escrow_hold_note.note_type {
-      NoteType::EscrowHold {
+    let (recipient, delegated_signer) = match &channel_hold_note.note_type {
+      NoteType::ChannelHold {
         recipient,
         delegated_signer,
       } => (recipient, delegated_signer),
       _ => {
         bail!(
-          "Balance change has invalid escrow hold note type {:?}",
-          escrow_hold_note.note_type
+          "Balance change has invalid channel hold note type {:?}",
+          channel_hold_note.note_type
         );
       }
     };
@@ -143,9 +143,9 @@ impl Escrow {
       );
     }
     let settle_note = &balance_change.notes[0];
-    if settle_note.note_type != NoteType::EscrowSettle {
+    if settle_note.note_type != NoteType::ChannelHoldSettle {
       bail!(
-        "Balance change doesn't have a EscrowSettle note. It is: {:?}",
+        "Balance change doesn't have a ChannelHoldSettle note. It is: {:?}",
         settle_note.note_type
       );
     }
@@ -153,13 +153,13 @@ impl Escrow {
       bail!("Balance change has no proof");
     };
 
-    let id = Escrow::create_escrow_id(&balance_change)?;
+    let id = ChannelHold::create_channel_hold_id(&balance_change)?;
 
-    Ok(Escrow {
+    Ok(ChannelHold {
       id,
       is_client: false,
       initial_balance_change_json: balance_change_json,
-      hold_amount: escrow_hold_note.milligons,
+      hold_amount: channel_hold_note.milligons,
       from_address: AccountStore::to_address(&balance_change.account_id),
       to_address: AccountStore::to_address(recipient),
       delegated_signer_address: delegated_signer.as_ref().map(AccountStore::to_address),
@@ -186,7 +186,7 @@ impl Escrow {
   pub async fn get_final(&self) -> Result<BalanceChange> {
     let mut balance_change = self.get_change_with_settled_amount(self.settled_amount);
     if self.settled_signature.is_empty() || self.settled_signature == *EMPTY_SIGNATURE {
-      bail!("Escrow settlement has not been signed");
+      bail!("ChannelHold settlement has not been signed");
     }
     balance_change.signature = MultiSignatureBytes::decode(&mut self.settled_signature.as_slice())?;
     verify_changeset_signatures(&vec![balance_change.clone()])?;
@@ -199,7 +199,7 @@ impl Escrow {
     let from_address = self.from_address.clone();
 
     let res = sqlx::query!(
-      r#"INSERT INTO open_escrows
+      r#"INSERT INTO open_channel_holds
       (id, initial_balance_change_json, from_address, balance_change_number, expiration_tick, settled_amount, settled_signature, is_client)
       VALUES (?, ?, ?, ?, ?, ?, ?, ?)"#,
       self.id,
@@ -214,7 +214,7 @@ impl Escrow {
     .execute(&mut *db)
     .await?;
     if res.rows_affected() != 1 {
-      bail!("Failed to insert escrow");
+      bail!("Failed to insert channel_hold");
     }
 
     Ok(())
@@ -247,7 +247,7 @@ impl Escrow {
     let settled_amount = milligons.to_string();
     let id = &self.id;
     let res = sqlx::query!(
-      "UPDATE open_escrows SET settled_amount=?, settled_signature = ?, updated_at = CURRENT_TIMESTAMP WHERE id = ?",
+      "UPDATE open_channel_holds SET settled_amount=?, settled_signature = ?, updated_at = CURRENT_TIMESTAMP WHERE id = ?",
       settled_amount,
       self.settled_signature,
       id,
@@ -255,20 +255,20 @@ impl Escrow {
     .execute(&mut *db)
     .await?;
     if res.rows_affected() != 1 {
-      bail!("Failed to update escrow");
+      bail!("Failed to update channel_hold");
     }
     Ok(())
   }
 
   pub async fn db_mark_unable_to_claim(&mut self, db: &mut SqliteConnection) -> Result<()> {
     let res = sqlx::query!(
-      "UPDATE open_escrows SET missed_claim_window = true, updated_at = CURRENT_TIMESTAMP WHERE id = ?",
+      "UPDATE open_channel_holds SET missed_claim_window = true, updated_at = CURRENT_TIMESTAMP WHERE id = ?",
       self.id,
     )
         .execute(&mut *db)
         .await?;
     if res.rows_affected() != 1 {
-      bail!("Failed to update escrow");
+      bail!("Failed to update channel_hold");
     }
     self.missed_claim_window = true;
     Ok(())
@@ -282,70 +282,71 @@ impl Escrow {
     self.notarization_id = Some(notarization_id);
     let id = &self.id;
     let res = sqlx::query!(
-      "UPDATE open_escrows SET notarization_id = ?, updated_at = CURRENT_TIMESTAMP WHERE id = ?",
+      "UPDATE open_channel_holds SET notarization_id = ?, updated_at = CURRENT_TIMESTAMP WHERE id = ?",
       notarization_id,
       id,
     )
     .execute(&mut *db)
     .await?;
     if res.rows_affected() != 1 {
-      bail!("Failed to update escrow");
+      bail!("Failed to update channel_hold");
     }
     Ok(())
   }
 }
 
-impl TryFrom<EscrowRow> for Escrow {
+impl TryFrom<ChannelHoldRow> for ChannelHold {
   type Error = Error;
-  fn try_from(row: EscrowRow) -> Result<Self> {
-    let mut escrow = Escrow::try_from_balance_change_json(row.initial_balance_change_json)?;
+  fn try_from(row: ChannelHoldRow) -> Result<Self> {
+    let mut channel_hold =
+      ChannelHold::try_from_balance_change_json(row.initial_balance_change_json)?;
 
-    escrow.expiration_tick = row.expiration_tick as u32;
-    escrow.settled_amount = row.settled_amount.parse()?;
-    escrow.settled_signature = row.settled_signature;
-    escrow.notarization_id = row.notarization_id;
-    escrow.is_client = row.is_client;
-    escrow.missed_claim_window = row.missed_claim_window;
-    Ok(escrow)
+    channel_hold.expiration_tick = row.expiration_tick as u32;
+    channel_hold.settled_amount = row.settled_amount.parse()?;
+    channel_hold.settled_signature = row.settled_signature;
+    channel_hold.notarization_id = row.notarization_id;
+    channel_hold.is_client = row.is_client;
+    channel_hold.missed_claim_window = row.missed_claim_window;
+    Ok(channel_hold)
   }
 }
 
 #[cfg_attr(feature = "napi", napi)]
 #[derive(Clone)]
-pub struct OpenEscrow {
+pub struct OpenChannelHold {
   db: SqlitePool,
-  escrow: Arc<Mutex<Escrow>>,
+  channel_hold: Arc<Mutex<ChannelHold>>,
   keystore: Keystore,
 }
 
-impl OpenEscrow {
-  pub fn new(db: SqlitePool, escrow: Escrow, keystore: &Keystore) -> Self {
-    OpenEscrow {
+impl OpenChannelHold {
+  pub fn new(db: SqlitePool, channel_hold: ChannelHold, keystore: &Keystore) -> Self {
+    OpenChannelHold {
       db,
-      escrow: Arc::new(Mutex::new(escrow)),
+      channel_hold: Arc::new(Mutex::new(channel_hold)),
       keystore: keystore.clone(),
     }
   }
 
-  pub async fn escrow(&self) -> Escrow {
-    self.escrow.lock().await.clone()
+  pub async fn channel_hold(&self) -> ChannelHold {
+    self.channel_hold.lock().await.clone()
   }
 
   pub async fn sign(&self, settled_amount: Balance) -> Result<SignatureResult> {
-    if settled_amount < MINIMUM_ESCROW_SETTLEMENT {
-      bail!("Settled amount must be greater than the minimum escrow settlement amount ({MINIMUM_ESCROW_SETTLEMENT})");
+    if settled_amount < MINIMUM_CHANNEL_HOLD_SETTLEMENT {
+      bail!("Settled amount must be greater than the minimum channel_hold settlement amount ({MINIMUM_CHANNEL_HOLD_SETTLEMENT})");
     }
-    let mut escrow = self.escrow.lock().await;
+    let mut channel_hold = self.channel_hold.lock().await;
     let mut tx = self.db.begin().await?;
-    let balance_change = escrow.get_change_with_settled_amount(settled_amount);
+    let balance_change = channel_hold.get_change_with_settled_amount(settled_amount);
     let bytes = balance_change.hash();
 
     let signature = self
       .keystore
-      .sign(escrow.from_address.clone(), bytes.as_bytes().to_vec())
+      .sign(channel_hold.from_address.clone(), bytes.as_bytes().to_vec())
       .await?;
 
-    escrow
+    channel_hold
       .db_update_signature(&mut tx, settled_amount, signature.to_vec())
       .await?;
 
@@ -359,15 +360,15 @@ impl OpenEscrow {
 
   pub async fn export_for_send(&self) -> Result<String> {
     {
-      let escrow = self.escrow.lock().await;
-      let is_empty = escrow.settled_signature == *EMPTY_SIGNATURE;
-      drop(escrow);
+      let channel_hold = self.channel_hold.lock().await;
+      let is_empty = channel_hold.settled_signature == *EMPTY_SIGNATURE;
+      drop(channel_hold);
       if is_empty {
-        self.sign(ESCROW_MINIMUM_SETTLEMENT).await?;
+        self.sign(CHANNEL_HOLD_MINIMUM_SETTLEMENT).await?;
       }
     }
-    let escrow = self.escrow.lock().await;
-    let balance_change = escrow.get_final().await?;
+    let channel_hold = self.channel_hold.lock().await;
+    let balance_change = channel_hold.get_final().await?;
     let json = serde_json::to_string(&balance_change)?;
     Ok(json)
   }
@@ -377,43 +378,47 @@ impl OpenEscrow {
     milligons: Balance,
     signature: Vec<u8>,
   ) -> Result<()> {
-    if milligons < MINIMUM_ESCROW_SETTLEMENT {
-      bail!("Settled amount is less than minimum escrow settlement amount ({MINIMUM_ESCROW_SETTLEMENT})");
+    if milligons < MINIMUM_CHANNEL_HOLD_SETTLEMENT {
+      bail!("Settled amount is less than minimum channel_hold settlement amount ({MINIMUM_CHANNEL_HOLD_SETTLEMENT})");
     }
-    let mut escrow = self.escrow.lock().await;
+    let mut channel_hold = self.channel_hold.lock().await;
     let mut db = self.db.acquire().await?;
-    escrow
+    channel_hold
       .db_update_signature(&mut db, milligons, signature)
       .await?;
 
     Ok(())
   }
 
-  pub async fn inner(&self) -> Escrow {
-    self.escrow.lock().await.clone()
+  pub async fn inner(&self) -> ChannelHold {
+    self.channel_hold.lock().await.clone()
   }
 
   pub async fn reload(&self) -> Result<()> {
-    let id = self.escrow.lock().await.id.clone();
-    let escrow = Escrow::try_from(
-      sqlx::query_as!(EscrowRow, "SELECT * FROM open_escrows WHERE id = ?", id)
-        .fetch_one(&self.db)
-        .await?,
+    let id = self.channel_hold.lock().await.id.clone();
+    let channel_hold = ChannelHold::try_from(
+      sqlx::query_as!(
+        ChannelHoldRow,
+        "SELECT * FROM open_channel_holds WHERE id = ?",
+        id
+      )
+      .fetch_one(&self.db)
+      .await?,
     )?;
-    *self.escrow.lock().await = escrow;
+    *self.channel_hold.lock().await = channel_hold;
     Ok(())
   }
 }
 
 #[cfg_attr(feature = "napi", napi)]
-pub struct OpenEscrowsStore {
+pub struct OpenChannelHoldsStore {
   db: SqlitePool,
   ticker: TickerRef,
   notary_clients: NotaryClients,
   keystore: Keystore,
 }
 
-impl OpenEscrowsStore {
+impl OpenChannelHoldsStore {
   pub(crate) fn new(
     db: SqlitePool,
     ticker: TickerRef,
@@ -428,18 +433,22 @@ impl OpenEscrowsStore {
     }
   }
 
-  pub async fn get(&self, id: String) -> Result<OpenEscrow> {
-    let row = sqlx::query_as!(EscrowRow, "SELECT * FROM open_escrows WHERE id = ?", id)
-      .fetch_one(&self.db)
-      .await?;
+  pub async fn get(&self, id: String) -> Result<OpenChannelHold> {
+    let row = sqlx::query_as!(
+      ChannelHoldRow,
+      "SELECT * FROM open_channel_holds WHERE id = ?",
+      id
+    )
+    .fetch_one(&self.db)
+    .await?;
 
-    let escrow = Escrow::try_from(row)?;
+    let channel_hold = ChannelHold::try_from(row)?;
 
-    Ok(self.open(&escrow))
+    Ok(self.open(&channel_hold))
   }
 
-  pub fn open(&self, escrow: &Escrow) -> OpenEscrow {
-    OpenEscrow::new(self.db.clone(), escrow.clone(), &self.keystore)
+  pub fn open(&self, channel_hold: &ChannelHold) -> OpenChannelHold {
+    OpenChannelHold::new(self.db.clone(), channel_hold.clone(), &self.keystore)
   }
 
   pub async fn db_record_notarized(
@@ -450,7 +459,7 @@ impl OpenEscrowsStore {
     let address = AccountStore::to_address(&balance_change.account_id);
     let settled_amount = balance_change.notes[0].milligons.to_string();
     let res = sqlx::query!(
-      r#"UPDATE open_escrows SET notarization_id = ?, settled_amount = ?, updated_at = CURRENT_TIMESTAMP
+      r#"UPDATE open_channel_holds SET notarization_id = ?, settled_amount = ?, updated_at = CURRENT_TIMESTAMP
        WHERE from_address = ? AND balance_change_number = ?"#,
       notarization_id,
       settled_amount,
@@ -460,60 +469,65 @@ impl OpenEscrowsStore {
     .execute(db)
     .await?;
     if res.rows_affected() != 1 {
-      bail!("Failed to update escrow");
+      bail!("Failed to update channel_hold");
     }
     Ok(())
   }
 
-  pub async fn get_claimable(&self) -> Result<Vec<OpenEscrow>> {
+  pub async fn get_claimable(&self) -> Result<Vec<OpenChannelHold>> {
     let current_tick = self.ticker.current();
     let expired = sqlx::query_as!(
-      EscrowRow,
-      r#"SELECT * FROM open_escrows WHERE notarization_id IS NULL AND missed_claim_window = false AND expiration_tick <= $1"#,
+      ChannelHoldRow,
+      r#"SELECT * FROM open_channel_holds WHERE notarization_id IS NULL AND missed_claim_window = false AND expiration_tick <= $1"#,
       current_tick,
     )
     .fetch_all(&self.db)
     .await
     ?;
-    tracing::info!("Found {} claimable escrows", expired.len());
+    tracing::info!("Found {} claimable channel_holds", expired.len());
 
-    let mut escrows = vec![];
+    let mut channel_holds = vec![];
     for row in expired.into_iter() {
-      let escrow = Escrow::try_from(row)?;
-      escrows.push(OpenEscrow::new(self.db.clone(), escrow, &self.keystore))
+      let channel_hold = ChannelHold::try_from(row)?;
+      channel_holds.push(OpenChannelHold::new(
+        self.db.clone(),
+        channel_hold,
+        &self.keystore,
+      ))
     }
-    tracing::info!("return escrows {}", escrows.len());
-    Ok(escrows)
+    tracing::info!("return channel_holds {}", channel_holds.len());
+    Ok(channel_holds)
   }
 
-  /// Import an escrow from a JSON string. Verifies with the notary that the escrow hold is valid.
-  pub async fn import_escrow(&self, escrow_json: String) -> Result<OpenEscrow> {
-    let mut escrow = Escrow::try_from_balance_change_json(escrow_json)?;
-    verify_changeset_signatures(&vec![escrow.balance_change.clone()])?;
+  /// Import a channel_hold from a JSON string. Verifies with the notary that the channel hold is valid.
+  pub async fn import_channel_hold(&self, channel_hold_json: String) -> Result<OpenChannelHold> {
+    let mut channel_hold = ChannelHold::try_from_balance_change_json(channel_hold_json)?;
+    verify_changeset_signatures(&vec![channel_hold.balance_change.clone()])?;
     let mut db = self.db.acquire().await?;
-    let default_account = AccountStore::db_deposit_account(&mut db, Some(escrow.notary_id)).await?;
-    if default_account.address != escrow.to_address {
+    let default_account =
+      AccountStore::db_deposit_account(&mut db, Some(channel_hold.notary_id)).await?;
+    if default_account.address != channel_hold.to_address {
       bail!(
         "This localchain is not configured to accept payments addressed to {}",
-        escrow.to_address,
+        channel_hold.to_address,
       );
     }
 
-    let notary_client = self.notary_clients.get(escrow.notary_id).await?;
+    let notary_client = self.notary_clients.get(channel_hold.notary_id).await?;
 
     let balance_tip = notary_client
-      .get_balance_tip(escrow.from_address.clone(), AccountType::Deposit)
+      .get_balance_tip(channel_hold.from_address.clone(), AccountType::Deposit)
       .await?;
 
-    let Some(balance_proof) = &escrow.balance_change.previous_balance_proof else {
+    let Some(balance_proof) = &channel_hold.balance_change.previous_balance_proof else {
       bail!("Balance change has no previous balance proof");
     };
 
     let calculated_tip = BalanceTip::compute_tip(
-      escrow.balance_change.change_number.saturating_sub(1),
+      channel_hold.balance_change.change_number.saturating_sub(1),
       balance_proof.balance,
       balance_proof.account_origin.clone(),
-      escrow.balance_change.escrow_hold_note.clone(),
+      channel_hold.balance_change.channel_hold_note.clone(),
     );
 
     let current_tip = balance_tip.balance_tip.as_ref();
@@ -525,13 +539,17 @@ impl OpenEscrowsStore {
         current_tip
       );
     }
-    escrow.expiration_tick = balance_tip.tick + self.ticker.escrow_expiration_ticks();
-    escrow.db_insert(&mut db).await?;
-    Ok(OpenEscrow::new(self.db.clone(), escrow, &self.keystore))
+    channel_hold.expiration_tick = balance_tip.tick + self.ticker.channel_hold_expiration_ticks();
+    channel_hold.db_insert(&mut db).await?;
+    Ok(OpenChannelHold::new(
+      self.db.clone(),
+      channel_hold,
+      &self.keystore,
+    ))
   }
 
-  /// Create a new escrow as a client. You must first notarize an escrow hold note to the notary for the `client_address`.
-  pub async fn open_client_escrow(&self, account_id: i64) -> Result<OpenEscrow> {
+  /// Create a new channel_hold as a client. You must first notarize a channel hold note to the notary for the `client_address`.
+  pub async fn open_client_channel_hold(&self, account_id: i64) -> Result<OpenChannelHold> {
     let mut tx = self.db.begin().await?;
     let account = AccountStore::db_get_by_id(&mut tx, account_id).await?;
     let (mut balance_tip, status) =
@@ -544,19 +562,19 @@ impl OpenEscrowsStore {
       );
     }
 
-    let hold_note = &balance_tip.escrow_hold_note.clone().ok_or(anyhow!(
-      "Account {} has no escrow hold note",
+    let hold_note = &balance_tip.channel_hold_note.clone().ok_or(anyhow!(
+      "Account {} has no channel hold note",
       account.address
     ))?;
 
     let (recipient, delegated_signer) = match &hold_note.note_type {
-      NoteType::EscrowHold {
+      NoteType::ChannelHold {
         recipient,
         delegated_signer,
       } => (recipient, delegated_signer),
       _ => {
         bail!(
-          "Balance change has invalid escrow hold note type {:?}",
+          "Balance change has invalid channel hold note type {:?}",
           hold_note.note_type
         );
       }
@@ -569,12 +587,12 @@ impl OpenEscrowsStore {
       .ok_or(anyhow!("Balance change has no previous balance proof"))?;
 
     balance_tip.change_number += 1;
-    balance_tip.push_note(MINIMUM_ESCROW_SETTLEMENT, NoteType::EscrowSettle);
-    balance_tip.balance -= MINIMUM_ESCROW_SETTLEMENT;
+    balance_tip.push_note(MINIMUM_CHANNEL_HOLD_SETTLEMENT, NoteType::ChannelHoldSettle);
+    balance_tip.balance -= MINIMUM_CHANNEL_HOLD_SETTLEMENT;
 
-    let id = Escrow::create_escrow_id(&balance_tip)?;
+    let id = ChannelHold::create_channel_hold_id(&balance_tip)?;
 
-    let mut escrow = Escrow {
+    let mut channel_hold = ChannelHold {
       id,
       is_client: true,
       initial_balance_change_json: serde_json::to_string(&balance_tip)?,
@@ -584,17 +602,21 @@ impl OpenEscrowsStore {
       delegated_signer_address: delegated_signer.as_ref().map(AccountStore::to_address),
       to_address: AccountStore::to_address(recipient),
       notary_id: *notary_id,
-      expiration_tick: tick + self.ticker.escrow_expiration_ticks(),
-      settled_amount: MINIMUM_ESCROW_SETTLEMENT,
+      expiration_tick: tick + self.ticker.channel_hold_expiration_ticks(),
+      settled_amount: MINIMUM_CHANNEL_HOLD_SETTLEMENT,
       settled_signature: EMPTY_SIGNATURE.clone(),
       notarization_id: None,
       balance_change: balance_tip,
       missed_claim_window: false,
     };
-    escrow.db_insert(&mut tx).await?;
+    channel_hold.db_insert(&mut tx).await?;
     tx.commit().await?;
 
-    Ok(OpenEscrow::new(self.db.clone(), escrow, &self.keystore))
+    Ok(OpenChannelHold::new(
+      self.db.clone(),
+      channel_hold,
+      &self.keystore,
+    ))
   }
 }
 
@@ -605,12 +627,12 @@ pub struct SignatureResult {
 
 #[cfg(feature = "napi")]
 pub mod napi_ext {
-  use super::{Escrow, OpenEscrow, OpenEscrowsStore};
+  use super::{ChannelHold, OpenChannelHold, OpenChannelHoldsStore};
   use crate::error::NapiOk;
   use napi::bindgen_prelude::{BigInt, Uint8Array};
 
   #[napi]
-  impl Escrow {
+  impl ChannelHold {
     #[napi(getter, js_name = "holdAmount")]
     pub fn hold_amount_napi(&self) -> BigInt {
       BigInt::from(self.hold_amount)
@@ -636,10 +658,10 @@ pub mod napi_ext {
   }
 
   #[napi]
-  impl OpenEscrow {
-    #[napi(getter, js_name = "escrow")]
-    pub async fn escrow_napi(&self) -> Escrow {
-      self.escrow().await
+  impl OpenChannelHold {
+    #[napi(getter, js_name = "channelHold")]
+    pub async fn channel_hold_napi(&self) -> ChannelHold {
+      self.channel_hold().await
     }
     #[napi(js_name = "sign")]
     pub async fn sign_napi(&self, settled_amount: BigInt) -> napi::Result<SignatureResult> {
@@ -668,29 +690,35 @@ pub mod napi_ext {
   }
 
   #[napi]
-  impl OpenEscrowsStore {
+  impl OpenChannelHoldsStore {
     #[napi(js_name = "get")]
-    pub async fn get_napi(&self, id: String) -> napi::Result<OpenEscrow> {
+    pub async fn get_napi(&self, id: String) -> napi::Result<OpenChannelHold> {
       self.get(id).await.napi_ok()
     }
     #[napi(js_name = "open")]
-    pub fn open_napi(&self, escrow: &Escrow) -> OpenEscrow {
-      self.open(escrow)
+    pub fn open_napi(&self, channel_hold: &ChannelHold) -> OpenChannelHold {
+      self.open(channel_hold)
     }
 
     #[napi(js_name = "getClaimable")]
-    pub async fn get_claimable_napi(&self) -> napi::Result<Vec<OpenEscrow>> {
+    pub async fn get_claimable_napi(&self) -> napi::Result<Vec<OpenChannelHold>> {
       self.get_claimable().await.napi_ok()
     }
-    #[napi(js_name = "importEscrow")]
-    /// Import an escrow from a JSON string. Verifies with the notary that the escrow hold is valid.
-    pub async fn import_escrow_napi(&self, escrow_json: String) -> napi::Result<OpenEscrow> {
-      self.import_escrow(escrow_json).await.napi_ok()
+    #[napi(js_name = "importChannelHold")]
+    /// Import a channel_hold from a JSON string. Verifies with the notary that the channel hold is valid.
+    pub async fn import_channel_hold_napi(
+      &self,
+      channel_hold_json: String,
+    ) -> napi::Result<OpenChannelHold> {
+      self.import_channel_hold(channel_hold_json).await.napi_ok()
     }
-    #[napi(js_name = "openClientEscrow")]
-    /// Create a new escrow as a client. You must first notarize an escrow hold note to the notary for the `client_address`.
-    pub async fn open_client_escrow_napi(&self, account_id: i64) -> napi::Result<OpenEscrow> {
-      self.open_client_escrow(account_id).await.napi_ok()
+    #[napi(js_name = "openClientChannelHold")]
+    /// Create a new channel_hold as a client. You must first notarize a channel hold note to the notary for the `client_address`.
+    pub async fn open_client_channel_hold_napi(
+      &self,
+      account_id: i64,
+    ) -> napi::Result<OpenChannelHold> {
+      self.open_client_channel_hold(account_id).await.napi_ok()
     }
   }
 }
@@ -725,7 +753,7 @@ mod tests {
   }
 
   #[allow(clippy::too_many_arguments)]
-  async fn create_escrow_hold(
+  async fn create_channel_hold(
     pool: &SqlitePool,
     account: &LocalAccount,
     localchain_transfer_amount: u128,
@@ -748,7 +776,7 @@ mod tests {
       })
       .await?;
     builder
-      .create_escrow_hold(hold_amount, recipient.clone(), delegated_signer)
+      .create_channel_hold(hold_amount, recipient.clone(), delegated_signer)
       .await?;
 
     let balance_change = builder.inner().await;
@@ -796,7 +824,7 @@ mod tests {
   }
 
   #[sqlx::test]
-  async fn test_open_escrow(pool: SqlitePool) -> Result<()> {
+  async fn test_open_channel_hold(pool: SqlitePool) -> Result<()> {
     let mock_notary = create_mock_notary().await?;
     let notary_clients = mock_notary_clients(&mock_notary, Ferdie).await?;
 
@@ -804,7 +832,7 @@ mod tests {
     let mut db = pool.acquire().await?;
     let bob_account = register_account(&mut db, Bob.to_account_id(), 1, 1).await?;
 
-    let _bob_hold = create_escrow_hold(
+    let _bob_hold = create_channel_hold(
       &pool,
       &bob_account,
       20_000,
@@ -816,46 +844,54 @@ mod tests {
     )
     .await?;
 
-    let escrow_expiration_ticks: u32 = 2;
+    let channel_hold_expiration_ticks: u32 = 2;
     let ticker = TickerRef::new(Ticker::start(
       Duration::from_secs(60),
-      escrow_expiration_ticks,
+      channel_hold_expiration_ticks,
     ));
-    println!("about to open escrow");
+    println!("about to open channel_hold");
     let keystore = Keystore::new(pool.clone());
     let _ = keystore
       .import_suri(Bob.to_seed(), CryptoScheme::Ed25519, None)
       .await?;
 
-    let store = OpenEscrowsStore::new(pool, ticker, &notary_clients, &keystore);
-    let open_escrow = store.open_client_escrow(bob_account.id).await?;
-    println!("opened escrow");
-    let escrow = open_escrow.inner().await;
-    assert_eq!(escrow.to_address.clone(), alice_address);
-    assert_eq!(escrow.expiration_tick, 1 + escrow_expiration_ticks);
+    let store = OpenChannelHoldsStore::new(pool, ticker, &notary_clients, &keystore);
+    let open_channel_hold = store.open_client_channel_hold(bob_account.id).await?;
+    println!("opened channel_hold");
+    let channel_hold = open_channel_hold.inner().await;
+    assert_eq!(channel_hold.to_address.clone(), alice_address);
+    assert_eq!(
+      channel_hold.expiration_tick,
+      1 + channel_hold_expiration_ticks
+    );
 
     assert_eq!(store.get_claimable().await?.len(), 0);
-    let json = open_escrow.export_for_send().await?;
+    let json = open_channel_hold.export_for_send().await?;
 
-    println!("escrow {}", &json);
-    assert!(json.contains("escrowHoldNote\":{"));
+    println!("channel_hold {}", &json);
+    assert!(json.contains("channelHoldNote\":{"));
 
     assert_eq!(
       store
-        .get(escrow.id.clone())
+        .get(channel_hold.id.clone())
         .await?
         .inner()
         .await
         .get_final()
         .await?,
-      open_escrow.inner().await.get_final().await?,
+      open_channel_hold.inner().await.get_final().await?,
       "can reload from db"
     );
 
-    open_escrow.sign(10u128).await?;
+    open_channel_hold.sign(10u128).await?;
 
     assert_eq!(
-      store.get(escrow.id).await?.inner().await.settled_amount(),
+      store
+        .get(channel_hold.id)
+        .await?
+        .inner()
+        .await
+        .settled_amount(),
       10_u128
     );
 
@@ -863,7 +899,7 @@ mod tests {
   }
 
   #[sqlx::test]
-  async fn test_open_escrow_with_delegated_signer(pool: SqlitePool) -> Result<()> {
+  async fn test_open_channel_hold_with_delegated_signer(pool: SqlitePool) -> Result<()> {
     let mock_notary = create_mock_notary().await?;
     let notary_clients = mock_notary_clients(&mock_notary, Ferdie).await?;
 
@@ -872,7 +908,7 @@ mod tests {
     let bob_account = register_account(&mut db, Bob.to_account_id(), 1, 1).await?;
     let signer_address = AccountStore::to_address(&Charlie.to_account_id());
 
-    let bob_hold = create_escrow_hold(
+    let bob_hold = create_channel_hold(
       &pool,
       &bob_account,
       20_000,
@@ -890,15 +926,15 @@ mod tests {
     let _ = keystore
       .import_suri(Bob.to_seed(), CryptoScheme::Ed25519, None)
       .await?;
-    let store = OpenEscrowsStore::new(pool, ticker.clone(), &notary_clients, &keystore);
-    let open_escrow = store.open_client_escrow(bob_account.id).await?;
-    let escrow = open_escrow.inner().await;
+    let store = OpenChannelHoldsStore::new(pool, ticker.clone(), &notary_clients, &keystore);
+    let open_channel_hold = store.open_client_channel_hold(bob_account.id).await?;
+    let channel_hold = open_channel_hold.inner().await;
     assert_eq!(
-      escrow.delegated_signer_address,
+      channel_hold.delegated_signer_address,
       Some(signer_address.clone())
     );
 
-    let json = open_escrow.export_for_send().await?;
+    let json = open_channel_hold.export_for_send().await?;
 
     let alice_pool = SqlitePool::connect(":memory:").await?;
     sqlx::migrate!()
@@ -907,15 +943,15 @@ mod tests {
       .map_err(|e| anyhow!("Error migrating database {:?}", e))?;
     let mut alice_db = alice_pool.acquire().await?;
 
-    let alice_store = OpenEscrowsStore::new(alice_pool, ticker, &notary_clients, &keystore);
+    let alice_store = OpenChannelHoldsStore::new(alice_pool, ticker, &notary_clients, &keystore);
     let _alice_account = register_account(&mut alice_db, Alice.to_account_id(), 1, 1).await?;
     // before registered with notary, should fail
     register_balance_tip(&bob_account, &mock_notary, &bob_hold, 1, 1).await?;
 
-    let alice_escrow = alice_store.import_escrow(json.clone()).await?;
-    let imported_escrow = alice_escrow.inner().await;
+    let alice_channel_hold = alice_store.import_channel_hold(json.clone()).await?;
+    let imported_channel_hold = alice_channel_hold.inner().await;
     assert_eq!(
-      imported_escrow.delegated_signer_address,
+      imported_channel_hold.delegated_signer_address,
       Some(signer_address.clone())
     );
 
@@ -923,7 +959,10 @@ mod tests {
     let (updated_signature, updated_total) = {
       let mut balance_change: BalanceChange = serde_json::from_str(&json)?;
       balance_change.balance -= 100;
-      assert_eq!(balance_change.notes[0].note_type, NoteType::EscrowSettle);
+      assert_eq!(
+        balance_change.notes[0].note_type,
+        NoteType::ChannelHoldSettle
+      );
       balance_change.notes[0].milligons += 100;
       let encoded = balance_change.hash().0;
       let charlie_pair = sp_core::sr25519::Pair::from_string(&Charlie.to_seed(), None)?;
@@ -931,7 +970,7 @@ mod tests {
       balance_change.signature = signature.into();
       (balance_change.signature, balance_change.notes[0].milligons)
     };
-    assert!(alice_escrow
+    assert!(alice_channel_hold
       .record_updated_settlement(updated_total, updated_signature.encode())
       .await
       .is_ok());
@@ -939,7 +978,7 @@ mod tests {
     Ok(())
   }
   #[sqlx::test]
-  async fn test_importing_escrow(bob_pool: SqlitePool) -> Result<()> {
+  async fn test_importing_channel_hold(bob_pool: SqlitePool) -> Result<()> {
     let mock_notary = create_mock_notary().await?;
     let notary_clients = mock_notary_clients(&mock_notary, Ferdie).await?;
 
@@ -955,7 +994,7 @@ mod tests {
     let bob_account = register_account(&mut bob_db, Bob.to_account_id(), 1, 1).await?;
 
     let _alice_account = register_account(&mut alice_db, Alice.to_account_id(), 1, 1).await?;
-    let bob_hold = create_escrow_hold(
+    let bob_hold = create_channel_hold(
       &bob_pool,
       &bob_account,
       20_000,
@@ -967,20 +1006,23 @@ mod tests {
     )
     .await?;
 
-    let escrow_expiration_ticks: u32 = 2;
-    let ticker: TickerRef = Ticker::start(Duration::from_secs(60), escrow_expiration_ticks).into();
+    let channel_hold_expiration_ticks: u32 = 2;
+    let ticker: TickerRef =
+      Ticker::start(Duration::from_secs(60), channel_hold_expiration_ticks).into();
     let keystore = Keystore::new(bob_pool.clone());
     keystore
       .import_suri("//Bob".to_string(), CryptoScheme::Ed25519, None)
       .await?;
-    let bob_store = OpenEscrowsStore::new(bob_pool, ticker.clone(), &notary_clients, &keystore);
-    let open_escrow = bob_store.open_client_escrow(bob_account.id).await?;
+    let bob_store =
+      OpenChannelHoldsStore::new(bob_pool, ticker.clone(), &notary_clients, &keystore);
+    let open_channel_hold = bob_store.open_client_channel_hold(bob_account.id).await?;
 
-    let json = open_escrow.export_for_send().await?;
+    let json = open_channel_hold.export_for_send().await?;
 
-    let alice_store = OpenEscrowsStore::new(alice_pool, ticker.clone(), &notary_clients, &keystore);
+    let alice_store =
+      OpenChannelHoldsStore::new(alice_pool, ticker.clone(), &notary_clients, &keystore);
     // before registered with notary, should fail
-    match alice_store.import_escrow(json.clone()).await {
+    match alice_store.import_channel_hold(json.clone()).await {
       Err(e) => {
         assert!(e.to_string().contains("balance_tip not set"))
       }
@@ -991,35 +1033,56 @@ mod tests {
     println!("registering balance tip");
     register_balance_tip(&bob_account, &mock_notary, &bob_hold, 1, 1).await?;
 
-    println!("importing escrow");
-    let alice_escrow = alice_store.import_escrow(json).await?;
-    println!("imported escrow");
-    let imported_escrow = alice_escrow.inner().await;
-    let sent_escrow = open_escrow.inner().await;
-    assert_eq!(imported_escrow.to_address, sent_escrow.to_address);
-    assert_eq!(imported_escrow.from_address, sent_escrow.from_address);
-    assert_eq!(imported_escrow.expiration_tick, sent_escrow.expiration_tick);
-    assert_eq!(imported_escrow.settled_amount, sent_escrow.settled_amount);
+    println!("importing channel_hold");
+    let alice_channel_hold = alice_store.import_channel_hold(json).await?;
+    println!("imported channel_hold");
+    let imported_channel_hold = alice_channel_hold.inner().await;
+    let sent_channel_hold = open_channel_hold.inner().await;
     assert_eq!(
-      imported_escrow.settled_signature,
-      sent_escrow.settled_signature
+      imported_channel_hold.to_address,
+      sent_channel_hold.to_address
     );
-    assert_eq!(imported_escrow.hold_amount, sent_escrow.hold_amount);
-    assert_eq!(imported_escrow.notary_id, sent_escrow.notary_id);
     assert_eq!(
-      imported_escrow.balance_change_number,
-      sent_escrow.balance_change_number
+      imported_channel_hold.from_address,
+      sent_channel_hold.from_address
+    );
+    assert_eq!(
+      imported_channel_hold.expiration_tick,
+      sent_channel_hold.expiration_tick
+    );
+    assert_eq!(
+      imported_channel_hold.settled_amount,
+      sent_channel_hold.settled_amount
+    );
+    assert_eq!(
+      imported_channel_hold.settled_signature,
+      sent_channel_hold.settled_signature
+    );
+    assert_eq!(
+      imported_channel_hold.hold_amount,
+      sent_channel_hold.hold_amount
+    );
+    assert_eq!(imported_channel_hold.notary_id, sent_channel_hold.notary_id);
+    assert_eq!(
+      imported_channel_hold.balance_change_number,
+      sent_channel_hold.balance_change_number
     );
 
-    assert_eq!(imported_escrow.expiration_tick, 1 + escrow_expiration_ticks);
-    assert_eq!(imported_escrow.settled_amount, MINIMUM_ESCROW_SETTLEMENT);
-    assert_eq!(imported_escrow.id, sent_escrow.id);
+    assert_eq!(
+      imported_channel_hold.expiration_tick,
+      1 + channel_hold_expiration_ticks
+    );
+    assert_eq!(
+      imported_channel_hold.settled_amount,
+      MINIMUM_CHANNEL_HOLD_SETTLEMENT
+    );
+    assert_eq!(imported_channel_hold.id, sent_channel_hold.id);
 
-    let result = open_escrow.sign(10u128).await?;
-    alice_escrow
+    let result = open_channel_hold.sign(10u128).await?;
+    alice_channel_hold
       .record_updated_settlement(result.milligons, result.signature)
       .await?;
-    assert_eq!(alice_escrow.inner().await.settled_amount(), 10_u128);
+    assert_eq!(alice_channel_hold.inner().await.settled_amount(), 10_u128);
 
     Ok(())
   }
@@ -1074,10 +1137,10 @@ mod tests {
       &bob_signer,
     );
 
-    let escrow = transactions
-      .create_escrow(800u128, not_alice.clone(), None, None)
+    let channel_hold = transactions
+      .create_channel_hold(800u128, not_alice.clone(), None, None)
       .await?;
-    let json = escrow.export_for_send().await?;
+    let json = channel_hold.export_for_send().await?;
 
     let mut db = bob_pool.acquire().await?;
     let bob_hold = BalanceChangeStore::db_get_latest_for_account(&mut db, bob_account.id)
@@ -1089,9 +1152,10 @@ mod tests {
     let _ = alice_signer
       .import_suri("//Alice".to_string(), CryptoScheme::Sr25519, None)
       .await?;
-    let alice_store = OpenEscrowsStore::new(alice_pool, ticker, &notary_clients, &alice_signer);
+    let alice_store =
+      OpenChannelHoldsStore::new(alice_pool, ticker, &notary_clients, &alice_signer);
 
-    let result = alice_store.import_escrow(json.clone()).await;
+    let result = alice_store.import_channel_hold(json.clone()).await;
     assert!(result.is_err());
     println!("{:?}", result.as_ref().err());
     assert!(result

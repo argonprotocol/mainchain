@@ -51,7 +51,7 @@ impl Note {
 		}
 	}
 
-	pub fn calculate_escrow_tax(amount: u128) -> u128 {
+	pub fn calculate_channel_hold_tax(amount: u128) -> u128 {
 		round_up(amount, TAX_PERCENT_BASE)
 	}
 }
@@ -77,9 +77,9 @@ pub fn round_up(value: u128, percentage: u128) -> u128 {
 	numerator.saturating_div(100) + round
 }
 
-pub const ESCROW_CLAWBACK_TICKS: u32 = 15;
+pub const CHANNEL_HOLD_CLAWBACK_TICKS: u32 = 15;
 // 15 after expiration
-pub const MINIMUM_ESCROW_SETTLEMENT: u128 = 5u128;
+pub const MINIMUM_CHANNEL_HOLD_SETTLEMENT: u128 = 5u128;
 
 pub type MaxNoteRecipients = ConstU32<10>;
 
@@ -125,18 +125,18 @@ pub enum NoteType {
 	Tax,
 	/// Send this tax to a BlockVote
 	SendToVote,
-	/// Escrow hold notes
+	/// Channel hold notes
 	#[serde(rename_all = "camelCase")]
-	EscrowHold {
+	ChannelHold {
 		/// The account id of the recipient
 		recipient: AccountId,
 		/// Delegate signing permissions to another account
 		delegated_signer: Option<AccountId>,
 	},
-	/// Escrow settlement note - applied to escrow hold creator balance
-	EscrowSettle,
-	/// Claim funds from one or more escrows - must be the recipient of the hold
-	EscrowClaim,
+	/// ChannelHold settlement note - applied to channel hold creator balance
+	ChannelHoldSettle,
+	/// Claim funds from one or more channel_holds - must be the recipient of the hold
+	ChannelHoldClaim,
 }
 
 impl Display for NoteType {
@@ -176,10 +176,10 @@ impl Display for NoteType {
 			NoteType::SendToVote => {
 				write!(f, "SendToVote")
 			},
-			NoteType::EscrowHold { recipient, delegated_signer } => {
+			NoteType::ChannelHold { recipient, delegated_signer } => {
 				write!(
 					f,
-					"EscrowHold(recipient: {:?}, delegated_signer: {:?})",
+					"ChannelHold(recipient: {:?}, delegated_signer: {:?})",
 					recipient.to_ss58check_with_version(Ss58AddressFormat::from(ADDRESS_PREFIX)),
 					delegated_signer
 						.as_ref()
@@ -187,11 +187,11 @@ impl Display for NoteType {
 							.to_ss58check_with_version(Ss58AddressFormat::from(ADDRESS_PREFIX)))
 				)
 			},
-			NoteType::EscrowSettle => {
-				write!(f, "EscrowSettle")
+			NoteType::ChannelHoldSettle => {
+				write!(f, "ChannelHoldSettle")
 			},
-			NoteType::EscrowClaim => {
-				write!(f, "EscrowClaim")
+			NoteType::ChannelHoldClaim => {
+				write!(f, "ChannelHoldClaim")
 			},
 		}
 	}
