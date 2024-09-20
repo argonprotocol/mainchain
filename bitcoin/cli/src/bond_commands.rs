@@ -3,17 +3,15 @@ use std::str::FromStr;
 use anyhow::{anyhow, bail, Context};
 use base64::{engine::general_purpose, Engine};
 use bitcoin::{
-	absolute::LockTime,
 	bip32::{ChildNumber, DerivationPath, Fingerprint},
-	secp256k1,
-	transaction::Version,
-	Address, CompressedPublicKey, FeeRate, Network, Psbt, Transaction, TxOut, Txid,
+	key::Secp256k1,
+	secp256k1, Address, CompressedPublicKey, FeeRate, Network, Txid,
 };
 use clap::{Subcommand, ValueEnum};
 use comfy_table::{modifiers::UTF8_ROUND_CORNERS, presets::UTF8_FULL, ContentArrangement, Table};
 use sp_runtime::{testing::H256, FixedPointNumber, FixedU128};
 
-use argon_bitcoin::{Amount, CosignScript, CosignScriptArgs, Error, UnlockStep, UtxoUnlocker};
+use argon_bitcoin::{Amount, CosignScript, CosignScriptArgs, UnlockStep, UtxoUnlocker};
 use argon_client::{
 	api,
 	api::{apis, runtime_types::pallet_bond::pallet::UtxoCosignRequest, storage, tx},
@@ -22,13 +20,13 @@ use argon_client::{
 };
 use argon_primitives::{
 	bitcoin::{
-		BitcoinNetwork, BitcoinScriptPubkey, BitcoinSignature, CompressedBitcoinPubkey, H256Le,
-		UtxoId, SATOSHIS_PER_BITCOIN,
+		BitcoinScriptPubkey, BitcoinSignature, CompressedBitcoinPubkey, H256Le, UtxoId,
+		SATOSHIS_PER_BITCOIN,
 	},
 	BlockNumber, BondId, KeystoreParams, VaultId,
 };
 
-use crate::formatters::ArgonFormatter;
+use crate::{formatters::ArgonFormatter, helpers::get_bitcoin_network, xpriv_file::XprivFile};
 
 #[derive(Subcommand, Debug)]
 pub enum BondCommands {
@@ -40,7 +38,7 @@ pub enum BondCommands {
 
 		/// The amount of btc to bond
 		#[clap(short, long)]
-		btc: f32,
+		btc: f64,
 
 		/// The owner pubkey you will cosign with
 		#[clap(short, long)]
@@ -49,8 +47,8 @@ pub enum BondCommands {
 		#[clap(flatten)]
 		keypair: KeystoreParams,
 	},
-	/// Create a partially signed bitcoin transaction to fund this bitcoin bond
-	CreatePsbt {
+	/// Outputs the address that must be funded to activate the bond
+	SendToAddress {
 		/// The bond id
 		#[clap(short, long)]
 		bond_id: BondId,
@@ -74,28 +72,25 @@ pub enum BondCommands {
 		#[clap(short, long)]
 		dest_pubkey: String,
 
-		/// The fee rate per sats to use
+		/// The fee rate per sats (sat/vB) to use
 		#[clap(short, long, default_value = "5")]
-		fee_rate_per_sats: u64,
+		fee_rate_sats_per_kb: u64,
 
 		#[clap(flatten)]
 		keypair: KeystoreParams,
 	},
-	/// Create the vault side of this unlock request
-	VaultCosignPsbt {
-		/// The bond id to unlock
-		#[clap(short, long)]
-		bond_id: BondId,
-	},
-	/// Submit a cosignature to the blockchain
-	VaultCosignSubmit {
+	/// Create the vault side of this unlock request to submit to Argon
+	VaultCosign {
 		/// The bond id to unlock
 		#[clap(short, long)]
 		bond_id: BondId,
 
-		/// The psbt to retrieve the signature from
-		#[clap(short, long)]
-		psbt: String,
+		#[clap(flatten)]
+		xpriv_file: XprivFile,
+
+		/// Provide the path of the derived master xpub uploaded to Argon
+		#[clap(long)]
+		master_xpub_hd_path: String,
 	},
 	/// Create an unlock psbt to submit to bitcoin
 	OwnerCosignPsbt {
@@ -111,6 +106,11 @@ pub enum BondCommands {
 		/// Provide the parent fingerprint to put as a hint into the psbt (if applicable)
 		#[clap(long)]
 		parent_fingerprint: Option<String>,
+
+		/// Provide the private key directly to sign the psbt (this should be used for testnet
+		/// only).
+		#[clap(long)]
+		private_key: Option<String>,
 
 		/// Wait for the cosignature to be submitted if it's not found right away
 		#[clap(long)]
@@ -130,6 +130,14 @@ pub enum BondCommands {
 		#[clap(long)]
 		claimer: BitcoinClaimer,
 
+		#[clap(flatten)]
+		xpriv_file: XprivFile,
+
+		/// If claiming as the vault, the master xpub hd path to put as a hint into the psbt (if
+		/// applicable)
+		#[clap(long)]
+		master_xpub_hd_path: Option<String>,
+
 		/// Provide the hd path to put as a hint into the psbt (if applicable)
 		#[clap(long)]
 		hd_path: Option<String>,
@@ -144,7 +152,7 @@ pub enum BondCommands {
 
 		/// The fee rate per sats to use
 		#[clap(short, long, default_value = "5")]
-		fee_rate_per_sats: u64,
+		fee_rate_sats_per_kb: u64,
 	},
 }
 
@@ -169,8 +177,7 @@ impl BondCommands {
 					.fetch_storage(&storage().vaults().vaults_by_id(vault_id), None)
 					.await?
 					.ok_or(anyhow!("Vault not found"))?;
-				let satoshis =
-					FixedU128::from_float(btc as f64).saturating_mul_int(SATOSHIS_PER_BITCOIN);
+				let satoshis = FixedU128::from_float(btc).saturating_mul_int(SATOSHIS_PER_BITCOIN);
 				let Some(argons_minted) =
 					client.call(apis().bitcoin_apis().market_rate(satoshis), None).await?
 				else {
@@ -187,7 +194,7 @@ impl BondCommands {
 				let url = client.create_polkadotjs_deeplink(&call)?;
 				println!("Link to complete transaction:\n\t{}", url);
 			},
-			BondCommands::CreatePsbt { bond_id } => {
+			BondCommands::SendToAddress { bond_id } => {
 				let client = MainchainClient::from_url(&rpc_url)
 					.await
 					.context("Failed to connect to argon node")?;
@@ -196,26 +203,14 @@ impl BondCommands {
 				let network = get_bitcoin_network(&client, None).await?;
 
 				let unlocker = get_cosign_script(&utxo, network)?;
-
-				let tx_out = TxOut {
-					value: Amount::from_sat(utxo.satoshis),
-					script_pubkey: unlocker.get_script_pubkey(),
-				};
-
-				// Create an empty transaction with no inputs and one output
-				let tx = Transaction {
-					version: Version::TWO, // Post BIP-68.
-					lock_time: LockTime::ZERO,
-					input: vec![],
-					output: vec![tx_out],
-				};
-				let psbt = Psbt::from_unsigned_tx(tx).map_err(Error::PsbtError)?;
+				let compressed_pubkey: CompressedBitcoinPubkey = utxo.owner_pubkey.into();
+				let compressed_pubkey: CompressedPublicKey = compressed_pubkey.try_into()?;
 
 				println!(
-					"You are sending {} sats to {}.\n\nAdd this psbt to your wallet to fund the bitcoin:\n\n{}",
+					"You must send exactly {} satoshis to {}, which is a multisig with your public key {}.",
 					utxo.satoshis,
 					unlocker.get_script_address(),
-					general_purpose::STANDARD.encode(&psbt.serialize()[..])
+					compressed_pubkey
 				);
 				// bitcoin-cli walletprocesspsbt "psbt_base64"
 				// bitcoin-cli finalizepsbt "processed_psbt_base64"
@@ -285,6 +280,7 @@ impl BondCommands {
 						format!("{}, vout={}", utxo_txid, a.output_index)
 					})
 					.unwrap_or("-".to_string());
+				let cosign_script = get_cosign_script(&utxo, Network::Bitcoin)?;
 
 				let vault_pubkey: CompressedBitcoinPubkey = utxo.vault_pubkey.into();
 				let vault_bitcoin_pubkey: bitcoin::CompressedPublicKey = vault_pubkey.try_into()?;
@@ -296,6 +292,7 @@ impl BondCommands {
 					vec!["Bitcoin Utxo".into(), utxo_ref_str],
 					vec!["Vault pubkey".into(), format!("{}", vault_bitcoin_pubkey)],
 					vec!["Owner pubkey".into(), format!("{}", owner_bitcoin_pubkey)],
+					vec!["Output Descriptor".into(), format!("{}", cosign_script.descriptor)],
 					vec![
 						"Minted Argons".into(),
 						format!("{} of {}", ArgonFormatter(minted), ArgonFormatter(bond.amount)),
@@ -332,7 +329,12 @@ impl BondCommands {
 
 				println!("{table}");
 			},
-			BondCommands::RequestUnlock { bond_id, dest_pubkey, fee_rate_per_sats, keypair: _ } => {
+			BondCommands::RequestUnlock {
+				bond_id,
+				dest_pubkey,
+				fee_rate_sats_per_kb,
+				keypair: _,
+			} => {
 				let client = MainchainClient::from_url(&rpc_url)
 					.await
 					.context("Failed to connect to argon node")?;
@@ -360,7 +362,7 @@ impl BondCommands {
 				let network_fee = cosign.calculate_fee(
 					true,
 					bitcoin_dest_pubkey.clone(),
-					FeeRate::from_sat_per_vb(fee_rate_per_sats)
+					FeeRate::from_sat_per_vb(fee_rate_sats_per_kb)
 						.ok_or(anyhow!("Invalid fee rate"))?,
 				)?;
 
@@ -378,12 +380,16 @@ impl BondCommands {
 				let url = client.create_polkadotjs_deeplink(&call)?;
 				println!("Link to create transaction:\n\t{}", url);
 			},
-			BondCommands::VaultCosignPsbt { bond_id } => {
+			BondCommands::VaultCosign { bond_id, xpriv_file, master_xpub_hd_path } => {
 				let client = MainchainClient::from_url(&rpc_url)
 					.await
 					.context("Failed to connect to argon node")?;
 				let latest_block = client.latest_finalized_block_hash().await?;
 				let at_block = Some(latest_block.hash());
+				let child_xpriv = xpriv_file.read()?.derive_priv(
+					&Secp256k1::new(),
+					&DerivationPath::from_str(&master_xpub_hd_path)?,
+				)?;
 
 				let (utxo_id, utxo, _) = get_utxo_from_bond_id(&client, bond_id, at_block).await?;
 				let mut unlocker = load_unlocker(&client, utxo_id, &utxo, at_block).await?;
@@ -391,27 +397,24 @@ impl BondCommands {
 					unlocker.cosign_script.script_args.owner_pubkey.try_into()?;
 				let compressed: CompressedPublicKey = owner_pubkey;
 				let fingerprint = Fingerprint::from(utxo.vault_xpub_sources.0);
+
 				let hd_path =
 					DerivationPath::from(vec![ChildNumber::from(utxo.vault_xpub_sources.1)]);
+
 				unlocker.psbt.inputs[0]
 					.bip32_derivation
 					.insert(compressed.0, (fingerprint, hd_path));
-				let psbt = unlocker.psbt;
+				let mut psbt = unlocker.psbt;
+				psbt.sign(&child_xpriv, &Secp256k1::new()).map_err(|e| {
+					anyhow!(
+						"Unable to sign this bitcoin transaction with the given XPriv -> {:#?}",
+						e.1
+					)
+				})?;
 				println!(
-					"Add your signature to this psbt the bitcoin:\n\n{}",
+					"Your xpriv was used to sign the following psbt:\n\n{}",
 					general_purpose::STANDARD.encode(&psbt.serialize()[..])
 				);
-			},
-			BondCommands::VaultCosignSubmit { bond_id, psbt } => {
-				let client = MainchainClient::from_url(&rpc_url)
-					.await
-					.context("Failed to connect to argon node")?;
-				let latest_block = client.latest_finalized_block_hash().await?;
-				let at_block = Some(latest_block.hash());
-
-				let (_, utxo, _) = get_utxo_from_bond_id(&client, bond_id, at_block).await?;
-
-				let psbt = Psbt::from_str(&psbt)?;
 				let compressed_pubkey: CompressedBitcoinPubkey = utxo.vault_pubkey.clone().into();
 				let compressed_pubkey: CompressedPublicKey = compressed_pubkey.try_into()?;
 
@@ -426,7 +429,19 @@ impl BondCommands {
 				let url = client.create_polkadotjs_deeplink(&unlock_fulfill)?;
 				println!("Link to create transaction:\n\t{}", url);
 			},
-			BondCommands::OwnerCosignPsbt { utxo_id, parent_fingerprint, hd_path, wait } => {
+			BondCommands::OwnerCosignPsbt {
+				utxo_id,
+				parent_fingerprint,
+				hd_path,
+				private_key,
+				wait,
+			} => {
+				let private_key = if let Some(private_key) = private_key {
+					Some(bitcoin::PrivateKey::from_str(&private_key)?)
+				} else {
+					None
+				};
+
 				let client = MainchainClient::from_url(&rpc_url)
 					.await
 					.context("Failed to connect to argon node")?;
@@ -546,11 +561,14 @@ impl BondCommands {
 						keysource,
 					);
 				}
+				if let Some(private_key) = private_key {
+					unlocker.sign(private_key)?;
+				}
 
 				let psbt = unlocker.psbt;
 
 				println!(
-					"Add this psbt to your wallet to fund the bitcoin:\n\n{}",
+					"Import this psbt to sign and broadcast the transaction:\n\n{}",
 					general_purpose::STANDARD.encode(&psbt.serialize()[..])
 				);
 				return Ok(());
@@ -560,7 +578,9 @@ impl BondCommands {
 				at_block: block_number,
 				claimer,
 				dest_pubkey,
-				fee_rate_per_sats,
+				xpriv_file,
+				master_xpub_hd_path,
+				fee_rate_sats_per_kb,
 				hd_path,
 				parent_fingerprint,
 			} => {
@@ -582,7 +602,7 @@ impl BondCommands {
 				let network = get_bitcoin_network(&client, at_block).await?;
 				let cosign_script = get_cosign_script(&utxo, network)?;
 				let txid: Txid = H256Le(utxo_ref.txid.0).into();
-				let fee_rate = FeeRate::from_sat_per_vb(fee_rate_per_sats)
+				let fee_rate = FeeRate::from_sat_per_vb(fee_rate_sats_per_kb)
 					.ok_or(anyhow!("Invalid fee rate"))?;
 
 				let pay_scriptpub: BitcoinScriptPubkey = Address::from_str(&dest_pubkey)
@@ -624,28 +644,31 @@ impl BondCommands {
 						.bip32_derivation
 						.insert(owner_pubkey.0, (fingerprint, hd_path));
 				}
-				let psbt = unlocker.psbt;
+				let mut psbt = unlocker.psbt;
+				if matches!(claimer, BitcoinClaimer::Vault) {
+					let master_xpub_hd_path = master_xpub_hd_path.ok_or(anyhow!(
+						"Master xpub hd path is required when claiming as the vault"
+					))?;
+					let vault_xpriv = xpriv_file.read()?.derive_priv(
+						&Secp256k1::new(),
+						&DerivationPath::from_str(&master_xpub_hd_path)?,
+					)?;
+					psbt.sign(&vault_xpriv, &Secp256k1::new()).map_err(|e| {
+						anyhow!(
+							"Unable to sign this bitcoin transaction with the given XPriv -> {:#?}",
+							e.1
+						)
+					})?;
+				}
 
 				println!(
-					"Add this psbt to your wallet to fund the bitcoin:\n\n{}",
+					"Load this psbt to your wallet to claim the bitcoin:\n\n{}",
 					general_purpose::STANDARD.encode(&psbt.serialize()[..])
 				);
 			},
 		}
 		Ok(())
 	}
-}
-
-async fn get_bitcoin_network(
-	client: &MainchainClient,
-	at_block: Option<H256>,
-) -> anyhow::Result<Network> {
-	let network: BitcoinNetwork = client
-		.fetch_storage(&storage().bitcoin_utxos().bitcoin_network(), at_block)
-		.await?
-		.ok_or(anyhow!("No bitcoin network found"))?
-		.into();
-	Ok(network.into())
 }
 
 async fn load_unlocker(

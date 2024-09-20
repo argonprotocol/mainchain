@@ -56,8 +56,8 @@ impl pallet_balances::Config<ArgonToken> for Test {
 	type RuntimeFreezeReason = RuntimeFreezeReason;
 }
 
-type SharesToken = pallet_balances::Instance2;
-impl pallet_balances::Config<SharesToken> for Test {
+type OwnershipToken = pallet_balances::Instance2;
+impl pallet_balances::Config<OwnershipToken> for Test {
 	type MaxLocks = ConstU32<0>;
 	type MaxReserves = ConstU32<0>;
 	type ReserveIdentifier = ();
@@ -66,7 +66,7 @@ impl pallet_balances::Config<SharesToken> for Test {
 	type DustRemoval = ();
 	type ExistentialDeposit = ExistentialDeposit;
 	type AccountStore = StorageMapShim<
-		pallet_balances::Account<Test, SharesToken>,
+		pallet_balances::Account<Test, OwnershipToken>,
 		AccountId,
 		pallet_balances::AccountData<Balance>,
 	>;
@@ -149,7 +149,7 @@ impl pallet_block_rewards::Config for Test {
 	type RuntimeEvent = RuntimeEvent;
 	type WeightInfo = ();
 	type ArgonCurrency = Balances;
-	type SharesCurrency = Ownership;
+	type OwnershipCurrency = Ownership;
 	type ArgonsPerBlock = ArgonsPerBlock;
 	type StartingOwnershipTokensPerBlock = StartingOwnershipTokensPerBlock;
 	type MaturationBlocks = MaturationBlocks;

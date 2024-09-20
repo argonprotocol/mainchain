@@ -1,4 +1,4 @@
-name: Build + Test Node Apis
+name: Build + Test Node.js Apis
 'on':
   push:
     branches:

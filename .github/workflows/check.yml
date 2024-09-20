@@ -23,7 +23,6 @@ jobs:
       - uses: actions/checkout@v4
 
       - name: Free Disk Space
-        if: ${{startsWith(matrix.os, 'ubuntu')}}
         uses: ./.github/templates/clear-space
 
       - uses: ikalnytskyi/action-setup-postgres@v6
@@ -53,7 +52,7 @@ jobs:
 
       - uses: rui314/setup-mold@v1
 
-      - name: Install
+      - name: Install Rust
         uses: dtolnay/rust-toolchain@stable
         with:
           toolchain: stable

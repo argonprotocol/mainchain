@@ -58,7 +58,7 @@ pub mod pallet {
 		type ArgonCurrency: MutateFreeze<Self::AccountId, Balance = Self::Balance>
 			+ Mutate<Self::AccountId, Balance = Self::Balance>
 			+ InspectFreeze<Self::AccountId, Balance = Self::Balance, Id = Self::RuntimeFreezeReason>;
-		type SharesCurrency: MutateFreeze<Self::AccountId, Balance = Self::Balance>
+		type OwnershipCurrency: MutateFreeze<Self::AccountId, Balance = Self::Balance>
 			+ Mutate<Self::AccountId, Balance = Self::Balance>
 			+ InspectFreeze<Self::AccountId, Balance = Self::Balance, Id = Self::RuntimeFreezeReason>;
 
@@ -166,9 +166,10 @@ pub mod pallet {
 					});
 				}
 
-				if let Err(e) =
-					Self::unfreeze_amount::<T::SharesCurrency>(&reward.account_id, reward.ownership)
-				{
+				if let Err(e) = Self::unfreeze_amount::<T::OwnershipCurrency>(
+					&reward.account_id,
+					reward.ownership,
+				) {
 					log::error!(target: LOG_TARGET, "Failed to unfreeze ownership for reward: {:?}, {:?}", reward, e);
 					Self::deposit_event(Event::RewardUnlockError {
 						account_id: reward.account_id.clone(),
@@ -192,11 +193,11 @@ pub mod pallet {
 
 			let mut block_argons =
 				UniqueSaturatedInto::<u128>::unique_saturated_into(T::ArgonsPerBlock::get());
-			let block_shares = UniqueSaturatedInto::<u128>::unique_saturated_into(
+			let block_ownership = UniqueSaturatedInto::<u128>::unique_saturated_into(
 				T::StartingOwnershipTokensPerBlock::get(),
 			);
 
-			let mut block_shares = block_shares.saturating_div(halvings + 1u128);
+			let mut block_ownership = block_ownership.saturating_div(halvings + 1u128);
 			let active_notaries = T::NotaryProvider::active_notaries().len() as u128;
 			let block_notebooks = T::NotebookProvider::notebooks_in_block();
 			let current_tick = T::CurrentTick::get();
@@ -210,20 +211,22 @@ pub mod pallet {
 
 			if active_notaries > tick_notebooks {
 				if tick_notebooks == 0 {
-					block_shares = 1u128;
+					block_ownership = 1u128;
 					block_argons = 1u128;
 				} else {
-					block_shares = block_shares.saturating_mul(tick_notebooks) / active_notaries;
+					block_ownership =
+						block_ownership.saturating_mul(tick_notebooks) / active_notaries;
 					block_argons = block_argons.saturating_mul(tick_notebooks) / active_notaries;
 				}
 			}
 
-			let block_shares: T::Balance = block_shares.into();
+			let block_ownership: T::Balance = block_ownership.into();
 			let block_argons: T::Balance = block_argons.into();
 
 			let miner_percent = T::MinerPayoutPercent::get();
 
-			let miner_shares: T::Balance = Self::saturating_mul_ceil(miner_percent, block_shares);
+			let miner_ownership: T::Balance =
+				Self::saturating_mul_ceil(miner_percent, block_ownership);
 			let miner_argons: T::Balance = Self::saturating_mul_ceil(miner_percent, block_argons);
 
 			let (assigned_rewards_account, reward_sharing) =
@@ -235,7 +238,7 @@ pub mod pallet {
 
 			let mut rewards: Vec<BlockPayout<T::AccountId, T::Balance>> = vec![BlockPayout {
 				account_id: miner_reward_account.clone(),
-				ownership: miner_shares,
+				ownership: miner_ownership,
 				argons: miner_argons,
 			}];
 			if let Some(sharing) = reward_sharing {
@@ -255,14 +258,14 @@ pub mod pallet {
 					.block_vote_rewards_account
 					.unwrap_or(authors.block_author_account_id.clone())
 					.clone(),
-				ownership: block_shares.saturating_sub(miner_shares),
+				ownership: block_ownership.saturating_sub(miner_ownership),
 				argons: block_argons.saturating_sub(miner_argons),
 			});
 
 			let reward_height = n.saturating_add(T::MaturationBlocks::get().into());
 			for reward in rewards.iter_mut() {
 				let start_argons = reward.argons;
-				let start_shares = reward.ownership;
+				let start_ownership = reward.ownership;
 				if let Err(e) = Self::mint_and_freeze::<T::ArgonCurrency>(reward) {
 					log::error!(target: LOG_TARGET, "Failed to mint argons for reward: {:?}, {:?}", reward, e);
 					Self::deposit_event(Event::RewardCreateError {
@@ -272,12 +275,12 @@ pub mod pallet {
 						error: e,
 					});
 				}
-				if let Err(e) = Self::mint_and_freeze::<T::SharesCurrency>(reward) {
+				if let Err(e) = Self::mint_and_freeze::<T::OwnershipCurrency>(reward) {
 					log::error!(target: LOG_TARGET, "Failed to mint ownership for reward: {:?}, {:?}", reward, e);
 					Self::deposit_event(Event::RewardCreateError {
 						account_id: reward.account_id.clone(),
 						argons: None,
-						ownership: Some(start_shares),
+						ownership: Some(start_ownership),
 						error: e,
 					});
 				}
@@ -305,19 +308,18 @@ pub mod pallet {
 			reward: &mut BlockPayout<T::AccountId, T::Balance>,
 		) -> DispatchResult {
 			let freeze_id = FreezeReason::MaturationPeriod.into();
-			let is_shares = TypeId::of::<C>() == TypeId::of::<T::SharesCurrency>();
-			let amount = if is_shares { reward.ownership } else { reward.argons };
+			let is_ownership = TypeId::of::<C>() == TypeId::of::<T::OwnershipCurrency>();
+			let amount = if is_ownership { reward.ownership } else { reward.argons };
 			if amount == 0u128.into() {
 				return Ok(());
 			}
 
-			C::mint_into(&reward.account_id, amount).map_err(|e| {
-				if is_shares {
+			C::mint_into(&reward.account_id, amount).inspect_err(|_| {
+				if is_ownership {
 					reward.ownership = 0u128.into();
 				} else {
 					reward.argons = 0u128.into();
 				}
-				e
 			})?;
 
 			let frozen = C::balance_frozen(&freeze_id, &reward.account_id);

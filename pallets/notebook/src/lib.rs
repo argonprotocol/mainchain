@@ -593,12 +593,11 @@ pub mod pallet {
 				block_vote_minimums,
 				escrow_expiration_ticks,
 			)
-			.map_err(|e| {
+			.inspect_err(|e| {
 				info!(
 					target: LOG_TARGET,
 					"Notebook audit failed for notary {notary_id}, notebook {notebook_number}: {:?}", e.to_string()
 				);
-				e
 			})?;
 
 			let audit_result = NotebookAuditResult {

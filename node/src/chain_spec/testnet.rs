@@ -50,7 +50,7 @@ pub fn testnet_config() -> Result<ChainSpec, String> {
 		vec![(miner_zero, miner_zero_keys)],
 		// Sudo account
 		sudo_account.clone(),
-		BitcoinNetwork::Testnet,
+		BitcoinNetwork::Signet,
 		// Bitcoin utxo tip operator
 		bitcoin_oracle.clone(),
 		// Price index operator

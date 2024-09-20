@@ -176,6 +176,7 @@ impl CosignScript {
 			.map_err(|_| BitcoinError::InvalidPolicy)?;
 		Ok(descriptor)
 	}
+
 	pub fn build_descriptor<Pk: MiniscriptKey + FromStrKey>(
 		cosign_script_args: &CosignScriptArgs,
 		policy: &Policy<Pk>,

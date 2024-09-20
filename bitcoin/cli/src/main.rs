@@ -3,6 +3,7 @@ use crate::{
 	formatters::{parse_number, Pct64},
 	helpers::{read_bitcoin_xpub, read_percent_to_fixed_128},
 	vault_commands::VaultCommands,
+	xpriv_commands::XPrivCommands,
 };
 use anyhow::anyhow;
 use clap::{crate_version, Parser, Subcommand};
@@ -14,6 +15,8 @@ mod formatters;
 mod helpers;
 mod vault_commands;
 mod vault_create;
+mod xpriv_commands;
+mod xpriv_file;
 
 #[derive(Parser, Debug)]
 #[clap(version = crate_version!())]
@@ -39,6 +42,11 @@ enum Commands {
 		#[clap(subcommand)]
 		subcommand: BondCommands,
 	},
+	#[clap(name = "xpriv")]
+	XPriv {
+		#[clap(subcommand)]
+		subcommand: XPrivCommands,
+	},
 	/// Utilities for working with Bitcoin and Argon primitives
 	Utils {
 		#[clap(subcommand)]
@@ -60,7 +68,8 @@ async fn main() -> anyhow::Result<()> {
 	match cli.command {
 		Commands::Vault { subcommand } => subcommand.process(rpc_url).await?,
 		Commands::Bond { subcommand } => subcommand.process(rpc_url).await?,
-		Commands::Utils { subcommand } => subcommand.process().await?,
+		Commands::Utils { subcommand } => subcommand.process(rpc_url).await?,
+		Commands::XPriv { subcommand } => subcommand.process(rpc_url).await?,
 	};
 
 	Ok(())
@@ -82,7 +91,7 @@ struct OneArg {
 	arg: String,
 }
 impl UtilCommands {
-	pub async fn process(self) -> anyhow::Result<()> {
+	pub async fn process(self, _rpc_url: String) -> anyhow::Result<()> {
 		match self {
 			UtilCommands::ToFixed(OneArg { arg }) => {
 				let fixed = parse_number(&arg).map_err(|e| anyhow!(e))?;

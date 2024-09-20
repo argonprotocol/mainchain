@@ -1,7 +1,9 @@
+use anyhow::anyhow;
+use argon_client::{api::storage, MainchainClient};
+use argon_primitives::bitcoin::{BitcoinNetwork, OpaqueBitcoinXpub};
 use base58::FromBase58;
-use sp_runtime::FixedU128;
-
-use argon_primitives::bitcoin::OpaqueBitcoinXpub;
+use bitcoin::Network;
+use sp_runtime::{testing::H256, FixedU128};
 
 pub fn read_bitcoin_xpub(xpub: &str) -> Result<OpaqueBitcoinXpub, String> {
 	let mut vpub_bytes = xpub.from_base58().map_err(|_| "Invalid Base58 string")?;
@@ -18,4 +20,16 @@ pub fn read_bitcoin_xpub(xpub: &str) -> Result<OpaqueBitcoinXpub, String> {
 /// Translate a percent out of 100 to a fixed 128-bit number
 pub fn read_percent_to_fixed_128(percent: f32) -> FixedU128 {
 	FixedU128::from_float(percent as f64).div(FixedU128::from_u32(100))
+}
+
+pub async fn get_bitcoin_network(
+	client: &MainchainClient,
+	at_block: Option<H256>,
+) -> anyhow::Result<Network> {
+	let network: BitcoinNetwork = client
+		.fetch_storage(&storage().bitcoin_utxos().bitcoin_network(), at_block)
+		.await?
+		.ok_or(anyhow!("No bitcoin network found"))?
+		.into();
+	Ok(network.into())
 }

@@ -6,6 +6,7 @@ runs:
   using: "composite"
   steps:
     - name: Clear space
+      if: ${{ runner.os == 'Linux' }}
       shell: bash
       run: |
         df -h
@@ -17,4 +18,16 @@ runs:
         sudo rm -rf /usr/local/lib/android/sdk
         sudo rm -rf /usr/share/swift
         sudo rm -rf /usr/share/miniconda
+        df -h
+    - name: Clear space
+      if: ${{ runner.os == 'macOS' }}
+      shell: bash
+      run: |
+        df -h
+        sudo rm -rf /Users/runner/Library/Android/sdk
+        sudo rm -rf /Users/runner/hostedtoolcache/CodeQL
+        sudo rm -rf /Users/runner/Library/Developer/CoreSimulator
+        sudo rm -rf /Users/runner/Library/Developer/Xcode/DerivedData
+        sudo rm -rf /Users/runner/Library/Developer/Xcode/iOS DeviceSupport
+        sudo rm -rf /Users/runner/Library/Developer/Xcode/watchOS DeviceSupport
         df -h

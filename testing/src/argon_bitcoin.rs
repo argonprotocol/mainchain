@@ -23,9 +23,9 @@ pub async fn run_bitcoin_cli(
 			.into_iter(),
 		)
 		.output()?;
+	let stdout = String::from_utf8_lossy(&output.stdout);
+	println!("{}", stdout);
 	if output.status.success() {
-		// Convert the output to a string and print it
-		let stdout = String::from_utf8_lossy(&output.stdout);
 		Ok(stdout.to_string())
 	} else {
 		// Print the error
