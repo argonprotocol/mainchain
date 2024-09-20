@@ -56,10 +56,9 @@ pub async fn connect_with_logs(
   pool_options: SqlitePoolOptions,
   connect_options: SqliteConnectOptions,
 ) -> anyhow::Result<SqlitePool> {
-  tracing_subscriber::FmtSubscriber::builder()
+  let _ = tracing_subscriber::FmtSubscriber::builder()
     .with_env_filter(tracing_subscriber::EnvFilter::from_default_env())
-    .try_init()
-    .expect("setting default subscriber failed");
+    .try_init();
   let connect_options = connect_options
     .clone()
     .log_statements(LogLevelFilter::Trace.into());

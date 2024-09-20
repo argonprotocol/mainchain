@@ -628,9 +628,7 @@ export default {
       InvalidBlockVoteList: 'Null',
       InvalidComputeProof: 'Null',
       InvalidBlockVoteSource: 'Null',
-      InsufficientBlockVoteMinimum: 'Null',
-      BlockVoteDataDomainMismatch: 'Null',
-      BlockVoteEscrowReused: 'Null'
+      InsufficientBlockVoteMinimum: 'Null'
     }
   },
   /**
@@ -1621,8 +1619,6 @@ export default {
     blockHash: 'H256',
     index: 'Compact<u32>',
     power: 'Compact<u128>',
-    dataDomainHash: 'H256',
-    dataDomainAccount: 'AccountId32',
     signature: 'SpRuntimeMultiSignature',
     blockRewardsAccountId: 'AccountId32'
   },
@@ -2183,52 +2179,52 @@ export default {
     _enum: ['MaxNotebooksAtTickExceeded']
   },
   /**
-   * Lookup329: pallet_data_domain::pallet::Error<T>
+   * Lookup328: pallet_data_domain::pallet::Error<T>
    **/
   PalletDataDomainError: {
     _enum: ['DomainNotRegistered', 'NotDomainOwner', 'FailedToAddToAddressHistory', 'FailedToAddExpiringDomain', 'AccountDecodingError']
   },
   /**
-   * Lookup330: pallet_price_index::pallet::Error<T>
+   * Lookup329: pallet_price_index::pallet::Error<T>
    **/
   PalletPriceIndexError: {
     _enum: ['NotAuthorizedOperator', 'MissingValue', 'PricesTooOld', 'MaxPriceChangePerTickExceeded']
   },
   /**
-   * Lookup335: sp_core::crypto::KeyTypeId
+   * Lookup334: sp_core::crypto::KeyTypeId
    **/
   SpCoreCryptoKeyTypeId: '[u8;4]',
   /**
-   * Lookup336: pallet_session::pallet::Error<T>
+   * Lookup335: pallet_session::pallet::Error<T>
    **/
   PalletSessionError: {
     _enum: ['InvalidProof', 'NoAssociatedValidatorId', 'DuplicatedKey', 'NoKeys', 'NoAccount']
   },
   /**
-   * Lookup337: argon_primitives::providers::BlockSealerInfo<sp_core::crypto::AccountId32>
+   * Lookup336: argon_primitives::providers::BlockSealerInfo<sp_core::crypto::AccountId32>
    **/
   ArgonPrimitivesProvidersBlockSealerInfo: {
     blockAuthorAccountId: 'AccountId32',
     blockVoteRewardsAccount: 'Option<AccountId32>'
   },
   /**
-   * Lookup338: argon_primitives::digests::ParentVotingKeyDigest
+   * Lookup337: argon_primitives::digests::ParentVotingKeyDigest
    **/
   ArgonPrimitivesDigestsParentVotingKeyDigest: {
     parentVotingKey: 'Option<H256>'
   },
   /**
-   * Lookup339: pallet_block_seal::pallet::Error<T>
+   * Lookup338: pallet_block_seal::pallet::Error<T>
    **/
   PalletBlockSealError: {
     _enum: ['InvalidVoteSealStrength', 'InvalidSubmitter', 'UnableToDecodeVoteAccount', 'UnregisteredBlockAuthor', 'InvalidBlockVoteProof', 'NoGrandparentVoteMinimum', 'DuplicateBlockSealProvided', 'InsufficientVotingPower', 'ParentVotingKeyNotFound', 'InvalidVoteGrandparentHash', 'IneligibleNotebookUsed', 'NoEligibleVotingRoot', 'UnregisteredDataDomain', 'InvalidDataDomainAccount', 'InvalidAuthoritySignature', 'CouldNotDecodeVote', 'MaxNotebooksAtTickExceeded', 'NoClosestMinerFoundForVote', 'BlockVoteInvalidSignature']
   },
   /**
-   * Lookup341: pallet_block_rewards::pallet::Error<T>
+   * Lookup340: pallet_block_rewards::pallet::Error<T>
    **/
   PalletBlockRewardsError: 'Null',
   /**
-   * Lookup342: pallet_grandpa::StoredState<N>
+   * Lookup341: pallet_grandpa::StoredState<N>
    **/
   PalletGrandpaStoredState: {
     _enum: {
@@ -2245,7 +2241,7 @@ export default {
     }
   },
   /**
-   * Lookup343: pallet_grandpa::StoredPendingChange<N, Limit>
+   * Lookup342: pallet_grandpa::StoredPendingChange<N, Limit>
    **/
   PalletGrandpaStoredPendingChange: {
     scheduledAt: 'u32',
@@ -2254,32 +2250,32 @@ export default {
     forced: 'Option<u32>'
   },
   /**
-   * Lookup346: pallet_grandpa::pallet::Error<T>
+   * Lookup345: pallet_grandpa::pallet::Error<T>
    **/
   PalletGrandpaError: {
     _enum: ['PauseFailed', 'ResumeFailed', 'ChangePending', 'TooSoon', 'InvalidKeyOwnershipProof', 'InvalidEquivocationProof', 'DuplicateOffenceReport']
   },
   /**
-   * Lookup347: sp_staking::offence::OffenceDetails<sp_core::crypto::AccountId32, Offender>
+   * Lookup346: sp_staking::offence::OffenceDetails<sp_core::crypto::AccountId32, Offender>
    **/
   SpStakingOffenceOffenceDetails: {
     offender: '(AccountId32,PalletMiningSlotMinerHistory)',
     reporters: 'Vec<AccountId32>'
   },
   /**
-   * Lookup349: pallet_mining_slot::MinerHistory
+   * Lookup348: pallet_mining_slot::MinerHistory
    **/
   PalletMiningSlotMinerHistory: {
     authorityIndex: 'u32'
   },
   /**
-   * Lookup354: pallet_mint::pallet::Error<T>
+   * Lookup353: pallet_mint::pallet::Error<T>
    **/
   PalletMintError: {
     _enum: ['TooManyPendingMints']
   },
   /**
-   * Lookup356: pallet_balances::types::BalanceLock<Balance>
+   * Lookup355: pallet_balances::types::BalanceLock<Balance>
    **/
   PalletBalancesBalanceLock: {
     id: '[u8;8]',
@@ -2287,27 +2283,27 @@ export default {
     reasons: 'PalletBalancesReasons'
   },
   /**
-   * Lookup357: pallet_balances::types::Reasons
+   * Lookup356: pallet_balances::types::Reasons
    **/
   PalletBalancesReasons: {
     _enum: ['Fee', 'Misc', 'All']
   },
   /**
-   * Lookup360: pallet_balances::types::ReserveData<ReserveIdentifier, Balance>
+   * Lookup359: pallet_balances::types::ReserveData<ReserveIdentifier, Balance>
    **/
   PalletBalancesReserveData: {
     id: '[u8;8]',
     amount: 'u128'
   },
   /**
-   * Lookup363: frame_support::traits::tokens::misc::IdAmount<argon_node_runtime::RuntimeHoldReason, Balance>
+   * Lookup362: frame_support::traits::tokens::misc::IdAmount<argon_node_runtime::RuntimeHoldReason, Balance>
    **/
   FrameSupportTokensMiscIdAmountRuntimeHoldReason: {
     id: 'ArgonNodeRuntimeRuntimeHoldReason',
     amount: 'u128'
   },
   /**
-   * Lookup364: argon_node_runtime::RuntimeHoldReason
+   * Lookup363: argon_node_runtime::RuntimeHoldReason
    **/
   ArgonNodeRuntimeRuntimeHoldReason: {
     _enum: {
@@ -2334,38 +2330,38 @@ export default {
     }
   },
   /**
-   * Lookup365: pallet_mining_slot::pallet::HoldReason
+   * Lookup364: pallet_mining_slot::pallet::HoldReason
    **/
   PalletMiningSlotHoldReason: {
     _enum: ['RegisterAsMiner']
   },
   /**
-   * Lookup366: pallet_vaults::pallet::HoldReason
+   * Lookup365: pallet_vaults::pallet::HoldReason
    **/
   PalletVaultsHoldReason: {
     _enum: ['EnterVault', 'BondFee']
   },
   /**
-   * Lookup367: pallet_bond::pallet::HoldReason
+   * Lookup366: pallet_bond::pallet::HoldReason
    **/
   PalletBondHoldReason: {
     _enum: ['UnlockingBitcoin']
   },
   /**
-   * Lookup368: pallet_block_rewards::pallet::HoldReason
+   * Lookup367: pallet_block_rewards::pallet::HoldReason
    **/
   PalletBlockRewardsHoldReason: {
     _enum: ['MaturationPeriod']
   },
   /**
-   * Lookup371: frame_support::traits::tokens::misc::IdAmount<argon_node_runtime::RuntimeFreezeReason, Balance>
+   * Lookup370: frame_support::traits::tokens::misc::IdAmount<argon_node_runtime::RuntimeFreezeReason, Balance>
    **/
   FrameSupportTokensMiscIdAmountRuntimeFreezeReason: {
     id: 'ArgonNodeRuntimeRuntimeFreezeReason',
     amount: 'u128'
   },
   /**
-   * Lookup372: argon_node_runtime::RuntimeFreezeReason
+   * Lookup371: argon_node_runtime::RuntimeFreezeReason
    **/
   ArgonNodeRuntimeRuntimeFreezeReason: {
     _enum: {
@@ -2392,83 +2388,83 @@ export default {
     }
   },
   /**
-   * Lookup373: pallet_block_rewards::pallet::FreezeReason
+   * Lookup372: pallet_block_rewards::pallet::FreezeReason
    **/
   PalletBlockRewardsFreezeReason: {
     _enum: ['MaturationPeriod']
   },
   /**
-   * Lookup375: pallet_balances::pallet::Error<T, I>
+   * Lookup374: pallet_balances::pallet::Error<T, I>
    **/
   PalletBalancesError: {
     _enum: ['VestingBalance', 'LiquidityRestrictions', 'InsufficientBalance', 'ExistentialDeposit', 'Expendability', 'ExistingVestingSchedule', 'DeadAccount', 'TooManyReserves', 'TooManyHolds', 'TooManyFreezes', 'IssuanceDeactivated', 'DeltaZero']
   },
   /**
-   * Lookup377: pallet_tx_pause::pallet::Error<T>
+   * Lookup376: pallet_tx_pause::pallet::Error<T>
    **/
   PalletTxPauseError: {
     _enum: ['IsPaused', 'IsUnpaused', 'Unpausable', 'NotFound']
   },
   /**
-   * Lookup378: pallet_transaction_payment::Releases
+   * Lookup377: pallet_transaction_payment::Releases
    **/
   PalletTransactionPaymentReleases: {
     _enum: ['V1Ancient', 'V2']
   },
   /**
-   * Lookup379: pallet_utility::pallet::Error<T>
+   * Lookup378: pallet_utility::pallet::Error<T>
    **/
   PalletUtilityError: {
     _enum: ['TooManyCalls']
   },
   /**
-   * Lookup380: pallet_sudo::pallet::Error<T>
+   * Lookup379: pallet_sudo::pallet::Error<T>
    **/
   PalletSudoError: {
     _enum: ['RequireSudo']
   },
   /**
-   * Lookup383: frame_system::extensions::check_non_zero_sender::CheckNonZeroSender<T>
+   * Lookup382: frame_system::extensions::check_non_zero_sender::CheckNonZeroSender<T>
    **/
   FrameSystemExtensionsCheckNonZeroSender: 'Null',
   /**
-   * Lookup384: frame_system::extensions::check_spec_version::CheckSpecVersion<T>
+   * Lookup383: frame_system::extensions::check_spec_version::CheckSpecVersion<T>
    **/
   FrameSystemExtensionsCheckSpecVersion: 'Null',
   /**
-   * Lookup385: frame_system::extensions::check_tx_version::CheckTxVersion<T>
+   * Lookup384: frame_system::extensions::check_tx_version::CheckTxVersion<T>
    **/
   FrameSystemExtensionsCheckTxVersion: 'Null',
   /**
-   * Lookup386: frame_system::extensions::check_genesis::CheckGenesis<T>
+   * Lookup385: frame_system::extensions::check_genesis::CheckGenesis<T>
    **/
   FrameSystemExtensionsCheckGenesis: 'Null',
   /**
-   * Lookup389: frame_system::extensions::check_nonce::CheckNonce<T>
+   * Lookup388: frame_system::extensions::check_nonce::CheckNonce<T>
    **/
   FrameSystemExtensionsCheckNonce: 'Compact<u32>',
   /**
-   * Lookup390: frame_system::extensions::check_weight::CheckWeight<T>
+   * Lookup389: frame_system::extensions::check_weight::CheckWeight<T>
    **/
   FrameSystemExtensionsCheckWeight: 'Null',
   /**
-   * Lookup391: pallet_transaction_payment::ChargeTransactionPayment<T>
+   * Lookup390: pallet_transaction_payment::ChargeTransactionPayment<T>
    **/
   PalletTransactionPaymentChargeTransactionPayment: 'Compact<u128>',
   /**
-   * Lookup392: frame_metadata_hash_extension::CheckMetadataHash<T>
+   * Lookup391: frame_metadata_hash_extension::CheckMetadataHash<T>
    **/
   FrameMetadataHashExtensionCheckMetadataHash: {
     mode: 'FrameMetadataHashExtensionMode'
   },
   /**
-   * Lookup393: frame_metadata_hash_extension::Mode
+   * Lookup392: frame_metadata_hash_extension::Mode
    **/
   FrameMetadataHashExtensionMode: {
     _enum: ['Disabled', 'Enabled']
   },
   /**
-   * Lookup395: argon_node_runtime::Runtime
+   * Lookup394: argon_node_runtime::Runtime
    **/
   ArgonNodeRuntimeRuntime: 'Null'
 };

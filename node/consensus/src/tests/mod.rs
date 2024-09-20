@@ -20,7 +20,7 @@ use argon_primitives::{
 	block_seal::{BlockSealAuthorityId, BLOCK_SEAL_KEY_TYPE},
 	localchain::BlockVote,
 	tick::Ticker,
-	BestBlockVoteSeal, DataDomain, DataTLD, MerkleProof, TickApis,
+	BestBlockVoteSeal, MerkleProof, TickApis,
 };
 
 use crate::{
@@ -307,8 +307,6 @@ async fn can_run_proof_of_tax() {
 		let vote = BlockVote {
 			block_hash: grandparent_hash,
 			account_id: account_id.clone(),
-			data_domain_hash: DataDomain::new("delta", DataTLD::Flights).hash(),
-			data_domain_account: Keyring::Alice.to_account_id(),
 			power: 500,
 			index: 1,
 			signature: Signature::from_raw([0; 64]).into(),

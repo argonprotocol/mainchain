@@ -36,9 +36,9 @@ pub mod pallet {
 		notebook::NotebookNumber,
 		tick::Tick,
 		AuthorityProvider, BlockSealAuthoritySignature, BlockSealEventHandler, BlockSealerInfo,
-		BlockSealerProvider, BlockVotingKey, BlockVotingProvider, DataDomainProvider, MerkleProof,
-		NotaryId, NotaryNotebookVotes, NotebookProvider, ParentVotingKeyDigest, TickProvider,
-		VotingKey, AUTHOR_DIGEST_ID, ESCROW_CLAWBACK_TICKS, PARENT_VOTING_KEY_DIGEST,
+		BlockSealerProvider, BlockVotingKey, BlockVotingProvider, MerkleProof, NotaryId,
+		NotaryNotebookVotes, NotebookProvider, ParentVotingKeyDigest, TickProvider, VotingKey,
+		AUTHOR_DIGEST_ID, PARENT_VOTING_KEY_DIGEST,
 	};
 
 	use super::*;
@@ -66,8 +66,6 @@ pub mod pallet {
 		type BlockVotingProvider: BlockVotingProvider<Self::Block>;
 
 		type TickProvider: TickProvider<Self::Block>;
-
-		type DataDomainProvider: DataDomainProvider<Self::AccountId>;
 
 		/// Emit events when a block seal is read
 		type EventHandler: BlockSealEventHandler;
@@ -130,10 +128,6 @@ pub mod pallet {
 		IneligibleNotebookUsed,
 		/// The lookup to verify a vote's authenticity is not available for the given block
 		NoEligibleVotingRoot,
-		/// The data domain was not registered
-		UnregisteredDataDomain,
-		/// The data domain account is mismatched with the block reward seeker
-		InvalidDataDomainAccount,
 		/// Message was not signed by a registered miner
 		InvalidAuthoritySignature,
 		/// Could not decode the scale bytes of the votes
@@ -377,20 +371,6 @@ pub mod pallet {
 			ensure!(
 				authority_id.verify(&message, &signature),
 				Error::<T>::InvalidAuthoritySignature
-			);
-			let data_domain_hash = &block_vote.data_domain_hash;
-			let data_domain_account =
-				T::AccountId::decode(&mut block_vote.data_domain_account.encode().as_slice())
-					.map_err(|_| Error::<T>::UnableToDecodeVoteAccount)?;
-			let last_tick =
-				votes_from_tick.saturating_sub(T::TickProvider::ticker().escrow_expiration_ticks);
-			ensure!(
-				T::DataDomainProvider::is_registered_payment_account(
-					data_domain_hash,
-					&data_domain_account,
-					(last_tick.saturating_sub(ESCROW_CLAWBACK_TICKS), last_tick)
-				),
-				Error::<T>::InvalidDataDomainAccount
 			);
 			ensure!(
 				block_vote.signature.verify(&block_vote.hash()[..], &block_vote.account_id),

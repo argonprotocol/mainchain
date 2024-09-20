@@ -343,7 +343,6 @@ mod tests {
 			&ticker,
 			result.tick,
 			origin.clone(),
-			domain_hash,
 			Alice.to_account_id(),
 		)
 		.await?;
@@ -706,16 +705,11 @@ mod tests {
 		ticker: &Ticker,
 		tick: Tick,
 		account_origin: AccountOrigin,
-		domain_hash: DataDomainHash,
 		domain_account: AccountId,
 	) -> anyhow::Result<(Note, BalanceChangeResult)> {
 		let hold_note = Note::create(
 			amount,
-			NoteType::EscrowHold {
-				recipient: domain_account,
-				data_domain_hash: Some(domain_hash),
-				delegated_signer: None,
-			},
+			NoteType::EscrowHold { recipient: domain_account, delegated_signer: None },
 		);
 		let changes = vec![BalanceChange {
 			account_id: Bob.to_account_id(),
@@ -748,11 +742,6 @@ mod tests {
 		vote_block_hash: HashOutput,
 		bob_balance_proof: BalanceProof,
 	) -> anyhow::Result<BalanceChangeResult> {
-		let (data_domain_hash, recipient) = match hold_note.note_type.clone() {
-			NoteType::EscrowHold { recipient, data_domain_hash, delegated_signer: None } =>
-				(data_domain_hash, recipient),
-			_ => panic!("Should be an escrow hold note"),
-		};
 		let tax = (hold_note.milligons as f64 * 0.2f64) as u128;
 		let changes = vec![
 			BalanceChange {
@@ -804,8 +793,6 @@ mod tests {
 			ticker,
 			changes,
 			vec![BlockVote {
-				data_domain_hash: data_domain_hash.unwrap(),
-				data_domain_account: recipient,
 				account_id: Alice.to_account_id(),
 				index: 1,
 				block_hash: vote_block_hash,

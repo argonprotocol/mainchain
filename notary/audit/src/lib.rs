@@ -93,7 +93,7 @@ pub fn notebook_verify<T: NotebookHistoryLookup>(
 		verify_changeset_signatures(changeset)?;
 		verify_balance_sources(lookup, &mut state, header, changeset)?;
 		track_block_votes(&mut state, block_votes)?;
-		verify_voting_sources(&state.escrow_data_domains, block_votes, vote_minimums)?;
+		verify_voting_sources(block_votes, vote_minimums)?;
 	}
 
 	ensure!(
@@ -138,7 +138,6 @@ struct NotebookVerifyState {
 	block_votes: BTreeMap<(AccountId, u32), BlockVote>,
 	seen_transfers_in: BTreeSet<(AccountId, TransferToLocalchainId)>,
 	new_account_origins: BTreeMap<LocalchainAccountId, AccountOriginUid>,
-	escrow_data_domains: BTreeMap<(DataDomainHash, AccountId), u32>,
 	blocks_voted_on: BTreeSet<H256>,
 	block_power: u128,
 	tax: u128,
@@ -276,19 +275,6 @@ fn verify_balance_sources<T: NotebookHistoryLookup>(
 				},
 				// this condition is redundant, but leaving for clarity
 				NoteType::EscrowSettle => {
-					if let Some(hold_note) = &change.escrow_hold_note {
-						match &hold_note.note_type {
-							NoteType::EscrowHold { data_domain_hash, recipient, .. } =>
-								if let Some(data_domain_hash) = data_domain_hash {
-									let count = state
-										.escrow_data_domains
-										.entry((*data_domain_hash, recipient.clone()))
-										.or_insert(0);
-									*count += 1u32;
-								},
-							_ => return Err(VerifyError::InvalidEscrowHoldNote),
-						}
-					}
 					escrow_hold_note = None;
 				},
 				_ => {},
@@ -338,11 +324,9 @@ fn verify_balance_sources<T: NotebookHistoryLookup>(
 }
 
 pub fn verify_voting_sources(
-	escrow_data_domains: &BTreeMap<(DataDomainHash, AccountId), u32>,
 	block_votes: &Vec<BlockVote>,
 	vote_minimums: &BTreeMap<H256, VoteMinimum>,
 ) -> anyhow::Result<(), VerifyError> {
-	let mut data_domain_tracker = escrow_data_domains.clone();
 	for block_vote in block_votes {
 		let minimum = vote_minimums
 			.get(&block_vote.block_hash)
@@ -350,15 +334,10 @@ pub fn verify_voting_sources(
 
 		ensure!(block_vote.power >= *minimum, VerifyError::InsufficientBlockVoteMinimum);
 
-		let count = data_domain_tracker
-			.get_mut(&(block_vote.data_domain_hash, block_vote.data_domain_account.clone()))
-			.ok_or(VerifyError::BlockVoteDataDomainMismatch)?;
-		ensure!(*count > 0, VerifyError::BlockVoteEscrowReused);
 		ensure!(
 			block_vote.signature.verify(&block_vote.hash()[..], &block_vote.account_id),
 			VerifyError::BlockVoteInvalidSignature
 		);
-		*count -= 1;
 	}
 	Ok(())
 }

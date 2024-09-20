@@ -1274,8 +1274,6 @@ pub mod napi_ext {
         block_hash: H256::from_slice(self.block_hash.as_slice()),
         index: self.index,
         power,
-        data_domain_hash: H256::from_slice(self.data_domain_hash.as_slice()),
-        data_domain_account: AccountStore::parse_address(&self.data_domain_address)?,
         block_rewards_account_id: AccountStore::parse_address(&self.block_rewards_address)?,
         signature: MultiSignature::decode(&mut self.signature.as_slice())?,
       })

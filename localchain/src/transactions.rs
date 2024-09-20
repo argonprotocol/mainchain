@@ -115,7 +115,6 @@ impl Transactions {
     &self,
     escrow_milligons: Balance,
     recipient_address: String,
-    data_domain: Option<String>,
     notary_id: Option<u32>,
     delegated_signer_address: Option<String>,
   ) -> Result<OpenEscrow> {
@@ -138,24 +137,13 @@ impl Transactions {
       .add_account_by_id(jump_account.local_account_id)
       .await?;
 
-    if let Some(data_domain) = data_domain {
-      balance_change
-        .create_escrow_hold(
-          escrow_milligons,
-          data_domain,
-          recipient_address,
-          delegated_signer_address,
-        )
-        .await?;
-    } else {
-      balance_change
-        .create_private_server_escrow_hold(
-          escrow_milligons,
-          recipient_address,
-          delegated_signer_address,
-        )
-        .await?;
-    }
+    balance_change
+      .create_escrow_hold(
+        escrow_milligons,
+        recipient_address,
+        delegated_signer_address,
+      )
+      .await?;
     escrow_notarization.notarize().await?;
 
     let escrow = OpenEscrowsStore::new(
@@ -247,7 +235,6 @@ pub mod napi_ext {
       &self,
       escrow_milligons: BigInt,
       recipient_address: String,
-      data_domain: Option<String>,
       notary_id: Option<u32>,
       delegated_signer_address: Option<String>,
     ) -> napi::Result<OpenEscrow> {
@@ -255,7 +242,6 @@ pub mod napi_ext {
         .create_escrow(
           escrow_milligons.get_u128().1,
           recipient_address,
-          data_domain,
           notary_id,
           delegated_signer_address,
         )

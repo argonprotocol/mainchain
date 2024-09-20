@@ -14,7 +14,7 @@ use sp_runtime::BoundedVec;
 
 #[cfg(feature = "std")]
 use crate::serialize_unsafe_u128_as_string;
-use crate::{AccountId, DataDomainHash, TransferToLocalchainId, ADDRESS_PREFIX};
+use crate::{AccountId, TransferToLocalchainId, ADDRESS_PREFIX};
 
 #[derive(
 	Clone,
@@ -130,8 +130,6 @@ pub enum NoteType {
 	EscrowHold {
 		/// The account id of the recipient
 		recipient: AccountId,
-		/// The data domain that this escrow is created for
-		data_domain_hash: Option<DataDomainHash>,
 		/// Delegate signing permissions to another account
 		delegated_signer: Option<AccountId>,
 	},
@@ -178,11 +176,10 @@ impl Display for NoteType {
 			NoteType::SendToVote => {
 				write!(f, "SendToVote")
 			},
-			NoteType::EscrowHold { data_domain_hash, recipient, delegated_signer } => {
+			NoteType::EscrowHold { recipient, delegated_signer } => {
 				write!(
 					f,
-					"EscrowHold(data_domain_hash: {:?}, recipient: {:?}, delegated_signer: {:?})",
-					data_domain_hash,
+					"EscrowHold(recipient: {:?}, delegated_signer: {:?})",
 					recipient.to_ss58check_with_version(Ss58AddressFormat::from(ADDRESS_PREFIX)),
 					delegated_signer
 						.as_ref()

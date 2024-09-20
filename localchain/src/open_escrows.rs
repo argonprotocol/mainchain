@@ -55,7 +55,6 @@ pub struct Escrow {
   pub from_address: String,
   pub delegated_signer_address: Option<String>,
   pub to_address: String,
-  pub data_domain_hash: Option<Vec<u8>>,
   pub expiration_tick: u32,
   pub balance_change_number: u32,
   pub notarization_id: Option<i64>,
@@ -117,12 +116,11 @@ impl Escrow {
       );
     }
 
-    let (recipient, data_domain_hash, delegated_signer) = match &escrow_hold_note.note_type {
+    let (recipient, delegated_signer) = match &escrow_hold_note.note_type {
       NoteType::EscrowHold {
         recipient,
-        data_domain_hash,
         delegated_signer,
-      } => (recipient, data_domain_hash, delegated_signer),
+      } => (recipient, delegated_signer),
       _ => {
         bail!(
           "Balance change has invalid escrow hold note type {:?}",
@@ -166,7 +164,6 @@ impl Escrow {
       to_address: AccountStore::to_address(recipient),
       delegated_signer_address: delegated_signer.as_ref().map(AccountStore::to_address),
       balance_change_number: balance_change.change_number,
-      data_domain_hash: data_domain_hash.map(|h| h.0.to_vec()).clone(),
       notary_id: proof.notary_id,
       expiration_tick: 0,
       settled_amount: settle_note.milligons,
@@ -552,12 +549,11 @@ impl OpenEscrowsStore {
       account.address
     ))?;
 
-    let (data_domain_hash, recipient, delegated_signer) = match &hold_note.note_type {
+    let (recipient, delegated_signer) = match &hold_note.note_type {
       NoteType::EscrowHold {
         recipient,
-        data_domain_hash,
         delegated_signer,
-      } => (data_domain_hash, recipient, delegated_signer),
+      } => (recipient, delegated_signer),
       _ => {
         bail!(
           "Balance change has invalid escrow hold note type {:?}",
@@ -587,7 +583,6 @@ impl OpenEscrowsStore {
       from_address: account.address,
       delegated_signer_address: delegated_signer.as_ref().map(AccountStore::to_address),
       to_address: AccountStore::to_address(recipient),
-      data_domain_hash: data_domain_hash.map(|h| h.0.to_vec()).clone(),
       notary_id: *notary_id,
       expiration_tick: tick + self.ticker.escrow_expiration_ticks(),
       settled_amount: MINIMUM_ESCROW_SETTLEMENT,
@@ -735,7 +730,6 @@ mod tests {
     account: &LocalAccount,
     localchain_transfer_amount: u128,
     hold_amount: u128,
-    data_domain: String,
     recipient: String,
     notebook_number: NotebookNumber,
     tick: Tick,
@@ -754,12 +748,7 @@ mod tests {
       })
       .await?;
     builder
-      .create_escrow_hold(
-        hold_amount,
-        data_domain,
-        recipient.clone(),
-        delegated_signer,
-      )
+      .create_escrow_hold(hold_amount, recipient.clone(), delegated_signer)
       .await?;
 
     let balance_change = builder.inner().await;
@@ -820,7 +809,6 @@ mod tests {
       &bob_account,
       20_000,
       1_000,
-      "delta.flights".to_string(),
       alice_address.clone(),
       1,
       1,
@@ -889,7 +877,6 @@ mod tests {
       &bob_account,
       20_000,
       1_000,
-      "delta.flights".to_string(),
       alice_address.clone(),
       1,
       1,
@@ -973,7 +960,6 @@ mod tests {
       &bob_account,
       20_000,
       1_000,
-      "delta.flights".to_string(),
       alice_address.clone(),
       1,
       1,
@@ -1019,10 +1005,6 @@ mod tests {
       sent_escrow.settled_signature
     );
     assert_eq!(imported_escrow.hold_amount, sent_escrow.hold_amount);
-    assert_eq!(
-      imported_escrow.data_domain_hash,
-      sent_escrow.data_domain_hash
-    );
     assert_eq!(imported_escrow.notary_id, sent_escrow.notary_id);
     assert_eq!(
       imported_escrow.balance_change_number,
@@ -1093,13 +1075,7 @@ mod tests {
     );
 
     let escrow = transactions
-      .create_escrow(
-        800u128,
-        not_alice.clone(),
-        Some("delta.flights".to_string()),
-        None,
-        None,
-      )
+      .create_escrow(800u128, not_alice.clone(), None, None)
       .await?;
     let json = escrow.export_for_send().await?;
 

@@ -393,7 +393,6 @@ impl pallet_block_seal::Config for Runtime {
 	type NotebookProvider = Notebook;
 	type BlockVotingProvider = BlockSealSpec;
 	type TickProvider = Ticks;
-	type DataDomainProvider = DataDomain;
 	type EventHandler = MiningSlot;
 }
 

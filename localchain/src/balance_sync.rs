@@ -536,20 +536,6 @@ impl BalanceSync {
       return Ok(());
     }
 
-    let escrows = notarization.escrows().await;
-    let Some((data_domain_hash, data_domain_address)) = escrows.into_iter().find_map(|c| {
-      if c.is_client {
-        return None;
-      }
-      if let Some(domain) = c.data_domain_hash {
-        Some((domain, c.to_address))
-      } else {
-        None
-      }
-    }) else {
-      return Ok(());
-    };
-
     let mut tax_account = None;
     for (_, (account, tax)) in tax_accounts {
       let balance_change = notarization.get_balance_change(&account).await?;
@@ -570,8 +556,6 @@ impl BalanceSync {
     let mut vote = BlockVote {
       account_id: tax_account.get_account_id32()?,
       power: total_available_tax,
-      data_domain_hash: H256::from_slice(data_domain_hash.as_ref()),
-      data_domain_account: AccountStore::parse_address(&data_domain_address)?,
       index: tick_counter.1,
       block_hash: H256::from_slice(best_block_for_vote.block_hash.as_ref()),
       block_rewards_account_id: AccountStore::parse_address(&vote_address)?,

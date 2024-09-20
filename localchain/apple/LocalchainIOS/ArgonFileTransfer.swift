@@ -221,7 +221,6 @@ struct NoteType: Codable {
   var accountNonce: UInt32?
   var to: [String]?
   var recipient: String?
-  var dataDomainHash: String?
 }
 
 @propertyWrapper

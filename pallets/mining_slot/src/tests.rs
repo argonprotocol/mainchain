@@ -23,8 +23,7 @@ use crate::{
 use argon_primitives::{
 	block_seal::{MiningAuthority, MiningRegistration, RewardDestination, RewardSharing},
 	inherents::BlockSealInherent,
-	AuthorityProvider, BlockRewardAccountsProvider, BlockSealAuthorityId, BlockVote, DataDomain,
-	DataTLD, MerkleProof,
+	AuthorityProvider, BlockRewardAccountsProvider, BlockSealAuthorityId, BlockVote, MerkleProof,
 };
 
 #[test]
@@ -950,8 +949,6 @@ fn create_block_vote_seal(seal_strength: U256) -> BlockSealInherent {
 		notary_id: 1,
 		block_vote: BlockVote {
 			block_hash: System::block_hash(System::block_number().saturating_sub(4)),
-			data_domain_hash: DataDomain::new("test", DataTLD::Bikes).hash(),
-			data_domain_account: AccountId32::from_slice(&[0u8; 32]).expect("32 bytes"),
 			account_id: AccountId32::from_slice(&[2u8; 32]).expect("32 bytes"),
 			index: 1,
 			power: 500,

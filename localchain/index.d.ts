@@ -45,8 +45,7 @@ export class BalanceChangeBuilder {
   claimEscrow(amount: bigint): Promise<ClaimResult>
   claimFromMainchain(transfer: LocalchainTransfer): Promise<void>
   sendToMainchain(amount: bigint): Promise<void>
-  createEscrowHold(amount: bigint, dataDomain: string, dataDomainAddress: string, delegatedSignerAddress?: string | undefined | null): Promise<void>
-  createPrivateServerEscrowHold(amount: bigint, paymentAddress: string, delegatedSignerAddress?: string | undefined | null): Promise<void>
+  createEscrowHold(amount: bigint, paymentAddress: string, delegatedSignerAddress?: string | undefined | null): Promise<void>
   sendToVote(amount: bigint): Promise<void>
   /** Lease a data domain. DataDomain leases are converted in full to tax. */
   leaseDataDomain(): Promise<bigint>
@@ -111,7 +110,6 @@ export class Escrow {
   fromAddress: string
   delegatedSignerAddress?: string
   toAddress: string
-  dataDomainHash?: Array<number>
   expirationTick: number
   balanceChangeNumber: number
   notarizationId?: number
@@ -188,7 +186,7 @@ export class MainchainClient {
   getDataDomainZoneRecord(domainName: string, tld: DataTLD): Promise<ZoneRecord | null>
   getNotaryDetails(notaryId: number): Promise<NotaryDetails | null>
   getAccount(address: string): Promise<AccountInfo>
-  getShares(address: string): Promise<BalancesAccountData>
+  getOwnership(address: string): Promise<BalancesAccountData>
   getTransferToLocalchainFinalizedBlock(transferId: number): Promise<number | null>
   waitForLocalchainTransfer(transferId: number): Promise<LocalchainTransfer | null>
   getAccountChangesRoot(notaryId: number, notebookNumber: number): Promise<Uint8Array | null>
@@ -311,7 +309,7 @@ export class TickerRef {
 export class Transactions {
   create(transactionType: TransactionType): Promise<LocalchainTransaction>
   request(milligons: bigint): Promise<string>
-  createEscrow(escrowMilligons: bigint, recipientAddress: string, dataDomain?: string | undefined | null, notaryId?: number | undefined | null, delegatedSignerAddress?: string | undefined | null): Promise<OpenEscrow>
+  createEscrow(escrowMilligons: bigint, recipientAddress: string, notaryId?: number | undefined | null, delegatedSignerAddress?: string | undefined | null): Promise<OpenEscrow>
   send(milligons: bigint, to?: Array<string> | undefined | null): Promise<string>
   importArgons(argonFile: string): Promise<NotarizationTracker>
   acceptArgonRequest(argonFile: string): Promise<NotarizationTracker>

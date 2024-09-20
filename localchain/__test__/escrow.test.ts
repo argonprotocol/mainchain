@@ -59,7 +59,7 @@ describeIntegration("Escrow integration", () => {
     }, 120e3);
 
 
-    it('can run a data domain escrow', async () => {
+    it('can create an escrow from a data domain registration', async () => {
         let mainchain = new TestMainchain();
         const mainchainUrl = await mainchain.launch();
         const notary = new TestNotary();
@@ -131,7 +131,7 @@ describeIntegration("Escrow integration", () => {
 
         const bobEscrowHold = bobchain.beginChange();
         const change = await bobEscrowHold.addAccountById(jumpAccount.localAccountId);
-        await change.createEscrowHold(5000n, "example.Analytics", zoneRecord.paymentAddress);
+        await change.createEscrowHold(5000n, zoneRecord.paymentAddress);
         const holdTracker = await bobEscrowHold.notarizeAndWaitForNotebook();
 
         const clientEscrow = await bobchain.openEscrows.openClientEscrow(jumpAccount.localAccountId);

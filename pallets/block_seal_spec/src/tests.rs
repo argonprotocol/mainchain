@@ -13,7 +13,7 @@ use argon_primitives::{
 	notary::NotaryNotebookVoteDigestDetails,
 	notebook::{NotebookHeader, NotebookNumber},
 	tick::Tick,
-	DataDomain, DataTLD, MerkleProof, NotaryId, NotebookEventHandler,
+	MerkleProof, NotaryId, NotebookEventHandler,
 };
 
 use crate::{
@@ -274,8 +274,6 @@ fn it_doesnt_adjust_difficulty_if_tax_block() {
 			notary_id: 1,
 			block_vote: BlockVote {
 				block_hash: System::block_hash(System::block_number().saturating_sub(4)),
-				data_domain_account: AccountId32::new([0u8; 32]),
-				data_domain_hash: DataDomain::new("test", DataTLD::Automotive).hash(),
 				account_id: AccountId32::new([0u8; 32]),
 				index: 1,
 				power: 500,

@@ -11,7 +11,7 @@ use crate::stores::{
 };
 use argon_notary_apis::{error::Error, localchain::BalanceChangeResult};
 use argon_notary_audit::{
-	verify_changeset_signatures, verify_notarization_allocation, verify_voting_sources, VerifyError,
+	verify_changeset_signatures, verify_notarization_allocation, verify_voting_sources,
 };
 use argon_primitives::{
 	ensure, tick::Ticker, AccountId, AccountOrigin, AccountType, BalanceChange, BalanceProof,
@@ -207,7 +207,6 @@ impl NotarizationsStore {
 		let mut new_account_origins = BTreeMap::<LocalchainAccountId, AccountOrigin>::new();
 
 		let mut changes_with_proofs = changes.clone();
-		let mut escrow_data_domains = BTreeMap::new();
 		let mut chain_transfers: u32 = 0;
 		for (change_index, change) in changes.into_iter().enumerate() {
 			let change_index = change_index as u32;
@@ -347,18 +346,6 @@ impl NotarizationsStore {
 					},
 					NoteType::EscrowSettle => {
 						escrow_hold_note = None;
-						if let Some(hold_note) = &prev_escrow_hold_note {
-							match &hold_note.note_type {
-								NoteType::EscrowHold { data_domain_hash, recipient, .. } =>
-									if let Some(data_domain_hash) = data_domain_hash {
-										let count = escrow_data_domains
-											.entry((*data_domain_hash, recipient.clone()))
-											.or_insert(0);
-										*count += 1;
-									},
-								_ => return Err(VerifyError::InvalidEscrowHoldNote.into()),
-							}
-						}
 						Ok(())
 					},
 					_ => Ok(()),
@@ -386,7 +373,7 @@ impl NotarizationsStore {
 			.await?;
 		}
 
-		verify_voting_sources(&escrow_data_domains, &block_votes, &block_vote_specifications)?;
+		verify_voting_sources(&block_votes, &block_vote_specifications)?;
 
 		NotebookConstraintsStore::try_increment(
 			&mut tx,
@@ -478,8 +465,6 @@ mod tests {
 			power: 1222,
 			account_id: Bob.to_account_id(),
 			index: 0,
-			data_domain_hash: DataDomain::new("test", DataTLD::Analytics).hash(),
-			data_domain_account: Bob.to_account_id(),
 			block_rewards_account_id: Bob.to_account_id(),
 			signature: Signature::from_raw([0u8; 64]).into(),
 		}

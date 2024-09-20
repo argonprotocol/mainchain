@@ -21,9 +21,9 @@ use argon_primitives::{
 	balance_change::{AccountOrigin, BalanceChange, BalanceProof},
 	note::{Note, NoteType},
 	tick::Tick,
-	AccountType, Balance, BalanceTip, BlockVote, ChainTransfer, DataDomain, DataTLD,
-	LocalchainAccountId, MerkleProof, MultiSignatureBytes, NewAccountOrigin, Notarization,
-	Notebook, NotebookHeader, NotebookNumber, TransferToLocalchainId,
+	AccountType, Balance, BalanceTip, BlockVote, ChainTransfer, LocalchainAccountId, MerkleProof,
+	MultiSignatureBytes, NewAccountOrigin, Notarization, Notebook, NotebookHeader, NotebookNumber,
+	TransferToLocalchainId,
 };
 
 use super::notebook_verify;
@@ -621,11 +621,7 @@ fn test_cannot_remove_lock_between_changesets_in_a_notebook() {
 		escrow_hold_note: None,
 		notes: bounded_vec![Note::create(
 			1000,
-			NoteType::EscrowHold {
-				recipient: Bob.to_account_id(),
-				data_domain_hash: None,
-				delegated_signer: None
-			}
+			NoteType::EscrowHold { recipient: Bob.to_account_id(), delegated_signer: None }
 		)],
 		signature: empty_signature(),
 	}
@@ -716,11 +712,7 @@ fn test_cannot_remove_lock_between_changesets_in_a_notebook() {
 			escrow_hold_note: None,
 			notes: bounded_vec![Note::create(
 				1000,
-				NoteType::EscrowHold {
-					recipient: Ferdie.to_account_id(),
-					data_domain_hash: None,
-					delegated_signer: None
-				}
+				NoteType::EscrowHold { recipient: Ferdie.to_account_id(), delegated_signer: None }
 			)],
 			signature: empty_signature(),
 		}
@@ -764,11 +756,7 @@ fn test_cannot_remove_lock_between_changesets_in_a_notebook() {
 			}),
 			escrow_hold_note: Some(Note::create(
 				1000,
-				NoteType::EscrowHold {
-					recipient: Bob.to_account_id(),
-					data_domain_hash: None,
-					delegated_signer: None,
-				},
+				NoteType::EscrowHold { recipient: Bob.to_account_id(), delegated_signer: None },
 			)),
 			notes: bounded_vec![Note::create(0, NoteType::EscrowSettle)],
 			signature: empty_signature(),
@@ -802,8 +790,6 @@ fn test_cannot_remove_lock_between_changesets_in_a_notebook() {
 
 #[test]
 fn test_votes_must_add_up() {
-	let data_domain = DataDomain::new("test", DataTLD::Flights);
-
 	let notebook_1_tips = vec![
 		BalanceTip {
 			account_id: Alice.to_account_id(),
@@ -818,11 +804,7 @@ fn test_votes_must_add_up() {
 			account_type: AccountType::Deposit,
 			escrow_hold_note: Some(Note::create(
 				500,
-				NoteType::EscrowHold {
-					recipient: Alice.to_account_id(),
-					data_domain_hash: Some(data_domain.hash()),
-					delegated_signer: None,
-				},
+				NoteType::EscrowHold { recipient: Alice.to_account_id(), delegated_signer: None },
 			)),
 			balance: 500,
 			change_number: 1,
@@ -833,11 +815,7 @@ fn test_votes_must_add_up() {
 			account_type: AccountType::Deposit,
 			escrow_hold_note: Some(Note::create(
 				500,
-				NoteType::EscrowHold {
-					recipient: Alice.to_account_id(),
-					data_domain_hash: Some(data_domain.hash()),
-					delegated_signer: None,
-				},
+				NoteType::EscrowHold { recipient: Alice.to_account_id(), delegated_signer: None },
 			)),
 			balance: 500,
 			change_number: 1,
@@ -876,7 +854,6 @@ fn test_votes_must_add_up() {
 						500,
 						NoteType::EscrowHold {
 							recipient: Alice.to_account_id(),
-							data_domain_hash: Some(data_domain.hash()),
 							delegated_signer: None
 						}
 					)),
@@ -902,7 +879,6 @@ fn test_votes_must_add_up() {
 						500,
 						NoteType::EscrowHold {
 							recipient: Alice.to_account_id(),
-							data_domain_hash: Some(data_domain.hash()),
 							delegated_signer: None
 						}
 					)),
@@ -964,8 +940,6 @@ fn test_votes_must_add_up() {
 					power: 4,
 					block_hash: vote_block_hash,
 					account_id: Alice.to_account_id(),
-					data_domain_hash: data_domain.hash(),
-					data_domain_account: Ferdie.to_account_id(),
 					block_rewards_account_id: Alice.to_account_id(),
 					signature: Signature::from_raw([0u8; 64]).into(),
 				}
@@ -976,12 +950,10 @@ fn test_votes_must_add_up() {
 					power: 30,
 					block_hash: vote_block_hash,
 					account_id: Alice.to_account_id(),
-					data_domain_hash: data_domain.hash(),
-					data_domain_account: Alice.to_account_id(),
 					block_rewards_account_id: Alice.to_account_id(),
 					signature: Signature::from_raw([0u8; 64]).into(),
 				}
-				.sign(Alice.pair())
+				.sign(Bob.pair())
 				.clone(),
 			],
 			vec![]
@@ -1076,13 +1048,12 @@ fn test_votes_must_add_up() {
 	);
 	let minimums = BTreeMap::from([(vote_block_hash, 2)]);
 
-	// 2. One of the votes didn't match the payment account
+	// 2. One of the votes had the wrong signature
 	assert_err!(
 		notebook_verify(&TestLookup, &notebook, &minimums, 2,),
-		VerifyError::BlockVoteDataDomainMismatch
+		VerifyError::BlockVoteInvalidSignature
 	);
-	notebook.notarizations[0].block_votes[0].data_domain_account = Alice.to_account_id();
-	notebook.notarizations[0].block_votes[0].sign(Alice.pair());
+	notebook.notarizations[0].block_votes[1].sign(Alice.pair());
 
 	// 3. Once vote minimums are allowed, the "vote root is wrong"
 	assert_err!(

@@ -1,11 +1,11 @@
 use crate::{
 	mock::{DataDomain as DataDomainPallet, *},
-	pallet::{DomainPaymentAddressHistory, ExpiringDomainsByBlock, RegisteredDataDomains},
+	pallet::{ExpiringDomainsByBlock, RegisteredDataDomains},
 	DataDomainRegistration, Error, Event,
 };
 use argon_primitives::{
-	notebook::NotebookHeader, tick::Tick, AccountId, DataDomain, DataDomainHash,
-	DataDomainProvider, DataTLD, NotebookEventHandler, Semver, VersionHost, ZoneRecord,
+	notebook::NotebookHeader, tick::Tick, AccountId, DataDomain, DataDomainHash, DataTLD,
+	NotebookEventHandler, Semver, VersionHost, ZoneRecord,
 };
 use frame_support::{assert_err, assert_ok, traits::Hooks};
 use sp_keyring::AccountKeyring::{Alice, Bob};
@@ -138,10 +138,6 @@ fn it_registers_zone_records() {
 			domain,
 			zone.clone()
 		));
-		assert_eq!(
-			DomainPaymentAddressHistory::<Test>::get(domain).to_vec(),
-			vec![(Bob.to_account_id(), 2 as Tick)]
-		);
 		System::assert_last_event(
 			Event::ZoneRecordUpdated { domain_hash: domain, zone_record: zone.clone() }.into(),
 		);
@@ -163,62 +159,6 @@ fn it_registers_zone_records() {
 			),
 			Error::<Test>::DomainNotRegistered
 		);
-	});
-}
-
-#[test]
-fn it_tracks_historical_payment() {
-	new_test_ext().execute_with(|| {
-		System::set_block_number(1);
-		CurrentTick::set(2);
-		let domain =
-			DataDomain { top_level_domain: DataTLD::Analytics, domain_name: "test".into() }.hash();
-		DataDomainPallet::notebook_submitted(&create_notebook(
-			1,
-			vec![(domain, Bob.to_account_id())],
-		));
-
-		let mut zone = ZoneRecord {
-			payment_account: Bob.to_account_id(),
-			notary_id: 1,
-			versions: BTreeMap::new(),
-		};
-
-		assert_ok!(DataDomainPallet::set_zone_record(
-			RuntimeOrigin::signed(Bob.to_account_id()),
-			domain,
-			zone.clone()
-		));
-		assert_eq!(
-			DomainPaymentAddressHistory::<Test>::get(domain).to_vec(),
-			vec![(Bob.to_account_id(), 2 as Tick)]
-		);
-		CurrentTick::set(4);
-		zone.payment_account = Alice.to_account_id();
-		assert_ok!(DataDomainPallet::set_zone_record(
-			RuntimeOrigin::signed(Bob.to_account_id()),
-			domain,
-			zone.clone()
-		));
-		assert_eq!(
-			DomainPaymentAddressHistory::<Test>::get(domain).to_vec(),
-			vec![(Bob.to_account_id(), 2 as Tick), (Alice.to_account_id(), 4 as Tick)]
-		);
-		assert!(DataDomainPallet::is_registered_payment_account(
-			&domain,
-			&Bob.to_account_id(),
-			(2, 3)
-		));
-		assert!(!DataDomainPallet::is_registered_payment_account(
-			&domain,
-			&Bob.to_account_id(),
-			(4, 5)
-		));
-		assert!(DataDomainPallet::is_registered_payment_account(
-			&domain,
-			&Alice.to_account_id(),
-			(4, 5)
-		));
 	});
 }
 

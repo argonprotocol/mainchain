@@ -212,7 +212,6 @@ declare module '@polkadot/api-base/types/storage' {
       transfersUsedInBlockNotebooks: AugmentedQuery<ApiType, (arg: u32 | AnyNumber | Uint8Array) => Observable<Vec<ITuple<[AccountId32, u32]>>>, [u32]>;
     };
     dataDomain: {
-      domainPaymentAddressHistory: AugmentedQuery<ApiType, (arg: H256 | string | Uint8Array) => Observable<Vec<ITuple<[AccountId32, u32]>>>, [H256]>;
       expiringDomainsByBlock: AugmentedQuery<ApiType, (arg: u32 | AnyNumber | Uint8Array) => Observable<Vec<H256>>, [u32]>;
       registeredDataDomains: AugmentedQuery<ApiType, (arg: H256 | string | Uint8Array) => Observable<Option<PalletDataDomainDataDomainRegistration>>, [H256]>;
       zoneRecordsByDomain: AugmentedQuery<ApiType, (arg: H256 | string | Uint8Array) => Observable<Option<ArgonPrimitivesDataDomainZoneRecord>>, [H256]>;

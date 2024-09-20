@@ -172,12 +172,6 @@ pub enum VerifyError {
 
 	#[snafu(display("Minimums were not met for a block vote"))]
 	InsufficientBlockVoteMinimum,
-
-	#[snafu(display("Invalid block vote data domain or account"))]
-	BlockVoteDataDomainMismatch,
-
-	#[snafu(display("Block vote escrow reused"))]
-	BlockVoteEscrowReused,
 }
 
 impl From<AccountHistoryLookupError> for VerifyError {

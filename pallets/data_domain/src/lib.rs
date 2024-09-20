@@ -27,8 +27,8 @@ pub mod weights;
 #[frame_support::pallet(dev_mode)]
 pub mod pallet {
 	use argon_primitives::{
-		notebook::NotebookHeader, DataDomainHash, DataDomainProvider, NotebookEventHandler,
-		TickProvider, ZoneRecord, MAX_DOMAINS_PER_NOTEBOOK, MAX_NOTARIES,
+		notebook::NotebookHeader, DataDomainHash, NotebookEventHandler, TickProvider, ZoneRecord,
+		MAX_DOMAINS_PER_NOTEBOOK, MAX_NOTARIES,
 	};
 	use frame_support::{pallet_prelude::*, traits::Len};
 	use frame_system::pallet_prelude::*;
@@ -61,15 +61,6 @@ pub mod pallet {
 	#[pallet::storage]
 	pub(super) type ZoneRecordsByDomain<T: Config> =
 		StorageMap<_, Blake2_128Concat, DataDomainHash, ZoneRecord<T::AccountId>, OptionQuery>;
-
-	#[pallet::storage]
-	pub(super) type DomainPaymentAddressHistory<T: Config> = StorageMap<
-		_,
-		Blake2_128Concat,
-		DataDomainHash,
-		BoundedVec<(T::AccountId, Tick), T::HistoricalPaymentAddressTicksToKeep>,
-		ValueQuery,
-	>;
 
 	#[pallet::storage]
 	pub(super) type ExpiringDomainsByBlock<T: Config> = StorageMap<
@@ -131,7 +122,6 @@ pub mod pallet {
 			for domain_hash in expiring {
 				RegisteredDataDomains::<T>::remove(domain_hash);
 				ZoneRecordsByDomain::<T>::remove(domain_hash);
-				Self::clean_old_payment_addresses(&domain_hash, tick);
 				Self::deposit_event(Event::DataDomainExpired { domain_hash });
 			}
 
@@ -156,12 +146,6 @@ pub mod pallet {
 			ensure!(registration.account_id == who, Error::<T>::NotDomainOwner);
 
 			ZoneRecordsByDomain::<T>::insert(domain_hash, &zone_record);
-			let tick = T::TickProvider::current_tick();
-			Self::clean_old_payment_addresses(&domain_hash, tick);
-			DomainPaymentAddressHistory::<T>::try_mutate(domain_hash, |entry| {
-				entry.try_push((zone_record.payment_account.clone(), tick))
-			})
-			.map_err(|_| Error::<T>::FailedToAddToAddressHistory)?;
 			Self::deposit_event(Event::ZoneRecordUpdated { domain_hash, zone_record });
 
 			Ok(())
@@ -238,43 +222,6 @@ pub mod pallet {
 					});
 				}
 			}
-		}
-	}
-
-	impl<T: Config> Pallet<T> {
-		fn clean_old_payment_addresses(domain_hash: &DataDomainHash, current_tick: Tick) {
-			let oldest_history_to_preserve =
-				current_tick.saturating_sub(T::HistoricalPaymentAddressTicksToKeep::get());
-			DomainPaymentAddressHistory::<T>::mutate_exists(domain_hash, |entry| {
-				if let Some(records) = entry {
-					records.retain(|(_, tick)| tick >= &oldest_history_to_preserve);
-					if records.is_empty() {
-						*entry = None;
-					}
-				}
-			});
-		}
-	}
-
-	impl<T: Config> DataDomainProvider<T::AccountId> for Pallet<T> {
-		fn is_registered_payment_account(
-			data_domain_hash: &DataDomainHash,
-			account_id: &T::AccountId,
-			tick_range: (Tick, Tick),
-		) -> bool {
-			if let Some(zone) = ZoneRecordsByDomain::<T>::get(data_domain_hash) {
-				if zone.payment_account == *account_id {
-					return true;
-				}
-			}
-
-			for (addr, tick) in <DomainPaymentAddressHistory<T>>::get(data_domain_hash) {
-				if addr == *account_id && tick >= tick_range.0 && tick <= tick_range.1 {
-					return true;
-				}
-			}
-
-			false
 		}
 	}
 }

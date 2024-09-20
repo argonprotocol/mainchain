@@ -11,8 +11,8 @@ use argon_primitives::{
 	block_vote::VoteMinimum,
 	notebook::NotebookNumber,
 	tick::{Tick, Ticker},
-	AuthorityProvider, BlockVotingProvider, DataDomainHash, DataDomainProvider, HashOutput,
-	NotaryId, NotebookProvider, NotebookSecret, TickProvider,
+	AuthorityProvider, BlockVotingProvider, DataDomainHash, HashOutput, NotaryId, NotebookProvider,
+	NotebookSecret, TickProvider,
 };
 
 type Block = frame_system::mocking::MockBlock<Test>;
@@ -97,16 +97,6 @@ impl BlockVotingProvider<Block> for StaticBlockVotingProvider {
 		GrandpaVoteMinimum::get()
 	}
 }
-pub struct StaticDataDomainProvider;
-impl DataDomainProvider<u64> for StaticDataDomainProvider {
-	fn is_registered_payment_account(
-		data_domain_hash: &DataDomainHash,
-		_account_id: &u64,
-		_tick_range: (Tick, Tick),
-	) -> bool {
-		RegisteredDataDomains::get().contains(data_domain_hash)
-	}
-}
 impl pallet_block_seal::Config for Test {
 	type WeightInfo = ();
 	type AuthorityId = BlockSealAuthorityId;
@@ -114,7 +104,6 @@ impl pallet_block_seal::Config for Test {
 	type NotebookProvider = StaticNotebookProvider;
 	type BlockVotingProvider = StaticBlockVotingProvider;
 	type TickProvider = StaticTickProvider;
-	type DataDomainProvider = StaticDataDomainProvider;
 	type EventHandler = ();
 }
 

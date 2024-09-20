@@ -11,8 +11,7 @@ use sp_keyring::{
 use argon_primitives::{
 	balance_change::{AccountOrigin, BalanceChange, BalanceProof},
 	note::{Note, NoteType},
-	AccountType, BlockVote, DataDomain, DataTLD, LocalchainAccountId, MultiSignatureBytes,
-	ESCROW_CLAWBACK_TICKS,
+	AccountType, BlockVote, LocalchainAccountId, MultiSignatureBytes, ESCROW_CLAWBACK_TICKS,
 };
 
 use crate::{
@@ -269,11 +268,7 @@ fn test_sending_to_mainchain() {
 fn test_can_lock_with_a_escrow_note() -> anyhow::Result<()> {
 	let escrow_note = Note::create(
 		250,
-		NoteType::EscrowHold {
-			recipient: Alice.to_account_id(),
-			data_domain_hash: None,
-			delegated_signer: None,
-		},
+		NoteType::EscrowHold { recipient: Alice.to_account_id(), delegated_signer: None },
 	);
 	let balance_change = BalanceChange {
 		account_id: Bob.to_account_id(),
@@ -453,11 +448,7 @@ fn test_with_note_claim_signatures() {
 	};
 	balance_change.push_note(
 		250,
-		NoteType::EscrowHold {
-			recipient: Alice.to_account_id(),
-			data_domain_hash: None,
-			delegated_signer: None,
-		},
+		NoteType::EscrowHold { recipient: Alice.to_account_id(), delegated_signer: None },
 	);
 	balance_change.sign(Bob.pair());
 
@@ -507,7 +498,6 @@ fn test_with_delegated_note_claim_signatures() {
 			250,
 			NoteType::EscrowHold {
 				recipient: Alice.to_account_id(),
-				data_domain_hash: None,
 				delegated_signer: Some(Charlie.to_account_id()),
 			},
 		)),
@@ -759,8 +749,6 @@ fn verify_tax_votes() {
 		block_hash: H256::zero(),
 		index: 0,
 		power: 20_000,
-		data_domain_hash: H256::random(),
-		data_domain_account: Alice.to_account_id(),
 		block_rewards_account_id: Bob.to_account_id(),
 		signature: Signature::from_raw([0u8; 64]).into(),
 	}
@@ -778,16 +766,12 @@ fn verify_tax_votes() {
 fn test_vote_sources() {
 	let vote_block_hash = H256::from([1u8; 32]);
 
-	let jobs_domain = DataDomain::new("Monster", DataTLD::Jobs);
-	let jobs_domain_author = Alice.to_account_id();
 	let mut votes = vec![
 		BlockVote {
 			account_id: Bob.to_account_id(),
 			block_hash: vote_block_hash,
 			index: 0,
 			power: 20_000,
-			data_domain_hash: jobs_domain.hash(),
-			data_domain_account: jobs_domain_author.clone(),
 			block_rewards_account_id: Bob.to_account_id(),
 			signature: Signature::from_raw([0u8; 64]).into(),
 		}
@@ -798,8 +782,6 @@ fn test_vote_sources() {
 			block_hash: vote_block_hash,
 			index: 1,
 			power: 400,
-			data_domain_hash: jobs_domain.hash(),
-			data_domain_account: jobs_domain_author.clone(),
 			block_rewards_account_id: Bob.to_account_id(),
 			signature: Signature::from_raw([0u8; 64]).into(),
 		}
@@ -810,42 +792,16 @@ fn test_vote_sources() {
 	let vote_minimums = BTreeMap::from([(vote_block_hash, 500)]);
 
 	assert_err!(
-		verify_voting_sources(&BTreeMap::new(), &votes, &vote_minimums),
-		VerifyError::BlockVoteDataDomainMismatch
-	);
-
-	assert_err!(
-		verify_voting_sources(
-			&BTreeMap::from([((jobs_domain.hash(), jobs_domain_author.clone()), 1)]),
-			&votes,
-			&vote_minimums
-		),
+		verify_voting_sources(&votes, &vote_minimums),
 		VerifyError::InsufficientBlockVoteMinimum
 	);
 
 	votes[1].power = 500;
 	assert_err!(
-		verify_voting_sources(
-			&BTreeMap::from([((jobs_domain.hash(), Bob.to_account_id()), 1)]),
-			&votes,
-			&vote_minimums
-		),
-		VerifyError::BlockVoteDataDomainMismatch
-	);
-
-	assert_err!(
-		verify_voting_sources(
-			&BTreeMap::from([((jobs_domain.hash(), jobs_domain_author.clone()), 2)]),
-			&votes,
-			&vote_minimums
-		),
+		verify_voting_sources(&votes, &vote_minimums),
 		VerifyError::BlockVoteInvalidSignature
 	);
 
 	votes[1].sign(Bob.pair());
-	assert_ok!(verify_voting_sources(
-		&BTreeMap::from([((jobs_domain.hash(), jobs_domain_author), 2)]),
-		&votes,
-		&vote_minimums
-	),);
+	assert_ok!(verify_voting_sources(&votes, &vote_minimums),);
 }

@@ -1,6 +1,6 @@
 use argon_primitives::{
-  AccountId, AccountType, Balance, BalanceChange, DataDomain, DataDomainHash, MultiSignatureBytes,
-  Note, NoteType, DATA_DOMAIN_LEASE_COST, MINIMUM_ESCROW_SETTLEMENT,
+  AccountId, AccountType, Balance, BalanceChange, MultiSignatureBytes, Note, NoteType,
+  DATA_DOMAIN_LEASE_COST, MINIMUM_ESCROW_SETTLEMENT,
 };
 use lazy_static::lazy_static;
 use sp_core::bounded_vec::BoundedVec;
@@ -215,36 +215,6 @@ impl BalanceChangeBuilder {
   pub async fn create_escrow_hold(
     &self,
     amount: Balance,
-    data_domain: String,
-    data_domain_address: String,
-    delegated_signer_address: Option<String>,
-  ) -> Result<()> {
-    let domain: DataDomain = DataDomain::parse(data_domain)?;
-    self
-      .internal_create_escrow_hold(
-        amount,
-        Some(domain.hash()),
-        data_domain_address,
-        delegated_signer_address,
-      )
-      .await
-  }
-
-  pub async fn create_private_server_escrow_hold(
-    &self,
-    amount: Balance,
-    payment_address: String,
-    delegated_signer_address: Option<String>,
-  ) -> Result<()> {
-    self
-      .internal_create_escrow_hold(amount, None, payment_address, delegated_signer_address)
-      .await
-  }
-
-  async fn internal_create_escrow_hold(
-    &self,
-    amount: Balance,
-    data_domain_hash: Option<DataDomainHash>,
     payment_address: String,
     delegated_signer_address: Option<String>,
   ) -> Result<()> {
@@ -276,7 +246,6 @@ impl BalanceChangeBuilder {
     balance_change.push_note(
       amount,
       NoteType::EscrowHold {
-        data_domain_hash,
         recipient: AccountStore::parse_address(&payment_address)?,
         delegated_signer: match delegated_signer_address {
           Some(address) => Some(AccountStore::parse_address(&address)?),
@@ -442,30 +411,11 @@ pub mod napi_ext {
     pub async fn create_escrow_hold_napi(
       &self,
       amount: BigInt,
-      data_domain: String,
-      data_domain_address: String,
-      delegated_signer_address: Option<String>,
-    ) -> napi::Result<()> {
-      self
-        .create_escrow_hold(
-          amount.get_u128().1,
-          data_domain,
-          data_domain_address,
-          delegated_signer_address,
-        )
-        .await
-        .napi_ok()
-    }
-
-    #[napi(js_name = "createPrivateServerEscrowHold")]
-    pub async fn create_private_server_escrow_hold_napi(
-      &self,
-      amount: BigInt,
       payment_address: String,
       delegated_signer_address: Option<String>,
     ) -> napi::Result<()> {
       self
-        .create_private_server_escrow_hold(
+        .create_escrow_hold(
           amount.get_u128().1,
           payment_address,
           delegated_signer_address,
@@ -582,7 +532,7 @@ mod test {
   #[tokio::test]
   async fn test_escrow_hold() {
     let address = AccountStore::to_address(&Bob.to_account_id());
-    let data_domain_author = AccountStore::to_address(&Alice.to_account_id());
+    let payment_address = AccountStore::to_address(&Alice.to_account_id());
     let builder =
       BalanceChangeBuilder::new_account(address.clone(), 1, AccountType::Deposit).unwrap();
     builder
@@ -597,12 +547,7 @@ mod test {
       .unwrap();
 
     builder
-      .create_escrow_hold(
-        1_000u128,
-        "test.flights".to_string(),
-        data_domain_author.clone(),
-        None,
-      )
+      .create_escrow_hold(1_000u128, payment_address.clone(), None)
       .await
       .unwrap();
 
@@ -614,11 +559,7 @@ mod test {
     let alice = Alice.to_account_id();
 
     match &balance_change.notes[1].note_type {
-      NoteType::EscrowHold {
-        data_domain_hash: _,
-        recipient,
-        ..
-      } => assert_eq!(recipient, &alice),
+      NoteType::EscrowHold { recipient, .. } => assert_eq!(recipient, &alice),
       _ => unreachable!(),
     };
   }
