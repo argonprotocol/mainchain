@@ -1,8 +1,15 @@
 # Changelog
 
-## [v0.0.4](https://github.com/argonprotocol/mainchain/compare/v0.0.3...HEAD) (2024-09-06)
+## [v0.0.5](https://github.com/argonprotocol/mainchain/compare/v0.0.4...a3d6e64d476bc78f0e38b6580103799a5db1af00) (2024-09-21)
 
-### Features
+### Fixes
+
+* don’t require data domain for votes
+([714e3b0](https://github.com/argonprotocol/mainchain/commit/714e3b045c3e2bbe448f88d0ceaa976a54016094))
+
+### [v0.0.4](https://github.com/argonprotocol/mainchain/compare/v0.0.3...v0.0.4) (2024-09-06)
+
+#### Features
 
 * **bitcoin:** cli commands to store vault xpriv
 ([fd1694b](https://github.com/argonprotocol/mainchain/commit/fd1694b3db0e5ecbbb7c427054b6e964bca8ea17))
