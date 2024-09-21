@@ -621,7 +621,11 @@ fn test_cannot_remove_lock_between_changesets_in_a_notebook() {
 		channel_hold_note: None,
 		notes: bounded_vec![Note::create(
 			1000,
-			NoteType::ChannelHold { recipient: Bob.to_account_id(), delegated_signer: None }
+			NoteType::ChannelHold {
+				recipient: Bob.to_account_id(),
+				delegated_signer: None,
+				domain_hash: None
+			}
 		)],
 		signature: empty_signature(),
 	}
@@ -712,7 +716,11 @@ fn test_cannot_remove_lock_between_changesets_in_a_notebook() {
 			channel_hold_note: None,
 			notes: bounded_vec![Note::create(
 				1000,
-				NoteType::ChannelHold { recipient: Ferdie.to_account_id(), delegated_signer: None }
+				NoteType::ChannelHold {
+					recipient: Ferdie.to_account_id(),
+					delegated_signer: None,
+					domain_hash: None
+				}
 			)],
 			signature: empty_signature(),
 		}
@@ -756,7 +764,11 @@ fn test_cannot_remove_lock_between_changesets_in_a_notebook() {
 			}),
 			channel_hold_note: Some(Note::create(
 				1000,
-				NoteType::ChannelHold { recipient: Bob.to_account_id(), delegated_signer: None },
+				NoteType::ChannelHold {
+					recipient: Bob.to_account_id(),
+					delegated_signer: None,
+					domain_hash: None,
+				},
 			)),
 			notes: bounded_vec![Note::create(0, NoteType::ChannelHoldSettle)],
 			signature: empty_signature(),
@@ -804,7 +816,11 @@ fn test_votes_must_add_up() {
 			account_type: AccountType::Deposit,
 			channel_hold_note: Some(Note::create(
 				500,
-				NoteType::ChannelHold { recipient: Alice.to_account_id(), delegated_signer: None },
+				NoteType::ChannelHold {
+					recipient: Alice.to_account_id(),
+					delegated_signer: None,
+					domain_hash: None,
+				},
 			)),
 			balance: 500,
 			change_number: 1,
@@ -815,7 +831,11 @@ fn test_votes_must_add_up() {
 			account_type: AccountType::Deposit,
 			channel_hold_note: Some(Note::create(
 				500,
-				NoteType::ChannelHold { recipient: Alice.to_account_id(), delegated_signer: None },
+				NoteType::ChannelHold {
+					recipient: Alice.to_account_id(),
+					delegated_signer: None,
+					domain_hash: None,
+				},
 			)),
 			balance: 500,
 			change_number: 1,
@@ -854,7 +874,8 @@ fn test_votes_must_add_up() {
 						500,
 						NoteType::ChannelHold {
 							recipient: Alice.to_account_id(),
-							delegated_signer: None
+							delegated_signer: None,
+							domain_hash: None
 						}
 					)),
 					account_type: AccountType::Deposit,
@@ -879,7 +900,8 @@ fn test_votes_must_add_up() {
 						500,
 						NoteType::ChannelHold {
 							recipient: Alice.to_account_id(),
-							delegated_signer: None
+							delegated_signer: None,
+							domain_hash: None
 						}
 					)),
 					account_type: AccountType::Deposit,

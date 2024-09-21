@@ -131,7 +131,7 @@ describeIntegration("ChannelHold integration", () => {
 
         const bobChannelHold = bobchain.beginChange();
         const change = await bobChannelHold.addAccountById(jumpAccount.localAccountId);
-        await change.createChannelHold(5000n, zoneRecord.paymentAddress);
+        await change.createChannelHold(5000n, zoneRecord.paymentAddress, "example.Analytics",);
         const holdTracker = await bobChannelHold.notarizeAndWaitForNotebook();
 
         const clientChannelHold = await bobchain.openChannelHolds.openClientChannelHold(jumpAccount.localAccountId);

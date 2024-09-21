@@ -268,7 +268,11 @@ fn test_sending_to_mainchain() {
 fn test_can_lock_with_a_channel_hold_note() -> anyhow::Result<()> {
 	let channel_hold_note = Note::create(
 		250,
-		NoteType::ChannelHold { recipient: Alice.to_account_id(), delegated_signer: None },
+		NoteType::ChannelHold {
+			recipient: Alice.to_account_id(),
+			delegated_signer: None,
+			domain_hash: None,
+		},
 	);
 	let balance_change = BalanceChange {
 		account_id: Bob.to_account_id(),
@@ -449,7 +453,11 @@ fn test_with_note_claim_signatures() {
 	};
 	balance_change.push_note(
 		250,
-		NoteType::ChannelHold { recipient: Alice.to_account_id(), delegated_signer: None },
+		NoteType::ChannelHold {
+			recipient: Alice.to_account_id(),
+			delegated_signer: None,
+			domain_hash: None,
+		},
 	);
 	balance_change.sign(Bob.pair());
 
@@ -500,6 +508,7 @@ fn test_with_delegated_note_claim_signatures() {
 			NoteType::ChannelHold {
 				recipient: Alice.to_account_id(),
 				delegated_signer: Some(Charlie.to_account_id()),
+				domain_hash: None,
 			},
 		)),
 		signature: empty_signature(),

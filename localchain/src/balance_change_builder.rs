@@ -1,5 +1,5 @@
 use argon_primitives::{
-  AccountId, AccountType, Balance, BalanceChange, MultiSignatureBytes, Note, NoteType,
+  AccountId, AccountType, Balance, BalanceChange, Domain, MultiSignatureBytes, Note, NoteType,
   DOMAIN_LEASE_COST, MINIMUM_CHANNEL_HOLD_SETTLEMENT,
 };
 use lazy_static::lazy_static;
@@ -216,8 +216,14 @@ impl BalanceChangeBuilder {
     &self,
     amount: Balance,
     payment_address: String,
+    domain: Option<String>,
     delegated_signer_address: Option<String>,
   ) -> Result<()> {
+    let domain_hash = if let Some(domain) = domain {
+      Some(Domain::parse(domain)?.hash())
+    } else {
+      None
+    };
     let mut balance_change = self.balance_change.lock().await;
     if balance_change.account_type != AccountType::Deposit {
       bail!(
@@ -251,6 +257,7 @@ impl BalanceChangeBuilder {
           Some(address) => Some(AccountStore::parse_address(&address)?),
           None => None,
         },
+        domain_hash,
       },
     );
     Ok(())
@@ -412,12 +419,14 @@ pub mod napi_ext {
       &self,
       amount: BigInt,
       payment_address: String,
+      domain: Option<String>,
       delegated_signer_address: Option<String>,
     ) -> napi::Result<()> {
       self
         .create_channel_hold(
           amount.get_u128().1,
           payment_address,
+          domain,
           delegated_signer_address,
         )
         .await
@@ -547,7 +556,12 @@ mod test {
       .unwrap();
 
     builder
-      .create_channel_hold(1_000u128, payment_address.clone(), None)
+      .create_channel_hold(
+        1_000u128,
+        payment_address.clone(),
+        Some("test.flights".to_string()),
+        None,
+      )
       .await
       .unwrap();
 

@@ -709,7 +709,11 @@ mod tests {
 	) -> anyhow::Result<(Note, BalanceChangeResult)> {
 		let hold_note = Note::create(
 			amount,
-			NoteType::ChannelHold { recipient: domain_account, delegated_signer: None },
+			NoteType::ChannelHold {
+				recipient: domain_account,
+				delegated_signer: None,
+				domain_hash: None,
+			},
 		);
 		let changes = vec![BalanceChange {
 			account_id: Bob.to_account_id(),

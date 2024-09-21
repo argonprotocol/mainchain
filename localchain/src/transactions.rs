@@ -115,6 +115,7 @@ impl Transactions {
     &self,
     channel_hold_milligons: Balance,
     recipient_address: String,
+    domain: Option<String>,
     notary_id: Option<u32>,
     delegated_signer_address: Option<String>,
   ) -> Result<OpenChannelHold> {
@@ -142,6 +143,7 @@ impl Transactions {
         channel_hold_milligons,
         recipient_address,
         delegated_signer_address,
+        domain,
       )
       .await?;
     channel_hold_notarization.notarize().await?;
@@ -235,6 +237,7 @@ pub mod napi_ext {
       &self,
       channel_hold_milligons: BigInt,
       recipient_address: String,
+      domain: Option<String>,
       notary_id: Option<u32>,
       delegated_signer_address: Option<String>,
     ) -> napi::Result<OpenChannelHold> {
@@ -242,6 +245,7 @@ pub mod napi_ext {
         .create_channel_hold(
           channel_hold_milligons.get_u128().1,
           recipient_address,
+          domain,
           notary_id,
           delegated_signer_address,
         )

@@ -55,6 +55,7 @@ pub struct ChannelHold {
   pub from_address: String,
   pub delegated_signer_address: Option<String>,
   pub to_address: String,
+  pub domain_hash: Option<Vec<u8>>,
   pub expiration_tick: u32,
   pub balance_change_number: u32,
   pub notarization_id: Option<i64>,
@@ -116,11 +117,12 @@ impl ChannelHold {
       );
     }
 
-    let (recipient, delegated_signer) = match &channel_hold_note.note_type {
+    let (recipient, delegated_signer, domain_hash) = match &channel_hold_note.note_type {
       NoteType::ChannelHold {
         recipient,
         delegated_signer,
-      } => (recipient, delegated_signer),
+        domain_hash,
+      } => (recipient, delegated_signer, domain_hash),
       _ => {
         bail!(
           "Balance change has invalid channel hold note type {:?}",
@@ -164,6 +166,7 @@ impl ChannelHold {
       to_address: AccountStore::to_address(recipient),
       delegated_signer_address: delegated_signer.as_ref().map(AccountStore::to_address),
       balance_change_number: balance_change.change_number,
+      domain_hash: domain_hash.map(|h| h.0.to_vec()).clone(),
       notary_id: proof.notary_id,
       expiration_tick: 0,
       settled_amount: settle_note.milligons,
@@ -567,11 +570,12 @@ impl OpenChannelHoldsStore {
       account.address
     ))?;
 
-    let (recipient, delegated_signer) = match &hold_note.note_type {
+    let (recipient, delegated_signer, domain_hash) = match &hold_note.note_type {
       NoteType::ChannelHold {
         recipient,
         delegated_signer,
-      } => (recipient, delegated_signer),
+        domain_hash,
+      } => (recipient, delegated_signer, domain_hash),
       _ => {
         bail!(
           "Balance change has invalid channel hold note type {:?}",
@@ -601,6 +605,7 @@ impl OpenChannelHoldsStore {
       from_address: account.address,
       delegated_signer_address: delegated_signer.as_ref().map(AccountStore::to_address),
       to_address: AccountStore::to_address(recipient),
+      domain_hash: domain_hash.map(|h| h.0.to_vec()).clone(),
       notary_id: *notary_id,
       expiration_tick: tick + self.ticker.channel_hold_expiration_ticks(),
       settled_amount: MINIMUM_CHANNEL_HOLD_SETTLEMENT,
@@ -758,6 +763,7 @@ mod tests {
     account: &LocalAccount,
     localchain_transfer_amount: u128,
     hold_amount: u128,
+    domain: Option<String>,
     recipient: String,
     notebook_number: NotebookNumber,
     tick: Tick,
@@ -776,7 +782,7 @@ mod tests {
       })
       .await?;
     builder
-      .create_channel_hold(hold_amount, recipient.clone(), delegated_signer)
+      .create_channel_hold(hold_amount, recipient.clone(), domain, delegated_signer)
       .await?;
 
     let balance_change = builder.inner().await;
@@ -837,6 +843,7 @@ mod tests {
       &bob_account,
       20_000,
       1_000,
+      Some("delta.flights".to_string()),
       alice_address.clone(),
       1,
       1,
@@ -913,6 +920,7 @@ mod tests {
       &bob_account,
       20_000,
       1_000,
+      Some("delta.flights".to_string()),
       alice_address.clone(),
       1,
       1,
@@ -999,6 +1007,7 @@ mod tests {
       &bob_account,
       20_000,
       1_000,
+      Some("delta.flights".to_string()),
       alice_address.clone(),
       1,
       1,
@@ -1061,6 +1070,10 @@ mod tests {
     assert_eq!(
       imported_channel_hold.hold_amount,
       sent_channel_hold.hold_amount
+    );
+    assert_eq!(
+      imported_channel_hold.domain_hash,
+      sent_channel_hold.domain_hash
     );
     assert_eq!(imported_channel_hold.notary_id, sent_channel_hold.notary_id);
     assert_eq!(
@@ -1138,7 +1151,7 @@ mod tests {
     );
 
     let channel_hold = transactions
-      .create_channel_hold(800u128, not_alice.clone(), None, None)
+      .create_channel_hold(800u128, not_alice.clone(), None, None, None)
       .await?;
     let json = channel_hold.export_for_send().await?;
 

@@ -14,7 +14,7 @@ use sp_runtime::BoundedVec;
 
 #[cfg(feature = "std")]
 use crate::serialize_unsafe_u128_as_string;
-use crate::{AccountId, TransferToLocalchainId, ADDRESS_PREFIX};
+use crate::{AccountId, DomainHash, TransferToLocalchainId, ADDRESS_PREFIX};
 
 #[derive(
 	Clone,
@@ -132,6 +132,8 @@ pub enum NoteType {
 		recipient: AccountId,
 		/// Delegate signing permissions to another account
 		delegated_signer: Option<AccountId>,
+		/// Optional domain hash this channel is held for
+		domain_hash: Option<DomainHash>,
 	},
 	/// ChannelHold settlement note - applied to channel hold creator balance
 	ChannelHoldSettle,
@@ -176,15 +178,16 @@ impl Display for NoteType {
 			NoteType::SendToVote => {
 				write!(f, "SendToVote")
 			},
-			NoteType::ChannelHold { recipient, delegated_signer } => {
+			NoteType::ChannelHold { recipient, domain_hash, delegated_signer } => {
 				write!(
 					f,
-					"ChannelHold(recipient: {:?}, delegated_signer: {:?})",
+					"ChannelHold(recipient: {:?}, delegated_signer: {:?}, domain_hash: {:?})",
 					recipient.to_ss58check_with_version(Ss58AddressFormat::from(ADDRESS_PREFIX)),
 					delegated_signer
 						.as_ref()
 						.map(|a| a
-							.to_ss58check_with_version(Ss58AddressFormat::from(ADDRESS_PREFIX)))
+							.to_ss58check_with_version(Ss58AddressFormat::from(ADDRESS_PREFIX))),
+					domain_hash
 				)
 			},
 			NoteType::ChannelHoldSettle => {
