@@ -21,14 +21,15 @@ completed their task of sending or requesting funds.
 
 ### Tax
 
-Localchains must "pay" tax on transactions of either 20 centagons or 20% if < 20 centagons are exchanged. This tax is
+Localchains must "pay" tax on transactions of either 20 centagons or 20% if less than 1 argon is exchanged. This tax is
 moved to a "tax" account in the user's Localchain. It can be used to vote for which blocks to follow on the mainchain.
 
-### Escrows / Ulixee Datastores
+### Channel Holds / Ulixee Datastore Micropayments
 
-Escrows are a special type of Balance Change "note" that are used to escrow funds for high volume transactions. They are
-used by Ulixee Datastores to enable a p2p transaction for purchasing data by query. When an Escrow closes, it has the
-right to generate 20% of the funds as tax to be used for voting.
+ChannelHolds are a special type of Balance Change "note" that are used to set aside funds for high volume transactions.
+ChannelHolds can settle in increments of one milligon, but can be divided up further by micropayment implementers like
+Ulixee. In the case of Ulixee, per-query payments are allowed down to on millionth of an Argon. When a ChannelHold
+closes, it has the right to generate 20% of the funds as tax to be used for voting used to close blocks.
 
 ### Notarizations
 
@@ -41,7 +42,8 @@ Localchains have 3 types of transactions they can submit:
    change from the recipient. All funds must be allocated.
 2. `Block Votes`: Votes created through aggregated tax funds. These are used to vote on which block to follow in the
    mainchain.
-3. `Data Domains`: Localchains can register data domains that are used to route data requests to Ulixee Datastores.
+3. `Domains`: Localchains can register domains that are used to establish micropayment channel holds. They're used in
+   the Ulixee Data network to facilitate data query payments.
 
 The current implementation of Localchain uses a Sqlite database to track the state of balance changes. It must have an
 external source run a "sync" operation to get the latest state and proofs.
@@ -58,8 +60,8 @@ The Argon ecosystem is a stablecoin on top of bitcoin.
 Usage: argon-localchain [OPTIONS] <COMMAND>
 
 Commands:
-  sync          Sync the localchain proofs with the latest notebooks. This will also submit votes and close/claim escrows as needed
-  data-domains  Explore and manage data domains
+  sync          Sync the localchain proofs with the latest notebooks. This will also submit votes and close/claim ChannelHolds as needed
+  domains       Explore and manage Domains
   accounts      Manage local accounts
   transactions  Create and receive transactions
   help          Print this message or the help of the given subcommand(s)

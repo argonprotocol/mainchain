@@ -35,6 +35,7 @@ class LocalchainBridge: ObservableObject {
     let tickerConfig = TickerConfig(
       tickDurationMillis: 1_000,
       genesisUtcTime: fakeGenesis,
+      channelHoldExpirationTicks: 2,
       ntpPoolUrl: nil
     )
     localchain = try await Localchain.newWithoutMainchain(

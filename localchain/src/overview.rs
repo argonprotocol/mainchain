@@ -22,7 +22,7 @@ pub struct LocalchainOverview {
   pub balance: i128,
   /// The net pending balance change acceptance pending acceptance by another party
   pub pending_balance_change: i128,
-  /// Balance held in escrow
+  /// Balance held in channel_hold
   pub held_balance: i128,
   /// Tax accumulated for the account
   pub tax: i128,
@@ -243,7 +243,7 @@ impl OverviewStore {
       let notes = get_notes(&change);
       if let Some(note) = notes
         .iter()
-        .find(|n| matches!(n.note_type, NoteType::EscrowHold { .. }))
+        .find(|n| matches!(n.note_type, NoteType::ChannelHold { .. }))
       {
         overview.held_balance += note.milligons as i128;
         balance_change.hold_balance = note.milligons as i128;
@@ -326,10 +326,10 @@ impl OverviewStore {
         .find(|change| {
           if is_transaction {
             match group.transaction_type {
-              Some(TransactionType::OpenEscrow) => {
+              Some(TransactionType::OpenChannelHold) => {
                 return change.is_jump_account
                   && change.account_type == AccountType::Deposit
-                  && change.notes[0].starts_with("Escrow");
+                  && change.notes[0].starts_with("ChannelHold");
               }
               Some(TransactionType::Consolidation) => {
                 return !change.is_jump_account;
@@ -367,7 +367,7 @@ pub mod uniffi_ext {
     pub balance: String,
     /// The net pending balance change acceptance/confirmation
     pub pending_balance_change: String,
-    /// Balance held in escrow
+    /// Balance held in channel_hold
     pub held_balance: String,
     /// Tax accumulated for the account
     pub tax: String,
@@ -491,7 +491,7 @@ pub mod napi_ext {
     pub balance: BigInt,
     /// The net pending balance change acceptance/confirmation
     pub pending_balance_change: BigInt,
-    /// Balance held in escrow
+    /// Balance held in channel_hold
     pub held_balance: BigInt,
     /// Tax accumulated for the account
     pub tax: BigInt,

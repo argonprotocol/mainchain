@@ -436,7 +436,7 @@ fn it_can_audit_notebooks() {
 				change_number: 1,
 				balance: 2000,
 				account_origin: AccountOrigin { notebook_number: 1, account_uid: 1 },
-				escrow_hold_note: None,
+				channel_hold_note: None,
 			}
 			.encode()]),
 			changed_account_origins: bounded_vec![AccountOrigin {
@@ -451,7 +451,7 @@ fn it_can_audit_notebooks() {
 			secret_hash: H256::random(),
 			parent_secret: None,
 			block_votes_count: 0,
-			data_domains: Default::default(),
+			domains: Default::default(),
 		};
 		let header_hash = header.hash();
 
@@ -474,7 +474,7 @@ fn it_can_audit_notebooks() {
 						2000,
 						NoteType::ClaimFromMainchain { transfer_id: 1 },
 					)],
-					escrow_hold_note: None,
+					channel_hold_note: None,
 					signature: ed25519::Signature::from_raw([0u8; 64]).into(),
 				},],
 				vec![],
@@ -577,7 +577,7 @@ fn it_can_audit_notebooks_with_history() {
 			change_number: 1,
 			balance: 2000,
 			account_origin: AccountOrigin { notebook_number, account_uid: 1 },
-			escrow_hold_note: None,
+			channel_hold_note: None,
 		};
 
 		let changed_accounts_root = merkle_root::<Blake2Hasher, _>(vec![account_root.encode()]);
@@ -611,7 +611,7 @@ fn it_can_audit_notebooks_with_history() {
 						2000,
 						NoteType::ClaimFromMainchain { transfer_id: 1 },
 					)],
-					escrow_hold_note: None,
+					channel_hold_note: None,
 					signature: ed25519::Signature::from_raw([0u8; 64]).into(),
 				},],
 				vec![],
@@ -735,7 +735,7 @@ fn it_can_audit_notebooks_with_history() {
 				change_number: 2,
 				balance: 1000,
 				account_origin: AccountOrigin { notebook_number: 5, account_uid: 1 },
-				escrow_hold_note: None,
+				channel_hold_note: None,
 			}
 			.encode(),
 			BalanceTip {
@@ -744,7 +744,7 @@ fn it_can_audit_notebooks_with_history() {
 				change_number: 1,
 				balance: 200,
 				account_origin: AccountOrigin { notebook_number, account_uid: 2 },
-				escrow_hold_note: None,
+				channel_hold_note: None,
 			}
 			.encode(),
 			BalanceTip {
@@ -753,7 +753,7 @@ fn it_can_audit_notebooks_with_history() {
 				change_number: 1,
 				balance: 800,
 				account_origin: AccountOrigin { notebook_number, account_uid: 1 },
-				escrow_hold_note: None,
+				channel_hold_note: None,
 			}
 			.encode(),
 		]);
@@ -792,7 +792,7 @@ fn it_can_audit_notebooks_with_history() {
 						}),
 						change_number: 2,
 						notes: bounded_vec![Note::create(1000, NoteType::Send { to: None })],
-						escrow_hold_note: None,
+						channel_hold_note: None,
 						signature: ed25519::Signature::from_raw([0u8; 64]).into(),
 					},
 					BalanceChange {
@@ -805,7 +805,7 @@ fn it_can_audit_notebooks_with_history() {
 							Note::create(1000, NoteType::Claim),
 							Note::create(200, NoteType::Tax)
 						],
-						escrow_hold_note: None,
+						channel_hold_note: None,
 						signature: ed25519::Signature::from_raw([0u8; 64]).into(),
 					},
 					BalanceChange {
@@ -815,7 +815,7 @@ fn it_can_audit_notebooks_with_history() {
 						previous_balance_proof: None,
 						change_number: 1,
 						notes: bounded_vec![Note::create(200, NoteType::Claim)],
-						escrow_hold_note: None,
+						channel_hold_note: None,
 						signature: ed25519::Signature::from_raw([0u8; 64]).into(),
 					},
 				],
@@ -888,6 +888,6 @@ fn make_header(notebook_number: NotebookNumber, tick: Tick) -> NotebookHeader {
 		secret_hash: H256::random(),
 		parent_secret: None,
 		block_votes_count: 0,
-		data_domains: Default::default(),
+		domains: Default::default(),
 	}
 }

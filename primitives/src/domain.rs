@@ -8,53 +8,53 @@ use sp_crypto_hashing::blake2_256;
 use sp_debug_derive::RuntimeDebug;
 use sp_runtime::{BoundedBTreeMap, BoundedVec, RuntimeString};
 
-use crate::{data_tld::DataTLD, host::Host, NotaryId};
+use crate::{domain_top_level::DomainTopLevel, host::Host, NotaryId};
 
 pub const MAX_DATASTORE_VERSIONS: u32 = 25;
 
-pub const DATA_DOMAIN_LEASE_COST: u128 = 1_000;
+pub const DOMAIN_LEASE_COST: u128 = 1_000;
 
-pub const MIN_DATA_DOMAIN_NAME_LENGTH: usize = 2;
+pub const MIN_DOMAIN_NAME_LENGTH: usize = 2;
 
-pub type DataDomainHash = H256;
+pub type DomainHash = H256;
 
 #[derive(Clone, PartialEq, Eq, Encode, Decode, RuntimeDebug, TypeInfo, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
-pub struct DataDomain {
-	pub domain_name: RuntimeString,
-	pub top_level_domain: DataTLD,
+pub struct Domain {
+	pub name: RuntimeString,
+	pub top_level: DomainTopLevel,
 }
 
-impl DataDomain {
-	pub fn hash(&self) -> DataDomainHash {
+impl Domain {
+	pub fn hash(&self) -> DomainHash {
 		self.using_encoded(blake2_256).into()
 	}
 }
 
-impl PartialOrd for DataDomain {
+impl PartialOrd for Domain {
 	fn partial_cmp(&self, other: &Self) -> Option<Ordering> {
 		Some(self.cmp(other))
 	}
 }
 
-impl Ord for DataDomain {
+impl Ord for Domain {
 	fn cmp(&self, other: &Self) -> Ordering {
-		if self.top_level_domain != other.top_level_domain {
-			return self.top_level_domain.cmp(&other.top_level_domain);
+		if self.top_level != other.top_level {
+			return self.top_level.cmp(&other.top_level);
 		}
 
-		self.domain_name.as_ref().cmp(other.domain_name.as_ref())
+		self.name.as_ref().cmp(other.name.as_ref())
 	}
 }
 
-impl DataDomain {
-	pub fn new(domain_name: &'static str, top_level_domain: DataTLD) -> Self {
-		Self { domain_name: RuntimeString::Borrowed(domain_name), top_level_domain }
+impl Domain {
+	pub fn new(name: &'static str, top_level: DomainTopLevel) -> Self {
+		Self { name: RuntimeString::Borrowed(name), top_level }
 	}
 
 	#[cfg(feature = "std")]
-	pub fn from_string(domain_name: String, top_level_domain: DataTLD) -> Self {
-		Self { domain_name: RuntimeString::Owned(domain_name.to_lowercase()), top_level_domain }
+	pub fn from_string(name: String, top_level: DomainTopLevel) -> Self {
+		Self { name: RuntimeString::Owned(name.to_lowercase()), top_level }
 	}
 
 	#[cfg(feature = "std")]
@@ -63,21 +63,21 @@ impl DataDomain {
 		if parts.len() < 2 {
 			return Err("Invalid domain".to_string());
 		}
-		let tld = parts[1];
+		let top_level = parts[1];
 		let domain_name = parts[0].to_lowercase();
-		let tld_str = format!("\"{}\"", tld);
+		let tld_str = format!("\"{}\"", top_level);
 		let mut parsed_tld = serde_json::from_str(&tld_str).ok();
 		if parsed_tld.is_none() {
-			let tld_str = tld[0..1].to_uppercase() + &tld[1..];
+			let tld_str = top_level[0..1].to_uppercase() + &top_level[1..];
 			let tld_str = format!("\"{}\"", tld_str);
 			parsed_tld = serde_json::from_str(&tld_str).ok();
 		}
 		if parsed_tld.is_none() {
-			let tld_str = format!("\"{}\"", tld.to_lowercase());
+			let tld_str = format!("\"{}\"", top_level.to_lowercase());
 			parsed_tld = serde_json::from_str(&tld_str).ok();
 		}
 		let Some(parsed_tld) = parsed_tld else {
-			return Err("Invalid tld".to_string());
+			return Err("Invalid top_level".to_string());
 		};
 		Ok(Self::from_string(domain_name, parsed_tld))
 	}

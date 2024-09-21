@@ -6,7 +6,7 @@ use sp_core::{RuntimeDebug, H256};
 
 use argon_primitives::{
 	tick::Tick, AccountId, AccountOrigin, AccountType, NewAccountOrigin,
-	NotarizationBalanceChangeset, NotarizationBlockVotes, NotarizationDataDomains, NotebookNumber,
+	NotarizationBalanceChangeset, NotarizationBlockVotes, NotarizationDomains, NotebookNumber,
 };
 
 #[rpc(server, client, namespace = "localchain")]
@@ -16,7 +16,7 @@ pub trait LocalchainRpc {
 		&self,
 		balance_changeset: NotarizationBalanceChangeset,
 		block_votes: NotarizationBlockVotes,
-		data_domains: NotarizationDataDomains,
+		domains: NotarizationDomains,
 	) -> Result<BalanceChangeResult, ErrorObjectOwned>;
 
 	#[method(name = "getTip")]

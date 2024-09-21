@@ -18,7 +18,7 @@ export class BalanceChange {
   changeNumber: number
   balance: string
   netBalanceChange: string
-  escrowHoldNoteJson?: string
+  channelHoldNoteJson?: string
   notaryId: number
   notesJson: string
   proofJson?: string
@@ -42,14 +42,13 @@ export class BalanceChangeBuilder {
   isPendingClaim(): Promise<boolean>
   send(amount: bigint, restrictToAddresses?: Array<string> | undefined | null): Promise<void>
   claim(amount: bigint): Promise<ClaimResult>
-  claimEscrow(amount: bigint): Promise<ClaimResult>
+  claimChannelHold(amount: bigint): Promise<ClaimResult>
   claimFromMainchain(transfer: LocalchainTransfer): Promise<void>
   sendToMainchain(amount: bigint): Promise<void>
-  createEscrowHold(amount: bigint, dataDomain: string, dataDomainAddress: string, delegatedSignerAddress?: string | undefined | null): Promise<void>
-  createPrivateServerEscrowHold(amount: bigint, paymentAddress: string, delegatedSignerAddress?: string | undefined | null): Promise<void>
+  createChannelHold(amount: bigint, paymentAddress: string, domain?: string | undefined | null, delegatedSignerAddress?: string | undefined | null): Promise<void>
   sendToVote(amount: bigint): Promise<void>
-  /** Lease a data domain. DataDomain leases are converted in full to tax. */
-  leaseDataDomain(): Promise<bigint>
+  /** Lease a data domain. Domain leases are converted in full to tax. */
+  leaseDomain(): Promise<bigint>
   /** Create scale encoded signature message for the balance change. */
   static toSigningMessage(balanceChangeJson: string): Uint8Array
 }
@@ -64,17 +63,17 @@ export class BalanceChangeStore {
 
 export class BalanceSync {
   constructor(localchain: Localchain)
-  sync(options?: EscrowCloseOptions | undefined | null): Promise<BalanceSyncResult>
+  sync(options?: ChannelHoldCloseOptions | undefined | null): Promise<BalanceSyncResult>
   consolidateJumpAccounts(): Promise<Array<NotarizationTracker>>
   syncUnsettledBalances(): Promise<Array<BalanceChange>>
   syncMainchainTransfers(): Promise<Array<NotarizationTracker>>
   syncBalanceChange(balanceChange: BalanceChange): Promise<BalanceChange>
-  processPendingEscrows(options?: EscrowCloseOptions | undefined | null): Promise<Array<NotarizationBuilder>>
+  processPendingChannelHolds(options?: ChannelHoldCloseOptions | undefined | null): Promise<Array<NotarizationBuilder>>
 }
 
 export class BalanceSyncResult {
   get balanceChanges(): Array<BalanceChange>
-  get escrowNotarizations(): Array<NotarizationBuilder>
+  get channelHoldNotarizations(): Array<NotarizationBuilder>
   get mainchainTransfers(): Array<NotarizationTracker>
   get jumpAccountConsolidations(): Array<NotarizationTracker>
 }
@@ -85,33 +84,14 @@ export class BalanceTipResult {
   tick: number
 }
 
-export class DataDomainLease {
-  id: number
-  name: string
-  tld: string
-  registeredToAddress: string
-  notarizationId: number
-  registeredAtTick: number
-}
-export type DataDomainRow = DataDomainLease
-
-export class DataDomainStore {
-  static tldFromString(tld: string): DataTLD
-  get list(): Promise<Array<DataDomainLease>>
-  hashDomain(domain: JsDataDomain): Uint8Array
-  static getHash(domain: string): Uint8Array
-  static parse(domain: string): DataDomain
-  get(id: number): Promise<DataDomainLease>
-}
-
-export class Escrow {
+export class ChannelHold {
   id: string
   initialBalanceChangeJson: string
   notaryId: number
   fromAddress: string
   delegatedSignerAddress?: string
   toAddress: string
-  dataDomainHash?: Array<number>
+  domainHash?: Array<number>
   expirationTick: number
   balanceChangeNumber: number
   notarizationId?: number
@@ -121,6 +101,25 @@ export class Escrow {
   get settledAmount(): bigint
   get settledSignature(): Uint8Array
   isPastClaimPeriod(currentTick: number): boolean
+}
+
+export class DomainLease {
+  id: number
+  name: string
+  topLevel: string
+  registeredToAddress: string
+  notarizationId: number
+  registeredAtTick: number
+}
+export type DomainRow = DomainLease
+
+export class DomainStore {
+  static tldFromString(topLevel: string): DomainTopLevel
+  get list(): Promise<Array<DomainLease>>
+  hashDomain(domain: JsDomain): Uint8Array
+  static getHash(domain: string): Uint8Array
+  static parse(domain: string): Domain
+  get(id: number): Promise<DomainLease>
 }
 
 export class Keystore {
@@ -170,8 +169,8 @@ export class Localchain {
   get notaryClients(): NotaryClients
   get accounts(): AccountStore
   get balanceChanges(): BalanceChangeStore
-  get dataDomains(): DataDomainStore
-  get openEscrows(): OpenEscrowsStore
+  get domains(): DomainStore
+  get openChannelHolds(): OpenChannelHoldsStore
   get balanceSync(): BalanceSync
   get transactions(): Transactions
   beginChange(): NotarizationBuilder
@@ -184,11 +183,11 @@ export class MainchainClient {
   getTicker(): Promise<Ticker>
   getBestBlockHash(): Promise<Uint8Array>
   getVoteBlockHash(currentTick: number): Promise<BestBlockForVote | null>
-  getDataDomainRegistration(domainName: string, tld: DataTLD): Promise<DataDomainRegistration | null>
-  getDataDomainZoneRecord(domainName: string, tld: DataTLD): Promise<ZoneRecord | null>
+  getDomainRegistration(domainName: string, topLevel: DomainTopLevel): Promise<DomainRegistration | null>
+  getDomainZoneRecord(domainName: string, topLevel: DomainTopLevel): Promise<ZoneRecord | null>
   getNotaryDetails(notaryId: number): Promise<NotaryDetails | null>
   getAccount(address: string): Promise<AccountInfo>
-  getShares(address: string): Promise<BalancesAccountData>
+  getOwnership(address: string): Promise<BalancesAccountData>
   getTransferToLocalchainFinalizedBlock(transferId: number): Promise<number | null>
   waitForLocalchainTransfer(transferId: number): Promise<LocalchainTransfer | null>
   getAccountChangesRoot(notaryId: number, notebookNumber: number): Promise<Uint8Array | null>
@@ -207,7 +206,7 @@ export class NotarizationBuilder {
   get transaction(): Promise<LocalchainTransaction | null>
   get isFinalized(): Promise<boolean>
   get unclaimedTax(): Promise<bigint>
-  get escrows(): Promise<Array<Escrow>>
+  get channelHolds(): Promise<Array<ChannelHold>>
   get accounts(): Promise<Array<LocalAccount>>
   get balanceChangeBuilders(): Promise<Array<BalanceChangeBuilder>>
   get unusedVoteFunds(): Promise<bigint>
@@ -220,16 +219,16 @@ export class NotarizationBuilder {
   defaultDepositAccount(): Promise<BalanceChangeBuilder>
   defaultTaxAccount(): Promise<BalanceChangeBuilder>
   loadAccount(account: LocalAccount): Promise<BalanceChangeBuilder>
-  canAddEscrow(escrow: OpenEscrow): Promise<boolean>
-  cancelEscrow(openEscrow: OpenEscrow): Promise<void>
-  claimEscrow(openEscrow: OpenEscrow): Promise<void>
+  canAddChannelHold(channelHold: OpenChannelHold): Promise<boolean>
+  cancelChannelHold(openChannelHold: OpenChannelHold): Promise<void>
+  claimChannelHold(openChannelHold: OpenChannelHold): Promise<void>
   addVote(vote: BlockVote): Promise<void>
-  leaseDataDomain(dataDomain: string, registerToAddress: string): Promise<void>
+  leaseDomain(domain: string, registerToAddress: string): Promise<void>
   /** Calculates the transfer tax on the given amount */
   getTransferTaxAmount(amount: bigint): bigint
   /** Calculates the total needed to end up with the given balance */
   getTotalForAfterTaxBalance(finalBalance: bigint): bigint
-  getEscrowTaxAmount(amount: bigint): bigint
+  getChannelHoldTaxAmount(amount: bigint): bigint
   claimFromMainchain(transfer: LocalchainTransfer): Promise<BalanceChangeBuilder>
   claimAndPayTax(milligonsPlusTax: bigint, depositAccountId: number | undefined | null, useDefaultTaxAccount: boolean): Promise<BalanceChangeBuilder>
   fundJumpAccount(milligons: bigint): Promise<BalanceChangeBuilder>
@@ -279,21 +278,21 @@ export class NotaryClients {
   get(notaryId: number): Promise<NotaryClient>
 }
 
-export class OpenEscrow {
-  get escrow(): Promise<Escrow>
+export class OpenChannelHold {
+  get channelHold(): Promise<ChannelHold>
   sign(settledAmount: bigint): Promise<SignatureResult>
   exportForSend(): Promise<string>
   recordUpdatedSettlement(milligons: bigint, signature: Uint8Array): Promise<void>
 }
 
-export class OpenEscrowsStore {
-  get(id: string): Promise<OpenEscrow>
-  open(escrow: Escrow): OpenEscrow
-  getClaimable(): Promise<Array<OpenEscrow>>
-  /** Import an escrow from a JSON string. Verifies with the notary that the escrow hold is valid. */
-  importEscrow(escrowJson: string): Promise<OpenEscrow>
-  /** Create a new escrow as a client. You must first notarize an escrow hold note to the notary for the `client_address`. */
-  openClientEscrow(accountId: number): Promise<OpenEscrow>
+export class OpenChannelHoldsStore {
+  get(id: string): Promise<OpenChannelHold>
+  open(channelHold: ChannelHold): OpenChannelHold
+  getClaimable(): Promise<Array<OpenChannelHold>>
+  /** Import a channel_hold from a JSON string. Verifies with the notary that the channel hold is valid. */
+  importChannelHold(channelHoldJson: string): Promise<OpenChannelHold>
+  /** Create a new channel_hold as a client. You must first notarize a channel hold note to the notary for the `client_address`. */
+  openClientChannelHold(accountId: number): Promise<OpenChannelHold>
 }
 
 export class OverviewStore {
@@ -305,13 +304,13 @@ export class TickerRef {
   tickForTime(timestampMillis: number): number
   timeForTick(tick: number): bigint
   millisToNextTick(): bigint
-  get escrowExpirationTicks(): Tick
+  get channelHoldExpirationTicks(): Tick
 }
 
 export class Transactions {
   create(transactionType: TransactionType): Promise<LocalchainTransaction>
   request(milligons: bigint): Promise<string>
-  createEscrow(escrowMilligons: bigint, recipientAddress: string, dataDomain?: string | undefined | null, notaryId?: number | undefined | null, delegatedSignerAddress?: string | undefined | null): Promise<OpenEscrow>
+  createChannelHold(channelHoldMilligons: bigint, recipientAddress: string, domain?: string | undefined | null, notaryId?: number | undefined | null, delegatedSignerAddress?: string | undefined | null): Promise<OpenChannelHold>
   send(milligons: bigint, to?: Array<string> | undefined | null): Promise<string>
   importArgons(argonFile: string): Promise<NotarizationTracker>
   acceptArgonRequest(argonFile: string): Promise<NotarizationTracker>
@@ -366,7 +365,7 @@ export enum BalanceChangeStatus {
   Immortalized = 'Immortalized',
   /** A balance change has been sent to another user to claim. Keep checking until it is claimed. */
   WaitingForSendClaim = 'WaitingForSendClaim',
-  /** A pending balance change that was canceled before being claimed by another user (escrow or send). */
+  /** A pending balance change that was canceled before being claimed by another user (channel_hold or send). */
   Canceled = 'Canceled'
 }
 
@@ -407,13 +406,25 @@ export interface BlockVote {
   /** The voting power of this vote, determined from the amount of tax */
   power: bigint
   /** The data domain used to create this vote */
-  dataDomainHash: Array<number>
+  domainHash: Array<number>
   /** The data domain payment address used to create this vote */
-  dataDomainAddress: string
+  domainAddress: string
   /** The mainchain address where rewards will be sent */
   blockRewardsAddress: string
   /** A signature of the vote by the account_id */
   signature: Array<number>
+}
+
+/** Number of ticks past the expiration of a channel_hold that a recipient has to claim. After this point, sender can recoup the channel_holded funds */
+export const CHANNEL_HOLD_CLAWBACK_TICKS: number
+
+/** Minimum milligons that can be settled in a channel_hold */
+export const CHANNEL_HOLD_MINIMUM_SETTLEMENT: bigint
+
+export interface ChannelHoldCloseOptions {
+  votesAddress?: string
+  /** What's the minimum amount of tax we should wait for before voting on blocks */
+  minimumVoteAmount?: number
 }
 
 export interface ClaimResult {
@@ -427,26 +438,26 @@ export enum CryptoScheme {
   Ecdsa = 2
 }
 
-/** Cost to lease a data domain for 1 year */
-export const DATA_DOMAIN_LEASE_COST: bigint
+/** Max versions that can be in a datastore zone record */
+export const DATASTORE_MAX_VERSIONS: number
 
-/** Minimum data domain name length */
-export const DATA_DOMAIN_MIN_NAME_LENGTH: number
-
-export interface DataDomain {
-  domainName: string
-  topLevelDomain: DataTLD
+export interface Domain {
+  name: string
+  topLevel: DomainTopLevel
 }
 
-export interface DataDomainRegistration {
+/** Cost to lease a data domain for 1 year */
+export const DOMAIN_LEASE_COST: bigint
+
+/** Minimum data domain name length */
+export const DOMAIN_MIN_NAME_LENGTH: number
+
+export interface DomainRegistration {
   registeredToAddress: string
   registeredAtTick: number
 }
 
-/** Max versions that can be in a datastore zone record */
-export const DATASTORE_MAX_VERSIONS: number
-
-export enum DataTLD {
+export enum DomainTopLevel {
   Analytics = 0,
   Automotive = 1,
   Bikes = 2,
@@ -467,18 +478,6 @@ export enum DataTLD {
   Transportation = 17,
   Travel = 18,
   Weather = 19
-}
-
-/** Number of ticks past the expiration of an escrow that a recipient has to claim. After this point, sender can recoup the escrowed funds */
-export const ESCROW_CLAWBACK_TICKS: number
-
-/** Minimum milligons that can be settled in an escrow */
-export const ESCROW_MINIMUM_SETTLEMENT: bigint
-
-export interface EscrowCloseOptions {
-  votesAddress?: string
-  /** What's the minimum amount of tax we should wait for before voting on blocks */
-  minimumVoteAmount?: number
 }
 
 export interface ImmortalizedBlock {
@@ -515,7 +514,7 @@ export interface LocalchainOverview {
   balance: bigint
   /** The net pending balance change acceptance/confirmation */
   pendingBalanceChange: bigint
-  /** Balance held in escrow */
+  /** Balance held in channel_hold */
   heldBalance: bigint
   /** Tax accumulated for the account */
   tax: bigint
@@ -548,7 +547,7 @@ export const NOTARIZATION_MAX_BALANCE_CHANGES: number
 /** Max notarizations that can be in a single notarization */
 export const NOTARIZATION_MAX_BLOCK_VOTES: number
 
-/** Max data domains that can be in a single notarization */
+/** Max domains that can be in a single notarization */
 export const NOTARIZATION_MAX_DOMAINS: number
 
 export interface NotaryAccountOrigin {
@@ -577,7 +576,7 @@ export interface NotebookProof {
   balanceTip: Uint8Array
   changeNumber: number
   accountOrigin: NotaryAccountOrigin
-  escrowHoldNoteJson?: string
+  channelHoldNoteJson?: string
   leafIndex: number
   numberOfLeaves: number
   proof: Array<Uint8Array>
@@ -598,14 +597,14 @@ export interface Ticker {
 export interface TickerConfig {
   tickDurationMillis: number
   genesisUtcTime: number
-  escrowExpirationTicks: number
+  channelHoldExpirationTicks: number
   ntpPoolUrl?: string
 }
 
 export enum TransactionType {
   Send = 0,
   Request = 1,
-  OpenEscrow = 2,
+  OpenChannelHold = 2,
   Consolidation = 3
 }
 

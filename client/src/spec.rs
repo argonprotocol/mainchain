@@ -20,7 +20,7 @@ pub mod api {
 		"Notebook",
 		"ChainTransfer",
 		"BlockSealSpec",
-		"DataDomain",
+		"Domain",
 		"PriceIndex",
 		"Authorship",
 		"Historical",
@@ -1146,9 +1146,9 @@ pub mod api {
 						"query_call_info",
 						types::QueryCallInfo { call, len },
 						[
-							11u8, 171u8, 185u8, 183u8, 93u8, 187u8, 196u8, 9u8, 188u8, 72u8, 114u8,
-							236u8, 46u8, 63u8, 194u8, 175u8, 12u8, 145u8, 76u8, 68u8, 250u8, 137u8,
-							68u8, 191u8, 73u8, 63u8, 16u8, 83u8, 37u8, 154u8, 30u8, 9u8,
+							12u8, 135u8, 31u8, 44u8, 58u8, 180u8, 83u8, 103u8, 145u8, 56u8, 237u8,
+							146u8, 27u8, 71u8, 97u8, 245u8, 147u8, 71u8, 197u8, 92u8, 220u8, 135u8,
+							55u8, 242u8, 179u8, 163u8, 212u8, 69u8, 69u8, 209u8, 137u8, 107u8,
 						],
 					)
 				}
@@ -1166,10 +1166,9 @@ pub mod api {
 						"query_call_fee_details",
 						types::QueryCallFeeDetails { call, len },
 						[
-							162u8, 138u8, 241u8, 123u8, 220u8, 39u8, 225u8, 163u8, 168u8, 124u8,
-							37u8, 151u8, 162u8, 107u8, 108u8, 125u8, 244u8, 187u8, 109u8, 59u8,
-							232u8, 23u8, 7u8, 217u8, 82u8, 132u8, 231u8, 156u8, 201u8, 88u8, 253u8,
-							56u8,
+							45u8, 13u8, 18u8, 196u8, 162u8, 233u8, 66u8, 166u8, 231u8, 35u8, 231u8,
+							115u8, 168u8, 57u8, 5u8, 46u8, 157u8, 10u8, 240u8, 108u8, 207u8, 68u8,
+							0u8, 148u8, 168u8, 157u8, 238u8, 197u8, 9u8, 156u8, 24u8, 190u8,
 						],
 					)
 				}
@@ -1769,9 +1768,9 @@ pub mod api {
 							audit_dependency_summaries,
 						},
 						[
-							12u8, 0u8, 42u8, 2u8, 96u8, 188u8, 239u8, 75u8, 246u8, 170u8, 18u8,
-							213u8, 30u8, 73u8, 197u8, 224u8, 83u8, 70u8, 126u8, 80u8, 28u8, 147u8,
-							238u8, 83u8, 25u8, 45u8, 150u8, 240u8, 31u8, 71u8, 241u8, 50u8,
+							164u8, 165u8, 165u8, 251u8, 25u8, 194u8, 175u8, 78u8, 43u8, 31u8, 76u8,
+							202u8, 29u8, 236u8, 11u8, 42u8, 30u8, 174u8, 49u8, 175u8, 127u8, 182u8,
+							213u8, 124u8, 206u8, 73u8, 55u8, 255u8, 202u8, 124u8, 185u8, 175u8,
 						],
 					)
 				}
@@ -1955,10 +1954,9 @@ pub mod api {
 						"ticker",
 						types::Ticker {},
 						[
-							95u8, 123u8, 127u8, 14u8, 3u8, 213u8, 90u8, 210u8, 249u8, 251u8, 46u8,
-							232u8, 203u8, 10u8, 108u8, 113u8, 232u8, 148u8, 223u8, 80u8, 236u8,
-							134u8, 48u8, 75u8, 150u8, 136u8, 185u8, 51u8, 247u8, 86u8, 234u8,
-							165u8,
+							3u8, 56u8, 229u8, 216u8, 50u8, 84u8, 230u8, 217u8, 8u8, 242u8, 213u8,
+							95u8, 30u8, 97u8, 99u8, 88u8, 122u8, 11u8, 27u8, 118u8, 135u8, 139u8,
+							120u8, 163u8, 246u8, 54u8, 196u8, 238u8, 167u8, 211u8, 137u8, 151u8,
 						],
 					)
 				}
@@ -2803,8 +2801,8 @@ pub mod api {
 		pub fn block_seal_spec(&self) -> block_seal_spec::storage::StorageApi {
 			block_seal_spec::storage::StorageApi
 		}
-		pub fn data_domain(&self) -> data_domain::storage::StorageApi {
-			data_domain::storage::StorageApi
+		pub fn domain(&self) -> domain::storage::StorageApi {
+			domain::storage::StorageApi
 		}
 		pub fn price_index(&self) -> price_index::storage::StorageApi {
 			price_index::storage::StorageApi
@@ -2890,8 +2888,8 @@ pub mod api {
 		pub fn block_seal_spec(&self) -> block_seal_spec::calls::TransactionApi {
 			block_seal_spec::calls::TransactionApi
 		}
-		pub fn data_domain(&self) -> data_domain::calls::TransactionApi {
-			data_domain::calls::TransactionApi
+		pub fn domain(&self) -> domain::calls::TransactionApi {
+			domain::calls::TransactionApi
 		}
 		pub fn price_index(&self) -> price_index::calls::TransactionApi {
 			price_index::calls::TransactionApi
@@ -2936,9 +2934,9 @@ pub mod api {
 			.hash();
 		runtime_metadata_hash ==
 			[
-				216u8, 155u8, 80u8, 145u8, 193u8, 156u8, 224u8, 37u8, 184u8, 232u8, 244u8, 160u8,
-				56u8, 147u8, 23u8, 109u8, 38u8, 119u8, 93u8, 190u8, 145u8, 236u8, 252u8, 29u8,
-				12u8, 170u8, 170u8, 110u8, 204u8, 73u8, 19u8, 131u8,
+				67u8, 213u8, 95u8, 83u8, 55u8, 34u8, 215u8, 12u8, 41u8, 106u8, 77u8, 187u8, 39u8,
+				201u8, 5u8, 226u8, 219u8, 105u8, 22u8, 113u8, 231u8, 104u8, 143u8, 155u8, 82u8,
+				227u8, 246u8, 43u8, 10u8, 72u8, 66u8, 212u8,
 			]
 	}
 	pub mod system {
@@ -4089,10 +4087,9 @@ pub mod api {
 						"Events",
 						(),
 						[
-							111u8, 177u8, 98u8, 41u8, 174u8, 31u8, 36u8, 123u8, 64u8, 106u8, 135u8,
-							219u8, 74u8, 32u8, 145u8, 225u8, 147u8, 189u8, 205u8, 212u8, 125u8,
-							157u8, 101u8, 108u8, 182u8, 96u8, 139u8, 174u8, 160u8, 242u8, 89u8,
-							161u8,
+							215u8, 142u8, 101u8, 249u8, 154u8, 42u8, 195u8, 51u8, 39u8, 191u8,
+							72u8, 169u8, 41u8, 99u8, 1u8, 29u8, 172u8, 45u8, 27u8, 180u8, 76u8,
+							112u8, 197u8, 80u8, 120u8, 4u8, 221u8, 234u8, 118u8, 16u8, 103u8, 64u8,
 						],
 					)
 				}
@@ -4872,9 +4869,9 @@ pub mod api {
 							call: ::subxt::ext::subxt_core::alloc::boxed::Box::new(call),
 						},
 						[
-							42u8, 69u8, 20u8, 133u8, 136u8, 19u8, 0u8, 25u8, 27u8, 25u8, 229u8,
-							81u8, 206u8, 18u8, 53u8, 157u8, 212u8, 11u8, 202u8, 54u8, 113u8, 5u8,
-							106u8, 9u8, 200u8, 138u8, 113u8, 203u8, 17u8, 12u8, 91u8, 188u8,
+							62u8, 123u8, 48u8, 249u8, 11u8, 156u8, 61u8, 43u8, 142u8, 82u8, 220u8,
+							75u8, 73u8, 195u8, 79u8, 164u8, 191u8, 108u8, 150u8, 127u8, 13u8, 49u8,
+							89u8, 33u8, 87u8, 20u8, 216u8, 192u8, 167u8, 33u8, 202u8, 67u8,
 						],
 					)
 				}
@@ -4936,9 +4933,9 @@ pub mod api {
 							max_weight,
 						},
 						[
-							216u8, 179u8, 155u8, 49u8, 128u8, 244u8, 117u8, 182u8, 125u8, 92u8,
-							167u8, 82u8, 58u8, 90u8, 105u8, 85u8, 37u8, 55u8, 249u8, 167u8, 30u8,
-							155u8, 114u8, 18u8, 130u8, 129u8, 48u8, 29u8, 120u8, 78u8, 48u8, 185u8,
+							176u8, 179u8, 40u8, 85u8, 61u8, 41u8, 53u8, 5u8, 24u8, 37u8, 18u8,
+							83u8, 127u8, 239u8, 157u8, 45u8, 49u8, 219u8, 77u8, 60u8, 175u8, 142u8,
+							58u8, 156u8, 66u8, 137u8, 246u8, 48u8, 54u8, 246u8, 37u8, 121u8,
 						],
 					)
 				}
@@ -5801,10 +5798,10 @@ pub mod api {
 							call: ::subxt::ext::subxt_core::alloc::boxed::Box::new(call),
 						},
 						[
-							184u8, 100u8, 196u8, 18u8, 108u8, 192u8, 105u8, 226u8, 189u8, 98u8,
-							88u8, 46u8, 39u8, 95u8, 101u8, 56u8, 50u8, 120u8, 235u8, 11u8, 123u8,
-							167u8, 106u8, 184u8, 151u8, 217u8, 242u8, 79u8, 61u8, 36u8, 191u8,
-							52u8,
+							35u8, 191u8, 144u8, 102u8, 226u8, 101u8, 188u8, 211u8, 18u8, 221u8,
+							30u8, 73u8, 173u8, 15u8, 31u8, 140u8, 57u8, 199u8, 96u8, 61u8, 195u8,
+							187u8, 232u8, 35u8, 236u8, 177u8, 113u8, 223u8, 252u8, 62u8, 38u8,
+							129u8,
 						],
 					)
 				}
@@ -6066,9 +6063,9 @@ pub mod api {
 							call: ::subxt::ext::subxt_core::alloc::boxed::Box::new(call),
 						},
 						[
-							14u8, 74u8, 39u8, 255u8, 155u8, 178u8, 83u8, 191u8, 45u8, 135u8, 224u8,
-							1u8, 53u8, 134u8, 244u8, 4u8, 112u8, 174u8, 37u8, 7u8, 22u8, 86u8,
-							208u8, 129u8, 4u8, 38u8, 184u8, 226u8, 23u8, 184u8, 54u8, 138u8,
+							153u8, 5u8, 99u8, 195u8, 224u8, 119u8, 68u8, 206u8, 78u8, 108u8, 169u8,
+							25u8, 137u8, 125u8, 203u8, 164u8, 67u8, 249u8, 64u8, 190u8, 149u8,
+							199u8, 135u8, 75u8, 48u8, 156u8, 36u8, 109u8, 93u8, 84u8, 230u8, 70u8,
 						],
 					)
 				}
@@ -6543,10 +6540,9 @@ pub mod api {
 						"GenesisTicker",
 						(),
 						[
-							207u8, 46u8, 88u8, 181u8, 124u8, 159u8, 186u8, 221u8, 77u8, 18u8,
-							119u8, 183u8, 252u8, 133u8, 211u8, 18u8, 42u8, 225u8, 126u8, 166u8,
-							150u8, 15u8, 219u8, 142u8, 120u8, 219u8, 17u8, 24u8, 107u8, 248u8,
-							144u8, 35u8,
+							20u8, 252u8, 9u8, 36u8, 16u8, 22u8, 115u8, 109u8, 170u8, 216u8, 99u8,
+							32u8, 210u8, 153u8, 72u8, 197u8, 241u8, 206u8, 14u8, 74u8, 144u8, 97u8,
+							68u8, 85u8, 201u8, 161u8, 151u8, 151u8, 35u8, 119u8, 204u8, 118u8,
 						],
 					)
 				}
@@ -10545,9 +10541,10 @@ pub mod api {
 						"submit",
 						types::Submit { notebooks },
 						[
-							226u8, 89u8, 102u8, 115u8, 24u8, 77u8, 60u8, 95u8, 160u8, 22u8, 110u8,
-							135u8, 8u8, 45u8, 166u8, 138u8, 247u8, 23u8, 18u8, 65u8, 247u8, 171u8,
-							43u8, 78u8, 118u8, 91u8, 56u8, 174u8, 235u8, 5u8, 87u8, 38u8,
+							131u8, 103u8, 127u8, 241u8, 80u8, 172u8, 53u8, 149u8, 119u8, 133u8,
+							150u8, 140u8, 227u8, 185u8, 248u8, 72u8, 75u8, 126u8, 219u8, 87u8,
+							142u8, 136u8, 249u8, 148u8, 204u8, 116u8, 71u8, 111u8, 10u8, 207u8,
+							5u8, 142u8,
 						],
 					)
 				}
@@ -10826,10 +10823,9 @@ pub mod api {
 						"BlockNotebooks",
 						(),
 						[
-							195u8, 186u8, 187u8, 231u8, 93u8, 224u8, 232u8, 100u8, 244u8, 111u8,
-							168u8, 152u8, 59u8, 65u8, 156u8, 150u8, 181u8, 118u8, 106u8, 250u8,
-							219u8, 224u8, 211u8, 34u8, 236u8, 168u8, 231u8, 190u8, 45u8, 69u8,
-							91u8, 136u8,
+							121u8, 183u8, 198u8, 65u8, 102u8, 83u8, 146u8, 209u8, 151u8, 96u8,
+							45u8, 23u8, 54u8, 83u8, 33u8, 156u8, 176u8, 17u8, 47u8, 166u8, 226u8,
+							59u8, 224u8, 252u8, 12u8, 0u8, 144u8, 221u8, 139u8, 245u8, 30u8, 127u8,
 						],
 					)
 				}
@@ -10848,9 +10844,9 @@ pub mod api {
 						"TempNotebookDigest",
 						(),
 						[
-							163u8, 174u8, 68u8, 196u8, 172u8, 0u8, 5u8, 180u8, 244u8, 60u8, 114u8,
-							38u8, 197u8, 134u8, 94u8, 115u8, 5u8, 240u8, 229u8, 11u8, 21u8, 88u8,
-							151u8, 105u8, 216u8, 109u8, 56u8, 236u8, 239u8, 230u8, 183u8, 168u8,
+							28u8, 31u8, 52u8, 2u8, 66u8, 194u8, 15u8, 96u8, 162u8, 241u8, 249u8,
+							20u8, 222u8, 235u8, 36u8, 156u8, 155u8, 221u8, 27u8, 32u8, 33u8, 8u8,
+							99u8, 179u8, 156u8, 53u8, 241u8, 186u8, 118u8, 43u8, 93u8, 105u8,
 						],
 					)
 				}
@@ -10870,10 +10866,9 @@ pub mod api {
 						"NotariesLockedForFailedAudit",
 						(),
 						[
-							190u8, 65u8, 197u8, 240u8, 114u8, 105u8, 88u8, 238u8, 11u8, 127u8,
-							30u8, 196u8, 222u8, 73u8, 184u8, 173u8, 4u8, 54u8, 40u8, 99u8, 92u8,
-							181u8, 2u8, 196u8, 235u8, 157u8, 199u8, 153u8, 125u8, 139u8, 223u8,
-							203u8,
+							115u8, 240u8, 19u8, 42u8, 98u8, 218u8, 83u8, 20u8, 162u8, 169u8, 32u8,
+							230u8, 216u8, 32u8, 222u8, 194u8, 184u8, 110u8, 103u8, 9u8, 153u8,
+							54u8, 92u8, 197u8, 38u8, 237u8, 50u8, 132u8, 210u8, 48u8, 12u8, 225u8,
 						],
 					)
 				}
@@ -10898,10 +10893,9 @@ pub mod api {
 							_0.borrow(),
 						),
 						[
-							190u8, 65u8, 197u8, 240u8, 114u8, 105u8, 88u8, 238u8, 11u8, 127u8,
-							30u8, 196u8, 222u8, 73u8, 184u8, 173u8, 4u8, 54u8, 40u8, 99u8, 92u8,
-							181u8, 2u8, 196u8, 235u8, 157u8, 199u8, 153u8, 125u8, 139u8, 223u8,
-							203u8,
+							115u8, 240u8, 19u8, 42u8, 98u8, 218u8, 83u8, 20u8, 162u8, 169u8, 32u8,
+							230u8, 216u8, 32u8, 222u8, 194u8, 184u8, 110u8, 103u8, 9u8, 153u8,
+							54u8, 92u8, 197u8, 38u8, 237u8, 50u8, 132u8, 210u8, 48u8, 12u8, 225u8,
 						],
 					)
 				}
@@ -11898,12 +11892,12 @@ pub mod api {
 			}
 		}
 	}
-	pub mod data_domain {
+	pub mod domain {
 		use super::{root_mod, runtime_types};
 		#[doc = "The `Error` enum of this pallet."]
-		pub type Error = runtime_types::pallet_data_domain::pallet::Error;
+		pub type Error = runtime_types::pallet_domains::pallet::Error;
 		#[doc = "Contains a variant per dispatchable extrinsic that this pallet has."]
-		pub type Call = runtime_types::pallet_data_domain::pallet::Call;
+		pub type Call = runtime_types::pallet_domains::pallet::Call;
 		pub mod calls {
 			use super::{root_mod, runtime_types};
 			type DispatchError = runtime_types::sp_runtime::DispatchError;
@@ -11931,12 +11925,12 @@ pub mod api {
 				pub mod set_zone_record {
 					use super::runtime_types;
 					pub type DomainHash = ::sp_core::H256;
-					pub type ZoneRecord = runtime_types::argon_primitives::data_domain::ZoneRecord<
+					pub type ZoneRecord = runtime_types::argon_primitives::domain::ZoneRecord<
 						::subxt::ext::subxt_core::utils::AccountId32,
 					>;
 				}
 				impl ::subxt::ext::subxt_core::blocks::StaticExtrinsic for SetZoneRecord {
-					const PALLET: &'static str = "DataDomain";
+					const PALLET: &'static str = "Domain";
 					const CALL: &'static str = "set_zone_record";
 				}
 			}
@@ -11949,7 +11943,7 @@ pub mod api {
 				) -> ::subxt::ext::subxt_core::tx::payload::StaticPayload<types::SetZoneRecord>
 				{
 					::subxt::ext::subxt_core::tx::payload::StaticPayload::new_static(
-						"DataDomain",
+						"Domain",
 						"set_zone_record",
 						types::SetZoneRecord { domain_hash, zone_record },
 						[
@@ -11963,7 +11957,7 @@ pub mod api {
 			}
 		}
 		#[doc = "The `Event` enum of this pallet"]
-		pub type Event = runtime_types::pallet_data_domain::pallet::Event;
+		pub type Event = runtime_types::pallet_domains::pallet::Event;
 		pub mod events {
 			use super::runtime_types;
 			#[derive(
@@ -11985,12 +11979,12 @@ pub mod api {
 			pub mod zone_record_updated {
 				use super::runtime_types;
 				pub type DomainHash = ::sp_core::H256;
-				pub type ZoneRecord = runtime_types::argon_primitives::data_domain::ZoneRecord<
+				pub type ZoneRecord = runtime_types::argon_primitives::domain::ZoneRecord<
 					::subxt::ext::subxt_core::utils::AccountId32,
 				>;
 			}
 			impl ::subxt::ext::subxt_core::events::StaticEvent for ZoneRecordUpdated {
-				const PALLET: &'static str = "DataDomain";
+				const PALLET: &'static str = "Domain";
 				const EVENT: &'static str = "ZoneRecordUpdated";
 			}
 			#[derive(
@@ -12005,20 +11999,20 @@ pub mod api {
 			#[decode_as_type(crate_path = ":: subxt :: ext :: subxt_core :: ext :: scale_decode")]
 			#[encode_as_type(crate_path = ":: subxt :: ext :: subxt_core :: ext :: scale_encode")]
 			#[doc = "A data domain was registered"]
-			pub struct DataDomainRegistered {
-				pub domain_hash: data_domain_registered::DomainHash,
-				pub registration: data_domain_registered::Registration,
+			pub struct DomainRegistered {
+				pub domain_hash: domain_registered::DomainHash,
+				pub registration: domain_registered::Registration,
 			}
-			pub mod data_domain_registered {
+			pub mod domain_registered {
 				use super::runtime_types;
 				pub type DomainHash = ::sp_core::H256;
-				pub type Registration = runtime_types::pallet_data_domain::DataDomainRegistration<
+				pub type Registration = runtime_types::pallet_domains::DomainRegistration<
 					::subxt::ext::subxt_core::utils::AccountId32,
 				>;
 			}
-			impl ::subxt::ext::subxt_core::events::StaticEvent for DataDomainRegistered {
-				const PALLET: &'static str = "DataDomain";
-				const EVENT: &'static str = "DataDomainRegistered";
+			impl ::subxt::ext::subxt_core::events::StaticEvent for DomainRegistered {
+				const PALLET: &'static str = "Domain";
+				const EVENT: &'static str = "DomainRegistered";
 			}
 			#[derive(
 				:: subxt :: ext :: subxt_core :: ext :: codec :: Decode,
@@ -12032,16 +12026,16 @@ pub mod api {
 			#[decode_as_type(crate_path = ":: subxt :: ext :: subxt_core :: ext :: scale_decode")]
 			#[encode_as_type(crate_path = ":: subxt :: ext :: subxt_core :: ext :: scale_encode")]
 			#[doc = "A data domain was registered"]
-			pub struct DataDomainRenewed {
-				pub domain_hash: data_domain_renewed::DomainHash,
+			pub struct DomainRenewed {
+				pub domain_hash: domain_renewed::DomainHash,
 			}
-			pub mod data_domain_renewed {
+			pub mod domain_renewed {
 				use super::runtime_types;
 				pub type DomainHash = ::sp_core::H256;
 			}
-			impl ::subxt::ext::subxt_core::events::StaticEvent for DataDomainRenewed {
-				const PALLET: &'static str = "DataDomain";
-				const EVENT: &'static str = "DataDomainRenewed";
+			impl ::subxt::ext::subxt_core::events::StaticEvent for DomainRenewed {
+				const PALLET: &'static str = "Domain";
+				const EVENT: &'static str = "DomainRenewed";
 			}
 			#[derive(
 				:: subxt :: ext :: subxt_core :: ext :: codec :: Decode,
@@ -12055,16 +12049,16 @@ pub mod api {
 			#[decode_as_type(crate_path = ":: subxt :: ext :: subxt_core :: ext :: scale_decode")]
 			#[encode_as_type(crate_path = ":: subxt :: ext :: subxt_core :: ext :: scale_encode")]
 			#[doc = "A data domain was expired"]
-			pub struct DataDomainExpired {
-				pub domain_hash: data_domain_expired::DomainHash,
+			pub struct DomainExpired {
+				pub domain_hash: domain_expired::DomainHash,
 			}
-			pub mod data_domain_expired {
+			pub mod domain_expired {
 				use super::runtime_types;
 				pub type DomainHash = ::sp_core::H256;
 			}
-			impl ::subxt::ext::subxt_core::events::StaticEvent for DataDomainExpired {
-				const PALLET: &'static str = "DataDomain";
-				const EVENT: &'static str = "DataDomainExpired";
+			impl ::subxt::ext::subxt_core::events::StaticEvent for DomainExpired {
+				const PALLET: &'static str = "Domain";
+				const EVENT: &'static str = "DomainExpired";
 			}
 			#[derive(
 				:: subxt :: ext :: subxt_core :: ext :: codec :: Decode,
@@ -12079,20 +12073,20 @@ pub mod api {
 			#[encode_as_type(crate_path = ":: subxt :: ext :: subxt_core :: ext :: scale_encode")]
 			#[doc = "A data domain registration was canceled due to a conflicting registration in the same"]
 			#[doc = "tick"]
-			pub struct DataDomainRegistrationCanceled {
-				pub domain_hash: data_domain_registration_canceled::DomainHash,
-				pub registration: data_domain_registration_canceled::Registration,
+			pub struct DomainRegistrationCanceled {
+				pub domain_hash: domain_registration_canceled::DomainHash,
+				pub registration: domain_registration_canceled::Registration,
 			}
-			pub mod data_domain_registration_canceled {
+			pub mod domain_registration_canceled {
 				use super::runtime_types;
 				pub type DomainHash = ::sp_core::H256;
-				pub type Registration = runtime_types::pallet_data_domain::DataDomainRegistration<
+				pub type Registration = runtime_types::pallet_domains::DomainRegistration<
 					::subxt::ext::subxt_core::utils::AccountId32,
 				>;
 			}
-			impl ::subxt::ext::subxt_core::events::StaticEvent for DataDomainRegistrationCanceled {
-				const PALLET: &'static str = "DataDomain";
-				const EVENT: &'static str = "DataDomainRegistrationCanceled";
+			impl ::subxt::ext::subxt_core::events::StaticEvent for DomainRegistrationCanceled {
+				const PALLET: &'static str = "Domain";
+				const EVENT: &'static str = "DomainRegistrationCanceled";
 			}
 			#[derive(
 				:: subxt :: ext :: subxt_core :: ext :: codec :: Decode,
@@ -12106,49 +12100,39 @@ pub mod api {
 			#[decode_as_type(crate_path = ":: subxt :: ext :: subxt_core :: ext :: scale_decode")]
 			#[encode_as_type(crate_path = ":: subxt :: ext :: subxt_core :: ext :: scale_encode")]
 			#[doc = "A data domain registration failed due to an error"]
-			pub struct DataDomainRegistrationError {
-				pub domain_hash: data_domain_registration_error::DomainHash,
-				pub account_id: data_domain_registration_error::AccountId,
-				pub error: data_domain_registration_error::Error,
+			pub struct DomainRegistrationError {
+				pub domain_hash: domain_registration_error::DomainHash,
+				pub account_id: domain_registration_error::AccountId,
+				pub error: domain_registration_error::Error,
 			}
-			pub mod data_domain_registration_error {
+			pub mod domain_registration_error {
 				use super::runtime_types;
 				pub type DomainHash = ::sp_core::H256;
 				pub type AccountId = ::subxt::ext::subxt_core::utils::AccountId32;
 				pub type Error = runtime_types::sp_runtime::DispatchError;
 			}
-			impl ::subxt::ext::subxt_core::events::StaticEvent for DataDomainRegistrationError {
-				const PALLET: &'static str = "DataDomain";
-				const EVENT: &'static str = "DataDomainRegistrationError";
+			impl ::subxt::ext::subxt_core::events::StaticEvent for DomainRegistrationError {
+				const PALLET: &'static str = "Domain";
+				const EVENT: &'static str = "DomainRegistrationError";
 			}
 		}
 		pub mod storage {
 			use super::runtime_types;
 			pub mod types {
 				use super::runtime_types;
-				pub mod registered_data_domains {
+				pub mod registered_domains {
 					use super::runtime_types;
-					pub type RegisteredDataDomains =
-						runtime_types::pallet_data_domain::DataDomainRegistration<
-							::subxt::ext::subxt_core::utils::AccountId32,
-						>;
+					pub type RegisteredDomains = runtime_types::pallet_domains::DomainRegistration<
+						::subxt::ext::subxt_core::utils::AccountId32,
+					>;
 					pub type Param0 = ::sp_core::H256;
 				}
 				pub mod zone_records_by_domain {
 					use super::runtime_types;
 					pub type ZoneRecordsByDomain =
-						runtime_types::argon_primitives::data_domain::ZoneRecord<
+						runtime_types::argon_primitives::domain::ZoneRecord<
 							::subxt::ext::subxt_core::utils::AccountId32,
 						>;
-					pub type Param0 = ::sp_core::H256;
-				}
-				pub mod domain_payment_address_history {
-					use super::runtime_types;
-					pub type DomainPaymentAddressHistory =
-						runtime_types::bounded_collections::bounded_vec::BoundedVec<(
-							::subxt::ext::subxt_core::utils::AccountId32,
-							::core::primitive::u32,
-						)>;
 					pub type Param0 = ::sp_core::H256;
 				}
 				pub mod expiring_domains_by_block {
@@ -12162,50 +12146,50 @@ pub mod api {
 			}
 			pub struct StorageApi;
 			impl StorageApi {
-				pub fn registered_data_domains_iter(
+				pub fn registered_domains_iter(
 					&self,
 				) -> ::subxt::ext::subxt_core::storage::address::StaticAddress<
 					(),
-					types::registered_data_domains::RegisteredDataDomains,
+					types::registered_domains::RegisteredDomains,
 					(),
 					(),
 					::subxt::ext::subxt_core::utils::Yes,
 				> {
 					::subxt::ext::subxt_core::storage::address::StaticAddress::new_static(
-						"DataDomain",
-						"RegisteredDataDomains",
+						"Domain",
+						"RegisteredDomains",
 						(),
 						[
-							170u8, 223u8, 96u8, 217u8, 109u8, 173u8, 60u8, 75u8, 121u8, 255u8,
-							183u8, 225u8, 40u8, 141u8, 154u8, 7u8, 236u8, 133u8, 75u8, 191u8,
-							127u8, 226u8, 48u8, 207u8, 31u8, 90u8, 194u8, 75u8, 100u8, 165u8,
-							146u8, 28u8,
+							238u8, 63u8, 35u8, 155u8, 242u8, 229u8, 211u8, 15u8, 243u8, 165u8,
+							234u8, 95u8, 148u8, 102u8, 168u8, 59u8, 160u8, 8u8, 90u8, 174u8, 15u8,
+							72u8, 233u8, 247u8, 249u8, 89u8, 89u8, 234u8, 204u8, 234u8, 102u8,
+							104u8,
 						],
 					)
 				}
-				pub fn registered_data_domains(
+				pub fn registered_domains(
 					&self,
-					_0: impl ::core::borrow::Borrow<types::registered_data_domains::Param0>,
+					_0: impl ::core::borrow::Borrow<types::registered_domains::Param0>,
 				) -> ::subxt::ext::subxt_core::storage::address::StaticAddress<
 					::subxt::ext::subxt_core::storage::address::StaticStorageKey<
-						types::registered_data_domains::Param0,
+						types::registered_domains::Param0,
 					>,
-					types::registered_data_domains::RegisteredDataDomains,
+					types::registered_domains::RegisteredDomains,
 					::subxt::ext::subxt_core::utils::Yes,
 					(),
 					(),
 				> {
 					::subxt::ext::subxt_core::storage::address::StaticAddress::new_static(
-						"DataDomain",
-						"RegisteredDataDomains",
+						"Domain",
+						"RegisteredDomains",
 						::subxt::ext::subxt_core::storage::address::StaticStorageKey::new(
 							_0.borrow(),
 						),
 						[
-							170u8, 223u8, 96u8, 217u8, 109u8, 173u8, 60u8, 75u8, 121u8, 255u8,
-							183u8, 225u8, 40u8, 141u8, 154u8, 7u8, 236u8, 133u8, 75u8, 191u8,
-							127u8, 226u8, 48u8, 207u8, 31u8, 90u8, 194u8, 75u8, 100u8, 165u8,
-							146u8, 28u8,
+							238u8, 63u8, 35u8, 155u8, 242u8, 229u8, 211u8, 15u8, 243u8, 165u8,
+							234u8, 95u8, 148u8, 102u8, 168u8, 59u8, 160u8, 8u8, 90u8, 174u8, 15u8,
+							72u8, 233u8, 247u8, 249u8, 89u8, 89u8, 234u8, 204u8, 234u8, 102u8,
+							104u8,
 						],
 					)
 				}
@@ -12219,7 +12203,7 @@ pub mod api {
 					::subxt::ext::subxt_core::utils::Yes,
 				> {
 					::subxt::ext::subxt_core::storage::address::StaticAddress::new_static(
-						"DataDomain",
+						"Domain",
 						"ZoneRecordsByDomain",
 						(),
 						[
@@ -12243,7 +12227,7 @@ pub mod api {
 					(),
 				> {
 					::subxt::ext::subxt_core::storage::address::StaticAddress::new_static(
-						"DataDomain",
+						"Domain",
 						"ZoneRecordsByDomain",
 						::subxt::ext::subxt_core::storage::address::StaticStorageKey::new(
 							_0.borrow(),
@@ -12253,53 +12237,6 @@ pub mod api {
 							117u8, 192u8, 175u8, 47u8, 173u8, 145u8, 255u8, 91u8, 208u8, 238u8,
 							99u8, 100u8, 38u8, 182u8, 219u8, 113u8, 161u8, 196u8, 186u8, 254u8,
 							59u8, 213u8,
-						],
-					)
-				}
-				pub fn domain_payment_address_history_iter(
-					&self,
-				) -> ::subxt::ext::subxt_core::storage::address::StaticAddress<
-					(),
-					types::domain_payment_address_history::DomainPaymentAddressHistory,
-					(),
-					::subxt::ext::subxt_core::utils::Yes,
-					::subxt::ext::subxt_core::utils::Yes,
-				> {
-					::subxt::ext::subxt_core::storage::address::StaticAddress::new_static(
-						"DataDomain",
-						"DomainPaymentAddressHistory",
-						(),
-						[
-							139u8, 10u8, 161u8, 228u8, 6u8, 142u8, 223u8, 232u8, 177u8, 237u8,
-							179u8, 75u8, 61u8, 224u8, 169u8, 114u8, 150u8, 245u8, 215u8, 214u8,
-							246u8, 127u8, 45u8, 51u8, 246u8, 216u8, 217u8, 59u8, 232u8, 104u8,
-							124u8, 82u8,
-						],
-					)
-				}
-				pub fn domain_payment_address_history(
-					&self,
-					_0: impl ::core::borrow::Borrow<types::domain_payment_address_history::Param0>,
-				) -> ::subxt::ext::subxt_core::storage::address::StaticAddress<
-					::subxt::ext::subxt_core::storage::address::StaticStorageKey<
-						types::domain_payment_address_history::Param0,
-					>,
-					types::domain_payment_address_history::DomainPaymentAddressHistory,
-					::subxt::ext::subxt_core::utils::Yes,
-					::subxt::ext::subxt_core::utils::Yes,
-					(),
-				> {
-					::subxt::ext::subxt_core::storage::address::StaticAddress::new_static(
-						"DataDomain",
-						"DomainPaymentAddressHistory",
-						::subxt::ext::subxt_core::storage::address::StaticStorageKey::new(
-							_0.borrow(),
-						),
-						[
-							139u8, 10u8, 161u8, 228u8, 6u8, 142u8, 223u8, 232u8, 177u8, 237u8,
-							179u8, 75u8, 61u8, 224u8, 169u8, 114u8, 150u8, 245u8, 215u8, 214u8,
-							246u8, 127u8, 45u8, 51u8, 246u8, 216u8, 217u8, 59u8, 232u8, 104u8,
-							124u8, 82u8,
 						],
 					)
 				}
@@ -12313,7 +12250,7 @@ pub mod api {
 					::subxt::ext::subxt_core::utils::Yes,
 				> {
 					::subxt::ext::subxt_core::storage::address::StaticAddress::new_static(
-						"DataDomain",
+						"Domain",
 						"ExpiringDomainsByBlock",
 						(),
 						[
@@ -12336,7 +12273,7 @@ pub mod api {
 					(),
 				> {
 					::subxt::ext::subxt_core::storage::address::StaticAddress::new_static(
-						"DataDomain",
+						"Domain",
 						"ExpiringDomainsByBlock",
 						::subxt::ext::subxt_core::storage::address::StaticStorageKey::new(
 							_0.borrow(),
@@ -13281,9 +13218,10 @@ pub mod api {
 						"apply",
 						types::Apply { seal },
 						[
-							219u8, 28u8, 137u8, 83u8, 119u8, 114u8, 20u8, 229u8, 253u8, 233u8,
-							140u8, 58u8, 32u8, 228u8, 139u8, 84u8, 9u8, 93u8, 54u8, 8u8, 96u8, 8u8,
-							97u8, 25u8, 73u8, 9u8, 55u8, 175u8, 198u8, 182u8, 196u8, 85u8,
+							220u8, 220u8, 126u8, 129u8, 206u8, 237u8, 180u8, 231u8, 16u8, 230u8,
+							15u8, 54u8, 234u8, 53u8, 125u8, 108u8, 175u8, 60u8, 133u8, 136u8,
+							253u8, 247u8, 18u8, 218u8, 42u8, 114u8, 204u8, 90u8, 47u8, 251u8, 73u8,
+							121u8,
 						],
 					)
 				}
@@ -13401,10 +13339,10 @@ pub mod api {
 						"TempSealInherent",
 						(),
 						[
-							155u8, 198u8, 152u8, 193u8, 160u8, 65u8, 79u8, 57u8, 173u8, 165u8,
-							225u8, 42u8, 102u8, 64u8, 210u8, 78u8, 243u8, 181u8, 84u8, 156u8,
-							139u8, 238u8, 34u8, 129u8, 199u8, 138u8, 84u8, 136u8, 156u8, 115u8,
-							10u8, 107u8,
+							99u8, 190u8, 164u8, 154u8, 242u8, 119u8, 10u8, 22u8, 100u8, 213u8,
+							234u8, 166u8, 54u8, 104u8, 86u8, 35u8, 36u8, 105u8, 143u8, 229u8,
+							152u8, 149u8, 167u8, 178u8, 9u8, 50u8, 204u8, 82u8, 117u8, 81u8, 32u8,
+							161u8,
 						],
 					)
 				}
@@ -18660,10 +18598,10 @@ pub mod api {
 						"batch",
 						types::Batch { calls },
 						[
-							82u8, 150u8, 246u8, 136u8, 52u8, 26u8, 2u8, 237u8, 106u8, 2u8, 84u8,
-							182u8, 29u8, 179u8, 147u8, 166u8, 139u8, 56u8, 205u8, 95u8, 83u8,
-							115u8, 83u8, 23u8, 161u8, 212u8, 225u8, 153u8, 153u8, 249u8, 49u8,
-							252u8,
+							26u8, 227u8, 210u8, 240u8, 149u8, 179u8, 30u8, 10u8, 204u8, 54u8,
+							181u8, 250u8, 130u8, 62u8, 207u8, 143u8, 30u8, 141u8, 170u8, 206u8,
+							207u8, 48u8, 30u8, 195u8, 220u8, 181u8, 10u8, 101u8, 37u8, 192u8,
+							206u8, 0u8,
 						],
 					)
 				}
@@ -18693,10 +18631,10 @@ pub mod api {
 							call: ::subxt::ext::subxt_core::alloc::boxed::Box::new(call),
 						},
 						[
-							112u8, 75u8, 127u8, 2u8, 10u8, 174u8, 22u8, 244u8, 152u8, 35u8, 26u8,
-							249u8, 173u8, 134u8, 19u8, 12u8, 168u8, 148u8, 232u8, 52u8, 122u8,
-							199u8, 218u8, 114u8, 134u8, 254u8, 236u8, 242u8, 251u8, 142u8, 113u8,
-							210u8,
+							40u8, 147u8, 29u8, 215u8, 120u8, 253u8, 227u8, 227u8, 218u8, 132u8,
+							141u8, 70u8, 200u8, 2u8, 131u8, 44u8, 138u8, 27u8, 221u8, 83u8, 44u8,
+							47u8, 184u8, 58u8, 107u8, 115u8, 201u8, 29u8, 43u8, 103u8, 190u8,
+							218u8,
 						],
 					)
 				}
@@ -18722,10 +18660,9 @@ pub mod api {
 						"batch_all",
 						types::BatchAll { calls },
 						[
-							129u8, 188u8, 151u8, 186u8, 39u8, 126u8, 22u8, 254u8, 19u8, 52u8,
-							246u8, 138u8, 69u8, 34u8, 211u8, 221u8, 189u8, 48u8, 4u8, 237u8, 151u8,
-							35u8, 237u8, 208u8, 251u8, 103u8, 163u8, 255u8, 146u8, 167u8, 118u8,
-							164u8,
+							77u8, 9u8, 202u8, 123u8, 84u8, 85u8, 219u8, 51u8, 213u8, 40u8, 127u8,
+							59u8, 129u8, 202u8, 31u8, 46u8, 153u8, 29u8, 69u8, 173u8, 101u8, 130u8,
+							31u8, 160u8, 75u8, 19u8, 178u8, 121u8, 174u8, 12u8, 97u8, 60u8,
 						],
 					)
 				}
@@ -18748,9 +18685,9 @@ pub mod api {
 							call: ::subxt::ext::subxt_core::alloc::boxed::Box::new(call),
 						},
 						[
-							215u8, 39u8, 47u8, 56u8, 251u8, 181u8, 235u8, 5u8, 147u8, 51u8, 155u8,
-							64u8, 44u8, 161u8, 104u8, 195u8, 177u8, 95u8, 117u8, 37u8, 194u8, 46u8,
-							108u8, 53u8, 243u8, 108u8, 220u8, 179u8, 201u8, 166u8, 201u8, 249u8,
+							233u8, 89u8, 223u8, 142u8, 28u8, 201u8, 187u8, 175u8, 189u8, 200u8,
+							209u8, 152u8, 42u8, 75u8, 191u8, 52u8, 17u8, 252u8, 47u8, 8u8, 217u8,
+							118u8, 14u8, 69u8, 135u8, 167u8, 77u8, 119u8, 27u8, 183u8, 160u8, 27u8,
 						],
 					)
 				}
@@ -18776,9 +18713,10 @@ pub mod api {
 						"force_batch",
 						types::ForceBatch { calls },
 						[
-							201u8, 59u8, 50u8, 15u8, 28u8, 88u8, 17u8, 199u8, 39u8, 253u8, 163u8,
-							144u8, 130u8, 38u8, 20u8, 38u8, 202u8, 19u8, 20u8, 209u8, 253u8, 70u8,
-							60u8, 13u8, 126u8, 57u8, 148u8, 115u8, 19u8, 244u8, 78u8, 34u8,
+							230u8, 90u8, 214u8, 145u8, 37u8, 15u8, 123u8, 120u8, 98u8, 243u8,
+							233u8, 90u8, 190u8, 213u8, 30u8, 22u8, 104u8, 243u8, 227u8, 226u8,
+							213u8, 149u8, 119u8, 122u8, 188u8, 23u8, 74u8, 157u8, 115u8, 72u8,
+							181u8, 115u8,
 						],
 					)
 				}
@@ -18801,9 +18739,9 @@ pub mod api {
 							weight,
 						},
 						[
-							232u8, 202u8, 218u8, 134u8, 180u8, 239u8, 238u8, 178u8, 80u8, 123u8,
-							245u8, 53u8, 77u8, 188u8, 93u8, 132u8, 93u8, 13u8, 37u8, 109u8, 108u8,
-							255u8, 101u8, 167u8, 8u8, 44u8, 87u8, 62u8, 15u8, 221u8, 116u8, 112u8,
+							15u8, 4u8, 21u8, 184u8, 115u8, 7u8, 193u8, 27u8, 133u8, 71u8, 110u8,
+							253u8, 95u8, 205u8, 82u8, 108u8, 86u8, 54u8, 36u8, 28u8, 211u8, 235u8,
+							209u8, 234u8, 81u8, 31u8, 79u8, 31u8, 150u8, 52u8, 141u8, 170u8,
 						],
 					)
 				}
@@ -19138,9 +19076,9 @@ pub mod api {
 							call: ::subxt::ext::subxt_core::alloc::boxed::Box::new(call),
 						},
 						[
-							72u8, 92u8, 49u8, 130u8, 4u8, 73u8, 20u8, 210u8, 25u8, 217u8, 187u8,
-							36u8, 49u8, 29u8, 238u8, 43u8, 73u8, 88u8, 213u8, 144u8, 247u8, 134u8,
-							63u8, 231u8, 86u8, 249u8, 44u8, 116u8, 77u8, 166u8, 136u8, 20u8,
+							11u8, 166u8, 46u8, 162u8, 196u8, 39u8, 197u8, 216u8, 119u8, 137u8,
+							54u8, 50u8, 86u8, 18u8, 233u8, 17u8, 227u8, 134u8, 243u8, 38u8, 218u8,
+							246u8, 42u8, 102u8, 91u8, 41u8, 25u8, 34u8, 217u8, 18u8, 219u8, 116u8,
 						],
 					)
 				}
@@ -19163,10 +19101,9 @@ pub mod api {
 							weight,
 						},
 						[
-							199u8, 175u8, 48u8, 42u8, 140u8, 245u8, 236u8, 148u8, 236u8, 52u8,
-							117u8, 222u8, 100u8, 110u8, 40u8, 239u8, 187u8, 36u8, 241u8, 75u8,
-							240u8, 83u8, 202u8, 156u8, 102u8, 206u8, 231u8, 228u8, 178u8, 209u8,
-							103u8, 3u8,
+							15u8, 52u8, 70u8, 105u8, 190u8, 75u8, 199u8, 48u8, 210u8, 251u8, 103u8,
+							17u8, 39u8, 3u8, 135u8, 103u8, 13u8, 90u8, 223u8, 43u8, 241u8, 129u8,
+							48u8, 243u8, 92u8, 181u8, 110u8, 28u8, 169u8, 131u8, 186u8, 21u8,
 						],
 					)
 				}
@@ -19204,9 +19141,10 @@ pub mod api {
 							call: ::subxt::ext::subxt_core::alloc::boxed::Box::new(call),
 						},
 						[
-							227u8, 60u8, 0u8, 181u8, 111u8, 52u8, 205u8, 160u8, 86u8, 188u8, 2u8,
-							7u8, 8u8, 237u8, 112u8, 203u8, 53u8, 216u8, 189u8, 203u8, 83u8, 66u8,
-							148u8, 159u8, 230u8, 204u8, 135u8, 164u8, 205u8, 75u8, 42u8, 47u8,
+							182u8, 110u8, 136u8, 8u8, 225u8, 224u8, 109u8, 178u8, 52u8, 62u8, 69u8,
+							206u8, 62u8, 192u8, 243u8, 47u8, 221u8, 153u8, 192u8, 67u8, 162u8,
+							226u8, 152u8, 206u8, 207u8, 16u8, 251u8, 19u8, 76u8, 181u8, 50u8,
+							137u8,
 						],
 					)
 				}
@@ -19478,7 +19416,7 @@ pub mod api {
 				#[codec(index = 12)]
 				BlockSealSpec(runtime_types::pallet_block_seal_spec::pallet::Call),
 				#[codec(index = 13)]
-				DataDomain(runtime_types::pallet_data_domain::pallet::Call),
+				Domain(runtime_types::pallet_domains::pallet::Call),
 				#[codec(index = 14)]
 				PriceIndex(runtime_types::pallet_price_index::pallet::Call),
 				#[codec(index = 17)]
@@ -19539,7 +19477,7 @@ pub mod api {
 				#[codec(index = 12)]
 				BlockSealSpec(runtime_types::pallet_block_seal_spec::pallet::Error),
 				#[codec(index = 13)]
-				DataDomain(runtime_types::pallet_data_domain::pallet::Error),
+				Domain(runtime_types::pallet_domains::pallet::Error),
 				#[codec(index = 14)]
 				PriceIndex(runtime_types::pallet_price_index::pallet::Error),
 				#[codec(index = 17)]
@@ -19598,7 +19536,7 @@ pub mod api {
 				#[codec(index = 12)]
 				BlockSealSpec(runtime_types::pallet_block_seal_spec::pallet::Event),
 				#[codec(index = 13)]
-				DataDomain(runtime_types::pallet_data_domain::pallet::Event),
+				Domain(runtime_types::pallet_domains::pallet::Event),
 				#[codec(index = 14)]
 				PriceIndex(runtime_types::pallet_price_index::pallet::Event),
 				#[codec(index = 17)]
@@ -19775,24 +19713,24 @@ pub mod api {
 					#[codec(index = 31)]
 					DecodeError,
 					#[codec(index = 32)]
-					AccountEscrowHoldDoesntExist,
+					AccountChannelHoldDoesntExist,
 					#[codec(index = 33)]
-					AccountAlreadyHasEscrowHold,
+					AccountAlreadyHasChannelHold,
 					#[codec(index = 34)]
-					EscrowHoldNotReadyForClaim {
+					ChannelHoldNotReadyForClaim {
 						current_tick: ::core::primitive::u32,
 						claim_tick: ::core::primitive::u32,
 					},
 					#[codec(index = 35)]
 					AccountLocked,
 					#[codec(index = 36)]
-					MissingEscrowHoldNote,
+					MissingChannelHoldNote,
 					#[codec(index = 37)]
-					InvalidEscrowHoldNote,
+					InvalidChannelHoldNote,
 					#[codec(index = 38)]
-					InvalidEscrowClaimers,
+					InvalidChannelHoldClaimers,
 					#[codec(index = 39)]
-					EscrowNoteBelowMinimum,
+					ChannelHoldNoteBelowMinimum,
 					#[codec(index = 40)]
 					InvalidTaxNoteAccount,
 					#[codec(index = 41)]
@@ -19825,10 +19763,6 @@ pub mod api {
 					InvalidBlockVoteSource,
 					#[codec(index = 53)]
 					InsufficientBlockVoteMinimum,
-					#[codec(index = 54)]
-					BlockVoteDataDomainMismatch,
-					#[codec(index = 55)]
-					BlockVoteEscrowReused,
 				}
 			}
 			#[derive(
@@ -20540,8 +20474,6 @@ pub mod api {
 					pub index: ::core::primitive::u32,
 					#[codec(compact)]
 					pub power: ::core::primitive::u128,
-					pub data_domain_hash: ::sp_core::H256,
-					pub data_domain_account: ::subxt::ext::subxt_core::utils::AccountId32,
 					pub signature: runtime_types::sp_runtime::MultiSignature,
 					pub block_rewards_account_id: ::subxt::ext::subxt_core::utils::AccountId32,
 				}
@@ -20767,73 +20699,6 @@ pub mod api {
 						runtime_types::sp_arithmetic::fixed_point::FixedU128,
 				}
 			}
-			pub mod data_domain {
-				use super::runtime_types;
-				#[derive(
-					:: subxt :: ext :: subxt_core :: ext :: codec :: Decode,
-					:: subxt :: ext :: subxt_core :: ext :: codec :: Encode,
-					:: subxt :: ext :: subxt_core :: ext :: scale_decode :: DecodeAsType,
-					:: subxt :: ext :: subxt_core :: ext :: scale_encode :: EncodeAsType,
-					Clone,
-					Debug,
-				)]
-				# [codec (crate = :: subxt :: ext :: subxt_core :: ext :: codec)]
-				#[decode_as_type(
-					crate_path = ":: subxt :: ext :: subxt_core :: ext :: scale_decode"
-				)]
-				#[encode_as_type(
-					crate_path = ":: subxt :: ext :: subxt_core :: ext :: scale_encode"
-				)]
-				pub struct Semver {
-					pub major: ::core::primitive::u32,
-					pub minor: ::core::primitive::u32,
-					pub patch: ::core::primitive::u32,
-				}
-				#[derive(
-					:: subxt :: ext :: subxt_core :: ext :: codec :: Decode,
-					:: subxt :: ext :: subxt_core :: ext :: codec :: Encode,
-					:: subxt :: ext :: subxt_core :: ext :: scale_decode :: DecodeAsType,
-					:: subxt :: ext :: subxt_core :: ext :: scale_encode :: EncodeAsType,
-					Clone,
-					Debug,
-				)]
-				# [codec (crate = :: subxt :: ext :: subxt_core :: ext :: codec)]
-				#[decode_as_type(
-					crate_path = ":: subxt :: ext :: subxt_core :: ext :: scale_decode"
-				)]
-				#[encode_as_type(
-					crate_path = ":: subxt :: ext :: subxt_core :: ext :: scale_encode"
-				)]
-				pub struct VersionHost {
-					pub datastore_id: runtime_types::bounded_collections::bounded_vec::BoundedVec<
-						::core::primitive::u8,
-					>,
-					pub host: runtime_types::argon_primitives::host::Host,
-				}
-				#[derive(
-					:: subxt :: ext :: subxt_core :: ext :: codec :: Decode,
-					:: subxt :: ext :: subxt_core :: ext :: codec :: Encode,
-					:: subxt :: ext :: subxt_core :: ext :: scale_decode :: DecodeAsType,
-					:: subxt :: ext :: subxt_core :: ext :: scale_encode :: EncodeAsType,
-					Clone,
-					Debug,
-				)]
-				# [codec (crate = :: subxt :: ext :: subxt_core :: ext :: codec)]
-				#[decode_as_type(
-					crate_path = ":: subxt :: ext :: subxt_core :: ext :: scale_decode"
-				)]
-				#[encode_as_type(
-					crate_path = ":: subxt :: ext :: subxt_core :: ext :: scale_encode"
-				)]
-				pub struct ZoneRecord<_0> {
-					pub payment_account: _0,
-					pub notary_id: ::core::primitive::u32,
-					pub versions: ::subxt::ext::subxt_core::utils::KeyedVec<
-						runtime_types::argon_primitives::data_domain::Semver,
-						runtime_types::argon_primitives::data_domain::VersionHost,
-					>,
-				}
-			}
 			pub mod digests {
 				use super::runtime_types;
 				#[derive(
@@ -20918,6 +20783,73 @@ pub mod api {
 				)]
 				pub struct ParentVotingKeyDigest {
 					pub parent_voting_key: ::core::option::Option<::sp_core::H256>,
+				}
+			}
+			pub mod domain {
+				use super::runtime_types;
+				#[derive(
+					:: subxt :: ext :: subxt_core :: ext :: codec :: Decode,
+					:: subxt :: ext :: subxt_core :: ext :: codec :: Encode,
+					:: subxt :: ext :: subxt_core :: ext :: scale_decode :: DecodeAsType,
+					:: subxt :: ext :: subxt_core :: ext :: scale_encode :: EncodeAsType,
+					Clone,
+					Debug,
+				)]
+				# [codec (crate = :: subxt :: ext :: subxt_core :: ext :: codec)]
+				#[decode_as_type(
+					crate_path = ":: subxt :: ext :: subxt_core :: ext :: scale_decode"
+				)]
+				#[encode_as_type(
+					crate_path = ":: subxt :: ext :: subxt_core :: ext :: scale_encode"
+				)]
+				pub struct Semver {
+					pub major: ::core::primitive::u32,
+					pub minor: ::core::primitive::u32,
+					pub patch: ::core::primitive::u32,
+				}
+				#[derive(
+					:: subxt :: ext :: subxt_core :: ext :: codec :: Decode,
+					:: subxt :: ext :: subxt_core :: ext :: codec :: Encode,
+					:: subxt :: ext :: subxt_core :: ext :: scale_decode :: DecodeAsType,
+					:: subxt :: ext :: subxt_core :: ext :: scale_encode :: EncodeAsType,
+					Clone,
+					Debug,
+				)]
+				# [codec (crate = :: subxt :: ext :: subxt_core :: ext :: codec)]
+				#[decode_as_type(
+					crate_path = ":: subxt :: ext :: subxt_core :: ext :: scale_decode"
+				)]
+				#[encode_as_type(
+					crate_path = ":: subxt :: ext :: subxt_core :: ext :: scale_encode"
+				)]
+				pub struct VersionHost {
+					pub datastore_id: runtime_types::bounded_collections::bounded_vec::BoundedVec<
+						::core::primitive::u8,
+					>,
+					pub host: runtime_types::argon_primitives::host::Host,
+				}
+				#[derive(
+					:: subxt :: ext :: subxt_core :: ext :: codec :: Decode,
+					:: subxt :: ext :: subxt_core :: ext :: codec :: Encode,
+					:: subxt :: ext :: subxt_core :: ext :: scale_decode :: DecodeAsType,
+					:: subxt :: ext :: subxt_core :: ext :: scale_encode :: EncodeAsType,
+					Clone,
+					Debug,
+				)]
+				# [codec (crate = :: subxt :: ext :: subxt_core :: ext :: codec)]
+				#[decode_as_type(
+					crate_path = ":: subxt :: ext :: subxt_core :: ext :: scale_decode"
+				)]
+				#[encode_as_type(
+					crate_path = ":: subxt :: ext :: subxt_core :: ext :: scale_encode"
+				)]
+				pub struct ZoneRecord<_0> {
+					pub payment_account: _0,
+					pub notary_id: ::core::primitive::u32,
+					pub versions: ::subxt::ext::subxt_core::utils::KeyedVec<
+						runtime_types::argon_primitives::domain::Semver,
+						runtime_types::argon_primitives::domain::VersionHost,
+					>,
 				}
 			}
 			pub mod host {
@@ -21240,9 +21172,10 @@ pub mod api {
 					pub block_voting_power: ::core::primitive::u128,
 					pub secret_hash: ::sp_core::H256,
 					pub parent_secret: ::core::option::Option<::sp_core::H256>,
-					pub data_domains: runtime_types::bounded_collections::bounded_vec::BoundedVec<
-						(::sp_core::H256, ::subxt::ext::subxt_core::utils::AccountId32),
-					>,
+					pub domains: runtime_types::bounded_collections::bounded_vec::BoundedVec<(
+						::sp_core::H256,
+						::subxt::ext::subxt_core::utils::AccountId32,
+					)>,
 				}
 				#[derive(
 					:: subxt :: ext :: subxt_core :: ext :: codec :: Decode,
@@ -21309,7 +21242,7 @@ pub mod api {
 					#[codec(compact)]
 					pub genesis_utc_time: ::core::primitive::u64,
 					#[codec(compact)]
-					pub escrow_expiration_ticks: ::core::primitive::u32,
+					pub channel_hold_expiration_ticks: ::core::primitive::u32,
 				}
 			}
 		}
@@ -22961,24 +22894,18 @@ pub mod api {
 					#[doc = "The lookup to verify a vote's authenticity is not available for the given block"]
 					NoEligibleVotingRoot,
 					#[codec(index = 12)]
-					#[doc = "The data domain was not registered"]
-					UnregisteredDataDomain,
-					#[codec(index = 13)]
-					#[doc = "The data domain account is mismatched with the block reward seeker"]
-					InvalidDataDomainAccount,
-					#[codec(index = 14)]
 					#[doc = "Message was not signed by a registered miner"]
 					InvalidAuthoritySignature,
-					#[codec(index = 15)]
+					#[codec(index = 13)]
 					#[doc = "Could not decode the scale bytes of the votes"]
 					CouldNotDecodeVote,
-					#[codec(index = 16)]
+					#[codec(index = 14)]
 					#[doc = "Too many notebooks were submitted for the current tick. Should not be possible"]
 					MaxNotebooksAtTickExceeded,
-					#[codec(index = 17)]
+					#[codec(index = 15)]
 					#[doc = "No closest miner found for vote"]
 					NoClosestMinerFoundForVote,
-					#[codec(index = 18)]
+					#[codec(index = 16)]
 					#[doc = "The vote signature was invalid"]
 					BlockVoteInvalidSignature,
 				}
@@ -23548,7 +23475,7 @@ pub mod api {
 				pub notary_id: ::core::primitive::u32,
 			}
 		}
-		pub mod pallet_data_domain {
+		pub mod pallet_domains {
 			use super::runtime_types;
 			pub mod pallet {
 				use super::runtime_types;
@@ -23572,7 +23499,7 @@ pub mod api {
 					#[codec(index = 0)]
 					set_zone_record {
 						domain_hash: ::sp_core::H256,
-						zone_record: runtime_types::argon_primitives::data_domain::ZoneRecord<
+						zone_record: runtime_types::argon_primitives::domain::ZoneRecord<
 							::subxt::ext::subxt_core::utils::AccountId32,
 						>,
 					},
@@ -23631,36 +23558,36 @@ pub mod api {
 					#[doc = "A data domain zone record was updated"]
 					ZoneRecordUpdated {
 						domain_hash: ::sp_core::H256,
-						zone_record: runtime_types::argon_primitives::data_domain::ZoneRecord<
+						zone_record: runtime_types::argon_primitives::domain::ZoneRecord<
 							::subxt::ext::subxt_core::utils::AccountId32,
 						>,
 					},
 					#[codec(index = 1)]
 					#[doc = "A data domain was registered"]
-					DataDomainRegistered {
+					DomainRegistered {
 						domain_hash: ::sp_core::H256,
-						registration: runtime_types::pallet_data_domain::DataDomainRegistration<
+						registration: runtime_types::pallet_domains::DomainRegistration<
 							::subxt::ext::subxt_core::utils::AccountId32,
 						>,
 					},
 					#[codec(index = 2)]
 					#[doc = "A data domain was registered"]
-					DataDomainRenewed { domain_hash: ::sp_core::H256 },
+					DomainRenewed { domain_hash: ::sp_core::H256 },
 					#[codec(index = 3)]
 					#[doc = "A data domain was expired"]
-					DataDomainExpired { domain_hash: ::sp_core::H256 },
+					DomainExpired { domain_hash: ::sp_core::H256 },
 					#[codec(index = 4)]
 					#[doc = "A data domain registration was canceled due to a conflicting registration in the same"]
 					#[doc = "tick"]
-					DataDomainRegistrationCanceled {
+					DomainRegistrationCanceled {
 						domain_hash: ::sp_core::H256,
-						registration: runtime_types::pallet_data_domain::DataDomainRegistration<
+						registration: runtime_types::pallet_domains::DomainRegistration<
 							::subxt::ext::subxt_core::utils::AccountId32,
 						>,
 					},
 					#[codec(index = 5)]
 					#[doc = "A data domain registration failed due to an error"]
-					DataDomainRegistrationError {
+					DomainRegistrationError {
 						domain_hash: ::sp_core::H256,
 						account_id: ::subxt::ext::subxt_core::utils::AccountId32,
 						error: runtime_types::sp_runtime::DispatchError,
@@ -23678,7 +23605,7 @@ pub mod api {
 			# [codec (crate = :: subxt :: ext :: subxt_core :: ext :: codec)]
 			#[decode_as_type(crate_path = ":: subxt :: ext :: subxt_core :: ext :: scale_decode")]
 			#[encode_as_type(crate_path = ":: subxt :: ext :: subxt_core :: ext :: scale_encode")]
-			pub struct DataDomainRegistration<_0> {
+			pub struct DomainRegistration<_0> {
 				pub account_id: _0,
 				pub registered_at_tick: ::core::primitive::u32,
 			}

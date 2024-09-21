@@ -244,7 +244,7 @@ impl NotebookStore {
 		let mut voting_power = 0u128;
 		let mut tax = 0u128;
 		let mut blocks_with_votes = BTreeSet::new();
-		let mut data_domains = Vec::new();
+		let mut domains = Vec::new();
 		// NOTE: rebuild transfers list so it matches the final order
 		let mut transfers = vec![];
 		for change in notarizations.clone() {
@@ -268,8 +268,8 @@ impl NotebookStore {
 				for note in change.notes {
 					match note.note_type {
 						NoteType::Tax | NoteType::LeaseDomain => tax += note.milligons,
-						NoteType::EscrowHold { .. } => change_note = Some(note.clone()),
-						NoteType::EscrowSettle { .. } => change_note = None,
+						NoteType::ChannelHold { .. } => change_note = Some(note.clone()),
+						NoteType::ChannelHoldSettle { .. } => change_note = None,
 						NoteType::ClaimFromMainchain { transfer_id } =>
 							transfers.push(ChainTransfer::ToLocalchain { transfer_id }),
 						NoteType::SendToMainchain => transfers.push(ChainTransfer::ToMainchain {
@@ -298,15 +298,15 @@ impl NotebookStore {
 				block_votes.insert(key, vote);
 				blocks_with_votes.insert(block_hash);
 			}
-			for domain in change.data_domains {
-				data_domains.push(domain);
+			for domain in change.domains {
+				domains.push(domain);
 			}
 		}
 
 		let mut account_changelist = vec![];
 		let merkle_leafs = changed_accounts
 			.into_iter()
-			.map(|(localchain_account_id, (nonce, balance, account_origin, escrow_hold_note))| {
+			.map(|(localchain_account_id, (nonce, balance, account_origin, channel_hold_note))| {
 				account_changelist.push(account_origin.clone());
 				BalanceTip {
 					account_id: localchain_account_id.account_id,
@@ -314,7 +314,7 @@ impl NotebookStore {
 					change_number: nonce,
 					balance,
 					account_origin,
-					escrow_hold_note,
+					channel_hold_note,
 				}
 				.encode()
 			})
@@ -334,7 +334,7 @@ impl NotebookStore {
 			&mut *db,
 			notebook_number,
 			transfers,
-			data_domains,
+			domains,
 			tax,
 			changes_root,
 			account_changelist,
@@ -471,7 +471,7 @@ mod tests {
 					balance: 1000,
 					previous_balance_proof: None,
 					notes: bounded_vec![],
-					escrow_hold_note: None,
+					channel_hold_note: None,
 					signature: Signature::from_raw([0u8; 64]).into(),
 				},
 				BalanceChange {
@@ -481,7 +481,7 @@ mod tests {
 					balance: 2500,
 					previous_balance_proof: None,
 					notes: bounded_vec![],
-					escrow_hold_note: None,
+					channel_hold_note: None,
 					signature: Signature::from_raw([0u8; 64]).into(),
 				},
 				BalanceChange {
@@ -491,7 +491,7 @@ mod tests {
 					balance: 500,
 					previous_balance_proof: None,
 					notes: bounded_vec![],
-					escrow_hold_note: None,
+					channel_hold_note: None,
 					signature: Signature::from_raw([0u8; 64]).into(),
 				},
 			],
@@ -517,7 +517,7 @@ mod tests {
 			change_number: 1,
 			balance: 1000,
 			account_origin: AccountOrigin { notebook_number: 1, account_uid: 1 },
-			escrow_hold_note: None,
+			channel_hold_note: None,
 		};
 		let proof = NotebookStore::get_balance_proof(&pool, 1, 1, &balance_tip).await?;
 

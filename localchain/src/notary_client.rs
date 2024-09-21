@@ -168,7 +168,7 @@ impl NotaryClient {
         .notarize(
           notarization.balance_changes.clone(),
           notarization.block_votes.clone(),
-          notarization.data_domains.clone(),
+          notarization.domains.clone(),
         )
         .await;
 

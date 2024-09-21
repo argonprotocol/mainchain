@@ -9,7 +9,7 @@ import type { ApiTypes, AugmentedSubmittable, SubmittableExtrinsic, SubmittableE
 import type { Bytes, Compact, Option, U8aFixed, Vec, bool, u128, u16, u32, u64 } from '@polkadot/types-codec';
 import type { AnyNumber, IMethod, ITuple } from '@polkadot/types-codec/types';
 import type { AccountId32, Call, H256, MultiAddress } from '@polkadot/types/interfaces/runtime';
-import type { ArgonNodeRuntimeOpaqueSessionKeys, ArgonNodeRuntimeOriginCaller, ArgonNodeRuntimeProxyType, ArgonPrimitivesBitcoinCompressedBitcoinPubkey, ArgonPrimitivesBitcoinH256Le, ArgonPrimitivesBitcoinOpaqueBitcoinXpub, ArgonPrimitivesBlockSealRewardDestination, ArgonPrimitivesBondVaultTerms, ArgonPrimitivesDataDomainZoneRecord, ArgonPrimitivesInherentsBitcoinUtxoSync, ArgonPrimitivesInherentsBlockSealInherent, ArgonPrimitivesNotaryNotaryMeta, ArgonPrimitivesNotebookSignedNotebookHeader, PalletBalancesAdjustmentDirection, PalletMiningSlotMiningSlotBid, PalletMultisigTimepoint, PalletPriceIndexPriceIndex, PalletVaultsVaultConfig, SpConsensusGrandpaEquivocationProof, SpSessionMembershipProof, SpWeightsWeightV2Weight } from '@polkadot/types/lookup';
+import type { ArgonNodeRuntimeOpaqueSessionKeys, ArgonNodeRuntimeOriginCaller, ArgonNodeRuntimeProxyType, ArgonPrimitivesBitcoinCompressedBitcoinPubkey, ArgonPrimitivesBitcoinH256Le, ArgonPrimitivesBitcoinOpaqueBitcoinXpub, ArgonPrimitivesBlockSealRewardDestination, ArgonPrimitivesBondVaultTerms, ArgonPrimitivesDomainZoneRecord, ArgonPrimitivesInherentsBitcoinUtxoSync, ArgonPrimitivesInherentsBlockSealInherent, ArgonPrimitivesNotaryNotaryMeta, ArgonPrimitivesNotebookSignedNotebookHeader, PalletBalancesAdjustmentDirection, PalletMiningSlotMiningSlotBid, PalletMultisigTimepoint, PalletPriceIndexPriceIndex, PalletVaultsVaultConfig, SpConsensusGrandpaEquivocationProof, SpSessionMembershipProof, SpWeightsWeightV2Weight } from '@polkadot/types/lookup';
 
 export type __AugmentedSubmittable = AugmentedSubmittable<() => unknown>;
 export type __SubmittableExtrinsic<ApiType extends ApiTypes> = SubmittableExtrinsic<ApiType>;
@@ -162,8 +162,8 @@ declare module '@polkadot/api-base/types/submittable' {
     chainTransfer: {
       sendToLocalchain: AugmentedSubmittable<(amount: Compact<u128> | AnyNumber | Uint8Array, notaryId: u32 | AnyNumber | Uint8Array) => SubmittableExtrinsic<ApiType>, [Compact<u128>, u32]>;
     };
-    dataDomain: {
-      setZoneRecord: AugmentedSubmittable<(domainHash: H256 | string | Uint8Array, zoneRecord: ArgonPrimitivesDataDomainZoneRecord | { paymentAccount?: any; notaryId?: any; versions?: any } | string | Uint8Array) => SubmittableExtrinsic<ApiType>, [H256, ArgonPrimitivesDataDomainZoneRecord]>;
+    domain: {
+      setZoneRecord: AugmentedSubmittable<(domainHash: H256 | string | Uint8Array, zoneRecord: ArgonPrimitivesDomainZoneRecord | { paymentAccount?: any; notaryId?: any; versions?: any } | string | Uint8Array) => SubmittableExtrinsic<ApiType>, [H256, ArgonPrimitivesDomainZoneRecord]>;
     };
     grandpa: {
       /**

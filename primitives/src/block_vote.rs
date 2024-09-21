@@ -9,7 +9,7 @@ use sp_crypto_hashing::blake2_256;
 use sp_debug_derive::RuntimeDebug;
 use sp_runtime::{scale_info::TypeInfo, MultiSignature};
 
-use crate::{AccountId, BlockVotingPower, DataDomainHash, MerkleProof, NotaryId, NotebookNumber};
+use crate::{AccountId, BlockVotingPower, MerkleProof, NotaryId, NotebookNumber};
 
 pub type VoteMinimum = u128;
 
@@ -38,10 +38,6 @@ pub struct BlockVoteT<Hash: Codec = H256> {
 	#[codec(compact)]
 	#[cfg_attr(feature = "std", serde(with = "serialize_unsafe_u128_as_string"))]
 	pub power: BlockVotingPower,
-	/// The data domain used to create this vote
-	pub data_domain_hash: DataDomainHash,
-	/// The data domain payment address used to create this vote
-	pub data_domain_account: AccountId,
 	/// A signature of the vote by the account_id
 	pub signature: MultiSignature,
 	/// The claimer of rewards
@@ -55,8 +51,6 @@ struct BlockVoteHashMessage<Hash: Codec> {
 	block_hash: Hash,
 	index: u32,
 	power: BlockVotingPower,
-	data_domain_hash: DataDomainHash,
-	data_domain_account: AccountId,
 	block_rewards_account_id: AccountId,
 }
 
@@ -72,8 +66,6 @@ impl<Hash: Codec + Clone> BlockVoteT<Hash> {
 			block_hash: self.block_hash.clone(),
 			index: self.index,
 			power: self.power,
-			data_domain_hash: self.data_domain_hash,
-			data_domain_account: self.data_domain_account.clone(),
 			block_rewards_account_id: self.block_rewards_account_id.clone(),
 		}
 		.using_encoded(blake2_256)

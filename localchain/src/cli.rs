@@ -1,12 +1,12 @@
 use crate::keystore::Keystore;
 use crate::overview::LocalchainOverview;
 use crate::{
-  overview, AccountStore, CryptoScheme, DataDomainStore, EscrowCloseOptions, Localchain,
+  overview, AccountStore, ChannelHoldCloseOptions, CryptoScheme, DomainStore, Localchain,
   LocalchainConfig, MainchainClient, TickerConfig,
 };
 use anyhow::anyhow;
 use argon_primitives::argon_utils::format_argons;
-use argon_primitives::DataDomain;
+use argon_primitives::Domain;
 use clap::{Args, Parser, Subcommand, ValueHint};
 use comfy_table::modifiers::UTF8_ROUND_CORNERS;
 use comfy_table::presets::UTF8_FULL;
@@ -51,9 +51,9 @@ struct Cli {
 
 #[derive(Subcommand, Debug)]
 enum Commands {
-  /// Sync the localchain proofs with the latest notebooks. This will also submit votes and close/claim escrows as needed.
+  /// Sync the localchain proofs with the latest notebooks. This will also submit votes and close/claim channel_holds as needed.
   Sync {
-    /// What address should be used for votes (only relevant if claiming escrows)
+    /// What address should be used for votes (only relevant if claiming channel_holds)
     #[clap(long, value_name = "SS58_ADDRESS")]
     vote_address: Option<String>,
 
@@ -66,10 +66,10 @@ enum Commands {
     keystore_password: EmbeddedKeyPassword,
   },
 
-  /// Explore and manage data domains
-  DataDomains {
+  /// Explore and manage domains
+  Domains {
     #[clap(subcommand)]
-    subcommand: DataDomainsSubcommand,
+    subcommand: DomainsSubcommand,
   },
 
   /// Manage local accounts
@@ -86,26 +86,26 @@ enum Commands {
 }
 
 #[derive(Subcommand, Debug)]
-enum DataDomainsSubcommand {
-  /// List all installed data domains
+enum DomainsSubcommand {
+  /// List all installed domains
   List,
   /// Generate the hash for a data domain
   Hash {
     /// The data domain name
     #[clap()]
-    data_domain: String,
+    domain: String,
   },
   /// Check if a data domain is registered
   Check {
     /// The data domain name
     #[clap()]
-    data_domain: String,
+    domain: String,
   },
   /// Lease a data domain
   Lease {
     /// The data domain name
     #[clap()]
-    data_domain: String,
+    domain: String,
 
     /// Password to unlock the embedded keystore
     #[clap(flatten)]
@@ -264,23 +264,23 @@ where
       .await?;
 
       let balance_sync = localchain.balance_sync();
-      let sync_options = vote_address.map(|vote_address| EscrowCloseOptions {
+      let sync_options = vote_address.map(|vote_address| ChannelHoldCloseOptions {
         votes_address: Some(vote_address),
         minimum_vote_amount: minimum_vote_amount.map(|v| v as i64),
       });
 
       let sync = balance_sync.sync(sync_options.clone()).await?;
       println!(
-        "Synced {:?} balance changes. Escrows updated: {:?}",
+        "Synced {:?} balance changes. ChannelHolds updated: {:?}",
         sync.balance_changes().len(),
-        sync.escrow_notarizations().len()
+        sync.channel_hold_notarizations().len()
       );
     }
-    Commands::DataDomains { subcommand } => match subcommand {
-      DataDomainsSubcommand::List => {
+    Commands::Domains { subcommand } => match subcommand {
+      DomainsSubcommand::List => {
         let db = Localchain::create_db(path).await?;
-        let domains = DataDomainStore::new(db);
-        let data_domains = domains.list().await?;
+        let domains = DomainStore::new(db);
+        let domains = domains.list().await?;
 
         let mut table = Table::new();
 
@@ -295,16 +295,16 @@ where
             "Registration Tick",
             "Hash",
           ]);
-        for domain in data_domains {
+        for domain in domains {
           table.add_row(vec![
-            domain.tld.clone(),
+            domain.top_level.clone(),
             domain.name.clone(),
             domain.registered_to_address,
             domain.registered_at_tick.to_string(),
-            DataDomain::from_string(
+            Domain::from_string(
               domain.name,
-              DataDomainStore::tld_from_string(domain.tld)
-                .expect("Should be able to translate a tld"),
+              DomainStore::tld_from_string(domain.top_level)
+                .expect("Should be able to translate a top_level"),
             )
             .hash()
             .to_string(),
@@ -312,19 +312,18 @@ where
         }
         println!("{table}");
       }
-      DataDomainsSubcommand::Hash { data_domain } => {
-        let domain =
-          DataDomain::parse(data_domain).map_err(|_| anyhow!("Not a valid data domain"))?;
+      DomainsSubcommand::Hash { domain } => {
+        let domain = Domain::parse(domain).map_err(|_| anyhow!("Not a valid data domain"))?;
         println!("Hash: {:?}", domain.hash());
       }
-      DataDomainsSubcommand::Check { data_domain } => {
-        let domain =
-          DataDomain::parse(data_domain.clone()).map_err(|_| anyhow!("Not a valid data domain"))?;
+      DomainsSubcommand::Check { domain } => {
+        let argon_domain =
+          Domain::parse(domain.clone()).map_err(|_| anyhow!("Not a valid data domain"))?;
         let mainchain = MainchainClient::connect(mainchain_url, 5_000).await?;
         let registration = mainchain
-          .get_data_domain_registration(
-            domain.domain_name.clone().to_string(),
-            domain.top_level_domain,
+          .get_domain_registration(
+            argon_domain.name.clone().to_string(),
+            argon_domain.top_level,
           )
           .await?;
         let mut table = Table::new();
@@ -334,39 +333,37 @@ where
           .set_content_arrangement(ContentArrangement::Dynamic)
           .set_header(vec!["Domain", "Registered?", "Hash"]);
         table.add_row(vec![
-          Cell::new(&data_domain),
+          Cell::new(&domain),
           Cell::new(match registration.is_some() {
             true => "Yes",
             false => "No",
           })
           .set_alignment(CellAlignment::Center),
-          Cell::new(hex::encode(domain.hash().0)).set_alignment(CellAlignment::Center),
+          Cell::new(hex::encode(argon_domain.hash().0)).set_alignment(CellAlignment::Center),
         ]);
         println!("{table}");
       }
-      DataDomainsSubcommand::Lease {
+      DomainsSubcommand::Lease {
         keystore_password,
-        data_domain,
+        domain,
         owner_address,
       } => {
-        let domain =
-          DataDomain::parse(data_domain.clone()).map_err(|_| anyhow!("Not a valid data domain"))?;
+        let argon_domain =
+          Domain::parse(domain.clone()).map_err(|_| anyhow!("Not a valid data domain"))?;
         let localchain = Localchain::load_without_mainchain(
           path,
           TickerConfig {
             ntp_pool_url: None,
             genesis_utc_time: 0,
             tick_duration_millis: 0,
-            escrow_expiration_ticks: 0,
+            channel_hold_expiration_ticks: 0,
           },
           Some(keystore_password),
         )
         .await?;
 
         let change = localchain.begin_change();
-        change
-          .lease_data_domain(data_domain.clone(), owner_address)
-          .await?;
+        change.lease_domain(domain.clone(), owner_address).await?;
         change.sign().await?;
         let tracker = change.notarize().await?;
         let mut table = Table::new();
@@ -385,7 +382,7 @@ where
         }
         println!("{} registered at tick {} in notebook {}. Domain hash={:#?} (use this hash for zone record registration on mainchain).\
           \n\nChanged Accounts:\n{table}",
-                         data_domain, tracker.tick, tracker.notebook_number, domain.hash());
+                         domain, tracker.tick, tracker.notebook_number, argon_domain.hash());
       }
     },
 

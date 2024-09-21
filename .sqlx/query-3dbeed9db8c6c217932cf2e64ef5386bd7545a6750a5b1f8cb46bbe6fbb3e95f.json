@@ -1,0 +1,27 @@
+{
+  "db_name": "PostgreSQL",
+  "query": "\n\t\t\t\tUPDATE notebook_headers\n\t\t\t\tSET hash = $1,\n\t\t\t\t\tchanged_accounts_root = $2,\n\t\t\t\t\tchanged_account_origins = $3,\n\t\t\t\t\tchain_transfers = $4,\n\t\t\t\t\ttax=$5,\n\t\t\t\t\tblock_voting_power=$6,\n\t\t\t\t\tblock_votes_root=$7,\n\t\t\t\t\tblock_votes_count=$8,\n\t\t\t\t\tblocks_with_votes=$9,\n\t\t\t\t\tsecret_hash=$10,\n\t\t\t\t\tparent_secret=$11,\n\t\t\t\t\tsignature=$12,\n\t\t\t\t\tdomains=$13\n\t\t\t\tWHERE notebook_number = $14\n\t\t\t",
+  "describe": {
+    "columns": [],
+    "parameters": {
+      "Left": [
+        "Bytea",
+        "Bytea",
+        "Jsonb",
+        "Jsonb",
+        "Varchar",
+        "Varchar",
+        "Bytea",
+        "Int4",
+        "ByteaArray",
+        "Bytea",
+        "Bytea",
+        "Bytea",
+        "Jsonb",
+        "Int4"
+      ]
+    },
+    "nullable": []
+  },
+  "hash": "3dbeed9db8c6c217932cf2e64ef5386bd7545a6750a5b1f8cb46bbe6fbb3e95f"
+}

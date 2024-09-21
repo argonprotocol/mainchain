@@ -563,7 +563,7 @@ dependencies = [
  "pallet-block-seal-spec",
  "pallet-bond",
  "pallet-chain-transfer",
- "pallet-data-domain",
+ "pallet-domains",
  "pallet-grandpa",
  "pallet-mining-slot",
  "pallet-mint",
@@ -7187,7 +7187,7 @@ dependencies = [
 ]
 
 [[package]]
-name = "pallet-data-domain"
+name = "pallet-domains"
 version = "0.0.4"
 dependencies = [
  "argon-primitives",

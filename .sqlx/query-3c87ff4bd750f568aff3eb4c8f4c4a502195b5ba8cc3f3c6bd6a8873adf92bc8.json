@@ -20,7 +20,7 @@
       },
       {
         "ordinal": 3,
-        "name": "data_domains",
+        "name": "domains",
         "type_info": "Jsonb"
       },
       {

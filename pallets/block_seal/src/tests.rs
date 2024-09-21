@@ -26,7 +26,7 @@ use argon_primitives::{
 	inherents::{BlockSealInherent, BlockSealInherentDataProvider, SealInherentError},
 	localchain::BlockVote,
 	BlockSealAuthorityId, BlockSealAuthoritySignature, BlockSealDigest, BlockSealerInfo,
-	BlockVoteT, BlockVotingKey, DataDomain, DataTLD, MerkleProof, NotaryNotebookVotes,
+	BlockVoteT, BlockVotingKey, Domain, DomainTopLevel, MerkleProof, NotaryNotebookVotes,
 	ParentVotingKeyDigest, AUTHOR_DIGEST_ID, PARENT_VOTING_KEY_DIGEST,
 };
 
@@ -218,8 +218,8 @@ fn it_should_be_able_to_submit_a_seal() {
 		BlocksAtTick::mutate(|a| {
 			a.insert(2, vec![System::block_hash(2)]);
 		});
-		RegisteredDataDomains::mutate(|a| {
-			a.insert(DataDomain::new("test", DataTLD::Bikes).hash());
+		RegisteredDomains::mutate(|a| {
+			a.insert(Domain::new("test", DomainTopLevel::Bikes).hash());
 		});
 
 		let block_vote = default_vote();
@@ -464,8 +464,6 @@ fn it_can_find_best_vote_seals() {
 			index: 0,
 			block_hash: parent_hash,
 			power: 500,
-			data_domain_hash: DataDomain::new("test", DataTLD::Bikes).hash(),
-			data_domain_account: Alice.to_account_id(),
 			block_rewards_account_id: Alice.to_account_id(),
 			signature: empty_vote_signature(),
 		};
@@ -568,8 +566,6 @@ fn it_checks_tax_votes() {
 		System::set_block_number(4);
 		let mut vote = BlockVote {
 			block_hash: System::block_hash(System::block_number().saturating_sub(4)),
-			data_domain_hash: DataDomain::new("test", DataTLD::Bikes).hash(),
-			data_domain_account: Alice.to_account_id(),
 			account_id: Keyring::Alice.into(),
 			index: 1,
 			power: 500,
@@ -649,21 +645,6 @@ fn it_checks_tax_votes() {
 				votes_from_tick,
 				signature.clone()
 			),
-			Error::<Test>::InvalidDataDomainAccount
-		);
-
-		RegisteredDataDomains::mutate(|a| {
-			a.insert(vote.data_domain_hash);
-		});
-
-		assert_err!(
-			BlockSeal::verify_block_vote(
-				seal_strength,
-				&vote,
-				author,
-				votes_from_tick,
-				signature.clone()
-			),
 			Error::<Test>::BlockVoteInvalidSignature
 		);
 		vote.sign(Alice.pair());
@@ -714,8 +695,6 @@ fn get_block_vote_digest(votes: u32) -> BlockVoteDigest {
 fn default_vote() -> BlockVote {
 	BlockVote {
 		block_hash: System::block_hash(System::block_number().saturating_sub(4)),
-		data_domain_hash: DataDomain::new("test", DataTLD::Bikes).hash(),
-		data_domain_account: Alice.to_account_id(),
 		account_id: Keyring::Alice.into(),
 		index: 1,
 		power: 500,

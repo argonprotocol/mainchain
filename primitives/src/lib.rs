@@ -12,9 +12,9 @@ pub use account::{AccountType, LocalchainAccountId};
 pub use balance_change::*;
 pub use block_seal::{BlockSealAuthorityId, BlockSealAuthoritySignature, BLOCK_SEAL_KEY_TYPE};
 pub use block_vote::*;
-pub use data_domain::*;
-pub use data_tld::DataTLD;
 pub use digests::{BlockSealDigest, AUTHOR_DIGEST_ID, BLOCK_SEAL_DIGEST_ID, *};
+pub use domain::*;
+pub use domain_top_level::DomainTopLevel;
 #[cfg(feature = "std")]
 pub use keystore_helper::*;
 
@@ -29,9 +29,9 @@ pub mod balance_change;
 pub mod block_seal;
 pub mod block_vote;
 pub mod bond;
-mod data_domain;
-pub mod data_tld;
 pub mod digests;
+mod domain;
+pub mod domain_top_level;
 pub mod host;
 pub mod inherents;
 pub mod macros;

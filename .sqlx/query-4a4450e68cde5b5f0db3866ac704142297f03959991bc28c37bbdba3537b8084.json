@@ -29,7 +29,7 @@
         "type_info": "Text"
       },
       {
-        "name": "escrow_hold_note_json",
+        "name": "channel_hold_note_json",
         "ordinal": 5,
         "type_info": "Text"
       },

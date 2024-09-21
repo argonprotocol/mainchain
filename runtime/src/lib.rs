@@ -71,7 +71,7 @@ use argon_primitives::{
 	notebook::NotebookNumber,
 	tick::{Tick, Ticker},
 	ArgonCPI, BlockSealAuthorityId, NotaryNotebookVotes, NotebookAuditResult, NotebookAuditSummary,
-	PriceProvider, TickProvider, ESCROW_CLAWBACK_TICKS,
+	PriceProvider, TickProvider, CHANNEL_HOLD_CLAWBACK_TICKS,
 };
 pub use argon_primitives::{
 	AccountId, Balance, BlockHash, BlockNumber, HashOutput, Moment, Nonce, Signature,
@@ -233,8 +233,8 @@ parameter_types! {
 	pub const TargetBlockVotes: u32 = 50_000;
 	pub const MinimumsChangePeriod: u32 = 60 * 24; // change block_seal_spec once a day
 
-	pub const DefaultEscrowDuration: Tick = 60;
-	pub const HistoricalPaymentAddressTicksToKeep: Tick = DefaultEscrowDuration::get() + ESCROW_CLAWBACK_TICKS + 10;
+	pub const DefaultChannelHoldDuration: Tick = 60;
+	pub const HistoricalPaymentAddressTicksToKeep: Tick = DefaultChannelHoldDuration::get() + CHANNEL_HOLD_CLAWBACK_TICKS + 10;
 
 	pub const ArgonsPerBlock: u32 = 5_000;
 	pub const StartingOwnershipTokensPerBlock: u32 = 5_000;
@@ -277,9 +277,9 @@ impl pallet_block_rewards::Config for Runtime {
 	type BlockRewardAccountsProvider = MiningSlot;
 }
 
-impl pallet_data_domain::Config for Runtime {
+impl pallet_domains::Config for Runtime {
 	type RuntimeEvent = RuntimeEvent;
-	type WeightInfo = pallet_data_domain::weights::SubstrateWeight<Runtime>;
+	type WeightInfo = pallet_domains::weights::SubstrateWeight<Runtime>;
 	type TickProvider = Ticks;
 	type DomainExpirationTicks = DomainExpirationTicks;
 	type HistoricalPaymentAddressTicksToKeep = HistoricalPaymentAddressTicksToKeep;
@@ -393,7 +393,6 @@ impl pallet_block_seal::Config for Runtime {
 	type NotebookProvider = Notebook;
 	type BlockVotingProvider = BlockSealSpec;
 	type TickProvider = Ticks;
-	type DataDomainProvider = DataDomain;
 	type EventHandler = MiningSlot;
 }
 
@@ -474,7 +473,7 @@ impl pallet_chain_transfer::Config for Runtime {
 impl pallet_notebook::Config for Runtime {
 	type RuntimeEvent = RuntimeEvent;
 	type WeightInfo = pallet_notebook::weights::SubstrateWeight<Runtime>;
-	type EventHandler = (ChainTransfer, BlockSealSpec, DataDomain);
+	type EventHandler = (ChainTransfer, BlockSealSpec, Domain);
 	type NotaryProvider = Notaries;
 	type ChainTransferLookup = ChainTransfer;
 	type BlockVotingProvider = BlockSealSpec;
@@ -824,7 +823,7 @@ mod runtime {
 	#[runtime::pallet_index(12)]
 	pub type BlockSealSpec = pallet_block_seal_spec;
 	#[runtime::pallet_index(13)]
-	pub type DataDomain = pallet_data_domain;
+	pub type Domain = pallet_domains;
 	#[runtime::pallet_index(14)]
 	pub type PriceIndex = pallet_price_index;
 	// NOTE: Authorship must be before session
@@ -1248,7 +1247,7 @@ mod benches {
 		[pallet_balances, OwnershipTokens]
 		[pallet_timestamp, Timestamp]
 		[pallet_ticks, Ticks]
-		[pallet_data_domain, DataDomain]
+		[pallet_domains, Domain]
 		[pallet_block_seal_spec, VoteEligibility]
 		[pallet_block_rewards, BlockRewards]
 		[pallet_mining_slot, MiningSlot]

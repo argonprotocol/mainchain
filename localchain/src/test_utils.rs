@@ -29,8 +29,8 @@ use argon_primitives::tick::Ticker;
 use argon_primitives::{
   AccountId, AccountOrigin, AccountOriginUid, AccountType, BalanceChange, BalanceProof, BalanceTip,
   ChainTransfer, LocalchainAccountId, MerkleProof, NewAccountOrigin, Notarization,
-  NotarizationBalanceChangeset, NotarizationBlockVotes, NotarizationDataDomains, NoteType,
-  Notebook, NotebookHeader, NotebookMeta, NotebookNumber, SignedNotebookHeader,
+  NotarizationBalanceChangeset, NotarizationBlockVotes, NotarizationDomains, NoteType, Notebook,
+  NotebookHeader, NotebookMeta, NotebookNumber, SignedNotebookHeader,
 };
 
 use crate::notarization_builder::NotarizationBuilder;
@@ -56,10 +56,9 @@ pub async fn connect_with_logs(
   pool_options: SqlitePoolOptions,
   connect_options: SqliteConnectOptions,
 ) -> anyhow::Result<SqlitePool> {
-  tracing_subscriber::FmtSubscriber::builder()
+  let _ = tracing_subscriber::FmtSubscriber::builder()
     .with_env_filter(tracing_subscriber::EnvFilter::from_default_env())
-    .try_init()
-    .expect("setting default subscriber failed");
+    .try_init();
   let connect_options = connect_options
     .clone()
     .log_statements(LogLevelFilter::Trace.into());
@@ -294,10 +293,10 @@ impl MockNotary {
             account_origin: account.clone(),
             change_number: *change_number,
             balance: balance_change.balance,
-            escrow_hold_note: balance_change
+            channel_hold_note: balance_change
               .notes
               .iter()
-              .find(|a| matches!(a.note_type, NoteType::EscrowHold { .. }))
+              .find(|a| matches!(a.note_type, NoteType::ChannelHold { .. }))
               .cloned(),
           });
         }
@@ -356,7 +355,7 @@ impl MockNotary {
       notebook_number,
       tick: 1,
       tax: 0,
-      data_domains: Default::default(),
+      domains: Default::default(),
       block_votes_count: 0,
       block_voting_power: 0,
       parent_secret: None,
@@ -398,7 +397,7 @@ pub fn get_balance_tip(
     account_type: balance_change.account_type,
     account_id: balance_change.account_id,
     balance: balance_change.balance,
-    escrow_hold_note: balance_change.escrow_hold_note.clone(),
+    channel_hold_note: balance_change.channel_hold_note.clone(),
     account_origin: AccountOrigin {
       account_uid: account_origin_uid,
       notebook_number: account_origin_notebook_number,
@@ -423,14 +422,14 @@ impl LocalchainRpcServer for MockNotary {
     &self,
     balance_changeset: NotarizationBalanceChangeset,
     block_votes: NotarizationBlockVotes,
-    data_domains: NotarizationDataDomains,
+    domains: NotarizationDomains,
   ) -> Result<BalanceChangeResult, ErrorObjectOwned> {
     let notebook_number = self.next_notebook_number().await;
     self
       .add_notarization(
         notebook_number,
         Notarization {
-          data_domains,
+          domains,
           block_votes,
           balance_changes: balance_changeset.clone(),
         },

@@ -23,13 +23,13 @@ use argon_primitives::tick::{Tick, Ticker};
 pub use balance_changes::*;
 pub use balance_sync::*;
 pub use constants::*;
-pub use data_domain::*;
+pub use domain::*;
 pub use embedded_keystore::CryptoScheme;
 pub use error::Error;
 pub use keystore::Keystore;
 pub use mainchain_client::*;
 pub use notary_client::*;
-pub use open_escrows::*;
+pub use open_channel_holds::*;
 
 use crate::cli::EmbeddedKeyPassword;
 use crate::mainchain_transfer::MainchainTransferStore;
@@ -43,14 +43,14 @@ mod accounts;
 mod balance_change_builder;
 mod balance_changes;
 mod balance_sync;
-mod data_domain;
+mod domain;
 pub mod keystore;
 mod mainchain_client;
 mod mainchain_transfer;
 mod notarization_builder;
 mod notarization_tracker;
 mod notary_client;
-mod open_escrows;
+mod open_channel_holds;
 
 pub mod embedded_keystore;
 
@@ -178,7 +178,7 @@ impl Localchain {
     let mut ticker = Ticker::new(
       ticker_config.tick_duration_millis as u64,
       ticker_config.genesis_utc_time as u64,
-      ticker_config.escrow_expiration_ticks as Tick,
+      ticker_config.channel_hold_expiration_ticks as Tick,
     );
     if let Some(ntp_pool_url) = ticker_config.ntp_pool_url {
       ticker.lookup_ntp_offset(&ntp_pool_url).await?;
@@ -312,12 +312,12 @@ impl Localchain {
     balance_changes::BalanceChangeStore::new(self.db.clone())
   }
 
-  pub fn data_domains(&self) -> data_domain::DataDomainStore {
-    data_domain::DataDomainStore::new(self.db.clone())
+  pub fn domains(&self) -> domain::DomainStore {
+    domain::DomainStore::new(self.db.clone())
   }
 
-  pub fn open_escrows(&self) -> open_escrows::OpenEscrowsStore {
-    open_escrows::OpenEscrowsStore::new(
+  pub fn open_channel_holds(&self) -> open_channel_holds::OpenChannelHoldsStore {
+    open_channel_holds::OpenChannelHoldsStore::new(
       self.db.clone(),
       self.ticker.clone(),
       &self.notary_clients,
@@ -666,14 +666,14 @@ pub mod napi_ext {
       self.balance_changes()
     }
 
-    #[napi(js_name = "dataDomains", getter)]
-    pub fn data_domains_napi(&self) -> data_domain::DataDomainStore {
-      self.data_domains()
+    #[napi(js_name = "domains", getter)]
+    pub fn domains_napi(&self) -> domain::DomainStore {
+      self.domains()
     }
 
-    #[napi(js_name = "openEscrows", getter)]
-    pub fn open_escrows_napi(&self) -> open_escrows::OpenEscrowsStore {
-      self.open_escrows()
+    #[napi(js_name = "openChannelHolds", getter)]
+    pub fn open_channel_holds_napi(&self) -> open_channel_holds::OpenChannelHoldsStore {
+      self.open_channel_holds()
     }
 
     #[napi(js_name = "balanceSync", getter)]
@@ -714,9 +714,9 @@ pub mod napi_ext {
       self.millis_to_next_tick()
     }
 
-    #[napi(js_name = "escrowExpirationTicks", getter)]
-    pub fn escrow_expiration_ticks_napi(&self) -> Tick {
-      self.escrow_expiration_ticks()
+    #[napi(js_name = "channelHoldExpirationTicks", getter)]
+    pub fn channel_hold_expiration_ticks_napi(&self) -> Tick {
+      self.channel_hold_expiration_ticks()
     }
   }
 }
@@ -764,8 +764,8 @@ impl TickerRef {
     self.ticker.read().duration_to_next_tick()
   }
 
-  pub fn escrow_expiration_ticks(&self) -> Tick {
-    self.ticker.read().escrow_expiration_ticks
+  pub fn channel_hold_expiration_ticks(&self) -> Tick {
+    self.ticker.read().channel_hold_expiration_ticks
   }
 }
 
@@ -774,6 +774,6 @@ impl TickerRef {
 pub struct TickerConfig {
   pub tick_duration_millis: i64,
   pub genesis_utc_time: i64,
-  pub escrow_expiration_ticks: i64,
+  pub channel_hold_expiration_ticks: i64,
   pub ntp_pool_url: Option<String>,
 }

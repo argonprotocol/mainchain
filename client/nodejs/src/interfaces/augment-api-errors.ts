@@ -139,10 +139,6 @@ declare module '@polkadot/api-base/types/errors' {
        **/
       InvalidBlockVoteProof: AugmentedError<ApiType>;
       /**
-       * The data domain account is mismatched with the block reward seeker
-       **/
-      InvalidDataDomainAccount: AugmentedError<ApiType>;
-      /**
        * Vote not submitted by the right miner
        **/
       InvalidSubmitter: AugmentedError<ApiType>;
@@ -182,10 +178,6 @@ declare module '@polkadot/api-base/types/errors' {
        * The block author is not a registered miner
        **/
       UnregisteredBlockAuthor: AugmentedError<ApiType>;
-      /**
-       * The data domain was not registered
-       **/
-      UnregisteredDataDomain: AugmentedError<ApiType>;
     };
     blockSealSpec: {
       /**
@@ -290,7 +282,7 @@ declare module '@polkadot/api-base/types/errors' {
        **/
       NotebookIncludesExpiredLocalchainTransfer: AugmentedError<ApiType>;
     };
-    dataDomain: {
+    domain: {
       /**
        * Error decoding account from notary
        **/

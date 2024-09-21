@@ -233,10 +233,10 @@ mod tests {
 		AccountId, AccountOrigin,
 		AccountType::{Deposit, Tax},
 		BalanceChange, BalanceProof, BalanceTip, BlockSealDigest, BlockVote, BlockVoteDigest,
-		DataDomain, DataDomainHash, DataTLD, HashOutput, MerkleProof, Note, NoteType,
-		NoteType::{EscrowClaim, EscrowSettle},
+		Domain, DomainHash, DomainTopLevel, HashOutput, MerkleProof, Note, NoteType,
+		NoteType::{ChannelHoldClaim, ChannelHoldSettle},
 		NotebookDigest, ParentVotingKeyDigest, TickDigest, TransferToLocalchainId,
-		DATA_DOMAIN_LEASE_COST,
+		DOMAIN_LEASE_COST,
 	};
 	use argon_testing::start_argon_test_node;
 
@@ -294,7 +294,7 @@ mod tests {
 		wait_for_transfers(&pool, vec![bob_transfer.clone(), ferdie_transfer.clone()]).await?;
 		println!("bob and ferdie transfers confirmed");
 
-		let domain_hash = DataDomain::new("HelloWorld", DataTLD::Entertainment).hash();
+		let domain_hash = Domain::new("HelloWorld", DomainTopLevel::Entertainment).hash();
 		let result = submit_balance_change_to_notary_and_create_domain(
 			&pool,
 			&ticker,
@@ -319,7 +319,7 @@ mod tests {
 		assert_eq!(
 			ctx.client
 				.fetch_storage(
-					&storage().data_domain().zone_records_by_domain(domain_hash),
+					&storage().domain().zone_records_by_domain(domain_hash),
 					Some(zone_block)
 				)
 				.await?
@@ -336,22 +336,21 @@ mod tests {
 			notebook_number: result.notebook_number,
 		};
 
-		let (hold_note, hold_result) = create_escrow_hold(
+		let (hold_note, hold_result) = create_channel_hold(
 			&pool,
 			bob_balance as u128,
 			5000,
 			&ticker,
 			result.tick,
 			origin.clone(),
-			domain_hash,
 			Alice.to_account_id(),
 		)
 		.await?;
 
-		println!("created escrow hold. Waiting for notebook {}", hold_result.notebook_number);
+		println!("created channel hold. Waiting for notebook {}", hold_result.notebook_number);
 
 		// TODO: use api once we update
-		let escrow_expiration_ticks = 2;
+		let channel_hold_expiration_ticks = 2;
 
 		let mut header_sub = notary_server.completed_notebook_stream.subscribe(100);
 		let mut notebook_proof: Option<MerkleProof> = None;
@@ -371,7 +370,7 @@ mod tests {
 											account_origin: origin.clone(),
 											balance: bob_balance as u128,
 											account_id: Bob.to_account_id(),
-											escrow_hold_note: Some(hold_note.clone()),
+											channel_hold_note: Some(hold_note.clone()),
 											change_number: 2,
 											account_type: Deposit,
 										},
@@ -379,9 +378,9 @@ mod tests {
 									.await?,
 								);
 							}
-							if header.notebook_number >= hold_result.notebook_number + escrow_expiration_ticks
+							if header.notebook_number >= hold_result.notebook_number + channel_hold_expiration_ticks
 							{
-								println!("Expiration of escrow ready");
+								println!("Expiration of channel_hold ready");
 								break;
 							}
 						},
@@ -427,7 +426,7 @@ mod tests {
 
 		let vote_power = (hold_note.milligons as f64 * 0.2f64) as u128;
 
-		let escrow_result = settle_escrow_and_vote(
+		let channel_hold_result = settle_channel_hold_and_vote(
 			&pool,
 			&ticker,
 			hold_note,
@@ -442,7 +441,7 @@ mod tests {
 			},
 		)
 		.await?;
-		println!("Escrow result is {:?}", escrow_result);
+		println!("ChannelHold result is {:?}", channel_hold_result);
 
 		let mut best_sub = ctx.client.live.blocks().subscribe_finalized().await?;
 		let mut did_see_vote = false;
@@ -453,10 +452,10 @@ mod tests {
 					let (tick, votes, seal, key, notebooks) = get_digests(block);
 					if let Some(notebook) = notebooks.notebooks.first() {
 						assert_eq!(notebook.audit_first_failure, None);
-						if notebook.notebook_number == escrow_result.notebook_number {
+						if notebook.notebook_number == channel_hold_result.notebook_number {
 							assert_eq!(votes.votes_count, 1, "Should have votes");
 							assert_eq!(votes.voting_power, vote_power);
-							assert_eq!(tick, escrow_result.tick)
+							assert_eq!(tick, channel_hold_result.tick)
 						}
 					}
 					println!("Got block with tick {tick} {:?} {:?}", votes, seal);
@@ -468,7 +467,7 @@ mod tests {
 					}
 
 					// should have gotten a vote in tick 2
-					if tick >= escrow_result.tick + 3 {
+					if tick >= channel_hold_result.tick + 3 {
 						break;
 					}
 				},
@@ -597,7 +596,7 @@ mod tests {
 					amount as u128,
 					NoteType::ClaimFromMainchain { transfer_id },
 				)],
-				escrow_hold_note: None,
+				channel_hold_note: None,
 				signature: sp_core::ed25519::Signature::from_raw([0u8; 64]).into(),
 			}
 			.sign(keypair)
@@ -615,7 +614,7 @@ mod tests {
 		pool: &PgPool,
 		ticker: &Ticker,
 		transfer: (TransferToLocalchainId, u32, Keypair),
-		domain_hash: DataDomainHash,
+		domain_hash: DomainHash,
 		register_domain_to: AccountId,
 	) -> anyhow::Result<AccountOrigin> {
 		let (transfer_id, amount, keypair) = transfer;
@@ -638,13 +637,13 @@ mod tests {
 					account_id: keypair.public().into(),
 					account_type: Deposit,
 					change_number: 1,
-					balance: amount as u128 - DATA_DOMAIN_LEASE_COST,
+					balance: amount as u128 - DOMAIN_LEASE_COST,
 					previous_balance_proof: None,
 					notes: bounded_vec![
 						Note::create(amount as u128, NoteType::ClaimFromMainchain { transfer_id },),
-						Note::create(DATA_DOMAIN_LEASE_COST, NoteType::LeaseDomain,)
+						Note::create(DOMAIN_LEASE_COST, NoteType::LeaseDomain,)
 					],
-					escrow_hold_note: None,
+					channel_hold_note: None,
 					signature: sp_core::ed25519::Signature::from_raw([0u8; 64]).into(),
 				}
 				.sign(keypair.clone())
@@ -653,10 +652,10 @@ mod tests {
 					account_id: keypair.public().into(),
 					account_type: Tax,
 					change_number: 1,
-					balance: DATA_DOMAIN_LEASE_COST,
+					balance: DOMAIN_LEASE_COST,
 					previous_balance_proof: None,
-					notes: bounded_vec![Note::create(DATA_DOMAIN_LEASE_COST, NoteType::Claim,)],
-					escrow_hold_note: None,
+					notes: bounded_vec![Note::create(DOMAIN_LEASE_COST, NoteType::Claim,)],
+					channel_hold_note: None,
 					signature: sp_core::ed25519::Signature::from_raw([0u8; 64]).into(),
 				}
 				.sign(keypair.clone())
@@ -676,15 +675,15 @@ mod tests {
 
 	async fn set_zone_record(
 		client: &ArgonOnlineClient,
-		data_domain_hash: DataDomainHash,
+		domain_hash: DomainHash,
 		account: Keypair,
 	) -> anyhow::Result<H256> {
 		let tx_progress = client
 			.tx()
 			.sign_and_submit_then_watch_default(
-				&tx().data_domain().set_zone_record(
-					data_domain_hash,
-					runtime_types::argon_primitives::data_domain::ZoneRecord {
+				&tx().domain().set_zone_record(
+					domain_hash,
+					runtime_types::argon_primitives::domain::ZoneRecord {
 						payment_account: AccountId32::from(account.public_key()),
 						notary_id: 1,
 						versions: subxt::utils::KeyedVec::new(),
@@ -699,22 +698,21 @@ mod tests {
 	}
 
 	#[allow(clippy::too_many_arguments)]
-	async fn create_escrow_hold(
+	async fn create_channel_hold(
 		pool: &PgPool,
 		balance: u128,
 		amount: u128,
 		ticker: &Ticker,
 		tick: Tick,
 		account_origin: AccountOrigin,
-		domain_hash: DataDomainHash,
 		domain_account: AccountId,
 	) -> anyhow::Result<(Note, BalanceChangeResult)> {
 		let hold_note = Note::create(
 			amount,
-			NoteType::EscrowHold {
+			NoteType::ChannelHold {
 				recipient: domain_account,
-				data_domain_hash: Some(domain_hash),
 				delegated_signer: None,
+				domain_hash: None,
 			},
 		);
 		let changes = vec![BalanceChange {
@@ -731,7 +729,7 @@ mod tests {
 				account_origin: account_origin.clone(),
 			}),
 			notes: bounded_vec![hold_note.clone()],
-			escrow_hold_note: None,
+			channel_hold_note: None,
 			signature: sp_core::sr25519::Signature::from_raw([0u8; 64]).into(),
 		}
 		.sign(Bob.pair())
@@ -741,18 +739,13 @@ mod tests {
 		Ok((hold_note.clone(), result))
 	}
 
-	async fn settle_escrow_and_vote(
+	async fn settle_channel_hold_and_vote(
 		pool: &PgPool,
 		ticker: &Ticker,
 		hold_note: Note,
 		vote_block_hash: HashOutput,
 		bob_balance_proof: BalanceProof,
 	) -> anyhow::Result<BalanceChangeResult> {
-		let (data_domain_hash, recipient) = match hold_note.note_type.clone() {
-			NoteType::EscrowHold { recipient, data_domain_hash, delegated_signer: None } =>
-				(data_domain_hash, recipient),
-			_ => panic!("Should be an escrow hold note"),
-		};
 		let tax = (hold_note.milligons as f64 * 0.2f64) as u128;
 		let changes = vec![
 			BalanceChange {
@@ -761,8 +754,8 @@ mod tests {
 				change_number: 3,
 				balance: bob_balance_proof.balance - hold_note.milligons,
 				previous_balance_proof: Some(bob_balance_proof),
-				escrow_hold_note: Some(hold_note.clone()),
-				notes: bounded_vec![Note::create(hold_note.milligons, EscrowSettle)],
+				channel_hold_note: Some(hold_note.clone()),
+				notes: bounded_vec![Note::create(hold_note.milligons, ChannelHoldSettle)],
 				signature: sp_core::sr25519::Signature::from_raw([0u8; 64]).into(),
 			}
 			.sign(Bob.pair())
@@ -773,9 +766,9 @@ mod tests {
 				change_number: 1,
 				balance: hold_note.milligons - tax,
 				previous_balance_proof: None,
-				escrow_hold_note: None,
+				channel_hold_note: None,
 				notes: bounded_vec![
-					Note::create(hold_note.milligons, EscrowClaim),
+					Note::create(hold_note.milligons, ChannelHoldClaim),
 					Note::create(tax, NoteType::Tax)
 				],
 				signature: sp_core::sr25519::Signature::from_raw([0u8; 64]).into(),
@@ -788,7 +781,7 @@ mod tests {
 				change_number: 1,
 				balance: 0,
 				previous_balance_proof: None,
-				escrow_hold_note: None,
+				channel_hold_note: None,
 				notes: bounded_vec![
 					Note::create(tax, NoteType::Claim),
 					Note::create(tax, NoteType::SendToVote)
@@ -804,8 +797,6 @@ mod tests {
 			ticker,
 			changes,
 			vec![BlockVote {
-				data_domain_hash: data_domain_hash.unwrap(),
-				data_domain_account: recipient,
 				account_id: Alice.to_account_id(),
 				index: 1,
 				block_hash: vote_block_hash,

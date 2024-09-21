@@ -19,11 +19,11 @@ use crate::keystore::Keystore;
 use crate::mainchain_transfer::MainchainTransferStore;
 use crate::notarization_builder::NotarizationBuilder;
 use crate::notarization_tracker::NotarizationTracker;
-use crate::open_escrows::OpenEscrowsStore;
+use crate::open_channel_holds::OpenChannelHoldsStore;
 use crate::transactions::{TransactionType, Transactions};
-use crate::{Escrow, MainchainClient};
+use crate::{ChannelHold, MainchainClient};
 use crate::{LocalAccount, NOTARIZATION_MAX_BALANCE_CHANGES};
-use crate::{Localchain, OpenEscrow};
+use crate::{Localchain, OpenChannelHold};
 use crate::{LocalchainTransfer, NotaryAccountOrigin, TickerRef};
 use crate::{NotaryClient, NotaryClients};
 
@@ -34,14 +34,14 @@ pub struct BalanceSync {
   mainchain_client: Arc<Mutex<Option<MainchainClient>>>,
   notary_clients: NotaryClients,
   lock: Arc<Mutex<()>>,
-  open_escrows: OpenEscrowsStore,
+  open_channel_holds: OpenChannelHoldsStore,
   keystore: Keystore,
   tick_counter: Arc<Mutex<(u32, u32)>>,
 }
 
 #[cfg_attr(feature = "napi", napi(object))]
 #[derive(Clone)]
-pub struct EscrowCloseOptions {
+pub struct ChannelHoldCloseOptions {
   pub votes_address: Option<String>,
   /// What's the minimum amount of tax we should wait for before voting on blocks
   pub minimum_vote_amount: Option<i64>,
@@ -51,7 +51,7 @@ pub struct EscrowCloseOptions {
 pub struct BalanceSyncResult {
   pub(crate) balance_changes: Vec<BalanceChangeRow>,
   pub(crate) mainchain_transfers: Vec<NotarizationTracker>,
-  pub(crate) escrow_notarizations: Vec<NotarizationBuilder>,
+  pub(crate) channel_hold_notarizations: Vec<NotarizationBuilder>,
   pub(crate) jump_account_consolidations: Vec<NotarizationTracker>,
 }
 
@@ -59,8 +59,8 @@ impl BalanceSyncResult {
   pub fn balance_changes(&self) -> Vec<BalanceChangeRow> {
     self.balance_changes.clone()
   }
-  pub fn escrow_notarizations(&self) -> Vec<NotarizationBuilder> {
-    self.escrow_notarizations.clone()
+  pub fn channel_hold_notarizations(&self) -> Vec<NotarizationBuilder> {
+    self.channel_hold_notarizations.clone()
   }
 
   pub fn mainchain_transfers(&self) -> Vec<NotarizationTracker> {
@@ -113,7 +113,9 @@ pub mod napi_ext {
   use crate::error::NapiOk;
   use crate::notarization_builder::NotarizationBuilder;
   use crate::notarization_tracker::NotarizationTracker;
-  use crate::{BalanceChangeRow, BalanceSync, BalanceSyncResult, EscrowCloseOptions, Localchain};
+  use crate::{
+    BalanceChangeRow, BalanceSync, BalanceSyncResult, ChannelHoldCloseOptions, Localchain,
+  };
   use napi_derive::napi;
 
   #[napi]
@@ -122,9 +124,9 @@ pub mod napi_ext {
     pub fn balance_changes_napi(&self) -> Vec<BalanceChangeRow> {
       self.balance_changes.clone()
     }
-    #[napi(getter, js_name = "escrowNotarizations")]
-    pub fn escrow_notarizations_napi(&self) -> Vec<NotarizationBuilder> {
-      self.escrow_notarizations.clone()
+    #[napi(getter, js_name = "channelHoldNotarizations")]
+    pub fn channel_hold_notarizations_napi(&self) -> Vec<NotarizationBuilder> {
+      self.channel_hold_notarizations.clone()
     }
     #[napi(getter, js_name = "mainchainTransfers")]
     pub fn mainchain_transfers_napi(&self) -> Vec<NotarizationTracker> {
@@ -145,7 +147,7 @@ pub mod napi_ext {
     #[napi(js_name = "sync")]
     pub async fn sync_napi(
       &self,
-      options: Option<EscrowCloseOptions>,
+      options: Option<ChannelHoldCloseOptions>,
     ) -> napi::Result<BalanceSyncResult> {
       self.sync(options).await.napi_ok()
     }
@@ -168,12 +170,12 @@ pub mod napi_ext {
     ) -> napi::Result<BalanceChangeRow> {
       self.sync_balance_change(balance_change).await.napi_ok()
     }
-    #[napi(js_name = "processPendingEscrows")]
-    pub async fn process_pending_escrows_napi(
+    #[napi(js_name = "processPendingChannelHolds")]
+    pub async fn process_pending_channel_holds_napi(
       &self,
-      options: Option<EscrowCloseOptions>,
+      options: Option<ChannelHoldCloseOptions>,
     ) -> napi::Result<Vec<NotarizationBuilder>> {
-      self.process_pending_escrows(options).await.napi_ok()
+      self.process_pending_channel_holds(options).await.napi_ok()
     }
   }
 }
@@ -186,13 +188,13 @@ impl BalanceSync {
       mainchain_client: localchain.mainchain_client.clone(),
       notary_clients: localchain.notary_clients.clone(),
       lock: Arc::new(Mutex::new(())),
-      open_escrows: localchain.open_escrows(),
+      open_channel_holds: localchain.open_channel_holds(),
       tick_counter: Arc::new(Mutex::new((0, 0))),
       keystore: localchain.keystore.clone(),
     }
   }
 
-  pub async fn sync(&self, options: Option<EscrowCloseOptions>) -> Result<BalanceSyncResult> {
+  pub async fn sync(&self, options: Option<ChannelHoldCloseOptions>) -> Result<BalanceSyncResult> {
     let balance_changes = self.sync_unsettled_balances().await?;
 
     tracing::debug!(
@@ -200,7 +202,7 @@ impl BalanceSync {
       balance_changes.len(),
     );
 
-    let escrow_notarizations = self.process_pending_escrows(options).await?;
+    let channel_hold_notarizations = self.process_pending_channel_holds(options).await?;
 
     let jump_account_consolidations = self.consolidate_jump_accounts().await?;
 
@@ -208,7 +210,7 @@ impl BalanceSync {
 
     Ok(BalanceSyncResult {
       balance_changes,
-      escrow_notarizations,
+      channel_hold_notarizations,
       jump_account_consolidations,
       mainchain_transfers,
     })
@@ -414,25 +416,25 @@ impl BalanceSync {
     Ok(change)
   }
 
-  pub async fn process_pending_escrows(
+  pub async fn process_pending_channel_holds(
     &self,
-    options: Option<EscrowCloseOptions>,
+    options: Option<ChannelHoldCloseOptions>,
   ) -> Result<Vec<NotarizationBuilder>> {
     let _lock = self.lock.lock().await;
-    let open_escrows = self.open_escrows.get_claimable().await?;
+    let open_channel_holds = self.open_channel_holds.get_claimable().await?;
     tracing::debug!(
-      "Processing pending escrows. Found {} to check for claims.",
-      open_escrows.len(),
+      "Processing pending channel_holds. Found {} to check for claims.",
+      open_channel_holds.len(),
     );
 
     let mut builder_by_notary = HashMap::new();
 
     let mut notarizations = vec![];
 
-    for open_escrow in open_escrows {
-      let mut escrow = open_escrow.inner().await;
+    for open_channel_hold in open_channel_holds {
+      let mut channel_hold = open_channel_hold.inner().await;
 
-      let notary_id = escrow.notary_id;
+      let notary_id = channel_hold.notary_id;
 
       let notarization = builder_by_notary.entry(notary_id).or_insert_with(|| {
         NotarizationBuilder::new(
@@ -443,21 +445,39 @@ impl BalanceSync {
         )
       });
 
-      if escrow.is_client {
+      if channel_hold.is_client {
         if let Err(e) = self
-          .sync_client_escrow(notary_id, &open_escrow, &mut escrow, notarization)
+          .sync_client_channel_hold(
+            notary_id,
+            &open_channel_hold,
+            &mut channel_hold,
+            notarization,
+          )
           .await
         {
-          tracing::warn!("Error syncing client escrow (#{}): {:?}", escrow.id, e);
+          tracing::warn!(
+            "Error syncing client channel_hold (#{}): {:?}",
+            channel_hold.id,
+            e
+          );
         } else {
-          let _ = open_escrow.reload().await;
+          let _ = open_channel_hold.reload().await;
         }
       } else {
         if let Err(e) = self
-          .sync_server_escrow(&open_escrow, &mut escrow, &options, notarization)
+          .sync_server_channel_hold(
+            &open_channel_hold,
+            &mut channel_hold,
+            &options,
+            notarization,
+          )
           .await
         {
-          tracing::warn!("Error syncing server escrow (#{}): {:?}", escrow.id, e);
+          tracing::warn!(
+            "Error syncing server channel_hold (#{}): {:?}",
+            channel_hold.id,
+            e
+          );
         }
         if notarization.is_finalized().await {
           if let Some(n) = builder_by_notary.remove(&notary_id) {
@@ -472,7 +492,7 @@ impl BalanceSync {
         continue;
       }
       self
-        .finalize_escrow_notarization(&mut notarization, &options)
+        .finalize_channel_hold_notarization(&mut notarization, &options)
         .await;
       if notarization.is_finalized().await {
         notarizations.push(notarization.clone());
@@ -508,7 +528,7 @@ impl BalanceSync {
   pub async fn convert_tax_to_votes(
     &self,
     notarization: &mut NotarizationBuilder,
-    options: &Option<EscrowCloseOptions>,
+    options: &Option<ChannelHoldCloseOptions>,
   ) -> Result<()> {
     let Some(options) = options else {
       bail!("No options provided to create votes with tax");
@@ -536,20 +556,6 @@ impl BalanceSync {
       return Ok(());
     }
 
-    let escrows = notarization.escrows().await;
-    let Some((data_domain_hash, data_domain_address)) = escrows.into_iter().find_map(|c| {
-      if c.is_client {
-        return None;
-      }
-      if let Some(domain) = c.data_domain_hash {
-        Some((domain, c.to_address))
-      } else {
-        None
-      }
-    }) else {
-      return Ok(());
-    };
-
     let mut tax_account = None;
     for (_, (account, tax)) in tax_accounts {
       let balance_change = notarization.get_balance_change(&account).await?;
@@ -570,8 +576,6 @@ impl BalanceSync {
     let mut vote = BlockVote {
       account_id: tax_account.get_account_id32()?,
       power: total_available_tax,
-      data_domain_hash: H256::from_slice(data_domain_hash.as_ref()),
-      data_domain_account: AccountStore::parse_address(&data_domain_address)?,
       index: tick_counter.1,
       block_hash: H256::from_slice(best_block_for_vote.block_hash.as_ref()),
       block_rewards_account_id: AccountStore::parse_address(&vote_address)?,
@@ -587,10 +591,10 @@ impl BalanceSync {
     Ok(())
   }
 
-  pub async fn finalize_escrow_notarization(
+  pub async fn finalize_channel_hold_notarization(
     &self,
     notarization: &mut NotarizationBuilder,
-    options: &Option<EscrowCloseOptions>,
+    options: &Option<ChannelHoldCloseOptions>,
   ) {
     if let Err(e) = self.convert_tax_to_votes(notarization, options).await {
       tracing::error!(
@@ -600,7 +604,7 @@ impl BalanceSync {
     }
 
     if let Err(e) = notarization.sign().await {
-      tracing::error!("Could not claim an escrow -> {:?}", e);
+      tracing::error!("Could not claim a channel_hold -> {:?}", e);
       return;
     }
 
@@ -612,7 +616,7 @@ impl BalanceSync {
       match notarization.notarize().await {
         Ok(tracker) => {
           tracing::info!(
-            "Finalized escrow notarization. id={}, balance_changes={}, votes={}",
+            "Finalized channel_hold notarization. id={}, balance_changes={}, votes={}",
             tracker.notarization_id,
             tracker.notarized_balance_changes,
             tracker.notarized_votes
@@ -624,102 +628,102 @@ impl BalanceSync {
             || matches!(
               e,
               Error::NotaryApiError(argon_notary_apis::Error::BalanceChangeVerifyError(
-                argon_notary_audit::VerifyError::EscrowHoldNotReadyForClaim { .. }
+                argon_notary_audit::VerifyError::ChannelHoldNotReadyForClaim { .. }
               ))
             )
           {
             let delay = (2 + i) ^ 5;
-            tracing::debug!("Escrow hold not ready for claim. Waiting {delay} seconds.");
+            tracing::debug!("Channel hold not ready for claim. Waiting {delay} seconds.");
             tokio::time::sleep(tokio::time::Duration::from_secs(delay)).await;
             continue;
           }
-          tracing::warn!("Error finalizing escrow notarization: {:?}", e);
+          tracing::warn!("Error finalizing channel_hold notarization: {:?}", e);
         }
       }
     }
   }
 
-  pub async fn sync_server_escrow(
+  pub async fn sync_server_channel_hold(
     &self,
-    open_escrow: &OpenEscrow,
-    escrow: &mut Escrow,
-    options: &Option<EscrowCloseOptions>,
+    open_channel_hold: &OpenChannelHold,
+    channel_hold: &mut ChannelHold,
+    options: &Option<ChannelHoldCloseOptions>,
     notarization: &mut NotarizationBuilder,
   ) -> Result<()> {
     let current_tick = self.ticker.current();
 
-    if escrow.is_past_claim_period(current_tick) {
+    if channel_hold.is_past_claim_period(current_tick) {
       tracing::warn!(
-        "Escrow expired and we missed claim window, marking unable to claim. id={}",
-        escrow.id
+        "ChannelHold expired and we missed claim window, marking unable to claim. id={}",
+        channel_hold.id
       );
       let mut db = self.db.acquire().await?;
-      escrow.db_mark_unable_to_claim(&mut db).await?;
+      channel_hold.db_mark_unable_to_claim(&mut db).await?;
       return Ok(());
     }
 
     tracing::debug!(
-      "Server escrow {} ready for claim. escrow address={}, change number={}",
-      escrow.id,
-      escrow.from_address,
-      escrow.balance_change_number
+      "Server channel_hold {} ready for claim. channel_hold address={}, change number={}",
+      channel_hold.id,
+      channel_hold.from_address,
+      channel_hold.balance_change_number
     );
-    if !notarization.can_add_escrow(open_escrow).await {
+    if !notarization.can_add_channel_hold(open_channel_hold).await {
       self
-        .finalize_escrow_notarization(notarization, options)
+        .finalize_channel_hold_notarization(notarization, options)
         .await;
       return Ok(());
     }
-    notarization.claim_escrow(open_escrow).await?;
+    notarization.claim_channel_hold(open_channel_hold).await?;
     Ok(())
   }
 
-  pub async fn sync_client_escrow(
+  pub async fn sync_client_channel_hold(
     &self,
     notary_id: u32,
-    open_escrow: &OpenEscrow,
-    escrow: &mut Escrow,
+    open_channel_hold: &OpenChannelHold,
+    channel_hold: &mut ChannelHold,
     notarization: &mut NotarizationBuilder,
   ) -> Result<()> {
     let tip = self
       .notary_clients
       .get(notary_id)
       .await?
-      .get_balance_tip(escrow.from_address.clone(), AccountType::Deposit)
+      .get_balance_tip(channel_hold.from_address.clone(), AccountType::Deposit)
       .await?;
 
-    let hold_notebook = escrow.hold_notebook_number();
+    let hold_notebook = channel_hold.hold_notebook_number();
     // hasn't changed - aka, nothing synced
     if tip.notebook_number == hold_notebook {
       let current_tick = self.ticker.current();
-      if escrow.is_past_claim_period(current_tick) {
+      if channel_hold.is_past_claim_period(current_tick) {
         tracing::info!(
-          "An escrow was not claimed by the recipient. We're taking it back. id={}",
-          escrow.id
+          "A channel_hold was not claimed by the recipient. We're taking it back. id={}",
+          channel_hold.id
         );
-        notarization.cancel_escrow(open_escrow).await?;
+        notarization.cancel_channel_hold(open_channel_hold).await?;
       }
       return Ok(());
     }
 
     tracing::debug!(
-      "Trying to sync a client escrow that appears to have been updated by the recipient. escrow address={}, change number={}",
-      escrow.from_address,
-      escrow.balance_change_number
+      "Trying to sync a client channel_hold that appears to have been updated by the recipient. channel_hold address={}, change number={}",
+      channel_hold.from_address,
+      channel_hold.balance_change_number
     );
 
     // will handle notarization
     let _ = self
       .sync_notarization(
-        escrow.from_address.clone(),
+        channel_hold.from_address.clone(),
         AccountType::Deposit,
         notary_id,
         tip.notebook_number,
-        escrow.balance_change_number,
+        channel_hold.balance_change_number,
         tip.tick,
       )
       .await?;
-    notarization.add_escrow(open_escrow).await;
+    notarization.add_channel_hold(open_channel_hold).await;
     Ok(())
   }
 
@@ -763,7 +767,8 @@ impl BalanceSync {
         .map(|a| a.unwrap());
 
     for balance_change in notarization.balance_changes.iter() {
-      let _ = OpenEscrowsStore::db_record_notarized(&mut tx, balance_change, notarization_id).await;
+      let _ =
+        OpenChannelHoldsStore::db_record_notarized(&mut tx, balance_change, notarization_id).await;
 
       BalanceChangeStore::tx_upsert_notarized(
         &mut tx,

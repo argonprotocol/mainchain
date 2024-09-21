@@ -17,17 +17,8 @@ use crate::{
 	block_seal::{BlockPayout, MiningAuthority, RewardSharing},
 	inherents::BlockSealInherent,
 	tick::{Tick, Ticker},
-	DataDomainHash, NotaryId, NotebookHeader, NotebookNumber, NotebookSecret,
-	TransferToLocalchainId, VoteMinimum,
+	NotaryId, NotebookHeader, NotebookNumber, NotebookSecret, TransferToLocalchainId, VoteMinimum,
 };
-
-pub trait DataDomainProvider<AccountId> {
-	fn is_registered_payment_account(
-		data_domain_hash: &DataDomainHash,
-		account_id: &AccountId,
-		tick_range: (Tick, Tick),
-	) -> bool;
-}
 
 pub trait NotebookProvider {
 	/// Returns a block voting root only if submitted in time for previous block

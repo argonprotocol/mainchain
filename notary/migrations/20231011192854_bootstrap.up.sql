@@ -46,7 +46,7 @@ CREATE TABLE IF NOT EXISTS notebook_headers
     blocks_with_votes       bytea[]             NOT NULL,
     secret_hash             bytea               NOT NULL,
     parent_secret           bytea               NULL,
-    data_domains            jsonb               NOT NULL,
+    domains                 jsonb               NOT NULL,
     last_updated            timestamptz         NOT NULL default now()
 );
 
@@ -74,7 +74,7 @@ CREATE TABLE IF NOT EXISTS notarizations
     notebook_number integer NOT NULL REFERENCES notebook_headers (notebook_number),
     balance_changes jsonb   NOT NULL,
     block_votes     jsonb   NOT NULL,
-    data_domains    jsonb   NOT NULL,
+    domains    jsonb   NOT NULL,
     account_lookups bytea[] NOT NULL -- combined key of <account_id::hex>_<account_type>_<change_number>
 );
 
@@ -125,7 +125,7 @@ CREATE TABLE IF NOT EXISTS notebook_constraints
     block_votes     integer NOT NULL default 0,
     balance_changes integer NOT NULL default 0,
     notarizations   integer NOT NULL default 0,
-    data_domains    integer NOT NULL default 0
+    domains    integer NOT NULL default 0
 );
 
 

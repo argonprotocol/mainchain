@@ -30,21 +30,21 @@ pub struct Ticker {
 	#[codec(compact)]
 	pub genesis_utc_time: u64,
 	#[codec(compact)]
-	pub escrow_expiration_ticks: Tick,
+	pub channel_hold_expiration_ticks: Tick,
 	#[codec(skip)]
 	ntp_offset_millis: i64,
 }
 
 impl Ticker {
 	#[cfg(feature = "std")]
-	pub fn start(tick_duration: Duration, escrow_expiration_ticks: Tick) -> Self {
+	pub fn start(tick_duration: Duration, channel_hold_expiration_ticks: Tick) -> Self {
 		let current_time = now();
 		let offset = current_time % tick_duration.as_millis() as u64;
 		let genesis_utc_time = current_time - offset;
 		Self {
 			tick_duration_millis: tick_duration.as_millis() as u64,
 			genesis_utc_time,
-			escrow_expiration_ticks,
+			channel_hold_expiration_ticks,
 			ntp_offset_millis: 0,
 		}
 	}
@@ -66,12 +66,12 @@ impl Ticker {
 	pub fn new(
 		tick_duration_millis: u64,
 		genesis_utc_time: u64,
-		escrow_expiration_ticks: Tick,
+		channel_hold_expiration_ticks: Tick,
 	) -> Self {
 		Self {
 			tick_duration_millis,
 			genesis_utc_time,
-			escrow_expiration_ticks,
+			channel_hold_expiration_ticks,
 			ntp_offset_millis: 0,
 		}
 	}

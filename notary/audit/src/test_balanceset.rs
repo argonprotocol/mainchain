@@ -11,8 +11,7 @@ use sp_keyring::{
 use argon_primitives::{
 	balance_change::{AccountOrigin, BalanceChange, BalanceProof},
 	note::{Note, NoteType},
-	AccountType, BlockVote, DataDomain, DataTLD, LocalchainAccountId, MultiSignatureBytes,
-	ESCROW_CLAWBACK_TICKS,
+	AccountType, BlockVote, LocalchainAccountId, MultiSignatureBytes, CHANNEL_HOLD_CLAWBACK_TICKS,
 };
 
 use crate::{
@@ -45,7 +44,7 @@ fn test_balance_change_allocation_errs_non_zero() {
 				change_number: 1,
 				balance: 100,
 				previous_balance_proof: None,
-				escrow_hold_note: None,
+				channel_hold_note: None,
 				notes: bounded_vec![Note::create(100, NoteType::Claim)],
 				signature: empty_signature(),
 			}
@@ -68,7 +67,7 @@ fn must_supply_zero_balance_on_first_nonce() {
 		change_number: 2,
 		balance: 100,
 		previous_balance_proof: None,
-		escrow_hold_note: None,
+		channel_hold_note: None,
 		notes: Default::default(),
 		signature: empty_signature(),
 	}];
@@ -88,7 +87,7 @@ fn test_balance_change_allocation_must_be_zero() {
 			change_number: 2,
 			balance: 0,
 			previous_balance_proof: empty_proof(100),
-			escrow_hold_note: None,
+			channel_hold_note: None,
 			notes: bounded_vec![Note::create(
 				100,
 				NoteType::Send { to: Some(bounded_vec!(Alice.to_account_id())) }
@@ -101,7 +100,7 @@ fn test_balance_change_allocation_must_be_zero() {
 			change_number: 1,
 			balance: 100,
 			previous_balance_proof: None,
-			escrow_hold_note: None,
+			channel_hold_note: None,
 			notes: bounded_vec![Note::create(100, NoteType::Claim)],
 			signature: empty_signature(),
 		},
@@ -119,7 +118,7 @@ fn test_notes_must_add_up() {
 			change_number: 2,
 			balance: 0,
 			previous_balance_proof: empty_proof(250),
-			escrow_hold_note: None,
+			channel_hold_note: None,
 			notes: bounded_vec![Note::create(250, NoteType::Send { to: None })],
 			signature: empty_signature(),
 		},
@@ -129,7 +128,7 @@ fn test_notes_must_add_up() {
 			change_number: 1,
 			balance: 100,
 			previous_balance_proof: None,
-			escrow_hold_note: None,
+			channel_hold_note: None,
 			notes: bounded_vec![Note::create(100, NoteType::Claim)],
 			signature: empty_signature(),
 		},
@@ -139,7 +138,7 @@ fn test_notes_must_add_up() {
 			change_number: 1,
 			balance: 100, // WRONG BALANCE - should be 150
 			previous_balance_proof: None,
-			escrow_hold_note: None,
+			channel_hold_note: None,
 			notes: bounded_vec![Note::create(150, NoteType::Claim)],
 			signature: empty_signature(),
 		},
@@ -167,7 +166,7 @@ fn test_recipients() {
 
 			balance: 0,
 			previous_balance_proof: empty_proof(250),
-			escrow_hold_note: None,
+			channel_hold_note: None,
 			notes: bounded_vec![Note::create(
 				250,
 				NoteType::Send {
@@ -182,7 +181,7 @@ fn test_recipients() {
 			change_number: 1,
 			balance: 200,
 			previous_balance_proof: None,
-			escrow_hold_note: None,
+			channel_hold_note: None,
 			notes: bounded_vec![Note::create(200, NoteType::Claim)],
 			signature: empty_signature(),
 		},
@@ -192,7 +191,7 @@ fn test_recipients() {
 			change_number: 1,
 			balance: 50,
 			previous_balance_proof: None,
-			escrow_hold_note: None,
+			channel_hold_note: None,
 			notes: bounded_vec![Note::create(50, NoteType::Claim)],
 			signature: empty_signature(),
 		},
@@ -217,7 +216,7 @@ fn test_sending_to_localchain() {
 		change_number: 1,
 		balance: 250,
 		previous_balance_proof: None,
-		escrow_hold_note: None,
+		channel_hold_note: None,
 		notes: bounded_vec![Note {
 			milligons: 250,
 			note_type: NoteType::ClaimFromMainchain { transfer_id: 1 },
@@ -240,7 +239,7 @@ fn test_sending_to_mainchain() {
 			change_number: 2,
 			balance: 100,
 			previous_balance_proof: empty_proof(50),
-			escrow_hold_note: None,
+			channel_hold_note: None,
 			notes: bounded_vec![
 				Note::create(250, NoteType::ClaimFromMainchain { transfer_id: 15 }),
 				Note::create(200, NoteType::Send { to: None }),
@@ -253,7 +252,7 @@ fn test_sending_to_mainchain() {
 			change_number: 1,
 			balance: 50,
 			previous_balance_proof: None,
-			escrow_hold_note: None,
+			channel_hold_note: None,
 			notes: bounded_vec![
 				Note::create(200, NoteType::Claim),
 				Note::create(150, NoteType::SendToMainchain),
@@ -266,13 +265,13 @@ fn test_sending_to_mainchain() {
 }
 
 #[test]
-fn test_can_lock_with_a_escrow_note() -> anyhow::Result<()> {
-	let escrow_note = Note::create(
+fn test_can_lock_with_a_channel_hold_note() -> anyhow::Result<()> {
+	let channel_hold_note = Note::create(
 		250,
-		NoteType::EscrowHold {
+		NoteType::ChannelHold {
 			recipient: Alice.to_account_id(),
-			data_domain_hash: None,
 			delegated_signer: None,
+			domain_hash: None,
 		},
 	);
 	let balance_change = BalanceChange {
@@ -281,15 +280,15 @@ fn test_can_lock_with_a_escrow_note() -> anyhow::Result<()> {
 		change_number: 2,
 		balance: 250,
 		previous_balance_proof: empty_proof(250),
-		escrow_hold_note: None,
-		notes: bounded_vec![escrow_note.clone()],
+		channel_hold_note: None,
+		notes: bounded_vec![channel_hold_note.clone()],
 		signature: empty_signature(),
 	};
 	{
 		let res = verify_notarization_allocation(&vec![balance_change], &[], &[], Some(1), 2)
 			.expect("should be ok");
-		assert!(!res.needs_escrow_settle_followup);
-		assert_eq!(res.unclaimed_escrow_balances.len(), 0);
+		assert!(!res.needs_channel_hold_settle_followup);
+		assert_eq!(res.unclaimed_channel_hold_balances.len(), 0);
 		assert_eq!(res.sent_deposits, 0);
 		assert_ok!(res.verify_taxes());
 	}
@@ -302,7 +301,7 @@ fn test_can_lock_with_a_escrow_note() -> anyhow::Result<()> {
 				change_number: 3,
 				balance: 250,
 				previous_balance_proof: empty_proof(250),
-				escrow_hold_note: Some(escrow_note.clone()),
+				channel_hold_note: Some(channel_hold_note.clone()),
 				notes: bounded_vec![Note::create(250, NoteType::Send { to: None })],
 				signature: empty_signature(),
 			}],
@@ -314,54 +313,54 @@ fn test_can_lock_with_a_escrow_note() -> anyhow::Result<()> {
 		VerifyError::AccountLocked
 	);
 
-	let mut escrow_settle = BalanceChange {
+	let mut channel_hold_settle = BalanceChange {
 		account_id: Bob.to_account_id(),
 		account_type: AccountType::Deposit,
 		change_number: 3,
 		balance: 200,
 		previous_balance_proof: empty_proof(250),
-		escrow_hold_note: Some(escrow_note.clone()),
-		notes: bounded_vec![Note::create(50, NoteType::EscrowSettle)],
+		channel_hold_note: Some(channel_hold_note.clone()),
+		notes: bounded_vec![Note::create(50, NoteType::ChannelHoldSettle)],
 		signature: empty_signature(),
 	};
 
 	assert!(matches!(
-		verify_notarization_allocation(&vec![escrow_settle.clone()], &[], &[], Some(2), 2),
-		Err(VerifyError::EscrowHoldNotReadyForClaim { .. })
+		verify_notarization_allocation(&vec![channel_hold_settle.clone()], &[], &[], Some(2), 2),
+		Err(VerifyError::ChannelHoldNotReadyForClaim { .. })
 	));
 
 	// try to clear out change
-	escrow_settle.balance = 250;
-	escrow_settle.notes[0].milligons = 0;
+	channel_hold_settle.balance = 250;
+	channel_hold_settle.notes[0].milligons = 0;
 
-	let proof_tick = escrow_settle.clone().previous_balance_proof.unwrap().tick;
+	let proof_tick = channel_hold_settle.clone().previous_balance_proof.unwrap().tick;
 
-	let escrow_expiration_ticks = 2;
+	let channel_hold_expiration_ticks = 2;
 
 	// it won't let you claim your own note back before the clawback period
 	assert_err!(
 		verify_notarization_allocation(
-			&vec![escrow_settle.clone()],
+			&vec![channel_hold_settle.clone()],
 			&[],
 			&[],
-			Some(escrow_expiration_ticks + proof_tick),
-			escrow_expiration_ticks
+			Some(channel_hold_expiration_ticks + proof_tick),
+			channel_hold_expiration_ticks
 		),
-		VerifyError::InvalidEscrowClaimers
+		VerifyError::InvalidChannelHoldClaimers
 	);
 
 	// it WILL let you claim back your own note if it's past the grace period
 	{
 		let res = verify_notarization_allocation(
-			&vec![escrow_settle.clone()],
+			&vec![channel_hold_settle.clone()],
 			&[],
 			&[],
-			Some(1 + ESCROW_CLAWBACK_TICKS + escrow_expiration_ticks),
+			Some(1 + CHANNEL_HOLD_CLAWBACK_TICKS + channel_hold_expiration_ticks),
 			2,
 		)
 		.expect("should be ok");
-		assert!(!res.needs_escrow_settle_followup);
-		assert_eq!(res.unclaimed_escrow_balances.len(), 0);
+		assert!(!res.needs_channel_hold_settle_followup);
+		assert_eq!(res.unclaimed_channel_hold_balances.len(), 0);
 		assert_eq!(res.sent_deposits, 0);
 		assert_ok!(res.verify_taxes());
 	}
@@ -373,8 +372,8 @@ fn test_can_lock_with_a_escrow_note() -> anyhow::Result<()> {
 			change_number: 3,
 			balance: 200,
 			previous_balance_proof: empty_proof(250),
-			escrow_hold_note: Some(escrow_note.clone()),
-			notes: bounded_vec![Note::create(50, NoteType::EscrowSettle)],
+			channel_hold_note: Some(channel_hold_note.clone()),
+			notes: bounded_vec![Note::create(50, NoteType::ChannelHoldSettle)],
 			signature: empty_signature(),
 		},
 		BalanceChange {
@@ -383,24 +382,25 @@ fn test_can_lock_with_a_escrow_note() -> anyhow::Result<()> {
 			change_number: 1,
 			balance: 50,
 			previous_balance_proof: None,
-			escrow_hold_note: None,
-			notes: bounded_vec![Note::create(50, NoteType::EscrowClaim)],
+			channel_hold_note: None,
+			notes: bounded_vec![Note::create(50, NoteType::ChannelHoldClaim)],
 			signature: empty_signature(),
 		},
 	];
 
 	assert!(
-		verify_notarization_allocation(&changes, &[], &[], None, 2)?.needs_escrow_settle_followup
+		verify_notarization_allocation(&changes, &[], &[], None, 2)?
+			.needs_channel_hold_settle_followup
 	);
 	// a valid claim is also acceptable
 	{
 		let res =
 			verify_notarization_allocation(&changes, &[], &[], Some(61), 2).expect("should be ok");
-		assert!(!res.needs_escrow_settle_followup);
-		assert_eq!(res.unclaimed_escrow_balances.len(), 0);
-		assert_eq!(res.claimed_escrow_deposits_per_account.len(), 1);
+		assert!(!res.needs_channel_hold_settle_followup);
+		assert_eq!(res.unclaimed_channel_hold_balances.len(), 0);
+		assert_eq!(res.claimed_channel_hold_deposits_per_account.len(), 1);
 		assert_eq!(
-			res.claimed_escrow_deposits_per_account
+			res.claimed_channel_hold_deposits_per_account
 				.get(&LocalchainAccountId::new(Alice.to_account_id(), AccountType::Deposit)),
 			Some(&50)
 		);
@@ -426,7 +426,7 @@ fn test_change_signature() {
 		change_number: 1,
 		balance: 250,
 		previous_balance_proof: None,
-		escrow_hold_note: None,
+		channel_hold_note: None,
 		notes: bounded_vec![Note::create(250, NoteType::ClaimFromMainchain { transfer_id: 1 }),],
 		signature: empty_signature(),
 	}];
@@ -448,15 +448,15 @@ fn test_with_note_claim_signatures() {
 		previous_balance_proof: empty_proof(250),
 		balance: 250,
 		notes: bounded_vec![],
-		escrow_hold_note: None,
+		channel_hold_note: None,
 		signature: empty_signature(),
 	};
 	balance_change.push_note(
 		250,
-		NoteType::EscrowHold {
+		NoteType::ChannelHold {
 			recipient: Alice.to_account_id(),
-			data_domain_hash: None,
 			delegated_signer: None,
+			domain_hash: None,
 		},
 	);
 	balance_change.sign(Bob.pair());
@@ -470,24 +470,24 @@ fn test_with_note_claim_signatures() {
 		previous_balance_proof: empty_proof(250),
 		balance: 200,
 		notes: bounded_vec![],
-		escrow_hold_note: Some(balance_change.notes[0].clone()),
+		channel_hold_note: Some(balance_change.notes[0].clone()),
 		signature: empty_signature(),
 	};
-	balance_change2.push_note(50, NoteType::EscrowSettle);
+	balance_change2.push_note(50, NoteType::ChannelHoldSettle);
 	balance_change2.sign(Bob.pair());
 	assert_ok!(verify_changeset_signatures(&vec![balance_change2.clone()]));
 
-	let mut escrow_note = balance_change.notes[0].clone();
+	let mut channel_hold_note = balance_change.notes[0].clone();
 
 	balance_change2.sign(Bob.pair());
-	balance_change2.escrow_hold_note = Some(Note::create(100, NoteType::Tax));
+	balance_change2.channel_hold_note = Some(Note::create(100, NoteType::Tax));
 	assert_err!(
 		verify_changeset_signatures(&vec![balance_change2.clone()]),
-		VerifyError::InvalidEscrowHoldNote
+		VerifyError::InvalidChannelHoldNote
 	);
 
-	escrow_note.milligons = 102;
-	balance_change2.escrow_hold_note = Some(escrow_note.clone());
+	channel_hold_note.milligons = 102;
+	balance_change2.channel_hold_note = Some(channel_hold_note.clone());
 	assert_err!(
 		verify_changeset_signatures(&vec![balance_change2.clone()]),
 		VerifyError::InvalidBalanceChangeSignature { change_index: 0 }
@@ -502,13 +502,13 @@ fn test_with_delegated_note_claim_signatures() {
 		change_number: 5,
 		previous_balance_proof: empty_proof(250),
 		balance: 0,
-		notes: bounded_vec![Note::create(250, NoteType::EscrowSettle,)],
-		escrow_hold_note: Some(Note::create(
+		notes: bounded_vec![Note::create(250, NoteType::ChannelHoldSettle,)],
+		channel_hold_note: Some(Note::create(
 			250,
-			NoteType::EscrowHold {
+			NoteType::ChannelHold {
 				recipient: Alice.to_account_id(),
-				data_domain_hash: None,
 				delegated_signer: Some(Charlie.to_account_id()),
+				domain_hash: None,
 			},
 		)),
 		signature: empty_signature(),
@@ -529,7 +529,7 @@ fn test_tax_must_be_claimed_on_tax_account() {
 			account_id: Bob.to_account_id(),
 			account_type: AccountType::Deposit,
 			previous_balance_proof: empty_proof(21_000),
-			escrow_hold_note: None,
+			channel_hold_note: None,
 			notes: Default::default(),
 			signature: empty_signature(),
 		}
@@ -544,7 +544,7 @@ fn test_tax_must_be_claimed_on_tax_account() {
 			previous_balance_proof: None,
 			notes: Default::default(),
 			signature: empty_signature(),
-			escrow_hold_note: None,
+			channel_hold_note: None,
 		}
 		.push_note(1000, NoteType::Claim)
 		.push_note(200, NoteType::Tax)
@@ -567,7 +567,7 @@ fn test_tax_must_be_claimed_on_tax_account() {
 			previous_balance_proof: None,
 			notes: Default::default(),
 			signature: empty_signature(),
-			escrow_hold_note: None,
+			channel_hold_note: None,
 		}
 		.push_note(200, NoteType::Claim)
 		.clone(),
@@ -587,7 +587,7 @@ fn test_tax_must_be_claimed_on_tax_account() {
 			previous_balance_proof: None,
 			notes: Default::default(),
 			signature: empty_signature(),
-			escrow_hold_note: None,
+			channel_hold_note: None,
 		}
 		.push_note(200, NoteType::Claim)
 		.clone(),
@@ -608,7 +608,7 @@ fn test_can_transfer_tax() {
 		account_id: Bob.to_account_id(),
 		account_type: AccountType::Tax,
 		previous_balance_proof: None,
-		escrow_hold_note: None,
+		channel_hold_note: None,
 		notes: bounded_vec!(Note::create(20_000, NoteType::ClaimFromMainchain { transfer_id: 1 })),
 		signature: empty_signature(),
 	}];
@@ -625,7 +625,7 @@ fn test_can_transfer_tax() {
 			account_id: Bob.to_account_id(),
 			account_type: AccountType::Tax,
 			previous_balance_proof: empty_proof(20_000),
-			escrow_hold_note: None,
+			channel_hold_note: None,
 			notes: bounded_vec!(Note::create(
 				20_000,
 				NoteType::Send {
@@ -640,7 +640,7 @@ fn test_can_transfer_tax() {
 			account_id: Alice.to_account_id(),
 			account_type: AccountType::Tax,
 			previous_balance_proof: None,
-			escrow_hold_note: None,
+			channel_hold_note: None,
 			notes: bounded_vec!(Note::create(9_000, NoteType::Claim)),
 			signature: empty_signature(),
 		},
@@ -650,7 +650,7 @@ fn test_can_transfer_tax() {
 			account_id: Ferdie.to_account_id(),
 			account_type: AccountType::Tax,
 			previous_balance_proof: None,
-			escrow_hold_note: None,
+			channel_hold_note: None,
 			notes: bounded_vec!(Note::create(11_000, NoteType::Claim)),
 			signature: empty_signature(),
 		},
@@ -665,7 +665,7 @@ fn test_can_transfer_tax() {
 }
 
 #[test]
-fn test_can_buy_data_domains() {
+fn test_can_buy_domains() {
 	let set = vec![
 		BalanceChange {
 			balance: 19_000,
@@ -673,7 +673,7 @@ fn test_can_buy_data_domains() {
 			account_id: Bob.to_account_id(),
 			account_type: AccountType::Deposit,
 			previous_balance_proof: empty_proof(20_000),
-			escrow_hold_note: None,
+			channel_hold_note: None,
 			notes: bounded_vec![Note::create(1_000, NoteType::LeaseDomain),],
 			signature: empty_signature(),
 		},
@@ -683,7 +683,7 @@ fn test_can_buy_data_domains() {
 			account_id: Bob.to_account_id(),
 			account_type: AccountType::Tax,
 			previous_balance_proof: None,
-			escrow_hold_note: None,
+			channel_hold_note: None,
 			notes: bounded_vec![Note::create(1_000, NoteType::Claim)],
 			signature: empty_signature(),
 		},
@@ -724,7 +724,7 @@ fn verify_taxes() {
 	set.tax_created_per_account.insert(localchain_account_id.clone(), 22);
 	assert_ok!(set.verify_taxes());
 
-	set.claimed_escrow_deposits_per_account
+	set.claimed_channel_hold_deposits_per_account
 		.insert(localchain_account_id.clone(), 1000);
 	assert_err!(
 		set.verify_taxes(),
@@ -744,7 +744,7 @@ fn verify_tax_votes() {
 		account_id: Bob.to_account_id(),
 		account_type: AccountType::Tax,
 		previous_balance_proof: empty_proof(20_000),
-		escrow_hold_note: None,
+		channel_hold_note: None,
 		notes: bounded_vec!(Note::create(20_000, NoteType::SendToVote)),
 		signature: Signature::from_raw([0u8; 64]).into(),
 	}];
@@ -759,8 +759,6 @@ fn verify_tax_votes() {
 		block_hash: H256::zero(),
 		index: 0,
 		power: 20_000,
-		data_domain_hash: H256::random(),
-		data_domain_account: Alice.to_account_id(),
 		block_rewards_account_id: Bob.to_account_id(),
 		signature: Signature::from_raw([0u8; 64]).into(),
 	}
@@ -778,16 +776,12 @@ fn verify_tax_votes() {
 fn test_vote_sources() {
 	let vote_block_hash = H256::from([1u8; 32]);
 
-	let jobs_domain = DataDomain::new("Monster", DataTLD::Jobs);
-	let jobs_domain_author = Alice.to_account_id();
 	let mut votes = vec![
 		BlockVote {
 			account_id: Bob.to_account_id(),
 			block_hash: vote_block_hash,
 			index: 0,
 			power: 20_000,
-			data_domain_hash: jobs_domain.hash(),
-			data_domain_account: jobs_domain_author.clone(),
 			block_rewards_account_id: Bob.to_account_id(),
 			signature: Signature::from_raw([0u8; 64]).into(),
 		}
@@ -798,8 +792,6 @@ fn test_vote_sources() {
 			block_hash: vote_block_hash,
 			index: 1,
 			power: 400,
-			data_domain_hash: jobs_domain.hash(),
-			data_domain_account: jobs_domain_author.clone(),
 			block_rewards_account_id: Bob.to_account_id(),
 			signature: Signature::from_raw([0u8; 64]).into(),
 		}
@@ -810,42 +802,16 @@ fn test_vote_sources() {
 	let vote_minimums = BTreeMap::from([(vote_block_hash, 500)]);
 
 	assert_err!(
-		verify_voting_sources(&BTreeMap::new(), &votes, &vote_minimums),
-		VerifyError::BlockVoteDataDomainMismatch
-	);
-
-	assert_err!(
-		verify_voting_sources(
-			&BTreeMap::from([((jobs_domain.hash(), jobs_domain_author.clone()), 1)]),
-			&votes,
-			&vote_minimums
-		),
+		verify_voting_sources(&votes, &vote_minimums),
 		VerifyError::InsufficientBlockVoteMinimum
 	);
 
 	votes[1].power = 500;
 	assert_err!(
-		verify_voting_sources(
-			&BTreeMap::from([((jobs_domain.hash(), Bob.to_account_id()), 1)]),
-			&votes,
-			&vote_minimums
-		),
-		VerifyError::BlockVoteDataDomainMismatch
-	);
-
-	assert_err!(
-		verify_voting_sources(
-			&BTreeMap::from([((jobs_domain.hash(), jobs_domain_author.clone()), 2)]),
-			&votes,
-			&vote_minimums
-		),
+		verify_voting_sources(&votes, &vote_minimums),
 		VerifyError::BlockVoteInvalidSignature
 	);
 
 	votes[1].sign(Bob.pair());
-	assert_ok!(verify_voting_sources(
-		&BTreeMap::from([((jobs_domain.hash(), jobs_domain_author), 2)]),
-		&votes,
-		&vote_minimums
-	),);
+	assert_ok!(verify_voting_sources(&votes, &vote_minimums),);
 }

@@ -13,8 +13,8 @@ use argon_notary_apis::{
 };
 use argon_primitives::{
 	tick::Ticker, AccountId, AccountOrigin, AccountType, BalanceProof, BalanceTip, Notarization,
-	NotarizationBalanceChangeset, NotarizationBlockVotes, NotarizationDataDomains, NotaryId,
-	Notebook, NotebookMeta, NotebookNumber, SignedNotebookHeader,
+	NotarizationBalanceChangeset, NotarizationBlockVotes, NotarizationDomains, NotaryId, Notebook,
+	NotebookMeta, NotebookNumber, SignedNotebookHeader,
 };
 use codec::Encode;
 use futures::{Stream, StreamExt};
@@ -239,7 +239,7 @@ impl LocalchainRpcServer for NotaryServer {
 		&self,
 		balance_changeset: NotarizationBalanceChangeset,
 		block_votes: NotarizationBlockVotes,
-		data_domains: NotarizationDataDomains,
+		domains: NotarizationDomains,
 	) -> Result<BalanceChangeResult, ErrorObjectOwned> {
 		Ok(NotarizationsStore::apply(
 			&self.pool,
@@ -247,7 +247,7 @@ impl LocalchainRpcServer for NotaryServer {
 			&self.ticker,
 			balance_changeset.into_inner(),
 			block_votes.into_inner(),
-			data_domains.into_inner(),
+			domains.into_inner(),
 		)
 		.await?)
 	}
@@ -362,7 +362,7 @@ mod tests {
 				1000,
 				NoteType::ClaimFromMainchain { transfer_id: 1 }
 			)],
-			escrow_hold_note: None,
+			channel_hold_note: None,
 			signature: Signature::from_raw([0; 64]).into(),
 		}
 		.sign(Bob.pair())
@@ -420,7 +420,7 @@ mod tests {
 			change_number: 1,
 			balance: 1000,
 			account_origin: AccountOrigin { notebook_number: 1, account_uid: 1 },
-			escrow_hold_note: None,
+			channel_hold_note: None,
 		};
 
 		let proof = client.get_balance_proof(header.notebook_number, tip.clone()).await?;

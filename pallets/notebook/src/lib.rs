@@ -585,13 +585,14 @@ pub mod pallet {
 				);
 			}
 
-			let escrow_expiration_ticks = T::TickProvider::ticker().escrow_expiration_ticks;
+			let channel_hold_expiration_ticks =
+				T::TickProvider::ticker().channel_hold_expiration_ticks;
 
 			notebook_verify(
 				&history_lookup,
 				&notebook,
 				block_vote_minimums,
-				escrow_expiration_ticks,
+				channel_hold_expiration_ticks,
 			)
 			.inspect_err(|e| {
 				info!(
