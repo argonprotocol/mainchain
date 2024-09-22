@@ -142,8 +142,8 @@ impl Transactions {
       .create_channel_hold(
         channel_hold_milligons,
         recipient_address,
-        delegated_signer_address,
         domain,
+        delegated_signer_address,
       )
       .await?;
     channel_hold_notarization.notarize().await?;
