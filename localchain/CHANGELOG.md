@@ -1,8 +1,15 @@
 # Changelog
 
-## [v0.0.5](https://github.com/argonprotocol/mainchain/compare/v0.0.4...a3d6e64d476bc78f0e38b6580103799a5db1af00) (2024-09-21)
+## [v0.0.6](https://github.com/argonprotocol/mainchain/compare/v0.0.5...c05160f3b2f4e07348d789750050183f4cee33be) (2024-09-22)
 
 ### Fixes
+
+* broken transaction order from refactor
+([c05160f](https://github.com/argonprotocol/mainchain/commit/c05160f3b2f4e07348d789750050183f4cee33be))
+
+### [v0.0.5](https://github.com/argonprotocol/mainchain/compare/v0.0.4...v0.0.5) (2024-09-21)
+
+#### Fixes
 
 * don’t require data domain for votes
 ([714e3b0](https://github.com/argonprotocol/mainchain/commit/714e3b045c3e2bbe448f88d0ceaa976a54016094))
