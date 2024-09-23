@@ -30,9 +30,10 @@ impl MainchainIdentityStore {
 		db: &mut PgConnection,
 		chain_identity: ChainIdentity,
 	) -> anyhow::Result<(), Error> {
-		let existing = sqlx::query_as!(MainchainIdentity, "SELECT * FROM mainchain_identity",)
-			.fetch_optional(&mut *db)
-			.await?;
+		let existing =
+			sqlx::query_as!(MainchainIdentity, "SELECT * FROM mainchain_identity LIMIT 1",)
+				.fetch_optional(&mut *db)
+				.await?;
 		if let Some(existing) = existing {
 			let existing: ChainIdentity = existing.try_into()?;
 			if existing == chain_identity {

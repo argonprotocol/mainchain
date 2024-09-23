@@ -417,10 +417,10 @@ export interface BlockVote {
 }
 
 export enum Chain {
-  Mainnet = 0,
-  Testnet = 1,
-  LocalTestnet = 2,
-  Devnet = 3
+  Mainnet = 'mainnet',
+  Testnet = 'testnet',
+  LocalTestnet = 'local-testnet',
+  Devnet = 'devnet'
 }
 
 export interface ChainIdentity {

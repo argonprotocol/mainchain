@@ -3,6 +3,7 @@ extern crate alloc;
 extern crate core;
 
 use core::{fmt::Display, str::FromStr};
+use serde::{Deserialize, Serialize};
 use sp_core::{crypto::Ss58AddressFormatRegistry, H256};
 use sp_runtime::{
 	traits::{BlakeTwo256, IdentifyAccount, Verify},
@@ -89,10 +90,11 @@ pub mod localchain {
 	};
 }
 
-#[derive(Debug, PartialEq, Eq)]
+#[derive(Debug, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(rename_all = "kebab-case")]
 #[cfg_attr(feature = "std", derive(clap::ValueEnum))]
 #[cfg_attr(not(feature = "napi"), derive(Clone, Copy))]
-#[cfg_attr(feature = "napi", napi_derive::napi)]
+#[cfg_attr(feature = "napi", napi_derive::napi(string_enum = "kebab-case"))]
 #[cfg_attr(feature = "uniffi", derive(uniffi::Enum))]
 pub enum Chain {
 	Mainnet,
