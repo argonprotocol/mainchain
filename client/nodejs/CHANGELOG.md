@@ -1,8 +1,10 @@
 # Changelog
 
-## [v0.0.6](https://github.com/argonprotocol/mainchain/compare/v0.0.5...c05160f3b2f4e07348d789750050183f4cee33be) (2024-09-22)
+## [v0.0.7](https://github.com/argonprotocol/mainchain/compare/v0.0.6...2647511598583e17d6c61b1ad5d515341d017caa) (2024-09-23)
 
-### Fixes
+### [v0.0.6](https://github.com/argonprotocol/mainchain/compare/v0.0.5...v0.0.6) (2024-09-22)
+
+#### Fixes
 
 * broken transaction order from refactor
 ([c05160f](https://github.com/argonprotocol/mainchain/commit/c05160f3b2f4e07348d789750050183f4cee33be))

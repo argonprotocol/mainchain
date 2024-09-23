@@ -1,6 +1,6 @@
 {
   "name": "@argonprotocol/localchain",
-  "version": "0.0.6",
+  "version": "0.0.7",
   "description": "A nodejs binding to the Argon Localchain",
   "bin": "cli.js",
   "publishConfig": {
@@ -40,7 +40,7 @@
     ]
   },
   "devDependencies": {
-    "@argonprotocol/mainchain": "0.0.6",
+    "@argonprotocol/mainchain": "0.0.7",
     "@napi-rs/cli": "3.0.0-alpha.55",
     "@polkadot/util": "^13.0.2",
     "@polkadot/util-crypto": "^13.0.2",
