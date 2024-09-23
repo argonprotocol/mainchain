@@ -1,8 +1,15 @@
 # Changelog
 
-## [v0.0.7](https://github.com/argonprotocol/mainchain/compare/v0.0.6...2647511598583e17d6c61b1ad5d515341d017caa) (2024-09-23)
+## [v0.0.8](https://github.com/argonprotocol/mainchain/compare/v0.0.7...02848ff4f088345cb0d46b349ee1fdeff9be6399) (2024-09-23)
 
-### Features
+### Fixes
+
+* **notary:** sqlx error
+([02848ff](https://github.com/argonprotocol/mainchain/commit/02848ff4f088345cb0d46b349ee1fdeff9be6399))
+
+### [v0.0.7](https://github.com/argonprotocol/mainchain/compare/v0.0.6...v0.0.7) (2024-09-23)
+
+#### Features
 
 * lock localchain and mainchain to chainId/gen
 ([2647511](https://github.com/argonprotocol/mainchain/commit/2647511598583e17d6c61b1ad5d515341d017caa))
