@@ -10,7 +10,7 @@ use argon_primitives::{
 	bitcoin::{BitcoinNetwork, SATOSHIS_PER_BITCOIN},
 	block_seal::MiningSlotConfig,
 	notary::{GenesisNotary, NotaryPublic},
-	ComputeDifficulty, ADDRESS_PREFIX,
+	Chain, ComputeDifficulty, ADDRESS_PREFIX,
 };
 
 pub fn local_testnet_config() -> Result<ChainSpec, String> {
@@ -28,7 +28,7 @@ pub fn local_testnet_config() -> Result<ChainSpec, String> {
 		WASM_BINARY.ok_or_else(|| "Development wasm not available".to_string())?,
 		None,
 	)
-	.with_name("Argon Local Testnet")
+	.with_name(&Chain::LocalTestnet.to_string())
 	.with_id("argon-local")
 	.with_chain_type(ChainType::Local)
 	.with_properties(properties)

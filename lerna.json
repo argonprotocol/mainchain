@@ -4,6 +4,7 @@
   "useWorkspaces": true,
   "workspaces": [
     "client/nodejs",
-    "localchain"
+    "localchain",
+    "localchain/npm/*"
   ]
 }

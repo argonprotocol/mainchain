@@ -24,6 +24,14 @@ CREATE TABLE IF NOT EXISTS key
     data        BLOB NOT NULL
 );
 
+-- The chain this localchain is connected to.
+CREATE TABLE IF NOT EXISTS mainchain_identity
+(
+    chain      TEXT NOT NULL PRIMARY KEY,
+    genesis_hash    BLOB NOT NULL,
+    created_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP
+);
+
 -- The notarizations stores the notarization json and the new account origins json if the notarization was done by this wallet.
 -- If the notarization was done by another wallet, the notarization will be populated once it is found in a wallet for any pending balance changes.
 CREATE TABLE IF NOT EXISTS notarizations

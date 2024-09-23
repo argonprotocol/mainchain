@@ -1,5 +1,5 @@
 import {
-    BalanceChangeBuilder,
+    BalanceChangeBuilder, Chain,
     DomainStore,
     DomainTopLevel,
     Localchain,
@@ -78,6 +78,8 @@ describeIntegration("ChannelHold integration", () => {
         await activateNotary(sudo, mainchainClient, notary);
 
         const bobchain = await createLocalchain(mainchainUrl);
+        const overview = await bobchain.accountOverview();
+        expect(overview.mainchainIdentity.chain).toBe(Chain.Devnet);
 
         await bobchain.keystore.useExternal(bob.address, async (address, signatureMessage) => {
             return bobkeys.getPair(address)?.sign(signatureMessage, {withType: true});

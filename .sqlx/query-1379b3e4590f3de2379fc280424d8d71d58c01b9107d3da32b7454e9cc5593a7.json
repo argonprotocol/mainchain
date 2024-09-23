@@ -1,0 +1,12 @@
+{
+  "db_name": "SQLite",
+  "query": "INSERT INTO mainchain_identity (chain, genesis_hash) VALUES (?, ?)",
+  "describe": {
+    "columns": [],
+    "parameters": {
+      "Right": 2
+    },
+    "nullable": []
+  },
+  "hash": "1379b3e4590f3de2379fc280424d8d71d58c01b9107d3da32b7454e9cc5593a7"
+}

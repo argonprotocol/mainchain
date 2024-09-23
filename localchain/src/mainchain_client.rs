@@ -24,7 +24,7 @@ use argon_client::{
 use argon_primitives::host::Host;
 use argon_primitives::tick::{Tick, Ticker};
 use argon_primitives::{
-  Balance, Domain, DomainTopLevel, NotaryId, NotebookNumber, TransferToLocalchainId,
+  Balance, ChainIdentity, Domain, DomainTopLevel, NotaryId, NotebookNumber, TransferToLocalchainId,
 };
 
 use crate::AccountStore;
@@ -149,6 +149,11 @@ impl MainchainClient {
   pub async fn get_ticker(&self) -> Result<Ticker> {
     let client = self.client().await?;
     Ok(client.lookup_ticker().await?)
+  }
+
+  pub async fn get_chain_identity(&self) -> Result<ChainIdentity> {
+    let client = self.client().await?;
+    Ok(client.get_chain_identity().await?)
   }
 
   pub async fn get_best_block_hash(&self) -> Result<H256> {
@@ -613,7 +618,7 @@ impl MainchainClient {
 pub mod napi_ext {
   use napi::bindgen_prelude::*;
 
-  use argon_primitives::DomainTopLevel;
+  use argon_primitives::{Chain, DomainTopLevel};
 
   use crate::error::NapiOk;
   use crate::{DomainRegistration, MainchainClient, ZoneRecord};
@@ -633,6 +638,12 @@ pub mod napi_ext {
     pub reserved: BigInt,
     pub frozen: BigInt,
     pub flags: BigInt,
+  }
+
+  #[napi(object)]
+  pub struct ChainIdentity {
+    pub chain: Chain,
+    pub genesis: Buffer,
   }
 
   #[napi(object)]
@@ -682,6 +693,15 @@ pub mod napi_ext {
       Ok(Ticker {
         tick_duration_millis: ticker.tick_duration_millis as i64,
         genesis_utc_time: ticker.genesis_utc_time as i64,
+      })
+    }
+
+    #[napi(js_name = "getChainIdentity")]
+    pub async fn get_chain_identity_napi(&self) -> napi::Result<ChainIdentity> {
+      let chain = self.get_chain_identity().await.napi_ok()?;
+      Ok(ChainIdentity {
+        chain: chain.chain,
+        genesis: chain.genesis_hash.as_ref().into(),
       })
     }
 

@@ -28,6 +28,12 @@ CREATE TABLE IF NOT EXISTS blocks
     received_time          timestamptz NOT NULL
 );
 
+CREATE TABLE IF NOT EXISTS mainchain_identity (
+    chain varchar NOT NULL PRIMARY KEY,
+    genesis_hash    bytea NOT NULL,
+    created_at timestamptz NOT NULL
+);
+
 CREATE TABLE IF NOT EXISTS notebook_headers
 (
     notebook_number         integer PRIMARY KEY NOT NULL,

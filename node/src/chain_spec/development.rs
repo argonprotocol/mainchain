@@ -8,7 +8,7 @@ use argon_node_runtime::WASM_BINARY;
 use argon_primitives::{
 	bitcoin::{BitcoinNetwork, SATOSHIS_PER_BITCOIN},
 	block_seal::MiningSlotConfig,
-	ComputeDifficulty, ADDRESS_PREFIX,
+	Chain, ComputeDifficulty, ADDRESS_PREFIX,
 };
 
 pub fn development_config() -> Result<ChainSpec, String> {
@@ -24,7 +24,7 @@ pub fn development_config() -> Result<ChainSpec, String> {
 		WASM_BINARY.ok_or_else(|| "Development wasm not available".to_string())?,
 		None,
 	)
-	.with_name("Argon Development")
+	.with_name(&Chain::Devnet.to_string())
 	.with_id("argon-dev")
 	.with_chain_type(ChainType::Development)
 	.with_properties(properties)

@@ -392,6 +392,7 @@ module.exports.ADDRESS_PREFIX = nativeBinding.ADDRESS_PREFIX
 module.exports.ARGON_FILE_VERSION = nativeBinding.ARGON_FILE_VERSION
 module.exports.ArgonFileType = nativeBinding.ArgonFileType
 module.exports.BalanceChangeStatus = nativeBinding.BalanceChangeStatus
+module.exports.Chain = nativeBinding.Chain
 module.exports.CHANNEL_HOLD_CLAWBACK_TICKS = nativeBinding.CHANNEL_HOLD_CLAWBACK_TICKS
 module.exports.CHANNEL_HOLD_MINIMUM_SETTLEMENT = nativeBinding.CHANNEL_HOLD_MINIMUM_SETTLEMENT
 module.exports.CryptoScheme = nativeBinding.CryptoScheme

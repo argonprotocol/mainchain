@@ -1,7 +1,8 @@
-use std::collections::BTreeMap;
-use std::sync::Arc;
-
+use sp_core::H256;
 use sqlx::SqlitePool;
+use std::collections::BTreeMap;
+use std::str::FromStr;
+use std::sync::Arc;
 use tokio::sync::Mutex;
 
 use crate::mainchain_transfer::MainchainTransferIn;
@@ -10,7 +11,7 @@ use crate::Result;
 use crate::{AccountStore, BalanceChangeRow};
 use crate::{BalanceChangeStatus, LocalAccount, MainchainClient};
 use argon_primitives::argon_utils::format_argons;
-use argon_primitives::{AccountType, Note, NoteType};
+use argon_primitives::{AccountType, Chain, ChainIdentity, Note, NoteType};
 
 #[derive(Clone, Debug, Default)]
 pub struct LocalchainOverview {
@@ -30,6 +31,8 @@ pub struct LocalchainOverview {
   pub pending_tax_change: i128,
   /// Changes to the account ordered from most recent to oldest
   pub changes: Vec<BalanceChangeGroup>,
+  /// The mainchain chain identity
+  pub mainchain_identity: Option<ChainIdentity>,
   /// The mainchain balance
   pub mainchain_balance: i128,
   /// The net pending mainchain balance pending movement in/out of the localchain
@@ -155,6 +158,16 @@ impl OverviewStore {
       name: self.name.clone(),
       ..Default::default()
     };
+
+    let mainchain_identity = sqlx::query!("SELECT * FROM mainchain_identity")
+      .fetch_optional(&self.db)
+      .await?;
+    if let Some(identity) = mainchain_identity {
+      overview.mainchain_identity = Some(ChainIdentity {
+        genesis_hash: H256::from_slice(identity.genesis_hash.as_ref()),
+        chain: Chain::from_str(&identity.chain)?,
+      });
+    }
 
     let transactions_by_id: BTreeMap<i64, TransactionType> =
       sqlx::query!("SELECT * from transactions")
@@ -355,7 +368,7 @@ impl OverviewStore {
 pub mod uniffi_ext {
   use crate::transactions::TransactionType;
   use crate::BalanceChangeStatus;
-  use argon_primitives::AccountType;
+  use argon_primitives::{AccountType, Chain};
 
   #[derive(uniffi::Record, Clone, Debug)]
   pub struct LocalchainOverview {
@@ -375,6 +388,8 @@ pub mod uniffi_ext {
     pub pending_tax_change: String,
     /// Changes to the account ordered from most recent to oldest
     pub changes: Vec<BalanceChangeGroup>,
+    /// The mainchain chain and genesis
+    pub mainchain_identity: Option<ChainIdentity>,
     /// The mainchain balance
     pub mainchain_balance: String,
     /// The net pending mainchain balance pending movement in/out of the localchain
@@ -395,6 +410,12 @@ pub mod uniffi_ext {
     pub transaction_type: Option<TransactionType>,
     pub balance_changes: Vec<BalanceChangeSummary>,
     pub notebook_number: Option<u32>,
+  }
+
+  #[derive(uniffi::Record, Clone, Debug)]
+  pub struct ChainIdentity {
+    pub chain: Chain,
+    pub genesis_hash: String,
   }
 
   #[derive(uniffi::Record, Clone, Debug)]
@@ -428,11 +449,21 @@ pub mod uniffi_ext {
           .into_iter()
           .map(|c| c.into())
           .collect::<Vec<_>>(),
+        mainchain_identity: self.mainchain_identity.map(|x| x.into()),
         mainchain_balance: self.mainchain_balance.to_string(),
         processing_mainchain_balance_change: self.processing_mainchain_balance_change.to_string(),
       }
     }
   }
+  impl Into<ChainIdentity> for argon_primitives::ChainIdentity {
+    fn into(self) -> ChainIdentity {
+      ChainIdentity {
+        chain: self.chain,
+        genesis_hash: hex::encode(self.genesis_hash),
+      }
+    }
+  }
+
   impl Into<BalanceChangeGroup> for super::BalanceChangeGroup {
     fn into(self) -> BalanceChangeGroup {
       BalanceChangeGroup {
@@ -473,12 +504,11 @@ pub mod uniffi_ext {
 #[cfg(feature = "napi")]
 pub mod napi_ext {
   use super::OverviewStore;
-  use napi::bindgen_prelude::*;
-
   use crate::error::NapiOk;
   use crate::transactions::TransactionType;
   use crate::BalanceChangeStatus;
-  use argon_primitives::AccountType;
+  use argon_primitives::{AccountType, Chain};
+  use napi::bindgen_prelude::*;
 
   #[napi(object)]
   #[derive(Clone, Debug)]
@@ -501,8 +531,17 @@ pub mod napi_ext {
     pub changes: Vec<BalanceChangeGroup>,
     /// The mainchain balance
     pub mainchain_balance: BigInt,
+    /// The mainchain identity
+    pub mainchain_identity: Option<ChainIdentity>,
     /// The net pending mainchain balance pending movement in/out of the localchain
     pub processing_mainchain_balance_change: BigInt,
+  }
+
+  #[napi(object)]
+  #[derive(Clone, Debug)]
+  pub struct ChainIdentity {
+    pub chain: Chain,
+    pub genesis_hash: String,
   }
 
   #[napi(object)]
@@ -554,11 +593,21 @@ pub mod napi_ext {
           .into_iter()
           .map(|c| c.into())
           .collect::<Vec<_>>(),
+        mainchain_identity: self.mainchain_identity.map(|x| x.into()),
         mainchain_balance: self.mainchain_balance.into(),
         processing_mainchain_balance_change: self.processing_mainchain_balance_change.into(),
       }
     }
   }
+  impl Into<ChainIdentity> for argon_primitives::ChainIdentity {
+    fn into(self) -> ChainIdentity {
+      ChainIdentity {
+        chain: self.chain,
+        genesis_hash: hex::encode(self.genesis_hash),
+      }
+    }
+  }
+
   impl Into<BalanceChangeGroup> for super::BalanceChangeGroup {
     fn into(self) -> BalanceChangeGroup {
       BalanceChangeGroup {

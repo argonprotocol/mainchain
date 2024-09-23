@@ -18,6 +18,7 @@ use crate::{
 	stores::{
 		blocks::BlocksStore,
 		chain_transfer::ChainTransferStore,
+		mainchain_identity::MainchainIdentityStore,
 		notebook_header::NotebookHeaderStore,
 		notebook_status::{NotebookFinalizationStep, NotebookStatusStore},
 		registered_key::RegisteredKeyStore,
@@ -63,6 +64,12 @@ async fn sync_finalized_blocks(
 	ticker: Ticker,
 ) -> anyhow::Result<()> {
 	let client = MainchainClient::try_until_connected(url.as_str(), 2500, 120_000).await?;
+	let chain_identity = client.get_chain_identity().await?;
+
+	{
+		let mut db = pool.acquire().await?;
+		MainchainIdentityStore::confirm_chain(&mut db, chain_identity).await?;
+	}
 	let notaries_query = api::storage().notaries().active_notaries();
 
 	let active_notaries =
