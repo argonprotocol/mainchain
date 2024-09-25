@@ -36,14 +36,19 @@ Removing the excess currency allows the price to rise.
 
 ### Bitcoin Wallet
 
-You'll need a bitcoin wallet that supports the Signet. NOTE: as explained below, Argon needs wallets that support
+You'll need a bitcoin wallet that supports a custom Signet. NOTE: as explained below, Argon needs wallets that support
 Miniscript, but they are currently limited and Bitcoin Core takes a good deal of disk space and several hours to sync.
 Because of that, we are using Electrum for this flow.
 
+To make transactions more reliable on Bitcoin and faucet tokens available, we have set up a custom Signet. It currently
+only has a single node with blocks timed to 10 minutes. You can connect to it using the following parameters:
+
 To launch in Signet:
 
-- [Electrum](https://electrum.org/#home): Open with --testnet. Eg, in Mac OS: `open -a Electrum.app --args --signet`
+- [Electrum](https://electrum.org/#home): Open with --testnet. Eg, in Mac
+  OS: `open -a Electrum.app --args --oneserver --server=electrs.testnet.argonprotocol.org:50002:s`
 - [Bitcoin Core](https://bitcoincore.org/en/download/): Modify bitcoin.conf to include `signet=1`
+  and `signetseednode=bitcoin-node0.testnet.argonprotocol.org:38333`
 
 We'll show examples in this flow using Electrum. After you have opened Electrum, follow the flow to create a new wallet
 ![<img src="./images/electrum-wallet.png" width="200px" alt="Electrum Wallet Setup">](images/electrum-wallet.png)
@@ -51,23 +56,25 @@ We'll show examples in this flow using Electrum. After you have opened Electrum,
 Ensure you did in fact use Signet (the message will say Testnet):
 ![Electrum signet.png](images/electrum-testnet.png)
 
-Now go to addresses and copy the address you want to get funds from several Signet faucets (each will only allow about
-5000 satoshis, so you likely want to use multiple):
+Now go to addresses and copy the address you want to get funds from the Signet faucet:
 ![Electrum address.png](images/electrum-address.png)
 
 ### Testnet
 
-The Argon testnet is a place to experiment with the Argon Network. It is connected to the Bitcoin Signet. You will
+The Argon testnet is a place to experiment with the Argon Network. It is connected to a custom Bitcoin Signet. You will
 likely need to acquire testnet Argons and Bitcoins to experiment with this feature.
 
 - [Argon Testnet Faucet](./account-setup.md#requesting-testnet-funds)
-- Bitcoin has several public faucets. You can find a list of
-  them [here](https://en.bitcoin.it/wiki/Signet#Faucets). One example is https://signetfaucet.com/
+- The Testnet Faucet will also grant you Signet Bitcoins (good only on the Argon Testnet). To use it, go to
+  our [Discord](https://discord.gg/ChyAhFtD) `testnet` channel and type `/drip-bitcoin`. Enter your address at the
+  prompt:
+  ![Discord Faucet.png](images/discord-faucet-bitcoin.png)
 
 ### Insecure Flow Note
 
 We'll be adding support for Hardware wallets and additional software wallets in future releases. It's a goal of this
-project for self custody of Bitcoins to be possible with a wide range of tools, however, miniscript support is currently
+project for self-custody of Bitcoins to be supported with a wide range of tools, however, miniscript support is
+currently
 limited. For now, we'll show you how to use Electrum for most commands (simply to bypass synching the entire Bitcoin
 blockchain), and we'll sign the psbt using the Argon CLI.
 
@@ -146,7 +153,7 @@ to cover the Vault Fee as well as the Fee to submit the transaction to the netwo
 You'll need to fill in your Satoshis, the Vault ID and you need to tell the Vault what Pubkey you'll
 send the funds to (eg, select the address of the next pubkey from Electrum).
 
-> To Extract from Electru, double click the next Address. You will copy the public key.
+> To Extract from Electrum, double-click the next Address. You will copy the public key.
 > ![Electrum - Next Address](images/electrum-key-details.png)
 
 #### Using the Polkadot.js interface:
@@ -233,9 +240,10 @@ $ argon-bitcoin-cli bond get --bond-id=1 -t wss://rpc.testnet.argonprotocol.org
 The first step is to submit an unlock request to the mainchain. Your unlock request requires the `BondId`, an address
 you'd like to send the Bitcoin to, and the `Network Fee` you are willing to pay to unlock the Bitcoin.
 
-NOTE: the network fee can change from when you submit the request to when it is processed. The Vault will co-sign the
-transaction so that you can add additional inputs to cover the fee. You can see recent fees sent over the signet
-using https://mempool.space/signet. The CLI `fee-rate-sats-per-kb` is in satoshis per byte.
+NOTE: the network fee will normally change from when you submit the request to when it is processed. However, in the
+custom Signet, fees will be stable. The Vault will co-sign the transaction so that you can add additional inputs to
+cover the fee. You can see recent fees sent over the public signet using https://mempool.space/signet. The
+CLI `fee-rate-sats-per-kb` is in satoshis per byte.
 
 You'll want to get a destination address from Electrum, and see what the current Fee Rate is on the network.
 ![Electrum - Address](images/electrum-copyaddress.png)

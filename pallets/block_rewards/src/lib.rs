@@ -19,7 +19,6 @@ const LOG_TARGET: &str = "runtime::block_rewards";
 pub mod pallet {
 	use alloc::{vec, vec::Vec};
 	use core::any::TypeId;
-
 	use frame_support::{
 		pallet_prelude::*,
 		traits::fungible::{InspectFreeze, Mutate, MutateFreeze},
@@ -285,13 +284,20 @@ pub mod pallet {
 					});
 				}
 			}
+			let rewards = rewards
+				.iter()
+				.filter(|r| r.argons > 0u128.into() || r.ownership > 0u128.into())
+				.cloned()
+				.collect::<Vec<_>>();
 
-			Self::deposit_event(Event::RewardCreated {
-				maturation_block: reward_height,
-				rewards: rewards.clone(),
-			});
-			T::EventHandler::rewards_created(&rewards);
-			<PayoutsByBlock<T>>::insert(reward_height, BoundedVec::truncate_from(rewards));
+			if rewards.len() > 0 {
+				Self::deposit_event(Event::RewardCreated {
+					maturation_block: reward_height,
+					rewards: rewards.clone(),
+				});
+				T::EventHandler::rewards_created(&rewards);
+				<PayoutsByBlock<T>>::insert(reward_height, BoundedVec::truncate_from(rewards));
+			}
 		}
 	}
 

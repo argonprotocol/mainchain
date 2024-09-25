@@ -96,6 +96,7 @@ async fn test_bitcoin_minting_e2e() {
 		.unwrap();
 
 	let ticker = client.lookup_ticker().await.expect("ticker");
+	let tick = ticker.current();
 	client
 		.live
 		.tx()
@@ -104,7 +105,7 @@ async fn test_bitcoin_minting_e2e() {
 				btc_usd_price: FixedU128Ext(FixedU128::from_float(62_000.0).into_inner()),
 				argon_usd_target_price: FixedU128Ext(FixedU128::from_float(1.0).into_inner()),
 				argon_usd_price: FixedU128Ext(FixedU128::from_float(1.1).into_inner()),
-				tick: ticker.current(),
+				tick,
 			}),
 			&Sr25519Signer::new(price_index_operator.clone()),
 		)
@@ -113,7 +114,7 @@ async fn test_bitcoin_minting_e2e() {
 		.wait_for_finalized_success()
 		.await
 		.unwrap();
-	println!("bitcoin prices submitted");
+	println!("bitcoin prices submitted at tick {tick}",);
 
 	let _ = run_bitcoin_cli(&test_node, vec!["vault", "list", "--btc", &utxo_btc.to_string()])
 		.await

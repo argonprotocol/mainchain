@@ -2,7 +2,7 @@
 extern crate alloc;
 extern crate core;
 
-use core::{fmt::Display, str::FromStr};
+use core::fmt::Display;
 use serde::{Deserialize, Serialize};
 use sp_core::{crypto::Ss58AddressFormatRegistry, H256};
 use sp_runtime::{
@@ -14,6 +14,8 @@ pub use account::{AccountType, LocalchainAccountId};
 pub use balance_change::*;
 pub use block_seal::{BlockSealAuthorityId, BlockSealAuthoritySignature, BLOCK_SEAL_KEY_TYPE};
 pub use block_vote::*;
+#[cfg(feature = "std")]
+use core::str::FromStr;
 pub use digests::{BlockSealDigest, AUTHOR_DIGEST_ID, BLOCK_SEAL_DIGEST_ID, *};
 pub use domain::*;
 pub use domain_top_level::DomainTopLevel;
