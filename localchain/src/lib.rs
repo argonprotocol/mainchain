@@ -20,6 +20,7 @@ use tokio::sync::Mutex;
 
 pub use accounts::*;
 use argon_primitives::tick::{Tick, Ticker};
+use argon_primitives::Chain;
 pub use balance_changes::*;
 pub use balance_sync::*;
 pub use constants::*;
@@ -126,6 +127,41 @@ impl Localchain {
     Ok(db)
   }
 
+  pub async fn confirm_chain(db: &SqlitePool, mainchain_client: &MainchainClient) -> Result<()> {
+    let identity = mainchain_client.get_chain_identity().await?;
+    let existing = sqlx::query!("SELECT * FROM mainchain_identity")
+      .fetch_optional(db)
+      .await?;
+    if let Some(existing) = existing {
+      let existing_chain: Chain = existing.chain.try_into()?;
+      if existing_chain != identity.chain {
+        bail!(
+          "The connected mainchain chain ({}) does not match this Localchain ({})",
+          identity.chain,
+          existing_chain
+        );
+      }
+      if existing.genesis_hash != identity.genesis_hash.as_ref().to_vec() {
+        bail!(
+          "The connected mainchain genesis hash ({}) does not match this Localchain ({})",
+          identity.genesis_hash,
+          hex::encode(existing.genesis_hash)
+        );
+      }
+    } else {
+      let identity_chain = identity.chain.to_string();
+      let genesis_hash = identity.genesis_hash.as_ref().to_vec();
+      sqlx::query!(
+        "INSERT INTO mainchain_identity (chain, genesis_hash) VALUES (?, ?)",
+        identity_chain,
+        genesis_hash
+      )
+      .execute(db)
+      .await?;
+    }
+    Ok(())
+  }
+
   pub async fn load(config: LocalchainConfig) -> Result<Localchain> {
     Self::config_logs();
     tracing::info!("Loading localchain at {:?}", config.path);
@@ -148,6 +184,7 @@ impl Localchain {
     if let Some(ntp_pool_url) = ntp_pool_url {
       ticker.lookup_ntp_offset(&ntp_pool_url).await?;
     }
+    Self::confirm_chain(&db, &mainchain_client).await?;
     let mainchain_mutex = Arc::new(Mutex::new(Some(mainchain_client.clone())));
     let keystore = Keystore::new(db.clone());
     if let Some(password_option) = keystore_password {
@@ -205,6 +242,8 @@ impl Localchain {
   }
 
   pub async fn attach_mainchain(&self, mainchain_client: &MainchainClient) -> Result<()> {
+    Self::confirm_chain(&self.db, mainchain_client).await?;
+
     let mut mainchain_mutex = self.mainchain_client.lock().await;
     *mainchain_mutex = Some(mainchain_client.clone());
     Ok(())

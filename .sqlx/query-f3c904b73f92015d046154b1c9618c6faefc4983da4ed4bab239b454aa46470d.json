@@ -1,0 +1,32 @@
+{
+  "db_name": "SQLite",
+  "query": "SELECT * FROM mainchain_identity",
+  "describe": {
+    "columns": [
+      {
+        "name": "chain",
+        "ordinal": 0,
+        "type_info": "Text"
+      },
+      {
+        "name": "genesis_hash",
+        "ordinal": 1,
+        "type_info": "Blob"
+      },
+      {
+        "name": "created_at",
+        "ordinal": 2,
+        "type_info": "Datetime"
+      }
+    ],
+    "parameters": {
+      "Right": 0
+    },
+    "nullable": [
+      false,
+      false,
+      false
+    ]
+  },
+  "hash": "f3c904b73f92015d046154b1c9618c6faefc4983da4ed4bab239b454aa46470d"
+}

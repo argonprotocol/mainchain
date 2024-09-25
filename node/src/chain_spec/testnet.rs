@@ -9,7 +9,7 @@ use argon_primitives::{
 	bitcoin::BitcoinNetwork,
 	block_seal::MiningSlotConfig,
 	notary::{GenesisNotary, NotaryPublic},
-	ComputeDifficulty, ADDRESS_PREFIX,
+	Chain, ComputeDifficulty, ADDRESS_PREFIX,
 };
 
 pub fn testnet_config() -> Result<ChainSpec, String> {
@@ -34,7 +34,7 @@ pub fn testnet_config() -> Result<ChainSpec, String> {
 		WASM_BINARY.ok_or_else(|| "Wasm not available".to_string())?,
 		None,
 	)
-	.with_name("Argon Testnet")
+	.with_name(&Chain::Testnet.to_string())
 	.with_id("argon-testnet")
 	.with_protocol_id("targon")
 	.with_chain_type(ChainType::Custom("Testnet".into()))

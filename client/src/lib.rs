@@ -24,7 +24,7 @@ use tokio::{
 };
 use tracing::warn;
 
-use argon_primitives::{AccountId, BlockNumber, Nonce};
+use argon_primitives::{AccountId, BlockNumber, Chain, ChainIdentity, Nonce};
 pub use spec::api;
 
 use crate::api::{ownership, storage, system};
@@ -287,6 +287,13 @@ impl MainchainClient {
 		let ticker_data = self.call(api::runtime_apis::tick_apis::TickApis.ticker(), None).await?;
 
 		Ok(ticker_data.into())
+	}
+
+	/// Get the system chain and genesis hash.
+	pub async fn get_chain_identity(&self) -> Result<ChainIdentity, Error> {
+		let chain: Chain = self.methods.system_chain().await?.try_into()?;
+		let genesis_hash = self.methods.genesis_hash().await?;
+		Ok(ChainIdentity { chain, genesis_hash })
 	}
 
 	pub async fn call<Call: RuntimeApiPayload>(

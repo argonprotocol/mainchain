@@ -4,6 +4,7 @@ use std::{future::Future, pin::Pin};
 pub mod balance_tip;
 pub mod blocks;
 pub mod chain_transfer;
+pub mod mainchain_identity;
 pub mod notarizations;
 pub mod notebook;
 pub mod notebook_constraints;

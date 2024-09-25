@@ -2,6 +2,8 @@
 extern crate alloc;
 extern crate core;
 
+use core::{fmt::Display, str::FromStr};
+use serde::{Deserialize, Serialize};
 use sp_core::{crypto::Ss58AddressFormatRegistry, H256};
 use sp_runtime::{
 	traits::{BlakeTwo256, IdentifyAccount, Verify},
@@ -86,4 +88,58 @@ pub mod localchain {
 		AccountType, BalanceChange, BestBlockVoteSeal, BlockVote, BlockVoteT, Note, NoteType,
 		VoteMinimum,
 	};
+}
+
+#[derive(Debug, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(rename_all = "kebab-case")]
+#[cfg_attr(feature = "std", derive(clap::ValueEnum))]
+#[cfg_attr(not(feature = "napi"), derive(Clone, Copy))]
+#[cfg_attr(feature = "napi", napi_derive::napi(string_enum = "kebab-case"))]
+#[cfg_attr(feature = "uniffi", derive(uniffi::Enum))]
+pub enum Chain {
+	Mainnet,
+	Testnet,
+	LocalTestnet,
+	Devnet,
+}
+
+#[cfg(feature = "std")]
+impl FromStr for Chain {
+	type Err = String;
+
+	fn from_str(s: &str) -> Result<Self, Self::Err> {
+		match s {
+			"Argon" => Ok(Chain::Mainnet),
+			"Argon Testnet" => Ok(Chain::Testnet),
+			"Argon Local Testnet" => Ok(Chain::LocalTestnet),
+			"Argon Development" => Ok(Chain::Devnet),
+			_ => Err("Unknown chain".to_string()),
+		}
+	}
+}
+
+#[cfg(feature = "std")]
+impl TryFrom<String> for Chain {
+	type Error = String;
+
+	fn try_from(s: String) -> Result<Self, Self::Error> {
+		Chain::from_str(&s)
+	}
+}
+
+impl Display for Chain {
+	fn fmt(&self, f: &mut core::fmt::Formatter) -> core::fmt::Result {
+		match self {
+			Chain::Mainnet => write!(f, "Argon"),
+			Chain::Testnet => write!(f, "Argon Testnet"),
+			Chain::LocalTestnet => write!(f, "Argon Local Testnet"),
+			Chain::Devnet => write!(f, "Argon Development"),
+		}
+	}
+}
+
+#[derive(Debug, Clone, Eq, PartialEq)]
+pub struct ChainIdentity {
+	pub chain: Chain,
+	pub genesis_hash: H256,
 }

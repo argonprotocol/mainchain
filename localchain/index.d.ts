@@ -181,6 +181,7 @@ export class MainchainClient {
   close(): Promise<void>
   static connect(host: string, timeoutMillis: number): Promise<MainchainClient>
   getTicker(): Promise<Ticker>
+  getChainIdentity(): Promise<ChainIdentity>
   getBestBlockHash(): Promise<Uint8Array>
   getVoteBlockHash(currentTick: number): Promise<BestBlockForVote | null>
   getDomainRegistration(domainName: string, topLevel: DomainTopLevel): Promise<DomainRegistration | null>
@@ -415,6 +416,23 @@ export interface BlockVote {
   signature: Array<number>
 }
 
+export enum Chain {
+  Mainnet = 'mainnet',
+  Testnet = 'testnet',
+  LocalTestnet = 'local-testnet',
+  Devnet = 'devnet'
+}
+
+export interface ChainIdentity {
+  chain: Chain
+  genesis: Buffer
+}
+
+export interface ChainIdentity {
+  chain: Chain
+  genesisHash: string
+}
+
 /** Number of ticks past the expiration of a channel_hold that a recipient has to claim. After this point, sender can recoup the channel_holded funds */
 export const CHANNEL_HOLD_CLAWBACK_TICKS: number
 
@@ -524,6 +542,8 @@ export interface LocalchainOverview {
   changes: Array<BalanceChangeGroup>
   /** The mainchain balance */
   mainchainBalance: bigint
+  /** The mainchain identity */
+  mainchainIdentity?: ChainIdentity
   /** The net pending mainchain balance pending movement in/out of the localchain */
   processingMainchainBalanceChange: bigint
 }

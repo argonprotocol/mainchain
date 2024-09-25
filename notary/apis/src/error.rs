@@ -96,6 +96,9 @@ pub enum Error {
 
 	#[error("Unsigned notebook header")]
 	UnsignedNotebookHeader,
+
+	#[error("Connected to the wrong mainchain")]
+	ChainMismatch,
 }
 
 impl From<Error> for i32 {
@@ -121,6 +124,7 @@ impl From<Error> for i32 {
 			Error::UnsignedNotebookHeader => 17,
 			Error::EmptyNotarizationProposed => 18,
 			Error::JsonError(_) => 19,
+			Error::ChainMismatch => 20,
 		}
 	}
 }
