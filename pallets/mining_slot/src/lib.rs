@@ -239,6 +239,9 @@ pub mod pallet {
 				ActiveMinersByIndex::<T>::insert(0, miner.clone());
 				ActiveMinersCount::<T>::put(1);
 			}
+			if self.mining_config.slot_bidding_start_block == Zero::zero() {
+				IsNextSlotBiddingOpen::<T>::put(true);
+			}
 			MiningConfig::<T>::put(self.mining_config.clone());
 		}
 	}

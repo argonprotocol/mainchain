@@ -434,6 +434,7 @@ dependencies = [
  "frame-system",
  "futures",
  "futures-timer",
+ "hex",
  "jsonrpsee",
  "num_cpus",
  "pallet-transaction-payment",

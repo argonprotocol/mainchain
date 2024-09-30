@@ -1,16 +1,15 @@
-use sc_service::{ChainType, Properties};
-use sp_core::sr25519;
-
-use crate::chain_spec::{
-	authority_keys_from_seed, get_account_id_from_seed, get_from_seed, testnet_genesis, ChainSpec,
-};
-use argon_node_runtime::WASM_BINARY;
+use crate::chain_spec::{get_account_id_from_seed, get_from_seed, testnet_genesis, ChainSpec};
+use argon_node_runtime::{opaque::SessionKeys, WASM_BINARY};
 use argon_primitives::{
 	bitcoin::BitcoinNetwork,
 	block_seal::MiningSlotConfig,
 	notary::{GenesisNotary, NotaryPublic},
-	Chain, ComputeDifficulty, ADDRESS_PREFIX,
+	AccountId, Chain, ComputeDifficulty, ADDRESS_PREFIX,
 };
+use codec::Decode;
+use sc_service::{ChainType, Properties};
+use sp_core::sr25519;
+use std::str::FromStr;
 
 pub fn testnet_config() -> Result<ChainSpec, String> {
 	let mut properties = Properties::new();
@@ -20,7 +19,7 @@ pub fn testnet_config() -> Result<ChainSpec, String> {
 
 	const HASHES_PER_SECOND: u64 = 200;
 	const TICK_MILLIS: u64 = 60_000;
-	let sudo_account = get_account_id_from_seed::<sr25519::Public>("Alice");
+	let sudo_account = AccountId::from_str("5EZxgPRoQDYW72ceBKTd8AcSPizNL38cVjBzDGTqbeHUPfRx")?;
 	let bitcoin_oracle = get_account_id_from_seed::<sr25519::Public>("Dave");
 	let price_oracle = get_account_id_from_seed::<sr25519::Public>("Eve");
 
@@ -28,7 +27,10 @@ pub fn testnet_config() -> Result<ChainSpec, String> {
 	let notary_public = get_from_seed::<NotaryPublic>("Ferdie//notary");
 
 	let miner_zero = get_account_id_from_seed::<sr25519::Public>("Alice");
-	let miner_zero_keys = authority_keys_from_seed("Alice");
+	let miner_zero_keys = SessionKeys::decode(
+		&mut &hex::decode("1e69c7672dfb67dc19abfce302caf4c60cc5cb21f39538f749efdc6a28feaba695d5d04b29524e535278e511ac0ec98e4bb76b08a9a6874c5c481f338d727e60")
+			.map_err(|e| format!("Error processing miner zero authority key hex {:?}", e))?[..]
+	).map_err(|e| format!("Error decoding miner zero authority keys {:?}", e))?;
 
 	Ok(ChainSpec::builder(
 		WASM_BINARY.ok_or_else(|| "Wasm not available".to_string())?,

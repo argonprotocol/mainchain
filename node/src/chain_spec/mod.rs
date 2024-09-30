@@ -37,15 +37,11 @@ pub(crate) fn get_from_seed<TPublic: Public>(seed: &str) -> <TPublic::Pair as Pa
 
 type AccountPublic = <Signature as Verify>::Signer;
 
-pub(crate) fn session_keys(
-	block_seal_authority: BlockSealAuthorityId,
-	grandpa: GrandpaId,
-) -> SessionKeys {
-	SessionKeys { block_seal_authority, grandpa }
-}
 /// Generate a BlockSeal authority key.
-pub(crate) fn authority_keys_from_seed(s: &str) -> (BlockSealAuthorityId, GrandpaId) {
-	(get_from_seed::<BlockSealAuthorityId>(s), get_from_seed::<GrandpaId>(s))
+pub(crate) fn authority_keys_from_seed(s: &str) -> SessionKeys {
+	let (block_seal_authority, grandpa) =
+		(get_from_seed::<BlockSealAuthorityId>(s), get_from_seed::<GrandpaId>(s));
+	SessionKeys { block_seal_authority, grandpa }
 }
 /// Generate an account ID from seed.
 pub(crate) fn get_account_id_from_seed<TPublic: Public>(seed: &str) -> AccountId
@@ -58,7 +54,7 @@ where
 #[allow(clippy::too_many_arguments)]
 /// Configure initial storage state for FRAME modules.
 pub(crate) fn testnet_genesis(
-	initial_authorities: Vec<(AccountId, (BlockSealAuthorityId, GrandpaId))>,
+	initial_authorities: Vec<(AccountId, SessionKeys)>,
 	root_key: AccountId,
 	bitcoin_network: BitcoinNetwork,
 	bitcoin_tip_operator: AccountId,
@@ -118,11 +114,11 @@ pub(crate) fn testnet_genesis(
 		"session":  {
 			"keys": initial_authorities
 				.iter()
-				.map(|(id, (block_seal_id, grandpa_id))| {
+				.map(|(id, session_keys)| {
 					(
 						id.clone(),
 						id.clone(),
-						session_keys(block_seal_id.clone(), grandpa_id.clone()),
+						session_keys,
 					)
 				})
 				.collect::<Vec<_>>(),

@@ -47,6 +47,7 @@ sp-statement-store = { workspace = true, features = ["default"] }
 sp-io = { workspace = true, features = ["default"] }
 sp-timestamp = { workspace = true, features = ["default"] }
 sp-inherents = { workspace = true, features = ["default"] }
+hex = { workspace = true }
 sp-keystore = { workspace = true, features = ["default"] }
 sp-keyring = { workspace = true, features = ["default"] }
 frame-system = { workspace = true, features = ["default"] }
