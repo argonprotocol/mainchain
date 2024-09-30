@@ -168,28 +168,28 @@ declare module '@polkadot/api-base/types/events' {
     };
     domain: {
       /**
-       * A data domain was expired
+       * A domain was expired
        **/
       DomainExpired: AugmentedEvent<ApiType, [domainHash: H256], { domainHash: H256 }>;
       /**
-       * A data domain was registered
+       * A domain was registered
        **/
       DomainRegistered: AugmentedEvent<ApiType, [domainHash: H256, registration: PalletDomainsDomainRegistration], { domainHash: H256, registration: PalletDomainsDomainRegistration }>;
       /**
-       * A data domain registration was canceled due to a conflicting registration in the same
+       * A domain registration was canceled due to a conflicting registration in the same
        * tick
        **/
       DomainRegistrationCanceled: AugmentedEvent<ApiType, [domainHash: H256, registration: PalletDomainsDomainRegistration], { domainHash: H256, registration: PalletDomainsDomainRegistration }>;
       /**
-       * A data domain registration failed due to an error
+       * A domain registration failed due to an error
        **/
       DomainRegistrationError: AugmentedEvent<ApiType, [domainHash: H256, accountId: AccountId32, error: SpRuntimeDispatchError], { domainHash: H256, accountId: AccountId32, error: SpRuntimeDispatchError }>;
       /**
-       * A data domain was registered
+       * A domain was registered
        **/
       DomainRenewed: AugmentedEvent<ApiType, [domainHash: H256], { domainHash: H256 }>;
       /**
-       * A data domain zone record was updated
+       * A domain zone record was updated
        **/
       ZoneRecordUpdated: AugmentedEvent<ApiType, [domainHash: H256, zoneRecord: ArgonPrimitivesDomainZoneRecord], { domainHash: H256, zoneRecord: ArgonPrimitivesDomainZoneRecord }>;
     };

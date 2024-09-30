@@ -665,7 +665,7 @@ mod tests {
 			vec![(domain_hash, register_domain_to)],
 		)
 		.await?;
-		println!("submitted chain transfer + data domain to notary");
+		println!("submitted chain transfer + domain to notary");
 
 		Ok(AccountOrigin {
 			notebook_number: result.notebook_number,

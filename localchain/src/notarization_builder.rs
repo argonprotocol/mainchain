@@ -1255,9 +1255,9 @@ pub mod napi_ext {
     pub index: u32,
     /// The voting power of this vote, determined from the amount of tax
     pub power: BigInt,
-    /// The data domain used to create this vote
+    /// The domain used to create this vote
     pub domain_hash: Vec<u8>,
-    /// The data domain payment address used to create this vote
+    /// The domain payment address used to create this vote
     pub domain_address: String,
     /// The mainchain address where rewards will be sent
     pub block_rewards_address: String,

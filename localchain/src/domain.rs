@@ -96,7 +96,7 @@ impl DomainStore {
             .await
             ?;
     if res.rows_affected() != 1 {
-      bail!("Error inserting data domain {}", domain.name);
+      bail!("Error inserting domain {}", domain.name);
     }
     Ok(())
   }

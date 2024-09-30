@@ -11971,7 +11971,7 @@ pub mod api {
 			# [codec (crate = :: subxt :: ext :: subxt_core :: ext :: codec)]
 			#[decode_as_type(crate_path = ":: subxt :: ext :: subxt_core :: ext :: scale_decode")]
 			#[encode_as_type(crate_path = ":: subxt :: ext :: subxt_core :: ext :: scale_encode")]
-			#[doc = "A data domain zone record was updated"]
+			#[doc = "A domain zone record was updated"]
 			pub struct ZoneRecordUpdated {
 				pub domain_hash: zone_record_updated::DomainHash,
 				pub zone_record: zone_record_updated::ZoneRecord,
@@ -11998,7 +11998,7 @@ pub mod api {
 			# [codec (crate = :: subxt :: ext :: subxt_core :: ext :: codec)]
 			#[decode_as_type(crate_path = ":: subxt :: ext :: subxt_core :: ext :: scale_decode")]
 			#[encode_as_type(crate_path = ":: subxt :: ext :: subxt_core :: ext :: scale_encode")]
-			#[doc = "A data domain was registered"]
+			#[doc = "A domain was registered"]
 			pub struct DomainRegistered {
 				pub domain_hash: domain_registered::DomainHash,
 				pub registration: domain_registered::Registration,
@@ -12025,7 +12025,7 @@ pub mod api {
 			# [codec (crate = :: subxt :: ext :: subxt_core :: ext :: codec)]
 			#[decode_as_type(crate_path = ":: subxt :: ext :: subxt_core :: ext :: scale_decode")]
 			#[encode_as_type(crate_path = ":: subxt :: ext :: subxt_core :: ext :: scale_encode")]
-			#[doc = "A data domain was registered"]
+			#[doc = "A domain was registered"]
 			pub struct DomainRenewed {
 				pub domain_hash: domain_renewed::DomainHash,
 			}
@@ -12048,7 +12048,7 @@ pub mod api {
 			# [codec (crate = :: subxt :: ext :: subxt_core :: ext :: codec)]
 			#[decode_as_type(crate_path = ":: subxt :: ext :: subxt_core :: ext :: scale_decode")]
 			#[encode_as_type(crate_path = ":: subxt :: ext :: subxt_core :: ext :: scale_encode")]
-			#[doc = "A data domain was expired"]
+			#[doc = "A domain was expired"]
 			pub struct DomainExpired {
 				pub domain_hash: domain_expired::DomainHash,
 			}
@@ -12071,7 +12071,7 @@ pub mod api {
 			# [codec (crate = :: subxt :: ext :: subxt_core :: ext :: codec)]
 			#[decode_as_type(crate_path = ":: subxt :: ext :: subxt_core :: ext :: scale_decode")]
 			#[encode_as_type(crate_path = ":: subxt :: ext :: subxt_core :: ext :: scale_encode")]
-			#[doc = "A data domain registration was canceled due to a conflicting registration in the same"]
+			#[doc = "A domain registration was canceled due to a conflicting registration in the same"]
 			#[doc = "tick"]
 			pub struct DomainRegistrationCanceled {
 				pub domain_hash: domain_registration_canceled::DomainHash,
@@ -12099,7 +12099,7 @@ pub mod api {
 			# [codec (crate = :: subxt :: ext :: subxt_core :: ext :: codec)]
 			#[decode_as_type(crate_path = ":: subxt :: ext :: subxt_core :: ext :: scale_decode")]
 			#[encode_as_type(crate_path = ":: subxt :: ext :: subxt_core :: ext :: scale_encode")]
-			#[doc = "A data domain registration failed due to an error"]
+			#[doc = "A domain registration failed due to an error"]
 			pub struct DomainRegistrationError {
 				pub domain_hash: domain_registration_error::DomainHash,
 				pub account_id: domain_registration_error::AccountId,
@@ -23555,7 +23555,7 @@ pub mod api {
 				#[doc = "The `Event` enum of this pallet"]
 				pub enum Event {
 					#[codec(index = 0)]
-					#[doc = "A data domain zone record was updated"]
+					#[doc = "A domain zone record was updated"]
 					ZoneRecordUpdated {
 						domain_hash: ::sp_core::H256,
 						zone_record: runtime_types::argon_primitives::domain::ZoneRecord<
@@ -23563,7 +23563,7 @@ pub mod api {
 						>,
 					},
 					#[codec(index = 1)]
-					#[doc = "A data domain was registered"]
+					#[doc = "A domain was registered"]
 					DomainRegistered {
 						domain_hash: ::sp_core::H256,
 						registration: runtime_types::pallet_domains::DomainRegistration<
@@ -23571,13 +23571,13 @@ pub mod api {
 						>,
 					},
 					#[codec(index = 2)]
-					#[doc = "A data domain was registered"]
+					#[doc = "A domain was registered"]
 					DomainRenewed { domain_hash: ::sp_core::H256 },
 					#[codec(index = 3)]
-					#[doc = "A data domain was expired"]
+					#[doc = "A domain was expired"]
 					DomainExpired { domain_hash: ::sp_core::H256 },
 					#[codec(index = 4)]
-					#[doc = "A data domain registration was canceled due to a conflicting registration in the same"]
+					#[doc = "A domain registration was canceled due to a conflicting registration in the same"]
 					#[doc = "tick"]
 					DomainRegistrationCanceled {
 						domain_hash: ::sp_core::H256,
@@ -23586,7 +23586,7 @@ pub mod api {
 						>,
 					},
 					#[codec(index = 5)]
-					#[doc = "A data domain registration failed due to an error"]
+					#[doc = "A domain registration failed due to an error"]
 					DomainRegistrationError {
 						domain_hash: ::sp_core::H256,
 						account_id: ::subxt::ext::subxt_core::utils::AccountId32,

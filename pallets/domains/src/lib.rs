@@ -20,10 +20,10 @@ pub mod weights;
 ///
 /// This pallet tracks domains and their zone records. Domains are registered via
 /// localchain tax write-offs that are synchronized through the notary network. Zone records are
-/// updated by the domain owner and are used to track the latest version of a data domain and the
+/// updated by the domain owner and are used to track the latest version of a domain and the
 /// host addresses where it can be accessed.
 ///
-/// If more than one data domain registration is received in a tick, they are canceled out.
+/// If more than one domain registration is received in a tick, they are canceled out.
 #[frame_support::pallet(dev_mode)]
 pub mod pallet {
 	use argon_primitives::{
@@ -73,21 +73,21 @@ pub mod pallet {
 	#[pallet::event]
 	#[pallet::generate_deposit(pub(super) fn deposit_event)]
 	pub enum Event<T: Config> {
-		/// A data domain zone record was updated
+		/// A domain zone record was updated
 		ZoneRecordUpdated { domain_hash: DomainHash, zone_record: ZoneRecord<T::AccountId> },
-		/// A data domain was registered
+		/// A domain was registered
 		DomainRegistered { domain_hash: DomainHash, registration: DomainRegistration<T::AccountId> },
-		/// A data domain was registered
+		/// A domain was registered
 		DomainRenewed { domain_hash: DomainHash },
-		/// A data domain was expired
+		/// A domain was expired
 		DomainExpired { domain_hash: DomainHash },
-		/// A data domain registration was canceled due to a conflicting registration in the same
+		/// A domain registration was canceled due to a conflicting registration in the same
 		/// tick
 		DomainRegistrationCanceled {
 			domain_hash: DomainHash,
 			registration: DomainRegistration<T::AccountId>,
 		},
-		/// A data domain registration failed due to an error
+		/// A domain registration failed due to an error
 		DomainRegistrationError {
 			domain_hash: DomainHash,
 			account_id: AccountId32,

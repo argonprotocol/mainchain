@@ -117,7 +117,7 @@ pub enum NoteType {
 		/// Recipient addresses (address of recipient party)
 		to: Option<BoundedVec<AccountId, MaxNoteRecipients>>,
 	},
-	/// Lease a data domain
+	/// Lease a domain
 	LeaseDomain,
 	/// Pay a fee to a notary or mainchain service
 	Fee,

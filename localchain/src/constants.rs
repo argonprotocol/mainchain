@@ -21,10 +21,10 @@ pub const CHANNEL_HOLD_MINIMUM_SETTLEMENT: u128 = argon_primitives::MINIMUM_CHAN
 #[cfg_attr(feature = "napi", napi)]
 pub const DATASTORE_MAX_VERSIONS: u32 = argon_primitives::MAX_DATASTORE_VERSIONS;
 
-/// Minimum data domain name length
+/// Minimum domain name length
 #[cfg_attr(feature = "napi", napi)]
 pub const DOMAIN_MIN_NAME_LENGTH: u32 = argon_primitives::MIN_DOMAIN_NAME_LENGTH as u32;
 
-/// Cost to lease a data domain for 1 year
+/// Cost to lease a domain for 1 year
 #[cfg_attr(feature = "napi", napi)]
 pub const DOMAIN_LEASE_COST: u128 = argon_primitives::DOMAIN_LEASE_COST;

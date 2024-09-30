@@ -285,7 +285,7 @@ impl BalanceChangeBuilder {
     Ok(())
   }
 
-  /// Lease a data domain. Domain leases are converted in full to tax.
+  /// Lease a Domain. Domain leases are converted in full to tax.
   pub async fn lease_domain(&self) -> Result<Balance> {
     let mut balance_change = self.balance_change.lock().await;
     if balance_change.account_type != AccountType::Deposit {
@@ -298,7 +298,7 @@ impl BalanceChangeBuilder {
 
     if balance_change.balance < amount {
       bail!(
-        "Insufficient balance {} to lease a data domain for {}",
+        "Insufficient balance {} to lease a Domain for {}",
         balance_change.balance,
         amount
       );
@@ -438,7 +438,7 @@ pub mod napi_ext {
       self.send_to_vote(amount.get_u128().1).await.napi_ok()
     }
 
-    /// Lease a data domain. Domain leases are converted in full to tax.
+    /// Lease a Domain. Domain leases are converted in full to tax.
     #[napi(js_name = "leaseDomain")]
     pub async fn lease_domain_napi(&self) -> napi::Result<BigInt> {
       self.lease_domain().await.map(Into::into).napi_ok()

@@ -87,23 +87,23 @@ enum Commands {
 
 #[derive(Subcommand, Debug)]
 enum DomainsSubcommand {
-  /// List all installed domains
+  /// List all locally registered domains
   List,
-  /// Generate the hash for a data domain
+  /// Generate the hash for a domain
   Hash {
-    /// The data domain name
+    /// The domain name
     #[clap()]
     domain: String,
   },
-  /// Check if a data domain is registered
+  /// Check if a domain is registered
   Check {
-    /// The data domain name
+    /// The domain name
     #[clap()]
     domain: String,
   },
-  /// Lease a data domain
+  /// Lease a domain
   Lease {
-    /// The data domain name
+    /// The domain name
     #[clap()]
     domain: String,
 
@@ -111,7 +111,7 @@ enum DomainsSubcommand {
     #[clap(flatten)]
     keystore_password: EmbeddedKeyPassword,
 
-    /// Which account should the registration be assigned to. This is the account you'll manage the data domain with on the mainchain.
+    /// Which account should the registration be assigned to. This is the account you'll manage the domain with on the mainchain.
     #[arg(short, long, value_name = "SS58_ADDRESS", required = true)]
     owner_address: String,
   },
@@ -313,12 +313,12 @@ where
         println!("{table}");
       }
       DomainsSubcommand::Hash { domain } => {
-        let domain = Domain::parse(domain).map_err(|_| anyhow!("Not a valid data domain"))?;
+        let domain = Domain::parse(domain).map_err(|_| anyhow!("Not a valid domain"))?;
         println!("Hash: {:?}", domain.hash());
       }
       DomainsSubcommand::Check { domain } => {
         let argon_domain =
-          Domain::parse(domain.clone()).map_err(|_| anyhow!("Not a valid data domain"))?;
+          Domain::parse(domain.clone()).map_err(|_| anyhow!("Not a valid domain"))?;
         let mainchain = MainchainClient::connect(mainchain_url, 5_000).await?;
         let registration = mainchain
           .get_domain_registration(
@@ -349,7 +349,7 @@ where
         owner_address,
       } => {
         let argon_domain =
-          Domain::parse(domain.clone()).map_err(|_| anyhow!("Not a valid data domain"))?;
+          Domain::parse(domain.clone()).map_err(|_| anyhow!("Not a valid domain"))?;
         let localchain = Localchain::load_without_mainchain(
           path,
           TickerConfig {

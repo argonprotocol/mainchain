@@ -59,7 +59,7 @@ describeIntegration("ChannelHold integration", () => {
     }, 120e3);
 
 
-    it('can create an channelHold from a data domain registration', async () => {
+    it('can create an channelHold from a domain registration', async () => {
         let mainchain = new TestMainchain();
         const mainchainUrl = await mainchain.launch();
         const notary = new TestNotary();

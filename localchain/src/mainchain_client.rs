@@ -210,7 +210,7 @@ impl MainchainClient {
         Ok(s) => AccountStore::to_address(&s),
         Err(_) => {
           bail!(
-            "Could not parse the data domain registration address {}",
+            "Could not parse the domain registration address {}",
             &x.account_id
           );
         }
@@ -241,7 +241,7 @@ impl MainchainClient {
       Ok(s) => s,
       Err(_) => {
         bail!(
-          "Could not parse the data domain zone record payment address {}",
+          "Could not parse the domain zone record payment address {}",
           &zone_record.payment_account
         );
       }
@@ -893,9 +893,9 @@ pub struct ZoneRecord {
 
 #[cfg_attr(feature = "napi", napi(object))]
 pub struct VersionHost {
-  /// Datastore id is a 2-50 char string that uniquely identifies a data domain.
+  /// Datastore id is a 2-50 char string that uniquely identifies a domain.
   pub datastore_id: String,
-  /// The host address where the data domain can be accessed.
+  /// The host address where the domain can be accessed.
   pub host: String,
 }
 

@@ -7,7 +7,7 @@ async function main() {
     let domainTld = api.createType("ArgonPrimitivesDomainTopLevel", "Analytics");
 
     let result = await api.query.domain.registeredDomains({domainName: "test", topLevelDomain: domainTld});
-    console.log("got a registered data domain", result.isSome);
+    console.log("got a registered domain", result.isSome);
 
     console.log('current tick', (await api.query.ticks.currentTick()).toPrimitive());
 

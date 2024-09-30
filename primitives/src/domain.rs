@@ -85,7 +85,7 @@ impl Domain {
 
 #[derive(Clone, PartialEq, Eq, Encode, Decode, RuntimeDebug, TypeInfo, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
-/// ZoneRecords track versions of a data domain and the host addresses where they can be accessed.
+/// ZoneRecords track versions of a domain and the host addresses where they can be accessed.
 pub struct ZoneRecord<AccountId: Codec> {
 	pub payment_account: AccountId,
 	/// The notary that payments must be notarized through
@@ -95,7 +95,7 @@ pub struct ZoneRecord<AccountId: Codec> {
 }
 
 #[derive(Clone, PartialEq, Eq, Encode, Decode, RuntimeDebug, TypeInfo, MaxEncodedLen)]
-/// ZoneRecords track versions of a data domain and the host addresses where they can be accessed.
+/// ZoneRecords track versions of a domain and the host addresses where they can be accessed.
 pub struct BoundZoneRecord {
 	/// A mapping of versions to host addresses.
 	pub versions: BoundedBTreeMap<Semver, VersionHost, ConstU32<MAX_DATASTORE_VERSIONS>>,
@@ -121,9 +121,9 @@ impl<A: Codec> ZoneRecord<A> {
 )]
 #[serde(rename_all = "camelCase")]
 pub struct VersionHost {
-	/// Datastore id is a 2-50 char string that uniquely identifies a data domain.
+	/// Datastore id is a 2-50 char string that uniquely identifies a domain.
 	pub datastore_id: BoundedVec<u8, ConstU32<50>>,
-	/// The host address where the data domain can be accessed.
+	/// The host address where the domain can be accessed.
 	pub host: Host,
 }
 
