@@ -184,7 +184,7 @@ struct BalanceProof: Codable {
   var tick: UInt32
   @StringOrNumber var balance: String
   var accountOrigin: AccountOrigin
-  var noteookbProof: MerkleProof?
+  var notebookProof: MerkleProof?
 }
 
 struct AccountOrigin: Codable {
@@ -195,7 +195,7 @@ struct AccountOrigin: Codable {
 struct MerkleProof: Codable {
   var proof: [String]
   var numberOfLeaves: UInt32
-  var leafInxed: UInt32
+  var leafIndex: UInt32
 }
 
 struct Note: Codable {

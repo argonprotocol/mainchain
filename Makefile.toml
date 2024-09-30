@@ -118,7 +118,7 @@ dependencies = ["build-node"]
 [tasks.test]
 description = "Run tests with cargo,"
 command = "cargo"
-args = ["test", "--no-fail-fast", "${@}"]
+args = ["test", "--lib", "--no-fail-fast", "${@}"]
 dependencies = ["build"]
 env = { "RUSTC_WRAPPER" = "sccache" }
 

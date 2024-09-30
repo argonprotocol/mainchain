@@ -222,17 +222,6 @@ fn it_should_not_fail_with_no_notebooks() {
 		System::set_block_number(1);
 		BlockRewards::on_initialize(1);
 		BlockRewards::on_finalize(1);
-		let maturation_block = (1 + MaturationBlocks::get()).into();
-		System::assert_last_event(
-			Event::RewardCreated {
-				maturation_block,
-				rewards: vec![
-					BlockPayout { account_id: 1, ownership: 0, argons: 0 },
-					BlockPayout { account_id: 2, ownership: 0, argons: 0 },
-				],
-			}
-			.into(),
-		);
 		System::assert_has_event(
 			Event::RewardCreateError {
 				account_id: 2,

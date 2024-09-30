@@ -107,37 +107,6 @@ we'll show some of the high-level steps.
    curl -H "Content-Type: application/json" -d '{"id":1, "jsonrpc":"2.0", "method": "
    author_rotateKeys"}' http://localhost:9944/
       ```
-   **Register your Session Key:**
-   You need to register your session key with the network. You can do this by submitting a `session.setKeys`
-   extrinsic using the keys you just generated. NOTE: you need Argons to submit this transaction, which you
-   can [acquire](#2-acquire-argons-and-ownership-tokens) from the Testnet faucet.
-   <br/><br/>
-   This can be done using
-   the [Polkadot.js interface](https://polkadot.js.org/apps/?rpc=wss%3A%2F%2Frpc.testnet.argonprotocol.org#/extrinsics/decode/0x11001e69c7672dfb67dc19abfce302caf4c60cc5cb21f39538f749efdc6a28feaba695d5d04b29524e535278e511ac0ec98e4bb76b08a9a6874c5c481f338d727e600400).
-   You'll need to split the output of the `author_rotateKeys` call into the two 32 byte keys (they'll in the same order
-   as the output, or there's a runtime
-   call [available](https://polkadot.js.org/apps/?rpc=wss://rpc.testnet.argonprotocol.org#/runtime)
-   called `sessionKeys` -> `decodeSessionKey`). Your Proof should
-   be `0x00`.
-   <br/><br/>
-   You can also do this using the `@argonprotocol/mainchain` Node.js library:
-
-   ```javascript
-    const {getClient, checkForExtrinsicSuccess} = require('@argonprotocol/mainchain');
-
-   const client = await getClient('wss://rpc.testnet.argonprotocol.org');
-   client.tx.session.setKeys('0x<KEY OUTPUT FROM ROTATEKEYS>', '0x00')
-    .signAndSend(myAccount, ({events, status}) => {
-        if (status.isFinalized) {
-            // if finalized, we're done
-            checkForExtrinsicSuccess(events, client).then(resolve).catch(reject);
-        }
-        if (status.isInBlock) {
-            // log errors if they exist
-            checkForExtrinsicSuccess(events, client).catch(reject);
-        }
-    });
-   ```
 
 ## 2. Acquire Argons and Ownership Tokens
 
@@ -177,11 +146,22 @@ given time, there are 10 overlapping cohorts of miners. Each day, 1,000 will rot
 
 You are bidding for a slot, and can be outbid at any time by someone who "locks" more Argons than you. You can monitor
 if you currently have a winning slot by looking at
-the [Chain State](https://polkadot.js.org/apps/?rpc=wss://rpc.testnet.argonprotocol.org#/chainstate) under **miningSlot
-**-> **nextSlotCohort**. If you are in the nextSlotCohort, you have a winning bid. You can also monitor for events in
+the [Chain State](https://polkadot.js.org/apps/?rpc=wss://rpc.testnet.argonprotocol.org#/chainstate)
+under **miningSlot** -> **nextSlotCohort**. If you are in the nextSlotCohort, you have a winning bid. You can also
+monitor for events in
 each block matching `SlotBidderReplaced` to see if you have been outbid. (Events can be monitored programmatically using
 the `@argonprotocol/mainchain` node.js library, or using the `argon-client` rust library, which is
 a [`subxt`](https://github.com/paritytech/subxt) based rust library).
+
+To submit your bid, you'll need to submit the signing keys you'll use for the slot. These are the keys you generated
+when
+you created your node [here](#node-setup) -> Session Keys. You'll need to split the output of the `author_rotateKeys`
+call into the two 32 byte keys (they'll in the same order
+as the output, or there's a runtime
+call [available](https://polkadot.js.org/apps/?rpc=wss://rpc.testnet.argonprotocol.org#/runtime)
+called `sessionKeys` -> `decodeSessionKey`). If you want to more carefully create and backup your keys, you can also
+generate them individually as shown [here](https://docs.substrate.io/tutorials/build-a-blockchain/add-trusted-nodes/).
+You'll need to insert two Ed25519 keys with key-types of `gran` and one of `seal`.
 
 You can bid for a slot by using the Polkadot.js
 interface [here](https://polkadot.js.org/apps/?rpc=wss%3A%2F%2Frpc.testnet.argonprotocol.org#/extrinsics/decode/0x050001010000006400000000000000000000000000000000).

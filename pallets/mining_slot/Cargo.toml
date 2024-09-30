@@ -19,13 +19,14 @@ scale-info = { workspace = true }
 frame-benchmarking = { workspace = true, optional = true }
 frame-support = { workspace = true }
 frame-system = { workspace = true }
-pallet-session = { workspace = true }
+pallet-grandpa = { workspace = true }
 sp-runtime = { workspace = true }
 sp-core = { workspace = true }
 sp-io = { workspace = true }
 sp-api = { workspace = true }
 log = { workspace = true }
 argon-primitives = { workspace = true }
+impl-trait-for-tuples = { workspace = true }
 
 [dev-dependencies]
 pallet-balances = { workspace = true }
@@ -42,7 +43,7 @@ std = [
 	"frame-system/std",
 	"log/std",
 	"pallet-balances/std",
-	"pallet-session/std",
+	"pallet-grandpa/std",
 	"scale-info/std",
 	"sp-api/std",
 	"sp-core/std",
@@ -53,11 +54,12 @@ runtime-benchmarks = [
 	"frame-benchmarking/runtime-benchmarks",
 	"frame-support/runtime-benchmarks",
 	"frame-system/runtime-benchmarks",
+	"pallet-grandpa/runtime-benchmarks",
 	"sp-runtime/runtime-benchmarks",
 ]
 try-runtime = [
 	"frame-support/try-runtime",
 	"frame-system/try-runtime",
-	"pallet-session/try-runtime",
+	"pallet-grandpa/try-runtime",
 	"sp-runtime/try-runtime",
 ]

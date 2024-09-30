@@ -1,3 +1,4 @@
+use crate::BondId;
 use codec::{Codec, Decode, Encode, HasCompact, MaxEncodedLen};
 use frame_support::{CloneNoBound, EqNoBound, Parameter, PartialEqNoBound};
 use scale_info::TypeInfo;
@@ -9,12 +10,11 @@ use sp_core::{
 	OpaquePeerId,
 };
 use sp_debug_derive::RuntimeDebug;
-
-use crate::BondId;
+use sp_runtime::traits::OpaqueKeys;
 
 pub const BLOCK_SEAL_KEY_TYPE: KeyTypeId = KeyTypeId(*b"seal");
 
-// sr25519 signatures are non deterministic, so we use ed25519 for deterministic signatures since
+// sr25519 signatures are non-deterministic, so we use ed25519 for deterministic signatures since
 // these are part of the nonce hash
 pub mod app {
 	use sp_application_crypto::{app_crypto, ed25519};
@@ -35,7 +35,11 @@ pub const BLOCK_SEAL_CRYPTO_ID: CryptoTypeId = <app::Public as AppCrypto>::CRYPT
 #[scale_info(skip_type_params(MaxHosts))]
 #[derive(Deserialize, Serialize)]
 #[serde(rename_all = "camelCase")]
-pub struct MiningRegistration<AccountId: Parameter, Balance: Parameter + MaxEncodedLen> {
+pub struct MiningRegistration<
+	AccountId: Parameter,
+	Balance: Parameter + MaxEncodedLen,
+	Keys: OpaqueKeys + Parameter,
+> {
 	pub account_id: AccountId,
 	pub reward_destination: RewardDestination<AccountId>,
 	pub bond_id: Option<BondId>,
@@ -44,6 +48,7 @@ pub struct MiningRegistration<AccountId: Parameter, Balance: Parameter + MaxEnco
 	#[codec(compact)]
 	pub ownership_tokens: Balance,
 	pub reward_sharing: Option<RewardSharing<AccountId>>,
+	pub authority_keys: Keys,
 }
 
 #[derive(

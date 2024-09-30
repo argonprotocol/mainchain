@@ -70,13 +70,14 @@ pub(crate) fn testnet_genesis(
 ) -> serde_json::Value {
 	let authority_zero = initial_authorities[0].clone();
 	let ticker = Ticker::start(Duration::from_millis(tick_millis), channel_hold_expiration_ticks);
-	let miner_zero = MiningRegistration::<AccountId, Balance> {
+	let miner_zero = MiningRegistration::<AccountId, Balance, SessionKeys> {
 		account_id: authority_zero.0.clone(),
 		bond_id: None,
 		reward_destination: RewardDestination::Owner,
 		bond_amount: 0u32.into(),
 		ownership_tokens: 0u32.into(),
 		reward_sharing: None,
+		authority_keys: authority_zero.1,
 	};
 
 	serde_json::json!({
@@ -111,17 +112,8 @@ pub(crate) fn testnet_genesis(
 		"notaries": {
 			"list": initial_notaries,
 		},
-		"session":  {
-			"keys": initial_authorities
-				.iter()
-				.map(|(id, session_keys)| {
-					(
-						id.clone(),
-						id.clone(),
-						session_keys,
-					)
-				})
-				.collect::<Vec<_>>(),
+		"grandpa":  {
+			"authorities": initial_authorities.iter().map(|(_, keys)| (keys.grandpa.clone(), 1)).collect::<Vec<_>>(),
 		},
 	})
 }

@@ -187,14 +187,6 @@ struct NotebookAuditResponse {
 
 #[cfg(test)]
 mod tests {
-	use std::{
-		future::Future,
-		net::{IpAddr, SocketAddr},
-		pin::Pin,
-		sync::Arc,
-		task::{Context, Poll},
-	};
-
 	use anyhow::anyhow;
 	use codec::Decode;
 	use frame_support::assert_ok;
@@ -203,6 +195,14 @@ mod tests {
 	use sp_keyring::Sr25519Keyring::{Alice, Bob, Ferdie};
 	use sp_keystore::{testing::MemoryKeystore, Keystore, KeystoreExt};
 	use sqlx::PgPool;
+	use std::{
+		future::Future,
+		net::{IpAddr, SocketAddr},
+		pin::Pin,
+		sync::Arc,
+		task::{Context, Poll},
+		time::Duration,
+	};
 	use subxt::{
 		blocks::Block,
 		config::substrate::DigestItem,
@@ -319,7 +319,7 @@ mod tests {
 		assert_eq!(
 			ctx.client
 				.fetch_storage(
-					&storage().domain().zone_records_by_domain(domain_hash),
+					&storage().domains().zone_records_by_domain(domain_hash),
 					Some(zone_block)
 				)
 				.await?
@@ -403,9 +403,12 @@ mod tests {
 				.await?
 		);
 
+		let mut attempts = 0;
 		let (grandparent_tick, best_grandparents) = {
 			loop {
 				let grandparent_tick = ticker.current() - 2;
+				let best_hash =
+					ctx.client.best_block_hash().await.expect("should find a best block");
 				match ctx
 					.client
 					.fetch_storage(
@@ -416,7 +419,18 @@ mod tests {
 				{
 					Some(x) => break (grandparent_tick, x.0),
 					// wait a second
-					None => tokio::time::sleep(ticker.duration_to_next_tick()).await,
+					None => {
+						println!(
+							"No grandparents found at tick {}. Waiting. Current={}",
+							grandparent_tick,
+							ticker.current()
+						);
+						if attempts > 200 {
+							panic!("Should have found a grandparent");
+						}
+						attempts += 1;
+						tokio::time::sleep(Duration::from_millis(100)).await
+					},
 				}
 			}
 		};
@@ -681,7 +695,7 @@ mod tests {
 		let tx_progress = client
 			.tx()
 			.sign_and_submit_then_watch_default(
-				&tx().domain().set_zone_record(
+				&tx().domains().set_zone_record(
 					domain_hash,
 					runtime_types::argon_primitives::domain::ZoneRecord {
 						payment_account: AccountId32::from(account.public_key()),

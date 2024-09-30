@@ -9,7 +9,7 @@ import type { ApiTypes, AugmentedSubmittable, SubmittableExtrinsic, SubmittableE
 import type { Bytes, Compact, Option, U8aFixed, Vec, bool, u128, u16, u32, u64 } from '@polkadot/types-codec';
 import type { AnyNumber, IMethod, ITuple } from '@polkadot/types-codec/types';
 import type { AccountId32, Call, H256, MultiAddress } from '@polkadot/types/interfaces/runtime';
-import type { ArgonNodeRuntimeOpaqueSessionKeys, ArgonNodeRuntimeOriginCaller, ArgonNodeRuntimeProxyType, ArgonPrimitivesBitcoinCompressedBitcoinPubkey, ArgonPrimitivesBitcoinH256Le, ArgonPrimitivesBitcoinOpaqueBitcoinXpub, ArgonPrimitivesBlockSealRewardDestination, ArgonPrimitivesBondVaultTerms, ArgonPrimitivesDomainZoneRecord, ArgonPrimitivesInherentsBitcoinUtxoSync, ArgonPrimitivesInherentsBlockSealInherent, ArgonPrimitivesNotaryNotaryMeta, ArgonPrimitivesNotebookSignedNotebookHeader, PalletBalancesAdjustmentDirection, PalletMiningSlotMiningSlotBid, PalletMultisigTimepoint, PalletPriceIndexPriceIndex, PalletVaultsVaultConfig, SpConsensusGrandpaEquivocationProof, SpSessionMembershipProof, SpWeightsWeightV2Weight } from '@polkadot/types/lookup';
+import type { ArgonNodeRuntimeOpaqueSessionKeys, ArgonNodeRuntimeOriginCaller, ArgonNodeRuntimeProxyType, ArgonPrimitivesBitcoinCompressedBitcoinPubkey, ArgonPrimitivesBitcoinH256Le, ArgonPrimitivesBitcoinOpaqueBitcoinXpub, ArgonPrimitivesBlockSealRewardDestination, ArgonPrimitivesBondVaultTerms, ArgonPrimitivesDomainZoneRecord, ArgonPrimitivesInherentsBitcoinUtxoSync, ArgonPrimitivesInherentsBlockSealInherent, ArgonPrimitivesNotaryNotaryMeta, ArgonPrimitivesNotebookSignedNotebookHeader, PalletBalancesAdjustmentDirection, PalletMiningSlotMiningSlotBid, PalletMultisigTimepoint, PalletPriceIndexPriceIndex, PalletVaultsVaultConfig, SpConsensusGrandpaEquivocationProof, SpCoreVoid, SpWeightsWeightV2Weight } from '@polkadot/types/lookup';
 
 export type __AugmentedSubmittable = AugmentedSubmittable<() => unknown>;
 export type __SubmittableExtrinsic<ApiType extends ApiTypes> = SubmittableExtrinsic<ApiType>;
@@ -162,7 +162,7 @@ declare module '@polkadot/api-base/types/submittable' {
     chainTransfer: {
       sendToLocalchain: AugmentedSubmittable<(amount: Compact<u128> | AnyNumber | Uint8Array, notaryId: u32 | AnyNumber | Uint8Array) => SubmittableExtrinsic<ApiType>, [Compact<u128>, u32]>;
     };
-    domain: {
+    domains: {
       setZoneRecord: AugmentedSubmittable<(domainHash: H256 | string | Uint8Array, zoneRecord: ArgonPrimitivesDomainZoneRecord | { paymentAccount?: any; notaryId?: any; versions?: any } | string | Uint8Array) => SubmittableExtrinsic<ApiType>, [H256, ArgonPrimitivesDomainZoneRecord]>;
     };
     grandpa: {
@@ -187,7 +187,7 @@ declare module '@polkadot/api-base/types/submittable' {
        * against the extracted offender. If both are valid, the offence
        * will be reported.
        **/
-      reportEquivocation: AugmentedSubmittable<(equivocationProof: SpConsensusGrandpaEquivocationProof | { setId?: any; equivocation?: any } | string | Uint8Array, keyOwnerProof: SpSessionMembershipProof | { session?: any; trieNodes?: any; validatorCount?: any } | string | Uint8Array) => SubmittableExtrinsic<ApiType>, [SpConsensusGrandpaEquivocationProof, SpSessionMembershipProof]>;
+      reportEquivocation: AugmentedSubmittable<(equivocationProof: SpConsensusGrandpaEquivocationProof | { setId?: any; equivocation?: any } | string | Uint8Array, keyOwnerProof: SpCoreVoid | null) => SubmittableExtrinsic<ApiType>, [SpConsensusGrandpaEquivocationProof, SpCoreVoid]>;
       /**
        * Report voter equivocation/misbehavior. This method will verify the
        * equivocation proof and validate the given key ownership proof
@@ -199,7 +199,7 @@ declare module '@polkadot/api-base/types/submittable' {
        * if the block author is defined it will be defined as the equivocation
        * reporter.
        **/
-      reportEquivocationUnsigned: AugmentedSubmittable<(equivocationProof: SpConsensusGrandpaEquivocationProof | { setId?: any; equivocation?: any } | string | Uint8Array, keyOwnerProof: SpSessionMembershipProof | { session?: any; trieNodes?: any; validatorCount?: any } | string | Uint8Array) => SubmittableExtrinsic<ApiType>, [SpConsensusGrandpaEquivocationProof, SpSessionMembershipProof]>;
+      reportEquivocationUnsigned: AugmentedSubmittable<(equivocationProof: SpConsensusGrandpaEquivocationProof | { setId?: any; equivocation?: any } | string | Uint8Array, keyOwnerProof: SpCoreVoid | null) => SubmittableExtrinsic<ApiType>, [SpConsensusGrandpaEquivocationProof, SpCoreVoid]>;
     };
     miningSlot: {
       /**
@@ -231,7 +231,7 @@ declare module '@polkadot/api-base/types/submittable' {
        * - `reward_destination`: The account_id for the mining rewards, or `Owner` for the
        * submitting user.
        **/
-      bid: AugmentedSubmittable<(bondInfo: Option<PalletMiningSlotMiningSlotBid> | null | Uint8Array | PalletMiningSlotMiningSlotBid | { vaultId?: any; amount?: any } | string, rewardDestination: ArgonPrimitivesBlockSealRewardDestination | { Owner: any } | { Account: any } | string | Uint8Array) => SubmittableExtrinsic<ApiType>, [Option<PalletMiningSlotMiningSlotBid>, ArgonPrimitivesBlockSealRewardDestination]>;
+      bid: AugmentedSubmittable<(bondInfo: Option<PalletMiningSlotMiningSlotBid> | null | Uint8Array | PalletMiningSlotMiningSlotBid | { vaultId?: any; amount?: any } | string, rewardDestination: ArgonPrimitivesBlockSealRewardDestination | { Owner: any } | { Account: any } | string | Uint8Array, keys: ArgonNodeRuntimeOpaqueSessionKeys | { grandpa?: any; blockSealAuthority?: any } | string | Uint8Array) => SubmittableExtrinsic<ApiType>, [Option<PalletMiningSlotMiningSlotBid>, ArgonPrimitivesBlockSealRewardDestination, ArgonNodeRuntimeOpaqueSessionKeys]>;
     };
     mint: {
     };
@@ -603,35 +603,6 @@ declare module '@polkadot/api-base/types/submittable' {
        * - `proxy_type`: The permissions currently enabled for the removed proxy account.
        **/
       removeProxy: AugmentedSubmittable<(delegate: MultiAddress | { Id: any } | { Index: any } | { Raw: any } | { Address32: any } | { Address20: any } | string | Uint8Array, proxyType: ArgonNodeRuntimeProxyType | 'Any' | 'NonTransfer' | 'PriceIndex' | number | Uint8Array, delay: u32 | AnyNumber | Uint8Array) => SubmittableExtrinsic<ApiType>, [MultiAddress, ArgonNodeRuntimeProxyType, u32]>;
-    };
-    session: {
-      /**
-       * Removes any session key(s) of the function caller.
-       *
-       * This doesn't take effect until the next session.
-       *
-       * The dispatch origin of this function must be Signed and the account must be either be
-       * convertible to a validator ID using the chain's typical addressing system (this usually
-       * means being a controller account) or directly convertible into a validator ID (which
-       * usually means being a stash account).
-       *
-       * ## Complexity
-       * - `O(1)` in number of key types. Actual cost depends on the number of length of
-       * `T::Keys::key_ids()` which is fixed.
-       **/
-      purgeKeys: AugmentedSubmittable<() => SubmittableExtrinsic<ApiType>, []>;
-      /**
-       * Sets the session key(s) of the function caller to `keys`.
-       * Allows an account to set its session key prior to becoming a validator.
-       * This doesn't take effect until the next session.
-       *
-       * The dispatch origin of this function must be signed.
-       *
-       * ## Complexity
-       * - `O(1)`. Actual cost depends on the number of length of `T::Keys::key_ids()` which is
-       * fixed.
-       **/
-      setKeys: AugmentedSubmittable<(keys: ArgonNodeRuntimeOpaqueSessionKeys | { grandpa?: any; blockSealAuthority?: any } | string | Uint8Array, proof: Bytes | string | Uint8Array) => SubmittableExtrinsic<ApiType>, [ArgonNodeRuntimeOpaqueSessionKeys, Bytes]>;
     };
     sudo: {
       /**

@@ -35,7 +35,6 @@ use frame_support::{
 };
 pub use frame_system::Call as SystemCall;
 use frame_system::EnsureRoot;
-use pallet_session::historical as pallet_session_historical;
 pub use pallet_timestamp::Call as TimestampCall;
 use pallet_transaction_payment::{ConstFeeMultiplier, FungibleAdapter, Multiplier};
 use pallet_tx_pause::RuntimeCallNameOf;
@@ -43,14 +42,14 @@ use scale_info::TypeInfo;
 use smallvec::smallvec;
 use sp_api::impl_runtime_apis;
 use sp_arithmetic::{traits::Zero, FixedPointNumber, FixedU128, Percent};
-use sp_consensus_grandpa::AuthorityId as GrandpaId;
+use sp_consensus_grandpa::{AuthorityId as GrandpaId, AuthorityList};
 use sp_core::{crypto::KeyTypeId, ConstU16, OpaqueMetadata, H256, U256};
 use sp_debug_derive::RuntimeDebug;
 #[cfg(any(feature = "std", test))]
 pub use sp_runtime::BuildStorage;
 use sp_runtime::{
 	create_runtime_str, generic,
-	traits::{BlakeTwo256, Block as BlockT, NumberFor, One, OpaqueKeys},
+	traits::{BlakeTwo256, Block as BlockT, NumberFor, One},
 	transaction_validity::{TransactionSource, TransactionValidity},
 	ApplyExtrinsicResult, BoundedVec, DispatchError,
 };
@@ -78,6 +77,7 @@ pub use argon_primitives::{
 };
 pub use currency::*;
 use pallet_bond::BitcoinVerifier;
+use pallet_mining_slot::OnNewSlot;
 pub use pallet_notebook::NotebookVerifyError;
 
 use crate::opaque::SessionKeys;
@@ -313,20 +313,12 @@ parameter_types! {
 	pub const BlocksPerDay: u32 = 1440;
 	pub const BlocksPerYear: u32 = 1440 * 365;
 
-	// Arbitrarily chosen. We keep these around for equivocation reporting in grandpa, and for
-	// notary auditing using validators of finalized blocks.
-	pub const SessionWindowsToKeepInHistory: u32 = 10;
-
 	const BitcoinBlocksPerDay: BitcoinHeight = 6 * 24;
 	pub const BitcoinBondDurationBlocks: BitcoinHeight = BitcoinBlocksPerDay::get() * 365; // 1 year
 	pub const BitcoinBondReclamationBlocks: BitcoinHeight = BitcoinBlocksPerDay::get() * 30; // 30 days
 	pub const UtxoUnlockCosignDeadlineBlocks: BitcoinHeight = BitcoinBlocksPerDay::get() * 5; // 5 days
 
-	pub const SessionsPerMiningWindow: u32 = 2;
-
-	pub const MaxSetIdSessionEntries: u32 = SessionsPerMiningWindow::get() * 2u32;
-	// keep around for 2
-	pub const ReportLongevity: u64 = BlocksPerDay::get() as u64 * 10;
+	pub const MaxSetIdSessionEntries: u32 = 2u32;
 
 	pub const MaxUnlockingUtxos: u32 = 1000;
 	pub const MaxPendingTermModificationsPerBlock: u32 = 100;
@@ -371,6 +363,33 @@ impl pallet_bond::Config for Runtime {
 	type BitcoinSignatureVerifier = BitcoinSignatureVerifier;
 }
 
+pub struct GrandpaSlotRotation;
+
+impl OnNewSlot<AccountId> for GrandpaSlotRotation {
+	type Key = GrandpaId;
+	fn on_new_slot(
+		removed_authorities: Vec<(&AccountId, Self::Key)>,
+		added_authorities: Vec<(&AccountId, Self::Key)>,
+	) {
+		if removed_authorities.is_empty() && added_authorities.is_empty() {
+			return;
+		}
+		let mut next_authorities: AuthorityList = Grandpa::grandpa_authorities();
+		for (_, authority_id) in removed_authorities {
+			if let Some(index) = next_authorities.iter().position(|x| x.0 == authority_id) {
+				next_authorities.remove(index);
+			}
+		}
+		for (_, authority_id) in added_authorities {
+			next_authorities.push((authority_id, 1));
+		}
+
+		if let Err(err) = Grandpa::schedule_change(next_authorities, Zero::zero(), None) {
+			log::error!("Failed to schedule grandpa change: {:?}", err);
+		}
+	}
+}
+
 impl pallet_mining_slot::Config for Runtime {
 	type RuntimeEvent = RuntimeEvent;
 	type WeightInfo = pallet_mining_slot::weights::SubstrateWeight<Runtime>;
@@ -380,10 +399,11 @@ impl pallet_mining_slot::Config for Runtime {
 	type TargetBidsPerSlot = TargetBidsPerSlot;
 	type RuntimeHoldReason = RuntimeHoldReason;
 	type MaxCohortSize = MaxCohortSize;
-	type SessionWindowsToKeepInHistory = SessionWindowsToKeepInHistory;
 	type Balance = Balance;
 	type BondProvider = Bonds;
-	type SessionRotationsPerMiningWindow = SessionsPerMiningWindow;
+	type SlotEvents = (GrandpaSlotRotation,);
+	type Keys = SessionKeys;
+	type MiningAuthorityId = BlockSealAuthorityId;
 }
 
 impl pallet_block_seal::Config for Runtime {
@@ -396,52 +416,14 @@ impl pallet_block_seal::Config for Runtime {
 	type EventHandler = MiningSlot;
 }
 
-impl pallet_session::Config for Runtime {
-	type RuntimeEvent = RuntimeEvent;
-	type ValidatorId = <Self as frame_system::Config>::AccountId;
-	type ValidatorIdOf = pallet_mining_slot::ValidatorIdOf<Self>;
-	type ShouldEndSession = MiningSlot;
-	type NextSessionRotation = MiningSlot;
-	type SessionManager = pallet_session_historical::NoteHistoricalRoot<Self, MiningSlot>;
-	type SessionHandler = <SessionKeys as OpaqueKeys>::KeyTypeIdProviders;
-	type Keys = SessionKeys;
-	type WeightInfo = pallet_session::weights::SubstrateWeight<Runtime>;
-}
-
-impl pallet_session_historical::Config for Runtime {
-	type FullIdentification = pallet_mining_slot::MinerHistory;
-	type FullIdentificationOf = pallet_mining_slot::FullIdentificationOf<Runtime>;
-}
-
-impl pallet_offences::Config for Runtime {
-	type RuntimeEvent = RuntimeEvent;
-	type IdentificationTuple = pallet_session_historical::IdentificationTuple<Self>;
-	// TODO: mining_slot should deal with offenses
-	type OnOffenceHandler = ();
-}
-
 impl pallet_grandpa::Config for Runtime {
 	type RuntimeEvent = RuntimeEvent;
 	type WeightInfo = ();
 	type MaxAuthorities = MaxMiners;
 	type MaxNominators = ConstU32<0>;
 	type MaxSetIdSessionEntries = MaxSetIdSessionEntries;
-	type KeyOwnerProof = <Historical as KeyOwnerProofSystem<(KeyTypeId, GrandpaId)>>::Proof;
-	type EquivocationReportSystem =
-		pallet_grandpa::EquivocationReportSystem<Self, Offences, Historical, ReportLongevity>;
-}
-
-impl frame_system::offchain::SigningTypes for Runtime {
-	type Public = <Signature as sp_runtime::traits::Verify>::Signer;
-	type Signature = Signature;
-}
-
-impl<C> frame_system::offchain::SendTransactionTypes<C> for Runtime
-where
-	RuntimeCall: From<C>,
-{
-	type OverarchingCall = RuntimeCall;
-	type Extrinsic = UncheckedExtrinsic;
+	type KeyOwnerProof = sp_core::Void;
+	type EquivocationReportSystem = ();
 }
 
 parameter_types! {
@@ -452,8 +434,6 @@ parameter_types! {
 
 	/// How many transfers out can be queued per block
 	pub const MaxPendingTransfersOutPerBlock: u32 = 1000;
-
-
 }
 
 impl pallet_chain_transfer::Config for Runtime {
@@ -473,7 +453,7 @@ impl pallet_chain_transfer::Config for Runtime {
 impl pallet_notebook::Config for Runtime {
 	type RuntimeEvent = RuntimeEvent;
 	type WeightInfo = pallet_notebook::weights::SubstrateWeight<Runtime>;
-	type EventHandler = (ChainTransfer, BlockSealSpec, Domain);
+	type EventHandler = (ChainTransfer, BlockSealSpec, Domains);
 	type NotaryProvider = Notaries;
 	type ChainTransferLookup = ChainTransfer;
 	type BlockVotingProvider = BlockSealSpec;
@@ -823,38 +803,31 @@ mod runtime {
 	#[runtime::pallet_index(12)]
 	pub type BlockSealSpec = pallet_block_seal_spec;
 	#[runtime::pallet_index(13)]
-	pub type Domain = pallet_domains;
+	pub type Domains = pallet_domains;
 	#[runtime::pallet_index(14)]
 	pub type PriceIndex = pallet_price_index;
-	// NOTE: Authorship must be before session
 	#[runtime::pallet_index(15)]
 	pub type Authorship = pallet_authorship;
 	#[runtime::pallet_index(16)]
-	pub type Historical = pallet_session_historical;
-	#[runtime::pallet_index(17)]
-	pub type Session = pallet_session;
-	#[runtime::pallet_index(18)]
 	pub type BlockSeal = pallet_block_seal;
 	// NOTE: BlockRewards must come after seal (on_finalize uses seal info)
-	#[runtime::pallet_index(19)]
+	#[runtime::pallet_index(17)]
 	pub type BlockRewards = pallet_block_rewards;
-	#[runtime::pallet_index(20)]
+	#[runtime::pallet_index(18)]
 	pub type Grandpa = pallet_grandpa;
-	#[runtime::pallet_index(21)]
-	pub type Offences = pallet_offences;
-	#[runtime::pallet_index(22)]
+	#[runtime::pallet_index(19)]
 	pub type Mint = pallet_mint;
-	#[runtime::pallet_index(23)]
+	#[runtime::pallet_index(20)]
 	pub type Balances = pallet_balances<Instance1>;
-	#[runtime::pallet_index(24)]
+	#[runtime::pallet_index(21)]
 	pub type Ownership = pallet_balances<Instance2>;
-	#[runtime::pallet_index(25)]
+	#[runtime::pallet_index(22)]
 	pub type TxPause = pallet_tx_pause;
-	#[runtime::pallet_index(26)]
+	#[runtime::pallet_index(23)]
 	pub type TransactionPayment = pallet_transaction_payment;
-	#[runtime::pallet_index(27)]
+	#[runtime::pallet_index(24)]
 	pub type Utility = pallet_utility;
-	#[runtime::pallet_index(28)]
+	#[runtime::pallet_index(25)]
 	pub type Sudo = pallet_sudo;
 }
 
@@ -1134,29 +1107,20 @@ impl_runtime_apis! {
 		}
 
 		fn submit_report_equivocation_unsigned_extrinsic(
-			equivocation_proof: sp_consensus_grandpa::EquivocationProof<
+			_equivocation_proof: sp_consensus_grandpa::EquivocationProof<
 				<Block as BlockT>::Hash,
 				NumberFor<Block>,
 			>,
-			key_owner_proof: sp_consensus_grandpa::OpaqueKeyOwnershipProof,
+			_key_owner_proof: sp_consensus_grandpa::OpaqueKeyOwnershipProof,
 		) -> Option<()> {
-			let key_owner_proof = key_owner_proof.decode()?;
-
-			Grandpa::submit_unsigned_equivocation_report(
-				equivocation_proof,
-				key_owner_proof,
-			)
+			None
 		}
 
 		fn generate_key_ownership_proof(
 			_set_id: sp_consensus_grandpa::SetId,
-			authority_id: GrandpaId,
+			_authority_id: GrandpaId,
 		) -> Option<sp_consensus_grandpa::OpaqueKeyOwnershipProof> {
-			use codec::Encode;
-
-			Historical::prove((sp_consensus_grandpa::KEY_TYPE, authority_id))
-				.map(|p| p.encode())
-				.map(sp_consensus_grandpa::OpaqueKeyOwnershipProof::new)
+			None
 		}
 	}
 
@@ -1254,12 +1218,10 @@ mod benches {
 		[pallet_bond, Bonds]
 		[pallet_bitcoin_utxos, BitcoinMint]
 		[pallet_mint, Mint]
-		[pallet_session, Session]
 		[pallet_block_seal, BlockSeal]
 		[pallet_authorship, Authorship]
 		[pallet_sudo, Sudo]
 		[pallet_grandpa, Grandpa]
-		[pallet_offences, Offences]
 		[pallet_notaries, Notaries]
 		[pallet_chain_transfer, ChainTransfer]
 	);

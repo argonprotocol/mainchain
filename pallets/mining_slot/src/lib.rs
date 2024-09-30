@@ -2,38 +2,30 @@
 extern crate alloc;
 
 use alloc::{vec, vec::Vec};
-use core::{cmp::max, marker::PhantomData};
-
-use codec::Codec;
-use frame_support::{
-	pallet_prelude::*,
-	traits::{
-		fungible::{Inspect, InspectHold, MutateHold},
-		tokens::Precision,
-		OneSessionHandler,
-	},
-};
-use frame_system::pallet_prelude::BlockNumberFor;
-use pallet_session::SessionManager;
-use sp_core::{Get, U256};
-use sp_io::hashing::blake2_256;
-use sp_runtime::{
-	traits::{Convert, One, UniqueSaturatedInto, Zero},
-	BoundedBTreeMap, FixedI128, FixedPointNumber, FixedU128, Permill, SaturatedConversion,
-	Saturating,
-};
-
 use argon_primitives::{
-	block_seal::{
-		BlockSealAuthorityId, MinerIndex, MiningAuthority, MiningSlotConfig, RewardDestination,
-		RewardSharing,
-	},
+	block_seal::{MinerIndex, MiningAuthority, MiningSlotConfig, RewardDestination, RewardSharing},
 	bond::BondProvider,
 	inherents::BlockSealInherent,
 	AuthorityProvider, BlockRewardAccountsProvider, BlockSealEventHandler, MiningSlotProvider,
 	RewardShare,
 };
+use codec::Codec;
+use core::{cmp::max, marker::PhantomData};
+use frame_support::{
+	pallet_prelude::*,
+	traits::{
+		fungible::{Inspect, InspectHold, MutateHold},
+		tokens::Precision,
+	},
+};
+use frame_system::pallet_prelude::BlockNumberFor;
 pub use pallet::*;
+use sp_core::{Get, U256};
+use sp_io::hashing::blake2_256;
+use sp_runtime::{
+	traits::{Convert, One, OpaqueKeys, UniqueSaturatedInto},
+	FixedI128, FixedPointNumber, FixedU128, RuntimeAppPublic, SaturatedConversion, Saturating,
+};
 pub use weights::*;
 
 #[cfg(test)]
@@ -86,7 +78,7 @@ pub mod pallet {
 	};
 	use frame_system::pallet_prelude::*;
 	use sp_runtime::{
-		traits::{AtLeast32BitUnsigned, UniqueSaturatedInto},
+		traits::{AtLeast32BitUnsigned, Member, OpaqueKeys, UniqueSaturatedInto, Zero},
 		BoundedBTreeMap,
 	};
 
@@ -101,8 +93,11 @@ pub mod pallet {
 	#[pallet::pallet]
 	pub struct Pallet<T>(_);
 
-	pub type Registration<T> =
-		MiningRegistration<<T as frame_system::Config>::AccountId, <T as Config>::Balance>;
+	pub type Registration<T> = MiningRegistration<
+		<T as frame_system::Config>::AccountId,
+		<T as Config>::Balance,
+		<T as Config>::Keys,
+	>;
 
 	/// Configure the pallet by specifying the parameters and types on which it depends.
 	#[pallet::config]
@@ -117,13 +112,6 @@ pub mod pallet {
 		/// How many new miners can be in the cohort for each slot
 		#[pallet::constant]
 		type MaxCohortSize: Get<u32>;
-		/// How many session indexes to keep session history
-		#[pallet::constant]
-		type SessionWindowsToKeepInHistory: Get<u32>;
-
-		/// The number of session rotations per slot (one will align with the start of the session)
-		#[pallet::constant]
-		type SessionRotationsPerMiningWindow: Get<u32>;
 
 		/// The max percent swing for the ownership bond amount per slot (from the last percent
 		#[pallet::constant]
@@ -158,6 +146,14 @@ pub mod pallet {
 			AccountId = Self::AccountId,
 			BlockNumber = BlockNumberFor<Self>,
 		>;
+		/// Handler when a new slot is started
+		type SlotEvents: SlotEvents<Self::AccountId>;
+
+		/// The mining authority runtime public key
+		type MiningAuthorityId: RuntimeAppPublic + Decode;
+
+		/// The authority signing keys.
+		type Keys: OpaqueKeys + Member + Parameter + MaybeSerializeDeserialize;
 	}
 
 	/// A reason for the pallet placing a hold on funds.
@@ -177,11 +173,8 @@ pub mod pallet {
 	/// Authorities are the session keys that are actively participating in the network.
 	/// The tuple is the authority, and the blake2 256 hash of the authority used for xor lookups
 	#[pallet::storage]
-	pub(super) type AuthoritiesByIndex<T: Config> = StorageValue<
-		_,
-		BoundedBTreeMap<MinerIndex, (BlockSealAuthorityId, U256), T::MaxMiners>,
-		ValueQuery,
-	>;
+	pub(super) type AuthorityHashByIndex<T: Config> =
+		StorageValue<_, BoundedBTreeMap<MinerIndex, U256, T::MaxMiners>, ValueQuery>;
 
 	/// Tokens that must be bonded to take a Miner role
 	#[pallet::storage]
@@ -238,6 +231,20 @@ pub mod pallet {
 				AccountIndexLookup::<T>::insert(&miner.account_id, 0);
 				ActiveMinersByIndex::<T>::insert(0, miner.clone());
 				ActiveMinersCount::<T>::put(1);
+
+				AuthorityHashByIndex::<T>::try_mutate(|hashes| {
+					hashes.try_insert(
+						0,
+						U256::from(blake2_256(
+							&miner
+								.authority_keys
+								.get::<T::MiningAuthorityId>(T::MiningAuthorityId::ID)
+								.expect("should have authority id")
+								.to_raw_vec(),
+						)),
+					)
+				})
+				.expect("should be able to insert");
 			}
 			if self.mining_config.slot_bidding_start_block == Zero::zero() {
 				IsNextSlotBiddingOpen::<T>::put(true);
@@ -381,6 +388,7 @@ pub mod pallet {
 			origin: OriginFor<T>,
 			bond_info: Option<MiningSlotBid<VaultId, T::Balance>>,
 			reward_destination: RewardDestination<T::AccountId>,
+			keys: T::Keys,
 		) -> DispatchResult {
 			let who = ensure_signed(origin)?;
 
@@ -452,6 +460,7 @@ pub mod pallet {
 							bond_amount: bid,
 							ownership_tokens,
 							reward_sharing,
+							authority_keys: keys,
 						},
 					)
 					.map_err(|_| Error::<T>::TooManyBlockRegistrants)?;
@@ -509,36 +518,39 @@ impl<T: Config> BlockRewardAccountsProvider<T::AccountId> for Pallet<T> {
 		result
 	}
 }
-impl<T: Config> AuthorityProvider<BlockSealAuthorityId, T::Block, T::AccountId> for Pallet<T> {
-	fn get_authority(author: T::AccountId) -> Option<BlockSealAuthorityId> {
-		<AccountIndexLookup<T>>::get(&author)
-			.and_then(|index| AuthoritiesByIndex::<T>::get().get(&index).map(|x| x.0.clone()))
+
+impl<T: Config> AuthorityProvider<T::MiningAuthorityId, T::Block, T::AccountId> for Pallet<T> {
+	fn get_authority(author: T::AccountId) -> Option<T::MiningAuthorityId> {
+		Self::get_mining_authority(&author).map(|x| x.authority_id)
 	}
 
 	fn xor_closest_authority(
 		nonce: U256,
-	) -> Option<MiningAuthority<BlockSealAuthorityId, T::AccountId>> {
-		let (authority_id, index) = find_xor_closest(<AuthoritiesByIndex<T>>::get(), nonce)?;
+	) -> Option<MiningAuthority<T::MiningAuthorityId, T::AccountId>> {
+		let closest = find_xor_closest(<AuthorityHashByIndex<T>>::get(), nonce)?;
 
-		let registration = ActiveMinersByIndex::<T>::get(index)?;
-		Some(MiningAuthority {
-			authority_id,
-			account_id: registration.account_id.clone(),
-			authority_index: index.unique_saturated_into(),
-		})
+		Self::get_mining_authority_by_index(closest)
 	}
 }
 
 impl<T: Config> Pallet<T> {
 	pub fn get_mining_authority(
 		account_id: &T::AccountId,
-	) -> Option<MiningAuthority<BlockSealAuthorityId, T::AccountId>> {
+	) -> Option<MiningAuthority<T::MiningAuthorityId, T::AccountId>> {
 		let index = <AccountIndexLookup<T>>::get(account_id)?;
-		AuthoritiesByIndex::<T>::get()
-			.get(&index)
-			.map(|(authority_id, _)| MiningAuthority {
-				authority_id: authority_id.clone(),
-				account_id: account_id.clone(),
+		Self::get_mining_authority_by_index(index)
+	}
+
+	pub fn get_mining_authority_by_index(
+		index: MinerIndex,
+	) -> Option<MiningAuthority<T::MiningAuthorityId, T::AccountId>> {
+		let miner = ActiveMinersByIndex::<T>::get(index)?;
+		miner
+			.authority_keys
+			.get(T::MiningAuthorityId::ID)
+			.map(|authority_id| MiningAuthority {
+				authority_id,
+				account_id: miner.account_id.clone(),
 				authority_index: index.unique_saturated_into(),
 			})
 	}
@@ -564,41 +576,66 @@ impl<T: Config> Pallet<T> {
 		let slot_cohort = NextSlotCohort::<T>::take();
 		IsNextSlotBiddingOpen::<T>::put(true);
 		let mut active_miners = ActiveMinersCount::<T>::get();
+		let mut authority_hash_by_index = AuthorityHashByIndex::<T>::get();
+		let mut added_miners = vec![];
+		let mut removed_miners = vec![];
 
 		for i in 0..cohort_size {
 			let index = i + start_index_to_replace_miners;
 
+			authority_hash_by_index.remove(&index);
 			if let Some(entry) = ActiveMinersByIndex::<T>::take(index) {
 				let account_id = entry.account_id.clone();
 				AccountIndexLookup::<T>::remove(&account_id);
 				active_miners -= 1;
 
 				let registered_for_next = slot_cohort.iter().any(|x| x.account_id == account_id);
+				removed_miners.push((account_id, entry.authority_keys.clone()));
 				Self::unbond_account(entry, registered_for_next);
 			}
 
-			if let Some(registration) = slot_cohort.get(i as usize) {
-				AccountIndexLookup::<T>::insert(&registration.account_id, index);
+			if let Some(entry) = slot_cohort.get(i as usize) {
+				AccountIndexLookup::<T>::insert(&entry.account_id, index);
 				active_miners += 1;
-				ActiveMinersByIndex::<T>::insert(index, registration.clone());
+				ActiveMinersByIndex::<T>::insert(index, entry.clone());
+				added_miners.push((entry.account_id.clone(), entry.authority_keys.clone()));
+				if let Some(authority_id) =
+					entry.authority_keys.get::<T::MiningAuthorityId>(T::MiningAuthorityId::ID)
+				{
+					let hash = blake2_256(&authority_id.to_raw_vec());
+					authority_hash_by_index
+						.try_insert(index, U256::from(hash))
+						.expect("only insert if we've removed first, ergo, should be impossible");
+				}
 			}
 		}
 
 		if active_miners == 0 {
-			if let Some(miner) = MinerZero::<T>::get() {
+			if let Some(entry) = MinerZero::<T>::get() {
 				let index = start_index_to_replace_miners;
-				AccountIndexLookup::<T>::insert(&miner.account_id, index);
+				AccountIndexLookup::<T>::insert(&entry.account_id, index);
 				active_miners = 1;
-				ActiveMinersByIndex::<T>::insert(index, miner.clone());
+				ActiveMinersByIndex::<T>::insert(index, entry.clone());
+				added_miners.push((entry.account_id.clone(), entry.authority_keys.clone()));
+				if let Some(authority_id) =
+					entry.authority_keys.get::<T::MiningAuthorityId>(T::MiningAuthorityId::ID)
+				{
+					let hash = blake2_256(&authority_id.to_raw_vec());
+					authority_hash_by_index
+						.try_insert(index, U256::from(hash))
+						.expect("only insert if empty, ergo, should be impossible");
+				}
 			}
 		}
 
+		<AuthorityHashByIndex<T>>::put(authority_hash_by_index);
 		ActiveMinersCount::<T>::put(active_miners);
 
 		Pallet::<T>::deposit_event(Event::<T>::NewMiners {
 			start_index: start_index_to_replace_miners,
 			new_miners: slot_cohort,
 		});
+		T::SlotEvents::on_new_slot(removed_miners, added_miners);
 	}
 
 	/// Adjust the ownership bond amount based on a rolling 10 slot average of bids.
@@ -758,47 +795,8 @@ impl<T: Config> Pallet<T> {
 		None
 	}
 
-	pub(crate) fn get_miner_accounts() -> Vec<T::AccountId> {
-		<ActiveMinersByIndex<T>>::iter().map(|(_, a)| a.account_id).collect()
-	}
-
 	pub(crate) fn get_next_registration(account_id: &T::AccountId) -> Option<Registration<T>> {
 		NextSlotCohort::<T>::get().into_iter().find(|x| x.account_id == *account_id)
-	}
-
-	pub(crate) fn load_session_keys<'a>(
-		miners_with_keys: impl Iterator<Item = (&'a T::AccountId, BlockSealAuthorityId)>,
-	) {
-		let mut next_authorities =
-			BoundedBTreeMap::<u32, (BlockSealAuthorityId, U256), T::MaxMiners>::new();
-		for (account_id, authority_id) in miners_with_keys {
-			if let Some(account_index) = <AccountIndexLookup<T>>::get(account_id) {
-				let hash = blake2_256(&authority_id.clone().into_inner().0);
-				// this should not be possible to fail. The bounds equal the source lookup
-				next_authorities
-					.try_insert(account_index, (authority_id, U256::from(hash)))
-					.expect("should not be possible to fail next_authorities insert");
-			}
-		}
-
-		if next_authorities.len() != <ActiveMinersCount<T>>::get() as usize {
-			let no_key_miners = ActiveMinersByIndex::<T>::iter()
-				.filter(|(index, _)| !next_authorities.contains_key(index))
-				.map(|a| a.1.account_id)
-				.collect::<Vec<_>>();
-			if !no_key_miners.is_empty() {
-				log::warn!(
-					target: LOG_TARGET,
-					"The following registered miner accounts do not have session keys: {:?}",
-					no_key_miners
-				);
-			}
-		}
-
-		let last_authorities = <AuthoritiesByIndex<T>>::get();
-		if last_authorities != next_authorities {
-			<AuthoritiesByIndex<T>>::put(next_authorities);
-		}
 	}
 
 	pub(crate) fn hold_ownership_bond(
@@ -912,21 +910,6 @@ impl<T: Config> Pallet<T> {
 			MiningConfig::<T>::get().blocks_between_slots,
 		)
 	}
-
-	fn session_rotation_blocks() -> BlockNumberFor<T> {
-		let blocks_between_slots = Self::blocks_between_slots();
-		let session_rotations = T::SessionRotationsPerMiningWindow::get();
-		let blocks_per_rotation = blocks_between_slots.saturating_div(session_rotations);
-		blocks_per_rotation.into()
-	}
-
-	pub fn sessions_per_window() -> u32 {
-		let mining_window_blocks =
-			UniqueSaturatedInto::<u32>::unique_saturated_into(Self::get_mining_window_blocks());
-		let session_rotation_blocks =
-			UniqueSaturatedInto::<u32>::unique_saturated_into(Self::session_rotation_blocks());
-		mining_window_blocks.saturating_div(session_rotation_blocks)
-	}
 }
 
 impl<T: Config> MiningSlotProvider<BlockNumberFor<T>> for Pallet<T> {
@@ -950,17 +933,17 @@ impl<T: Config> BlockSealEventHandler for Pallet<T> {
 	}
 }
 
-pub fn find_xor_closest<I>(authorities: I, hash: U256) -> Option<(BlockSealAuthorityId, MinerIndex)>
+pub fn find_xor_closest<I>(authorities: I, hash: U256) -> Option<MinerIndex>
 where
-	I: IntoIterator<Item = (MinerIndex, (BlockSealAuthorityId, U256))>,
+	I: IntoIterator<Item = (MinerIndex, U256)>,
 {
 	let mut closest_distance: U256 = U256::MAX;
 	let mut closest = None;
-	for (index, (a, peer_hash)) in authorities.into_iter() {
+	for (index, peer_hash) in authorities.into_iter() {
 		let distance = hash ^ peer_hash;
 		if distance < closest_distance {
 			closest_distance = distance;
-			closest = Some((a, index));
+			closest = Some(index);
 		}
 	}
 	closest
@@ -1003,140 +986,7 @@ impl<T: Config> Convert<T::AccountId, Option<MinerHistory>> for FullIdentificati
 }
 
 impl<T: Config> sp_runtime::BoundToRuntimeAppPublic for Pallet<T> {
-	type Public = BlockSealAuthorityId;
-}
-
-impl<T: Config> SessionManager<T::AccountId> for Pallet<T> {
-	fn new_session(_: u32) -> Option<Vec<T::AccountId>> {
-		let block_number_u32: u32 = UniqueSaturatedInto::<u32>::unique_saturated_into(
-			<frame_system::Pallet<T>>::block_number(),
-		);
-
-		if Self::blocks_between_slots() == 0 {
-			return None;
-		}
-
-		// only rotate miners on cohort changeover. The keys representing the authority ids will
-		// auto-change
-		if block_number_u32 % Self::blocks_between_slots() != 0 {
-			return None;
-		}
-		Some(Self::get_miner_accounts())
-	}
-	fn new_session_genesis(_: u32) -> Option<Vec<T::AccountId>> {
-		Some(Self::get_miner_accounts())
-	}
-	fn end_session(_: u32) {}
-	fn start_session(_: u32) {}
-}
-
-impl<T: Config> pallet_session::ShouldEndSession<BlockNumberFor<T>> for Pallet<T> {
-	fn should_end_session(now: BlockNumberFor<T>) -> bool {
-		let block_number_u32: u32 = UniqueSaturatedInto::<u32>::unique_saturated_into(now);
-		let rotation_blocks =
-			UniqueSaturatedInto::<u32>::unique_saturated_into(Self::session_rotation_blocks());
-		block_number_u32 % rotation_blocks == 0
-	}
-}
-
-impl<T: Config> frame_support::traits::EstimateNextSessionRotation<BlockNumberFor<T>>
-	for Pallet<T>
-{
-	fn average_session_length() -> BlockNumberFor<T> {
-		Self::session_rotation_blocks()
-	}
-
-	fn estimate_current_session_progress(now: BlockNumberFor<T>) -> (Option<Permill>, Weight) {
-		let period = Self::session_rotation_blocks();
-
-		// NOTE: we add one since we assume that the current block has already elapsed,
-		// i.e. when evaluating the last block in the session the progress should be 100%
-		// (0% is never returned).
-		let current = now % period + One::one();
-		let progress = Some(Permill::from_rational(current, period));
-
-		(progress, Zero::zero())
-	}
-
-	fn estimate_next_session_rotation(
-		now: BlockNumberFor<T>,
-	) -> (Option<BlockNumberFor<T>>, Weight) {
-		let period = Self::session_rotation_blocks();
-
-		let block_after_last_session = now % period;
-		let next_session = if block_after_last_session > Zero::zero() {
-			now.saturating_add(period.saturating_sub(block_after_last_session))
-		} else {
-			// this branch happens when the session is already rotated or will rotate in this
-			// block (depending on being called before or after `session::on_initialize`). Here,
-			// we assume the latter, namely that this is called after `session::on_initialize`,
-			// and thus we add period to it as well.
-			now + period
-		};
-
-		(Some(next_session), Zero::zero())
-	}
-}
-
-impl<T: Config> pallet_session::historical::SessionManager<T::AccountId, MinerHistory> for Pallet<T>
-where
-	T: pallet_session::historical::Config<
-		FullIdentification = MinerHistory,
-		FullIdentificationOf = FullIdentificationOf<T>,
-	>,
-{
-	fn new_session(new_index: u32) -> Option<Vec<(T::AccountId, MinerHistory)>> {
-		<Self as SessionManager<_>>::new_session(new_index).map(|miners| {
-			miners
-				.into_iter()
-				.filter_map(|v| {
-					if let Some(miner) = FullIdentificationOf::<T>::convert(v.clone()) {
-						return Some((v, miner));
-					}
-					None
-				})
-				.collect::<Vec<_>>()
-		})
-	}
-
-	fn new_session_genesis(_: u32) -> Option<Vec<(T::AccountId, MinerHistory)>> {
-		<Self as pallet_session::historical::SessionManager<_, _>>::new_session(0)
-	}
-
-	fn start_session(_: u32) {}
-	fn end_session(index: u32) {
-		let sessions_per_window = Self::sessions_per_window();
-		let sessions_to_keep = sessions_per_window * T::SessionWindowsToKeepInHistory::get();
-
-		<pallet_session::historical::Pallet<T>>::prune_up_to(
-			index.saturating_sub(sessions_to_keep),
-		);
-	}
-}
-
-impl<T: Config> OneSessionHandler<T::AccountId> for Pallet<T> {
-	type Key = BlockSealAuthorityId;
-
-	fn on_genesis_session<'a, I>(miners: I)
-	where
-		I: 'a,
-		I: Iterator<Item = (&'a T::AccountId, Self::Key)>,
-		T::AccountId: 'a,
-	{
-		Self::load_session_keys(miners);
-	}
-
-	fn on_new_session<'a, I>(changed: bool, miners_with_keys: I, _queued_miners: I)
-	where
-		I: 'a,
-		I: Iterator<Item = (&'a T::AccountId, BlockSealAuthorityId)>,
-	{
-		if changed {
-			Self::load_session_keys(miners_with_keys);
-		}
-	}
-
-	fn on_disabled(_miner_index: u32) {}
+	type Public = T::MiningAuthorityId;
 }
 
 sp_api::decl_runtime_apis! {
@@ -1144,5 +994,43 @@ sp_api::decl_runtime_apis! {
 	pub trait MiningSlotApi<BlockNumber> where
 		BlockNumber: Codec {
 		fn next_slot_era() -> (BlockNumber, BlockNumber);
+	}
+}
+
+pub trait OnNewSlot<AccountId> {
+	type Key: Decode + RuntimeAppPublic;
+	fn on_new_slot(
+		removed_authorities: Vec<(&AccountId, Self::Key)>,
+		added_authorities: Vec<(&AccountId, Self::Key)>,
+	);
+}
+
+pub trait SlotEvents<AccountId> {
+	fn on_new_slot<Ks: OpaqueKeys>(
+		removed_authorities: Vec<(AccountId, Ks)>,
+		added_authorities: Vec<(AccountId, Ks)>,
+	);
+}
+
+#[impl_trait_for_tuples::impl_for_tuples(1, 5)]
+#[tuple_types_custom_trait_bound(OnNewSlot<AId>)]
+impl<AId> SlotEvents<AId> for Tuple {
+	fn on_new_slot<Ks: OpaqueKeys>(
+		removed_authorities: Vec<(AId, Ks)>,
+		added_authorities: Vec<(AId, Ks)>,
+	) {
+		for_tuples!(
+		#(
+			let removed_keys =
+				removed_authorities.iter().filter_map(|k| {
+					k.1.get::<Tuple::Key>(<Tuple::Key as RuntimeAppPublic>::ID).map(|k1| (&k.0, k1))
+				}).collect::<Vec<_>>();
+			let added_keys  =
+				added_authorities.iter().filter_map(|k| {
+					k.1.get::<Tuple::Key>(<Tuple::Key as RuntimeAppPublic>::ID).map(|k1| (&k.0, k1))
+				}).collect::<Vec<_>>();
+			Tuple::on_new_slot(removed_keys, added_keys);
+		)*
+		)
 	}
 }

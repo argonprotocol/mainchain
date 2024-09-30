@@ -122,10 +122,6 @@ Argon makes use of a few runtime pallets that are useful to know about as a user
   the [balances](https://paritytech.github.io/polkadot-sdk/master/pallet_balances/index.html) pallet that is used to
   track the Ownership Tokens
   of an account. Ownership tokens allow you to bid on mining slots.
-- `Sessions`: This is an instance of
-  the [session](https://paritytech.github.io/polkadot-sdk/master/pallet_session/index.html)
-  pallet that is used to track the session keys of active miners. You must submit session keys to activate your mining
-  slot. NOTE: this is usually done on your miner itself, not via rpc to a public rpc host.
 - `Grandpa`: Argon uses the [Grandpa](https://github.com/w3f/consensus/blob/master/pdf/grandpa.pdf) Finality gadget to
   finalize blocks. This pallet is used to track the finality authorities (which correspond to the active miners) and
   equivocations (which are penalties for not following grandpa rules).

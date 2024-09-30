@@ -9,7 +9,7 @@ import type { ApiTypes, AugmentedQuery, QueryableStorageEntry } from '@polkadot/
 import type { BTreeMap, Bytes, Null, Option, U256, U8aFixed, Vec, bool, u128, u16, u32, u64 } from '@polkadot/types-codec';
 import type { AnyNumber, ITuple } from '@polkadot/types-codec/types';
 import type { AccountId32, H256 } from '@polkadot/types/interfaces/runtime';
-import type { ArgonNodeRuntimeOpaqueSessionKeys, ArgonNotaryAuditErrorVerifyError, ArgonPrimitivesBalanceChangeAccountOrigin, ArgonPrimitivesBitcoinBitcoinBlock, ArgonPrimitivesBitcoinBitcoinNetwork, ArgonPrimitivesBitcoinBitcoinXPub, ArgonPrimitivesBitcoinUtxoRef, ArgonPrimitivesBitcoinUtxoValue, ArgonPrimitivesBlockSealAppPublic, ArgonPrimitivesBlockSealBlockPayout, ArgonPrimitivesBlockSealMiningRegistration, ArgonPrimitivesBlockSealMiningSlotConfig, ArgonPrimitivesBond, ArgonPrimitivesBondVault, ArgonPrimitivesDigestsBlockVoteDigest, ArgonPrimitivesDigestsNotebookDigest, ArgonPrimitivesDigestsParentVotingKeyDigest, ArgonPrimitivesDomainZoneRecord, ArgonPrimitivesInherentsBlockSealInherent, ArgonPrimitivesNotaryNotaryMeta, ArgonPrimitivesNotaryNotaryNotebookKeyDetails, ArgonPrimitivesNotaryNotaryNotebookVoteDigestDetails, ArgonPrimitivesNotaryNotaryRecord, ArgonPrimitivesProvidersBlockSealerInfo, ArgonPrimitivesTickTicker, FrameSupportDispatchPerDispatchClassWeight, FrameSupportTokensMiscIdAmountRuntimeFreezeReason, FrameSupportTokensMiscIdAmountRuntimeHoldReason, FrameSystemAccountInfo, FrameSystemCodeUpgradeAuthorization, FrameSystemEventRecord, FrameSystemLastRuntimeUpgradeInfo, FrameSystemPhase, PalletBalancesAccountData, PalletBalancesBalanceLock, PalletBalancesReserveData, PalletBondUtxoCosignRequest, PalletBondUtxoState, PalletChainTransferQueuedTransferOut, PalletDomainsDomainRegistration, PalletGrandpaStoredPendingChange, PalletGrandpaStoredState, PalletMultisigMultisig, PalletPriceIndexPriceIndex, PalletProxyAnnouncement, PalletProxyProxyDefinition, PalletTransactionPaymentReleases, SpConsensusGrandpaAppPublic, SpCoreCryptoKeyTypeId, SpRuntimeDigest, SpStakingOffenceOffenceDetails } from '@polkadot/types/lookup';
+import type { ArgonNotaryAuditErrorVerifyError, ArgonPrimitivesBalanceChangeAccountOrigin, ArgonPrimitivesBitcoinBitcoinBlock, ArgonPrimitivesBitcoinBitcoinNetwork, ArgonPrimitivesBitcoinBitcoinXPub, ArgonPrimitivesBitcoinUtxoRef, ArgonPrimitivesBitcoinUtxoValue, ArgonPrimitivesBlockSealBlockPayout, ArgonPrimitivesBlockSealMiningRegistration, ArgonPrimitivesBlockSealMiningSlotConfig, ArgonPrimitivesBond, ArgonPrimitivesBondVault, ArgonPrimitivesDigestsBlockVoteDigest, ArgonPrimitivesDigestsNotebookDigest, ArgonPrimitivesDigestsParentVotingKeyDigest, ArgonPrimitivesDomainZoneRecord, ArgonPrimitivesInherentsBlockSealInherent, ArgonPrimitivesNotaryNotaryMeta, ArgonPrimitivesNotaryNotaryNotebookKeyDetails, ArgonPrimitivesNotaryNotaryNotebookVoteDigestDetails, ArgonPrimitivesNotaryNotaryRecord, ArgonPrimitivesProvidersBlockSealerInfo, ArgonPrimitivesTickTicker, FrameSupportDispatchPerDispatchClassWeight, FrameSupportTokensMiscIdAmountRuntimeFreezeReason, FrameSupportTokensMiscIdAmountRuntimeHoldReason, FrameSystemAccountInfo, FrameSystemCodeUpgradeAuthorization, FrameSystemEventRecord, FrameSystemLastRuntimeUpgradeInfo, FrameSystemPhase, PalletBalancesAccountData, PalletBalancesBalanceLock, PalletBalancesReserveData, PalletBondUtxoCosignRequest, PalletBondUtxoState, PalletChainTransferQueuedTransferOut, PalletDomainsDomainRegistration, PalletGrandpaStoredPendingChange, PalletGrandpaStoredState, PalletMultisigMultisig, PalletPriceIndexPriceIndex, PalletProxyAnnouncement, PalletProxyProxyDefinition, PalletTransactionPaymentReleases, SpConsensusGrandpaAppPublic, SpRuntimeDigest } from '@polkadot/types/lookup';
 import type { Observable } from '@polkadot/types/types';
 
 export type __AugmentedQuery<ApiType extends ApiTypes> = AugmentedQuery<ApiType, () => unknown>;
@@ -211,7 +211,7 @@ declare module '@polkadot/api-base/types/storage' {
       pendingTransfersOut: AugmentedQuery<ApiType, (arg: u32 | AnyNumber | Uint8Array) => Observable<Option<PalletChainTransferQueuedTransferOut>>, [u32]>;
       transfersUsedInBlockNotebooks: AugmentedQuery<ApiType, (arg: u32 | AnyNumber | Uint8Array) => Observable<Vec<ITuple<[AccountId32, u32]>>>, [u32]>;
     };
-    domain: {
+    domains: {
       expiringDomainsByBlock: AugmentedQuery<ApiType, (arg: u32 | AnyNumber | Uint8Array) => Observable<Vec<H256>>, [u32]>;
       registeredDomains: AugmentedQuery<ApiType, (arg: H256 | string | Uint8Array) => Observable<Option<PalletDomainsDomainRegistration>>, [H256]>;
       zoneRecordsByDomain: AugmentedQuery<ApiType, (arg: H256 | string | Uint8Array) => Observable<Option<ArgonPrimitivesDomainZoneRecord>>, [H256]>;
@@ -256,16 +256,6 @@ declare module '@polkadot/api-base/types/storage' {
        **/
       state: AugmentedQuery<ApiType, () => Observable<PalletGrandpaStoredState>, []>;
     };
-    historical: {
-      /**
-       * Mapping from historical session indices to session-data root hash and validator count.
-       **/
-      historicalSessions: AugmentedQuery<ApiType, (arg: u32 | AnyNumber | Uint8Array) => Observable<Option<ITuple<[H256, u32]>>>, [u32]>;
-      /**
-       * The range of historical sessions we store. [first, last)
-       **/
-      storedRange: AugmentedQuery<ApiType, () => Observable<Option<ITuple<[u32, u32]>>>, []>;
-    };
     miningSlot: {
       /**
        * Lookup by account id to the corresponding index in ActiveMinersByIndex and Authorities
@@ -280,7 +270,7 @@ declare module '@polkadot/api-base/types/storage' {
        * Authorities are the session keys that are actively participating in the network.
        * The tuple is the authority, and the blake2 256 hash of the authority used for xor lookups
        **/
-      authoritiesByIndex: AugmentedQuery<ApiType, () => Observable<BTreeMap<u32, ITuple<[ArgonPrimitivesBlockSealAppPublic, U256]>>>, []>;
+      authorityHashByIndex: AugmentedQuery<ApiType, () => Observable<BTreeMap<u32, U256>>, []>;
       /**
        * The number of bids per slot for the last 10 slots (newest first)
        **/
@@ -368,16 +358,6 @@ declare module '@polkadot/api-base/types/storage' {
        **/
       tempNotebookDigest: AugmentedQuery<ApiType, () => Observable<Option<ArgonPrimitivesDigestsNotebookDigest>>, []>;
     };
-    offences: {
-      /**
-       * A vector of reports of the same kind that happened at the same time slot.
-       **/
-      concurrentReportsIndex: AugmentedQuery<ApiType, (arg1: U8aFixed | string | Uint8Array, arg2: Bytes | string | Uint8Array) => Observable<Vec<H256>>, [U8aFixed, Bytes]>;
-      /**
-       * The primary structure that holds all offence records keyed by report identifiers.
-       **/
-      reports: AugmentedQuery<ApiType, (arg: H256 | string | Uint8Array) => Observable<Option<SpStakingOffenceOffenceDetails>>, [H256]>;
-    };
     ownership: {
       /**
        * The Balances pallet example of storing the balance of an account.
@@ -456,42 +436,6 @@ declare module '@polkadot/api-base/types/storage' {
        * which are being delegated to, together with the amount held on deposit.
        **/
       proxies: AugmentedQuery<ApiType, (arg: AccountId32 | string | Uint8Array) => Observable<ITuple<[Vec<PalletProxyProxyDefinition>, u128]>>, [AccountId32]>;
-    };
-    session: {
-      /**
-       * Current index of the session.
-       **/
-      currentIndex: AugmentedQuery<ApiType, () => Observable<u32>, []>;
-      /**
-       * Indices of disabled validators.
-       *
-       * The vec is always kept sorted so that we can find whether a given validator is
-       * disabled using binary search. It gets cleared when `on_session_ending` returns
-       * a new set of identities.
-       **/
-      disabledValidators: AugmentedQuery<ApiType, () => Observable<Vec<u32>>, []>;
-      /**
-       * The owner of a key. The key is the `KeyTypeId` + the encoded key.
-       **/
-      keyOwner: AugmentedQuery<ApiType, (arg: ITuple<[SpCoreCryptoKeyTypeId, Bytes]> | [SpCoreCryptoKeyTypeId | string | Uint8Array, Bytes | string | Uint8Array]) => Observable<Option<AccountId32>>, [ITuple<[SpCoreCryptoKeyTypeId, Bytes]>]>;
-      /**
-       * The next session keys for a validator.
-       **/
-      nextKeys: AugmentedQuery<ApiType, (arg: AccountId32 | string | Uint8Array) => Observable<Option<ArgonNodeRuntimeOpaqueSessionKeys>>, [AccountId32]>;
-      /**
-       * True if the underlying economic identities or weighting behind the validators
-       * has changed in the queued validator set.
-       **/
-      queuedChanged: AugmentedQuery<ApiType, () => Observable<bool>, []>;
-      /**
-       * The queued keys for the next session. When the next session begins, these keys
-       * will be used to determine the validator's session keys.
-       **/
-      queuedKeys: AugmentedQuery<ApiType, () => Observable<Vec<ITuple<[AccountId32, ArgonNodeRuntimeOpaqueSessionKeys]>>>, []>;
-      /**
-       * The current set of validators.
-       **/
-      validators: AugmentedQuery<ApiType, () => Observable<Vec<AccountId32>>, []>;
     };
     sudo: {
       /**

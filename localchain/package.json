@@ -42,9 +42,6 @@
   "devDependencies": {
     "@argonprotocol/mainchain": "0.0.8",
     "@napi-rs/cli": "3.0.0-alpha.55",
-    "@polkadot/util": "^13.0.2",
-    "@polkadot/util-crypto": "^13.0.2",
-    "@polkadot/wasm-crypto": "^7.3.2",
     "@types/http-proxy": "^1.17.14",
     "@types/jest": "^29.5.11",
     "@types/node": "^18.19.6",

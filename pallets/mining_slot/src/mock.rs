@@ -1,5 +1,5 @@
 use crate as pallet_mining_slot;
-use crate::Registration;
+use crate::{OnNewSlot, Registration};
 use argon_primitives::{
 	block_seal::{MiningSlotConfig, RewardSharing},
 	bond::{BondError, BondProvider},
@@ -11,8 +11,7 @@ use frame_support::{
 	traits::{Currency, StorageMapShim},
 };
 use frame_system::pallet_prelude::BlockNumberFor;
-use sp_core::ConstU32;
-use sp_runtime::{BuildStorage, FixedU128};
+use sp_runtime::{impl_opaque_keys, testing::UintAuthorityId, BuildStorage, FixedU128};
 
 type Block = frame_system::mocking::MockBlock<Test>;
 
@@ -101,6 +100,9 @@ parameter_types! {
 	pub static Bonds: Vec<(BondId, VaultId, u64, Balance)> = vec![];
 	pub static NextBondId: u64 = 1;
 	pub static VaultSharing: Option<RewardSharing<u64>> = None;
+
+	pub static LastSlotRemoved: Vec<(u64, UintAuthorityId)> = vec![];
+	pub static LastSlotAdded: Vec<(u64, UintAuthorityId)> = vec![];
 }
 
 pub struct StaticBondProvider;
@@ -131,10 +133,39 @@ impl BondProvider for StaticBondProvider {
 	}
 }
 
+pub struct StaticNewSlotEvent;
+impl OnNewSlot<u64> for StaticNewSlotEvent {
+	type Key = UintAuthorityId;
+	fn on_new_slot(
+		removed_authorities: Vec<(&u64, Self::Key)>,
+		added_authorities: Vec<(&u64, Self::Key)>,
+	) {
+		LastSlotRemoved::set(removed_authorities.into_iter().map(|(a, b)| (*a, b)).collect());
+		LastSlotAdded::set(added_authorities.into_iter().map(|(a, b)| (*a, b)).collect());
+	}
+}
+
+impl_opaque_keys! {
+	pub struct MockSessionKeys {
+		pub dummy: UintAuthorityId,
+	}
+}
+
+impl From<UintAuthorityId> for MockSessionKeys {
+	fn from(dummy: UintAuthorityId) -> Self {
+		Self { dummy }
+	}
+}
+
+impl From<u64> for MockSessionKeys {
+	fn from(dummy: u64) -> Self {
+		Self { dummy: dummy.into() }
+	}
+}
+
 impl pallet_mining_slot::Config for Test {
 	type RuntimeEvent = RuntimeEvent;
 	type WeightInfo = ();
-	type SessionWindowsToKeepInHistory = ConstU32<10>;
 	type MaxCohortSize = MaxCohortSize;
 	type TargetBidsPerSlot = TargetBidsPerSlot;
 	type MaxMiners = MaxMiners;
@@ -143,7 +174,9 @@ impl pallet_mining_slot::Config for Test {
 	type OwnershipPercentAdjustmentDamper = OwnershipPercentAdjustmentDamper;
 	type Balance = Balance;
 	type BondProvider = StaticBondProvider;
-	type SessionRotationsPerMiningWindow = ConstU32<2>;
+	type SlotEvents = (StaticNewSlotEvent,);
+	type Keys = MockSessionKeys;
+	type MiningAuthorityId = UintAuthorityId;
 }
 
 // Build genesis storage according to the mock runtime.

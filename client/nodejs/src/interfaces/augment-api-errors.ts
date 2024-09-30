@@ -282,7 +282,7 @@ declare module '@polkadot/api-base/types/errors' {
        **/
       NotebookIncludesExpiredLocalchainTransfer: AugmentedError<ApiType>;
     };
-    domain: {
+    domains: {
       /**
        * Error decoding account from notary
        **/
@@ -614,28 +614,6 @@ declare module '@polkadot/api-base/types/errors' {
        * A call which is incompatible with the proxy type's filter was attempted.
        **/
       Unproxyable: AugmentedError<ApiType>;
-    };
-    session: {
-      /**
-       * Registered duplicate key.
-       **/
-      DuplicatedKey: AugmentedError<ApiType>;
-      /**
-       * Invalid ownership proof.
-       **/
-      InvalidProof: AugmentedError<ApiType>;
-      /**
-       * Key setting account is not live, so it's impossible to associate keys.
-       **/
-      NoAccount: AugmentedError<ApiType>;
-      /**
-       * No associated validator ID for account.
-       **/
-      NoAssociatedValidatorId: AugmentedError<ApiType>;
-      /**
-       * No keys are associated with this account.
-       **/
-      NoKeys: AugmentedError<ApiType>;
     };
     sudo: {
       /**

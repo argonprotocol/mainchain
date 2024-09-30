@@ -166,7 +166,7 @@ declare module '@polkadot/api-base/types/events' {
        **/
       TransferToLocalchainRefundError: AugmentedEvent<ApiType, [accountId: AccountId32, transferId: u32, notaryId: u32, notebookNumber: u32, error: SpRuntimeDispatchError], { accountId: AccountId32, transferId: u32, notaryId: u32, notebookNumber: u32, error: SpRuntimeDispatchError }>;
     };
-    domain: {
+    domains: {
       /**
        * A domain was expired
        **/
@@ -261,14 +261,6 @@ declare module '@polkadot/api-base/types/events' {
     notebook: {
       NotebookAuditFailure: AugmentedEvent<ApiType, [notaryId: u32, notebookNumber: u32, firstFailureReason: ArgonNotaryAuditErrorVerifyError], { notaryId: u32, notebookNumber: u32, firstFailureReason: ArgonNotaryAuditErrorVerifyError }>;
       NotebookSubmitted: AugmentedEvent<ApiType, [notaryId: u32, notebookNumber: u32], { notaryId: u32, notebookNumber: u32 }>;
-    };
-    offences: {
-      /**
-       * There is an offence reported of the given `kind` happened at the `session_index` and
-       * (kind-specific) time slot. This event is not deposited for duplicate slashes.
-       * \[kind, timeslot\].
-       **/
-      Offence: AugmentedEvent<ApiType, [kind: U8aFixed, timeslot: Bytes], { kind: U8aFixed, timeslot: Bytes }>;
     };
     ownership: {
       /**
@@ -391,13 +383,6 @@ declare module '@polkadot/api-base/types/events' {
        * disambiguation index and proxy type.
        **/
       PureCreated: AugmentedEvent<ApiType, [pure: AccountId32, who: AccountId32, proxyType: ArgonNodeRuntimeProxyType, disambiguationIndex: u16], { pure: AccountId32, who: AccountId32, proxyType: ArgonNodeRuntimeProxyType, disambiguationIndex: u16 }>;
-    };
-    session: {
-      /**
-       * New session has happened. Note that the argument is the session index, not the
-       * block number as the type might suggest.
-       **/
-      NewSession: AugmentedEvent<ApiType, [sessionIndex: u32], { sessionIndex: u32 }>;
     };
     sudo: {
       /**

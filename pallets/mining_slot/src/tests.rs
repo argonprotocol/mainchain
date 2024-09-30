@@ -4,17 +4,17 @@ use frame_support::{
 	assert_err, assert_noop, assert_ok,
 	traits::{
 		fungible::{InspectHold, Unbalanced},
-		Currency, OnInitialize, OneSessionHandler,
+		Currency, OnInitialize,
 	},
 };
 use pallet_balances::Event as OwnershipEvent;
-use sp_core::{bounded_vec, crypto::AccountId32, ByteArray, H256, U256};
+use sp_core::{blake2_256, bounded_vec, crypto::AccountId32, ByteArray, H256, U256};
 use sp_runtime::{testing::UintAuthorityId, BoundedVec, FixedU128};
 
 use crate::{
 	mock::{MiningSlots, Ownership, *},
 	pallet::{
-		AccountIndexLookup, ActiveMinersByIndex, ActiveMinersCount, AuthoritiesByIndex,
+		AccountIndexLookup, ActiveMinersByIndex, ActiveMinersCount, AuthorityHashByIndex,
 		HistoricalBidsPerSlot, IsNextSlotBiddingOpen, LastOwnershipPercentAdjustment,
 		NextSlotCohort, OwnershipBondAmount,
 	},
@@ -23,7 +23,7 @@ use crate::{
 use argon_primitives::{
 	block_seal::{MiningAuthority, MiningRegistration, RewardDestination, RewardSharing},
 	inherents::BlockSealInherent,
-	AuthorityProvider, BlockRewardAccountsProvider, BlockSealAuthorityId, BlockVote, MerkleProof,
+	AuthorityProvider, BlockRewardAccountsProvider, BlockVote, MerkleProof,
 };
 
 #[test]
@@ -40,12 +40,13 @@ fn it_doesnt_add_cohorts_until_time() {
 			bond_amount: 0,
 			reward_destination: RewardDestination::Owner,
 			reward_sharing: None,
+			authority_keys: 1.into()
 		}]);
 
 		MiningSlots::on_initialize(1);
 
 		assert_eq!(NextSlotCohort::<Test>::get().len(), 1);
-		assert_eq!(NextSlotCohort::<Test>::get()[0].reward_destination, RewardDestination::Owner);
+		assert_eq!(NextSlotCohort::<Test>::get()[0].reward_destination, RewardDestination::Owner,);
 	});
 }
 
@@ -181,11 +182,14 @@ fn it_activates_miner_zero_if_no_miners() {
 		bond_amount: 0,
 		reward_destination: RewardDestination::Owner,
 		reward_sharing: None,
+		authority_keys: 1.into(),
 	}))
 	.execute_with(|| {
 		MiningSlots::on_initialize(1);
 
 		assert_eq!(ActiveMinersByIndex::<Test>::get(0).unwrap().account_id, 1);
+		assert_eq!(ActiveMinersCount::<Test>::get(), 1);
+		assert_eq!(AuthorityHashByIndex::<Test>::get().into_inner().len(), 1);
 	});
 }
 
@@ -203,6 +207,7 @@ fn it_activates_miner_zero_if_upcoming_miners_will_empty() {
 		bond_amount: 0,
 		reward_destination: RewardDestination::Owner,
 		reward_sharing: None,
+		authority_keys: 1.into(),
 	}))
 	.execute_with(|| {
 		ActiveMinersByIndex::<Test>::insert(
@@ -214,6 +219,7 @@ fn it_activates_miner_zero_if_upcoming_miners_will_empty() {
 				bond_amount: 0,
 				reward_destination: RewardDestination::Owner,
 				reward_sharing: None,
+				authority_keys: 1.into(),
 			},
 		);
 		AccountIndexLookup::<Test>::insert(10, 5);
@@ -222,6 +228,7 @@ fn it_activates_miner_zero_if_upcoming_miners_will_empty() {
 
 		assert_eq!(ActiveMinersByIndex::<Test>::get(0).unwrap().account_id, 1);
 		assert_eq!(ActiveMinersCount::<Test>::get(), 1);
+		assert_eq!(AuthorityHashByIndex::<Test>::get().keys().next(), Some(&0));
 	});
 }
 
@@ -245,11 +252,18 @@ fn it_adds_new_cohorts_on_block() {
 					bond_amount: 0,
 					reward_destination: RewardDestination::Owner,
 					reward_sharing: None,
+					authority_keys: account_id.into(),
 				},
 			);
 			AccountIndexLookup::<Test>::insert(account_id, i);
+			AuthorityHashByIndex::<Test>::try_mutate(|index| {
+				let hash = blake2_256(&account_id.to_le_bytes());
+				index.try_insert(i, U256::from(hash))
+			})
+			.unwrap();
 		}
 		ActiveMinersCount::<Test>::put(4);
+		// filled indexes are [0, 1, 2, 3, _, _]
 
 		let cohort = BoundedVec::truncate_from(vec![MiningRegistration {
 			account_id: 1,
@@ -258,27 +272,33 @@ fn it_adds_new_cohorts_on_block() {
 			bond_amount: 0,
 			reward_destination: RewardDestination::Owner,
 			reward_sharing: None,
+			authority_keys: 1.into(),
 		}]);
 
 		NextSlotCohort::<Test>::set(cohort.clone());
 
+		// on 8, we're filling indexes 2 and 3 [0, 1, -> 2, -> 3, _, _]
 		MiningSlots::on_initialize(8);
 
 		// re-fetch
-		let validators = ActiveMinersByIndex::<Test>::iter().collect::<HashMap<_, _>>();
-		assert_eq!(
-			NextSlotCohort::<Test>::get().len(),
-			0,
-			"Queued mining_slot for block 8 should be removed"
-		);
-		assert_eq!(validators.len(), 3, "Should have 3 validators still after insertion");
 		assert_eq!(
 			ActiveMinersCount::<Test>::get(),
 			3,
 			"Should have 3 validators still after insertion"
 		);
+		let validators = ActiveMinersByIndex::<Test>::iter().collect::<HashMap<_, _>>();
+		let authority_hashes = AuthorityHashByIndex::<Test>::get().into_inner();
+		assert_eq!(
+			NextSlotCohort::<Test>::get().len(),
+			0,
+			"Queued mining_slot for block 8 should be removed"
+		);
+		assert_eq!(authority_hashes.len(), 3, "Should have 3 authority hashes after insertion");
+		assert_eq!(validators.len(), 3, "Should have 3 validators still after insertion");
+
 		assert!(validators.contains_key(&2), "Should insert validator at index 2");
 		assert!(!validators.contains_key(&3), "Should no longer have a validator at index 3");
+
 		assert_eq!(
 			AccountIndexLookup::<Test>::get(1),
 			Some(2),
@@ -292,6 +312,15 @@ fn it_adds_new_cohorts_on_block() {
 			!AccountIndexLookup::<Test>::contains_key(7),
 			"Should no longer have account 7 registered"
 		);
+		assert!(!authority_hashes.contains_key(&3), "Should no longer have hash index 3");
+
+		// check what was called from the events
+		assert_eq!(
+			LastSlotAdded::get().len(),
+			1,
+			"Should emit a new slot event for the new cohort"
+		);
+		assert_eq!(LastSlotRemoved::get().len(), 2);
 
 		System::assert_last_event(Event::NewMiners { start_index: 2, new_miners: cohort }.into())
 	});
@@ -326,6 +355,7 @@ fn it_unbonds_accounts_when_a_window_closes() {
 					bond_amount,
 					reward_destination: RewardDestination::Owner,
 					reward_sharing: None,
+					authority_keys: 1.into(),
 				},
 			);
 			AccountIndexLookup::<Test>::insert(account_id, i);
@@ -334,7 +364,12 @@ fn it_unbonds_accounts_when_a_window_closes() {
 		IsNextSlotBiddingOpen::<Test>::set(true);
 		assert_eq!(MiningSlots::get_slot_era(), (8, 8 + (2 * 3)));
 
-		assert_ok!(MiningSlots::bid(RuntimeOrigin::signed(2), None, RewardDestination::Owner));
+		assert_ok!(MiningSlots::bid(
+			RuntimeOrigin::signed(2),
+			None,
+			RewardDestination::Owner,
+			1.into()
+		));
 
 		System::set_block_number(8);
 
@@ -350,6 +385,7 @@ fn it_unbonds_accounts_when_a_window_closes() {
 					bond_amount: 0,
 					reward_destination: RewardDestination::Owner,
 					reward_sharing: None,
+					authority_keys: 1.into(),
 				}]),
 			}
 			.into(),
@@ -388,16 +424,16 @@ fn it_holds_ownership_tokens_for_a_slot() {
 	BlocksBetweenSlots::set(3);
 	MaxMiners::set(6);
 	MaxCohortSize::set(2);
-	SlotBiddingStartBlock::set(0);
 
 	new_test_ext(None).execute_with(|| {
 		System::set_block_number(6);
 
 		assert_err!(
-			MiningSlots::bid(RuntimeOrigin::signed(2), None, RewardDestination::Owner),
+			MiningSlots::bid(RuntimeOrigin::signed(2), None, RewardDestination::Owner, 1.into()),
 			Error::<Test>::SlotNotTakingBids
 		);
 
+		SlotBiddingStartBlock::set(0);
 		IsNextSlotBiddingOpen::<Test>::set(true);
 
 		set_ownership(3, 5000u32.into());
@@ -406,20 +442,30 @@ fn it_holds_ownership_tokens_for_a_slot() {
 		assert_eq!(OwnershipBondAmount::<Test>::get(), share_amount);
 
 		assert_err!(
-			MiningSlots::bid(RuntimeOrigin::signed(1), None, RewardDestination::Owner),
+			MiningSlots::bid(RuntimeOrigin::signed(1), None, RewardDestination::Owner, 1.into()),
 			Error::<Test>::InsufficientOwnershipTokens
 		);
 
 		set_ownership(1, 1000u32.into());
 
-		assert_ok!(MiningSlots::bid(RuntimeOrigin::signed(1), None, RewardDestination::Owner));
+		assert_ok!(MiningSlots::bid(
+			RuntimeOrigin::signed(1),
+			None,
+			RewardDestination::Owner,
+			1.into()
+		));
 		System::assert_last_event(
 			Event::SlotBidderAdded { account_id: 1, bid_amount: 0u32.into(), index: 0 }.into(),
 		);
 		assert_eq!(Ownership::free_balance(1), 1000 - share_amount);
 
 		// should be able to re-register
-		assert_ok!(MiningSlots::bid(RuntimeOrigin::signed(1), None, RewardDestination::Owner));
+		assert_ok!(MiningSlots::bid(
+			RuntimeOrigin::signed(1),
+			None,
+			RewardDestination::Owner,
+			1.into()
+		));
 		assert_eq!(
 			NextSlotCohort::<Test>::get().iter().map(|a| a.account_id).collect::<Vec<_>>(),
 			vec![1]
@@ -450,7 +496,12 @@ fn it_wont_accept_bids_until_bidding_starts() {
 
 			MiningSlots::on_initialize(i);
 			assert_err!(
-				MiningSlots::bid(RuntimeOrigin::signed(2), None, RewardDestination::Owner),
+				MiningSlots::bid(
+					RuntimeOrigin::signed(2),
+					None,
+					RewardDestination::Owner,
+					1.into()
+				),
 				Error::<Test>::SlotNotTakingBids
 			);
 		}
@@ -459,7 +510,12 @@ fn it_wont_accept_bids_until_bidding_starts() {
 		MiningSlots::on_initialize(12);
 
 		assert!(IsNextSlotBiddingOpen::<Test>::get(), "bidding should now be open");
-		assert_ok!(MiningSlots::bid(RuntimeOrigin::signed(2), None, RewardDestination::Owner));
+		assert_ok!(MiningSlots::bid(
+			RuntimeOrigin::signed(2),
+			None,
+			RewardDestination::Owner,
+			1.into()
+		));
 	});
 }
 #[test]
@@ -482,7 +538,12 @@ fn it_wont_let_you_reuse_ownership_tokens_for_two_bids() {
 
 		let ownership = (200 / 6) as u128;
 		assert_eq!(OwnershipBondAmount::<Test>::get(), ownership);
-		assert_ok!(MiningSlots::bid(RuntimeOrigin::signed(1), None, RewardDestination::Owner));
+		assert_ok!(MiningSlots::bid(
+			RuntimeOrigin::signed(1),
+			None,
+			RewardDestination::Owner,
+			1.into()
+		));
 		System::set_block_number(16);
 		MiningSlots::on_initialize(16);
 
@@ -496,6 +557,7 @@ fn it_wont_let_you_reuse_ownership_tokens_for_two_bids() {
 					bond_amount: 0,
 					reward_destination: RewardDestination::Owner,
 					reward_sharing: None,
+					authority_keys: 1.into(),
 				}]),
 			}
 			.into(),
@@ -509,7 +571,7 @@ fn it_wont_let_you_reuse_ownership_tokens_for_two_bids() {
 		assert_eq!(MiningSlots::get_next_slot_starting_index(), 4);
 
 		assert_err!(
-			MiningSlots::bid(RuntimeOrigin::signed(1), None, RewardDestination::Owner),
+			MiningSlots::bid(RuntimeOrigin::signed(1), None, RewardDestination::Owner, 1.into()),
 			Error::<Test>::CannotRegisterOverlappingSessions
 		);
 		assert!(System::account_exists(&1));
@@ -522,16 +584,16 @@ fn it_will_order_bids_with_argon_bonds() {
 	BlocksBetweenSlots::set(3);
 	MaxMiners::set(6);
 	MaxCohortSize::set(2);
-	SlotBiddingStartBlock::set(0);
 
 	new_test_ext(None).execute_with(|| {
 		System::set_block_number(6);
 
 		assert_err!(
-			MiningSlots::bid(RuntimeOrigin::signed(2), None, RewardDestination::Owner),
+			MiningSlots::bid(RuntimeOrigin::signed(2), None, RewardDestination::Owner, 1.into()),
 			Error::<Test>::SlotNotTakingBids
 		);
 
+		SlotBiddingStartBlock::set(0);
 		IsNextSlotBiddingOpen::<Test>::set(true);
 
 		set_ownership(1, 1000u32.into());
@@ -546,7 +608,8 @@ fn it_will_order_bids_with_argon_bonds() {
 		assert_ok!(MiningSlots::bid(
 			RuntimeOrigin::signed(1),
 			Some(MiningSlotBid { vault_id: 1, amount: 1000u32.into() }),
-			RewardDestination::Owner
+			RewardDestination::Owner,
+			1.into()
 		));
 		System::assert_last_event(
 			Event::SlotBidderAdded { account_id: 1, bid_amount: 1000u32.into(), index: 0 }.into(),
@@ -561,7 +624,8 @@ fn it_will_order_bids_with_argon_bonds() {
 		assert_ok!(MiningSlots::bid(
 			RuntimeOrigin::signed(2),
 			Some(MiningSlotBid { vault_id: 1, amount: 1001u32.into() }),
-			RewardDestination::Owner
+			RewardDestination::Owner,
+			1.into()
 		));
 		System::assert_last_event(
 			Event::SlotBidderAdded { account_id: 2, bid_amount: 1001u32.into(), index: 0 }.into(),
@@ -579,7 +643,8 @@ fn it_will_order_bids_with_argon_bonds() {
 		assert_ok!(MiningSlots::bid(
 			RuntimeOrigin::signed(3),
 			Some(MiningSlotBid { vault_id: 1, amount: 1001u32.into() }),
-			RewardDestination::Owner
+			RewardDestination::Owner,
+			1.into()
 		));
 		System::assert_last_event(
 			Event::SlotBidderAdded { account_id: 3, bid_amount: 1001u32.into(), index: 1 }.into(),
@@ -616,7 +681,8 @@ fn it_will_order_bids_with_argon_bonds() {
 		assert_ok!(MiningSlots::bid(
 			RuntimeOrigin::signed(1),
 			Some(MiningSlotBid { vault_id: 1, amount: 1002u32.into() }),
-			RewardDestination::Owner
+			RewardDestination::Owner,
+			1.into()
 		));
 		assert_eq!(HistoricalBidsPerSlot::<Test>::get().into_inner()[0], 4);
 
@@ -664,18 +730,28 @@ fn handles_a_max_of_bids_per_block() {
 			set_ownership(i, 1000u32.into());
 		}
 
-		assert_ok!(MiningSlots::bid(RuntimeOrigin::signed(1), None, RewardDestination::Owner));
+		assert_ok!(MiningSlots::bid(
+			RuntimeOrigin::signed(1),
+			None,
+			RewardDestination::Owner,
+			1.into()
+		));
 		assert_eq!(HistoricalBidsPerSlot::<Test>::get().into_inner()[0], 1);
 
 		System::assert_last_event(
 			Event::SlotBidderAdded { account_id: 1, bid_amount: 0u32.into(), index: 0 }.into(),
 		);
-		assert_ok!(MiningSlots::bid(RuntimeOrigin::signed(2), None, RewardDestination::Owner));
+		assert_ok!(MiningSlots::bid(
+			RuntimeOrigin::signed(2),
+			None,
+			RewardDestination::Owner,
+			1.into()
+		));
 		System::assert_last_event(
 			Event::SlotBidderAdded { account_id: 2, bid_amount: 0u32.into(), index: 1 }.into(),
 		);
 		assert_noop!(
-			MiningSlots::bid(RuntimeOrigin::signed(3), None, RewardDestination::Owner),
+			MiningSlots::bid(RuntimeOrigin::signed(3), None, RewardDestination::Owner, 1.into()),
 			Error::<Test>::BidTooLow,
 		);
 		// should not have changed
@@ -709,7 +785,8 @@ fn records_profit_sharing_if_applicable() {
 		assert_ok!(MiningSlots::bid(
 			RuntimeOrigin::signed(1),
 			Some(MiningSlotBid { vault_id: 1, amount: 1000u32.into() }),
-			RewardDestination::Account(25)
+			RewardDestination::Account(25),
+			1.into()
 		));
 		assert_eq!(HistoricalBidsPerSlot::<Test>::get().into_inner()[0], 1);
 
@@ -766,17 +843,16 @@ fn it_can_get_closest_authority() {
 					bond_amount: 0,
 					reward_destination: RewardDestination::Owner,
 					reward_sharing: None,
+					authority_keys: account_id.into(),
 				},
 			);
 			AccountIndexLookup::<Test>::insert(account_id, i);
 		}
-		AuthoritiesByIndex::<Test>::try_mutate(|a| {
+		AuthorityHashByIndex::<Test>::try_mutate(|a| {
 			for i in 0..100u32 {
-				let account_id: u64 = i.into();
-				let public_key: BlockSealAuthorityId = UintAuthorityId(account_id).to_public_key();
 				// these are normally hashed, but we'll simplify to ease the xor calculation
 				let hash = U256::from(i);
-				let _ = a.try_insert(i, (public_key, hash));
+				let _ = a.try_insert(i, hash);
 			}
 			Ok::<(), Error<Test>>(())
 		})
@@ -786,61 +862,9 @@ fn it_can_get_closest_authority() {
 			MiningSlots::xor_closest_authority(U256::from(100)),
 			Some(MiningAuthority {
 				account_id: 96,
-				authority_id: UintAuthorityId(96).to_public_key(),
+				authority_id: UintAuthorityId(96),
 				authority_index: 96,
 			})
-		);
-	});
-}
-
-#[test]
-fn it_can_replace_authority_keys() {
-	MaxMiners::set(10);
-	new_test_ext(None).execute_with(|| {
-		System::set_block_number(8);
-
-		for i in 0..10u32 {
-			let account_id: u64 = i.into();
-			ActiveMinersByIndex::<Test>::insert(
-				i,
-				MiningRegistration {
-					account_id,
-					bond_id: None,
-					ownership_tokens: 0,
-					bond_amount: 0,
-					reward_destination: RewardDestination::Owner,
-					reward_sharing: None,
-				},
-			);
-			AccountIndexLookup::<Test>::insert(account_id, i);
-		}
-
-		AuthoritiesByIndex::<Test>::try_mutate(|a| {
-			a.try_insert(0u32, (UintAuthorityId(0u64).to_public_key(), U256::from(0)))
-		})
-		.expect("Could seed authorities");
-
-		let account_keys = (2..12u32)
-			.map(|i| {
-				let account_id: u64 = i.into();
-				let public_key: BlockSealAuthorityId = UintAuthorityId(account_id).to_public_key();
-				(account_id, public_key)
-			})
-			.collect::<Vec<(u64, BlockSealAuthorityId)>>();
-
-		let with_keys: Box<dyn Iterator<Item = _>> =
-			Box::new(account_keys.iter().map(|k| (&k.0, k.clone().1)));
-
-		let queued_keys: Box<dyn Iterator<Item = _>> =
-			Box::new(account_keys.iter().map(|k| (&k.0, k.clone().1)));
-
-		assert_eq!(AuthoritiesByIndex::<Test>::get().len(), 1);
-		MiningSlots::on_new_session(true, with_keys, queued_keys);
-		assert_eq!(AuthoritiesByIndex::<Test>::get().len(), 8, "should register only 8 keys");
-		assert!(!AuthoritiesByIndex::<Test>::get().contains_key(&0u32), "should not have index 0");
-		assert!(
-			!AuthoritiesByIndex::<Test>::get().contains_key(&10u32),
-			"should not have index 11"
 		);
 	});
 }

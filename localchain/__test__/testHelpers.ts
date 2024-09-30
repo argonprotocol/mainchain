@@ -1,14 +1,19 @@
-import {checkForExtrinsicSuccess, Keyring, KeyringPair, ArgonClient} from "@argonprotocol/mainchain";
+import {
+    checkForExtrinsicSuccess,
+    Keyring,
+    KeyringPair,
+    ArgonClient,
+    KeypairType,
+    waitForLoad
+} from "@argonprotocol/mainchain";
 import {Localchain} from "../index";
 import TestNotary from "./TestNotary";
-import type {KeypairType} from "@polkadot/util-crypto/types";
 import process from "node:process";
 import HttpProxy from "http-proxy";
 import child_process from "node:child_process";
 import * as http from "node:http";
 import * as url from "node:url";
 import * as net from "node:net";
-import {cryptoWaitReady} from '@polkadot/util-crypto';
 
 export interface ITeardownable {
     teardown(): Promise<void>;
@@ -112,7 +117,7 @@ export class KeyringSigner {
     }
 
     static async load(mainSuri: string, type: KeypairType = "sr25519"): Promise<KeyringSigner> {
-        await cryptoWaitReady();
+        await waitForLoad();
         return new KeyringSigner(mainSuri, type)
     }
 

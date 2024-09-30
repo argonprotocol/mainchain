@@ -290,7 +290,7 @@ pub mod pallet {
 				.cloned()
 				.collect::<Vec<_>>();
 
-			if rewards.len() > 0 {
+			if !rewards.is_empty() {
 				Self::deposit_event(Event::RewardCreated {
 					maturation_block: reward_height,
 					rewards: rewards.clone(),

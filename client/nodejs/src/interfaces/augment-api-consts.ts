@@ -167,14 +167,6 @@ declare module '@polkadot/api-base/types/consts' {
        **/
       ownershipPercentAdjustmentDamper: u128 & AugmentedConst<ApiType>;
       /**
-       * The number of session rotations per slot (one will align with the start of the session)
-       **/
-      sessionRotationsPerMiningWindow: u32 & AugmentedConst<ApiType>;
-      /**
-       * How many session indexes to keep session history
-       **/
-      sessionWindowsToKeepInHistory: u32 & AugmentedConst<ApiType>;
-      /**
        * The target number of bids per slot. This will adjust the ownership bond amount up or
        * down to ensure mining slots are filled.
        **/

@@ -201,7 +201,7 @@ impl MainchainClient {
     let best_block_hash = &self.get_best_block_hash().await?.0.to_vec();
     if let Some(x) = self
       .fetch_storage(
-        &storage().domain().registered_domains(domain_hash),
+        &storage().domains().registered_domains(domain_hash),
         Some(H256::from_slice(best_block_hash)),
       )
       .await?
@@ -231,7 +231,7 @@ impl MainchainClient {
   ) -> Result<Option<ZoneRecord>> {
     let domain = Domain::from_string(domain_name, top_level).hash();
     let Some(zone_record) = self
-      .fetch_storage(&storage().domain().zone_records_by_domain(domain), None)
+      .fetch_storage(&storage().domains().zone_records_by_domain(domain), None)
       .await?
     else {
       return Ok(None);

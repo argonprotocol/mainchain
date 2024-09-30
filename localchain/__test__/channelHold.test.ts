@@ -55,7 +55,7 @@ describeIntegration("ChannelHold integration", () => {
                 datastoreId: mainchainClient.createType('Bytes', 'default'),
                 host: 'ws://192.168.1.1:80'
             })
-        })).rejects.toThrow("ExtrinsicFailed:: domain.DomainNotRegistered");
+        })).rejects.toThrow("ExtrinsicFailed:: domains.DomainNotRegistered");
     }, 120e3);
 
 
@@ -230,7 +230,7 @@ async function registerZoneRecord(client: ArgonClient, domainHash: Uint8Array, o
         codecVersions.set(versionCodec, client.createType('ArgonPrimitivesDomainVersionHost', host));
     }
 
-    await new Promise((resolve, reject) => client.tx.domain.setZoneRecord(domainHash, {
+    await new Promise((resolve, reject) => client.tx.domains.setZoneRecord(domainHash, {
         paymentAccount,
         notaryId,
         versions: codecVersions,
