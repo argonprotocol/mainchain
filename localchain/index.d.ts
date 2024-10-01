@@ -67,8 +67,9 @@ export class BalanceSync {
   consolidateJumpAccounts(): Promise<Array<NotarizationTracker>>
   syncUnsettledBalances(): Promise<Array<BalanceChange>>
   syncMainchainTransfers(): Promise<Array<NotarizationTracker>>
+  convertTaxToVotes(options: ChannelHoldCloseOptions): Promise<Array<NotarizationTracker>>
   syncBalanceChange(balanceChange: BalanceChange): Promise<BalanceChange>
-  processPendingChannelHolds(options?: ChannelHoldCloseOptions | undefined | null): Promise<Array<NotarizationBuilder>>
+  processPendingChannelHolds(): Promise<Array<NotarizationBuilder>>
 }
 
 export class BalanceSyncResult {
@@ -76,6 +77,7 @@ export class BalanceSyncResult {
   get channelHoldNotarizations(): Array<NotarizationBuilder>
   get mainchainTransfers(): Array<NotarizationTracker>
   get jumpAccountConsolidations(): Array<NotarizationTracker>
+  get blockVotes(): Array<NotarizationTracker>
 }
 
 export class BalanceTipResult {

@@ -53,6 +53,7 @@ pub struct BalanceSyncResult {
   pub(crate) mainchain_transfers: Vec<NotarizationTracker>,
   pub(crate) channel_hold_notarizations: Vec<NotarizationBuilder>,
   pub(crate) jump_account_consolidations: Vec<NotarizationTracker>,
+  pub(crate) block_votes: Vec<NotarizationTracker>,
 }
 
 impl BalanceSyncResult {
@@ -70,6 +71,10 @@ impl BalanceSyncResult {
   pub fn jump_account_consolidations(&self) -> Vec<NotarizationTracker> {
     self.jump_account_consolidations.clone()
   }
+
+  pub fn block_votes(&self) -> Vec<NotarizationTracker> {
+    self.block_votes.clone()
+  }
 }
 
 #[cfg(feature = "uniffi")]
@@ -83,6 +88,7 @@ pub mod uniffi_ext {
     pub balance_changes: Vec<BalanceChange>,
     pub mainchain_transfers: Vec<Arc<NotarizationTracker>>,
     pub jump_account_consolidations: Vec<Arc<NotarizationTracker>>,
+    pub block_votes: Vec<Arc<NotarizationTracker>>,
   }
 
   impl From<super::BalanceSyncResult> for BalanceSyncResult {
@@ -100,6 +106,11 @@ pub mod uniffi_ext {
           .collect(),
         jump_account_consolidations: result
           .jump_account_consolidations
+          .into_iter()
+          .map(|x| Arc::new(x.into()))
+          .collect(),
+        block_votes: result
+          .block_votes
           .into_iter()
           .map(|x| Arc::new(x.into()))
           .collect(),
@@ -136,6 +147,10 @@ pub mod napi_ext {
     pub fn jump_account_consolidations_napi(&self) -> Vec<NotarizationTracker> {
       self.jump_account_consolidations.clone()
     }
+    #[napi(getter, js_name = "blockVotes")]
+    pub fn block_votes_napi(&self) -> Vec<NotarizationTracker> {
+      self.block_votes.clone()
+    }
   }
 
   #[napi]
@@ -163,6 +178,14 @@ pub mod napi_ext {
     pub async fn sync_mainchain_transfers_napi(&self) -> napi::Result<Vec<NotarizationTracker>> {
       self.sync_mainchain_transfers().await.napi_ok()
     }
+    #[napi(js_name = "convertTaxToVotes")]
+    pub async fn convert_tax_to_votes_napi(
+      &self,
+      options: ChannelHoldCloseOptions,
+    ) -> napi::Result<Vec<NotarizationTracker>> {
+      self.convert_tax_to_votes(options).await.napi_ok()
+    }
+
     #[napi(js_name = "syncBalanceChange")]
     pub async fn sync_balance_change_napi(
       &self,
@@ -173,9 +196,8 @@ pub mod napi_ext {
     #[napi(js_name = "processPendingChannelHolds")]
     pub async fn process_pending_channel_holds_napi(
       &self,
-      options: Option<ChannelHoldCloseOptions>,
     ) -> napi::Result<Vec<NotarizationBuilder>> {
-      self.process_pending_channel_holds(options).await.napi_ok()
+      self.process_pending_channel_holds().await.napi_ok()
     }
   }
 }
@@ -202,17 +224,30 @@ impl BalanceSync {
       balance_changes.len(),
     );
 
-    let channel_hold_notarizations = self.process_pending_channel_holds(options).await?;
+    let channel_hold_notarizations = self.process_pending_channel_holds().await?;
 
     let jump_account_consolidations = self.consolidate_jump_accounts().await?;
 
     let mainchain_transfers = self.sync_mainchain_transfers().await?;
+
+    let block_votes = if let Some(options) = options {
+      self
+        .convert_tax_to_votes(options)
+        .await
+        .unwrap_or_else(|e| {
+          tracing::warn!("Error converting tax to votes: {:?}", e);
+          vec![]
+        })
+    } else {
+      vec![]
+    };
 
     Ok(BalanceSyncResult {
       balance_changes,
       channel_hold_notarizations,
       jump_account_consolidations,
       mainchain_transfers,
+      block_votes,
     })
   }
 
@@ -416,10 +451,7 @@ impl BalanceSync {
     Ok(change)
   }
 
-  pub async fn process_pending_channel_holds(
-    &self,
-    options: Option<ChannelHoldCloseOptions>,
-  ) -> Result<Vec<NotarizationBuilder>> {
+  pub async fn process_pending_channel_holds(&self) -> Result<Vec<NotarizationBuilder>> {
     let _lock = self.lock.lock().await;
     let open_channel_holds = self.open_channel_holds.get_claimable().await?;
     tracing::debug!(
@@ -465,12 +497,7 @@ impl BalanceSync {
         }
       } else {
         if let Err(e) = self
-          .sync_server_channel_hold(
-            &open_channel_hold,
-            &mut channel_hold,
-            &options,
-            notarization,
-          )
+          .sync_server_channel_hold(&open_channel_hold, &mut channel_hold, notarization)
           .await
         {
           tracing::warn!(
@@ -492,7 +519,7 @@ impl BalanceSync {
         continue;
       }
       self
-        .finalize_channel_hold_notarization(&mut notarization, &options)
+        .finalize_channel_hold_notarization(&mut notarization)
         .await;
       if notarization.is_finalized().await {
         notarizations.push(notarization.clone());
@@ -502,37 +529,10 @@ impl BalanceSync {
     Ok(notarizations)
   }
 
-  pub async fn get_available_tax_by_account(
-    &self,
-    notarization: &mut NotarizationBuilder,
-  ) -> (u128, HashMap<i64, (LocalAccount, u128)>) {
-    let accounts = notarization.accounts().await;
-    let mut tax_accounts = HashMap::new();
-    let mut total_available_tax = 0;
-
-    for account in accounts {
-      if account.account_type == AccountType::Deposit || account.hd_path.is_some() {
-        continue;
-      }
-      if let Ok(balance) = notarization.get_balance_change(&account).await {
-        let tax = balance.balance().await;
-        if tax > 0 {
-          total_available_tax += tax;
-          tax_accounts.insert(account.id, (account, tax));
-        }
-      }
-    }
-    (total_available_tax, tax_accounts)
-  }
-
   pub async fn convert_tax_to_votes(
     &self,
-    notarization: &mut NotarizationBuilder,
-    options: &Option<ChannelHoldCloseOptions>,
-  ) -> Result<()> {
-    let Some(options) = options else {
-      bail!("No options provided to create votes with tax");
-    };
+    options: ChannelHoldCloseOptions,
+  ) -> Result<Vec<NotarizationTracker>> {
     let Some(votes_address) = options.votes_address.as_ref() else {
       bail!("No votes address provided to create votes with tax");
     };
@@ -542,67 +542,68 @@ impl BalanceSync {
       bail!("Cannot create votes.. No mainchain client available!");
     };
 
-    let (total_available_tax, tax_accounts) = self.get_available_tax_by_account(notarization).await;
+    let mut notarizations = vec![];
+    let mut db = self.db.acquire().await?;
+    let accounts = AccountStore::db_list(&mut db, false).await?;
+    drop(db);
 
-    let current_tick = self.ticker.current();
-    let Some(best_block_for_vote) = mainchain_client.get_vote_block_hash(current_tick).await?
-    else {
-      return Ok(());
-    };
-
-    if total_available_tax < options.minimum_vote_amount.unwrap_or_default() as u128
-      || total_available_tax < best_block_for_vote.vote_minimum
-    {
-      return Ok(());
-    }
-
-    let mut tax_account = None;
-    for (_, (account, tax)) in tax_accounts {
-      let balance_change = notarization.get_balance_change(&account).await?;
-      balance_change.send_to_vote(tax).await?;
-      if tax_account.is_none() {
-        tax_account = Some(account.clone());
+    for account in accounts {
+      if account.account_type == AccountType::Deposit {
+        continue;
       }
+      let notarization = NotarizationBuilder::new(
+        self.db.clone(),
+        self.notary_clients.clone(),
+        self.keystore.clone(),
+        self.ticker.clone(),
+      );
+      let balance_change = notarization.load_account(&account).await?;
+      let total_available_tax = balance_change.balance().await;
+      if total_available_tax < options.minimum_vote_amount.unwrap_or_default() as u128 {
+        continue;
+      }
+
+      balance_change.send_to_vote(total_available_tax).await?;
+
+      let current_tick = self.ticker.current();
+      let Some(best_block_for_vote) = mainchain_client.get_vote_block_hash(current_tick).await?
+      else {
+        continue;
+      };
+      if total_available_tax < best_block_for_vote.vote_minimum {
+        continue;
+      }
+
+      let mut tick_counter = self.tick_counter.lock().await;
+      if tick_counter.0 == current_tick {
+        tick_counter.1 += 1;
+      } else {
+        *tick_counter = (current_tick, 0);
+      }
+      let vote_address = votes_address.clone();
+
+      let mut vote = BlockVote {
+        account_id: account.get_account_id32()?,
+        power: total_available_tax,
+        index: tick_counter.1,
+        block_hash: H256::from_slice(best_block_for_vote.block_hash.as_ref()),
+        block_rewards_account_id: AccountStore::parse_address(&vote_address)?,
+        signature: Signature::from_raw([0; 64]).into(),
+      };
+      let signature = self
+        .keystore
+        .sign(account.address, vote.hash().as_bytes().to_vec())
+        .await?;
+      vote.signature = MultiSignature::decode(&mut signature.as_ref())?;
+      notarization.add_vote(vote).await?;
+      let tracker = notarization.notarize().await?;
+      notarizations.push(tracker);
     }
 
-    let mut tick_counter = self.tick_counter.lock().await;
-    if tick_counter.0 == current_tick {
-      tick_counter.1 += 1;
-    } else {
-      *tick_counter = (current_tick, 0);
-    }
-    let vote_address = votes_address.clone();
-    let tax_account = tax_account.unwrap();
-    let mut vote = BlockVote {
-      account_id: tax_account.get_account_id32()?,
-      power: total_available_tax,
-      index: tick_counter.1,
-      block_hash: H256::from_slice(best_block_for_vote.block_hash.as_ref()),
-      block_rewards_account_id: AccountStore::parse_address(&vote_address)?,
-      signature: Signature::from_raw([0; 64]).into(),
-    };
-    let signature = self
-      .keystore
-      .sign(tax_account.address, vote.hash().as_bytes().to_vec())
-      .await?;
-    vote.signature = MultiSignature::decode(&mut signature.as_ref())?;
-    notarization.add_vote(vote).await?;
-
-    Ok(())
+    Ok(notarizations)
   }
 
-  pub async fn finalize_channel_hold_notarization(
-    &self,
-    notarization: &mut NotarizationBuilder,
-    options: &Option<ChannelHoldCloseOptions>,
-  ) {
-    if let Err(e) = self.convert_tax_to_votes(notarization, options).await {
-      tracing::error!(
-        "Error converting tax to votes: {:?}. Continuing with notarization",
-        e
-      );
-    }
-
+  pub async fn finalize_channel_hold_notarization(&self, notarization: &mut NotarizationBuilder) {
     if let Err(e) = notarization.sign().await {
       tracing::error!("Could not claim a channel_hold -> {:?}", e);
       return;
@@ -647,7 +648,6 @@ impl BalanceSync {
     &self,
     open_channel_hold: &OpenChannelHold,
     channel_hold: &mut ChannelHold,
-    options: &Option<ChannelHoldCloseOptions>,
     notarization: &mut NotarizationBuilder,
   ) -> Result<()> {
     let current_tick = self.ticker.current();
@@ -669,9 +669,7 @@ impl BalanceSync {
       channel_hold.balance_change_number
     );
     if !notarization.can_add_channel_hold(open_channel_hold).await {
-      self
-        .finalize_channel_hold_notarization(notarization, options)
-        .await;
+      self.finalize_channel_hold_notarization(notarization).await;
       return Ok(());
     }
     notarization.claim_channel_hold(open_channel_hold).await?;

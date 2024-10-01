@@ -44,7 +44,9 @@ pub(crate) fn get_target_dir() -> PathBuf {
 		.join("target")
 		.join(CURRENT_PLATFORM)
 		.join("debug");
-	if Path::is_dir(triple_target.as_path()) {
+	if Path::is_dir(triple_target.as_path()) &&
+		Path::is_file(&triple_target.as_path().join("argon-node"))
+	{
 		return triple_target;
 	}
 	workspace_cargo_path.as_path().join("target/debug")

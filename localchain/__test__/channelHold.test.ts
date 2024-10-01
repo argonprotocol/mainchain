@@ -188,7 +188,7 @@ describeIntegration("ChannelHold integration", () => {
             await new Promise(resolve => setTimeout(resolve, Number(ferdiechain.ticker.millisToNextTick())));
         }
 
-        const voteResult = await ferdiechain.balanceSync.sync({
+        let voteResult = await ferdiechain.balanceSync.sync({
             votesAddress: ferdieVotesAddress.address,
         },);
         console.log("Result of balance sync notarization of channelHold. Balance Changes=%s, ChannelHolds=%s", voteResult.balanceChanges.length, voteResult.channelHoldNotarizations.length);
@@ -200,7 +200,19 @@ describeIntegration("ChannelHold integration", () => {
         const json = JSON.parse(await notarization.toJSON());
         expect(json).toBeTruthy();
 
-        expect(json.blockVotes).toHaveLength(1);
+        if (voteResult.blockVotes.length === 0) {
+            // try 10 more times to vote
+            for (let i = 0; i < 10; i++) {
+                await new Promise(resolve => setTimeout(resolve, 100));
+
+                voteResult = await ferdiechain.balanceSync.sync({
+                    votesAddress: ferdieVotesAddress.address,
+                },);
+                console.log(`Votes on try ${i + 2} -> ${voteResult.blockVotes.length}`);
+                if (voteResult.blockVotes.length) break;
+            }
+        }
+        expect(voteResult.blockVotes.length).toBe(1);
 
     }, 120e3);
 });
