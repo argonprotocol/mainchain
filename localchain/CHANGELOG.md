@@ -1,8 +1,20 @@
 # Changelog
 
-## [v0.0.8](https://github.com/argonprotocol/mainchain/compare/v0.0.7...02848ff4f088345cb0d46b349ee1fdeff9be6399) (2024-09-23)
+## [v0.0.9](https://github.com/argonprotocol/mainchain/compare/v0.0.8...c746a55be8a0db6d3132ec48d0642cf59e62e457) (2024-10-01)
+
+### Features
+
+* integrate keys into mining slots
+([662bdd6](https://github.com/argonprotocol/mainchain/commit/662bdd61963c87147ec6f1de6dc3d8662c980dd7))
 
 ### Fixes
+
+* **localchain:** always create block votes now
+([c746a55](https://github.com/argonprotocol/mainchain/commit/c746a55be8a0db6d3132ec48d0642cf59e62e457))
+
+### [v0.0.8](https://github.com/argonprotocol/mainchain/compare/v0.0.7...v0.0.8) (2024-09-23)
+
+#### Fixes
 
 * **notary:** sqlx error
 ([02848ff](https://github.com/argonprotocol/mainchain/commit/02848ff4f088345cb0d46b349ee1fdeff9be6399))
