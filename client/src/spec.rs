@@ -1545,7 +1545,7 @@ pub mod api {
 				pub mod find_vote_block_seals {
 					use super::runtime_types;
 					pub type Votes = ::subxt::ext::subxt_core::alloc::vec::Vec<
-						runtime_types::argon_primitives::apis::NotaryNotebookVotes,
+						runtime_types::argon_primitives::notary::NotaryNotebookRawVotes,
 					>;
 					pub type WithBetterStrength = runtime_types::primitive_types::U256;
 					pub mod output {
@@ -1748,7 +1748,7 @@ pub mod api {
 					header_hash: types::audit_notebook_and_get_votes::HeaderHash,
 					vote_minimums: types::audit_notebook_and_get_votes::VoteMinimums,
 					bytes: types::audit_notebook_and_get_votes::Bytes,
-					audit_dependency_summaries : types :: audit_notebook_and_get_votes :: AuditDependencySummaries,
+					raw_audit_dependency_summaries : types :: audit_notebook_and_get_votes :: RawAuditDependencySummaries,
 				) -> ::subxt::ext::subxt_core::runtime_api::payload::StaticPayload<
 					types::AuditNotebookAndGetVotes,
 					types::audit_notebook_and_get_votes::output::Output,
@@ -1763,12 +1763,13 @@ pub mod api {
 							header_hash,
 							vote_minimums,
 							bytes,
-							audit_dependency_summaries,
+							raw_audit_dependency_summaries,
 						},
 						[
-							164u8, 165u8, 165u8, 251u8, 25u8, 194u8, 175u8, 78u8, 43u8, 31u8, 76u8,
-							202u8, 29u8, 236u8, 11u8, 42u8, 30u8, 174u8, 49u8, 175u8, 127u8, 182u8,
-							213u8, 124u8, 206u8, 73u8, 55u8, 255u8, 202u8, 124u8, 185u8, 175u8,
+							201u8, 222u8, 215u8, 242u8, 192u8, 93u8, 23u8, 243u8, 109u8, 24u8,
+							95u8, 23u8, 245u8, 9u8, 66u8, 23u8, 102u8, 14u8, 105u8, 0u8, 139u8,
+							194u8, 85u8, 155u8, 221u8, 220u8, 103u8, 182u8, 10u8, 194u8, 43u8,
+							160u8,
 						],
 					)
 				}
@@ -1784,10 +1785,10 @@ pub mod api {
 						"decode_signed_raw_notebook_header",
 						types::DecodeSignedRawNotebookHeader { raw_header },
 						[
-							161u8, 122u8, 93u8, 183u8, 54u8, 151u8, 145u8, 232u8, 214u8, 0u8,
-							254u8, 196u8, 214u8, 65u8, 221u8, 233u8, 63u8, 175u8, 209u8, 15u8,
-							227u8, 20u8, 89u8, 192u8, 50u8, 46u8, 159u8, 34u8, 44u8, 2u8, 125u8,
-							57u8,
+							255u8, 61u8, 138u8, 198u8, 117u8, 35u8, 186u8, 239u8, 120u8, 162u8,
+							123u8, 128u8, 114u8, 224u8, 14u8, 72u8, 207u8, 46u8, 116u8, 165u8,
+							170u8, 220u8, 131u8, 226u8, 95u8, 153u8, 61u8, 233u8, 0u8, 149u8,
+							187u8, 79u8,
 						],
 					)
 				}
@@ -1824,13 +1825,14 @@ pub mod api {
 					>;
 					pub type Bytes =
 						::subxt::ext::subxt_core::alloc::vec::Vec<::core::primitive::u8>;
-					pub type AuditDependencySummaries = ::subxt::ext::subxt_core::alloc::vec::Vec<
-						runtime_types::argon_primitives::apis::NotebookAuditSummary,
-					>;
+					pub type RawAuditDependencySummaries =
+						::subxt::ext::subxt_core::alloc::vec::Vec<
+							runtime_types::argon_primitives::notary::NotaryNotebookAuditSummary,
+						>;
 					pub mod output {
 						use super::runtime_types;
 						pub type Output = ::core::result::Result<
-							runtime_types::argon_primitives::apis::NotebookAuditResult,
+							runtime_types::argon_primitives::notary::NotaryNotebookRawVotes,
 							runtime_types::argon_notary_audit::error::VerifyError,
 						>;
 					}
@@ -1857,8 +1859,8 @@ pub mod api {
 					pub header_hash: audit_notebook_and_get_votes::HeaderHash,
 					pub vote_minimums: audit_notebook_and_get_votes::VoteMinimums,
 					pub bytes: audit_notebook_and_get_votes::Bytes,
-					pub audit_dependency_summaries:
-						audit_notebook_and_get_votes::AuditDependencySummaries,
+					pub raw_audit_dependency_summaries:
+						audit_notebook_and_get_votes::RawAuditDependencySummaries,
 				}
 				pub mod decode_signed_raw_notebook_header {
 					use super::runtime_types;
@@ -1867,7 +1869,7 @@ pub mod api {
 					pub mod output {
 						use super::runtime_types;
 						pub type Output = ::core::result::Result<
-							runtime_types::argon_primitives::notary::NotaryNotebookVoteDetails<
+							runtime_types::argon_primitives::notary::NotaryNotebookDetails<
 								::sp_core::H256,
 							>,
 							runtime_types::sp_runtime::DispatchError,
@@ -2920,9 +2922,9 @@ pub mod api {
 			.hash();
 		runtime_metadata_hash ==
 			[
-				107u8, 200u8, 141u8, 174u8, 164u8, 170u8, 214u8, 7u8, 180u8, 167u8, 55u8, 57u8,
-				176u8, 235u8, 5u8, 50u8, 160u8, 194u8, 190u8, 202u8, 132u8, 131u8, 170u8, 204u8,
-				253u8, 54u8, 164u8, 126u8, 173u8, 239u8, 2u8, 133u8,
+				51u8, 112u8, 66u8, 75u8, 46u8, 105u8, 245u8, 91u8, 150u8, 222u8, 168u8, 17u8,
+				178u8, 103u8, 209u8, 125u8, 25u8, 200u8, 72u8, 112u8, 160u8, 103u8, 91u8, 58u8,
+				152u8, 139u8, 234u8, 206u8, 117u8, 186u8, 24u8, 156u8,
 			]
 	}
 	pub mod system {
@@ -19012,100 +19014,6 @@ pub mod api {
 					Deposit,
 				}
 			}
-			pub mod apis {
-				use super::runtime_types;
-				#[derive(
-					:: subxt :: ext :: subxt_core :: ext :: codec :: Decode,
-					:: subxt :: ext :: subxt_core :: ext :: codec :: Encode,
-					:: subxt :: ext :: subxt_core :: ext :: scale_decode :: DecodeAsType,
-					:: subxt :: ext :: subxt_core :: ext :: scale_encode :: EncodeAsType,
-					Clone,
-					Debug,
-				)]
-				# [codec (crate = :: subxt :: ext :: subxt_core :: ext :: codec)]
-				#[decode_as_type(
-					crate_path = ":: subxt :: ext :: subxt_core :: ext :: scale_decode"
-				)]
-				#[encode_as_type(
-					crate_path = ":: subxt :: ext :: subxt_core :: ext :: scale_encode"
-				)]
-				pub struct NotaryNotebookVotes {
-					#[codec(compact)]
-					pub notary_id: ::core::primitive::u32,
-					#[codec(compact)]
-					pub notebook_number: ::core::primitive::u32,
-					pub raw_votes: ::subxt::ext::subxt_core::alloc::vec::Vec<(
-						::subxt::ext::subxt_core::alloc::vec::Vec<::core::primitive::u8>,
-						::core::primitive::u128,
-					)>,
-				}
-				#[derive(
-					:: subxt :: ext :: subxt_core :: ext :: codec :: Decode,
-					:: subxt :: ext :: subxt_core :: ext :: codec :: Encode,
-					:: subxt :: ext :: subxt_core :: ext :: scale_decode :: DecodeAsType,
-					:: subxt :: ext :: subxt_core :: ext :: scale_encode :: EncodeAsType,
-					Clone,
-					Debug,
-				)]
-				# [codec (crate = :: subxt :: ext :: subxt_core :: ext :: codec)]
-				#[decode_as_type(
-					crate_path = ":: subxt :: ext :: subxt_core :: ext :: scale_decode"
-				)]
-				#[encode_as_type(
-					crate_path = ":: subxt :: ext :: subxt_core :: ext :: scale_encode"
-				)]
-				pub struct NotebookAuditResult {
-					#[codec(compact)]
-					pub notary_id: ::core::primitive::u32,
-					#[codec(compact)]
-					pub notebook_number: ::core::primitive::u32,
-					#[codec(compact)]
-					pub tick: ::core::primitive::u32,
-					pub raw_votes: ::subxt::ext::subxt_core::alloc::vec::Vec<(
-						::subxt::ext::subxt_core::alloc::vec::Vec<::core::primitive::u8>,
-						::core::primitive::u128,
-					)>,
-					pub changed_accounts_root: ::sp_core::H256,
-					pub account_changelist: ::subxt::ext::subxt_core::alloc::vec::Vec<
-						runtime_types::argon_primitives::balance_change::AccountOrigin,
-					>,
-					pub used_transfers_to_localchain:
-						::subxt::ext::subxt_core::alloc::vec::Vec<::core::primitive::u32>,
-					pub secret_hash: ::sp_core::H256,
-					pub block_votes_root: ::sp_core::H256,
-				}
-				#[derive(
-					:: subxt :: ext :: subxt_core :: ext :: codec :: Decode,
-					:: subxt :: ext :: subxt_core :: ext :: codec :: Encode,
-					:: subxt :: ext :: subxt_core :: ext :: scale_decode :: DecodeAsType,
-					:: subxt :: ext :: subxt_core :: ext :: scale_encode :: EncodeAsType,
-					Clone,
-					Debug,
-				)]
-				# [codec (crate = :: subxt :: ext :: subxt_core :: ext :: codec)]
-				#[decode_as_type(
-					crate_path = ":: subxt :: ext :: subxt_core :: ext :: scale_decode"
-				)]
-				#[encode_as_type(
-					crate_path = ":: subxt :: ext :: subxt_core :: ext :: scale_encode"
-				)]
-				pub struct NotebookAuditSummary {
-					#[codec(compact)]
-					pub notary_id: ::core::primitive::u32,
-					#[codec(compact)]
-					pub notebook_number: ::core::primitive::u32,
-					#[codec(compact)]
-					pub tick: ::core::primitive::u32,
-					pub changed_accounts_root: ::sp_core::H256,
-					pub account_changelist: ::subxt::ext::subxt_core::alloc::vec::Vec<
-						runtime_types::argon_primitives::balance_change::AccountOrigin,
-					>,
-					pub used_transfers_to_localchain:
-						::subxt::ext::subxt_core::alloc::vec::Vec<::core::primitive::u32>,
-					pub secret_hash: ::sp_core::H256,
-					pub block_votes_root: ::sp_core::H256,
-				}
-			}
 			pub mod balance_change {
 				use super::runtime_types;
 				#[derive(
@@ -20201,6 +20109,65 @@ pub mod api {
 				#[encode_as_type(
 					crate_path = ":: subxt :: ext :: subxt_core :: ext :: scale_encode"
 				)]
+				pub struct NotaryNotebookAuditSummary {
+					#[codec(compact)]
+					pub notary_id: ::core::primitive::u32,
+					#[codec(compact)]
+					pub notebook_number: ::core::primitive::u32,
+					#[codec(compact)]
+					pub tick: ::core::primitive::u32,
+					#[codec(compact)]
+					pub version: ::core::primitive::u32,
+					pub raw_data: ::subxt::ext::subxt_core::alloc::vec::Vec<::core::primitive::u8>,
+				}
+				#[derive(
+					:: subxt :: ext :: subxt_core :: ext :: codec :: Decode,
+					:: subxt :: ext :: subxt_core :: ext :: codec :: Encode,
+					:: subxt :: ext :: subxt_core :: ext :: scale_decode :: DecodeAsType,
+					:: subxt :: ext :: subxt_core :: ext :: scale_encode :: EncodeAsType,
+					Clone,
+					Debug,
+				)]
+				# [codec (crate = :: subxt :: ext :: subxt_core :: ext :: codec)]
+				#[decode_as_type(
+					crate_path = ":: subxt :: ext :: subxt_core :: ext :: scale_decode"
+				)]
+				#[encode_as_type(
+					crate_path = ":: subxt :: ext :: subxt_core :: ext :: scale_encode"
+				)]
+				pub struct NotaryNotebookDetails<_0> {
+					#[codec(compact)]
+					pub notary_id: ::core::primitive::u32,
+					#[codec(compact)]
+					pub version: ::core::primitive::u32,
+					#[codec(compact)]
+					pub notebook_number: ::core::primitive::u32,
+					#[codec(compact)]
+					pub tick: ::core::primitive::u32,
+					pub header_hash: ::sp_core::H256,
+					#[codec(compact)]
+					pub block_votes_count: ::core::primitive::u32,
+					#[codec(compact)]
+					pub block_voting_power: ::core::primitive::u128,
+					pub blocks_with_votes: ::subxt::ext::subxt_core::alloc::vec::Vec<_0>,
+					pub raw_audit_summary:
+						::subxt::ext::subxt_core::alloc::vec::Vec<::core::primitive::u8>,
+				}
+				#[derive(
+					:: subxt :: ext :: subxt_core :: ext :: codec :: Decode,
+					:: subxt :: ext :: subxt_core :: ext :: codec :: Encode,
+					:: subxt :: ext :: subxt_core :: ext :: scale_decode :: DecodeAsType,
+					:: subxt :: ext :: subxt_core :: ext :: scale_encode :: EncodeAsType,
+					Clone,
+					Debug,
+				)]
+				# [codec (crate = :: subxt :: ext :: subxt_core :: ext :: codec)]
+				#[decode_as_type(
+					crate_path = ":: subxt :: ext :: subxt_core :: ext :: scale_decode"
+				)]
+				#[encode_as_type(
+					crate_path = ":: subxt :: ext :: subxt_core :: ext :: scale_encode"
+				)]
 				pub struct NotaryNotebookKeyDetails {
 					#[codec(compact)]
 					pub notebook_number: ::core::primitive::u32,
@@ -20225,21 +20192,15 @@ pub mod api {
 				#[encode_as_type(
 					crate_path = ":: subxt :: ext :: subxt_core :: ext :: scale_encode"
 				)]
-				pub struct NotaryNotebookVoteDetails<_0> {
+				pub struct NotaryNotebookRawVotes {
 					#[codec(compact)]
 					pub notary_id: ::core::primitive::u32,
 					#[codec(compact)]
-					pub version: ::core::primitive::u32,
-					#[codec(compact)]
 					pub notebook_number: ::core::primitive::u32,
-					#[codec(compact)]
-					pub tick: ::core::primitive::u32,
-					pub header_hash: ::sp_core::H256,
-					#[codec(compact)]
-					pub block_votes_count: ::core::primitive::u32,
-					#[codec(compact)]
-					pub block_voting_power: ::core::primitive::u128,
-					pub blocks_with_votes: ::subxt::ext::subxt_core::alloc::vec::Vec<_0>,
+					pub raw_votes: ::subxt::ext::subxt_core::alloc::vec::Vec<(
+						::subxt::ext::subxt_core::alloc::vec::Vec<::core::primitive::u8>,
+						::core::primitive::u128,
+					)>,
 				}
 				#[derive(
 					:: subxt :: ext :: subxt_core :: ext :: codec :: Decode,

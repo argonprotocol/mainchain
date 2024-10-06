@@ -10,16 +10,18 @@ use sp_core::blake2_256;
 use sp_runtime::traits::Block as BlockT;
 use tokio::sync::Mutex;
 
-use argon_node_runtime::{NotaryRecordT, NotebookVerifyError};
-use argon_notary_apis::notebook::{NotebookRpcClient, RawHeadersSubscription};
-use argon_primitives::{
-	notary::NotaryNotebookVoteDetails, notebook::NotebookNumber, tick::Tick, BlockSealApis,
-	BlockSealAuthorityId, NotaryApis, NotaryId, NotebookApis, NotebookDigest, NotebookHeaderData,
-};
-
 use crate::{
 	aux_client::{ArgonAux, NotebookAuditResult},
 	error::Error,
+};
+use argon_node_runtime::{NotaryRecordT, NotebookVerifyError};
+use argon_notary_apis::notebook::{NotebookRpcClient, RawHeadersSubscription};
+use argon_primitives::{
+	notary::{NotaryNotebookDetails, NotaryNotebookTickState},
+	notebook::NotebookNumber,
+	tick::Tick,
+	BlockSealApis, BlockSealAuthorityId, NotaryApis, NotaryId, NotebookApis, NotebookDigest,
+	NotebookHeaderData,
 };
 
 pub struct NotaryClient<B: BlockT, C: AuxStore, AC> {
@@ -160,16 +162,22 @@ where
 		// ensure headers are sorted
 		headers.sort_by(|a, b| a.0.cmp(&b.0));
 
+		// remove notebooks from missing list
+		let notebooks_retrieved = headers.iter().map(|(n, _)| *n).collect::<Vec<_>>();
+		missing_notebooks_aux.mutate(|x| {
+			for notebook_number in notebooks_retrieved {
+				x.remove(&notebook_number);
+			}
+		})?;
+		drop(lock);
+
 		for (notebook_number, header) in headers {
-			missing_notebooks_aux.mutate(|x| x.remove(&notebook_number))?;
 			self.header_stream
 				.unbounded_send((notary_id, notebook_number, header))
 				.map_err(|e| {
 					Error::NotaryError(format!("Could not send header to stream - {:?}", e))
 				})?;
 		}
-
-		drop(lock);
 
 		Ok(())
 	}
@@ -220,8 +228,9 @@ where
 		&self,
 		finalized_hash: &B::Hash,
 		best_hash: &B::Hash,
-		vote_details: &NotaryNotebookVoteDetails<B::Hash>,
-	) -> Result<NotebookAuditResult, Error> {
+		raw_header: Vec<u8>,
+		vote_details: &NotaryNotebookDetails<B::Hash>,
+	) -> Result<NotaryNotebookTickState, Error> {
 		let notary_id = vote_details.notary_id;
 		let notebook_number = vote_details.notebook_number;
 
@@ -306,8 +315,7 @@ where
 		let oldest_tick_to_keep = latest_finalized_notebook_by_notary
 			.get(&notary_id)
 			.map(|(_, t)| *t)
-			.unwrap_or_default()
-			.saturating_sub(256); // keep extra history lasting as long as the rollback blocks
+			.unwrap_or_default();
 
 		let mut vote_count = 0;
 		// audit on the best block at the height of the notebook
@@ -323,12 +331,10 @@ where
 		)? {
 			Ok(result) => {
 				vote_count = result.raw_votes.len();
-				let (summary, votes) = result.into();
+				let votes = result;
 				self.aux_client.store_votes(vote_details.tick, votes)?;
-				self.aux_client.store_audit_summary(summary, oldest_tick_to_keep)?;
 			},
 			Err(error) => {
-				// TODO: if we don't store audit summaries, we will stall
 				audit_result.is_valid = false;
 				audit_result.first_error_reason = Some(error);
 			},
@@ -345,8 +351,14 @@ where
 			notebook_number,
 			vote_count
 		);
+		let notary_state = self.aux_client.store_notebook_result(
+			audit_result,
+			raw_header,
+			vote_details,
+			oldest_tick_to_keep,
+		)?;
 
-		Ok(audit_result)
+		Ok(notary_state)
 	}
 
 	async fn get_client(
@@ -470,21 +482,22 @@ where
 			*latest_runtime_notebook_number,
 			submitting_tick,
 		)?;
+		notary_headers
+			.notebook_digest
+			.notebooks
+			.sort_by(|a, b| a.notebook_number.cmp(&b.notebook_number));
 
-		let missing_notebooks =
-			get_missing_notebooks(*latest_runtime_notebook_number, &mut notary_headers);
-		if !missing_notebooks.is_empty() {
+		let mut expected_next_number = *latest_runtime_notebook_number;
+		// if there are any notebooks supplied, they must be next in sequence
+		if notary_headers.notebook_digest.notebooks.iter().any(|notebook| {
+			expected_next_number += 1;
+			notebook.notebook_number != expected_next_number
+		}) {
 			warn!(
 				target: LOG_TARGET,
-				"Notebook(s) {:?} missing for notary {}. Cannot submit notebooks with block.",
-				missing_notebooks,
+				"Notebook(s) missing for notary {}. Delaying to allow import.",
 				notary.notary_id
 			);
-			aux_client.get_missing_notebooks(notary.notary_id)?.mutate(|a| {
-				for notebook_number in missing_notebooks {
-					a.insert(notebook_number);
-				}
-			})?;
 			continue;
 		}
 
@@ -503,27 +516,4 @@ where
 			.runtime_api()
 			.create_vote_digest(*best_hash, submitting_tick, tick_notebooks)?;
 	Ok(headers)
-}
-
-fn get_missing_notebooks(
-	latest_notebook_in_runtime: NotebookNumber,
-	notary_headers: &mut NotebookHeaderData<NotebookVerifyError>,
-) -> Vec<NotebookNumber> {
-	notary_headers
-		.notebook_digest
-		.notebooks
-		.sort_by(|a, b| a.notebook_number.cmp(&b.notebook_number));
-
-	let mut missing_notebooks = vec![];
-	let mut expected_next_number = latest_notebook_in_runtime + 1;
-	for notebook in &notary_headers.notebook_digest.notebooks {
-		if notebook.notebook_number != expected_next_number {
-			while expected_next_number < notebook.notebook_number {
-				missing_notebooks.push(expected_next_number);
-				expected_next_number += 1;
-			}
-		}
-		expected_next_number += 1;
-	}
-	missing_notebooks
 }

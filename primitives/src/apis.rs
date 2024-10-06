@@ -2,18 +2,19 @@
 #![allow(clippy::too_many_arguments)]
 
 use alloc::{collections::btree_map::BTreeMap, vec::Vec};
-use codec::{Codec, Decode, Encode, MaxEncodedLen};
-use scale_info::TypeInfo;
-use sp_core::{ConstU32, RuntimeDebug, H256, U256};
+use codec::{Codec, MaxEncodedLen};
+use sp_core::{ConstU32, H256, U256};
 use sp_runtime::{BoundedVec, DispatchError};
 
 use crate::{
 	bitcoin::{BitcoinNetwork, BitcoinSyncStatus, Satoshis, UtxoRef, UtxoValue},
 	block_seal::MiningAuthority,
-	notary::{NotaryId, NotaryNotebookVoteDetails, NotaryNotebookVoteDigestDetails},
+	notary::{
+		NotaryId, NotaryNotebookAuditSummary, NotaryNotebookDetails, NotaryNotebookRawVotes,
+		NotaryNotebookVoteDigestDetails,
+	},
 	tick::{Tick, Ticker},
-	AccountOrigin, BestBlockVoteSeal, BlockVoteDigest, BlockVotingPower, NotebookNumber,
-	NotebookSecretHash, TransferToLocalchainId, VoteMinimum,
+	BestBlockVoteSeal, BlockVoteDigest, NotebookNumber, VoteMinimum,
 };
 
 sp_api::decl_runtime_apis! {
@@ -22,7 +23,7 @@ sp_api::decl_runtime_apis! {
 		fn compute_difficulty() -> u128;
 		fn create_vote_digest(tick: Tick, included_notebooks: Vec<NotaryNotebookVoteDigestDetails>) -> BlockVoteDigest;
 		fn find_vote_block_seals(
-			votes: Vec<NotaryNotebookVotes>,
+			votes: Vec<NotaryNotebookRawVotes>,
 			with_better_strength: U256,
 		) -> Result<BoundedVec<BestBlockVoteSeal<AccountId, BlockSealAuthorityId>, ConstU32<2>>, DispatchError>;
 	}
@@ -59,11 +60,11 @@ sp_api::decl_runtime_apis! {
 			header_hash: H256,
 			vote_minimums: &BTreeMap<Block::Hash, VoteMinimum>,
 			bytes: &Vec<u8>,
-			audit_dependency_summaries: Vec<NotebookAuditSummary>,
-		) -> Result<NotebookAuditResult, VerifyError>;
+			raw_audit_dependency_summaries: Vec<NotaryNotebookAuditSummary>,
+		) -> Result<NotaryNotebookRawVotes, VerifyError>;
 
 
-		fn decode_signed_raw_notebook_header(raw_header: Vec<u8>) -> Result<NotaryNotebookVoteDetails<Block::Hash>, DispatchError>;
+		fn decode_signed_raw_notebook_header(raw_header: Vec<u8>) -> Result<NotaryNotebookDetails<Block::Hash>, DispatchError>;
 
 		fn latest_notebook_by_notary() -> BTreeMap<NotaryId, (NotebookNumber, Tick)>;
 	}
@@ -76,67 +77,5 @@ sp_api::decl_runtime_apis! {
 		fn redemption_rate(satoshis: Satoshis) -> Option<Balance>;
 		fn market_rate(satoshis: Satoshis) -> Option<Balance>;
 		fn get_bitcoin_network() -> BitcoinNetwork;
-	}
-}
-
-#[derive(Encode, Decode, Clone, PartialEq, Eq, TypeInfo, RuntimeDebug)]
-pub struct NotaryNotebookVotes {
-	#[codec(compact)]
-	pub notary_id: NotaryId,
-	#[codec(compact)]
-	pub notebook_number: NotebookNumber,
-	pub raw_votes: Vec<(Vec<u8>, BlockVotingPower)>,
-}
-
-#[derive(Encode, Decode, Clone, PartialEq, Eq, TypeInfo, RuntimeDebug)]
-pub struct NotebookAuditSummary {
-	#[codec(compact)]
-	pub notary_id: NotaryId,
-	#[codec(compact)]
-	pub notebook_number: NotebookNumber,
-	#[codec(compact)]
-	pub tick: Tick,
-	pub changed_accounts_root: H256,
-	pub account_changelist: Vec<AccountOrigin>,
-	pub used_transfers_to_localchain: Vec<TransferToLocalchainId>,
-	pub secret_hash: NotebookSecretHash,
-	pub block_votes_root: H256,
-}
-
-#[derive(Encode, Decode, Clone, PartialEq, Eq, TypeInfo, RuntimeDebug)]
-pub struct NotebookAuditResult {
-	#[codec(compact)]
-	pub notary_id: NotaryId,
-	#[codec(compact)]
-	pub notebook_number: NotebookNumber,
-	#[codec(compact)]
-	pub tick: Tick,
-	pub raw_votes: Vec<(Vec<u8>, BlockVotingPower)>,
-	pub changed_accounts_root: H256,
-	pub account_changelist: Vec<AccountOrigin>,
-	pub used_transfers_to_localchain: Vec<TransferToLocalchainId>,
-	pub secret_hash: NotebookSecretHash,
-	pub block_votes_root: H256,
-}
-
-impl From<NotebookAuditResult> for (NotebookAuditSummary, NotaryNotebookVotes) {
-	fn from(val: NotebookAuditResult) -> Self {
-		(
-			NotebookAuditSummary {
-				notary_id: val.notary_id,
-				notebook_number: val.notebook_number,
-				tick: val.tick,
-				changed_accounts_root: val.changed_accounts_root,
-				account_changelist: val.account_changelist,
-				used_transfers_to_localchain: val.used_transfers_to_localchain,
-				secret_hash: val.secret_hash,
-				block_votes_root: val.block_votes_root,
-			},
-			NotaryNotebookVotes {
-				notary_id: val.notary_id,
-				notebook_number: val.notebook_number,
-				raw_votes: val.raw_votes,
-			},
-		)
 	}
 }

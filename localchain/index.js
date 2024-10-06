@@ -370,6 +370,7 @@ module.exports.BalanceSync = nativeBinding.BalanceSync
 module.exports.BalanceSyncResult = nativeBinding.BalanceSyncResult
 module.exports.BalanceTipResult = nativeBinding.BalanceTipResult
 module.exports.ChannelHold = nativeBinding.ChannelHold
+module.exports.ChannelHoldResult = nativeBinding.ChannelHoldResult
 module.exports.DomainLease = nativeBinding.DomainLease
 module.exports.DomainRow = nativeBinding.DomainRow
 module.exports.DomainStore = nativeBinding.DomainStore

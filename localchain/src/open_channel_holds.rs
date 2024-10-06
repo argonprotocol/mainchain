@@ -677,6 +677,7 @@ pub mod napi_ext {
     pub async fn channel_hold_napi(&self) -> ChannelHold {
       self.channel_hold().await
     }
+
     #[napi(js_name = "sign")]
     pub async fn sign_napi(&self, settled_amount: BigInt) -> napi::Result<SignatureResult> {
       let result = self.sign(settled_amount.get_u128().1).await.napi_ok()?;
@@ -685,6 +686,7 @@ pub mod napi_ext {
         milligons: result.milligons.into(),
       })
     }
+
     #[napi(js_name = "exportForSend")]
     pub async fn export_for_send_napi(&self) -> napi::Result<String> {
       self.export_for_send().await.napi_ok()

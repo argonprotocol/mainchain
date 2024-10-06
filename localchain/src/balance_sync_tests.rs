@@ -130,23 +130,20 @@ async fn test_will_handle_broken_consolidate_accounts(pool: SqlitePool) -> anyho
     else {
       continue;
     };
-    if balance.balance != "0" && account.hd_path.is_some() {
-      if did_break_account == false {
-        did_break_account = true;
-        network
-          .notary
-          .set_bad_tip_error(
-            account.get_account_id32()?,
-            account.account_type,
-            argon_notary_apis::Error::BalanceTipMismatch {
-              provided_tip: None,
-              stored_tip: None,
-              change_index: 0,
-            }
-            .into(),
-          )
-          .await;
-      }
+    if balance.balance != "0" && account.hd_path.is_some() && !did_break_account {
+      did_break_account = true;
+      network
+        .notary
+        .set_bad_tip_error(
+          account.get_account_id32()?,
+          account.account_type,
+          argon_notary_apis::Error::BalanceTipMismatch {
+            provided_tip: None,
+            stored_tip: None,
+            change_index: 0,
+          },
+        )
+        .await;
     }
   }
 
@@ -193,11 +190,11 @@ async fn test_will_sync_client_channel_holds(pool: SqlitePool) -> anyhow::Result
 
   let pending_tips = network.notary.get_pending_tips().await;
   network.notary.create_notebook_header(pending_tips).await;
-
-  let mut start_ticker = network.bob.ticker.ticker.write();
-  start_ticker.genesis_utc_time =
-    start_ticker.genesis_utc_time - (channel_expiration as u64 * start_ticker.tick_duration_millis);
-  drop(start_ticker);
+  {
+    let mut start_ticker = network.bob.ticker.ticker.write();
+    start_ticker.genesis_utc_time -= channel_expiration as u64 * start_ticker.tick_duration_millis;
+    drop(start_ticker);
+  }
   network.alice.ticker.ticker.write().genesis_utc_time =
     network.bob.ticker().ticker.read().genesis_utc_time;
   {

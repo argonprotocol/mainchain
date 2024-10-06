@@ -780,9 +780,9 @@ impl NotarizationBuilder {
       .notarize(notarization.clone())
       .await
       .map_err(|e| {
-        let e: Error = e.into();
+        let e: Error = e;
         if let Error::NotaryApiError(inner) = e {
-          Error::NotarizationError(inner, notarization.clone())
+          Error::NotarizationError(inner, Box::new(notarization.clone()))
         } else {
           e
         }

@@ -30,20 +30,23 @@ pub mod pallet {
 	use sp_core::{crypto::AccountId32, H256};
 	use sp_runtime::traits::Block as BlockT;
 
+	use super::*;
 	use argon_notary_audit::{notebook_verify, AccountHistoryLookupError, NotebookHistoryLookup};
 	use argon_primitives::{
 		block_vote::VoteMinimum,
 		inherents::{NotebookInherentData, NotebookInherentError},
-		notary::{NotaryId, NotaryNotebookKeyDetails, NotaryNotebookVoteDetails},
+		notary::{
+			NotaryId, NotaryNotebookAuditSummary, NotaryNotebookAuditSummaryDecoded,
+			NotaryNotebookAuditSummaryDetails, NotaryNotebookDetails, NotaryNotebookKeyDetails,
+			NotaryNotebookRawVotes,
+		},
 		notebook::{AccountOrigin, Notebook, NotebookHeader},
 		tick::Tick,
 		AccountOriginUid, Balance, BlockVotingProvider, ChainTransfer, ChainTransferLookup,
-		NotebookAuditResult, NotebookAuditSummary, NotebookDigest as NotebookDigestT,
-		NotebookEventHandler, NotebookProvider, NotebookSecret, NotebookSecretHash,
-		SignedNotebookHeader, TickProvider, TransferToLocalchainId, NOTEBOOKS_DIGEST_ID,
+		NotebookDigest as NotebookDigestT, NotebookEventHandler, NotebookProvider, NotebookSecret,
+		NotebookSecretHash, SignedNotebookHeader, TickProvider, TransferToLocalchainId,
+		NOTEBOOKS_DIGEST_ID,
 	};
-
-	use super::*;
 
 	type NotebookDigest = NotebookDigestT<NotebookVerifyError>;
 
@@ -295,15 +298,16 @@ pub mod pallet {
 			Default::default()
 		}
 
-		pub fn add_audit_summary(&mut self, audit_summary: NotebookAuditSummary) {
+		pub fn add_audit_summary(&mut self, audit_summary: NotaryNotebookAuditSummaryDecoded) {
 			let notary_id = audit_summary.notary_id;
 			let notebook_number = audit_summary.notebook_number;
-			for id in audit_summary.used_transfers_to_localchain.iter() {
+			let details = audit_summary.details;
+			for id in details.used_transfers_to_localchain.iter() {
 				self.used_transfers_to_localchain.insert(*id);
 			}
 			self.account_changes_root
-				.insert((notary_id, notebook_number), audit_summary.changed_accounts_root);
-			for account_origin in audit_summary.account_changelist.iter() {
+				.insert((notary_id, notebook_number), details.changed_accounts_root);
+			for account_origin in details.account_changelist.iter() {
 				self.last_changed_notebooks.insert(
 					(notary_id, account_origin.notebook_number, account_origin.account_uid),
 					notebook_number,
@@ -499,11 +503,24 @@ pub mod pallet {
 			header_hash: H256,
 			block_vote_minimums: &BTreeMap<<T::Block as BlockT>::Hash, VoteMinimum>,
 			bytes: &Vec<u8>,
-			audit_dependency_summaries: Vec<NotebookAuditSummary>,
-		) -> Result<NotebookAuditResult, NotebookVerifyError> {
+			raw_audit_dependency_summaries: Vec<NotaryNotebookAuditSummary>,
+		) -> Result<NotaryNotebookRawVotes, NotebookVerifyError> {
 			let mut history_lookup = LocalchainHistoryLookup::<T>::new();
 
-			let mut audit_dependency_summaries = audit_dependency_summaries;
+			let mut audit_dependency_summaries: Vec<NotaryNotebookAuditSummaryDecoded> =
+				raw_audit_dependency_summaries
+					.into_iter()
+					.map(|audit_summary| {
+						audit_summary.try_into().map_err(|_| {
+							log::warn!(
+								target: LOG_TARGET,
+								"Notebook audit failed to decode for notary {notary_id}, notebook {notebook_number}"
+							);
+							NotebookVerifyError::DecodeError
+						})
+					})
+					.collect::<Result<Vec<_>, _>>()?;
+
 			audit_dependency_summaries.sort_by(|a, b| {
 				let tick_cmp = a.tick.cmp(&b.tick);
 				if tick_cmp != core::cmp::Ordering::Equal {
@@ -533,8 +550,8 @@ pub mod pallet {
 					NotebookVerifyError::CatchupNotebooksMissing
 				);
 				if audit_summary.notebook_number == parent_block_number {
-					parent_secret_hash = audit_summary.secret_hash;
-					parent_block_votes_root = audit_summary.block_votes_root;
+					parent_secret_hash = audit_summary.details.secret_hash;
+					parent_block_votes_root = audit_summary.details.block_votes_root;
 				}
 
 				last_notebook_processed = audit_summary.notebook_number;
@@ -601,14 +618,27 @@ pub mod pallet {
 				);
 			})?;
 
-			let audit_result = NotebookAuditResult {
-				notary_id,
-				notebook_number,
-				tick: notebook.header.tick,
-				changed_accounts_root: notebook.header.changed_accounts_root,
-				account_changelist: notebook.header.changed_account_origins.clone().to_vec(),
-				used_transfers_to_localchain: notebook
-					.header
+			let block_votes = notebook
+				.notarizations
+				.iter()
+				.flat_map(|notarization| {
+					notarization.block_votes.iter().map(|vote| (vote.encode(), vote.power))
+				})
+				.collect::<Vec<_>>();
+			Ok(NotaryNotebookRawVotes { notary_id, notebook_number, raw_votes: block_votes })
+		}
+
+		/// Decode the notebook submission into high level details
+		pub fn decode_signed_raw_notebook_header(
+			header_data: Vec<u8>,
+		) -> Result<NotaryNotebookDetails<<T::Block as BlockT>::Hash>, DispatchError> {
+			let header = NotebookHeader::decode(&mut header_data.as_ref())
+				.map_err(|_| Error::<T>::CouldNotDecodeNotebook)?;
+
+			let summary = NotaryNotebookAuditSummaryDetails {
+				changed_accounts_root: header.changed_accounts_root,
+				account_changelist: header.changed_account_origins.clone().to_vec(),
+				used_transfers_to_localchain: header
 					.chain_transfers
 					.iter()
 					.filter_map(|t| match t {
@@ -616,27 +646,11 @@ pub mod pallet {
 						_ => None,
 					})
 					.collect(),
-				raw_votes: notebook
-					.notarizations
-					.iter()
-					.flat_map(|notarization| {
-						notarization.block_votes.iter().map(|vote| (vote.encode(), vote.power))
-					})
-					.collect::<Vec<_>>(),
-				secret_hash: notebook.header.secret_hash,
-				block_votes_root: notebook.header.block_votes_root,
+				secret_hash: header.secret_hash,
+				block_votes_root: header.block_votes_root,
 			};
-			Ok(audit_result)
-		}
 
-		/// Decode the notebook submission into high level details
-		pub fn decode_signed_raw_notebook_header(
-			header_data: Vec<u8>,
-		) -> Result<NotaryNotebookVoteDetails<<T::Block as BlockT>::Hash>, DispatchError> {
-			let header = NotebookHeader::decode(&mut header_data.as_ref())
-				.map_err(|_| Error::<T>::CouldNotDecodeNotebook)?;
-
-			Ok(NotaryNotebookVoteDetails {
+			Ok(NotaryNotebookDetails {
 				notary_id: header.notary_id,
 				notebook_number: header.notebook_number,
 				version: header.version as u32,
@@ -645,6 +659,7 @@ pub mod pallet {
 				block_votes_count: header.block_votes_count,
 				block_voting_power: header.block_voting_power,
 				blocks_with_votes: header.blocks_with_votes.to_vec().clone(),
+				raw_audit_summary: summary.encode(),
 			})
 		}
 

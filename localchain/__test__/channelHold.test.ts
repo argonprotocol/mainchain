@@ -197,8 +197,6 @@ describeIntegration("ChannelHold integration", () => {
         const notarizationChannelHolds = await notarization.channelHolds;
         expect(notarizationChannelHolds).toHaveLength(1);
         expect(notarizationChannelHolds[0].id).toBe(insideChannelHold.id);
-        const json = JSON.parse(await notarization.toJSON());
-        expect(json).toBeTruthy();
 
         if (voteResult.blockVotes.length === 0) {
             // try 10 more times to vote

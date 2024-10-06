@@ -66,11 +66,13 @@ use argon_primitives::{
 	block_vote::VoteMinimum,
 	digests::BlockVoteDigest,
 	localchain::BestBlockVoteSeal,
-	notary::{NotaryId, NotaryNotebookVoteDetails, NotaryNotebookVoteDigestDetails, NotaryRecord},
+	notary::{
+		NotaryId, NotaryNotebookAuditSummary, NotaryNotebookDetails, NotaryNotebookRawVotes,
+		NotaryNotebookVoteDigestDetails, NotaryRecord,
+	},
 	notebook::NotebookNumber,
 	tick::{Tick, Ticker},
-	ArgonCPI, BlockSealAuthorityId, NotaryNotebookVotes, NotebookAuditResult, NotebookAuditSummary,
-	PriceProvider, TickProvider, CHANNEL_HOLD_CLAWBACK_TICKS,
+	ArgonCPI, BlockSealAuthorityId, PriceProvider, TickProvider, CHANNEL_HOLD_CLAWBACK_TICKS,
 };
 pub use argon_primitives::{
 	AccountId, Balance, BlockHash, BlockNumber, HashOutput, Moment, Nonce, Signature,
@@ -1018,7 +1020,7 @@ impl_runtime_apis! {
 		}
 
 		fn find_vote_block_seals(
-			votes: Vec<NotaryNotebookVotes>,
+			votes: Vec<NotaryNotebookRawVotes>,
 			with_better_strength: U256,
 		) -> Result<BoundedVec<BestBlockVoteSeal<AccountId, BlockSealAuthorityId>, ConstU32<2>>, DispatchError>{
 			Ok(BlockSeal::find_vote_block_seals(votes,with_better_strength)?)
@@ -1049,12 +1051,12 @@ impl_runtime_apis! {
 			header_hash: H256,
 			vote_minimums: &BTreeMap<<Block as BlockT>::Hash, VoteMinimum>,
 			bytes: &Vec<u8>,
-			audit_dependency_summaries: Vec<NotebookAuditSummary>,
-		) -> Result<NotebookAuditResult, NotebookVerifyError> {
+			audit_dependency_summaries: Vec<NotaryNotebookAuditSummary>,
+		) -> Result<NotaryNotebookRawVotes, NotebookVerifyError> {
 			Notebook::audit_notebook(version, notary_id, notebook_number, header_hash, vote_minimums, bytes, audit_dependency_summaries)
 		}
 
-		fn decode_signed_raw_notebook_header(raw_header: Vec<u8>) -> Result<NotaryNotebookVoteDetails<<Block as BlockT>::Hash>, DispatchError> {
+		fn decode_signed_raw_notebook_header(raw_header: Vec<u8>) -> Result<NotaryNotebookDetails <<Block as BlockT>::Hash>, DispatchError> {
 			Notebook::decode_signed_raw_notebook_header(raw_header)
 		}
 

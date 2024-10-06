@@ -10,21 +10,26 @@
       },
       {
         "ordinal": 1,
+        "name": "sequence_number",
+        "type_info": "Int4"
+      },
+      {
+        "ordinal": 2,
         "name": "balance_changes",
         "type_info": "Jsonb"
       },
       {
-        "ordinal": 2,
+        "ordinal": 3,
         "name": "block_votes",
         "type_info": "Jsonb"
       },
       {
-        "ordinal": 3,
+        "ordinal": 4,
         "name": "domains",
         "type_info": "Jsonb"
       },
       {
-        "ordinal": 4,
+        "ordinal": 5,
         "name": "account_lookups",
         "type_info": "ByteaArray"
       }
@@ -36,6 +41,7 @@
       ]
     },
     "nullable": [
+      false,
       false,
       false,
       false,

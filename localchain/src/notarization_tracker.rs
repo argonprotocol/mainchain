@@ -30,10 +30,15 @@ pub struct NotarizationTracker {
   pub(crate) accounts_by_id: HashMap<i64, LocalAccount>,
   pub(crate) notary_clients: NotaryClients,
   pub(crate) db: SqlitePool,
-  pub channel_holds: Vec<ChannelHold>,
+  #[allow(dead_code)]
+  pub(crate) channel_holds: Vec<ChannelHold>,
 }
 
 impl NotarizationTracker {
+  pub fn channel_holds(&self) -> Vec<ChannelHold> {
+    self.channel_holds.clone()
+  }
+
   pub async fn get_balance_tips(&self) -> Result<Vec<BalanceTip>> {
     let balance_changes = self.balance_changes_by_account.lock().await;
     let mut tips: Vec<BalanceTip> = vec![];
@@ -321,10 +326,11 @@ pub mod napi_ext {
 
   use argon_primitives::AccountType;
 
+  use crate::balance_sync::napi_ext::ChannelHold;
   use crate::error::NapiOk;
+  use crate::BalanceChangeRow;
   use crate::MainchainClient;
   use crate::NotaryAccountOrigin;
-  use crate::{BalanceChangeRow, ChannelHold};
 
   use super::NotarizationTracker;
 
@@ -363,7 +369,12 @@ pub mod napi_ext {
     }
     #[napi(getter, js_name = "channelHolds")]
     pub async fn channel_holds_napi(&self) -> Vec<ChannelHold> {
-      self.channel_holds().await
+      self
+        .channel_holds
+        .clone()
+        .into_iter()
+        .map(|ch| ch.into())
+        .collect::<Vec<_>>()
     }
 
     /// Asks the notary for proof the transaction was included in a notebook header. If this notebook has not been finalized yet, it will return an error.

@@ -139,13 +139,54 @@ pub mod uniffi_ext {
 #[cfg(feature = "napi")]
 pub mod napi_ext {
   use crate::error::NapiOk;
-  use crate::notarization_builder::NotarizationBuilder;
   use crate::notarization_tracker::NotarizationTracker;
   use crate::{
-    BalanceChangeRow, BalanceSync, BalanceSyncResult, ChannelHold, ChannelHoldCloseOptions,
-    Localchain,
+    BalanceChangeRow, BalanceSync, BalanceSyncResult, ChannelHold as ChannelHoldParent,
+    ChannelHoldCloseOptions, Localchain,
   };
+  use napi::bindgen_prelude::*;
   use napi_derive::napi;
+
+  #[napi(object)]
+  #[derive(Clone)]
+  pub struct ChannelHold {
+    pub id: String,
+    pub from_address: String,
+    pub to_address: String,
+    pub balance_change_number: i32,
+    pub expiration_tick: i32,
+    pub is_client: bool,
+    pub initial_balance_change_json: String,
+    pub notary_id: i32,
+    pub hold_amount: BigInt,
+    pub delegated_signer_address: Option<String>,
+    pub domain_hash: Option<Buffer>,
+    pub notarization_id: Option<i64>,
+    pub missed_claim_window: bool,
+    pub settled_amount: BigInt,
+  }
+
+  impl From<ChannelHoldParent> for ChannelHold {
+    fn from(hold: ChannelHoldParent) -> Self {
+      let hold_amount = hold.hold_amount();
+      ChannelHold {
+        id: hold.id,
+        from_address: hold.from_address,
+        to_address: hold.to_address,
+        balance_change_number: hold.balance_change_number as i32,
+        expiration_tick: hold.expiration_tick as i32,
+        is_client: hold.is_client,
+        initial_balance_change_json: hold.initial_balance_change_json,
+        notary_id: hold.notary_id as i32,
+        hold_amount: BigInt::from(hold_amount),
+        delegated_signer_address: hold.delegated_signer_address,
+        domain_hash: hold.domain_hash.map(|x| x.into()),
+        notarization_id: hold.notarization_id,
+        missed_claim_window: hold.missed_claim_window,
+        settled_amount: BigInt::from(hold.settled_amount.clone()),
+      }
+    }
+  }
 
   #[napi]
   impl BalanceSyncResult {
@@ -159,7 +200,12 @@ pub mod napi_ext {
     }
     #[napi(getter, js_name = "channelHoldsUpdated")]
     pub fn channel_holds_updated_napi(&self) -> Vec<ChannelHold> {
-      self.channel_holds_updated.clone()
+      self
+        .channel_holds_updated
+        .clone()
+        .into_iter()
+        .map(|x| x.into())
+        .collect::<Vec<_>>()
     }
     #[napi(getter, js_name = "mainchainTransfers")]
     pub fn mainchain_transfers_napi(&self) -> Vec<NotarizationTracker> {
@@ -172,6 +218,23 @@ pub mod napi_ext {
     #[napi(getter, js_name = "blockVotes")]
     pub fn block_votes_napi(&self) -> Vec<NotarizationTracker> {
       self.block_votes.clone()
+    }
+  }
+
+  #[napi]
+  pub struct ChannelHoldResult {
+    pub(crate) channel_hold_notarizations: Vec<NotarizationTracker>,
+    pub(crate) channel_holds_updated: Vec<ChannelHold>,
+  }
+  #[napi]
+  impl ChannelHoldResult {
+    #[napi(getter, js_name = "channelHoldNotarizations")]
+    pub fn channel_hold_notarizations(&self) -> Vec<NotarizationTracker> {
+      self.channel_hold_notarizations.clone()
+    }
+    #[napi(getter, js_name = "channelHoldsUpdated")]
+    pub fn channel_holds_updated(&self) -> Vec<ChannelHold> {
+      self.channel_holds_updated.clone()
     }
   }
 
@@ -215,11 +278,15 @@ pub mod napi_ext {
     ) -> napi::Result<BalanceChangeRow> {
       self.sync_balance_change(balance_change).await.napi_ok()
     }
+
     #[napi(js_name = "processPendingChannelHolds")]
-    pub async fn process_pending_channel_holds_napi(
-      &self,
-    ) -> napi::Result<Vec<NotarizationBuilder>> {
-      self.process_pending_channel_holds().await.napi_ok()
+    pub async fn process_pending_channel_holds_napi(&self) -> napi::Result<ChannelHoldResult> {
+      let (notarizations, holds) = self.process_pending_channel_holds().await.napi_ok()?;
+      let result = ChannelHoldResult {
+        channel_hold_notarizations: notarizations,
+        channel_holds_updated: holds.into_iter().map(|x| x.into()).collect::<Vec<_>>(),
+      };
+      Ok(result)
     }
   }
 }
@@ -761,7 +828,7 @@ impl BalanceSync {
     );
 
     // will handle notarization
-    if let Ok(_) = self
+    if self
       .sync_notarization(
         channel_hold.from_address.clone(),
         AccountType::Deposit,
@@ -771,6 +838,7 @@ impl BalanceSync {
         tip.tick,
       )
       .await
+      .is_ok()
     {
       return Ok((None, true));
     }

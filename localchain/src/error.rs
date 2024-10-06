@@ -46,7 +46,7 @@ pub enum Error {
   NotaryApiError(argon_notary_apis::Error),
 
   #[error("Notarization Error {0}")]
-  NotarizationError(argon_notary_apis::Error, Notarization),
+  NotarizationError(argon_notary_apis::Error, Box<Notarization>),
 
   #[error("Notary Internal API Error {0}")]
   NotaryInternalApiError(JsonrpseeError),
