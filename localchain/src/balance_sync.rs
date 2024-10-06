@@ -1,4 +1,3 @@
-use std::collections::HashMap;
 use std::sync::Arc;
 
 use serde_json::json;
@@ -21,8 +20,8 @@ use crate::notarization_builder::NotarizationBuilder;
 use crate::notarization_tracker::NotarizationTracker;
 use crate::open_channel_holds::OpenChannelHoldsStore;
 use crate::transactions::{TransactionType, Transactions};
+use crate::LocalAccount;
 use crate::{ChannelHold, MainchainClient};
-use crate::{LocalAccount, NOTARIZATION_MAX_BALANCE_CHANGES};
 use crate::{Localchain, OpenChannelHold};
 use crate::{LocalchainTransfer, NotaryAccountOrigin, TickerRef};
 use crate::{NotaryClient, NotaryClients};
@@ -51,7 +50,8 @@ pub struct ChannelHoldCloseOptions {
 pub struct BalanceSyncResult {
   pub(crate) balance_changes: Vec<BalanceChangeRow>,
   pub(crate) mainchain_transfers: Vec<NotarizationTracker>,
-  pub(crate) channel_hold_notarizations: Vec<NotarizationBuilder>,
+  pub(crate) channel_hold_notarizations: Vec<NotarizationTracker>,
+  pub(crate) channel_holds_updated: Vec<ChannelHold>,
   pub(crate) jump_account_consolidations: Vec<NotarizationTracker>,
   pub(crate) block_votes: Vec<NotarizationTracker>,
 }
@@ -60,7 +60,7 @@ impl BalanceSyncResult {
   pub fn balance_changes(&self) -> Vec<BalanceChangeRow> {
     self.balance_changes.clone()
   }
-  pub fn channel_hold_notarizations(&self) -> Vec<NotarizationBuilder> {
+  pub fn channel_hold_notarizations(&self) -> Vec<NotarizationTracker> {
     self.channel_hold_notarizations.clone()
   }
 
@@ -75,18 +75,25 @@ impl BalanceSyncResult {
   pub fn block_votes(&self) -> Vec<NotarizationTracker> {
     self.block_votes.clone()
   }
+
+  pub fn channel_holds_updated(&self) -> Vec<ChannelHold> {
+    self.channel_holds_updated.clone()
+  }
 }
 
 #[cfg(feature = "uniffi")]
 pub mod uniffi_ext {
   use crate::notarization_tracker::uniffi_ext::BalanceChange;
   use crate::notarization_tracker::uniffi_ext::NotarizationTracker;
+  use crate::ChannelHold;
   use std::sync::Arc;
 
   #[derive(uniffi::Record)]
   pub struct BalanceSyncResult {
     pub balance_changes: Vec<BalanceChange>,
     pub mainchain_transfers: Vec<Arc<NotarizationTracker>>,
+    pub channel_hold_notarizations: Vec<Arc<NotarizationTracker>>,
+    pub channel_holds_updated: Vec<Arc<ChannelHold>>,
     pub jump_account_consolidations: Vec<Arc<NotarizationTracker>>,
     pub block_votes: Vec<Arc<NotarizationTracker>>,
   }
@@ -109,6 +116,16 @@ pub mod uniffi_ext {
           .into_iter()
           .map(|x| Arc::new(x.into()))
           .collect(),
+        channel_holds_updated: result
+          .channel_holds_updated
+          .into_iter()
+          .map(|x| Arc::new(x))
+          .collect(),
+        channel_hold_notarizations: result
+          .channel_hold_notarizations
+          .into_iter()
+          .map(|x| Arc::new(x.into()))
+          .collect(),
         block_votes: result
           .block_votes
           .into_iter()
@@ -125,7 +142,8 @@ pub mod napi_ext {
   use crate::notarization_builder::NotarizationBuilder;
   use crate::notarization_tracker::NotarizationTracker;
   use crate::{
-    BalanceChangeRow, BalanceSync, BalanceSyncResult, ChannelHoldCloseOptions, Localchain,
+    BalanceChangeRow, BalanceSync, BalanceSyncResult, ChannelHold, ChannelHoldCloseOptions,
+    Localchain,
   };
   use napi_derive::napi;
 
@@ -136,8 +154,12 @@ pub mod napi_ext {
       self.balance_changes.clone()
     }
     #[napi(getter, js_name = "channelHoldNotarizations")]
-    pub fn channel_hold_notarizations_napi(&self) -> Vec<NotarizationBuilder> {
+    pub fn channel_hold_notarizations_napi(&self) -> Vec<NotarizationTracker> {
       self.channel_hold_notarizations.clone()
+    }
+    #[napi(getter, js_name = "channelHoldsUpdated")]
+    pub fn channel_holds_updated_napi(&self) -> Vec<ChannelHold> {
+      self.channel_holds_updated.clone()
     }
     #[napi(getter, js_name = "mainchainTransfers")]
     pub fn mainchain_transfers_napi(&self) -> Vec<NotarizationTracker> {
@@ -224,7 +246,8 @@ impl BalanceSync {
       balance_changes.len(),
     );
 
-    let channel_hold_notarizations = self.process_pending_channel_holds().await?;
+    let (channel_hold_notarizations, channel_holds_updated) =
+      self.process_pending_channel_holds().await?;
 
     let jump_account_consolidations = self.consolidate_jump_accounts().await?;
 
@@ -244,6 +267,7 @@ impl BalanceSync {
 
     Ok(BalanceSyncResult {
       balance_changes,
+      channel_holds_updated,
       channel_hold_notarizations,
       jump_account_consolidations,
       mainchain_transfers,
@@ -256,60 +280,63 @@ impl BalanceSync {
 
     let all_accounts = AccountStore::db_list(&mut db, true).await?;
     let mut notarizations: Vec<NotarizationTracker> = vec![];
-    let mut notarization = NotarizationBuilder::new(
-      self.db.clone(),
-      self.notary_clients.clone(),
-      self.keystore.clone(),
-      self.ticker.clone(),
-    );
     for jump_account in all_accounts {
-      let latest = BalanceChangeStore::db_get_latest_for_account(&mut db, jump_account.id).await?;
-      if let Some(latest) = latest {
-        let balance = latest.balance.parse::<u128>()?;
-        if balance > 0 {
-          let claim_account = match jump_account.account_type {
-            AccountType::Deposit => notarization.default_deposit_account().await?,
-            AccountType::Tax => notarization.default_tax_account().await?,
-          };
-          if claim_account.local_account_id == jump_account.id {
-            continue;
-          }
-          notarization
-            .load_account(&jump_account)
-            .await?
-            .send(balance, Some(vec![claim_account.address.clone()]))
-            .await?;
-          let claim_result = claim_account.claim(balance).await?;
-          if claim_result.tax > 0 {
-            notarization
-              .default_tax_account()
-              .await?
-              .claim(claim_result.tax)
-              .await?;
-          }
-          if notarization.accounts().await.len() >= NOTARIZATION_MAX_BALANCE_CHANGES as usize {
-            let tracker = notarization.notarize().await?;
-            notarizations.push(tracker);
-            notarization = NotarizationBuilder::new(
-              self.db.clone(),
-              self.notary_clients.clone(),
-              self.keystore.clone(),
-              self.ticker.clone(),
-            );
-            let transaction =
-              Transactions::create_static(&mut db, TransactionType::Consolidation).await?;
-            notarization.set_transaction(transaction).await;
-          }
-        }
+      // not a jump account if no hd_path
+      if jump_account.hd_path.is_none() {
+        continue;
       }
-    }
+      let Some(latest) =
+        BalanceChangeStore::db_get_latest_for_account(&mut db, jump_account.id).await?
+      else {
+        continue;
+      };
+      // can't consolidate if there's a channel_hold
+      if latest.channel_hold_note_json.is_some() {
+        continue;
+      }
+      let balance = latest.balance.parse::<u128>()?;
+      if balance == 0 {
+        continue;
+      }
 
-    if notarization.has_items_to_notarize().await {
+      let notarization = self.create_notarization();
       let transaction =
         Transactions::create_static(&mut db, TransactionType::Consolidation).await?;
       notarization.set_transaction(transaction).await;
-      let tracker = notarization.notarize().await?;
-      notarizations.push(tracker);
+      notarization.set_notary_id(jump_account.notary_id).await;
+
+      let claim_account = match jump_account.account_type {
+        AccountType::Deposit => notarization.default_deposit_account().await?,
+        AccountType::Tax => notarization.default_tax_account().await?,
+      };
+      if claim_account.local_account_id == jump_account.id {
+        continue;
+      }
+      notarization
+        .load_account(&jump_account)
+        .await?
+        .send(balance, Some(vec![claim_account.address.clone()]))
+        .await?;
+      let claim_result = claim_account.claim(balance).await?;
+      if claim_result.tax > 0 {
+        notarization
+          .default_tax_account()
+          .await?
+          .claim(claim_result.tax)
+          .await?;
+      }
+      match notarization.notarize().await {
+        Ok(tracker) => {
+          notarizations.push(tracker);
+        }
+        Err(e) => {
+          tracing::warn!(
+            "Error consolidating jump account {}: {:?}",
+            jump_account.id,
+            e
+          );
+        }
+      }
     }
 
     Ok(notarizations)
@@ -319,7 +346,7 @@ impl BalanceSync {
     let mut db = self.db.acquire().await?;
 
     let pending_changes = BalanceChangeStore::db_find_unsettled(&mut db).await?;
-    tracing::debug!("Found {} unsettled balance changes", pending_changes.len());
+    tracing::info!("Found {} unsettled balance changes", pending_changes.len());
 
     let mut results = vec![];
 
@@ -350,12 +377,6 @@ impl BalanceSync {
     if transfers.is_empty() {
       return Ok(vec![]);
     }
-    let notarization = NotarizationBuilder::new(
-      self.db.clone(),
-      self.notary_clients.clone(),
-      self.keystore.clone(),
-      self.ticker.clone(),
-    );
     let mut notarizations = vec![];
 
     for x in &transfers {
@@ -366,17 +387,35 @@ impl BalanceSync {
         notary_id: x.notary_id as u32,
         expiration_tick: x.expiration_tick.unwrap_or_default() as u32,
       };
-      notarization.claim_from_mainchain(transfer).await?;
-    }
 
-    if notarization.has_items_to_notarize().await {
-      let tracker = notarization.notarize().await?;
-      for transfer in transfers {
-        mainchain_transfers
-          .record_balance_change_id(transfer.id, tracker.notarization_id)
-          .await?;
+      let notarization = self.create_notarization();
+      notarization.claim_from_mainchain(transfer).await?;
+      let account_id = notarization
+        .default_deposit_account()
+        .await?
+        .local_account_id;
+      match notarization.notarize().await {
+        Ok(tracker) => {
+          let balance_change_id = tracker
+            .balance_changes_by_account
+            .lock()
+            .await
+            .get(&account_id)
+            .map(|x| x.id)
+            .unwrap_or_default();
+          mainchain_transfers
+            .record_balance_change_id(x.transfer_id, balance_change_id)
+            .await?;
+          notarizations.push(tracker);
+        }
+        Err(e) => {
+          tracing::warn!(
+            "Error notarizing mainchain transfer id={}: {:?}",
+            x.transfer_id,
+            e
+          );
+        }
       }
-      notarizations.push(tracker);
     }
 
     Ok(notarizations)
@@ -451,7 +490,9 @@ impl BalanceSync {
     Ok(change)
   }
 
-  pub async fn process_pending_channel_holds(&self) -> Result<Vec<NotarizationBuilder>> {
+  pub async fn process_pending_channel_holds(
+    &self,
+  ) -> Result<(Vec<NotarizationTracker>, Vec<ChannelHold>)> {
     let _lock = self.lock.lock().await;
     let open_channel_holds = self.open_channel_holds.get_claimable().await?;
     tracing::debug!(
@@ -459,74 +500,58 @@ impl BalanceSync {
       open_channel_holds.len(),
     );
 
-    let mut builder_by_notary = HashMap::new();
-
     let mut notarizations = vec![];
+    let mut channel_holds = vec![];
 
     for open_channel_hold in open_channel_holds {
-      let mut channel_hold = open_channel_hold.inner().await;
-
-      let notary_id = channel_hold.notary_id;
-
-      let notarization = builder_by_notary.entry(notary_id).or_insert_with(|| {
-        NotarizationBuilder::new(
-          self.db.clone(),
-          self.notary_clients.clone(),
-          self.keystore.clone(),
-          self.ticker.clone(),
-        )
-      });
+      let channel_hold = open_channel_hold.inner().await;
+      let id = channel_hold.id.clone();
 
       if channel_hold.is_client {
-        if let Err(e) = self
-          .sync_client_channel_hold(
-            notary_id,
-            &open_channel_hold,
-            &mut channel_hold,
-            notarization,
-          )
+        match self
+          .sync_client_channel_hold(&open_channel_hold, channel_hold)
           .await
         {
-          tracing::warn!(
-            "Error syncing client channel_hold (#{}): {:?}",
-            channel_hold.id,
-            e
-          );
-        } else {
-          let _ = open_channel_hold.reload().await;
+          Ok((tracker, did_update)) => {
+            if let Some(tracker) = tracker {
+              notarizations.push(tracker);
+            }
+            if did_update {
+              if let Ok(channel_hold) = open_channel_hold.reload().await {
+                tracing::info!(
+                  "Updated client channel hold. Id={}, Final Balance={}",
+                  channel_hold.id,
+                  channel_hold.settled_amount,
+                );
+                channel_holds.push(channel_hold);
+              }
+            }
+          }
+          Err(e) => {
+            tracing::warn!("Error syncing client channel_hold (#{}): {:?}", id, e);
+          }
         }
       } else {
-        if let Err(e) = self
-          .sync_server_channel_hold(&open_channel_hold, &mut channel_hold, notarization)
+        match self
+          .sync_server_channel_hold(&open_channel_hold, channel_hold)
           .await
         {
-          tracing::warn!(
-            "Error syncing server channel_hold (#{}): {:?}",
-            channel_hold.id,
-            e
-          );
-        }
-        if notarization.is_finalized().await {
-          if let Some(n) = builder_by_notary.remove(&notary_id) {
-            notarizations.push(n);
+          Ok(tracker) => {
+            if let Some(tracker) = tracker {
+              notarizations.push(tracker);
+            }
+            if let Ok(channel_hold) = open_channel_hold.reload().await {
+              channel_holds.push(channel_hold);
+            }
+          }
+          Err(e) => {
+            tracing::warn!("Error syncing server channel_hold (#{}): {:?}", id, e);
           }
         }
       }
     }
 
-    for (_, mut notarization) in builder_by_notary {
-      if !notarization.has_items_to_notarize().await {
-        continue;
-      }
-      self
-        .finalize_channel_hold_notarization(&mut notarization)
-        .await;
-      if notarization.is_finalized().await {
-        notarizations.push(notarization.clone());
-      }
-    }
-
-    Ok(notarizations)
+    Ok((notarizations, channel_holds))
   }
 
   pub async fn convert_tax_to_votes(
@@ -551,12 +576,7 @@ impl BalanceSync {
       if account.account_type == AccountType::Deposit {
         continue;
       }
-      let notarization = NotarizationBuilder::new(
-        self.db.clone(),
-        self.notary_clients.clone(),
-        self.keystore.clone(),
-        self.ticker.clone(),
-      );
+      let notarization = self.create_notarization();
       let balance_change = notarization.load_account(&account).await?;
       let total_available_tax = balance_change.balance().await;
       if total_available_tax < options.minimum_vote_amount.unwrap_or_default() as u128 {
@@ -603,10 +623,14 @@ impl BalanceSync {
     Ok(notarizations)
   }
 
-  pub async fn finalize_channel_hold_notarization(&self, notarization: &mut NotarizationBuilder) {
+  /// Sends the notarizations to the notary for finalization. If there are errors, it will return the problem accounts
+  pub async fn finalize_channel_hold_notarization(
+    &self,
+    notarization: &mut NotarizationBuilder,
+  ) -> Option<NotarizationTracker> {
     if let Err(e) = notarization.sign().await {
       tracing::error!("Could not claim a channel_hold -> {:?}", e);
-      return;
+      return None;
     }
 
     for i in 0..3 {
@@ -622,7 +646,7 @@ impl BalanceSync {
             tracker.notarized_balance_changes,
             tracker.notarized_votes
           );
-          break;
+          return Some(tracker);
         }
         Err(e) => {
           if is_notebook_finalization_error(&e)
@@ -638,18 +662,37 @@ impl BalanceSync {
             tokio::time::sleep(tokio::time::Duration::from_secs(delay)).await;
             continue;
           }
-          tracing::warn!("Error finalizing channel_hold notarization: {:?}", e);
+          if let Error::NotarizationError(
+            argon_notary_apis::Error::BalanceTipMismatch { change_index, .. },
+            ref submitted_notarization,
+          ) = e
+          {
+            if let Some(failed_entry) = submitted_notarization
+              .balance_changes
+              .get(change_index as usize)
+            {
+              let failed_address = AccountStore::to_address(&failed_entry.account_id);
+              tracing::warn!(
+                "Account {}, change {} broke notarizations. Will retry without it. Error: {:?}",
+                failed_address,
+                failed_entry.change_number,
+                e,
+              );
+            }
+          } else {
+            tracing::warn!("Error finalizing channel_hold notarization: {:?}", e);
+          }
         }
       }
     }
+    None
   }
 
   pub async fn sync_server_channel_hold(
     &self,
     open_channel_hold: &OpenChannelHold,
-    channel_hold: &mut ChannelHold,
-    notarization: &mut NotarizationBuilder,
-  ) -> Result<()> {
+    mut channel_hold: ChannelHold,
+  ) -> Result<Option<NotarizationTracker>> {
     let current_tick = self.ticker.current();
 
     if channel_hold.is_past_claim_period(current_tick) {
@@ -659,7 +702,7 @@ impl BalanceSync {
       );
       let mut db = self.db.acquire().await?;
       channel_hold.db_mark_unable_to_claim(&mut db).await?;
-      return Ok(());
+      return Ok(None);
     }
 
     tracing::debug!(
@@ -668,21 +711,25 @@ impl BalanceSync {
       channel_hold.from_address,
       channel_hold.balance_change_number
     );
-    if !notarization.can_add_channel_hold(open_channel_hold).await {
-      self.finalize_channel_hold_notarization(notarization).await;
-      return Ok(());
-    }
+
+    let mut notarization = self.create_notarization();
     notarization.claim_channel_hold(open_channel_hold).await?;
-    Ok(())
+    let tracker = self
+      .finalize_channel_hold_notarization(&mut notarization)
+      .await;
+    Ok(tracker)
   }
 
+  /// Syncs a client channel hold. If the recipient has claimed the channel hold, it will finalize the notarization.
+  /// If the recipient has not claimed the channel hold, it will cancel the channel hold and return the notarization.
+  ///
+  /// Returns a tuple of (Optional Updated Notarization submitted, Did update channel Hold).
   pub async fn sync_client_channel_hold(
     &self,
-    notary_id: u32,
     open_channel_hold: &OpenChannelHold,
-    channel_hold: &mut ChannelHold,
-    notarization: &mut NotarizationBuilder,
-  ) -> Result<()> {
+    channel_hold: ChannelHold,
+  ) -> Result<(Option<NotarizationTracker>, bool)> {
+    let notary_id = channel_hold.notary_id;
     let tip = self
       .notary_clients
       .get(notary_id)
@@ -699,9 +746,12 @@ impl BalanceSync {
           "A channel_hold was not claimed by the recipient. We're taking it back. id={}",
           channel_hold.id
         );
+        let notarization = self.create_notarization();
         notarization.cancel_channel_hold(open_channel_hold).await?;
+        let tracker = notarization.notarize().await?;
+        return Ok((Some(tracker), true));
       }
-      return Ok(());
+      return Ok((None, false));
     }
 
     tracing::debug!(
@@ -711,7 +761,7 @@ impl BalanceSync {
     );
 
     // will handle notarization
-    let _ = self
+    if let Ok(_) = self
       .sync_notarization(
         channel_hold.from_address.clone(),
         AccountType::Deposit,
@@ -720,9 +770,12 @@ impl BalanceSync {
         channel_hold.balance_change_number,
         tip.tick,
       )
-      .await?;
-    notarization.add_channel_hold(open_channel_hold).await;
-    Ok(())
+      .await
+    {
+      return Ok((None, true));
+    }
+
+    Ok((None, false))
   }
 
   pub async fn sync_notarization(
@@ -735,12 +788,11 @@ impl BalanceSync {
     tick: Tick,
   ) -> Result<i64> {
     let mut tx = self.db.begin().await?;
-    let account = AccountStore::db_get(&mut tx, address, account_type, notary_id).await?;
     let notary_client = self.notary_clients.get(notary_id).await?;
 
     let notarization = notary_client
       .get_notarization(
-        account.get_account_id32()?,
+        AccountStore::parse_address(&address)?,
         account_type,
         notebook_number,
         change_number,
@@ -765,6 +817,14 @@ impl BalanceSync {
         .map(|a| a.unwrap());
 
     for balance_change in notarization.balance_changes.iter() {
+      let address = AccountStore::to_address(&balance_change.account_id);
+      let Some(account) =
+        AccountStore::db_get(&mut tx, address, balance_change.account_type, notary_id)
+          .await
+          .ok()
+      else {
+        continue;
+      };
       let _ =
         OpenChannelHoldsStore::db_record_notarized(&mut tx, balance_change, notarization_id).await;
 
@@ -1022,6 +1082,15 @@ impl BalanceSync {
     );
 
     Ok(())
+  }
+
+  fn create_notarization(&self) -> NotarizationBuilder {
+    NotarizationBuilder::new(
+      self.db.clone(),
+      self.notary_clients.clone(),
+      self.keystore.clone(),
+      self.ticker.clone(),
+    )
   }
 }
 

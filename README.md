@@ -147,7 +147,7 @@ Useful Urls:
 - Testnet Notary: `wss://notary1.testnet.argonprotocol.org`
 - Testnet Bootnode: `wss://bootnode0.testnet.argonprotocol.org`
 - [Polkadot/Substrate Portal](https://polkadot.js.org/apps/#/explorer?rpc=wss://rpc.testnet.argonprotocol.org)
-- [Argon Discord](https://discord.gg/ChyAhFtD)
+- [Argon Discord](https://discord.gg/6JxjCNvu6x)
 
 Here are some tutorials to get you started:
 

@@ -45,6 +45,10 @@ where
 		Ok(result)
 	}
 
+	pub fn hold_lock(&self) -> Arc<RwLock<T>> {
+		self.data.clone()
+	}
+
 	pub fn get(&self) -> T {
 		self.data.read().clone()
 	}

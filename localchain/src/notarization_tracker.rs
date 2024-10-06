@@ -11,8 +11,8 @@ use argon_primitives::{AccountType, Balance, BalanceChange, BalanceTip, Notariza
 use crate::accounts::LocalAccount;
 use crate::balance_changes::{BalanceChangeRow, BalanceChangeStatus};
 use crate::mainchain_client::MainchainClient;
-use crate::Result;
 use crate::{BalanceChangeStore, BalanceSync, NotaryAccountOrigin, NotaryClients};
+use crate::{ChannelHold, Result};
 
 #[cfg_attr(feature = "napi", napi)]
 #[derive(Clone)]
@@ -30,6 +30,7 @@ pub struct NotarizationTracker {
   pub(crate) accounts_by_id: HashMap<i64, LocalAccount>,
   pub(crate) notary_clients: NotaryClients,
   pub(crate) db: SqlitePool,
+  pub channel_holds: Vec<ChannelHold>,
 }
 
 impl NotarizationTracker {
@@ -321,9 +322,9 @@ pub mod napi_ext {
   use argon_primitives::AccountType;
 
   use crate::error::NapiOk;
-  use crate::BalanceChangeRow;
   use crate::MainchainClient;
   use crate::NotaryAccountOrigin;
+  use crate::{BalanceChangeRow, ChannelHold};
 
   use super::NotarizationTracker;
 
@@ -360,6 +361,11 @@ pub mod napi_ext {
     pub async fn wait_for_notebook_napi(&self) -> napi::Result<()> {
       self.wait_for_notebook().await.napi_ok()
     }
+    #[napi(getter, js_name = "channelHolds")]
+    pub async fn channel_holds_napi(&self) -> Vec<ChannelHold> {
+      self.channel_holds().await
+    }
+
     /// Asks the notary for proof the transaction was included in a notebook header. If this notebook has not been finalized yet, it will return an error.
     #[napi(js_name = "getNotebookProof")]
     pub async fn get_notebook_proof_napi(&self) -> napi::Result<Vec<NotebookProof>> {

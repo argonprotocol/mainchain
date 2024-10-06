@@ -56,6 +56,8 @@ mod open_channel_holds;
 pub mod embedded_keystore;
 
 mod argon_file;
+#[cfg(test)]
+mod balance_sync_tests;
 pub mod cli;
 pub mod constants;
 mod error;

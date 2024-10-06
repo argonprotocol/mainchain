@@ -27,6 +27,8 @@ use sqlx::{query, types::Json, FromRow, PgConnection, PgPool};
 #[allow(dead_code)]
 struct NotarizationRow {
 	pub notebook_number: i32,
+	/// An ordered sequence number within the notebook
+	pub sequence_number: i32,
 	/// Scale encoded set of BalanceChangesets submitted together
 	pub balance_changes: Json<Vec<BalanceChange>>,
 	/// Scale encoded set of BlockVotes submitted together
@@ -48,6 +50,7 @@ impl NotarizationsStore {
 	pub async fn append_to_notebook<'a>(
 		db: impl sqlx::PgExecutor<'a> + 'a,
 		notebook_number: NotebookNumber,
+		sequence_number: u32,
 		balance_changes: Vec<BalanceChange>,
 		block_votes: Vec<BlockVote>,
 		domains: Vec<(DomainHash, AccountId)>,
@@ -64,9 +67,10 @@ impl NotarizationsStore {
 
 		let res = query!(
 			r#"
-			INSERT INTO notarizations (notebook_number, balance_changes, block_votes, domains, account_lookups) VALUES ($1, $2, $3, $4, $5)
+			INSERT INTO notarizations (notebook_number, sequence_number, balance_changes, block_votes, domains, account_lookups) VALUES ($1, $2, $3, $4, $5, $6)
 		"#,
 			notebook_number as i32,
+			sequence_number as i32,
 			balance_changes_json,
 			json!(block_votes),
 			json!(domains),
@@ -115,7 +119,7 @@ impl NotarizationsStore {
 	) -> anyhow::Result<Vec<Notarization>, Error> {
 		let rows = query!(
 			r#"
-			SELECT balance_changes, block_votes, domains FROM notarizations WHERE notebook_number = $1
+			SELECT balance_changes, block_votes, domains FROM notarizations WHERE notebook_number = $1 ORDER BY sequence_number ASC
 		"#,
 			notebook_number as i32,
 		)
@@ -190,6 +194,7 @@ impl NotarizationsStore {
 
 		let (current_notebook_number, tick) =
 			NotebookStatusStore::lock_open_for_appending(&mut tx).await?;
+		let sequence_number = Self::next_sequence_number(&mut *tx, current_notebook_number).await?;
 
 		if initial_allocation_result.needs_channel_hold_settle_followup {
 			verify_notarization_allocation(
@@ -208,6 +213,7 @@ impl NotarizationsStore {
 
 		let mut changes_with_proofs = changes.clone();
 		let mut chain_transfers: u32 = 0;
+
 		for (change_index, change) in changes.into_iter().enumerate() {
 			let change_index = change_index as u32;
 			let BalanceChange { account_id, account_type, change_number, balance, .. } = change;
@@ -391,6 +397,7 @@ impl NotarizationsStore {
 		NotarizationsStore::append_to_notebook(
 			&mut *tx,
 			current_notebook_number,
+			sequence_number,
 			changes_with_proofs,
 			block_votes,
 			domains,
@@ -412,6 +419,36 @@ impl NotarizationsStore {
 				})
 				.collect(),
 		})
+	}
+
+	pub async fn next_sequence_number<'a>(
+		db: impl sqlx::PgExecutor<'a> + 'a,
+		notebook_number: NotebookNumber,
+	) -> anyhow::Result<u32, Error> {
+		let next = sqlx::query_scalar!(
+			"SELECT nextval('notar_id_seq_' || $1::TEXT)",
+			(notebook_number % 5u32) as i32
+		)
+		.fetch_one(db)
+		.await?
+		.ok_or(Error::InternalError("Unable to get next sequence number".to_string()))?;
+
+		Ok(next as u32)
+	}
+
+	pub async fn reset_seq<'a>(
+		db: impl sqlx::PgExecutor<'a> + 'a,
+		notebook_number: NotebookNumber,
+	) -> anyhow::Result<(), Error> {
+		sqlx::query!(
+			r#"
+				SELECT setval('notar_id_seq_' || $1::TEXT, 1, false)
+			"#,
+			(notebook_number % 5u32) as i32
+		)
+		.fetch_optional(db)
+		.await?;
+		Ok(())
 	}
 }
 
@@ -473,11 +510,13 @@ mod tests {
 		let domains =
 			vec![(Domain::new("test", DomainTopLevel::Analytics).hash(), Bob.to_account_id())];
 
+		let next_seq = NotarizationsStore::next_sequence_number(&pool, notebook_number).await?;
 		{
 			let mut tx = pool.begin().await?;
 			NotarizationsStore::append_to_notebook(
 				&mut *tx,
 				notebook_number,
+				next_seq,
 				changeset.clone(),
 				block_votes.clone(),
 				domains.clone(),

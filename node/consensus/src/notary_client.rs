@@ -306,7 +306,8 @@ where
 		let oldest_tick_to_keep = latest_finalized_notebook_by_notary
 			.get(&notary_id)
 			.map(|(_, t)| *t)
-			.unwrap_or_default();
+			.unwrap_or_default()
+			.saturating_sub(256); // keep extra history lasting as long as the rollback blocks
 
 		let mut vote_count = 0;
 		// audit on the best block at the height of the notebook
@@ -327,6 +328,7 @@ where
 				self.aux_client.store_audit_summary(summary, oldest_tick_to_keep)?;
 			},
 			Err(error) => {
+				// TODO: if we don't store audit summaries, we will stall
 				audit_result.is_valid = false;
 				audit_result.first_error_reason = Some(error);
 			},

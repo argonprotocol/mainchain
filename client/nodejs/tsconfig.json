@@ -40,10 +40,11 @@
   },
   "include": [
     "./src/index.ts",
-    "./src/interfaces/*.ts"
+    "./src/interfaces/*.ts",
+    "./src/examples/*"
   ],
   "exclude": [
-    "**/rm localchain",
+    "**/localchain",
     "build/**/*",
     "node_modules",
     "target"

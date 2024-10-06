@@ -14,7 +14,7 @@ use argon_primitives::{
 
 use crate::{
 	stores::{
-		notebook_constraints::NotebookConstraintsStore,
+		notarizations::NotarizationsStore, notebook_constraints::NotebookConstraintsStore,
 		notebook_new_accounts::NotebookNewAccountsStore, notebook_status::NotebookStatusStore,
 		BoxFutureResult,
 	},
@@ -160,6 +160,7 @@ impl NotebookHeaderStore {
 		Box::pin(async move {
 			Self::create_header(&mut *db, notary_id, notebook_number, tick).await?;
 			NotebookNewAccountsStore::reset_seq(&mut *db, notebook_number).await?;
+			NotarizationsStore::reset_seq(&mut *db, notebook_number).await?;
 			NotebookConstraintsStore::create(&mut *db, notebook_number).await?;
 			NotebookStatusStore::create(
 				&mut *db,

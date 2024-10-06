@@ -474,8 +474,9 @@ mod tests {
 						}
 					}
 					println!(
-						"Got block with tick {tick} {:?} {:?} {:?}",
+						"Got block with tick {tick}. Notebooks: {:?}, {:?} {:?} {:?}",
 						votes,
+						notebooks.notebooks,
 						if matches!(seal, BlockSealDigest::Compute { .. }) {
 							"Compute"
 						} else {

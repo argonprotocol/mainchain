@@ -69,7 +69,7 @@ the [Localchain documentation](localchain.md#creating-a-localchain).
 The testnet faucet is a simple service that provides free testnet argons for testing purposes. NOTE: these are not worth
 anything, so should not be used for anything other than testing.
 
-Our Testnet Faucet is available in the [Argon Discord](https://discord.gg/ChyAhFtD). You can request testnet funds by
+Our Testnet Faucet is available in the [Argon Discord](https://discord.gg/6JxjCNvu6x). You can request testnet funds by
 joining the Discord and typing `/drip [address]` in the `# testnet` channel, or direct messaging the bot.
 
 You'll see the funds processing on the mainchain
