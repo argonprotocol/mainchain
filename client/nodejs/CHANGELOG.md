@@ -1,8 +1,17 @@
 # Changelog
 
-## [v0.0.9](https://github.com/argonprotocol/mainchain/compare/v0.0.8...c746a55be8a0db6d3132ec48d0642cf59e62e457) (2024-10-01)
+## [v0.0.10](https://github.com/argonprotocol/mainchain/compare/v0.0.9...996d153e147ffa50ec151c79fe1ffd3ed6451b2e) (2024-10-07)
 
-### Features
+### Fixes
+
+* **localchain:** require a vote to include a tick
+([996d153](https://github.com/argonprotocol/mainchain/commit/996d153e147ffa50ec151c79fe1ffd3ed6451b2e))
+* **localchain:** simplify balance_sync
+([8b337ab](https://github.com/argonprotocol/mainchain/commit/8b337ab1ed774a970936bcc17e1a6b54e9dd15c4))
+
+### [v0.0.9](https://github.com/argonprotocol/mainchain/compare/v0.0.8...v0.0.9) (2024-10-01)
+
+#### Features
 
 * integrate keys into mining slots
 ([662bdd6](https://github.com/argonprotocol/mainchain/commit/662bdd61963c87147ec6f1de6dc3d8662c980dd7))
