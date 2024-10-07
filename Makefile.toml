@@ -171,4 +171,4 @@ script = [
     "git commit -m \"$COMMIT_MSG\" || (git add . && git commit -m \"$COMMIT_MSG\")",
     #    "git tag v${VERSION}"
 ]
-#dependencies = ["testnet-spec"]
+dependencies = ["testnet-spec"]

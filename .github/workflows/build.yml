@@ -423,8 +423,6 @@ jobs:
           node-version: 20
           cache: yarn
           registry-url: 'https://registry.npmjs.org'
-      - name: Setup gh
-        uses: actions/setup-gh@v4
 
       - name: Install dependencies
         run: yarn install
@@ -461,3 +459,5 @@ jobs:
       - name: Upload artifacts to release
         if: github.ref_name != 'main'
         run: gh release upload ${{ github.ref_name }} ./localchain/npm/**/*.node --clobber
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}

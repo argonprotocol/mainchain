@@ -32,28 +32,28 @@ jobs:
         with:
           persist-credentials: false
 
-      - uses: actions/setup-gh@v4  # Correct action name for GitHub CLI setup
-
       - name: Check if release exists (including drafts)
         id: check_release
         run: |
-          # List all releases and filter by the tag name
-          if gh release list --json tagName --jq ".[] | select(.tagName==\"${{ github.ref_name }}\")"; then
-            echo "RELEASE_EXISTS=true" >> $GITHUB_ENV
+          RELEASE_EXISTS=$(gh release list --json tagName --jq ".[] | select(.tagName==\"${{ github.ref_name }}\") | .tagName" | head -n 1)
+          if [[ -n "$RELEASE_EXISTS" ]]; then
+           echo "RELEASE_EXISTS=true" >> $GITHUB_ENV
           else
             echo "RELEASE_EXISTS=false" >> $GITHUB_ENV
           fi
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
 
       - name: Extract changelog for the current version
         id: extract_changelog
         run: |
           # Extract changelog section for the specified version
-          awk "/^## \[${{ github.ref_name }}\]/,/^## \[/" CHANGELOG.md | sed '$d' > changelog.txt
+          sed "/^## \[${{ github.ref_name }}\]/,/^### \[v/p" CHANGELOG.md | sed '$d' > changelog.txt
           cat changelog.txt  # Print the extracted changelog
 
       - name: Create draft release if not exists
         if: env.RELEASE_EXISTS == 'false'
-        run: gh release create ${{ github.ref_name }} --draft --title "Release ${{ github.ref_name }}" --notes-file changelog.txt --target ${{ github.ref_name }}
+        run: gh release create ${{ github.ref_name }} --draft --title "${{ github.ref_name }}" --notes-file changelog.txt --target ${{ github.ref_name }}
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
 

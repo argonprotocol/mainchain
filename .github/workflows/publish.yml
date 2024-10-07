@@ -28,9 +28,6 @@ jobs:
       - name: Check out the repo
         uses: actions/checkout@v4
 
-      - name: Set up GitHub CLI
-        uses: actions/setup-gh@v4
-
       - name: Download artifacts
         run: |
           gh release download ${{env.VERSION}} --dir ./amd64 --pattern *x86_64-unknown-linux-gnu*
@@ -74,8 +71,6 @@ jobs:
           ref: ${{ github.head_ref }}
           fetch-depth: 0
 
-      - uses: actions/setup-gh@v4
-
       - name: Setup node
         uses: actions/setup-node@v4
         with:
@@ -92,8 +87,8 @@ jobs:
 
       - name: Download all artifacts
         run: gh release download ${{ env.VERSION }} --dir ./localchain/artifacts --pattern *.node
-        with:
-          github-token: ${{ secrets.GITHUB_TOKEN }}
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
 
       - name: Move artifacts
         run: yarn artifacts

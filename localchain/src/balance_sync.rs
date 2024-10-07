@@ -668,7 +668,7 @@ impl BalanceSync {
     options: &ChannelHoldCloseOptions,
   ) -> Result<(Option<NotarizationTracker>, bool)> {
     let notarization = self.create_notarization();
-    let balance_change = notarization.load_account(&account).await?;
+    let balance_change = notarization.load_account(account).await?;
     let total_available_tax = balance_change.balance().await;
     if total_available_tax < options.minimum_vote_amount.unwrap_or_default() as u128 {
       return Ok((None, false));

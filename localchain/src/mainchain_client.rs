@@ -166,7 +166,7 @@ impl MainchainClient {
     let best_votes = self
       .fetch_storage(
         &api::ticks::storage::StorageApi.recent_blocks_at_ticks(grandparent_tick),
-        Some(best_hash.into()),
+        Some(best_hash),
       )
       .await?
       .ok_or_else(|| anyhow!("No best block found"))?
@@ -184,7 +184,7 @@ impl MainchainClient {
     let minimum = self
       .fetch_storage(
         &api::block_seal_spec::storage::StorageApi.current_vote_minimum(),
-        Some(best_hash.into()),
+        Some(best_hash),
       )
       .await?
       .ok_or_else(|| anyhow!("No minimum vote requirement found"))?;
