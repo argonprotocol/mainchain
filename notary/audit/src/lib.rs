@@ -85,7 +85,7 @@ pub fn notebook_verify<T: NotebookHistoryLookup>(
 			changeset,
 			block_votes,
 			domains,
-			Some(notebook.header.tick),
+			Some(header.tick),
 			channel_hold_expiration_ticks,
 		)?;
 		result.verify_taxes()?;
@@ -93,7 +93,7 @@ pub fn notebook_verify<T: NotebookHistoryLookup>(
 		verify_changeset_signatures(changeset)?;
 		verify_balance_sources(lookup, &mut state, header, changeset)?;
 		track_block_votes(&mut state, block_votes)?;
-		verify_voting_sources(block_votes, vote_minimums)?;
+		verify_voting_sources(block_votes, header.tick, vote_minimums)?;
 	}
 
 	ensure!(
@@ -325,6 +325,7 @@ fn verify_balance_sources<T: NotebookHistoryLookup>(
 
 pub fn verify_voting_sources(
 	block_votes: &Vec<BlockVote>,
+	notebook_tick: Tick,
 	vote_minimums: &BTreeMap<H256, VoteMinimum>,
 ) -> anyhow::Result<(), VerifyError> {
 	for block_vote in block_votes {
@@ -333,6 +334,10 @@ pub fn verify_voting_sources(
 			.ok_or(VerifyError::InvalidBlockVoteSource)?;
 
 		ensure!(block_vote.power >= *minimum, VerifyError::InsufficientBlockVoteMinimum);
+		ensure!(
+			block_vote.tick == notebook_tick,
+			VerifyError::InvalidBlockVoteTick { tick: block_vote.tick, notebook_tick }
+		);
 
 		ensure!(
 			block_vote.signature.verify(&block_vote.hash()[..], &block_vote.account_id),

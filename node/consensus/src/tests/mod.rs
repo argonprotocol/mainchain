@@ -304,18 +304,18 @@ async fn can_run_proof_of_tax() {
 
 		let account_id: AccountId32 = Keyring::Dave.public().into();
 
+		let current_tick = api.runtime_api().current_tick(parent_hash).expect("can call the api");
 		let vote = BlockVote {
 			block_hash: grandparent_hash,
 			account_id: account_id.clone(),
 			power: 500,
+			tick: current_tick,
 			index: 1,
 			signature: Signature::from_raw([0; 64]).into(),
 			block_rewards_account_id: account_id.clone(),
 		};
 		let parent_voting_key = H256::random();
 		let seal_strength = vote.get_seal_strength(1, parent_voting_key);
-
-		let current_tick = api.runtime_api().current_tick(parent_hash).expect("can call the api");
 
 		let closest_miner_id: NodeIdentity = miner1.node_identity.clone();
 

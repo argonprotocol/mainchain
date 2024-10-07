@@ -959,6 +959,7 @@ fn test_votes_must_add_up() {
 			vec![
 				BlockVote {
 					index: 0,
+					tick: channel_hold_expiration_ticks + 1,
 					power: 4,
 					block_hash: vote_block_hash,
 					account_id: Alice.to_account_id(),
@@ -969,6 +970,7 @@ fn test_votes_must_add_up() {
 				.clone(),
 				BlockVote {
 					index: 1,
+					tick: channel_hold_expiration_ticks + 1,
 					power: 30,
 					block_hash: vote_block_hash,
 					account_id: Alice.to_account_id(),

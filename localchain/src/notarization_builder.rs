@@ -1255,6 +1255,8 @@ pub mod napi_ext {
     pub index: u32,
     /// The voting power of this vote, determined from the amount of tax
     pub power: BigInt,
+    /// The tick where a vote was intended
+    pub tick: u32,
     /// The domain used to create this vote
     pub domain_hash: Vec<u8>,
     /// The domain payment address used to create this vote
@@ -1274,6 +1276,7 @@ pub mod napi_ext {
         block_hash: H256::from_slice(self.block_hash.as_slice()),
         index: self.index,
         power,
+        tick: self.tick,
         block_rewards_account_id: AccountStore::parse_address(&self.block_rewards_address)?,
         signature: MultiSignature::decode(&mut self.signature.as_slice())?,
       })

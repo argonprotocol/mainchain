@@ -676,15 +676,27 @@ impl BalanceSync {
         block_hash: H256::from_slice(best_block_for_vote.block_hash.as_ref()),
         block_rewards_account_id: AccountStore::parse_address(&vote_address)?,
         signature: Signature::from_raw([0; 64]).into(),
+        tick: current_tick,
       };
       let signature = self
         .keystore
-        .sign(account.address, vote.hash().as_bytes().to_vec())
+        .sign(account.address.clone(), vote.hash().as_bytes().to_vec())
         .await?;
       vote.signature = MultiSignature::decode(&mut signature.as_ref())?;
       notarization.add_vote(vote).await?;
-      let tracker = notarization.notarize().await?;
-      notarizations.push(tracker);
+      match notarization.notarize().await {
+        Ok(tracker) => {
+          notarizations.push(tracker);
+          break;
+        }
+        Err(e) => {
+          tracing::warn!(
+            "Error converting tax to votes at tick {}: {:?}",
+            current_tick,
+            e
+          );
+        }
+      }
     }
 
     Ok(notarizations)

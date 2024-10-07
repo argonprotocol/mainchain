@@ -824,6 +824,7 @@ mod tests {
 			vec![BlockVote {
 				account_id: Alice.to_account_id(),
 				index: 1,
+				tick: ticker.current(),
 				block_hash: vote_block_hash,
 				power: tax,
 				block_rewards_account_id: Alice.to_account_id(),

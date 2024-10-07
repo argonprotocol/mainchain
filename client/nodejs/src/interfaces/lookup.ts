@@ -644,7 +644,11 @@ export default {
       InvalidBlockVoteList: 'Null',
       InvalidComputeProof: 'Null',
       InvalidBlockVoteSource: 'Null',
-      InsufficientBlockVoteMinimum: 'Null'
+      InsufficientBlockVoteMinimum: 'Null',
+      InvalidBlockVoteTick: {
+        tick: 'u32',
+        notebookTick: 'u32'
+      }
     }
   },
   /**
@@ -1589,7 +1593,8 @@ export default {
     index: 'Compact<u32>',
     power: 'Compact<u128>',
     signature: 'SpRuntimeMultiSignature',
-    blockRewardsAccountId: 'AccountId32'
+    blockRewardsAccountId: 'AccountId32',
+    tick: 'Compact<u32>'
   },
   /**
    * Lookup200: sp_runtime::MultiSignature

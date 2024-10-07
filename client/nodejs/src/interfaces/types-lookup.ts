@@ -691,7 +691,12 @@ declare module '@polkadot/types/lookup' {
     readonly isInvalidComputeProof: boolean;
     readonly isInvalidBlockVoteSource: boolean;
     readonly isInsufficientBlockVoteMinimum: boolean;
-    readonly type: 'MissingAccountOrigin' | 'HistoryLookupError' | 'InvalidAccountChangelist' | 'InvalidChainTransfersList' | 'InvalidBalanceChangeRoot' | 'InvalidHeaderTaxRecorded' | 'InvalidPreviousNonce' | 'InvalidPreviousBalance' | 'InvalidPreviousAccountOrigin' | 'InvalidPreviousBalanceChangeNotebook' | 'InvalidBalanceChange' | 'InvalidBalanceChangeSignature' | 'InvalidNoteRecipients' | 'BalanceChangeError' | 'InvalidNetBalanceChangeset' | 'InsufficientBalance' | 'ExceededMaxBalance' | 'BalanceChangeMismatch' | 'BalanceChangeNotNetZero' | 'InvalidDomainLeaseAllocation' | 'TaxBalanceChangeNotNetZero' | 'MissingBalanceProof' | 'InvalidPreviousBalanceProof' | 'InvalidNotebookHash' | 'InvalidNotebookHeaderHash' | 'DuplicateChainTransfer' | 'DuplicatedAccountOriginUid' | 'InvalidNotarySignature' | 'InvalidSecretProvided' | 'NotebookTooOld' | 'CatchupNotebooksMissing' | 'DecodeError' | 'AccountChannelHoldDoesntExist' | 'AccountAlreadyHasChannelHold' | 'ChannelHoldNotReadyForClaim' | 'AccountLocked' | 'MissingChannelHoldNote' | 'InvalidChannelHoldNote' | 'InvalidChannelHoldClaimers' | 'ChannelHoldNoteBelowMinimum' | 'InvalidTaxNoteAccount' | 'InvalidTaxOperation' | 'InsufficientTaxIncluded' | 'InsufficientBlockVoteTax' | 'IneligibleTaxVoter' | 'BlockVoteInvalidSignature' | 'InvalidBlockVoteAllocation' | 'InvalidBlockVoteRoot' | 'InvalidBlockVotesCount' | 'InvalidBlockVotingPower' | 'InvalidBlockVoteList' | 'InvalidComputeProof' | 'InvalidBlockVoteSource' | 'InsufficientBlockVoteMinimum';
+    readonly isInvalidBlockVoteTick: boolean;
+    readonly asInvalidBlockVoteTick: {
+      readonly tick: u32;
+      readonly notebookTick: u32;
+    } & Struct;
+    readonly type: 'MissingAccountOrigin' | 'HistoryLookupError' | 'InvalidAccountChangelist' | 'InvalidChainTransfersList' | 'InvalidBalanceChangeRoot' | 'InvalidHeaderTaxRecorded' | 'InvalidPreviousNonce' | 'InvalidPreviousBalance' | 'InvalidPreviousAccountOrigin' | 'InvalidPreviousBalanceChangeNotebook' | 'InvalidBalanceChange' | 'InvalidBalanceChangeSignature' | 'InvalidNoteRecipients' | 'BalanceChangeError' | 'InvalidNetBalanceChangeset' | 'InsufficientBalance' | 'ExceededMaxBalance' | 'BalanceChangeMismatch' | 'BalanceChangeNotNetZero' | 'InvalidDomainLeaseAllocation' | 'TaxBalanceChangeNotNetZero' | 'MissingBalanceProof' | 'InvalidPreviousBalanceProof' | 'InvalidNotebookHash' | 'InvalidNotebookHeaderHash' | 'DuplicateChainTransfer' | 'DuplicatedAccountOriginUid' | 'InvalidNotarySignature' | 'InvalidSecretProvided' | 'NotebookTooOld' | 'CatchupNotebooksMissing' | 'DecodeError' | 'AccountChannelHoldDoesntExist' | 'AccountAlreadyHasChannelHold' | 'ChannelHoldNotReadyForClaim' | 'AccountLocked' | 'MissingChannelHoldNote' | 'InvalidChannelHoldNote' | 'InvalidChannelHoldClaimers' | 'ChannelHoldNoteBelowMinimum' | 'InvalidTaxNoteAccount' | 'InvalidTaxOperation' | 'InsufficientTaxIncluded' | 'InsufficientBlockVoteTax' | 'IneligibleTaxVoter' | 'BlockVoteInvalidSignature' | 'InvalidBlockVoteAllocation' | 'InvalidBlockVoteRoot' | 'InvalidBlockVotesCount' | 'InvalidBlockVotingPower' | 'InvalidBlockVoteList' | 'InvalidComputeProof' | 'InvalidBlockVoteSource' | 'InsufficientBlockVoteMinimum' | 'InvalidBlockVoteTick';
   }
 
   /** @name ArgonPrimitivesAccountAccountType (74) */
@@ -1650,6 +1655,7 @@ declare module '@polkadot/types/lookup' {
     readonly power: Compact<u128>;
     readonly signature: SpRuntimeMultiSignature;
     readonly blockRewardsAccountId: AccountId32;
+    readonly tick: Compact<u32>;
   }
 
   /** @name SpRuntimeMultiSignature (200) */

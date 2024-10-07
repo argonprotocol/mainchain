@@ -759,6 +759,7 @@ fn verify_tax_votes() {
 		block_hash: H256::zero(),
 		index: 0,
 		power: 20_000,
+		tick: 1,
 		block_rewards_account_id: Bob.to_account_id(),
 		signature: Signature::from_raw([0u8; 64]).into(),
 	}
@@ -781,6 +782,7 @@ fn test_vote_sources() {
 			account_id: Bob.to_account_id(),
 			block_hash: vote_block_hash,
 			index: 0,
+			tick: 1,
 			power: 20_000,
 			block_rewards_account_id: Bob.to_account_id(),
 			signature: Signature::from_raw([0u8; 64]).into(),
@@ -791,6 +793,7 @@ fn test_vote_sources() {
 			account_id: Bob.to_account_id(),
 			block_hash: vote_block_hash,
 			index: 1,
+			tick: 1,
 			power: 400,
 			block_rewards_account_id: Bob.to_account_id(),
 			signature: Signature::from_raw([0u8; 64]).into(),
@@ -802,16 +805,20 @@ fn test_vote_sources() {
 	let vote_minimums = BTreeMap::from([(vote_block_hash, 500)]);
 
 	assert_err!(
-		verify_voting_sources(&votes, &vote_minimums),
+		verify_voting_sources(&votes, 1, &vote_minimums),
 		VerifyError::InsufficientBlockVoteMinimum
 	);
 
 	votes[1].power = 500;
 	assert_err!(
-		verify_voting_sources(&votes, &vote_minimums),
+		verify_voting_sources(&votes, 1, &vote_minimums),
 		VerifyError::BlockVoteInvalidSignature
 	);
-
 	votes[1].sign(Bob.pair());
-	assert_ok!(verify_voting_sources(&votes, &vote_minimums),);
+
+	assert_err!(
+		verify_voting_sources(&votes, 2, &vote_minimums),
+		VerifyError::InvalidBlockVoteTick { tick: 1, notebook_tick: 2 }
+	);
+	assert_ok!(verify_voting_sources(&votes, 1, &vote_minimums),);
 }

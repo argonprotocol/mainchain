@@ -462,6 +462,7 @@ fn it_can_find_best_vote_seals() {
 		let mut first_vote = BlockVoteT {
 			account_id: Bob.public().into(),
 			index: 0,
+			tick: 1,
 			block_hash: parent_hash,
 			power: 500,
 			block_rewards_account_id: Alice.to_account_id(),
@@ -567,6 +568,7 @@ fn it_checks_tax_votes() {
 		let mut vote = BlockVote {
 			block_hash: System::block_hash(System::block_number().saturating_sub(4)),
 			account_id: Keyring::Alice.into(),
+			tick: 1,
 			index: 1,
 			power: 500,
 			block_rewards_account_id: Ferdie.to_account_id(),
@@ -697,6 +699,7 @@ fn default_vote() -> BlockVote {
 		block_hash: System::block_hash(System::block_number().saturating_sub(4)),
 		account_id: Keyring::Alice.into(),
 		index: 1,
+		tick: 1,
 		power: 500,
 		block_rewards_account_id: Alice.to_account_id(),
 		signature: empty_vote_signature(),

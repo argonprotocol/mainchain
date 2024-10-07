@@ -379,7 +379,7 @@ impl NotarizationsStore {
 			.await?;
 		}
 
-		verify_voting_sources(&block_votes, &block_vote_specifications)?;
+		verify_voting_sources(&block_votes, tick, &block_vote_specifications)?;
 
 		NotebookConstraintsStore::try_increment(
 			&mut tx,
@@ -500,6 +500,7 @@ mod tests {
 		let block_votes = vec![BlockVote {
 			block_hash: [0u8; 32].into(),
 			power: 1222,
+			tick: 1,
 			account_id: Bob.to_account_id(),
 			index: 0,
 			block_rewards_account_id: Bob.to_account_id(),

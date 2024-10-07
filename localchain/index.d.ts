@@ -415,6 +415,8 @@ export interface BlockVote {
   index: number
   /** The voting power of this vote, determined from the amount of tax */
   power: bigint
+  /** The tick where a vote was intended */
+  tick: number
   /** The domain used to create this vote */
   domainHash: Array<number>
   /** The domain payment address used to create this vote */
