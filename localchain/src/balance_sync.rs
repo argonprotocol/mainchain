@@ -625,10 +625,6 @@ impl BalanceSync {
     &self,
     options: ChannelHoldCloseOptions,
   ) -> Result<Vec<NotarizationTracker>> {
-    let Some(votes_address) = options.votes_address.as_ref() else {
-      bail!("No votes address provided to create votes with tax");
-    };
-
     let mainchain_mutex = self.mainchain_client.lock().await;
     let Some(ref mainchain_client) = *mainchain_mutex else {
       bail!("Cannot create votes.. No mainchain client available!");
@@ -643,63 +639,104 @@ impl BalanceSync {
       if account.account_type == AccountType::Deposit {
         continue;
       }
-      let notarization = self.create_notarization();
-      let balance_change = notarization.load_account(&account).await?;
-      let total_available_tax = balance_change.balance().await;
-      if total_available_tax < options.minimum_vote_amount.unwrap_or_default() as u128 {
-        continue;
-      }
 
-      balance_change.send_to_vote(total_available_tax).await?;
-
-      let current_tick = self.ticker.current();
-      let Some(best_block_for_vote) = mainchain_client.get_vote_block_hash(current_tick).await?
-      else {
-        continue;
-      };
-      if total_available_tax < best_block_for_vote.vote_minimum {
-        continue;
-      }
-
-      let mut tick_counter = self.tick_counter.lock().await;
-      if tick_counter.0 == current_tick {
-        tick_counter.1 += 1;
-      } else {
-        *tick_counter = (current_tick, 0);
-      }
-      let vote_address = votes_address.clone();
-
-      let mut vote = BlockVote {
-        account_id: account.get_account_id32()?,
-        power: total_available_tax,
-        index: tick_counter.1,
-        block_hash: H256::from_slice(best_block_for_vote.block_hash.as_ref()),
-        block_rewards_account_id: AccountStore::parse_address(&vote_address)?,
-        signature: Signature::from_raw([0; 64]).into(),
-        tick: current_tick,
-      };
-      let signature = self
-        .keystore
-        .sign(account.address.clone(), vote.hash().as_bytes().to_vec())
-        .await?;
-      vote.signature = MultiSignature::decode(&mut signature.as_ref())?;
-      notarization.add_vote(vote).await?;
-      match notarization.notarize().await {
-        Ok(tracker) => {
-          notarizations.push(tracker);
-          break;
+      for _ in 0..3 {
+        match self.create_vote(&account, mainchain_client, &options).await {
+          Ok((tracker, should_retry)) => {
+            if let Some(tracker) = tracker {
+              notarizations.push(tracker);
+            }
+            if should_retry {
+              continue;
+            }
+          }
+          Err(e) => {
+            tracing::warn!("Error creating vote for account {}: {:?}", account.id, e);
+          }
         }
-        Err(e) => {
-          tracing::warn!(
-            "Error converting tax to votes at tick {}: {:?}",
-            current_tick,
-            e
-          );
-        }
+        break;
       }
     }
 
     Ok(notarizations)
+  }
+
+  async fn create_vote(
+    &self,
+    account: &LocalAccount,
+    mainchain_client: &MainchainClient,
+    options: &ChannelHoldCloseOptions,
+  ) -> Result<(Option<NotarizationTracker>, bool)> {
+    let notarization = self.create_notarization();
+    let balance_change = notarization.load_account(&account).await?;
+    let total_available_tax = balance_change.balance().await;
+    if total_available_tax < options.minimum_vote_amount.unwrap_or_default() as u128 {
+      return Ok((None, false));
+    }
+
+    balance_change.send_to_vote(total_available_tax).await?;
+
+    let current_tick = self.ticker.current();
+    let Some(best_block_for_vote) = mainchain_client.get_vote_block_hash(current_tick).await?
+    else {
+      tracing::debug!("No grandpa blocks to vote on at tick {}.", current_tick);
+      let millis_to_next_tick = self.ticker.millis_to_next_tick();
+      tokio::time::sleep(tokio::time::Duration::from_millis(millis_to_next_tick + 1)).await;
+      return Ok((None, true));
+    };
+    if total_available_tax < best_block_for_vote.vote_minimum {
+      return Ok((None, false));
+    }
+
+    let mut tick_counter = self.tick_counter.lock().await;
+    if tick_counter.0 == current_tick {
+      tick_counter.1 += 1;
+    } else {
+      *tick_counter = (current_tick, 0);
+    }
+    let Some(votes_address) = options.votes_address.as_ref() else {
+      bail!("No votes address provided to create votes with tax");
+    };
+
+    let vote_address = votes_address.clone();
+
+    let mut vote = BlockVote {
+      account_id: account.get_account_id32()?,
+      power: total_available_tax,
+      index: tick_counter.1,
+      block_hash: H256::from_slice(best_block_for_vote.block_hash.as_ref()),
+      block_rewards_account_id: AccountStore::parse_address(&vote_address)?,
+      signature: Signature::from_raw([0; 64]).into(),
+      tick: current_tick,
+    };
+    let signature = self
+      .keystore
+      .sign(account.address.clone(), vote.hash().as_bytes().to_vec())
+      .await?;
+    vote.signature = MultiSignature::decode(&mut signature.as_ref())?;
+    notarization.add_vote(vote).await?;
+    match notarization.notarize().await {
+      Ok(tracker) => Ok((Some(tracker), false)),
+      Err(e) => {
+        if let Error::NotaryApiError(argon_notary_apis::Error::BalanceChangeVerifyError(
+          argon_notary_audit::VerifyError::InvalidBlockVoteTick {
+            tick,
+            notebook_tick,
+          },
+        )) = e
+        {
+          tracing::warn!(
+            "Voted on an invalid vote tick {} vs notebook tick {}: {:?}",
+            tick,
+            notebook_tick,
+            e
+          );
+          Ok((None, true))
+        } else {
+          Err(e)
+        }
+      }
+    }
   }
 
   /// Sends the notarizations to the notary for finalization. If there are errors, it will return the problem accounts

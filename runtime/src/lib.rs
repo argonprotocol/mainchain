@@ -714,24 +714,22 @@ parameter_types! {
 	pub FeeMultiplier: Multiplier = Multiplier::one();
 }
 
-pub struct WageProtectorFee;
-
-impl WeightToFeePolynomial for WageProtectorFee {
+pub struct RefTimeToFee;
+impl WeightToFeePolynomial for RefTimeToFee {
 	type Balance = Balance;
-
 	/// This function attempts to add some weight to larger transactions, but given the 3 digits of
 	/// milligons to work with, it can be difficult to scale this properly.
 	fn polynomial() -> WeightToFeeCoefficients<Self::Balance> {
-		let cpi = PriceIndex::get_argon_cpi().unwrap_or(ArgonCPI::zero());
-		let mut p = 1_000; // milligons
-		if cpi.is_positive() {
-			let cpi = cpi.into_inner() / ArgonCPI::accuracy();
-			let adjustment = (p * (cpi as u128) * 1_000).checked_div(1_000).unwrap_or_default();
-			p += adjustment;
-		}
-		let q = 10 * Self::Balance::from(ExtrinsicBaseWeight::get().ref_time());
-
-		smallvec![WeightToFeeCoefficient::<Self::Balance> {
+		let p = 1_000; // milligons
+		let q = 100 * Balance::from(ExtrinsicBaseWeight::get().ref_time());
+		// BAB - disabling wage protector for fees. Makes it hard to keep system stable
+		// let cpi = PriceIndex::get_argon_cpi().unwrap_or(ArgonCPI::zero());
+		// if cpi.is_positive() {
+		// 	let cpi = cpi.into_inner() / ArgonCPI::accuracy();
+		// 	let adjustment = (p * (cpi as u128) * 1_000).checked_div(1_000).unwrap_or_default();
+		// 	p += adjustment;
+		// }
+		smallvec![WeightToFeeCoefficient {
 			degree: 1,
 			negative: false,
 			coeff_frac: Perbill::from_rational(p % q, q),
@@ -744,8 +742,8 @@ impl pallet_transaction_payment::Config for Runtime {
 	type RuntimeEvent = RuntimeEvent;
 	type OnChargeTransaction = FungibleAdapter<Balances, DealWithFees<Runtime>>;
 	type OperationalFeeMultiplier = ConstU8<5>;
-	type WeightToFee = WageProtectorFee;
-	type LengthToFee = WageProtectorFee;
+	type WeightToFee = RefTimeToFee;
+	type LengthToFee = RefTimeToFee;
 	type FeeMultiplierUpdate = ConstFeeMultiplier<FeeMultiplier>;
 }
 

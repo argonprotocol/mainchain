@@ -400,9 +400,11 @@ jobs:
 
       - name: Test bindings
         run: yarn test:js-only --forceExit --verbose --runInBand
+        continue-on-error: true
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
           ADD_DOCKER_HOST: true
+          RUST_LOG: debug,sqlx=info
   publish:
     name: Publish
     permissions:

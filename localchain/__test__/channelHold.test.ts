@@ -38,7 +38,7 @@ beforeAll(() => {
     retryTimes(3, {
         logErrorsBeforeRetry: true,
     });
-})
+});
 
 describeIntegration("ChannelHold integration", () => {
     it('can create a zone record type', async () => {
@@ -188,29 +188,31 @@ describeIntegration("ChannelHold integration", () => {
             await new Promise(resolve => setTimeout(resolve, Number(ferdiechain.ticker.millisToNextTick())));
         }
 
-        let voteResult = await ferdiechain.balanceSync.sync({
+        let syncResult = await ferdiechain.balanceSync.sync({
             votesAddress: ferdieVotesAddress.address,
         },);
-        console.log("Result of balance sync notarization of channelHold. Balance Changes=%s, ChannelHolds=%s", voteResult.balanceChanges.length, voteResult.channelHoldNotarizations.length);
-        expect(voteResult.channelHoldNotarizations).toHaveLength(1);
-        const notarization = voteResult.channelHoldNotarizations[0];
+        console.log("Result of balance sync notarization of channelHold. Balance Changes=%s, ChannelHolds=%s, Votes=%s",
+            syncResult.balanceChanges.length, syncResult.channelHoldNotarizations.length,
+            syncResult.blockVotes.length);
+        expect(syncResult.channelHoldNotarizations).toHaveLength(1);
+        const notarization = syncResult.channelHoldNotarizations[0];
         const notarizationChannelHolds = await notarization.channelHolds;
         expect(notarizationChannelHolds).toHaveLength(1);
         expect(notarizationChannelHolds[0].id).toBe(insideChannelHold.id);
 
-        if (voteResult.blockVotes.length === 0) {
+        if (syncResult.blockVotes.length === 0) {
             // try 10 more times to vote
             for (let i = 0; i < 10; i++) {
                 await new Promise(resolve => setTimeout(resolve, 100));
 
-                voteResult = await ferdiechain.balanceSync.sync({
+                syncResult = await ferdiechain.balanceSync.sync({
                     votesAddress: ferdieVotesAddress.address,
                 },);
-                console.log(`Votes on try ${i + 2} -> ${voteResult.blockVotes.length}`);
-                if (voteResult.blockVotes.length) break;
+                console.log(`Votes on try ${i + 2} -> ${syncResult.blockVotes.length}`);
+                if (syncResult.blockVotes.length) break;
             }
         }
-        expect(voteResult.blockVotes.length).toBe(1);
+        expect(syncResult.blockVotes.length).toBe(1);
 
     }, 120e3);
 });
