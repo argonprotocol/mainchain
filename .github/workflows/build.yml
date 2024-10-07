@@ -4,8 +4,6 @@ name: Build + Test Node.js Apis
     branches:
       - main
       - v[0-9]+.*
-    tags:
-      - v[0-9]+.*
   workflow_dispatch:
     inputs:
       SKIP_REBUILD_DOCKER:
@@ -405,10 +403,9 @@ jobs:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
           ADD_DOCKER_HOST: true
           RUST_LOG: debug,sqlx=info
-  publish:
-    name: Publish
+  upload-assets:
+    name: Upload assets
     permissions:
-      id-token: write  # Grant write access to the id-token permission for this job
       contents: write
     runs-on: ubuntu-latest
     needs:
@@ -426,6 +423,8 @@ jobs:
           node-version: 20
           cache: yarn
           registry-url: 'https://registry.npmjs.org'
+      - name: Setup gh
+        uses: actions/setup-gh@v4
 
       - name: Install dependencies
         run: yarn install
@@ -459,11 +458,6 @@ jobs:
         shell: bash
         working-directory: ./localchain
 
-      - name: Publish mainchain
-        if: ${{ vars.NPM_ENABLED == 'true' && startsWith(github.ref, 'refs/tags/v') }}
-        run: |
-          npm publish --provenance --access public --workspace=client/nodejs
-          npm publish --provenance --access public --workspace=localchain
-        env:
-          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-          NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}
+      - name: Upload artifacts to release
+        if: github.ref_name != 'main'
+        run: gh release upload ${{ github.ref_name }} ./localchain/npm/**/*.node --clobber

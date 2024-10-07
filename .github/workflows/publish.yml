@@ -1,0 +1,113 @@
+name: Publish
+
+on:
+  push:
+    tags:
+      - v[0-9]+.*
+  workflow_dispatch:
+    inputs:
+      TAG:
+        description: 'The tag to publish'
+        required: true
+
+
+defaults:
+  run:
+    shell: bash
+
+env:
+  VERSION: ${{ github.event.inputs.TAG || github.ref_name }}
+
+jobs:
+  docker:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+      packages: write
+    steps:
+      - name: Check out the repo
+        uses: actions/checkout@v4
+
+      - name: Set up GitHub CLI
+        uses: actions/setup-gh@v4
+
+      - name: Download artifacts
+        run: |
+          gh release download ${{env.VERSION}} --dir ./amd64 --pattern *x86_64-unknown-linux-gnu*
+          gh release download ${{env.VERSION}} --dir ./arm64 --pattern *aarch64-unknown-linux-gnu*
+
+      - name: Argon Node
+        uses: ./.github/templates/docker
+        with:
+          image: ghcr.io/argonprotocol/argon-miner
+          bin: argon-node
+          github-token: ${{ secrets.GITHUB_TOKEN }}
+          flavor: latest=true
+          tags: |
+            type=semver,pattern=${{env.VERSION}}
+            type=semver,pattern={{major}}.{{minor}}
+            type=sha
+
+      - name: Notary
+        uses: ./.github/templates/docker
+        with:
+          image: ghcr.io/argonprotocol/argon-notary
+          bin: argon-notary
+          github-token: ${{ secrets.GITHUB_TOKEN }}
+          flavor: latest=true
+          tags: |
+            type=semver,pattern=${{env.VERSION}}
+            type=semver,pattern={{major}}.{{minor}}
+            type=sha
+  npm:
+    name: Publish
+    permissions:
+      id-token: write  # Grant write access to the id-token permission for this job
+      contents: write
+    runs-on: ubuntu-latest
+    needs:
+      - test-linux
+      - test-mac-win
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ github.head_ref }}
+          fetch-depth: 0
+
+      - uses: actions/setup-gh@v4
+
+      - name: Setup node
+        uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: yarn
+          registry-url: 'https://registry.npmjs.org'
+
+      - name: Install dependencies
+        run: yarn install
+
+      - name: Build client
+        run: yarn tsc
+        working-directory: ./client/nodejs
+
+      - name: Download all artifacts
+        run: gh release download ${{ env.VERSION }} --dir ./localchain/artifacts --pattern *.node
+        with:
+          github-token: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Move artifacts
+        run: yarn artifacts
+        working-directory: ./localchain
+
+      - name: Verify artifacts
+        run: ls -R ./npm
+        working-directory: ./localchain
+
+      - name: Publish mainchain
+        if: ${{ vars.NPM_ENABLED == 'true !!remove-this-part' }}
+        run: |
+          npm publish --provenance --access public --workspace=client/nodejs
+          npm publish --provenance --access public --workspace=localchain
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}

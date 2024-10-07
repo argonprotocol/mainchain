@@ -41,7 +41,7 @@ use pallet_tx_pause::RuntimeCallNameOf;
 use scale_info::TypeInfo;
 use smallvec::smallvec;
 use sp_api::impl_runtime_apis;
-use sp_arithmetic::{traits::Zero, FixedPointNumber, FixedU128, Percent};
+use sp_arithmetic::{traits::Zero, FixedU128, Percent};
 use sp_consensus_grandpa::{AuthorityId as GrandpaId, AuthorityList};
 use sp_core::{crypto::KeyTypeId, ConstU16, OpaqueMetadata, H256, U256};
 use sp_debug_derive::RuntimeDebug;
@@ -72,7 +72,7 @@ use argon_primitives::{
 	},
 	notebook::NotebookNumber,
 	tick::{Tick, Ticker},
-	ArgonCPI, BlockSealAuthorityId, PriceProvider, TickProvider, CHANNEL_HOLD_CLAWBACK_TICKS,
+	BlockSealAuthorityId, PriceProvider, TickProvider, CHANNEL_HOLD_CLAWBACK_TICKS,
 };
 pub use argon_primitives::{
 	AccountId, Balance, BlockHash, BlockNumber, HashOutput, Moment, Nonce, Signature,
