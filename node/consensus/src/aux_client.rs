@@ -204,14 +204,20 @@ impl<B: BlockT, C: AuxStore + 'static> ArgonAux<B, C> {
 		latest_runtime_notebook_number: NotebookNumber,
 		submitting_tick: Tick,
 	) -> Result<
-		(NotebookHeaderData<NotebookVerifyError>, Option<NotaryNotebookVoteDigestDetails>),
+		(
+			NotebookHeaderData<NotebookVerifyError>,
+			Option<NotaryNotebookVoteDigestDetails>,
+			Vec<NotebookNumber>,
+		),
 		Error,
 	> {
 		let mut headers = NotebookHeaderData::default();
 		let mut tick_notebook = None;
-		let audit_results = self.get_notary_audit_history(notary_id)?;
+		let mut audit_results = self.get_notary_audit_history(notary_id)?.get();
 
-		for notebook in audit_results.get() {
+		audit_results.sort_by(|a, b| a.notebook_number.cmp(&b.notebook_number));
+
+		for notebook in audit_results {
 			if notebook.notebook_number <= latest_runtime_notebook_number ||
 				notebook.tick > submitting_tick
 			{
@@ -238,7 +244,24 @@ impl<B: BlockT, C: AuxStore + 'static> ArgonAux<B, C> {
 				continue;
 			}
 		}
-		Ok((headers, tick_notebook))
+
+		let mut missing_notebooks = vec![];
+		let mut expected_next_number = latest_runtime_notebook_number + 1;
+		for notebook in &headers.notebook_digest.notebooks {
+			if notebook.notebook_number != expected_next_number {
+				while expected_next_number < notebook.notebook_number {
+					missing_notebooks.push(expected_next_number);
+					expected_next_number += 1;
+				}
+			}
+			expected_next_number += 1;
+		}
+		self.get_missing_notebooks(notary_id)?.mutate(|a| {
+			for notebook_number in &missing_notebooks {
+				a.insert(*notebook_number);
+			}
+		})?;
+		Ok((headers, tick_notebook, missing_notebooks))
 	}
 
 	pub fn get_missing_notebooks(

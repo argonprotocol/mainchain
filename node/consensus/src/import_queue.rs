@@ -223,9 +223,7 @@ where
 			compute_difficulty,
 		)?;
 
-		if block.fork_choice.is_none() {
-			block.fork_choice = Some(ForkChoiceStrategy::Custom(fork_power > best_fork_power));
-		}
+		block.fork_choice = Some(ForkChoiceStrategy::Custom(fork_power > best_fork_power));
 
 		self.inner.import_block(block).await.map_err(Into::into)
 	}
