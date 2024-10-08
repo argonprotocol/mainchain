@@ -157,7 +157,7 @@ script = [
     "brew install convco",
     "cargo binstall cargo-edit --no-confirm",
     "export VERSION=$(convco version --bump)",
-    "export COMMIT_MSG=\"chore(release): update changelogs and bump versions to ${VERSION}\"",
+    "export COMMIT_MSG=\"chore(release): update changelogs and bump versions to v${VERSION}\"",
     "echo $COMMIT_MSG",
     "cargo set-version ${VERSION}",
     "convco changelog --unreleased ${VERSION} > CHANGELOG.md",
@@ -167,8 +167,9 @@ script = [
     "yarn version:bump",
     "yarn", # re-link workspaces
     "git add .",
+    # if not already on a branch matching the version, create one
+    "git checkout -b v${VERSION} || true",
     # commit a second time in case there pre-commit hooks that modify files
     "git commit -m \"$COMMIT_MSG\" || (git add . && git commit -m \"$COMMIT_MSG\")",
-    #    "git tag v${VERSION}"
 ]
 dependencies = ["testnet-spec"]

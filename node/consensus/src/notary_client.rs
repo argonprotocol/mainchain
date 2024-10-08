@@ -244,7 +244,7 @@ where
 		let mut missing_notebooks = vec![];
 		if latest_notebook < notebook_number - 1 {
 			let notary_notebooks = self.aux_client.get_audit_summaries(notary_id)?.get();
-			for notebook_number_needed in latest_notebook + 1..notebook_number {
+			for notebook_number_needed in (latest_notebook + 1)..notebook_number {
 				if let Some(summary) =
 					notary_notebooks.iter().find(|s| s.notebook_number == notebook_number_needed)
 				{
@@ -420,37 +420,32 @@ pub async fn verify_notebook_audits<B: BlockT, C>(
 where
 	C: AuxStore + 'static,
 {
-	let mut is_missing_entries = false;
-	'retries: for _ in 0..10 {
+	for _ in 0..10 {
+		let mut missing_audits = vec![];
 		for digest_record in &notebook_digest.notebooks {
-			let notary_audits = aux_client.get_notary_audit_history(digest_record.notary_id)?;
+			let notary_audits = aux_client.get_notary_audit_history(digest_record.notary_id)?.get();
 
-			match notary_audits
-				.get()
+			let audit = notary_audits
 				.iter()
-				.find(|a| a.notebook_number == digest_record.notebook_number)
-			{
-				Some(audit) =>
-					if digest_record.audit_first_failure != audit.first_error_reason {
-						return Err(Error::InvalidNotebookDigest(format!(
-							"Notary {}, notebook #{} has an audit mismatch \"{:?}\" with local result. \"{:?}\"",
-							digest_record.notary_id, digest_record.notebook_number, digest_record.audit_first_failure, audit.first_error_reason
-						)));
-					},
-				None => {
-					is_missing_entries = true;
-					info!(
-						target: LOG_TARGET,
-						"Notebook digest record not found in local storage. Delaying to allow import. Notary {}, notebook #{}",
-						digest_record.notary_id, digest_record.notebook_number);
-					tokio::time::sleep(std::time::Duration::from_secs(1)).await;
-					continue 'retries;
-				},
+				.find(|a| a.notebook_number == digest_record.notebook_number);
+
+			if let Some(audit) = audit {
+				if digest_record.audit_first_failure != audit.first_error_reason {
+					return Err(Error::InvalidNotebookDigest(format!(
+						"Notary {}, notebook #{} has an audit mismatch \"{:?}\" with local result. \"{:?}\"",
+						digest_record.notary_id, digest_record.notebook_number, digest_record.audit_first_failure, audit.first_error_reason
+					)));
+				}
+			} else {
+				missing_audits.push(digest_record);
 			}
 		}
-		if !is_missing_entries {
+		if missing_audits.is_empty() {
 			return Ok(());
 		}
+
+		info!(target: LOG_TARGET, "Notebook digest has missing audits. Delaying to allow import. {:#?}", missing_audits);
+		tokio::time::sleep(std::time::Duration::from_secs(1)).await;
 	}
 	Err(Error::InvalidNotebookDigest(
 		"Notebook digest record could not verify all records in local storage".to_string(),
@@ -477,25 +472,18 @@ where
 	for notary in notaries {
 		let (latest_runtime_notebook_number, _) =
 			latest_notebooks_in_runtime.get(&notary.notary_id).unwrap_or(&(0, 0));
-		let (mut notary_headers, tick_notebook) = aux_client.get_notary_notebooks_for_header(
-			notary.notary_id,
-			*latest_runtime_notebook_number,
-			submitting_tick,
-		)?;
-		notary_headers
-			.notebook_digest
-			.notebooks
-			.sort_by(|a, b| a.notebook_number.cmp(&b.notebook_number));
+		let (mut notary_headers, tick_notebook, missing_notebooks) = aux_client
+			.get_notary_notebooks_for_header(
+				notary.notary_id,
+				*latest_runtime_notebook_number,
+				submitting_tick,
+			)?;
 
-		let mut expected_next_number = *latest_runtime_notebook_number;
-		// if there are any notebooks supplied, they must be next in sequence
-		if notary_headers.notebook_digest.notebooks.iter().any(|notebook| {
-			expected_next_number += 1;
-			notebook.notebook_number != expected_next_number
-		}) {
+		if !missing_notebooks.is_empty() {
 			warn!(
 				target: LOG_TARGET,
-				"Notebook(s) missing for notary {}. Delaying to allow import.",
+				"Notebook(s) {:?} missing for notary {}. Cannot submit notebooks with block.",
+				missing_notebooks,
 				notary.notary_id
 			);
 			continue;
