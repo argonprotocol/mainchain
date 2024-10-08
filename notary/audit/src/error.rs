@@ -172,6 +172,11 @@ pub enum VerifyError {
 
 	#[snafu(display("Minimums were not met for a block vote"))]
 	InsufficientBlockVoteMinimum,
+
+	#[snafu(display(
+		"Invalid block vote tick. Vote tick: {tick}, notebook tick: {notebook_tick}"
+	))]
+	InvalidBlockVoteTick { tick: Tick, notebook_tick: Tick },
 }
 
 impl From<AccountHistoryLookupError> for VerifyError {

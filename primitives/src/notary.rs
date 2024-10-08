@@ -13,8 +13,8 @@ use sp_core::{ed25519, Get, RuntimeDebug, H256};
 use sp_runtime::{traits::Block as BlockT, BoundedVec};
 
 use crate::{
-	host::Host, tick::Tick, BlockVotingPower, NotebookHeader, NotebookNumber, NotebookSecret,
-	NotebookSecretHash,
+	host::Host, tick::Tick, AccountOrigin, BlockVotingPower, NotebookHeader, NotebookNumber,
+	NotebookSecret, NotebookSecretHash, TransferToLocalchainId,
 };
 
 pub type NotaryId = u32;
@@ -129,7 +129,7 @@ pub struct NotaryNotebookTickState {
 }
 
 #[derive(Clone, PartialEq, Eq, Encode, Decode, RuntimeDebug, TypeInfo)]
-pub struct NotaryNotebookVoteDetails<Hash: Codec> {
+pub struct NotaryNotebookDetails<Hash: Codec> {
 	#[codec(compact)]
 	pub notary_id: NotaryId,
 	#[codec(compact)]
@@ -144,6 +144,64 @@ pub struct NotaryNotebookVoteDetails<Hash: Codec> {
 	#[codec(compact)]
 	pub block_voting_power: BlockVotingPower,
 	pub blocks_with_votes: Vec<Hash>,
+	pub raw_audit_summary: Vec<u8>,
+}
+
+#[derive(Clone, PartialEq, Eq, Encode, Decode, RuntimeDebug, TypeInfo)]
+pub struct NotaryNotebookRawVotes {
+	#[codec(compact)]
+	pub notary_id: NotaryId,
+	#[codec(compact)]
+	pub notebook_number: NotebookNumber,
+	pub raw_votes: Vec<(Vec<u8>, BlockVotingPower)>,
+}
+
+#[derive(Clone, PartialEq, Eq, Encode, Decode, RuntimeDebug, TypeInfo)]
+pub struct NotaryNotebookAuditSummary {
+	#[codec(compact)]
+	pub notary_id: NotaryId,
+	#[codec(compact)]
+	pub notebook_number: NotebookNumber,
+	#[codec(compact)]
+	pub tick: Tick,
+	#[codec(compact)]
+	pub version: u32,
+	// Encoded NotaryNotebookAuditSummaryDetails
+	pub raw_data: Vec<u8>,
+}
+
+impl TryInto<NotaryNotebookAuditSummaryDecoded> for NotaryNotebookAuditSummary {
+	type Error = String;
+
+	fn try_into(self) -> Result<NotaryNotebookAuditSummaryDecoded, Self::Error> {
+		let details = NotaryNotebookAuditSummaryDetails::decode(&mut &self.raw_data[..])
+			.map_err(|_| "Invalid NotaryNotebookAuditSummaryDetails".to_string())?;
+		Ok(NotaryNotebookAuditSummaryDecoded {
+			notary_id: self.notary_id,
+			notebook_number: self.notebook_number,
+			tick: self.tick,
+			version: self.version,
+			details,
+		})
+	}
+}
+
+#[derive(Clone, PartialEq, Eq)]
+pub struct NotaryNotebookAuditSummaryDecoded {
+	pub notary_id: NotaryId,
+	pub notebook_number: NotebookNumber,
+	pub tick: Tick,
+	pub version: u32,
+	pub details: NotaryNotebookAuditSummaryDetails,
+}
+
+#[derive(Clone, PartialEq, Eq, Encode, Decode, RuntimeDebug, TypeInfo)]
+pub struct NotaryNotebookAuditSummaryDetails {
+	pub changed_accounts_root: H256,
+	pub account_changelist: Vec<AccountOrigin>,
+	pub used_transfers_to_localchain: Vec<TransferToLocalchainId>,
+	pub secret_hash: NotebookSecretHash,
+	pub block_votes_root: H256,
 }
 
 #[derive(Clone, PartialEq, Eq, Encode, Decode, RuntimeDebug, TypeInfo)]
@@ -171,8 +229,8 @@ impl From<&NotebookHeader> for NotaryNotebookVoteDigestDetails {
 		}
 	}
 }
-impl<H: Codec> From<&NotaryNotebookVoteDetails<H>> for NotaryNotebookVoteDigestDetails {
-	fn from(header: &NotaryNotebookVoteDetails<H>) -> Self {
+impl<H: Codec> From<&NotaryNotebookDetails<H>> for NotaryNotebookVoteDigestDetails {
+	fn from(header: &NotaryNotebookDetails<H>) -> Self {
 		Self {
 			notary_id: header.notary_id,
 			notebook_number: header.notebook_number,

@@ -160,7 +160,6 @@ impl NotaryClient {
   }
 
   pub async fn notarize(&self, notarization: Notarization) -> Result<BalanceChangeResult> {
-    let json = serde_json::to_string_pretty(&notarization).unwrap();
     for i in 0..5 {
       let client = self.client.lock().await;
 
@@ -187,6 +186,8 @@ impl NotaryClient {
             .await;
             continue;
           }
+          let json = serde_json::to_string_pretty(&notarization)
+            .unwrap_or("<UNABLE TO PRETTIFY".to_string());
           tracing::error!("Error sending notarization: {:?} {}", e, json);
           Err(e)
         }

@@ -463,6 +463,7 @@ mod tests {
 		NotarizationsStore::append_to_notebook(
 			&mut *tx,
 			1,
+			1,
 			vec![
 				BalanceChange {
 					account_id: Bob.to_account_id(),

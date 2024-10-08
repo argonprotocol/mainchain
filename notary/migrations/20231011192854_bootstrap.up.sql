@@ -78,6 +78,7 @@ CREATE TABLE IF NOT EXISTS registered_keys
 CREATE TABLE IF NOT EXISTS notarizations
 (
     notebook_number integer NOT NULL REFERENCES notebook_headers (notebook_number),
+    sequence_number integer NOT NULL,
     balance_changes jsonb   NOT NULL,
     block_votes     jsonb   NOT NULL,
     domains    jsonb   NOT NULL,
@@ -204,6 +205,12 @@ CREATE SEQUENCE IF NOT EXISTS uid_seq_1;
 CREATE SEQUENCE IF NOT EXISTS uid_seq_2;
 CREATE SEQUENCE IF NOT EXISTS uid_seq_3;
 CREATE SEQUENCE IF NOT EXISTS uid_seq_4;
+
+CREATE SEQUENCE IF NOT EXISTS notar_id_seq_0;
+CREATE SEQUENCE IF NOT EXISTS notar_id_seq_1;
+CREATE SEQUENCE IF NOT EXISTS notar_id_seq_2;
+CREATE SEQUENCE IF NOT EXISTS notar_id_seq_3;
+CREATE SEQUENCE IF NOT EXISTS notar_id_seq_4;
 
 -- TODO: need to know the roles
 -- GRANT USAGE ON SEQUENCE uid_seq_0 TO argon;

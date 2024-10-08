@@ -67,15 +67,18 @@ export class BalanceSync {
   consolidateJumpAccounts(): Promise<Array<NotarizationTracker>>
   syncUnsettledBalances(): Promise<Array<BalanceChange>>
   syncMainchainTransfers(): Promise<Array<NotarizationTracker>>
+  convertTaxToVotes(options: ChannelHoldCloseOptions): Promise<Array<NotarizationTracker>>
   syncBalanceChange(balanceChange: BalanceChange): Promise<BalanceChange>
-  processPendingChannelHolds(options?: ChannelHoldCloseOptions | undefined | null): Promise<Array<NotarizationBuilder>>
+  processPendingChannelHolds(): Promise<ChannelHoldResult>
 }
 
 export class BalanceSyncResult {
   get balanceChanges(): Array<BalanceChange>
-  get channelHoldNotarizations(): Array<NotarizationBuilder>
+  get channelHoldNotarizations(): Array<NotarizationTracker>
+  get channelHoldsUpdated(): Array<ChannelHold>
   get mainchainTransfers(): Array<NotarizationTracker>
   get jumpAccountConsolidations(): Array<NotarizationTracker>
+  get blockVotes(): Array<NotarizationTracker>
 }
 
 export class BalanceTipResult {
@@ -101,6 +104,11 @@ export class ChannelHold {
   get settledAmount(): bigint
   get settledSignature(): Uint8Array
   isPastClaimPeriod(currentTick: number): boolean
+}
+
+export class ChannelHoldResult {
+  get channelHoldNotarizations(): Array<NotarizationTracker>
+  get channelHoldsUpdated(): Array<ChannelHold>
 }
 
 export class DomainLease {
@@ -257,6 +265,7 @@ export class NotarizationTracker {
   /** Returns the balance changes that were submitted to the notary indexed by the stringified account id (napi doesn't allow numbers as keys) */
   get balanceChangesByAccountId(): Promise<Record<string, BalanceChange>>
   waitForNotebook(): Promise<void>
+  get channelHolds(): Promise<Array<ChannelHold>>
   /** Asks the notary for proof the transaction was included in a notebook header. If this notebook has not been finalized yet, it will return an error. */
   getNotebookProof(): Promise<Array<NotebookProof>>
   /** Confirms the root added to the mainchain */
@@ -406,6 +415,8 @@ export interface BlockVote {
   index: number
   /** The voting power of this vote, determined from the amount of tax */
   power: bigint
+  /** The tick where a vote was intended */
+  tick: number
   /** The domain used to create this vote */
   domainHash: Array<number>
   /** The domain payment address used to create this vote */
@@ -438,6 +449,23 @@ export const CHANNEL_HOLD_CLAWBACK_TICKS: number
 
 /** Minimum milligons that can be settled in a channel_hold */
 export const CHANNEL_HOLD_MINIMUM_SETTLEMENT: bigint
+
+export interface ChannelHold {
+  id: string
+  fromAddress: string
+  toAddress: string
+  balanceChangeNumber: number
+  expirationTick: number
+  isClient: boolean
+  initialBalanceChangeJson: string
+  notaryId: number
+  holdAmount: bigint
+  delegatedSignerAddress?: string
+  domainHash?: Buffer
+  notarizationId?: number
+  missedClaimWindow: boolean
+  settledAmount: bigint
+}
 
 export interface ChannelHoldCloseOptions {
   votesAddress?: string

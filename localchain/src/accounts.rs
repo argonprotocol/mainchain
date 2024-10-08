@@ -154,6 +154,7 @@ impl AccountStore {
     let res = super::AccountStore::db_tax_account(&mut db, notary_id).await?;
     Ok(res)
   }
+
   pub async fn db_tax_account(
     db: &mut SqliteConnection,
     notary_id: Option<NotaryId>,

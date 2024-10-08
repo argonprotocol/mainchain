@@ -20,20 +20,20 @@ use sp_runtime::{
 	BoundedVec, Digest, DigestItem, MultiSignature,
 };
 
+use crate::{
+	mock::{BlockSeal, *},
+	pallet::{LastBlockSealerInfo, ParentVotingKey, TempAuthor, TempSealInherent},
+	Call, Error,
+};
 use argon_primitives::{
 	block_seal::MiningAuthority,
 	digests::{BlockVoteDigest, BLOCK_VOTES_DIGEST_ID},
 	inherents::{BlockSealInherent, BlockSealInherentDataProvider, SealInherentError},
 	localchain::BlockVote,
+	notary::NotaryNotebookRawVotes,
 	BlockSealAuthorityId, BlockSealAuthoritySignature, BlockSealDigest, BlockSealerInfo,
-	BlockVoteT, BlockVotingKey, Domain, DomainTopLevel, MerkleProof, NotaryNotebookVotes,
-	ParentVotingKeyDigest, AUTHOR_DIGEST_ID, PARENT_VOTING_KEY_DIGEST,
-};
-
-use crate::{
-	mock::{BlockSeal, *},
-	pallet::{LastBlockSealerInfo, ParentVotingKey, TempAuthor, TempSealInherent},
-	Call, Error,
+	BlockVoteT, BlockVotingKey, Domain, DomainTopLevel, MerkleProof, ParentVotingKeyDigest,
+	AUTHOR_DIGEST_ID, PARENT_VOTING_KEY_DIGEST,
 };
 
 fn empty_signature() -> BlockSealAuthoritySignature {
@@ -462,6 +462,7 @@ fn it_can_find_best_vote_seals() {
 		let mut first_vote = BlockVoteT {
 			account_id: Bob.public().into(),
 			index: 0,
+			tick: 1,
 			block_hash: parent_hash,
 			power: 500,
 			block_rewards_account_id: Alice.to_account_id(),
@@ -473,7 +474,7 @@ fn it_can_find_best_vote_seals() {
 			authority_index: 0,
 		}));
 
-		let mut vote = NotaryNotebookVotes {
+		let mut vote = NotaryNotebookRawVotes {
 			notary_id: 1,
 			notebook_number: 1,
 			raw_votes: vec![(first_vote.encode(), 500)],
@@ -529,7 +530,7 @@ fn it_can_find_best_vote_seals() {
 		for i in 2..200 {
 			let mut vote = first_vote.clone();
 			vote.index = i;
-			votes.push(NotaryNotebookVotes {
+			votes.push(NotaryNotebookRawVotes {
 				notary_id: i,
 				notebook_number: 1,
 				raw_votes: vec![(vote.encode(), 500)],
@@ -567,6 +568,7 @@ fn it_checks_tax_votes() {
 		let mut vote = BlockVote {
 			block_hash: System::block_hash(System::block_number().saturating_sub(4)),
 			account_id: Keyring::Alice.into(),
+			tick: 1,
 			index: 1,
 			power: 500,
 			block_rewards_account_id: Ferdie.to_account_id(),
@@ -697,6 +699,7 @@ fn default_vote() -> BlockVote {
 		block_hash: System::block_hash(System::block_number().saturating_sub(4)),
 		account_id: Keyring::Alice.into(),
 		index: 1,
+		tick: 1,
 		power: 500,
 		block_rewards_account_id: Alice.to_account_id(),
 		signature: empty_vote_signature(),

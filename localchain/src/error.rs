@@ -2,6 +2,7 @@ use jsonrpsee::core::client::error::Error as JsonrpseeError;
 use sp_core::crypto::{DeriveError, SecretStringError};
 
 use argon_notary_audit::VerifyError;
+use argon_primitives::Notarization;
 
 #[derive(thiserror::Error, Debug)]
 pub enum Error {
@@ -43,6 +44,9 @@ pub enum Error {
 
   #[error("Notary API Error {0}")]
   NotaryApiError(argon_notary_apis::Error),
+
+  #[error("Notarization Error {0}")]
+  NotarizationError(argon_notary_apis::Error, Box<Notarization>),
 
   #[error("Notary Internal API Error {0}")]
   NotaryInternalApiError(JsonrpseeError),

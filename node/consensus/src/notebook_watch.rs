@@ -95,7 +95,7 @@ where
 		notary_id: NotaryId,
 		notebook_number: NotebookNumber,
 		notary_client: Arc<NotaryClient<B, C, AC>>,
-		raw_data: Vec<u8>,
+		raw_header_data: Vec<u8>,
 	) -> Result<(), Error> {
 		let best_header = self.select_chain.best_chain().await.map_err(|_| {
 			Error::NoBestHeader("Unable to get best header for notebook processing".to_string())
@@ -107,10 +107,10 @@ where
 		if validated_notebooks.iter().any(|n| n.notebook_number == notebook_number) {
 			return Ok(());
 		}
-		let Some(vote_details) = self
+		let Some(notebook_details) = self
 			.client
 			.runtime_api()
-			.decode_signed_raw_notebook_header(best_hash, raw_data.clone())?
+			.decode_signed_raw_notebook_header(best_hash, raw_header_data.clone())?
 			.ok()
 		else {
 			return Err(Error::NotaryError(format!(
@@ -119,7 +119,7 @@ where
 			)));
 		};
 
-		let mut lookup_tick = vote_details.tick.saturating_sub(1);
+		let mut lookup_tick = notebook_details.tick.saturating_sub(1);
 		let mut audit_at_block_hash = best_hash;
 
 		while lookup_tick > 0 {
@@ -131,18 +131,16 @@ where
 			lookup_tick -= 1;
 		}
 
-		let audit_result = notary_client
-			.try_audit_notebook(&finalized_hash, &audit_at_block_hash, &vote_details)
+		let notary_state = notary_client
+			.try_audit_notebook(
+				&finalized_hash,
+				&audit_at_block_hash,
+				raw_header_data,
+				&notebook_details,
+			)
 			.await?;
 
-		let notary_state = self.aux_client.store_notebook_result(
-			notary_id,
-			audit_result,
-			raw_data,
-			&vote_details,
-		)?;
-
-		self.check_for_new_blocks(vote_details.tick, notary_state).await
+		self.check_for_new_blocks(notebook_details.tick, notary_state).await
 	}
 
 	async fn check_for_new_blocks(
@@ -176,7 +174,7 @@ where
 			.get_best_beatable_fork(vote_key_tick, voting_power, notebooks, strongest_fork_at_tick)
 			.await?
 		else {
-			trace!(target: LOG_TARGET, "No beatable fork at tick {} with {} notebooks and {} voting power",vote_key_tick, notebooks, voting_power);
+			trace!(target: LOG_TARGET, "No beatable fork at tick {} with {} notebooks and {} voting power", vote_key_tick, notebooks, voting_power);
 			return Ok(());
 		};
 

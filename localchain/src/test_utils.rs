@@ -117,6 +117,7 @@ pub struct NotaryState {
   pub metadata: Option<NotebookMeta>,
   pub notarizations: BTreeMap<(AccountId, AccountType, NotebookNumber, u32), Notarization>,
   pub headers: HashMap<NotebookNumber, SignedNotebookHeader>,
+  pub mark_bad_tip: BTreeMap<LocalchainAccountId, argon_notary_apis::Error>,
 }
 
 #[derive(Clone)]
@@ -166,6 +167,18 @@ impl MockNotary {
     Ok(())
   }
 
+  pub async fn set_bad_tip_error(
+    &self,
+    account_id: AccountId,
+    account_type: AccountType,
+    error: argon_notary_apis::Error,
+  ) {
+    let mut state = self.state.lock().await;
+    state
+      .mark_bad_tip
+      .insert(LocalchainAccountId::new(account_id, account_type), error);
+  }
+
   pub async fn add_notebook_header(&self, header: SignedNotebookHeader) {
     let mut state = self.state.lock().await;
     state
@@ -186,8 +199,9 @@ impl MockNotary {
     &self,
     notebook_number: NotebookNumber,
     notarization: Notarization,
-  ) {
+  ) -> anyhow::Result<()> {
     let mut state = self.state.lock().await;
+
     for change in &notarization.balance_changes {
       state.notarizations.insert(
         (
@@ -198,7 +212,13 @@ impl MockNotary {
         ),
         notarization.clone(),
       );
+      let local_account_id =
+        LocalchainAccountId::new(change.account_id.clone(), change.account_type);
+      if let Some(error) = state.mark_bad_tip.remove(&local_account_id) {
+        return Err(error.into());
+      }
     }
+    Ok(())
   }
 
   pub async fn next_notebook_number(&self) -> NotebookNumber {
@@ -434,7 +454,8 @@ impl LocalchainRpcServer for MockNotary {
           balance_changes: balance_changeset.clone(),
         },
       )
-      .await;
+      .await
+      .map_err(|e| ErrorObjectOwned::owned(-32000, e.to_string(), None::<String>))?;
     let mut state = self.state.lock().await;
     let mut new_origins = vec![];
     for change in balance_changeset {

@@ -169,6 +169,6 @@ script = [
     "git add .",
     # commit a second time in case there pre-commit hooks that modify files
     "git commit -m \"$COMMIT_MSG\" || (git add . && git commit -m \"$COMMIT_MSG\")",
-    "git tag v${VERSION}"
+    #    "git tag v${VERSION}"
 ]
 dependencies = ["testnet-spec"]

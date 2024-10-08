@@ -46,6 +46,7 @@ struct ChannelHoldRow {
 }
 
 #[cfg_attr(feature = "napi", napi)]
+#[cfg_attr(feature = "uniffi", derive(uniffi::Record))]
 #[derive(Clone, Debug, PartialEq)]
 pub struct ChannelHold {
   pub id: String,
@@ -96,7 +97,7 @@ impl ChannelHold {
       .map(|a| a.balance)
       .unwrap_or_default()
       .saturating_sub(MINIMUM_CHANNEL_HOLD_SETTLEMENT);
-    let Ok(hrp) = Hrp::parse("esc") else {
+    let Ok(hrp) = Hrp::parse("chan") else {
       bail!("Failed to parse internal bech32 encoding hrp");
     };
     let id =
@@ -258,7 +259,10 @@ impl ChannelHold {
     .execute(&mut *db)
     .await?;
     if res.rows_affected() != 1 {
-      bail!("Failed to update channel_hold");
+      bail!(
+        "Failed to update channel_hold signature (account={}, id={id})",
+        self.from_address,
+      );
     }
     Ok(())
   }
@@ -292,7 +296,7 @@ impl ChannelHold {
     .execute(&mut *db)
     .await?;
     if res.rows_affected() != 1 {
-      bail!("Failed to update channel_hold");
+      bail!("Failed to mark channel_hold notarized (id={notarization_id}",);
     }
     Ok(())
   }
@@ -397,7 +401,7 @@ impl OpenChannelHold {
     self.channel_hold.lock().await.clone()
   }
 
-  pub async fn reload(&self) -> Result<()> {
+  pub async fn reload(&self) -> Result<ChannelHold> {
     let id = self.channel_hold.lock().await.id.clone();
     let channel_hold = ChannelHold::try_from(
       sqlx::query_as!(
@@ -408,8 +412,8 @@ impl OpenChannelHold {
       .fetch_one(&self.db)
       .await?,
     )?;
-    *self.channel_hold.lock().await = channel_hold;
-    Ok(())
+    *self.channel_hold.lock().await = channel_hold.clone();
+    Ok(channel_hold)
   }
 }
 
@@ -472,7 +476,12 @@ impl OpenChannelHoldsStore {
     .execute(db)
     .await?;
     if res.rows_affected() != 1 {
-      bail!("Failed to update channel_hold");
+      bail!(
+        "Failed to record channel_hold as notarized (id={}, address={}, balance_change={})",
+        notarization_id,
+        address,
+        balance_change.change_number
+      );
     }
     Ok(())
   }
@@ -498,7 +507,7 @@ impl OpenChannelHoldsStore {
         &self.keystore,
       ))
     }
-    tracing::info!("return channel_holds {}", channel_holds.len());
+    tracing::debug!("Loaded channel_holds {}", channel_holds.len());
     Ok(channel_holds)
   }
 
@@ -668,6 +677,7 @@ pub mod napi_ext {
     pub async fn channel_hold_napi(&self) -> ChannelHold {
       self.channel_hold().await
     }
+
     #[napi(js_name = "sign")]
     pub async fn sign_napi(&self, settled_amount: BigInt) -> napi::Result<SignatureResult> {
       let result = self.sign(settled_amount.get_u128().1).await.napi_ok()?;
@@ -676,6 +686,7 @@ pub mod napi_ext {
         milligons: result.milligons.into(),
       })
     }
+
     #[napi(js_name = "exportForSend")]
     pub async fn export_for_send_napi(&self) -> napi::Result<String> {
       self.export_for_send().await.napi_ok()

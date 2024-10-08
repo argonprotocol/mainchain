@@ -41,7 +41,7 @@ use pallet_tx_pause::RuntimeCallNameOf;
 use scale_info::TypeInfo;
 use smallvec::smallvec;
 use sp_api::impl_runtime_apis;
-use sp_arithmetic::{traits::Zero, FixedPointNumber, FixedU128, Percent};
+use sp_arithmetic::{traits::Zero, FixedU128, Percent};
 use sp_consensus_grandpa::{AuthorityId as GrandpaId, AuthorityList};
 use sp_core::{crypto::KeyTypeId, ConstU16, OpaqueMetadata, H256, U256};
 use sp_debug_derive::RuntimeDebug;
@@ -66,11 +66,13 @@ use argon_primitives::{
 	block_vote::VoteMinimum,
 	digests::BlockVoteDigest,
 	localchain::BestBlockVoteSeal,
-	notary::{NotaryId, NotaryNotebookVoteDetails, NotaryNotebookVoteDigestDetails, NotaryRecord},
+	notary::{
+		NotaryId, NotaryNotebookAuditSummary, NotaryNotebookDetails, NotaryNotebookRawVotes,
+		NotaryNotebookVoteDigestDetails, NotaryRecord,
+	},
 	notebook::NotebookNumber,
 	tick::{Tick, Ticker},
-	ArgonCPI, BlockSealAuthorityId, NotaryNotebookVotes, NotebookAuditResult, NotebookAuditSummary,
-	PriceProvider, TickProvider, CHANNEL_HOLD_CLAWBACK_TICKS,
+	BlockSealAuthorityId, PriceProvider, TickProvider, CHANNEL_HOLD_CLAWBACK_TICKS,
 };
 pub use argon_primitives::{
 	AccountId, Balance, BlockHash, BlockNumber, HashOutput, Moment, Nonce, Signature,
@@ -712,24 +714,22 @@ parameter_types! {
 	pub FeeMultiplier: Multiplier = Multiplier::one();
 }
 
-pub struct WageProtectorFee;
-
-impl WeightToFeePolynomial for WageProtectorFee {
+pub struct RefTimeToFee;
+impl WeightToFeePolynomial for RefTimeToFee {
 	type Balance = Balance;
-
 	/// This function attempts to add some weight to larger transactions, but given the 3 digits of
 	/// milligons to work with, it can be difficult to scale this properly.
 	fn polynomial() -> WeightToFeeCoefficients<Self::Balance> {
-		let cpi = PriceIndex::get_argon_cpi().unwrap_or(ArgonCPI::zero());
-		let mut p = 1_000; // milligons
-		if cpi.is_positive() {
-			let cpi = cpi.into_inner() / ArgonCPI::accuracy();
-			let adjustment = (p * (cpi as u128) * 1_000).checked_div(1_000).unwrap_or_default();
-			p += adjustment;
-		}
-		let q = 10 * Self::Balance::from(ExtrinsicBaseWeight::get().ref_time());
-
-		smallvec![WeightToFeeCoefficient::<Self::Balance> {
+		let p = 1_000; // milligons
+		let q = 100 * Balance::from(ExtrinsicBaseWeight::get().ref_time());
+		// BAB - disabling wage protector for fees. Makes it hard to keep system stable
+		// let cpi = PriceIndex::get_argon_cpi().unwrap_or(ArgonCPI::zero());
+		// if cpi.is_positive() {
+		// 	let cpi = cpi.into_inner() / ArgonCPI::accuracy();
+		// 	let adjustment = (p * (cpi as u128) * 1_000).checked_div(1_000).unwrap_or_default();
+		// 	p += adjustment;
+		// }
+		smallvec![WeightToFeeCoefficient {
 			degree: 1,
 			negative: false,
 			coeff_frac: Perbill::from_rational(p % q, q),
@@ -742,8 +742,8 @@ impl pallet_transaction_payment::Config for Runtime {
 	type RuntimeEvent = RuntimeEvent;
 	type OnChargeTransaction = FungibleAdapter<Balances, DealWithFees<Runtime>>;
 	type OperationalFeeMultiplier = ConstU8<5>;
-	type WeightToFee = WageProtectorFee;
-	type LengthToFee = WageProtectorFee;
+	type WeightToFee = RefTimeToFee;
+	type LengthToFee = RefTimeToFee;
 	type FeeMultiplierUpdate = ConstFeeMultiplier<FeeMultiplier>;
 }
 
@@ -1018,7 +1018,7 @@ impl_runtime_apis! {
 		}
 
 		fn find_vote_block_seals(
-			votes: Vec<NotaryNotebookVotes>,
+			votes: Vec<NotaryNotebookRawVotes>,
 			with_better_strength: U256,
 		) -> Result<BoundedVec<BestBlockVoteSeal<AccountId, BlockSealAuthorityId>, ConstU32<2>>, DispatchError>{
 			Ok(BlockSeal::find_vote_block_seals(votes,with_better_strength)?)
@@ -1049,12 +1049,12 @@ impl_runtime_apis! {
 			header_hash: H256,
 			vote_minimums: &BTreeMap<<Block as BlockT>::Hash, VoteMinimum>,
 			bytes: &Vec<u8>,
-			audit_dependency_summaries: Vec<NotebookAuditSummary>,
-		) -> Result<NotebookAuditResult, NotebookVerifyError> {
+			audit_dependency_summaries: Vec<NotaryNotebookAuditSummary>,
+		) -> Result<NotaryNotebookRawVotes, NotebookVerifyError> {
 			Notebook::audit_notebook(version, notary_id, notebook_number, header_hash, vote_minimums, bytes, audit_dependency_summaries)
 		}
 
-		fn decode_signed_raw_notebook_header(raw_header: Vec<u8>) -> Result<NotaryNotebookVoteDetails<<Block as BlockT>::Hash>, DispatchError> {
+		fn decode_signed_raw_notebook_header(raw_header: Vec<u8>) -> Result<NotaryNotebookDetails <<Block as BlockT>::Hash>, DispatchError> {
 			Notebook::decode_signed_raw_notebook_header(raw_header)
 		}
 

@@ -463,6 +463,7 @@ mod tests {
 		while let Some(block) = best_sub.next().await {
 			match block {
 				Ok(block) => {
+					let block_hash = block.hash();
 					let (tick, votes, seal, key, notebooks) = get_digests(block);
 					if let Some(notebook) = notebooks.notebooks.first() {
 						assert_eq!(notebook.audit_first_failure, None);
@@ -472,7 +473,17 @@ mod tests {
 							assert_eq!(tick, channel_hold_result.tick)
 						}
 					}
-					println!("Got block with tick {tick} {:?} {:?}", votes, seal);
+					println!(
+						"Got block with tick {tick}. Notebooks: {:?}, {:?} {:?} {:?}",
+						votes,
+						notebooks.notebooks,
+						if matches!(seal, BlockSealDigest::Compute { .. }) {
+							"Compute"
+						} else {
+							"Vote"
+						},
+						block_hash
+					);
 					if key.parent_voting_key.is_some() {
 						did_see_voting_key = true;
 					}
@@ -813,6 +824,7 @@ mod tests {
 			vec![BlockVote {
 				account_id: Alice.to_account_id(),
 				index: 1,
+				tick: ticker.current(),
 				block_hash: vote_block_hash,
 				power: tax,
 				block_rewards_account_id: Alice.to_account_id(),

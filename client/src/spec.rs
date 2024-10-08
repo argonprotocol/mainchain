@@ -1143,9 +1143,9 @@ pub mod api {
 						"query_call_info",
 						types::QueryCallInfo { call, len },
 						[
-							69u8, 254u8, 67u8, 188u8, 47u8, 119u8, 12u8, 71u8, 49u8, 222u8, 9u8,
-							164u8, 4u8, 2u8, 69u8, 244u8, 122u8, 221u8, 179u8, 229u8, 205u8, 173u8,
-							16u8, 132u8, 131u8, 140u8, 142u8, 146u8, 182u8, 126u8, 29u8, 109u8,
+							108u8, 74u8, 110u8, 52u8, 170u8, 12u8, 40u8, 41u8, 158u8, 226u8, 89u8,
+							180u8, 249u8, 50u8, 220u8, 157u8, 176u8, 182u8, 105u8, 71u8, 102u8,
+							154u8, 64u8, 17u8, 66u8, 167u8, 102u8, 184u8, 238u8, 42u8, 7u8, 110u8,
 						],
 					)
 				}
@@ -1163,10 +1163,10 @@ pub mod api {
 						"query_call_fee_details",
 						types::QueryCallFeeDetails { call, len },
 						[
-							68u8, 106u8, 161u8, 227u8, 161u8, 141u8, 91u8, 156u8, 211u8, 67u8,
-							186u8, 90u8, 217u8, 201u8, 58u8, 245u8, 160u8, 57u8, 235u8, 105u8,
-							31u8, 233u8, 192u8, 106u8, 203u8, 43u8, 234u8, 114u8, 160u8, 9u8, 50u8,
-							58u8,
+							22u8, 212u8, 175u8, 26u8, 30u8, 185u8, 33u8, 133u8, 216u8, 116u8,
+							201u8, 69u8, 166u8, 63u8, 106u8, 196u8, 67u8, 192u8, 179u8, 88u8,
+							224u8, 171u8, 100u8, 171u8, 21u8, 205u8, 252u8, 110u8, 245u8, 70u8,
+							98u8, 156u8,
 						],
 					)
 				}
@@ -1545,7 +1545,7 @@ pub mod api {
 				pub mod find_vote_block_seals {
 					use super::runtime_types;
 					pub type Votes = ::subxt::ext::subxt_core::alloc::vec::Vec<
-						runtime_types::argon_primitives::apis::NotaryNotebookVotes,
+						runtime_types::argon_primitives::notary::NotaryNotebookRawVotes,
 					>;
 					pub type WithBetterStrength = runtime_types::primitive_types::U256;
 					pub mod output {
@@ -1748,7 +1748,7 @@ pub mod api {
 					header_hash: types::audit_notebook_and_get_votes::HeaderHash,
 					vote_minimums: types::audit_notebook_and_get_votes::VoteMinimums,
 					bytes: types::audit_notebook_and_get_votes::Bytes,
-					audit_dependency_summaries : types :: audit_notebook_and_get_votes :: AuditDependencySummaries,
+					raw_audit_dependency_summaries : types :: audit_notebook_and_get_votes :: RawAuditDependencySummaries,
 				) -> ::subxt::ext::subxt_core::runtime_api::payload::StaticPayload<
 					types::AuditNotebookAndGetVotes,
 					types::audit_notebook_and_get_votes::output::Output,
@@ -1763,12 +1763,13 @@ pub mod api {
 							header_hash,
 							vote_minimums,
 							bytes,
-							audit_dependency_summaries,
+							raw_audit_dependency_summaries,
 						},
 						[
-							164u8, 165u8, 165u8, 251u8, 25u8, 194u8, 175u8, 78u8, 43u8, 31u8, 76u8,
-							202u8, 29u8, 236u8, 11u8, 42u8, 30u8, 174u8, 49u8, 175u8, 127u8, 182u8,
-							213u8, 124u8, 206u8, 73u8, 55u8, 255u8, 202u8, 124u8, 185u8, 175u8,
+							77u8, 83u8, 68u8, 88u8, 141u8, 201u8, 175u8, 104u8, 77u8, 3u8, 181u8,
+							147u8, 179u8, 122u8, 42u8, 80u8, 213u8, 135u8, 47u8, 51u8, 160u8,
+							177u8, 179u8, 212u8, 92u8, 20u8, 116u8, 25u8, 70u8, 144u8, 194u8,
+							196u8,
 						],
 					)
 				}
@@ -1784,10 +1785,10 @@ pub mod api {
 						"decode_signed_raw_notebook_header",
 						types::DecodeSignedRawNotebookHeader { raw_header },
 						[
-							161u8, 122u8, 93u8, 183u8, 54u8, 151u8, 145u8, 232u8, 214u8, 0u8,
-							254u8, 196u8, 214u8, 65u8, 221u8, 233u8, 63u8, 175u8, 209u8, 15u8,
-							227u8, 20u8, 89u8, 192u8, 50u8, 46u8, 159u8, 34u8, 44u8, 2u8, 125u8,
-							57u8,
+							255u8, 61u8, 138u8, 198u8, 117u8, 35u8, 186u8, 239u8, 120u8, 162u8,
+							123u8, 128u8, 114u8, 224u8, 14u8, 72u8, 207u8, 46u8, 116u8, 165u8,
+							170u8, 220u8, 131u8, 226u8, 95u8, 153u8, 61u8, 233u8, 0u8, 149u8,
+							187u8, 79u8,
 						],
 					)
 				}
@@ -1824,13 +1825,14 @@ pub mod api {
 					>;
 					pub type Bytes =
 						::subxt::ext::subxt_core::alloc::vec::Vec<::core::primitive::u8>;
-					pub type AuditDependencySummaries = ::subxt::ext::subxt_core::alloc::vec::Vec<
-						runtime_types::argon_primitives::apis::NotebookAuditSummary,
-					>;
+					pub type RawAuditDependencySummaries =
+						::subxt::ext::subxt_core::alloc::vec::Vec<
+							runtime_types::argon_primitives::notary::NotaryNotebookAuditSummary,
+						>;
 					pub mod output {
 						use super::runtime_types;
 						pub type Output = ::core::result::Result<
-							runtime_types::argon_primitives::apis::NotebookAuditResult,
+							runtime_types::argon_primitives::notary::NotaryNotebookRawVotes,
 							runtime_types::argon_notary_audit::error::VerifyError,
 						>;
 					}
@@ -1857,8 +1859,8 @@ pub mod api {
 					pub header_hash: audit_notebook_and_get_votes::HeaderHash,
 					pub vote_minimums: audit_notebook_and_get_votes::VoteMinimums,
 					pub bytes: audit_notebook_and_get_votes::Bytes,
-					pub audit_dependency_summaries:
-						audit_notebook_and_get_votes::AuditDependencySummaries,
+					pub raw_audit_dependency_summaries:
+						audit_notebook_and_get_votes::RawAuditDependencySummaries,
 				}
 				pub mod decode_signed_raw_notebook_header {
 					use super::runtime_types;
@@ -1867,7 +1869,7 @@ pub mod api {
 					pub mod output {
 						use super::runtime_types;
 						pub type Output = ::core::result::Result<
-							runtime_types::argon_primitives::notary::NotaryNotebookVoteDetails<
+							runtime_types::argon_primitives::notary::NotaryNotebookDetails<
 								::sp_core::H256,
 							>,
 							runtime_types::sp_runtime::DispatchError,
@@ -2920,9 +2922,9 @@ pub mod api {
 			.hash();
 		runtime_metadata_hash ==
 			[
-				107u8, 200u8, 141u8, 174u8, 164u8, 170u8, 214u8, 7u8, 180u8, 167u8, 55u8, 57u8,
-				176u8, 235u8, 5u8, 50u8, 160u8, 194u8, 190u8, 202u8, 132u8, 131u8, 170u8, 204u8,
-				253u8, 54u8, 164u8, 126u8, 173u8, 239u8, 2u8, 133u8,
+				42u8, 188u8, 171u8, 35u8, 38u8, 210u8, 233u8, 222u8, 162u8, 126u8, 169u8, 32u8,
+				254u8, 235u8, 35u8, 65u8, 73u8, 34u8, 167u8, 210u8, 42u8, 171u8, 186u8, 253u8,
+				173u8, 63u8, 154u8, 222u8, 92u8, 75u8, 56u8, 141u8,
 			]
 	}
 	pub mod system {
@@ -4073,10 +4075,10 @@ pub mod api {
 						"Events",
 						(),
 						[
-							14u8, 253u8, 236u8, 128u8, 207u8, 33u8, 9u8, 204u8, 112u8, 37u8, 51u8,
-							122u8, 94u8, 124u8, 164u8, 141u8, 156u8, 44u8, 163u8, 210u8, 247u8,
-							68u8, 79u8, 49u8, 229u8, 199u8, 224u8, 148u8, 144u8, 181u8, 81u8,
-							124u8,
+							65u8, 141u8, 60u8, 29u8, 75u8, 114u8, 169u8, 219u8, 107u8, 115u8,
+							205u8, 199u8, 78u8, 226u8, 28u8, 129u8, 135u8, 202u8, 157u8, 249u8,
+							196u8, 168u8, 241u8, 157u8, 231u8, 64u8, 239u8, 178u8, 194u8, 241u8,
+							151u8, 165u8,
 						],
 					)
 				}
@@ -4856,9 +4858,9 @@ pub mod api {
 							call: ::subxt::ext::subxt_core::alloc::boxed::Box::new(call),
 						},
 						[
-							82u8, 207u8, 165u8, 245u8, 29u8, 205u8, 80u8, 39u8, 2u8, 162u8, 227u8,
-							4u8, 84u8, 91u8, 49u8, 100u8, 93u8, 238u8, 18u8, 211u8, 150u8, 167u8,
-							145u8, 103u8, 136u8, 225u8, 207u8, 233u8, 149u8, 54u8, 160u8, 40u8,
+							196u8, 206u8, 88u8, 37u8, 75u8, 140u8, 38u8, 45u8, 47u8, 206u8, 209u8,
+							249u8, 175u8, 99u8, 123u8, 155u8, 147u8, 43u8, 205u8, 146u8, 113u8,
+							85u8, 203u8, 218u8, 223u8, 185u8, 144u8, 25u8, 65u8, 49u8, 42u8, 200u8,
 						],
 					)
 				}
@@ -4920,10 +4922,9 @@ pub mod api {
 							max_weight,
 						},
 						[
-							166u8, 34u8, 206u8, 14u8, 165u8, 83u8, 210u8, 241u8, 53u8, 172u8,
-							192u8, 138u8, 229u8, 140u8, 15u8, 54u8, 38u8, 6u8, 224u8, 147u8, 252u8,
-							147u8, 227u8, 182u8, 151u8, 222u8, 231u8, 35u8, 119u8, 163u8, 145u8,
-							196u8,
+							146u8, 90u8, 213u8, 224u8, 135u8, 62u8, 135u8, 81u8, 26u8, 116u8,
+							189u8, 68u8, 243u8, 28u8, 106u8, 92u8, 151u8, 251u8, 37u8, 36u8, 16u8,
+							56u8, 192u8, 103u8, 29u8, 93u8, 163u8, 56u8, 15u8, 100u8, 22u8, 14u8,
 						],
 					)
 				}
@@ -5786,9 +5787,10 @@ pub mod api {
 							call: ::subxt::ext::subxt_core::alloc::boxed::Box::new(call),
 						},
 						[
-							19u8, 74u8, 242u8, 70u8, 228u8, 84u8, 111u8, 101u8, 114u8, 79u8, 140u8,
-							89u8, 76u8, 226u8, 25u8, 228u8, 29u8, 66u8, 3u8, 129u8, 214u8, 157u8,
-							186u8, 114u8, 164u8, 10u8, 198u8, 135u8, 209u8, 39u8, 133u8, 148u8,
+							239u8, 91u8, 68u8, 70u8, 223u8, 71u8, 92u8, 87u8, 87u8, 186u8, 27u8,
+							208u8, 217u8, 179u8, 72u8, 188u8, 202u8, 90u8, 131u8, 56u8, 249u8,
+							222u8, 84u8, 151u8, 202u8, 87u8, 250u8, 156u8, 220u8, 35u8, 171u8,
+							94u8,
 						],
 					)
 				}
@@ -6050,9 +6052,9 @@ pub mod api {
 							call: ::subxt::ext::subxt_core::alloc::boxed::Box::new(call),
 						},
 						[
-							170u8, 19u8, 238u8, 214u8, 221u8, 104u8, 151u8, 90u8, 144u8, 29u8,
-							75u8, 163u8, 69u8, 37u8, 165u8, 154u8, 208u8, 52u8, 11u8, 83u8, 216u8,
-							62u8, 243u8, 202u8, 203u8, 101u8, 96u8, 49u8, 142u8, 77u8, 152u8, 38u8,
+							160u8, 239u8, 224u8, 217u8, 2u8, 165u8, 152u8, 62u8, 144u8, 188u8, 3u8,
+							125u8, 127u8, 160u8, 130u8, 13u8, 102u8, 24u8, 56u8, 47u8, 162u8,
+							128u8, 230u8, 111u8, 101u8, 60u8, 145u8, 243u8, 46u8, 35u8, 1u8, 100u8,
 						],
 					)
 				}
@@ -10782,9 +10784,9 @@ pub mod api {
 						"BlockNotebooks",
 						(),
 						[
-							121u8, 183u8, 198u8, 65u8, 102u8, 83u8, 146u8, 209u8, 151u8, 96u8,
-							45u8, 23u8, 54u8, 83u8, 33u8, 156u8, 176u8, 17u8, 47u8, 166u8, 226u8,
-							59u8, 224u8, 252u8, 12u8, 0u8, 144u8, 221u8, 139u8, 245u8, 30u8, 127u8,
+							121u8, 35u8, 59u8, 7u8, 131u8, 231u8, 163u8, 124u8, 130u8, 195u8, 59u8,
+							14u8, 75u8, 75u8, 35u8, 246u8, 92u8, 180u8, 117u8, 173u8, 2u8, 35u8,
+							135u8, 66u8, 184u8, 113u8, 227u8, 242u8, 81u8, 103u8, 136u8, 93u8,
 						],
 					)
 				}
@@ -10803,9 +10805,10 @@ pub mod api {
 						"TempNotebookDigest",
 						(),
 						[
-							28u8, 31u8, 52u8, 2u8, 66u8, 194u8, 15u8, 96u8, 162u8, 241u8, 249u8,
-							20u8, 222u8, 235u8, 36u8, 156u8, 155u8, 221u8, 27u8, 32u8, 33u8, 8u8,
-							99u8, 179u8, 156u8, 53u8, 241u8, 186u8, 118u8, 43u8, 93u8, 105u8,
+							144u8, 223u8, 41u8, 109u8, 148u8, 48u8, 94u8, 105u8, 41u8, 210u8, 55u8,
+							146u8, 60u8, 196u8, 248u8, 41u8, 219u8, 255u8, 27u8, 239u8, 206u8,
+							202u8, 95u8, 40u8, 156u8, 138u8, 218u8, 144u8, 116u8, 250u8, 241u8,
+							143u8,
 						],
 					)
 				}
@@ -10825,9 +10828,10 @@ pub mod api {
 						"NotariesLockedForFailedAudit",
 						(),
 						[
-							115u8, 240u8, 19u8, 42u8, 98u8, 218u8, 83u8, 20u8, 162u8, 169u8, 32u8,
-							230u8, 216u8, 32u8, 222u8, 194u8, 184u8, 110u8, 103u8, 9u8, 153u8,
-							54u8, 92u8, 197u8, 38u8, 237u8, 50u8, 132u8, 210u8, 48u8, 12u8, 225u8,
+							118u8, 246u8, 132u8, 173u8, 16u8, 242u8, 114u8, 36u8, 231u8, 236u8,
+							82u8, 54u8, 24u8, 104u8, 156u8, 237u8, 122u8, 146u8, 27u8, 173u8,
+							134u8, 71u8, 128u8, 249u8, 245u8, 149u8, 47u8, 59u8, 202u8, 37u8,
+							171u8, 250u8,
 						],
 					)
 				}
@@ -10852,9 +10856,10 @@ pub mod api {
 							_0.borrow(),
 						),
 						[
-							115u8, 240u8, 19u8, 42u8, 98u8, 218u8, 83u8, 20u8, 162u8, 169u8, 32u8,
-							230u8, 216u8, 32u8, 222u8, 194u8, 184u8, 110u8, 103u8, 9u8, 153u8,
-							54u8, 92u8, 197u8, 38u8, 237u8, 50u8, 132u8, 210u8, 48u8, 12u8, 225u8,
+							118u8, 246u8, 132u8, 173u8, 16u8, 242u8, 114u8, 36u8, 231u8, 236u8,
+							82u8, 54u8, 24u8, 104u8, 156u8, 237u8, 122u8, 146u8, 27u8, 173u8,
+							134u8, 71u8, 128u8, 249u8, 245u8, 149u8, 47u8, 59u8, 202u8, 37u8,
+							171u8, 250u8,
 						],
 					)
 				}
@@ -12622,10 +12627,9 @@ pub mod api {
 						"apply",
 						types::Apply { seal },
 						[
-							220u8, 220u8, 126u8, 129u8, 206u8, 237u8, 180u8, 231u8, 16u8, 230u8,
-							15u8, 54u8, 234u8, 53u8, 125u8, 108u8, 175u8, 60u8, 133u8, 136u8,
-							253u8, 247u8, 18u8, 218u8, 42u8, 114u8, 204u8, 90u8, 47u8, 251u8, 73u8,
-							121u8,
+							46u8, 16u8, 241u8, 30u8, 21u8, 122u8, 15u8, 51u8, 139u8, 177u8, 189u8,
+							52u8, 177u8, 104u8, 54u8, 48u8, 13u8, 126u8, 136u8, 39u8, 6u8, 95u8,
+							149u8, 233u8, 34u8, 118u8, 88u8, 16u8, 18u8, 204u8, 56u8, 223u8,
 						],
 					)
 				}
@@ -12743,10 +12747,10 @@ pub mod api {
 						"TempSealInherent",
 						(),
 						[
-							99u8, 190u8, 164u8, 154u8, 242u8, 119u8, 10u8, 22u8, 100u8, 213u8,
-							234u8, 166u8, 54u8, 104u8, 86u8, 35u8, 36u8, 105u8, 143u8, 229u8,
-							152u8, 149u8, 167u8, 178u8, 9u8, 50u8, 204u8, 82u8, 117u8, 81u8, 32u8,
-							161u8,
+							132u8, 118u8, 19u8, 146u8, 151u8, 72u8, 20u8, 30u8, 124u8, 27u8, 18u8,
+							121u8, 192u8, 229u8, 166u8, 149u8, 56u8, 14u8, 81u8, 89u8, 106u8,
+							131u8, 168u8, 243u8, 177u8, 155u8, 55u8, 13u8, 218u8, 154u8, 61u8,
+							172u8,
 						],
 					)
 				}
@@ -17805,9 +17809,10 @@ pub mod api {
 						"batch",
 						types::Batch { calls },
 						[
-							5u8, 253u8, 59u8, 77u8, 88u8, 224u8, 96u8, 29u8, 218u8, 10u8, 58u8,
-							5u8, 155u8, 222u8, 124u8, 168u8, 240u8, 4u8, 180u8, 51u8, 250u8, 27u8,
-							45u8, 117u8, 134u8, 133u8, 99u8, 161u8, 131u8, 220u8, 85u8, 123u8,
+							36u8, 149u8, 237u8, 172u8, 151u8, 82u8, 57u8, 116u8, 199u8, 149u8,
+							245u8, 187u8, 192u8, 138u8, 163u8, 3u8, 150u8, 245u8, 36u8, 34u8,
+							220u8, 250u8, 170u8, 70u8, 62u8, 57u8, 43u8, 108u8, 248u8, 70u8, 22u8,
+							242u8,
 						],
 					)
 				}
@@ -17837,10 +17842,10 @@ pub mod api {
 							call: ::subxt::ext::subxt_core::alloc::boxed::Box::new(call),
 						},
 						[
-							249u8, 67u8, 0u8, 110u8, 11u8, 129u8, 225u8, 179u8, 83u8, 221u8, 234u8,
-							5u8, 180u8, 225u8, 139u8, 231u8, 241u8, 195u8, 183u8, 137u8, 68u8,
-							111u8, 147u8, 193u8, 228u8, 23u8, 195u8, 104u8, 202u8, 223u8, 61u8,
-							91u8,
+							100u8, 178u8, 89u8, 74u8, 101u8, 192u8, 136u8, 102u8, 240u8, 158u8,
+							101u8, 78u8, 58u8, 238u8, 94u8, 139u8, 199u8, 227u8, 174u8, 124u8,
+							105u8, 89u8, 33u8, 10u8, 33u8, 165u8, 145u8, 8u8, 40u8, 162u8, 141u8,
+							67u8,
 						],
 					)
 				}
@@ -17866,9 +17871,10 @@ pub mod api {
 						"batch_all",
 						types::BatchAll { calls },
 						[
-							42u8, 28u8, 79u8, 15u8, 97u8, 217u8, 158u8, 111u8, 138u8, 199u8, 40u8,
-							20u8, 172u8, 145u8, 150u8, 81u8, 76u8, 21u8, 4u8, 103u8, 85u8, 128u8,
-							120u8, 112u8, 57u8, 171u8, 97u8, 237u8, 189u8, 164u8, 26u8, 247u8,
+							34u8, 126u8, 22u8, 109u8, 226u8, 169u8, 236u8, 125u8, 238u8, 74u8,
+							243u8, 118u8, 223u8, 184u8, 16u8, 149u8, 223u8, 235u8, 251u8, 69u8,
+							137u8, 215u8, 148u8, 43u8, 244u8, 133u8, 20u8, 17u8, 231u8, 180u8,
+							248u8, 151u8,
 						],
 					)
 				}
@@ -17891,9 +17897,9 @@ pub mod api {
 							call: ::subxt::ext::subxt_core::alloc::boxed::Box::new(call),
 						},
 						[
-							10u8, 241u8, 44u8, 201u8, 72u8, 51u8, 144u8, 93u8, 25u8, 53u8, 39u8,
-							137u8, 59u8, 189u8, 112u8, 255u8, 3u8, 47u8, 107u8, 208u8, 40u8, 9u8,
-							55u8, 62u8, 77u8, 165u8, 108u8, 15u8, 45u8, 90u8, 178u8, 141u8,
+							193u8, 228u8, 208u8, 216u8, 38u8, 173u8, 53u8, 135u8, 107u8, 9u8, 0u8,
+							58u8, 220u8, 174u8, 23u8, 103u8, 100u8, 121u8, 220u8, 228u8, 14u8,
+							255u8, 41u8, 66u8, 245u8, 55u8, 136u8, 49u8, 222u8, 72u8, 73u8, 191u8,
 						],
 					)
 				}
@@ -17919,10 +17925,10 @@ pub mod api {
 						"force_batch",
 						types::ForceBatch { calls },
 						[
-							214u8, 178u8, 156u8, 240u8, 53u8, 125u8, 34u8, 220u8, 89u8, 96u8,
-							237u8, 102u8, 61u8, 208u8, 58u8, 20u8, 173u8, 191u8, 102u8, 18u8,
-							113u8, 175u8, 85u8, 80u8, 99u8, 51u8, 29u8, 18u8, 187u8, 228u8, 115u8,
-							154u8,
+							243u8, 104u8, 239u8, 90u8, 113u8, 99u8, 204u8, 249u8, 102u8, 36u8,
+							241u8, 124u8, 85u8, 68u8, 223u8, 7u8, 174u8, 43u8, 180u8, 117u8, 1u8,
+							249u8, 145u8, 74u8, 69u8, 156u8, 255u8, 149u8, 221u8, 153u8, 193u8,
+							80u8,
 						],
 					)
 				}
@@ -17945,10 +17951,10 @@ pub mod api {
 							weight,
 						},
 						[
-							189u8, 1u8, 120u8, 176u8, 112u8, 68u8, 19u8, 247u8, 182u8, 168u8,
-							125u8, 163u8, 119u8, 218u8, 24u8, 82u8, 172u8, 32u8, 62u8, 88u8, 165u8,
-							235u8, 11u8, 68u8, 172u8, 196u8, 107u8, 238u8, 54u8, 160u8, 73u8,
-							176u8,
+							7u8, 141u8, 114u8, 138u8, 252u8, 27u8, 175u8, 21u8, 138u8, 70u8, 84u8,
+							127u8, 86u8, 158u8, 159u8, 228u8, 107u8, 33u8, 132u8, 217u8, 22u8,
+							118u8, 141u8, 185u8, 125u8, 202u8, 53u8, 151u8, 143u8, 246u8, 22u8,
+							195u8,
 						],
 					)
 				}
@@ -18283,9 +18289,9 @@ pub mod api {
 							call: ::subxt::ext::subxt_core::alloc::boxed::Box::new(call),
 						},
 						[
-							214u8, 204u8, 103u8, 252u8, 94u8, 177u8, 209u8, 2u8, 145u8, 40u8, 12u8,
-							110u8, 38u8, 136u8, 116u8, 106u8, 103u8, 106u8, 2u8, 111u8, 77u8,
-							175u8, 206u8, 34u8, 24u8, 166u8, 17u8, 71u8, 101u8, 177u8, 45u8, 103u8,
+							68u8, 160u8, 227u8, 27u8, 224u8, 151u8, 119u8, 217u8, 6u8, 8u8, 48u8,
+							102u8, 231u8, 203u8, 29u8, 186u8, 128u8, 58u8, 7u8, 125u8, 30u8, 223u8,
+							205u8, 227u8, 150u8, 216u8, 121u8, 176u8, 24u8, 173u8, 242u8, 197u8,
 						],
 					)
 				}
@@ -18308,9 +18314,9 @@ pub mod api {
 							weight,
 						},
 						[
-							122u8, 65u8, 176u8, 200u8, 8u8, 134u8, 101u8, 169u8, 35u8, 223u8, 28u8,
-							113u8, 50u8, 152u8, 53u8, 237u8, 84u8, 48u8, 230u8, 235u8, 14u8, 34u8,
-							226u8, 133u8, 234u8, 137u8, 20u8, 26u8, 45u8, 206u8, 7u8, 81u8,
+							254u8, 38u8, 119u8, 158u8, 32u8, 73u8, 41u8, 177u8, 205u8, 248u8, 58u8,
+							82u8, 26u8, 32u8, 39u8, 69u8, 51u8, 21u8, 116u8, 106u8, 2u8, 80u8,
+							28u8, 150u8, 230u8, 169u8, 120u8, 138u8, 64u8, 0u8, 176u8, 119u8,
 						],
 					)
 				}
@@ -18348,10 +18354,10 @@ pub mod api {
 							call: ::subxt::ext::subxt_core::alloc::boxed::Box::new(call),
 						},
 						[
-							247u8, 7u8, 71u8, 252u8, 196u8, 25u8, 110u8, 34u8, 244u8, 56u8, 49u8,
-							151u8, 98u8, 130u8, 174u8, 195u8, 196u8, 68u8, 245u8, 124u8, 185u8,
-							160u8, 20u8, 74u8, 165u8, 157u8, 31u8, 205u8, 254u8, 240u8, 67u8,
-							200u8,
+							245u8, 114u8, 124u8, 5u8, 103u8, 179u8, 95u8, 63u8, 54u8, 133u8, 220u8,
+							166u8, 243u8, 245u8, 246u8, 42u8, 202u8, 246u8, 210u8, 106u8, 228u8,
+							63u8, 114u8, 237u8, 89u8, 138u8, 30u8, 111u8, 139u8, 242u8, 48u8,
+							159u8,
 						],
 					)
 				}
@@ -18962,6 +18968,11 @@ pub mod api {
 					InvalidBlockVoteSource,
 					#[codec(index = 53)]
 					InsufficientBlockVoteMinimum,
+					#[codec(index = 54)]
+					InvalidBlockVoteTick {
+						tick: ::core::primitive::u32,
+						notebook_tick: ::core::primitive::u32,
+					},
 				}
 			}
 			#[derive(
@@ -19010,100 +19021,6 @@ pub mod api {
 					Tax,
 					#[codec(index = 1)]
 					Deposit,
-				}
-			}
-			pub mod apis {
-				use super::runtime_types;
-				#[derive(
-					:: subxt :: ext :: subxt_core :: ext :: codec :: Decode,
-					:: subxt :: ext :: subxt_core :: ext :: codec :: Encode,
-					:: subxt :: ext :: subxt_core :: ext :: scale_decode :: DecodeAsType,
-					:: subxt :: ext :: subxt_core :: ext :: scale_encode :: EncodeAsType,
-					Clone,
-					Debug,
-				)]
-				# [codec (crate = :: subxt :: ext :: subxt_core :: ext :: codec)]
-				#[decode_as_type(
-					crate_path = ":: subxt :: ext :: subxt_core :: ext :: scale_decode"
-				)]
-				#[encode_as_type(
-					crate_path = ":: subxt :: ext :: subxt_core :: ext :: scale_encode"
-				)]
-				pub struct NotaryNotebookVotes {
-					#[codec(compact)]
-					pub notary_id: ::core::primitive::u32,
-					#[codec(compact)]
-					pub notebook_number: ::core::primitive::u32,
-					pub raw_votes: ::subxt::ext::subxt_core::alloc::vec::Vec<(
-						::subxt::ext::subxt_core::alloc::vec::Vec<::core::primitive::u8>,
-						::core::primitive::u128,
-					)>,
-				}
-				#[derive(
-					:: subxt :: ext :: subxt_core :: ext :: codec :: Decode,
-					:: subxt :: ext :: subxt_core :: ext :: codec :: Encode,
-					:: subxt :: ext :: subxt_core :: ext :: scale_decode :: DecodeAsType,
-					:: subxt :: ext :: subxt_core :: ext :: scale_encode :: EncodeAsType,
-					Clone,
-					Debug,
-				)]
-				# [codec (crate = :: subxt :: ext :: subxt_core :: ext :: codec)]
-				#[decode_as_type(
-					crate_path = ":: subxt :: ext :: subxt_core :: ext :: scale_decode"
-				)]
-				#[encode_as_type(
-					crate_path = ":: subxt :: ext :: subxt_core :: ext :: scale_encode"
-				)]
-				pub struct NotebookAuditResult {
-					#[codec(compact)]
-					pub notary_id: ::core::primitive::u32,
-					#[codec(compact)]
-					pub notebook_number: ::core::primitive::u32,
-					#[codec(compact)]
-					pub tick: ::core::primitive::u32,
-					pub raw_votes: ::subxt::ext::subxt_core::alloc::vec::Vec<(
-						::subxt::ext::subxt_core::alloc::vec::Vec<::core::primitive::u8>,
-						::core::primitive::u128,
-					)>,
-					pub changed_accounts_root: ::sp_core::H256,
-					pub account_changelist: ::subxt::ext::subxt_core::alloc::vec::Vec<
-						runtime_types::argon_primitives::balance_change::AccountOrigin,
-					>,
-					pub used_transfers_to_localchain:
-						::subxt::ext::subxt_core::alloc::vec::Vec<::core::primitive::u32>,
-					pub secret_hash: ::sp_core::H256,
-					pub block_votes_root: ::sp_core::H256,
-				}
-				#[derive(
-					:: subxt :: ext :: subxt_core :: ext :: codec :: Decode,
-					:: subxt :: ext :: subxt_core :: ext :: codec :: Encode,
-					:: subxt :: ext :: subxt_core :: ext :: scale_decode :: DecodeAsType,
-					:: subxt :: ext :: subxt_core :: ext :: scale_encode :: EncodeAsType,
-					Clone,
-					Debug,
-				)]
-				# [codec (crate = :: subxt :: ext :: subxt_core :: ext :: codec)]
-				#[decode_as_type(
-					crate_path = ":: subxt :: ext :: subxt_core :: ext :: scale_decode"
-				)]
-				#[encode_as_type(
-					crate_path = ":: subxt :: ext :: subxt_core :: ext :: scale_encode"
-				)]
-				pub struct NotebookAuditSummary {
-					#[codec(compact)]
-					pub notary_id: ::core::primitive::u32,
-					#[codec(compact)]
-					pub notebook_number: ::core::primitive::u32,
-					#[codec(compact)]
-					pub tick: ::core::primitive::u32,
-					pub changed_accounts_root: ::sp_core::H256,
-					pub account_changelist: ::subxt::ext::subxt_core::alloc::vec::Vec<
-						runtime_types::argon_primitives::balance_change::AccountOrigin,
-					>,
-					pub used_transfers_to_localchain:
-						::subxt::ext::subxt_core::alloc::vec::Vec<::core::primitive::u32>,
-					pub secret_hash: ::sp_core::H256,
-					pub block_votes_root: ::sp_core::H256,
 				}
 			}
 			pub mod balance_change {
@@ -19676,6 +19593,8 @@ pub mod api {
 					pub power: ::core::primitive::u128,
 					pub signature: runtime_types::sp_runtime::MultiSignature,
 					pub block_rewards_account_id: ::subxt::ext::subxt_core::utils::AccountId32,
+					#[codec(compact)]
+					pub tick: ::core::primitive::u32,
 				}
 			}
 			pub mod bond {
@@ -20201,6 +20120,65 @@ pub mod api {
 				#[encode_as_type(
 					crate_path = ":: subxt :: ext :: subxt_core :: ext :: scale_encode"
 				)]
+				pub struct NotaryNotebookAuditSummary {
+					#[codec(compact)]
+					pub notary_id: ::core::primitive::u32,
+					#[codec(compact)]
+					pub notebook_number: ::core::primitive::u32,
+					#[codec(compact)]
+					pub tick: ::core::primitive::u32,
+					#[codec(compact)]
+					pub version: ::core::primitive::u32,
+					pub raw_data: ::subxt::ext::subxt_core::alloc::vec::Vec<::core::primitive::u8>,
+				}
+				#[derive(
+					:: subxt :: ext :: subxt_core :: ext :: codec :: Decode,
+					:: subxt :: ext :: subxt_core :: ext :: codec :: Encode,
+					:: subxt :: ext :: subxt_core :: ext :: scale_decode :: DecodeAsType,
+					:: subxt :: ext :: subxt_core :: ext :: scale_encode :: EncodeAsType,
+					Clone,
+					Debug,
+				)]
+				# [codec (crate = :: subxt :: ext :: subxt_core :: ext :: codec)]
+				#[decode_as_type(
+					crate_path = ":: subxt :: ext :: subxt_core :: ext :: scale_decode"
+				)]
+				#[encode_as_type(
+					crate_path = ":: subxt :: ext :: subxt_core :: ext :: scale_encode"
+				)]
+				pub struct NotaryNotebookDetails<_0> {
+					#[codec(compact)]
+					pub notary_id: ::core::primitive::u32,
+					#[codec(compact)]
+					pub version: ::core::primitive::u32,
+					#[codec(compact)]
+					pub notebook_number: ::core::primitive::u32,
+					#[codec(compact)]
+					pub tick: ::core::primitive::u32,
+					pub header_hash: ::sp_core::H256,
+					#[codec(compact)]
+					pub block_votes_count: ::core::primitive::u32,
+					#[codec(compact)]
+					pub block_voting_power: ::core::primitive::u128,
+					pub blocks_with_votes: ::subxt::ext::subxt_core::alloc::vec::Vec<_0>,
+					pub raw_audit_summary:
+						::subxt::ext::subxt_core::alloc::vec::Vec<::core::primitive::u8>,
+				}
+				#[derive(
+					:: subxt :: ext :: subxt_core :: ext :: codec :: Decode,
+					:: subxt :: ext :: subxt_core :: ext :: codec :: Encode,
+					:: subxt :: ext :: subxt_core :: ext :: scale_decode :: DecodeAsType,
+					:: subxt :: ext :: subxt_core :: ext :: scale_encode :: EncodeAsType,
+					Clone,
+					Debug,
+				)]
+				# [codec (crate = :: subxt :: ext :: subxt_core :: ext :: codec)]
+				#[decode_as_type(
+					crate_path = ":: subxt :: ext :: subxt_core :: ext :: scale_decode"
+				)]
+				#[encode_as_type(
+					crate_path = ":: subxt :: ext :: subxt_core :: ext :: scale_encode"
+				)]
 				pub struct NotaryNotebookKeyDetails {
 					#[codec(compact)]
 					pub notebook_number: ::core::primitive::u32,
@@ -20225,21 +20203,15 @@ pub mod api {
 				#[encode_as_type(
 					crate_path = ":: subxt :: ext :: subxt_core :: ext :: scale_encode"
 				)]
-				pub struct NotaryNotebookVoteDetails<_0> {
+				pub struct NotaryNotebookRawVotes {
 					#[codec(compact)]
 					pub notary_id: ::core::primitive::u32,
 					#[codec(compact)]
-					pub version: ::core::primitive::u32,
-					#[codec(compact)]
 					pub notebook_number: ::core::primitive::u32,
-					#[codec(compact)]
-					pub tick: ::core::primitive::u32,
-					pub header_hash: ::sp_core::H256,
-					#[codec(compact)]
-					pub block_votes_count: ::core::primitive::u32,
-					#[codec(compact)]
-					pub block_voting_power: ::core::primitive::u128,
-					pub blocks_with_votes: ::subxt::ext::subxt_core::alloc::vec::Vec<_0>,
+					pub raw_votes: ::subxt::ext::subxt_core::alloc::vec::Vec<(
+						::subxt::ext::subxt_core::alloc::vec::Vec<::core::primitive::u8>,
+						::core::primitive::u128,
+					)>,
 				}
 				#[derive(
 					:: subxt :: ext :: subxt_core :: ext :: codec :: Decode,

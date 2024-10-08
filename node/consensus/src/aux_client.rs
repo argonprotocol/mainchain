@@ -17,23 +17,25 @@ use sp_arithmetic::traits::UniqueSaturatedInto;
 use sp_core::{H256, U256};
 use sp_runtime::traits::{Block as BlockT, Header};
 
+use crate::{aux_data::AuxData, error::Error};
 use argon_node_runtime::{AccountId, BlockNumber, NotebookVerifyError};
 use argon_primitives::{
-	notary::{NotaryNotebookTickState, NotaryNotebookVoteDetails, NotaryNotebookVoteDigestDetails},
+	notary::{
+		NotaryNotebookAuditSummary, NotaryNotebookDetails, NotaryNotebookRawVotes,
+		NotaryNotebookTickState, NotaryNotebookVoteDigestDetails,
+	},
 	tick::Tick,
-	BlockSealDigest, BlockVotingPower, ComputeDifficulty, NotaryId, NotaryNotebookVotes,
-	NotebookAuditSummary, NotebookDigestRecord, NotebookHeaderData, NotebookNumber,
+	BlockSealDigest, BlockVotingPower, ComputeDifficulty, NotaryId, NotebookDigestRecord,
+	NotebookHeaderData, NotebookNumber,
 };
-
-use crate::{aux_data::AuxData, error::Error};
 
 pub enum AuxState<C: AuxStore> {
 	NotaryStateAtTick(Arc<AuxData<NotaryNotebookTickState, C>>),
 	AuthorsAtHeight(Arc<AuxData<BTreeMap<H256, BTreeSet<AccountId>>, C>>),
 	NotaryNotebooks(Arc<AuxData<Vec<NotebookAuditResult>, C>>),
+	NotaryAuditSummaries(Arc<AuxData<Vec<NotaryNotebookAuditSummary>, C>>),
 	NotaryMissingNotebooks(Arc<AuxData<BTreeSet<NotebookNumber>, C>>),
-	VotesAtTick(Arc<AuxData<Vec<NotaryNotebookVotes>, C>>),
-	NotaryAuditSummaries(Arc<AuxData<Vec<NotebookAuditSummary>, C>>),
+	VotesAtTick(Arc<AuxData<Vec<NotaryNotebookRawVotes>, C>>),
 	ForkVotingPower(Arc<AuxData<ForkPower, C>>),
 	MaxVotingPowerAtTick(Arc<AuxData<ForkPower, C>>),
 }
@@ -273,7 +275,7 @@ impl<B: BlockT, C: AuxStore + 'static> ArgonAux<B, C> {
 		self.get_or_insert_state(key)
 	}
 
-	pub fn store_votes(&self, tick: Tick, votes: NotaryNotebookVotes) -> Result<(), Error> {
+	pub fn store_votes(&self, tick: Tick, votes: NotaryNotebookRawVotes) -> Result<(), Error> {
 		self.get_votes(tick)?.mutate(|existing| {
 			if !existing.iter().any(|x| {
 				x.notary_id == votes.notary_id && x.notebook_number == votes.notebook_number
@@ -284,26 +286,10 @@ impl<B: BlockT, C: AuxStore + 'static> ArgonAux<B, C> {
 		Ok(())
 	}
 
-	pub fn store_audit_summary(
-		&self,
-		summary: NotebookAuditSummary,
-		oldest_tick_to_keep: Tick,
-	) -> Result<(), Error> {
-		let notary_id = summary.notary_id;
-		self.get_audit_summaries(notary_id)?.mutate(|summaries| {
-			summaries.retain(|s| s.tick >= oldest_tick_to_keep);
-			if !summaries.iter().any(|s| s.notebook_number == summary.notebook_number) {
-				summaries.push(summary);
-				summaries.sort_by(|a, b| a.notebook_number.cmp(&b.notebook_number));
-			}
-		})?;
-		Ok(())
-	}
-
 	pub fn get_votes(
 		&self,
 		tick: Tick,
-	) -> Result<Arc<AuxData<Vec<NotaryNotebookVotes>, C>>, Error> {
+	) -> Result<Arc<AuxData<Vec<NotaryNotebookRawVotes>, C>>, Error> {
 		let key = AuxKey::VotesAtTick(tick);
 		self.get_or_insert_state(key)
 	}
@@ -311,7 +297,7 @@ impl<B: BlockT, C: AuxStore + 'static> ArgonAux<B, C> {
 	pub fn get_audit_summaries(
 		&self,
 		notary_id: NotaryId,
-	) -> Result<Arc<AuxData<Vec<NotebookAuditSummary>, C>>, Error> {
+	) -> Result<Arc<AuxData<Vec<NotaryNotebookAuditSummary>, C>>, Error> {
 		let key = AuxKey::NotaryAuditSummaries(notary_id);
 		self.get_or_insert_state(key)
 	}
@@ -323,12 +309,41 @@ impl<B: BlockT, C: AuxStore + 'static> ArgonAux<B, C> {
 
 	pub fn store_notebook_result(
 		&self,
-		notary_id: NotaryId,
 		audit_result: NotebookAuditResult,
 		raw_signed_header: Vec<u8>,
-		vote_details: &NotaryNotebookVoteDetails<B::Hash>,
+		notebook_details: &NotaryNotebookDetails<B::Hash>,
+		oldest_tick_to_keep: Tick,
 	) -> Result<NotaryNotebookTickState, Error> {
-		let notary_state = self.update_tick_state(raw_signed_header, vote_details)?;
+		let tick = notebook_details.tick;
+		let notary_id = notebook_details.notary_id;
+		let notebook_number = notebook_details.notebook_number;
+		let notary_state = self.get_notebook_tick_state(tick)?.mutate(|state| {
+			let vote_details = NotaryNotebookVoteDigestDetails::from(notebook_details);
+
+			info!(
+				"Storing vote details for tick {} and notary {} at notebook #{}",
+				tick, notary_id, vote_details.notebook_number
+			);
+
+			if state.notebook_key_details_by_notary.insert(notary_id, vote_details).is_none() {
+				state.raw_headers_by_notary.insert(notary_id, raw_signed_header);
+			}
+			state.clone()
+		})?;
+
+		self.get_audit_summaries(notary_id)?.mutate(|summaries| {
+			summaries.retain(|s| s.tick >= oldest_tick_to_keep);
+			if !summaries.iter().any(|s| s.notebook_number == notebook_number) {
+				summaries.push(NotaryNotebookAuditSummary {
+					notary_id,
+					notebook_number,
+					tick,
+					version: notebook_details.version,
+					raw_data: notebook_details.raw_audit_summary.clone(),
+				});
+				summaries.sort_by(|a, b| a.notebook_number.cmp(&b.notebook_number));
+			}
+		})?;
 
 		self.get_notary_audit_history(notary_id)?.mutate(|notebooks| {
 			if !notebooks.iter().any(|n| n.notebook_number == audit_result.notebook_number) {
@@ -356,28 +371,6 @@ impl<B: BlockT, C: AuxStore + 'static> ArgonAux<B, C> {
 	) -> Result<Arc<AuxData<NotaryNotebookTickState, C>>, Error> {
 		let key = AuxKey::NotaryStateAtTick(tick);
 		self.get_or_insert_state(key)
-	}
-
-	fn update_tick_state(
-		&self,
-		raw_signed_header: Vec<u8>,
-		vote_details: &NotaryNotebookVoteDetails<B::Hash>,
-	) -> Result<NotaryNotebookTickState, Error> {
-		let tick = vote_details.tick;
-		let notary_id = vote_details.notary_id;
-		self.get_notebook_tick_state(tick)?.mutate(|state| {
-			let vote_details = NotaryNotebookVoteDigestDetails::from(vote_details);
-
-			info!(
-				"Storing vote details for tick {} and notary {} at notebook #{}",
-				tick, notary_id, vote_details.notebook_number
-			);
-
-			if state.notebook_key_details_by_notary.insert(notary_id, vote_details).is_none() {
-				state.raw_headers_by_notary.insert(notary_id, raw_signed_header);
-			}
-			Ok(state.clone())
-		})?
 	}
 
 	fn get_or_insert_state<T: 'static + Clone>(

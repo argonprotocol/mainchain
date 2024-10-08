@@ -66,7 +66,7 @@ likely need to acquire testnet Argons and Bitcoins to experiment with this featu
 
 - [Argon Testnet Faucet](./account-setup.md#requesting-testnet-funds)
 - The Testnet Faucet will also grant you Signet Bitcoins (good only on the Argon Testnet). To use it, go to
-  our [Discord](https://discord.gg/ChyAhFtD) `testnet` channel and type `/drip-bitcoin`. Enter your address at the
+  our [Discord](https://discord.gg/6JxjCNvu6x) `testnet` channel and type `/drip-bitcoin`. Enter your address at the
   prompt:
   ![Discord Faucet.png](images/discord-faucet-bitcoin.png)
 

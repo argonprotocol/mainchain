@@ -976,6 +976,7 @@ fn create_block_vote_seal(seal_strength: U256) -> BlockSealInherent {
 			account_id: AccountId32::from_slice(&[2u8; 32]).expect("32 bytes"),
 			index: 1,
 			power: 500,
+			tick: 1,
 			block_rewards_account_id: AccountId32::from_slice(&[3u8; 32]).expect("32 bytes"),
 			signature: sp_core::sr25519::Signature::from_raw([0u8; 64]).into(),
 		},

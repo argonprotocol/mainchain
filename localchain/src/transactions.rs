@@ -675,7 +675,7 @@ mod tests {
           assert_eq!(latest.change_number, 2);
         } else {
           assert_eq!(latest.balance, "400");
-          assert_eq!(latest.change_number, 1);
+          assert_eq!(latest.change_number, 2);
         }
       } else if account.hd_path.is_some() {
         // should be getting consolidated

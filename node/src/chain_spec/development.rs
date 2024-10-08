@@ -17,7 +17,7 @@ pub fn development_config() -> Result<ChainSpec, String> {
 	properties.insert("tokenSymbol".into(), "ARGON".into());
 	properties.insert("ss58Format".into(), ADDRESS_PREFIX.into());
 
-	const HASHES_PER_SECOND: u64 = 1000;
+	const HASHES_PER_SECOND: u64 = 500;
 	const TICK_MILLIS: u64 = 2000;
 
 	Ok(ChainSpec::builder(

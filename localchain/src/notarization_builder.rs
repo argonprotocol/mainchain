@@ -703,19 +703,6 @@ impl NotarizationBuilder {
     Ok(json)
   }
 
-  pub(crate) async fn has_items_to_notarize(&self) -> bool {
-    let balance_changes_by_account = self.balance_changes_by_account.lock().await;
-
-    let mut balance_changes = 0;
-    for balance_change_tx in (*balance_changes_by_account).values() {
-      let balance_change = balance_change_tx.inner().await;
-      if balance_change.notes.len() > 0 {
-        balance_changes += 1;
-      }
-    }
-    balance_changes > 0
-  }
-
   pub(crate) async fn to_notarization(&self) -> Result<Notarization> {
     let imports = self.imported_balance_changes.lock().await;
     let block_votes = self.votes.lock().await;
@@ -789,7 +776,17 @@ impl NotarizationBuilder {
     let notary_client = self.notary_clients.get(notary_id).await?;
     let notarized_balance_changes = notarization.balance_changes.len() as u32;
     let notarized_votes = notarization.block_votes.len() as u32;
-    let result = notary_client.notarize(notarization.clone()).await?;
+    let result = notary_client
+      .notarize(notarization.clone())
+      .await
+      .map_err(|e| {
+        let e: Error = e;
+        if let Error::NotaryApiError(inner) = e {
+          Error::NotarizationError(inner, Box::new(notarization.clone()))
+        } else {
+          e
+        }
+      })?;
 
     let mut tx = self.db.begin().await?;
     let notarization_id = sqlx::query_scalar!(
@@ -804,11 +801,13 @@ impl NotarizationBuilder {
     ?;
 
     let channel_holds = self.channel_holds.lock().await;
+    let mut inner_channel_holds = vec![];
     for channel_hold in (*channel_holds).iter() {
       let mut channel_hold_inner = channel_hold.inner().await;
       channel_hold_inner
         .db_mark_notarized(&mut tx, notarization_id)
         .await?;
+      inner_channel_holds.push(channel_hold_inner);
     }
 
     let notary_id = notary_client.notary_id;
@@ -826,6 +825,7 @@ impl NotarizationBuilder {
       balance_changes_by_account: Default::default(),
       accounts_by_id: Default::default(),
       notarized_balance_changes,
+      channel_holds: inner_channel_holds,
       notarized_votes,
     };
     let mut tracker_balance_changes = tracker.balance_changes_by_account.lock().await;
@@ -1255,6 +1255,8 @@ pub mod napi_ext {
     pub index: u32,
     /// The voting power of this vote, determined from the amount of tax
     pub power: BigInt,
+    /// The tick where a vote was intended
+    pub tick: u32,
     /// The domain used to create this vote
     pub domain_hash: Vec<u8>,
     /// The domain payment address used to create this vote
@@ -1274,6 +1276,7 @@ pub mod napi_ext {
         block_hash: H256::from_slice(self.block_hash.as_slice()),
         index: self.index,
         power,
+        tick: self.tick,
         block_rewards_account_id: AccountStore::parse_address(&self.block_rewards_address)?,
         signature: MultiSignature::decode(&mut self.signature.as_slice())?,
       })
@@ -1472,7 +1475,7 @@ mod test {
     let header = mock_notary
       .create_notebook_header(bob_notarization.get_balance_tips().await?)
       .await;
-    mock_notary
+    let _ = mock_notary
       .add_notarization(
         header.notebook_number,
         bob_notarization.notarization.clone(),

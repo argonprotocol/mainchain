@@ -14,8 +14,8 @@ for (const entry of Registry) {
 // Find SS58 Address Prefixes that generate an SS58 Address Format that starts with the letter 'e'
 // Optionally add a filter to this function if you only want to return those not listed in the
 // the SS58 Registry https://github.com/paritytech/ss58-registry/blob/main/ss58-registry.json
-function findSS58AddressPrefixes(): [number, string][] {
-    const foundSS58AddressPrefixes = [];
+function findSS58AddressPrefixes(): [number, string, string, string][] {
+    const foundSS58AddressPrefixes: [number, string, string, string][] = [];
 
     //
     for (let prefix = 0; prefix <= maxSS58AddressPrefixesCount; prefix++) {

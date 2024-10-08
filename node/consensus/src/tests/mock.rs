@@ -31,18 +31,20 @@ use sp_runtime::{
 use substrate_test_runtime::{AccountId, BlockNumber, Executive, Hash, Header};
 use substrate_test_runtime_client::Backend;
 
+use crate::{aux_client::ArgonAux, import_queue};
 use argon_node_runtime::{NotaryRecordT, NotebookVerifyError};
 use argon_primitives::{
 	bitcoin::{BitcoinSyncStatus, Satoshis, UtxoRef, UtxoValue},
 	block_seal::BlockSealAuthorityId,
 	digests::BlockVoteDigest,
-	notary::{NotaryNotebookVoteDetails, NotaryNotebookVoteDigestDetails},
+	notary::{
+		NotaryNotebookAuditSummary, NotaryNotebookDetails, NotaryNotebookRawVotes,
+		NotaryNotebookVoteDigestDetails,
+	},
 	tick::{Tick, Ticker},
-	Balance, BestBlockVoteSeal, ComputeDifficulty, HashOutput, NotaryId, NotaryNotebookVotes,
-	NotebookAuditResult, NotebookAuditSummary, NotebookNumber, VoteMinimum,
+	Balance, BestBlockVoteSeal, ComputeDifficulty, HashOutput, NotaryId, NotebookNumber,
+	VoteMinimum,
 };
-
-use crate::{aux_client::ArgonAux, import_queue};
 
 type Error = sp_blockchain::Error;
 
@@ -256,7 +258,7 @@ sp_api::mock_impl_runtime_apis! {
 			digest
 		}
 		fn find_vote_block_seals(
-			_votes: Vec<NotaryNotebookVotes>,
+			_votes: Vec<NotaryNotebookRawVotes>,
 			_: U256
 		) -> Result<BoundedVec<BestBlockVoteSeal<AccountId, BlockSealAuthorityId>, ConstU32<2>>, DispatchError> {
 			Ok(BoundedVec::truncate_from(vec![]))
@@ -280,12 +282,12 @@ sp_api::mock_impl_runtime_apis! {
 			_header_hash: H256,
 			_vote_minimums: &BTreeMap<HashOutput, VoteMinimum>,
 			_bytes: &Vec<u8>,
-			_audit_dependency_summaries: Vec<NotebookAuditSummary>,
-		) -> Result<NotebookAuditResult, NotebookVerifyError> {
+			_audit_dependency_summaries: Vec<NotaryNotebookAuditSummary>,
+		) -> Result<NotaryNotebookRawVotes, NotebookVerifyError> {
 			todo!("implement audit_notebook_and_get_votes")
 		}
 
-		fn decode_signed_raw_notebook_header(_raw_header: Vec<u8>) -> Result<NotaryNotebookVoteDetails<HashOutput>, DispatchError> {
+		fn decode_signed_raw_notebook_header(_raw_header: Vec<u8>) -> Result<NotaryNotebookDetails<HashOutput>, DispatchError> {
 			todo!()
 		}
 

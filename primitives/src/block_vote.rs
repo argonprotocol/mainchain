@@ -9,7 +9,7 @@ use sp_crypto_hashing::blake2_256;
 use sp_debug_derive::RuntimeDebug;
 use sp_runtime::{scale_info::TypeInfo, MultiSignature};
 
-use crate::{AccountId, BlockVotingPower, MerkleProof, NotaryId, NotebookNumber};
+use crate::{tick::Tick, AccountId, BlockVotingPower, MerkleProof, NotaryId, NotebookNumber};
 
 pub type VoteMinimum = u128;
 
@@ -42,6 +42,9 @@ pub struct BlockVoteT<Hash: Codec = H256> {
 	pub signature: MultiSignature,
 	/// The claimer of rewards
 	pub block_rewards_account_id: AccountId,
+	/// The tick of the block vote
+	#[codec(compact)]
+	pub tick: Tick,
 }
 
 #[derive(Encode)]
@@ -52,6 +55,7 @@ struct BlockVoteHashMessage<Hash: Codec> {
 	index: u32,
 	power: BlockVotingPower,
 	block_rewards_account_id: AccountId,
+	tick: Tick,
 }
 
 pub type BlockVote = BlockVoteT<H256>;
@@ -67,6 +71,7 @@ impl<Hash: Codec + Clone> BlockVoteT<Hash> {
 			index: self.index,
 			power: self.power,
 			block_rewards_account_id: self.block_rewards_account_id.clone(),
+			tick: self.tick,
 		}
 		.using_encoded(blake2_256)
 		.into()

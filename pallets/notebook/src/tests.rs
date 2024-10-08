@@ -10,19 +10,6 @@ use sp_keyring::{
 };
 use sp_runtime::{testing::H256, BoundedVec, Digest, DigestItem};
 
-use argon_notary_audit::{AccountHistoryLookupError, VerifyError};
-use argon_primitives::{
-	localchain::{AccountType, BalanceChange, Note, NoteType},
-	notary::NotaryNotebookKeyDetails,
-	notebook::{
-		AccountOrigin, BalanceTip, ChainTransfer, NewAccountOrigin, Notarization, NotebookHeader,
-		NotebookNumber,
-	},
-	tick::Tick,
-	BalanceProof, MerkleProof, NotaryId, NotebookAuditSummary, NotebookDigest,
-	NotebookDigestRecord, NotebookProvider, SignedNotebookHeader, NOTEBOOKS_DIGEST_ID,
-};
-
 use crate::{
 	mock::*,
 	pallet::{
@@ -30,6 +17,20 @@ use crate::{
 		NotebookChangedAccountsRootByNotary,
 	},
 	Error, Event,
+};
+use argon_notary_audit::{AccountHistoryLookupError, VerifyError};
+use argon_primitives::{
+	localchain::{AccountType, BalanceChange, Note, NoteType},
+	notary::{
+		NotaryNotebookAuditSummary, NotaryNotebookAuditSummaryDetails, NotaryNotebookKeyDetails,
+	},
+	notebook::{
+		AccountOrigin, BalanceTip, ChainTransfer, NewAccountOrigin, Notarization, NotebookHeader,
+		NotebookNumber,
+	},
+	tick::Tick,
+	BalanceProof, MerkleProof, NotaryId, NotebookDigest, NotebookDigestRecord, NotebookProvider,
+	SignedNotebookHeader, NOTEBOOKS_DIGEST_ID,
 };
 
 fn notebook_digest(books: Vec<(NotaryId, NotebookNumber, Tick, bool)>) -> DigestItem {
@@ -663,15 +664,19 @@ fn it_can_audit_notebooks_with_history() {
 				header_hash,
 				&eligibility,
 				&notebook.encode(),
-				vec![NotebookAuditSummary {
+				vec![NotaryNotebookAuditSummary {
 					notary_id,
 					notebook_number: notebook_number - 1,
 					tick: tick - 1,
-					changed_accounts_root: H256::random(),
-					account_changelist: vec![],
-					used_transfers_to_localchain: vec![1],
-					block_votes_root: H256::random(),
-					secret_hash: H256::random(),
+					version: 1,
+					raw_data: NotaryNotebookAuditSummaryDetails {
+						changed_accounts_root: H256::random(),
+						account_changelist: vec![],
+						used_transfers_to_localchain: vec![1],
+						block_votes_root: H256::random(),
+						secret_hash: H256::random(),
+					}
+					.encode()
 				}]
 			),
 			VerifyError::HistoryLookupError {
@@ -685,15 +690,19 @@ fn it_can_audit_notebooks_with_history() {
 			header_hash,
 			&eligibility,
 			&notebook.encode(),
-			vec![NotebookAuditSummary {
+			vec![NotaryNotebookAuditSummary {
 				notary_id,
 				notebook_number: notebook_number - 1,
 				tick: tick - 1,
-				changed_accounts_root: H256::random(),
-				account_changelist: vec![],
-				used_transfers_to_localchain: vec![],
-				block_votes_root: H256::random(),
-				secret_hash: H256::random(),
+				version: 1,
+				raw_data: NotaryNotebookAuditSummaryDetails {
+					changed_accounts_root: H256::random(),
+					account_changelist: vec![],
+					used_transfers_to_localchain: vec![],
+					block_votes_root: H256::random(),
+					secret_hash: H256::random(),
+				}
+				.encode()
 			}]
 		),);
 
@@ -838,15 +847,22 @@ fn it_can_audit_notebooks_with_history() {
 				header_hash,
 				&eligibility,
 				&notebook.encode(),
-				vec![NotebookAuditSummary {
+				vec![NotaryNotebookAuditSummary {
 					notary_id,
 					notebook_number: notebook_number - 1,
 					tick: tick - 1,
-					changed_accounts_root: H256::random(),
-					account_changelist: vec![AccountOrigin { notebook_number: 5, account_uid: 1 }],
-					used_transfers_to_localchain: vec![],
-					block_votes_root: H256::random(),
-					secret_hash: H256::random(),
+					version: 1,
+					raw_data: NotaryNotebookAuditSummaryDetails {
+						changed_accounts_root: H256::random(),
+						account_changelist: vec![AccountOrigin {
+							notebook_number: 5,
+							account_uid: 1
+						}],
+						used_transfers_to_localchain: vec![],
+						block_votes_root: H256::random(),
+						secret_hash: H256::random(),
+					}
+					.encode()
 				}]
 			),
 			VerifyError::InvalidPreviousBalanceChangeNotebook
@@ -858,15 +874,19 @@ fn it_can_audit_notebooks_with_history() {
 			header_hash,
 			&eligibility,
 			&notebook.encode(),
-			vec![NotebookAuditSummary {
+			vec![NotaryNotebookAuditSummary {
 				notary_id,
 				notebook_number: notebook_number - 1,
 				tick: tick - 1,
-				changed_accounts_root: H256::random(),
-				account_changelist: vec![],
-				used_transfers_to_localchain: vec![],
-				block_votes_root: H256::random(),
-				secret_hash: H256::random(),
+				version: 1,
+				raw_data: NotaryNotebookAuditSummaryDetails {
+					changed_accounts_root: H256::random(),
+					account_changelist: vec![],
+					used_transfers_to_localchain: vec![],
+					block_votes_root: H256::random(),
+					secret_hash: H256::random(),
+				}
+				.encode()
 			}]
 		),);
 	});

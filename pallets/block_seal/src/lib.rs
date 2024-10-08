@@ -33,12 +33,13 @@ pub mod pallet {
 	use argon_primitives::{
 		inherents::{BlockSealInherent, BlockSealInherentData, SealInherentError},
 		localchain::{BestBlockVoteSeal, BlockVote, BlockVoteT},
+		notary::NotaryNotebookRawVotes,
 		notebook::NotebookNumber,
 		tick::Tick,
 		AuthorityProvider, BlockSealAuthoritySignature, BlockSealEventHandler, BlockSealerInfo,
 		BlockSealerProvider, BlockVotingKey, BlockVotingProvider, MerkleProof, NotaryId,
-		NotaryNotebookVotes, NotebookProvider, ParentVotingKeyDigest, TickProvider, VotingKey,
-		AUTHOR_DIGEST_ID, PARENT_VOTING_KEY_DIGEST,
+		NotebookProvider, ParentVotingKeyDigest, TickProvider, VotingKey, AUTHOR_DIGEST_ID,
+		PARENT_VOTING_KEY_DIGEST,
 	};
 
 	use super::*;
@@ -384,7 +385,7 @@ pub mod pallet {
 		/// calling into the runtime while trying to build the next block. This means the current
 		/// tick is expected to be +1 of the runtime tick.
 		pub fn find_vote_block_seals(
-			notebook_votes: Vec<NotaryNotebookVotes>,
+			notebook_votes: Vec<NotaryNotebookRawVotes>,
 			with_better_strength: U256,
 		) -> Result<FindBlockVoteSealResult<T>, Error<T>> {
 			let Some(parent_key) = <ParentVotingKey<T>>::get() else {
@@ -412,7 +413,7 @@ pub mod pallet {
 			let mut best_votes = vec![];
 			let mut leafs_by_notary = BTreeMap::new();
 
-			for NotaryNotebookVotes { notebook_number, notary_id, raw_votes } in
+			for NotaryNotebookRawVotes { notebook_number, notary_id, raw_votes } in
 				notebook_votes.into_iter()
 			{
 				// don't use locked notary votes!
