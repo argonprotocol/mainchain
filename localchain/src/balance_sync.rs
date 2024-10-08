@@ -471,7 +471,7 @@ impl BalanceSync {
             .map(|x| x.id)
             .unwrap_or_default();
           mainchain_transfers
-            .record_balance_change_id(x.transfer_id, balance_change_id)
+            .record_balance_change_id(x.id, balance_change_id)
             .await?;
           notarizations.push(tracker);
         }

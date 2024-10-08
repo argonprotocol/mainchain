@@ -4,7 +4,7 @@ use chrono::NaiveDateTime;
 use sqlx::{FromRow, SqlitePool};
 use tokio::sync::Mutex;
 
-use argon_primitives::Balance;
+use argon_primitives::{Balance, TransferToLocalchainId};
 
 use crate::{bail, AccountStore, Keystore, LocalchainTransfer, MainchainClient, Result};
 
@@ -85,11 +85,12 @@ impl MainchainTransferStore {
     Ok(transfer)
   }
 
-  pub async fn get(&self, transfer_id: i64) -> Result<MainchainTransferIn> {
+  pub async fn get(&self, transfer_id: TransferToLocalchainId) -> Result<MainchainTransferIn> {
     let mut db = self.db.acquire().await?;
+    let transfer_id = transfer_id as i64;
     let transfer = sqlx::query_as!(
       MainchainTransferIn,
-      "SELECT * FROM mainchain_transfers_in WHERE id = ?",
+      "SELECT * FROM mainchain_transfers_in WHERE transfer_id = ?",
       transfer_id
     )
     .fetch_one(&mut *db)
@@ -142,14 +143,14 @@ impl MainchainTransferStore {
 
   pub async fn record_balance_change_id(
     &self,
-    transfer_id: i64,
+    local_id: i64,
     balance_change_id: i64,
   ) -> Result<()> {
     let mut db = self.db.acquire().await?;
     let res = sqlx::query!(
       "UPDATE mainchain_transfers_in SET balance_change_id = ? WHERE id = ?",
       balance_change_id,
-      transfer_id
+      local_id
     )
     .execute(&mut *db)
     .await?;
