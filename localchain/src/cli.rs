@@ -574,7 +574,7 @@ where
           .send_to_localchain(milligons, None)
           .await?;
         localchain.balance_sync().sync(None).await?;
-        let details = mainchain_transfers.get(transfer.transfer_id as i64).await?;
+        let details = mainchain_transfers.get(transfer.transfer_id).await?;
         println!(
           "Transfer details:\n\tblock_hash: {}\n\text_hash: {}",
           details.first_block_hash, details.extrinsic_hash

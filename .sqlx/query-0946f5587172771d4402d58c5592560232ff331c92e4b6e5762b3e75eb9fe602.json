@@ -1,6 +1,6 @@
 {
   "db_name": "SQLite",
-  "query": "SELECT * FROM mainchain_transfers_in WHERE id = ?",
+  "query": "SELECT * FROM mainchain_transfers_in WHERE transfer_id = ?",
   "describe": {
     "columns": [
       {
@@ -76,5 +76,5 @@
       false
     ]
   },
-  "hash": "b7694f0427e1fe097bb1c37b7e6e50ff283545e46512910b12f4dc664f52c32e"
+  "hash": "0946f5587172771d4402d58c5592560232ff331c92e4b6e5762b3e75eb9fe602"
 }
