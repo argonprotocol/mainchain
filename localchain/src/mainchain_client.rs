@@ -169,7 +169,7 @@ impl MainchainClient {
         Some(best_hash),
       )
       .await?
-      .ok_or_else(|| anyhow!("No best block found"))?
+      .ok_or_else(|| anyhow!("No vote blocks at grandparent tick ({grandparent_tick}) found"))?
       .0;
 
     debug!(
