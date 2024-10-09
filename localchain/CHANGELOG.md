@@ -1,6 +1,15 @@
 # Changelog
 
-## [v0.0.12](https://github.com/argonprotocol/mainchain/compare/v0.0.11...ba7f86fdeb646c6db350c60cd57e6a3bc0ff3cb9) (2024-10-08)
+## [v0.0.13](https://github.com/argonprotocol/mainchain/compare/v0.0.12...c07cbbb5a9c0f7774370cfa6e0adc5fbf29e7e28) (2024-10-09)
+
+### Fixes
+
+* **localchain:** holding mainchain locks too long
+([c07cbbb](https://github.com/argonprotocol/mainchain/commit/c07cbbb5a9c0f7774370cfa6e0adc5fbf29e7e28))
+* **localchain:** updating wrong mainchain transfer
+([7a7e31c](https://github.com/argonprotocol/mainchain/commit/7a7e31c6726aaecbc8a9dee459efd219dee648de))
+
+### [v0.0.12](https://github.com/argonprotocol/mainchain/compare/v0.0.11...v0.0.12) (2024-10-08)
 
 ### [v0.0.11](https://github.com/argonprotocol/mainchain/compare/v0.0.10...v0.0.11) (2024-10-08)
 
