@@ -1,3 +1,5 @@
+use crate::mainchain_client::MainchainClient;
+use crate::{bail, AccountStore, Error, Result};
 use anyhow::anyhow;
 use argon_notary_apis::localchain::{BalanceChangeResult, BalanceTipResult};
 use argon_notary_apis::LocalchainRpcClient;
@@ -12,10 +14,10 @@ use sp_core::ed25519;
 use sp_runtime::traits::Verify;
 use std::collections::HashMap;
 use std::sync::Arc;
+use std::time::Duration;
 use tokio::sync::Mutex;
-
-use crate::mainchain_client::MainchainClient;
-use crate::{bail, AccountStore, Error, Result};
+use tokio::time::timeout;
+use tracing::info;
 
 #[cfg_attr(feature = "napi", napi)]
 #[derive(Clone)]
@@ -57,6 +59,7 @@ impl NotaryClients {
   }
 
   pub async fn get(&self, notary_id: u32) -> Result<NotaryClient> {
+    // hold lock for this function
     let mut clients_by_id = self.clients_by_id.lock().await;
     if let Some(client) = clients_by_id.get(&notary_id) {
       if client.is_connected().await {
@@ -64,15 +67,25 @@ impl NotaryClients {
       }
     }
 
-    let mainchain_mutex = self.mainchain_client.lock().await;
+    let notary_details = {
+      let Some(ref mainchain_client) =
+        *(timeout(Duration::from_secs(5), self.mainchain_client.lock())
+          .await
+          .map_err(|_| anyhow!("Timeout getting mainchain lock"))?)
+      else {
+        bail!("Mainchain client not set");
+      };
 
-    let Some(ref mainchain_client) = *mainchain_mutex else {
-      bail!("Mainchain client not set");
-    };
+      mainchain_client
+        .get_notary_details(notary_id)
+        .await?
+        .ok_or(anyhow!("Notary {} not found", notary_id))
+    }?;
 
-    let Some(notary_details) = mainchain_client.get_notary_details(notary_id).await? else {
-      bail!("Notary {} not found", notary_id);
-    };
+    info!(
+      "Connecting to notary {} at {}",
+      notary_id, notary_details.hosts[0]
+    );
 
     let client = NotaryClient::connect(
       notary_id,
@@ -81,6 +94,7 @@ impl NotaryClients {
       true,
     )
     .await?;
+    info!("Connected to notary {}", notary_id);
     clients_by_id.insert(notary_id, client.clone());
     Ok(client)
   }

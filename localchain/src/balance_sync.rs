@@ -10,7 +10,7 @@ use tokio::sync::Mutex;
 
 use crate::{bail, Error, Result};
 use argon_primitives::tick::Tick;
-use argon_primitives::{AccountType, BlockVote, NotaryId, NotebookNumber};
+use argon_primitives::{AccountType, Balance, BlockVote, NotaryId, NotebookNumber};
 
 use crate::accounts::AccountStore;
 use crate::balance_changes::{BalanceChangeRow, BalanceChangeStatus, BalanceChangeStore};
@@ -325,7 +325,7 @@ impl BalanceSync {
         .convert_tax_to_votes(options)
         .await
         .unwrap_or_else(|e| {
-          tracing::warn!("Error converting tax to votes: {:?}", e);
+          tracing::warn!("Error converting tax to votes: {:?}", e.to_string());
           vec![]
         })
     } else {
@@ -413,7 +413,7 @@ impl BalanceSync {
     let mut db = self.db.acquire().await?;
 
     let pending_changes = BalanceChangeStore::db_find_unsettled(&mut db).await?;
-    tracing::info!("Found {} unsettled balance changes", pending_changes.len());
+    tracing::debug!("Found {} unsettled balance changes", pending_changes.len());
 
     let mut results = vec![];
 
@@ -427,8 +427,7 @@ impl BalanceSync {
 
   pub async fn sync_mainchain_transfers(&self) -> Result<Vec<NotarizationTracker>> {
     {
-      let mainchain_mutex = self.mainchain_client.lock().await;
-      let Some(_) = *mainchain_mutex else {
+      let Some(_) = *(self.mainchain_client.lock().await) else {
         return Ok(vec![]);
       };
     }
@@ -625,8 +624,7 @@ impl BalanceSync {
     &self,
     options: ChannelHoldCloseOptions,
   ) -> Result<Vec<NotarizationTracker>> {
-    let mainchain_mutex = self.mainchain_client.lock().await;
-    let Some(ref mainchain_client) = *mainchain_mutex else {
+    let Some(ref mainchain_client) = *(self.mainchain_client.lock().await) else {
       bail!("Cannot create votes.. No mainchain client available!");
     };
 
@@ -642,16 +640,33 @@ impl BalanceSync {
 
       for _ in 0..3 {
         match self.create_vote(&account, mainchain_client, &options).await {
-          Ok((tracker, should_retry)) => {
+          Ok(tracker) => {
             if let Some(tracker) = tracker {
               notarizations.push(tracker);
             }
-            if should_retry {
-              continue;
-            }
           }
           Err(e) => {
-            tracing::warn!("Error creating vote for account {}: {:?}", account.id, e);
+            if let Error::NotaryApiError(argon_notary_apis::Error::BalanceChangeVerifyError(
+              argon_notary_audit::VerifyError::InvalidBlockVoteTick {
+                tick,
+                notebook_tick,
+              },
+            )) = e
+            {
+              tracing::warn!(
+                "Voted on an invalid vote tick {} vs notebook tick {}: {:?}",
+                tick,
+                notebook_tick,
+                e.to_string()
+              );
+              continue;
+            } else {
+              tracing::warn!(
+                "Error creating vote for account {}: {:?}",
+                account.id,
+                e.to_string()
+              );
+            }
           }
         }
         break;
@@ -666,12 +681,17 @@ impl BalanceSync {
     account: &LocalAccount,
     mainchain_client: &MainchainClient,
     options: &ChannelHoldCloseOptions,
-  ) -> Result<(Option<NotarizationTracker>, bool)> {
+  ) -> Result<Option<NotarizationTracker>> {
     let notarization = self.create_notarization();
     let balance_change = notarization.load_account(account).await?;
     let total_available_tax = balance_change.balance().await;
-    if total_available_tax < options.minimum_vote_amount.unwrap_or_default() as u128 {
-      return Ok((None, false));
+    const DEFAULT_MINIMUM_VOTE_AMOUNT: Balance = 500;
+    if total_available_tax
+      <= options
+        .minimum_vote_amount
+        .unwrap_or(DEFAULT_MINIMUM_VOTE_AMOUNT as i64) as Balance
+    {
+      return Ok(None);
     }
 
     balance_change.send_to_vote(total_available_tax).await?;
@@ -679,13 +699,10 @@ impl BalanceSync {
     let current_tick = self.ticker.current();
     let Some(best_block_for_vote) = mainchain_client.get_vote_block_hash(current_tick).await?
     else {
-      tracing::debug!("No grandpa blocks to vote on at tick {}.", current_tick);
-      let millis_to_next_tick = self.ticker.millis_to_next_tick();
-      tokio::time::sleep(tokio::time::Duration::from_millis(millis_to_next_tick + 1)).await;
-      return Ok((None, true));
+      return Ok(None);
     };
     if total_available_tax < best_block_for_vote.vote_minimum {
-      return Ok((None, false));
+      return Ok(None);
     }
 
     let mut tick_counter = self.tick_counter.lock().await;
@@ -715,28 +732,8 @@ impl BalanceSync {
       .await?;
     vote.signature = MultiSignature::decode(&mut signature.as_ref())?;
     notarization.add_vote(vote).await?;
-    match notarization.notarize().await {
-      Ok(tracker) => Ok((Some(tracker), false)),
-      Err(e) => {
-        if let Error::NotaryApiError(argon_notary_apis::Error::BalanceChangeVerifyError(
-          argon_notary_audit::VerifyError::InvalidBlockVoteTick {
-            tick,
-            notebook_tick,
-          },
-        )) = e
-        {
-          tracing::warn!(
-            "Voted on an invalid vote tick {} vs notebook tick {}: {:?}",
-            tick,
-            notebook_tick,
-            e
-          );
-          Ok((None, true))
-        } else {
-          Err(e)
-        }
-      }
-    }
+    let tracker = notarization.notarize().await?;
+    Ok(Some(tracker))
   }
 
   /// Sends the notarizations to the notary for finalization. If there are errors, it will return the problem accounts
@@ -1142,8 +1139,7 @@ impl BalanceSync {
   pub async fn check_finalized(&self, balance_change: &mut BalanceChangeRow) -> Result<()> {
     let mut tx = self.db.begin().await?;
 
-    let mainchain_mutex = self.mainchain_client.lock().await;
-    let Some(ref mainchain_client) = *mainchain_mutex else {
+    let Some(ref mainchain_client) = *(self.mainchain_client.lock().await) else {
       tracing::warn!(
         "Cannot synchronize finalization of balance change; id={}. No mainchain client available.",
         balance_change.id,
