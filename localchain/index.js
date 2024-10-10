@@ -406,3 +406,4 @@ module.exports.NOTARIZATION_MAX_BLOCK_VOTES = nativeBinding.NOTARIZATION_MAX_BLO
 module.exports.NOTARIZATION_MAX_DOMAINS = nativeBinding.NOTARIZATION_MAX_DOMAINS
 module.exports.runCli = nativeBinding.runCli
 module.exports.TransactionType = nativeBinding.TransactionType
+module.exports.TRANSFER_TAX_CAP = nativeBinding.TRANSFER_TAX_CAP

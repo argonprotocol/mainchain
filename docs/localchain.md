@@ -68,7 +68,7 @@ Commands:
 
 Options:
   -b, --base-dir <BASE_DIR>            Where is your localchain? Defaults to a project-specific directory based on OS.
-                                          Linux:   /home/alice/.config/argon/localchain
+                                          Linux:   /root/.local/share/argon/localchain
                                           Windows: C:\Users\Alice\AppData\Roaming\argon\localchain
                                           macOS:   /Users/Alice/Library/Application Support/argon/localchain [env: ARGON_LOCALCHAIN_BASE_PATH=]
   -n, --name <NAME>                    The localchain name you'd like to use [env: ARGON_LOCALCHAIN_NAME=] [default: primary]

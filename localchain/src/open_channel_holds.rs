@@ -496,7 +496,7 @@ impl OpenChannelHoldsStore {
     .fetch_all(&self.db)
     .await
     ?;
-    tracing::info!("Found {} claimable channel_holds", expired.len());
+    tracing::debug!("Found {} claimable channel_holds", expired.len());
 
     let mut channel_holds = vec![];
     for row in expired.into_iter() {
@@ -507,7 +507,6 @@ impl OpenChannelHoldsStore {
         &self.keystore,
       ))
     }
-    tracing::debug!("Loaded channel_holds {}", channel_holds.len());
     Ok(channel_holds)
   }
 

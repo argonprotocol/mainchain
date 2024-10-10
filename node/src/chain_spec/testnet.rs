@@ -26,7 +26,7 @@ pub fn testnet_config() -> Result<ChainSpec, String> {
 	let notary_account = get_account_id_from_seed::<sr25519::Public>("Ferdie");
 	let notary_public = get_from_seed::<NotaryPublic>("Ferdie//notary");
 
-	let miner_zero = get_account_id_from_seed::<sr25519::Public>("Alice");
+	let miner_zero = AccountId::from_str("5GBdjj5vi4W1jDW5iNwAju8tiBvxhMdHeAEPmuP1ZY6ZPQCH");
 	let miner_zero_keys = SessionKeys::decode(
 		&mut &hex::decode("1e69c7672dfb67dc19abfce302caf4c60cc5cb21f39538f749efdc6a28feaba695d5d04b29524e535278e511ac0ec98e4bb76b08a9a6874c5c481f338d727e60")
 			.map_err(|e| format!("Error processing miner zero authority key hex {:?}", e))?[..]

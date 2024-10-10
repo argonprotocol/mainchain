@@ -1,6 +1,6 @@
 use sp_core::H256;
 use sqlx::SqlitePool;
-use std::collections::BTreeMap;
+use std::collections::{BTreeMap, HashSet};
 use std::str::FromStr;
 use std::sync::Arc;
 use tokio::sync::Mutex;
@@ -226,6 +226,8 @@ impl OverviewStore {
       }
     }
 
+    let mut seen_accounts = HashSet::new();
+
     for change in balance_changes {
       if change.status == BalanceChangeStatus::Canceled {
         continue;
@@ -253,13 +255,17 @@ impl OverviewStore {
         finalized_block_number: change.finalized_block_number.map(|n| n as u32),
       };
 
-      let notes = get_notes(&change);
-      if let Some(note) = notes
-        .iter()
-        .find(|n| matches!(n.note_type, NoteType::ChannelHold { .. }))
-      {
-        overview.held_balance += note.milligons as i128;
-        balance_change.hold_balance = note.milligons as i128;
+      // if this is the last change for this account, record the held balance
+      if !seen_accounts.contains(&change.account_id) {
+        seen_accounts.insert(change.account_id);
+        let notes = get_notes(&change);
+        if let Some(note) = notes
+          .iter()
+          .find(|n| matches!(n.note_type, NoteType::ChannelHold { .. }))
+        {
+          overview.held_balance += note.milligons as i128;
+          balance_change.hold_balance = note.milligons as i128;
+        }
       }
 
       let net_balance_change = change.net_balance_change.parse::<i128>()?;

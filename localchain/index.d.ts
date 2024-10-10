@@ -656,6 +656,9 @@ export enum TransactionType {
   Consolidation = 3
 }
 
+/** Maximum tax amount that can be charged on a transfer */
+export const TRANSFER_TAX_CAP: bigint
+
 export interface VersionHost {
   /** Datastore id is a 2-50 char string that uniquely identifies a domain. */
   datastoreId: string

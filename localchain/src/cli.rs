@@ -2,7 +2,7 @@ use crate::keystore::Keystore;
 use crate::overview::LocalchainOverview;
 use crate::{
   overview, AccountStore, ChannelHoldCloseOptions, CryptoScheme, DomainStore, Localchain,
-  LocalchainConfig, MainchainClient, TickerConfig,
+  LocalchainConfig, MainchainClient,
 };
 use anyhow::anyhow;
 use argon_primitives::argon_utils::format_argons;
@@ -350,16 +350,12 @@ where
       } => {
         let argon_domain =
           Domain::parse(domain.clone()).map_err(|_| anyhow!("Not a valid domain"))?;
-        let localchain = Localchain::load_without_mainchain(
+        let localchain = Localchain::load(LocalchainConfig {
           path,
-          TickerConfig {
-            ntp_pool_url: None,
-            genesis_utc_time: 0,
-            tick_duration_millis: 0,
-            channel_hold_expiration_ticks: 0,
-          },
-          Some(keystore_password),
-        )
+          mainchain_url,
+          ntp_pool_url: None,
+          keystore_password: Some(keystore_password),
+        })
         .await?;
 
         let change = localchain.begin_change();

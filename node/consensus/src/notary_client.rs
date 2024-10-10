@@ -315,7 +315,8 @@ where
 		let oldest_tick_to_keep = latest_finalized_notebook_by_notary
 			.get(&notary_id)
 			.map(|(_, t)| *t)
-			.unwrap_or_default();
+			.unwrap_or_default()
+			.saturating_sub(100);
 
 		let mut vote_count = 0;
 		// audit on the best block at the height of the notebook

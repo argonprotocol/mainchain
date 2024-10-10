@@ -28,3 +28,7 @@ pub const DOMAIN_MIN_NAME_LENGTH: u32 = argon_primitives::MIN_DOMAIN_NAME_LENGTH
 /// Cost to lease a domain for 1 year
 #[cfg_attr(feature = "napi", napi)]
 pub const DOMAIN_LEASE_COST: u128 = argon_primitives::DOMAIN_LEASE_COST;
+
+/// Maximum tax amount that can be charged on a transfer
+#[cfg_attr(feature = "napi", napi)]
+pub const TRANSFER_TAX_CAP: u128 = argon_primitives::TRANSFER_TAX_CAP;
