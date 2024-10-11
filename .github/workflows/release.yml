@@ -32,7 +32,17 @@ jobs:
         with:
           persist-credentials: false
 
-      - name: Check if release exists (including drafts)
+      - name: If published release exists, exit
+        id: check_release
+        run: |
+          PUBLISHED_RELEASE_EXISTS=$(gh release list --json tagName,isDraft --jq ".[] | select(.tagName==\"${{ github.ref_name }}\" and .isDraft = false) | .tagName" | head -n 1)
+          if [[ -n "PUBLISHED_RELEASE_EXISTS" ]]; then
+           exit 1
+          fi
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Check if draft release exists
         id: check_release
         run: |
           RELEASE_EXISTS=$(gh release list --json tagName --jq ".[] | select(.tagName==\"${{ github.ref_name }}\") | .tagName" | head -n 1)
