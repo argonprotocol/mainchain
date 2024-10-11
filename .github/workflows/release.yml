@@ -48,7 +48,7 @@ jobs:
         id: extract_changelog
         run: |
           # Extract changelog section for the specified version
-          sed "/^## \[${{ github.ref_name }}\]/,/^### \[v/p" CHANGELOG.md | sed '$d' > changelog.txt
+          sed -n "/^## \[${{ github.ref_name }}\]/,/^### \[v/p" CHANGELOG.md | sed '$d' > changelog.txt
           cat changelog.txt  # Print the extracted changelog
 
       - name: Create draft release if not exists
