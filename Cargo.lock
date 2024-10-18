@@ -487,6 +487,7 @@ dependencies = [
 name = "argon-node-consensus"
 version = "0.0.14"
 dependencies = [
+ "anyhow",
  "argon-bitcoin-utxo-tracker",
  "argon-node-runtime",
  "argon-notary",
@@ -494,6 +495,7 @@ dependencies = [
  "argon-primitives",
  "argon-randomx",
  "async-trait",
+ "binary-merkle-tree",
  "env_logger 0.11.5",
  "frame-support",
  "futures",

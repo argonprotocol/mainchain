@@ -68,9 +68,11 @@ sc-network-test = { workspace = true }
 sc-network-types = { workspace = true }
 sc-utils = { workspace = true }
 sp-test-primitives = { workspace = true }
-substrate-test-runtime = { workspace = true }
-substrate-test-runtime-client = { workspace = true }
+substrate-test-runtime = { workspace = true, default-features = false }
+substrate-test-runtime-client = { workspace = true, default-features = false }
 sp-keyring = { workspace = true }
 sc-network = { workspace = true }
 pallet-mining-slot = { workspace = true, features = ["default"] }
 argon-notary = { workspace = true }
+anyhow = { workspace = true }
+binary-merkle-tree = { workspace = true }

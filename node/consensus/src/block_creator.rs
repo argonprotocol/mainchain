@@ -25,15 +25,15 @@ use argon_primitives::{
 	},
 	tick::Tick,
 	Balance, BestBlockVoteSeal, BitcoinApis, BlockSealApis, BlockSealAuthorityId,
-	BlockSealAuthoritySignature, BlockSealDigest, NotaryApis, NotaryId, NotebookApis, TickApis,
+	BlockSealAuthoritySignature, BlockSealDigest, NotaryApis, NotebookApis, TickApis,
 };
 
 use crate::{
 	aux_client::ArgonAux,
 	digests::{create_pre_runtime_digests, create_seal_digest},
 	error::Error,
-	notary_client::{get_notebook_header_data, NotaryClient},
-	notebook_watch::NotebookWatch,
+	notary_client::{get_notebook_header_data, notary_sync_task, NotaryClient},
+	notebook_sealer::NotebookSealer,
 };
 
 const LOG_TARGET: &str = "node::consensus::block_creator";
@@ -46,119 +46,75 @@ pub struct CreateTaxVoteBlock<Block: BlockT, AccountId: Clone + Codec> {
 	pub signature: BlockSealAuthoritySignature,
 }
 
-pub fn notary_client_task<B, C, SC, AC>(
+pub fn block_creation_task<B, C, SC, AC>(
 	client: Arc<C>,
 	select_chain: SC,
 	aux_client: ArgonAux<B, C>,
 	keystore: KeystorePtr,
-) -> (impl Future<Output = ()>, Receiver<CreateTaxVoteBlock<B, AC>>)
+) -> (
+	impl Future<Output = ()>,
+	impl Future<Output = ()>,
+	impl Future<Output = ()>,
+	Receiver<CreateTaxVoteBlock<B, AC>>,
+)
 where
 	B: BlockT<Hash = H256>,
-	C: ProvideRuntimeApi<B> + BlockchainEvents<B> + HeaderBackend<B> + AuxStore + BlockOf + 'static,
+	C: ProvideRuntimeApi<B>
+		+ BlockchainEvents<B>
+		+ HeaderBackend<B>
+		+ AuxStore
+		+ BlockOf
+		+ Send
+		+ Sync
+		+ 'static,
 	C::Api: NotebookApis<B, NotebookVerifyError>
 		+ BlockSealApis<B, AC, BlockSealAuthorityId>
 		+ NotaryApis<B, NotaryRecordT>
 		+ TickApis<B>,
 	SC: SelectChain<B> + 'static,
-	AC: Codec + Clone,
+	AC: Codec + Clone + Send + Sync + 'static,
 {
-	let (sender, receiver) = channel(1000);
+	let (tax_vote_sender, tax_vote_rx) = channel(1000);
+	let (notebook_tick_tx, mut notebook_tick_rx) =
+		sc_utils::mpsc::tracing_unbounded("node::consensus::notebook_tick_stream", 100);
+	let notary_client =
+		Arc::new(NotaryClient::new(client.clone(), aux_client.clone(), notebook_tick_tx.clone()));
 
-	let task = async move {
-		let (header_tx, mut header_rx) =
-			sc_utils::mpsc::tracing_unbounded("node::consensus::notebook_header_stream", 100);
-		let notary_client =
-			Arc::new(NotaryClient::new(client.clone(), aux_client.clone(), header_tx.clone()));
-		let notebook_watch =
-			NotebookWatch::new(client.clone(), select_chain, keystore, aux_client, sender.clone());
+	let notary_sync_task = notary_sync_task(client.clone(), notary_client.clone());
 
-		let mut best_block = Box::pin(client.import_notification_stream());
-
-		let mut update_notaries_with_hash = None;
-		let mut to_remove: Vec<(NotaryId, Option<String>)> = Vec::new();
-
+	let notary_queue_task = async move {
 		loop {
-			{
-				let mut subscriptions_by_id = notary_client.subscriptions_by_id.lock().await;
+			let has_more_work = notary_client
+				.process_queues()
+				.await
+				.map_err(|err| {
+					warn!(target: LOG_TARGET, "Error while processing notary queues: {:?}", err);
+				})
+				.unwrap_or(false);
 
-				tokio::select! {biased;
-					notebook =  futures::future::poll_fn(|cx| {
-						let item = subscriptions_by_id.iter_mut().find_map(|(notary_id, sub)| {
-							let sub = Pin::new(sub);
-							match sub.poll_next(cx) {
-								Pending => None,
-								Ready(e) => Some((*notary_id, e)),
-							}
-						});
-						match item {
-							Some((id, e)) => Ready((id, e)),
-							None => Pending,
-						}
-					}) => {
-						match notebook {
-							(notary_id, Some(Ok((notebook_number, header)))) => {
-								match header_tx.unbounded_send((notary_id, notebook_number, header)) {
-									Ok(_) => (),
-									Err(e) => {
-										warn!(
-											"Could not send header to stream for notary {} - {:?}",
-											notary_id, e
-										)
-									},
-								}
-							},
-							(notary_id, None) => {
-								to_remove.push((notary_id, None));
-							},
-							(notary_id, Some(Err(e))) => {
-								let reason = e.to_string();
-								to_remove.push((notary_id, Some(reason)));
-							},
-						}
-					},
-					header = header_rx.next() => {
-						if let Some((notary_id, notebook_number, raw_data)) = header {
-							info!(target: LOG_TARGET, "Processing notebook for notary {}, #{}", notary_id, notebook_number);
-							let _ = notebook_watch.on_notebook(
-								notary_id,
-								notebook_number,
-								notary_client.clone(),
-								raw_data,
-							).map_err(move |e| {
-								warn!(target: LOG_TARGET, "Error processing notebook from notary {}. Error: {}", notary_id, e.to_string());
-							}).await;
-						}
-					},
-					block = best_block.next () => {
-						if let Some(block) = block.as_ref() {
-							if block.is_new_best {
-								update_notaries_with_hash = Some(block.hash);
-							}
-						}
-					},
-				}
-			};
-
-			if let Some(best_hash) = update_notaries_with_hash {
-				if let Err(e) = notary_client.update_notaries(&best_hash).await {
-					warn!(
-						target: LOG_TARGET,
-						"Could not update notaries at best hash {} - {:?}",
-						best_hash,
-						e
-					);
-				}
-			}
-
-			for (notary_id, reason) in &to_remove {
-				notary_client.disconnect(notary_id, reason.clone()).await;
-			}
-			to_remove.clear();
-			update_notaries_with_hash = None;
-			let _ = notary_client.retrieve_missing_notebooks().await;
+			let delay = if has_more_work { 100 } else { 500 };
+			tokio::time::sleep(Duration::from_millis(delay)).await;
 		}
 	};
-	(task, receiver)
+
+	let seal_watch_task = async move {
+		let notebook_sealer = NotebookSealer::new(
+			client.clone(),
+			select_chain,
+			keystore,
+			aux_client,
+			tax_vote_sender.clone(),
+		);
+
+		while let Some((tick, voting_power, notebooks)) = notebook_tick_rx.next().await {
+			if let Err(err) =
+				notebook_sealer.check_for_new_blocks(tick, voting_power, notebooks).await
+			{
+				warn!(target: LOG_TARGET, "Error while checking for new blocks: {:?}", err);
+			}
+		}
+	};
+	(seal_watch_task, notary_sync_task, notary_queue_task, tax_vote_rx)
 }
 
 #[allow(clippy::too_many_arguments)]

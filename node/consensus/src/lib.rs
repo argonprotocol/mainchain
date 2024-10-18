@@ -1,4 +1,4 @@
-pub use block_creator::{notary_client_task, tax_block_creator};
+pub use block_creator::{block_creation_task, tax_block_creator};
 
 #[cfg(test)]
 mod tests;
@@ -12,6 +12,4 @@ mod digests;
 pub mod error;
 pub mod import_queue;
 mod notary_client;
-pub mod notebook_watch;
-
-const LOG_TARGET: &str = "node::consensus";
+pub mod notebook_sealer;
