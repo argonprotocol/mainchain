@@ -13,7 +13,7 @@
   "homepage": "https://argonprotocol.org",
   "scripts": {
     "artifacts": "napi artifacts",
-    "build": "napi build --platform --release --no-const-enum --features=napi -p argon-localchain",
+    "build": "RUST_BACKTRACE=1 napi build --platform --release --no-const-enum --features=napi -p argon-localchain",
     "build:debug": "napi build --platform --no-const-enum --features=napi -p argon-localchain",
     "prepublishOnly": "napi prepublish -t npm",
     "pretest": "npm run build:debug",

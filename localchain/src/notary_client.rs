@@ -17,7 +17,7 @@ use std::sync::Arc;
 use std::time::Duration;
 use tokio::sync::Mutex;
 use tokio::time::timeout;
-use tracing::info;
+use tracing::{info, trace};
 
 #[cfg_attr(feature = "napi", napi)]
 #[derive(Clone)]
@@ -94,7 +94,7 @@ impl NotaryClients {
       true,
     )
     .await?;
-    info!("Connected to notary {}", notary_id);
+    trace!("Connected to notary {}", notary_id);
     clients_by_id.insert(notary_id, client.clone());
     Ok(client)
   }
