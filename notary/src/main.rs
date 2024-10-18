@@ -99,6 +99,7 @@ impl From<String> for Error {
 #[tokio::main]
 async fn main() -> anyhow::Result<()> {
 	let cli = Cli::parse();
+	color_backtrace::install();
 	tracing_subscriber::FmtSubscriber::builder()
 		.with_env_filter(tracing_subscriber::EnvFilter::from_default_env())
 		.try_init()

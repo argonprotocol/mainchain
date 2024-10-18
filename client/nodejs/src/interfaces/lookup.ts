@@ -544,7 +544,11 @@ export default {
       NotebookAuditFailure: {
         notaryId: 'u32',
         notebookNumber: 'u32',
-        firstFailureReason: 'ArgonNotaryAuditErrorVerifyError'
+        firstFailureReason: 'ArgonNotaryAuditErrorVerifyError',
+      },
+      NotebookReadyForReprocess: {
+        notaryId: 'u32',
+        notebookNumber: 'u32'
       }
     }
   },
@@ -1443,7 +1447,10 @@ export default {
   PalletNotebookCall: {
     _enum: {
       submit: {
-        notebooks: 'Vec<ArgonPrimitivesNotebookSignedNotebookHeader>'
+        notebooks: 'Vec<ArgonPrimitivesNotebookSignedNotebookHeader>',
+      },
+      unlock: {
+        notaryId: 'u32'
       }
     }
   },
@@ -2100,7 +2107,7 @@ export default {
    * Lookup302: pallet_notebook::pallet::Error<T>
    **/
   PalletNotebookError: {
-    _enum: ['DuplicateNotebookNumber', 'MissingNotebookNumber', 'NotebookTickAlreadyUsed', 'InvalidNotebookSignature', 'InvalidSecretProvided', 'CouldNotDecodeNotebook', 'DuplicateNotebookDigest', 'MissingNotebookDigest', 'InvalidNotebookDigest', 'MultipleNotebookInherentsProvided', 'InternalError']
+    _enum: ['DuplicateNotebookNumber', 'MissingNotebookNumber', 'NotebookTickAlreadyUsed', 'InvalidNotebookSignature', 'InvalidSecretProvided', 'CouldNotDecodeNotebook', 'DuplicateNotebookDigest', 'MissingNotebookDigest', 'InvalidNotebookDigest', 'MultipleNotebookInherentsProvided', 'InternalError', 'NotebookSubmittedForLockedNotary', 'InvalidReprocessNotebook', 'InvalidNotaryOperator']
   },
   /**
    * Lookup303: pallet_chain_transfer::QueuedTransferOut<sp_core::crypto::AccountId32, Balance>
@@ -2119,7 +2126,7 @@ export default {
    * Lookup309: pallet_chain_transfer::pallet::Error<T>
    **/
   PalletChainTransferError: {
-    _enum: ['MaxBlockTransfersExceeded', 'InsufficientFunds', 'InsufficientNotarizedFunds', 'InvalidOrDuplicatedLocalchainTransfer', 'NotebookIncludesExpiredLocalchainTransfer', 'InvalidNotaryUsedForTransfer', 'NotaryLocked']
+    _enum: ['MaxBlockTransfersExceeded', 'InsufficientFunds', 'InsufficientNotarizedFunds', 'InvalidOrDuplicatedLocalchainTransfer', 'NotebookIncludesExpiredLocalchainTransfer', 'InvalidNotaryUsedForTransfer']
   },
   /**
    * Lookup314: argon_primitives::notary::NotaryNotebookVoteDigestDetails

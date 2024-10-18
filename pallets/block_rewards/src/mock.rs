@@ -103,12 +103,15 @@ impl BlockSealerProvider<u64> for StaticBlockSealerProvider {
 }
 
 pub struct TestProvider;
-impl NotaryProvider<Block> for TestProvider {
+impl NotaryProvider<Block, AccountId> for TestProvider {
 	fn verify_signature(_: NotaryId, _: Tick, _: &H256, _: &NotarySignature) -> bool {
 		true
 	}
 	fn active_notaries() -> Vec<NotaryId> {
 		ActiveNotaries::get()
+	}
+	fn is_notary_operator(_: NotaryId, _: &AccountId) -> bool {
+		todo!()
 	}
 }
 impl NotebookProvider for TestProvider {

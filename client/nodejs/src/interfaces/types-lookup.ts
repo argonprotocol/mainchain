@@ -583,7 +583,12 @@ declare module '@polkadot/types/lookup' {
       readonly notebookNumber: u32;
       readonly firstFailureReason: ArgonNotaryAuditErrorVerifyError;
     } & Struct;
-    readonly type: 'NotebookSubmitted' | 'NotebookAuditFailure';
+    readonly isNotebookReadyForReprocess: boolean;
+    readonly asNotebookReadyForReprocess: {
+      readonly notaryId: u32;
+      readonly notebookNumber: u32;
+    } & Struct;
+    readonly type: 'NotebookSubmitted' | 'NotebookAuditFailure' | 'NotebookReadyForReprocess';
   }
 
   /** @name ArgonNotaryAuditErrorVerifyError (73) */
@@ -1517,7 +1522,11 @@ declare module '@polkadot/types/lookup' {
     readonly asSubmit: {
       readonly notebooks: Vec<ArgonPrimitivesNotebookSignedNotebookHeader>;
     } & Struct;
-    readonly type: 'Submit';
+    readonly isUnlock: boolean;
+    readonly asUnlock: {
+      readonly notaryId: u32;
+    } & Struct;
+    readonly type: 'Submit' | 'Unlock';
   }
 
   /** @name ArgonPrimitivesNotebookSignedNotebookHeader (173) */
@@ -2249,7 +2258,10 @@ declare module '@polkadot/types/lookup' {
     readonly isInvalidNotebookDigest: boolean;
     readonly isMultipleNotebookInherentsProvided: boolean;
     readonly isInternalError: boolean;
-    readonly type: 'DuplicateNotebookNumber' | 'MissingNotebookNumber' | 'NotebookTickAlreadyUsed' | 'InvalidNotebookSignature' | 'InvalidSecretProvided' | 'CouldNotDecodeNotebook' | 'DuplicateNotebookDigest' | 'MissingNotebookDigest' | 'InvalidNotebookDigest' | 'MultipleNotebookInherentsProvided' | 'InternalError';
+    readonly isNotebookSubmittedForLockedNotary: boolean;
+    readonly isInvalidReprocessNotebook: boolean;
+    readonly isInvalidNotaryOperator: boolean;
+    readonly type: 'DuplicateNotebookNumber' | 'MissingNotebookNumber' | 'NotebookTickAlreadyUsed' | 'InvalidNotebookSignature' | 'InvalidSecretProvided' | 'CouldNotDecodeNotebook' | 'DuplicateNotebookDigest' | 'MissingNotebookDigest' | 'InvalidNotebookDigest' | 'MultipleNotebookInherentsProvided' | 'InternalError' | 'NotebookSubmittedForLockedNotary' | 'InvalidReprocessNotebook' | 'InvalidNotaryOperator';
   }
 
   /** @name PalletChainTransferQueuedTransferOut (303) */
@@ -2271,8 +2283,7 @@ declare module '@polkadot/types/lookup' {
     readonly isInvalidOrDuplicatedLocalchainTransfer: boolean;
     readonly isNotebookIncludesExpiredLocalchainTransfer: boolean;
     readonly isInvalidNotaryUsedForTransfer: boolean;
-    readonly isNotaryLocked: boolean;
-    readonly type: 'MaxBlockTransfersExceeded' | 'InsufficientFunds' | 'InsufficientNotarizedFunds' | 'InvalidOrDuplicatedLocalchainTransfer' | 'NotebookIncludesExpiredLocalchainTransfer' | 'InvalidNotaryUsedForTransfer' | 'NotaryLocked';
+    readonly type: 'MaxBlockTransfersExceeded' | 'InsufficientFunds' | 'InsufficientNotarizedFunds' | 'InvalidOrDuplicatedLocalchainTransfer' | 'NotebookIncludesExpiredLocalchainTransfer' | 'InvalidNotaryUsedForTransfer';
   }
 
   /** @name ArgonPrimitivesNotaryNotaryNotebookVoteDigestDetails (314) */

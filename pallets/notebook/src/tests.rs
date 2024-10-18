@@ -14,7 +14,7 @@ use crate::{
 	mock::*,
 	pallet::{
 		AccountOriginLastChangedNotebookByNotary, LastNotebookDetailsByNotary,
-		NotebookChangedAccountsRootByNotary,
+		NotariesLockedForFailedAudit, NotebookChangedAccountsRootByNotary,
 	},
 	Error, Event,
 };
@@ -23,6 +23,7 @@ use argon_primitives::{
 	localchain::{AccountType, BalanceChange, Note, NoteType},
 	notary::{
 		NotaryNotebookAuditSummary, NotaryNotebookAuditSummaryDetails, NotaryNotebookKeyDetails,
+		NotaryState,
 	},
 	notebook::{
 		AccountOrigin, BalanceTip, ChainTransfer, NewAccountOrigin, Notarization, NotebookHeader,
@@ -103,8 +104,12 @@ fn it_locks_notaries_on_audit_failure() {
 				}
 			]
 		));
+		let callbacks = NotebookEvents::get();
+		// should only callback for the valid notebook
+		assert_eq!(callbacks.len(), 1);
+		assert_eq!(callbacks[0], header1);
 		// should store that it's no longer valid
-		assert!(!LastNotebookDetailsByNotary::<Test>::get(2)[0].1);
+		assert_eq!(LastNotebookDetailsByNotary::<Test>::get(2).len(), 0);
 		// this is the default verify error
 		assert_eq!(Notebook::notary_failed_audit_by_id(1), None);
 		assert_eq!(
@@ -114,6 +119,95 @@ fn it_locks_notaries_on_audit_failure() {
 		assert!(Notebook::is_notary_locked_at_tick(2, 1));
 		assert!(Notebook::is_notary_locked_at_tick(2, 2));
 		assert!(!Notebook::is_notary_locked_at_tick(2, 0));
+		assert_eq!(
+			Notebook::get_state(2),
+			NotaryState::Locked {
+				failed_audit_reason: VerifyError::InvalidBlockVoteRoot,
+				at_tick: 1,
+				notebook_number: 1
+			}
+		);
+		assert_eq!(Notebook::get_state(1), NotaryState::Active);
+	});
+}
+
+#[test]
+fn it_cannot_submit_additional_notebooks_once_locked() {
+	new_test_ext().execute_with(|| {
+		NotariesLockedForFailedAudit::<Test>::insert(1, (1, 1, VerifyError::InvalidBlockVoteRoot));
+
+		let digest = notebook_digest(vec![(1, 1, 1, false)]);
+		System::initialize(&2, &System::parent_hash(), &Digest { logs: vec![digest.clone()] });
+		Notebook::on_initialize(2);
+		CurrentTick::set(2);
+
+		let header1 = make_header(1, 1);
+
+		assert_err!(
+			Notebook::submit(
+				RuntimeOrigin::none(),
+				vec![SignedNotebookHeader {
+					header: header1.clone(),
+					signature: Ed25519Keyring::Bob.pair().sign(header1.hash().as_ref())
+				},]
+			),
+			Error::<Test>::NotebookSubmittedForLockedNotary
+		);
+	});
+}
+
+#[test]
+fn it_can_submit_transactions_to_unlock_audits() {
+	new_test_ext().execute_with(|| {
+		NotariesLockedForFailedAudit::<Test>::insert(1, (1, 1, VerifyError::InvalidBlockVoteRoot));
+
+		assert_eq!(
+			Notebook::get_state(1),
+			NotaryState::Locked {
+				failed_audit_reason: VerifyError::InvalidBlockVoteRoot,
+				at_tick: 1,
+				notebook_number: 1
+			}
+		);
+
+		let digest = notebook_digest(vec![(1, 1, 1, false)]);
+		System::initialize(&2, &System::parent_hash(), &Digest { logs: vec![digest.clone()] });
+		Notebook::on_initialize(2);
+		CurrentTick::set(2);
+
+		let header1 = make_header(1, 1);
+
+		// test cannot submit when locked
+		assert_err!(
+			Notebook::submit(
+				RuntimeOrigin::none(),
+				vec![SignedNotebookHeader {
+					header: header1.clone(),
+					signature: Ed25519Keyring::Bob.pair().sign(header1.hash().as_ref())
+				},]
+			),
+			Error::<Test>::NotebookSubmittedForLockedNotary
+		);
+
+		assert_err!(
+			Notebook::unlock(RuntimeOrigin::signed(Ed25519Keyring::Alice.to_account_id()), 1),
+			Error::<Test>::InvalidNotaryOperator
+		);
+
+		assert_ok!(Notebook::unlock(RuntimeOrigin::signed(Ed25519Keyring::Bob.to_account_id()), 1));
+		assert_eq!(
+			Notebook::get_state(1),
+			NotaryState::Reactivated { reprocess_notebook_number: 1 }
+		);
+
+		// should be able to submit again
+		assert_ok!(Notebook::submit(
+			RuntimeOrigin::none(),
+			vec![SignedNotebookHeader {
+				header: header1.clone(),
+				signature: Ed25519Keyring::Bob.pair().sign(header1.hash().as_ref())
+			},]
+		));
 	});
 }
 
@@ -159,11 +253,11 @@ fn it_tracks_notebooks_at_tick() {
 	new_test_ext().execute_with(|| {
 		CurrentTick::set(1);
 		let header1 = make_header(1, 1);
-		Notebook::process_notebook(header1, true);
+		Notebook::process_notebook(header1);
 
 		let mut header2 = make_header(1, 1);
 		header2.notary_id = 2;
-		Notebook::process_notebook(header2, true);
+		Notebook::process_notebook(header2);
 
 		assert_eq!(Notebook::notebooks_at_tick(1), vec![(2, 1, None), (1, 1, None),]);
 
@@ -175,7 +269,7 @@ fn it_tracks_notebooks_at_tick() {
 
 		let mut header3 = make_header(2, 4);
 		header3.notary_id = 2;
-		Notebook::process_notebook(header3, true);
+		Notebook::process_notebook(header3);
 		assert_eq!(Notebook::notebooks_at_tick(4), vec![(2, 2, None)]);
 	});
 }
@@ -246,7 +340,7 @@ fn it_tracks_changed_accounts() {
 		secret_hashes.push(header.secret_hash);
 		let first_votes = header.block_votes_root;
 		CurrentTick::set(2);
-		Notebook::process_notebook(header.clone(), true);
+		Notebook::process_notebook(header.clone());
 
 		assert_eq!(
 			NotebookChangedAccountsRootByNotary::<Test>::get(1, 1),
@@ -278,7 +372,7 @@ fn it_tracks_changed_accounts() {
 		let second_votes = header.block_votes_root;
 		CurrentTick::set(3);
 		assert_ok!(Notebook::verify_notebook_order(&header),);
-		Notebook::process_notebook(header, true);
+		Notebook::process_notebook(header);
 		assert_eq!(Balances::free_balance(&who), 5000);
 		assert_eq!(
 			NotebookChangedAccountsRootByNotary::<Test>::get(1, 1),
@@ -327,7 +421,7 @@ fn it_tracks_changed_accounts() {
 		secret_hashes.push(header.secret_hash);
 
 		CurrentTick::set(4);
-		Notebook::process_notebook(header.clone(), true);
+		Notebook::process_notebook(header.clone());
 		assert_eq!(
 			LastNotebookDetailsByNotary::<Test>::get(1),
 			vec![
@@ -387,14 +481,14 @@ fn it_tracks_notebooks_received_out_of_tick() {
 			NotebookHeader::create_secret_hash(secrets[0], header1.block_votes_root, 1);
 		secret_hashes.push(header1.secret_hash);
 		CurrentTick::set(3);
-		Notebook::process_notebook(header1.clone(), true);
+		Notebook::process_notebook(header1.clone());
 
 		let mut header2 = make_header(2, 3);
 		header2.parent_secret = Some(secrets[0]);
 		header2.secret_hash =
 			NotebookHeader::create_secret_hash(secrets[1], header2.block_votes_root, 2);
 		secret_hashes.push(header2.secret_hash);
-		Notebook::process_notebook(header2.clone(), true);
+		Notebook::process_notebook(header2.clone());
 
 		let last_details = LastNotebookDetailsByNotary::<Test>::get(1);
 
@@ -519,7 +613,7 @@ fn it_handles_bad_secrets() {
 				NotebookHeader::create_secret_hash(secrets[0], header.block_votes_root, 1);
 			secret_hashes.push(header.secret_hash);
 			CurrentTick::set(2);
-			Notebook::process_notebook(header.clone(), true);
+			Notebook::process_notebook(header.clone());
 
 			System::set_block_number(4);
 			System::on_initialize(4);

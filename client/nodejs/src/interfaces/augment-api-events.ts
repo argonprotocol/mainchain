@@ -260,6 +260,7 @@ declare module '@polkadot/api-base/types/events' {
     };
     notebook: {
       NotebookAuditFailure: AugmentedEvent<ApiType, [notaryId: u32, notebookNumber: u32, firstFailureReason: ArgonNotaryAuditErrorVerifyError], { notaryId: u32, notebookNumber: u32, firstFailureReason: ArgonNotaryAuditErrorVerifyError }>;
+      NotebookReadyForReprocess: AugmentedEvent<ApiType, [notaryId: u32, notebookNumber: u32], { notaryId: u32, notebookNumber: u32 }>;
       NotebookSubmitted: AugmentedEvent<ApiType, [notaryId: u32, notebookNumber: u32], { notaryId: u32, notebookNumber: u32 }>;
     };
     ownership: {

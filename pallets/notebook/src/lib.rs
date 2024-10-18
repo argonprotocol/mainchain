@@ -38,7 +38,7 @@ pub mod pallet {
 		notary::{
 			NotaryId, NotaryNotebookAuditSummary, NotaryNotebookAuditSummaryDecoded,
 			NotaryNotebookAuditSummaryDetails, NotaryNotebookDetails, NotaryNotebookKeyDetails,
-			NotaryNotebookRawVotes,
+			NotaryNotebookRawVotes, NotaryState,
 		},
 		notebook::{AccountOrigin, Notebook, NotebookHeader},
 		tick::Tick,
@@ -66,7 +66,7 @@ pub mod pallet {
 
 		type EventHandler: NotebookEventHandler;
 
-		type NotaryProvider: NotaryProvider<<Self as frame_system::Config>::Block>;
+		type NotaryProvider: NotaryProvider<<Self as frame_system::Config>::Block, Self::AccountId>;
 
 		type ChainTransferLookup: ChainTransferLookup<Self::AccountId, Balance>;
 
@@ -120,11 +120,15 @@ pub mod pallet {
 	pub(super) type TempNotebookDigest<T: Config> = StorageValue<_, NotebookDigest, OptionQuery>;
 
 	/// Notaries locked for failing audits
-	/// TODO: we need a mechanism to unlock a notary with "Fixes"
 	#[pallet::storage]
 	#[pallet::getter(fn notary_failed_audit_by_id)]
 	pub(super) type NotariesLockedForFailedAudit<T: Config> =
 		StorageMap<_, Blake2_128Concat, NotaryId, (NotebookNumber, Tick, NotebookVerifyError)>;
+
+	/// Notaries ready to start reprocessing at a given notebook number
+	#[pallet::storage]
+	pub(super) type LockedNotaryReadyForReprocess<T: Config> =
+		StorageMap<_, Blake2_128Concat, NotaryId, NotebookNumber>;
 
 	#[pallet::event]
 	#[pallet::generate_deposit(pub(super) fn deposit_event)]
@@ -137,6 +141,10 @@ pub mod pallet {
 			notary_id: NotaryId,
 			notebook_number: NotebookNumber,
 			first_failure_reason: NotebookVerifyError,
+		},
+		NotebookReadyForReprocess {
+			notary_id: NotaryId,
+			notebook_number: NotebookNumber,
 		},
 	}
 
@@ -164,6 +172,12 @@ pub mod pallet {
 		MultipleNotebookInherentsProvided,
 		/// Unable to track the notebook change list
 		InternalError,
+		/// A notebook was submitted for a notary that failed audit, which is not allowed
+		NotebookSubmittedForLockedNotary,
+		/// Invalid reprocess notebook
+		InvalidReprocessNotebook,
+		/// Invalid notary operator
+		InvalidNotaryOperator,
 	}
 
 	#[pallet::hooks]
@@ -220,6 +234,20 @@ pub mod pallet {
 			for SignedNotebookHeader { header, signature } in notebooks {
 				let notebook_number = header.notebook_number;
 				let notary_id = header.notary_id;
+
+				ensure!(
+					!Self::is_notary_locked_at_tick(notary_id, header.tick),
+					Error::<T>::NotebookSubmittedForLockedNotary
+				);
+				if let Some(reprocess_notebook_number) =
+					LockedNotaryReadyForReprocess::<T>::get(notary_id)
+				{
+					ensure!(
+						reprocess_notebook_number == notebook_number,
+						Error::<T>::InvalidReprocessNotebook
+					);
+				}
+
 				// Failure case(s): audit not in digest (created by node)
 				let did_pass_audit = Self::check_audit_result(
 					notary_id,
@@ -230,10 +258,10 @@ pub mod pallet {
 				)?;
 				info!(
 					target: LOG_TARGET,
-					"Audit result for {}, {}: {}", notary_id, notebook_number, did_pass_audit
+					"Audit result for notary {}, notebook {}: pass? {}", notary_id, notebook_number, did_pass_audit
 				);
 
-				// Failure cases: all based on nodebooks not in order of runtime state; controllable
+				// Failure cases: all based on notebooks not in order of runtime state; controllable
 				// by node
 				Self::verify_notebook_order(&header)?;
 				// Failure case: invalid signature is not possible without bypassing audit
@@ -248,12 +276,34 @@ pub mod pallet {
 					Error::<T>::InvalidNotebookSignature
 				);
 
-				T::EventHandler::notebook_submitted(&header);
+				if did_pass_audit {
+					T::EventHandler::notebook_submitted(&header);
 
-				Self::process_notebook(header, did_pass_audit);
+					Self::process_notebook(header);
+				}
 			}
 
 			<BlockNotebooks<T>>::put(notebook_digest);
+			Ok(())
+		}
+
+		#[pallet::call_index(1)]
+		#[pallet::weight(0)]
+		pub fn unlock(origin: OriginFor<T>, notary_id: NotaryId) -> DispatchResult {
+			let who = ensure_signed(origin)?;
+			ensure!(
+				T::NotaryProvider::is_notary_operator(notary_id, &who),
+				Error::<T>::InvalidNotaryOperator
+			);
+			if let Some((notebook_number, _, _)) =
+				<NotariesLockedForFailedAudit<T>>::take(notary_id)
+			{
+				LockedNotaryReadyForReprocess::<T>::insert(notary_id, notebook_number);
+				Self::deposit_event(Event::NotebookReadyForReprocess {
+					notary_id,
+					notebook_number,
+				});
+			}
 			Ok(())
 		}
 	}
@@ -371,6 +421,20 @@ pub mod pallet {
 	}
 
 	impl<T: Config> Pallet<T> {
+		pub fn get_state(notary_id: NotaryId) -> NotaryState<NotebookVerifyError> {
+			if let Some((notebook_number, at_tick, failed_audit_reason)) =
+				<NotariesLockedForFailedAudit<T>>::get(notary_id)
+			{
+				return NotaryState::Locked { notebook_number, at_tick, failed_audit_reason }
+			}
+			if let Some(reprocess_notebook_number) =
+				LockedNotaryReadyForReprocess::<T>::get(notary_id)
+			{
+				return NotaryState::Reactivated { reprocess_notebook_number }
+			}
+
+			NotaryState::Active
+		}
 		/// Verify the notebook order is correct compared to the block state. This can fail as it is
 		/// up to the node to do this correctly
 		pub(crate) fn verify_notebook_order(header: &NotebookHeader) -> Result<(), DispatchError> {
@@ -449,7 +513,7 @@ pub mod pallet {
 			Ok(true)
 		}
 
-		pub(crate) fn process_notebook(header: NotebookHeader, did_pass_audit: bool) {
+		pub(crate) fn process_notebook(header: NotebookHeader) {
 			let notary_id = header.notary_id;
 			let notebook_number = header.notebook_number;
 			let current_tick = T::TickProvider::current_tick();
@@ -459,7 +523,7 @@ pub mod pallet {
 					x.pop();
 				}
 
-				let is_vote_eligible = current_tick == header.tick && did_pass_audit;
+				let is_vote_eligible = current_tick == header.tick;
 				x.try_insert(
 					0,
 					(

@@ -619,6 +619,7 @@ dependencies = [
  "binary-merkle-tree",
  "chrono",
  "clap",
+ "color-backtrace",
  "dotenv",
  "frame-support",
  "futures",
