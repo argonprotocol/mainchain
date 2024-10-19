@@ -2,6 +2,7 @@ use std::env;
 
 use anyhow::Context;
 use clap::{Parser, Subcommand};
+use futures::StreamExt;
 use sqlx::{migrate, postgres::PgPoolOptions};
 
 use argon_client::ReconnectingClient;
@@ -142,13 +143,21 @@ async fn main() -> anyhow::Result<()> {
 				spawn_block_sync(trusted_rpc_url.clone(), notary_id, pool.clone(), ticker).await?;
 			}
 			if finalize_notebooks {
-				let _ = spawn_notebook_closer(
+				let handles = spawn_notebook_closer(
 					pool.clone(),
 					notary_id,
 					keystore,
 					ticker,
 					server.completed_notebook_sender.clone(),
-				);
+				)?;
+
+				let mut subscription = server.audit_failure_stream.subscribe(10);
+				tokio::spawn(async move {
+					while (subscription.next().await).is_some() {
+						handles.0.abort();
+						handles.1.abort();
+					}
+				});
 			}
 
 			// print to stdout - ignore log filters

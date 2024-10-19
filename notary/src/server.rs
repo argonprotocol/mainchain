@@ -1,8 +1,11 @@
-use std::net::SocketAddr;
-
 use crate::{
 	stores::{
-		balance_tip::BalanceTipStore, notarizations::NotarizationsStore, notebook::NotebookStore,
+		balance_tip::BalanceTipStore,
+		notarizations::NotarizationsStore,
+		notebook::NotebookStore,
+		notebook_audit_failure::{
+			AuditFailureListener, AuditFailureStream, NotebookAuditFailureStore,
+		},
 		notebook_header::NotebookHeaderStore,
 	},
 	Error,
@@ -30,7 +33,8 @@ use jsonrpsee::{
 use sc_utils::notification::{NotificationSender, NotificationStream, TracingKeyStr};
 use serde::Serialize;
 use sqlx::{pool::PoolConnection, PgPool, Postgres};
-use tokio::net::ToSocketAddrs;
+use std::{net::SocketAddr, sync::Arc};
+use tokio::{net::ToSocketAddrs, sync::Mutex, task::JoinHandle};
 use tower::layer::util::{Identity, Stack};
 
 pub type NotebookHeaderStream = NotificationStream<SignedNotebookHeader, NotebookHeaderTracingKey>;
@@ -47,9 +51,21 @@ pub struct NotaryServer {
 	notary_id: NotaryId,
 	pool: PgPool,
 	ticker: Ticker,
+	pub audit_failure_stream: AuditFailureStream,
 	pub(crate) completed_notebook_stream: NotebookHeaderStream,
 	pub completed_notebook_sender: NotificationSender<SignedNotebookHeader>,
+	audit_failure_number: Arc<Mutex<Option<NotebookNumber>>>,
 	server_handle: Option<ServerHandle>,
+	audit_handle: Arc<JoinHandle<()>>,
+}
+
+impl Drop for NotaryServer {
+	fn drop(&mut self) {
+		self.audit_handle.abort();
+		if let Some(server) = self.server_handle.clone() {
+			server.stop().expect("Should be able to stop server");
+		}
+	}
 }
 
 impl NotaryServer {
@@ -81,7 +97,10 @@ impl NotaryServer {
 	) -> anyhow::Result<Self> {
 		let (completed_notebook_sender, completed_notebook_stream) =
 			NotebookHeaderStream::channel();
+		let (audit_failure_sender, audit_failure_stream) = AuditFailureStream::channel();
 
+		let (audit_failure_number, audit_handle) =
+			Self::listen_for_audit_failure(&pool, audit_failure_sender).await?;
 		let addr = server.local_addr()?;
 		let mut notary_server = Self {
 			notary_id,
@@ -91,6 +110,9 @@ impl NotaryServer {
 			pool,
 			addr,
 			server_handle: None,
+			audit_failure_stream,
+			audit_failure_number,
+			audit_handle: Arc::new(audit_handle),
 		};
 
 		let mut module = RpcModule::new(());
@@ -119,6 +141,58 @@ impl NotaryServer {
 		Self::start_with(server, notary_id, ticker, pool).await
 	}
 
+	async fn listen_for_audit_failure(
+		pool: &PgPool,
+		audit_failure_sender: NotificationSender<NotebookNumber>,
+	) -> Result<(Arc<Mutex<Option<NotebookNumber>>>, JoinHandle<()>), Error> {
+		let mut audit_failure_listener =
+			AuditFailureListener::connect(pool.clone(), audit_failure_sender)
+				.await
+				.map_err(|e| {
+					Error::InternalError(format!(
+						"An error occurred creating a Notebook Audit Failure listener {}",
+						e
+					))
+				})?;
+		let audit_failure_number: Arc<Mutex<Option<NotebookNumber>>> = Default::default();
+		if let Some(is_failed) =
+			NotebookAuditFailureStore::has_unresolved_audit_failure(pool).await?
+		{
+			*audit_failure_number.lock().await = Some(is_failed.notebook_number as NotebookNumber);
+		}
+
+		let audit_failure_number_copy = audit_failure_number.clone();
+		let handle = tokio::spawn(async move {
+			loop {
+				while let Ok(notebook_number) = audit_failure_listener.next().await {
+					tracing::error!("Audit failure for notebook {}", notebook_number);
+					*audit_failure_number_copy.lock().await = Some(notebook_number);
+				}
+			}
+		});
+		Ok((audit_failure_number, handle))
+	}
+
+	async fn ensure_active(&self) -> Result<(), Error> {
+		if let Some(notebook_number) = *self.audit_failure_number.lock().await {
+			Err(Error::NotaryFailedAudit(notebook_number))
+		} else {
+			Ok(())
+		}
+	}
+
+	async fn disallow_notebook_after_audit_failure(
+		&self,
+		notebook_number: NotebookNumber,
+	) -> Result<(), Error> {
+		if let Some(failed_notebook_number) = *self.audit_failure_number.lock().await {
+			if notebook_number >= failed_notebook_number {
+				return Err(Error::NotaryFailedAudit(notebook_number));
+			}
+		}
+		Ok(())
+	}
+
 	async fn get_conn(&self) -> Result<PoolConnection<Postgres>, ErrorObjectOwned> {
 		let conn = self.pool.acquire().await.map_err(|e| Error::Database(e.to_string()))?;
 		Ok(conn)
@@ -132,6 +206,7 @@ impl NotebookRpcServer for NotaryServer {
 		notebook_number: NotebookNumber,
 		balance_tip: BalanceTip,
 	) -> Result<BalanceProof, ErrorObjectOwned> {
+		self.disallow_notebook_after_audit_failure(notebook_number).await?;
 		let mut db = self.get_conn().await?;
 
 		let merkle_proof = NotebookStore::get_balance_proof(
@@ -160,6 +235,8 @@ impl NotebookRpcServer for NotaryServer {
 		notebook_number: NotebookNumber,
 		change_number: u32,
 	) -> Result<Notarization, ErrorObjectOwned> {
+		self.disallow_notebook_after_audit_failure(notebook_number).await?;
+		self.ensure_active().await?;
 		let mut db = self.get_conn().await?;
 		let notarization = NotarizationsStore::get_account_change(
 			&mut db,
@@ -176,6 +253,7 @@ impl NotebookRpcServer for NotaryServer {
 		&self,
 		notebook_number: NotebookNumber,
 	) -> Result<SignedNotebookHeader, ErrorObjectOwned> {
+		self.disallow_notebook_after_audit_failure(notebook_number).await?;
 		Ok(NotebookHeaderStore::load_with_signature(&self.pool, notebook_number).await?)
 	}
 
@@ -184,6 +262,7 @@ impl NotebookRpcServer for NotaryServer {
 		since_notebook: Option<NotebookNumber>,
 		or_specific_notebooks: Option<Vec<NotebookNumber>>,
 	) -> Result<Vec<(NotebookNumber, Vec<u8>)>, ErrorObjectOwned> {
+		// NOTE: keeping this alive in audit failure so auditing can still be performed
 		Ok(NotebookHeaderStore::load_raw_signed_headers(
 			&self.pool,
 			since_notebook,
@@ -197,6 +276,7 @@ impl NotebookRpcServer for NotaryServer {
 	}
 
 	async fn get(&self, notebook_number: NotebookNumber) -> Result<Notebook, ErrorObjectOwned> {
+		self.disallow_notebook_after_audit_failure(notebook_number).await?;
 		let mut db = self.get_conn().await?;
 
 		Ok(NotebookStore::load_finalized(&mut db, notebook_number).await?)
@@ -206,12 +286,14 @@ impl NotebookRpcServer for NotaryServer {
 		&self,
 		notebook_number: NotebookNumber,
 	) -> Result<Vec<u8>, ErrorObjectOwned> {
+		// NOTE: keeping this alive in audit failure so auditing can still be performed
 		let mut db = self.get_conn().await?;
 
 		Ok(NotebookStore::load_raw(&mut db, notebook_number).await?)
 	}
 
 	async fn subscribe_headers(&self, pending: PendingSubscriptionSink) -> SubscriptionResult {
+		self.ensure_active().await?;
 		let stream = self.completed_notebook_stream.subscribe(1_000);
 
 		pipe_from_stream_and_drop(pending, stream, |a| {
@@ -222,6 +304,7 @@ impl NotebookRpcServer for NotaryServer {
 	}
 
 	async fn subscribe_raw_headers(&self, pending: PendingSubscriptionSink) -> SubscriptionResult {
+		self.ensure_active().await?;
 		let stream = self.completed_notebook_stream.subscribe(1_000);
 
 		pipe_from_stream_and_drop(pending, stream, |item| {
@@ -241,6 +324,7 @@ impl LocalchainRpcServer for NotaryServer {
 		block_votes: NotarizationBlockVotes,
 		domains: NotarizationDomains,
 	) -> Result<BalanceChangeResult, ErrorObjectOwned> {
+		self.ensure_active().await?;
 		Ok(NotarizationsStore::apply(
 			&self.pool,
 			self.notary_id,
@@ -258,7 +342,9 @@ impl LocalchainRpcServer for NotaryServer {
 		account_type: AccountType,
 	) -> Result<BalanceTipResult, ErrorObjectOwned> {
 		let mut db = self.get_conn().await?;
-		Ok(BalanceTipStore::get_tip(&mut db, &account_id, account_type).await?)
+		let tip = BalanceTipStore::get_tip(&mut db, &account_id, account_type).await?;
+		self.disallow_notebook_after_audit_failure(tip.notebook_number).await?;
+		Ok(tip)
 	}
 
 	async fn get_origin(
@@ -267,7 +353,10 @@ impl LocalchainRpcServer for NotaryServer {
 		account_type: AccountType,
 	) -> Result<AccountOrigin, ErrorObjectOwned> {
 		let mut db = self.get_conn().await?;
-		Ok(NotebookStore::get_account_origin(&mut db, account_id.clone(), account_type).await?)
+		let origin =
+			NotebookStore::get_account_origin(&mut db, account_id.clone(), account_type).await?;
+		self.disallow_notebook_after_audit_failure(origin.notebook_number).await?;
+		Ok(origin)
 	}
 }
 
@@ -314,10 +403,12 @@ mod tests {
 		ChainTransfer, NewAccountOrigin, Note, NoteType,
 	};
 
+	use super::NotaryServer;
 	use crate::{
 		notebook_closer::{FinalizedNotebookHeaderListener, NotebookCloser, NOTARY_KEYID},
 		stores::{
 			blocks::BlocksStore, chain_transfer::ChainTransferStore,
+			notebook_audit_failure::NotebookAuditFailureStore,
 			notebook_header::NotebookHeaderStore, registered_key::RegisteredKeyStore,
 		},
 	};
@@ -325,8 +416,6 @@ mod tests {
 		localchain::{BalanceChangeResult, LocalchainRpcClient},
 		notebook::NotebookRpcClient,
 	};
-
-	use super::NotaryServer;
 
 	#[sqlx::test]
 	async fn test_balance_change_and_get_proof(pool: PgPool) -> anyhow::Result<()> {
@@ -433,6 +522,61 @@ mod tests {
 			notebook_proof.leaf_index as usize,
 			&tip.encode(),
 		));
+
+		Ok(())
+	}
+
+	#[sqlx::test]
+	async fn test_should_block_apis_if_audit_fails(pool: PgPool) -> anyhow::Result<()> {
+		let _ = tracing_subscriber::fmt::try_init();
+		let ticker =
+			Ticker::new(2_000, Utc::now().timestamp_millis().saturating_sub(2_000) as u64, 2);
+		let notary = NotaryServer::start(1, pool.clone(), ticker, "127.0.0.1:0").await?;
+		assert!(notary.addr.port() > 0);
+
+		let mut db = notary.pool.acquire().await?;
+		BlocksStore::record(&mut db, 0, [1u8; 32].into(), [0u8; 32].into(), 100, vec![]).await?;
+		BlocksStore::record_finalized(&mut db, [1u8; 32].into()).await?;
+		NotebookHeaderStore::create(&mut db, notary.notary_id, 1, 1, ticker.time_for_tick(1))
+			.await?;
+
+		let client = WsClientBuilder::default().build(format!("ws://{}", notary.addr)).await?;
+
+		let keystore = MemoryKeystore::new();
+		let keystore = KeystoreExt::new(keystore);
+		let notary_key =
+			keystore.ed25519_generate_new(NOTARY_KEYID, None).expect("should have a key");
+		RegisteredKeyStore::store_public(&mut *db, notary_key, 1).await?;
+
+		let mut notebook_closer = NotebookCloser {
+			pool: pool.clone(),
+			notary_id: notary.notary_id,
+			keystore: keystore.clone(),
+			ticker,
+		};
+
+		notebook_closer
+			.try_rotate_notebook()
+			.await
+			.expect("Should be able to rotate notebook");
+		notebook_closer
+			.try_close_notebook()
+			.await
+			.expect("Should be able to close notebook");
+		// now we have an audit failure
+
+		let notebook1 = client.get(1).await?;
+		NotebookAuditFailureStore::record(&mut db, 1, notebook1.hash, "failure".to_string(), 1)
+			.await
+			.expect("Should be able to record audit failure");
+		{
+			let mut stream = notary.audit_failure_stream.subscribe(1);
+			stream.next().await.expect("Should get audit failure");
+		}
+
+		assert_eq!(*notary.audit_failure_number.lock().await, Some(1));
+		client.get_header(1).await.expect_err("Should not be able to get header");
+		client.get(1).await.expect_err("Should not be able to get header");
 
 		Ok(())
 	}

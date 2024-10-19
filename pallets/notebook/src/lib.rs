@@ -140,6 +140,7 @@ pub mod pallet {
 		NotebookAuditFailure {
 			notary_id: NotaryId,
 			notebook_number: NotebookNumber,
+			notebook_hash: H256,
 			first_failure_reason: NotebookVerifyError,
 		},
 		NotebookReadyForReprocess {
@@ -248,11 +249,14 @@ pub mod pallet {
 					);
 				}
 
+				let header_hash = header.hash();
+
 				// Failure case(s): audit not in digest (created by node)
 				let did_pass_audit = Self::check_audit_result(
 					notary_id,
 					notebook_number,
 					header.tick,
+					header_hash,
 					&notebook_digest,
 					header.parent_secret,
 				)?;
@@ -270,7 +274,7 @@ pub mod pallet {
 						notary_id,
 						// we validate signatures based on the latest tick
 						header.tick,
-						&header.hash(),
+						&header_hash,
 						&signature
 					),
 					Error::<T>::InvalidNotebookSignature
@@ -465,6 +469,7 @@ pub mod pallet {
 			notary_id: NotaryId,
 			notebook_number: NotebookNumber,
 			tick: Tick,
+			notebook_hash: H256,
 			notebook_digest: &NotebookDigest,
 			parent_secret: Option<NotebookSecret>,
 		) -> Result<bool, DispatchError> {
@@ -499,6 +504,7 @@ pub mod pallet {
 				Self::deposit_event(Event::<T>::NotebookAuditFailure {
 					notary_id,
 					notebook_number,
+					notebook_hash,
 					first_failure_reason: first_failure_reason.clone(),
 				});
 				if Self::notary_failed_audit_by_id(notary_id).is_none() {

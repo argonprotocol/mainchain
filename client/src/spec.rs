@@ -2924,9 +2924,9 @@ pub mod api {
 			.hash();
 		runtime_metadata_hash ==
 			[
-				52u8, 108u8, 130u8, 115u8, 222u8, 42u8, 222u8, 196u8, 130u8, 168u8, 230u8, 39u8,
-				9u8, 146u8, 194u8, 227u8, 54u8, 136u8, 153u8, 13u8, 119u8, 253u8, 86u8, 151u8,
-				208u8, 123u8, 174u8, 127u8, 180u8, 72u8, 2u8, 99u8,
+				223u8, 190u8, 186u8, 177u8, 219u8, 8u8, 141u8, 171u8, 110u8, 187u8, 190u8, 69u8,
+				65u8, 108u8, 51u8, 211u8, 193u8, 133u8, 26u8, 7u8, 196u8, 126u8, 228u8, 78u8,
+				153u8, 56u8, 248u8, 62u8, 101u8, 218u8, 141u8, 219u8,
 			]
 	}
 	pub mod system {
@@ -4077,9 +4077,10 @@ pub mod api {
 						"Events",
 						(),
 						[
-							67u8, 28u8, 161u8, 95u8, 199u8, 68u8, 128u8, 148u8, 27u8, 54u8, 56u8,
-							105u8, 163u8, 153u8, 206u8, 82u8, 40u8, 221u8, 101u8, 105u8, 195u8,
-							163u8, 141u8, 252u8, 102u8, 94u8, 251u8, 113u8, 7u8, 99u8, 37u8, 246u8,
+							65u8, 139u8, 22u8, 30u8, 74u8, 9u8, 28u8, 210u8, 166u8, 244u8, 84u8,
+							136u8, 5u8, 236u8, 137u8, 53u8, 150u8, 154u8, 154u8, 225u8, 173u8,
+							34u8, 249u8, 246u8, 145u8, 123u8, 163u8, 117u8, 182u8, 115u8, 37u8,
+							201u8,
 						],
 					)
 				}
@@ -10594,12 +10595,14 @@ pub mod api {
 			pub struct NotebookAuditFailure {
 				pub notary_id: notebook_audit_failure::NotaryId,
 				pub notebook_number: notebook_audit_failure::NotebookNumber,
+				pub notebook_hash: notebook_audit_failure::NotebookHash,
 				pub first_failure_reason: notebook_audit_failure::FirstFailureReason,
 			}
 			pub mod notebook_audit_failure {
 				use super::runtime_types;
 				pub type NotaryId = ::core::primitive::u32;
 				pub type NotebookNumber = ::core::primitive::u32;
+				pub type NotebookHash = ::sp_core::H256;
 				pub type FirstFailureReason = runtime_types::argon_notary_audit::error::VerifyError;
 			}
 			impl ::subxt::ext::subxt_core::events::StaticEvent for NotebookAuditFailure {
@@ -24018,6 +24021,7 @@ pub mod api {
 					NotebookAuditFailure {
 						notary_id: ::core::primitive::u32,
 						notebook_number: ::core::primitive::u32,
+						notebook_hash: ::sp_core::H256,
 						first_failure_reason: runtime_types::argon_notary_audit::error::VerifyError,
 					},
 					#[codec(index = 2)]

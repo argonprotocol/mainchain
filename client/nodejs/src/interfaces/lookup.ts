@@ -544,6 +544,7 @@ export default {
       NotebookAuditFailure: {
         notaryId: 'u32',
         notebookNumber: 'u32',
+        notebookHash: 'H256',
         firstFailureReason: 'ArgonNotaryAuditErrorVerifyError',
       },
       NotebookReadyForReprocess: {

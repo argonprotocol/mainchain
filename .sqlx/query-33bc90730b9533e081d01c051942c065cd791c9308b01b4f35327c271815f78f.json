@@ -1,0 +1,17 @@
+{
+  "db_name": "PostgreSQL",
+  "query": "\n            INSERT INTO notebook_audit_failures (notebook_number, hash, failure_reason, failure_block_number, is_resolved)\n            VALUES ($1, $2, $3, $4, false)\n            ",
+  "describe": {
+    "columns": [],
+    "parameters": {
+      "Left": [
+        "Int4",
+        "Bytea",
+        "Varchar",
+        "Int4"
+      ]
+    },
+    "nullable": []
+  },
+  "hash": "33bc90730b9533e081d01c051942c065cd791c9308b01b4f35327c271815f78f"
+}

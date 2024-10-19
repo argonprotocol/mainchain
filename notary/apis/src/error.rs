@@ -5,6 +5,7 @@ use sp_core::H256;
 use tracing::error;
 
 use argon_notary_audit::VerifyError;
+use argon_primitives::NotebookNumber;
 
 #[derive(Debug, PartialEq, Decode, Encode, Clone, thiserror::Error)]
 pub enum Error {
@@ -53,6 +54,11 @@ pub enum Error {
 		#[codec(compact)]
 		amount: u128,
 	},
+
+	#[error(
+		"A notebook ({0}) in this notary failed audit. This notary is paused until it is recovered"
+	)]
+	NotaryFailedAudit(NotebookNumber),
 
 	#[error("{0}")]
 	Database(String),
@@ -125,6 +131,7 @@ impl From<Error> for i32 {
 			Error::EmptyNotarizationProposed => 18,
 			Error::JsonError(_) => 19,
 			Error::ChainMismatch => 20,
+			Error::NotaryFailedAudit(_) => 21,
 		}
 	}
 }

@@ -629,6 +629,7 @@ fn it_handles_bad_secrets() {
 				1,
 				header.notebook_number,
 				header.tick,
+				header.hash(),
 				&NotebookDigest {
 					notebooks: vec![NotebookDigestRecord {
 						notary_id: 1,
@@ -644,6 +645,7 @@ fn it_handles_bad_secrets() {
 				Event::<Test>::NotebookAuditFailure {
 					notary_id: 1,
 					notebook_number: 2,
+					notebook_hash: header.hash(),
 					first_failure_reason: VerifyError::InvalidSecretProvided,
 				}
 				.into(),

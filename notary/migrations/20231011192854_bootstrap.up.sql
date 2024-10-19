@@ -112,6 +112,16 @@ CREATE TABLE IF NOT EXISTS notebooks
 );
 CREATE INDEX IF NOT EXISTS notebook_new_account_origins ON notebooks USING GIN (new_account_origins);
 
+CREATE TABLE IF NOT EXISTS notebook_audit_failures
+(
+    notebook_number integer NOT NULL REFERENCES notebook_headers (notebook_number),
+    hash                    bytea NOT NULL,
+    failure_reason          varchar NOT NULL,
+    failure_block_number    integer NOT NULL,
+    is_resolved             boolean NOT NULL,
+    last_updated            timestamptz NOT NULL default now(),
+    PRIMARY KEY (notebook_number, hash)
+);
 
 CREATE TABLE IF NOT EXISTS notebooks_raw
 (
@@ -152,8 +162,23 @@ CREATE UNIQUE INDEX idx_one_open_notebook
     ON notebook_status (step)
     WHERE step = 1;
 
--- create a notify channel for each notebook
+-- create a pg_notify if a failed audit is inserted
+CREATE OR REPLACE FUNCTION notify_audit_failure()
+    RETURNS TRIGGER AS
+$$
+BEGIN
+    PERFORM pg_notify('audit_failure', NEW.notebook_number::text);
+    RETURN NEW;
+END;
+$$ LANGUAGE plpgsql;
 
+CREATE TRIGGER notify_audit_failure
+    AFTER INSERT
+    ON notebook_audit_failures
+    FOR EACH ROW
+EXECUTE PROCEDURE notify_audit_failure();
+
+-- create a notify channel for each notebook
 
 -- Do not allow a notebook to be modified once it has been finalized
 CREATE OR REPLACE FUNCTION check_notebook_finalized()

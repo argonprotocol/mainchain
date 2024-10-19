@@ -77,16 +77,13 @@ where
 		self.info().finalized_hash
 	}
 	fn notaries(&self, block_hash: B::Hash) -> Result<Vec<NotaryRecordT>, Error> {
-		self.runtime_api().notaries(block_hash).map_err(|e| {
-			Error::NotaryError(format!("Could not get notaries from runtime - {:?}", e))
-		})
+		self.runtime_api().notaries(block_hash).map_err(Into::into)
 	}
 	fn latest_notebook_by_notary(
 		&self,
 		block_hash: B::Hash,
 	) -> Result<BTreeMap<NotaryId, (NotebookNumber, Tick)>, Error> {
-		let result = self.runtime_api().latest_notebook_by_notary(block_hash)?;
-		Ok(result)
+		self.runtime_api().latest_notebook_by_notary(block_hash).map_err(Into::into)
 	}
 	fn audit_notebook_and_get_votes(
 		&self,
@@ -99,30 +96,30 @@ where
 		notebook: &[u8],
 		notebook_dependencies: Vec<NotaryNotebookAuditSummary>,
 	) -> Result<Result<NotaryNotebookRawVotes, NotebookVerifyError>, Error> {
-		let result = self.runtime_api().audit_notebook_and_get_votes(
-			block_hash,
-			version,
-			notary_id,
-			notebook_number,
-			header_hash,
-			vote_minimums,
-			&notebook.to_vec(),
-			notebook_dependencies,
-		)?;
-		Ok(result)
+		self.runtime_api()
+			.audit_notebook_and_get_votes(
+				block_hash,
+				version,
+				notary_id,
+				notebook_number,
+				header_hash,
+				vote_minimums,
+				&notebook.to_vec(),
+				notebook_dependencies,
+			)
+			.map_err(Into::into)
 	}
 	fn vote_minimum(&self, block_hash: B::Hash) -> Result<VoteMinimum, Error> {
-		let result = self.runtime_api().vote_minimum(block_hash)?;
-		Ok(result)
+		self.runtime_api().vote_minimum(block_hash).map_err(Into::into)
 	}
 	fn decode_signed_raw_notebook_header(
 		&self,
 		block_hash: &B::Hash,
 		raw_header: Vec<u8>,
 	) -> Result<Result<NotaryNotebookDetails<B::Hash>, DispatchError>, Error> {
-		let result =
-			self.runtime_api().decode_signed_raw_notebook_header(*block_hash, raw_header)?;
-		Ok(result)
+		self.runtime_api()
+			.decode_signed_raw_notebook_header(*block_hash, raw_header)
+			.map_err(Into::into)
 	}
 }
 

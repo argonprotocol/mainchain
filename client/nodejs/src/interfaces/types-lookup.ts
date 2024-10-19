@@ -581,6 +581,7 @@ declare module '@polkadot/types/lookup' {
     readonly asNotebookAuditFailure: {
       readonly notaryId: u32;
       readonly notebookNumber: u32;
+      readonly notebookHash: H256;
       readonly firstFailureReason: ArgonNotaryAuditErrorVerifyError;
     } & Struct;
     readonly isNotebookReadyForReprocess: boolean;
