@@ -12,7 +12,7 @@ use argon_primitives::{
 	notebook::NotebookNumber,
 	tick::{Tick, Ticker},
 	AuthorityProvider, BlockSealAuthorityId, NotaryId, NotebookProvider, NotebookSecret,
-	TickProvider,
+	TickProvider, VotingSchedule,
 };
 
 type Block = frame_system::mocking::MockBlock<Test>;
@@ -22,7 +22,7 @@ frame_support::construct_runtime!(
 	pub enum Test
 	{
 		System: frame_system,
-		SealMinimums: pallet_block_seal_spec,
+		BlockSealSpec: pallet_block_seal_spec,
 		Timestamp: pallet_timestamp,
 	}
 );
@@ -100,8 +100,11 @@ impl TickProvider<Block> for StaticTickProvider {
 	fn ticker() -> Ticker {
 		Ticker::new(200, 1, 2)
 	}
-	fn blocks_at_tick(_: Tick) -> Vec<H256> {
-		vec![]
+	fn block_at_tick(_: Tick) -> Option<H256> {
+		None
+	}
+	fn voting_schedule() -> VotingSchedule {
+		VotingSchedule::from_runtime_current_tick(CurrentTick::get())
 	}
 }
 

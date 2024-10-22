@@ -25,7 +25,7 @@ use sc_service::TaskManager;
 use sp_api::ProvideRuntimeApi;
 use sp_arithmetic::traits::UniqueSaturatedInto;
 use sp_blockchain::HeaderBackend;
-use sp_consensus::{Environment, Proposal, Proposer, SelectChain, SyncOracle};
+use sp_consensus::{Environment, Proposal, Proposer, SyncOracle};
 use sp_core::{traits::SpawnEssentialNamed, RuntimeDebug, H256, U256};
 use sp_runtime::traits::{Block as BlockT, Header as HeaderT};
 use sp_timestamp::Timestamp;
@@ -36,7 +36,7 @@ use argon_randomx::RandomXError;
 
 use crate::{
 	aux_client::ArgonAux, block_creator, block_creator::propose, compute_solver::ComputeSolver,
-	digests::get_tick_digest, error::Error, notebook_sealer::has_votes_at_tick,
+	digests::get_tick_digest, error::Error,
 };
 
 /// Version of the mining worker.
@@ -48,9 +48,11 @@ pub struct Version(pub usize);
 pub struct MiningMetadata<H> {
 	/// Currently known best hash which the pre-hash is built on.
 	pub best_hash: H,
-	pub import_time: Instant,
+	pub start_time: Instant,
 	pub has_tax_votes: bool,
 	pub parent_tick: Tick,
+	/// At which tick do we kick in mining no matter what?
+	pub emergency_tick: Tick,
 	pub key_block_hash: H256,
 }
 
@@ -104,6 +106,7 @@ where
 		best_hash: B::Hash,
 		has_tax_votes: bool,
 		parent_tick: Tick,
+		emergency_tick: Tick,
 		key_block: H256,
 	) {
 		self.stop_solving_current();
@@ -111,9 +114,10 @@ where
 		*metadata = Some(MiningMetadata {
 			best_hash,
 			has_tax_votes,
-			import_time: Instant::now(),
+			start_time: Instant::now(),
 			parent_tick,
 			key_block_hash: key_block,
+			emergency_tick,
 		});
 	}
 
@@ -192,11 +196,17 @@ where
 	pub fn ready_to_solve(&self, current_tick: Tick) -> bool {
 		match self.metadata.lock().as_ref() {
 			Some(x) => {
-				if !x.has_tax_votes {
+				// if we've passed the emergency tick, we should mine no matter what
+				if current_tick > x.emergency_tick {
 					return true;
 				}
-				x.parent_tick <= current_tick.saturating_sub(2)
+				// must be past the parent tick and not have tax votes
+				if x.parent_tick < current_tick && !x.has_tax_votes {
+					return true;
+				}
+				false
 			},
+
 			_ => false,
 		}
 	}
@@ -303,11 +313,10 @@ pub fn run_compute_solver_threads<B, L, Proof>(
 }
 
 #[allow(clippy::too_many_arguments)]
-pub fn create_compute_miner<B, C, S, E, SO, L, AccountId>(
+pub fn create_compute_miner<B, C, E, SO, L, AccountId>(
 	block_import: BoxBlockImport<B>,
 	client: Arc<C>,
 	aux_client: ArgonAux<B, C>,
-	select_chain: S,
 	mut env: E,
 	sync_oracle: SO,
 	account_id: AccountId,
@@ -323,7 +332,6 @@ where
 		+ NotebookApis<B, NotebookVerifyError>
 		+ NotaryApis<B, NotaryRecordT>
 		+ BitcoinApis<B, Balance>,
-	S: SelectChain<B> + 'static,
 	E: Environment<B> + Send + Sync + 'static,
 	E::Error: std::fmt::Debug,
 	E::Proposer: Proposer<B>,
@@ -360,37 +368,36 @@ where
 				continue;
 			}
 
-			let best_header = match select_chain.best_chain().await {
-				Ok(x) => x,
-				Err(err) => {
-					warn!(
-						target: LOG_TARGET,
-						"Unable to pull new block for compute miner. Select best chain error: {}",
-						err
-					);
-					continue;
-				},
-			};
-			let best_hash = best_header.hash();
+			let best_hash = client.info().best_hash;
 
 			if mining_handle.best_hash() != Some(best_hash) {
-				let parent_tick = get_tick_digest(best_header.digest()).unwrap_or_default();
-				let votes_tick = parent_tick.saturating_sub(1);
-				let has_tax_votes = has_votes_at_tick(&client, &best_header, votes_tick);
+				let Ok(Some(best_header)) = client.header(best_hash) else {
+					continue;
+				};
+				let block_tick = get_tick_digest(best_header.digest()).unwrap_or_default();
+				let emergency_tick = block_tick + 3;
+				let has_eligible_votes =
+					client.runtime_api().has_eligible_votes(best_hash).unwrap_or_default();
 				let key_block = randomx_key_block(&client, &best_hash).unwrap_or_default();
 
-				mining_handle.on_block(best_hash, has_tax_votes, parent_tick, key_block);
+				mining_handle.on_block(
+					best_hash,
+					has_eligible_votes,
+					block_tick,
+					emergency_tick,
+					key_block,
+				);
 			}
 
 			let time = Timestamp::current();
 			let tick = ticker.tick_for_time(time.as_millis());
 			if !mining_handle.ready_to_solve(tick) {
+				let time_to_next_tick = ticker.duration_to_next_tick();
+				tokio::time::sleep(time_to_next_tick).await;
 				continue;
 			}
 
 			if mining_handle.build_hash() != Some(best_hash) {
-				let notebooks_tick = tick.saturating_sub(1);
-
 				let difficulty = match client.runtime_api().compute_difficulty(best_hash) {
 					Ok(x) => x,
 					Err(err) => {
@@ -407,7 +414,7 @@ where
 					aux_client.clone(),
 					&mut env,
 					account_id.clone(),
-					notebooks_tick,
+					tick,
 					time.as_millis(),
 					best_hash,
 					BlockSealInherentNodeSide::Compute,

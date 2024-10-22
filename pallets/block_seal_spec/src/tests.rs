@@ -17,7 +17,7 @@ use argon_primitives::{
 };
 
 use crate::{
-	mock::{SealMinimums, System, *},
+	mock::{BlockSealSpec, System, *},
 	pallet::{PastBlockVotes, PastComputeBlockTimes, PreviousBlockTimestamp},
 	Event,
 };
@@ -44,11 +44,11 @@ fn it_will_adjust_minimum() {
 		}));
 		System::set_block_number(2);
 
-		let start_vote_minimum = SealMinimums::vote_minimum();
+		let start_vote_minimum = BlockSealSpec::vote_minimum();
 
-		SealMinimums::update_vote_minimum(11, 2, 0);
+		BlockSealSpec::update_vote_minimum(11, 2, 0);
 
-		assert_eq!(SealMinimums::vote_minimum(), 901);
+		assert_eq!(BlockSealSpec::vote_minimum(), 901);
 		assert_eq!(PastBlockVotes::<Test>::get(), vec![(11, 2, 0)]);
 		System::assert_last_event(
 			Event::VoteMinimumAdjusted {
@@ -84,11 +84,11 @@ fn it_updates_tick_votes_if_not_changed() {
 		}));
 		System::set_block_number(2);
 
-		let start_vote_minimum = SealMinimums::vote_minimum();
+		let start_vote_minimum = BlockSealSpec::vote_minimum();
 
-		SealMinimums::update_vote_minimum(10, 2, 0);
+		BlockSealSpec::update_vote_minimum(10, 2, 0);
 
-		assert_eq!(SealMinimums::vote_minimum(), start_vote_minimum);
+		assert_eq!(BlockSealSpec::vote_minimum(), start_vote_minimum);
 		assert_eq!(
 			PastBlockVotes::<Test>::get(),
 			vec![
@@ -126,12 +126,12 @@ fn it_creates_a_block_digest() {
 			block_votes_count: 3,
 			block_voting_power: 10_000,
 		};
-		let digest = SealMinimums::create_block_vote_digest(2, vec![book1.clone(), book2.clone()]);
+		let digest = BlockSealSpec::create_block_vote_digest(2, vec![book1.clone(), book2.clone()]);
 		assert_eq!(digest, BlockVoteDigest { voting_power: 30_000, votes_count: 4 });
 		// if locked, should not include!!
 
 		LockedNotaries::set(vec![(2, 2)]);
-		let digest = SealMinimums::create_block_vote_digest(2, vec![book1, book2]);
+		let digest = BlockSealSpec::create_block_vote_digest(2, vec![book1, book2]);
 		assert_eq!(digest, BlockVoteDigest { voting_power: 20_000, votes_count: 1 });
 	});
 }
@@ -139,7 +139,7 @@ fn it_creates_a_block_digest() {
 #[test]
 fn it_checks_the_vote_digest() {
 	new_test_ext(100, 10_000_000).execute_with(|| {
-		CurrentTick::set(2);
+		CurrentTick::set(3);
 		let mut book1 = create_default_notebook(1, 1, 2);
 		book1.block_votes_count = 1;
 		book1.block_voting_power = 20_000;
@@ -151,18 +151,18 @@ fn it_checks_the_vote_digest() {
 			NotaryNotebookVoteDigestDetails::from(&book1),
 			NotaryNotebookVoteDigestDetails::from(&book2),
 		];
-		let digest = SealMinimums::create_block_vote_digest(2, digest_details);
+		let digest = BlockSealSpec::create_block_vote_digest(2, digest_details);
 		System::initialize(
 			&2,
 			&System::parent_hash(),
 			&Digest { logs: vec![DigestItem::PreRuntime(BLOCK_VOTES_DIGEST_ID, digest.encode())] },
 		);
-		SealMinimums::notebook_submitted(&book1);
-		SealMinimums::notebook_submitted(&book2);
+		BlockSealSpec::notebook_submitted(&book1);
+		BlockSealSpec::notebook_submitted(&book2);
 
-		SealMinimums::on_timestamp_set(2);
-		SealMinimums::on_initialize(2);
-		SealMinimums::on_finalize(2);
+		BlockSealSpec::on_timestamp_set(2);
+		BlockSealSpec::on_initialize(2);
+		BlockSealSpec::on_finalize(2);
 
 		///// Test with empty set
 		System::set_block_number(3);
@@ -172,14 +172,14 @@ fn it_checks_the_vote_digest() {
 			&Digest {
 				logs: vec![DigestItem::PreRuntime(
 					BLOCK_VOTES_DIGEST_ID,
-					SealMinimums::create_block_vote_digest(2, Default::default()).encode(),
+					BlockSealSpec::create_block_vote_digest(2, Default::default()).encode(),
 				)],
 			},
 		);
 
-		SealMinimums::on_timestamp_set(3);
-		SealMinimums::on_initialize(3);
-		SealMinimums::on_finalize(3);
+		BlockSealSpec::on_timestamp_set(3);
+		BlockSealSpec::on_initialize(3);
+		BlockSealSpec::on_finalize(3);
 	});
 }
 
@@ -204,14 +204,14 @@ fn it_calculates_next_vote_minimum() {
 fn it_handles_overflowing_minimum() {
 	new_test_ext(1, 0);
 	let actual =
-		SealMinimums::calculate_next_vote_minimum(u128::MAX - 500, 1000, 4000, 1, u128::MAX);
+		BlockSealSpec::calculate_next_vote_minimum(u128::MAX - 500, 1000, 4000, 1, u128::MAX);
 	assert_eq!(u128::MAX, actual, "Failed to overflow block_seal_spec");
 }
 
 // assume that the current block_seal_spec is 100 and the target window time is 100
 fn assert_next_minimum(start_minimum: u64, actual_votes: u64, next_minimum: u64) {
 	let next_minimum: u128 = next_minimum.into();
-	let actual = SealMinimums::calculate_next_vote_minimum(
+	let actual = BlockSealSpec::calculate_next_vote_minimum(
 		start_minimum.into(),
 		100,
 		actual_votes.into(),
@@ -254,13 +254,13 @@ fn it_doesnt_adjust_difficulty_until_time() {
 		// Go past genesis block so events get deposited
 		System::set_block_number(1);
 
-		let start_difficulty = SealMinimums::compute_difficulty();
+		let start_difficulty = BlockSealSpec::compute_difficulty();
 
-		SealMinimums::on_timestamp_set(1);
-		SealMinimums::on_initialize(1);
-		SealMinimums::on_finalize(1);
+		BlockSealSpec::on_timestamp_set(1);
+		BlockSealSpec::on_initialize(1);
+		BlockSealSpec::on_finalize(1);
 
-		assert_eq!(SealMinimums::compute_difficulty(), start_difficulty);
+		assert_eq!(BlockSealSpec::compute_difficulty(), start_difficulty);
 		assert_eq!(PastComputeBlockTimes::<Test>::get().len(), 1);
 	});
 }
@@ -294,13 +294,13 @@ fn it_doesnt_adjust_difficulty_if_tax_block() {
 		assert_ok!(PastComputeBlockTimes::<Test>::try_mutate(|a| {
 			a.try_append(&mut vec![100, 100, 100, 100, 100, 100, 100, 100, 100, 1])
 		}));
-		let start_difficulty = SealMinimums::compute_difficulty();
+		let start_difficulty = BlockSealSpec::compute_difficulty();
 
-		SealMinimums::on_timestamp_set(1);
-		SealMinimums::on_initialize(1);
-		SealMinimums::on_finalize(1);
+		BlockSealSpec::on_timestamp_set(1);
+		BlockSealSpec::on_initialize(1);
+		BlockSealSpec::on_finalize(1);
 
-		assert_eq!(SealMinimums::compute_difficulty(), start_difficulty);
+		assert_eq!(BlockSealSpec::compute_difficulty(), start_difficulty);
 		assert_eq!(PastComputeBlockTimes::<Test>::get().len(), 10);
 	});
 }
@@ -312,14 +312,14 @@ fn it_tracks_the_block_time_for_compute() {
 		System::set_block_number(1);
 		CurrentSeal::set(BlockSealInherent::Compute);
 
-		let start_difficulty = SealMinimums::compute_difficulty();
+		let start_difficulty = BlockSealSpec::compute_difficulty();
 		PreviousBlockTimestamp::<Test>::set(Some(500));
 
-		SealMinimums::on_timestamp_set(1000);
-		SealMinimums::on_initialize(1);
-		SealMinimums::on_finalize(1);
+		BlockSealSpec::on_timestamp_set(1000);
+		BlockSealSpec::on_initialize(1);
+		BlockSealSpec::on_finalize(1);
 
-		assert_eq!(SealMinimums::compute_difficulty(), start_difficulty);
+		assert_eq!(BlockSealSpec::compute_difficulty(), start_difficulty);
 		assert_eq!(PastComputeBlockTimes::<Test>::get().into_inner(), vec![500]);
 	});
 }
@@ -335,11 +335,11 @@ fn it_will_adjust_difficulty() {
 		}));
 		System::set_block_number(2);
 
-		let start_difficulty = SealMinimums::compute_difficulty();
+		let start_difficulty = BlockSealSpec::compute_difficulty();
 
-		SealMinimums::on_timestamp_set(2);
-		SealMinimums::on_initialize(1);
-		SealMinimums::on_finalize(1);
+		BlockSealSpec::on_timestamp_set(2);
+		BlockSealSpec::on_initialize(1);
+		BlockSealSpec::on_finalize(1);
 
 		System::assert_last_event(
 			Event::ComputeDifficultyAdjusted {
@@ -350,7 +350,7 @@ fn it_will_adjust_difficulty() {
 			}
 			.into(),
 		);
-		assert_ne!(SealMinimums::compute_difficulty(), start_difficulty);
+		assert_ne!(BlockSealSpec::compute_difficulty(), start_difficulty);
 		assert_eq!(PastComputeBlockTimes::<Test>::get().len(), 1);
 	});
 }
@@ -373,14 +373,14 @@ fn it_calculates_next_difficulty() {
 #[test]
 fn it_handles_overflowing_difficulty() {
 	new_test_ext(0, 1);
-	let actual = SealMinimums::calculate_next_difficulty(u128::MAX - 500, 1000, 0, 1, u128::MAX);
+	let actual = BlockSealSpec::calculate_next_difficulty(u128::MAX - 500, 1000, 0, 1, u128::MAX);
 	assert_eq!(u128::MAX, actual, "Failed to overflow difficulty");
 }
 
 // assume that the current difficulty is 100 and the target window time is 100
 fn assert_next_difficulty(start_difficulty: u64, time_observed: u64, next_difficulty: u64) {
 	let next_difficulty: u128 = next_difficulty.into();
-	let actual = SealMinimums::calculate_next_difficulty(
+	let actual = BlockSealSpec::calculate_next_difficulty(
 		start_difficulty.into(),
 		100,
 		time_observed,

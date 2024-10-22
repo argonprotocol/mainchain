@@ -570,7 +570,7 @@ mod tests {
 			.await
 			.expect("Should be able to record audit failure");
 		{
-			let mut stream = notary.audit_failure_stream.subscribe(1);
+			let mut stream = notary.audit_failure_stream.subscribe(2);
 			stream.next().await.expect("Should get audit failure");
 		}
 

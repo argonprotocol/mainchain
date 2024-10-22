@@ -30,19 +30,20 @@ pub mod pallet {
 		ConsensusEngineId, DigestItem, RuntimeAppPublic,
 	};
 
+	use super::*;
 	use argon_primitives::{
+		fork_power::ForkPower,
 		inherents::{BlockSealInherent, BlockSealInherentData, SealInherentError},
 		localchain::{BestBlockVoteSeal, BlockVote, BlockVoteT},
 		notary::NotaryNotebookRawVotes,
 		notebook::NotebookNumber,
 		tick::Tick,
-		AuthorityProvider, BlockSealAuthoritySignature, BlockSealEventHandler, BlockSealerInfo,
-		BlockSealerProvider, BlockVotingKey, BlockVotingProvider, MerkleProof, NotaryId,
-		NotebookProvider, ParentVotingKeyDigest, TickProvider, VotingKey, AUTHOR_DIGEST_ID,
+		AuthorityProvider, BlockSealAuthoritySignature, BlockSealEventHandler,
+		BlockSealSpecProvider, BlockSealerInfo, BlockSealerProvider, BlockVoteDigest,
+		BlockVotingKey, MerkleProof, NotaryId, NotebookProvider, ParentVotingKeyDigest,
+		TickProvider, VotingKey, VotingSchedule, AUTHOR_DIGEST_ID, BLOCK_VOTES_DIGEST_ID,
 		PARENT_VOTING_KEY_DIGEST,
 	};
-
-	use super::*;
 
 	#[pallet::pallet]
 	pub struct Pallet<T>(_);
@@ -63,8 +64,8 @@ pub mod pallet {
 		/// Provide notebook lookups
 		type NotebookProvider: NotebookProvider;
 
-		/// Lookup previous block votes specifications
-		type BlockVotingProvider: BlockVotingProvider<Self::Block>;
+		/// Lookup seal specifications
+		type BlockSealSpecProvider: BlockSealSpecProvider<Self::Block>;
 
 		type TickProvider: TickProvider<Self::Block>;
 
@@ -80,6 +81,16 @@ pub mod pallet {
 	/// Secret + VotesMerkleRoot of the parent block notebooks.
 	#[pallet::storage]
 	pub(super) type ParentVotingKey<T: Config> = StorageValue<_, Option<H256>, ValueQuery>;
+
+	/// The calculated strength in the runtime so that it can be
+	/// upgraded, but is used by the node to determine which fork to follow
+	#[pallet::storage]
+	pub(super) type BlockForkPower<T: Config> = StorageValue<_, ForkPower, ValueQuery>;
+
+	/// The count of votes in the last 3 ticks
+	#[pallet::storage]
+	pub(super) type VotesInPast3Ticks<T> =
+		StorageValue<_, BoundedVec<(Tick, u32), ConstU32<3>>, ValueQuery>;
 
 	/// Author of current block (temporary storage).
 	#[pallet::storage]
@@ -187,12 +198,13 @@ pub mod pallet {
 			// ensure we never go to trie with these values.
 			TempAuthor::<T>::kill();
 
-			let current_tick = T::TickProvider::current_tick();
+			let voting_schedule = T::TickProvider::voting_schedule();
 
 			// tick of the parent voting key
-			let votes_tick = current_tick.saturating_sub(1);
+			let votes_tick = voting_schedule.eligible_votes_tick();
 
-			let notebooks_at_tick = T::NotebookProvider::notebooks_at_tick(current_tick);
+			let notebooks_at_tick =
+				T::NotebookProvider::notebooks_at_tick(voting_schedule.notebook_tick());
 
 			let parent_voting_keys = notebooks_at_tick
 				.into_iter()
@@ -236,7 +248,10 @@ pub mod pallet {
 			ensure_none(origin)?;
 			info!(
 				target: LOG_TARGET,
-				"Block seal inherent submitted {:?}", seal
+				"Block seal inherent submitted -> {}", match seal {
+					BlockSealInherent::Compute => "Compute",
+					BlockSealInherent::Vote { .. } => "Vote",
+				}
 			);
 			Self::apply_seal(seal).inspect_err(|e| {
 				log::error!(target: LOG_TARGET, "Error applying block seal: {:?}", e);
@@ -246,12 +261,30 @@ pub mod pallet {
 	}
 
 	impl<T: Config> Pallet<T> {
+		pub fn fork_power() -> ForkPower {
+			BlockForkPower::<T>::get()
+		}
+
 		pub fn apply_seal(seal: BlockSealInherent) -> DispatchResult {
 			ensure!(!TempSealInherent::<T>::exists(), Error::<T>::DuplicateBlockSealProvided);
 			TempSealInherent::<T>::put(seal.clone());
 
 			let block_author =
 				<TempAuthor<T>>::get().expect("already unwrapped, should not be possible");
+			let notebooks = T::NotebookProvider::notebooks_in_block().len() as u32;
+			let vote_digest = <frame_system::Pallet<T>>::digest()
+				.logs
+				.iter()
+				.find_map(|log| log.pre_runtime_try_to::<BlockVoteDigest>(&BLOCK_VOTES_DIGEST_ID))
+				.ok_or(Error::<T>::CouldNotDecodeVote)?;
+
+			<VotesInPast3Ticks<T>>::mutate(|votes| {
+				if votes.is_full() {
+					votes.remove(0);
+				}
+				let notebook_tick = T::TickProvider::voting_schedule().notebook_tick();
+				let _ = votes.try_push((notebook_tick, vote_digest.votes_count));
+			});
 
 			match seal {
 				BlockSealInherent::Compute => {
@@ -259,6 +292,11 @@ pub mod pallet {
 					<LastBlockSealerInfo<T>>::put(BlockSealerInfo {
 						block_vote_rewards_account: None,
 						block_author_account_id: block_author,
+					});
+					let compute_difficulty = T::BlockSealSpecProvider::compute_difficulty();
+
+					BlockForkPower::<T>::mutate(|fork| {
+						fork.add_compute(vote_digest.voting_power, notebooks, compute_difficulty);
 					});
 				},
 				BlockSealInherent::Vote {
@@ -270,10 +308,10 @@ pub mod pallet {
 					ref miner_signature,
 				} => {
 					let current_tick = T::TickProvider::current_tick();
+					let voting_schedule =
+						VotingSchedule::when_evaluating_runtime_seals(current_tick);
 
-					// there won't be a grandparent block to vote for until block 2, and those votes
-					// don't count until tick 4
-					ensure!(current_tick >= 4u32, Error::<T>::NoEligibleVotingRoot);
+					ensure!(voting_schedule.is_voting_started(), Error::<T>::NoEligibleVotingRoot);
 
 					let parent_voting_key =
 						<ParentVotingKey<T>>::get().ok_or(Error::<T>::ParentVotingKeyNotFound)?;
@@ -282,7 +320,6 @@ pub mod pallet {
 						Error::<T>::InvalidVoteSealStrength
 					);
 
-					let votes_from_tick = current_tick - 2u32;
 					let block_vote_rewards_account = T::AccountId::decode(
 						&mut block_vote.block_rewards_account_id.encode().as_slice(),
 					)
@@ -291,12 +328,12 @@ pub mod pallet {
 						seal_strength,
 						block_vote,
 						&block_author,
-						votes_from_tick,
+						&voting_schedule,
 						miner_signature.clone(),
 					)?;
 					Self::verify_vote_source(
 						notary_id,
-						votes_from_tick,
+						&voting_schedule,
 						block_vote,
 						source_notebook_proof,
 						source_notebook_number,
@@ -305,21 +342,30 @@ pub mod pallet {
 						block_author_account_id: block_author,
 						block_vote_rewards_account: Some(block_vote_rewards_account),
 					});
+
+					BlockForkPower::<T>::mutate(|fork| {
+						fork.add_vote(vote_digest.voting_power, notebooks, seal_strength);
+					});
 				},
 			}
+
 			T::EventHandler::block_seal_read(&seal);
 			Ok(())
 		}
+
 		pub fn verify_vote_source(
 			notary_id: NotaryId,
-			votes_from_tick: Tick,
+			voting_schedule: &VotingSchedule,
 			block_vote: &BlockVote,
 			source_notebook_proof: &MerkleProof,
 			source_notebook_number: NotebookNumber,
 		) -> DispatchResult {
 			let (notebook_votes_root, notebook_number) =
-				T::NotebookProvider::get_eligible_tick_votes_root(notary_id, votes_from_tick)
-					.ok_or(Error::<T>::NoEligibleVotingRoot)?;
+				T::NotebookProvider::get_eligible_tick_votes_root(
+					notary_id,
+					voting_schedule.eligible_votes_tick(),
+				)
+				.ok_or(Error::<T>::NoEligibleVotingRoot)?;
 			ensure!(notebook_number == source_notebook_number, Error::<T>::IneligibleNotebookUsed);
 			ensure!(
 				verify_proof::<'_, BlakeTwo256, _, _>(
@@ -338,18 +384,19 @@ pub mod pallet {
 			seal_strength: U256,
 			block_vote: &BlockVote,
 			block_author: &T::AccountId,
-			votes_from_tick: Tick,
+			voting_schedule: &VotingSchedule,
 			signature: BlockSealAuthoritySignature,
 		) -> DispatchResult {
-			let grandpa_vote_minimum = T::BlockVotingProvider::grandparent_vote_minimum()
+			let grandpa_vote_minimum = T::BlockSealSpecProvider::grandparent_vote_minimum()
 				.ok_or(Error::<T>::NoGrandparentVoteMinimum)?;
 
 			ensure!(block_vote.power >= grandpa_vote_minimum, Error::<T>::InsufficientVotingPower);
 
-			let voted_on_blocks =
-				T::TickProvider::blocks_at_tick(votes_from_tick.saturating_sub(2));
+			let grandpa_tick_block =
+				T::TickProvider::block_at_tick(voting_schedule.grandparent_votes_tick())
+					.ok_or(Error::<T>::InvalidVoteGrandparentHash)?;
 			ensure!(
-				voted_on_blocks.iter().any(|a| a.as_ref() == block_vote.block_hash.as_bytes()),
+				grandpa_tick_block.as_ref() == block_vote.block_hash.as_bytes(),
 				Error::<T>::InvalidVoteGrandparentHash
 			);
 
@@ -381,33 +428,56 @@ pub mod pallet {
 			Ok(())
 		}
 
+		/// Returns true if there's a parent voting key and votes in the tick notebooks
+		/// This API is used by the node to determine if it should build on a block
+		pub fn has_eligible_votes() -> bool {
+			if !<ParentVotingKey<T>>::exists() {
+				return false;
+			}
+			let current_tick = T::TickProvider::current_tick();
+			let voting_schedule = VotingSchedule::when_evaluating_runtime_votes(current_tick);
+			let votes_tick = voting_schedule.eligible_votes_tick();
+			let vote_history = <VotesInPast3Ticks<T>>::get();
+			vote_history.iter().any(|(tick, votes)| *tick == votes_tick && *votes > 0)
+		}
+
 		/// This API will find block votes from the perspective of a new block creation activity
-		/// calling into the runtime while trying to build the next block. This means the current
-		/// tick is expected to be +1 of the runtime tick.
+		/// calling into the runtime while trying to build the next block.
+		///
+		/// That means we're using the votes from the notebooks themselves
 		pub fn find_vote_block_seals(
 			notebook_votes: Vec<NotaryNotebookRawVotes>,
 			with_better_strength: U256,
+			expected_notebook_tick: Tick,
 		) -> Result<FindBlockVoteSealResult<T>, Error<T>> {
 			let Some(parent_key) = <ParentVotingKey<T>>::get() else {
 				return Ok(BoundedVec::new());
 			};
 
 			// runtime tick will have the voting key for the parent
-			let runtime_tick = T::TickProvider::current_tick();
-			if runtime_tick <= 4u32 {
+			let current_tick = T::TickProvider::current_tick();
+			let voting_schedule = VotingSchedule::when_evaluating_runtime_votes(current_tick);
+			if !voting_schedule.is_voting_started() {
 				return Ok(BoundedVec::new());
 			}
 
-			let votes_in_tick = runtime_tick - 1u32;
-			let voted_for_blocks_at_tick = votes_in_tick - 2u32;
+			ensure!(
+				expected_notebook_tick == voting_schedule.notebook_tick(),
+				Error::<T>::IneligibleNotebookUsed
+			);
 
-			// This API is called when trying to assemble a block. Current tick will be the "parent"
-			// of the new block, so votes come from 1 tick previous. They will be votes for the
-			// previous tick - aka, - 2 ticks from the current (parent) tick.
-			let grandparent_tick_blocks = T::TickProvider::blocks_at_tick(voted_for_blocks_at_tick);
+			let voted_for_block_at_tick = voting_schedule.grandparent_votes_tick();
+
+			let Some(grandparent_tick_block) =
+				T::TickProvider::block_at_tick(voted_for_block_at_tick)
+			else {
+				info!(target: LOG_TARGET, "No eligible blocks to vote on in grandparent tick {:?}", voted_for_block_at_tick);
+				return Ok(BoundedVec::new());
+			};
+
 			info!(target: LOG_TARGET,
-				"eligible votes at tick {} - {:?} (runtime tick={})",
-				voted_for_blocks_at_tick, grandparent_tick_blocks, runtime_tick
+				"Finding votes for block at tick {} - {:?} (notebook tick={})",
+				voted_for_block_at_tick, grandparent_tick_block, expected_notebook_tick
 			);
 
 			let mut best_votes = vec![];
@@ -417,7 +487,8 @@ pub mod pallet {
 				notebook_votes.into_iter()
 			{
 				// don't use locked notary votes!
-				if T::NotebookProvider::is_notary_locked_at_tick(notary_id, votes_in_tick) {
+				if T::NotebookProvider::is_notary_locked_at_tick(notary_id, expected_notebook_tick)
+				{
 					continue;
 				}
 
@@ -452,8 +523,8 @@ pub mod pallet {
 					BlockVoteT::<<T::Block as BlockT>::Hash>::decode(&mut leafs[index].as_slice())
 						.map_err(|_| Error::<T>::CouldNotDecodeVote)?;
 
-				if !grandparent_tick_blocks.contains(&vote.block_hash) {
-					info!(target: LOG_TARGET, "cant use vote for grandparent tick {:?}", vote.block_hash);
+				if grandparent_tick_block != vote.block_hash {
+					info!(target: LOG_TARGET, "Cant use vote for grandparent tick {:?} - voted for {:?}", grandparent_tick_block, vote.block_hash);
 					continue;
 				}
 

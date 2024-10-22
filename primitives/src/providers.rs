@@ -17,7 +17,8 @@ use crate::{
 	block_seal::{BlockPayout, MiningAuthority, RewardSharing},
 	inherents::BlockSealInherent,
 	tick::{Tick, Ticker},
-	NotaryId, NotebookHeader, NotebookNumber, NotebookSecret, TransferToLocalchainId, VoteMinimum,
+	ComputeDifficulty, NotaryId, NotebookHeader, NotebookNumber, NotebookSecret,
+	TransferToLocalchainId, VoteMinimum, VotingSchedule,
 };
 
 pub trait NotebookProvider {
@@ -133,8 +134,9 @@ pub trait ChainTransferLookup<AccountId, Balance> {
 	) -> bool;
 }
 
-pub trait BlockVotingProvider<Block: BlockT> {
+pub trait BlockSealSpecProvider<Block: BlockT> {
 	fn grandparent_vote_minimum() -> Option<VoteMinimum>;
+	fn compute_difficulty() -> ComputeDifficulty;
 }
 
 #[derive(Encode, Decode, Clone, PartialEq, Eq, TypeInfo, MaxEncodedLen, RuntimeDebug)]
@@ -171,9 +173,12 @@ where
 }
 
 pub trait TickProvider<B: BlockT> {
+	/// The current tick supplied by the Node tier
 	fn current_tick() -> Tick;
+	/// The schedule for when voting is eligible
+	fn voting_schedule() -> VotingSchedule;
 	fn ticker() -> Ticker;
-	fn blocks_at_tick(tick: Tick) -> Vec<B::Hash>;
+	fn block_at_tick(tick: Tick) -> Option<B::Hash>;
 }
 
 /// An event handler to listen for submitted notebook

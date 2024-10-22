@@ -9,6 +9,7 @@ use sp_runtime::{BoundedVec, DispatchError};
 use crate::{
 	bitcoin::{BitcoinNetwork, BitcoinSyncStatus, Satoshis, UtxoRef, UtxoValue},
 	block_seal::MiningAuthority,
+	fork_power::ForkPower,
 	notary::{
 		NotaryId, NotaryNotebookAuditSummary, NotaryNotebookDetails, NotaryNotebookRawVotes,
 		NotaryNotebookVoteDigestDetails,
@@ -21,11 +22,14 @@ sp_api::decl_runtime_apis! {
 	pub trait BlockSealApis<AccountId:Codec, BlockSealAuthorityId:Codec> {
 		fn vote_minimum() -> VoteMinimum;
 		fn compute_difficulty() -> u128;
-		fn create_vote_digest(tick: Tick, included_notebooks: Vec<NotaryNotebookVoteDigestDetails>) -> BlockVoteDigest;
+		fn create_vote_digest(notebook_tick: Tick, included_notebooks: Vec<NotaryNotebookVoteDigestDetails>) -> BlockVoteDigest;
 		fn find_vote_block_seals(
 			votes: Vec<NotaryNotebookRawVotes>,
 			with_better_strength: U256,
+			expected_notebook_tick: Tick,
 		) -> Result<BoundedVec<BestBlockVoteSeal<AccountId, BlockSealAuthorityId>, ConstU32<2>>, DispatchError>;
+		fn fork_power() -> ForkPower;
+		fn has_eligible_votes() -> bool;
 	}
 }
 
@@ -33,7 +37,7 @@ sp_api::decl_runtime_apis! {
 	pub trait TickApis {
 		fn current_tick() -> Tick;
 		fn ticker() -> Ticker;
-		fn blocks_at_tick(tick: Tick) -> Vec<Block::Hash>;
+		fn block_at_tick(tick: Tick) -> Option<Block::Hash>;
 	}
 }
 

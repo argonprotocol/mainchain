@@ -114,13 +114,20 @@ where
 		&mut self,
 		mut block: BlockImportParams<B>,
 	) -> Result<ImportResult, Self::Error> {
-		info!("Importing block with hash {:?} ({})", block.post_hash(), block.header.number());
 		let digests = load_digests::<B>(&block.header)?;
-
 		let parent_hash = *block.header.parent_hash();
+
 		let Some(Some(seal_digest)) = block.post_digests.last().map(read_seal_digest) else {
 			return Err(Error::MissingBlockSealDigest.into());
 		};
+		info!(
+			"Importing block with hash {:?} ({}, tick {}). Seal: {:?}, Votes {:?}",
+			block.post_hash(),
+			block.header.number(),
+			digests.tick.tick,
+			seal_digest,
+			digests.block_vote.votes_count,
+		);
 
 		let compute_difficulty = match seal_digest {
 			BlockSealDigest::Compute { .. } => {
@@ -209,33 +216,23 @@ where
 			}
 		}
 
-		let best_header = self
-			.select_chain
-			.best_chain()
-			.await
-			.map_err(|e| format!("Fetch best chain failed via select chain: {}", e))
-			.map_err(ConsensusError::ChainLookup)?;
-
-		let tick = digests.tick.tick;
-		let (fork_power, best_fork_power) = self.aux_client.record_block(
-			best_header,
+		let mut fork_power = self.client.runtime_api().fork_power(parent_hash).map_err(|e| {
+			Error::MissingRuntimeData(format!("Failed to get fork power from runtime: {}", e))
+		})?;
+		fork_power.add(
+			digests.block_vote.voting_power,
+			digests.notebooks.notebooks.len() as u32,
+			seal_digest.clone(),
+			compute_difficulty.unwrap_or_default(),
+		);
+		let is_top = self.aux_client.record_block(
 			&mut block,
 			digests.author,
 			digests.voting_key.parent_voting_key,
-			digests.notebooks.notebooks.iter().fold(0u32, |acc, x| {
-				if tick == x.tick {
-					acc + 1
-				} else {
-					acc
-				}
-			}),
-			tick,
-			digests.block_vote.voting_power,
-			seal_digest,
-			compute_difficulty,
+			digests.tick.tick,
+			fork_power,
 		)?;
-
-		block.fork_choice = Some(ForkChoiceStrategy::Custom(fork_power > best_fork_power));
+		block.fork_choice = Some(ForkChoiceStrategy::Custom(is_top));
 
 		self.inner.import_block(block).await.map_err(Into::into)
 	}

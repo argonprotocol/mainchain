@@ -11,8 +11,8 @@ use argon_primitives::{
 	block_vote::VoteMinimum,
 	notebook::NotebookNumber,
 	tick::{Tick, Ticker},
-	AuthorityProvider, BlockVotingProvider, DomainHash, HashOutput, NotaryId, NotebookProvider,
-	NotebookSecret, TickProvider,
+	AuthorityProvider, BlockSealSpecProvider, ComputeDifficulty, DomainHash, HashOutput, NotaryId,
+	NotebookProvider, NotebookSecret, TickProvider, VotingSchedule,
 };
 
 type Block = frame_system::mocking::MockBlock<Test>;
@@ -38,7 +38,7 @@ parameter_types! {
 	pub static MinerZero: Option<(u64, MiningAuthority<BlockSealAuthorityId, u64>)> = None;
 	pub static NotebooksAtTick: BTreeMap<Tick, Vec<(NotaryId, NotebookNumber, Option<NotebookSecret>)>> = BTreeMap::new();
 	pub static CurrentTick: Tick = 0;
-	pub static BlocksAtTick: BTreeMap<Tick, Vec<HashOutput>> = BTreeMap::new();
+	pub static BlocksAtTick: BTreeMap<Tick, HashOutput> = BTreeMap::new();
 	pub static RegisteredDomains: BTreeSet<DomainHash> = BTreeSet::new();
 }
 
@@ -68,7 +68,13 @@ impl NotebookProvider for StaticNotebookProvider {
 		VotingRoots::get().get(&(notary_id, tick)).cloned()
 	}
 	fn notebooks_in_block() -> Vec<(NotaryId, NotebookNumber, Tick)> {
-		todo!()
+		let mut res = vec![];
+		for (tick, notebooks) in NotebooksAtTick::get() {
+			for (notary_id, notebook_number, _) in notebooks {
+				res.push((notary_id, notebook_number, tick));
+			}
+		}
+		res
 	}
 	fn notebooks_at_tick(tick: Tick) -> Vec<(NotaryId, NotebookNumber, Option<NotebookSecret>)> {
 		NotebooksAtTick::get().get(&tick).cloned().unwrap_or_default()
@@ -86,15 +92,21 @@ impl TickProvider<Block> for StaticTickProvider {
 	fn ticker() -> Ticker {
 		Ticker::new(1, 1, 2)
 	}
-	fn blocks_at_tick(tick: Tick) -> Vec<HashOutput> {
-		BlocksAtTick::get().get(&tick).cloned().unwrap_or_default()
+	fn block_at_tick(tick: Tick) -> Option<HashOutput> {
+		BlocksAtTick::get().get(&tick).cloned()
+	}
+	fn voting_schedule() -> VotingSchedule {
+		VotingSchedule::from_runtime_current_tick(CurrentTick::get())
 	}
 }
 
-pub struct StaticBlockVotingProvider;
-impl BlockVotingProvider<Block> for StaticBlockVotingProvider {
+pub struct StaticBlockSealSpecProvider;
+impl BlockSealSpecProvider<Block> for StaticBlockSealSpecProvider {
 	fn grandparent_vote_minimum() -> Option<VoteMinimum> {
 		GrandpaVoteMinimum::get()
+	}
+	fn compute_difficulty() -> ComputeDifficulty {
+		0u128
 	}
 }
 impl pallet_block_seal::Config for Test {
@@ -102,7 +114,7 @@ impl pallet_block_seal::Config for Test {
 	type AuthorityId = BlockSealAuthorityId;
 	type AuthorityProvider = StaticAuthorityProvider;
 	type NotebookProvider = StaticNotebookProvider;
-	type BlockVotingProvider = StaticBlockVotingProvider;
+	type BlockSealSpecProvider = StaticBlockSealSpecProvider;
 	type TickProvider = StaticTickProvider;
 	type EventHandler = ();
 }

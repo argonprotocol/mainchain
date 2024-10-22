@@ -58,6 +58,137 @@ struct BlockVoteHashMessage<Hash: Codec> {
 	tick: Tick,
 }
 
+/// This struct exists mostly because the mental model of the voting is so difficult to
+/// conceptualize.
+///
+/// When a vote is created, the voter will lookup a grandparent block to vote on. This is a
+/// grandparent in terms of occurring 2 ticks prior to the active one.
+///
+/// Current Tick = 10
+/// GrandParent to Vote on = 0x233..044 from tick 8
+///
+/// This vote is created and submitted to a notebook in tick 10.
+/// Notebook 3 - Tick 10
+/// Votes in notebook 3 will have votes for blocks at tick 8.
+///
+/// Notebook 3 goes into a block at tick 11.
+///
+/// At tick 11, the block creation process looks at the votes that could be used to create a new
+/// block. These are the votes from notebooks in tick 10, which will themselves have a tick of 9.
+///
+/// Therefor, eligible votes -> tick 9
+/// Votes for blocks -> tick 7
+pub struct VotingSchedule {
+	pub context: VotingContext,
+}
+
+pub enum VotingContext {
+	/// When creating votes, you operate on the current tick and votes are for blocks 2 back
+	Voting {
+		current_tick: Tick,
+	},
+	/// When creating a block, you operate on the current tick and include notebooks from the
+	/// previous tick
+	CreatingBlock {
+		current_tick: Tick,
+	},
+	/// When in runtime, the notebooks are all 1 tick behind
+	Runtime {
+		current_tick: Tick,
+	},
+	/// When evaluating a runtime seal in the `block_seal` pallet, you are looking at notebooks
+	/// from 2 ticks back
+	RuntimeSeal {
+		current_tick: Tick,
+	},
+	EvaluateRuntimeVotes {
+		current_tick: Tick,
+	},
+}
+
+impl VotingSchedule {
+	pub fn on_notebook_tick_state(notebook_tick: Tick) -> Self {
+		Self {
+			context: VotingContext::CreatingBlock { current_tick: notebook_tick.saturating_add(1) },
+		}
+	}
+
+	pub fn from_runtime_current_tick(current_tick: Tick) -> Self {
+		Self { context: VotingContext::Runtime { current_tick } }
+	}
+
+	pub fn when_creating_votes(current_tick: Tick) -> Self {
+		Self { context: VotingContext::Voting { current_tick } }
+	}
+
+	pub fn when_evaluating_runtime_seals(current_tick: Tick) -> Self {
+		Self { context: VotingContext::RuntimeSeal { current_tick } }
+	}
+
+	pub fn when_evaluating_runtime_votes(current_tick: Tick) -> Self {
+		Self { context: VotingContext::EvaluateRuntimeVotes { current_tick } }
+	}
+
+	pub fn new(context: VotingContext) -> Self {
+		Self { context }
+	}
+
+	pub fn when_creating_block(current_tick: Tick) -> Self {
+		Self { context: VotingContext::CreatingBlock { current_tick } }
+	}
+
+	/// Which tick will the notebook be included in
+	pub fn block_tick(&self) -> Tick {
+		match self.context {
+			VotingContext::CreatingBlock { current_tick } => current_tick,
+			VotingContext::Runtime { current_tick } => current_tick,
+			VotingContext::RuntimeSeal { current_tick } => current_tick,
+			VotingContext::Voting { current_tick } => current_tick.saturating_add(1),
+			VotingContext::EvaluateRuntimeVotes { current_tick } => current_tick,
+		}
+	}
+
+	/// The parent block of the block with the notebook included in it
+	///
+	/// -> Block at Tick 3 -> Parent Notebook (notebook tick 2) <-- Parent Tick
+	/// -> Block at Tick 4 -> Notebook (notebook tick 3)
+	pub fn parent_block_tick(&self) -> Tick {
+		self.block_tick().saturating_sub(1)
+	}
+
+	pub fn notebook_tick(&self) -> Tick {
+		match self.context {
+			VotingContext::CreatingBlock { current_tick } => current_tick.saturating_sub(1),
+			VotingContext::Runtime { current_tick } => current_tick.saturating_sub(1),
+			VotingContext::RuntimeSeal { current_tick } => current_tick.saturating_sub(2),
+			VotingContext::Voting { current_tick } => current_tick,
+			VotingContext::EvaluateRuntimeVotes { current_tick } => current_tick.saturating_sub(1),
+		}
+	}
+
+	/// there won't be a grandparent block to vote for until block 2, and those votes
+	/// don't count until tick 3
+	pub fn is_voting_started(&self) -> bool {
+		self.notebook_tick() >= 3
+	}
+
+	/// When do we evaluate the votes relative to the current notebook
+	pub fn eligible_votes_tick(&self) -> Tick {
+		match self.context {
+			VotingContext::CreatingBlock { .. } => self.notebook_tick().saturating_sub(1),
+			VotingContext::Runtime { .. } => self.notebook_tick().saturating_sub(1),
+			VotingContext::RuntimeSeal { .. } => self.notebook_tick(),
+			VotingContext::Voting { .. } => self.notebook_tick().saturating_sub(1),
+			VotingContext::EvaluateRuntimeVotes { .. } => self.notebook_tick(),
+		}
+	}
+
+	/// Which blocks were voted on relative to the current notebook
+	pub fn grandparent_votes_tick(&self) -> Tick {
+		self.notebook_tick().saturating_sub(2)
+	}
+}
+
 pub type BlockVote = BlockVoteT<H256>;
 pub type VotingKey = H256;
 

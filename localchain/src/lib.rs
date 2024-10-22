@@ -265,9 +265,11 @@ impl Localchain {
 
   pub async fn close(&self) -> Result<()> {
     tracing::trace!("Closing Localchain");
-    let mut mainchain_client = self.mainchain_client.lock().await;
-    if let Some(mainchain_client) = mainchain_client.take() {
-      mainchain_client.close().await?;
+    {
+      let mut mainchain_client = self.mainchain_client.lock().await;
+      if let Some(mainchain_client) = mainchain_client.take() {
+        mainchain_client.close().await?;
+      }
     }
     self.notary_clients.close().await;
     if !self.db.is_closed() {

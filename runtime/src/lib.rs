@@ -65,6 +65,7 @@ use argon_primitives::{
 	block_seal::MiningAuthority,
 	block_vote::VoteMinimum,
 	digests::BlockVoteDigest,
+	fork_power::ForkPower,
 	localchain::BestBlockVoteSeal,
 	notary::{
 		NotaryId, NotaryNotebookAuditSummary, NotaryNotebookDetails, NotaryNotebookRawVotes,
@@ -296,7 +297,7 @@ impl pallet_timestamp::Config for Runtime {
 	/// A timestamp: milliseconds since the unix epoch.
 	type Moment = Moment;
 	type OnTimestampSet = (BlockSealSpec, Ticks);
-	type MinimumPeriod = ConstU64<500>;
+	type MinimumPeriod = ConstU64<1000>;
 	type WeightInfo = ();
 }
 
@@ -413,7 +414,7 @@ impl pallet_block_seal::Config for Runtime {
 	type WeightInfo = pallet_block_seal::weights::SubstrateWeight<Runtime>;
 	type AuthorityProvider = MiningSlot;
 	type NotebookProvider = Notebook;
-	type BlockVotingProvider = BlockSealSpec;
+	type BlockSealSpecProvider = BlockSealSpec;
 	type TickProvider = Ticks;
 	type EventHandler = MiningSlot;
 }
@@ -457,7 +458,7 @@ impl pallet_notebook::Config for Runtime {
 	type EventHandler = (ChainTransfer, BlockSealSpec, Domains);
 	type NotaryProvider = Notaries;
 	type ChainTransferLookup = ChainTransfer;
-	type BlockVotingProvider = BlockSealSpec;
+	type BlockSealSpecProvider = BlockSealSpec;
 	type TickProvider = Ticks;
 }
 
@@ -781,7 +782,6 @@ mod runtime {
 	pub type Timestamp = pallet_timestamp;
 	#[runtime::pallet_index(2)]
 	pub type Multisig = pallet_multisig;
-
 	#[runtime::pallet_index(3)]
 	pub type Proxy = pallet_proxy;
 	#[runtime::pallet_index(4)]
@@ -808,6 +808,7 @@ mod runtime {
 	pub type PriceIndex = pallet_price_index;
 	#[runtime::pallet_index(15)]
 	pub type Authorship = pallet_authorship;
+	// Block Seal uses notebooks and ticks
 	#[runtime::pallet_index(16)]
 	pub type BlockSeal = pallet_block_seal;
 	// NOTE: BlockRewards must come after seal (on_finalize uses seal info)
@@ -1013,17 +1014,25 @@ impl_runtime_apis! {
 			BlockSealSpec::compute_difficulty()
 		}
 
-		fn create_vote_digest(tick: Tick, included_notebooks: Vec<NotaryNotebookVoteDigestDetails>) -> BlockVoteDigest {
-			BlockSealSpec::create_block_vote_digest(tick, included_notebooks)
+		fn create_vote_digest(notebook_tick: Tick, included_notebooks: Vec<NotaryNotebookVoteDigestDetails>) -> BlockVoteDigest {
+			BlockSealSpec::create_block_vote_digest(notebook_tick, included_notebooks)
 		}
 
 		fn find_vote_block_seals(
 			votes: Vec<NotaryNotebookRawVotes>,
 			with_better_strength: U256,
+			expected_notebook_tick: Tick,
 		) -> Result<BoundedVec<BestBlockVoteSeal<AccountId, BlockSealAuthorityId>, ConstU32<2>>, DispatchError>{
-			Ok(BlockSeal::find_vote_block_seals(votes,with_better_strength)?)
+			Ok(BlockSeal::find_vote_block_seals(votes,with_better_strength, expected_notebook_tick)?)
 		}
 
+		fn fork_power() -> ForkPower {
+			BlockSeal::fork_power()
+		}
+
+		fn has_eligible_votes() -> bool {
+			BlockSeal::has_eligible_votes()
+		}
 	}
 
 	impl argon_primitives::NotaryApis<Block, NotaryRecordT> for Runtime {
@@ -1081,8 +1090,8 @@ impl_runtime_apis! {
 		fn ticker() -> Ticker {
 			Ticks::ticker()
 		}
-		fn blocks_at_tick(tick: Tick) -> Vec<<Block as BlockT>::Hash> {
-			Ticks::blocks_at_tick(tick)
+		fn block_at_tick(tick: Tick) -> Option<<Block as BlockT>::Hash> {
+			Ticks::block_at_tick(tick)
 		}
 	}
 

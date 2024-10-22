@@ -1,32 +1,31 @@
 #![allow(clippy::type_complexity)]
 use std::{
 	any::Any,
-	cmp::Ordering,
 	collections::{BTreeMap, BTreeSet},
 	fmt::Debug,
 	sync::Arc,
 };
 
 use codec::{Decode, Encode};
-use log::{info, warn};
+use log::{trace, warn};
 use parking_lot::RwLock;
 use sc_client_api::{self, backend::AuxStore};
 use sc_consensus::BlockImportParams;
 use schnellru::{ByLength, LruMap};
 use sp_arithmetic::traits::UniqueSaturatedInto;
-use sp_core::{H256, U256};
+use sp_core::H256;
 use sp_runtime::traits::{Block as BlockT, Header};
 
 use crate::{aux_data::AuxData, error::Error, notary_client::VotingPowerInfo};
 use argon_node_runtime::{AccountId, BlockNumber, NotebookVerifyError};
 use argon_primitives::{
+	fork_power::ForkPower,
 	notary::{
 		NotaryNotebookAuditSummary, NotaryNotebookDetails, NotaryNotebookRawVotes,
 		NotaryNotebookTickState, NotaryNotebookVoteDigestDetails,
 	},
 	tick::Tick,
-	BlockSealDigest, BlockVotingPower, ComputeDifficulty, NotaryId, NotebookDigestRecord,
-	NotebookHeaderData, NotebookNumber,
+	NotaryId, NotebookDigestRecord, NotebookHeaderData, NotebookNumber, VotingSchedule,
 };
 
 pub enum AuxState<C: AuxStore> {
@@ -36,8 +35,7 @@ pub enum AuxState<C: AuxStore> {
 	NotaryAuditSummaries(Arc<AuxData<Vec<NotaryNotebookAuditSummary>, C>>),
 	NotaryMissingNotebooks(Arc<AuxData<BTreeSet<NotebookNumber>, C>>),
 	VotesAtTick(Arc<AuxData<Vec<NotaryNotebookRawVotes>, C>>),
-	ForkVotingPower(Arc<AuxData<ForkPower, C>>),
-	MaxVotingPowerAtTick(Arc<AuxData<ForkPower, C>>),
+	MaxForkPower(Arc<AuxData<ForkPower, C>>),
 }
 trait AuxStateData {
 	fn as_any(&self) -> &dyn Any;
@@ -52,8 +50,7 @@ impl<C: AuxStore + 'static> AuxStateData for AuxState<C> {
 			AuxState::NotaryMissingNotebooks(a) => a,
 			AuxState::VotesAtTick(a) => a,
 			AuxState::NotaryAuditSummaries(a) => a,
-			AuxState::ForkVotingPower(a) => a,
-			AuxState::MaxVotingPowerAtTick(a) => a,
+			AuxState::MaxForkPower(a) => a,
 		}
 	}
 }
@@ -64,8 +61,7 @@ pub enum AuxKey {
 	NotaryNotebooks(NotaryId),
 	VotesAtTick(Tick),
 	NotaryAuditSummaries(NotaryId),
-	ForkVotingPower(H256),
-	MaxVotingPowerAtTick(Tick),
+	MaxForkPower,
 }
 
 impl AuxKey {
@@ -81,10 +77,8 @@ impl AuxKey {
 				AuxState::VotesAtTick(AuxData::new(client, self.clone()).into()),
 			AuxKey::NotaryAuditSummaries(_) =>
 				AuxState::NotaryAuditSummaries(AuxData::new(client, self.clone()).into()),
-			AuxKey::ForkVotingPower(_) =>
-				AuxState::ForkVotingPower(AuxData::new(client, self.clone()).into()),
-			AuxKey::MaxVotingPowerAtTick(_) =>
-				AuxState::MaxVotingPowerAtTick(AuxData::new(client, self.clone()).into()),
+			AuxKey::MaxForkPower =>
+				AuxState::MaxForkPower(AuxData::new(client, self.clone()).into()),
 		}
 	}
 }
@@ -122,31 +116,23 @@ impl<B: BlockT, C: AuxStore> ArgonAux<B, C> {
 /// Stores auxiliary data for argon consensus (eg - cross block data)
 ///
 /// We store several types of data
-/// - `ForkPower` - stored at each block to determine the aggregate voting power for a fork
-///   (++voting_power, --nonce)
 /// - `BlockVotes` - all block votes submitted (voting for a block hash)
 /// - `StrongestVoteAtHeight` - the strongest vote at a given height - helps determine if we should
 ///   create a block
 /// - `AuthorsAtHeight` - the authors at a given height for every voting key. A block will only be
 ///   accepted once per author per key
 impl<B: BlockT, C: AuxStore + 'static> ArgonAux<B, C> {
-	#[allow(clippy::too_many_arguments)]
 	pub fn record_block(
 		&self,
-		best_header: B::Header,
 		block: &mut BlockImportParams<B>,
 		author: AccountId,
 		voting_key: Option<H256>,
-		notebooks: u32,
 		tick: Tick,
-		block_voting_power: BlockVotingPower,
-		seal_digest: BlockSealDigest,
-		compute_difficulty: Option<ComputeDifficulty>,
-	) -> Result<(ForkPower, ForkPower), Error> {
+		fork_power: ForkPower,
+	) -> Result<bool, Error> {
 		let _lock = self.lock.write();
 		let block_number =
 			UniqueSaturatedInto::<u32>::unique_saturated_into(*block.header.number());
-		let strongest_at_height = self.strongest_fork_at_tick(tick)?.get();
 
 		// add author to voting key
 		if let Some(voting_key) = voting_key {
@@ -158,22 +144,14 @@ impl<B: BlockT, C: AuxStore + 'static> ArgonAux<B, C> {
 					Ok::<(), Error>(())
 				})??;
 		}
-
-		let parent_hash = block.header.parent_hash();
-		let mut fork_power = self.get_fork_voting_power(parent_hash)?.get();
-		fork_power.add(block_voting_power, notebooks, seal_digest, compute_difficulty);
-
-		if fork_power > strongest_at_height {
-			let key = AuxKey::MaxVotingPowerAtTick(tick).encode();
-			block.auxiliary.push((key, Some(fork_power.encode())));
-		}
-
-		let best_header_fork_power = self.get_fork_voting_power(&best_header.hash())?.get();
-
-		block.auxiliary.push((
-			AuxKey::ForkVotingPower(H256::from_slice(block.post_hash().as_ref())).encode(),
-			Some(fork_power.encode()),
-		));
+		let is_new_best = self.strongest_fork_power()?.mutate(|state| {
+			if &fork_power > state {
+				*state = fork_power.clone();
+				Ok::<bool, Error>(true)
+			} else {
+				Ok::<bool, Error>(false)
+			}
+		})??;
 
 		// cleanup old votes (None deletes)
 		if tick >= 10 {
@@ -181,25 +159,24 @@ impl<B: BlockT, C: AuxStore + 'static> ArgonAux<B, C> {
 			block.auxiliary.push((AuxKey::VotesAtTick(cleanup_height).encode(), None));
 			block
 				.auxiliary
-				.push((AuxKey::MaxVotingPowerAtTick(cleanup_height).encode(), None));
-			block
-				.auxiliary
 				.push((AuxKey::AuthorsAtHeight(block_number.saturating_sub(5)).encode(), None));
 		}
 		// Cleanup old notary state. We keep this longer because we might need to catchup on
 		// notebooks
 		if tick >= 256 {
-			block.auxiliary.push((AuxKey::NotaryStateAtTick(tick - 256).encode(), None));
+			// submit 10 just to be sure since we can miss a tick
+			for tick in (tick.saturating_add(266))..=(tick - 256) {
+				block.auxiliary.push((AuxKey::NotaryStateAtTick(tick).encode(), None));
+			}
 		}
-
-		Ok((fork_power, best_header_fork_power))
+		Ok(is_new_best)
 	}
 
 	pub fn get_notary_notebooks_for_header(
 		&self,
 		notary_id: NotaryId,
 		latest_runtime_notebook_number: NotebookNumber,
-		submitting_tick: Tick,
+		voting_schedule: &VotingSchedule,
 	) -> Result<
 		(NotebookHeaderData<NotebookVerifyError>, Option<NotaryNotebookVoteDigestDetails>),
 		Error,
@@ -210,7 +187,7 @@ impl<B: BlockT, C: AuxStore + 'static> ArgonAux<B, C> {
 
 		for notebook in audit_results {
 			if notebook.notebook_number <= latest_runtime_notebook_number ||
-				notebook.tick > submitting_tick
+				notebook.tick > voting_schedule.notebook_tick()
 			{
 				continue;
 			}
@@ -225,7 +202,7 @@ impl<B: BlockT, C: AuxStore + 'static> ArgonAux<B, C> {
 			let tick = notebook.tick;
 
 			let state = self.get_notebook_tick_state(tick)?.get();
-			if tick == submitting_tick {
+			if tick == voting_schedule.notebook_tick() {
 				let Some(details) = state.notebook_key_details_by_notary.get(&notary_id) else {
 					continue;
 				};
@@ -287,15 +264,6 @@ impl<B: BlockT, C: AuxStore + 'static> ArgonAux<B, C> {
 		self.get_or_insert_state(key)
 	}
 
-	/// Retrieves aggregate voting power for a fork
-	pub fn get_fork_voting_power(
-		&self,
-		block_hash: &B::Hash,
-	) -> Result<Arc<AuxData<ForkPower, C>>, Error> {
-		let key = AuxKey::ForkVotingPower(H256::from_slice(block_hash.as_ref()));
-		self.get_or_insert_state(key)
-	}
-
 	pub fn store_votes(&self, tick: Tick, votes: NotaryNotebookRawVotes) -> Result<(), Error> {
 		self.get_votes(tick)?.mutate(|existing| {
 			if !existing.iter().any(|x| {
@@ -323,8 +291,8 @@ impl<B: BlockT, C: AuxStore + 'static> ArgonAux<B, C> {
 		self.get_or_insert_state(key)
 	}
 
-	pub fn strongest_fork_at_tick(&self, tick: Tick) -> Result<Arc<AuxData<ForkPower, C>>, Error> {
-		let key = AuxKey::MaxVotingPowerAtTick(tick);
+	pub fn strongest_fork_power(&self) -> Result<Arc<AuxData<ForkPower, C>>, Error> {
+		let key = AuxKey::MaxForkPower;
 		self.get_or_insert_state(key)
 	}
 
@@ -373,9 +341,11 @@ impl<B: BlockT, C: AuxStore + 'static> ArgonAux<B, C> {
 		let notary_id = notebook_details.notary_id;
 		let notebook_number = notebook_details.notebook_number;
 
-		info!(
+		trace!(
 			"Storing vote details for tick {} and notary {} at notebook #{}",
-			tick, notary_id, notebook_number
+			tick,
+			notary_id,
+			notebook_number
 		);
 
 		const MAX_AUDIT_SUMMARY_HISTORY: usize = 2000;
@@ -455,95 +425,6 @@ impl<B: BlockT, C: AuxStore + 'static> ArgonAux<B, C> {
 	}
 }
 
-#[derive(Clone, Encode, Decode, Debug, Eq, PartialEq)]
-pub struct ForkPower {
-	pub notebooks: u64,
-	pub voting_power: U256,
-	pub seal_strength: U256,
-	pub total_compute_difficulty: U256,
-	pub vote_created_blocks: u128,
-}
-
-impl ForkPower {
-	pub fn add(
-		&mut self,
-		block_voting_power: BlockVotingPower,
-		notebooks: u32,
-		seal_digest: BlockSealDigest,
-		compute_difficulty: Option<ComputeDifficulty>,
-	) {
-		match seal_digest {
-			BlockSealDigest::Vote { seal_strength } => {
-				self.add_vote(block_voting_power, notebooks, seal_strength);
-			},
-			BlockSealDigest::Compute { .. } => {
-				self.add_compute(
-					block_voting_power,
-					notebooks,
-					compute_difficulty.unwrap_or_default(),
-				);
-			},
-		}
-	}
-
-	pub fn add_vote(
-		&mut self,
-		block_voting_power: BlockVotingPower,
-		notebooks: u32,
-		seal_strength: U256,
-	) {
-		self.seal_strength = self.seal_strength.saturating_add(seal_strength);
-		self.vote_created_blocks = self.vote_created_blocks.saturating_add(1);
-		self.voting_power = self.voting_power.saturating_add(U256::from(block_voting_power));
-		self.notebooks = self.notebooks.saturating_add(notebooks as u64);
-	}
-
-	pub fn add_compute(
-		&mut self,
-		block_voting_power: BlockVotingPower,
-		notebooks: u32,
-		compute_difficulty: ComputeDifficulty,
-	) {
-		self.voting_power = self.voting_power.saturating_add(U256::from(block_voting_power));
-		self.notebooks = self.notebooks.saturating_add(notebooks as u64);
-		self.total_compute_difficulty =
-			self.total_compute_difficulty.saturating_add(compute_difficulty.into());
-	}
-}
-
-impl Default for ForkPower {
-	fn default() -> Self {
-		Self {
-			voting_power: U256::zero(),
-			notebooks: 0,
-			seal_strength: U256::MAX,
-			total_compute_difficulty: U256::zero(),
-			vote_created_blocks: 0,
-		}
-	}
-}
-
-impl PartialOrd for ForkPower {
-	fn partial_cmp(&self, other: &Self) -> Option<Ordering> {
-		let mut cmp = self.notebooks.cmp(&other.notebooks);
-		if cmp == Ordering::Equal {
-			cmp = self.voting_power.cmp(&other.voting_power);
-		}
-		if cmp == Ordering::Equal {
-			// count forks with tax votes over compute
-			cmp = self.vote_created_blocks.cmp(&other.vote_created_blocks);
-		}
-		if cmp == Ordering::Equal {
-			// smaller vote proof is better
-			cmp = other.seal_strength.cmp(&self.seal_strength)
-		}
-		if cmp == Ordering::Equal {
-			cmp = self.total_compute_difficulty.cmp(&other.total_compute_difficulty)
-		}
-		Some(cmp)
-	}
-}
-
 #[derive(Clone, Encode, Decode, Debug, PartialEq)]
 pub struct NotebookAuditResult {
 	pub notebook_number: NotebookNumber,
@@ -589,31 +470,6 @@ mod test {
 			let aux = self.aux.lock();
 			Ok(aux.get(key).cloned())
 		}
-	}
-
-	#[test]
-	fn it_should_compare_fork_power() {
-		assert_eq!(ForkPower::default(), ForkPower::default());
-
-		assert!(
-			ForkPower { voting_power: 1.into(), ..Default::default() } >
-				ForkPower { voting_power: 0.into(), ..Default::default() }
-		);
-
-		assert!(
-			ForkPower { notebooks: 1, ..Default::default() } >
-				ForkPower { notebooks: 0, ..Default::default() }
-		);
-
-		assert!(
-			ForkPower { seal_strength: 200.into(), ..Default::default() } >
-				ForkPower { seal_strength: 201.into(), ..Default::default() }
-		);
-
-		assert!(
-			ForkPower { total_compute_difficulty: 1000.into(), ..Default::default() } >
-				ForkPower { total_compute_difficulty: 999.into(), ..Default::default() }
-		);
 	}
 
 	#[test]

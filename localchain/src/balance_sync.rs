@@ -1,17 +1,5 @@
 use std::sync::Arc;
 
-use serde_json::json;
-use sp_core::sr25519::Signature;
-use sp_core::Decode;
-use sp_core::H256;
-use sp_runtime::MultiSignature;
-use sqlx::{Sqlite, SqlitePool, Transaction};
-use tokio::sync::Mutex;
-
-use crate::{bail, Error, Result};
-use argon_primitives::tick::Tick;
-use argon_primitives::{AccountType, Balance, BlockVote, NotaryId, NotebookNumber};
-
 use crate::accounts::AccountStore;
 use crate::balance_changes::{BalanceChangeRow, BalanceChangeStatus, BalanceChangeStore};
 use crate::keystore::Keystore;
@@ -21,10 +9,23 @@ use crate::notarization_tracker::NotarizationTracker;
 use crate::open_channel_holds::OpenChannelHoldsStore;
 use crate::transactions::{TransactionType, Transactions};
 use crate::LocalAccount;
+use crate::{bail, Error, Result};
 use crate::{ChannelHold, MainchainClient};
 use crate::{Localchain, OpenChannelHold};
 use crate::{LocalchainTransfer, NotaryAccountOrigin, TickerRef};
 use crate::{NotaryClient, NotaryClients};
+use argon_notary_apis::Error as NotaryError;
+use argon_notary_audit::VerifyError;
+use argon_primitives::tick::Tick;
+use argon_primitives::{AccountType, Balance, BlockVote, NotaryId, NotebookNumber};
+use serde_json::json;
+use sp_core::sr25519::Signature;
+use sp_core::Decode;
+use sp_core::H256;
+use sp_runtime::MultiSignature;
+use sqlx::{Sqlite, SqlitePool, Transaction};
+use tokio::sync::Mutex;
+use tracing::{info, trace};
 
 #[cfg_attr(feature = "napi", napi)]
 pub struct BalanceSync {
@@ -308,11 +309,6 @@ impl BalanceSync {
   pub async fn sync(&self, options: Option<ChannelHoldCloseOptions>) -> Result<BalanceSyncResult> {
     let balance_changes = self.sync_unsettled_balances().await?;
 
-    tracing::debug!(
-      "Finished processing unsettled balances {}",
-      balance_changes.len(),
-    );
-
     let (channel_hold_notarizations, channel_holds_updated) =
       self.process_pending_channel_holds().await?;
 
@@ -331,6 +327,16 @@ impl BalanceSync {
     } else {
       vec![]
     };
+    tracing::debug!(
+      "Finished processing sync.\nUnsettled Balances synced: {},\nBlock Votes {},\n\
+      Mainchain Transfers {}\nChannel Holds: {} notarized/{} updated\nJump Account Consolidations: {}",
+        balance_changes.len(),
+        block_votes.len(),
+        mainchain_transfers.len(),
+        channel_hold_notarizations.len(),
+        channel_holds_updated.len(),
+        jump_account_consolidations.len(),
+    );
 
     Ok(BalanceSyncResult {
       balance_changes,
@@ -646,12 +652,15 @@ impl BalanceSync {
             }
           }
           Err(e) => {
-            if let Error::NotaryApiError(argon_notary_apis::Error::BalanceChangeVerifyError(
-              argon_notary_audit::VerifyError::InvalidBlockVoteTick {
-                tick,
-                notebook_tick,
-              },
-            )) = e
+            if let Error::NotarizationError(
+              argon_notary_apis::Error::BalanceChangeVerifyError(
+                VerifyError::InvalidBlockVoteTick {
+                  tick,
+                  notebook_tick,
+                },
+              ),
+              _,
+            ) = e
             {
               tracing::warn!(
                 "Voted on an invalid vote tick {} vs notebook tick {}: {:?}",
@@ -686,11 +695,17 @@ impl BalanceSync {
     let balance_change = notarization.load_account(account).await?;
     let total_available_tax = balance_change.balance().await;
     const DEFAULT_MINIMUM_VOTE_AMOUNT: Balance = 500;
-    if total_available_tax
-      <= options
-        .minimum_vote_amount
-        .unwrap_or(DEFAULT_MINIMUM_VOTE_AMOUNT as i64) as Balance
-    {
+
+    let minimum_tax = options
+      .minimum_vote_amount
+      .unwrap_or(DEFAULT_MINIMUM_VOTE_AMOUNT as i64) as Balance;
+    trace!(
+      "Checking if we should create a vote for account {}. Total available tax: {}. Configured minimum for vote: {}",
+      account.id,
+      total_available_tax,
+      minimum_tax
+    );
+    if total_available_tax < minimum_tax {
       return Ok(None);
     }
 
@@ -699,6 +714,7 @@ impl BalanceSync {
     let current_tick = self.ticker.current();
     let Some(best_block_for_vote) = mainchain_client.get_vote_block_hash(current_tick).await?
     else {
+      trace!("No best block for vote found for tick {}", current_tick);
       return Ok(None);
     };
     if total_available_tax < best_block_for_vote.vote_minimum {
@@ -733,6 +749,10 @@ impl BalanceSync {
     vote.signature = MultiSignature::decode(&mut signature.as_ref())?;
     notarization.add_vote(vote).await?;
     let tracker = notarization.notarize().await?;
+    info!(
+      "Created vote for account {}. Total available tax: {}.",
+      account.id, total_available_tax
+    );
     Ok(Some(tracker))
   }
 
@@ -750,7 +770,6 @@ impl BalanceSync {
       if i > 0 {
         tracing::debug!("Retrying notarization finalization. Attempt #{}", i);
       }
-
       match notarization.notarize().await {
         Ok(tracker) => {
           tracing::info!(
@@ -762,39 +781,40 @@ impl BalanceSync {
           return Some(tracker);
         }
         Err(e) => {
-          if is_notebook_finalization_error(&e)
-            || matches!(
-              e,
-              Error::NotaryApiError(argon_notary_apis::Error::BalanceChangeVerifyError(
-                argon_notary_audit::VerifyError::ChannelHoldNotReadyForClaim { .. }
-              ))
-            )
-          {
-            let delay = (2 + i) ^ 5;
-            tracing::debug!("Channel hold not ready for claim. Waiting {delay} seconds.");
-            tokio::time::sleep(tokio::time::Duration::from_secs(delay)).await;
-            continue;
-          }
-          if let Error::NotarizationError(
-            argon_notary_apis::Error::BalanceTipMismatch { change_index, .. },
-            ref submitted_notarization,
-          ) = e
-          {
-            if let Some(failed_entry) = submitted_notarization
-              .balance_changes
-              .get(change_index as usize)
-            {
-              let failed_address = AccountStore::to_address(&failed_entry.account_id);
-              tracing::warn!(
-                "Account {}, change {} broke notarizations. Will retry without it. Error: {:?}",
-                failed_address,
-                failed_entry.change_number,
-                e,
-              );
+          match e {
+            Error::NotarizationError(
+              NotaryError::BalanceChangeVerifyError(VerifyError::ChannelHoldNotReadyForClaim {
+                ..
+              }),
+              _,
+            ) => {
+              let delay = (2 + i) ^ 5;
+              tracing::debug!("Channel hold not ready for claim. Waiting {delay} seconds.");
+              tokio::time::sleep(tokio::time::Duration::from_secs(delay)).await;
+              continue;
             }
-          } else {
-            tracing::warn!("Error finalizing channel_hold notarization: {:?}", e);
+            Error::NotarizationError(
+              NotaryError::BalanceTipMismatch { change_index, .. },
+              ref submitted_notarization,
+            ) => {
+              if let Some(failed_entry) = submitted_notarization
+                .balance_changes
+                .get(change_index as usize)
+              {
+                let failed_address = AccountStore::to_address(&failed_entry.account_id);
+                tracing::warn!(
+                  "Account {}, change {} broke notarizations. Will retry without it. Error: {:?}",
+                  failed_address,
+                  failed_entry.change_number,
+                  e,
+                );
+                return None;
+              }
+            }
+            _ => {}
           }
+          tracing::warn!("Error finalizing channel_hold notarization: {:?}", e);
+          return None;
         }
       }
     }
@@ -1208,8 +1228,9 @@ impl BalanceSync {
 }
 
 fn is_notebook_finalization_error(e: &Error) -> bool {
-  matches!(
-    e,
-    Error::NotaryApiError(argon_notary_apis::Error::NotebookNotFinalized)
-  )
+  matches!(e, Error::NotaryApiError(NotaryError::NotebookNotFinalized))
+    || matches!(
+      e,
+      Error::NotarizationError(NotaryError::NotebookNotFinalized, _)
+    )
 }

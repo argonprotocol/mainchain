@@ -8,8 +8,8 @@ use argon_primitives::{
 	block_vote::VoteMinimum,
 	notary::{NotaryId, NotaryProvider, NotarySignature},
 	tick::{Tick, Ticker},
-	BlockVotingProvider, ChainTransferLookup, NotebookEventHandler, NotebookHeader, TickProvider,
-	TransferToLocalchainId,
+	BlockSealSpecProvider, ChainTransferLookup, NotebookEventHandler, NotebookHeader, TickProvider,
+	TransferToLocalchainId, VotingSchedule,
 };
 
 use crate as pallet_notebook;
@@ -102,10 +102,13 @@ pub fn set_argons(account_id: &AccountId32, amount: Balance) {
 	drop(Balances::issue(amount));
 }
 
-pub struct StaticBlockVotingProvider;
-impl BlockVotingProvider<Block> for StaticBlockVotingProvider {
+pub struct StaticBlockSealSpecProvider;
+impl BlockSealSpecProvider<Block> for StaticBlockSealSpecProvider {
 	fn grandparent_vote_minimum() -> Option<VoteMinimum> {
 		GrandpaVoteMinimum::get()
+	}
+	fn compute_difficulty() -> u128 {
+		todo!("compute_difficulty")
 	}
 }
 
@@ -117,8 +120,11 @@ impl TickProvider<Block> for StaticTickProvider {
 	fn ticker() -> Ticker {
 		Ticker::new(1, 1, 2)
 	}
-	fn blocks_at_tick(_: Tick) -> Vec<H256> {
+	fn block_at_tick(_: Tick) -> Option<H256> {
 		todo!()
+	}
+	fn voting_schedule() -> VotingSchedule {
+		VotingSchedule::from_runtime_current_tick(CurrentTick::get())
 	}
 }
 
@@ -137,7 +143,7 @@ impl pallet_notebook::Config for Test {
 	type EventHandler = OnNotebook;
 
 	type ChainTransferLookup = ChainTransferLookupImpl;
-	type BlockVotingProvider = StaticBlockVotingProvider;
+	type BlockSealSpecProvider = StaticBlockSealSpecProvider;
 	type TickProvider = StaticTickProvider;
 }
 

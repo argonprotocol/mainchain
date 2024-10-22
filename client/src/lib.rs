@@ -22,12 +22,17 @@ use tokio::{
 	sync::{mpsc, Mutex, RwLock},
 	task::JoinHandle,
 };
-use tracing::warn;
+use tracing::{log::debug, warn};
 
-use argon_primitives::{AccountId, BlockNumber, Chain, ChainIdentity, Nonce};
+use argon_primitives::{
+	tick::Tick, AccountId, BlockNumber, Chain, ChainIdentity, Nonce, VotingSchedule,
+};
 pub use spec::api;
 
-use crate::api::{ownership, storage, system};
+use crate::api::{
+	block_seal_spec::storage::types::current_vote_minimum::CurrentVoteMinimum, ownership, storage,
+	system,
+};
 
 pub mod conversion;
 pub mod signer;
@@ -237,6 +242,41 @@ impl MainchainClient {
 			.await?
 			.map(|a| a.number)
 			.ok_or_else(|| anyhow!("Block header not found for block hash"))
+	}
+
+	pub async fn get_vote_block_hash(
+		&self,
+		current_tick: Tick,
+	) -> anyhow::Result<(H256, CurrentVoteMinimum)> {
+		let best_hash = self.best_block_hash().await?;
+		let voting_schedule = VotingSchedule::when_creating_votes(current_tick);
+		let grandparent_tick = voting_schedule.grandparent_votes_tick();
+		let votable_blocks = self
+			.fetch_storage(
+				&api::ticks::storage::StorageApi.recent_blocks_at_ticks(),
+				Some(best_hash),
+			)
+			.await?
+			.ok_or_else(|| anyhow!("No vote blocks found"))?
+			.0;
+
+		let best_vote_block = votable_blocks
+			.into_iter()
+			.find_map(|(tick, hash)| if tick == grandparent_tick { Some(hash) } else { None })
+			.ok_or_else(|| {
+				anyhow!("No vote block found at grandparent tick ({grandparent_tick})")
+			})?;
+		debug!("Block to vote on at grandparent tick {}: {:?}", grandparent_tick, best_vote_block);
+
+		let minimum = self
+			.fetch_storage(
+				&api::block_seal_spec::storage::StorageApi.current_vote_minimum(),
+				Some(best_hash),
+			)
+			.await?
+			.ok_or_else(|| anyhow!("No minimum vote requirement found"))?;
+
+		Ok((H256(best_vote_block.0), minimum))
 	}
 
 	pub async fn best_block_hash(&self) -> anyhow::Result<H256> {
