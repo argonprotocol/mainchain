@@ -12,7 +12,7 @@ use subxt::tx::TxInBlock;
 use subxt::utils::Yes;
 use subxt::OnlineClient;
 use tokio::sync::Mutex;
-use tracing::{debug, warn};
+use tracing::warn;
 
 use argon_client::api::storage;
 use argon_client::api::{runtime_types, tx};
@@ -110,13 +110,13 @@ impl MainchainClient {
   }
 
   pub async fn close(&self) -> Result<()> {
-    let mut client_lock = self.client.lock().await;
-    if let Some(client) = (*client_lock).take() {
-      drop(client);
-    }
     if let Some((handle1, handle2)) = (*self.join_handles.lock().await).take() {
       handle1.abort();
       handle2.abort();
+    }
+    let mut client_lock = self.client.lock().await;
+    if let Some(client) = (*client_lock).take() {
+      drop(client);
     }
     Ok(())
   }
@@ -160,38 +160,15 @@ impl MainchainClient {
     Ok(self.client().await?.best_block_hash().await?)
   }
 
-  pub async fn get_vote_block_hash(&self, current_tick: u32) -> Result<Option<BestBlockForVote>> {
-    let best_hash = self.get_best_block_hash().await?;
-    let grandparent_tick = current_tick - 2;
-    let best_votes = self
-      .fetch_storage(
-        &api::ticks::storage::StorageApi.recent_blocks_at_ticks(grandparent_tick),
-        Some(best_hash),
-      )
+  pub async fn get_vote_block_hash(&self, current_tick: Tick) -> Result<Option<BestBlockForVote>> {
+    let (block_hash, vote_minimum) = self
+      .client()
       .await?
-      .ok_or_else(|| anyhow!("No vote blocks at grandparent tick ({grandparent_tick}) found"))?
-      .0;
-
-    debug!(
-      "Best blocks to vote on at grandparent tick {}: {:?}",
-      grandparent_tick, best_votes
-    );
-
-    let Some(best_vote_block) = best_votes.last() else {
-      return Ok(None);
-    };
-
-    let minimum = self
-      .fetch_storage(
-        &api::block_seal_spec::storage::StorageApi.current_vote_minimum(),
-        Some(best_hash),
-      )
-      .await?
-      .ok_or_else(|| anyhow!("No minimum vote requirement found"))?;
-
+      .get_vote_block_hash(current_tick)
+      .await?;
     Ok(Some(BestBlockForVote {
-      block_hash: sp_core::H256(best_vote_block.0),
-      vote_minimum: minimum,
+      block_hash,
+      vote_minimum,
     }))
   }
 

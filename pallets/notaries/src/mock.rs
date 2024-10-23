@@ -1,6 +1,6 @@
 use argon_primitives::{
 	tick::{Tick, Ticker},
-	TickProvider,
+	TickProvider, VotingSchedule,
 };
 use env_logger::{Builder, Env};
 use frame_support::{derive_impl, parameter_types, traits::ConstU16};
@@ -46,7 +46,10 @@ impl TickProvider<Block> for StaticTickProvider {
 	fn ticker() -> Ticker {
 		Ticker::new(1, 1, 2)
 	}
-	fn blocks_at_tick(_: Tick) -> Vec<H256> {
+	fn block_at_tick(_: Tick) -> Option<H256> {
+		todo!()
+	}
+	fn voting_schedule() -> VotingSchedule {
 		todo!()
 	}
 }

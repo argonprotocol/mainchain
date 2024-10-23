@@ -1,7 +1,7 @@
 pub use block_creator::{block_creation_task, tax_block_creator};
 
 #[cfg(test)]
-mod tests;
+pub(crate) mod mock_notary;
 
 pub mod aux_client;
 mod aux_data;

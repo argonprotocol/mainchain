@@ -48,7 +48,7 @@ pub mod pallet {
 		notary::NotaryNotebookVoteDigestDetails,
 		notebook::{BlockVotingPower, NotebookHeader},
 		tick::Tick,
-		AuthorityProvider, BlockSealAuthorityId, BlockVotingProvider, ComputeDifficulty,
+		AuthorityProvider, BlockSealAuthorityId, BlockSealSpecProvider, ComputeDifficulty,
 		NotebookEventHandler, NotebookProvider,
 	};
 
@@ -220,9 +220,10 @@ pub mod pallet {
 
 		fn on_finalize(_: BlockNumberFor<T>) {
 			let block_notebooks = <TempCurrentTickNotebooksInBlock<T>>::take();
-			let tick = T::TickProvider::current_tick();
+			let notebook_tick = T::TickProvider::voting_schedule().notebook_tick();
 
-			let block_votes = Self::create_block_vote_digest(tick, block_notebooks.to_vec());
+			let block_votes =
+				Self::create_block_vote_digest(notebook_tick, block_notebooks.to_vec());
 
 			if let Some(included_digest) = <TempBlockVoteDigest<T>>::take() {
 				assert_eq!(
@@ -234,7 +235,11 @@ pub mod pallet {
 			let now = <TempBlockTimestamp<T>>::take().expect("Timestamp must be set");
 			Self::update_compute_difficulty(now);
 
-			Self::update_vote_minimum(tick, block_votes.votes_count, block_votes.voting_power);
+			Self::update_vote_minimum(
+				notebook_tick,
+				block_votes.votes_count,
+				block_votes.voting_power,
+			);
 
 			<VoteMinimumHistory<T>>::mutate(|specs| {
 				if specs.is_full() {
@@ -247,16 +252,20 @@ pub mod pallet {
 	}
 
 	impl<T: Config> Pallet<T> {
-		pub(crate) fn update_vote_minimum(tick: Tick, total_votes: u32, total_voting_power: u128) {
+		pub(crate) fn update_vote_minimum(
+			notebook_tick: Tick,
+			total_votes: u32,
+			total_voting_power: u128,
+		) {
 			let did_append = <PastBlockVotes<T>>::try_mutate(|x| {
 				if let Some(entry) = x.last_mut() {
-					if entry.0 == tick {
+					if entry.0 == notebook_tick {
 						entry.1 = entry.1.saturating_add(total_votes);
 						entry.2 = entry.2.saturating_add(total_voting_power);
 						return Ok(());
 					}
 				}
-				x.try_push((tick, total_votes, total_voting_power))
+				x.try_push((notebook_tick, total_votes, total_voting_power))
 			})
 			.ok();
 			if did_append.is_some() {
@@ -283,7 +292,7 @@ pub mod pallet {
 
 			let _ = <PastBlockVotes<T>>::try_mutate(|x| {
 				x.truncate(0);
-				x.try_insert(0, (tick, total_votes, total_voting_power))
+				x.try_insert(0, (notebook_tick, total_votes, total_voting_power))
 			});
 			if start_vote_minimum != vote_minimum {
 				<CurrentVoteMinimum<T>>::put(vote_minimum);
@@ -352,13 +361,13 @@ pub mod pallet {
 		}
 
 		pub fn create_block_vote_digest(
-			tick: Tick,
+			notebook_tick: Tick,
 			included_notebooks: Vec<NotaryNotebookVoteDigestDetails>,
 		) -> BlockVoteDigest {
 			let mut block_votes = BlockVoteDigest { voting_power: 0, votes_count: 0 };
 
 			for header in included_notebooks {
-				if header.tick != tick {
+				if header.tick != notebook_tick {
 					continue;
 				}
 				if !T::NotebookProvider::is_notary_locked_at_tick(header.notary_id, header.tick) {
@@ -435,7 +444,7 @@ pub mod pallet {
 
 	impl<T: Config> NotebookEventHandler for Pallet<T> {
 		fn notebook_submitted(header: &NotebookHeader) {
-			let current_tick = T::TickProvider::current_tick();
+			let current_tick = T::TickProvider::voting_schedule().notebook_tick();
 			if header.tick == current_tick {
 				let digest_details = header.into();
 				<TempCurrentTickNotebooksInBlock<T>>::try_mutate(|a| a.try_push(digest_details))
@@ -446,9 +455,12 @@ pub mod pallet {
 		}
 	}
 
-	impl<T: Config> BlockVotingProvider<T::Block> for Pallet<T> {
+	impl<T: Config> BlockSealSpecProvider<T::Block> for Pallet<T> {
 		fn grandparent_vote_minimum() -> Option<VoteMinimum> {
 			<VoteMinimumHistory<T>>::get().first().cloned()
+		}
+		fn compute_difficulty() -> ComputeDifficulty {
+			<CurrentComputeDifficulty<T>>::get()
 		}
 	}
 }

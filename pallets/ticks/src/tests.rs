@@ -1,4 +1,4 @@
-use argon_primitives::{digests::TICK_DIGEST_ID, tick::Ticker, TickDigest, TickProvider};
+use argon_primitives::{digests::TICK_DIGEST_ID, TickDigest, TickProvider};
 use frame_support::{pallet_prelude::*, traits::OnTimestampSet};
 use sp_runtime::{Digest, DigestItem};
 use std::panic::catch_unwind;
@@ -34,13 +34,17 @@ fn it_panics_if_the_tick_is_invalid() {
 		);
 		Ticks::on_initialize(2);
 		let err = catch_unwind(|| {
-			Ticks::on_timestamp_set(1000);
+			let now = 1000;
+			assert_eq!(Ticks::ticker().tick_for_time(now), 1);
+			// now tick is 1, so once timestamp comes in, it should panic (less than proposed 2)
+			Ticks::on_timestamp_set(now);
 		});
 		assert!(err.is_err());
 	});
 }
+
 #[test]
-fn it_tests_the_current_tick() {
+fn it_panics_if_two_blocks_use_the_same_tick() {
 	new_test_ext(1000, 500).execute_with(|| {
 		// Go past genesis block so events get deposited
 		System::set_block_number(2);
@@ -55,8 +59,48 @@ fn it_tests_the_current_tick() {
 			},
 		);
 		Ticks::on_initialize(2);
-		Ticks::on_timestamp_set(2500);
+		let err = catch_unwind(|| {
+			let now = 1000;
+			assert_eq!(Ticks::ticker().tick_for_time(now), 1);
+			// now tick is 1, so once timestamp comes in, it should panic (less than proposed 2)
+			Ticks::on_timestamp_set(now);
+		});
+		assert!(err.is_err());
+	});
+}
+
+#[test]
+fn it_tests_the_current_tick() {
+	new_test_ext(1000, 500).execute_with(|| {
+		System::initialize(
+			&2,
+			&System::parent_hash(),
+			&Digest {
+				logs: vec![DigestItem::PreRuntime(
+					TICK_DIGEST_ID,
+					TickDigest { tick: 2u32 }.encode(),
+				)],
+			},
+		);
+		Ticks::on_initialize(2);
 		assert_eq!(Ticks::current_tick(), 2);
+
+		System::initialize(
+			&3,
+			&System::parent_hash(),
+			&Digest {
+				logs: vec![DigestItem::PreRuntime(
+					TICK_DIGEST_ID,
+					TickDigest { tick: 2u32 }.encode(),
+				)],
+			},
+		);
+
+		// should not allow a second block at tick 2
+		let err = catch_unwind(|| {
+			Ticks::on_initialize(3);
+		});
+		assert!(err.is_err());
 	});
 }
 
@@ -65,13 +109,11 @@ fn it_should_track_blocks_at_tick() {
 	new_test_ext(5, 500).execute_with(|| {
 		// Go past genesis block so events get deposited
 		System::set_block_number(2);
-		let ticker = Ticker::new(5, 500, 2);
 		let mut parent_hash = System::parent_hash();
 		let mut last_block_tick = 0;
 		for i in 0..=501 {
 			let block_number = (i + 2u32).into();
-			let timestamp = 500u64 + i as u64;
-			let tick = ticker.tick_for_time(timestamp);
+			let tick = i + 1;
 			System::initialize(
 				&block_number,
 				&parent_hash,
@@ -86,13 +128,14 @@ fn it_should_track_blocks_at_tick() {
 
 			if block_number > 0 {
 				// we have to run 1 block behind because the current block is not yet finalized
-				assert!(Ticks::blocks_at_tick(last_block_tick).contains(&System::parent_hash()));
+				assert_eq!(Ticks::block_at_tick(last_block_tick), Some(System::parent_hash()));
 			}
 			last_block_tick = tick;
 			let header = System::finalize();
 			parent_hash = header.hash();
 		}
-		assert_eq!(<RecentBlocksAtTicks<Test>>::get(0).len(), 0);
-		assert_eq!(<RecentBlocksAtTicks<Test>>::get(100).len(), 1);
+		assert_eq!(RecentBlocksAtTicks::<Test>::get().len(), 10);
+		assert_eq!(Ticks::block_at_tick(0), None);
+		assert_eq!(Ticks::block_at_tick(501), Some(System::parent_hash()));
 	});
 }

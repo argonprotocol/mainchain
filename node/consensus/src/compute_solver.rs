@@ -94,7 +94,7 @@ mod tests {
 	use crate::{
 		compute_solver::{BlockComputeNonce, ComputeSolver},
 		compute_worker::Version,
-		tests::setup_logs,
+		mock_notary::setup_logs,
 	};
 
 	#[test]

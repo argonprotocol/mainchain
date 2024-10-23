@@ -30,7 +30,7 @@ use argon_primitives::{
 	notebook::NotebookNumber,
 	tick::Tick,
 	Balance, BlockSealApis, BlockSealAuthorityId, BlockVotingPower, NotaryApis, NotaryId,
-	NotebookApis, NotebookDigest, NotebookHeaderData, VoteMinimum,
+	NotebookApis, NotebookDigest, NotebookHeaderData, VoteMinimum, VotingSchedule,
 };
 
 pub trait NotaryApisExt<B: BlockT, AC> {
@@ -600,7 +600,7 @@ where
 		let notebook_number = notebook_details.notebook_number;
 		let notebook_dependencies =
 			self.get_notebook_dependencies(notary_id, notebook_number, best_hash).await?;
-		info!(target: LOG_TARGET, "Attempting to audit notebook. Notary {notary_id}, #{notebook_number}, tick {tick}.",);
+		trace!(target: LOG_TARGET, "Attempting to audit notebook. Notary {notary_id}, #{notebook_number}, tick {tick}.",);
 
 		let mut vote_minimums = BTreeMap::new();
 		for block_hash in &notebook_details.blocks_with_votes {
@@ -770,7 +770,7 @@ pub async fn get_notebook_header_data<B: BlockT, C, AccountId: Codec>(
 	client: &Arc<C>,
 	aux_client: &ArgonAux<B, C>,
 	parent_hash: &B::Hash,
-	submitting_tick: Tick,
+	voting_schedule: &VotingSchedule,
 ) -> Result<NotebookHeaderData<NotebookVerifyError>, Error>
 where
 	C: ProvideRuntimeApi<B> + HeaderBackend<B> + AuxStore + 'static,
@@ -793,7 +793,7 @@ where
 		let Ok((mut notary_headers, tick_notebook)) = aux_client.get_notary_notebooks_for_header(
 			notary.notary_id,
 			*latest_runtime_notebook_number,
-			submitting_tick,
+			voting_schedule,
 		) else {
 			continue;
 		};
@@ -808,17 +808,18 @@ where
 		}
 	}
 
-	headers.vote_digest =
-		client
-			.runtime_api()
-			.create_vote_digest(*parent_hash, submitting_tick, tick_notebooks)?;
+	headers.vote_digest = client.runtime_api().create_vote_digest(
+		*parent_hash,
+		voting_schedule.notebook_tick(),
+		tick_notebooks,
+	)?;
 	Ok(headers)
 }
 
 #[cfg(test)]
 mod test {
 	use super::*;
-	use crate::{error::Error, notary_client::NotaryApisExt, tests::mock_notary::MockNotary};
+	use crate::{error::Error, mock_notary::MockNotary, notary_client::NotaryApisExt};
 	use argon_node_runtime::Block;
 	use argon_primitives::{
 		notary::{

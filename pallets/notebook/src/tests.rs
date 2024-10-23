@@ -217,7 +217,7 @@ fn it_supports_multiple_notebooks() {
 		let digest = notebook_digest(vec![(1, 1, 1, false), (2, 1, 1, false)]);
 		System::initialize(&1, &System::parent_hash(), &Digest { logs: vec![digest.clone()] });
 		Notebook::on_initialize(1);
-		CurrentTick::set(1);
+		CurrentTick::set(2);
 		let header1 = make_header(1, 1);
 		let mut header2 = make_header(1, 1);
 		header2.notary_id = 2;
@@ -339,7 +339,7 @@ fn it_tracks_changed_accounts() {
 			NotebookHeader::create_secret_hash(secrets[0], header.block_votes_root, 1);
 		secret_hashes.push(header.secret_hash);
 		let first_votes = header.block_votes_root;
-		CurrentTick::set(2);
+		CurrentTick::set(3);
 		Notebook::process_notebook(header.clone());
 
 		assert_eq!(
@@ -370,7 +370,7 @@ fn it_tracks_changed_accounts() {
 		secret_hashes.push(header.secret_hash);
 		header.parent_secret = Some(secrets[0]);
 		let second_votes = header.block_votes_root;
-		CurrentTick::set(3);
+		CurrentTick::set(4);
 		assert_ok!(Notebook::verify_notebook_order(&header),);
 		Notebook::process_notebook(header);
 		assert_eq!(Balances::free_balance(&who), 5000);
@@ -420,7 +420,7 @@ fn it_tracks_changed_accounts() {
 			NotebookHeader::create_secret_hash(secrets[2], header.block_votes_root, 3);
 		secret_hashes.push(header.secret_hash);
 
-		CurrentTick::set(4);
+		CurrentTick::set(5);
 		Notebook::process_notebook(header.clone());
 		assert_eq!(
 			LastNotebookDetailsByNotary::<Test>::get(1),
@@ -480,7 +480,7 @@ fn it_tracks_notebooks_received_out_of_tick() {
 		header1.secret_hash =
 			NotebookHeader::create_secret_hash(secrets[0], header1.block_votes_root, 1);
 		secret_hashes.push(header1.secret_hash);
-		CurrentTick::set(3);
+		CurrentTick::set(4);
 		Notebook::process_notebook(header1.clone());
 
 		let mut header2 = make_header(2, 3);

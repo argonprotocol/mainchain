@@ -53,6 +53,7 @@ pub mod argon_utils;
 #[cfg(feature = "std")]
 pub mod keystore_helper;
 
+pub mod fork_power;
 #[cfg(feature = "std")]
 pub mod git_version;
 

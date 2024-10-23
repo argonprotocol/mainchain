@@ -21,6 +21,13 @@ use argon_primitives::{
 	Notarization, NotarizationBalanceChangeset, NotarizationBlockVotes, NotarizationDomains,
 	Notebook, NotebookHeader, NotebookMeta, NotebookNumber, SignedNotebookHeader,
 };
+use env_logger::{Builder, Env};
+
+pub fn setup_logs() {
+	let env = Env::new().default_filter_or("node=debug"); //info,sync=debug,sc_=debug,sub-libp2p=debug,node=debug,runtime=debug");
+	let _ = Builder::from_env(env).is_test(true).try_init();
+	sp_tracing::try_init_simple();
+}
 
 #[derive(Debug, Default)]
 pub struct NotaryState {

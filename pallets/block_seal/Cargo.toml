@@ -25,7 +25,7 @@ sp-core = { workspace = true }
 sp-inherents = { workspace = true }
 binary-merkle-tree = { workspace = true }
 argon-primitives = { workspace = true }
-
+#sp-debug-derive = { workspace = true, features = ["force-debug"] }
 
 [dev-dependencies]
 sp-io = { workspace = true }

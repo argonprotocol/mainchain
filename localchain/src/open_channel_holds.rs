@@ -550,7 +550,7 @@ impl OpenChannelHoldsStore {
         current_tip
       );
     }
-    channel_hold.expiration_tick = balance_tip.tick + self.ticker.channel_hold_expiration_ticks();
+    channel_hold.expiration_tick = balance_proof.tick + self.ticker.channel_hold_expiration_ticks();
     channel_hold.db_insert(&mut db).await?;
     Ok(OpenChannelHold::new(
       self.db.clone(),

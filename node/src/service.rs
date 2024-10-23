@@ -295,7 +295,6 @@ pub fn new_full<
 					Box::new(argon_block_import.clone()),
 					client.clone(),
 					aux_client.clone(),
-					select_chain.clone(),
 					proposer_factory_compute,
 					sync_service.clone(),
 					block_author.clone(),

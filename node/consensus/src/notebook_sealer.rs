@@ -1,5 +1,11 @@
-use std::{default::Default, marker::PhantomData, sync::Arc};
-
+use crate::{aux_client::ArgonAux, block_creator::CreateTaxVoteBlock, error::Error};
+use argon_primitives::{
+	block_seal::BLOCK_SEAL_CRYPTO_ID,
+	localchain::BlockVote,
+	tick::{Tick, Ticker},
+	BlockSealApis, BlockSealAuthorityId, BlockSealAuthoritySignature, BlockVotingPower, TickApis,
+	VotingSchedule, BLOCK_SEAL_KEY_TYPE,
+};
 use codec::Codec;
 use futures::{channel::mpsc::*, prelude::*};
 use log::*;
@@ -9,28 +15,15 @@ use sp_blockchain::HeaderBackend;
 use sp_consensus::{Error as ConsensusError, SelectChain};
 use sp_core::{ByteArray, U256};
 use sp_keystore::{Keystore, KeystorePtr};
-use sp_runtime::traits::{Block as BlockT, Header as HeaderT};
+use sp_runtime::traits::Block as BlockT;
 use sp_timestamp::Timestamp;
-
-use argon_primitives::{
-	block_seal::BLOCK_SEAL_CRYPTO_ID,
-	digests::{BlockVoteDigest, BLOCK_VOTES_DIGEST_ID},
-	localchain::BlockVote,
-	tick::Tick,
-	BlockSealApis, BlockSealAuthorityId, BlockSealAuthoritySignature, BlockVotingPower, TickApis,
-	BLOCK_SEAL_KEY_TYPE,
-};
-
-use crate::{
-	aux_client::{ArgonAux, ForkPower},
-	block_creator::CreateTaxVoteBlock,
-	error::Error,
-};
+use std::{collections::HashMap, marker::PhantomData, sync::Arc};
 
 const LOG_TARGET: &str = "node::consensus::notebook_sealer";
 
 pub struct NotebookSealer<B: BlockT, C: AuxStore, SC, AC: Clone + Codec> {
 	client: Arc<C>,
+	ticker: Ticker,
 	select_chain: Arc<SC>,
 	keystore: KeystorePtr,
 	sender: Sender<CreateTaxVoteBlock<B, AC>>,
@@ -48,6 +41,7 @@ where
 	fn clone(&self) -> Self {
 		Self {
 			client: self.client.clone(),
+			ticker: self.ticker,
 			select_chain: self.select_chain.clone(),
 			keystore: self.keystore.clone(),
 			sender: self.sender.clone(),
@@ -60,13 +54,14 @@ where
 impl<B, C, SC, AC> NotebookSealer<B, C, SC, AC>
 where
 	B: BlockT,
-	C: ProvideRuntimeApi<B> + AuxStore + 'static,
+	C: ProvideRuntimeApi<B> + HeaderBackend<B> + AuxStore + 'static,
 	C::Api: BlockSealApis<B, AC, BlockSealAuthorityId> + TickApis<B>,
 	SC: SelectChain<B> + 'static,
 	AC: Codec + Clone,
 {
 	pub fn new(
 		client: Arc<C>,
+		ticker: Ticker,
 		select_chain: SC,
 		keystore: KeystorePtr,
 		aux_client: ArgonAux<B, C>,
@@ -74,6 +69,7 @@ where
 	) -> Self {
 		Self {
 			client: client.clone(),
+			ticker,
 			select_chain: Arc::new(select_chain),
 			aux_client,
 			keystore,
@@ -84,150 +80,147 @@ where
 
 	pub async fn check_for_new_blocks(
 		&self,
-		tick: Tick,
+		notebook_tick: Tick,
 		voting_power: BlockVotingPower,
 		notebooks: u32,
 	) -> Result<(), Error> {
-		let timestamp_millis = Timestamp::current().as_millis();
+		let current_tick = self.ticker.current();
 
-		let votes_tick = tick.saturating_sub(2);
-		let vote_key_tick = tick.saturating_sub(1);
+		if current_tick <= notebook_tick {
+			trace!(target: LOG_TARGET, "Current tick {} is not greater than notebook tick {}", current_tick, notebook_tick);
+			return Ok(());
+		}
+
+		let voting_schedule = VotingSchedule::on_notebook_tick_state(notebook_tick);
+		let votes_tick = voting_schedule.eligible_votes_tick();
+		// get the active votes, which were from 2 notebooks previous
 		let block_votes = self.aux_client.get_votes(votes_tick)?.get();
 		let votes_count = block_votes.iter().fold(0u32, |acc, x| acc + x.raw_votes.len() as u32);
 		if votes_count == 0 {
 			trace!(target: LOG_TARGET, "No block votes at tick {}", votes_tick);
 			return Ok(());
 		}
-		info!(target: LOG_TARGET, "Checking {} block votes for tick {}", votes_count, votes_tick);
 
-		// aren't these ordered?
-		let strongest_fork_at_tick = self.aux_client.strongest_fork_at_tick(tick)?.get();
-		let strongest_seal_strength = strongest_fork_at_tick.seal_strength;
+		let blocks_to_build_on = self
+			.get_parent_blocks_to_build_on(&voting_schedule, notebooks, voting_power)
+			.await?;
+		trace!(target: LOG_TARGET, "Checking tick {} for better blocks with {} votes. Found {} blocks to attempt to build on",
+			votes_tick, votes_count, blocks_to_build_on.len());
 
-		let Some(best_hash) = self
-			.get_best_beatable_fork(vote_key_tick, voting_power, notebooks, strongest_fork_at_tick)
-			.await?
-		else {
-			trace!(target: LOG_TARGET, "No beatable fork at tick {} with {} notebooks and {} voting power", vote_key_tick, notebooks, voting_power);
-			return Ok(());
-		};
-
-		let stronger_seals = self
-			.client
-			.runtime_api()
-			.find_vote_block_seals(best_hash, block_votes, strongest_seal_strength)?
-			.expect("Must be able to call the runtime api");
-
-		for vote in stronger_seals.into_iter() {
-			let Ok(miner_signature) = try_sign_vote(
-				&self.keystore,
-				&best_hash,
-				&vote.closest_miner.1,
-				vote.seal_strength,
-			) else {
+		for (block_hash, best_seal_strength) in blocks_to_build_on.into_iter() {
+			let Ok(stronger_seals) = self
+				.client
+				.runtime_api()
+				.find_vote_block_seals(
+					block_hash,
+					block_votes.clone(),
+					best_seal_strength,
+					votes_tick,
+				)?
+				.inspect_err(|e| {
+					error!(target: LOG_TARGET, "Unable to lookup vote block seals: {:?}", e);
+				})
+			else {
+				trace!(target: LOG_TARGET, "Could not find any stronger seals for block {:?}. Notebook tick {}, votes at tick {}. Existing power {:?}.",
+					block_hash, notebook_tick, votes_tick, best_seal_strength);
 				continue;
 			};
 
-			let mut sender = self.sender.clone();
-			sender
-				.send(CreateTaxVoteBlock::<B, AC> {
-					tick,
-					timestamp_millis,
-					vote,
-					parent_hash: best_hash,
-					signature: miner_signature,
-				})
-				.await?;
-			return Ok(());
+			for vote in stronger_seals.into_iter() {
+				trace!(target: LOG_TARGET, "Will try to sign vote for block with seal strength {}", vote.seal_strength);
+				let Ok(miner_signature) = try_sign_vote(
+					&self.keystore,
+					&block_hash,
+					&vote.closest_miner.1,
+					vote.seal_strength,
+				) else {
+					trace!(target: LOG_TARGET, "Could not sign vote for block with seal strength {}", vote.seal_strength);
+					continue;
+				};
+
+				let mut sender = self.sender.clone();
+				sender
+					.send(CreateTaxVoteBlock::<B, AC> {
+						current_tick: notebook_tick + 1,
+						timestamp_millis: Timestamp::current().as_millis(),
+						vote,
+						parent_hash: block_hash,
+						signature: miner_signature,
+					})
+					.await?;
+				return Ok(());
+			}
 		}
 		Ok(())
 	}
 
-	/// This function gets the active forks and the associated block voting for each
-	///
-	/// The leaves are all the active forks that have no children. We are going to get all at the
-	/// tick level
-	async fn get_best_beatable_fork(
+	async fn get_parent_blocks_to_build_on(
 		&self,
-		tick: Tick,
-		block_voting_power: BlockVotingPower,
-		block_notebooks: u32,
-		strongest_fork_at_tick: ForkPower,
-	) -> Result<Option<B::Hash>, Error> {
+		voting_schedule: &VotingSchedule,
+		notebooks: u32,
+		voting_power: BlockVotingPower,
+	) -> Result<HashMap<B::Hash, U256>, Error> {
 		let leaves = self.select_chain.leaves().await?;
 
-		let mut best_fork = ForkPower::default();
-		let mut best_hash = None;
+		let mut blocks_to_build_on = HashMap::new();
 
-		let max_nonce = U256::zero();
-
+		// Blocks are always created with a tick at least notebook tick +1, so the parent will be at
+		// notebook tick
+		let notebook_in_block_tick = voting_schedule.block_tick();
+		let parent_tick = voting_schedule.parent_block_tick();
 		for leaf in leaves {
-			let Some(block_hash) = get_block_descendent_with_tick(&self.client, leaf, tick) else {
+			let Some(parent_block) = self.get_block_descendent_with_tick(leaf, parent_tick) else {
+				trace!(target: LOG_TARGET, "No block at notebook parent tick {} for leaf {:?}", parent_tick, leaf);
 				continue;
 			};
 
-			let mut fork_power = self.aux_client.get_fork_voting_power(&block_hash)?.get();
-			fork_power.add_vote(block_voting_power, block_notebooks, max_nonce);
+			// blocks to beat that include notebook are tick +1
+			let Some(block_hash_to_beat) =
+				self.get_block_descendent_with_tick(leaf, notebook_in_block_tick)
+			else {
+				trace!(target: LOG_TARGET, "Adding parent block (at tick {}) since no competition {:?}", parent_tick, leaf);
+				// if not trying to beat anyone, just add the parent hash
+				blocks_to_build_on.insert(parent_block, U256::MAX);
+				continue;
+			};
 
-			if fork_power > strongest_fork_at_tick && fork_power > best_fork {
-				best_fork = fork_power;
-				best_hash = Some(block_hash);
+			let fork_power_to_beat = self.client.runtime_api().fork_power(block_hash_to_beat)?;
+			let best_seal_strength = fork_power_to_beat.seal_strength;
+
+			// pretend we beat the best vote - could we beat this fork power?
+			let mut theoretical_power = self.client.runtime_api().fork_power(parent_block)?;
+			theoretical_power.add_vote(
+				voting_power,
+				notebooks,
+				best_seal_strength.saturating_sub(U256::one()),
+			);
+
+			if theoretical_power >= fork_power_to_beat {
+				trace!(target: LOG_TARGET, "Adding parent block (at tick {}) since we can beat the competition {:?}", parent_tick, leaf);
+				blocks_to_build_on.insert(parent_block, best_seal_strength);
 			}
 		}
+		blocks_to_build_on.retain(|block, strength| {
+			let has_eligible_votes =
+				self.client.runtime_api().has_eligible_votes(*block).unwrap_or_default();
+			let block_tick = self.client.runtime_api().current_tick(*block).unwrap_or_default();
+			trace!(target: LOG_TARGET, "Block {:?} with strength {}. Has Votes? {}. Block Runtime Tick {}",
+				block, strength, has_eligible_votes, block_tick);
+			has_eligible_votes
+		});
 
-		Ok(best_hash)
+		Ok(blocks_to_build_on)
 	}
-}
 
-/// Checks if the applicable parent height has tax votes. This would be the parent block of the
-/// given header
-pub fn has_votes_at_tick<C, B>(client: &Arc<C>, solve_header: &B::Header, at_tick: Tick) -> bool
-where
-	B: BlockT,
-	C: HeaderBackend<B> + ProvideRuntimeApi<B>,
-	C::Api: TickApis<B>,
-{
-	if at_tick < 2 {
-		return false;
-	}
-	let Some(block_with_tick) =
-		get_block_descendent_with_tick(client, solve_header.hash(), at_tick)
-	else {
-		return false;
-	};
-
-	let Some(descendent_with_tick) =
-		client.header(block_with_tick).expect("Must be able to get header from client")
-	else {
-		return false;
-	};
-
-	for log in &descendent_with_tick.digest().logs {
-		if let Some(votes) = log.pre_runtime_try_to::<BlockVoteDigest>(&BLOCK_VOTES_DIGEST_ID) {
-			return votes.votes_count > 0;
+	fn get_block_descendent_with_tick(&self, hash: B::Hash, tick: Tick) -> Option<B::Hash> {
+		// first check this because `block_at_tick` can't include a block until it's a parent block
+		if let Ok(current_tick) = self.client.runtime_api().current_tick(hash) {
+			if current_tick == tick {
+				return Some(hash);
+			}
 		}
+		self.client.runtime_api().block_at_tick(hash, tick).ok()?
 	}
-
-	false
-}
-
-pub fn get_block_descendent_with_tick<B: BlockT, C: ProvideRuntimeApi<B>>(
-	client: &Arc<C>,
-	hash: B::Hash,
-	tick: Tick,
-) -> Option<B::Hash>
-where
-	C::Api: TickApis<B>,
-{
-	if let Ok(current_tick) = client.runtime_api().current_tick(hash) {
-		if current_tick == tick {
-			return Some(hash);
-		}
-	}
-	if let Ok(blocks) = client.runtime_api().blocks_at_tick(hash, tick) {
-		return blocks.last().copied();
-	}
-	None
 }
 
 pub(crate) fn try_sign_vote<Hash: Codec>(
@@ -275,7 +268,7 @@ mod tests {
 
 	use argon_primitives::block_seal::BLOCK_SEAL_KEY_TYPE;
 
-	use crate::tests::setup_logs;
+	use crate::mock_notary::setup_logs;
 
 	use super::*;
 

@@ -26,20 +26,21 @@ use argon_primitives::{
 	tick::Tick,
 	Balance, BestBlockVoteSeal, BitcoinApis, BlockSealApis, BlockSealAuthorityId,
 	BlockSealAuthoritySignature, BlockSealDigest, NotaryApis, NotebookApis, TickApis,
+	VotingSchedule,
 };
 
 use crate::{
 	aux_client::ArgonAux,
 	digests::{create_pre_runtime_digests, create_seal_digest},
 	error::Error,
-	notary_client::{get_notebook_header_data, notary_sync_task, NotaryClient},
+	notary_client::{get_notebook_header_data, notary_sync_task, NotaryClient, VotingPowerInfo},
 	notebook_sealer::NotebookSealer,
 };
 
 const LOG_TARGET: &str = "node::consensus::block_creator";
 
 pub struct CreateTaxVoteBlock<Block: BlockT, AccountId: Clone + Codec> {
-	pub tick: Tick,
+	pub current_tick: Tick,
 	pub timestamp_millis: u64,
 	pub parent_hash: Block::Hash,
 	pub vote: BestBlockVoteSeal<AccountId, BlockSealAuthorityId>,
@@ -80,6 +81,10 @@ where
 	let notary_client =
 		Arc::new(NotaryClient::new(client.clone(), aux_client.clone(), notebook_tick_tx.clone()));
 
+	let best_hash = client.info().best_hash;
+	let ticker = client.runtime_api().ticker(best_hash).expect("Ticker not available");
+	let no_work_delay_millis = if ticker.tick_duration_millis <= 10_000 { 100 } else { 1000 };
+
 	let notary_sync_task = notary_sync_task(client.clone(), notary_client.clone());
 
 	let notary_queue_task = async move {
@@ -92,7 +97,10 @@ where
 				})
 				.unwrap_or(false);
 
-			let delay = if has_more_work { 100 } else { 500 };
+			let mut delay = 20;
+			if !has_more_work {
+				delay = no_work_delay_millis
+			}
 			tokio::time::sleep(Duration::from_millis(delay)).await;
 		}
 	};
@@ -100,17 +108,42 @@ where
 	let seal_watch_task = async move {
 		let notebook_sealer = NotebookSealer::new(
 			client.clone(),
+			ticker,
 			select_chain,
 			keystore,
-			aux_client,
+			aux_client.clone(),
 			tax_vote_sender.clone(),
 		);
+		let mut import_stream = client.import_notification_stream();
+		loop {
+			let mut next: Option<VotingPowerInfo> = None;
+			tokio::select! {biased;
+				notebook = notebook_tick_rx.next() => {
+					next = notebook;
+				},
+				block_next = import_stream.next() => {
+					if let Some(block) = block_next {
+						if block.origin == BlockOrigin::Own {
+							continue;
+						}
+						let Ok(tick) = client.runtime_api().current_tick(block.hash) else {
+							continue;
+						};
+						let voting_schedule = VotingSchedule::when_creating_block(tick + 1);
+						if let Ok(info) = aux_client.get_tick_voting_power(voting_schedule.notebook_tick()) {
+							next = info
+						}
+					}
+				},
+			}
 
-		while let Some((tick, voting_power, notebooks)) = notebook_tick_rx.next().await {
-			if let Err(err) =
-				notebook_sealer.check_for_new_blocks(tick, voting_power, notebooks).await
-			{
-				warn!(target: LOG_TARGET, "Error while checking for new blocks: {:?}", err);
+			if let Some((notebook_tick, voting_power, notebooks)) = next {
+				if let Err(err) = notebook_sealer
+					.check_for_new_blocks(notebook_tick, voting_power, notebooks)
+					.await
+				{
+					warn!(target: LOG_TARGET, "Error while checking for new blocks: {:?}", err);
+				}
 			}
 		}
 	};
@@ -152,7 +185,7 @@ pub async fn tax_block_creator<B, C, E, L, CS, A>(
 			aux_client.clone(),
 			&mut env,
 			vote.closest_miner.0.clone(),
-			command.tick,
+			command.current_tick,
 			command.timestamp_millis,
 			command.parent_hash,
 			BlockSealInherentNodeSide::from_vote(vote, command.signature),
@@ -183,7 +216,7 @@ pub async fn propose<B, C, E, A>(
 	aux_client: ArgonAux<B, C>,
 	env: &mut E,
 	author: A,
-	tick: Tick,
+	submitting_tick: Tick,
 	timestamp_millis: u64,
 	parent_hash: B::Hash,
 	seal_inherent: BlockSealInherentNodeSide,
@@ -215,19 +248,26 @@ where
 			None
 		});
 
-	let notebook_header_data =
-		match get_notebook_header_data(&client, &aux_client, &parent_hash, tick).await {
-			Ok(x) => x,
-			Err(err) => {
-				warn!(
-					target: LOG_TARGET,
-					"Unable to pull new block for compute miner. No notebook header data found!! {}", err
-				);
-				return Err(err);
-			},
-		};
+	let voting_schedule = VotingSchedule::when_creating_block(submitting_tick);
+	let notebook_header_data = match get_notebook_header_data(
+		&client,
+		&aux_client,
+		&parent_hash,
+		&voting_schedule,
+	)
+	.await
+	{
+		Ok(x) => x,
+		Err(err) => {
+			warn!(
+				target: LOG_TARGET,
+				"Unable to pull new block for compute miner. No notebook header data found!! {}", err
+			);
+			return Err(err);
+		},
+	};
 
-	info!(target: LOG_TARGET, "Proposing block at tick {} with {} notebooks", tick, notebook_header_data.notebook_digest.notebooks.len());
+	info!(target: LOG_TARGET, "Proposing block at tick {} with {} notebooks", submitting_tick, notebook_header_data.notebook_digest.notebooks.len());
 
 	let timestamp = sp_timestamp::InherentDataProvider::new(Timestamp::new(timestamp_millis));
 	let seal = BlockSealInherentDataProvider { seal: Some(seal_inherent.clone()), digest: None };
@@ -267,7 +307,7 @@ where
 
 	let inherent_digest = create_pre_runtime_digests(
 		author,
-		tick,
+		submitting_tick,
 		notebook_header_data.vote_digest,
 		notebook_header_data.notebook_digest,
 	);
@@ -309,7 +349,7 @@ pub(crate) async fn submit_block<Block, L, Proof>(
 		StateAction::ApplyChanges(StorageChanges::Changes(proposal.storage_changes));
 
 	let post_hash = block_import_params.post_hash();
-	info!(target: LOG_TARGET, "Importing self-generated block: {:?}. {:?}", &post_hash, &block_seal_digest);
+	trace!(target: LOG_TARGET, "Importing self-generated block: {:?}. {:?}", &post_hash, &block_seal_digest);
 	match block_import.import_block(block_import_params).await {
 		Ok(res) => match res {
 			ImportResult::Imported(_) => {

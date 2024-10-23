@@ -22,7 +22,10 @@ use sp_runtime::{
 
 use crate::{
 	mock::{BlockSeal, *},
-	pallet::{LastBlockSealerInfo, ParentVotingKey, TempAuthor, TempSealInherent},
+	pallet::{
+		BlockForkPower, LastBlockSealerInfo, ParentVotingKey, TempAuthor, TempSealInherent,
+		VotesInPast3Ticks,
+	},
 	Call, Error,
 };
 use argon_primitives::{
@@ -33,7 +36,7 @@ use argon_primitives::{
 	notary::NotaryNotebookRawVotes,
 	BlockSealAuthorityId, BlockSealAuthoritySignature, BlockSealDigest, BlockSealerInfo,
 	BlockVoteT, BlockVotingKey, Domain, DomainTopLevel, MerkleProof, ParentVotingKeyDigest,
-	AUTHOR_DIGEST_ID, PARENT_VOTING_KEY_DIGEST,
+	VotingSchedule, AUTHOR_DIGEST_ID, PARENT_VOTING_KEY_DIGEST,
 };
 
 fn empty_signature() -> BlockSealAuthoritySignature {
@@ -167,7 +170,7 @@ fn it_requires_the_nonce_to_match() {
 		// Go past genesis block so events get deposited
 		setup_blocks(2);
 		System::set_block_number(4);
-		CurrentTick::set(4);
+		CurrentTick::set(5);
 		System::reset_events();
 		let block_vote = default_vote();
 		let parent_voting_key = H256::random();
@@ -215,18 +218,28 @@ fn it_should_be_able_to_submit_a_seal() {
 		ParentVotingKey::<Test>::put(Some(parent_voting_key));
 		GrandpaVoteMinimum::set(Some(500));
 		CurrentTick::set(6);
+		let voting_schedule = VotingSchedule::when_evaluating_runtime_seals(6);
+		assert_eq!(voting_schedule.grandparent_votes_tick(), 2);
+		assert_eq!(voting_schedule.eligible_votes_tick(), 4);
+		assert!(!BlockSeal::has_eligible_votes());
 		BlocksAtTick::mutate(|a| {
-			a.insert(2, vec![System::block_hash(2)]);
+			a.insert(voting_schedule.grandparent_votes_tick(), System::block_hash(2));
 		});
+		assert!(!BlockSeal::has_eligible_votes());
 		RegisteredDomains::mutate(|a| {
 			a.insert(Domain::new("test", DomainTopLevel::Bikes).hash());
+		});
+		NotebooksAtTick::mutate(|a| {
+			a.insert(voting_schedule.notebook_tick(), vec![(1, 2, None)]);
 		});
 
 		let block_vote = default_vote();
 		let seal_strength = block_vote.get_seal_strength(1, parent_voting_key);
 
 		let root = merkle_root::<BlakeTwo256, _>(vec![block_vote.encode()]);
-		VotingRoots::mutate(|a| a.insert((1, 4), (root, 1)));
+		VotingRoots::mutate(|a| a.insert((1, voting_schedule.eligible_votes_tick()), (root, 1)));
+		let _ = VotesInPast3Ticks::<Test>::try_append((voting_schedule.eligible_votes_tick(), 1));
+		assert!(!BlockSeal::has_eligible_votes());
 		let merkle_proof = merkle_proof::<BlakeTwo256, _, _>(vec![block_vote.encode()], 0).proof;
 
 		let inherent = BlockSealInherent::Vote {
@@ -252,12 +265,29 @@ fn it_should_be_able_to_submit_a_seal() {
 		BlockSeal::on_initialize(4);
 
 		assert_ok!(BlockSeal::apply(RuntimeOrigin::none(), inherent.clone()));
+		// only after block seal is applied is this true
+		assert!(BlockSeal::has_eligible_votes());
 
 		assert_eq!(LastBlockSealerInfo::<Test>::get().unwrap().block_author_account_id, 10);
 
-		// the vote sealer will be a u64 conversion of a an account32
+		let new_notebook_voting_schedule =
+			VotingSchedule::from_runtime_current_tick(CurrentTick::get());
+		assert_eq!(
+			VotesInPast3Ticks::<Test>::get().into_inner(),
+			vec![
+				(voting_schedule.eligible_votes_tick(), 1),
+				(new_notebook_voting_schedule.notebook_tick(), 1)
+			]
+		);
+
+		// the vote sealer will be a u64 conversion of an account32
 		assert_eq!(TempSealInherent::<Test>::get(), Some(inherent.clone()));
 		assert_eq!(BlockSeal::get(), inherent);
+		println!("{:?}", BlockForkPower::<Test>::get());
+		assert_eq!(BlockForkPower::<Test>::get().seal_strength, seal_strength);
+		assert_eq!(BlockForkPower::<Test>::get().voting_power, U256::from(1));
+		assert_eq!(BlockForkPower::<Test>::get().notebooks, 1);
+		assert_eq!(BlockForkPower::<Test>::get().vote_created_blocks, 1);
 		BlockSeal::on_finalize(4);
 	});
 }
@@ -283,20 +313,45 @@ fn it_requires_vote_notebook_proof() {
 
 		// set block to 2 - not in the history
 		assert_err!(
-			BlockSeal::verify_vote_source(1, 2, &block_vote, &source_notebook_proof, 1,),
+			BlockSeal::verify_vote_source(
+				1,
+				&VotingSchedule::when_evaluating_runtime_seals(4),
+				&block_vote,
+				&source_notebook_proof,
+				1,
+			),
 			Error::<Test>::NoEligibleVotingRoot
 		);
 
+		let voting_schedule = VotingSchedule::when_evaluating_runtime_seals(3);
 		// notebook number i mismatched
 		assert_err!(
-			BlockSeal::verify_vote_source(1, 1, &block_vote, &source_notebook_proof, 1,),
+			BlockSeal::verify_vote_source(
+				1,
+				&voting_schedule,
+				&block_vote,
+				&source_notebook_proof,
+				1,
+			),
 			Error::<Test>::IneligibleNotebookUsed
 		);
-		assert_ok!(BlockSeal::verify_vote_source(1, 1, &block_vote, &source_notebook_proof, 2,),);
+		assert_ok!(BlockSeal::verify_vote_source(
+			1,
+			&voting_schedule,
+			&block_vote,
+			&source_notebook_proof,
+			2,
+		),);
 
 		block_vote.power = 100;
 		assert_err!(
-			BlockSeal::verify_vote_source(1, 1, &block_vote, &source_notebook_proof, 2,),
+			BlockSeal::verify_vote_source(
+				1,
+				&voting_schedule,
+				&block_vote,
+				&source_notebook_proof,
+				2,
+			),
 			Error::<Test>::InvalidBlockVoteProof
 		);
 	});
@@ -309,25 +364,38 @@ fn it_checks_that_votes_are_for_great_grandpa_tick() {
 		System::set_block_number(10);
 		let mut vote = default_vote();
 		vote.block_hash = System::block_hash(8);
-		let votes_from_tick = 8;
-
-		// should be voting for blocks at tick 6
-		let _votes_for_grandparent_from_tick = 6;
+		let voting_schedule = VotingSchedule::when_evaluating_runtime_seals(10);
+		assert_eq!(voting_schedule.grandparent_votes_tick(), 6);
+		assert_eq!(voting_schedule.eligible_votes_tick(), 8);
 
 		GrandpaVoteMinimum::set(Some(500));
 
 		BlocksAtTick::mutate(|a| {
-			a.insert(votes_from_tick, vec![vote.block_hash]);
+			a.insert(voting_schedule.grandparent_votes_tick() - 1, vote.block_hash);
 		});
 		assert_err!(
 			BlockSeal::verify_block_vote(
 				U256::from(1),
 				&vote,
 				&1,
-				votes_from_tick,
+				&voting_schedule,
 				empty_signature()
 			),
 			Error::<Test>::InvalidVoteGrandparentHash
+		);
+		BlocksAtTick::mutate(|a| {
+			a.insert(voting_schedule.grandparent_votes_tick(), vote.block_hash);
+		});
+		// still errors, but moves past the invalid vote hash
+		assert_err!(
+			BlockSeal::verify_block_vote(
+				U256::from(1),
+				&vote,
+				&1,
+				&voting_schedule,
+				empty_signature()
+			),
+			Error::<Test>::UnregisteredBlockAuthor
 		);
 	});
 }
@@ -361,17 +429,17 @@ fn it_creates_the_next_parent_key() {
 				)],
 			},
 		);
-		CurrentTick::set(3);
+		CurrentTick::set(4);
 		TempAuthor::<Test>::put(1);
 		TempSealInherent::<Test>::put(BlockSealInherent::Compute);
-		BlockSeal::on_initialize(3);
+		BlockSeal::on_initialize(4);
 
 		// add notebook 2/2 at tick 3
 		NotebooksAtTick::mutate(|a| {
 			a.insert(3, vec![(1, 2, Some(book1_secret)), (2, 2, Some(book2_secret))]);
 		});
 
-		BlockSeal::on_finalize(3);
+		BlockSeal::on_finalize(4);
 		assert_eq!(ParentVotingKey::<Test>::get(), Some(parent_key));
 	});
 }
@@ -437,7 +505,7 @@ fn it_skips_ineligible_voting_roots() {
 				)],
 			},
 		);
-		CurrentTick::set(3);
+		CurrentTick::set(4);
 		TempAuthor::<Test>::put(1);
 		TempSealInherent::<Test>::put(BlockSealInherent::Compute);
 
@@ -458,7 +526,10 @@ fn it_can_find_best_vote_seals() {
 		// Go past genesis block so events get deposited
 		let mut parent_hash = System::parent_hash();
 
-		assert_eq!(BlockSeal::find_vote_block_seals(vec![], U256::MAX).unwrap().to_vec(), vec![]);
+		assert_eq!(
+			BlockSeal::find_vote_block_seals(vec![], U256::MAX, 0).unwrap().to_vec(),
+			vec![]
+		);
 		let mut first_vote = BlockVoteT {
 			account_id: Bob.public().into(),
 			index: 0,
@@ -480,7 +551,7 @@ fn it_can_find_best_vote_seals() {
 			raw_votes: vec![(first_vote.encode(), 500)],
 		};
 		assert_eq!(
-			BlockSeal::find_vote_block_seals(vec![vote.clone()], U256::MAX)
+			BlockSeal::find_vote_block_seals(vec![vote.clone()], U256::MAX, 0)
 				.unwrap()
 				.to_vec(),
 			vec![]
@@ -496,32 +567,38 @@ fn it_can_find_best_vote_seals() {
 		}
 		CurrentTick::set(5);
 		// This api assumes you are building the next block, so the runtime tick will already be -1
-		let _solving_tick = 6;
-		let votes_from_tick = 4;
-		let voted_on_blocks_at_tick = 2;
+		let voting_schedule = VotingSchedule::when_evaluating_runtime_votes(5);
 		BlocksAtTick::mutate(|a| {
 			for i in 1..5 {
-				a.insert(i as u32, vec![System::block_hash(i)]);
+				a.insert(i as u32, System::block_hash(i));
 			}
 		});
 
-		first_vote.block_hash = System::block_hash(votes_from_tick);
+		first_vote.block_hash = System::block_hash(voting_schedule.eligible_votes_tick() as u64);
 
 		vote.raw_votes = vec![(first_vote.encode(), 500)];
 
 		ParentVotingKey::<Test>::put(Some(H256::random()));
 		// vote is for grandparent, but should be for great grandparent
 		assert_eq!(
-			BlockSeal::find_vote_block_seals(vec![vote.clone()], U256::MAX)
-				.unwrap()
-				.into_inner(),
+			BlockSeal::find_vote_block_seals(
+				vec![vote.clone()],
+				U256::MAX,
+				voting_schedule.notebook_tick()
+			)
+			.unwrap()
+			.into_inner(),
 			vec![]
 		);
 
-		first_vote.block_hash = System::block_hash(voted_on_blocks_at_tick);
+		first_vote.block_hash = System::block_hash(voting_schedule.grandparent_votes_tick() as u64);
 		vote.raw_votes = vec![(first_vote.encode(), 500)];
-		let best =
-			BlockSeal::find_vote_block_seals(vec![vote.clone()], U256::MAX).expect("should return");
+		let best = BlockSeal::find_vote_block_seals(
+			vec![vote.clone()],
+			U256::MAX,
+			voting_schedule.notebook_tick(),
+		)
+		.expect("should return");
 		assert_eq!(best.len(), 1);
 		assert_eq!(best[0].block_vote_bytes, first_vote.encode());
 
@@ -536,8 +613,12 @@ fn it_can_find_best_vote_seals() {
 				raw_votes: vec![(vote.encode(), 500)],
 			});
 		}
-		let best =
-			BlockSeal::find_vote_block_seals(votes.clone(), U256::MAX).expect("should return");
+		let best = BlockSeal::find_vote_block_seals(
+			votes.clone(),
+			U256::MAX,
+			voting_schedule.notebook_tick(),
+		)
+		.expect("should return");
 		assert_eq!(best.len(), 2);
 		let strongest = best[0].seal_strength;
 		assert_eq!(best[0].closest_miner, (1, default_authority()));
@@ -550,15 +631,29 @@ fn it_can_find_best_vote_seals() {
 				);
 			}
 		}
-		assert_eq!(BlockSeal::find_vote_block_seals(votes.clone(), strongest).expect("").len(), 0);
 		assert_eq!(
-			BlockSeal::find_vote_block_seals(votes.clone(), best[1].seal_strength)
-				.expect("")
-				.len(),
+			BlockSeal::find_vote_block_seals(
+				votes.clone(),
+				strongest,
+				voting_schedule.notebook_tick()
+			)
+			.expect("")
+			.len(),
+			0
+		);
+		assert_eq!(
+			BlockSeal::find_vote_block_seals(
+				votes.clone(),
+				best[1].seal_strength,
+				voting_schedule.notebook_tick()
+			)
+			.expect("")
+			.len(),
 			1
 		);
 	})
 }
+
 #[test]
 fn it_checks_tax_votes() {
 	new_test_ext().execute_with(|| {
@@ -578,12 +673,11 @@ fn it_checks_tax_votes() {
 		let default_authority = default_authority();
 		let author = &1;
 		let tick = 6;
-		let votes_from_tick = 4;
-		let voted_on_blocks_at_tick = 2;
 		CurrentTick::set(tick);
+		let voting_schedule = VotingSchedule::when_evaluating_runtime_seals(tick);
 
 		BlocksAtTick::mutate(|a| {
-			a.insert(voted_on_blocks_at_tick, vec![vote.block_hash]);
+			a.insert(voting_schedule.grandparent_votes_tick(), vote.block_hash);
 		});
 		GrandpaVoteMinimum::set(Some(501));
 		let seal_strength = vote.get_seal_strength(1, H256::random());
@@ -592,7 +686,7 @@ fn it_checks_tax_votes() {
 				seal_strength,
 				&vote,
 				author,
-				votes_from_tick,
+				&voting_schedule,
 				empty_signature()
 			),
 			Error::<Test>::InsufficientVotingPower
@@ -603,7 +697,7 @@ fn it_checks_tax_votes() {
 				seal_strength,
 				&vote,
 				author,
-				votes_from_tick,
+				&voting_schedule,
 				empty_signature()
 			),
 			Error::<Test>::UnregisteredBlockAuthor
@@ -614,7 +708,7 @@ fn it_checks_tax_votes() {
 				seal_strength,
 				&vote,
 				author,
-				votes_from_tick,
+				&voting_schedule,
 				empty_signature()
 			),
 			Error::<Test>::InvalidSubmitter
@@ -629,7 +723,7 @@ fn it_checks_tax_votes() {
 				seal_strength,
 				&vote,
 				author,
-				votes_from_tick,
+				&voting_schedule,
 				empty_signature()
 			),
 			Error::<Test>::InvalidAuthoritySignature
@@ -644,7 +738,7 @@ fn it_checks_tax_votes() {
 				seal_strength,
 				&vote,
 				author,
-				votes_from_tick,
+				&voting_schedule,
 				signature.clone()
 			),
 			Error::<Test>::BlockVoteInvalidSignature
@@ -655,7 +749,7 @@ fn it_checks_tax_votes() {
 			seal_strength,
 			&vote,
 			author,
-			votes_from_tick,
+			&voting_schedule,
 			signature.clone()
 		),);
 	});

@@ -10,7 +10,6 @@ use std::{
 
 use bitcoind::{bitcoincore_rpc::Auth, BitcoinD};
 use lazy_static::lazy_static;
-use strip_ansi_escapes::strip;
 use tokio::task::spawn_blocking;
 use url::Url;
 
@@ -65,6 +64,7 @@ impl ArgonTestNode {
 			.env("RUST_LOG", rust_log)
 			.stderr(process::Stdio::piped())
 			.arg("--dev")
+			.arg("--detailed-log-output")
 			.arg(format!("--{}", authority.to_lowercase()))
 			.arg("--port=0")
 			.arg("--rpc-port=0")
@@ -81,8 +81,6 @@ impl ArgonTestNode {
 		spawn_blocking(move || {
 			for line in stderr_reader.lines() {
 				let line = line.expect("failed to obtain next line from stdout");
-				let cleaned_log = strip(&line);
-				println!("NODE>> {}", String::from_utf8_lossy(&cleaned_log));
 
 				let line_port = line
 					.rsplit_once("Running JSON-RPC server: addr=127.0.0.1:")
@@ -99,6 +97,7 @@ impl ArgonTestNode {
 					});
 					let ws_url = format!("ws://127.0.0.1:{}", port_num);
 					tx_clone.send(ws_url).unwrap();
+					break;
 				}
 			}
 		});

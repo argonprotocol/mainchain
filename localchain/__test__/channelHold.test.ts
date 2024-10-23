@@ -181,6 +181,7 @@ describeIntegration("ChannelHold integration", () => {
             try {
                 const voteBlocks = await ferdieMainchainClient.getVoteBlockHash(ferdiechain.currentTick);
                 if (voteBlocks.blockHash) {
+                    console.log("Vote block hash=%s", Buffer.from(voteBlocks.blockHash).toString('hex'));
                     break;
                 }
             } catch {
@@ -203,7 +204,7 @@ describeIntegration("ChannelHold integration", () => {
         if (syncResult.blockVotes.length === 0) {
             // try 10 more times to vote
             for (let i = 0; i < 10; i++) {
-                await new Promise(resolve => setTimeout(resolve, 100));
+                await new Promise(resolve => setTimeout(resolve, Number(ferdiechain.ticker.millisToNextTick())));
 
                 syncResult = await ferdiechain.balanceSync.sync({
                     votesAddress: ferdieVotesAddress.address,

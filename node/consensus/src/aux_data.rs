@@ -44,10 +44,9 @@ where
 
 		self.client
 			.insert_aux(&[(self.key.as_slice(), encoded.as_slice())], &[])
-			.map_err(|e| {
+			.inspect_err(|_| {
 				// roll back the data and throw
 				*self.data.write() = start_data;
-				e
 			})?;
 
 		Ok(result)

@@ -212,7 +212,6 @@ mod tests {
 		pin::Pin,
 		sync::Arc,
 		task::{Context, Poll},
-		time::Duration,
 	};
 	use subxt::{
 		blocks::Block,
@@ -246,7 +245,7 @@ mod tests {
 		BalanceChange, BalanceProof, BalanceTip, BlockSealDigest, BlockVote, BlockVoteDigest,
 		Domain, DomainHash, DomainTopLevel, HashOutput, MerkleProof, Note, NoteType,
 		NoteType::{ChannelHoldClaim, ChannelHoldSettle},
-		NotebookDigest, ParentVotingKeyDigest, TickDigest, TransferToLocalchainId,
+		NotebookDigest, ParentVotingKeyDigest, TickDigest, TransferToLocalchainId, VotingSchedule,
 		DOMAIN_LEASE_COST,
 	};
 	use argon_testing::start_argon_test_node;
@@ -406,7 +405,7 @@ mod tests {
 		let best_hash = ctx.client.best_block_hash().await.expect("should find a best block");
 
 		println!(
-			"Got a notebook proof at block {:?}. Current tick {}. Block Tick {}",
+			"Got a notebook proof at block {:?}. Current tick {}. Runtime Tick {}",
 			best_hash,
 			ticker.current(),
 			ctx.client
@@ -415,39 +414,32 @@ mod tests {
 		);
 
 		let mut attempts = 0;
-		let (grandparent_tick, best_grandparents) = {
+		let best_grandparent = {
 			loop {
-				let grandparent_tick = ticker.current() - 2;
-				let best_hash =
-					ctx.client.best_block_hash().await.expect("should find a best block");
-				match ctx
-					.client
-					.fetch_storage(
-						&api::ticks::storage::StorageApi.recent_blocks_at_ticks(grandparent_tick),
-						Some(best_hash),
-					)
-					.await?
-				{
-					Some(x) => break (grandparent_tick, x.0),
+				match ctx.client.get_vote_block_hash(ticker.current()).await.ok() {
+					Some((grandparent_block, _)) => {
+						println!(
+							"Voting for grandparent {:?}. Current tick {}",
+							grandparent_block,
+							ticker.current()
+						);
+						break grandparent_block;
+					},
 					// wait a second
 					None => {
 						println!(
-							"No grandparents found at tick {}. Waiting. Current={}",
-							grandparent_tick,
+							"No grandparents found. Waiting. Runtime tick={}",
 							ticker.current()
 						);
-						if attempts > 200 {
+						if attempts > 5 {
 							panic!("Should have found a grandparent");
 						}
 						attempts += 1;
-						tokio::time::sleep(Duration::from_millis(100)).await
+						tokio::time::sleep(ticker.duration_to_next_tick()).await
 					},
 				}
 			}
 		};
-
-		let best_grandparent = best_grandparents.last().expect("Should have blocks in every tick");
-		println!("Voting for grandparent {:?} at tick {}", best_grandparent, grandparent_tick);
 
 		let vote_power = (hold_note.milligons as f64 * 0.2f64) as u128;
 
@@ -455,7 +447,7 @@ mod tests {
 			&pool,
 			&ticker,
 			hold_note,
-			*best_grandparent,
+			best_grandparent,
 			BalanceProof {
 				balance: bob_balance as u128,
 				notebook_number: hold_result.notebook_number,
@@ -468,6 +460,7 @@ mod tests {
 		.await?;
 		println!("ChannelHold result is {:?}", channel_hold_result);
 
+		let voting_schedule = VotingSchedule::when_creating_votes(channel_hold_result.tick);
 		let mut best_sub = ctx.client.live.blocks().subscribe_finalized().await?;
 		let mut did_see_vote = false;
 		let mut did_see_voting_key = false;
@@ -481,7 +474,7 @@ mod tests {
 						if notebook.notebook_number == channel_hold_result.notebook_number {
 							assert_eq!(votes.votes_count, 1, "Should have votes");
 							assert_eq!(votes.voting_power, vote_power);
-							assert_eq!(tick, channel_hold_result.tick)
+							assert_eq!(tick, voting_schedule.block_tick())
 						}
 					}
 					println!(
@@ -503,7 +496,7 @@ mod tests {
 					}
 
 					// should have gotten a vote in tick 2
-					if tick >= channel_hold_result.tick + 3 {
+					if tick >= voting_schedule.block_tick() + 3 {
 						break;
 					}
 				},

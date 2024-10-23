@@ -42,7 +42,7 @@ pub mod pallet {
 		},
 		notebook::{AccountOrigin, Notebook, NotebookHeader},
 		tick::Tick,
-		AccountOriginUid, Balance, BlockVotingProvider, ChainTransfer, ChainTransferLookup,
+		AccountOriginUid, Balance, BlockSealSpecProvider, ChainTransfer, ChainTransferLookup,
 		NotebookDigest as NotebookDigestT, NotebookEventHandler, NotebookProvider, NotebookSecret,
 		NotebookSecretHash, SignedNotebookHeader, TickProvider, TransferToLocalchainId,
 		NOTEBOOKS_DIGEST_ID,
@@ -70,7 +70,7 @@ pub mod pallet {
 
 		type ChainTransferLookup: ChainTransferLookup<Self::AccountId, Balance>;
 
-		type BlockVotingProvider: BlockVotingProvider<Self::Block>;
+		type BlockSealSpecProvider: BlockSealSpecProvider<Self::Block>;
 		type TickProvider: TickProvider<Self::Block>;
 	}
 
@@ -522,14 +522,15 @@ pub mod pallet {
 		pub(crate) fn process_notebook(header: NotebookHeader) {
 			let notary_id = header.notary_id;
 			let notebook_number = header.notebook_number;
-			let current_tick = T::TickProvider::current_tick();
 
 			<LastNotebookDetailsByNotary<T>>::try_mutate(notary_id, |x| {
 				if x.is_full() {
 					x.pop();
 				}
 
-				let is_vote_eligible = current_tick == header.tick;
+				let voting_schedule = T::TickProvider::voting_schedule();
+				// we submit notebooks for the previous tick
+				let is_vote_eligible = header.tick == voting_schedule.notebook_tick();
 				x.try_insert(
 					0,
 					(
@@ -601,12 +602,12 @@ pub mod pallet {
 
 			let mut parent_secret_hash = NotebookSecretHash::zero();
 			let mut parent_block_votes_root = H256::zero();
-			let parent_block_number = notebook_number.saturating_sub(1);
+			let previous_notebook = notebook_number.saturating_sub(1);
 			let mut last_notebook_processed: NotebookNumber =
 				<LastNotebookDetailsByNotary<T>>::get(notary_id)
 					.first()
 					.map(|(details, _)| {
-						if details.notebook_number == parent_block_number {
+						if details.notebook_number == previous_notebook {
 							parent_secret_hash = details.secret_hash;
 							parent_block_votes_root = details.block_votes_root;
 						}
@@ -619,7 +620,7 @@ pub mod pallet {
 					audit_summary.notebook_number == last_notebook_processed + 1,
 					NotebookVerifyError::CatchupNotebooksMissing
 				);
-				if audit_summary.notebook_number == parent_block_number {
+				if audit_summary.notebook_number == previous_notebook {
 					parent_secret_hash = audit_summary.details.secret_hash;
 					parent_block_votes_root = audit_summary.details.block_votes_root;
 				}

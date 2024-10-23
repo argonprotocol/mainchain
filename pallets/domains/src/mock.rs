@@ -5,7 +5,7 @@ use sp_runtime::{traits::IdentityLookup, BuildStorage};
 
 use argon_primitives::{
 	tick::{Tick, Ticker},
-	TickProvider,
+	TickProvider, VotingSchedule,
 };
 
 use crate as pallet_domains;
@@ -44,7 +44,10 @@ impl TickProvider<Block> for StaticTickProvider {
 	fn ticker() -> Ticker {
 		Ticker::new(1, 1, 2)
 	}
-	fn blocks_at_tick(_: Tick) -> Vec<H256> {
+	fn block_at_tick(_: Tick) -> Option<H256> {
+		todo!()
+	}
+	fn voting_schedule() -> VotingSchedule {
 		todo!()
 	}
 }
