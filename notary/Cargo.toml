@@ -51,7 +51,6 @@ url = { workspace = true }
 frame-support = { workspace = true }
 sp-keyring = { workspace = true }
 argon-testing = { workspace = true }
-subxt-signer = { workspace = true }
 
 [build-dependencies]
 argon-primitives = { workspace = true, features = ["std"] }

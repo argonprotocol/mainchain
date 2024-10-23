@@ -282,15 +282,10 @@ async fn create_vault(
 	let client = test_node.client.clone();
 	// wait for alice to have enough argons
 	let mut finalized_sub = client.live.blocks().subscribe_finalized().await?;
+	let vault_account = client.api_account(vault_owner_account_id32);
 	while let Some(_block) = finalized_sub.next().await {
-		if let Some(alice_balance) = client
-			.fetch_storage(
-				&storage()
-					.system()
-					.account(subxt::utils::AccountId32(*vault_owner_account_id32.as_ref())),
-				None,
-			)
-			.await?
+		if let Some(alice_balance) =
+			client.fetch_storage(&storage().system().account(&vault_account), None).await?
 		{
 			println!("Alice argon balance {:#?}", alice_balance.data.free);
 			if alice_balance.data.free > 100_001_000 {
@@ -486,8 +481,7 @@ async fn wait_for_mint(
 		assert!(balance.free >= bond_amount);
 	} else {
 		assert_eq!(pending_mint.0.len(), 1);
-		let subxt_owner_account_id = subxt::utils::AccountId32(*owner_account_id32.as_ref());
-		assert_eq!(pending_mint.0[0].1, subxt_owner_account_id.clone());
+		assert_eq!(pending_mint.0[0].1, owner_account_id32.into());
 		// should have minted some amount
 		assert!(pending_mint.0[0].2 < bond_amount);
 		println!(

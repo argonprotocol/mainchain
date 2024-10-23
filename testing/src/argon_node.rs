@@ -86,7 +86,10 @@ impl ArgonTestNode {
 					.rsplit_once("Running JSON-RPC server: addr=127.0.0.1:")
 					.map(|(_, port)| port);
 
-				if let Some(line_port) = line_port {
+				if let Some(mut line_port) = line_port {
+					if line_port.contains(",") {
+						line_port = line_port.split(',').next().unwrap();
+					}
 					// trim non-numeric chars from the end of the port part of the line.
 					let port_str = line_port.trim_end_matches(|b: char| !b.is_ascii_digit());
 

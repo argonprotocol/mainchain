@@ -1,15 +1,21 @@
+extern crate core;
+
 use std::{io::Write, sync::Arc};
 
 use anyhow::anyhow;
+use codec::Encode;
 use jsonrpsee::{
 	client_transport::ws::{Url, WsTransportClientBuilder},
 	core::client::ClientBuilder,
 	ws_client::{PingConfig, WsClient},
 };
-use sp_core::{crypto::AccountId32, H256};
+use sp_core::{blake2_256, crypto::AccountId32, H256};
+use sp_runtime::{MultiAddress, MultiSignature};
 use subxt::{
 	backend::{legacy::LegacyRpcMethods, rpc::RpcClient, BlockRef},
-	config::{Config, DefaultExtrinsicParams, DefaultExtrinsicParamsBuilder, ExtrinsicParams},
+	config::{
+		Config, DefaultExtrinsicParams, DefaultExtrinsicParamsBuilder, ExtrinsicParams, Hasher,
+	},
 	error::{Error, RpcError},
 	ext::subxt_core::tx::payload::ValidationDetails,
 	runtime_api::Payload as RuntimeApiPayload,
@@ -37,17 +43,28 @@ use crate::api::{
 pub mod conversion;
 pub mod signer;
 mod spec;
+pub mod types;
 
 pub enum ArgonConfig {}
 
 pub type ArgonOnlineClient = OnlineClient<ArgonConfig>;
 
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Encode)]
+pub struct BlakeTwo256;
+
+impl Hasher for BlakeTwo256 {
+	type Output = sp_core::H256;
+	fn hash(s: &[u8]) -> Self::Output {
+		sp_core::H256(blake2_256(s))
+	}
+}
+
 impl Config for ArgonConfig {
-	type Hash = subxt::utils::H256;
-	type AccountId = subxt::utils::AccountId32;
-	type Address = subxt::utils::MultiAddress<Self::AccountId, ()>;
-	type Signature = subxt::utils::MultiSignature;
-	type Hasher = subxt::config::substrate::BlakeTwo256;
+	type Hash = sp_core::H256;
+	type AccountId = AccountId;
+	type Address = MultiAddress<Self::AccountId, ()>;
+	type Signature = MultiSignature;
+	type Hasher = BlakeTwo256;
 	type Header = subxt::config::substrate::SubstrateHeader<u32, Self::Hasher>;
 	type ExtrinsicParams = ArgonExtrinsicParams<Self>;
 	type AssetId = ();
@@ -62,11 +79,6 @@ pub type ArgonTxProgress = TxProgress<ArgonConfig, ArgonOnlineClient>;
 /// A builder which leads to [`ArgonExtrinsicParams`] being constructed.
 /// This is what you provide to methods like `sign_and_submit()`.
 pub type ArgonExtrinsicParamsBuilder<T> = DefaultExtrinsicParamsBuilder<T>;
-
-pub fn account_id_to_subxt(account_id: &AccountId) -> subxt::utils::AccountId32 {
-	let bytes: [u8; 32] = *account_id.as_ref();
-	subxt::utils::AccountId32::from(bytes)
-}
 
 #[derive(Clone)]
 pub struct MainchainClient {
@@ -87,7 +99,7 @@ impl MainchainClient {
 		&self,
 		account_id: AccountId32,
 	) -> anyhow::Result<ArgonExtrinsicParamsBuilder<ArgonConfig>> {
-		let nonce = self.get_account_nonce(account_id).await?;
+		let nonce = self.get_account_nonce(&account_id).await?;
 		Ok(Self::ext_params_builder().nonce(nonce.into()))
 	}
 
@@ -180,15 +192,19 @@ impl MainchainClient {
 		}
 	}
 
+	pub fn api_account(&self, account_id: &AccountId32) -> types::AccountId32 {
+		account_id.clone().into()
+	}
+
 	pub async fn get_account(
 		&self,
 		account_id: &AccountId32,
 	) -> anyhow::Result<system::storage::types::account::Account> {
-		let account_id32 = account_id_to_subxt(account_id);
+		let account_id = self.api_account(account_id);
 		let info = self
-			.fetch_storage(&storage().system().account(account_id32), None)
+			.fetch_storage(&storage().system().account(&account_id), None)
 			.await?
-			.ok_or_else(|| anyhow!("No record found for account {:?}", &account_id))?;
+			.ok_or_else(|| anyhow!("No record found for account {:?}", account_id))?;
 		Ok(info)
 	}
 
@@ -204,23 +220,16 @@ impl MainchainClient {
 		&self,
 		account_id: &AccountId32,
 	) -> anyhow::Result<ownership::storage::types::account::Account> {
-		let account_id32 = account_id_to_subxt(account_id);
+		let account_id = self.api_account(account_id);
 		let balance = self
-			.fetch_storage(&storage().ownership().account(account_id32), None)
+			.fetch_storage(&storage().ownership().account(&account_id), None)
 			.await?
-			.ok_or_else(|| anyhow!("No record found for account {:?}", &account_id))?;
+			.ok_or_else(|| anyhow!("No record found for account {:?}", account_id))?;
 		Ok(balance)
 	}
 
-	pub async fn get_account_nonce(&self, account_id: AccountId32) -> anyhow::Result<Nonce> {
-		let account_id32 = account_id_to_subxt(&account_id);
-		self.get_account_nonce_subxt(&account_id32).await
-	}
-	pub async fn get_account_nonce_subxt(
-		&self,
-		account_id32: &subxt::utils::AccountId32,
-	) -> anyhow::Result<Nonce> {
-		let nonce = self.methods.system_account_next_index(account_id32).await?;
+	pub async fn get_account_nonce(&self, account_id: &AccountId32) -> anyhow::Result<Nonce> {
+		let nonce = self.methods.system_account_next_index(account_id).await?;
 		Ok(nonce as Nonce)
 	}
 
@@ -229,7 +238,7 @@ impl MainchainClient {
 		let block_hash = self
 			.fetch_storage(&storage().system().block_hash(height), Some(best_block))
 			.await?;
-		Ok(block_hash)
+		Ok(block_hash.map(|a| a.into()))
 	}
 
 	pub async fn block_number(

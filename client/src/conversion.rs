@@ -28,7 +28,9 @@ impl From<runtime_types::argon_primitives::bitcoin::BitcoinCosignScriptPubkey>
 		match value {
 			runtime_types::argon_primitives::bitcoin::BitcoinCosignScriptPubkey::P2WSH {
 				wscript_hash,
-			} => argon_primitives::bitcoin::BitcoinCosignScriptPubkey::P2WSH { wscript_hash },
+			} => argon_primitives::bitcoin::BitcoinCosignScriptPubkey::P2WSH {
+				wscript_hash: wscript_hash.into(),
+			},
 		}
 	}
 }

@@ -221,11 +221,11 @@ impl BondCommands {
 					.await
 					.context("Failed to connect to argon node")?;
 				let at_block = if let Some(at_block) = at_block {
-					let block_chash = client
+					let block_hash = client
 						.fetch_storage(&storage().system().block_hash(at_block), None)
 						.await?
 						.unwrap();
-					Some(block_chash)
+					Some(block_hash.into())
 				} else {
 					let latest_block = client.latest_finalized_block_hash().await?;
 					Some(latest_block.hash())
@@ -592,7 +592,7 @@ impl BondCommands {
 					.await?
 					.ok_or(anyhow::anyhow!("No block found for the given block number"))?;
 
-				let at_block = Some(block_hash);
+				let at_block = Some(block_hash.into());
 				let (utxo_id, utxo, _) = get_utxo_from_bond_id(&client, bond_id, at_block).await?;
 
 				let utxo_ref = client
