@@ -33,7 +33,7 @@ use crate::{
 	aux_client::ArgonAux,
 	digests::{create_pre_runtime_digests, create_seal_digest},
 	error::Error,
-	notary_client::{get_notebook_header_data, notary_sync_task, NotaryClient},
+	notary_client::{get_notebook_header_data, notary_sync_task, NotaryClient, VotingPowerInfo},
 	notebook_sealer::NotebookSealer,
 };
 
@@ -83,7 +83,7 @@ where
 
 	let best_hash = client.info().best_hash;
 	let ticker = client.runtime_api().ticker(best_hash).expect("Ticker not available");
-	let tick_millis = ticker.tick_duration_millis;
+	let no_work_delay_millis = if ticker.tick_duration_millis <= 10_000 { 100 } else { 1000 };
 
 	let notary_sync_task = notary_sync_task(client.clone(), notary_client.clone());
 
@@ -99,11 +99,7 @@ where
 
 			let mut delay = 20;
 			if !has_more_work {
-				if tick_millis <= 10_000 {
-					delay = 100;
-				} else {
-					delay = 1000;
-				}
+				delay = no_work_delay_millis
 			}
 			tokio::time::sleep(Duration::from_millis(delay)).await;
 		}
@@ -115,16 +111,39 @@ where
 			ticker,
 			select_chain,
 			keystore,
-			aux_client,
+			aux_client.clone(),
 			tax_vote_sender.clone(),
 		);
+		let mut import_stream = client.import_notification_stream();
+		loop {
+			let mut next: Option<VotingPowerInfo> = None;
+			tokio::select! {biased;
+				notebook = notebook_tick_rx.next() => {
+					next = notebook;
+				},
+				block_next = import_stream.next() => {
+					if let Some(block) = block_next {
+						if block.origin == BlockOrigin::Own {
+							continue;
+						}
+						let Ok(tick) = client.runtime_api().current_tick(block.hash) else {
+							continue;
+						};
+						let voting_schedule = VotingSchedule::when_creating_block(tick + 1);
+						if let Ok(info) = aux_client.get_tick_voting_power(voting_schedule.notebook_tick()) {
+							next = info
+						}
+					}
+				},
+			}
 
-		while let Some((notebook_tick, voting_power, notebooks)) = notebook_tick_rx.next().await {
-			if let Err(err) = notebook_sealer
-				.check_for_new_blocks(notebook_tick, voting_power, notebooks)
-				.await
-			{
-				warn!(target: LOG_TARGET, "Error while checking for new blocks: {:?}", err);
+			if let Some((notebook_tick, voting_power, notebooks)) = next {
+				if let Err(err) = notebook_sealer
+					.check_for_new_blocks(notebook_tick, voting_power, notebooks)
+					.await
+				{
+					warn!(target: LOG_TARGET, "Error while checking for new blocks: {:?}", err);
+				}
 			}
 		}
 	};

@@ -172,6 +172,17 @@ impl<B: BlockT, C: AuxStore + 'static> ArgonAux<B, C> {
 		Ok(is_new_best)
 	}
 
+	pub fn get_tick_voting_power(&self, tick: Tick) -> Result<Option<VotingPowerInfo>, Error> {
+		let state = self.get_notebook_tick_state(tick)?.get();
+		let mut voting_power = 0u128;
+		let mut notebooks = 0u32;
+		for digest in state.notebook_key_details_by_notary.values() {
+			voting_power += digest.block_voting_power;
+			notebooks += 1;
+		}
+		Ok(Some((tick, voting_power, notebooks)))
+	}
+
 	pub fn get_notary_notebooks_for_header(
 		&self,
 		notary_id: NotaryId,
