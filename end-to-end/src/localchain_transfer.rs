@@ -1,6 +1,6 @@
 use std::env::temp_dir;
 
-use sp_core::{crypto::AccountId32, sr25519::Pair, Pair as PairT};
+use sp_core::{sr25519::Pair, Pair as PairT};
 
 use argon_client::{
 	api::{runtime_types::argon_node_runtime::RuntimeCall, tx},
@@ -17,16 +17,14 @@ async fn test_localchain_transfers_using_cli() {
 
 	let test_notary = ArgonTestNotary::start(&test_node, None).await.unwrap();
 
+	let owner = test_node.client.api_account(&test_notary.operator.public().into());
 	// give ferdie//notary some balance
 	let _ = test_node
 		.client
 		.live
 		.tx()
 		.sign_and_submit_then_watch_default(
-			&tx().balances().transfer_keep_alive(
-				subxt::utils::AccountId32(test_notary.operator.public().into()).into(),
-				10_000,
-			),
+			&tx().balances().transfer_keep_alive(owner.into(), 10_000),
 			&alice_signer,
 		)
 		.await
@@ -39,7 +37,7 @@ async fn test_localchain_transfers_using_cli() {
 	test_notary.register_operator(&test_node).await.unwrap();
 	{
 		println!("Sudo approving notary");
-		let activate_operator: AccountId32 = test_notary.operator.public().into();
+		let operator_account = test_node.client.api_account(&test_notary.operator.public().into());
 		test_node
 			.client
 			.live
@@ -47,7 +45,7 @@ async fn test_localchain_transfers_using_cli() {
 			.sign_and_submit_then_watch_default(
 				&tx().sudo().sudo(RuntimeCall::Notaries(
 					argon_client::api::runtime_types::pallet_notaries::pallet::Call::activate {
-						operator_account: subxt::utils::AccountId32(activate_operator.into()),
+						operator_account,
 					},
 				)),
 				&alice_signer,

@@ -167,7 +167,7 @@ async fn process_block(
 				NotebookAuditFailureStore::record(
 					db,
 					notebook.notebook_number,
-					notebook.notebook_hash,
+					notebook.notebook_hash.into(),
 					format!("{:?}", notebook.first_failure_reason),
 					block.number(),
 				)

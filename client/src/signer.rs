@@ -1,9 +1,6 @@
 use crate::ArgonConfig;
 use argon_primitives::{AccountId, CryptoType};
-use sp_core::{
-	crypto::{key_types::ACCOUNT, AccountId32},
-	ed25519, sr25519, Pair,
-};
+use sp_core::{crypto::key_types::ACCOUNT, ed25519, sr25519, Pair};
 use sp_keystore::Keystore;
 pub use subxt::tx::Signer;
 use subxt::Config;
@@ -28,7 +25,12 @@ impl Signer<ArgonConfig> for Ed25519Signer {
 	}
 
 	fn sign(&self, data: &[u8]) -> <ArgonConfig as Config>::Signature {
-		<ArgonConfig as Config>::Signature::Ed25519(self.keypair.sign(data).0)
+		self.keypair.sign(data).into()
+	}
+}
+impl From<ed25519::Pair> for Ed25519Signer {
+	fn from(keypair: ed25519::Pair) -> Self {
+		Self::new(keypair)
 	}
 }
 
@@ -50,7 +52,12 @@ impl Signer<ArgonConfig> for Sr25519Signer {
 	}
 
 	fn sign(&self, data: &[u8]) -> <ArgonConfig as Config>::Signature {
-		<ArgonConfig as Config>::Signature::Sr25519(self.keypair.sign(data).0)
+		self.keypair.sign(data).into()
+	}
+}
+impl From<sr25519::Pair> for Sr25519Signer {
+	fn from(keypair: sr25519::Pair) -> Self {
+		Self::new(keypair)
 	}
 }
 
@@ -71,9 +78,7 @@ impl KeystoreSigner {
 }
 impl Signer<ArgonConfig> for KeystoreSigner {
 	fn account_id(&self) -> <ArgonConfig as Config>::AccountId {
-		let account_id32: AccountId32 = self.account_id.clone();
-
-		subxt::utils::AccountId32(account_id32.into())
+		self.account_id.clone()
 	}
 
 	fn address(&self) -> <ArgonConfig as Config>::Address {
@@ -81,26 +86,20 @@ impl Signer<ArgonConfig> for KeystoreSigner {
 	}
 
 	fn sign(&self, data: &[u8]) -> <ArgonConfig as Config>::Signature {
-		let account_id = self.account_id().0;
+		let account_id: [u8; 32] = self.account_id.clone().into();
 		match self.crypto_type {
-			CryptoType::Sr25519 => {
-				let signature = self
-					.keystore
-					.sr25519_sign(ACCOUNT, &account_id.into(), data)
-					.expect("Failed to sign with sr25519")
-					.expect("Failed to create signature");
-
-				<ArgonConfig as Config>::Signature::Sr25519(signature.0)
-			},
-			CryptoType::Ed25519 => {
-				let signature = self
-					.keystore
-					.ed25519_sign(ACCOUNT, &account_id.into(), data)
-					.expect("Failed to sign with ed25519")
-					.expect("Failed to create signature");
-
-				<ArgonConfig as Config>::Signature::Ed25519(signature.0)
-			},
+			CryptoType::Sr25519 => self
+				.keystore
+				.sr25519_sign(ACCOUNT, &account_id.into(), data)
+				.expect("Failed to sign with sr25519")
+				.expect("Failed to create signature")
+				.into(),
+			CryptoType::Ed25519 => self
+				.keystore
+				.ed25519_sign(ACCOUNT, &account_id.into(), data)
+				.expect("Failed to sign with ed25519")
+				.expect("Failed to create signature")
+				.into(),
 		}
 	}
 }

@@ -1,23 +1,28 @@
+use sp_core::Pair;
+use sp_keyring::Sr25519Keyring::{Alice, Bob};
 use subxt::{tx::TxStatus, Config, OnlineClient};
-use subxt_signer::sr25519::dev;
 
-use argon_client::{api, ArgonConfig, ArgonExtrinsicParamsBuilder, ArgonOnlineClient};
+use argon_client::{
+	api, signer::Sr25519Signer, ArgonConfig, ArgonExtrinsicParamsBuilder, ArgonOnlineClient,
+};
 
 #[tokio::main]
 async fn main() -> Result<(), Box<dyn std::error::Error>> {
 	// Create a client to use:
 	let client = ArgonOnlineClient::new().await?;
 
-	let account = dev::bob().public_key().into();
+	let bob = Bob.pair();
+	let bob_signer = Sr25519Signer::new(bob.clone());
+
+	let account = bob.public().into();
 
 	// NOTE: argon balances are stored in system.. not the pallet itself
 	let balance_query = api::storage().system().account(&account);
 	let result = client.storage().at_latest().await?.fetch(&balance_query).await?;
 	println!("Bob has free balance: {:?}, {}", result.unwrap().data.free, account);
 
-	let transfer_query = api::tx()
-		.balances()
-		.transfer_allow_death(dev::alice().public_key().into(), 1_000);
+	let alice_account = argon_client::types::AccountId32::from(Alice.to_account_id());
+	let transfer_query = api::tx().balances().transfer_allow_death(alice_account.into(), 1_000);
 
 	let latest_block = client.blocks().at_latest().await?;
 
@@ -29,7 +34,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
 
 	let mut sub = client
 		.tx()
-		.sign_and_submit_then_watch(&transfer_query, &dev::bob(), tx_params)
+		.sign_and_submit_then_watch(&transfer_query, &bob_signer, tx_params)
 		.await?;
 
 	while let Some(status) = sub.next().await {

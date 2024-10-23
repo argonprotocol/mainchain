@@ -62,7 +62,6 @@ sp-keyring = { workspace = true }
 argon-testing = { workspace = true }
 sc-utils = { workspace = true }
 argon-notary = { workspace = true }
-subxt-signer = { workspace = true }
 
 [build-dependencies]
 napi-build = { workspace = true }

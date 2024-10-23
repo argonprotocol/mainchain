@@ -111,7 +111,7 @@ where
 	}
 
 	async fn import_block(
-		&mut self,
+		&self,
 		mut block: BlockImportParams<B>,
 	) -> Result<ImportResult, Self::Error> {
 		let digests = load_digests::<B>(&block.header)?;

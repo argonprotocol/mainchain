@@ -28,8 +28,8 @@ tracing-subscriber = { workspace = true }
 sp-core = { workspace = true, features = ["default"] }
 sp-arithmetic = { workspace = true, features = ["default"] }
 sp-keystore = { workspace = true, features = ["default"] }
+sp-runtime = { workspace = true, features = ["default"] }
 argon-primitives = { workspace = true, features = ["default"] }
-
 anyhow = { workspace = true, features = ["default"] }
 tokio = { workspace = true }
 
@@ -37,4 +37,3 @@ tokio = { workspace = true }
 sp-keyring = { workspace = true }
 tokio = { workspace = true, features = ["test-util"] }
 argon-testing = { workspace = true }
-subxt-signer = { workspace = true }

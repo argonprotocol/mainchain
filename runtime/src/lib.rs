@@ -516,7 +516,7 @@ where
 	AccountIdOf<R>: From<AccountId> + Into<AccountId>,
 	<R as frame_system::Config>::RuntimeEvent: From<pallet_balances::Event<R, ArgonToken>>,
 {
-	fn on_unbalanceds<B>(
+	fn on_unbalanceds(
 		mut fees_then_tips: impl Iterator<
 			Item = fungible::Credit<R::AccountId, pallet_balances::Pallet<R, ArgonToken>>,
 		>,

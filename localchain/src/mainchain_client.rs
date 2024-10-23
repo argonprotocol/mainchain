@@ -6,6 +6,7 @@ use anyhow::anyhow;
 use sp_core::crypto::AccountId32;
 use sp_core::Decode;
 use sp_core::{ByteArray, H256};
+use sp_runtime::MultiSignature;
 use subxt::runtime_api::Payload as RuntimeApiPayload;
 use subxt::storage::Address as StorageAddress;
 use subxt::tx::TxInBlock;
@@ -177,13 +178,14 @@ impl MainchainClient {
     domain_name: String,
     top_level: DomainTopLevel,
   ) -> Result<Option<DomainRegistration>> {
-    let domain_hash = Domain::from_string(domain_name, top_level).hash();
+    let domain_hash: argon_client::types::H256 =
+      Domain::from_string(domain_name, top_level).hash().into();
 
-    let best_block_hash = &self.get_best_block_hash().await?.0.to_vec();
+    let best_block_hash = self.get_best_block_hash().await?;
     if let Some(x) = self
       .fetch_storage(
         &storage().domains().registered_domains(domain_hash),
-        Some(H256::from_slice(best_block_hash)),
+        Some(best_block_hash),
       )
       .await?
     {
@@ -210,7 +212,8 @@ impl MainchainClient {
     domain_name: String,
     top_level: DomainTopLevel,
   ) -> Result<Option<ZoneRecord>> {
-    let domain = Domain::from_string(domain_name, top_level).hash();
+    let domain: argon_client::types::H256 =
+      Domain::from_string(domain_name, top_level).hash().into();
     let Some(zone_record) = self
       .fetch_storage(&storage().domains().zone_records_by_domain(domain), None)
       .await?
@@ -286,11 +289,12 @@ impl MainchainClient {
   }
 
   pub async fn get_account(&self, address: String) -> Result<AccountInfo> {
-    let account_id32 = subxt::utils::AccountId32::from_str(&address).map_err(|e| anyhow!(e))?;
-    let info = self
-      .fetch_storage(&storage().system().account(account_id32), None)
-      .await?
-      .ok_or_else(|| anyhow!("No account found for address {}", address))?;
+    let account_id32 = AccountId32::from_str(&address).map_err(|e| anyhow!(e))?;
+    let client = self.client().await?;
+    let info = client
+      .get_account(&account_id32)
+      .await
+      .map_err(|_| anyhow!("No account found for address {address}"))?;
     Ok(AccountInfo {
       nonce: info.nonce,
       consumers: info.consumers,
@@ -306,11 +310,12 @@ impl MainchainClient {
   }
 
   pub async fn get_ownership(&self, address: String) -> Result<BalancesAccountData> {
-    let account_id32 = subxt::utils::AccountId32::from_str(&address).map_err(|e| anyhow!(e))?;
-    let balance = self
-      .fetch_storage(&storage().ownership().account(account_id32), None)
-      .await?
-      .ok_or_else(|| anyhow!("No record found for address {}", address))?;
+    let account_id32 = AccountId32::from_str(&address).map_err(|e| anyhow!(e))?;
+    let client = self.client().await?;
+    let balance = client
+      .get_ownership(&account_id32)
+      .await
+      .map_err(|_| anyhow!("No account found for address {address}"))?;
     Ok(BalancesAccountData {
       free: balance.free,
       reserved: balance.reserved,
@@ -320,13 +325,9 @@ impl MainchainClient {
   }
 
   pub async fn get_account_nonce(&self, address: String) -> Result<u32> {
-    let account_id32 = subxt::utils::AccountId32::from_str(&address).map_err(|e| anyhow!(e))?;
-    let nonce = self
-      .client()
-      .await?
-      .methods
-      .system_account_next_index(&account_id32)
-      .await?;
+    let client = self.client().await?;
+    let account_id32 = AccountId32::from_str(&address).map_err(|e| anyhow!(e))?;
+    let nonce = client.get_account_nonce(&account_id32).await?;
     Ok(nonce as u32)
   }
 
@@ -366,8 +367,9 @@ impl MainchainClient {
 
     let client = self.client().await?;
 
-    let account_id = subxt::utils::AccountId32::from_str(&address).map_err(|e| anyhow!(e))?;
-    let multi_address = subxt::utils::MultiAddress::from(account_id.clone());
+    let account_id = AccountId32::from_str(&address).map_err(|e| anyhow!(e))?;
+    let account_bytes: [u8; 32] = account_id.clone().into();
+
     let latest_block = client.live.blocks().at(best_block).await?;
 
     let payload = {
@@ -384,7 +386,7 @@ impl MainchainClient {
 
     let signature = keystore.sign(address.clone(), payload).await?;
 
-    let multi_signature = subxt::utils::MultiSignature::decode(&mut signature.as_ref())?;
+    let multi_signature = MultiSignature::decode(&mut signature.as_ref())?;
 
     // have to recreate this because the internal types are not send. inefficient, but small penalty
     let submittable = {
@@ -398,7 +400,7 @@ impl MainchainClient {
             .mortal(latest_block.header(), mortality)
             .build(),
         )?
-        .sign_with_address_and_signature(&multi_address, &multi_signature)
+        .sign_with_address_and_signature(&account_id.into(), &multi_signature)
     };
 
     let tx_progress = submittable.submit_and_watch().await?;
@@ -413,7 +415,7 @@ impl MainchainClient {
           .as_event::<api::chain_transfer::events::TransferToLocalchain>()
           .transpose()
         {
-          if transfer.account_id == account_id {
+          if transfer.account_id.0 == account_bytes {
             return Some(transfer);
           }
         }
@@ -436,15 +438,6 @@ impl MainchainClient {
     ))
   }
 
-  fn subxt_account_to_address(
-    &self,
-    account_id: subxt::utils::AccountId32,
-  ) -> anyhow::Result<String> {
-    let account_id = AccountId32::from_slice(account_id.as_ref())
-      .map_err(|_| anyhow!("Unable to decode subxt account"))?;
-    Ok(AccountStore::to_address(&account_id))
-  }
-
   pub async fn wait_for_localchain_transfer(
     &self,
     transfer_id: TransferToLocalchainId,
@@ -459,7 +452,7 @@ impl MainchainClient {
       .await?
     {
       return Ok(Some(LocalchainTransfer {
-        address: self.subxt_account_to_address(transfer.account_id)?,
+        address: transfer.account_id.to_address(),
         amount: transfer.amount,
         notary_id: transfer.notary_id,
         expiration_tick: transfer.expiration_tick,
@@ -490,7 +483,7 @@ impl MainchainClient {
         {
           if transfer.transfer_id == transfer_id {
             return Ok(Some(LocalchainTransfer {
-              address: self.subxt_account_to_address(transfer.account_id)?,
+              address: transfer.account_id.to_address(),
               amount: transfer.amount,
               notary_id: transfer.notary_id,
               expiration_tick: transfer.expiration_tick,
@@ -538,7 +531,7 @@ impl MainchainClient {
         None,
       )
       .await?
-      .map(|a| H256::from_slice(a.as_bytes()));
+      .map(|a| a.into());
 
     Ok(result)
   }

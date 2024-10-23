@@ -42,7 +42,6 @@ env_logger = { workspace = true }
 sp-keyring = { workspace = true }
 sp-keystore = { workspace = true }
 argon-testing = { workspace = true }
-subxt-signer = { workspace = true }
 
 [build-dependencies]
 argon-primitives = { workspace = true, features = ["std"] }

@@ -93,7 +93,8 @@ export default class TestMainchain implements ITeardownable {
                 console.log('Main >> %s', line);
                 let match = line.match(/Running JSON-RPC server: addr=([\d.:]+)/);
                 if (match) {
-                    resolve(match[1].split(':').pop());
+                    let ipv4 = match[1].split(',').at(0);
+                    resolve(ipv4.split(':').pop());
                 }
             });
             this.#interfaces.push(int2);

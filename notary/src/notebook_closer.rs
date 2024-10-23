@@ -202,8 +202,12 @@ mod tests {
 	use codec::Decode;
 	use frame_support::assert_ok;
 	use futures::{task::noop_waker_ref, StreamExt};
-	use sp_core::{bounded_vec, ed25519::Public, hexdisplay::AsBytesRef, sr25519::Signature, Pair};
-	use sp_keyring::Sr25519Keyring::{Alice, Bob, Ferdie};
+	use sp_core::{bounded_vec, crypto::AccountId32, ed25519::Public, sr25519::Signature, Pair};
+	use sp_keyring::{
+		sr25519::Keyring,
+		AccountKeyring,
+		Sr25519Keyring::{Alice, Bob, Ferdie},
+	};
 	use sp_keystore::{testing::MemoryKeystore, Keystore, KeystoreExt};
 	use sqlx::PgPool;
 	use std::{
@@ -217,10 +221,8 @@ mod tests {
 		blocks::Block,
 		config::substrate::DigestItem,
 		tx::{TxInBlock, TxProgress},
-		utils::AccountId32,
 		OnlineClient,
 	};
-	use subxt_signer::sr25519::{dev, Keypair};
 	use tokio::sync::Mutex;
 
 	use argon_client::{
@@ -233,6 +235,7 @@ mod tests {
 			},
 			storage, tx,
 		},
+		signer::Sr25519Signer,
 		ArgonConfig, ArgonOnlineClient, MainchainClient, ReconnectingClient,
 	};
 	use argon_notary_apis::localchain::BalanceChangeResult;
@@ -263,7 +266,8 @@ mod tests {
 	async fn test_submitting_votes(pool: PgPool) -> anyhow::Result<()> {
 		let _ = tracing_subscriber::fmt::try_init();
 		let ctx = start_argon_test_node().await;
-		let bob_id = dev::bob().public_key().to_account_id();
+
+		let bob_id = Bob.to_account_id();
 
 		let notary_id = 1;
 		let ws_url = ctx.client.url.clone();
@@ -296,12 +300,10 @@ mod tests {
 
 		let bob_balance = 8000;
 		// Submit a transfer to localchain and wait for result
-		let bob_transfer =
-			create_localchain_transfer(&ctx.client.live, dev::bob(), bob_balance).await?;
-		let ferdie_transfer =
-			create_localchain_transfer(&ctx.client.live, dev::ferdie(), 1000).await?;
+		let bob_transfer = create_localchain_transfer(&ctx.client.live, Bob, bob_balance).await?;
+		let ferdie_transfer = create_localchain_transfer(&ctx.client.live, Ferdie, 1000).await?;
 		println!("bob and ferdie transfers created");
-		wait_for_transfers(&pool, vec![bob_transfer.clone(), ferdie_transfer.clone()]).await?;
+		wait_for_transfers(&pool, vec![bob_transfer, ferdie_transfer]).await?;
 		println!("bob and ferdie transfers confirmed");
 
 		let domain_hash = Domain::new("HelloWorld", DomainTopLevel::Entertainment).hash();
@@ -324,18 +326,20 @@ mod tests {
 			tokio::time::sleep(tokio::time::Duration::from_millis(50)).await;
 			check_block_watch_status(block_tracker.clone()).await?;
 		}
-		let zone_block = set_zone_record(&ctx.client.live, domain_hash, dev::alice()).await?;
+		let zone_block = set_zone_record(&ctx.client.live, domain_hash, Alice).await?;
 		println!("set zone record");
 		assert_eq!(
 			ctx.client
 				.fetch_storage(
-					&storage().domains().zone_records_by_domain(domain_hash),
+					&storage()
+						.domains()
+						.zone_records_by_domain(argon_client::types::H256::from(domain_hash)),
 					Some(zone_block)
 				)
 				.await?
 				.unwrap()
 				.payment_account,
-			dev::alice().public_key().into(),
+			Alice.to_account_id().into(),
 			"Should have stored alice as payment key"
 		);
 
@@ -583,9 +587,10 @@ mod tests {
 			public: notary_key.0,
 		});
 		println!("notary proposal {:?}", notary_proposal.call_data());
+		let signer: Sr25519Signer = Bob.pair().into();
 		let tx_progress = client
 			.tx()
-			.sign_and_submit_then_watch_default(&notary_proposal, &dev::bob())
+			.sign_and_submit_then_watch_default(&notary_proposal, &signer)
 			.await?;
 		let result = wait_for_in_block(tx_progress).await;
 
@@ -598,15 +603,13 @@ mod tests {
 	async fn submit_balance_change_to_notary(
 		pool: &PgPool,
 		ticker: &Ticker,
-		transfer: (TransferToLocalchainId, u32, Keypair),
+		transfer: (TransferToLocalchainId, u32, Keyring),
 	) -> anyhow::Result<BalanceChangeResult> {
-		let (transfer_id, amount, keypair) = transfer;
-		let public = keypair.public_key();
-		let public = public.as_ref();
+		let (transfer_id, amount, keyring) = transfer;
 
-		let keypair = if public == Bob.public().as_bytes_ref() {
+		let keypair = if keyring == Bob {
 			Bob.pair()
-		} else if public == Alice.public().as_bytes_ref() {
+		} else if keyring == Alice {
 			Alice.pair()
 		} else {
 			Ferdie.pair()
@@ -642,17 +645,15 @@ mod tests {
 	async fn submit_balance_change_to_notary_and_create_domain(
 		pool: &PgPool,
 		ticker: &Ticker,
-		transfer: (TransferToLocalchainId, u32, Keypair),
+		transfer: (TransferToLocalchainId, u32, Keyring),
 		domain_hash: DomainHash,
 		register_domain_to: AccountId,
 	) -> anyhow::Result<AccountOrigin> {
-		let (transfer_id, amount, keypair) = transfer;
-		let public = keypair.public_key();
-		let public = public.as_ref();
+		let (transfer_id, amount, keyring) = transfer;
 
-		let keypair = if public == Bob.public().as_bytes_ref() {
+		let keypair = if keyring == Bob {
 			Bob.pair()
-		} else if public == Alice.public().as_bytes_ref() {
+		} else if keyring == Alice {
 			Alice.pair()
 		} else {
 			Ferdie.pair()
@@ -705,20 +706,21 @@ mod tests {
 	async fn set_zone_record(
 		client: &ArgonOnlineClient,
 		domain_hash: DomainHash,
-		account: Keypair,
+		account: AccountKeyring,
 	) -> anyhow::Result<H256> {
+		let signer = Sr25519Signer::new(account.pair());
 		let tx_progress = client
 			.tx()
 			.sign_and_submit_then_watch_default(
 				&tx().domains().set_zone_record(
-					domain_hash,
+					domain_hash.into(),
 					runtime_types::argon_primitives::domain::ZoneRecord {
-						payment_account: AccountId32::from(account.public_key()),
+						payment_account: account.public().into(),
 						notary_id: 1,
 						versions: subxt::utils::KeyedVec::new(),
 					},
 				),
-				&account,
+				&signer,
 			)
 			.await?;
 		let result = wait_for_in_block(tx_progress).await;
@@ -844,14 +846,15 @@ mod tests {
 
 	async fn create_localchain_transfer(
 		client: &ArgonOnlineClient,
-		account: Keypair,
+		account: Keyring,
 		amount: u32,
-	) -> anyhow::Result<(TransferToLocalchainId, u32, Keypair)> {
+	) -> anyhow::Result<(TransferToLocalchainId, u32, Keyring)> {
+		let signer: Sr25519Signer = account.pair().into();
 		let in_block = client
 			.tx()
 			.sign_and_submit_then_watch_default(
 				&tx().chain_transfer().send_to_localchain(amount.into(), 1),
-				&account,
+				&signer,
 			)
 			.await?
 			.wait_for_finalized_success()
@@ -863,8 +866,8 @@ mod tests {
 				.as_event::<api::chain_transfer::events::TransferToLocalchain>()
 				.transpose()
 			{
-				if transfer.account_id == account.public_key().to_account_id() {
-					return Ok((transfer.transfer_id, transfer.amount as u32, account.clone()));
+				if transfer.account_id == account.public().into() {
+					return Ok((transfer.transfer_id, transfer.amount as u32, account));
 				}
 			}
 		}
@@ -873,7 +876,7 @@ mod tests {
 
 	async fn wait_for_transfers(
 		pool: &PgPool,
-		transfers: Vec<(TransferToLocalchainId, u32, Keypair)>,
+		transfers: Vec<(TransferToLocalchainId, u32, Keyring)>,
 	) -> anyhow::Result<()> {
 		let mut found = false;
 		for _ in 0..5 {
@@ -908,13 +911,15 @@ mod tests {
 		client: &ArgonOnlineClient,
 		bob_id: &AccountId32,
 	) -> anyhow::Result<()> {
+		let api_bob = argon_client::types::AccountId32::from(bob_id.clone());
+		let signer: Sr25519Signer = Alice.pair().into();
 		let notary_activated_finalized_block = client
 			.tx()
 			.sign_and_submit_then_watch_default(
 				&tx().sudo().sudo(RuntimeCall::Notaries(NotaryCall::activate {
-					operator_account: bob_id.clone(),
+					operator_account: api_bob,
 				})),
-				&dev::alice(),
+				&signer,
 			)
 			.await?
 			.wait_for_finalized()

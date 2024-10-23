@@ -230,7 +230,7 @@ pub mod api {
 				pub struct Version {}
 				pub mod execute_block {
 					use super::runtime_types;
-					pub type Block = runtime_types :: sp_runtime :: generic :: block :: Block < runtime_types :: sp_runtime :: generic :: header :: Header < :: core :: primitive :: u32 > , :: subxt :: ext :: subxt_core :: utils :: UncheckedExtrinsic < :: subxt :: ext :: subxt_core :: utils :: MultiAddress < :: subxt :: ext :: subxt_core :: utils :: AccountId32 , () > , runtime_types :: argon_node_runtime :: RuntimeCall , runtime_types :: sp_runtime :: MultiSignature , (runtime_types :: frame_system :: extensions :: check_non_zero_sender :: CheckNonZeroSender , runtime_types :: frame_system :: extensions :: check_spec_version :: CheckSpecVersion , runtime_types :: frame_system :: extensions :: check_tx_version :: CheckTxVersion , runtime_types :: frame_system :: extensions :: check_genesis :: CheckGenesis , runtime_types :: frame_system :: extensions :: check_mortality :: CheckMortality , runtime_types :: frame_system :: extensions :: check_nonce :: CheckNonce , runtime_types :: frame_system :: extensions :: check_weight :: CheckWeight , runtime_types :: pallet_transaction_payment :: ChargeTransactionPayment , runtime_types :: frame_metadata_hash_extension :: CheckMetadataHash ,) > > ;
+					pub type Block = runtime_types :: sp_runtime :: generic :: block :: Block < runtime_types :: sp_runtime :: generic :: header :: Header < :: core :: primitive :: u32 > , :: subxt :: ext :: subxt_core :: utils :: UncheckedExtrinsic < :: subxt :: ext :: subxt_core :: utils :: MultiAddress < crate :: types :: AccountId32 , () > , runtime_types :: argon_node_runtime :: RuntimeCall , runtime_types :: sp_runtime :: MultiSignature , (runtime_types :: frame_system :: extensions :: check_non_zero_sender :: CheckNonZeroSender , runtime_types :: frame_system :: extensions :: check_spec_version :: CheckSpecVersion , runtime_types :: frame_system :: extensions :: check_tx_version :: CheckTxVersion , runtime_types :: frame_system :: extensions :: check_genesis :: CheckGenesis , runtime_types :: frame_system :: extensions :: check_mortality :: CheckMortality , runtime_types :: frame_system :: extensions :: check_nonce :: CheckNonce , runtime_types :: frame_system :: extensions :: check_weight :: CheckWeight , runtime_types :: pallet_transaction_payment :: ChargeTransactionPayment , runtime_types :: frame_metadata_hash_extension :: CheckMetadataHash ,) > > ;
 					pub mod output {
 						use super::runtime_types;
 						pub type Output = ();
@@ -520,7 +520,7 @@ pub mod api {
 				use super::runtime_types;
 				pub mod apply_extrinsic {
 					use super::runtime_types;
-					pub type Extrinsic = :: subxt :: ext :: subxt_core :: utils :: UncheckedExtrinsic < :: subxt :: ext :: subxt_core :: utils :: MultiAddress < :: subxt :: ext :: subxt_core :: utils :: AccountId32 , () > , runtime_types :: argon_node_runtime :: RuntimeCall , runtime_types :: sp_runtime :: MultiSignature , (runtime_types :: frame_system :: extensions :: check_non_zero_sender :: CheckNonZeroSender , runtime_types :: frame_system :: extensions :: check_spec_version :: CheckSpecVersion , runtime_types :: frame_system :: extensions :: check_tx_version :: CheckTxVersion , runtime_types :: frame_system :: extensions :: check_genesis :: CheckGenesis , runtime_types :: frame_system :: extensions :: check_mortality :: CheckMortality , runtime_types :: frame_system :: extensions :: check_nonce :: CheckNonce , runtime_types :: frame_system :: extensions :: check_weight :: CheckWeight , runtime_types :: pallet_transaction_payment :: ChargeTransactionPayment , runtime_types :: frame_metadata_hash_extension :: CheckMetadataHash ,) > ;
+					pub type Extrinsic = :: subxt :: ext :: subxt_core :: utils :: UncheckedExtrinsic < :: subxt :: ext :: subxt_core :: utils :: MultiAddress < crate :: types :: AccountId32 , () > , runtime_types :: argon_node_runtime :: RuntimeCall , runtime_types :: sp_runtime :: MultiSignature , (runtime_types :: frame_system :: extensions :: check_non_zero_sender :: CheckNonZeroSender , runtime_types :: frame_system :: extensions :: check_spec_version :: CheckSpecVersion , runtime_types :: frame_system :: extensions :: check_tx_version :: CheckTxVersion , runtime_types :: frame_system :: extensions :: check_genesis :: CheckGenesis , runtime_types :: frame_system :: extensions :: check_mortality :: CheckMortality , runtime_types :: frame_system :: extensions :: check_nonce :: CheckNonce , runtime_types :: frame_system :: extensions :: check_weight :: CheckWeight , runtime_types :: pallet_transaction_payment :: ChargeTransactionPayment , runtime_types :: frame_metadata_hash_extension :: CheckMetadataHash ,) > ;
 					pub mod output {
 						use super::runtime_types;
 						pub type Output = :: core :: result :: Result < :: core :: result :: Result < () , runtime_types :: sp_runtime :: DispatchError > , runtime_types :: sp_runtime :: transaction_validity :: TransactionValidityError > ;
@@ -574,7 +574,7 @@ pub mod api {
 					pub type Inherent = runtime_types::sp_inherents::InherentData;
 					pub mod output {
 						use super::runtime_types;
-						pub type Output = :: subxt :: ext :: subxt_core :: alloc :: vec :: Vec < :: subxt :: ext :: subxt_core :: utils :: UncheckedExtrinsic < :: subxt :: ext :: subxt_core :: utils :: MultiAddress < :: subxt :: ext :: subxt_core :: utils :: AccountId32 , () > , runtime_types :: argon_node_runtime :: RuntimeCall , runtime_types :: sp_runtime :: MultiSignature , (runtime_types :: frame_system :: extensions :: check_non_zero_sender :: CheckNonZeroSender , runtime_types :: frame_system :: extensions :: check_spec_version :: CheckSpecVersion , runtime_types :: frame_system :: extensions :: check_tx_version :: CheckTxVersion , runtime_types :: frame_system :: extensions :: check_genesis :: CheckGenesis , runtime_types :: frame_system :: extensions :: check_mortality :: CheckMortality , runtime_types :: frame_system :: extensions :: check_nonce :: CheckNonce , runtime_types :: frame_system :: extensions :: check_weight :: CheckWeight , runtime_types :: pallet_transaction_payment :: ChargeTransactionPayment , runtime_types :: frame_metadata_hash_extension :: CheckMetadataHash ,) > > ;
+						pub type Output = :: subxt :: ext :: subxt_core :: alloc :: vec :: Vec < :: subxt :: ext :: subxt_core :: utils :: UncheckedExtrinsic < :: subxt :: ext :: subxt_core :: utils :: MultiAddress < crate :: types :: AccountId32 , () > , runtime_types :: argon_node_runtime :: RuntimeCall , runtime_types :: sp_runtime :: MultiSignature , (runtime_types :: frame_system :: extensions :: check_non_zero_sender :: CheckNonZeroSender , runtime_types :: frame_system :: extensions :: check_spec_version :: CheckSpecVersion , runtime_types :: frame_system :: extensions :: check_tx_version :: CheckTxVersion , runtime_types :: frame_system :: extensions :: check_genesis :: CheckGenesis , runtime_types :: frame_system :: extensions :: check_mortality :: CheckMortality , runtime_types :: frame_system :: extensions :: check_nonce :: CheckNonce , runtime_types :: frame_system :: extensions :: check_weight :: CheckWeight , runtime_types :: pallet_transaction_payment :: ChargeTransactionPayment , runtime_types :: frame_metadata_hash_extension :: CheckMetadataHash ,) > > ;
 					}
 				}
 				#[derive(
@@ -597,7 +597,7 @@ pub mod api {
 				}
 				pub mod check_inherents {
 					use super::runtime_types;
-					pub type Block = runtime_types :: sp_runtime :: generic :: block :: Block < runtime_types :: sp_runtime :: generic :: header :: Header < :: core :: primitive :: u32 > , :: subxt :: ext :: subxt_core :: utils :: UncheckedExtrinsic < :: subxt :: ext :: subxt_core :: utils :: MultiAddress < :: subxt :: ext :: subxt_core :: utils :: AccountId32 , () > , runtime_types :: argon_node_runtime :: RuntimeCall , runtime_types :: sp_runtime :: MultiSignature , (runtime_types :: frame_system :: extensions :: check_non_zero_sender :: CheckNonZeroSender , runtime_types :: frame_system :: extensions :: check_spec_version :: CheckSpecVersion , runtime_types :: frame_system :: extensions :: check_tx_version :: CheckTxVersion , runtime_types :: frame_system :: extensions :: check_genesis :: CheckGenesis , runtime_types :: frame_system :: extensions :: check_mortality :: CheckMortality , runtime_types :: frame_system :: extensions :: check_nonce :: CheckNonce , runtime_types :: frame_system :: extensions :: check_weight :: CheckWeight , runtime_types :: pallet_transaction_payment :: ChargeTransactionPayment , runtime_types :: frame_metadata_hash_extension :: CheckMetadataHash ,) > > ;
+					pub type Block = runtime_types :: sp_runtime :: generic :: block :: Block < runtime_types :: sp_runtime :: generic :: header :: Header < :: core :: primitive :: u32 > , :: subxt :: ext :: subxt_core :: utils :: UncheckedExtrinsic < :: subxt :: ext :: subxt_core :: utils :: MultiAddress < crate :: types :: AccountId32 , () > , runtime_types :: argon_node_runtime :: RuntimeCall , runtime_types :: sp_runtime :: MultiSignature , (runtime_types :: frame_system :: extensions :: check_non_zero_sender :: CheckNonZeroSender , runtime_types :: frame_system :: extensions :: check_spec_version :: CheckSpecVersion , runtime_types :: frame_system :: extensions :: check_tx_version :: CheckTxVersion , runtime_types :: frame_system :: extensions :: check_genesis :: CheckGenesis , runtime_types :: frame_system :: extensions :: check_mortality :: CheckMortality , runtime_types :: frame_system :: extensions :: check_nonce :: CheckNonce , runtime_types :: frame_system :: extensions :: check_weight :: CheckWeight , runtime_types :: pallet_transaction_payment :: ChargeTransactionPayment , runtime_types :: frame_metadata_hash_extension :: CheckMetadataHash ,) > > ;
 					pub type Data = runtime_types::sp_inherents::InherentData;
 					pub mod output {
 						use super::runtime_types;
@@ -666,8 +666,8 @@ pub mod api {
 					use super::runtime_types;
 					pub type Source =
 						runtime_types::sp_runtime::transaction_validity::TransactionSource;
-					pub type Tx = :: subxt :: ext :: subxt_core :: utils :: UncheckedExtrinsic < :: subxt :: ext :: subxt_core :: utils :: MultiAddress < :: subxt :: ext :: subxt_core :: utils :: AccountId32 , () > , runtime_types :: argon_node_runtime :: RuntimeCall , runtime_types :: sp_runtime :: MultiSignature , (runtime_types :: frame_system :: extensions :: check_non_zero_sender :: CheckNonZeroSender , runtime_types :: frame_system :: extensions :: check_spec_version :: CheckSpecVersion , runtime_types :: frame_system :: extensions :: check_tx_version :: CheckTxVersion , runtime_types :: frame_system :: extensions :: check_genesis :: CheckGenesis , runtime_types :: frame_system :: extensions :: check_mortality :: CheckMortality , runtime_types :: frame_system :: extensions :: check_nonce :: CheckNonce , runtime_types :: frame_system :: extensions :: check_weight :: CheckWeight , runtime_types :: pallet_transaction_payment :: ChargeTransactionPayment , runtime_types :: frame_metadata_hash_extension :: CheckMetadataHash ,) > ;
-					pub type BlockHash = ::sp_core::H256;
+					pub type Tx = :: subxt :: ext :: subxt_core :: utils :: UncheckedExtrinsic < :: subxt :: ext :: subxt_core :: utils :: MultiAddress < crate :: types :: AccountId32 , () > , runtime_types :: argon_node_runtime :: RuntimeCall , runtime_types :: sp_runtime :: MultiSignature , (runtime_types :: frame_system :: extensions :: check_non_zero_sender :: CheckNonZeroSender , runtime_types :: frame_system :: extensions :: check_spec_version :: CheckSpecVersion , runtime_types :: frame_system :: extensions :: check_tx_version :: CheckTxVersion , runtime_types :: frame_system :: extensions :: check_genesis :: CheckGenesis , runtime_types :: frame_system :: extensions :: check_mortality :: CheckMortality , runtime_types :: frame_system :: extensions :: check_nonce :: CheckNonce , runtime_types :: frame_system :: extensions :: check_weight :: CheckWeight , runtime_types :: pallet_transaction_payment :: ChargeTransactionPayment , runtime_types :: frame_metadata_hash_extension :: CheckMetadataHash ,) > ;
+					pub type BlockHash = crate::types::H256;
 					pub mod output {
 						use super::runtime_types;
 						pub type Output = :: core :: result :: Result < runtime_types :: sp_runtime :: transaction_validity :: ValidTransaction , runtime_types :: sp_runtime :: transaction_validity :: TransactionValidityError > ;
@@ -781,7 +781,7 @@ pub mod api {
 				use super::runtime_types;
 				pub mod account_nonce {
 					use super::runtime_types;
-					pub type Account = ::subxt::ext::subxt_core::utils::AccountId32;
+					pub type Account = crate::types::AccountId32;
 					pub mod output {
 						use super::runtime_types;
 						pub type Output = ::core::primitive::u32;
@@ -1010,7 +1010,7 @@ pub mod api {
 				use super::runtime_types;
 				pub mod query_info {
 					use super::runtime_types;
-					pub type Uxt = :: subxt :: ext :: subxt_core :: utils :: UncheckedExtrinsic < :: subxt :: ext :: subxt_core :: utils :: MultiAddress < :: subxt :: ext :: subxt_core :: utils :: AccountId32 , () > , runtime_types :: argon_node_runtime :: RuntimeCall , runtime_types :: sp_runtime :: MultiSignature , (runtime_types :: frame_system :: extensions :: check_non_zero_sender :: CheckNonZeroSender , runtime_types :: frame_system :: extensions :: check_spec_version :: CheckSpecVersion , runtime_types :: frame_system :: extensions :: check_tx_version :: CheckTxVersion , runtime_types :: frame_system :: extensions :: check_genesis :: CheckGenesis , runtime_types :: frame_system :: extensions :: check_mortality :: CheckMortality , runtime_types :: frame_system :: extensions :: check_nonce :: CheckNonce , runtime_types :: frame_system :: extensions :: check_weight :: CheckWeight , runtime_types :: pallet_transaction_payment :: ChargeTransactionPayment , runtime_types :: frame_metadata_hash_extension :: CheckMetadataHash ,) > ;
+					pub type Uxt = :: subxt :: ext :: subxt_core :: utils :: UncheckedExtrinsic < :: subxt :: ext :: subxt_core :: utils :: MultiAddress < crate :: types :: AccountId32 , () > , runtime_types :: argon_node_runtime :: RuntimeCall , runtime_types :: sp_runtime :: MultiSignature , (runtime_types :: frame_system :: extensions :: check_non_zero_sender :: CheckNonZeroSender , runtime_types :: frame_system :: extensions :: check_spec_version :: CheckSpecVersion , runtime_types :: frame_system :: extensions :: check_tx_version :: CheckTxVersion , runtime_types :: frame_system :: extensions :: check_genesis :: CheckGenesis , runtime_types :: frame_system :: extensions :: check_mortality :: CheckMortality , runtime_types :: frame_system :: extensions :: check_nonce :: CheckNonce , runtime_types :: frame_system :: extensions :: check_weight :: CheckWeight , runtime_types :: pallet_transaction_payment :: ChargeTransactionPayment , runtime_types :: frame_metadata_hash_extension :: CheckMetadataHash ,) > ;
 					pub type Len = ::core::primitive::u32;
 					pub mod output {
 						use super::runtime_types;
@@ -1042,7 +1042,7 @@ pub mod api {
 				}
 				pub mod query_fee_details {
 					use super::runtime_types;
-					pub type Uxt = :: subxt :: ext :: subxt_core :: utils :: UncheckedExtrinsic < :: subxt :: ext :: subxt_core :: utils :: MultiAddress < :: subxt :: ext :: subxt_core :: utils :: AccountId32 , () > , runtime_types :: argon_node_runtime :: RuntimeCall , runtime_types :: sp_runtime :: MultiSignature , (runtime_types :: frame_system :: extensions :: check_non_zero_sender :: CheckNonZeroSender , runtime_types :: frame_system :: extensions :: check_spec_version :: CheckSpecVersion , runtime_types :: frame_system :: extensions :: check_tx_version :: CheckTxVersion , runtime_types :: frame_system :: extensions :: check_genesis :: CheckGenesis , runtime_types :: frame_system :: extensions :: check_mortality :: CheckMortality , runtime_types :: frame_system :: extensions :: check_nonce :: CheckNonce , runtime_types :: frame_system :: extensions :: check_weight :: CheckWeight , runtime_types :: pallet_transaction_payment :: ChargeTransactionPayment , runtime_types :: frame_metadata_hash_extension :: CheckMetadataHash ,) > ;
+					pub type Uxt = :: subxt :: ext :: subxt_core :: utils :: UncheckedExtrinsic < :: subxt :: ext :: subxt_core :: utils :: MultiAddress < crate :: types :: AccountId32 , () > , runtime_types :: argon_node_runtime :: RuntimeCall , runtime_types :: sp_runtime :: MultiSignature , (runtime_types :: frame_system :: extensions :: check_non_zero_sender :: CheckNonZeroSender , runtime_types :: frame_system :: extensions :: check_spec_version :: CheckSpecVersion , runtime_types :: frame_system :: extensions :: check_tx_version :: CheckTxVersion , runtime_types :: frame_system :: extensions :: check_genesis :: CheckGenesis , runtime_types :: frame_system :: extensions :: check_mortality :: CheckMortality , runtime_types :: frame_system :: extensions :: check_nonce :: CheckNonce , runtime_types :: frame_system :: extensions :: check_weight :: CheckWeight , runtime_types :: pallet_transaction_payment :: ChargeTransactionPayment , runtime_types :: frame_metadata_hash_extension :: CheckMetadataHash ,) > ;
 					pub type Len = ::core::primitive::u32;
 					pub mod output {
 						use super::runtime_types;
@@ -1355,13 +1355,13 @@ pub mod api {
 				use super::runtime_types;
 				pub mod get_authority_id {
 					use super::runtime_types;
-					pub type AccountId = ::subxt::ext::subxt_core::utils::AccountId32;
+					pub type AccountId = crate::types::AccountId32;
 					pub mod output {
 						use super::runtime_types;
 						pub type Output = ::core::option::Option<
 							runtime_types::argon_primitives::block_seal::MiningAuthority<
 								runtime_types::argon_primitives::block_seal::app::Public,
-								::subxt::ext::subxt_core::utils::AccountId32,
+								crate::types::AccountId32,
 							>,
 						>;
 					}
@@ -1592,7 +1592,7 @@ pub mod api {
 						pub type Output = ::core::result::Result<
 							runtime_types::bounded_collections::bounded_vec::BoundedVec<
 								runtime_types::argon_primitives::block_vote::BestBlockVoteSeal<
-									::subxt::ext::subxt_core::utils::AccountId32,
+									crate::types::AccountId32,
 									runtime_types::argon_primitives::block_seal::app::Public,
 								>,
 							>,
@@ -1719,7 +1719,7 @@ pub mod api {
 						use super::runtime_types;
 						pub type Output = ::core::option::Option<
 							runtime_types::argon_primitives::notary::NotaryRecordWithState<
-								::subxt::ext::subxt_core::utils::AccountId32,
+								crate::types::AccountId32,
 								::core::primitive::u32,
 								runtime_types::argon_notary_audit::error::VerifyError,
 							>,
@@ -1750,7 +1750,7 @@ pub mod api {
 						use super::runtime_types;
 						pub type Output = ::subxt::ext::subxt_core::alloc::vec::Vec<
 							runtime_types::argon_primitives::notary::NotaryRecordWithState<
-								::subxt::ext::subxt_core::utils::AccountId32,
+								crate::types::AccountId32,
 								::core::primitive::u32,
 								runtime_types::argon_notary_audit::error::VerifyError,
 							>,
@@ -1907,9 +1907,9 @@ pub mod api {
 					pub type Version = ::core::primitive::u32;
 					pub type NotaryId = ::core::primitive::u32;
 					pub type NotebookNumber = ::core::primitive::u32;
-					pub type HeaderHash = ::sp_core::H256;
+					pub type HeaderHash = crate::types::H256;
 					pub type VoteMinimums = ::subxt::ext::subxt_core::utils::KeyedVec<
-						::sp_core::H256,
+						crate::types::H256,
 						::core::primitive::u128,
 					>;
 					pub type Bytes =
@@ -1959,7 +1959,7 @@ pub mod api {
 						use super::runtime_types;
 						pub type Output = ::core::result::Result<
 							runtime_types::argon_primitives::notary::NotaryNotebookDetails<
-								::sp_core::H256,
+								crate::types::H256,
 							>,
 							runtime_types::sp_runtime::DispatchError,
 						>;
@@ -2121,7 +2121,7 @@ pub mod api {
 					pub type Tick = ::core::primitive::u32;
 					pub mod output {
 						use super::runtime_types;
-						pub type Output = ::core::option::Option<::sp_core::H256>;
+						pub type Output = ::core::option::Option<crate::types::H256>;
 					}
 				}
 				#[derive(
@@ -2518,7 +2518,7 @@ pub mod api {
 					use super::runtime_types;
 					pub type EquivocationProof =
 						runtime_types::sp_consensus_grandpa::EquivocationProof<
-							::sp_core::H256,
+							crate::types::H256,
 							::core::primitive::u32,
 						>;
 					pub type KeyOwnerProof = runtime_types::sp_runtime::OpaqueValue;
@@ -2643,7 +2643,7 @@ pub mod api {
 				#[doc = ""]
 				#[doc = " Otherwise function returns a JSON representation of the built-in, named"]
 				#[doc = " `RuntimeGenesisConfig` preset identified by `id`, or `None` if such preset does not"]
-				#[doc = " exists. Returned `Vec<u8>` contains bytes of JSON blob (patch) which comprises a list of"]
+				#[doc = " exist. Returned `Vec<u8>` contains bytes of JSON blob (patch) which comprises a list of"]
 				#[doc = " (potentially nested) key-value pairs that are intended for customizing the default"]
 				#[doc = " runtime genesis config. The patch shall be merged (rfc7386) with the JSON representation"]
 				#[doc = " of the default `RuntimeGenesisConfig` to create a comprehensive genesis config that can"]
@@ -3285,7 +3285,7 @@ pub mod api {
 				}
 				pub mod authorize_upgrade {
 					use super::runtime_types;
-					pub type CodeHash = ::sp_core::H256;
+					pub type CodeHash = crate::types::H256;
 				}
 				impl ::subxt::ext::subxt_core::blocks::StaticExtrinsic for AuthorizeUpgrade {
 					const PALLET: &'static str = "System";
@@ -3319,7 +3319,7 @@ pub mod api {
 				}
 				pub mod authorize_upgrade_without_checks {
 					use super::runtime_types;
-					pub type CodeHash = ::sp_core::H256;
+					pub type CodeHash = crate::types::H256;
 				}
 				impl ::subxt::ext::subxt_core::blocks::StaticExtrinsic for AuthorizeUpgradeWithoutChecks {
 					const PALLET: &'static str = "System";
@@ -3670,7 +3670,7 @@ pub mod api {
 			}
 			pub mod new_account {
 				use super::runtime_types;
-				pub type Account = ::subxt::ext::subxt_core::utils::AccountId32;
+				pub type Account = crate::types::AccountId32;
 			}
 			impl ::subxt::ext::subxt_core::events::StaticEvent for NewAccount {
 				const PALLET: &'static str = "System";
@@ -3693,7 +3693,7 @@ pub mod api {
 			}
 			pub mod killed_account {
 				use super::runtime_types;
-				pub type Account = ::subxt::ext::subxt_core::utils::AccountId32;
+				pub type Account = crate::types::AccountId32;
 			}
 			impl ::subxt::ext::subxt_core::events::StaticEvent for KilledAccount {
 				const PALLET: &'static str = "System";
@@ -3717,8 +3717,8 @@ pub mod api {
 			}
 			pub mod remarked {
 				use super::runtime_types;
-				pub type Sender = ::subxt::ext::subxt_core::utils::AccountId32;
-				pub type Hash = ::sp_core::H256;
+				pub type Sender = crate::types::AccountId32;
+				pub type Hash = crate::types::H256;
 			}
 			impl ::subxt::ext::subxt_core::events::StaticEvent for Remarked {
 				const PALLET: &'static str = "System";
@@ -3742,7 +3742,7 @@ pub mod api {
 			}
 			pub mod upgrade_authorized {
 				use super::runtime_types;
-				pub type CodeHash = ::sp_core::H256;
+				pub type CodeHash = crate::types::H256;
 				pub type CheckVersion = ::core::primitive::bool;
 			}
 			impl ::subxt::ext::subxt_core::events::StaticEvent for UpgradeAuthorized {
@@ -3760,7 +3760,7 @@ pub mod api {
 						::core::primitive::u32,
 						runtime_types::pallet_balances::types::AccountData<::core::primitive::u128>,
 					>;
-					pub type Param0 = ::subxt::ext::subxt_core::utils::AccountId32;
+					pub type Param0 = crate::types::AccountId32;
 				}
 				pub mod extrinsic_count {
 					use super::runtime_types;
@@ -3782,7 +3782,7 @@ pub mod api {
 				}
 				pub mod block_hash {
 					use super::runtime_types;
-					pub type BlockHash = ::sp_core::H256;
+					pub type BlockHash = crate::types::H256;
 					pub type Param0 = ::core::primitive::u32;
 				}
 				pub mod extrinsic_data {
@@ -3797,7 +3797,7 @@ pub mod api {
 				}
 				pub mod parent_hash {
 					use super::runtime_types;
-					pub type ParentHash = ::sp_core::H256;
+					pub type ParentHash = crate::types::H256;
 				}
 				pub mod digest {
 					use super::runtime_types;
@@ -3808,7 +3808,7 @@ pub mod api {
 					pub type Events = ::subxt::ext::subxt_core::alloc::vec::Vec<
 						runtime_types::frame_system::EventRecord<
 							runtime_types::argon_node_runtime::RuntimeEvent,
-							::sp_core::H256,
+							crate::types::H256,
 						>,
 					>;
 				}
@@ -3822,7 +3822,7 @@ pub mod api {
 						::core::primitive::u32,
 						::core::primitive::u32,
 					)>;
-					pub type Param0 = ::sp_core::H256;
+					pub type Param0 = crate::types::H256;
 				}
 				pub mod last_runtime_upgrade {
 					use super::runtime_types;
@@ -4706,9 +4706,8 @@ pub mod api {
 				}
 				pub mod as_multi_threshold1 {
 					use super::runtime_types;
-					pub type OtherSignatories = ::subxt::ext::subxt_core::alloc::vec::Vec<
-						::subxt::ext::subxt_core::utils::AccountId32,
-					>;
+					pub type OtherSignatories =
+						::subxt::ext::subxt_core::alloc::vec::Vec<crate::types::AccountId32>;
 					pub type Call = runtime_types::argon_node_runtime::RuntimeCall;
 				}
 				impl ::subxt::ext::subxt_core::blocks::StaticExtrinsic for AsMultiThreshold1 {
@@ -4779,9 +4778,8 @@ pub mod api {
 				pub mod as_multi {
 					use super::runtime_types;
 					pub type Threshold = ::core::primitive::u16;
-					pub type OtherSignatories = ::subxt::ext::subxt_core::alloc::vec::Vec<
-						::subxt::ext::subxt_core::utils::AccountId32,
-					>;
+					pub type OtherSignatories =
+						::subxt::ext::subxt_core::alloc::vec::Vec<crate::types::AccountId32>;
 					pub type MaybeTimepoint = ::core::option::Option<
 						runtime_types::pallet_multisig::Timepoint<::core::primitive::u32>,
 					>;
@@ -4847,9 +4845,8 @@ pub mod api {
 				pub mod approve_as_multi {
 					use super::runtime_types;
 					pub type Threshold = ::core::primitive::u16;
-					pub type OtherSignatories = ::subxt::ext::subxt_core::alloc::vec::Vec<
-						::subxt::ext::subxt_core::utils::AccountId32,
-					>;
+					pub type OtherSignatories =
+						::subxt::ext::subxt_core::alloc::vec::Vec<crate::types::AccountId32>;
 					pub type MaybeTimepoint = ::core::option::Option<
 						runtime_types::pallet_multisig::Timepoint<::core::primitive::u32>,
 					>;
@@ -4905,9 +4902,8 @@ pub mod api {
 				pub mod cancel_as_multi {
 					use super::runtime_types;
 					pub type Threshold = ::core::primitive::u16;
-					pub type OtherSignatories = ::subxt::ext::subxt_core::alloc::vec::Vec<
-						::subxt::ext::subxt_core::utils::AccountId32,
-					>;
+					pub type OtherSignatories =
+						::subxt::ext::subxt_core::alloc::vec::Vec<crate::types::AccountId32>;
 					pub type Timepoint =
 						runtime_types::pallet_multisig::Timepoint<::core::primitive::u32>;
 					pub type CallHash = [::core::primitive::u8; 32usize];
@@ -5136,8 +5132,8 @@ pub mod api {
 			}
 			pub mod new_multisig {
 				use super::runtime_types;
-				pub type Approving = ::subxt::ext::subxt_core::utils::AccountId32;
-				pub type Multisig = ::subxt::ext::subxt_core::utils::AccountId32;
+				pub type Approving = crate::types::AccountId32;
+				pub type Multisig = crate::types::AccountId32;
 				pub type CallHash = [::core::primitive::u8; 32usize];
 			}
 			impl ::subxt::ext::subxt_core::events::StaticEvent for NewMultisig {
@@ -5164,10 +5160,10 @@ pub mod api {
 			}
 			pub mod multisig_approval {
 				use super::runtime_types;
-				pub type Approving = ::subxt::ext::subxt_core::utils::AccountId32;
+				pub type Approving = crate::types::AccountId32;
 				pub type Timepoint =
 					runtime_types::pallet_multisig::Timepoint<::core::primitive::u32>;
-				pub type Multisig = ::subxt::ext::subxt_core::utils::AccountId32;
+				pub type Multisig = crate::types::AccountId32;
 				pub type CallHash = [::core::primitive::u8; 32usize];
 			}
 			impl ::subxt::ext::subxt_core::events::StaticEvent for MultisigApproval {
@@ -5195,10 +5191,10 @@ pub mod api {
 			}
 			pub mod multisig_executed {
 				use super::runtime_types;
-				pub type Approving = ::subxt::ext::subxt_core::utils::AccountId32;
+				pub type Approving = crate::types::AccountId32;
 				pub type Timepoint =
 					runtime_types::pallet_multisig::Timepoint<::core::primitive::u32>;
-				pub type Multisig = ::subxt::ext::subxt_core::utils::AccountId32;
+				pub type Multisig = crate::types::AccountId32;
 				pub type CallHash = [::core::primitive::u8; 32usize];
 				pub type Result =
 					::core::result::Result<(), runtime_types::sp_runtime::DispatchError>;
@@ -5227,10 +5223,10 @@ pub mod api {
 			}
 			pub mod multisig_cancelled {
 				use super::runtime_types;
-				pub type Cancelling = ::subxt::ext::subxt_core::utils::AccountId32;
+				pub type Cancelling = crate::types::AccountId32;
 				pub type Timepoint =
 					runtime_types::pallet_multisig::Timepoint<::core::primitive::u32>;
-				pub type Multisig = ::subxt::ext::subxt_core::utils::AccountId32;
+				pub type Multisig = crate::types::AccountId32;
 				pub type CallHash = [::core::primitive::u8; 32usize];
 			}
 			impl ::subxt::ext::subxt_core::events::StaticEvent for MultisigCancelled {
@@ -5247,9 +5243,9 @@ pub mod api {
 					pub type Multisigs = runtime_types::pallet_multisig::Multisig<
 						::core::primitive::u32,
 						::core::primitive::u128,
-						::subxt::ext::subxt_core::utils::AccountId32,
+						crate::types::AccountId32,
 					>;
-					pub type Param0 = ::subxt::ext::subxt_core::utils::AccountId32;
+					pub type Param0 = crate::types::AccountId32;
 					pub type Param1 = [::core::primitive::u8; 32usize];
 				}
 			}
@@ -5447,7 +5443,7 @@ pub mod api {
 				pub mod proxy {
 					use super::runtime_types;
 					pub type Real = ::subxt::ext::subxt_core::utils::MultiAddress<
-						::subxt::ext::subxt_core::utils::AccountId32,
+						crate::types::AccountId32,
 						(),
 					>;
 					pub type ForceProxyType =
@@ -5490,7 +5486,7 @@ pub mod api {
 				pub mod add_proxy {
 					use super::runtime_types;
 					pub type Delegate = ::subxt::ext::subxt_core::utils::MultiAddress<
-						::subxt::ext::subxt_core::utils::AccountId32,
+						crate::types::AccountId32,
 						(),
 					>;
 					pub type ProxyType = runtime_types::argon_node_runtime::ProxyType;
@@ -5530,7 +5526,7 @@ pub mod api {
 				pub mod remove_proxy {
 					use super::runtime_types;
 					pub type Delegate = ::subxt::ext::subxt_core::utils::MultiAddress<
-						::subxt::ext::subxt_core::utils::AccountId32,
+						crate::types::AccountId32,
 						(),
 					>;
 					pub type ProxyType = runtime_types::argon_node_runtime::ProxyType;
@@ -5657,7 +5653,7 @@ pub mod api {
 				pub mod kill_pure {
 					use super::runtime_types;
 					pub type Spawner = ::subxt::ext::subxt_core::utils::MultiAddress<
-						::subxt::ext::subxt_core::utils::AccountId32,
+						crate::types::AccountId32,
 						(),
 					>;
 					pub type ProxyType = runtime_types::argon_node_runtime::ProxyType;
@@ -5706,10 +5702,10 @@ pub mod api {
 				pub mod announce {
 					use super::runtime_types;
 					pub type Real = ::subxt::ext::subxt_core::utils::MultiAddress<
-						::subxt::ext::subxt_core::utils::AccountId32,
+						crate::types::AccountId32,
 						(),
 					>;
-					pub type CallHash = ::sp_core::H256;
+					pub type CallHash = crate::types::H256;
 				}
 				impl ::subxt::ext::subxt_core::blocks::StaticExtrinsic for Announce {
 					const PALLET: &'static str = "Proxy";
@@ -5747,10 +5743,10 @@ pub mod api {
 				pub mod remove_announcement {
 					use super::runtime_types;
 					pub type Real = ::subxt::ext::subxt_core::utils::MultiAddress<
-						::subxt::ext::subxt_core::utils::AccountId32,
+						crate::types::AccountId32,
 						(),
 					>;
-					pub type CallHash = ::sp_core::H256;
+					pub type CallHash = crate::types::H256;
 				}
 				impl ::subxt::ext::subxt_core::blocks::StaticExtrinsic for RemoveAnnouncement {
 					const PALLET: &'static str = "Proxy";
@@ -5788,10 +5784,10 @@ pub mod api {
 				pub mod reject_announcement {
 					use super::runtime_types;
 					pub type Delegate = ::subxt::ext::subxt_core::utils::MultiAddress<
-						::subxt::ext::subxt_core::utils::AccountId32,
+						crate::types::AccountId32,
 						(),
 					>;
-					pub type CallHash = ::sp_core::H256;
+					pub type CallHash = crate::types::H256;
 				}
 				impl ::subxt::ext::subxt_core::blocks::StaticExtrinsic for RejectAnnouncement {
 					const PALLET: &'static str = "Proxy";
@@ -5832,11 +5828,11 @@ pub mod api {
 				pub mod proxy_announced {
 					use super::runtime_types;
 					pub type Delegate = ::subxt::ext::subxt_core::utils::MultiAddress<
-						::subxt::ext::subxt_core::utils::AccountId32,
+						crate::types::AccountId32,
 						(),
 					>;
 					pub type Real = ::subxt::ext::subxt_core::utils::MultiAddress<
-						::subxt::ext::subxt_core::utils::AccountId32,
+						crate::types::AccountId32,
 						(),
 					>;
 					pub type ForceProxyType =
@@ -6195,8 +6191,8 @@ pub mod api {
 			}
 			pub mod pure_created {
 				use super::runtime_types;
-				pub type Pure = ::subxt::ext::subxt_core::utils::AccountId32;
-				pub type Who = ::subxt::ext::subxt_core::utils::AccountId32;
+				pub type Pure = crate::types::AccountId32;
+				pub type Who = crate::types::AccountId32;
 				pub type ProxyType = runtime_types::argon_node_runtime::ProxyType;
 				pub type DisambiguationIndex = ::core::primitive::u16;
 			}
@@ -6223,9 +6219,9 @@ pub mod api {
 			}
 			pub mod announced {
 				use super::runtime_types;
-				pub type Real = ::subxt::ext::subxt_core::utils::AccountId32;
-				pub type Proxy = ::subxt::ext::subxt_core::utils::AccountId32;
-				pub type CallHash = ::sp_core::H256;
+				pub type Real = crate::types::AccountId32;
+				pub type Proxy = crate::types::AccountId32;
+				pub type CallHash = crate::types::H256;
 			}
 			impl ::subxt::ext::subxt_core::events::StaticEvent for Announced {
 				const PALLET: &'static str = "Proxy";
@@ -6251,8 +6247,8 @@ pub mod api {
 			}
 			pub mod proxy_added {
 				use super::runtime_types;
-				pub type Delegator = ::subxt::ext::subxt_core::utils::AccountId32;
-				pub type Delegatee = ::subxt::ext::subxt_core::utils::AccountId32;
+				pub type Delegator = crate::types::AccountId32;
+				pub type Delegatee = crate::types::AccountId32;
 				pub type ProxyType = runtime_types::argon_node_runtime::ProxyType;
 				pub type Delay = ::core::primitive::u32;
 			}
@@ -6280,8 +6276,8 @@ pub mod api {
 			}
 			pub mod proxy_removed {
 				use super::runtime_types;
-				pub type Delegator = ::subxt::ext::subxt_core::utils::AccountId32;
-				pub type Delegatee = ::subxt::ext::subxt_core::utils::AccountId32;
+				pub type Delegator = crate::types::AccountId32;
+				pub type Delegatee = crate::types::AccountId32;
 				pub type ProxyType = runtime_types::argon_node_runtime::ProxyType;
 				pub type Delay = ::core::primitive::u32;
 			}
@@ -6299,28 +6295,28 @@ pub mod api {
 					pub type Proxies = (
 						runtime_types::bounded_collections::bounded_vec::BoundedVec<
 							runtime_types::pallet_proxy::ProxyDefinition<
-								::subxt::ext::subxt_core::utils::AccountId32,
+								crate::types::AccountId32,
 								runtime_types::argon_node_runtime::ProxyType,
 								::core::primitive::u32,
 							>,
 						>,
 						::core::primitive::u128,
 					);
-					pub type Param0 = ::subxt::ext::subxt_core::utils::AccountId32;
+					pub type Param0 = crate::types::AccountId32;
 				}
 				pub mod announcements {
 					use super::runtime_types;
 					pub type Announcements = (
 						runtime_types::bounded_collections::bounded_vec::BoundedVec<
 							runtime_types::pallet_proxy::Announcement<
-								::subxt::ext::subxt_core::utils::AccountId32,
-								::sp_core::H256,
+								crate::types::AccountId32,
+								crate::types::H256,
 								::core::primitive::u32,
 							>,
 						>,
 						::core::primitive::u128,
 					);
-					pub type Param0 = ::subxt::ext::subxt_core::utils::AccountId32;
+					pub type Param0 = crate::types::AccountId32;
 				}
 			}
 			pub struct StorageApi;
@@ -6575,7 +6571,7 @@ pub mod api {
 					pub type RecentBlocksAtTicks =
 						runtime_types::bounded_collections::bounded_btree_map::BoundedBTreeMap<
 							::core::primitive::u32,
-							::sp_core::H256,
+							crate::types::H256,
 						>;
 				}
 			}
@@ -6715,7 +6711,7 @@ pub mod api {
 					>;
 					pub type RewardDestination =
 						runtime_types::argon_primitives::block_seal::RewardDestination<
-							::subxt::ext::subxt_core::utils::AccountId32,
+							crate::types::AccountId32,
 						>;
 					pub type Keys = runtime_types::argon_node_runtime::opaque::SessionKeys;
 				}
@@ -6797,7 +6793,7 @@ pub mod api {
 				pub type StartIndex = ::core::primitive::u32;
 				pub type NewMiners = runtime_types::bounded_collections::bounded_vec::BoundedVec<
 					runtime_types::argon_primitives::block_seal::MiningRegistration<
-						::subxt::ext::subxt_core::utils::AccountId32,
+						crate::types::AccountId32,
 						::core::primitive::u128,
 						runtime_types::argon_node_runtime::opaque::SessionKeys,
 					>,
@@ -6825,7 +6821,7 @@ pub mod api {
 			}
 			pub mod slot_bidder_added {
 				use super::runtime_types;
-				pub type AccountId = ::subxt::ext::subxt_core::utils::AccountId32;
+				pub type AccountId = crate::types::AccountId32;
 				pub type BidAmount = ::core::primitive::u128;
 				pub type Index = ::core::primitive::u32;
 			}
@@ -6851,7 +6847,7 @@ pub mod api {
 			}
 			pub mod slot_bidder_replaced {
 				use super::runtime_types;
-				pub type AccountId = ::subxt::ext::subxt_core::utils::AccountId32;
+				pub type AccountId = crate::types::AccountId32;
 				pub type BondId = ::core::option::Option<::core::primitive::u64>;
 				pub type KeptOwnershipBond = ::core::primitive::bool;
 			}
@@ -6877,7 +6873,7 @@ pub mod api {
 			}
 			pub mod unbonded_miner {
 				use super::runtime_types;
-				pub type AccountId = ::subxt::ext::subxt_core::utils::AccountId32;
+				pub type AccountId = crate::types::AccountId32;
 				pub type BondId = ::core::option::Option<::core::primitive::u64>;
 				pub type KeptOwnershipBond = ::core::primitive::bool;
 			}
@@ -6903,7 +6899,7 @@ pub mod api {
 			}
 			pub mod unbond_miner_error {
 				use super::runtime_types;
-				pub type AccountId = ::subxt::ext::subxt_core::utils::AccountId32;
+				pub type AccountId = crate::types::AccountId32;
 				pub type BondId = ::core::option::Option<::core::primitive::u64>;
 				pub type Error = runtime_types::sp_runtime::DispatchError;
 			}
@@ -6920,7 +6916,7 @@ pub mod api {
 					use super::runtime_types;
 					pub type ActiveMinersByIndex =
 						runtime_types::argon_primitives::block_seal::MiningRegistration<
-							::subxt::ext::subxt_core::utils::AccountId32,
+							crate::types::AccountId32,
 							::core::primitive::u128,
 							runtime_types::argon_node_runtime::opaque::SessionKeys,
 						>;
@@ -6950,14 +6946,14 @@ pub mod api {
 				pub mod account_index_lookup {
 					use super::runtime_types;
 					pub type AccountIndexLookup = ::core::primitive::u32;
-					pub type Param0 = ::subxt::ext::subxt_core::utils::AccountId32;
+					pub type Param0 = crate::types::AccountId32;
 				}
 				pub mod next_slot_cohort {
 					use super::runtime_types;
 					pub type NextSlotCohort =
 						runtime_types::bounded_collections::bounded_vec::BoundedVec<
 							runtime_types::argon_primitives::block_seal::MiningRegistration<
-								::subxt::ext::subxt_core::utils::AccountId32,
+								crate::types::AccountId32,
 								::core::primitive::u128,
 								runtime_types::argon_node_runtime::opaque::SessionKeys,
 							>,
@@ -6971,7 +6967,7 @@ pub mod api {
 					use super::runtime_types;
 					pub type MinerZero =
 						runtime_types::argon_primitives::block_seal::MiningRegistration<
-							::subxt::ext::subxt_core::utils::AccountId32,
+							crate::types::AccountId32,
 							::core::primitive::u128,
 							runtime_types::argon_node_runtime::opaque::SessionKeys,
 						>;
@@ -7457,7 +7453,7 @@ pub mod api {
 				}
 				pub mod set_operator {
 					use super::runtime_types;
-					pub type AccountId = ::subxt::ext::subxt_core::utils::AccountId32;
+					pub type AccountId = crate::types::AccountId32;
 				}
 				impl ::subxt::ext::subxt_core::blocks::StaticExtrinsic for SetOperator {
 					const PALLET: &'static str = "BitcoinUtxos";
@@ -7762,7 +7758,7 @@ pub mod api {
 				}
 				pub mod oracle_operator_account {
 					use super::runtime_types;
-					pub type OracleOperatorAccount = ::subxt::ext::subxt_core::utils::AccountId32;
+					pub type OracleOperatorAccount = crate::types::AccountId32;
 				}
 				pub mod locked_utxo_expirations_by_block {
 					use super::runtime_types;
@@ -8395,7 +8391,7 @@ pub mod api {
 				pub type MiningArgons = ::core::primitive::u128;
 				pub type SecuritizationPercent =
 					runtime_types::sp_arithmetic::fixed_point::FixedU128;
-				pub type OperatorAccountId = ::subxt::ext::subxt_core::utils::AccountId32;
+				pub type OperatorAccountId = crate::types::AccountId32;
 			}
 			impl ::subxt::ext::subxt_core::events::StaticEvent for VaultCreated {
 				const PALLET: &'static str = "Vaults";
@@ -8538,7 +8534,7 @@ pub mod api {
 				pub mod vaults_by_id {
 					use super::runtime_types;
 					pub type VaultsById = runtime_types::argon_primitives::bond::Vault<
-						::subxt::ext::subxt_core::utils::AccountId32,
+						crate::types::AccountId32,
 						::core::primitive::u128,
 						::core::primitive::u32,
 					>;
@@ -9033,7 +9029,7 @@ pub mod api {
 				pub type VaultId = ::core::primitive::u32;
 				pub type BondId = ::core::primitive::u64;
 				pub type BondType = runtime_types::argon_primitives::bond::BondType;
-				pub type BondedAccountId = ::subxt::ext::subxt_core::utils::AccountId32;
+				pub type BondedAccountId = crate::types::AccountId32;
 				pub type UtxoId = ::core::option::Option<::core::primitive::u64>;
 				pub type Amount = ::core::primitive::u128;
 				pub type Expiration =
@@ -9089,7 +9085,7 @@ pub mod api {
 				use super::runtime_types;
 				pub type VaultId = ::core::primitive::u32;
 				pub type BondId = ::core::primitive::u64;
-				pub type BondedAccountId = ::subxt::ext::subxt_core::utils::AccountId32;
+				pub type BondedAccountId = crate::types::AccountId32;
 				pub type BondType = runtime_types::argon_primitives::bond::BondType;
 				pub type ReturnedFee = ::core::primitive::u128;
 			}
@@ -9209,7 +9205,7 @@ pub mod api {
 				pub type UtxoId = ::core::primitive::u64;
 				pub type CompensationAmount = ::core::primitive::u128;
 				pub type CompensationStillOwed = ::core::primitive::u128;
-				pub type CompensatedAccountId = ::subxt::ext::subxt_core::utils::AccountId32;
+				pub type CompensatedAccountId = crate::types::AccountId32;
 			}
 			impl ::subxt::ext::subxt_core::events::StaticEvent for BitcoinCosignPastDue {
 				const PALLET: &'static str = "Bonds";
@@ -9277,7 +9273,7 @@ pub mod api {
 				pub mod bonds_by_id {
 					use super::runtime_types;
 					pub type BondsById = runtime_types::argon_primitives::bond::Bond<
-						::subxt::ext::subxt_core::utils::AccountId32,
+						crate::types::AccountId32,
 						::core::primitive::u128,
 						::core::primitive::u32,
 					>;
@@ -9316,7 +9312,7 @@ pub mod api {
 				pub mod owed_utxo_aggrieved {
 					use super::runtime_types;
 					pub type OwedUtxoAggrieved = (
-						::subxt::ext::subxt_core::utils::AccountId32,
+						crate::types::AccountId32,
 						::core::primitive::u32,
 						::core::primitive::u128,
 						runtime_types::pallet_bond::pallet::UtxoState,
@@ -9883,7 +9879,7 @@ pub mod api {
 				}
 				pub mod activate {
 					use super::runtime_types;
-					pub type OperatorAccount = ::subxt::ext::subxt_core::utils::AccountId32;
+					pub type OperatorAccount = crate::types::AccountId32;
 				}
 				impl ::subxt::ext::subxt_core::blocks::StaticExtrinsic for Activate {
 					const PALLET: &'static str = "Notaries";
@@ -10001,7 +9997,7 @@ pub mod api {
 			}
 			pub mod notary_proposed {
 				use super::runtime_types;
-				pub type OperatorAccount = ::subxt::ext::subxt_core::utils::AccountId32;
+				pub type OperatorAccount = crate::types::AccountId32;
 				pub type Meta = runtime_types::argon_primitives::notary::NotaryMeta;
 				pub type Expires = ::core::primitive::u32;
 			}
@@ -10027,7 +10023,7 @@ pub mod api {
 			pub mod notary_activated {
 				use super::runtime_types;
 				pub type Notary = runtime_types::argon_primitives::notary::NotaryRecord<
-					::subxt::ext::subxt_core::utils::AccountId32,
+					crate::types::AccountId32,
 					::core::primitive::u32,
 				>;
 			}
@@ -10129,13 +10125,13 @@ pub mod api {
 						runtime_types::argon_primitives::notary::NotaryMeta,
 						::core::primitive::u32,
 					);
-					pub type Param0 = ::subxt::ext::subxt_core::utils::AccountId32;
+					pub type Param0 = crate::types::AccountId32;
 				}
 				pub mod expiring_proposals {
 					use super::runtime_types;
 					pub type ExpiringProposals =
 						runtime_types::bounded_collections::bounded_vec::BoundedVec<
-							::subxt::ext::subxt_core::utils::AccountId32,
+							crate::types::AccountId32,
 						>;
 					pub type Param0 = ::core::primitive::u32;
 				}
@@ -10144,7 +10140,7 @@ pub mod api {
 					pub type ActiveNotaries =
 						runtime_types::bounded_collections::bounded_vec::BoundedVec<
 							runtime_types::argon_primitives::notary::NotaryRecord<
-								::subxt::ext::subxt_core::utils::AccountId32,
+								crate::types::AccountId32,
 								::core::primitive::u32,
 							>,
 						>;
@@ -10661,7 +10657,7 @@ pub mod api {
 				use super::runtime_types;
 				pub type NotaryId = ::core::primitive::u32;
 				pub type NotebookNumber = ::core::primitive::u32;
-				pub type NotebookHash = ::sp_core::H256;
+				pub type NotebookHash = crate::types::H256;
 				pub type FirstFailureReason = runtime_types::argon_notary_audit::error::VerifyError;
 			}
 			impl ::subxt::ext::subxt_core::events::StaticEvent for NotebookAuditFailure {
@@ -10699,7 +10695,7 @@ pub mod api {
 				use super::runtime_types;
 				pub mod notebook_changed_accounts_root_by_notary {
 					use super::runtime_types;
-					pub type NotebookChangedAccountsRootByNotary = ::sp_core::H256;
+					pub type NotebookChangedAccountsRootByNotary = crate::types::H256;
 					pub type Param0 = ::core::primitive::u32;
 					pub type Param1 = ::core::primitive::u32;
 				}
@@ -11131,7 +11127,7 @@ pub mod api {
 			}
 			pub mod transfer_to_localchain {
 				use super::runtime_types;
-				pub type AccountId = ::subxt::ext::subxt_core::utils::AccountId32;
+				pub type AccountId = crate::types::AccountId32;
 				pub type Amount = ::core::primitive::u128;
 				pub type TransferId = ::core::primitive::u32;
 				pub type NotaryId = ::core::primitive::u32;
@@ -11159,7 +11155,7 @@ pub mod api {
 			}
 			pub mod transfer_to_localchain_expired {
 				use super::runtime_types;
-				pub type AccountId = ::subxt::ext::subxt_core::utils::AccountId32;
+				pub type AccountId = crate::types::AccountId32;
 				pub type TransferId = ::core::primitive::u32;
 				pub type NotaryId = ::core::primitive::u32;
 			}
@@ -11185,7 +11181,7 @@ pub mod api {
 			}
 			pub mod transfer_in {
 				use super::runtime_types;
-				pub type AccountId = ::subxt::ext::subxt_core::utils::AccountId32;
+				pub type AccountId = crate::types::AccountId32;
 				pub type Amount = ::core::primitive::u128;
 				pub type NotaryId = ::core::primitive::u32;
 			}
@@ -11214,7 +11210,7 @@ pub mod api {
 			}
 			pub mod transfer_in_error {
 				use super::runtime_types;
-				pub type AccountId = ::subxt::ext::subxt_core::utils::AccountId32;
+				pub type AccountId = crate::types::AccountId32;
 				pub type Amount = ::core::primitive::u128;
 				pub type NotaryId = ::core::primitive::u32;
 				pub type NotebookNumber = ::core::primitive::u32;
@@ -11245,7 +11241,7 @@ pub mod api {
 			}
 			pub mod transfer_to_localchain_refund_error {
 				use super::runtime_types;
-				pub type AccountId = ::subxt::ext::subxt_core::utils::AccountId32;
+				pub type AccountId = crate::types::AccountId32;
 				pub type TransferId = ::core::primitive::u32;
 				pub type NotaryId = ::core::primitive::u32;
 				pub type NotebookNumber = ::core::primitive::u32;
@@ -11325,7 +11321,7 @@ pub mod api {
 					use super::runtime_types;
 					pub type PendingTransfersOut =
 						runtime_types::pallet_chain_transfer::QueuedTransferOut<
-							::subxt::ext::subxt_core::utils::AccountId32,
+							crate::types::AccountId32,
 							::core::primitive::u128,
 						>;
 					pub type Param0 = ::core::primitive::u32;
@@ -11343,7 +11339,7 @@ pub mod api {
 					use super::runtime_types;
 					pub type TransfersUsedInBlockNotebooks =
 						runtime_types::bounded_collections::bounded_vec::BoundedVec<(
-							::subxt::ext::subxt_core::utils::AccountId32,
+							crate::types::AccountId32,
 							::core::primitive::u32,
 						)>;
 					pub type Param0 = ::core::primitive::u32;
@@ -12067,9 +12063,9 @@ pub mod api {
 				}
 				pub mod set_zone_record {
 					use super::runtime_types;
-					pub type DomainHash = ::sp_core::H256;
+					pub type DomainHash = crate::types::H256;
 					pub type ZoneRecord = runtime_types::argon_primitives::domain::ZoneRecord<
-						::subxt::ext::subxt_core::utils::AccountId32,
+						crate::types::AccountId32,
 					>;
 				}
 				impl ::subxt::ext::subxt_core::blocks::StaticExtrinsic for SetZoneRecord {
@@ -12121,10 +12117,9 @@ pub mod api {
 			}
 			pub mod zone_record_updated {
 				use super::runtime_types;
-				pub type DomainHash = ::sp_core::H256;
-				pub type ZoneRecord = runtime_types::argon_primitives::domain::ZoneRecord<
-					::subxt::ext::subxt_core::utils::AccountId32,
-				>;
+				pub type DomainHash = crate::types::H256;
+				pub type ZoneRecord =
+					runtime_types::argon_primitives::domain::ZoneRecord<crate::types::AccountId32>;
 			}
 			impl ::subxt::ext::subxt_core::events::StaticEvent for ZoneRecordUpdated {
 				const PALLET: &'static str = "Domains";
@@ -12148,10 +12143,9 @@ pub mod api {
 			}
 			pub mod domain_registered {
 				use super::runtime_types;
-				pub type DomainHash = ::sp_core::H256;
-				pub type Registration = runtime_types::pallet_domains::DomainRegistration<
-					::subxt::ext::subxt_core::utils::AccountId32,
-				>;
+				pub type DomainHash = crate::types::H256;
+				pub type Registration =
+					runtime_types::pallet_domains::DomainRegistration<crate::types::AccountId32>;
 			}
 			impl ::subxt::ext::subxt_core::events::StaticEvent for DomainRegistered {
 				const PALLET: &'static str = "Domains";
@@ -12174,7 +12168,7 @@ pub mod api {
 			}
 			pub mod domain_renewed {
 				use super::runtime_types;
-				pub type DomainHash = ::sp_core::H256;
+				pub type DomainHash = crate::types::H256;
 			}
 			impl ::subxt::ext::subxt_core::events::StaticEvent for DomainRenewed {
 				const PALLET: &'static str = "Domains";
@@ -12197,7 +12191,7 @@ pub mod api {
 			}
 			pub mod domain_expired {
 				use super::runtime_types;
-				pub type DomainHash = ::sp_core::H256;
+				pub type DomainHash = crate::types::H256;
 			}
 			impl ::subxt::ext::subxt_core::events::StaticEvent for DomainExpired {
 				const PALLET: &'static str = "Domains";
@@ -12222,10 +12216,9 @@ pub mod api {
 			}
 			pub mod domain_registration_canceled {
 				use super::runtime_types;
-				pub type DomainHash = ::sp_core::H256;
-				pub type Registration = runtime_types::pallet_domains::DomainRegistration<
-					::subxt::ext::subxt_core::utils::AccountId32,
-				>;
+				pub type DomainHash = crate::types::H256;
+				pub type Registration =
+					runtime_types::pallet_domains::DomainRegistration<crate::types::AccountId32>;
 			}
 			impl ::subxt::ext::subxt_core::events::StaticEvent for DomainRegistrationCanceled {
 				const PALLET: &'static str = "Domains";
@@ -12250,8 +12243,8 @@ pub mod api {
 			}
 			pub mod domain_registration_error {
 				use super::runtime_types;
-				pub type DomainHash = ::sp_core::H256;
-				pub type AccountId = ::subxt::ext::subxt_core::utils::AccountId32;
+				pub type DomainHash = crate::types::H256;
+				pub type AccountId = crate::types::AccountId32;
 				pub type Error = runtime_types::sp_runtime::DispatchError;
 			}
 			impl ::subxt::ext::subxt_core::events::StaticEvent for DomainRegistrationError {
@@ -12266,23 +12259,23 @@ pub mod api {
 				pub mod registered_domains {
 					use super::runtime_types;
 					pub type RegisteredDomains = runtime_types::pallet_domains::DomainRegistration<
-						::subxt::ext::subxt_core::utils::AccountId32,
+						crate::types::AccountId32,
 					>;
-					pub type Param0 = ::sp_core::H256;
+					pub type Param0 = crate::types::H256;
 				}
 				pub mod zone_records_by_domain {
 					use super::runtime_types;
 					pub type ZoneRecordsByDomain =
 						runtime_types::argon_primitives::domain::ZoneRecord<
-							::subxt::ext::subxt_core::utils::AccountId32,
+							crate::types::AccountId32,
 						>;
-					pub type Param0 = ::sp_core::H256;
+					pub type Param0 = crate::types::H256;
 				}
 				pub mod expiring_domains_by_block {
 					use super::runtime_types;
 					pub type ExpiringDomainsByBlock =
 						runtime_types::bounded_collections::bounded_vec::BoundedVec<
-							::sp_core::H256,
+							crate::types::H256,
 						>;
 					pub type Param0 = ::core::primitive::u32;
 				}
@@ -12493,7 +12486,7 @@ pub mod api {
 				}
 				pub mod set_operator {
 					use super::runtime_types;
-					pub type AccountId = ::subxt::ext::subxt_core::utils::AccountId32;
+					pub type AccountId = crate::types::AccountId32;
 				}
 				impl ::subxt::ext::subxt_core::blocks::StaticExtrinsic for SetOperator {
 					const PALLET: &'static str = "PriceIndex";
@@ -12577,7 +12570,7 @@ pub mod api {
 			}
 			pub mod operator_changed {
 				use super::runtime_types;
-				pub type OperatorId = ::subxt::ext::subxt_core::utils::AccountId32;
+				pub type OperatorId = crate::types::AccountId32;
 			}
 			impl ::subxt::ext::subxt_core::events::StaticEvent for OperatorChanged {
 				const PALLET: &'static str = "PriceIndex";
@@ -12594,7 +12587,7 @@ pub mod api {
 				}
 				pub mod operator {
 					use super::runtime_types;
-					pub type Operator = ::subxt::ext::subxt_core::utils::AccountId32;
+					pub type Operator = crate::types::AccountId32;
 				}
 			}
 			pub struct StorageApi;
@@ -12727,7 +12720,7 @@ pub mod api {
 				use super::runtime_types;
 				pub mod author {
 					use super::runtime_types;
-					pub type Author = ::subxt::ext::subxt_core::utils::AccountId32;
+					pub type Author = crate::types::AccountId32;
 				}
 			}
 			pub struct StorageApi;
@@ -12822,12 +12815,12 @@ pub mod api {
 					use super::runtime_types;
 					pub type LastBlockSealerInfo =
 						runtime_types::argon_primitives::providers::BlockSealerInfo<
-							::subxt::ext::subxt_core::utils::AccountId32,
+							crate::types::AccountId32,
 						>;
 				}
 				pub mod parent_voting_key {
 					use super::runtime_types;
-					pub type ParentVotingKey = ::core::option::Option<::sp_core::H256>;
+					pub type ParentVotingKey = ::core::option::Option<crate::types::H256>;
 				}
 				pub mod block_fork_power {
 					use super::runtime_types;
@@ -12844,7 +12837,7 @@ pub mod api {
 				}
 				pub mod temp_author {
 					use super::runtime_types;
-					pub type TempAuthor = ::subxt::ext::subxt_core::utils::AccountId32;
+					pub type TempAuthor = crate::types::AccountId32;
 				}
 				pub mod temp_seal_inherent {
 					use super::runtime_types;
@@ -13053,7 +13046,7 @@ pub mod api {
 				pub type MaturationBlock = ::core::primitive::u32;
 				pub type Rewards = ::subxt::ext::subxt_core::alloc::vec::Vec<
 					runtime_types::argon_primitives::block_seal::BlockPayout<
-						::subxt::ext::subxt_core::utils::AccountId32,
+						crate::types::AccountId32,
 						::core::primitive::u128,
 					>,
 				>;
@@ -13080,7 +13073,7 @@ pub mod api {
 				use super::runtime_types;
 				pub type Rewards = ::subxt::ext::subxt_core::alloc::vec::Vec<
 					runtime_types::argon_primitives::block_seal::BlockPayout<
-						::subxt::ext::subxt_core::utils::AccountId32,
+						crate::types::AccountId32,
 						::core::primitive::u128,
 					>,
 				>;
@@ -13108,7 +13101,7 @@ pub mod api {
 			}
 			pub mod reward_unlock_error {
 				use super::runtime_types;
-				pub type AccountId = ::subxt::ext::subxt_core::utils::AccountId32;
+				pub type AccountId = crate::types::AccountId32;
 				pub type Argons = ::core::option::Option<::core::primitive::u128>;
 				pub type Ownership = ::core::option::Option<::core::primitive::u128>;
 				pub type Error = runtime_types::sp_runtime::DispatchError;
@@ -13136,7 +13129,7 @@ pub mod api {
 			}
 			pub mod reward_create_error {
 				use super::runtime_types;
-				pub type AccountId = ::subxt::ext::subxt_core::utils::AccountId32;
+				pub type AccountId = crate::types::AccountId32;
 				pub type Argons = ::core::option::Option<::core::primitive::u128>;
 				pub type Ownership = ::core::option::Option<::core::primitive::u128>;
 				pub type Error = runtime_types::sp_runtime::DispatchError;
@@ -13155,7 +13148,7 @@ pub mod api {
 					pub type PayoutsByBlock =
 						runtime_types::bounded_collections::bounded_vec::BoundedVec<
 							runtime_types::argon_primitives::block_seal::BlockPayout<
-								::subxt::ext::subxt_core::utils::AccountId32,
+								crate::types::AccountId32,
 								::core::primitive::u128,
 							>,
 						>;
@@ -13341,7 +13334,7 @@ pub mod api {
 					use super::runtime_types;
 					pub type EquivocationProof =
 						runtime_types::sp_consensus_grandpa::EquivocationProof<
-							::sp_core::H256,
+							crate::types::H256,
 							::core::primitive::u32,
 						>;
 					pub type KeyOwnerProof = runtime_types::sp_core::Void;
@@ -13384,7 +13377,7 @@ pub mod api {
 					use super::runtime_types;
 					pub type EquivocationProof =
 						runtime_types::sp_consensus_grandpa::EquivocationProof<
-							::sp_core::H256,
+							crate::types::H256,
 							::core::primitive::u32,
 						>;
 					pub type KeyOwnerProof = runtime_types::sp_core::Void;
@@ -13931,7 +13924,7 @@ pub mod api {
 			pub mod argons_minted {
 				use super::runtime_types;
 				pub type MintType = runtime_types::pallet_mint::pallet::MintType;
-				pub type AccountId = ::subxt::ext::subxt_core::utils::AccountId32;
+				pub type AccountId = crate::types::AccountId32;
 				pub type UtxoId = ::core::option::Option<::core::primitive::u64>;
 				pub type Amount = ::core::primitive::u128;
 			}
@@ -13960,7 +13953,7 @@ pub mod api {
 			pub mod mint_error {
 				use super::runtime_types;
 				pub type MintType = runtime_types::pallet_mint::pallet::MintType;
-				pub type AccountId = ::subxt::ext::subxt_core::utils::AccountId32;
+				pub type AccountId = crate::types::AccountId32;
 				pub type UtxoId = ::core::option::Option<::core::primitive::u64>;
 				pub type Amount = ::core::primitive::u128;
 				pub type Error = runtime_types::sp_runtime::DispatchError;
@@ -13979,7 +13972,7 @@ pub mod api {
 					pub type PendingMintUtxos =
 						runtime_types::bounded_collections::bounded_vec::BoundedVec<(
 							::core::primitive::u64,
-							::subxt::ext::subxt_core::utils::AccountId32,
+							crate::types::AccountId32,
 							::core::primitive::u128,
 						)>;
 				}
@@ -14127,7 +14120,7 @@ pub mod api {
 				pub mod transfer_allow_death {
 					use super::runtime_types;
 					pub type Dest = ::subxt::ext::subxt_core::utils::MultiAddress<
-						::subxt::ext::subxt_core::utils::AccountId32,
+						crate::types::AccountId32,
 						(),
 					>;
 					pub type Value = ::core::primitive::u128;
@@ -14162,11 +14155,11 @@ pub mod api {
 				pub mod force_transfer {
 					use super::runtime_types;
 					pub type Source = ::subxt::ext::subxt_core::utils::MultiAddress<
-						::subxt::ext::subxt_core::utils::AccountId32,
+						crate::types::AccountId32,
 						(),
 					>;
 					pub type Dest = ::subxt::ext::subxt_core::utils::MultiAddress<
-						::subxt::ext::subxt_core::utils::AccountId32,
+						crate::types::AccountId32,
 						(),
 					>;
 					pub type Value = ::core::primitive::u128;
@@ -14204,7 +14197,7 @@ pub mod api {
 				pub mod transfer_keep_alive {
 					use super::runtime_types;
 					pub type Dest = ::subxt::ext::subxt_core::utils::MultiAddress<
-						::subxt::ext::subxt_core::utils::AccountId32,
+						crate::types::AccountId32,
 						(),
 					>;
 					pub type Value = ::core::primitive::u128;
@@ -14250,7 +14243,7 @@ pub mod api {
 				pub mod transfer_all {
 					use super::runtime_types;
 					pub type Dest = ::subxt::ext::subxt_core::utils::MultiAddress<
-						::subxt::ext::subxt_core::utils::AccountId32,
+						crate::types::AccountId32,
 						(),
 					>;
 					pub type KeepAlive = ::core::primitive::bool;
@@ -14284,7 +14277,7 @@ pub mod api {
 				pub mod force_unreserve {
 					use super::runtime_types;
 					pub type Who = ::subxt::ext::subxt_core::utils::MultiAddress<
-						::subxt::ext::subxt_core::utils::AccountId32,
+						crate::types::AccountId32,
 						(),
 					>;
 					pub type Amount = ::core::primitive::u128;
@@ -14321,9 +14314,8 @@ pub mod api {
 				}
 				pub mod upgrade_accounts {
 					use super::runtime_types;
-					pub type Who = ::subxt::ext::subxt_core::alloc::vec::Vec<
-						::subxt::ext::subxt_core::utils::AccountId32,
-					>;
+					pub type Who =
+						::subxt::ext::subxt_core::alloc::vec::Vec<crate::types::AccountId32>;
 				}
 				impl ::subxt::ext::subxt_core::blocks::StaticExtrinsic for UpgradeAccounts {
 					const PALLET: &'static str = "Balances";
@@ -14355,7 +14347,7 @@ pub mod api {
 				pub mod force_set_balance {
 					use super::runtime_types;
 					pub type Who = ::subxt::ext::subxt_core::utils::MultiAddress<
-						::subxt::ext::subxt_core::utils::AccountId32,
+						crate::types::AccountId32,
 						(),
 					>;
 					pub type NewFree = ::core::primitive::u128;
@@ -14672,7 +14664,7 @@ pub mod api {
 			}
 			pub mod endowed {
 				use super::runtime_types;
-				pub type Account = ::subxt::ext::subxt_core::utils::AccountId32;
+				pub type Account = crate::types::AccountId32;
 				pub type FreeBalance = ::core::primitive::u128;
 			}
 			impl ::subxt::ext::subxt_core::events::StaticEvent for Endowed {
@@ -14698,7 +14690,7 @@ pub mod api {
 			}
 			pub mod dust_lost {
 				use super::runtime_types;
-				pub type Account = ::subxt::ext::subxt_core::utils::AccountId32;
+				pub type Account = crate::types::AccountId32;
 				pub type Amount = ::core::primitive::u128;
 			}
 			impl ::subxt::ext::subxt_core::events::StaticEvent for DustLost {
@@ -14724,8 +14716,8 @@ pub mod api {
 			}
 			pub mod transfer {
 				use super::runtime_types;
-				pub type From = ::subxt::ext::subxt_core::utils::AccountId32;
-				pub type To = ::subxt::ext::subxt_core::utils::AccountId32;
+				pub type From = crate::types::AccountId32;
+				pub type To = crate::types::AccountId32;
 				pub type Amount = ::core::primitive::u128;
 			}
 			impl ::subxt::ext::subxt_core::events::StaticEvent for Transfer {
@@ -14750,7 +14742,7 @@ pub mod api {
 			}
 			pub mod balance_set {
 				use super::runtime_types;
-				pub type Who = ::subxt::ext::subxt_core::utils::AccountId32;
+				pub type Who = crate::types::AccountId32;
 				pub type Free = ::core::primitive::u128;
 			}
 			impl ::subxt::ext::subxt_core::events::StaticEvent for BalanceSet {
@@ -14775,7 +14767,7 @@ pub mod api {
 			}
 			pub mod reserved {
 				use super::runtime_types;
-				pub type Who = ::subxt::ext::subxt_core::utils::AccountId32;
+				pub type Who = crate::types::AccountId32;
 				pub type Amount = ::core::primitive::u128;
 			}
 			impl ::subxt::ext::subxt_core::events::StaticEvent for Reserved {
@@ -14800,7 +14792,7 @@ pub mod api {
 			}
 			pub mod unreserved {
 				use super::runtime_types;
-				pub type Who = ::subxt::ext::subxt_core::utils::AccountId32;
+				pub type Who = crate::types::AccountId32;
 				pub type Amount = ::core::primitive::u128;
 			}
 			impl ::subxt::ext::subxt_core::events::StaticEvent for Unreserved {
@@ -14828,8 +14820,8 @@ pub mod api {
 			}
 			pub mod reserve_repatriated {
 				use super::runtime_types;
-				pub type From = ::subxt::ext::subxt_core::utils::AccountId32;
-				pub type To = ::subxt::ext::subxt_core::utils::AccountId32;
+				pub type From = crate::types::AccountId32;
+				pub type To = crate::types::AccountId32;
 				pub type Amount = ::core::primitive::u128;
 				pub type DestinationStatus =
 					runtime_types::frame_support::traits::tokens::misc::BalanceStatus;
@@ -14856,7 +14848,7 @@ pub mod api {
 			}
 			pub mod deposit {
 				use super::runtime_types;
-				pub type Who = ::subxt::ext::subxt_core::utils::AccountId32;
+				pub type Who = crate::types::AccountId32;
 				pub type Amount = ::core::primitive::u128;
 			}
 			impl ::subxt::ext::subxt_core::events::StaticEvent for Deposit {
@@ -14881,7 +14873,7 @@ pub mod api {
 			}
 			pub mod withdraw {
 				use super::runtime_types;
-				pub type Who = ::subxt::ext::subxt_core::utils::AccountId32;
+				pub type Who = crate::types::AccountId32;
 				pub type Amount = ::core::primitive::u128;
 			}
 			impl ::subxt::ext::subxt_core::events::StaticEvent for Withdraw {
@@ -14906,7 +14898,7 @@ pub mod api {
 			}
 			pub mod slashed {
 				use super::runtime_types;
-				pub type Who = ::subxt::ext::subxt_core::utils::AccountId32;
+				pub type Who = crate::types::AccountId32;
 				pub type Amount = ::core::primitive::u128;
 			}
 			impl ::subxt::ext::subxt_core::events::StaticEvent for Slashed {
@@ -14931,7 +14923,7 @@ pub mod api {
 			}
 			pub mod minted {
 				use super::runtime_types;
-				pub type Who = ::subxt::ext::subxt_core::utils::AccountId32;
+				pub type Who = crate::types::AccountId32;
 				pub type Amount = ::core::primitive::u128;
 			}
 			impl ::subxt::ext::subxt_core::events::StaticEvent for Minted {
@@ -14956,7 +14948,7 @@ pub mod api {
 			}
 			pub mod burned {
 				use super::runtime_types;
-				pub type Who = ::subxt::ext::subxt_core::utils::AccountId32;
+				pub type Who = crate::types::AccountId32;
 				pub type Amount = ::core::primitive::u128;
 			}
 			impl ::subxt::ext::subxt_core::events::StaticEvent for Burned {
@@ -14981,7 +14973,7 @@ pub mod api {
 			}
 			pub mod suspended {
 				use super::runtime_types;
-				pub type Who = ::subxt::ext::subxt_core::utils::AccountId32;
+				pub type Who = crate::types::AccountId32;
 				pub type Amount = ::core::primitive::u128;
 			}
 			impl ::subxt::ext::subxt_core::events::StaticEvent for Suspended {
@@ -15006,7 +14998,7 @@ pub mod api {
 			}
 			pub mod restored {
 				use super::runtime_types;
-				pub type Who = ::subxt::ext::subxt_core::utils::AccountId32;
+				pub type Who = crate::types::AccountId32;
 				pub type Amount = ::core::primitive::u128;
 			}
 			impl ::subxt::ext::subxt_core::events::StaticEvent for Restored {
@@ -15030,7 +15022,7 @@ pub mod api {
 			}
 			pub mod upgraded {
 				use super::runtime_types;
-				pub type Who = ::subxt::ext::subxt_core::utils::AccountId32;
+				pub type Who = crate::types::AccountId32;
 			}
 			impl ::subxt::ext::subxt_core::events::StaticEvent for Upgraded {
 				const PALLET: &'static str = "Balances";
@@ -15100,7 +15092,7 @@ pub mod api {
 			}
 			pub mod locked {
 				use super::runtime_types;
-				pub type Who = ::subxt::ext::subxt_core::utils::AccountId32;
+				pub type Who = crate::types::AccountId32;
 				pub type Amount = ::core::primitive::u128;
 			}
 			impl ::subxt::ext::subxt_core::events::StaticEvent for Locked {
@@ -15125,7 +15117,7 @@ pub mod api {
 			}
 			pub mod unlocked {
 				use super::runtime_types;
-				pub type Who = ::subxt::ext::subxt_core::utils::AccountId32;
+				pub type Who = crate::types::AccountId32;
 				pub type Amount = ::core::primitive::u128;
 			}
 			impl ::subxt::ext::subxt_core::events::StaticEvent for Unlocked {
@@ -15150,7 +15142,7 @@ pub mod api {
 			}
 			pub mod frozen {
 				use super::runtime_types;
-				pub type Who = ::subxt::ext::subxt_core::utils::AccountId32;
+				pub type Who = crate::types::AccountId32;
 				pub type Amount = ::core::primitive::u128;
 			}
 			impl ::subxt::ext::subxt_core::events::StaticEvent for Frozen {
@@ -15175,7 +15167,7 @@ pub mod api {
 			}
 			pub mod thawed {
 				use super::runtime_types;
-				pub type Who = ::subxt::ext::subxt_core::utils::AccountId32;
+				pub type Who = crate::types::AccountId32;
 				pub type Amount = ::core::primitive::u128;
 			}
 			impl ::subxt::ext::subxt_core::events::StaticEvent for Thawed {
@@ -15224,7 +15216,7 @@ pub mod api {
 					use super::runtime_types;
 					pub type Account =
 						runtime_types::pallet_balances::types::AccountData<::core::primitive::u128>;
-					pub type Param0 = ::subxt::ext::subxt_core::utils::AccountId32;
+					pub type Param0 = crate::types::AccountId32;
 				}
 				pub mod locks {
 					use super::runtime_types;
@@ -15234,7 +15226,7 @@ pub mod api {
 								::core::primitive::u128,
 							>,
 						>;
-					pub type Param0 = ::subxt::ext::subxt_core::utils::AccountId32;
+					pub type Param0 = crate::types::AccountId32;
 				}
 				pub mod reserves {
 					use super::runtime_types;
@@ -15244,7 +15236,7 @@ pub mod api {
 							::core::primitive::u128,
 						>,
 					>;
-					pub type Param0 = ::subxt::ext::subxt_core::utils::AccountId32;
+					pub type Param0 = crate::types::AccountId32;
 				}
 				pub mod holds {
 					use super::runtime_types;
@@ -15254,7 +15246,7 @@ pub mod api {
 							::core::primitive::u128,
 						>,
 					>;
-					pub type Param0 = ::subxt::ext::subxt_core::utils::AccountId32;
+					pub type Param0 = crate::types::AccountId32;
 				}
 				pub mod freezes {
 					use super::runtime_types;
@@ -15264,7 +15256,7 @@ pub mod api {
 							::core::primitive::u128,
 						>,
 					>;
-					pub type Param0 = ::subxt::ext::subxt_core::utils::AccountId32;
+					pub type Param0 = crate::types::AccountId32;
 				}
 			}
 			pub struct StorageApi;
@@ -15736,7 +15728,7 @@ pub mod api {
 				pub mod transfer_allow_death {
 					use super::runtime_types;
 					pub type Dest = ::subxt::ext::subxt_core::utils::MultiAddress<
-						::subxt::ext::subxt_core::utils::AccountId32,
+						crate::types::AccountId32,
 						(),
 					>;
 					pub type Value = ::core::primitive::u128;
@@ -15771,11 +15763,11 @@ pub mod api {
 				pub mod force_transfer {
 					use super::runtime_types;
 					pub type Source = ::subxt::ext::subxt_core::utils::MultiAddress<
-						::subxt::ext::subxt_core::utils::AccountId32,
+						crate::types::AccountId32,
 						(),
 					>;
 					pub type Dest = ::subxt::ext::subxt_core::utils::MultiAddress<
-						::subxt::ext::subxt_core::utils::AccountId32,
+						crate::types::AccountId32,
 						(),
 					>;
 					pub type Value = ::core::primitive::u128;
@@ -15813,7 +15805,7 @@ pub mod api {
 				pub mod transfer_keep_alive {
 					use super::runtime_types;
 					pub type Dest = ::subxt::ext::subxt_core::utils::MultiAddress<
-						::subxt::ext::subxt_core::utils::AccountId32,
+						crate::types::AccountId32,
 						(),
 					>;
 					pub type Value = ::core::primitive::u128;
@@ -15859,7 +15851,7 @@ pub mod api {
 				pub mod transfer_all {
 					use super::runtime_types;
 					pub type Dest = ::subxt::ext::subxt_core::utils::MultiAddress<
-						::subxt::ext::subxt_core::utils::AccountId32,
+						crate::types::AccountId32,
 						(),
 					>;
 					pub type KeepAlive = ::core::primitive::bool;
@@ -15893,7 +15885,7 @@ pub mod api {
 				pub mod force_unreserve {
 					use super::runtime_types;
 					pub type Who = ::subxt::ext::subxt_core::utils::MultiAddress<
-						::subxt::ext::subxt_core::utils::AccountId32,
+						crate::types::AccountId32,
 						(),
 					>;
 					pub type Amount = ::core::primitive::u128;
@@ -15930,9 +15922,8 @@ pub mod api {
 				}
 				pub mod upgrade_accounts {
 					use super::runtime_types;
-					pub type Who = ::subxt::ext::subxt_core::alloc::vec::Vec<
-						::subxt::ext::subxt_core::utils::AccountId32,
-					>;
+					pub type Who =
+						::subxt::ext::subxt_core::alloc::vec::Vec<crate::types::AccountId32>;
 				}
 				impl ::subxt::ext::subxt_core::blocks::StaticExtrinsic for UpgradeAccounts {
 					const PALLET: &'static str = "Ownership";
@@ -15964,7 +15955,7 @@ pub mod api {
 				pub mod force_set_balance {
 					use super::runtime_types;
 					pub type Who = ::subxt::ext::subxt_core::utils::MultiAddress<
-						::subxt::ext::subxt_core::utils::AccountId32,
+						crate::types::AccountId32,
 						(),
 					>;
 					pub type NewFree = ::core::primitive::u128;
@@ -16281,7 +16272,7 @@ pub mod api {
 			}
 			pub mod endowed {
 				use super::runtime_types;
-				pub type Account = ::subxt::ext::subxt_core::utils::AccountId32;
+				pub type Account = crate::types::AccountId32;
 				pub type FreeBalance = ::core::primitive::u128;
 			}
 			impl ::subxt::ext::subxt_core::events::StaticEvent for Endowed {
@@ -16307,7 +16298,7 @@ pub mod api {
 			}
 			pub mod dust_lost {
 				use super::runtime_types;
-				pub type Account = ::subxt::ext::subxt_core::utils::AccountId32;
+				pub type Account = crate::types::AccountId32;
 				pub type Amount = ::core::primitive::u128;
 			}
 			impl ::subxt::ext::subxt_core::events::StaticEvent for DustLost {
@@ -16333,8 +16324,8 @@ pub mod api {
 			}
 			pub mod transfer {
 				use super::runtime_types;
-				pub type From = ::subxt::ext::subxt_core::utils::AccountId32;
-				pub type To = ::subxt::ext::subxt_core::utils::AccountId32;
+				pub type From = crate::types::AccountId32;
+				pub type To = crate::types::AccountId32;
 				pub type Amount = ::core::primitive::u128;
 			}
 			impl ::subxt::ext::subxt_core::events::StaticEvent for Transfer {
@@ -16359,7 +16350,7 @@ pub mod api {
 			}
 			pub mod balance_set {
 				use super::runtime_types;
-				pub type Who = ::subxt::ext::subxt_core::utils::AccountId32;
+				pub type Who = crate::types::AccountId32;
 				pub type Free = ::core::primitive::u128;
 			}
 			impl ::subxt::ext::subxt_core::events::StaticEvent for BalanceSet {
@@ -16384,7 +16375,7 @@ pub mod api {
 			}
 			pub mod reserved {
 				use super::runtime_types;
-				pub type Who = ::subxt::ext::subxt_core::utils::AccountId32;
+				pub type Who = crate::types::AccountId32;
 				pub type Amount = ::core::primitive::u128;
 			}
 			impl ::subxt::ext::subxt_core::events::StaticEvent for Reserved {
@@ -16409,7 +16400,7 @@ pub mod api {
 			}
 			pub mod unreserved {
 				use super::runtime_types;
-				pub type Who = ::subxt::ext::subxt_core::utils::AccountId32;
+				pub type Who = crate::types::AccountId32;
 				pub type Amount = ::core::primitive::u128;
 			}
 			impl ::subxt::ext::subxt_core::events::StaticEvent for Unreserved {
@@ -16437,8 +16428,8 @@ pub mod api {
 			}
 			pub mod reserve_repatriated {
 				use super::runtime_types;
-				pub type From = ::subxt::ext::subxt_core::utils::AccountId32;
-				pub type To = ::subxt::ext::subxt_core::utils::AccountId32;
+				pub type From = crate::types::AccountId32;
+				pub type To = crate::types::AccountId32;
 				pub type Amount = ::core::primitive::u128;
 				pub type DestinationStatus =
 					runtime_types::frame_support::traits::tokens::misc::BalanceStatus;
@@ -16465,7 +16456,7 @@ pub mod api {
 			}
 			pub mod deposit {
 				use super::runtime_types;
-				pub type Who = ::subxt::ext::subxt_core::utils::AccountId32;
+				pub type Who = crate::types::AccountId32;
 				pub type Amount = ::core::primitive::u128;
 			}
 			impl ::subxt::ext::subxt_core::events::StaticEvent for Deposit {
@@ -16490,7 +16481,7 @@ pub mod api {
 			}
 			pub mod withdraw {
 				use super::runtime_types;
-				pub type Who = ::subxt::ext::subxt_core::utils::AccountId32;
+				pub type Who = crate::types::AccountId32;
 				pub type Amount = ::core::primitive::u128;
 			}
 			impl ::subxt::ext::subxt_core::events::StaticEvent for Withdraw {
@@ -16515,7 +16506,7 @@ pub mod api {
 			}
 			pub mod slashed {
 				use super::runtime_types;
-				pub type Who = ::subxt::ext::subxt_core::utils::AccountId32;
+				pub type Who = crate::types::AccountId32;
 				pub type Amount = ::core::primitive::u128;
 			}
 			impl ::subxt::ext::subxt_core::events::StaticEvent for Slashed {
@@ -16540,7 +16531,7 @@ pub mod api {
 			}
 			pub mod minted {
 				use super::runtime_types;
-				pub type Who = ::subxt::ext::subxt_core::utils::AccountId32;
+				pub type Who = crate::types::AccountId32;
 				pub type Amount = ::core::primitive::u128;
 			}
 			impl ::subxt::ext::subxt_core::events::StaticEvent for Minted {
@@ -16565,7 +16556,7 @@ pub mod api {
 			}
 			pub mod burned {
 				use super::runtime_types;
-				pub type Who = ::subxt::ext::subxt_core::utils::AccountId32;
+				pub type Who = crate::types::AccountId32;
 				pub type Amount = ::core::primitive::u128;
 			}
 			impl ::subxt::ext::subxt_core::events::StaticEvent for Burned {
@@ -16590,7 +16581,7 @@ pub mod api {
 			}
 			pub mod suspended {
 				use super::runtime_types;
-				pub type Who = ::subxt::ext::subxt_core::utils::AccountId32;
+				pub type Who = crate::types::AccountId32;
 				pub type Amount = ::core::primitive::u128;
 			}
 			impl ::subxt::ext::subxt_core::events::StaticEvent for Suspended {
@@ -16615,7 +16606,7 @@ pub mod api {
 			}
 			pub mod restored {
 				use super::runtime_types;
-				pub type Who = ::subxt::ext::subxt_core::utils::AccountId32;
+				pub type Who = crate::types::AccountId32;
 				pub type Amount = ::core::primitive::u128;
 			}
 			impl ::subxt::ext::subxt_core::events::StaticEvent for Restored {
@@ -16639,7 +16630,7 @@ pub mod api {
 			}
 			pub mod upgraded {
 				use super::runtime_types;
-				pub type Who = ::subxt::ext::subxt_core::utils::AccountId32;
+				pub type Who = crate::types::AccountId32;
 			}
 			impl ::subxt::ext::subxt_core::events::StaticEvent for Upgraded {
 				const PALLET: &'static str = "Ownership";
@@ -16709,7 +16700,7 @@ pub mod api {
 			}
 			pub mod locked {
 				use super::runtime_types;
-				pub type Who = ::subxt::ext::subxt_core::utils::AccountId32;
+				pub type Who = crate::types::AccountId32;
 				pub type Amount = ::core::primitive::u128;
 			}
 			impl ::subxt::ext::subxt_core::events::StaticEvent for Locked {
@@ -16734,7 +16725,7 @@ pub mod api {
 			}
 			pub mod unlocked {
 				use super::runtime_types;
-				pub type Who = ::subxt::ext::subxt_core::utils::AccountId32;
+				pub type Who = crate::types::AccountId32;
 				pub type Amount = ::core::primitive::u128;
 			}
 			impl ::subxt::ext::subxt_core::events::StaticEvent for Unlocked {
@@ -16759,7 +16750,7 @@ pub mod api {
 			}
 			pub mod frozen {
 				use super::runtime_types;
-				pub type Who = ::subxt::ext::subxt_core::utils::AccountId32;
+				pub type Who = crate::types::AccountId32;
 				pub type Amount = ::core::primitive::u128;
 			}
 			impl ::subxt::ext::subxt_core::events::StaticEvent for Frozen {
@@ -16784,7 +16775,7 @@ pub mod api {
 			}
 			pub mod thawed {
 				use super::runtime_types;
-				pub type Who = ::subxt::ext::subxt_core::utils::AccountId32;
+				pub type Who = crate::types::AccountId32;
 				pub type Amount = ::core::primitive::u128;
 			}
 			impl ::subxt::ext::subxt_core::events::StaticEvent for Thawed {
@@ -16833,7 +16824,7 @@ pub mod api {
 					use super::runtime_types;
 					pub type Account =
 						runtime_types::pallet_balances::types::AccountData<::core::primitive::u128>;
-					pub type Param0 = ::subxt::ext::subxt_core::utils::AccountId32;
+					pub type Param0 = crate::types::AccountId32;
 				}
 				pub mod locks {
 					use super::runtime_types;
@@ -16843,7 +16834,7 @@ pub mod api {
 								::core::primitive::u128,
 							>,
 						>;
-					pub type Param0 = ::subxt::ext::subxt_core::utils::AccountId32;
+					pub type Param0 = crate::types::AccountId32;
 				}
 				pub mod reserves {
 					use super::runtime_types;
@@ -16853,7 +16844,7 @@ pub mod api {
 							::core::primitive::u128,
 						>,
 					>;
-					pub type Param0 = ::subxt::ext::subxt_core::utils::AccountId32;
+					pub type Param0 = crate::types::AccountId32;
 				}
 				pub mod holds {
 					use super::runtime_types;
@@ -16863,7 +16854,7 @@ pub mod api {
 							::core::primitive::u128,
 						>,
 					>;
-					pub type Param0 = ::subxt::ext::subxt_core::utils::AccountId32;
+					pub type Param0 = crate::types::AccountId32;
 				}
 				pub mod freezes {
 					use super::runtime_types;
@@ -16873,7 +16864,7 @@ pub mod api {
 							::core::primitive::u128,
 						>,
 					>;
-					pub type Param0 = ::subxt::ext::subxt_core::utils::AccountId32;
+					pub type Param0 = crate::types::AccountId32;
 				}
 			}
 			pub struct StorageApi;
@@ -17653,7 +17644,7 @@ pub mod api {
 			}
 			pub mod transaction_fee_paid {
 				use super::runtime_types;
-				pub type Who = ::subxt::ext::subxt_core::utils::AccountId32;
+				pub type Who = crate::types::AccountId32;
 				pub type ActualFee = ::core::primitive::u128;
 				pub type Tip = ::core::primitive::u128;
 			}
@@ -18441,7 +18432,7 @@ pub mod api {
 				pub mod set_key {
 					use super::runtime_types;
 					pub type New = ::subxt::ext::subxt_core::utils::MultiAddress<
-						::subxt::ext::subxt_core::utils::AccountId32,
+						crate::types::AccountId32,
 						(),
 					>;
 				}
@@ -18475,7 +18466,7 @@ pub mod api {
 				pub mod sudo_as {
 					use super::runtime_types;
 					pub type Who = ::subxt::ext::subxt_core::utils::MultiAddress<
-						::subxt::ext::subxt_core::utils::AccountId32,
+						crate::types::AccountId32,
 						(),
 					>;
 					pub type Call = runtime_types::argon_node_runtime::RuntimeCall;
@@ -18660,8 +18651,8 @@ pub mod api {
 			}
 			pub mod key_changed {
 				use super::runtime_types;
-				pub type Old = ::core::option::Option<::subxt::ext::subxt_core::utils::AccountId32>;
-				pub type New = ::subxt::ext::subxt_core::utils::AccountId32;
+				pub type Old = ::core::option::Option<crate::types::AccountId32>;
+				pub type New = crate::types::AccountId32;
 			}
 			impl ::subxt::ext::subxt_core::events::StaticEvent for KeyChanged {
 				const PALLET: &'static str = "Sudo";
@@ -18715,7 +18706,7 @@ pub mod api {
 				use super::runtime_types;
 				pub mod key {
 					use super::runtime_types;
-					pub type Key = ::subxt::ext::subxt_core::utils::AccountId32;
+					pub type Key = crate::types::AccountId32;
 				}
 			}
 			pub struct StorageApi;
@@ -18785,9 +18776,7 @@ pub mod api {
 			pub enum OriginCaller {
 				#[codec(index = 0)]
 				system(
-					runtime_types::frame_support::dispatch::RawOrigin<
-						::subxt::ext::subxt_core::utils::AccountId32,
-					>,
+					runtime_types::frame_support::dispatch::RawOrigin<crate::types::AccountId32>,
 				),
 				#[codec(index = 1)]
 				Void(runtime_types::sp_core::Void),
@@ -19059,7 +19048,7 @@ pub mod api {
 				pub enum VerifyError {
 					#[codec(index = 0)]
 					MissingAccountOrigin {
-						account_id: ::subxt::ext::subxt_core::utils::AccountId32,
+						account_id: crate::types::AccountId32,
 						account_type: runtime_types::argon_primitives::account::AccountType,
 					},
 					#[codec(index = 1)]
@@ -19177,7 +19166,7 @@ pub mod api {
 					InsufficientTaxIncluded {
 						tax_sent: ::core::primitive::u128,
 						tax_owed: ::core::primitive::u128,
-						account_id: ::subxt::ext::subxt_core::utils::AccountId32,
+						account_id: crate::types::AccountId32,
 					},
 					#[codec(index = 43)]
 					InsufficientBlockVoteTax,
@@ -19296,7 +19285,7 @@ pub mod api {
 				)]
 				pub struct MerkleProof {
 					pub proof: runtime_types::bounded_collections::bounded_vec::BoundedVec<
-						::sp_core::H256,
+						crate::types::H256,
 					>,
 					#[codec(compact)]
 					pub number_of_leaves: ::core::primitive::u32,
@@ -19343,7 +19332,7 @@ pub mod api {
 				)]
 				pub enum BitcoinCosignScriptPubkey {
 					#[codec(index = 0)]
-					P2WSH { wscript_hash: ::sp_core::H256 },
+					P2WSH { wscript_hash: crate::types::H256 },
 				}
 				#[derive(
 					:: subxt :: ext :: subxt_core :: ext :: codec :: Decode,
@@ -19818,14 +19807,14 @@ pub mod api {
 					crate_path = ":: subxt :: ext :: subxt_core :: ext :: scale_encode"
 				)]
 				pub struct BlockVoteT<_0> {
-					pub account_id: ::subxt::ext::subxt_core::utils::AccountId32,
+					pub account_id: crate::types::AccountId32,
 					pub block_hash: _0,
 					#[codec(compact)]
 					pub index: ::core::primitive::u32,
 					#[codec(compact)]
 					pub power: ::core::primitive::u128,
 					pub signature: runtime_types::sp_runtime::MultiSignature,
-					pub block_rewards_account_id: ::subxt::ext::subxt_core::utils::AccountId32,
+					pub block_rewards_account_id: crate::types::AccountId32,
 					#[codec(compact)]
 					pub tick: ::core::primitive::u32,
 				}
@@ -20134,7 +20123,7 @@ pub mod api {
 					crate_path = ":: subxt :: ext :: subxt_core :: ext :: scale_encode"
 				)]
 				pub struct ParentVotingKeyDigest {
-					pub parent_voting_key: ::core::option::Option<::sp_core::H256>,
+					pub parent_voting_key: ::core::option::Option<crate::types::H256>,
 				}
 			}
 			pub mod domain {
@@ -20312,7 +20301,7 @@ pub mod api {
 						source_notebook_proof:
 							runtime_types::argon_primitives::balance_change::MerkleProof,
 						block_vote: runtime_types::argon_primitives::block_vote::BlockVoteT<
-							::sp_core::H256,
+							crate::types::H256,
 						>,
 						miner_signature:
 							runtime_types::argon_primitives::block_seal::app::Signature,
@@ -20415,7 +20404,7 @@ pub mod api {
 					pub notebook_number: ::core::primitive::u32,
 					#[codec(compact)]
 					pub tick: ::core::primitive::u32,
-					pub header_hash: ::sp_core::H256,
+					pub header_hash: crate::types::H256,
 					#[codec(compact)]
 					pub block_votes_count: ::core::primitive::u32,
 					#[codec(compact)]
@@ -20444,9 +20433,9 @@ pub mod api {
 					pub notebook_number: ::core::primitive::u32,
 					#[codec(compact)]
 					pub tick: ::core::primitive::u32,
-					pub block_votes_root: ::sp_core::H256,
-					pub secret_hash: ::sp_core::H256,
-					pub parent_secret: ::core::option::Option<::sp_core::H256>,
+					pub block_votes_root: crate::types::H256,
+					pub secret_hash: crate::types::H256,
+					pub parent_secret: ::core::option::Option<crate::types::H256>,
 				}
 				#[derive(
 					:: subxt :: ext :: subxt_core :: ext :: codec :: Decode,
@@ -20603,7 +20592,7 @@ pub mod api {
 				pub enum ChainTransfer {
 					#[codec(index = 0)]
 					ToMainchain {
-						account_id: ::subxt::ext::subxt_core::utils::AccountId32,
+						account_id: crate::types::AccountId32,
 						#[codec(compact)]
 						amount: ::core::primitive::u128,
 					},
@@ -20643,25 +20632,25 @@ pub mod api {
 						runtime_types::bounded_collections::bounded_vec::BoundedVec<
 							runtime_types::argon_primitives::notebook::ChainTransfer,
 						>,
-					pub changed_accounts_root: ::sp_core::H256,
+					pub changed_accounts_root: crate::types::H256,
 					pub changed_account_origins:
 						runtime_types::bounded_collections::bounded_vec::BoundedVec<
 							runtime_types::argon_primitives::balance_change::AccountOrigin,
 						>,
-					pub block_votes_root: ::sp_core::H256,
+					pub block_votes_root: crate::types::H256,
 					#[codec(compact)]
 					pub block_votes_count: ::core::primitive::u32,
 					pub blocks_with_votes:
 						runtime_types::bounded_collections::bounded_vec::BoundedVec<
-							::sp_core::H256,
+							crate::types::H256,
 						>,
 					#[codec(compact)]
 					pub block_voting_power: ::core::primitive::u128,
-					pub secret_hash: ::sp_core::H256,
-					pub parent_secret: ::core::option::Option<::sp_core::H256>,
+					pub secret_hash: crate::types::H256,
+					pub parent_secret: ::core::option::Option<crate::types::H256>,
 					pub domains: runtime_types::bounded_collections::bounded_vec::BoundedVec<(
-						::sp_core::H256,
-						::subxt::ext::subxt_core::utils::AccountId32,
+						crate::types::H256,
+						crate::types::AccountId32,
 					)>,
 				}
 				#[derive(
@@ -21338,7 +21327,7 @@ pub mod api {
 					#[doc = "later."]
 					#[doc = ""]
 					#[doc = "This call requires Root origin."]
-					authorize_upgrade { code_hash: ::sp_core::H256 },
+					authorize_upgrade { code_hash: crate::types::H256 },
 					#[codec(index = 10)]
 					#[doc = "Authorize an upgrade to a given `code_hash` for the runtime. The runtime can be supplied"]
 					#[doc = "later."]
@@ -21348,7 +21337,7 @@ pub mod api {
 					#[doc = "recommended for normal use. Use `authorize_upgrade` instead."]
 					#[doc = ""]
 					#[doc = "This call requires Root origin."]
-					authorize_upgrade_without_checks { code_hash: ::sp_core::H256 },
+					authorize_upgrade_without_checks { code_hash: crate::types::H256 },
 					#[codec(index = 11)]
 					#[doc = "Provide the preimage (runtime binary) `code` for an upgrade that has been authorized."]
 					#[doc = ""]
@@ -21445,20 +21434,17 @@ pub mod api {
 					CodeUpdated,
 					#[codec(index = 3)]
 					#[doc = "A new account was created."]
-					NewAccount { account: ::subxt::ext::subxt_core::utils::AccountId32 },
+					NewAccount { account: crate::types::AccountId32 },
 					#[codec(index = 4)]
 					#[doc = "An account was reaped."]
-					KilledAccount { account: ::subxt::ext::subxt_core::utils::AccountId32 },
+					KilledAccount { account: crate::types::AccountId32 },
 					#[codec(index = 5)]
 					#[doc = "On on-chain remark happened."]
-					Remarked {
-						sender: ::subxt::ext::subxt_core::utils::AccountId32,
-						hash: ::sp_core::H256,
-					},
+					Remarked { sender: crate::types::AccountId32, hash: crate::types::H256 },
 					#[codec(index = 6)]
 					#[doc = "An upgrade was authorized."]
 					UpgradeAuthorized {
-						code_hash: ::sp_core::H256,
+						code_hash: crate::types::H256,
 						check_version: ::core::primitive::bool,
 					},
 				}
@@ -21493,7 +21479,7 @@ pub mod api {
 			#[decode_as_type(crate_path = ":: subxt :: ext :: subxt_core :: ext :: scale_decode")]
 			#[encode_as_type(crate_path = ":: subxt :: ext :: subxt_core :: ext :: scale_encode")]
 			pub struct CodeUpgradeAuthorization {
-				pub code_hash: ::sp_core::H256,
+				pub code_hash: crate::types::H256,
 				pub check_version: ::core::primitive::bool,
 			}
 			#[derive(
@@ -21579,7 +21565,7 @@ pub mod api {
 					#[doc = "The dispatch origin for this call must be `Signed` by the transactor."]
 					transfer_allow_death {
 						dest: ::subxt::ext::subxt_core::utils::MultiAddress<
-							::subxt::ext::subxt_core::utils::AccountId32,
+							crate::types::AccountId32,
 							(),
 						>,
 						#[codec(compact)]
@@ -21590,11 +21576,11 @@ pub mod api {
 					#[doc = "may be specified."]
 					force_transfer {
 						source: ::subxt::ext::subxt_core::utils::MultiAddress<
-							::subxt::ext::subxt_core::utils::AccountId32,
+							crate::types::AccountId32,
 							(),
 						>,
 						dest: ::subxt::ext::subxt_core::utils::MultiAddress<
-							::subxt::ext::subxt_core::utils::AccountId32,
+							crate::types::AccountId32,
 							(),
 						>,
 						#[codec(compact)]
@@ -21609,7 +21595,7 @@ pub mod api {
 					#[doc = "[`transfer_allow_death`]: struct.Pallet.html#method.transfer"]
 					transfer_keep_alive {
 						dest: ::subxt::ext::subxt_core::utils::MultiAddress<
-							::subxt::ext::subxt_core::utils::AccountId32,
+							crate::types::AccountId32,
 							(),
 						>,
 						#[codec(compact)]
@@ -21633,7 +21619,7 @@ pub mod api {
 					#[doc = "  keep the sender account alive (true)."]
 					transfer_all {
 						dest: ::subxt::ext::subxt_core::utils::MultiAddress<
-							::subxt::ext::subxt_core::utils::AccountId32,
+							crate::types::AccountId32,
 							(),
 						>,
 						keep_alive: ::core::primitive::bool,
@@ -21644,7 +21630,7 @@ pub mod api {
 					#[doc = "Can only be called by ROOT."]
 					force_unreserve {
 						who: ::subxt::ext::subxt_core::utils::MultiAddress<
-							::subxt::ext::subxt_core::utils::AccountId32,
+							crate::types::AccountId32,
 							(),
 						>,
 						amount: ::core::primitive::u128,
@@ -21659,9 +21645,7 @@ pub mod api {
 					#[doc = "be upgraded. (We let some not have to be upgraded just in order to allow for the"]
 					#[doc = "possibility of churn)."]
 					upgrade_accounts {
-						who: ::subxt::ext::subxt_core::alloc::vec::Vec<
-							::subxt::ext::subxt_core::utils::AccountId32,
-						>,
+						who: ::subxt::ext::subxt_core::alloc::vec::Vec<crate::types::AccountId32>,
 					},
 					#[codec(index = 8)]
 					#[doc = "Set the regular balance of a given account."]
@@ -21669,7 +21653,7 @@ pub mod api {
 					#[doc = "The dispatch origin for this call is `root`."]
 					force_set_balance {
 						who: ::subxt::ext::subxt_core::utils::MultiAddress<
-							::subxt::ext::subxt_core::utils::AccountId32,
+							crate::types::AccountId32,
 							(),
 						>,
 						#[codec(compact)]
@@ -21774,96 +21758,63 @@ pub mod api {
 					#[codec(index = 0)]
 					#[doc = "An account was created with some free balance."]
 					Endowed {
-						account: ::subxt::ext::subxt_core::utils::AccountId32,
+						account: crate::types::AccountId32,
 						free_balance: ::core::primitive::u128,
 					},
 					#[codec(index = 1)]
 					#[doc = "An account was removed whose balance was non-zero but below ExistentialDeposit,"]
 					#[doc = "resulting in an outright loss."]
-					DustLost {
-						account: ::subxt::ext::subxt_core::utils::AccountId32,
-						amount: ::core::primitive::u128,
-					},
+					DustLost { account: crate::types::AccountId32, amount: ::core::primitive::u128 },
 					#[codec(index = 2)]
 					#[doc = "Transfer succeeded."]
 					Transfer {
-						from: ::subxt::ext::subxt_core::utils::AccountId32,
-						to: ::subxt::ext::subxt_core::utils::AccountId32,
+						from: crate::types::AccountId32,
+						to: crate::types::AccountId32,
 						amount: ::core::primitive::u128,
 					},
 					#[codec(index = 3)]
 					#[doc = "A balance was set by root."]
-					BalanceSet {
-						who: ::subxt::ext::subxt_core::utils::AccountId32,
-						free: ::core::primitive::u128,
-					},
+					BalanceSet { who: crate::types::AccountId32, free: ::core::primitive::u128 },
 					#[codec(index = 4)]
 					#[doc = "Some balance was reserved (moved from free to reserved)."]
-					Reserved {
-						who: ::subxt::ext::subxt_core::utils::AccountId32,
-						amount: ::core::primitive::u128,
-					},
+					Reserved { who: crate::types::AccountId32, amount: ::core::primitive::u128 },
 					#[codec(index = 5)]
 					#[doc = "Some balance was unreserved (moved from reserved to free)."]
-					Unreserved {
-						who: ::subxt::ext::subxt_core::utils::AccountId32,
-						amount: ::core::primitive::u128,
-					},
+					Unreserved { who: crate::types::AccountId32, amount: ::core::primitive::u128 },
 					#[codec(index = 6)]
 					#[doc = "Some balance was moved from the reserve of the first account to the second account."]
 					#[doc = "Final argument indicates the destination balance type."]
 					ReserveRepatriated {
-						from: ::subxt::ext::subxt_core::utils::AccountId32,
-						to: ::subxt::ext::subxt_core::utils::AccountId32,
+						from: crate::types::AccountId32,
+						to: crate::types::AccountId32,
 						amount: ::core::primitive::u128,
 						destination_status:
 							runtime_types::frame_support::traits::tokens::misc::BalanceStatus,
 					},
 					#[codec(index = 7)]
 					#[doc = "Some amount was deposited (e.g. for transaction fees)."]
-					Deposit {
-						who: ::subxt::ext::subxt_core::utils::AccountId32,
-						amount: ::core::primitive::u128,
-					},
+					Deposit { who: crate::types::AccountId32, amount: ::core::primitive::u128 },
 					#[codec(index = 8)]
 					#[doc = "Some amount was withdrawn from the account (e.g. for transaction fees)."]
-					Withdraw {
-						who: ::subxt::ext::subxt_core::utils::AccountId32,
-						amount: ::core::primitive::u128,
-					},
+					Withdraw { who: crate::types::AccountId32, amount: ::core::primitive::u128 },
 					#[codec(index = 9)]
 					#[doc = "Some amount was removed from the account (e.g. for misbehavior)."]
-					Slashed {
-						who: ::subxt::ext::subxt_core::utils::AccountId32,
-						amount: ::core::primitive::u128,
-					},
+					Slashed { who: crate::types::AccountId32, amount: ::core::primitive::u128 },
 					#[codec(index = 10)]
 					#[doc = "Some amount was minted into an account."]
-					Minted {
-						who: ::subxt::ext::subxt_core::utils::AccountId32,
-						amount: ::core::primitive::u128,
-					},
+					Minted { who: crate::types::AccountId32, amount: ::core::primitive::u128 },
 					#[codec(index = 11)]
 					#[doc = "Some amount was burned from an account."]
-					Burned {
-						who: ::subxt::ext::subxt_core::utils::AccountId32,
-						amount: ::core::primitive::u128,
-					},
+					Burned { who: crate::types::AccountId32, amount: ::core::primitive::u128 },
 					#[codec(index = 12)]
 					#[doc = "Some amount was suspended from an account (it can be restored later)."]
-					Suspended {
-						who: ::subxt::ext::subxt_core::utils::AccountId32,
-						amount: ::core::primitive::u128,
-					},
+					Suspended { who: crate::types::AccountId32, amount: ::core::primitive::u128 },
 					#[codec(index = 13)]
 					#[doc = "Some amount was restored into an account."]
-					Restored {
-						who: ::subxt::ext::subxt_core::utils::AccountId32,
-						amount: ::core::primitive::u128,
-					},
+					Restored { who: crate::types::AccountId32, amount: ::core::primitive::u128 },
 					#[codec(index = 14)]
 					#[doc = "An account was upgraded."]
-					Upgraded { who: ::subxt::ext::subxt_core::utils::AccountId32 },
+					Upgraded { who: crate::types::AccountId32 },
 					#[codec(index = 15)]
 					#[doc = "Total issuance was increased by `amount`, creating a credit to be balanced."]
 					Issued { amount: ::core::primitive::u128 },
@@ -21872,28 +21823,16 @@ pub mod api {
 					Rescinded { amount: ::core::primitive::u128 },
 					#[codec(index = 17)]
 					#[doc = "Some balance was locked."]
-					Locked {
-						who: ::subxt::ext::subxt_core::utils::AccountId32,
-						amount: ::core::primitive::u128,
-					},
+					Locked { who: crate::types::AccountId32, amount: ::core::primitive::u128 },
 					#[codec(index = 18)]
 					#[doc = "Some balance was unlocked."]
-					Unlocked {
-						who: ::subxt::ext::subxt_core::utils::AccountId32,
-						amount: ::core::primitive::u128,
-					},
+					Unlocked { who: crate::types::AccountId32, amount: ::core::primitive::u128 },
 					#[codec(index = 19)]
 					#[doc = "Some balance was frozen."]
-					Frozen {
-						who: ::subxt::ext::subxt_core::utils::AccountId32,
-						amount: ::core::primitive::u128,
-					},
+					Frozen { who: crate::types::AccountId32, amount: ::core::primitive::u128 },
 					#[codec(index = 20)]
 					#[doc = "Some balance was thawed."]
-					Thawed {
-						who: ::subxt::ext::subxt_core::utils::AccountId32,
-						amount: ::core::primitive::u128,
-					},
+					Thawed { who: crate::types::AccountId32, amount: ::core::primitive::u128 },
 					#[codec(index = 21)]
 					#[doc = "The `TotalIssuance` was forcefully changed."]
 					TotalIssuanceForced {
@@ -22066,7 +22005,7 @@ pub mod api {
 					#[doc = ""]
 					#[doc = "# Arguments"]
 					#[doc = "* `account_id` - the account id of the operator"]
-					set_operator { account_id: ::subxt::ext::subxt_core::utils::AccountId32 },
+					set_operator { account_id: crate::types::AccountId32 },
 				}
 				#[derive(
 					:: subxt :: ext :: subxt_core :: ext :: codec :: Decode,
@@ -22234,7 +22173,7 @@ pub mod api {
 						maturation_block: ::core::primitive::u32,
 						rewards: ::subxt::ext::subxt_core::alloc::vec::Vec<
 							runtime_types::argon_primitives::block_seal::BlockPayout<
-								::subxt::ext::subxt_core::utils::AccountId32,
+								crate::types::AccountId32,
 								::core::primitive::u128,
 							>,
 						>,
@@ -22243,21 +22182,21 @@ pub mod api {
 					RewardUnlocked {
 						rewards: ::subxt::ext::subxt_core::alloc::vec::Vec<
 							runtime_types::argon_primitives::block_seal::BlockPayout<
-								::subxt::ext::subxt_core::utils::AccountId32,
+								crate::types::AccountId32,
 								::core::primitive::u128,
 							>,
 						>,
 					},
 					#[codec(index = 2)]
 					RewardUnlockError {
-						account_id: ::subxt::ext::subxt_core::utils::AccountId32,
+						account_id: crate::types::AccountId32,
 						argons: ::core::option::Option<::core::primitive::u128>,
 						ownership: ::core::option::Option<::core::primitive::u128>,
 						error: runtime_types::sp_runtime::DispatchError,
 					},
 					#[codec(index = 3)]
 					RewardCreateError {
-						account_id: ::subxt::ext::subxt_core::utils::AccountId32,
+						account_id: crate::types::AccountId32,
 						argons: ::core::option::Option<::core::primitive::u128>,
 						ownership: ::core::option::Option<::core::primitive::u128>,
 						error: runtime_types::sp_runtime::DispatchError,
@@ -22650,7 +22589,7 @@ pub mod api {
 						vault_id: ::core::primitive::u32,
 						bond_id: ::core::primitive::u64,
 						bond_type: runtime_types::argon_primitives::bond::BondType,
-						bonded_account_id: ::subxt::ext::subxt_core::utils::AccountId32,
+						bonded_account_id: crate::types::AccountId32,
 						utxo_id: ::core::option::Option<::core::primitive::u64>,
 						amount: ::core::primitive::u128,
 						expiration: runtime_types::argon_primitives::bond::BondExpiration<
@@ -22666,7 +22605,7 @@ pub mod api {
 					BondCanceled {
 						vault_id: ::core::primitive::u32,
 						bond_id: ::core::primitive::u64,
-						bonded_account_id: ::subxt::ext::subxt_core::utils::AccountId32,
+						bonded_account_id: crate::types::AccountId32,
 						bond_type: runtime_types::argon_primitives::bond::BondType,
 						returned_fee: ::core::primitive::u128,
 					},
@@ -22699,7 +22638,7 @@ pub mod api {
 						utxo_id: ::core::primitive::u64,
 						compensation_amount: ::core::primitive::u128,
 						compensation_still_owed: ::core::primitive::u128,
-						compensated_account_id: ::subxt::ext::subxt_core::utils::AccountId32,
+						compensated_account_id: crate::types::AccountId32,
 					},
 					#[codec(index = 7)]
 					#[doc = "An error occurred while completing a bond"]
@@ -22887,7 +22826,7 @@ pub mod api {
 				pub enum Event {
 					#[codec(index = 0)]
 					TransferToLocalchain {
-						account_id: ::subxt::ext::subxt_core::utils::AccountId32,
+						account_id: crate::types::AccountId32,
 						amount: ::core::primitive::u128,
 						transfer_id: ::core::primitive::u32,
 						notary_id: ::core::primitive::u32,
@@ -22895,20 +22834,20 @@ pub mod api {
 					},
 					#[codec(index = 1)]
 					TransferToLocalchainExpired {
-						account_id: ::subxt::ext::subxt_core::utils::AccountId32,
+						account_id: crate::types::AccountId32,
 						transfer_id: ::core::primitive::u32,
 						notary_id: ::core::primitive::u32,
 					},
 					#[codec(index = 2)]
 					TransferIn {
-						account_id: ::subxt::ext::subxt_core::utils::AccountId32,
+						account_id: crate::types::AccountId32,
 						amount: ::core::primitive::u128,
 						notary_id: ::core::primitive::u32,
 					},
 					#[codec(index = 3)]
 					#[doc = "A transfer into the mainchain failed"]
 					TransferInError {
-						account_id: ::subxt::ext::subxt_core::utils::AccountId32,
+						account_id: crate::types::AccountId32,
 						amount: ::core::primitive::u128,
 						notary_id: ::core::primitive::u32,
 						notebook_number: ::core::primitive::u32,
@@ -22917,7 +22856,7 @@ pub mod api {
 					#[codec(index = 4)]
 					#[doc = "An expired transfer to localchain failed to be refunded"]
 					TransferToLocalchainRefundError {
-						account_id: ::subxt::ext::subxt_core::utils::AccountId32,
+						account_id: crate::types::AccountId32,
 						transfer_id: ::core::primitive::u32,
 						notary_id: ::core::primitive::u32,
 						notebook_number: ::core::primitive::u32,
@@ -22982,9 +22921,9 @@ pub mod api {
 				pub enum Call {
 					#[codec(index = 0)]
 					set_zone_record {
-						domain_hash: ::sp_core::H256,
+						domain_hash: crate::types::H256,
 						zone_record: runtime_types::argon_primitives::domain::ZoneRecord<
-							::subxt::ext::subxt_core::utils::AccountId32,
+							crate::types::AccountId32,
 						>,
 					},
 				}
@@ -23041,39 +22980,39 @@ pub mod api {
 					#[codec(index = 0)]
 					#[doc = "A domain zone record was updated"]
 					ZoneRecordUpdated {
-						domain_hash: ::sp_core::H256,
+						domain_hash: crate::types::H256,
 						zone_record: runtime_types::argon_primitives::domain::ZoneRecord<
-							::subxt::ext::subxt_core::utils::AccountId32,
+							crate::types::AccountId32,
 						>,
 					},
 					#[codec(index = 1)]
 					#[doc = "A domain was registered"]
 					DomainRegistered {
-						domain_hash: ::sp_core::H256,
+						domain_hash: crate::types::H256,
 						registration: runtime_types::pallet_domains::DomainRegistration<
-							::subxt::ext::subxt_core::utils::AccountId32,
+							crate::types::AccountId32,
 						>,
 					},
 					#[codec(index = 2)]
 					#[doc = "A domain was registered"]
-					DomainRenewed { domain_hash: ::sp_core::H256 },
+					DomainRenewed { domain_hash: crate::types::H256 },
 					#[codec(index = 3)]
 					#[doc = "A domain was expired"]
-					DomainExpired { domain_hash: ::sp_core::H256 },
+					DomainExpired { domain_hash: crate::types::H256 },
 					#[codec(index = 4)]
 					#[doc = "A domain registration was canceled due to a conflicting registration in the same"]
 					#[doc = "tick"]
 					DomainRegistrationCanceled {
-						domain_hash: ::sp_core::H256,
+						domain_hash: crate::types::H256,
 						registration: runtime_types::pallet_domains::DomainRegistration<
-							::subxt::ext::subxt_core::utils::AccountId32,
+							crate::types::AccountId32,
 						>,
 					},
 					#[codec(index = 5)]
 					#[doc = "A domain registration failed due to an error"]
 					DomainRegistrationError {
-						domain_hash: ::sp_core::H256,
-						account_id: ::subxt::ext::subxt_core::utils::AccountId32,
+						domain_hash: crate::types::H256,
+						account_id: crate::types::AccountId32,
 						error: runtime_types::sp_runtime::DispatchError,
 					},
 				}
@@ -23123,7 +23062,7 @@ pub mod api {
 					report_equivocation {
 						equivocation_proof: ::subxt::ext::subxt_core::alloc::boxed::Box<
 							runtime_types::sp_consensus_grandpa::EquivocationProof<
-								::sp_core::H256,
+								crate::types::H256,
 								::core::primitive::u32,
 							>,
 						>,
@@ -23142,7 +23081,7 @@ pub mod api {
 					report_equivocation_unsigned {
 						equivocation_proof: ::subxt::ext::subxt_core::alloc::boxed::Box<
 							runtime_types::sp_consensus_grandpa::EquivocationProof<
-								::sp_core::H256,
+								crate::types::H256,
 								::core::primitive::u32,
 							>,
 						>,
@@ -23341,7 +23280,7 @@ pub mod api {
 						>,
 						reward_destination:
 							runtime_types::argon_primitives::block_seal::RewardDestination<
-								::subxt::ext::subxt_core::utils::AccountId32,
+								crate::types::AccountId32,
 							>,
 						keys: runtime_types::argon_node_runtime::opaque::SessionKeys,
 					},
@@ -23431,7 +23370,7 @@ pub mod api {
 						start_index: ::core::primitive::u32,
 						new_miners: runtime_types::bounded_collections::bounded_vec::BoundedVec<
 							runtime_types::argon_primitives::block_seal::MiningRegistration<
-								::subxt::ext::subxt_core::utils::AccountId32,
+								crate::types::AccountId32,
 								::core::primitive::u128,
 								runtime_types::argon_node_runtime::opaque::SessionKeys,
 							>,
@@ -23439,25 +23378,25 @@ pub mod api {
 					},
 					#[codec(index = 1)]
 					SlotBidderAdded {
-						account_id: ::subxt::ext::subxt_core::utils::AccountId32,
+						account_id: crate::types::AccountId32,
 						bid_amount: ::core::primitive::u128,
 						index: ::core::primitive::u32,
 					},
 					#[codec(index = 2)]
 					SlotBidderReplaced {
-						account_id: ::subxt::ext::subxt_core::utils::AccountId32,
+						account_id: crate::types::AccountId32,
 						bond_id: ::core::option::Option<::core::primitive::u64>,
 						kept_ownership_bond: ::core::primitive::bool,
 					},
 					#[codec(index = 3)]
 					UnbondedMiner {
-						account_id: ::subxt::ext::subxt_core::utils::AccountId32,
+						account_id: crate::types::AccountId32,
 						bond_id: ::core::option::Option<::core::primitive::u64>,
 						kept_ownership_bond: ::core::primitive::bool,
 					},
 					#[codec(index = 4)]
 					UnbondMinerError {
-						account_id: ::subxt::ext::subxt_core::utils::AccountId32,
+						account_id: crate::types::AccountId32,
 						bond_id: ::core::option::Option<::core::primitive::u64>,
 						error: runtime_types::sp_runtime::DispatchError,
 					},
@@ -23559,14 +23498,14 @@ pub mod api {
 					#[codec(index = 0)]
 					ArgonsMinted {
 						mint_type: runtime_types::pallet_mint::pallet::MintType,
-						account_id: ::subxt::ext::subxt_core::utils::AccountId32,
+						account_id: crate::types::AccountId32,
 						utxo_id: ::core::option::Option<::core::primitive::u64>,
 						amount: ::core::primitive::u128,
 					},
 					#[codec(index = 1)]
 					MintError {
 						mint_type: runtime_types::pallet_mint::pallet::MintType,
-						account_id: ::subxt::ext::subxt_core::utils::AccountId32,
+						account_id: crate::types::AccountId32,
 						utxo_id: ::core::option::Option<::core::primitive::u64>,
 						amount: ::core::primitive::u128,
 						error: runtime_types::sp_runtime::DispatchError,
@@ -23630,9 +23569,8 @@ pub mod api {
 					#[doc = "## Complexity"]
 					#[doc = "O(Z + C) where Z is the length of the call and C its execution weight."]
 					as_multi_threshold_1 {
-						other_signatories: ::subxt::ext::subxt_core::alloc::vec::Vec<
-							::subxt::ext::subxt_core::utils::AccountId32,
-						>,
+						other_signatories:
+							::subxt::ext::subxt_core::alloc::vec::Vec<crate::types::AccountId32>,
 						call: ::subxt::ext::subxt_core::alloc::boxed::Box<
 							runtime_types::argon_node_runtime::RuntimeCall,
 						>,
@@ -23679,9 +23617,8 @@ pub mod api {
 					#[doc = "  taken for its lifetime of `DepositBase + threshold * DepositFactor`."]
 					as_multi {
 						threshold: ::core::primitive::u16,
-						other_signatories: ::subxt::ext::subxt_core::alloc::vec::Vec<
-							::subxt::ext::subxt_core::utils::AccountId32,
-						>,
+						other_signatories:
+							::subxt::ext::subxt_core::alloc::vec::Vec<crate::types::AccountId32>,
 						maybe_timepoint: ::core::option::Option<
 							runtime_types::pallet_multisig::Timepoint<::core::primitive::u32>,
 						>,
@@ -23723,9 +23660,8 @@ pub mod api {
 					#[doc = "  taken for its lifetime of `DepositBase + threshold * DepositFactor`."]
 					approve_as_multi {
 						threshold: ::core::primitive::u16,
-						other_signatories: ::subxt::ext::subxt_core::alloc::vec::Vec<
-							::subxt::ext::subxt_core::utils::AccountId32,
-						>,
+						other_signatories:
+							::subxt::ext::subxt_core::alloc::vec::Vec<crate::types::AccountId32>,
 						maybe_timepoint: ::core::option::Option<
 							runtime_types::pallet_multisig::Timepoint<::core::primitive::u32>,
 						>,
@@ -23756,9 +23692,8 @@ pub mod api {
 					#[doc = "- Storage: removes one item."]
 					cancel_as_multi {
 						threshold: ::core::primitive::u16,
-						other_signatories: ::subxt::ext::subxt_core::alloc::vec::Vec<
-							::subxt::ext::subxt_core::utils::AccountId32,
-						>,
+						other_signatories:
+							::subxt::ext::subxt_core::alloc::vec::Vec<crate::types::AccountId32>,
 						timepoint:
 							runtime_types::pallet_multisig::Timepoint<::core::primitive::u32>,
 						call_hash: [::core::primitive::u8; 32usize],
@@ -23844,26 +23779,26 @@ pub mod api {
 					#[codec(index = 0)]
 					#[doc = "A new multisig operation has begun."]
 					NewMultisig {
-						approving: ::subxt::ext::subxt_core::utils::AccountId32,
-						multisig: ::subxt::ext::subxt_core::utils::AccountId32,
+						approving: crate::types::AccountId32,
+						multisig: crate::types::AccountId32,
 						call_hash: [::core::primitive::u8; 32usize],
 					},
 					#[codec(index = 1)]
 					#[doc = "A multisig operation has been approved by someone."]
 					MultisigApproval {
-						approving: ::subxt::ext::subxt_core::utils::AccountId32,
+						approving: crate::types::AccountId32,
 						timepoint:
 							runtime_types::pallet_multisig::Timepoint<::core::primitive::u32>,
-						multisig: ::subxt::ext::subxt_core::utils::AccountId32,
+						multisig: crate::types::AccountId32,
 						call_hash: [::core::primitive::u8; 32usize],
 					},
 					#[codec(index = 2)]
 					#[doc = "A multisig operation has been executed."]
 					MultisigExecuted {
-						approving: ::subxt::ext::subxt_core::utils::AccountId32,
+						approving: crate::types::AccountId32,
 						timepoint:
 							runtime_types::pallet_multisig::Timepoint<::core::primitive::u32>,
-						multisig: ::subxt::ext::subxt_core::utils::AccountId32,
+						multisig: crate::types::AccountId32,
 						call_hash: [::core::primitive::u8; 32usize],
 						result:
 							::core::result::Result<(), runtime_types::sp_runtime::DispatchError>,
@@ -23871,10 +23806,10 @@ pub mod api {
 					#[codec(index = 3)]
 					#[doc = "A multisig operation has been cancelled."]
 					MultisigCancelled {
-						cancelling: ::subxt::ext::subxt_core::utils::AccountId32,
+						cancelling: crate::types::AccountId32,
 						timepoint:
 							runtime_types::pallet_multisig::Timepoint<::core::primitive::u32>,
-						multisig: ::subxt::ext::subxt_core::utils::AccountId32,
+						multisig: crate::types::AccountId32,
 						call_hash: [::core::primitive::u8; 32usize],
 					},
 				}
@@ -23936,7 +23871,7 @@ pub mod api {
 					#[codec(index = 0)]
 					propose { meta: runtime_types::argon_primitives::notary::NotaryMeta },
 					#[codec(index = 1)]
-					activate { operator_account: ::subxt::ext::subxt_core::utils::AccountId32 },
+					activate { operator_account: crate::types::AccountId32 },
 					#[codec(index = 2)]
 					#[doc = "Update the metadata of a notary, to be effective at the given tick height, which must be"]
 					#[doc = ">= MetaChangesTickDelay ticks in the future."]
@@ -24013,7 +23948,7 @@ pub mod api {
 					#[codec(index = 0)]
 					#[doc = "A user has proposed operating as a notary"]
 					NotaryProposed {
-						operator_account: ::subxt::ext::subxt_core::utils::AccountId32,
+						operator_account: crate::types::AccountId32,
 						meta: runtime_types::argon_primitives::notary::NotaryMeta,
 						expires: ::core::primitive::u32,
 					},
@@ -24021,7 +23956,7 @@ pub mod api {
 					#[doc = "A notary proposal has been accepted"]
 					NotaryActivated {
 						notary: runtime_types::argon_primitives::notary::NotaryRecord<
-							::subxt::ext::subxt_core::utils::AccountId32,
+							crate::types::AccountId32,
 							::core::primitive::u32,
 						>,
 					},
@@ -24164,7 +24099,7 @@ pub mod api {
 					NotebookAuditFailure {
 						notary_id: ::core::primitive::u32,
 						notebook_number: ::core::primitive::u32,
-						notebook_hash: ::sp_core::H256,
+						notebook_hash: crate::types::H256,
 						first_failure_reason: runtime_types::argon_notary_audit::error::VerifyError,
 					},
 					#[codec(index = 2)]
@@ -24204,7 +24139,7 @@ pub mod api {
 					#[doc = ""]
 					#[doc = "# Arguments"]
 					#[doc = "* `account_id` - the account id of the operator"]
-					set_operator { account_id: ::subxt::ext::subxt_core::utils::AccountId32 },
+					set_operator { account_id: crate::types::AccountId32 },
 				}
 				#[derive(
 					:: subxt :: ext :: subxt_core :: ext :: codec :: Decode,
@@ -24257,7 +24192,7 @@ pub mod api {
 					#[doc = "Event emitted when a new price index is submitted"]
 					NewIndex,
 					#[codec(index = 1)]
-					OperatorChanged { operator_id: ::subxt::ext::subxt_core::utils::AccountId32 },
+					OperatorChanged { operator_id: crate::types::AccountId32 },
 				}
 			}
 			#[derive(
@@ -24314,7 +24249,7 @@ pub mod api {
 					#[doc = "- `call`: The call to be made by the `real` account."]
 					proxy {
 						real: ::subxt::ext::subxt_core::utils::MultiAddress<
-							::subxt::ext::subxt_core::utils::AccountId32,
+							crate::types::AccountId32,
 							(),
 						>,
 						force_proxy_type:
@@ -24335,7 +24270,7 @@ pub mod api {
 					#[doc = "zero."]
 					add_proxy {
 						delegate: ::subxt::ext::subxt_core::utils::MultiAddress<
-							::subxt::ext::subxt_core::utils::AccountId32,
+							crate::types::AccountId32,
 							(),
 						>,
 						proxy_type: runtime_types::argon_node_runtime::ProxyType,
@@ -24351,7 +24286,7 @@ pub mod api {
 					#[doc = "- `proxy_type`: The permissions currently enabled for the removed proxy account."]
 					remove_proxy {
 						delegate: ::subxt::ext::subxt_core::utils::MultiAddress<
-							::subxt::ext::subxt_core::utils::AccountId32,
+							crate::types::AccountId32,
 							(),
 						>,
 						proxy_type: runtime_types::argon_node_runtime::ProxyType,
@@ -24408,7 +24343,7 @@ pub mod api {
 					#[doc = "account whose `pure` call has corresponding parameters."]
 					kill_pure {
 						spawner: ::subxt::ext::subxt_core::utils::MultiAddress<
-							::subxt::ext::subxt_core::utils::AccountId32,
+							crate::types::AccountId32,
 							(),
 						>,
 						proxy_type: runtime_types::argon_node_runtime::ProxyType,
@@ -24436,10 +24371,10 @@ pub mod api {
 					#[doc = "- `call_hash`: The hash of the call to be made by the `real` account."]
 					announce {
 						real: ::subxt::ext::subxt_core::utils::MultiAddress<
-							::subxt::ext::subxt_core::utils::AccountId32,
+							crate::types::AccountId32,
 							(),
 						>,
-						call_hash: ::sp_core::H256,
+						call_hash: crate::types::H256,
 					},
 					#[codec(index = 7)]
 					#[doc = "Remove a given announcement."]
@@ -24454,10 +24389,10 @@ pub mod api {
 					#[doc = "- `call_hash`: The hash of the call to be made by the `real` account."]
 					remove_announcement {
 						real: ::subxt::ext::subxt_core::utils::MultiAddress<
-							::subxt::ext::subxt_core::utils::AccountId32,
+							crate::types::AccountId32,
 							(),
 						>,
-						call_hash: ::sp_core::H256,
+						call_hash: crate::types::H256,
 					},
 					#[codec(index = 8)]
 					#[doc = "Remove the given announcement of a delegate."]
@@ -24472,10 +24407,10 @@ pub mod api {
 					#[doc = "- `call_hash`: The hash of the call to be made."]
 					reject_announcement {
 						delegate: ::subxt::ext::subxt_core::utils::MultiAddress<
-							::subxt::ext::subxt_core::utils::AccountId32,
+							crate::types::AccountId32,
 							(),
 						>,
-						call_hash: ::sp_core::H256,
+						call_hash: crate::types::H256,
 					},
 					#[codec(index = 9)]
 					#[doc = "Dispatch the given `call` from an account that the sender is authorized for through"]
@@ -24491,11 +24426,11 @@ pub mod api {
 					#[doc = "- `call`: The call to be made by the `real` account."]
 					proxy_announced {
 						delegate: ::subxt::ext::subxt_core::utils::MultiAddress<
-							::subxt::ext::subxt_core::utils::AccountId32,
+							crate::types::AccountId32,
 							(),
 						>,
 						real: ::subxt::ext::subxt_core::utils::MultiAddress<
-							::subxt::ext::subxt_core::utils::AccountId32,
+							crate::types::AccountId32,
 							(),
 						>,
 						force_proxy_type:
@@ -24574,31 +24509,31 @@ pub mod api {
 					#[doc = "A pure account has been created by new proxy with given"]
 					#[doc = "disambiguation index and proxy type."]
 					PureCreated {
-						pure: ::subxt::ext::subxt_core::utils::AccountId32,
-						who: ::subxt::ext::subxt_core::utils::AccountId32,
+						pure: crate::types::AccountId32,
+						who: crate::types::AccountId32,
 						proxy_type: runtime_types::argon_node_runtime::ProxyType,
 						disambiguation_index: ::core::primitive::u16,
 					},
 					#[codec(index = 2)]
 					#[doc = "An announcement was placed to make a call in the future."]
 					Announced {
-						real: ::subxt::ext::subxt_core::utils::AccountId32,
-						proxy: ::subxt::ext::subxt_core::utils::AccountId32,
-						call_hash: ::sp_core::H256,
+						real: crate::types::AccountId32,
+						proxy: crate::types::AccountId32,
+						call_hash: crate::types::H256,
 					},
 					#[codec(index = 3)]
 					#[doc = "A proxy was added."]
 					ProxyAdded {
-						delegator: ::subxt::ext::subxt_core::utils::AccountId32,
-						delegatee: ::subxt::ext::subxt_core::utils::AccountId32,
+						delegator: crate::types::AccountId32,
+						delegatee: crate::types::AccountId32,
 						proxy_type: runtime_types::argon_node_runtime::ProxyType,
 						delay: ::core::primitive::u32,
 					},
 					#[codec(index = 4)]
 					#[doc = "A proxy was removed."]
 					ProxyRemoved {
-						delegator: ::subxt::ext::subxt_core::utils::AccountId32,
-						delegatee: ::subxt::ext::subxt_core::utils::AccountId32,
+						delegator: crate::types::AccountId32,
+						delegatee: crate::types::AccountId32,
 						proxy_type: runtime_types::argon_node_runtime::ProxyType,
 						delay: ::core::primitive::u32,
 					},
@@ -24682,7 +24617,7 @@ pub mod api {
 					#[doc = "key."]
 					set_key {
 						new: ::subxt::ext::subxt_core::utils::MultiAddress<
-							::subxt::ext::subxt_core::utils::AccountId32,
+							crate::types::AccountId32,
 							(),
 						>,
 					},
@@ -24693,7 +24628,7 @@ pub mod api {
 					#[doc = "The dispatch origin for this call must be _Signed_."]
 					sudo_as {
 						who: ::subxt::ext::subxt_core::utils::MultiAddress<
-							::subxt::ext::subxt_core::utils::AccountId32,
+							crate::types::AccountId32,
 							(),
 						>,
 						call: ::subxt::ext::subxt_core::alloc::boxed::Box<
@@ -24753,8 +24688,8 @@ pub mod api {
 					#[codec(index = 1)]
 					#[doc = "The sudo key has been updated."]
 					KeyChanged {
-						old: ::core::option::Option<::subxt::ext::subxt_core::utils::AccountId32>,
-						new: ::subxt::ext::subxt_core::utils::AccountId32,
+						old: ::core::option::Option<crate::types::AccountId32>,
+						new: crate::types::AccountId32,
 					},
 					#[codec(index = 2)]
 					#[doc = "The key was permanently removed."]
@@ -24881,7 +24816,7 @@ pub mod api {
 					#[doc = "A transaction fee `actual_fee`, of which `tip` was added to the minimum inclusion fee,"]
 					#[doc = "has been paid by `who`."]
 					TransactionFeePaid {
-						who: ::subxt::ext::subxt_core::utils::AccountId32,
+						who: crate::types::AccountId32,
 						actual_fee: ::core::primitive::u128,
 						tip: ::core::primitive::u128,
 					},
@@ -25506,7 +25441,7 @@ pub mod api {
 						mining_argons: ::core::primitive::u128,
 						securitization_percent:
 							runtime_types::sp_arithmetic::fixed_point::FixedU128,
-						operator_account_id: ::subxt::ext::subxt_core::utils::AccountId32,
+						operator_account_id: crate::types::AccountId32,
 					},
 					#[codec(index = 1)]
 					VaultModified {
@@ -26441,11 +26376,11 @@ pub mod api {
 						crate_path = ":: subxt :: ext :: subxt_core :: ext :: scale_encode"
 					)]
 					pub struct Header<_0> {
-						pub parent_hash: ::sp_core::H256,
+						pub parent_hash: crate::types::H256,
 						#[codec(compact)]
 						pub number: _0,
-						pub state_root: ::sp_core::H256,
-						pub extrinsics_root: ::sp_core::H256,
+						pub state_root: crate::types::H256,
+						pub extrinsics_root: crate::types::H256,
 						pub digest: runtime_types::sp_runtime::generic::digest::Digest,
 					}
 				}
