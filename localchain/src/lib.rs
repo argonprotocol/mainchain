@@ -9,28 +9,28 @@ use std::str::FromStr;
 use std::sync::Arc;
 use std::time::Duration;
 
-use anyhow::{anyhow, Context};
-use directories::BaseDirs;
-use lazy_static::lazy_static;
-use parking_lot::RwLock;
-use sqlx::sqlite::{SqliteConnectOptions, SqlitePoolOptions, SqliteSynchronous};
-use sqlx::Sqlite;
-use sqlx::{migrate::MigrateDatabase, SqlitePool};
-use tokio::sync::Mutex;
-
 pub use accounts::*;
+use anyhow::{anyhow, Context};
 use argon_primitives::tick::{Tick, Ticker};
 use argon_primitives::Chain;
 pub use balance_changes::*;
 pub use balance_sync::*;
 pub use constants::*;
+use directories::BaseDirs;
 pub use domain::*;
 pub use embedded_keystore::CryptoScheme;
 pub use error::Error;
 pub use keystore::Keystore;
+use lazy_static::lazy_static;
 pub use mainchain_client::*;
 pub use notary_client::*;
 pub use open_channel_holds::*;
+use parking_lot::RwLock;
+use sqlx::sqlite::{SqliteConnectOptions, SqlitePoolOptions, SqliteSynchronous};
+use sqlx::Sqlite;
+use sqlx::{migrate::MigrateDatabase, SqlitePool};
+use tokio::sync::Mutex;
+use tracing_subscriber::{fmt, EnvFilter};
 
 use crate::cli::EmbeddedKeyPassword;
 use crate::mainchain_transfer::MainchainTransferStore;
@@ -388,13 +388,21 @@ impl Localchain {
     )
   }
 
-  fn config_logs() {
+  pub fn config_logs() {
+    color_backtrace::install();
     // RUST_LOG=trace,soketto=info,sqlx=info,jsonrpsee_core=info
-    let trace = tracing_subscriber::fmt()
-      .with_env_filter(tracing_subscriber::EnvFilter::from_default_env())
-      .pretty();
+    let filter = EnvFilter::try_from_default_env()
+      .or_else(|_| EnvFilter::try_new("info,secp256k1=warn"))
+      .expect("Failed to parse RUST_LOG environment variable");
+
+    let trace = fmt::Subscriber::builder()
+      .with_env_filter(filter)
+      .with_line_number(true)
+      .with_file(true)
+      .with_thread_names(true);
     #[cfg(feature = "uniffi")]
     let trace = trace.with_ansi(false);
+
     let _ = trace.try_init();
 
     env::set_var("RUST_BACKTRACE", "1");

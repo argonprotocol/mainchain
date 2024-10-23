@@ -7,11 +7,7 @@ use scale_info::TypeInfo;
 use sp_runtime::RuntimeDebug;
 
 pub use argon_notary_audit::VerifyError as NotebookVerifyError;
-use argon_primitives::{
-	notary::{NotaryId, NotaryProvider},
-	tick::Tick,
-	TransferToLocalchainId,
-};
+use argon_primitives::{notary::NotaryId, tick::Tick, TransferToLocalchainId};
 pub use pallet::*;
 pub use weights::*;
 
@@ -71,8 +67,6 @@ pub mod pallet {
 			+ TryInto<u128>
 			+ TypeInfo
 			+ MaxEncodedLen;
-
-		type NotaryProvider: NotaryProvider<<Self as frame_system::Config>::Block>;
 
 		type NotebookProvider: NotebookProvider;
 		type CurrentTick: Get<Tick>;
@@ -187,8 +181,6 @@ pub mod pallet {
 		NotebookIncludesExpiredLocalchainTransfer,
 		/// The notary id is not registered
 		InvalidNotaryUsedForTransfer,
-		/// The notary is locked (likey due to failed audits)
-		NotaryLocked,
 	}
 
 	#[pallet::call]
@@ -242,8 +234,6 @@ pub mod pallet {
 		fn notebook_submitted(header: &NotebookHeader) {
 			let notary_id = header.notary_id;
 
-			let is_locked = T::NotebookProvider::is_notary_locked_at_tick(notary_id, header.tick);
-
 			// un-spendable notary account
 			let notary_pallet_account_id = Self::notary_account_id(notary_id);
 			for transfer in header.chain_transfers.iter() {
@@ -251,7 +241,6 @@ pub mod pallet {
 					ChainTransfer::ToMainchain { account_id, amount } => {
 						let amount = (*amount).into();
 						if let Err(e) = Self::transfer_funds_to_mainchain(
-							is_locked,
 							&notary_pallet_account_id,
 							account_id,
 							amount,
@@ -293,7 +282,7 @@ pub mod pallet {
 				}
 			}
 
-			if header.tax > 0 && !is_locked {
+			if header.tax > 0 {
 				if let Err(e) = T::Currency::burn_from(
 					&notary_pallet_account_id,
 					header.tax.into(),
@@ -309,13 +298,6 @@ pub mod pallet {
 					});
 				}
 				T::EventHandler::on_argon_burn(&header.tax.into());
-			} else if header.tax > 0 {
-				Self::deposit_event(Event::TaxationError {
-					notary_id,
-					notebook_number: header.notebook_number,
-					tax: header.tax.into(),
-					error: Error::<T>::NotaryLocked.into(),
-				});
 			}
 
 			let expiring = <ExpiringTransfersOutByNotary<T>>::take(notary_id, header.tick);
@@ -378,13 +360,10 @@ pub mod pallet {
 
 	impl<T: Config> Pallet<T> {
 		pub fn transfer_funds_to_mainchain(
-			is_locked: bool,
 			notary_pallet_account_id: &T::AccountId,
 			account_id: &T::AccountId,
 			amount: T::Balance,
 		) -> DispatchResult {
-			ensure!(!is_locked, Error::<T>::NotaryLocked);
-
 			ensure!(
 				T::Currency::reducible_balance(
 					notary_pallet_account_id,

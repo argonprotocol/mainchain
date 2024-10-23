@@ -3,7 +3,7 @@ use std::{default::Default, marker::PhantomData, sync::Arc};
 use codec::Codec;
 use futures::{channel::mpsc::*, prelude::*};
 use log::*;
-use sc_client_api::{AuxStore, BlockOf};
+use sc_client_api::AuxStore;
 use sp_api::ProvideRuntimeApi;
 use sp_blockchain::HeaderBackend;
 use sp_consensus::{Error as ConsensusError, SelectChain};
@@ -12,26 +12,24 @@ use sp_keystore::{Keystore, KeystorePtr};
 use sp_runtime::traits::{Block as BlockT, Header as HeaderT};
 use sp_timestamp::Timestamp;
 
-use argon_node_runtime::{NotaryRecordT, NotebookVerifyError};
 use argon_primitives::{
 	block_seal::BLOCK_SEAL_CRYPTO_ID,
 	digests::{BlockVoteDigest, BLOCK_VOTES_DIGEST_ID},
 	localchain::BlockVote,
-	notary::NotaryNotebookTickState,
 	tick::Tick,
-	BlockSealApis, BlockSealAuthorityId, BlockSealAuthoritySignature, BlockVotingPower, NotaryApis,
-	NotaryId, NotebookApis, NotebookNumber, TickApis, BLOCK_SEAL_KEY_TYPE,
+	BlockSealApis, BlockSealAuthorityId, BlockSealAuthoritySignature, BlockVotingPower, TickApis,
+	BLOCK_SEAL_KEY_TYPE,
 };
 
 use crate::{
 	aux_client::{ArgonAux, ForkPower},
 	block_creator::CreateTaxVoteBlock,
 	error::Error,
-	notary_client::NotaryClient,
-	LOG_TARGET,
 };
 
-pub struct NotebookWatch<B: BlockT, C: AuxStore, SC, AC: Clone + Codec> {
+const LOG_TARGET: &str = "node::consensus::notebook_sealer";
+
+pub struct NotebookSealer<B: BlockT, C: AuxStore, SC, AC: Clone + Codec> {
 	client: Arc<C>,
 	select_chain: Arc<SC>,
 	keystore: KeystorePtr,
@@ -40,14 +38,11 @@ pub struct NotebookWatch<B: BlockT, C: AuxStore, SC, AC: Clone + Codec> {
 	_phantom: PhantomData<B>,
 }
 
-impl<B, C, SC, AC> Clone for NotebookWatch<B, C, SC, AC>
+impl<B, C, SC, AC> Clone for NotebookSealer<B, C, SC, AC>
 where
 	B: BlockT,
-	C: ProvideRuntimeApi<B> + HeaderBackend<B> + AuxStore + BlockOf + 'static,
-	C::Api: NotebookApis<B, NotebookVerifyError>
-		+ BlockSealApis<B, AC, BlockSealAuthorityId>
-		+ NotaryApis<B, NotaryRecordT>
-		+ TickApis<B>,
+	C: ProvideRuntimeApi<B> + AuxStore + 'static,
+	C::Api: BlockSealApis<B, AC, BlockSealAuthorityId> + TickApis<B>,
 	AC: Codec + Clone,
 {
 	fn clone(&self) -> Self {
@@ -62,14 +57,11 @@ where
 	}
 }
 
-impl<B, C, SC, AC> NotebookWatch<B, C, SC, AC>
+impl<B, C, SC, AC> NotebookSealer<B, C, SC, AC>
 where
 	B: BlockT,
-	C: ProvideRuntimeApi<B> + HeaderBackend<B> + AuxStore + BlockOf + 'static,
-	C::Api: NotebookApis<B, NotebookVerifyError>
-		+ BlockSealApis<B, AC, BlockSealAuthorityId>
-		+ NotaryApis<B, NotaryRecordT>
-		+ TickApis<B>,
+	C: ProvideRuntimeApi<B> + AuxStore + 'static,
+	C::Api: BlockSealApis<B, AC, BlockSealAuthorityId> + TickApis<B>,
 	SC: SelectChain<B> + 'static,
 	AC: Codec + Clone,
 {
@@ -90,63 +82,11 @@ where
 		}
 	}
 
-	pub async fn on_notebook(
-		&self,
-		notary_id: NotaryId,
-		notebook_number: NotebookNumber,
-		notary_client: Arc<NotaryClient<B, C, AC>>,
-		raw_header_data: Vec<u8>,
-	) -> Result<(), Error> {
-		let best_header = self.select_chain.best_chain().await.map_err(|_| {
-			Error::NoBestHeader("Unable to get best header for notebook processing".to_string())
-		})?;
-		let finalized_hash = self.client.info().finalized_hash;
-		let best_hash = best_header.hash();
-
-		let validated_notebooks = self.aux_client.get_notary_audit_history(notary_id)?.get();
-		if validated_notebooks.iter().any(|n| n.notebook_number == notebook_number) {
-			return Ok(());
-		}
-		let Some(notebook_details) = self
-			.client
-			.runtime_api()
-			.decode_signed_raw_notebook_header(best_hash, raw_header_data.clone())?
-			.ok()
-		else {
-			return Err(Error::NotaryError(format!(
-				"Unable to decode notebook header in runtime. Notary={}",
-				notary_id
-			)));
-		};
-
-		let mut lookup_tick = notebook_details.tick.saturating_sub(1);
-		let mut audit_at_block_hash = best_hash;
-
-		while lookup_tick > 0 {
-			if let Some(hash) = get_block_descendent_with_tick(&self.client, best_hash, lookup_tick)
-			{
-				audit_at_block_hash = hash;
-				break;
-			}
-			lookup_tick -= 1;
-		}
-
-		let notary_state = notary_client
-			.try_audit_notebook(
-				&finalized_hash,
-				&audit_at_block_hash,
-				raw_header_data,
-				&notebook_details,
-			)
-			.await?;
-
-		self.check_for_new_blocks(notebook_details.tick, notary_state).await
-	}
-
-	async fn check_for_new_blocks(
+	pub async fn check_for_new_blocks(
 		&self,
 		tick: Tick,
-		notary_state: NotaryNotebookTickState,
+		voting_power: BlockVotingPower,
+		notebooks: u32,
 	) -> Result<(), Error> {
 		let timestamp_millis = Timestamp::current().as_millis();
 
@@ -155,6 +95,7 @@ where
 		let block_votes = self.aux_client.get_votes(votes_tick)?.get();
 		let votes_count = block_votes.iter().fold(0u32, |acc, x| acc + x.raw_votes.len() as u32);
 		if votes_count == 0 {
+			trace!(target: LOG_TARGET, "No block votes at tick {}", votes_tick);
 			return Ok(());
 		}
 		info!(target: LOG_TARGET, "Checking {} block votes for tick {}", votes_count, votes_tick);
@@ -162,13 +103,6 @@ where
 		// aren't these ordered?
 		let strongest_fork_at_tick = self.aux_client.strongest_fork_at_tick(tick)?.get();
 		let strongest_seal_strength = strongest_fork_at_tick.seal_strength;
-
-		let (voting_power, notebooks) = notary_state
-			.notebook_key_details_by_notary
-			.iter()
-			.fold((0u128, 0u32), |(acc_v, acc_n), (_, details)| {
-				(acc_v + details.block_voting_power, acc_n + 1)
-			});
 
 		let Some(best_hash) = self
 			.get_best_beatable_fork(vote_key_tick, voting_power, notebooks, strongest_fork_at_tick)

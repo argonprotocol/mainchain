@@ -7,6 +7,7 @@ pub mod chain_transfer;
 pub mod mainchain_identity;
 pub mod notarizations;
 pub mod notebook;
+pub mod notebook_audit_failure;
 pub mod notebook_constraints;
 pub mod notebook_header;
 pub mod notebook_new_accounts;

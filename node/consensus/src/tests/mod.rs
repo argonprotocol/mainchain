@@ -32,6 +32,7 @@ use crate::{
 use super::tax_block_creator;
 
 pub(crate) mod mock;
+pub mod mock_notary;
 
 fn create_keystore(authority: Keyring) -> KeystorePtr {
 	let keystore = MemoryKeystore::new();
@@ -319,7 +320,7 @@ async fn can_run_proof_of_tax() {
 
 		let closest_miner_id: NodeIdentity = miner1.node_identity.clone();
 
-		let miner_signature = crate::notebook_watch::try_sign_vote(
+		let miner_signature = crate::notebook_sealer::try_sign_vote(
 			&closest_miner_id.keystore,
 			&parent_hash,
 			&closest_miner_id.authority_id,

@@ -36,7 +36,7 @@ use argon_randomx::RandomXError;
 
 use crate::{
 	aux_client::ArgonAux, block_creator, block_creator::propose, compute_solver::ComputeSolver,
-	digests::get_tick_digest, error::Error, notebook_watch::has_votes_at_tick,
+	digests::get_tick_digest, error::Error, notebook_sealer::has_votes_at_tick,
 };
 
 /// Version of the mining worker.

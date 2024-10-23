@@ -242,6 +242,7 @@ where
   I: IntoIterator<Item = T>,
   T: Into<OsString> + Clone,
 {
+  Localchain::config_logs();
   let cli = Cli::parse_from(itr);
 
   let base_dir = cli.base_dir.clone();

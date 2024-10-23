@@ -21,7 +21,7 @@ pub type NotaryId = u32;
 pub type NotaryPublic = ed25519::Public;
 pub type NotarySignature = ed25519::Signature;
 
-pub trait NotaryProvider<B: BlockT> {
+pub trait NotaryProvider<B: BlockT, AccountId> {
 	fn verify_signature(
 		notary_id: NotaryId,
 		at_tick: Tick,
@@ -29,6 +29,7 @@ pub trait NotaryProvider<B: BlockT> {
 		signature: &NotarySignature,
 	) -> bool;
 	fn active_notaries() -> Vec<NotaryId>;
+	fn is_notary_operator(notary_id: NotaryId, account_id: &AccountId) -> bool;
 }
 
 #[derive(
@@ -120,8 +121,46 @@ pub struct NotaryRecord<
 	pub meta_updated_tick: Tick,
 	pub meta: NotaryMeta<MaxHosts>,
 }
+
+#[derive(CloneNoBound, PartialEqNoBound, Encode, Decode, RuntimeDebugNoBound, TypeInfo)]
+#[scale_info(skip_type_params(MaxHosts))]
+pub struct NotaryRecordWithState<
+	AccountId: Codec + Clone + PartialEq + Debug,
+	BlockNumber: Codec + Clone + PartialEq + Debug,
+	MaxHosts: Get<u32>,
+	NotebookVerifyError: Codec + Clone + PartialEq + Debug,
+> {
+	#[codec(compact)]
+	pub notary_id: NotaryId,
+	pub operator_account_id: AccountId,
+	#[codec(compact)]
+	pub activated_block: BlockNumber,
+
+	#[codec(compact)]
+	pub meta_updated_block: BlockNumber,
+	#[codec(compact)]
+	pub meta_updated_tick: Tick,
+	pub meta: NotaryMeta<MaxHosts>,
+	pub state: NotaryState<NotebookVerifyError>,
+}
+
+#[derive(CloneNoBound, PartialEqNoBound, Encode, Decode, RuntimeDebugNoBound, TypeInfo)]
+pub enum NotaryState<NotebookVerifyError: Codec + Clone + PartialEq + Debug> {
+	Active,
+	Locked {
+		failed_audit_reason: NotebookVerifyError,
+		at_tick: Tick,
+		notebook_number: NotebookNumber,
+	},
+	Reactivated {
+		reprocess_notebook_number: NotebookNumber,
+	},
+}
+
 #[derive(Clone, PartialEq, Eq, Encode, Decode, RuntimeDebug, TypeInfo, Default)]
 pub struct NotaryNotebookTickState {
+	#[codec(compact)]
+	pub tick: Tick,
 	#[codec(compact)]
 	pub notaries: u16,
 	pub notebook_key_details_by_notary: BTreeMap<NotaryId, NotaryNotebookVoteDigestDetails>,
@@ -183,6 +222,24 @@ impl TryInto<NotaryNotebookAuditSummaryDecoded> for NotaryNotebookAuditSummary {
 			version: self.version,
 			details,
 		})
+	}
+}
+
+impl<Hash: Codec> From<NotaryNotebookDetails<Hash>>
+	for (NotaryNotebookAuditSummary, NotaryNotebookVoteDigestDetails)
+{
+	fn from(
+		details: NotaryNotebookDetails<Hash>,
+	) -> (NotaryNotebookAuditSummary, NotaryNotebookVoteDigestDetails) {
+		let vote_digest = NotaryNotebookVoteDigestDetails::from(&details);
+		let audit_summary = NotaryNotebookAuditSummary {
+			notary_id: details.notary_id,
+			notebook_number: details.notebook_number,
+			tick: details.tick,
+			version: details.version,
+			raw_data: details.raw_audit_summary,
+		};
+		(audit_summary, vote_digest)
 	}
 }
 

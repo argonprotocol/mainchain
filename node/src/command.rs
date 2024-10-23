@@ -54,6 +54,7 @@ impl SubstrateCli for Cli {
 
 /// Parse and run command line arguments
 pub fn run() -> sc_cli::Result<()> {
+	color_backtrace::install();
 	let cli = Cli::from_args();
 
 	let bitcoin_rpc_url = cli.bitcoin_rpc_url.clone().unwrap_or_default();

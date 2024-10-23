@@ -68,7 +68,7 @@ use argon_primitives::{
 	localchain::BestBlockVoteSeal,
 	notary::{
 		NotaryId, NotaryNotebookAuditSummary, NotaryNotebookDetails, NotaryNotebookRawVotes,
-		NotaryNotebookVoteDigestDetails, NotaryRecord,
+		NotaryNotebookVoteDigestDetails, NotaryRecordWithState,
 	},
 	notebook::NotebookNumber,
 	tick::{Tick, Ticker},
@@ -443,7 +443,6 @@ impl pallet_chain_transfer::Config for Runtime {
 	type WeightInfo = pallet_chain_transfer::weights::SubstrateWeight<Runtime>;
 	type Currency = Balances;
 	type Balance = Balance;
-	type NotaryProvider = Notaries;
 	type PalletId = ChainTransferPalletId;
 	type TransferExpirationTicks = TransferExpirationTicks;
 	type MaxPendingTransfersOutPerBlock = MaxPendingTransfersOutPerBlock;
@@ -472,7 +471,8 @@ parameter_types! {
 	pub const MaxNotaryHosts: u32 = 4;
 }
 
-pub type NotaryRecordT = NotaryRecord<AccountId, BlockNumber, crate::MaxNotaryHosts>;
+pub type NotaryRecordT =
+	NotaryRecordWithState<AccountId, BlockNumber, MaxNotaryHosts, NotebookVerifyError>;
 
 impl pallet_notaries::Config for Runtime {
 	type RuntimeEvent = RuntimeEvent;
@@ -1028,10 +1028,21 @@ impl_runtime_apis! {
 
 	impl argon_primitives::NotaryApis<Block, NotaryRecordT> for Runtime {
 		fn notary_by_id(notary_id: NotaryId) -> Option<NotaryRecordT> {
-			Notaries::notaries().iter().find(|a| a.notary_id == notary_id).cloned()
+			Self::notaries().iter().find(|a| a.notary_id == notary_id).cloned()
 		}
 		fn notaries() -> Vec<NotaryRecordT> {
-			Notaries::notaries().iter().cloned().collect()
+			Notaries::notaries().iter().map(|n| {
+				let state = Notebook::get_state(n.notary_id);
+				NotaryRecordWithState {
+					notary_id: n.notary_id,
+					operator_account_id: n.operator_account_id.clone(),
+					activated_block: n.activated_block,
+					meta_updated_block: n.meta_updated_block,
+					meta_updated_tick: n.meta_updated_tick,
+					meta: n.meta.clone(),
+					state,
+				}
+			}).collect()
 		}
 	}
 

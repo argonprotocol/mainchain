@@ -117,21 +117,42 @@ where
 		info!("Importing block with hash {:?} ({})", block.post_hash(), block.header.number());
 		let digests = load_digests::<B>(&block.header)?;
 
-		// if we're importing a non-finalized block from someone else, verify the notebook audits
-		let latest_verified_finalized = self.client.info().finalized_number;
-		if block.origin != BlockOrigin::Own && block.header.number() > &latest_verified_finalized {
-			verify_notebook_audits(&self.aux_client, &digests.notebooks).await?;
-		}
-
+		let parent_hash = *block.header.parent_hash();
 		let Some(Some(seal_digest)) = block.post_digests.last().map(read_seal_digest) else {
 			return Err(Error::MissingBlockSealDigest.into());
 		};
-		let parent_hash = *block.header.parent_hash();
 
-		if let Some(inner_body) = block.body.take() {
-			let check_block = B::new(block.header.clone(), inner_body);
+		let compute_difficulty = match seal_digest {
+			BlockSealDigest::Compute { .. } => {
+				let difficulty =
+					self.client.runtime_api().compute_difficulty(parent_hash).map_err(|e| {
+						Error::MissingRuntimeData(
+							format!("Failed to get difficulty from runtime: {}", e).to_string(),
+						)
+					})?;
+				Some(difficulty)
+			},
+			_ => None,
+		};
 
-			if !block.state_action.skip_execution_checks() {
+		// Only do the checks if we're not skipping execution checks or if we're importing a
+		// block
+		if !block.state_action.skip_execution_checks() &&
+			!block.with_state() &&
+			block.origin != BlockOrigin::Own
+		{
+			// if we're importing a non-finalized block from someone else, verify the notebook
+			// audits
+			let latest_verified_finalized = self.client.info().finalized_number;
+			if block.origin != BlockOrigin::Own &&
+				block.header.number() > &latest_verified_finalized
+			{
+				verify_notebook_audits(&self.aux_client, &digests.notebooks).await?;
+			}
+
+			if let Some(inner_body) = block.body.take() {
+				let check_block = B::new(block.header.clone(), inner_body);
+
 				let timestamp = sp_timestamp::InherentDataProvider::from_system_time();
 				let seal =
 					BlockSealInherentDataProvider { seal: None, digest: Some(seal_digest.clone()) };
@@ -167,34 +188,25 @@ where
 						}
 					}
 				}
+
+				// NOTE: we verify compute nonce in import queue because we use the pre-hash, which
+				// we'd have to inject into the runtime
+				if let BlockSealDigest::Compute { nonce } = &seal_digest {
+					let pre_hash = block.header.hash();
+
+					let key_block_hash = randomx_key_block(&self.client, &parent_hash)?;
+					if !BlockComputeNonce::is_valid(
+						nonce,
+						pre_hash.as_ref().to_vec(),
+						&key_block_hash,
+						compute_difficulty.unwrap(),
+					) {
+						return Err(Error::InvalidComputeNonce.into());
+					}
+				}
+
+				block.body = Some(check_block.deconstruct().1);
 			}
-
-			block.body = Some(check_block.deconstruct().1);
-		}
-
-		let pre_hash = block.header.hash();
-		let mut compute_difficulty = None;
-
-		// NOTE: we verify compute nonce in import queue because we use the pre-hash, which we'd
-		// have to inject into the runtime
-		if let BlockSealDigest::Compute { nonce } = &seal_digest {
-			// verify compute effort
-			let difficulty =
-				self.client.runtime_api().compute_difficulty(parent_hash).map_err(|e| {
-					Error::MissingRuntimeData(
-						format!("Failed to get difficulty from runtime: {}", e).to_string(),
-					)
-				})?;
-			let key_block_hash = randomx_key_block(&self.client, &parent_hash)?;
-			if !BlockComputeNonce::is_valid(
-				nonce,
-				pre_hash.as_ref().to_vec(),
-				&key_block_hash,
-				difficulty,
-			) {
-				return Err(Error::InvalidComputeNonce.into());
-			}
-			compute_difficulty = Some(difficulty);
 		}
 
 		let best_header = self

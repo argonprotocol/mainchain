@@ -259,7 +259,8 @@ declare module '@polkadot/api-base/types/events' {
       NotaryProposed: AugmentedEvent<ApiType, [operatorAccount: AccountId32, meta: ArgonPrimitivesNotaryNotaryMeta, expires: u32], { operatorAccount: AccountId32, meta: ArgonPrimitivesNotaryNotaryMeta, expires: u32 }>;
     };
     notebook: {
-      NotebookAuditFailure: AugmentedEvent<ApiType, [notaryId: u32, notebookNumber: u32, firstFailureReason: ArgonNotaryAuditErrorVerifyError], { notaryId: u32, notebookNumber: u32, firstFailureReason: ArgonNotaryAuditErrorVerifyError }>;
+      NotebookAuditFailure: AugmentedEvent<ApiType, [notaryId: u32, notebookNumber: u32, notebookHash: H256, firstFailureReason: ArgonNotaryAuditErrorVerifyError], { notaryId: u32, notebookNumber: u32, notebookHash: H256, firstFailureReason: ArgonNotaryAuditErrorVerifyError }>;
+      NotebookReadyForReprocess: AugmentedEvent<ApiType, [notaryId: u32, notebookNumber: u32], { notaryId: u32, notebookNumber: u32 }>;
       NotebookSubmitted: AugmentedEvent<ApiType, [notaryId: u32, notebookNumber: u32], { notaryId: u32, notebookNumber: u32 }>;
     };
     ownership: {

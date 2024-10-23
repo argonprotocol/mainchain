@@ -2,7 +2,7 @@
 #![allow(clippy::too_many_arguments)]
 
 use alloc::{collections::btree_map::BTreeMap, vec::Vec};
-use codec::{Codec, MaxEncodedLen};
+use codec::Codec;
 use sp_core::{ConstU32, H256, U256};
 use sp_runtime::{BoundedVec, DispatchError};
 
@@ -38,8 +38,7 @@ sp_api::decl_runtime_apis! {
 }
 
 sp_api::decl_runtime_apis! {
-	pub trait NotaryApis<NotaryRecord> where
-		NotaryRecord: Codec + MaxEncodedLen{
+	pub trait NotaryApis<NotaryRecord: Codec> {
 		fn notary_by_id(notary_id: NotaryId) -> Option<NotaryRecord>;
 		fn notaries() -> Vec<NotaryRecord>;
 	}

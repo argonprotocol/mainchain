@@ -345,8 +345,11 @@ declare module '@polkadot/api-base/types/storage' {
        **/
       lastNotebookDetailsByNotary: AugmentedQuery<ApiType, (arg: u32 | AnyNumber | Uint8Array) => Observable<Vec<ITuple<[ArgonPrimitivesNotaryNotaryNotebookKeyDetails, bool]>>>, [u32]>;
       /**
+       * Notaries ready to start reprocessing at a given notebook number
+       **/
+      lockedNotaryReadyForReprocess: AugmentedQuery<ApiType, (arg: u32 | AnyNumber | Uint8Array) => Observable<Option<u32>>, [u32]>;
+      /**
        * Notaries locked for failing audits
-       * TODO: we need a mechanism to unlock a notary with "Fixes"
        **/
       notariesLockedForFailedAudit: AugmentedQuery<ApiType, (arg: u32 | AnyNumber | Uint8Array) => Observable<Option<ITuple<[u32, u32, ArgonNotaryAuditErrorVerifyError]>>>, [u32]>;
       /**

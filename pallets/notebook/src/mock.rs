@@ -1,13 +1,15 @@
 use env_logger::{Builder, Env};
 use frame_support::{derive_impl, parameter_types, traits::Currency};
 use sp_core::{crypto::AccountId32, ConstU32, H256};
+use sp_keyring::Ed25519Keyring;
 use sp_runtime::{traits::IdentityLookup, BuildStorage};
 
 use argon_primitives::{
 	block_vote::VoteMinimum,
 	notary::{NotaryId, NotaryProvider, NotarySignature},
 	tick::{Tick, Ticker},
-	BlockVotingProvider, ChainTransferLookup, TickProvider, TransferToLocalchainId,
+	BlockVotingProvider, ChainTransferLookup, NotebookEventHandler, NotebookHeader, TickProvider,
+	TransferToLocalchainId,
 };
 
 use crate as pallet_notebook;
@@ -38,15 +40,19 @@ parameter_types! {
 
 	pub static ExistentialDeposit: Balance = 10;
 	pub static IsProofOfCompute: bool = false;
+	pub static NotaryOperator: AccountId32 = Ed25519Keyring::Bob.to_account_id();
 }
 
 pub struct NotaryProviderImpl;
-impl NotaryProvider<Block> for NotaryProviderImpl {
+impl NotaryProvider<Block, AccountId32> for NotaryProviderImpl {
 	fn verify_signature(_: NotaryId, _: Tick, _: &H256, _: &NotarySignature) -> bool {
 		true
 	}
 	fn active_notaries() -> Vec<NotaryId> {
 		vec![1]
+	}
+	fn is_notary_operator(_: NotaryId, account_id32: &AccountId32) -> bool {
+		account_id32 == &NotaryOperator::get()
 	}
 }
 
@@ -55,6 +61,7 @@ parameter_types! {
 	pub static ParentVotingKey: Option<H256> = None;
 	pub static GrandpaVoteMinimum: Option<VoteMinimum> = None;
 	pub static CurrentTick: Tick = 0;
+	pub static NotebookEvents: Vec<NotebookHeader> = vec![];
 }
 pub struct ChainTransferLookupImpl;
 impl ChainTransferLookup<AccountId32, Balance> for ChainTransferLookupImpl {
@@ -114,12 +121,20 @@ impl TickProvider<Block> for StaticTickProvider {
 		todo!()
 	}
 }
+
+pub struct OnNotebook;
+impl NotebookEventHandler for OnNotebook {
+	fn notebook_submitted(header: &NotebookHeader) {
+		NotebookEvents::mutate(|events| events.push(header.clone()));
+	}
+}
+
 impl pallet_notebook::Config for Test {
 	type RuntimeEvent = RuntimeEvent;
 	type WeightInfo = ();
 
 	type NotaryProvider = NotaryProviderImpl;
-	type EventHandler = ();
+	type EventHandler = OnNotebook;
 
 	type ChainTransferLookup = ChainTransferLookupImpl;
 	type BlockVotingProvider = StaticBlockVotingProvider;

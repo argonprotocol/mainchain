@@ -19,6 +19,7 @@ use crate::{
 		blocks::BlocksStore,
 		chain_transfer::ChainTransferStore,
 		mainchain_identity::MainchainIdentityStore,
+		notebook_audit_failure::NotebookAuditFailureStore,
 		notebook_header::NotebookHeaderStore,
 		notebook_status::{NotebookFinalizationStep, NotebookStatusStore},
 		registered_key::RegisteredKeyStore,
@@ -156,6 +157,26 @@ async fn process_block(
 		})
 		.unwrap_or_default();
 
+	let events = block.events().await?;
+	for event in events.iter().flatten() {
+		if let Some(Ok(notebook)) =
+			event.as_event::<api::notebook::events::NotebookAuditFailure>().transpose()
+		{
+			if notebook.notary_id == notary_id {
+				info!("Notebook audit failure: {:?}", notebook);
+				NotebookAuditFailureStore::record(
+					db,
+					notebook.notebook_number,
+					notebook.notebook_hash,
+					format!("{:?}", notebook.first_failure_reason),
+					block.number(),
+				)
+				.await?;
+				break;
+			}
+		}
+	}
+
 	let parent_hash = block.header().parent_hash;
 	BlocksStore::record(
 		db,
@@ -285,15 +306,6 @@ async fn process_finalized_block(
 					NotebookFinalizationStep::Closed,
 				)
 				.await?;
-			}
-			continue;
-		}
-
-		if let Some(Ok(notebook)) =
-			event.as_event::<api::notebook::events::NotebookAuditFailure>().transpose()
-		{
-			if notebook.notary_id == notary_id {
-				panic!("Notebook audit failed! Need to shut down {:?}", notebook);
 			}
 			continue;
 		}

@@ -10,6 +10,7 @@ use argon_primitives::{tick::Ticker, NotaryId, SignedNotebookHeader};
 
 use crate::stores::{
 	notebook::NotebookStore,
+	notebook_audit_failure::NotebookAuditFailureStore,
 	notebook_header::NotebookHeaderStore,
 	notebook_status::{NotebookFinalizationStep, NotebookStatusStore},
 	registered_key::RegisteredKeyStore,
@@ -99,6 +100,16 @@ pub fn spawn_notebook_closer(
 impl NotebookCloser {
 	pub async fn create_task(&'_ mut self) -> anyhow::Result<(), Error> {
 		loop {
+			if let Some(has_failed_audit) =
+				NotebookAuditFailureStore::has_unresolved_audit_failure(&self.pool).await?
+			{
+				tracing::error!(
+					"This notary has a failed audit. Need to shut down processing. Notebook={}, Reason={}",
+					has_failed_audit.notebook_number,
+					has_failed_audit.failure_reason
+				);
+				return Ok(());
+			}
 			let _ = self.iterate_notebook_close_loop().await;
 			let tick = self.ticker.current();
 			let next_tick = self.ticker.time_for_tick(tick + 1);

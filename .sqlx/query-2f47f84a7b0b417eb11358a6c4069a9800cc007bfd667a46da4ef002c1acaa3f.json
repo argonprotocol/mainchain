@@ -1,0 +1,50 @@
+{
+  "db_name": "PostgreSQL",
+  "query": "\n\t\t\t\tSELECT * from notebook_audit_failures\n\t\t\t\tWHERE is_resolved = false\n\t\t\t\tLIMIT 1\n            ",
+  "describe": {
+    "columns": [
+      {
+        "ordinal": 0,
+        "name": "notebook_number",
+        "type_info": "Int4"
+      },
+      {
+        "ordinal": 1,
+        "name": "hash",
+        "type_info": "Bytea"
+      },
+      {
+        "ordinal": 2,
+        "name": "failure_reason",
+        "type_info": "Varchar"
+      },
+      {
+        "ordinal": 3,
+        "name": "failure_block_number",
+        "type_info": "Int4"
+      },
+      {
+        "ordinal": 4,
+        "name": "is_resolved",
+        "type_info": "Bool"
+      },
+      {
+        "ordinal": 5,
+        "name": "last_updated",
+        "type_info": "Timestamptz"
+      }
+    ],
+    "parameters": {
+      "Left": []
+    },
+    "nullable": [
+      false,
+      false,
+      false,
+      false,
+      false,
+      false
+    ]
+  },
+  "hash": "2f47f84a7b0b417eb11358a6c4069a9800cc007bfd667a46da4ef002c1acaa3f"
+}

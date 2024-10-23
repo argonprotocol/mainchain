@@ -75,7 +75,7 @@ pub mod pallet {
 
 		type BlockSealerProvider: BlockSealerProvider<Self::AccountId>;
 		type BlockRewardAccountsProvider: BlockRewardAccountsProvider<Self::AccountId>;
-		type NotaryProvider: NotaryProvider<Self::Block>;
+		type NotaryProvider: NotaryProvider<Self::Block, Self::AccountId>;
 		type NotebookProvider: NotebookProvider;
 		type CurrentTick: Get<Tick>;
 		/// Number of argons minted per block

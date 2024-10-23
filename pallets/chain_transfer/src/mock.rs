@@ -7,9 +7,8 @@ use sp_runtime::{traits::IdentityLookup, BuildStorage};
 
 use crate as pallet_chain_transfer;
 use argon_primitives::{
-	notary::{NotaryId, NotaryProvider, NotarySignature},
-	tick::Tick,
-	BlockSealAuthorityId, NotebookNumber, NotebookProvider, NotebookSecret,
+	notary::NotaryId, tick::Tick, BlockSealAuthorityId, NotebookNumber, NotebookProvider,
+	NotebookSecret,
 };
 
 pub type Balance = u128;
@@ -54,16 +53,6 @@ parameter_types! {
 	pub static LockedNotaries: BTreeMap<NotaryId, Tick> = BTreeMap::new();
 
 	pub static IsProofOfCompute: bool = false;
-}
-
-pub struct NotaryProviderImpl;
-impl NotaryProvider<Block> for NotaryProviderImpl {
-	fn verify_signature(_: NotaryId, _: Tick, _: &H256, _: &NotarySignature) -> bool {
-		true
-	}
-	fn active_notaries() -> Vec<NotaryId> {
-		vec![1]
-	}
 }
 
 impl pallet_balances::Config for Test {
@@ -113,7 +102,6 @@ impl pallet_chain_transfer::Config for Test {
 	type Currency = Balances;
 	type Balance = Balance;
 	type MaxPendingTransfersOutPerBlock = MaxPendingTransfersOutPerBlock;
-	type NotaryProvider = NotaryProviderImpl;
 	type PalletId = LocalchainPalletId;
 	type TransferExpirationTicks = TransferExpirationTicks;
 	type NotebookProvider = StaticNotebookProvider;

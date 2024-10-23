@@ -310,7 +310,12 @@ pub fn new_full<
 				compute_task,
 			);
 
-			let (vote_watch_task, create_block_stream) = argon_node_consensus::notary_client_task(
+			let (
+				seal_watch_task,
+				notary_sync_task,
+				notary_notebook_queue_task,
+				create_block_stream,
+			) = argon_node_consensus::block_creation_task(
 				client.clone(),
 				select_chain,
 				aux_client.clone(),
@@ -335,9 +340,19 @@ pub fn new_full<
 			);
 
 			task_manager.spawn_essential_handle().spawn_blocking(
-				"argon-vote-blocks-watch",
+				"argon-vote-block-seal-watch",
 				Some("block-authoring"),
-				vote_watch_task,
+				seal_watch_task,
+			);
+			task_manager.spawn_essential_handle().spawn_blocking(
+				"argon-vote-notary-sync",
+				Some("block-authoring"),
+				notary_sync_task,
+			);
+			task_manager.spawn_essential_handle().spawn_blocking(
+				"argon-vote-notebook-queue",
+				Some("block-authoring"),
+				notary_notebook_queue_task,
 			);
 			task_manager.spawn_essential_handle().spawn_blocking(
 				"argon-blocks",

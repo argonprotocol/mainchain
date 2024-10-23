@@ -35,12 +35,20 @@ where
 	where
 		F: FnOnce(&mut T) -> R,
 	{
-		let (result, encoded) = {
+		let (result, encoded, start_data) = {
 			let mut data = self.data.write();
+			let start_data = data.clone();
 			let result = f(&mut data);
-			(result, data.encode())
+			(result, data.encode(), start_data)
 		};
-		self.client.insert_aux(&[(self.key.as_slice(), encoded.as_slice())], &[])?;
+
+		self.client
+			.insert_aux(&[(self.key.as_slice(), encoded.as_slice())], &[])
+			.map_err(|e| {
+				// roll back the data and throw
+				*self.data.write() = start_data;
+				e
+			})?;
 
 		Ok(result)
 	}

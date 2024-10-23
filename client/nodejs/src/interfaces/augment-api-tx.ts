@@ -362,6 +362,7 @@ declare module '@polkadot/api-base/types/submittable' {
     };
     notebook: {
       submit: AugmentedSubmittable<(notebooks: Vec<ArgonPrimitivesNotebookSignedNotebookHeader> | (ArgonPrimitivesNotebookSignedNotebookHeader | { header?: any; signature?: any } | string | Uint8Array)[]) => SubmittableExtrinsic<ApiType>, [Vec<ArgonPrimitivesNotebookSignedNotebookHeader>]>;
+      unlock: AugmentedSubmittable<(notaryId: u32 | AnyNumber | Uint8Array) => SubmittableExtrinsic<ApiType>, [u32]>;
     };
     ownership: {
       /**

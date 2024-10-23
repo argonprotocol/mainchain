@@ -1143,9 +1143,9 @@ pub mod api {
 						"query_call_info",
 						types::QueryCallInfo { call, len },
 						[
-							108u8, 74u8, 110u8, 52u8, 170u8, 12u8, 40u8, 41u8, 158u8, 226u8, 89u8,
-							180u8, 249u8, 50u8, 220u8, 157u8, 176u8, 182u8, 105u8, 71u8, 102u8,
-							154u8, 64u8, 17u8, 66u8, 167u8, 102u8, 184u8, 238u8, 42u8, 7u8, 110u8,
+							205u8, 98u8, 23u8, 80u8, 236u8, 76u8, 85u8, 105u8, 121u8, 191u8, 188u8,
+							170u8, 48u8, 52u8, 174u8, 138u8, 159u8, 18u8, 64u8, 134u8, 128u8, 47u8,
+							61u8, 252u8, 112u8, 229u8, 252u8, 160u8, 149u8, 153u8, 112u8, 85u8,
 						],
 					)
 				}
@@ -1163,10 +1163,9 @@ pub mod api {
 						"query_call_fee_details",
 						types::QueryCallFeeDetails { call, len },
 						[
-							22u8, 212u8, 175u8, 26u8, 30u8, 185u8, 33u8, 133u8, 216u8, 116u8,
-							201u8, 69u8, 166u8, 63u8, 106u8, 196u8, 67u8, 192u8, 179u8, 88u8,
-							224u8, 171u8, 100u8, 171u8, 21u8, 205u8, 252u8, 110u8, 245u8, 70u8,
-							98u8, 156u8,
+							145u8, 164u8, 154u8, 155u8, 54u8, 28u8, 231u8, 43u8, 76u8, 69u8, 200u8,
+							87u8, 5u8, 144u8, 136u8, 87u8, 56u8, 11u8, 146u8, 156u8, 1u8, 236u8,
+							247u8, 174u8, 143u8, 124u8, 187u8, 233u8, 98u8, 229u8, 3u8, 18u8,
 						],
 					)
 				}
@@ -1598,10 +1597,10 @@ pub mod api {
 						"notary_by_id",
 						types::NotaryById { notary_id },
 						[
-							67u8, 89u8, 113u8, 93u8, 230u8, 187u8, 174u8, 251u8, 11u8, 150u8,
-							230u8, 190u8, 82u8, 190u8, 48u8, 170u8, 253u8, 3u8, 254u8, 175u8,
-							156u8, 118u8, 196u8, 149u8, 147u8, 90u8, 150u8, 109u8, 123u8, 190u8,
-							155u8, 92u8,
+							245u8, 111u8, 219u8, 224u8, 176u8, 148u8, 17u8, 3u8, 255u8, 226u8,
+							254u8, 160u8, 72u8, 66u8, 78u8, 240u8, 105u8, 237u8, 5u8, 24u8, 162u8,
+							104u8, 36u8, 216u8, 249u8, 198u8, 36u8, 144u8, 125u8, 36u8, 171u8,
+							21u8,
 						],
 					)
 				}
@@ -1616,9 +1615,10 @@ pub mod api {
 						"notaries",
 						types::Notaries {},
 						[
-							255u8, 199u8, 119u8, 53u8, 165u8, 244u8, 14u8, 63u8, 108u8, 87u8, 40u8,
-							202u8, 181u8, 23u8, 18u8, 118u8, 27u8, 128u8, 232u8, 24u8, 124u8, 13u8,
-							193u8, 65u8, 121u8, 113u8, 80u8, 54u8, 29u8, 238u8, 191u8, 221u8,
+							218u8, 211u8, 73u8, 204u8, 165u8, 150u8, 86u8, 4u8, 43u8, 168u8, 43u8,
+							163u8, 135u8, 142u8, 207u8, 190u8, 230u8, 22u8, 192u8, 120u8, 150u8,
+							89u8, 59u8, 240u8, 241u8, 144u8, 235u8, 86u8, 151u8, 177u8, 51u8,
+							191u8,
 						],
 					)
 				}
@@ -1631,9 +1631,10 @@ pub mod api {
 					pub mod output {
 						use super::runtime_types;
 						pub type Output = ::core::option::Option<
-							runtime_types::argon_primitives::notary::NotaryRecord<
+							runtime_types::argon_primitives::notary::NotaryRecordWithState<
 								::subxt::ext::subxt_core::utils::AccountId32,
 								::core::primitive::u32,
+								runtime_types::argon_notary_audit::error::VerifyError,
 							>,
 						>;
 					}
@@ -1661,9 +1662,10 @@ pub mod api {
 					pub mod output {
 						use super::runtime_types;
 						pub type Output = ::subxt::ext::subxt_core::alloc::vec::Vec<
-							runtime_types::argon_primitives::notary::NotaryRecord<
+							runtime_types::argon_primitives::notary::NotaryRecordWithState<
 								::subxt::ext::subxt_core::utils::AccountId32,
 								::core::primitive::u32,
+								runtime_types::argon_notary_audit::error::VerifyError,
 							>,
 						>;
 					}
@@ -2922,9 +2924,9 @@ pub mod api {
 			.hash();
 		runtime_metadata_hash ==
 			[
-				42u8, 188u8, 171u8, 35u8, 38u8, 210u8, 233u8, 222u8, 162u8, 126u8, 169u8, 32u8,
-				254u8, 235u8, 35u8, 65u8, 73u8, 34u8, 167u8, 210u8, 42u8, 171u8, 186u8, 253u8,
-				173u8, 63u8, 154u8, 222u8, 92u8, 75u8, 56u8, 141u8,
+				223u8, 190u8, 186u8, 177u8, 219u8, 8u8, 141u8, 171u8, 110u8, 187u8, 190u8, 69u8,
+				65u8, 108u8, 51u8, 211u8, 193u8, 133u8, 26u8, 7u8, 196u8, 126u8, 228u8, 78u8,
+				153u8, 56u8, 248u8, 62u8, 101u8, 218u8, 141u8, 219u8,
 			]
 	}
 	pub mod system {
@@ -4075,10 +4077,10 @@ pub mod api {
 						"Events",
 						(),
 						[
-							65u8, 141u8, 60u8, 29u8, 75u8, 114u8, 169u8, 219u8, 107u8, 115u8,
-							205u8, 199u8, 78u8, 226u8, 28u8, 129u8, 135u8, 202u8, 157u8, 249u8,
-							196u8, 168u8, 241u8, 157u8, 231u8, 64u8, 239u8, 178u8, 194u8, 241u8,
-							151u8, 165u8,
+							65u8, 139u8, 22u8, 30u8, 74u8, 9u8, 28u8, 210u8, 166u8, 244u8, 84u8,
+							136u8, 5u8, 236u8, 137u8, 53u8, 150u8, 154u8, 154u8, 225u8, 173u8,
+							34u8, 249u8, 246u8, 145u8, 123u8, 163u8, 117u8, 182u8, 115u8, 37u8,
+							201u8,
 						],
 					)
 				}
@@ -4858,9 +4860,9 @@ pub mod api {
 							call: ::subxt::ext::subxt_core::alloc::boxed::Box::new(call),
 						},
 						[
-							196u8, 206u8, 88u8, 37u8, 75u8, 140u8, 38u8, 45u8, 47u8, 206u8, 209u8,
-							249u8, 175u8, 99u8, 123u8, 155u8, 147u8, 43u8, 205u8, 146u8, 113u8,
-							85u8, 203u8, 218u8, 223u8, 185u8, 144u8, 25u8, 65u8, 49u8, 42u8, 200u8,
+							90u8, 237u8, 48u8, 227u8, 118u8, 193u8, 140u8, 166u8, 109u8, 87u8, 4u8,
+							182u8, 147u8, 195u8, 65u8, 64u8, 204u8, 119u8, 250u8, 183u8, 37u8,
+							53u8, 136u8, 216u8, 171u8, 171u8, 8u8, 131u8, 77u8, 45u8, 166u8, 96u8,
 						],
 					)
 				}
@@ -4922,9 +4924,9 @@ pub mod api {
 							max_weight,
 						},
 						[
-							146u8, 90u8, 213u8, 224u8, 135u8, 62u8, 135u8, 81u8, 26u8, 116u8,
-							189u8, 68u8, 243u8, 28u8, 106u8, 92u8, 151u8, 251u8, 37u8, 36u8, 16u8,
-							56u8, 192u8, 103u8, 29u8, 93u8, 163u8, 56u8, 15u8, 100u8, 22u8, 14u8,
+							51u8, 11u8, 85u8, 173u8, 53u8, 80u8, 89u8, 143u8, 198u8, 52u8, 225u8,
+							124u8, 148u8, 106u8, 236u8, 86u8, 251u8, 102u8, 86u8, 19u8, 96u8,
+							176u8, 176u8, 27u8, 103u8, 59u8, 113u8, 215u8, 11u8, 194u8, 3u8, 121u8,
 						],
 					)
 				}
@@ -5787,10 +5789,9 @@ pub mod api {
 							call: ::subxt::ext::subxt_core::alloc::boxed::Box::new(call),
 						},
 						[
-							239u8, 91u8, 68u8, 70u8, 223u8, 71u8, 92u8, 87u8, 87u8, 186u8, 27u8,
-							208u8, 217u8, 179u8, 72u8, 188u8, 202u8, 90u8, 131u8, 56u8, 249u8,
-							222u8, 84u8, 151u8, 202u8, 87u8, 250u8, 156u8, 220u8, 35u8, 171u8,
-							94u8,
+							135u8, 253u8, 35u8, 184u8, 173u8, 218u8, 79u8, 209u8, 33u8, 14u8, 37u8,
+							80u8, 104u8, 23u8, 235u8, 58u8, 228u8, 217u8, 255u8, 82u8, 174u8,
+							161u8, 179u8, 58u8, 164u8, 169u8, 217u8, 84u8, 99u8, 253u8, 27u8, 5u8,
 						],
 					)
 				}
@@ -6052,9 +6053,9 @@ pub mod api {
 							call: ::subxt::ext::subxt_core::alloc::boxed::Box::new(call),
 						},
 						[
-							160u8, 239u8, 224u8, 217u8, 2u8, 165u8, 152u8, 62u8, 144u8, 188u8, 3u8,
-							125u8, 127u8, 160u8, 130u8, 13u8, 102u8, 24u8, 56u8, 47u8, 162u8,
-							128u8, 230u8, 111u8, 101u8, 60u8, 145u8, 243u8, 46u8, 35u8, 1u8, 100u8,
+							72u8, 68u8, 236u8, 39u8, 29u8, 96u8, 168u8, 242u8, 248u8, 66u8, 135u8,
+							78u8, 222u8, 219u8, 85u8, 142u8, 102u8, 84u8, 80u8, 211u8, 129u8, 86u8,
+							68u8, 152u8, 48u8, 7u8, 246u8, 68u8, 171u8, 108u8, 2u8, 189u8,
 						],
 					)
 				}
@@ -10490,6 +10491,32 @@ pub mod api {
 					const PALLET: &'static str = "Notebook";
 					const CALL: &'static str = "submit";
 				}
+				#[derive(
+					:: subxt :: ext :: subxt_core :: ext :: codec :: Decode,
+					:: subxt :: ext :: subxt_core :: ext :: codec :: Encode,
+					:: subxt :: ext :: subxt_core :: ext :: scale_decode :: DecodeAsType,
+					:: subxt :: ext :: subxt_core :: ext :: scale_encode :: EncodeAsType,
+					Clone,
+					Debug,
+				)]
+				# [codec (crate = :: subxt :: ext :: subxt_core :: ext :: codec)]
+				#[decode_as_type(
+					crate_path = ":: subxt :: ext :: subxt_core :: ext :: scale_decode"
+				)]
+				#[encode_as_type(
+					crate_path = ":: subxt :: ext :: subxt_core :: ext :: scale_encode"
+				)]
+				pub struct Unlock {
+					pub notary_id: unlock::NotaryId,
+				}
+				pub mod unlock {
+					use super::runtime_types;
+					pub type NotaryId = ::core::primitive::u32;
+				}
+				impl ::subxt::ext::subxt_core::blocks::StaticExtrinsic for Unlock {
+					const PALLET: &'static str = "Notebook";
+					const CALL: &'static str = "unlock";
+				}
 			}
 			pub struct TransactionApi;
 			impl TransactionApi {
@@ -10506,6 +10533,21 @@ pub mod api {
 							150u8, 140u8, 227u8, 185u8, 248u8, 72u8, 75u8, 126u8, 219u8, 87u8,
 							142u8, 136u8, 249u8, 148u8, 204u8, 116u8, 71u8, 111u8, 10u8, 207u8,
 							5u8, 142u8,
+						],
+					)
+				}
+				pub fn unlock(
+					&self,
+					notary_id: types::unlock::NotaryId,
+				) -> ::subxt::ext::subxt_core::tx::payload::StaticPayload<types::Unlock> {
+					::subxt::ext::subxt_core::tx::payload::StaticPayload::new_static(
+						"Notebook",
+						"unlock",
+						types::Unlock { notary_id },
+						[
+							233u8, 40u8, 76u8, 200u8, 116u8, 54u8, 28u8, 223u8, 195u8, 156u8, 3u8,
+							34u8, 175u8, 8u8, 185u8, 139u8, 243u8, 130u8, 149u8, 155u8, 84u8, 72u8,
+							224u8, 21u8, 211u8, 22u8, 184u8, 67u8, 158u8, 181u8, 37u8, 42u8,
 						],
 					)
 				}
@@ -10553,17 +10595,43 @@ pub mod api {
 			pub struct NotebookAuditFailure {
 				pub notary_id: notebook_audit_failure::NotaryId,
 				pub notebook_number: notebook_audit_failure::NotebookNumber,
+				pub notebook_hash: notebook_audit_failure::NotebookHash,
 				pub first_failure_reason: notebook_audit_failure::FirstFailureReason,
 			}
 			pub mod notebook_audit_failure {
 				use super::runtime_types;
 				pub type NotaryId = ::core::primitive::u32;
 				pub type NotebookNumber = ::core::primitive::u32;
+				pub type NotebookHash = ::sp_core::H256;
 				pub type FirstFailureReason = runtime_types::argon_notary_audit::error::VerifyError;
 			}
 			impl ::subxt::ext::subxt_core::events::StaticEvent for NotebookAuditFailure {
 				const PALLET: &'static str = "Notebook";
 				const EVENT: &'static str = "NotebookAuditFailure";
+			}
+			#[derive(
+				:: subxt :: ext :: subxt_core :: ext :: codec :: Decode,
+				:: subxt :: ext :: subxt_core :: ext :: codec :: Encode,
+				:: subxt :: ext :: subxt_core :: ext :: scale_decode :: DecodeAsType,
+				:: subxt :: ext :: subxt_core :: ext :: scale_encode :: EncodeAsType,
+				Clone,
+				Debug,
+			)]
+			# [codec (crate = :: subxt :: ext :: subxt_core :: ext :: codec)]
+			#[decode_as_type(crate_path = ":: subxt :: ext :: subxt_core :: ext :: scale_decode")]
+			#[encode_as_type(crate_path = ":: subxt :: ext :: subxt_core :: ext :: scale_encode")]
+			pub struct NotebookReadyForReprocess {
+				pub notary_id: notebook_ready_for_reprocess::NotaryId,
+				pub notebook_number: notebook_ready_for_reprocess::NotebookNumber,
+			}
+			pub mod notebook_ready_for_reprocess {
+				use super::runtime_types;
+				pub type NotaryId = ::core::primitive::u32;
+				pub type NotebookNumber = ::core::primitive::u32;
+			}
+			impl ::subxt::ext::subxt_core::events::StaticEvent for NotebookReadyForReprocess {
+				const PALLET: &'static str = "Notebook";
+				const EVENT: &'static str = "NotebookReadyForReprocess";
 			}
 		}
 		pub mod storage {
@@ -10613,6 +10681,11 @@ pub mod api {
 						::core::primitive::u32,
 						runtime_types::argon_notary_audit::error::VerifyError,
 					);
+					pub type Param0 = ::core::primitive::u32;
+				}
+				pub mod locked_notary_ready_for_reprocess {
+					use super::runtime_types;
+					pub type LockedNotaryReadyForReprocess = ::core::primitive::u32;
 					pub type Param0 = ::core::primitive::u32;
 				}
 			}
@@ -10813,7 +10886,6 @@ pub mod api {
 					)
 				}
 				#[doc = " Notaries locked for failing audits"]
-				#[doc = " TODO: we need a mechanism to unlock a notary with \"Fixes\""]
 				pub fn notaries_locked_for_failed_audit_iter(
 					&self,
 				) -> ::subxt::ext::subxt_core::storage::address::StaticAddress<
@@ -10836,7 +10908,6 @@ pub mod api {
 					)
 				}
 				#[doc = " Notaries locked for failing audits"]
-				#[doc = " TODO: we need a mechanism to unlock a notary with \"Fixes\""]
 				pub fn notaries_locked_for_failed_audit(
 					&self,
 					_0: impl ::core::borrow::Borrow<types::notaries_locked_for_failed_audit::Param0>,
@@ -10860,6 +10931,55 @@ pub mod api {
 							82u8, 54u8, 24u8, 104u8, 156u8, 237u8, 122u8, 146u8, 27u8, 173u8,
 							134u8, 71u8, 128u8, 249u8, 245u8, 149u8, 47u8, 59u8, 202u8, 37u8,
 							171u8, 250u8,
+						],
+					)
+				}
+				#[doc = " Notaries ready to start reprocessing at a given notebook number"]
+				pub fn locked_notary_ready_for_reprocess_iter(
+					&self,
+				) -> ::subxt::ext::subxt_core::storage::address::StaticAddress<
+					(),
+					types::locked_notary_ready_for_reprocess::LockedNotaryReadyForReprocess,
+					(),
+					(),
+					::subxt::ext::subxt_core::utils::Yes,
+				> {
+					::subxt::ext::subxt_core::storage::address::StaticAddress::new_static(
+						"Notebook",
+						"LockedNotaryReadyForReprocess",
+						(),
+						[
+							213u8, 112u8, 72u8, 60u8, 86u8, 51u8, 106u8, 231u8, 200u8, 244u8,
+							114u8, 159u8, 109u8, 127u8, 248u8, 234u8, 229u8, 48u8, 140u8, 161u8,
+							33u8, 149u8, 189u8, 164u8, 225u8, 2u8, 114u8, 6u8, 9u8, 209u8, 221u8,
+							65u8,
+						],
+					)
+				}
+				#[doc = " Notaries ready to start reprocessing at a given notebook number"]
+				pub fn locked_notary_ready_for_reprocess(
+					&self,
+					_0: impl ::core::borrow::Borrow<types::locked_notary_ready_for_reprocess::Param0>,
+				) -> ::subxt::ext::subxt_core::storage::address::StaticAddress<
+					::subxt::ext::subxt_core::storage::address::StaticStorageKey<
+						types::locked_notary_ready_for_reprocess::Param0,
+					>,
+					types::locked_notary_ready_for_reprocess::LockedNotaryReadyForReprocess,
+					::subxt::ext::subxt_core::utils::Yes,
+					(),
+					(),
+				> {
+					::subxt::ext::subxt_core::storage::address::StaticAddress::new_static(
+						"Notebook",
+						"LockedNotaryReadyForReprocess",
+						::subxt::ext::subxt_core::storage::address::StaticStorageKey::new(
+							_0.borrow(),
+						),
+						[
+							213u8, 112u8, 72u8, 60u8, 86u8, 51u8, 106u8, 231u8, 200u8, 244u8,
+							114u8, 159u8, 109u8, 127u8, 248u8, 234u8, 229u8, 48u8, 140u8, 161u8,
+							33u8, 149u8, 189u8, 164u8, 225u8, 2u8, 114u8, 6u8, 9u8, 209u8, 221u8,
+							65u8,
 						],
 					)
 				}
@@ -17809,10 +17929,9 @@ pub mod api {
 						"batch",
 						types::Batch { calls },
 						[
-							36u8, 149u8, 237u8, 172u8, 151u8, 82u8, 57u8, 116u8, 199u8, 149u8,
-							245u8, 187u8, 192u8, 138u8, 163u8, 3u8, 150u8, 245u8, 36u8, 34u8,
-							220u8, 250u8, 170u8, 70u8, 62u8, 57u8, 43u8, 108u8, 248u8, 70u8, 22u8,
-							242u8,
+							59u8, 1u8, 171u8, 36u8, 67u8, 250u8, 180u8, 37u8, 13u8, 52u8, 18u8,
+							167u8, 221u8, 195u8, 198u8, 112u8, 85u8, 149u8, 41u8, 83u8, 206u8,
+							183u8, 66u8, 73u8, 234u8, 7u8, 250u8, 35u8, 28u8, 101u8, 139u8, 3u8,
 						],
 					)
 				}
@@ -17842,10 +17961,9 @@ pub mod api {
 							call: ::subxt::ext::subxt_core::alloc::boxed::Box::new(call),
 						},
 						[
-							100u8, 178u8, 89u8, 74u8, 101u8, 192u8, 136u8, 102u8, 240u8, 158u8,
-							101u8, 78u8, 58u8, 238u8, 94u8, 139u8, 199u8, 227u8, 174u8, 124u8,
-							105u8, 89u8, 33u8, 10u8, 33u8, 165u8, 145u8, 8u8, 40u8, 162u8, 141u8,
-							67u8,
+							68u8, 9u8, 222u8, 80u8, 91u8, 55u8, 116u8, 129u8, 93u8, 96u8, 159u8,
+							188u8, 136u8, 145u8, 178u8, 77u8, 126u8, 226u8, 117u8, 2u8, 158u8,
+							77u8, 178u8, 52u8, 28u8, 70u8, 104u8, 197u8, 201u8, 9u8, 244u8, 248u8,
 						],
 					)
 				}
@@ -17871,10 +17989,9 @@ pub mod api {
 						"batch_all",
 						types::BatchAll { calls },
 						[
-							34u8, 126u8, 22u8, 109u8, 226u8, 169u8, 236u8, 125u8, 238u8, 74u8,
-							243u8, 118u8, 223u8, 184u8, 16u8, 149u8, 223u8, 235u8, 251u8, 69u8,
-							137u8, 215u8, 148u8, 43u8, 244u8, 133u8, 20u8, 17u8, 231u8, 180u8,
-							248u8, 151u8,
+							138u8, 1u8, 61u8, 118u8, 141u8, 32u8, 4u8, 11u8, 206u8, 218u8, 112u8,
+							58u8, 214u8, 144u8, 93u8, 44u8, 99u8, 29u8, 23u8, 210u8, 116u8, 114u8,
+							96u8, 138u8, 53u8, 183u8, 191u8, 178u8, 50u8, 39u8, 140u8, 250u8,
 						],
 					)
 				}
@@ -17897,9 +18014,10 @@ pub mod api {
 							call: ::subxt::ext::subxt_core::alloc::boxed::Box::new(call),
 						},
 						[
-							193u8, 228u8, 208u8, 216u8, 38u8, 173u8, 53u8, 135u8, 107u8, 9u8, 0u8,
-							58u8, 220u8, 174u8, 23u8, 103u8, 100u8, 121u8, 220u8, 228u8, 14u8,
-							255u8, 41u8, 66u8, 245u8, 55u8, 136u8, 49u8, 222u8, 72u8, 73u8, 191u8,
+							112u8, 163u8, 179u8, 161u8, 217u8, 103u8, 25u8, 53u8, 86u8, 241u8,
+							166u8, 136u8, 246u8, 241u8, 174u8, 16u8, 254u8, 13u8, 42u8, 211u8,
+							180u8, 234u8, 254u8, 146u8, 245u8, 128u8, 94u8, 2u8, 210u8, 95u8, 82u8,
+							177u8,
 						],
 					)
 				}
@@ -17925,10 +18043,9 @@ pub mod api {
 						"force_batch",
 						types::ForceBatch { calls },
 						[
-							243u8, 104u8, 239u8, 90u8, 113u8, 99u8, 204u8, 249u8, 102u8, 36u8,
-							241u8, 124u8, 85u8, 68u8, 223u8, 7u8, 174u8, 43u8, 180u8, 117u8, 1u8,
-							249u8, 145u8, 74u8, 69u8, 156u8, 255u8, 149u8, 221u8, 153u8, 193u8,
-							80u8,
+							32u8, 75u8, 47u8, 131u8, 200u8, 100u8, 129u8, 118u8, 208u8, 14u8,
+							203u8, 18u8, 8u8, 54u8, 246u8, 64u8, 249u8, 40u8, 98u8, 100u8, 175u8,
+							43u8, 188u8, 136u8, 47u8, 154u8, 2u8, 2u8, 134u8, 74u8, 76u8, 193u8,
 						],
 					)
 				}
@@ -17951,10 +18068,10 @@ pub mod api {
 							weight,
 						},
 						[
-							7u8, 141u8, 114u8, 138u8, 252u8, 27u8, 175u8, 21u8, 138u8, 70u8, 84u8,
-							127u8, 86u8, 158u8, 159u8, 228u8, 107u8, 33u8, 132u8, 217u8, 22u8,
-							118u8, 141u8, 185u8, 125u8, 202u8, 53u8, 151u8, 143u8, 246u8, 22u8,
-							195u8,
+							68u8, 90u8, 208u8, 126u8, 184u8, 84u8, 210u8, 193u8, 141u8, 191u8,
+							72u8, 46u8, 218u8, 163u8, 103u8, 115u8, 140u8, 89u8, 231u8, 88u8, 45u8,
+							234u8, 170u8, 243u8, 24u8, 80u8, 193u8, 234u8, 20u8, 196u8, 46u8,
+							181u8,
 						],
 					)
 				}
@@ -18289,9 +18406,10 @@ pub mod api {
 							call: ::subxt::ext::subxt_core::alloc::boxed::Box::new(call),
 						},
 						[
-							68u8, 160u8, 227u8, 27u8, 224u8, 151u8, 119u8, 217u8, 6u8, 8u8, 48u8,
-							102u8, 231u8, 203u8, 29u8, 186u8, 128u8, 58u8, 7u8, 125u8, 30u8, 223u8,
-							205u8, 227u8, 150u8, 216u8, 121u8, 176u8, 24u8, 173u8, 242u8, 197u8,
+							1u8, 152u8, 181u8, 167u8, 59u8, 139u8, 120u8, 194u8, 165u8, 167u8,
+							19u8, 155u8, 179u8, 109u8, 54u8, 167u8, 20u8, 122u8, 158u8, 169u8,
+							162u8, 140u8, 205u8, 146u8, 231u8, 128u8, 158u8, 197u8, 187u8, 222u8,
+							100u8, 229u8,
 						],
 					)
 				}
@@ -18314,9 +18432,9 @@ pub mod api {
 							weight,
 						},
 						[
-							254u8, 38u8, 119u8, 158u8, 32u8, 73u8, 41u8, 177u8, 205u8, 248u8, 58u8,
-							82u8, 26u8, 32u8, 39u8, 69u8, 51u8, 21u8, 116u8, 106u8, 2u8, 80u8,
-							28u8, 150u8, 230u8, 169u8, 120u8, 138u8, 64u8, 0u8, 176u8, 119u8,
+							7u8, 51u8, 12u8, 170u8, 72u8, 141u8, 192u8, 233u8, 55u8, 58u8, 52u8,
+							102u8, 23u8, 57u8, 217u8, 97u8, 190u8, 105u8, 86u8, 240u8, 34u8, 167u8,
+							161u8, 179u8, 228u8, 37u8, 93u8, 255u8, 153u8, 184u8, 111u8, 133u8,
 						],
 					)
 				}
@@ -18354,10 +18472,9 @@ pub mod api {
 							call: ::subxt::ext::subxt_core::alloc::boxed::Box::new(call),
 						},
 						[
-							245u8, 114u8, 124u8, 5u8, 103u8, 179u8, 95u8, 63u8, 54u8, 133u8, 220u8,
-							166u8, 243u8, 245u8, 246u8, 42u8, 202u8, 246u8, 210u8, 106u8, 228u8,
-							63u8, 114u8, 237u8, 89u8, 138u8, 30u8, 111u8, 139u8, 242u8, 48u8,
-							159u8,
+							81u8, 255u8, 20u8, 20u8, 244u8, 208u8, 141u8, 125u8, 30u8, 31u8, 192u8,
+							148u8, 126u8, 91u8, 31u8, 225u8, 119u8, 103u8, 58u8, 85u8, 124u8,
+							110u8, 59u8, 105u8, 7u8, 94u8, 188u8, 166u8, 234u8, 55u8, 226u8, 232u8,
 						],
 					)
 				}
@@ -20266,6 +20383,61 @@ pub mod api {
 					#[codec(compact)]
 					pub meta_updated_tick: _1,
 					pub meta: runtime_types::argon_primitives::notary::NotaryMeta,
+				}
+				#[derive(
+					:: subxt :: ext :: subxt_core :: ext :: codec :: Decode,
+					:: subxt :: ext :: subxt_core :: ext :: codec :: Encode,
+					:: subxt :: ext :: subxt_core :: ext :: scale_decode :: DecodeAsType,
+					:: subxt :: ext :: subxt_core :: ext :: scale_encode :: EncodeAsType,
+					Clone,
+					Debug,
+				)]
+				# [codec (crate = :: subxt :: ext :: subxt_core :: ext :: codec)]
+				#[decode_as_type(
+					crate_path = ":: subxt :: ext :: subxt_core :: ext :: scale_decode"
+				)]
+				#[encode_as_type(
+					crate_path = ":: subxt :: ext :: subxt_core :: ext :: scale_encode"
+				)]
+				pub struct NotaryRecordWithState<_0, _1, _3> {
+					#[codec(compact)]
+					pub notary_id: _1,
+					pub operator_account_id: _0,
+					#[codec(compact)]
+					pub activated_block: _1,
+					#[codec(compact)]
+					pub meta_updated_block: _1,
+					#[codec(compact)]
+					pub meta_updated_tick: _1,
+					pub meta: runtime_types::argon_primitives::notary::NotaryMeta,
+					pub state: runtime_types::argon_primitives::notary::NotaryState<_3>,
+				}
+				#[derive(
+					:: subxt :: ext :: subxt_core :: ext :: codec :: Decode,
+					:: subxt :: ext :: subxt_core :: ext :: codec :: Encode,
+					:: subxt :: ext :: subxt_core :: ext :: scale_decode :: DecodeAsType,
+					:: subxt :: ext :: subxt_core :: ext :: scale_encode :: EncodeAsType,
+					Clone,
+					Debug,
+				)]
+				# [codec (crate = :: subxt :: ext :: subxt_core :: ext :: codec)]
+				#[decode_as_type(
+					crate_path = ":: subxt :: ext :: subxt_core :: ext :: scale_decode"
+				)]
+				#[encode_as_type(
+					crate_path = ":: subxt :: ext :: subxt_core :: ext :: scale_encode"
+				)]
+				pub enum NotaryState<_0> {
+					#[codec(index = 0)]
+					Active,
+					#[codec(index = 1)]
+					Locked {
+						failed_audit_reason: _0,
+						at_tick: ::core::primitive::u32,
+						notebook_number: ::core::primitive::u32,
+					},
+					#[codec(index = 2)]
+					Reactivated { reprocess_notebook_number: ::core::primitive::u32 },
 				}
 			}
 			pub mod notebook {
@@ -22552,9 +22724,6 @@ pub mod api {
 					#[codec(index = 5)]
 					#[doc = "The notary id is not registered"]
 					InvalidNotaryUsedForTransfer,
-					#[codec(index = 6)]
-					#[doc = "The notary is locked (likey due to failed audits)"]
-					NotaryLocked,
 				}
 				#[derive(
 					:: subxt :: ext :: subxt_core :: ext :: codec :: Decode,
@@ -23763,6 +23932,8 @@ pub mod api {
 							runtime_types::argon_primitives::notebook::SignedNotebookHeader,
 						>,
 					},
+					#[codec(index = 1)]
+					unlock { notary_id: ::core::primitive::u32 },
 				}
 				#[derive(
 					:: subxt :: ext :: subxt_core :: ext :: codec :: Decode,
@@ -23814,6 +23985,15 @@ pub mod api {
 					#[codec(index = 10)]
 					#[doc = "Unable to track the notebook change list"]
 					InternalError,
+					#[codec(index = 11)]
+					#[doc = "A notebook was submitted for a notary that failed audit, which is not allowed"]
+					NotebookSubmittedForLockedNotary,
+					#[codec(index = 12)]
+					#[doc = "Invalid reprocess notebook"]
+					InvalidReprocessNotebook,
+					#[codec(index = 13)]
+					#[doc = "Invalid notary operator"]
+					InvalidNotaryOperator,
 				}
 				#[derive(
 					:: subxt :: ext :: subxt_core :: ext :: codec :: Decode,
@@ -23841,7 +24021,13 @@ pub mod api {
 					NotebookAuditFailure {
 						notary_id: ::core::primitive::u32,
 						notebook_number: ::core::primitive::u32,
+						notebook_hash: ::sp_core::H256,
 						first_failure_reason: runtime_types::argon_notary_audit::error::VerifyError,
+					},
+					#[codec(index = 2)]
+					NotebookReadyForReprocess {
+						notary_id: ::core::primitive::u32,
+						notebook_number: ::core::primitive::u32,
 					},
 				}
 			}

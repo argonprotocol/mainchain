@@ -163,6 +163,7 @@ tracing-subscriber = { version = "0.3", features = ["env-filter"] }
 log = { version = "0.4", default-features = false }
 env_logger = "0.11"
 humantime = { version = "2.1" }
+color-backtrace = { version = "0.6" }
 
 sqlx = { version = "0.8", features = ["macros"] }
 chrono = { version = "0.4", features = ["serde"] }
@@ -223,8 +224,8 @@ pallet-transaction-payment-rpc = { git = "https://github.com/paritytech/polkadot
 # test clients
 sc-network-test = { git = "https://github.com/paritytech/polkadot-sdk.git", tag = "polkadot-stable2407-1" }
 sp-test-primitives = { git = "https://github.com/paritytech/polkadot-sdk.git", tag = "polkadot-stable2407-1" }
-substrate-test-runtime = { git = "https://github.com/paritytech/polkadot-sdk.git", tag = "polkadot-stable2407-1" }
-substrate-test-runtime-client = { git = "https://github.com/paritytech/polkadot-sdk.git", tag = "polkadot-stable2407-1" }
+substrate-test-runtime = { git = "https://github.com/paritytech/polkadot-sdk.git", tag = "polkadot-stable2407-1", default-features = false }
+substrate-test-runtime-client = { git = "https://github.com/paritytech/polkadot-sdk.git", tag = "polkadot-stable2407-1", default-features = false }
 fs2 = { version = "0.4" }
 strip-ansi-escapes = { version = "0.2" }
 current_platform = { version = "0.2" }

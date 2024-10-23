@@ -385,6 +385,7 @@ dependencies = [
  "binary-merkle-tree",
  "chrono",
  "clap",
+ "color-backtrace",
  "comfy-table",
  "directories",
  "dotenv",
@@ -428,6 +429,7 @@ dependencies = [
  "argon-randomx",
  "async-trait",
  "clap",
+ "color-backtrace",
  "frame-benchmarking",
  "frame-benchmarking-cli",
  "frame-metadata-hash-extension",
@@ -485,6 +487,7 @@ dependencies = [
 name = "argon-node-consensus"
 version = "0.0.14"
 dependencies = [
+ "anyhow",
  "argon-bitcoin-utxo-tracker",
  "argon-node-runtime",
  "argon-notary",
@@ -492,6 +495,7 @@ dependencies = [
  "argon-primitives",
  "argon-randomx",
  "async-trait",
+ "binary-merkle-tree",
  "env_logger 0.11.5",
  "frame-support",
  "futures",
@@ -617,6 +621,7 @@ dependencies = [
  "binary-merkle-tree",
  "chrono",
  "clap",
+ "color-backtrace",
  "dotenv",
  "frame-support",
  "futures",
@@ -2074,6 +2079,16 @@ checksum = "3538270d33cc669650c4b093848450d380def10c331d38c768e34cac80576e6e"
 dependencies = [
  "termcolor",
  "unicode-width",
+]
+
+[[package]]
+name = "color-backtrace"
+version = "0.6.1"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "150fd80a270c0671379f388c8204deb6a746bb4eac8a6c03fe2460b2c0127ea0"
+dependencies = [
+ "backtrace",
+ "termcolor",
 ]
 
 [[package]]

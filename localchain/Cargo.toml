@@ -25,6 +25,7 @@ futures = { workspace = true }
 getrandom = { workspace = true }
 parking_lot = { workspace = true }
 async-trait = { workspace = true }
+color-backtrace = { workspace = true }
 codec = { workspace = true, features = ["default"] }
 serde = { workspace = true, features = ["default"] }
 serde_json = { workspace = true, features = ["default"] }

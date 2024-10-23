@@ -274,10 +274,6 @@ declare module '@polkadot/api-base/types/errors' {
       InvalidOrDuplicatedLocalchainTransfer: AugmentedError<ApiType>;
       MaxBlockTransfersExceeded: AugmentedError<ApiType>;
       /**
-       * The notary is locked (likey due to failed audits)
-       **/
-      NotaryLocked: AugmentedError<ApiType>;
-      /**
        * A transfer was submitted in a previous block but the expiration block has passed
        **/
       NotebookIncludesExpiredLocalchainTransfer: AugmentedError<ApiType>;
@@ -485,6 +481,10 @@ declare module '@polkadot/api-base/types/errors' {
        **/
       InternalError: AugmentedError<ApiType>;
       /**
+       * Invalid notary operator
+       **/
+      InvalidNotaryOperator: AugmentedError<ApiType>;
+      /**
        * The notebook digest did not match the included notebooks
        **/
       InvalidNotebookDigest: AugmentedError<ApiType>;
@@ -492,6 +492,10 @@ declare module '@polkadot/api-base/types/errors' {
        * The signature of the notebook is invalid
        **/
       InvalidNotebookSignature: AugmentedError<ApiType>;
+      /**
+       * Invalid reprocess notebook
+       **/
+      InvalidReprocessNotebook: AugmentedError<ApiType>;
       /**
        * The secret or secret hash of the parent notebook do not match
        **/
@@ -508,6 +512,10 @@ declare module '@polkadot/api-base/types/errors' {
        * Multiple inherents provided
        **/
       MultipleNotebookInherentsProvided: AugmentedError<ApiType>;
+      /**
+       * A notebook was submitted for a notary that failed audit, which is not allowed
+       **/
+      NotebookSubmittedForLockedNotary: AugmentedError<ApiType>;
       /**
        * A notebook was already provided at this tick
        **/
