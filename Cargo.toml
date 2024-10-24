@@ -50,6 +50,8 @@ documentation = "https://argonprotocol.org/docs"
 
 [profile.release]
 lto = true
+opt-level = 3
+panic = "unwind"
 
 [profile.testnet]
 inherits = "release"
@@ -298,7 +300,7 @@ cmake = { version = "0.1" }
 dotenv = { version = "0.15" }
 
 # releases are using old versions of jsonrpsee
-subxt = { version = "0.37", git = "https://github.com/paritytech/subxt", branch = "master" }
+subxt = { git = "https://github.com/paritytech/subxt", rev = "72db833defd2664410d61f51408b26fc9314fc41" }
 
 argon-testing = { path = "testing" }
 argon-localchain = { path = "localchain" }

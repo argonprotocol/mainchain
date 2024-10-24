@@ -42,7 +42,6 @@ bitcoin = { workspace = true, optional = true, default-features = false }
 rpassword = { workspace = true, optional = true }
 anyhow = { workspace = true, optional = true }
 
-k256 = { workspace = true, optional = true }
 bip32 = { workspace = true, optional = true, features = ["secp256k1"] }
 base58 = { workspace = true, optional = true }
 
@@ -67,7 +66,6 @@ std = [
 	"frame-support-procedural/std",
 	"frame-support/std",
 	"hex",
-	"k256?/std",
 	"rpassword",
 	"rsntp",
 	"sc-keystore",
@@ -92,4 +90,4 @@ std = [
 ]
 napi = [ "napi-derive/type-def", "napi/napi9", "napi/serde-json" ]
 uniffi = [ "dep:uniffi" ]
-bitcoin = [ "base58", "bip32", "dep:bitcoin", "k256" ]
+bitcoin = [ "base58", "bip32", "dep:bitcoin" ]
