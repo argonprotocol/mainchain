@@ -33,17 +33,15 @@ jobs:
           persist-credentials: false
 
       - name: If published release exists, exit
-        id: check_release
         run: |
-          PUBLISHED_RELEASE_EXISTS=$(gh release list --json tagName,isDraft --jq ".[] | select(.tagName==\"${{ github.ref_name }}\" and .isDraft = false) | .tagName" | head -n 1)
-          if [[ -n "PUBLISHED_RELEASE_EXISTS" ]]; then
+          PUBLISHED_RELEASE_EXISTS=$(gh release list --json tagName,isDraft --jq ".[] | select(.tagName==\"${{ github.ref_name }}\" and .isDraft == false) | .tagName" | head -n 1)
+          if [[ -n "$PUBLISHED_RELEASE_EXISTS" ]]; then
            exit 1
           fi
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
 
       - name: Check if draft release exists
-        id: check_release
         run: |
           RELEASE_EXISTS=$(gh release list --json tagName --jq ".[] | select(.tagName==\"${{ github.ref_name }}\") | .tagName" | head -n 1)
           if [[ -n "$RELEASE_EXISTS" ]]; then
@@ -55,7 +53,6 @@ jobs:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
 
       - name: Extract changelog for the current version
-        id: extract_changelog
         run: |
           # Extract changelog section for the specified version
           sed -n "/^## \[${{ github.ref_name }}\]/,/^### \[v/p" CHANGELOG.md | sed '$d' > changelog.txt

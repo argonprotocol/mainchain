@@ -26,9 +26,9 @@ pub use mainchain_client::*;
 pub use notary_client::*;
 pub use open_channel_holds::*;
 use parking_lot::RwLock;
-use sqlx::sqlite::{SqliteConnectOptions, SqlitePoolOptions, SqliteSynchronous};
-use sqlx::Sqlite;
+use sqlx::sqlite::{SqliteConnectOptions, SqliteJournalMode, SqlitePoolOptions};
 use sqlx::{migrate::MigrateDatabase, SqlitePool};
+use sqlx::{Executor, Sqlite};
 use tokio::sync::Mutex;
 use tracing_subscriber::{fmt, EnvFilter};
 
@@ -118,8 +118,8 @@ impl Localchain {
     }
 
     let options = SqliteConnectOptions::from_str(&path)?
-      .optimize_on_close(true, None)
-      .synchronous(SqliteSynchronous::Normal);
+      .journal_mode(SqliteJournalMode::Wal)
+      .optimize_on_close(true, None);
 
     let db = SqlitePoolOptions::new().connect_with(options).await?;
     sqlx::migrate!()
@@ -273,6 +273,7 @@ impl Localchain {
     }
     self.notary_clients.close().await;
     if !self.db.is_closed() {
+      self.db.execute("PRAGMA wal_checkpoint(FULL);").await?;
       self.db.close().await;
     }
     tracing::trace!("Closed Localchain");
