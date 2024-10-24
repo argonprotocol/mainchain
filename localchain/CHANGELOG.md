@@ -1,8 +1,18 @@
 # Changelog
 
-## [v0.0.14](https://github.com/argonprotocol/mainchain/compare/v0.0.13...71839151e4f9969f2b9c0e2e32d417a79941f2e1) (2024-10-11)
+## [v0.0.15](https://github.com/argonprotocol/mainchain/compare/v0.0.14...5f22086ffa71902ec243d030597a9c6377a91f3f) (2024-10-24)
 
-### [v0.0.13](https://github.com/argonprotocol/mainchain/compare/v0.0.12...v0.0.13) (2024-10-09)
+### Features
+
+* **localchain:** improve backtrace logging
+([9f60056](https://github.com/argonprotocol/mainchain/commit/9f60056de03823a9a88ccb542021cbd883e55b77))
+
+### Fixes
+
+* **ticks:** only allow a single block per tick
+([cdf295a](https://github.com/argonprotocol/mainchain/commit/cdf295aae082adae7f72deb4ddc9517b48e9ccbd))
+
+### [v0.0.14](https://github.com/argonprotocol/mainchain/compare/v0.0.13...v0.0.14) (2024-10-11)
 
 #### Fixes
 
@@ -10,6 +20,15 @@
 ([7d0eb9d](https://github.com/argonprotocol/mainchain/commit/7d0eb9d07e3489fc694933c567bd780c6e08d1b0))
 * **localchain:** updating wrong mainchain transfer
 ([4d9bef3](https://github.com/argonprotocol/mainchain/commit/4d9bef34bc847ccc0739ad854ecc1eeebd4f86b6))
+
+### [v0.0.13](https://github.com/argonprotocol/mainchain/compare/v0.0.12...v0.0.13) (2024-10-09)
+
+#### Fixes
+
+* **localchain:** holding mainchain locks too long
+([c07cbbb](https://github.com/argonprotocol/mainchain/commit/c07cbbb5a9c0f7774370cfa6e0adc5fbf29e7e28))
+* **localchain:** updating wrong mainchain transfer
+([7a7e31c](https://github.com/argonprotocol/mainchain/commit/7a7e31c6726aaecbc8a9dee459efd219dee648de))
 
 ### [v0.0.12](https://github.com/argonprotocol/mainchain/compare/v0.0.11...v0.0.12) (2024-10-08)
 

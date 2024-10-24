@@ -1,6 +1,20 @@
 # Changelog
 
-## [v0.0.14](https://github.com/argonprotocol/mainchain/compare/v0.0.13...71839151e4f9969f2b9c0e2e32d417a79941f2e1) (2024-10-11)
+## [v0.0.15](https://github.com/argonprotocol/mainchain/compare/v0.0.14...5f22086ffa71902ec243d030597a9c6377a91f3f) (2024-10-24)
+
+### Features
+
+* **notary:** stop apis if audit fails
+([5787461](https://github.com/argonprotocol/mainchain/commit/57874612671dc6f4f178438a86653592d6fa0bee))
+* **notebook:** allow a notary to recover
+([e1246d5](https://github.com/argonprotocol/mainchain/commit/e1246d5c61fd4e1397bd65b4b5e173455098acd0))
+
+### Fixes
+
+* **ticks:** only allow a single block per tick
+([cdf295a](https://github.com/argonprotocol/mainchain/commit/cdf295aae082adae7f72deb4ddc9517b48e9ccbd))
+
+### [v0.0.14](https://github.com/argonprotocol/mainchain/compare/v0.0.13...v0.0.14) (2024-10-11)
 
 ### [v0.0.13](https://github.com/argonprotocol/mainchain/compare/v0.0.12...v0.0.13) (2024-10-09)
 
