@@ -216,12 +216,12 @@ mod bitcoin_compat {
 		BitcoinXPub, CompressedBitcoinPubkey, H256Le, NetworkKind, OpaqueBitcoinXpub, UtxoRef,
 		XpubErrors,
 	};
+	use ::bip32::secp256k1::ecdsa::VerifyingKey;
 	use bip32::{ChildNumber, ExtendedKeyAttrs, XPub};
 	use bitcoin::{
 		hashes::{FromSliceError, Hash},
 		Network,
 	};
-	use k256::ecdsa::VerifyingKey;
 	use sp_core::H256;
 	use sp_runtime::BoundedVec;
 

@@ -25,14 +25,14 @@ sp-runtime = { workspace = true }
 sp-core = { workspace = true }
 argon-primitives = { workspace = true, features = ["bitcoin"] }
 argon-bitcoin = { workspace = true, default-features = false }
-k256 = { workspace = true }
-bip32 = { workspace = true, features = ["secp256k1"] }
 
 [dev-dependencies]
 pallet-balances = { workspace = true }
 sp-io = { workspace = true }
 bitcoin = { workspace = true }
+k256 = { workspace = true }
 env_logger = { workspace = true }
+bip32 = { workspace = true, features = ["secp256k1"] }
 
 [features]
 default = [ "std" ]

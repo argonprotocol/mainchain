@@ -1,7 +1,7 @@
 # Argon
 
 An inflation-proof stablecoin backed by [Bitcoin](https://bitcoin.org) and the [Ulixee](https://ulixee.org) data
-network. The Argon is built as a transactional
+network. The Argon is designed as a transactional
 currency that can scale to micropayments as low as 1 millionth of a dollar. It is built on the
 Polkadot [Substrate](https://substrate.dev) framework.
 
