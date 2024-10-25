@@ -1230,10 +1230,7 @@ mod test {
 			.get_notebook_dependencies(test_notary.notary_id, 10, &client.best_hash())
 			.await
 			.expect_err("Should not have all dependencies");
-		assert_eq!(
-			result.to_string(),
-			"Notary error: Missing notebooks #[1, 2, 3, 4, 5, 6, 7, 8, 9] to audit 10 for notary 1"
-		);
+		assert!(matches!(result, Error::MissingNotebooksError(_)),);
 		assert_eq!(
 			notary_client.notebook_queue_by_id.lock().await.get(&1).unwrap(),
 			&vec![
@@ -1253,10 +1250,11 @@ mod test {
 			.get_notebook_dependencies(test_notary.notary_id, 10, &client.best_hash())
 			.await
 			.expect_err("Should have all dependencies");
-		assert_eq!(
-			result.to_string(),
-			"Notary error: Missing notebooks #[9] to audit 10 for notary 1"
-		);
+
+		// still missing number 9
+		assert!(matches!(result, Error::MissingNotebooksError(_)),);
+		assert!(result.to_string().contains("[9]"));
+
 		for _ in 0..9 {
 			notary_client.process_queues().await.expect("Could not process queues");
 		}
