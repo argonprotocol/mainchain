@@ -14,8 +14,6 @@ mod tests;
 
 pub mod weights;
 
-const LOG_TARGET: &str = "runtime::notebook";
-
 #[frame_support::pallet(dev_mode)]
 pub mod pallet {
 	use alloc::{
@@ -211,10 +209,7 @@ pub mod pallet {
 			notebooks: Vec<SignedNotebookHeader>,
 		) -> DispatchResult {
 			ensure_none(origin)?;
-			info!(
-				target: LOG_TARGET,
-				"Notebook inherent submitted with {} notebooks", notebooks.len()
-			);
+			info!("Notebook inherent submitted with {} notebooks", notebooks.len());
 
 			// CRITICAL NOTE: very important to only have dispatch errors that are from the assembly
 			// of the notebooks, not the notebooks themselves. Otherwise we will stall here as
@@ -261,8 +256,8 @@ pub mod pallet {
 					header.parent_secret,
 				)?;
 				info!(
-					target: LOG_TARGET,
-					"Audit result for notary {}, notebook {}: pass? {}", notary_id, notebook_number, did_pass_audit
+					"Audit result for notary {}, notebook {}: pass? {}",
+					notary_id, notebook_number, did_pass_audit
 				);
 
 				// Failure cases: all based on notebooks not in order of runtime state; controllable
@@ -584,7 +579,7 @@ pub mod pallet {
 					.map(|audit_summary| {
 						audit_summary.try_into().map_err(|_| {
 							log::warn!(
-								target: LOG_TARGET,
+
 								"Notebook audit failed to decode for notary {notary_id}, notebook {notebook_number}"
 							);
 							NotebookVerifyError::DecodeError
@@ -636,7 +631,7 @@ pub mod pallet {
 
 			let notebook = Notebook::decode(&mut bytes.as_ref()).map_err(|e| {
 				log::warn!(
-					target: LOG_TARGET,
+
 					"Notebook audit failed to decode for notary {notary_id}, notebook {notebook_number}: {:?}", e.to_string()
 				);
 				NotebookVerifyError::DecodeError
@@ -684,7 +679,7 @@ pub mod pallet {
 			)
 			.inspect_err(|e| {
 				info!(
-					target: LOG_TARGET,
+
 					"Notebook audit failed for notary {notary_id}, notebook {notebook_number}: {:?}", e.to_string()
 				);
 			})?;

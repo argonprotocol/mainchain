@@ -11,7 +11,6 @@ mod mock;
 #[cfg(test)]
 mod tests;
 
-const LOG_TARGET: &str = "runtime::block_seal";
 #[cfg(feature = "runtime-benchmarks")]
 mod benchmarking;
 pub mod weights;
@@ -247,14 +246,14 @@ pub mod pallet {
 		pub fn apply(origin: OriginFor<T>, seal: BlockSealInherent) -> DispatchResult {
 			ensure_none(origin)?;
 			info!(
-				target: LOG_TARGET,
-				"Block seal inherent submitted -> {}", match seal {
+				"Block seal inherent submitted -> {}",
+				match seal {
 					BlockSealInherent::Compute => "Compute",
 					BlockSealInherent::Vote { .. } => "Vote",
 				}
 			);
 			Self::apply_seal(seal).inspect_err(|e| {
-				log::error!(target: LOG_TARGET, "Error applying block seal: {:?}", e);
+				log::error!("Error applying block seal: {:?}", e);
 			})?;
 			Ok(())
 		}
@@ -471,11 +470,14 @@ pub mod pallet {
 			let Some(grandparent_tick_block) =
 				T::TickProvider::block_at_tick(voted_for_block_at_tick)
 			else {
-				info!(target: LOG_TARGET, "No eligible blocks to vote on in grandparent tick {:?}", voted_for_block_at_tick);
+				info!(
+					"No eligible blocks to vote on in grandparent tick {:?}",
+					voted_for_block_at_tick
+				);
 				return Ok(BoundedVec::new());
 			};
 
-			info!(target: LOG_TARGET,
+			info!(
 				"Finding votes for block at tick {} - {:?} (notebook tick={})",
 				voted_for_block_at_tick, grandparent_tick_block, expected_notebook_tick
 			);
@@ -524,7 +526,10 @@ pub mod pallet {
 						.map_err(|_| Error::<T>::CouldNotDecodeVote)?;
 
 				if grandparent_tick_block != vote.block_hash {
-					info!(target: LOG_TARGET, "Cant use vote for grandparent tick {:?} - voted for {:?}", grandparent_tick_block, vote.block_hash);
+					info!(
+						"Cant use vote for grandparent tick {:?} - voted for {:?}",
+						grandparent_tick_block, vote.block_hash
+					);
 					continue;
 				}
 

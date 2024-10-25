@@ -17,7 +17,6 @@ mod mock;
 mod tests;
 
 pub mod weights;
-const LOG_TARGET: &str = "runtime::bond";
 
 /// The bond pallet allows users to manage the lifecycle of Bitcoin bonds, and stores the state for
 /// Mining Bonds. Bonds lock up argons for a pre-defined period of time for a fee. A vault issuer
@@ -461,7 +460,7 @@ pub mod pallet {
 			for bond_id in bond_completions {
 				let res = with_storage_layer(|| Self::bond_completed(bond_id));
 				if let Err(e) = res {
-					log::error!( target: LOG_TARGET, "Mining bond id {:?} failed to `complete` {:?}", bond_id, e);
+					log::error!("Mining bond id {:?} failed to `complete` {:?}", bond_id, e);
 					Self::deposit_event(Event::<T>::BondCompletionError { bond_id, error: e });
 				}
 			}
@@ -482,7 +481,7 @@ pub mod pallet {
 				let res =
 					with_storage_layer(|| Self::cosign_bitcoin_overdue(utxo_id, redemption_amount));
 				if let Err(e) = res {
-					log::error!( target: LOG_TARGET, "Bitcoin utxo id {:?} failed to `cosign` {:?}", utxo_id, e);
+					log::error!("Bitcoin utxo id {:?} failed to `cosign` {:?}", utxo_id, e);
 					Self::deposit_event(Event::<T>::CosignOverdueError { utxo_id, error: e });
 				}
 			}
@@ -491,7 +490,7 @@ pub mod pallet {
 			for bond_id in bitcoin_bond_completions {
 				let res = with_storage_layer(|| Self::bond_completed(bond_id));
 				if let Err(e) = res {
-					log::error!( target: LOG_TARGET, "Bitcoin bond id {:?} failed to `complete` {:?}", bond_id, e);
+					log::error!("Bitcoin bond id {:?} failed to `complete` {:?}", bond_id, e);
 					Self::deposit_event(Event::<T>::BondCompletionError { bond_id, error: e });
 				}
 			}
@@ -774,7 +773,7 @@ pub mod pallet {
 						BondsById::<T>::get(utxo_state.bond_id).ok_or(Error::<T>::BondNotFound)?;
 					T::BondEvents::utxo_bonded(utxo_id, &bond.bonded_account_id, bond.amount)?;
 				} else {
-					warn!( target: LOG_TARGET, "Verified utxo_id {:?} not found", utxo_id);
+					warn!("Verified utxo_id {:?} not found", utxo_id);
 				}
 				Ok::<(), DispatchError>(())
 			})

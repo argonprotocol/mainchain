@@ -12,7 +12,6 @@ mod mock;
 mod tests;
 
 pub mod weights;
-const LOG_TARGET: &str = "runtime::bitcoin_utxos";
 
 #[frame_support::pallet(dev_mode)]
 pub mod pallet {
@@ -165,8 +164,10 @@ pub mod pallet {
 		pub fn sync(origin: OriginFor<T>, utxo_sync: BitcoinUtxoSync) -> DispatchResult {
 			ensure_none(origin)?;
 			info!(
-				target: LOG_TARGET,
-				"Bitcoin UTXO sync submitted (spent: {:?}, confirmed {}, rejected {})", utxo_sync.spent.len(), utxo_sync.verified.len(), utxo_sync.invalid.len()
+				"Bitcoin UTXO sync submitted (spent: {:?}, confirmed {}, rejected {})",
+				utxo_sync.spent.len(),
+				utxo_sync.verified.len(),
+				utxo_sync.invalid.len()
 			);
 
 			let current_confirmed =
@@ -186,7 +187,7 @@ pub mod pallet {
 			for (utxo_id, block_height) in utxo_sync.spent.into_iter() {
 				let err = with_storage_layer(|| Self::utxo_spent(utxo_id, block_height));
 				if let Err(e) = err {
-					warn!(target: LOG_TARGET, "Failed to mark UTXO {} as spent: {:?}", utxo_id, e);
+					warn!("Failed to mark UTXO {} as spent: {:?}", utxo_id, e);
 					Self::deposit_event(Event::UtxoSpentError { utxo_id, error: e });
 				}
 			}
@@ -194,7 +195,7 @@ pub mod pallet {
 			for (utxo_id, utxo_ref) in utxo_sync.verified.into_iter() {
 				let res = with_storage_layer(|| Self::utxo_verified(utxo_id, utxo_ref));
 				if let Err(e) = res {
-					warn!(target: LOG_TARGET, "Failed to verify UTXO {}: {:?}", utxo_id, e);
+					warn!("Failed to verify UTXO {}: {:?}", utxo_id, e);
 					Self::deposit_event(Event::UtxoVerifiedError { utxo_id, error: e });
 				}
 			}
@@ -202,7 +203,7 @@ pub mod pallet {
 			for (utxo_id, rejected_reason) in utxo_sync.invalid.into_iter() {
 				let res = with_storage_layer(|| Self::utxo_rejected(utxo_id, rejected_reason));
 				if let Err(e) = res {
-					warn!(target: LOG_TARGET, "Failed to reject UTXO {}: {:?}", utxo_id, e);
+					warn!("Failed to reject UTXO {}: {:?}", utxo_id, e);
 					Self::deposit_event(Event::UtxoRejectedError { utxo_id, error: e });
 				}
 			}
@@ -218,8 +219,8 @@ pub mod pallet {
 					});
 					if let Err(e) = res {
 						warn!(
-							target: LOG_TARGET,
-							"Failed to reject UTXO {:?} due to lookup expiration: {:?}", utxo_id, e
+							"Failed to reject UTXO {:?} due to lookup expiration: {:?}",
+							utxo_id, e
 						);
 						Self::deposit_event(Event::UtxoRejectedError { utxo_id, error: e });
 					}
@@ -236,10 +237,7 @@ pub mod pallet {
 				for utxo_ref in utxos.into_iter() {
 					let res = with_storage_layer(|| Self::utxo_expired(utxo_ref.clone()));
 					if let Err(e) = res {
-						warn!(
-							target: LOG_TARGET,
-							"Failed to expire UTXO {:?}: {:?}", utxo_ref, e
-						);
+						warn!("Failed to expire UTXO {:?}: {:?}", utxo_ref, e);
 						Self::deposit_event(Event::UtxoExpiredError { utxo_ref, error: e });
 					}
 				}

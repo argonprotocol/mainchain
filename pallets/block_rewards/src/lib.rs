@@ -14,7 +14,6 @@ mod tests;
 mod benchmarking;
 pub mod weights;
 
-const LOG_TARGET: &str = "runtime::block_rewards";
 #[frame_support::pallet(dev_mode)]
 pub mod pallet {
 	use alloc::{vec, vec::Vec};
@@ -156,7 +155,7 @@ pub mod pallet {
 				if let Err(e) =
 					Self::unfreeze_amount::<T::ArgonCurrency>(&reward.account_id, reward.argons)
 				{
-					log::error!(target: LOG_TARGET, "Failed to unfreeze argons for reward: {:?}, {:?}", reward, e);
+					log::error!("Failed to unfreeze argons for reward: {:?}, {:?}", reward, e);
 					Self::deposit_event(Event::RewardUnlockError {
 						account_id: reward.account_id.clone(),
 						argons: Some(reward.argons),
@@ -169,7 +168,7 @@ pub mod pallet {
 					&reward.account_id,
 					reward.ownership,
 				) {
-					log::error!(target: LOG_TARGET, "Failed to unfreeze ownership for reward: {:?}, {:?}", reward, e);
+					log::error!("Failed to unfreeze ownership for reward: {:?}, {:?}", reward, e);
 					Self::deposit_event(Event::RewardUnlockError {
 						account_id: reward.account_id.clone(),
 						argons: None,
@@ -266,7 +265,7 @@ pub mod pallet {
 				let start_argons = reward.argons;
 				let start_ownership = reward.ownership;
 				if let Err(e) = Self::mint_and_freeze::<T::ArgonCurrency>(reward) {
-					log::error!(target: LOG_TARGET, "Failed to mint argons for reward: {:?}, {:?}", reward, e);
+					log::error!("Failed to mint argons for reward: {:?}, {:?}", reward, e);
 					Self::deposit_event(Event::RewardCreateError {
 						account_id: reward.account_id.clone(),
 						argons: Some(start_argons),
@@ -275,7 +274,7 @@ pub mod pallet {
 					});
 				}
 				if let Err(e) = Self::mint_and_freeze::<T::OwnershipCurrency>(reward) {
-					log::error!(target: LOG_TARGET, "Failed to mint ownership for reward: {:?}, {:?}", reward, e);
+					log::error!("Failed to mint ownership for reward: {:?}, {:?}", reward, e);
 					Self::deposit_event(Event::RewardCreateError {
 						account_id: reward.account_id.clone(),
 						argons: None,

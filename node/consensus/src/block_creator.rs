@@ -37,8 +37,6 @@ use crate::{
 	notebook_sealer::NotebookSealer,
 };
 
-const LOG_TARGET: &str = "node::consensus::block_creator";
-
 pub struct CreateTaxVoteBlock<Block: BlockT, AccountId: Clone + Codec> {
 	pub current_tick: Tick,
 	pub timestamp_millis: u64,
@@ -93,7 +91,7 @@ where
 				.process_queues()
 				.await
 				.map_err(|err| {
-					warn!(target: LOG_TARGET, "Error while processing notary queues: {:?}", err);
+					warn!("Error while processing notary queues: {:?}", err);
 				})
 				.unwrap_or(false);
 
@@ -129,7 +127,7 @@ where
 						let Ok(tick) = client.runtime_api().current_tick(block.hash) else {
 							continue;
 						};
-						let voting_schedule = VotingSchedule::when_creating_block(tick + 1);
+						let voting_schedule = VotingSchedule::when_creating_block(tick);
 						if let Ok(info) = aux_client.get_tick_voting_power(voting_schedule.notebook_tick()) {
 							next = info
 						}
@@ -142,7 +140,7 @@ where
 					.check_for_new_blocks(notebook_tick, voting_power, notebooks)
 					.await
 				{
-					warn!(target: LOG_TARGET, "Error while checking for new blocks: {:?}", err);
+					warn!("Error while checking for new blocks: {:?}", err);
 				}
 			}
 		}
@@ -196,7 +194,7 @@ pub async fn tax_block_creator<B, C, E, L, CS, A>(
 		{
 			Ok(x) => x,
 			Err(err) => {
-				warn!(target: LOG_TARGET, "Unable to propose new block: {:?}", err);
+				warn!("Unable to propose new block: {:?}", err);
 				continue;
 			},
 		};
@@ -244,7 +242,7 @@ where
 
 	let bitcoin_utxo_sync = get_bitcoin_inherent(&utxo_tracker, &client, &parent_hash)
 		.unwrap_or_else(|err| {
-			warn!(target: LOG_TARGET, "Unable to get bitcoin inherent: {:?}", err);
+			warn!("Unable to get bitcoin inherent: {:?}", err);
 			None
 		});
 
@@ -260,14 +258,18 @@ where
 		Ok(x) => x,
 		Err(err) => {
 			warn!(
-				target: LOG_TARGET,
-				"Unable to pull new block for compute miner. No notebook header data found!! {}", err
+				"Unable to pull new block for compute miner. No notebook header data found!! {}",
+				err
 			);
 			return Err(err);
 		},
 	};
 
-	info!(target: LOG_TARGET, "Proposing block at tick {} with {} notebooks", submitting_tick, notebook_header_data.notebook_digest.notebooks.len());
+	info!(
+		"Proposing block at tick {} with {} notebooks",
+		submitting_tick,
+		notebook_header_data.notebook_digest.notebooks.len()
+	);
 
 	let timestamp = sp_timestamp::InherentDataProvider::new(Timestamp::new(timestamp_millis));
 	let seal = BlockSealInherentDataProvider { seal: Some(seal_inherent.clone()), digest: None };
@@ -278,7 +280,6 @@ where
 		Ok(r) => r,
 		Err(err) => {
 			warn!(
-				target: LOG_TARGET,
 				"Unable to propose new block for authoring. \
 				 Creating inherent data failed: {:?}",
 				err,
@@ -349,23 +350,20 @@ pub(crate) async fn submit_block<Block, L, Proof>(
 		StateAction::ApplyChanges(StorageChanges::Changes(proposal.storage_changes));
 
 	let post_hash = block_import_params.post_hash();
-	trace!(target: LOG_TARGET, "Importing self-generated block: {:?}. {:?}", &post_hash, &block_seal_digest);
+	trace!("Importing self-generated block: {:?}. {:?}", &post_hash, &block_seal_digest);
 	match block_import.import_block(block_import_params).await {
 		Ok(res) => match res {
 			ImportResult::Imported(_) => {
 				res.handle_justification(&post_hash, block_number, justification_sync_link);
 
-				info!(
-					target: LOG_TARGET,
-					"✅ Successfully mined block on top of: {} -> {}", parent_hash, post_hash
-				);
+				info!("✅ Successfully mined block on top of: {} -> {}", parent_hash, post_hash);
 			},
 			other => {
-				warn!(target: LOG_TARGET, "Import of own block - result not success: {:?}", other);
+				warn!("Import of own block - result not success: {:?}", other);
 			},
 		},
 		Err(err) => {
-			warn!(target: LOG_TARGET, "Unable to import own block: {:?}", err);
+			warn!("Unable to import own block: {:?}", err);
 		},
 	}
 }

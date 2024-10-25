@@ -38,8 +38,6 @@ mod tests;
 mod benchmarking;
 pub mod weights;
 
-const LOG_TARGET: &str = "runtime::mining_slot";
-
 /// To register as a Slot 1+ miner, operators must `Bid` on a `Slot`. Each `Slot` allows a
 /// `Cohort` of miners to operate for a given number of blocks (an `Era`).
 ///
@@ -883,12 +881,7 @@ impl<T: Config> Pallet<T> {
 			if let Err(e) =
 				Self::release_ownership_hold(&account_id, active_registration.ownership_tokens)
 			{
-				log::error!(
-					target: LOG_TARGET,
-					"Failed to unbond account {:?}. {:?}",
-					account_id,
-					e,
-				);
+				log::error!("Failed to unbond account {:?}. {:?}", account_id, e,);
 				Self::deposit_event(Event::<T>::UnbondMinerError {
 					account_id: account_id.clone(),
 					bond_id: active_bond_id,
