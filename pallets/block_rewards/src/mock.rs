@@ -84,7 +84,7 @@ parameter_types! {
 	pub static MaturationBlocks :u32 = 5;
 	pub static MinerPayoutPercent :FixedU128 = FixedU128::from_rational(75, 100);
 	pub static ActiveNotaries: Vec<NotaryId> = vec![1];
-	pub static CurrentTick: Tick = 0;
+	pub static NotebookTick: Tick = 0;
 
 	pub static GetRewardSharing: Option<RewardSharing<u64>> = None;
 	pub static NotebooksInBlock: Vec<(NotaryId, NotebookNumber, Tick)> = vec![];
@@ -162,7 +162,7 @@ impl pallet_block_rewards::Config for Test {
 	type BlockSealerProvider = StaticBlockSealerProvider;
 	type NotaryProvider = TestProvider;
 	type RuntimeFreezeReason = RuntimeFreezeReason;
-	type CurrentTick = CurrentTick;
+	type NotebookTick = NotebookTick;
 	type NotebookProvider = TestProvider;
 	type EventHandler = ();
 	type BlockRewardAccountsProvider = StaticBlockRewardAccountsProvider;

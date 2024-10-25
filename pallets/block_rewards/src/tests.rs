@@ -24,7 +24,7 @@ fn it_should_only_allow_a_single_seal() {
 		block_vote_rewards_account: Some(2),
 	});
 	NotebooksInBlock::set(vec![(1, 1, 1)]);
-	CurrentTick::set(1);
+	NotebookTick::set(1);
 	new_test_ext().execute_with(|| {
 		// Go past genesis block so events get deposited
 		System::set_block_number(1);
@@ -89,7 +89,7 @@ fn it_should_unlock_rewards() {
 		// Go past genesis block so events get deposited
 		System::set_block_number(1);
 		NotebooksInBlock::set(vec![(1, 1, 1)]);
-		CurrentTick::set(1);
+		NotebookTick::set(1);
 		BlockRewards::on_initialize(1);
 		BlockRewards::on_finalize(1);
 		let maturation_block = (1 + MaturationBlocks::get()).into();
@@ -137,7 +137,7 @@ fn it_should_payout_block_vote_to_miner() {
 		// Go past genesis block so events get deposited
 		System::set_block_number(1);
 		NotebooksInBlock::set(vec![(1, 1, 1)]);
-		CurrentTick::set(1);
+		NotebookTick::set(1);
 		BlockRewards::on_initialize(1);
 		BlockRewards::on_finalize(1);
 		let maturation_block = (1 + MaturationBlocks::get()).into();
@@ -165,7 +165,7 @@ fn it_should_halve_rewards() {
 		let halving = HalvingBlocks::get() + 1;
 		System::set_block_number(halving.into());
 		NotebooksInBlock::set(vec![(1, 1, 1)]);
-		CurrentTick::set(1);
+		NotebookTick::set(1);
 		BlockRewards::on_initialize(halving.into());
 		BlockRewards::on_finalize(halving.into());
 		let maturation_block = (halving + MaturationBlocks::get()).into();
@@ -190,7 +190,7 @@ fn it_should_scale_rewards_based_on_notaries() {
 		block_vote_rewards_account: Some(2),
 	});
 	NotebooksInBlock::set(vec![(1, 1, 1)]);
-	CurrentTick::set(1);
+	NotebookTick::set(1);
 	new_test_ext().execute_with(|| {
 		System::set_block_number(1);
 		BlockRewards::on_initialize(1);
@@ -217,7 +217,7 @@ fn it_should_not_fail_with_no_notebooks() {
 		block_vote_rewards_account: Some(2),
 	});
 	NotebooksInBlock::set(vec![]);
-	CurrentTick::set(1);
+	NotebookTick::set(1);
 	new_test_ext().execute_with(|| {
 		System::set_block_number(1);
 		BlockRewards::on_initialize(1);
@@ -243,7 +243,7 @@ fn it_should_not_fail_with_no_notaries() {
 		block_vote_rewards_account: Some(2),
 	});
 	NotebooksInBlock::set(vec![]);
-	CurrentTick::set(1);
+	NotebookTick::set(1);
 	new_test_ext().execute_with(|| {
 		System::set_block_number(1);
 		BlockRewards::on_initialize(1);
@@ -274,7 +274,7 @@ fn it_should_support_profit_sharing() {
 		percent_take: FixedU128::from_rational(40, 100),
 	}));
 	NotebooksInBlock::set(vec![(1, 1, 1), (2, 1, 1)]);
-	CurrentTick::set(1);
+	NotebookTick::set(1);
 	new_test_ext().execute_with(|| {
 		System::set_block_number(1);
 		BlockRewards::on_initialize(1);

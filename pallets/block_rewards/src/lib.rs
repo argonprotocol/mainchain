@@ -77,7 +77,7 @@ pub mod pallet {
 		type BlockRewardAccountsProvider: BlockRewardAccountsProvider<Self::AccountId>;
 		type NotaryProvider: NotaryProvider<Self::Block, Self::AccountId>;
 		type NotebookProvider: NotebookProvider;
-		type CurrentTick: Get<Tick>;
+		type NotebookTick: Get<Tick>;
 		/// Number of argons minted per block
 		#[pallet::constant]
 		type ArgonsPerBlock: Get<Self::Balance>;
@@ -199,7 +199,7 @@ pub mod pallet {
 			let mut block_ownership = block_ownership.saturating_div(halvings + 1u128);
 			let active_notaries = T::NotaryProvider::active_notaries().len() as u128;
 			let block_notebooks = T::NotebookProvider::notebooks_in_block();
-			let current_tick = T::CurrentTick::get();
+			let current_tick = T::NotebookTick::get();
 			let tick_notebooks = block_notebooks.iter().fold(0u128, |acc, (_, _, tick)| {
 				if *tick == current_tick {
 					acc + 1u128

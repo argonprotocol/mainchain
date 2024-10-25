@@ -1,12 +1,9 @@
 use env_logger::{Builder, Env};
 use frame_support::{derive_impl, parameter_types};
-use sp_core::{crypto::AccountId32, H256};
+use sp_core::crypto::AccountId32;
 use sp_runtime::{traits::IdentityLookup, BuildStorage};
 
-use argon_primitives::{
-	tick::{Tick, Ticker},
-	TickProvider, VotingSchedule,
-};
+use argon_primitives::tick::Tick;
 
 use crate as pallet_domains;
 
@@ -32,30 +29,14 @@ impl frame_system::Config for Test {
 parameter_types! {
 
 	pub static DomainExpirationTicks :u32 = 1000;
-	pub static CurrentTick: Tick = 0;
+	pub static NotebookTick: Tick = 0;
 	pub static HistoricalPaymentAddressTicksToKeep: u32 = 100;
-}
-
-pub struct StaticTickProvider;
-impl TickProvider<Block> for StaticTickProvider {
-	fn current_tick() -> Tick {
-		CurrentTick::get()
-	}
-	fn ticker() -> Ticker {
-		Ticker::new(1, 1, 2)
-	}
-	fn block_at_tick(_: Tick) -> Option<H256> {
-		todo!()
-	}
-	fn voting_schedule() -> VotingSchedule {
-		todo!()
-	}
 }
 
 impl pallet_domains::Config for Test {
 	type RuntimeEvent = RuntimeEvent;
 	type WeightInfo = ();
-	type TickProvider = StaticTickProvider;
+	type NotebookTick = NotebookTick;
 	type DomainExpirationTicks = DomainExpirationTicks;
 	type HistoricalPaymentAddressTicksToKeep = HistoricalPaymentAddressTicksToKeep;
 }

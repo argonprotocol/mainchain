@@ -69,7 +69,7 @@ pub mod pallet {
 			+ MaxEncodedLen;
 
 		type NotebookProvider: NotebookProvider;
-		type CurrentTick: Get<Tick>;
+		type NotebookTick: Get<Tick>;
 		type EventHandler: BurnEventHandler<Self::Balance>;
 		#[pallet::constant]
 		type PalletId: Get<PalletId>;
@@ -210,7 +210,7 @@ pub mod pallet {
 				Preservation::Expendable,
 			)?;
 
-			let expiration_tick: Tick = T::CurrentTick::get() + T::TransferExpirationTicks::get();
+			let expiration_tick: Tick = T::NotebookTick::get() + T::TransferExpirationTicks::get();
 
 			PendingTransfersOut::<T>::insert(
 				transfer_id,

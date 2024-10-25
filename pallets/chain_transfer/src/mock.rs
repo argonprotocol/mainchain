@@ -44,7 +44,7 @@ parameter_types! {
 	pub const MaxNotebookTransfers :u32 = 1;
 	pub static MaxPendingTransfersOutPerBlock :u32 = 1;
 	pub static TransferExpirationTicks :u32 = 2;
-	pub static CurrentTick: Tick = 1;
+	pub static NotebookTick: Tick = 1;
 
 	pub const LocalchainPalletId: PalletId = PalletId(*b"loclchai");
 
@@ -106,7 +106,7 @@ impl pallet_chain_transfer::Config for Test {
 	type TransferExpirationTicks = TransferExpirationTicks;
 	type NotebookProvider = StaticNotebookProvider;
 	type EventHandler = ();
-	type CurrentTick = CurrentTick;
+	type NotebookTick = NotebookTick;
 }
 
 // Build genesis storage according to the mock runtime.

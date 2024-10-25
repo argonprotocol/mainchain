@@ -67,7 +67,7 @@ fn it_renews_domains() {
 		assert_eq!(ExpiringDomainsByBlock::<Test>::get(1001).len(), 1);
 
 		System::set_block_number(100);
-		CurrentTick::set(100);
+		NotebookTick::set(100);
 		DomainPallet::notebook_submitted(&create_notebook(
 			100,
 			vec![(domain, Bob.to_account_id())],
@@ -88,7 +88,7 @@ fn it_ignores_duplicated_domains() {
 		assert_eq!(RegisteredDomains::<Test>::get(domain), Some(registered_to_bob.clone()));
 
 		System::set_block_number(2);
-		CurrentTick::set(2);
+		NotebookTick::set(2);
 		DomainPallet::notebook_submitted(&create_notebook(
 			2,
 			vec![(domain, Alice.to_account_id())],
@@ -100,7 +100,7 @@ fn it_ignores_duplicated_domains() {
 fn it_registers_zone_records() {
 	new_test_ext().execute_with(|| {
 		System::set_block_number(1);
-		CurrentTick::set(2);
+		NotebookTick::set(2);
 		let domain = Domain { top_level: DomainTopLevel::Analytics, name: "test".into() }.hash();
 		DomainPallet::notebook_submitted(&create_notebook(1, vec![(domain, Bob.to_account_id())]));
 
@@ -152,7 +152,7 @@ fn it_expires_domains() {
 		DomainPallet::notebook_submitted(&create_notebook(1, vec![(domain, Bob.to_account_id())]));
 
 		System::set_block_number(1001);
-		CurrentTick::set(1001);
+		NotebookTick::set(1001);
 		DomainPallet::on_initialize(1001);
 		assert_eq!(RegisteredDomains::<Test>::get(domain), None);
 	});

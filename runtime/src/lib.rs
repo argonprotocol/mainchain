@@ -60,6 +60,7 @@ use sp_runtime::traits::Get;
 use sp_version::NativeVersion;
 use sp_version::RuntimeVersion;
 
+use crate::opaque::SessionKeys;
 use argon_primitives::{
 	bitcoin::{BitcoinHeight, BitcoinNetwork, BitcoinSyncStatus, Satoshis, UtxoRef, UtxoValue},
 	block_seal::MiningAuthority,
@@ -82,8 +83,6 @@ pub use currency::*;
 use pallet_bond::BitcoinVerifier;
 use pallet_mining_slot::OnNewSlot;
 pub use pallet_notebook::NotebookVerifyError;
-
-use crate::opaque::SessionKeys;
 
 // A few exports that help ease life for downstream crates.
 
@@ -260,6 +259,13 @@ impl pallet_block_seal_spec::Config for Runtime {
 	type MaxActiveNotaries = MaxActiveNotaries;
 }
 
+pub struct NotebookTickProvider;
+impl Get<Tick> for NotebookTickProvider {
+	fn get() -> Tick {
+		let schedule = Ticks::voting_schedule();
+		schedule.notebook_tick()
+	}
+}
 impl pallet_block_rewards::Config for Runtime {
 	type RuntimeEvent = RuntimeEvent;
 	type WeightInfo = pallet_block_rewards::weights::SubstrateWeight<Runtime>;
@@ -269,7 +275,7 @@ impl pallet_block_rewards::Config for Runtime {
 	type BlockSealerProvider = BlockSeal;
 	type NotaryProvider = Notaries;
 	type NotebookProvider = Notebook;
-	type CurrentTick = Ticks;
+	type NotebookTick = NotebookTickProvider;
 	type ArgonsPerBlock = ArgonsPerBlock;
 	type StartingOwnershipTokensPerBlock = StartingOwnershipTokensPerBlock;
 	type HalvingBlocks = HalvingBlocks;
@@ -283,7 +289,7 @@ impl pallet_block_rewards::Config for Runtime {
 impl pallet_domains::Config for Runtime {
 	type RuntimeEvent = RuntimeEvent;
 	type WeightInfo = pallet_domains::weights::SubstrateWeight<Runtime>;
-	type TickProvider = Ticks;
+	type NotebookTick = NotebookTickProvider;
 	type DomainExpirationTicks = DomainExpirationTicks;
 	type HistoricalPaymentAddressTicksToKeep = HistoricalPaymentAddressTicksToKeep;
 }
@@ -449,7 +455,7 @@ impl pallet_chain_transfer::Config for Runtime {
 	type MaxPendingTransfersOutPerBlock = MaxPendingTransfersOutPerBlock;
 	type NotebookProvider = Notebook;
 	type EventHandler = Mint;
-	type CurrentTick = Ticks;
+	type NotebookTick = NotebookTickProvider;
 }
 
 impl pallet_notebook::Config for Runtime {

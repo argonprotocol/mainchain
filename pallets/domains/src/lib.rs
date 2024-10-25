@@ -27,7 +27,7 @@ pub mod weights;
 #[frame_support::pallet(dev_mode)]
 pub mod pallet {
 	use argon_primitives::{
-		notebook::NotebookHeader, DomainHash, NotebookEventHandler, TickProvider, ZoneRecord,
+		notebook::NotebookHeader, DomainHash, NotebookEventHandler, ZoneRecord,
 		MAX_DOMAINS_PER_NOTEBOOK, MAX_NOTARIES,
 	};
 	use frame_support::{pallet_prelude::*, traits::Len};
@@ -49,7 +49,7 @@ pub mod pallet {
 		/// The number of blocks after which a domain will expire if not renewed.
 		type DomainExpirationTicks: Get<Tick>;
 
-		type TickProvider: TickProvider<Self::Block>;
+		type NotebookTick: Get<Tick>;
 
 		type HistoricalPaymentAddressTicksToKeep: Get<Tick>;
 	}
@@ -112,7 +112,7 @@ pub mod pallet {
 	#[pallet::hooks]
 	impl<T: Config> Hooks<BlockNumberFor<T>> for Pallet<T> {
 		fn on_initialize(_n: BlockNumberFor<T>) -> Weight {
-			let tick = T::TickProvider::current_tick();
+			let tick = T::NotebookTick::get();
 			let expiring = ExpiringDomainsByBlock::<T>::take(tick);
 			let entries = expiring.len() as u64;
 			for domain_hash in expiring {
