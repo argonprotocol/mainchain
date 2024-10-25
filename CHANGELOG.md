@@ -1,8 +1,15 @@
 # Changelog
 
-## [v0.0.15](https://github.com/argonprotocol/mainchain/compare/v0.0.14...5f22086ffa71902ec243d030597a9c6377a91f3f) (2024-10-24)
+## [v0.0.16](https://github.com/argonprotocol/mainchain/compare/v0.0.15...60a5b63b1a28a750f49e43e16b889ee57174eced) (2024-10-25)
 
-### Features
+### Fixes
+
+* rewards should be for notebook tick
+([60a5b63](https://github.com/argonprotocol/mainchain/commit/60a5b63b1a28a750f49e43e16b889ee57174eced))
+
+### [v0.0.15](https://github.com/argonprotocol/mainchain/compare/v0.0.14...v0.0.15) (2024-10-25)
+
+#### Features
 
 * **node:** check for blocks when importing
 ([0a4e567](https://github.com/argonprotocol/mainchain/commit/0a4e567bc8800b564660862fc513356f27f7aaf1))
@@ -15,8 +22,10 @@
 * **localchain:** improve backtrace logging
 ([9f60056](https://github.com/argonprotocol/mainchain/commit/9f60056de03823a9a88ccb542021cbd883e55b77))
 
-### Fixes
+#### Fixes
 
+* release overwrite protector
+([3c2a037](https://github.com/argonprotocol/mainchain/commit/3c2a037071ce90cd69be8cecacdd07e65b0a9798))
 * llvm 19.1.2 broke build on mac
 ([5f22086](https://github.com/argonprotocol/mainchain/commit/5f22086ffa71902ec243d030597a9c6377a91f3f))
 * **ticks:** only allow a single block per tick
