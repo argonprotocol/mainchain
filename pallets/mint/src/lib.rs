@@ -15,7 +15,6 @@ mod tests;
 
 pub mod weights;
 
-const LOG_TARGET: &str = "runtime::mint";
 #[frame_support::pallet(dev_mode)]
 pub mod pallet {
 	use frame_support::{
@@ -139,8 +138,8 @@ pub mod pallet {
 						},
 						Err(e) => {
 							warn!(
-								target: LOG_TARGET,
-								"Failed to mint {:?} argons for miner {:?}: {:?}", amount, &miner, e
+								"Failed to mint {:?} argons for miner {:?}: {:?}",
+								amount, &miner, e
 							);
 							Self::deposit_event(Event::<T>::MintError {
 								mint_type: MintType::Mining,
@@ -185,8 +184,8 @@ pub mod pallet {
 							},
 							Err(e) => {
 								warn!(
-									target: LOG_TARGET,
-									"Failed to mint {:?} argons for bitcoin UTXO {:?}: {:?}", amount_to_mint, &utxo_id, e
+									"Failed to mint {:?} argons for bitcoin UTXO {:?}: {:?}",
+									amount_to_mint, &utxo_id, e
 								);
 								Self::deposit_event(Event::<T>::MintError {
 									mint_type: MintType::Bitcoin,

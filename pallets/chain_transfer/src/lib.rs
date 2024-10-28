@@ -18,7 +18,6 @@ mod mock;
 mod tests;
 
 pub mod weights;
-const LOG_TARGET: &str = "runtime::chain_transfer";
 
 #[frame_support::pallet(dev_mode)]
 pub mod pallet {
@@ -319,7 +318,7 @@ pub mod pallet {
 					Err(e) => {
 						// can't panic here or chain will get stuck
 						log::warn!(
-							target: LOG_TARGET,
+
 							"Failed to return pending Localchain transfer to account {:?} (amount={:?}): {:?}",
 							&transfer.account_id,
 							transfer.amount,

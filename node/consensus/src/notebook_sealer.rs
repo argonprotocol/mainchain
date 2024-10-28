@@ -19,8 +19,6 @@ use sp_runtime::traits::Block as BlockT;
 use sp_timestamp::Timestamp;
 use std::{collections::HashMap, marker::PhantomData, sync::Arc};
 
-const LOG_TARGET: &str = "node::consensus::notebook_sealer";
-
 pub struct NotebookSealer<B: BlockT, C: AuxStore, SC, AC: Clone + Codec> {
 	client: Arc<C>,
 	ticker: Ticker,
@@ -87,7 +85,11 @@ where
 		let current_tick = self.ticker.current();
 
 		if current_tick <= notebook_tick {
-			trace!(target: LOG_TARGET, "Current tick {} is not greater than notebook tick {}", current_tick, notebook_tick);
+			trace!(
+				"Current tick {} is not greater than notebook tick {}",
+				current_tick,
+				notebook_tick
+			);
 			return Ok(());
 		}
 
@@ -97,14 +99,14 @@ where
 		let block_votes = self.aux_client.get_votes(votes_tick)?.get();
 		let votes_count = block_votes.iter().fold(0u32, |acc, x| acc + x.raw_votes.len() as u32);
 		if votes_count == 0 {
-			trace!(target: LOG_TARGET, "No block votes at tick {}", votes_tick);
+			trace!("No block votes at tick {}", votes_tick);
 			return Ok(());
 		}
 
 		let blocks_to_build_on = self
 			.get_parent_blocks_to_build_on(&voting_schedule, notebooks, voting_power)
 			.await?;
-		trace!(target: LOG_TARGET, "Checking tick {} for better blocks with {} votes. Found {} blocks to attempt to build on",
+		trace!( "Checking tick {} for better blocks with {} votes. Found {} blocks to attempt to build on",
 			votes_tick, votes_count, blocks_to_build_on.len());
 
 		for (block_hash, best_seal_strength) in blocks_to_build_on.into_iter() {
@@ -118,23 +120,26 @@ where
 					votes_tick,
 				)?
 				.inspect_err(|e| {
-					error!(target: LOG_TARGET, "Unable to lookup vote block seals: {:?}", e);
+					error!("Unable to lookup vote block seals: {:?}", e);
 				})
 			else {
-				trace!(target: LOG_TARGET, "Could not find any stronger seals for block {:?}. Notebook tick {}, votes at tick {}. Existing power {:?}.",
+				trace!( "Could not find any stronger seals for block {:?}. Notebook tick {}, votes at tick {}. Existing power {:?}.",
 					block_hash, notebook_tick, votes_tick, best_seal_strength);
 				continue;
 			};
 
 			for vote in stronger_seals.into_iter() {
-				trace!(target: LOG_TARGET, "Will try to sign vote for block with seal strength {}", vote.seal_strength);
+				trace!("Will try to sign vote for block with seal strength {}", vote.seal_strength);
 				let Ok(miner_signature) = try_sign_vote(
 					&self.keystore,
 					&block_hash,
 					&vote.closest_miner.1,
 					vote.seal_strength,
 				) else {
-					trace!(target: LOG_TARGET, "Could not sign vote for block with seal strength {}", vote.seal_strength);
+					trace!(
+						"Could not sign vote for block with seal strength {}",
+						vote.seal_strength
+					);
 					continue;
 				};
 
@@ -170,7 +175,7 @@ where
 		let parent_tick = voting_schedule.parent_block_tick();
 		for leaf in leaves {
 			let Some(parent_block) = self.get_block_descendent_with_tick(leaf, parent_tick) else {
-				trace!(target: LOG_TARGET, "No block at notebook parent tick {} for leaf {:?}", parent_tick, leaf);
+				trace!("No block at notebook parent tick {} for leaf {:?}", parent_tick, leaf);
 				continue;
 			};
 
@@ -178,7 +183,11 @@ where
 			let Some(block_hash_to_beat) =
 				self.get_block_descendent_with_tick(leaf, notebook_in_block_tick)
 			else {
-				trace!(target: LOG_TARGET, "Adding parent block (at tick {}) since no competition {:?}", parent_tick, leaf);
+				trace!(
+					"Adding parent block (at tick {}) since no competition {:?}",
+					parent_tick,
+					leaf
+				);
 				// if not trying to beat anyone, just add the parent hash
 				blocks_to_build_on.insert(parent_block, U256::MAX);
 				continue;
@@ -196,7 +205,11 @@ where
 			);
 
 			if theoretical_power >= fork_power_to_beat {
-				trace!(target: LOG_TARGET, "Adding parent block (at tick {}) since we can beat the competition {:?}", parent_tick, leaf);
+				trace!(
+					"Adding parent block (at tick {}) since we can beat the competition {:?}",
+					parent_tick,
+					leaf
+				);
 				blocks_to_build_on.insert(parent_block, best_seal_strength);
 			}
 		}
@@ -204,8 +217,13 @@ where
 			let has_eligible_votes =
 				self.client.runtime_api().has_eligible_votes(*block).unwrap_or_default();
 			let block_tick = self.client.runtime_api().current_tick(*block).unwrap_or_default();
-			trace!(target: LOG_TARGET, "Block {:?} with strength {}. Has Votes? {}. Block Runtime Tick {}",
-				block, strength, has_eligible_votes, block_tick);
+			trace!(
+				"Block {:?} with strength {}. Has Votes? {}. Block Runtime Tick {}",
+				block,
+				strength,
+				has_eligible_votes,
+				block_tick
+			);
 			has_eligible_votes
 		});
 

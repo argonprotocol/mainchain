@@ -219,7 +219,7 @@ where
 		};
 
 		let Some(build) = build else {
-			trace!(target: LOG_TARGET, "Unable to submit mined block in compute worker: internal build does not exist",);
+			trace!("Unable to submit mined block in compute worker: internal build does not exist",);
 			return Ok(());
 		};
 
@@ -254,7 +254,6 @@ where
 	}
 }
 
-const LOG_TARGET: &str = "node::compute::miner";
 pub(crate) fn create_compute_solver_task<B, L, Proof>(
 	mut worker: MiningHandle<B, L, Proof>,
 ) -> BoxFuture<'static, ()>
@@ -363,7 +362,7 @@ where
 				break;
 			}
 			if sync_oracle.is_major_syncing() {
-				debug!(target: LOG_TARGET, "Skipping proposal due to sync.");
+				debug!("Skipping proposal due to sync.");
 				mining_handle.stop_solving_current();
 				continue;
 			}
@@ -402,8 +401,8 @@ where
 					Ok(x) => x,
 					Err(err) => {
 						warn!(
-							target: LOG_TARGET,
-							"Unable to pull new block for compute miner. No difficulty found!! {}", err
+							"Unable to pull new block for compute miner. No difficulty found!! {}",
+							err
 						);
 						continue;
 					},
@@ -425,10 +424,7 @@ where
 				{
 					Ok(x) => x,
 					Err(err) => {
-						warn!(
-							target: LOG_TARGET,
-							"Unable to propose a new block {}", err
-						);
+						warn!("Unable to propose a new block {}", err);
 						continue;
 					},
 				};
@@ -469,7 +465,7 @@ where
 		key_block = key_block.saturating_sub(PERIOD)
 	};
 
-	info!("Using key block: {}", key_block);
+	trace!("Using RandomX key block height: {}", key_block);
 
 	let hash = client
 		.hash(key_block.unique_saturated_into())

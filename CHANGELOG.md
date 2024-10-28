@@ -1,8 +1,15 @@
 # Changelog
 
-## [v0.0.16](https://github.com/argonprotocol/mainchain/compare/v0.0.15...60a5b63b1a28a750f49e43e16b889ee57174eced) (2024-10-25)
+## [v0.0.17](https://github.com/argonprotocol/mainchain/compare/v0.0.16...130990f1c550cff872644fa38cf4c03352109ef3) (2024-10-25)
 
 ### Fixes
+
+* **node:** notary can’t catch up
+([130990f](https://github.com/argonprotocol/mainchain/commit/130990f1c550cff872644fa38cf4c03352109ef3))
+
+### [v0.0.16](https://github.com/argonprotocol/mainchain/compare/v0.0.15...v0.0.16) (2024-10-25)
+
+#### Fixes
 
 * rewards should be for notebook tick
 ([60a5b63](https://github.com/argonprotocol/mainchain/commit/60a5b63b1a28a750f49e43e16b889ee57174eced))
