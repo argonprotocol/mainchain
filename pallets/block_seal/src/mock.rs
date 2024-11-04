@@ -1,19 +1,22 @@
 use std::collections::{BTreeMap, BTreeSet};
 
-use env_logger::{Builder, Env};
-use frame_support::{derive_impl, parameter_types};
-use sp_core::{H256, U256};
-use sp_runtime::BuildStorage;
-
 use crate as pallet_block_seal;
+use argon_notary_audit::VerifyError;
 use argon_primitives::{
 	block_seal::{BlockSealAuthorityId, MiningAuthority},
 	block_vote::VoteMinimum,
+	digests::Digestset,
 	notebook::NotebookNumber,
 	tick::{Tick, Ticker},
-	AuthorityProvider, BlockSealSpecProvider, ComputeDifficulty, DomainHash, HashOutput, NotaryId,
-	NotebookProvider, NotebookSecret, TickProvider, VotingSchedule,
+	AuthorityProvider, BlockSealSpecProvider, BlockVoteDigest, ComputeDifficulty, DomainHash,
+	HashOutput, NotaryId, NotebookAuditResult, NotebookDigest, NotebookProvider, NotebookSecret,
+	TickDigest, TickProvider, VotingSchedule,
 };
+use env_logger::{Builder, Env};
+use frame_support::{derive_impl, parameter_types};
+use frame_support::__private::Get;
+use sp_core::{H256, U256};
+use sp_runtime::{traits::Block as BlockT, BuildStorage, DispatchError};
 
 type Block = frame_system::mocking::MockBlock<Test>;
 
@@ -40,7 +43,30 @@ parameter_types! {
 	pub static CurrentTick: Tick = 0;
 	pub static BlocksAtTick: BTreeMap<Tick, HashOutput> = BTreeMap::new();
 	pub static RegisteredDomains: BTreeSet<DomainHash> = BTreeSet::new();
+
+	pub static Digests: Digestset<VerifyError, u64> = Digestset {
+		block_vote: BlockVoteDigest { voting_power: 500, votes_count: 1 },
+		author: 1,
+		voting_key: None,
+		tick: TickDigest { tick: 2 },
+		notebooks: NotebookDigest {
+			notebooks: vec![NotebookAuditResult::<VerifyError> {
+				notary_id: 1,
+				notebook_number: 1,
+				tick: 1,
+				audit_first_failure: None,
+			}],
+		},
+	};
 }
+
+pub struct DigestGetter;
+impl Get<Result<Digestset<VerifyError, u64>, DispatchError>> for DigestGetter {
+	fn get() -> Result<Digestset<VerifyError, u64>, DispatchError> {
+		Ok(Digests::get())
+	}
+}
+
 
 pub struct StaticAuthorityProvider;
 impl AuthorityProvider<BlockSealAuthorityId, Block, u64> for StaticAuthorityProvider {
@@ -106,7 +132,10 @@ impl BlockSealSpecProvider<Block> for StaticBlockSealSpecProvider {
 		GrandpaVoteMinimum::get()
 	}
 	fn compute_difficulty() -> ComputeDifficulty {
-		0u128
+		0
+	}
+	fn compute_key_block_hash() -> Option<<Block as BlockT>::Hash> {
+		todo!()
 	}
 }
 impl pallet_block_seal::Config for Test {
@@ -117,6 +146,7 @@ impl pallet_block_seal::Config for Test {
 	type BlockSealSpecProvider = StaticBlockSealSpecProvider;
 	type TickProvider = StaticTickProvider;
 	type EventHandler = ();
+	type Digests = DigestGetter;
 }
 
 // Build genesis storage according to the mock runtime.

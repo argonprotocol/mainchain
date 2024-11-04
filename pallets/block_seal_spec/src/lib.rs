@@ -39,7 +39,7 @@ pub mod pallet {
 	use frame_support::pallet_prelude::*;
 	use frame_system::pallet_prelude::*;
 	use sp_core::U256;
-	use sp_runtime::{traits::UniqueSaturatedInto, DigestItem, Percent};
+	use sp_runtime::{traits::UniqueSaturatedInto, DigestItem, FixedPointNumber, FixedU128};
 
 	use argon_primitives::{
 		block_vote::VoteMinimum,
@@ -63,8 +63,8 @@ pub mod pallet {
 		/// Because this pallet emits events, it depends on the runtime's definition of an event.
 		type RuntimeEvent: From<Event<Self>> + IsType<<Self as frame_system::Config>::RuntimeEvent>;
 
-		/// The desired milliseconds per compute block
-		type TargetComputeBlockPercent: Get<Percent>;
+		/// The desired percent of the default block time to use for compute
+		type TargetComputeBlockPercent: Get<FixedU128>;
 
 		type AuthorityProvider: AuthorityProvider<
 			BlockSealAuthorityId,
@@ -330,7 +330,7 @@ pub mod pallet {
 
 			let timestamps = <PastComputeBlockTimes<T>>::get();
 			let tick_millis = T::TickProvider::ticker().tick_duration_millis;
-			let target_time = T::TargetComputeBlockPercent::get().mul_floor(tick_millis);
+			let target_time = T::TargetComputeBlockPercent::get().saturating_mul_int(tick_millis);
 			let expected_block_time = target_time * timestamps.len() as u64;
 			let actual_block_time =
 				timestamps.into_iter().fold(0u64, |sum, time| sum.saturating_add(time));

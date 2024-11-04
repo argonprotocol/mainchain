@@ -41,9 +41,9 @@ pub mod pallet {
 		notebook::{AccountOrigin, Notebook, NotebookHeader},
 		tick::Tick,
 		AccountOriginUid, Balance, BlockSealSpecProvider, ChainTransfer, ChainTransferLookup,
-		NotebookDigest as NotebookDigestT, NotebookEventHandler, NotebookProvider, NotebookSecret,
-		NotebookSecretHash, SignedNotebookHeader, TickProvider, TransferToLocalchainId,
-		NOTEBOOKS_DIGEST_ID,
+		Digestset, NotebookDigest as NotebookDigestT, NotebookEventHandler, NotebookProvider,
+		NotebookSecret, NotebookSecretHash, SignedNotebookHeader, TickProvider,
+		TransferToLocalchainId,
 	};
 
 	type NotebookDigest = NotebookDigestT<NotebookVerifyError>;
@@ -70,6 +70,8 @@ pub mod pallet {
 
 		type BlockSealSpecProvider: BlockSealSpecProvider<Self::Block>;
 		type TickProvider: TickProvider<Self::Block>;
+
+		type Digests: Get<Result<Digestset<NotebookVerifyError, Self::AccountId>, DispatchError>>;
 	}
 
 	const MAX_NOTEBOOK_DETAILS_PER_NOTARY: u32 = 3;
@@ -113,9 +115,9 @@ pub mod pallet {
 	#[pallet::storage]
 	pub(super) type BlockNotebooks<T: Config> = StorageValue<_, NotebookDigest, ValueQuery>;
 
-	/// Temporary store a copy of the notebook digest in storage
+	/// Check if the inherent was included
 	#[pallet::storage]
-	pub(super) type TempNotebookDigest<T: Config> = StorageValue<_, NotebookDigest, OptionQuery>;
+	pub(super) type InherentIncluded<T: Config> = StorageValue<_, bool, ValueQuery>;
 
 	/// Notaries locked for failing audits
 	#[pallet::storage]
@@ -182,21 +184,17 @@ pub mod pallet {
 	#[pallet::hooks]
 	impl<T: Config> Hooks<BlockNumberFor<T>> for Pallet<T> {
 		fn on_initialize(_: BlockNumberFor<T>) -> Weight {
-			let digest = <frame_system::Pallet<T>>::digest();
-			for log in digest.logs.iter() {
-				if let Some(digest) = log.pre_runtime_try_to::<NotebookDigest>(&NOTEBOOKS_DIGEST_ID)
-				{
-					assert!(
-						!<TempNotebookDigest<T>>::exists(),
-						"Notebook digest can only be provided once!"
-					);
-					<TempNotebookDigest<T>>::put(digest);
-				}
-			}
-
-			assert_ne!(<TempNotebookDigest<T>>::get(), None, "No valid notebook digest was found.");
-
 			T::DbWeight::get().reads_writes(1, 1)
+		}
+
+		fn on_finalize(_: BlockNumberFor<T>) {
+			// According to parity, the only way to ensure that a mandatory inherent is included
+			// is by checking on block finalization that the inherent set a particular storage item:
+			// https://github.com/paritytech/polkadot-sdk/issues/2841#issuecomment-1876040854
+			assert!(
+				InherentIncluded::<T>::take(),
+				"Block invalid, missing inherent `notebooks::submit`"
+			);
 		}
 	}
 
@@ -211,13 +209,16 @@ pub mod pallet {
 			ensure_none(origin)?;
 			info!("Notebook inherent submitted with {} notebooks", notebooks.len());
 
+			ensure!(!InherentIncluded::<T>::get(), Error::<T>::MultipleNotebookInherentsProvided);
+
+			InherentIncluded::<T>::put(true);
+
 			// CRITICAL NOTE: very important to only have dispatch errors that are from the assembly
-			// of the notebooks, not the notebooks themselves. Otherwise we will stall here as
+			// of the notebooks, not the notebooks themselves. Otherwise, we will stall here as
 			// the node doesn't know.
 
 			// Take this value the first time. should reject a second time
-			let notebook_digest = <TempNotebookDigest<T>>::take()
-				.ok_or(Error::<T>::MultipleNotebookInherentsProvided)?;
+			let notebook_digest = T::Digests::get()?.notebooks;
 
 			ensure!(
 				notebook_digest.notebooks.len() == notebooks.len(),

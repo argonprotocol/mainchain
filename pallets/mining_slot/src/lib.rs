@@ -1005,7 +1005,7 @@ pub trait SlotEvents<AccountId> {
 	);
 }
 
-#[impl_trait_for_tuples::impl_for_tuples(1, 5)]
+#[impl_trait_for_tuples::impl_for_tuples(0, 5)]
 #[tuple_types_custom_trait_bound(OnNewSlot<AId>)]
 impl<AId> SlotEvents<AId> for Tuple {
 	fn on_new_slot<Ks: OpaqueKeys>(

@@ -23,8 +23,7 @@ use sp_runtime::{
 use crate::{
 	mock::{BlockSeal, *},
 	pallet::{
-		BlockForkPower, LastBlockSealerInfo, ParentVotingKey, TempAuthor, TempSealInherent,
-		VotesInPast3Ticks,
+		BlockForkPower, LastBlockSealerInfo, ParentVotingKey, TempSealInherent, VotesInPast3Ticks,
 	},
 	Call, Error,
 };
@@ -34,19 +33,13 @@ use argon_primitives::{
 	inherents::{BlockSealInherent, BlockSealInherentDataProvider, SealInherentError},
 	localchain::BlockVote,
 	notary::NotaryNotebookRawVotes,
-	BlockSealAuthorityId, BlockSealAuthoritySignature, BlockSealDigest, BlockSealerInfo,
-	BlockVoteT, BlockVotingKey, Domain, DomainTopLevel, MerkleProof, ParentVotingKeyDigest,
-	VotingSchedule, AUTHOR_DIGEST_ID, PARENT_VOTING_KEY_DIGEST,
+	BlockSealAuthorityId, BlockSealAuthoritySignature, BlockSealDigest, BlockVoteT, BlockVotingKey,
+	Domain, DomainTopLevel, MerkleProof, ParentVotingKeyDigest, VotingSchedule, AUTHOR_DIGEST_ID,
+	PARENT_VOTING_KEY_DIGEST,
 };
 
 fn empty_signature() -> BlockSealAuthoritySignature {
 	Signature::from_raw([0u8; 64]).into()
-}
-
-#[test]
-#[should_panic(expected = "No valid account id provided for block author.")]
-fn it_should_panic_if_no_block_author() {
-	new_test_ext().execute_with(|| BlockSeal::on_initialize(1));
 }
 
 #[test]
@@ -86,35 +79,6 @@ fn it_should_check_vote_seal_inherents() {
 			.to_string(),
 			SealInherentError::InvalidSeal.to_string()
 		);
-	});
-}
-
-#[test]
-fn it_should_read_the_digests() {
-	new_test_ext().execute_with(|| {
-		let block_vote_digest = get_block_vote_digest(1);
-		let pre_digest = Digest {
-			logs: vec![
-				author_digest(1),
-				DigestItem::PreRuntime(BLOCK_VOTES_DIGEST_ID, block_vote_digest.encode()),
-			],
-		};
-
-		System::reset_events();
-		System::initialize(&42, &System::parent_hash(), &pre_digest);
-		BlockSeal::on_initialize(42);
-		assert_eq!(TempAuthor::<Test>::get(), Some(1u64));
-		assert_eq!(TempSealInherent::<Test>::get(), None);
-
-		TempSealInherent::<Test>::put(BlockSealInherent::Compute);
-		LastBlockSealerInfo::<Test>::put(BlockSealerInfo {
-			block_vote_rewards_account: Some(1),
-			block_author_account_id: 1,
-		});
-		BlockSeal::on_finalize(42);
-
-		assert_eq!(TempAuthor::<Test>::get(), None);
-		assert_eq!(TempSealInherent::<Test>::get(), None);
 	});
 }
 
@@ -263,6 +227,11 @@ fn it_should_be_able_to_submit_a_seal() {
 			&Digest { logs: vec![author_digest(10), vote_digest(1)] },
 		);
 		BlockSeal::on_initialize(4);
+
+		Digests::mutate(|a| {
+			a.block_vote = BlockVoteDigest { voting_power: 1, votes_count: 1 };
+			a.author = 10;
+		});
 
 		assert_ok!(BlockSeal::apply(RuntimeOrigin::none(), inherent.clone()));
 		// only after block seal is applied is this true
@@ -430,7 +399,6 @@ fn it_creates_the_next_parent_key() {
 			},
 		);
 		CurrentTick::set(4);
-		TempAuthor::<Test>::put(1);
 		TempSealInherent::<Test>::put(BlockSealInherent::Compute);
 		BlockSeal::on_initialize(4);
 
@@ -465,8 +433,12 @@ fn it_should_panic_if_voting_key_digest_is_wrong() {
 				)],
 			},
 		);
+
+		Digests::mutate(|a| {
+			a.voting_key = Some(ParentVotingKeyDigest { parent_voting_key: Some(parent_key) });
+		});
+
 		CurrentTick::set(3);
-		TempAuthor::<Test>::put(1);
 		TempSealInherent::<Test>::put(BlockSealInherent::Compute);
 		BlockSeal::on_initialize(3);
 
@@ -506,7 +478,6 @@ fn it_skips_ineligible_voting_roots() {
 			},
 		);
 		CurrentTick::set(4);
-		TempAuthor::<Test>::put(1);
 		TempSealInherent::<Test>::put(BlockSealInherent::Compute);
 
 		// still add both notebooks

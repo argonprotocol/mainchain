@@ -1,15 +1,19 @@
-use env_logger::{Builder, Env};
-use frame_support::{derive_impl, parameter_types, traits::Currency};
-use sp_core::{crypto::AccountId32, ConstU32, H256};
-use sp_keyring::Ed25519Keyring;
-use sp_runtime::{traits::IdentityLookup, BuildStorage};
-
+use argon_notary_audit::VerifyError;
 use argon_primitives::{
 	block_vote::VoteMinimum,
 	notary::{NotaryId, NotaryProvider, NotarySignature},
 	tick::{Tick, Ticker},
-	BlockSealSpecProvider, ChainTransferLookup, NotebookEventHandler, NotebookHeader, TickProvider,
+	BlockSealSpecProvider, BlockVoteDigest, ChainTransferLookup, ComputeDifficulty, Digestset,
+	NotebookDigest, NotebookEventHandler, NotebookHeader, TickDigest, TickProvider,
 	TransferToLocalchainId, VotingSchedule,
+};
+use env_logger::{Builder, Env};
+use frame_support::{derive_impl, parameter_types, traits::Currency};
+use sp_core::{crypto::AccountId32, ConstU32, Get, H256};
+use sp_keyring::{ed25519::Keyring, Ed25519Keyring};
+use sp_runtime::{
+	traits::{Block as BlockT, IdentityLookup},
+	BuildStorage, DispatchError,
 };
 
 use crate as pallet_notebook;
@@ -62,7 +66,25 @@ parameter_types! {
 	pub static GrandpaVoteMinimum: Option<VoteMinimum> = None;
 	pub static CurrentTick: Tick = 0;
 	pub static NotebookEvents: Vec<NotebookHeader> = vec![];
+
+	pub static Digests: Digestset<VerifyError, AccountId32> = Digestset {
+		block_vote: BlockVoteDigest { voting_power: 500, votes_count: 1 },
+		author: Keyring::Alice.to_account_id(),
+		voting_key: None,
+		tick: TickDigest { tick: 2 },
+		notebooks: NotebookDigest {
+			notebooks: vec![],
+		},
+	};
 }
+
+pub struct DigestGetter;
+impl Get<Result<Digestset<VerifyError, AccountId32>, DispatchError>> for DigestGetter {
+	fn get() -> Result<Digestset<VerifyError, AccountId32>, DispatchError> {
+		Ok(Digests::get())
+	}
+}
+
 pub struct ChainTransferLookupImpl;
 impl ChainTransferLookup<AccountId32, Balance> for ChainTransferLookupImpl {
 	fn is_valid_transfer_to_localchain(
@@ -107,8 +129,11 @@ impl BlockSealSpecProvider<Block> for StaticBlockSealSpecProvider {
 	fn grandparent_vote_minimum() -> Option<VoteMinimum> {
 		GrandpaVoteMinimum::get()
 	}
-	fn compute_difficulty() -> u128 {
-		todo!("compute_difficulty")
+	fn compute_difficulty() -> ComputeDifficulty {
+		todo!("(")
+	}
+	fn compute_key_block_hash() -> Option<<Block as BlockT>::Hash> {
+		todo!()
 	}
 }
 
@@ -145,6 +170,7 @@ impl pallet_notebook::Config for Test {
 	type ChainTransferLookup = ChainTransferLookupImpl;
 	type BlockSealSpecProvider = StaticBlockSealSpecProvider;
 	type TickProvider = StaticTickProvider;
+	type Digests = DigestGetter;
 }
 
 // Build genesis storage according to the mock runtime.
