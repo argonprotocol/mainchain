@@ -137,6 +137,7 @@ pub trait ChainTransferLookup<AccountId, Balance> {
 pub trait BlockSealSpecProvider<Block: BlockT> {
 	fn grandparent_vote_minimum() -> Option<VoteMinimum>;
 	fn compute_difficulty() -> ComputeDifficulty;
+	fn compute_key_block_hash() -> Option<Block::Hash>;
 }
 
 #[derive(Encode, Decode, Clone, PartialEq, Eq, TypeInfo, MaxEncodedLen, RuntimeDebug)]

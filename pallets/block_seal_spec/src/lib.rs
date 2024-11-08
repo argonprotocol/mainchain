@@ -22,7 +22,8 @@ const MAX_ADJUST_DOWN: u128 = 4; // Represents 1/4 adjustment
 const MAX_COMPUTE_DIFFICULTY: u128 = u128::MAX;
 const MIN_COMPUTE_DIFFICULTY: u128 = 4;
 const MAX_TAX_MINIMUM: u128 = u128::MAX;
-const MIN_TAX_MINIMUM: u128 = 500;
+const MIN_TAX_MINIMUM: u128 = 1;
+const KEY_BLOCK_ROTATION: u32 = 1440;
 
 /// This pallet adjusts the BlockSeal Specification after every block for both voting and compute.
 ///
@@ -36,11 +37,6 @@ const MIN_TAX_MINIMUM: u128 = 500;
 #[frame_support::pallet(dev_mode)]
 pub mod pallet {
 	use alloc::{vec, vec::Vec};
-	use frame_support::pallet_prelude::*;
-	use frame_system::pallet_prelude::*;
-	use sp_core::U256;
-	use sp_runtime::{traits::UniqueSaturatedInto, DigestItem, FixedPointNumber, FixedU128};
-
 	use argon_primitives::{
 		block_vote::VoteMinimum,
 		digests::{BlockVoteDigest, BLOCK_VOTES_DIGEST_ID},
@@ -50,6 +46,13 @@ pub mod pallet {
 		tick::Tick,
 		AuthorityProvider, BlockSealAuthorityId, BlockSealSpecProvider, ComputeDifficulty,
 		NotebookEventHandler, NotebookProvider,
+	};
+	use frame_support::pallet_prelude::*;
+	use frame_system::pallet_prelude::*;
+	use sp_core::U256;
+	use sp_runtime::{
+		traits::{Block, UniqueSaturatedInto},
+		DigestItem, FixedPointNumber, FixedU128,
 	};
 
 	use super::*;
@@ -105,6 +108,13 @@ pub mod pallet {
 	/// minimum amount of tax or compute needed to create a vote. It is adjusted up or down to
 	/// target a max number of votes
 	pub(super) type CurrentComputeDifficulty<T: Config> = StorageValue<_, u128, ValueQuery>;
+
+	#[pallet::storage]
+	/// The key K is selected to be the hash of a block in the blockchain - this block is called
+	/// the 'key block'. For optimal mining and verification performance, the key should
+	/// change every day
+	pub(super) type CurrentComputeKeyBlock<T: Config> =
+		StorageValue<_, <T::Block as Block>::Hash, OptionQuery>;
 
 	#[pallet::storage]
 	pub(super) type PastComputeBlockTimes<T: Config> =
@@ -218,7 +228,7 @@ pub mod pallet {
 			T::DbWeight::get().reads_writes(3, 3)
 		}
 
-		fn on_finalize(_: BlockNumberFor<T>) {
+		fn on_finalize(n: BlockNumberFor<T>) {
 			let block_notebooks = <TempCurrentTickNotebooksInBlock<T>>::take();
 			let notebook_tick = T::TickProvider::voting_schedule().notebook_tick();
 
@@ -248,6 +258,12 @@ pub mod pallet {
 				specs.try_insert(0, Self::vote_minimum())
 			})
 			.expect("VoteMinimumHistory is bounded");
+
+			let block_number = UniqueSaturatedInto::<u32>::unique_saturated_into(n);
+			if (block_number - 1) % KEY_BLOCK_ROTATION == 0 {
+				let block_hash = <frame_system::Pallet<T>>::parent_hash();
+				<CurrentComputeKeyBlock<T>>::put(block_hash);
+			}
 		}
 	}
 
@@ -462,9 +478,12 @@ pub mod pallet {
 		fn compute_difficulty() -> ComputeDifficulty {
 			<CurrentComputeDifficulty<T>>::get()
 		}
+
+		fn compute_key_block_hash() -> Option<<T::Block as Block>::Hash> {
+			<CurrentComputeKeyBlock<T>>::get()
+		}
 	}
 }
-
 impl<T: Config> OnTimestampSet<T::Moment> for Pallet<T> {
 	fn on_timestamp_set(now: T::Moment) {
 		TempBlockTimestamp::<T>::put(now);

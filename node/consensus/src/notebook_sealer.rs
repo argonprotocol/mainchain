@@ -1,15 +1,16 @@
 use crate::{aux_client::ArgonAux, block_creator::CreateTaxVoteBlock, error::Error};
+use argon_node_runtime::NotebookVerifyError;
 use argon_primitives::{
 	block_seal::BLOCK_SEAL_CRYPTO_ID,
 	localchain::BlockVote,
 	tick::{Tick, Ticker},
-	BlockSealApis, BlockSealAuthorityId, BlockSealAuthoritySignature, BlockVotingPower, TickApis,
-	VotingSchedule, BLOCK_SEAL_KEY_TYPE,
+	BlockCreatorApis, BlockSealApis, BlockSealAuthorityId, BlockSealAuthoritySignature,
+	BlockVotingPower, TickApis, VotingSchedule, BLOCK_SEAL_KEY_TYPE,
 };
 use codec::Codec;
-use futures::{channel::mpsc::*, prelude::*};
 use log::*;
 use sc_client_api::AuxStore;
+use sc_utils::mpsc::TracingUnboundedSender;
 use sp_api::ProvideRuntimeApi;
 use sp_blockchain::HeaderBackend;
 use sp_consensus::{Error as ConsensusError, SelectChain};
@@ -24,7 +25,7 @@ pub struct NotebookSealer<B: BlockT, C: AuxStore, SC, AC: Clone + Codec> {
 	ticker: Ticker,
 	select_chain: Arc<SC>,
 	keystore: KeystorePtr,
-	sender: Sender<CreateTaxVoteBlock<B, AC>>,
+	sender: TracingUnboundedSender<CreateTaxVoteBlock<B, AC>>,
 	aux_client: ArgonAux<B, C>,
 	_phantom: PhantomData<B>,
 }
@@ -33,7 +34,9 @@ impl<B, C, SC, AC> Clone for NotebookSealer<B, C, SC, AC>
 where
 	B: BlockT,
 	C: ProvideRuntimeApi<B> + AuxStore + 'static,
-	C::Api: BlockSealApis<B, AC, BlockSealAuthorityId> + TickApis<B>,
+	C::Api: BlockSealApis<B, AC, BlockSealAuthorityId>
+		+ TickApis<B>
+		+ BlockCreatorApis<B, AC, NotebookVerifyError>,
 	AC: Codec + Clone,
 {
 	fn clone(&self) -> Self {
@@ -53,7 +56,9 @@ impl<B, C, SC, AC> NotebookSealer<B, C, SC, AC>
 where
 	B: BlockT,
 	C: ProvideRuntimeApi<B> + HeaderBackend<B> + AuxStore + 'static,
-	C::Api: BlockSealApis<B, AC, BlockSealAuthorityId> + TickApis<B>,
+	C::Api: BlockSealApis<B, AC, BlockSealAuthorityId>
+		+ TickApis<B>
+		+ BlockCreatorApis<B, AC, NotebookVerifyError>,
 	SC: SelectChain<B> + 'static,
 	AC: Codec + Clone,
 {
@@ -63,7 +68,7 @@ where
 		select_chain: SC,
 		keystore: KeystorePtr,
 		aux_client: ArgonAux<B, C>,
-		sender: Sender<CreateTaxVoteBlock<B, AC>>,
+		sender: TracingUnboundedSender<CreateTaxVoteBlock<B, AC>>,
 	) -> Self {
 		Self {
 			client: client.clone(),
@@ -143,16 +148,20 @@ where
 					continue;
 				};
 
-				let mut sender = self.sender.clone();
-				sender
-					.send(CreateTaxVoteBlock::<B, AC> {
+				self.sender
+					.unbounded_send(CreateTaxVoteBlock::<B, AC> {
 						current_tick: notebook_tick + 1,
 						timestamp_millis: Timestamp::current().as_millis(),
 						vote,
 						parent_hash: block_hash,
 						signature: miner_signature,
 					})
-					.await?;
+					.map_err(|e| {
+						Error::StringError(format!(
+							"Failed to send CreateTaxVoteBlock message: {:?}",
+							e
+						))
+					})?;
 				return Ok(());
 			}
 		}

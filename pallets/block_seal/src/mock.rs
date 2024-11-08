@@ -13,8 +13,7 @@ use argon_primitives::{
 	TickDigest, TickProvider, VotingSchedule,
 };
 use env_logger::{Builder, Env};
-use frame_support::{derive_impl, parameter_types};
-use frame_support::__private::Get;
+use frame_support::{__private::Get, derive_impl, parameter_types};
 use sp_core::{H256, U256};
 use sp_runtime::{traits::Block as BlockT, BuildStorage, DispatchError};
 
@@ -66,7 +65,6 @@ impl Get<Result<Digestset<VerifyError, u64>, DispatchError>> for DigestGetter {
 		Ok(Digests::get())
 	}
 }
-
 
 pub struct StaticAuthorityProvider;
 impl AuthorityProvider<BlockSealAuthorityId, Block, u64> for StaticAuthorityProvider {

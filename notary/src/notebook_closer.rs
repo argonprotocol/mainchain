@@ -473,14 +473,7 @@ mod tests {
 				Ok(block) => {
 					let block_hash = block.hash();
 					let (tick, votes, seal, key, notebooks) = get_digests(block);
-					if let Some(notebook) = notebooks.notebooks.first() {
-						assert_eq!(notebook.audit_first_failure, None);
-						if notebook.notebook_number == channel_hold_result.notebook_number {
-							assert_eq!(votes.votes_count, 1, "Should have votes");
-							assert_eq!(votes.voting_power, vote_power);
-							assert_eq!(tick, voting_schedule.block_tick())
-						}
-					}
+
 					println!(
 						"Got block with tick {tick}. Notebooks: {:?}, {:?} {:?} {:?}",
 						votes,
@@ -492,6 +485,14 @@ mod tests {
 						},
 						block_hash
 					);
+					if let Some(notebook) = notebooks.notebooks.first() {
+						assert_eq!(notebook.audit_first_failure, None);
+						if notebook.notebook_number == channel_hold_result.notebook_number {
+							assert_eq!(votes.votes_count, 1, "Should have votes");
+							assert_eq!(votes.voting_power, vote_power);
+							assert_eq!(tick, voting_schedule.block_tick())
+						}
+					}
 					if key.parent_voting_key.is_some() {
 						did_see_voting_key = true;
 					}
@@ -629,7 +630,7 @@ mod tests {
 					NoteType::ClaimFromMainchain { transfer_id },
 				)],
 				channel_hold_note: None,
-				signature: sp_core::ed25519::Signature::from_raw([0u8; 64]).into(),
+				signature: Signature::from_raw([0u8; 64]).into(),
 			}
 			.sign(keypair)
 			.clone()],
@@ -674,7 +675,7 @@ mod tests {
 						Note::create(DOMAIN_LEASE_COST, NoteType::LeaseDomain,)
 					],
 					channel_hold_note: None,
-					signature: sp_core::ed25519::Signature::from_raw([0u8; 64]).into(),
+					signature: Signature::from_raw([0u8; 64]).into(),
 				}
 				.sign(keypair.clone())
 				.clone(),
@@ -686,7 +687,7 @@ mod tests {
 					previous_balance_proof: None,
 					notes: bounded_vec![Note::create(DOMAIN_LEASE_COST, NoteType::Claim,)],
 					channel_hold_note: None,
-					signature: sp_core::ed25519::Signature::from_raw([0u8; 64]).into(),
+					signature: Signature::from_raw([0u8; 64]).into(),
 				}
 				.sign(keypair.clone())
 				.clone(),

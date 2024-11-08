@@ -7,10 +7,10 @@ use sp_application_crypto::AppCrypto;
 use sp_arithmetic::FixedU128;
 use sp_core::{
 	crypto::{CryptoTypeId, KeyTypeId},
-	OpaquePeerId,
+	OpaquePeerId, H256,
 };
 use sp_debug_derive::RuntimeDebug;
-use sp_runtime::traits::OpaqueKeys;
+use sp_runtime::traits::{Block, OpaqueKeys};
 
 pub const BLOCK_SEAL_KEY_TYPE: KeyTypeId = KeyTypeId(*b"seal");
 
@@ -28,6 +28,33 @@ sp_application_crypto::with_pair! {
 pub type BlockSealAuthoritySignature = app::Signature;
 pub type BlockSealAuthorityId = app::Public;
 pub const BLOCK_SEAL_CRYPTO_ID: CryptoTypeId = <app::Public as AppCrypto>::CRYPTO_ID;
+
+pub type ComputeDifficulty = u128;
+
+#[derive(
+	PartialEqNoBound,
+	EqNoBound,
+	CloneNoBound,
+	Encode,
+	Decode,
+	RuntimeDebug,
+	TypeInfo,
+	MaxEncodedLen,
+	Deserialize,
+	Serialize,
+)]
+pub struct ComputePuzzle<B: Block> {
+	pub difficulty: ComputeDifficulty,
+	/// The block hash to load the randomx vm from. None means use genesis (which isn't available
+	/// in block 0... so we have this odd setup)
+	pub randomx_key_block: Option<B::Hash>,
+}
+
+impl<B: Block> ComputePuzzle<B> {
+	pub fn get_key_block(&self, genesis_hash: B::Hash) -> H256 {
+		H256::from_slice(self.randomx_key_block.unwrap_or(genesis_hash).as_ref())
+	}
+}
 
 #[derive(
 	PartialEqNoBound, EqNoBound, CloneNoBound, Encode, Decode, RuntimeDebug, TypeInfo, MaxEncodedLen,

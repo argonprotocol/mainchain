@@ -26,7 +26,6 @@ pub use crate::{apis::*, notary::NotaryId, note::*, notebook::*, providers::*};
 
 #[cfg(feature = "uniffi")]
 uniffi::setup_scaffolding!();
-pub type ComputeDifficulty = u128;
 
 mod apis;
 pub mod balance_change;
@@ -59,6 +58,8 @@ pub mod git_version;
 
 /// An index to a block.
 pub type BlockNumber = u32;
+
+pub use block_seal::ComputeDifficulty;
 
 /// Alias to 512-bit hash when used in the context of a transaction signature on the chain.
 pub type Signature = MultiSignature;

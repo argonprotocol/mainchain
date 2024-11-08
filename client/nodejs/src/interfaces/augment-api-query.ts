@@ -9,7 +9,7 @@ import type { ApiTypes, AugmentedQuery, QueryableStorageEntry } from '@polkadot/
 import type { BTreeMap, Bytes, Null, Option, U256, U8aFixed, Vec, bool, u128, u16, u32, u64 } from '@polkadot/types-codec';
 import type { AnyNumber, ITuple } from '@polkadot/types-codec/types';
 import type { AccountId32, H256 } from '@polkadot/types/interfaces/runtime';
-import type { ArgonNotaryAuditErrorVerifyError, ArgonPrimitivesBalanceChangeAccountOrigin, ArgonPrimitivesBitcoinBitcoinBlock, ArgonPrimitivesBitcoinBitcoinNetwork, ArgonPrimitivesBitcoinBitcoinXPub, ArgonPrimitivesBitcoinUtxoRef, ArgonPrimitivesBitcoinUtxoValue, ArgonPrimitivesBlockSealBlockPayout, ArgonPrimitivesBlockSealMiningRegistration, ArgonPrimitivesBlockSealMiningSlotConfig, ArgonPrimitivesBond, ArgonPrimitivesBondVault, ArgonPrimitivesDigestsBlockVoteDigest, ArgonPrimitivesDigestsNotebookDigest, ArgonPrimitivesDigestsParentVotingKeyDigest, ArgonPrimitivesDomainZoneRecord, ArgonPrimitivesForkPower, ArgonPrimitivesInherentsBlockSealInherent, ArgonPrimitivesNotaryNotaryMeta, ArgonPrimitivesNotaryNotaryNotebookKeyDetails, ArgonPrimitivesNotaryNotaryNotebookVoteDigestDetails, ArgonPrimitivesNotaryNotaryRecord, ArgonPrimitivesProvidersBlockSealerInfo, ArgonPrimitivesTickTicker, FrameSupportDispatchPerDispatchClassWeight, FrameSupportTokensMiscIdAmountRuntimeFreezeReason, FrameSupportTokensMiscIdAmountRuntimeHoldReason, FrameSystemAccountInfo, FrameSystemCodeUpgradeAuthorization, FrameSystemEventRecord, FrameSystemLastRuntimeUpgradeInfo, FrameSystemPhase, PalletBalancesAccountData, PalletBalancesBalanceLock, PalletBalancesReserveData, PalletBondUtxoCosignRequest, PalletBondUtxoState, PalletChainTransferQueuedTransferOut, PalletDomainsDomainRegistration, PalletGrandpaStoredPendingChange, PalletGrandpaStoredState, PalletMultisigMultisig, PalletPriceIndexPriceIndex, PalletProxyAnnouncement, PalletProxyProxyDefinition, PalletTransactionPaymentReleases, SpConsensusGrandpaAppPublic, SpRuntimeDigest } from '@polkadot/types/lookup';
+import type { ArgonNotaryAuditErrorVerifyError, ArgonPrimitivesBalanceChangeAccountOrigin, ArgonPrimitivesBitcoinBitcoinBlock, ArgonPrimitivesBitcoinBitcoinNetwork, ArgonPrimitivesBitcoinBitcoinXPub, ArgonPrimitivesBitcoinUtxoRef, ArgonPrimitivesBitcoinUtxoValue, ArgonPrimitivesBlockSealBlockPayout, ArgonPrimitivesBlockSealMiningRegistration, ArgonPrimitivesBlockSealMiningSlotConfig, ArgonPrimitivesBond, ArgonPrimitivesBondVault, ArgonPrimitivesDigestsBlockVoteDigest, ArgonPrimitivesDigestsDigestset, ArgonPrimitivesDigestsNotebookDigest, ArgonPrimitivesDomainZoneRecord, ArgonPrimitivesForkPower, ArgonPrimitivesInherentsBlockSealInherent, ArgonPrimitivesNotaryNotaryMeta, ArgonPrimitivesNotaryNotaryNotebookKeyDetails, ArgonPrimitivesNotaryNotaryNotebookVoteDigestDetails, ArgonPrimitivesNotaryNotaryRecord, ArgonPrimitivesProvidersBlockSealerInfo, ArgonPrimitivesTickTicker, FrameSupportDispatchPerDispatchClassWeight, FrameSupportTokensMiscIdAmountRuntimeFreezeReason, FrameSupportTokensMiscIdAmountRuntimeHoldReason, FrameSystemAccountInfo, FrameSystemCodeUpgradeAuthorization, FrameSystemEventRecord, FrameSystemLastRuntimeUpgradeInfo, FrameSystemPhase, PalletBalancesAccountData, PalletBalancesBalanceLock, PalletBalancesReserveData, PalletBondUtxoCosignRequest, PalletBondUtxoState, PalletChainTransferQueuedTransferOut, PalletDomainsDomainRegistration, PalletGrandpaStoredPendingChange, PalletGrandpaStoredState, PalletMultisigMultisig, PalletPriceIndexPriceIndex, PalletProxyAnnouncement, PalletProxyProxyDefinition, PalletTransactionPaymentReleases, SpConsensusGrandpaAppPublic, SpRuntimeDigest } from '@polkadot/types/lookup';
 import type { Observable } from '@polkadot/types/types';
 
 export type __AugmentedQuery<ApiType extends ApiTypes> = AugmentedQuery<ApiType, () => unknown>;
@@ -91,6 +91,10 @@ declare module '@polkadot/api-base/types/storage' {
        **/
       confirmedBitcoinBlockTip: AugmentedQuery<ApiType, () => Observable<Option<ArgonPrimitivesBitcoinBitcoinBlock>>, []>;
       /**
+       * Check if the inherent was included
+       **/
+      inherentIncluded: AugmentedQuery<ApiType, () => Observable<bool>, []>;
+      /**
        * Expiration date as a day since unix timestamp mapped to Bitcoin UTXOs
        **/
       lockedUtxoExpirationsByBlock: AugmentedQuery<ApiType, (arg: u64 | AnyNumber | Uint8Array) => Observable<Vec<ArgonPrimitivesBitcoinUtxoRef>>, [u64]>;
@@ -130,17 +134,9 @@ declare module '@polkadot/api-base/types/storage' {
        **/
       parentVotingKey: AugmentedQuery<ApiType, () => Observable<Option<H256>>, []>;
       /**
-       * Author of current block (temporary storage).
-       **/
-      tempAuthor: AugmentedQuery<ApiType, () => Observable<Option<AccountId32>>, []>;
-      /**
        * Ensures only a single inherent is applied
        **/
       tempSealInherent: AugmentedQuery<ApiType, () => Observable<Option<ArgonPrimitivesInherentsBlockSealInherent>>, []>;
-      /**
-       * Temporarily track the parent voting key digest
-       **/
-      tempVotingKeyDigest: AugmentedQuery<ApiType, () => Observable<Option<ArgonPrimitivesDigestsParentVotingKeyDigest>>, []>;
       /**
        * The count of votes in the last 3 ticks
        **/
@@ -153,6 +149,12 @@ declare module '@polkadot/api-base/types/storage' {
        * target a max number of votes
        **/
       currentComputeDifficulty: AugmentedQuery<ApiType, () => Observable<u128>, []>;
+      /**
+       * The key K is selected to be the hash of a block in the blockchain - this block is called
+       * the 'key block'. For optimal mining and verification performance, the key should
+       * change every day
+       **/
+      currentComputeKeyBlock: AugmentedQuery<ApiType, () => Observable<Option<H256>>, []>;
       /**
        * The current vote minimum of the chain. Block votes use this minimum to determine the
        * minimum amount of tax or compute needed to create a vote. It is adjusted up or down to
@@ -219,6 +221,9 @@ declare module '@polkadot/api-base/types/storage' {
       nextTransferId: AugmentedQuery<ApiType, () => Observable<Option<u32>>, []>;
       pendingTransfersOut: AugmentedQuery<ApiType, (arg: u32 | AnyNumber | Uint8Array) => Observable<Option<PalletChainTransferQueuedTransferOut>>, [u32]>;
       transfersUsedInBlockNotebooks: AugmentedQuery<ApiType, (arg: u32 | AnyNumber | Uint8Array) => Observable<Vec<ITuple<[AccountId32, u32]>>>, [u32]>;
+    };
+    digests: {
+      tempDigests: AugmentedQuery<ApiType, () => Observable<Option<ArgonPrimitivesDigestsDigestset>>, []>;
     };
     domains: {
       expiringDomainsByBlock: AugmentedQuery<ApiType, (arg: u32 | AnyNumber | Uint8Array) => Observable<Vec<H256>>, [u32]>;
@@ -349,6 +354,10 @@ declare module '@polkadot/api-base/types/storage' {
        **/
       blockNotebooks: AugmentedQuery<ApiType, () => Observable<ArgonPrimitivesDigestsNotebookDigest>, []>;
       /**
+       * Check if the inherent was included
+       **/
+      inherentIncluded: AugmentedQuery<ApiType, () => Observable<bool>, []>;
+      /**
        * List of last few notebook details by notary. The bool is whether the notebook is eligible
        * for votes (received at correct tick and audit passed)
        **/
@@ -365,10 +374,6 @@ declare module '@polkadot/api-base/types/storage' {
        * Double storage map of notary id + notebook # to the change root
        **/
       notebookChangedAccountsRootByNotary: AugmentedQuery<ApiType, (arg1: u32 | AnyNumber | Uint8Array, arg2: u32 | AnyNumber | Uint8Array) => Observable<Option<H256>>, [u32, u32]>;
-      /**
-       * Temporary store a copy of the notebook digest in storage
-       **/
-      tempNotebookDigest: AugmentedQuery<ApiType, () => Observable<Option<ArgonPrimitivesDigestsNotebookDigest>>, []>;
     };
     ownership: {
       /**

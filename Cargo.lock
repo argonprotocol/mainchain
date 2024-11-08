@@ -428,6 +428,7 @@ dependencies = [
  "futures-timer",
  "hex",
  "jsonrpsee",
+ "log",
  "num_cpus",
  "pallet-transaction-payment",
  "pallet-transaction-payment-rpc",
@@ -448,6 +449,7 @@ dependencies = [
  "sc-rpc-spec-v2",
  "sc-service",
  "sc-telemetry",
+ "sc-tracing",
  "sc-transaction-pool",
  "sc-transaction-pool-api",
  "serde",
@@ -508,6 +510,7 @@ dependencies = [
  "sc-network-types",
  "sc-service",
  "sc-telemetry",
+ "sc-tracing",
  "sc-transaction-pool",
  "sc-transaction-pool-api",
  "sc-utils",
@@ -530,6 +533,7 @@ dependencies = [
  "substrate-prometheus-endpoint",
  "thiserror",
  "tokio",
+ "tracing",
 ]
 
 [[package]]
@@ -554,6 +558,7 @@ dependencies = [
  "pallet-block-seal-spec",
  "pallet-bond",
  "pallet-chain-transfer",
+ "pallet-digests",
  "pallet-domains",
  "pallet-grandpa",
  "pallet-mining-slot",
@@ -564,7 +569,6 @@ dependencies = [
  "pallet-offences",
  "pallet-price-index",
  "pallet-proxy",
- "pallet-session",
  "pallet-sudo",
  "pallet-ticks",
  "pallet-timestamp",
@@ -762,7 +766,6 @@ dependencies = [
  "parking_lot 0.12.3",
  "randomx-rs",
  "sp-core",
- "thiserror",
 ]
 
 [[package]]
@@ -780,6 +783,7 @@ dependencies = [
  "env_logger 0.11.5",
  "fs2",
  "lazy_static",
+ "num_cpus",
  "rand",
  "sp-core",
  "sp-keyring",
@@ -7077,6 +7081,7 @@ dependencies = [
 name = "pallet-block-seal"
 version = "0.0.17"
 dependencies = [
+ "argon-notary-audit",
  "argon-primitives",
  "binary-merkle-tree",
  "env_logger 0.11.5",
@@ -7158,6 +7163,26 @@ dependencies = [
 ]
 
 [[package]]
+name = "pallet-digests"
+version = "0.0.17"
+dependencies = [
+ "argon-notary-audit",
+ "argon-primitives",
+ "env_logger 0.11.5",
+ "frame-benchmarking",
+ "frame-support",
+ "frame-system",
+ "log",
+ "parity-scale-codec",
+ "scale-info",
+ "sp-api",
+ "sp-core",
+ "sp-io",
+ "sp-keyring",
+ "sp-runtime",
+]
+
+[[package]]
 name = "pallet-domains"
 version = "0.0.17"
 dependencies = [
@@ -7210,7 +7235,6 @@ dependencies = [
  "impl-trait-for-tuples",
  "log",
  "pallet-balances",
- "pallet-grandpa",
  "parity-scale-codec",
  "scale-info",
  "sp-api",
