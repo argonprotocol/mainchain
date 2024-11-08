@@ -1,18 +1,20 @@
-use std::time::Duration;
-
-use sp_consensus_grandpa::AuthorityId as GrandpaId;
-use sp_core::{Pair, Public};
-use sp_runtime::traits::{IdentifyAccount, Verify};
-
-use argon_node_runtime::{opaque::SessionKeys, AccountId, Balance, Signature};
+use argon_node_runtime::{
+	BalancesConfig, BitcoinUtxosConfig, BlockSealSpecConfig, BondsConfig, GrandpaConfig,
+	MiningSlotConfig as MiningSlotPalletConfig, NotariesConfig, PriceIndexConfig,
+	RuntimeGenesisConfig, SessionKeys, SudoConfig, TicksConfig,
+};
 use argon_primitives::{
 	bitcoin::{BitcoinNetwork, Satoshis},
 	block_seal::{MiningRegistration, MiningSlotConfig, RewardDestination},
 	block_vote::VoteMinimum,
 	notary::GenesisNotary,
 	tick::{Tick, Ticker},
-	BlockNumber, BlockSealAuthorityId, ComputeDifficulty,
+	AccountId, Balance, BlockNumber, BlockSealAuthorityId, ComputeDifficulty, Signature,
 };
+use sp_consensus_grandpa::AuthorityId as GrandpaId;
+use sp_core::{Pair, Public};
+use sp_runtime::traits::{IdentifyAccount, Verify};
+use std::time::Duration;
 
 mod development;
 mod local_testnet;
@@ -25,7 +27,7 @@ pub use testnet::testnet_config;
 // The URL for the telemetry server.
 // const STAGING_TELEMETRY_URL: &str = "wss://telemetry.polkadot.io/submit/";
 
-/// Specialized `ChainSpec`. This is a specialization of the general Substrate ChainSpec type.
+/// Specialized `ChainSpec` for the normal parachain runtime.
 pub type ChainSpec = sc_service::GenericChainSpec;
 
 /// Generate a crypto pair from seed.
@@ -51,22 +53,40 @@ where
 	AccountPublic::from(get_from_seed::<TPublic>(seed)).into_account()
 }
 
+pub struct GenesisSettings {
+	pub initial_authorities: Vec<(AccountId, SessionKeys)>,
+	pub sudo_key: AccountId,
+	pub bitcoin_network: BitcoinNetwork,
+	pub bitcoin_tip_operator: AccountId,
+	pub price_index_operator: AccountId,
+	pub endowed_accounts: Vec<(AccountId, Balance)>,
+	pub initial_vote_minimum: VoteMinimum,
+	pub initial_difficulty: ComputeDifficulty,
+	pub tick_millis: u64,
+	pub initial_notaries: Vec<GenesisNotary<AccountId>>,
+	pub channel_hold_expiration_ticks: Tick,
+	pub mining_config: MiningSlotConfig<BlockNumber>,
+	pub minimum_bitcoin_bond_satoshis: Satoshis,
+}
+
 #[allow(clippy::too_many_arguments)]
 /// Configure initial storage state for FRAME modules.
 pub(crate) fn testnet_genesis(
-	initial_authorities: Vec<(AccountId, SessionKeys)>,
-	root_key: AccountId,
-	bitcoin_network: BitcoinNetwork,
-	bitcoin_tip_operator: AccountId,
-	price_index_operator: AccountId,
-	endowed_accounts: Vec<(AccountId, Balance)>,
-	initial_vote_minimum: VoteMinimum,
-	initial_difficulty: ComputeDifficulty,
-	tick_millis: u64,
-	initial_notaries: Vec<GenesisNotary<AccountId>>,
-	channel_hold_expiration_ticks: Tick,
-	mining_config: MiningSlotConfig<BlockNumber>,
-	minimum_bitcoin_bond_satoshis: Satoshis,
+	GenesisSettings {
+		initial_authorities,
+		sudo_key,
+		bitcoin_network,
+		bitcoin_tip_operator,
+		price_index_operator,
+		endowed_accounts,
+		initial_vote_minimum,
+		initial_difficulty,
+		tick_millis,
+		initial_notaries,
+		channel_hold_expiration_ticks,
+		mining_config,
+		minimum_bitcoin_bond_satoshis,
+	}: GenesisSettings,
 ) -> serde_json::Value {
 	let authority_zero = initial_authorities[0].clone();
 	let ticker = Ticker::start(Duration::from_millis(tick_millis), channel_hold_expiration_ticks);
@@ -80,40 +100,36 @@ pub(crate) fn testnet_genesis(
 		authority_keys: authority_zero.1,
 	};
 
-	serde_json::json!({
-		"balances": {
-			"balances": endowed_accounts,
+	let config = RuntimeGenesisConfig {
+		balances: BalancesConfig { balances: endowed_accounts },
+		bonds: BondsConfig { minimum_bitcoin_bond_satoshis, ..Default::default() },
+		price_index: PriceIndexConfig { operator: Some(price_index_operator) },
+		bitcoin_utxos: BitcoinUtxosConfig {
+			tip_oracle_operator: Some(bitcoin_tip_operator),
+			network: bitcoin_network,
 		},
-		"bonds": {
-			"minimumBitcoinBondSatoshis": minimum_bitcoin_bond_satoshis
+		mining_slot: MiningSlotPalletConfig {
+			miner_zero: Some(miner_zero),
+			mining_config,
+			..Default::default()
 		},
-		"priceIndex": {
-			"operator": Some(price_index_operator),
+		sudo: SudoConfig { key: Some(sudo_key) },
+		ticks: TicksConfig { ticker, ..Default::default() },
+		block_seal_spec: BlockSealSpecConfig {
+			initial_vote_minimum,
+			initial_compute_difficulty: initial_difficulty,
+			..Default::default()
 		},
-		"bitcoinUtxos": {
-			"tipOracleOperator": Some(bitcoin_tip_operator),
-			"network": bitcoin_network,
+		notaries: NotariesConfig { list: initial_notaries },
+		grandpa: GrandpaConfig {
+			authorities: initial_authorities
+				.iter()
+				.map(|(_, keys)| (keys.grandpa.clone(), 1u64))
+				.collect(),
+			..Default::default()
 		},
-		"miningSlot":  {
-			"minerZero": Some(miner_zero),
-			"miningConfig": mining_config,
-		},
-		"sudo":  {
-			// Assign network admin rights.
-			"key": Some(root_key),
-		},
-		"ticks":  {
-			"ticker": ticker,
-		},
-		"blockSealSpec":  {
-			"initialVoteMinimum": initial_vote_minimum,
-			"initialComputeDifficulty": initial_difficulty,
-		},
-		"notaries": {
-			"list": initial_notaries,
-		},
-		"grandpa":  {
-			"authorities": initial_authorities.iter().map(|(_, keys)| (keys.grandpa.clone(), 1)).collect::<Vec<_>>(),
-		},
-	})
+		..Default::default()
+	};
+
+	serde_json::to_value(config).expect("Could not build genesis config.")
 }
