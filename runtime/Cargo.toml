@@ -25,7 +25,6 @@ pallet-balances = { workspace = true }
 pallet-multisig = { workspace = true }
 pallet-sudo = { workspace = true }
 pallet-timestamp = { workspace = true }
-pallet-session = { workspace = true }
 pallet-grandpa = { workspace = true }
 pallet-offences = { workspace = true }
 pallet-proxy = { workspace = true }
@@ -39,7 +38,7 @@ frame-executive = { workspace = true }
 sp-api = { workspace = true }
 sp-arithmetic = { workspace = true }
 sp-block-builder = { workspace = true }
-sp-debug-derive = { workspace = true }
+sp-debug-derive = { workspace = true, features = ["force-debug"] }
 sp-core = { workspace = true }
 sp-inherents = { workspace = true }
 sp-offchain = { workspace = true }
@@ -64,6 +63,7 @@ pallet-block-seal-spec = { workspace = true }
 pallet-block-rewards = { workspace = true }
 pallet-bond = { workspace = true }
 pallet-chain-transfer = { workspace = true }
+pallet-digests = { workspace = true }
 pallet-domains = { workspace = true }
 pallet-notebook = { workspace = true }
 pallet-notaries = { workspace = true }
@@ -100,6 +100,7 @@ std = [
 	"pallet-block-seal/std",
 	"pallet-bond/std",
 	"pallet-chain-transfer/std",
+	"pallet-digests/std",
 	"pallet-domains/std",
 	"pallet-grandpa/std",
 	"pallet-mining-slot/std",
@@ -110,7 +111,6 @@ std = [
 	"pallet-offences/std",
 	"pallet-price-index/std",
 	"pallet-proxy/std",
-	"pallet-session/std",
 	"pallet-sudo/std",
 	"pallet-ticks/std",
 	"pallet-timestamp/std",
@@ -149,6 +149,7 @@ runtime-benchmarks = [
 	"pallet-block-seal/runtime-benchmarks",
 	"pallet-bond/runtime-benchmarks",
 	"pallet-chain-transfer/runtime-benchmarks",
+	"pallet-digests/runtime-benchmarks",
 	"pallet-domains/runtime-benchmarks",
 	"pallet-grandpa/runtime-benchmarks",
 	"pallet-mining-slot/runtime-benchmarks",
@@ -180,6 +181,7 @@ try-runtime = [
 	"pallet-block-seal/try-runtime",
 	"pallet-bond/try-runtime",
 	"pallet-chain-transfer/try-runtime",
+	"pallet-digests/try-runtime",
 	"pallet-domains/try-runtime",
 	"pallet-grandpa/try-runtime",
 	"pallet-mining-slot/try-runtime",
@@ -190,7 +192,6 @@ try-runtime = [
 	"pallet-offences/try-runtime",
 	"pallet-price-index/try-runtime",
 	"pallet-proxy/try-runtime",
-	"pallet-session/try-runtime",
 	"pallet-sudo/try-runtime",
 	"pallet-ticks/try-runtime",
 	"pallet-timestamp/try-runtime",
