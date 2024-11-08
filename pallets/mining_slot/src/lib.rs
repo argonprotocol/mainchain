@@ -23,7 +23,7 @@ pub use pallet::*;
 use sp_core::{Get, U256};
 use sp_io::hashing::blake2_256;
 use sp_runtime::{
-	traits::{Convert, One, OpaqueKeys, UniqueSaturatedInto},
+	traits::{One, OpaqueKeys, UniqueSaturatedInto},
 	FixedI128, FixedPointNumber, FixedU128, RuntimeAppPublic, SaturatedConversion, Saturating,
 };
 pub use weights::*;
@@ -942,19 +942,6 @@ where
 	closest
 }
 
-// Lookup needed for pallet_session
-pub struct ValidatorIdOf<T>(PhantomData<T>);
-
-impl<T: Config> Convert<T::AccountId, Option<T::AccountId>> for ValidatorIdOf<T> {
-	fn convert(account_id: T::AccountId) -> Option<T::AccountId> {
-		if <AccountIndexLookup<T>>::contains_key(&account_id) {
-			Some(account_id)
-		} else {
-			None
-		}
-	}
-}
-
 #[derive(Clone, Encode, Decode, Eq, PartialEq, RuntimeDebug, TypeInfo)]
 pub struct MinerHistory {
 	pub authority_index: MinerIndex,
@@ -964,18 +951,6 @@ pub struct MinerHistory {
 pub struct MiningSlotBid<VaultId: Codec, Balance: Codec> {
 	pub vault_id: VaultId,
 	pub amount: Balance,
-}
-
-/// What to track in history
-pub struct FullIdentificationOf<T>(PhantomData<T>);
-
-impl<T: Config> Convert<T::AccountId, Option<MinerHistory>> for FullIdentificationOf<T> {
-	fn convert(miner: T::AccountId) -> Option<MinerHistory> {
-		if let Some(index) = <AccountIndexLookup<T>>::get(&miner) {
-			return Some(MinerHistory { authority_index: index });
-		}
-		None
-	}
 }
 
 impl<T: Config> sp_runtime::BoundToRuntimeAppPublic for Pallet<T> {

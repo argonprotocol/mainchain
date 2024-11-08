@@ -40,7 +40,7 @@ lazy_static! {
 	static ref CONTEXT_LOCK: std::sync::Mutex<()> = std::sync::Mutex::new(());
 }
 impl ArgonTestNode {
-	pub async fn start(authority: String) -> anyhow::Result<Self> {
+	pub async fn start(authority: String, compute_miners: u16) -> anyhow::Result<Self> {
 		#[allow(clippy::await_holding_lock)]
 		let _lock = CONTEXT_LOCK.lock().unwrap();
 
@@ -48,8 +48,18 @@ impl ArgonTestNode {
 			eprintln!("ERROR starting bitcoind {:#?}", e);
 			e
 		})?;
-		let rust_log =
-			format!("{},sc_rpc_server=info", env::var("RUST_LOG").unwrap_or("warn".to_string()));
+		let overall_log = env::var("RUST_LOG").unwrap_or("warn".to_string());
+		let argon_log = match overall_log.as_str() {
+			"trace" => "trace",
+			"debug" => "debug",
+			_ => "info",
+		};
+
+		// set cumulus_relay_chain to info to ensure we get the PARACHAIN prefix
+		let rust_log = format!(
+			"{},argon={},cumulus_relay_chain=info,sc_rpc_server=info",
+			overall_log, argon_log
+		);
 
 		let target_dir = get_target_dir();
 
@@ -68,6 +78,7 @@ impl ArgonTestNode {
 			.arg(format!("--{}", authority.to_lowercase()))
 			.arg("--port=0")
 			.arg("--rpc-port=0")
+			.arg(format!("--compute-miners={}", compute_miners))
 			.arg(format!("--bitcoin-rpc-url={}", rpc_url))
 			.spawn()?;
 
