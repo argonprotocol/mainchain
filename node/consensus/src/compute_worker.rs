@@ -1,63 +1,42 @@
+use crate::block_creator::BlockProposal;
+use argon_primitives::{tick::Tick, BlockSealDigest, ComputeDifficulty};
+use argon_randomx::{calculate_hash, calculate_mining_hash, RandomXError};
+use codec::Encode;
+use frame_support::CloneNoBound;
+use futures::prelude::*;
+use log::*;
+use parking_lot::Mutex;
+use sc_service::TaskManager;
+use sc_utils::mpsc::TracingUnboundedSender;
+use sp_core::{traits::SpawnEssentialNamed, H256, U256};
+use sp_runtime::traits::{Block as BlockT, Header as HeaderT};
+use sp_timestamp::Timestamp;
 use std::{
-	pin::Pin,
-	string::ToString,
 	sync::{
 		atomic::{AtomicUsize, Ordering},
 		Arc,
 	},
-	time::{Duration, Instant},
+	time::Duration,
 };
 
-use argon_bitcoin_utxo_tracker::UtxoTracker;
-use codec::Codec;
-use futures::{
-	executor::block_on,
-	future::BoxFuture,
-	prelude::*,
-	task::{Context, Poll},
-};
-use futures_timer::Delay;
-use log::*;
-use parking_lot::Mutex;
-use sc_client_api::{AuxStore, BlockchainEvents, ImportNotifications};
-use sc_consensus::BoxBlockImport;
-use sc_service::TaskManager;
-use sp_api::ProvideRuntimeApi;
-use sp_arithmetic::traits::UniqueSaturatedInto;
-use sp_blockchain::HeaderBackend;
-use sp_consensus::{Environment, Proposal, Proposer, SyncOracle};
-use sp_core::{traits::SpawnEssentialNamed, RuntimeDebug, H256, U256};
-use sp_runtime::traits::{Block as BlockT, Header as HeaderT};
-use sp_timestamp::Timestamp;
-
-use argon_node_runtime::{NotaryRecordT, NotebookVerifyError};
-use argon_primitives::{inherents::BlockSealInherentNodeSide, tick::Tick, *};
-use argon_randomx::RandomXError;
-
-use crate::{
-	aux_client::ArgonAux, block_creator, block_creator::propose, compute_solver::ComputeSolver,
-	digests::get_tick_digest, error::Error,
-};
-
-/// Version of the mining worker.
-#[derive(Eq, PartialEq, Clone, Copy, RuntimeDebug)]
-pub struct Version(pub usize);
+pub(crate) type Version = usize;
 
 /// Mining metadata. This is the information needed to start an actual mining loop.
 #[derive(Clone, Eq, PartialEq)]
-pub struct MiningMetadata<H> {
+pub(crate) struct MiningMetadata<H> {
 	/// Currently known best hash which the pre-hash is built on.
 	pub best_hash: H,
-	pub start_time: Instant,
+	pub activate_mining_time: Timestamp,
 	pub has_tax_votes: bool,
-	pub parent_tick: Tick,
 	/// At which tick do we kick in mining no matter what?
 	pub emergency_tick: Tick,
+	/// The randomx key block hash.
 	pub key_block_hash: H256,
+	pub difficulty: ComputeDifficulty,
 }
 
-struct MiningBuild<B: BlockT, Proof> {
-	pub proposal: Proposal<B, Proof>,
+pub(crate) struct SolvingBlock<B: BlockT, Proof> {
+	pub proposal: BlockProposal<B, Proof>,
 	/// Mining pre-hash.
 	pub pre_hash: B::Hash,
 	/// Pre-runtime digest item.
@@ -65,83 +44,65 @@ struct MiningBuild<B: BlockT, Proof> {
 }
 
 /// Mining worker that exposes structs to query the current mining build and submit mined blocks.
-pub struct MiningHandle<Block: BlockT, L: sc_consensus::JustificationSyncLink<Block>, Proof> {
+#[derive(CloneNoBound)]
+pub(crate) struct ComputeHandle<B: BlockT, Proof> {
 	version: Arc<AtomicUsize>,
-	justification_sync_link: Arc<L>,
-	metadata: Arc<Mutex<Option<MiningMetadata<Block::Hash>>>>,
-	build: Arc<Mutex<Option<MiningBuild<Block, Proof>>>>,
-	block_import: Arc<tokio::sync::Mutex<BoxBlockImport<Block>>>,
+	metadata: Arc<Mutex<Option<MiningMetadata<B::Hash>>>>,
+	solving_block: Arc<Mutex<Option<SolvingBlock<B, Proof>>>>,
+	block_found_tx: TracingUnboundedSender<(SolvingBlock<B, Proof>, BlockSealDigest)>,
 }
 
-impl<B, L, Proof> MiningHandle<B, L, Proof>
+impl<B, Proof> ComputeHandle<B, Proof>
 where
 	B: BlockT,
-	L: sc_consensus::JustificationSyncLink<B>,
-	Proof: Send,
 {
-	fn increment_version(&self) {
-		self.version.fetch_add(1, Ordering::SeqCst);
-	}
-
-	pub fn new(block_import: BoxBlockImport<B>, justification_sync_link: L) -> Self {
+	pub(crate) fn new(
+		block_found_tx: TracingUnboundedSender<(SolvingBlock<B, Proof>, BlockSealDigest)>,
+	) -> Self {
 		Self {
 			version: Arc::new(AtomicUsize::new(0)),
-			justification_sync_link: Arc::new(justification_sync_link),
-			build: Arc::new(Mutex::new(None)),
-			block_import: Arc::new(tokio::sync::Mutex::new(block_import)),
+			solving_block: Arc::new(Mutex::new(None)),
+			block_found_tx,
 			metadata: Arc::new(Mutex::new(None)),
 		}
 	}
 
 	pub(crate) fn stop_solving_current(&self) {
-		let mut build = self.build.lock();
-		*build = None;
-		let mut metadata = self.metadata.lock();
-		*metadata = None;
+		*self.solving_block.lock() = None;
+		*self.metadata.lock() = None;
 		self.increment_version();
 	}
 
-	pub(crate) fn on_block(
-		&self,
-		best_hash: B::Hash,
-		has_tax_votes: bool,
-		parent_tick: Tick,
-		emergency_tick: Tick,
-		key_block: H256,
-	) {
+	pub(crate) fn new_best_block(&self, metadata: MiningMetadata<B::Hash>) {
 		self.stop_solving_current();
-		let mut metadata = self.metadata.lock();
-		*metadata = Some(MiningMetadata {
-			best_hash,
-			has_tax_votes,
-			start_time: Instant::now(),
-			parent_tick,
-			key_block_hash: key_block,
-			emergency_tick,
-		});
+		*self.metadata.lock() = Some(metadata);
 	}
 
 	pub(crate) fn start_solving(
 		&self,
 		best_hash: B::Hash,
 		pre_hash: B::Hash,
-		difficulty: ComputeDifficulty,
-		proposal: Proposal<B, Proof>,
+		proposal: BlockProposal<B, Proof>,
 	) {
 		if self.best_hash() != Some(best_hash) {
 			self.stop_solving_current();
 			return;
 		}
+		let difficulty = self.metadata.lock().as_ref().map(|x| x.difficulty).unwrap_or_default();
 
-		let mut build = self.build.lock();
-		*build = Some(MiningBuild { pre_hash, difficulty, proposal });
+		*self.solving_block.lock() = Some(SolvingBlock { pre_hash, difficulty, proposal });
 	}
+
+	fn increment_version(&self) {
+		self.version.fetch_add(1, Ordering::SeqCst);
+	}
+
 	/// Get the version of the mining worker.
 	///
 	/// This returns type `Version` which can only compare equality. If `Version` is unchanged, then
 	/// it can be certain that `best_hash` and `metadata` were not changed.
 	pub fn version(&self) -> Version {
-		Version(self.version.load(Ordering::SeqCst))
+		self.version.load(Ordering::SeqCst)
 	}
 
 	/// Get the current best hash. `None` if the worker has just started or the client is doing
@@ -150,38 +111,23 @@ where
 		self.metadata.lock().as_ref().map(|b| b.best_hash)
 	}
 
-	/// Get the current key block hash. `None` if the worker has just started or the client is doing
-	/// major syncing.
-	pub fn key_block_hash(&self) -> Option<H256> {
-		self.metadata.lock().as_ref().map(|b| b.key_block_hash)
-	}
-
-	pub fn build_hash(&self) -> Option<B::Hash> {
-		self.build
+	pub fn proposal_parent_hash(&self) -> Option<B::Hash> {
+		self.solving_block
 			.lock()
 			.as_ref()
-			.map(|b| b.proposal.block.header().parent_hash())
+			.map(|b| b.proposal.proposal.block.header().parent_hash())
 			.cloned()
 	}
 
-	/// Get a copy of the current mining metadata, if available.
-	pub fn metadata(&self) -> Option<MiningMetadata<B::Hash>> {
-		self.metadata.lock().as_ref().cloned()
-	}
-
 	pub fn create_solver(&self) -> Option<ComputeSolver> {
-		let key_block_hash = match self.metadata.lock().as_ref() {
-			Some(x) => x.key_block_hash,
-			_ => return None,
-		};
-		match self.build.lock().as_ref() {
+		match self.solving_block.lock().as_ref() {
 			Some(x) => {
-				let pre_hash = x.pre_hash;
+				let key_block_hash = self.metadata.lock().as_ref()?.key_block_hash;
 
 				Some(ComputeSolver::new(
 					self.version(),
-					pre_hash.as_ref().to_vec(),
-					H256::from_slice(key_block_hash.as_ref()),
+					x.pre_hash.as_ref().to_vec(),
+					key_block_hash,
 					x.difficulty,
 				))
 			},
@@ -193,7 +139,7 @@ where
 		solver.as_ref().map(|a| a.version) == Some(self.version())
 	}
 
-	pub fn ready_to_solve(&self, current_tick: Tick) -> bool {
+	pub fn ready_to_solve(&self, current_tick: Tick, time: Timestamp) -> bool {
 		match self.metadata.lock().as_ref() {
 			Some(x) => {
 				// if we've passed the emergency tick, we should mine no matter what
@@ -201,7 +147,7 @@ where
 					return true;
 				}
 				// must be past the parent tick and not have tax votes
-				if x.parent_tick < current_tick && !x.has_tax_votes {
+				if !x.has_tax_votes && x.activate_mining_time < time {
 					return true;
 				}
 				false
@@ -211,314 +157,188 @@ where
 		}
 	}
 
-	pub async fn submit(&mut self, nonce: U256) -> Result<(), Error> {
-		let build = {
-			let mut build = self.build.lock();
-			// try to take out of option. if not exists, we've moved on
-			build.take()
-		};
-
-		let Some(build) = build else {
+	pub fn submit(&self, nonce: U256) {
+		let Some(build) = self.solving_block.lock().take() else {
 			trace!("Unable to submit mined block in compute worker: internal build does not exist",);
-			return Ok(());
+			return;
 		};
 
 		self.increment_version();
 
-		let mut block_import = self.block_import.lock().await;
-
-		block_creator::submit_block::<B, L, Proof>(
-			&mut block_import,
-			build.proposal,
-			&self.justification_sync_link,
-			BlockSealDigest::Compute { nonce },
-		)
-		.await;
-		Ok(())
+		let _ = self
+			.block_found_tx
+			.unbounded_send((build, BlockSealDigest::Compute { nonce }))
+			.inspect_err(|e| error!("Error sending block found message: {:?}", e));
 	}
 }
 
-impl<B, L, Proof> Clone for MiningHandle<B, L, Proof>
-where
-	B: BlockT,
-	L: sc_consensus::JustificationSyncLink<B>,
-{
-	fn clone(&self) -> Self {
-		Self {
-			version: self.version.clone(),
-			justification_sync_link: self.justification_sync_link.clone(),
-			build: self.build.clone(),
-			metadata: self.metadata.clone(),
-			block_import: self.block_import.clone(),
+#[derive(Clone, Eq, PartialEq, Encode)]
+pub struct BlockComputeNonce {
+	pub pre_hash: Vec<u8>,
+	pub nonce: U256,
+}
+
+impl BlockComputeNonce {
+	pub fn increment(&mut self) {
+		self.nonce = self.nonce.checked_add(U256::one()).unwrap_or_default();
+	}
+
+	pub fn meets_threshold(hash: &[u8; 32], threshold: U256) -> bool {
+		U256::from_big_endian(hash) <= threshold
+	}
+
+	pub fn threshold(difficulty: ComputeDifficulty) -> U256 {
+		U256::MAX / U256::from(difficulty).max(U256::one())
+	}
+
+	pub fn is_valid(
+		nonce: &U256,
+		pre_hash: Vec<u8>,
+		key_block_hash: &H256,
+		compute_difficulty: ComputeDifficulty,
+	) -> bool {
+		let hash =
+			Self { nonce: *nonce, pre_hash }.using_encoded(|x| calculate_hash(key_block_hash, x));
+		let Ok(hash) = hash else {
+			return false;
+		};
+		let threshold = Self::threshold(compute_difficulty);
+		Self::meets_threshold(hash.as_fixed_bytes(), threshold)
+	}
+}
+
+/// This is a lightweight struct that lives in-thread for each mining thread.
+#[derive(Clone)]
+pub(crate) struct ComputeSolver {
+	pub version: Version,
+	pub wip_nonce: BlockComputeNonce,
+	pub wip_nonce_hash: Vec<u8>,
+	pub threshold: U256,
+	pub key_block_hash: H256,
+}
+
+impl ComputeSolver {
+	pub fn new(
+		version: Version,
+		pre_hash: Vec<u8>,
+		key_block_hash: H256,
+		compute_difficulty: ComputeDifficulty,
+	) -> Self {
+		let mut solver = ComputeSolver {
+			version,
+			threshold: BlockComputeNonce::threshold(compute_difficulty),
+			wip_nonce_hash: vec![],
+			wip_nonce: BlockComputeNonce { nonce: U256::from(rand::random::<u128>()), pre_hash },
+			key_block_hash,
+		};
+		solver.wip_nonce_hash = solver.wip_nonce.encode().to_vec();
+		solver
+	}
+
+	/// Synchronous step to look at the next nonce
+	pub fn check_next(&mut self) -> Result<Option<BlockComputeNonce>, RandomXError> {
+		self.wip_nonce.increment();
+
+		let nonce_bytes = self.wip_nonce.nonce.encode();
+		let payload = &mut self.wip_nonce_hash;
+		payload.splice(payload.len() - nonce_bytes.len().., nonce_bytes);
+
+		let hash = calculate_mining_hash(&self.key_block_hash, payload)?;
+		if BlockComputeNonce::meets_threshold(hash.as_fixed_bytes(), self.threshold) {
+			return Ok(Some(self.wip_nonce.clone()));
 		}
+		Ok(None)
 	}
 }
 
-pub(crate) fn create_compute_solver_task<B, L, Proof>(
-	mut worker: MiningHandle<B, L, Proof>,
-) -> BoxFuture<'static, ()>
-where
-	B: BlockT,
-	L: sc_consensus::JustificationSyncLink<B> + 'static,
-	Proof: Send + 'static,
-{
-	async move {
-		let mut solver_ref = None;
-		loop {
-			if !worker.is_valid_solver(&solver_ref) {
-				solver_ref = worker.create_solver().map(Box::new);
-			}
-
-			let Some(solver) = solver_ref.as_mut() else {
-				tokio::time::sleep(Duration::from_millis(500)).await;
-				continue;
-			};
-
-			match solver.check_next() {
-				Ok(Some(nonce)) => {
-					let _ = block_on(worker.submit(nonce.nonce));
-				},
-				Ok(None) => (),
-				Err(RandomXError::CreationError(err)) => {
-					warn!("RandomX creation failed for mining: {:?}", err);
-					tokio::time::sleep(Duration::from_secs(10)).await;
-				},
-				Err(err) => {
-					warn!("Mining failed: {:?}", err);
-				},
-			}
-		}
-	}
-	.boxed()
-}
-
-pub fn run_compute_solver_threads<B, L, Proof>(
+pub fn run_compute_solver_threads<B, Proof>(
 	task_handle: &TaskManager,
-	worker: MiningHandle<B, L, Proof>,
-	threads: usize,
+	worker: ComputeHandle<B, Proof>,
+	threads: u32,
 ) where
 	B: BlockT,
-	L: sc_consensus::JustificationSyncLink<B> + 'static,
 	Proof: Send + 'static,
 {
+	let handle = task_handle.spawn_essential_handle();
 	for _ in 0..threads {
 		let worker = worker.clone();
-		task_handle.spawn_essential_handle().spawn_essential_blocking(
-			"mining-voter",
-			Some("block-authoring"),
-			create_compute_solver_task(worker),
-		);
-	}
-}
+		let task = async move {
+			let mut solver_ref = None;
+			loop {
+				if !worker.is_valid_solver(&solver_ref) {
+					solver_ref = worker.create_solver().map(Box::new);
+				}
 
-#[allow(clippy::too_many_arguments)]
-pub fn create_compute_miner<B, C, E, SO, L, AccountId>(
-	block_import: BoxBlockImport<B>,
-	client: Arc<C>,
-	aux_client: ArgonAux<B, C>,
-	mut env: E,
-	sync_oracle: SO,
-	account_id: AccountId,
-	justification_sync_link: L,
-	utxo_tracker: Arc<UtxoTracker>,
-	max_time_to_build_block: Duration,
-) -> (MiningHandle<B, L, <E::Proposer as Proposer<B>>::Proof>, impl Future<Output = ()> + 'static)
-where
-	B: BlockT,
-	C: ProvideRuntimeApi<B> + BlockchainEvents<B> + HeaderBackend<B> + AuxStore + 'static,
-	C::Api: BlockSealApis<B, AccountId, BlockSealAuthorityId>
-		+ TickApis<B>
-		+ NotebookApis<B, NotebookVerifyError>
-		+ NotaryApis<B, NotaryRecordT>
-		+ BitcoinApis<B, Balance>,
-	E: Environment<B> + Send + Sync + 'static,
-	E::Error: std::fmt::Debug,
-	E::Proposer: Proposer<B>,
-	SO: SyncOracle + Clone + Send + Sync + 'static,
-	L: sc_consensus::JustificationSyncLink<B> + 'static,
-	AccountId: Codec + Clone + 'static,
-{
-	// create a timer that fires whenever there are new blocks, or 500 ms go by
-	let mut timer = UntilImportedOrTimeout::new(
-		client.import_notification_stream(),
-		Duration::from_millis(1000),
-	);
-	let mining_handle = MiningHandle::new(block_import, justification_sync_link);
-
-	let handle_to_return = mining_handle.clone();
-
-	let ticker = match client.runtime_api().ticker(client.info().finalized_hash) {
-		Ok(x) => x,
-		Err(err) => {
-			panic!("Unable to pull ticker from runtime api: {}", err)
-		},
-	};
-
-	let task = async move {
-		loop {
-			if timer.next().await.is_none() {
-				// this should occur if the block import notifications completely stop... indicating
-				// we should exit
-				break;
-			}
-			if sync_oracle.is_major_syncing() {
-				debug!("Skipping proposal due to sync.");
-				mining_handle.stop_solving_current();
-				continue;
-			}
-
-			let best_hash = client.info().best_hash;
-
-			if mining_handle.best_hash() != Some(best_hash) {
-				let Ok(Some(best_header)) = client.header(best_hash) else {
+				let Some(solver) = solver_ref.as_mut() else {
+					tokio::time::sleep(Duration::from_millis(500)).await;
 					continue;
 				};
-				let block_tick = get_tick_digest(best_header.digest()).unwrap_or_default();
-				let emergency_tick = block_tick + 3;
-				let has_eligible_votes =
-					client.runtime_api().has_eligible_votes(best_hash).unwrap_or_default();
-				let key_block = randomx_key_block(&client, &best_hash).unwrap_or_default();
 
-				mining_handle.on_block(
-					best_hash,
-					has_eligible_votes,
-					block_tick,
-					emergency_tick,
-					key_block,
-				);
-			}
-
-			let time = Timestamp::current();
-			let tick = ticker.tick_for_time(time.as_millis());
-			if !mining_handle.ready_to_solve(tick) {
-				let time_to_next_tick = ticker.duration_to_next_tick();
-				tokio::time::sleep(time_to_next_tick).await;
-				continue;
-			}
-
-			if mining_handle.build_hash() != Some(best_hash) {
-				let difficulty = match client.runtime_api().compute_difficulty(best_hash) {
-					Ok(x) => x,
+				match solver.check_next() {
+					Ok(Some(nonce)) => worker.submit(nonce.nonce),
 					Err(err) => {
-						warn!(
-							"Unable to pull new block for compute miner. No difficulty found!! {}",
-							err
-						);
-						continue;
+						warn!("Mining failed: {:?}", err);
+						if matches!(err, RandomXError::CreationError(_)) {
+							tokio::time::sleep(Duration::from_secs(10)).await;
+						}
 					},
-				};
-
-				let proposal = match propose(
-					client.clone(),
-					aux_client.clone(),
-					&mut env,
-					account_id.clone(),
-					tick,
-					time.as_millis(),
-					best_hash,
-					BlockSealInherentNodeSide::Compute,
-					utxo_tracker.clone(),
-					max_time_to_build_block,
-				)
-				.await
-				{
-					Ok(x) => x,
-					Err(err) => {
-						warn!("Unable to propose a new block {}", err);
-						continue;
-					},
-				};
-
-				let pre_hash = proposal.block.header().hash();
-
-				mining_handle.start_solving(best_hash, pre_hash, difficulty, proposal);
+					_ => (),
+				}
 			}
 		}
-	};
-
-	(handle_to_return, task)
-}
-
-/// The key K is selected to be the hash of a block in the blockchain - this block is called the
-/// 'key block'. For optimal mining and verification performance, the key should change every 2048
-/// blocks (~2.8 days) and there should be a delay of 64 blocks (~2 hours) between the key block and
-/// the change of the key K. This can be achieved by changing the key when blockHeight % 2048 == 64
-/// and selecting key block such that keyBlockHeight % 2048 == 0.
-pub fn randomx_key_block<B, C>(client: &Arc<C>, parent_hash: &B::Hash) -> Result<H256, Error>
-where
-	B: BlockT,
-	C: HeaderBackend<B>,
-{
-	const PERIOD: u32 = (1440.0 * 2.8) as u32; // 2.8 days
-	const OFFSET: u32 = 120; // 2 hours
-
-	let parent_number = client
-		.number(*parent_hash)
-		.map_err(|e| Error::Environment(format!("Client execution error: {:?}", e)))?
-		.ok_or(Error::Environment("Parent header not found".to_string()))?;
-	let parent_number = UniqueSaturatedInto::<u32>::unique_saturated_into(parent_number);
-
-	let mut key_block = parent_number.saturating_sub(parent_number % PERIOD);
-
-	// if we're before offset, stick with previous key block
-	if parent_number % PERIOD < OFFSET {
-		key_block = key_block.saturating_sub(PERIOD)
-	};
-
-	trace!("Using RandomX key block height: {}", key_block);
-
-	let hash = client
-		.hash(key_block.unique_saturated_into())
-		.map_err(|e| Error::Environment(format!("Key hash lookup error: {:?}", e)))?
-		.ok_or(Error::Environment("Key hash not found".to_string()))?;
-	Ok(H256::from_slice(hash.as_ref()))
-}
-
-/// A stream that waits for a block import or timeout.
-pub struct UntilImportedOrTimeout<Block: BlockT> {
-	import_notifications: ImportNotifications<Block>,
-	timeout: Duration,
-	inner_delay: Option<Delay>,
-}
-
-impl<Block: BlockT> UntilImportedOrTimeout<Block> {
-	/// Create a new stream using the given import notification and timeout duration.
-	pub fn new(import_notifications: ImportNotifications<Block>, timeout: Duration) -> Self {
-		Self { import_notifications, timeout, inner_delay: None }
+		.boxed();
+		handle.spawn_essential_blocking("mining-voter", Some("block-authoring"), task);
 	}
 }
 
-impl<Block: BlockT> Stream for UntilImportedOrTimeout<Block> {
-	type Item = ();
+#[cfg(test)]
+mod tests {
+	use crate::{
+		compute_worker::{BlockComputeNonce, ComputeSolver},
+		mock_notary::setup_logs,
+	};
+	use codec::Encode;
+	use sp_core::{H256, U256};
 
-	fn poll_next(mut self: Pin<&mut Self>, cx: &mut Context) -> Poll<Option<()>> {
-		let mut fire = false;
+	#[test]
+	fn nonce_verify_compute() {
+		let mut bytes = [0u8; 32];
+		bytes[31] = 1;
 
-		loop {
-			match Stream::poll_next(Pin::new(&mut self.import_notifications), cx) {
-				Poll::Pending => break,
-				Poll::Ready(Some(_)) => {
-					fire = true;
-				},
-				Poll::Ready(None) => return Poll::Ready(None),
-			}
-		}
+		let key_block_hash = H256::from_slice(&[1u8; 32]);
 
-		let timeout = self.timeout;
-		let inner_delay = self.inner_delay.get_or_insert_with(|| Delay::new(timeout));
+		assert!(BlockComputeNonce::is_valid(&U256::from(1), bytes.to_vec(), &key_block_hash, 1));
 
-		match Future::poll(Pin::new(inner_delay), cx) {
-			Poll::Pending => (),
-			Poll::Ready(()) => {
-				fire = true;
-			},
-		}
+		assert!(!BlockComputeNonce::is_valid(
+			&U256::from(1),
+			bytes.to_vec(),
+			&key_block_hash,
+			10_000
+		));
+	}
+	#[test]
+	fn it_can_reuse_a_nonce_algorithm_multiple_times() {
+		setup_logs();
 
-		if fire {
-			self.inner_delay = None;
-			Poll::Ready(Some(()))
-		} else {
-			Poll::Pending
+		let mut bytes = [0u8; 32];
+		bytes[31] = 2;
+		let key_block_hash = H256::from_slice(&[1u8; 32]);
+		let pre_hash = bytes.to_vec();
+		let mut solver = ComputeSolver::new(0, pre_hash.clone(), key_block_hash, 1);
+
+		for _ in 0..100 {
+			let did_solve = solver.check_next().is_ok_and(|x| x.is_some());
+
+			assert_eq!(solver.wip_nonce_hash, solver.wip_nonce.encode());
+			assert_eq!(
+				did_solve,
+				BlockComputeNonce::is_valid(
+					&solver.wip_nonce.nonce,
+					pre_hash.clone(),
+					&key_block_hash,
+					1
+				)
+			);
 		}
 	}
 }

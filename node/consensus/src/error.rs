@@ -1,4 +1,4 @@
-use argon_node_runtime::AccountId;
+use argon_primitives::AccountId;
 use sc_consensus::ImportResult;
 use sp_api::ApiError;
 use sp_blockchain::Error as BlockchainError;
