@@ -25,6 +25,8 @@ futures-timer = { workspace = true }
 thiserror = { workspace = true }
 serde = { workspace = true }
 prometheus-endpoint = { workspace = true }
+log = { workspace = true }
+sc-tracing = { workspace = true }
 sc-cli = { workspace = true }
 sp-core = { workspace = true, features = ["default"] }
 sc-executor = { workspace = true, features = ["default"] }

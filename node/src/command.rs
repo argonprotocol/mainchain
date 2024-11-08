@@ -1,16 +1,16 @@
-use frame_benchmarking_cli::{BenchmarkCmd, ExtrinsicFactory, SUBSTRATE_REFERENCE_HARDWARE};
-use sc_cli::SubstrateCli;
-use sc_service::PartialComponents;
-use sp_keyring::Sr25519Keyring;
-
-use argon_node_runtime::{Block, EXISTENTIAL_DEPOSIT};
-
 use crate::{
-	benchmarking::{inherent_benchmark_data, RemarkBuilder, TransferKeepAliveBuilder},
 	chain_spec,
 	cli::{Cli, RandomxFlag, Subcommand},
 	service,
+	service::new_partial,
 };
+use argon_node_runtime::{opaque, Block};
+use frame_benchmarking_cli::{BenchmarkCmd, SUBSTRATE_REFERENCE_HARDWARE};
+use sc_cli::{Error, Result as CliResult, SubstrateCli};
+use sp_core::crypto::AccountId32;
+use sp_keyring::AccountKeyring::Alice;
+use std::cmp::max;
+use url::Url;
 
 impl SubstrateCli for Cli {
 	fn impl_name() -> String {
@@ -52,12 +52,21 @@ impl SubstrateCli for Cli {
 	}
 }
 
+macro_rules! construct_async_run {
+	(|$components:ident, $cli:ident, $cmd:ident, $config:ident| $( $code:tt )* ) => {{
+		let runner = $cli.create_runner($cmd)?;
+		let mining_config = MiningConfig::new(&$cli);
+		runner.async_run(|$config| {
+			let $components = new_partial(&$config, &mining_config)?;
+			let task_manager = $components.task_manager;
+			{ $( $code )* }.map(|v| (v, task_manager))
+		})
+	}}
+}
 /// Parse and run command line arguments
 pub fn run() -> sc_cli::Result<()> {
 	color_backtrace::install();
 	let cli = Cli::from_args();
-
-	let bitcoin_rpc_url = cli.bitcoin_rpc_url.clone().unwrap_or_default();
 
 	match &cli.subcommand {
 		Some(Subcommand::Key(cmd)) => cmd.run(&cli),
@@ -66,140 +75,83 @@ pub fn run() -> sc_cli::Result<()> {
 			runner.sync_run(|config| cmd.run(config.chain_spec, config.network))
 		},
 		Some(Subcommand::CheckBlock(cmd)) => {
-			let runner = cli.create_runner(cmd)?;
-			runner.async_run(|config| {
-				if bitcoin_rpc_url.is_empty() {
-					return Err("Bitcoin RPC URL is required for block validation".into());
-				}
-				let PartialComponents { client, task_manager, import_queue, .. } =
-					service::new_partial(&config, bitcoin_rpc_url)?;
-				Ok((cmd.run(client, import_queue), task_manager))
+			construct_async_run!(|components, cli, cmd, config| {
+				Ok(cmd.run(components.client, components.import_queue))
 			})
 		},
 		Some(Subcommand::ExportBlocks(cmd)) => {
-			let runner = cli.create_runner(cmd)?;
-			runner.async_run(|config| {
-				let PartialComponents { client, task_manager, .. } =
-					service::new_partial(&config, bitcoin_rpc_url)?;
-				Ok((cmd.run(client, config.database), task_manager))
+			construct_async_run!(|components, cli, cmd, config| {
+				Ok(cmd.run(components.client, config.database))
 			})
 		},
 		Some(Subcommand::ExportState(cmd)) => {
-			let runner = cli.create_runner(cmd)?;
-			runner.async_run(|config| {
-				let PartialComponents { client, task_manager, .. } =
-					service::new_partial(&config, bitcoin_rpc_url)?;
-				Ok((cmd.run(client, config.chain_spec), task_manager))
+			construct_async_run!(|components, cli, cmd, config| {
+				Ok(cmd.run(components.client, config.chain_spec))
 			})
 		},
 		Some(Subcommand::ImportBlocks(cmd)) => {
-			let runner = cli.create_runner(cmd)?;
-			runner.async_run(|config| {
-				if bitcoin_rpc_url.is_empty() {
-					return Err("Bitcoin RPC URL is required for block validation".into());
-				}
-				let PartialComponents { client, task_manager, import_queue, .. } =
-					service::new_partial(&config, bitcoin_rpc_url)?;
-				Ok((cmd.run(client, import_queue), task_manager))
+			construct_async_run!(|components, cli, cmd, config| {
+				Ok(cmd.run(components.client, components.import_queue))
+			})
+		},
+		Some(Subcommand::Revert(cmd)) => {
+			construct_async_run!(|components, cli, cmd, config| {
+				Ok(cmd.run(components.client, components.backend, None))
 			})
 		},
 		Some(Subcommand::PurgeChain(cmd)) => {
 			let runner = cli.create_runner(cmd)?;
 			runner.sync_run(|config| cmd.run(config.database))
 		},
-		Some(Subcommand::Revert(cmd)) => {
-			let runner = cli.create_runner(cmd)?;
-			runner.async_run(|config| {
-				let PartialComponents { client, task_manager, backend, .. } =
-					service::new_partial(&config, bitcoin_rpc_url)?;
-				let aux_revert = Box::new(|client, _, blocks| {
-					sc_consensus_grandpa::revert(client, blocks)?;
-					Ok(())
-				});
-				Ok((cmd.run(client, backend, Some(aux_revert)), task_manager))
-			})
-		},
 		Some(Subcommand::Benchmark(cmd)) => {
 			let runner = cli.create_runner(cmd)?;
-
-			runner.sync_run(|config| {
-				// This switch needs to be in the client, since the client decides
-				// which sub-commands it wants to support.
-				match cmd {
-					BenchmarkCmd::Pallet(cmd) => {
-						if !cfg!(feature = "runtime-benchmarks") {
-							return Err(
-								"Runtime benchmarking wasn't enabled when building the node. \
-							You can enable it with `--features runtime-benchmarks`."
-									.into(),
-							);
-						}
-
-						cmd.run_with_spec::<sp_runtime::traits::HashingFor<Block>, ()>(Some(
-							config.chain_spec,
-						))
+			// Switch on the concrete benchmark sub-command-variant.
+			match cmd {
+				BenchmarkCmd::Pallet(cmd) =>
+					if cfg!(feature = "runtime-benchmarks") {
+						runner.sync_run(|config| {
+							cmd.run_with_spec::<sp_runtime::traits::HashingFor<Block>, ()>(Some(
+								config.chain_spec,
+							))
+						})
+					} else {
+						Err("Benchmarking wasn't enabled when building the node. \
+					You can enable it with `--features runtime-benchmarks`."
+							.into())
 					},
-					BenchmarkCmd::Block(cmd) => {
-						let PartialComponents { client, .. } =
-							service::new_partial(&config, bitcoin_rpc_url)?;
-						cmd.run(client)
-					},
-					#[cfg(not(feature = "runtime-benchmarks"))]
-					BenchmarkCmd::Storage(_) => Err(
-						"Storage benchmarking can be enabled with `--features runtime-benchmarks`."
-							.into(),
-					),
-					#[cfg(feature = "runtime-benchmarks")]
-					BenchmarkCmd::Storage(cmd) => {
-						let PartialComponents { client, backend, .. } =
-							service::new_partial(&config, bitcoin_rpc_url)?;
-						let db = backend.expose_db();
-						let storage = backend.expose_storage();
-
-						cmd.run(config, client, db, storage)
-					},
-					BenchmarkCmd::Overhead(cmd) => {
-						let PartialComponents { client, .. } =
-							service::new_partial(&config, bitcoin_rpc_url)?;
-						let ext_builder = RemarkBuilder::new(client.clone());
-
-						cmd.run(
-							config,
-							client,
-							inherent_benchmark_data()?,
-							Vec::new(),
-							&ext_builder,
-						)
-					},
-					BenchmarkCmd::Extrinsic(cmd) => {
-						let PartialComponents { client, .. } =
-							service::new_partial(&config, bitcoin_rpc_url)?;
-						// Register the *Remark* and *TKA* builders.
-						let ext_factory = ExtrinsicFactory(vec![
-							Box::new(RemarkBuilder::new(client.clone())),
-							Box::new(TransferKeepAliveBuilder::new(
-								client.clone(),
-								Sr25519Keyring::Alice.to_account_id(),
-								EXISTENTIAL_DEPOSIT,
-							)),
-						]);
-
-						cmd.run(client, inherent_benchmark_data()?, Vec::new(), &ext_factory)
-					},
-					BenchmarkCmd::Machine(cmd) =>
-						cmd.run(&config, SUBSTRATE_REFERENCE_HARDWARE.clone()),
-				}
-			})
+				BenchmarkCmd::Block(cmd) => runner.sync_run(|config| {
+					let mining_config = MiningConfig::new(&cli);
+					let partials = new_partial(&config, &mining_config)?;
+					cmd.run(partials.client)
+				}),
+				#[cfg(not(feature = "runtime-benchmarks"))]
+				BenchmarkCmd::Storage(_) => Err(Error::Input(
+					"Compile with --features=runtime-benchmarks \
+						to enable storage benchmarks."
+						.into(),
+				)),
+				#[cfg(feature = "runtime-benchmarks")]
+				BenchmarkCmd::Storage(cmd) => runner.sync_run(|config| {
+					let mining_config = cli.into();
+					let partials = new_partial(&config, &mining_config)?;
+					let db = partials.backend.expose_db();
+					let storage = partials.backend.expose_storage();
+					cmd.run(config, partials.client.clone(), db, storage)
+				}),
+				BenchmarkCmd::Machine(cmd) =>
+					runner.sync_run(|config| cmd.run(&config, SUBSTRATE_REFERENCE_HARDWARE.clone())),
+				// NOTE: this allows the Client to leniently implement
+				// new benchmark commands without requiring a companion MR.
+				#[allow(unreachable_patterns)]
+				_ => Err("Benchmarking sub-command unsupported".into()),
+			}
 		},
 		Some(Subcommand::ChainInfo(cmd)) => {
 			let runner = cli.create_runner(cmd)?;
 			runner.sync_run(|config| cmd.run::<Block>(&config))
 		},
 		None => {
-			let runner = cli.create_runner(&cli.run.inner)?;
-			if bitcoin_rpc_url.is_empty() {
-				return Err("Bitcoin RPC URL is required to run a node".into());
-			}
+			let runner = cli.create_runner(&cli.run.base)?;
 
 			let mut randomx_config = argon_randomx::Config::default();
 			if cli.run.randomx_flags.contains(&RandomxFlag::LargePages) {
@@ -208,32 +160,89 @@ pub fn run() -> sc_cli::Result<()> {
 			if cli.run.randomx_flags.contains(&RandomxFlag::Secure) {
 				randomx_config.secure = true;
 			}
-			let _ = argon_randomx::set_global_config(randomx_config);
+			let _ = argon_randomx::full_vm::set_global_config(randomx_config);
 
 			runner.run_node_until_exit(|config| async move {
+				let mining_config = MiningConfig::new(&cli);
 				match config.network.network_backend {
 					sc_network::config::NetworkBackendType::Libp2p => service::new_full::<
 						sc_network::NetworkWorker<
-							argon_node_runtime::opaque::Block,
-							<argon_node_runtime::opaque::Block as sp_runtime::traits::Block>::Hash,
+							opaque::Block,
+							<opaque::Block as sp_runtime::traits::Block>::Hash,
 						>,
-					>(
-						config,
-						cli.block_author(),
-						cli.run.compute_miners,
-						bitcoin_rpc_url,
-					)
-					.map_err(sc_cli::Error::Service),
-					sc_network::config::NetworkBackendType::Litep2p =>
-						service::new_full::<sc_network::Litep2pNetworkBackend>(
-							config,
-							cli.block_author(),
-							cli.run.compute_miners,
-							bitcoin_rpc_url,
-						)
-						.map_err(sc_cli::Error::Service),
+					>(config, mining_config)
+					.map_err(Error::Service),
+					sc_network::config::NetworkBackendType::Litep2p => service::new_full::<
+						sc_network::Litep2pNetworkBackend,
+					>(config, mining_config)
+					.map_err(Error::Service),
 				}
 			})
 		},
+	}
+}
+
+pub struct MiningConfig {
+	mining_threads: Option<u32>,
+	pub block_author: Option<AccountId32>,
+	bitcoin_rpc_url: Option<String>,
+}
+
+impl From<Cli> for MiningConfig {
+	fn from(cli: Cli) -> Self {
+		Self::new(&cli)
+	}
+}
+
+impl MiningConfig {
+	pub fn new(cli: &Cli) -> Self {
+		let block_author = if let Some(block_author) = &cli.run.author {
+			Some(block_author.clone())
+		} else if let Some(account) = &cli.run.base.get_keyring() {
+			Some(account.to_account_id())
+		} else if cli.run.base.shared_params.dev {
+			Some(Alice.to_account_id())
+		} else {
+			None
+		};
+
+		let mining_threads = cli.run.compute_miners;
+		let bitcoin_rpc_url = cli.bitcoin_rpc_url.clone();
+
+		Self { mining_threads, block_author, bitcoin_rpc_url }
+	}
+
+	pub fn mining_threads(&self) -> usize {
+		let mining_threads = if let Some(mining_threads) = self.mining_threads {
+			mining_threads as usize
+		} else {
+			max(num_cpus::get() - 1, 1)
+		};
+		if mining_threads > 0 {
+			log::info!("Compute fallback mining is enabled with {} threads", mining_threads);
+		} else {
+			log::info!("Compute fallback mining is disabled");
+		}
+		mining_threads
+	}
+
+	pub fn bitcoin_rpc_url_with_auth(&self) -> CliResult<(Url, Option<(String, String)>)> {
+		let Some(bitcoin_rpc_url) = &self.bitcoin_rpc_url else {
+			return Err(Error::Input(
+				"Bitcoin RPC URL is required for block validation".to_string(),
+			));
+		};
+
+		let bitcoin_url = Url::parse(bitcoin_rpc_url).map_err(|e| {
+			Error::Input(format!("Unable to parse bitcoin rpc url ({}) {:?}", bitcoin_rpc_url, e))
+		})?;
+		let (user, password) = (bitcoin_url.username(), bitcoin_url.password());
+
+		let bitcoin_auth = if !user.is_empty() {
+			Some((user.to_string(), password.unwrap_or_default().to_string()))
+		} else {
+			None
+		};
+		Ok((bitcoin_url, bitcoin_auth))
 	}
 }

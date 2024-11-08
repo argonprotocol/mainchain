@@ -1,4 +1,4 @@
-use argon_node_runtime::AccountId;
+use argon_primitives::AccountId;
 use clap::{Parser, ValueEnum};
 use sc_cli::RunCmd;
 
@@ -19,7 +19,7 @@ pub struct Cli {
 #[derive(Debug, Clone, Parser)]
 pub struct ArgonRunCmd {
 	#[clap(flatten)]
-	pub inner: RunCmd,
+	pub base: RunCmd,
 
 	/// Enable an account to author blocks
 	///
@@ -45,22 +45,6 @@ pub struct ArgonRunCmd {
 pub enum RandomxFlag {
 	LargePages,
 	Secure,
-}
-
-impl Cli {
-	pub fn block_author(&self) -> Option<AccountId> {
-		if let Some(block_author) = &self.run.author {
-			Some(block_author.clone())
-		} else if let Some(account) = self.run.inner.get_keyring() {
-			Some(account.to_account_id())
-		} else if self.run.inner.shared_params.dev {
-			use sp_core::crypto::Pair;
-			let block_author = sp_core::sr25519::Pair::from_string("//Alice", None).unwrap();
-			Some(AccountId::from(block_author.public()))
-		} else {
-			None
-		}
-	}
 }
 
 #[derive(Debug, clap::Subcommand)]
