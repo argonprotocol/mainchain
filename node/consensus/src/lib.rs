@@ -9,7 +9,7 @@ use argon_bitcoin_utxo_tracker::UtxoTracker;
 use argon_node_runtime::{NotaryRecordT, NotebookVerifyError};
 use argon_primitives::{
 	inherents::BlockSealInherentNodeSide, Balance, BitcoinApis, BlockCreatorApis, BlockSealApis,
-	BlockSealAuthorityId, BlockSealDigest, NotaryApis, NotebookApis, TickApis, VotingSchedule,
+	BlockSealAuthorityId, NotaryApis, NotebookApis, TickApis, VotingSchedule,
 };
 use codec::Codec;
 use futures::prelude::*;
@@ -40,7 +40,7 @@ pub mod import_queue;
 pub(crate) mod notary_client;
 pub(crate) mod notebook_sealer;
 
-use crate::compute_worker::MiningMetadata;
+use crate::{compute_worker::MiningMetadata, notebook_sealer::create_vote_seal};
 pub use import_queue::create_import_queue;
 
 pub struct BlockBuilderParams<
@@ -127,7 +127,6 @@ pub fn run_block_builder_task<Block, BI, C, PF, A, SC, SO, JS>(
 		author,
 		block_import,
 		client: client.clone(),
-		keystore: keystore.clone(),
 		proposer: Arc::new(Mutex::new(proposer)),
 		authoring_duration,
 		aux_client: aux_client.clone(),
@@ -165,18 +164,32 @@ pub fn run_block_builder_task<Block, BI, C, PF, A, SC, SO, JS>(
 						trace!("Got tax vote command at tick {:?}", command.current_tick);
 						let vote = command.vote;
 						let seal_strength = vote.seal_strength;
+						let authority = vote.closest_miner.1.clone();
 
 						let Some(proposal) =  creator
 							.propose(
 								command.current_tick,
 								command.timestamp_millis,
 								command.parent_hash,
-								BlockSealInherentNodeSide::from_vote(vote, command.signature),
+								BlockSealInherentNodeSide::from_vote(vote),
 							)
 							.await else {
 							continue;
 						};
-						creator.submit_block(proposal, BlockSealDigest::Vote { seal_strength }).await;
+						let pre_hash = proposal.proposal.block.header().hash();
+						let digest = match create_vote_seal(
+							&keystore,
+							&pre_hash,
+							&authority,
+							seal_strength,
+						) {
+							Ok(x) => x,
+							Err(err) => {
+								warn!("Unable to create vote seal: {:?}", err);
+								continue;
+							},
+						};
+						creator.submit_block(proposal, digest).await;
 					}
 				},
 				// compute blocks are created with a hash on top of the pre-built block

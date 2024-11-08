@@ -10,7 +10,7 @@ use argon_primitives::{
 	RewardShare,
 };
 use codec::Codec;
-use core::{cmp::max, marker::PhantomData};
+use core::cmp::max;
 use frame_support::{
 	pallet_prelude::*,
 	traits::{

@@ -1,11 +1,6 @@
 #![allow(clippy::ptr_arg)]
 #![allow(clippy::too_many_arguments)]
 
-use alloc::{collections::btree_map::BTreeMap, vec::Vec};
-use codec::Codec;
-use sp_core::{ConstU32, H256, U256};
-use sp_runtime::{BoundedVec, Digest, DispatchError};
-
 use crate::{
 	bitcoin::{BitcoinNetwork, BitcoinSyncStatus, Satoshis, UtxoRef, UtxoValue},
 	block_seal::{ComputePuzzle, MiningAuthority},
@@ -18,6 +13,10 @@ use crate::{
 	BestBlockVoteSeal, BlockSealDigest, BlockVoteDigest, NotebookAuditResult, NotebookNumber,
 	VoteMinimum, VotingKey,
 };
+use alloc::{collections::btree_map::BTreeMap, vec::Vec};
+use codec::Codec;
+use sp_core::{ConstU32, H256, U256};
+use sp_runtime::{BoundedVec, Digest, DispatchError};
 
 sp_api::decl_runtime_apis! {
 	pub trait BlockSealApis<AccountId:Codec, BlockSealAuthorityId:Codec> {
@@ -30,6 +29,7 @@ sp_api::decl_runtime_apis! {
 			expected_notebook_tick: Tick,
 		) -> Result<BoundedVec<BestBlockVoteSeal<AccountId, BlockSealAuthorityId>, ConstU32<2>>, DispatchError>;
 		fn has_eligible_votes() -> bool;
+		fn is_valid_signature(block_hash: Block::Hash, seal: &BlockSealDigest, digest: &Digest) -> bool;
 	}
 }
 

@@ -318,6 +318,7 @@ impl pallet_block_seal::Config for Runtime {
 	type TickProvider = Ticks;
 	type EventHandler = MiningSlot;
 	type Digests = Digests;
+	type FindAuthor = Digests;
 }
 
 impl pallet_grandpa::Config for Runtime {

@@ -2,9 +2,8 @@ use crate::{aux_client::ArgonAux, block_creator::CreateTaxVoteBlock, error::Erro
 use argon_node_runtime::NotebookVerifyError;
 use argon_primitives::{
 	block_seal::BLOCK_SEAL_CRYPTO_ID,
-	localchain::BlockVote,
 	tick::{Tick, Ticker},
-	BlockCreatorApis, BlockSealApis, BlockSealAuthorityId, BlockSealAuthoritySignature,
+	BlockCreatorApis, BlockSealApis, BlockSealAuthorityId, BlockSealDigest, BlockVote,
 	BlockVotingPower, TickApis, VotingSchedule, BLOCK_SEAL_KEY_TYPE,
 };
 use codec::Codec;
@@ -135,18 +134,14 @@ where
 
 			for vote in stronger_seals.into_iter() {
 				trace!("Will try to sign vote for block with seal strength {}", vote.seal_strength);
-				let Ok(miner_signature) = try_sign_vote(
-					&self.keystore,
-					&block_hash,
-					&vote.closest_miner.1,
-					vote.seal_strength,
-				) else {
+				let raw_authority = vote.closest_miner.1.to_raw_vec();
+				if !self.keystore.has_keys(&[(raw_authority, BLOCK_SEAL_KEY_TYPE)]) {
 					trace!(
 						"Could not sign vote for block with seal strength {}",
 						vote.seal_strength
 					);
 					continue;
-				};
+				}
 
 				self.sender
 					.unbounded_send(CreateTaxVoteBlock::<B, AC> {
@@ -154,7 +149,6 @@ where
 						timestamp_millis: Timestamp::current().as_millis(),
 						vote,
 						parent_hash: block_hash,
-						signature: miner_signature,
 					})
 					.map_err(|e| {
 						Error::StringError(format!(
@@ -250,40 +244,29 @@ where
 	}
 }
 
-pub(crate) fn try_sign_vote<Hash: Codec>(
+pub fn create_vote_seal<Hash: AsRef<[u8]>>(
 	keystore: &KeystorePtr,
-	block_hash: &Hash,
-	seal_authority_id: &BlockSealAuthorityId,
+	pre_hash: &Hash,
+	vote_authority: &BlockSealAuthorityId,
 	seal_strength: U256,
-) -> Result<BlockSealAuthoritySignature, ConsensusError> {
-	if !keystore.has_keys(&[(seal_authority_id.to_raw_vec(), BLOCK_SEAL_KEY_TYPE)]) {
-		return Err(ConsensusError::CannotSign(format!(
-			"Keystore does not have keys for {}",
-			seal_authority_id
-		)));
-	}
-
-	let message = BlockVote::seal_signature_message(block_hash, seal_strength);
+) -> Result<BlockSealDigest, Error> {
+	let message = BlockVote::seal_signature_message(pre_hash);
 	let signature = keystore
-		.sign_with(
-			BLOCK_SEAL_KEY_TYPE,
-			BLOCK_SEAL_CRYPTO_ID,
-			seal_authority_id.as_slice(),
-			&message,
-		)
-		.map_err(|e| ConsensusError::CannotSign(format!("{}. Key: {:?}", e, seal_authority_id)))?
+		.sign_with(BLOCK_SEAL_KEY_TYPE, BLOCK_SEAL_CRYPTO_ID, vote_authority.as_slice(), &message)
+		.map_err(|e| ConsensusError::CannotSign(format!("{}. Key: {:?}", e, vote_authority)))?
 		.ok_or_else(|| {
 			ConsensusError::CannotSign(format!(
 				"Could not find key in keystore. Key: {:?}",
-				seal_authority_id
+				vote_authority
 			))
 		})?;
 
 	let signature = signature
 		.clone()
 		.try_into()
-		.map_err(|_| ConsensusError::InvalidSignature(signature, seal_authority_id.to_raw_vec()))?;
-	Ok(signature)
+		.map_err(|_| ConsensusError::InvalidSignature(signature, vote_authority.to_raw_vec()))?;
+
+	Ok(BlockSealDigest::Vote { seal_strength, signature })
 }
 
 #[cfg(test)]
@@ -312,7 +295,7 @@ mod tests {
 		setup_logs();
 		let keystore = create_keystore(Ed25519Keyring::Alice);
 
-		assert_ok!(try_sign_vote(
+		assert_ok!(create_vote_seal(
 			&keystore,
 			&H256::from_slice(&[2u8; 32]),
 			&Ed25519Keyring::Alice.public().into(),
@@ -329,8 +312,8 @@ mod tests {
 		let nonce = U256::from(1);
 
 		assert!(matches!(
-			try_sign_vote(&keystore, &block_hash, &Ed25519Keyring::Bob.public().into(), nonce),
-			Err(ConsensusError::CannotSign(_))
+			create_vote_seal(&keystore, &block_hash, &Ed25519Keyring::Bob.public().into(), nonce),
+			Err(Error::ConsensusError(ConsensusError::CannotSign(_)))
 		),);
 	}
 }

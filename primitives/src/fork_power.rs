@@ -23,7 +23,7 @@ impl ForkPower {
 		compute_difficulty: ComputeDifficulty,
 	) {
 		match seal_digest {
-			BlockSealDigest::Vote { seal_strength } => {
+			BlockSealDigest::Vote { seal_strength, .. } => {
 				self.add_vote(block_voting_power, notebooks, seal_strength);
 			},
 			BlockSealDigest::Compute { .. } => {

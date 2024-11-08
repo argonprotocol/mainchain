@@ -980,7 +980,6 @@ fn create_block_vote_seal(seal_strength: U256) -> BlockSealInherent {
 			block_rewards_account_id: AccountId32::from_slice(&[3u8; 32]).expect("32 bytes"),
 			signature: sp_core::sr25519::Signature::from_raw([0u8; 64]).into(),
 		},
-		miner_signature: sp_core::ed25519::Signature::from_raw([0u8; 64]).into(),
 		source_notebook_number: 1,
 		source_notebook_proof: MerkleProof::default(),
 	}

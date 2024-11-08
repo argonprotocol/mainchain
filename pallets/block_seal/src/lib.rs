@@ -28,19 +28,19 @@ pub mod pallet {
 		notary::NotaryNotebookRawVotes,
 		notebook::NotebookNumber,
 		tick::Tick,
-		AuthorityProvider, BlockSealAuthoritySignature, BlockSealDigest, BlockSealEventHandler,
-		BlockSealSpecProvider, BlockSealerInfo, BlockSealerProvider, BlockVotingKey,
-		BlockVotingPower, MerkleProof, NotaryId, NotebookProvider, ParentVotingKeyDigest,
-		TickProvider, VotingKey, VotingSchedule, PARENT_VOTING_KEY_DIGEST,
+		AuthorityProvider, BlockSealDigest, BlockSealEventHandler, BlockSealSpecProvider,
+		BlockSealerInfo, BlockSealerProvider, BlockVotingKey, BlockVotingPower, MerkleProof,
+		NotaryId, NotebookProvider, ParentVotingKeyDigest, TickProvider, VotingKey, VotingSchedule,
+		PARENT_VOTING_KEY_DIGEST,
 	};
 	use binary_merkle_tree::{merkle_proof, verify_proof};
-	use frame_support::pallet_prelude::*;
+	use frame_support::{pallet_prelude::*, traits::FindAuthor};
 	use frame_system::pallet_prelude::*;
 	use log::info;
 	use sp_core::{H256, U256};
 	use sp_runtime::{
 		traits::{BlakeTwo256, Block as BlockT, Verify},
-		DigestItem, RuntimeAppPublic,
+		Digest, DigestItem, RuntimeAppPublic,
 	};
 
 	#[pallet::pallet]
@@ -64,6 +64,9 @@ pub mod pallet {
 
 		/// Lookup seal specifications
 		type BlockSealSpecProvider: BlockSealSpecProvider<Self::Block>;
+
+		/// Find the author of a block
+		type FindAuthor: FindAuthor<Self::AccountId>;
 
 		type TickProvider: TickProvider<Self::Block>;
 
@@ -130,8 +133,6 @@ pub mod pallet {
 		IneligibleNotebookUsed,
 		/// The lookup to verify a vote's authenticity is not available for the given block
 		NoEligibleVotingRoot,
-		/// Message was not signed by a registered miner
-		InvalidAuthoritySignature,
 		/// Could not decode the scale bytes of the votes
 		CouldNotDecodeVote,
 		/// Too many notebooks were submitted for the current tick. Should not be possible
@@ -272,7 +273,6 @@ pub mod pallet {
 					notary_id,
 					ref source_notebook_proof,
 					source_notebook_number,
-					ref miner_signature,
 				} => {
 					let current_tick = T::TickProvider::current_tick();
 					let voting_schedule =
@@ -296,7 +296,6 @@ pub mod pallet {
 						block_vote,
 						&block_author,
 						&voting_schedule,
-						miner_signature.clone(),
 					)?;
 					Self::verify_vote_source(
 						notary_id,
@@ -352,7 +351,6 @@ pub mod pallet {
 			block_vote: &BlockVote,
 			block_author: &T::AccountId,
 			voting_schedule: &VotingSchedule,
-			signature: BlockSealAuthoritySignature,
 		) -> DispatchResult {
 			let grandpa_vote_minimum = T::BlockSealSpecProvider::grandparent_vote_minimum()
 				.ok_or(Error::<T>::NoGrandparentVoteMinimum)?;
@@ -377,22 +375,40 @@ pub mod pallet {
 
 			ensure!(block_peer.authority_id == authority_id, Error::<T>::InvalidSubmitter);
 
-			let parent_hash = <frame_system::Pallet<T>>::parent_hash();
-
-			let message = BlockVote::seal_signature_message(&parent_hash, seal_strength);
-			let Ok(signature) = AuthoritySignature::<T>::decode(&mut signature.as_ref()) else {
-				return Err(Error::<T>::InvalidAuthoritySignature.into());
-			};
-			ensure!(
-				authority_id.verify(&message, &signature),
-				Error::<T>::InvalidAuthoritySignature
-			);
 			ensure!(
 				block_vote.signature.verify(&block_vote.hash()[..], &block_vote.account_id),
 				Error::<T>::BlockVoteInvalidSignature
 			);
 
 			Ok(())
+		}
+
+		pub fn is_valid_miner_signature(
+			hash: <T::Block as BlockT>::Hash,
+			seal: &BlockSealDigest,
+			digest: &Digest,
+		) -> bool {
+			match seal {
+				BlockSealDigest::Vote { signature, .. } => {
+					let Some(author) = T::FindAuthor::find_author(
+						digest.logs.iter().filter_map(|a| a.as_pre_runtime()),
+					) else {
+						return false;
+					};
+					// dumb hack to convert the signature type to match
+					let Ok(signature) = AuthoritySignature::<T>::decode(&mut signature.as_ref())
+					else {
+						log::error!("Could not decode signature for vote");
+						return false;
+					};
+
+					let block_seal_message = BlockVote::seal_signature_message(hash);
+					let authority_id = T::AuthorityProvider::get_authority(author)
+						.expect("Authority must be registered");
+					authority_id.verify(&block_seal_message, &signature)
+				},
+				_ => false,
+			}
 		}
 
 		/// Returns true if there's a parent voting key and votes in the tick notebooks

@@ -3,7 +3,7 @@ use frame_support::{
 	assert_ok,
 	traits::{Len, OnFinalize, OnInitialize, OnTimestampSet},
 };
-use sp_core::{crypto::AccountId32, ed25519::Signature, H256};
+use sp_core::{crypto::AccountId32, H256};
 use sp_runtime::{Digest, DigestItem};
 
 use argon_primitives::{
@@ -288,7 +288,6 @@ fn it_doesnt_adjust_difficulty_if_tax_block() {
 				leaf_index: 0,
 			},
 			source_notebook_number: 1,
-			miner_signature: Signature::from_raw([0u8; 64]).into(),
 		});
 
 		assert_ok!(PastComputeBlockTimes::<Test>::try_mutate(|a| {

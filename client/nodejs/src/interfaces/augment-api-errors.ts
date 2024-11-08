@@ -131,10 +131,6 @@ declare module '@polkadot/api-base/types/errors' {
        **/
       InsufficientVotingPower: AugmentedError<ApiType>;
       /**
-       * Message was not signed by a registered miner
-       **/
-      InvalidAuthoritySignature: AugmentedError<ApiType>;
-      /**
        * The merkle proof of vote inclusion in the notebook is invalid
        **/
       InvalidBlockVoteProof: AugmentedError<ApiType>;

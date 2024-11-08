@@ -1,10 +1,12 @@
-use crate::{tick::Tick, BlockVotingPower, NotebookAuditResult, VotingKey};
+use crate::{
+	tick::Tick, BlockSealAuthoritySignature, BlockVotingPower, NotebookAuditResult, VotingKey,
+};
 use alloc::{vec, vec::Vec};
 use codec::{Codec, Decode, Encode, MaxEncodedLen};
 use frame_support_procedural::DefaultNoBound;
 use scale_info::TypeInfo;
 use serde::{Deserialize, Serialize};
-use sp_core::{RuntimeDebug, U256};
+use sp_core::{ed25519::Signature, RuntimeDebug, U256};
 use sp_runtime::{ConsensusEngineId, Digest, DigestItem};
 
 /// The block creator account_id - matches POW so that we can use the built-in front end decoding
@@ -26,8 +28,14 @@ pub const PARENT_VOTING_KEY_DIGEST: ConsensusEngineId = [b'p', b'k', b'e', b'y']
 
 #[derive(Clone, PartialEq, Eq, Encode, Decode, RuntimeDebug, TypeInfo)]
 pub enum BlockSealDigest {
-	Vote { seal_strength: U256 },
+	Vote { seal_strength: U256, signature: BlockSealAuthoritySignature },
 	Compute { nonce: U256 },
+}
+
+impl BlockSealDigest {
+	pub fn pre_final_vote(seal_strength: U256) -> Self {
+		BlockSealDigest::Vote { seal_strength, signature: Signature::from_raw([0u8; 64]).into() }
+	}
 }
 
 #[derive(Clone, PartialEq, Eq, Encode, Decode, RuntimeDebug, TypeInfo)]
@@ -48,7 +56,7 @@ impl TryFrom<DigestItem> for TickDigest {
 }
 
 impl BlockSealDigest {
-	pub fn is_tax(&self) -> bool {
+	pub fn is_vote(&self) -> bool {
 		matches!(self, BlockSealDigest::Vote { .. })
 	}
 

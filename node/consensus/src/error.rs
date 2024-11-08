@@ -31,6 +31,9 @@ pub enum Error {
 
 	#[error("Missing block seal digest")]
 	MissingBlockSealDigest,
+	#[error("Invalid vote seal signature")]
+	InvalidVoteSealSignature,
+
 	#[error(transparent)]
 	Client(sp_blockchain::Error),
 	#[error(transparent)]

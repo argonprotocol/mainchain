@@ -9,9 +9,8 @@ use argon_primitives::{
 		NotebooksInherentDataProvider,
 	},
 	tick::Tick,
-	Balance, BestBlockVoteSeal, BitcoinApis, BlockSealApis, BlockSealAuthorityId,
-	BlockSealAuthoritySignature, BlockSealDigest, Digestset, NotaryApis, NotebookApis, TickApis,
-	TickDigest, VotingSchedule,
+	Balance, BestBlockVoteSeal, BitcoinApis, BlockSealApis, BlockSealAuthorityId, BlockSealDigest,
+	Digestset, NotaryApis, NotebookApis, TickApis, TickDigest, VotingSchedule,
 };
 use codec::Codec;
 use frame_support::CloneNoBound;
@@ -22,7 +21,6 @@ use sp_api::ProvideRuntimeApi;
 use sp_blockchain::HeaderBackend;
 use sp_consensus::{BlockOrigin, Environment, Proposal, Proposer};
 use sp_inherents::{InherentData, InherentDataProvider};
-use sp_keystore::KeystorePtr;
 use sp_runtime::{
 	traits::{Block as BlockT, Header as HeaderT},
 	Digest,
@@ -35,7 +33,6 @@ pub struct CreateTaxVoteBlock<Block: BlockT, AccountId: Clone + Codec> {
 	pub timestamp_millis: u64,
 	pub parent_hash: Block::Hash,
 	pub vote: BestBlockVoteSeal<AccountId, BlockSealAuthorityId>,
-	pub signature: BlockSealAuthoritySignature,
 }
 
 #[derive(CloneNoBound)]
@@ -46,8 +43,6 @@ pub struct BlockCreator<Block: BlockT, BI: Clone, Client: AuxStore, PF, JS: Clon
 	pub block_import: BI,
 	/// The underlying para client.
 	pub client: Arc<Client>,
-	/// The underlying keystore, which should contain Aura consensus keys.
-	pub keystore: KeystorePtr,
 	/// The underlying block proposer this should call into.
 	pub proposer: Arc<Mutex<PF>>,
 	/// The amount of time to spend authoring each block.
@@ -172,10 +167,6 @@ where
 				})?;
 		}
 
-		println!(
-			"Creating digest with notebooks: {:?}, vote {:?}",
-			notebook_header_data.notebook_digest, notebook_header_data.vote_digest
-		);
 		let inherent_digest = Digestset {
 			author: self.author.clone(),
 			tick: TickDigest { tick: submitting_tick },
@@ -198,7 +189,6 @@ where
 		let (pre_header, body) = proposal.block.deconstruct();
 		let pre_hash = pre_header.hash();
 		let parent_hash = *pre_header.parent_hash();
-
 		let block_number = *pre_header.number();
 
 		// seal the block.

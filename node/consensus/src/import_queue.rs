@@ -137,19 +137,32 @@ where
 			return Ok(block_params)
 		}
 
-		let pre_hash = block_params.header.hash();
+		let post_hash = block_params.header.hash();
 		let parent_hash = *block_params.header.parent_hash();
-		let mut header = block_params.header;
-		let digest = header.digest().clone();
-		let hash = header.hash();
 
+		let mut header = block_params.header;
 		let raw_seal_digest = header.digest_mut().pop().ok_or(Error::MissingBlockSealDigest)?;
 		let seal_digest =
 			BlockSealDigest::try_from(&raw_seal_digest).ok_or(Error::MissingBlockSealDigest)?;
 
 		block_params.header = header;
 		block_params.post_digests.push(raw_seal_digest);
-		block_params.post_hash = Some(hash);
+		block_params.post_hash = Some(post_hash);
+
+		let digest = block_params.header.digest();
+
+		if seal_digest.is_vote() {
+			let pre_hash = block_params.header.hash();
+
+			let is_valid = self
+				.client
+				.runtime_api()
+				.is_valid_signature(parent_hash, pre_hash, &seal_digest, digest)
+				.map_err(|e| format!("Error verifying miner signature {:?}", e))?;
+			if !is_valid {
+				return Err(Error::InvalidVoteSealSignature.into());
+			}
+		}
 
 		// if we're importing a non-finalized block from someone else, verify the notebook
 		// audits
@@ -160,7 +173,7 @@ where
 			let digest_notebooks = self
 				.client
 				.runtime_api()
-				.digest_notebooks(parent_hash, &digest)
+				.digest_notebooks(parent_hash, digest)
 				.map_err(|e| format!("Error calling digest notebooks api {e:?}"))?
 				.map_err(|e| format!("Failed to get digest notebooks: {:?}", e))?;
 			verify_notebook_audits(&self.aux_client, digest_notebooks).await?;
@@ -179,7 +192,7 @@ where
 			let compute_difficulty = compute_puzzle.difficulty;
 			if !BlockComputeNonce::is_valid(
 				nonce,
-				pre_hash.as_ref().to_vec(),
+				post_hash.as_ref().to_vec(),
 				&key_block_hash,
 				compute_difficulty,
 			) {
