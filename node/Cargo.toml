@@ -22,9 +22,9 @@ futures = { workspace = true }
 codec = { workspace = true }
 async-trait = { workspace = true }
 futures-timer = { workspace = true }
-thiserror = { workspace = true }
+thiserror = { workspace = true, features = ["default"] }
 serde = { workspace = true }
-prometheus-endpoint = { workspace = true }
+substrate-prometheus-endpoint = { workspace = true }
 log = { workspace = true }
 sc-tracing = { workspace = true }
 sc-cli = { workspace = true }

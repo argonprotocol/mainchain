@@ -30,7 +30,7 @@ codec = { workspace = true, features = ["default"] }
 serde = { workspace = true, features = ["default"] }
 serde_json = { workspace = true, features = ["default"] }
 scale-info = { workspace = true, features = ["default"] }
-thiserror = { workspace = true }
+thiserror = { workspace = true, features = ["default"] }
 subxt = { workspace = true, features = ["default"] }
 tokio = { workspace = true }
 hex = { workspace = true, features = ["default"] }

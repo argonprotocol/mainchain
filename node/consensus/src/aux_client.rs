@@ -220,14 +220,13 @@ impl<B: BlockT, C: AuxStore + 'static> ArgonAux<B, C> {
 			let tick = notebook.tick;
 
 			let state = self.get_notebook_tick_state(tick)?.get();
-			tracing::info!(
+			tracing::trace!(
 				vote_details = ?state.notebook_key_details_by_notary.get(&notary_id),
 				notebook_tick,
 				"Notebook state for tick {}",
 				tick
 			);
 			if tick == notebook_tick {
-				tracing::info!("set tick notebook");
 				tick_notebook = state.notebook_key_details_by_notary.get(&notary_id).cloned();
 			}
 			if let Some(raw_data) = state.raw_headers_by_notary.get(&notary_id) {

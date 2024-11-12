@@ -6,7 +6,7 @@ use sp_consensus::Error as ConsensusError;
 use sp_inherents::Error as InherentsError;
 use sp_runtime::RuntimeString;
 
-#[derive(thiserror::Error, std::fmt::Debug)]
+#[derive(thiserror::Error, Debug)]
 pub enum Error {
 	#[error("Header uses the wrong engine {0:?}")]
 	WrongEngine([u8; 4]),

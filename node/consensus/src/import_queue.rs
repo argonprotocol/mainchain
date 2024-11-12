@@ -249,7 +249,7 @@ pub fn create_import_queue<C, B, I, AC>(
 	aux_client: ArgonAux<B, C>,
 	block_import: I,
 	spawner: &impl sp_core::traits::SpawnEssentialNamed,
-	registry: Option<&prometheus_endpoint::Registry>,
+	registry: Option<&substrate_prometheus_endpoint::Registry>,
 	telemetry: Option<TelemetryHandle>,
 	utxo_tracker: Arc<UtxoTracker>,
 ) -> (BasicQueue<B>, ArgonBlockImport<B, I, C, AC>)

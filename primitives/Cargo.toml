@@ -30,7 +30,7 @@ sp-core = { workspace = true }
 sp-crypto-hashing = { workspace = true }
 frame-support-procedural = { workspace = true }
 frame-support = { workspace = true }
-thiserror = { workspace = true, optional = true }
+thiserror = { workspace = true, default-features = false }
 impl-trait-for-tuples = { workspace = true }
 napi-derive = { workspace = true, optional = true }
 napi = { workspace = true, optional = true }
@@ -86,7 +86,8 @@ std = [
 	"sp-keystore",
 	"sp-keystore?/std",
 	"sp-runtime/std",
-	"thiserror",
+	"thiserror/default",
+	"thiserror/std",
 ]
 napi = [ "napi-derive/type-def", "napi/napi9", "napi/serde-json" ]
 uniffi = [ "dep:uniffi" ]
