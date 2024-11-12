@@ -154,10 +154,10 @@ pub fn run() -> sc_cli::Result<()> {
 			let runner = cli.create_runner(&cli.run.base)?;
 
 			let mut randomx_config = argon_randomx::Config::default();
-			if cli.run.randomx_flags.contains(&RandomxFlag::LargePages) {
+			if cli.run.compute_flags.contains(&RandomxFlag::LargePages) {
 				randomx_config.large_pages = true;
 			}
-			if cli.run.randomx_flags.contains(&RandomxFlag::Secure) {
+			if cli.run.compute_flags.contains(&RandomxFlag::Secure) {
 				randomx_config.secure = true;
 			}
 			let _ = argon_randomx::full_vm::set_global_config(randomx_config);
@@ -183,8 +183,8 @@ pub fn run() -> sc_cli::Result<()> {
 }
 
 pub struct MiningConfig {
-	mining_threads: Option<u32>,
-	pub block_author: Option<AccountId32>,
+	compute_threads: Option<u32>,
+	pub compute_author: Option<AccountId32>,
 	bitcoin_rpc_url: Option<String>,
 }
 
@@ -196,8 +196,8 @@ impl From<Cli> for MiningConfig {
 
 impl MiningConfig {
 	pub fn new(cli: &Cli) -> Self {
-		let block_author = if let Some(block_author) = &cli.run.author {
-			Some(block_author.clone())
+		let compute_author = if let Some(compute_author) = &cli.run.compute_author {
+			Some(compute_author.clone())
 		} else if let Some(account) = &cli.run.base.get_keyring() {
 			Some(account.to_account_id())
 		} else if cli.run.base.shared_params.dev {
@@ -206,24 +206,28 @@ impl MiningConfig {
 			None
 		};
 
-		let mining_threads = cli.run.compute_miners;
+		let compute_threads = cli.run.compute_miners;
+
 		let bitcoin_rpc_url = cli.bitcoin_rpc_url.clone();
 
-		Self { mining_threads, block_author, bitcoin_rpc_url }
+		Self { compute_threads, compute_author, bitcoin_rpc_url }
 	}
 
-	pub fn mining_threads(&self) -> usize {
-		let mining_threads = if let Some(mining_threads) = self.mining_threads {
-			mining_threads as usize
+	pub fn compute_threads(&self) -> usize {
+		let compute_threads = if let Some(compute_threads) = self.compute_threads {
+			compute_threads as usize
 		} else {
 			max(num_cpus::get() - 1, 1)
 		};
-		if mining_threads > 0 {
-			log::info!("Compute fallback mining is enabled with {} threads", mining_threads);
+		if compute_threads > 0 {
+			if self.compute_author.is_none() {
+				panic!("Compute fallback mining is enabled without a compute author. Unable to activate!");
+			}
+			log::info!("Compute fallback mining is enabled with {} threads", compute_threads);
 		} else {
 			log::info!("Compute fallback mining is disabled");
 		}
-		mining_threads
+		compute_threads
 	}
 
 	pub fn bitcoin_rpc_url_with_auth(&self) -> CliResult<(Url, Option<(String, String)>)> {

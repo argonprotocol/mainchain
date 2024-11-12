@@ -227,10 +227,8 @@ pub fn new_full<
 	})?;
 
 	if role.is_authority() {
-		let mining_threads = mining_config.mining_threads() as u32;
-		let author = mining_config
-			.block_author
-			.expect("A block author is required to be a validator");
+		let compute_threads = mining_config.compute_threads() as u32;
+		let compute_author = mining_config.compute_author;
 		let proposer_factory = sc_basic_authorship::ProposerFactory::new(
 			task_manager.spawn_handle(),
 			client.clone(),
@@ -251,8 +249,8 @@ pub fn new_full<
 				utxo_tracker,
 				aux_client: aux_client.clone(),
 				justification_sync_link: sync_service.clone(),
-				author,
-				mining_threads,
+				compute_author,
+				compute_threads,
 			},
 			&task_manager,
 		);

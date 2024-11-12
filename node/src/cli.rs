@@ -21,11 +21,11 @@ pub struct ArgonRunCmd {
 	#[clap(flatten)]
 	pub base: RunCmd,
 
-	/// Enable an account to author blocks
+	/// The rewards author for compute mining (if activated).
 	///
 	/// The account address must be given in SS58 format.
 	#[arg(long, value_name = "SS58_ADDRESS", value_parser = parse_ss58_account_id)]
-	pub author: Option<AccountId>,
+	pub compute_author: Option<AccountId>,
 
 	/// How many permissionless compute mining threads to run
 	///
@@ -38,7 +38,7 @@ pub struct ArgonRunCmd {
 	/// - LargePages: use large memory pages for the randomx dataset (default inactive)
 	/// - Secure: use secure memory for the randomx dataset (default inactive)
 	#[arg(long, verbatim_doc_comment)]
-	pub randomx_flags: Vec<RandomxFlag>,
+	pub compute_flags: Vec<RandomxFlag>,
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, ValueEnum)]

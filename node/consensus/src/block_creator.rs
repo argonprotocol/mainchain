@@ -37,8 +37,6 @@ pub struct CreateTaxVoteBlock<Block: BlockT, AccountId: Clone + Codec> {
 
 #[derive(CloneNoBound)]
 pub struct BlockCreator<Block: BlockT, BI: Clone, Client: AuxStore, PF, JS: Clone, A: Clone> {
-	/// The block author,
-	pub author: A,
 	/// Used to actually import blocks.
 	pub block_import: BI,
 	/// The underlying para client.
@@ -50,6 +48,7 @@ pub struct BlockCreator<Block: BlockT, BI: Clone, Client: AuxStore, PF, JS: Clon
 	pub justification_sync_link: JS,
 	pub aux_client: ArgonAux<Block, Client>,
 	pub utxo_tracker: Arc<UtxoTracker>,
+	pub(crate) _phantom: std::marker::PhantomData<A>,
 }
 
 impl<Block: BlockT, BI, C, PF, JS, A, Proof> BlockCreator<Block, BI, C, PF, JS, A>
@@ -70,6 +69,7 @@ where
 {
 	pub async fn propose(
 		&self,
+		author: A,
 		submitting_tick: Tick,
 		timestamp_millis: u64,
 		parent_hash: Block::Hash,
@@ -88,7 +88,7 @@ where
 		};
 
 		let (inherent_data, inherent_digest) = self
-			.create_inherents(parent_hash, submitting_tick, timestamp_millis, seal_inherent)
+			.create_inherents(author, parent_hash, submitting_tick, timestamp_millis, seal_inherent)
 			.await
 			.ok()?;
 
@@ -112,8 +112,9 @@ where
 		Some(BlockProposal { proposal })
 	}
 
-	pub async fn create_inherents(
+	async fn create_inherents(
 		&self,
+		author: A,
 		parent_hash: Block::Hash,
 		submitting_tick: Tick,
 		timestamp_millis: u64,
@@ -168,7 +169,7 @@ where
 		}
 
 		let inherent_digest = Digestset {
-			author: self.author.clone(),
+			author,
 			tick: TickDigest { tick: submitting_tick },
 			block_vote: notebook_header_data.vote_digest,
 			notebooks: notebook_header_data.notebook_digest,

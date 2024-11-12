@@ -53,7 +53,8 @@ pub struct BlockBuilderParams<
 	SO: Clone,
 	JS: Clone,
 > {
-	pub author: A,
+	/// The account id to use for authoring compute blocks
+	pub compute_author: Option<A>,
 	/// Used to actually import blocks.
 	pub block_import: BI,
 	/// The underlying para client.
@@ -74,7 +75,7 @@ pub struct BlockBuilderParams<
 
 	pub select_chain: SC,
 	/// How many mining threads to activate
-	pub mining_threads: u32,
+	pub compute_threads: u32,
 }
 
 pub fn run_block_builder_task<Block, BI, C, PF, A, SC, SO, JS>(
@@ -109,7 +110,7 @@ pub fn run_block_builder_task<Block, BI, C, PF, A, SC, SO, JS>(
 	let (tax_vote_sender, mut tax_vote_rx) = tracing_unbounded("node::consensus::tax_votes", 1000);
 
 	let BlockBuilderParams {
-		author,
+		compute_author,
 		block_import,
 		client,
 		proposer,
@@ -120,11 +121,10 @@ pub fn run_block_builder_task<Block, BI, C, PF, A, SC, SO, JS>(
 		sync_oracle,
 		select_chain,
 		justification_sync_link,
-		mining_threads,
+		compute_threads,
 	} = params;
 
 	let block_creator = BlockCreator {
-		author,
 		block_import,
 		client: client.clone(),
 		proposer: Arc::new(Mutex::new(proposer)),
@@ -132,6 +132,7 @@ pub fn run_block_builder_task<Block, BI, C, PF, A, SC, SO, JS>(
 		aux_client: aux_client.clone(),
 		justification_sync_link,
 		utxo_tracker,
+		_phantom: Default::default(),
 	};
 	let best_hash = client.info().best_hash;
 	let ticker = client.runtime_api().ticker(best_hash).expect("Ticker not available");
@@ -140,8 +141,8 @@ pub fn run_block_builder_task<Block, BI, C, PF, A, SC, SO, JS>(
 
 	let compute_handle = ComputeHandle::new(compute_block_tx);
 
-	if mining_threads > 0 {
-		run_compute_solver_threads(task_manager, compute_handle.clone(), mining_threads)
+	if compute_threads > 0 {
+		run_compute_solver_threads(task_manager, compute_handle.clone(), compute_threads)
 	}
 
 	let notebook_sealer = NotebookSealer::new(
@@ -164,10 +165,12 @@ pub fn run_block_builder_task<Block, BI, C, PF, A, SC, SO, JS>(
 						trace!("Got tax vote command at tick {:?}", command.current_tick);
 						let vote = command.vote;
 						let seal_strength = vote.seal_strength;
+						let author = vote.closest_miner.0.clone();
 						let authority = vote.closest_miner.1.clone();
 
 						let Some(proposal) =  creator
 							.propose(
+								author,
 								command.current_tick,
 								command.timestamp_millis,
 								command.parent_hash,
@@ -258,6 +261,11 @@ pub fn run_block_builder_task<Block, BI, C, PF, A, SC, SO, JS>(
 				}
 			}
 
+			// don't deal with compute blocks if we don't have a compute author
+			let Some(ref compute_author) = compute_author else {
+				continue;
+			};
+
 			// TODO: this whole section needs to loop within a tick to create blocks, and as more
 			//   notebooks come in,  it needs to create more blocks (cause they're stronger than
 			//   the previous ones)
@@ -308,7 +316,13 @@ pub fn run_block_builder_task<Block, BI, C, PF, A, SC, SO, JS>(
 			if compute_handle.proposal_parent_hash() != Some(best_hash) {
 				trace!(?best_hash, ?tick, "Fallback mining activated");
 				let Some(proposal) = block_creator
-					.propose(tick, time.as_millis(), best_hash, BlockSealInherentNodeSide::Compute)
+					.propose(
+						compute_author.clone(),
+						tick,
+						time.as_millis(),
+						best_hash,
+						BlockSealInherentNodeSide::Compute,
+					)
 					.await
 				else {
 					continue;
