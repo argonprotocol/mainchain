@@ -11,13 +11,13 @@ use argon_primitives::{
 	bitcoin::{BitcoinNetwork, SATOSHIS_PER_BITCOIN},
 	block_seal::MiningSlotConfig,
 	notary::{GenesisNotary, NotaryPublic},
-	Chain, ComputeDifficulty, ADDRESS_PREFIX,
+	Chain, ComputeDifficulty, ADDRESS_PREFIX, ARGON_TOKEN_SYMBOL, TOKEN_DECIMALS,
 };
 
 pub fn local_testnet_config() -> Result<ChainSpec, String> {
 	let mut properties = Properties::new();
-	properties.insert("tokenSymbol".into(), "ARGON".into());
-	properties.insert("tokenDecimals".into(), 3.into());
+	properties.insert("tokenSymbol".into(), ARGON_TOKEN_SYMBOL.into());
+	properties.insert("tokenDecimals".into(), TOKEN_DECIMALS.into());
 	properties.insert("ss58Format".into(), ADDRESS_PREFIX.into());
 
 	let notary_host = env::var("ARGON_LOCAL_TESTNET_NOTARY_URL")
@@ -69,6 +69,8 @@ pub fn local_testnet_config() -> Result<ChainSpec, String> {
 			slot_bidding_start_block: 4,
 		},
 		minimum_bitcoin_bond_satoshis: SATOSHIS_PER_BITCOIN / 1_000,
+		cross_token_operator: get_account_id_from_seed::<sr25519::Public>("Alice"),
+		connect_to_test_evm_networks: true,
 	}))
 	.build())
 }

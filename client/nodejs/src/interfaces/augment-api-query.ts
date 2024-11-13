@@ -9,7 +9,7 @@ import type { ApiTypes, AugmentedQuery, QueryableStorageEntry } from '@polkadot/
 import type { BTreeMap, Bytes, Null, Option, U256, U8aFixed, Vec, bool, u128, u16, u32, u64 } from '@polkadot/types-codec';
 import type { AnyNumber, ITuple } from '@polkadot/types-codec/types';
 import type { AccountId32, H256 } from '@polkadot/types/interfaces/runtime';
-import type { ArgonNotaryAuditErrorVerifyError, ArgonPrimitivesBalanceChangeAccountOrigin, ArgonPrimitivesBitcoinBitcoinBlock, ArgonPrimitivesBitcoinBitcoinNetwork, ArgonPrimitivesBitcoinBitcoinXPub, ArgonPrimitivesBitcoinUtxoRef, ArgonPrimitivesBitcoinUtxoValue, ArgonPrimitivesBlockSealBlockPayout, ArgonPrimitivesBlockSealMiningRegistration, ArgonPrimitivesBlockSealMiningSlotConfig, ArgonPrimitivesBond, ArgonPrimitivesBondVault, ArgonPrimitivesDigestsBlockVoteDigest, ArgonPrimitivesDigestsDigestset, ArgonPrimitivesDigestsNotebookDigest, ArgonPrimitivesDomainZoneRecord, ArgonPrimitivesForkPower, ArgonPrimitivesInherentsBlockSealInherent, ArgonPrimitivesNotaryNotaryMeta, ArgonPrimitivesNotaryNotaryNotebookKeyDetails, ArgonPrimitivesNotaryNotaryNotebookVoteDigestDetails, ArgonPrimitivesNotaryNotaryRecord, ArgonPrimitivesProvidersBlockSealerInfo, ArgonPrimitivesTickTicker, FrameSupportDispatchPerDispatchClassWeight, FrameSupportTokensMiscIdAmountRuntimeFreezeReason, FrameSupportTokensMiscIdAmountRuntimeHoldReason, FrameSystemAccountInfo, FrameSystemCodeUpgradeAuthorization, FrameSystemEventRecord, FrameSystemLastRuntimeUpgradeInfo, FrameSystemPhase, PalletBalancesAccountData, PalletBalancesBalanceLock, PalletBalancesReserveData, PalletBondUtxoCosignRequest, PalletBondUtxoState, PalletChainTransferQueuedTransferOut, PalletDomainsDomainRegistration, PalletGrandpaStoredPendingChange, PalletGrandpaStoredState, PalletMultisigMultisig, PalletPriceIndexPriceIndex, PalletProxyAnnouncement, PalletProxyProxyDefinition, PalletTransactionPaymentReleases, SpConsensusGrandpaAppPublic, SpRuntimeDigest } from '@polkadot/types/lookup';
+import type { ArgonNotaryAuditErrorVerifyError, ArgonPrimitivesBalanceChangeAccountOrigin, ArgonPrimitivesBitcoinBitcoinBlock, ArgonPrimitivesBitcoinBitcoinNetwork, ArgonPrimitivesBitcoinBitcoinXPub, ArgonPrimitivesBitcoinUtxoRef, ArgonPrimitivesBitcoinUtxoValue, ArgonPrimitivesBlockSealBlockPayout, ArgonPrimitivesBlockSealMiningRegistration, ArgonPrimitivesBlockSealMiningSlotConfig, ArgonPrimitivesBond, ArgonPrimitivesBondVault, ArgonPrimitivesDigestsBlockVoteDigest, ArgonPrimitivesDigestsDigestset, ArgonPrimitivesDigestsNotebookDigest, ArgonPrimitivesDomainZoneRecord, ArgonPrimitivesForkPower, ArgonPrimitivesInherentsBlockSealInherent, ArgonPrimitivesNotaryNotaryMeta, ArgonPrimitivesNotaryNotaryNotebookKeyDetails, ArgonPrimitivesNotaryNotaryNotebookVoteDigestDetails, ArgonPrimitivesNotaryNotaryRecord, ArgonPrimitivesProvidersBlockSealerInfo, ArgonPrimitivesTickTicker, FrameSupportDispatchPerDispatchClassWeight, FrameSupportTokensMiscIdAmountRuntimeFreezeReason, FrameSupportTokensMiscIdAmountRuntimeHoldReason, FrameSystemAccountInfo, FrameSystemCodeUpgradeAuthorization, FrameSystemEventRecord, FrameSystemLastRuntimeUpgradeInfo, FrameSystemPhase, IsmpConsensusStateCommitment, IsmpConsensusStateMachineHeight, IsmpConsensusStateMachineId, IsmpHostStateMachine, PalletBalancesAccountData, PalletBalancesBalanceLock, PalletBalancesReserveData, PalletBondUtxoCosignRequest, PalletBondUtxoState, PalletChainTransferIsmpModuleEvmChain, PalletChainTransferQueuedTransferOut, PalletDomainsDomainRegistration, PalletGrandpaStoredPendingChange, PalletGrandpaStoredState, PalletHyperbridgeVersionedHostParams, PalletMultisigMultisig, PalletPriceIndexPriceIndex, PalletProxyAnnouncement, PalletProxyProxyDefinition, PalletTransactionPaymentReleases, SpConsensusGrandpaAppPublic, SpRuntimeDigest } from '@polkadot/types/lookup';
 import type { Observable } from '@polkadot/types/types';
 
 export type __AugmentedQuery<ApiType extends ApiTypes> = AugmentedQuery<ApiType, () => unknown>;
@@ -217,10 +217,26 @@ declare module '@polkadot/api-base/types/storage' {
       utxosPendingUnlockByUtxoId: AugmentedQuery<ApiType, () => Observable<BTreeMap<u64, PalletBondUtxoCosignRequest>>, []>;
     };
     chainTransfer: {
+      /**
+       * The token gateway addresses on different chains
+       **/
+      activeEvmDestinations: AugmentedQuery<ApiType, () => Observable<Vec<PalletChainTransferIsmpModuleEvmChain>>, []>;
       expiringTransfersOutByNotary: AugmentedQuery<ApiType, (arg1: u32 | AnyNumber | Uint8Array, arg2: u32 | AnyNumber | Uint8Array) => Observable<Vec<u32>>, [u32, u32]>;
       nextTransferId: AugmentedQuery<ApiType, () => Observable<Option<u32>>, []>;
       pendingTransfersOut: AugmentedQuery<ApiType, (arg: u32 | AnyNumber | Uint8Array) => Observable<Option<PalletChainTransferQueuedTransferOut>>, [u32]>;
+      /**
+       * The admin of this side of the token gateway
+       **/
+      tokenAdmin: AugmentedQuery<ApiType, () => Observable<Option<AccountId32>>, []>;
+      /**
+       * The token gateway addresses on different chains
+       **/
+      tokenGatewayAddresses: AugmentedQuery<ApiType, (arg: IsmpHostStateMachine | { Evm: any } | { Polkadot: any } | { Kusama: any } | { Substrate: any } | { Tendermint: any } | string | Uint8Array) => Observable<Option<Bytes>>, [IsmpHostStateMachine]>;
       transfersUsedInBlockNotebooks: AugmentedQuery<ApiType, (arg: u32 | AnyNumber | Uint8Array) => Observable<Vec<ITuple<[AccountId32, u32]>>>, [u32]>;
+      /**
+       * Should we use test networks for Polkadot and Ethereum
+       **/
+      useTestNetworks: AugmentedQuery<ApiType, () => Observable<bool>, []>;
     };
     digests: {
       tempDigests: AugmentedQuery<ApiType, () => Observable<Option<ArgonPrimitivesDigestsDigestset>>, []>;
@@ -269,6 +285,73 @@ declare module '@polkadot/api-base/types/storage' {
        * State of the current authority set.
        **/
       state: AugmentedQuery<ApiType, () => Observable<PalletGrandpaStoredState>, []>;
+    };
+    hyperbridge: {
+      /**
+       * The host parameters of the pallet-hyperbridge.
+       **/
+      hostParams: AugmentedQuery<ApiType, () => Observable<PalletHyperbridgeVersionedHostParams>, []>;
+    };
+    ismp: {
+      /**
+       * A mapping of state machine Ids to their challenge periods
+       **/
+      challengePeriod: AugmentedQuery<ApiType, (arg: IsmpConsensusStateMachineId | { stateId?: any; consensusStateId?: any } | string | Uint8Array) => Observable<Option<u64>>, [IsmpConsensusStateMachineId]>;
+      /**
+       * The child trie root of messages
+       **/
+      childTrieRoot: AugmentedQuery<ApiType, () => Observable<H256>, []>;
+      /**
+       * Holds the timestamp at which a consensus client was recently updated.
+       * Used in ensuring that the configured challenge period elapses.
+       **/
+      consensusClientUpdateTime: AugmentedQuery<ApiType, (arg: U8aFixed | string | Uint8Array) => Observable<Option<u64>>, [U8aFixed]>;
+      /**
+       * A mapping of consensus state identifier to it's associated consensus client identifier
+       **/
+      consensusStateClient: AugmentedQuery<ApiType, (arg: U8aFixed | string | Uint8Array) => Observable<Option<U8aFixed>>, [U8aFixed]>;
+      /**
+       * Holds a map of consensus state identifiers to their consensus state.
+       **/
+      consensusStates: AugmentedQuery<ApiType, (arg: U8aFixed | string | Uint8Array) => Observable<Option<Bytes>>, [U8aFixed]>;
+      /**
+       * Holds a map of consensus clients frozen due to byzantine
+       * behaviour
+       **/
+      frozenConsensusClients: AugmentedQuery<ApiType, (arg: U8aFixed | string | Uint8Array) => Observable<bool>, [U8aFixed]>;
+      /**
+       * The latest verified height for a state machine
+       **/
+      latestStateMachineHeight: AugmentedQuery<ApiType, (arg: IsmpConsensusStateMachineId | { stateId?: any; consensusStateId?: any } | string | Uint8Array) => Observable<Option<u64>>, [IsmpConsensusStateMachineId]>;
+      /**
+       * Latest nonce for messages sent from this chain
+       **/
+      nonce: AugmentedQuery<ApiType, () => Observable<u64>, []>;
+      /**
+       * Tracks requests that have been responded to
+       * The key is the request commitment
+       **/
+      responded: AugmentedQuery<ApiType, (arg: H256 | string | Uint8Array) => Observable<bool>, [H256]>;
+      /**
+       * Holds a map of state machine heights to their verified state commitments. These state
+       * commitments end up here after they are successfully verified by a `ConsensusClient`
+       **/
+      stateCommitments: AugmentedQuery<ApiType, (arg: IsmpConsensusStateMachineHeight | { id?: any; height?: any } | string | Uint8Array) => Observable<Option<IsmpConsensusStateCommitment>>, [IsmpConsensusStateMachineHeight]>;
+      /**
+       * Holds the timestamp at which a state machine height was updated.
+       * Used in ensuring that the configured challenge period elapses.
+       **/
+      stateMachineUpdateTime: AugmentedQuery<ApiType, (arg: IsmpConsensusStateMachineHeight | { id?: any; height?: any } | string | Uint8Array) => Observable<Option<u64>>, [IsmpConsensusStateMachineHeight]>;
+      /**
+       * A mapping of consensus state identifiers to their unbonding periods
+       **/
+      unbondingPeriod: AugmentedQuery<ApiType, (arg: U8aFixed | string | Uint8Array) => Observable<Option<u64>>, [U8aFixed]>;
+    };
+    ismpGrandpa: {
+      /**
+       * Registered state machines for the grandpa consensus client
+       **/
+      supportedStateMachines: AugmentedQuery<ApiType, (arg: IsmpHostStateMachine | { Evm: any } | { Polkadot: any } | { Kusama: any } | { Substrate: any } | { Tendermint: any } | string | Uint8Array) => Observable<Option<u64>>, [IsmpHostStateMachine]>;
     };
     miningSlot: {
       /**

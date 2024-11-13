@@ -26,11 +26,11 @@ use argon_primitives::{
 		NotaryNotebookAuditSummary, NotaryNotebookDetails, NotaryNotebookRawVotes,
 		NotaryNotebookVoteDigestDetails, NotaryRecordWithState,
 	},
-	tick::{Tick, Ticker},
-	AccountId, Balance, BestBlockVoteSeal, BlockHash, BlockNumber, BlockSealAuthorityId,
-	BlockSealDigest, BlockSealSpecProvider, BlockVoteDigest, HashOutput, Nonce, NotaryId,
-	NotebookAuditResult, NotebookNumber, PriceProvider, Signature, TickProvider, VoteMinimum,
-	VotingKey,
+	prelude::*,
+	tick::Ticker,
+	BestBlockVoteSeal, BlockHash, BlockSealAuthorityId, BlockSealDigest, BlockSealSpecProvider,
+	BlockVoteDigest, HashOutput, NotebookAuditResult, NotebookNumber, PriceProvider, Signature,
+	TickProvider, VoteMinimum, VotingKey,
 };
 use frame_support::{
 	derive_impl,
@@ -38,6 +38,12 @@ use frame_support::{
 	traits::{ConstU32, InsideBoth},
 	weights::{constants::RocksDbWeight, Weight},
 };
+use ismp::{
+	consensus::{ConsensusClientId, StateMachineHeight, StateMachineId},
+	host::StateMachine,
+	router::{Request, Response},
+};
+use pallet_ismp::mmr::{Leaf, Proof, ProofKeys};
 use sp_api::impl_runtime_apis;
 use sp_consensus_grandpa::AuthorityId as GrandpaId;
 use sp_core::{crypto::KeyTypeId, ConstU16, Get, OpaqueMetadata, H256, U256};
@@ -230,6 +236,13 @@ mod runtime {
 	pub type Utility = pallet_utility;
 	#[runtime::pallet_index(26)]
 	pub type Sudo = pallet_sudo;
+
+	#[runtime::pallet_index(27)]
+	pub type Ismp = pallet_ismp;
+	#[runtime::pallet_index(28)]
+	pub type IsmpGrandpa = ismp_grandpa;
+	#[runtime::pallet_index(29)]
+	pub type Hyperbridge = pallet_hyperbridge;
 }
 
 /// The address format for describing accounts.
@@ -645,6 +658,59 @@ impl_runtime_apis! {
 
 		fn preset_names() -> Vec<sp_genesis_builder::PresetId> {
 			vec![]
+		}
+	}
+
+	impl pallet_ismp_runtime_api::IsmpRuntimeApi<Block, <Block as BlockT>::Hash> for Runtime {
+		fn host_state_machine() -> StateMachine {
+			<Runtime as pallet_ismp::Config>::HostStateMachine::get()
+		}
+
+		fn challenge_period(state_machine_id: StateMachineId) -> Option<u64> {
+			Ismp::challenge_period(state_machine_id)
+		}
+
+		/// Generate a proof for the provided leaf indices
+		fn generate_proof(
+			keys: ProofKeys
+		) -> Result<(Vec<Leaf>, Proof<<Block as BlockT>::Hash>), sp_mmr_primitives::Error> {
+			Ismp::generate_proof(keys)
+		}
+
+		/// Fetch all ISMP events in the block, should only be called from runtime-api.
+		fn block_events() -> Vec<::ismp::events::Event> {
+			Ismp::block_events()
+		}
+
+		/// Fetch all ISMP events and their extrinsic metadata, should only be called from runtime-api.
+		fn block_events_with_metadata() -> Vec<(::ismp::events::Event, Option<u32>)> {
+			Ismp::block_events_with_metadata()
+		}
+
+		/// Return the scale encoded consensus state
+		fn consensus_state(id: ConsensusClientId) -> Option<Vec<u8>> {
+			Ismp::consensus_states(id)
+		}
+
+		/// Return the timestamp this client was last updated in seconds
+		fn state_machine_update_time(height: StateMachineHeight) -> Option<u64> {
+			Ismp::state_machine_update_time(height)
+		}
+
+		/// Return the latest height of the state machine
+		fn latest_state_machine_height(id: StateMachineId) -> Option<u64> {
+			Ismp::latest_state_machine_height(id)
+		}
+
+
+		/// Get actual requests
+		fn requests(commitments: Vec<H256>) -> Vec<Request> {
+			Ismp::requests(commitments)
+		}
+
+		/// Get actual requests
+		fn responses(commitments: Vec<H256>) -> Vec<Response> {
+			Ismp::responses(commitments)
 		}
 	}
 }

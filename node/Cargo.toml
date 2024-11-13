@@ -71,6 +71,11 @@ color-backtrace = { workspace = true }
 frame-benchmarking = { workspace = true }
 frame-benchmarking-cli = { workspace = true }
 
+pallet-ismp-runtime-api = { workspace = true, features = ["default"] }
+pallet-ismp-rpc = { workspace = true }
+
+sp-mmr-primitives = { workspace = true }
+
 rand = { workspace = true }
 
 # Local Dependencies

@@ -151,6 +151,13 @@ pub fn run() -> sc_cli::Result<()> {
 			runner.sync_run(|config| cmd.run::<Block>(&config))
 		},
 		None => {
+			let mut cli = cli;
+			// this is required for hyperbridge
+			cli.run.base.offchain_worker_params.indexing_enabled = true;
+			// Set max rpc request and response size to 150mb
+			cli.run.base.rpc_max_request_size = 150;
+			cli.run.base.rpc_max_response_size = 150;
+
 			let runner = cli.create_runner(&cli.run.base)?;
 
 			let mut randomx_config = argon_randomx::Config::default();

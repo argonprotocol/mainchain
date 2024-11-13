@@ -203,9 +203,14 @@ pub fn new_full<
 	let rpc_builder = {
 		let client = client.clone();
 		let transaction_pool = transaction_pool.clone();
+		let backend = backend.clone();
 
 		Box::new(move |_| {
-			let deps = rpc::FullDeps { client: client.clone(), pool: transaction_pool.clone() };
+			let deps = rpc::FullDeps {
+				client: client.clone(),
+				pool: transaction_pool.clone(),
+				backend: backend.clone(),
+			};
 
 			rpc::create_full(deps).map_err(Into::into)
 		})

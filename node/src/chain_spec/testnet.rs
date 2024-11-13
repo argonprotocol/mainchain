@@ -6,7 +6,7 @@ use argon_primitives::{
 	bitcoin::BitcoinNetwork,
 	block_seal::MiningSlotConfig,
 	notary::{GenesisNotary, NotaryPublic},
-	AccountId, Chain, ComputeDifficulty, ADDRESS_PREFIX,
+	AccountId, Chain, ComputeDifficulty, ADDRESS_PREFIX, ARGON_TOKEN_SYMBOL, TOKEN_DECIMALS,
 };
 use codec::Decode;
 use sc_service::{ChainType, Properties};
@@ -15,8 +15,8 @@ use std::str::FromStr;
 
 pub fn testnet_config() -> Result<ChainSpec, String> {
 	let mut properties = Properties::new();
-	properties.insert("tokenSymbol".into(), "ARGON".into());
-	properties.insert("tokenDecimals".into(), 3.into());
+	properties.insert("tokenSymbol".into(), ARGON_TOKEN_SYMBOL.into());
+	properties.insert("tokenDecimals".into(), TOKEN_DECIMALS.into());
 	properties.insert("ss58Format".into(), ADDRESS_PREFIX.into());
 
 	const HASHES_PER_SECOND: u64 = 200;
@@ -25,6 +25,7 @@ pub fn testnet_config() -> Result<ChainSpec, String> {
 	let sudo_account = AccountId::from_str("5EZxgPRoQDYW72ceBKTd8AcSPizNL38cVjBzDGTqbeHUPfRx")?;
 	let bitcoin_oracle = get_account_id_from_seed::<sr25519::Public>("Dave");
 	let price_oracle = get_account_id_from_seed::<sr25519::Public>("Eve");
+	let token_admin = get_account_id_from_seed::<sr25519::Public>("Charlie");
 
 	let notary_account = get_account_id_from_seed::<sr25519::Public>("Ferdie");
 	let notary_public = get_from_seed::<NotaryPublic>("Ferdie//notary");
@@ -83,6 +84,8 @@ pub fn testnet_config() -> Result<ChainSpec, String> {
 				slot_bidding_start_block: 0,
 			},
 			minimum_bitcoin_bond_satoshis: 5_000,
+			cross_token_operator: token_admin,
+			connect_to_test_evm_networks: true,
 		}
 	))
 	.build())

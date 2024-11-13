@@ -8,8 +8,8 @@ import '@polkadot/api-base/types/events';
 import type { ApiTypes, AugmentedEvent } from '@polkadot/api-base/types';
 import type { Bytes, Null, Option, Result, U8aFixed, Vec, bool, u128, u16, u32, u64 } from '@polkadot/types-codec';
 import type { ITuple } from '@polkadot/types-codec/types';
-import type { AccountId32, H256 } from '@polkadot/types/interfaces/runtime';
-import type { ArgonNodeRuntimeConfigsProxyType, ArgonNotaryAuditErrorVerifyError, ArgonPrimitivesBitcoinBitcoinRejectedReason, ArgonPrimitivesBitcoinUtxoRef, ArgonPrimitivesBlockSealBlockPayout, ArgonPrimitivesBlockSealMiningRegistration, ArgonPrimitivesBondBondExpiration, ArgonPrimitivesBondBondType, ArgonPrimitivesDomainZoneRecord, ArgonPrimitivesNotaryNotaryMeta, ArgonPrimitivesNotaryNotaryRecord, FrameSupportDispatchDispatchInfo, FrameSupportTokensMiscBalanceStatus, PalletDomainsDomainRegistration, PalletMintMintType, PalletMultisigTimepoint, SpConsensusGrandpaAppPublic, SpRuntimeDispatchError } from '@polkadot/types/lookup';
+import type { AccountId32, H160, H256 } from '@polkadot/types/interfaces/runtime';
+import type { ArgonNodeRuntimeConfigsProxyType, ArgonNotaryAuditErrorVerifyError, ArgonPrimitivesBitcoinBitcoinRejectedReason, ArgonPrimitivesBitcoinUtxoRef, ArgonPrimitivesBlockSealBlockPayout, ArgonPrimitivesBlockSealMiningRegistration, ArgonPrimitivesBondBondExpiration, ArgonPrimitivesBondBondType, ArgonPrimitivesDomainZoneRecord, ArgonPrimitivesNotaryNotaryMeta, ArgonPrimitivesNotaryNotaryRecord, FrameSupportDispatchDispatchInfo, FrameSupportTokensMiscBalanceStatus, IsmpConsensusStateMachineHeight, IsmpConsensusStateMachineId, IsmpEventsRequestResponseHandled, IsmpEventsTimeoutHandled, IsmpHostStateMachine, PalletChainTransferIsmpModuleAsset, PalletChainTransferIsmpModuleEvmChain, PalletDomainsDomainRegistration, PalletHyperbridgeVersionedHostParams, PalletIsmpErrorsHandlingError, PalletMintMintType, PalletMultisigTimepoint, SpConsensusGrandpaAppPublic, SpRuntimeDispatchError } from '@polkadot/types/lookup';
 
 export type __AugmentedEvent<ApiType extends ApiTypes> = AugmentedEvent<ApiType>;
 
@@ -146,20 +146,45 @@ declare module '@polkadot/api-base/types/events' {
     };
     chainTransfer: {
       /**
+       * ERC6160 asset creation request dispatched to hyperbridge
+       **/
+      ERC6160AssetRegistrationDispatched: AugmentedEvent<ApiType, [commitment: H256, asset: PalletChainTransferIsmpModuleAsset, addedChains: Vec<IsmpHostStateMachine>, removedChains: Vec<IsmpHostStateMachine>], { commitment: H256, asset: PalletChainTransferIsmpModuleAsset, addedChains: Vec<IsmpHostStateMachine>, removedChains: Vec<IsmpHostStateMachine> }>;
+      /**
        * A localchain transfer could not be cleaned up properly. Possible invalid transfer
        * needing investigation.
        **/
-      PossibleInvalidTransferAllowed: AugmentedEvent<ApiType, [transferId: u32, notaryId: u32, notebookNumber: u32], { transferId: u32, notaryId: u32, notebookNumber: u32 }>;
+      PossibleInvalidLocalchainTransferAllowed: AugmentedEvent<ApiType, [transferId: u32, notaryId: u32, notebookNumber: u32], { transferId: u32, notaryId: u32, notebookNumber: u32 }>;
       /**
        * Taxation failed
        **/
       TaxationError: AugmentedEvent<ApiType, [notaryId: u32, notebookNumber: u32, tax: u128, error: SpRuntimeDispatchError], { notaryId: u32, notebookNumber: u32, tax: u128, error: SpRuntimeDispatchError }>;
-      TransferIn: AugmentedEvent<ApiType, [accountId: AccountId32, amount: u128, notaryId: u32], { accountId: AccountId32, amount: u128, notaryId: u32 }>;
+      /**
+       * An asset has been received from an EVM chain
+       **/
+      TransferFromEvm: AugmentedEvent<ApiType, [from: H160, to: AccountId32, asset: PalletChainTransferIsmpModuleAsset, amount: u128, evmChain: PalletChainTransferIsmpModuleEvmChain], { from: H160, to: AccountId32, asset: PalletChainTransferIsmpModuleAsset, amount: u128, evmChain: PalletChainTransferIsmpModuleEvmChain }>;
+      /**
+       * Transfer from Localchain to Mainchain
+       **/
+      TransferFromLocalchain: AugmentedEvent<ApiType, [accountId: AccountId32, amount: u128, notaryId: u32], { accountId: AccountId32, amount: u128, notaryId: u32 }>;
       /**
        * A transfer into the mainchain failed
        **/
-      TransferInError: AugmentedEvent<ApiType, [accountId: AccountId32, amount: u128, notaryId: u32, notebookNumber: u32, error: SpRuntimeDispatchError], { accountId: AccountId32, amount: u128, notaryId: u32, notebookNumber: u32, error: SpRuntimeDispatchError }>;
+      TransferFromLocalchainError: AugmentedEvent<ApiType, [accountId: AccountId32, amount: u128, notaryId: u32, notebookNumber: u32, error: SpRuntimeDispatchError], { accountId: AccountId32, amount: u128, notaryId: u32, notebookNumber: u32, error: SpRuntimeDispatchError }>;
+      /**
+       * An asset has been sent to an EVM
+       **/
+      TransferToEvm: AugmentedEvent<ApiType, [from: AccountId32, to: H160, amount: u128, evmChain: PalletChainTransferIsmpModuleEvmChain, asset: PalletChainTransferIsmpModuleAsset, commitment: H256], { from: AccountId32, to: H160, amount: u128, evmChain: PalletChainTransferIsmpModuleEvmChain, asset: PalletChainTransferIsmpModuleAsset, commitment: H256 }>;
+      /**
+       * An asset has been refunded and transferred back to the source account
+       **/
+      TransferToEvmExpired: AugmentedEvent<ApiType, [from: AccountId32, to: H160, amount: u128, evmChain: PalletChainTransferIsmpModuleEvmChain, asset: PalletChainTransferIsmpModuleAsset], { from: AccountId32, to: H160, amount: u128, evmChain: PalletChainTransferIsmpModuleEvmChain, asset: PalletChainTransferIsmpModuleAsset }>;
+      /**
+       * Funds sent to a localchain
+       **/
       TransferToLocalchain: AugmentedEvent<ApiType, [accountId: AccountId32, amount: u128, transferId: u32, notaryId: u32, expirationTick: u32], { accountId: AccountId32, amount: u128, transferId: u32, notaryId: u32, expirationTick: u32 }>;
+      /**
+       * Transfer to localchain expired and rolled back
+       **/
       TransferToLocalchainExpired: AugmentedEvent<ApiType, [accountId: AccountId32, transferId: u32, notaryId: u32], { accountId: AccountId32, transferId: u32, notaryId: u32 }>;
       /**
        * An expired transfer to localchain failed to be refunded
@@ -208,6 +233,84 @@ declare module '@polkadot/api-base/types/events' {
        * Current authority set has been resumed.
        **/
       Resumed: AugmentedEvent<ApiType, []>;
+    };
+    hyperbridge: {
+      /**
+       * Hyperbridge governance has now updated it's host params on this chain.
+       **/
+      HostParamsUpdated: AugmentedEvent<ApiType, [old: PalletHyperbridgeVersionedHostParams, new_: PalletHyperbridgeVersionedHostParams], { old: PalletHyperbridgeVersionedHostParams, new_: PalletHyperbridgeVersionedHostParams }>;
+      /**
+       * Hyperbridge has withdrawn it's protocol revenue
+       **/
+      ProtocolRevenueWithdrawn: AugmentedEvent<ApiType, [amount: u128, account: AccountId32], { amount: u128, account: AccountId32 }>;
+      /**
+       * A relayer has withdrawn some fees
+       **/
+      RelayerFeeWithdrawn: AugmentedEvent<ApiType, [amount: u128, account: AccountId32], { amount: u128, account: AccountId32 }>;
+    };
+    ismp: {
+      /**
+       * Indicates that a consensus client has been created
+       **/
+      ConsensusClientCreated: AugmentedEvent<ApiType, [consensusClientId: U8aFixed], { consensusClientId: U8aFixed }>;
+      /**
+       * Indicates that a consensus client has been created
+       **/
+      ConsensusClientFrozen: AugmentedEvent<ApiType, [consensusClientId: U8aFixed], { consensusClientId: U8aFixed }>;
+      /**
+       * Some errors handling some ismp messages
+       **/
+      Errors: AugmentedEvent<ApiType, [errors: Vec<PalletIsmpErrorsHandlingError>], { errors: Vec<PalletIsmpErrorsHandlingError> }>;
+      /**
+       * Get Response Handled
+       **/
+      GetRequestHandled: AugmentedEvent<ApiType, [IsmpEventsRequestResponseHandled]>;
+      /**
+       * Get request timeout handled
+       **/
+      GetRequestTimeoutHandled: AugmentedEvent<ApiType, [IsmpEventsTimeoutHandled]>;
+      /**
+       * Post Request Handled
+       **/
+      PostRequestHandled: AugmentedEvent<ApiType, [IsmpEventsRequestResponseHandled]>;
+      /**
+       * Post request timeout handled
+       **/
+      PostRequestTimeoutHandled: AugmentedEvent<ApiType, [IsmpEventsTimeoutHandled]>;
+      /**
+       * Post Response Handled
+       **/
+      PostResponseHandled: AugmentedEvent<ApiType, [IsmpEventsRequestResponseHandled]>;
+      /**
+       * Post response timeout handled
+       **/
+      PostResponseTimeoutHandled: AugmentedEvent<ApiType, [IsmpEventsTimeoutHandled]>;
+      /**
+       * An Outgoing Request has been deposited
+       **/
+      Request: AugmentedEvent<ApiType, [destChain: IsmpHostStateMachine, sourceChain: IsmpHostStateMachine, requestNonce: u64, commitment: H256], { destChain: IsmpHostStateMachine, sourceChain: IsmpHostStateMachine, requestNonce: u64, commitment: H256 }>;
+      /**
+       * An Outgoing Response has been deposited
+       **/
+      Response: AugmentedEvent<ApiType, [destChain: IsmpHostStateMachine, sourceChain: IsmpHostStateMachine, requestNonce: u64, commitment: H256, reqCommitment: H256], { destChain: IsmpHostStateMachine, sourceChain: IsmpHostStateMachine, requestNonce: u64, commitment: H256, reqCommitment: H256 }>;
+      /**
+       * Emitted when a state commitment is vetoed by a fisherman
+       **/
+      StateCommitmentVetoed: AugmentedEvent<ApiType, [height: IsmpConsensusStateMachineHeight, fisherman: Bytes], { height: IsmpConsensusStateMachineHeight, fisherman: Bytes }>;
+      /**
+       * Emitted when a state machine is successfully updated to a new height
+       **/
+      StateMachineUpdated: AugmentedEvent<ApiType, [stateMachineId: IsmpConsensusStateMachineId, latestHeight: u64], { stateMachineId: IsmpConsensusStateMachineId, latestHeight: u64 }>;
+    };
+    ismpGrandpa: {
+      /**
+       * State machines have been added to whitelist
+       **/
+      StateMachineAdded: AugmentedEvent<ApiType, [stateMachines: Vec<IsmpHostStateMachine>], { stateMachines: Vec<IsmpHostStateMachine> }>;
+      /**
+       * State machines have been removed from the whitelist
+       **/
+      StateMachineRemoved: AugmentedEvent<ApiType, [stateMachines: Vec<IsmpHostStateMachine>], { stateMachines: Vec<IsmpHostStateMachine> }>;
     };
     miningSlot: {
       NewMiners: AugmentedEvent<ApiType, [startIndex: u32, newMiners: Vec<ArgonPrimitivesBlockSealMiningRegistration>], { startIndex: u32, newMiners: Vec<ArgonPrimitivesBlockSealMiningRegistration> }>;

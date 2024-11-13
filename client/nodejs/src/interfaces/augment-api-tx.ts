@@ -8,8 +8,8 @@ import '@polkadot/api-base/types/submittable';
 import type { ApiTypes, AugmentedSubmittable, SubmittableExtrinsic, SubmittableExtrinsicFunction } from '@polkadot/api-base/types';
 import type { Bytes, Compact, Option, U8aFixed, Vec, bool, u128, u16, u32, u64 } from '@polkadot/types-codec';
 import type { AnyNumber, IMethod, ITuple } from '@polkadot/types-codec/types';
-import type { AccountId32, Call, H256, MultiAddress } from '@polkadot/types/interfaces/runtime';
-import type { ArgonNodeRuntimeConfigsProxyType, ArgonNodeRuntimeOriginCaller, ArgonNodeRuntimeSessionKeys, ArgonPrimitivesBitcoinCompressedBitcoinPubkey, ArgonPrimitivesBitcoinH256Le, ArgonPrimitivesBitcoinOpaqueBitcoinXpub, ArgonPrimitivesBlockSealRewardDestination, ArgonPrimitivesBondVaultTerms, ArgonPrimitivesDomainZoneRecord, ArgonPrimitivesInherentsBitcoinUtxoSync, ArgonPrimitivesInherentsBlockSealInherent, ArgonPrimitivesNotaryNotaryMeta, ArgonPrimitivesNotebookSignedNotebookHeader, PalletBalancesAdjustmentDirection, PalletMiningSlotMiningSlotBid, PalletMultisigTimepoint, PalletPriceIndexPriceIndex, PalletVaultsVaultConfig, SpConsensusGrandpaEquivocationProof, SpCoreVoid, SpWeightsWeightV2Weight } from '@polkadot/types/lookup';
+import type { AccountId32, Call, H160, H256, MultiAddress } from '@polkadot/types/interfaces/runtime';
+import type { ArgonNodeRuntimeConfigsProxyType, ArgonNodeRuntimeOriginCaller, ArgonNodeRuntimeSessionKeys, ArgonPrimitivesBitcoinCompressedBitcoinPubkey, ArgonPrimitivesBitcoinH256Le, ArgonPrimitivesBitcoinOpaqueBitcoinXpub, ArgonPrimitivesBlockSealRewardDestination, ArgonPrimitivesBondVaultTerms, ArgonPrimitivesDomainZoneRecord, ArgonPrimitivesInherentsBitcoinUtxoSync, ArgonPrimitivesInherentsBlockSealInherent, ArgonPrimitivesNotaryNotaryMeta, ArgonPrimitivesNotebookSignedNotebookHeader, IsmpGrandpaAddStateMachine, IsmpHostStateMachine, IsmpMessagingCreateConsensusState, IsmpMessagingMessage, PalletBalancesAdjustmentDirection, PalletChainTransferTransferToEvm, PalletIsmpUtilsFundMessageParams, PalletIsmpUtilsUpdateConsensusState, PalletMiningSlotMiningSlotBid, PalletMultisigTimepoint, PalletPriceIndexPriceIndex, PalletVaultsVaultConfig, SpConsensusGrandpaEquivocationProof, SpCoreVoid, SpWeightsWeightV2Weight } from '@polkadot/types/lookup';
 
 export type __AugmentedSubmittable = AugmentedSubmittable<() => unknown>;
 export type __SubmittableExtrinsic<ApiType extends ApiTypes> = SubmittableExtrinsic<ApiType>;
@@ -160,7 +160,33 @@ declare module '@polkadot/api-base/types/submittable' {
       unlockBitcoinBond: AugmentedSubmittable<(bondId: u64 | AnyNumber | Uint8Array, toScriptPubkey: Bytes | string | Uint8Array, bitcoinNetworkFee: u64 | AnyNumber | Uint8Array) => SubmittableExtrinsic<ApiType>, [u64, Bytes, u64]>;
     };
     chainTransfer: {
+      /**
+       * One time api to register assets for cross chain transfers
+       *
+       * # Arguments
+       * `chains` - Each chain and its corresponding token gateway address
+       **/
+      registerHyperbridgeAssets: AugmentedSubmittable<(chains: Vec<ITuple<[IsmpHostStateMachine, Bytes]>> | ([IsmpHostStateMachine | { Evm: any } | { Polkadot: any } | { Kusama: any } | { Substrate: any } | { Tendermint: any } | string | Uint8Array, Bytes | string | Uint8Array])[]) => SubmittableExtrinsic<ApiType>, [Vec<ITuple<[IsmpHostStateMachine, Bytes]>>]>;
+      /**
+       * This api will re-assign admins for ERC6160 accounts on the TokenGateway.sol contracts
+       * created by Hyperbridge.
+       *
+       * This api is only used to disconnect from hyperbridge.
+       **/
+      replaceHyperbridgeAdmins: AugmentedSubmittable<(newAdmins: Vec<ITuple<[IsmpHostStateMachine, H160]>> | ([IsmpHostStateMachine | { Evm: any } | { Polkadot: any } | { Kusama: any } | { Substrate: any } | { Tendermint: any } | string | Uint8Array, H160 | string | Uint8Array])[]) => SubmittableExtrinsic<ApiType>, [Vec<ITuple<[IsmpHostStateMachine, H160]>>]>;
+      /**
+       * Send argons to a remote EVM based chain. Available destinations are specified in the
+       * `ActiveEvmDestinations` storage item.
+       **/
+      sendToEvmChain: AugmentedSubmittable<(params: PalletChainTransferTransferToEvm | { asset?: any; evmChain?: any; recipient?: any; amount?: any; timeout?: any; relayerFee?: any } | string | Uint8Array) => SubmittableExtrinsic<ApiType>, [PalletChainTransferTransferToEvm]>;
       sendToLocalchain: AugmentedSubmittable<(amount: Compact<u128> | AnyNumber | Uint8Array, notaryId: u32 | AnyNumber | Uint8Array) => SubmittableExtrinsic<ApiType>, [Compact<u128>, u32]>;
+      /**
+       * Set the asset registration for cross chain transfers
+       *
+       * # Arguments
+       * `chains` - Each chain and its corresponding token gateway address
+       **/
+      updateHyperbridgeAssets: AugmentedSubmittable<(chains: Vec<ITuple<[IsmpHostStateMachine, Bytes]>> | ([IsmpHostStateMachine | { Evm: any } | { Polkadot: any } | { Kusama: any } | { Substrate: any } | { Tendermint: any } | string | Uint8Array, Bytes | string | Uint8Array])[]) => SubmittableExtrinsic<ApiType>, [Vec<ITuple<[IsmpHostStateMachine, Bytes]>>]>;
     };
     domains: {
       setZoneRecord: AugmentedSubmittable<(domainHash: H256 | string | Uint8Array, zoneRecord: ArgonPrimitivesDomainZoneRecord | { paymentAccount?: any; notaryId?: any; versions?: any } | string | Uint8Array) => SubmittableExtrinsic<ApiType>, [H256, ArgonPrimitivesDomainZoneRecord]>;
@@ -200,6 +226,55 @@ declare module '@polkadot/api-base/types/submittable' {
        * reporter.
        **/
       reportEquivocationUnsigned: AugmentedSubmittable<(equivocationProof: SpConsensusGrandpaEquivocationProof | { setId?: any; equivocation?: any } | string | Uint8Array, keyOwnerProof: SpCoreVoid | null) => SubmittableExtrinsic<ApiType>, [SpConsensusGrandpaEquivocationProof, SpCoreVoid]>;
+    };
+    ismp: {
+      /**
+       * Create a consensus client, using a subjectively chosen consensus state. This can also
+       * be used to overwrite an existing consensus state. The dispatch origin for this
+       * call must be `T::AdminOrigin`.
+       *
+       * - `message`: [`CreateConsensusState`] struct.
+       *
+       * Emits [`Event::ConsensusClientCreated`] if successful.
+       **/
+      createConsensusClient: AugmentedSubmittable<(message: IsmpMessagingCreateConsensusState | { consensusState?: any; consensusClientId?: any; consensusStateId?: any; unbondingPeriod?: any; challengePeriods?: any; stateMachineCommitments?: any } | string | Uint8Array) => SubmittableExtrinsic<ApiType>, [IsmpMessagingCreateConsensusState]>;
+      /**
+       * Add more funds to a message (request or response) to be used for delivery and execution.
+       *
+       * Should not be called on a message that has been completed (delivered or timed-out) as
+       * those funds will be lost forever.
+       **/
+      fundMessage: AugmentedSubmittable<(message: PalletIsmpUtilsFundMessageParams | { commitment?: any; amount?: any } | string | Uint8Array) => SubmittableExtrinsic<ApiType>, [PalletIsmpUtilsFundMessageParams]>;
+      /**
+       * Execute the provided batch of ISMP messages, this will short-circuit and revert if any
+       * of the provided messages are invalid. This is an unsigned extrinsic that permits anyone
+       * execute ISMP messages for free, provided they have valid proofs and the messages have
+       * not been previously processed.
+       *
+       * The dispatch origin for this call must be an unsigned one.
+       *
+       * - `messages`: the messages to handle or process.
+       *
+       * Emits different message events based on the Message received if successful.
+       **/
+      handleUnsigned: AugmentedSubmittable<(messages: Vec<IsmpMessagingMessage> | (IsmpMessagingMessage | { Consensus: any } | { FraudProof: any } | { Request: any } | { Response: any } | { Timeout: any } | string | Uint8Array)[]) => SubmittableExtrinsic<ApiType>, [Vec<IsmpMessagingMessage>]>;
+      /**
+       * Modify the unbonding period and challenge period for a consensus state.
+       * The dispatch origin for this call must be `T::AdminOrigin`.
+       *
+       * - `message`: `UpdateConsensusState` struct.
+       **/
+      updateConsensusState: AugmentedSubmittable<(message: PalletIsmpUtilsUpdateConsensusState | { consensusStateId?: any; unbondingPeriod?: any; challengePeriods?: any } | string | Uint8Array) => SubmittableExtrinsic<ApiType>, [PalletIsmpUtilsUpdateConsensusState]>;
+    };
+    ismpGrandpa: {
+      /**
+       * Add some a state machine to the list of supported state machines
+       **/
+      addStateMachines: AugmentedSubmittable<(newStateMachines: Vec<IsmpGrandpaAddStateMachine> | (IsmpGrandpaAddStateMachine | { stateMachine?: any; slotDuration?: any } | string | Uint8Array)[]) => SubmittableExtrinsic<ApiType>, [Vec<IsmpGrandpaAddStateMachine>]>;
+      /**
+       * Remove a state machine from the list of supported state machines
+       **/
+      removeStateMachines: AugmentedSubmittable<(stateMachines: Vec<IsmpHostStateMachine> | (IsmpHostStateMachine | { Evm: any } | { Polkadot: any } | { Kusama: any } | { Substrate: any } | { Tendermint: any } | string | Uint8Array)[]) => SubmittableExtrinsic<ApiType>, [Vec<IsmpHostStateMachine>]>;
     };
     miningSlot: {
       /**
