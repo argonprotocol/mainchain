@@ -19,13 +19,16 @@ codec = { workspace = true }
 futures = { workspace = true, features = ["thread-pool"] }
 futures-timer = { workspace = true }
 log = { workspace = true }
+tracing = { workspace = true }
 parking_lot = { workspace = true }
-thiserror = { workspace = true }
+thiserror = { workspace = true, features = ["default"] }
 rand = { workspace = true }
 lazy_static = { workspace = true }
-prometheus-endpoint = { workspace = true }
+substrate-prometheus-endpoint = { workspace = true }
+frame-support = { workspace = true, features = ["default"] }
 sp-consensus = { workspace = true }
 sc-consensus = { workspace = true }
+sc-tracing = { workspace = true }
 sp-api = { workspace = true, features = ["default"] }
 sp-blockchain = { workspace = true }
 sp-block-builder = { workspace = true, features = ["default"] }

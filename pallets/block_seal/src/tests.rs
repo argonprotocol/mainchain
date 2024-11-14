@@ -13,40 +13,35 @@ use sp_inherents::InherentDataProvider;
 use sp_keyring::{
 	ed25519::Keyring,
 	AccountKeyring::{Bob, Ferdie},
+	Ed25519Keyring,
 	Ed25519Keyring::Alice,
 };
 use sp_runtime::{
 	traits::{BlakeTwo256, Header},
 	BoundedVec, Digest, DigestItem, MultiSignature,
 };
+use std::panic::catch_unwind;
 
 use crate::{
 	mock::{BlockSeal, *},
 	pallet::{
-		BlockForkPower, LastBlockSealerInfo, ParentVotingKey, TempAuthor, TempSealInherent,
-		VotesInPast3Ticks,
+		BlockForkPower, LastBlockSealerInfo, ParentVotingKey, TempSealInherent, VotesInPast3Ticks,
 	},
 	Call, Error,
 };
 use argon_primitives::{
 	block_seal::MiningAuthority,
-	digests::{BlockVoteDigest, BLOCK_VOTES_DIGEST_ID},
+	digests::BlockVoteDigest,
 	inherents::{BlockSealInherent, BlockSealInherentDataProvider, SealInherentError},
 	localchain::BlockVote,
 	notary::NotaryNotebookRawVotes,
-	BlockSealAuthorityId, BlockSealAuthoritySignature, BlockSealDigest, BlockSealerInfo,
-	BlockVoteT, BlockVotingKey, Domain, DomainTopLevel, MerkleProof, ParentVotingKeyDigest,
-	VotingSchedule, AUTHOR_DIGEST_ID, PARENT_VOTING_KEY_DIGEST,
+	BlockSealAuthorityId, BlockSealAuthoritySignature, BlockSealDigest, BlockVoteT, BlockVotingKey,
+	Domain, DomainTopLevel, MerkleProof, ParentVotingKeyDigest, VotingSchedule,
+	PARENT_VOTING_KEY_DIGEST,
 };
 
 fn empty_signature() -> BlockSealAuthoritySignature {
 	Signature::from_raw([0u8; 64]).into()
-}
-
-#[test]
-#[should_panic(expected = "No valid account id provided for block author.")]
-fn it_should_panic_if_no_block_author() {
-	new_test_ext().execute_with(|| BlockSeal::on_initialize(1));
 }
 
 #[test]
@@ -71,7 +66,10 @@ fn it_should_check_vote_seal_inherents() {
 	new_test_ext().execute_with(|| {
 		let data_provider = BlockSealInherentDataProvider {
 			seal: None,
-			digest: Some(BlockSealDigest::Vote { seal_strength: U256::from(1) }),
+			digest: Some(BlockSealDigest::Vote {
+				seal_strength: U256::from(1),
+				signature: empty_signature(),
+			}),
 		};
 		let mut inherent_data = InherentData::new();
 		assert_ok!(futures::executor::block_on(
@@ -86,35 +84,6 @@ fn it_should_check_vote_seal_inherents() {
 			.to_string(),
 			SealInherentError::InvalidSeal.to_string()
 		);
-	});
-}
-
-#[test]
-fn it_should_read_the_digests() {
-	new_test_ext().execute_with(|| {
-		let block_vote_digest = get_block_vote_digest(1);
-		let pre_digest = Digest {
-			logs: vec![
-				author_digest(1),
-				DigestItem::PreRuntime(BLOCK_VOTES_DIGEST_ID, block_vote_digest.encode()),
-			],
-		};
-
-		System::reset_events();
-		System::initialize(&42, &System::parent_hash(), &pre_digest);
-		BlockSeal::on_initialize(42);
-		assert_eq!(TempAuthor::<Test>::get(), Some(1u64));
-		assert_eq!(TempSealInherent::<Test>::get(), None);
-
-		TempSealInherent::<Test>::put(BlockSealInherent::Compute);
-		LastBlockSealerInfo::<Test>::put(BlockSealerInfo {
-			block_vote_rewards_account: Some(1),
-			block_author_account_id: 1,
-		});
-		BlockSeal::on_finalize(42);
-
-		assert_eq!(TempAuthor::<Test>::get(), None);
-		assert_eq!(TempSealInherent::<Test>::get(), None);
 	});
 }
 
@@ -147,14 +116,8 @@ fn it_should_only_allow_compute_for_first_4() {
 				leaf_index: 0,
 			},
 			source_notebook_number: 1,
-			miner_signature: empty_signature(),
 		};
 
-		System::initialize(
-			&2,
-			&System::parent_hash(),
-			&Digest { logs: vec![author_digest(1), vote_digest(1)] },
-		);
 		BlockSeal::on_initialize(2);
 
 		assert_err!(
@@ -176,11 +139,7 @@ fn it_requires_the_nonce_to_match() {
 		let parent_voting_key = H256::random();
 		ParentVotingKey::<Test>::set(Some(parent_voting_key));
 		let seal_strength = block_vote.get_seal_strength(1, parent_voting_key) + U256::from(1u32);
-		System::initialize(
-			&4,
-			&System::parent_hash(),
-			&Digest { logs: vec![author_digest(1), vote_digest(1)] },
-		);
+
 		BlockSeal::on_initialize(4);
 
 		assert_err!(
@@ -192,11 +151,42 @@ fn it_requires_the_nonce_to_match() {
 					seal_strength,
 					source_notebook_proof: Default::default(),
 					source_notebook_number: 1,
-					miner_signature: empty_signature(),
 				}
 			),
 			Error::<Test>::InvalidVoteSealStrength
 		);
+	});
+}
+
+#[test]
+fn it_can_validate_miner_signatures() {
+	new_test_ext().execute_with(|| {
+		// Go past genesis block so events get deposited
+		setup_blocks(2);
+		System::set_block_number(4);
+		CurrentTick::set(5);
+		System::reset_events();
+		let hash = System::parent_hash();
+		let err = catch_unwind(|| {
+			let signature =
+				Ed25519Keyring::Alice.sign(&BlockVote::seal_signature_message(hash)).into();
+
+			assert!(BlockSeal::is_valid_miner_signature(
+				hash,
+				&BlockSealDigest::Vote { seal_strength: 1.into(), signature },
+				&Digest { logs: vec![] }
+			));
+		});
+		assert!(err.is_err());
+
+		AuthorityList::set(vec![(Alice.into(), Ed25519Keyring::Alice.public().into())]);
+		let signature = Ed25519Keyring::Alice.sign(&BlockVote::seal_signature_message(hash)).into();
+
+		assert!(BlockSeal::is_valid_miner_signature(
+			hash,
+			&BlockSealDigest::Vote { seal_strength: 1.into(), signature },
+			&Digest { logs: vec![] }
+		));
 	});
 }
 
@@ -207,9 +197,9 @@ fn it_should_be_able_to_submit_a_seal() {
 		setup_blocks(6);
 		System::set_block_number(6);
 		System::reset_events();
-		AuthorityList::set(vec![(10, default_authority())]);
+		AuthorityList::set(vec![(Bob.into(), default_authority())]);
 		XorClosest::set(Some(MiningAuthority {
-			account_id: 1,
+			account_id: Alice.into(),
 			authority_id: default_authority(),
 			authority_index: 0,
 		}));
@@ -252,23 +242,20 @@ fn it_should_be_able_to_submit_a_seal() {
 				leaf_index: 0,
 			},
 			source_notebook_number: 1,
-			miner_signature: Alice
-				.sign(&BlockVote::seal_signature_message(&System::parent_hash(), seal_strength))
-				.into(),
 		};
 
-		System::initialize(
-			&4,
-			&System::parent_hash(),
-			&Digest { logs: vec![author_digest(10), vote_digest(1)] },
-		);
 		BlockSeal::on_initialize(4);
+
+		Digests::mutate(|a| {
+			a.block_vote = BlockVoteDigest { voting_power: 1, votes_count: 1 };
+			a.author = Bob.into();
+		});
 
 		assert_ok!(BlockSeal::apply(RuntimeOrigin::none(), inherent.clone()));
 		// only after block seal is applied is this true
 		assert!(BlockSeal::has_eligible_votes());
 
-		assert_eq!(LastBlockSealerInfo::<Test>::get().unwrap().block_author_account_id, 10);
+		assert_eq!(LastBlockSealerInfo::<Test>::get().unwrap().block_author_account_id, Bob.into());
 
 		let new_notebook_voting_schedule =
 			VotingSchedule::from_runtime_current_tick(CurrentTick::get());
@@ -299,7 +286,10 @@ fn it_requires_vote_notebook_proof() {
 		setup_blocks(2);
 		System::set_block_number(3);
 		System::reset_events();
-		AuthorityList::set(vec![(10, BlockSealAuthorityId::from(Public::from_raw([0; 32])))]);
+		AuthorityList::set(vec![(
+			Bob.into(),
+			BlockSealAuthorityId::from(Public::from_raw([0; 32])),
+		)]);
 
 		let mut block_vote = default_vote();
 		let merkle_proof = merkle_proof::<BlakeTwo256, _, _>(vec![block_vote.encode()], 0).proof;
@@ -374,13 +364,7 @@ fn it_checks_that_votes_are_for_great_grandpa_tick() {
 			a.insert(voting_schedule.grandparent_votes_tick() - 1, vote.block_hash);
 		});
 		assert_err!(
-			BlockSeal::verify_block_vote(
-				U256::from(1),
-				&vote,
-				&1,
-				&voting_schedule,
-				empty_signature()
-			),
+			BlockSeal::verify_block_vote(U256::from(1), &vote, &Alice.into(), &voting_schedule,),
 			Error::<Test>::InvalidVoteGrandparentHash
 		);
 		BlocksAtTick::mutate(|a| {
@@ -388,13 +372,7 @@ fn it_checks_that_votes_are_for_great_grandpa_tick() {
 		});
 		// still errors, but moves past the invalid vote hash
 		assert_err!(
-			BlockSeal::verify_block_vote(
-				U256::from(1),
-				&vote,
-				&1,
-				&voting_schedule,
-				empty_signature()
-			),
+			BlockSeal::verify_block_vote(U256::from(1), &vote, &Alice.into(), &voting_schedule,),
 			Error::<Test>::UnregisteredBlockAuthor
 		);
 	});
@@ -430,7 +408,6 @@ fn it_creates_the_next_parent_key() {
 			},
 		);
 		CurrentTick::set(4);
-		TempAuthor::<Test>::put(1);
 		TempSealInherent::<Test>::put(BlockSealInherent::Compute);
 		BlockSeal::on_initialize(4);
 
@@ -465,8 +442,12 @@ fn it_should_panic_if_voting_key_digest_is_wrong() {
 				)],
 			},
 		);
+
+		Digests::mutate(|a| {
+			a.voting_key = Some(ParentVotingKeyDigest { parent_voting_key: Some(parent_key) });
+		});
+
 		CurrentTick::set(3);
-		TempAuthor::<Test>::put(1);
 		TempSealInherent::<Test>::put(BlockSealInherent::Compute);
 		BlockSeal::on_initialize(3);
 
@@ -506,7 +487,6 @@ fn it_skips_ineligible_voting_roots() {
 			},
 		);
 		CurrentTick::set(4);
-		TempAuthor::<Test>::put(1);
 		TempSealInherent::<Test>::put(BlockSealInherent::Compute);
 
 		// still add both notebooks
@@ -540,7 +520,7 @@ fn it_can_find_best_vote_seals() {
 			signature: empty_vote_signature(),
 		};
 		XorClosest::set(Some(MiningAuthority {
-			account_id: 1,
+			account_id: Alice.into(),
 			authority_id: default_authority(),
 			authority_index: 0,
 		}));
@@ -621,7 +601,7 @@ fn it_can_find_best_vote_seals() {
 		.expect("should return");
 		assert_eq!(best.len(), 2);
 		let strongest = best[0].seal_strength;
-		assert_eq!(best[0].closest_miner, (1, default_authority()));
+		assert_eq!(best[0].closest_miner, (Alice.into(), default_authority()));
 		let voting_key = ParentVotingKey::<Test>::get().unwrap();
 		for notebook_vote in &votes {
 			for (vote, _) in &notebook_vote.raw_votes {
@@ -671,7 +651,7 @@ fn it_checks_tax_votes() {
 		};
 
 		let default_authority = default_authority();
-		let author = &1;
+		let author = Alice.to_account_id();
 		let tick = 6;
 		CurrentTick::set(tick);
 		let voting_schedule = VotingSchedule::when_evaluating_runtime_seals(tick);
@@ -682,76 +662,32 @@ fn it_checks_tax_votes() {
 		GrandpaVoteMinimum::set(Some(501));
 		let seal_strength = vote.get_seal_strength(1, H256::random());
 		assert_err!(
-			BlockSeal::verify_block_vote(
-				seal_strength,
-				&vote,
-				author,
-				&voting_schedule,
-				empty_signature()
-			),
+			BlockSeal::verify_block_vote(seal_strength, &vote, &author, &voting_schedule,),
 			Error::<Test>::InsufficientVotingPower
 		);
 		GrandpaVoteMinimum::set(Some(500));
 		assert_err!(
-			BlockSeal::verify_block_vote(
-				seal_strength,
-				&vote,
-				author,
-				&voting_schedule,
-				empty_signature()
-			),
+			BlockSeal::verify_block_vote(seal_strength, &vote, &author, &voting_schedule,),
 			Error::<Test>::UnregisteredBlockAuthor
 		);
-		AuthorityList::mutate(|a| a.push((1, default_authority.clone())));
+		AuthorityList::mutate(|a| a.push((Alice.into(), default_authority.clone())));
 		assert_err!(
-			BlockSeal::verify_block_vote(
-				seal_strength,
-				&vote,
-				author,
-				&voting_schedule,
-				empty_signature()
-			),
+			BlockSeal::verify_block_vote(seal_strength, &vote, &author, &voting_schedule,),
 			Error::<Test>::InvalidSubmitter
 		);
 		XorClosest::set(Some(MiningAuthority {
-			account_id: 1,
+			account_id: Alice.into(),
 			authority_id: default_authority.clone(),
 			authority_index: 0,
 		}));
-		assert_err!(
-			BlockSeal::verify_block_vote(
-				seal_strength,
-				&vote,
-				author,
-				&voting_schedule,
-				empty_signature()
-			),
-			Error::<Test>::InvalidAuthoritySignature
-		);
-
-		let signature: BlockSealAuthoritySignature = Alice
-			.sign(&BlockVote::seal_signature_message(&System::parent_hash(), seal_strength))
-			.into();
 
 		assert_err!(
-			BlockSeal::verify_block_vote(
-				seal_strength,
-				&vote,
-				author,
-				&voting_schedule,
-				signature.clone()
-			),
+			BlockSeal::verify_block_vote(seal_strength, &vote, &author, &voting_schedule,),
 			Error::<Test>::BlockVoteInvalidSignature
 		);
 		vote.sign(Alice.pair());
 
-		assert_ok!(BlockSeal::verify_block_vote(
-			seal_strength,
-			&vote,
-			author,
-			&voting_schedule,
-			signature.clone()
-		),);
+		assert_ok!(BlockSeal::verify_block_vote(seal_strength, &vote, &author, &voting_schedule,),);
 	});
 }
 
@@ -774,18 +710,6 @@ fn default_authority() -> BlockSealAuthorityId {
 
 fn authority_of(author: Public) -> BlockSealAuthorityId {
 	BlockSealAuthorityId::from(author)
-}
-
-fn author_digest(author: u64) -> DigestItem {
-	DigestItem::PreRuntime(AUTHOR_DIGEST_ID, author.encode())
-}
-
-fn vote_digest(votes: u32) -> DigestItem {
-	DigestItem::PreRuntime(BLOCK_VOTES_DIGEST_ID, get_block_vote_digest(votes).encode())
-}
-
-fn get_block_vote_digest(votes: u32) -> BlockVoteDigest {
-	BlockVoteDigest { voting_power: 1, votes_count: votes }
 }
 
 fn default_vote() -> BlockVote {

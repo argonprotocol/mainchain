@@ -1,18 +1,24 @@
 use std::collections::{BTreeMap, BTreeSet};
 
-use env_logger::{Builder, Env};
-use frame_support::{derive_impl, parameter_types};
-use sp_core::{H256, U256};
-use sp_runtime::BuildStorage;
-
 use crate as pallet_block_seal;
+use argon_notary_audit::VerifyError;
 use argon_primitives::{
 	block_seal::{BlockSealAuthorityId, MiningAuthority},
 	block_vote::VoteMinimum,
+	digests::Digestset,
 	notebook::NotebookNumber,
 	tick::{Tick, Ticker},
-	AuthorityProvider, BlockSealSpecProvider, ComputeDifficulty, DomainHash, HashOutput, NotaryId,
-	NotebookProvider, NotebookSecret, TickProvider, VotingSchedule,
+	AccountId, AuthorityProvider, BlockSealSpecProvider, BlockVoteDigest, ComputeDifficulty,
+	DomainHash, HashOutput, NotaryId, NotebookAuditResult, NotebookDigest, NotebookProvider,
+	NotebookSecret, TickDigest, TickProvider, VotingSchedule,
+};
+use env_logger::{Builder, Env};
+use frame_support::{__private::Get, derive_impl, parameter_types, traits::FindAuthor};
+use sp_core::{crypto::AccountId32, H256, U256};
+use sp_keyring::Ed25519Keyring::Alice;
+use sp_runtime::{
+	traits::{Block as BlockT, IdentityLookup},
+	BuildStorage, ConsensusEngineId, DispatchError,
 };
 
 type Block = frame_system::mocking::MockBlock<Test>;
@@ -27,24 +33,48 @@ frame_support::construct_runtime!(
 );
 #[derive_impl(frame_system::config_preludes::TestDefaultConfig as frame_system::DefaultConfig)]
 impl frame_system::Config for Test {
+	type AccountId = AccountId32;
+	type Lookup = IdentityLookup<Self::AccountId>;
 	type Block = Block;
 }
 
 parameter_types! {
-	pub static AuthorityList: Vec<(u64, BlockSealAuthorityId)> = vec![];
-	pub static XorClosest: Option<MiningAuthority<BlockSealAuthorityId, u64>> = None;
+	pub static AuthorityList: Vec<(AccountId, BlockSealAuthorityId)> = vec![];
+	pub static XorClosest: Option<MiningAuthority<BlockSealAuthorityId, AccountId>> = None;
 	pub static VotingRoots: BTreeMap<(NotaryId, Tick), (H256, NotebookNumber)> = BTreeMap::new();
 	pub static GrandpaVoteMinimum: Option<VoteMinimum> = None;
-	pub static MinerZero: Option<(u64, MiningAuthority<BlockSealAuthorityId, u64>)> = None;
+	pub static MinerZero: Option<(AccountId, MiningAuthority<BlockSealAuthorityId, AccountId>)> = None;
 	pub static NotebooksAtTick: BTreeMap<Tick, Vec<(NotaryId, NotebookNumber, Option<NotebookSecret>)>> = BTreeMap::new();
 	pub static CurrentTick: Tick = 0;
 	pub static BlocksAtTick: BTreeMap<Tick, HashOutput> = BTreeMap::new();
 	pub static RegisteredDomains: BTreeSet<DomainHash> = BTreeSet::new();
+
+	pub static Digests: Digestset<VerifyError, AccountId> = Digestset {
+		block_vote: BlockVoteDigest { voting_power: 500, votes_count: 1 },
+		author: Alice.into(),
+		voting_key: None,
+		tick: TickDigest { tick: 2 },
+		notebooks: NotebookDigest {
+			notebooks: vec![NotebookAuditResult::<VerifyError> {
+				notary_id: 1,
+				notebook_number: 1,
+				tick: 1,
+				audit_first_failure: None,
+			}],
+		},
+	};
+}
+
+pub struct DigestGetter;
+impl Get<Result<Digestset<VerifyError, AccountId>, DispatchError>> for DigestGetter {
+	fn get() -> Result<Digestset<VerifyError, AccountId>, DispatchError> {
+		Ok(Digests::get())
+	}
 }
 
 pub struct StaticAuthorityProvider;
-impl AuthorityProvider<BlockSealAuthorityId, Block, u64> for StaticAuthorityProvider {
-	fn get_authority(author: u64) -> Option<BlockSealAuthorityId> {
+impl AuthorityProvider<BlockSealAuthorityId, Block, AccountId> for StaticAuthorityProvider {
+	fn get_authority(author: AccountId) -> Option<BlockSealAuthorityId> {
 		AuthorityList::get().iter().find_map(|(account, id)| {
 			if *account == author {
 				Some(id.clone())
@@ -54,7 +84,7 @@ impl AuthorityProvider<BlockSealAuthorityId, Block, u64> for StaticAuthorityProv
 		})
 	}
 
-	fn xor_closest_authority(_: U256) -> Option<MiningAuthority<BlockSealAuthorityId, u64>> {
+	fn xor_closest_authority(_: U256) -> Option<MiningAuthority<BlockSealAuthorityId, AccountId>> {
 		XorClosest::get().clone()
 	}
 }
@@ -84,6 +114,16 @@ impl NotebookProvider for StaticNotebookProvider {
 	}
 }
 
+pub struct StaticFindAuthor;
+impl FindAuthor<AccountId> for StaticFindAuthor {
+	fn find_author<'a, I>(_digests: I) -> Option<AccountId>
+	where
+		I: 'a + IntoIterator<Item = (ConsensusEngineId, &'a [u8])>,
+	{
+		Some(Digests::get().author)
+	}
+}
+
 pub struct StaticTickProvider;
 impl TickProvider<Block> for StaticTickProvider {
 	fn current_tick() -> Tick {
@@ -106,7 +146,10 @@ impl BlockSealSpecProvider<Block> for StaticBlockSealSpecProvider {
 		GrandpaVoteMinimum::get()
 	}
 	fn compute_difficulty() -> ComputeDifficulty {
-		0u128
+		0
+	}
+	fn compute_key_block_hash() -> Option<<Block as BlockT>::Hash> {
+		todo!()
 	}
 }
 impl pallet_block_seal::Config for Test {
@@ -117,6 +160,8 @@ impl pallet_block_seal::Config for Test {
 	type BlockSealSpecProvider = StaticBlockSealSpecProvider;
 	type TickProvider = StaticTickProvider;
 	type EventHandler = ();
+	type Digests = DigestGetter;
+	type FindAuthor = StaticFindAuthor;
 }
 
 // Build genesis storage according to the mock runtime.

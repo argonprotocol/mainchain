@@ -28,7 +28,12 @@ pub async fn start_argon_test_node() -> ArgonTestNode {
 	if use_live {
 		ArgonTestNode::from_url("ws://localhost:9944".to_string(), None).await
 	} else {
-		ArgonTestNode::start("alice".to_string())
+		let cpus = num_cpus::get();
+		let mut threads = 2;
+		if cpus <= 2 {
+			threads = 1;
+		}
+		ArgonTestNode::start("alice".to_string(), threads)
 			.await
 			.expect("Unable to create test context - ensure debug argon-node build is available")
 	}

@@ -8,7 +8,7 @@ use sp_keyring::{
 	AccountKeyring::{Alice, Bob},
 	Ed25519Keyring,
 };
-use sp_runtime::{testing::H256, BoundedVec, Digest, DigestItem};
+use sp_runtime::{testing::H256, BoundedVec};
 
 use crate::{
 	mock::*,
@@ -30,43 +30,35 @@ use argon_primitives::{
 		NotebookNumber,
 	},
 	tick::Tick,
-	BalanceProof, MerkleProof, NotaryId, NotebookDigest, NotebookDigestRecord, NotebookProvider,
-	SignedNotebookHeader, NOTEBOOKS_DIGEST_ID,
+	BalanceProof, MerkleProof, NotaryId, NotebookAuditResult, NotebookDigest, NotebookProvider,
+	SignedNotebookHeader,
 };
 
-fn notebook_digest(books: Vec<(NotaryId, NotebookNumber, Tick, bool)>) -> DigestItem {
-	DigestItem::PreRuntime(
-		NOTEBOOKS_DIGEST_ID,
-		NotebookDigest {
-			notebooks: books
-				.into_iter()
-				.map(|(notary_id, notebook_number, tick, has_error)| NotebookDigestRecord {
-					notebook_number,
-					notary_id,
-					tick,
-					audit_first_failure: if has_error {
-						Some(VerifyError::InvalidBlockVoteRoot)
-					} else {
-						None
-					},
-				})
-				.collect(),
-		}
-		.encode(),
-	)
-}
-
-#[test]
-#[should_panic]
-fn it_should_panic_if_no_notebook_digest() {
-	new_test_ext().execute_with(|| Notebook::on_initialize(1));
+fn notebook_digest(
+	books: Vec<(NotaryId, NotebookNumber, Tick, bool)>,
+) -> NotebookDigest<VerifyError> {
+	NotebookDigest {
+		notebooks: books
+			.into_iter()
+			.map(|(notary_id, notebook_number, tick, has_error)| NotebookAuditResult {
+				notebook_number,
+				notary_id,
+				tick,
+				audit_first_failure: if has_error {
+					Some(VerifyError::InvalidBlockVoteRoot)
+				} else {
+					None
+				},
+			})
+			.collect(),
+	}
 }
 
 #[test]
 fn it_ensures_only_a_single_inherent_is_submitted() {
 	new_test_ext().execute_with(|| {
 		let digest = notebook_digest(vec![]);
-		System::initialize(&1, &System::parent_hash(), &Digest { logs: vec![digest.clone()] });
+		Digests::mutate(|d| d.notebooks = digest.clone());
 		Notebook::on_initialize(1);
 		assert_ok!(Notebook::submit(RuntimeOrigin::none(), vec![]));
 		assert_err!(
@@ -80,7 +72,7 @@ fn it_ensures_only_a_single_inherent_is_submitted() {
 fn it_locks_notaries_on_audit_failure() {
 	new_test_ext().execute_with(|| {
 		let digest = notebook_digest(vec![(1, 1, 1, false), (2, 1, 1, true)]);
-		System::initialize(&1, &System::parent_hash(), &Digest { logs: vec![digest.clone()] });
+		Digests::mutate(|d| d.notebooks = digest.clone());
 		Notebook::on_initialize(1);
 		CurrentTick::set(1);
 		assert_err!(
@@ -137,7 +129,7 @@ fn it_cannot_submit_additional_notebooks_once_locked() {
 		NotariesLockedForFailedAudit::<Test>::insert(1, (1, 1, VerifyError::InvalidBlockVoteRoot));
 
 		let digest = notebook_digest(vec![(1, 1, 1, false)]);
-		System::initialize(&2, &System::parent_hash(), &Digest { logs: vec![digest.clone()] });
+		Digests::mutate(|d| d.notebooks = digest.clone());
 		Notebook::on_initialize(2);
 		CurrentTick::set(2);
 
@@ -171,7 +163,7 @@ fn it_can_submit_transactions_to_unlock_audits() {
 		);
 
 		let digest = notebook_digest(vec![(1, 1, 1, false)]);
-		System::initialize(&2, &System::parent_hash(), &Digest { logs: vec![digest.clone()] });
+		Digests::mutate(|d| d.notebooks = digest.clone());
 		Notebook::on_initialize(2);
 		CurrentTick::set(2);
 
@@ -215,7 +207,8 @@ fn it_can_submit_transactions_to_unlock_audits() {
 fn it_supports_multiple_notebooks() {
 	new_test_ext().execute_with(|| {
 		let digest = notebook_digest(vec![(1, 1, 1, false), (2, 1, 1, false)]);
-		System::initialize(&1, &System::parent_hash(), &Digest { logs: vec![digest.clone()] });
+
+		Digests::mutate(|d| d.notebooks = digest.clone());
 		Notebook::on_initialize(1);
 		CurrentTick::set(2);
 		let header1 = make_header(1, 1);
@@ -261,12 +254,7 @@ fn it_tracks_notebooks_at_tick() {
 
 		assert_eq!(Notebook::notebooks_at_tick(1), vec![(2, 1, None), (1, 1, None),]);
 
-		System::initialize(
-			&2,
-			&System::parent_hash(),
-			&Digest { logs: vec![notebook_digest(vec![])] },
-		);
-
+		Digests::mutate(|d| d.notebooks = notebook_digest(vec![]));
 		let mut header3 = make_header(2, 4);
 		header3.notary_id = 2;
 		Notebook::process_notebook(header3);
@@ -631,7 +619,7 @@ fn it_handles_bad_secrets() {
 				header.tick,
 				header.hash(),
 				&NotebookDigest {
-					notebooks: vec![NotebookDigestRecord {
+					notebooks: vec![NotebookAuditResult {
 						notary_id: 1,
 						notebook_number: header.notebook_number,
 						tick: header.tick,

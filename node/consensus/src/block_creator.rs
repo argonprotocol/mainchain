@@ -1,22 +1,7 @@
-use std::{convert::Into, sync::Arc, time::Duration};
+use std::{sync::Arc, time::Duration};
 
+use crate::{aux_client::ArgonAux, error::Error, notary_client::get_notebook_header_data};
 use argon_bitcoin_utxo_tracker::{get_bitcoin_inherent, UtxoTracker};
-use codec::Codec;
-use futures::{channel::mpsc::*, prelude::*};
-use log::*;
-use sc_client_api::{AuxStore, BlockOf, BlockchainEvents};
-use sc_consensus::{
-	BlockImport, BlockImportParams, BoxBlockImport, ImportResult, StateAction, StorageChanges,
-};
-use sp_api::ProvideRuntimeApi;
-use sp_blockchain::HeaderBackend;
-use sp_consensus::{BlockOrigin, Environment, Proposal, Proposer, SelectChain};
-use sp_core::H256;
-use sp_inherents::InherentDataProvider;
-use sp_keystore::KeystorePtr;
-use sp_runtime::traits::{Block as BlockT, Header as HeaderT};
-use sp_timestamp::Timestamp;
-
 use argon_node_runtime::{NotaryRecordT, NotebookVerifyError};
 use argon_primitives::{
 	inherents::{
@@ -24,346 +9,231 @@ use argon_primitives::{
 		NotebooksInherentDataProvider,
 	},
 	tick::Tick,
-	Balance, BestBlockVoteSeal, BitcoinApis, BlockSealApis, BlockSealAuthorityId,
-	BlockSealAuthoritySignature, BlockSealDigest, NotaryApis, NotebookApis, TickApis,
-	VotingSchedule,
+	Balance, BestBlockVoteSeal, BitcoinApis, BlockSealApis, BlockSealAuthorityId, BlockSealDigest,
+	Digestset, NotaryApis, NotebookApis, TickApis, TickDigest, VotingSchedule,
 };
-
-use crate::{
-	aux_client::ArgonAux,
-	digests::{create_pre_runtime_digests, create_seal_digest},
-	error::Error,
-	notary_client::{get_notebook_header_data, notary_sync_task, NotaryClient, VotingPowerInfo},
-	notebook_sealer::NotebookSealer,
+use codec::Codec;
+use frame_support::CloneNoBound;
+use log::*;
+use sc_client_api::AuxStore;
+use sc_consensus::{BlockImport, BlockImportParams, ImportResult, StateAction, StorageChanges};
+use sp_api::ProvideRuntimeApi;
+use sp_blockchain::HeaderBackend;
+use sp_consensus::{BlockOrigin, Environment, Proposal, Proposer};
+use sp_inherents::{InherentData, InherentDataProvider};
+use sp_runtime::{
+	traits::{Block as BlockT, Header as HeaderT},
+	Digest,
 };
+use sp_timestamp::Timestamp;
+use tokio::sync::Mutex;
 
 pub struct CreateTaxVoteBlock<Block: BlockT, AccountId: Clone + Codec> {
 	pub current_tick: Tick,
 	pub timestamp_millis: u64,
 	pub parent_hash: Block::Hash,
 	pub vote: BestBlockVoteSeal<AccountId, BlockSealAuthorityId>,
-	pub signature: BlockSealAuthoritySignature,
 }
 
-pub fn block_creation_task<B, C, SC, AC>(
-	client: Arc<C>,
-	select_chain: SC,
-	aux_client: ArgonAux<B, C>,
-	keystore: KeystorePtr,
-) -> (
-	impl Future<Output = ()>,
-	impl Future<Output = ()>,
-	impl Future<Output = ()>,
-	Receiver<CreateTaxVoteBlock<B, AC>>,
-)
+#[derive(CloneNoBound)]
+pub struct BlockCreator<Block: BlockT, BI: Clone, Client: AuxStore, PF, JS: Clone, A: Clone> {
+	/// Used to actually import blocks.
+	pub block_import: BI,
+	/// The underlying para client.
+	pub client: Arc<Client>,
+	/// The underlying block proposer this should call into.
+	pub proposer: Arc<Mutex<PF>>,
+	/// The amount of time to spend authoring each block.
+	pub authoring_duration: Duration,
+	pub justification_sync_link: JS,
+	pub aux_client: ArgonAux<Block, Client>,
+	pub utxo_tracker: Arc<UtxoTracker>,
+	pub(crate) _phantom: std::marker::PhantomData<A>,
+}
+
+impl<Block: BlockT, BI, C, PF, JS, A, Proof> BlockCreator<Block, BI, C, PF, JS, A>
 where
-	B: BlockT<Hash = H256>,
-	C: ProvideRuntimeApi<B>
-		+ BlockchainEvents<B>
-		+ HeaderBackend<B>
-		+ AuxStore
-		+ BlockOf
-		+ Send
-		+ Sync
-		+ 'static,
-	C::Api: NotebookApis<B, NotebookVerifyError>
-		+ BlockSealApis<B, AC, BlockSealAuthorityId>
-		+ NotaryApis<B, NotaryRecordT>
-		+ TickApis<B>,
-	SC: SelectChain<B> + 'static,
-	AC: Codec + Clone + Send + Sync + 'static,
-{
-	let (tax_vote_sender, tax_vote_rx) = channel(1000);
-	let (notebook_tick_tx, mut notebook_tick_rx) =
-		sc_utils::mpsc::tracing_unbounded("node::consensus::notebook_tick_stream", 100);
-	let notary_client =
-		Arc::new(NotaryClient::new(client.clone(), aux_client.clone(), notebook_tick_tx.clone()));
-
-	let best_hash = client.info().best_hash;
-	let ticker = client.runtime_api().ticker(best_hash).expect("Ticker not available");
-	let no_work_delay_millis = if ticker.tick_duration_millis <= 10_000 { 100 } else { 1000 };
-
-	let notary_sync_task = notary_sync_task(client.clone(), notary_client.clone());
-
-	let notary_queue_task = async move {
-		loop {
-			let has_more_work = notary_client
-				.process_queues()
-				.await
-				.map_err(|err| {
-					warn!("Error while processing notary queues: {:?}", err);
-				})
-				.unwrap_or(false);
-
-			let mut delay = 20;
-			if !has_more_work {
-				delay = no_work_delay_millis
-			}
-			tokio::time::sleep(Duration::from_millis(delay)).await;
-		}
-	};
-
-	let seal_watch_task = async move {
-		let notebook_sealer = NotebookSealer::new(
-			client.clone(),
-			ticker,
-			select_chain,
-			keystore,
-			aux_client.clone(),
-			tax_vote_sender.clone(),
-		);
-		let mut import_stream = client.import_notification_stream();
-		loop {
-			let mut next: Option<VotingPowerInfo> = None;
-			tokio::select! {biased;
-				notebook = notebook_tick_rx.next() => {
-					next = notebook;
-				},
-				block_next = import_stream.next() => {
-					if let Some(block) = block_next {
-						if block.origin == BlockOrigin::Own {
-							continue;
-						}
-						let Ok(tick) = client.runtime_api().current_tick(block.hash) else {
-							continue;
-						};
-						let voting_schedule = VotingSchedule::when_creating_block(tick);
-						if let Ok(info) = aux_client.get_tick_voting_power(voting_schedule.notebook_tick()) {
-							next = info
-						}
-					}
-				},
-			}
-
-			if let Some((notebook_tick, voting_power, notebooks)) = next {
-				if let Err(err) = notebook_sealer
-					.check_for_new_blocks(notebook_tick, voting_power, notebooks)
-					.await
-				{
-					warn!("Error while checking for new blocks: {:?}", err);
-				}
-			}
-		}
-	};
-	(seal_watch_task, notary_sync_task, notary_queue_task, tax_vote_rx)
-}
-
-#[allow(clippy::too_many_arguments)]
-pub async fn tax_block_creator<B, C, E, L, CS, A>(
-	mut block_import: BoxBlockImport<B>,
-	client: Arc<C>,
-	aux_client: ArgonAux<B, C>,
-	mut env: E,
-	justification_sync_link: L,
-	max_time_to_build_block: Duration,
-	mut tax_block_create_stream: CS,
-	utxo_tracker: Arc<UtxoTracker>,
-) where
-	B: BlockT + 'static,
-	B::Hash: Send + 'static,
-	C: ProvideRuntimeApi<B> + HeaderBackend<B> + AuxStore + 'static,
-	C::Api: NotebookApis<B, NotebookVerifyError>
-		+ BlockSealApis<B, A, BlockSealAuthorityId>
-		+ NotaryApis<B, NotaryRecordT>
-		+ TickApis<B>
-		+ BitcoinApis<B, Balance>,
-	E: Environment<B> + Send + Sync + 'static,
-	E::Error: std::fmt::Debug,
-	E::Proposer: Proposer<B>,
-	L: sc_consensus::JustificationSyncLink<B> + 'static,
-	CS: Stream<Item = CreateTaxVoteBlock<B, A>> + Unpin + 'static,
-	A: Codec + Clone + Send + Sync + 'static,
-{
-	while let Some(command) = tax_block_create_stream.next().await {
-		let vote = command.vote;
-		let seal_strength = vote.seal_strength;
-
-		let proposal = match propose(
-			client.clone(),
-			aux_client.clone(),
-			&mut env,
-			vote.closest_miner.0.clone(),
-			command.current_tick,
-			command.timestamp_millis,
-			command.parent_hash,
-			BlockSealInherentNodeSide::from_vote(vote, command.signature),
-			utxo_tracker.clone(),
-			max_time_to_build_block,
-		)
-		.await
-		{
-			Ok(x) => x,
-			Err(err) => {
-				warn!("Unable to propose new block: {:?}", err);
-				continue;
-			},
-		};
-		submit_block::<B, L, _>(
-			&mut block_import,
-			proposal,
-			&justification_sync_link,
-			BlockSealDigest::Vote { seal_strength },
-		)
-		.await;
-	}
-}
-
-#[allow(clippy::too_many_arguments)]
-pub async fn propose<B, C, E, A>(
-	client: Arc<C>,
-	aux_client: ArgonAux<B, C>,
-	env: &mut E,
-	author: A,
-	submitting_tick: Tick,
-	timestamp_millis: u64,
-	parent_hash: B::Hash,
-	seal_inherent: BlockSealInherentNodeSide,
-	utxo_tracker: Arc<UtxoTracker>,
-	max_time_to_build_block: Duration,
-) -> Result<Proposal<B, <E::Proposer as Proposer<B>>::Proof>, Error>
-where
-	B: BlockT + 'static,
-	C: ProvideRuntimeApi<B> + HeaderBackend<B> + AuxStore + 'static,
-	C::Api: NotebookApis<B, NotebookVerifyError>
-		+ BlockSealApis<B, A, BlockSealAuthorityId>
-		+ NotaryApis<B, NotaryRecordT>
-		+ TickApis<B>
-		+ BitcoinApis<B, Balance>,
-	E: Environment<B> + Send + Sync + 'static,
-	E::Error: std::fmt::Debug,
-	E::Proposer: Proposer<B>,
-	A: Codec + Clone,
-{
-	let parent_header = match client.header(parent_hash) {
-		Ok(Some(x)) => x,
-		Ok(None) => return Err(Error::BlockNotFound(parent_hash.to_string())),
-		Err(err) => return Err(err.into()),
-	};
-
-	let bitcoin_utxo_sync = get_bitcoin_inherent(&utxo_tracker, &client, &parent_hash)
-		.unwrap_or_else(|err| {
-			warn!("Unable to get bitcoin inherent: {:?}", err);
-			None
-		});
-
-	let voting_schedule = VotingSchedule::when_creating_block(submitting_tick);
-	let notebook_header_data = match get_notebook_header_data(
-		&client,
-		&aux_client,
-		&parent_hash,
-		&voting_schedule,
-	)
-	.await
-	{
-		Ok(x) => x,
-		Err(err) => {
-			warn!(
-				"Unable to pull new block for compute miner. No notebook header data found!! {}",
-				err
-			);
-			return Err(err);
-		},
-	};
-
-	info!(
-		"Proposing block at tick {} with {} notebooks",
-		submitting_tick,
-		notebook_header_data.notebook_digest.notebooks.len()
-	);
-
-	let timestamp = sp_timestamp::InherentDataProvider::new(Timestamp::new(timestamp_millis));
-	let seal = BlockSealInherentDataProvider { seal: Some(seal_inherent.clone()), digest: None };
-	let notebooks =
-		NotebooksInherentDataProvider { raw_notebooks: notebook_header_data.signed_headers };
-
-	let mut inherent_data = match (timestamp, seal, notebooks).create_inherent_data().await {
-		Ok(r) => r,
-		Err(err) => {
-			warn!(
-				"Unable to propose new block for authoring. \
-				 Creating inherent data failed: {:?}",
-				err,
-			);
-			return Err(err.into());
-		},
-	};
-
-	if let Some(bitcoin_utxo_sync) = bitcoin_utxo_sync {
-		BitcoinInherentDataProvider { bitcoin_utxo_sync }
-			.provide_inherent_data(&mut inherent_data)
-			.await?;
-	}
-
-	let proposer: E::Proposer = match env.init(&parent_header).await {
-		Ok(x) => x,
-		Err(err) => {
-			let msg = format!(
-				"Unable to propose new block for authoring. \
-						Initializing proposer failed: {:?}",
-				err
-			);
-			return Err(Error::StringError(msg));
-		},
-	};
-
-	let inherent_digest = create_pre_runtime_digests(
-		author,
-		submitting_tick,
-		notebook_header_data.vote_digest,
-		notebook_header_data.notebook_digest,
-	);
-
-	let proposal = match proposer
-		.propose(inherent_data, inherent_digest, max_time_to_build_block, None)
-		.await
-	{
-		Ok(x) => x,
-		Err(err) => {
-			let msg = format!("Unable to propose. Creating proposer failed: {:?}", err);
-			return Err(Error::StringError(msg));
-		},
-	};
-	Ok(proposal)
-}
-
-pub(crate) async fn submit_block<Block, L, Proof>(
-	block_import: &mut BoxBlockImport<Block>,
-	proposal: Proposal<Block, Proof>,
-	justification_sync_link: &L,
-	block_seal_digest: BlockSealDigest,
-) where
 	Block: BlockT + 'static,
 	Block::Hash: Send + 'static,
-	L: sc_consensus::JustificationSyncLink<Block>,
+	BI: BlockImport<Block> + Clone + Send + Sync + 'static,
+	C: ProvideRuntimeApi<Block> + HeaderBackend<Block> + AuxStore + 'static,
+	C::Api: NotebookApis<Block, NotebookVerifyError>
+		+ BlockSealApis<Block, A, BlockSealAuthorityId>
+		+ NotaryApis<Block, NotaryRecordT>
+		+ TickApis<Block>
+		+ BitcoinApis<Block, Balance>,
+	PF: Environment<Block> + Send + Sync + 'static,
+	PF::Proposer: Proposer<Block, Proof = Proof>,
+	A: Codec + Clone + Send + Sync + 'static,
+	JS: sc_consensus::JustificationSyncLink<Block> + Clone + Send + Sync + 'static,
 {
-	let (header, body) = proposal.block.deconstruct();
-	let parent_hash = *header.parent_hash();
-	let block_number = *header.number();
-
-	let mut block_import_params = BlockImportParams::new(BlockOrigin::Own, header);
-
-	let seal = create_seal_digest(&block_seal_digest);
-
-	block_import_params.post_digests.push(seal);
-	block_import_params.body = Some(body);
-	block_import_params.state_action =
-		StateAction::ApplyChanges(StorageChanges::Changes(proposal.storage_changes));
-
-	let post_hash = block_import_params.post_hash();
-	trace!("Importing self-generated block: {:?}. {:?}", &post_hash, &block_seal_digest);
-	match block_import.import_block(block_import_params).await {
-		Ok(res) => match res {
-			ImportResult::Imported(_) => {
-				res.handle_justification(&post_hash, block_number, justification_sync_link);
-
-				info!("✅ Successfully mined block on top of: {} -> {}", parent_hash, post_hash);
+	pub async fn propose(
+		&self,
+		author: A,
+		submitting_tick: Tick,
+		timestamp_millis: u64,
+		parent_hash: Block::Hash,
+		seal_inherent: BlockSealInherentNodeSide,
+	) -> Option<BlockProposal<Block, Proof>> {
+		let parent_header = match self.client.header(parent_hash) {
+			Ok(Some(x)) => x,
+			Ok(None) => {
+				tracing::warn!("Parent header not found {:?}", parent_hash);
+				return None
 			},
-			other => {
-				warn!("Import of own block - result not success: {:?}", other);
+			Err(err) => {
+				tracing::error!(?err, ?parent_hash, "Error while fetching parent header");
+				return None
 			},
-		},
-		Err(err) => {
-			warn!("Unable to import own block: {:?}", err);
-		},
+		};
+
+		let (inherent_data, inherent_digest) = self
+			.create_inherents(author, parent_hash, submitting_tick, timestamp_millis, seal_inherent)
+			.await
+			.ok()?;
+
+		let mut proposer = self.proposer.lock().await;
+		let proposer: PF::Proposer = match proposer.init(&parent_header).await {
+			Ok(x) => x,
+			Err(err) => {
+				tracing::warn!(?err, "Unable to propose. Creating proposer failed");
+				return None;
+			},
+		};
+		let size_limit = None;
+		let proposal = proposer
+			.propose(inherent_data, inherent_digest, self.authoring_duration, size_limit)
+			.await
+			.inspect_err(|err| {
+				tracing::warn!(?err, "Unable to propose. Creating proposer failed");
+			})
+			.ok()?;
+
+		Some(BlockProposal { proposal })
 	}
+
+	async fn create_inherents(
+		&self,
+		author: A,
+		parent_hash: Block::Hash,
+		submitting_tick: Tick,
+		timestamp_millis: u64,
+		seal_inherent: BlockSealInherentNodeSide,
+	) -> Result<(InherentData, Digest), Error> {
+		let voting_schedule = VotingSchedule::when_creating_block(submitting_tick);
+		let notebook_header_data = get_notebook_header_data(
+			&self.client,
+			&self.aux_client,
+			&parent_hash,
+			&voting_schedule,
+		)
+		.await
+		.inspect_err(|err| {
+			tracing::warn!(?err, "Unable to get inherent data");
+		})?;
+
+		info!(
+			"Proposing block at tick {} with {} notebooks",
+			submitting_tick,
+			notebook_header_data.notebook_digest.notebooks.len()
+		);
+
+		let timestamp = sp_timestamp::InherentDataProvider::new(Timestamp::new(timestamp_millis));
+		let seal =
+			BlockSealInherentDataProvider { seal: Some(seal_inherent.clone()), digest: None };
+		let notebooks =
+			NotebooksInherentDataProvider { raw_notebooks: notebook_header_data.signed_headers };
+
+		let mut inherent_data =
+			(timestamp, seal, notebooks).create_inherent_data().await.inspect_err(|err| {
+				tracing::warn!(
+					?err,
+					"Unable to propose new block for authoring. Creating inherent data failed",
+				);
+			})?;
+
+		let bitcoin_utxo_sync =
+			get_bitcoin_inherent(&self.utxo_tracker, &self.client, &parent_hash).unwrap_or_else(
+				|err| {
+					tracing::warn!(?err, "Unable to get bitcoin inherent");
+					None
+				},
+			);
+		if let Some(bitcoin_utxo_sync) = bitcoin_utxo_sync {
+			BitcoinInherentDataProvider { bitcoin_utxo_sync }
+				.provide_inherent_data(&mut inherent_data)
+				.await
+				.inspect_err(|err| {
+					tracing::warn!(?err, "Unable to provide bitcoin inherent data");
+				})?;
+		}
+
+		let inherent_digest = Digestset {
+			author,
+			tick: TickDigest { tick: submitting_tick },
+			block_vote: notebook_header_data.vote_digest,
+			notebooks: notebook_header_data.notebook_digest,
+			voting_key: Default::default(),
+		}
+		.create_pre_runtime_digest();
+
+		Ok((inherent_data, inherent_digest))
+	}
+
+	pub async fn submit_block(
+		&self,
+		block_proposal: BlockProposal<Block, Proof>,
+		block_seal_digest: BlockSealDigest,
+	) {
+		let BlockProposal { proposal } = block_proposal;
+
+		let (pre_header, body) = proposal.block.deconstruct();
+		let pre_hash = pre_header.hash();
+		let parent_hash = *pre_header.parent_hash();
+		let block_number = *pre_header.number();
+
+		// seal the block.
+		let seal = block_seal_digest.to_digest();
+		let mut block_import_params = BlockImportParams::new(BlockOrigin::Own, pre_header);
+
+		block_import_params.post_digests.push(seal);
+		block_import_params.body = Some(body.clone());
+		block_import_params.state_action =
+			StateAction::ApplyChanges(StorageChanges::Changes(proposal.storage_changes));
+		let post_hash = block_import_params.post_hash();
+
+		tracing::info!(
+			"🔖 Pre-sealed block for proposal at {}. Hash now {:?}, previously {:?}.",
+			block_number,
+			post_hash,
+			pre_hash,
+		);
+
+		match self.block_import.import_block(block_import_params).await {
+			Ok(res) => match res {
+				ImportResult::Imported(_) => {
+					res.handle_justification(
+						&post_hash,
+						block_number,
+						&self.justification_sync_link,
+					);
+					tracing::info!(
+						"✅ Successfully mined block on top of: {} -> {}",
+						parent_hash,
+						post_hash
+					);
+				},
+				other => {
+					warn!("Import of own block - result not success: {:?}", other);
+				},
+			},
+			Err(e) => {
+				tracing::error!(?e, "Failed to produce candidate");
+			},
+		}
+	}
+}
+
+pub struct BlockProposal<Block: BlockT, Proof> {
+	pub proposal: Proposal<Block, Proof>,
 }

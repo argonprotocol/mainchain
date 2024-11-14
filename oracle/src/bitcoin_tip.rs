@@ -89,7 +89,7 @@ mod tests {
 		signer::Sr25519Signer,
 	};
 	use argon_primitives::bitcoin::BitcoinNetwork;
-	use argon_testing::ArgonTestNode;
+	use argon_testing::start_argon_test_node;
 	use bitcoin::Network;
 	use sp_core::{sr25519, Pair};
 
@@ -99,11 +99,10 @@ mod tests {
 	async fn test_bitcoin_loop() {
 		let _ = env_logger::builder().is_test(true).try_init();
 
-		let alice = sr25519::Pair::from_string("//Dave", None).unwrap();
+		let signer_pair = sr25519::Pair::from_string("//Dave", None).unwrap();
 
-		let signer = Sr25519Signer::new(alice);
-		let argon_node =
-			ArgonTestNode::start("alice".into()).await.expect("Failed to start argon-node");
+		let signer = Sr25519Signer::new(signer_pair);
+		let argon_node = start_argon_test_node().await;
 		let bitcoind = argon_node.bitcoind.as_ref().expect("Bitcoind not started");
 		let network: BitcoinNetwork = argon_node
 			.client

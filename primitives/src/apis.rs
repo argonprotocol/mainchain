@@ -1,37 +1,53 @@
 #![allow(clippy::ptr_arg)]
 #![allow(clippy::too_many_arguments)]
 
-use alloc::{collections::btree_map::BTreeMap, vec::Vec};
-use codec::Codec;
-use sp_core::{ConstU32, H256, U256};
-use sp_runtime::{BoundedVec, DispatchError};
-
 use crate::{
 	bitcoin::{BitcoinNetwork, BitcoinSyncStatus, Satoshis, UtxoRef, UtxoValue},
-	block_seal::MiningAuthority,
+	block_seal::{ComputePuzzle, MiningAuthority},
 	fork_power::ForkPower,
 	notary::{
 		NotaryId, NotaryNotebookAuditSummary, NotaryNotebookDetails, NotaryNotebookRawVotes,
 		NotaryNotebookVoteDigestDetails,
 	},
 	tick::{Tick, Ticker},
-	BestBlockVoteSeal, BlockVoteDigest, NotebookNumber, VoteMinimum,
+	BestBlockVoteSeal, BlockSealDigest, BlockVoteDigest, NotebookAuditResult, NotebookNumber,
+	VoteMinimum, VotingKey,
 };
+use alloc::{collections::btree_map::BTreeMap, vec::Vec};
+use codec::Codec;
+use sp_core::{ConstU32, H256, U256};
+use sp_runtime::{BoundedVec, Digest, DispatchError};
 
 sp_api::decl_runtime_apis! {
 	pub trait BlockSealApis<AccountId:Codec, BlockSealAuthorityId:Codec> {
 		fn vote_minimum() -> VoteMinimum;
-		fn compute_difficulty() -> u128;
+		fn compute_puzzle() -> ComputePuzzle<Block>;
 		fn create_vote_digest(notebook_tick: Tick, included_notebooks: Vec<NotaryNotebookVoteDigestDetails>) -> BlockVoteDigest;
 		fn find_vote_block_seals(
 			votes: Vec<NotaryNotebookRawVotes>,
 			with_better_strength: U256,
 			expected_notebook_tick: Tick,
 		) -> Result<BoundedVec<BestBlockVoteSeal<AccountId, BlockSealAuthorityId>, ConstU32<2>>, DispatchError>;
-		fn fork_power() -> ForkPower;
 		fn has_eligible_votes() -> bool;
+		fn is_valid_signature(block_hash: Block::Hash, seal: &BlockSealDigest, digest: &Digest) -> bool;
 	}
 }
+
+sp_api::decl_runtime_apis!(
+	pub trait BlockCreatorApis<AccountId: Codec, VerifyError: Codec> {
+		fn fork_power() -> ForkPower;
+		fn calculate_fork_power(
+			seal: BlockSealDigest,
+			header: &Block::Header,
+		) -> Result<ForkPower, DispatchError>;
+		fn decode_voting_author(
+			digests: &Digest,
+		) -> Result<(AccountId, Tick, Option<VotingKey>), DispatchError>;
+		fn digest_notebooks(
+			digests: &Digest,
+		) -> Result<Vec<NotebookAuditResult<VerifyError>>, DispatchError>;
+	}
+);
 
 sp_api::decl_runtime_apis! {
 	pub trait TickApis {

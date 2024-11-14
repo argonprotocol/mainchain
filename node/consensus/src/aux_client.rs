@@ -6,7 +6,7 @@ use std::{
 	sync::Arc,
 };
 
-use codec::{Decode, Encode};
+use codec::{Codec, Decode, Encode};
 use log::{trace, warn};
 use parking_lot::RwLock;
 use sc_client_api::{self, backend::AuxStore};
@@ -17,7 +17,7 @@ use sp_core::H256;
 use sp_runtime::traits::{Block as BlockT, Header};
 
 use crate::{aux_data::AuxData, error::Error, notary_client::VotingPowerInfo};
-use argon_node_runtime::{AccountId, BlockNumber, NotebookVerifyError};
+use argon_node_runtime::NotebookVerifyError;
 use argon_primitives::{
 	fork_power::ForkPower,
 	notary::{
@@ -25,13 +25,14 @@ use argon_primitives::{
 		NotaryNotebookTickState, NotaryNotebookVoteDigestDetails,
 	},
 	tick::Tick,
-	NotaryId, NotebookDigestRecord, NotebookHeaderData, NotebookNumber, VotingSchedule,
+	AccountId, BlockNumber, NotaryId, NotebookAuditResult, NotebookHeaderData, NotebookNumber,
+	VotingSchedule,
 };
 
 pub enum AuxState<C: AuxStore> {
 	NotaryStateAtTick(Arc<AuxData<NotaryNotebookTickState, C>>),
 	AuthorsAtHeight(Arc<AuxData<BTreeMap<H256, BTreeSet<AccountId>>, C>>),
-	NotaryNotebooks(Arc<AuxData<Vec<NotebookAuditResult>, C>>),
+	NotaryNotebooks(Arc<AuxData<Vec<NotebookAuditResult<NotebookVerifyError>>, C>>),
 	NotaryAuditSummaries(Arc<AuxData<Vec<NotaryNotebookAuditSummary>, C>>),
 	NotaryMissingNotebooks(Arc<AuxData<BTreeSet<NotebookNumber>, C>>),
 	VotesAtTick(Arc<AuxData<Vec<NotaryNotebookRawVotes>, C>>),
@@ -122,14 +123,13 @@ impl<B: BlockT, C: AuxStore> ArgonAux<B, C> {
 /// - `AuthorsAtHeight` - the authors at a given height for every voting key. A block will only be
 ///   accepted once per author per key
 impl<B: BlockT, C: AuxStore + 'static> ArgonAux<B, C> {
-	pub fn record_block(
+	pub fn record_block<AC: Codec>(
 		&self,
 		block: &mut BlockImportParams<B>,
-		author: AccountId,
+		author: AC,
 		voting_key: Option<H256>,
 		tick: Tick,
-		fork_power: ForkPower,
-	) -> Result<bool, Error> {
+	) -> Result<ForkPower, Error> {
 		let _lock = self.lock.write();
 		let block_number =
 			UniqueSaturatedInto::<u32>::unique_saturated_into(*block.header.number());
@@ -138,20 +138,17 @@ impl<B: BlockT, C: AuxStore + 'static> ArgonAux<B, C> {
 		if let Some(voting_key) = voting_key {
 			self.authors_by_voting_key_at_height(block_number)?
 				.mutate(|authors_at_height| {
-					if !authors_at_height.entry(voting_key).or_default().insert(author.clone()) {
-						return Err(Error::DuplicateAuthoredBlock(author));
+					let account_id = AccountId::decode(&mut &author.encode()[..]).map_err(|e| {
+						Error::StringError(format!("Failed to decode author: {:?}", e))
+					})?;
+					if !authors_at_height.entry(voting_key).or_default().insert(account_id.clone())
+					{
+						return Err(Error::DuplicateAuthoredBlock(account_id));
 					}
 					Ok::<(), Error>(())
 				})??;
 		}
-		let is_new_best = self.strongest_fork_power()?.mutate(|state| {
-			if &fork_power > state {
-				*state = fork_power.clone();
-				Ok::<bool, Error>(true)
-			} else {
-				Ok::<bool, Error>(false)
-			}
-		})??;
+		let max_fork_power = self.strongest_fork_power()?.get();
 
 		// cleanup old votes (None deletes)
 		if tick >= 10 {
@@ -169,7 +166,16 @@ impl<B: BlockT, C: AuxStore + 'static> ArgonAux<B, C> {
 				block.auxiliary.push((AuxKey::NotaryStateAtTick(tick).encode(), None));
 			}
 		}
-		Ok(is_new_best)
+		Ok(max_fork_power)
+	}
+
+	pub fn block_accepted(&self, max_fork_power: ForkPower) -> Result<(), Error> {
+		self.strongest_fork_power()?.mutate(|existing| {
+			if max_fork_power > *existing {
+				*existing = max_fork_power;
+			}
+			Ok::<_, Error>(())
+		})?
 	}
 
 	pub fn get_tick_voting_power(&self, tick: Tick) -> Result<Option<VotingPowerInfo>, Error> {
@@ -195,40 +201,42 @@ impl<B: BlockT, C: AuxStore + 'static> ArgonAux<B, C> {
 		let mut headers = NotebookHeaderData::default();
 		let mut tick_notebook = None;
 		let audit_results = self.get_notary_audit_history(notary_id)?.get();
+		let notebook_tick = voting_schedule.notebook_tick();
 
 		for notebook in audit_results {
 			if notebook.notebook_number <= latest_runtime_notebook_number ||
-				notebook.tick > voting_schedule.notebook_tick()
+				notebook.tick > notebook_tick
 			{
 				continue;
 			}
-			if notebook.audit_failure_reason.is_some() {
+			if notebook.audit_first_failure.is_some() {
 				warn!(
 					"Not adding additional notebooks for notary {} due to audit failure {}",
 					notary_id,
-					notebook.audit_failure_reason.unwrap()
+					notebook.audit_first_failure.unwrap()
 				);
 				break;
 			}
 			let tick = notebook.tick;
 
 			let state = self.get_notebook_tick_state(tick)?.get();
-			if tick == voting_schedule.notebook_tick() {
-				let Some(details) = state.notebook_key_details_by_notary.get(&notary_id) else {
-					continue;
-				};
-				tick_notebook = Some(details.clone());
+			tracing::trace!(
+				vote_details = ?state.notebook_key_details_by_notary.get(&notary_id),
+				notebook_tick,
+				"Notebook state for tick {}",
+				tick
+			);
+			if tick == notebook_tick {
+				tick_notebook = state.notebook_key_details_by_notary.get(&notary_id).cloned();
 			}
 			if let Some(raw_data) = state.raw_headers_by_notary.get(&notary_id) {
 				headers.signed_headers.push(raw_data.clone());
-				headers.notebook_digest.notebooks.push(NotebookDigestRecord {
+				headers.notebook_digest.notebooks.push(NotebookAuditResult {
 					notary_id,
 					notebook_number: notebook.notebook_number,
 					tick,
-					audit_first_failure: notebook.audit_failure_reason.clone(),
+					audit_first_failure: notebook.audit_first_failure.clone(),
 				});
-			} else {
-				continue;
 			}
 		}
 
@@ -255,14 +263,14 @@ impl<B: BlockT, C: AuxStore + 'static> ArgonAux<B, C> {
 			.map(|a| a.get())
 			.unwrap_or_default()
 			.iter()
-			.any(|n| n.notebook_number == notebook_number && n.audit_failure_reason.is_none())
+			.any(|n| n.notebook_number == notebook_number && n.audit_first_failure.is_none())
 	}
 
 	/// Keeps a manually truncated vec of the last 2000 notary audit results
 	pub fn get_notary_audit_history(
 		&self,
 		notary_id: NotaryId,
-	) -> Result<Arc<AuxData<Vec<NotebookAuditResult>, C>>, Error> {
+	) -> Result<Arc<AuxData<Vec<NotebookAuditResult<NotebookVerifyError>>, C>>, Error> {
 		let key = AuxKey::NotaryNotebooks(notary_id);
 		self.get_or_insert_state(key)
 	}
@@ -321,7 +329,7 @@ impl<B: BlockT, C: AuxStore + 'static> ArgonAux<B, C> {
 		};
 
 		// if this audit is valid, assume we're good
-		if existing.audit_failure_reason.is_none() {
+		if existing.audit_first_failure.is_none() {
 			return Ok(());
 		}
 
@@ -343,7 +351,7 @@ impl<B: BlockT, C: AuxStore + 'static> ArgonAux<B, C> {
 	/// Returns total block votes at tick and the number of notebooks stored
 	pub fn store_notebook_result(
 		&self,
-		audit_result: NotebookAuditResult,
+		audit_result: NotebookAuditResult<NotebookVerifyError>,
 		raw_signed_header: Vec<u8>,
 		notebook_details: NotaryNotebookDetails<B::Hash>,
 		finalized_notebook_number: NotebookNumber,
@@ -436,13 +444,6 @@ impl<B: BlockT, C: AuxStore + 'static> ArgonAux<B, C> {
 	}
 }
 
-#[derive(Clone, Encode, Decode, Debug, PartialEq)]
-pub struct NotebookAuditResult {
-	pub notebook_number: NotebookNumber,
-	pub tick: Tick,
-	pub audit_failure_reason: Option<NotebookVerifyError>,
-}
-
 #[cfg(test)]
 mod test {
 	use super::*;
@@ -487,8 +488,12 @@ mod test {
 	fn it_should_store_notebook_results() {
 		let aux = Arc::new(MockAux::default());
 		let argon_aux = ArgonAux::<Block, _>::new(aux.clone());
-		let audit_10 =
-			NotebookAuditResult { notebook_number: 10, tick: 1, audit_failure_reason: None };
+		let audit_10 = NotebookAuditResult {
+			notebook_number: 10,
+			tick: 1,
+			notary_id: 1,
+			audit_first_failure: None,
+		};
 		let details_10 = NotaryNotebookDetails {
 			notary_id: 1,
 			block_voting_power: 0,
@@ -524,8 +529,12 @@ mod test {
 			1
 		);
 
-		let audit_9 =
-			NotebookAuditResult { notebook_number: 9, tick: 1, audit_failure_reason: None };
+		let audit_9 = NotebookAuditResult {
+			notebook_number: 9,
+			tick: 1,
+			notary_id: 1,
+			audit_first_failure: None,
+		};
 		let details_9 = NotaryNotebookDetails {
 			notary_id: 1,
 			block_voting_power: 0,
@@ -552,8 +561,12 @@ mod test {
 			vec![summary_9.clone(), summary_10.clone(),]
 		);
 
-		let audit_11 =
-			NotebookAuditResult { notebook_number: 11, tick: 2, audit_failure_reason: None };
+		let audit_11 = NotebookAuditResult {
+			notebook_number: 11,
+			tick: 2,
+			notary_id: 1,
+			audit_first_failure: None,
+		};
 		let details_11 = NotaryNotebookDetails {
 			notary_id: 1,
 			block_voting_power: 0,
@@ -602,8 +615,12 @@ mod test {
 	fn it_returns_if_audits_successful() {
 		let aux = Arc::new(MockAux::default());
 		let argon_aux = ArgonAux::<Block, _>::new(aux.clone());
-		let audit_10 =
-			NotebookAuditResult { notebook_number: 10, tick: 1, audit_failure_reason: None };
+		let audit_10 = NotebookAuditResult {
+			notebook_number: 10,
+			tick: 1,
+			notary_id: 1,
+			audit_first_failure: None,
+		};
 		let details_10 = NotaryNotebookDetails {
 			notary_id: 1,
 			block_voting_power: 0,
@@ -625,7 +642,7 @@ mod test {
 			.get_notary_audit_history(1)
 			.expect("get audit summaries")
 			.mutate(|a| {
-				a[0].audit_failure_reason = Some(NotebookVerifyError::InvalidSecretProvided);
+				a[0].audit_first_failure = Some(NotebookVerifyError::InvalidSecretProvided);
 			})
 			.expect("mutate");
 		assert!(!argon_aux.has_successful_audit(1, 10));
@@ -636,9 +653,14 @@ mod test {
 		let aux = Arc::new(MockAux::default());
 		let argon_aux = ArgonAux::<Block, _>::new(aux.clone());
 		for i in 1..=10 {
-			let audit_failure_reason =
+			let audit_first_failure =
 				if i == 10 { Some(NotebookVerifyError::InvalidSecretProvided) } else { None };
-			let audit = NotebookAuditResult { notebook_number: i, tick: 1, audit_failure_reason };
+			let audit = NotebookAuditResult {
+				notebook_number: i,
+				tick: 1,
+				notary_id: 1,
+				audit_first_failure,
+			};
 			let details = NotaryNotebookDetails {
 				notary_id: 1,
 				block_voting_power: 0,
@@ -664,7 +686,7 @@ mod test {
 		);
 		assert_eq!(
 			argon_aux.get_notary_audit_history(1).expect("get notary audit history").get()[9]
-				.audit_failure_reason,
+				.audit_first_failure,
 			Some(NotebookVerifyError::InvalidSecretProvided)
 		);
 		argon_aux.reprocess_notebook(1, 10).expect("reprocess notebook");
@@ -695,7 +717,12 @@ mod test {
 
 		argon_aux
 			.store_notebook_result(
-				NotebookAuditResult { notebook_number: 10, tick: 1, audit_failure_reason: None },
+				NotebookAuditResult {
+					notebook_number: 10,
+					tick: 1,
+					notary_id: 1,
+					audit_first_failure: None,
+				},
 				vec![],
 				NotaryNotebookDetails {
 					notary_id: 1,
@@ -721,7 +748,7 @@ mod test {
 		);
 		assert_eq!(
 			argon_aux.get_notary_audit_history(1).expect("get notary audit history").get()[9]
-				.audit_failure_reason,
+				.audit_first_failure,
 			None
 		);
 	}

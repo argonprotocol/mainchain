@@ -89,6 +89,10 @@ pub mod pallet {
 	#[pallet::storage]
 	pub(super) type OracleOperatorAccount<T: Config> = StorageValue<_, T::AccountId, OptionQuery>;
 
+	/// Check if the inherent was included
+	#[pallet::storage]
+	pub(super) type InherentIncluded<T: Config> = StorageValue<_, bool, ValueQuery>;
+
 	/// Expiration date as a day since unix timestamp mapped to Bitcoin UTXOs
 	#[pallet::storage]
 	pub(super) type LockedUtxoExpirationsByBlock<T: Config> = StorageMap<
@@ -155,6 +159,21 @@ pub mod pallet {
 			<BitcoinNetwork<T>>::put(self.network.clone());
 		}
 	}
+	#[pallet::hooks]
+	impl<T: Config> Hooks<BlockNumberFor<T>> for Pallet<T> {
+		fn on_finalize(_: BlockNumberFor<T>) {
+			// If we have started synching bitcoin blocks, inherent must be included
+			if SynchedBitcoinBlock::<T>::exists() {
+				// According to parity, the only way to ensure that a mandatory inherent is included
+				// is by checking on block finalization that the inherent set a particular storage
+				// item: https://github.com/paritytech/polkadot-sdk/issues/2841#issuecomment-1876040854
+				assert!(
+					InherentIncluded::<T>::take(),
+					"Block invalid, missing inherent `bitcoin_utxos::sync`"
+				);
+			}
+		}
+	}
 
 	#[pallet::call]
 	impl<T: Config> Pallet<T> {
@@ -169,6 +188,8 @@ pub mod pallet {
 				utxo_sync.verified.len(),
 				utxo_sync.invalid.len()
 			);
+
+			ensure!(!InherentIncluded::<T>::get(), "Inherent already included");
 
 			let current_confirmed =
 				ConfirmedBitcoinBlockTip::<T>::get().ok_or(Error::<T>::NoBitcoinConfirmedBlock)?;
@@ -243,6 +264,9 @@ pub mod pallet {
 				}
 			}
 			<SynchedBitcoinBlock<T>>::set(Some(utxo_sync.sync_to_block));
+
+			// this ensures we can be sure the inherent was included in a relay chain
+			InherentIncluded::<T>::put(true);
 
 			Ok(())
 		}

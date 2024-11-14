@@ -225,9 +225,9 @@ impl<Hash: Codec + Clone> BlockVoteT<Hash> {
 			.unwrap_or(U256::zero())
 	}
 
-	pub fn seal_signature_message<H: Codec>(block_hash: &H, seal_strength: U256) -> [u8; 32] {
+	pub fn seal_signature_message<H: AsRef<[u8]>>(block_hash: H) -> [u8; 32] {
 		const PREFIX: &[u8] = b"BlockVoteSeal";
-		let message = &[PREFIX, &block_hash.encode()[..], &seal_strength.encode()[..]].concat();
+		let message = &[PREFIX, block_hash.as_ref()].concat();
 		message.using_encoded(blake2_256)
 	}
 

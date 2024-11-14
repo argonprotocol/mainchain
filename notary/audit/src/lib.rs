@@ -8,7 +8,6 @@ use alloc::{
 use binary_merkle_tree::{merkle_root, verify_proof, Leaf};
 use codec::{Decode, Encode};
 use serde::{Deserialize, Serialize};
-use snafu::Snafu;
 use sp_core::H256;
 use sp_runtime::{
 	scale_info::TypeInfo,
@@ -31,15 +30,17 @@ mod test_balanceset;
 #[cfg(test)]
 mod test_notebook;
 
-#[derive(Debug, Clone, PartialEq, TypeInfo, Encode, Decode, Serialize, Deserialize, Snafu)]
+#[derive(
+	Debug, Clone, PartialEq, TypeInfo, Encode, Decode, Serialize, Deserialize, thiserror::Error,
+)]
 pub enum AccountHistoryLookupError {
-	#[snafu(display("Notebook root not found"))]
+	#[error("Notebook root not found")]
 	RootNotFound,
-	#[snafu(display("Last change not found"))]
+	#[error("Last change not found")]
 	LastChangeNotFound,
-	#[snafu(display("Invalid transfer to localchain"))]
+	#[error("Invalid transfer to localchain")]
 	InvalidTransferToLocalchain,
-	#[snafu(display("The block given block specification could not be found"))]
+	#[error("The block given block specification could not be found")]
 	BlockSpecificationNotFound,
 }
 

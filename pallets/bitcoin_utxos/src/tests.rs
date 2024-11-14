@@ -8,7 +8,7 @@ use argon_primitives::{
 	inherents::BitcoinUtxoSync,
 	BitcoinUtxoTracker,
 };
-use frame_support::{assert_err, assert_noop, assert_ok};
+use frame_support::{assert_err, assert_noop, assert_ok, pallet_prelude::Hooks};
 use sp_core::H256;
 use sp_runtime::DispatchError;
 
@@ -125,6 +125,9 @@ fn it_requires_block_sync_to_be_newer() {
 			block_hash: H256Le([0; 32]),
 		});
 		assert_ok!(BitcoinUtxos::sync(RuntimeOrigin::none(), utxo_sync.clone()),);
+
+		// simulate next block
+		BitcoinUtxos::on_finalize(2);
 		// should not allow synching an older block
 		utxo_sync.sync_to_block.block_height = 1;
 		assert_err!(
@@ -175,6 +178,8 @@ fn it_should_move_utxos_to_lock_once_verified() {
 			block_height: 10,
 			block_hash: H256Le([0; 32]),
 		});
+		// simulate next block
+		BitcoinUtxos::on_finalize(2);
 		assert_ok!(BitcoinUtxos::sync(
 			RuntimeOrigin::none(),
 			BitcoinUtxoSync {

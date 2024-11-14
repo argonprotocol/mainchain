@@ -6,7 +6,7 @@ use serde_json::json;
 use sp_core::H256;
 use sqlx::{FromRow, PgConnection};
 
-use argon_primitives::{ensure, NotebookDigestRecord, VoteMinimum};
+use argon_primitives::{ensure, NotebookAuditResult, VoteMinimum};
 
 use crate::Error;
 
@@ -161,7 +161,7 @@ impl BlocksStore {
 		block_hash: H256,
 		parent_hash: H256,
 		vote_minimum: VoteMinimum,
-		notebook_digests: Vec<NotebookDigestRecord<VerifyError>>,
+		notebook_digests: Vec<NotebookAuditResult<VerifyError>>,
 	) -> anyhow::Result<(), Error> {
 		let latest_notebook_number =
 			notebook_digests.iter().map(|x| x.notebook_number as i32).max();
@@ -196,7 +196,7 @@ impl BlocksStore {
 #[cfg(test)]
 mod tests {
 	use argon_notary_audit::VerifyError;
-	use argon_primitives::NotebookDigestRecord;
+	use argon_primitives::NotebookAuditResult;
 	use sp_core::H256;
 	use sqlx::PgPool;
 
@@ -221,7 +221,7 @@ mod tests {
 				H256::from_slice(&[2u8; 32]),
 				H256::from_slice(&[1u8; 32]),
 				100,
-				vec![NotebookDigestRecord {
+				vec![NotebookAuditResult {
 					notebook_number: 1,
 					notary_id: 1,
 					audit_first_failure: Some(VerifyError::AccountAlreadyHasChannelHold),

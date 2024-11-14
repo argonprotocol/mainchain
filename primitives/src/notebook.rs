@@ -1,5 +1,5 @@
 use alloc::vec::Vec;
-use codec::{Decode, Encode, MaxEncodedLen};
+use codec::{Codec, Decode, Encode, MaxEncodedLen};
 use scale_info::TypeInfo;
 use serde::{Deserialize, Serialize};
 use sp_core::{bounded::BoundedVec, ed25519::Signature, ConstU32, H256};
@@ -248,6 +248,30 @@ pub struct NotebookHeader {
 	/// Registered domains
 	pub domains: BoundedVec<(DomainHash, AccountId), MaxDomainsPerNotebook>,
 }
+
+#[derive(
+	Clone,
+	PartialEq,
+	Eq,
+	Encode,
+	Decode,
+	RuntimeDebug,
+	TypeInfo,
+	MaxEncodedLen,
+	Serialize,
+	Deserialize,
+	Default,
+)]
+pub struct NotebookAuditResult<VerifyError: Codec> {
+	#[codec(compact)]
+	pub notary_id: NotaryId,
+	#[codec(compact)]
+	pub notebook_number: NotebookNumber,
+	#[codec(compact)]
+	pub tick: Tick,
+	pub audit_first_failure: Option<VerifyError>,
+}
+
 #[derive(
 	Clone,
 	PartialEq,

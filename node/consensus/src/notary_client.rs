@@ -1,7 +1,8 @@
 use codec::Codec;
 use futures::{future::join_all, Stream, StreamExt};
 use log::{info, trace, warn};
-use sc_client_api::{AuxStore, BlockOf, BlockchainEvents};
+use sc_client_api::{AuxStore, BlockchainEvents};
+use sc_service::TaskManager;
 use sc_utils::mpsc::TracingUnboundedSender;
 use sp_api::ProvideRuntimeApi;
 use sp_blockchain::HeaderBackend;
@@ -13,13 +14,11 @@ use std::{
 	marker::PhantomData,
 	pin::Pin,
 	sync::Arc,
+	time::Duration,
 };
 use tokio::sync::Mutex;
 
-use crate::{
-	aux_client::{ArgonAux, NotebookAuditResult},
-	error::Error,
-};
+use crate::{aux_client::ArgonAux, error::Error};
 use argon_node_runtime::{NotaryRecordT, NotebookVerifyError};
 use argon_notary_apis::notebook::{NotebookRpcClient, RawHeadersSubscription};
 use argon_primitives::{
@@ -30,7 +29,7 @@ use argon_primitives::{
 	notebook::NotebookNumber,
 	tick::Tick,
 	Balance, BlockSealApis, BlockSealAuthorityId, BlockVotingPower, NotaryApis, NotaryId,
-	NotebookApis, NotebookDigest, NotebookHeaderData, VoteMinimum, VotingSchedule,
+	NotebookApis, NotebookAuditResult, NotebookHeaderData, VoteMinimum, VotingSchedule,
 };
 
 pub trait NotaryApisExt<B: BlockT, AC> {
@@ -123,14 +122,18 @@ where
 	}
 }
 
-pub async fn notary_sync_task<B, C, AC>(client: Arc<C>, notary_client: Arc<NotaryClient<B, C, AC>>)
-where
-	B: BlockT<Hash = H256>,
+pub fn run_notary_sync<B, C, AC>(
+	task_manager: &TaskManager,
+	client: Arc<C>,
+	aux_client: ArgonAux<B, C>,
+	notebook_tick_tx: TracingUnboundedSender<VotingPowerInfo>,
+	no_work_delay_millis: u64,
+) where
+	B: BlockT,
 	C: ProvideRuntimeApi<B>
 		+ BlockchainEvents<B>
 		+ HeaderBackend<B>
 		+ AuxStore
-		+ BlockOf
 		+ Send
 		+ Sync
 		+ 'static,
@@ -139,32 +142,61 @@ where
 		+ NotaryApis<B, NotaryRecordT>,
 	AC: Codec + Clone + Send + Sync + 'static,
 {
-	let mut best_block = Box::pin(client.import_notification_stream());
+	let notary_client =
+		Arc::new(NotaryClient::new(client.clone(), aux_client.clone(), notebook_tick_tx));
 
-	loop {
-		tokio::select! {biased;
-			notebook =  notary_client.poll_subscriptions() => {
-				if let Some((notary_id, notebook_number)) = notebook {
-					trace!( "Next notebook pushed (notary {}, notebook {})", notary_id, notebook_number);
-				}
-			},
-			block = best_block.next () => {
-				if let Some(block) = block.as_ref() {
-					if block.is_new_best {
-						let best_hash = block.hash;
-						if let Err(e) = notary_client.update_notaries(&best_hash).await {
-							warn!(
+	let notary_client_clone = Arc::clone(&notary_client);
+	let notary_sync_task = async move {
+		let mut best_block = Box::pin(client.import_notification_stream());
 
-								"Could not update notaries at best hash {} - {:?}",
-								best_hash,
-								e
-							);
+		loop {
+			tokio::select! {biased;
+				notebook =  notary_client.poll_subscriptions() => {
+					if let Some((notary_id, notebook_number)) = notebook {
+						trace!( "Next notebook pushed (notary {}, notebook {})", notary_id, notebook_number);
+					}
+				},
+				block = best_block.next () => {
+					if let Some(block) = block.as_ref() {
+						if block.is_new_best {
+							let best_hash = block.hash;
+							if let Err(e) = notary_client.update_notaries(&best_hash).await {
+								warn!(
+
+									"Could not update notaries at best hash {} - {:?}",
+									best_hash,
+									e
+								);
+							}
 						}
 					}
-				}
-			},
+				},
+			}
 		}
-	}
+	};
+
+	let notary_queue_task = async move {
+		let notary_client = notary_client_clone;
+		loop {
+			let has_more_work = notary_client
+				.process_queues()
+				.await
+				.inspect_err(|err| {
+					warn!("Error while processing notary queues: {:?}", err);
+				})
+				.unwrap_or(false);
+
+			let mut delay = 20;
+			if !has_more_work {
+				delay = no_work_delay_millis
+			}
+			tokio::time::sleep(Duration::from_millis(delay)).await;
+		}
+	};
+	let handle = task_manager.spawn_essential_handle();
+	handle.spawn("notary_sync_task", "notary_sync", notary_sync_task);
+	// Making this blocking due to the runtime calls and potentially heavy decodes
+	handle.spawn_blocking("notary_queue_task", "notary_queue", notary_queue_task);
 }
 
 type PendingNotebook = (NotebookNumber, Option<Vec<u8>>);
@@ -641,7 +673,7 @@ where
 		&self,
 		best_hash: &B::Hash,
 		notebook_details: &NotaryNotebookDetails<B::Hash>,
-	) -> Result<NotebookAuditResult, Error> {
+	) -> Result<NotebookAuditResult<NotebookVerifyError>, Error> {
 		let tick = notebook_details.tick;
 		let notary_id = notebook_details.notary_id;
 		let notebook_number = notebook_details.notebook_number;
@@ -703,7 +735,12 @@ where
 			},
 		};
 
-		Ok(NotebookAuditResult { tick, notebook_number, audit_failure_reason })
+		Ok(NotebookAuditResult {
+			notary_id,
+			tick,
+			notebook_number,
+			audit_first_failure: audit_failure_reason,
+		})
 	}
 
 	fn should_connect_to_notary(notary_record: &NotaryRecordT) -> bool {
@@ -777,14 +814,14 @@ where
 
 pub async fn verify_notebook_audits<B: BlockT, C>(
 	aux_client: &ArgonAux<B, C>,
-	notebook_digest: &NotebookDigest<NotebookVerifyError>,
+	notebook_audit_results: Vec<NotebookAuditResult<NotebookVerifyError>>,
 ) -> Result<(), Error>
 where
 	C: AuxStore + 'static,
 {
 	for _ in 0..10 {
 		let mut missing_audits = vec![];
-		for digest_record in &notebook_digest.notebooks {
+		for digest_record in &notebook_audit_results {
 			let notary_audits = aux_client.get_notary_audit_history(digest_record.notary_id)?.get();
 
 			let audit = notary_audits
@@ -792,10 +829,10 @@ where
 				.find(|a| a.notebook_number == digest_record.notebook_number);
 
 			if let Some(audit) = audit {
-				if digest_record.audit_first_failure != audit.audit_failure_reason {
+				if digest_record.audit_first_failure != audit.audit_first_failure {
 					return Err(Error::InvalidNotebookDigest(format!(
 						"Notary {}, notebook #{} has an audit mismatch \"{:?}\" with local result. \"{:?}\"",
-						digest_record.notary_id, digest_record.notebook_number, digest_record.audit_first_failure, audit.audit_failure_reason
+						digest_record.notary_id, digest_record.notebook_number, digest_record.audit_first_failure, audit.audit_first_failure
 					)));
 				}
 			} else {

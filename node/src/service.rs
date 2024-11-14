@@ -1,25 +1,20 @@
 //! Service and ServiceFactory implementation. Specialized wrapper over substrate service.
-
-use std::{cmp::max, sync::Arc, time::Duration};
-
+use crate::{command::MiningConfig, rpc};
+use argon_bitcoin_utxo_tracker::UtxoTracker;
+use argon_node_consensus::{
+	aux_client::ArgonAux, create_import_queue, run_block_builder_task, BlockBuilderParams,
+};
+use argon_node_runtime::{self, opaque::Block, RuntimeApi};
+use argon_primitives::AccountId;
 use sc_client_api::BlockBackend;
+use sc_consensus::BasicQueue;
 use sc_consensus_grandpa::{GrandpaBlockImport, SharedVoterState};
 use sc_service::{
 	config::Configuration, error::Error as ServiceError, TaskManager, WarpSyncConfig,
 };
-use sc_telemetry::{log, Telemetry, TelemetryWorker};
+use sc_telemetry::{Telemetry, TelemetryWorker};
 use sc_transaction_pool_api::OffchainTransactionPoolFactory;
-use url::Url;
-
-use argon_bitcoin_utxo_tracker::UtxoTracker;
-use argon_node_consensus::{
-	aux_client::ArgonAux,
-	compute_worker::run_compute_solver_threads,
-	import_queue::{ArgonImportQueue, ArgonVerifier},
-};
-use argon_node_runtime::{self, opaque::Block, AccountId, RuntimeApi};
-
-use crate::rpc;
+use std::{sync::Arc, time::Duration};
 
 pub(crate) type FullClient = sc_service::TFullClient<
 	Block,
@@ -36,7 +31,6 @@ type ArgonBlockImport = argon_node_consensus::import_queue::ArgonBlockImport<
 	Block,
 	GrandpaBlockImport<FullBackend, Block, FullClient, FullSelectChain>,
 	FullClient,
-	FullSelectChain,
 	AccountId,
 >;
 
@@ -44,7 +38,7 @@ pub type Service = sc_service::PartialComponents<
 	FullClient,
 	FullBackend,
 	FullSelectChain,
-	ArgonImportQueue<Block>,
+	BasicQueue<Block>,
 	sc_transaction_pool::FullPool<Block, FullClient>,
 	(
 		ArgonBlockImport,
@@ -57,7 +51,7 @@ pub type Service = sc_service::PartialComponents<
 
 pub fn new_partial(
 	config: &Configuration,
-	bitcoin_rpc_url: String,
+	mining_config: &MiningConfig,
 ) -> Result<Service, ServiceError> {
 	let telemetry = config
 		.telemetry_endpoints
@@ -84,7 +78,6 @@ pub fn new_partial(
 		task_manager.spawn_handle().spawn("telemetry", None, worker.run());
 		telemetry
 	});
-
 	let select_chain = sc_consensus::LongestChain::new(backend.clone());
 
 	let transaction_pool = sc_transaction_pool::BasicPool::new_full(
@@ -102,20 +95,9 @@ pub fn new_partial(
 		telemetry.as_ref().map(|x| x.handle()),
 	)?;
 
-	let bitcoin_url = Url::parse(&bitcoin_rpc_url).map_err(|e| {
-		ServiceError::Other(format!(
-			"Unable to parse bitcoin rpc url ({}) {:?}",
-			bitcoin_rpc_url, e
-		))
-	})?;
-	let (user, password) = (bitcoin_url.username(), bitcoin_url.password());
-
-	let bitcoin_auth = if !user.is_empty() {
-		Some((user.to_string(), password.unwrap_or_default().to_string()))
-	} else {
-		None
-	};
-
+	let (bitcoin_url, bitcoin_auth) = mining_config
+		.bitcoin_rpc_url_with_auth()
+		.map_err(|e| ServiceError::Other(format!("Failed to parse bitcoin rpc url {:?}", e)))?;
 	let utxo_tracker = UtxoTracker::new(bitcoin_url.origin().unicode_serialization(), bitcoin_auth)
 		.map_err(|e| {
 			ServiceError::Other(format!("Failed to initialize bitcoin monitoring {:?}", e))
@@ -124,20 +106,15 @@ pub fn new_partial(
 	let utxo_tracker = Arc::new(utxo_tracker);
 
 	let aux_client = ArgonAux::<Block, _>::new(client.clone());
-	let argon_block_import = ArgonBlockImport::new(
-		grandpa_block_import.clone(),
+
+	let (import_queue, argon_block_import) = create_import_queue(
 		client.clone(),
 		aux_client.clone(),
-		select_chain.clone(),
-		utxo_tracker.clone(),
-	);
-
-	let import_queue = ArgonImportQueue::<Block>::new(
-		ArgonVerifier::new(),
-		Box::new(argon_block_import.clone()),
-		Some(Box::new(grandpa_block_import.clone())),
+		grandpa_block_import,
 		&task_manager.spawn_essential_handle(),
 		config.prometheus_registry(),
+		telemetry.as_ref().map(|telemetry| telemetry.handle()),
+		utxo_tracker.clone(),
 	);
 
 	Ok(sc_service::PartialComponents {
@@ -157,20 +134,20 @@ pub fn new_full<
 	N: sc_network::NetworkBackend<Block, <Block as sp_runtime::traits::Block>::Hash>,
 >(
 	config: Configuration,
-	mining_account_id: Option<AccountId>,
-	mining_threads: Option<u32>,
-	bitcoin_rpc_url: String,
-) -> Result<TaskManager, ServiceError> {
-	let sc_service::PartialComponents {
+	mining_config: MiningConfig,
+) -> sc_service::error::Result<TaskManager> {
+	let params = new_partial(&config, &mining_config)?;
+	let Service {
+		select_chain,
 		client,
-		transaction_pool,
 		backend,
 		mut task_manager,
 		import_queue,
+		transaction_pool,
 		keystore_container,
-		select_chain,
-		other: (argon_block_import, aux_client, utxo_tracker, grandpa_link, mut telemetry),
-	} = new_partial(&config, bitcoin_rpc_url)?;
+		other,
+	} = params;
+	let (argon_block_import, aux_client, utxo_tracker, grandpa_link, mut telemetry) = other;
 
 	let metrics = N::register_notification_metrics(config.prometheus_registry());
 	let mut net_config = sc_network::config::FullNetworkConfiguration::<
@@ -198,7 +175,7 @@ pub fn new_full<
 		grandpa_link.shared_authority_set().clone(),
 		Vec::default(),
 	));
-	let (network, system_rpc_tx, tx_handler_controller, network_starter, sync_service) =
+	let (network, system_rpc_tx, tx_handler_controller, start_network, sync_service) =
 		sc_service::build_network(sc_service::BuildNetworkParams {
 			config: &config,
 			net_config,
@@ -215,7 +192,6 @@ pub fn new_full<
 	let role = config.role;
 	let name = config.network.node_name.clone();
 	let prometheus_registry = config.prometheus_registry().cloned();
-	let keystore = keystore_container.keystore();
 
 	#[cfg(not(debug_assertions))]
 	{
@@ -224,127 +200,60 @@ pub fn new_full<
 		})?;
 	}
 
-	let rpc_extensions_builder = {
+	let rpc_builder = {
 		let client = client.clone();
-		let pool = transaction_pool.clone();
+		let transaction_pool = transaction_pool.clone();
 
 		Box::new(move |_| {
-			rpc::create_full(rpc::FullDeps { client: client.clone(), pool: pool.clone() })
-				.map_err(Into::into)
+			let deps = rpc::FullDeps { client: client.clone(), pool: transaction_pool.clone() };
+
+			rpc::create_full(deps).map_err(Into::into)
 		})
 	};
 
-	let _rpc_handlers = sc_service::spawn_tasks(sc_service::SpawnTasksParams {
-		network: Arc::new(network.clone()),
+	sc_service::spawn_tasks(sc_service::SpawnTasksParams {
+		rpc_builder,
 		client: client.clone(),
-		keystore,
-		task_manager: &mut task_manager,
 		transaction_pool: transaction_pool.clone(),
-		rpc_builder: rpc_extensions_builder,
+		task_manager: &mut task_manager,
+		config,
+		keystore: keystore_container.keystore(),
 		backend,
+		network: network.clone(),
+		sync_service: sync_service.clone(),
 		system_rpc_tx,
 		tx_handler_controller,
-		sync_service: sync_service.clone(),
-		config,
 		telemetry: telemetry.as_mut(),
 	})?;
 
 	if role.is_authority() {
-		if let Some(block_author) = mining_account_id {
-			let proposer_factory_compute = sc_basic_authorship::ProposerFactory::new(
-				task_manager.spawn_handle(),
-				client.clone(),
-				transaction_pool.clone(),
-				prometheus_registry.as_ref(),
-				telemetry.as_ref().map(|x| x.handle()),
-			);
+		let compute_threads = mining_config.compute_threads() as u32;
+		let compute_author = mining_config.compute_author;
+		let proposer_factory = sc_basic_authorship::ProposerFactory::new(
+			task_manager.spawn_handle(),
+			client.clone(),
+			transaction_pool.clone(),
+			prometheus_registry.as_ref(),
+			telemetry.as_ref().map(|x| x.handle()),
+		);
 
-			// how long to take to actually build the block (i.e. executing extrinsics)
-			let block_seconds = Duration::from_secs(10);
-
-			let (compute_miner, compute_task) =
-				argon_node_consensus::compute_worker::create_compute_miner(
-					Box::new(argon_block_import.clone()),
-					client.clone(),
-					aux_client.clone(),
-					proposer_factory_compute,
-					sync_service.clone(),
-					block_author.clone(),
-					sync_service.clone(),
-					utxo_tracker.clone(),
-					block_seconds,
-				);
-
-			task_manager.spawn_essential_handle().spawn_blocking(
-				"argon-compute-miner",
-				Some("block-authoring"),
-				compute_task,
-			);
-
-			let (
-				seal_watch_task,
-				notary_sync_task,
-				notary_notebook_queue_task,
-				create_block_stream,
-			) = argon_node_consensus::block_creation_task(
-				client.clone(),
-				select_chain,
-				aux_client.clone(),
-				keystore_container.keystore(),
-			);
-			let proposer_factory_tax = sc_basic_authorship::ProposerFactory::new(
-				task_manager.spawn_handle(),
-				client.clone(),
-				transaction_pool.clone(),
-				prometheus_registry.as_ref(),
-				telemetry.as_ref().map(|x| x.handle()),
-			);
-			let block_create_task = argon_node_consensus::tax_block_creator(
-				Box::new(argon_block_import),
-				client.clone(),
-				aux_client.clone(),
-				proposer_factory_tax,
-				sync_service.clone(),
-				block_seconds,
-				create_block_stream,
-				utxo_tracker.clone(),
-			);
-
-			task_manager.spawn_essential_handle().spawn_blocking(
-				"argon-vote-block-seal-watch",
-				Some("block-authoring"),
-				seal_watch_task,
-			);
-			task_manager.spawn_essential_handle().spawn_blocking(
-				"argon-vote-notary-sync",
-				Some("block-authoring"),
-				notary_sync_task,
-			);
-			task_manager.spawn_essential_handle().spawn_blocking(
-				"argon-vote-notebook-queue",
-				Some("block-authoring"),
-				notary_notebook_queue_task,
-			);
-			task_manager.spawn_essential_handle().spawn_blocking(
-				"argon-blocks",
-				Some("block-authoring"),
-				block_create_task,
-			);
-
-			let mining_threads = if let Some(mining_threads) = mining_threads {
-				mining_threads as usize
-			} else {
-				max(num_cpus::get() - 1, 1)
-			};
-			if mining_threads > 0 {
-				log::info!("Mining is enabled as {:?}, {} threads", block_author, mining_threads);
-				run_compute_solver_threads(&task_manager, compute_miner, mining_threads)
-			} else {
-				log::info!("Mining is disabled");
-			}
-		} else {
-			log::info!("Mining is disabled");
-		}
+		run_block_builder_task(
+			BlockBuilderParams {
+				block_import: argon_block_import,
+				client: client.clone(),
+				keystore: keystore_container.keystore(),
+				sync_oracle: sync_service.clone(),
+				select_chain: select_chain.clone(),
+				proposer: proposer_factory,
+				authoring_duration: Duration::from_secs(10),
+				utxo_tracker,
+				aux_client: aux_client.clone(),
+				justification_sync_link: sync_service.clone(),
+				compute_author,
+				compute_threads,
+			},
+			&task_manager,
+		);
 
 		let grandpa_config = sc_consensus_grandpa::Config {
 			// FIXME #1578 make this available through chainspec
@@ -385,7 +294,7 @@ pub fn new_full<
 			sc_consensus_grandpa::run_grandpa_voter(grandpa_config)?,
 		);
 	}
+	start_network.start_network();
 
-	network_starter.start_network();
 	Ok(task_manager)
 }

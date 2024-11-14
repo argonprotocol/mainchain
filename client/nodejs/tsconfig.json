@@ -19,7 +19,7 @@
     "declaration": true,
     "composite": true,
     "noImplicitAny": true,
-    "noUnusedLocals": true,
+    "noUnusedLocals": false,
     "noImplicitReturns": true,
     "moduleResolution": "node",
     "esModuleInterop": true,

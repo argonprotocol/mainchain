@@ -17,8 +17,22 @@ pub mod weights;
 
 #[frame_support::pallet(dev_mode)]
 pub mod pallet {
+	use super::*;
 	use alloc::{collections::btree_map::BTreeMap, vec, vec::Vec};
-
+	use argon_notary_audit::VerifyError;
+	use argon_primitives::{
+		digests::Digestset,
+		fork_power::ForkPower,
+		inherents::{BlockSealInherent, BlockSealInherentData, SealInherentError},
+		localchain::{BestBlockVoteSeal, BlockVote, BlockVoteT},
+		notary::NotaryNotebookRawVotes,
+		notebook::NotebookNumber,
+		tick::Tick,
+		AuthorityProvider, BlockSealDigest, BlockSealEventHandler, BlockSealSpecProvider,
+		BlockSealerInfo, BlockSealerProvider, BlockVotingKey, BlockVotingPower, MerkleProof,
+		NotaryId, NotebookProvider, ParentVotingKeyDigest, TickProvider, VotingKey, VotingSchedule,
+		PARENT_VOTING_KEY_DIGEST,
+	};
 	use binary_merkle_tree::{merkle_proof, verify_proof};
 	use frame_support::{pallet_prelude::*, traits::FindAuthor};
 	use frame_system::pallet_prelude::*;
@@ -26,22 +40,7 @@ pub mod pallet {
 	use sp_core::{H256, U256};
 	use sp_runtime::{
 		traits::{BlakeTwo256, Block as BlockT, Verify},
-		ConsensusEngineId, DigestItem, RuntimeAppPublic,
-	};
-
-	use super::*;
-	use argon_primitives::{
-		fork_power::ForkPower,
-		inherents::{BlockSealInherent, BlockSealInherentData, SealInherentError},
-		localchain::{BestBlockVoteSeal, BlockVote, BlockVoteT},
-		notary::NotaryNotebookRawVotes,
-		notebook::NotebookNumber,
-		tick::Tick,
-		AuthorityProvider, BlockSealAuthoritySignature, BlockSealEventHandler,
-		BlockSealSpecProvider, BlockSealerInfo, BlockSealerProvider, BlockVoteDigest,
-		BlockVotingKey, MerkleProof, NotaryId, NotebookProvider, ParentVotingKeyDigest,
-		TickProvider, VotingKey, VotingSchedule, AUTHOR_DIGEST_ID, BLOCK_VOTES_DIGEST_ID,
-		PARENT_VOTING_KEY_DIGEST,
+		Digest, DigestItem, RuntimeAppPublic,
 	};
 
 	#[pallet::pallet]
@@ -66,10 +65,15 @@ pub mod pallet {
 		/// Lookup seal specifications
 		type BlockSealSpecProvider: BlockSealSpecProvider<Self::Block>;
 
+		/// Find the author of a block
+		type FindAuthor: FindAuthor<Self::AccountId>;
+
 		type TickProvider: TickProvider<Self::Block>;
 
 		/// Emit events when a block seal is read
 		type EventHandler: BlockSealEventHandler;
+
+		type Digests: Get<Result<Digestset<VerifyError, Self::AccountId>, DispatchError>>;
 	}
 
 	#[pallet::storage]
@@ -91,19 +95,9 @@ pub mod pallet {
 	pub(super) type VotesInPast3Ticks<T> =
 		StorageValue<_, BoundedVec<(Tick, u32), ConstU32<3>>, ValueQuery>;
 
-	/// Author of current block (temporary storage).
-	#[pallet::storage]
-	#[pallet::getter(fn author)]
-	pub(super) type TempAuthor<T: Config> = StorageValue<_, T::AccountId, OptionQuery>;
-
 	/// Ensures only a single inherent is applied
 	#[pallet::storage]
 	pub(super) type TempSealInherent<T: Config> = StorageValue<_, BlockSealInherent, OptionQuery>;
-
-	/// Temporarily track the parent voting key digest
-	#[pallet::storage]
-	pub(super) type TempVotingKeyDigest<T: Config> =
-		StorageValue<_, ParentVotingKeyDigest, OptionQuery>;
 
 	type FindBlockVoteSealResult<T> = BoundedVec<
 		BestBlockVoteSeal<
@@ -139,8 +133,6 @@ pub mod pallet {
 		IneligibleNotebookUsed,
 		/// The lookup to verify a vote's authenticity is not available for the given block
 		NoEligibleVotingRoot,
-		/// Message was not signed by a registered miner
-		InvalidAuthoritySignature,
 		/// Could not decode the scale bytes of the votes
 		CouldNotDecodeVote,
 		/// Too many notebooks were submitted for the current tick. Should not be possible
@@ -149,43 +141,13 @@ pub mod pallet {
 		NoClosestMinerFoundForVote,
 		/// The vote signature was invalid
 		BlockVoteInvalidSignature,
+		/// Invalid fork power parent
+		InvalidForkPowerParent,
 	}
 
 	#[pallet::hooks]
 	impl<T: Config> Hooks<BlockNumberFor<T>> for Pallet<T> {
 		fn on_initialize(_: BlockNumberFor<T>) -> Weight {
-			let digest = <frame_system::Pallet<T>>::digest();
-			let is_author_preset = <TempAuthor<T>>::exists();
-			for log in digest.logs.into_iter() {
-				if let Some(parent_voting_key_digest) =
-					log.consensus_try_to::<ParentVotingKeyDigest>(&PARENT_VOTING_KEY_DIGEST)
-				{
-					assert!(
-						!<TempVotingKeyDigest<T>>::exists(),
-						"ParentVotingKey digest can only be provided once!"
-					);
-					<TempVotingKeyDigest<T>>::put(parent_voting_key_digest);
-				}
-
-				if let Some(account_id) = log.pre_runtime_try_to::<T::AccountId>(&AUTHOR_DIGEST_ID)
-				{
-					if !is_author_preset {
-						assert!(
-							!<TempAuthor<T>>::exists(),
-							"ParentVotingKey digest can only be provided once!"
-						);
-					}
-
-					<TempAuthor<T>>::put(account_id);
-				}
-			}
-
-			assert_ne!(
-				<TempAuthor<T>>::get(),
-				None,
-				"No valid account id provided for block author."
-			);
-
 			T::DbWeight::get().reads_writes(2, 2)
 		}
 
@@ -194,8 +156,6 @@ pub mod pallet {
 				TempSealInherent::<T>::take().is_some(),
 				"Block seal inherent must be included"
 			);
-			// ensure we never go to trie with these values.
-			TempAuthor::<T>::kill();
 
 			let voting_schedule = T::TickProvider::voting_schedule();
 
@@ -226,7 +186,8 @@ pub mod pallet {
 				<ParentVotingKey<T>>::put(parent_voting_key);
 			}
 
-			if let Some(included_digest) = TempVotingKeyDigest::<T>::take() {
+			let included_digest = T::Digests::get().expect("Digests must be set");
+			if let Some(included_digest) = included_digest.voting_key {
 				assert_eq!(
 					included_digest.parent_voting_key, parent_voting_key,
 					"Calculated ParentVotingKey does not match the value in included digest."
@@ -264,18 +225,26 @@ pub mod pallet {
 			BlockForkPower::<T>::get()
 		}
 
+		pub fn calculate_fork_power(
+			seal: BlockSealDigest,
+			voting_power: BlockVotingPower,
+			notebooks: u32,
+		) -> ForkPower {
+			let mut fork_power = BlockForkPower::<T>::get();
+			let compute = T::BlockSealSpecProvider::compute_difficulty();
+
+			fork_power.add(voting_power, notebooks, seal, compute);
+			fork_power
+		}
+
 		pub fn apply_seal(seal: BlockSealInherent) -> DispatchResult {
 			ensure!(!TempSealInherent::<T>::exists(), Error::<T>::DuplicateBlockSealProvided);
 			TempSealInherent::<T>::put(seal.clone());
 
-			let block_author =
-				<TempAuthor<T>>::get().expect("already unwrapped, should not be possible");
+			let digests = T::Digests::get()?;
+			let block_author = digests.author;
 			let notebooks = T::NotebookProvider::notebooks_in_block().len() as u32;
-			let vote_digest = <frame_system::Pallet<T>>::digest()
-				.logs
-				.iter()
-				.find_map(|log| log.pre_runtime_try_to::<BlockVoteDigest>(&BLOCK_VOTES_DIGEST_ID))
-				.ok_or(Error::<T>::CouldNotDecodeVote)?;
+			let vote_digest = digests.block_vote;
 
 			<VotesInPast3Ticks<T>>::mutate(|votes| {
 				if votes.is_full() {
@@ -304,7 +273,6 @@ pub mod pallet {
 					notary_id,
 					ref source_notebook_proof,
 					source_notebook_number,
-					ref miner_signature,
 				} => {
 					let current_tick = T::TickProvider::current_tick();
 					let voting_schedule =
@@ -328,7 +296,6 @@ pub mod pallet {
 						block_vote,
 						&block_author,
 						&voting_schedule,
-						miner_signature.clone(),
 					)?;
 					Self::verify_vote_source(
 						notary_id,
@@ -384,7 +351,6 @@ pub mod pallet {
 			block_vote: &BlockVote,
 			block_author: &T::AccountId,
 			voting_schedule: &VotingSchedule,
-			signature: BlockSealAuthoritySignature,
 		) -> DispatchResult {
 			let grandpa_vote_minimum = T::BlockSealSpecProvider::grandparent_vote_minimum()
 				.ok_or(Error::<T>::NoGrandparentVoteMinimum)?;
@@ -409,22 +375,40 @@ pub mod pallet {
 
 			ensure!(block_peer.authority_id == authority_id, Error::<T>::InvalidSubmitter);
 
-			let parent_hash = <frame_system::Pallet<T>>::parent_hash();
-
-			let message = BlockVote::seal_signature_message(&parent_hash, seal_strength);
-			let Ok(signature) = AuthoritySignature::<T>::decode(&mut signature.as_ref()) else {
-				return Err(Error::<T>::InvalidAuthoritySignature.into());
-			};
-			ensure!(
-				authority_id.verify(&message, &signature),
-				Error::<T>::InvalidAuthoritySignature
-			);
 			ensure!(
 				block_vote.signature.verify(&block_vote.hash()[..], &block_vote.account_id),
 				Error::<T>::BlockVoteInvalidSignature
 			);
 
 			Ok(())
+		}
+
+		pub fn is_valid_miner_signature(
+			hash: <T::Block as BlockT>::Hash,
+			seal: &BlockSealDigest,
+			digest: &Digest,
+		) -> bool {
+			match seal {
+				BlockSealDigest::Vote { signature, .. } => {
+					let Some(author) = T::FindAuthor::find_author(
+						digest.logs.iter().filter_map(|a| a.as_pre_runtime()),
+					) else {
+						return false;
+					};
+					// dumb hack to convert the signature type to match
+					let Ok(signature) = AuthoritySignature::<T>::decode(&mut signature.as_ref())
+					else {
+						log::error!("Could not decode signature for vote");
+						return false;
+					};
+
+					let block_seal_message = BlockVote::seal_signature_message(hash);
+					let authority_id = T::AuthorityProvider::get_authority(author)
+						.expect("Authority must be registered");
+					authority_id.verify(&block_seal_message, &signature)
+				},
+				_ => false,
+			}
 		}
 
 		/// Returns true if there's a parent voting key and votes in the tick notebooks
@@ -596,30 +580,6 @@ pub mod pallet {
 
 		fn is_inherent(call: &Self::Call) -> bool {
 			matches!(call, Call::apply { .. })
-		}
-	}
-
-	impl<T: Config> FindAuthor<T::AccountId> for Pallet<T> {
-		fn find_author<'a, I>(digests: I) -> Option<T::AccountId>
-		where
-			I: 'a + IntoIterator<Item = (ConsensusEngineId, &'a [u8])>,
-		{
-			// if this is called after initialize, we're fine, but it might not be
-			if let Some(account_id) = <TempAuthor<T>>::get() {
-				return Some(account_id);
-			}
-
-			for (id, mut data) in digests.into_iter() {
-				if id == AUTHOR_DIGEST_ID {
-					let decoded = T::AccountId::decode(&mut data);
-					if let Ok(account_id) = decoded {
-						<TempAuthor<T>>::put(&account_id);
-						return Some(account_id);
-					}
-				}
-			}
-
-			None
 		}
 	}
 

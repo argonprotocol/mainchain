@@ -6,70 +6,66 @@ use sp_runtime::RuntimeDebug;
 
 use argon_primitives::bitcoin::BitcoinError;
 
-#[derive(RuntimeDebug)]
-#[cfg_attr(feature = "std", derive(thiserror::Error))]
+#[derive(RuntimeDebug, thiserror::Error)]
 pub enum Error {
 	/// Fees overflowed
-	#[cfg_attr(feature = "std", error("The fees overflowed."))]
+	#[error("The fees overflowed.")]
 	FeeOverflow,
 
 	/// Insufficient fees
-	#[cfg_attr(feature = "std", error("Insufficient fees."))]
+	#[error("Insufficient fees.")]
 	FeeTooLow,
 
 	/// An error occurred creating the timelock multisig script
-	#[cfg_attr(
-		feature = "std",
-		error("An error occurred creating the timelock multisig script. {0:?}")
-	)]
+	#[error("An error occurred creating the timelock multisig script. {0:?}")]
 	TimelockScriptError(BitcoinError),
 
 	/// Could not create an address
-	#[cfg_attr(feature = "std", error("Could not create an address."))]
+	#[error("Could not create an address.")]
 	AddressError,
 
 	/// Could not sign with derived key
-	#[cfg_attr(feature = "std", error("Could not sign with derived key."))]
+	#[error("Could not sign with derived key.")]
 	DerivedKeySignError,
 
 	/// Signature Expected
-	#[cfg_attr(feature = "std", error("Signature Expected."))]
+	#[error("Signature Expected.")]
 	SignatureExpected,
 
 	/// Signing Errors
-	#[cfg_attr(feature = "std", error("Signing Errors {0:?}."))]
+	#[error("Signing Errors {0:?}.")]
 	SigningErrors(SigningErrors),
 
 	/// Sign Error
-	#[cfg_attr(feature = "std", error("Sign Error {0:?}."))]
+	#[error("Sign Error {0:?}.")]
 	SignError(SignError),
 
 	/// Bip32 Error
-	#[cfg_attr(feature = "std", error("Bip32 Error {0}."))]
+	#[error("Bip32 Error {0}.")]
 	Bip32Error(bip32::Error),
 
 	/// Unknown pubkey hash in partial sigs
-	#[cfg_attr(feature = "std", error("Unknown pubkey hash in partial sigs"))]
+	#[error("Unknown pubkey hash in partial sigs")]
 	UnknownPubkeyHash,
 
 	/// Could not extract tx
-	#[cfg_attr(feature = "std", error("Could not extract tx {0:?}"))]
+	#[error("Could not extract tx {0:?}")]
 	ExtractTxError(ExtractTxError),
 
 	/// Partially Signed Bitcoin Transaction Error
-	#[cfg_attr(feature = "std", error("Partially Signed Bitcoin Transaction Error {0:?}"))]
+	#[error("Partially Signed Bitcoin Transaction Error {0:?}")]
 	PsbtError(psbt::Error),
 
 	/// Psbt Finalize Error
-	#[cfg_attr(feature = "std", error("Psbt Finalize Error"))]
+	#[error("Psbt Finalize Error")]
 	PsbtFinalizeError,
 
 	/// Invalid Signature Bytes
-	#[cfg_attr(feature = "std", error("Invalid Signature Bytes"))]
+	#[error("Invalid Signature Bytes")]
 	InvalidSignatureBytes,
 
 	/// Invalid Compressed Pubkey Bytes
-	#[cfg_attr(feature = "std", error("Invalid Compressed Pubkey Bytes"))]
+	#[error("Invalid Compressed Pubkey Bytes")]
 	InvalidCompressPubkeyBytes,
 }
 

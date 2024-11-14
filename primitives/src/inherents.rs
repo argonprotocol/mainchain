@@ -7,8 +7,8 @@ use sp_runtime::RuntimeDebug;
 
 use crate::{
 	bitcoin::{BitcoinBlock, BitcoinHeight, BitcoinRejectedReason, UtxoId, UtxoRef},
-	BestBlockVoteSeal, BlockSealAuthoritySignature, BlockSealDigest, BlockVote, MerkleProof,
-	NotaryId, NotebookNumber, SignedNotebookHeader,
+	BestBlockVoteSeal, BlockSealDigest, BlockVote, MerkleProof, NotaryId, NotebookNumber,
+	SignedNotebookHeader,
 };
 
 pub const SEAL_INHERENT_IDENTIFIER: InherentIdentifier = *b"seal_arg";
@@ -28,7 +28,6 @@ pub enum BlockSealInherent {
 		source_notebook_number: NotebookNumber,
 		source_notebook_proof: MerkleProof,
 		block_vote: BlockVote,
-		miner_signature: BlockSealAuthoritySignature,
 	},
 	Compute,
 }
@@ -42,24 +41,20 @@ pub enum BlockSealInherentNodeSide {
 		#[codec(compact)]
 		source_notebook_number: NotebookNumber,
 		source_notebook_proof: MerkleProof,
-		miner_signature: BlockSealAuthoritySignature,
+		/// Encoded block vote on node side
 		block_vote_bytes: Vec<u8>,
 	},
 	Compute,
 }
 
 impl BlockSealInherentNodeSide {
-	pub fn from_vote<A: Codec, Auth: Codec>(
-		best_vote: BestBlockVoteSeal<A, Auth>,
-		miner_signature: BlockSealAuthoritySignature,
-	) -> Self {
+	pub fn from_vote<A: Codec, Auth: Codec>(best_vote: BestBlockVoteSeal<A, Auth>) -> Self {
 		Self::Vote {
 			notary_id: best_vote.notary_id,
 			seal_strength: best_vote.seal_strength,
 			source_notebook_number: best_vote.source_notebook_number,
 			source_notebook_proof: best_vote.source_notebook_proof,
 			block_vote_bytes: best_vote.block_vote_bytes,
-			miner_signature,
 		}
 	}
 }
@@ -68,7 +63,7 @@ impl BlockSealInherent {
 	pub fn matches(&self, seal_digest: BlockSealDigest) -> bool {
 		match self {
 			Self::Vote { seal_strength, .. } => match seal_digest {
-				BlockSealDigest::Vote { seal_strength: included_seal_strength } =>
+				BlockSealDigest::Vote { seal_strength: included_seal_strength, .. } =>
 					seal_strength == &included_seal_strength,
 				_ => false,
 			},
@@ -87,7 +82,6 @@ impl TryInto<BlockSealInherent> for BlockSealInherentNodeSide {
 				block_vote_bytes,
 				source_notebook_number,
 				source_notebook_proof,
-				miner_signature,
 			} => BlockSealInherent::Vote {
 				seal_strength,
 				notary_id,
@@ -96,7 +90,6 @@ impl TryInto<BlockSealInherent> for BlockSealInherentNodeSide {
 				})?,
 				source_notebook_number,
 				source_notebook_proof,
-				miner_signature,
 			},
 			BlockSealInherentNodeSide::Compute => BlockSealInherent::Compute,
 		})
@@ -122,14 +115,14 @@ impl BlockSealInherentData for InherentData {
 }
 
 /// Errors that can occur while checking the timestamp inherent.
-#[derive(Encode, RuntimeDebug)]
-#[cfg_attr(feature = "std", derive(Decode, thiserror::Error))]
+#[derive(Encode, RuntimeDebug, thiserror::Error)]
+#[cfg_attr(feature = "std", derive(Decode))]
 pub enum SealInherentError {
 	/// The block seal is missing
-	#[cfg_attr(feature = "std", error("The block seal is missing."))]
+	#[error("The block seal is missing.")]
 	MissingSeal,
 	/// The block seal is invalid
-	#[cfg_attr(feature = "std", error("The block seal does not match the digest."))]
+	#[error("The block seal does not match the digest.")]
 	InvalidSeal,
 }
 
@@ -230,14 +223,14 @@ impl sp_inherents::InherentDataProvider for NotebooksInherentDataProvider {
 	}
 }
 
-#[derive(Encode, RuntimeDebug)]
-#[cfg_attr(feature = "std", derive(Decode, thiserror::Error))]
+#[derive(Encode, RuntimeDebug, thiserror::Error)]
+#[cfg_attr(feature = "std", derive(Decode))]
 pub enum NotebookInherentError {
 	/// The block seal is missing
-	#[cfg_attr(feature = "std", error("The notebook inherent is missing."))]
+	#[error("The notebook inherent is missing.")]
 	MissingInherent,
 	/// The inherent has a mismatch with the details included in the block
-	#[cfg_attr(feature = "std", error("The notebook inherent does not match the block."))]
+	#[error("The notebook inherent does not match the block.")]
 	InherentMismatch,
 }
 
@@ -304,14 +297,11 @@ impl sp_inherents::InherentDataProvider for BitcoinInherentDataProvider {
 	}
 }
 
-#[derive(Encode, RuntimeDebug)]
-#[cfg_attr(feature = "std", derive(Decode, thiserror::Error))]
+#[derive(Encode, RuntimeDebug, thiserror::Error)]
+#[cfg_attr(feature = "std", derive(Decode))]
 pub enum BitcoinInherentError {
 	/// The inherent has a mismatch with the details coordinated between bitcoin and the block
-	#[cfg_attr(
-		feature = "std",
-		error("The bitcoin inherent does not match the bitcoin state compared to the block.")
-	)]
+	#[error("The bitcoin inherent does not match the bitcoin state compared to the block.")]
 	InvalidInherentData,
 }
 

@@ -19,7 +19,7 @@ codec = { workspace = true }
 log = { workspace = true }
 anyhow = { workspace = true }
 parking_lot = { workspace = true }
-thiserror = { workspace = true }
+thiserror = { workspace = true, features = ["default"] }
 bitcoincore-rpc = { workspace = true }
 bitcoin = { workspace = true }
 argon-primitives = { workspace = true, features = ["std", "bitcoin"] }

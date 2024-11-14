@@ -2,104 +2,73 @@
 // `construct_runtime!` does a lot of recursion and requires us to increase the limit to 256.
 #![recursion_limit = "256"]
 extern crate alloc;
-#[cfg(feature = "runtime-benchmarks")]
-#[macro_use]
-extern crate frame_benchmarking;
 
+#[cfg(feature = "std")]
+include!(concat!(env!("OUT_DIR"), "/wasm_binary.rs"));
+
+#[cfg(feature = "runtime-benchmarks")]
+mod benchmark;
+
+pub mod configs;
+
+pub use crate::configs::NotaryRecordT;
+pub use pallet_notebook::NotebookVerifyError;
+
+use crate::configs::{
+	ArgonToken, BaseCallFilter, BlockHashCount, BlockLength, BlockWeights, Version,
+};
 use alloc::{collections::btree_map::BTreeMap, vec, vec::Vec};
-use codec::{Decode, Encode, MaxEncodedLen};
-use core::marker::PhantomData;
-pub use frame_support::{
-	construct_runtime, parameter_types,
-	traits::{
-		ConstBool, ConstU128, ConstU32, ConstU64, ConstU8, KeyOwnerProofSystem, Randomness,
-		StorageInfo,
+use argon_primitives::{
+	bitcoin::{BitcoinNetwork, BitcoinSyncStatus, Satoshis, UtxoRef, UtxoValue},
+	block_seal::{ComputePuzzle, MiningAuthority},
+	fork_power::ForkPower,
+	notary::{
+		NotaryNotebookAuditSummary, NotaryNotebookDetails, NotaryNotebookRawVotes,
+		NotaryNotebookVoteDigestDetails, NotaryRecordWithState,
 	},
-	weights::{
-		constants::{
-			BlockExecutionWeight, ExtrinsicBaseWeight, RocksDbWeight, WEIGHT_REF_TIME_PER_SECOND,
-		},
-		IdentityFee, Weight, WeightToFeePolynomial,
-	},
-	StorageValue,
+	tick::{Tick, Ticker},
+	AccountId, Balance, BestBlockVoteSeal, BlockHash, BlockNumber, BlockSealAuthorityId,
+	BlockSealDigest, BlockSealSpecProvider, BlockVoteDigest, HashOutput, Nonce, NotaryId,
+	NotebookAuditResult, NotebookNumber, PriceProvider, Signature, TickProvider, VoteMinimum,
+	VotingKey,
 };
 use frame_support::{
 	derive_impl,
 	genesis_builder_helper::{build_state, get_preset},
-	traits::{
-		fungible, fungible::Balanced, Contains, Currency, Everything, Imbalance, InsideBoth,
-		InstanceFilter, OnUnbalanced, StorageMapShim,
-	},
-	weights::{WeightToFeeCoefficient, WeightToFeeCoefficients},
-	PalletId,
+	traits::{ConstU32, InsideBoth},
+	weights::{constants::RocksDbWeight, Weight},
 };
-pub use frame_system::Call as SystemCall;
-use frame_system::EnsureRoot;
-pub use pallet_timestamp::Call as TimestampCall;
-use pallet_transaction_payment::{ConstFeeMultiplier, FungibleAdapter, Multiplier};
-use pallet_tx_pause::RuntimeCallNameOf;
-use scale_info::TypeInfo;
-use smallvec::smallvec;
 use sp_api::impl_runtime_apis;
-use sp_arithmetic::{traits::Zero, FixedU128, Percent};
-use sp_consensus_grandpa::{AuthorityId as GrandpaId, AuthorityList};
-use sp_core::{crypto::KeyTypeId, ConstU16, OpaqueMetadata, H256, U256};
-use sp_debug_derive::RuntimeDebug;
+use sp_consensus_grandpa::AuthorityId as GrandpaId;
+use sp_core::{crypto::KeyTypeId, ConstU16, Get, OpaqueMetadata, H256, U256};
+use sp_runtime::{
+	create_runtime_str, generic, impl_opaque_keys,
+	traits::{BlakeTwo256, Block as BlockT, NumberFor},
+	transaction_validity::{TransactionSource, TransactionValidity},
+	ApplyExtrinsicResult, BoundedVec, Digest, DispatchError,
+};
+
 #[cfg(any(feature = "std", test))]
 pub use sp_runtime::BuildStorage;
-use sp_runtime::{
-	create_runtime_str, generic,
-	traits::{BlakeTwo256, Block as BlockT, NumberFor, One},
-	transaction_validity::{TransactionSource, TransactionValidity},
-	ApplyExtrinsicResult, BoundedVec, DispatchError,
-};
-pub use sp_runtime::{Perbill, Permill};
 
-use sp_runtime::traits::Get;
 #[cfg(feature = "std")]
 use sp_version::NativeVersion;
 use sp_version::RuntimeVersion;
 
-use crate::opaque::SessionKeys;
-use argon_primitives::{
-	bitcoin::{BitcoinHeight, BitcoinNetwork, BitcoinSyncStatus, Satoshis, UtxoRef, UtxoValue},
-	block_seal::MiningAuthority,
-	block_vote::VoteMinimum,
-	digests::BlockVoteDigest,
-	fork_power::ForkPower,
-	localchain::BestBlockVoteSeal,
-	notary::{
-		NotaryId, NotaryNotebookAuditSummary, NotaryNotebookDetails, NotaryNotebookRawVotes,
-		NotaryNotebookVoteDigestDetails, NotaryRecordWithState,
-	},
-	notebook::NotebookNumber,
-	tick::{Tick, Ticker},
-	BlockSealAuthorityId, PriceProvider, TickProvider, CHANNEL_HOLD_CLAWBACK_TICKS,
-};
-pub use argon_primitives::{
-	AccountId, Balance, BlockHash, BlockNumber, HashOutput, Moment, Nonce, Signature,
-};
-pub use currency::*;
-use pallet_bond::BitcoinVerifier;
-use pallet_mining_slot::OnNewSlot;
-pub use pallet_notebook::NotebookVerifyError;
-
+pub type BalancesCall = pallet_balances::Call<Runtime, ArgonToken>;
 // A few exports that help ease life for downstream crates.
-
-// Make the WASM binary available.
-#[cfg(feature = "std")]
-include!(concat!(env!("OUT_DIR"), "/wasm_binary.rs"));
-
 pub type AccountData = pallet_balances::AccountData<Balance>;
 /// Opaque types. These are used by the CLI to instantiate machinery that don't need to know
 /// the specifics of the runtime. They can then be made to be agnostic over specific formats
 /// of data like extrinsics, allowing for them to continue syncing the network through upgrades
 /// to even the core data structures.
 pub mod opaque {
-	use sp_runtime::impl_opaque_keys;
-	pub use sp_runtime::OpaqueExtrinsic as UncheckedExtrinsic;
-
 	use super::*;
+	pub use sp_runtime::OpaqueExtrinsic as UncheckedExtrinsic;
+	use sp_runtime::{
+		generic,
+		traits::{BlakeTwo256, Hash as HashT},
+	};
 
 	/// Opaque block header type.
 	pub type Header = generic::Header<BlockNumber, BlockHash>;
@@ -107,12 +76,14 @@ pub mod opaque {
 	pub type Block = generic::Block<Header, UncheckedExtrinsic>;
 	/// Opaque block identifier type.
 	pub type BlockId = generic::BlockId<Block>;
+	/// Opaque block hash type.
+	pub type Hash = <BlakeTwo256 as HashT>::Output;
+}
 
-	impl_opaque_keys! {
-		pub struct SessionKeys {
-			pub grandpa: Grandpa,
-			pub block_seal_authority: MiningSlot,
-		}
+impl_opaque_keys! {
+	pub struct SessionKeys {
+	pub grandpa: Grandpa,
+	pub block_seal_authority: MiningSlot,
 	}
 }
 
@@ -132,8 +103,6 @@ pub mod currency {
 		items as Balance * 100 * CENTS + (bytes as Balance) * 5 * MILLICENTS
 	}
 }
-
-pub type BalancesCall = pallet_balances::Call<Runtime, ArgonToken>;
 
 // To learn more about runtime versioning, see:
 // https://docs.substrate.io/main-docs/build/upgrade#runtime-versioning
@@ -160,49 +129,10 @@ pub fn native_version() -> NativeVersion {
 	NativeVersion { runtime_version: VERSION, can_author_with: Default::default() }
 }
 
-const NORMAL_DISPATCH_RATIO: Perbill = Perbill::from_percent(75);
-
-parameter_types! {
-	pub const BlockHashCount: BlockNumber = 2400;
-	pub const Version: RuntimeVersion = VERSION;
-	/// We allow for 60 seconds of compute with a 6 second average block time.
-	pub BlockWeights: frame_system::limits::BlockWeights =
-		frame_system::limits::BlockWeights::with_sensible_defaults(
-			Weight::from_parts(60u64 * WEIGHT_REF_TIME_PER_SECOND, u64::MAX),
-			NORMAL_DISPATCH_RATIO,
-		);
-	pub BlockLength: frame_system::limits::BlockLength = frame_system::limits::BlockLength
-		::max_with_normal_ratio(5 * 1024 * 1024, NORMAL_DISPATCH_RATIO);
-}
-/// Calls that cannot be paused by the tx-pause pallet.
-pub struct TxPauseWhitelistedCalls;
-/// All calls are pausable.
-impl Contains<RuntimeCallNameOf<Runtime>> for TxPauseWhitelistedCalls {
-	fn contains(_full_name: &RuntimeCallNameOf<Runtime>) -> bool {
-		false
-		// match (full_name.0.as_slice(), full_name.1.as_slice()) {
-		// 	(b"Balances", b"transfer_keep_alive") => true,
-		// 	_ => false,
-		// }
-	}
-}
-
-/// This pallet is intended to be used as a shortterm security measure.
-impl pallet_tx_pause::Config for Runtime {
-	type RuntimeEvent = RuntimeEvent;
-	type RuntimeCall = RuntimeCall;
-	type PauseOrigin = EnsureRoot<AccountId>;
-	type UnpauseOrigin = EnsureRoot<AccountId>;
-	type WhitelistedCalls = TxPauseWhitelistedCalls;
-	type MaxNameLen = ConstU32<256>;
-	type WeightInfo = pallet_tx_pause::weights::SubstrateWeight<Runtime>;
-}
-
-#[derive_impl(frame_system::config_preludes::SolochainDefaultConfig)]
+#[derive_impl(frame_system::config_preludes::ParaChainDefaultConfig)]
 impl frame_system::Config for Runtime {
 	/// The basic call filter to use in dispatchable.
-	/// example filter: https://github.com/AcalaNetwork/Acala/blob/f4b80d7200c19b78d3777e8a4a87bc6893740d23/runtime/karura/src/lib.rs#L198
-	type BaseCallFilter = InsideBoth<Everything, TxPause>;
+	type BaseCallFilter = InsideBoth<BaseCallFilter, TxPause>;
 	/// The block type for the runtime.
 	type Block = Block;
 	/// Block & extrinsics weights: base values and limits.
@@ -227,547 +157,8 @@ impl frame_system::Config for Runtime {
 	type AccountData = pallet_balances::AccountData<Balance>;
 	/// This is used as an identifier of the chain. 42 is the generic substrate prefix.
 	type SS58Prefix = ConstU16<{ argon_primitives::ADDRESS_PREFIX }>;
-	type MaxConsumers = frame_support::traits::ConstU32<16>;
+	type MaxConsumers = ConstU32<16>;
 }
-
-parameter_types! {
-	pub const TargetComputeBlockPercent: Percent = Percent::from_percent(50); // aim for compute to take half of vote time
-	pub const TargetBlockVotes: u32 = 50_000;
-	pub const SealSpecMinimumsChangePeriod: u32 = 60 * 24; // change block_seal_spec once a day
-
-	pub const DefaultChannelHoldDuration: Tick = 60;
-	pub const HistoricalPaymentAddressTicksToKeep: Tick = DefaultChannelHoldDuration::get() + CHANNEL_HOLD_CLAWBACK_TICKS + 10;
-
-	pub const ArgonsPerBlock: u32 = 5_000;
-	pub const StartingOwnershipTokensPerBlock: u32 = 5_000;
-	pub const HalvingBlocks: u32 = 2_100_000; // based on bitcoin, but 10x since we're 1 block per minute
-	pub const MaturationBlocks: u32 = 5;
-	pub const MinerPayoutPercent: FixedU128 = FixedU128::from_rational(75, 100);
-	pub const DomainExpirationTicks: Tick = 60 * 24 * 365; // 1 year
-}
-
-impl pallet_block_seal_spec::Config for Runtime {
-	type RuntimeEvent = RuntimeEvent;
-	type TargetComputeBlockPercent = TargetComputeBlockPercent;
-	type AuthorityProvider = MiningSlot;
-	type NotebookProvider = Notebook;
-	type WeightInfo = pallet_block_seal_spec::weights::SubstrateWeight<Runtime>;
-	type TargetBlockVotes = TargetBlockVotes;
-	type ChangePeriod = SealSpecMinimumsChangePeriod;
-	type SealInherent = BlockSeal;
-	type TickProvider = Ticks;
-	type MaxActiveNotaries = MaxActiveNotaries;
-}
-
-pub struct NotebookTickProvider;
-impl Get<Tick> for NotebookTickProvider {
-	fn get() -> Tick {
-		let schedule = Ticks::voting_schedule();
-		schedule.notebook_tick()
-	}
-}
-impl pallet_block_rewards::Config for Runtime {
-	type RuntimeEvent = RuntimeEvent;
-	type WeightInfo = pallet_block_rewards::weights::SubstrateWeight<Runtime>;
-	type ArgonCurrency = Balances;
-	type OwnershipCurrency = Ownership;
-	type Balance = Balance;
-	type BlockSealerProvider = BlockSeal;
-	type NotaryProvider = Notaries;
-	type NotebookProvider = Notebook;
-	type NotebookTick = NotebookTickProvider;
-	type ArgonsPerBlock = ArgonsPerBlock;
-	type StartingOwnershipTokensPerBlock = StartingOwnershipTokensPerBlock;
-	type HalvingBlocks = HalvingBlocks;
-	type MinerPayoutPercent = MinerPayoutPercent;
-	type MaturationBlocks = MaturationBlocks;
-	type RuntimeFreezeReason = RuntimeFreezeReason;
-	type EventHandler = Mint;
-	type BlockRewardAccountsProvider = MiningSlot;
-}
-
-impl pallet_domains::Config for Runtime {
-	type RuntimeEvent = RuntimeEvent;
-	type WeightInfo = pallet_domains::weights::SubstrateWeight<Runtime>;
-	type NotebookTick = NotebookTickProvider;
-	type DomainExpirationTicks = DomainExpirationTicks;
-	type HistoricalPaymentAddressTicksToKeep = HistoricalPaymentAddressTicksToKeep;
-}
-
-impl pallet_authorship::Config for Runtime {
-	type FindAuthor = BlockSeal;
-	type EventHandler = ();
-}
-
-impl pallet_timestamp::Config for Runtime {
-	/// A timestamp: milliseconds since the unix epoch.
-	type Moment = Moment;
-	type OnTimestampSet = (BlockSealSpec, Ticks);
-	type MinimumPeriod = ConstU64<1000>;
-	type WeightInfo = ();
-}
-
-impl pallet_ticks::Config for Runtime {
-	type WeightInfo = ();
-}
-
-parameter_types! {
-	pub const MaxCohortSize: u32 = 1_000; // this means mining_slots last 10 days
-	pub const MaxMiners: u32 = 10_000; // must multiply cleanly by MaxCohortSize
-	pub const OwnershipPercentAdjustmentDamper: FixedU128 = FixedU128::from_rational(20, 100);
-	pub const TargetBidsPerSlot: u32 = 1_200; // 20% extra bids
-
-	pub const MaxConcurrentlyExpiringBonds: u32 = 1000;
-	pub const MinimumBondAmount: u128 = 1_000;
-	pub const BlocksPerDay: u32 = 1440;
-	pub const BlocksPerYear: u32 = 1440 * 365;
-
-	const BitcoinBlocksPerDay: BitcoinHeight = 6 * 24;
-	pub const BitcoinBondDurationBlocks: BitcoinHeight = BitcoinBlocksPerDay::get() * 365; // 1 year
-	pub const BitcoinBondReclamationBlocks: BitcoinHeight = BitcoinBlocksPerDay::get() * 30; // 30 days
-	pub const UtxoUnlockCosignDeadlineBlocks: BitcoinHeight = BitcoinBlocksPerDay::get() * 5; // 5 days
-
-	pub const MaxSetIdSessionEntries: u32 = 2u32;
-
-	pub const MaxUnlockingUtxos: u32 = 1000;
-	pub const MaxPendingTermModificationsPerBlock: u32 = 100;
-	pub const MinTermsModificationBlockDelay: u32 = 1439; // must be at least one slot (day)
-}
-
-impl pallet_vaults::Config for Runtime {
-	type RuntimeEvent = RuntimeEvent;
-	type WeightInfo = pallet_vaults::weights::SubstrateWeight<Runtime>;
-	type Currency = Balances;
-	type Balance = Balance;
-	type RuntimeHoldReason = RuntimeHoldReason;
-	type MinimumBondAmount = MinimumBondAmount;
-	type BlocksPerDay = BlocksPerDay;
-	type MaxPendingTermModificationsPerBlock = MaxPendingTermModificationsPerBlock;
-	type MiningSlotProvider = MiningSlot;
-	type MinTermsModificationBlockDelay = MinTermsModificationBlockDelay;
-	type GetBitcoinNetwork = BitcoinUtxos;
-}
-
-pub struct BitcoinSignatureVerifier;
-impl BitcoinVerifier<Runtime> for BitcoinSignatureVerifier {}
-impl pallet_bond::Config for Runtime {
-	type RuntimeEvent = RuntimeEvent;
-	type WeightInfo = pallet_bond::weights::SubstrateWeight<Runtime>;
-	type Currency = Balances;
-	type RuntimeHoldReason = RuntimeHoldReason;
-	type MinimumBondAmount = MinimumBondAmount;
-	type MaxConcurrentlyExpiringBonds = MaxConcurrentlyExpiringBonds;
-	type Balance = Balance;
-	type VaultProvider = Vaults;
-	type PriceProvider = PriceIndex;
-	type BitcoinBlockHeight = BitcoinUtxos;
-	type GetBitcoinNetwork = BitcoinUtxos;
-	type BitcoinBondDurationBlocks = BitcoinBondDurationBlocks;
-	type BitcoinBondReclamationBlocks = BitcoinBondReclamationBlocks;
-	type BitcoinUtxoTracker = BitcoinUtxos;
-	type MaxUnlockingUtxos = MaxUnlockingUtxos;
-	type BondEvents = Mint;
-	type ArgonBlocksPerDay = BlocksPerDay;
-	type UtxoUnlockCosignDeadlineBlocks = UtxoUnlockCosignDeadlineBlocks;
-	type BitcoinSignatureVerifier = BitcoinSignatureVerifier;
-}
-
-pub struct GrandpaSlotRotation;
-
-impl OnNewSlot<AccountId> for GrandpaSlotRotation {
-	type Key = GrandpaId;
-	fn on_new_slot(
-		removed_authorities: Vec<(&AccountId, Self::Key)>,
-		added_authorities: Vec<(&AccountId, Self::Key)>,
-	) {
-		if removed_authorities.is_empty() && added_authorities.is_empty() {
-			return;
-		}
-		let mut next_authorities: AuthorityList = Grandpa::grandpa_authorities();
-		for (_, authority_id) in removed_authorities {
-			if let Some(index) = next_authorities.iter().position(|x| x.0 == authority_id) {
-				next_authorities.remove(index);
-			}
-		}
-		for (_, authority_id) in added_authorities {
-			next_authorities.push((authority_id, 1));
-		}
-
-		if let Err(err) = Grandpa::schedule_change(next_authorities, Zero::zero(), None) {
-			log::error!("Failed to schedule grandpa change: {:?}", err);
-		}
-	}
-}
-
-impl pallet_mining_slot::Config for Runtime {
-	type RuntimeEvent = RuntimeEvent;
-	type WeightInfo = pallet_mining_slot::weights::SubstrateWeight<Runtime>;
-	type MaxMiners = MaxMiners;
-	type OwnershipCurrency = Ownership;
-	type OwnershipPercentAdjustmentDamper = OwnershipPercentAdjustmentDamper;
-	type TargetBidsPerSlot = TargetBidsPerSlot;
-	type RuntimeHoldReason = RuntimeHoldReason;
-	type MaxCohortSize = MaxCohortSize;
-	type Balance = Balance;
-	type BondProvider = Bonds;
-	type SlotEvents = (GrandpaSlotRotation,);
-	type Keys = SessionKeys;
-	type MiningAuthorityId = BlockSealAuthorityId;
-}
-
-impl pallet_block_seal::Config for Runtime {
-	type AuthorityId = BlockSealAuthorityId;
-	type WeightInfo = pallet_block_seal::weights::SubstrateWeight<Runtime>;
-	type AuthorityProvider = MiningSlot;
-	type NotebookProvider = Notebook;
-	type BlockSealSpecProvider = BlockSealSpec;
-	type TickProvider = Ticks;
-	type EventHandler = MiningSlot;
-}
-
-impl pallet_grandpa::Config for Runtime {
-	type RuntimeEvent = RuntimeEvent;
-	type WeightInfo = ();
-	type MaxAuthorities = MaxMiners;
-	type MaxNominators = ConstU32<0>;
-	type MaxSetIdSessionEntries = MaxSetIdSessionEntries;
-	type KeyOwnerProof = sp_core::Void;
-	type EquivocationReportSystem = ();
-}
-
-parameter_types! {
-	pub const ChainTransferPalletId: PalletId = PalletId(*b"transfer");
-
-	/// How long a transfer should remain in storage before returning.
-	pub const TransferExpirationTicks: u32 = 1400 * 10;
-
-	/// How many transfers out can be queued per block
-	pub const MaxPendingTransfersOutPerBlock: u32 = 1000;
-}
-
-impl pallet_chain_transfer::Config for Runtime {
-	type RuntimeEvent = RuntimeEvent;
-	type WeightInfo = pallet_chain_transfer::weights::SubstrateWeight<Runtime>;
-	type Currency = Balances;
-	type Balance = Balance;
-	type PalletId = ChainTransferPalletId;
-	type TransferExpirationTicks = TransferExpirationTicks;
-	type MaxPendingTransfersOutPerBlock = MaxPendingTransfersOutPerBlock;
-	type NotebookProvider = Notebook;
-	type EventHandler = Mint;
-	type NotebookTick = NotebookTickProvider;
-}
-
-impl pallet_notebook::Config for Runtime {
-	type RuntimeEvent = RuntimeEvent;
-	type WeightInfo = pallet_notebook::weights::SubstrateWeight<Runtime>;
-	type EventHandler = (ChainTransfer, BlockSealSpec, Domains);
-	type NotaryProvider = Notaries;
-	type ChainTransferLookup = ChainTransfer;
-	type BlockSealSpecProvider = BlockSealSpec;
-	type TickProvider = Ticks;
-}
-
-parameter_types! {
-	pub const MaxActiveNotaries: u32 = 25; // arbitrarily set
-	pub const MaxProposalHoldBlocks: u32 = 1440 * 14; // 2 weeks to approve
-	pub const MaxProposalsPerBlock: u32 = 10;
-	pub const MetaChangesTickDelay: u32 = 6; // delay pubkey changes for minimum of an hour
-	pub const MaxTicksForKeyHistory: u32 = 1440 * 2; // keep for 2 days.. only used for notebook submission
-	/// Max host ips a notary can provide
-	pub const MaxNotaryHosts: u32 = 4;
-}
-
-pub type NotaryRecordT =
-	NotaryRecordWithState<AccountId, BlockNumber, MaxNotaryHosts, NotebookVerifyError>;
-
-impl pallet_notaries::Config for Runtime {
-	type RuntimeEvent = RuntimeEvent;
-	type WeightInfo = pallet_notaries::weights::SubstrateWeight<Runtime>;
-	type MaxActiveNotaries = MaxActiveNotaries;
-	type MaxProposalHoldBlocks = MaxProposalHoldBlocks;
-	type MaxProposalsPerBlock = MaxProposalsPerBlock;
-	type MetaChangesTickDelay = MetaChangesTickDelay;
-	type MaxTicksForKeyHistory = MaxTicksForKeyHistory;
-	type MaxNotaryHosts = MaxNotaryHosts;
-	type TickProvider = Ticks;
-}
-pub type AccountIdOf<T> = <T as frame_system::Config>::AccountId;
-pub type ArgonNegativeImbalance<T> = <pallet_balances::Pallet<T, ArgonToken> as Currency<
-	<T as frame_system::Config>::AccountId,
->>::NegativeImbalance;
-
-pub struct Author<R>(PhantomData<R>);
-impl<R> OnUnbalanced<ArgonNegativeImbalance<R>> for Author<R>
-where
-	R: pallet_authorship::Config + pallet_balances::Config<ArgonToken>,
-	AccountIdOf<R>: From<AccountId> + Into<AccountId>,
-	<R as frame_system::Config>::RuntimeEvent: From<pallet_balances::Event<R, ArgonToken>>,
-{
-	fn on_nonzero_unbalanced(amount: ArgonNegativeImbalance<R>) {
-		if let Some(author) = pallet_authorship::Pallet::<R>::author() {
-			<pallet_balances::Pallet<R, ArgonToken>>::resolve_creating(&author, amount);
-		} else {
-			drop(amount);
-		}
-	}
-}
-
-pub struct DealWithFees<R>(PhantomData<R>);
-
-impl<R> OnUnbalanced<fungible::Credit<R::AccountId, pallet_balances::Pallet<R, ArgonToken>>>
-	for DealWithFees<R>
-where
-	R: pallet_authorship::Config + pallet_balances::Config<ArgonToken>,
-	AccountIdOf<R>: From<AccountId> + Into<AccountId>,
-	<R as frame_system::Config>::RuntimeEvent: From<pallet_balances::Event<R, ArgonToken>>,
-{
-	fn on_unbalanceds(
-		mut fees_then_tips: impl Iterator<
-			Item = fungible::Credit<R::AccountId, pallet_balances::Pallet<R, ArgonToken>>,
-		>,
-	) {
-		if let Some(mut fees) = fees_then_tips.next() {
-			if let Some(tips) = fees_then_tips.next() {
-				tips.merge_into(&mut fees);
-			}
-			if let Some(author) = pallet_authorship::Pallet::<R>::author() {
-				let _ =
-					<pallet_balances::Pallet<R, ArgonToken>>::resolve(&author, fees).map_err(drop);
-			}
-		}
-	}
-}
-
-type ArgonToken = pallet_balances::Instance1;
-impl pallet_balances::Config<ArgonToken> for Runtime {
-	type MaxLocks = ConstU32<50>;
-	type MaxReserves = ();
-	type ReserveIdentifier = [u8; 8];
-	/// The type for recording an account's balance.
-	type Balance = Balance;
-	/// The ubiquitous event type.
-	type RuntimeEvent = RuntimeEvent;
-	type DustRemoval = ();
-	type ExistentialDeposit = ConstU128<EXISTENTIAL_DEPOSIT>;
-	type AccountStore = System;
-	type WeightInfo = pallet_balances::weights::SubstrateWeight<Runtime>;
-	type FreezeIdentifier = RuntimeFreezeReason;
-	type MaxFreezes = ConstU32<2>;
-	type RuntimeHoldReason = RuntimeHoldReason;
-	type RuntimeFreezeReason = RuntimeFreezeReason;
-}
-
-parameter_types! {
-	// One storage item; key size 32, value size 8; .
-	pub const ProxyDepositBase: Balance = deposit(1, 40);
-	// Additional storage item size of 33 bytes.
-	pub const ProxyDepositFactor: Balance = deposit(0, 33);
-	// One storage item; key size 32, value size 16
-	pub const AnnouncementDepositBase: Balance = deposit(1, 48);
-	pub const AnnouncementDepositFactor: Balance = deposit(0, 66);
-	pub const MaxProxies: u16 = 32;
-	pub const MaxPending: u16 = 32;
-}
-
-/// The type used to represent the kinds of proxying allowed.
-#[derive(
-	Copy,
-	Clone,
-	Eq,
-	PartialEq,
-	Ord,
-	PartialOrd,
-	TypeInfo,
-	Encode,
-	Decode,
-	RuntimeDebug,
-	MaxEncodedLen,
-)]
-pub enum ProxyType {
-	Any,
-	NonTransfer,
-	PriceIndex,
-}
-impl Default for ProxyType {
-	fn default() -> Self {
-		Self::Any
-	}
-}
-impl InstanceFilter<RuntimeCall> for ProxyType {
-	fn filter(&self, c: &RuntimeCall) -> bool {
-		match self {
-			ProxyType::Any => true,
-			ProxyType::NonTransfer =>
-				!matches!(c, RuntimeCall::Balances(..) | RuntimeCall::Ownership(..)),
-			ProxyType::PriceIndex => matches!(c, RuntimeCall::PriceIndex(..)),
-		}
-	}
-	fn is_superset(&self, o: &Self) -> bool {
-		match (self, o) {
-			(x, y) if x == y => true,
-			(ProxyType::Any, _) => true,
-			(_, ProxyType::Any) => false,
-			(ProxyType::NonTransfer, _) => true,
-			_ => false,
-		}
-	}
-}
-
-parameter_types! {
-	// One storage item; key size is 32; value is size 4+4+16+32 bytes = 56 bytes.
-	pub const DepositBase: Balance = deposit(1, 88);
-	// Additional storage item size of 32 bytes.
-	pub const DepositFactor: Balance = deposit(0, 32);
-	pub const MaxSignatories: u32 = 100;
-}
-
-impl pallet_multisig::Config for Runtime {
-	type RuntimeEvent = RuntimeEvent;
-	type RuntimeCall = RuntimeCall;
-	type Currency = Balances;
-	type DepositBase = DepositBase;
-	type DepositFactor = DepositFactor;
-	type MaxSignatories = MaxSignatories;
-	type WeightInfo = pallet_multisig::weights::SubstrateWeight<Runtime>;
-}
-impl pallet_proxy::Config for Runtime {
-	type RuntimeEvent = RuntimeEvent;
-	type RuntimeCall = RuntimeCall;
-	type Currency = Balances;
-	type ProxyType = ProxyType;
-	type ProxyDepositBase = ProxyDepositBase;
-	type ProxyDepositFactor = ProxyDepositFactor;
-	type MaxProxies = MaxProxies;
-	type WeightInfo = pallet_proxy::weights::SubstrateWeight<Runtime>;
-	type MaxPending = MaxPending;
-	type CallHasher = BlakeTwo256;
-	type AnnouncementDepositBase = AnnouncementDepositBase;
-	type AnnouncementDepositFactor = AnnouncementDepositFactor;
-}
-
-parameter_types! {
-	pub const BitcoinBondDuration: u32 = 60 * 24 * 365; // 1 year
-	pub const MaxPendingMintUtxos: u32 = 10_000;
-	pub const MaxTrackedUtxos: u32 = 18_000_000;
-
-	pub const MaxDowntimeTicksBeforeReset: Tick = 60; // 1 hour
-	pub const MaxHistoryToKeep: u32 = 24 * 60; // 1 day worth of prices
-	pub const MaxPriceAgeInTicks: Tick = 24 * 60; // 1 day
-	pub const MaxArgonChangePerTickAwayFromTarget: FixedU128 = FixedU128::from_rational(1, 100); // 1 centagon
-	pub const MaxArgonTargetChangePerTick: FixedU128 = FixedU128::from_rational(1, 100); // 1 centagon
-
-	pub const MaxPendingConfirmationBlocks: BitcoinHeight = 10 * (6 * 24); // 10 days of bitcoin blocks
-
-	pub const MaxPendingConfirmationUtxos: u32 = 10_000;
-	pub const MaxBitcoinBirthBlocksOld: BitcoinHeight = 10 * (6 * 24); // 10 days of bitcoin blocks
-}
-
-impl pallet_price_index::Config for Runtime {
-	type RuntimeEvent = RuntimeEvent;
-
-	type CurrentTick = Ticks;
-	type WeightInfo = pallet_price_index::weights::SubstrateWeight<Runtime>;
-	type Balance = Balance;
-	type MaxDowntimeTicksBeforeReset = MaxDowntimeTicksBeforeReset;
-	type MaxPriceAgeInTicks = MaxPriceAgeInTicks;
-	type MaxArgonChangePerTickAwayFromTarget = MaxArgonChangePerTickAwayFromTarget;
-	type MaxArgonTargetChangePerTick = MaxArgonTargetChangePerTick;
-}
-
-impl pallet_bitcoin_utxos::Config for Runtime {
-	type RuntimeEvent = RuntimeEvent;
-	type WeightInfo = pallet_bitcoin_utxos::weights::SubstrateWeight<Runtime>;
-	type EventHandler = Bonds;
-	type MaxPendingConfirmationBlocks = MaxPendingConfirmationBlocks;
-	type MaxPendingConfirmationUtxos = MaxPendingConfirmationUtxos;
-}
-
-impl pallet_mint::Config for Runtime {
-	type RuntimeEvent = RuntimeEvent;
-	type WeightInfo = pallet_mint::weights::SubstrateWeight<Runtime>;
-	type Currency = Balances;
-	type Balance = Balance;
-	type PriceProvider = PriceIndex;
-	type MaxPendingMintUtxos = MaxPendingMintUtxos;
-	type BlockRewardAccountsProvider = MiningSlot;
-}
-
-type OwnershipToken = pallet_balances::Instance2;
-impl pallet_balances::Config<OwnershipToken> for Runtime {
-	type MaxLocks = ConstU32<50>;
-	type MaxReserves = ();
-	type ReserveIdentifier = [u8; 8];
-	/// The type for recording an account's balance.
-	type Balance = Balance;
-	/// The ubiquitous event type.
-	type RuntimeEvent = RuntimeEvent;
-	type DustRemoval = ();
-	type ExistentialDeposit = ConstU128<EXISTENTIAL_DEPOSIT>;
-	type AccountStore = StorageMapShim<
-		pallet_balances::Account<Runtime, OwnershipToken>,
-		AccountId,
-		pallet_balances::AccountData<Balance>,
-	>;
-
-	type WeightInfo = pallet_balances::weights::SubstrateWeight<Runtime>;
-	type FreezeIdentifier = RuntimeFreezeReason;
-	type MaxFreezes = ConstU32<2>;
-	type RuntimeHoldReason = RuntimeHoldReason;
-	type RuntimeFreezeReason = RuntimeFreezeReason;
-}
-
-parameter_types! {
-	pub FeeMultiplier: Multiplier = Multiplier::one();
-}
-
-pub struct RefTimeToFee;
-impl WeightToFeePolynomial for RefTimeToFee {
-	type Balance = Balance;
-	/// This function attempts to add some weight to larger transactions, but given the 3 digits of
-	/// milligons to work with, it can be difficult to scale this properly.
-	fn polynomial() -> WeightToFeeCoefficients<Self::Balance> {
-		let p = 1_000; // milligons
-		let q = 100 * Balance::from(ExtrinsicBaseWeight::get().ref_time());
-		// BAB - disabling wage protector for fees. Makes it hard to keep system stable
-		// let cpi = PriceIndex::get_argon_cpi().unwrap_or(ArgonCPI::zero());
-		// if cpi.is_positive() {
-		// 	let cpi = cpi.into_inner() / ArgonCPI::accuracy();
-		// 	let adjustment = (p * (cpi as u128) * 1_000).checked_div(1_000).unwrap_or_default();
-		// 	p += adjustment;
-		// }
-		smallvec![WeightToFeeCoefficient {
-			degree: 1,
-			negative: false,
-			coeff_frac: Perbill::from_rational(p % q, q),
-			coeff_integer: p / q,
-		}]
-	}
-}
-
-impl pallet_transaction_payment::Config for Runtime {
-	type RuntimeEvent = RuntimeEvent;
-	type OnChargeTransaction = FungibleAdapter<Balances, DealWithFees<Runtime>>;
-	type OperationalFeeMultiplier = ConstU8<5>;
-	type WeightToFee = RefTimeToFee;
-	type LengthToFee = RefTimeToFee;
-	type FeeMultiplierUpdate = ConstFeeMultiplier<FeeMultiplier>;
-}
-
-impl pallet_sudo::Config for Runtime {
-	type RuntimeEvent = RuntimeEvent;
-	type RuntimeCall = RuntimeCall;
-	type WeightInfo = pallet_sudo::weights::SubstrateWeight<Runtime>;
-}
-
-impl pallet_utility::Config for Runtime {
-	type RuntimeEvent = RuntimeEvent;
-	type RuntimeCall = RuntimeCall;
-	type WeightInfo = pallet_utility::weights::SubstrateWeight<Runtime>;
-	type PalletsOrigin = OriginCaller;
-}
-
-// Create the runtime by composing the FRAME pallets that were previously configured.
 
 #[frame_support::runtime]
 mod runtime {
@@ -782,59 +173,62 @@ mod runtime {
 		RuntimeTask
 	)]
 	pub struct Runtime;
+
 	#[runtime::pallet_index(0)]
 	pub type System = frame_system;
 	#[runtime::pallet_index(1)]
-	pub type Timestamp = pallet_timestamp;
+	pub type Digests = pallet_digests;
 	#[runtime::pallet_index(2)]
-	pub type Multisig = pallet_multisig;
+	pub type Timestamp = pallet_timestamp;
 	#[runtime::pallet_index(3)]
-	pub type Proxy = pallet_proxy;
+	pub type Multisig = pallet_multisig;
 	#[runtime::pallet_index(4)]
-	pub type Ticks = pallet_ticks;
+	pub type Proxy = pallet_proxy;
 	#[runtime::pallet_index(5)]
-	pub type MiningSlot = pallet_mining_slot;
+	pub type Ticks = pallet_ticks;
 	#[runtime::pallet_index(6)]
-	pub type BitcoinUtxos = pallet_bitcoin_utxos;
+	pub type MiningSlot = pallet_mining_slot;
 	#[runtime::pallet_index(7)]
-	pub type Vaults = pallet_vaults;
+	pub type BitcoinUtxos = pallet_bitcoin_utxos;
 	#[runtime::pallet_index(8)]
-	pub type Bonds = pallet_bond;
+	pub type Vaults = pallet_vaults;
 	#[runtime::pallet_index(9)]
-	pub type Notaries = pallet_notaries;
+	pub type Bonds = pallet_bond;
 	#[runtime::pallet_index(10)]
-	pub type Notebook = pallet_notebook;
+	pub type Notaries = pallet_notaries;
 	#[runtime::pallet_index(11)]
-	pub type ChainTransfer = pallet_chain_transfer;
+	pub type Notebook = pallet_notebook;
 	#[runtime::pallet_index(12)]
-	pub type BlockSealSpec = pallet_block_seal_spec;
+	pub type ChainTransfer = pallet_chain_transfer;
 	#[runtime::pallet_index(13)]
-	pub type Domains = pallet_domains;
+	pub type BlockSealSpec = pallet_block_seal_spec;
 	#[runtime::pallet_index(14)]
-	pub type PriceIndex = pallet_price_index;
+	pub type Domains = pallet_domains;
 	#[runtime::pallet_index(15)]
-	pub type Authorship = pallet_authorship;
-	// Block Seal uses notebooks and ticks
+	pub type PriceIndex = pallet_price_index;
 	#[runtime::pallet_index(16)]
+	pub type Authorship = pallet_authorship;
+	#[runtime::pallet_index(17)]
+	pub type Grandpa = pallet_grandpa;
+	// Block Seal uses notebooks and ticks
+	#[runtime::pallet_index(18)]
 	pub type BlockSeal = pallet_block_seal;
 	// NOTE: BlockRewards must come after seal (on_finalize uses seal info)
-	#[runtime::pallet_index(17)]
-	pub type BlockRewards = pallet_block_rewards;
-	#[runtime::pallet_index(18)]
-	pub type Grandpa = pallet_grandpa;
 	#[runtime::pallet_index(19)]
-	pub type Mint = pallet_mint;
+	pub type BlockRewards = pallet_block_rewards;
 	#[runtime::pallet_index(20)]
-	pub type Balances = pallet_balances<Instance1>;
+	pub type Mint = pallet_mint;
 	#[runtime::pallet_index(21)]
-	pub type Ownership = pallet_balances<Instance2>;
+	pub type Balances = pallet_balances<Instance1>;
 	#[runtime::pallet_index(22)]
-	pub type TxPause = pallet_tx_pause;
+	pub type Ownership = pallet_balances<Instance2>;
 	#[runtime::pallet_index(23)]
-	pub type TransactionPayment = pallet_transaction_payment;
+	pub type TxPause = pallet_tx_pause;
 	#[runtime::pallet_index(24)]
-	pub type Utility = pallet_utility;
+	pub type TransactionPayment = pallet_transaction_payment;
 	#[runtime::pallet_index(25)]
+	pub type Utility = pallet_utility;
+	#[runtime::pallet_index(26)]
 	pub type Sudo = pallet_sudo;
 }
 
@@ -901,7 +295,7 @@ impl_runtime_apis! {
 			Runtime::metadata_at_version(version)
 		}
 
-		fn metadata_versions() -> alloc::vec::Vec<u32> {
+		fn metadata_versions() -> Vec<u32> {
 			Runtime::metadata_versions()
 		}
 	}
@@ -951,13 +345,13 @@ impl_runtime_apis! {
 
 	impl sp_session::SessionKeys<Block> for Runtime {
 		fn generate_session_keys(seed: Option<Vec<u8>>) -> Vec<u8> {
-			opaque::SessionKeys::generate(seed)
+			SessionKeys::generate(seed)
 		}
 
 		fn decode_session_keys(
 			encoded: Vec<u8>,
 		) -> Option<Vec<(Vec<u8>, KeyTypeId)>> {
-			opaque::SessionKeys::decode_into_raw_public_keys(&encoded)
+			SessionKeys::decode_into_raw_public_keys(&encoded)
 		}
 	}
 
@@ -1016,8 +410,11 @@ impl_runtime_apis! {
 			BlockSealSpec::vote_minimum()
 		}
 
-		fn compute_difficulty() -> u128 {
-			BlockSealSpec::compute_difficulty()
+		fn compute_puzzle() -> ComputePuzzle<Block> {
+			ComputePuzzle {
+				difficulty: BlockSealSpec::compute_difficulty(),
+				randomx_key_block: BlockSealSpec::compute_key_block_hash(),
+			}
 		}
 
 		fn create_vote_digest(notebook_tick: Tick, included_notebooks: Vec<NotaryNotebookVoteDigestDetails>) -> BlockVoteDigest {
@@ -1032,12 +429,34 @@ impl_runtime_apis! {
 			Ok(BlockSeal::find_vote_block_seals(votes,with_better_strength, expected_notebook_tick)?)
 		}
 
+		fn has_eligible_votes() -> bool {
+			BlockSeal::has_eligible_votes()
+		}
+
+		fn is_valid_signature(block_hash: <Block as BlockT>::Hash, seal: &BlockSealDigest, digest: &Digest) -> bool {
+			BlockSeal::is_valid_miner_signature(block_hash, seal, digest)
+		}
+	}
+
+	impl argon_primitives::BlockCreatorApis<Block, AccountId, NotebookVerifyError> for Runtime {
 		fn fork_power() -> ForkPower {
 			BlockSeal::fork_power()
 		}
 
-		fn has_eligible_votes() -> bool {
-			BlockSeal::has_eligible_votes()
+		fn calculate_fork_power(seal: BlockSealDigest, header: &<Block as BlockT>::Header) -> Result<ForkPower, DispatchError> {
+			let digests = Digests::decode(&header.digest)?;
+			Ok(BlockSeal::calculate_fork_power(seal, digests.block_vote.voting_power, digests.notebooks.notebooks.len() as u32))
+		}
+
+		fn decode_voting_author(digest: &Digest) -> Result<(AccountId, Tick, Option<VotingKey>), DispatchError> {
+			Digests::decode_voting_author(digest)
+		}
+
+		fn digest_notebooks(
+			digests: &Digest,
+		) -> Result<Vec<NotebookAuditResult<NotebookVerifyError>>, DispatchError> {
+			let digests = Digests::decode(digests)?;
+			Ok(digests.notebooks.notebooks.clone())
 		}
 	}
 
@@ -1173,7 +592,8 @@ impl_runtime_apis! {
 		fn dispatch_benchmark(
 			config: frame_benchmarking::BenchmarkConfig
 		) -> Result<Vec<frame_benchmarking::BenchmarkBatch>, sp_runtime::RuntimeString> {
-			use frame_benchmarking::{baseline, Benchmarking, BenchmarkBatch, TrackedStorageKey};
+			use frame_benchmarking::{baseline, Benchmarking, BenchmarkBatch};
+			use frame_support::traits::TrackedStorageKey;
 
 			use frame_system_benchmarking::Pallet as SystemBench;
 			use baseline::Pallet as BaselineBench;
@@ -1227,28 +647,4 @@ impl_runtime_apis! {
 			vec![]
 		}
 	}
-}
-#[cfg(feature = "runtime-benchmarks")]
-mod benches {
-	define_benchmarks!(
-		[frame_benchmarking, BaselineBench::<Runtime>]
-		[frame_system, SystemBench::<Runtime>]
-		[pallet_balances, ArgonTokens]
-		[pallet_balances, OwnershipTokens]
-		[pallet_timestamp, Timestamp]
-		[pallet_ticks, Ticks]
-		[pallet_domains, Domain]
-		[pallet_block_seal_spec, VoteEligibility]
-		[pallet_block_rewards, BlockRewards]
-		[pallet_mining_slot, MiningSlot]
-		[pallet_bond, Bonds]
-		[pallet_bitcoin_utxos, BitcoinMint]
-		[pallet_mint, Mint]
-		[pallet_block_seal, BlockSeal]
-		[pallet_authorship, Authorship]
-		[pallet_sudo, Sudo]
-		[pallet_grandpa, Grandpa]
-		[pallet_notaries, Notaries]
-		[pallet_chain_transfer, ChainTransfer]
-	);
 }

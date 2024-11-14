@@ -131,13 +131,13 @@ declare module '@polkadot/api-base/types/errors' {
        **/
       InsufficientVotingPower: AugmentedError<ApiType>;
       /**
-       * Message was not signed by a registered miner
-       **/
-      InvalidAuthoritySignature: AugmentedError<ApiType>;
-      /**
        * The merkle proof of vote inclusion in the notebook is invalid
        **/
       InvalidBlockVoteProof: AugmentedError<ApiType>;
+      /**
+       * Invalid fork power parent
+       **/
+      InvalidForkPowerParent: AugmentedError<ApiType>;
       /**
        * Vote not submitted by the right miner
        **/
@@ -277,6 +277,52 @@ declare module '@polkadot/api-base/types/errors' {
        * A transfer was submitted in a previous block but the expiration block has passed
        **/
       NotebookIncludesExpiredLocalchainTransfer: AugmentedError<ApiType>;
+    };
+    digests: {
+      /**
+       * Failed to decode digests
+       **/
+      CouldNotDecodeDigest: AugmentedError<ApiType>;
+      /**
+       * Duplicate AuthorDigest found
+       **/
+      DuplicateAuthorDigest: AugmentedError<ApiType>;
+      /**
+       * Duplicate BlockVoteDigest found
+       **/
+      DuplicateBlockVoteDigest: AugmentedError<ApiType>;
+      /**
+       * Duplicate NotebookDigest found
+       **/
+      DuplicateNotebookDigest: AugmentedError<ApiType>;
+      /**
+       * Duplicate ParentVotingKeyDigest found
+       **/
+      DuplicateParentVotingKeyDigest: AugmentedError<ApiType>;
+      /**
+       * Duplicate TickDigest found
+       **/
+      DuplicateTickDigest: AugmentedError<ApiType>;
+      /**
+       * Missing AuthorDigest
+       **/
+      MissingAuthorDigest: AugmentedError<ApiType>;
+      /**
+       * Missing BlockVoteDigest
+       **/
+      MissingBlockVoteDigest: AugmentedError<ApiType>;
+      /**
+       * Missing NotebookDigest
+       **/
+      MissingNotebookDigest: AugmentedError<ApiType>;
+      /**
+       * Missing ParentVotingKeyDigest
+       **/
+      MissingParentVotingKeyDigest: AugmentedError<ApiType>;
+      /**
+       * Missing TickDigest
+       **/
+      MissingTickDigest: AugmentedError<ApiType>;
     };
     domains: {
       /**

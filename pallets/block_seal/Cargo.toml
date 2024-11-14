@@ -25,6 +25,7 @@ sp-core = { workspace = true }
 sp-inherents = { workspace = true }
 binary-merkle-tree = { workspace = true }
 argon-primitives = { workspace = true }
+argon-notary-audit = { workspace = true }
 #sp-debug-derive = { workspace = true, features = ["force-debug"] }
 
 [dev-dependencies]
@@ -36,6 +37,7 @@ futures = { workspace = true }
 [features]
 default = [ "std" ]
 std = [
+	"argon-notary-audit/std",
 	"argon-primitives/std",
 	"binary-merkle-tree/std",
 	"codec/std",

@@ -1,4 +1,4 @@
-use argon_node_runtime::AccountId;
+use argon_primitives::AccountId;
 use clap::{Parser, ValueEnum};
 use sc_cli::RunCmd;
 
@@ -19,13 +19,13 @@ pub struct Cli {
 #[derive(Debug, Clone, Parser)]
 pub struct ArgonRunCmd {
 	#[clap(flatten)]
-	pub inner: RunCmd,
+	pub base: RunCmd,
 
-	/// Enable an account to author blocks
+	/// The rewards author for compute mining (if activated).
 	///
 	/// The account address must be given in SS58 format.
 	#[arg(long, value_name = "SS58_ADDRESS", value_parser = parse_ss58_account_id)]
-	pub author: Option<AccountId>,
+	pub compute_author: Option<AccountId>,
 
 	/// How many permissionless compute mining threads to run
 	///
@@ -38,29 +38,13 @@ pub struct ArgonRunCmd {
 	/// - LargePages: use large memory pages for the randomx dataset (default inactive)
 	/// - Secure: use secure memory for the randomx dataset (default inactive)
 	#[arg(long, verbatim_doc_comment)]
-	pub randomx_flags: Vec<RandomxFlag>,
+	pub compute_flags: Vec<RandomxFlag>,
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, ValueEnum)]
 pub enum RandomxFlag {
 	LargePages,
 	Secure,
-}
-
-impl Cli {
-	pub fn block_author(&self) -> Option<AccountId> {
-		if let Some(block_author) = &self.run.author {
-			Some(block_author.clone())
-		} else if let Some(account) = self.run.inner.get_keyring() {
-			Some(account.to_account_id())
-		} else if self.run.inner.shared_params.dev {
-			use sp_core::crypto::Pair;
-			let block_author = sp_core::sr25519::Pair::from_string("//Alice", None).unwrap();
-			Some(AccountId::from(block_author.public()))
-		} else {
-			None
-		}
-	}
 }
 
 #[derive(Debug, clap::Subcommand)]

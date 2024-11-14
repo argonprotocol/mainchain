@@ -1,4 +1,4 @@
-use argon_node_runtime::AccountId;
+use argon_primitives::AccountId;
 use sc_consensus::ImportResult;
 use sp_api::ApiError;
 use sp_blockchain::Error as BlockchainError;
@@ -6,7 +6,7 @@ use sp_consensus::Error as ConsensusError;
 use sp_inherents::Error as InherentsError;
 use sp_runtime::RuntimeString;
 
-#[derive(thiserror::Error, std::fmt::Debug)]
+#[derive(thiserror::Error, Debug)]
 pub enum Error {
 	#[error("Header uses the wrong engine {0:?}")]
 	WrongEngine([u8; 4]),
@@ -31,6 +31,9 @@ pub enum Error {
 
 	#[error("Missing block seal digest")]
 	MissingBlockSealDigest,
+	#[error("Invalid vote seal signature")]
+	InvalidVoteSealSignature,
+
 	#[error(transparent)]
 	Client(sp_blockchain::Error),
 	#[error(transparent)]
