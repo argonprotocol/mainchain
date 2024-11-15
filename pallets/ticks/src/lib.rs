@@ -25,8 +25,8 @@ pub mod pallet {
 	use super::*;
 	use argon_primitives::{
 		digests::TICK_DIGEST_ID,
-		tick::{Tick, Ticker},
-		TickDigest, TickProvider, VotingSchedule,
+		tick::{Tick, TickDigest, Ticker},
+		TickProvider, VotingSchedule,
 	};
 	use frame_support::pallet_prelude::*;
 	use frame_system::pallet_prelude::*;
@@ -89,7 +89,7 @@ pub mod pallet {
 				.iter()
 				.find_map(|a| a.pre_runtime_try_to::<TickDigest>(&TICK_DIGEST_ID))
 				.expect("Tick digest must be set")
-				.tick;
+				.0;
 
 			let parent_hash = <frame_system::Pallet<T>>::parent_hash();
 			if let Err(e) = RecentBlocksAtTicks::<T>::try_mutate(|map| {

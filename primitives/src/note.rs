@@ -14,7 +14,7 @@ use sp_runtime::BoundedVec;
 
 #[cfg(feature = "std")]
 use crate::serialize_unsafe_u128_as_string;
-use crate::{AccountId, DomainHash, TransferToLocalchainId, ADDRESS_PREFIX};
+use crate::{tick::Tick, AccountId, DomainHash, TransferToLocalchainId, ADDRESS_PREFIX};
 
 #[derive(
 	Clone,
@@ -77,7 +77,7 @@ pub fn round_up(value: u128, percentage: u128) -> u128 {
 	numerator.saturating_div(100) + round
 }
 
-pub const CHANNEL_HOLD_CLAWBACK_TICKS: u32 = 15;
+pub const CHANNEL_HOLD_CLAWBACK_TICKS: Tick = 15;
 // 15 after expiration
 pub const MINIMUM_CHANNEL_HOLD_SETTLEMENT: u128 = 5u128;
 

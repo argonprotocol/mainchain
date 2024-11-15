@@ -9,7 +9,7 @@ use directories::BaseDirs;
 use lazy_static::lazy_static;
 use reqwest::Client;
 use serde::{Deserialize, Serialize};
-use sp_runtime::{traits::One, FixedI128, FixedU128};
+use sp_runtime::{traits::One, FixedI128, FixedPointNumber, FixedU128};
 #[cfg(test)]
 use std::sync::{Arc, Mutex};
 use std::{env, fs::File, path::PathBuf};
@@ -175,7 +175,7 @@ impl UsCpiRetriever {
 	}
 
 	fn calculate_smoothed_us_cpi_ratio(&self, tick: Tick) -> FixedI128 {
-		let ticks = FixedI128::from_u32(self.ticks_since_last_cpi(tick));
+		let ticks = FixedI128::saturating_from_integer(self.ticks_since_last_cpi(tick));
 		let previous_cpi = to_fixed_i128(self.previous_us_cpi);
 		(self.cpi_change_per_tick * ticks) + previous_cpi
 	}
@@ -406,8 +406,7 @@ mod tests {
 	#[test]
 	fn test_can_smooth_out_cpi() {
 		let previous_cpi = *BASELINE_CPI;
-		let start_time = parse_date("1 April 2024", vec!["%d %B %Y"]).unwrap();
-		let ticker = Ticker::new(60_000, start_time.timestamp_millis() as u64, 2);
+		let ticker = Ticker::new(60_000, 2);
 
 		let mut retriever = UsCpiRetriever {
 			schedule: vec![],
@@ -473,7 +472,10 @@ mod tests {
 
 		let ticks = retriever.current_cpi_duration_ticks;
 		retriever.cpi_change_per_tick = retriever.calculate_cpi_change_per_tick();
-		assert_eq!(retriever.cpi_change_per_tick, FixedI128::one().div(FixedI128::from_u32(ticks)));
+		assert_eq!(
+			retriever.cpi_change_per_tick,
+			FixedI128::one().div(FixedI128::saturating_from_integer(ticks))
+		);
 
 		assert_eq!(retriever.ticks_since_last_cpi(retriever.current_cpi_release_tick + 1), 1);
 		assert_eq!(
@@ -487,8 +489,7 @@ mod tests {
 
 	#[test]
 	fn calculates_intervals_elapsed() {
-		let start_time = parse_date("1 April 2024", vec!["%d %B %Y"]).unwrap();
-		let ticker = Ticker::new(60_000, start_time.timestamp_millis() as u64, 2);
+		let ticker = Ticker::new(60_000, 2);
 		let retriever = UsCpiRetriever {
 			schedule: vec![],
 			current_cpi_end_value: FixedU128::from_u32(300),

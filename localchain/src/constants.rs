@@ -11,7 +11,7 @@ pub const NOTARIZATION_MAX_DOMAINS: u32 = argon_primitives::MAX_DOMAINS_PER_NOTA
 pub const NOTARIZATION_MAX_BLOCK_VOTES: u32 = argon_primitives::MAX_BLOCK_VOTES_PER_NOTARIZATION;
 /// Number of ticks past the expiration of a channel_hold that a recipient has to claim. After this point, sender can recoup the channel_holded funds
 #[cfg_attr(feature = "napi", napi)]
-pub const CHANNEL_HOLD_CLAWBACK_TICKS: u32 = argon_primitives::CHANNEL_HOLD_CLAWBACK_TICKS;
+pub const CHANNEL_HOLD_CLAWBACK_TICKS: i64 = argon_primitives::CHANNEL_HOLD_CLAWBACK_TICKS as i64;
 
 /// Minimum milligons that can be settled in a channel_hold
 #[cfg_attr(feature = "napi", napi)]

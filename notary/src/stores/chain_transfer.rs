@@ -90,7 +90,7 @@ impl ChainTransferStore {
 			notebook_number as i32,
 			account_id.as_slice(),
 			transfer_id as i64,
-			notebook_tick as i32,
+			notebook_tick as i64,
 		)
 		.fetch_one(db)
 		.await
@@ -145,7 +145,7 @@ impl ChainTransferStore {
 			account_id.as_slice(),
 			transfer_id as i32,
 			finalized_block_number as i32,
-			expiration_tick as i32,
+			expiration_tick as i64,
 		)
 		.execute(db)
 		.await?;

@@ -375,7 +375,7 @@ parameter_types! {
 	pub const MaxActiveNotaries: u32 = 25; // arbitrarily set
 	pub const MaxProposalHoldBlocks: u32 = 1440 * 14; // 2 weeks to approve
 	pub const MaxProposalsPerBlock: u32 = 10;
-	pub const MetaChangesTickDelay: u32 = 6; // delay pubkey changes for minimum of an hour
+	pub const MetaChangesTickDelay: u64 = 6; // delay pubkey changes for minimum of an hour
 	pub const MaxTicksForKeyHistory: u32 = 1440 * 2; // keep for 2 days.. only used for notebook submission
 	/// Max host ips a notary can provide
 	pub const MaxNotaryHosts: u32 = 4;

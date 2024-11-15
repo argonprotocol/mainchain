@@ -2,15 +2,9 @@ use frame_support::{
 	assert_noop, assert_ok,
 	traits::{Len, OnFinalize, OnInitialize},
 };
-use frame_system::pallet_prelude::BlockNumberFor;
 use sp_core::H256;
 use sp_keyring::Ed25519Keyring;
 use sp_runtime::BoundedVec;
-
-use argon_primitives::{
-	host::Host,
-	notary::{NotaryMeta, NotaryProvider, NotaryPublic, NotaryRecord},
-};
 
 use crate::{
 	mock::*,
@@ -19,6 +13,11 @@ use crate::{
 		QueuedNotaryMetaChanges,
 	},
 	Error, Event,
+};
+use argon_primitives::{
+	host::Host,
+	notary::{NotaryMeta, NotaryProvider, NotaryPublic, NotaryRecord},
+	tick::Tick,
 };
 
 #[test]
@@ -106,7 +105,8 @@ fn it_allows_proposal_activation() {
 			RuntimeOrigin::signed(1),
 			NotaryMeta::<MaxNotaryHosts> {
 				name: "TestNotary".into(),
-public: Ed25519Keyring::Alice.public(),										hosts: rpc_hosts("ws://localhost:9945"),
+				public: Ed25519Keyring::Alice.public(),
+				hosts: rpc_hosts("ws://localhost:9945"),
 			}
 		));
 		System::set_block_number(2);
@@ -121,7 +121,8 @@ public: Ed25519Keyring::Alice.public(),										hosts: rpc_hosts("ws://localhos
 				meta: {
 					NotaryMeta::<MaxNotaryHosts> {
 						name: "TestNotary".into(),
-public: Ed25519Keyring::Alice.public(),												hosts: rpc_hosts("ws://localhost:9945"),
+						public: Ed25519Keyring::Alice.public(),
+						hosts: rpc_hosts("ws://localhost:9945"),
 					}
 				},
 				activated_block: 2,
@@ -141,7 +142,10 @@ public: Ed25519Keyring::Alice.public(),												hosts: rpc_hosts("ws://localh
 		assert_eq!(ProposedNotaries::<Test>::get(1).len(), 0);
 		assert_eq!(
 			NotaryKeyHistory::<Test>::get(1),
-			BoundedVec::<(BlockNumberFor<Test>, NotaryPublic), MaxTicksForKeyHistory>::truncate_from(vec![(3u32, Ed25519Keyring::Alice.public())])
+			BoundedVec::<(Tick, NotaryPublic), MaxTicksForKeyHistory>::truncate_from(vec![(
+				3u64,
+				Ed25519Keyring::Alice.public()
+			)])
 		);
 	});
 }
@@ -242,9 +246,9 @@ fn it_allows_a_notary_to_update_meta() {
 		);
 		assert_eq!(
 			NotaryKeyHistory::<Test>::get(1),
-			BoundedVec::<(BlockNumberFor<Test>, NotaryPublic), MaxTicksForKeyHistory>::truncate_from(vec![
-				(1u32, Ed25519Keyring::Alice.public()),
-				(10u32, Ed25519Keyring::Bob.public())
+			BoundedVec::<(Tick, NotaryPublic), MaxTicksForKeyHistory>::truncate_from(vec![
+				(1, Ed25519Keyring::Alice.public()),
+				(10, Ed25519Keyring::Bob.public())
 			])
 		);
 	});

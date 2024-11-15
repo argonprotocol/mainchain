@@ -216,7 +216,6 @@ impl Localchain {
 
     let mut ticker = Ticker::new(
       ticker_config.tick_duration_millis as u64,
-      ticker_config.genesis_utc_time as u64,
       ticker_config.channel_hold_expiration_ticks as Tick,
     );
     if let Some(ntp_pool_url) = ticker_config.ntp_pool_url {
@@ -315,7 +314,7 @@ impl Localchain {
       .to_string()
   }
 
-  pub fn current_tick(&self) -> u32 {
+  pub fn current_tick(&self) -> Tick {
     self.ticker.current()
   }
 
@@ -517,7 +516,7 @@ pub mod uniffi_ext {
     }
 
     #[uniffi::method(name = "currentTick")]
-    pub fn current_tick_uniffi(&self) -> u32 {
+    pub fn current_tick_uniffi(&self) -> u64 {
       self.inner.current_tick()
     }
 
@@ -674,8 +673,8 @@ pub mod napi_ext {
     }
 
     #[napi(js_name = "currentTick", getter)]
-    pub fn current_tick_napi(&self) -> u32 {
-      self.current_tick()
+    pub fn current_tick_napi(&self) -> i64 {
+      self.current_tick() as i64
     }
 
     #[napi(js_name = "durationToNextTick")]
@@ -747,28 +746,28 @@ pub mod napi_ext {
   #[napi]
   impl TickerRef {
     #[napi(getter, js_name = "current")]
-    pub fn current_napi(&self) -> u32 {
-      self.current()
+    pub fn current_napi(&self) -> i64 {
+      self.current() as i64
     }
 
     #[napi(js_name = "tickForTime")]
-    pub fn tick_for_time_napi(&self, timestamp_millis: i64) -> u32 {
+    pub fn tick_for_time_napi(&self, timestamp_millis: i64) -> u64 {
       self.tick_for_time(timestamp_millis)
     }
 
     #[napi(js_name = "timeForTick")]
-    pub fn time_for_tick_napi(&self, tick: u32) -> u64 {
-      self.time_for_tick(tick)
+    pub fn time_for_tick_napi(&self, tick: i64) -> i64 {
+      self.time_for_tick(tick as u64) as i64
     }
 
     #[napi(js_name = "millisToNextTick")]
-    pub fn millis_to_next_tick_napi(&self) -> u64 {
-      self.millis_to_next_tick()
+    pub fn millis_to_next_tick_napi(&self) -> i64 {
+      self.millis_to_next_tick() as i64
     }
 
     #[napi(js_name = "channelHoldExpirationTicks", getter)]
-    pub fn channel_hold_expiration_ticks_napi(&self) -> Tick {
-      self.channel_hold_expiration_ticks()
+    pub fn channel_hold_expiration_ticks_napi(&self) -> i64 {
+      self.channel_hold_expiration_ticks() as i64
     }
   }
 }
@@ -796,15 +795,15 @@ impl TickerRef {
     *self.ticker.write() = ticker;
   }
 
-  pub fn current(&self) -> u32 {
+  pub fn current(&self) -> Tick {
     self.ticker.read().current()
   }
 
-  pub fn tick_for_time(&self, timestamp_millis: i64) -> u32 {
+  pub fn tick_for_time(&self, timestamp_millis: i64) -> Tick {
     self.ticker.read().tick_for_time(timestamp_millis as u64)
   }
 
-  pub fn time_for_tick(&self, tick: u32) -> u64 {
+  pub fn time_for_tick(&self, tick: Tick) -> u64 {
     self.ticker.read().time_for_tick(tick)
   }
 
@@ -825,7 +824,6 @@ impl TickerRef {
 #[cfg_attr(feature = "uniffi", derive(uniffi::Record))]
 pub struct TickerConfig {
   pub tick_duration_millis: i64,
-  pub genesis_utc_time: i64,
   pub channel_hold_expiration_ticks: i64,
   pub ntp_pool_url: Option<String>,
 }

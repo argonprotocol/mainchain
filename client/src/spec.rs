@@ -1155,10 +1155,9 @@ pub mod api {
 						"query_call_info",
 						types::QueryCallInfo { call, len },
 						[
-							105u8, 89u8, 49u8, 221u8, 182u8, 218u8, 100u8, 183u8, 225u8, 97u8,
-							228u8, 137u8, 47u8, 230u8, 114u8, 85u8, 191u8, 21u8, 233u8, 152u8,
-							235u8, 75u8, 119u8, 109u8, 136u8, 75u8, 7u8, 144u8, 187u8, 208u8,
-							249u8, 90u8,
+							254u8, 71u8, 226u8, 242u8, 55u8, 146u8, 151u8, 92u8, 91u8, 24u8, 40u8,
+							53u8, 159u8, 5u8, 130u8, 181u8, 91u8, 34u8, 142u8, 160u8, 38u8, 198u8,
+							145u8, 209u8, 68u8, 244u8, 208u8, 81u8, 177u8, 85u8, 93u8, 180u8,
 						],
 					)
 				}
@@ -1176,9 +1175,9 @@ pub mod api {
 						"query_call_fee_details",
 						types::QueryCallFeeDetails { call, len },
 						[
-							121u8, 139u8, 95u8, 86u8, 132u8, 162u8, 158u8, 229u8, 25u8, 201u8,
-							160u8, 101u8, 74u8, 185u8, 60u8, 19u8, 253u8, 88u8, 180u8, 57u8, 43u8,
-							198u8, 236u8, 70u8, 232u8, 98u8, 187u8, 166u8, 15u8, 64u8, 97u8, 27u8,
+							105u8, 13u8, 166u8, 76u8, 81u8, 184u8, 92u8, 113u8, 151u8, 67u8, 177u8,
+							48u8, 100u8, 119u8, 163u8, 74u8, 106u8, 241u8, 19u8, 245u8, 254u8,
+							40u8, 250u8, 51u8, 92u8, 228u8, 214u8, 81u8, 19u8, 32u8, 214u8, 1u8,
 						],
 					)
 				}
@@ -1450,9 +1449,10 @@ pub mod api {
 						"create_vote_digest",
 						types::CreateVoteDigest { notebook_tick, included_notebooks },
 						[
-							8u8, 165u8, 132u8, 241u8, 184u8, 195u8, 91u8, 224u8, 252u8, 76u8, 2u8,
-							176u8, 154u8, 75u8, 155u8, 140u8, 74u8, 43u8, 169u8, 44u8, 35u8, 129u8,
-							187u8, 113u8, 85u8, 96u8, 206u8, 150u8, 185u8, 31u8, 195u8, 52u8,
+							125u8, 161u8, 133u8, 32u8, 105u8, 128u8, 141u8, 157u8, 212u8, 103u8,
+							110u8, 136u8, 24u8, 160u8, 6u8, 200u8, 82u8, 124u8, 204u8, 170u8, 96u8,
+							46u8, 210u8, 157u8, 247u8, 241u8, 234u8, 118u8, 87u8, 128u8, 111u8,
+							177u8,
 						],
 					)
 				}
@@ -1474,9 +1474,9 @@ pub mod api {
 							expected_notebook_tick,
 						},
 						[
-							164u8, 206u8, 57u8, 61u8, 202u8, 164u8, 14u8, 136u8, 96u8, 27u8, 174u8,
-							193u8, 22u8, 94u8, 133u8, 165u8, 4u8, 88u8, 86u8, 153u8, 200u8, 79u8,
-							14u8, 95u8, 163u8, 42u8, 137u8, 254u8, 215u8, 33u8, 114u8, 111u8,
+							227u8, 180u8, 73u8, 31u8, 19u8, 185u8, 92u8, 40u8, 202u8, 148u8, 185u8,
+							127u8, 122u8, 248u8, 97u8, 184u8, 90u8, 27u8, 51u8, 8u8, 252u8, 55u8,
+							183u8, 17u8, 28u8, 99u8, 230u8, 13u8, 207u8, 192u8, 142u8, 102u8,
 						],
 					)
 				}
@@ -1569,7 +1569,7 @@ pub mod api {
 				pub struct ComputePuzzle {}
 				pub mod create_vote_digest {
 					use super::runtime_types;
-					pub type NotebookTick = ::core::primitive::u32;
+					pub type NotebookTick = ::core::primitive::u64;
 					pub type IncludedNotebooks = ::subxt::ext::subxt_core::alloc::vec::Vec<
 						runtime_types::argon_primitives::notary::NotaryNotebookVoteDigestDetails,
 					>;
@@ -1603,7 +1603,7 @@ pub mod api {
 						runtime_types::argon_primitives::notary::NotaryNotebookRawVotes,
 					>;
 					pub type WithBetterStrength = runtime_types::primitive_types::U256;
-					pub type ExpectedNotebookTick = ::core::primitive::u32;
+					pub type ExpectedNotebookTick = ::core::primitive::u64;
 					pub mod output {
 						use super::runtime_types;
 						pub type Output = ::core::result::Result<
@@ -1696,42 +1696,6 @@ pub mod api {
 			use super::{root_mod, runtime_types};
 			pub struct BlockCreatorApis;
 			impl BlockCreatorApis {
-				pub fn fork_power(
-					&self,
-				) -> ::subxt::ext::subxt_core::runtime_api::payload::StaticPayload<
-					types::ForkPower,
-					types::fork_power::output::Output,
-				> {
-					::subxt::ext::subxt_core::runtime_api::payload::StaticPayload::new_static(
-						"BlockCreatorApis",
-						"fork_power",
-						types::ForkPower {},
-						[
-							22u8, 99u8, 7u8, 150u8, 68u8, 36u8, 217u8, 178u8, 55u8, 82u8, 20u8,
-							187u8, 123u8, 122u8, 149u8, 152u8, 44u8, 23u8, 9u8, 224u8, 52u8, 85u8,
-							146u8, 248u8, 97u8, 52u8, 98u8, 143u8, 59u8, 62u8, 32u8, 76u8,
-						],
-					)
-				}
-				pub fn calculate_fork_power(
-					&self,
-					seal: types::calculate_fork_power::Seal,
-					header: types::calculate_fork_power::Header,
-				) -> ::subxt::ext::subxt_core::runtime_api::payload::StaticPayload<
-					types::CalculateForkPower,
-					types::calculate_fork_power::output::Output,
-				> {
-					::subxt::ext::subxt_core::runtime_api::payload::StaticPayload::new_static(
-						"BlockCreatorApis",
-						"calculate_fork_power",
-						types::CalculateForkPower { seal, header },
-						[
-							211u8, 14u8, 213u8, 193u8, 187u8, 44u8, 251u8, 84u8, 122u8, 148u8,
-							195u8, 5u8, 124u8, 99u8, 112u8, 122u8, 109u8, 23u8, 16u8, 69u8, 224u8,
-							75u8, 32u8, 19u8, 200u8, 103u8, 185u8, 152u8, 79u8, 249u8, 40u8, 76u8,
-						],
-					)
-				}
 				pub fn decode_voting_author(
 					&self,
 					digests: types::decode_voting_author::Digests,
@@ -1744,9 +1708,9 @@ pub mod api {
 						"decode_voting_author",
 						types::DecodeVotingAuthor { digests },
 						[
-							107u8, 195u8, 53u8, 88u8, 104u8, 70u8, 171u8, 163u8, 85u8, 57u8, 219u8,
-							157u8, 135u8, 183u8, 199u8, 137u8, 176u8, 3u8, 73u8, 134u8, 105u8,
-							21u8, 239u8, 176u8, 234u8, 81u8, 165u8, 48u8, 36u8, 216u8, 87u8, 79u8,
+							52u8, 38u8, 130u8, 99u8, 245u8, 30u8, 109u8, 24u8, 186u8, 161u8, 15u8,
+							232u8, 74u8, 85u8, 48u8, 50u8, 218u8, 197u8, 148u8, 252u8, 199u8,
+							207u8, 145u8, 86u8, 159u8, 49u8, 116u8, 11u8, 96u8, 132u8, 85u8, 15u8,
 						],
 					)
 				}
@@ -1762,71 +1726,15 @@ pub mod api {
 						"digest_notebooks",
 						types::DigestNotebooks { digests },
 						[
-							190u8, 228u8, 96u8, 178u8, 177u8, 119u8, 110u8, 27u8, 88u8, 121u8,
-							169u8, 228u8, 103u8, 44u8, 42u8, 3u8, 93u8, 230u8, 178u8, 187u8, 35u8,
-							152u8, 15u8, 101u8, 102u8, 233u8, 163u8, 171u8, 250u8, 14u8, 255u8,
-							3u8,
+							242u8, 253u8, 5u8, 65u8, 164u8, 17u8, 169u8, 68u8, 147u8, 180u8, 130u8,
+							228u8, 174u8, 149u8, 97u8, 68u8, 208u8, 218u8, 75u8, 93u8, 56u8, 190u8,
+							225u8, 4u8, 247u8, 216u8, 148u8, 37u8, 233u8, 248u8, 202u8, 106u8,
 						],
 					)
 				}
 			}
 			pub mod types {
 				use super::runtime_types;
-				pub mod fork_power {
-					use super::runtime_types;
-					pub mod output {
-						use super::runtime_types;
-						pub type Output = runtime_types::argon_primitives::fork_power::ForkPower;
-					}
-				}
-				#[derive(
-					:: subxt :: ext :: subxt_core :: ext :: codec :: Decode,
-					:: subxt :: ext :: subxt_core :: ext :: codec :: Encode,
-					:: subxt :: ext :: subxt_core :: ext :: scale_decode :: DecodeAsType,
-					:: subxt :: ext :: subxt_core :: ext :: scale_encode :: EncodeAsType,
-					Clone,
-					Debug,
-				)]
-				# [codec (crate = :: subxt :: ext :: subxt_core :: ext :: codec)]
-				#[decode_as_type(
-					crate_path = ":: subxt :: ext :: subxt_core :: ext :: scale_decode"
-				)]
-				#[encode_as_type(
-					crate_path = ":: subxt :: ext :: subxt_core :: ext :: scale_encode"
-				)]
-				pub struct ForkPower {}
-				pub mod calculate_fork_power {
-					use super::runtime_types;
-					pub type Seal = runtime_types::argon_primitives::digests::BlockSealDigest;
-					pub type Header =
-						runtime_types::sp_runtime::generic::header::Header<::core::primitive::u32>;
-					pub mod output {
-						use super::runtime_types;
-						pub type Output = ::core::result::Result<
-							runtime_types::argon_primitives::fork_power::ForkPower,
-							runtime_types::sp_runtime::DispatchError,
-						>;
-					}
-				}
-				#[derive(
-					:: subxt :: ext :: subxt_core :: ext :: codec :: Decode,
-					:: subxt :: ext :: subxt_core :: ext :: codec :: Encode,
-					:: subxt :: ext :: subxt_core :: ext :: scale_decode :: DecodeAsType,
-					:: subxt :: ext :: subxt_core :: ext :: scale_encode :: EncodeAsType,
-					Clone,
-					Debug,
-				)]
-				# [codec (crate = :: subxt :: ext :: subxt_core :: ext :: codec)]
-				#[decode_as_type(
-					crate_path = ":: subxt :: ext :: subxt_core :: ext :: scale_decode"
-				)]
-				#[encode_as_type(
-					crate_path = ":: subxt :: ext :: subxt_core :: ext :: scale_encode"
-				)]
-				pub struct CalculateForkPower {
-					pub seal: calculate_fork_power::Seal,
-					pub header: calculate_fork_power::Header,
-				}
 				pub mod decode_voting_author {
 					use super::runtime_types;
 					pub type Digests = runtime_types::sp_runtime::generic::digest::Digest;
@@ -1835,7 +1743,7 @@ pub mod api {
 						pub type Output = ::core::result::Result<
 							(
 								crate::types::AccountId32,
-								::core::primitive::u32,
+								::core::primitive::u64,
 								::core::option::Option<crate::types::H256>,
 							),
 							runtime_types::sp_runtime::DispatchError,
@@ -1911,10 +1819,10 @@ pub mod api {
 						"notary_by_id",
 						types::NotaryById { notary_id },
 						[
-							245u8, 111u8, 219u8, 224u8, 176u8, 148u8, 17u8, 3u8, 255u8, 226u8,
-							254u8, 160u8, 72u8, 66u8, 78u8, 240u8, 105u8, 237u8, 5u8, 24u8, 162u8,
-							104u8, 36u8, 216u8, 249u8, 198u8, 36u8, 144u8, 125u8, 36u8, 171u8,
-							21u8,
+							0u8, 25u8, 140u8, 36u8, 205u8, 7u8, 163u8, 244u8, 131u8, 146u8, 134u8,
+							60u8, 249u8, 209u8, 180u8, 147u8, 231u8, 238u8, 225u8, 11u8, 144u8,
+							107u8, 238u8, 142u8, 132u8, 69u8, 185u8, 31u8, 118u8, 94u8, 184u8,
+							104u8,
 						],
 					)
 				}
@@ -1929,10 +1837,9 @@ pub mod api {
 						"notaries",
 						types::Notaries {},
 						[
-							218u8, 211u8, 73u8, 204u8, 165u8, 150u8, 86u8, 4u8, 43u8, 168u8, 43u8,
-							163u8, 135u8, 142u8, 207u8, 190u8, 230u8, 22u8, 192u8, 120u8, 150u8,
-							89u8, 59u8, 240u8, 241u8, 144u8, 235u8, 86u8, 151u8, 177u8, 51u8,
-							191u8,
+							19u8, 214u8, 83u8, 6u8, 212u8, 6u8, 248u8, 92u8, 200u8, 187u8, 30u8,
+							177u8, 45u8, 119u8, 212u8, 96u8, 75u8, 212u8, 74u8, 112u8, 16u8, 227u8,
+							80u8, 122u8, 132u8, 81u8, 78u8, 2u8, 235u8, 127u8, 125u8, 30u8,
 						],
 					)
 				}
@@ -2061,6 +1968,7 @@ pub mod api {
 					version: types::audit_notebook_and_get_votes::Version,
 					notary_id: types::audit_notebook_and_get_votes::NotaryId,
 					notebook_number: types::audit_notebook_and_get_votes::NotebookNumber,
+					notebook_tick: types::audit_notebook_and_get_votes::NotebookTick,
 					header_hash: types::audit_notebook_and_get_votes::HeaderHash,
 					vote_minimums: types::audit_notebook_and_get_votes::VoteMinimums,
 					bytes: types::audit_notebook_and_get_votes::Bytes,
@@ -2076,16 +1984,16 @@ pub mod api {
 							version,
 							notary_id,
 							notebook_number,
+							notebook_tick,
 							header_hash,
 							vote_minimums,
 							bytes,
 							raw_audit_dependency_summaries,
 						},
 						[
-							77u8, 83u8, 68u8, 88u8, 141u8, 201u8, 175u8, 104u8, 77u8, 3u8, 181u8,
-							147u8, 179u8, 122u8, 42u8, 80u8, 213u8, 135u8, 47u8, 51u8, 160u8,
-							177u8, 179u8, 212u8, 92u8, 20u8, 116u8, 25u8, 70u8, 144u8, 194u8,
-							196u8,
+							120u8, 121u8, 180u8, 197u8, 119u8, 79u8, 80u8, 127u8, 206u8, 39u8,
+							23u8, 66u8, 201u8, 157u8, 58u8, 247u8, 187u8, 38u8, 107u8, 8u8, 218u8,
+							78u8, 83u8, 89u8, 221u8, 208u8, 63u8, 51u8, 73u8, 43u8, 169u8, 117u8,
 						],
 					)
 				}
@@ -2101,10 +2009,9 @@ pub mod api {
 						"decode_signed_raw_notebook_header",
 						types::DecodeSignedRawNotebookHeader { raw_header },
 						[
-							255u8, 61u8, 138u8, 198u8, 117u8, 35u8, 186u8, 239u8, 120u8, 162u8,
-							123u8, 128u8, 114u8, 224u8, 14u8, 72u8, 207u8, 46u8, 116u8, 165u8,
-							170u8, 220u8, 131u8, 226u8, 95u8, 153u8, 61u8, 233u8, 0u8, 149u8,
-							187u8, 79u8,
+							220u8, 10u8, 9u8, 187u8, 79u8, 119u8, 146u8, 189u8, 238u8, 221u8, 40u8,
+							202u8, 76u8, 159u8, 214u8, 58u8, 85u8, 47u8, 118u8, 83u8, 10u8, 119u8,
+							122u8, 12u8, 181u8, 73u8, 52u8, 152u8, 147u8, 127u8, 250u8, 104u8,
 						],
 					)
 				}
@@ -2119,10 +2026,9 @@ pub mod api {
 						"latest_notebook_by_notary",
 						types::LatestNotebookByNotary {},
 						[
-							85u8, 20u8, 202u8, 169u8, 17u8, 113u8, 81u8, 236u8, 115u8, 197u8,
-							120u8, 136u8, 102u8, 113u8, 49u8, 102u8, 175u8, 238u8, 64u8, 34u8,
-							88u8, 80u8, 194u8, 239u8, 232u8, 40u8, 227u8, 162u8, 135u8, 203u8,
-							122u8, 236u8,
+							88u8, 142u8, 183u8, 32u8, 8u8, 54u8, 131u8, 85u8, 18u8, 127u8, 69u8,
+							101u8, 27u8, 173u8, 150u8, 55u8, 21u8, 243u8, 95u8, 34u8, 53u8, 63u8,
+							174u8, 21u8, 233u8, 61u8, 127u8, 36u8, 58u8, 233u8, 227u8, 211u8,
 						],
 					)
 				}
@@ -2134,6 +2040,7 @@ pub mod api {
 					pub type Version = ::core::primitive::u32;
 					pub type NotaryId = ::core::primitive::u32;
 					pub type NotebookNumber = ::core::primitive::u32;
+					pub type NotebookTick = ::core::primitive::u64;
 					pub type HeaderHash = crate::types::H256;
 					pub type VoteMinimums = ::subxt::ext::subxt_core::utils::KeyedVec<
 						crate::types::H256,
@@ -2172,6 +2079,7 @@ pub mod api {
 					pub version: audit_notebook_and_get_votes::Version,
 					pub notary_id: audit_notebook_and_get_votes::NotaryId,
 					pub notebook_number: audit_notebook_and_get_votes::NotebookNumber,
+					pub notebook_tick: audit_notebook_and_get_votes::NotebookTick,
 					pub header_hash: audit_notebook_and_get_votes::HeaderHash,
 					pub vote_minimums: audit_notebook_and_get_votes::VoteMinimums,
 					pub bytes: audit_notebook_and_get_votes::Bytes,
@@ -2216,7 +2124,7 @@ pub mod api {
 						use super::runtime_types;
 						pub type Output = ::subxt::ext::subxt_core::utils::KeyedVec<
 							::core::primitive::u32,
-							(::core::primitive::u32, ::core::primitive::u32),
+							(::core::primitive::u32, ::core::primitive::u64),
 						>;
 					}
 				}
@@ -2253,9 +2161,9 @@ pub mod api {
 						"current_tick",
 						types::CurrentTick {},
 						[
-							14u8, 164u8, 187u8, 5u8, 165u8, 232u8, 115u8, 62u8, 28u8, 152u8, 59u8,
-							125u8, 52u8, 220u8, 63u8, 169u8, 198u8, 88u8, 58u8, 185u8, 7u8, 214u8,
-							232u8, 65u8, 163u8, 38u8, 161u8, 233u8, 164u8, 129u8, 67u8, 193u8,
+							146u8, 22u8, 203u8, 137u8, 113u8, 70u8, 190u8, 246u8, 186u8, 164u8,
+							25u8, 19u8, 91u8, 43u8, 31u8, 250u8, 210u8, 112u8, 58u8, 122u8, 73u8,
+							202u8, 170u8, 73u8, 234u8, 50u8, 67u8, 52u8, 108u8, 159u8, 7u8, 106u8,
 						],
 					)
 				}
@@ -2270,9 +2178,9 @@ pub mod api {
 						"ticker",
 						types::Ticker {},
 						[
-							3u8, 56u8, 229u8, 216u8, 50u8, 84u8, 230u8, 217u8, 8u8, 242u8, 213u8,
-							95u8, 30u8, 97u8, 99u8, 88u8, 122u8, 11u8, 27u8, 118u8, 135u8, 139u8,
-							120u8, 163u8, 246u8, 54u8, 196u8, 238u8, 167u8, 211u8, 137u8, 151u8,
+							211u8, 140u8, 183u8, 251u8, 30u8, 79u8, 73u8, 110u8, 27u8, 185u8, 4u8,
+							25u8, 182u8, 69u8, 196u8, 199u8, 214u8, 81u8, 183u8, 195u8, 116u8,
+							57u8, 10u8, 116u8, 226u8, 52u8, 190u8, 34u8, 87u8, 210u8, 70u8, 66u8,
 						],
 					)
 				}
@@ -2288,9 +2196,10 @@ pub mod api {
 						"block_at_tick",
 						types::BlockAtTick { tick },
 						[
-							72u8, 19u8, 19u8, 190u8, 26u8, 124u8, 10u8, 12u8, 30u8, 187u8, 6u8,
-							163u8, 253u8, 20u8, 207u8, 74u8, 96u8, 135u8, 80u8, 61u8, 33u8, 121u8,
-							198u8, 230u8, 232u8, 44u8, 89u8, 235u8, 45u8, 13u8, 158u8, 149u8,
+							255u8, 22u8, 112u8, 151u8, 189u8, 174u8, 219u8, 227u8, 244u8, 51u8,
+							40u8, 18u8, 69u8, 133u8, 249u8, 75u8, 141u8, 255u8, 251u8, 24u8, 143u8,
+							240u8, 232u8, 41u8, 56u8, 77u8, 218u8, 186u8, 207u8, 67u8, 193u8,
+							186u8,
 						],
 					)
 				}
@@ -2301,7 +2210,7 @@ pub mod api {
 					use super::runtime_types;
 					pub mod output {
 						use super::runtime_types;
-						pub type Output = ::core::primitive::u32;
+						pub type Output = ::core::primitive::u64;
 					}
 				}
 				#[derive(
@@ -2345,7 +2254,7 @@ pub mod api {
 				pub struct Ticker {}
 				pub mod block_at_tick {
 					use super::runtime_types;
-					pub type Tick = ::core::primitive::u32;
+					pub type Tick = ::core::primitive::u64;
 					pub mod output {
 						use super::runtime_types;
 						pub type Output = ::core::option::Option<crate::types::H256>;
@@ -3728,9 +3637,9 @@ pub mod api {
 			.hash();
 		runtime_metadata_hash ==
 			[
-				181u8, 91u8, 58u8, 25u8, 122u8, 250u8, 0u8, 168u8, 225u8, 122u8, 64u8, 90u8, 104u8,
-				178u8, 214u8, 15u8, 129u8, 255u8, 242u8, 103u8, 218u8, 210u8, 49u8, 156u8, 109u8,
-				231u8, 237u8, 189u8, 74u8, 200u8, 132u8, 191u8,
+				140u8, 27u8, 133u8, 158u8, 27u8, 242u8, 102u8, 119u8, 23u8, 163u8, 196u8, 101u8,
+				93u8, 26u8, 49u8, 72u8, 19u8, 248u8, 199u8, 200u8, 109u8, 238u8, 231u8, 73u8, 70u8,
+				152u8, 37u8, 94u8, 231u8, 140u8, 164u8, 204u8,
 			]
 	}
 	pub mod system {
@@ -4881,9 +4790,10 @@ pub mod api {
 						"Events",
 						(),
 						[
-							150u8, 143u8, 57u8, 182u8, 234u8, 98u8, 50u8, 209u8, 93u8, 56u8, 108u8,
-							165u8, 170u8, 210u8, 81u8, 40u8, 52u8, 85u8, 80u8, 166u8, 88u8, 163u8,
-							132u8, 36u8, 70u8, 150u8, 134u8, 123u8, 53u8, 49u8, 74u8, 94u8,
+							192u8, 74u8, 102u8, 106u8, 236u8, 211u8, 29u8, 237u8, 227u8, 9u8,
+							210u8, 99u8, 159u8, 135u8, 82u8, 3u8, 210u8, 83u8, 162u8, 103u8, 42u8,
+							149u8, 153u8, 55u8, 31u8, 127u8, 27u8, 33u8, 173u8, 228u8, 244u8,
+							243u8,
 						],
 					)
 				}
@@ -5230,10 +5140,10 @@ pub mod api {
 						"TempDigests",
 						(),
 						[
-							152u8, 229u8, 87u8, 3u8, 41u8, 205u8, 4u8, 134u8, 233u8, 63u8, 158u8,
-							129u8, 24u8, 16u8, 178u8, 147u8, 246u8, 216u8, 90u8, 85u8, 143u8,
-							237u8, 62u8, 93u8, 194u8, 82u8, 95u8, 106u8, 241u8, 233u8, 124u8,
-							209u8,
+							103u8, 233u8, 241u8, 215u8, 19u8, 94u8, 177u8, 240u8, 138u8, 91u8,
+							138u8, 19u8, 61u8, 79u8, 130u8, 70u8, 158u8, 61u8, 55u8, 33u8, 75u8,
+							52u8, 57u8, 117u8, 244u8, 227u8, 106u8, 148u8, 144u8, 17u8, 24u8,
+							194u8,
 						],
 					)
 				}
@@ -5706,10 +5616,10 @@ pub mod api {
 							call: ::subxt::ext::subxt_core::alloc::boxed::Box::new(call),
 						},
 						[
-							113u8, 161u8, 220u8, 232u8, 166u8, 146u8, 161u8, 160u8, 185u8, 149u8,
-							215u8, 222u8, 84u8, 245u8, 22u8, 124u8, 139u8, 196u8, 111u8, 176u8,
-							209u8, 244u8, 210u8, 11u8, 150u8, 43u8, 173u8, 14u8, 54u8, 167u8,
-							255u8, 253u8,
+							130u8, 191u8, 167u8, 140u8, 33u8, 127u8, 220u8, 175u8, 96u8, 42u8,
+							51u8, 197u8, 65u8, 78u8, 202u8, 235u8, 24u8, 231u8, 244u8, 179u8,
+							167u8, 174u8, 123u8, 192u8, 20u8, 39u8, 30u8, 23u8, 177u8, 84u8, 161u8,
+							99u8,
 						],
 					)
 				}
@@ -5771,10 +5681,9 @@ pub mod api {
 							max_weight,
 						},
 						[
-							173u8, 190u8, 152u8, 39u8, 254u8, 239u8, 15u8, 229u8, 12u8, 68u8,
-							110u8, 84u8, 131u8, 52u8, 132u8, 111u8, 224u8, 99u8, 59u8, 52u8, 118u8,
-							109u8, 124u8, 244u8, 181u8, 16u8, 143u8, 254u8, 247u8, 155u8, 96u8,
-							93u8,
+							175u8, 220u8, 88u8, 9u8, 236u8, 2u8, 152u8, 100u8, 1u8, 158u8, 56u8,
+							22u8, 126u8, 132u8, 161u8, 34u8, 244u8, 97u8, 137u8, 174u8, 129u8,
+							169u8, 53u8, 43u8, 169u8, 8u8, 197u8, 120u8, 196u8, 56u8, 84u8, 192u8,
 						],
 					)
 				}
@@ -6639,9 +6548,10 @@ pub mod api {
 							call: ::subxt::ext::subxt_core::alloc::boxed::Box::new(call),
 						},
 						[
-							128u8, 79u8, 156u8, 164u8, 45u8, 59u8, 25u8, 182u8, 0u8, 24u8, 150u8,
-							130u8, 156u8, 226u8, 44u8, 238u8, 22u8, 172u8, 19u8, 239u8, 47u8,
-							147u8, 77u8, 56u8, 217u8, 227u8, 77u8, 107u8, 93u8, 112u8, 3u8, 22u8,
+							136u8, 114u8, 81u8, 146u8, 86u8, 98u8, 74u8, 94u8, 34u8, 2u8, 185u8,
+							212u8, 194u8, 97u8, 105u8, 200u8, 139u8, 249u8, 125u8, 219u8, 26u8,
+							204u8, 15u8, 211u8, 91u8, 180u8, 162u8, 123u8, 153u8, 51u8, 70u8,
+							187u8,
 						],
 					)
 				}
@@ -6903,9 +6813,9 @@ pub mod api {
 							call: ::subxt::ext::subxt_core::alloc::boxed::Box::new(call),
 						},
 						[
-							73u8, 69u8, 0u8, 1u8, 235u8, 28u8, 176u8, 249u8, 63u8, 45u8, 84u8, 9u8,
-							5u8, 196u8, 113u8, 36u8, 45u8, 251u8, 70u8, 212u8, 188u8, 53u8, 3u8,
-							106u8, 49u8, 229u8, 76u8, 123u8, 153u8, 201u8, 170u8, 22u8,
+							17u8, 22u8, 120u8, 64u8, 45u8, 215u8, 80u8, 196u8, 198u8, 117u8, 184u8,
+							210u8, 83u8, 224u8, 190u8, 173u8, 13u8, 167u8, 28u8, 240u8, 98u8,
+							221u8, 9u8, 70u8, 94u8, 223u8, 199u8, 209u8, 186u8, 192u8, 56u8, 240u8,
 						],
 					)
 				}
@@ -7329,7 +7239,7 @@ pub mod api {
 				use super::runtime_types;
 				pub mod current_tick {
 					use super::runtime_types;
-					pub type CurrentTick = ::core::primitive::u32;
+					pub type CurrentTick = ::core::primitive::u64;
 				}
 				pub mod genesis_ticker {
 					use super::runtime_types;
@@ -7339,7 +7249,7 @@ pub mod api {
 					use super::runtime_types;
 					pub type RecentBlocksAtTicks =
 						runtime_types::bounded_collections::bounded_btree_map::BoundedBTreeMap<
-							::core::primitive::u32,
+							::core::primitive::u64,
 							crate::types::H256,
 						>;
 				}
@@ -7360,9 +7270,9 @@ pub mod api {
 						"CurrentTick",
 						(),
 						[
-							22u8, 7u8, 231u8, 159u8, 250u8, 169u8, 243u8, 224u8, 215u8, 82u8, 83u8,
-							88u8, 83u8, 90u8, 150u8, 36u8, 157u8, 90u8, 223u8, 33u8, 128u8, 179u8,
-							239u8, 41u8, 14u8, 89u8, 96u8, 146u8, 165u8, 37u8, 38u8, 232u8,
+							115u8, 54u8, 229u8, 23u8, 97u8, 60u8, 64u8, 116u8, 37u8, 184u8, 10u8,
+							37u8, 110u8, 80u8, 205u8, 157u8, 72u8, 245u8, 79u8, 69u8, 169u8, 19u8,
+							137u8, 188u8, 154u8, 27u8, 238u8, 62u8, 75u8, 157u8, 69u8, 145u8,
 						],
 					)
 				}
@@ -7380,9 +7290,9 @@ pub mod api {
 						"GenesisTicker",
 						(),
 						[
-							20u8, 252u8, 9u8, 36u8, 16u8, 22u8, 115u8, 109u8, 170u8, 216u8, 99u8,
-							32u8, 210u8, 153u8, 72u8, 197u8, 241u8, 206u8, 14u8, 74u8, 144u8, 97u8,
-							68u8, 85u8, 201u8, 161u8, 151u8, 151u8, 35u8, 119u8, 204u8, 118u8,
+							78u8, 162u8, 118u8, 169u8, 147u8, 81u8, 8u8, 124u8, 130u8, 187u8, 0u8,
+							169u8, 204u8, 202u8, 186u8, 8u8, 244u8, 110u8, 36u8, 81u8, 178u8, 24u8,
+							240u8, 43u8, 249u8, 206u8, 108u8, 168u8, 36u8, 193u8, 32u8, 210u8,
 						],
 					)
 				}
@@ -7402,10 +7312,9 @@ pub mod api {
 						"RecentBlocksAtTicks",
 						(),
 						[
-							21u8, 197u8, 172u8, 240u8, 251u8, 138u8, 234u8, 132u8, 77u8, 129u8,
-							93u8, 212u8, 250u8, 7u8, 71u8, 89u8, 205u8, 101u8, 209u8, 154u8, 110u8,
-							248u8, 243u8, 209u8, 56u8, 103u8, 183u8, 149u8, 67u8, 192u8, 149u8,
-							213u8,
+							24u8, 141u8, 87u8, 195u8, 108u8, 48u8, 208u8, 191u8, 192u8, 76u8, 96u8,
+							150u8, 100u8, 233u8, 126u8, 188u8, 109u8, 81u8, 245u8, 197u8, 16u8,
+							20u8, 144u8, 182u8, 32u8, 236u8, 118u8, 77u8, 74u8, 22u8, 31u8, 180u8,
 						],
 					)
 				}
@@ -10707,7 +10616,7 @@ pub mod api {
 					use super::runtime_types;
 					pub type NotaryId = ::core::primitive::u32;
 					pub type Meta = runtime_types::argon_primitives::notary::NotaryMeta;
-					pub type EffectiveTick = ::core::primitive::u32;
+					pub type EffectiveTick = ::core::primitive::u64;
 				}
 				impl ::subxt::ext::subxt_core::blocks::StaticExtrinsic for Update {
 					const PALLET: &'static str = "Notaries";
@@ -10760,9 +10669,9 @@ pub mod api {
 						"update",
 						types::Update { notary_id, meta, effective_tick },
 						[
-							120u8, 206u8, 188u8, 143u8, 26u8, 121u8, 25u8, 34u8, 108u8, 154u8,
-							209u8, 53u8, 182u8, 242u8, 116u8, 9u8, 180u8, 244u8, 90u8, 79u8, 153u8,
-							121u8, 122u8, 172u8, 210u8, 48u8, 70u8, 142u8, 62u8, 150u8, 60u8, 14u8,
+							0u8, 231u8, 38u8, 77u8, 166u8, 65u8, 238u8, 225u8, 159u8, 147u8, 12u8,
+							200u8, 75u8, 166u8, 187u8, 33u8, 52u8, 123u8, 117u8, 122u8, 3u8, 72u8,
+							32u8, 225u8, 222u8, 170u8, 253u8, 200u8, 171u8, 212u8, 166u8, 26u8,
 						],
 					)
 				}
@@ -10846,7 +10755,7 @@ pub mod api {
 				use super::runtime_types;
 				pub type NotaryId = ::core::primitive::u32;
 				pub type Meta = runtime_types::argon_primitives::notary::NotaryMeta;
-				pub type EffectiveTick = ::core::primitive::u32;
+				pub type EffectiveTick = ::core::primitive::u64;
 			}
 			impl ::subxt::ext::subxt_core::events::StaticEvent for NotaryMetaUpdateQueued {
 				const PALLET: &'static str = "Notaries";
@@ -10943,7 +10852,7 @@ pub mod api {
 					use super::runtime_types;
 					pub type NotaryKeyHistory =
 						runtime_types::bounded_collections::bounded_vec::BoundedVec<(
-							::core::primitive::u32,
+							::core::primitive::u64,
 							[::core::primitive::u8; 32usize],
 						)>;
 					pub type Param0 = ::core::primitive::u32;
@@ -10955,7 +10864,7 @@ pub mod api {
 							::core::primitive::u32,
 							runtime_types::argon_primitives::notary::NotaryMeta,
 						>;
-					pub type Param0 = ::core::primitive::u32;
+					pub type Param0 = ::core::primitive::u64;
 				}
 			}
 			pub struct StorageApi;
@@ -11088,10 +10997,10 @@ pub mod api {
 						"ActiveNotaries",
 						(),
 						[
-							120u8, 168u8, 144u8, 200u8, 209u8, 168u8, 173u8, 186u8, 99u8, 9u8,
-							162u8, 212u8, 120u8, 72u8, 26u8, 114u8, 187u8, 232u8, 177u8, 86u8,
-							104u8, 165u8, 110u8, 71u8, 33u8, 204u8, 237u8, 148u8, 233u8, 35u8,
-							139u8, 60u8,
+							126u8, 46u8, 226u8, 130u8, 110u8, 51u8, 110u8, 206u8, 15u8, 216u8,
+							35u8, 28u8, 209u8, 20u8, 165u8, 142u8, 92u8, 95u8, 188u8, 177u8, 67u8,
+							248u8, 135u8, 187u8, 34u8, 65u8, 115u8, 12u8, 145u8, 90u8, 186u8,
+							251u8,
 						],
 					)
 				}
@@ -11109,9 +11018,9 @@ pub mod api {
 						"NotaryKeyHistory",
 						(),
 						[
-							59u8, 52u8, 23u8, 225u8, 223u8, 28u8, 225u8, 2u8, 39u8, 170u8, 155u8,
-							214u8, 55u8, 134u8, 180u8, 53u8, 230u8, 255u8, 30u8, 165u8, 102u8,
-							81u8, 80u8, 26u8, 213u8, 207u8, 158u8, 183u8, 71u8, 77u8, 191u8, 123u8,
+							141u8, 175u8, 18u8, 63u8, 107u8, 171u8, 83u8, 21u8, 0u8, 93u8, 208u8,
+							29u8, 144u8, 157u8, 77u8, 103u8, 229u8, 126u8, 154u8, 59u8, 89u8, 82u8,
+							153u8, 182u8, 104u8, 125u8, 39u8, 17u8, 226u8, 140u8, 147u8, 51u8,
 						],
 					)
 				}
@@ -11134,9 +11043,9 @@ pub mod api {
 							_0.borrow(),
 						),
 						[
-							59u8, 52u8, 23u8, 225u8, 223u8, 28u8, 225u8, 2u8, 39u8, 170u8, 155u8,
-							214u8, 55u8, 134u8, 180u8, 53u8, 230u8, 255u8, 30u8, 165u8, 102u8,
-							81u8, 80u8, 26u8, 213u8, 207u8, 158u8, 183u8, 71u8, 77u8, 191u8, 123u8,
+							141u8, 175u8, 18u8, 63u8, 107u8, 171u8, 83u8, 21u8, 0u8, 93u8, 208u8,
+							29u8, 144u8, 157u8, 77u8, 103u8, 229u8, 126u8, 154u8, 59u8, 89u8, 82u8,
+							153u8, 182u8, 104u8, 125u8, 39u8, 17u8, 226u8, 140u8, 147u8, 51u8,
 						],
 					)
 				}
@@ -11155,10 +11064,9 @@ pub mod api {
 						"QueuedNotaryMetaChanges",
 						(),
 						[
-							53u8, 211u8, 146u8, 97u8, 213u8, 139u8, 42u8, 197u8, 253u8, 77u8,
-							144u8, 117u8, 91u8, 179u8, 122u8, 83u8, 177u8, 108u8, 91u8, 50u8,
-							195u8, 248u8, 70u8, 99u8, 68u8, 254u8, 75u8, 140u8, 195u8, 193u8, 81u8,
-							25u8,
+							195u8, 31u8, 22u8, 74u8, 252u8, 81u8, 191u8, 32u8, 127u8, 57u8, 117u8,
+							140u8, 136u8, 23u8, 84u8, 53u8, 156u8, 79u8, 202u8, 115u8, 83u8, 106u8,
+							1u8, 118u8, 59u8, 49u8, 168u8, 235u8, 37u8, 52u8, 103u8, 42u8,
 						],
 					)
 				}
@@ -11182,10 +11090,9 @@ pub mod api {
 							_0.borrow(),
 						),
 						[
-							53u8, 211u8, 146u8, 97u8, 213u8, 139u8, 42u8, 197u8, 253u8, 77u8,
-							144u8, 117u8, 91u8, 179u8, 122u8, 83u8, 177u8, 108u8, 91u8, 50u8,
-							195u8, 248u8, 70u8, 99u8, 68u8, 254u8, 75u8, 140u8, 195u8, 193u8, 81u8,
-							25u8,
+							195u8, 31u8, 22u8, 74u8, 252u8, 81u8, 191u8, 32u8, 127u8, 57u8, 117u8,
+							140u8, 136u8, 23u8, 84u8, 53u8, 156u8, 79u8, 202u8, 115u8, 83u8, 106u8,
+							1u8, 118u8, 59u8, 49u8, 168u8, 235u8, 37u8, 52u8, 103u8, 42u8,
 						],
 					)
 				}
@@ -11250,16 +11157,16 @@ pub mod api {
 				pub fn meta_changes_tick_delay(
 					&self,
 				) -> ::subxt::ext::subxt_core::constants::address::StaticAddress<
-					::core::primitive::u32,
+					::core::primitive::u64,
 				> {
 					::subxt::ext::subxt_core::constants::address::StaticAddress::new_static(
 						"Notaries",
 						"MetaChangesTickDelay",
 						[
-							98u8, 252u8, 116u8, 72u8, 26u8, 180u8, 225u8, 83u8, 200u8, 157u8,
-							125u8, 151u8, 53u8, 76u8, 168u8, 26u8, 10u8, 9u8, 98u8, 68u8, 9u8,
-							178u8, 197u8, 113u8, 31u8, 79u8, 200u8, 90u8, 203u8, 100u8, 41u8,
-							145u8,
+							128u8, 214u8, 205u8, 242u8, 181u8, 142u8, 124u8, 231u8, 190u8, 146u8,
+							59u8, 226u8, 157u8, 101u8, 103u8, 117u8, 249u8, 65u8, 18u8, 191u8,
+							103u8, 119u8, 53u8, 85u8, 81u8, 96u8, 220u8, 42u8, 184u8, 239u8, 42u8,
+							246u8,
 						],
 					)
 				}
@@ -11378,10 +11285,9 @@ pub mod api {
 						"submit",
 						types::Submit { notebooks },
 						[
-							131u8, 103u8, 127u8, 241u8, 80u8, 172u8, 53u8, 149u8, 119u8, 133u8,
-							150u8, 140u8, 227u8, 185u8, 248u8, 72u8, 75u8, 126u8, 219u8, 87u8,
-							142u8, 136u8, 249u8, 148u8, 204u8, 116u8, 71u8, 111u8, 10u8, 207u8,
-							5u8, 142u8,
+							180u8, 62u8, 149u8, 51u8, 198u8, 62u8, 170u8, 244u8, 8u8, 162u8, 180u8,
+							216u8, 84u8, 214u8, 251u8, 152u8, 241u8, 26u8, 193u8, 171u8, 181u8,
+							103u8, 205u8, 0u8, 242u8, 85u8, 12u8, 17u8, 62u8, 214u8, 128u8, 209u8,
 						],
 					)
 				}
@@ -11524,7 +11430,7 @@ pub mod api {
 					use super::runtime_types;
 					pub type NotariesLockedForFailedAudit = (
 						::core::primitive::u32,
-						::core::primitive::u32,
+						::core::primitive::u64,
 						runtime_types::argon_notary_audit::error::VerifyError,
 					);
 					pub type Param0 = ::core::primitive::u32;
@@ -11655,9 +11561,10 @@ pub mod api {
 						"LastNotebookDetailsByNotary",
 						(),
 						[
-							64u8, 129u8, 238u8, 122u8, 17u8, 221u8, 69u8, 225u8, 72u8, 184u8,
-							105u8, 250u8, 99u8, 151u8, 43u8, 252u8, 57u8, 109u8, 163u8, 1u8, 135u8,
-							215u8, 78u8, 62u8, 248u8, 161u8, 207u8, 89u8, 136u8, 227u8, 59u8, 78u8,
+							32u8, 140u8, 153u8, 157u8, 93u8, 149u8, 12u8, 255u8, 183u8, 192u8,
+							199u8, 184u8, 205u8, 180u8, 81u8, 33u8, 6u8, 184u8, 31u8, 71u8, 187u8,
+							230u8, 119u8, 167u8, 101u8, 137u8, 242u8, 18u8, 157u8, 237u8, 226u8,
+							8u8,
 						],
 					)
 				}
@@ -11682,9 +11589,10 @@ pub mod api {
 							_0.borrow(),
 						),
 						[
-							64u8, 129u8, 238u8, 122u8, 17u8, 221u8, 69u8, 225u8, 72u8, 184u8,
-							105u8, 250u8, 99u8, 151u8, 43u8, 252u8, 57u8, 109u8, 163u8, 1u8, 135u8,
-							215u8, 78u8, 62u8, 248u8, 161u8, 207u8, 89u8, 136u8, 227u8, 59u8, 78u8,
+							32u8, 140u8, 153u8, 157u8, 93u8, 149u8, 12u8, 255u8, 183u8, 192u8,
+							199u8, 184u8, 205u8, 180u8, 81u8, 33u8, 6u8, 184u8, 31u8, 71u8, 187u8,
+							230u8, 119u8, 167u8, 101u8, 137u8, 242u8, 18u8, 157u8, 237u8, 226u8,
+							8u8,
 						],
 					)
 				}
@@ -11703,9 +11611,10 @@ pub mod api {
 						"BlockNotebooks",
 						(),
 						[
-							121u8, 35u8, 59u8, 7u8, 131u8, 231u8, 163u8, 124u8, 130u8, 195u8, 59u8,
-							14u8, 75u8, 75u8, 35u8, 246u8, 92u8, 180u8, 117u8, 173u8, 2u8, 35u8,
-							135u8, 66u8, 184u8, 113u8, 227u8, 242u8, 81u8, 103u8, 136u8, 93u8,
+							20u8, 174u8, 149u8, 132u8, 52u8, 219u8, 105u8, 41u8, 158u8, 71u8,
+							226u8, 194u8, 3u8, 87u8, 36u8, 103u8, 12u8, 103u8, 222u8, 210u8, 198u8,
+							61u8, 252u8, 88u8, 187u8, 164u8, 102u8, 183u8, 183u8, 181u8, 196u8,
+							186u8,
 						],
 					)
 				}
@@ -11745,10 +11654,9 @@ pub mod api {
 						"NotariesLockedForFailedAudit",
 						(),
 						[
-							118u8, 246u8, 132u8, 173u8, 16u8, 242u8, 114u8, 36u8, 231u8, 236u8,
-							82u8, 54u8, 24u8, 104u8, 156u8, 237u8, 122u8, 146u8, 27u8, 173u8,
-							134u8, 71u8, 128u8, 249u8, 245u8, 149u8, 47u8, 59u8, 202u8, 37u8,
-							171u8, 250u8,
+							149u8, 169u8, 97u8, 60u8, 98u8, 31u8, 146u8, 77u8, 118u8, 219u8, 251u8,
+							80u8, 157u8, 97u8, 90u8, 0u8, 245u8, 146u8, 210u8, 229u8, 67u8, 19u8,
+							233u8, 35u8, 153u8, 208u8, 212u8, 136u8, 201u8, 27u8, 151u8, 171u8,
 						],
 					)
 				}
@@ -11772,10 +11680,9 @@ pub mod api {
 							_0.borrow(),
 						),
 						[
-							118u8, 246u8, 132u8, 173u8, 16u8, 242u8, 114u8, 36u8, 231u8, 236u8,
-							82u8, 54u8, 24u8, 104u8, 156u8, 237u8, 122u8, 146u8, 27u8, 173u8,
-							134u8, 71u8, 128u8, 249u8, 245u8, 149u8, 47u8, 59u8, 202u8, 37u8,
-							171u8, 250u8,
+							149u8, 169u8, 97u8, 60u8, 98u8, 31u8, 146u8, 77u8, 118u8, 219u8, 251u8,
+							80u8, 157u8, 97u8, 90u8, 0u8, 245u8, 146u8, 210u8, 229u8, 67u8, 19u8,
+							233u8, 35u8, 153u8, 208u8, 212u8, 136u8, 201u8, 27u8, 151u8, 171u8,
 						],
 					)
 				}
@@ -12135,7 +12042,7 @@ pub mod api {
 				pub type Amount = ::core::primitive::u128;
 				pub type TransferId = ::core::primitive::u32;
 				pub type NotaryId = ::core::primitive::u32;
-				pub type ExpirationTick = ::core::primitive::u32;
+				pub type ExpirationTick = ::core::primitive::u64;
 			}
 			impl ::subxt::ext::subxt_core::events::StaticEvent for TransferToLocalchain {
 				const PALLET: &'static str = "ChainTransfer";
@@ -12468,7 +12375,7 @@ pub mod api {
 							::core::primitive::u32,
 						>;
 					pub type Param0 = ::core::primitive::u32;
-					pub type Param1 = ::core::primitive::u32;
+					pub type Param1 = ::core::primitive::u64;
 				}
 				pub mod transfers_used_in_block_notebooks {
 					use super::runtime_types;
@@ -12537,10 +12444,9 @@ pub mod api {
 						"PendingTransfersOut",
 						(),
 						[
-							140u8, 69u8, 183u8, 224u8, 241u8, 38u8, 50u8, 205u8, 168u8, 146u8,
-							113u8, 111u8, 247u8, 46u8, 126u8, 64u8, 166u8, 208u8, 70u8, 80u8,
-							231u8, 104u8, 230u8, 67u8, 186u8, 147u8, 19u8, 226u8, 117u8, 177u8,
-							155u8, 138u8,
+							240u8, 125u8, 51u8, 103u8, 117u8, 206u8, 78u8, 227u8, 94u8, 102u8,
+							198u8, 72u8, 23u8, 80u8, 102u8, 121u8, 192u8, 76u8, 192u8, 34u8, 40u8,
+							59u8, 213u8, 190u8, 128u8, 121u8, 42u8, 130u8, 47u8, 67u8, 63u8, 112u8,
 						],
 					)
 				}
@@ -12563,10 +12469,9 @@ pub mod api {
 							_0.borrow(),
 						),
 						[
-							140u8, 69u8, 183u8, 224u8, 241u8, 38u8, 50u8, 205u8, 168u8, 146u8,
-							113u8, 111u8, 247u8, 46u8, 126u8, 64u8, 166u8, 208u8, 70u8, 80u8,
-							231u8, 104u8, 230u8, 67u8, 186u8, 147u8, 19u8, 226u8, 117u8, 177u8,
-							155u8, 138u8,
+							240u8, 125u8, 51u8, 103u8, 117u8, 206u8, 78u8, 227u8, 94u8, 102u8,
+							198u8, 72u8, 23u8, 80u8, 102u8, 121u8, 192u8, 76u8, 192u8, 34u8, 40u8,
+							59u8, 213u8, 190u8, 128u8, 121u8, 42u8, 130u8, 47u8, 67u8, 63u8, 112u8,
 						],
 					)
 				}
@@ -12584,10 +12489,10 @@ pub mod api {
 						"ExpiringTransfersOutByNotary",
 						(),
 						[
-							71u8, 202u8, 250u8, 213u8, 80u8, 177u8, 45u8, 234u8, 239u8, 244u8,
-							48u8, 170u8, 79u8, 174u8, 219u8, 77u8, 149u8, 123u8, 98u8, 218u8,
-							105u8, 105u8, 236u8, 104u8, 144u8, 237u8, 242u8, 209u8, 133u8, 16u8,
-							189u8, 36u8,
+							133u8, 187u8, 70u8, 52u8, 181u8, 133u8, 243u8, 239u8, 255u8, 239u8,
+							18u8, 15u8, 42u8, 42u8, 238u8, 66u8, 238u8, 125u8, 186u8, 81u8, 111u8,
+							165u8, 145u8, 169u8, 75u8, 236u8, 127u8, 3u8, 166u8, 41u8, 158u8,
+							154u8,
 						],
 					)
 				}
@@ -12610,10 +12515,10 @@ pub mod api {
 							_0.borrow(),
 						),
 						[
-							71u8, 202u8, 250u8, 213u8, 80u8, 177u8, 45u8, 234u8, 239u8, 244u8,
-							48u8, 170u8, 79u8, 174u8, 219u8, 77u8, 149u8, 123u8, 98u8, 218u8,
-							105u8, 105u8, 236u8, 104u8, 144u8, 237u8, 242u8, 209u8, 133u8, 16u8,
-							189u8, 36u8,
+							133u8, 187u8, 70u8, 52u8, 181u8, 133u8, 243u8, 239u8, 255u8, 239u8,
+							18u8, 15u8, 42u8, 42u8, 238u8, 66u8, 238u8, 125u8, 186u8, 81u8, 111u8,
+							165u8, 145u8, 169u8, 75u8, 236u8, 127u8, 3u8, 166u8, 41u8, 158u8,
+							154u8,
 						],
 					)
 				}
@@ -12647,10 +12552,10 @@ pub mod api {
 							),
 						),
 						[
-							71u8, 202u8, 250u8, 213u8, 80u8, 177u8, 45u8, 234u8, 239u8, 244u8,
-							48u8, 170u8, 79u8, 174u8, 219u8, 77u8, 149u8, 123u8, 98u8, 218u8,
-							105u8, 105u8, 236u8, 104u8, 144u8, 237u8, 242u8, 209u8, 133u8, 16u8,
-							189u8, 36u8,
+							133u8, 187u8, 70u8, 52u8, 181u8, 133u8, 243u8, 239u8, 255u8, 239u8,
+							18u8, 15u8, 42u8, 42u8, 238u8, 66u8, 238u8, 125u8, 186u8, 81u8, 111u8,
+							165u8, 145u8, 169u8, 75u8, 236u8, 127u8, 3u8, 166u8, 41u8, 158u8,
+							154u8,
 						],
 					)
 				}
@@ -12838,16 +12743,16 @@ pub mod api {
 				pub fn transfer_expiration_ticks(
 					&self,
 				) -> ::subxt::ext::subxt_core::constants::address::StaticAddress<
-					::core::primitive::u32,
+					::core::primitive::u64,
 				> {
 					::subxt::ext::subxt_core::constants::address::StaticAddress::new_static(
 						"ChainTransfer",
 						"TransferExpirationTicks",
 						[
-							98u8, 252u8, 116u8, 72u8, 26u8, 180u8, 225u8, 83u8, 200u8, 157u8,
-							125u8, 151u8, 53u8, 76u8, 168u8, 26u8, 10u8, 9u8, 98u8, 68u8, 9u8,
-							178u8, 197u8, 113u8, 31u8, 79u8, 200u8, 90u8, 203u8, 100u8, 41u8,
-							145u8,
+							128u8, 214u8, 205u8, 242u8, 181u8, 142u8, 124u8, 231u8, 190u8, 146u8,
+							59u8, 226u8, 157u8, 101u8, 103u8, 117u8, 249u8, 65u8, 18u8, 191u8,
+							103u8, 119u8, 53u8, 85u8, 81u8, 96u8, 220u8, 42u8, 184u8, 239u8, 42u8,
+							246u8,
 						],
 					)
 				}
@@ -13043,7 +12948,7 @@ pub mod api {
 					use super::runtime_types;
 					pub type PastBlockVotes =
 						runtime_types::bounded_collections::bounded_vec::BoundedVec<(
-							::core::primitive::u32,
+							::core::primitive::u64,
 							::core::primitive::u32,
 							::core::primitive::u128,
 						)>;
@@ -13220,10 +13125,9 @@ pub mod api {
 						"TempCurrentTickNotebooksInBlock",
 						(),
 						[
-							44u8, 17u8, 131u8, 64u8, 117u8, 10u8, 84u8, 129u8, 184u8, 227u8, 180u8,
-							61u8, 162u8, 160u8, 189u8, 249u8, 202u8, 103u8, 51u8, 254u8, 97u8,
-							218u8, 234u8, 192u8, 64u8, 146u8, 10u8, 174u8, 101u8, 110u8, 234u8,
-							142u8,
+							204u8, 142u8, 201u8, 131u8, 1u8, 240u8, 102u8, 12u8, 71u8, 93u8, 171u8,
+							10u8, 69u8, 41u8, 48u8, 84u8, 125u8, 78u8, 6u8, 140u8, 191u8, 218u8,
+							98u8, 201u8, 239u8, 161u8, 123u8, 3u8, 159u8, 187u8, 206u8, 249u8,
 						],
 					)
 				}
@@ -13262,9 +13166,9 @@ pub mod api {
 						"PastBlockVotes",
 						(),
 						[
-							96u8, 31u8, 172u8, 50u8, 227u8, 32u8, 171u8, 95u8, 14u8, 206u8, 31u8,
-							192u8, 30u8, 75u8, 199u8, 111u8, 243u8, 142u8, 194u8, 59u8, 101u8, 4u8,
-							207u8, 52u8, 6u8, 131u8, 130u8, 83u8, 227u8, 80u8, 149u8, 168u8,
+							233u8, 29u8, 167u8, 39u8, 35u8, 197u8, 147u8, 62u8, 41u8, 249u8, 20u8,
+							181u8, 63u8, 241u8, 56u8, 18u8, 81u8, 234u8, 10u8, 109u8, 254u8, 243u8,
+							110u8, 218u8, 59u8, 91u8, 76u8, 66u8, 189u8, 115u8, 142u8, 190u8,
 						],
 					)
 				}
@@ -13574,7 +13478,7 @@ pub mod api {
 						runtime_types::bounded_collections::bounded_vec::BoundedVec<
 							crate::types::H256,
 						>;
-					pub type Param0 = ::core::primitive::u32;
+					pub type Param0 = ::core::primitive::u64;
 				}
 			}
 			pub struct StorageApi;
@@ -13593,10 +13497,10 @@ pub mod api {
 						"RegisteredDomains",
 						(),
 						[
-							238u8, 63u8, 35u8, 155u8, 242u8, 229u8, 211u8, 15u8, 243u8, 165u8,
-							234u8, 95u8, 148u8, 102u8, 168u8, 59u8, 160u8, 8u8, 90u8, 174u8, 15u8,
-							72u8, 233u8, 247u8, 249u8, 89u8, 89u8, 234u8, 204u8, 234u8, 102u8,
-							104u8,
+							129u8, 197u8, 103u8, 155u8, 102u8, 182u8, 101u8, 193u8, 244u8, 201u8,
+							188u8, 233u8, 211u8, 148u8, 35u8, 1u8, 0u8, 170u8, 10u8, 67u8, 211u8,
+							157u8, 240u8, 162u8, 145u8, 223u8, 214u8, 249u8, 73u8, 107u8, 158u8,
+							145u8,
 						],
 					)
 				}
@@ -13619,10 +13523,10 @@ pub mod api {
 							_0.borrow(),
 						),
 						[
-							238u8, 63u8, 35u8, 155u8, 242u8, 229u8, 211u8, 15u8, 243u8, 165u8,
-							234u8, 95u8, 148u8, 102u8, 168u8, 59u8, 160u8, 8u8, 90u8, 174u8, 15u8,
-							72u8, 233u8, 247u8, 249u8, 89u8, 89u8, 234u8, 204u8, 234u8, 102u8,
-							104u8,
+							129u8, 197u8, 103u8, 155u8, 102u8, 182u8, 101u8, 193u8, 244u8, 201u8,
+							188u8, 233u8, 211u8, 148u8, 35u8, 1u8, 0u8, 170u8, 10u8, 67u8, 211u8,
+							157u8, 240u8, 162u8, 145u8, 223u8, 214u8, 249u8, 73u8, 107u8, 158u8,
+							145u8,
 						],
 					)
 				}
@@ -13687,9 +13591,9 @@ pub mod api {
 						"ExpiringDomainsByBlock",
 						(),
 						[
-							75u8, 15u8, 133u8, 11u8, 204u8, 248u8, 72u8, 80u8, 4u8, 5u8, 0u8,
-							168u8, 130u8, 36u8, 43u8, 246u8, 211u8, 66u8, 249u8, 52u8, 60u8, 67u8,
-							113u8, 130u8, 240u8, 148u8, 245u8, 99u8, 98u8, 203u8, 12u8, 116u8,
+							71u8, 136u8, 185u8, 228u8, 96u8, 184u8, 85u8, 124u8, 16u8, 81u8, 87u8,
+							1u8, 85u8, 45u8, 46u8, 13u8, 3u8, 13u8, 167u8, 78u8, 189u8, 6u8, 211u8,
+							0u8, 16u8, 29u8, 229u8, 251u8, 53u8, 72u8, 125u8, 114u8,
 						],
 					)
 				}
@@ -13712,9 +13616,9 @@ pub mod api {
 							_0.borrow(),
 						),
 						[
-							75u8, 15u8, 133u8, 11u8, 204u8, 248u8, 72u8, 80u8, 4u8, 5u8, 0u8,
-							168u8, 130u8, 36u8, 43u8, 246u8, 211u8, 66u8, 249u8, 52u8, 60u8, 67u8,
-							113u8, 130u8, 240u8, 148u8, 245u8, 99u8, 98u8, 203u8, 12u8, 116u8,
+							71u8, 136u8, 185u8, 228u8, 96u8, 184u8, 85u8, 124u8, 16u8, 81u8, 87u8,
+							1u8, 85u8, 45u8, 46u8, 13u8, 3u8, 13u8, 167u8, 78u8, 189u8, 6u8, 211u8,
+							0u8, 16u8, 29u8, 229u8, 251u8, 53u8, 72u8, 125u8, 114u8,
 						],
 					)
 				}
@@ -13802,10 +13706,9 @@ pub mod api {
 						"submit",
 						types::Submit { index },
 						[
-							94u8, 206u8, 248u8, 131u8, 143u8, 26u8, 189u8, 238u8, 151u8, 78u8,
-							199u8, 145u8, 127u8, 63u8, 30u8, 175u8, 198u8, 197u8, 104u8, 233u8,
-							136u8, 107u8, 51u8, 152u8, 204u8, 139u8, 234u8, 143u8, 37u8, 113u8,
-							224u8, 28u8,
+							226u8, 53u8, 15u8, 190u8, 101u8, 46u8, 149u8, 23u8, 47u8, 182u8, 49u8,
+							71u8, 148u8, 245u8, 60u8, 254u8, 228u8, 26u8, 191u8, 116u8, 56u8, 2u8,
+							234u8, 11u8, 232u8, 103u8, 68u8, 80u8, 63u8, 140u8, 10u8, 192u8,
 						],
 					)
 				}
@@ -13904,9 +13807,10 @@ pub mod api {
 						"Current",
 						(),
 						[
-							24u8, 100u8, 2u8, 213u8, 216u8, 27u8, 132u8, 28u8, 34u8, 22u8, 106u8,
-							108u8, 248u8, 161u8, 103u8, 63u8, 82u8, 230u8, 205u8, 44u8, 159u8,
-							38u8, 222u8, 0u8, 8u8, 248u8, 208u8, 161u8, 101u8, 179u8, 132u8, 36u8,
+							120u8, 32u8, 15u8, 198u8, 170u8, 4u8, 107u8, 139u8, 237u8, 167u8, 2u8,
+							123u8, 201u8, 182u8, 119u8, 32u8, 69u8, 240u8, 32u8, 200u8, 30u8,
+							139u8, 48u8, 134u8, 244u8, 48u8, 57u8, 203u8, 212u8, 44u8, 218u8,
+							138u8,
 						],
 					)
 				}
@@ -13942,16 +13846,16 @@ pub mod api {
 				pub fn max_downtime_ticks_before_reset(
 					&self,
 				) -> ::subxt::ext::subxt_core::constants::address::StaticAddress<
-					::core::primitive::u32,
+					::core::primitive::u64,
 				> {
 					::subxt::ext::subxt_core::constants::address::StaticAddress::new_static(
 						"PriceIndex",
 						"MaxDowntimeTicksBeforeReset",
 						[
-							98u8, 252u8, 116u8, 72u8, 26u8, 180u8, 225u8, 83u8, 200u8, 157u8,
-							125u8, 151u8, 53u8, 76u8, 168u8, 26u8, 10u8, 9u8, 98u8, 68u8, 9u8,
-							178u8, 197u8, 113u8, 31u8, 79u8, 200u8, 90u8, 203u8, 100u8, 41u8,
-							145u8,
+							128u8, 214u8, 205u8, 242u8, 181u8, 142u8, 124u8, 231u8, 190u8, 146u8,
+							59u8, 226u8, 157u8, 101u8, 103u8, 117u8, 249u8, 65u8, 18u8, 191u8,
+							103u8, 119u8, 53u8, 85u8, 81u8, 96u8, 220u8, 42u8, 184u8, 239u8, 42u8,
+							246u8,
 						],
 					)
 				}
@@ -13959,16 +13863,16 @@ pub mod api {
 				pub fn max_price_age_in_ticks(
 					&self,
 				) -> ::subxt::ext::subxt_core::constants::address::StaticAddress<
-					::core::primitive::u32,
+					::core::primitive::u64,
 				> {
 					::subxt::ext::subxt_core::constants::address::StaticAddress::new_static(
 						"PriceIndex",
 						"MaxPriceAgeInTicks",
 						[
-							98u8, 252u8, 116u8, 72u8, 26u8, 180u8, 225u8, 83u8, 200u8, 157u8,
-							125u8, 151u8, 53u8, 76u8, 168u8, 26u8, 10u8, 9u8, 98u8, 68u8, 9u8,
-							178u8, 197u8, 113u8, 31u8, 79u8, 200u8, 90u8, 203u8, 100u8, 41u8,
-							145u8,
+							128u8, 214u8, 205u8, 242u8, 181u8, 142u8, 124u8, 231u8, 190u8, 146u8,
+							59u8, 226u8, 157u8, 101u8, 103u8, 117u8, 249u8, 65u8, 18u8, 191u8,
+							103u8, 119u8, 53u8, 85u8, 81u8, 96u8, 220u8, 42u8, 184u8, 239u8, 42u8,
+							246u8,
 						],
 					)
 				}
@@ -14687,9 +14591,10 @@ pub mod api {
 						"apply",
 						types::Apply { seal },
 						[
-							59u8, 5u8, 186u8, 75u8, 98u8, 7u8, 252u8, 248u8, 226u8, 50u8, 136u8,
-							44u8, 152u8, 65u8, 25u8, 197u8, 66u8, 61u8, 109u8, 76u8, 178u8, 209u8,
-							152u8, 136u8, 182u8, 147u8, 239u8, 72u8, 122u8, 1u8, 22u8, 151u8,
+							204u8, 99u8, 107u8, 98u8, 39u8, 171u8, 248u8, 70u8, 85u8, 206u8, 235u8,
+							205u8, 239u8, 88u8, 143u8, 102u8, 67u8, 173u8, 114u8, 253u8, 15u8,
+							232u8, 29u8, 169u8, 85u8, 146u8, 145u8, 126u8, 28u8, 30u8, 232u8,
+							116u8,
 						],
 					)
 				}
@@ -14719,7 +14624,7 @@ pub mod api {
 					use super::runtime_types;
 					pub type VotesInPast3Ticks =
 						runtime_types::bounded_collections::bounded_vec::BoundedVec<(
-							::core::primitive::u32,
+							::core::primitive::u64,
 							::core::primitive::u32,
 						)>;
 				}
@@ -14811,10 +14716,10 @@ pub mod api {
 						"VotesInPast3Ticks",
 						(),
 						[
-							216u8, 212u8, 53u8, 159u8, 196u8, 62u8, 193u8, 121u8, 181u8, 72u8,
-							19u8, 183u8, 177u8, 203u8, 205u8, 220u8, 63u8, 146u8, 107u8, 100u8,
-							20u8, 210u8, 96u8, 220u8, 224u8, 116u8, 226u8, 3u8, 164u8, 157u8,
-							114u8, 105u8,
+							60u8, 135u8, 22u8, 221u8, 68u8, 136u8, 162u8, 220u8, 61u8, 149u8,
+							234u8, 72u8, 116u8, 22u8, 121u8, 80u8, 59u8, 142u8, 245u8, 155u8, 39u8,
+							37u8, 247u8, 153u8, 243u8, 202u8, 193u8, 76u8, 84u8, 86u8, 196u8,
+							142u8,
 						],
 					)
 				}
@@ -14833,10 +14738,10 @@ pub mod api {
 						"TempSealInherent",
 						(),
 						[
-							43u8, 104u8, 207u8, 221u8, 108u8, 89u8, 91u8, 94u8, 35u8, 248u8, 98u8,
-							176u8, 123u8, 188u8, 235u8, 160u8, 5u8, 75u8, 186u8, 201u8, 180u8,
-							14u8, 48u8, 177u8, 133u8, 239u8, 220u8, 166u8, 214u8, 129u8, 9u8,
-							252u8,
+							234u8, 143u8, 13u8, 78u8, 161u8, 38u8, 245u8, 227u8, 224u8, 41u8,
+							230u8, 119u8, 156u8, 69u8, 159u8, 27u8, 252u8, 137u8, 87u8, 146u8,
+							233u8, 198u8, 49u8, 7u8, 252u8, 202u8, 33u8, 109u8, 61u8, 85u8, 58u8,
+							188u8,
 						],
 					)
 				}
@@ -19281,9 +19186,10 @@ pub mod api {
 						"batch",
 						types::Batch { calls },
 						[
-							51u8, 210u8, 61u8, 249u8, 145u8, 141u8, 118u8, 70u8, 8u8, 79u8, 135u8,
-							144u8, 78u8, 155u8, 203u8, 207u8, 79u8, 6u8, 48u8, 147u8, 65u8, 148u8,
-							201u8, 113u8, 109u8, 14u8, 106u8, 43u8, 8u8, 254u8, 136u8, 192u8,
+							44u8, 108u8, 141u8, 140u8, 136u8, 26u8, 74u8, 115u8, 251u8, 29u8,
+							192u8, 54u8, 254u8, 171u8, 37u8, 24u8, 23u8, 240u8, 112u8, 179u8, 5u8,
+							40u8, 237u8, 233u8, 214u8, 214u8, 245u8, 44u8, 25u8, 221u8, 189u8,
+							176u8,
 						],
 					)
 				}
@@ -19313,9 +19219,10 @@ pub mod api {
 							call: ::subxt::ext::subxt_core::alloc::boxed::Box::new(call),
 						},
 						[
-							26u8, 32u8, 240u8, 73u8, 164u8, 63u8, 85u8, 28u8, 10u8, 178u8, 158u8,
-							154u8, 169u8, 57u8, 91u8, 23u8, 141u8, 214u8, 252u8, 7u8, 169u8, 164u8,
-							97u8, 0u8, 19u8, 88u8, 188u8, 35u8, 220u8, 154u8, 74u8, 9u8,
+							69u8, 148u8, 97u8, 102u8, 146u8, 57u8, 155u8, 240u8, 124u8, 249u8,
+							65u8, 74u8, 200u8, 9u8, 183u8, 22u8, 160u8, 74u8, 191u8, 2u8, 179u8,
+							30u8, 226u8, 116u8, 242u8, 86u8, 32u8, 229u8, 22u8, 119u8, 221u8,
+							128u8,
 						],
 					)
 				}
@@ -19341,9 +19248,9 @@ pub mod api {
 						"batch_all",
 						types::BatchAll { calls },
 						[
-							21u8, 179u8, 150u8, 3u8, 11u8, 7u8, 210u8, 103u8, 158u8, 123u8, 146u8,
-							18u8, 5u8, 209u8, 49u8, 108u8, 37u8, 88u8, 252u8, 137u8, 123u8, 101u8,
-							42u8, 221u8, 227u8, 115u8, 100u8, 67u8, 191u8, 212u8, 117u8, 7u8,
+							215u8, 67u8, 63u8, 85u8, 26u8, 202u8, 103u8, 77u8, 218u8, 244u8, 61u8,
+							146u8, 189u8, 194u8, 173u8, 63u8, 81u8, 71u8, 153u8, 114u8, 67u8, 61u8,
+							205u8, 217u8, 194u8, 178u8, 95u8, 66u8, 198u8, 198u8, 193u8, 7u8,
 						],
 					)
 				}
@@ -19366,10 +19273,10 @@ pub mod api {
 							call: ::subxt::ext::subxt_core::alloc::boxed::Box::new(call),
 						},
 						[
-							205u8, 231u8, 162u8, 218u8, 186u8, 78u8, 153u8, 149u8, 40u8, 53u8,
-							123u8, 141u8, 106u8, 253u8, 110u8, 21u8, 241u8, 173u8, 33u8, 74u8,
-							46u8, 255u8, 152u8, 167u8, 255u8, 214u8, 201u8, 70u8, 66u8, 175u8,
-							16u8, 44u8,
+							245u8, 143u8, 199u8, 106u8, 126u8, 213u8, 176u8, 17u8, 170u8, 17u8,
+							144u8, 21u8, 69u8, 111u8, 118u8, 99u8, 37u8, 113u8, 202u8, 44u8, 28u8,
+							206u8, 36u8, 47u8, 63u8, 219u8, 255u8, 243u8, 151u8, 163u8, 116u8,
+							177u8,
 						],
 					)
 				}
@@ -19395,9 +19302,9 @@ pub mod api {
 						"force_batch",
 						types::ForceBatch { calls },
 						[
-							93u8, 14u8, 99u8, 54u8, 105u8, 206u8, 27u8, 147u8, 184u8, 60u8, 180u8,
-							75u8, 158u8, 120u8, 180u8, 193u8, 219u8, 146u8, 98u8, 131u8, 120u8,
-							41u8, 244u8, 133u8, 97u8, 78u8, 155u8, 9u8, 156u8, 122u8, 237u8, 20u8,
+							166u8, 15u8, 158u8, 179u8, 124u8, 139u8, 107u8, 127u8, 28u8, 132u8,
+							198u8, 179u8, 255u8, 81u8, 87u8, 215u8, 13u8, 39u8, 206u8, 49u8, 17u8,
+							231u8, 135u8, 50u8, 193u8, 2u8, 109u8, 107u8, 1u8, 185u8, 40u8, 143u8,
 						],
 					)
 				}
@@ -19420,9 +19327,10 @@ pub mod api {
 							weight,
 						},
 						[
-							254u8, 184u8, 86u8, 22u8, 202u8, 188u8, 149u8, 197u8, 4u8, 3u8, 253u8,
-							199u8, 202u8, 229u8, 145u8, 213u8, 47u8, 220u8, 173u8, 56u8, 194u8,
-							118u8, 118u8, 67u8, 4u8, 38u8, 26u8, 77u8, 180u8, 101u8, 173u8, 9u8,
+							158u8, 24u8, 20u8, 192u8, 74u8, 182u8, 158u8, 155u8, 124u8, 59u8,
+							161u8, 176u8, 128u8, 212u8, 14u8, 54u8, 151u8, 116u8, 83u8, 42u8,
+							235u8, 227u8, 32u8, 231u8, 164u8, 229u8, 29u8, 16u8, 25u8, 221u8,
+							185u8, 14u8,
 						],
 					)
 				}
@@ -19757,10 +19665,9 @@ pub mod api {
 							call: ::subxt::ext::subxt_core::alloc::boxed::Box::new(call),
 						},
 						[
-							102u8, 144u8, 128u8, 144u8, 115u8, 110u8, 82u8, 129u8, 132u8, 97u8,
-							242u8, 44u8, 212u8, 187u8, 155u8, 113u8, 123u8, 105u8, 95u8, 25u8,
-							118u8, 229u8, 87u8, 123u8, 60u8, 235u8, 127u8, 207u8, 70u8, 9u8, 68u8,
-							225u8,
+							16u8, 23u8, 84u8, 51u8, 79u8, 255u8, 48u8, 228u8, 179u8, 232u8, 84u8,
+							241u8, 90u8, 212u8, 192u8, 190u8, 217u8, 142u8, 43u8, 130u8, 79u8,
+							15u8, 230u8, 188u8, 105u8, 148u8, 79u8, 219u8, 0u8, 43u8, 58u8, 25u8,
 						],
 					)
 				}
@@ -19783,10 +19690,10 @@ pub mod api {
 							weight,
 						},
 						[
-							175u8, 90u8, 32u8, 68u8, 23u8, 216u8, 150u8, 68u8, 239u8, 212u8, 61u8,
-							147u8, 51u8, 255u8, 223u8, 83u8, 195u8, 181u8, 194u8, 94u8, 143u8,
-							11u8, 130u8, 186u8, 134u8, 39u8, 101u8, 246u8, 248u8, 90u8, 134u8,
-							91u8,
+							31u8, 184u8, 152u8, 199u8, 240u8, 105u8, 163u8, 121u8, 153u8, 132u8,
+							161u8, 240u8, 99u8, 222u8, 152u8, 103u8, 127u8, 15u8, 45u8, 214u8,
+							223u8, 28u8, 189u8, 19u8, 16u8, 206u8, 191u8, 98u8, 205u8, 4u8, 232u8,
+							102u8,
 						],
 					)
 				}
@@ -19824,10 +19731,9 @@ pub mod api {
 							call: ::subxt::ext::subxt_core::alloc::boxed::Box::new(call),
 						},
 						[
-							35u8, 176u8, 122u8, 55u8, 154u8, 145u8, 179u8, 161u8, 216u8, 118u8,
-							32u8, 86u8, 222u8, 90u8, 91u8, 9u8, 212u8, 201u8, 143u8, 153u8, 245u8,
-							102u8, 28u8, 209u8, 22u8, 141u8, 184u8, 111u8, 239u8, 185u8, 247u8,
-							120u8,
+							184u8, 56u8, 77u8, 247u8, 197u8, 28u8, 219u8, 102u8, 90u8, 205u8, 88u8,
+							204u8, 128u8, 70u8, 126u8, 211u8, 73u8, 86u8, 51u8, 2u8, 50u8, 11u8,
+							252u8, 3u8, 63u8, 14u8, 66u8, 203u8, 242u8, 238u8, 210u8, 16u8,
 						],
 					)
 				}
@@ -21907,8 +21813,8 @@ pub mod api {
 					AccountAlreadyHasChannelHold,
 					#[codec(index = 34)]
 					ChannelHoldNotReadyForClaim {
-						current_tick: ::core::primitive::u32,
-						claim_tick: ::core::primitive::u32,
+						current_tick: ::core::primitive::u64,
+						claim_tick: ::core::primitive::u64,
 					},
 					#[codec(index = 35)]
 					AccountLocked,
@@ -21954,8 +21860,8 @@ pub mod api {
 					InsufficientBlockVoteMinimum,
 					#[codec(index = 54)]
 					InvalidBlockVoteTick {
-						tick: ::core::primitive::u32,
-						notebook_tick: ::core::primitive::u32,
+						tick: ::core::primitive::u64,
+						notebook_tick: ::core::primitive::u64,
 					},
 				}
 			}
@@ -22599,7 +22505,7 @@ pub mod api {
 					pub signature: runtime_types::sp_runtime::MultiSignature,
 					pub block_rewards_account_id: crate::types::AccountId32,
 					#[codec(compact)]
-					pub tick: ::core::primitive::u32,
+					pub tick: ::core::primitive::u64,
 				}
 			}
 			pub mod bond {
@@ -22891,7 +22797,10 @@ pub mod api {
 					pub voting_key: ::core::option::Option<
 						runtime_types::argon_primitives::digests::ParentVotingKeyDigest,
 					>,
-					pub tick: runtime_types::argon_primitives::digests::TickDigest,
+					pub fork_power: ::core::option::Option<
+						runtime_types::argon_primitives::fork_power::ForkPower,
+					>,
+					pub tick: runtime_types::argon_primitives::tick::TickDigest,
 					pub notebooks: runtime_types::argon_primitives::digests::NotebookDigest<_0>,
 				}
 				#[derive(
@@ -22931,25 +22840,6 @@ pub mod api {
 				)]
 				pub struct ParentVotingKeyDigest {
 					pub parent_voting_key: ::core::option::Option<crate::types::H256>,
-				}
-				#[derive(
-					:: subxt :: ext :: subxt_core :: ext :: codec :: Decode,
-					:: subxt :: ext :: subxt_core :: ext :: codec :: Encode,
-					:: subxt :: ext :: subxt_core :: ext :: scale_decode :: DecodeAsType,
-					:: subxt :: ext :: subxt_core :: ext :: scale_encode :: EncodeAsType,
-					Clone,
-					Debug,
-				)]
-				# [codec (crate = :: subxt :: ext :: subxt_core :: ext :: codec)]
-				#[decode_as_type(
-					crate_path = ":: subxt :: ext :: subxt_core :: ext :: scale_decode"
-				)]
-				#[encode_as_type(
-					crate_path = ":: subxt :: ext :: subxt_core :: ext :: scale_encode"
-				)]
-				pub struct TickDigest {
-					#[codec(compact)]
-					pub tick: ::core::primitive::u32,
 				}
 			}
 			pub mod domain {
@@ -23199,7 +23089,7 @@ pub mod api {
 					#[codec(compact)]
 					pub notebook_number: ::core::primitive::u32,
 					#[codec(compact)]
-					pub tick: ::core::primitive::u32,
+					pub tick: ::core::primitive::u64,
 					#[codec(compact)]
 					pub version: ::core::primitive::u32,
 					pub raw_data: ::subxt::ext::subxt_core::alloc::vec::Vec<::core::primitive::u8>,
@@ -23227,7 +23117,7 @@ pub mod api {
 					#[codec(compact)]
 					pub notebook_number: ::core::primitive::u32,
 					#[codec(compact)]
-					pub tick: ::core::primitive::u32,
+					pub tick: ::core::primitive::u64,
 					pub header_hash: crate::types::H256,
 					#[codec(compact)]
 					pub block_votes_count: ::core::primitive::u32,
@@ -23256,7 +23146,7 @@ pub mod api {
 					#[codec(compact)]
 					pub notebook_number: ::core::primitive::u32,
 					#[codec(compact)]
-					pub tick: ::core::primitive::u32,
+					pub tick: ::core::primitive::u64,
 					pub block_votes_root: crate::types::H256,
 					pub secret_hash: crate::types::H256,
 					pub parent_secret: ::core::option::Option<crate::types::H256>,
@@ -23307,7 +23197,7 @@ pub mod api {
 					#[codec(compact)]
 					pub notebook_number: ::core::primitive::u32,
 					#[codec(compact)]
-					pub tick: ::core::primitive::u32,
+					pub tick: ::core::primitive::u64,
 					#[codec(compact)]
 					pub block_votes_count: ::core::primitive::u32,
 					#[codec(compact)]
@@ -23337,7 +23227,7 @@ pub mod api {
 					#[codec(compact)]
 					pub meta_updated_block: _1,
 					#[codec(compact)]
-					pub meta_updated_tick: _1,
+					pub meta_updated_tick: ::core::primitive::u64,
 					pub meta: runtime_types::argon_primitives::notary::NotaryMeta,
 				}
 				#[derive(
@@ -23364,7 +23254,7 @@ pub mod api {
 					#[codec(compact)]
 					pub meta_updated_block: _1,
 					#[codec(compact)]
-					pub meta_updated_tick: _1,
+					pub meta_updated_tick: ::core::primitive::u64,
 					pub meta: runtime_types::argon_primitives::notary::NotaryMeta,
 					pub state: runtime_types::argon_primitives::notary::NotaryState<_3>,
 				}
@@ -23389,7 +23279,7 @@ pub mod api {
 					#[codec(index = 1)]
 					Locked {
 						failed_audit_reason: _0,
-						at_tick: ::core::primitive::u32,
+						at_tick: ::core::primitive::u64,
 						notebook_number: ::core::primitive::u32,
 					},
 					#[codec(index = 2)]
@@ -23447,7 +23337,7 @@ pub mod api {
 					#[codec(compact)]
 					pub notebook_number: ::core::primitive::u32,
 					#[codec(compact)]
-					pub tick: ::core::primitive::u32,
+					pub tick: ::core::primitive::u64,
 					pub audit_first_failure: ::core::option::Option<_0>,
 				}
 				#[derive(
@@ -23471,7 +23361,7 @@ pub mod api {
 					#[codec(compact)]
 					pub notebook_number: ::core::primitive::u32,
 					#[codec(compact)]
-					pub tick: ::core::primitive::u32,
+					pub tick: ::core::primitive::u64,
 					#[codec(compact)]
 					pub tax: ::core::primitive::u128,
 					#[codec(compact)]
@@ -23546,6 +23436,23 @@ pub mod api {
 			pub mod tick {
 				use super::runtime_types;
 				#[derive(
+					:: subxt :: ext :: subxt_core :: ext :: codec :: CompactAs,
+					:: subxt :: ext :: subxt_core :: ext :: codec :: Decode,
+					:: subxt :: ext :: subxt_core :: ext :: codec :: Encode,
+					:: subxt :: ext :: subxt_core :: ext :: scale_decode :: DecodeAsType,
+					:: subxt :: ext :: subxt_core :: ext :: scale_encode :: EncodeAsType,
+					Clone,
+					Debug,
+				)]
+				# [codec (crate = :: subxt :: ext :: subxt_core :: ext :: codec)]
+				#[decode_as_type(
+					crate_path = ":: subxt :: ext :: subxt_core :: ext :: scale_decode"
+				)]
+				#[encode_as_type(
+					crate_path = ":: subxt :: ext :: subxt_core :: ext :: scale_encode"
+				)]
+				pub struct TickDigest(pub ::core::primitive::u64);
+				#[derive(
 					:: subxt :: ext :: subxt_core :: ext :: codec :: Decode,
 					:: subxt :: ext :: subxt_core :: ext :: codec :: Encode,
 					:: subxt :: ext :: subxt_core :: ext :: scale_decode :: DecodeAsType,
@@ -23564,9 +23471,7 @@ pub mod api {
 					#[codec(compact)]
 					pub tick_duration_millis: ::core::primitive::u64,
 					#[codec(compact)]
-					pub genesis_utc_time: ::core::primitive::u64,
-					#[codec(compact)]
-					pub channel_hold_expiration_ticks: ::core::primitive::u32,
+					pub channel_hold_expiration_ticks: ::core::primitive::u64,
 				}
 			}
 		}
@@ -26502,7 +26407,7 @@ pub mod api {
 						amount: ::core::primitive::u128,
 						transfer_id: ::core::primitive::u32,
 						notary_id: ::core::primitive::u32,
-						expiration_tick: ::core::primitive::u32,
+						expiration_tick: ::core::primitive::u64,
 					},
 					#[codec(index = 1)]
 					#[doc = "Transfer to localchain expired and rolled back"]
@@ -26608,7 +26513,7 @@ pub mod api {
 			pub struct QueuedTransferOut<_0, _1> {
 				pub account_id: _0,
 				pub amount: _1,
-				pub expiration_tick: ::core::primitive::u32,
+				pub expiration_tick: ::core::primitive::u64,
 				pub notary_id: ::core::primitive::u32,
 			}
 			#[derive(
@@ -26668,21 +26573,24 @@ pub mod api {
 					#[doc = "Duplicate NotebookDigest found"]
 					DuplicateNotebookDigest,
 					#[codec(index = 5)]
+					#[doc = "Duplicate ForkPowerDigest found"]
+					DuplicateForkPowerDigest,
+					#[codec(index = 6)]
 					#[doc = "Missing BlockVoteDigest"]
 					MissingBlockVoteDigest,
-					#[codec(index = 6)]
+					#[codec(index = 7)]
 					#[doc = "Missing AuthorDigest"]
 					MissingAuthorDigest,
-					#[codec(index = 7)]
+					#[codec(index = 8)]
 					#[doc = "Missing TickDigest"]
 					MissingTickDigest,
-					#[codec(index = 8)]
+					#[codec(index = 9)]
 					#[doc = "Missing ParentVotingKeyDigest"]
 					MissingParentVotingKeyDigest,
-					#[codec(index = 9)]
+					#[codec(index = 10)]
 					#[doc = "Missing NotebookDigest"]
 					MissingNotebookDigest,
-					#[codec(index = 10)]
+					#[codec(index = 11)]
 					#[doc = "Failed to decode digests"]
 					CouldNotDecodeDigest,
 				}
@@ -26837,7 +26745,7 @@ pub mod api {
 			#[encode_as_type(crate_path = ":: subxt :: ext :: subxt_core :: ext :: scale_encode")]
 			pub struct DomainRegistration<_0> {
 				pub account_id: _0,
-				pub registered_at_tick: ::core::primitive::u32,
+				pub registered_at_tick: ::core::primitive::u64,
 			}
 		}
 		pub mod pallet_grandpa {
@@ -28141,7 +28049,7 @@ pub mod api {
 						notary_id: ::core::primitive::u32,
 						meta: runtime_types::argon_primitives::notary::NotaryMeta,
 						#[codec(compact)]
-						effective_tick: ::core::primitive::u32,
+						effective_tick: ::core::primitive::u64,
 					},
 				}
 				#[derive(
@@ -28226,7 +28134,7 @@ pub mod api {
 					NotaryMetaUpdateQueued {
 						notary_id: ::core::primitive::u32,
 						meta: runtime_types::argon_primitives::notary::NotaryMeta,
-						effective_tick: ::core::primitive::u32,
+						effective_tick: ::core::primitive::u64,
 					},
 					#[codec(index = 3)]
 					#[doc = "Notary metadata updated"]
@@ -28474,7 +28382,7 @@ pub mod api {
 				pub argon_usd_price: runtime_types::sp_arithmetic::fixed_point::FixedU128,
 				pub argon_usd_target_price: runtime_types::sp_arithmetic::fixed_point::FixedU128,
 				#[codec(compact)]
-				pub tick: ::core::primitive::u32,
+				pub tick: ::core::primitive::u64,
 			}
 		}
 		pub mod pallet_proxy {

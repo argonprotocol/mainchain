@@ -241,14 +241,15 @@ mod tests {
 	use argon_notary_apis::localchain::BalanceChangeResult;
 	use argon_notary_audit::VerifyError;
 	use argon_primitives::{
+		fork_power::ForkPower,
 		host::Host,
-		tick::Tick,
+		tick::{Tick, TickDigest},
 		AccountId, AccountOrigin,
 		AccountType::{Deposit, Tax},
 		BalanceChange, BalanceProof, BalanceTip, BlockSealDigest, BlockVote, BlockVoteDigest,
 		Domain, DomainHash, DomainTopLevel, HashOutput, MerkleProof, Note, NoteType,
 		NoteType::{ChannelHoldClaim, ChannelHoldSettle},
-		NotebookDigest, ParentVotingKeyDigest, TickDigest, TransferToLocalchainId, VotingSchedule,
+		NotebookDigest, ParentVotingKeyDigest, TransferToLocalchainId, VotingSchedule,
 		DOMAIN_LEASE_COST,
 	};
 	use argon_testing::start_argon_test_node;
@@ -468,11 +469,12 @@ mod tests {
 		let mut best_sub = ctx.client.live.blocks().subscribe_finalized().await?;
 		let mut did_see_vote = false;
 		let mut did_see_voting_key = false;
+		let mut last_block_fork = ForkPower::default();
 		while let Some(block) = best_sub.next().await {
 			match block {
 				Ok(block) => {
 					let block_hash = block.hash();
-					let (tick, votes, seal, key, notebooks) = get_digests(block);
+					let (tick, votes, seal, parent_key, notebooks, fork_power) = get_digests(block);
 
 					println!(
 						"Got block with tick {tick}. Notebooks: {:?}, {:?} {:?} {:?}",
@@ -485,6 +487,8 @@ mod tests {
 						},
 						block_hash
 					);
+					assert!(fork_power >= last_block_fork, "Should have increasing fork power");
+					last_block_fork = fork_power;
 					if let Some(notebook) = notebooks.notebooks.first() {
 						assert_eq!(notebook.audit_first_failure, None);
 						if notebook.notebook_number == channel_hold_result.notebook_number {
@@ -493,7 +497,18 @@ mod tests {
 							assert_eq!(tick, voting_schedule.block_tick())
 						}
 					}
-					if key.parent_voting_key.is_some() {
+					if let Some(Some(parent_voting_key)) = ctx
+						.client
+						.fetch_storage(
+							&storage().block_seal().parent_voting_key(),
+							Some(block_hash),
+						)
+						.await?
+					{
+						assert_eq!(
+							parent_voting_key.0,
+							parent_key.parent_voting_key.expect("Should have parent voting key").0
+						);
 						did_see_voting_key = true;
 					}
 					if matches!(seal, BlockSealDigest::Vote { .. }) {
@@ -539,13 +554,20 @@ mod tests {
 
 	fn get_digests(
 		block: Block<ArgonConfig, OnlineClient<ArgonConfig>>,
-	) -> (Tick, BlockVoteDigest, BlockSealDigest, ParentVotingKeyDigest, NotebookDigest<VerifyError>)
-	{
+	) -> (
+		Tick,
+		BlockVoteDigest,
+		BlockSealDigest,
+		ParentVotingKeyDigest,
+		NotebookDigest<VerifyError>,
+		ForkPower,
+	) {
 		let mut tick = None;
 		let mut votes = None;
 		let mut block_seal = None;
 		let mut notebook_digest = None;
 		let mut parent_voting_key = None;
+		let mut fork_power = None;
 		for log in block.header().digest.logs.iter() {
 			match log {
 				DigestItem::PreRuntime(argon_primitives::TICK_DIGEST_ID, data) =>
@@ -558,16 +580,19 @@ mod tests {
 					block_seal = BlockSealDigest::decode(&mut &data[..]).ok(),
 				DigestItem::Consensus(argon_primitives::PARENT_VOTING_KEY_DIGEST, data) =>
 					parent_voting_key = ParentVotingKeyDigest::decode(&mut &data[..]).ok(),
+				DigestItem::Consensus(argon_primitives::FORK_POWER_DIGEST, data) =>
+					fork_power = ForkPower::decode(&mut &data[..]).ok(),
 				_ => (),
 			}
 		}
-		let tick = tick.expect("Should have a tick").tick;
+		let tick = tick.expect("Should have a tick").0;
 		let votes = votes.expect("Should have votes");
 		let block_seal = block_seal.expect("Should have block seal");
 		let notebook_digest = notebook_digest.expect("Should have notebook digest");
+		let fork_power = fork_power.expect("Should have fork power");
 		let parent_voting_key = parent_voting_key.expect("Should have parent voting key");
 
-		(tick, votes, block_seal, parent_voting_key, notebook_digest)
+		(tick, votes, block_seal, parent_voting_key, notebook_digest, fork_power)
 	}
 
 	async fn propose_bob_as_notary(

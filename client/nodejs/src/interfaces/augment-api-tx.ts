@@ -433,7 +433,7 @@ declare module '@polkadot/api-base/types/submittable' {
        * Update the metadata of a notary, to be effective at the given tick height, which must be
        * >= MetaChangesTickDelay ticks in the future.
        **/
-      update: AugmentedSubmittable<(notaryId: Compact<u32> | AnyNumber | Uint8Array, meta: ArgonPrimitivesNotaryNotaryMeta | { name?: any; public?: any; hosts?: any } | string | Uint8Array, effectiveTick: Compact<u32> | AnyNumber | Uint8Array) => SubmittableExtrinsic<ApiType>, [Compact<u32>, ArgonPrimitivesNotaryNotaryMeta, Compact<u32>]>;
+      update: AugmentedSubmittable<(notaryId: Compact<u32> | AnyNumber | Uint8Array, meta: ArgonPrimitivesNotaryNotaryMeta | { name?: any; public?: any; hosts?: any } | string | Uint8Array, effectiveTick: Compact<u64> | AnyNumber | Uint8Array) => SubmittableExtrinsic<ApiType>, [Compact<u32>, ArgonPrimitivesNotaryNotaryMeta, Compact<u64>]>;
     };
     notebook: {
       submit: AugmentedSubmittable<(notebooks: Vec<ArgonPrimitivesNotebookSignedNotebookHeader> | (ArgonPrimitivesNotebookSignedNotebookHeader | { header?: any; signature?: any } | string | Uint8Array)[]) => SubmittableExtrinsic<ApiType>, [Vec<ArgonPrimitivesNotebookSignedNotebookHeader>]>;

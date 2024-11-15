@@ -65,7 +65,7 @@ parameter_types! {
 	pub static MaxNotebookBlocksToRemember :u32 = 1;
 	pub const MaxNotebookTransfers :u32 = 1;
 	pub static MaxPendingTransfersOutPerBlock :u32 = 1;
-	pub static TransferExpirationTicks :u32 = 2;
+	pub static TransferExpirationTicks :u64 = 2;
 	pub static NotebookTick: Tick = 1;
 
 	pub const LocalchainPalletId: PalletId = PalletId(*b"loclchai");

@@ -6,7 +6,6 @@ afterAll(teardown);
 
 it('can create and reload a localchain', async () => {
     const ticker = {
-        genesisUtcTime: Date.now(),
         tickDurationMillis: 1000,
         channelHoldExpirationTicks: 2,
     };

@@ -216,7 +216,7 @@ impl NotaryClient {
 
     *self.last_metadata.lock().await = Some(meta.clone());
     Ok(NotebookMeta {
-      finalized_tick: meta.finalized_tick,
+      finalized_tick: meta.finalized_tick as i64,
       finalized_notebook_number: meta.finalized_notebook_number,
     })
   }
@@ -302,7 +302,7 @@ pub mod napi_ext {
   pub struct BalanceTipResult {
     pub balance_tip: Uint8Array,
     pub notebook_number: u32,
-    pub tick: u32,
+    pub tick: i64,
   }
 
   #[napi]
@@ -364,7 +364,7 @@ pub mod napi_ext {
       Ok(BalanceTipResult {
         balance_tip: result.balance_tip.as_ref().to_vec().into(),
         notebook_number: result.notebook_number,
-        tick: result.tick,
+        tick: result.tick as i64,
       })
     }
 
@@ -379,5 +379,5 @@ pub mod napi_ext {
 #[derive(Clone)]
 pub struct NotebookMeta {
   pub finalized_notebook_number: u32,
-  pub finalized_tick: u32,
+  pub finalized_tick: i64,
 }

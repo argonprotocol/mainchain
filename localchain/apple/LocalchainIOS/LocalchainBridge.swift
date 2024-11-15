@@ -30,12 +30,9 @@ class LocalchainBridge: ObservableObject {
     )
     let fileURL = documentsDirectory.appendingPathComponent("primary.db")
 
-    let fakeGenesis = Int64(Date().timeIntervalSince1970 * 1_000)
-
     let tickerConfig = TickerConfig(
-      tickDurationMillis: 1_000,
-      genesisUtcTime: fakeGenesis,
-      channelHoldExpirationTicks: 2,
+      tickDurationMillis: 60_000,
+      channelHoldExpirationTicks: 60,
       ntpPoolUrl: nil
     )
     localchain = try await Localchain.newWithoutMainchain(

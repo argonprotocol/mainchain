@@ -1,11 +1,12 @@
+use crate as pallet_notebook;
 use argon_notary_audit::VerifyError;
 use argon_primitives::{
 	block_vote::VoteMinimum,
 	notary::{NotaryId, NotaryProvider, NotarySignature},
-	tick::{Tick, Ticker},
+	tick::{Tick, TickDigest, Ticker},
 	BlockSealSpecProvider, BlockVoteDigest, ChainTransferLookup, ComputeDifficulty, Digestset,
-	NotebookDigest, NotebookEventHandler, NotebookHeader, TickDigest, TickProvider,
-	TransferToLocalchainId, VotingSchedule,
+	NotebookDigest, NotebookEventHandler, NotebookHeader, TickProvider, TransferToLocalchainId,
+	VotingSchedule,
 };
 use env_logger::{Builder, Env};
 use frame_support::{derive_impl, parameter_types, traits::Currency};
@@ -15,8 +16,6 @@ use sp_runtime::{
 	traits::{Block as BlockT, IdentityLookup},
 	BuildStorage, DispatchError,
 };
-
-use crate as pallet_notebook;
 
 pub type Balance = u128;
 pub(crate) type Block = frame_system::mocking::MockBlock<Test>;
@@ -71,7 +70,8 @@ parameter_types! {
 		block_vote: BlockVoteDigest { voting_power: 500, votes_count: 1 },
 		author: Keyring::Alice.to_account_id(),
 		voting_key: None,
-		tick: TickDigest { tick: 2 },
+		tick: TickDigest(2),
+		fork_power: None,
 		notebooks: NotebookDigest {
 			notebooks: vec![],
 		},
@@ -143,7 +143,7 @@ impl TickProvider<Block> for StaticTickProvider {
 		CurrentTick::get()
 	}
 	fn ticker() -> Ticker {
-		Ticker::new(1, 1, 2)
+		Ticker::new(1, 2)
 	}
 	fn block_at_tick(_: Tick) -> Option<H256> {
 		todo!()

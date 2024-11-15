@@ -1,14 +1,13 @@
+use codec::{Decode, Encode, MaxEncodedLen};
 #[cfg(feature = "std")]
 use core::time::Duration;
-
-use codec::{Decode, Encode};
 #[cfg(feature = "std")]
 use rsntp::SntpClient;
 use scale_info::TypeInfo;
 use serde::{Deserialize, Serialize};
 use sp_core::RuntimeDebug;
 
-pub type Tick = u32;
+pub type Tick = u64;
 
 #[derive(
 	Encode,
@@ -28,22 +27,38 @@ pub struct Ticker {
 	#[codec(compact)]
 	pub tick_duration_millis: u64,
 	#[codec(compact)]
-	pub genesis_utc_time: u64,
-	#[codec(compact)]
 	pub channel_hold_expiration_ticks: Tick,
 	#[codec(skip)]
 	ntp_offset_millis: i64,
 }
 
+/// Unit type wrapper that represents a tick digest (format is fixed due to compatibility with
+/// aura).
+#[derive(
+	Debug,
+	Encode,
+	MaxEncodedLen,
+	Decode,
+	Serialize,
+	Deserialize,
+	Eq,
+	Clone,
+	Copy,
+	Default,
+	Ord,
+	Hash,
+	TypeInfo,
+	PartialOrd,
+	PartialEq,
+)]
+#[repr(transparent)]
+pub struct TickDigest(pub Tick);
+
 impl Ticker {
 	#[cfg(feature = "std")]
 	pub fn start(tick_duration: Duration, channel_hold_expiration_ticks: Tick) -> Self {
-		let current_time = now();
-		let offset = current_time % tick_duration.as_millis() as u64;
-		let genesis_utc_time = current_time - offset;
 		Self {
 			tick_duration_millis: tick_duration.as_millis() as u64,
-			genesis_utc_time,
 			channel_hold_expiration_ticks,
 			ntp_offset_millis: 0,
 		}
@@ -63,17 +78,8 @@ impl Ticker {
 		Ok(())
 	}
 
-	pub fn new(
-		tick_duration_millis: u64,
-		genesis_utc_time: u64,
-		channel_hold_expiration_ticks: Tick,
-	) -> Self {
-		Self {
-			tick_duration_millis,
-			genesis_utc_time,
-			channel_hold_expiration_ticks,
-			ntp_offset_millis: 0,
-		}
+	pub fn new(tick_duration_millis: u64, channel_hold_expiration_ticks: Tick) -> Self {
+		Self { tick_duration_millis, channel_hold_expiration_ticks, ntp_offset_millis: 0 }
 	}
 
 	#[cfg(feature = "std")]
@@ -90,13 +96,12 @@ impl Ticker {
 		let now = timestamp_millis
 			.checked_add_signed(self.ntp_offset_millis)
 			.unwrap_or(timestamp_millis);
-		let offset = now.saturating_sub(self.genesis_utc_time);
-		let tick = offset / self.tick_duration_millis;
-		tick as Tick
+		(now / self.tick_duration_millis) as Tick
 	}
 
+	#[cfg(feature = "std")]
 	pub fn time_for_tick(&self, tick: Tick) -> u64 {
-		let base = self.genesis_utc_time + (tick as u64 * self.tick_duration_millis);
+		let base = tick * self.tick_duration_millis;
 		base.checked_add_signed(self.ntp_offset_millis).unwrap_or(base)
 	}
 
@@ -112,6 +117,12 @@ impl Ticker {
 	#[cfg(feature = "std")]
 	pub fn next(&self) -> Tick {
 		self.current() + 1
+	}
+
+	#[cfg(feature = "std")]
+	pub fn now_adjusted_to_ntp(&self) -> u64 {
+		let now = now();
+		now.checked_add_signed(self.ntp_offset_millis).unwrap_or(now)
 	}
 }
 
@@ -133,30 +144,14 @@ mod test {
 	use crate::tick::Ticker;
 
 	#[test]
-	fn it_should_calculate_genesis() {
-		use chrono::{DurationRound, Utc};
-
-		let ticker = Ticker::start(Duration::from_secs(1), 2);
-		let beginning_of_second =
-			Utc::now().duration_trunc(chrono::Duration::try_seconds(1).unwrap()).unwrap();
-		assert_eq!(ticker.genesis_utc_time, beginning_of_second.timestamp_millis() as u64);
-
-		let ticker = Ticker::start(Duration::from_secs(60), 2);
-		let beginning_of_minute =
-			Utc::now().duration_trunc(chrono::Duration::try_minutes(1).unwrap()).unwrap();
-		assert_eq!(ticker.genesis_utc_time, beginning_of_minute.timestamp_millis() as u64);
-	}
-
-	#[test]
 	fn it_should_create_next_ticks() {
-		let ticker = Ticker::start(Duration::from_secs(30), 2);
+		let ticker = Ticker::start(Duration::from_secs(60), 2);
+		assert_eq!(ticker.tick_for_time(0), 0);
+		assert_eq!(ticker.tick_for_time(15_000), 0);
+		assert_eq!(ticker.tick_for_time(60_001), 1);
 
-		let start = ticker.genesis_utc_time;
 		let current_tick = ticker.current();
-		assert_eq!(current_tick, 0);
-
-		assert_eq!(ticker.tick_for_time(start + 15_000), 0);
-		assert_eq!(ticker.tick_for_time(start + 30_001), 1);
+		assert!(current_tick > 28_861_638);
 	}
 
 	#[tokio::test]

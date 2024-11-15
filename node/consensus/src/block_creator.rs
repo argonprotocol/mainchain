@@ -8,9 +8,9 @@ use argon_primitives::{
 		BitcoinInherentDataProvider, BlockSealInherentDataProvider, BlockSealInherentNodeSide,
 		NotebooksInherentDataProvider,
 	},
-	tick::Tick,
+	tick::{Tick, TickDigest},
 	Balance, BestBlockVoteSeal, BitcoinApis, BlockSealApis, BlockSealAuthorityId, BlockSealDigest,
-	Digestset, NotaryApis, NotebookApis, TickApis, TickDigest, VotingSchedule,
+	Digestset, NotaryApis, NotebookApis, TickApis, VotingSchedule,
 };
 use codec::Codec;
 use frame_support::CloneNoBound;
@@ -170,10 +170,12 @@ where
 
 		let inherent_digest = Digestset {
 			author,
-			tick: TickDigest { tick: submitting_tick },
+			tick: TickDigest(submitting_tick),
 			block_vote: notebook_header_data.vote_digest,
 			notebooks: notebook_header_data.notebook_digest,
+			// these are from the runtime
 			voting_key: Default::default(),
+			fork_power: Default::default(),
 		}
 		.create_pre_runtime_digest();
 

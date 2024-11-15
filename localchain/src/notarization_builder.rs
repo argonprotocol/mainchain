@@ -789,12 +789,13 @@ impl NotarizationBuilder {
       })?;
 
     let mut tx = self.db.begin().await?;
+    let tick = result.tick as i64;
     let notarization_id = sqlx::query_scalar!(
       "INSERT INTO notarizations (json, notary_id, notebook_number, tick) VALUES (?, ?, ?, ?) RETURNING id",
       notarizations_json,
       notary_client.notary_id,
       result.notebook_number,
-      result.tick,
+      tick,
     )
     .fetch_one(&mut *tx)
     .await
@@ -816,7 +817,7 @@ impl NotarizationBuilder {
     let mut tracker = NotarizationTracker {
       db: self.db.clone(),
       notary_clients: self.notary_clients.clone(),
-      tick: result.tick,
+      tick: result.tick as i64,
       notebook_number,
       notary_id,
       notarization_id,
@@ -895,7 +896,7 @@ impl NotarizationBuilder {
         },
         AccountStore::to_address(account),
         notarization_id,
-        result.tick,
+        result.tick as i64,
       )
       .await?;
     }
@@ -974,6 +975,7 @@ pub mod napi_ext {
   use crate::ChannelHold;
   use crate::LocalAccount;
   use crate::{notarization_tracker::NotarizationTracker, AccountStore};
+  use argon_primitives::tick::Tick;
   use argon_primitives::{AccountType, BlockVote};
   use codec::Decode;
   use napi::bindgen_prelude::BigInt;
@@ -1163,7 +1165,7 @@ pub mod napi_ext {
         amount: transfer.amount.get_u128().1,
         notary_id: transfer.notary_id,
         transfer_id: transfer.transfer_id,
-        expiration_tick: transfer.expiration_tick,
+        expiration_tick: transfer.expiration_tick as Tick,
       };
       self.claim_from_mainchain(transfer).await.napi_ok()
     }
@@ -1256,7 +1258,7 @@ pub mod napi_ext {
     /// The voting power of this vote, determined from the amount of tax
     pub power: BigInt,
     /// The tick where a vote was intended
-    pub tick: u32,
+    pub tick: i64,
     /// The domain used to create this vote
     pub domain_hash: Vec<u8>,
     /// The domain payment address used to create this vote
@@ -1276,7 +1278,7 @@ pub mod napi_ext {
         block_hash: H256::from_slice(self.block_hash.as_slice()),
         index: self.index,
         power,
-        tick: self.tick,
+        tick: self.tick as Tick,
         block_rewards_account_id: AccountStore::parse_address(&self.block_rewards_address)?,
         signature: MultiSignature::decode(&mut self.signature.as_slice())?,
       })

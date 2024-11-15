@@ -21,7 +21,6 @@ use alloc::{collections::btree_map::BTreeMap, vec, vec::Vec};
 use argon_primitives::{
 	bitcoin::{BitcoinNetwork, BitcoinSyncStatus, Satoshis, UtxoRef, UtxoValue},
 	block_seal::{ComputePuzzle, MiningAuthority},
-	fork_power::ForkPower,
 	notary::{
 		NotaryNotebookAuditSummary, NotaryNotebookDetails, NotaryNotebookRawVotes,
 		NotaryNotebookVoteDigestDetails, NotaryRecordWithState,
@@ -452,15 +451,6 @@ impl_runtime_apis! {
 	}
 
 	impl argon_primitives::BlockCreatorApis<Block, AccountId, NotebookVerifyError> for Runtime {
-		fn fork_power() -> ForkPower {
-			BlockSeal::fork_power()
-		}
-
-		fn calculate_fork_power(seal: BlockSealDigest, header: &<Block as BlockT>::Header) -> Result<ForkPower, DispatchError> {
-			let digests = Digests::decode(&header.digest)?;
-			Ok(BlockSeal::calculate_fork_power(seal, digests.block_vote.voting_power, digests.notebooks.notebooks.len() as u32))
-		}
-
 		fn decode_voting_author(digest: &Digest) -> Result<(AccountId, Tick, Option<VotingKey>), DispatchError> {
 			Digests::decode_voting_author(digest)
 		}
@@ -504,12 +494,13 @@ impl_runtime_apis! {
 			version: u32,
 			notary_id: NotaryId,
 			notebook_number: NotebookNumber,
+			notebook_tick: Tick,
 			header_hash: H256,
 			vote_minimums: &BTreeMap<<Block as BlockT>::Hash, VoteMinimum>,
 			bytes: &Vec<u8>,
 			audit_dependency_summaries: Vec<NotaryNotebookAuditSummary>,
 		) -> Result<NotaryNotebookRawVotes, NotebookVerifyError> {
-			Notebook::audit_notebook(version, notary_id, notebook_number, header_hash, vote_minimums, bytes, audit_dependency_summaries)
+			Notebook::audit_notebook(version, notary_id, notebook_number, notebook_tick, header_hash, vote_minimums, bytes, audit_dependency_summaries)
 		}
 
 		fn decode_signed_raw_notebook_header(raw_header: Vec<u8>) -> Result<NotaryNotebookDetails <<Block as BlockT>::Hash>, DispatchError> {

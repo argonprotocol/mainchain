@@ -95,7 +95,7 @@ pub const OWNERSHIP_TOKEN_SYMBOL: &str = "ARGOWN";
 pub mod prelude {
 	pub use super::{
 		localchain::*, tick::Tick, AccountId, Balance, BlockNumber, BondId, Chain, ChainIdentity,
-		Moment, Nonce, NotaryId, VaultId,
+		Moment, Nonce, NotaryId, NotebookNumber, VaultId,
 	};
 }
 pub mod localchain {

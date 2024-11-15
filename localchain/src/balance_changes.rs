@@ -298,9 +298,9 @@ impl BalanceChangeStore {
         .ok_or_else(|| anyhow::anyhow!("Notarization {} not sent to notary", notarization_id))?;
 
       balance_change.previous_balance_proof = Some(BalanceProof {
-        notary_id: latest.notary_id as u32,
-        notebook_number: notebook_number as u32,
-        tick: notarization.tick.unwrap() as u32,
+        notary_id: latest.notary_id as NotaryId,
+        notebook_number: notebook_number as NotebookNumber,
+        tick: notarization.tick.unwrap() as Tick,
         notebook_proof: match latest.proof_json.map(|a| serde_json::from_str(&a)) {
           Some(Ok(proof)) => proof,
           // TODO: we should prolly only allow this to be none if the change is in the current notebook

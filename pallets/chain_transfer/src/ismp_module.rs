@@ -155,7 +155,7 @@ where
 	}
 
 	pub fn is_ismp_module_id(id: &[u8]) -> bool {
-		id == &token_gateway_id().0
+		id == token_gateway_id().0
 	}
 
 	pub fn charge_hyperbridge_registration_fee(

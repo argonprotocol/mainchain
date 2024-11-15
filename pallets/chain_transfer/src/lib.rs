@@ -109,7 +109,7 @@ pub mod pallet {
 		/// How long a transfer should remain in storage before returning. NOTE: there is a 2 tick
 		/// grace period where we will still allow a transfer
 		#[pallet::constant]
-		type TransferExpirationTicks: Get<u32>;
+		type TransferExpirationTicks: Get<Tick>;
 
 		/// How many transfers out can be queued per block
 		#[pallet::constant]

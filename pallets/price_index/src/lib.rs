@@ -233,7 +233,7 @@ pub mod pallet {
 
 		pub(crate) fn clamp_argon_prices(current: &PriceIndex, next: &mut PriceIndex) {
 			let max_diff = T::MaxArgonChangePerTickAwayFromTarget::get() *
-				FixedU128::from_u32(next.tick - current.tick);
+				FixedU128::saturating_from_integer(next.tick - current.tick);
 			let argon_cpi = next.argon_cpi();
 			if next.argon_usd_price <= current.argon_usd_price {
 				// If the argon cpi is negative, then we're in inflation. We will allow price to
@@ -260,7 +260,7 @@ pub mod pallet {
 
 			// clamp change for target price
 			let max_target_diff = T::MaxArgonTargetChangePerTick::get() *
-				FixedU128::from_u32(next.tick - current.tick);
+				FixedU128::saturating_from_integer(next.tick - current.tick);
 			if current.argon_usd_target_price > next.argon_usd_target_price {
 				let diff = current.argon_usd_target_price - next.argon_usd_target_price;
 				if diff > max_target_diff {

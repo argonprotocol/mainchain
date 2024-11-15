@@ -563,10 +563,12 @@ pub mod pallet {
 			});
 		}
 
+		#[allow(clippy::too_many_arguments)]
 		pub fn audit_notebook(
 			_version: u32,
 			notary_id: NotaryId,
 			notebook_number: NotebookNumber,
+			notebook_tick: Tick,
 			header_hash: H256,
 			block_vote_minimums: &BTreeMap<<T::Block as BlockT>::Hash, VoteMinimum>,
 			bytes: &Vec<u8>,
@@ -650,7 +652,7 @@ pub mod pallet {
 			ensure!(
 				T::NotaryProvider::verify_signature(
 					notary_id,
-					notebook_number,
+					notebook_tick,
 					&notebook.hash,
 					&notebook.signature
 				),

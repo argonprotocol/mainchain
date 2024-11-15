@@ -5,6 +5,7 @@ use crate::{
 use argon_bitcoin_utxo_tracker::{get_bitcoin_inherent, UtxoTracker};
 use argon_node_runtime::NotebookVerifyError;
 use argon_primitives::{
+	fork_power::ForkPower,
 	inherents::{BitcoinInherentDataProvider, BlockSealInherentDataProvider},
 	Balance, BitcoinApis, BlockCreatorApis, BlockSealApis, BlockSealAuthorityId, BlockSealDigest,
 	NotebookApis,
@@ -66,33 +67,22 @@ where
 	) -> Result<ImportResult, Self::Error> {
 		let parent_hash = *block.header.parent_hash();
 
-		let seal_digest = block
-			.post_digests
-			.iter()
-			.find_map(BlockSealDigest::try_from)
-			.ok_or(Error::MissingBlockSealDigest)?;
-
-		let fork_power = self
-			.client
-			.runtime_api()
-			.calculate_fork_power(parent_hash, seal_digest, &block.header)
-			.map_err(Error::Api)?
-			.map_err(|e| Error::MissingRuntimeData(format!("Failed to get fork power: {:?}", e)))?;
-
 		let (block_author, tick, voting_key) = self
 			.client
 			.runtime_api()
 			.decode_voting_author(parent_hash, block.header.digest())
 			.map_err(Error::Api)?
 			.map_err(|e| {
-				Error::MissingRuntimeData(format!("Failed to get block_author power: {:?}", e))
+				Error::MissingRuntimeData(format!("Failed to get voting author power: {:?}", e))
 			})?;
 		let max_fork_power =
 			self.aux_client.record_block(&mut block, block_author, voting_key, tick)?;
-		let block_hash = block.post_hash();
+		let fork_power = ForkPower::try_from(block.header.digest())
+			.map_err(|e| Error::MissingRuntimeData(format!("Failed to get fork power: {:?}", e)))?;
 		block.fork_choice = Some(ForkChoiceStrategy::Custom(fork_power > max_fork_power));
 
 		// TODO: do we need to hold a lock here?
+		let block_hash = block.post_hash();
 		match self.inner.import_block(block).await {
 			Ok(result) => {
 				self.aux_client.block_accepted(max_fork_power).inspect_err(|e| {

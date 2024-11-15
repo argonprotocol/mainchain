@@ -181,7 +181,7 @@ declare module '@polkadot/api-base/types/events' {
       /**
        * Funds sent to a localchain
        **/
-      TransferToLocalchain: AugmentedEvent<ApiType, [accountId: AccountId32, amount: u128, transferId: u32, notaryId: u32, expirationTick: u32], { accountId: AccountId32, amount: u128, transferId: u32, notaryId: u32, expirationTick: u32 }>;
+      TransferToLocalchain: AugmentedEvent<ApiType, [accountId: AccountId32, amount: u128, transferId: u32, notaryId: u32, expirationTick: u64], { accountId: AccountId32, amount: u128, transferId: u32, notaryId: u32, expirationTick: u64 }>;
       /**
        * Transfer to localchain expired and rolled back
        **/
@@ -357,7 +357,7 @@ declare module '@polkadot/api-base/types/events' {
       /**
        * Notary metadata queued for update
        **/
-      NotaryMetaUpdateQueued: AugmentedEvent<ApiType, [notaryId: u32, meta: ArgonPrimitivesNotaryNotaryMeta, effectiveTick: u32], { notaryId: u32, meta: ArgonPrimitivesNotaryNotaryMeta, effectiveTick: u32 }>;
+      NotaryMetaUpdateQueued: AugmentedEvent<ApiType, [notaryId: u32, meta: ArgonPrimitivesNotaryNotaryMeta, effectiveTick: u64], { notaryId: u32, meta: ArgonPrimitivesNotaryNotaryMeta, effectiveTick: u64 }>;
       /**
        * A user has proposed operating as a notary
        **/

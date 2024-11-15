@@ -420,7 +420,7 @@ mod tests {
 	#[sqlx::test]
 	async fn test_balance_change_and_get_proof(pool: PgPool) -> anyhow::Result<()> {
 		let _ = tracing_subscriber::fmt::try_init();
-		let ticker = Ticker::new(60_000, Utc::now().timestamp_millis() as u64, 2);
+		let ticker = Ticker::new(60_000, 2);
 		let notary = NotaryServer::start(1, pool.clone(), ticker, "127.0.0.1:0").await?;
 		assert!(notary.addr.port() > 0);
 
@@ -529,16 +529,22 @@ mod tests {
 	#[sqlx::test]
 	async fn test_should_block_apis_if_audit_fails(pool: PgPool) -> anyhow::Result<()> {
 		let _ = tracing_subscriber::fmt::try_init();
-		let ticker =
-			Ticker::new(2_000, Utc::now().timestamp_millis().saturating_sub(2_000) as u64, 2);
+		let ticker = Ticker::new(2_000, 2);
+		let start_tick = ticker.current();
 		let notary = NotaryServer::start(1, pool.clone(), ticker, "127.0.0.1:0").await?;
 		assert!(notary.addr.port() > 0);
 
 		let mut db = notary.pool.acquire().await?;
 		BlocksStore::record(&mut db, 0, [1u8; 32].into(), [0u8; 32].into(), 100, vec![]).await?;
 		BlocksStore::record_finalized(&mut db, [1u8; 32].into()).await?;
-		NotebookHeaderStore::create(&mut db, notary.notary_id, 1, 1, ticker.time_for_tick(1))
-			.await?;
+		NotebookHeaderStore::create(
+			&mut db,
+			notary.notary_id,
+			1,
+			start_tick,
+			ticker.time_for_tick(start_tick),
+		)
+		.await?;
 
 		let client = WsClientBuilder::default().build(format!("ws://{}", notary.addr)).await?;
 

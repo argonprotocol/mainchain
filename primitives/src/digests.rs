@@ -1,5 +1,6 @@
 use crate::{
-	tick::Tick, BlockSealAuthoritySignature, BlockVotingPower, NotebookAuditResult, VotingKey,
+	fork_power::ForkPower, tick::TickDigest, BlockSealAuthoritySignature, BlockVotingPower,
+	NotebookAuditResult, VotingKey,
 };
 use alloc::{vec, vec::Vec};
 use codec::{Codec, Decode, Encode, MaxEncodedLen};
@@ -10,21 +11,23 @@ use sp_core::{ed25519::Signature, RuntimeDebug, U256};
 use sp_runtime::{ConsensusEngineId, Digest, DigestItem};
 
 /// The block creator account_id - matches POW so that we can use the built-in front end decoding
-pub const AUTHOR_DIGEST_ID: ConsensusEngineId = [b'p', b'o', b'w', b'_'];
+pub const AUTHOR_DIGEST_ID: ConsensusEngineId = *b"pow_";
+/// The "tick" for the block - matches aura to provide compatibility for aura slot information.
+pub const TICK_DIGEST_ID: ConsensusEngineId = *b"aura";
 
 /// Seal Digest ID for the high level block seal details - used to quickly check the seal
 /// details in the node.
-pub const BLOCK_SEAL_DIGEST_ID: ConsensusEngineId = [b's', b'e', b'a', b'l'];
-
-/// The tick of the given block
-pub const TICK_DIGEST_ID: ConsensusEngineId = [b't', b'i', b'c', b'k'];
+pub const BLOCK_SEAL_DIGEST_ID: ConsensusEngineId = *b"seal";
 
 /// Key for the block vote digest in a block header
-pub const BLOCK_VOTES_DIGEST_ID: ConsensusEngineId = [b'v', b'o', b't', b'e'];
+pub const BLOCK_VOTES_DIGEST_ID: ConsensusEngineId = *b"vote";
 /// Key for the block vote digest in a block header
-pub const NOTEBOOKS_DIGEST_ID: ConsensusEngineId = [b'b', b'o', b'o', b'k'];
+pub const NOTEBOOKS_DIGEST_ID: ConsensusEngineId = *b"book";
 /// Parent Voting Key Digest
-pub const PARENT_VOTING_KEY_DIGEST: ConsensusEngineId = [b'p', b'k', b'e', b'y'];
+pub const PARENT_VOTING_KEY_DIGEST: ConsensusEngineId = *b"pkey";
+
+/// Fork Power
+pub const FORK_POWER_DIGEST: ConsensusEngineId = *b"powr";
 
 #[derive(Clone, PartialEq, Eq, Encode, Decode, RuntimeDebug, TypeInfo)]
 pub enum BlockSealDigest {
@@ -38,18 +41,25 @@ impl BlockSealDigest {
 	}
 }
 
-#[derive(Clone, PartialEq, Eq, Encode, Decode, RuntimeDebug, TypeInfo)]
-pub struct TickDigest {
-	#[codec(compact)]
-	pub tick: Tick,
-}
-
 impl TryFrom<DigestItem> for TickDigest {
 	type Error = codec::Error;
 
 	fn try_from(digest_item: DigestItem) -> Result<Self, Self::Error> {
 		if let DigestItem::PreRuntime(TICK_DIGEST_ID, value) = digest_item {
 			return TickDigest::decode(&mut &value[..])
+		}
+		Err(codec::Error::from("Digest not found"))
+	}
+}
+
+impl TryFrom<&Digest> for ForkPower {
+	type Error = codec::Error;
+
+	fn try_from(digest: &Digest) -> Result<Self, Self::Error> {
+		for digest_item in digest.logs.iter() {
+			if let DigestItem::Consensus(FORK_POWER_DIGEST, value) = digest_item {
+				return ForkPower::decode(&mut &value[..])
+			}
 		}
 		Err(codec::Error::from("Digest not found"))
 	}
@@ -155,6 +165,9 @@ pub struct Digestset<NotebookVerifyError: Codec + Clone, AccountId: Codec + Clon
 	// this is optional because it is generated in the runtime, so will not be available in a newly
 	// created block
 	pub voting_key: Option<ParentVotingKeyDigest>,
+	// this is optional because it is generated in the runtime, so will not be available in a newly
+	// created block
+	pub fork_power: Option<ForkPower>,
 	pub tick: TickDigest,
 	pub notebooks: NotebookDigest<NotebookVerifyError>,
 }

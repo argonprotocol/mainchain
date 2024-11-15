@@ -77,13 +77,12 @@ impl DomainStore {
     domain: JsDomain,
     registered_to_address: String,
     notarization_id: i64,
-    registered_at_tick: u32,
+    registered_at_tick: i64,
   ) -> Result<()> {
     let top_level = json!(domain.top_level);
     // remove leading and trailing quote from json
     let top_level = top_level.to_string();
     let top_level = top_level.trim_matches('"');
-    let registered_at_tick = registered_at_tick as i64;
     let res = sqlx::query!(
       "INSERT INTO domains (name, top_level, registered_to_address, notarization_id, registered_at_tick) VALUES (?, ?, ?, ?, ?)",
       domain.name,

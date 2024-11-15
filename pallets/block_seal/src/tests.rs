@@ -32,11 +32,13 @@ use crate::{
 use argon_primitives::{
 	block_seal::MiningAuthority,
 	digests::BlockVoteDigest,
+	fork_power::ForkPower,
 	inherents::{BlockSealInherent, BlockSealInherentDataProvider, SealInherentError},
 	localchain::BlockVote,
 	notary::NotaryNotebookRawVotes,
+	tick::Tick,
 	BlockSealAuthorityId, BlockSealAuthoritySignature, BlockSealDigest, BlockVoteT, BlockVotingKey,
-	Domain, DomainTopLevel, MerkleProof, ParentVotingKeyDigest, VotingSchedule,
+	Domain, DomainTopLevel, MerkleProof, ParentVotingKeyDigest, VotingSchedule, FORK_POWER_DIGEST,
 	PARENT_VOTING_KEY_DIGEST,
 };
 
@@ -397,16 +399,6 @@ fn it_creates_the_next_parent_key() {
 			BlockVotingKey { parent_secret: book2_secret, parent_vote_root: old_root2 },
 		]);
 
-		System::initialize(
-			&3,
-			&System::parent_hash(),
-			&Digest {
-				logs: vec![DigestItem::Consensus(
-					PARENT_VOTING_KEY_DIGEST,
-					ParentVotingKeyDigest { parent_voting_key: Some(parent_key) }.encode(),
-				)],
-			},
-		);
 		CurrentTick::set(4);
 		TempSealInherent::<Test>::put(BlockSealInherent::Compute);
 		BlockSeal::on_initialize(4);
@@ -418,6 +410,13 @@ fn it_creates_the_next_parent_key() {
 
 		BlockSeal::on_finalize(4);
 		assert_eq!(ParentVotingKey::<Test>::get(), Some(parent_key));
+		assert_eq!(
+			System::digest()
+				.logs
+				.iter()
+				.find(|a| matches!(a, DigestItem::Consensus(PARENT_VOTING_KEY_DIGEST, _))),
+			Some(&DigestItem::Consensus(PARENT_VOTING_KEY_DIGEST, Some(parent_key).encode()))
+		);
 	});
 }
 
@@ -431,18 +430,6 @@ fn it_should_panic_if_voting_key_digest_is_wrong() {
 		});
 
 		let parent_key = BlockVotingKey::create_key(vec![]);
-
-		System::initialize(
-			&3,
-			&System::parent_hash(),
-			&Digest {
-				logs: vec![DigestItem::Consensus(
-					PARENT_VOTING_KEY_DIGEST,
-					ParentVotingKeyDigest { parent_voting_key: Some(parent_key) }.encode(),
-				)],
-			},
-		);
-
 		Digests::mutate(|a| {
 			a.voting_key = Some(ParentVotingKeyDigest { parent_voting_key: Some(parent_key) });
 		});
@@ -456,6 +443,66 @@ fn it_should_panic_if_voting_key_digest_is_wrong() {
 		});
 
 		BlockSeal::on_finalize(3);
+	});
+}
+
+#[test]
+fn it_creates_the_fork_power_digest() {
+	new_test_ext().execute_with(|| {
+		let fork_power = ForkPower::default();
+		BlockForkPower::<Test>::put(fork_power.clone());
+
+		let mut next_fork_power = fork_power.clone();
+		next_fork_power.add(1u128, 1u32, BlockSealDigest::Compute { nonce: 1.into() }, 1);
+		CurrentTick::set(4);
+		TempSealInherent::<Test>::put(BlockSealInherent::Compute);
+		BlockSeal::on_initialize(4);
+		Digests::mutate(|a| {
+			a.fork_power = Some(next_fork_power.clone());
+		});
+
+		BlockForkPower::<Test>::put(next_fork_power.clone());
+		BlockSeal::on_finalize(4);
+		assert_eq!(
+			System::digest()
+				.logs
+				.iter()
+				.find(|a| matches!(a, DigestItem::Consensus(FORK_POWER_DIGEST, _))),
+			None
+		);
+
+		// now it should add a log
+		TempSealInherent::<Test>::put(BlockSealInherent::Compute);
+		Digests::mutate(|a| {
+			a.fork_power = None;
+		});
+		BlockSeal::on_finalize(5);
+		assert_eq!(
+			System::digest()
+				.logs
+				.iter()
+				.find(|a| matches!(a, DigestItem::Consensus(FORK_POWER_DIGEST, _))),
+			Some(&DigestItem::Consensus(FORK_POWER_DIGEST, next_fork_power.encode()))
+		);
+	});
+}
+
+#[test]
+#[should_panic(expected = "does not match")]
+fn it_should_panic_if_the_fork_power_mismatches() {
+	new_test_ext().execute_with(|| {
+		let fork_power = ForkPower::default();
+		BlockForkPower::<Test>::put(fork_power.clone());
+
+		let mut next_fork_power = fork_power.clone();
+		next_fork_power.add(1u128, 1u32, BlockSealDigest::Compute { nonce: 1.into() }, 1);
+		CurrentTick::set(4);
+		TempSealInherent::<Test>::put(BlockSealInherent::Compute);
+		BlockSeal::on_initialize(4);
+		Digests::mutate(|a| {
+			a.fork_power = Some(next_fork_power.clone());
+		});
+		BlockSeal::on_finalize(4);
 	});
 }
 
@@ -550,11 +597,11 @@ fn it_can_find_best_vote_seals() {
 		let voting_schedule = VotingSchedule::when_evaluating_runtime_votes(5);
 		BlocksAtTick::mutate(|a| {
 			for i in 1..5 {
-				a.insert(i as u32, System::block_hash(i));
+				a.insert(i as Tick, System::block_hash(i));
 			}
 		});
 
-		first_vote.block_hash = System::block_hash(voting_schedule.eligible_votes_tick() as u64);
+		first_vote.block_hash = System::block_hash(voting_schedule.eligible_votes_tick());
 
 		vote.raw_votes = vec![(first_vote.encode(), 500)];
 
@@ -571,7 +618,7 @@ fn it_can_find_best_vote_seals() {
 			vec![]
 		);
 
-		first_vote.block_hash = System::block_hash(voting_schedule.grandparent_votes_tick() as u64);
+		first_vote.block_hash = System::block_hash(voting_schedule.grandparent_votes_tick());
 		vote.raw_votes = vec![(first_vote.encode(), 500)];
 		let best = BlockSeal::find_vote_block_seals(
 			vec![vote.clone()],

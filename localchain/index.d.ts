@@ -311,10 +311,10 @@ export class OverviewStore {
 
 export class TickerRef {
   get current(): number
-  tickForTime(timestampMillis: number): number
-  timeForTick(tick: number): bigint
-  millisToNextTick(): bigint
-  get channelHoldExpirationTicks(): Tick
+  tickForTime(timestampMillis: number): bigint
+  timeForTick(tick: number): number
+  millisToNextTick(): number
+  get channelHoldExpirationTicks(): number
 }
 
 export class Transactions {
@@ -639,12 +639,11 @@ export interface SignatureResult {
 
 export interface Ticker {
   tickDurationMillis: number
-  genesisUtcTime: number
+  channelHoldExpirationTicks: number
 }
 
 export interface TickerConfig {
   tickDurationMillis: number
-  genesisUtcTime: number
   channelHoldExpirationTicks: number
   ntpPoolUrl?: string
 }

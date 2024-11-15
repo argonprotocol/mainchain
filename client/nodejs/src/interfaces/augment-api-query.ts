@@ -140,7 +140,7 @@ declare module '@polkadot/api-base/types/storage' {
       /**
        * The count of votes in the last 3 ticks
        **/
-      votesInPast3Ticks: AugmentedQuery<ApiType, () => Observable<Vec<ITuple<[u32, u32]>>>, []>;
+      votesInPast3Ticks: AugmentedQuery<ApiType, () => Observable<Vec<ITuple<[u64, u32]>>>, []>;
     };
     blockSealSpec: {
       /**
@@ -161,7 +161,7 @@ declare module '@polkadot/api-base/types/storage' {
        * target a max number of votes
        **/
       currentVoteMinimum: AugmentedQuery<ApiType, () => Observable<u128>, []>;
-      pastBlockVotes: AugmentedQuery<ApiType, () => Observable<Vec<ITuple<[u32, u32, u128]>>>, []>;
+      pastBlockVotes: AugmentedQuery<ApiType, () => Observable<Vec<ITuple<[u64, u32, u128]>>>, []>;
       pastComputeBlockTimes: AugmentedQuery<ApiType, () => Observable<Vec<u64>>, []>;
       previousBlockTimestamp: AugmentedQuery<ApiType, () => Observable<Option<u64>>, []>;
       tempBlockTimestamp: AugmentedQuery<ApiType, () => Observable<Option<u64>>, []>;
@@ -221,7 +221,7 @@ declare module '@polkadot/api-base/types/storage' {
        * The token gateway addresses on different chains
        **/
       activeEvmDestinations: AugmentedQuery<ApiType, () => Observable<Vec<PalletChainTransferIsmpModuleEvmChain>>, []>;
-      expiringTransfersOutByNotary: AugmentedQuery<ApiType, (arg1: u32 | AnyNumber | Uint8Array, arg2: u32 | AnyNumber | Uint8Array) => Observable<Vec<u32>>, [u32, u32]>;
+      expiringTransfersOutByNotary: AugmentedQuery<ApiType, (arg1: u32 | AnyNumber | Uint8Array, arg2: u64 | AnyNumber | Uint8Array) => Observable<Vec<u32>>, [u32, u64]>;
       nextTransferId: AugmentedQuery<ApiType, () => Observable<Option<u32>>, []>;
       pendingTransfersOut: AugmentedQuery<ApiType, (arg: u32 | AnyNumber | Uint8Array) => Observable<Option<PalletChainTransferQueuedTransferOut>>, [u32]>;
       /**
@@ -242,7 +242,7 @@ declare module '@polkadot/api-base/types/storage' {
       tempDigests: AugmentedQuery<ApiType, () => Observable<Option<ArgonPrimitivesDigestsDigestset>>, []>;
     };
     domains: {
-      expiringDomainsByBlock: AugmentedQuery<ApiType, (arg: u32 | AnyNumber | Uint8Array) => Observable<Vec<H256>>, [u32]>;
+      expiringDomainsByBlock: AugmentedQuery<ApiType, (arg: u64 | AnyNumber | Uint8Array) => Observable<Vec<H256>>, [u64]>;
       registeredDomains: AugmentedQuery<ApiType, (arg: H256 | string | Uint8Array) => Observable<Option<PalletDomainsDomainRegistration>>, [H256]>;
       zoneRecordsByDomain: AugmentedQuery<ApiType, (arg: H256 | string | Uint8Array) => Observable<Option<ArgonPrimitivesDomainZoneRecord>>, [H256]>;
     };
@@ -418,12 +418,12 @@ declare module '@polkadot/api-base/types/storage' {
       activeNotaries: AugmentedQuery<ApiType, () => Observable<Vec<ArgonPrimitivesNotaryNotaryRecord>>, []>;
       expiringProposals: AugmentedQuery<ApiType, (arg: u32 | AnyNumber | Uint8Array) => Observable<Vec<AccountId32>>, [u32]>;
       nextNotaryId: AugmentedQuery<ApiType, () => Observable<Option<u32>>, []>;
-      notaryKeyHistory: AugmentedQuery<ApiType, (arg: u32 | AnyNumber | Uint8Array) => Observable<Vec<ITuple<[u32, U8aFixed]>>>, [u32]>;
+      notaryKeyHistory: AugmentedQuery<ApiType, (arg: u32 | AnyNumber | Uint8Array) => Observable<Vec<ITuple<[u64, U8aFixed]>>>, [u32]>;
       proposedNotaries: AugmentedQuery<ApiType, (arg: AccountId32 | string | Uint8Array) => Observable<Option<ITuple<[ArgonPrimitivesNotaryNotaryMeta, u32]>>>, [AccountId32]>;
       /**
        * Metadata changes to be activated at the given tick
        **/
-      queuedNotaryMetaChanges: AugmentedQuery<ApiType, (arg: u32 | AnyNumber | Uint8Array) => Observable<BTreeMap<u32, ArgonPrimitivesNotaryNotaryMeta>>, [u32]>;
+      queuedNotaryMetaChanges: AugmentedQuery<ApiType, (arg: u64 | AnyNumber | Uint8Array) => Observable<BTreeMap<u32, ArgonPrimitivesNotaryNotaryMeta>>, [u64]>;
     };
     notebook: {
       /**
@@ -452,7 +452,7 @@ declare module '@polkadot/api-base/types/storage' {
       /**
        * Notaries locked for failing audits
        **/
-      notariesLockedForFailedAudit: AugmentedQuery<ApiType, (arg: u32 | AnyNumber | Uint8Array) => Observable<Option<ITuple<[u32, u32, ArgonNotaryAuditErrorVerifyError]>>>, [u32]>;
+      notariesLockedForFailedAudit: AugmentedQuery<ApiType, (arg: u32 | AnyNumber | Uint8Array) => Observable<Option<ITuple<[u32, u64, ArgonNotaryAuditErrorVerifyError]>>>, [u32]>;
       /**
        * Double storage map of notary id + notebook # to the change root
        **/
@@ -634,13 +634,13 @@ declare module '@polkadot/api-base/types/storage' {
       upgradedToU32RefCount: AugmentedQuery<ApiType, () => Observable<bool>, []>;
     };
     ticks: {
-      currentTick: AugmentedQuery<ApiType, () => Observable<u32>, []>;
+      currentTick: AugmentedQuery<ApiType, () => Observable<u64>, []>;
       genesisTicker: AugmentedQuery<ApiType, () => Observable<ArgonPrimitivesTickTicker>, []>;
       /**
        * Blocks from the last 100 ticks. Trimmed in on_initialize.
        * NOTE: cannot include the current block hash until next block
        **/
-      recentBlocksAtTicks: AugmentedQuery<ApiType, () => Observable<BTreeMap<u32, H256>>, []>;
+      recentBlocksAtTicks: AugmentedQuery<ApiType, () => Observable<BTreeMap<u64, H256>>, []>;
     };
     timestamp: {
       /**

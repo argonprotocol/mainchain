@@ -6,6 +6,7 @@ use crate::{bail, BalanceChangeStatus, Error, Result};
 use crate::{TickerRef, CHANNEL_HOLD_MINIMUM_SETTLEMENT};
 use anyhow::anyhow;
 use argon_notary_audit::verify_changeset_signatures;
+use argon_primitives::tick::Tick;
 use argon_primitives::{
   AccountType, Balance, BalanceChange, BalanceTip, MultiSignatureBytes, NoteType, NotebookNumber,
   CHANNEL_HOLD_CLAWBACK_TICKS, MINIMUM_CHANNEL_HOLD_SETTLEMENT,
@@ -57,7 +58,7 @@ pub struct ChannelHold {
   pub delegated_signer_address: Option<String>,
   pub to_address: String,
   pub domain_hash: Option<Vec<u8>>,
-  pub expiration_tick: u32,
+  pub expiration_tick: i64,
   pub balance_change_number: u32,
   pub notarization_id: Option<i64>,
   pub is_client: bool,
@@ -79,8 +80,8 @@ impl ChannelHold {
     self.settled_signature.clone()
   }
 
-  pub fn is_past_claim_period(&self, current_tick: u32) -> bool {
-    current_tick > self.expiration_tick + CHANNEL_HOLD_CLAWBACK_TICKS
+  pub fn is_past_claim_period(&self, current_tick: Tick) -> bool {
+    current_tick > self.expiration_tick as Tick + CHANNEL_HOLD_CLAWBACK_TICKS
   }
 
   pub fn get_initial_balance_change(&self) -> BalanceChange {
@@ -201,6 +202,7 @@ impl ChannelHold {
     let settled_amount = self.settled_amount.to_string();
     let balance_change_number = self.balance_change_number as i64;
     let from_address = self.from_address.clone();
+    let expiration_tick = self.expiration_tick;
 
     let res = sqlx::query!(
       r#"INSERT INTO open_channel_holds
@@ -210,7 +212,7 @@ impl ChannelHold {
       self.initial_balance_change_json,
       from_address,
       balance_change_number,
-      self.expiration_tick,
+      expiration_tick,
       settled_amount,
       self.settled_signature,
       self.is_client,
@@ -308,7 +310,7 @@ impl TryFrom<ChannelHoldRow> for ChannelHold {
     let mut channel_hold =
       ChannelHold::try_from_balance_change_json(row.initial_balance_change_json)?;
 
-    channel_hold.expiration_tick = row.expiration_tick as u32;
+    channel_hold.expiration_tick = row.expiration_tick;
     channel_hold.settled_amount = row.settled_amount.parse()?;
     channel_hold.settled_signature = row.settled_signature;
     channel_hold.notarization_id = row.notarization_id;
@@ -487,7 +489,7 @@ impl OpenChannelHoldsStore {
   }
 
   pub async fn get_claimable(&self) -> Result<Vec<OpenChannelHold>> {
-    let current_tick = self.ticker.current();
+    let current_tick = self.ticker.current() as i64;
     let expired = sqlx::query_as!(
       ChannelHoldRow,
       r#"SELECT * FROM open_channel_holds WHERE notarization_id IS NULL AND missed_claim_window = false AND expiration_tick <= $1"#,
@@ -550,7 +552,8 @@ impl OpenChannelHoldsStore {
         current_tip
       );
     }
-    channel_hold.expiration_tick = balance_proof.tick + self.ticker.channel_hold_expiration_ticks();
+    channel_hold.expiration_tick =
+      (balance_proof.tick + self.ticker.channel_hold_expiration_ticks()) as i64;
     channel_hold.db_insert(&mut db).await?;
     Ok(OpenChannelHold::new(
       self.db.clone(),
@@ -615,7 +618,7 @@ impl OpenChannelHoldsStore {
       to_address: AccountStore::to_address(recipient),
       domain_hash: domain_hash.map(|h| h.0.to_vec()).clone(),
       notary_id: *notary_id,
-      expiration_tick: tick + self.ticker.channel_hold_expiration_ticks(),
+      expiration_tick: (tick + self.ticker.channel_hold_expiration_ticks()) as i64,
       settled_amount: MINIMUM_CHANNEL_HOLD_SETTLEMENT,
       settled_signature: EMPTY_SIGNATURE.clone(),
       notarization_id: None,
@@ -642,6 +645,7 @@ pub struct SignatureResult {
 pub mod napi_ext {
   use super::{ChannelHold, OpenChannelHold, OpenChannelHoldsStore};
   use crate::error::NapiOk;
+  use argon_primitives::tick::Tick;
   use napi::bindgen_prelude::{BigInt, Uint8Array};
 
   #[napi]
@@ -659,8 +663,8 @@ pub mod napi_ext {
       Uint8Array::from(self.settled_signature.clone())
     }
     #[napi(js_name = "isPastClaimPeriod")]
-    pub fn is_past_claim_period_napi(&self, current_tick: u32) -> bool {
-      self.is_past_claim_period(current_tick)
+    pub fn is_past_claim_period_napi(&self, current_tick: i64) -> bool {
+      self.is_past_claim_period(current_tick as Tick)
     }
   }
 
@@ -799,6 +803,7 @@ mod tests {
     let notarization = Notarization::new(vec![balance_change.clone()], vec![], vec![]);
 
     let json_notarization = json!(notarization);
+    let tick = tick as i64;
     let id = sqlx::query_scalar!(
       "INSERT into notarizations (json, notary_id, notebook_number, tick) VALUES (?, ?, ?, ?) RETURNING id",
       json_notarization,
@@ -848,6 +853,12 @@ mod tests {
     let mut db = pool.acquire().await?;
     let bob_account = register_account(&mut db, Bob.to_account_id(), 1, 1).await?;
 
+    let channel_hold_expiration_ticks = 2;
+    let ticker = TickerRef::new(Ticker::start(
+      Duration::from_secs(60),
+      channel_hold_expiration_ticks,
+    ));
+    let start_tick = ticker.current();
     let _bob_hold = create_channel_hold(
       &pool,
       &bob_account,
@@ -856,16 +867,11 @@ mod tests {
       Some("delta.flights".to_string()),
       alice_address.clone(),
       1,
-      1,
+      start_tick,
       None,
     )
     .await?;
 
-    let channel_hold_expiration_ticks: u32 = 2;
-    let ticker = TickerRef::new(Ticker::start(
-      Duration::from_secs(60),
-      channel_hold_expiration_ticks,
-    ));
     println!("about to open channel_hold");
     let keystore = Keystore::new(pool.clone());
     let _ = keystore
@@ -878,8 +884,8 @@ mod tests {
     let channel_hold = open_channel_hold.inner().await;
     assert_eq!(channel_hold.to_address.clone(), alice_address);
     assert_eq!(
-      channel_hold.expiration_tick,
-      1 + channel_hold_expiration_ticks
+      channel_hold.expiration_tick as Tick,
+      start_tick + channel_hold_expiration_ticks
     );
 
     assert_eq!(store.get_claimable().await?.len(), 0);
@@ -1025,7 +1031,7 @@ mod tests {
     )
     .await?;
 
-    let channel_hold_expiration_ticks: u32 = 2;
+    let channel_hold_expiration_ticks = 2;
     let ticker: TickerRef =
       Ticker::start(Duration::from_secs(60), channel_hold_expiration_ticks).into();
     let keystore = Keystore::new(bob_pool.clone());
@@ -1092,7 +1098,7 @@ mod tests {
     );
 
     assert_eq!(
-      imported_channel_hold.expiration_tick,
+      imported_channel_hold.expiration_tick as Tick,
       1 + channel_hold_expiration_ticks
     );
     assert_eq!(

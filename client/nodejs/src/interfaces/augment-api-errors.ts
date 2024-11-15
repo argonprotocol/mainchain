@@ -324,6 +324,10 @@ declare module '@polkadot/api-base/types/errors' {
        **/
       DuplicateBlockVoteDigest: AugmentedError<ApiType>;
       /**
+       * Duplicate ForkPowerDigest found
+       **/
+      DuplicateForkPowerDigest: AugmentedError<ApiType>;
+      /**
        * Duplicate NotebookDigest found
        **/
       DuplicateNotebookDigest: AugmentedError<ApiType>;

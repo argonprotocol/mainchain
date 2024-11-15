@@ -28,7 +28,7 @@ struct NotebookHeaderRow {
 	pub notebook_number: i32,
 	pub hash: Option<Vec<u8>>,
 	pub signature: Option<Vec<u8>>,
-	pub tick: i32,
+	pub tick: i64,
 	pub notary_id: i32,
 	pub tax: Option<String>,
 	pub chain_transfers: JsonValue,
@@ -49,9 +49,9 @@ impl TryInto<NotebookHeader> for NotebookHeaderRow {
 	fn try_into(self) -> Result<NotebookHeader, Error> {
 		Ok(NotebookHeader {
 			version: self.version as u16,
-			notebook_number: self.notebook_number as u32,
-			tick: self.tick as u32,
-			notary_id: self.notary_id as u32,
+			notebook_number: self.notebook_number as NotebookNumber,
+			tick: self.tick as Tick,
+			notary_id: self.notary_id as NotaryId,
 			tax: self
 				.tax
 				.unwrap_or("0".to_string())
@@ -110,7 +110,7 @@ impl NotebookHeaderStore {
 		db: &mut PgConnection,
 		notary_id: NotaryId,
 		notebook_number: NotebookNumber,
-		tick: u32,
+		tick: u64,
 	) -> anyhow::Result<(), Error> {
 		let version = NOTEBOOK_VERSION;
 		let empty = json!([]);
@@ -124,7 +124,7 @@ impl NotebookHeaderStore {
 			"#,
 			version as i16,
 			notary_id as i32,
-			tick as i32,
+			tick as i64,
 			notebook_number as i32,
 			empty.clone(),
 			empty.clone(),
@@ -190,8 +190,8 @@ impl NotebookHeaderStore {
 		};
 
 		Ok(NotebookMeta {
-			finalized_tick: record.tick as u32,
-			finalized_notebook_number: record.notebook_number as u32,
+			finalized_tick: record.tick as Tick,
+			finalized_notebook_number: record.notebook_number as NotebookNumber,
 		})
 	}
 	pub async fn load<'a>(
@@ -302,14 +302,14 @@ impl NotebookHeaderStore {
 	pub async fn get_notebook_tick(
 		db: &mut PgConnection,
 		notebook_number: NotebookNumber,
-	) -> anyhow::Result<u32, Error> {
+	) -> anyhow::Result<Tick, Error> {
 		let row = sqlx::query_scalar!(
 			"SELECT tick FROM notebook_headers WHERE notebook_number = $1 LIMIT 1",
 			notebook_number as i32
 		)
 		.fetch_one(db)
 		.await?;
-		Ok(row as u32)
+		Ok(row as Tick)
 	}
 
 	pub async fn get_changed_accounts_root<'a>(

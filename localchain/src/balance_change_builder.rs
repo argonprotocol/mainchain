@@ -402,7 +402,7 @@ pub mod napi_ext {
           address: transfer.address,
           amount: transfer.amount.get_u128().1,
           notary_id: transfer.notary_id,
-          expiration_tick: transfer.expiration_tick,
+          expiration_tick: transfer.expiration_tick as u64,
           transfer_id: transfer.transfer_id,
         })
         .await

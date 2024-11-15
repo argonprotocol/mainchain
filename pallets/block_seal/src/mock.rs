@@ -7,10 +7,10 @@ use argon_primitives::{
 	block_vote::VoteMinimum,
 	digests::Digestset,
 	notebook::NotebookNumber,
-	tick::{Tick, Ticker},
+	tick::{Tick, TickDigest, Ticker},
 	AccountId, AuthorityProvider, BlockSealSpecProvider, BlockVoteDigest, ComputeDifficulty,
 	DomainHash, HashOutput, NotaryId, NotebookAuditResult, NotebookDigest, NotebookProvider,
-	NotebookSecret, TickDigest, TickProvider, VotingSchedule,
+	NotebookSecret, TickProvider, VotingSchedule,
 };
 use env_logger::{Builder, Env};
 use frame_support::{__private::Get, derive_impl, parameter_types, traits::FindAuthor};
@@ -53,7 +53,8 @@ parameter_types! {
 		block_vote: BlockVoteDigest { voting_power: 500, votes_count: 1 },
 		author: Alice.into(),
 		voting_key: None,
-		tick: TickDigest { tick: 2 },
+		fork_power: None,
+		tick: TickDigest(2),
 		notebooks: NotebookDigest {
 			notebooks: vec![NotebookAuditResult::<VerifyError> {
 				notary_id: 1,
@@ -130,7 +131,7 @@ impl TickProvider<Block> for StaticTickProvider {
 		CurrentTick::get()
 	}
 	fn ticker() -> Ticker {
-		Ticker::new(1, 1, 2)
+		Ticker::new(1, 2)
 	}
 	fn block_at_tick(tick: Tick) -> Option<HashOutput> {
 		BlocksAtTick::get().get(&tick).cloned()

@@ -132,7 +132,7 @@ declare module '@polkadot/api-base/types/consts' {
        * How long a transfer should remain in storage before returning. NOTE: there is a 2 tick
        * grace period where we will still allow a transfer
        **/
-      transferExpirationTicks: u32 & AugmentedConst<ApiType>;
+      transferExpirationTicks: u64 & AugmentedConst<ApiType>;
     };
     grandpa: {
       /**
@@ -222,7 +222,7 @@ declare module '@polkadot/api-base/types/consts' {
        * Number of ticks to delay changing a notaries' meta (this is to allow a window for
        * notaries to switch to new keys after a new key is finalized)
        **/
-      metaChangesTickDelay: u32 & AugmentedConst<ApiType>;
+      metaChangesTickDelay: u64 & AugmentedConst<ApiType>;
     };
     ownership: {
       /**
@@ -264,11 +264,11 @@ declare module '@polkadot/api-base/types/consts' {
       /**
        * The maximum number of ticks to preserve a price index
        **/
-      maxDowntimeTicksBeforeReset: u32 & AugmentedConst<ApiType>;
+      maxDowntimeTicksBeforeReset: u64 & AugmentedConst<ApiType>;
       /**
        * The oldest history to keep
        **/
-      maxPriceAgeInTicks: u32 & AugmentedConst<ApiType>;
+      maxPriceAgeInTicks: u64 & AugmentedConst<ApiType>;
     };
     proxy: {
       /**

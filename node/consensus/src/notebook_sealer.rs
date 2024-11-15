@@ -2,6 +2,7 @@ use crate::{aux_client::ArgonAux, block_creator::CreateTaxVoteBlock, error::Erro
 use argon_node_runtime::NotebookVerifyError;
 use argon_primitives::{
 	block_seal::BLOCK_SEAL_CRYPTO_ID,
+	fork_power::ForkPower,
 	tick::{Tick, Ticker},
 	BlockCreatorApis, BlockSealApis, BlockSealAuthorityId, BlockSealDigest, BlockVote,
 	BlockVotingPower, TickApis, VotingSchedule, BLOCK_SEAL_KEY_TYPE,
@@ -15,8 +16,7 @@ use sp_blockchain::HeaderBackend;
 use sp_consensus::{Error as ConsensusError, SelectChain};
 use sp_core::{ByteArray, U256};
 use sp_keystore::{Keystore, KeystorePtr};
-use sp_runtime::traits::Block as BlockT;
-use sp_timestamp::Timestamp;
+use sp_runtime::traits::{Block as BlockT, Header};
 use std::{collections::HashMap, marker::PhantomData, sync::Arc};
 
 pub struct NotebookSealer<B: BlockT, C: AuxStore, SC, AC: Clone + Codec> {
@@ -146,7 +146,7 @@ where
 				self.sender
 					.unbounded_send(CreateTaxVoteBlock::<B, AC> {
 						current_tick: notebook_tick + 1,
-						timestamp_millis: Timestamp::current().as_millis(),
+						timestamp_millis: self.ticker.now_adjusted_to_ntp(),
 						vote,
 						parent_hash: block_hash,
 					})
@@ -196,11 +196,11 @@ where
 				continue;
 			};
 
-			let fork_power_to_beat = self.client.runtime_api().fork_power(block_hash_to_beat)?;
+			let fork_power_to_beat = self.get_fork_power(block_hash_to_beat)?;
 			let best_seal_strength = fork_power_to_beat.seal_strength;
 
 			// pretend we beat the best vote - could we beat this fork power?
-			let mut theoretical_power = self.client.runtime_api().fork_power(parent_block)?;
+			let mut theoretical_power = self.get_fork_power(parent_block)?;
 			theoretical_power.add_vote(
 				voting_power,
 				notebooks,
@@ -241,6 +241,16 @@ where
 			}
 		}
 		self.client.runtime_api().block_at_tick(hash, tick).ok()?
+	}
+
+	fn get_fork_power(&self, block_hash: B::Hash) -> Result<ForkPower, Error> {
+		let header = self.client.header(block_hash)?.ok_or_else(|| {
+			Error::StringError(format!("Could not find header for block {:?}", block_hash))
+		})?;
+		let digest = header.digest();
+		ForkPower::try_from(digest).map_err(|e| {
+			Error::StringError(format!("Could not get fork power from header: {:?}", e))
+		})
 	}
 }
 

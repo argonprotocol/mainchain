@@ -181,7 +181,7 @@ struct BalanceChangeEntry: Codable {
 struct BalanceProof: Codable {
   var notaryId: UInt32
   var notebookNumber: UInt32
-  var tick: UInt32
+  var tick: UInt64
   @StringOrNumber var balance: String
   var accountOrigin: AccountOrigin
   var notebookProof: MerkleProof?

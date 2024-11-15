@@ -4,7 +4,7 @@ use argon_primitives::{
 };
 use env_logger::{Builder, Env};
 use frame_support::{derive_impl, parameter_types, traits::ConstU16};
-use sp_core::{ConstU32, H256};
+use sp_core::{ConstU64, H256};
 use sp_runtime::{traits::IdentityLookup, BuildStorage};
 
 use crate as pallet_notaries;
@@ -44,7 +44,7 @@ impl TickProvider<Block> for StaticTickProvider {
 		CurrentTick::get()
 	}
 	fn ticker() -> Ticker {
-		Ticker::new(1, 1, 2)
+		Ticker::new(1, 2)
 	}
 	fn block_at_tick(_: Tick) -> Option<H256> {
 		todo!()
@@ -60,7 +60,7 @@ impl pallet_notaries::Config for Test {
 	type MaxProposalHoldBlocks = MaxProposalHoldBlocks;
 	type MaxActiveNotaries = MaxActiveNotaries;
 	type MaxProposalsPerBlock = MaxProposalsPerBlock;
-	type MetaChangesTickDelay = ConstU32<1>;
+	type MetaChangesTickDelay = ConstU64<1>;
 	type MaxNotaryHosts = MaxNotaryHosts;
 	type MaxTicksForKeyHistory = MaxTicksForKeyHistory;
 	type TickProvider = StaticTickProvider;

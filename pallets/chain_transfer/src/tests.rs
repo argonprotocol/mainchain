@@ -34,7 +34,7 @@ fn it_can_send_funds_to_localchain() {
 			1,
 		));
 		assert_eq!(Balances::free_balance(&who), 4000);
-		let expires_tick: Tick = 1u32 + TransferExpirationTicks::get();
+		let expires_tick: Tick = 1 + TransferExpirationTicks::get();
 		assert_eq!(ExpiringTransfersOutByNotary::<Test>::get(1, expires_tick)[0], 1);
 		assert_eq!(NextTransferId::<Test>::get(), Some(2));
 	});
@@ -72,7 +72,7 @@ fn it_expires_transfers_on_notebook_tick() {
 		));
 		assert_eq!(Balances::free_balance(&who), 0);
 		assert!(!System::account_exists(&who));
-		let expires_tick: Tick = 1u32 + TransferExpirationTicks::get();
+		let expires_tick: Tick = 1 + TransferExpirationTicks::get();
 		assert_eq!(ExpiringTransfersOutByNotary::<Test>::get(1, expires_tick)[0], 1);
 
 		ChainTransferPallet::notebook_submitted(&NotebookHeader {
@@ -118,7 +118,7 @@ fn it_can_handle_multiple_transfer() {
 			1,
 		),);
 		assert_eq!(Balances::free_balance(&who), 3300);
-		let expires_tick: Tick = 1u32 + TransferExpirationTicks::get();
+		let expires_tick: Tick = 1 + TransferExpirationTicks::get();
 		assert_eq!(ExpiringTransfersOutByNotary::<Test>::get(1, expires_tick), vec![1, 2]);
 
 		System::inc_account_nonce(&who);
@@ -143,7 +143,7 @@ fn it_can_handle_transfers_in() {
 			5000,
 			1,
 		));
-		let expires_tick: Tick = 1u32 + TransferExpirationTicks::get();
+		let expires_tick: Tick = 1 + TransferExpirationTicks::get();
 		assert_eq!(ExpiringTransfersOutByNotary::<Test>::get(1, expires_tick)[0], 1);
 
 		let changed_accounts_root = H256::random();
