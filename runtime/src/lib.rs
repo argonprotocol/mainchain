@@ -97,15 +97,15 @@ pub mod currency {
 	use argon_primitives::Balance;
 
 	/// The existential deposit.
-	pub const EXISTENTIAL_DEPOSIT: Balance = 500;
+	pub const EXISTENTIAL_DEPOSIT: Balance = 500_000;
 
-	pub const UNITS: Balance = 1_000;
-	pub const CENTS: Balance = UNITS / 100;
-	pub const MILLICENTS: Balance = CENTS / 1_000;
-	pub const GRAND: Balance = CENTS * 100_000;
+	pub const ARGON: Balance = 1_000_000;
+	pub const CENTS: Balance = ARGON / 100_000;
+	pub const MILLIGONS: Balance = 1_000;
+	pub const MICROGONS: Balance = 1;
 
 	pub const fn deposit(items: u32, bytes: u32) -> Balance {
-		items as Balance * 100 * CENTS + (bytes as Balance) * 5 * MILLICENTS
+		items as Balance * 100 * CENTS + (bytes as Balance) * 5 * MICROGONS
 	}
 }
 

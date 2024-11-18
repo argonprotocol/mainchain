@@ -66,7 +66,7 @@ impl NotebookHistoryLookup for TestLookup {
 		_notary_id: u32,
 		transfer_to_localchain_id: TransferToLocalchainId,
 		account_id: &AccountId32,
-		_milligons: Balance,
+		_microgons: Balance,
 		_at_tick: Tick,
 	) -> Result<bool, AccountHistoryLookupError> {
 		ValidLocalchainTransfers::get()
@@ -87,7 +87,7 @@ fn test_verify_previous_balance() {
 	let mut change = BalanceChange {
 		account_id,
 		account_type,
-		change_number: 500,
+		change_number: 500_000,
 		balance: 0,
 		previous_balance_proof: None,
 		channel_hold_note: None,
@@ -182,10 +182,10 @@ fn test_verify_previous_balance() {
 
 #[test]
 fn test_verify_notebook() {
-	let note = Note::create(1000, NoteType::ClaimFromMainchain { transfer_id: 1 });
+	let note = Note::create(1_000_000, NoteType::ClaimFromMainchain { transfer_id: 1 });
 
 	let alice_balance_changeset = vec![BalanceChange {
-		balance: 1000,
+		balance: 1_000_000,
 		change_number: 1,
 		account_id: Alice.to_account_id(),
 		account_type: AccountType::Deposit,
@@ -204,7 +204,7 @@ fn test_verify_notebook() {
 		changed_accounts_root: merkle_root::<Blake2Hasher, _>(vec![BalanceTip {
 			account_id: Alice.to_account_id(),
 			account_type: AccountType::Deposit,
-			balance: 1000,
+			balance: 1_000_000,
 			change_number: 1,
 			account_origin: AccountOrigin { notebook_number: 1, account_uid: 1 },
 			channel_hold_note: None,
@@ -277,11 +277,11 @@ fn test_verify_notebook() {
 
 #[test]
 fn test_disallows_double_claim() {
-	let note1 = Note::create(1000, NoteType::ClaimFromMainchain { transfer_id: 1 });
-	let note2 = Note::create(1000, NoteType::ClaimFromMainchain { transfer_id: 1 });
+	let note1 = Note::create(1_000_000, NoteType::ClaimFromMainchain { transfer_id: 1 });
+	let note2 = Note::create(1_000_000, NoteType::ClaimFromMainchain { transfer_id: 1 });
 
 	let alice_balance_changeset = vec![BalanceChange {
-		balance: 2000,
+		balance: 2_000_000,
 		change_number: 1,
 		account_id: Alice.to_account_id(),
 		account_type: AccountType::Deposit,
@@ -300,7 +300,7 @@ fn test_disallows_double_claim() {
 		changed_accounts_root: merkle_root::<Blake2Hasher, _>(vec![BalanceTip {
 			account_id: Alice.to_account_id(),
 			account_type: AccountType::Deposit,
-			balance: 2000,
+			balance: 2_000_000,
 			change_number: 1,
 			account_origin: AccountOrigin { notebook_number: 1, account_uid: 1 },
 			channel_hold_note: None,
@@ -355,36 +355,36 @@ fn test_multiple_changesets_in_a_notebook() {
 			previous_balance_proof: None,
 			channel_hold_note: None,
 			notes: bounded_vec![
-				Note::create(1000, NoteType::ClaimFromMainchain { transfer_id: 1 }),
-				Note::create(1000, NoteType::Send { to: None }),
+				Note::create(1_000_000, NoteType::ClaimFromMainchain { transfer_id: 1 }),
+				Note::create(1_000_000, NoteType::Send { to: None }),
 			],
 			signature: empty_signature(),
 		}
 		.sign(Alice.pair())
 		.clone(),
 		BalanceChange {
-			balance: 800,
+			balance: 800_000,
 			change_number: 1,
 			account_id: Bob.to_account_id(),
 			account_type: AccountType::Deposit,
 			previous_balance_proof: None,
 			channel_hold_note: None,
 			notes: bounded_vec![
-				Note::create(1000, NoteType::Claim),
-				Note::create(200, NoteType::Tax),
+				Note::create(1_000_000, NoteType::Claim),
+				Note::create(200_000, NoteType::Tax),
 			],
 			signature: empty_signature(),
 		}
 		.sign(Bob.pair())
 		.clone(),
 		BalanceChange {
-			balance: 200,
+			balance: 200_000,
 			change_number: 1,
 			account_id: Bob.to_account_id(),
 			account_type: AccountType::Tax,
 			previous_balance_proof: None,
 			channel_hold_note: None,
-			notes: bounded_vec![Note::create(200, NoteType::Claim),],
+			notes: bounded_vec![Note::create(200_000, NoteType::Claim),],
 			signature: empty_signature(),
 		}
 		.sign(Bob.pair())
@@ -410,7 +410,7 @@ fn test_multiple_changesets_in_a_notebook() {
 			BalanceTip {
 				account_id: Bob.to_account_id(),
 				account_type: AccountType::Deposit,
-				balance: 800,
+				balance: 800_000,
 				change_number: 1,
 				account_origin: AccountOrigin { notebook_number: 1, account_uid: 2 },
 				channel_hold_note: None,
@@ -421,7 +421,7 @@ fn test_multiple_changesets_in_a_notebook() {
 			BalanceTip {
 				account_id: Bob.to_account_id(),
 				account_type: AccountType::Tax,
-				balance: 200,
+				balance: 200_000,
 				change_number: 1,
 				account_origin: AccountOrigin { notebook_number: 1, account_uid: 3 },
 				channel_hold_note: None,
@@ -435,7 +435,7 @@ fn test_multiple_changesets_in_a_notebook() {
 			notary_id: 1,
 			notebook_number: 1,
 			tick: 0,
-			tax: 200,
+			tax: 200_000,
 			changed_accounts_root: merkle_root::<Blake2Hasher, _>(
 				balance_tips.values().map(|v| v.encode()).collect::<Vec<_>>(),
 			),
@@ -479,34 +479,34 @@ fn test_multiple_changesets_in_a_notebook() {
 			account_type: AccountType::Deposit,
 			previous_balance_proof: None,
 			channel_hold_note: None,
-			notes: bounded_vec![Note::create(800, NoteType::Send { to: None }),],
+			notes: bounded_vec![Note::create(800_000, NoteType::Send { to: None }),],
 			signature: empty_signature(),
 		}
 		.sign(Bob.pair())
 		.clone(),
 		BalanceChange {
-			balance: 600,
+			balance: 600_000,
 			change_number: 2,
 			account_id: Alice.to_account_id(),
 			account_type: AccountType::Deposit,
 			previous_balance_proof: None,
 			channel_hold_note: None,
 			notes: bounded_vec![
-				Note::create(800, NoteType::Claim),
-				Note::create(200, NoteType::Tax),
+				Note::create(800_000, NoteType::Claim),
+				Note::create(200_000, NoteType::Tax),
 			],
 			signature: empty_signature(),
 		}
 		.sign(Alice.pair())
 		.clone(),
 		BalanceChange {
-			balance: 200,
+			balance: 200_000,
 			change_number: 1,
 			account_id: Alice.to_account_id(),
 			account_type: AccountType::Tax,
 			previous_balance_proof: None,
 			channel_hold_note: None,
-			notes: bounded_vec![Note::create(200, NoteType::Claim),],
+			notes: bounded_vec![Note::create(200_000, NoteType::Claim),],
 			signature: empty_signature(),
 		}
 		.sign(Alice.pair())
@@ -525,12 +525,12 @@ fn test_multiple_changesets_in_a_notebook() {
 	}
 	if let Some(tip) = balance_tips.get_mut(&(Alice.to_account_id(), AccountType::Deposit)) {
 		tip.change_number = 2;
-		tip.balance = 600;
+		tip.balance = 600_000;
 	}
 	balance_tips.insert(
 		(Alice.to_account_id(), AccountType::Tax),
 		BalanceTip {
-			balance: 200,
+			balance: 200_000,
 			change_number: 1,
 			account_id: Alice.to_account_id(),
 			account_type: AccountType::Tax,
@@ -556,7 +556,7 @@ fn test_multiple_changesets_in_a_notebook() {
 		tick: 1,
 		notebook_proof: None,
 		account_origin: AccountOrigin { notebook_number: 1, account_uid: 2 },
-		balance: 800,
+		balance: 800_000,
 	});
 	notebook.notarizations[1].balance_changes[1].previous_balance_proof = Some(BalanceProof {
 		notary_id: 1,
@@ -574,7 +574,7 @@ fn test_multiple_changesets_in_a_notebook() {
 		account_origin: AccountOrigin { notebook_number: 1, account_uid: 1 },
 		balance: 0,
 	});
-	notebook.header.tax = 400;
+	notebook.header.tax = 400_000;
 	notebook.hash = notebook.calculate_hash();
 	assert_err!(
 		notebook_verify(&TestLookup, &notebook, &BTreeMap::new(), 2),
@@ -594,19 +594,22 @@ fn test_multiple_changesets_in_a_notebook() {
 #[test]
 fn test_cannot_remove_lock_between_changesets_in_a_notebook() {
 	let alice_balance_changeset = vec![BalanceChange {
-		balance: 1000,
+		balance: 1_000_000,
 		change_number: 1,
 		account_id: Alice.to_account_id(),
 		account_type: AccountType::Deposit,
 		previous_balance_proof: None,
 		channel_hold_note: None,
-		notes: bounded_vec![Note::create(1000, NoteType::ClaimFromMainchain { transfer_id: 1 }),],
+		notes: bounded_vec![Note::create(
+			1_000_000,
+			NoteType::ClaimFromMainchain { transfer_id: 1 }
+		),],
 		signature: empty_signature(),
 	}
 	.sign(Alice.pair())
 	.clone()];
 	let alice_balance_changeset2 = vec![BalanceChange {
-		balance: 1000,
+		balance: 1_000_000,
 		change_number: 2,
 		account_id: Alice.to_account_id(),
 		account_type: AccountType::Deposit,
@@ -616,11 +619,11 @@ fn test_cannot_remove_lock_between_changesets_in_a_notebook() {
 			tick: 1,
 			notebook_proof: None,
 			account_origin: AccountOrigin { notebook_number: 1, account_uid: 1 },
-			balance: 1000,
+			balance: 1_000_000,
 		}),
 		channel_hold_note: None,
 		notes: bounded_vec![Note::create(
-			1000,
+			1_000_000,
 			NoteType::ChannelHold {
 				recipient: Bob.to_account_id(),
 				delegated_signer: None,
@@ -642,7 +645,7 @@ fn test_cannot_remove_lock_between_changesets_in_a_notebook() {
 			changed_accounts_root: merkle_root::<Blake2Hasher, _>(vec![BalanceTip {
 				account_id: Alice.to_account_id(),
 				account_type: AccountType::Deposit,
-				balance: 1000,
+				balance: 1_000_000,
 				change_number: 2,
 				account_origin: AccountOrigin { notebook_number: 1, account_uid: 1 },
 				channel_hold_note: None,
@@ -688,7 +691,7 @@ fn test_cannot_remove_lock_between_changesets_in_a_notebook() {
 	notebook.header.changed_accounts_root = merkle_root::<Blake2Hasher, _>(vec![BalanceTip {
 		account_id: Alice.to_account_id(),
 		account_type: AccountType::Deposit,
-		balance: 1000,
+		balance: 1_000_000,
 		change_number: 2,
 		account_origin: AccountOrigin { notebook_number: 1, account_uid: 1 },
 		channel_hold_note: Some(hold_note),
@@ -701,7 +704,7 @@ fn test_cannot_remove_lock_between_changesets_in_a_notebook() {
 	{
 		// Try 1: pretend it didn't happen
 		let alice_balance_changeset3 = vec![BalanceChange {
-			balance: 1000,
+			balance: 1_000_000,
 			change_number: 3,
 			account_id: Alice.to_account_id(),
 			account_type: AccountType::Deposit,
@@ -711,11 +714,11 @@ fn test_cannot_remove_lock_between_changesets_in_a_notebook() {
 				tick: 1,
 				notebook_proof: None,
 				account_origin: AccountOrigin { notebook_number: 1, account_uid: 1 },
-				balance: 1000,
+				balance: 1_000_000,
 			}),
 			channel_hold_note: None,
 			notes: bounded_vec![Note::create(
-				1000,
+				1_000_000,
 				NoteType::ChannelHold {
 					recipient: Ferdie.to_account_id(),
 					delegated_signer: None,
@@ -736,7 +739,7 @@ fn test_cannot_remove_lock_between_changesets_in_a_notebook() {
 		notebook.header.changed_accounts_root = merkle_root::<Blake2Hasher, _>(vec![BalanceTip {
 			account_id: Alice.to_account_id(),
 			account_type: AccountType::Deposit,
-			balance: 1000,
+			balance: 1_000_000,
 			change_number: 3,
 			account_origin: AccountOrigin { notebook_number: 1, account_uid: 1 },
 			channel_hold_note: Some(hold_note),
@@ -750,7 +753,7 @@ fn test_cannot_remove_lock_between_changesets_in_a_notebook() {
 	{
 		// Try 2: try to remove the hold
 		let alice_balance_changeset3 = vec![BalanceChange {
-			balance: 1000,
+			balance: 1_000_000,
 			change_number: 3,
 			account_id: Alice.to_account_id(),
 			account_type: AccountType::Deposit,
@@ -760,10 +763,10 @@ fn test_cannot_remove_lock_between_changesets_in_a_notebook() {
 				tick: 1,
 				notebook_proof: None,
 				account_origin: AccountOrigin { notebook_number: 1, account_uid: 1 },
-				balance: 1000,
+				balance: 1_000_000,
 			}),
 			channel_hold_note: Some(Note::create(
-				1000,
+				1_000_000,
 				NoteType::ChannelHold {
 					recipient: Bob.to_account_id(),
 					delegated_signer: None,
@@ -787,7 +790,7 @@ fn test_cannot_remove_lock_between_changesets_in_a_notebook() {
 		notebook.header.changed_accounts_root = merkle_root::<Blake2Hasher, _>(vec![BalanceTip {
 			account_id: Alice.to_account_id(),
 			account_type: AccountType::Deposit,
-			balance: 1000,
+			balance: 1_000_000,
 			change_number: 3,
 			account_origin: AccountOrigin { notebook_number: 1, account_uid: 1 },
 			channel_hold_note: Some(hold_note),
@@ -807,7 +810,7 @@ fn test_votes_must_add_up() {
 			account_id: Alice.to_account_id(),
 			account_type: AccountType::Tax,
 			channel_hold_note: None,
-			balance: 1000,
+			balance: 1_000_000,
 			change_number: 1,
 			account_origin: AccountOrigin { notebook_number: 1, account_uid: 1 },
 		},
@@ -815,14 +818,14 @@ fn test_votes_must_add_up() {
 			account_id: Bob.to_account_id(),
 			account_type: AccountType::Deposit,
 			channel_hold_note: Some(Note::create(
-				500,
+				500_000,
 				NoteType::ChannelHold {
 					recipient: Alice.to_account_id(),
 					delegated_signer: None,
 					domain_hash: None,
 				},
 			)),
-			balance: 500,
+			balance: 500_000,
 			change_number: 1,
 			account_origin: AccountOrigin { notebook_number: 1, account_uid: 2 },
 		},
@@ -830,14 +833,14 @@ fn test_votes_must_add_up() {
 			account_id: Ferdie.to_account_id(),
 			account_type: AccountType::Deposit,
 			channel_hold_note: Some(Note::create(
-				500,
+				500_000,
 				NoteType::ChannelHold {
 					recipient: Alice.to_account_id(),
 					delegated_signer: None,
 					domain_hash: None,
 				},
 			)),
-			balance: 500,
+			balance: 500_000,
 			change_number: 1,
 			account_origin: AccountOrigin { notebook_number: 1, account_uid: 3 },
 		},
@@ -871,7 +874,7 @@ fn test_votes_must_add_up() {
 					change_number: 2,
 					account_id: Bob.to_account_id(),
 					channel_hold_note: Some(Note::create(
-						500,
+						500_000,
 						NoteType::ChannelHold {
 							recipient: Alice.to_account_id(),
 							delegated_signer: None,
@@ -885,10 +888,10 @@ fn test_votes_must_add_up() {
 						tick: 1,
 						notebook_proof: Some(proof(notebook_1_tips.clone(), 1),),
 						account_origin: AccountOrigin { notebook_number: 1, account_uid: 2 },
-						balance: 500,
+						balance: 500_000,
 					}),
 					signature: empty_signature(),
-					notes: bounded_vec![Note::create(500, NoteType::ChannelHoldSettle)],
+					notes: bounded_vec![Note::create(500_000, NoteType::ChannelHoldSettle)],
 				}
 				.sign(Bob.pair())
 				.clone(),
@@ -897,7 +900,7 @@ fn test_votes_must_add_up() {
 					change_number: 2,
 					account_id: Ferdie.to_account_id(),
 					channel_hold_note: Some(Note::create(
-						500,
+						500_000,
 						NoteType::ChannelHold {
 							recipient: Alice.to_account_id(),
 							delegated_signer: None,
@@ -911,30 +914,30 @@ fn test_votes_must_add_up() {
 						tick: 1,
 						notebook_proof: Some(proof(notebook_1_tips.clone(), 2),),
 						account_origin: AccountOrigin { notebook_number: 1, account_uid: 3 },
-						balance: 500,
+						balance: 500_000,
 					}),
 					signature: empty_signature(),
-					notes: bounded_vec![Note::create(500, NoteType::ChannelHoldSettle)],
+					notes: bounded_vec![Note::create(500_000, NoteType::ChannelHoldSettle)],
 				}
 				.sign(Ferdie.pair())
 				.clone(),
 				BalanceChange {
-					balance: 800,
+					balance: 800_000,
 					change_number: 1,
 					account_id: Alice.to_account_id(),
 					account_type: AccountType::Deposit,
 					previous_balance_proof: None,
 					channel_hold_note: None,
 					notes: bounded_vec![
-						Note::create(200, NoteType::Tax),
-						Note::create(1000, NoteType::ChannelHoldClaim),
+						Note::create(200_000, NoteType::Tax),
+						Note::create(1_000_000, NoteType::ChannelHoldClaim),
 					],
 					signature: empty_signature(),
 				}
 				.sign(Alice.pair())
 				.clone(),
 				BalanceChange {
-					balance: 1000 - 34 + 200,
+					balance: 1_000_000 - 34_000 + 200_000,
 					change_number: 2,
 					account_id: Alice.to_account_id(),
 					account_type: AccountType::Tax,
@@ -944,12 +947,12 @@ fn test_votes_must_add_up() {
 						tick: 1,
 						notebook_proof: Some(proof(notebook_1_tips.clone(), 0),),
 						account_origin: AccountOrigin { notebook_number: 1, account_uid: 1 },
-						balance: 1000,
+						balance: 1_000_000,
 					}),
 					channel_hold_note: None,
 					notes: bounded_vec![
-						Note::create(200, NoteType::Claim),
-						Note::create(34, NoteType::SendToVote),
+						Note::create(200_000, NoteType::Claim),
+						Note::create(34_000, NoteType::SendToVote),
 					],
 					signature: empty_signature(),
 				}
@@ -960,7 +963,7 @@ fn test_votes_must_add_up() {
 				BlockVote {
 					index: 0,
 					tick: channel_hold_expiration_ticks + 1,
-					power: 4,
+					power: 4_000,
 					block_hash: vote_block_hash,
 					account_id: Alice.to_account_id(),
 					block_rewards_account_id: Alice.to_account_id(),
@@ -971,7 +974,7 @@ fn test_votes_must_add_up() {
 				BlockVote {
 					index: 1,
 					tick: channel_hold_expiration_ticks + 1,
-					power: 30,
+					power: 30_000,
 					block_hash: vote_block_hash,
 					account_id: Alice.to_account_id(),
 					block_rewards_account_id: Alice.to_account_id(),
@@ -991,7 +994,7 @@ fn test_votes_must_add_up() {
 		signature: ed25519::Signature::from_raw([0u8; 64]),
 	};
 
-	notebook.header.tax = 200;
+	notebook.header.tax = 200_000;
 	notebook.header.changed_account_origins = bounded_vec![
 		AccountOrigin { notebook_number: 1, account_uid: 1 },
 		AccountOrigin { notebook_number: 1, account_uid: 2 },
@@ -1005,7 +1008,7 @@ fn test_votes_must_add_up() {
 				BalanceTip {
 					account_id: Alice.to_account_id(),
 					account_type: AccountType::Tax,
-					balance: 1000 - 34 + 200,
+					balance: 1_000_000 - 34_000 + 200_000,
 					change_number: 2,
 					account_origin: AccountOrigin { notebook_number: 1, account_uid: 1 },
 					channel_hold_note: None,
@@ -1016,7 +1019,7 @@ fn test_votes_must_add_up() {
 				BalanceTip {
 					account_id: Alice.to_account_id(),
 					account_type: AccountType::Deposit,
-					balance: 800,
+					balance: 800_000,
 					change_number: 1,
 					account_origin: AccountOrigin { notebook_number: 62, account_uid: 1 },
 					channel_hold_note: None,
@@ -1065,12 +1068,12 @@ fn test_votes_must_add_up() {
 		)
 	});
 	// 1. Test a vote minimum > the votes
-	let minimums = BTreeMap::from([(vote_block_hash, 100)]);
+	let minimums = BTreeMap::from([(vote_block_hash, 100_000)]);
 	assert_err!(
 		notebook_verify(&TestLookup, &notebook, &minimums, 2),
 		VerifyError::InsufficientBlockVoteMinimum
 	);
-	let minimums = BTreeMap::from([(vote_block_hash, 2)]);
+	let minimums = BTreeMap::from([(vote_block_hash, 2_000)]);
 
 	// 2. One of the votes had the wrong signature
 	assert_err!(

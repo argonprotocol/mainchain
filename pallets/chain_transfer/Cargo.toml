@@ -30,7 +30,7 @@ argon-notary-audit = { workspace = true }
 
 ismp = { workspace = true }
 pallet-hyperbridge = { workspace = true }
-pallet-ismp = { workspace = true }
+pallet-ismp = { workspace = true, features = ["unsigned"] }
 token-gateway-primitives = { workspace = true }
 alloy-primitives = { workspace = true }
 alloy-sol-types = { workspace = true }

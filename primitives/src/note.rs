@@ -14,7 +14,7 @@ use sp_runtime::BoundedVec;
 
 #[cfg(feature = "std")]
 use crate::serialize_unsafe_u128_as_string;
-use crate::{tick::Tick, AccountId, DomainHash, TransferToLocalchainId, ADDRESS_PREFIX};
+use crate::{tick::Tick, AccountId, Balance, DomainHash, TransferToLocalchainId, ADDRESS_PREFIX};
 
 #[derive(
 	Clone,
@@ -30,21 +30,22 @@ use crate::{tick::Tick, AccountId, DomainHash, TransferToLocalchainId, ADDRESS_P
 )]
 #[serde(rename_all = "camelCase")]
 pub struct Note {
-	/// Number of milligons transferred
+	/// Amount transferred (units are in 1/1_000_000th of an argon)
 	#[codec(compact)]
 	#[cfg_attr(feature = "std", serde(with = "serialize_unsafe_u128_as_string"))]
-	pub milligons: u128,
+	pub microgons: Balance,
 	/// Type
 	pub note_type: NoteType,
 }
 
 impl Note {
-	pub fn create(milligons: u128, note_type: NoteType) -> Self {
-		Self { milligons, note_type }
+	pub fn create(amount: Balance, note_type: NoteType) -> Self {
+		Self { microgons: amount, note_type }
 	}
 
-	pub fn calculate_transfer_tax(amount: u128) -> u128 {
-		if amount < 1000 {
+	pub fn calculate_transfer_tax(amount: Balance) -> Balance {
+		// less than one argon is percent based
+		if amount < 1_000_000 {
 			round_up(amount, TAX_PERCENT_BASE)
 		} else {
 			TRANSFER_TAX_CAP
@@ -58,13 +59,20 @@ impl Note {
 
 impl Display for Note {
 	fn fmt(&self, f: &mut Formatter<'_>) -> Result {
-		let argons = self.milligons as f64 / 1000.0;
-		if self.milligons % 1000 == 0 || self.milligons % 100 == 0 {
+		let argons = self.microgons as f64 / 1_000_000.0;
+
+		if self.microgons % 1_000_000 == 0 || self.microgons % 100_000 == 0 {
 			write!(f, "{} ₳{:.1}", self.note_type, argons)
-		} else if self.milligons % 10 == 0 {
+		} else if self.microgons % 10_000 == 0 {
 			write!(f, "{} ₳{:.2}", self.note_type, argons)
-		} else {
+		} else if self.microgons % 1_000 == 0 {
 			write!(f, "{} ₳{:.3}", self.note_type, argons)
+		} else if self.microgons % 100 == 0 {
+			write!(f, "{} ₳{:.4}", self.note_type, argons)
+		} else if self.microgons % 10 == 0 {
+			write!(f, "{} ₳{:.5}", self.note_type, argons)
+		} else {
+			write!(f, "{} ₳{:.6}", self.note_type, argons)
 		}
 	}
 }
@@ -79,12 +87,12 @@ pub fn round_up(value: u128, percentage: u128) -> u128 {
 
 pub const CHANNEL_HOLD_CLAWBACK_TICKS: Tick = 15;
 // 15 after expiration
-pub const MINIMUM_CHANNEL_HOLD_SETTLEMENT: u128 = 5u128;
+pub const MINIMUM_CHANNEL_HOLD_SETTLEMENT: Balance = 5_000u128;
 
 pub type MaxNoteRecipients = ConstU32<10>;
 
 pub const TAX_PERCENT_BASE: u128 = 20;
-pub const TRANSFER_TAX_CAP: u128 = 200;
+pub const TRANSFER_TAX_CAP: Balance = 200_000;
 
 #[derive(
 	Clone,

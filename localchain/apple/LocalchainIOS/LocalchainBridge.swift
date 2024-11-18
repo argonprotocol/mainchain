@@ -124,13 +124,13 @@ class LocalchainBridge: ObservableObject {
     }
   }
 
-  func createArgonFile(isRequesting: Bool, milligons: UInt64) async throws -> ArgonFileTransfer {
+  func createArgonFile(isRequesting: Bool, microgons: UInt64) async throws -> ArgonFileTransfer {
     guard let localchain = localchain else {
       throw AppError.runtimeError("Localchain not initialized")
     }
     if isRequesting == false {
       let balance = balance
-      if milligons > balance {
+      if microgons > balance {
         let amount = formatArgons(balance)
         throw AppError.insufficientBalance(balance: amount)
       }
@@ -138,8 +138,8 @@ class LocalchainBridge: ObservableObject {
     let txs = localchain.transactions()
     let file = try await (
       isRequesting ?
-        txs.request(milligons: String(milligons)) : txs.send(
-          milligons: String(milligons),
+        txs.request(microgons: String(microgons)) : txs.send(
+          microgons: String(microgons),
           to: nil
         )
     )
@@ -147,13 +147,13 @@ class LocalchainBridge: ObservableObject {
       await updateAccount()
     }
 
-    let amount = formatArgons(BInt(milligons))
+    let amount = formatArgons(BInt(microgons))
     return ArgonFileTransfer(name: "\(isRequesting ? "Request" : "Send") \(amount)", json: file)
   }
 }
 
-func formatArgons(_ milligons: String, digits: Int = 2) -> String {
-  formatArgons(BInt(milligons) ?? BInt(0), digits: digits)
+func formatArgons(_ microgons: String, digits: Int = 2) -> String {
+  formatArgons(BInt(microgons) ?? BInt(0), digits: digits)
 }
 
 func calculateAnnualCompoundInterest(principal: BInt, rate: Double, years: Int) -> BInt {
@@ -172,10 +172,10 @@ func currencyFormatter(_ symbol: String = "₳", digits: Int = 2) -> NumberForma
   return formatter
 }
 
-func formatArgons(_ milligons: BInt, digits: Int = 2) -> String {
-  let balanceDecimal = milligons.toDecimal()
+func formatArgons(_ microgons: BInt, digits: Int = 2) -> String {
+  let balanceDecimal = microgons.toDecimal()
 
-  let actualBalance = balanceDecimal / Decimal(1_000.0)
+  let actualBalance = balanceDecimal / Decimal(1_000_000.0)
 
   let formatter = currencyFormatter("₳", digits: digits)
   guard let formattedBalance = actualBalance.formatted(formatter) else {
@@ -185,8 +185,8 @@ func formatArgons(_ milligons: BInt, digits: Int = 2) -> String {
   return formattedBalance
 }
 
-func formatCents(_ milligons: BInt) -> String {
-  String(milligons % BInt(1_000) / BInt(10)).padding(toLength: 2, withPad: "0", startingAt: 0)
+func formatCents(_ microgons: BInt) -> String {
+  String(microgons % BInt(1_000_000) / BInt(10)).padding(toLength: 2, withPad: "0", startingAt: 0)
 }
 
 extension BInt {

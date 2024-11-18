@@ -129,8 +129,8 @@ parameter_types! {
 	pub const DefaultChannelHoldDuration: Tick = 60;
 	pub const HistoricalPaymentAddressTicksToKeep: Tick = DefaultChannelHoldDuration::get() + CHANNEL_HOLD_CLAWBACK_TICKS + 10;
 
-	pub const ArgonsPerBlock: u32 = 5_000;
-	pub const StartingOwnershipTokensPerBlock: u32 = 5_000;
+	pub const ArgonsPerBlock: u32 = 5_000_000;
+	pub const StartingOwnershipTokensPerBlock: u32 = 5_000_000;
 	pub const HalvingBlocks: u32 = 2_100_000; // based on bitcoin, but 10x since we're 1 block per minute
 	pub const MaturationBlocks: u32 = 5;
 	pub const MinerPayoutPercent: FixedU128 = FixedU128::from_rational(75, 100);
@@ -141,13 +141,13 @@ impl pallet_block_seal_spec::Config for Runtime {
 	type RuntimeEvent = RuntimeEvent;
 	type TargetComputeBlockPercent = TargetComputeBlockPercent;
 	type AuthorityProvider = MiningSlot;
+	type MaxActiveNotaries = MaxActiveNotaries;
 	type NotebookProvider = Notebook;
+	type TickProvider = Ticks;
 	type WeightInfo = pallet_block_seal_spec::weights::SubstrateWeight<Runtime>;
 	type TargetBlockVotes = TargetBlockVotes;
 	type ChangePeriod = SealSpecMinimumsChangePeriod;
 	type SealInherent = BlockSeal;
-	type TickProvider = Ticks;
-	type MaxActiveNotaries = MaxActiveNotaries;
 }
 
 pub struct NotebookTickProvider;
@@ -214,8 +214,8 @@ parameter_types! {
 	pub const OwnershipPercentAdjustmentDamper: FixedU128 = FixedU128::from_rational(20, 100);
 	pub const TargetBidsPerSlot: u32 = 1_200; // 20% extra bids
 
-	pub const MaxConcurrentlyExpiringBonds: u32 = 1000;
-	pub const MinimumBondAmount: u128 = 1_000;
+	pub const MaxConcurrentlyExpiringBonds: u32 = 1_000;
+	pub const MinimumBondAmount: u128 = 1_000_000;
 	pub const BlocksPerDay: u32 = 1440;
 	pub const BlocksPerYear: u32 = 1440 * 365;
 
@@ -507,7 +507,7 @@ impl pallet_proxy::Config for Runtime {
 parameter_types! {
 	pub const BitcoinBondDuration: u32 = 60 * 24 * 365; // 1 year
 	pub const MaxPendingMintUtxos: u32 = 10_000;
-	pub const MaxTrackedUtxos: u32 = 18_000_000;
+	pub const MaxTrackedUtxos: u32 = 1_000_000_000;
 
 	pub const MaxDowntimeTicksBeforeReset: Tick = 60; // 1 hour
 	pub const MaxHistoryToKeep: u32 = 24 * 60; // 1 day worth of prices

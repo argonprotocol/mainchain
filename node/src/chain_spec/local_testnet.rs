@@ -53,7 +53,7 @@ pub fn local_testnet_config() -> Result<ChainSpec, String> {
 			(get_account_id_from_seed::<sr25519::Public>("Ferdie"), 100_000_000),
 			(get_account_id_from_seed::<sr25519::Public>("Ferdie//notary"), 100_000_000),
 		],
-		initial_vote_minimum: 1,
+		initial_vote_minimum: 1_000,
 		initial_difficulty: (TICK_MILLIS * HASHES_PER_SECOND / 1_000) as ComputeDifficulty,
 		tick_millis: TICK_MILLIS,
 		initial_notaries: vec![GenesisNotary {

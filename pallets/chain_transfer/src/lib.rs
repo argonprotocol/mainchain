@@ -697,13 +697,13 @@ pub mod pallet {
 			notary_id: NotaryId,
 			transfer_id: TransferToLocalchainId,
 			account_id: &<T as frame_system::Config>::AccountId,
-			milligons: <T as Config>::Balance,
+			microgons: <T as Config>::Balance,
 			at_tick: Tick,
 		) -> bool {
 			let result = <PendingTransfersOut<T>>::get(transfer_id);
 			if let Some(transfer) = result {
 				return transfer.notary_id == notary_id &&
-					transfer.amount == milligons &&
+					transfer.amount == microgons &&
 					transfer.account_id == *account_id &&
 					transfer.expiration_tick >= at_tick;
 			}

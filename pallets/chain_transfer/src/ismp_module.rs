@@ -467,12 +467,12 @@ mod tests {
 		let converted_balance = convert_to_balance(supposedly_small_u256).unwrap();
 		println!("{}", converted_balance);
 
-		let argon = 1_000u128;
+		let argon = 1_000_000u128;
 
 		assert_eq!(converted_balance, argon);
 
 		// Convert 1 argon to erc20
-		let argon = 1_908u128;
+		let argon = 1_908_000u128;
 		let erc_20_val = convert_to_erc20(argon);
 		assert_eq!(erc_20_val, U256::from_dec_str("1908000000000000000").unwrap());
 	}
@@ -495,7 +495,7 @@ mod tests {
 
 	#[test]
 	fn can_create_evm_body() {
-		let amount = 1_009u128;
+		let amount = 1_009_000u128;
 		let from = Bob.to_account_id();
 		let to = H160([8u8; 20]);
 		let body = super::Body::send_to_evm(amount, Asset::Argon.asset_id(), from, to);

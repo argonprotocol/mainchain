@@ -288,7 +288,7 @@ async fn create_vault(
 			client.fetch_storage(&storage().system().account(&vault_account), None).await?
 		{
 			println!("Alice argon balance {:#?}", alice_balance.data.free);
-			if alice_balance.data.free > 100_001_000 {
+			if alice_balance.data.free > 100_001_000_000 {
 				println!("Alice can start a vault now!");
 				break;
 			}

@@ -97,8 +97,8 @@ describeIntegration("ChannelHold integration", () => {
         const domainHash = DomainStore.getHash("example.analytics");
         {
             const [bobChange, ferdieChange] = await Promise.all([
-                transferMainchainToLocalchain(mainchainClient, bobchain, bob, 5200, 1),
-                transferMainchainToLocalchain(mainchainClient, ferdiechain, ferdiekeys.defaultPair, 5000, 1),
+                transferMainchainToLocalchain(mainchainClient, bobchain, bob, 5_200_000, 1),
+                transferMainchainToLocalchain(mainchainClient, ferdiechain, ferdiekeys.defaultPair, 5_000_000, 1),
             ]);
             await ferdieChange.notarization.leaseDomain("example.Analytics", ferdiekeys.address);
             let [ferdieTracker] = await Promise.all([
@@ -128,34 +128,34 @@ describeIntegration("ChannelHold integration", () => {
         expect(zoneRecord.notaryId).toBe(1);
         expect(zoneRecord.paymentAddress).toBe(ferdiekeys.address);
         const channelHoldFunding = bobchain.beginChange();
-        const jumpAccount = await channelHoldFunding.fundJumpAccount(5200n);
+        const jumpAccount = await channelHoldFunding.fundJumpAccount(5_200_000n);
         await channelHoldFunding.notarize();
 
         const bobChannelHold = bobchain.beginChange();
         const change = await bobChannelHold.addAccountById(jumpAccount.localAccountId);
-        await change.createChannelHold(5000n, zoneRecord.paymentAddress, "example.Analytics",);
+        await change.createChannelHold(5_000_000n, zoneRecord.paymentAddress, "example.Analytics",);
         const holdTracker = await bobChannelHold.notarizeAndWaitForNotebook();
 
         const clientChannelHold = await bobchain.openChannelHolds.openClientChannelHold(jumpAccount.localAccountId);
-        await clientChannelHold.sign(5n);
+        await clientChannelHold.sign(5_000_000n);
         const channelHoldJson = await clientChannelHold.exportForSend();
         {
             const parsed = JSON.parse(channelHoldJson.toString());
             console.log(parsed)
             expect(parsed).toBeTruthy();
             expect(parsed.channelHoldNote).toBeTruthy();
-            expect(parsed.channelHoldNote.milligons).toBe(5000);
-            expect(parsed.notes[0].milligons).toBe(5);
-            expect(parsed.balance).toBe(parsed.previousBalanceProof.balance - 5);
+            expect(parsed.channelHoldNote.microgons).toBe(5_000_000);
+            expect(parsed.notes[0].microgons).toBe(5_000_000);
+            expect(parsed.balance).toBe(parsed.previousBalanceProof.balance - 5_000_000);
         }
 
         const ferdieChannelHoldRecord = await ferdiechain.openChannelHolds.importChannelHold(channelHoldJson);
 
         // get to 2500 in channelHold costs so that 20% is 500 (minimum vote)
         for (let i = 0n; i <= 10n; i++) {
-            const next = await clientChannelHold.sign(500n + i * 200n,);
+            const next = await clientChannelHold.sign(5_000n + i * 200n,);
             // now we would send to ferdie
-            await expect(ferdieChannelHoldRecord.recordUpdatedSettlement(next.milligons, next.signature)).resolves.toBeUndefined();
+            await expect(ferdieChannelHoldRecord.recordUpdatedSettlement(next.microgons, next.signature)).resolves.toBeUndefined();
         }
 
         // now ferdie goes to claim it

@@ -87,7 +87,7 @@ pub type VaultId = u32;
 pub type HashOutput = H256;
 pub type BlockHash = BlakeTwo256;
 
-pub const TOKEN_DECIMALS: u8 = 3;
+pub const TOKEN_DECIMALS: u8 = 6;
 
 pub const ARGON_TOKEN_SYMBOL: &str = "ARGON";
 pub const OWNERSHIP_TOKEN_SYMBOL: &str = "ARGOWN";

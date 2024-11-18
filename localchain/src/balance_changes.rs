@@ -647,7 +647,7 @@ mod test {
     next.balance = 200;
     next.notes = bounded_vec![Note {
       note_type: NoteType::Claim,
-      milligons: 100
+      microgons: 100
     }];
     let mut tx = pool.begin().await?;
     let id2 =

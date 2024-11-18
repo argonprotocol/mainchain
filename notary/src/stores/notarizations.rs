@@ -329,7 +329,7 @@ impl NotarizationsStore {
 							tick,
 							&account_id,
 							transfer_id,
-							note.milligons,
+							note.microgons,
 							change_index,
 							note_index,
 						)
@@ -341,7 +341,7 @@ impl NotarizationsStore {
 							&mut tx,
 							current_notebook_number,
 							&account_id,
-							note.milligons,
+							note.microgons,
 						)
 						.await
 						.map(|_| ())

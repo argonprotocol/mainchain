@@ -24,7 +24,7 @@ use crate::{
 
 #[test]
 fn it_will_adjust_minimum() {
-	new_test_ext(1000, 100).execute_with(|| {
+	new_test_ext(1_000_000, 100).execute_with(|| {
 		// Go past genesis block so events get deposited
 		System::set_block_number(1);
 
@@ -48,14 +48,14 @@ fn it_will_adjust_minimum() {
 
 		BlockSealSpec::update_vote_minimum(11, 2, 0);
 
-		assert_eq!(BlockSealSpec::vote_minimum(), 901);
+		assert_eq!(BlockSealSpec::vote_minimum(), 901_000);
 		assert_eq!(PastBlockVotes::<Test>::get(), vec![(11, 2, 0)]);
 		System::assert_last_event(
 			Event::VoteMinimumAdjusted {
 				start_vote_minimum,
 				actual_block_votes: 901,
 				expected_block_votes: 1000,
-				new_vote_minimum: 901,
+				new_vote_minimum: 901_000,
 			}
 			.into(),
 		);

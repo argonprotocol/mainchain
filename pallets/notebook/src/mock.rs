@@ -91,14 +91,14 @@ impl ChainTransferLookup<AccountId32, Balance> for ChainTransferLookupImpl {
 		notary_id: NotaryId,
 		transfer_to_localchain_id: TransferToLocalchainId,
 		account_id: &AccountId32,
-		milligons: Balance,
+		microgons: Balance,
 		_for_notebook_tick: Tick,
 	) -> bool {
 		ChainTransfers::get().iter().any(|(id, acc, tid, t_mill)| {
 			*id == notary_id &&
 				*acc == *account_id &&
 				*tid == transfer_to_localchain_id &&
-				*t_mill == milligons
+				*t_mill == microgons
 		})
 	}
 }

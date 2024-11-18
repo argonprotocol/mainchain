@@ -13,7 +13,7 @@ pub const NOTARIZATION_MAX_BLOCK_VOTES: u32 = argon_primitives::MAX_BLOCK_VOTES_
 #[cfg_attr(feature = "napi", napi)]
 pub const CHANNEL_HOLD_CLAWBACK_TICKS: i64 = argon_primitives::CHANNEL_HOLD_CLAWBACK_TICKS as i64;
 
-/// Minimum milligons that can be settled in a channel_hold
+/// Minimum amount that can be settled in a channel_hold
 #[cfg_attr(feature = "napi", napi)]
 pub const CHANNEL_HOLD_MINIMUM_SETTLEMENT: u128 = argon_primitives::MINIMUM_CHANNEL_HOLD_SETTLEMENT;
 

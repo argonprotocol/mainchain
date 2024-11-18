@@ -547,7 +547,7 @@ mod test {
     builder
       .claim_from_mainchain(LocalchainTransfer {
         address,
-        amount: 20_000u128,
+        amount: 20_000_000u128,
         notary_id: 1,
         expiration_tick: 500,
         transfer_id: 1,
@@ -557,7 +557,7 @@ mod test {
 
     builder
       .create_channel_hold(
-        1_000u128,
+        1_000_000u128,
         payment_address.clone(),
         Some("test.flights".to_string()),
         None,
@@ -567,7 +567,7 @@ mod test {
 
     let balance_change = builder.inner().await;
     // no funds move yet
-    assert_eq!(balance_change.balance, 20_000);
+    assert_eq!(balance_change.balance, 20_000_000);
     assert_eq!(balance_change.notes.len(), 2);
 
     let alice = Alice.to_account_id();

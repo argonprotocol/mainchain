@@ -516,12 +516,12 @@ where
         })
         .await?;
         let transactions = localchain.transactions();
-        let milligons = (argons * 1_000.0) as u128;
+        let microgons = (argons * 1_000_000.0) as u128;
 
-        let result = transactions.send(milligons, to.map(|a| vec![a])).await?;
+        let result = transactions.send(microgons, to.map(|a| vec![a])).await?;
         let filename = save_to_path.unwrap_or_else(|| {
           let mut path = env::temp_dir();
-          let argons = format_argons(milligons);
+          let argons = format_argons(microgons);
           path.push(format!("Send {}.argon", argons));
           path
             .to_str()
@@ -558,7 +558,7 @@ where
         transfer_args: TransferArgs { argons },
         keystore_password,
       } => {
-        let milligons = (argons * 1_000.0) as u128;
+        let microgons = (argons * 1_000_000.0) as u128;
         let localchain = Localchain::load(LocalchainConfig {
           path,
           mainchain_url,
@@ -568,7 +568,7 @@ where
         .await?;
         let mainchain_transfers = localchain.mainchain_transfers();
         let transfer = mainchain_transfers
-          .send_to_localchain(milligons, None)
+          .send_to_localchain(microgons, None)
           .await?;
         localchain.balance_sync().sync(None).await?;
         let details = mainchain_transfers.get(transfer.transfer_id).await?;
@@ -582,7 +582,7 @@ where
         wait_for_immortalized,
         keystore_password,
       } => {
-        let milligons = (argons * 1_000.0) as u128;
+        let microgons = (argons * 1_000_000.0) as u128;
         let localchain = Localchain::load(LocalchainConfig {
           path,
           mainchain_url,
@@ -595,7 +595,7 @@ where
           "Mainchain client not available. Ensure a mainchain url was provided."
         ))?;
         let main_account = change.default_deposit_account().await?;
-        main_account.send_to_mainchain(milligons).await?;
+        main_account.send_to_mainchain(microgons).await?;
         let notarization_tracker = change.notarize().await?;
         localchain.balance_sync().sync(None).await?;
         if wait_for_immortalized {
@@ -604,13 +604,13 @@ where
             .await?;
           println!(
             "Sent {} argons to mainchain. Immortalized in notebook {}",
-            format_argons(milligons),
+            format_argons(microgons),
             notarization_tracker.notebook_number
           );
         } else {
           println!(
             "Sent {} argons to mainchain. Will be included in notebook {}",
-            format_argons(milligons),
+            format_argons(microgons),
             notarization_tracker.notebook_number
           );
         }

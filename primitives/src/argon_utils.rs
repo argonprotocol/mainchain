@@ -6,8 +6,8 @@ use alloc::{
 
 pub fn format_argons(argons: u128) -> String {
 	let value = argons;
-	let whole_part = value / 1_000; // Extract the whole part
-	let decimal_part = (value % 1_000) / 10; // Extract the decimal part, considering only 2 decimal places
+	let whole_part = value / 1_000_000; // Extract the whole part
+	let decimal_part = (value % 1_000_000) / 10_000; // Extract the decimal part, considering only 2 decimal places
 	let whole_part_str = insert_commas(whole_part);
 
 	if decimal_part == 0 {

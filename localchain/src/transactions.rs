@@ -88,18 +88,18 @@ impl Transactions {
     Self::create_static(&mut db, transaction_type).await
   }
 
-  pub async fn request(&self, milligons: Balance) -> Result<String> {
+  pub async fn request(&self, microgons: Balance) -> Result<String> {
     let transaction = self.create(TransactionType::Request).await?;
 
     let jump_notarization = self.new_notarization();
     jump_notarization.set_transaction(transaction).await;
-    let milligons_plus_tax = jump_notarization.get_total_for_after_tax_balance(milligons);
+    let microgons_plus_tax = jump_notarization.get_total_for_after_tax_balance(microgons);
     let jump_account = jump_notarization
       .get_jump_account(AccountType::Deposit)
       .await?;
     let _ = jump_notarization
       .claim_and_pay_tax(
-        milligons_plus_tax,
+        microgons_plus_tax,
         Some(jump_account.local_account_id),
         false,
       )
@@ -113,7 +113,7 @@ impl Transactions {
 
   pub async fn create_channel_hold(
     &self,
-    channel_hold_milligons: Balance,
+    channel_hold_microgons: Balance,
     recipient_address: String,
     domain: Option<String>,
     notary_id: Option<u32>,
@@ -126,9 +126,9 @@ impl Transactions {
     let transaction = self.create(TransactionType::OpenChannelHold).await?;
     jump_notarization.set_transaction(transaction.clone()).await;
 
-    let channel_hold_milligons = channel_hold_milligons.max(CHANNEL_HOLD_MINIMUM_SETTLEMENT);
+    let channel_hold_microgons = channel_hold_microgons.max(CHANNEL_HOLD_MINIMUM_SETTLEMENT);
 
-    let amount_plus_tax = jump_notarization.get_total_for_after_tax_balance(channel_hold_milligons);
+    let amount_plus_tax = jump_notarization.get_total_for_after_tax_balance(channel_hold_microgons);
     let jump_account = jump_notarization.fund_jump_account(amount_plus_tax).await?;
     let _ = jump_notarization.notarize().await?;
 
@@ -140,7 +140,7 @@ impl Transactions {
 
     balance_change
       .create_channel_hold(
-        channel_hold_milligons,
+        channel_hold_microgons,
         recipient_address,
         domain,
         delegated_signer_address,
@@ -160,14 +160,14 @@ impl Transactions {
     Ok(open_channel_hold)
   }
 
-  pub async fn send(&self, milligons: u128, to: Option<Vec<String>>) -> Result<String> {
+  pub async fn send(&self, microgons: u128, to: Option<Vec<String>>) -> Result<String> {
     let jump_notarization = self.new_notarization();
     let transaction = self.create(TransactionType::Send).await?;
     jump_notarization.set_transaction(transaction.clone()).await;
-    let jump_account = jump_notarization.fund_jump_account(milligons).await?;
+    let jump_account = jump_notarization.fund_jump_account(microgons).await?;
     let _ = jump_notarization.notarize().await?;
 
-    let amount = milligons;
+    let amount = microgons;
     let tax = Note::calculate_transfer_tax(amount);
 
     let fund_notarization = self.new_notarization();
@@ -228,14 +228,14 @@ pub mod napi_ext {
     }
 
     #[napi(js_name = "request")]
-    pub async fn request_napi(&self, milligons: BigInt) -> napi::Result<String> {
-      self.request(milligons.get_u128().1).await.napi_ok()
+    pub async fn request_napi(&self, microgons: BigInt) -> napi::Result<String> {
+      self.request(microgons.get_u128().1).await.napi_ok()
     }
 
     #[napi(js_name = "createChannelHold")]
     pub async fn create_channel_hold_napi(
       &self,
-      channel_hold_milligons: BigInt,
+      channel_hold_microgons: BigInt,
       recipient_address: String,
       domain: Option<String>,
       notary_id: Option<u32>,
@@ -243,7 +243,7 @@ pub mod napi_ext {
     ) -> napi::Result<OpenChannelHold> {
       self
         .create_channel_hold(
-          channel_hold_milligons.get_u128().1,
+          channel_hold_microgons.get_u128().1,
           recipient_address,
           domain,
           notary_id,
@@ -256,10 +256,10 @@ pub mod napi_ext {
     #[napi(js_name = "send")]
     pub async fn send_napi(
       &self,
-      milligons: BigInt,
+      microgons: BigInt,
       to: Option<Vec<String>>,
     ) -> napi::Result<String> {
-      self.send(milligons.get_u128().1, to).await.napi_ok()
+      self.send(microgons.get_u128().1, to).await.napi_ok()
     }
 
     #[napi(js_name = "importArgons")]
@@ -300,24 +300,24 @@ pub mod uniffi_ext {
     }
 
     #[uniffi::method(name = "request")]
-    pub async fn request_uniffi(&self, milligons: String) -> UniffiResult<String> {
-      let milligons = milligons
+    pub async fn request_uniffi(&self, microgons: String) -> UniffiResult<String> {
+      let microgons = microgons
         .parse::<u128>()
         .map_err(|e| anyhow!("Could not parse the milligon value -> {:?}", e))?;
-      Ok(self.request(milligons).await?)
+      Ok(self.request(microgons).await?)
     }
 
     #[uniffi::method(name = "send")]
     pub async fn send_uniffi(
       &self,
-      milligons: String,
+      microgons: String,
       to: Option<Vec<String>>,
     ) -> UniffiResult<String> {
-      let milligons = milligons
+      let microgons = microgons
         .parse::<u128>()
         .map_err(|e| anyhow!("Could not parse the milligon value -> {:?}", e))?;
 
-      Ok(self.send(milligons, to).await?)
+      Ok(self.send(microgons, to).await?)
     }
 
     #[uniffi::method(name = "importArgons")]
@@ -364,14 +364,14 @@ mod tests {
     mock_notary
       .create_claim_from_mainchain(
         alice_localchain.begin_change(),
-        5_000u128,
+        5_000_000u128,
         Alice.to_account_id(),
       )
       .await?;
 
     let alice_json = alice_localchain
       .transactions()
-      .send(3500_u128, Some(vec![bob_localchain.address().await?]))
+      .send(3_500_000_u128, Some(vec![bob_localchain.address().await?]))
       .await?;
 
     let bob_builder = bob_localchain.begin_change();
@@ -397,7 +397,7 @@ mod tests {
         );
         if account.account_type == AccountType::Tax {
           if account.hd_path.is_some() {
-            assert_eq!(latest.balance, "200");
+            assert_eq!(latest.balance, "200000");
             assert!(latest.transaction_id.is_some());
             assert_eq!(latest.change_number, 1);
           }
@@ -407,7 +407,7 @@ mod tests {
           assert!(latest.transaction_id.is_some());
           assert_eq!(latest.change_number, 2);
         } else {
-          assert_eq!(latest.balance, "1500");
+          assert_eq!(latest.balance, "1500000");
           assert_eq!(latest.status, BalanceChangeStatus::Notarized);
           assert!(latest.transaction_id.is_some());
           assert_eq!(latest.change_number, 2);
@@ -434,9 +434,9 @@ mod tests {
         .await?
         .expect("Bob accounts should have balance");
       if account.account_type == AccountType::Tax {
-        assert_eq!(latest.balance, "200");
+        assert_eq!(latest.balance, "200000");
       } else {
-        assert_eq!(latest.balance, "3100");
+        assert_eq!(latest.balance, "3100000");
       }
       tips.push(latest.get_balance_tip(&account)?);
     }
@@ -461,7 +461,7 @@ mod tests {
             assert_eq!(latest.status, BalanceChangeStatus::Notarized);
             assert_eq!(latest.change_number, 2);
           } else {
-            assert_eq!(latest.balance, "200");
+            assert_eq!(latest.balance, "200000");
             assert_eq!(latest.status, BalanceChangeStatus::Notarized);
             assert_eq!(latest.change_number, 1);
           }
@@ -471,7 +471,7 @@ mod tests {
           assert!(latest.transaction_id.is_some());
           assert_eq!(latest.change_number, 2);
         } else {
-          assert_eq!(latest.balance, "1500");
+          assert_eq!(latest.balance, "1500000");
           assert_eq!(latest.status, BalanceChangeStatus::NotebookPublished);
           assert!(latest.transaction_id.is_some());
           assert_eq!(latest.change_number, 2);
@@ -490,10 +490,10 @@ mod tests {
         account.hd_path, account.account_type, latest
       );
       if account.account_type == AccountType::Tax {
-        assert_eq!(latest.balance, "200");
+        assert_eq!(latest.balance, "200000");
         assert_eq!(latest.status, BalanceChangeStatus::NotebookPublished);
       } else {
-        assert_eq!(latest.balance, "3100");
+        assert_eq!(latest.balance, "3100000");
         assert_eq!(latest.status, BalanceChangeStatus::NotebookPublished);
       }
     }
@@ -525,7 +525,7 @@ mod tests {
     mock_notary
       .create_claim_from_mainchain(
         alice_localchain.begin_change(),
-        5_000u128,
+        5_000_000u128,
         Alice.to_account_id(),
       )
       .await?;
@@ -534,13 +534,16 @@ mod tests {
     mock_notary
       .create_claim_from_mainchain(
         bob_localchain.begin_change(),
-        200u128,
+        200_000u128,
         Ed25519Keyring::Bob.to_account_id(),
       )
       .await?;
 
     println!("Bob requesting");
-    let bob_request_json = bob_localchain.transactions().request(3500_u128).await?;
+    let bob_request_json = bob_localchain
+      .transactions()
+      .request(3_500_000_u128)
+      .await?;
 
     let alice_builder = alice_localchain.begin_change();
     alice_builder
@@ -567,7 +570,7 @@ mod tests {
         if account.account_type == AccountType::Tax {
           assert_eq!(latest.balance, "0");
         } else {
-          assert_eq!(latest.balance, "1300");
+          assert_eq!(latest.balance, "1300000");
           assert_eq!(latest.status, BalanceChangeStatus::Notarized);
           assert_eq!(latest.change_number, 2);
         }
@@ -602,18 +605,18 @@ mod tests {
           assert_eq!(latest.balance, "0");
           assert_eq!(latest.change_number, 1);
         } else {
-          assert_eq!(latest.balance, "200");
+          assert_eq!(latest.balance, "200000");
           assert!(latest.transaction_id.is_some());
           assert_eq!(latest.change_number, 1);
         }
       } else if account.hd_path.is_some() {
-        assert_eq!(latest.balance, "3500");
+        assert_eq!(latest.balance, "3500000");
         assert_eq!(latest.status, BalanceChangeStatus::WaitingForSendClaim);
         assert!(latest.transaction_id.is_some());
         assert_eq!(latest.change_number, 1);
       } else {
         // this is still the claim from mainchain
-        assert_eq!(latest.balance, "200");
+        assert_eq!(latest.balance, "200000");
         assert_eq!(latest.status, BalanceChangeStatus::NotebookPublished);
         assert_eq!(latest.change_number, 1);
       }
@@ -642,7 +645,7 @@ mod tests {
             assert_eq!(latest.status, BalanceChangeStatus::Notarized);
             assert_eq!(latest.change_number, 2);
           } else {
-            assert_eq!(latest.balance, "200");
+            assert_eq!(latest.balance, "200000");
             assert_eq!(latest.status, BalanceChangeStatus::Notarized);
             assert_eq!(latest.change_number, 1);
           }
@@ -652,7 +655,7 @@ mod tests {
           assert!(latest.transaction_id.is_some());
           assert_eq!(latest.change_number, 2);
         } else {
-          assert_eq!(latest.balance, "1300");
+          assert_eq!(latest.balance, "1300000");
           assert_eq!(latest.status, BalanceChangeStatus::NotebookPublished);
           assert_eq!(latest.change_number, 2);
         }
@@ -674,7 +677,7 @@ mod tests {
           assert_eq!(latest.balance, "0");
           assert_eq!(latest.change_number, 2);
         } else {
-          assert_eq!(latest.balance, "400");
+          assert_eq!(latest.balance, "400000");
           assert_eq!(latest.change_number, 2);
         }
       } else if account.hd_path.is_some() {
@@ -682,10 +685,10 @@ mod tests {
         assert_eq!(latest.balance, "0");
         assert_eq!(latest.status, BalanceChangeStatus::Notarized);
         assert!(latest.transaction_id.is_some());
-        assert_eq!(latest.net_balance_change, "-3500");
+        assert_eq!(latest.net_balance_change, "-3500000");
         assert_eq!(latest.change_number, 2);
       } else {
-        assert_eq!(latest.balance, "3500");
+        assert_eq!(latest.balance, "3500000");
         assert_eq!(latest.status, BalanceChangeStatus::Notarized);
         assert_eq!(latest.change_number, 2);
       }

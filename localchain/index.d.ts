@@ -239,8 +239,8 @@ export class NotarizationBuilder {
   getTotalForAfterTaxBalance(finalBalance: bigint): bigint
   getChannelHoldTaxAmount(amount: bigint): bigint
   claimFromMainchain(transfer: LocalchainTransfer): Promise<BalanceChangeBuilder>
-  claimAndPayTax(milligonsPlusTax: bigint, depositAccountId: number | undefined | null, useDefaultTaxAccount: boolean): Promise<BalanceChangeBuilder>
-  fundJumpAccount(milligons: bigint): Promise<BalanceChangeBuilder>
+  claimAndPayTax(microgonsPlusTax: bigint, depositAccountId: number | undefined | null, useDefaultTaxAccount: boolean): Promise<BalanceChangeBuilder>
+  fundJumpAccount(microgons: bigint): Promise<BalanceChangeBuilder>
   acceptArgonFileRequest(argonFileJson: string): Promise<void>
   importArgonFile(argonFileJson: string): Promise<void>
   /**
@@ -292,7 +292,7 @@ export class OpenChannelHold {
   get channelHold(): Promise<ChannelHold>
   sign(settledAmount: bigint): Promise<SignatureResult>
   exportForSend(): Promise<string>
-  recordUpdatedSettlement(milligons: bigint, signature: Uint8Array): Promise<void>
+  recordUpdatedSettlement(microgons: bigint, signature: Uint8Array): Promise<void>
 }
 
 export class OpenChannelHoldsStore {
@@ -319,9 +319,9 @@ export class TickerRef {
 
 export class Transactions {
   create(transactionType: TransactionType): Promise<LocalchainTransaction>
-  request(milligons: bigint): Promise<string>
-  createChannelHold(channelHoldMilligons: bigint, recipientAddress: string, domain?: string | undefined | null, notaryId?: number | undefined | null, delegatedSignerAddress?: string | undefined | null): Promise<OpenChannelHold>
-  send(milligons: bigint, to?: Array<string> | undefined | null): Promise<string>
+  request(microgons: bigint): Promise<string>
+  createChannelHold(channelHoldMicrogons: bigint, recipientAddress: string, domain?: string | undefined | null, notaryId?: number | undefined | null, delegatedSignerAddress?: string | undefined | null): Promise<OpenChannelHold>
+  send(microgons: bigint, to?: Array<string> | undefined | null): Promise<string>
   importArgons(argonFile: string): Promise<NotarizationTracker>
   acceptArgonRequest(argonFile: string): Promise<NotarizationTracker>
 }
@@ -447,7 +447,7 @@ export interface ChainIdentity {
 /** Number of ticks past the expiration of a channel_hold that a recipient has to claim. After this point, sender can recoup the channel_holded funds */
 export const CHANNEL_HOLD_CLAWBACK_TICKS: number
 
-/** Minimum milligons that can be settled in a channel_hold */
+/** Minimum amount that can be settled in a channel_hold */
 export const CHANNEL_HOLD_MINIMUM_SETTLEMENT: bigint
 
 export interface ChannelHold {
@@ -634,7 +634,7 @@ export declare function runCli(): Promise<void>
 
 export interface SignatureResult {
   signature: Uint8Array
-  milligons: bigint
+  microgons: bigint
 }
 
 export interface Ticker {

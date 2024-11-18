@@ -61,13 +61,13 @@ pub fn testnet_config() -> Result<ChainSpec, String> {
 			price_index_operator: price_oracle.clone(),
 			endowed_accounts: vec![
 				// funds for the sudo account
-				(sudo_account, 10_000),
+				(sudo_account, 10_000_000),
 				// basic funds so an oracle can submit a price
-				(bitcoin_oracle, 1_000),
+				(bitcoin_oracle, 1_000_000),
 				// oracle funds
-				(price_oracle, 1_000),
+				(price_oracle, 1_000_000),
 			],
-			initial_vote_minimum: 1,
+			initial_vote_minimum: 1_000,
 			initial_difficulty: (TICK_MILLIS * HASHES_PER_SECOND / 1_000) as ComputeDifficulty,
 			tick_millis: TICK_MILLIS,
 			initial_notaries: vec![GenesisNotary {

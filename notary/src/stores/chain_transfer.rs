@@ -50,7 +50,7 @@ impl ChainTransferStore {
 		db: &mut PgConnection,
 		notebook_number: NotebookNumber,
 		account_id: &AccountId,
-		milligons: u128,
+		microgons: u128,
 	) -> anyhow::Result<(), Error> {
 		let res = query!(
 			r#"
@@ -58,7 +58,7 @@ impl ChainTransferStore {
 			SELECT $1, $2, $3, $4
 			"#,
 			false,
-			milligons.to_string(),
+			microgons.to_string(),
 			account_id.as_slice(),
 			notebook_number as i32,
 		)
@@ -134,14 +134,14 @@ impl ChainTransferStore {
 		expiration_tick: Tick,
 		account_id: &AccountId,
 		transfer_id: TransferToLocalchainId,
-		milligons: u128,
+		microgons: u128,
 	) -> anyhow::Result<()> {
 		let res = query!(
 			r#"
 			INSERT INTO chain_transfers (to_localchain, amount, account_id, transfer_id, finalized_block_number, expiration_tick) VALUES ($1, $2, $3, $4, $5, $6)
 			"#,
 			true,
-			milligons.to_string(),
+			microgons.to_string(),
 			account_id.as_slice(),
 			transfer_id as i32,
 			finalized_block_number as i32,
@@ -191,7 +191,7 @@ mod tests {
 		let notebook_number = 1;
 		let account_id = Bob.to_account_id();
 		let transfer_id = 1;
-		let milligons = 1000;
+		let microgons = 1000;
 		let change_index = 0;
 		let note_index = 0;
 		{
@@ -203,7 +203,7 @@ mod tests {
 					100,
 					&account_id,
 					transfer_id,
-					milligons
+					microgons
 				)
 				.await
 			);
@@ -218,7 +218,7 @@ mod tests {
 					10,
 					&account_id,
 					transfer_id,
-					milligons,
+					microgons,
 					change_index,
 					note_index,
 				)
@@ -256,7 +256,7 @@ mod tests {
 		let notebook_number = 1;
 		let account_id = Bob.to_account_id();
 		let transfer_id = 1;
-		let milligons = 1000;
+		let microgons = 1000;
 		let change_index = 0;
 		let note_index = 0;
 
@@ -268,7 +268,7 @@ mod tests {
 				100,
 				&account_id,
 				transfer_id,
-				milligons
+				microgons
 			)
 			.await
 		);
@@ -279,7 +279,7 @@ mod tests {
 				1,
 				&account_id,
 				transfer_id,
-				milligons,
+				microgons,
 				change_index,
 				note_index,
 			)
@@ -292,7 +292,7 @@ mod tests {
 			1,
 			&account_id,
 			transfer_id,
-			milligons,
+			microgons,
 			change_index,
 			note_index,
 		)
@@ -320,7 +320,7 @@ mod tests {
 		let notebook_number = 1;
 		let account_id = Bob.to_account_id();
 		let transfer_id = 1;
-		let milligons = 1000;
+		let microgons = 1000;
 		let change_index = 0;
 		let note_index = 0;
 
@@ -332,7 +332,7 @@ mod tests {
 				10,
 				&account_id,
 				transfer_id,
-				milligons
+				microgons
 			)
 			.await
 		);
@@ -343,7 +343,7 @@ mod tests {
 			11,
 			&account_id,
 			transfer_id,
-			milligons,
+			microgons,
 			change_index,
 			note_index,
 		)

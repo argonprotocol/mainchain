@@ -299,10 +299,11 @@ mod tests {
 
 		activate_notary(&pool, &ctx.client.live, &bob_id).await?;
 
-		let bob_balance = 8000;
+		let bob_balance = 8_000_000;
 		// Submit a transfer to localchain and wait for result
 		let bob_transfer = create_localchain_transfer(&ctx.client.live, Bob, bob_balance).await?;
-		let ferdie_transfer = create_localchain_transfer(&ctx.client.live, Ferdie, 1000).await?;
+		let ferdie_transfer =
+			create_localchain_transfer(&ctx.client.live, Ferdie, 1_000_000).await?;
 		println!("bob and ferdie transfers created");
 		wait_for_transfers(&pool, vec![bob_transfer, ferdie_transfer]).await?;
 		println!("bob and ferdie transfers confirmed");
@@ -354,7 +355,7 @@ mod tests {
 		let (hold_note, hold_result) = create_channel_hold(
 			&pool,
 			bob_balance as u128,
-			5000,
+			5_000_000,
 			&ticker,
 			result.tick,
 			origin.clone(),
@@ -446,7 +447,7 @@ mod tests {
 			}
 		};
 
-		let vote_power = (hold_note.milligons as f64 * 0.2f64) as u128;
+		let vote_power = (hold_note.microgons as f64 * 0.2f64) as u128;
 
 		let channel_hold_result = settle_channel_hold_and_vote(
 			&pool,
@@ -803,16 +804,16 @@ mod tests {
 		vote_block_hash: HashOutput,
 		bob_balance_proof: BalanceProof,
 	) -> anyhow::Result<BalanceChangeResult> {
-		let tax = (hold_note.milligons as f64 * 0.2f64) as u128;
+		let tax = (hold_note.microgons as f64 * 0.2f64) as u128;
 		let changes = vec![
 			BalanceChange {
 				account_id: Bob.to_account_id(),
 				account_type: Deposit,
 				change_number: 3,
-				balance: bob_balance_proof.balance - hold_note.milligons,
+				balance: bob_balance_proof.balance - hold_note.microgons,
 				previous_balance_proof: Some(bob_balance_proof),
 				channel_hold_note: Some(hold_note.clone()),
-				notes: bounded_vec![Note::create(hold_note.milligons, ChannelHoldSettle)],
+				notes: bounded_vec![Note::create(hold_note.microgons, ChannelHoldSettle)],
 				signature: sp_core::sr25519::Signature::from_raw([0u8; 64]).into(),
 			}
 			.sign(Bob.pair())
@@ -821,11 +822,11 @@ mod tests {
 				account_id: Alice.to_account_id(),
 				account_type: Deposit,
 				change_number: 1,
-				balance: hold_note.milligons - tax,
+				balance: hold_note.microgons - tax,
 				previous_balance_proof: None,
 				channel_hold_note: None,
 				notes: bounded_vec![
-					Note::create(hold_note.milligons, ChannelHoldClaim),
+					Note::create(hold_note.microgons, ChannelHoldClaim),
 					Note::create(tax, NoteType::Tax)
 				],
 				signature: sp_core::sr25519::Signature::from_raw([0u8; 64]).into(),

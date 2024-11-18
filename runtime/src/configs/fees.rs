@@ -43,7 +43,7 @@ pub struct WeightToFee;
 impl WeightToFeePolynomial for WeightToFee {
 	type Balance = Balance;
 	fn polynomial() -> WeightToFeeCoefficients<Self::Balance> {
-		let p = 1_000; // milligons
+		let p = 1_000_000; // microgons
 		let q = 100 * Balance::from(ExtrinsicBaseWeight::get().ref_time());
 		// BAB - disabling wage protector for fees. Makes it hard to keep system stable
 		// let cpi = PriceIndex::get_argon_cpi().unwrap_or(ArgonCPI::zero());

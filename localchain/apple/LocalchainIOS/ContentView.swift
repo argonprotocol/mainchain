@@ -139,7 +139,7 @@ struct ContentView: View {
 
           HStack(spacing: 2) {
             Text(
-              "\((localchainLoader.futureBuyingPower.toDecimal() / Decimal(1_000.0)).formatted(dollarsFormatter) ?? "Err")"
+              "\((localchainLoader.futureBuyingPower.toDecimal() / Decimal(1_000_000.0)).formatted(dollarsFormatter) ?? "Err")"
             )
             .fontWeight(.bold)
             .font(.system(size: 40.0))

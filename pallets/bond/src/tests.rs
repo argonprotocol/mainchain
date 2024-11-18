@@ -29,11 +29,11 @@ fn can_bond_a_bitcoin_utxo() {
 	new_test_ext().execute_with(|| {
 		System::set_block_number(1);
 
-		set_argons(2, 2_000);
+		set_argons(2, 2_000_000);
 		let pubkey = CompressedBitcoinPubkey([1; 33]);
 
 		assert_err!(
-			Bonds::bond_bitcoin(RuntimeOrigin::signed(2), 1, 1_000, pubkey),
+			Bonds::bond_bitcoin(RuntimeOrigin::signed(2), 1, 1_000_000, pubkey),
 			Error::<Test>::InsufficientSatoshisBonded
 		);
 		assert_ok!(Bonds::bond_bitcoin(RuntimeOrigin::signed(2), 1, SATOSHIS_PER_BITCOIN, pubkey));
@@ -69,7 +69,7 @@ fn cleans_up_a_rejected_bitcoin() {
 		System::set_block_number(1);
 
 		let who = 1;
-		set_argons(who, 2_000);
+		set_argons(who, 2_000_000);
 		let pubkey = CompressedBitcoinPubkey([1; 33]);
 
 		assert_ok!(Bonds::bond_bitcoin(
@@ -97,7 +97,7 @@ fn marks_a_verified_bitcoin() {
 		System::set_block_number(1);
 
 		let who = 1;
-		set_argons(who, 2_000);
+		set_argons(who, 2_000_000);
 		let pubkey = CompressedBitcoinPubkey([1; 33]);
 
 		assert_ok!(Bonds::bond_bitcoin(
@@ -125,20 +125,21 @@ fn calculates_redemption_prices() {
 		ArgonCPI::set(Some(FixedI128::zero()));
 		{
 			let new_price = Bonds::get_redemption_price(&100_000_000).expect("should have price");
-			assert_eq!(new_price, 50_000_000);
+			assert_eq!(new_price, 50_000_000_000);
 		}
 		ArgonPricePerUsd::set(Some(FixedU128::from_float(1.01)));
 		{
 			let new_price = Bonds::get_redemption_price(&100_000_000).expect("should have price");
-			assert_eq!(new_price, (50_000_000f64 / 1.01f64) as u128);
+			assert_eq!(new_price, (50_000_000_000f64 / 1.01f64) as u128);
 		}
 		ArgonCPI::set(Some(FixedI128::from_float(0.1)));
 		{
 			let new_price = Bonds::get_redemption_price(&100_000_000).expect("should have price");
 			// round to 3 digit precision for multiplier
 			let multiplier = 0.713 * 1.01 + 0.274;
-			// NOTE: floating point yields diffferent rounding, so need to subtract 1
-			assert_eq!(new_price, (multiplier * (50_000_000.0 / 1.01)) as u128 - 1);
+			// NOTE: floating point yields different rounding - might need to modify if you change
+			// values
+			assert_eq!(new_price, (multiplier * (50_000_000_000.0 / 1.01)) as u128);
 		}
 	});
 }
@@ -172,9 +173,9 @@ fn burns_a_spent_bitcoin() {
 
 		let new_price =
 			Bonds::get_redemption_price(&SATOSHIS_PER_BITCOIN).expect("should have price");
-		// 50_000_000 milligons for a bitcoin
+		// 50_000_000_000 microgons for a bitcoin
 		// 50m * 0.987 = 49,350,000
-		assert_eq!(new_price, 49_350_000);
+		assert_eq!(new_price, 49_350_000_000);
 
 		assert_ok!(Bonds::utxo_spent(1));
 		assert_eq!(UtxosById::<Test>::get(1), None);
@@ -570,8 +571,8 @@ fn it_can_create_a_mining_bond() {
 	new_test_ext().execute_with(|| {
 		System::set_block_number(1);
 		let who = 1;
-		set_argons(who, 2_000);
-		let amount = 1_000;
+		set_argons(who, 2_000_000);
+		let amount = 1_000_000;
 		let vault = DefaultVault::get();
 		assert_ok!(Bonds::bond_mining_slot(1, who, amount, 10));
 		assert_eq!(

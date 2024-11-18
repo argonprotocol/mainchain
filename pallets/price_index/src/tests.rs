@@ -101,8 +101,8 @@ fn can_convert_argon_prices() {
 
 		assert_eq!(
 			<PriceIndex as PriceProvider<u128>>::get_bitcoin_argon_price(SATOSHIS_PER_BITCOIN),
-			Some(62_000 * 1000),
-			"price in milligons"
+			Some(62_000 * 1_000_000),
+			"price in microgons"
 		);
 
 		index.argon_usd_price = FixedU128::from_float(1.01);
@@ -110,7 +110,7 @@ fn can_convert_argon_prices() {
 
 		assert_eq!(
 			<PriceIndex as PriceProvider<u128>>::get_bitcoin_argon_price(SATOSHIS_PER_BITCOIN),
-			Some(1000 * (62_000 * 100) / 101),
+			Some(1_000_000 * (62_000 * 100) / 101),
 		);
 	});
 }
