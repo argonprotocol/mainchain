@@ -7,11 +7,12 @@
 
 use std::sync::Arc;
 
-use argon_node_runtime::opaque::Block;
-use argon_primitives::{AccountId, Balance, BlockSealAuthorityId, MiningApis, Nonce};
+use argon_node_runtime::opaque::{Block, Hash};
+use argon_primitives::{AccountId, Balance, BlockNumber, BlockSealAuthorityId, MiningApis, Nonce};
 use jsonrpsee::RpcModule;
 use pallet_ismp_runtime_api::IsmpRuntimeApi;
 use sc_client_api::{AuxStore, BlockBackend, ProofProvider};
+use sc_consensus_grandpa::FinalityProofProvider;
 use sc_transaction_pool_api::TransactionPool;
 use sp_api::ProvideRuntimeApi;
 use sp_block_builder::BlockBuilder;
@@ -26,6 +27,22 @@ pub struct FullDeps<C, P, B> {
 	pub pool: Arc<P>,
 	/// Backend used by the node.
 	pub backend: Arc<B>,
+	/// GRANDPA specific dependencies.
+	pub grandpa: GrandpaDeps<B>,
+}
+
+/// Dependencies for GRANDPA
+pub struct GrandpaDeps<B> {
+	/// Voting round info.
+	pub shared_voter_state: sc_consensus_grandpa::SharedVoterState,
+	/// Authority set info.
+	pub shared_authority_set: sc_consensus_grandpa::SharedAuthoritySet<Hash, BlockNumber>,
+	/// Receives notifications about justification events from Grandpa.
+	pub justification_stream: sc_consensus_grandpa::GrandpaJustificationStream<Block>,
+	/// Executor to drive the subscription manager in the Grandpa RPC handler.
+	pub subscription_executor: sc_rpc::SubscriptionTaskExecutor,
+	/// Finality proof provider.
+	pub finality_provider: Arc<FinalityProofProvider<B, Block>>,
 }
 
 /// Instantiate all full RPC extensions.
@@ -51,14 +68,33 @@ where
 {
 	use pallet_ismp_rpc::{IsmpApiServer, IsmpRpcHandler};
 	use pallet_transaction_payment_rpc::{TransactionPayment, TransactionPaymentApiServer};
+	use sc_consensus_grandpa_rpc::{Grandpa, GrandpaApiServer};
 	use substrate_frame_rpc_system::{System, SystemApiServer};
 
 	let mut module = RpcModule::new(());
-	let FullDeps { client, pool, backend } = deps;
+	let FullDeps { client, pool, backend, grandpa } = deps;
+	let GrandpaDeps {
+		shared_voter_state,
+		shared_authority_set,
+		justification_stream,
+		subscription_executor,
+		finality_provider,
+	} = grandpa;
 
 	module.merge(System::new(client.clone(), pool).into_rpc())?;
 	module.merge(TransactionPayment::new(client.clone()).into_rpc())?;
 	module.merge(IsmpRpcHandler::new(client, backend)?.into_rpc())?;
+
+	module.merge(
+		Grandpa::new(
+			subscription_executor,
+			shared_authority_set.clone(),
+			shared_voter_state,
+			justification_stream,
+			finality_provider,
+		)
+		.into_rpc(),
+	)?;
 
 	Ok(module)
 }

@@ -1,5 +1,5 @@
 //! Service and ServiceFactory implementation. Specialized wrapper over substrate service.
-use crate::{command::MiningConfig, rpc};
+use crate::{command::MiningConfig, rpc, rpc::GrandpaDeps};
 use argon_bitcoin_utxo_tracker::UtxoTracker;
 use argon_node_consensus::{
 	aux_client::ArgonAux, create_import_queue, run_block_builder_task, BlockBuilderParams,
@@ -8,7 +8,10 @@ use argon_node_runtime::{self, opaque::Block, RuntimeApi};
 use argon_primitives::AccountId;
 use sc_client_api::BlockBackend;
 use sc_consensus::BasicQueue;
-use sc_consensus_grandpa::{GrandpaBlockImport, SharedVoterState};
+use sc_consensus_grandpa::{
+	FinalityProofProvider as GrandpaFinalityProofProvider, GrandpaBlockImport, SharedVoterState,
+};
+use sc_rpc::SubscriptionTaskExecutor;
 use sc_service::{
 	config::Configuration, error::Error as ServiceError, TaskManager, WarpSyncConfig,
 };
@@ -204,12 +207,26 @@ pub fn new_full<
 		let client = client.clone();
 		let transaction_pool = transaction_pool.clone();
 		let backend = backend.clone();
-
-		Box::new(move |_| {
+		let justification_stream = grandpa_link.justification_stream();
+		let shared_authority_set = grandpa_link.shared_authority_set().clone();
+		let shared_voter_state = sc_consensus_grandpa::SharedVoterState::empty();
+		let finality_proof_provider = GrandpaFinalityProofProvider::new_for_service(
+			backend.clone(),
+			Some(shared_authority_set.clone()),
+		);
+		Box::new(move |subscription_executor: SubscriptionTaskExecutor| {
 			let deps = rpc::FullDeps {
 				client: client.clone(),
 				pool: transaction_pool.clone(),
 				backend: backend.clone(),
+
+				grandpa: GrandpaDeps {
+					shared_voter_state: shared_voter_state.clone(),
+					shared_authority_set: shared_authority_set.clone(),
+					justification_stream: justification_stream.clone(),
+					subscription_executor: subscription_executor.clone(),
+					finality_provider: finality_proof_provider.clone(),
+				},
 			};
 
 			rpc::create_full(deps).map_err(Into::into)
