@@ -2,7 +2,6 @@ use std::{sync::Arc, time::Duration};
 
 use crate::{aux_client::ArgonAux, error::Error, notary_client::get_notebook_header_data};
 use argon_bitcoin_utxo_tracker::{get_bitcoin_inherent, UtxoTracker};
-use argon_node_runtime::{NotaryRecordT, NotebookVerifyError};
 use argon_primitives::{
 	inherents::{
 		BitcoinInherentDataProvider, BlockSealInherentDataProvider, BlockSealInherentNodeSide,
@@ -12,6 +11,7 @@ use argon_primitives::{
 	Balance, BestBlockVoteSeal, BitcoinApis, BlockSealApis, BlockSealAuthorityId, BlockSealDigest,
 	Digestset, NotaryApis, NotebookApis, TickApis, VotingSchedule,
 };
+use argon_runtime::{NotaryRecordT, NotebookVerifyError};
 use codec::Codec;
 use frame_support::CloneNoBound;
 use log::*;

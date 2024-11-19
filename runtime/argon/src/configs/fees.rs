@@ -1,4 +1,7 @@
-use crate::{configs::ArgonToken, Balances, Runtime, RuntimeEvent};
+use crate::{
+	configs::{ArgonToken, ARGON},
+	Balances, Runtime, RuntimeEvent,
+};
 use argon_primitives::{AccountId, Balance};
 use core::marker::PhantomData;
 use frame_support::{
@@ -17,7 +20,7 @@ pub type AccountIdOf<T> = <T as frame_system::Config>::AccountId;
 
 parameter_types! {
 	pub FeeMultiplier: Multiplier = Multiplier::one();
-	pub const TransactionByteFee: Balance = 1;
+	pub const TransactionByteFee: Balance = 10;
 }
 
 impl pallet_transaction_payment::Config for Runtime {
@@ -43,7 +46,7 @@ pub struct WeightToFee;
 impl WeightToFeePolynomial for WeightToFee {
 	type Balance = Balance;
 	fn polynomial() -> WeightToFeeCoefficients<Self::Balance> {
-		let p = 1_000_000; // microgons
+		let p = ARGON; // microgons
 		let q = 100 * Balance::from(ExtrinsicBaseWeight::get().ref_time());
 		// BAB - disabling wage protector for fees. Makes it hard to keep system stable
 		// let cpi = PriceIndex::get_argon_cpi().unwrap_or(ArgonCPI::zero());

@@ -3,7 +3,7 @@ use std::env::temp_dir;
 use sp_core::{sr25519::Pair, Pair as PairT};
 
 use argon_client::{
-	api::{runtime_types::argon_node_runtime::RuntimeCall, tx},
+	api::{runtime_types::argon_runtime::RuntimeCall, tx},
 	signer::Sr25519Signer,
 };
 use argon_testing::{

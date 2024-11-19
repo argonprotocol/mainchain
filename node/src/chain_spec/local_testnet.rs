@@ -6,7 +6,7 @@ use crate::chain_spec::{
 	authority_keys_from_seed, get_account_id_from_seed, get_from_seed, testnet_genesis, ChainSpec,
 	GenesisSettings,
 };
-use argon_node_runtime::WASM_BINARY;
+use argon_canary_runtime::WASM_BINARY;
 use argon_primitives::{
 	bitcoin::{BitcoinNetwork, SATOSHIS_PER_BITCOIN},
 	block_seal::MiningSlotConfig,

@@ -1,5 +1,5 @@
 [package]
-name = "argon-node-runtime"
+name = "argon-runtime"
 version.workspace = true
 authors.workspace = true
 edition.workspace = true
@@ -89,7 +89,7 @@ substrate-wasm-builder = { workspace = true, optional = true }
 
 [features]
 default = [ "std" ]
-ismp-testnet = []
+canary = []
 std = [
 	"anyhow/std",
 	"argon-primitives/std",

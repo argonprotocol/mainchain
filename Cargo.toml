@@ -24,7 +24,8 @@ members = [
     "localchain",
     "localchain/uniffi-bindgen",
     "primitives",
-    "runtime",
+    "runtime/argon",
+    "runtime/canary",
     "notary",
     "notary/audit",
     "notary/apis",
@@ -333,7 +334,8 @@ argon-node-consensus = { path = "node/consensus" }
 argon-bitcoin = { path = "bitcoin", default-features = false }
 argon-bitcoin-utxo-tracker = { path = "node/bitcoin_utxo_tracker" }
 argon-node = { path = "node" }
-argon-node-runtime = { path = "runtime" }
+argon-runtime = { path = "runtime/argon", default-features = false }
+argon-canary-runtime = { path = "runtime/canary", default-features = false }
 argon-randomx = { path = "node/randomx" }
 argon-notary = { path = "notary" }
 argon-notary-apis = { path = "notary/apis" }

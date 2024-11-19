@@ -19,7 +19,6 @@ use std::{
 use tokio::sync::Mutex;
 
 use crate::{aux_client::ArgonAux, error::Error};
-use argon_node_runtime::{NotaryRecordT, NotebookVerifyError};
 use argon_notary_apis::notebook::{NotebookRpcClient, RawHeadersSubscription};
 use argon_primitives::{
 	ensure,
@@ -31,6 +30,7 @@ use argon_primitives::{
 	Balance, BlockSealApis, BlockSealAuthorityId, BlockVotingPower, NotaryApis, NotaryId,
 	NotebookApis, NotebookAuditResult, NotebookHeaderData, VoteMinimum, VotingSchedule,
 };
+use argon_runtime::{NotaryRecordT, NotebookVerifyError};
 
 pub trait NotaryApisExt<B: BlockT, AC> {
 	fn notaries(&self, block_hash: B::Hash) -> Result<Vec<NotaryRecordT>, Error>;
@@ -912,7 +912,6 @@ where
 mod test {
 	use super::*;
 	use crate::{error::Error, mock_notary::MockNotary, notary_client::NotaryApisExt};
-	use argon_node_runtime::Block;
 	use argon_primitives::{
 		notary::{
 			NotaryMeta, NotaryNotebookAuditSummary, NotaryNotebookAuditSummaryDetails,
@@ -920,6 +919,7 @@ mod test {
 		},
 		AccountId, Balance, ChainTransfer, NotaryId, NotebookHeader, NotebookMeta, NotebookNumber,
 	};
+	use argon_runtime::Block;
 	use codec::{Decode, Encode};
 	use sc_utils::mpsc::TracingUnboundedReceiver;
 	use sp_core::{bounded_vec, H256};

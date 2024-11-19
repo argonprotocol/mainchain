@@ -1,0 +1,24 @@
+[package]
+name = "argon-canary-runtime"
+version.workspace = true
+authors.workspace = true
+edition.workspace = true
+rust-version.workspace = true
+license.workspace = true
+repository.workspace = true
+documentation.workspace = true
+homepage.workspace = true
+publish = false
+
+[dependencies]
+argon-runtime = { workspace = true, default-features = false, features = ["canary"] }
+
+[build-dependencies]
+substrate-wasm-builder = { workspace = true, optional = true }
+
+[features]
+default = [ "std" ]
+std = [ "argon-runtime/std", "substrate-wasm-builder" ]
+runtime-benchmarks = [ "argon-runtime/runtime-benchmarks" ]
+try-runtime = [ "argon-runtime/try-runtime" ]
+metadata-hash = [ "substrate-wasm-builder/metadata-hash" ]

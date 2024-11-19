@@ -7,7 +7,7 @@
 
 use std::sync::Arc;
 
-use argon_node_runtime::opaque::{Block, Hash};
+use crate::runtime_api::opaque::{Block, Hash};
 use argon_primitives::{AccountId, Balance, BlockNumber, BlockSealAuthorityId, MiningApis, Nonce};
 use jsonrpsee::RpcModule;
 use pallet_ismp_runtime_api::IsmpRuntimeApi;

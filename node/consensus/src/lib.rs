@@ -6,11 +6,11 @@ use crate::{
 	notebook_sealer::NotebookSealer,
 };
 use argon_bitcoin_utxo_tracker::UtxoTracker;
-use argon_node_runtime::{NotaryRecordT, NotebookVerifyError};
 use argon_primitives::{
 	inherents::BlockSealInherentNodeSide, Balance, BitcoinApis, BlockCreatorApis, BlockSealApis,
 	BlockSealAuthorityId, NotaryApis, NotebookApis, TickApis, VotingSchedule,
 };
+use argon_runtime::{NotaryRecordT, NotebookVerifyError};
 use codec::Codec;
 use futures::prelude::*;
 use futures_timer::Delay;

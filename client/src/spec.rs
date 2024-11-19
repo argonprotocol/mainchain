@@ -38,7 +38,7 @@ pub mod api {
 		"IsmpGrandpa",
 		"Hyperbridge",
 	];
-	pub static RUNTIME_APIS: [&str; 20usize] = [
+	pub static RUNTIME_APIS: [&str; 21usize] = [
 		"Core",
 		"Metadata",
 		"BlockBuilder",
@@ -59,15 +59,16 @@ pub mod api {
 		"GrandpaApi",
 		"GenesisBuilder",
 		"IsmpRuntimeApi",
+		"ConfigurationApis",
 	];
 	#[doc = r" The error type returned when there is a runtime issue."]
 	pub type DispatchError = runtime_types::sp_runtime::DispatchError;
 	#[doc = r" The outer event enum."]
-	pub type Event = runtime_types::argon_node_runtime::RuntimeEvent;
+	pub type Event = runtime_types::argon_runtime::RuntimeEvent;
 	#[doc = r" The outer extrinsic enum."]
-	pub type Call = runtime_types::argon_node_runtime::RuntimeCall;
+	pub type Call = runtime_types::argon_runtime::RuntimeCall;
 	#[doc = r" The outer error enum representing the DispatchError's Module variant."]
-	pub type Error = runtime_types::argon_node_runtime::RuntimeError;
+	pub type Error = runtime_types::argon_runtime::RuntimeError;
 	pub fn constants() -> ConstantsApi {
 		ConstantsApi
 	}
@@ -150,6 +151,9 @@ pub mod api {
 			}
 			pub fn ismp_runtime_api(&self) -> ismp_runtime_api::IsmpRuntimeApi {
 				ismp_runtime_api::IsmpRuntimeApi
+			}
+			pub fn configuration_apis(&self) -> configuration_apis::ConfigurationApis {
+				configuration_apis::ConfigurationApis
 			}
 		}
 		pub mod core {
@@ -242,7 +246,7 @@ pub mod api {
 				pub struct Version {}
 				pub mod execute_block {
 					use super::runtime_types;
-					pub type Block = runtime_types :: sp_runtime :: generic :: block :: Block < runtime_types :: sp_runtime :: generic :: header :: Header < :: core :: primitive :: u32 > , :: subxt :: ext :: subxt_core :: utils :: UncheckedExtrinsic < :: subxt :: ext :: subxt_core :: utils :: MultiAddress < crate :: types :: AccountId32 , () > , runtime_types :: argon_node_runtime :: RuntimeCall , runtime_types :: sp_runtime :: MultiSignature , (runtime_types :: frame_system :: extensions :: check_non_zero_sender :: CheckNonZeroSender , runtime_types :: frame_system :: extensions :: check_spec_version :: CheckSpecVersion , runtime_types :: frame_system :: extensions :: check_tx_version :: CheckTxVersion , runtime_types :: frame_system :: extensions :: check_genesis :: CheckGenesis , runtime_types :: frame_system :: extensions :: check_mortality :: CheckMortality , runtime_types :: frame_system :: extensions :: check_nonce :: CheckNonce , runtime_types :: frame_system :: extensions :: check_weight :: CheckWeight , runtime_types :: pallet_transaction_payment :: ChargeTransactionPayment , runtime_types :: frame_metadata_hash_extension :: CheckMetadataHash ,) > > ;
+					pub type Block = runtime_types :: sp_runtime :: generic :: block :: Block < runtime_types :: sp_runtime :: generic :: header :: Header < :: core :: primitive :: u32 > , :: subxt :: ext :: subxt_core :: utils :: UncheckedExtrinsic < :: subxt :: ext :: subxt_core :: utils :: MultiAddress < crate :: types :: AccountId32 , () > , runtime_types :: argon_runtime :: RuntimeCall , runtime_types :: sp_runtime :: MultiSignature , (runtime_types :: frame_system :: extensions :: check_non_zero_sender :: CheckNonZeroSender , runtime_types :: frame_system :: extensions :: check_spec_version :: CheckSpecVersion , runtime_types :: frame_system :: extensions :: check_tx_version :: CheckTxVersion , runtime_types :: frame_system :: extensions :: check_genesis :: CheckGenesis , runtime_types :: frame_system :: extensions :: check_mortality :: CheckMortality , runtime_types :: frame_system :: extensions :: check_nonce :: CheckNonce , runtime_types :: frame_system :: extensions :: check_weight :: CheckWeight , runtime_types :: pallet_transaction_payment :: ChargeTransactionPayment , runtime_types :: frame_metadata_hash_extension :: CheckMetadataHash ,) > > ;
 					pub mod output {
 						use super::runtime_types;
 						pub type Output = ();
@@ -532,7 +536,7 @@ pub mod api {
 				use super::runtime_types;
 				pub mod apply_extrinsic {
 					use super::runtime_types;
-					pub type Extrinsic = :: subxt :: ext :: subxt_core :: utils :: UncheckedExtrinsic < :: subxt :: ext :: subxt_core :: utils :: MultiAddress < crate :: types :: AccountId32 , () > , runtime_types :: argon_node_runtime :: RuntimeCall , runtime_types :: sp_runtime :: MultiSignature , (runtime_types :: frame_system :: extensions :: check_non_zero_sender :: CheckNonZeroSender , runtime_types :: frame_system :: extensions :: check_spec_version :: CheckSpecVersion , runtime_types :: frame_system :: extensions :: check_tx_version :: CheckTxVersion , runtime_types :: frame_system :: extensions :: check_genesis :: CheckGenesis , runtime_types :: frame_system :: extensions :: check_mortality :: CheckMortality , runtime_types :: frame_system :: extensions :: check_nonce :: CheckNonce , runtime_types :: frame_system :: extensions :: check_weight :: CheckWeight , runtime_types :: pallet_transaction_payment :: ChargeTransactionPayment , runtime_types :: frame_metadata_hash_extension :: CheckMetadataHash ,) > ;
+					pub type Extrinsic = :: subxt :: ext :: subxt_core :: utils :: UncheckedExtrinsic < :: subxt :: ext :: subxt_core :: utils :: MultiAddress < crate :: types :: AccountId32 , () > , runtime_types :: argon_runtime :: RuntimeCall , runtime_types :: sp_runtime :: MultiSignature , (runtime_types :: frame_system :: extensions :: check_non_zero_sender :: CheckNonZeroSender , runtime_types :: frame_system :: extensions :: check_spec_version :: CheckSpecVersion , runtime_types :: frame_system :: extensions :: check_tx_version :: CheckTxVersion , runtime_types :: frame_system :: extensions :: check_genesis :: CheckGenesis , runtime_types :: frame_system :: extensions :: check_mortality :: CheckMortality , runtime_types :: frame_system :: extensions :: check_nonce :: CheckNonce , runtime_types :: frame_system :: extensions :: check_weight :: CheckWeight , runtime_types :: pallet_transaction_payment :: ChargeTransactionPayment , runtime_types :: frame_metadata_hash_extension :: CheckMetadataHash ,) > ;
 					pub mod output {
 						use super::runtime_types;
 						pub type Output = :: core :: result :: Result < :: core :: result :: Result < () , runtime_types :: sp_runtime :: DispatchError > , runtime_types :: sp_runtime :: transaction_validity :: TransactionValidityError > ;
@@ -586,7 +590,7 @@ pub mod api {
 					pub type Inherent = runtime_types::sp_inherents::InherentData;
 					pub mod output {
 						use super::runtime_types;
-						pub type Output = :: subxt :: ext :: subxt_core :: alloc :: vec :: Vec < :: subxt :: ext :: subxt_core :: utils :: UncheckedExtrinsic < :: subxt :: ext :: subxt_core :: utils :: MultiAddress < crate :: types :: AccountId32 , () > , runtime_types :: argon_node_runtime :: RuntimeCall , runtime_types :: sp_runtime :: MultiSignature , (runtime_types :: frame_system :: extensions :: check_non_zero_sender :: CheckNonZeroSender , runtime_types :: frame_system :: extensions :: check_spec_version :: CheckSpecVersion , runtime_types :: frame_system :: extensions :: check_tx_version :: CheckTxVersion , runtime_types :: frame_system :: extensions :: check_genesis :: CheckGenesis , runtime_types :: frame_system :: extensions :: check_mortality :: CheckMortality , runtime_types :: frame_system :: extensions :: check_nonce :: CheckNonce , runtime_types :: frame_system :: extensions :: check_weight :: CheckWeight , runtime_types :: pallet_transaction_payment :: ChargeTransactionPayment , runtime_types :: frame_metadata_hash_extension :: CheckMetadataHash ,) > > ;
+						pub type Output = :: subxt :: ext :: subxt_core :: alloc :: vec :: Vec < :: subxt :: ext :: subxt_core :: utils :: UncheckedExtrinsic < :: subxt :: ext :: subxt_core :: utils :: MultiAddress < crate :: types :: AccountId32 , () > , runtime_types :: argon_runtime :: RuntimeCall , runtime_types :: sp_runtime :: MultiSignature , (runtime_types :: frame_system :: extensions :: check_non_zero_sender :: CheckNonZeroSender , runtime_types :: frame_system :: extensions :: check_spec_version :: CheckSpecVersion , runtime_types :: frame_system :: extensions :: check_tx_version :: CheckTxVersion , runtime_types :: frame_system :: extensions :: check_genesis :: CheckGenesis , runtime_types :: frame_system :: extensions :: check_mortality :: CheckMortality , runtime_types :: frame_system :: extensions :: check_nonce :: CheckNonce , runtime_types :: frame_system :: extensions :: check_weight :: CheckWeight , runtime_types :: pallet_transaction_payment :: ChargeTransactionPayment , runtime_types :: frame_metadata_hash_extension :: CheckMetadataHash ,) > > ;
 					}
 				}
 				#[derive(
@@ -609,7 +613,7 @@ pub mod api {
 				}
 				pub mod check_inherents {
 					use super::runtime_types;
-					pub type Block = runtime_types :: sp_runtime :: generic :: block :: Block < runtime_types :: sp_runtime :: generic :: header :: Header < :: core :: primitive :: u32 > , :: subxt :: ext :: subxt_core :: utils :: UncheckedExtrinsic < :: subxt :: ext :: subxt_core :: utils :: MultiAddress < crate :: types :: AccountId32 , () > , runtime_types :: argon_node_runtime :: RuntimeCall , runtime_types :: sp_runtime :: MultiSignature , (runtime_types :: frame_system :: extensions :: check_non_zero_sender :: CheckNonZeroSender , runtime_types :: frame_system :: extensions :: check_spec_version :: CheckSpecVersion , runtime_types :: frame_system :: extensions :: check_tx_version :: CheckTxVersion , runtime_types :: frame_system :: extensions :: check_genesis :: CheckGenesis , runtime_types :: frame_system :: extensions :: check_mortality :: CheckMortality , runtime_types :: frame_system :: extensions :: check_nonce :: CheckNonce , runtime_types :: frame_system :: extensions :: check_weight :: CheckWeight , runtime_types :: pallet_transaction_payment :: ChargeTransactionPayment , runtime_types :: frame_metadata_hash_extension :: CheckMetadataHash ,) > > ;
+					pub type Block = runtime_types :: sp_runtime :: generic :: block :: Block < runtime_types :: sp_runtime :: generic :: header :: Header < :: core :: primitive :: u32 > , :: subxt :: ext :: subxt_core :: utils :: UncheckedExtrinsic < :: subxt :: ext :: subxt_core :: utils :: MultiAddress < crate :: types :: AccountId32 , () > , runtime_types :: argon_runtime :: RuntimeCall , runtime_types :: sp_runtime :: MultiSignature , (runtime_types :: frame_system :: extensions :: check_non_zero_sender :: CheckNonZeroSender , runtime_types :: frame_system :: extensions :: check_spec_version :: CheckSpecVersion , runtime_types :: frame_system :: extensions :: check_tx_version :: CheckTxVersion , runtime_types :: frame_system :: extensions :: check_genesis :: CheckGenesis , runtime_types :: frame_system :: extensions :: check_mortality :: CheckMortality , runtime_types :: frame_system :: extensions :: check_nonce :: CheckNonce , runtime_types :: frame_system :: extensions :: check_weight :: CheckWeight , runtime_types :: pallet_transaction_payment :: ChargeTransactionPayment , runtime_types :: frame_metadata_hash_extension :: CheckMetadataHash ,) > > ;
 					pub type Data = runtime_types::sp_inherents::InherentData;
 					pub mod output {
 						use super::runtime_types;
@@ -678,7 +682,7 @@ pub mod api {
 					use super::runtime_types;
 					pub type Source =
 						runtime_types::sp_runtime::transaction_validity::TransactionSource;
-					pub type Tx = :: subxt :: ext :: subxt_core :: utils :: UncheckedExtrinsic < :: subxt :: ext :: subxt_core :: utils :: MultiAddress < crate :: types :: AccountId32 , () > , runtime_types :: argon_node_runtime :: RuntimeCall , runtime_types :: sp_runtime :: MultiSignature , (runtime_types :: frame_system :: extensions :: check_non_zero_sender :: CheckNonZeroSender , runtime_types :: frame_system :: extensions :: check_spec_version :: CheckSpecVersion , runtime_types :: frame_system :: extensions :: check_tx_version :: CheckTxVersion , runtime_types :: frame_system :: extensions :: check_genesis :: CheckGenesis , runtime_types :: frame_system :: extensions :: check_mortality :: CheckMortality , runtime_types :: frame_system :: extensions :: check_nonce :: CheckNonce , runtime_types :: frame_system :: extensions :: check_weight :: CheckWeight , runtime_types :: pallet_transaction_payment :: ChargeTransactionPayment , runtime_types :: frame_metadata_hash_extension :: CheckMetadataHash ,) > ;
+					pub type Tx = :: subxt :: ext :: subxt_core :: utils :: UncheckedExtrinsic < :: subxt :: ext :: subxt_core :: utils :: MultiAddress < crate :: types :: AccountId32 , () > , runtime_types :: argon_runtime :: RuntimeCall , runtime_types :: sp_runtime :: MultiSignature , (runtime_types :: frame_system :: extensions :: check_non_zero_sender :: CheckNonZeroSender , runtime_types :: frame_system :: extensions :: check_spec_version :: CheckSpecVersion , runtime_types :: frame_system :: extensions :: check_tx_version :: CheckTxVersion , runtime_types :: frame_system :: extensions :: check_genesis :: CheckGenesis , runtime_types :: frame_system :: extensions :: check_mortality :: CheckMortality , runtime_types :: frame_system :: extensions :: check_nonce :: CheckNonce , runtime_types :: frame_system :: extensions :: check_weight :: CheckWeight , runtime_types :: pallet_transaction_payment :: ChargeTransactionPayment , runtime_types :: frame_metadata_hash_extension :: CheckMetadataHash ,) > ;
 					pub type BlockHash = crate::types::H256;
 					pub mod output {
 						use super::runtime_types;
@@ -1022,7 +1026,7 @@ pub mod api {
 				use super::runtime_types;
 				pub mod query_info {
 					use super::runtime_types;
-					pub type Uxt = :: subxt :: ext :: subxt_core :: utils :: UncheckedExtrinsic < :: subxt :: ext :: subxt_core :: utils :: MultiAddress < crate :: types :: AccountId32 , () > , runtime_types :: argon_node_runtime :: RuntimeCall , runtime_types :: sp_runtime :: MultiSignature , (runtime_types :: frame_system :: extensions :: check_non_zero_sender :: CheckNonZeroSender , runtime_types :: frame_system :: extensions :: check_spec_version :: CheckSpecVersion , runtime_types :: frame_system :: extensions :: check_tx_version :: CheckTxVersion , runtime_types :: frame_system :: extensions :: check_genesis :: CheckGenesis , runtime_types :: frame_system :: extensions :: check_mortality :: CheckMortality , runtime_types :: frame_system :: extensions :: check_nonce :: CheckNonce , runtime_types :: frame_system :: extensions :: check_weight :: CheckWeight , runtime_types :: pallet_transaction_payment :: ChargeTransactionPayment , runtime_types :: frame_metadata_hash_extension :: CheckMetadataHash ,) > ;
+					pub type Uxt = :: subxt :: ext :: subxt_core :: utils :: UncheckedExtrinsic < :: subxt :: ext :: subxt_core :: utils :: MultiAddress < crate :: types :: AccountId32 , () > , runtime_types :: argon_runtime :: RuntimeCall , runtime_types :: sp_runtime :: MultiSignature , (runtime_types :: frame_system :: extensions :: check_non_zero_sender :: CheckNonZeroSender , runtime_types :: frame_system :: extensions :: check_spec_version :: CheckSpecVersion , runtime_types :: frame_system :: extensions :: check_tx_version :: CheckTxVersion , runtime_types :: frame_system :: extensions :: check_genesis :: CheckGenesis , runtime_types :: frame_system :: extensions :: check_mortality :: CheckMortality , runtime_types :: frame_system :: extensions :: check_nonce :: CheckNonce , runtime_types :: frame_system :: extensions :: check_weight :: CheckWeight , runtime_types :: pallet_transaction_payment :: ChargeTransactionPayment , runtime_types :: frame_metadata_hash_extension :: CheckMetadataHash ,) > ;
 					pub type Len = ::core::primitive::u32;
 					pub mod output {
 						use super::runtime_types;
@@ -1054,7 +1058,7 @@ pub mod api {
 				}
 				pub mod query_fee_details {
 					use super::runtime_types;
-					pub type Uxt = :: subxt :: ext :: subxt_core :: utils :: UncheckedExtrinsic < :: subxt :: ext :: subxt_core :: utils :: MultiAddress < crate :: types :: AccountId32 , () > , runtime_types :: argon_node_runtime :: RuntimeCall , runtime_types :: sp_runtime :: MultiSignature , (runtime_types :: frame_system :: extensions :: check_non_zero_sender :: CheckNonZeroSender , runtime_types :: frame_system :: extensions :: check_spec_version :: CheckSpecVersion , runtime_types :: frame_system :: extensions :: check_tx_version :: CheckTxVersion , runtime_types :: frame_system :: extensions :: check_genesis :: CheckGenesis , runtime_types :: frame_system :: extensions :: check_mortality :: CheckMortality , runtime_types :: frame_system :: extensions :: check_nonce :: CheckNonce , runtime_types :: frame_system :: extensions :: check_weight :: CheckWeight , runtime_types :: pallet_transaction_payment :: ChargeTransactionPayment , runtime_types :: frame_metadata_hash_extension :: CheckMetadataHash ,) > ;
+					pub type Uxt = :: subxt :: ext :: subxt_core :: utils :: UncheckedExtrinsic < :: subxt :: ext :: subxt_core :: utils :: MultiAddress < crate :: types :: AccountId32 , () > , runtime_types :: argon_runtime :: RuntimeCall , runtime_types :: sp_runtime :: MultiSignature , (runtime_types :: frame_system :: extensions :: check_non_zero_sender :: CheckNonZeroSender , runtime_types :: frame_system :: extensions :: check_spec_version :: CheckSpecVersion , runtime_types :: frame_system :: extensions :: check_tx_version :: CheckTxVersion , runtime_types :: frame_system :: extensions :: check_genesis :: CheckGenesis , runtime_types :: frame_system :: extensions :: check_mortality :: CheckMortality , runtime_types :: frame_system :: extensions :: check_nonce :: CheckNonce , runtime_types :: frame_system :: extensions :: check_weight :: CheckWeight , runtime_types :: pallet_transaction_payment :: ChargeTransactionPayment , runtime_types :: frame_metadata_hash_extension :: CheckMetadataHash ,) > ;
 					pub type Len = ::core::primitive::u32;
 					pub mod output {
 						use super::runtime_types;
@@ -1224,7 +1228,7 @@ pub mod api {
 				use super::runtime_types;
 				pub mod query_call_info {
 					use super::runtime_types;
-					pub type Call = runtime_types::argon_node_runtime::RuntimeCall;
+					pub type Call = runtime_types::argon_runtime::RuntimeCall;
 					pub type Len = ::core::primitive::u32;
 					pub mod output {
 						use super::runtime_types;
@@ -1256,7 +1260,7 @@ pub mod api {
 				}
 				pub mod query_call_fee_details {
 					use super::runtime_types;
-					pub type Call = runtime_types::argon_node_runtime::RuntimeCall;
+					pub type Call = runtime_types::argon_runtime::RuntimeCall;
 					pub type Len = ::core::primitive::u32;
 					pub mod output {
 						use super::runtime_types;
@@ -1548,7 +1552,7 @@ pub mod api {
 					use super::runtime_types;
 					pub mod output {
 						use super::runtime_types;
-						pub type Output = runtime_types :: argon_primitives :: block_seal :: ComputePuzzle < runtime_types :: sp_runtime :: generic :: block :: Block < runtime_types :: sp_runtime :: generic :: header :: Header < :: core :: primitive :: u32 > , :: subxt :: ext :: subxt_core :: utils :: UncheckedExtrinsic < :: subxt :: ext :: subxt_core :: utils :: MultiAddress < crate :: types :: AccountId32 , () > , runtime_types :: argon_node_runtime :: RuntimeCall , runtime_types :: sp_runtime :: MultiSignature , (runtime_types :: frame_system :: extensions :: check_non_zero_sender :: CheckNonZeroSender , runtime_types :: frame_system :: extensions :: check_spec_version :: CheckSpecVersion , runtime_types :: frame_system :: extensions :: check_tx_version :: CheckTxVersion , runtime_types :: frame_system :: extensions :: check_genesis :: CheckGenesis , runtime_types :: frame_system :: extensions :: check_mortality :: CheckMortality , runtime_types :: frame_system :: extensions :: check_nonce :: CheckNonce , runtime_types :: frame_system :: extensions :: check_weight :: CheckWeight , runtime_types :: pallet_transaction_payment :: ChargeTransactionPayment , runtime_types :: frame_metadata_hash_extension :: CheckMetadataHash ,) > > > ;
+						pub type Output = runtime_types :: argon_primitives :: block_seal :: ComputePuzzle < runtime_types :: sp_runtime :: generic :: block :: Block < runtime_types :: sp_runtime :: generic :: header :: Header < :: core :: primitive :: u32 > , :: subxt :: ext :: subxt_core :: utils :: UncheckedExtrinsic < :: subxt :: ext :: subxt_core :: utils :: MultiAddress < crate :: types :: AccountId32 , () > , runtime_types :: argon_runtime :: RuntimeCall , runtime_types :: sp_runtime :: MultiSignature , (runtime_types :: frame_system :: extensions :: check_non_zero_sender :: CheckNonZeroSender , runtime_types :: frame_system :: extensions :: check_spec_version :: CheckSpecVersion , runtime_types :: frame_system :: extensions :: check_tx_version :: CheckTxVersion , runtime_types :: frame_system :: extensions :: check_genesis :: CheckGenesis , runtime_types :: frame_system :: extensions :: check_mortality :: CheckMortality , runtime_types :: frame_system :: extensions :: check_nonce :: CheckNonce , runtime_types :: frame_system :: extensions :: check_weight :: CheckWeight , runtime_types :: pallet_transaction_payment :: ChargeTransactionPayment , runtime_types :: frame_metadata_hash_extension :: CheckMetadataHash ,) > > > ;
 					}
 				}
 				#[derive(
@@ -3388,6 +3392,58 @@ pub mod api {
 				}
 			}
 		}
+		pub mod configuration_apis {
+			use super::{root_mod, runtime_types};
+			#[doc = " Configuration items exposed via rpc so they can be confirmed externally"]
+			pub struct ConfigurationApis;
+			impl ConfigurationApis {
+				pub fn ismp_coprocessor(
+					&self,
+				) -> ::subxt::ext::subxt_core::runtime_api::payload::StaticPayload<
+					types::IsmpCoprocessor,
+					types::ismp_coprocessor::output::Output,
+				> {
+					::subxt::ext::subxt_core::runtime_api::payload::StaticPayload::new_static(
+						"ConfigurationApis",
+						"ismp_coprocessor",
+						types::IsmpCoprocessor {},
+						[
+							159u8, 166u8, 37u8, 236u8, 2u8, 207u8, 100u8, 209u8, 145u8, 255u8,
+							181u8, 153u8, 250u8, 227u8, 12u8, 106u8, 238u8, 49u8, 51u8, 107u8,
+							250u8, 5u8, 131u8, 190u8, 132u8, 96u8, 151u8, 243u8, 155u8, 81u8,
+							112u8, 165u8,
+						],
+					)
+				}
+			}
+			pub mod types {
+				use super::runtime_types;
+				pub mod ismp_coprocessor {
+					use super::runtime_types;
+					pub mod output {
+						use super::runtime_types;
+						pub type Output =
+							::core::option::Option<runtime_types::ismp::host::StateMachine>;
+					}
+				}
+				#[derive(
+					:: subxt :: ext :: subxt_core :: ext :: codec :: Decode,
+					:: subxt :: ext :: subxt_core :: ext :: codec :: Encode,
+					:: subxt :: ext :: subxt_core :: ext :: scale_decode :: DecodeAsType,
+					:: subxt :: ext :: subxt_core :: ext :: scale_encode :: EncodeAsType,
+					Clone,
+					Debug,
+				)]
+				# [codec (crate = :: subxt :: ext :: subxt_core :: ext :: codec)]
+				#[decode_as_type(
+					crate_path = ":: subxt :: ext :: subxt_core :: ext :: scale_decode"
+				)]
+				#[encode_as_type(
+					crate_path = ":: subxt :: ext :: subxt_core :: ext :: scale_encode"
+				)]
+				pub struct IsmpCoprocessor {}
+			}
+		}
 	}
 	pub fn custom() -> CustomValuesApi {
 		CustomValuesApi
@@ -3637,9 +3693,9 @@ pub mod api {
 			.hash();
 		runtime_metadata_hash ==
 			[
-				140u8, 27u8, 133u8, 158u8, 27u8, 242u8, 102u8, 119u8, 23u8, 163u8, 196u8, 101u8,
-				93u8, 26u8, 49u8, 72u8, 19u8, 248u8, 199u8, 200u8, 109u8, 238u8, 231u8, 73u8, 70u8,
-				152u8, 37u8, 94u8, 231u8, 140u8, 164u8, 204u8,
+				124u8, 179u8, 174u8, 10u8, 182u8, 162u8, 133u8, 29u8, 172u8, 130u8, 69u8, 182u8,
+				221u8, 154u8, 31u8, 165u8, 13u8, 143u8, 163u8, 241u8, 239u8, 181u8, 114u8, 243u8,
+				148u8, 167u8, 251u8, 62u8, 148u8, 245u8, 163u8, 148u8,
 			]
 	}
 	pub mod system {
@@ -4435,7 +4491,7 @@ pub mod api {
 					use super::runtime_types;
 					pub type Events = ::subxt::ext::subxt_core::alloc::vec::Vec<
 						runtime_types::frame_system::EventRecord<
-							runtime_types::argon_node_runtime::RuntimeEvent,
+							runtime_types::argon_runtime::RuntimeEvent,
 							crate::types::H256,
 						>,
 					>;
@@ -5383,7 +5439,7 @@ pub mod api {
 					use super::runtime_types;
 					pub type OtherSignatories =
 						::subxt::ext::subxt_core::alloc::vec::Vec<crate::types::AccountId32>;
-					pub type Call = runtime_types::argon_node_runtime::RuntimeCall;
+					pub type Call = runtime_types::argon_runtime::RuntimeCall;
 				}
 				impl ::subxt::ext::subxt_core::blocks::StaticExtrinsic for AsMultiThreshold1 {
 					const PALLET: &'static str = "Multisig";
@@ -5458,7 +5514,7 @@ pub mod api {
 					pub type MaybeTimepoint = ::core::option::Option<
 						runtime_types::pallet_multisig::Timepoint<::core::primitive::u32>,
 					>;
-					pub type Call = runtime_types::argon_node_runtime::RuntimeCall;
+					pub type Call = runtime_types::argon_runtime::RuntimeCall;
 					pub type MaxWeight = runtime_types::sp_weights::weight_v2::Weight;
 				}
 				impl ::subxt::ext::subxt_core::blocks::StaticExtrinsic for AsMulti {
@@ -6122,10 +6178,9 @@ pub mod api {
 						crate::types::AccountId32,
 						(),
 					>;
-					pub type ForceProxyType = ::core::option::Option<
-						runtime_types::argon_node_runtime::configs::ProxyType,
-					>;
-					pub type Call = runtime_types::argon_node_runtime::RuntimeCall;
+					pub type ForceProxyType =
+						::core::option::Option<runtime_types::argon_runtime::configs::ProxyType>;
+					pub type Call = runtime_types::argon_runtime::RuntimeCall;
 				}
 				impl ::subxt::ext::subxt_core::blocks::StaticExtrinsic for Proxy {
 					const PALLET: &'static str = "Proxy";
@@ -6166,7 +6221,7 @@ pub mod api {
 						crate::types::AccountId32,
 						(),
 					>;
-					pub type ProxyType = runtime_types::argon_node_runtime::configs::ProxyType;
+					pub type ProxyType = runtime_types::argon_runtime::configs::ProxyType;
 					pub type Delay = ::core::primitive::u32;
 				}
 				impl ::subxt::ext::subxt_core::blocks::StaticExtrinsic for AddProxy {
@@ -6206,7 +6261,7 @@ pub mod api {
 						crate::types::AccountId32,
 						(),
 					>;
-					pub type ProxyType = runtime_types::argon_node_runtime::configs::ProxyType;
+					pub type ProxyType = runtime_types::argon_runtime::configs::ProxyType;
 					pub type Delay = ::core::primitive::u32;
 				}
 				impl ::subxt::ext::subxt_core::blocks::StaticExtrinsic for RemoveProxy {
@@ -6279,7 +6334,7 @@ pub mod api {
 				}
 				pub mod create_pure {
 					use super::runtime_types;
-					pub type ProxyType = runtime_types::argon_node_runtime::configs::ProxyType;
+					pub type ProxyType = runtime_types::argon_runtime::configs::ProxyType;
 					pub type Delay = ::core::primitive::u32;
 					pub type Index = ::core::primitive::u16;
 				}
@@ -6333,7 +6388,7 @@ pub mod api {
 						crate::types::AccountId32,
 						(),
 					>;
-					pub type ProxyType = runtime_types::argon_node_runtime::configs::ProxyType;
+					pub type ProxyType = runtime_types::argon_runtime::configs::ProxyType;
 					pub type Index = ::core::primitive::u16;
 					pub type Height = ::core::primitive::u32;
 					pub type ExtIndex = ::core::primitive::u32;
@@ -6512,10 +6567,9 @@ pub mod api {
 						crate::types::AccountId32,
 						(),
 					>;
-					pub type ForceProxyType = ::core::option::Option<
-						runtime_types::argon_node_runtime::configs::ProxyType,
-					>;
-					pub type Call = runtime_types::argon_node_runtime::RuntimeCall;
+					pub type ForceProxyType =
+						::core::option::Option<runtime_types::argon_runtime::configs::ProxyType>;
+					pub type Call = runtime_types::argon_runtime::RuntimeCall;
 				}
 				impl ::subxt::ext::subxt_core::blocks::StaticExtrinsic for ProxyAnnounced {
 					const PALLET: &'static str = "Proxy";
@@ -6872,7 +6926,7 @@ pub mod api {
 				use super::runtime_types;
 				pub type Pure = crate::types::AccountId32;
 				pub type Who = crate::types::AccountId32;
-				pub type ProxyType = runtime_types::argon_node_runtime::configs::ProxyType;
+				pub type ProxyType = runtime_types::argon_runtime::configs::ProxyType;
 				pub type DisambiguationIndex = ::core::primitive::u16;
 			}
 			impl ::subxt::ext::subxt_core::events::StaticEvent for PureCreated {
@@ -6928,7 +6982,7 @@ pub mod api {
 				use super::runtime_types;
 				pub type Delegator = crate::types::AccountId32;
 				pub type Delegatee = crate::types::AccountId32;
-				pub type ProxyType = runtime_types::argon_node_runtime::configs::ProxyType;
+				pub type ProxyType = runtime_types::argon_runtime::configs::ProxyType;
 				pub type Delay = ::core::primitive::u32;
 			}
 			impl ::subxt::ext::subxt_core::events::StaticEvent for ProxyAdded {
@@ -6957,7 +7011,7 @@ pub mod api {
 				use super::runtime_types;
 				pub type Delegator = crate::types::AccountId32;
 				pub type Delegatee = crate::types::AccountId32;
-				pub type ProxyType = runtime_types::argon_node_runtime::configs::ProxyType;
+				pub type ProxyType = runtime_types::argon_runtime::configs::ProxyType;
 				pub type Delay = ::core::primitive::u32;
 			}
 			impl ::subxt::ext::subxt_core::events::StaticEvent for ProxyRemoved {
@@ -6975,7 +7029,7 @@ pub mod api {
 						runtime_types::bounded_collections::bounded_vec::BoundedVec<
 							runtime_types::pallet_proxy::ProxyDefinition<
 								crate::types::AccountId32,
-								runtime_types::argon_node_runtime::configs::ProxyType,
+								runtime_types::argon_runtime::configs::ProxyType,
 								::core::primitive::u32,
 							>,
 						>,
@@ -7391,7 +7445,7 @@ pub mod api {
 						runtime_types::argon_primitives::block_seal::RewardDestination<
 							crate::types::AccountId32,
 						>;
-					pub type Keys = runtime_types::argon_node_runtime::SessionKeys;
+					pub type Keys = runtime_types::argon_runtime::SessionKeys;
 				}
 				impl ::subxt::ext::subxt_core::blocks::StaticExtrinsic for Bid {
 					const PALLET: &'static str = "MiningSlot";
@@ -7473,7 +7527,7 @@ pub mod api {
 					runtime_types::argon_primitives::block_seal::MiningRegistration<
 						crate::types::AccountId32,
 						::core::primitive::u128,
-						runtime_types::argon_node_runtime::SessionKeys,
+						runtime_types::argon_runtime::SessionKeys,
 					>,
 				>;
 			}
@@ -7596,7 +7650,7 @@ pub mod api {
 						runtime_types::argon_primitives::block_seal::MiningRegistration<
 							crate::types::AccountId32,
 							::core::primitive::u128,
-							runtime_types::argon_node_runtime::SessionKeys,
+							runtime_types::argon_runtime::SessionKeys,
 						>;
 					pub type Param0 = ::core::primitive::u32;
 				}
@@ -7633,7 +7687,7 @@ pub mod api {
 							runtime_types::argon_primitives::block_seal::MiningRegistration<
 								crate::types::AccountId32,
 								::core::primitive::u128,
-								runtime_types::argon_node_runtime::SessionKeys,
+								runtime_types::argon_runtime::SessionKeys,
 							>,
 						>;
 				}
@@ -7647,7 +7701,7 @@ pub mod api {
 						runtime_types::argon_primitives::block_seal::MiningRegistration<
 							crate::types::AccountId32,
 							::core::primitive::u128,
-							runtime_types::argon_node_runtime::SessionKeys,
+							runtime_types::argon_runtime::SessionKeys,
 						>;
 				}
 				pub mod historical_bids_per_slot {
@@ -16392,7 +16446,7 @@ pub mod api {
 					use super::runtime_types;
 					pub type Holds = runtime_types::bounded_collections::bounded_vec::BoundedVec<
 						runtime_types::frame_support::traits::tokens::misc::IdAmount<
-							runtime_types::argon_node_runtime::RuntimeHoldReason,
+							runtime_types::argon_runtime::RuntimeHoldReason,
 							::core::primitive::u128,
 						>,
 					>;
@@ -16402,7 +16456,7 @@ pub mod api {
 					use super::runtime_types;
 					pub type Freezes = runtime_types::bounded_collections::bounded_vec::BoundedVec<
 						runtime_types::frame_support::traits::tokens::misc::IdAmount<
-							runtime_types::argon_node_runtime::RuntimeFreezeReason,
+							runtime_types::argon_runtime::RuntimeFreezeReason,
 							::core::primitive::u128,
 						>,
 					>;
@@ -18000,7 +18054,7 @@ pub mod api {
 					use super::runtime_types;
 					pub type Holds = runtime_types::bounded_collections::bounded_vec::BoundedVec<
 						runtime_types::frame_support::traits::tokens::misc::IdAmount<
-							runtime_types::argon_node_runtime::RuntimeHoldReason,
+							runtime_types::argon_runtime::RuntimeHoldReason,
 							::core::primitive::u128,
 						>,
 					>;
@@ -18010,7 +18064,7 @@ pub mod api {
 					use super::runtime_types;
 					pub type Freezes = runtime_types::bounded_collections::bounded_vec::BoundedVec<
 						runtime_types::frame_support::traits::tokens::misc::IdAmount<
-							runtime_types::argon_node_runtime::RuntimeFreezeReason,
+							runtime_types::argon_runtime::RuntimeFreezeReason,
 							::core::primitive::u128,
 						>,
 					>;
@@ -18957,7 +19011,7 @@ pub mod api {
 				pub mod batch {
 					use super::runtime_types;
 					pub type Calls = ::subxt::ext::subxt_core::alloc::vec::Vec<
-						runtime_types::argon_node_runtime::RuntimeCall,
+						runtime_types::argon_runtime::RuntimeCall,
 					>;
 				}
 				impl ::subxt::ext::subxt_core::blocks::StaticExtrinsic for Batch {
@@ -18999,7 +19053,7 @@ pub mod api {
 				pub mod as_derivative {
 					use super::runtime_types;
 					pub type Index = ::core::primitive::u16;
-					pub type Call = runtime_types::argon_node_runtime::RuntimeCall;
+					pub type Call = runtime_types::argon_runtime::RuntimeCall;
 				}
 				impl ::subxt::ext::subxt_core::blocks::StaticExtrinsic for AsDerivative {
 					const PALLET: &'static str = "Utility";
@@ -19039,7 +19093,7 @@ pub mod api {
 				pub mod batch_all {
 					use super::runtime_types;
 					pub type Calls = ::subxt::ext::subxt_core::alloc::vec::Vec<
-						runtime_types::argon_node_runtime::RuntimeCall,
+						runtime_types::argon_runtime::RuntimeCall,
 					>;
 				}
 				impl ::subxt::ext::subxt_core::blocks::StaticExtrinsic for BatchAll {
@@ -19074,8 +19128,8 @@ pub mod api {
 				}
 				pub mod dispatch_as {
 					use super::runtime_types;
-					pub type AsOrigin = runtime_types::argon_node_runtime::OriginCaller;
-					pub type Call = runtime_types::argon_node_runtime::RuntimeCall;
+					pub type AsOrigin = runtime_types::argon_runtime::OriginCaller;
+					pub type Call = runtime_types::argon_runtime::RuntimeCall;
 				}
 				impl ::subxt::ext::subxt_core::blocks::StaticExtrinsic for DispatchAs {
 					const PALLET: &'static str = "Utility";
@@ -19115,7 +19169,7 @@ pub mod api {
 				pub mod force_batch {
 					use super::runtime_types;
 					pub type Calls = ::subxt::ext::subxt_core::alloc::vec::Vec<
-						runtime_types::argon_node_runtime::RuntimeCall,
+						runtime_types::argon_runtime::RuntimeCall,
 					>;
 				}
 				impl ::subxt::ext::subxt_core::blocks::StaticExtrinsic for ForceBatch {
@@ -19149,7 +19203,7 @@ pub mod api {
 				}
 				pub mod with_weight {
 					use super::runtime_types;
-					pub type Call = runtime_types::argon_node_runtime::RuntimeCall;
+					pub type Call = runtime_types::argon_runtime::RuntimeCall;
 					pub type Weight = runtime_types::sp_weights::weight_v2::Weight;
 				}
 				impl ::subxt::ext::subxt_core::blocks::StaticExtrinsic for WithWeight {
@@ -19521,7 +19575,7 @@ pub mod api {
 				}
 				pub mod sudo {
 					use super::runtime_types;
-					pub type Call = runtime_types::argon_node_runtime::RuntimeCall;
+					pub type Call = runtime_types::argon_runtime::RuntimeCall;
 				}
 				impl ::subxt::ext::subxt_core::blocks::StaticExtrinsic for Sudo {
 					const PALLET: &'static str = "Sudo";
@@ -19554,7 +19608,7 @@ pub mod api {
 				}
 				pub mod sudo_unchecked_weight {
 					use super::runtime_types;
-					pub type Call = runtime_types::argon_node_runtime::RuntimeCall;
+					pub type Call = runtime_types::argon_runtime::RuntimeCall;
 					pub type Weight = runtime_types::sp_weights::weight_v2::Weight;
 				}
 				impl ::subxt::ext::subxt_core::blocks::StaticExtrinsic for SudoUncheckedWeight {
@@ -19621,7 +19675,7 @@ pub mod api {
 						crate::types::AccountId32,
 						(),
 					>;
-					pub type Call = runtime_types::argon_node_runtime::RuntimeCall;
+					pub type Call = runtime_types::argon_runtime::RuntimeCall;
 				}
 				impl ::subxt::ext::subxt_core::blocks::StaticExtrinsic for SudoAs {
 					const PALLET: &'static str = "Sudo";
@@ -21388,312 +21442,6 @@ pub mod api {
 	}
 	pub mod runtime_types {
 		use super::runtime_types;
-		pub mod argon_node_runtime {
-			use super::runtime_types;
-			pub mod configs {
-				use super::runtime_types;
-				#[derive(
-					:: subxt :: ext :: subxt_core :: ext :: codec :: Decode,
-					:: subxt :: ext :: subxt_core :: ext :: codec :: Encode,
-					:: subxt :: ext :: subxt_core :: ext :: scale_decode :: DecodeAsType,
-					:: subxt :: ext :: subxt_core :: ext :: scale_encode :: EncodeAsType,
-					Clone,
-					Debug,
-				)]
-				# [codec (crate = :: subxt :: ext :: subxt_core :: ext :: codec)]
-				#[decode_as_type(
-					crate_path = ":: subxt :: ext :: subxt_core :: ext :: scale_decode"
-				)]
-				#[encode_as_type(
-					crate_path = ":: subxt :: ext :: subxt_core :: ext :: scale_encode"
-				)]
-				pub enum ProxyType {
-					#[codec(index = 0)]
-					Any,
-					#[codec(index = 1)]
-					NonTransfer,
-					#[codec(index = 2)]
-					PriceIndex,
-				}
-			}
-			#[derive(
-				:: subxt :: ext :: subxt_core :: ext :: codec :: Decode,
-				:: subxt :: ext :: subxt_core :: ext :: codec :: Encode,
-				:: subxt :: ext :: subxt_core :: ext :: scale_decode :: DecodeAsType,
-				:: subxt :: ext :: subxt_core :: ext :: scale_encode :: EncodeAsType,
-				Clone,
-				Debug,
-			)]
-			# [codec (crate = :: subxt :: ext :: subxt_core :: ext :: codec)]
-			#[decode_as_type(crate_path = ":: subxt :: ext :: subxt_core :: ext :: scale_decode")]
-			#[encode_as_type(crate_path = ":: subxt :: ext :: subxt_core :: ext :: scale_encode")]
-			pub enum OriginCaller {
-				#[codec(index = 0)]
-				system(
-					runtime_types::frame_support::dispatch::RawOrigin<crate::types::AccountId32>,
-				),
-				#[codec(index = 1)]
-				Void(runtime_types::sp_core::Void),
-			}
-			#[derive(
-				:: subxt :: ext :: subxt_core :: ext :: codec :: Decode,
-				:: subxt :: ext :: subxt_core :: ext :: codec :: Encode,
-				:: subxt :: ext :: subxt_core :: ext :: scale_decode :: DecodeAsType,
-				:: subxt :: ext :: subxt_core :: ext :: scale_encode :: EncodeAsType,
-				Clone,
-				Debug,
-			)]
-			# [codec (crate = :: subxt :: ext :: subxt_core :: ext :: codec)]
-			#[decode_as_type(crate_path = ":: subxt :: ext :: subxt_core :: ext :: scale_decode")]
-			#[encode_as_type(crate_path = ":: subxt :: ext :: subxt_core :: ext :: scale_encode")]
-			pub struct Runtime;
-			#[derive(
-				:: subxt :: ext :: subxt_core :: ext :: codec :: Decode,
-				:: subxt :: ext :: subxt_core :: ext :: codec :: Encode,
-				:: subxt :: ext :: subxt_core :: ext :: scale_decode :: DecodeAsType,
-				:: subxt :: ext :: subxt_core :: ext :: scale_encode :: EncodeAsType,
-				Clone,
-				Debug,
-			)]
-			# [codec (crate = :: subxt :: ext :: subxt_core :: ext :: codec)]
-			#[decode_as_type(crate_path = ":: subxt :: ext :: subxt_core :: ext :: scale_decode")]
-			#[encode_as_type(crate_path = ":: subxt :: ext :: subxt_core :: ext :: scale_encode")]
-			pub enum RuntimeCall {
-				#[codec(index = 0)]
-				System(runtime_types::frame_system::pallet::Call),
-				#[codec(index = 2)]
-				Timestamp(runtime_types::pallet_timestamp::pallet::Call),
-				#[codec(index = 3)]
-				Multisig(runtime_types::pallet_multisig::pallet::Call),
-				#[codec(index = 4)]
-				Proxy(runtime_types::pallet_proxy::pallet::Call),
-				#[codec(index = 5)]
-				Ticks(runtime_types::pallet_ticks::pallet::Call),
-				#[codec(index = 6)]
-				MiningSlot(runtime_types::pallet_mining_slot::pallet::Call),
-				#[codec(index = 7)]
-				BitcoinUtxos(runtime_types::pallet_bitcoin_utxos::pallet::Call),
-				#[codec(index = 8)]
-				Vaults(runtime_types::pallet_vaults::pallet::Call),
-				#[codec(index = 9)]
-				Bonds(runtime_types::pallet_bond::pallet::Call),
-				#[codec(index = 10)]
-				Notaries(runtime_types::pallet_notaries::pallet::Call),
-				#[codec(index = 11)]
-				Notebook(runtime_types::pallet_notebook::pallet::Call),
-				#[codec(index = 12)]
-				ChainTransfer(runtime_types::pallet_chain_transfer::pallet::Call),
-				#[codec(index = 13)]
-				BlockSealSpec(runtime_types::pallet_block_seal_spec::pallet::Call),
-				#[codec(index = 14)]
-				Domains(runtime_types::pallet_domains::pallet::Call),
-				#[codec(index = 15)]
-				PriceIndex(runtime_types::pallet_price_index::pallet::Call),
-				#[codec(index = 17)]
-				Grandpa(runtime_types::pallet_grandpa::pallet::Call),
-				#[codec(index = 18)]
-				BlockSeal(runtime_types::pallet_block_seal::pallet::Call),
-				#[codec(index = 19)]
-				BlockRewards(runtime_types::pallet_block_rewards::pallet::Call),
-				#[codec(index = 20)]
-				Mint(runtime_types::pallet_mint::pallet::Call),
-				#[codec(index = 21)]
-				Balances(runtime_types::pallet_balances::pallet::Call),
-				#[codec(index = 22)]
-				Ownership(runtime_types::pallet_balances::pallet::Call),
-				#[codec(index = 23)]
-				TxPause(runtime_types::pallet_tx_pause::pallet::Call),
-				#[codec(index = 25)]
-				Utility(runtime_types::pallet_utility::pallet::Call),
-				#[codec(index = 26)]
-				Sudo(runtime_types::pallet_sudo::pallet::Call),
-				#[codec(index = 27)]
-				Ismp(runtime_types::pallet_ismp::pallet::Call),
-				#[codec(index = 28)]
-				IsmpGrandpa(runtime_types::ismp_grandpa::pallet::Call),
-			}
-			#[derive(
-				:: subxt :: ext :: subxt_core :: ext :: codec :: Decode,
-				:: subxt :: ext :: subxt_core :: ext :: codec :: Encode,
-				:: subxt :: ext :: subxt_core :: ext :: scale_decode :: DecodeAsType,
-				:: subxt :: ext :: subxt_core :: ext :: scale_encode :: EncodeAsType,
-				Clone,
-				Debug,
-			)]
-			# [codec (crate = :: subxt :: ext :: subxt_core :: ext :: codec)]
-			#[decode_as_type(crate_path = ":: subxt :: ext :: subxt_core :: ext :: scale_decode")]
-			#[encode_as_type(crate_path = ":: subxt :: ext :: subxt_core :: ext :: scale_encode")]
-			pub enum RuntimeError {
-				#[codec(index = 0)]
-				System(runtime_types::frame_system::pallet::Error),
-				#[codec(index = 1)]
-				Digests(runtime_types::pallet_digests::pallet::Error),
-				#[codec(index = 3)]
-				Multisig(runtime_types::pallet_multisig::pallet::Error),
-				#[codec(index = 4)]
-				Proxy(runtime_types::pallet_proxy::pallet::Error),
-				#[codec(index = 5)]
-				Ticks(runtime_types::pallet_ticks::pallet::Error),
-				#[codec(index = 6)]
-				MiningSlot(runtime_types::pallet_mining_slot::pallet::Error),
-				#[codec(index = 7)]
-				BitcoinUtxos(runtime_types::pallet_bitcoin_utxos::pallet::Error),
-				#[codec(index = 8)]
-				Vaults(runtime_types::pallet_vaults::pallet::Error),
-				#[codec(index = 9)]
-				Bonds(runtime_types::pallet_bond::pallet::Error),
-				#[codec(index = 10)]
-				Notaries(runtime_types::pallet_notaries::pallet::Error),
-				#[codec(index = 11)]
-				Notebook(runtime_types::pallet_notebook::pallet::Error),
-				#[codec(index = 12)]
-				ChainTransfer(runtime_types::pallet_chain_transfer::pallet::Error),
-				#[codec(index = 13)]
-				BlockSealSpec(runtime_types::pallet_block_seal_spec::pallet::Error),
-				#[codec(index = 14)]
-				Domains(runtime_types::pallet_domains::pallet::Error),
-				#[codec(index = 15)]
-				PriceIndex(runtime_types::pallet_price_index::pallet::Error),
-				#[codec(index = 17)]
-				Grandpa(runtime_types::pallet_grandpa::pallet::Error),
-				#[codec(index = 18)]
-				BlockSeal(runtime_types::pallet_block_seal::pallet::Error),
-				#[codec(index = 19)]
-				BlockRewards(runtime_types::pallet_block_rewards::pallet::Error),
-				#[codec(index = 20)]
-				Mint(runtime_types::pallet_mint::pallet::Error),
-				#[codec(index = 21)]
-				Balances(runtime_types::pallet_balances::pallet::Error),
-				#[codec(index = 22)]
-				Ownership(runtime_types::pallet_balances::pallet::Error),
-				#[codec(index = 23)]
-				TxPause(runtime_types::pallet_tx_pause::pallet::Error),
-				#[codec(index = 25)]
-				Utility(runtime_types::pallet_utility::pallet::Error),
-				#[codec(index = 26)]
-				Sudo(runtime_types::pallet_sudo::pallet::Error),
-				#[codec(index = 27)]
-				Ismp(runtime_types::pallet_ismp::pallet::Error),
-				#[codec(index = 29)]
-				Hyperbridge(runtime_types::pallet_hyperbridge::pallet::Error),
-			}
-			#[derive(
-				:: subxt :: ext :: subxt_core :: ext :: codec :: Decode,
-				:: subxt :: ext :: subxt_core :: ext :: codec :: Encode,
-				:: subxt :: ext :: subxt_core :: ext :: scale_decode :: DecodeAsType,
-				:: subxt :: ext :: subxt_core :: ext :: scale_encode :: EncodeAsType,
-				Clone,
-				Debug,
-			)]
-			# [codec (crate = :: subxt :: ext :: subxt_core :: ext :: codec)]
-			#[decode_as_type(crate_path = ":: subxt :: ext :: subxt_core :: ext :: scale_decode")]
-			#[encode_as_type(crate_path = ":: subxt :: ext :: subxt_core :: ext :: scale_encode")]
-			pub enum RuntimeEvent {
-				#[codec(index = 0)]
-				System(runtime_types::frame_system::pallet::Event),
-				#[codec(index = 1)]
-				Digests(runtime_types::pallet_digests::pallet::Event),
-				#[codec(index = 3)]
-				Multisig(runtime_types::pallet_multisig::pallet::Event),
-				#[codec(index = 4)]
-				Proxy(runtime_types::pallet_proxy::pallet::Event),
-				#[codec(index = 6)]
-				MiningSlot(runtime_types::pallet_mining_slot::pallet::Event),
-				#[codec(index = 7)]
-				BitcoinUtxos(runtime_types::pallet_bitcoin_utxos::pallet::Event),
-				#[codec(index = 8)]
-				Vaults(runtime_types::pallet_vaults::pallet::Event),
-				#[codec(index = 9)]
-				Bonds(runtime_types::pallet_bond::pallet::Event),
-				#[codec(index = 10)]
-				Notaries(runtime_types::pallet_notaries::pallet::Event),
-				#[codec(index = 11)]
-				Notebook(runtime_types::pallet_notebook::pallet::Event),
-				#[codec(index = 12)]
-				ChainTransfer(runtime_types::pallet_chain_transfer::pallet::Event),
-				#[codec(index = 13)]
-				BlockSealSpec(runtime_types::pallet_block_seal_spec::pallet::Event),
-				#[codec(index = 14)]
-				Domains(runtime_types::pallet_domains::pallet::Event),
-				#[codec(index = 15)]
-				PriceIndex(runtime_types::pallet_price_index::pallet::Event),
-				#[codec(index = 17)]
-				Grandpa(runtime_types::pallet_grandpa::pallet::Event),
-				#[codec(index = 19)]
-				BlockRewards(runtime_types::pallet_block_rewards::pallet::Event),
-				#[codec(index = 20)]
-				Mint(runtime_types::pallet_mint::pallet::Event),
-				#[codec(index = 21)]
-				Balances(runtime_types::pallet_balances::pallet::Event),
-				#[codec(index = 22)]
-				Ownership(runtime_types::pallet_balances::pallet::Event),
-				#[codec(index = 23)]
-				TxPause(runtime_types::pallet_tx_pause::pallet::Event),
-				#[codec(index = 24)]
-				TransactionPayment(runtime_types::pallet_transaction_payment::pallet::Event),
-				#[codec(index = 25)]
-				Utility(runtime_types::pallet_utility::pallet::Event),
-				#[codec(index = 26)]
-				Sudo(runtime_types::pallet_sudo::pallet::Event),
-				#[codec(index = 27)]
-				Ismp(runtime_types::pallet_ismp::pallet::Event),
-				#[codec(index = 28)]
-				IsmpGrandpa(runtime_types::ismp_grandpa::pallet::Event),
-				#[codec(index = 29)]
-				Hyperbridge(runtime_types::pallet_hyperbridge::pallet::Event),
-			}
-			#[derive(
-				:: subxt :: ext :: subxt_core :: ext :: codec :: Decode,
-				:: subxt :: ext :: subxt_core :: ext :: codec :: Encode,
-				:: subxt :: ext :: subxt_core :: ext :: scale_decode :: DecodeAsType,
-				:: subxt :: ext :: subxt_core :: ext :: scale_encode :: EncodeAsType,
-				Clone,
-				Debug,
-			)]
-			# [codec (crate = :: subxt :: ext :: subxt_core :: ext :: codec)]
-			#[decode_as_type(crate_path = ":: subxt :: ext :: subxt_core :: ext :: scale_decode")]
-			#[encode_as_type(crate_path = ":: subxt :: ext :: subxt_core :: ext :: scale_encode")]
-			pub enum RuntimeFreezeReason {
-				#[codec(index = 19)]
-				BlockRewards(runtime_types::pallet_block_rewards::pallet::FreezeReason),
-			}
-			#[derive(
-				:: subxt :: ext :: subxt_core :: ext :: codec :: Decode,
-				:: subxt :: ext :: subxt_core :: ext :: codec :: Encode,
-				:: subxt :: ext :: subxt_core :: ext :: scale_decode :: DecodeAsType,
-				:: subxt :: ext :: subxt_core :: ext :: scale_encode :: EncodeAsType,
-				Clone,
-				Debug,
-			)]
-			# [codec (crate = :: subxt :: ext :: subxt_core :: ext :: codec)]
-			#[decode_as_type(crate_path = ":: subxt :: ext :: subxt_core :: ext :: scale_decode")]
-			#[encode_as_type(crate_path = ":: subxt :: ext :: subxt_core :: ext :: scale_encode")]
-			pub enum RuntimeHoldReason {
-				#[codec(index = 6)]
-				MiningSlot(runtime_types::pallet_mining_slot::pallet::HoldReason),
-				#[codec(index = 8)]
-				Vaults(runtime_types::pallet_vaults::pallet::HoldReason),
-				#[codec(index = 9)]
-				Bonds(runtime_types::pallet_bond::pallet::HoldReason),
-				#[codec(index = 19)]
-				BlockRewards(runtime_types::pallet_block_rewards::pallet::HoldReason),
-			}
-			#[derive(
-				:: subxt :: ext :: subxt_core :: ext :: codec :: Decode,
-				:: subxt :: ext :: subxt_core :: ext :: codec :: Encode,
-				:: subxt :: ext :: subxt_core :: ext :: scale_decode :: DecodeAsType,
-				:: subxt :: ext :: subxt_core :: ext :: scale_encode :: EncodeAsType,
-				Clone,
-				Debug,
-			)]
-			# [codec (crate = :: subxt :: ext :: subxt_core :: ext :: codec)]
-			#[decode_as_type(crate_path = ":: subxt :: ext :: subxt_core :: ext :: scale_decode")]
-			#[encode_as_type(crate_path = ":: subxt :: ext :: subxt_core :: ext :: scale_encode")]
-			pub struct SessionKeys {
-				pub grandpa: runtime_types::sp_consensus_grandpa::app::Public,
-				pub block_seal_authority: runtime_types::argon_primitives::block_seal::app::Public,
-			}
-		}
 		pub mod argon_notary_audit {
 			use super::runtime_types;
 			pub mod error {
@@ -23473,6 +23221,312 @@ pub mod api {
 					#[codec(compact)]
 					pub channel_hold_expiration_ticks: ::core::primitive::u64,
 				}
+			}
+		}
+		pub mod argon_runtime {
+			use super::runtime_types;
+			pub mod configs {
+				use super::runtime_types;
+				#[derive(
+					:: subxt :: ext :: subxt_core :: ext :: codec :: Decode,
+					:: subxt :: ext :: subxt_core :: ext :: codec :: Encode,
+					:: subxt :: ext :: subxt_core :: ext :: scale_decode :: DecodeAsType,
+					:: subxt :: ext :: subxt_core :: ext :: scale_encode :: EncodeAsType,
+					Clone,
+					Debug,
+				)]
+				# [codec (crate = :: subxt :: ext :: subxt_core :: ext :: codec)]
+				#[decode_as_type(
+					crate_path = ":: subxt :: ext :: subxt_core :: ext :: scale_decode"
+				)]
+				#[encode_as_type(
+					crate_path = ":: subxt :: ext :: subxt_core :: ext :: scale_encode"
+				)]
+				pub enum ProxyType {
+					#[codec(index = 0)]
+					Any,
+					#[codec(index = 1)]
+					NonTransfer,
+					#[codec(index = 2)]
+					PriceIndex,
+				}
+			}
+			#[derive(
+				:: subxt :: ext :: subxt_core :: ext :: codec :: Decode,
+				:: subxt :: ext :: subxt_core :: ext :: codec :: Encode,
+				:: subxt :: ext :: subxt_core :: ext :: scale_decode :: DecodeAsType,
+				:: subxt :: ext :: subxt_core :: ext :: scale_encode :: EncodeAsType,
+				Clone,
+				Debug,
+			)]
+			# [codec (crate = :: subxt :: ext :: subxt_core :: ext :: codec)]
+			#[decode_as_type(crate_path = ":: subxt :: ext :: subxt_core :: ext :: scale_decode")]
+			#[encode_as_type(crate_path = ":: subxt :: ext :: subxt_core :: ext :: scale_encode")]
+			pub enum OriginCaller {
+				#[codec(index = 0)]
+				system(
+					runtime_types::frame_support::dispatch::RawOrigin<crate::types::AccountId32>,
+				),
+				#[codec(index = 1)]
+				Void(runtime_types::sp_core::Void),
+			}
+			#[derive(
+				:: subxt :: ext :: subxt_core :: ext :: codec :: Decode,
+				:: subxt :: ext :: subxt_core :: ext :: codec :: Encode,
+				:: subxt :: ext :: subxt_core :: ext :: scale_decode :: DecodeAsType,
+				:: subxt :: ext :: subxt_core :: ext :: scale_encode :: EncodeAsType,
+				Clone,
+				Debug,
+			)]
+			# [codec (crate = :: subxt :: ext :: subxt_core :: ext :: codec)]
+			#[decode_as_type(crate_path = ":: subxt :: ext :: subxt_core :: ext :: scale_decode")]
+			#[encode_as_type(crate_path = ":: subxt :: ext :: subxt_core :: ext :: scale_encode")]
+			pub struct Runtime;
+			#[derive(
+				:: subxt :: ext :: subxt_core :: ext :: codec :: Decode,
+				:: subxt :: ext :: subxt_core :: ext :: codec :: Encode,
+				:: subxt :: ext :: subxt_core :: ext :: scale_decode :: DecodeAsType,
+				:: subxt :: ext :: subxt_core :: ext :: scale_encode :: EncodeAsType,
+				Clone,
+				Debug,
+			)]
+			# [codec (crate = :: subxt :: ext :: subxt_core :: ext :: codec)]
+			#[decode_as_type(crate_path = ":: subxt :: ext :: subxt_core :: ext :: scale_decode")]
+			#[encode_as_type(crate_path = ":: subxt :: ext :: subxt_core :: ext :: scale_encode")]
+			pub enum RuntimeCall {
+				#[codec(index = 0)]
+				System(runtime_types::frame_system::pallet::Call),
+				#[codec(index = 2)]
+				Timestamp(runtime_types::pallet_timestamp::pallet::Call),
+				#[codec(index = 3)]
+				Multisig(runtime_types::pallet_multisig::pallet::Call),
+				#[codec(index = 4)]
+				Proxy(runtime_types::pallet_proxy::pallet::Call),
+				#[codec(index = 5)]
+				Ticks(runtime_types::pallet_ticks::pallet::Call),
+				#[codec(index = 6)]
+				MiningSlot(runtime_types::pallet_mining_slot::pallet::Call),
+				#[codec(index = 7)]
+				BitcoinUtxos(runtime_types::pallet_bitcoin_utxos::pallet::Call),
+				#[codec(index = 8)]
+				Vaults(runtime_types::pallet_vaults::pallet::Call),
+				#[codec(index = 9)]
+				Bonds(runtime_types::pallet_bond::pallet::Call),
+				#[codec(index = 10)]
+				Notaries(runtime_types::pallet_notaries::pallet::Call),
+				#[codec(index = 11)]
+				Notebook(runtime_types::pallet_notebook::pallet::Call),
+				#[codec(index = 12)]
+				ChainTransfer(runtime_types::pallet_chain_transfer::pallet::Call),
+				#[codec(index = 13)]
+				BlockSealSpec(runtime_types::pallet_block_seal_spec::pallet::Call),
+				#[codec(index = 14)]
+				Domains(runtime_types::pallet_domains::pallet::Call),
+				#[codec(index = 15)]
+				PriceIndex(runtime_types::pallet_price_index::pallet::Call),
+				#[codec(index = 17)]
+				Grandpa(runtime_types::pallet_grandpa::pallet::Call),
+				#[codec(index = 18)]
+				BlockSeal(runtime_types::pallet_block_seal::pallet::Call),
+				#[codec(index = 19)]
+				BlockRewards(runtime_types::pallet_block_rewards::pallet::Call),
+				#[codec(index = 20)]
+				Mint(runtime_types::pallet_mint::pallet::Call),
+				#[codec(index = 21)]
+				Balances(runtime_types::pallet_balances::pallet::Call),
+				#[codec(index = 22)]
+				Ownership(runtime_types::pallet_balances::pallet::Call),
+				#[codec(index = 23)]
+				TxPause(runtime_types::pallet_tx_pause::pallet::Call),
+				#[codec(index = 25)]
+				Utility(runtime_types::pallet_utility::pallet::Call),
+				#[codec(index = 26)]
+				Sudo(runtime_types::pallet_sudo::pallet::Call),
+				#[codec(index = 27)]
+				Ismp(runtime_types::pallet_ismp::pallet::Call),
+				#[codec(index = 28)]
+				IsmpGrandpa(runtime_types::ismp_grandpa::pallet::Call),
+			}
+			#[derive(
+				:: subxt :: ext :: subxt_core :: ext :: codec :: Decode,
+				:: subxt :: ext :: subxt_core :: ext :: codec :: Encode,
+				:: subxt :: ext :: subxt_core :: ext :: scale_decode :: DecodeAsType,
+				:: subxt :: ext :: subxt_core :: ext :: scale_encode :: EncodeAsType,
+				Clone,
+				Debug,
+			)]
+			# [codec (crate = :: subxt :: ext :: subxt_core :: ext :: codec)]
+			#[decode_as_type(crate_path = ":: subxt :: ext :: subxt_core :: ext :: scale_decode")]
+			#[encode_as_type(crate_path = ":: subxt :: ext :: subxt_core :: ext :: scale_encode")]
+			pub enum RuntimeError {
+				#[codec(index = 0)]
+				System(runtime_types::frame_system::pallet::Error),
+				#[codec(index = 1)]
+				Digests(runtime_types::pallet_digests::pallet::Error),
+				#[codec(index = 3)]
+				Multisig(runtime_types::pallet_multisig::pallet::Error),
+				#[codec(index = 4)]
+				Proxy(runtime_types::pallet_proxy::pallet::Error),
+				#[codec(index = 5)]
+				Ticks(runtime_types::pallet_ticks::pallet::Error),
+				#[codec(index = 6)]
+				MiningSlot(runtime_types::pallet_mining_slot::pallet::Error),
+				#[codec(index = 7)]
+				BitcoinUtxos(runtime_types::pallet_bitcoin_utxos::pallet::Error),
+				#[codec(index = 8)]
+				Vaults(runtime_types::pallet_vaults::pallet::Error),
+				#[codec(index = 9)]
+				Bonds(runtime_types::pallet_bond::pallet::Error),
+				#[codec(index = 10)]
+				Notaries(runtime_types::pallet_notaries::pallet::Error),
+				#[codec(index = 11)]
+				Notebook(runtime_types::pallet_notebook::pallet::Error),
+				#[codec(index = 12)]
+				ChainTransfer(runtime_types::pallet_chain_transfer::pallet::Error),
+				#[codec(index = 13)]
+				BlockSealSpec(runtime_types::pallet_block_seal_spec::pallet::Error),
+				#[codec(index = 14)]
+				Domains(runtime_types::pallet_domains::pallet::Error),
+				#[codec(index = 15)]
+				PriceIndex(runtime_types::pallet_price_index::pallet::Error),
+				#[codec(index = 17)]
+				Grandpa(runtime_types::pallet_grandpa::pallet::Error),
+				#[codec(index = 18)]
+				BlockSeal(runtime_types::pallet_block_seal::pallet::Error),
+				#[codec(index = 19)]
+				BlockRewards(runtime_types::pallet_block_rewards::pallet::Error),
+				#[codec(index = 20)]
+				Mint(runtime_types::pallet_mint::pallet::Error),
+				#[codec(index = 21)]
+				Balances(runtime_types::pallet_balances::pallet::Error),
+				#[codec(index = 22)]
+				Ownership(runtime_types::pallet_balances::pallet::Error),
+				#[codec(index = 23)]
+				TxPause(runtime_types::pallet_tx_pause::pallet::Error),
+				#[codec(index = 25)]
+				Utility(runtime_types::pallet_utility::pallet::Error),
+				#[codec(index = 26)]
+				Sudo(runtime_types::pallet_sudo::pallet::Error),
+				#[codec(index = 27)]
+				Ismp(runtime_types::pallet_ismp::pallet::Error),
+				#[codec(index = 29)]
+				Hyperbridge(runtime_types::pallet_hyperbridge::pallet::Error),
+			}
+			#[derive(
+				:: subxt :: ext :: subxt_core :: ext :: codec :: Decode,
+				:: subxt :: ext :: subxt_core :: ext :: codec :: Encode,
+				:: subxt :: ext :: subxt_core :: ext :: scale_decode :: DecodeAsType,
+				:: subxt :: ext :: subxt_core :: ext :: scale_encode :: EncodeAsType,
+				Clone,
+				Debug,
+			)]
+			# [codec (crate = :: subxt :: ext :: subxt_core :: ext :: codec)]
+			#[decode_as_type(crate_path = ":: subxt :: ext :: subxt_core :: ext :: scale_decode")]
+			#[encode_as_type(crate_path = ":: subxt :: ext :: subxt_core :: ext :: scale_encode")]
+			pub enum RuntimeEvent {
+				#[codec(index = 0)]
+				System(runtime_types::frame_system::pallet::Event),
+				#[codec(index = 1)]
+				Digests(runtime_types::pallet_digests::pallet::Event),
+				#[codec(index = 3)]
+				Multisig(runtime_types::pallet_multisig::pallet::Event),
+				#[codec(index = 4)]
+				Proxy(runtime_types::pallet_proxy::pallet::Event),
+				#[codec(index = 6)]
+				MiningSlot(runtime_types::pallet_mining_slot::pallet::Event),
+				#[codec(index = 7)]
+				BitcoinUtxos(runtime_types::pallet_bitcoin_utxos::pallet::Event),
+				#[codec(index = 8)]
+				Vaults(runtime_types::pallet_vaults::pallet::Event),
+				#[codec(index = 9)]
+				Bonds(runtime_types::pallet_bond::pallet::Event),
+				#[codec(index = 10)]
+				Notaries(runtime_types::pallet_notaries::pallet::Event),
+				#[codec(index = 11)]
+				Notebook(runtime_types::pallet_notebook::pallet::Event),
+				#[codec(index = 12)]
+				ChainTransfer(runtime_types::pallet_chain_transfer::pallet::Event),
+				#[codec(index = 13)]
+				BlockSealSpec(runtime_types::pallet_block_seal_spec::pallet::Event),
+				#[codec(index = 14)]
+				Domains(runtime_types::pallet_domains::pallet::Event),
+				#[codec(index = 15)]
+				PriceIndex(runtime_types::pallet_price_index::pallet::Event),
+				#[codec(index = 17)]
+				Grandpa(runtime_types::pallet_grandpa::pallet::Event),
+				#[codec(index = 19)]
+				BlockRewards(runtime_types::pallet_block_rewards::pallet::Event),
+				#[codec(index = 20)]
+				Mint(runtime_types::pallet_mint::pallet::Event),
+				#[codec(index = 21)]
+				Balances(runtime_types::pallet_balances::pallet::Event),
+				#[codec(index = 22)]
+				Ownership(runtime_types::pallet_balances::pallet::Event),
+				#[codec(index = 23)]
+				TxPause(runtime_types::pallet_tx_pause::pallet::Event),
+				#[codec(index = 24)]
+				TransactionPayment(runtime_types::pallet_transaction_payment::pallet::Event),
+				#[codec(index = 25)]
+				Utility(runtime_types::pallet_utility::pallet::Event),
+				#[codec(index = 26)]
+				Sudo(runtime_types::pallet_sudo::pallet::Event),
+				#[codec(index = 27)]
+				Ismp(runtime_types::pallet_ismp::pallet::Event),
+				#[codec(index = 28)]
+				IsmpGrandpa(runtime_types::ismp_grandpa::pallet::Event),
+				#[codec(index = 29)]
+				Hyperbridge(runtime_types::pallet_hyperbridge::pallet::Event),
+			}
+			#[derive(
+				:: subxt :: ext :: subxt_core :: ext :: codec :: Decode,
+				:: subxt :: ext :: subxt_core :: ext :: codec :: Encode,
+				:: subxt :: ext :: subxt_core :: ext :: scale_decode :: DecodeAsType,
+				:: subxt :: ext :: subxt_core :: ext :: scale_encode :: EncodeAsType,
+				Clone,
+				Debug,
+			)]
+			# [codec (crate = :: subxt :: ext :: subxt_core :: ext :: codec)]
+			#[decode_as_type(crate_path = ":: subxt :: ext :: subxt_core :: ext :: scale_decode")]
+			#[encode_as_type(crate_path = ":: subxt :: ext :: subxt_core :: ext :: scale_encode")]
+			pub enum RuntimeFreezeReason {
+				#[codec(index = 19)]
+				BlockRewards(runtime_types::pallet_block_rewards::pallet::FreezeReason),
+			}
+			#[derive(
+				:: subxt :: ext :: subxt_core :: ext :: codec :: Decode,
+				:: subxt :: ext :: subxt_core :: ext :: codec :: Encode,
+				:: subxt :: ext :: subxt_core :: ext :: scale_decode :: DecodeAsType,
+				:: subxt :: ext :: subxt_core :: ext :: scale_encode :: EncodeAsType,
+				Clone,
+				Debug,
+			)]
+			# [codec (crate = :: subxt :: ext :: subxt_core :: ext :: codec)]
+			#[decode_as_type(crate_path = ":: subxt :: ext :: subxt_core :: ext :: scale_decode")]
+			#[encode_as_type(crate_path = ":: subxt :: ext :: subxt_core :: ext :: scale_encode")]
+			pub enum RuntimeHoldReason {
+				#[codec(index = 6)]
+				MiningSlot(runtime_types::pallet_mining_slot::pallet::HoldReason),
+				#[codec(index = 8)]
+				Vaults(runtime_types::pallet_vaults::pallet::HoldReason),
+				#[codec(index = 9)]
+				Bonds(runtime_types::pallet_bond::pallet::HoldReason),
+				#[codec(index = 19)]
+				BlockRewards(runtime_types::pallet_block_rewards::pallet::HoldReason),
+			}
+			#[derive(
+				:: subxt :: ext :: subxt_core :: ext :: codec :: Decode,
+				:: subxt :: ext :: subxt_core :: ext :: codec :: Encode,
+				:: subxt :: ext :: subxt_core :: ext :: scale_decode :: DecodeAsType,
+				:: subxt :: ext :: subxt_core :: ext :: scale_encode :: EncodeAsType,
+				Clone,
+				Debug,
+			)]
+			# [codec (crate = :: subxt :: ext :: subxt_core :: ext :: codec)]
+			#[decode_as_type(crate_path = ":: subxt :: ext :: subxt_core :: ext :: scale_decode")]
+			#[encode_as_type(crate_path = ":: subxt :: ext :: subxt_core :: ext :: scale_encode")]
+			pub struct SessionKeys {
+				pub grandpa: runtime_types::sp_consensus_grandpa::app::Public,
+				pub block_seal_authority: runtime_types::argon_primitives::block_seal::app::Public,
 			}
 		}
 		pub mod bounded_collections {
@@ -27451,7 +27505,7 @@ pub mod api {
 							runtime_types::argon_primitives::block_seal::RewardDestination<
 								crate::types::AccountId32,
 							>,
-						keys: runtime_types::argon_node_runtime::SessionKeys,
+						keys: runtime_types::argon_runtime::SessionKeys,
 					},
 				}
 				#[derive(
@@ -27541,7 +27595,7 @@ pub mod api {
 							runtime_types::argon_primitives::block_seal::MiningRegistration<
 								crate::types::AccountId32,
 								::core::primitive::u128,
-								runtime_types::argon_node_runtime::SessionKeys,
+								runtime_types::argon_runtime::SessionKeys,
 							>,
 						>,
 					},
@@ -27741,7 +27795,7 @@ pub mod api {
 						other_signatories:
 							::subxt::ext::subxt_core::alloc::vec::Vec<crate::types::AccountId32>,
 						call: ::subxt::ext::subxt_core::alloc::boxed::Box<
-							runtime_types::argon_node_runtime::RuntimeCall,
+							runtime_types::argon_runtime::RuntimeCall,
 						>,
 					},
 					#[codec(index = 1)]
@@ -27792,7 +27846,7 @@ pub mod api {
 							runtime_types::pallet_multisig::Timepoint<::core::primitive::u32>,
 						>,
 						call: ::subxt::ext::subxt_core::alloc::boxed::Box<
-							runtime_types::argon_node_runtime::RuntimeCall,
+							runtime_types::argon_runtime::RuntimeCall,
 						>,
 						max_weight: runtime_types::sp_weights::weight_v2::Weight,
 					},
@@ -28422,10 +28476,10 @@ pub mod api {
 							(),
 						>,
 						force_proxy_type: ::core::option::Option<
-							runtime_types::argon_node_runtime::configs::ProxyType,
+							runtime_types::argon_runtime::configs::ProxyType,
 						>,
 						call: ::subxt::ext::subxt_core::alloc::boxed::Box<
-							runtime_types::argon_node_runtime::RuntimeCall,
+							runtime_types::argon_runtime::RuntimeCall,
 						>,
 					},
 					#[codec(index = 1)]
@@ -28443,7 +28497,7 @@ pub mod api {
 							crate::types::AccountId32,
 							(),
 						>,
-						proxy_type: runtime_types::argon_node_runtime::configs::ProxyType,
+						proxy_type: runtime_types::argon_runtime::configs::ProxyType,
 						delay: ::core::primitive::u32,
 					},
 					#[codec(index = 2)]
@@ -28459,7 +28513,7 @@ pub mod api {
 							crate::types::AccountId32,
 							(),
 						>,
-						proxy_type: runtime_types::argon_node_runtime::configs::ProxyType,
+						proxy_type: runtime_types::argon_runtime::configs::ProxyType,
 						delay: ::core::primitive::u32,
 					},
 					#[codec(index = 3)]
@@ -28490,7 +28544,7 @@ pub mod api {
 					#[doc = ""]
 					#[doc = "Fails if there are insufficient funds to pay for deposit."]
 					create_pure {
-						proxy_type: runtime_types::argon_node_runtime::configs::ProxyType,
+						proxy_type: runtime_types::argon_runtime::configs::ProxyType,
 						delay: ::core::primitive::u32,
 						index: ::core::primitive::u16,
 					},
@@ -28516,7 +28570,7 @@ pub mod api {
 							crate::types::AccountId32,
 							(),
 						>,
-						proxy_type: runtime_types::argon_node_runtime::configs::ProxyType,
+						proxy_type: runtime_types::argon_runtime::configs::ProxyType,
 						index: ::core::primitive::u16,
 						#[codec(compact)]
 						height: ::core::primitive::u32,
@@ -28604,10 +28658,10 @@ pub mod api {
 							(),
 						>,
 						force_proxy_type: ::core::option::Option<
-							runtime_types::argon_node_runtime::configs::ProxyType,
+							runtime_types::argon_runtime::configs::ProxyType,
 						>,
 						call: ::subxt::ext::subxt_core::alloc::boxed::Box<
-							runtime_types::argon_node_runtime::RuntimeCall,
+							runtime_types::argon_runtime::RuntimeCall,
 						>,
 					},
 				}
@@ -28682,7 +28736,7 @@ pub mod api {
 					PureCreated {
 						pure: crate::types::AccountId32,
 						who: crate::types::AccountId32,
-						proxy_type: runtime_types::argon_node_runtime::configs::ProxyType,
+						proxy_type: runtime_types::argon_runtime::configs::ProxyType,
 						disambiguation_index: ::core::primitive::u16,
 					},
 					#[codec(index = 2)]
@@ -28697,7 +28751,7 @@ pub mod api {
 					ProxyAdded {
 						delegator: crate::types::AccountId32,
 						delegatee: crate::types::AccountId32,
-						proxy_type: runtime_types::argon_node_runtime::configs::ProxyType,
+						proxy_type: runtime_types::argon_runtime::configs::ProxyType,
 						delay: ::core::primitive::u32,
 					},
 					#[codec(index = 4)]
@@ -28705,7 +28759,7 @@ pub mod api {
 					ProxyRemoved {
 						delegator: crate::types::AccountId32,
 						delegatee: crate::types::AccountId32,
-						proxy_type: runtime_types::argon_node_runtime::configs::ProxyType,
+						proxy_type: runtime_types::argon_runtime::configs::ProxyType,
 						delay: ::core::primitive::u32,
 					},
 				}
@@ -28768,7 +28822,7 @@ pub mod api {
 					#[doc = "Authenticates the sudo key and dispatches a function call with `Root` origin."]
 					sudo {
 						call: ::subxt::ext::subxt_core::alloc::boxed::Box<
-							runtime_types::argon_node_runtime::RuntimeCall,
+							runtime_types::argon_runtime::RuntimeCall,
 						>,
 					},
 					#[codec(index = 1)]
@@ -28779,7 +28833,7 @@ pub mod api {
 					#[doc = "The dispatch origin for this call must be _Signed_."]
 					sudo_unchecked_weight {
 						call: ::subxt::ext::subxt_core::alloc::boxed::Box<
-							runtime_types::argon_node_runtime::RuntimeCall,
+							runtime_types::argon_runtime::RuntimeCall,
 						>,
 						weight: runtime_types::sp_weights::weight_v2::Weight,
 					},
@@ -28803,7 +28857,7 @@ pub mod api {
 							(),
 						>,
 						call: ::subxt::ext::subxt_core::alloc::boxed::Box<
-							runtime_types::argon_node_runtime::RuntimeCall,
+							runtime_types::argon_runtime::RuntimeCall,
 						>,
 					},
 					#[codec(index = 4)]
@@ -29254,7 +29308,7 @@ pub mod api {
 					#[doc = "event is deposited."]
 					batch {
 						calls: ::subxt::ext::subxt_core::alloc::vec::Vec<
-							runtime_types::argon_node_runtime::RuntimeCall,
+							runtime_types::argon_runtime::RuntimeCall,
 						>,
 					},
 					#[codec(index = 1)]
@@ -29274,7 +29328,7 @@ pub mod api {
 					as_derivative {
 						index: ::core::primitive::u16,
 						call: ::subxt::ext::subxt_core::alloc::boxed::Box<
-							runtime_types::argon_node_runtime::RuntimeCall,
+							runtime_types::argon_runtime::RuntimeCall,
 						>,
 					},
 					#[codec(index = 2)]
@@ -29293,7 +29347,7 @@ pub mod api {
 					#[doc = "- O(C) where C is the number of calls to be batched."]
 					batch_all {
 						calls: ::subxt::ext::subxt_core::alloc::vec::Vec<
-							runtime_types::argon_node_runtime::RuntimeCall,
+							runtime_types::argon_runtime::RuntimeCall,
 						>,
 					},
 					#[codec(index = 3)]
@@ -29305,10 +29359,10 @@ pub mod api {
 					#[doc = "- O(1)."]
 					dispatch_as {
 						as_origin: ::subxt::ext::subxt_core::alloc::boxed::Box<
-							runtime_types::argon_node_runtime::OriginCaller,
+							runtime_types::argon_runtime::OriginCaller,
 						>,
 						call: ::subxt::ext::subxt_core::alloc::boxed::Box<
-							runtime_types::argon_node_runtime::RuntimeCall,
+							runtime_types::argon_runtime::RuntimeCall,
 						>,
 					},
 					#[codec(index = 4)]
@@ -29327,7 +29381,7 @@ pub mod api {
 					#[doc = "- O(C) where C is the number of calls to be batched."]
 					force_batch {
 						calls: ::subxt::ext::subxt_core::alloc::vec::Vec<
-							runtime_types::argon_node_runtime::RuntimeCall,
+							runtime_types::argon_runtime::RuntimeCall,
 						>,
 					},
 					#[codec(index = 5)]
@@ -29339,7 +29393,7 @@ pub mod api {
 					#[doc = "The dispatch origin for this call must be _Root_."]
 					with_weight {
 						call: ::subxt::ext::subxt_core::alloc::boxed::Box<
-							runtime_types::argon_node_runtime::RuntimeCall,
+							runtime_types::argon_runtime::RuntimeCall,
 						>,
 						weight: runtime_types::sp_weights::weight_v2::Weight,
 					},

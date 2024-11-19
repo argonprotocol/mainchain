@@ -233,7 +233,7 @@ declare module '@polkadot/types/lookup' {
     readonly asPureCreated: {
       readonly pure: AccountId32;
       readonly who: AccountId32;
-      readonly proxyType: ArgonNodeRuntimeConfigsProxyType;
+      readonly proxyType: ArgonRuntimeConfigsProxyType;
       readonly disambiguationIndex: u16;
     } & Struct;
     readonly isAnnounced: boolean;
@@ -246,21 +246,21 @@ declare module '@polkadot/types/lookup' {
     readonly asProxyAdded: {
       readonly delegator: AccountId32;
       readonly delegatee: AccountId32;
-      readonly proxyType: ArgonNodeRuntimeConfigsProxyType;
+      readonly proxyType: ArgonRuntimeConfigsProxyType;
       readonly delay: u32;
     } & Struct;
     readonly isProxyRemoved: boolean;
     readonly asProxyRemoved: {
       readonly delegator: AccountId32;
       readonly delegatee: AccountId32;
-      readonly proxyType: ArgonNodeRuntimeConfigsProxyType;
+      readonly proxyType: ArgonRuntimeConfigsProxyType;
       readonly delay: u32;
     } & Struct;
     readonly type: 'ProxyExecuted' | 'PureCreated' | 'Announced' | 'ProxyAdded' | 'ProxyRemoved';
   }
 
-  /** @name ArgonNodeRuntimeConfigsProxyType (37) */
-  interface ArgonNodeRuntimeConfigsProxyType extends Enum {
+  /** @name ArgonRuntimeConfigsProxyType (37) */
+  interface ArgonRuntimeConfigsProxyType extends Enum {
     readonly isAny: boolean;
     readonly isNonTransfer: boolean;
     readonly isPriceIndex: boolean;
@@ -309,11 +309,11 @@ declare module '@polkadot/types/lookup' {
     readonly bondAmount: Compact<u128>;
     readonly ownershipTokens: Compact<u128>;
     readonly rewardSharing: Option<ArgonPrimitivesBlockSealRewardSharing>;
-    readonly authorityKeys: ArgonNodeRuntimeSessionKeys;
+    readonly authorityKeys: ArgonRuntimeSessionKeys;
   }
 
-  /** @name ArgonNodeRuntimeSessionKeys (42) */
-  interface ArgonNodeRuntimeSessionKeys extends Struct {
+  /** @name ArgonRuntimeSessionKeys (42) */
+  interface ArgonRuntimeSessionKeys extends Struct {
     readonly grandpa: SpConsensusGrandpaAppPublic;
     readonly blockSealAuthority: ArgonPrimitivesBlockSealAppPublic;
   }
@@ -1574,32 +1574,32 @@ declare module '@polkadot/types/lookup' {
     readonly isProxy: boolean;
     readonly asProxy: {
       readonly real: MultiAddress;
-      readonly forceProxyType: Option<ArgonNodeRuntimeConfigsProxyType>;
+      readonly forceProxyType: Option<ArgonRuntimeConfigsProxyType>;
       readonly call: Call;
     } & Struct;
     readonly isAddProxy: boolean;
     readonly asAddProxy: {
       readonly delegate: MultiAddress;
-      readonly proxyType: ArgonNodeRuntimeConfigsProxyType;
+      readonly proxyType: ArgonRuntimeConfigsProxyType;
       readonly delay: u32;
     } & Struct;
     readonly isRemoveProxy: boolean;
     readonly asRemoveProxy: {
       readonly delegate: MultiAddress;
-      readonly proxyType: ArgonNodeRuntimeConfigsProxyType;
+      readonly proxyType: ArgonRuntimeConfigsProxyType;
       readonly delay: u32;
     } & Struct;
     readonly isRemoveProxies: boolean;
     readonly isCreatePure: boolean;
     readonly asCreatePure: {
-      readonly proxyType: ArgonNodeRuntimeConfigsProxyType;
+      readonly proxyType: ArgonRuntimeConfigsProxyType;
       readonly delay: u32;
       readonly index: u16;
     } & Struct;
     readonly isKillPure: boolean;
     readonly asKillPure: {
       readonly spawner: MultiAddress;
-      readonly proxyType: ArgonNodeRuntimeConfigsProxyType;
+      readonly proxyType: ArgonRuntimeConfigsProxyType;
       readonly index: u16;
       readonly height: Compact<u32>;
       readonly extIndex: Compact<u32>;
@@ -1623,7 +1623,7 @@ declare module '@polkadot/types/lookup' {
     readonly asProxyAnnounced: {
       readonly delegate: MultiAddress;
       readonly real: MultiAddress;
-      readonly forceProxyType: Option<ArgonNodeRuntimeConfigsProxyType>;
+      readonly forceProxyType: Option<ArgonRuntimeConfigsProxyType>;
       readonly call: Call;
     } & Struct;
     readonly type: 'Proxy' | 'AddProxy' | 'RemoveProxy' | 'RemoveProxies' | 'CreatePure' | 'KillPure' | 'Announce' | 'RemoveAnnouncement' | 'RejectAnnouncement' | 'ProxyAnnounced';
@@ -1638,7 +1638,7 @@ declare module '@polkadot/types/lookup' {
     readonly asBid: {
       readonly bondInfo: Option<PalletMiningSlotMiningSlotBid>;
       readonly rewardDestination: ArgonPrimitivesBlockSealRewardDestination;
-      readonly keys_: ArgonNodeRuntimeSessionKeys;
+      readonly keys_: ArgonRuntimeSessionKeys;
     } & Struct;
     readonly type: 'Bid';
   }
@@ -2125,7 +2125,7 @@ declare module '@polkadot/types/lookup' {
     } & Struct;
     readonly isDispatchAs: boolean;
     readonly asDispatchAs: {
-      readonly asOrigin: ArgonNodeRuntimeOriginCaller;
+      readonly asOrigin: ArgonRuntimeOriginCaller;
       readonly call: Call;
     } & Struct;
     readonly isForceBatch: boolean;
@@ -2140,8 +2140,8 @@ declare module '@polkadot/types/lookup' {
     readonly type: 'Batch' | 'AsDerivative' | 'BatchAll' | 'DispatchAs' | 'ForceBatch' | 'WithWeight';
   }
 
-  /** @name ArgonNodeRuntimeOriginCaller (263) */
-  interface ArgonNodeRuntimeOriginCaller extends Enum {
+  /** @name ArgonRuntimeOriginCaller (263) */
+  interface ArgonRuntimeOriginCaller extends Enum {
     readonly isSystem: boolean;
     readonly asSystem: FrameSupportDispatchRawOrigin;
     readonly isVoid: boolean;
@@ -2425,7 +2425,7 @@ declare module '@polkadot/types/lookup' {
   /** @name PalletProxyProxyDefinition (307) */
   interface PalletProxyProxyDefinition extends Struct {
     readonly delegate: AccountId32;
-    readonly proxyType: ArgonNodeRuntimeConfigsProxyType;
+    readonly proxyType: ArgonRuntimeConfigsProxyType;
     readonly delay: u32;
   }
 
@@ -2915,12 +2915,12 @@ declare module '@polkadot/types/lookup' {
 
   /** @name FrameSupportTokensMiscIdAmountRuntimeHoldReason (427) */
   interface FrameSupportTokensMiscIdAmountRuntimeHoldReason extends Struct {
-    readonly id: ArgonNodeRuntimeRuntimeHoldReason;
+    readonly id: ArgonRuntimeRuntimeHoldReason;
     readonly amount: u128;
   }
 
-  /** @name ArgonNodeRuntimeRuntimeHoldReason (428) */
-  interface ArgonNodeRuntimeRuntimeHoldReason extends Enum {
+  /** @name ArgonRuntimeRuntimeHoldReason (428) */
+  interface ArgonRuntimeRuntimeHoldReason extends Enum {
     readonly isMiningSlot: boolean;
     readonly asMiningSlot: PalletMiningSlotHoldReason;
     readonly isVaults: boolean;
@@ -2959,12 +2959,12 @@ declare module '@polkadot/types/lookup' {
 
   /** @name FrameSupportTokensMiscIdAmountRuntimeFreezeReason (435) */
   interface FrameSupportTokensMiscIdAmountRuntimeFreezeReason extends Struct {
-    readonly id: ArgonNodeRuntimeRuntimeFreezeReason;
+    readonly id: ArgonRuntimeRuntimeFreezeReason;
     readonly amount: u128;
   }
 
-  /** @name ArgonNodeRuntimeRuntimeFreezeReason (436) */
-  interface ArgonNodeRuntimeRuntimeFreezeReason extends Enum {
+  /** @name ArgonRuntimeRuntimeFreezeReason (436) */
+  interface ArgonRuntimeRuntimeFreezeReason extends Enum {
     readonly isBlockRewards: boolean;
     readonly asBlockRewards: PalletBlockRewardsFreezeReason;
     readonly type: 'BlockRewards';
@@ -3067,7 +3067,7 @@ declare module '@polkadot/types/lookup' {
     readonly type: 'Disabled' | 'Enabled';
   }
 
-  /** @name ArgonNodeRuntimeRuntime (461) */
-  type ArgonNodeRuntimeRuntime = Null;
+  /** @name ArgonRuntimeRuntime (461) */
+  type ArgonRuntimeRuntime = Null;
 
 } // declare module

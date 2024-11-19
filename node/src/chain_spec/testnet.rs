@@ -1,7 +1,7 @@
 use crate::chain_spec::{
 	get_account_id_from_seed, get_from_seed, testnet_genesis, ChainSpec, GenesisSettings,
 };
-use argon_node_runtime::{SessionKeys, WASM_BINARY};
+use argon_canary_runtime::{SessionKeys, WASM_BINARY};
 use argon_primitives::{
 	bitcoin::BitcoinNetwork,
 	block_seal::MiningSlotConfig,

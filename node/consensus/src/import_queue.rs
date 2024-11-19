@@ -3,13 +3,13 @@ use crate::{
 	notary_client::verify_notebook_audits,
 };
 use argon_bitcoin_utxo_tracker::{get_bitcoin_inherent, UtxoTracker};
-use argon_node_runtime::NotebookVerifyError;
 use argon_primitives::{
 	fork_power::ForkPower,
 	inherents::{BitcoinInherentDataProvider, BlockSealInherentDataProvider},
 	Balance, BitcoinApis, BlockCreatorApis, BlockSealApis, BlockSealAuthorityId, BlockSealDigest,
 	NotebookApis,
 };
+use argon_runtime::NotebookVerifyError;
 use codec::Codec;
 use sc_client_api::{self, backend::AuxStore};
 use sc_consensus::{

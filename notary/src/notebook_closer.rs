@@ -230,7 +230,7 @@ mod tests {
 		api::{
 			runtime_types,
 			runtime_types::{
-				argon_node_runtime::RuntimeCall, argon_primitives::notary::NotaryMeta,
+				argon_primitives::notary::NotaryMeta, argon_runtime::RuntimeCall,
 				pallet_notaries::pallet::Call as NotaryCall,
 			},
 			storage, tx,

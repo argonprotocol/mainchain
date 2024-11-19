@@ -16,7 +16,6 @@ use sp_core::H256;
 use sp_runtime::traits::Block as BlockT;
 
 use crate::{aux_data::AuxData, error::Error, notary_client::VotingPowerInfo};
-use argon_node_runtime::NotebookVerifyError;
 use argon_primitives::{
 	fork_power::ForkPower,
 	notary::{
@@ -26,6 +25,7 @@ use argon_primitives::{
 	tick::Tick,
 	AccountId, NotaryId, NotebookAuditResult, NotebookHeaderData, NotebookNumber, VotingSchedule,
 };
+use argon_runtime::NotebookVerifyError;
 
 pub enum AuxState<C: AuxStore> {
 	NotaryStateAtTick(Arc<AuxData<NotaryNotebookTickState, C>>),
@@ -438,7 +438,7 @@ impl<B: BlockT, C: AuxStore + 'static> ArgonAux<B, C> {
 #[cfg(test)]
 mod test {
 	use super::*;
-	use argon_node_runtime::Block;
+	use argon_runtime::Block;
 	use sc_client_api::AuxStore;
 	use std::{collections::BTreeMap, sync::Arc};
 

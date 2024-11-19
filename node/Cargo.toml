@@ -14,7 +14,6 @@ build = "build.rs"
 [package.metadata.docs.rs]
 targets = ["x86_64-unknown-linux-gnu"]
 
-
 [dependencies]
 num_cpus = { workspace = true }
 clap = { workspace = true }
@@ -45,10 +44,12 @@ sc-chain-spec = { workspace = true }
 sc-rpc-spec-v2 = { workspace = true }
 sp-runtime = { workspace = true, features = ["default"] }
 sp-arithmetic = { workspace = true, features = ["default"] }
+sp-session = { workspace = true, features = ["default"] }
 sp-statement-store = { workspace = true, features = ["default"] }
 sp-io = { workspace = true, features = ["default"] }
 sp-timestamp = { workspace = true, features = ["default"] }
 sp-inherents = { workspace = true, features = ["default"] }
+sp-transaction-pool = { workspace = true, features = ["default"] }
 hex = { workspace = true }
 sp-keystore = { workspace = true, features = ["default"] }
 sp-keyring = { workspace = true, features = ["default"] }
@@ -80,7 +81,8 @@ rand = { workspace = true }
 
 # Local Dependencies
 argon-node-consensus = { workspace = true }
-argon-node-runtime = { workspace = true, features = ["default"] }
+argon-runtime = { workspace = true, features = ["default"] }
+argon-canary-runtime = { workspace = true, features = ["default"] }
 argon-primitives = { workspace = true, features = ["default"] }
 argon-bitcoin-utxo-tracker = { workspace = true }
 argon-randomx = { workspace = true }
@@ -95,7 +97,8 @@ substrate-build-script-utils = { workspace = true }
 default = []
 # Dependencies that are only required if runtime benchmarking should be built
 runtime-benchmarks = [
-	"argon-node-runtime/runtime-benchmarks",
+	"argon-canary-runtime/runtime-benchmarks",
+	"argon-runtime/runtime-benchmarks",
 	"frame-benchmarking-cli/runtime-benchmarks",
 	"frame-benchmarking/runtime-benchmarks",
 	"frame-system/runtime-benchmarks",
@@ -105,7 +108,8 @@ runtime-benchmarks = [
 # Enable features that allow the runtime to be tried and debugged. Name might be subject to change
 # in the near future.
 try-runtime = [
-	"argon-node-runtime/try-runtime",
+	"argon-canary-runtime/try-runtime",
+	"argon-runtime/try-runtime",
 	"frame-system/try-runtime",
 	"pallet-transaction-payment/try-runtime",
 	"sp-runtime/try-runtime",

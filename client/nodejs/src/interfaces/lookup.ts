@@ -61,7 +61,7 @@ export default {
     }
   },
   /**
-   * Lookup20: frame_system::EventRecord<argon_node_runtime::RuntimeEvent, primitive_types::H256>
+   * Lookup20: frame_system::EventRecord<argon_runtime::RuntimeEvent, primitive_types::H256>
    **/
   FrameSystemEventRecord: {
     phase: 'FrameSystemPhase',
@@ -219,7 +219,7 @@ export default {
       PureCreated: {
         pure: 'AccountId32',
         who: 'AccountId32',
-        proxyType: 'ArgonNodeRuntimeConfigsProxyType',
+        proxyType: 'ArgonRuntimeConfigsProxyType',
         disambiguationIndex: 'u16',
       },
       Announced: {
@@ -230,21 +230,21 @@ export default {
       ProxyAdded: {
         delegator: 'AccountId32',
         delegatee: 'AccountId32',
-        proxyType: 'ArgonNodeRuntimeConfigsProxyType',
+        proxyType: 'ArgonRuntimeConfigsProxyType',
         delay: 'u32',
       },
       ProxyRemoved: {
         delegator: 'AccountId32',
         delegatee: 'AccountId32',
-        proxyType: 'ArgonNodeRuntimeConfigsProxyType',
+        proxyType: 'ArgonRuntimeConfigsProxyType',
         delay: 'u32'
       }
     }
   },
   /**
-   * Lookup37: argon_node_runtime::configs::ProxyType
+   * Lookup37: argon_runtime::configs::ProxyType
    **/
-  ArgonNodeRuntimeConfigsProxyType: {
+  ArgonRuntimeConfigsProxyType: {
     _enum: ['Any', 'NonTransfer', 'PriceIndex']
   },
   /**
@@ -279,7 +279,7 @@ export default {
     }
   },
   /**
-   * Lookup41: argon_primitives::block_seal::MiningRegistration<sp_core::crypto::AccountId32, Balance, argon_node_runtime::SessionKeys>
+   * Lookup41: argon_primitives::block_seal::MiningRegistration<sp_core::crypto::AccountId32, Balance, argon_runtime::SessionKeys>
    **/
   ArgonPrimitivesBlockSealMiningRegistration: {
     accountId: 'AccountId32',
@@ -288,12 +288,12 @@ export default {
     bondAmount: 'Compact<u128>',
     ownershipTokens: 'Compact<u128>',
     rewardSharing: 'Option<ArgonPrimitivesBlockSealRewardSharing>',
-    authorityKeys: 'ArgonNodeRuntimeSessionKeys'
+    authorityKeys: 'ArgonRuntimeSessionKeys'
   },
   /**
-   * Lookup42: argon_node_runtime::SessionKeys
+   * Lookup42: argon_runtime::SessionKeys
    **/
-  ArgonNodeRuntimeSessionKeys: {
+  ArgonRuntimeSessionKeys: {
     grandpa: 'SpConsensusGrandpaAppPublic',
     blockSealAuthority: 'ArgonPrimitivesBlockSealAppPublic'
   },
@@ -1480,28 +1480,28 @@ export default {
     _enum: {
       proxy: {
         real: 'MultiAddress',
-        forceProxyType: 'Option<ArgonNodeRuntimeConfigsProxyType>',
+        forceProxyType: 'Option<ArgonRuntimeConfigsProxyType>',
         call: 'Call',
       },
       add_proxy: {
         delegate: 'MultiAddress',
-        proxyType: 'ArgonNodeRuntimeConfigsProxyType',
+        proxyType: 'ArgonRuntimeConfigsProxyType',
         delay: 'u32',
       },
       remove_proxy: {
         delegate: 'MultiAddress',
-        proxyType: 'ArgonNodeRuntimeConfigsProxyType',
+        proxyType: 'ArgonRuntimeConfigsProxyType',
         delay: 'u32',
       },
       remove_proxies: 'Null',
       create_pure: {
-        proxyType: 'ArgonNodeRuntimeConfigsProxyType',
+        proxyType: 'ArgonRuntimeConfigsProxyType',
         delay: 'u32',
         index: 'u16',
       },
       kill_pure: {
         spawner: 'MultiAddress',
-        proxyType: 'ArgonNodeRuntimeConfigsProxyType',
+        proxyType: 'ArgonRuntimeConfigsProxyType',
         index: 'u16',
         height: 'Compact<u32>',
         extIndex: 'Compact<u32>',
@@ -1521,7 +1521,7 @@ export default {
       proxy_announced: {
         delegate: 'MultiAddress',
         real: 'MultiAddress',
-        forceProxyType: 'Option<ArgonNodeRuntimeConfigsProxyType>',
+        forceProxyType: 'Option<ArgonRuntimeConfigsProxyType>',
         call: 'Call'
       }
     }
@@ -1541,7 +1541,7 @@ export default {
         },
         bondInfo: 'Option<PalletMiningSlotMiningSlotBid>',
         rewardDestination: 'ArgonPrimitivesBlockSealRewardDestination',
-        keys_: 'ArgonNodeRuntimeSessionKeys'
+        keys_: 'ArgonRuntimeSessionKeys'
       }
     }
   },
@@ -2039,7 +2039,7 @@ export default {
         calls: 'Vec<Call>',
       },
       dispatch_as: {
-        asOrigin: 'ArgonNodeRuntimeOriginCaller',
+        asOrigin: 'ArgonRuntimeOriginCaller',
         call: 'Call',
       },
       force_batch: {
@@ -2052,9 +2052,9 @@ export default {
     }
   },
   /**
-   * Lookup263: argon_node_runtime::OriginCaller
+   * Lookup263: argon_runtime::OriginCaller
    **/
-  ArgonNodeRuntimeOriginCaller: {
+  ArgonRuntimeOriginCaller: {
     _enum: {
       system: 'FrameSupportDispatchRawOrigin',
       Void: 'SpCoreVoid'
@@ -2338,11 +2338,11 @@ export default {
     _enum: ['MinimumThreshold', 'AlreadyApproved', 'NoApprovalsNeeded', 'TooFewSignatories', 'TooManySignatories', 'SignatoriesOutOfOrder', 'SenderInSignatories', 'NotFound', 'NotOwner', 'NoTimepoint', 'WrongTimepoint', 'UnexpectedTimepoint', 'MaxWeightTooLow', 'AlreadyStored']
   },
   /**
-   * Lookup307: pallet_proxy::ProxyDefinition<sp_core::crypto::AccountId32, argon_node_runtime::configs::ProxyType, BlockNumber>
+   * Lookup307: pallet_proxy::ProxyDefinition<sp_core::crypto::AccountId32, argon_runtime::configs::ProxyType, BlockNumber>
    **/
   PalletProxyProxyDefinition: {
     delegate: 'AccountId32',
-    proxyType: 'ArgonNodeRuntimeConfigsProxyType',
+    proxyType: 'ArgonRuntimeConfigsProxyType',
     delay: 'u32'
   },
   /**
@@ -2712,16 +2712,16 @@ export default {
     amount: 'u128'
   },
   /**
-   * Lookup427: frame_support::traits::tokens::misc::IdAmount<argon_node_runtime::RuntimeHoldReason, Balance>
+   * Lookup427: frame_support::traits::tokens::misc::IdAmount<argon_runtime::RuntimeHoldReason, Balance>
    **/
   FrameSupportTokensMiscIdAmountRuntimeHoldReason: {
-    id: 'ArgonNodeRuntimeRuntimeHoldReason',
+    id: 'ArgonRuntimeRuntimeHoldReason',
     amount: 'u128'
   },
   /**
-   * Lookup428: argon_node_runtime::RuntimeHoldReason
+   * Lookup428: argon_runtime::RuntimeHoldReason
    **/
-  ArgonNodeRuntimeRuntimeHoldReason: {
+  ArgonRuntimeRuntimeHoldReason: {
     _enum: {
       __Unused0: 'Null',
       __Unused1: 'Null',
@@ -2770,16 +2770,16 @@ export default {
     _enum: ['MaturationPeriod']
   },
   /**
-   * Lookup435: frame_support::traits::tokens::misc::IdAmount<argon_node_runtime::RuntimeFreezeReason, Balance>
+   * Lookup435: frame_support::traits::tokens::misc::IdAmount<argon_runtime::RuntimeFreezeReason, Balance>
    **/
   FrameSupportTokensMiscIdAmountRuntimeFreezeReason: {
-    id: 'ArgonNodeRuntimeRuntimeFreezeReason',
+    id: 'ArgonRuntimeRuntimeFreezeReason',
     amount: 'u128'
   },
   /**
-   * Lookup436: argon_node_runtime::RuntimeFreezeReason
+   * Lookup436: argon_runtime::RuntimeFreezeReason
    **/
-  ArgonNodeRuntimeRuntimeFreezeReason: {
+  ArgonRuntimeRuntimeFreezeReason: {
     _enum: {
       __Unused0: 'Null',
       __Unused1: 'Null',
@@ -2890,7 +2890,7 @@ export default {
     _enum: ['Disabled', 'Enabled']
   },
   /**
-   * Lookup461: argon_node_runtime::Runtime
+   * Lookup461: argon_runtime::Runtime
    **/
-  ArgonNodeRuntimeRuntime: 'Null'
+  ArgonRuntimeRuntime: 'Null'
 };

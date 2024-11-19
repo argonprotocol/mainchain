@@ -3,9 +3,6 @@
 #![recursion_limit = "256"]
 extern crate alloc;
 
-#[cfg(feature = "std")]
-include!(concat!(env!("OUT_DIR"), "/wasm_binary.rs"));
-
 #[cfg(feature = "runtime-benchmarks")]
 mod benchmark;
 
@@ -14,10 +11,9 @@ pub mod configs;
 pub use crate::configs::NotaryRecordT;
 pub use pallet_notebook::NotebookVerifyError;
 
-use crate::configs::{
-	ArgonToken, BaseCallFilter, BlockHashCount, BlockLength, BlockWeights, Version,
-};
-use alloc::{collections::btree_map::BTreeMap, vec, vec::Vec};
+use crate::configs::ArgonToken;
+
+use alloc::{collections::BTreeMap, vec, vec::Vec};
 use argon_primitives::{
 	bitcoin::{BitcoinNetwork, BitcoinSyncStatus, Satoshis, UtxoRef, UtxoValue},
 	block_seal::{ComputePuzzle, MiningAuthority},
@@ -28,14 +24,13 @@ use argon_primitives::{
 	prelude::*,
 	tick::Ticker,
 	BestBlockVoteSeal, BlockHash, BlockSealAuthorityId, BlockSealDigest, BlockSealSpecProvider,
-	BlockVoteDigest, HashOutput, NotebookAuditResult, NotebookNumber, PriceProvider, Signature,
-	TickProvider, VoteMinimum, VotingKey,
+	BlockVoteDigest, NotebookAuditResult, NotebookNumber, PriceProvider, Signature, TickProvider,
+	VoteMinimum, VotingKey,
 };
 use frame_support::{
-	derive_impl,
 	genesis_builder_helper::{build_state, get_preset},
-	traits::{ConstU32, InsideBoth},
-	weights::{constants::RocksDbWeight, Weight},
+	traits::ConstU32,
+	weights::Weight,
 };
 use ismp::{
 	consensus::{ConsensusClientId, StateMachineHeight, StateMachineId},
@@ -43,69 +38,33 @@ use ismp::{
 	router::{Request, Response},
 };
 use pallet_ismp::mmr::{Leaf, Proof, ProofKeys};
-use sp_api::impl_runtime_apis;
+use sp_api::{decl_runtime_apis, impl_runtime_apis};
 use sp_consensus_grandpa::AuthorityId as GrandpaId;
-use sp_core::{crypto::KeyTypeId, ConstU16, Get, OpaqueMetadata, H256, U256};
+use sp_core::{crypto::KeyTypeId, Get, OpaqueMetadata, H256, U256};
 use sp_runtime::{
 	create_runtime_str, generic, impl_opaque_keys,
-	traits::{BlakeTwo256, Block as BlockT, NumberFor},
+	traits::{Block as BlockT, NumberFor},
 	transaction_validity::{TransactionSource, TransactionValidity},
 	ApplyExtrinsicResult, BoundedVec, Digest, DispatchError,
 };
+use sp_version::RuntimeVersion;
+
+#[cfg(feature = "std")]
+include!(concat!(env!("OUT_DIR"), "/wasm_binary.rs"));
 
 #[cfg(any(feature = "std", test))]
 pub use sp_runtime::BuildStorage;
-
 #[cfg(feature = "std")]
 use sp_version::NativeVersion;
-use sp_version::RuntimeVersion;
 
 pub type BalancesCall = pallet_balances::Call<Runtime, ArgonToken>;
 // A few exports that help ease life for downstream crates.
 pub type AccountData = pallet_balances::AccountData<Balance>;
-/// Opaque types. These are used by the CLI to instantiate machinery that don't need to know
-/// the specifics of the runtime. They can then be made to be agnostic over specific formats
-/// of data like extrinsics, allowing for them to continue syncing the network through upgrades
-/// to even the core data structures.
-pub mod opaque {
-	use super::*;
-	pub use sp_runtime::OpaqueExtrinsic as UncheckedExtrinsic;
-	use sp_runtime::{
-		generic,
-		traits::{BlakeTwo256, Hash as HashT},
-	};
-
-	/// Opaque block header type.
-	pub type Header = generic::Header<BlockNumber, BlockHash>;
-	/// Opaque block type.
-	pub type Block = generic::Block<Header, UncheckedExtrinsic>;
-	/// Opaque block identifier type.
-	pub type BlockId = generic::BlockId<Block>;
-	/// Opaque block hash type.
-	pub type Hash = <BlakeTwo256 as HashT>::Output;
-}
 
 impl_opaque_keys! {
 	pub struct SessionKeys {
 	pub grandpa: Grandpa,
 	pub block_seal_authority: MiningSlot,
-	}
-}
-
-/// Money matters.
-pub mod currency {
-	use argon_primitives::Balance;
-
-	/// The existential deposit.
-	pub const EXISTENTIAL_DEPOSIT: Balance = 500_000;
-
-	pub const ARGON: Balance = 1_000_000;
-	pub const CENTS: Balance = ARGON / 100_000;
-	pub const MILLIGONS: Balance = 1_000;
-	pub const MICROGONS: Balance = 1;
-
-	pub const fn deposit(items: u32, bytes: u32) -> Balance {
-		items as Balance * 100 * CENTS + (bytes as Balance) * 5 * MICROGONS
 	}
 }
 
@@ -132,37 +91,6 @@ pub const VERSION: RuntimeVersion = RuntimeVersion {
 #[cfg(feature = "std")]
 pub fn native_version() -> NativeVersion {
 	NativeVersion { runtime_version: VERSION, can_author_with: Default::default() }
-}
-
-#[derive_impl(frame_system::config_preludes::ParaChainDefaultConfig)]
-impl frame_system::Config for Runtime {
-	/// The basic call filter to use in dispatchable.
-	type BaseCallFilter = InsideBoth<BaseCallFilter, TxPause>;
-	/// The block type for the runtime.
-	type Block = Block;
-	/// Block & extrinsics weights: base values and limits.
-	type BlockWeights = BlockWeights;
-	/// The maximum length of a block (in bytes).
-	type BlockLength = BlockLength;
-	/// The identifier used to distinguish between accounts.
-	type AccountId = AccountId;
-	/// The type for storing how many extrinsics an account has signed.
-	type Nonce = Nonce;
-	/// The type for hashing blocks and tries.
-	type Hash = HashOutput;
-	/// The hashing algorithm used.
-	type Hashing = BlakeTwo256;
-	/// Maximum number of block number to block hash mappings to keep (oldest pruned first).
-	type BlockHashCount = BlockHashCount;
-	/// The weight of database operations that the runtime can invoke.
-	type DbWeight = RocksDbWeight;
-	/// Version of the runtime.
-	type Version = Version;
-	/// The data to be stored in an account.
-	type AccountData = pallet_balances::AccountData<Balance>;
-	/// This is used as an identifier of the chain. 42 is the generic substrate prefix.
-	type SS58Prefix = ConstU16<{ argon_primitives::ADDRESS_PREFIX }>;
-	type MaxConsumers = ConstU32<16>;
 }
 
 #[frame_support::runtime]
@@ -282,6 +210,13 @@ pub type Executive = frame_executive::Executive<
 	AllPalletsWithSystem,
 	Migrations,
 >;
+
+decl_runtime_apis! {
+	/// Configuration items exposed via rpc so they can be confirmed externally
+	pub trait ConfigurationApis {
+		fn ismp_coprocessor() -> Option<StateMachine>;
+	}
+}
 
 impl_runtime_apis! {
 	impl sp_api::Core<Block> for Runtime {
@@ -623,7 +558,7 @@ impl_runtime_apis! {
 			// have a backtrace here. If any of the pre/post migration checks fail, we shall stop
 			// right here and right now.
 			let weight = Executive::try_runtime_upgrade(checks).unwrap();
-			(weight, BlockWeights::get().max_block)
+			(weight, RuntimeBlockWeights::get().max_block)
 		}
 
 		fn execute_block(
@@ -702,6 +637,12 @@ impl_runtime_apis! {
 		/// Get actual requests
 		fn responses(commitments: Vec<H256>) -> Vec<Response> {
 			Ismp::responses(commitments)
+		}
+	}
+
+	impl crate::ConfigurationApis<Block> for Runtime {
+		fn ismp_coprocessor() -> Option<StateMachine> {
+			<Runtime as pallet_ismp::Config>::Coprocessor::get()
 		}
 	}
 }

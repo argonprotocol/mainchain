@@ -1,8 +1,3 @@
-use argon_node_runtime::{
-	BalancesConfig, BitcoinUtxosConfig, BlockSealSpecConfig, BondsConfig, ChainTransferConfig,
-	GrandpaConfig, MiningSlotConfig as MiningSlotPalletConfig, NotariesConfig, PriceIndexConfig,
-	RuntimeGenesisConfig, SessionKeys, SudoConfig, TicksConfig,
-};
 use argon_primitives::{
 	bitcoin::{BitcoinNetwork, Satoshis},
 	block_seal::{MiningRegistration, MiningSlotConfig, RewardDestination},
@@ -10,6 +5,11 @@ use argon_primitives::{
 	notary::GenesisNotary,
 	tick::{Tick, Ticker},
 	AccountId, Balance, BlockNumber, BlockSealAuthorityId, ComputeDifficulty, Signature,
+};
+use argon_runtime::{
+	BalancesConfig, BitcoinUtxosConfig, BlockSealSpecConfig, BondsConfig, ChainTransferConfig,
+	GrandpaConfig, MiningSlotConfig as MiningSlotPalletConfig, NotariesConfig, PriceIndexConfig,
+	RuntimeGenesisConfig, SessionKeys, SudoConfig, TicksConfig,
 };
 use sp_consensus_grandpa::AuthorityId as GrandpaId;
 use sp_core::{Pair, Public};

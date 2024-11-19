@@ -1,5 +1,4 @@
 use crate::{aux_client::ArgonAux, block_creator::CreateTaxVoteBlock, error::Error};
-use argon_node_runtime::NotebookVerifyError;
 use argon_primitives::{
 	block_seal::BLOCK_SEAL_CRYPTO_ID,
 	fork_power::ForkPower,
@@ -7,6 +6,7 @@ use argon_primitives::{
 	BlockCreatorApis, BlockSealApis, BlockSealAuthorityId, BlockSealDigest, BlockVote,
 	BlockVotingPower, TickApis, VotingSchedule, BLOCK_SEAL_KEY_TYPE,
 };
+use argon_runtime::NotebookVerifyError;
 use codec::Codec;
 use log::*;
 use sc_client_api::AuxStore;
