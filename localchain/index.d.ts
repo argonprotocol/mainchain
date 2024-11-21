@@ -63,11 +63,11 @@ export class BalanceChangeStore {
 
 export class BalanceSync {
   constructor(localchain: Localchain)
-  sync(options?: ChannelHoldCloseOptions | undefined | null): Promise<BalanceSyncResult>
+  sync(options?: VoteCreationOptions | undefined | null): Promise<BalanceSyncResult>
   consolidateJumpAccounts(): Promise<Array<NotarizationTracker>>
   syncUnsettledBalances(): Promise<Array<BalanceChange>>
   syncMainchainTransfers(): Promise<Array<NotarizationTracker>>
-  convertTaxToVotes(options: ChannelHoldCloseOptions): Promise<Array<NotarizationTracker>>
+  convertTaxToVotes(options: VoteCreationOptions): Promise<Array<NotarizationTracker>>
   syncBalanceChange(balanceChange: BalanceChange): Promise<BalanceChange>
   processPendingChannelHolds(): Promise<ChannelHoldResult>
 }
@@ -467,12 +467,6 @@ export interface ChannelHold {
   settledAmount: bigint
 }
 
-export interface ChannelHoldCloseOptions {
-  votesAddress?: string
-  /** What's the minimum amount of tax we should wait for before voting on blocks */
-  minimumVoteAmount?: number
-}
-
 export interface ClaimResult {
   claimed: bigint
   tax: bigint
@@ -663,6 +657,12 @@ export interface VersionHost {
   datastoreId: string
   /** The host address where the domain can be accessed. */
   host: string
+}
+
+export interface VoteCreationOptions {
+  votesAddress?: string
+  /** What's the minimum amount of tax we should wait for before voting on blocks */
+  minimumVoteAmount?: number
 }
 
 export interface ZoneRecord {
