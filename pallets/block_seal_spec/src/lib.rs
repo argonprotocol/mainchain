@@ -23,7 +23,7 @@ const MAX_COMPUTE_DIFFICULTY: u128 = u128::MAX;
 const MIN_COMPUTE_DIFFICULTY: u128 = 4;
 const MAX_TAX_MINIMUM: u128 = u128::MAX;
 const MIN_TAX_MINIMUM: u128 = 1_000;
-const KEY_BLOCK_ROTATION: u32 = 1440;
+pub(crate) const KEY_BLOCK_ROTATION: u32 = 1440;
 
 /// This pallet adjusts the BlockSeal Specification after every block for both voting and compute.
 ///
