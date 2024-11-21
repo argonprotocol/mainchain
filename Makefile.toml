@@ -91,7 +91,7 @@ script = [
 [tasks.build]
 description = "Compiles the project"
 command = "cargo"
-args = ["build"]
+args = ["build", "--features", "simulated-prices"]
 env = { "RUSTC_WRAPPER" = "sccache" }
 dependencies = ["sqlx-setup"]
 

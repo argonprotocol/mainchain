@@ -54,7 +54,7 @@ export argon_LOCAL_TESTNET_NOTARY_URL="wss://$argon_LOCAL_TESTNET_NOTARY_URL"
 
 
 # start a temporary node with alice and bob funded
-for i in {0..1} ; do
+for i in {0..2} ; do
   RUST_LOG=info,argon=info,ismp=trace "$BASEDIR/target/debug/argon-node" --tmp --"${validators[$i]}" --detailed-log-output --chain local --name="${validators[$i]}"  --rpc-port=994$((i+4))  --port 3033$((i+4)) --compute-miners 1 --unsafe-force-node-key-generation --unsafe-rpc-external --rpc-methods=unsafe --rpc-cors=all  --bitcoin-rpc-url=http://bitcoin:bitcoin@localhost:18444 &
 done
 

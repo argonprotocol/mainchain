@@ -90,7 +90,7 @@ mod tests {
 	};
 	use argon_primitives::bitcoin::BitcoinNetwork;
 	use argon_testing::start_argon_test_node;
-	use bitcoin::Network;
+	use bitcoin::{hashes::Hash, Network};
 	use sp_core::{sr25519, Pair};
 
 	use super::*;
@@ -144,12 +144,12 @@ mod tests {
 		assert!(block.block_height >= 1);
 		assert_eq!(
 			block.block_hash.0,
-			bitcoind
+			*bitcoind
 				.client
 				.get_block_hash(block.block_height)
 				.unwrap()
 				.as_raw_hash()
-				.as_ref()
+				.as_byte_array()
 		);
 
 		handle.abort();

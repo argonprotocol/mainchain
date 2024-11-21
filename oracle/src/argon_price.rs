@@ -1,24 +1,37 @@
+use crate::uniswap_oracle::{UniswapOracle, USDC_ADDRESS, USDC_ADDRESS_SEPOLIA};
 use anyhow::Result;
 use argon_client::api::runtime_types::pallet_price_index::PriceIndex;
 use argon_primitives::tick::{Tick, Ticker};
-use sp_runtime::{traits::One, FixedI128, FixedU128};
+use sp_runtime::{traits::One, FixedI128, FixedPointNumber, FixedU128, Saturating};
+use std::env;
+use uniswap_sdk_core::{prelude::*, token};
 
 #[allow(dead_code)]
 pub struct ArgonPriceLookup {
 	pub ticker: Ticker,
-	pub use_simulated_schedule: bool,
 	pub last_price: FixedU128,
 	pub last_price_tick: Tick,
+	pub uniswap_oracle: UniswapOracle,
+}
+
+pub fn get_usdc_token(chain: ChainId) -> Token {
+	let address = if chain == ChainId::SEPOLIA { USDC_ADDRESS_SEPOLIA } else { USDC_ADDRESS };
+
+	token!(chain as u64, address, 6, "USDC", "USD Coin")
 }
 
 impl ArgonPriceLookup {
-	pub fn new(
-		use_simulated_schedule: bool,
+	pub async fn new(
 		ticker: &Ticker,
 		last_price: Option<PriceIndex>,
-	) -> Self {
-		Self {
-			use_simulated_schedule,
+		project_id: String,
+		usd_token: Token,
+		lookup_token: Token,
+	) -> Result<Self> {
+		let uniswap_oracle = UniswapOracle::new(project_id, usd_token, lookup_token).await?;
+
+		Ok(Self {
+			uniswap_oracle,
 			ticker: *ticker,
 			last_price: last_price
 				.as_ref()
@@ -27,7 +40,19 @@ impl ArgonPriceLookup {
 			last_price_tick: last_price
 				.map(|a| a.tick)
 				.unwrap_or(ticker.current().saturating_sub(1)),
-		}
+		})
+	}
+
+	pub async fn from_env(ticker: &Ticker, last_price: Option<PriceIndex>) -> Result<Self> {
+		let use_sepolia = env::var("USE_SEPOLIA").unwrap_or_default() == "true";
+		let argon_token_address =
+			env::var("ARGON_TOKEN_ADDRESS").expect("ARGON_TOKEN_ADDRESS must be set");
+		let network = if use_sepolia { ChainId::SEPOLIA } else { ChainId::MAINNET };
+		let project_id = env::var("INFURA_PROJECT_ID").expect("INFURA_PROJECT_ID must be set");
+
+		let usdc_token = get_usdc_token(network);
+		let lookup_token = token!(network as u64, argon_token_address, 18, "ARGON", "Argon");
+		Self::new(ticker, last_price, project_id, usdc_token, lookup_token).await
 	}
 
 	/// Calculates the expected cost of an Argon in USD based on the starting and current U.S. CPI.
@@ -36,41 +61,56 @@ impl ArgonPriceLookup {
 		FixedU128::from_inner(cpi_as_u128.into_inner() as u128)
 	}
 
-	pub async fn get_argon_price(
+	pub async fn get_latest_price(
+		&mut self,
+		tick: Tick,
+		max_argon_change_per_tick_away_from_target: FixedU128,
+		usd_token_price: FixedU128,
+	) -> Result<FixedU128> {
+		let mut price = self.uniswap_oracle.get_current_price().await?;
+		// ARGON/USDC * USDC/USD = ARGON/USD
+		price = price * usd_token_price;
+
+		price = self.clamp_price(price, tick, max_argon_change_per_tick_away_from_target);
+		self.last_price = price;
+		self.last_price_tick = tick;
+
+		Ok(price)
+	}
+
+	#[cfg(feature = "simulated-prices")]
+	pub async fn get_simulated_price(
 		&mut self,
 		target_price: FixedU128,
 		tick: Tick,
 		max_argon_change_per_tick_away_from_target: FixedU128,
 	) -> Result<FixedU128> {
-		let price = self
-			.get_latest_price(target_price, tick, max_argon_change_per_tick_away_from_target)
-			.await?;
+		let mut price = self.simulate_price_change(target_price, tick);
+		price = self.clamp_price(price, tick, max_argon_change_per_tick_away_from_target);
 		self.last_price = price;
 		self.last_price_tick = tick;
 		Ok(price)
 	}
 
-	#[allow(unused_variables)]
-	pub async fn get_latest_price(
+	fn clamp_price(
 		&self,
-		target_price: FixedU128,
+		price: FixedU128,
 		tick: Tick,
 		max_argon_change_per_tick_away_from_target: FixedU128,
-	) -> Result<FixedU128> {
-		if self.use_simulated_schedule {
-			#[cfg(feature = "simulated-prices")]
-			{
-				return Ok(self.simulate_price_change(
-					target_price,
-					tick,
-					max_argon_change_per_tick_away_from_target,
-				));
-			}
+	) -> FixedU128 {
+		let start_price = self.last_price;
+		if self.last_price_tick == 0 {
+			return price;
 		}
 
-		// Eventually, we'll want to hit asset hub and moonbeam directly for pricing. Maybe
-		// ethereum too if it ends up on there.
-		Ok(target_price)
+		let ticks = tick.saturating_sub(self.last_price_tick).min(10);
+		let max_change =
+			max_argon_change_per_tick_away_from_target * FixedU128::saturating_from_integer(ticks);
+		if price > start_price {
+			price.min(start_price.saturating_add(max_change))
+		} else {
+			price.max(start_price.saturating_sub(max_change))
+		}
 	}
 }
 
@@ -87,7 +127,6 @@ mod dev {
 			&self,
 			target_price: FixedU128,
 			tick: Tick,
-			max_argon_change_per_tick_away_from_target: FixedU128,
 		) -> FixedU128 {
 			let ticks = if self.last_price_tick == 0 {
 				1
@@ -166,18 +205,7 @@ mod dev {
 					},
 				}
 			}
-			let mut price =
-				last_price.clamp(FixedU128::from_rational(1, 1000), FixedU128::from_u32(2));
-			let start_price = self.last_price;
-
-			// TODO: how do we clamp this only when cpi is same direction
-			if price > start_price {
-				price = price
-					.min(start_price.saturating_add(max_argon_change_per_tick_away_from_target));
-			} else {
-				price = price
-					.max(start_price.saturating_sub(max_argon_change_per_tick_away_from_target));
-			}
+			let price = last_price.clamp(FixedU128::from_rational(1, 1000), FixedU128::from_u32(2));
 
 			price
 		}
@@ -187,38 +215,69 @@ mod dev {
 #[cfg(test)]
 mod test {
 	use super::*;
+	use crate::uniswap_oracle::use_mock_argon_prices;
 	use std::time::Duration;
 
-	#[test]
-	fn test_get_target_price() {
+	const DAI_ADDRESS_SEPOLIA: &str = "6b175474e89094c44da98b954eedeac495271d0f";
+
+	fn before_each() {
+		dotenv::dotenv().ok();
+		env::set_var("USE_SEPOLIA", "true");
+		env::set_var("INFURA_PROJECT_ID", "test");
+		env::set_var("ARGON_TOKEN_ADDRESS", DAI_ADDRESS_SEPOLIA);
+	}
+
+	#[tokio::test]
+	async fn test_get_target_price() {
+		before_each();
 		let ticker = Ticker::start(Duration::from_secs(60), 2);
-		let argon_price_lookup = ArgonPriceLookup::new(false, &ticker, None);
+		let argon_price_lookup = ArgonPriceLookup::from_env(&ticker, None).await.unwrap();
 		let us_cpi_ratio = FixedI128::from_float(0.00);
 		assert_eq!(argon_price_lookup.get_target_price(us_cpi_ratio), FixedU128::from_u32(1));
 	}
 
-	#[test]
-	fn test_get_target_price_with_cpi() {
+	#[tokio::test]
+	async fn test_get_target_price_with_cpi() {
+		before_each();
 		let ticker = Ticker::start(Duration::from_secs(60), 2);
-		let argon_price_lookup = ArgonPriceLookup::new(false, &ticker, None);
+		let argon_price_lookup = ArgonPriceLookup::from_env(&ticker, None).await.unwrap();
 		let us_cpi_ratio = FixedI128::from_float(0.1);
 		assert_eq!(argon_price_lookup.get_target_price(us_cpi_ratio).to_float(), 1.1);
 	}
 
-	#[test]
+	#[tokio::test]
 	#[cfg(feature = "simulated-prices")]
-	fn can_use_simulated_schedule() {
+	async fn can_use_simulated_schedule() {
+		before_each();
 		let ticker = Ticker::start(Duration::from_secs(60), 2);
-		let mut argon_price_lookup = ArgonPriceLookup::new(true, &ticker, None);
+		let mut argon_price_lookup = ArgonPriceLookup::from_env(&ticker, None).await.unwrap();
 
 		argon_price_lookup.last_price = FixedU128::from_float(1.01);
 		argon_price_lookup.last_price_tick = ticker.current();
 		let ts = argon_price_lookup.last_price_tick + 1000;
-		let price = argon_price_lookup.simulate_price_change(
-			FixedU128::from_u32(1),
-			ts,
-			FixedU128::from_rational(1, 100),
-		);
+		let price = argon_price_lookup.simulate_price_change(FixedU128::from_u32(1), ts);
 		assert_ne!(price, FixedU128::from_u32(0));
+	}
+
+	#[tokio::test]
+	async fn adjusts_price_by_usdc_price() {
+		before_each();
+		let ticker = Ticker::start(Duration::from_secs(60), 2);
+		let mut argon_price_lookup = ArgonPriceLookup::from_env(&ticker, None).await.unwrap();
+
+		let argon_usdc_price = FixedU128::from_float(0.99);
+		use_mock_argon_prices(vec![argon_usdc_price]);
+		let usdc_usd_price = FixedU128::from_float(0.99);
+
+		// If the argon/usdc price is 0.99 usdc, and the usdc/usd price is 0.99 usd, the argon/usd
+		// price should be 0.99 * 0.99 = 0.9801
+
+		assert_eq!(
+			argon_price_lookup
+				.get_latest_price(ticker.current() + 1, FixedU128::from_float(0.01), usdc_usd_price)
+				.await
+				.unwrap(),
+			FixedU128::from_float(0.9801)
+		);
 	}
 }
