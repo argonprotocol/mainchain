@@ -1,4 +1,4 @@
-use std::time::Duration;
+use std::{env, time::Duration};
 
 use anyhow::{anyhow, ensure};
 use sp_runtime::{traits::One, FixedU128, Saturating};
@@ -30,11 +30,13 @@ pub async fn price_index_loop(
 	}
 
 	let mut ticker = mainchain_client.lookup_ticker().await?;
-	if !cfg!(test) {
-		ticker
-			.lookup_ntp_offset("pool.ntp.org")
-			.await
-			.map_err(|e| anyhow!("Unable to synchronize time {e:?}"))?;
+	if let Ok(ntp_pool) = env::var("NTP_POOL") {
+		if !ntp_pool.is_empty() {
+			ticker
+				.lookup_ntp_offset(&ntp_pool)
+				.await
+				.map_err(|e| anyhow!("Unable to synchronize time {e:?}"))?;
+		}
 	}
 
 	let best_block = mainchain_client.best_block_hash().await?;
