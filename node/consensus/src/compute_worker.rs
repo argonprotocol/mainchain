@@ -6,6 +6,7 @@ use frame_support::CloneNoBound;
 use futures::prelude::*;
 use log::*;
 use parking_lot::Mutex;
+use rand::Rng;
 use sc_service::TaskManager;
 use sc_utils::mpsc::TracingUnboundedSender;
 use sp_core::{traits::SpawnEssentialNamed, H256, U256};
@@ -224,11 +225,14 @@ impl ComputeSolver {
 		key_block_hash: H256,
 		compute_difficulty: ComputeDifficulty,
 	) -> Self {
+		let mut rng = rand::thread_rng();
+		let mut bytes = [0u8; 32];
+		rng.fill(&mut bytes);
 		let mut solver = ComputeSolver {
 			version,
 			threshold: BlockComputeNonce::threshold(compute_difficulty),
 			wip_nonce_hash: vec![],
-			wip_nonce: BlockComputeNonce { nonce: U256::from(rand::random::<u128>()), pre_hash },
+			wip_nonce: BlockComputeNonce { nonce: U256::from_big_endian(&bytes[..]), pre_hash },
 			key_block_hash,
 		};
 		solver.wip_nonce_hash = solver.wip_nonce.encode().to_vec();
