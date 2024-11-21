@@ -7,7 +7,6 @@ afterAll(teardown);
 
 it('can sign a message from javscript', async () => {
     const bobchain = await Localchain.loadWithoutMainchain(':memory:', {
-        genesisUtcTime: Date.now(),
         tickDurationMillis: 1000,
         channelHoldExpirationTicks: 2,
     });
@@ -28,7 +27,6 @@ it('can sign a message from javscript', async () => {
 });
 it('can sign using built-in', async () => {
     const bobchain = await Localchain.loadWithoutMainchain(':memory:', {
-        genesisUtcTime: Date.now(),
         tickDurationMillis: 1000,
         channelHoldExpirationTicks: 2,
     });

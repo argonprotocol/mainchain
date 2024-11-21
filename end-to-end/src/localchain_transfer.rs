@@ -3,7 +3,7 @@ use std::env::temp_dir;
 use sp_core::{sr25519::Pair, Pair as PairT};
 
 use argon_client::{
-	api::{runtime_types::argon_node_runtime::RuntimeCall, tx},
+	api::{runtime_types::argon_runtime::RuntimeCall, tx},
 	signer::Sr25519Signer,
 };
 use argon_testing::{
@@ -24,7 +24,7 @@ async fn test_localchain_transfers_using_cli() {
 		.live
 		.tx()
 		.sign_and_submit_then_watch_default(
-			&tx().balances().transfer_keep_alive(owner.into(), 10_000),
+			&tx().balances().transfer_keep_alive(owner.into(), 10_000_000),
 			&alice_signer,
 		)
 		.await
@@ -183,7 +183,7 @@ async fn test_localchain_transfers_using_cli() {
 
 	let pair = Pair::from_string("//chicken dog pig box bread cat", None).unwrap();
 	let mainchain_balance = test_node.client.get_argons(&pair.public().into()).await.unwrap();
-	assert_eq!(mainchain_balance.free, 4800);
+	assert_eq!(mainchain_balance.free, 4_800_000);
 	println!("Mainchain account of primary localchain: {:#?}", mainchain_balance);
 
 	drop(test_node);

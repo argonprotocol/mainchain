@@ -18,7 +18,12 @@ pub mod weights;
 #[frame_support::pallet(dev_mode)]
 pub mod pallet {
 	use super::*;
-	use argon_primitives::{digests::*, tick::Tick, VotingKey};
+	use argon_primitives::{
+		digests::*,
+		fork_power::ForkPower,
+		tick::{Tick, TickDigest},
+		VotingKey,
+	};
 	use codec::{Codec, EncodeLike};
 	use frame_support::{pallet_prelude::*, traits::FindAuthor};
 	use frame_system::pallet_prelude::*;
@@ -53,6 +58,8 @@ pub mod pallet {
 		DuplicateParentVotingKeyDigest,
 		/// Duplicate NotebookDigest found
 		DuplicateNotebookDigest,
+		/// Duplicate ForkPowerDigest found
+		DuplicateForkPowerDigest,
 		/// Missing BlockVoteDigest
 		MissingBlockVoteDigest,
 		/// Missing AuthorDigest
@@ -95,6 +102,7 @@ pub mod pallet {
 			let mut tick = None;
 			let mut notebooks = None;
 			let mut parent_voting_key = None;
+			let mut fork_power = None;
 
 			for log in digest.logs() {
 				match log {
@@ -125,6 +133,12 @@ pub mod pallet {
 							.map_err(|_| Error::<T>::CouldNotDecodeDigest)?;
 						parent_voting_key = Some(digest);
 					},
+					DigestItem::Consensus(FORK_POWER_DIGEST, v) => {
+						ensure!(fork_power.is_none(), Error::<T>::DuplicateForkPowerDigest);
+						let digest = ForkPower::decode(&mut &v[..])
+							.map_err(|_| Error::<T>::CouldNotDecodeDigest)?;
+						fork_power = Some(digest);
+					},
 					DigestItem::PreRuntime(NOTEBOOKS_DIGEST_ID, v) => {
 						ensure!(notebooks.is_none(), Error::<T>::DuplicateNotebookDigest);
 						let digest = NotebookDigest::<T::NotebookVerifyError>::decode(&mut &v[..])
@@ -141,6 +155,7 @@ pub mod pallet {
 				author: author.ok_or(Error::<T>::MissingAuthorDigest)?,
 				notebooks: notebooks.ok_or(Error::<T>::MissingNotebookDigest)?,
 				voting_key: parent_voting_key,
+				fork_power,
 			})
 		}
 
@@ -165,7 +180,7 @@ pub mod pallet {
 				parent_voting_key = voting_key.parent_voting_key;
 			}
 
-			Ok((decoded.author, decoded.tick.tick, parent_voting_key))
+			Ok((decoded.author, decoded.tick.0, parent_voting_key))
 		}
 	}
 

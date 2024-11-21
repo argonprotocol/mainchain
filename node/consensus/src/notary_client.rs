@@ -19,7 +19,6 @@ use std::{
 use tokio::sync::Mutex;
 
 use crate::{aux_client::ArgonAux, error::Error};
-use argon_node_runtime::{NotaryRecordT, NotebookVerifyError};
 use argon_notary_apis::notebook::{NotebookRpcClient, RawHeadersSubscription};
 use argon_primitives::{
 	ensure,
@@ -31,6 +30,7 @@ use argon_primitives::{
 	Balance, BlockSealApis, BlockSealAuthorityId, BlockVotingPower, NotaryApis, NotaryId,
 	NotebookApis, NotebookAuditResult, NotebookHeaderData, VoteMinimum, VotingSchedule,
 };
+use argon_runtime::{NotaryRecordT, NotebookVerifyError};
 
 pub trait NotaryApisExt<B: BlockT, AC> {
 	fn notaries(&self, block_hash: B::Hash) -> Result<Vec<NotaryRecordT>, Error>;
@@ -45,6 +45,7 @@ pub trait NotaryApisExt<B: BlockT, AC> {
 		version: u32,
 		notary_id: NotaryId,
 		notebook_number: NotebookNumber,
+		notebook_tick: Tick,
 		header_hash: H256,
 		vote_minimums: &BTreeMap<B::Hash, Balance>,
 		notebook: &[u8],
@@ -90,6 +91,7 @@ where
 		version: u32,
 		notary_id: NotaryId,
 		notebook_number: NotebookNumber,
+		notebook_tick: Tick,
 		header_hash: H256,
 		vote_minimums: &BTreeMap<B::Hash, Balance>,
 		notebook: &[u8],
@@ -101,6 +103,7 @@ where
 				version,
 				notary_id,
 				notebook_number,
+				notebook_tick,
 				header_hash,
 				vote_minimums,
 				&notebook.to_vec(),
@@ -709,6 +712,7 @@ where
 			notebook_details.version,
 			notary_id,
 			notebook_number,
+			tick,
 			notebook_details.header_hash,
 			&vote_minimums,
 			&full_notebook,
@@ -908,7 +912,6 @@ where
 mod test {
 	use super::*;
 	use crate::{error::Error, mock_notary::MockNotary, notary_client::NotaryApisExt};
-	use argon_node_runtime::Block;
 	use argon_primitives::{
 		notary::{
 			NotaryMeta, NotaryNotebookAuditSummary, NotaryNotebookAuditSummaryDetails,
@@ -916,6 +919,7 @@ mod test {
 		},
 		AccountId, Balance, ChainTransfer, NotaryId, NotebookHeader, NotebookMeta, NotebookNumber,
 	};
+	use argon_runtime::Block;
 	use codec::{Decode, Encode};
 	use sc_utils::mpsc::TracingUnboundedReceiver;
 	use sp_core::{bounded_vec, H256};
@@ -1001,6 +1005,7 @@ mod test {
 			_version: u32,
 			notary_id: NotaryId,
 			notebook_number: NotebookNumber,
+			_tick: Tick,
 			_header_hash: H256,
 			_vote_minimums: &BTreeMap<<Block as BlockT>::Hash, Balance>,
 			_notebook: &[u8],

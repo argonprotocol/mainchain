@@ -200,7 +200,7 @@ impl MainchainClient {
       };
       Ok(Some(DomainRegistration {
         registered_to_address,
-        registered_at_tick: x.registered_at_tick,
+        registered_at_tick: x.registered_at_tick as i64,
       }))
     } else {
       Ok(None)
@@ -592,17 +592,17 @@ impl MainchainClient {
 pub mod napi_ext {
   use napi::bindgen_prelude::*;
 
-  use argon_primitives::{Chain, DomainTopLevel};
-
   use crate::error::NapiOk;
   use crate::{DomainRegistration, MainchainClient, ZoneRecord};
+  use argon_primitives::tick::Tick;
+  use argon_primitives::{Chain, DomainTopLevel};
 
   #[napi(object)]
   pub struct LocalchainTransfer {
     pub address: String,
     pub amount: BigInt,
     pub notary_id: u32,
-    pub expiration_tick: u32,
+    pub expiration_tick: i64,
     pub transfer_id: u32,
   }
 
@@ -641,10 +641,11 @@ pub mod napi_ext {
     pub block_hash: Uint8Array,
     pub vote_minimum: BigInt,
   }
+
   #[napi(object)]
   pub struct Ticker {
     pub tick_duration_millis: i64,
-    pub genesis_utc_time: i64,
+    pub channel_hold_expiration_ticks: i64,
   }
 
   #[napi]
@@ -666,7 +667,7 @@ pub mod napi_ext {
       let ticker = self.get_ticker().await.napi_ok()?;
       Ok(Ticker {
         tick_duration_millis: ticker.tick_duration_millis as i64,
-        genesis_utc_time: ticker.genesis_utc_time as i64,
+        channel_hold_expiration_ticks: ticker.channel_hold_expiration_ticks as i64,
       })
     }
 
@@ -688,9 +689,12 @@ pub mod napi_ext {
     #[napi(js_name = "getVoteBlockHash")]
     pub async fn get_vote_block_hash_napi(
       &self,
-      current_tick: u32,
+      current_tick: i64,
     ) -> napi::Result<Option<BestBlockForVote>> {
-      let best_block = self.get_vote_block_hash(current_tick).await.napi_ok()?;
+      let best_block = self
+        .get_vote_block_hash(current_tick as Tick)
+        .await
+        .napi_ok()?;
       let Some(best_block) = best_block else {
         return Ok(None);
       };
@@ -797,7 +801,7 @@ pub mod napi_ext {
         address: result.address,
         amount: result.amount.into(),
         notary_id: result.notary_id,
-        expiration_tick: result.expiration_tick,
+        expiration_tick: result.expiration_tick as i64,
         transfer_id,
       }))
     }
@@ -882,7 +886,7 @@ pub struct NotaryDetails {
 #[cfg_attr(feature = "napi", napi(object))]
 pub struct DomainRegistration {
   pub registered_to_address: String,
-  pub registered_at_tick: u32,
+  pub registered_at_tick: i64,
 }
 
 pub struct BestBlockForVote {

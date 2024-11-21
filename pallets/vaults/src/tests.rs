@@ -393,7 +393,7 @@ fn it_can_bond_funds() {
 			Vaults::bond_funds(1, 500_000, BondType::Bitcoin, 2440, &2).expect("bonding failed");
 
 		let per_block_fee = 0.01f64 * 500_000f64 / (1440f64 * 365f64);
-		// fee is 9 milligons per block per argon (rented 5 argons)
+		// fee is 9 microgons per block per argon (rented 5 argons)
 		let fee = (2440f64 * per_block_fee) as u128;
 		assert_eq!(total_fee, fee + 1000);
 		assert_eq!(paid, 1000);

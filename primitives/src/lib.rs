@@ -87,6 +87,17 @@ pub type VaultId = u32;
 pub type HashOutput = H256;
 pub type BlockHash = BlakeTwo256;
 
+pub const TOKEN_DECIMALS: u8 = 6;
+
+pub const ARGON_TOKEN_SYMBOL: &str = "ARGON";
+pub const OWNERSHIP_TOKEN_SYMBOL: &str = "ARGOWN";
+
+pub mod prelude {
+	pub use super::{
+		localchain::*, tick::Tick, AccountId, Balance, BlockNumber, BondId, Chain, ChainIdentity,
+		Moment, Nonce, NotaryId, NotebookNumber, VaultId,
+	};
+}
 pub mod localchain {
 	pub use crate::{
 		AccountType, BalanceChange, BestBlockVoteSeal, BlockVote, BlockVoteT, Note, NoteType,

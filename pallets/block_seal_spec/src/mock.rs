@@ -98,7 +98,7 @@ impl TickProvider<Block> for StaticTickProvider {
 		CurrentTick::get()
 	}
 	fn ticker() -> Ticker {
-		Ticker::new(200, 1, 2)
+		Ticker::new(200, 2)
 	}
 	fn block_at_tick(_: Tick) -> Option<H256> {
 		None

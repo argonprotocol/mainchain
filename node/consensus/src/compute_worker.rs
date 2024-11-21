@@ -10,7 +10,6 @@ use sc_service::TaskManager;
 use sc_utils::mpsc::TracingUnboundedSender;
 use sp_core::{traits::SpawnEssentialNamed, H256, U256};
 use sp_runtime::traits::{Block as BlockT, Header as HeaderT};
-use sp_timestamp::Timestamp;
 use std::{
 	sync::{
 		atomic::{AtomicUsize, Ordering},
@@ -26,7 +25,8 @@ pub(crate) type Version = usize;
 pub(crate) struct MiningMetadata<H> {
 	/// Currently known best hash which the pre-hash is built on.
 	pub best_hash: H,
-	pub activate_mining_time: Timestamp,
+	/// The time at which mining is activated (in milliseconds).
+	pub activate_mining_time: u64,
 	pub has_tax_votes: bool,
 	/// At which tick do we kick in mining no matter what?
 	pub emergency_tick: Tick,
@@ -139,7 +139,7 @@ where
 		solver.as_ref().map(|a| a.version) == Some(self.version())
 	}
 
-	pub fn ready_to_solve(&self, current_tick: Tick, time: Timestamp) -> bool {
+	pub fn ready_to_solve(&self, current_tick: Tick, now_millis: u64) -> bool {
 		match self.metadata.lock().as_ref() {
 			Some(x) => {
 				// if we've passed the emergency tick, we should mine no matter what
@@ -147,7 +147,7 @@ where
 					return true;
 				}
 				// must be past the parent tick and not have tax votes
-				if !x.has_tax_votes && x.activate_mining_time < time {
+				if !x.has_tax_votes && x.activate_mining_time < now_millis {
 					return true;
 				}
 				false

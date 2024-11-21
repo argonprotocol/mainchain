@@ -26,11 +26,10 @@ pub mod pallet {
 		inherents::{BlockSealInherent, BlockSealInherentData, SealInherentError},
 		localchain::{BestBlockVoteSeal, BlockVote, BlockVoteT},
 		notary::NotaryNotebookRawVotes,
-		notebook::NotebookNumber,
-		tick::Tick,
+		prelude::*,
 		AuthorityProvider, BlockSealDigest, BlockSealEventHandler, BlockSealSpecProvider,
-		BlockSealerInfo, BlockSealerProvider, BlockVotingKey, BlockVotingPower, MerkleProof,
-		NotaryId, NotebookProvider, ParentVotingKeyDigest, TickProvider, VotingKey, VotingSchedule,
+		BlockSealerInfo, BlockSealerProvider, BlockVotingKey, MerkleProof, NotebookProvider,
+		ParentVotingKeyDigest, TickProvider, VotingKey, VotingSchedule, FORK_POWER_DIGEST,
 		PARENT_VOTING_KEY_DIGEST,
 	};
 	use binary_merkle_tree::{merkle_proof, verify_proof};
@@ -183,8 +182,8 @@ pub mod pallet {
 			let mut parent_voting_key: Option<VotingKey> = None;
 			if !parent_voting_keys.is_empty() {
 				parent_voting_key = Some(BlockVotingKey::create_key(parent_voting_keys));
-				<ParentVotingKey<T>>::put(parent_voting_key);
 			}
+			<ParentVotingKey<T>>::put(parent_voting_key);
 
 			let included_digest = T::Digests::get().expect("Digests must be set");
 			if let Some(included_digest) = included_digest.voting_key {
@@ -196,6 +195,20 @@ pub mod pallet {
 				<frame_system::Pallet<T>>::deposit_log(DigestItem::Consensus(
 					PARENT_VOTING_KEY_DIGEST,
 					ParentVotingKeyDigest { parent_voting_key }.encode(),
+				));
+			}
+
+			// this is modified during the block seal inherent
+			let new_fork_power = BlockForkPower::<T>::get();
+			if let Some(fork_power) = included_digest.fork_power {
+				assert_eq!(
+					fork_power, new_fork_power,
+					"Calculated ForkPower does not match the value in included digest."
+				);
+			} else {
+				<frame_system::Pallet<T>>::deposit_log(DigestItem::Consensus(
+					FORK_POWER_DIGEST,
+					new_fork_power.encode(),
 				));
 			}
 		}
@@ -223,18 +236,6 @@ pub mod pallet {
 	impl<T: Config> Pallet<T> {
 		pub fn fork_power() -> ForkPower {
 			BlockForkPower::<T>::get()
-		}
-
-		pub fn calculate_fork_power(
-			seal: BlockSealDigest,
-			voting_power: BlockVotingPower,
-			notebooks: u32,
-		) -> ForkPower {
-			let mut fork_power = BlockForkPower::<T>::get();
-			let compute = T::BlockSealSpecProvider::compute_difficulty();
-
-			fork_power.add(voting_power, notebooks, seal, compute);
-			fork_power
 		}
 
 		pub fn apply_seal(seal: BlockSealInherent) -> DispatchResult {

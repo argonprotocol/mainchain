@@ -257,6 +257,30 @@ declare module '@polkadot/api-base/types/errors' {
     };
     chainTransfer: {
       /**
+       * Coprocessor not configured
+       **/
+      CoprocessorNotConfigured: AugmentedError<ApiType>;
+      /**
+       * ERC6160 asset registration failed
+       **/
+      Erc6160RegistrationFailed: AugmentedError<ApiType>;
+      /**
+       * The bridge is paused
+       **/
+      EvmBridgePaused: AugmentedError<ApiType>;
+      /**
+       * Evm Chain doesn't have the proper configuration setup
+       **/
+      EvmChainNotConfigured: AugmentedError<ApiType>;
+      /**
+       * Evm Chain is not supported yet
+       **/
+      EvmChainNotSupported: AugmentedError<ApiType>;
+      /**
+       * An error was encountered trying to send a transfer to an EVM
+       **/
+      FailedToTransferToEvm: AugmentedError<ApiType>;
+      /**
        * Insufficient balance to create this transfer
        **/
       InsufficientFunds: AugmentedError<ApiType>;
@@ -264,6 +288,10 @@ declare module '@polkadot/api-base/types/errors' {
        * Insufficient balance to fulfill a mainchain transfer
        **/
       InsufficientNotarizedFunds: AugmentedError<ApiType>;
+      /**
+       * Invalid Destination Chain
+       **/
+      InvalidEvmChain: AugmentedError<ApiType>;
       /**
        * The notary id is not registered
        **/
@@ -273,6 +301,14 @@ declare module '@polkadot/api-base/types/errors' {
        **/
       InvalidOrDuplicatedLocalchainTransfer: AugmentedError<ApiType>;
       MaxBlockTransfersExceeded: AugmentedError<ApiType>;
+      /**
+       * Max number of chains exceeded
+       **/
+      MaxChainsExceeded: AugmentedError<ApiType>;
+      /**
+       * This account is not a token admin
+       **/
+      NotATokenAdmin: AugmentedError<ApiType>;
       /**
        * A transfer was submitted in a previous block but the expiration block has passed
        **/
@@ -291,6 +327,10 @@ declare module '@polkadot/api-base/types/errors' {
        * Duplicate BlockVoteDigest found
        **/
       DuplicateBlockVoteDigest: AugmentedError<ApiType>;
+      /**
+       * Duplicate ForkPowerDigest found
+       **/
+      DuplicateForkPowerDigest: AugmentedError<ApiType>;
       /**
        * Duplicate NotebookDigest found
        **/
@@ -377,6 +417,30 @@ declare module '@polkadot/api-base/types/errors' {
        * Cannot signal forced change so soon after last.
        **/
       TooSoon: AugmentedError<ApiType>;
+    };
+    hyperbridge: {
+    };
+    ismp: {
+      /**
+       * Couldn't update challenge period
+       **/
+      ChallengePeriodUpdateFailed: AugmentedError<ApiType>;
+      /**
+       * Encountered an error while creating the consensus client.
+       **/
+      ConsensusClientCreationFailed: AugmentedError<ApiType>;
+      /**
+       * Invalid ISMP message
+       **/
+      InvalidMessage: AugmentedError<ApiType>;
+      /**
+       * Requested message was not found
+       **/
+      MessageNotFound: AugmentedError<ApiType>;
+      /**
+       * Couldn't update unbonding period
+       **/
+      UnbondingPeriodUpdateFailed: AugmentedError<ApiType>;
     };
     miningSlot: {
       AccountWouldBeBelowMinimum: AugmentedError<ApiType>;

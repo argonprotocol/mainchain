@@ -42,10 +42,10 @@ fn test_balance_change_allocation_errs_non_zero() {
 				account_id: Alice.to_account_id(),
 				account_type: AccountType::Deposit,
 				change_number: 1,
-				balance: 100,
+				balance: 100_000,
 				previous_balance_proof: None,
 				channel_hold_note: None,
-				notes: bounded_vec![Note::create(100, NoteType::Claim)],
+				notes: bounded_vec![Note::create(100_000, NoteType::Claim)],
 				signature: empty_signature(),
 			}
 			.sign(Alice.pair())
@@ -55,7 +55,7 @@ fn test_balance_change_allocation_errs_non_zero() {
 			None,
 			2
 		),
-		VerifyError::BalanceChangeNotNetZero { sent: 0, claimed: 100 }
+		VerifyError::BalanceChangeNotNetZero { sent: 0, claimed: 100_000 }
 	);
 }
 
@@ -65,7 +65,7 @@ fn must_supply_zero_balance_on_first_nonce() {
 		account_id: Bob.to_account_id(),
 		account_type: AccountType::Deposit,
 		change_number: 2,
-		balance: 100,
+		balance: 100_000,
 		previous_balance_proof: None,
 		channel_hold_note: None,
 		notes: Default::default(),
@@ -86,10 +86,10 @@ fn test_balance_change_allocation_must_be_zero() {
 			account_type: AccountType::Deposit,
 			change_number: 2,
 			balance: 0,
-			previous_balance_proof: empty_proof(100),
+			previous_balance_proof: empty_proof(100_000),
 			channel_hold_note: None,
 			notes: bounded_vec![Note::create(
-				100,
+				100_000,
 				NoteType::Send { to: Some(bounded_vec!(Alice.to_account_id())) }
 			)],
 			signature: empty_signature(),
@@ -98,10 +98,10 @@ fn test_balance_change_allocation_must_be_zero() {
 			account_id: Alice.to_account_id(),
 			account_type: AccountType::Deposit,
 			change_number: 1,
-			balance: 100,
+			balance: 100_000,
 			previous_balance_proof: None,
 			channel_hold_note: None,
-			notes: bounded_vec![Note::create(100, NoteType::Claim)],
+			notes: bounded_vec![Note::create(100_000, NoteType::Claim)],
 			signature: empty_signature(),
 		},
 	];
@@ -117,29 +117,29 @@ fn test_notes_must_add_up() {
 			account_type: AccountType::Deposit,
 			change_number: 2,
 			balance: 0,
-			previous_balance_proof: empty_proof(250),
+			previous_balance_proof: empty_proof(250_000),
 			channel_hold_note: None,
-			notes: bounded_vec![Note::create(250, NoteType::Send { to: None })],
+			notes: bounded_vec![Note::create(250_000, NoteType::Send { to: None })],
 			signature: empty_signature(),
 		},
 		BalanceChange {
 			account_id: Alice.to_account_id(),
 			account_type: AccountType::Deposit,
 			change_number: 1,
-			balance: 100,
+			balance: 100_000,
 			previous_balance_proof: None,
 			channel_hold_note: None,
-			notes: bounded_vec![Note::create(100, NoteType::Claim)],
+			notes: bounded_vec![Note::create(100_000, NoteType::Claim)],
 			signature: empty_signature(),
 		},
 		BalanceChange {
 			account_id: Dave.to_account_id(),
 			account_type: AccountType::Deposit,
 			change_number: 1,
-			balance: 100, // WRONG BALANCE - should be 150
+			balance: 100_000, // WRONG BALANCE - should be 150_000
 			previous_balance_proof: None,
 			channel_hold_note: None,
-			notes: bounded_vec![Note::create(150, NoteType::Claim)],
+			notes: bounded_vec![Note::create(150_000, NoteType::Claim)],
 			signature: empty_signature(),
 		},
 	];
@@ -147,12 +147,12 @@ fn test_notes_must_add_up() {
 		verify_notarization_allocation(&balance_change, &[], &[], None, 2),
 		VerifyError::BalanceChangeMismatch {
 			change_index: 2,
-			provided_balance: 100,
-			calculated_balance: 150
+			provided_balance: 100_000,
+			calculated_balance: 150_000
 		}
 	);
 
-	balance_change[2].balance = 150;
+	balance_change[2].balance = 150_000;
 	assert_ok!(verify_notarization_allocation(&balance_change, &[], &[], None, 2));
 }
 
@@ -165,10 +165,10 @@ fn test_recipients() {
 			change_number: 2,
 
 			balance: 0,
-			previous_balance_proof: empty_proof(250),
+			previous_balance_proof: empty_proof(250_000),
 			channel_hold_note: None,
 			notes: bounded_vec![Note::create(
-				250,
+				250_000,
 				NoteType::Send {
 					to: Some(bounded_vec!(Alice.to_account_id(), Ferdie.to_account_id()))
 				}
@@ -179,20 +179,20 @@ fn test_recipients() {
 			account_id: Alice.to_account_id(),
 			account_type: AccountType::Deposit,
 			change_number: 1,
-			balance: 200,
+			balance: 200_000,
 			previous_balance_proof: None,
 			channel_hold_note: None,
-			notes: bounded_vec![Note::create(200, NoteType::Claim)],
+			notes: bounded_vec![Note::create(200_000, NoteType::Claim)],
 			signature: empty_signature(),
 		},
 		BalanceChange {
 			account_id: Dave.to_account_id(),
 			account_type: AccountType::Deposit,
 			change_number: 1,
-			balance: 50,
+			balance: 50_000,
 			previous_balance_proof: None,
 			channel_hold_note: None,
-			notes: bounded_vec![Note::create(50, NoteType::Claim)],
+			notes: bounded_vec![Note::create(50_000, NoteType::Claim)],
 			signature: empty_signature(),
 		},
 	];
@@ -201,8 +201,8 @@ fn test_recipients() {
 		VerifyError::InvalidNoteRecipients
 	);
 
-	balance_change[1].balance = 250;
-	balance_change[1].notes[0].milligons = 250;
+	balance_change[1].balance = 250_000;
+	balance_change[1].notes[0].microgons = 250_000;
 	balance_change.pop();
 	assert_ok!(verify_notarization_allocation(&balance_change, &[], &[], None, 2));
 }
@@ -214,11 +214,11 @@ fn test_sending_to_localchain() {
 		account_id: Bob.to_account_id(),
 		account_type: AccountType::Deposit,
 		change_number: 1,
-		balance: 250,
+		balance: 250_000,
 		previous_balance_proof: None,
 		channel_hold_note: None,
 		notes: bounded_vec![Note {
-			milligons: 250,
+			microgons: 250_000,
 			note_type: NoteType::ClaimFromMainchain { transfer_id: 1 },
 		}],
 		signature: empty_signature(),
@@ -237,12 +237,12 @@ fn test_sending_to_mainchain() {
 			account_id: Bob.to_account_id(),
 			account_type: AccountType::Deposit,
 			change_number: 2,
-			balance: 100,
-			previous_balance_proof: empty_proof(50),
+			balance: 100_000,
+			previous_balance_proof: empty_proof(50_000),
 			channel_hold_note: None,
 			notes: bounded_vec![
-				Note::create(250, NoteType::ClaimFromMainchain { transfer_id: 15 }),
-				Note::create(200, NoteType::Send { to: None }),
+				Note::create(250_000, NoteType::ClaimFromMainchain { transfer_id: 15 }),
+				Note::create(200_000, NoteType::Send { to: None }),
 			],
 			signature: empty_signature(),
 		},
@@ -250,12 +250,12 @@ fn test_sending_to_mainchain() {
 			account_id: Alice.to_account_id(),
 			account_type: AccountType::Deposit,
 			change_number: 1,
-			balance: 50,
+			balance: 50_000,
 			previous_balance_proof: None,
 			channel_hold_note: None,
 			notes: bounded_vec![
-				Note::create(200, NoteType::Claim),
-				Note::create(150, NoteType::SendToMainchain),
+				Note::create(200_000, NoteType::Claim),
+				Note::create(150_000, NoteType::SendToMainchain),
 			],
 			signature: empty_signature(),
 		},
@@ -267,7 +267,7 @@ fn test_sending_to_mainchain() {
 #[test]
 fn test_can_lock_with_a_channel_hold_note() -> anyhow::Result<()> {
 	let channel_hold_note = Note::create(
-		250,
+		250_000,
 		NoteType::ChannelHold {
 			recipient: Alice.to_account_id(),
 			delegated_signer: None,
@@ -278,8 +278,8 @@ fn test_can_lock_with_a_channel_hold_note() -> anyhow::Result<()> {
 		account_id: Bob.to_account_id(),
 		account_type: AccountType::Deposit,
 		change_number: 2,
-		balance: 250,
-		previous_balance_proof: empty_proof(250),
+		balance: 250_000,
+		previous_balance_proof: empty_proof(250_000),
 		channel_hold_note: None,
 		notes: bounded_vec![channel_hold_note.clone()],
 		signature: empty_signature(),
@@ -299,10 +299,10 @@ fn test_can_lock_with_a_channel_hold_note() -> anyhow::Result<()> {
 				account_id: Bob.to_account_id(),
 				account_type: AccountType::Deposit,
 				change_number: 3,
-				balance: 250,
-				previous_balance_proof: empty_proof(250),
+				balance: 250_000,
+				previous_balance_proof: empty_proof(250_000),
 				channel_hold_note: Some(channel_hold_note.clone()),
-				notes: bounded_vec![Note::create(250, NoteType::Send { to: None })],
+				notes: bounded_vec![Note::create(250_000, NoteType::Send { to: None })],
 				signature: empty_signature(),
 			}],
 			&[],
@@ -317,10 +317,10 @@ fn test_can_lock_with_a_channel_hold_note() -> anyhow::Result<()> {
 		account_id: Bob.to_account_id(),
 		account_type: AccountType::Deposit,
 		change_number: 3,
-		balance: 200,
-		previous_balance_proof: empty_proof(250),
+		balance: 200_000,
+		previous_balance_proof: empty_proof(250_000),
 		channel_hold_note: Some(channel_hold_note.clone()),
-		notes: bounded_vec![Note::create(50, NoteType::ChannelHoldSettle)],
+		notes: bounded_vec![Note::create(50_000, NoteType::ChannelHoldSettle)],
 		signature: empty_signature(),
 	};
 
@@ -330,8 +330,8 @@ fn test_can_lock_with_a_channel_hold_note() -> anyhow::Result<()> {
 	));
 
 	// try to clear out change
-	channel_hold_settle.balance = 250;
-	channel_hold_settle.notes[0].milligons = 0;
+	channel_hold_settle.balance = 250_000;
+	channel_hold_settle.notes[0].microgons = 0;
 
 	let proof_tick = channel_hold_settle.clone().previous_balance_proof.unwrap().tick;
 
@@ -370,20 +370,20 @@ fn test_can_lock_with_a_channel_hold_note() -> anyhow::Result<()> {
 			account_id: Bob.to_account_id(),
 			account_type: AccountType::Deposit,
 			change_number: 3,
-			balance: 200,
-			previous_balance_proof: empty_proof(250),
+			balance: 200_000,
+			previous_balance_proof: empty_proof(250_000),
 			channel_hold_note: Some(channel_hold_note.clone()),
-			notes: bounded_vec![Note::create(50, NoteType::ChannelHoldSettle)],
+			notes: bounded_vec![Note::create(50_000, NoteType::ChannelHoldSettle)],
 			signature: empty_signature(),
 		},
 		BalanceChange {
 			account_id: Alice.to_account_id(),
 			account_type: AccountType::Deposit,
 			change_number: 1,
-			balance: 50,
+			balance: 50_000,
 			previous_balance_proof: None,
 			channel_hold_note: None,
-			notes: bounded_vec![Note::create(50, NoteType::ChannelHoldClaim)],
+			notes: bounded_vec![Note::create(50_000, NoteType::ChannelHoldClaim)],
 			signature: empty_signature(),
 		},
 	];
@@ -402,14 +402,14 @@ fn test_can_lock_with_a_channel_hold_note() -> anyhow::Result<()> {
 		assert_eq!(
 			res.claimed_channel_hold_deposits_per_account
 				.get(&LocalchainAccountId::new(Alice.to_account_id(), AccountType::Deposit)),
-			Some(&50)
+			Some(&50_000)
 		);
 		assert_err!(
 			res.verify_taxes(),
 			VerifyError::InsufficientTaxIncluded {
 				account_id: Alice.to_account_id(),
 				tax_sent: 0,
-				tax_owed: 10
+				tax_owed: 10_000
 			}
 		);
 	}
@@ -424,10 +424,10 @@ fn test_change_signature() {
 		account_id: Bob.to_account_id(),
 		account_type: AccountType::Deposit,
 		change_number: 1,
-		balance: 250,
+		balance: 250_000,
 		previous_balance_proof: None,
 		channel_hold_note: None,
-		notes: bounded_vec![Note::create(250, NoteType::ClaimFromMainchain { transfer_id: 1 }),],
+		notes: bounded_vec![Note::create(250_000, NoteType::ClaimFromMainchain { transfer_id: 1 }),],
 		signature: empty_signature(),
 	}];
 
@@ -445,14 +445,14 @@ fn test_with_note_claim_signatures() {
 		account_id: Bob.to_account_id(),
 		account_type: AccountType::Deposit,
 		change_number: 5,
-		previous_balance_proof: empty_proof(250),
-		balance: 250,
+		previous_balance_proof: empty_proof(250_000),
+		balance: 250_000,
 		notes: bounded_vec![],
 		channel_hold_note: None,
 		signature: empty_signature(),
 	};
 	balance_change.push_note(
-		250,
+		250_000,
 		NoteType::ChannelHold {
 			recipient: Alice.to_account_id(),
 			delegated_signer: None,
@@ -467,26 +467,26 @@ fn test_with_note_claim_signatures() {
 		account_id: Bob.to_account_id(),
 		account_type: AccountType::Deposit,
 		change_number: 6,
-		previous_balance_proof: empty_proof(250),
-		balance: 200,
+		previous_balance_proof: empty_proof(250_000),
+		balance: 200_000,
 		notes: bounded_vec![],
 		channel_hold_note: Some(balance_change.notes[0].clone()),
 		signature: empty_signature(),
 	};
-	balance_change2.push_note(50, NoteType::ChannelHoldSettle);
+	balance_change2.push_note(50_000, NoteType::ChannelHoldSettle);
 	balance_change2.sign(Bob.pair());
 	assert_ok!(verify_changeset_signatures(&vec![balance_change2.clone()]));
 
 	let mut channel_hold_note = balance_change.notes[0].clone();
 
 	balance_change2.sign(Bob.pair());
-	balance_change2.channel_hold_note = Some(Note::create(100, NoteType::Tax));
+	balance_change2.channel_hold_note = Some(Note::create(100_000, NoteType::Tax));
 	assert_err!(
 		verify_changeset_signatures(&vec![balance_change2.clone()]),
 		VerifyError::InvalidChannelHoldNote
 	);
 
-	channel_hold_note.milligons = 102;
+	channel_hold_note.microgons = 102;
 	balance_change2.channel_hold_note = Some(channel_hold_note.clone());
 	assert_err!(
 		verify_changeset_signatures(&vec![balance_change2.clone()]),
@@ -500,11 +500,11 @@ fn test_with_delegated_note_claim_signatures() {
 		account_id: Bob.to_account_id(),
 		account_type: AccountType::Deposit,
 		change_number: 5,
-		previous_balance_proof: empty_proof(250),
+		previous_balance_proof: empty_proof(250_000),
 		balance: 0,
-		notes: bounded_vec![Note::create(250, NoteType::ChannelHoldSettle,)],
+		notes: bounded_vec![Note::create(250_000, NoteType::ChannelHoldSettle,)],
 		channel_hold_note: Some(Note::create(
-			250,
+			250_000,
 			NoteType::ChannelHold {
 				recipient: Alice.to_account_id(),
 				delegated_signer: Some(Charlie.to_account_id()),
@@ -524,20 +524,20 @@ fn test_with_delegated_note_claim_signatures() {
 fn test_tax_must_be_claimed_on_tax_account() {
 	let set = vec![
 		BalanceChange {
-			balance: 20_000,
+			balance: 20_000_000,
 			change_number: 2,
 			account_id: Bob.to_account_id(),
 			account_type: AccountType::Deposit,
-			previous_balance_proof: empty_proof(21_000),
+			previous_balance_proof: empty_proof(21_000_000),
 			channel_hold_note: None,
 			notes: Default::default(),
 			signature: empty_signature(),
 		}
-		.push_note(1000, NoteType::Send { to: None })
+		.push_note(1_000_000, NoteType::Send { to: None })
 		.sign(Bob.pair())
 		.clone(),
 		BalanceChange {
-			balance: 800,
+			balance: 800_000,
 			change_number: 1,
 			account_id: Alice.to_account_id(),
 			account_type: AccountType::Deposit,
@@ -546,21 +546,21 @@ fn test_tax_must_be_claimed_on_tax_account() {
 			signature: empty_signature(),
 			channel_hold_note: None,
 		}
-		.push_note(1000, NoteType::Claim)
-		.push_note(200, NoteType::Tax)
+		.push_note(1_000_000, NoteType::Claim)
+		.push_note(200_000, NoteType::Tax)
 		.sign(Alice.pair())
 		.clone(),
 	];
 
 	assert_err!(
 		verify_notarization_allocation(&set, &[], &[], Some(1), 2),
-		VerifyError::TaxBalanceChangeNotNetZero { sent: 200, claimed: 0 }
+		VerifyError::TaxBalanceChangeNotNetZero { sent: 200_000, claimed: 0 }
 	);
 
 	let mut claim_tax_on_deposit = set.clone();
 	claim_tax_on_deposit.push(
 		BalanceChange {
-			balance: 200,
+			balance: 200_000,
 			change_number: 1,
 			account_id: Alice.to_account_id(),
 			account_type: AccountType::Deposit,
@@ -569,18 +569,18 @@ fn test_tax_must_be_claimed_on_tax_account() {
 			signature: empty_signature(),
 			channel_hold_note: None,
 		}
-		.push_note(200, NoteType::Claim)
+		.push_note(200_000, NoteType::Claim)
 		.clone(),
 	);
 	assert_err!(
 		verify_notarization_allocation(&claim_tax_on_deposit, &[], &[], Some(1), 2),
-		VerifyError::BalanceChangeNotNetZero { sent: 1000, claimed: 1200 }
+		VerifyError::BalanceChangeNotNetZero { sent: 1_000_000, claimed: 1_200_000 }
 	);
 
 	let mut claim_tax_on_deposit = set.clone();
 	claim_tax_on_deposit.push(
 		BalanceChange {
-			balance: 200,
+			balance: 200_000,
 			change_number: 1,
 			account_id: Alice.to_account_id(),
 			account_type: AccountType::Tax,
@@ -589,27 +589,30 @@ fn test_tax_must_be_claimed_on_tax_account() {
 			signature: empty_signature(),
 			channel_hold_note: None,
 		}
-		.push_note(200, NoteType::Claim)
+		.push_note(200_000, NoteType::Claim)
 		.clone(),
 	);
 
 	let result = verify_notarization_allocation(&claim_tax_on_deposit, &[], &[], Some(1), 2)
 		.expect("should unwrap");
-	assert_eq!(result.claimed_deposits, 1000);
-	assert_eq!(result.sent_tax, 200);
-	assert_eq!(result.claimed_tax, 200);
+	assert_eq!(result.claimed_deposits, 1_000_000);
+	assert_eq!(result.sent_tax, 200_000);
+	assert_eq!(result.claimed_tax, 200_000);
 }
 
 #[test]
 fn test_can_transfer_tax() {
 	let set = vec![BalanceChange {
-		balance: 20_000,
+		balance: 20_000_000,
 		change_number: 1,
 		account_id: Bob.to_account_id(),
 		account_type: AccountType::Tax,
 		previous_balance_proof: None,
 		channel_hold_note: None,
-		notes: bounded_vec!(Note::create(20_000, NoteType::ClaimFromMainchain { transfer_id: 1 })),
+		notes: bounded_vec!(Note::create(
+			20_000_000,
+			NoteType::ClaimFromMainchain { transfer_id: 1 }
+		)),
 		signature: empty_signature(),
 	}];
 
@@ -624,10 +627,10 @@ fn test_can_transfer_tax() {
 			change_number: 2,
 			account_id: Bob.to_account_id(),
 			account_type: AccountType::Tax,
-			previous_balance_proof: empty_proof(20_000),
+			previous_balance_proof: empty_proof(20_000_000),
 			channel_hold_note: None,
 			notes: bounded_vec!(Note::create(
-				20_000,
+				20_000_000,
 				NoteType::Send {
 					to: Some(bounded_vec!(Alice.to_account_id(), Ferdie.to_account_id()))
 				}
@@ -635,23 +638,23 @@ fn test_can_transfer_tax() {
 			signature: empty_signature(),
 		},
 		BalanceChange {
-			balance: 9_000,
+			balance: 9_000_000,
 			change_number: 1,
 			account_id: Alice.to_account_id(),
 			account_type: AccountType::Tax,
 			previous_balance_proof: None,
 			channel_hold_note: None,
-			notes: bounded_vec!(Note::create(9_000, NoteType::Claim)),
+			notes: bounded_vec!(Note::create(9_000_000, NoteType::Claim)),
 			signature: empty_signature(),
 		},
 		BalanceChange {
-			balance: 11_000,
+			balance: 11_000_000,
 			change_number: 1,
 			account_id: Ferdie.to_account_id(),
 			account_type: AccountType::Tax,
 			previous_balance_proof: None,
 			channel_hold_note: None,
-			notes: bounded_vec!(Note::create(11_000, NoteType::Claim)),
+			notes: bounded_vec!(Note::create(11_000_000, NoteType::Claim)),
 			signature: empty_signature(),
 		},
 	];
@@ -659,8 +662,8 @@ fn test_can_transfer_tax() {
 	let result = verify_notarization_allocation(&set, &[], &[], Some(1), 2).expect("should unwrap");
 
 	assert_eq!(result.claimed_deposits, 0);
-	assert_eq!(result.claimed_tax, 20_000);
-	assert_eq!(result.sent_tax, 20_000);
+	assert_eq!(result.claimed_tax, 20_000_000);
+	assert_eq!(result.sent_tax, 20_000_000);
 	assert_ok!(result.verify_taxes());
 }
 
@@ -668,23 +671,23 @@ fn test_can_transfer_tax() {
 fn test_can_buy_domains() {
 	let set = vec![
 		BalanceChange {
-			balance: 19_000,
+			balance: 19_000_000,
 			change_number: 2,
 			account_id: Bob.to_account_id(),
 			account_type: AccountType::Deposit,
-			previous_balance_proof: empty_proof(20_000),
+			previous_balance_proof: empty_proof(20_000_000),
 			channel_hold_note: None,
-			notes: bounded_vec![Note::create(1_000, NoteType::LeaseDomain),],
+			notes: bounded_vec![Note::create(1_000_000, NoteType::LeaseDomain),],
 			signature: empty_signature(),
 		},
 		BalanceChange {
-			balance: 1_000,
+			balance: 1_000_000,
 			change_number: 1,
 			account_id: Bob.to_account_id(),
 			account_type: AccountType::Tax,
 			previous_balance_proof: None,
 			channel_hold_note: None,
-			notes: bounded_vec![Note::create(1_000, NoteType::Claim)],
+			notes: bounded_vec![Note::create(1_000_000, NoteType::Claim)],
 			signature: empty_signature(),
 		},
 	];
@@ -699,9 +702,9 @@ fn test_can_buy_domains() {
 	.expect("should unwrap");
 
 	assert_eq!(result.claimed_deposits, 0);
-	assert_eq!(result.claimed_tax, 1_000);
-	assert_eq!(result.sent_tax, 1_000);
-	assert_eq!(result.allocated_to_domains, 1_000);
+	assert_eq!(result.claimed_tax, 1_000_000);
+	assert_eq!(result.sent_tax, 1_000_000);
+	assert_eq!(result.allocated_to_domains, 1_000_000);
 	assert_ok!(result.verify_taxes());
 }
 
@@ -712,26 +715,26 @@ fn verify_taxes() {
 	let localchain_account_id =
 		LocalchainAccountId::new(Alice.to_account_id(), AccountType::Deposit);
 
-	set.claims_per_account.insert(localchain_account_id.clone(), 100);
+	set.claims_per_account.insert(localchain_account_id.clone(), 100_000);
 	assert_err!(
 		set.verify_taxes(),
 		VerifyError::InsufficientTaxIncluded {
 			account_id: Alice.to_account_id(),
 			tax_sent: 0,
-			tax_owed: 20
+			tax_owed: 20_000
 		}
 	);
-	set.tax_created_per_account.insert(localchain_account_id.clone(), 22);
+	set.tax_created_per_account.insert(localchain_account_id.clone(), 22_000);
 	assert_ok!(set.verify_taxes());
 
 	set.claimed_channel_hold_deposits_per_account
-		.insert(localchain_account_id.clone(), 1000);
+		.insert(localchain_account_id.clone(), 1_000_000);
 	assert_err!(
 		set.verify_taxes(),
 		VerifyError::InsufficientTaxIncluded {
 			account_id: Alice.to_account_id(),
-			tax_sent: 22,
-			tax_owed: 220
+			tax_sent: 22_000,
+			tax_owed: 220_000
 		}
 	);
 }
@@ -743,9 +746,9 @@ fn verify_tax_votes() {
 		change_number: 2,
 		account_id: Bob.to_account_id(),
 		account_type: AccountType::Tax,
-		previous_balance_proof: empty_proof(20_000),
+		previous_balance_proof: empty_proof(20_000_000),
 		channel_hold_note: None,
-		notes: bounded_vec!(Note::create(20_000, NoteType::SendToVote)),
+		notes: bounded_vec!(Note::create(20_000_000, NoteType::SendToVote)),
 		signature: Signature::from_raw([0u8; 64]).into(),
 	}];
 
@@ -758,7 +761,7 @@ fn verify_tax_votes() {
 		account_id: Bob.to_account_id(),
 		block_hash: H256::zero(),
 		index: 0,
-		power: 20_000,
+		power: 20_000_000,
 		tick: 1,
 		block_rewards_account_id: Bob.to_account_id(),
 		signature: Signature::from_raw([0u8; 64]).into(),
@@ -783,7 +786,7 @@ fn test_vote_sources() {
 			block_hash: vote_block_hash,
 			index: 0,
 			tick: 1,
-			power: 20_000,
+			power: 20_000_000,
 			block_rewards_account_id: Bob.to_account_id(),
 			signature: Signature::from_raw([0u8; 64]).into(),
 		}
@@ -794,7 +797,7 @@ fn test_vote_sources() {
 			block_hash: vote_block_hash,
 			index: 1,
 			tick: 1,
-			power: 400,
+			power: 400_000,
 			block_rewards_account_id: Bob.to_account_id(),
 			signature: Signature::from_raw([0u8; 64]).into(),
 		}
@@ -802,14 +805,14 @@ fn test_vote_sources() {
 		.clone(),
 	];
 
-	let vote_minimums = BTreeMap::from([(vote_block_hash, 500)]);
+	let vote_minimums = BTreeMap::from([(vote_block_hash, 500_000)]);
 
 	assert_err!(
 		verify_voting_sources(&votes, 1, &vote_minimums),
 		VerifyError::InsufficientBlockVoteMinimum
 	);
 
-	votes[1].power = 500;
+	votes[1].power = 500_000;
 	assert_err!(
 		verify_voting_sources(&votes, 1, &vote_minimums),
 		VerifyError::BlockVoteInvalidSignature

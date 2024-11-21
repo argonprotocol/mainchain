@@ -133,12 +133,12 @@ impl NotarizationBuilder {
       for note in change.notes {
         if change.account_type == AccountType::Tax {
           match note.note_type {
-            NoteType::Claim => balance -= note.milligons as i128,
-            NoteType::Send { .. } => balance += note.milligons as i128,
+            NoteType::Claim => balance -= note.microgons as i128,
+            NoteType::Send { .. } => balance += note.microgons as i128,
             _ => {}
           }
         } else if note.note_type == NoteType::Tax {
-          balance += note.milligons as i128;
+          balance += note.microgons as i128;
         }
       }
     }
@@ -176,7 +176,7 @@ impl NotarizationBuilder {
       if change.account_type == AccountType::Tax {
         for note in change.notes {
           if note.note_type == NoteType::SendToVote {
-            balance += note.milligons as i128;
+            balance += note.microgons as i128;
           }
         }
       }
@@ -195,7 +195,7 @@ impl NotarizationBuilder {
       if change.account_type == AccountType::Deposit {
         for note in change.notes {
           if note.note_type == NoteType::LeaseDomain {
-            balance += note.milligons as i128;
+            balance += note.microgons as i128;
           }
         }
       }
@@ -217,8 +217,8 @@ impl NotarizationBuilder {
 
       for note in change.notes {
         match note.note_type {
-          NoteType::Claim { .. } | NoteType::ChannelHoldClaim => balance -= note.milligons as i128,
-          NoteType::Send { .. } | NoteType::ChannelHoldSettle => balance += note.milligons as i128,
+          NoteType::Claim { .. } | NoteType::ChannelHoldClaim => balance -= note.microgons as i128,
+          NoteType::Send { .. } | NoteType::ChannelHoldSettle => balance += note.microgons as i128,
           _ => {}
         };
       }
@@ -517,7 +517,7 @@ impl NotarizationBuilder {
 
   pub async fn claim_and_pay_tax(
     &self,
-    milligons_plus_tax: Balance,
+    microgons_plus_tax: Balance,
     deposit_account_id: Option<i64>,
     use_default_tax_account: bool,
   ) -> Result<BalanceChangeBuilder> {
@@ -526,7 +526,7 @@ impl NotarizationBuilder {
       None => self.default_deposit_account().await?,
     };
 
-    let tax_result = claim_account.claim(milligons_plus_tax).await?;
+    let tax_result = claim_account.claim(microgons_plus_tax).await?;
 
     let tax = tax_result.tax;
 
@@ -541,17 +541,17 @@ impl NotarizationBuilder {
     Ok(claim_account)
   }
 
-  pub async fn fund_jump_account(&self, milligons: Balance) -> Result<BalanceChangeBuilder> {
+  pub async fn fund_jump_account(&self, microgons: Balance) -> Result<BalanceChangeBuilder> {
     let jump_account = self.get_jump_account(AccountType::Deposit).await?;
 
     self
       .default_deposit_account()
       .await?
-      .send(milligons, Some(vec![jump_account.address.clone()]))
+      .send(microgons, Some(vec![jump_account.address.clone()]))
       .await?;
 
     self
-      .claim_and_pay_tax(milligons, Some(jump_account.local_account_id), false)
+      .claim_and_pay_tax(microgons, Some(jump_account.local_account_id), false)
       .await
   }
 
@@ -562,7 +562,7 @@ impl NotarizationBuilder {
     ))?;
 
     let mut recipients = vec![];
-    let mut requested_milligons: u128 = 0;
+    let mut requested_microgons: u128 = 0;
     let mut paid_tax = false;
 
     for change in balance_changes.iter() {
@@ -580,7 +580,7 @@ impl NotarizationBuilder {
         match note.note_type {
           NoteType::Claim => {
             recipients.push(AccountStore::to_address(&change.account_id));
-            requested_milligons += note.milligons;
+            requested_microgons += note.microgons;
           }
           NoteType::Tax => {
             continue;
@@ -601,7 +601,7 @@ impl NotarizationBuilder {
     self
       .default_deposit_account()
       .await?
-      .send(requested_milligons, Some(recipients))
+      .send(requested_microgons, Some(recipients))
       .await?;
 
     let mut imports = self.imported_balance_changes.lock().await;
@@ -646,7 +646,7 @@ impl NotarizationBuilder {
               }
             }
 
-            let _ = self.claim_and_pay_tax(note.milligons, None, true).await?;
+            let _ = self.claim_and_pay_tax(note.microgons, None, true).await?;
           }
           _ => bail!(
             "This api can only accept 'Send' notes. The note type is {:?}",
@@ -789,12 +789,13 @@ impl NotarizationBuilder {
       })?;
 
     let mut tx = self.db.begin().await?;
+    let tick = result.tick as i64;
     let notarization_id = sqlx::query_scalar!(
       "INSERT INTO notarizations (json, notary_id, notebook_number, tick) VALUES (?, ?, ?, ?) RETURNING id",
       notarizations_json,
       notary_client.notary_id,
       result.notebook_number,
-      result.tick,
+      tick,
     )
     .fetch_one(&mut *tx)
     .await
@@ -816,7 +817,7 @@ impl NotarizationBuilder {
     let mut tracker = NotarizationTracker {
       db: self.db.clone(),
       notary_clients: self.notary_clients.clone(),
-      tick: result.tick,
+      tick: result.tick as i64,
       notebook_number,
       notary_id,
       notarization_id,
@@ -895,7 +896,7 @@ impl NotarizationBuilder {
         },
         AccountStore::to_address(account),
         notarization_id,
-        result.tick,
+        result.tick as i64,
       )
       .await?;
     }
@@ -974,6 +975,7 @@ pub mod napi_ext {
   use crate::ChannelHold;
   use crate::LocalAccount;
   use crate::{notarization_tracker::NotarizationTracker, AccountStore};
+  use argon_primitives::tick::Tick;
   use argon_primitives::{AccountType, BlockVote};
   use codec::Decode;
   use napi::bindgen_prelude::BigInt;
@@ -1163,7 +1165,7 @@ pub mod napi_ext {
         amount: transfer.amount.get_u128().1,
         notary_id: transfer.notary_id,
         transfer_id: transfer.transfer_id,
-        expiration_tick: transfer.expiration_tick,
+        expiration_tick: transfer.expiration_tick as Tick,
       };
       self.claim_from_mainchain(transfer).await.napi_ok()
     }
@@ -1171,13 +1173,13 @@ pub mod napi_ext {
     #[napi(js_name = "claimAndPayTax")]
     pub async fn claim_and_pay_tax_napi(
       &self,
-      milligons_plus_tax: BigInt,
+      microgons_plus_tax: BigInt,
       deposit_account_id: Option<i64>,
       use_default_tax_account: bool,
     ) -> napi::Result<BalanceChangeBuilder> {
       self
         .claim_and_pay_tax(
-          milligons_plus_tax.get_u128().1,
+          microgons_plus_tax.get_u128().1,
           deposit_account_id,
           use_default_tax_account,
         )
@@ -1188,10 +1190,10 @@ pub mod napi_ext {
     #[napi(js_name = "fundJumpAccount")]
     pub async fn fund_jump_account_napi(
       &self,
-      milligons: BigInt,
+      microgons: BigInt,
     ) -> napi::Result<BalanceChangeBuilder> {
       self
-        .fund_jump_account(milligons.get_u128().1)
+        .fund_jump_account(microgons.get_u128().1)
         .await
         .napi_ok()
     }
@@ -1256,7 +1258,7 @@ pub mod napi_ext {
     /// The voting power of this vote, determined from the amount of tax
     pub power: BigInt,
     /// The tick where a vote was intended
-    pub tick: u32,
+    pub tick: i64,
     /// The domain used to create this vote
     pub domain_hash: Vec<u8>,
     /// The domain payment address used to create this vote
@@ -1276,7 +1278,7 @@ pub mod napi_ext {
         block_hash: H256::from_slice(self.block_hash.as_slice()),
         index: self.index,
         power,
-        tick: self.tick,
+        tick: self.tick as Tick,
         block_rewards_account_id: AccountStore::parse_address(&self.block_rewards_address)?,
         signature: MultiSignature::decode(&mut self.signature.as_slice())?,
       })
@@ -1326,7 +1328,7 @@ mod test {
     assert_eq!(default_account.change_number, 0);
 
     let _ = alice_builder
-      .claim_from_mainchain(mock_mainchain_transfer(&alice_address, 10_000u128))
+      .claim_from_mainchain(mock_mainchain_transfer(&alice_address, 10_000_000u128))
       .await?;
     alice_builder.sign().await?;
 
@@ -1334,10 +1336,10 @@ mod test {
     assert_eq!(test_notarization.balance_changes.len(), 1);
     assert_eq!(test_notarization.balance_changes[0].notes.len(), 1);
     assert_eq!(
-      test_notarization.balance_changes[0].notes[0].milligons,
-      10_000
+      test_notarization.balance_changes[0].notes[0].microgons,
+      10_000_000
     );
-    assert_eq!(test_notarization.balance_changes[0].balance, 10_000);
+    assert_eq!(test_notarization.balance_changes[0].balance, 10_000_000);
 
     assert!(test_notarization.balance_changes[0].verify_signature());
 
@@ -1535,10 +1537,10 @@ mod test {
     let mut balance_change = BalanceChange {
       account_id: Bob.to_account_id(),
       account_type: AccountType::Deposit,
-      balance: 10_000,
+      balance: 10_000_000,
       previous_balance_proof: Some(BalanceProof {
         notary_id: 1,
-        balance: 11_000,
+        balance: 11_000_000,
         account_origin: AccountOrigin {
           account_uid: 1,
           notebook_number: 1,
@@ -1548,7 +1550,7 @@ mod test {
         notebook_proof: None,
       }),
       notes: bounded_vec![Note {
-        milligons: 1000,
+        microgons: 1_000_000,
         note_type: NoteType::Send {
           to: Some(bounded_vec![Ferdie.to_account_id()])
         }
@@ -1585,10 +1587,10 @@ mod test {
     let mut balance_change = BalanceChange {
       account_id: Bob.to_account_id(),
       account_type: AccountType::Deposit,
-      balance: 10_000,
+      balance: 10_000_000,
       previous_balance_proof: Some(BalanceProof {
         notary_id: 1,
-        balance: 11_000,
+        balance: 11_000_000,
         account_origin: AccountOrigin {
           account_uid: 1,
           notebook_number: 1,
@@ -1598,7 +1600,7 @@ mod test {
         notebook_proof: None,
       }),
       notes: bounded_vec![Note {
-        milligons: 1000,
+        microgons: 1_000_000,
         note_type: NoteType::Send {
           to: Some(bounded_vec![Ferdie.to_account_id()])
         }
@@ -1632,19 +1634,19 @@ mod test {
       "accountId": "5CiPPseXPECbkjWCa6MnjNokrgYjMqmKndv2rSnekmSK2DjL",
       "accountType": "deposit",
       "changeNumber": 1,
-      "balance": 4000,
+      "balance": 4000000,
       "previousBalanceProof": null,
       "channelHoldNote": null,
       "notes": [
         {
-          "milligons": 5000,
+          "microgons": 5000000,
           "noteType": {
             "action": "claimFromMainchain",
             "transferId": 1
           }
         },
         {
-          "milligons": 1000,
+          "microgons": 1000000,
           "noteType": {
             "action": "leaseDomain"
           }
@@ -1656,12 +1658,12 @@ mod test {
       "accountId": "5CiPPseXPECbkjWCa6MnjNokrgYjMqmKndv2rSnekmSK2DjL",
       "accountType": "tax",
       "changeNumber": 1,
-      "balance": 1000,
+      "balance": 1000000,
       "previousBalanceProof": null,
       "channelHoldNote": null,
       "notes": [
         {
-          "milligons": 1000,
+          "microgons": 1000000,
           "noteType": {
             "action": "claim"
           }

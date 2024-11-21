@@ -42,7 +42,7 @@ parameter_types! {
 	pub const OwnershipPercentAdjustmentDamper: FixedU128 = FixedU128::from_rational(20, 100);
 
 	pub static ExistentialDeposit: Balance = 1;
-	pub const MinimumBondAmount:u128 = 1_000;
+	pub const MinimumBondAmount:u128 = 1_000_000;
 }
 
 pub type BondId = u64;

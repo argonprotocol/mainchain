@@ -1,8 +1,3 @@
-use argon_node_runtime::{
-	BalancesConfig, BitcoinUtxosConfig, BlockSealSpecConfig, BondsConfig, GrandpaConfig,
-	MiningSlotConfig as MiningSlotPalletConfig, NotariesConfig, PriceIndexConfig,
-	RuntimeGenesisConfig, SessionKeys, SudoConfig, TicksConfig,
-};
 use argon_primitives::{
 	bitcoin::{BitcoinNetwork, Satoshis},
 	block_seal::{MiningRegistration, MiningSlotConfig, RewardDestination},
@@ -10,6 +5,11 @@ use argon_primitives::{
 	notary::GenesisNotary,
 	tick::{Tick, Ticker},
 	AccountId, Balance, BlockNumber, BlockSealAuthorityId, ComputeDifficulty, Signature,
+};
+use argon_runtime::{
+	BalancesConfig, BitcoinUtxosConfig, BlockSealSpecConfig, BondsConfig, ChainTransferConfig,
+	GrandpaConfig, MiningSlotConfig as MiningSlotPalletConfig, NotariesConfig, PriceIndexConfig,
+	RuntimeGenesisConfig, SessionKeys, SudoConfig, TicksConfig,
 };
 use sp_consensus_grandpa::AuthorityId as GrandpaId;
 use sp_core::{Pair, Public};
@@ -67,6 +67,8 @@ pub struct GenesisSettings {
 	pub channel_hold_expiration_ticks: Tick,
 	pub mining_config: MiningSlotConfig<BlockNumber>,
 	pub minimum_bitcoin_bond_satoshis: Satoshis,
+	pub cross_token_operator: AccountId,
+	pub connect_to_test_evm_networks: bool,
 }
 
 #[allow(clippy::too_many_arguments)]
@@ -86,6 +88,8 @@ pub(crate) fn testnet_genesis(
 		channel_hold_expiration_ticks,
 		mining_config,
 		minimum_bitcoin_bond_satoshis,
+		connect_to_test_evm_networks,
+		cross_token_operator,
 	}: GenesisSettings,
 ) -> serde_json::Value {
 	let authority_zero = initial_authorities[0].clone();
@@ -126,6 +130,11 @@ pub(crate) fn testnet_genesis(
 				.iter()
 				.map(|(_, keys)| (keys.grandpa.clone(), 1u64))
 				.collect(),
+			..Default::default()
+		},
+		chain_transfer: ChainTransferConfig {
+			token_admin: Some(cross_token_operator),
+			use_evm_test_networks: connect_to_test_evm_networks,
 			..Default::default()
 		},
 		..Default::default()

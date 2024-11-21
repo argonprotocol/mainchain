@@ -8,8 +8,8 @@ import '@polkadot/api-base/types/submittable';
 import type { ApiTypes, AugmentedSubmittable, SubmittableExtrinsic, SubmittableExtrinsicFunction } from '@polkadot/api-base/types';
 import type { Bytes, Compact, Option, U8aFixed, Vec, bool, u128, u16, u32, u64 } from '@polkadot/types-codec';
 import type { AnyNumber, IMethod, ITuple } from '@polkadot/types-codec/types';
-import type { AccountId32, Call, H256, MultiAddress } from '@polkadot/types/interfaces/runtime';
-import type { ArgonNodeRuntimeConfigsProxyType, ArgonNodeRuntimeOriginCaller, ArgonNodeRuntimeSessionKeys, ArgonPrimitivesBitcoinCompressedBitcoinPubkey, ArgonPrimitivesBitcoinH256Le, ArgonPrimitivesBitcoinOpaqueBitcoinXpub, ArgonPrimitivesBlockSealRewardDestination, ArgonPrimitivesBondVaultTerms, ArgonPrimitivesDomainZoneRecord, ArgonPrimitivesInherentsBitcoinUtxoSync, ArgonPrimitivesInherentsBlockSealInherent, ArgonPrimitivesNotaryNotaryMeta, ArgonPrimitivesNotebookSignedNotebookHeader, PalletBalancesAdjustmentDirection, PalletMiningSlotMiningSlotBid, PalletMultisigTimepoint, PalletPriceIndexPriceIndex, PalletVaultsVaultConfig, SpConsensusGrandpaEquivocationProof, SpCoreVoid, SpWeightsWeightV2Weight } from '@polkadot/types/lookup';
+import type { AccountId32, Call, H160, H256, MultiAddress } from '@polkadot/types/interfaces/runtime';
+import type { ArgonPrimitivesBitcoinCompressedBitcoinPubkey, ArgonPrimitivesBitcoinH256Le, ArgonPrimitivesBitcoinOpaqueBitcoinXpub, ArgonPrimitivesBlockSealRewardDestination, ArgonPrimitivesBondVaultTerms, ArgonPrimitivesDomainZoneRecord, ArgonPrimitivesInherentsBitcoinUtxoSync, ArgonPrimitivesInherentsBlockSealInherent, ArgonPrimitivesNotaryNotaryMeta, ArgonPrimitivesNotebookSignedNotebookHeader, ArgonRuntimeConfigsProxyType, ArgonRuntimeOriginCaller, ArgonRuntimeSessionKeys, IsmpGrandpaAddStateMachine, IsmpHostStateMachine, IsmpMessagingCreateConsensusState, IsmpMessagingMessage, PalletBalancesAdjustmentDirection, PalletChainTransferTransferToEvm, PalletIsmpUtilsFundMessageParams, PalletIsmpUtilsUpdateConsensusState, PalletMiningSlotMiningSlotBid, PalletMultisigTimepoint, PalletPriceIndexPriceIndex, PalletVaultsVaultConfig, SpConsensusGrandpaEquivocationProof, SpCoreVoid, SpWeightsWeightV2Weight } from '@polkadot/types/lookup';
 
 export type __AugmentedSubmittable = AugmentedSubmittable<() => unknown>;
 export type __SubmittableExtrinsic<ApiType extends ApiTypes> = SubmittableExtrinsic<ApiType>;
@@ -160,7 +160,38 @@ declare module '@polkadot/api-base/types/submittable' {
       unlockBitcoinBond: AugmentedSubmittable<(bondId: u64 | AnyNumber | Uint8Array, toScriptPubkey: Bytes | string | Uint8Array, bitcoinNetworkFee: u64 | AnyNumber | Uint8Array) => SubmittableExtrinsic<ApiType>, [u64, Bytes, u64]>;
     };
     chainTransfer: {
+      /**
+       * One time api to register assets for cross chain transfers
+       *
+       * # Arguments
+       * `chains` - Each chain and its corresponding token gateway address
+       **/
+      registerHyperbridgeAssets: AugmentedSubmittable<(chains: Vec<ITuple<[IsmpHostStateMachine, Bytes]>> | ([IsmpHostStateMachine | { Evm: any } | { Polkadot: any } | { Kusama: any } | { Substrate: any } | { Tendermint: any } | string | Uint8Array, Bytes | string | Uint8Array])[]) => SubmittableExtrinsic<ApiType>, [Vec<ITuple<[IsmpHostStateMachine, Bytes]>>]>;
+      /**
+       * This api will re-assign admins for ERC6160 accounts on the TokenGateway.sol contracts
+       * created by Hyperbridge.
+       *
+       * This api is only used to disconnect from hyperbridge.
+       **/
+      replaceHyperbridgeAdmins: AugmentedSubmittable<(newAdmins: Vec<ITuple<[IsmpHostStateMachine, H160]>> | ([IsmpHostStateMachine | { Evm: any } | { Polkadot: any } | { Kusama: any } | { Substrate: any } | { Tendermint: any } | string | Uint8Array, H160 | string | Uint8Array])[]) => SubmittableExtrinsic<ApiType>, [Vec<ITuple<[IsmpHostStateMachine, H160]>>]>;
+      /**
+       * Send argons to a remote EVM based chain. Available destinations are specified in the
+       * `ActiveEvmDestinations` storage item.
+       **/
+      sendToEvmChain: AugmentedSubmittable<(params: PalletChainTransferTransferToEvm | { asset?: any; evmChain?: any; recipient?: any; amount?: any; timeout?: any; relayerFee?: any } | string | Uint8Array) => SubmittableExtrinsic<ApiType>, [PalletChainTransferTransferToEvm]>;
       sendToLocalchain: AugmentedSubmittable<(amount: Compact<u128> | AnyNumber | Uint8Array, notaryId: u32 | AnyNumber | Uint8Array) => SubmittableExtrinsic<ApiType>, [Compact<u128>, u32]>;
+      /**
+       * Pause the bridge
+       **/
+      setBrideEnabled: AugmentedSubmittable<(enabled: bool | boolean | Uint8Array) => SubmittableExtrinsic<ApiType>, [bool]>;
+      /**
+       * Set the asset registration for cross chain transfers
+       *
+       * # Arguments
+       * `add_chains` - Each new chain and its corresponding token gateway address
+       * `remove_chains` - Chains to remove
+       **/
+      updateHyperbridgeAssets: AugmentedSubmittable<(addChains: Vec<ITuple<[IsmpHostStateMachine, Bytes]>> | ([IsmpHostStateMachine | { Evm: any } | { Polkadot: any } | { Kusama: any } | { Substrate: any } | { Tendermint: any } | string | Uint8Array, Bytes | string | Uint8Array])[], removeChains: Vec<IsmpHostStateMachine> | (IsmpHostStateMachine | { Evm: any } | { Polkadot: any } | { Kusama: any } | { Substrate: any } | { Tendermint: any } | string | Uint8Array)[]) => SubmittableExtrinsic<ApiType>, [Vec<ITuple<[IsmpHostStateMachine, Bytes]>>, Vec<IsmpHostStateMachine>]>;
     };
     domains: {
       setZoneRecord: AugmentedSubmittable<(domainHash: H256 | string | Uint8Array, zoneRecord: ArgonPrimitivesDomainZoneRecord | { paymentAccount?: any; notaryId?: any; versions?: any } | string | Uint8Array) => SubmittableExtrinsic<ApiType>, [H256, ArgonPrimitivesDomainZoneRecord]>;
@@ -201,6 +232,55 @@ declare module '@polkadot/api-base/types/submittable' {
        **/
       reportEquivocationUnsigned: AugmentedSubmittable<(equivocationProof: SpConsensusGrandpaEquivocationProof | { setId?: any; equivocation?: any } | string | Uint8Array, keyOwnerProof: SpCoreVoid | null) => SubmittableExtrinsic<ApiType>, [SpConsensusGrandpaEquivocationProof, SpCoreVoid]>;
     };
+    ismp: {
+      /**
+       * Create a consensus client, using a subjectively chosen consensus state. This can also
+       * be used to overwrite an existing consensus state. The dispatch origin for this
+       * call must be `T::AdminOrigin`.
+       *
+       * - `message`: [`CreateConsensusState`] struct.
+       *
+       * Emits [`Event::ConsensusClientCreated`] if successful.
+       **/
+      createConsensusClient: AugmentedSubmittable<(message: IsmpMessagingCreateConsensusState | { consensusState?: any; consensusClientId?: any; consensusStateId?: any; unbondingPeriod?: any; challengePeriods?: any; stateMachineCommitments?: any } | string | Uint8Array) => SubmittableExtrinsic<ApiType>, [IsmpMessagingCreateConsensusState]>;
+      /**
+       * Add more funds to a message (request or response) to be used for delivery and execution.
+       *
+       * Should not be called on a message that has been completed (delivered or timed-out) as
+       * those funds will be lost forever.
+       **/
+      fundMessage: AugmentedSubmittable<(message: PalletIsmpUtilsFundMessageParams | { commitment?: any; amount?: any } | string | Uint8Array) => SubmittableExtrinsic<ApiType>, [PalletIsmpUtilsFundMessageParams]>;
+      /**
+       * Execute the provided batch of ISMP messages, this will short-circuit and revert if any
+       * of the provided messages are invalid. This is an unsigned extrinsic that permits anyone
+       * execute ISMP messages for free, provided they have valid proofs and the messages have
+       * not been previously processed.
+       *
+       * The dispatch origin for this call must be an unsigned one.
+       *
+       * - `messages`: the messages to handle or process.
+       *
+       * Emits different message events based on the Message received if successful.
+       **/
+      handleUnsigned: AugmentedSubmittable<(messages: Vec<IsmpMessagingMessage> | (IsmpMessagingMessage | { Consensus: any } | { FraudProof: any } | { Request: any } | { Response: any } | { Timeout: any } | string | Uint8Array)[]) => SubmittableExtrinsic<ApiType>, [Vec<IsmpMessagingMessage>]>;
+      /**
+       * Modify the unbonding period and challenge period for a consensus state.
+       * The dispatch origin for this call must be `T::AdminOrigin`.
+       *
+       * - `message`: `UpdateConsensusState` struct.
+       **/
+      updateConsensusState: AugmentedSubmittable<(message: PalletIsmpUtilsUpdateConsensusState | { consensusStateId?: any; unbondingPeriod?: any; challengePeriods?: any } | string | Uint8Array) => SubmittableExtrinsic<ApiType>, [PalletIsmpUtilsUpdateConsensusState]>;
+    };
+    ismpGrandpa: {
+      /**
+       * Add some a state machine to the list of supported state machines
+       **/
+      addStateMachines: AugmentedSubmittable<(newStateMachines: Vec<IsmpGrandpaAddStateMachine> | (IsmpGrandpaAddStateMachine | { stateMachine?: any; slotDuration?: any } | string | Uint8Array)[]) => SubmittableExtrinsic<ApiType>, [Vec<IsmpGrandpaAddStateMachine>]>;
+      /**
+       * Remove a state machine from the list of supported state machines
+       **/
+      removeStateMachines: AugmentedSubmittable<(stateMachines: Vec<IsmpHostStateMachine> | (IsmpHostStateMachine | { Evm: any } | { Polkadot: any } | { Kusama: any } | { Substrate: any } | { Tendermint: any } | string | Uint8Array)[]) => SubmittableExtrinsic<ApiType>, [Vec<IsmpHostStateMachine>]>;
+    };
     miningSlot: {
       /**
        * Submit a bid for a mining slot in the next cohort. Once all spots are filled in a slot,
@@ -231,7 +311,7 @@ declare module '@polkadot/api-base/types/submittable' {
        * - `reward_destination`: The account_id for the mining rewards, or `Owner` for the
        * submitting user.
        **/
-      bid: AugmentedSubmittable<(bondInfo: Option<PalletMiningSlotMiningSlotBid> | null | Uint8Array | PalletMiningSlotMiningSlotBid | { vaultId?: any; amount?: any } | string, rewardDestination: ArgonPrimitivesBlockSealRewardDestination | { Owner: any } | { Account: any } | string | Uint8Array, keys: ArgonNodeRuntimeSessionKeys | { grandpa?: any; blockSealAuthority?: any } | string | Uint8Array) => SubmittableExtrinsic<ApiType>, [Option<PalletMiningSlotMiningSlotBid>, ArgonPrimitivesBlockSealRewardDestination, ArgonNodeRuntimeSessionKeys]>;
+      bid: AugmentedSubmittable<(bondInfo: Option<PalletMiningSlotMiningSlotBid> | null | Uint8Array | PalletMiningSlotMiningSlotBid | { vaultId?: any; amount?: any } | string, rewardDestination: ArgonPrimitivesBlockSealRewardDestination | { Owner: any } | { Account: any } | string | Uint8Array, keys: ArgonRuntimeSessionKeys | { grandpa?: any; blockSealAuthority?: any } | string | Uint8Array) => SubmittableExtrinsic<ApiType>, [Option<PalletMiningSlotMiningSlotBid>, ArgonPrimitivesBlockSealRewardDestination, ArgonRuntimeSessionKeys]>;
     };
     mint: {
     };
@@ -358,7 +438,7 @@ declare module '@polkadot/api-base/types/submittable' {
        * Update the metadata of a notary, to be effective at the given tick height, which must be
        * >= MetaChangesTickDelay ticks in the future.
        **/
-      update: AugmentedSubmittable<(notaryId: Compact<u32> | AnyNumber | Uint8Array, meta: ArgonPrimitivesNotaryNotaryMeta | { name?: any; public?: any; hosts?: any } | string | Uint8Array, effectiveTick: Compact<u32> | AnyNumber | Uint8Array) => SubmittableExtrinsic<ApiType>, [Compact<u32>, ArgonPrimitivesNotaryNotaryMeta, Compact<u32>]>;
+      update: AugmentedSubmittable<(notaryId: Compact<u32> | AnyNumber | Uint8Array, meta: ArgonPrimitivesNotaryNotaryMeta | { name?: any; public?: any; hosts?: any } | string | Uint8Array, effectiveTick: Compact<u64> | AnyNumber | Uint8Array) => SubmittableExtrinsic<ApiType>, [Compact<u32>, ArgonPrimitivesNotaryNotaryMeta, Compact<u64>]>;
     };
     notebook: {
       submit: AugmentedSubmittable<(notebooks: Vec<ArgonPrimitivesNotebookSignedNotebookHeader> | (ArgonPrimitivesNotebookSignedNotebookHeader | { header?: any; signature?: any } | string | Uint8Array)[]) => SubmittableExtrinsic<ApiType>, [Vec<ArgonPrimitivesNotebookSignedNotebookHeader>]>;
@@ -474,7 +554,7 @@ declare module '@polkadot/api-base/types/submittable' {
        * - `delay`: The announcement period required of the initial proxy. Will generally be
        * zero.
        **/
-      addProxy: AugmentedSubmittable<(delegate: MultiAddress | { Id: any } | { Index: any } | { Raw: any } | { Address32: any } | { Address20: any } | string | Uint8Array, proxyType: ArgonNodeRuntimeConfigsProxyType | 'Any' | 'NonTransfer' | 'PriceIndex' | number | Uint8Array, delay: u32 | AnyNumber | Uint8Array) => SubmittableExtrinsic<ApiType>, [MultiAddress, ArgonNodeRuntimeConfigsProxyType, u32]>;
+      addProxy: AugmentedSubmittable<(delegate: MultiAddress | { Id: any } | { Index: any } | { Raw: any } | { Address32: any } | { Address20: any } | string | Uint8Array, proxyType: ArgonRuntimeConfigsProxyType | 'Any' | 'NonTransfer' | 'PriceIndex' | number | Uint8Array, delay: u32 | AnyNumber | Uint8Array) => SubmittableExtrinsic<ApiType>, [MultiAddress, ArgonRuntimeConfigsProxyType, u32]>;
       /**
        * Publish the hash of a proxy-call that will be made in the future.
        *
@@ -513,7 +593,7 @@ declare module '@polkadot/api-base/types/submittable' {
        *
        * Fails if there are insufficient funds to pay for deposit.
        **/
-      createPure: AugmentedSubmittable<(proxyType: ArgonNodeRuntimeConfigsProxyType | 'Any' | 'NonTransfer' | 'PriceIndex' | number | Uint8Array, delay: u32 | AnyNumber | Uint8Array, index: u16 | AnyNumber | Uint8Array) => SubmittableExtrinsic<ApiType>, [ArgonNodeRuntimeConfigsProxyType, u32, u16]>;
+      createPure: AugmentedSubmittable<(proxyType: ArgonRuntimeConfigsProxyType | 'Any' | 'NonTransfer' | 'PriceIndex' | number | Uint8Array, delay: u32 | AnyNumber | Uint8Array, index: u16 | AnyNumber | Uint8Array) => SubmittableExtrinsic<ApiType>, [ArgonRuntimeConfigsProxyType, u32, u16]>;
       /**
        * Removes a previously spawned pure proxy.
        *
@@ -532,7 +612,7 @@ declare module '@polkadot/api-base/types/submittable' {
        * Fails with `NoPermission` in case the caller is not a previously created pure
        * account whose `pure` call has corresponding parameters.
        **/
-      killPure: AugmentedSubmittable<(spawner: MultiAddress | { Id: any } | { Index: any } | { Raw: any } | { Address32: any } | { Address20: any } | string | Uint8Array, proxyType: ArgonNodeRuntimeConfigsProxyType | 'Any' | 'NonTransfer' | 'PriceIndex' | number | Uint8Array, index: u16 | AnyNumber | Uint8Array, height: Compact<u32> | AnyNumber | Uint8Array, extIndex: Compact<u32> | AnyNumber | Uint8Array) => SubmittableExtrinsic<ApiType>, [MultiAddress, ArgonNodeRuntimeConfigsProxyType, u16, Compact<u32>, Compact<u32>]>;
+      killPure: AugmentedSubmittable<(spawner: MultiAddress | { Id: any } | { Index: any } | { Raw: any } | { Address32: any } | { Address20: any } | string | Uint8Array, proxyType: ArgonRuntimeConfigsProxyType | 'Any' | 'NonTransfer' | 'PriceIndex' | number | Uint8Array, index: u16 | AnyNumber | Uint8Array, height: Compact<u32> | AnyNumber | Uint8Array, extIndex: Compact<u32> | AnyNumber | Uint8Array) => SubmittableExtrinsic<ApiType>, [MultiAddress, ArgonRuntimeConfigsProxyType, u16, Compact<u32>, Compact<u32>]>;
       /**
        * Dispatch the given `call` from an account that the sender is authorised for through
        * `add_proxy`.
@@ -544,7 +624,7 @@ declare module '@polkadot/api-base/types/submittable' {
        * - `force_proxy_type`: Specify the exact proxy type to be used and checked for this call.
        * - `call`: The call to be made by the `real` account.
        **/
-      proxy: AugmentedSubmittable<(real: MultiAddress | { Id: any } | { Index: any } | { Raw: any } | { Address32: any } | { Address20: any } | string | Uint8Array, forceProxyType: Option<ArgonNodeRuntimeConfigsProxyType> | null | Uint8Array | ArgonNodeRuntimeConfigsProxyType | 'Any' | 'NonTransfer' | 'PriceIndex' | number, call: Call | IMethod | string | Uint8Array) => SubmittableExtrinsic<ApiType>, [MultiAddress, Option<ArgonNodeRuntimeConfigsProxyType>, Call]>;
+      proxy: AugmentedSubmittable<(real: MultiAddress | { Id: any } | { Index: any } | { Raw: any } | { Address32: any } | { Address20: any } | string | Uint8Array, forceProxyType: Option<ArgonRuntimeConfigsProxyType> | null | Uint8Array | ArgonRuntimeConfigsProxyType | 'Any' | 'NonTransfer' | 'PriceIndex' | number, call: Call | IMethod | string | Uint8Array) => SubmittableExtrinsic<ApiType>, [MultiAddress, Option<ArgonRuntimeConfigsProxyType>, Call]>;
       /**
        * Dispatch the given `call` from an account that the sender is authorized for through
        * `add_proxy`.
@@ -558,7 +638,7 @@ declare module '@polkadot/api-base/types/submittable' {
        * - `force_proxy_type`: Specify the exact proxy type to be used and checked for this call.
        * - `call`: The call to be made by the `real` account.
        **/
-      proxyAnnounced: AugmentedSubmittable<(delegate: MultiAddress | { Id: any } | { Index: any } | { Raw: any } | { Address32: any } | { Address20: any } | string | Uint8Array, real: MultiAddress | { Id: any } | { Index: any } | { Raw: any } | { Address32: any } | { Address20: any } | string | Uint8Array, forceProxyType: Option<ArgonNodeRuntimeConfigsProxyType> | null | Uint8Array | ArgonNodeRuntimeConfigsProxyType | 'Any' | 'NonTransfer' | 'PriceIndex' | number, call: Call | IMethod | string | Uint8Array) => SubmittableExtrinsic<ApiType>, [MultiAddress, MultiAddress, Option<ArgonNodeRuntimeConfigsProxyType>, Call]>;
+      proxyAnnounced: AugmentedSubmittable<(delegate: MultiAddress | { Id: any } | { Index: any } | { Raw: any } | { Address32: any } | { Address20: any } | string | Uint8Array, real: MultiAddress | { Id: any } | { Index: any } | { Raw: any } | { Address32: any } | { Address20: any } | string | Uint8Array, forceProxyType: Option<ArgonRuntimeConfigsProxyType> | null | Uint8Array | ArgonRuntimeConfigsProxyType | 'Any' | 'NonTransfer' | 'PriceIndex' | number, call: Call | IMethod | string | Uint8Array) => SubmittableExtrinsic<ApiType>, [MultiAddress, MultiAddress, Option<ArgonRuntimeConfigsProxyType>, Call]>;
       /**
        * Remove the given announcement of a delegate.
        *
@@ -603,7 +683,7 @@ declare module '@polkadot/api-base/types/submittable' {
        * - `proxy`: The account that the `caller` would like to remove as a proxy.
        * - `proxy_type`: The permissions currently enabled for the removed proxy account.
        **/
-      removeProxy: AugmentedSubmittable<(delegate: MultiAddress | { Id: any } | { Index: any } | { Raw: any } | { Address32: any } | { Address20: any } | string | Uint8Array, proxyType: ArgonNodeRuntimeConfigsProxyType | 'Any' | 'NonTransfer' | 'PriceIndex' | number | Uint8Array, delay: u32 | AnyNumber | Uint8Array) => SubmittableExtrinsic<ApiType>, [MultiAddress, ArgonNodeRuntimeConfigsProxyType, u32]>;
+      removeProxy: AugmentedSubmittable<(delegate: MultiAddress | { Id: any } | { Index: any } | { Raw: any } | { Address32: any } | { Address20: any } | string | Uint8Array, proxyType: ArgonRuntimeConfigsProxyType | 'Any' | 'NonTransfer' | 'PriceIndex' | number | Uint8Array, delay: u32 | AnyNumber | Uint8Array) => SubmittableExtrinsic<ApiType>, [MultiAddress, ArgonRuntimeConfigsProxyType, u32]>;
     };
     sudo: {
       /**
@@ -813,7 +893,7 @@ declare module '@polkadot/api-base/types/submittable' {
        * ## Complexity
        * - O(1).
        **/
-      dispatchAs: AugmentedSubmittable<(asOrigin: ArgonNodeRuntimeOriginCaller | { system: any } | { Void: any } | string | Uint8Array, call: Call | IMethod | string | Uint8Array) => SubmittableExtrinsic<ApiType>, [ArgonNodeRuntimeOriginCaller, Call]>;
+      dispatchAs: AugmentedSubmittable<(asOrigin: ArgonRuntimeOriginCaller | { system: any } | { Void: any } | string | Uint8Array, call: Call | IMethod | string | Uint8Array) => SubmittableExtrinsic<ApiType>, [ArgonRuntimeOriginCaller, Call]>;
       /**
        * Send a batch of dispatch calls.
        * Unlike `batch`, it allows errors and won't interrupt.

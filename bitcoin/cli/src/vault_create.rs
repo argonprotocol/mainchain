@@ -25,7 +25,7 @@ pub struct VaultConfig {
 	#[clap(long)]
 	bitcoin_xpub: Option<String>,
 
-	/// The base fee in argons. Up to 3 decimal points
+	/// The base fee in argons. Up to 6 decimal points
 	#[clap(long, value_parser=parse_number)]
 	bitcoin_base_fee: Option<f32>,
 
@@ -38,7 +38,7 @@ pub struct VaultConfig {
 	/// duration
 	#[clap(long, value_parser=parse_number)]
 	mining_apr: Option<f32>,
-	/// The base fee in argons. Up to 3 decimal points
+	/// The base fee in argons. Up to 6 decimal points
 	#[clap(long, value_parser=parse_number)]
 	mining_base_fee: Option<f32>,
 	/// An optional profit sharing setup where any argons mined or minted (not including fees) are
@@ -96,11 +96,11 @@ impl VaultConfig {
 		api::vaults::calls::types::create::VaultConfig {
 			bitcoin_xpubkey: opaque_xpub.0.into(),
 			terms: runtime_types::argon_primitives::bond::VaultTerms::<u128> {
-				bitcoin_base_fee: (self.bitcoin_base_fee.unwrap_or(0.0) * 1000.0) as u128,
+				bitcoin_base_fee: (self.bitcoin_base_fee.unwrap_or(0.0) * 1_000_000.0) as u128,
 				bitcoin_annual_percent_rate: to_api_fixed_u128(read_percent_to_fixed_128(
 					self.bitcoin_apr.unwrap_or(0.0),
 				)),
-				mining_base_fee: (self.mining_base_fee.unwrap_or(0.0) * 1000.0) as u128,
+				mining_base_fee: (self.mining_base_fee.unwrap_or(0.0) * 1_000_000.0) as u128,
 				mining_annual_percent_rate: to_api_fixed_u128(read_percent_to_fixed_128(
 					self.mining_apr.unwrap_or(0.0),
 				)),
@@ -111,8 +111,8 @@ impl VaultConfig {
 			securitization_percent: to_api_fixed_u128(read_percent_to_fixed_128(
 				self.securitization_percent.unwrap_or(0.0),
 			)),
-			bitcoin_amount_allocated: (self.bitcoin_argons.unwrap_or(0.0) * 1000.0) as u128,
-			mining_amount_allocated: (self.mining_argons.unwrap_or(0.0) * 1000.0) as u128,
+			bitcoin_amount_allocated: (self.bitcoin_argons.unwrap_or(0.0) * 1_000_000.0) as u128,
+			mining_amount_allocated: (self.mining_argons.unwrap_or(0.0) * 1_000_000.0) as u128,
 		}
 	}
 

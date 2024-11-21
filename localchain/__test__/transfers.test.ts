@@ -28,7 +28,7 @@ describeIntegration("Transfer Localchain <-> Mainchain", () => {
         const alice = new Keyring({type: 'sr25519'}).createFromUri('//Alice');
         const bob = await KeyringSigner.load("//Bob");
         await activateNotary(alice, mainchainClient, notary);
-        const transferId = await transferToLocalchain(bob.defaultPair, 5000, 1, mainchainClient);
+        const transferId = await transferToLocalchain(bob.defaultPair, 5_000_000, 1, mainchainClient);
         const bobchain = await createLocalchain(mainchainUrl);
         await bobchain.keystore.importSuri("//Bob", CryptoScheme.Sr25519);
         const bobMainchainClient = await bobchain.mainchainClient;
@@ -70,7 +70,7 @@ describeIntegration("Transfer Localchain <-> Mainchain", () => {
         // TODO: convert this to export pkcs8 and then import it
         await bobchain.keystore.importSuri("//Bob", CryptoScheme.Sr25519);
         {
-            const transfer = await bobchain.mainchainTransfers.sendToLocalchain(5000n, 1);
+            const transfer = await bobchain.mainchainTransfers.sendToLocalchain(5_000_000n, 1);
             console.log('Transfer', transfer);
             expect(transfer.transferId).toBe(1);
 

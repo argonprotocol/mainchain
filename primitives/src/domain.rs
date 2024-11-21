@@ -8,11 +8,11 @@ use sp_crypto_hashing::blake2_256;
 use sp_debug_derive::RuntimeDebug;
 use sp_runtime::{BoundedBTreeMap, BoundedVec, RuntimeString};
 
-use crate::{domain_top_level::DomainTopLevel, host::Host, NotaryId};
+use crate::{domain_top_level::DomainTopLevel, host::Host, Balance, NotaryId};
 
 pub const MAX_DATASTORE_VERSIONS: u32 = 25;
 
-pub const DOMAIN_LEASE_COST: u128 = 1_000;
+pub const DOMAIN_LEASE_COST: Balance = 1_000_000;
 
 pub const MIN_DOMAIN_NAME_LENGTH: usize = 2;
 

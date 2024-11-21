@@ -113,11 +113,13 @@ async fn test_will_consolidate_accounts(pool: SqlitePool) -> anyhow::Result<()> 
 #[sqlx::test]
 async fn test_will_handle_broken_consolidate_accounts(pool: SqlitePool) -> anyhow::Result<()> {
   let network = TestNetwork::new(pool.clone()).await?;
-  network.add_mainchain_funds(&network.alice, 5_000).await?;
+  network
+    .add_mainchain_funds(&network.alice, 5_000_000)
+    .await?;
 
-  let _1 = network.alice.transactions().send(500, None).await?;
-  let _2 = network.alice.transactions().send(500, None).await?;
-  let _3 = network.alice.transactions().send(500, None).await?;
+  let _1 = network.alice.transactions().send(500_000, None).await?;
+  let _2 = network.alice.transactions().send(500_000, None).await?;
+  let _3 = network.alice.transactions().send(500_000, None).await?;
 
   let mut did_break_account = false;
   let alice_accounts = network.alice.accounts().list(Some(true)).await?;
@@ -156,12 +158,18 @@ async fn test_will_handle_broken_consolidate_accounts(pool: SqlitePool) -> anyho
 #[sqlx::test]
 async fn test_will_sync_client_channel_holds(pool: SqlitePool) -> anyhow::Result<()> {
   let network = TestNetwork::new(pool.clone()).await?;
-  network.add_mainchain_funds(&network.alice, 5_000).await?;
+  network.notary.ticker.lock().await.tick_duration_millis = 200;
+  network.bob.ticker.ticker.write().tick_duration_millis = 200;
+  network.alice.ticker.ticker.write().tick_duration_millis = 200;
+
+  network
+    .add_mainchain_funds(&network.alice, 5_000_000)
+    .await?;
 
   let channel_hold = network
     .alice
     .transactions()
-    .create_channel_hold(500, network.bob.address().await?, None, None, None)
+    .create_channel_hold(500_000, network.bob.address().await?, None, None, None)
     .await?;
   let channel_expiration = channel_hold.channel_hold().await.expiration_tick;
   let json = channel_hold.export_for_send().await?;
@@ -190,19 +198,20 @@ async fn test_will_sync_client_channel_holds(pool: SqlitePool) -> anyhow::Result
 
   let pending_tips = network.notary.get_pending_tips().await;
   network.notary.create_notebook_header(pending_tips).await;
-  {
-    let mut start_ticker = network.bob.ticker.ticker.write();
-    start_ticker.genesis_utc_time -= channel_expiration as u64 * start_ticker.tick_duration_millis;
-    drop(start_ticker);
-  }
-  network.alice.ticker.ticker.write().genesis_utc_time =
-    network.bob.ticker().ticker.read().genesis_utc_time;
+  // update start time to be after the channel hold expiration
+  let sleep_time = {
+    let ticker = network.notary.ticker.lock().await;
+    let next_tick_time = ticker.time_for_tick(channel_expiration as u64 + 1);
+
+    next_tick_time.saturating_sub(ticker.now_adjusted_to_ntp())
+  };
+  tokio::time::sleep(Duration::from_millis(sleep_time)).await;
   {
     let result = network.bob.balance_sync().sync(None).await?;
     assert_eq!(result.jump_account_consolidations.len(), 0);
     assert_eq!(result.channel_hold_notarizations.len(), 1);
     let hold = result.channel_hold_notarizations[0].channel_holds[0].clone();
-    assert_eq!(hold.settled_amount(), 5);
+    assert_eq!(hold.settled_amount(), 5_000);
   }
   let pending_tips = network.notary.get_pending_tips().await;
   assert_eq!(pending_tips.len(), 3);
@@ -212,7 +221,7 @@ async fn test_will_sync_client_channel_holds(pool: SqlitePool) -> anyhow::Result
     assert_eq!(result.jump_account_consolidations.len(), 1);
     assert_eq!(result.channel_holds_updated().len(), 1);
     let hold = result.channel_holds_updated[0].clone();
-    assert_eq!(hold.settled_amount(), 5);
+    assert_eq!(hold.settled_amount(), 5_000);
   }
 
   Ok(())

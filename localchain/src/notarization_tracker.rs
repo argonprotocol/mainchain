@@ -18,7 +18,7 @@ use crate::{ChannelHold, Result};
 #[derive(Clone)]
 pub struct NotarizationTracker {
   pub notebook_number: u32,
-  pub tick: u32,
+  pub tick: i64,
   pub notary_id: u32,
   pub notarization_id: i64,
   pub notarized_balance_changes: u32,

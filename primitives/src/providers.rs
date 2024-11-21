@@ -37,11 +37,11 @@ pub trait NotebookProvider {
 }
 
 pub trait PriceProvider<Balance: Codec + AtLeast32BitUnsigned> {
-	/// Price of the given satoshis in milligons
+	/// Price of the given satoshis in argon microgons
 	fn get_bitcoin_argon_price(satoshis: Satoshis) -> Option<Balance> {
 		let satoshis = FixedU128::saturating_from_integer(satoshis);
 		let satoshis_per_bitcoin = FixedU128::saturating_from_integer(SATOSHIS_PER_BITCOIN);
-		let milligons_per_argon = FixedU128::saturating_from_integer(1000);
+		let microgons_per_argon = FixedU128::saturating_from_integer(1_000_000);
 
 		let btc_usd_price = Self::get_latest_btc_price_in_us_cents()?;
 		let argon_usd_price = Self::get_latest_argon_price_in_us_cents()?;
@@ -49,11 +49,11 @@ pub trait PriceProvider<Balance: Codec + AtLeast32BitUnsigned> {
 		let satoshi_cents =
 			satoshis.saturating_mul(btc_usd_price).checked_div(&satoshis_per_bitcoin)?;
 
-		let milligons = satoshi_cents
-			.saturating_mul(milligons_per_argon)
+		let microgons = satoshi_cents
+			.saturating_mul(microgons_per_argon)
 			.checked_div(&argon_usd_price)?;
 
-		Some((milligons.into_inner() / FixedU128::accuracy()).unique_saturated_into())
+		Some((microgons.into_inner() / FixedU128::accuracy()).unique_saturated_into())
 	}
 
 	/// Prices of a single bitcoin in US cents
@@ -129,7 +129,7 @@ pub trait ChainTransferLookup<AccountId, Balance> {
 		notary_id: NotaryId,
 		transfer_to_localchain_id: TransferToLocalchainId,
 		account_id: &AccountId,
-		milligons: Balance,
+		microgons: Balance,
 		for_notebook_tick: Tick,
 	) -> bool;
 }
@@ -208,13 +208,13 @@ impl BlockSealEventHandler for Tuple {
 
 /// An event handler to listen for submitted notebook
 pub trait BurnEventHandler<Balance> {
-	fn on_argon_burn(milligons: &Balance);
+	fn on_argon_burn(microgons: &Balance);
 }
 
 #[impl_trait_for_tuples::impl_for_tuples(5)]
 impl<Balance> BurnEventHandler<Balance> for Tuple {
-	fn on_argon_burn(milligons: &Balance) {
-		for_tuples!( #( Tuple::on_argon_burn(milligons); )* );
+	fn on_argon_burn(microgons: &Balance) {
+		for_tuples!( #( Tuple::on_argon_burn(microgons); )* );
 	}
 }
 

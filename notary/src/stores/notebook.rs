@@ -267,14 +267,14 @@ impl NotebookStore {
 				let mut change_note = None;
 				for note in change.notes {
 					match note.note_type {
-						NoteType::Tax | NoteType::LeaseDomain => tax += note.milligons,
+						NoteType::Tax | NoteType::LeaseDomain => tax += note.microgons,
 						NoteType::ChannelHold { .. } => change_note = Some(note.clone()),
 						NoteType::ChannelHoldSettle { .. } => change_note = None,
 						NoteType::ClaimFromMainchain { transfer_id } =>
 							transfers.push(ChainTransfer::ToLocalchain { transfer_id }),
 						NoteType::SendToMainchain => transfers.push(ChainTransfer::ToMainchain {
 							account_id: account_id.clone(),
-							amount: note.milligons,
+							amount: note.microgons,
 						}),
 						_ => {},
 					}

@@ -67,12 +67,12 @@ impl BalanceChange {
 		self.balance as i128 - self.previous_balance_proof.as_ref().map_or(0, |p| p.balance as i128)
 	}
 
-	pub fn push_note(&mut self, milligons: u128, note_type: NoteType) -> &mut Self {
+	pub fn push_note(&mut self, microgons: u128, note_type: NoteType) -> &mut Self {
 		if let Some(existing) = self.notes.iter_mut().find(|n| n.note_type == note_type) {
-			existing.milligons += milligons;
+			existing.microgons += microgons;
 			return self;
 		}
-		let note = Note::create(milligons, note_type);
+		let note = Note::create(microgons, note_type);
 		self.notes.try_push(note).expect("Should be able to push note");
 		self
 	}

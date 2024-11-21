@@ -4,17 +4,17 @@ use sp_core::sr25519;
 use crate::chain_spec::{
 	authority_keys_from_seed, get_account_id_from_seed, testnet_genesis, ChainSpec, GenesisSettings,
 };
-use argon_node_runtime::WASM_BINARY;
+use argon_canary_runtime::WASM_BINARY;
 use argon_primitives::{
 	bitcoin::{BitcoinNetwork, SATOSHIS_PER_BITCOIN},
 	block_seal::MiningSlotConfig,
-	Chain, ComputeDifficulty, ADDRESS_PREFIX,
+	Chain, ComputeDifficulty, ADDRESS_PREFIX, ARGON_TOKEN_SYMBOL, TOKEN_DECIMALS,
 };
 
 pub fn development_config() -> Result<ChainSpec, String> {
 	let mut properties = Properties::new();
-	properties.insert("tokenDecimals".into(), 3.into());
-	properties.insert("tokenSymbol".into(), "ARGON".into());
+	properties.insert("tokenDecimals".into(), TOKEN_DECIMALS.into());
+	properties.insert("tokenSymbol".into(), ARGON_TOKEN_SYMBOL.into());
 	properties.insert("ss58Format".into(), ADDRESS_PREFIX.into());
 
 	const HASHES_PER_SECOND: u64 = 10;
@@ -39,13 +39,13 @@ pub fn development_config() -> Result<ChainSpec, String> {
 		bitcoin_tip_operator: get_account_id_from_seed::<sr25519::Public>("Dave"),
 		price_index_operator: get_account_id_from_seed::<sr25519::Public>("Eve"),
 		endowed_accounts: vec![
-			(get_account_id_from_seed::<sr25519::Public>("Alice"), 100_000_000),
-			(get_account_id_from_seed::<sr25519::Public>("Bob"), 100_000_000),
-			(get_account_id_from_seed::<sr25519::Public>("Ferdie"), 100_000_000),
-			(get_account_id_from_seed::<sr25519::Public>("Eve"), 100_000_000),
-			(get_account_id_from_seed::<sr25519::Public>("Dave"), 100_000_000),
+			(get_account_id_from_seed::<sr25519::Public>("Alice"), 100_000_000_000),
+			(get_account_id_from_seed::<sr25519::Public>("Bob"), 100_000_000_000),
+			(get_account_id_from_seed::<sr25519::Public>("Ferdie"), 100_000_000_000),
+			(get_account_id_from_seed::<sr25519::Public>("Eve"), 100_000_000_000),
+			(get_account_id_from_seed::<sr25519::Public>("Dave"), 100_000_000_000),
 		],
-		initial_vote_minimum: 1,
+		initial_vote_minimum: 1_000,
 		initial_difficulty: (TICK_MILLIS * HASHES_PER_SECOND / 1_000) as ComputeDifficulty,
 		tick_millis: TICK_MILLIS,
 		initial_notaries: vec![], // No notaries
@@ -56,6 +56,8 @@ pub fn development_config() -> Result<ChainSpec, String> {
 			slot_bidding_start_block: 4,
 		},
 		minimum_bitcoin_bond_satoshis: SATOSHIS_PER_BITCOIN / 1_000,
+		cross_token_operator: get_account_id_from_seed::<sr25519::Public>("Alice"),
+		connect_to_test_evm_networks: true,
 	}))
 	.build())
 }

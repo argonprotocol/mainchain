@@ -2,16 +2,16 @@ use std::{sync::Arc, time::Duration};
 
 use crate::{aux_client::ArgonAux, error::Error, notary_client::get_notebook_header_data};
 use argon_bitcoin_utxo_tracker::{get_bitcoin_inherent, UtxoTracker};
-use argon_node_runtime::{NotaryRecordT, NotebookVerifyError};
 use argon_primitives::{
 	inherents::{
 		BitcoinInherentDataProvider, BlockSealInherentDataProvider, BlockSealInherentNodeSide,
 		NotebooksInherentDataProvider,
 	},
-	tick::Tick,
+	tick::{Tick, TickDigest},
 	Balance, BestBlockVoteSeal, BitcoinApis, BlockSealApis, BlockSealAuthorityId, BlockSealDigest,
-	Digestset, NotaryApis, NotebookApis, TickApis, TickDigest, VotingSchedule,
+	Digestset, NotaryApis, NotebookApis, TickApis, VotingSchedule,
 };
+use argon_runtime::{NotaryRecordT, NotebookVerifyError};
 use codec::Codec;
 use frame_support::CloneNoBound;
 use log::*;
@@ -170,10 +170,12 @@ where
 
 		let inherent_digest = Digestset {
 			author,
-			tick: TickDigest { tick: submitting_tick },
+			tick: TickDigest(submitting_tick),
 			block_vote: notebook_header_data.vote_digest,
 			notebooks: notebook_header_data.notebook_digest,
+			// these are from the runtime
 			voting_key: Default::default(),
+			fork_power: Default::default(),
 		}
 		.create_pre_runtime_digest();
 

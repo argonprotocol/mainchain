@@ -36,7 +36,7 @@ pub struct BalanceSync {
   lock: Arc<Mutex<()>>,
   open_channel_holds: OpenChannelHoldsStore,
   keystore: Keystore,
-  tick_counter: Arc<Mutex<(u32, u32)>>,
+  tick_counter: Arc<Mutex<(Tick, u32)>>,
 }
 
 #[cfg_attr(feature = "napi", napi(object))]
@@ -155,7 +155,7 @@ pub mod napi_ext {
     pub from_address: String,
     pub to_address: String,
     pub balance_change_number: i32,
-    pub expiration_tick: i32,
+    pub expiration_tick: i64,
     pub is_client: bool,
     pub initial_balance_change_json: String,
     pub notary_id: i32,
@@ -175,7 +175,7 @@ pub mod napi_ext {
         from_address: hold.from_address,
         to_address: hold.to_address,
         balance_change_number: hold.balance_change_number as i32,
-        expiration_tick: hold.expiration_tick as i32,
+        expiration_tick: hold.expiration_tick as i64,
         is_client: hold.is_client,
         initial_balance_change_json: hold.initial_balance_change_json,
         notary_id: hold.notary_id as i32,
@@ -456,8 +456,8 @@ impl BalanceSync {
         address: x.address.clone(),
         amount: x.amount.parse::<u128>().unwrap_or_default(),
         transfer_id: x.transfer_id as u32,
-        notary_id: x.notary_id as u32,
-        expiration_tick: x.expiration_tick.unwrap_or_default() as u32,
+        notary_id: x.notary_id as NotaryId,
+        expiration_tick: x.expiration_tick.unwrap_or_default() as Tick,
       };
 
       let notarization = self.create_notarization();
@@ -935,6 +935,7 @@ impl BalanceSync {
 
     let json = json!(&notarization);
 
+    let tick = tick as i64;
     let notarization_id = sqlx::query_scalar!(
       "INSERT INTO notarizations (json, notary_id, notebook_number, tick) VALUES (?, ?, ?, ?) RETURNING id",
         json,
@@ -1039,13 +1040,14 @@ impl BalanceSync {
 
       let json = json!(notarization);
 
+      let tick = tip.tick as i64;
       let notarization_id = match balance_change.notarization_id {
         Some(id) => {
           sqlx::query!(
               "UPDATE notarizations SET json = ?, notebook_number = ?, tick = ? WHERE id = ?",
               json,
               tip.notebook_number,
-              tip.tick,
+              tick,
               id
             )
               .execute(&mut *tx)
@@ -1058,7 +1060,7 @@ impl BalanceSync {
                 json,
                 balance_change.notary_id,
                 tip.notebook_number,
-                tip.tick,
+                tick,
               )
               .fetch_one(&mut *tx)
               .await?

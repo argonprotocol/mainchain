@@ -4,7 +4,6 @@
 use crate::{
 	bitcoin::{BitcoinNetwork, BitcoinSyncStatus, Satoshis, UtxoRef, UtxoValue},
 	block_seal::{ComputePuzzle, MiningAuthority},
-	fork_power::ForkPower,
 	notary::{
 		NotaryId, NotaryNotebookAuditSummary, NotaryNotebookDetails, NotaryNotebookRawVotes,
 		NotaryNotebookVoteDigestDetails,
@@ -35,11 +34,6 @@ sp_api::decl_runtime_apis! {
 
 sp_api::decl_runtime_apis!(
 	pub trait BlockCreatorApis<AccountId: Codec, VerifyError: Codec> {
-		fn fork_power() -> ForkPower;
-		fn calculate_fork_power(
-			seal: BlockSealDigest,
-			header: &Block::Header,
-		) -> Result<ForkPower, DispatchError>;
 		fn decode_voting_author(
 			digests: &Digest,
 		) -> Result<(AccountId, Tick, Option<VotingKey>), DispatchError>;
@@ -76,6 +70,7 @@ sp_api::decl_runtime_apis! {
 			version: u32,
 			notary_id: NotaryId,
 			notebook_number: NotebookNumber,
+			notebook_tick: Tick,
 			header_hash: H256,
 			vote_minimums: &BTreeMap<Block::Hash, VoteMinimum>,
 			bytes: &Vec<u8>,

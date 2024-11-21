@@ -242,13 +242,13 @@ pub mod pallet {
 			let mining_mint = MintedMiningArgons::<T>::get();
 			let total_minted = mining_mint + bitcoin_utxos;
 			let mining_prorata = (amount * mining_mint).checked_div(&total_minted);
-			if let Some(milligons) = mining_prorata {
-				MintedMiningArgons::<T>::mutate(|mint| *mint -= milligons);
+			if let Some(microgons) = mining_prorata {
+				MintedMiningArgons::<T>::mutate(|mint| *mint -= microgons);
 			}
 
 			let bitcoin_prorata = (amount * bitcoin_utxos).checked_div(&total_minted);
-			if let Some(milligons) = bitcoin_prorata {
-				MintedBitcoinArgons::<T>::mutate(|mint| *mint -= milligons);
+			if let Some(microgons) = bitcoin_prorata {
+				MintedBitcoinArgons::<T>::mutate(|mint| *mint -= microgons);
 			}
 		}
 	}
@@ -268,8 +268,8 @@ pub mod pallet {
 	}
 
 	impl<T: Config> BurnEventHandler<T::Balance> for Pallet<T> {
-		fn on_argon_burn(milligons: &T::Balance) {
-			Self::on_argon_burn(*milligons);
+		fn on_argon_burn(microgons: &T::Balance) {
+			Self::on_argon_burn(*microgons);
 		}
 	}
 

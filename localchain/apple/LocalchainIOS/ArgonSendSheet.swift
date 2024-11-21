@@ -163,12 +163,12 @@ struct ArgonSendSheet: View {
       errorMessage = "Please input the amount"
       return nil
     }
-    let milligons = UInt64(argons * 1_000)
+    let microgons = UInt64(argons * 1_000_000)
     let localchain = localchain
     do {
       let file = try await localchain.createArgonFile(
         isRequesting: false,
-        milligons: milligons
+        microgons: microgons
       )
 
       return file

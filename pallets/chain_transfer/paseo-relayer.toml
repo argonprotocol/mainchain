@@ -1,0 +1,54 @@
+# Required
+[hyperbridge]
+type = "grandpa"
+
+[hyperbridge.grandpa]
+# Hyperbridge's relay chain websocket RPC
+rpc = "wss://paseo.dotters.network"
+# Hyperbridge's slot duration
+slot_duration = 6
+# How frequently to exchange consensus proofs
+consensus_update_frequency = 60
+# Hyperbridge's paraId on the provided relay chain
+# For Paseo Testnet: para_ids = [4009]
+# For Polkadot Mainnet: para_ids = [3367]
+para_ids = [4009]
+
+[hyperbridge.substrate]
+# Hyperbridge's relay chain websocket RPC
+rpc_ws = "wss://paseo.dotters.network"
+# Hyperbridge's hashing algorithm
+hashing = "Keccak"
+# Hyperbridge's consensus state id
+# For Paseo Testnet: PAS0
+# For Polkadot Mainnet: DOT0
+consensus_state_id = "PASO"
+# Hyperbridge's state machine ID
+# For Paseo Testnet: KUSAMA-4009
+# For Polkadot Mainnet: POLKADOT-3367
+state_machine = "KUSAMA-4009"
+
+# can use any key here
+[argon]
+type = "grandpa"
+
+[argon.substrate]
+# Solochains's websocket RPC
+rpc_ws = "ws://host.docker.internal:9944"
+# Hashing can be "Keccak" or "Blake2"
+hashing = "Blake2"
+# Solochains's consensus state id on Hyperbridge
+# should be 4 utf-8 chars chosen by solochain
+consensus_state_id = "argn"
+# Solochains's state machine id. eg
+state_machine = "SUBSTRATE-argn"
+
+[argon.grandpa]
+# Solochains's websocket RPC
+rpc = "ws://host.docker.internal:9944"
+# Solochains's slot duration
+slot_duration = 2
+# How frequently to exchange consensus proofs
+consensus_update_frequency = 60
+# Any para ids to prove if solochain is actually a relay chain
+para_ids = []

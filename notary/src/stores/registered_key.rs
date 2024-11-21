@@ -20,7 +20,7 @@ impl RegisteredKeyStore {
             VALUES ($1, $2)
             "#,
 			&public.0,
-			effective_tick as i32,
+			effective_tick as i64,
 		)
 		.execute(db)
 		.await?;
@@ -42,7 +42,7 @@ impl RegisteredKeyStore {
 				ORDER BY effective_tick DESC
 				LIMIT 1
             "#,
-			tick as i32
+			tick as i64
 		)
 		.fetch_one(db)
 		.await?

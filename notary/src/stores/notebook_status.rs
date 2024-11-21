@@ -131,7 +131,7 @@ impl NotebookStatusStore {
 			"#,
 			notebook_number as i32,
 			next_tick_end,
-			tick as i32,
+			tick as i64,
 			NotebookFinalizationStep::Open as i32,
 		)
 		.execute(db)

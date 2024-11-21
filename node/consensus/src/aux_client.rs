@@ -12,12 +12,10 @@ use parking_lot::RwLock;
 use sc_client_api::{self, backend::AuxStore};
 use sc_consensus::BlockImportParams;
 use schnellru::{ByLength, LruMap};
-use sp_arithmetic::traits::UniqueSaturatedInto;
 use sp_core::H256;
-use sp_runtime::traits::{Block as BlockT, Header};
+use sp_runtime::traits::Block as BlockT;
 
 use crate::{aux_data::AuxData, error::Error, notary_client::VotingPowerInfo};
-use argon_node_runtime::NotebookVerifyError;
 use argon_primitives::{
 	fork_power::ForkPower,
 	notary::{
@@ -25,13 +23,13 @@ use argon_primitives::{
 		NotaryNotebookTickState, NotaryNotebookVoteDigestDetails,
 	},
 	tick::Tick,
-	AccountId, BlockNumber, NotaryId, NotebookAuditResult, NotebookHeaderData, NotebookNumber,
-	VotingSchedule,
+	AccountId, NotaryId, NotebookAuditResult, NotebookHeaderData, NotebookNumber, VotingSchedule,
 };
+use argon_runtime::NotebookVerifyError;
 
 pub enum AuxState<C: AuxStore> {
 	NotaryStateAtTick(Arc<AuxData<NotaryNotebookTickState, C>>),
-	AuthorsAtHeight(Arc<AuxData<BTreeMap<H256, BTreeSet<AccountId>>, C>>),
+	AuthorsAtTick(Arc<AuxData<BTreeMap<H256, BTreeSet<AccountId>>, C>>),
 	NotaryNotebooks(Arc<AuxData<Vec<NotebookAuditResult<NotebookVerifyError>>, C>>),
 	NotaryAuditSummaries(Arc<AuxData<Vec<NotaryNotebookAuditSummary>, C>>),
 	NotaryMissingNotebooks(Arc<AuxData<BTreeSet<NotebookNumber>, C>>),
@@ -46,7 +44,7 @@ impl<C: AuxStore + 'static> AuxStateData for AuxState<C> {
 	fn as_any(&self) -> &dyn Any {
 		match self {
 			AuxState::NotaryStateAtTick(a) => a,
-			AuxState::AuthorsAtHeight(a) => a,
+			AuxState::AuthorsAtTick(a) => a,
 			AuxState::NotaryNotebooks(a) => a,
 			AuxState::NotaryMissingNotebooks(a) => a,
 			AuxState::VotesAtTick(a) => a,
@@ -58,7 +56,7 @@ impl<C: AuxStore + 'static> AuxStateData for AuxState<C> {
 #[derive(Clone, Encode, Decode, Debug, Hash, Eq, PartialEq)]
 pub enum AuxKey {
 	NotaryStateAtTick(Tick),
-	AuthorsAtHeight(BlockNumber),
+	AuthorsAtTick(Tick),
 	NotaryNotebooks(NotaryId),
 	VotesAtTick(Tick),
 	NotaryAuditSummaries(NotaryId),
@@ -70,8 +68,8 @@ impl AuxKey {
 		match self {
 			AuxKey::NotaryStateAtTick(_) =>
 				AuxState::NotaryStateAtTick(AuxData::new(client, self.clone()).into()),
-			AuxKey::AuthorsAtHeight(_) =>
-				AuxState::AuthorsAtHeight(AuxData::new(client, self.clone()).into()),
+			AuxKey::AuthorsAtTick(_) =>
+				AuxState::AuthorsAtTick(AuxData::new(client, self.clone()).into()),
 			AuxKey::NotaryNotebooks(_) =>
 				AuxState::NotaryNotebooks(AuxData::new(client, self.clone()).into()),
 			AuxKey::VotesAtTick(_) =>
@@ -131,22 +129,17 @@ impl<B: BlockT, C: AuxStore + 'static> ArgonAux<B, C> {
 		tick: Tick,
 	) -> Result<ForkPower, Error> {
 		let _lock = self.lock.write();
-		let block_number =
-			UniqueSaturatedInto::<u32>::unique_saturated_into(*block.header.number());
 
 		// add author to voting key
 		if let Some(voting_key) = voting_key {
-			self.authors_by_voting_key_at_height(block_number)?
-				.mutate(|authors_at_height| {
-					let account_id = AccountId::decode(&mut &author.encode()[..]).map_err(|e| {
-						Error::StringError(format!("Failed to decode author: {:?}", e))
-					})?;
-					if !authors_at_height.entry(voting_key).or_default().insert(account_id.clone())
-					{
-						return Err(Error::DuplicateAuthoredBlock(account_id));
-					}
-					Ok::<(), Error>(())
-				})??;
+			self.authors_by_voting_key_at_tick(tick)?.mutate(|authors_at_height| {
+				let account_id = AccountId::decode(&mut &author.encode()[..])
+					.map_err(|e| Error::StringError(format!("Failed to decode author: {:?}", e)))?;
+				if !authors_at_height.entry(voting_key).or_default().insert(account_id.clone()) {
+					return Err(Error::DuplicateAuthoredBlock(account_id));
+				}
+				Ok::<(), Error>(())
+			})??;
 		}
 		let max_fork_power = self.strongest_fork_power()?.get();
 
@@ -154,15 +147,13 @@ impl<B: BlockT, C: AuxStore + 'static> ArgonAux<B, C> {
 		if tick >= 10 {
 			let cleanup_height = tick - 10;
 			block.auxiliary.push((AuxKey::VotesAtTick(cleanup_height).encode(), None));
-			block
-				.auxiliary
-				.push((AuxKey::AuthorsAtHeight(block_number.saturating_sub(5)).encode(), None));
+			block.auxiliary.push((AuxKey::AuthorsAtTick(cleanup_height).encode(), None));
 		}
 		// Cleanup old notary state. We keep this longer because we might need to catchup on
 		// notebooks
 		if tick >= 256 {
 			// submit 10 just to be sure since we can miss a tick
-			for tick in (tick.saturating_add(266))..=(tick - 256) {
+			for tick in tick.saturating_add(266)..=(tick - 256) {
 				block.auxiliary.push((AuxKey::NotaryStateAtTick(tick).encode(), None));
 			}
 		}
@@ -275,11 +266,11 @@ impl<B: BlockT, C: AuxStore + 'static> ArgonAux<B, C> {
 		self.get_or_insert_state(key)
 	}
 
-	pub fn authors_by_voting_key_at_height(
+	pub fn authors_by_voting_key_at_tick(
 		&self,
-		block_number: BlockNumber,
+		tick: Tick,
 	) -> Result<Arc<AuxData<BTreeMap<H256, BTreeSet<AccountId>>, C>>, Error> {
-		let key = AuxKey::AuthorsAtHeight(block_number);
+		let key = AuxKey::AuthorsAtTick(tick);
 		self.get_or_insert_state(key)
 	}
 
@@ -447,7 +438,7 @@ impl<B: BlockT, C: AuxStore + 'static> ArgonAux<B, C> {
 #[cfg(test)]
 mod test {
 	use super::*;
-	use argon_node_runtime::Block;
+	use argon_runtime::Block;
 	use sc_client_api::AuxStore;
 	use std::{collections::BTreeMap, sync::Arc};
 
@@ -664,7 +655,7 @@ mod test {
 			let details = NotaryNotebookDetails {
 				notary_id: 1,
 				block_voting_power: 0,
-				tick: i,
+				tick: i as Tick,
 				notebook_number: i,
 				raw_audit_summary: vec![],
 				version: 1,

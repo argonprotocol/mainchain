@@ -1,24 +1,32 @@
 //! Service and ServiceFactory implementation. Specialized wrapper over substrate service.
-use crate::{command::MiningConfig, rpc};
+use crate::{
+	command::MiningConfig,
+	rpc,
+	rpc::GrandpaDeps,
+	runtime_api::{opaque::Block, BaseHostRuntimeApis},
+};
 use argon_bitcoin_utxo_tracker::UtxoTracker;
 use argon_node_consensus::{
 	aux_client::ArgonAux, create_import_queue, run_block_builder_task, BlockBuilderParams,
 };
-use argon_node_runtime::{self, opaque::Block, RuntimeApi};
 use argon_primitives::AccountId;
 use sc_client_api::BlockBackend;
 use sc_consensus::BasicQueue;
-use sc_consensus_grandpa::{GrandpaBlockImport, SharedVoterState};
+use sc_consensus_grandpa::{
+	FinalityProofProvider as GrandpaFinalityProofProvider, GrandpaBlockImport, SharedVoterState,
+};
+use sc_rpc::SubscriptionTaskExecutor;
 use sc_service::{
 	config::Configuration, error::Error as ServiceError, TaskManager, WarpSyncConfig,
 };
 use sc_telemetry::{Telemetry, TelemetryWorker};
 use sc_transaction_pool_api::OffchainTransactionPoolFactory;
+use sp_api::ConstructRuntimeApi;
 use std::{sync::Arc, time::Duration};
 
-pub(crate) type FullClient = sc_service::TFullClient<
+pub(crate) type FullClient<Runtime> = sc_service::TFullClient<
 	Block,
-	RuntimeApi,
+	Runtime,
 	sc_executor::WasmExecutor<sp_io::SubstrateHostFunctions>,
 >;
 type FullBackend = sc_service::TFullBackend<Block>;
@@ -27,32 +35,36 @@ type FullSelectChain = sc_consensus::LongestChain<FullBackend, Block>;
 /// imported and generated.
 const GRANDPA_JUSTIFICATION_PERIOD: u32 = 512;
 
-type ArgonBlockImport = argon_node_consensus::import_queue::ArgonBlockImport<
+type ArgonBlockImport<Runtime> = argon_node_consensus::import_queue::ArgonBlockImport<
 	Block,
-	GrandpaBlockImport<FullBackend, Block, FullClient, FullSelectChain>,
-	FullClient,
+	GrandpaBlockImport<FullBackend, Block, FullClient<Runtime>, FullSelectChain>,
+	FullClient<Runtime>,
 	AccountId,
 >;
 
-pub type Service = sc_service::PartialComponents<
-	FullClient,
+pub type Service<Runtime> = sc_service::PartialComponents<
+	FullClient<Runtime>,
 	FullBackend,
 	FullSelectChain,
 	BasicQueue<Block>,
-	sc_transaction_pool::FullPool<Block, FullClient>,
+	sc_transaction_pool::FullPool<Block, FullClient<Runtime>>,
 	(
-		ArgonBlockImport,
-		ArgonAux<Block, FullClient>,
+		ArgonBlockImport<Runtime>,
+		ArgonAux<Block, FullClient<Runtime>>,
 		Arc<UtxoTracker>,
-		sc_consensus_grandpa::LinkHalf<Block, FullClient, FullSelectChain>,
+		sc_consensus_grandpa::LinkHalf<Block, FullClient<Runtime>, FullSelectChain>,
 		Option<Telemetry>,
 	),
 >;
 
-pub fn new_partial(
+pub fn new_partial<Runtime>(
 	config: &Configuration,
 	mining_config: &MiningConfig,
-) -> Result<Service, ServiceError> {
+) -> Result<Service<Runtime>, ServiceError>
+where
+	Runtime: ConstructRuntimeApi<Block, FullClient<Runtime>> + Send + Sync + 'static,
+	Runtime::RuntimeApi: BaseHostRuntimeApis,
+{
 	let telemetry = config
 		.telemetry_endpoints
 		.clone()
@@ -67,7 +79,7 @@ pub fn new_partial(
 	let executor = sc_service::new_wasm_executor::<sp_io::SubstrateHostFunctions>(&config.executor);
 
 	let (client, backend, keystore_container, task_manager) =
-		sc_service::new_full_parts::<Block, RuntimeApi, _>(
+		sc_service::new_full_parts::<Block, Runtime, _>(
 			config,
 			telemetry.as_ref().map(|(_, telemetry)| telemetry.handle()),
 			executor,
@@ -130,13 +142,16 @@ pub fn new_partial(
 }
 
 /// Builds a new service for a full client.
-pub fn new_full<
-	N: sc_network::NetworkBackend<Block, <Block as sp_runtime::traits::Block>::Hash>,
->(
+pub fn new_full<Runtime, N>(
 	config: Configuration,
 	mining_config: MiningConfig,
-) -> sc_service::error::Result<TaskManager> {
-	let params = new_partial(&config, &mining_config)?;
+) -> sc_service::error::Result<TaskManager>
+where
+	Runtime: ConstructRuntimeApi<Block, FullClient<Runtime>> + Send + Sync + 'static,
+	Runtime::RuntimeApi: BaseHostRuntimeApis,
+	N: sc_network::NetworkBackend<Block, <Block as sp_runtime::traits::Block>::Hash>,
+{
+	let params = new_partial::<Runtime>(&config, &mining_config)?;
 	let Service {
 		select_chain,
 		client,
@@ -203,9 +218,28 @@ pub fn new_full<
 	let rpc_builder = {
 		let client = client.clone();
 		let transaction_pool = transaction_pool.clone();
+		let backend = backend.clone();
+		let justification_stream = grandpa_link.justification_stream();
+		let shared_authority_set = grandpa_link.shared_authority_set().clone();
+		let shared_voter_state = sc_consensus_grandpa::SharedVoterState::empty();
+		let finality_proof_provider = GrandpaFinalityProofProvider::new_for_service(
+			backend.clone(),
+			Some(shared_authority_set.clone()),
+		);
+		Box::new(move |subscription_executor: SubscriptionTaskExecutor| {
+			let deps = rpc::FullDeps {
+				client: client.clone(),
+				pool: transaction_pool.clone(),
+				backend: backend.clone(),
 
-		Box::new(move |_| {
-			let deps = rpc::FullDeps { client: client.clone(), pool: transaction_pool.clone() };
+				grandpa: GrandpaDeps {
+					shared_voter_state: shared_voter_state.clone(),
+					shared_authority_set: shared_authority_set.clone(),
+					justification_stream: justification_stream.clone(),
+					subscription_executor: subscription_executor.clone(),
+					finality_provider: finality_proof_provider.clone(),
+				},
+			};
 
 			rpc::create_full(deps).map_err(Into::into)
 		})

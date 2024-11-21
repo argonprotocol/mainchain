@@ -6,11 +6,11 @@ use crate::{
 	notebook_sealer::NotebookSealer,
 };
 use argon_bitcoin_utxo_tracker::UtxoTracker;
-use argon_node_runtime::{NotaryRecordT, NotebookVerifyError};
 use argon_primitives::{
 	inherents::BlockSealInherentNodeSide, Balance, BitcoinApis, BlockCreatorApis, BlockSealApis,
 	BlockSealAuthorityId, NotaryApis, NotebookApis, TickApis, VotingSchedule,
 };
+use argon_runtime::{NotaryRecordT, NotebookVerifyError};
 use codec::Codec;
 use futures::prelude::*;
 use futures_timer::Delay;
@@ -23,7 +23,6 @@ use sp_blockchain::HeaderBackend;
 use sp_consensus::{BlockOrigin, Environment, SelectChain, SyncOracle};
 use sp_keystore::KeystorePtr;
 use sp_runtime::traits::{Block as BlockT, Header};
-use sp_timestamp::Timestamp;
 use std::{sync::Arc, time::Duration};
 use tokio::sync::Mutex;
 use tracing::{trace, warn};
@@ -297,7 +296,7 @@ pub fn run_block_builder_task<Block, BI, C, PF, A, SC, SO, JS>(
 				compute_handle.new_best_block(MiningMetadata {
 					best_hash,
 					has_tax_votes,
-					activate_mining_time: Timestamp::from(next_tick + delay),
+					activate_mining_time: next_tick + delay,
 					key_block_hash: compute_puzzle.get_key_block(genesis_hash),
 					emergency_tick: block_tick + 3,
 					difficulty: compute_puzzle.difficulty,
@@ -305,8 +304,8 @@ pub fn run_block_builder_task<Block, BI, C, PF, A, SC, SO, JS>(
 			}
 
 			// don't do anything if we are syncing or not ready to solve
-			let time = Timestamp::current();
-			let tick = ticker.tick_for_time(time.as_millis());
+			let time = ticker.now_adjusted_to_ntp();
+			let tick = ticker.tick_for_time(time);
 			if sync_oracle.is_major_syncing() || !compute_handle.ready_to_solve(tick, time) {
 				continue;
 			}
@@ -319,7 +318,7 @@ pub fn run_block_builder_task<Block, BI, C, PF, A, SC, SO, JS>(
 					.propose(
 						compute_author.clone(),
 						tick,
-						time.as_millis(),
+						time,
 						best_hash,
 						BlockSealInherentNodeSide::Compute,
 					)

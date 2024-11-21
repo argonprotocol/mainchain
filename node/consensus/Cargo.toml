@@ -56,7 +56,7 @@ humantime = { workspace = true }
 # Local Dependencies
 argon-primitives = { workspace = true, features = ["default"] }
 argon-notary-apis = { workspace = true }
-argon-node-runtime = { workspace = true, features = ["default"] }
+argon-runtime = { workspace = true, features = ["default"] }
 argon-bitcoin-utxo-tracker = { workspace = true }
 argon-randomx = { workspace = true }
 

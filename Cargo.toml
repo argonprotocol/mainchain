@@ -24,7 +24,8 @@ members = [
     "localchain",
     "localchain/uniffi-bindgen",
     "primitives",
-    "runtime",
+    "runtime/argon",
+    "runtime/canary",
     "notary",
     "notary/audit",
     "notary/apis",
@@ -131,6 +132,16 @@ x25519-dalek = { opt-level = 3 }
 yamux = { opt-level = 3 }
 zeroize = { opt-level = 3 }
 
+[patch.crates-io]
+pallet-ismp = { git = "https://github.com/argonprotocol/hyperbridge", branch = "seun/deploy-mnt" }
+pallet-ismp-runtime-api = { git = "https://github.com/argonprotocol/hyperbridge", branch = "seun/deploy-mnt" }
+pallet-hyperbridge = { git = "https://github.com/argonprotocol/hyperbridge", branch = "seun/deploy-mnt" }
+pallet-ismp-rpc = { git = "https://github.com/argonprotocol/hyperbridge", branch = "seun/deploy-mnt" }
+ismp-grandpa = { git = "https://github.com/argonprotocol/hyperbridge", branch = "seun/deploy-mnt" }
+ismp = { git = "https://github.com/argonprotocol/hyperbridge", branch = "seun/deploy-mnt" }
+token-gateway-primitives = { git = "https://github.com/argonprotocol/hyperbridge", branch = "seun/deploy-mnt" }
+
+
 [workspace.dependencies]
 futures = { version = "0.3" }
 futures-timer = "3.0.1"
@@ -147,7 +158,7 @@ hex = { version = "0.4" }
 url = "2.5.0"
 num_cpus = "1.16"
 reqwest = { version = "0.12", features = ["json"] }
-scraper = { version = "0.20" }
+scraper = { version = "0.21" }
 
 codec = { default-features = false, package = "parity-scale-codec", version = "3.6", features = ["derive", "max-encoded-len"] }
 serde = { default-features = false, version = "1.0", features = ["derive"] }
@@ -298,6 +309,21 @@ cmake = { version = "0.1" }
 
 dotenv = { version = "0.15" }
 
+# hyperprocessor bridge
+pallet-ismp = { version = "1.15.1", default-features = false }
+pallet-ismp-runtime-api = { version = "1.15.1", default-features = false }
+pallet-hyperbridge = { version = "1.15.1", default-features = false }
+pallet-ismp-rpc = { version = "1.15.1", default-features = false }
+ismp-grandpa = { version = "1.15.1", default-features = false }
+ismp = { version = "0.2.2", default-features = false }
+token-gateway-primitives = { version = "1.15.1", default-features = false }
+mmr-primitives = { version = "1.15.1", default-features = false }
+sp-mmr-primitives = { version = "34.1.0", default-features = false }
+
+alloy-primitives = { version = "0.8.11", default-features = false }
+alloy-sol-types = { version = "0.8.11", default-features = false }
+alloy-sol-macro = { version = "0.8.11", default-features = false }
+
 # releases are using old versions of jsonrpsee
 subxt = { git = "https://github.com/paritytech/subxt", rev = "72db833defd2664410d61f51408b26fc9314fc41" }
 
@@ -308,7 +334,8 @@ argon-node-consensus = { path = "node/consensus" }
 argon-bitcoin = { path = "bitcoin", default-features = false }
 argon-bitcoin-utxo-tracker = { path = "node/bitcoin_utxo_tracker" }
 argon-node = { path = "node" }
-argon-node-runtime = { path = "runtime" }
+argon-runtime = { path = "runtime/argon", default-features = false }
+argon-canary-runtime = { path = "runtime/canary", default-features = false }
 argon-randomx = { path = "node/randomx" }
 argon-notary = { path = "notary" }
 argon-notary-apis = { path = "notary/apis" }

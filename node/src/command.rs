@@ -1,16 +1,22 @@
 use crate::{
 	chain_spec,
 	cli::{Cli, RandomxFlag, Subcommand},
+	runtime_api::opaque::Block,
 	service,
 	service::new_partial,
 };
-use argon_node_runtime::{opaque, Block};
 use frame_benchmarking_cli::{BenchmarkCmd, SUBSTRATE_REFERENCE_HARDWARE};
+use sc_chain_spec::ChainSpec;
 use sc_cli::{Error, Result as CliResult, SubstrateCli};
+use sc_network::{config::NetworkBackendType, Litep2pNetworkBackend, NetworkWorker};
 use sp_core::crypto::AccountId32;
 use sp_keyring::AccountKeyring::Alice;
 use std::cmp::max;
 use url::Url;
+
+type CanaryRuntimeApi = argon_runtime::RuntimeApi;
+type ArgonRuntimeApi = argon_canary_runtime::RuntimeApi;
+type BlockHashT = <Block as sp_runtime::traits::Block>::Hash;
 
 impl SubstrateCli for Cli {
 	fn impl_name() -> String {
@@ -51,18 +57,33 @@ impl SubstrateCli for Cli {
 		})
 	}
 }
+/// Can be called for a `Configuration` to check if it is a configuration for the `Crab Parachain`
+/// network.
+pub trait IdentifyVariant {
+	fn is_canary(&self) -> bool;
+}
+impl IdentifyVariant for Box<dyn ChainSpec> {
+	fn is_canary(&self) -> bool {
+		matches!(self.id(), "argon-dev" | "argon-local" | "argon-testnet")
+	}
+}
 
 macro_rules! construct_async_run {
 	(|$components:ident, $cli:ident, $cmd:ident, $config:ident| $( $code:tt )* ) => {{
 		let runner = $cli.create_runner($cmd)?;
 		let mining_config = MiningConfig::new(&$cli);
 		runner.async_run(|$config| {
-			let $components = new_partial(&$config, &mining_config)?;
+			let $components = if $config.chain_spec.is_canary() {
+				new_partial::<CanaryRuntimeApi>(&$config, &mining_config)?
+			} else {
+				new_partial::<ArgonRuntimeApi>(&$config, &mining_config)?
+			};
 			let task_manager = $components.task_manager;
 			{ $( $code )* }.map(|v| (v, task_manager))
 		})
 	}}
 }
+
 /// Parse and run command line arguments
 pub fn run() -> sc_cli::Result<()> {
 	color_backtrace::install();
@@ -121,7 +142,11 @@ pub fn run() -> sc_cli::Result<()> {
 					},
 				BenchmarkCmd::Block(cmd) => runner.sync_run(|config| {
 					let mining_config = MiningConfig::new(&cli);
-					let partials = new_partial(&config, &mining_config)?;
+					let partials = if config.chain_spec.is_canary() {
+						new_partial::<CanaryRuntimeApi>(&config, &mining_config)?
+					} else {
+						new_partial::<ArgonRuntimeApi>(&config, &mining_config)?
+					};
 					cmd.run(partials.client)
 				}),
 				#[cfg(not(feature = "runtime-benchmarks"))]
@@ -133,7 +158,11 @@ pub fn run() -> sc_cli::Result<()> {
 				#[cfg(feature = "runtime-benchmarks")]
 				BenchmarkCmd::Storage(cmd) => runner.sync_run(|config| {
 					let mining_config = cli.into();
-					let partials = new_partial(&config, &mining_config)?;
+					let partials = if config.chain_spec.is_canary() {
+						new_partial::<CanaryRuntimeApi>(&config, &mining_config)?
+					} else {
+						new_partial::<ArgonRuntimeApi>(&config, &mining_config)?
+					};
 					let db = partials.backend.expose_db();
 					let storage = partials.backend.expose_storage();
 					cmd.run(config, partials.client.clone(), db, storage)
@@ -151,6 +180,13 @@ pub fn run() -> sc_cli::Result<()> {
 			runner.sync_run(|config| cmd.run::<Block>(&config))
 		},
 		None => {
+			let mut cli = cli;
+			// this is required for hyperbridge
+			cli.run.base.offchain_worker_params.indexing_enabled = true;
+			// Set max rpc request and response size to 150mb
+			cli.run.base.rpc_max_request_size = 150;
+			cli.run.base.rpc_max_response_size = 150;
+
 			let runner = cli.create_runner(&cli.run.base)?;
 
 			let mut randomx_config = argon_randomx::Config::default();
@@ -164,19 +200,33 @@ pub fn run() -> sc_cli::Result<()> {
 
 			runner.run_node_until_exit(|config| async move {
 				let mining_config = MiningConfig::new(&cli);
-				match config.network.network_backend {
-					sc_network::config::NetworkBackendType::Libp2p => service::new_full::<
-						sc_network::NetworkWorker<
-							opaque::Block,
-							<opaque::Block as sp_runtime::traits::Block>::Hash,
-						>,
-					>(config, mining_config)
-					.map_err(Error::Service),
-					sc_network::config::NetworkBackendType::Litep2p => service::new_full::<
-						sc_network::Litep2pNetworkBackend,
-					>(config, mining_config)
-					.map_err(Error::Service),
+
+				let is_lipb2p =
+					matches!(config.network.network_backend, NetworkBackendType::Libp2p);
+				if is_lipb2p {
+					if config.chain_spec.is_canary() {
+						service::new_full::<CanaryRuntimeApi, NetworkWorker<Block, BlockHashT>>(
+							config,
+							mining_config,
+						)
+					} else {
+						service::new_full::<ArgonRuntimeApi, NetworkWorker<Block, BlockHashT>>(
+							config,
+							mining_config,
+						)
+					}
+				} else if config.chain_spec.is_canary() {
+					service::new_full::<CanaryRuntimeApi, Litep2pNetworkBackend>(
+						config,
+						mining_config,
+					)
+				} else {
+					service::new_full::<ArgonRuntimeApi, Litep2pNetworkBackend>(
+						config,
+						mining_config,
+					)
 				}
+				.map_err(Error::Service)
 			})
 		},
 	}

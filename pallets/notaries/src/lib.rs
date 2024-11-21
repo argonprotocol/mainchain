@@ -66,7 +66,7 @@ pub mod pallet {
 		/// Number of ticks to maintain key history for each notary
 		/// NOTE: only pruned when new keys are added
 		#[pallet::constant]
-		type MaxTicksForKeyHistory: Get<Tick>;
+		type MaxTicksForKeyHistory: Get<u32>;
 
 		/// Maximum hosts a notary can supply
 		#[pallet::constant]
@@ -193,7 +193,7 @@ pub mod pallet {
 			let meta_changes = QueuedNotaryMetaChanges::<T>::take(current_tick);
 			if meta_changes.len() > 0 {
 				let old_block_to_preserve =
-					current_tick.saturating_sub(T::MaxTicksForKeyHistory::get());
+					current_tick.saturating_sub(T::MaxTicksForKeyHistory::get() as Tick);
 				<ActiveNotaries<T>>::mutate(|active| {
 					for (notary_id, meta) in meta_changes.into_iter() {
 						if let Some(pos) = active.iter().position(|n| n.notary_id == notary_id) {

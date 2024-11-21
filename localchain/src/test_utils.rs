@@ -126,6 +126,7 @@ pub struct MockNotary {
   pub addr: String,
   pub notary_id: u32,
   pub state: Arc<Mutex<NotaryState>>,
+  pub ticker: Arc<Mutex<Ticker>>,
   pub header_channel: (
     NotificationSender<SignedNotebookHeader>,
     NotebookHeaderStream,
@@ -139,6 +140,7 @@ impl MockNotary {
       state: Default::default(),
       header_channel: NotebookHeaderStream::channel(),
       server_handle: None,
+      ticker: Arc::new(Mutex::new(Ticker::start(Duration::from_secs(60), 2))),
       addr: String::new(),
     }
   }
@@ -244,7 +246,7 @@ impl MockNotary {
       .claim_from_mainchain(LocalchainTransfer {
         amount,
         notary_id: 1,
-        expiration_tick: 1,
+        expiration_tick: self.ticker.lock().await.current() + 10,
         address: AccountStore::to_address(&account_id),
         transfer_id: 1,
       })
@@ -332,6 +334,7 @@ impl MockNotary {
     let notebook_number = self.next_notebook_number().await;
     let mut notary_state = self.state.lock().await;
 
+    let tick = self.ticker.lock().await.current();
     for (leaf_index, balance_tip) in balance_tips.iter().enumerate() {
       let proof = merkle_proof::<Blake2Hasher, _, _>(merkle_leafs.clone(), leaf_index);
 
@@ -342,7 +345,7 @@ impl MockNotary {
           balance: balance_tip.balance,
           account_origin: balance_tip.account_origin.clone(),
           notebook_number,
-          tick: notebook_number,
+          tick,
           notebook_proof: Some(MerkleProof {
             proof: BoundedVec::truncate_from(proof.proof),
             number_of_leaves: proof.number_of_leaves as u32,
@@ -354,7 +357,7 @@ impl MockNotary {
       notary_state.balance_tips.insert(
         LocalchainAccountId::new(balance_tip.account_id.clone(), balance_tip.account_type),
         BalanceTipResult {
-          tick: notebook_number,
+          tick,
           balance_tip: balance_tip.tip().into(),
           notebook_number,
         },
@@ -373,7 +376,7 @@ impl MockNotary {
       version: 1,
       notary_id: 1,
       notebook_number,
-      tick: 1,
+      tick,
       tax: 0,
       domains: Default::default(),
       block_votes_count: 0,
@@ -445,6 +448,7 @@ impl LocalchainRpcServer for MockNotary {
     domains: NotarizationDomains,
   ) -> Result<BalanceChangeResult, ErrorObjectOwned> {
     let notebook_number = self.next_notebook_number().await;
+    let tick = self.ticker.lock().await.current();
     self
       .add_notarization(
         notebook_number,
@@ -485,7 +489,7 @@ impl LocalchainRpcServer for MockNotary {
         .headers
         .get(&notebook_number)
         .map(|x| x.header.tick)
-        .unwrap_or(1u32),
+        .unwrap_or(tick),
     })
   }
 

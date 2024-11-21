@@ -1,7 +1,8 @@
 use crate::{mock::*, pallet::TempDigests};
 use argon_notary_audit::VerifyError;
 use argon_primitives::{
-	BlockVoteDigest, Digestset, NotebookAuditResult, NotebookDigest, TickDigest, AUTHOR_DIGEST_ID,
+	tick::TickDigest, BlockVoteDigest, Digestset, NotebookAuditResult, NotebookDigest,
+	AUTHOR_DIGEST_ID,
 };
 use codec::Encode;
 use frame_support::pallet_prelude::Hooks;
@@ -24,7 +25,8 @@ fn it_disallows_duplicates() {
 			block_vote: BlockVoteDigest { voting_power: 500, votes_count: 1 },
 			author: 1u64,
 			voting_key: None,
-			tick: TickDigest { tick: 2 },
+			tick: TickDigest(2),
+			fork_power: None,
 			notebooks: NotebookDigest {
 				notebooks: vec![NotebookAuditResult::<VerifyError> {
 					notary_id: 1,
@@ -51,7 +53,8 @@ fn it_should_read_and_clear_the_digests() {
 			block_vote: BlockVoteDigest { voting_power: 500, votes_count: 1 },
 			author: 1u64,
 			voting_key: None,
-			tick: TickDigest { tick: 2 },
+			fork_power: None,
+			tick: TickDigest(2),
 			notebooks: NotebookDigest::<VerifyError> {
 				notebooks: vec![NotebookAuditResult {
 					notary_id: 1,
@@ -71,7 +74,7 @@ fn it_should_read_and_clear_the_digests() {
 		let digests = digests.unwrap();
 		assert_eq!(&digests.author, &1);
 		assert_eq!(&digests.block_vote.votes_count, &1);
-		assert_eq!(&digests.tick.tick, &2);
+		assert_eq!(&digests.tick.0, &2);
 		assert_eq!(digests.notebooks.notebooks.len(), 1);
 		assert_eq!(digests.notebooks.notebooks[0].notary_id, 1);
 		assert_eq!(digests.notebooks.notebooks[0].notebook_number, 1);

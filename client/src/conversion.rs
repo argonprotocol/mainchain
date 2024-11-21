@@ -68,11 +68,7 @@ impl<T, X: sp_core::Get<u32>>
 
 impl From<runtime_types::argon_primitives::tick::Ticker> for argon_primitives::tick::Ticker {
 	fn from(value: runtime_types::argon_primitives::tick::Ticker) -> Self {
-		Self::new(
-			value.tick_duration_millis,
-			value.genesis_utc_time,
-			value.channel_hold_expiration_ticks,
-		)
+		Self::new(value.tick_duration_millis, value.channel_hold_expiration_ticks)
 	}
 }
 

@@ -10,8 +10,9 @@ use tracing::info;
 pub use argon_client;
 use argon_client::{api, ArgonConfig, ArgonOnlineClient, MainchainClient};
 use argon_primitives::{
-	tick::{Tick, Ticker},
-	AccountId, NotaryId, NotebookDigest, TickDigest,
+	prelude::*,
+	tick::{TickDigest, Ticker},
+	NotebookDigest,
 };
 
 use crate::{
@@ -265,7 +266,7 @@ async fn process_finalized_block(
 				TickDigest::decode(&mut &data[..]).ok(),
 			_ => None,
 		})
-		.map(|digest| digest.tick)
+		.map(|digest| digest.0)
 		.unwrap_or(ticker.current());
 
 	let events = block.events().await?;
@@ -289,8 +290,7 @@ async fn process_finalized_block(
 			info!("Notary activated: {:?}", activated_event);
 			if activated_event.notary.notary_id == notary_id {
 				let public = Ed25519Public::from_raw(activated_event.notary.meta.public);
-				activate_notebook_processing(&mut *db, notary_id, public, block_height, ticker)
-					.await?;
+				activate_notebook_processing(&mut *db, notary_id, public, tick, ticker).await?;
 			}
 			continue;
 		}

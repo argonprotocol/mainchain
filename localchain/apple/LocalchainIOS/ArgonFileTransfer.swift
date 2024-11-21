@@ -39,7 +39,7 @@ struct ArgonFileTransfer: Transferable, Identifiable {
     var amount = BInt(0)
     for request in requests {
       for note in request.notes where note.noteType.action == NoteTypeAction.claim {
-        amount += BInt(note.milligons) ?? 0
+        amount += BInt(note.microgons) ?? 0
       }
     }
 
@@ -54,8 +54,8 @@ struct ArgonFileTransfer: Transferable, Identifiable {
     var amount = BInt(0)
     for change in sent {
       for note in change.notes where note.noteType.action == NoteTypeAction.send {
-        if let milligons = BInt(note.milligons) {
-          amount += milligons
+        if let microgons = BInt(note.microgons) {
+          amount += microgons
         }
       }
     }
@@ -181,7 +181,7 @@ struct BalanceChangeEntry: Codable {
 struct BalanceProof: Codable {
   var notaryId: UInt32
   var notebookNumber: UInt32
-  var tick: UInt32
+  var tick: UInt64
   @StringOrNumber var balance: String
   var accountOrigin: AccountOrigin
   var notebookProof: MerkleProof?
@@ -199,7 +199,7 @@ struct MerkleProof: Codable {
 }
 
 struct Note: Codable {
-  @StringOrNumber var milligons: String
+  @StringOrNumber var microgons: String
   var noteType: NoteType
 }
 

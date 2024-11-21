@@ -93,7 +93,7 @@ impl MockNotary {
 	pub async fn next_details(&self) -> (NotebookNumber, Tick) {
 		let state = self.state.lock().await;
 		let mut notebook_number = 0u32;
-		let mut last_tick = 0u32;
+		let mut last_tick = 0;
 		for (num, header) in state.headers.iter() {
 			if num > &notebook_number {
 				notebook_number = *num;

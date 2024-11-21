@@ -61,7 +61,7 @@ pub trait NotebookHistoryLookup {
 		notary_id: NotaryId,
 		transfer_id: TransferToLocalchainId,
 		account_id: &AccountId,
-		milligons: Balance,
+		microgons: Balance,
 		for_notebook_tick: Tick,
 	) -> Result<bool, AccountHistoryLookupError>;
 }
@@ -211,7 +211,7 @@ impl NotebookVerifyState {
 		match note.note_type {
 			NoteType::SendToMainchain => {
 				self.chain_transfers.push(ChainTransfer::ToMainchain {
-					amount: note.milligons,
+					amount: note.microgons,
 					account_id: account_id.clone(),
 				});
 			},
@@ -266,7 +266,7 @@ fn verify_balance_sources<T: NotebookHistoryLookup>(
 						notary_id,
 						*transfer_id,
 						account_id,
-						note.milligons,
+						note.microgons,
 						header.tick,
 					)?;
 					state.track_chain_transfer(account_id.clone(), note)?;
@@ -569,14 +569,14 @@ impl BalanceChangesetState {
 
 	fn send_balance(
 		&mut self,
-		milligons: u128,
+		microgons: Balance,
 		recipients: &Vec<AccountId>,
 		account_type: &AccountType,
 	) {
 		if account_type == &AccountType::Tax {
-			self.sent_tax += milligons;
+			self.sent_tax += microgons;
 		} else {
-			self.sent_deposits += milligons;
+			self.sent_deposits += microgons;
 		}
 
 		if !recipients.is_empty() {
@@ -585,37 +585,37 @@ impl BalanceChangesetState {
 				set.insert(LocalchainAccountId::new(rec.clone(), *account_type));
 			}
 			let entry = self.unclaimed_restricted_balance.entry(set.clone()).or_insert(0i128);
-			*entry += milligons as i128;
+			*entry += microgons as i128;
 		}
 	}
 
 	fn record_tax(
 		&mut self,
-		milligons: u128,
+		microgons: u128,
 		claimer: &LocalchainAccountId,
 	) -> anyhow::Result<(), VerifyError> {
-		self.sent_tax += milligons;
-		*self.tax_created_per_account.entry(claimer.clone()).or_insert(0) += milligons;
+		self.sent_tax += microgons;
+		*self.tax_created_per_account.entry(claimer.clone()).or_insert(0) += microgons;
 
 		Ok(())
 	}
 
 	fn record_tax_sent_to_vote(
 		&mut self,
-		milligons: u128,
+		microgons: u128,
 		local_account_id: &LocalchainAccountId,
 	) -> anyhow::Result<(), VerifyError> {
 		*self
 			.unclaimed_block_vote_tax_per_account
 			.entry(local_account_id.clone())
-			.or_insert(0) += milligons;
+			.or_insert(0) += microgons;
 
 		Ok(())
 	}
 
 	fn used_tax_vote_amount(
 		&mut self,
-		milligons: u128,
+		microgons: u128,
 		account_id: &LocalchainAccountId,
 	) -> anyhow::Result<(), VerifyError> {
 		let amount = self
@@ -623,8 +623,8 @@ impl BalanceChangesetState {
 			.get_mut(account_id)
 			.ok_or(VerifyError::IneligibleTaxVoter)?;
 
-		ensure!(*amount >= milligons, VerifyError::InsufficientBlockVoteTax);
-		*amount -= milligons;
+		ensure!(*amount >= microgons, VerifyError::InsufficientBlockVoteTax);
+		*amount -= microgons;
 		if *amount == 0 {
 			self.unclaimed_block_vote_tax_per_account.remove(account_id);
 		}
@@ -633,29 +633,29 @@ impl BalanceChangesetState {
 
 	fn claim_balance(
 		&mut self,
-		milligons: u128,
+		microgons: u128,
 		localchain_account_id: &LocalchainAccountId,
 	) -> anyhow::Result<(), VerifyError> {
 		if localchain_account_id.account_type == AccountType::Tax {
-			self.claimed_tax += milligons;
+			self.claimed_tax += microgons;
 		} else {
-			self.claimed_deposits += milligons;
+			self.claimed_deposits += microgons;
 		}
-		*self.claims_per_account.entry(localchain_account_id.clone()).or_insert(0) += milligons;
+		*self.claims_per_account.entry(localchain_account_id.clone()).or_insert(0) += microgons;
 
 		Ok(())
 	}
 
 	fn claim_channel_hold_balance(
 		&mut self,
-		milligons: u128,
+		microgons: u128,
 		claimer: &LocalchainAccountId,
 	) -> anyhow::Result<(), VerifyError> {
-		self.claimed_deposits += milligons;
+		self.claimed_deposits += microgons;
 		*self
 			.claimed_channel_hold_deposits_per_account
 			.entry(claimer.clone())
-			.or_insert(0) += milligons;
+			.or_insert(0) += microgons;
 
 		Ok(())
 	}
@@ -665,7 +665,7 @@ impl BalanceChangesetState {
 	fn record_channel_hold_settle(
 		&mut self,
 		localchain_account_id: &LocalchainAccountId,
-		milligons: i128,
+		microgons: i128,
 		channel_hold_note: &Note,
 		expiration_tick: Tick,
 		notebook_tick: Option<Tick>,
@@ -689,7 +689,7 @@ impl BalanceChangesetState {
 			recipients.insert(LocalchainAccountId::new(recipient.clone(), AccountType::Deposit));
 			if tick >= expiration_tick + CHANNEL_HOLD_CLAWBACK_TICKS {
 				// no claim necessary for a 0 claim
-				if milligons == 0 {
+				if microgons == 0 {
 					recipients.clear();
 				} else {
 					recipients.insert(localchain_account_id.clone());
@@ -699,12 +699,12 @@ impl BalanceChangesetState {
 			self.needs_channel_hold_settle_followup = true;
 		}
 
-		self.sent_deposits += milligons as u128;
+		self.sent_deposits += microgons as u128;
 		if !recipients.is_empty() {
 			*self
 				.unclaimed_channel_hold_balances
 				.entry(BTreeSet::from_iter(recipients))
-				.or_insert(0) += milligons;
+				.or_insert(0) += microgons;
 		}
 		Ok(())
 	}
@@ -750,17 +750,17 @@ pub fn verify_notarization_allocation(
 			match &note.note_type {
 				NoteType::Send { to: recipients } => {
 					state.send_balance(
-						note.milligons,
+						note.microgons,
 						&recipients.as_ref().map(|a| a.to_vec()).unwrap_or_default(),
 						&change.account_type,
 					);
 				},
 				NoteType::Claim => {
-					state.claim_balance(note.milligons, &localchain_account_id)?;
+					state.claim_balance(note.microgons, &localchain_account_id)?;
 				},
 				NoteType::ChannelHold { .. } => {
 					ensure!(
-						note.milligons >= MINIMUM_CHANNEL_HOLD_SETTLEMENT,
+						note.microgons >= MINIMUM_CHANNEL_HOLD_SETTLEMENT,
 						VerifyError::InvalidChannelHoldNote
 					);
 					// NOTE: a channel_hold doesn't change the source balance
@@ -771,10 +771,10 @@ pub fn verify_notarization_allocation(
 					);
 				},
 				NoteType::ChannelHoldClaim => {
-					if note.milligons < MINIMUM_CHANNEL_HOLD_SETTLEMENT {
+					if note.microgons < MINIMUM_CHANNEL_HOLD_SETTLEMENT {
 						return Err(VerifyError::ChannelHoldNoteBelowMinimum);
 					}
-					state.claim_channel_hold_balance(note.milligons, &localchain_account_id)?;
+					state.claim_channel_hold_balance(note.microgons, &localchain_account_id)?;
 				},
 				NoteType::ChannelHoldSettle => {
 					let Some(source_change_tick) =
@@ -790,7 +790,7 @@ pub fn verify_notarization_allocation(
 
 					state.record_channel_hold_settle(
 						&localchain_account_id,
-						note.milligons as i128,
+						note.microgons as i128,
 						channel_hold_note,
 						source_change_tick + channel_hold_expiration_ticks,
 						notebook_tick,
@@ -798,17 +798,17 @@ pub fn verify_notarization_allocation(
 				},
 				NoteType::Tax => {
 					ensure!(localchain_account_id.is_deposit(), VerifyError::InvalidTaxOperation);
-					state.record_tax(note.milligons, &localchain_account_id)?;
+					state.record_tax(note.microgons, &localchain_account_id)?;
 				},
 				NoteType::LeaseDomain => {
 					ensure!(localchain_account_id.is_deposit(), VerifyError::InvalidTaxOperation);
-					state.record_tax(note.milligons, &localchain_account_id)?;
+					state.record_tax(note.microgons, &localchain_account_id)?;
 					state.allocated_to_domains =
-						state.allocated_to_domains.saturating_add(note.milligons);
+						state.allocated_to_domains.saturating_add(note.microgons);
 				},
 				NoteType::SendToVote { .. } => {
 					ensure!(localchain_account_id.is_tax(), VerifyError::InvalidTaxOperation);
-					state.record_tax_sent_to_vote(note.milligons, &localchain_account_id)?;
+					state.record_tax_sent_to_vote(note.microgons, &localchain_account_id)?;
 				},
 				_ => {},
 			}
@@ -818,12 +818,12 @@ pub fn verify_notarization_allocation(
 				NoteType::ClaimFromMainchain { .. } |
 				NoteType::Claim { .. } |
 				NoteType::ChannelHoldClaim => {
-					if let Some(new_balance) = balance.checked_add(note.milligons as i128) {
+					if let Some(new_balance) = balance.checked_add(note.microgons as i128) {
 						balance = new_balance;
 					} else {
 						return Err(VerifyError::ExceededMaxBalance {
 							balance: balance as u128,
-							amount: note.milligons,
+							amount: note.microgons,
 							note_index: note_index as u16,
 							change_index: change_index as u16,
 						});
@@ -834,7 +834,7 @@ pub fn verify_notarization_allocation(
 				NoteType::ChannelHoldSettle |
 				NoteType::LeaseDomain |
 				NoteType::Tax |
-				NoteType::SendToVote => balance -= note.milligons as i128,
+				NoteType::SendToVote => balance -= note.microgons as i128,
 				_ => {},
 			};
 		}

@@ -42,7 +42,7 @@ impl frame_system::Config for Test {
 parameter_types! {
 
 	pub static ExistentialDeposit: Balance = 10;
-	pub const MinimumBondAmount:u128 = 1_000;
+	pub const MinimumBondAmount:u128 = 1_000_000;
 	pub const BlocksPerYear:u32 = 1440*365;
 }
 
@@ -79,13 +79,13 @@ parameter_types! {
 	pub static MinimumBondSatoshis: Satoshis = 10_000_000;
 	pub static DefaultVault: Vault<u64, Balance, BlockNumberFor<Test>> = Vault {
 		mining_argons: VaultArgons {
-			allocated: 100_000_000,
+			allocated: 100_000_000_000,
 			bonded: 0,
 			annual_percent_rate: FixedU128::from_float(10.0),
 			base_fee: 0,
 		},
 		bitcoin_argons: VaultArgons {
-			allocated: 200_000_000,
+			allocated: 200_000_000_000,
 			bonded: 0,
 			annual_percent_rate: FixedU128::from_float(10.0),
 			base_fee: 0,

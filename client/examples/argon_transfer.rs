@@ -22,7 +22,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
 	println!("Bob has free balance: {:?}, {}", result.unwrap().data.free, account);
 
 	let alice_account = argon_client::types::AccountId32::from(Alice.to_account_id());
-	let transfer_query = api::tx().balances().transfer_allow_death(alice_account.into(), 1_000);
+	let transfer_query = api::tx().balances().transfer_allow_death(alice_account.into(), 1_000_000);
 
 	let latest_block = client.blocks().at_latest().await?;
 

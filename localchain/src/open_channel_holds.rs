@@ -6,6 +6,7 @@ use crate::{bail, BalanceChangeStatus, Error, Result};
 use crate::{TickerRef, CHANNEL_HOLD_MINIMUM_SETTLEMENT};
 use anyhow::anyhow;
 use argon_notary_audit::verify_changeset_signatures;
+use argon_primitives::tick::Tick;
 use argon_primitives::{
   AccountType, Balance, BalanceChange, BalanceTip, MultiSignatureBytes, NoteType, NotebookNumber,
   CHANNEL_HOLD_CLAWBACK_TICKS, MINIMUM_CHANNEL_HOLD_SETTLEMENT,
@@ -57,7 +58,7 @@ pub struct ChannelHold {
   pub delegated_signer_address: Option<String>,
   pub to_address: String,
   pub domain_hash: Option<Vec<u8>>,
-  pub expiration_tick: u32,
+  pub expiration_tick: i64,
   pub balance_change_number: u32,
   pub notarization_id: Option<i64>,
   pub is_client: bool,
@@ -79,8 +80,8 @@ impl ChannelHold {
     self.settled_signature.clone()
   }
 
-  pub fn is_past_claim_period(&self, current_tick: u32) -> bool {
-    current_tick > self.expiration_tick + CHANNEL_HOLD_CLAWBACK_TICKS
+  pub fn is_past_claim_period(&self, current_tick: Tick) -> bool {
+    current_tick > self.expiration_tick as Tick + CHANNEL_HOLD_CLAWBACK_TICKS
   }
 
   pub fn get_initial_balance_change(&self) -> BalanceChange {
@@ -90,7 +91,7 @@ impl ChannelHold {
   pub fn create_channel_hold_id(balance_change: &BalanceChange) -> Result<String> {
     let mut balance_change = balance_change.clone();
     // set to minimum for id
-    balance_change.notes[0].milligons = MINIMUM_CHANNEL_HOLD_SETTLEMENT;
+    balance_change.notes[0].microgons = MINIMUM_CHANNEL_HOLD_SETTLEMENT;
     balance_change.balance = balance_change
       .previous_balance_proof
       .as_ref()
@@ -110,10 +111,10 @@ impl ChannelHold {
     let Some(ref channel_hold_note) = balance_change.channel_hold_note else {
       bail!("Balance change has no channel hold note");
     };
-    if channel_hold_note.milligons < MINIMUM_CHANNEL_HOLD_SETTLEMENT {
+    if channel_hold_note.microgons < MINIMUM_CHANNEL_HOLD_SETTLEMENT {
       bail!(
         "Channel hold note {} is less than minimum settlement amount: {}",
-        channel_hold_note.milligons,
+        channel_hold_note.microgons,
         MINIMUM_CHANNEL_HOLD_SETTLEMENT
       );
     }
@@ -162,7 +163,7 @@ impl ChannelHold {
       id,
       is_client: false,
       initial_balance_change_json: balance_change_json,
-      hold_amount: channel_hold_note.milligons,
+      hold_amount: channel_hold_note.microgons,
       from_address: AccountStore::to_address(&balance_change.account_id),
       to_address: AccountStore::to_address(recipient),
       delegated_signer_address: delegated_signer.as_ref().map(AccountStore::to_address),
@@ -170,7 +171,7 @@ impl ChannelHold {
       domain_hash: domain_hash.map(|h| h.0.to_vec()).clone(),
       notary_id: proof.notary_id,
       expiration_tick: 0,
-      settled_amount: settle_note.milligons,
+      settled_amount: settle_note.microgons,
       settled_signature: balance_change.signature.encode(),
       notarization_id: None,
       missed_claim_window: false,
@@ -201,6 +202,7 @@ impl ChannelHold {
     let settled_amount = self.settled_amount.to_string();
     let balance_change_number = self.balance_change_number as i64;
     let from_address = self.from_address.clone();
+    let expiration_tick = self.expiration_tick;
 
     let res = sqlx::query!(
       r#"INSERT INTO open_channel_holds
@@ -210,7 +212,7 @@ impl ChannelHold {
       self.initial_balance_change_json,
       from_address,
       balance_change_number,
-      self.expiration_tick,
+      expiration_tick,
       settled_amount,
       self.settled_signature,
       self.is_client,
@@ -226,7 +228,7 @@ impl ChannelHold {
 
   fn get_change_with_settled_amount(&self, amount: u128) -> BalanceChange {
     let mut balance_change = self.balance_change.clone();
-    balance_change.notes[0].milligons = amount;
+    balance_change.notes[0].microgons = amount;
     balance_change.balance = balance_change
       .previous_balance_proof
       .as_ref()
@@ -239,16 +241,16 @@ impl ChannelHold {
   pub async fn db_update_signature(
     &mut self,
     db: &mut SqliteConnection,
-    milligons: Balance,
+    microgons: Balance,
     signature: Vec<u8>,
   ) -> Result<()> {
-    let mut balance_change = self.get_change_with_settled_amount(milligons);
+    let mut balance_change = self.get_change_with_settled_amount(microgons);
     balance_change.signature = MultiSignatureBytes::decode(&mut signature.as_slice())?;
     verify_changeset_signatures(&vec![balance_change.clone()])?;
 
-    self.settled_amount = milligons;
+    self.settled_amount = microgons;
     self.settled_signature = signature;
-    let settled_amount = milligons.to_string();
+    let settled_amount = microgons.to_string();
     let id = &self.id;
     let res = sqlx::query!(
       "UPDATE open_channel_holds SET settled_amount=?, settled_signature = ?, updated_at = CURRENT_TIMESTAMP WHERE id = ?",
@@ -308,7 +310,7 @@ impl TryFrom<ChannelHoldRow> for ChannelHold {
     let mut channel_hold =
       ChannelHold::try_from_balance_change_json(row.initial_balance_change_json)?;
 
-    channel_hold.expiration_tick = row.expiration_tick as u32;
+    channel_hold.expiration_tick = row.expiration_tick;
     channel_hold.settled_amount = row.settled_amount.parse()?;
     channel_hold.settled_signature = row.settled_signature;
     channel_hold.notarization_id = row.notarization_id;
@@ -361,7 +363,7 @@ impl OpenChannelHold {
 
     Ok(SignatureResult {
       signature,
-      milligons: settled_amount,
+      microgons: settled_amount,
     })
   }
 
@@ -382,16 +384,16 @@ impl OpenChannelHold {
 
   pub async fn record_updated_settlement(
     &self,
-    milligons: Balance,
+    microgons: Balance,
     signature: Vec<u8>,
   ) -> Result<()> {
-    if milligons < MINIMUM_CHANNEL_HOLD_SETTLEMENT {
+    if microgons < MINIMUM_CHANNEL_HOLD_SETTLEMENT {
       bail!("Settled amount is less than minimum channel_hold settlement amount ({MINIMUM_CHANNEL_HOLD_SETTLEMENT})");
     }
     let mut channel_hold = self.channel_hold.lock().await;
     let mut db = self.db.acquire().await?;
     channel_hold
-      .db_update_signature(&mut db, milligons, signature)
+      .db_update_signature(&mut db, microgons, signature)
       .await?;
 
     Ok(())
@@ -464,7 +466,7 @@ impl OpenChannelHoldsStore {
     notarization_id: i64,
   ) -> Result<()> {
     let address = AccountStore::to_address(&balance_change.account_id);
-    let settled_amount = balance_change.notes[0].milligons.to_string();
+    let settled_amount = balance_change.notes[0].microgons.to_string();
     let res = sqlx::query!(
       r#"UPDATE open_channel_holds SET notarization_id = ?, settled_amount = ?, updated_at = CURRENT_TIMESTAMP
        WHERE from_address = ? AND balance_change_number = ?"#,
@@ -487,7 +489,7 @@ impl OpenChannelHoldsStore {
   }
 
   pub async fn get_claimable(&self) -> Result<Vec<OpenChannelHold>> {
-    let current_tick = self.ticker.current();
+    let current_tick = self.ticker.current() as i64;
     let expired = sqlx::query_as!(
       ChannelHoldRow,
       r#"SELECT * FROM open_channel_holds WHERE notarization_id IS NULL AND missed_claim_window = false AND expiration_tick <= $1"#,
@@ -550,7 +552,8 @@ impl OpenChannelHoldsStore {
         current_tip
       );
     }
-    channel_hold.expiration_tick = balance_proof.tick + self.ticker.channel_hold_expiration_ticks();
+    channel_hold.expiration_tick =
+      (balance_proof.tick + self.ticker.channel_hold_expiration_ticks()) as i64;
     channel_hold.db_insert(&mut db).await?;
     Ok(OpenChannelHold::new(
       self.db.clone(),
@@ -609,13 +612,13 @@ impl OpenChannelHoldsStore {
       is_client: true,
       initial_balance_change_json: serde_json::to_string(&balance_tip)?,
       balance_change_number: balance_tip.change_number,
-      hold_amount: hold_note.milligons,
+      hold_amount: hold_note.microgons,
       from_address: account.address,
       delegated_signer_address: delegated_signer.as_ref().map(AccountStore::to_address),
       to_address: AccountStore::to_address(recipient),
       domain_hash: domain_hash.map(|h| h.0.to_vec()).clone(),
       notary_id: *notary_id,
-      expiration_tick: tick + self.ticker.channel_hold_expiration_ticks(),
+      expiration_tick: (tick + self.ticker.channel_hold_expiration_ticks()) as i64,
       settled_amount: MINIMUM_CHANNEL_HOLD_SETTLEMENT,
       settled_signature: EMPTY_SIGNATURE.clone(),
       notarization_id: None,
@@ -635,13 +638,14 @@ impl OpenChannelHoldsStore {
 
 pub struct SignatureResult {
   pub signature: Vec<u8>,
-  pub milligons: Balance,
+  pub microgons: Balance,
 }
 
 #[cfg(feature = "napi")]
 pub mod napi_ext {
   use super::{ChannelHold, OpenChannelHold, OpenChannelHoldsStore};
   use crate::error::NapiOk;
+  use argon_primitives::tick::Tick;
   use napi::bindgen_prelude::{BigInt, Uint8Array};
 
   #[napi]
@@ -659,15 +663,15 @@ pub mod napi_ext {
       Uint8Array::from(self.settled_signature.clone())
     }
     #[napi(js_name = "isPastClaimPeriod")]
-    pub fn is_past_claim_period_napi(&self, current_tick: u32) -> bool {
-      self.is_past_claim_period(current_tick)
+    pub fn is_past_claim_period_napi(&self, current_tick: i64) -> bool {
+      self.is_past_claim_period(current_tick as Tick)
     }
   }
 
   #[napi(object)]
   pub struct SignatureResult {
     pub signature: Uint8Array,
-    pub milligons: BigInt,
+    pub microgons: BigInt,
   }
 
   #[napi]
@@ -682,7 +686,7 @@ pub mod napi_ext {
       let result = self.sign(settled_amount.get_u128().1).await.napi_ok()?;
       Ok(SignatureResult {
         signature: result.signature.into(),
-        milligons: result.milligons.into(),
+        microgons: result.microgons.into(),
       })
     }
 
@@ -694,11 +698,11 @@ pub mod napi_ext {
     #[napi(js_name = "recordUpdatedSettlement")]
     pub async fn record_updated_settlement_napi(
       &self,
-      milligons: BigInt,
+      microgons: BigInt,
       signature: Uint8Array,
     ) -> napi::Result<()> {
       self
-        .record_updated_settlement(milligons.get_u128().1, signature.to_vec())
+        .record_updated_settlement(microgons.get_u128().1, signature.to_vec())
         .await
         .napi_ok()
     }
@@ -799,6 +803,7 @@ mod tests {
     let notarization = Notarization::new(vec![balance_change.clone()], vec![], vec![]);
 
     let json_notarization = json!(notarization);
+    let tick = tick as i64;
     let id = sqlx::query_scalar!(
       "INSERT into notarizations (json, notary_id, notebook_number, tick) VALUES (?, ?, ?, ?) RETURNING id",
       json_notarization,
@@ -848,24 +853,25 @@ mod tests {
     let mut db = pool.acquire().await?;
     let bob_account = register_account(&mut db, Bob.to_account_id(), 1, 1).await?;
 
-    let _bob_hold = create_channel_hold(
-      &pool,
-      &bob_account,
-      20_000,
-      1_000,
-      Some("delta.flights".to_string()),
-      alice_address.clone(),
-      1,
-      1,
-      None,
-    )
-    .await?;
-
-    let channel_hold_expiration_ticks: u32 = 2;
+    let channel_hold_expiration_ticks = 2;
     let ticker = TickerRef::new(Ticker::start(
       Duration::from_secs(60),
       channel_hold_expiration_ticks,
     ));
+    let start_tick = ticker.current();
+    let _bob_hold = create_channel_hold(
+      &pool,
+      &bob_account,
+      20_000_000,
+      1_000_000,
+      Some("delta.flights".to_string()),
+      alice_address.clone(),
+      1,
+      start_tick,
+      None,
+    )
+    .await?;
+
     println!("about to open channel_hold");
     let keystore = Keystore::new(pool.clone());
     let _ = keystore
@@ -878,8 +884,8 @@ mod tests {
     let channel_hold = open_channel_hold.inner().await;
     assert_eq!(channel_hold.to_address.clone(), alice_address);
     assert_eq!(
-      channel_hold.expiration_tick,
-      1 + channel_hold_expiration_ticks
+      channel_hold.expiration_tick as Tick,
+      start_tick + channel_hold_expiration_ticks
     );
 
     assert_eq!(store.get_claimable().await?.len(), 0);
@@ -900,7 +906,7 @@ mod tests {
       "can reload from db"
     );
 
-    open_channel_hold.sign(10u128).await?;
+    open_channel_hold.sign(10_000u128).await?;
 
     assert_eq!(
       store
@@ -909,7 +915,7 @@ mod tests {
         .inner()
         .await
         .settled_amount(),
-      10_u128
+      10_000u128
     );
 
     Ok(())
@@ -928,8 +934,8 @@ mod tests {
     let bob_hold = create_channel_hold(
       &pool,
       &bob_account,
-      20_000,
-      1_000,
+      20_000_000,
+      1_000_000,
       Some("delta.flights".to_string()),
       alice_address.clone(),
       1,
@@ -976,17 +982,17 @@ mod tests {
     // simulate signing
     let (updated_signature, updated_total) = {
       let mut balance_change: BalanceChange = serde_json::from_str(&json)?;
-      balance_change.balance -= 100;
+      balance_change.balance -= 100_000;
       assert_eq!(
         balance_change.notes[0].note_type,
         NoteType::ChannelHoldSettle
       );
-      balance_change.notes[0].milligons += 100;
+      balance_change.notes[0].microgons += 100_000;
       let encoded = balance_change.hash().0;
       let charlie_pair = sp_core::sr25519::Pair::from_string(&Charlie.to_seed(), None)?;
       let signature = charlie_pair.sign(&encoded);
       balance_change.signature = signature.into();
-      (balance_change.signature, balance_change.notes[0].milligons)
+      (balance_change.signature, balance_change.notes[0].microgons)
     };
     assert!(alice_channel_hold
       .record_updated_settlement(updated_total, updated_signature.encode())
@@ -1015,8 +1021,8 @@ mod tests {
     let bob_hold = create_channel_hold(
       &bob_pool,
       &bob_account,
-      20_000,
-      1_000,
+      20_000_000,
+      1_000_000,
       Some("delta.flights".to_string()),
       alice_address.clone(),
       1,
@@ -1025,7 +1031,7 @@ mod tests {
     )
     .await?;
 
-    let channel_hold_expiration_ticks: u32 = 2;
+    let channel_hold_expiration_ticks = 2;
     let ticker: TickerRef =
       Ticker::start(Duration::from_secs(60), channel_hold_expiration_ticks).into();
     let keystore = Keystore::new(bob_pool.clone());
@@ -1092,7 +1098,7 @@ mod tests {
     );
 
     assert_eq!(
-      imported_channel_hold.expiration_tick,
+      imported_channel_hold.expiration_tick as Tick,
       1 + channel_hold_expiration_ticks
     );
     assert_eq!(
@@ -1101,11 +1107,14 @@ mod tests {
     );
     assert_eq!(imported_channel_hold.id, sent_channel_hold.id);
 
-    let result = open_channel_hold.sign(10u128).await?;
+    let result = open_channel_hold.sign(10_000u128).await?;
     alice_channel_hold
-      .record_updated_settlement(result.milligons, result.signature)
+      .record_updated_settlement(result.microgons, result.signature)
       .await?;
-    assert_eq!(alice_channel_hold.inner().await.settled_amount(), 10_u128);
+    assert_eq!(
+      alice_channel_hold.inner().await.settled_amount(),
+      10_000u128
+    );
 
     Ok(())
   }
@@ -1139,7 +1148,7 @@ mod tests {
       .claim_from_mainchain(LocalchainTransfer {
         address: bob_address.clone(),
         notary_id: 1,
-        amount: 2_000u128,
+        amount: 2_000_000u128,
         expiration_tick: 100,
         transfer_id: 1,
       })
@@ -1161,7 +1170,7 @@ mod tests {
     );
 
     let channel_hold = transactions
-      .create_channel_hold(800u128, not_alice.clone(), None, None, None)
+      .create_channel_hold(800_000u128, not_alice.clone(), None, None, None)
       .await?;
     let json = channel_hold.export_for_send().await?;
 

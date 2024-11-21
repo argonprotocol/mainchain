@@ -22,13 +22,13 @@ const MAX_ADJUST_DOWN: u128 = 4; // Represents 1/4 adjustment
 const MAX_COMPUTE_DIFFICULTY: u128 = u128::MAX;
 const MIN_COMPUTE_DIFFICULTY: u128 = 4;
 const MAX_TAX_MINIMUM: u128 = u128::MAX;
-const MIN_TAX_MINIMUM: u128 = 1;
+const MIN_TAX_MINIMUM: u128 = 1_000;
 const KEY_BLOCK_ROTATION: u32 = 1440;
 
 /// This pallet adjusts the BlockSeal Specification after every block for both voting and compute.
 ///
 /// The VoteMinimum is the Minimum power of a BlockVote the network will accept in a Notebook. For
-/// Compute, this means the number of leading zeros. For Tax, it's the milligons of Tax. Minimums
+/// Compute, this means the number of leading zeros. For Tax, it's the amount of Tax. Minimums
 /// are only adjusted based on the votes in the last `BlockChangePeriod` blocks. The seal minimum is
 /// adjusted up or down by a maximum of 4x or 1/4x respectively.
 ///

@@ -138,7 +138,7 @@ impl BalanceTipStore {
 				key.as_slice(),
 				tip.as_slice(),
 				notebook_number as i32,
-				tick as i32,
+				tick as i64,
 				prev.as_slice()
 			)
 			.execute(db)

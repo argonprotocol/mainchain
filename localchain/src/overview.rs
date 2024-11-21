@@ -263,8 +263,8 @@ impl OverviewStore {
           .iter()
           .find(|n| matches!(n.note_type, NoteType::ChannelHold { .. }))
         {
-          overview.held_balance += note.milligons as i128;
-          balance_change.hold_balance = note.milligons as i128;
+          overview.held_balance += note.microgons as i128;
+          balance_change.hold_balance = note.microgons as i128;
         }
       }
 
@@ -688,7 +688,7 @@ mod tests {
     mock_notary
       .create_claim_from_mainchain(
         alice_localchain.begin_change(),
-        5_000u128,
+        5_000_000u128,
         Alice.to_account_id(),
       )
       .await?;
@@ -698,7 +698,7 @@ mod tests {
     {
       let overview = alice_overview.get().await?;
       println!("Alice {:#?}", overview);
-      assert_eq!(overview.balance, 5000);
+      assert_eq!(overview.balance, 5_000_000);
       assert_eq!(overview.pending_balance_change, 0);
       assert_eq!(overview.tax, 0);
       assert_eq!(overview.pending_tax_change, 0);
@@ -715,14 +715,14 @@ mod tests {
 
     let alice_json = alice_localchain
       .transactions()
-      .send(3500_u128, Some(vec![bob_localchain.address().await?]))
+      .send(3_500_000u128, Some(vec![bob_localchain.address().await?]))
       .await?;
     {
       let overview = alice_overview.get().await?;
       println!("Alice {:#?}", overview);
-      assert_eq!(overview.balance, 4800);
-      assert_eq!(overview.pending_balance_change, -3300);
-      assert_eq!(overview.tax, 200);
+      assert_eq!(overview.balance, 4_800_000);
+      assert_eq!(overview.pending_balance_change, -3_300_000);
+      assert_eq!(overview.tax, 200_000);
       assert_eq!(overview.pending_tax_change, 0);
       assert_eq!(overview.changes.len(), 2);
       assert_eq!(
@@ -745,9 +745,9 @@ mod tests {
     {
       let overview = bob_overview.get().await?;
       println!("Bob {:#?}", overview);
-      assert_eq!(overview.balance, 3100);
+      assert_eq!(overview.balance, 3_100_000);
       assert_eq!(overview.pending_balance_change, 0);
-      assert_eq!(overview.tax, 200);
+      assert_eq!(overview.tax, 200_000);
       assert_eq!(overview.pending_tax_change, 0);
       assert_eq!(overview.changes.len(), 1);
       assert_eq!(overview.changes[0].status, BalanceChangeStatus::Notarized);
@@ -761,9 +761,9 @@ mod tests {
       bob_localchain.balance_sync().sync(None).await?;
       let overview = bob_overview.get().await?;
       println!("Bob {:#?}", overview);
-      assert_eq!(overview.balance, 3100);
+      assert_eq!(overview.balance, 3_100_000);
       assert_eq!(overview.pending_balance_change, 0);
-      assert_eq!(overview.tax, 200);
+      assert_eq!(overview.tax, 200_000);
       assert_eq!(overview.pending_tax_change, 0);
       assert_eq!(overview.changes.len(), 1);
       assert_eq!(
@@ -777,9 +777,9 @@ mod tests {
       alice_localchain.balance_sync().sync(None).await?;
       let overview = alice_overview.get().await?;
       println!("Alice {:#?}", overview);
-      assert_eq!(overview.balance, 1500);
+      assert_eq!(overview.balance, 1_500_000);
       assert_eq!(overview.pending_balance_change, 0);
-      assert_eq!(overview.tax, 200);
+      assert_eq!(overview.tax, 200_000);
       assert_eq!(overview.pending_tax_change, 0);
       assert_eq!(overview.changes.len(), 3);
       assert_eq!(overview.changes[0].status, BalanceChangeStatus::Notarized);
