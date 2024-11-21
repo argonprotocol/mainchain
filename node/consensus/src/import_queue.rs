@@ -127,8 +127,8 @@ where
 			return Ok(block_params)
 		}
 
-		let post_hash = block_params.header.hash();
 		let parent_hash = *block_params.header.parent_hash();
+		let post_hash = block_params.header.hash();
 
 		let mut header = block_params.header;
 		let raw_seal_digest = header.digest_mut().pop().ok_or(Error::MissingBlockSealDigest)?;
@@ -140,10 +140,9 @@ where
 		block_params.post_hash = Some(post_hash);
 
 		let digest = block_params.header.digest();
+		let pre_hash = block_params.header.hash();
 
 		if seal_digest.is_vote() {
-			let pre_hash = block_params.header.hash();
-
 			let is_valid = self
 				.client
 				.runtime_api()
@@ -180,9 +179,11 @@ where
 
 			let key_block_hash = compute_puzzle.get_key_block(self.client.info().genesis_hash);
 			let compute_difficulty = compute_puzzle.difficulty;
+
+			tracing::info!(?key_block_hash, ?compute_difficulty, ?nonce, "Verifying compute nonce");
 			if !BlockComputeNonce::is_valid(
 				nonce,
-				post_hash.as_ref().to_vec(),
+				pre_hash.as_ref().to_vec(),
 				&key_block_hash,
 				compute_difficulty,
 			) {
