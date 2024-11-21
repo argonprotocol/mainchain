@@ -13,15 +13,22 @@ need for a centralized intermediary. More here: https://docs.hyperbridge.network
 
 A token transfer ui is available here: https://app.hyperbridge.network/
 
+### Relayer
+
+There's a hyperbridge script that will all you to start a local relayer to retrieve the initial genesis state:
+`start_pallet_relayer.sh`
+
+### Configuration
+
 Configuration details relevant to transactions are below:
 
-### Testnet
+#### Testnet
 
 Contract addresses for the hyperbridge contracts: https://docs.hyperbridge.network/developers/evm/contracts/testnet
 
 Token Gateway is 0xFcDa26cA021d5535C3059547390E6cCd8De7acA6
 
-#### EVM
+##### EVM
 
 - Ethereum => Evm 11155111,
 - Optimism => Evm 11155420,
@@ -31,17 +38,17 @@ Token Gateway is 0xFcDa26cA021d5535C3059547390E6cCd8De7acA6
 - BinanceSmartChain => Evm 97,
 - Gnosis => Evm 10200,
 
-#### Substrate
+##### Substrate
 
 - Hyperbridge Paseo => Polkadot(4009),
 
-### Mainnet
+#### Mainnet
 
 Contract addresses for the hyperbridge contracts:https://docs.hyperbridge.network/developers/evm/contracts/mainnet
 
 Token Gateway is 0xFd413e3AFe560182C4471F4d143A96d3e259B6dE
 
-#### EVM
+##### EVM
 
 - Ethereum => Evm 1,
 - Arbitrum => Evm 42161,
@@ -50,7 +57,7 @@ Token Gateway is 0xFd413e3AFe560182C4471F4d143A96d3e259B6dE
 - BinanceSmartChain => Evm 56,
 - Gnosis => Evm 100,
 
-#### Substrate
+##### Substrate
 
 - Hyperbridge Polkadot => Polkadot(3367),
 - Hyperbridge Kusama => Kusama(3340),

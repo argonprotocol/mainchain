@@ -1159,9 +1159,9 @@ pub mod api {
 						"query_call_info",
 						types::QueryCallInfo { call, len },
 						[
-							254u8, 71u8, 226u8, 242u8, 55u8, 146u8, 151u8, 92u8, 91u8, 24u8, 40u8,
-							53u8, 159u8, 5u8, 130u8, 181u8, 91u8, 34u8, 142u8, 160u8, 38u8, 198u8,
-							145u8, 209u8, 68u8, 244u8, 208u8, 81u8, 177u8, 85u8, 93u8, 180u8,
+							129u8, 95u8, 250u8, 233u8, 140u8, 74u8, 102u8, 81u8, 28u8, 212u8, 18u8,
+							15u8, 108u8, 76u8, 127u8, 222u8, 154u8, 132u8, 195u8, 42u8, 139u8,
+							139u8, 146u8, 91u8, 228u8, 23u8, 180u8, 6u8, 108u8, 213u8, 114u8, 18u8,
 						],
 					)
 				}
@@ -1179,9 +1179,9 @@ pub mod api {
 						"query_call_fee_details",
 						types::QueryCallFeeDetails { call, len },
 						[
-							105u8, 13u8, 166u8, 76u8, 81u8, 184u8, 92u8, 113u8, 151u8, 67u8, 177u8,
-							48u8, 100u8, 119u8, 163u8, 74u8, 106u8, 241u8, 19u8, 245u8, 254u8,
-							40u8, 250u8, 51u8, 92u8, 228u8, 214u8, 81u8, 19u8, 32u8, 214u8, 1u8,
+							87u8, 168u8, 14u8, 54u8, 48u8, 35u8, 150u8, 227u8, 247u8, 21u8, 213u8,
+							90u8, 1u8, 230u8, 107u8, 19u8, 223u8, 44u8, 253u8, 103u8, 91u8, 115u8,
+							176u8, 96u8, 109u8, 47u8, 119u8, 132u8, 27u8, 40u8, 80u8, 59u8,
 						],
 					)
 				}
@@ -3693,9 +3693,9 @@ pub mod api {
 			.hash();
 		runtime_metadata_hash ==
 			[
-				124u8, 179u8, 174u8, 10u8, 182u8, 162u8, 133u8, 29u8, 172u8, 130u8, 69u8, 182u8,
-				221u8, 154u8, 31u8, 165u8, 13u8, 143u8, 163u8, 241u8, 239u8, 181u8, 114u8, 243u8,
-				148u8, 167u8, 251u8, 62u8, 148u8, 245u8, 163u8, 148u8,
+				164u8, 196u8, 145u8, 51u8, 57u8, 197u8, 87u8, 213u8, 11u8, 62u8, 50u8, 215u8,
+				156u8, 199u8, 82u8, 252u8, 32u8, 38u8, 90u8, 133u8, 180u8, 139u8, 41u8, 192u8, 1u8,
+				213u8, 70u8, 177u8, 186u8, 16u8, 150u8, 97u8,
 			]
 	}
 	pub mod system {
@@ -4846,10 +4846,10 @@ pub mod api {
 						"Events",
 						(),
 						[
-							192u8, 74u8, 102u8, 106u8, 236u8, 211u8, 29u8, 237u8, 227u8, 9u8,
-							210u8, 99u8, 159u8, 135u8, 82u8, 3u8, 210u8, 83u8, 162u8, 103u8, 42u8,
-							149u8, 153u8, 55u8, 31u8, 127u8, 27u8, 33u8, 173u8, 228u8, 244u8,
-							243u8,
+							236u8, 149u8, 171u8, 100u8, 175u8, 87u8, 182u8, 58u8, 55u8, 7u8, 28u8,
+							232u8, 126u8, 200u8, 138u8, 157u8, 138u8, 237u8, 81u8, 78u8, 99u8,
+							197u8, 164u8, 114u8, 244u8, 49u8, 41u8, 122u8, 1u8, 180u8, 116u8,
+							198u8,
 						],
 					)
 				}
@@ -5672,10 +5672,10 @@ pub mod api {
 							call: ::subxt::ext::subxt_core::alloc::boxed::Box::new(call),
 						},
 						[
-							130u8, 191u8, 167u8, 140u8, 33u8, 127u8, 220u8, 175u8, 96u8, 42u8,
-							51u8, 197u8, 65u8, 78u8, 202u8, 235u8, 24u8, 231u8, 244u8, 179u8,
-							167u8, 174u8, 123u8, 192u8, 20u8, 39u8, 30u8, 23u8, 177u8, 84u8, 161u8,
-							99u8,
+							255u8, 208u8, 138u8, 254u8, 60u8, 190u8, 76u8, 24u8, 251u8, 211u8,
+							15u8, 99u8, 166u8, 3u8, 183u8, 233u8, 218u8, 9u8, 53u8, 72u8, 204u8,
+							136u8, 25u8, 90u8, 110u8, 176u8, 126u8, 200u8, 50u8, 248u8, 200u8,
+							85u8,
 						],
 					)
 				}
@@ -5737,9 +5737,10 @@ pub mod api {
 							max_weight,
 						},
 						[
-							175u8, 220u8, 88u8, 9u8, 236u8, 2u8, 152u8, 100u8, 1u8, 158u8, 56u8,
-							22u8, 126u8, 132u8, 161u8, 34u8, 244u8, 97u8, 137u8, 174u8, 129u8,
-							169u8, 53u8, 43u8, 169u8, 8u8, 197u8, 120u8, 196u8, 56u8, 84u8, 192u8,
+							112u8, 68u8, 253u8, 54u8, 95u8, 184u8, 253u8, 26u8, 127u8, 206u8,
+							226u8, 145u8, 249u8, 62u8, 123u8, 223u8, 48u8, 25u8, 114u8, 124u8,
+							108u8, 169u8, 239u8, 95u8, 64u8, 252u8, 199u8, 57u8, 239u8, 185u8,
+							215u8, 158u8,
 						],
 					)
 				}
@@ -6602,10 +6603,9 @@ pub mod api {
 							call: ::subxt::ext::subxt_core::alloc::boxed::Box::new(call),
 						},
 						[
-							136u8, 114u8, 81u8, 146u8, 86u8, 98u8, 74u8, 94u8, 34u8, 2u8, 185u8,
-							212u8, 194u8, 97u8, 105u8, 200u8, 139u8, 249u8, 125u8, 219u8, 26u8,
-							204u8, 15u8, 211u8, 91u8, 180u8, 162u8, 123u8, 153u8, 51u8, 70u8,
-							187u8,
+							191u8, 8u8, 213u8, 31u8, 200u8, 60u8, 47u8, 137u8, 37u8, 10u8, 243u8,
+							152u8, 32u8, 122u8, 131u8, 140u8, 191u8, 85u8, 57u8, 44u8, 224u8,
+							141u8, 159u8, 75u8, 240u8, 245u8, 69u8, 71u8, 61u8, 76u8, 233u8, 6u8,
 						],
 					)
 				}
@@ -6867,9 +6867,9 @@ pub mod api {
 							call: ::subxt::ext::subxt_core::alloc::boxed::Box::new(call),
 						},
 						[
-							17u8, 22u8, 120u8, 64u8, 45u8, 215u8, 80u8, 196u8, 198u8, 117u8, 184u8,
-							210u8, 83u8, 224u8, 190u8, 173u8, 13u8, 167u8, 28u8, 240u8, 98u8,
-							221u8, 9u8, 70u8, 94u8, 223u8, 199u8, 209u8, 186u8, 192u8, 56u8, 240u8,
+							30u8, 232u8, 0u8, 28u8, 117u8, 140u8, 21u8, 198u8, 235u8, 118u8, 179u8,
+							108u8, 182u8, 170u8, 105u8, 6u8, 175u8, 172u8, 226u8, 82u8, 243u8,
+							18u8, 251u8, 22u8, 67u8, 120u8, 135u8, 166u8, 202u8, 149u8, 20u8, 58u8,
 						],
 					)
 				}
@@ -11914,17 +11914,23 @@ pub mod api {
 				#[doc = "Set the asset registration for cross chain transfers"]
 				#[doc = ""]
 				#[doc = "# Arguments"]
-				#[doc = "`chains` - Each chain and its corresponding token gateway address"]
+				#[doc = "`add_chains` - Each new chain and its corresponding token gateway address"]
+				#[doc = "`remove_chains` - Chains to remove"]
 				pub struct UpdateHyperbridgeAssets {
-					pub chains: update_hyperbridge_assets::Chains,
+					pub add_chains: update_hyperbridge_assets::AddChains,
+					pub remove_chains: update_hyperbridge_assets::RemoveChains,
 				}
 				pub mod update_hyperbridge_assets {
 					use super::runtime_types;
-					pub type Chains =
+					pub type AddChains =
 						runtime_types::bounded_collections::bounded_vec::BoundedVec<(
 							runtime_types::ismp::host::StateMachine,
 							::subxt::ext::subxt_core::alloc::vec::Vec<::core::primitive::u8>,
 						)>;
+					pub type RemoveChains =
+						runtime_types::bounded_collections::bounded_vec::BoundedVec<
+							runtime_types::ismp::host::StateMachine,
+						>;
 				}
 				impl ::subxt::ext::subxt_core::blocks::StaticExtrinsic for UpdateHyperbridgeAssets {
 					const PALLET: &'static str = "ChainTransfer";
@@ -11963,6 +11969,33 @@ pub mod api {
 				impl ::subxt::ext::subxt_core::blocks::StaticExtrinsic for ReplaceHyperbridgeAdmins {
 					const PALLET: &'static str = "ChainTransfer";
 					const CALL: &'static str = "replace_hyperbridge_admins";
+				}
+				#[derive(
+					:: subxt :: ext :: subxt_core :: ext :: codec :: Decode,
+					:: subxt :: ext :: subxt_core :: ext :: codec :: Encode,
+					:: subxt :: ext :: subxt_core :: ext :: scale_decode :: DecodeAsType,
+					:: subxt :: ext :: subxt_core :: ext :: scale_encode :: EncodeAsType,
+					Clone,
+					Debug,
+				)]
+				# [codec (crate = :: subxt :: ext :: subxt_core :: ext :: codec)]
+				#[decode_as_type(
+					crate_path = ":: subxt :: ext :: subxt_core :: ext :: scale_decode"
+				)]
+				#[encode_as_type(
+					crate_path = ":: subxt :: ext :: subxt_core :: ext :: scale_encode"
+				)]
+				#[doc = "Pause the bridge"]
+				pub struct SetBrideEnabled {
+					pub enabled: set_bride_enabled::Enabled,
+				}
+				pub mod set_bride_enabled {
+					use super::runtime_types;
+					pub type Enabled = ::core::primitive::bool;
+				}
+				impl ::subxt::ext::subxt_core::blocks::StaticExtrinsic for SetBrideEnabled {
+					const PALLET: &'static str = "ChainTransfer";
+					const CALL: &'static str = "set_bride_enabled";
 				}
 			}
 			pub struct TransactionApi;
@@ -12026,21 +12059,24 @@ pub mod api {
 				#[doc = "Set the asset registration for cross chain transfers"]
 				#[doc = ""]
 				#[doc = "# Arguments"]
-				#[doc = "`chains` - Each chain and its corresponding token gateway address"]
+				#[doc = "`add_chains` - Each new chain and its corresponding token gateway address"]
+				#[doc = "`remove_chains` - Chains to remove"]
 				pub fn update_hyperbridge_assets(
 					&self,
-					chains: types::update_hyperbridge_assets::Chains,
+					add_chains: types::update_hyperbridge_assets::AddChains,
+					remove_chains: types::update_hyperbridge_assets::RemoveChains,
 				) -> ::subxt::ext::subxt_core::tx::payload::StaticPayload<
 					types::UpdateHyperbridgeAssets,
 				> {
 					::subxt::ext::subxt_core::tx::payload::StaticPayload::new_static(
 						"ChainTransfer",
 						"update_hyperbridge_assets",
-						types::UpdateHyperbridgeAssets { chains },
+						types::UpdateHyperbridgeAssets { add_chains, remove_chains },
 						[
-							53u8, 45u8, 34u8, 53u8, 127u8, 160u8, 207u8, 202u8, 217u8, 168u8, 70u8,
-							10u8, 98u8, 191u8, 104u8, 90u8, 23u8, 114u8, 179u8, 32u8, 186u8, 76u8,
-							28u8, 77u8, 168u8, 149u8, 217u8, 163u8, 62u8, 34u8, 68u8, 225u8,
+							163u8, 195u8, 98u8, 21u8, 111u8, 167u8, 103u8, 78u8, 135u8, 107u8,
+							80u8, 201u8, 170u8, 169u8, 140u8, 0u8, 95u8, 44u8, 132u8, 59u8, 108u8,
+							208u8, 57u8, 209u8, 99u8, 155u8, 156u8, 212u8, 50u8, 224u8, 55u8,
+							170u8,
 						],
 					)
 				}
@@ -12062,6 +12098,24 @@ pub mod api {
 							14u8, 241u8, 48u8, 172u8, 15u8, 168u8, 153u8, 168u8, 127u8, 168u8,
 							231u8, 187u8, 60u8, 168u8, 79u8, 204u8, 183u8, 31u8, 4u8, 182u8, 161u8,
 							200u8, 66u8, 145u8, 109u8, 54u8, 154u8, 3u8, 235u8, 145u8, 122u8, 37u8,
+						],
+					)
+				}
+				#[doc = "Pause the bridge"]
+				pub fn set_bride_enabled(
+					&self,
+					enabled: types::set_bride_enabled::Enabled,
+				) -> ::subxt::ext::subxt_core::tx::payload::StaticPayload<types::SetBrideEnabled>
+				{
+					::subxt::ext::subxt_core::tx::payload::StaticPayload::new_static(
+						"ChainTransfer",
+						"set_bride_enabled",
+						types::SetBrideEnabled { enabled },
+						[
+							151u8, 231u8, 166u8, 112u8, 19u8, 169u8, 95u8, 180u8, 178u8, 242u8,
+							29u8, 238u8, 189u8, 18u8, 129u8, 4u8, 237u8, 170u8, 177u8, 136u8,
+							219u8, 222u8, 255u8, 74u8, 157u8, 188u8, 20u8, 72u8, 132u8, 152u8,
+							221u8, 222u8,
 						],
 					)
 				}
@@ -12381,6 +12435,39 @@ pub mod api {
 			# [codec (crate = :: subxt :: ext :: subxt_core :: ext :: codec)]
 			#[decode_as_type(crate_path = ":: subxt :: ext :: subxt_core :: ext :: scale_decode")]
 			#[encode_as_type(crate_path = ":: subxt :: ext :: subxt_core :: ext :: scale_encode")]
+			#[doc = "An asset has been received from an EVM chain while the bridge is paused. This is not"]
+			#[doc = "processed, and added to the logs for a future resolution. Funds are maintained in"]
+			#[doc = "pallet balance."]
+			pub struct TransferFromEvmWhilePaused {
+				pub from: transfer_from_evm_while_paused::From,
+				pub to: transfer_from_evm_while_paused::To,
+				pub asset: transfer_from_evm_while_paused::Asset,
+				pub amount: transfer_from_evm_while_paused::Amount,
+				pub evm_chain: transfer_from_evm_while_paused::EvmChain,
+			}
+			pub mod transfer_from_evm_while_paused {
+				use super::runtime_types;
+				pub type From = ::subxt::ext::subxt_core::utils::H160;
+				pub type To = crate::types::AccountId32;
+				pub type Asset = runtime_types::pallet_chain_transfer::ismp_module::Asset;
+				pub type Amount = ::core::primitive::u128;
+				pub type EvmChain = runtime_types::pallet_chain_transfer::ismp_module::EvmChain;
+			}
+			impl ::subxt::ext::subxt_core::events::StaticEvent for TransferFromEvmWhilePaused {
+				const PALLET: &'static str = "ChainTransfer";
+				const EVENT: &'static str = "TransferFromEvmWhilePaused";
+			}
+			#[derive(
+				:: subxt :: ext :: subxt_core :: ext :: codec :: Decode,
+				:: subxt :: ext :: subxt_core :: ext :: codec :: Encode,
+				:: subxt :: ext :: subxt_core :: ext :: scale_decode :: DecodeAsType,
+				:: subxt :: ext :: subxt_core :: ext :: scale_encode :: EncodeAsType,
+				Clone,
+				Debug,
+			)]
+			# [codec (crate = :: subxt :: ext :: subxt_core :: ext :: codec)]
+			#[decode_as_type(crate_path = ":: subxt :: ext :: subxt_core :: ext :: scale_decode")]
+			#[encode_as_type(crate_path = ":: subxt :: ext :: subxt_core :: ext :: scale_encode")]
 			#[doc = "ERC6160 asset creation request dispatched to hyperbridge"]
 			pub struct ERC6160AssetRegistrationDispatched {
 				pub commitment: erc6160_asset_registration_dispatched::Commitment,
@@ -12443,7 +12530,7 @@ pub mod api {
 				pub mod active_evm_destinations {
 					use super::runtime_types;
 					pub type ActiveEvmDestinations =
-						runtime_types::bounded_collections::bounded_vec::BoundedVec<
+						runtime_types::bounded_collections::bounded_btree_set::BoundedBTreeSet<
 							runtime_types::pallet_chain_transfer::ismp_module::EvmChain,
 						>;
 				}
@@ -12460,6 +12547,10 @@ pub mod api {
 				pub mod token_admin {
 					use super::runtime_types;
 					pub type TokenAdmin = crate::types::AccountId32;
+				}
+				pub mod pause_bridge {
+					use super::runtime_types;
+					pub type PauseBridge = ::core::primitive::bool;
 				}
 			}
 			pub struct StorageApi;
@@ -12673,9 +12764,9 @@ pub mod api {
 						"ActiveEvmDestinations",
 						(),
 						[
-							7u8, 99u8, 5u8, 74u8, 50u8, 22u8, 173u8, 78u8, 239u8, 23u8, 80u8,
-							151u8, 146u8, 28u8, 173u8, 230u8, 151u8, 13u8, 73u8, 191u8, 125u8,
-							90u8, 215u8, 24u8, 52u8, 80u8, 20u8, 8u8, 162u8, 42u8, 200u8, 110u8,
+							223u8, 184u8, 158u8, 130u8, 70u8, 71u8, 227u8, 163u8, 139u8, 252u8,
+							77u8, 220u8, 95u8, 6u8, 119u8, 226u8, 18u8, 185u8, 40u8, 232u8, 120u8,
+							193u8, 161u8, 227u8, 8u8, 215u8, 155u8, 27u8, 23u8, 193u8, 18u8, 73u8,
 						],
 					)
 				}
@@ -12768,6 +12859,27 @@ pub mod api {
 							236u8, 125u8, 139u8, 2u8, 37u8, 49u8, 170u8, 205u8, 108u8, 61u8, 193u8,
 							170u8, 173u8, 117u8, 29u8, 192u8, 131u8, 61u8, 160u8, 194u8, 59u8, 0u8,
 							231u8, 180u8, 105u8, 194u8, 30u8, 43u8, 9u8, 115u8, 39u8, 94u8,
+						],
+					)
+				}
+				pub fn pause_bridge(
+					&self,
+				) -> ::subxt::ext::subxt_core::storage::address::StaticAddress<
+					(),
+					types::pause_bridge::PauseBridge,
+					::subxt::ext::subxt_core::utils::Yes,
+					::subxt::ext::subxt_core::utils::Yes,
+					(),
+				> {
+					::subxt::ext::subxt_core::storage::address::StaticAddress::new_static(
+						"ChainTransfer",
+						"PauseBridge",
+						(),
+						[
+							68u8, 248u8, 140u8, 177u8, 125u8, 92u8, 241u8, 186u8, 43u8, 98u8,
+							125u8, 72u8, 137u8, 4u8, 180u8, 99u8, 59u8, 114u8, 126u8, 17u8, 29u8,
+							216u8, 58u8, 253u8, 60u8, 102u8, 244u8, 232u8, 228u8, 86u8, 133u8,
+							110u8,
 						],
 					)
 				}
@@ -19240,10 +19352,10 @@ pub mod api {
 						"batch",
 						types::Batch { calls },
 						[
-							44u8, 108u8, 141u8, 140u8, 136u8, 26u8, 74u8, 115u8, 251u8, 29u8,
-							192u8, 54u8, 254u8, 171u8, 37u8, 24u8, 23u8, 240u8, 112u8, 179u8, 5u8,
-							40u8, 237u8, 233u8, 214u8, 214u8, 245u8, 44u8, 25u8, 221u8, 189u8,
-							176u8,
+							163u8, 175u8, 113u8, 57u8, 236u8, 78u8, 191u8, 252u8, 116u8, 158u8,
+							36u8, 186u8, 232u8, 239u8, 244u8, 75u8, 167u8, 253u8, 166u8, 171u8,
+							123u8, 168u8, 1u8, 196u8, 216u8, 140u8, 11u8, 20u8, 182u8, 235u8, 18u8,
+							125u8,
 						],
 					)
 				}
@@ -19273,10 +19385,9 @@ pub mod api {
 							call: ::subxt::ext::subxt_core::alloc::boxed::Box::new(call),
 						},
 						[
-							69u8, 148u8, 97u8, 102u8, 146u8, 57u8, 155u8, 240u8, 124u8, 249u8,
-							65u8, 74u8, 200u8, 9u8, 183u8, 22u8, 160u8, 74u8, 191u8, 2u8, 179u8,
-							30u8, 226u8, 116u8, 242u8, 86u8, 32u8, 229u8, 22u8, 119u8, 221u8,
-							128u8,
+							200u8, 112u8, 78u8, 236u8, 109u8, 220u8, 51u8, 245u8, 46u8, 155u8, 1u8,
+							193u8, 156u8, 73u8, 107u8, 82u8, 147u8, 218u8, 115u8, 245u8, 142u8,
+							0u8, 99u8, 89u8, 38u8, 213u8, 45u8, 85u8, 115u8, 133u8, 231u8, 52u8,
 						],
 					)
 				}
@@ -19302,9 +19413,9 @@ pub mod api {
 						"batch_all",
 						types::BatchAll { calls },
 						[
-							215u8, 67u8, 63u8, 85u8, 26u8, 202u8, 103u8, 77u8, 218u8, 244u8, 61u8,
-							146u8, 189u8, 194u8, 173u8, 63u8, 81u8, 71u8, 153u8, 114u8, 67u8, 61u8,
-							205u8, 217u8, 194u8, 178u8, 95u8, 66u8, 198u8, 198u8, 193u8, 7u8,
+							142u8, 160u8, 58u8, 128u8, 160u8, 121u8, 42u8, 144u8, 130u8, 80u8,
+							237u8, 232u8, 126u8, 185u8, 87u8, 75u8, 168u8, 203u8, 63u8, 87u8, 87u8,
+							254u8, 201u8, 185u8, 26u8, 200u8, 177u8, 18u8, 186u8, 48u8, 29u8, 21u8,
 						],
 					)
 				}
@@ -19327,10 +19438,9 @@ pub mod api {
 							call: ::subxt::ext::subxt_core::alloc::boxed::Box::new(call),
 						},
 						[
-							245u8, 143u8, 199u8, 106u8, 126u8, 213u8, 176u8, 17u8, 170u8, 17u8,
-							144u8, 21u8, 69u8, 111u8, 118u8, 99u8, 37u8, 113u8, 202u8, 44u8, 28u8,
-							206u8, 36u8, 47u8, 63u8, 219u8, 255u8, 243u8, 151u8, 163u8, 116u8,
-							177u8,
+							232u8, 168u8, 23u8, 7u8, 32u8, 5u8, 192u8, 5u8, 34u8, 71u8, 161u8,
+							185u8, 40u8, 124u8, 38u8, 7u8, 63u8, 10u8, 218u8, 234u8, 157u8, 196u8,
+							232u8, 78u8, 223u8, 119u8, 26u8, 43u8, 67u8, 178u8, 219u8, 159u8,
 						],
 					)
 				}
@@ -19356,9 +19466,9 @@ pub mod api {
 						"force_batch",
 						types::ForceBatch { calls },
 						[
-							166u8, 15u8, 158u8, 179u8, 124u8, 139u8, 107u8, 127u8, 28u8, 132u8,
-							198u8, 179u8, 255u8, 81u8, 87u8, 215u8, 13u8, 39u8, 206u8, 49u8, 17u8,
-							231u8, 135u8, 50u8, 193u8, 2u8, 109u8, 107u8, 1u8, 185u8, 40u8, 143u8,
+							3u8, 229u8, 247u8, 190u8, 224u8, 100u8, 85u8, 136u8, 75u8, 232u8, 79u8,
+							160u8, 42u8, 49u8, 58u8, 223u8, 223u8, 12u8, 117u8, 22u8, 109u8, 231u8,
+							213u8, 235u8, 91u8, 132u8, 19u8, 9u8, 61u8, 116u8, 103u8, 145u8,
 						],
 					)
 				}
@@ -19381,10 +19491,10 @@ pub mod api {
 							weight,
 						},
 						[
-							158u8, 24u8, 20u8, 192u8, 74u8, 182u8, 158u8, 155u8, 124u8, 59u8,
-							161u8, 176u8, 128u8, 212u8, 14u8, 54u8, 151u8, 116u8, 83u8, 42u8,
-							235u8, 227u8, 32u8, 231u8, 164u8, 229u8, 29u8, 16u8, 25u8, 221u8,
-							185u8, 14u8,
+							202u8, 208u8, 129u8, 73u8, 240u8, 172u8, 89u8, 151u8, 215u8, 118u8,
+							98u8, 122u8, 227u8, 52u8, 133u8, 109u8, 237u8, 220u8, 161u8, 104u8,
+							32u8, 165u8, 145u8, 84u8, 156u8, 23u8, 160u8, 135u8, 51u8, 203u8,
+							226u8, 66u8,
 						],
 					)
 				}
@@ -19719,9 +19829,10 @@ pub mod api {
 							call: ::subxt::ext::subxt_core::alloc::boxed::Box::new(call),
 						},
 						[
-							16u8, 23u8, 84u8, 51u8, 79u8, 255u8, 48u8, 228u8, 179u8, 232u8, 84u8,
-							241u8, 90u8, 212u8, 192u8, 190u8, 217u8, 142u8, 43u8, 130u8, 79u8,
-							15u8, 230u8, 188u8, 105u8, 148u8, 79u8, 219u8, 0u8, 43u8, 58u8, 25u8,
+							76u8, 148u8, 117u8, 100u8, 164u8, 216u8, 12u8, 56u8, 236u8, 105u8,
+							173u8, 243u8, 17u8, 243u8, 184u8, 160u8, 213u8, 236u8, 228u8, 25u8,
+							71u8, 245u8, 184u8, 109u8, 107u8, 222u8, 231u8, 39u8, 71u8, 56u8,
+							237u8, 66u8,
 						],
 					)
 				}
@@ -19744,10 +19855,10 @@ pub mod api {
 							weight,
 						},
 						[
-							31u8, 184u8, 152u8, 199u8, 240u8, 105u8, 163u8, 121u8, 153u8, 132u8,
-							161u8, 240u8, 99u8, 222u8, 152u8, 103u8, 127u8, 15u8, 45u8, 214u8,
-							223u8, 28u8, 189u8, 19u8, 16u8, 206u8, 191u8, 98u8, 205u8, 4u8, 232u8,
-							102u8,
+							119u8, 174u8, 104u8, 95u8, 173u8, 144u8, 230u8, 28u8, 202u8, 62u8,
+							41u8, 1u8, 163u8, 206u8, 68u8, 40u8, 170u8, 39u8, 123u8, 59u8, 232u8,
+							171u8, 145u8, 170u8, 242u8, 162u8, 120u8, 237u8, 152u8, 127u8, 13u8,
+							60u8,
 						],
 					)
 				}
@@ -19785,9 +19896,9 @@ pub mod api {
 							call: ::subxt::ext::subxt_core::alloc::boxed::Box::new(call),
 						},
 						[
-							184u8, 56u8, 77u8, 247u8, 197u8, 28u8, 219u8, 102u8, 90u8, 205u8, 88u8,
-							204u8, 128u8, 70u8, 126u8, 211u8, 73u8, 86u8, 51u8, 2u8, 50u8, 11u8,
-							252u8, 3u8, 63u8, 14u8, 66u8, 203u8, 242u8, 238u8, 210u8, 16u8,
+							85u8, 174u8, 147u8, 55u8, 56u8, 53u8, 240u8, 91u8, 229u8, 172u8, 60u8,
+							92u8, 128u8, 224u8, 181u8, 188u8, 151u8, 99u8, 45u8, 254u8, 175u8,
+							178u8, 182u8, 89u8, 177u8, 89u8, 186u8, 30u8, 27u8, 26u8, 80u8, 150u8,
 						],
 					)
 				}
@@ -23552,6 +23663,25 @@ pub mod api {
 					pub ::subxt::ext::subxt_core::utils::KeyedVec<_0, _1>,
 				);
 			}
+			pub mod bounded_btree_set {
+				use super::runtime_types;
+				#[derive(
+					:: subxt :: ext :: subxt_core :: ext :: codec :: Decode,
+					:: subxt :: ext :: subxt_core :: ext :: codec :: Encode,
+					:: subxt :: ext :: subxt_core :: ext :: scale_decode :: DecodeAsType,
+					:: subxt :: ext :: subxt_core :: ext :: scale_encode :: EncodeAsType,
+					Clone,
+					Debug,
+				)]
+				# [codec (crate = :: subxt :: ext :: subxt_core :: ext :: codec)]
+				#[decode_as_type(
+					crate_path = ":: subxt :: ext :: subxt_core :: ext :: scale_decode"
+				)]
+				#[encode_as_type(
+					crate_path = ":: subxt :: ext :: subxt_core :: ext :: scale_encode"
+				)]
+				pub struct BoundedBTreeSet<_0>(pub ::subxt::ext::subxt_core::alloc::vec::Vec<_0>);
+			}
 			pub mod bounded_vec {
 				use super::runtime_types;
 				#[derive(
@@ -26359,12 +26489,16 @@ pub mod api {
 					#[doc = "Set the asset registration for cross chain transfers"]
 					#[doc = ""]
 					#[doc = "# Arguments"]
-					#[doc = "`chains` - Each chain and its corresponding token gateway address"]
+					#[doc = "`add_chains` - Each new chain and its corresponding token gateway address"]
+					#[doc = "`remove_chains` - Chains to remove"]
 					update_hyperbridge_assets {
-						chains: runtime_types::bounded_collections::bounded_vec::BoundedVec<(
+						add_chains: runtime_types::bounded_collections::bounded_vec::BoundedVec<(
 							runtime_types::ismp::host::StateMachine,
 							::subxt::ext::subxt_core::alloc::vec::Vec<::core::primitive::u8>,
 						)>,
+						remove_chains: runtime_types::bounded_collections::bounded_vec::BoundedVec<
+							runtime_types::ismp::host::StateMachine,
+						>,
 					},
 					#[codec(index = 4)]
 					#[doc = "This api will re-assign admins for ERC6160 accounts on the TokenGateway.sol contracts"]
@@ -26377,6 +26511,9 @@ pub mod api {
 							::subxt::ext::subxt_core::utils::H160,
 						)>,
 					},
+					#[codec(index = 5)]
+					#[doc = "Pause the bridge"]
+					set_bride_enabled { enabled: ::core::primitive::bool },
 				}
 				#[derive(
 					:: subxt :: ext :: subxt_core :: ext :: codec :: Decode,
@@ -26422,20 +26559,23 @@ pub mod api {
 					#[doc = "ERC6160 asset registration failed"]
 					Erc6160RegistrationFailed,
 					#[codec(index = 9)]
-					#[doc = "ERC6160 asset already registered"]
-					Erc6160AlreadyRegistered,
-					#[codec(index = 10)]
 					#[doc = "Coprocessor not configured"]
 					CoprocessorNotConfigured,
-					#[codec(index = 11)]
+					#[codec(index = 10)]
 					#[doc = "Invalid Destination Chain"]
 					InvalidEvmChain,
-					#[codec(index = 12)]
+					#[codec(index = 11)]
 					#[doc = "Evm Chain is not supported yet"]
 					EvmChainNotSupported,
-					#[codec(index = 13)]
+					#[codec(index = 12)]
 					#[doc = "Evm Chain doesn't have the proper configuration setup"]
 					EvmChainNotConfigured,
+					#[codec(index = 13)]
+					#[doc = "The bridge is paused"]
+					EvmBridgePaused,
+					#[codec(index = 14)]
+					#[doc = "Max number of chains exceeded"]
+					MaxChainsExceeded,
 				}
 				#[derive(
 					:: subxt :: ext :: subxt_core :: ext :: codec :: Decode,
@@ -26540,6 +26680,17 @@ pub mod api {
 						evm_chain: runtime_types::pallet_chain_transfer::ismp_module::EvmChain,
 					},
 					#[codec(index = 10)]
+					#[doc = "An asset has been received from an EVM chain while the bridge is paused. This is not"]
+					#[doc = "processed, and added to the logs for a future resolution. Funds are maintained in"]
+					#[doc = "pallet balance."]
+					TransferFromEvmWhilePaused {
+						from: ::subxt::ext::subxt_core::utils::H160,
+						to: crate::types::AccountId32,
+						asset: runtime_types::pallet_chain_transfer::ismp_module::Asset,
+						amount: ::core::primitive::u128,
+						evm_chain: runtime_types::pallet_chain_transfer::ismp_module::EvmChain,
+					},
+					#[codec(index = 11)]
 					#[doc = "ERC6160 asset creation request dispatched to hyperbridge"]
 					ERC6160AssetRegistrationDispatched {
 						commitment: crate::types::H256,

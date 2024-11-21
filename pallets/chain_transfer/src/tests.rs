@@ -299,10 +299,8 @@ fn it_allows_you_to_transfer_to_evm_chains() {
 		);
 		assert_eq!(Balances::free_balance(&who), 5000);
 
-		ActiveEvmDestinations::<Test>::try_mutate(|destinations| {
-			destinations.try_push(evm_chain.clone())
-		})
-		.expect("Failed to insert destination");
+		ActiveEvmDestinations::<Test>::try_mutate(|a| a.try_insert(evm_chain.clone()))
+			.expect("Failed to insert destination");
 
 		assert_err!(
 			ChainTransferPallet::send_to_evm_chain(
@@ -392,7 +390,7 @@ fn it_allows_you_to_transfer_ownership_tokens_to_evm_chains() {
 		assert_eq!(Ownership::free_balance(&who), 5000);
 
 		ActiveEvmDestinations::<Test>::try_mutate(|destinations| {
-			destinations.try_push(evm_chain.clone())
+			destinations.try_insert(evm_chain.clone())
 		})
 		.expect("Failed to insert destination");
 		TokenGatewayAddresses::<Test>::insert(
@@ -428,7 +426,7 @@ fn it_refunds_timed_out_requests() {
 			recipient: account,
 		};
 		ActiveEvmDestinations::<Test>::try_mutate(|destinations| {
-			destinations.try_push(evm_chain.clone())
+			destinations.try_insert(evm_chain.clone())
 		})
 		.expect("Failed to insert destination");
 		TokenGatewayAddresses::<Test>::insert(
@@ -496,7 +494,7 @@ fn it_transfers_in_from_evm() {
 			recipient: evm_account,
 		};
 		ActiveEvmDestinations::<Test>::try_mutate(|destinations| {
-			destinations.try_push(evm_chain.clone())
+			destinations.try_insert(evm_chain.clone())
 		})
 		.expect("Failed to insert destination");
 		TokenGatewayAddresses::<Test>::insert(
@@ -567,7 +565,8 @@ fn it_registers_tokens_correctly() {
 			TokenGatewayAddresses::<Test>::get(EvmChain::Ethereum.get_state_machine(true)),
 			Some(gateway_address.clone())
 		);
-		assert_eq!(ActiveEvmDestinations::<Test>::get().to_vec(), vec![EvmChain::Ethereum]);
+		assert_eq!(ActiveEvmDestinations::<Test>::get().len(), 1);
+		assert_eq!(ActiveEvmDestinations::<Test>::get().iter().next(), Some(&EvmChain::Ethereum));
 
 		let commitments = System::events()
 			.iter()
@@ -602,28 +601,22 @@ fn it_registers_tokens_correctly() {
 
 		System::reset_events();
 
-		assert_err!(
-			ChainTransferPallet::register_hyperbridge_assets(
-				RuntimeOrigin::signed(Alice.to_account_id()),
-				bounded_vec![(EvmChain::Base.get_state_machine(true), gateway_address.clone())],
-			),
-			Error::<Test>::Erc6160AlreadyRegistered
-		);
-
 		// can update the chains
 		assert_ok!(ChainTransferPallet::update_hyperbridge_assets(
 			RuntimeOrigin::signed(Alice.to_account_id()),
 			bounded_vec![
+				// doesn't fail with an extra one
 				(EvmChain::Ethereum.get_state_machine(true), gateway_address.clone()),
 				(EvmChain::Base.get_state_machine(true), gateway_address.clone())
 			],
+			bounded_vec![]
 		),);
 		assert_eq!(
 			TokenGatewayAddresses::<Test>::get(EvmChain::Base.get_state_machine(true)),
 			Some(gateway_address.clone())
 		);
 		assert_eq!(
-			ActiveEvmDestinations::<Test>::get().to_vec(),
+			ActiveEvmDestinations::<Test>::get().into_iter().collect::<Vec<_>>(),
 			vec![EvmChain::Ethereum, EvmChain::Base]
 		);
 
@@ -656,7 +649,8 @@ fn it_registers_tokens_correctly() {
 		System::reset_events();
 		assert_ok!(ChainTransferPallet::update_hyperbridge_assets(
 			RuntimeOrigin::signed(Alice.to_account_id()),
-			bounded_vec![(EvmChain::Ethereum.get_state_machine(true), gateway_address.clone())],
+			bounded_vec![],
+			bounded_vec![EvmChain::Base.get_state_machine(true)]
 		),);
 		assert_eq!(
 			TokenGatewayAddresses::<Test>::get(EvmChain::Ethereum.get_state_machine(true)),
@@ -666,7 +660,10 @@ fn it_registers_tokens_correctly() {
 			TokenGatewayAddresses::<Test>::get(EvmChain::Base.get_state_machine(true)),
 			None
 		);
-		assert_eq!(ActiveEvmDestinations::<Test>::get().to_vec(), vec![EvmChain::Ethereum]);
+		assert_eq!(
+			ActiveEvmDestinations::<Test>::get().into_iter().collect::<Vec<_>>(),
+			vec![EvmChain::Ethereum]
+		);
 		let new_chain_events = System::events()
 			.iter()
 			.filter_map(|event| match &event.event {
@@ -691,5 +688,89 @@ fn it_registers_tokens_correctly() {
 			})
 			.collect::<Vec<_>>();
 		assert_eq!(new_chain_events.len(), 2);
+	});
+}
+
+#[test]
+fn it_can_pause_hyperbridge() {
+	new_test_ext().execute_with(|| {
+		// Go past genesis block so events get deposited
+		System::set_block_number(1);
+
+		set_argons(&Alice.to_account_id(), 5000);
+
+		let gateway_address = H160::random().as_bytes().to_vec();
+
+		assert_ok!(ChainTransferPallet::register_hyperbridge_assets(
+			RuntimeOrigin::signed(Alice.to_account_id()),
+			bounded_vec![(EvmChain::Ethereum.get_state_machine(true), gateway_address.clone())],
+		));
+		ChainTransferPallet::set_bride_enabled(RuntimeOrigin::root(), false).unwrap();
+		assert_err!(
+			ChainTransferPallet::send_to_evm_chain(
+				RuntimeOrigin::signed(Alice.to_account_id()),
+				TransferToEvm {
+					evm_chain: EvmChain::Ethereum,
+					relayer_fee: 0,
+					timeout: 60,
+					amount: 1009,
+					asset: Asset::Argon,
+					recipient: H160::random()
+				}
+			),
+			Error::<Test>::EvmBridgePaused,
+		);
+		assert_eq!(Balances::free_balance(Alice.to_account_id()), 5000);
+
+		let to = Alice.to_account_id();
+		let to_bytes: [u8; 32] = to.clone().into();
+		let evm_account = H160::random();
+
+		let post_request = PostRequest {
+			body: {
+				let mut encoded = vec![0];
+				let body = Body {
+					to: to_bytes.into(),
+					from: {
+						let mut from = [0u8; 32];
+						from[12..].copy_from_slice(&evm_account[..]);
+						from.into()
+					},
+					amount: {
+						let mut bytes = [0u8; 32];
+						convert_to_erc20(1001u128).to_big_endian(&mut bytes);
+						alloy_primitives::U256::from_be_bytes(bytes)
+					},
+					asset_id: Asset::Argon.asset_id().0.into(),
+					redeem: false,
+				};
+				encoded.extend_from_slice(&Body::abi_encode(&body));
+				encoded
+			},
+			to: to.as_slice().to_vec(),
+			from: gateway_address.clone(),
+			source: EvmChain::Ethereum.get_state_machine(true),
+			dest: StateMachine::Substrate(*b"argn"),
+			nonce: 0,
+			timeout_timestamp: SystemTime::now().elapsed().unwrap().as_secs(),
+		};
+		ChainTransferPallet::default()
+			.on_accept(post_request)
+			.expect("should handle, but log error");
+		System::assert_has_event(
+			Event::<Test>::TransferFromEvmWhilePaused {
+				evm_chain: EvmChain::Ethereum,
+				amount: 1001,
+				asset: Asset::Argon,
+				from: evm_account,
+				to,
+			}
+			.into(),
+		);
+		assert_eq!(
+			Balances::free_balance(Alice.to_account_id()),
+			5000,
+			"should not transfer funds"
+		);
 	});
 }

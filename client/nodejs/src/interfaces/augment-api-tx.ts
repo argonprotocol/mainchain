@@ -181,12 +181,17 @@ declare module '@polkadot/api-base/types/submittable' {
       sendToEvmChain: AugmentedSubmittable<(params: PalletChainTransferTransferToEvm | { asset?: any; evmChain?: any; recipient?: any; amount?: any; timeout?: any; relayerFee?: any } | string | Uint8Array) => SubmittableExtrinsic<ApiType>, [PalletChainTransferTransferToEvm]>;
       sendToLocalchain: AugmentedSubmittable<(amount: Compact<u128> | AnyNumber | Uint8Array, notaryId: u32 | AnyNumber | Uint8Array) => SubmittableExtrinsic<ApiType>, [Compact<u128>, u32]>;
       /**
+       * Pause the bridge
+       **/
+      setBrideEnabled: AugmentedSubmittable<(enabled: bool | boolean | Uint8Array) => SubmittableExtrinsic<ApiType>, [bool]>;
+      /**
        * Set the asset registration for cross chain transfers
        *
        * # Arguments
-       * `chains` - Each chain and its corresponding token gateway address
+       * `add_chains` - Each new chain and its corresponding token gateway address
+       * `remove_chains` - Chains to remove
        **/
-      updateHyperbridgeAssets: AugmentedSubmittable<(chains: Vec<ITuple<[IsmpHostStateMachine, Bytes]>> | ([IsmpHostStateMachine | { Evm: any } | { Polkadot: any } | { Kusama: any } | { Substrate: any } | { Tendermint: any } | string | Uint8Array, Bytes | string | Uint8Array])[]) => SubmittableExtrinsic<ApiType>, [Vec<ITuple<[IsmpHostStateMachine, Bytes]>>]>;
+      updateHyperbridgeAssets: AugmentedSubmittable<(addChains: Vec<ITuple<[IsmpHostStateMachine, Bytes]>> | ([IsmpHostStateMachine | { Evm: any } | { Polkadot: any } | { Kusama: any } | { Substrate: any } | { Tendermint: any } | string | Uint8Array, Bytes | string | Uint8Array])[], removeChains: Vec<IsmpHostStateMachine> | (IsmpHostStateMachine | { Evm: any } | { Polkadot: any } | { Kusama: any } | { Substrate: any } | { Tendermint: any } | string | Uint8Array)[]) => SubmittableExtrinsic<ApiType>, [Vec<ITuple<[IsmpHostStateMachine, Bytes]>>, Vec<IsmpHostStateMachine>]>;
     };
     domains: {
       setZoneRecord: AugmentedSubmittable<(domainHash: H256 | string | Uint8Array, zoneRecord: ArgonPrimitivesDomainZoneRecord | { paymentAccount?: any; notaryId?: any; versions?: any } | string | Uint8Array) => SubmittableExtrinsic<ApiType>, [H256, ArgonPrimitivesDomainZoneRecord]>;

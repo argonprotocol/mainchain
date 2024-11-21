@@ -73,7 +73,9 @@ impl TryFrom<Vec<u8>> for Asset {
 }
 
 /// Destinations: https://docs.hyperbridge.network/developers/evm/contract-addresses
-#[derive(Clone, PartialEq, Eq, Encode, Decode, RuntimeDebug, TypeInfo, Default)]
+#[derive(
+	Clone, PartialEq, Eq, Encode, Decode, RuntimeDebug, TypeInfo, Default, PartialOrd, Ord,
+)]
 pub enum EvmChain {
 	#[default]
 	Ethereum,
@@ -309,6 +311,18 @@ where
 		let to: <T as frame_system::Config>::AccountId = body.to.0.into();
 
 		let asset = body.get_asset(&meta)?;
+
+		if PauseBridge::<T>::get() {
+			Self::deposit_event(Event::<T>::TransferFromEvmWhilePaused {
+				from: H160::from_slice(&body.from.0[12..]),
+				to: to.clone(),
+				amount,
+				evm_chain: evm_chain.clone(),
+				asset: asset.clone(),
+			});
+			return Ok(());
+		}
+
 		Self::transfer(&Self::pallet_account(), &to, amount, &asset).map_err(|_| {
 			dispatch_error("Token Gateway: Failed to complete asset transfer", &meta)
 		})?;
@@ -329,6 +343,8 @@ where
 
 	fn on_timeout(&self, request: Timeout) -> Result<(), anyhow::Error> {
 		match request {
+			// NOTE: duplicate checking and timeout checking is handled in ismp pallet and
+			// ismp-core before they get here, so we don't do it again
 			Timeout::Request(Request::Post(PostRequest { body, source, dest, nonce, .. })) => {
 				let meta = Meta { source, dest, nonce };
 				let evm_chain = Self::get_evm_chain(source).ok_or_else(|| {

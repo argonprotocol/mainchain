@@ -154,7 +154,7 @@ pub mod pallet {
 	/// The token gateway addresses on different chains
 	#[pallet::storage]
 	pub type ActiveEvmDestinations<T: Config> =
-		StorageValue<_, BoundedVec<EvmChain, ConstU32<20>>, ValueQuery>;
+		StorageValue<_, BoundedBTreeSet<EvmChain, ConstU32<50>>, ValueQuery>;
 
 	/// The token gateway addresses on different chains
 	#[pallet::storage]
@@ -169,6 +169,9 @@ pub mod pallet {
 	#[pallet::storage]
 	pub(super) type TokenAdmin<T: Config> =
 		StorageValue<_, <T as frame_system::Config>::AccountId, OptionQuery>;
+
+	#[pallet::storage]
+	pub type PauseBridge<T: Config> = StorageValue<_, bool, ValueQuery>;
 
 	#[pallet::event]
 	#[pallet::generate_deposit(pub(super) fn deposit_event)]
@@ -264,6 +267,21 @@ pub mod pallet {
 			/// Source chain
 			evm_chain: EvmChain,
 		},
+		/// An asset has been received from an EVM chain while the bridge is paused. This is not
+		/// processed, and added to the logs for a future resolution. Funds are maintained in
+		/// pallet balance.
+		TransferFromEvmWhilePaused {
+			/// the source account
+			from: H160,
+			/// beneficiary account
+			to: <T as frame_system::Config>::AccountId,
+			/// asset
+			asset: Asset,
+			/// Amount transferred
+			amount: <T as Config>::Balance,
+			/// Source chain
+			evm_chain: EvmChain,
+		},
 		/// ERC6160 asset creation request dispatched to hyperbridge
 		ERC6160AssetRegistrationDispatched {
 			/// Request commitment
@@ -296,8 +314,6 @@ pub mod pallet {
 		NotATokenAdmin,
 		/// ERC6160 asset registration failed
 		Erc6160RegistrationFailed,
-		/// ERC6160 asset already registered
-		Erc6160AlreadyRegistered,
 		/// Coprocessor not configured
 		CoprocessorNotConfigured,
 		/// Invalid Destination Chain
@@ -306,6 +322,10 @@ pub mod pallet {
 		EvmChainNotSupported,
 		/// Evm Chain doesn't have the proper configuration setup
 		EvmChainNotConfigured,
+		/// The bridge is paused
+		EvmBridgePaused,
+		/// Max number of chains exceeded
+		MaxChainsExceeded,
 	}
 
 	#[pallet::genesis_config]
@@ -388,6 +408,8 @@ pub mod pallet {
 		) -> DispatchResult {
 			let who = ensure_signed(origin)?;
 
+			ensure!(!PauseBridge::<T>::get(), Error::<T>::EvmBridgePaused);
+
 			let asset_id = params.asset.asset_id();
 			let is_evm_supported = ActiveEvmDestinations::<T>::get().contains(&params.evm_chain);
 			ensure!(is_evm_supported, Error::<T>::EvmChainNotSupported);
@@ -448,11 +470,7 @@ pub mod pallet {
 				Error::<T>::NotATokenAdmin,
 			);
 
-			let is_empty = TokenGatewayAddresses::<T>::iter_keys().collect::<Vec<_>>().is_empty();
-			ensure!(is_empty, Error::<T>::Erc6160AlreadyRegistered);
-
 			let mut state_machines = vec![];
-			let mut evm_chains = vec![];
 
 			let is_testnet = UseTestNetworks::<T>::get();
 			for (sm, gateway) in chains {
@@ -460,11 +478,12 @@ pub mod pallet {
 				if let StateMachine::Evm(id) = sm {
 					let evm_chain =
 						EvmChain::try_from(id, is_testnet).ok_or(Error::<T>::InvalidEvmChain)?;
-					evm_chains.push(evm_chain);
+
+					ActiveEvmDestinations::<T>::try_mutate(|a| a.try_insert(evm_chain))
+						.map_err(|_| Error::<T>::MaxChainsExceeded)?;
 				}
 				TokenGatewayAddresses::<T>::insert(sm, gateway.clone());
 			}
-			ActiveEvmDestinations::<T>::put(BoundedVec::truncate_from(evm_chains));
 
 			let minimum: u128 = T::ExistentialDeposit::get().into();
 			for asset in [Asset::Argon, Asset::OwnershipToken] {
@@ -485,12 +504,14 @@ pub mod pallet {
 		/// Set the asset registration for cross chain transfers
 		///
 		/// # Arguments
-		/// `chains` - Each chain and its corresponding token gateway address
+		/// `add_chains` - Each new chain and its corresponding token gateway address
+		/// `remove_chains` - Chains to remove
 		#[pallet::call_index(3)]
 		#[pallet::weight(0)]
 		pub fn update_hyperbridge_assets(
 			origin: OriginFor<T>,
-			chains: BoundedVec<(StateMachine, Vec<u8>), ConstU32<20>>,
+			add_chains: BoundedVec<(StateMachine, Vec<u8>), ConstU32<100>>,
+			remove_chains: BoundedVec<StateMachine, ConstU32<100>>,
 		) -> DispatchResult {
 			let who = ensure_signed(origin)?;
 			ensure!(
@@ -500,35 +521,37 @@ pub mod pallet {
 
 			let is_testnet = UseTestNetworks::<T>::get();
 			let mut added_chains = vec![];
-			let mut removed_chains = vec![];
-			let mut evm_chains = vec![];
-			for chain in TokenGatewayAddresses::<T>::iter_keys() {
-				if !chains.iter().any(|(sm, _)| sm == &chain) {
-					removed_chains.push(chain);
-				}
-			}
-			for (chain, address) in &chains {
-				if !TokenGatewayAddresses::<T>::contains_key(chain) {
-					added_chains.push(*chain);
-					TokenGatewayAddresses::<T>::insert(chain, address);
-				}
+			for (chain, gateway_address) in add_chains {
+				if let StateMachine::Evm(id) = chain {
+					let evm_chain =
+						EvmChain::try_from(id, is_testnet).ok_or(Error::<T>::InvalidEvmChain)?;
 
+					ActiveEvmDestinations::<T>::try_mutate(|a| a.try_insert(evm_chain))
+						.map_err(|_| Error::<T>::MaxChainsExceeded)?;
+				}
+				if !TokenGatewayAddresses::<T>::contains_key(chain) {
+					added_chains.push(chain);
+				}
+				TokenGatewayAddresses::<T>::insert(chain, gateway_address);
+			}
+
+			for chain in &remove_chains {
+				TokenGatewayAddresses::<T>::remove(chain);
 				if let StateMachine::Evm(id) = chain {
 					let evm_chain =
 						EvmChain::try_from(*id, is_testnet).ok_or(Error::<T>::InvalidEvmChain)?;
-					evm_chains.push(evm_chain);
+					ActiveEvmDestinations::<T>::mutate(|v| {
+						v.remove(&evm_chain);
+					});
 				}
 			}
-			ActiveEvmDestinations::<T>::put(BoundedVec::truncate_from(evm_chains));
-			for chain in &removed_chains {
-				TokenGatewayAddresses::<T>::remove(chain);
-			}
+
 			for asset in [Asset::Argon, Asset::OwnershipToken] {
 				Self::update_asset_registration(
 					RemoteERC6160AssetRegistration::UpdateAsset(GatewayAssetUpdate {
 						asset_id: asset.asset_id().0.into(),
 						add_chains: BoundedVec::truncate_from(added_chains.clone()),
-						remove_chains: BoundedVec::truncate_from(removed_chains.clone()),
+						remove_chains: remove_chains.clone(),
 						new_admins: Default::default(),
 					}),
 					&who,
@@ -568,6 +591,21 @@ pub mod pallet {
 				)?;
 			}
 
+			Ok(())
+		}
+
+		/// Pause the bridge
+		#[pallet::call_index(5)]
+		#[pallet::weight(0)]
+		pub fn set_bride_enabled(origin: OriginFor<T>, enabled: bool) -> DispatchResult {
+			if let Some(who) = ensure_signed_or_root(origin)? {
+				ensure!(
+					who == <TokenAdmin<T>>::get()
+						.expect("No token admin. Should be set in genesis"),
+					Error::<T>::NotATokenAdmin,
+				);
+			}
+			PauseBridge::<T>::put(!enabled);
 			Ok(())
 		}
 	}

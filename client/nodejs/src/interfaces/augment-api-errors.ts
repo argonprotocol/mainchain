@@ -261,13 +261,13 @@ declare module '@polkadot/api-base/types/errors' {
        **/
       CoprocessorNotConfigured: AugmentedError<ApiType>;
       /**
-       * ERC6160 asset already registered
-       **/
-      Erc6160AlreadyRegistered: AugmentedError<ApiType>;
-      /**
        * ERC6160 asset registration failed
        **/
       Erc6160RegistrationFailed: AugmentedError<ApiType>;
+      /**
+       * The bridge is paused
+       **/
+      EvmBridgePaused: AugmentedError<ApiType>;
       /**
        * Evm Chain doesn't have the proper configuration setup
        **/
@@ -301,6 +301,10 @@ declare module '@polkadot/api-base/types/errors' {
        **/
       InvalidOrDuplicatedLocalchainTransfer: AugmentedError<ApiType>;
       MaxBlockTransfersExceeded: AugmentedError<ApiType>;
+      /**
+       * Max number of chains exceeded
+       **/
+      MaxChainsExceeded: AugmentedError<ApiType>;
       /**
        * This account is not a token admin
        **/

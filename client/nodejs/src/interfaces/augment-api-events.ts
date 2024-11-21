@@ -163,6 +163,12 @@ declare module '@polkadot/api-base/types/events' {
        **/
       TransferFromEvm: AugmentedEvent<ApiType, [from: H160, to: AccountId32, asset: PalletChainTransferIsmpModuleAsset, amount: u128, evmChain: PalletChainTransferIsmpModuleEvmChain], { from: H160, to: AccountId32, asset: PalletChainTransferIsmpModuleAsset, amount: u128, evmChain: PalletChainTransferIsmpModuleEvmChain }>;
       /**
+       * An asset has been received from an EVM chain while the bridge is paused. This is not
+       * processed, and added to the logs for a future resolution. Funds are maintained in
+       * pallet balance.
+       **/
+      TransferFromEvmWhilePaused: AugmentedEvent<ApiType, [from: H160, to: AccountId32, asset: PalletChainTransferIsmpModuleAsset, amount: u128, evmChain: PalletChainTransferIsmpModuleEvmChain], { from: H160, to: AccountId32, asset: PalletChainTransferIsmpModuleAsset, amount: u128, evmChain: PalletChainTransferIsmpModuleEvmChain }>;
+      /**
        * Transfer from Localchain to Mainchain
        **/
       TransferFromLocalchain: AugmentedEvent<ApiType, [accountId: AccountId32, amount: u128, notaryId: u32], { accountId: AccountId32, amount: u128, notaryId: u32 }>;
