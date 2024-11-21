@@ -31,11 +31,20 @@ directories = { workspace = true }
 argon-client = { workspace = true }
 argon-primitives = { workspace = true, features = ["default", "bitcoin"] }
 url = { workspace = true }
-
+ethers = { workspace = true }
+uniswap-sdk-core = { workspace = true }
+uniswap-v3-sdk = { workspace = true, features = ["extensions"] }
+uniswap-lens = { workspace = true }
 bitcoincore-rpc = { workspace = true }
 bitcoin = { workspace = true }
 dotenv = { workspace = true }
 lazy_static = { workspace = true }
+
+alloy-primitives = { workspace = true }
+alloy-eips = { workspace = true }
+alloy-transport = { workspace = true }
+alloy-transport-http = { workspace = true }
+alloy-provider = { workspace = true }
 
 [dev-dependencies]
 env_logger = { workspace = true }

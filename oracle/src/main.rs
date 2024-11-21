@@ -15,8 +15,9 @@ use crate::{bitcoin_tip::bitcoin_loop, price_index::price_index_loop};
 
 mod argon_price;
 mod bitcoin_tip;
-mod btc_price;
+mod coin_usd_prices;
 mod price_index;
+mod uniswap_oracle;
 mod us_cpi;
 mod us_cpi_schedule;
 pub(crate) mod utils;
@@ -48,17 +49,30 @@ struct Cli {
 	#[clap(global = true, long, env)]
 	signer_crypto: Option<OracleCryptoType>,
 }
-#[derive(Debug, Clone, clap::Subcommand, Default)]
+#[derive(Debug, Clone, clap::Subcommand)]
 #[allow(clippy::large_enum_variant)]
 pub enum Subcommand {
-	#[default]
-	PriceIndex,
+	PriceIndex {
+		/// Use a price simulator instead of uniswap
+		#[cfg(feature = "simulated-prices")]
+		#[clap(short, long)]
+		simulate_prices: bool,
+	},
 	Bitcoin {
 		/// The Bitcoin full node to follow for longest chain. Should be a hosted/trusted
 		/// full node. Include optional auth inline
 		#[clap(long, env)]
 		bitcoin_rpc_url: String,
 	},
+}
+
+impl Default for Subcommand {
+	fn default() -> Self {
+		Subcommand::PriceIndex {
+			#[cfg(feature = "simulated-prices")]
+			simulate_prices: false,
+		}
+	}
 }
 
 #[derive(ValueEnum, Debug, Clone)]
@@ -108,7 +122,7 @@ async fn main() -> anyhow::Result<()> {
 
 	let keystore = if dev && signer_address.is_none() {
 		let suri = match subcommand {
-			Subcommand::PriceIndex => "//Eve",
+			Subcommand::PriceIndex { .. } => "//Eve",
 			Subcommand::Bitcoin { .. } => "//Dave",
 		};
 		let pair = sr25519::Pair::from_string(suri, None)?;
@@ -133,7 +147,19 @@ async fn main() -> anyhow::Result<()> {
 	let signer = KeystoreSigner::new(keystore, signer_account, signer_crypto.into());
 
 	match subcommand {
-		Subcommand::PriceIndex => price_index_loop(trusted_rpc_url, signer, dev).await?,
+		Subcommand::PriceIndex {
+			#[cfg(feature = "simulated-prices")]
+			simulate_prices,
+		} => {
+			#[cfg(feature = "simulated-prices")]
+			{
+				price_index_loop(trusted_rpc_url, signer, simulate_prices).await?
+			}
+			#[cfg(not(feature = "simulated-prices"))]
+			{
+				price_index_loop(trusted_rpc_url, signer, false).await?
+			}
+		},
 		Subcommand::Bitcoin { bitcoin_rpc_url } => {
 			let bitcoin_url = Url::parse(&bitcoin_rpc_url).map_err(|e| {
 				anyhow!("Unable to parse bitcoin rpc url ({}) {:?}", bitcoin_rpc_url, e)
