@@ -705,7 +705,7 @@ fn it_can_pause_hyperbridge() {
 			RuntimeOrigin::signed(Alice.to_account_id()),
 			bounded_vec![(EvmChain::Ethereum.get_state_machine(true), gateway_address.clone())],
 		));
-		ChainTransferPallet::set_bride_enabled(RuntimeOrigin::root(), false).unwrap();
+		ChainTransferPallet::set_bridge_enabled(RuntimeOrigin::root(), false).unwrap();
 		assert_err!(
 			ChainTransferPallet::send_to_evm_chain(
 				RuntimeOrigin::signed(Alice.to_account_id()),

@@ -16,13 +16,13 @@ para_ids = [4009]
 
 [hyperbridge.substrate]
 # Hyperbridge's relay chain websocket RPC
-rpc_ws = "wss://paseo.dotters.network"
+rpc_ws = "wss://hyperbridge-paseo-rpc.blockops.network"
 # Hyperbridge's hashing algorithm
 hashing = "Keccak"
 # Hyperbridge's consensus state id
 # For Paseo Testnet: PAS0
 # For Polkadot Mainnet: DOT0
-consensus_state_id = "PASO"
+consensus_state_id = "PAS0"
 # Hyperbridge's state machine ID
 # For Paseo Testnet: KUSAMA-4009
 # For Polkadot Mainnet: POLKADOT-3367
@@ -39,7 +39,7 @@ rpc_ws = "ws://host.docker.internal:9944"
 hashing = "Blake2"
 # Solochains's consensus state id on Hyperbridge
 # should be 4 utf-8 chars chosen by solochain
-consensus_state_id = "argn"
+consensus_state_id = "ARGN"
 # Solochains's state machine id. eg
 state_machine = "SUBSTRATE-argn"
 
@@ -52,3 +52,5 @@ slot_duration = 2
 consensus_update_frequency = 60
 # Any para ids to prove if solochain is actually a relay chain
 para_ids = []
+
+[relayer]

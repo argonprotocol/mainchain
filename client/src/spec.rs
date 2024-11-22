@@ -3693,9 +3693,9 @@ pub mod api {
 			.hash();
 		runtime_metadata_hash ==
 			[
-				164u8, 196u8, 145u8, 51u8, 57u8, 197u8, 87u8, 213u8, 11u8, 62u8, 50u8, 215u8,
-				156u8, 199u8, 82u8, 252u8, 32u8, 38u8, 90u8, 133u8, 180u8, 139u8, 41u8, 192u8, 1u8,
-				213u8, 70u8, 177u8, 186u8, 16u8, 150u8, 97u8,
+				152u8, 3u8, 107u8, 181u8, 181u8, 11u8, 243u8, 5u8, 33u8, 180u8, 225u8, 178u8, 17u8,
+				85u8, 78u8, 7u8, 107u8, 117u8, 167u8, 52u8, 181u8, 248u8, 254u8, 73u8, 203u8, 8u8,
+				190u8, 79u8, 36u8, 8u8, 53u8, 94u8,
 			]
 	}
 	pub mod system {
@@ -11987,15 +11987,15 @@ pub mod api {
 				)]
 				#[doc = "Pause the bridge"]
 				pub struct SetBrideEnabled {
-					pub enabled: set_bride_enabled::Enabled,
+					pub enabled: set_bridge_enabled::Enabled,
 				}
-				pub mod set_bride_enabled {
+				pub mod set_bridge_enabled {
 					use super::runtime_types;
 					pub type Enabled = ::core::primitive::bool;
 				}
 				impl ::subxt::ext::subxt_core::blocks::StaticExtrinsic for SetBrideEnabled {
 					const PALLET: &'static str = "ChainTransfer";
-					const CALL: &'static str = "set_bride_enabled";
+					const CALL: &'static str = "set_bridge_enabled";
 				}
 			}
 			pub struct TransactionApi;
@@ -12102,14 +12102,14 @@ pub mod api {
 					)
 				}
 				#[doc = "Pause the bridge"]
-				pub fn set_bride_enabled(
+				pub fn set_bridge_enabled(
 					&self,
-					enabled: types::set_bride_enabled::Enabled,
+					enabled: types::set_bridge_enabled::Enabled,
 				) -> ::subxt::ext::subxt_core::tx::payload::StaticPayload<types::SetBrideEnabled>
 				{
 					::subxt::ext::subxt_core::tx::payload::StaticPayload::new_static(
 						"ChainTransfer",
-						"set_bride_enabled",
+						"set_bridge_enabled",
 						types::SetBrideEnabled { enabled },
 						[
 							151u8, 231u8, 166u8, 112u8, 19u8, 169u8, 95u8, 180u8, 178u8, 242u8,
@@ -15294,11 +15294,11 @@ pub mod api {
 				}
 				pub mod minted_mining_argons {
 					use super::runtime_types;
-					pub type MintedMiningArgons = ::core::primitive::u128;
+					pub type MintedMiningArgons = runtime_types::primitive_types::U256;
 				}
 				pub mod minted_bitcoin_argons {
 					use super::runtime_types;
-					pub type MintedBitcoinArgons = ::core::primitive::u128;
+					pub type MintedBitcoinArgons = runtime_types::primitive_types::U256;
 				}
 			}
 			pub struct StorageApi;
@@ -15341,10 +15341,10 @@ pub mod api {
 						"MintedMiningArgons",
 						(),
 						[
-							183u8, 163u8, 211u8, 212u8, 227u8, 236u8, 155u8, 227u8, 81u8, 137u8,
-							11u8, 195u8, 107u8, 28u8, 193u8, 128u8, 36u8, 112u8, 98u8, 158u8,
-							197u8, 151u8, 62u8, 77u8, 7u8, 200u8, 202u8, 37u8, 97u8, 185u8, 60u8,
-							91u8,
+							124u8, 198u8, 6u8, 10u8, 20u8, 76u8, 75u8, 78u8, 0u8, 136u8, 251u8,
+							78u8, 101u8, 45u8, 220u8, 164u8, 104u8, 102u8, 225u8, 150u8, 114u8,
+							206u8, 213u8, 69u8, 84u8, 100u8, 125u8, 248u8, 147u8, 109u8, 61u8,
+							88u8,
 						],
 					)
 				}
@@ -15362,10 +15362,9 @@ pub mod api {
 						"MintedBitcoinArgons",
 						(),
 						[
-							120u8, 95u8, 112u8, 229u8, 112u8, 13u8, 155u8, 208u8, 133u8, 219u8,
-							23u8, 36u8, 127u8, 221u8, 196u8, 20u8, 155u8, 91u8, 196u8, 50u8, 46u8,
-							172u8, 232u8, 31u8, 252u8, 111u8, 111u8, 56u8, 121u8, 38u8, 241u8,
-							124u8,
+							61u8, 61u8, 150u8, 84u8, 160u8, 9u8, 166u8, 80u8, 225u8, 163u8, 15u8,
+							39u8, 218u8, 183u8, 45u8, 230u8, 52u8, 8u8, 53u8, 147u8, 135u8, 79u8,
+							252u8, 128u8, 239u8, 228u8, 199u8, 31u8, 135u8, 58u8, 74u8, 114u8,
 						],
 					)
 				}
@@ -26513,7 +26512,7 @@ pub mod api {
 					},
 					#[codec(index = 5)]
 					#[doc = "Pause the bridge"]
-					set_bride_enabled { enabled: ::core::primitive::bool },
+					set_bridge_enabled { enabled: ::core::primitive::bool },
 				}
 				#[derive(
 					:: subxt :: ext :: subxt_core :: ext :: codec :: Decode,

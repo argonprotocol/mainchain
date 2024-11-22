@@ -597,7 +597,7 @@ pub mod pallet {
 		/// Pause the bridge
 		#[pallet::call_index(5)]
 		#[pallet::weight(0)]
-		pub fn set_bride_enabled(origin: OriginFor<T>, enabled: bool) -> DispatchResult {
+		pub fn set_bridge_enabled(origin: OriginFor<T>, enabled: bool) -> DispatchResult {
 			if let Some(who) = ensure_signed_or_root(origin)? {
 				ensure!(
 					who == <TokenAdmin<T>>::get()
