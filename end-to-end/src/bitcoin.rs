@@ -36,7 +36,7 @@ use argon_testing::{
 };
 use tokio::fs;
 
-#[tokio::test]
+#[tokio::test(flavor = "multi_thread")]
 async fn test_bitcoin_minting_e2e() {
 	let test_node = start_argon_test_node().await;
 	let bitcoind = test_node.bitcoind.as_ref().expect("bitcoind");
