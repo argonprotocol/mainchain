@@ -24,8 +24,9 @@ pub mod pallet {
 	use frame_system::pallet_prelude::*;
 	use log::warn;
 	use sp_arithmetic::FixedI128;
+	use sp_core::U256;
 	use sp_runtime::{
-		traits::{AtLeast32BitUnsigned, CheckedDiv, UniqueSaturatedInto},
+		traits::{AtLeast32BitUnsigned, UniqueSaturatedInto},
 		FixedPointNumber,
 	};
 
@@ -76,10 +77,10 @@ pub mod pallet {
 	>;
 
 	#[pallet::storage]
-	pub(super) type MintedMiningArgons<T: Config> = StorageValue<_, T::Balance, ValueQuery>;
+	pub(super) type MintedMiningArgons<T: Config> = StorageValue<_, U256, ValueQuery>;
 
 	#[pallet::storage]
-	pub(super) type MintedBitcoinArgons<T: Config> = StorageValue<_, T::Balance, ValueQuery>;
+	pub(super) type MintedBitcoinArgons<T: Config> = StorageValue<_, U256, ValueQuery>;
 
 	#[pallet::event]
 	#[pallet::generate_deposit(fn deposit_event)]
@@ -103,8 +104,13 @@ pub mod pallet {
 	pub enum Error<T> {
 		TooManyPendingMints,
 	}
+
 	#[pallet::hooks]
-	impl<T: Config> Hooks<BlockNumberFor<T>> for Pallet<T> {
+	impl<T: Config> Hooks<BlockNumberFor<T>> for Pallet<T>
+	where
+		<T as Config>::Balance: Into<u128>,
+		<T as Config>::Balance: From<u128>,
+	{
 		fn on_initialize(_: BlockNumberFor<T>) -> Weight {
 			let argon_cpi = T::PriceProvider::get_argon_cpi().unwrap_or_default();
 			// only mint when cpi is negative
@@ -112,12 +118,17 @@ pub mod pallet {
 				return T::DbWeight::get().reads(1);
 			}
 
-			let mut bitcoin_utxos = MintedBitcoinArgons::<T>::get();
-			let mut mining_mint = MintedMiningArgons::<T>::get();
-
+			// if there are no miners registered, we can't mint
 			let reward_accounts = T::BlockRewardAccountsProvider::get_all_rewards_accounts();
+			if reward_accounts.is_empty() {
+				return T::DbWeight::get().reads(2);
+			}
+
 			let argons_to_print_per_miner =
 				Self::get_argons_to_print_per_miner(argon_cpi, reward_accounts.len() as u128);
+
+			let mut bitcoin_mint = MintedBitcoinArgons::<T>::get();
+			let mut mining_mint = MintedMiningArgons::<T>::get();
 
 			if argons_to_print_per_miner > T::Balance::zero() {
 				for (miner, share) in reward_accounts {
@@ -128,7 +139,7 @@ pub mod pallet {
 					};
 					match T::Currency::mint_into(&miner, amount) {
 						Ok(_) => {
-							mining_mint += amount;
+							mining_mint += U256::from(amount.into());
 							Self::deposit_event(Event::<T>::ArgonsMinted {
 								mint_type: MintType::Mining,
 								account_id: miner.clone(),
@@ -154,26 +165,28 @@ pub mod pallet {
 				MintedMiningArgons::<T>::put(mining_mint);
 			}
 
-			let mut available_bitcoin_to_mint = mining_mint.saturating_sub(bitcoin_utxos);
-			if available_bitcoin_to_mint > T::Balance::zero() {
+			let mut available_bitcoin_to_mint = mining_mint.saturating_sub(bitcoin_mint);
+			if available_bitcoin_to_mint > U256::zero() {
 				let updated = <PendingMintUtxos<T>>::get().try_mutate(|pending| {
 					pending.retain_mut(|(utxo_id, account_id, remaining_account_mint)| {
-						if available_bitcoin_to_mint == T::Balance::zero() {
+						if available_bitcoin_to_mint == U256::zero() {
 							return true;
 						}
 
-						let amount_to_mint = if available_bitcoin_to_mint >= *remaining_account_mint
+						let amount_to_mint = if available_bitcoin_to_mint >=
+							U256::from((*remaining_account_mint).into())
 						{
 							*remaining_account_mint
 						} else {
-							available_bitcoin_to_mint
+							// an account can't have more than u128 worth of argons
+							available_bitcoin_to_mint.as_u128().into()
 						};
 
 						match T::Currency::mint_into(account_id, amount_to_mint) {
 							Ok(_) => {
-								available_bitcoin_to_mint -= amount_to_mint;
+								available_bitcoin_to_mint -= U256::from(amount_to_mint.into());
 								*remaining_account_mint -= amount_to_mint;
-								bitcoin_utxos += amount_to_mint;
+								bitcoin_mint += U256::from(amount_to_mint.into());
 
 								Self::deposit_event(Event::<T>::ArgonsMinted {
 									mint_type: MintType::Bitcoin,
@@ -201,7 +214,7 @@ pub mod pallet {
 				});
 				PendingMintUtxos::<T>::put(updated.expect("cannot fail, but should be handled"));
 			}
-			MintedBitcoinArgons::<T>::put(bitcoin_utxos);
+			MintedBitcoinArgons::<T>::put(bitcoin_mint);
 			T::DbWeight::get().reads_writes(1, 1)
 		}
 	}
@@ -209,7 +222,11 @@ pub mod pallet {
 	#[pallet::call]
 	impl<T: Config> Pallet<T> {}
 
-	impl<T: Config> Pallet<T> {
+	impl<T: Config> Pallet<T>
+	where
+		<T as Config>::Balance: Into<u128>,
+		<T as Config>::Balance: From<u128>,
+	{
 		pub fn get_argons_to_print_per_miner(
 			argon_cpi: ArgonCPI,
 			active_miners: u128,
@@ -232,7 +249,9 @@ pub mod pallet {
 
 			per_miner.unique_saturated_into()
 		}
+
 		pub fn track_block_mint(amount: T::Balance) {
+			let amount = U256::from(amount.into());
 			MintedMiningArgons::<T>::mutate(|mint| *mint += amount);
 		}
 
@@ -241,12 +260,13 @@ pub mod pallet {
 
 			let mining_mint = MintedMiningArgons::<T>::get();
 			let total_minted = mining_mint + bitcoin_utxos;
-			let mining_prorata = (amount * mining_mint).checked_div(&total_minted);
+			let amount = U256::from(amount.into());
+			let mining_prorata = (amount * mining_mint).checked_div(total_minted);
 			if let Some(microgons) = mining_prorata {
 				MintedMiningArgons::<T>::mutate(|mint| *mint -= microgons);
 			}
 
-			let bitcoin_prorata = (amount * bitcoin_utxos).checked_div(&total_minted);
+			let bitcoin_prorata = (amount * bitcoin_utxos).checked_div(total_minted);
 			if let Some(microgons) = bitcoin_prorata {
 				MintedBitcoinArgons::<T>::mutate(|mint| *mint -= microgons);
 			}
@@ -267,7 +287,11 @@ pub mod pallet {
 		}
 	}
 
-	impl<T: Config> BurnEventHandler<T::Balance> for Pallet<T> {
+	impl<T: Config> BurnEventHandler<T::Balance> for Pallet<T>
+	where
+		<T as Config>::Balance: Into<u128>,
+		<T as Config>::Balance: From<u128>,
+	{
 		fn on_argon_burn(microgons: &T::Balance) {
 			Self::on_argon_burn(*microgons);
 		}
@@ -280,7 +304,11 @@ pub mod pallet {
 	}
 }
 
-impl<T: Config> BlockRewardsEventHandler<T::AccountId, T::Balance> for Pallet<T> {
+impl<T: Config> BlockRewardsEventHandler<T::AccountId, T::Balance> for Pallet<T>
+where
+	<T as Config>::Balance: Into<u128>,
+	<T as Config>::Balance: From<u128>,
+{
 	fn rewards_created(payout: &[BlockPayout<T::AccountId, T::Balance>]) {
 		let mut argons = T::Balance::zero();
 		for reward in payout {
