@@ -169,6 +169,7 @@ pub trait AuthorityProvider<AuthorityId, Block, AccountId>
 where
 	Block: BlockT,
 {
+	fn authority_count() -> u32;
 	fn get_authority(author: AccountId) -> Option<AuthorityId>;
 	fn xor_closest_authority(nonce: U256) -> Option<MiningAuthority<AuthorityId, AccountId>>;
 }

@@ -58,6 +58,9 @@ parameter_types! {
 
 pub struct StaticAuthorityProvider;
 impl AuthorityProvider<BlockSealAuthorityId, Block, u64> for StaticAuthorityProvider {
+	fn authority_count() -> u32 {
+		AuthorityList::get().len() as u32
+	}
 	fn get_authority(author: u64) -> Option<BlockSealAuthorityId> {
 		AuthorityList::get().iter().find_map(|(account, id)| {
 			if *account == author {

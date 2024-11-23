@@ -382,10 +382,6 @@ declare module '@polkadot/api-base/types/storage' {
        **/
       lastOwnershipPercentAdjustment: AugmentedQuery<ApiType, () => Observable<Option<u128>>, []>;
       /**
-       * The configuration for a miner to supply if there are no registered miners
-       **/
-      minerZero: AugmentedQuery<ApiType, () => Observable<Option<ArgonPrimitivesBlockSealMiningRegistration>>, []>;
-      /**
        * The mining slot configuration set in genesis
        **/
       miningConfig: AugmentedQuery<ApiType, () => Observable<ArgonPrimitivesBlockSealMiningSlotConfig>, []>;
@@ -400,8 +396,8 @@ declare module '@polkadot/api-base/types/storage' {
       ownershipBondAmount: AugmentedQuery<ApiType, () => Observable<u128>, []>;
     };
     mint: {
-      mintedBitcoinArgons: AugmentedQuery<ApiType, () => Observable<u128>, []>;
-      mintedMiningArgons: AugmentedQuery<ApiType, () => Observable<u128>, []>;
+      mintedBitcoinArgons: AugmentedQuery<ApiType, () => Observable<U256>, []>;
+      mintedMiningArgons: AugmentedQuery<ApiType, () => Observable<U256>, []>;
       /**
        * Bitcoin UTXOs that have been submitted for minting. This list is FIFO for minting whenever
        * a) CPI >= 0 and

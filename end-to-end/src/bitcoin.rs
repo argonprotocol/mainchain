@@ -14,6 +14,7 @@ use bitcoind::{
 use sp_arithmetic::FixedU128;
 use sp_core::{crypto::AccountId32, sr25519, Pair};
 
+use crate::utils::register_miner;
 use anyhow::anyhow;
 use argon_bitcoin::{CosignScript, CosignScriptArgs};
 use argon_client::{
@@ -115,6 +116,18 @@ async fn test_bitcoin_minting_e2e() {
 		.await
 		.unwrap();
 	println!("bitcoin prices submitted at tick {tick}",);
+
+	let alice_signer = Sr25519Signer::new(alice_sr25519.clone());
+
+	let nonce = client.get_account_nonce(&alice_sr25519.public().into()).await.expect("nonce");
+	// add two vote miners
+	register_miner(&test_node, "//Eve".to_string(), &alice_signer, nonce)
+		.await
+		.inspect_err(|e| println!("Error registering miner: {:?}", e))
+		.expect("miner eve");
+	register_miner(&test_node, "//Dave".to_string(), &alice_signer, nonce + 1)
+		.await
+		.expect("miner dave");
 
 	let _ = run_bitcoin_cli(&test_node, vec!["vault", "list", "--btc", &utxo_btc.to_string()])
 		.await

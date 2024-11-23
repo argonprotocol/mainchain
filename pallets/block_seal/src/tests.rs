@@ -571,6 +571,7 @@ fn it_can_find_best_vote_seals() {
 			authority_id: default_authority(),
 			authority_index: 0,
 		}));
+		AuthorityList::set(vec![(Alice.into(), default_authority())]);
 
 		let mut vote = NotaryNotebookRawVotes {
 			notary_id: 1,

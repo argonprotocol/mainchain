@@ -75,6 +75,10 @@ impl Get<Result<Digestset<VerifyError, AccountId>, DispatchError>> for DigestGet
 
 pub struct StaticAuthorityProvider;
 impl AuthorityProvider<BlockSealAuthorityId, Block, AccountId> for StaticAuthorityProvider {
+	fn authority_count() -> u32 {
+		AuthorityList::get().len() as u32
+	}
+
 	fn get_authority(author: AccountId) -> Option<BlockSealAuthorityId> {
 		AuthorityList::get().iter().find_map(|(account, id)| {
 			if *account == author {

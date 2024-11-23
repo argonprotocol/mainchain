@@ -183,7 +183,7 @@ declare module '@polkadot/api-base/types/submittable' {
       /**
        * Pause the bridge
        **/
-      setBrideEnabled: AugmentedSubmittable<(enabled: bool | boolean | Uint8Array) => SubmittableExtrinsic<ApiType>, [bool]>;
+      setBridgeEnabled: AugmentedSubmittable<(enabled: bool | boolean | Uint8Array) => SubmittableExtrinsic<ApiType>, [bool]>;
       /**
        * Set the asset registration for cross chain transfers
        *

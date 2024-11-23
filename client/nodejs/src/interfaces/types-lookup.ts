@@ -1866,11 +1866,11 @@ declare module '@polkadot/types/lookup' {
     readonly asReplaceHyperbridgeAdmins: {
       readonly newAdmins: Vec<ITuple<[IsmpHostStateMachine, H160]>>;
     } & Struct;
-    readonly isSetBrideEnabled: boolean;
-    readonly asSetBrideEnabled: {
+    readonly isSetBridgeEnabled: boolean;
+    readonly asSetBridgeEnabled: {
       readonly enabled: bool;
     } & Struct;
-    readonly type: 'SendToLocalchain' | 'SendToEvmChain' | 'RegisterHyperbridgeAssets' | 'UpdateHyperbridgeAssets' | 'ReplaceHyperbridgeAdmins' | 'SetBrideEnabled';
+    readonly type: 'SendToLocalchain' | 'SendToEvmChain' | 'RegisterHyperbridgeAssets' | 'UpdateHyperbridgeAssets' | 'ReplaceHyperbridgeAdmins' | 'SetBridgeEnabled';
   }
 
   /** @name PalletChainTransferTransferToEvm (226) */

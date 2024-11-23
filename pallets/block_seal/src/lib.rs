@@ -445,6 +445,11 @@ pub mod pallet {
 				return Ok(BoundedVec::new());
 			}
 
+			// no authorities, so no point in wasting cycles
+			if T::AuthorityProvider::authority_count() == 0 {
+				return Ok(BoundedVec::new());
+			}
+
 			ensure!(
 				expected_notebook_tick == voting_schedule.notebook_tick(),
 				Error::<T>::IneligibleNotebookUsed

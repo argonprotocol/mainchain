@@ -19,7 +19,6 @@ use frame_support::{
 	},
 };
 use frame_system::pallet_prelude::BlockNumberFor;
-use log::warn;
 pub use pallet::*;
 use sp_core::{Get, U256};
 use sp_io::hashing::blake2_256;
@@ -205,10 +204,6 @@ pub mod pallet {
 	#[pallet::storage]
 	pub(super) type IsNextSlotBiddingOpen<T: Config> = StorageValue<_, bool, ValueQuery>;
 
-	/// The configuration for a miner to supply if there are no registered miners
-	#[pallet::storage]
-	pub(super) type MinerZero<T: Config> = StorageValue<_, Registration<T>, OptionQuery>;
-
 	/// The number of bids per slot for the last 10 slots (newest first)
 	#[pallet::storage]
 	pub(super) type HistoricalBidsPerSlot<T: Config> =
@@ -222,7 +217,6 @@ pub mod pallet {
 	#[pallet::genesis_config]
 	#[derive(frame_support::DefaultNoBound)]
 	pub struct GenesisConfig<T: Config> {
-		pub miner_zero: Option<Registration<T>>,
 		pub mining_config: MiningSlotConfig<BlockNumberFor<T>>,
 		#[serde(skip)]
 		pub _phantom: PhantomData<T>,
@@ -231,26 +225,6 @@ pub mod pallet {
 	#[pallet::genesis_build]
 	impl<T: Config> BuildGenesisConfig for GenesisConfig<T> {
 		fn build(&self) {
-			if let Some(miner) = &self.miner_zero {
-				<MinerZero<T>>::put(miner.clone());
-				AccountIndexLookup::<T>::insert(&miner.account_id, 0);
-				ActiveMinersByIndex::<T>::insert(0, miner.clone());
-				ActiveMinersCount::<T>::put(1);
-
-				AuthorityHashByIndex::<T>::try_mutate(|hashes| {
-					hashes.try_insert(
-						0,
-						U256::from(blake2_256(
-							&miner
-								.authority_keys
-								.get::<T::MiningAuthorityId>(T::MiningAuthorityId::ID)
-								.expect("should have authority id")
-								.to_raw_vec(),
-						)),
-					)
-				})
-				.expect("should be able to insert");
-			}
 			if self.mining_config.slot_bidding_start_block == Zero::zero() {
 				IsNextSlotBiddingOpen::<T>::put(true);
 			}
@@ -536,6 +510,10 @@ impl<T: Config> AuthorityProvider<T::MiningAuthorityId, T::Block, T::AccountId> 
 
 		Self::get_mining_authority_by_index(closest)
 	}
+
+	fn authority_count() -> u32 {
+		ActiveMinersCount::<T>::get().into()
+	}
 }
 
 impl<T: Config> Pallet<T> {
@@ -611,24 +589,6 @@ impl<T: Config> Pallet<T> {
 					authority_hash_by_index
 						.try_insert(index, U256::from(hash))
 						.expect("only insert if we've removed first, ergo, should be impossible");
-				}
-			}
-		}
-
-		if active_miners == 0 {
-			if let Some(entry) = MinerZero::<T>::get() {
-				let index = start_index_to_replace_miners;
-				AccountIndexLookup::<T>::insert(&entry.account_id, index);
-				active_miners = 1;
-				ActiveMinersByIndex::<T>::insert(index, entry.clone());
-				added_miners.push((entry.account_id.clone(), entry.authority_keys.clone()));
-				if let Some(authority_id) =
-					entry.authority_keys.get::<T::MiningAuthorityId>(T::MiningAuthorityId::ID)
-				{
-					let hash = blake2_256(&authority_id.to_raw_vec());
-					authority_hash_by_index
-						.try_insert(index, U256::from(hash))
-						.expect("only insert if empty, ergo, should be impossible");
 				}
 			}
 		}

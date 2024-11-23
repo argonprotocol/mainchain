@@ -30,7 +30,7 @@ use argon_primitives::{
 fn it_doesnt_add_cohorts_until_time() {
 	BlocksBetweenSlots::set(2);
 
-	new_test_ext(None).execute_with(|| {
+	new_test_ext().execute_with(|| {
 		System::set_block_number(1);
 
 		NextSlotCohort::<Test>::set(bounded_vec![MiningRegistration {
@@ -56,7 +56,7 @@ fn get_validation_window_blocks() {
 	MaxMiners::set(10);
 	BlocksBetweenSlots::set(1);
 
-	new_test_ext(None).execute_with(|| {
+	new_test_ext().execute_with(|| {
 		assert_eq!(MiningSlots::get_mining_window_blocks(), 5);
 	});
 
@@ -64,7 +64,7 @@ fn get_validation_window_blocks() {
 	MaxMiners::set(10);
 	BlocksBetweenSlots::set(10);
 
-	new_test_ext(None).execute_with(|| {
+	new_test_ext().execute_with(|| {
 		assert_eq!(MiningSlots::get_mining_window_blocks(), 2 * 10);
 	});
 }
@@ -74,7 +74,7 @@ fn get_slot_era() {
 	MaxCohortSize::set(2);
 	MaxMiners::set(10);
 	BlocksBetweenSlots::set(140);
-	new_test_ext(None).execute_with(|| {
+	new_test_ext().execute_with(|| {
 		System::set_block_number(8);
 
 		let window = 140 * 5;
@@ -85,7 +85,7 @@ fn get_slot_era() {
 	MaxCohortSize::set(5);
 	MaxMiners::set(10);
 	BlocksBetweenSlots::set(10);
-	new_test_ext(None).execute_with(|| {
+	new_test_ext().execute_with(|| {
 		System::set_block_number(8);
 
 		assert_eq!(MiningSlots::get_slot_era(), (10, 10 + (10 * 2)));
@@ -104,7 +104,7 @@ fn get_slot_era() {
 	MaxMiners::set(6);
 	BlocksBetweenSlots::set(4);
 
-	new_test_ext(None).execute_with(|| {
+	new_test_ext().execute_with(|| {
 		System::set_block_number(3);
 		assert_eq!(MiningSlots::get_slot_era(), (4, 4 + (4 * 3)));
 		System::set_block_number(4);
@@ -169,76 +169,12 @@ fn starting_cohort_index() {
 }
 
 #[test]
-fn it_activates_miner_zero_if_no_miners() {
-	BlocksBetweenSlots::set(2);
-	MaxMiners::set(6);
-	MaxCohortSize::set(2);
-	SlotBiddingStartBlock::set(0);
-
-	new_test_ext(Some(MiningRegistration {
-		account_id: 1,
-		bond_id: None,
-		ownership_tokens: 0,
-		bond_amount: 0,
-		reward_destination: RewardDestination::Owner,
-		reward_sharing: None,
-		authority_keys: 1.into(),
-	}))
-	.execute_with(|| {
-		MiningSlots::on_initialize(1);
-
-		assert_eq!(ActiveMinersByIndex::<Test>::get(0).unwrap().account_id, 1);
-		assert_eq!(ActiveMinersCount::<Test>::get(), 1);
-		assert_eq!(AuthorityHashByIndex::<Test>::get().into_inner().len(), 1);
-	});
-}
-
-#[test]
-fn it_activates_miner_zero_if_upcoming_miners_will_empty() {
-	BlocksBetweenSlots::set(2);
-	MaxMiners::set(6);
-	MaxCohortSize::set(2);
-	SlotBiddingStartBlock::set(0);
-
-	new_test_ext(Some(MiningRegistration {
-		account_id: 1,
-		bond_id: None,
-		ownership_tokens: 0,
-		bond_amount: 0,
-		reward_destination: RewardDestination::Owner,
-		reward_sharing: None,
-		authority_keys: 1.into(),
-	}))
-	.execute_with(|| {
-		ActiveMinersByIndex::<Test>::insert(
-			5,
-			MiningRegistration {
-				account_id: 10,
-				bond_id: None,
-				ownership_tokens: 0,
-				bond_amount: 0,
-				reward_destination: RewardDestination::Owner,
-				reward_sharing: None,
-				authority_keys: 1.into(),
-			},
-		);
-		AccountIndexLookup::<Test>::insert(10, 5);
-		ActiveMinersCount::<Test>::put(1);
-		MiningSlots::on_initialize(2);
-
-		assert_eq!(ActiveMinersByIndex::<Test>::get(0).unwrap().account_id, 1);
-		assert_eq!(ActiveMinersCount::<Test>::get(), 1);
-		assert_eq!(AuthorityHashByIndex::<Test>::get().keys().next(), Some(&0));
-	});
-}
-
-#[test]
 fn it_adds_new_cohorts_on_block() {
 	BlocksBetweenSlots::set(2);
 	MaxMiners::set(6);
 	MaxCohortSize::set(2);
 
-	new_test_ext(None).execute_with(|| {
+	new_test_ext().execute_with(|| {
 		System::set_block_number(8);
 
 		for i in 0..4u32 {
@@ -332,7 +268,7 @@ fn it_unbonds_accounts_when_a_window_closes() {
 	MaxMiners::set(6);
 	MaxCohortSize::set(2);
 
-	new_test_ext(None).execute_with(|| {
+	new_test_ext().execute_with(|| {
 		OwnershipBondAmount::<Test>::set(1000);
 
 		System::set_block_number(7);
@@ -425,7 +361,7 @@ fn it_holds_ownership_tokens_for_a_slot() {
 	MaxMiners::set(6);
 	MaxCohortSize::set(2);
 
-	new_test_ext(None).execute_with(|| {
+	new_test_ext().execute_with(|| {
 		System::set_block_number(6);
 
 		assert_err!(
@@ -489,7 +425,7 @@ fn it_wont_accept_bids_until_bidding_starts() {
 	MaxCohortSize::set(2);
 	SlotBiddingStartBlock::set(12);
 
-	new_test_ext(None).execute_with(|| {
+	new_test_ext().execute_with(|| {
 		set_ownership(2, 100u32.into());
 		for i in 1..11u64 {
 			System::set_block_number(i);
@@ -525,7 +461,7 @@ fn it_wont_let_you_reuse_ownership_tokens_for_two_bids() {
 	MaxCohortSize::set(2);
 	SlotBiddingStartBlock::set(0);
 
-	new_test_ext(None).execute_with(|| {
+	new_test_ext().execute_with(|| {
 		System::set_block_number(12);
 
 		IsNextSlotBiddingOpen::<Test>::set(true);
@@ -585,7 +521,7 @@ fn it_will_order_bids_with_argon_bonds() {
 	MaxMiners::set(6);
 	MaxCohortSize::set(2);
 
-	new_test_ext(None).execute_with(|| {
+	new_test_ext().execute_with(|| {
 		System::set_block_number(6);
 
 		assert_err!(
@@ -721,7 +657,7 @@ fn handles_a_max_of_bids_per_block() {
 	MaxMiners::set(4);
 	MaxCohortSize::set(2);
 
-	new_test_ext(None).execute_with(|| {
+	new_test_ext().execute_with(|| {
 		System::set_block_number(4);
 		MiningSlots::on_initialize(4);
 		IsNextSlotBiddingOpen::<Test>::set(true);
@@ -775,7 +711,7 @@ fn records_profit_sharing_if_applicable() {
 		percent_take: FixedU128::from_rational(90, 100),
 	}));
 
-	new_test_ext(None).execute_with(|| {
+	new_test_ext().execute_with(|| {
 		System::set_block_number(4);
 		MiningSlots::on_initialize(4);
 		IsNextSlotBiddingOpen::<Test>::set(true);
@@ -821,7 +757,7 @@ fn records_profit_sharing_if_applicable() {
 
 #[test]
 fn it_handles_null_authority() {
-	new_test_ext(None).execute_with(|| {
+	new_test_ext().execute_with(|| {
 		assert_eq!(MiningSlots::get_authority(1), None);
 	});
 }
@@ -829,7 +765,7 @@ fn it_handles_null_authority() {
 #[test]
 fn it_can_get_closest_authority() {
 	MaxMiners::set(100);
-	new_test_ext(None).execute_with(|| {
+	new_test_ext().execute_with(|| {
 		System::set_block_number(8);
 
 		for i in 0..100u32 {
@@ -877,7 +813,7 @@ fn it_will_end_auctions_if_a_seal_qualifies() {
 	BlocksBeforeBidEndForVrfClose::set(10);
 	SlotBiddingStartBlock::set(0);
 
-	new_test_ext(None).execute_with(|| {
+	new_test_ext().execute_with(|| {
 		System::set_block_number(89);
 
 		IsNextSlotBiddingOpen::<Test>::set(true);
@@ -928,7 +864,7 @@ fn it_adjusts_ownership_bonds() {
 	SlotBiddingStartBlock::set(10);
 	TargetBidsPerSlot::set(12);
 
-	new_test_ext(None).execute_with(|| {
+	new_test_ext().execute_with(|| {
 		System::set_block_number(10);
 
 		Ownership::set_total_issuance(1000);

@@ -163,6 +163,10 @@ declare module '@polkadot/api-base/types/consts' {
        **/
       maxMiners: u32 & AugmentedConst<ApiType>;
       /**
+       * The minimum bond amount possible
+       **/
+      minimumBondAmount: u128 & AugmentedConst<ApiType>;
+      /**
        * The max percent swing for the ownership bond amount per slot (from the last percent
        **/
       ownershipPercentAdjustmentDamper: u128 & AugmentedConst<ApiType>;
