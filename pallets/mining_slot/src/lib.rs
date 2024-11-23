@@ -19,6 +19,7 @@ use frame_support::{
 	},
 };
 use frame_system::pallet_prelude::BlockNumberFor;
+use log::warn;
 pub use pallet::*;
 use sp_core::{Get, U256};
 use sp_io::hashing::blake2_256;
@@ -99,7 +100,10 @@ pub mod pallet {
 
 	/// Configure the pallet by specifying the parameters and types on which it depends.
 	#[pallet::config]
-	pub trait Config: frame_system::Config {
+	pub trait Config: frame_system::Config
+	where
+		<Self as Config>::Balance: Into<u128>,
+	{
 		/// Because this pallet emits events, it depends on the runtime's definition of an event.
 		type RuntimeEvent: From<Event<Self>> + IsType<<Self as frame_system::Config>::RuntimeEvent>;
 		/// Type representing the weight of this pallet
@@ -114,6 +118,9 @@ pub mod pallet {
 		/// The max percent swing for the ownership bond amount per slot (from the last percent
 		#[pallet::constant]
 		type OwnershipPercentAdjustmentDamper: Get<FixedU128>;
+		/// The minimum bond amount possible
+		#[pallet::constant]
+		type MinimumBondAmount: Get<Self::Balance>;
 
 		/// The target number of bids per slot. This will adjust the ownership bond amount up or
 		/// down to ensure mining slots are filled.
@@ -674,6 +681,7 @@ impl<T: Config> Pallet<T> {
 		let max_swing =
 			FixedI128::from_inner(T::OwnershipPercentAdjustmentDamper::get().into_inner() as i128);
 		let limited_change = percent_change.clamp(-max_swing, max_swing);
+		let min_value = T::MinimumBondAmount::get().into();
 
 		let adjustment_percent = FixedU128::from_inner(
 			FixedI128::from_inner(previous_adjustment.into_inner() as i128)
@@ -684,7 +692,9 @@ impl<T: Config> Pallet<T> {
 
 		LastOwnershipPercentAdjustment::<T>::put(adjustment_percent);
 
-		let ownership_needed = adjustment_percent.saturating_mul_int(base_ownership_tokens);
+		let ownership_needed =
+			adjustment_percent.saturating_mul_int(base_ownership_tokens).max(min_value);
+
 		OwnershipBondAmount::<T>::put(max::<T::Balance>(
 			ownership_needed.saturated_into(),
 			1u128.into(),

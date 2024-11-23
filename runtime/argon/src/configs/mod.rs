@@ -71,7 +71,7 @@ pub const MICROGONS: Balance = 1;
 parameter_types! {
 	pub const BlockHashCount: BlockNumber = 4096;
 	pub const Version: RuntimeVersion = VERSION;
-	/// We allow for 60 seconds of compute with a 6 second average block time.
+	/// We allow for 60 seconds of compute with a 10 second average block time.
 	pub BlockWeights:  frame_system::limits::BlockWeights =  frame_system::limits::BlockWeights::builder()
 		.base_block(BlockExecutionWeight::get())
 		.for_class(DispatchClass::all(), |weights| {
@@ -340,6 +340,7 @@ impl pallet_mining_slot::Config for Runtime {
 	type WeightInfo = pallet_mining_slot::weights::SubstrateWeight<Runtime>;
 	type MaxMiners = MaxMiners;
 	type MaxCohortSize = MaxCohortSize;
+	type MinimumBondAmount = ConstU128<EXISTENTIAL_DEPOSIT>;
 	type OwnershipPercentAdjustmentDamper = OwnershipPercentAdjustmentDamper;
 	type TargetBidsPerSlot = TargetBidsPerSlot;
 	type Balance = Balance;

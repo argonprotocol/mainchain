@@ -11,6 +11,7 @@ use frame_support::{
 	traits::{Currency, StorageMapShim},
 };
 use frame_system::pallet_prelude::BlockNumberFor;
+use sp_core::ConstU128;
 use sp_runtime::{impl_opaque_keys, testing::UintAuthorityId, BuildStorage, FixedU128};
 
 type Block = frame_system::mocking::MockBlock<Test>;
@@ -177,6 +178,7 @@ impl pallet_mining_slot::Config for Test {
 	type SlotEvents = (StaticNewSlotEvent,);
 	type Keys = MockSessionKeys;
 	type MiningAuthorityId = UintAuthorityId;
+	type MinimumBondAmount = ExistentialDeposit;
 }
 
 // Build genesis storage according to the mock runtime.
