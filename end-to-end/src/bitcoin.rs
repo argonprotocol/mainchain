@@ -14,7 +14,7 @@ use bitcoind::{
 use sp_arithmetic::FixedU128;
 use sp_core::{crypto::AccountId32, sr25519, Pair};
 
-use crate::utils::register_miner;
+use crate::utils::{bankroll_miners, register_miner};
 use anyhow::anyhow;
 use argon_bitcoin::{CosignScript, CosignScriptArgs};
 use argon_client::{
@@ -34,6 +34,10 @@ use argon_primitives::{
 use argon_testing::{
 	add_blocks, add_wallet_address, fund_script_address, run_bitcoin_cli, start_argon_test_node,
 	ArgonTestNode, ArgonTestOracle,
+};
+use sp_keyring::{
+	AccountKeyring::{Bob, Eve},
+	Sr25519Keyring::Alice,
 };
 use tokio::fs;
 
@@ -73,9 +77,9 @@ async fn test_bitcoin_minting_e2e() {
 
 	let utxo_satoshis: Satoshis = Amount::ONE_BTC.to_sat() + 500;
 	let utxo_btc = utxo_satoshis as f64 / SATOSHIS_PER_BITCOIN as f64;
-	let alice_sr25519 = sr25519::Pair::from_string("//Alice", None).unwrap();
-	let price_index_operator = sr25519::Pair::from_string("//Eve", None).unwrap();
-	let bob_sr25519 = sr25519::Pair::from_string("//Bob", None).unwrap();
+	let alice_sr25519 = Alice.pair();
+	let price_index_operator = Eve.pair();
+	let bob_sr25519 = Bob.pair();
 
 	let client = test_node.client.clone();
 	let client = Arc::new(client);
@@ -119,15 +123,18 @@ async fn test_bitcoin_minting_e2e() {
 
 	let alice_signer = Sr25519Signer::new(alice_sr25519.clone());
 
-	let nonce = client.get_account_nonce(&alice_sr25519.public().into()).await.expect("nonce");
-	// add two vote miners
-	register_miner(&test_node, "//Eve".to_string(), &alice_signer, nonce)
+	bankroll_miners(
+		&test_node,
+		&alice_signer,
+		vec![Bob.to_account_id(), Eve.to_account_id()],
+		true,
+	)
+	.await
+	.unwrap();
+	register_miner(&test_node, Bob)
 		.await
 		.inspect_err(|e| println!("Error registering miner: {:?}", e))
 		.expect("miner eve");
-	register_miner(&test_node, "//Dave".to_string(), &alice_signer, nonce + 1)
-		.await
-		.expect("miner dave");
 
 	let _ = run_bitcoin_cli(&test_node, vec!["vault", "list", "--btc", &utxo_btc.to_string()])
 		.await
@@ -309,7 +316,7 @@ async fn create_vault(
 	}
 
 	println!("creating a vault");
-	let params = client.params_with_best_nonce(vault_owner_account_id32.clone()).await?;
+	let params = client.params_with_best_nonce(&vault_owner_account_id32.clone()).await?;
 
 	let result = run_bitcoin_cli(
 		test_node,

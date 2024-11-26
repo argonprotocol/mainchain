@@ -235,7 +235,7 @@ pallet-transaction-payment-rpc = { version = "41.0.0" }
 fs2 = { version = "0.4" }
 strip-ansi-escapes = { version = "0.2" }
 current_platform = { version = "0.2" }
-
+regex = { version = "1.11.1" }
 substrate-wasm-builder = { version = "24.0.1" }
 
 # node

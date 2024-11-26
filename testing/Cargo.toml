@@ -32,3 +32,4 @@ strip-ansi-escapes = { workspace = true }
 current_platform = { workspace = true }
 tokio = { workspace = true }
 num_cpus = { workspace = true }
+regex = { workspace = true }

@@ -6,6 +6,7 @@ use sp_core::U256;
 
 #[derive(Clone, Encode, Decode, Debug, Eq, PartialEq, MaxEncodedLen, TypeInfo)]
 pub struct ForkPower {
+	pub is_latest_vote: bool,
 	#[codec(compact)]
 	pub notebooks: u64,
 	pub voting_power: U256,
@@ -14,6 +15,7 @@ pub struct ForkPower {
 	#[codec(compact)]
 	pub vote_created_blocks: u128,
 }
+
 impl ForkPower {
 	pub fn add(
 		&mut self,
@@ -42,6 +44,7 @@ impl ForkPower {
 		self.notebooks = self.notebooks.saturating_add(notebooks as u64);
 		self.seal_strength = seal_strength;
 		self.vote_created_blocks = self.vote_created_blocks.saturating_add(1);
+		self.is_latest_vote = true;
 	}
 
 	pub fn add_compute(
@@ -54,12 +57,14 @@ impl ForkPower {
 		self.notebooks = self.notebooks.saturating_add(notebooks as u64);
 		self.total_compute_difficulty =
 			self.total_compute_difficulty.saturating_add(compute_difficulty.into());
+		self.is_latest_vote = false;
 	}
 }
 
 impl Default for ForkPower {
 	fn default() -> Self {
 		Self {
+			is_latest_vote: false,
 			voting_power: U256::zero(),
 			notebooks: 0,
 			seal_strength: U256::MAX,
@@ -71,8 +76,16 @@ impl Default for ForkPower {
 
 impl PartialOrd for ForkPower {
 	fn partial_cmp(&self, other: &Self) -> Option<Ordering> {
-		let mut cmp = self.notebooks.cmp(&other.notebooks);
+		let mut cmp = Ordering::Equal;
+		// Only sort by notebooks if both are vote blocks
+		//
+		// NOTE: careful to sort by `is_latest_vote`, as a block with a vote is always better than a
+		// compute nonce, but only at the same height
+		if self.is_latest_vote && other.is_latest_vote {
+			cmp = self.notebooks.cmp(&other.notebooks);
+		}
 		if cmp == Ordering::Equal {
+			// total spend on vote tax
 			cmp = self.voting_power.cmp(&other.voting_power);
 		}
 		if cmp == Ordering::Equal {
@@ -102,9 +115,15 @@ mod test {
 				ForkPower { voting_power: 0.into(), ..Default::default() }
 		);
 
+		// non-vote does not compare by notebooks
+		assert_eq!(
+			ForkPower { notebooks: 1, ..Default::default() }
+				.partial_cmp(&ForkPower { notebooks: 2, ..Default::default() }),
+			Some(Ordering::Equal),
+		);
 		assert!(
-			ForkPower { notebooks: 1, ..Default::default() } >
-				ForkPower { notebooks: 0, ..Default::default() }
+			ForkPower { notebooks: 1, is_latest_vote: true, ..Default::default() } >
+				ForkPower { notebooks: 0, is_latest_vote: true, ..Default::default() }
 		);
 
 		assert!(

@@ -90,7 +90,15 @@ pub mod pallet {
 		/// The number of historical compute times to use to calculate the rolling compute average
 		/// (for adjustment)
 		#[pallet::constant]
-		type ChangePeriod: Get<u32>;
+		type HistoricalComputeBlocksForAverage: Get<u32>;
+
+		/// The number of historical vote blocks to use to calculate the rolling vote average
+		#[pallet::constant]
+		type HistoricalVoteBlocksForAverage: Get<u32>;
+
+		/// The frequency we should update the compute difficulty
+		#[pallet::constant]
+		type ComputeDifficultyChangePeriod: Get<u32>;
 
 		type SealInherent: Get<BlockSealInherent>;
 	}
@@ -109,16 +117,18 @@ pub mod pallet {
 	/// target a max number of votes
 	pub(super) type CurrentComputeDifficulty<T: Config> = StorageValue<_, u128, ValueQuery>;
 
-	#[pallet::storage]
 	/// The key K is selected to be the hash of a block in the blockchain - this block is called
 	/// the 'key block'. For optimal mining and verification performance, the key should
 	/// change every day
+	#[pallet::storage]
 	pub(super) type CurrentComputeKeyBlock<T: Config> =
 		StorageValue<_, <T::Block as Block>::Hash, OptionQuery>;
 
 	#[pallet::storage]
 	pub(super) type PastComputeBlockTimes<T: Config> =
-		StorageValue<_, BoundedVec<u64, T::ChangePeriod>, ValueQuery>;
+		StorageValue<_, BoundedVec<u64, T::HistoricalComputeBlocksForAverage>, ValueQuery>;
+
+	/// The timestamp from the previous block
 	#[pallet::storage]
 	pub(super) type PreviousBlockTimestamp<T: Config> = StorageValue<_, T::Moment, OptionQuery>;
 
@@ -144,8 +154,11 @@ pub mod pallet {
 	pub(super) type TempBlockVoteDigest<T: Config> = StorageValue<_, BlockVoteDigest, OptionQuery>;
 
 	#[pallet::storage]
-	pub(super) type PastBlockVotes<T: Config> =
-		StorageValue<_, BoundedVec<(Tick, u32, BlockVotingPower), T::ChangePeriod>, ValueQuery>;
+	pub(super) type PastBlockVotes<T: Config> = StorageValue<
+		_,
+		BoundedVec<(Tick, u32, BlockVotingPower), T::HistoricalVoteBlocksForAverage>,
+		ValueQuery,
+	>;
 
 	#[pallet::genesis_config]
 	#[derive(frame_support::DefaultNoBound)]
@@ -330,50 +343,52 @@ pub mod pallet {
 				return;
 			}
 
+			// should be infallible
+			let block_as_u32 = UniqueSaturatedInto::<u32>::unique_saturated_into(
+				<frame_system::Pallet<T>>::block_number(),
+			);
+			// only adjust difficulty every `ChangePeriod` blocks
+			if block_as_u32 % T::ComputeDifficultyChangePeriod::get() == 0u32 {
+				let timestamps = <PastComputeBlockTimes<T>>::get();
+				let tick_millis = T::TickProvider::ticker().tick_duration_millis;
+				let target_time =
+					T::TargetComputeBlockPercent::get().saturating_mul_int(tick_millis);
+				let expected_block_time = target_time * timestamps.len() as u64;
+				let actual_block_time =
+					timestamps.into_iter().fold(0u64, |sum, time| sum.saturating_add(time));
+
+				let start_difficulty = Self::compute_difficulty();
+				let difficulty = Self::calculate_next_difficulty(
+					start_difficulty,
+					expected_block_time,
+					actual_block_time,
+					MIN_COMPUTE_DIFFICULTY,
+					MAX_COMPUTE_DIFFICULTY,
+				);
+
+				if start_difficulty != difficulty {
+					<CurrentComputeDifficulty<T>>::put(difficulty);
+
+					Pallet::<T>::deposit_event(Event::<T>::ComputeDifficultyAdjusted {
+						start_difficulty,
+						new_difficulty: difficulty,
+						expected_block_time,
+						actual_block_time,
+					});
+				}
+			}
+
 			let now: u64 = UniqueSaturatedInto::<u64>::unique_saturated_into(now);
 			let previous: u64 = previous_timestamp
 				.map(UniqueSaturatedInto::<u64>::unique_saturated_into)
 				.unwrap_or(now);
 			let block_period = now.saturating_sub(previous);
-
-			let did_append =
-				<PastComputeBlockTimes<T>>::try_mutate(|x| x.try_push(block_period)).ok();
-
-			// if we can still append, keep going
-			if did_append.is_some() {
-				return;
-			}
-
-			let timestamps = <PastComputeBlockTimes<T>>::get();
-			let tick_millis = T::TickProvider::ticker().tick_duration_millis;
-			let target_time = T::TargetComputeBlockPercent::get().saturating_mul_int(tick_millis);
-			let expected_block_time = target_time * timestamps.len() as u64;
-			let actual_block_time =
-				timestamps.into_iter().fold(0u64, |sum, time| sum.saturating_add(time));
-
-			let start_difficulty = Self::compute_difficulty();
-			let difficulty = Self::calculate_next_difficulty(
-				start_difficulty,
-				expected_block_time,
-				actual_block_time,
-				MIN_COMPUTE_DIFFICULTY,
-				MAX_COMPUTE_DIFFICULTY,
-			);
-
-			let _ = <PastComputeBlockTimes<T>>::try_mutate(|timestamps| {
-				timestamps.truncate(0);
-				timestamps.try_insert(0, block_period)
+			let _ = <PastComputeBlockTimes<T>>::try_mutate(|x| {
+				if x.is_full() {
+					x.remove(0);
+				}
+				x.try_push(block_period)
 			});
-			if start_difficulty != difficulty {
-				<CurrentComputeDifficulty<T>>::put(difficulty);
-
-				Pallet::<T>::deposit_event(Event::<T>::ComputeDifficultyAdjusted {
-					start_difficulty,
-					new_difficulty: difficulty,
-					expected_block_time,
-					actual_block_time,
-				});
-			}
 		}
 
 		pub fn create_block_vote_digest(

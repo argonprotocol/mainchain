@@ -26,6 +26,7 @@ argon-bitcoin-utxo-tracker = { workspace = true }
 argon-bitcoin = { workspace = true }
 hex = { workspace = true }
 base64 = { workspace = true }
+sp-keyring = { workspace = true }
 sp-arithmetic = { workspace = true }
 sp-core = { workspace = true }
 subxt = { workspace = true }

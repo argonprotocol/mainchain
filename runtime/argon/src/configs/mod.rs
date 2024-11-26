@@ -161,9 +161,11 @@ impl Contains<RuntimeCall> for BaseCallFilter {
 }
 
 parameter_types! {
-	pub const TargetComputeBlockPercent: FixedU128 = FixedU128::from_rational(125, 100); // aim for compute to take a bit longer than vote
+	pub const TargetComputeBlockPercent: FixedU128 = FixedU128::from_rational(75, 100); // aim for less than full compute time so it can wait for notebooks
 	pub const TargetBlockVotes: u32 = 50_000;
-	pub const SealSpecMinimumsChangePeriod: u32 = 60 * 24; // change block_seal_spec once a day
+	pub const SealSpecVoteHistoryForAverage: u32 = 24 * 60; // 24 hours of history
+	pub const SealSpecComputeHistoryToTrack: u32 = 6 * 60; // 6 hours of history
+	pub const SealSpecComputeDifficultyChangePeriod: u32 = 60; // change difficulty every hour
 
 	pub const DefaultChannelHoldDuration: Tick = 60;
 	pub const HistoricalPaymentAddressTicksToKeep: Tick = DefaultChannelHoldDuration::get() + CHANNEL_HOLD_CLAWBACK_TICKS + 10;
@@ -185,7 +187,9 @@ impl pallet_block_seal_spec::Config for Runtime {
 	type TickProvider = Ticks;
 	type WeightInfo = pallet_block_seal_spec::weights::SubstrateWeight<Runtime>;
 	type TargetBlockVotes = TargetBlockVotes;
-	type ChangePeriod = SealSpecMinimumsChangePeriod;
+	type HistoricalVoteBlocksForAverage = SealSpecVoteHistoryForAverage;
+	type HistoricalComputeBlocksForAverage = SealSpecComputeHistoryToTrack;
+	type ComputeDifficultyChangePeriod = SealSpecComputeDifficultyChangePeriod;
 	type SealInherent = BlockSeal;
 }
 
@@ -243,8 +247,16 @@ impl pallet_timestamp::Config for Runtime {
 	type WeightInfo = ();
 }
 
+pub struct MultiBlockPerTickEnabled;
+impl Get<bool> for MultiBlockPerTickEnabled {
+	fn get() -> bool {
+		!MiningSlot::is_registered_mining_active()
+	}
+}
+
 impl pallet_ticks::Config for Runtime {
 	type WeightInfo = ();
+	type AllowMultipleBlockPerTick = MultiBlockPerTickEnabled;
 }
 
 parameter_types! {

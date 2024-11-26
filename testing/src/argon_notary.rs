@@ -164,7 +164,7 @@ impl ArgonTestNotary {
 			.sign_and_submit_then_watch_default(&notary_proposal, &signer)
 			.await?;
 
-		MainchainClient::wait_for_ext_in_block(ext).await?;
+		MainchainClient::wait_for_ext_in_block(ext, false).await?;
 
 		Ok(())
 	}

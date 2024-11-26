@@ -405,7 +405,7 @@ impl MainchainClient {
 
     let tx_progress = submittable.submit_and_watch().await?;
 
-    let in_block = InnerMainchainClient::wait_for_ext_in_block(tx_progress)
+    let in_block = InnerMainchainClient::wait_for_ext_in_block(tx_progress, false)
       .await
       .map_err(|e| anyhow!("Error submitting notebook to block: {:?}", e))?;
 

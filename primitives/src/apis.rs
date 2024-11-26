@@ -47,7 +47,7 @@ sp_api::decl_runtime_apis! {
 	pub trait TickApis {
 		fn current_tick() -> Tick;
 		fn ticker() -> Ticker;
-		fn block_at_tick(tick: Tick) -> Option<Block::Hash>;
+		fn blocks_at_tick(tick: Tick) -> Vec<Block::Hash>;
 	}
 }
 

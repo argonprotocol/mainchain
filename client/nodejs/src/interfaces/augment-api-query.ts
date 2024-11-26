@@ -163,6 +163,9 @@ declare module '@polkadot/api-base/types/storage' {
       currentVoteMinimum: AugmentedQuery<ApiType, () => Observable<u128>, []>;
       pastBlockVotes: AugmentedQuery<ApiType, () => Observable<Vec<ITuple<[u64, u32, u128]>>>, []>;
       pastComputeBlockTimes: AugmentedQuery<ApiType, () => Observable<Vec<u64>>, []>;
+      /**
+       * The timestamp from the previous block
+       **/
       previousBlockTimestamp: AugmentedQuery<ApiType, () => Observable<Option<u64>>, []>;
       tempBlockTimestamp: AugmentedQuery<ApiType, () => Observable<Option<u64>>, []>;
       /**
@@ -637,7 +640,7 @@ declare module '@polkadot/api-base/types/storage' {
        * Blocks from the last 100 ticks. Trimmed in on_initialize.
        * NOTE: cannot include the current block hash until next block
        **/
-      recentBlocksAtTicks: AugmentedQuery<ApiType, () => Observable<BTreeMap<u64, H256>>, []>;
+      recentBlocksAtTicks: AugmentedQuery<ApiType, (arg: u64 | AnyNumber | Uint8Array) => Observable<Vec<H256>>, [u64]>;
     };
     timestamp: {
       /**

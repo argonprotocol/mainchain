@@ -359,10 +359,11 @@ pub mod pallet {
 			ensure!(block_vote.power >= grandpa_vote_minimum, Error::<T>::InsufficientVotingPower);
 
 			let grandpa_tick_block =
-				T::TickProvider::block_at_tick(voting_schedule.grandparent_votes_tick())
-					.ok_or(Error::<T>::InvalidVoteGrandparentHash)?;
+				T::TickProvider::blocks_at_tick(voting_schedule.grandparent_votes_tick());
 			ensure!(
-				grandpa_tick_block.as_ref() == block_vote.block_hash.as_bytes(),
+				grandpa_tick_block
+					.iter()
+					.any(|a| a.as_ref() == block_vote.block_hash.as_bytes()),
 				Error::<T>::InvalidVoteGrandparentHash
 			);
 
@@ -457,9 +458,9 @@ pub mod pallet {
 
 			let voted_for_block_at_tick = voting_schedule.grandparent_votes_tick();
 
-			let Some(grandparent_tick_block) =
-				T::TickProvider::block_at_tick(voted_for_block_at_tick)
-			else {
+			let grandparent_tick_blocks = T::TickProvider::blocks_at_tick(voted_for_block_at_tick);
+
+			if grandparent_tick_blocks.is_empty() {
 				info!(
 					"No eligible blocks to vote on in grandparent tick {:?}",
 					voted_for_block_at_tick
@@ -469,7 +470,7 @@ pub mod pallet {
 
 			info!(
 				"Finding votes for block at tick {} - {:?} (notebook tick={})",
-				voted_for_block_at_tick, grandparent_tick_block, expected_notebook_tick
+				voted_for_block_at_tick, grandparent_tick_blocks, expected_notebook_tick
 			);
 
 			let mut best_votes = vec![];
@@ -515,10 +516,10 @@ pub mod pallet {
 					BlockVoteT::<<T::Block as BlockT>::Hash>::decode(&mut leafs[index].as_slice())
 						.map_err(|_| Error::<T>::CouldNotDecodeVote)?;
 
-				if grandparent_tick_block != vote.block_hash {
+				if !grandparent_tick_blocks.contains(&vote.block_hash) {
 					info!(
 						"Cant use vote for grandparent tick {:?} - voted for {:?}",
-						grandparent_tick_block, vote.block_hash
+						grandparent_tick_blocks, vote.block_hash
 					);
 					continue;
 				}

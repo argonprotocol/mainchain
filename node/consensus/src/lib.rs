@@ -39,7 +39,7 @@ pub mod import_queue;
 pub(crate) mod notary_client;
 pub(crate) mod notebook_sealer;
 
-use crate::{compute_worker::MiningMetadata, notebook_sealer::create_vote_seal};
+use crate::{compute_worker::ComputeState, notebook_sealer::create_vote_seal};
 pub use import_queue::create_import_queue;
 
 pub struct BlockBuilderParams<
@@ -133,8 +133,11 @@ pub fn run_block_builder_task<Block, BI, C, PF, A, SC, SO, JS>(
 		utxo_tracker,
 		_phantom: Default::default(),
 	};
-	let best_hash = client.info().best_hash;
-	let ticker = client.runtime_api().ticker(best_hash).expect("Ticker not available");
+
+	let ticker = {
+		let best_hash = client.info().best_hash;
+		client.runtime_api().ticker(best_hash).expect("Ticker not available")
+	};
 	let idle_delay = if ticker.tick_duration_millis <= 10_000 { 100 } else { 1000 };
 	run_notary_sync(task_manager, client.clone(), aux_client.clone(), notebook_tick_tx, idle_delay);
 
@@ -206,16 +209,17 @@ pub fn run_block_builder_task<Block, BI, C, PF, A, SC, SO, JS>(
 	};
 
 	let block_finder_task = async move {
-		let ticker = ticker;
 		let mut import_stream = client.every_import_notification_stream();
-		let compute_delay = Duration::from_millis(idle_delay);
+		let idle_delay = Duration::from_millis(idle_delay);
 
+		let compute_state = ComputeState::new(compute_handle.clone(), client.clone(), ticker);
 		loop {
-			let mut tick = ticker.current();
-			let mut next: Option<VotingPowerInfo> = None;
+			let mut check_for_better_blocks: Option<VotingPowerInfo> = None;
+			let mut next_notebooks_at_tick: Option<VotingPowerInfo> = None;
 			tokio::select! {biased;
 				notebook = notebook_tick_rx.next() => {
-					next = notebook;
+					check_for_better_blocks = notebook;
+					next_notebooks_at_tick = notebook;
 				},
 				block_next = import_stream.next() => {
 					if let Some(block) = block_next {
@@ -227,13 +231,11 @@ pub fn run_block_builder_task<Block, BI, C, PF, A, SC, SO, JS>(
 						};
 						let voting_schedule = VotingSchedule::when_creating_block(tick);
 						if let Ok(info) = aux_client.get_tick_voting_power(voting_schedule.notebook_tick()) {
-							next = info
+							check_for_better_blocks = info
 						}
 					}
 				},
-				_on_delay = Delay::new(compute_delay) => {
-					next = None;
-				},
+				_on_delay = Delay::new(idle_delay) => {},
 			}
 
 			// don't try to check for blocks during a sync
@@ -241,17 +243,7 @@ pub fn run_block_builder_task<Block, BI, C, PF, A, SC, SO, JS>(
 				continue;
 			}
 
-			let next_tick = ticker.current();
-			if next.is_none() && tick != next_tick {
-				tick = next_tick;
-				let voting_schedule = VotingSchedule::when_creating_block(tick);
-				if let Ok(info) = aux_client.get_tick_voting_power(voting_schedule.notebook_tick())
-				{
-					next = info
-				}
-			}
-
-			if let Some((notebook_tick, voting_power, notebooks)) = next {
+			if let Some((notebook_tick, voting_power, notebooks)) = check_for_better_blocks {
 				if let Err(err) = notebook_sealer
 					.check_for_new_blocks(notebook_tick, voting_power, notebooks)
 					.await
@@ -265,56 +257,18 @@ pub fn run_block_builder_task<Block, BI, C, PF, A, SC, SO, JS>(
 				continue;
 			};
 
-			// TODO: this whole section needs to loop within a tick to create blocks, and as more
-			//   notebooks come in,  it needs to create more blocks (cause they're stronger than
-			//   the previous ones)
-
-			// clear out anything that should no longer be running compute
-			let best_hash = client.info().best_hash;
-			if compute_handle.best_hash() != Some(best_hash) {
-				compute_handle.stop_solving_current();
-
-				let block_tick = client.runtime_api().current_tick(best_hash).unwrap_or_default();
-				let has_tax_votes =
-					client.runtime_api().has_eligible_votes(best_hash).unwrap_or_default();
-				let compute_puzzle = match client.runtime_api().compute_puzzle(best_hash) {
-					Ok(x) => x,
-					Err(err) => {
-						warn!(
-							"Unable to pull new block for compute miner. No difficulty found!! {}",
-							err
-						);
-						continue;
-					},
-				};
-				let next_tick = ticker.time_for_tick(block_tick + 1);
-				// allow a little bit of time for the block to be built, but wait for notebooks to
-				// come in
-				let delay = ticker.tick_duration_millis * 2 / 3;
-
-				let genesis_hash = client.info().genesis_hash;
-				compute_handle.new_best_block(MiningMetadata {
-					best_hash,
-					has_tax_votes,
-					activate_mining_time: next_tick + delay,
-					key_block_hash: compute_puzzle.get_key_block(genesis_hash),
-					emergency_tick: block_tick + 3,
-					difficulty: compute_puzzle.difficulty,
-				});
-			}
+			let Some(best_hash) = compute_state.on_new_notebook_tick(next_notebooks_at_tick) else {
+				continue;
+			};
 
 			// don't do anything if we are syncing or not ready to solve
 			let time = ticker.now_adjusted_to_ntp();
 			let tick = ticker.tick_for_time(time);
-			if sync_oracle.is_major_syncing() || !compute_handle.ready_to_solve(tick, time) {
-				continue;
-			}
-
-			// check for any new mining that should be activated
-			let best_hash = client.info().best_hash;
-			if compute_handle.proposal_parent_hash() != Some(best_hash) {
-				trace!(?best_hash, ?tick, "Fallback mining activated");
-				let Some(proposal) = block_creator
+			if !sync_oracle.is_major_syncing() &&
+				compute_handle.ready_to_solve(tick, time) &&
+				!compute_handle.is_solving()
+			{
+				if let Some(proposal) = block_creator
 					.propose(
 						compute_author.clone(),
 						tick,
@@ -323,13 +277,10 @@ pub fn run_block_builder_task<Block, BI, C, PF, A, SC, SO, JS>(
 						BlockSealInherentNodeSide::Compute,
 					)
 					.await
-				else {
-					continue;
-				};
-
-				let pre_hash = proposal.proposal.block.header().hash();
-
-				compute_handle.start_solving(best_hash, pre_hash, proposal);
+				{
+					trace!(?best_hash, ?tick, "Fallback mining activated");
+					compute_handle.start_solving(proposal);
+				}
 			}
 		}
 	};

@@ -1,8 +1,8 @@
 #![cfg_attr(not(feature = "std"), no_std)]
 extern crate alloc;
 
+use argon_primitives::DecodeDigestError;
 use codec::Decode;
-
 pub use pallet::*;
 pub use weights::*;
 
@@ -18,16 +18,11 @@ pub mod weights;
 #[frame_support::pallet(dev_mode)]
 pub mod pallet {
 	use super::*;
-	use argon_primitives::{
-		digests::*,
-		fork_power::ForkPower,
-		tick::{Tick, TickDigest},
-		VotingKey,
-	};
+	use argon_primitives::{digests::*, tick::Tick, VotingKey};
 	use codec::{Codec, EncodeLike};
 	use frame_support::{pallet_prelude::*, traits::FindAuthor};
 	use frame_system::pallet_prelude::*;
-	use sp_runtime::{ConsensusEngineId, Digest, DigestItem};
+	use sp_runtime::{ConsensusEngineId, Digest};
 
 	#[pallet::pallet]
 	pub struct Pallet<T>(_);
@@ -96,67 +91,8 @@ pub mod pallet {
 		pub fn decode(
 			digest: &Digest,
 		) -> Result<Digestset<T::NotebookVerifyError, T::AccountId>, Error<T>> {
-			let mut author = None;
-
-			let mut block_vote = None;
-			let mut tick = None;
-			let mut notebooks = None;
-			let mut parent_voting_key = None;
-			let mut fork_power = None;
-
-			for log in digest.logs() {
-				match log {
-					DigestItem::PreRuntime(BLOCK_VOTES_DIGEST_ID, v) => {
-						ensure!(block_vote.is_none(), Error::<T>::DuplicateBlockVoteDigest);
-						let digest = BlockVoteDigest::decode(&mut &v[..])
-							.map_err(|_| Error::<T>::CouldNotDecodeDigest)?;
-						block_vote = Some(digest);
-					},
-					DigestItem::PreRuntime(AUTHOR_DIGEST_ID, v) => {
-						ensure!(author.is_none(), Error::<T>::DuplicateAuthorDigest);
-						let digest = T::AccountId::decode(&mut &v[..])
-							.map_err(|_| Error::<T>::CouldNotDecodeDigest)?;
-						author = Some(digest);
-					},
-					DigestItem::PreRuntime(TICK_DIGEST_ID, v) => {
-						ensure!(tick.is_none(), Error::<T>::DuplicateTickDigest);
-						let digest = TickDigest::decode(&mut &v[..])
-							.map_err(|_| Error::<T>::CouldNotDecodeDigest)?;
-						tick = Some(digest);
-					},
-					DigestItem::Consensus(PARENT_VOTING_KEY_DIGEST, v) => {
-						ensure!(
-							parent_voting_key.is_none(),
-							Error::<T>::DuplicateParentVotingKeyDigest
-						);
-						let digest = ParentVotingKeyDigest::decode(&mut &v[..])
-							.map_err(|_| Error::<T>::CouldNotDecodeDigest)?;
-						parent_voting_key = Some(digest);
-					},
-					DigestItem::Consensus(FORK_POWER_DIGEST, v) => {
-						ensure!(fork_power.is_none(), Error::<T>::DuplicateForkPowerDigest);
-						let digest = ForkPower::decode(&mut &v[..])
-							.map_err(|_| Error::<T>::CouldNotDecodeDigest)?;
-						fork_power = Some(digest);
-					},
-					DigestItem::PreRuntime(NOTEBOOKS_DIGEST_ID, v) => {
-						ensure!(notebooks.is_none(), Error::<T>::DuplicateNotebookDigest);
-						let digest = NotebookDigest::<T::NotebookVerifyError>::decode(&mut &v[..])
-							.map_err(|_| Error::<T>::CouldNotDecodeDigest)?;
-						notebooks = Some(digest);
-					},
-					_ => {},
-				}
-			}
-
-			Ok(Digestset {
-				block_vote: block_vote.ok_or(Error::<T>::MissingBlockVoteDigest)?,
-				tick: tick.ok_or(Error::<T>::MissingTickDigest)?,
-				author: author.ok_or(Error::<T>::MissingAuthorDigest)?,
-				notebooks: notebooks.ok_or(Error::<T>::MissingNotebookDigest)?,
-				voting_key: parent_voting_key,
-				fork_power,
-			})
+			Digestset::<T::NotebookVerifyError, T::AccountId>::try_from(digest.clone())
+				.map_err(Into::into)
 		}
 
 		pub fn read_digest() -> Result<Digestset<T::NotebookVerifyError, T::AccountId>, Error<T>> {
@@ -215,6 +151,27 @@ pub mod pallet {
 			}
 
 			None
+		}
+	}
+
+	impl<T: Config> From<DecodeDigestError> for Error<T> {
+		fn from(value: DecodeDigestError) -> Self {
+			match value {
+				DecodeDigestError::DuplicateBlockVoteDigest => Error::<T>::DuplicateBlockVoteDigest,
+				DecodeDigestError::DuplicateAuthorDigest => Error::<T>::DuplicateAuthorDigest,
+				DecodeDigestError::DuplicateTickDigest => Error::<T>::DuplicateTickDigest,
+				DecodeDigestError::DuplicateParentVotingKeyDigest =>
+					Error::<T>::DuplicateParentVotingKeyDigest,
+				DecodeDigestError::DuplicateNotebookDigest => Error::<T>::DuplicateNotebookDigest,
+				DecodeDigestError::DuplicateForkPowerDigest => Error::<T>::DuplicateForkPowerDigest,
+				DecodeDigestError::MissingBlockVoteDigest => Error::<T>::MissingBlockVoteDigest,
+				DecodeDigestError::MissingAuthorDigest => Error::<T>::MissingAuthorDigest,
+				DecodeDigestError::MissingTickDigest => Error::<T>::MissingTickDigest,
+				DecodeDigestError::MissingParentVotingKeyDigest =>
+					Error::<T>::MissingParentVotingKeyDigest,
+				DecodeDigestError::MissingNotebookDigest => Error::<T>::MissingNotebookDigest,
+				DecodeDigestError::CouldNotDecodeDigest => Error::<T>::CouldNotDecodeDigest,
+			}
 		}
 	}
 }

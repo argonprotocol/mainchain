@@ -180,7 +180,7 @@ pub trait TickProvider<B: BlockT> {
 	/// The schedule for when voting is eligible
 	fn voting_schedule() -> VotingSchedule;
 	fn ticker() -> Ticker;
-	fn block_at_tick(tick: Tick) -> Option<B::Hash>;
+	fn blocks_at_tick(tick: Tick) -> Vec<B::Hash>;
 }
 
 /// An event handler to listen for submitted notebook

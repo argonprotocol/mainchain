@@ -199,7 +199,7 @@ struct NotebookAuditResponse {
 #[cfg(test)]
 mod tests {
 	use anyhow::anyhow;
-	use codec::Decode;
+	use codec::{Decode, Encode};
 	use frame_support::assert_ok;
 	use futures::{task::noop_waker_ref, StreamExt};
 	use sp_core::{bounded_vec, crypto::AccountId32, ed25519::Public, sr25519::Signature, Pair};
@@ -219,7 +219,6 @@ mod tests {
 	};
 	use subxt::{
 		blocks::Block,
-		config::substrate::DigestItem,
 		tx::{TxInBlock, TxProgress},
 		OnlineClient,
 	};
@@ -235,6 +234,7 @@ mod tests {
 			},
 			storage, tx,
 		},
+		conversion::SubxtRuntime,
 		signer::Sr25519Signer,
 		ArgonConfig, ArgonOnlineClient, MainchainClient, ReconnectingClient,
 	};
@@ -243,11 +243,11 @@ mod tests {
 	use argon_primitives::{
 		fork_power::ForkPower,
 		host::Host,
-		tick::{Tick, TickDigest},
-		AccountId, AccountOrigin,
+		prelude::*,
+		AccountOrigin,
 		AccountType::{Deposit, Tax},
-		BalanceChange, BalanceProof, BalanceTip, BlockSealDigest, BlockVote, BlockVoteDigest,
-		Domain, DomainHash, DomainTopLevel, HashOutput, MerkleProof, Note, NoteType,
+		ArgonDigests, BalanceChange, BalanceProof, BalanceTip, BlockSealDigest, BlockVote,
+		BlockVoteDigest, Domain, DomainHash, DomainTopLevel, HashOutput, MerkleProof,
 		NoteType::{ChannelHoldClaim, ChannelHoldSettle},
 		NotebookDigest, ParentVotingKeyDigest, TransferToLocalchainId, VotingSchedule,
 		DOMAIN_LEASE_COST,
@@ -563,21 +563,21 @@ mod tests {
 		let mut notebook_digest = None;
 		let mut parent_voting_key = None;
 		let mut fork_power = None;
-		for log in block.header().digest.logs.iter() {
-			match log {
-				DigestItem::PreRuntime(argon_primitives::TICK_DIGEST_ID, data) =>
-					tick = TickDigest::decode(&mut &data[..]).ok(),
-				DigestItem::PreRuntime(argon_primitives::BLOCK_VOTES_DIGEST_ID, data) =>
-					votes = BlockVoteDigest::decode(&mut &data[..]).ok(),
-				DigestItem::PreRuntime(argon_primitives::NOTEBOOKS_DIGEST_ID, data) =>
-					notebook_digest = NotebookDigest::decode(&mut &data[..]).ok(),
-				DigestItem::Seal(argon_primitives::BLOCK_SEAL_DIGEST_ID, data) =>
-					block_seal = BlockSealDigest::decode(&mut &data[..]).ok(),
-				DigestItem::Consensus(argon_primitives::PARENT_VOTING_KEY_DIGEST, data) =>
-					parent_voting_key = ParentVotingKeyDigest::decode(&mut &data[..]).ok(),
-				DigestItem::Consensus(argon_primitives::FORK_POWER_DIGEST, data) =>
-					fork_power = ForkPower::decode(&mut &data[..]).ok(),
-				_ => (),
+		for log in block.header().runtime_digest().logs.iter() {
+			let digest = sp_runtime::DigestItem::decode(&mut &log.encode()[..])
+				.expect("Should be able to decode digest item");
+			if let Some(d) = digest.as_tick() {
+				tick = Some(d);
+			} else if let Some(d) = digest.as_block_vote() {
+				votes = Some(d);
+			} else if let Some(d) = digest.as_parent_voting_key() {
+				parent_voting_key = Some(d);
+			} else if let Some(d) = digest.as_fork_power() {
+				fork_power = Some(d);
+			} else if let Some(d) = digest.as_notebooks() {
+				notebook_digest = Some(d);
+			} else if let Some(d) = digest.as_block_seal() {
+				block_seal = Some(d);
 			}
 		}
 		let tick = tick.expect("Should have a tick").0;
@@ -971,7 +971,7 @@ mod tests {
 	async fn wait_for_in_block(
 		tx_progress: TxProgress<ArgonConfig, OnlineClient<ArgonConfig>>,
 	) -> anyhow::Result<TxInBlock<ArgonConfig, OnlineClient<ArgonConfig>>, Error> {
-		let res = MainchainClient::wait_for_ext_in_block(tx_progress).await?;
+		let res = MainchainClient::wait_for_ext_in_block(tx_progress, false).await?;
 		Ok(res)
 	}
 }

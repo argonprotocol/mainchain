@@ -517,6 +517,12 @@ impl<T: Config> AuthorityProvider<T::MiningAuthorityId, T::Block, T::AccountId> 
 }
 
 impl<T: Config> Pallet<T> {
+	pub fn is_registered_mining_active() -> bool {
+		<frame_system::Pallet<T>>::block_number() >=
+			MiningConfig::<T>::get().slot_bidding_start_block &&
+			ActiveMinersCount::<T>::get() > 0
+	}
+
 	pub fn get_mining_authority(
 		account_id: &T::AccountId,
 	) -> Option<MiningAuthority<T::MiningAuthorityId, T::AccountId>> {

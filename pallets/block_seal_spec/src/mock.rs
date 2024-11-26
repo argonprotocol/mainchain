@@ -2,7 +2,7 @@ use std::collections::BTreeMap;
 
 use env_logger::{Builder, Env};
 use frame_support::{derive_impl, parameter_types};
-use sp_core::{ConstU64, H256, U256};
+use sp_core::{ConstU32, ConstU64, H256, U256};
 use sp_runtime::{BuildStorage, Percent};
 
 use crate as pallet_block_seal_spec;
@@ -103,8 +103,8 @@ impl TickProvider<Block> for StaticTickProvider {
 	fn ticker() -> Ticker {
 		Ticker::new(200, 2)
 	}
-	fn block_at_tick(_: Tick) -> Option<H256> {
-		None
+	fn blocks_at_tick(_: Tick) -> Vec<H256> {
+		vec![]
 	}
 	fn voting_schedule() -> VotingSchedule {
 		VotingSchedule::from_runtime_current_tick(CurrentTick::get())
@@ -115,10 +115,12 @@ impl pallet_block_seal_spec::Config for Test {
 	type RuntimeEvent = RuntimeEvent;
 	type WeightInfo = ();
 	type TargetBlockVotes = TargetBlockVotes;
-	type ChangePeriod = ChangePeriod;
+	type ComputeDifficultyChangePeriod = ChangePeriod;
 	type AuthorityProvider = StaticAuthorityProvider;
 	type NotebookProvider = StaticNotebookProvider;
 	type SealInherent = CurrentSeal;
+	type HistoricalVoteBlocksForAverage = ConstU32<10>;
+	type HistoricalComputeBlocksForAverage = ConstU32<10>;
 	type TargetComputeBlockPercent = TargetComputeBlockPercent;
 	type TickProvider = StaticTickProvider;
 	type MaxActiveNotaries = MaxNotaries;

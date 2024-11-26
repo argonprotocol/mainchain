@@ -17,12 +17,13 @@ mod tests;
 mod benchmarking;
 pub mod weights;
 
-const MAX_RECENT_BLOCKS: u32 = 10;
+const MAX_RECENT_BLOCKS: u64 = 10;
 
 /// This pallet tracks the current tick of the system
 #[frame_support::pallet(dev_mode)]
 pub mod pallet {
 	use super::*;
+	use alloc::vec::Vec;
 	use argon_primitives::{
 		digests::TICK_DIGEST_ID,
 		tick::{Tick, TickDigest, Ticker},
@@ -40,6 +41,9 @@ pub mod pallet {
 	pub trait Config: pallet_timestamp::Config + frame_system::Config {
 		/// Type representing the weight of this pallet
 		type WeightInfo: WeightInfo;
+
+		/// Should the system allow multiple blocks to be produced in the same tick
+		type AllowMultipleBlockPerTick: Get<bool>;
 	}
 
 	#[pallet::storage]
@@ -52,11 +56,14 @@ pub mod pallet {
 	/// Blocks from the last 100 ticks. Trimmed in on_initialize.
 	/// NOTE: cannot include the current block hash until next block
 	#[pallet::storage]
-	pub(super) type RecentBlocksAtTicks<T: Config> = StorageValue<
+	pub(super) type RecentBlocksAtTicks<T: Config> = StorageMap<
 		_,
-		BoundedBTreeMap<Tick, <T::Block as BlockT>::Hash, ConstU32<MAX_RECENT_BLOCKS>>,
+		Twox64Concat,
+		Tick,
+		BoundedVec<<T::Block as BlockT>::Hash, ConstU32<10>>,
 		ValueQuery,
 	>;
+
 	#[pallet::genesis_config]
 	#[derive(frame_support::DefaultNoBound)]
 	pub struct GenesisConfig<T: Config> {
@@ -90,23 +97,22 @@ pub mod pallet {
 				.find_map(|a| a.pre_runtime_try_to::<TickDigest>(&TICK_DIGEST_ID))
 				.expect("Tick digest must be set")
 				.0;
-
-			let parent_hash = <frame_system::Pallet<T>>::parent_hash();
-			if let Err(e) = RecentBlocksAtTicks::<T>::try_mutate(|map| {
-				if map.contains_key(&parent_tick) {
-					panic!("Block at tick already exists");
+			// if we're past the max recent blocks, remove the oldest
+			if parent_tick > MAX_RECENT_BLOCKS {
+				for tick in parent_tick..=proposed_tick {
+					RecentBlocksAtTicks::<T>::take(tick.saturating_sub(MAX_RECENT_BLOCKS));
 				}
-				if map.len() >= MAX_RECENT_BLOCKS as usize {
-					let first_key = *map.iter().next().expect("List is not empty").0;
-					map.remove(&first_key);
-				}
-				map.try_insert(parent_tick, parent_hash).expect("Could not insert block");
-				Ok::<(), Error<T>>(())
-			}) {
-				panic!("Could not add block to recent blocks at tick: {:?}", e);
 			}
 
-			if proposed_tick <= parent_tick {
+			RecentBlocksAtTicks::<T>::mutate(parent_tick, |blocks| {
+				if blocks.len() > 0 && !T::AllowMultipleBlockPerTick::get() {
+					panic!("Multiple blocks per tick is not allowed.");
+				}
+				blocks.try_push(<frame_system::Pallet<T>>::parent_hash())
+			})
+				.expect("Failed to push block hash to recent blocks. Too many blocks per tick is a valid panic reason.");
+
+			if proposed_tick < parent_tick {
 				panic!("Proposed tick is less than or equal to current tick. Proposed: {:?}, Current: {:?}", proposed_tick, parent_tick);
 			}
 
@@ -125,8 +131,8 @@ pub mod pallet {
 			<GenesisTicker<T>>::get()
 		}
 
-		fn block_at_tick(tick: Tick) -> Option<<T::Block as BlockT>::Hash> {
-			<RecentBlocksAtTicks<T>>::get().get(&tick).cloned()
+		fn blocks_at_tick(tick: Tick) -> Vec<<T::Block as BlockT>::Hash> {
+			<RecentBlocksAtTicks<T>>::get(tick).to_vec()
 		}
 
 		fn voting_schedule() -> VotingSchedule {

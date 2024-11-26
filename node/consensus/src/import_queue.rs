@@ -79,13 +79,27 @@ where
 			self.aux_client.record_block(&mut block, block_author, voting_key, tick)?;
 		let fork_power = ForkPower::try_from(block.header.digest())
 			.map_err(|e| Error::MissingRuntimeData(format!("Failed to get fork power: {:?}", e)))?;
-		block.fork_choice = Some(ForkChoiceStrategy::Custom(fork_power > max_fork_power));
+
+		let mut is_best_fork = fork_power > max_fork_power;
+		if fork_power == max_fork_power {
+			is_best_fork = block.origin == BlockOrigin::Own;
+		}
+
+		if is_best_fork {
+			tracing::info!(
+				block_hash = ?block.header.hash(),
+				?fork_power,
+				"New best fork imported"
+			);
+		}
+
+		block.fork_choice = Some(ForkChoiceStrategy::Custom(is_best_fork));
 
 		// TODO: do we need to hold a lock here?
 		let block_hash = block.post_hash();
 		match self.inner.import_block(block).await {
 			Ok(result) => {
-				self.aux_client.block_accepted(max_fork_power).inspect_err(|e| {
+				self.aux_client.block_accepted(fork_power).inspect_err(|e| {
 					log::error!("Failed to record block accepted for {:?}: {:?}", block_hash, e)
 				})?;
 				Ok(result)
@@ -234,7 +248,7 @@ where
 	}
 }
 
-/// Start an import queue for a Cumulus node which checks blocks' seals and inherent data.
+/// Start an import queue which checks blocks' seals and inherent data.
 pub fn create_import_queue<C, B, I, AC>(
 	client: Arc<C>,
 	aux_client: ArgonAux<B, C>,

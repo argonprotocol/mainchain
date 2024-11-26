@@ -454,8 +454,8 @@ impl_runtime_apis! {
 		fn ticker() -> Ticker {
 			Ticks::ticker()
 		}
-		fn block_at_tick(tick: Tick) -> Option<<Block as BlockT>::Hash> {
-			Ticks::block_at_tick(tick)
+		fn blocks_at_tick(tick: Tick) -> Vec<<Block as BlockT>::Hash> {
+			Ticks::blocks_at_tick(tick)
 		}
 	}
 

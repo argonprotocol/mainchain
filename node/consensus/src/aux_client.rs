@@ -160,10 +160,10 @@ impl<B: BlockT, C: AuxStore + 'static> ArgonAux<B, C> {
 		Ok(max_fork_power)
 	}
 
-	pub fn block_accepted(&self, max_fork_power: ForkPower) -> Result<(), Error> {
+	pub fn block_accepted(&self, fork_power: ForkPower) -> Result<(), Error> {
 		self.strongest_fork_power()?.mutate(|existing| {
-			if max_fork_power > *existing {
-				*existing = max_fork_power;
+			if fork_power > *existing {
+				*existing = fork_power;
 			}
 			Ok::<_, Error>(())
 		})?

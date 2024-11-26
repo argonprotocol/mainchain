@@ -77,10 +77,18 @@ declare module '@polkadot/api-base/types/consts' {
     };
     blockSealSpec: {
       /**
+       * The frequency we should update the compute difficulty
+       **/
+      computeDifficultyChangePeriod: u32 & AugmentedConst<ApiType>;
+      /**
        * The number of historical compute times to use to calculate the rolling compute average
        * (for adjustment)
        **/
-      changePeriod: u32 & AugmentedConst<ApiType>;
+      historicalComputeBlocksForAverage: u32 & AugmentedConst<ApiType>;
+      /**
+       * The number of historical vote blocks to use to calculate the rolling vote average
+       **/
+      historicalVoteBlocksForAverage: u32 & AugmentedConst<ApiType>;
       /**
        * The maximum active notaries allowed
        **/

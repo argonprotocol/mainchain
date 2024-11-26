@@ -2190,22 +2190,22 @@ pub mod api {
 						],
 					)
 				}
-				pub fn block_at_tick(
+				pub fn blocks_at_tick(
 					&self,
-					tick: types::block_at_tick::Tick,
+					tick: types::blocks_at_tick::Tick,
 				) -> ::subxt::ext::subxt_core::runtime_api::payload::StaticPayload<
-					types::BlockAtTick,
-					types::block_at_tick::output::Output,
+					types::BlocksAtTick,
+					types::blocks_at_tick::output::Output,
 				> {
 					::subxt::ext::subxt_core::runtime_api::payload::StaticPayload::new_static(
 						"TickApis",
-						"block_at_tick",
-						types::BlockAtTick { tick },
+						"blocks_at_tick",
+						types::BlocksAtTick { tick },
 						[
-							255u8, 22u8, 112u8, 151u8, 189u8, 174u8, 219u8, 227u8, 244u8, 51u8,
-							40u8, 18u8, 69u8, 133u8, 249u8, 75u8, 141u8, 255u8, 251u8, 24u8, 143u8,
-							240u8, 232u8, 41u8, 56u8, 77u8, 218u8, 186u8, 207u8, 67u8, 193u8,
-							186u8,
+							227u8, 133u8, 197u8, 183u8, 198u8, 228u8, 188u8, 20u8, 134u8, 69u8,
+							135u8, 179u8, 70u8, 135u8, 89u8, 158u8, 183u8, 82u8, 125u8, 241u8,
+							251u8, 235u8, 70u8, 165u8, 228u8, 168u8, 14u8, 49u8, 219u8, 13u8,
+							101u8, 245u8,
 						],
 					)
 				}
@@ -2258,12 +2258,13 @@ pub mod api {
 					crate_path = ":: subxt :: ext :: subxt_core :: ext :: scale_encode"
 				)]
 				pub struct Ticker {}
-				pub mod block_at_tick {
+				pub mod blocks_at_tick {
 					use super::runtime_types;
 					pub type Tick = ::core::primitive::u64;
 					pub mod output {
 						use super::runtime_types;
-						pub type Output = ::core::option::Option<crate::types::H256>;
+						pub type Output =
+							::subxt::ext::subxt_core::alloc::vec::Vec<crate::types::H256>;
 					}
 				}
 				#[derive(
@@ -2281,8 +2282,8 @@ pub mod api {
 				#[encode_as_type(
 					crate_path = ":: subxt :: ext :: subxt_core :: ext :: scale_encode"
 				)]
-				pub struct BlockAtTick {
-					pub tick: block_at_tick::Tick,
+				pub struct BlocksAtTick {
+					pub tick: blocks_at_tick::Tick,
 				}
 			}
 		}
@@ -3695,9 +3696,9 @@ pub mod api {
 			.hash();
 		runtime_metadata_hash ==
 			[
-				23u8, 25u8, 102u8, 19u8, 105u8, 134u8, 114u8, 130u8, 223u8, 135u8, 140u8, 67u8,
-				106u8, 172u8, 99u8, 119u8, 86u8, 75u8, 178u8, 108u8, 79u8, 233u8, 97u8, 87u8, 23u8,
-				196u8, 25u8, 248u8, 185u8, 192u8, 254u8, 108u8,
+				132u8, 126u8, 146u8, 139u8, 194u8, 55u8, 7u8, 182u8, 218u8, 48u8, 28u8, 205u8,
+				107u8, 246u8, 163u8, 73u8, 223u8, 8u8, 3u8, 83u8, 104u8, 167u8, 251u8, 122u8,
+				255u8, 251u8, 128u8, 19u8, 227u8, 205u8, 130u8, 255u8,
 			]
 	}
 	pub mod system {
@@ -5198,10 +5199,9 @@ pub mod api {
 						"TempDigests",
 						(),
 						[
-							103u8, 233u8, 241u8, 215u8, 19u8, 94u8, 177u8, 240u8, 138u8, 91u8,
-							138u8, 19u8, 61u8, 79u8, 130u8, 70u8, 158u8, 61u8, 55u8, 33u8, 75u8,
-							52u8, 57u8, 117u8, 244u8, 227u8, 106u8, 148u8, 144u8, 17u8, 24u8,
-							194u8,
+							62u8, 147u8, 75u8, 217u8, 94u8, 40u8, 0u8, 91u8, 189u8, 205u8, 162u8,
+							159u8, 220u8, 6u8, 68u8, 102u8, 133u8, 49u8, 8u8, 146u8, 131u8, 127u8,
+							82u8, 109u8, 154u8, 190u8, 73u8, 181u8, 78u8, 211u8, 3u8, 247u8,
 						],
 					)
 				}
@@ -7305,10 +7305,10 @@ pub mod api {
 				pub mod recent_blocks_at_ticks {
 					use super::runtime_types;
 					pub type RecentBlocksAtTicks =
-						runtime_types::bounded_collections::bounded_btree_map::BoundedBTreeMap<
-							::core::primitive::u64,
+						runtime_types::bounded_collections::bounded_vec::BoundedVec<
 							crate::types::H256,
 						>;
+					pub type Param0 = ::core::primitive::u64;
 				}
 			}
 			pub struct StorageApi;
@@ -7355,10 +7355,35 @@ pub mod api {
 				}
 				#[doc = " Blocks from the last 100 ticks. Trimmed in on_initialize."]
 				#[doc = " NOTE: cannot include the current block hash until next block"]
-				pub fn recent_blocks_at_ticks(
+				pub fn recent_blocks_at_ticks_iter(
 					&self,
 				) -> ::subxt::ext::subxt_core::storage::address::StaticAddress<
 					(),
+					types::recent_blocks_at_ticks::RecentBlocksAtTicks,
+					(),
+					::subxt::ext::subxt_core::utils::Yes,
+					::subxt::ext::subxt_core::utils::Yes,
+				> {
+					::subxt::ext::subxt_core::storage::address::StaticAddress::new_static(
+						"Ticks",
+						"RecentBlocksAtTicks",
+						(),
+						[
+							229u8, 32u8, 175u8, 28u8, 187u8, 207u8, 207u8, 59u8, 133u8, 143u8,
+							179u8, 183u8, 23u8, 141u8, 138u8, 47u8, 85u8, 86u8, 216u8, 35u8, 202u8,
+							83u8, 59u8, 48u8, 254u8, 226u8, 74u8, 17u8, 1u8, 19u8, 107u8, 221u8,
+						],
+					)
+				}
+				#[doc = " Blocks from the last 100 ticks. Trimmed in on_initialize."]
+				#[doc = " NOTE: cannot include the current block hash until next block"]
+				pub fn recent_blocks_at_ticks(
+					&self,
+					_0: impl ::core::borrow::Borrow<types::recent_blocks_at_ticks::Param0>,
+				) -> ::subxt::ext::subxt_core::storage::address::StaticAddress<
+					::subxt::ext::subxt_core::storage::address::StaticStorageKey<
+						types::recent_blocks_at_ticks::Param0,
+					>,
 					types::recent_blocks_at_ticks::RecentBlocksAtTicks,
 					::subxt::ext::subxt_core::utils::Yes,
 					::subxt::ext::subxt_core::utils::Yes,
@@ -7367,11 +7392,13 @@ pub mod api {
 					::subxt::ext::subxt_core::storage::address::StaticAddress::new_static(
 						"Ticks",
 						"RecentBlocksAtTicks",
-						(),
+						::subxt::ext::subxt_core::storage::address::StaticStorageKey::new(
+							_0.borrow(),
+						),
 						[
-							24u8, 141u8, 87u8, 195u8, 108u8, 48u8, 208u8, 191u8, 192u8, 76u8, 96u8,
-							150u8, 100u8, 233u8, 126u8, 188u8, 109u8, 81u8, 245u8, 197u8, 16u8,
-							20u8, 144u8, 182u8, 32u8, 236u8, 118u8, 77u8, 74u8, 22u8, 31u8, 180u8,
+							229u8, 32u8, 175u8, 28u8, 187u8, 207u8, 207u8, 59u8, 133u8, 143u8,
+							179u8, 183u8, 23u8, 141u8, 138u8, 47u8, 85u8, 86u8, 216u8, 35u8, 202u8,
+							83u8, 59u8, 48u8, 254u8, 226u8, 74u8, 17u8, 1u8, 19u8, 107u8, 221u8,
 						],
 					)
 				}
@@ -13203,6 +13230,7 @@ pub mod api {
 						],
 					)
 				}
+				#[doc = " The timestamp from the previous block"]
 				pub fn previous_block_timestamp(
 					&self,
 				) -> ::subxt::ext::subxt_core::storage::address::StaticAddress<
@@ -13368,14 +13396,48 @@ pub mod api {
 				}
 				#[doc = " The number of historical compute times to use to calculate the rolling compute average"]
 				#[doc = " (for adjustment)"]
-				pub fn change_period(
+				pub fn historical_compute_blocks_for_average(
 					&self,
 				) -> ::subxt::ext::subxt_core::constants::address::StaticAddress<
 					::core::primitive::u32,
 				> {
 					::subxt::ext::subxt_core::constants::address::StaticAddress::new_static(
 						"BlockSealSpec",
-						"ChangePeriod",
+						"HistoricalComputeBlocksForAverage",
+						[
+							98u8, 252u8, 116u8, 72u8, 26u8, 180u8, 225u8, 83u8, 200u8, 157u8,
+							125u8, 151u8, 53u8, 76u8, 168u8, 26u8, 10u8, 9u8, 98u8, 68u8, 9u8,
+							178u8, 197u8, 113u8, 31u8, 79u8, 200u8, 90u8, 203u8, 100u8, 41u8,
+							145u8,
+						],
+					)
+				}
+				#[doc = " The number of historical vote blocks to use to calculate the rolling vote average"]
+				pub fn historical_vote_blocks_for_average(
+					&self,
+				) -> ::subxt::ext::subxt_core::constants::address::StaticAddress<
+					::core::primitive::u32,
+				> {
+					::subxt::ext::subxt_core::constants::address::StaticAddress::new_static(
+						"BlockSealSpec",
+						"HistoricalVoteBlocksForAverage",
+						[
+							98u8, 252u8, 116u8, 72u8, 26u8, 180u8, 225u8, 83u8, 200u8, 157u8,
+							125u8, 151u8, 53u8, 76u8, 168u8, 26u8, 10u8, 9u8, 98u8, 68u8, 9u8,
+							178u8, 197u8, 113u8, 31u8, 79u8, 200u8, 90u8, 203u8, 100u8, 41u8,
+							145u8,
+						],
+					)
+				}
+				#[doc = " The frequency we should update the compute difficulty"]
+				pub fn compute_difficulty_change_period(
+					&self,
+				) -> ::subxt::ext::subxt_core::constants::address::StaticAddress<
+					::core::primitive::u32,
+				> {
+					::subxt::ext::subxt_core::constants::address::StaticAddress::new_static(
+						"BlockSealSpec",
+						"ComputeDifficultyChangePeriod",
 						[
 							98u8, 252u8, 116u8, 72u8, 26u8, 180u8, 225u8, 83u8, 200u8, 157u8,
 							125u8, 151u8, 53u8, 76u8, 168u8, 26u8, 10u8, 9u8, 98u8, 68u8, 9u8,
@@ -14850,9 +14912,9 @@ pub mod api {
 						"BlockForkPower",
 						(),
 						[
-							137u8, 232u8, 93u8, 110u8, 147u8, 13u8, 157u8, 77u8, 23u8, 96u8, 67u8,
-							61u8, 98u8, 49u8, 57u8, 201u8, 103u8, 237u8, 226u8, 254u8, 215u8, 42u8,
-							26u8, 177u8, 235u8, 145u8, 79u8, 168u8, 174u8, 215u8, 60u8, 139u8,
+							177u8, 21u8, 184u8, 28u8, 105u8, 220u8, 13u8, 80u8, 235u8, 223u8, 33u8,
+							203u8, 183u8, 28u8, 238u8, 217u8, 63u8, 116u8, 35u8, 176u8, 249u8,
+							209u8, 202u8, 105u8, 26u8, 221u8, 125u8, 13u8, 179u8, 68u8, 44u8, 34u8,
 						],
 					)
 				}
@@ -22773,6 +22835,7 @@ pub mod api {
 					crate_path = ":: subxt :: ext :: subxt_core :: ext :: scale_encode"
 				)]
 				pub struct ForkPower {
+					pub is_latest_vote: ::core::primitive::bool,
 					#[codec(compact)]
 					pub notebooks: ::core::primitive::u64,
 					pub voting_power: runtime_types::primitive_types::U256,

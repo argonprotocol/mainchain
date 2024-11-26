@@ -204,8 +204,8 @@ where
 			StateAction::ApplyChanges(StorageChanges::Changes(proposal.storage_changes));
 		let post_hash = block_import_params.post_hash();
 
-		tracing::info!(
-			"🔖 Pre-sealed block for proposal at {}. Hash now {:?}, previously {:?}.",
+		tracing::trace!(
+			"🔖 Pre-sealed block for proposal at {}. Hash now {}, previously {}.",
 			block_number,
 			post_hash,
 			pre_hash,

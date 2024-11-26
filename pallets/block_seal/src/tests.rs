@@ -215,7 +215,7 @@ fn it_should_be_able_to_submit_a_seal() {
 		assert_eq!(voting_schedule.eligible_votes_tick(), 4);
 		assert!(!BlockSeal::has_eligible_votes());
 		BlocksAtTick::mutate(|a| {
-			a.insert(voting_schedule.grandparent_votes_tick(), System::block_hash(2));
+			a.insert(voting_schedule.grandparent_votes_tick(), vec![System::block_hash(2)]);
 		});
 		assert!(!BlockSeal::has_eligible_votes());
 		RegisteredDomains::mutate(|a| {
@@ -363,14 +363,14 @@ fn it_checks_that_votes_are_for_great_grandpa_tick() {
 		GrandpaVoteMinimum::set(Some(500));
 
 		BlocksAtTick::mutate(|a| {
-			a.insert(voting_schedule.grandparent_votes_tick() - 1, vote.block_hash);
+			a.insert(voting_schedule.grandparent_votes_tick() - 1, vec![vote.block_hash]);
 		});
 		assert_err!(
 			BlockSeal::verify_block_vote(U256::from(1), &vote, &Alice.into(), &voting_schedule,),
 			Error::<Test>::InvalidVoteGrandparentHash
 		);
 		BlocksAtTick::mutate(|a| {
-			a.insert(voting_schedule.grandparent_votes_tick(), vote.block_hash);
+			a.insert(voting_schedule.grandparent_votes_tick(), vec![vote.block_hash]);
 		});
 		// still errors, but moves past the invalid vote hash
 		assert_err!(
@@ -598,7 +598,7 @@ fn it_can_find_best_vote_seals() {
 		let voting_schedule = VotingSchedule::when_evaluating_runtime_votes(5);
 		BlocksAtTick::mutate(|a| {
 			for i in 1..5 {
-				a.insert(i as Tick, System::block_hash(i));
+				a.insert(i as Tick, vec![System::block_hash(i)]);
 			}
 		});
 
@@ -705,7 +705,7 @@ fn it_checks_tax_votes() {
 		let voting_schedule = VotingSchedule::when_evaluating_runtime_seals(tick);
 
 		BlocksAtTick::mutate(|a| {
-			a.insert(voting_schedule.grandparent_votes_tick(), vote.block_hash);
+			a.insert(voting_schedule.grandparent_votes_tick(), vec![vote.block_hash]);
 		});
 		GrandpaVoteMinimum::set(Some(501));
 		let seal_strength = vote.get_seal_strength(1, H256::random());

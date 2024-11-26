@@ -288,27 +288,33 @@ where
 			},
 			&task_manager,
 		);
-
-		let grandpa_config = sc_consensus_grandpa::Config {
-			// FIXME #1578 make this available through chainspec
-			gossip_duration: Duration::from_millis(333),
-			justification_generation_period: GRANDPA_JUSTIFICATION_PERIOD,
-			name: Some(name),
-			observer_enabled: false,
-			keystore: Some(keystore_container.keystore()),
-			local_role: role,
-			telemetry: telemetry.as_ref().map(|x| x.handle()),
-			protocol_name: grandpa_protocol_name,
-		};
-
-		// start the full GRANDPA voter
+	}
+	// grandpa voter task
+	{
+		// TODO: we need to create a keystore for each grandpa voter we want to run. Probably a
+		// service 	 that can dynamically allocate an deallocate voters with restricted/filtered
+		// keystore access start the full GRANDPA voter
 		// NOTE: non-authorities could run the GRANDPA observer protocol, but at
 		// this point the full voter should provide better guarantees of block
 		// and vote data availability than the observer. The observer has not
 		// been tested extensively yet and having most nodes in a network run it
 		// could lead to finality stalls.
-		let grandpa_config = sc_consensus_grandpa::GrandpaParams {
-			config: grandpa_config,
+		let grandpa_voter = sc_consensus_grandpa::GrandpaParams {
+			config: sc_consensus_grandpa::Config {
+				// FIXME #1578 make this available through chainspec
+				gossip_duration: Duration::from_millis(333),
+				justification_generation_period: GRANDPA_JUSTIFICATION_PERIOD,
+				name: Some(name),
+				observer_enabled: false,
+				keystore: if role.is_authority() {
+					Some(keystore_container.keystore())
+				} else {
+					None
+				},
+				local_role: role,
+				telemetry: telemetry.as_ref().map(|x| x.handle()),
+				protocol_name: grandpa_protocol_name,
+			},
 			link: grandpa_link,
 			network,
 			sync: Arc::new(sync_service),
@@ -325,7 +331,7 @@ where
 		task_manager.spawn_essential_handle().spawn_blocking(
 			"grandpa-voter",
 			None,
-			sc_consensus_grandpa::run_grandpa_voter(grandpa_config)?,
+			sc_consensus_grandpa::run_grandpa_voter(grandpa_voter)?,
 		);
 	}
 	start_network.start_network();

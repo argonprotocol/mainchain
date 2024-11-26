@@ -334,13 +334,13 @@ fn it_will_adjust_difficulty() {
 		assert_ok!(PastComputeBlockTimes::<Test>::try_mutate(|a| {
 			a.try_append(&mut vec![100, 100, 100, 100, 100, 100, 100, 100, 100, 1])
 		}));
-		System::set_block_number(2);
+		System::set_block_number(10);
 
 		let start_difficulty = BlockSealSpec::compute_difficulty();
 
 		BlockSealSpec::on_timestamp_set(2);
-		BlockSealSpec::on_initialize(1);
-		BlockSealSpec::on_finalize(1);
+		BlockSealSpec::on_initialize(10);
+		BlockSealSpec::on_finalize(10);
 
 		System::assert_last_event(
 			Event::ComputeDifficultyAdjusted {
@@ -352,7 +352,7 @@ fn it_will_adjust_difficulty() {
 			.into(),
 		);
 		assert_ne!(BlockSealSpec::compute_difficulty(), start_difficulty);
-		assert_eq!(PastComputeBlockTimes::<Test>::get().len(), 1);
+		assert_eq!(PastComputeBlockTimes::<Test>::get().len(), ChangePeriod::get() as usize);
 	});
 }
 

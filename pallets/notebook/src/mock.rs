@@ -145,7 +145,7 @@ impl TickProvider<Block> for StaticTickProvider {
 	fn ticker() -> Ticker {
 		Ticker::new(1, 2)
 	}
-	fn block_at_tick(_: Tick) -> Option<H256> {
+	fn blocks_at_tick(_: Tick) -> Vec<H256> {
 		todo!()
 	}
 	fn voting_schedule() -> VotingSchedule {

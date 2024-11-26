@@ -1381,6 +1381,7 @@ dependencies = [
  "lazy_static",
  "num_cpus",
  "rand",
+ "regex",
  "sp-core",
  "sp-keyring",
  "sqlx",
@@ -4044,6 +4045,7 @@ dependencies = [
  "rand",
  "sp-arithmetic",
  "sp-core",
+ "sp-keyring",
  "subxt",
  "tokio",
 ]
