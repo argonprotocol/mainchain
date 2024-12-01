@@ -30,7 +30,7 @@ pub fn development_config() -> Result<ChainSpec, String> {
 	.with_properties(properties)
 	.with_genesis_config_patch(testnet_genesis(GenesisSettings {
 		// You have to have an authority to start the chain
-		founding_grandpas: vec![(authority_keys_from_seed("Alice").grandpa, 10)],
+		founding_grandpas: vec![(authority_keys_from_seed("Alice").grandpa, 1)],
 		sudo_key: get_account_id_from_seed::<sr25519::Public>("Alice"),
 		bitcoin_network: BitcoinNetwork::Regtest,
 		bitcoin_tip_operator: get_account_id_from_seed::<sr25519::Public>("Dave"),

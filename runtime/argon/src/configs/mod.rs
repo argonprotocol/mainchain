@@ -42,7 +42,7 @@ use pallet_mining_slot::OnNewSlot;
 use pallet_notebook::NotebookVerifyError;
 use pallet_tx_pause::RuntimeCallNameOf;
 use sp_arithmetic::{FixedU128, Perbill};
-use sp_runtime::traits::{BlakeTwo256, Zero};
+use sp_runtime::traits::BlakeTwo256;
 use sp_version::RuntimeVersion;
 
 pub type AccountData = pallet_balances::AccountData<Balance>;
@@ -341,9 +341,13 @@ impl OnNewSlot<AccountId> for GrandpaSlotRotation {
 			next_authorities.push((authority_id, 1));
 		}
 
-		if let Err(err) = Grandpa::schedule_change(next_authorities, Zero::zero(), None) {
-			log::error!("Failed to schedule grandpa change: {:?}", err);
-		}
+		// TODO: we need to be able to run multiple grandpas on a single miner before activating
+		// 	changing the authorities. We want to activate a trailing 3 hours of miners who closed
+		// blocks 	to activate a more decentralized grandpa process
+		//
+		// if let Err(err) = Grandpa::schedule_change(next_authorities, Zero::zero(), None) {
+		// 	log::error!("Failed to schedule grandpa change: {:?}", err);
+		// }
 	}
 }
 
