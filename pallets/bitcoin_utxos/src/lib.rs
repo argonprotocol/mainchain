@@ -81,6 +81,10 @@ pub mod pallet {
 	pub(super) type ConfirmedBitcoinBlockTip<T: Config> =
 		StorageValue<_, BitcoinBlock, OptionQuery>;
 
+	/// Stores if parent block had a confirmed bitcoin block
+	#[pallet::storage]
+	pub(super) type TempParentHasSyncState<T: Config> = StorageValue<_, bool, ValueQuery>;
+
 	/// The last synched bitcoin block
 	#[pallet::storage]
 	pub(super) type SynchedBitcoinBlock<T: Config> = StorageValue<_, BitcoinBlock, OptionQuery>;
@@ -161,9 +165,15 @@ pub mod pallet {
 	}
 	#[pallet::hooks]
 	impl<T: Config> Hooks<BlockNumberFor<T>> for Pallet<T> {
+		fn on_initialize(_: BlockNumberFor<T>) -> Weight {
+			TempParentHasSyncState::<T>::put(ConfirmedBitcoinBlockTip::<T>::get().is_some());
+			// 1 write is temporary
+			T::DbWeight::get().reads_writes(2, 1)
+		}
+
 		fn on_finalize(_: BlockNumberFor<T>) {
 			// If we have started synching bitcoin blocks, inherent must be included
-			if SynchedBitcoinBlock::<T>::exists() {
+			if TempParentHasSyncState::<T>::get() {
 				// According to parity, the only way to ensure that a mandatory inherent is included
 				// is by checking on block finalization that the inherent set a particular storage
 				// item: https://github.com/paritytech/polkadot-sdk/issues/2841#issuecomment-1876040854
@@ -190,6 +200,8 @@ pub mod pallet {
 			);
 
 			ensure!(!InherentIncluded::<T>::get(), "Inherent already included");
+			// this ensures we can be sure the inherent was included in a relay chain
+			InherentIncluded::<T>::put(true);
 
 			let current_confirmed =
 				ConfirmedBitcoinBlockTip::<T>::get().ok_or(Error::<T>::NoBitcoinConfirmedBlock)?;
@@ -264,9 +276,6 @@ pub mod pallet {
 				}
 			}
 			<SynchedBitcoinBlock<T>>::set(Some(utxo_sync.sync_to_block));
-
-			// this ensures we can be sure the inherent was included in a relay chain
-			InherentIncluded::<T>::put(true);
 
 			Ok(())
 		}
