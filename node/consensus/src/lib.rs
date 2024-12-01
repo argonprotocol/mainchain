@@ -2,7 +2,7 @@ use crate::{
 	aux_client::ArgonAux,
 	block_creator::BlockCreator,
 	compute_worker::{run_compute_solver_threads, ComputeHandle},
-	notary_client::{run_notary_sync, VotingPowerInfo},
+	notary_client::VotingPowerInfo,
 	notebook_sealer::NotebookSealer,
 };
 use argon_bitcoin_utxo_tracker::UtxoTracker;
@@ -38,6 +38,7 @@ pub mod error;
 pub mod import_queue;
 pub(crate) mod notary_client;
 pub(crate) mod notebook_sealer;
+pub use notary_client::{run_notary_sync, NotaryClient};
 
 use crate::{compute_worker::ComputeState, notebook_sealer::create_vote_seal};
 pub use import_queue::create_import_queue;
@@ -75,6 +76,9 @@ pub struct BlockBuilderParams<
 	pub select_chain: SC,
 	/// How many mining threads to activate
 	pub compute_threads: u32,
+
+	/// A notary client to verify notebooks
+	pub notary_client: Arc<NotaryClient<Block, Client, A>>,
 }
 
 pub fn run_block_builder_task<Block, BI, C, PF, A, SC, SO, JS>(
@@ -102,8 +106,6 @@ pub fn run_block_builder_task<Block, BI, C, PF, A, SC, SO, JS>(
 	SO: SyncOracle + Clone + Send + Sync + 'static,
 	JS: sc_consensus::JustificationSyncLink<Block> + Clone + Send + Sync + 'static,
 {
-	let (notebook_tick_tx, mut notebook_tick_rx) =
-		tracing_unbounded("node::consensus::notebook_tick_stream", 100);
 	let (compute_block_tx, mut compute_block_rx) =
 		tracing_unbounded("node::consensus::compute_block_stream", 10);
 	let (tax_vote_sender, mut tax_vote_rx) = tracing_unbounded("node::consensus::tax_votes", 1000);
@@ -113,6 +115,7 @@ pub fn run_block_builder_task<Block, BI, C, PF, A, SC, SO, JS>(
 		block_import,
 		client,
 		proposer,
+		notary_client,
 		authoring_duration,
 		keystore,
 		aux_client,
@@ -138,8 +141,6 @@ pub fn run_block_builder_task<Block, BI, C, PF, A, SC, SO, JS>(
 		let best_hash = client.info().best_hash;
 		client.runtime_api().ticker(best_hash).expect("Ticker not available")
 	};
-	let idle_delay = if ticker.tick_duration_millis <= 10_000 { 100 } else { 1000 };
-	run_notary_sync(task_manager, client.clone(), aux_client.clone(), notebook_tick_tx, idle_delay);
 
 	let compute_handle = ComputeHandle::new(compute_block_tx);
 
@@ -210,7 +211,9 @@ pub fn run_block_builder_task<Block, BI, C, PF, A, SC, SO, JS>(
 
 	let block_finder_task = async move {
 		let mut import_stream = client.every_import_notification_stream();
+		let idle_delay = if ticker.tick_duration_millis <= 10_000 { 100 } else { 1000 };
 		let idle_delay = Duration::from_millis(idle_delay);
+		let mut notebook_tick_rx = notary_client.tick_voting_power_receiver.lock().await;
 
 		let compute_state = ComputeState::new(compute_handle.clone(), client.clone(), ticker);
 		loop {

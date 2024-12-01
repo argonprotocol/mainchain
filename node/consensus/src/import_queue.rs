@@ -1,15 +1,12 @@
-use crate::{
-	aux_client::ArgonAux, compute_worker::BlockComputeNonce, error::Error,
-	notary_client::verify_notebook_audits,
-};
+use crate::{aux_client::ArgonAux, compute_worker::BlockComputeNonce, error::Error, NotaryClient};
 use argon_bitcoin_utxo_tracker::{get_bitcoin_inherent, UtxoTracker};
 use argon_primitives::{
 	fork_power::ForkPower,
 	inherents::{BitcoinInherentDataProvider, BlockSealInherentDataProvider},
 	Balance, BitcoinApis, BlockCreatorApis, BlockSealApis, BlockSealAuthorityId, BlockSealDigest,
-	NotebookApis,
+	NotaryApis, NotebookApis,
 };
-use argon_runtime::NotebookVerifyError;
+use argon_runtime::{NotaryRecordT, NotebookVerifyError};
 use codec::Codec;
 use sc_client_api::{self, backend::AuxStore};
 use sc_consensus::{
@@ -112,7 +109,7 @@ where
 #[allow(dead_code)]
 struct Verifier<B: BlockT, C: AuxStore, AC> {
 	client: Arc<C>,
-	aux_client: ArgonAux<B, C>,
+	notary_client: Arc<NotaryClient<B, C, AC>>,
 	utxo_tracker: Arc<UtxoTracker>,
 	telemetry: Option<TelemetryHandle>,
 	_phantom: PhantomData<AC>,
@@ -126,7 +123,8 @@ where
 		+ BitcoinApis<B, Balance>
 		+ BlockSealApis<B, AC, BlockSealAuthorityId>
 		+ BlockCreatorApis<B, AC, NotebookVerifyError>
-		+ NotebookApis<B, NotebookVerifyError>,
+		+ NotebookApis<B, NotebookVerifyError>
+		+ NotaryApis<B, NotaryRecordT>,
 	AC: Codec + Clone + Send + Sync + 'static,
 {
 	async fn verify(
@@ -179,7 +177,7 @@ where
 				.digest_notebooks(parent_hash, digest)
 				.map_err(|e| format!("Error calling digest notebooks api {e:?}"))?
 				.map_err(|e| format!("Failed to get digest notebooks: {:?}", e))?;
-			verify_notebook_audits(&self.aux_client, digest_notebooks).await?;
+			self.notary_client.verify_notebook_audits(digest_notebooks).await?;
 		}
 
 		// NOTE: we verify compute nonce in import queue because we use the pre-hash, which
@@ -249,9 +247,11 @@ where
 }
 
 /// Start an import queue which checks blocks' seals and inherent data.
+#[allow(clippy::too_many_arguments)]
 pub fn create_import_queue<C, B, I, AC>(
 	client: Arc<C>,
 	aux_client: ArgonAux<B, C>,
+	notary_client: Arc<NotaryClient<B, C, AC>>,
 	block_import: I,
 	spawner: &impl sp_core::traits::SpawnEssentialNamed,
 	registry: Option<&substrate_prometheus_endpoint::Registry>,
@@ -267,20 +267,21 @@ where
 		+ BlockCreatorApis<B, AC, NotebookVerifyError>
 		+ BitcoinApis<B, Balance>
 		+ BlockSealApis<B, AC, BlockSealAuthorityId>
-		+ NotebookApis<B, NotebookVerifyError>,
+		+ NotebookApis<B, NotebookVerifyError>
+		+ NotaryApis<B, NotaryRecordT>,
 	AC: Codec + Clone + Send + Sync + 'static,
 	I: BlockImport<B, Error = ConsensusError> + Send + Sync + 'static,
 {
 	let importer = ArgonBlockImport {
 		inner: block_import,
 		client: client.clone(),
-		aux_client: ArgonAux::new(client.clone()),
+		aux_client,
 		_phantom: PhantomData,
 	};
 	let verifier = Verifier::<B, C, AC> {
 		client: client.clone(),
 		utxo_tracker,
-		aux_client,
+		notary_client,
 		telemetry,
 		_phantom: PhantomData,
 	};
