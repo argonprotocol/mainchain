@@ -7,7 +7,7 @@ use core::convert::TryInto;
 use scale_info::TypeInfo;
 use sp_arithmetic::{FixedI128, FixedU128};
 use sp_core::RuntimeDebug;
-use sp_runtime::traits::{CheckedDiv, One, Zero};
+use sp_runtime::traits::{CheckedDiv, One};
 
 use argon_primitives::{tick::Tick, ArgonCPI};
 pub use pallet::*;
@@ -54,7 +54,7 @@ impl PriceIndex {
 		let ratio = self
 			.argon_usd_target_price
 			.checked_div(&self.argon_usd_price)
-			.unwrap_or(FixedU128::zero());
+			.unwrap_or(FixedU128::one());
 		ArgonCPI::from_inner(ratio.into_inner() as i128) - FixedI128::one()
 	}
 }
