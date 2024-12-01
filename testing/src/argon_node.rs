@@ -41,38 +41,41 @@ lazy_static! {
 	static ref CONTEXT_LOCK: std::sync::Mutex<()> = std::sync::Mutex::new(());
 }
 impl ArgonTestNode {
-	pub async fn start(
+	pub async fn start_with_bitcoin_rpc(
 		authority: &str,
 		compute_miners: u16,
 		bootnodes: &str,
+		bitcoin_rpc: Url,
 	) -> anyhow::Result<Self> {
-		#[allow(clippy::await_holding_lock)]
-		let _lock = CONTEXT_LOCK.lock().unwrap();
-
-		let (bitcoin, rpc_url, _) = start_bitcoind().map_err(|e| {
-			eprintln!("ERROR starting bitcoind {:#?}", e);
-			e
-		})?;
-		let overall_log = env::var("RUST_LOG").unwrap_or("info".to_string());
-		let argon_log = match overall_log.as_str() {
-			"trace" => "trace",
-			"debug" => "debug",
-			_ => "warn",
-		};
-
-		let rust_log = format!("{},node=info,argon={},sc_rpc_server=info", overall_log, argon_log);
-
 		let target_dir = get_target_dir();
 
 		println!(
 			"Starting argon-node with bitcoin rpc url: {} at {}",
-			rpc_url,
+			bitcoin_rpc,
 			target_dir.display()
+		);
+		let overall_log = env::var("RUST_LOG").unwrap_or("info".to_string());
+		let mut argon_log = match overall_log.as_str() {
+			"trace" => "trace",
+			"debug" => "debug",
+			_ => "warn",
+		};
+		let node_log = match authority {
+			"bob" => {
+				argon_log = "trace";
+				"trace"
+			},
+			_ => "info",
+		};
+
+		let rust_log = format!(
+			"{},node={},runtime=trace,argon={},sc_rpc_server=info",
+			overall_log, node_log, argon_log
 		);
 
 		let keyring = Sr25519Keyring::from_str(authority).expect("Invalid authority");
 		let bootnodes_arg = if bootnodes.is_empty() {
-			format!("-l{}", overall_log)
+			"--".to_string()
 		} else {
 			format!("--bootnodes={}", bootnodes)
 		};
@@ -84,12 +87,13 @@ impl ArgonTestNode {
 			.arg("--dev")
 			.arg("--detailed-log-output")
 			.arg("--allow-private-ipv4")
+			.arg("--state-pruning=archive")
 			.arg(format!("--{}", authority.to_lowercase()))
 			.arg(format!("--name={}", authority.to_lowercase()))
 			.arg("--port=0")
 			.arg("--rpc-port=0")
 			.arg(format!("--compute-miners={}", compute_miners))
-			.arg(format!("--bitcoin-rpc-url={}", rpc_url))
+			.arg(format!("--bitcoin-rpc-url={}", bitcoin_rpc))
 			.arg(bootnodes_arg)
 			.spawn()?;
 
@@ -113,8 +117,8 @@ impl ArgonTestNode {
 		Ok(ArgonTestNode {
 			proc: Some(proc),
 			client,
-			bitcoind: Some(bitcoin),
-			bitcoin_rpc_url: Some(rpc_url),
+			bitcoind: None,
+			bitcoin_rpc_url: Some(bitcoin_rpc),
 			account_id: keyring.to_account_id(),
 			author_keyring_name: authority.to_string(),
 			boot_url: listen_urls
@@ -124,6 +128,28 @@ impl ArgonTestNode {
 				.clone(),
 			log_watcher: log_watch,
 		})
+	}
+
+	pub async fn start(
+		authority: &str,
+		compute_miners: u16,
+		bootnodes: &str,
+	) -> anyhow::Result<Self> {
+		#[allow(clippy::await_holding_lock)]
+		let _lock = CONTEXT_LOCK.lock().unwrap();
+
+		let (bitcoin, rpc_url, _) = start_bitcoind().map_err(|e| {
+			eprintln!("ERROR starting bitcoind {:#?}", e);
+			e
+		})?;
+		let mut node =
+			Self::start_with_bitcoin_rpc(authority, compute_miners, bootnodes, rpc_url).await?;
+		node.bitcoind = Some(bitcoin);
+		Ok(node)
+	}
+
+	pub fn keyring(&self) -> Sr25519Keyring {
+		Sr25519Keyring::from_str(self.author_keyring_name.as_str()).expect("Invalid keyring")
 	}
 
 	/// Inserts a key into the keystore and returns the public key.

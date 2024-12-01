@@ -1,5 +1,3 @@
-use std::{env, str::FromStr, sync::Arc};
-
 use bitcoin::{
 	bip32::{ChildNumber, DerivationPath, Fingerprint, Xpub},
 	hashes::Hash,
@@ -13,8 +11,9 @@ use bitcoind::{
 };
 use sp_arithmetic::FixedU128;
 use sp_core::{crypto::AccountId32, sr25519, Pair};
+use std::{env, str::FromStr, sync::Arc};
 
-use crate::utils::{bankroll_miners, register_miner};
+use crate::utils::{bankroll_miners, create_active_notary, register_miner};
 use anyhow::anyhow;
 use argon_bitcoin::{CosignScript, CosignScriptArgs};
 use argon_client::{
@@ -44,6 +43,8 @@ use tokio::fs;
 #[tokio::test(flavor = "multi_thread")]
 async fn test_bitcoin_minting_e2e() {
 	let test_node = start_argon_test_node().await;
+	// need a test notary to get ownership rewards, so we can actually mint.
+	let _test_notary = create_active_notary(&test_node).await.expect("Notary registered");
 	let bitcoind = test_node.bitcoind.as_ref().expect("bitcoind");
 	let block_creator = add_wallet_address(bitcoind);
 	bitcoind.client.generate_to_address(101, &block_creator).unwrap();
@@ -123,19 +124,6 @@ async fn test_bitcoin_minting_e2e() {
 
 	let alice_signer = Sr25519Signer::new(alice_sr25519.clone());
 
-	bankroll_miners(
-		&test_node,
-		&alice_signer,
-		vec![Bob.to_account_id(), Eve.to_account_id()],
-		true,
-	)
-	.await
-	.unwrap();
-	register_miner(&test_node, Bob)
-		.await
-		.inspect_err(|e| println!("Error registering miner: {:?}", e))
-		.expect("miner eve");
-
 	let _ = run_bitcoin_cli(&test_node, vec!["vault", "list", "--btc", &utxo_btc.to_string()])
 		.await
 		.unwrap();
@@ -177,6 +165,35 @@ async fn test_bitcoin_minting_e2e() {
 		fund_script_address(bitcoind, &scriptaddress, utxo_satoshis, &block_creator);
 
 	add_blocks(bitcoind, 5, &block_creator);
+	let miner_node = ArgonTestNode::start_with_bitcoin_rpc(
+		"bob",
+		0,
+		&test_node.boot_url,
+		test_node.bitcoin_rpc_url.clone().unwrap(),
+	)
+	.await
+	.unwrap();
+	// start miners so that we have ownership tokens to mint against
+	bankroll_miners(&test_node, &alice_signer, vec![Bob.to_account_id()], false)
+		.await
+		.unwrap();
+	// wait for miner_node to catch up
+
+	let finalized =
+		test_node.client.latest_finalized_block_hash().await.expect("should get latest");
+	let mut miner_node_catchup_sub =
+		miner_node.client.live.blocks().subscribe_finalized().await.unwrap();
+	while let Some(next) = miner_node_catchup_sub.next().await {
+		let next = next.unwrap();
+		println!("Got next finalized catching up to main node {:?}", next.header().number);
+		if next.hash().as_ref() == finalized.hash().as_ref() {
+			break;
+		}
+	}
+	register_miner(&miner_node, Bob)
+		.await
+		.inspect_err(|e| println!("Error registering miner: {:?}", e))
+		.expect("miner eve");
 
 	wait_for_mint(&bob_sr25519, &client, &utxo_id, bond_amount, txid, vout)
 		.await
@@ -468,14 +485,27 @@ async fn wait_for_mint(
 	vout: u32,
 ) -> anyhow::Result<()> {
 	let mut finalized_sub = client.live.blocks().subscribe_finalized().await?;
-	while let Some(block) = finalized_sub.next().await {
-		let block = block?;
-		let utxo_verified =
-			block.events().await?.find_first::<api::bitcoin_utxos::events::UtxoVerified>()?;
-		if let Some(utxo_verified) = utxo_verified {
-			if utxo_verified.utxo_id == 1 {
-				println!("Utxo verified in Argon mainchain");
-				break;
+	let pending_utxos = client
+		.fetch_storage(&storage().bitcoin_utxos().utxos_pending_confirmation(), None)
+		.await?
+		.unwrap()
+		.0;
+	if !pending_utxos.is_empty() {
+		println!("Waiting for pending utxo to be verified {:?}", pending_utxos);
+		let mut counter = 0;
+		while let Some(block) = finalized_sub.next().await {
+			let block = block?;
+			let utxo_verified =
+				block.events().await?.find_first::<api::bitcoin_utxos::events::UtxoVerified>()?;
+			if let Some(utxo_verified) = utxo_verified {
+				if utxo_verified.utxo_id == 1 {
+					println!("Utxo verified in Argon mainchain");
+					break;
+				}
+			}
+			counter += 1;
+			if counter >= 20 {
+				panic!("No mint after 100 blocks")
 			}
 		}
 	}
@@ -511,15 +541,22 @@ async fn wait_for_mint(
 		assert!(balance.free > (bond_amount - pending_mint.0[0].2));
 
 		// 4. Wait for the full payout
+		let mut counter = 0;
 		while let Some(_block) = finalized_sub.next().await {
 			let pending_mint = client
 				.fetch_storage(&storage().mint().pending_mint_utxos(), None)
 				.await?
 				.expect("pending mint");
+			println!("Pending mint {:?}", pending_mint);
 			if pending_mint.0.is_empty() {
 				break;
 			}
+			counter += 1;
+			if counter >= 20 {
+				panic!("Didn't ming remaining minted")
+			}
 		}
+		println!("Owner minted full bitcoin")
 	}
 	Ok(())
 }

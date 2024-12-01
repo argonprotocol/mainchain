@@ -1,11 +1,4 @@
-use std::{
-	env,
-	io::{BufRead, BufReader},
-	process,
-	process::Command,
-	sync::{mpsc, Arc},
-	thread,
-};
+use std::{env, process, process::Command, sync::Arc, thread};
 
 use anyhow::Context;
 use argon_client::{
@@ -20,12 +13,14 @@ use argon_client::{
 	MainchainClient,
 };
 use rand::seq::SliceRandom;
-use sp_core::{crypto::Pair, ed25519};
+use sp_core::{
+	crypto::{Pair, Ss58Codec},
+	ed25519,
+};
 use sqlx::{postgres::PgPoolOptions, PgPool};
-use strip_ansi_escapes::strip;
-use tokio::{runtime::Runtime, task::spawn_blocking};
+use tokio::runtime::Runtime;
 
-use crate::{get_target_dir, ArgonTestNode};
+use crate::{get_target_dir, log_watcher::LogWatcher, ArgonTestNode};
 
 pub struct ArgonTestNotary {
 	// Keep a handle to the node; once it's dropped the node is killed.
@@ -108,33 +103,28 @@ impl ArgonTestNotary {
 			.current_dir(&target_dir)
 			.env("RUST_LOG", rust_log)
 			.stdout(process::Stdio::piped())
-			.args(vec!["run", "--db-url", &db_url, "--dev", "-t", &node.client.url])
+			.args(vec![
+				"run",
+				"--db-url",
+				&db_url,
+				"--dev",
+				"--operator-address",
+				&operator.public().to_ss58check(),
+				"-t",
+				&node.client.url,
+			])
 			.spawn()?;
 
 		// Wait for RPC port to be logged (it's logged to stdout).
 		let stdout = proc.stdout.take().unwrap();
-		let stdout_reader = BufReader::new(stdout);
-		let (tx, rx) = mpsc::channel();
+		let log_watcher = LogWatcher::new(stdout);
+		let ws_url = log_watcher
+			.wait_for_log(r"Listening on (ws://[\d:.]+)", 1)
+			.await?
+			.first()
+			.expect("No ws url found")
+			.clone();
 
-		let tx_clone = tx.clone();
-
-		spawn_blocking(move || {
-			for line in stdout_reader.lines() {
-				let line = line.expect("failed to obtain next line from stdout");
-				let cleaned_log = strip(&line);
-				println!("NOTARY>> {}", String::from_utf8_lossy(&cleaned_log));
-
-				let line_port = line.rsplit_once("Listening on ws://").map(|(_, port)| port);
-
-				if let Some(line_port) = line_port {
-					let line_port = line_port.trim_end_matches(|b: char| !b.is_ascii_digit());
-					let ws_url = format!("ws://{}", line_port);
-					tx_clone.send(ws_url).unwrap();
-				}
-			}
-		});
-
-		let ws_url = rx.recv().expect("Failed to start notary");
 		let client = argon_notary_apis::create_client(&ws_url).await?;
 		Ok(Self {
 			proc: Some(proc),
