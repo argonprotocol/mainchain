@@ -22,7 +22,7 @@ pub mod pallet {
 		traits::fungible::{Inspect, Mutate},
 	};
 	use frame_system::pallet_prelude::*;
-	use log::warn;
+	use log::{trace, warn};
 	use sp_arithmetic::FixedI128;
 	use sp_core::U256;
 	use sp_runtime::{
@@ -115,14 +115,12 @@ pub mod pallet {
 			let argon_cpi = T::PriceProvider::get_argon_cpi().unwrap_or_default();
 			// only mint when cpi is negative
 			if !argon_cpi.is_negative() {
+				trace!("Argon cpi is non-negative. Nothing to mint.");
 				return T::DbWeight::get().reads(1);
 			}
 
 			// if there are no miners registered, we can't mint
 			let reward_accounts = T::BlockRewardAccountsProvider::get_all_rewards_accounts();
-			if reward_accounts.is_empty() {
-				return T::DbWeight::get().reads(2);
-			}
 
 			let argons_to_print_per_miner =
 				Self::get_argons_to_print_per_miner(argon_cpi, reward_accounts.len() as u128);
@@ -246,6 +244,12 @@ pub mod pallet {
 			let argons_to_print = argons_to_print as u128;
 
 			let per_miner = argons_to_print.checked_div(active_miners).unwrap_or_default();
+			trace!(
+				"Minting {} milligons. Circulation = {}. Per miner {}",
+				argons_to_print,
+				circulation.saturating_mul_int(1u128),
+				per_miner
+			);
 
 			per_miner.unique_saturated_into()
 		}
