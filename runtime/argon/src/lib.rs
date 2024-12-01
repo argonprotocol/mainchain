@@ -383,6 +383,10 @@ impl_runtime_apis! {
 		fn is_valid_signature(block_hash: <Block as BlockT>::Hash, seal: &BlockSealDigest, digest: &Digest) -> bool {
 			BlockSeal::is_valid_miner_signature(block_hash, seal, digest)
 		}
+
+		fn is_bootstrap_mining() -> bool {
+			!MiningSlot::is_registered_mining_active()
+		}
 	}
 
 	impl argon_primitives::BlockCreatorApis<Block, AccountId, NotebookVerifyError> for Runtime {

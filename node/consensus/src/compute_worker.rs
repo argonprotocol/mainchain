@@ -35,7 +35,12 @@ pub(crate) struct MiningMetadata<H> {
 	pub best_hash: H,
 	/// The time at which mining is activated (in milliseconds).
 	pub activate_mining_time: u64,
-	pub has_tax_votes: bool,
+	/// The time at which we should emergency submit notebooks (in milliseconds).
+	pub submit_notebooks_time: u64,
+	/// Are there valid votes for the block?
+	pub has_eligible_votes: bool,
+	/// Is the node bootstrap mining
+	pub is_bootstrap_mining: bool,
 	/// At which tick do we kick in mining no matter what?
 	pub emergency_tick: Tick,
 	/// The randomx key block hash.
@@ -84,23 +89,6 @@ where
 		self.increment_version();
 	}
 
-	pub(crate) fn new_best_block(&self, metadata: MiningMetadata<B::Hash>) {
-		self.stop_solving_current();
-		*self.metadata.lock() = Some(metadata);
-	}
-
-	pub(crate) fn start_solving(&self, proposal: BlockProposal<B, Proof>) {
-		let best_hash = proposal.proposal.block.header().parent_hash();
-		if self.best_hash() != Some(*best_hash) {
-			self.stop_solving_current();
-			return;
-		}
-		let difficulty = self.metadata.lock().as_ref().map(|x| x.difficulty).unwrap_or_default();
-		let pre_hash = proposal.proposal.block.header().hash();
-
-		*self.solving_block.lock() = Some(SolvingBlock { pre_hash, difficulty, proposal });
-	}
-
 	fn increment_version(&self) {
 		self.version.fetch_add(1, Ordering::SeqCst);
 	}
@@ -127,6 +115,27 @@ where
 		self.solving_block.lock().is_some()
 	}
 
+	pub(crate) fn new_best_block(&self, metadata: MiningMetadata<B::Hash>) {
+		self.stop_solving_current();
+		*self.metadata.lock() = Some(metadata);
+	}
+
+	pub(crate) fn start_solving(&self, proposal: BlockProposal<B, Proof>) {
+		let best_hash = proposal.proposal.block.header().parent_hash();
+		if self.best_hash() != Some(*best_hash) {
+			self.stop_solving_current();
+			return;
+		}
+		let difficulty = self.metadata.lock().as_ref().map(|x| x.difficulty).unwrap_or_default();
+		let pre_hash = proposal.proposal.block.header().hash();
+
+		*self.solving_block.lock() = Some(SolvingBlock { pre_hash, difficulty, proposal });
+	}
+
+	pub fn is_valid_solver(&self, solver: &Option<Box<ComputeSolver>>) -> bool {
+		solver.as_ref().map(|a| a.version) == Some(self.version())
+	}
+
 	pub fn create_solver(&self) -> Option<ComputeSolver> {
 		match self.solving_block.lock().as_ref() {
 			Some(x) => {
@@ -143,10 +152,6 @@ where
 		}
 	}
 
-	pub fn is_valid_solver(&self, solver: &Option<Box<ComputeSolver>>) -> bool {
-		solver.as_ref().map(|a| a.version) == Some(self.version())
-	}
-
 	pub fn ready_to_solve(&self, current_tick: Tick, now_millis: u64) -> bool {
 		match self.metadata.lock().as_ref() {
 			Some(x) => {
@@ -155,7 +160,12 @@ where
 					return true;
 				}
 				// must be past the parent tick and not have tax votes
-				if !x.has_tax_votes && x.activate_mining_time < now_millis {
+				if (!x.has_eligible_votes || x.is_bootstrap_mining) &&
+					x.activate_mining_time < now_millis
+				{
+					return true;
+				}
+				if x.solving_with_notebooks_at_tick.1 > 0 && x.submit_notebooks_time < now_millis {
 					return true;
 				}
 				false
@@ -307,6 +317,7 @@ pub trait ComputeApisExt<B: BlockT, AC> {
 	fn best_hash(&self) -> B::Hash;
 	fn genesis_hash(&self) -> B::Hash;
 	fn has_eligible_votes(&self, block_hash: B::Hash) -> Result<bool, Error>;
+	fn is_bootstrap_mining(&self, block_hash: B::Hash) -> Result<bool, Error>;
 	fn compute_puzzle(&self, block_hash: B::Hash) -> Result<ComputePuzzle<B>, Error>;
 }
 
@@ -333,6 +344,10 @@ where
 
 	fn has_eligible_votes(&self, block_hash: B::Hash) -> Result<bool, Error> {
 		self.runtime_api().has_eligible_votes(block_hash).map_err(Into::into)
+	}
+
+	fn is_bootstrap_mining(&self, block_hash: B::Hash) -> Result<bool, Error> {
+		self.runtime_api().is_bootstrap_mining(block_hash).map_err(Into::into)
 	}
 
 	fn compute_puzzle(&self, block_hash: B::Hash) -> Result<ComputePuzzle<B>, Error> {
@@ -384,13 +399,14 @@ where
 				.compute_handle
 				.solving_with_notebooks_at_tick()
 				.unwrap_or((notebook_tick, 0));
-			if notebook_tick == solving_for_tick &&
-				notebooks_at_latest_tick > solving_with_notebooks
+			if notebook_tick > solving_for_tick ||
+				(notebook_tick == solving_for_tick &&
+					notebooks_at_latest_tick > solving_with_notebooks)
 			{
 				tracing::info!(
 					?notebooks_at_latest_tick,
 					tick = notebook_tick - 1,
-					"Found new notebooks at tick. Will try to replace block with compute"
+					"Found new notebooks at tick. Will try to solve tick with compute"
 				);
 				solve_notebook_tick = notebook_tick;
 				notebooks = notebooks_at_latest_tick;
@@ -399,7 +415,9 @@ where
 		}
 
 		if self.compute_handle.best_hash() != Some(best_hash) {
-			let has_tax_votes = self.client.has_eligible_votes(best_hash).unwrap_or_default();
+			let has_eligible_votes = self.client.has_eligible_votes(best_hash).unwrap_or_default();
+			let is_bootstrap_mining =
+				self.client.is_bootstrap_mining(best_hash).unwrap_or_default();
 			let compute_puzzle = self
 				.client
 				.compute_puzzle(best_hash)
@@ -414,8 +432,10 @@ where
 				self.ticker.time_for_tick(solve_notebook_tick + 1) + self.compute_delay;
 			self.compute_handle.new_best_block(MiningMetadata {
 				best_hash,
-				has_tax_votes,
+				has_eligible_votes,
 				activate_mining_time,
+				is_bootstrap_mining,
+				submit_notebooks_time: activate_mining_time + (2 * self.compute_delay),
 				key_block_hash: compute_puzzle.get_key_block(self.genesis_hash),
 				emergency_tick: latest_block_tick + 2,
 				difficulty: compute_puzzle.difficulty,
@@ -442,6 +462,7 @@ mod tests {
 		ticker: Ticker,
 		best_hash: HashOutput,
 		genesis_hash: HashOutput,
+		is_bootstrap_mining: bool,
 		last_block_at_tick: HashMap<Tick, HashOutput>,
 		has_eligible_votes: bool,
 		compute_puzzle: ComputePuzzle<Block>,
@@ -466,6 +487,10 @@ mod tests {
 
 		fn has_eligible_votes(&self, _block_hash: HashOutput) -> Result<bool, Error> {
 			Ok(self.state.lock().has_eligible_votes)
+		}
+
+		fn is_bootstrap_mining(&self, _block_hash: HashOutput) -> Result<bool, Error> {
+			Ok(self.state.lock().is_bootstrap_mining)
 		}
 
 		fn compute_puzzle(&self, _block_hash: HashOutput) -> Result<ComputePuzzle<Block>, Error> {
@@ -528,6 +553,7 @@ mod tests {
 			best_hash: H256::from_slice(&[1u8; 32]),
 			genesis_hash: H256::from_slice(&[0u8; 32]),
 			last_block_at_tick: HashMap::new(),
+			is_bootstrap_mining: false,
 			has_eligible_votes: false,
 			compute_puzzle: ComputePuzzle {
 				difficulty: 1,
@@ -550,12 +576,38 @@ mod tests {
 
 		// if we have more notebooks, we should try to solve against the last block at the tick
 		let notebook_tick = 2;
+		let mut metadata = MiningMetadata {
+			best_hash: H256::from_slice(&[2u8; 32]),
+			has_eligible_votes: false,
+			activate_mining_time: 0,
+			is_bootstrap_mining: false,
+			submit_notebooks_time: 0,
+			key_block_hash: H256::from_slice(&[1u8; 32]),
+			emergency_tick: 0,
+			difficulty: 1,
+			// no notebooks
+			solving_with_notebooks_at_tick: (notebook_tick, 2),
+		};
+		compute_state.compute_handle.new_best_block(metadata.clone());
 		let previous_tick = notebook_tick - 1;
 		state
 			.lock()
 			.last_block_at_tick
 			.insert(previous_tick, H256::from_slice(&[2u8; 32]));
+
 		let best_hash = compute_state.on_new_notebook_tick(Some((notebook_tick, 1, 3)));
-		assert_eq!(best_hash, Some(api.state.lock().last_block_at_tick[&previous_tick]));
+		assert!(best_hash.is_some());
+		// should start solving with new notebooks
+		let notebooks_at_tick = compute_state.compute_handle.solving_with_notebooks_at_tick();
+		assert_eq!(notebooks_at_tick, Some((notebook_tick, 3)));
+
+		metadata.solving_with_notebooks_at_tick = (notebook_tick + 1, 0);
+		compute_state.compute_handle.stop_solving_current();
+		compute_state.compute_handle.new_best_block(metadata);
+		let best_hash = compute_state.on_new_notebook_tick(Some((notebook_tick + 1, 1, 1)));
+		assert!(best_hash.is_some());
+		// should start solving with new notebooks
+		let notebooks_at_tick = compute_state.compute_handle.solving_with_notebooks_at_tick();
+		assert_eq!(notebooks_at_tick, Some((notebook_tick + 1, 1)));
 	}
 }
