@@ -340,7 +340,14 @@ where
 			network,
 			sync: Arc::new(sync_service),
 			notification_service: grandpa_notification_service,
-			voting_rule: sc_consensus_grandpa::VotingRulesBuilder::default().build(),
+			voting_rule: sc_consensus_grandpa::VotingRulesBuilder::new()
+				// - Best Block (tick 5)
+				// - Notebooks for tick (4)
+				// - Eligible Votes (tick 3)
+				// - Votes for blocks at tick 2
+				.add(BeforeBestBlockBy(4u32))
+				.add(ThreeQuartersOfTheUnfinalizedChain)
+				.build(),
 			prometheus_registry,
 			shared_voter_state: SharedVoterState::empty(),
 			telemetry: telemetry.as_ref().map(|x| x.handle()),
