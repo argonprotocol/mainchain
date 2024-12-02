@@ -103,6 +103,7 @@ fn it_can_mint() {
 		assert_eq!(Balances::free_balance(1), 25_000);
 	});
 }
+
 #[test]
 fn it_records_failed_mints() {
 	ArgonCPI::set(Some(FixedI128::from_float(-1.0)));
@@ -325,5 +326,28 @@ fn it_pays_bitcoin_mints() {
 			U256::from(amount + bitcoin_amount_to_match)
 		);
 		assert_eq!(Balances::total_issuance(), amount + bitcoin_amount_to_match + miner_amount);
+	});
+}
+
+#[test]
+fn it_decrements_unlocked_bitcoins() {
+	new_test_ext().execute_with(|| {
+		System::set_block_number(1);
+		MintedBitcoinArgons::<Test>::set(U256::from(100));
+
+		assert_ok!(Mint::utxo_unlocked(1, true, 50));
+		assert_eq!(MintedBitcoinArgons::<Test>::get(), U256::from(50));
+
+		PendingMintUtxos::<Test>::try_append((1, 1, 10)).unwrap();
+
+		assert_ok!(Mint::utxo_unlocked(1, false, 10));
+
+		assert_eq!(MintedBitcoinArgons::<Test>::get(), U256::from(40));
+		// should still be in line
+		assert_eq!(PendingMintUtxos::<Test>::get().to_vec(), vec![(1, 1, 10)]);
+
+		assert_ok!(Mint::utxo_unlocked(1, true, 40));
+		assert_eq!(MintedBitcoinArgons::<Test>::get(), U256::from(0));
+		assert!(PendingMintUtxos::<Test>::get().is_empty());
 	});
 }

@@ -25,10 +25,7 @@ pub mod pallet {
 	use log::{trace, warn};
 	use sp_arithmetic::FixedI128;
 	use sp_core::U256;
-	use sp_runtime::{
-		traits::{AtLeast32BitUnsigned, UniqueSaturatedInto},
-		FixedPointNumber,
-	};
+	use sp_runtime::{traits::AtLeast32BitUnsigned, FixedPointNumber};
 
 	use argon_primitives::{
 		bitcoin::UtxoId, ArgonCPI, BlockRewardAccountsProvider, BurnEventHandler, PriceProvider,
@@ -232,8 +229,7 @@ pub mod pallet {
 			if !argon_cpi.is_negative() || active_miners == 0 {
 				return T::Balance::zero();
 			}
-			let circulation: u128 =
-				UniqueSaturatedInto::<u128>::unique_saturated_into(T::Currency::total_issuance());
+			let circulation: u128 = T::Currency::total_issuance().into();
 			let circulation = FixedI128::saturating_from_integer(circulation);
 			let argons_to_print =
 				argon_cpi.saturating_abs().saturating_mul(circulation).into_inner() /
@@ -251,7 +247,7 @@ pub mod pallet {
 				per_miner
 			);
 
-			per_miner.unique_saturated_into()
+			per_miner.into()
 		}
 
 		pub fn track_block_mint(amount: T::Balance) {
@@ -277,7 +273,11 @@ pub mod pallet {
 		}
 	}
 
-	impl<T: Config> UtxoBondedEvents<T::AccountId, T::Balance> for Pallet<T> {
+	impl<T: Config> UtxoBondedEvents<T::AccountId, T::Balance> for Pallet<T>
+	where
+		<T as Config>::Balance: From<u128>,
+		<T as Config>::Balance: Into<u128>,
+	{
 		fn utxo_bonded(
 			utxo_id: UtxoId,
 			account_id: &T::AccountId,
@@ -287,6 +287,25 @@ pub mod pallet {
 				x.try_push((utxo_id, account_id.clone(), amount))
 					.map_err(|_| Error::<T>::TooManyPendingMints.into())
 			})?;
+			Ok(())
+		}
+
+		fn utxo_unlocked(
+			utxo_id: UtxoId,
+			remove_pending_mints: bool,
+			amount_burned: T::Balance,
+		) -> sp_runtime::DispatchResult {
+			if remove_pending_mints {
+				<PendingMintUtxos<T>>::mutate(|x| {
+					x.retain(|(id, _, _)| id != &utxo_id);
+				});
+			}
+
+			let amount_burned: u128 = amount_burned.into();
+
+			MintedBitcoinArgons::<T>::mutate(|mint| {
+				*mint = mint.saturating_sub(U256::from(amount_burned))
+			});
 			Ok(())
 		}
 	}
