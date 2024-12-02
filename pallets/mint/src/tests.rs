@@ -215,7 +215,7 @@ fn it_can_mint_profit_sharing() {
 }
 
 #[test]
-fn it_does_not_mint_bitcoin_with_cpi_ge_zero() {
+fn it_does_not_mint_bitcoin_with_cpi_gt_zero() {
 	new_test_ext().execute_with(|| {
 		let utxo_id = 1;
 		let account_id = 1;
@@ -227,7 +227,7 @@ fn it_does_not_mint_bitcoin_with_cpi_ge_zero() {
 		// nothing to mint
 		MintedMiningArgons::<Test>::set(U256::from(1000));
 		MintedBitcoinArgons::<Test>::set(U256::from(0));
-		ArgonCPI::set(Some(FixedI128::from_float(0.0)));
+		ArgonCPI::set(Some(FixedI128::from_float(0.01)));
 
 		Mint::on_initialize(1);
 		// should not mint

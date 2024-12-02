@@ -1,5 +1,6 @@
 #![cfg_attr(not(feature = "std"), no_std)]
 extern crate alloc;
+extern crate core;
 
 use sp_runtime::{traits::Zero, Saturating};
 
@@ -17,6 +18,7 @@ pub mod weights;
 
 #[frame_support::pallet(dev_mode)]
 pub mod pallet {
+	use core::fmt::Debug;
 	use frame_support::{
 		pallet_prelude::*,
 		traits::fungible::{Inspect, Mutate},
@@ -110,9 +112,9 @@ pub mod pallet {
 	{
 		fn on_initialize(_: BlockNumberFor<T>) -> Weight {
 			let argon_cpi = T::PriceProvider::get_argon_cpi().unwrap_or_default();
-			// only mint when cpi is negative
-			if !argon_cpi.is_negative() {
-				trace!("Argon cpi is non-negative. Nothing to mint.");
+			// only mint when cpi is negative or 0
+			if argon_cpi.is_positive() {
+				trace!("Argon cpi is not-positive. Nothing to mint.");
 				return T::DbWeight::get().reads(1);
 			}
 
