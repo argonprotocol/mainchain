@@ -6,11 +6,12 @@ use frame_support::{
 		OnFinalize, OnInitialize,
 	},
 };
+use sp_arithmetic::traits::UniqueSaturatedInto;
 use sp_runtime::{DispatchError, FixedU128, TokenError};
 
 use crate::{
 	mock::{Balances, BlockRewards, Ownership, *},
-	Event, FreezeReason,
+	Event, FreezeReason, RewardAmounts,
 };
 use argon_primitives::{
 	block_seal::{BlockPayout, RewardSharing},
@@ -159,7 +160,7 @@ fn it_should_halve_rewards() {
 		block_vote_rewards_account: Some(2),
 	});
 	new_test_ext().execute_with(|| {
-		let halving = HalvingBlocks::get() + 1;
+		let halving = HalvingBlocks::get() + HalvingBeginBlock::get() + 1;
 		System::set_block_number(halving.into());
 		NotebooksInBlock::set(vec![(1, 1, 1)]);
 		NotebookTick::set(1);
@@ -170,13 +171,54 @@ fn it_should_halve_rewards() {
 			Event::RewardCreated {
 				maturation_block,
 				rewards: vec![
-					BlockPayout { account_id: 1, ownership: 1875, argons: 3750 },
-					BlockPayout { account_id: 2, ownership: 625, argons: 1250 },
+					BlockPayout { account_id: 1, ownership: 187500, argons: 375000 },
+					BlockPayout { account_id: 2, ownership: 62500, argons: 125000 },
 				],
 			}
 			.into(),
 		);
 	});
+}
+
+#[test]
+fn it_increments_rewards_until_halving() {
+	new_test_ext().execute_with(|| {
+		assert_eq!(
+			BlockRewards::get_reward_amounts(1),
+			RewardAmounts { argons: 5000, ownership: 5000 }
+		);
+
+		let (increments, increment_blocks, final_reward) = IncrementalGrowth::get();
+		assert_eq!(
+			BlockRewards::get_reward_amounts(increment_blocks - 1),
+			RewardAmounts { argons: 5000, ownership: 5000 }
+		);
+
+		assert_eq!(
+			BlockRewards::get_reward_amounts(increment_blocks),
+			RewardAmounts { argons: 5000 + increments, ownership: 5000 + increments }
+		);
+
+		let halving_begin =
+			UniqueSaturatedInto::<u128>::unique_saturated_into(HalvingBeginBlock::get());
+		let increments = UniqueSaturatedInto::<u128>::unique_saturated_into(increments);
+		let increment_blocks = UniqueSaturatedInto::<u128>::unique_saturated_into(increment_blocks);
+
+		let final_halvings = (halving_begin / increment_blocks) - 1;
+
+		assert_eq!(
+			BlockRewards::get_reward_amounts(halving_begin as u64 - 1),
+			RewardAmounts {
+				argons: (5000 + increments * final_halvings),
+				ownership: (5000 + increments * final_halvings)
+			}
+		);
+
+		assert_eq!(
+			BlockRewards::get_reward_amounts(HalvingBeginBlock::get() as u64),
+			RewardAmounts { argons: final_reward, ownership: final_reward }
+		);
+	})
 }
 
 #[test]

@@ -7,6 +7,7 @@ import '@polkadot/api-base/types/consts';
 
 import type { ApiTypes, AugmentedConst } from '@polkadot/api-base/types';
 import type { u128, u16, u32, u64, u8 } from '@polkadot/types-codec';
+import type { ITuple } from '@polkadot/types-codec/types';
 import type { FrameSupportPalletId, FrameSystemLimitsBlockLength, FrameSystemLimitsBlockWeights, SpVersionRuntimeVersion, SpWeightsRuntimeDbWeight } from '@polkadot/types/lookup';
 
 export type __AugmentedConst<ApiType extends ApiTypes> = AugmentedConst<ApiType>;
@@ -55,13 +56,17 @@ declare module '@polkadot/api-base/types/consts' {
     };
     blockRewards: {
       /**
-       * Number of argons minted per block
+       * The block number at which the halving begins for ownership shares
        **/
-      argonsPerBlock: u128 & AugmentedConst<ApiType>;
+      halvingBeginBlock: u32 & AugmentedConst<ApiType>;
       /**
        * Number of blocks for halving of ownership share rewards
        **/
       halvingBlocks: u32 & AugmentedConst<ApiType>;
+      /**
+       * The growth path for both ownership and argons before halving
+       **/
+      incrementalGrowth: ITuple<[u128, u32, u128]> & AugmentedConst<ApiType>;
       /**
        * Blocks until a block reward is mature
        **/
@@ -70,6 +75,10 @@ declare module '@polkadot/api-base/types/consts' {
        * Percent as a number out of 100 of the block reward that goes to the miner.
        **/
       minerPayoutPercent: u128 & AugmentedConst<ApiType>;
+      /**
+       * Number of argons minted per block
+       **/
+      startingArgonsPerBlock: u128 & AugmentedConst<ApiType>;
       /**
        * Number of ownership tokens minted per block
        **/

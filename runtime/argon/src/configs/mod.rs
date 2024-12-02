@@ -35,6 +35,7 @@ use ismp::{host::StateMachine, module::IsmpModule, router::IsmpRouter, Error};
 use sp_consensus_grandpa::{AuthorityId as GrandpaId, AuthorityList};
 
 use frame_system::EnsureRoot;
+use pallet_block_rewards::GrowthPath;
 use pallet_bond::BitcoinVerifier;
 use pallet_hyperbridge::PALLET_HYPERBRIDGE_ID;
 use pallet_ismp::NoOpMmrTree;
@@ -61,7 +62,7 @@ pub const MAXIMUM_BLOCK_WEIGHT: Weight =
 	Weight::from_parts(WEIGHT_REF_TIME_PER_SECOND.saturating_mul(10), u64::MAX);
 
 /// The existential deposit.
-pub const EXISTENTIAL_DEPOSIT: Balance = 500_000;
+pub const EXISTENTIAL_DEPOSIT: Balance = 100_000;
 
 pub const ARGON: Balance = 1_000_000;
 pub const CENTS: Balance = ARGON / 100_000;
@@ -160,6 +161,10 @@ impl Contains<RuntimeCall> for BaseCallFilter {
 	}
 }
 
+const FINAL_ARGONS_PER_BLOCK: Balance = 5_000_000;
+const INCREMENTAL_REWARD_AMOUNT: Balance = 1_000;
+const INCREMENT_TICKS: u32 = 118;
+
 parameter_types! {
 	pub const TargetComputeBlockPercent: FixedU128 = FixedU128::from_rational(75, 100); // aim for less than full compute time so it can wait for notebooks
 	pub const TargetBlockVotes: u32 = 50_000;
@@ -170,8 +175,10 @@ parameter_types! {
 	pub const DefaultChannelHoldDuration: Tick = 60;
 	pub const HistoricalPaymentAddressTicksToKeep: Tick = DefaultChannelHoldDuration::get() + CHANNEL_HOLD_CLAWBACK_TICKS + 10;
 
-	pub const ArgonsPerBlock: u32 = 5_000_000;
-	pub const StartingOwnershipTokensPerBlock: u32 = 5_000_000;
+	pub const StartingArgonsPerBlock: Balance = 500_000;
+	pub const StartingOwnershipTokensPerBlock: Balance = 500_000;
+	pub const IncrementalGrowth: GrowthPath<Runtime> = (INCREMENTAL_REWARD_AMOUNT, INCREMENT_TICKS, FINAL_ARGONS_PER_BLOCK); // we add 1 milligon every 118 blocks until we reach 5 argons/ownership shares
+	pub const HalvingBeginBlock: u32 = INCREMENT_TICKS * (FINAL_ARGONS_PER_BLOCK as u32 - StartingArgonsPerBlock::get() as u32) / INCREMENTAL_REWARD_AMOUNT as u32; // starts after ~ one year of increments
 	pub const HalvingBlocks: u32 = 2_100_000; // based on bitcoin, but 10x since we're 1 block per minute
 	pub const MaturationBlocks: u32 = 5;
 	pub const MinerPayoutPercent: FixedU128 = FixedU128::from_rational(75, 100);
@@ -211,9 +218,11 @@ impl pallet_block_rewards::Config for Runtime {
 	type NotaryProvider = Notaries;
 	type NotebookProvider = Notebook;
 	type NotebookTick = NotebookTickProvider;
-	type ArgonsPerBlock = ArgonsPerBlock;
+	type StartingArgonsPerBlock = StartingArgonsPerBlock;
 	type StartingOwnershipTokensPerBlock = StartingOwnershipTokensPerBlock;
+	type IncrementalGrowth = IncrementalGrowth;
 	type HalvingBlocks = HalvingBlocks;
+	type HalvingBeginBlock = HalvingBeginBlock;
 	type MinerPayoutPercent = MinerPayoutPercent;
 	type MaturationBlocks = MaturationBlocks;
 	type RuntimeFreezeReason = RuntimeFreezeReason;

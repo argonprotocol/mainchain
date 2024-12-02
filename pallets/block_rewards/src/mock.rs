@@ -4,6 +4,7 @@ use sp_core::{ConstU32, H256};
 use sp_runtime::{traits::IdentityLookup, BuildStorage, FixedU128};
 
 use crate as pallet_block_rewards;
+use crate::GrowthPath;
 use argon_primitives::{
 	block_seal::RewardSharing,
 	notary::{NotaryProvider, NotarySignature},
@@ -80,6 +81,8 @@ impl pallet_balances::Config<OwnershipToken> for Test {
 parameter_types! {
 	pub static ArgonsPerBlock :u32 = 5_000;
 	pub static StartingOwnershipTokensPerBlock :u32 = 5_000;
+	pub static IncrementalGrowth :GrowthPath<Test> = (1_000, 100, 500_000);
+	pub static HalvingBeginBlock: u32 = 1000;
 	pub static HalvingBlocks :u32 = 100;
 	pub static MaturationBlocks :u32 = 5;
 	pub static MinerPayoutPercent :FixedU128 = FixedU128::from_rational(75, 100);
@@ -153,11 +156,13 @@ impl pallet_block_rewards::Config for Test {
 	type WeightInfo = ();
 	type ArgonCurrency = Balances;
 	type OwnershipCurrency = Ownership;
-	type ArgonsPerBlock = ArgonsPerBlock;
+	type StartingArgonsPerBlock = ArgonsPerBlock;
 	type StartingOwnershipTokensPerBlock = StartingOwnershipTokensPerBlock;
 	type MaturationBlocks = MaturationBlocks;
 	type Balance = Balance;
+	type IncrementalGrowth = IncrementalGrowth;
 	type HalvingBlocks = HalvingBlocks;
+	type HalvingBeginBlock = HalvingBeginBlock;
 	type MinerPayoutPercent = MinerPayoutPercent;
 	type BlockSealerProvider = StaticBlockSealerProvider;
 	type NotaryProvider = TestProvider;

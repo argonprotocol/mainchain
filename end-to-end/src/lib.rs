@@ -134,17 +134,27 @@ pub(crate) mod utils {
 			.unwrap_or_default())
 	}
 
-	pub(crate) async fn register_miner(
+	pub(crate) async fn register_miner_keys(
 		node: &ArgonTestNode,
 		miner: Sr25519Keyring,
-	) -> anyhow::Result<()> {
-		let client = node.client.clone();
+	) -> anyhow::Result<SessionKeys> {
 		let grandpa_seed = format!("{}//grandpa", miner.to_seed());
 		let grandpa_public = node.insert_ed25519_keystore_key(GRANDPA, grandpa_seed).await?;
 		let mining_seed = format!("{}//seal", miner.to_seed());
 		let seal_public =
 			node.insert_ed25519_keystore_key(BLOCK_SEAL_KEY_TYPE, mining_seed).await?;
+		Ok(SessionKeys {
+			grandpa: grandpa::app::Public(grandpa_public),
+			block_seal_authority: block_seal::app::Public(seal_public),
+		})
+	}
 
+	pub(crate) async fn register_miner(
+		node: &ArgonTestNode,
+		miner: Sr25519Keyring,
+		keys: SessionKeys,
+	) -> anyhow::Result<()> {
+		let client = node.client.clone();
 		// how much ownership is needed
 		let ownership_needed = client
 			.fetch_storage(&storage().mining_slot().ownership_bond_amount(), None)
@@ -155,14 +165,7 @@ pub(crate) mod utils {
 		println!("Registering miner");
 		let register = client
 			.submit_tx(
-				&tx().mining_slot().bid(
-					None,
-					RewardDestination::Owner,
-					SessionKeys {
-						grandpa: grandpa::app::Public(grandpa_public),
-						block_seal_authority: block_seal::app::Public(seal_public),
-					},
-				),
+				&tx().mining_slot().bid(None, RewardDestination::Owner, keys),
 				&Sr25519Signer::new(miner.pair()),
 				None,
 				true,

@@ -3737,9 +3737,9 @@ pub mod api {
 			.hash();
 		runtime_metadata_hash ==
 			[
-				199u8, 91u8, 14u8, 131u8, 108u8, 237u8, 34u8, 217u8, 45u8, 80u8, 87u8, 32u8, 46u8,
-				182u8, 168u8, 253u8, 234u8, 24u8, 22u8, 196u8, 216u8, 135u8, 40u8, 108u8, 153u8,
-				151u8, 243u8, 72u8, 204u8, 198u8, 186u8, 253u8,
+				178u8, 74u8, 235u8, 10u8, 191u8, 184u8, 226u8, 84u8, 31u8, 238u8, 11u8, 77u8, 46u8,
+				200u8, 96u8, 123u8, 26u8, 93u8, 30u8, 86u8, 4u8, 33u8, 123u8, 217u8, 232u8, 101u8,
+				243u8, 46u8, 226u8, 31u8, 28u8, 243u8,
 			]
 	}
 	pub mod system {
@@ -8539,6 +8539,10 @@ pub mod api {
 					pub type ConfirmedBitcoinBlockTip =
 						runtime_types::argon_primitives::bitcoin::BitcoinBlock;
 				}
+				pub mod temp_parent_has_sync_state {
+					use super::runtime_types;
+					pub type TempParentHasSyncState = ::core::primitive::bool;
+				}
 				pub mod synched_bitcoin_block {
 					use super::runtime_types;
 					pub type SynchedBitcoinBlock =
@@ -8741,6 +8745,27 @@ pub mod api {
 							156u8, 65u8, 123u8, 186u8, 11u8, 116u8, 56u8, 185u8, 200u8, 220u8,
 							24u8, 35u8, 245u8, 31u8, 138u8, 229u8, 216u8, 238u8, 120u8, 249u8,
 							12u8, 122u8,
+						],
+					)
+				}
+				#[doc = " Stores if parent block had a confirmed bitcoin block"]
+				pub fn temp_parent_has_sync_state(
+					&self,
+				) -> ::subxt::ext::subxt_core::storage::address::StaticAddress<
+					(),
+					types::temp_parent_has_sync_state::TempParentHasSyncState,
+					::subxt::ext::subxt_core::utils::Yes,
+					::subxt::ext::subxt_core::utils::Yes,
+					(),
+				> {
+					::subxt::ext::subxt_core::storage::address::StaticAddress::new_static(
+						"BitcoinUtxos",
+						"TempParentHasSyncState",
+						(),
+						[
+							33u8, 213u8, 28u8, 180u8, 20u8, 3u8, 255u8, 224u8, 14u8, 159u8, 240u8,
+							113u8, 1u8, 33u8, 247u8, 85u8, 175u8, 49u8, 240u8, 74u8, 134u8, 101u8,
+							199u8, 240u8, 87u8, 155u8, 227u8, 255u8, 232u8, 222u8, 73u8, 226u8,
 						],
 					)
 				}
@@ -15209,14 +15234,14 @@ pub mod api {
 			pub struct ConstantsApi;
 			impl ConstantsApi {
 				#[doc = " Number of argons minted per block"]
-				pub fn argons_per_block(
+				pub fn starting_argons_per_block(
 					&self,
 				) -> ::subxt::ext::subxt_core::constants::address::StaticAddress<
 					::core::primitive::u128,
 				> {
 					::subxt::ext::subxt_core::constants::address::StaticAddress::new_static(
 						"BlockRewards",
-						"ArgonsPerBlock",
+						"StartingArgonsPerBlock",
 						[
 							84u8, 157u8, 140u8, 4u8, 93u8, 57u8, 29u8, 133u8, 105u8, 200u8, 214u8,
 							27u8, 144u8, 208u8, 218u8, 160u8, 130u8, 109u8, 101u8, 54u8, 210u8,
@@ -15240,6 +15265,24 @@ pub mod api {
 						],
 					)
 				}
+				#[doc = " The growth path for both ownership and argons before halving"]
+				pub fn incremental_growth(
+					&self,
+				) -> ::subxt::ext::subxt_core::constants::address::StaticAddress<(
+					::core::primitive::u128,
+					::core::primitive::u32,
+					::core::primitive::u128,
+				)> {
+					::subxt::ext::subxt_core::constants::address::StaticAddress::new_static(
+						"BlockRewards",
+						"IncrementalGrowth",
+						[
+							1u8, 241u8, 87u8, 117u8, 186u8, 191u8, 55u8, 21u8, 58u8, 119u8, 175u8,
+							141u8, 32u8, 155u8, 16u8, 151u8, 43u8, 63u8, 217u8, 103u8, 78u8, 32u8,
+							84u8, 226u8, 174u8, 67u8, 111u8, 223u8, 207u8, 239u8, 135u8, 238u8,
+						],
+					)
+				}
 				#[doc = " Number of blocks for halving of ownership share rewards"]
 				pub fn halving_blocks(
 					&self,
@@ -15249,6 +15292,23 @@ pub mod api {
 					::subxt::ext::subxt_core::constants::address::StaticAddress::new_static(
 						"BlockRewards",
 						"HalvingBlocks",
+						[
+							98u8, 252u8, 116u8, 72u8, 26u8, 180u8, 225u8, 83u8, 200u8, 157u8,
+							125u8, 151u8, 53u8, 76u8, 168u8, 26u8, 10u8, 9u8, 98u8, 68u8, 9u8,
+							178u8, 197u8, 113u8, 31u8, 79u8, 200u8, 90u8, 203u8, 100u8, 41u8,
+							145u8,
+						],
+					)
+				}
+				#[doc = " The block number at which the halving begins for ownership shares"]
+				pub fn halving_begin_block(
+					&self,
+				) -> ::subxt::ext::subxt_core::constants::address::StaticAddress<
+					::core::primitive::u32,
+				> {
+					::subxt::ext::subxt_core::constants::address::StaticAddress::new_static(
+						"BlockRewards",
+						"HalvingBeginBlock",
 						[
 							98u8, 252u8, 116u8, 72u8, 26u8, 180u8, 225u8, 83u8, 200u8, 157u8,
 							125u8, 151u8, 53u8, 76u8, 168u8, 26u8, 10u8, 9u8, 98u8, 68u8, 9u8,

@@ -112,6 +112,10 @@ declare module '@polkadot/api-base/types/storage' {
        * The last synched bitcoin block
        **/
       synchedBitcoinBlock: AugmentedQuery<ApiType, () => Observable<Option<ArgonPrimitivesBitcoinBitcoinBlock>>, []>;
+      /**
+       * Stores if parent block had a confirmed bitcoin block
+       **/
+      tempParentHasSyncState: AugmentedQuery<ApiType, () => Observable<bool>, []>;
       utxoIdToRef: AugmentedQuery<ApiType, (arg: u64 | AnyNumber | Uint8Array) => Observable<Option<ArgonPrimitivesBitcoinUtxoRef>>, [u64]>;
       /**
        * Bitcoin UTXOs that have been submitted for ownership confirmation

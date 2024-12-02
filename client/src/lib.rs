@@ -329,20 +329,21 @@ impl MainchainClient {
 	) -> anyhow::Result<TxInBlock<ArgonConfig, OnlineClient<ArgonConfig>>, Error> {
 		while let Some(status) = tx_progress.next().await {
 			match status? {
-				TxStatus::InBestBlock(tx_in_block) =>
+				TxStatus::InBestBlock(tx_in_block) => {
+					tx_in_block.wait_for_success().await?;
 					if !wait_for_finalized {
-						tx_in_block.wait_for_success().await?;
 						return Ok(tx_in_block);
-					},
-				TxStatus::InFinalizedBlock(tx_in_block) =>
+					}
+				},
+				TxStatus::InFinalizedBlock(tx_in_block) => {
+					tx_in_block.wait_for_success().await?;
 					if wait_for_finalized {
-						tx_in_block.wait_for_success().await?;
 						return Ok(tx_in_block);
-					},
+					}
+				},
 				TxStatus::Error { message } |
 				TxStatus::Invalid { message } |
 				TxStatus::Dropped { message } => {
-					println!("Error: {}", message);
 					// Handle any errors:
 					return Err(Error::from(format!(
 						"Error submitting transaction to block: {message}"

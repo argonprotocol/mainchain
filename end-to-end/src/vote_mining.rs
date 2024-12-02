@@ -1,4 +1,4 @@
-use crate::utils::{create_active_notary, register_miner};
+use crate::utils::{create_active_notary, register_miner, register_miner_keys};
 use argon_client::{api, conversion::SubxtRuntime};
 use argon_primitives::{AccountId, ArgonDigests, BlockSealDigest};
 use argon_testing::{test_miner_count, ArgonTestNode};
@@ -59,8 +59,14 @@ async fn test_end_to_end_vote_mining() {
 	let miner_2_keyring = miner_2.keyring();
 
 	let mut blocks_sub = grandpa_miner.client.live.blocks().subscribe_finalized().await.unwrap();
-	let (miner2_res, miner1_res) =
-		join!(register_miner(&miner_1, miner_2_keyring), register_miner(&miner_2, miner_1_keyring));
+	let (keys1, keys2) = join!(
+		register_miner_keys(&miner_1, miner_1_keyring),
+		register_miner_keys(&miner_2, miner_2_keyring)
+	);
+	let (miner2_res, miner1_res) = join!(
+		register_miner(&miner_2, miner_2_keyring, keys2.unwrap()),
+		register_miner(&miner_1, miner_1_keyring, keys1.unwrap())
+	);
 	miner2_res.unwrap();
 	miner1_res.unwrap();
 	let mut miner_registrations = 0;
