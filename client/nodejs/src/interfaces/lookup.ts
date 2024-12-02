@@ -656,8 +656,14 @@ export default {
       InsufficientBlockVoteMinimum: 'Null',
       InvalidBlockVoteTick: {
         tick: 'u64',
-        notebookTick: 'u64'
-      }
+        notebookTick: 'u64',
+      },
+      InvalidDefaultBlockVote: 'Null',
+      InvalidDefaultBlockVoteAuthor: {
+        author: 'AccountId32',
+        expected: 'AccountId32',
+      },
+      NoDefaultBlockVote: 'Null'
     }
   },
   /**

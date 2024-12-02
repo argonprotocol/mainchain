@@ -110,7 +110,7 @@ impl NotaryProvider<Block, AccountId> for TestProvider {
 	fn active_notaries() -> Vec<NotaryId> {
 		ActiveNotaries::get()
 	}
-	fn is_notary_operator(_: NotaryId, _: &AccountId) -> bool {
+	fn notary_operator_account_id(_notary_id: NotaryId) -> Option<AccountId> {
 		todo!()
 	}
 }

@@ -128,7 +128,7 @@ fn it_should_unlock_rewards() {
 }
 
 #[test]
-fn it_should_payout_block_vote_to_miner() {
+fn it_should_payout_only_to_set_miners() {
 	BlockSealer::set(BlockSealerInfo {
 		block_author_account_id: 1,
 		block_vote_rewards_account: None,
@@ -144,10 +144,7 @@ fn it_should_payout_block_vote_to_miner() {
 		System::assert_last_event(
 			Event::RewardCreated {
 				maturation_block,
-				rewards: vec![
-					BlockPayout { account_id: 1, ownership: 3750, argons: 3750 },
-					BlockPayout { account_id: 1, ownership: 1250, argons: 1250 },
-				],
+				rewards: vec![BlockPayout { account_id: 1, ownership: 3750, argons: 3750 }],
 			}
 			.into(),
 		);

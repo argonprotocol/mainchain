@@ -47,7 +47,7 @@ pub mod pallet {
 
 	/// Configure the pallet by specifying the parameters and types on which it depends.
 	#[pallet::config]
-	pub trait Config: frame_system::Config {
+	pub trait Config: frame_system::Config<Hash: From<[u8; 32]>, AccountId = AccountId> {
 		/// The identifier type for an authority.
 		type AuthorityId: Member
 			+ Parameter
@@ -288,10 +288,6 @@ pub mod pallet {
 						Error::<T>::InvalidVoteSealStrength
 					);
 
-					let block_vote_rewards_account = T::AccountId::decode(
-						&mut block_vote.block_rewards_account_id.encode().as_slice(),
-					)
-					.map_err(|_| Error::<T>::UnableToDecodeVoteAccount)?;
 					Self::verify_block_vote(
 						seal_strength,
 						block_vote,
@@ -307,7 +303,11 @@ pub mod pallet {
 					)?;
 					<LastBlockSealerInfo<T>>::put(BlockSealerInfo {
 						block_author_account_id: block_author,
-						block_vote_rewards_account: Some(block_vote_rewards_account),
+						block_vote_rewards_account: if block_vote.is_default_vote() {
+							None
+						} else {
+							Some(block_vote.block_rewards_account_id.clone())
+						},
 					});
 
 					BlockForkPower::<T>::mutate(|fork| {
@@ -353,19 +353,30 @@ pub mod pallet {
 			block_author: &T::AccountId,
 			voting_schedule: &VotingSchedule,
 		) -> DispatchResult {
-			let grandpa_vote_minimum = T::BlockSealSpecProvider::grandparent_vote_minimum()
-				.ok_or(Error::<T>::NoGrandparentVoteMinimum)?;
+			if !block_vote.is_proxy_vote() {
+				let grandpa_tick_block =
+					T::TickProvider::blocks_at_tick(voting_schedule.grandparent_votes_tick());
+				ensure!(
+					grandpa_tick_block
+						.iter()
+						.any(|a| a.as_ref() == block_vote.block_hash.as_bytes()),
+					Error::<T>::InvalidVoteGrandparentHash
+				);
+			}
 
-			ensure!(block_vote.power >= grandpa_vote_minimum, Error::<T>::InsufficientVotingPower);
+			if !block_vote.is_default_vote() {
+				let grandpa_vote_minimum = T::BlockSealSpecProvider::grandparent_vote_minimum()
+					.ok_or(Error::<T>::NoGrandparentVoteMinimum)?;
+				ensure!(
+					block_vote.power >= grandpa_vote_minimum,
+					Error::<T>::InsufficientVotingPower
+				);
 
-			let grandpa_tick_block =
-				T::TickProvider::blocks_at_tick(voting_schedule.grandparent_votes_tick());
-			ensure!(
-				grandpa_tick_block
-					.iter()
-					.any(|a| a.as_ref() == block_vote.block_hash.as_bytes()),
-				Error::<T>::InvalidVoteGrandparentHash
-			);
+				ensure!(
+					block_vote.signature.verify(&block_vote.hash()[..], &block_vote.account_id),
+					Error::<T>::BlockVoteInvalidSignature
+				);
+			}
 
 			// check that the block author is one of the validators
 			let authority_id = T::AuthorityProvider::get_authority(block_author.clone())
@@ -376,11 +387,6 @@ pub mod pallet {
 				.ok_or(Error::<T>::InvalidSubmitter)?;
 
 			ensure!(block_peer.authority_id == authority_id, Error::<T>::InvalidSubmitter);
-
-			ensure!(
-				block_vote.signature.verify(&block_vote.hash()[..], &block_vote.account_id),
-				Error::<T>::BlockVoteInvalidSignature
-			);
 
 			Ok(())
 		}
@@ -469,7 +475,7 @@ pub mod pallet {
 			};
 
 			info!(
-				"Finding votes for block at tick {} - {:?} (notebook tick={})",
+				"Finding votes for block at tick {} - (grandparents={:?}, notebook tick={})",
 				voted_for_block_at_tick, grandparent_tick_blocks, expected_notebook_tick
 			);
 
@@ -516,7 +522,8 @@ pub mod pallet {
 					BlockVoteT::<<T::Block as BlockT>::Hash>::decode(&mut leafs[index].as_slice())
 						.map_err(|_| Error::<T>::CouldNotDecodeVote)?;
 
-				if !grandparent_tick_blocks.contains(&vote.block_hash) {
+				// proxy votes can use any block
+				if !vote.is_proxy_vote() && !grandparent_tick_blocks.contains(&vote.block_hash) {
 					info!(
 						"Cant use vote for grandparent tick {:?} - voted for {:?}",
 						grandparent_tick_blocks, vote.block_hash

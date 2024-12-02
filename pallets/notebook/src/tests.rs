@@ -1,15 +1,5 @@
 use std::collections::BTreeMap;
 
-use binary_merkle_tree::{merkle_proof, merkle_root};
-use codec::Encode;
-use frame_support::{assert_err, assert_noop, assert_ok, traits::OnInitialize};
-use sp_core::{bounded_vec, ed25519, Blake2Hasher, Pair};
-use sp_keyring::{
-	AccountKeyring::{Alice, Bob},
-	Ed25519Keyring,
-};
-use sp_runtime::{testing::H256, BoundedVec};
-
 use crate::{
 	mock::*,
 	pallet::{
@@ -30,9 +20,18 @@ use argon_primitives::{
 		NotebookNumber,
 	},
 	tick::Tick,
-	BalanceProof, MerkleProof, NotaryId, NotebookAuditResult, NotebookDigest, NotebookProvider,
-	SignedNotebookHeader,
+	BalanceProof, BlockVote, MerkleProof, NotaryId, NotebookAuditResult, NotebookDigest,
+	NotebookProvider, SignedNotebookHeader,
 };
+use binary_merkle_tree::{merkle_proof, merkle_root};
+use codec::Encode;
+use frame_support::{assert_err, assert_noop, assert_ok, traits::OnInitialize};
+use sp_core::{bounded_vec, ed25519, Blake2Hasher, Pair};
+use sp_keyring::{
+	AccountKeyring::{Alice, Bob},
+	Ed25519Keyring,
+};
+use sp_runtime::{testing::H256, traits::BlakeTwo256, BoundedVec};
 
 fn notebook_digest(
 	books: Vec<(NotaryId, NotebookNumber, Tick, bool)>,
@@ -531,12 +530,11 @@ fn it_can_audit_notebooks() {
 			block_voting_power: 0,
 			blocks_with_votes: bounded_vec![],
 			block_votes_root: H256::zero(),
+			block_votes_count: 1,
 			secret_hash: H256::random(),
 			parent_secret: None,
-			block_votes_count: 0,
 			domains: Default::default(),
 		};
-		let header_hash = header.hash();
 
 		let mut notebook = argon_primitives::notebook::Notebook {
 			header,
@@ -546,28 +544,38 @@ fn it_can_audit_notebooks() {
 				1
 			)],
 			hash: Default::default(),
-			notarizations: bounded_vec![Notarization::new(
-				vec![BalanceChange {
-					account_id: who.clone(),
-					account_type: AccountType::Deposit,
-					balance: 2000,
-					previous_balance_proof: None,
-					change_number: 1,
-					notes: bounded_vec![Note::create(
-						2000,
-						NoteType::ClaimFromMainchain { transfer_id: 1 },
-					)],
-					channel_hold_note: None,
-					signature: ed25519::Signature::from_raw([0u8; 64]).into(),
-				},],
-				vec![],
-				vec![]
-			)],
+			notarizations: bounded_vec![
+				Notarization::new(
+					vec![BalanceChange {
+						account_id: who.clone(),
+						account_type: AccountType::Deposit,
+						balance: 2000,
+						previous_balance_proof: None,
+						change_number: 1,
+						notes: bounded_vec![Note::create(
+							2000,
+							NoteType::ClaimFromMainchain { transfer_id: 1 },
+						)],
+						channel_hold_note: None,
+						signature: ed25519::Signature::from_raw([0u8; 64]).into(),
+					},],
+					vec![],
+					vec![]
+				),
+				Notarization::new(
+					vec![],
+					vec![BlockVote::create_default_vote(NotaryOperator::get(), 1)],
+					vec![]
+				)
+			],
 			signature: ed25519::Signature::from_raw([0u8; 64]),
 		};
+		notebook.header.block_votes_root =
+			block_votes_root(notebook.notarizations.to_vec().clone());
 		notebook.notarizations[0].balance_changes[0].sign(Bob.pair());
 		notebook.hash = notebook.calculate_hash();
 		notebook.signature = Ed25519Keyring::Bob.pair().sign(notebook.hash.as_ref());
+		let header_hash = notebook.header.hash();
 
 		let eligibility = BTreeMap::new();
 
@@ -673,7 +681,6 @@ fn it_can_audit_notebooks_with_history() {
 		header.chain_transfers = bounded_vec![ChainTransfer::ToLocalchain { transfer_id: 1 }];
 		header.changed_account_origins =
 			bounded_vec![AccountOrigin { notebook_number, account_uid: 1 }];
-		let header_hash = header.hash();
 
 		let merkle_leaves = vec![account_root.tip()];
 		let account_1_proof = merkle_proof::<Blake2Hasher, _, _>(&merkle_leaves, 0);
@@ -686,25 +693,34 @@ fn it_can_audit_notebooks_with_history() {
 				1
 			)],
 			hash: Default::default(),
-			notarizations: bounded_vec![Notarization::new(
-				vec![BalanceChange {
-					account_id: who.clone(),
-					account_type: AccountType::Deposit,
-					balance: 2000,
-					previous_balance_proof: None,
-					change_number: 1,
-					notes: bounded_vec![Note::create(
-						2000,
-						NoteType::ClaimFromMainchain { transfer_id: 1 },
-					)],
-					channel_hold_note: None,
-					signature: ed25519::Signature::from_raw([0u8; 64]).into(),
-				},],
-				vec![],
-				vec![]
-			)],
+			notarizations: bounded_vec![
+				Notarization::new(
+					vec![BalanceChange {
+						account_id: who.clone(),
+						account_type: AccountType::Deposit,
+						balance: 2000,
+						previous_balance_proof: None,
+						change_number: 1,
+						notes: bounded_vec![Note::create(
+							2000,
+							NoteType::ClaimFromMainchain { transfer_id: 1 },
+						)],
+						channel_hold_note: None,
+						signature: ed25519::Signature::from_raw([0u8; 64]).into(),
+					},],
+					vec![],
+					vec![]
+				),
+				Notarization::new(
+					vec![],
+					vec![BlockVote::create_default_vote(NotaryOperator::get(), tick)],
+					vec![]
+				)
+			],
 			signature: ed25519::Signature::from_raw([0u8; 64]),
 		};
+		notebook.header.block_votes_root =
+			block_votes_root(notebook.notarizations.to_vec().clone());
 		notebook.notarizations[0].balance_changes[0].sign(Bob.pair());
 		notebook.hash = notebook.calculate_hash();
 		notebook.signature = Ed25519Keyring::Bob.pair().sign(notebook.hash.as_ref());
@@ -727,6 +743,7 @@ fn it_can_audit_notebooks_with_history() {
 			)
 		})
 		.expect("Couldn't insert details");
+		let header_hash = notebook.header.hash();
 
 		assert_err!(
 			Notebook::audit_notebook(
@@ -860,7 +877,6 @@ fn it_can_audit_notebooks_with_history() {
 			AccountOrigin { notebook_number: 7, account_uid: 2 }
 		];
 		header.tax = 200;
-		let header_hash = header.hash();
 
 		let mut notebook = argon_primitives::notebook::Notebook {
 			header,
@@ -869,63 +885,77 @@ fn it_can_audit_notebooks_with_history() {
 				NewAccountOrigin::new(Alice.to_account_id(), AccountType::Tax, 2)
 			],
 			hash: Default::default(),
-			notarizations: bounded_vec![Notarization::new(
-				vec![
-					BalanceChange {
-						account_id: who.clone(),
-						account_type: AccountType::Deposit,
-						balance: 1000,
-						previous_balance_proof: Some(BalanceProof {
-							notary_id,
-							notebook_number: 5,
-							notebook_proof: Some(MerkleProof {
-								proof: BoundedVec::truncate_from(account_1_proof.proof),
-								number_of_leaves: 1,
-								leaf_index: 0
+			notarizations: bounded_vec![
+				Notarization::new(
+					vec![
+						BalanceChange {
+							account_id: who.clone(),
+							account_type: AccountType::Deposit,
+							balance: 1000,
+							previous_balance_proof: Some(BalanceProof {
+								notary_id,
+								notebook_number: 5,
+								notebook_proof: Some(MerkleProof {
+									proof: BoundedVec::truncate_from(account_1_proof.proof),
+									number_of_leaves: 1,
+									leaf_index: 0
+								}),
+								tick: 5,
+								balance: 2000,
+								account_origin: AccountOrigin {
+									notebook_number: 5,
+									account_uid: 1
+								},
 							}),
-							tick: 5,
-							balance: 2000,
-							account_origin: AccountOrigin { notebook_number: 5, account_uid: 1 },
-						}),
-						change_number: 2,
-						notes: bounded_vec![Note::create(1000, NoteType::Send { to: None })],
-						channel_hold_note: None,
-						signature: ed25519::Signature::from_raw([0u8; 64]).into(),
-					},
-					BalanceChange {
-						account_id: Alice.to_account_id(),
-						account_type: AccountType::Deposit,
-						balance: 800,
-						previous_balance_proof: None,
-						change_number: 1,
-						notes: bounded_vec![
-							Note::create(1000, NoteType::Claim),
-							Note::create(200, NoteType::Tax)
-						],
-						channel_hold_note: None,
-						signature: ed25519::Signature::from_raw([0u8; 64]).into(),
-					},
-					BalanceChange {
-						account_id: Alice.to_account_id(),
-						account_type: AccountType::Tax,
-						balance: 200,
-						previous_balance_proof: None,
-						change_number: 1,
-						notes: bounded_vec![Note::create(200, NoteType::Claim)],
-						channel_hold_note: None,
-						signature: ed25519::Signature::from_raw([0u8; 64]).into(),
-					},
-				],
-				vec![],
-				vec![]
-			)],
+							change_number: 2,
+							notes: bounded_vec![Note::create(1000, NoteType::Send { to: None })],
+							channel_hold_note: None,
+							signature: ed25519::Signature::from_raw([0u8; 64]).into(),
+						},
+						BalanceChange {
+							account_id: Alice.to_account_id(),
+							account_type: AccountType::Deposit,
+							balance: 800,
+							previous_balance_proof: None,
+							change_number: 1,
+							notes: bounded_vec![
+								Note::create(1000, NoteType::Claim),
+								Note::create(200, NoteType::Tax)
+							],
+							channel_hold_note: None,
+							signature: ed25519::Signature::from_raw([0u8; 64]).into(),
+						},
+						BalanceChange {
+							account_id: Alice.to_account_id(),
+							account_type: AccountType::Tax,
+							balance: 200,
+							previous_balance_proof: None,
+							change_number: 1,
+							notes: bounded_vec![Note::create(200, NoteType::Claim)],
+							channel_hold_note: None,
+							signature: ed25519::Signature::from_raw([0u8; 64]).into(),
+						},
+					],
+					vec![],
+					vec![]
+				),
+				Notarization::new(
+					vec![],
+					vec![BlockVote::create_default_vote(NotaryOperator::get(), tick)],
+					vec![]
+				)
+			],
 			signature: ed25519::Signature::from_raw([0u8; 64]),
 		};
 		notebook.notarizations[0].balance_changes[0].sign(Bob.pair());
 		notebook.notarizations[0].balance_changes[1].sign(Alice.pair());
 		notebook.notarizations[0].balance_changes[2].sign(Alice.pair());
+		notebook.header.block_votes_root =
+			block_votes_root(notebook.notarizations.to_vec().clone());
 		notebook.hash = notebook.calculate_hash();
 		notebook.signature = Ed25519Keyring::Bob.pair().sign(notebook.hash.as_ref());
+
+		let header_hash = notebook.header.hash();
 
 		assert_err!(
 			Notebook::audit_notebook(
@@ -982,6 +1012,14 @@ fn it_can_audit_notebooks_with_history() {
 	});
 }
 
+fn block_votes_root(notarizations: Vec<Notarization>) -> H256 {
+	let mut votes = vec![];
+	for notarization in notarizations {
+		votes.extend(notarization.block_votes.iter().cloned());
+	}
+	merkle_root::<BlakeTwo256, _>(votes.iter().map(|v| v.encode()).collect::<Vec<_>>())
+}
+
 fn make_header(notebook_number: NotebookNumber, tick: Tick) -> NotebookHeader {
 	NotebookHeader {
 		notary_id: 1,
@@ -997,7 +1035,7 @@ fn make_header(notebook_number: NotebookNumber, tick: Tick) -> NotebookHeader {
 		block_votes_root: H256::zero(),
 		secret_hash: H256::random(),
 		parent_secret: None,
-		block_votes_count: 0,
+		block_votes_count: 1,
 		domains: Default::default(),
 	}
 }

@@ -166,6 +166,7 @@ impl NotarizationsStore {
 	pub async fn apply(
 		pool: &PgPool,
 		notary_id: NotaryId,
+		operator_account_id: &AccountId,
 		ticker: &Ticker,
 		changes: Vec<BalanceChange>,
 		block_votes: Vec<BlockVote>,
@@ -379,7 +380,7 @@ impl NotarizationsStore {
 			.await?;
 		}
 
-		verify_voting_sources(&block_votes, tick, &block_vote_specifications)?;
+		verify_voting_sources(&block_votes, tick, operator_account_id, &block_vote_specifications)?;
 
 		NotebookConstraintsStore::try_increment(
 			&mut tx,

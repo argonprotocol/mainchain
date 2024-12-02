@@ -69,6 +69,7 @@ pub trait NotebookHistoryLookup {
 pub fn notebook_verify<T: NotebookHistoryLookup>(
 	lookup: &T,
 	notebook: &Notebook,
+	notary_operator_account_id: &AccountId,
 	vote_minimums: &BTreeMap<H256, VoteMinimum>,
 	channel_hold_expiration_ticks: Tick,
 ) -> anyhow::Result<bool, VerifyError> {
@@ -94,8 +95,10 @@ pub fn notebook_verify<T: NotebookHistoryLookup>(
 		verify_changeset_signatures(changeset)?;
 		verify_balance_sources(lookup, &mut state, header, changeset)?;
 		track_block_votes(&mut state, block_votes)?;
-		verify_voting_sources(block_votes, header.tick, vote_minimums)?;
+		verify_voting_sources(block_votes, header.tick, notary_operator_account_id, vote_minimums)?;
 	}
+
+	ensure!(!state.block_votes.is_empty(), VerifyError::NoDefaultBlockVote);
 
 	ensure!(
 		state.chain_transfers == header.chain_transfers.to_vec(),
@@ -140,6 +143,7 @@ struct NotebookVerifyState {
 	seen_transfers_in: BTreeSet<(AccountId, TransferToLocalchainId)>,
 	new_account_origins: BTreeMap<LocalchainAccountId, AccountOriginUid>,
 	blocks_voted_on: BTreeSet<H256>,
+	did_use_default_vote: bool,
 	block_power: u128,
 	tax: u128,
 }
@@ -228,16 +232,23 @@ impl NotebookVerifyState {
 	}
 }
 
-fn track_block_votes(
+pub(crate) fn track_block_votes(
 	state: &mut NotebookVerifyState,
 	block_votes: &Vec<BlockVote>,
 ) -> anyhow::Result<(), VerifyError> {
 	for block_vote in block_votes {
-		state.blocks_voted_on.insert(block_vote.block_hash);
+		if !block_vote.is_proxy_vote() {
+			state.blocks_voted_on.insert(block_vote.block_hash);
+		}
 		state
 			.block_votes
 			.insert((block_vote.account_id.clone(), block_vote.index), block_vote.clone());
 		state.block_power = state.block_power.saturating_add(block_vote.power);
+
+		if block_vote.is_default_vote() {
+			ensure!(!state.did_use_default_vote, VerifyError::InvalidDefaultBlockVote);
+			state.did_use_default_vote = true;
+		}
 	}
 
 	Ok(())
@@ -327,18 +338,31 @@ fn verify_balance_sources<T: NotebookHistoryLookup>(
 pub fn verify_voting_sources(
 	block_votes: &Vec<BlockVote>,
 	notebook_tick: Tick,
+	notary_operator_account_id: &AccountId,
 	vote_minimums: &BTreeMap<H256, VoteMinimum>,
 ) -> anyhow::Result<(), VerifyError> {
 	for block_vote in block_votes {
+		ensure!(
+			block_vote.tick == notebook_tick,
+			VerifyError::InvalidBlockVoteTick { tick: block_vote.tick, notebook_tick }
+		);
+
+		if block_vote.is_default_vote() {
+			ensure!(
+				block_vote.account_id == *notary_operator_account_id,
+				VerifyError::InvalidDefaultBlockVoteAuthor {
+					author: block_vote.account_id.clone(),
+					expected: notary_operator_account_id.clone()
+				}
+			);
+			continue;
+		}
+
 		let minimum = vote_minimums
 			.get(&block_vote.block_hash)
 			.ok_or(VerifyError::InvalidBlockVoteSource)?;
 
 		ensure!(block_vote.power >= *minimum, VerifyError::InsufficientBlockVoteMinimum);
-		ensure!(
-			block_vote.tick == notebook_tick,
-			VerifyError::InvalidBlockVoteTick { tick: block_vote.tick, notebook_tick }
-		);
 
 		ensure!(
 			block_vote.signature.verify(&block_vote.hash()[..], &block_vote.account_id),
@@ -873,6 +897,9 @@ pub fn verify_notarization_allocation(
 	state.verify_channel_hold_claim_restrictions()?;
 
 	for block_vote in block_votes {
+		if block_vote.is_default_vote() {
+			continue;
+		}
 		state.used_tax_vote_amount(
 			block_vote.power,
 			&LocalchainAccountId::new(block_vote.account_id.clone(), AccountType::Tax),

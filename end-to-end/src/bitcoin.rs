@@ -174,7 +174,7 @@ async fn test_bitcoin_minting_e2e() {
 	.await
 	.unwrap();
 	// start miners so that we have ownership tokens to mint against
-	bankroll_miners(&test_node, &alice_signer, vec![Bob.to_account_id()], false)
+	bankroll_miners(&test_node, &alice_signer, vec![Bob.to_account_id()], true)
 		.await
 		.unwrap();
 	// wait for miner_node to catch up
@@ -190,6 +190,10 @@ async fn test_bitcoin_minting_e2e() {
 			break;
 		}
 	}
+	let nonce_miner_node = miner_node.client.get_account_nonce(&Bob.to_account_id()).await.unwrap();
+	let nonce_test_node = client.get_account_nonce(&Bob.to_account_id()).await.unwrap();
+	assert_eq!(nonce_miner_node, nonce_test_node);
+	println!("System health of miner node {:?}", miner_node.client.methods.system_health().await);
 	register_miner(&miner_node, Bob)
 		.await
 		.inspect_err(|e| println!("Error registering miner: {:?}", e))

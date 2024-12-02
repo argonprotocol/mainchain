@@ -392,10 +392,15 @@ pub mod pallet {
 		fn active_notaries() -> Vec<NotaryId> {
 			<ActiveNotaries<T>>::get().into_iter().map(|n| n.notary_id).collect()
 		}
-		fn is_notary_operator(notary_id: NotaryId, account_id: &T::AccountId) -> bool {
-			<ActiveNotaries<T>>::get()
-				.into_iter()
-				.any(|n| n.notary_id == notary_id && n.operator_account_id == *account_id)
+
+		fn notary_operator_account_id(notary_id: NotaryId) -> Option<T::AccountId> {
+			<ActiveNotaries<T>>::get().into_iter().find_map(|n| {
+				if n.notary_id == notary_id {
+					Some(n.operator_account_id)
+				} else {
+					None
+				}
+			})
 		}
 	}
 }

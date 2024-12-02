@@ -152,8 +152,7 @@ pub(crate) mod utils {
 			.unwrap();
 		println!("ownership needed {:?}", ownership_needed);
 
-		let params = client.params_with_best_nonce(&miner.to_account_id()).await?.build();
-		println!("Registering miner {:?}", &params.2 .0.clone());
+		println!("Registering miner");
 		let register = client
 			.submit_tx(
 				&tx().mining_slot().bid(
@@ -165,7 +164,7 @@ pub(crate) mod utils {
 					},
 				),
 				&Sr25519Signer::new(miner.pair()),
-				Some(params),
+				None,
 				true,
 			)
 			.await?;

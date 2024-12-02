@@ -49,6 +49,7 @@ impl TracingKeyStr for NotebookHeaderTracingKey {
 pub struct NotaryServer {
 	pub addr: SocketAddr,
 	notary_id: NotaryId,
+	operator_account_id: AccountId,
 	pool: PgPool,
 	ticker: Ticker,
 	pub audit_failure_stream: AuditFailureStream,
@@ -92,6 +93,7 @@ impl NotaryServer {
 	pub async fn start_with(
 		server: Server<Identity, Stack<RpcLoggerLayer, Identity>>,
 		notary_id: NotaryId,
+		operator_account_id: AccountId,
 		ticker: Ticker,
 		pool: PgPool,
 	) -> anyhow::Result<Self> {
@@ -107,6 +109,7 @@ impl NotaryServer {
 			ticker,
 			completed_notebook_sender,
 			completed_notebook_stream,
+			operator_account_id,
 			pool,
 			addr,
 			server_handle: None,
@@ -133,12 +136,13 @@ impl NotaryServer {
 
 	pub async fn start(
 		notary_id: NotaryId,
+		operator_account_id: AccountId,
 		pool: PgPool,
 		ticker: Ticker,
 		addrs: impl ToSocketAddrs,
 	) -> anyhow::Result<Self> {
 		let server = Self::create_http_server(addrs).await?;
-		Self::start_with(server, notary_id, ticker, pool).await
+		Self::start_with(server, notary_id, operator_account_id, ticker, pool).await
 	}
 
 	async fn listen_for_audit_failure(
@@ -328,6 +332,7 @@ impl LocalchainRpcServer for NotaryServer {
 		Ok(NotarizationsStore::apply(
 			&self.pool,
 			self.notary_id,
+			&self.operator_account_id,
 			&self.ticker,
 			balance_changeset.into_inner(),
 			block_votes.into_inner(),
@@ -394,7 +399,7 @@ mod tests {
 	use futures::{StreamExt, TryStreamExt};
 	use jsonrpsee::ws_client::WsClientBuilder;
 	use sp_core::{bounded_vec, ed25519::Signature, Blake2Hasher};
-	use sp_keyring::Ed25519Keyring::Bob;
+	use sp_keyring::{AccountKeyring::Ferdie, Ed25519Keyring::Bob};
 	use sp_keystore::{testing::MemoryKeystore, Keystore, KeystoreExt};
 	use sqlx::PgPool;
 
@@ -421,7 +426,9 @@ mod tests {
 	async fn test_balance_change_and_get_proof(pool: PgPool) -> anyhow::Result<()> {
 		let _ = tracing_subscriber::fmt::try_init();
 		let ticker = Ticker::new(60_000, 2);
-		let notary = NotaryServer::start(1, pool.clone(), ticker, "127.0.0.1:0").await?;
+		let operator = Ferdie.to_account_id();
+		let notary =
+			NotaryServer::start(1, operator.clone(), pool.clone(), ticker, "127.0.0.1:0").await?;
 		assert!(notary.addr.port() > 0);
 
 		let mut db = notary.pool.acquire().await?;
@@ -480,6 +487,7 @@ mod tests {
 			pool: pool.clone(),
 			notary_id: notary.notary_id,
 			keystore: keystore.clone(),
+			operator_account_id: operator.clone(),
 			ticker,
 		};
 		let mut header_listener = FinalizedNotebookHeaderListener::connect(
@@ -531,7 +539,9 @@ mod tests {
 		let _ = tracing_subscriber::fmt::try_init();
 		let ticker = Ticker::new(2_000, 2);
 		let start_tick = ticker.current();
-		let notary = NotaryServer::start(1, pool.clone(), ticker, "127.0.0.1:0").await?;
+		let operator = Ferdie.to_account_id();
+		let notary =
+			NotaryServer::start(1, operator.clone(), pool.clone(), ticker, "127.0.0.1:0").await?;
 		assert!(notary.addr.port() > 0);
 
 		let mut db = notary.pool.acquire().await?;
@@ -558,6 +568,7 @@ mod tests {
 			pool: pool.clone(),
 			notary_id: notary.notary_id,
 			keystore: keystore.clone(),
+			operator_account_id: operator.clone(),
 			ticker,
 		};
 

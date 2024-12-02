@@ -173,4 +173,15 @@ pub enum VerifyError {
 
 	#[error("Invalid block vote tick. Vote tick: {tick}, notebook tick: {notebook_tick}")]
 	InvalidBlockVoteTick { tick: Tick, notebook_tick: Tick },
+
+	#[error("Default block vote only eligible if no other votes")]
+	InvalidDefaultBlockVote,
+
+	#[error(
+		"Default block vote created by invalid author. Expected: {expected:?}, found: {author:?}"
+	)]
+	InvalidDefaultBlockVoteAuthor { author: AccountId32, expected: AccountId32 },
+
+	#[error("No default block vote included")]
+	NoDefaultBlockVote,
 }

@@ -250,15 +250,13 @@ pub mod pallet {
 				});
 			}
 
-			rewards.push(BlockPayout {
-				// block vote rewards account is the miner if not set
-				account_id: authors
-					.block_vote_rewards_account
-					.unwrap_or(authors.block_author_account_id.clone())
-					.clone(),
-				ownership: block_ownership.saturating_sub(miner_ownership),
-				argons: block_argons.saturating_sub(miner_argons),
-			});
+			if let Some(ref block_vote_rewards_account) = authors.block_vote_rewards_account {
+				rewards.push(BlockPayout {
+					account_id: block_vote_rewards_account.clone(),
+					ownership: block_ownership.saturating_sub(miner_ownership),
+					argons: block_argons.saturating_sub(miner_argons),
+				});
+			}
 
 			let reward_height = n.saturating_add(T::MaturationBlocks::get().into());
 			for reward in rewards.iter_mut() {

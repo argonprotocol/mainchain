@@ -1,17 +1,17 @@
 use std::env;
 
 use anyhow::Context;
-use clap::{Parser, Subcommand};
-use futures::StreamExt;
-use sqlx::{migrate, postgres::PgPoolOptions};
-
-use argon_client::ReconnectingClient;
+use argon_client::{api::storage, ReconnectingClient};
 use argon_notary::{
 	block_watch::spawn_block_sync,
 	notebook_closer::{spawn_notebook_closer, NOTARY_KEYID},
 	NotaryServer,
 };
-use argon_primitives::{tick::Ticker, CryptoType, KeystoreParams, NotaryId};
+use argon_primitives::{tick::Ticker, AccountId, CryptoType, KeystoreParams, NotaryId};
+use clap::{Parser, Subcommand};
+use futures::StreamExt;
+use sp_core::{crypto::Ss58Codec, sr25519, Pair};
+use sqlx::{migrate, postgres::PgPoolOptions};
 
 #[derive(Parser, Debug)]
 #[command(version = env!("IMPL_VERSION"), about, author, arg_required_else_help = true, long_about = None)]
@@ -39,6 +39,10 @@ enum Commands {
 		/// Required notary id you are running
 		#[clap(short, long, env = "ARGON_NOTARY_ID", default_value = "1")]
 		notary_id: NotaryId,
+
+		/// The notary operator account id. Required if notary is not registered yet
+		#[clap(short, long, env = "ARGON_OPERATOR_ACCOUNT_ID")]
+		operator_address: Option<String>,
 
 		#[allow(missing_docs)]
 		#[clap(flatten)]
@@ -112,6 +116,7 @@ async fn main() -> anyhow::Result<()> {
 			db_url,
 			bind_addr,
 			trusted_rpc_url,
+			mut operator_address,
 			notary_id,
 			sync_blocks,
 			finalize_notebooks,
@@ -125,6 +130,10 @@ async fn main() -> anyhow::Result<()> {
 				.await
 				.context("failed to connect to db")?;
 			let keystore = if dev {
+				if operator_address.is_none() {
+					operator_address =
+						Some(sr25519::Pair::from_string("//Ferdie", None)?.public().to_ss58check());
+				}
 				keystore_params.open_in_memory(
 					"//Ferdie//notary",
 					CryptoType::Ed25519,
@@ -137,7 +146,40 @@ async fn main() -> anyhow::Result<()> {
 			let mut mainchain_client = ReconnectingClient::new(vec![trusted_rpc_url.clone()]);
 			let ticker: Ticker = mainchain_client.get().await?.lookup_ticker().await?;
 
-			let server = NotaryServer::start(notary_id, pool.clone(), ticker, bind_addr).await?;
+			let operator_account_id = if let Some(address) = operator_address {
+				AccountId::from_ss58check_with_version(address.as_str())
+					.map_err(|_| Error::Input("Invalid account id".to_string()))
+					.map(|(a, _version)| a)?
+			} else {
+				let active_notaries = mainchain_client
+					.get()
+					.await?
+					.fetch_storage(&storage().notaries().active_notaries(), None)
+					.await?
+					.expect("active notaries storage is not available")
+					.0;
+				active_notaries
+					.iter()
+					.find_map(|notary| {
+						if notary.notary_id == notary_id {
+							Some(notary.operator_account_id.0.into())
+						} else {
+							None
+						}
+					})
+					.ok_or_else(|| {
+						Error::Input("Notary not found in active notaries".to_string())
+					})?
+			};
+
+			let server = NotaryServer::start(
+				notary_id,
+				operator_account_id.clone(),
+				pool.clone(),
+				ticker,
+				bind_addr,
+			)
+			.await?;
 
 			if sync_blocks {
 				spawn_block_sync(trusted_rpc_url.clone(), notary_id, pool.clone(), ticker).await?;
@@ -146,6 +188,7 @@ async fn main() -> anyhow::Result<()> {
 				let handles = spawn_notebook_closer(
 					pool.clone(),
 					notary_id,
+					operator_account_id,
 					keystore,
 					ticker,
 					server.completed_notebook_sender.clone(),

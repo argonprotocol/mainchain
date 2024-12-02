@@ -15,8 +15,8 @@ use argon_primitives::{
 };
 
 use crate::{
-	verify_changeset_signatures, verify_notarization_allocation, verify_voting_sources,
-	BalanceChangesetState, VerifyError,
+	track_block_votes, verify_changeset_signatures, verify_notarization_allocation,
+	verify_voting_sources, BalanceChangesetState, NotebookVerifyState, VerifyError,
 };
 
 fn empty_proof(balance: u128) -> Option<BalanceProof> {
@@ -807,21 +807,64 @@ fn test_vote_sources() {
 
 	let vote_minimums = BTreeMap::from([(vote_block_hash, 500_000)]);
 
+	let operator = Ferdie.to_account_id();
 	assert_err!(
-		verify_voting_sources(&votes, 1, &vote_minimums),
+		verify_voting_sources(&votes, 1, &operator, &vote_minimums),
 		VerifyError::InsufficientBlockVoteMinimum
 	);
 
 	votes[1].power = 500_000;
 	assert_err!(
-		verify_voting_sources(&votes, 1, &vote_minimums),
+		verify_voting_sources(&votes, 1, &operator, &vote_minimums),
 		VerifyError::BlockVoteInvalidSignature
 	);
 	votes[1].sign(Bob.pair());
 
 	assert_err!(
-		verify_voting_sources(&votes, 2, &vote_minimums),
+		verify_voting_sources(&votes, 2, &operator, &vote_minimums),
 		VerifyError::InvalidBlockVoteTick { tick: 1, notebook_tick: 2 }
 	);
-	assert_ok!(verify_voting_sources(&votes, 1, &vote_minimums),);
+	assert_ok!(verify_voting_sources(&votes, 1, &operator, &vote_minimums),);
+}
+
+#[test]
+fn test_default_votes() {
+	let operator = Ferdie.to_account_id();
+	let mut votes = vec![BlockVote::create_default_vote(Bob.to_account_id(), 10)];
+
+	let vote_minimums = BTreeMap::from([(H256::zero(), 500_000)]);
+
+	assert_err!(
+		verify_voting_sources(&votes, 1, &operator, &vote_minimums),
+		VerifyError::InvalidBlockVoteTick { tick: 10, notebook_tick: 1 }
+	);
+	assert_err!(
+		verify_voting_sources(&votes, 10, &operator, &vote_minimums),
+		VerifyError::InvalidDefaultBlockVoteAuthor {
+			author: Bob.to_account_id(),
+			expected: operator.clone()
+		}
+	);
+
+	votes[0].account_id = operator.clone();
+	assert_ok!(verify_voting_sources(&votes, 10, &operator, &vote_minimums),);
+	// if there's any power, not a default vote anymore
+	votes[0].power = 1;
+	assert_err!(
+		verify_voting_sources(&votes, 10, &operator, &vote_minimums),
+		VerifyError::InsufficientBlockVoteMinimum
+	);
+
+	// can't have more than one default vote
+	let mut notebook_state = NotebookVerifyState::default();
+	assert_err!(
+		track_block_votes(
+			&mut notebook_state,
+			&vec![
+				BlockVote::create_default_vote(operator.clone(), 10),
+				BlockVote::create_default_vote(operator.clone(), 10)
+			],
+		),
+		VerifyError::InvalidDefaultBlockVote
+	);
 }

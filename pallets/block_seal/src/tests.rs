@@ -375,7 +375,7 @@ fn it_checks_that_votes_are_for_great_grandpa_tick() {
 		// still errors, but moves past the invalid vote hash
 		assert_err!(
 			BlockSeal::verify_block_vote(U256::from(1), &vote, &Alice.into(), &voting_schedule,),
-			Error::<Test>::UnregisteredBlockAuthor
+			Error::<Test>::BlockVoteInvalidSignature
 		);
 	});
 }
@@ -585,7 +585,7 @@ fn it_can_find_best_vote_seals() {
 			vec![]
 		);
 
-		for i in 1..5 {
+		for i in 1..=5 {
 			System::reset_events();
 			System::initialize(&i, &parent_hash, &Default::default());
 
@@ -607,6 +607,7 @@ fn it_can_find_best_vote_seals() {
 		vote.raw_votes = vec![(first_vote.encode(), 500)];
 
 		ParentVotingKey::<Test>::put(Some(H256::random()));
+		assert!(!first_vote.is_proxy_vote());
 		// vote is for grandparent, but should be for great grandparent
 		assert_eq!(
 			BlockSeal::find_vote_block_seals(
@@ -683,6 +684,57 @@ fn it_can_find_best_vote_seals() {
 }
 
 #[test]
+fn it_allows_any_block_with_default_votes() {
+	new_test_ext().execute_with(|| {
+		// Go past genesis block so events get deposited
+		let mut parent_hash = System::parent_hash();
+
+		XorClosest::set(Some(MiningAuthority {
+			account_id: Alice.into(),
+			authority_id: default_authority(),
+			authority_index: 0,
+		}));
+		AuthorityList::set(vec![(Alice.into(), default_authority())]);
+
+		for i in 1..=5 {
+			System::reset_events();
+			System::initialize(&i, &parent_hash, &Default::default());
+
+			let header = System::finalize();
+			parent_hash = header.hash();
+			System::set_block_number(*header.number());
+		}
+		CurrentTick::set(5);
+		// This api assumes you are building the next block, so the runtime tick will already be -1
+		let voting_schedule = VotingSchedule::when_evaluating_runtime_votes(5);
+		BlocksAtTick::mutate(|a| {
+			for i in 1..5 {
+				a.insert(i as Tick, vec![System::block_hash(i)]);
+			}
+		});
+
+		let first_vote = BlockVote::create_default_vote(Bob.public().into(), 5);
+		assert!(first_vote.is_proxy_vote());
+		assert!(first_vote.is_default_vote());
+
+		ParentVotingKey::<Test>::put(Some(H256::random()));
+
+		let best = BlockSeal::find_vote_block_seals(
+			vec![NotaryNotebookRawVotes {
+				notary_id: 1,
+				notebook_number: 1,
+				raw_votes: vec![(first_vote.encode(), 0)],
+			}],
+			U256::MAX,
+			voting_schedule.notebook_tick(),
+		)
+		.expect("should return");
+		assert_eq!(best.len(), 1);
+		assert_eq!(best[0].block_vote_bytes, first_vote.encode());
+	})
+}
+
+#[test]
 fn it_checks_tax_votes() {
 	new_test_ext().execute_with(|| {
 		// Go past genesis block so events get deposited
@@ -716,6 +768,12 @@ fn it_checks_tax_votes() {
 		GrandpaVoteMinimum::set(Some(500));
 		assert_err!(
 			BlockSeal::verify_block_vote(seal_strength, &vote, &author, &voting_schedule,),
+			Error::<Test>::BlockVoteInvalidSignature
+		);
+		vote.sign(Alice.pair());
+
+		assert_err!(
+			BlockSeal::verify_block_vote(seal_strength, &vote, &author, &voting_schedule,),
 			Error::<Test>::UnregisteredBlockAuthor
 		);
 		AuthorityList::mutate(|a| a.push((Alice.into(), default_authority.clone())));
@@ -729,11 +787,41 @@ fn it_checks_tax_votes() {
 			authority_index: 0,
 		}));
 
+		assert_ok!(BlockSeal::verify_block_vote(seal_strength, &vote, &author, &voting_schedule,),);
+	});
+}
+
+#[test]
+fn it_checks_default_votes() {
+	new_test_ext().execute_with(|| {
+		// Go past genesis block so events get deposited
+		setup_blocks(2);
+		System::set_block_number(4);
+
+		let default_authority = default_authority();
+		let author = Alice.to_account_id();
+		let tick = 6;
+		CurrentTick::set(tick);
+		let voting_schedule = VotingSchedule::when_evaluating_runtime_seals(tick);
+		let vote =
+			BlockVote::create_default_vote(Alice.into(), voting_schedule.eligible_votes_tick());
+
+		let seal_strength = vote.get_seal_strength(1, H256::random());
+		// first thing default votes check is the block authority
 		assert_err!(
 			BlockSeal::verify_block_vote(seal_strength, &vote, &author, &voting_schedule,),
-			Error::<Test>::BlockVoteInvalidSignature
+			Error::<Test>::UnregisteredBlockAuthor
 		);
-		vote.sign(Alice.pair());
+		AuthorityList::mutate(|a| a.push((Alice.into(), default_authority.clone())));
+		assert_err!(
+			BlockSeal::verify_block_vote(seal_strength, &vote, &author, &voting_schedule,),
+			Error::<Test>::InvalidSubmitter
+		);
+		XorClosest::set(Some(MiningAuthority {
+			account_id: Alice.into(),
+			authority_id: default_authority.clone(),
+			authority_index: 0,
+		}));
 
 		assert_ok!(BlockSeal::verify_block_vote(seal_strength, &vote, &author, &voting_schedule,),);
 	});

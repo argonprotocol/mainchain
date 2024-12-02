@@ -1,6 +1,7 @@
 #[cfg(feature = "std")]
 use crate::serialize_unsafe_u128_as_string;
 
+use crate::{tick::Tick, AccountId, BlockVotingPower, MerkleProof, NotaryId, NotebookNumber};
 use alloc::vec::Vec;
 use codec::{Codec, Decode, Encode, MaxEncodedLen};
 use serde::{Deserialize, Serialize};
@@ -8,8 +9,6 @@ use sp_core::{H256, U256};
 use sp_crypto_hashing::blake2_256;
 use sp_debug_derive::RuntimeDebug;
 use sp_runtime::{scale_info::TypeInfo, MultiSignature};
-
-use crate::{tick::Tick, AccountId, BlockVotingPower, MerkleProof, NotaryId, NotebookNumber};
 
 pub type VoteMinimum = u128;
 
@@ -56,6 +55,105 @@ struct BlockVoteHashMessage<Hash: Codec> {
 	power: BlockVotingPower,
 	block_rewards_account_id: AccountId,
 	tick: Tick,
+}
+
+pub type BlockVote = BlockVoteT<H256>;
+
+pub type VotingKey = H256;
+const PROXY_VOTE: [u8; 32] = [0; 32];
+impl<Hash: Codec + Clone + PartialEq + From<[u8; 32]>> BlockVoteT<Hash> {
+	pub fn hash(&self) -> H256 {
+		const PREFIX: &str = "BlockVote";
+		BlockVoteHashMessage {
+			prefix: PREFIX,
+			account_id: self.account_id.clone(),
+			block_hash: self.block_hash.clone(),
+			index: self.index,
+			power: self.power,
+			block_rewards_account_id: self.block_rewards_account_id.clone(),
+			tick: self.tick,
+		}
+		.using_encoded(blake2_256)
+		.into()
+	}
+
+	pub fn is_proxy_vote(&self) -> bool {
+		self.block_hash == Hash::from(PROXY_VOTE)
+	}
+
+	pub fn create_default_vote(notary_account_id: AccountId, tick: Tick) -> Self {
+		Self {
+			account_id: notary_account_id,
+			tick,
+			block_hash: Hash::from(PROXY_VOTE),
+			index: 0,
+			power: 0,
+			signature: MultiSignature::Ed25519([0; 64].into()),
+			block_rewards_account_id: AccountId::new([0; 32]),
+		}
+	}
+
+	pub fn is_default_vote(&self) -> bool {
+		self.is_proxy_vote() &&
+			self.index == 0 &&
+			self.power == 0 &&
+			self.block_rewards_account_id == AccountId::new([0; 32]) &&
+			self.signature == MultiSignature::Ed25519([0; 64].into())
+	}
+
+	pub fn get_seal_strength(&self, notary_id: NotaryId, voting_key: H256) -> U256 {
+		Self::calculate_seal_strength(self.power, self.encode(), notary_id, voting_key)
+	}
+
+	pub fn calculate_seal_strength(
+		power: BlockVotingPower,
+		vote_bytes: Vec<u8>,
+		notary_id: NotaryId,
+		voting_key: H256,
+	) -> U256 {
+		let hash = BlockVoteProofHashMessage { notary_id, vote_bytes, voting_key }
+			.using_encoded(blake2_256);
+		let power = if power < 1 { U256::one() } else { U256::from(power) };
+		U256::from_big_endian(&hash[..]).checked_div(power).unwrap_or(U256::MAX)
+	}
+
+	pub fn seal_signature_message<H: AsRef<[u8]>>(block_hash: H) -> [u8; 32] {
+		const PREFIX: &[u8] = b"BlockVoteSeal";
+		let message = &[PREFIX, block_hash.as_ref()].concat();
+		message.using_encoded(blake2_256)
+	}
+
+	#[cfg(feature = "std")]
+	pub fn sign<S: sp_core::Pair>(&mut self, pair: S) -> &Self
+	where
+		S::Signature: Into<MultiSignature>,
+	{
+		self.signature = pair.sign(&self.hash()[..]).into();
+		self
+	}
+}
+
+#[derive(Encode)]
+struct BlockVoteProofHashMessage {
+	#[codec(compact)]
+	pub notary_id: NotaryId,
+	pub vote_bytes: Vec<u8>,
+	pub voting_key: H256,
+}
+
+#[derive(Clone, PartialEq, Eq, Encode, Decode, RuntimeDebug, TypeInfo, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct BestBlockVoteSeal<AccountId: Codec, Authority: Codec> {
+	/// The seal strength (a smallest u256)
+	pub seal_strength: U256,
+	#[codec(compact)]
+	pub notary_id: NotaryId,
+	pub block_vote_bytes: Vec<u8>,
+	#[codec(compact)]
+	pub source_notebook_number: NotebookNumber,
+	/// Proof the vote was included in the block vote root of a notary header
+	pub source_notebook_proof: MerkleProof,
+	pub closest_miner: (AccountId, Authority),
 }
 
 /// This struct exists mostly because the mental model of the voting is so difficult to
@@ -187,79 +285,4 @@ impl VotingSchedule {
 	pub fn grandparent_votes_tick(&self) -> Tick {
 		self.notebook_tick().saturating_sub(2)
 	}
-}
-
-pub type BlockVote = BlockVoteT<H256>;
-pub type VotingKey = H256;
-
-impl<Hash: Codec + Clone> BlockVoteT<Hash> {
-	pub fn hash(&self) -> H256 {
-		const PREFIX: &str = "BlockVote";
-		BlockVoteHashMessage {
-			prefix: PREFIX,
-			account_id: self.account_id.clone(),
-			block_hash: self.block_hash.clone(),
-			index: self.index,
-			power: self.power,
-			block_rewards_account_id: self.block_rewards_account_id.clone(),
-			tick: self.tick,
-		}
-		.using_encoded(blake2_256)
-		.into()
-	}
-
-	pub fn get_seal_strength(&self, notary_id: NotaryId, voting_key: H256) -> U256 {
-		Self::calculate_seal_strength(self.power, self.encode(), notary_id, voting_key)
-	}
-
-	pub fn calculate_seal_strength(
-		power: BlockVotingPower,
-		vote_bytes: Vec<u8>,
-		notary_id: NotaryId,
-		voting_key: H256,
-	) -> U256 {
-		let hash = BlockVoteProofHashMessage { notary_id, vote_bytes, voting_key }
-			.using_encoded(blake2_256);
-		U256::from_big_endian(&hash[..])
-			.checked_div(U256::from(power))
-			.unwrap_or(U256::zero())
-	}
-
-	pub fn seal_signature_message<H: AsRef<[u8]>>(block_hash: H) -> [u8; 32] {
-		const PREFIX: &[u8] = b"BlockVoteSeal";
-		let message = &[PREFIX, block_hash.as_ref()].concat();
-		message.using_encoded(blake2_256)
-	}
-
-	#[cfg(feature = "std")]
-	pub fn sign<S: sp_core::Pair>(&mut self, pair: S) -> &Self
-	where
-		S::Signature: Into<MultiSignature>,
-	{
-		self.signature = pair.sign(&self.hash()[..]).into();
-		self
-	}
-}
-
-#[derive(Encode)]
-struct BlockVoteProofHashMessage {
-	#[codec(compact)]
-	pub notary_id: NotaryId,
-	pub vote_bytes: Vec<u8>,
-	pub voting_key: H256,
-}
-
-#[derive(Clone, PartialEq, Eq, Encode, Decode, RuntimeDebug, TypeInfo, Serialize, Deserialize)]
-#[serde(rename_all = "camelCase")]
-pub struct BestBlockVoteSeal<AccountId: Codec, Authority: Codec> {
-	/// The seal strength (a smallest u256)
-	pub seal_strength: U256,
-	#[codec(compact)]
-	pub notary_id: NotaryId,
-	pub block_vote_bytes: Vec<u8>,
-	#[codec(compact)]
-	pub source_notebook_number: NotebookNumber,
-	/// Proof the vote was included in the block vote root of a notary header
-	pub source_notebook_proof: MerkleProof,
-	pub closest_miner: (AccountId, Authority),
 }

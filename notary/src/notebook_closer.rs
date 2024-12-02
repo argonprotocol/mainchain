@@ -1,12 +1,11 @@
+use argon_notary_apis::error::Error;
+use argon_primitives::{tick::Ticker, AccountId, NotaryId, SignedNotebookHeader};
 use futures::FutureExt;
 use sc_utils::notification::NotificationSender;
 use sp_core::{ed25519, H256};
 use sp_keystore::KeystorePtr;
 use sqlx::{postgres::PgListener, PgPool};
 use tokio::task::JoinHandle;
-
-use argon_notary_apis::error::Error;
-use argon_primitives::{tick::Ticker, NotaryId, SignedNotebookHeader};
 
 use crate::stores::{
 	notebook::NotebookStore,
@@ -24,6 +23,7 @@ pub struct NotebookCloser {
 	pub pool: PgPool,
 	pub keystore: KeystorePtr,
 	pub notary_id: NotaryId,
+	pub operator_account_id: AccountId,
 	pub ticker: Ticker,
 }
 
@@ -77,13 +77,15 @@ type NotebookCloserHandles = (JoinHandle<anyhow::Result<()>>, JoinHandle<anyhow:
 pub fn spawn_notebook_closer(
 	pool: PgPool,
 	notary_id: NotaryId,
+	operator_account_id: AccountId,
 	keystore: KeystorePtr,
 	ticker: Ticker,
 	completed_notebook_sender: NotificationSender<SignedNotebookHeader>,
 ) -> anyhow::Result<NotebookCloserHandles> {
 	let pool1 = pool.clone();
 	let handle_1 = tokio::spawn(async move {
-		let mut notebook_closer = NotebookCloser { pool: pool1, notary_id, keystore, ticker };
+		let mut notebook_closer =
+			NotebookCloser { pool: pool1, notary_id, keystore, operator_account_id, ticker };
 		notebook_closer.create_task().await?;
 		Ok(())
 	});
@@ -163,7 +165,15 @@ impl NotebookCloser {
 
 			let public = RegisteredKeyStore::get_valid_public(&mut *tx, tick).await?;
 
-			NotebookStore::close_notebook(&mut tx, notebook_number, public, &self.keystore).await?;
+			NotebookStore::close_notebook(
+				&mut tx,
+				notebook_number,
+				tick,
+				public,
+				self.operator_account_id.clone(),
+				&self.keystore,
+			)
+			.await?;
 
 			NotebookStatusStore::next_step(&mut *tx, notebook_number, step).await?;
 			tx.commit().await?;
@@ -199,7 +209,6 @@ struct NotebookAuditResponse {
 #[cfg(test)]
 mod tests {
 	use anyhow::anyhow;
-	use codec::{Decode, Encode};
 	use frame_support::assert_ok;
 	use futures::{task::noop_waker_ref, StreamExt};
 	use sp_core::{bounded_vec, crypto::AccountId32, ed25519::Public, sr25519::Signature, Pair};
@@ -268,7 +277,7 @@ mod tests {
 		let _ = tracing_subscriber::fmt::try_init();
 		let ctx = start_argon_test_node().await;
 
-		let bob_id = Bob.to_account_id();
+		let notary_operator = Bob.to_account_id();
 
 		let notary_id = 1;
 		let ws_url = ctx.client.url.clone();
@@ -285,11 +294,18 @@ mod tests {
 		let block_tracker = track_blocks(ws_url.clone(), 1, pool.clone(), ticker);
 		let block_tracker = Arc::new(Mutex::new(Some(block_tracker)));
 
-		let mut notary_server =
-			NotaryServer::start_with(server, notary_id, ticker, pool.clone()).await?;
+		let mut notary_server = NotaryServer::start_with(
+			server,
+			notary_id,
+			notary_operator.clone(),
+			ticker,
+			pool.clone(),
+		)
+		.await?;
 		let watches = spawn_notebook_closer(
 			pool.clone(),
 			notary_id,
+			notary_operator.clone(),
 			keystore.clone(),
 			ticker,
 			notary_server.completed_notebook_sender.clone(),
@@ -297,7 +313,7 @@ mod tests {
 
 		propose_bob_as_notary(&ctx.client.live, notary_key, addr).await?;
 
-		activate_notary(&pool, &ctx.client.live, &bob_id).await?;
+		activate_notary(&pool, &ctx.client.live, &notary_operator).await?;
 
 		let bob_balance = 8_000_000;
 		// Submit a transfer to localchain and wait for result
@@ -563,9 +579,7 @@ mod tests {
 		let mut notebook_digest = None;
 		let mut parent_voting_key = None;
 		let mut fork_power = None;
-		for log in block.header().runtime_digest().logs.iter() {
-			let digest = sp_runtime::DigestItem::decode(&mut &log.encode()[..])
-				.expect("Should be able to decode digest item");
+		for digest in block.header().runtime_digest().logs.iter() {
 			if let Some(d) = digest.as_tick() {
 				tick = Some(d);
 			} else if let Some(d) = digest.as_block_vote() {
@@ -638,6 +652,7 @@ mod tests {
 		let result = NotarizationsStore::apply(
 			pool,
 			1,
+			&Ferdie.to_account_id(),
 			ticker,
 			vec![BalanceChange {
 				account_id: keypair.public().into(),
@@ -682,6 +697,7 @@ mod tests {
 		let result = NotarizationsStore::apply(
 			pool,
 			1,
+			&Ferdie.to_account_id(),
 			ticker,
 			vec![
 				BalanceChange {
@@ -787,7 +803,16 @@ mod tests {
 		.sign(Bob.pair())
 		.clone()];
 
-		let result = NotarizationsStore::apply(pool, 1, ticker, changes, vec![], vec![]).await?;
+		let result = NotarizationsStore::apply(
+			pool,
+			1,
+			&Ferdie.to_account_id(),
+			ticker,
+			changes,
+			vec![],
+			vec![],
+		)
+		.await?;
 		Ok((hold_note.clone(), result))
 	}
 
@@ -846,6 +871,7 @@ mod tests {
 		let result = NotarizationsStore::apply(
 			pool,
 			1,
+			&Ferdie.to_account_id(),
 			ticker,
 			changes,
 			vec![BlockVote {

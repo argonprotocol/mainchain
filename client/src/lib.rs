@@ -100,6 +100,7 @@ impl MainchainClient {
 		account_id: &AccountId32,
 	) -> anyhow::Result<ArgonExtrinsicParamsBuilder<ArgonConfig>> {
 		let nonce = self.get_account_nonce(account_id).await?;
+		println!("latest nonce for account {:?} is {:?}", account_id, nonce);
 		Ok(Self::ext_params_builder().nonce(nonce.into()))
 	}
 
@@ -219,10 +220,11 @@ impl MainchainClient {
 	pub async fn get_ownership(
 		&self,
 		account_id: &AccountId32,
+		at_block: Option<<ArgonConfig as Config>::Hash>,
 	) -> anyhow::Result<ownership::storage::types::account::Account> {
 		let account_id = self.api_account(account_id);
 		let balance = self
-			.fetch_storage(&storage().ownership().account(&account_id), None)
+			.fetch_storage(&storage().ownership().account(&account_id), at_block)
 			.await?
 			.ok_or_else(|| anyhow!("No record found for account {:?}", account_id))?;
 		Ok(balance)

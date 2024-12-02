@@ -1503,6 +1503,23 @@ pub mod api {
 						],
 					)
 				}
+				pub fn is_bootstrap_mining(
+					&self,
+				) -> ::subxt::ext::subxt_core::runtime_api::payload::StaticPayload<
+					types::IsBootstrapMining,
+					types::is_bootstrap_mining::output::Output,
+				> {
+					::subxt::ext::subxt_core::runtime_api::payload::StaticPayload::new_static(
+						"BlockSealApis",
+						"is_bootstrap_mining",
+						types::IsBootstrapMining {},
+						[
+							93u8, 100u8, 145u8, 155u8, 242u8, 93u8, 91u8, 170u8, 102u8, 145u8,
+							154u8, 30u8, 31u8, 89u8, 205u8, 150u8, 194u8, 5u8, 111u8, 180u8, 46u8,
+							207u8, 155u8, 219u8, 210u8, 62u8, 26u8, 30u8, 230u8, 33u8, 6u8, 85u8,
+						],
+					)
+				}
 				pub fn is_valid_signature(
 					&self,
 					block_hash: types::is_valid_signature::BlockHash,
@@ -1666,6 +1683,29 @@ pub mod api {
 					crate_path = ":: subxt :: ext :: subxt_core :: ext :: scale_encode"
 				)]
 				pub struct HasEligibleVotes {}
+				pub mod is_bootstrap_mining {
+					use super::runtime_types;
+					pub mod output {
+						use super::runtime_types;
+						pub type Output = ::core::primitive::bool;
+					}
+				}
+				#[derive(
+					:: subxt :: ext :: subxt_core :: ext :: codec :: Decode,
+					:: subxt :: ext :: subxt_core :: ext :: codec :: Encode,
+					:: subxt :: ext :: subxt_core :: ext :: scale_decode :: DecodeAsType,
+					:: subxt :: ext :: subxt_core :: ext :: scale_encode :: EncodeAsType,
+					Clone,
+					Debug,
+				)]
+				# [codec (crate = :: subxt :: ext :: subxt_core :: ext :: codec)]
+				#[decode_as_type(
+					crate_path = ":: subxt :: ext :: subxt_core :: ext :: scale_decode"
+				)]
+				#[encode_as_type(
+					crate_path = ":: subxt :: ext :: subxt_core :: ext :: scale_encode"
+				)]
+				pub struct IsBootstrapMining {}
 				pub mod is_valid_signature {
 					use super::runtime_types;
 					pub type BlockHash = crate::types::H256;
@@ -1732,9 +1772,10 @@ pub mod api {
 						"digest_notebooks",
 						types::DigestNotebooks { digests },
 						[
-							242u8, 253u8, 5u8, 65u8, 164u8, 17u8, 169u8, 68u8, 147u8, 180u8, 130u8,
-							228u8, 174u8, 149u8, 97u8, 68u8, 208u8, 218u8, 75u8, 93u8, 56u8, 190u8,
-							225u8, 4u8, 247u8, 216u8, 148u8, 37u8, 233u8, 248u8, 202u8, 106u8,
+							141u8, 246u8, 52u8, 153u8, 222u8, 174u8, 16u8, 18u8, 249u8, 56u8,
+							191u8, 120u8, 222u8, 167u8, 128u8, 21u8, 101u8, 203u8, 203u8, 102u8,
+							32u8, 235u8, 52u8, 103u8, 134u8, 161u8, 102u8, 194u8, 73u8, 239u8,
+							98u8, 124u8,
 						],
 					)
 				}
@@ -1825,10 +1866,9 @@ pub mod api {
 						"notary_by_id",
 						types::NotaryById { notary_id },
 						[
-							0u8, 25u8, 140u8, 36u8, 205u8, 7u8, 163u8, 244u8, 131u8, 146u8, 134u8,
-							60u8, 249u8, 209u8, 180u8, 147u8, 231u8, 238u8, 225u8, 11u8, 144u8,
-							107u8, 238u8, 142u8, 132u8, 69u8, 185u8, 31u8, 118u8, 94u8, 184u8,
-							104u8,
+							173u8, 34u8, 57u8, 177u8, 35u8, 122u8, 201u8, 110u8, 222u8, 84u8,
+							107u8, 162u8, 197u8, 15u8, 223u8, 149u8, 21u8, 32u8, 96u8, 155u8, 94u8,
+							217u8, 108u8, 42u8, 63u8, 80u8, 233u8, 216u8, 128u8, 65u8, 226u8, 14u8,
 						],
 					)
 				}
@@ -1843,9 +1883,9 @@ pub mod api {
 						"notaries",
 						types::Notaries {},
 						[
-							19u8, 214u8, 83u8, 6u8, 212u8, 6u8, 248u8, 92u8, 200u8, 187u8, 30u8,
-							177u8, 45u8, 119u8, 212u8, 96u8, 75u8, 212u8, 74u8, 112u8, 16u8, 227u8,
-							80u8, 122u8, 132u8, 81u8, 78u8, 2u8, 235u8, 127u8, 125u8, 30u8,
+							183u8, 7u8, 54u8, 160u8, 255u8, 133u8, 211u8, 76u8, 135u8, 229u8,
+							107u8, 70u8, 188u8, 35u8, 39u8, 119u8, 160u8, 21u8, 45u8, 144u8, 1u8,
+							142u8, 68u8, 47u8, 176u8, 55u8, 61u8, 144u8, 64u8, 206u8, 125u8, 131u8,
 						],
 					)
 				}
@@ -1997,9 +2037,10 @@ pub mod api {
 							raw_audit_dependency_summaries,
 						},
 						[
-							120u8, 121u8, 180u8, 197u8, 119u8, 79u8, 80u8, 127u8, 206u8, 39u8,
-							23u8, 66u8, 201u8, 157u8, 58u8, 247u8, 187u8, 38u8, 107u8, 8u8, 218u8,
-							78u8, 83u8, 89u8, 221u8, 208u8, 63u8, 51u8, 73u8, 43u8, 169u8, 117u8,
+							197u8, 179u8, 219u8, 78u8, 252u8, 56u8, 168u8, 120u8, 50u8, 223u8,
+							161u8, 221u8, 159u8, 217u8, 51u8, 142u8, 202u8, 232u8, 165u8, 7u8,
+							188u8, 95u8, 236u8, 29u8, 28u8, 89u8, 138u8, 78u8, 234u8, 3u8, 170u8,
+							21u8,
 						],
 					)
 				}
@@ -3696,9 +3737,9 @@ pub mod api {
 			.hash();
 		runtime_metadata_hash ==
 			[
-				132u8, 126u8, 146u8, 139u8, 194u8, 55u8, 7u8, 182u8, 218u8, 48u8, 28u8, 205u8,
-				107u8, 246u8, 163u8, 73u8, 223u8, 8u8, 3u8, 83u8, 104u8, 167u8, 251u8, 122u8,
-				255u8, 251u8, 128u8, 19u8, 227u8, 205u8, 130u8, 255u8,
+				199u8, 91u8, 14u8, 131u8, 108u8, 237u8, 34u8, 217u8, 45u8, 80u8, 87u8, 32u8, 46u8,
+				182u8, 168u8, 253u8, 234u8, 24u8, 22u8, 196u8, 216u8, 135u8, 40u8, 108u8, 153u8,
+				151u8, 243u8, 72u8, 204u8, 198u8, 186u8, 253u8,
 			]
 	}
 	pub mod system {
@@ -4849,10 +4890,9 @@ pub mod api {
 						"Events",
 						(),
 						[
-							236u8, 149u8, 171u8, 100u8, 175u8, 87u8, 182u8, 58u8, 55u8, 7u8, 28u8,
-							232u8, 126u8, 200u8, 138u8, 157u8, 138u8, 237u8, 81u8, 78u8, 99u8,
-							197u8, 164u8, 114u8, 244u8, 49u8, 41u8, 122u8, 1u8, 180u8, 116u8,
-							198u8,
+							211u8, 139u8, 16u8, 21u8, 86u8, 115u8, 101u8, 227u8, 136u8, 207u8,
+							125u8, 189u8, 5u8, 179u8, 65u8, 156u8, 72u8, 150u8, 63u8, 98u8, 63u8,
+							48u8, 116u8, 239u8, 203u8, 6u8, 86u8, 148u8, 34u8, 101u8, 140u8, 19u8,
 						],
 					)
 				}
@@ -5199,9 +5239,9 @@ pub mod api {
 						"TempDigests",
 						(),
 						[
-							62u8, 147u8, 75u8, 217u8, 94u8, 40u8, 0u8, 91u8, 189u8, 205u8, 162u8,
-							159u8, 220u8, 6u8, 68u8, 102u8, 133u8, 49u8, 8u8, 146u8, 131u8, 127u8,
-							82u8, 109u8, 154u8, 190u8, 73u8, 181u8, 78u8, 211u8, 3u8, 247u8,
+							1u8, 33u8, 128u8, 201u8, 62u8, 255u8, 61u8, 173u8, 116u8, 14u8, 241u8,
+							208u8, 156u8, 164u8, 60u8, 2u8, 29u8, 139u8, 244u8, 190u8, 14u8, 204u8,
+							85u8, 90u8, 120u8, 91u8, 143u8, 231u8, 156u8, 63u8, 62u8, 148u8,
 						],
 					)
 				}
@@ -11681,10 +11721,10 @@ pub mod api {
 						"BlockNotebooks",
 						(),
 						[
-							20u8, 174u8, 149u8, 132u8, 52u8, 219u8, 105u8, 41u8, 158u8, 71u8,
-							226u8, 194u8, 3u8, 87u8, 36u8, 103u8, 12u8, 103u8, 222u8, 210u8, 198u8,
-							61u8, 252u8, 88u8, 187u8, 164u8, 102u8, 183u8, 183u8, 181u8, 196u8,
-							186u8,
+							123u8, 95u8, 72u8, 128u8, 110u8, 171u8, 170u8, 210u8, 166u8, 10u8,
+							247u8, 43u8, 160u8, 153u8, 147u8, 107u8, 193u8, 88u8, 21u8, 230u8,
+							103u8, 164u8, 197u8, 136u8, 140u8, 204u8, 50u8, 229u8, 59u8, 132u8,
+							12u8, 117u8,
 						],
 					)
 				}
@@ -11724,9 +11764,10 @@ pub mod api {
 						"NotariesLockedForFailedAudit",
 						(),
 						[
-							149u8, 169u8, 97u8, 60u8, 98u8, 31u8, 146u8, 77u8, 118u8, 219u8, 251u8,
-							80u8, 157u8, 97u8, 90u8, 0u8, 245u8, 146u8, 210u8, 229u8, 67u8, 19u8,
-							233u8, 35u8, 153u8, 208u8, 212u8, 136u8, 201u8, 27u8, 151u8, 171u8,
+							211u8, 26u8, 32u8, 235u8, 78u8, 101u8, 17u8, 101u8, 122u8, 193u8,
+							121u8, 214u8, 144u8, 196u8, 44u8, 2u8, 78u8, 35u8, 176u8, 175u8, 53u8,
+							76u8, 29u8, 166u8, 181u8, 189u8, 155u8, 140u8, 27u8, 146u8, 219u8,
+							230u8,
 						],
 					)
 				}
@@ -11750,9 +11791,10 @@ pub mod api {
 							_0.borrow(),
 						),
 						[
-							149u8, 169u8, 97u8, 60u8, 98u8, 31u8, 146u8, 77u8, 118u8, 219u8, 251u8,
-							80u8, 157u8, 97u8, 90u8, 0u8, 245u8, 146u8, 210u8, 229u8, 67u8, 19u8,
-							233u8, 35u8, 153u8, 208u8, 212u8, 136u8, 201u8, 27u8, 151u8, 171u8,
+							211u8, 26u8, 32u8, 235u8, 78u8, 101u8, 17u8, 101u8, 122u8, 193u8,
+							121u8, 214u8, 144u8, 196u8, 44u8, 2u8, 78u8, 35u8, 176u8, 175u8, 53u8,
+							76u8, 29u8, 166u8, 181u8, 189u8, 155u8, 140u8, 27u8, 146u8, 219u8,
+							230u8,
 						],
 					)
 				}
@@ -21771,6 +21813,15 @@ pub mod api {
 						tick: ::core::primitive::u64,
 						notebook_tick: ::core::primitive::u64,
 					},
+					#[codec(index = 55)]
+					InvalidDefaultBlockVote,
+					#[codec(index = 56)]
+					InvalidDefaultBlockVoteAuthor {
+						author: crate::types::AccountId32,
+						expected: crate::types::AccountId32,
+					},
+					#[codec(index = 57)]
+					NoDefaultBlockVote,
 				}
 			}
 			#[derive(

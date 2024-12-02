@@ -29,7 +29,7 @@ pub trait NotaryProvider<B: BlockT, AccountId> {
 		signature: &NotarySignature,
 	) -> bool;
 	fn active_notaries() -> Vec<NotaryId>;
-	fn is_notary_operator(notary_id: NotaryId, account_id: &AccountId) -> bool;
+	fn notary_operator_account_id(notary_id: NotaryId) -> Option<AccountId>;
 }
 
 #[derive(
