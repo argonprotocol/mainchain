@@ -52,6 +52,7 @@ frame-system-rpc-runtime-api = { workspace = true }
 pallet-transaction-payment-rpc-runtime-api = { workspace = true }
 frame-metadata-hash-extension = { workspace = true }
 
+pallet-token-gateway = { workspace = true }
 pallet-ismp = { workspace = true, features = ["unsigned"] }
 pallet-ismp-runtime-api = { workspace = true }
 pallet-hyperbridge = { workspace = true }
@@ -130,6 +131,7 @@ std = [
 	"pallet-sudo/std",
 	"pallet-ticks/std",
 	"pallet-timestamp/std",
+	"pallet-token-gateway/std",
 	"pallet-transaction-payment-rpc-runtime-api/std",
 	"pallet-transaction-payment/std",
 	"pallet-tx-pause/std",
@@ -217,6 +219,7 @@ try-runtime = [
 	"pallet-sudo/try-runtime",
 	"pallet-ticks/try-runtime",
 	"pallet-timestamp/try-runtime",
+	"pallet-token-gateway/try-runtime",
 	"pallet-transaction-payment/try-runtime",
 	"pallet-tx-pause/try-runtime",
 	"pallet-utility/try-runtime",

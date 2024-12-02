@@ -1,10 +1,3 @@
-This Pallet allows transfers to both Localchain and EVM-based chains via hyperbridge.
-
-## Localchain
-
-You can exchange assets back and forth with the Localchain using the `send_to_localchain` function in this pallet, and a
-corresponding localchain transaction to send back to mainchain.
-
 ## Hyperbridge
 
 Hyperbridge is a cross-chain bridge that allows for the transfer of assets between different blockchains. It is a
@@ -16,12 +9,33 @@ A token transfer ui is available here: https://app.hyperbridge.network/
 ### Relayer
 
 There's a hyperbridge script that will all you to start a local relayer to retrieve the initial genesis state:
-`hyperbridge/get_hyperbridge_state.sh` - this is what you register in argon (sudo -> ismp -> createConsensusClient)
-`hyperbridge/get_argon_state.sh` - this is what you send to hyperbridge to register the chain
+`get_hyperbridge_state.sh` - this is what you register in argon (sudo -> ismp -> createConsensusClient)
+`get_argon_state.sh` - this is what you send to hyperbridge to register the chain
 
 ### Configuration
 
 Configuration details relevant to transactions are below:
+
+Testnet registration
+
+The following are where configs are set:
+
+1. `pallet_ismp::AdminOrigin`: This origin can whitelist return addresses. Initially set to sudo
+2. `pallet_chain_transfer::HyperbridgeTokenAdmin`: This origin can update token registrations. Registered in genesis
+
+### Batch submit
+
+https://polkadot.js.org/apps/?rpc=ws%3A%2F%2F127.0.0.1%3A9944#/extrinsics/decode/0x19020c1e0200000000144172676f6e144152474f4e1400a736aa0000dc37aa0000ee6e060000344a0100006100000001a08601000000000000000000000000001e0201000000544172676f6e204f776e65727368697020546f6b656e184152474f574e1400a736aa0000dc37aa0000ee6e060000344a0100006100000001a08601000000000000000000000000001a001e0114006100000050fcda26ca021d5535c3059547390e6ccd8de7aca600344a010050fcda26ca021d5535c3059547390e6ccd8de7aca600ee6e060050fcda26ca021d5535c3059547390e6ccd8de7aca600a736aa0050fcda26ca021d5535c3059547390e6ccd8de7aca600dc37aa0050fcda26ca021d5535c3059547390e6ccd8de7aca6
+
+### Create testnet asset
+
+https://polkadot.js.org/apps/?rpc=ws%3A%2F%2F127.0.0.1%3A9944#/extrinsics/decode/0x1e0200000000144172676f6e144152474f4e1400a736aa0000dc37aa0000ee6e060000344a0100006100000001a0860100000000000000000000000000
+
+### Whitelist return addresses
+
+NOTE: This one requires sudo! (or the current "AdminOrigin" of the ismp pallet)
+
+https://polkadot.js.org/apps/?rpc=ws%3A%2F%2F127.0.0.1%3A9944#/extrinsics/decode/0x1a001e0114006100000050fcda26ca021d5535c3059547390e6ccd8de7aca600344a010050fcda26ca021d5535c3059547390e6ccd8de7aca600ee6e060050fcda26ca021d5535c3059547390e6ccd8de7aca600a736aa0050fcda26ca021d5535c3059547390e6ccd8de7aca600dc37aa0050fcda26ca021d5535c3059547390e6ccd8de7aca6
 
 #### Testnet
 

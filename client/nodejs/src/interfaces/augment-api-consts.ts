@@ -371,6 +371,12 @@ declare module '@polkadot/api-base/types/consts' {
        **/
       minimumPeriod: u64 & AugmentedConst<ApiType>;
     };
+    tokenGateway: {
+      /**
+       * The decimals of the native currency
+       **/
+      decimals: u8 & AugmentedConst<ApiType>;
+    };
     transactionPayment: {
       /**
        * A fee multiplier for `Operational` extrinsics to compute "virtual tip" to boost their

@@ -83,8 +83,7 @@ pub fn testnet_config() -> Result<ChainSpec, String> {
 				slot_bidding_start_block: 0,
 			},
 			minimum_bitcoin_bond_satoshis: 5_000,
-			cross_token_operator: token_admin,
-			connect_to_test_evm_networks: true,
+			hyperbridge_token_admin: token_admin,
 		}
 	))
 	.build())

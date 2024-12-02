@@ -53,8 +53,7 @@ pub fn development_config() -> Result<ChainSpec, String> {
 			slot_bidding_start_block: 4,
 		},
 		minimum_bitcoin_bond_satoshis: SATOSHIS_PER_BITCOIN / 1_000,
-		cross_token_operator: get_account_id_from_seed::<sr25519::Public>("Alice"),
-		connect_to_test_evm_networks: true,
+		hyperbridge_token_admin: get_account_id_from_seed::<sr25519::Public>("Alice"),
 	}))
 	.build())
 }

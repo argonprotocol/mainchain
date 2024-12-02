@@ -257,30 +257,6 @@ declare module '@polkadot/api-base/types/errors' {
     };
     chainTransfer: {
       /**
-       * Coprocessor not configured
-       **/
-      CoprocessorNotConfigured: AugmentedError<ApiType>;
-      /**
-       * ERC6160 asset registration failed
-       **/
-      Erc6160RegistrationFailed: AugmentedError<ApiType>;
-      /**
-       * The bridge is paused
-       **/
-      EvmBridgePaused: AugmentedError<ApiType>;
-      /**
-       * Evm Chain doesn't have the proper configuration setup
-       **/
-      EvmChainNotConfigured: AugmentedError<ApiType>;
-      /**
-       * Evm Chain is not supported yet
-       **/
-      EvmChainNotSupported: AugmentedError<ApiType>;
-      /**
-       * An error was encountered trying to send a transfer to an EVM
-       **/
-      FailedToTransferToEvm: AugmentedError<ApiType>;
-      /**
        * Insufficient balance to create this transfer
        **/
       InsufficientFunds: AugmentedError<ApiType>;
@@ -288,10 +264,6 @@ declare module '@polkadot/api-base/types/errors' {
        * Insufficient balance to fulfill a mainchain transfer
        **/
       InsufficientNotarizedFunds: AugmentedError<ApiType>;
-      /**
-       * Invalid Destination Chain
-       **/
-      InvalidEvmChain: AugmentedError<ApiType>;
       /**
        * The notary id is not registered
        **/
@@ -301,14 +273,6 @@ declare module '@polkadot/api-base/types/errors' {
        **/
       InvalidOrDuplicatedLocalchainTransfer: AugmentedError<ApiType>;
       MaxBlockTransfersExceeded: AugmentedError<ApiType>;
-      /**
-       * Max number of chains exceeded
-       **/
-      MaxChainsExceeded: AugmentedError<ApiType>;
-      /**
-       * This account is not a token admin
-       **/
-      NotATokenAdmin: AugmentedError<ApiType>;
       /**
        * A transfer was submitted in a previous block but the expiration block has passed
        **/
@@ -782,6 +746,44 @@ declare module '@polkadot/api-base/types/errors' {
       Unauthorized: AugmentedError<ApiType>;
     };
     ticks: {
+    };
+    tokenGateway: {
+      /**
+       * Asset Id creation failed
+       **/
+      AssetCreationError: AugmentedError<ApiType>;
+      /**
+       * Asset decimals not found
+       **/
+      AssetDecimalsNotFound: AugmentedError<ApiType>;
+      /**
+       * Error while teleporting asset
+       **/
+      AssetTeleportError: AugmentedError<ApiType>;
+      /**
+       * Coprocessor was not configured in the runtime
+       **/
+      CoprocessorNotConfigured: AugmentedError<ApiType>;
+      /**
+       * Asset or update Dispatch Error
+       **/
+      DispatchError: AugmentedError<ApiType>;
+      /**
+       * Only root or asset owner can update asset
+       **/
+      NotAssetOwner: AugmentedError<ApiType>;
+      /**
+       * Protocol Params have not been initialized
+       **/
+      NotInitialized: AugmentedError<ApiType>;
+      /**
+       * Unknown Asset
+       **/
+      UnknownAsset: AugmentedError<ApiType>;
+      /**
+       * A asset that has not been registered
+       **/
+      UnregisteredAsset: AugmentedError<ApiType>;
     };
     txPause: {
       /**

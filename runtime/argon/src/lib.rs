@@ -170,6 +170,8 @@ mod runtime {
 	pub type IsmpGrandpa = ismp_grandpa;
 	#[runtime::pallet_index(29)]
 	pub type Hyperbridge = pallet_hyperbridge;
+	#[runtime::pallet_index(30)]
+	pub type TokenGateway = pallet_token_gateway;
 }
 
 /// The address format for describing accounts.

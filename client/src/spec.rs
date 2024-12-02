@@ -6,7 +6,7 @@ pub mod api {
 	mod root_mod {
 		pub use super::*;
 	}
-	pub static PALLETS: [&str; 30usize] = [
+	pub static PALLETS: [&str; 31usize] = [
 		"System",
 		"Digests",
 		"Timestamp",
@@ -37,6 +37,7 @@ pub mod api {
 		"Ismp",
 		"IsmpGrandpa",
 		"Hyperbridge",
+		"TokenGateway",
 	];
 	pub static RUNTIME_APIS: [&str; 21usize] = [
 		"Core",
@@ -1159,10 +1160,10 @@ pub mod api {
 						"query_call_info",
 						types::QueryCallInfo { call, len },
 						[
-							205u8, 203u8, 81u8, 233u8, 207u8, 18u8, 140u8, 142u8, 156u8, 155u8,
-							186u8, 203u8, 70u8, 245u8, 134u8, 246u8, 160u8, 166u8, 123u8, 156u8,
-							195u8, 27u8, 15u8, 23u8, 138u8, 174u8, 173u8, 179u8, 35u8, 234u8, 32u8,
-							240u8,
+							182u8, 199u8, 182u8, 147u8, 31u8, 255u8, 227u8, 201u8, 70u8, 100u8,
+							72u8, 139u8, 212u8, 152u8, 10u8, 252u8, 150u8, 162u8, 57u8, 232u8,
+							150u8, 18u8, 175u8, 52u8, 84u8, 25u8, 177u8, 98u8, 162u8, 95u8, 130u8,
+							52u8,
 						],
 					)
 				}
@@ -1180,10 +1181,10 @@ pub mod api {
 						"query_call_fee_details",
 						types::QueryCallFeeDetails { call, len },
 						[
-							125u8, 86u8, 24u8, 201u8, 213u8, 88u8, 145u8, 193u8, 10u8, 234u8,
-							188u8, 83u8, 73u8, 158u8, 20u8, 251u8, 147u8, 252u8, 60u8, 80u8, 196u8,
-							248u8, 183u8, 79u8, 115u8, 77u8, 45u8, 99u8, 186u8, 202u8, 146u8,
-							199u8,
+							7u8, 152u8, 48u8, 209u8, 206u8, 162u8, 176u8, 13u8, 245u8, 106u8,
+							101u8, 179u8, 193u8, 155u8, 34u8, 79u8, 204u8, 157u8, 75u8, 148u8,
+							250u8, 240u8, 226u8, 130u8, 38u8, 65u8, 92u8, 125u8, 90u8, 29u8, 135u8,
+							206u8,
 						],
 					)
 				}
@@ -3556,6 +3557,9 @@ pub mod api {
 		pub fn utility(&self) -> utility::constants::ConstantsApi {
 			utility::constants::ConstantsApi
 		}
+		pub fn token_gateway(&self) -> token_gateway::constants::ConstantsApi {
+			token_gateway::constants::ConstantsApi
+		}
 	}
 	pub struct StorageApi;
 	impl StorageApi {
@@ -3646,6 +3650,9 @@ pub mod api {
 		pub fn hyperbridge(&self) -> hyperbridge::storage::StorageApi {
 			hyperbridge::storage::StorageApi
 		}
+		pub fn token_gateway(&self) -> token_gateway::storage::StorageApi {
+			token_gateway::storage::StorageApi
+		}
 	}
 	pub struct TransactionApi;
 	impl TransactionApi {
@@ -3727,6 +3734,9 @@ pub mod api {
 		pub fn ismp_grandpa(&self) -> ismp_grandpa::calls::TransactionApi {
 			ismp_grandpa::calls::TransactionApi
 		}
+		pub fn token_gateway(&self) -> token_gateway::calls::TransactionApi {
+			token_gateway::calls::TransactionApi
+		}
 	}
 	#[doc = r" check whether the metadata provided is aligned with this statically generated code."]
 	pub fn is_codegen_valid_for(metadata: &::subxt::ext::subxt_core::Metadata) -> bool {
@@ -3737,9 +3747,9 @@ pub mod api {
 			.hash();
 		runtime_metadata_hash ==
 			[
-				178u8, 74u8, 235u8, 10u8, 191u8, 184u8, 226u8, 84u8, 31u8, 238u8, 11u8, 77u8, 46u8,
-				200u8, 96u8, 123u8, 26u8, 93u8, 30u8, 86u8, 4u8, 33u8, 123u8, 217u8, 232u8, 101u8,
-				243u8, 46u8, 226u8, 31u8, 28u8, 243u8,
+				8u8, 235u8, 249u8, 101u8, 60u8, 121u8, 67u8, 17u8, 87u8, 18u8, 120u8, 137u8, 108u8,
+				62u8, 123u8, 235u8, 81u8, 247u8, 203u8, 132u8, 101u8, 179u8, 135u8, 224u8, 237u8,
+				178u8, 153u8, 163u8, 1u8, 158u8, 147u8, 32u8,
 			]
 	}
 	pub mod system {
@@ -4890,9 +4900,10 @@ pub mod api {
 						"Events",
 						(),
 						[
-							211u8, 139u8, 16u8, 21u8, 86u8, 115u8, 101u8, 227u8, 136u8, 207u8,
-							125u8, 189u8, 5u8, 179u8, 65u8, 156u8, 72u8, 150u8, 63u8, 98u8, 63u8,
-							48u8, 116u8, 239u8, 203u8, 6u8, 86u8, 148u8, 34u8, 101u8, 140u8, 19u8,
+							101u8, 77u8, 232u8, 250u8, 254u8, 194u8, 39u8, 122u8, 125u8, 55u8,
+							246u8, 194u8, 212u8, 112u8, 13u8, 175u8, 9u8, 104u8, 250u8, 105u8,
+							231u8, 46u8, 227u8, 166u8, 35u8, 97u8, 49u8, 190u8, 236u8, 254u8, 43u8,
+							186u8,
 						],
 					)
 				}
@@ -5714,9 +5725,9 @@ pub mod api {
 							call: ::subxt::ext::subxt_core::alloc::boxed::Box::new(call),
 						},
 						[
-							19u8, 78u8, 131u8, 208u8, 121u8, 211u8, 210u8, 143u8, 154u8, 183u8,
-							150u8, 176u8, 3u8, 161u8, 73u8, 191u8, 192u8, 38u8, 116u8, 156u8, 2u8,
-							145u8, 222u8, 213u8, 229u8, 162u8, 80u8, 6u8, 2u8, 64u8, 63u8, 145u8,
+							188u8, 195u8, 74u8, 17u8, 53u8, 46u8, 195u8, 184u8, 80u8, 245u8, 10u8,
+							73u8, 217u8, 61u8, 231u8, 163u8, 94u8, 208u8, 157u8, 106u8, 68u8, 4u8,
+							168u8, 222u8, 217u8, 66u8, 252u8, 239u8, 44u8, 218u8, 179u8, 47u8,
 						],
 					)
 				}
@@ -5778,10 +5789,10 @@ pub mod api {
 							max_weight,
 						},
 						[
-							4u8, 100u8, 91u8, 57u8, 70u8, 31u8, 11u8, 94u8, 181u8, 160u8, 121u8,
-							11u8, 104u8, 132u8, 169u8, 235u8, 181u8, 62u8, 151u8, 44u8, 136u8,
-							98u8, 172u8, 213u8, 182u8, 102u8, 127u8, 89u8, 139u8, 210u8, 204u8,
-							3u8,
+							79u8, 98u8, 125u8, 16u8, 55u8, 241u8, 76u8, 99u8, 166u8, 92u8, 219u8,
+							156u8, 10u8, 176u8, 162u8, 158u8, 93u8, 124u8, 108u8, 121u8, 172u8,
+							64u8, 194u8, 107u8, 77u8, 108u8, 181u8, 173u8, 170u8, 190u8, 52u8,
+							82u8,
 						],
 					)
 				}
@@ -6644,10 +6655,9 @@ pub mod api {
 							call: ::subxt::ext::subxt_core::alloc::boxed::Box::new(call),
 						},
 						[
-							6u8, 173u8, 2u8, 38u8, 232u8, 74u8, 72u8, 173u8, 14u8, 109u8, 167u8,
-							218u8, 209u8, 12u8, 111u8, 12u8, 227u8, 179u8, 109u8, 141u8, 98u8,
-							131u8, 88u8, 234u8, 55u8, 72u8, 179u8, 123u8, 198u8, 44u8, 106u8,
-							152u8,
+							156u8, 224u8, 80u8, 19u8, 148u8, 55u8, 78u8, 184u8, 219u8, 77u8, 167u8,
+							26u8, 187u8, 193u8, 183u8, 82u8, 23u8, 47u8, 145u8, 136u8, 30u8, 64u8,
+							125u8, 191u8, 149u8, 47u8, 126u8, 49u8, 52u8, 10u8, 125u8, 75u8,
 						],
 					)
 				}
@@ -6909,10 +6919,9 @@ pub mod api {
 							call: ::subxt::ext::subxt_core::alloc::boxed::Box::new(call),
 						},
 						[
-							249u8, 252u8, 241u8, 238u8, 139u8, 136u8, 11u8, 255u8, 188u8, 41u8,
-							249u8, 20u8, 136u8, 58u8, 44u8, 2u8, 201u8, 12u8, 144u8, 76u8, 66u8,
-							188u8, 93u8, 136u8, 56u8, 45u8, 247u8, 147u8, 182u8, 11u8, 227u8,
-							220u8,
+							178u8, 51u8, 43u8, 177u8, 133u8, 81u8, 68u8, 97u8, 15u8, 229u8, 174u8,
+							12u8, 223u8, 252u8, 65u8, 218u8, 21u8, 87u8, 157u8, 7u8, 43u8, 108u8,
+							79u8, 1u8, 114u8, 29u8, 107u8, 194u8, 48u8, 67u8, 64u8, 51u8,
 						],
 					)
 				}
@@ -11915,171 +11924,6 @@ pub mod api {
 					const PALLET: &'static str = "ChainTransfer";
 					const CALL: &'static str = "send_to_localchain";
 				}
-				#[derive(
-					:: subxt :: ext :: subxt_core :: ext :: codec :: Decode,
-					:: subxt :: ext :: subxt_core :: ext :: codec :: Encode,
-					:: subxt :: ext :: subxt_core :: ext :: scale_decode :: DecodeAsType,
-					:: subxt :: ext :: subxt_core :: ext :: scale_encode :: EncodeAsType,
-					Clone,
-					Debug,
-				)]
-				# [codec (crate = :: subxt :: ext :: subxt_core :: ext :: codec)]
-				#[decode_as_type(
-					crate_path = ":: subxt :: ext :: subxt_core :: ext :: scale_decode"
-				)]
-				#[encode_as_type(
-					crate_path = ":: subxt :: ext :: subxt_core :: ext :: scale_encode"
-				)]
-				#[doc = "Send argons to a remote EVM based chain. Available destinations are specified in the"]
-				#[doc = "`ActiveEvmDestinations` storage item."]
-				pub struct SendToEvmChain {
-					pub params: send_to_evm_chain::Params,
-				}
-				pub mod send_to_evm_chain {
-					use super::runtime_types;
-					pub type Params = runtime_types::pallet_chain_transfer::TransferToEvm<
-						::core::primitive::u128,
-					>;
-				}
-				impl ::subxt::ext::subxt_core::blocks::StaticExtrinsic for SendToEvmChain {
-					const PALLET: &'static str = "ChainTransfer";
-					const CALL: &'static str = "send_to_evm_chain";
-				}
-				#[derive(
-					:: subxt :: ext :: subxt_core :: ext :: codec :: Decode,
-					:: subxt :: ext :: subxt_core :: ext :: codec :: Encode,
-					:: subxt :: ext :: subxt_core :: ext :: scale_decode :: DecodeAsType,
-					:: subxt :: ext :: subxt_core :: ext :: scale_encode :: EncodeAsType,
-					Clone,
-					Debug,
-				)]
-				# [codec (crate = :: subxt :: ext :: subxt_core :: ext :: codec)]
-				#[decode_as_type(
-					crate_path = ":: subxt :: ext :: subxt_core :: ext :: scale_decode"
-				)]
-				#[encode_as_type(
-					crate_path = ":: subxt :: ext :: subxt_core :: ext :: scale_encode"
-				)]
-				#[doc = "One time api to register assets for cross chain transfers"]
-				#[doc = ""]
-				#[doc = "# Arguments"]
-				#[doc = "`chains` - Each chain and its corresponding token gateway address"]
-				pub struct RegisterHyperbridgeAssets {
-					pub chains: register_hyperbridge_assets::Chains,
-				}
-				pub mod register_hyperbridge_assets {
-					use super::runtime_types;
-					pub type Chains =
-						runtime_types::bounded_collections::bounded_vec::BoundedVec<(
-							runtime_types::ismp::host::StateMachine,
-							::subxt::ext::subxt_core::alloc::vec::Vec<::core::primitive::u8>,
-						)>;
-				}
-				impl ::subxt::ext::subxt_core::blocks::StaticExtrinsic for RegisterHyperbridgeAssets {
-					const PALLET: &'static str = "ChainTransfer";
-					const CALL: &'static str = "register_hyperbridge_assets";
-				}
-				#[derive(
-					:: subxt :: ext :: subxt_core :: ext :: codec :: Decode,
-					:: subxt :: ext :: subxt_core :: ext :: codec :: Encode,
-					:: subxt :: ext :: subxt_core :: ext :: scale_decode :: DecodeAsType,
-					:: subxt :: ext :: subxt_core :: ext :: scale_encode :: EncodeAsType,
-					Clone,
-					Debug,
-				)]
-				# [codec (crate = :: subxt :: ext :: subxt_core :: ext :: codec)]
-				#[decode_as_type(
-					crate_path = ":: subxt :: ext :: subxt_core :: ext :: scale_decode"
-				)]
-				#[encode_as_type(
-					crate_path = ":: subxt :: ext :: subxt_core :: ext :: scale_encode"
-				)]
-				#[doc = "Set the asset registration for cross chain transfers"]
-				#[doc = ""]
-				#[doc = "# Arguments"]
-				#[doc = "`add_chains` - Each new chain and its corresponding token gateway address"]
-				#[doc = "`remove_chains` - Chains to remove"]
-				pub struct UpdateHyperbridgeAssets {
-					pub add_chains: update_hyperbridge_assets::AddChains,
-					pub remove_chains: update_hyperbridge_assets::RemoveChains,
-				}
-				pub mod update_hyperbridge_assets {
-					use super::runtime_types;
-					pub type AddChains =
-						runtime_types::bounded_collections::bounded_vec::BoundedVec<(
-							runtime_types::ismp::host::StateMachine,
-							::subxt::ext::subxt_core::alloc::vec::Vec<::core::primitive::u8>,
-						)>;
-					pub type RemoveChains =
-						runtime_types::bounded_collections::bounded_vec::BoundedVec<
-							runtime_types::ismp::host::StateMachine,
-						>;
-				}
-				impl ::subxt::ext::subxt_core::blocks::StaticExtrinsic for UpdateHyperbridgeAssets {
-					const PALLET: &'static str = "ChainTransfer";
-					const CALL: &'static str = "update_hyperbridge_assets";
-				}
-				#[derive(
-					:: subxt :: ext :: subxt_core :: ext :: codec :: Decode,
-					:: subxt :: ext :: subxt_core :: ext :: codec :: Encode,
-					:: subxt :: ext :: subxt_core :: ext :: scale_decode :: DecodeAsType,
-					:: subxt :: ext :: subxt_core :: ext :: scale_encode :: EncodeAsType,
-					Clone,
-					Debug,
-				)]
-				# [codec (crate = :: subxt :: ext :: subxt_core :: ext :: codec)]
-				#[decode_as_type(
-					crate_path = ":: subxt :: ext :: subxt_core :: ext :: scale_decode"
-				)]
-				#[encode_as_type(
-					crate_path = ":: subxt :: ext :: subxt_core :: ext :: scale_encode"
-				)]
-				#[doc = "This api will re-assign admins for ERC6160 accounts on the TokenGateway.sol contracts"]
-				#[doc = "created by Hyperbridge."]
-				#[doc = ""]
-				#[doc = "This api is only used to disconnect from hyperbridge."]
-				pub struct ReplaceHyperbridgeAdmins {
-					pub new_admins: replace_hyperbridge_admins::NewAdmins,
-				}
-				pub mod replace_hyperbridge_admins {
-					use super::runtime_types;
-					pub type NewAdmins =
-						runtime_types::bounded_collections::bounded_vec::BoundedVec<(
-							runtime_types::ismp::host::StateMachine,
-							::subxt::ext::subxt_core::utils::H160,
-						)>;
-				}
-				impl ::subxt::ext::subxt_core::blocks::StaticExtrinsic for ReplaceHyperbridgeAdmins {
-					const PALLET: &'static str = "ChainTransfer";
-					const CALL: &'static str = "replace_hyperbridge_admins";
-				}
-				#[derive(
-					:: subxt :: ext :: subxt_core :: ext :: codec :: Decode,
-					:: subxt :: ext :: subxt_core :: ext :: codec :: Encode,
-					:: subxt :: ext :: subxt_core :: ext :: scale_decode :: DecodeAsType,
-					:: subxt :: ext :: subxt_core :: ext :: scale_encode :: EncodeAsType,
-					Clone,
-					Debug,
-				)]
-				# [codec (crate = :: subxt :: ext :: subxt_core :: ext :: codec)]
-				#[decode_as_type(
-					crate_path = ":: subxt :: ext :: subxt_core :: ext :: scale_decode"
-				)]
-				#[encode_as_type(
-					crate_path = ":: subxt :: ext :: subxt_core :: ext :: scale_encode"
-				)]
-				#[doc = "Pause the bridge"]
-				pub struct SetBridgeEnabled {
-					pub enabled: set_bridge_enabled::Enabled,
-				}
-				pub mod set_bridge_enabled {
-					use super::runtime_types;
-					pub type Enabled = ::core::primitive::bool;
-				}
-				impl ::subxt::ext::subxt_core::blocks::StaticExtrinsic for SetBridgeEnabled {
-					const PALLET: &'static str = "ChainTransfer";
-					const CALL: &'static str = "set_bridge_enabled";
-				}
 			}
 			pub struct TransactionApi;
 			impl TransactionApi {
@@ -12097,108 +11941,6 @@ pub mod api {
 							83u8, 216u8, 66u8, 149u8, 234u8, 85u8, 61u8, 45u8, 152u8, 156u8, 153u8,
 							118u8, 179u8, 201u8, 255u8, 21u8, 5u8, 117u8, 53u8, 241u8, 173u8, 66u8,
 							32u8, 8u8, 26u8, 176u8, 221u8, 245u8, 212u8, 13u8, 86u8, 171u8,
-						],
-					)
-				}
-				#[doc = "Send argons to a remote EVM based chain. Available destinations are specified in the"]
-				#[doc = "`ActiveEvmDestinations` storage item."]
-				pub fn send_to_evm_chain(
-					&self,
-					params: types::send_to_evm_chain::Params,
-				) -> ::subxt::ext::subxt_core::tx::payload::StaticPayload<types::SendToEvmChain>
-				{
-					::subxt::ext::subxt_core::tx::payload::StaticPayload::new_static(
-						"ChainTransfer",
-						"send_to_evm_chain",
-						types::SendToEvmChain { params },
-						[
-							128u8, 132u8, 70u8, 213u8, 82u8, 81u8, 130u8, 94u8, 7u8, 245u8, 165u8,
-							235u8, 156u8, 21u8, 191u8, 192u8, 191u8, 8u8, 230u8, 47u8, 74u8, 207u8,
-							14u8, 103u8, 209u8, 33u8, 146u8, 157u8, 225u8, 105u8, 163u8, 58u8,
-						],
-					)
-				}
-				#[doc = "One time api to register assets for cross chain transfers"]
-				#[doc = ""]
-				#[doc = "# Arguments"]
-				#[doc = "`chains` - Each chain and its corresponding token gateway address"]
-				pub fn register_hyperbridge_assets(
-					&self,
-					chains: types::register_hyperbridge_assets::Chains,
-				) -> ::subxt::ext::subxt_core::tx::payload::StaticPayload<
-					types::RegisterHyperbridgeAssets,
-				> {
-					::subxt::ext::subxt_core::tx::payload::StaticPayload::new_static(
-						"ChainTransfer",
-						"register_hyperbridge_assets",
-						types::RegisterHyperbridgeAssets { chains },
-						[
-							135u8, 37u8, 41u8, 140u8, 214u8, 1u8, 33u8, 98u8, 132u8, 61u8, 64u8,
-							204u8, 219u8, 8u8, 199u8, 191u8, 9u8, 133u8, 87u8, 246u8, 50u8, 93u8,
-							241u8, 39u8, 133u8, 253u8, 173u8, 31u8, 131u8, 1u8, 135u8, 19u8,
-						],
-					)
-				}
-				#[doc = "Set the asset registration for cross chain transfers"]
-				#[doc = ""]
-				#[doc = "# Arguments"]
-				#[doc = "`add_chains` - Each new chain and its corresponding token gateway address"]
-				#[doc = "`remove_chains` - Chains to remove"]
-				pub fn update_hyperbridge_assets(
-					&self,
-					add_chains: types::update_hyperbridge_assets::AddChains,
-					remove_chains: types::update_hyperbridge_assets::RemoveChains,
-				) -> ::subxt::ext::subxt_core::tx::payload::StaticPayload<
-					types::UpdateHyperbridgeAssets,
-				> {
-					::subxt::ext::subxt_core::tx::payload::StaticPayload::new_static(
-						"ChainTransfer",
-						"update_hyperbridge_assets",
-						types::UpdateHyperbridgeAssets { add_chains, remove_chains },
-						[
-							163u8, 195u8, 98u8, 21u8, 111u8, 167u8, 103u8, 78u8, 135u8, 107u8,
-							80u8, 201u8, 170u8, 169u8, 140u8, 0u8, 95u8, 44u8, 132u8, 59u8, 108u8,
-							208u8, 57u8, 209u8, 99u8, 155u8, 156u8, 212u8, 50u8, 224u8, 55u8,
-							170u8,
-						],
-					)
-				}
-				#[doc = "This api will re-assign admins for ERC6160 accounts on the TokenGateway.sol contracts"]
-				#[doc = "created by Hyperbridge."]
-				#[doc = ""]
-				#[doc = "This api is only used to disconnect from hyperbridge."]
-				pub fn replace_hyperbridge_admins(
-					&self,
-					new_admins: types::replace_hyperbridge_admins::NewAdmins,
-				) -> ::subxt::ext::subxt_core::tx::payload::StaticPayload<
-					types::ReplaceHyperbridgeAdmins,
-				> {
-					::subxt::ext::subxt_core::tx::payload::StaticPayload::new_static(
-						"ChainTransfer",
-						"replace_hyperbridge_admins",
-						types::ReplaceHyperbridgeAdmins { new_admins },
-						[
-							14u8, 241u8, 48u8, 172u8, 15u8, 168u8, 153u8, 168u8, 127u8, 168u8,
-							231u8, 187u8, 60u8, 168u8, 79u8, 204u8, 183u8, 31u8, 4u8, 182u8, 161u8,
-							200u8, 66u8, 145u8, 109u8, 54u8, 154u8, 3u8, 235u8, 145u8, 122u8, 37u8,
-						],
-					)
-				}
-				#[doc = "Pause the bridge"]
-				pub fn set_bridge_enabled(
-					&self,
-					enabled: types::set_bridge_enabled::Enabled,
-				) -> ::subxt::ext::subxt_core::tx::payload::StaticPayload<types::SetBridgeEnabled>
-				{
-					::subxt::ext::subxt_core::tx::payload::StaticPayload::new_static(
-						"ChainTransfer",
-						"set_bridge_enabled",
-						types::SetBridgeEnabled { enabled },
-						[
-							89u8, 70u8, 121u8, 44u8, 134u8, 250u8, 124u8, 146u8, 109u8, 142u8,
-							115u8, 218u8, 249u8, 39u8, 87u8, 159u8, 133u8, 143u8, 246u8, 222u8,
-							121u8, 0u8, 60u8, 8u8, 20u8, 154u8, 220u8, 56u8, 121u8, 79u8, 128u8,
-							192u8,
 						],
 					)
 				}
@@ -12412,168 +12154,6 @@ pub mod api {
 				const PALLET: &'static str = "ChainTransfer";
 				const EVENT: &'static str = "TaxationError";
 			}
-			#[derive(
-				:: subxt :: ext :: subxt_core :: ext :: codec :: Decode,
-				:: subxt :: ext :: subxt_core :: ext :: codec :: Encode,
-				:: subxt :: ext :: subxt_core :: ext :: scale_decode :: DecodeAsType,
-				:: subxt :: ext :: subxt_core :: ext :: scale_encode :: EncodeAsType,
-				Clone,
-				Debug,
-			)]
-			# [codec (crate = :: subxt :: ext :: subxt_core :: ext :: codec)]
-			#[decode_as_type(crate_path = ":: subxt :: ext :: subxt_core :: ext :: scale_decode")]
-			#[encode_as_type(crate_path = ":: subxt :: ext :: subxt_core :: ext :: scale_encode")]
-			#[doc = "An asset has been sent to an EVM"]
-			pub struct TransferToEvm {
-				pub from: transfer_to_evm::From,
-				pub to: transfer_to_evm::To,
-				pub amount: transfer_to_evm::Amount,
-				pub evm_chain: transfer_to_evm::EvmChain,
-				pub asset: transfer_to_evm::Asset,
-				pub commitment: transfer_to_evm::Commitment,
-			}
-			pub mod transfer_to_evm {
-				use super::runtime_types;
-				pub type From = crate::types::AccountId32;
-				pub type To = ::subxt::ext::subxt_core::utils::H160;
-				pub type Amount = ::core::primitive::u128;
-				pub type EvmChain = runtime_types::pallet_chain_transfer::ismp_module::EvmChain;
-				pub type Asset = runtime_types::pallet_chain_transfer::ismp_module::Asset;
-				pub type Commitment = crate::types::H256;
-			}
-			impl ::subxt::ext::subxt_core::events::StaticEvent for TransferToEvm {
-				const PALLET: &'static str = "ChainTransfer";
-				const EVENT: &'static str = "TransferToEvm";
-			}
-			#[derive(
-				:: subxt :: ext :: subxt_core :: ext :: codec :: Decode,
-				:: subxt :: ext :: subxt_core :: ext :: codec :: Encode,
-				:: subxt :: ext :: subxt_core :: ext :: scale_decode :: DecodeAsType,
-				:: subxt :: ext :: subxt_core :: ext :: scale_encode :: EncodeAsType,
-				Clone,
-				Debug,
-			)]
-			# [codec (crate = :: subxt :: ext :: subxt_core :: ext :: codec)]
-			#[decode_as_type(crate_path = ":: subxt :: ext :: subxt_core :: ext :: scale_decode")]
-			#[encode_as_type(crate_path = ":: subxt :: ext :: subxt_core :: ext :: scale_encode")]
-			#[doc = "An asset has been refunded and transferred back to the source account"]
-			pub struct TransferToEvmExpired {
-				pub from: transfer_to_evm_expired::From,
-				pub to: transfer_to_evm_expired::To,
-				pub amount: transfer_to_evm_expired::Amount,
-				pub evm_chain: transfer_to_evm_expired::EvmChain,
-				pub asset: transfer_to_evm_expired::Asset,
-			}
-			pub mod transfer_to_evm_expired {
-				use super::runtime_types;
-				pub type From = crate::types::AccountId32;
-				pub type To = ::subxt::ext::subxt_core::utils::H160;
-				pub type Amount = ::core::primitive::u128;
-				pub type EvmChain = runtime_types::pallet_chain_transfer::ismp_module::EvmChain;
-				pub type Asset = runtime_types::pallet_chain_transfer::ismp_module::Asset;
-			}
-			impl ::subxt::ext::subxt_core::events::StaticEvent for TransferToEvmExpired {
-				const PALLET: &'static str = "ChainTransfer";
-				const EVENT: &'static str = "TransferToEvmExpired";
-			}
-			#[derive(
-				:: subxt :: ext :: subxt_core :: ext :: codec :: Decode,
-				:: subxt :: ext :: subxt_core :: ext :: codec :: Encode,
-				:: subxt :: ext :: subxt_core :: ext :: scale_decode :: DecodeAsType,
-				:: subxt :: ext :: subxt_core :: ext :: scale_encode :: EncodeAsType,
-				Clone,
-				Debug,
-			)]
-			# [codec (crate = :: subxt :: ext :: subxt_core :: ext :: codec)]
-			#[decode_as_type(crate_path = ":: subxt :: ext :: subxt_core :: ext :: scale_decode")]
-			#[encode_as_type(crate_path = ":: subxt :: ext :: subxt_core :: ext :: scale_encode")]
-			#[doc = "An asset has been received from an EVM chain"]
-			pub struct TransferFromEvm {
-				pub from: transfer_from_evm::From,
-				pub to: transfer_from_evm::To,
-				pub asset: transfer_from_evm::Asset,
-				pub amount: transfer_from_evm::Amount,
-				pub evm_chain: transfer_from_evm::EvmChain,
-			}
-			pub mod transfer_from_evm {
-				use super::runtime_types;
-				pub type From = ::subxt::ext::subxt_core::utils::H160;
-				pub type To = crate::types::AccountId32;
-				pub type Asset = runtime_types::pallet_chain_transfer::ismp_module::Asset;
-				pub type Amount = ::core::primitive::u128;
-				pub type EvmChain = runtime_types::pallet_chain_transfer::ismp_module::EvmChain;
-			}
-			impl ::subxt::ext::subxt_core::events::StaticEvent for TransferFromEvm {
-				const PALLET: &'static str = "ChainTransfer";
-				const EVENT: &'static str = "TransferFromEvm";
-			}
-			#[derive(
-				:: subxt :: ext :: subxt_core :: ext :: codec :: Decode,
-				:: subxt :: ext :: subxt_core :: ext :: codec :: Encode,
-				:: subxt :: ext :: subxt_core :: ext :: scale_decode :: DecodeAsType,
-				:: subxt :: ext :: subxt_core :: ext :: scale_encode :: EncodeAsType,
-				Clone,
-				Debug,
-			)]
-			# [codec (crate = :: subxt :: ext :: subxt_core :: ext :: codec)]
-			#[decode_as_type(crate_path = ":: subxt :: ext :: subxt_core :: ext :: scale_decode")]
-			#[encode_as_type(crate_path = ":: subxt :: ext :: subxt_core :: ext :: scale_encode")]
-			#[doc = "An asset has been received from an EVM chain while the bridge is paused. This is not"]
-			#[doc = "processed, and added to the logs for a future resolution. Funds are maintained in"]
-			#[doc = "pallet balance."]
-			pub struct TransferFromEvmWhilePaused {
-				pub from: transfer_from_evm_while_paused::From,
-				pub to: transfer_from_evm_while_paused::To,
-				pub asset: transfer_from_evm_while_paused::Asset,
-				pub amount: transfer_from_evm_while_paused::Amount,
-				pub evm_chain: transfer_from_evm_while_paused::EvmChain,
-			}
-			pub mod transfer_from_evm_while_paused {
-				use super::runtime_types;
-				pub type From = ::subxt::ext::subxt_core::utils::H160;
-				pub type To = crate::types::AccountId32;
-				pub type Asset = runtime_types::pallet_chain_transfer::ismp_module::Asset;
-				pub type Amount = ::core::primitive::u128;
-				pub type EvmChain = runtime_types::pallet_chain_transfer::ismp_module::EvmChain;
-			}
-			impl ::subxt::ext::subxt_core::events::StaticEvent for TransferFromEvmWhilePaused {
-				const PALLET: &'static str = "ChainTransfer";
-				const EVENT: &'static str = "TransferFromEvmWhilePaused";
-			}
-			#[derive(
-				:: subxt :: ext :: subxt_core :: ext :: codec :: Decode,
-				:: subxt :: ext :: subxt_core :: ext :: codec :: Encode,
-				:: subxt :: ext :: subxt_core :: ext :: scale_decode :: DecodeAsType,
-				:: subxt :: ext :: subxt_core :: ext :: scale_encode :: EncodeAsType,
-				Clone,
-				Debug,
-			)]
-			# [codec (crate = :: subxt :: ext :: subxt_core :: ext :: codec)]
-			#[decode_as_type(crate_path = ":: subxt :: ext :: subxt_core :: ext :: scale_decode")]
-			#[encode_as_type(crate_path = ":: subxt :: ext :: subxt_core :: ext :: scale_encode")]
-			#[doc = "ERC6160 asset creation request dispatched to hyperbridge"]
-			pub struct ERC6160AssetRegistrationDispatched {
-				pub commitment: erc6160_asset_registration_dispatched::Commitment,
-				pub asset: erc6160_asset_registration_dispatched::Asset,
-				pub added_chains: erc6160_asset_registration_dispatched::AddedChains,
-				pub removed_chains: erc6160_asset_registration_dispatched::RemovedChains,
-			}
-			pub mod erc6160_asset_registration_dispatched {
-				use super::runtime_types;
-				pub type Commitment = crate::types::H256;
-				pub type Asset = runtime_types::pallet_chain_transfer::ismp_module::Asset;
-				pub type AddedChains = runtime_types::bounded_collections::bounded_vec::BoundedVec<
-					runtime_types::ismp::host::StateMachine,
-				>;
-				pub type RemovedChains =
-					runtime_types::bounded_collections::bounded_vec::BoundedVec<
-						runtime_types::ismp::host::StateMachine,
-					>;
-			}
-			impl ::subxt::ext::subxt_core::events::StaticEvent for ERC6160AssetRegistrationDispatched {
-				const PALLET: &'static str = "ChainTransfer";
-				const EVENT: &'static str = "ERC6160AssetRegistrationDispatched";
-			}
 		}
 		pub mod storage {
 			use super::runtime_types;
@@ -12610,30 +12190,9 @@ pub mod api {
 						)>;
 					pub type Param0 = ::core::primitive::u32;
 				}
-				pub mod active_evm_destinations {
+				pub mod hyperbridge_token_admin {
 					use super::runtime_types;
-					pub type ActiveEvmDestinations =
-						runtime_types::bounded_collections::bounded_btree_set::BoundedBTreeSet<
-							runtime_types::pallet_chain_transfer::ismp_module::EvmChain,
-						>;
-				}
-				pub mod token_gateway_addresses {
-					use super::runtime_types;
-					pub type TokenGatewayAddresses =
-						::subxt::ext::subxt_core::alloc::vec::Vec<::core::primitive::u8>;
-					pub type Param0 = runtime_types::ismp::host::StateMachine;
-				}
-				pub mod use_test_networks {
-					use super::runtime_types;
-					pub type UseTestNetworks = ::core::primitive::bool;
-				}
-				pub mod token_admin {
-					use super::runtime_types;
-					pub type TokenAdmin = crate::types::AccountId32;
-				}
-				pub mod pause_bridge {
-					use super::runtime_types;
-					pub type PauseBridge = ::core::primitive::bool;
+					pub type HyperbridgeTokenAdmin = crate::types::AccountId32;
 				}
 			}
 			pub struct StorageApi;
@@ -12832,137 +12391,25 @@ pub mod api {
 						],
 					)
 				}
-				#[doc = " The token gateway addresses on different chains"]
-				pub fn active_evm_destinations(
+				#[doc = " The admin of the hyperbridge token gateway"]
+				pub fn hyperbridge_token_admin(
 					&self,
 				) -> ::subxt::ext::subxt_core::storage::address::StaticAddress<
 					(),
-					types::active_evm_destinations::ActiveEvmDestinations,
+					types::hyperbridge_token_admin::HyperbridgeTokenAdmin,
 					::subxt::ext::subxt_core::utils::Yes,
-					::subxt::ext::subxt_core::utils::Yes,
+					(),
 					(),
 				> {
 					::subxt::ext::subxt_core::storage::address::StaticAddress::new_static(
 						"ChainTransfer",
-						"ActiveEvmDestinations",
+						"HyperbridgeTokenAdmin",
 						(),
 						[
-							223u8, 184u8, 158u8, 130u8, 70u8, 71u8, 227u8, 163u8, 139u8, 252u8,
-							77u8, 220u8, 95u8, 6u8, 119u8, 226u8, 18u8, 185u8, 40u8, 232u8, 120u8,
-							193u8, 161u8, 227u8, 8u8, 215u8, 155u8, 27u8, 23u8, 193u8, 18u8, 73u8,
-						],
-					)
-				}
-				#[doc = " The token gateway addresses on different chains"]
-				pub fn token_gateway_addresses_iter(
-					&self,
-				) -> ::subxt::ext::subxt_core::storage::address::StaticAddress<
-					(),
-					types::token_gateway_addresses::TokenGatewayAddresses,
-					(),
-					(),
-					::subxt::ext::subxt_core::utils::Yes,
-				> {
-					::subxt::ext::subxt_core::storage::address::StaticAddress::new_static(
-						"ChainTransfer",
-						"TokenGatewayAddresses",
-						(),
-						[
-							246u8, 148u8, 122u8, 115u8, 217u8, 240u8, 23u8, 177u8, 99u8, 37u8,
-							30u8, 107u8, 237u8, 126u8, 35u8, 194u8, 217u8, 195u8, 21u8, 235u8,
-							120u8, 131u8, 206u8, 102u8, 214u8, 141u8, 35u8, 119u8, 122u8, 177u8,
-							48u8, 148u8,
-						],
-					)
-				}
-				#[doc = " The token gateway addresses on different chains"]
-				pub fn token_gateway_addresses(
-					&self,
-					_0: impl ::core::borrow::Borrow<types::token_gateway_addresses::Param0>,
-				) -> ::subxt::ext::subxt_core::storage::address::StaticAddress<
-					::subxt::ext::subxt_core::storage::address::StaticStorageKey<
-						types::token_gateway_addresses::Param0,
-					>,
-					types::token_gateway_addresses::TokenGatewayAddresses,
-					::subxt::ext::subxt_core::utils::Yes,
-					(),
-					(),
-				> {
-					::subxt::ext::subxt_core::storage::address::StaticAddress::new_static(
-						"ChainTransfer",
-						"TokenGatewayAddresses",
-						::subxt::ext::subxt_core::storage::address::StaticStorageKey::new(
-							_0.borrow(),
-						),
-						[
-							246u8, 148u8, 122u8, 115u8, 217u8, 240u8, 23u8, 177u8, 99u8, 37u8,
-							30u8, 107u8, 237u8, 126u8, 35u8, 194u8, 217u8, 195u8, 21u8, 235u8,
-							120u8, 131u8, 206u8, 102u8, 214u8, 141u8, 35u8, 119u8, 122u8, 177u8,
-							48u8, 148u8,
-						],
-					)
-				}
-				#[doc = " Should we use test networks for Polkadot and Ethereum"]
-				pub fn use_test_networks(
-					&self,
-				) -> ::subxt::ext::subxt_core::storage::address::StaticAddress<
-					(),
-					types::use_test_networks::UseTestNetworks,
-					::subxt::ext::subxt_core::utils::Yes,
-					::subxt::ext::subxt_core::utils::Yes,
-					(),
-				> {
-					::subxt::ext::subxt_core::storage::address::StaticAddress::new_static(
-						"ChainTransfer",
-						"UseTestNetworks",
-						(),
-						[
-							88u8, 101u8, 219u8, 249u8, 201u8, 16u8, 214u8, 232u8, 176u8, 41u8,
-							158u8, 6u8, 154u8, 131u8, 123u8, 18u8, 239u8, 6u8, 201u8, 247u8, 192u8,
-							224u8, 180u8, 199u8, 95u8, 175u8, 35u8, 204u8, 32u8, 225u8, 166u8,
-							176u8,
-						],
-					)
-				}
-				#[doc = " The admin of this side of the token gateway"]
-				pub fn token_admin(
-					&self,
-				) -> ::subxt::ext::subxt_core::storage::address::StaticAddress<
-					(),
-					types::token_admin::TokenAdmin,
-					::subxt::ext::subxt_core::utils::Yes,
-					(),
-					(),
-				> {
-					::subxt::ext::subxt_core::storage::address::StaticAddress::new_static(
-						"ChainTransfer",
-						"TokenAdmin",
-						(),
-						[
-							236u8, 125u8, 139u8, 2u8, 37u8, 49u8, 170u8, 205u8, 108u8, 61u8, 193u8,
-							170u8, 173u8, 117u8, 29u8, 192u8, 131u8, 61u8, 160u8, 194u8, 59u8, 0u8,
-							231u8, 180u8, 105u8, 194u8, 30u8, 43u8, 9u8, 115u8, 39u8, 94u8,
-						],
-					)
-				}
-				pub fn pause_bridge(
-					&self,
-				) -> ::subxt::ext::subxt_core::storage::address::StaticAddress<
-					(),
-					types::pause_bridge::PauseBridge,
-					::subxt::ext::subxt_core::utils::Yes,
-					::subxt::ext::subxt_core::utils::Yes,
-					(),
-				> {
-					::subxt::ext::subxt_core::storage::address::StaticAddress::new_static(
-						"ChainTransfer",
-						"PauseBridge",
-						(),
-						[
-							68u8, 248u8, 140u8, 177u8, 125u8, 92u8, 241u8, 186u8, 43u8, 98u8,
-							125u8, 72u8, 137u8, 4u8, 180u8, 99u8, 59u8, 114u8, 126u8, 17u8, 29u8,
-							216u8, 58u8, 253u8, 60u8, 102u8, 244u8, 232u8, 228u8, 86u8, 133u8,
-							110u8,
+							174u8, 47u8, 144u8, 64u8, 169u8, 179u8, 198u8, 68u8, 153u8, 13u8,
+							103u8, 132u8, 84u8, 76u8, 173u8, 225u8, 120u8, 163u8, 37u8, 71u8, 35u8,
+							179u8, 220u8, 243u8, 155u8, 161u8, 130u8, 162u8, 254u8, 82u8, 53u8,
+							219u8,
 						],
 					)
 				}
@@ -19504,9 +18951,9 @@ pub mod api {
 						"batch",
 						types::Batch { calls },
 						[
-							233u8, 77u8, 85u8, 204u8, 94u8, 68u8, 180u8, 227u8, 35u8, 224u8, 221u8,
-							54u8, 21u8, 251u8, 244u8, 9u8, 223u8, 14u8, 15u8, 145u8, 74u8, 204u8,
-							255u8, 61u8, 106u8, 88u8, 83u8, 109u8, 254u8, 19u8, 160u8, 147u8,
+							234u8, 81u8, 201u8, 212u8, 93u8, 210u8, 50u8, 68u8, 127u8, 66u8, 225u8,
+							34u8, 191u8, 141u8, 48u8, 128u8, 137u8, 61u8, 53u8, 58u8, 185u8, 15u8,
+							122u8, 95u8, 83u8, 138u8, 182u8, 149u8, 87u8, 155u8, 67u8, 254u8,
 						],
 					)
 				}
@@ -19536,9 +18983,9 @@ pub mod api {
 							call: ::subxt::ext::subxt_core::alloc::boxed::Box::new(call),
 						},
 						[
-							93u8, 136u8, 134u8, 32u8, 211u8, 6u8, 193u8, 18u8, 79u8, 211u8, 229u8,
-							111u8, 247u8, 192u8, 9u8, 168u8, 198u8, 90u8, 131u8, 198u8, 230u8,
-							92u8, 55u8, 125u8, 102u8, 10u8, 48u8, 63u8, 201u8, 205u8, 154u8, 214u8,
+							152u8, 52u8, 196u8, 129u8, 43u8, 163u8, 65u8, 41u8, 182u8, 73u8, 161u8,
+							12u8, 110u8, 217u8, 166u8, 143u8, 223u8, 49u8, 154u8, 30u8, 135u8,
+							112u8, 68u8, 179u8, 113u8, 3u8, 117u8, 3u8, 139u8, 82u8, 4u8, 71u8,
 						],
 					)
 				}
@@ -19564,9 +19011,10 @@ pub mod api {
 						"batch_all",
 						types::BatchAll { calls },
 						[
-							116u8, 147u8, 103u8, 80u8, 168u8, 169u8, 1u8, 72u8, 26u8, 153u8, 35u8,
-							252u8, 2u8, 38u8, 232u8, 190u8, 209u8, 48u8, 174u8, 23u8, 31u8, 114u8,
-							81u8, 194u8, 31u8, 32u8, 67u8, 221u8, 103u8, 60u8, 116u8, 195u8,
+							237u8, 24u8, 180u8, 130u8, 183u8, 20u8, 36u8, 140u8, 127u8, 136u8,
+							134u8, 57u8, 177u8, 84u8, 128u8, 143u8, 240u8, 163u8, 51u8, 31u8, 29u8,
+							120u8, 18u8, 41u8, 178u8, 242u8, 55u8, 208u8, 121u8, 114u8, 80u8,
+							171u8,
 						],
 					)
 				}
@@ -19589,9 +19037,9 @@ pub mod api {
 							call: ::subxt::ext::subxt_core::alloc::boxed::Box::new(call),
 						},
 						[
-							177u8, 253u8, 15u8, 60u8, 69u8, 70u8, 128u8, 30u8, 236u8, 49u8, 25u8,
-							151u8, 132u8, 87u8, 86u8, 143u8, 252u8, 176u8, 168u8, 177u8, 46u8,
-							56u8, 215u8, 159u8, 125u8, 220u8, 37u8, 31u8, 124u8, 40u8, 3u8, 64u8,
+							135u8, 20u8, 177u8, 30u8, 61u8, 9u8, 182u8, 154u8, 86u8, 231u8, 108u8,
+							76u8, 209u8, 36u8, 59u8, 252u8, 51u8, 126u8, 56u8, 174u8, 240u8, 244u8,
+							48u8, 143u8, 182u8, 38u8, 181u8, 152u8, 193u8, 147u8, 69u8, 208u8,
 						],
 					)
 				}
@@ -19617,10 +19065,9 @@ pub mod api {
 						"force_batch",
 						types::ForceBatch { calls },
 						[
-							133u8, 180u8, 197u8, 205u8, 241u8, 253u8, 51u8, 157u8, 231u8, 161u8,
-							149u8, 122u8, 152u8, 49u8, 175u8, 3u8, 142u8, 155u8, 89u8, 176u8,
-							214u8, 18u8, 95u8, 47u8, 234u8, 213u8, 214u8, 146u8, 12u8, 183u8,
-							211u8, 113u8,
+							93u8, 222u8, 88u8, 13u8, 29u8, 43u8, 223u8, 34u8, 238u8, 9u8, 83u8,
+							98u8, 239u8, 220u8, 63u8, 81u8, 11u8, 71u8, 150u8, 75u8, 48u8, 179u8,
+							4u8, 54u8, 5u8, 212u8, 174u8, 23u8, 90u8, 63u8, 74u8, 245u8,
 						],
 					)
 				}
@@ -19643,10 +19090,10 @@ pub mod api {
 							weight,
 						},
 						[
-							210u8, 60u8, 27u8, 248u8, 15u8, 192u8, 225u8, 180u8, 103u8, 154u8,
-							29u8, 101u8, 177u8, 105u8, 146u8, 176u8, 175u8, 247u8, 10u8, 253u8,
-							124u8, 190u8, 77u8, 195u8, 70u8, 159u8, 17u8, 234u8, 153u8, 85u8,
-							109u8, 47u8,
+							185u8, 164u8, 221u8, 212u8, 154u8, 144u8, 72u8, 148u8, 53u8, 214u8,
+							43u8, 110u8, 106u8, 78u8, 5u8, 157u8, 234u8, 72u8, 247u8, 44u8, 158u8,
+							199u8, 55u8, 209u8, 131u8, 143u8, 179u8, 39u8, 80u8, 42u8, 110u8,
+							219u8,
 						],
 					)
 				}
@@ -19981,9 +19428,9 @@ pub mod api {
 							call: ::subxt::ext::subxt_core::alloc::boxed::Box::new(call),
 						},
 						[
-							196u8, 233u8, 0u8, 27u8, 48u8, 156u8, 203u8, 108u8, 53u8, 33u8, 183u8,
-							103u8, 9u8, 138u8, 36u8, 73u8, 48u8, 154u8, 160u8, 129u8, 242u8, 50u8,
-							203u8, 216u8, 13u8, 57u8, 106u8, 93u8, 43u8, 175u8, 226u8, 160u8,
+							214u8, 221u8, 31u8, 39u8, 55u8, 31u8, 72u8, 194u8, 218u8, 57u8, 89u8,
+							99u8, 43u8, 192u8, 88u8, 18u8, 63u8, 193u8, 205u8, 218u8, 23u8, 95u8,
+							225u8, 81u8, 116u8, 176u8, 45u8, 193u8, 206u8, 102u8, 75u8, 138u8,
 						],
 					)
 				}
@@ -20006,10 +19453,10 @@ pub mod api {
 							weight,
 						},
 						[
-							67u8, 39u8, 159u8, 240u8, 38u8, 96u8, 173u8, 61u8, 105u8, 203u8, 125u8,
-							220u8, 154u8, 136u8, 207u8, 190u8, 65u8, 231u8, 70u8, 242u8, 236u8,
-							235u8, 158u8, 195u8, 88u8, 100u8, 93u8, 131u8, 109u8, 211u8, 183u8,
-							126u8,
+							226u8, 140u8, 245u8, 34u8, 203u8, 130u8, 198u8, 125u8, 204u8, 126u8,
+							4u8, 12u8, 233u8, 198u8, 254u8, 176u8, 158u8, 136u8, 217u8, 101u8,
+							70u8, 1u8, 154u8, 7u8, 47u8, 244u8, 252u8, 88u8, 181u8, 41u8, 34u8,
+							229u8,
 						],
 					)
 				}
@@ -20047,9 +19494,10 @@ pub mod api {
 							call: ::subxt::ext::subxt_core::alloc::boxed::Box::new(call),
 						},
 						[
-							158u8, 4u8, 127u8, 143u8, 22u8, 61u8, 246u8, 10u8, 118u8, 57u8, 155u8,
-							148u8, 116u8, 18u8, 102u8, 51u8, 49u8, 40u8, 200u8, 8u8, 51u8, 139u8,
-							244u8, 154u8, 130u8, 93u8, 200u8, 85u8, 190u8, 225u8, 118u8, 74u8,
+							80u8, 116u8, 174u8, 104u8, 17u8, 30u8, 223u8, 115u8, 111u8, 164u8,
+							251u8, 221u8, 87u8, 255u8, 17u8, 228u8, 187u8, 197u8, 143u8, 153u8,
+							163u8, 139u8, 196u8, 4u8, 153u8, 235u8, 35u8, 150u8, 216u8, 96u8,
+							146u8, 200u8,
 						],
 					)
 				}
@@ -21696,6 +21144,583 @@ pub mod api {
 							63u8, 161u8, 59u8, 10u8, 66u8, 169u8, 151u8, 95u8, 136u8, 225u8, 228u8,
 							44u8, 4u8, 35u8, 109u8, 92u8, 129u8, 184u8, 94u8, 30u8, 190u8, 74u8,
 							108u8, 129u8, 127u8, 9u8, 93u8, 219u8, 6u8, 153u8, 35u8, 67u8,
+						],
+					)
+				}
+			}
+		}
+	}
+	pub mod token_gateway {
+		use super::{root_mod, runtime_types};
+		#[doc = "Errors that can be returned by this pallet."]
+		pub type Error = runtime_types::pallet_token_gateway::pallet::Error;
+		#[doc = "Contains a variant per dispatchable extrinsic that this pallet has."]
+		pub type Call = runtime_types::pallet_token_gateway::pallet::Call;
+		pub mod calls {
+			use super::{root_mod, runtime_types};
+			type DispatchError = runtime_types::sp_runtime::DispatchError;
+			pub mod types {
+				use super::runtime_types;
+				#[derive(
+					:: subxt :: ext :: subxt_core :: ext :: codec :: Decode,
+					:: subxt :: ext :: subxt_core :: ext :: codec :: Encode,
+					:: subxt :: ext :: subxt_core :: ext :: scale_decode :: DecodeAsType,
+					:: subxt :: ext :: subxt_core :: ext :: scale_encode :: EncodeAsType,
+					Clone,
+					Debug,
+				)]
+				# [codec (crate = :: subxt :: ext :: subxt_core :: ext :: codec)]
+				#[decode_as_type(
+					crate_path = ":: subxt :: ext :: subxt_core :: ext :: scale_decode"
+				)]
+				#[encode_as_type(
+					crate_path = ":: subxt :: ext :: subxt_core :: ext :: scale_encode"
+				)]
+				#[doc = "Teleports a registered asset"]
+				#[doc = "locks the asset and dispatches a request to token gateway on the destination"]
+				pub struct Teleport {
+					pub params: teleport::Params,
+				}
+				pub mod teleport {
+					use super::runtime_types;
+					pub type Params = runtime_types::pallet_token_gateway::types::TeleportParams<
+						::core::primitive::u32,
+						::core::primitive::u128,
+					>;
+				}
+				impl ::subxt::ext::subxt_core::blocks::StaticExtrinsic for Teleport {
+					const PALLET: &'static str = "TokenGateway";
+					const CALL: &'static str = "teleport";
+				}
+				#[derive(
+					:: subxt :: ext :: subxt_core :: ext :: codec :: Decode,
+					:: subxt :: ext :: subxt_core :: ext :: codec :: Encode,
+					:: subxt :: ext :: subxt_core :: ext :: scale_decode :: DecodeAsType,
+					:: subxt :: ext :: subxt_core :: ext :: scale_encode :: EncodeAsType,
+					Clone,
+					Debug,
+				)]
+				# [codec (crate = :: subxt :: ext :: subxt_core :: ext :: codec)]
+				#[decode_as_type(
+					crate_path = ":: subxt :: ext :: subxt_core :: ext :: scale_decode"
+				)]
+				#[encode_as_type(
+					crate_path = ":: subxt :: ext :: subxt_core :: ext :: scale_encode"
+				)]
+				#[doc = "Set the token gateway address for specified chains"]
+				pub struct SetTokenGatewayAddresses {
+					pub addresses: set_token_gateway_addresses::Addresses,
+				}
+				pub mod set_token_gateway_addresses {
+					use super::runtime_types;
+					pub type Addresses = ::subxt::ext::subxt_core::utils::KeyedVec<
+						runtime_types::ismp::host::StateMachine,
+						::subxt::ext::subxt_core::alloc::vec::Vec<::core::primitive::u8>,
+					>;
+				}
+				impl ::subxt::ext::subxt_core::blocks::StaticExtrinsic for SetTokenGatewayAddresses {
+					const PALLET: &'static str = "TokenGateway";
+					const CALL: &'static str = "set_token_gateway_addresses";
+				}
+				#[derive(
+					:: subxt :: ext :: subxt_core :: ext :: codec :: Decode,
+					:: subxt :: ext :: subxt_core :: ext :: codec :: Encode,
+					:: subxt :: ext :: subxt_core :: ext :: scale_decode :: DecodeAsType,
+					:: subxt :: ext :: subxt_core :: ext :: scale_encode :: EncodeAsType,
+					Clone,
+					Debug,
+				)]
+				# [codec (crate = :: subxt :: ext :: subxt_core :: ext :: codec)]
+				#[decode_as_type(
+					crate_path = ":: subxt :: ext :: subxt_core :: ext :: scale_decode"
+				)]
+				#[encode_as_type(
+					crate_path = ":: subxt :: ext :: subxt_core :: ext :: scale_encode"
+				)]
+				#[doc = "Registers a multi-chain ERC6160 asset. The asset should not already exist."]
+				#[doc = ""]
+				#[doc = "This works by dispatching a request to the TokenGateway module on each requested chain"]
+				#[doc = "to create the asset."]
+				pub struct CreateErc6160Asset {
+					pub asset: create_erc6160_asset::Asset,
+				}
+				pub mod create_erc6160_asset {
+					use super::runtime_types;
+					pub type Asset = runtime_types::pallet_token_gateway::types::AssetRegistration<
+						::core::primitive::u32,
+					>;
+				}
+				impl ::subxt::ext::subxt_core::blocks::StaticExtrinsic for CreateErc6160Asset {
+					const PALLET: &'static str = "TokenGateway";
+					const CALL: &'static str = "create_erc6160_asset";
+				}
+				#[derive(
+					:: subxt :: ext :: subxt_core :: ext :: codec :: Decode,
+					:: subxt :: ext :: subxt_core :: ext :: codec :: Encode,
+					:: subxt :: ext :: subxt_core :: ext :: scale_decode :: DecodeAsType,
+					:: subxt :: ext :: subxt_core :: ext :: scale_encode :: EncodeAsType,
+					Clone,
+					Debug,
+				)]
+				# [codec (crate = :: subxt :: ext :: subxt_core :: ext :: codec)]
+				#[decode_as_type(
+					crate_path = ":: subxt :: ext :: subxt_core :: ext :: scale_decode"
+				)]
+				#[encode_as_type(
+					crate_path = ":: subxt :: ext :: subxt_core :: ext :: scale_encode"
+				)]
+				#[doc = "Registers a multi-chain ERC6160 asset. The asset should not already exist."]
+				#[doc = ""]
+				#[doc = "This works by dispatching a request to the TokenGateway module on each requested chain"]
+				#[doc = "to create the asset."]
+				pub struct UpdateErc6160Asset {
+					pub asset: update_erc6160_asset::Asset,
+				}
+				pub mod update_erc6160_asset {
+					use super::runtime_types;
+					pub type Asset = runtime_types::token_gateway_primitives::GatewayAssetUpdate;
+				}
+				impl ::subxt::ext::subxt_core::blocks::StaticExtrinsic for UpdateErc6160Asset {
+					const PALLET: &'static str = "TokenGateway";
+					const CALL: &'static str = "update_erc6160_asset";
+				}
+			}
+			pub struct TransactionApi;
+			impl TransactionApi {
+				#[doc = "Teleports a registered asset"]
+				#[doc = "locks the asset and dispatches a request to token gateway on the destination"]
+				pub fn teleport(
+					&self,
+					params: types::teleport::Params,
+				) -> ::subxt::ext::subxt_core::tx::payload::StaticPayload<types::Teleport> {
+					::subxt::ext::subxt_core::tx::payload::StaticPayload::new_static(
+						"TokenGateway",
+						"teleport",
+						types::Teleport { params },
+						[
+							70u8, 182u8, 36u8, 138u8, 213u8, 41u8, 149u8, 117u8, 151u8, 60u8, 6u8,
+							69u8, 78u8, 137u8, 159u8, 20u8, 186u8, 48u8, 180u8, 169u8, 245u8, 62u8,
+							194u8, 156u8, 63u8, 1u8, 27u8, 5u8, 118u8, 251u8, 100u8, 53u8,
+						],
+					)
+				}
+				#[doc = "Set the token gateway address for specified chains"]
+				pub fn set_token_gateway_addresses(
+					&self,
+					addresses: types::set_token_gateway_addresses::Addresses,
+				) -> ::subxt::ext::subxt_core::tx::payload::StaticPayload<
+					types::SetTokenGatewayAddresses,
+				> {
+					::subxt::ext::subxt_core::tx::payload::StaticPayload::new_static(
+						"TokenGateway",
+						"set_token_gateway_addresses",
+						types::SetTokenGatewayAddresses { addresses },
+						[
+							75u8, 247u8, 223u8, 126u8, 244u8, 65u8, 124u8, 16u8, 224u8, 32u8, 33u8,
+							83u8, 219u8, 70u8, 156u8, 188u8, 121u8, 45u8, 46u8, 104u8, 228u8,
+							208u8, 102u8, 185u8, 25u8, 14u8, 61u8, 226u8, 200u8, 227u8, 117u8,
+							149u8,
+						],
+					)
+				}
+				#[doc = "Registers a multi-chain ERC6160 asset. The asset should not already exist."]
+				#[doc = ""]
+				#[doc = "This works by dispatching a request to the TokenGateway module on each requested chain"]
+				#[doc = "to create the asset."]
+				pub fn create_erc6160_asset(
+					&self,
+					asset: types::create_erc6160_asset::Asset,
+				) -> ::subxt::ext::subxt_core::tx::payload::StaticPayload<types::CreateErc6160Asset>
+				{
+					::subxt::ext::subxt_core::tx::payload::StaticPayload::new_static(
+						"TokenGateway",
+						"create_erc6160_asset",
+						types::CreateErc6160Asset { asset },
+						[
+							84u8, 169u8, 127u8, 18u8, 227u8, 196u8, 241u8, 32u8, 107u8, 41u8,
+							176u8, 143u8, 130u8, 13u8, 95u8, 190u8, 58u8, 66u8, 25u8, 61u8, 4u8,
+							106u8, 227u8, 186u8, 248u8, 190u8, 122u8, 235u8, 187u8, 163u8, 57u8,
+							121u8,
+						],
+					)
+				}
+				#[doc = "Registers a multi-chain ERC6160 asset. The asset should not already exist."]
+				#[doc = ""]
+				#[doc = "This works by dispatching a request to the TokenGateway module on each requested chain"]
+				#[doc = "to create the asset."]
+				pub fn update_erc6160_asset(
+					&self,
+					asset: types::update_erc6160_asset::Asset,
+				) -> ::subxt::ext::subxt_core::tx::payload::StaticPayload<types::UpdateErc6160Asset>
+				{
+					::subxt::ext::subxt_core::tx::payload::StaticPayload::new_static(
+						"TokenGateway",
+						"update_erc6160_asset",
+						types::UpdateErc6160Asset { asset },
+						[
+							211u8, 55u8, 237u8, 211u8, 169u8, 128u8, 105u8, 18u8, 185u8, 153u8,
+							33u8, 249u8, 86u8, 241u8, 209u8, 153u8, 88u8, 136u8, 11u8, 8u8, 85u8,
+							71u8, 225u8, 17u8, 226u8, 150u8, 32u8, 92u8, 111u8, 192u8, 20u8, 17u8,
+						],
+					)
+				}
+			}
+		}
+		#[doc = "Pallet events that functions in this pallet can emit."]
+		pub type Event = runtime_types::pallet_token_gateway::pallet::Event;
+		pub mod events {
+			use super::runtime_types;
+			#[derive(
+				:: subxt :: ext :: subxt_core :: ext :: codec :: Decode,
+				:: subxt :: ext :: subxt_core :: ext :: codec :: Encode,
+				:: subxt :: ext :: subxt_core :: ext :: scale_decode :: DecodeAsType,
+				:: subxt :: ext :: subxt_core :: ext :: scale_encode :: EncodeAsType,
+				Clone,
+				Debug,
+			)]
+			# [codec (crate = :: subxt :: ext :: subxt_core :: ext :: codec)]
+			#[decode_as_type(crate_path = ":: subxt :: ext :: subxt_core :: ext :: scale_decode")]
+			#[encode_as_type(crate_path = ":: subxt :: ext :: subxt_core :: ext :: scale_encode")]
+			#[doc = "An asset has been teleported"]
+			pub struct AssetTeleported {
+				pub from: asset_teleported::From,
+				pub to: asset_teleported::To,
+				pub amount: asset_teleported::Amount,
+				pub dest: asset_teleported::Dest,
+				pub commitment: asset_teleported::Commitment,
+			}
+			pub mod asset_teleported {
+				use super::runtime_types;
+				pub type From = crate::types::AccountId32;
+				pub type To = crate::types::H256;
+				pub type Amount = ::core::primitive::u128;
+				pub type Dest = runtime_types::ismp::host::StateMachine;
+				pub type Commitment = crate::types::H256;
+			}
+			impl ::subxt::ext::subxt_core::events::StaticEvent for AssetTeleported {
+				const PALLET: &'static str = "TokenGateway";
+				const EVENT: &'static str = "AssetTeleported";
+			}
+			#[derive(
+				:: subxt :: ext :: subxt_core :: ext :: codec :: Decode,
+				:: subxt :: ext :: subxt_core :: ext :: codec :: Encode,
+				:: subxt :: ext :: subxt_core :: ext :: scale_decode :: DecodeAsType,
+				:: subxt :: ext :: subxt_core :: ext :: scale_encode :: EncodeAsType,
+				Clone,
+				Debug,
+			)]
+			# [codec (crate = :: subxt :: ext :: subxt_core :: ext :: codec)]
+			#[decode_as_type(crate_path = ":: subxt :: ext :: subxt_core :: ext :: scale_decode")]
+			#[encode_as_type(crate_path = ":: subxt :: ext :: subxt_core :: ext :: scale_encode")]
+			#[doc = "An asset has been received and transferred to the beneficiary's account"]
+			pub struct AssetReceived {
+				pub beneficiary: asset_received::Beneficiary,
+				pub amount: asset_received::Amount,
+				pub source: asset_received::Source,
+			}
+			pub mod asset_received {
+				use super::runtime_types;
+				pub type Beneficiary = crate::types::AccountId32;
+				pub type Amount = ::core::primitive::u128;
+				pub type Source = runtime_types::ismp::host::StateMachine;
+			}
+			impl ::subxt::ext::subxt_core::events::StaticEvent for AssetReceived {
+				const PALLET: &'static str = "TokenGateway";
+				const EVENT: &'static str = "AssetReceived";
+			}
+			#[derive(
+				:: subxt :: ext :: subxt_core :: ext :: codec :: Decode,
+				:: subxt :: ext :: subxt_core :: ext :: codec :: Encode,
+				:: subxt :: ext :: subxt_core :: ext :: scale_decode :: DecodeAsType,
+				:: subxt :: ext :: subxt_core :: ext :: scale_encode :: EncodeAsType,
+				Clone,
+				Debug,
+			)]
+			# [codec (crate = :: subxt :: ext :: subxt_core :: ext :: codec)]
+			#[decode_as_type(crate_path = ":: subxt :: ext :: subxt_core :: ext :: scale_decode")]
+			#[encode_as_type(crate_path = ":: subxt :: ext :: subxt_core :: ext :: scale_encode")]
+			#[doc = "An asset has been refunded and transferred to the beneficiary's account"]
+			pub struct AssetRefunded {
+				pub beneficiary: asset_refunded::Beneficiary,
+				pub amount: asset_refunded::Amount,
+				pub source: asset_refunded::Source,
+			}
+			pub mod asset_refunded {
+				use super::runtime_types;
+				pub type Beneficiary = crate::types::AccountId32;
+				pub type Amount = ::core::primitive::u128;
+				pub type Source = runtime_types::ismp::host::StateMachine;
+			}
+			impl ::subxt::ext::subxt_core::events::StaticEvent for AssetRefunded {
+				const PALLET: &'static str = "TokenGateway";
+				const EVENT: &'static str = "AssetRefunded";
+			}
+			#[derive(
+				:: subxt :: ext :: subxt_core :: ext :: codec :: Decode,
+				:: subxt :: ext :: subxt_core :: ext :: codec :: Encode,
+				:: subxt :: ext :: subxt_core :: ext :: scale_decode :: DecodeAsType,
+				:: subxt :: ext :: subxt_core :: ext :: scale_encode :: EncodeAsType,
+				Clone,
+				Debug,
+			)]
+			# [codec (crate = :: subxt :: ext :: subxt_core :: ext :: codec)]
+			#[decode_as_type(crate_path = ":: subxt :: ext :: subxt_core :: ext :: scale_decode")]
+			#[encode_as_type(crate_path = ":: subxt :: ext :: subxt_core :: ext :: scale_encode")]
+			#[doc = "ERC6160 asset creation request dispatched to hyperbridge"]
+			pub struct ERC6160AssetRegistrationDispatched {
+				pub commitment: erc6160_asset_registration_dispatched::Commitment,
+			}
+			pub mod erc6160_asset_registration_dispatched {
+				use super::runtime_types;
+				pub type Commitment = crate::types::H256;
+			}
+			impl ::subxt::ext::subxt_core::events::StaticEvent for ERC6160AssetRegistrationDispatched {
+				const PALLET: &'static str = "TokenGateway";
+				const EVENT: &'static str = "ERC6160AssetRegistrationDispatched";
+			}
+		}
+		pub mod storage {
+			use super::runtime_types;
+			pub mod types {
+				use super::runtime_types;
+				pub mod supported_assets {
+					use super::runtime_types;
+					pub type SupportedAssets = crate::types::H256;
+					pub type Param0 = ::core::primitive::u32;
+				}
+				pub mod local_assets {
+					use super::runtime_types;
+					pub type LocalAssets = ::core::primitive::u32;
+					pub type Param0 = crate::types::H256;
+				}
+				pub mod decimals {
+					use super::runtime_types;
+					pub type Decimals = ::core::primitive::u8;
+					pub type Param0 = ::core::primitive::u32;
+				}
+				pub mod token_gateway_addresses {
+					use super::runtime_types;
+					pub type TokenGatewayAddresses =
+						::subxt::ext::subxt_core::alloc::vec::Vec<::core::primitive::u8>;
+					pub type Param0 = runtime_types::ismp::host::StateMachine;
+				}
+			}
+			pub struct StorageApi;
+			impl StorageApi {
+				#[doc = " Assets supported by this instance of token gateway"]
+				#[doc = " A map of the local asset id to the token gateway asset id"]
+				pub fn supported_assets_iter(
+					&self,
+				) -> ::subxt::ext::subxt_core::storage::address::StaticAddress<
+					(),
+					types::supported_assets::SupportedAssets,
+					(),
+					(),
+					::subxt::ext::subxt_core::utils::Yes,
+				> {
+					::subxt::ext::subxt_core::storage::address::StaticAddress::new_static(
+						"TokenGateway",
+						"SupportedAssets",
+						(),
+						[
+							190u8, 62u8, 184u8, 58u8, 157u8, 61u8, 82u8, 155u8, 41u8, 14u8, 109u8,
+							155u8, 133u8, 6u8, 243u8, 58u8, 122u8, 15u8, 126u8, 75u8, 1u8, 208u8,
+							57u8, 170u8, 207u8, 68u8, 78u8, 88u8, 46u8, 23u8, 157u8, 255u8,
+						],
+					)
+				}
+				#[doc = " Assets supported by this instance of token gateway"]
+				#[doc = " A map of the local asset id to the token gateway asset id"]
+				pub fn supported_assets(
+					&self,
+					_0: impl ::core::borrow::Borrow<types::supported_assets::Param0>,
+				) -> ::subxt::ext::subxt_core::storage::address::StaticAddress<
+					::subxt::ext::subxt_core::storage::address::StaticStorageKey<
+						types::supported_assets::Param0,
+					>,
+					types::supported_assets::SupportedAssets,
+					::subxt::ext::subxt_core::utils::Yes,
+					(),
+					(),
+				> {
+					::subxt::ext::subxt_core::storage::address::StaticAddress::new_static(
+						"TokenGateway",
+						"SupportedAssets",
+						::subxt::ext::subxt_core::storage::address::StaticStorageKey::new(
+							_0.borrow(),
+						),
+						[
+							190u8, 62u8, 184u8, 58u8, 157u8, 61u8, 82u8, 155u8, 41u8, 14u8, 109u8,
+							155u8, 133u8, 6u8, 243u8, 58u8, 122u8, 15u8, 126u8, 75u8, 1u8, 208u8,
+							57u8, 170u8, 207u8, 68u8, 78u8, 88u8, 46u8, 23u8, 157u8, 255u8,
+						],
+					)
+				}
+				#[doc = " Assets supported by this instance of token gateway"]
+				#[doc = " A map of the token gateway asset id to the local asset id"]
+				pub fn local_assets_iter(
+					&self,
+				) -> ::subxt::ext::subxt_core::storage::address::StaticAddress<
+					(),
+					types::local_assets::LocalAssets,
+					(),
+					(),
+					::subxt::ext::subxt_core::utils::Yes,
+				> {
+					::subxt::ext::subxt_core::storage::address::StaticAddress::new_static(
+						"TokenGateway",
+						"LocalAssets",
+						(),
+						[
+							6u8, 228u8, 217u8, 80u8, 249u8, 166u8, 134u8, 163u8, 72u8, 241u8, 2u8,
+							162u8, 140u8, 0u8, 198u8, 5u8, 241u8, 92u8, 78u8, 159u8, 55u8, 58u8,
+							176u8, 196u8, 148u8, 153u8, 0u8, 118u8, 129u8, 130u8, 65u8, 108u8,
+						],
+					)
+				}
+				#[doc = " Assets supported by this instance of token gateway"]
+				#[doc = " A map of the token gateway asset id to the local asset id"]
+				pub fn local_assets(
+					&self,
+					_0: impl ::core::borrow::Borrow<types::local_assets::Param0>,
+				) -> ::subxt::ext::subxt_core::storage::address::StaticAddress<
+					::subxt::ext::subxt_core::storage::address::StaticStorageKey<
+						types::local_assets::Param0,
+					>,
+					types::local_assets::LocalAssets,
+					::subxt::ext::subxt_core::utils::Yes,
+					(),
+					(),
+				> {
+					::subxt::ext::subxt_core::storage::address::StaticAddress::new_static(
+						"TokenGateway",
+						"LocalAssets",
+						::subxt::ext::subxt_core::storage::address::StaticStorageKey::new(
+							_0.borrow(),
+						),
+						[
+							6u8, 228u8, 217u8, 80u8, 249u8, 166u8, 134u8, 163u8, 72u8, 241u8, 2u8,
+							162u8, 140u8, 0u8, 198u8, 5u8, 241u8, 92u8, 78u8, 159u8, 55u8, 58u8,
+							176u8, 196u8, 148u8, 153u8, 0u8, 118u8, 129u8, 130u8, 65u8, 108u8,
+						],
+					)
+				}
+				#[doc = " The decimals used by the EVM counterpart of this asset"]
+				pub fn decimals_iter(
+					&self,
+				) -> ::subxt::ext::subxt_core::storage::address::StaticAddress<
+					(),
+					types::decimals::Decimals,
+					(),
+					(),
+					::subxt::ext::subxt_core::utils::Yes,
+				> {
+					::subxt::ext::subxt_core::storage::address::StaticAddress::new_static(
+						"TokenGateway",
+						"Decimals",
+						(),
+						[
+							182u8, 101u8, 74u8, 117u8, 72u8, 150u8, 54u8, 74u8, 95u8, 44u8, 176u8,
+							106u8, 153u8, 64u8, 8u8, 113u8, 53u8, 22u8, 106u8, 86u8, 227u8, 19u8,
+							238u8, 228u8, 192u8, 192u8, 53u8, 193u8, 240u8, 211u8, 120u8, 47u8,
+						],
+					)
+				}
+				#[doc = " The decimals used by the EVM counterpart of this asset"]
+				pub fn decimals(
+					&self,
+					_0: impl ::core::borrow::Borrow<types::decimals::Param0>,
+				) -> ::subxt::ext::subxt_core::storage::address::StaticAddress<
+					::subxt::ext::subxt_core::storage::address::StaticStorageKey<
+						types::decimals::Param0,
+					>,
+					types::decimals::Decimals,
+					::subxt::ext::subxt_core::utils::Yes,
+					(),
+					(),
+				> {
+					::subxt::ext::subxt_core::storage::address::StaticAddress::new_static(
+						"TokenGateway",
+						"Decimals",
+						::subxt::ext::subxt_core::storage::address::StaticStorageKey::new(
+							_0.borrow(),
+						),
+						[
+							182u8, 101u8, 74u8, 117u8, 72u8, 150u8, 54u8, 74u8, 95u8, 44u8, 176u8,
+							106u8, 153u8, 64u8, 8u8, 113u8, 53u8, 22u8, 106u8, 86u8, 227u8, 19u8,
+							238u8, 228u8, 192u8, 192u8, 53u8, 193u8, 240u8, 211u8, 120u8, 47u8,
+						],
+					)
+				}
+				#[doc = " The token gateway adresses on different chains"]
+				pub fn token_gateway_addresses_iter(
+					&self,
+				) -> ::subxt::ext::subxt_core::storage::address::StaticAddress<
+					(),
+					types::token_gateway_addresses::TokenGatewayAddresses,
+					(),
+					(),
+					::subxt::ext::subxt_core::utils::Yes,
+				> {
+					::subxt::ext::subxt_core::storage::address::StaticAddress::new_static(
+						"TokenGateway",
+						"TokenGatewayAddresses",
+						(),
+						[
+							246u8, 148u8, 122u8, 115u8, 217u8, 240u8, 23u8, 177u8, 99u8, 37u8,
+							30u8, 107u8, 237u8, 126u8, 35u8, 194u8, 217u8, 195u8, 21u8, 235u8,
+							120u8, 131u8, 206u8, 102u8, 214u8, 141u8, 35u8, 119u8, 122u8, 177u8,
+							48u8, 148u8,
+						],
+					)
+				}
+				#[doc = " The token gateway adresses on different chains"]
+				pub fn token_gateway_addresses(
+					&self,
+					_0: impl ::core::borrow::Borrow<types::token_gateway_addresses::Param0>,
+				) -> ::subxt::ext::subxt_core::storage::address::StaticAddress<
+					::subxt::ext::subxt_core::storage::address::StaticStorageKey<
+						types::token_gateway_addresses::Param0,
+					>,
+					types::token_gateway_addresses::TokenGatewayAddresses,
+					::subxt::ext::subxt_core::utils::Yes,
+					(),
+					(),
+				> {
+					::subxt::ext::subxt_core::storage::address::StaticAddress::new_static(
+						"TokenGateway",
+						"TokenGatewayAddresses",
+						::subxt::ext::subxt_core::storage::address::StaticStorageKey::new(
+							_0.borrow(),
+						),
+						[
+							246u8, 148u8, 122u8, 115u8, 217u8, 240u8, 23u8, 177u8, 99u8, 37u8,
+							30u8, 107u8, 237u8, 126u8, 35u8, 194u8, 217u8, 195u8, 21u8, 235u8,
+							120u8, 131u8, 206u8, 102u8, 214u8, 141u8, 35u8, 119u8, 122u8, 177u8,
+							48u8, 148u8,
+						],
+					)
+				}
+			}
+		}
+		pub mod constants {
+			use super::runtime_types;
+			pub struct ConstantsApi;
+			impl ConstantsApi {
+				#[doc = " The decimals of the native currency"]
+				pub fn decimals(
+					&self,
+				) -> ::subxt::ext::subxt_core::constants::address::StaticAddress<
+					::core::primitive::u8,
+				> {
+					::subxt::ext::subxt_core::constants::address::StaticAddress::new_static(
+						"TokenGateway",
+						"Decimals",
+						[
+							141u8, 130u8, 11u8, 35u8, 226u8, 114u8, 92u8, 179u8, 168u8, 110u8,
+							28u8, 91u8, 221u8, 64u8, 4u8, 148u8, 201u8, 193u8, 185u8, 66u8, 226u8,
+							114u8, 97u8, 79u8, 62u8, 212u8, 202u8, 114u8, 237u8, 228u8, 183u8,
+							165u8,
 						],
 					)
 				}
@@ -23618,6 +23643,8 @@ pub mod api {
 				Ismp(runtime_types::pallet_ismp::pallet::Call),
 				#[codec(index = 28)]
 				IsmpGrandpa(runtime_types::ismp_grandpa::pallet::Call),
+				#[codec(index = 30)]
+				TokenGateway(runtime_types::pallet_token_gateway::pallet::Call),
 			}
 			#[derive(
 				:: subxt :: ext :: subxt_core :: ext :: codec :: Decode,
@@ -23683,6 +23710,8 @@ pub mod api {
 				Ismp(runtime_types::pallet_ismp::pallet::Error),
 				#[codec(index = 29)]
 				Hyperbridge(runtime_types::pallet_hyperbridge::pallet::Error),
+				#[codec(index = 30)]
+				TokenGateway(runtime_types::pallet_token_gateway::pallet::Error),
 			}
 			#[derive(
 				:: subxt :: ext :: subxt_core :: ext :: codec :: Decode,
@@ -23748,6 +23777,8 @@ pub mod api {
 				IsmpGrandpa(runtime_types::ismp_grandpa::pallet::Event),
 				#[codec(index = 29)]
 				Hyperbridge(runtime_types::pallet_hyperbridge::pallet::Event),
+				#[codec(index = 30)]
+				TokenGateway(runtime_types::pallet_token_gateway::pallet::Event),
 			}
 			#[derive(
 				:: subxt :: ext :: subxt_core :: ext :: codec :: Decode,
@@ -23823,25 +23854,6 @@ pub mod api {
 				pub struct BoundedBTreeMap<_0, _1>(
 					pub ::subxt::ext::subxt_core::utils::KeyedVec<_0, _1>,
 				);
-			}
-			pub mod bounded_btree_set {
-				use super::runtime_types;
-				#[derive(
-					:: subxt :: ext :: subxt_core :: ext :: codec :: Decode,
-					:: subxt :: ext :: subxt_core :: ext :: codec :: Encode,
-					:: subxt :: ext :: subxt_core :: ext :: scale_decode :: DecodeAsType,
-					:: subxt :: ext :: subxt_core :: ext :: scale_encode :: EncodeAsType,
-					Clone,
-					Debug,
-				)]
-				# [codec (crate = :: subxt :: ext :: subxt_core :: ext :: codec)]
-				#[decode_as_type(
-					crate_path = ":: subxt :: ext :: subxt_core :: ext :: scale_decode"
-				)]
-				#[encode_as_type(
-					crate_path = ":: subxt :: ext :: subxt_core :: ext :: scale_encode"
-				)]
-				pub struct BoundedBTreeSet<_0>(pub ::subxt::ext::subxt_core::alloc::vec::Vec<_0>);
 			}
 			pub mod bounded_vec {
 				use super::runtime_types;
@@ -26549,59 +26561,6 @@ pub mod api {
 		}
 		pub mod pallet_chain_transfer {
 			use super::runtime_types;
-			pub mod ismp_module {
-				use super::runtime_types;
-				#[derive(
-					:: subxt :: ext :: subxt_core :: ext :: codec :: Decode,
-					:: subxt :: ext :: subxt_core :: ext :: codec :: Encode,
-					:: subxt :: ext :: subxt_core :: ext :: scale_decode :: DecodeAsType,
-					:: subxt :: ext :: subxt_core :: ext :: scale_encode :: EncodeAsType,
-					Clone,
-					Debug,
-				)]
-				# [codec (crate = :: subxt :: ext :: subxt_core :: ext :: codec)]
-				#[decode_as_type(
-					crate_path = ":: subxt :: ext :: subxt_core :: ext :: scale_decode"
-				)]
-				#[encode_as_type(
-					crate_path = ":: subxt :: ext :: subxt_core :: ext :: scale_encode"
-				)]
-				pub enum Asset {
-					#[codec(index = 0)]
-					Argon,
-					#[codec(index = 1)]
-					OwnershipToken,
-				}
-				#[derive(
-					:: subxt :: ext :: subxt_core :: ext :: codec :: Decode,
-					:: subxt :: ext :: subxt_core :: ext :: codec :: Encode,
-					:: subxt :: ext :: subxt_core :: ext :: scale_decode :: DecodeAsType,
-					:: subxt :: ext :: subxt_core :: ext :: scale_encode :: EncodeAsType,
-					Clone,
-					Debug,
-				)]
-				# [codec (crate = :: subxt :: ext :: subxt_core :: ext :: codec)]
-				#[decode_as_type(
-					crate_path = ":: subxt :: ext :: subxt_core :: ext :: scale_decode"
-				)]
-				#[encode_as_type(
-					crate_path = ":: subxt :: ext :: subxt_core :: ext :: scale_encode"
-				)]
-				pub enum EvmChain {
-					#[codec(index = 0)]
-					Ethereum,
-					#[codec(index = 1)]
-					Base,
-					#[codec(index = 2)]
-					Arbitrum,
-					#[codec(index = 3)]
-					Optimism,
-					#[codec(index = 4)]
-					Gnosis,
-					#[codec(index = 5)]
-					BinanceSmartChain,
-				}
-			}
 			pub mod pallet {
 				use super::runtime_types;
 				#[derive(
@@ -26627,54 +26586,6 @@ pub mod api {
 						amount: ::core::primitive::u128,
 						notary_id: ::core::primitive::u32,
 					},
-					#[codec(index = 1)]
-					#[doc = "Send argons to a remote EVM based chain. Available destinations are specified in the"]
-					#[doc = "`ActiveEvmDestinations` storage item."]
-					send_to_evm_chain {
-						params: runtime_types::pallet_chain_transfer::TransferToEvm<
-							::core::primitive::u128,
-						>,
-					},
-					#[codec(index = 2)]
-					#[doc = "One time api to register assets for cross chain transfers"]
-					#[doc = ""]
-					#[doc = "# Arguments"]
-					#[doc = "`chains` - Each chain and its corresponding token gateway address"]
-					register_hyperbridge_assets {
-						chains: runtime_types::bounded_collections::bounded_vec::BoundedVec<(
-							runtime_types::ismp::host::StateMachine,
-							::subxt::ext::subxt_core::alloc::vec::Vec<::core::primitive::u8>,
-						)>,
-					},
-					#[codec(index = 3)]
-					#[doc = "Set the asset registration for cross chain transfers"]
-					#[doc = ""]
-					#[doc = "# Arguments"]
-					#[doc = "`add_chains` - Each new chain and its corresponding token gateway address"]
-					#[doc = "`remove_chains` - Chains to remove"]
-					update_hyperbridge_assets {
-						add_chains: runtime_types::bounded_collections::bounded_vec::BoundedVec<(
-							runtime_types::ismp::host::StateMachine,
-							::subxt::ext::subxt_core::alloc::vec::Vec<::core::primitive::u8>,
-						)>,
-						remove_chains: runtime_types::bounded_collections::bounded_vec::BoundedVec<
-							runtime_types::ismp::host::StateMachine,
-						>,
-					},
-					#[codec(index = 4)]
-					#[doc = "This api will re-assign admins for ERC6160 accounts on the TokenGateway.sol contracts"]
-					#[doc = "created by Hyperbridge."]
-					#[doc = ""]
-					#[doc = "This api is only used to disconnect from hyperbridge."]
-					replace_hyperbridge_admins {
-						new_admins: runtime_types::bounded_collections::bounded_vec::BoundedVec<(
-							runtime_types::ismp::host::StateMachine,
-							::subxt::ext::subxt_core::utils::H160,
-						)>,
-					},
-					#[codec(index = 5)]
-					#[doc = "Pause the bridge"]
-					set_bridge_enabled { enabled: ::core::primitive::bool },
 				}
 				#[derive(
 					:: subxt :: ext :: subxt_core :: ext :: codec :: Decode,
@@ -26710,33 +26621,6 @@ pub mod api {
 					#[codec(index = 5)]
 					#[doc = "The notary id is not registered"]
 					InvalidNotaryUsedForTransfer,
-					#[codec(index = 6)]
-					#[doc = "An error was encountered trying to send a transfer to an EVM"]
-					FailedToTransferToEvm,
-					#[codec(index = 7)]
-					#[doc = "This account is not a token admin"]
-					NotATokenAdmin,
-					#[codec(index = 8)]
-					#[doc = "ERC6160 asset registration failed"]
-					Erc6160RegistrationFailed,
-					#[codec(index = 9)]
-					#[doc = "Coprocessor not configured"]
-					CoprocessorNotConfigured,
-					#[codec(index = 10)]
-					#[doc = "Invalid Destination Chain"]
-					InvalidEvmChain,
-					#[codec(index = 11)]
-					#[doc = "Evm Chain is not supported yet"]
-					EvmChainNotSupported,
-					#[codec(index = 12)]
-					#[doc = "Evm Chain doesn't have the proper configuration setup"]
-					EvmChainNotConfigured,
-					#[codec(index = 13)]
-					#[doc = "The bridge is paused"]
-					EvmBridgePaused,
-					#[codec(index = 14)]
-					#[doc = "Max number of chains exceeded"]
-					MaxChainsExceeded,
 				}
 				#[derive(
 					:: subxt :: ext :: subxt_core :: ext :: codec :: Decode,
@@ -26812,57 +26696,6 @@ pub mod api {
 						tax: ::core::primitive::u128,
 						error: runtime_types::sp_runtime::DispatchError,
 					},
-					#[codec(index = 7)]
-					#[doc = "An asset has been sent to an EVM"]
-					TransferToEvm {
-						from: crate::types::AccountId32,
-						to: ::subxt::ext::subxt_core::utils::H160,
-						amount: ::core::primitive::u128,
-						evm_chain: runtime_types::pallet_chain_transfer::ismp_module::EvmChain,
-						asset: runtime_types::pallet_chain_transfer::ismp_module::Asset,
-						commitment: crate::types::H256,
-					},
-					#[codec(index = 8)]
-					#[doc = "An asset has been refunded and transferred back to the source account"]
-					TransferToEvmExpired {
-						from: crate::types::AccountId32,
-						to: ::subxt::ext::subxt_core::utils::H160,
-						amount: ::core::primitive::u128,
-						evm_chain: runtime_types::pallet_chain_transfer::ismp_module::EvmChain,
-						asset: runtime_types::pallet_chain_transfer::ismp_module::Asset,
-					},
-					#[codec(index = 9)]
-					#[doc = "An asset has been received from an EVM chain"]
-					TransferFromEvm {
-						from: ::subxt::ext::subxt_core::utils::H160,
-						to: crate::types::AccountId32,
-						asset: runtime_types::pallet_chain_transfer::ismp_module::Asset,
-						amount: ::core::primitive::u128,
-						evm_chain: runtime_types::pallet_chain_transfer::ismp_module::EvmChain,
-					},
-					#[codec(index = 10)]
-					#[doc = "An asset has been received from an EVM chain while the bridge is paused. This is not"]
-					#[doc = "processed, and added to the logs for a future resolution. Funds are maintained in"]
-					#[doc = "pallet balance."]
-					TransferFromEvmWhilePaused {
-						from: ::subxt::ext::subxt_core::utils::H160,
-						to: crate::types::AccountId32,
-						asset: runtime_types::pallet_chain_transfer::ismp_module::Asset,
-						amount: ::core::primitive::u128,
-						evm_chain: runtime_types::pallet_chain_transfer::ismp_module::EvmChain,
-					},
-					#[codec(index = 11)]
-					#[doc = "ERC6160 asset creation request dispatched to hyperbridge"]
-					ERC6160AssetRegistrationDispatched {
-						commitment: crate::types::H256,
-						asset: runtime_types::pallet_chain_transfer::ismp_module::Asset,
-						added_chains: runtime_types::bounded_collections::bounded_vec::BoundedVec<
-							runtime_types::ismp::host::StateMachine,
-						>,
-						removed_chains: runtime_types::bounded_collections::bounded_vec::BoundedVec<
-							runtime_types::ismp::host::StateMachine,
-						>,
-					},
 				}
 			}
 			#[derive(
@@ -26881,25 +26714,6 @@ pub mod api {
 				pub amount: _1,
 				pub expiration_tick: ::core::primitive::u64,
 				pub notary_id: ::core::primitive::u32,
-			}
-			#[derive(
-				:: subxt :: ext :: subxt_core :: ext :: codec :: Decode,
-				:: subxt :: ext :: subxt_core :: ext :: codec :: Encode,
-				:: subxt :: ext :: subxt_core :: ext :: scale_decode :: DecodeAsType,
-				:: subxt :: ext :: subxt_core :: ext :: scale_encode :: EncodeAsType,
-				Clone,
-				Debug,
-			)]
-			# [codec (crate = :: subxt :: ext :: subxt_core :: ext :: codec)]
-			#[decode_as_type(crate_path = ":: subxt :: ext :: subxt_core :: ext :: scale_decode")]
-			#[encode_as_type(crate_path = ":: subxt :: ext :: subxt_core :: ext :: scale_encode")]
-			pub struct TransferToEvm<_0> {
-				pub asset: runtime_types::pallet_chain_transfer::ismp_module::Asset,
-				pub evm_chain: runtime_types::pallet_chain_transfer::ismp_module::EvmChain,
-				pub recipient: ::subxt::ext::subxt_core::utils::H160,
-				pub amount: _0,
-				pub timeout: ::core::primitive::u64,
-				pub relayer_fee: _0,
 			}
 		}
 		pub mod pallet_digests {
@@ -29328,6 +29142,201 @@ pub mod api {
 				}
 			}
 		}
+		pub mod pallet_token_gateway {
+			use super::runtime_types;
+			pub mod pallet {
+				use super::runtime_types;
+				#[derive(
+					:: subxt :: ext :: subxt_core :: ext :: codec :: Decode,
+					:: subxt :: ext :: subxt_core :: ext :: codec :: Encode,
+					:: subxt :: ext :: subxt_core :: ext :: scale_decode :: DecodeAsType,
+					:: subxt :: ext :: subxt_core :: ext :: scale_encode :: EncodeAsType,
+					Clone,
+					Debug,
+				)]
+				# [codec (crate = :: subxt :: ext :: subxt_core :: ext :: codec)]
+				#[decode_as_type(
+					crate_path = ":: subxt :: ext :: subxt_core :: ext :: scale_decode"
+				)]
+				#[encode_as_type(
+					crate_path = ":: subxt :: ext :: subxt_core :: ext :: scale_encode"
+				)]
+				#[doc = "Contains a variant per dispatchable extrinsic that this pallet has."]
+				pub enum Call {
+					#[codec(index = 0)]
+					#[doc = "Teleports a registered asset"]
+					#[doc = "locks the asset and dispatches a request to token gateway on the destination"]
+					teleport {
+						params: runtime_types::pallet_token_gateway::types::TeleportParams<
+							::core::primitive::u32,
+							::core::primitive::u128,
+						>,
+					},
+					#[codec(index = 1)]
+					#[doc = "Set the token gateway address for specified chains"]
+					set_token_gateway_addresses {
+						addresses: ::subxt::ext::subxt_core::utils::KeyedVec<
+							runtime_types::ismp::host::StateMachine,
+							::subxt::ext::subxt_core::alloc::vec::Vec<::core::primitive::u8>,
+						>,
+					},
+					#[codec(index = 2)]
+					#[doc = "Registers a multi-chain ERC6160 asset. The asset should not already exist."]
+					#[doc = ""]
+					#[doc = "This works by dispatching a request to the TokenGateway module on each requested chain"]
+					#[doc = "to create the asset."]
+					create_erc6160_asset {
+						asset: runtime_types::pallet_token_gateway::types::AssetRegistration<
+							::core::primitive::u32,
+						>,
+					},
+					#[codec(index = 3)]
+					#[doc = "Registers a multi-chain ERC6160 asset. The asset should not already exist."]
+					#[doc = ""]
+					#[doc = "This works by dispatching a request to the TokenGateway module on each requested chain"]
+					#[doc = "to create the asset."]
+					update_erc6160_asset {
+						asset: runtime_types::token_gateway_primitives::GatewayAssetUpdate,
+					},
+				}
+				#[derive(
+					:: subxt :: ext :: subxt_core :: ext :: codec :: Decode,
+					:: subxt :: ext :: subxt_core :: ext :: codec :: Encode,
+					:: subxt :: ext :: subxt_core :: ext :: scale_decode :: DecodeAsType,
+					:: subxt :: ext :: subxt_core :: ext :: scale_encode :: EncodeAsType,
+					Clone,
+					Debug,
+				)]
+				# [codec (crate = :: subxt :: ext :: subxt_core :: ext :: codec)]
+				#[decode_as_type(
+					crate_path = ":: subxt :: ext :: subxt_core :: ext :: scale_decode"
+				)]
+				#[encode_as_type(
+					crate_path = ":: subxt :: ext :: subxt_core :: ext :: scale_encode"
+				)]
+				#[doc = "Errors that can be returned by this pallet."]
+				pub enum Error {
+					#[codec(index = 0)]
+					#[doc = "A asset that has not been registered"]
+					UnregisteredAsset,
+					#[codec(index = 1)]
+					#[doc = "Error while teleporting asset"]
+					AssetTeleportError,
+					#[codec(index = 2)]
+					#[doc = "Coprocessor was not configured in the runtime"]
+					CoprocessorNotConfigured,
+					#[codec(index = 3)]
+					#[doc = "Asset or update Dispatch Error"]
+					DispatchError,
+					#[codec(index = 4)]
+					#[doc = "Asset Id creation failed"]
+					AssetCreationError,
+					#[codec(index = 5)]
+					#[doc = "Asset decimals not found"]
+					AssetDecimalsNotFound,
+					#[codec(index = 6)]
+					#[doc = "Protocol Params have not been initialized"]
+					NotInitialized,
+					#[codec(index = 7)]
+					#[doc = "Unknown Asset"]
+					UnknownAsset,
+					#[codec(index = 8)]
+					#[doc = "Only root or asset owner can update asset"]
+					NotAssetOwner,
+				}
+				#[derive(
+					:: subxt :: ext :: subxt_core :: ext :: codec :: Decode,
+					:: subxt :: ext :: subxt_core :: ext :: codec :: Encode,
+					:: subxt :: ext :: subxt_core :: ext :: scale_decode :: DecodeAsType,
+					:: subxt :: ext :: subxt_core :: ext :: scale_encode :: EncodeAsType,
+					Clone,
+					Debug,
+				)]
+				# [codec (crate = :: subxt :: ext :: subxt_core :: ext :: codec)]
+				#[decode_as_type(
+					crate_path = ":: subxt :: ext :: subxt_core :: ext :: scale_decode"
+				)]
+				#[encode_as_type(
+					crate_path = ":: subxt :: ext :: subxt_core :: ext :: scale_encode"
+				)]
+				#[doc = "Pallet events that functions in this pallet can emit."]
+				pub enum Event {
+					#[codec(index = 0)]
+					#[doc = "An asset has been teleported"]
+					AssetTeleported {
+						from: crate::types::AccountId32,
+						to: crate::types::H256,
+						amount: ::core::primitive::u128,
+						dest: runtime_types::ismp::host::StateMachine,
+						commitment: crate::types::H256,
+					},
+					#[codec(index = 1)]
+					#[doc = "An asset has been received and transferred to the beneficiary's account"]
+					AssetReceived {
+						beneficiary: crate::types::AccountId32,
+						amount: ::core::primitive::u128,
+						source: runtime_types::ismp::host::StateMachine,
+					},
+					#[codec(index = 2)]
+					#[doc = "An asset has been refunded and transferred to the beneficiary's account"]
+					AssetRefunded {
+						beneficiary: crate::types::AccountId32,
+						amount: ::core::primitive::u128,
+						source: runtime_types::ismp::host::StateMachine,
+					},
+					#[codec(index = 3)]
+					#[doc = "ERC6160 asset creation request dispatched to hyperbridge"]
+					ERC6160AssetRegistrationDispatched { commitment: crate::types::H256 },
+				}
+			}
+			pub mod types {
+				use super::runtime_types;
+				#[derive(
+					:: subxt :: ext :: subxt_core :: ext :: codec :: Decode,
+					:: subxt :: ext :: subxt_core :: ext :: codec :: Encode,
+					:: subxt :: ext :: subxt_core :: ext :: scale_decode :: DecodeAsType,
+					:: subxt :: ext :: subxt_core :: ext :: scale_encode :: EncodeAsType,
+					Clone,
+					Debug,
+				)]
+				# [codec (crate = :: subxt :: ext :: subxt_core :: ext :: codec)]
+				#[decode_as_type(
+					crate_path = ":: subxt :: ext :: subxt_core :: ext :: scale_decode"
+				)]
+				#[encode_as_type(
+					crate_path = ":: subxt :: ext :: subxt_core :: ext :: scale_encode"
+				)]
+				pub struct AssetRegistration<_0> {
+					pub local_id: _0,
+					pub reg: runtime_types::token_gateway_primitives::GatewayAssetRegistration,
+				}
+				#[derive(
+					:: subxt :: ext :: subxt_core :: ext :: codec :: Decode,
+					:: subxt :: ext :: subxt_core :: ext :: codec :: Encode,
+					:: subxt :: ext :: subxt_core :: ext :: scale_decode :: DecodeAsType,
+					:: subxt :: ext :: subxt_core :: ext :: scale_encode :: EncodeAsType,
+					Clone,
+					Debug,
+				)]
+				# [codec (crate = :: subxt :: ext :: subxt_core :: ext :: codec)]
+				#[decode_as_type(
+					crate_path = ":: subxt :: ext :: subxt_core :: ext :: scale_decode"
+				)]
+				#[encode_as_type(
+					crate_path = ":: subxt :: ext :: subxt_core :: ext :: scale_encode"
+				)]
+				pub struct TeleportParams<_0, _1> {
+					pub asset_id: _0,
+					pub destination: runtime_types::ismp::host::StateMachine,
+					pub recepient: crate::types::H256,
+					pub amount: _1,
+					pub timeout: ::core::primitive::u64,
+					pub token_gateway:
+						::subxt::ext::subxt_core::alloc::vec::Vec<::core::primitive::u8>,
+					pub relayer_fee: _1,
+				}
+			}
+		}
 		pub mod pallet_transaction_payment {
 			use super::runtime_types;
 			pub mod pallet {
@@ -31317,6 +31326,56 @@ pub mod api {
 			pub struct RuntimeDbWeight {
 				pub read: ::core::primitive::u64,
 				pub write: ::core::primitive::u64,
+			}
+		}
+		pub mod token_gateway_primitives {
+			use super::runtime_types;
+			#[derive(
+				:: subxt :: ext :: subxt_core :: ext :: codec :: Decode,
+				:: subxt :: ext :: subxt_core :: ext :: codec :: Encode,
+				:: subxt :: ext :: subxt_core :: ext :: scale_decode :: DecodeAsType,
+				:: subxt :: ext :: subxt_core :: ext :: scale_encode :: EncodeAsType,
+				Clone,
+				Debug,
+			)]
+			# [codec (crate = :: subxt :: ext :: subxt_core :: ext :: codec)]
+			#[decode_as_type(crate_path = ":: subxt :: ext :: subxt_core :: ext :: scale_decode")]
+			#[encode_as_type(crate_path = ":: subxt :: ext :: subxt_core :: ext :: scale_encode")]
+			pub struct GatewayAssetRegistration {
+				pub name: runtime_types::bounded_collections::bounded_vec::BoundedVec<
+					::core::primitive::u8,
+				>,
+				pub symbol: runtime_types::bounded_collections::bounded_vec::BoundedVec<
+					::core::primitive::u8,
+				>,
+				pub chains: ::subxt::ext::subxt_core::alloc::vec::Vec<
+					runtime_types::ismp::host::StateMachine,
+				>,
+				pub minimum_balance: ::core::option::Option<::core::primitive::u128>,
+			}
+			#[derive(
+				:: subxt :: ext :: subxt_core :: ext :: codec :: Decode,
+				:: subxt :: ext :: subxt_core :: ext :: codec :: Encode,
+				:: subxt :: ext :: subxt_core :: ext :: scale_decode :: DecodeAsType,
+				:: subxt :: ext :: subxt_core :: ext :: scale_encode :: EncodeAsType,
+				Clone,
+				Debug,
+			)]
+			# [codec (crate = :: subxt :: ext :: subxt_core :: ext :: codec)]
+			#[decode_as_type(crate_path = ":: subxt :: ext :: subxt_core :: ext :: scale_decode")]
+			#[encode_as_type(crate_path = ":: subxt :: ext :: subxt_core :: ext :: scale_encode")]
+			pub struct GatewayAssetUpdate {
+				pub asset_id: crate::types::H256,
+				pub add_chains: runtime_types::bounded_collections::bounded_vec::BoundedVec<
+					runtime_types::ismp::host::StateMachine,
+				>,
+				pub remove_chains: runtime_types::bounded_collections::bounded_vec::BoundedVec<
+					runtime_types::ismp::host::StateMachine,
+				>,
+				pub new_admins: runtime_types::bounded_collections::bounded_vec::BoundedVec<(
+					runtime_types::ismp::host::StateMachine,
+					::subxt::ext::subxt_core::utils::H160,
+				)>,
 			}
 		}
 	}

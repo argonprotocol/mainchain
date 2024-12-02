@@ -67,8 +67,7 @@ pub struct GenesisSettings {
 	pub channel_hold_expiration_ticks: Tick,
 	pub mining_config: MiningSlotConfig<BlockNumber>,
 	pub minimum_bitcoin_bond_satoshis: Satoshis,
-	pub cross_token_operator: AccountId,
-	pub connect_to_test_evm_networks: bool,
+	pub hyperbridge_token_admin: AccountId,
 }
 
 #[allow(clippy::too_many_arguments)]
@@ -88,8 +87,7 @@ pub(crate) fn testnet_genesis(
 		channel_hold_expiration_ticks,
 		mining_config,
 		minimum_bitcoin_bond_satoshis,
-		connect_to_test_evm_networks,
-		cross_token_operator,
+		hyperbridge_token_admin,
 	}: GenesisSettings,
 ) -> serde_json::Value {
 	let ticker = Ticker::start(Duration::from_millis(tick_millis), channel_hold_expiration_ticks);
@@ -113,8 +111,7 @@ pub(crate) fn testnet_genesis(
 		notaries: NotariesConfig { list: initial_notaries },
 		grandpa: GrandpaConfig { authorities: founding_grandpas, ..Default::default() },
 		chain_transfer: ChainTransferConfig {
-			token_admin: Some(cross_token_operator),
-			use_evm_test_networks: connect_to_test_evm_networks,
+			hyperbridge_token_admin: Some(hyperbridge_token_admin),
 			..Default::default()
 		},
 		..Default::default()

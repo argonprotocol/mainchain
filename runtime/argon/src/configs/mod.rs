@@ -1,14 +1,15 @@
 mod fees;
+mod hyperbridge;
 
 use super::{
 	Balances, BitcoinUtxos, Block, BlockSeal, BlockSealSpec, Bonds, ChainTransfer, Digests,
-	Domains, Grandpa, Hyperbridge, Ismp, MiningSlot, Mint, Notaries, Notebook, OriginCaller,
-	Ownership, PalletInfo, PriceIndex, Runtime, RuntimeCall, RuntimeEvent, RuntimeFreezeReason,
+	Domains, Grandpa, Ismp, MiningSlot, Mint, Notaries, Notebook, OriginCaller, Ownership,
+	PalletInfo, PriceIndex, Runtime, RuntimeCall, RuntimeEvent, RuntimeFreezeReason,
 	RuntimeHoldReason, RuntimeOrigin, RuntimeTask, System, Ticks, Timestamp, TxPause, Vaults,
 	VERSION,
 };
 use crate::SessionKeys;
-use alloc::{boxed::Box, vec::Vec};
+use alloc::vec::Vec;
 use argon_primitives::{
 	bitcoin::BitcoinHeight, notary::NotaryRecordWithState, prelude::*, BlockSealAuthorityId,
 	HashOutput, Moment, TickProvider, CHANNEL_HOLD_CLAWBACK_TICKS,
@@ -31,14 +32,11 @@ pub use frame_support::{
 	},
 	PalletId, StorageValue,
 };
-use ismp::{host::StateMachine, module::IsmpModule, router::IsmpRouter, Error};
 use sp_consensus_grandpa::{AuthorityId as GrandpaId, AuthorityList};
 
 use frame_system::EnsureRoot;
 use pallet_block_rewards::GrowthPath;
 use pallet_bond::BitcoinVerifier;
-use pallet_hyperbridge::PALLET_HYPERBRIDGE_ID;
-use pallet_ismp::NoOpMmrTree;
 use pallet_mining_slot::OnNewSlot;
 use pallet_notebook::NotebookVerifyError;
 use pallet_tx_pause::RuntimeCallNameOf;
@@ -194,8 +192,8 @@ impl pallet_block_seal_spec::Config for Runtime {
 	type TickProvider = Ticks;
 	type WeightInfo = pallet_block_seal_spec::weights::SubstrateWeight<Runtime>;
 	type TargetBlockVotes = TargetBlockVotes;
-	type HistoricalVoteBlocksForAverage = SealSpecVoteHistoryForAverage;
 	type HistoricalComputeBlocksForAverage = SealSpecComputeHistoryToTrack;
+	type HistoricalVoteBlocksForAverage = SealSpecVoteHistoryForAverage;
 	type ComputeDifficultyChangePeriod = SealSpecComputeDifficultyChangePeriod;
 	type SealInherent = BlockSeal;
 }
@@ -413,8 +411,6 @@ impl pallet_chain_transfer::Config for Runtime {
 	type RuntimeEvent = RuntimeEvent;
 	type WeightInfo = pallet_chain_transfer::weights::SubstrateWeight<Runtime>;
 	type Argon = Balances;
-	type OwnershipTokens = Ownership;
-	type Dispatcher = Hyperbridge;
 	type Balance = Balance;
 	type ExistentialDeposit = ConstU128<EXISTENTIAL_DEPOSIT>;
 	type NotebookProvider = Notebook;
@@ -621,7 +617,7 @@ impl pallet_mint::Config for Runtime {
 	type BlockRewardAccountsProvider = MiningSlot;
 }
 
-type OwnershipToken = pallet_balances::Instance2;
+pub(crate) type OwnershipToken = pallet_balances::Instance2;
 impl pallet_balances::Config<OwnershipToken> for Runtime {
 	type RuntimeEvent = RuntimeEvent;
 	type RuntimeHoldReason = RuntimeHoldReason;
@@ -655,72 +651,4 @@ impl pallet_utility::Config for Runtime {
 	type RuntimeCall = RuntimeCall;
 	type PalletsOrigin = OriginCaller;
 	type WeightInfo = pallet_utility::weights::SubstrateWeight<Runtime>;
-}
-
-parameter_types! {
-	// The host state machine of this pallet
-	pub const HostStateMachine: StateMachine = StateMachine::Substrate(*b"argn");
-}
-
-#[cfg(not(feature = "canary"))]
-parameter_types! {
-	// The hyperbridge parachain on Polkadot
-	pub const Coprocessor: Option<StateMachine> = Some(StateMachine::Polkadot(pallet_chain_transfer::ISMP_POLKADOT_PARACHAIN_ID));
-}
-
-#[cfg(feature = "canary")]
-parameter_types! {
-	pub const Coprocessor: Option<StateMachine> = Some(StateMachine::Kusama(pallet_chain_transfer::ISMP_PASEO_PARACHAIN_ID));
-}
-
-impl pallet_ismp::Config for Runtime {
-	// configure the runtime event
-	type RuntimeEvent = RuntimeEvent;
-	// Permissioned origin who can create or update consensus clients
-	type AdminOrigin = EnsureRoot<AccountId>;
-	// The pallet_timestamp pallet
-	type TimestampProvider = Timestamp;
-	// The balance type for the currency implementation
-	type Balance = Balance;
-	// The currency implementation that is offered to relayers
-	type Currency = Balances;
-	// The state machine identifier for this state machine
-	type HostStateMachine = HostStateMachine;
-	// Optional coprocessor for incoming requests/responses
-	type Coprocessor = Coprocessor;
-	// Router implementation for routing requests/responses to their respective modules
-	type Router = Router;
-	// Supported consensus clients
-	type ConsensusClients = (
-		// Add the grandpa or beefy consensus client here
-		ismp_grandpa::consensus::GrandpaConsensusClient<Runtime>,
-	);
-	// Weight provider for local modules
-	type WeightProvider = ();
-	// Optional merkle mountain range overlay tree, for cheaper outgoing request proofs.
-	// You most likely don't need it, just use the `NoOpMmrTree`
-	type Mmr = NoOpMmrTree<Runtime>;
-}
-
-impl ismp_grandpa::Config for Runtime {
-	type RuntimeEvent = RuntimeEvent;
-	type IsmpHost = Ismp;
-}
-
-impl pallet_hyperbridge::Config for Runtime {
-	type RuntimeEvent = RuntimeEvent;
-	type IsmpHost = Ismp;
-}
-
-// Add the token gateway pallet to your ISMP router
-#[derive(Default)]
-pub struct Router;
-impl IsmpRouter for Router {
-	fn module_for_id(&self, id: Vec<u8>) -> Result<Box<dyn IsmpModule>, anyhow::Error> {
-		match id.as_slice() {
-			id if id == PALLET_HYPERBRIDGE_ID => Ok(Box::new(Hyperbridge::default())),
-			id if ChainTransfer::is_ismp_module_id(id) => Ok(Box::new(ChainTransfer::default())),
-			_ => Err(Error::ModuleNotFound(id))?,
-		}
-	}
 }
