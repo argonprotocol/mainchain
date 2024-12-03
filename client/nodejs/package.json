@@ -17,7 +17,8 @@
     "generate:defs": "node --loader ts-node/esm node_modules/.bin/polkadot-types-from-defs --endpoint metadata.json --input ./src/interfaces --package @argonprotocol/mainchain/interfaces",
     "generate:meta": "node --loader ts-node/esm node_modules/.bin/polkadot-types-from-chain --endpoint metadata.json --output ./src/interfaces --strict",
     "lint": "tsc --noEmit --pretty",
-    "tsc": "tsc -p tsconfig.json && tsc -p tsconfig-cjs.json && tsc -p tsconfig-types.json && shx cp package.cjs.json lib/cjs/package.json"
+    "tsc": "tsc -p tsconfig.json && tsc -p tsconfig-cjs.json && tsc -p tsconfig-types.json && shx cp package.cjs.json lib/cjs/package.json",
+    "test": "npm run tsc && jest --testTimeout=60000"
   },
   "type": "module",
   "types": "./lib/types/index.d.ts",
@@ -55,9 +56,27 @@
   "devDependencies": {
     "@polkadot/typegen": "^14.3.1",
     "@substrate/ss58-registry": "^1.49.0",
+    "@types/jest": "^29.5.11",
+    "@types/node": "^18.19.6",
+    "jest": "^29.7.0",
     "shx": "^0.3.4",
     "ts-node": "^10.9.2",
     "typescript": "^5.3.3"
+  },
+  "jest": {
+    "testEnvironment": "node",
+    "testMatch": [
+      "**/cjs/__test__/*.test.js"
+    ],
+    "transform": {
+      "src/.+\\.ts": [
+        "ts-jest",
+        {
+          "useESM": false,
+          "tsconfig": "./tsconfig-cjs.json"
+        }
+      ]
+    }
   },
   "packageManager": "yarn@4.1.0"
 }

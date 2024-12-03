@@ -406,7 +406,7 @@ pub mod serialize_unsafe_u128_as_string {
 	{
 		struct U128Visitor;
 
-		impl<'de> serde::de::Visitor<'de> for U128Visitor {
+		impl serde::de::Visitor<'_> for U128Visitor {
 			type Value = u128;
 
 			fn expecting(&self, formatter: &mut std::fmt::Formatter) -> std::fmt::Result {

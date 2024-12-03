@@ -141,7 +141,7 @@ export default class TestNotary implements ITeardownable {
                 name: 'Test Notary',
             }).signAndSend(this.operator, ({events, status}) => {
                 if (status.isInBlock) {
-                    void checkForExtrinsicSuccess(events, client).then(() => {
+                    void checkForExtrinsicSuccess(events, client).then((): null => {
                         console.log(
                             `Successful proposal of notary in block ${status.asInBlock.toHex()}`,
                             status.type,
