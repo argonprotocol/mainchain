@@ -256,10 +256,6 @@ pub mod pallet {
 					&notebook_digest,
 					header.parent_secret,
 				)?;
-				info!(
-					"Audit result for notary {}, notebook {}: pass? {}",
-					notary_id, notebook_number, did_pass_audit
-				);
 
 				// Failure cases: all based on notebooks not in order of runtime state; controllable
 				// by node
