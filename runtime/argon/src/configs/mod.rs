@@ -267,8 +267,8 @@ impl pallet_ticks::Config for Runtime {
 }
 
 parameter_types! {
-	pub const MaxCohortSize: u32 = 1_000; // this means mining_slots last 10 days
-	pub const MaxMiners: u32 = 10_000; // must multiply cleanly by MaxCohortSize
+	pub const MaxMiners: u32 = 1_000; // must multiply cleanly by MaxCohortSize
+	pub const MaxCohortSize: u32 = MaxMiners::get() / 10; // this means mining_slots last 10 days
 	pub const OwnershipPercentAdjustmentDamper: FixedU128 = FixedU128::from_rational(20, 100);
 	pub const TargetBidsPerSlot: u32 = 1_200; // 20% extra bids
 

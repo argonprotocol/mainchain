@@ -110,14 +110,15 @@ we'll show some of the high-level steps.
 
 ## 2. Acquire Argons and Ownership Tokens
 
-Mining requires you to have two tokens: Argons and Ownership Tokens. There are 10,000 mining slots available in Argon,
-each lasting 10 days. So every day, you are bidding for 1 of 1,000 available slots. Bidding will continue until a random
-block less than or equal to 200 blocks before the next slot begins (slots start every 1440 blocks).
+Mining requires you to have two tokens: Argons and Ownership Tokens. There are initially 100 mining slots available in
+Argon, each lasting 10 days. So every day, you are bidding for 1 of 10 available slots. This will grow to 10,000 slots
+as the network grows. Bidding will continue until a random block less than or equal to 200 blocks before the next slot
+begins (slots start every 1440 blocks).
 
-At any given time, a mining slot requires you to own and lock 1/10,000th of the total Ownership Tokens in circulation.
-And you can (optionally) put yourself ahead of someone else on the list by bidding more Argons than they have. You will
-get these Argons back at the end of the slot (or if you lose your bid). Argons rented for this process must come from
-a [Vault](./running-a-vault#mining-bonds).
+At any given time, a mining slot requires you to own and lock 1/100th (or current mining slots) of the total Ownership
+Tokens in circulation. And you can (optionally) put yourself ahead of someone else on the list by bidding more Argons
+than they have. You will get these Argons back at the end of the slot (or if you lose your bid). Argons rented for this
+process must come from a [Vault](./running-a-vault#mining-bonds).
 
 You need to set up an account and acquire Argons to bid for a mining slot. You can do this by
 following the steps in the [Argon Faucet Guide](./account-setup.md).
@@ -141,8 +142,9 @@ day period starting at the next block that is divisible by 1440 blocks (eg, ever
 Mining bids close in a randomly chosen block within 200 blocks of the next slot. Mining bids normally begin after a 10
 day bootstrap period called "Slot Zero". However, in the Testnet, you can start bidding right away.
 
-There are 1,000 mining positions available every "slot", and 10,000 total miners. Each slot will last 10 days, so at any
-given time, there are 10 overlapping cohorts of miners. Each day, 1,000 will rotate out and 1,000 will rotate in.
+There are 10 mining positions available every "slot", and 100 total miners at genesis. Each slot will last 10 days, so
+at any given time, there are 10 overlapping cohorts of miners. Each day, 1/10th will rotate out and 1/10th will rotate
+in.
 
 You are bidding for a slot, and can be outbid at any time by someone who "locks" more Argons than you. You can monitor
 if you currently have a winning slot by looking at

@@ -1,6 +1,4 @@
-use crate::chain_spec::{
-	get_account_id_from_seed, get_from_seed, testnet_genesis, ChainSpec, GenesisSettings,
-};
+use crate::chain_spec::{testnet_genesis, ChainSpec, GenesisSettings};
 use argon_canary_runtime::{SessionKeys, WASM_BINARY};
 use argon_primitives::{
 	bitcoin::BitcoinNetwork,
@@ -10,8 +8,7 @@ use argon_primitives::{
 };
 use codec::Decode;
 use sc_service::{ChainType, Properties};
-use sp_core::sr25519;
-use std::str::FromStr;
+use std::{fmt::format, str::FromStr};
 
 pub fn testnet_config() -> Result<ChainSpec, String> {
 	let mut properties = Properties::new();
@@ -23,12 +20,13 @@ pub fn testnet_config() -> Result<ChainSpec, String> {
 	const TICK_MILLIS: u64 = 60_000;
 
 	let sudo_account = AccountId::from_str("5EZxgPRoQDYW72ceBKTd8AcSPizNL38cVjBzDGTqbeHUPfRx")?;
-	let bitcoin_oracle = get_account_id_from_seed::<sr25519::Public>("Dave");
-	let price_oracle = get_account_id_from_seed::<sr25519::Public>("Eve");
-	let token_admin = get_account_id_from_seed::<sr25519::Public>("Charlie");
+	let bitcoin_oracle = AccountId::from_str("5GZGFLKPxKegnjudkiy32gU6JmiKFgt6cJ35udQpSjnPu8PY")?;
+	let price_oracle = AccountId::from_str("5Gp8fDqBvgVj3BepUCeyGHEeguy1Jmeb2gfwcFvG8snV4icd")?;
+	let token_admin = sudo_account.clone();
 
-	let notary_account = get_account_id_from_seed::<sr25519::Public>("Ferdie");
-	let notary_public = get_from_seed::<NotaryPublic>("Ferdie//notary");
+	let notary_account = AccountId::from_str("5CFiHEZUFSqwEeiSqJwfxjp4wZWxom73y5EjVsrAw3GwQuWh")?;
+	let notary_public = NotaryPublic::from_str("5EX7HEsDt3nn3rsLttPiApADgFvVWmUpWdjU1UL3qgbNLnJ8")
+		.map_err(|e| format!("Error parsing notary public {:?}", e))?;
 
 	let miner_zero_keys = SessionKeys::decode(
 		&mut &hex::decode("1e69c7672dfb67dc19abfce302caf4c60cc5cb21f39538f749efdc6a28feaba695d5d04b29524e535278e511ac0ec98e4bb76b08a9a6874c5c481f338d727e60")
