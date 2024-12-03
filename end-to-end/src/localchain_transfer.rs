@@ -2,9 +2,11 @@ use std::env::temp_dir;
 
 use crate::utils::create_active_notary;
 use argon_testing::{start_argon_test_node, LocalchainCli};
+use serial_test::serial;
 use sp_core::{sr25519::Pair, Pair as PairT};
 
-#[tokio::test]
+#[tokio::test(flavor = "multi_thread")]
+#[serial]
 async fn test_localchain_transfers_using_cli() {
 	let test_node = start_argon_test_node().await;
 

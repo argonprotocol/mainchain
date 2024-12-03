@@ -208,7 +208,7 @@ struct NotebookAuditResponse {
 
 #[cfg(test)]
 mod tests {
-	use anyhow::anyhow;
+	use anyhow::{anyhow, bail};
 	use frame_support::assert_ok;
 	use futures::{task::noop_waker_ref, StreamExt};
 	use sp_core::{bounded_vec, crypto::AccountId32, ed25519::Public, sr25519::Signature, Pair};
@@ -464,21 +464,41 @@ mod tests {
 
 		let vote_power = (hold_note.microgons as f64 * 0.2f64) as u128;
 
-		let channel_hold_result = settle_channel_hold_and_vote(
-			&pool,
-			&ticker,
-			hold_note,
-			best_grandparent,
-			BalanceProof {
-				balance: bob_balance as u128,
-				notebook_number: hold_result.notebook_number,
-				tick: hold_result.tick,
-				notebook_proof,
-				notary_id,
-				account_origin: origin.clone(),
-			},
-		)
-		.await?;
+		let mut channel_hold_result = None;
+		for _ in 0..2 {
+			match settle_channel_hold_and_vote(
+				&pool,
+				&ticker,
+				hold_note.clone(),
+				best_grandparent,
+				BalanceProof {
+					balance: bob_balance as u128,
+					notebook_number: hold_result.notebook_number,
+					tick: hold_result.tick,
+					notebook_proof: notebook_proof.clone(),
+					notary_id,
+					account_origin: origin.clone(),
+				},
+			)
+			.await
+			{
+				Ok(result) => {
+					channel_hold_result = Some(result);
+					break;
+				},
+				Err(e) => match e.downcast_ref() {
+					Some(&Error::BalanceChangeVerifyError(VerifyError::InvalidBlockVoteTick {
+						..
+					})) => {
+						continue;
+					},
+					_ => bail!(e),
+				},
+			}
+		}
+
+		let channel_hold_result = channel_hold_result.expect("Should have channel hold result");
+
 		println!("ChannelHold result is {:?}", channel_hold_result);
 
 		let voting_schedule = VotingSchedule::when_creating_votes(channel_hold_result.tick);

@@ -23,7 +23,6 @@ use sp_runtime::traits::{Block as BlockT, Header as HeaderT};
 use std::{marker::PhantomData, sync::Arc};
 
 /// A block importer for argon.
-
 pub struct ArgonBlockImport<B: BlockT, I, C: AuxStore, AC> {
 	inner: I,
 	client: Arc<C>,

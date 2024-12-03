@@ -37,6 +37,7 @@ use argon_testing::{
 	add_blocks, add_wallet_address, fund_script_address, run_bitcoin_cli, start_argon_test_node,
 	ArgonTestNode, ArgonTestOracle,
 };
+use serial_test::serial;
 use sp_keyring::{
 	AccountKeyring::{Bob, Eve},
 	Sr25519Keyring::Alice,
@@ -44,7 +45,9 @@ use sp_keyring::{
 use tokio::fs;
 
 #[tokio::test(flavor = "multi_thread")]
+#[serial]
 async fn test_bitcoin_minting_e2e() {
+	env::set_var("RUST_LOG", "info");
 	let test_node = start_argon_test_node().await;
 	// need a test notary to get ownership rewards, so we can actually mint.
 	let _test_notary = create_active_notary(&test_node).await.expect("Notary registered");
@@ -576,13 +579,13 @@ async fn wait_for_mint(
 				.fetch_storage(&storage().mint().pending_mint_utxos(), None)
 				.await?
 				.expect("pending mint");
-			println!("Pending mint {:?}", pending_mint);
+			println!("Pending mint {:?}", pending_mint.0.first().map(|a| a.2));
 			if pending_mint.0.is_empty() {
 				break;
 			}
 			counter += 1;
 			if counter >= 20 {
-				panic!("Didn't ming remaining minted")
+				panic!("Timed out waiting for remaining mint")
 			}
 		}
 		println!("Owner minted full bitcoin")

@@ -205,7 +205,7 @@ where
 			StateAction::ApplyChanges(StorageChanges::Changes(proposal.storage_changes));
 		let post_hash = block_import_params.post_hash();
 
-		if !self.backend.state_at(parent_hash.clone()).is_ok() {
+		if self.backend.state_at(parent_hash).is_err() {
 			tracing::warn!(
 				"🚽 Parent block not found in state at {}. Likely dumped. Skipping block import.",
 				parent_hash
@@ -222,7 +222,7 @@ where
 
 		// ensure we don't dump the parent block, which will get us banned if we broadcast this and
 		// don't have it on request
-		let _ = self.backend.pin_block(parent_hash.clone());
+		let _ = self.backend.pin_block(parent_hash);
 
 		match self.block_import.import_block(block_import_params).await {
 			Ok(res) => match res {

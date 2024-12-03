@@ -1,14 +1,15 @@
 use crate::chain_spec::{testnet_genesis, ChainSpec, GenesisSettings};
-use argon_canary_runtime::{SessionKeys, WASM_BINARY};
+use argon_canary_runtime::WASM_BINARY;
 use argon_primitives::{
 	bitcoin::BitcoinNetwork,
 	block_seal::MiningSlotConfig,
 	notary::{GenesisNotary, NotaryPublic},
 	AccountId, Chain, ComputeDifficulty, ADDRESS_PREFIX, ARGON_TOKEN_SYMBOL, TOKEN_DECIMALS,
 };
-use codec::Decode;
+use core::str::FromStr;
 use sc_service::{ChainType, Properties};
-use std::{fmt::format, str::FromStr};
+use sp_consensus_grandpa::AuthorityId as GrandpaId;
+use sp_core::{hexdisplay::AsBytesRef, ByteArray};
 
 pub fn testnet_config() -> Result<ChainSpec, String> {
 	let mut properties = Properties::new();
@@ -28,10 +29,12 @@ pub fn testnet_config() -> Result<ChainSpec, String> {
 	let notary_public = NotaryPublic::from_str("5EX7HEsDt3nn3rsLttPiApADgFvVWmUpWdjU1UL3qgbNLnJ8")
 		.map_err(|e| format!("Error parsing notary public {:?}", e))?;
 
-	let miner_zero_keys = SessionKeys::decode(
-		&mut &hex::decode("1e69c7672dfb67dc19abfce302caf4c60cc5cb21f39538f749efdc6a28feaba695d5d04b29524e535278e511ac0ec98e4bb76b08a9a6874c5c481f338d727e60")
-			.map_err(|e| format!("Error processing miner zero authority key hex {:?}", e))?[..]
-	).map_err(|e| format!("Error decoding miner zero authority keys {:?}", e))?;
+	let grandpa_key = GrandpaId::from_slice(
+		hex::decode("0x1e69c7672dfb67dc19abfce302caf4c60cc5cb21f39538f749efdc6a28feaba6")
+			.map_err(|e| format!("Error decoding testnet grandpa key {:?}", e))?
+			.as_bytes_ref(),
+	)
+	.map_err(|e| format!("Error decoding testnet grandpa key {:?}", e))?;
 
 	Ok(ChainSpec::builder(
 		WASM_BINARY.ok_or_else(|| "Wasm not available".to_string())?,
@@ -51,7 +54,7 @@ pub fn testnet_config() -> Result<ChainSpec, String> {
 	.with_genesis_config_patch(testnet_genesis(
 		GenesisSettings {
 			// You have to have an authority to start the chain
-			founding_grandpas: vec![(miner_zero_keys.grandpa, 10)],
+			founding_grandpas: vec![(grandpa_key, 10)],
 			sudo_key: sudo_account.clone(),
 			bitcoin_network: BitcoinNetwork::Signet,
 			bitcoin_tip_operator: bitcoin_oracle.clone(),
@@ -74,8 +77,7 @@ pub fn testnet_config() -> Result<ChainSpec, String> {
 				name: "Argon Foundation".into(),
 			}],
 			channel_hold_expiration_ticks: 60,
-			mining_config:
-			MiningSlotConfig {
+			mining_config: MiningSlotConfig {
 				blocks_before_bid_end_for_vrf_close: 200,
 				blocks_between_slots: 1440,
 				slot_bidding_start_block: 0,

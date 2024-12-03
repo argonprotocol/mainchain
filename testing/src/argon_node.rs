@@ -74,10 +74,11 @@ impl ArgonTestNode {
 		);
 
 		let keyring = Sr25519Keyring::from_str(authority).expect("Invalid authority");
-		let bootnodes_arg = if bootnodes.is_empty() {
-			"--".to_string()
-		} else {
-			format!("--bootnodes={}", bootnodes)
+
+		let mut more_args = vec![];
+
+		if !bootnodes.is_empty() {
+			more_args.push(format!("--bootnodes={}", bootnodes))
 		};
 
 		let mut proc = Command::new("./argon-node")
@@ -94,7 +95,7 @@ impl ArgonTestNode {
 			.arg("--rpc-port=0")
 			.arg(format!("--compute-miners={}", compute_miners))
 			.arg(format!("--bitcoin-rpc-url={}", bitcoin_rpc))
-			.arg(bootnodes_arg)
+			.args(more_args.into_iter())
 			.spawn()?;
 
 		// Wait for RPC port to be logged (it's logged to stderr).

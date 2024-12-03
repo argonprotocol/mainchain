@@ -2,17 +2,16 @@ use crate::utils::{create_active_notary, register_miner, register_miner_keys};
 use argon_client::{api, conversion::SubxtRuntime};
 use argon_primitives::{AccountId, ArgonDigests, BlockSealDigest};
 use argon_testing::{test_miner_count, ArgonTestNode};
+use serial_test::serial;
 use sp_keyring::AccountKeyring;
-use std::collections::HashSet;
+use std::{collections::HashSet, env};
 use tokio::join;
 
-/// This test should
-/// - Create 2 compute nodes
-/// - Register a notary
-/// - Create 1 localchain voter
-/// - Create bids for both compute miners and add keys to their keystores
+/// Tests default votes submitted by a notebook after nodes register as vote miners
 #[tokio::test(flavor = "multi_thread")]
-async fn test_end_to_end_vote_mining() {
+#[serial]
+async fn test_end_to_end_default_vote_mining() {
+	env::set_var("RUST_LOG", "info");
 	let grandpa_miner = ArgonTestNode::start("alice", 0, "").await.unwrap();
 	let miner_threads = test_miner_count();
 	let miner_1 = ArgonTestNode::start("bob", miner_threads, &grandpa_miner.boot_url)
@@ -38,7 +37,7 @@ async fn test_end_to_end_vote_mining() {
 				if let Ok(ownership) =
 					grandpa_miner.client.get_ownership(&author, Some(block.hash())).await
 				{
-					if ownership.free > 500_000 {
+					if ownership.free > 500_000 && !authors.contains(&author) {
 						println!("Block Author is ready {:?}", keyring);
 						authors.insert(author);
 					}

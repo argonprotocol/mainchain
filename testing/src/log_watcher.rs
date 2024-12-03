@@ -17,21 +17,26 @@ impl LogWatcher {
 	pub fn new<R: Read + Send + Sync + 'static>(log_in: R) -> Self {
 		let (log_notifier, log_receiver) = watch::channel(());
 		let log = Arc::new(Mutex::new(String::new()));
-		let stderr_reader = BufReader::new(log_in);
 
 		let log_clone = log.clone();
 
 		let handle = task::spawn_blocking(move || {
-			for line in stderr_reader.lines() {
-				let line = line.expect("failed to obtain next line from stdout");
-
-				{
-					let mut log_guard = log_clone.lock().unwrap();
-					log_guard.push_str(&line);
-					log_guard.push('\n');
+			let buf_reader = BufReader::new(log_in);
+			for line in buf_reader.lines() {
+				match line {
+					Ok(line) => {
+						{
+							let mut log_guard = log_clone.lock().unwrap();
+							log_guard.push_str(&line);
+							log_guard.push('\n');
+						}
+						let _ = log_notifier.send(()); // Notify log updates
+					},
+					Err(e) => {
+						eprintln!("Error reading log line: {:?}", e);
+						break;
+					},
 				}
-
-				let _ = log_notifier.send(()); // Notify log updates
 			}
 		});
 		Self { log, handle: Arc::new(Mutex::new(Some(handle))), log_receiver }
