@@ -1,5 +1,3 @@
-use std::{sync::Arc, time::Duration};
-
 use crate::{aux_client::ArgonAux, error::Error, notary_client::get_notebook_header_data};
 use argon_bitcoin_utxo_tracker::{get_bitcoin_inherent, UtxoTracker};
 use argon_primitives::{
@@ -26,6 +24,7 @@ use sp_runtime::{
 	Digest,
 };
 use sp_timestamp::Timestamp;
+use std::{sync::Arc, time::Duration};
 use tokio::sync::Mutex;
 
 pub struct CreateTaxVoteBlock<Block: BlockT, AccountId: Clone + Codec> {
@@ -36,7 +35,7 @@ pub struct CreateTaxVoteBlock<Block: BlockT, AccountId: Clone + Codec> {
 }
 
 #[derive(CloneNoBound)]
-pub struct BlockCreator<Block: BlockT, BI: Clone, Client: AuxStore, PF, JS: Clone, A: Clone> {
+pub struct BlockCreator<Block: BlockT, BI: Clone, Client: AuxStore, PF, JS: Clone, A: Clone, B> {
 	/// Used to actually import blocks.
 	pub block_import: BI,
 	/// The underlying para client.
@@ -47,11 +46,12 @@ pub struct BlockCreator<Block: BlockT, BI: Clone, Client: AuxStore, PF, JS: Clon
 	pub authoring_duration: Duration,
 	pub justification_sync_link: JS,
 	pub aux_client: ArgonAux<Block, Client>,
+	pub backend: Arc<B>,
 	pub utxo_tracker: Arc<UtxoTracker>,
 	pub(crate) _phantom: std::marker::PhantomData<A>,
 }
 
-impl<Block: BlockT, BI, C, PF, JS, A, Proof> BlockCreator<Block, BI, C, PF, JS, A>
+impl<Block: BlockT, BI, C, PF, JS, A, Proof, B> BlockCreator<Block, BI, C, PF, JS, A, B>
 where
 	Block: BlockT + 'static,
 	Block::Hash: Send + 'static,
@@ -66,6 +66,7 @@ where
 	PF::Proposer: Proposer<Block, Proof = Proof>,
 	A: Codec + Clone + Send + Sync + 'static,
 	JS: sc_consensus::JustificationSyncLink<Block> + Clone + Send + Sync + 'static,
+	B: sc_client_api::Backend<Block> + Send + Sync + 'static,
 {
 	pub async fn propose(
 		&self,
@@ -204,12 +205,24 @@ where
 			StateAction::ApplyChanges(StorageChanges::Changes(proposal.storage_changes));
 		let post_hash = block_import_params.post_hash();
 
+		if !self.backend.state_at(parent_hash.clone()).is_ok() {
+			tracing::warn!(
+				"🚽 Parent block not found in state at {}. Likely dumped. Skipping block import.",
+				parent_hash
+			);
+			return;
+		}
+
 		tracing::trace!(
 			"🔖 Pre-sealed block for proposal at {}. Hash now {}, previously {}.",
 			block_number,
 			post_hash,
 			pre_hash,
 		);
+
+		// ensure we don't dump the parent block, which will get us banned if we broadcast this and
+		// don't have it on request
+		let _ = self.backend.pin_block(parent_hash.clone());
 
 		match self.block_import.import_block(block_import_params).await {
 			Ok(res) => match res {
@@ -226,10 +239,12 @@ where
 					);
 				},
 				other => {
+					self.backend.unpin_block(parent_hash);
 					warn!("Import of own block - result not success: {:?}", other);
 				},
 			},
 			Err(e) => {
+				self.backend.unpin_block(parent_hash);
 				tracing::error!(?e, "Failed to produce candidate");
 			},
 		}

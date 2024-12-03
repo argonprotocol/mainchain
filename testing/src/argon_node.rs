@@ -87,7 +87,7 @@ impl ArgonTestNode {
 			.arg("--dev")
 			.arg("--detailed-log-output")
 			.arg("--allow-private-ipv4")
-			.arg("--state-pruning=archive")
+			// .arg("--state-pruning=archive")
 			.arg(format!("--{}", authority.to_lowercase()))
 			.arg(format!("--name={}", authority.to_lowercase()))
 			.arg("--port=0")

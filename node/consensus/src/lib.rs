@@ -52,6 +52,7 @@ pub struct BlockBuilderParams<
 	SC: Clone,
 	SO: Clone,
 	JS: Clone,
+	B,
 > {
 	/// The account id to use for authoring compute blocks
 	pub compute_author: Option<A>,
@@ -79,10 +80,12 @@ pub struct BlockBuilderParams<
 
 	/// A notary client to verify notebooks
 	pub notary_client: Arc<NotaryClient<Block, Client, A>>,
+
+	pub backend: Arc<B>,
 }
 
-pub fn run_block_builder_task<Block, BI, C, PF, A, SC, SO, JS>(
-	params: BlockBuilderParams<Block, BI, C, PF, A, SC, SO, JS>,
+pub fn run_block_builder_task<Block, BI, C, PF, A, SC, SO, JS, B>(
+	params: BlockBuilderParams<Block, BI, C, PF, A, SC, SO, JS, B>,
 	task_manager: &TaskManager,
 ) where
 	Block: BlockT + 'static,
@@ -105,6 +108,7 @@ pub fn run_block_builder_task<Block, BI, C, PF, A, SC, SO, JS>(
 	SC: SelectChain<Block> + Clone + Send + Sync + 'static,
 	SO: SyncOracle + Clone + Send + Sync + 'static,
 	JS: sc_consensus::JustificationSyncLink<Block> + Clone + Send + Sync + 'static,
+	B: sc_client_api::Backend<Block> + Send + Sync + 'static,
 {
 	let (compute_block_tx, mut compute_block_rx) =
 		tracing_unbounded("node::consensus::compute_block_stream", 10);
@@ -118,6 +122,7 @@ pub fn run_block_builder_task<Block, BI, C, PF, A, SC, SO, JS>(
 		notary_client,
 		authoring_duration,
 		keystore,
+		backend,
 		aux_client,
 		utxo_tracker,
 		sync_oracle,
@@ -129,6 +134,7 @@ pub fn run_block_builder_task<Block, BI, C, PF, A, SC, SO, JS>(
 	let block_creator = BlockCreator {
 		block_import,
 		client: client.clone(),
+		backend,
 		proposer: Arc::new(Mutex::new(proposer)),
 		authoring_duration,
 		aux_client: aux_client.clone(),
