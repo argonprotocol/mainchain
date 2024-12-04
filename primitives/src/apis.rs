@@ -28,6 +28,7 @@ sp_api::decl_runtime_apis! {
 			expected_notebook_tick: Tick,
 		) -> Result<BoundedVec<BestBlockVoteSeal<AccountId, BlockSealAuthorityId>, ConstU32<2>>, DispatchError>;
 		fn has_eligible_votes() -> bool;
+		fn is_bootstrap_mining() -> bool;
 		fn is_valid_signature(block_hash: Block::Hash, seal: &BlockSealDigest, digest: &Digest) -> bool;
 	}
 }
@@ -47,7 +48,7 @@ sp_api::decl_runtime_apis! {
 	pub trait TickApis {
 		fn current_tick() -> Tick;
 		fn ticker() -> Ticker;
-		fn block_at_tick(tick: Tick) -> Option<Block::Hash>;
+		fn blocks_at_tick(tick: Tick) -> Vec<Block::Hash>;
 	}
 }
 

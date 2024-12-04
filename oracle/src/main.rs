@@ -9,6 +9,7 @@ use sp_core::{
 };
 use sp_runtime::traits::IdentifyAccount;
 use std::env;
+use tracing::info;
 use url::Url;
 
 use crate::{bitcoin_tip::bitcoin_loop, price_index::price_index_loop};
@@ -64,6 +65,18 @@ pub enum Subcommand {
 		#[clap(long, env)]
 		bitcoin_rpc_url: String,
 	},
+	/// Inserts an Oracle compatible key into the keystore.
+	InsertKey {
+		/// The secret key URI.
+		/// If the value is a file, the file content is used as URI.
+		/// If not given, you will be prompted for the URI.
+		#[clap(long, verbatim_doc_comment)]
+		suri: Option<String>,
+
+		/// The crypto type
+		#[clap(short, long, env, default_value_t=CryptoType::Sr25519)]
+		crypto_type: CryptoType,
+	},
 }
 
 impl Default for Subcommand {
@@ -101,14 +114,30 @@ async fn main() -> anyhow::Result<()> {
 	dotenv().ok();
 	dotenv::from_filename("oracle/.env").ok();
 
-	let binary_path = std::env::current_exe()?;
-	if binary_path.ends_with("debug/argon-oracle") {
-		let from_workspace_root = binary_path.join("../../oracle/.env");
-		dotenv::from_filename(from_workspace_root).ok();
-	}
-
 	let Cli { trusted_rpc_url, keystore_params, dev, signer_address, signer_crypto, subcommand } =
 		Cli::parse();
+
+	if let Subcommand::InsertKey { suri, crypto_type } = &subcommand {
+		let (_keystore, address) = keystore_params.open_with_account(
+			suri.as_ref(),
+			crypto_type.clone(),
+			ACCOUNT,
+			false,
+		)?;
+		info!(?address,
+			keystore_path = ?keystore_params.keystore_path,
+			"Inserted key to keystore");
+		return Ok(());
+	}
+
+	// load dotenv from the oracle directory if running in dev mode
+	if dev {
+		let binary_path = env::current_exe()?;
+		if binary_path.ends_with("debug/argon-oracle") {
+			let from_workspace_root = binary_path.join("../../oracle/.env");
+			dotenv::from_filename(from_workspace_root).ok();
+		}
+	}
 
 	tracing::info!(
 		"Running {:?} (url={}). {}",
@@ -124,6 +153,7 @@ async fn main() -> anyhow::Result<()> {
 		let suri = match subcommand {
 			Subcommand::PriceIndex { .. } => "//Eve",
 			Subcommand::Bitcoin { .. } => "//Dave",
+			_ => bail!("Signer address and crypto type must be provided"),
 		};
 		let pair = sr25519::Pair::from_string(suri, None)?;
 		let account_id = pair.public().into_account();
@@ -173,6 +203,7 @@ async fn main() -> anyhow::Result<()> {
 			};
 			bitcoin_loop(bitcoin_rpc_url, bitcoin_auth, trusted_rpc_url, signer).await?
 		},
+		_ => bail!("Handled above, qed, not possible"),
 	};
 	Ok(())
 }

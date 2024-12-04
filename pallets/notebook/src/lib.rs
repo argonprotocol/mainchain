@@ -256,10 +256,6 @@ pub mod pallet {
 					&notebook_digest,
 					header.parent_secret,
 				)?;
-				info!(
-					"Audit result for notary {}, notebook {}: pass? {}",
-					notary_id, notebook_number, did_pass_audit
-				);
 
 				// Failure cases: all based on notebooks not in order of runtime state; controllable
 				// by node
@@ -291,10 +287,9 @@ pub mod pallet {
 		#[pallet::weight(0)]
 		pub fn unlock(origin: OriginFor<T>, notary_id: NotaryId) -> DispatchResult {
 			let who = ensure_signed(origin)?;
-			ensure!(
-				T::NotaryProvider::is_notary_operator(notary_id, &who),
-				Error::<T>::InvalidNotaryOperator
-			);
+			let notary_operator = T::NotaryProvider::notary_operator_account_id(notary_id)
+				.ok_or(Error::<T>::InvalidNotaryOperator)?;
+			ensure!(who == notary_operator, Error::<T>::InvalidNotaryOperator);
 			if let Some((notebook_number, _, _)) =
 				<NotariesLockedForFailedAudit<T>>::take(notary_id)
 			{
@@ -673,10 +668,13 @@ pub mod pallet {
 
 			let channel_hold_expiration_ticks =
 				T::TickProvider::ticker().channel_hold_expiration_ticks;
+			let notary_operator = T::NotaryProvider::notary_operator_account_id(notary_id)
+				.ok_or(NotebookVerifyError::InvalidNotarySignature)?;
 
 			notebook_verify(
 				&history_lookup,
 				&notebook,
+				&notary_operator,
 				block_vote_minimums,
 				channel_hold_expiration_ticks,
 			)

@@ -17,7 +17,7 @@ use crate::{NotaryClient, NotaryClients};
 use argon_notary_apis::Error as NotaryError;
 use argon_notary_audit::VerifyError;
 use argon_primitives::tick::Tick;
-use argon_primitives::{AccountType, Balance, BlockVote, NotaryId, NotebookNumber};
+use argon_primitives::{ensure, AccountType, Balance, BlockVote, NotaryId, NotebookNumber};
 use serde_json::json;
 use sp_core::sr25519::Signature;
 use sp_core::Decode;
@@ -41,7 +41,7 @@ pub struct BalanceSync {
 
 #[cfg_attr(feature = "napi", napi(object))]
 #[derive(Clone)]
-pub struct ChannelHoldCloseOptions {
+pub struct VoteCreationOptions {
   pub votes_address: Option<String>,
   /// What's the minimum amount of tax we should wait for before voting on blocks
   pub minimum_vote_amount: Option<i64>,
@@ -142,8 +142,8 @@ pub mod napi_ext {
   use crate::error::NapiOk;
   use crate::notarization_tracker::NotarizationTracker;
   use crate::{
-    BalanceChangeRow, BalanceSync, BalanceSyncResult, ChannelHold as ChannelHoldParent,
-    ChannelHoldCloseOptions, Localchain,
+    BalanceChangeRow, BalanceSync, BalanceSyncResult, ChannelHold as ChannelHoldParent, Localchain,
+    VoteCreationOptions,
   };
   use napi::bindgen_prelude::*;
   use napi_derive::napi;
@@ -248,7 +248,7 @@ pub mod napi_ext {
     #[napi(js_name = "sync")]
     pub async fn sync_napi(
       &self,
-      options: Option<ChannelHoldCloseOptions>,
+      options: Option<VoteCreationOptions>,
     ) -> napi::Result<BalanceSyncResult> {
       self.sync(options).await.napi_ok()
     }
@@ -267,7 +267,7 @@ pub mod napi_ext {
     #[napi(js_name = "convertTaxToVotes")]
     pub async fn convert_tax_to_votes_napi(
       &self,
-      options: ChannelHoldCloseOptions,
+      options: VoteCreationOptions,
     ) -> napi::Result<Vec<NotarizationTracker>> {
       self.convert_tax_to_votes(options).await.napi_ok()
     }
@@ -306,7 +306,7 @@ impl BalanceSync {
     }
   }
 
-  pub async fn sync(&self, options: Option<ChannelHoldCloseOptions>) -> Result<BalanceSyncResult> {
+  pub async fn sync(&self, options: Option<VoteCreationOptions>) -> Result<BalanceSyncResult> {
     let balance_changes = self.sync_unsettled_balances().await?;
 
     let (channel_hold_notarizations, channel_holds_updated) =
@@ -628,7 +628,7 @@ impl BalanceSync {
 
   pub async fn convert_tax_to_votes(
     &self,
-    options: ChannelHoldCloseOptions,
+    options: VoteCreationOptions,
   ) -> Result<Vec<NotarizationTracker>> {
     let Some(ref mainchain_client) = *(self.mainchain_client.lock().await) else {
       bail!("Cannot create votes.. No mainchain client available!");
@@ -668,6 +668,7 @@ impl BalanceSync {
                 notebook_tick,
                 e.to_string()
               );
+              // this is the one case we'll retry
               continue;
             } else {
               tracing::warn!(
@@ -678,6 +679,7 @@ impl BalanceSync {
             }
           }
         }
+        // only do this once by default
         break;
       }
     }
@@ -689,27 +691,10 @@ impl BalanceSync {
     &self,
     account: &LocalAccount,
     mainchain_client: &MainchainClient,
-    options: &ChannelHoldCloseOptions,
+    options: &VoteCreationOptions,
   ) -> Result<Option<NotarizationTracker>> {
     let notarization = self.create_notarization();
     let balance_change = notarization.load_account(account).await?;
-    let total_available_tax = balance_change.balance().await;
-    const DEFAULT_MINIMUM_VOTE_AMOUNT: Balance = 500;
-
-    let minimum_tax = options
-      .minimum_vote_amount
-      .unwrap_or(DEFAULT_MINIMUM_VOTE_AMOUNT as i64) as Balance;
-    trace!(
-      "Checking if we should create a vote for account {}. Total available tax: {}. Configured minimum for vote: {}",
-      account.id,
-      total_available_tax,
-      minimum_tax
-    );
-    if total_available_tax < minimum_tax {
-      return Ok(None);
-    }
-
-    balance_change.send_to_vote(total_available_tax).await?;
 
     let current_tick = self.ticker.current();
     let Some(best_block_for_vote) = mainchain_client.get_vote_block_hash(current_tick).await?
@@ -717,9 +702,39 @@ impl BalanceSync {
       trace!("No best block for vote found for tick {}", current_tick);
       return Ok(None);
     };
-    if total_available_tax < best_block_for_vote.vote_minimum {
-      return Ok(None);
-    }
+
+    let tax_for_vote = {
+      let available_tax = balance_change.balance().await;
+
+      if let Some(minimum_vote_amount) = options.minimum_vote_amount {
+        let minimum_tax = minimum_vote_amount as Balance;
+        if available_tax < minimum_tax {
+          return Ok(None);
+        }
+        ensure!(
+          minimum_tax >= best_block_for_vote.vote_minimum,
+          format!(
+            "Minimum vote amount {} is less than the best block vote minimum {}",
+            minimum_tax, best_block_for_vote.vote_minimum
+          )
+        );
+        minimum_tax
+      } else {
+        if available_tax < best_block_for_vote.vote_minimum {
+          return Ok(None);
+        }
+        best_block_for_vote.vote_minimum
+      }
+    };
+
+    trace!(
+      "Checking if we should create a vote for account {}. Total to use: {}. Configured minimum for vote: {:?}",
+      account.id,
+      tax_for_vote,
+      options.minimum_vote_amount
+    );
+
+    balance_change.send_to_vote(tax_for_vote).await?;
 
     let mut tick_counter = self.tick_counter.lock().await;
     if tick_counter.0 == current_tick {
@@ -735,7 +750,7 @@ impl BalanceSync {
 
     let mut vote = BlockVote {
       account_id: account.get_account_id32()?,
-      power: total_available_tax,
+      power: tax_for_vote,
       index: tick_counter.1,
       block_hash: H256::from_slice(best_block_for_vote.block_hash.as_ref()),
       block_rewards_account_id: AccountStore::parse_address(&vote_address)?,
@@ -750,8 +765,8 @@ impl BalanceSync {
     notarization.add_vote(vote).await?;
     let tracker = notarization.notarize().await?;
     info!(
-      "Created vote for account {}. Total available tax: {}.",
-      account.id, total_available_tax
+      "Created vote for account {}. Used tax: {}.",
+      account.id, tax_for_vote
     );
     Ok(Some(tracker))
   }

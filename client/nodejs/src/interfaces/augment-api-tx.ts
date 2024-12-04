@@ -6,10 +6,10 @@
 import '@polkadot/api-base/types/submittable';
 
 import type { ApiTypes, AugmentedSubmittable, SubmittableExtrinsic, SubmittableExtrinsicFunction } from '@polkadot/api-base/types';
-import type { Bytes, Compact, Option, U8aFixed, Vec, bool, u128, u16, u32, u64 } from '@polkadot/types-codec';
+import type { BTreeMap, Bytes, Compact, Option, U8aFixed, Vec, bool, u128, u16, u32, u64 } from '@polkadot/types-codec';
 import type { AnyNumber, IMethod, ITuple } from '@polkadot/types-codec/types';
-import type { AccountId32, Call, H160, H256, MultiAddress } from '@polkadot/types/interfaces/runtime';
-import type { ArgonPrimitivesBitcoinCompressedBitcoinPubkey, ArgonPrimitivesBitcoinH256Le, ArgonPrimitivesBitcoinOpaqueBitcoinXpub, ArgonPrimitivesBlockSealRewardDestination, ArgonPrimitivesBondVaultTerms, ArgonPrimitivesDomainZoneRecord, ArgonPrimitivesInherentsBitcoinUtxoSync, ArgonPrimitivesInherentsBlockSealInherent, ArgonPrimitivesNotaryNotaryMeta, ArgonPrimitivesNotebookSignedNotebookHeader, ArgonRuntimeConfigsProxyType, ArgonRuntimeOriginCaller, ArgonRuntimeSessionKeys, IsmpGrandpaAddStateMachine, IsmpHostStateMachine, IsmpMessagingCreateConsensusState, IsmpMessagingMessage, PalletBalancesAdjustmentDirection, PalletChainTransferTransferToEvm, PalletIsmpUtilsFundMessageParams, PalletIsmpUtilsUpdateConsensusState, PalletMiningSlotMiningSlotBid, PalletMultisigTimepoint, PalletPriceIndexPriceIndex, PalletVaultsVaultConfig, SpConsensusGrandpaEquivocationProof, SpCoreVoid, SpWeightsWeightV2Weight } from '@polkadot/types/lookup';
+import type { AccountId32, Call, H256, MultiAddress } from '@polkadot/types/interfaces/runtime';
+import type { ArgonPrimitivesBitcoinCompressedBitcoinPubkey, ArgonPrimitivesBitcoinH256Le, ArgonPrimitivesBitcoinOpaqueBitcoinXpub, ArgonPrimitivesBlockSealRewardDestination, ArgonPrimitivesBondVaultTerms, ArgonPrimitivesDomainZoneRecord, ArgonPrimitivesInherentsBitcoinUtxoSync, ArgonPrimitivesInherentsBlockSealInherent, ArgonPrimitivesNotaryNotaryMeta, ArgonPrimitivesNotebookSignedNotebookHeader, ArgonRuntimeConfigsProxyType, ArgonRuntimeOriginCaller, ArgonRuntimeSessionKeys, IsmpGrandpaAddStateMachine, IsmpHostStateMachine, IsmpMessagingCreateConsensusState, IsmpMessagingMessage, PalletBalancesAdjustmentDirection, PalletIsmpUtilsFundMessageParams, PalletIsmpUtilsUpdateConsensusState, PalletMiningSlotMiningSlotBid, PalletMultisigTimepoint, PalletPriceIndexPriceIndex, PalletTokenGatewayAssetRegistration, PalletTokenGatewayTeleportParams, PalletVaultsVaultConfig, SpConsensusGrandpaEquivocationProof, SpCoreVoid, SpWeightsWeightV2Weight, TokenGatewayPrimitivesGatewayAssetUpdate } from '@polkadot/types/lookup';
 
 export type __AugmentedSubmittable = AugmentedSubmittable<() => unknown>;
 export type __SubmittableExtrinsic<ApiType extends ApiTypes> = SubmittableExtrinsic<ApiType>;
@@ -160,38 +160,7 @@ declare module '@polkadot/api-base/types/submittable' {
       unlockBitcoinBond: AugmentedSubmittable<(bondId: u64 | AnyNumber | Uint8Array, toScriptPubkey: Bytes | string | Uint8Array, bitcoinNetworkFee: u64 | AnyNumber | Uint8Array) => SubmittableExtrinsic<ApiType>, [u64, Bytes, u64]>;
     };
     chainTransfer: {
-      /**
-       * One time api to register assets for cross chain transfers
-       *
-       * # Arguments
-       * `chains` - Each chain and its corresponding token gateway address
-       **/
-      registerHyperbridgeAssets: AugmentedSubmittable<(chains: Vec<ITuple<[IsmpHostStateMachine, Bytes]>> | ([IsmpHostStateMachine | { Evm: any } | { Polkadot: any } | { Kusama: any } | { Substrate: any } | { Tendermint: any } | string | Uint8Array, Bytes | string | Uint8Array])[]) => SubmittableExtrinsic<ApiType>, [Vec<ITuple<[IsmpHostStateMachine, Bytes]>>]>;
-      /**
-       * This api will re-assign admins for ERC6160 accounts on the TokenGateway.sol contracts
-       * created by Hyperbridge.
-       *
-       * This api is only used to disconnect from hyperbridge.
-       **/
-      replaceHyperbridgeAdmins: AugmentedSubmittable<(newAdmins: Vec<ITuple<[IsmpHostStateMachine, H160]>> | ([IsmpHostStateMachine | { Evm: any } | { Polkadot: any } | { Kusama: any } | { Substrate: any } | { Tendermint: any } | string | Uint8Array, H160 | string | Uint8Array])[]) => SubmittableExtrinsic<ApiType>, [Vec<ITuple<[IsmpHostStateMachine, H160]>>]>;
-      /**
-       * Send argons to a remote EVM based chain. Available destinations are specified in the
-       * `ActiveEvmDestinations` storage item.
-       **/
-      sendToEvmChain: AugmentedSubmittable<(params: PalletChainTransferTransferToEvm | { asset?: any; evmChain?: any; recipient?: any; amount?: any; timeout?: any; relayerFee?: any } | string | Uint8Array) => SubmittableExtrinsic<ApiType>, [PalletChainTransferTransferToEvm]>;
       sendToLocalchain: AugmentedSubmittable<(amount: Compact<u128> | AnyNumber | Uint8Array, notaryId: u32 | AnyNumber | Uint8Array) => SubmittableExtrinsic<ApiType>, [Compact<u128>, u32]>;
-      /**
-       * Pause the bridge
-       **/
-      setBrideEnabled: AugmentedSubmittable<(enabled: bool | boolean | Uint8Array) => SubmittableExtrinsic<ApiType>, [bool]>;
-      /**
-       * Set the asset registration for cross chain transfers
-       *
-       * # Arguments
-       * `add_chains` - Each new chain and its corresponding token gateway address
-       * `remove_chains` - Chains to remove
-       **/
-      updateHyperbridgeAssets: AugmentedSubmittable<(addChains: Vec<ITuple<[IsmpHostStateMachine, Bytes]>> | ([IsmpHostStateMachine | { Evm: any } | { Polkadot: any } | { Kusama: any } | { Substrate: any } | { Tendermint: any } | string | Uint8Array, Bytes | string | Uint8Array])[], removeChains: Vec<IsmpHostStateMachine> | (IsmpHostStateMachine | { Evm: any } | { Polkadot: any } | { Kusama: any } | { Substrate: any } | { Tendermint: any } | string | Uint8Array)[]) => SubmittableExtrinsic<ApiType>, [Vec<ITuple<[IsmpHostStateMachine, Bytes]>>, Vec<IsmpHostStateMachine>]>;
     };
     domains: {
       setZoneRecord: AugmentedSubmittable<(domainHash: H256 | string | Uint8Array, zoneRecord: ArgonPrimitivesDomainZoneRecord | { paymentAccount?: any; notaryId?: any; versions?: any } | string | Uint8Array) => SubmittableExtrinsic<ApiType>, [H256, ArgonPrimitivesDomainZoneRecord]>;
@@ -814,6 +783,31 @@ declare module '@polkadot/api-base/types/submittable' {
        * - 1 event handler `on_timestamp_set`. Must be `O(1)`.
        **/
       set: AugmentedSubmittable<(now: Compact<u64> | AnyNumber | Uint8Array) => SubmittableExtrinsic<ApiType>, [Compact<u64>]>;
+    };
+    tokenGateway: {
+      /**
+       * Registers a multi-chain ERC6160 asset. The asset should not already exist.
+       *
+       * This works by dispatching a request to the TokenGateway module on each requested chain
+       * to create the asset.
+       **/
+      createErc6160Asset: AugmentedSubmittable<(asset: PalletTokenGatewayAssetRegistration | { localId?: any; reg?: any } | string | Uint8Array) => SubmittableExtrinsic<ApiType>, [PalletTokenGatewayAssetRegistration]>;
+      /**
+       * Set the token gateway address for specified chains
+       **/
+      setTokenGatewayAddresses: AugmentedSubmittable<(addresses: BTreeMap<IsmpHostStateMachine, Bytes>) => SubmittableExtrinsic<ApiType>, [BTreeMap<IsmpHostStateMachine, Bytes>]>;
+      /**
+       * Teleports a registered asset
+       * locks the asset and dispatches a request to token gateway on the destination
+       **/
+      teleport: AugmentedSubmittable<(params: PalletTokenGatewayTeleportParams | { assetId?: any; destination?: any; recepient?: any; amount?: any; timeout?: any; tokenGateway?: any; relayerFee?: any } | string | Uint8Array) => SubmittableExtrinsic<ApiType>, [PalletTokenGatewayTeleportParams]>;
+      /**
+       * Registers a multi-chain ERC6160 asset. The asset should not already exist.
+       *
+       * This works by dispatching a request to the TokenGateway module on each requested chain
+       * to create the asset.
+       **/
+      updateErc6160Asset: AugmentedSubmittable<(asset: TokenGatewayPrimitivesGatewayAssetUpdate | { assetId?: any; addChains?: any; removeChains?: any; newAdmins?: any } | string | Uint8Array) => SubmittableExtrinsic<ApiType>, [TokenGatewayPrimitivesGatewayAssetUpdate]>;
     };
     txPause: {
       /**

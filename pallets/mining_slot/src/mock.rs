@@ -1,5 +1,5 @@
 use crate as pallet_mining_slot;
-use crate::{OnNewSlot, Registration};
+use crate::OnNewSlot;
 use argon_primitives::{
 	block_seal::{MiningSlotConfig, RewardSharing},
 	bond::{BondError, BondProvider},
@@ -177,10 +177,11 @@ impl pallet_mining_slot::Config for Test {
 	type SlotEvents = (StaticNewSlotEvent,);
 	type Keys = MockSessionKeys;
 	type MiningAuthorityId = UintAuthorityId;
+	type MinimumBondAmount = ExistentialDeposit;
 }
 
 // Build genesis storage according to the mock runtime.
-pub fn new_test_ext(miner_zero: Option<Registration<Test>>) -> sp_io::TestExternalities {
+pub fn new_test_ext() -> sp_io::TestExternalities {
 	let env = Env::new().default_filter_or("debug");
 	let _ = Builder::from_env(env).is_test(true).try_init();
 
@@ -191,13 +192,9 @@ pub fn new_test_ext(miner_zero: Option<Registration<Test>>) -> sp_io::TestExtern
 	};
 
 	let mut t = frame_system::GenesisConfig::<Test>::default().build_storage().unwrap();
-	pallet_mining_slot::GenesisConfig::<Test> {
-		miner_zero,
-		mining_config,
-		_phantom: Default::default(),
-	}
-	.assimilate_storage(&mut t)
-	.unwrap();
+	pallet_mining_slot::GenesisConfig::<Test> { mining_config, _phantom: Default::default() }
+		.assimilate_storage(&mut t)
+		.unwrap();
 
 	sp_io::TestExternalities::new(t)
 }

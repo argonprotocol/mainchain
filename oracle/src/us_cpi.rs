@@ -36,8 +36,8 @@ lazy_static! {
 	/// - top 5%: `=PERCENTILE.INC(P2:AA113, 0.95)`
 	static ref CPI_5TH_PERCENTILE: FixedI128 = FixedI128::from_float(-0.7092); // -0.709219858
 	static ref CPI_95TH_PERCENTILE: FixedI128 = FixedI128::from_float(1.2429); // 1.242880338
-	// May 2024
-	static ref BASELINE_CPI: FixedU128 = FixedU128::from_float(314.069);
+	// Oct 2024
+	static ref BASELINE_CPI: FixedU128 = FixedU128::from_float(315.664);
 }
 
 #[derive(Serialize, Deserialize)]

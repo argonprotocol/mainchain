@@ -7,6 +7,7 @@ import '@polkadot/api-base/types/consts';
 
 import type { ApiTypes, AugmentedConst } from '@polkadot/api-base/types';
 import type { u128, u16, u32, u64, u8 } from '@polkadot/types-codec';
+import type { ITuple } from '@polkadot/types-codec/types';
 import type { FrameSupportPalletId, FrameSystemLimitsBlockLength, FrameSystemLimitsBlockWeights, SpVersionRuntimeVersion, SpWeightsRuntimeDbWeight } from '@polkadot/types/lookup';
 
 export type __AugmentedConst<ApiType extends ApiTypes> = AugmentedConst<ApiType>;
@@ -55,13 +56,17 @@ declare module '@polkadot/api-base/types/consts' {
     };
     blockRewards: {
       /**
-       * Number of argons minted per block
+       * The block number at which the halving begins for ownership shares
        **/
-      argonsPerBlock: u128 & AugmentedConst<ApiType>;
+      halvingBeginBlock: u32 & AugmentedConst<ApiType>;
       /**
        * Number of blocks for halving of ownership share rewards
        **/
       halvingBlocks: u32 & AugmentedConst<ApiType>;
+      /**
+       * The growth path for both ownership and argons before halving
+       **/
+      incrementalGrowth: ITuple<[u128, u32, u128]> & AugmentedConst<ApiType>;
       /**
        * Blocks until a block reward is mature
        **/
@@ -71,16 +76,28 @@ declare module '@polkadot/api-base/types/consts' {
        **/
       minerPayoutPercent: u128 & AugmentedConst<ApiType>;
       /**
+       * Number of argons minted per block
+       **/
+      startingArgonsPerBlock: u128 & AugmentedConst<ApiType>;
+      /**
        * Number of ownership tokens minted per block
        **/
       startingOwnershipTokensPerBlock: u128 & AugmentedConst<ApiType>;
     };
     blockSealSpec: {
       /**
+       * The frequency we should update the compute difficulty
+       **/
+      computeDifficultyChangePeriod: u32 & AugmentedConst<ApiType>;
+      /**
        * The number of historical compute times to use to calculate the rolling compute average
        * (for adjustment)
        **/
-      changePeriod: u32 & AugmentedConst<ApiType>;
+      historicalComputeBlocksForAverage: u32 & AugmentedConst<ApiType>;
+      /**
+       * The number of historical vote blocks to use to calculate the rolling vote average
+       **/
+      historicalVoteBlocksForAverage: u32 & AugmentedConst<ApiType>;
       /**
        * The maximum active notaries allowed
        **/
@@ -162,6 +179,10 @@ declare module '@polkadot/api-base/types/consts' {
        * The maximum number of Miners that the pallet can hold.
        **/
       maxMiners: u32 & AugmentedConst<ApiType>;
+      /**
+       * The minimum bond amount possible
+       **/
+      minimumBondAmount: u128 & AugmentedConst<ApiType>;
       /**
        * The max percent swing for the ownership bond amount per slot (from the last percent
        **/
@@ -349,6 +370,12 @@ declare module '@polkadot/api-base/types/consts' {
        * period on default settings.
        **/
       minimumPeriod: u64 & AugmentedConst<ApiType>;
+    };
+    tokenGateway: {
+      /**
+       * The decimals of the native currency
+       **/
+      decimals: u8 & AugmentedConst<ApiType>;
     };
     transactionPayment: {
       /**

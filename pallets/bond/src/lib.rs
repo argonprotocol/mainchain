@@ -737,14 +737,16 @@ pub mod pallet {
 			)?;
 
 			// burn the owner's held funds
+			let burn_amount = request.redemption_price;
 			let _ = T::Currency::burn_held(
 				&HoldReason::UnlockingBitcoin.into(),
 				&bond.bonded_account_id,
-				request.redemption_price,
+				burn_amount,
 				Precision::Exact,
 				Fortitude::Force,
 			)?;
 			frame_system::Pallet::<T>::dec_providers(&who)?;
+			T::BondEvents::utxo_unlocked(utxo_id, false, burn_amount)?;
 
 			<UtxosById<T>>::take(utxo_id);
 			<UtxosCosignReleaseHeightById<T>>::insert(
@@ -881,7 +883,11 @@ pub mod pallet {
 			Ok(())
 		}
 
-		fn burn_bitcoin_bond(utxo_id: UtxoId, utxo: UtxoState, is_spent: bool) -> DispatchResult {
+		fn burn_bitcoin_bond(
+			utxo_id: UtxoId,
+			utxo: UtxoState,
+			is_externally_spent: bool,
+		) -> DispatchResult {
 			let bond_id = utxo.bond_id;
 
 			if !utxo.is_verified {
@@ -899,6 +905,7 @@ pub mod pallet {
 				.map_err(Error::<T>::from)?;
 			let vault_id = bond.vault_id;
 			bond.amount = bond.amount.saturating_sub(amount_to_burn);
+			T::BondEvents::utxo_unlocked(utxo_id, is_externally_spent, amount_to_burn)?;
 
 			Self::deposit_event(Event::BitcoinBondBurned {
 				vault_id,
@@ -906,7 +913,7 @@ pub mod pallet {
 				utxo_id,
 				amount_burned: amount_to_burn,
 				amount_held: bond.amount,
-				was_utxo_spent: is_spent,
+				was_utxo_spent: is_externally_spent,
 			});
 			BondsById::<T>::insert(bond_id, bond);
 
@@ -925,6 +932,7 @@ pub mod pallet {
 			let mut bond = BondsById::<T>::get(bond_id).ok_or(Error::<T>::BondNotFound)?;
 			let vault_id = bond.vault_id;
 
+			// need to compensate with market price, not the redemption price
 			let market_price = T::PriceProvider::get_bitcoin_argon_price(utxo.satoshis)
 				.ok_or(Error::<T>::NoBitcoinPricesAvailable)?;
 
@@ -940,6 +948,7 @@ pub mod pallet {
 				);
 			}
 
+			// we return this amount to the bitcoin holder
 			T::Currency::release(
 				&HoldReason::UnlockingBitcoin.into(),
 				&bond.bonded_account_id,
@@ -947,6 +956,8 @@ pub mod pallet {
 				Precision::Exact,
 			)?;
 			frame_system::Pallet::<T>::dec_providers(&bond.bonded_account_id)?;
+			// count the amount we took from the vault as the burn amount
+			T::BondEvents::utxo_unlocked(utxo_id, false, market_price)?;
 
 			Self::deposit_event(Event::BitcoinCosignPastDue {
 				vault_id,

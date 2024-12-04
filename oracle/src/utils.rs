@@ -4,7 +4,6 @@ use serde::{Deserialize, Deserializer};
 use sp_runtime::{FixedI128, FixedU128};
 
 #[allow(dead_code)]
-
 pub fn to_fixed_u128(value: FixedI128) -> FixedU128 {
 	FixedU128::from_inner(value.into_inner() as u128)
 }

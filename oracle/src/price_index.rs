@@ -151,7 +151,7 @@ pub async fn price_index_loop(
 			last_target_price = target_price;
 
 			info!("Submitted price index with progress: {:?}", progress);
-			MainchainClient::wait_for_ext_in_block(progress).await.map_err(|e| {
+			MainchainClient::wait_for_ext_in_block(progress, false).await.map_err(|e| {
 				tracing::warn!("Error processing price index!! {:?}", e);
 				e
 			})?;

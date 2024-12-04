@@ -3,7 +3,7 @@ use futures::{future::join_all, Stream, StreamExt};
 use log::{info, trace, warn};
 use sc_client_api::{AuxStore, BlockchainEvents};
 use sc_service::TaskManager;
-use sc_utils::mpsc::TracingUnboundedSender;
+use sc_utils::mpsc::{tracing_unbounded, TracingUnboundedReceiver, TracingUnboundedSender};
 use sp_api::ProvideRuntimeApi;
 use sp_blockchain::HeaderBackend;
 use sp_core::H256;
@@ -129,9 +129,9 @@ pub fn run_notary_sync<B, C, AC>(
 	task_manager: &TaskManager,
 	client: Arc<C>,
 	aux_client: ArgonAux<B, C>,
-	notebook_tick_tx: TracingUnboundedSender<VotingPowerInfo>,
 	no_work_delay_millis: u64,
-) where
+) -> Arc<NotaryClient<B, C, AC>>
+where
 	B: BlockT,
 	C: ProvideRuntimeApi<B>
 		+ BlockchainEvents<B>
@@ -145,16 +145,16 @@ pub fn run_notary_sync<B, C, AC>(
 		+ NotaryApis<B, NotaryRecordT>,
 	AC: Codec + Clone + Send + Sync + 'static,
 {
-	let notary_client =
-		Arc::new(NotaryClient::new(client.clone(), aux_client.clone(), notebook_tick_tx));
+	let notary_client = Arc::new(NotaryClient::new(client.clone(), aux_client.clone()));
 
 	let notary_client_clone = Arc::clone(&notary_client);
+	let notary_client_poll = Arc::clone(&notary_client);
 	let notary_sync_task = async move {
-		let mut best_block = Box::pin(client.import_notification_stream());
+		let mut best_block = Box::pin(client.every_import_notification_stream());
 
 		loop {
 			tokio::select! {biased;
-				notebook =  notary_client.poll_subscriptions() => {
+				notebook =  notary_client_poll.poll_subscriptions() => {
 					if let Some((notary_id, notebook_number)) = notebook {
 						trace!( "Next notebook pushed (notary {}, notebook {})", notary_id, notebook_number);
 					}
@@ -163,7 +163,7 @@ pub fn run_notary_sync<B, C, AC>(
 					if let Some(block) = block.as_ref() {
 						if block.is_new_best {
 							let best_hash = block.hash;
-							if let Err(e) = notary_client.update_notaries(&best_hash).await {
+							if let Err(e) = notary_client_poll.update_notaries(&best_hash).await {
 								warn!(
 
 									"Could not update notaries at best hash {} - {:?}",
@@ -200,6 +200,7 @@ pub fn run_notary_sync<B, C, AC>(
 	handle.spawn("notary_sync_task", "notary_sync", notary_sync_task);
 	// Making this blocking due to the runtime calls and potentially heavy decodes
 	handle.spawn_blocking("notary_queue_task", "notary_queue", notary_queue_task);
+	notary_client
 }
 
 type PendingNotebook = (NotebookNumber, Option<Vec<u8>>);
@@ -212,7 +213,9 @@ pub struct NotaryClient<B: BlockT, C: AuxStore, AC> {
 	pub notaries_by_id: Arc<Mutex<BTreeMap<NotaryId, NotaryRecordT>>>,
 	pub subscriptions_by_id: Arc<Mutex<BTreeMap<NotaryId, Pin<Box<RawHeadersSubscription>>>>>,
 	tick_voting_power_sender: Arc<Mutex<TracingUnboundedSender<VotingPowerInfo>>>,
+	pub tick_voting_power_receiver: Arc<Mutex<TracingUnboundedReceiver<VotingPowerInfo>>>,
 	notebook_queue_by_id: Arc<Mutex<BTreeMap<NotaryId, Vec<PendingNotebook>>>>,
+
 	aux_client: ArgonAux<B, C>,
 	_block: PhantomData<AC>,
 }
@@ -223,11 +226,10 @@ where
 	C: NotaryApisExt<B, AC> + AuxStore + Send + Sync + 'static,
 	AC: Clone + Codec + Send + Sync + 'static,
 {
-	pub fn new(
-		client: Arc<C>,
-		aux_client: ArgonAux<B, C>,
-		tick_voting_power_sender: TracingUnboundedSender<VotingPowerInfo>,
-	) -> Self {
+	pub fn new(client: Arc<C>, aux_client: ArgonAux<B, C>) -> Self {
+		let (tick_voting_power_sender, tick_voting_power_receiver) =
+			tracing_unbounded("node::consensus::notebook_tick_stream", 100);
+
 		Self {
 			client,
 			subscriptions_by_id: Default::default(),
@@ -235,6 +237,7 @@ where
 			notaries_by_id: Default::default(),
 			notebook_queue_by_id: Default::default(),
 			tick_voting_power_sender: Arc::new(Mutex::new(tick_voting_power_sender)),
+			tick_voting_power_receiver: Arc::new(Mutex::new(tick_voting_power_receiver)),
 			aux_client,
 			_block: PhantomData,
 		}
@@ -414,7 +417,10 @@ where
 		let mut has_more_work = false;
 		for result in results {
 			match result {
-				Ok(inner_result) => has_more_work = has_more_work || inner_result?,
+				Ok(inner_result) => match inner_result {
+					Ok(x) => has_more_work = has_more_work || x,
+					Err(err) => warn!("Error processing notebooks for a notary {:?}", err),
+				},
 				Err(join_error) => {
 					warn!("Error while processing notary queue - {:?}", join_error);
 				},
@@ -633,6 +639,56 @@ where
 		Ok(())
 	}
 
+	pub async fn verify_notebook_audits(
+		self: &Arc<Self>,
+		notebook_audit_results: Vec<NotebookAuditResult<NotebookVerifyError>>,
+	) -> Result<(), Error> {
+		for _ in 0..2 {
+			let mut missing_audits_by_notary = BTreeMap::new();
+			for digest_record in &notebook_audit_results {
+				let notary_audits =
+					self.aux_client.get_notary_audit_history(digest_record.notary_id)?.get();
+
+				let audit = notary_audits
+					.iter()
+					.find(|a| a.notebook_number == digest_record.notebook_number);
+
+				if let Some(audit) = audit {
+					if digest_record.audit_first_failure != audit.audit_first_failure {
+						return Err(Error::InvalidNotebookDigest(format!(
+							"Notary {}, notebook #{} has an audit mismatch \"{:?}\" with local result. \"{:?}\"",
+							digest_record.notary_id, digest_record.notebook_number, digest_record.audit_first_failure, audit.audit_first_failure
+						)));
+					}
+				} else {
+					missing_audits_by_notary
+						.entry(digest_record.notary_id)
+						.or_insert(Vec::new())
+						.push((digest_record.notebook_number, None));
+				}
+			}
+			if missing_audits_by_notary.is_empty() {
+				return Ok(());
+			}
+
+			info!(
+				"Notebook digest has missing audits. Will attempt to catchup now. {:#?}",
+				missing_audits_by_notary
+			);
+			for (notary_id, missing) in missing_audits_by_notary {
+				self.enqueue_notebooks(notary_id, missing).await?;
+			}
+
+			// drain queues
+			while self.process_queues().await? {
+				tokio::time::sleep(Duration::from_millis(10)).await;
+			}
+		}
+		Err(Error::InvalidNotebookDigest(
+			"Notebook digest record could not verify all records in local storage".to_string(),
+		))
+	}
+
 	async fn get_notebook_dependencies(
 		&self,
 		notary_id: NotaryId,
@@ -816,48 +872,6 @@ where
 	}
 }
 
-pub async fn verify_notebook_audits<B: BlockT, C>(
-	aux_client: &ArgonAux<B, C>,
-	notebook_audit_results: Vec<NotebookAuditResult<NotebookVerifyError>>,
-) -> Result<(), Error>
-where
-	C: AuxStore + 'static,
-{
-	for _ in 0..10 {
-		let mut missing_audits = vec![];
-		for digest_record in &notebook_audit_results {
-			let notary_audits = aux_client.get_notary_audit_history(digest_record.notary_id)?.get();
-
-			let audit = notary_audits
-				.iter()
-				.find(|a| a.notebook_number == digest_record.notebook_number);
-
-			if let Some(audit) = audit {
-				if digest_record.audit_first_failure != audit.audit_first_failure {
-					return Err(Error::InvalidNotebookDigest(format!(
-						"Notary {}, notebook #{} has an audit mismatch \"{:?}\" with local result. \"{:?}\"",
-						digest_record.notary_id, digest_record.notebook_number, digest_record.audit_first_failure, audit.audit_first_failure
-					)));
-				}
-			} else {
-				missing_audits.push(digest_record);
-			}
-		}
-		if missing_audits.is_empty() {
-			return Ok(());
-		}
-
-		info!(
-			"Notebook digest has missing audits. Delaying to allow import. {:#?}",
-			missing_audits
-		);
-		tokio::time::sleep(std::time::Duration::from_secs(1)).await;
-	}
-	Err(Error::InvalidNotebookDigest(
-		"Notebook digest record could not verify all records in local storage".to_string(),
-	))
-}
-
 pub async fn get_notebook_header_data<B: BlockT, C, AccountId: Codec>(
 	client: &Arc<C>,
 	aux_client: &ArgonAux<B, C>,
@@ -921,7 +935,7 @@ mod test {
 	};
 	use argon_runtime::Block;
 	use codec::{Decode, Encode};
-	use sc_utils::mpsc::TracingUnboundedReceiver;
+
 	use sp_core::{bounded_vec, H256};
 	use sp_keyring::Ed25519Keyring;
 	use std::collections::BTreeMap;
@@ -1066,12 +1080,8 @@ mod test {
 		}
 	}
 
-	async fn system() -> (
-		MockNotary,
-		Arc<TestNode>,
-		Arc<NotaryClient<Block, TestNode, AccountId>>,
-		TracingUnboundedReceiver<VotingPowerInfo>,
-	) {
+	async fn system() -> (MockNotary, Arc<TestNode>, Arc<NotaryClient<Block, TestNode, AccountId>>)
+	{
 		let mut test_notary = MockNotary::new(1);
 		test_notary.start().await.expect("could not start notary");
 		test_notary.state.lock().await.metadata =
@@ -1079,16 +1089,14 @@ mod test {
 		let client = Arc::new(TestNode::new());
 		client.add_notary(&test_notary);
 		let aux_client = ArgonAux::new(client.clone());
-		let (notebook_tick_tx, notebook_tick_rx) =
-			sc_utils::mpsc::tracing_unbounded("node::consensus::notebook_tick_stream", 100);
-		let notary_client = NotaryClient::new(client.clone(), aux_client, notebook_tick_tx);
+		let notary_client = NotaryClient::new(client.clone(), aux_client);
 		let notary_client = Arc::new(notary_client);
-		(test_notary, client, notary_client, notebook_tick_rx)
+		(test_notary, client, notary_client)
 	}
 
 	#[tokio::test]
 	async fn adds_new_notaries() {
-		let (test_notary, client, notary_client, _) = system().await;
+		let (test_notary, client, notary_client) = system().await;
 		notary_client
 			.update_notaries(&client.best_hash())
 			.await
@@ -1122,7 +1130,7 @@ mod test {
 
 	#[tokio::test]
 	async fn wont_reconnect_if_queue_depth_exceeded() {
-		let (test_notary, client, notary_client, _) = system().await;
+		let (test_notary, client, notary_client) = system().await;
 		notary_client
 			.update_notaries(&client.best_hash())
 			.await
@@ -1169,7 +1177,7 @@ mod test {
 
 	#[tokio::test]
 	async fn handles_queueing_correctly() {
-		let (_test_notary, _client, notary_client, _) = system().await;
+		let (_test_notary, _client, notary_client) = system().await;
 		notary_client
 			.enqueue_notebooks(1, vec![(3, None)])
 			.await
@@ -1218,7 +1226,7 @@ mod test {
 
 	#[tokio::test]
 	async fn downloads_missing_audit_notebooks() {
-		let (test_notary, client, notary_client, _) = system().await;
+		let (test_notary, client, notary_client) = system().await;
 		notary_client
 			.update_notaries(&client.best_hash())
 			.await
@@ -1262,7 +1270,7 @@ mod test {
 
 	#[tokio::test]
 	async fn supplies_missing_notebooks_on_audit() {
-		let (test_notary, client, notary_client, mut rx) = system().await;
+		let (test_notary, client, notary_client) = system().await;
 		notary_client
 			.update_notaries(&client.best_hash())
 			.await
@@ -1308,6 +1316,7 @@ mod test {
 			test_notary.create_notebook_header(vec![]).await;
 			notary_client.process_queues().await.expect("Could not process queues");
 		}
+		let mut rx = notary_client.tick_voting_power_receiver.lock().await;
 		let next_rx = rx.next().await.expect("Could not receive");
 		assert_eq!(next_rx.0, 9);
 		assert_eq!(notary_client.notebook_queue_by_id.lock().await.get(&1).unwrap(), &vec![]);
@@ -1321,7 +1330,7 @@ mod test {
 
 	#[tokio::test]
 	async fn can_process_notebooks_in_parallel() {
-		let (test_notary, client, notary_client, mut rx) = system().await;
+		let (test_notary, client, notary_client) = system().await;
 		notary_client
 			.update_notaries(&client.best_hash())
 			.await
@@ -1339,7 +1348,14 @@ mod test {
 		notary_client.process_queues().await.expect("Could not process queues");
 		assert_eq!(notary_client.notebook_queue_by_id.lock().await.get(&1).unwrap().len(), 0);
 		assert!(notary_client.notebook_queue_by_id.lock().await.get(&2).is_none());
-		let next_rx = rx.next().await.expect("Could not receive");
+
+		let next_rx = notary_client
+			.tick_voting_power_receiver
+			.lock()
+			.await
+			.next()
+			.await
+			.expect("Could not receive");
 		assert_eq!(next_rx, (1, 0, 1));
 
 		notary_client

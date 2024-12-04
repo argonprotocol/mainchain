@@ -87,7 +87,13 @@ export default class TestNotary implements ITeardownable {
         console.log("Notary >> connecting to mainchain '%s', db %s", mainchainUrl, `${this.#dbConnectionString}/${this.#dbName}`);
 
 
-        const execArgs = ['run', `--db-url=${this.#dbConnectionString}/${this.#dbName}`, `--dev`, `-t ${mainchainUrl}`];
+        const execArgs = [
+            'run',
+            `--db-url=${this.#dbConnectionString}/${this.#dbName}`,
+            `--dev`,
+            `-t ${mainchainUrl}`,
+            `--operator-address=${this.operator.address}`
+        ];
         if (process.env.ARGON_USE_DOCKER_BINS) {
             execArgs.unshift(...notaryPath.replace("docker run", "run").split(' '));
             execArgs.push('-b=0.0.0.0:9925')
@@ -141,7 +147,7 @@ export default class TestNotary implements ITeardownable {
                 name: 'Test Notary',
             }).signAndSend(this.operator, ({events, status}) => {
                 if (status.isInBlock) {
-                    void checkForExtrinsicSuccess(events, client).then(() => {
+                    void checkForExtrinsicSuccess(events, client).then((): null => {
                         console.log(
                             `Successful proposal of notary in block ${status.asInBlock.toHex()}`,
                             status.type,

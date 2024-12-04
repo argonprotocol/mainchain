@@ -313,7 +313,7 @@ impl MainchainClient {
     let account_id32 = AccountId32::from_str(&address).map_err(|e| anyhow!(e))?;
     let client = self.client().await?;
     let balance = client
-      .get_ownership(&account_id32)
+      .get_ownership(&account_id32, None)
       .await
       .map_err(|_| anyhow!("No account found for address {address}"))?;
     Ok(BalancesAccountData {
@@ -405,7 +405,7 @@ impl MainchainClient {
 
     let tx_progress = submittable.submit_and_watch().await?;
 
-    let in_block = InnerMainchainClient::wait_for_ext_in_block(tx_progress)
+    let in_block = InnerMainchainClient::wait_for_ext_in_block(tx_progress, false)
       .await
       .map_err(|e| anyhow!("Error submitting notebook to block: {:?}", e))?;
 

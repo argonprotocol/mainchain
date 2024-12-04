@@ -112,11 +112,26 @@ impl BitcoinUtxoEvents for Tuple {
 
 pub trait UtxoBondedEvents<AccountId: Codec, Balance: Codec + Copy> {
 	fn utxo_bonded(utxo_id: UtxoId, account_id: &AccountId, amount: Balance) -> DispatchResult;
+	/// Called when a utxo is removed from bond (whether from being spent outside the system, or
+	/// from being unlocked)
+	fn utxo_unlocked(
+		utxo_id: UtxoId,
+		remove_pending_mints: bool,
+		burned_argons: Balance,
+	) -> DispatchResult;
 }
 #[impl_trait_for_tuples::impl_for_tuples(5)]
 impl<AccountId: Codec, Balance: Codec + Copy> UtxoBondedEvents<AccountId, Balance> for Tuple {
 	fn utxo_bonded(utxo_id: UtxoId, account_id: &AccountId, amount: Balance) -> DispatchResult {
 		for_tuples!( #( Tuple::utxo_bonded(utxo_id, account_id, amount)?; )* );
+		Ok(())
+	}
+	fn utxo_unlocked(
+		utxo_id: UtxoId,
+		remove_pending_mints: bool,
+		burned_argons: Balance,
+	) -> DispatchResult {
+		for_tuples!( #( Tuple::utxo_unlocked(utxo_id, remove_pending_mints, burned_argons)?; )* );
 		Ok(())
 	}
 }
@@ -169,6 +184,7 @@ pub trait AuthorityProvider<AuthorityId, Block, AccountId>
 where
 	Block: BlockT,
 {
+	fn authority_count() -> u32;
 	fn get_authority(author: AccountId) -> Option<AuthorityId>;
 	fn xor_closest_authority(nonce: U256) -> Option<MiningAuthority<AuthorityId, AccountId>>;
 }
@@ -179,7 +195,7 @@ pub trait TickProvider<B: BlockT> {
 	/// The schedule for when voting is eligible
 	fn voting_schedule() -> VotingSchedule;
 	fn ticker() -> Ticker;
-	fn block_at_tick(tick: Tick) -> Option<B::Hash>;
+	fn blocks_at_tick(tick: Tick) -> Vec<B::Hash>;
 }
 
 /// An event handler to listen for submitted notebook

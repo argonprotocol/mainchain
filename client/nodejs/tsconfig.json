@@ -27,7 +27,8 @@
     "strict": true,
     "noImplicitOverride": true,
     "types": [
-      "node"
+      "node",
+      "jest"
     ],
     "skipLibCheck": true,
     "allowSyntheticDefaultImports": true,
@@ -40,8 +41,10 @@
   },
   "include": [
     "./src/index.ts",
-    "./src/interfaces/*.ts",
-    "./src/examples/*"
+    "./src/WageProtector.ts",
+    "./src/interfaces/*",
+    "./src/examples/*",
+    "./src/__test__/*"
   ],
   "exclude": [
     "**/localchain",

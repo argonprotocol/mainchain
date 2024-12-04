@@ -4,8 +4,8 @@
   "scripts": {
     "build": "yarn workspaces foreach --all run build",
     "pretest": "yarn workspace @argonprotocol/localchain pretest",
-    "test": "yarn pretest && jest --testTimeout=60000",
-    "test:js-only": "ARGON_USE_DOCKER_BINS=1 jest --testTimeout=60000",
+    "test": "yarn pretest && yarn workspaces foreach --all run test",
+    "test:js-only": "ARGON_USE_DOCKER_BINS=1 yarn workspaces foreach --all run test",
     "version:bump": "npx lerna version $VERSION --no-push --no-git-tag-version --no-changelog --exact --yes"
   },
   "private": true,
@@ -19,28 +19,9 @@
   ],
   "devDependencies": {
     "@lerna-lite/version": "^3.9.1",
-    "@types/jest": "^29.5.11",
     "@types/node": "^18.19.6",
-    "jest": "^29.7.0",
-    "ts-jest": "^29.1.2",
     "tslib": "^2.6.2",
     "typescript": "^5.3.3"
-  },
-  "jest": {
-    "preset": "ts-jest",
-    "testEnvironment": "node",
-    "testMatch": [
-      "**/__test__/*.test.ts"
-    ],
-    "transform": {
-      "^.+\\.ts": [
-        "ts-jest",
-        {
-          "useESM": false,
-          "tsconfig": "./tsconfig-cjs.json"
-        }
-      ]
-    }
   },
   "packageManager": "yarn@4.1.1"
 }

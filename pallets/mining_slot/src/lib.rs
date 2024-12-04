@@ -99,7 +99,10 @@ pub mod pallet {
 
 	/// Configure the pallet by specifying the parameters and types on which it depends.
 	#[pallet::config]
-	pub trait Config: frame_system::Config {
+	pub trait Config: frame_system::Config
+	where
+		<Self as Config>::Balance: Into<u128>,
+	{
 		/// Because this pallet emits events, it depends on the runtime's definition of an event.
 		type RuntimeEvent: From<Event<Self>> + IsType<<Self as frame_system::Config>::RuntimeEvent>;
 		/// Type representing the weight of this pallet
@@ -114,6 +117,9 @@ pub mod pallet {
 		/// The max percent swing for the ownership bond amount per slot (from the last percent
 		#[pallet::constant]
 		type OwnershipPercentAdjustmentDamper: Get<FixedU128>;
+		/// The minimum bond amount possible
+		#[pallet::constant]
+		type MinimumBondAmount: Get<Self::Balance>;
 
 		/// The target number of bids per slot. This will adjust the ownership bond amount up or
 		/// down to ensure mining slots are filled.
@@ -198,10 +204,6 @@ pub mod pallet {
 	#[pallet::storage]
 	pub(super) type IsNextSlotBiddingOpen<T: Config> = StorageValue<_, bool, ValueQuery>;
 
-	/// The configuration for a miner to supply if there are no registered miners
-	#[pallet::storage]
-	pub(super) type MinerZero<T: Config> = StorageValue<_, Registration<T>, OptionQuery>;
-
 	/// The number of bids per slot for the last 10 slots (newest first)
 	#[pallet::storage]
 	pub(super) type HistoricalBidsPerSlot<T: Config> =
@@ -215,7 +217,6 @@ pub mod pallet {
 	#[pallet::genesis_config]
 	#[derive(frame_support::DefaultNoBound)]
 	pub struct GenesisConfig<T: Config> {
-		pub miner_zero: Option<Registration<T>>,
 		pub mining_config: MiningSlotConfig<BlockNumberFor<T>>,
 		#[serde(skip)]
 		pub _phantom: PhantomData<T>,
@@ -224,26 +225,6 @@ pub mod pallet {
 	#[pallet::genesis_build]
 	impl<T: Config> BuildGenesisConfig for GenesisConfig<T> {
 		fn build(&self) {
-			if let Some(miner) = &self.miner_zero {
-				<MinerZero<T>>::put(miner.clone());
-				AccountIndexLookup::<T>::insert(&miner.account_id, 0);
-				ActiveMinersByIndex::<T>::insert(0, miner.clone());
-				ActiveMinersCount::<T>::put(1);
-
-				AuthorityHashByIndex::<T>::try_mutate(|hashes| {
-					hashes.try_insert(
-						0,
-						U256::from(blake2_256(
-							&miner
-								.authority_keys
-								.get::<T::MiningAuthorityId>(T::MiningAuthorityId::ID)
-								.expect("should have authority id")
-								.to_raw_vec(),
-						)),
-					)
-				})
-				.expect("should be able to insert");
-			}
 			if self.mining_config.slot_bidding_start_block == Zero::zero() {
 				IsNextSlotBiddingOpen::<T>::put(true);
 			}
@@ -529,9 +510,19 @@ impl<T: Config> AuthorityProvider<T::MiningAuthorityId, T::Block, T::AccountId> 
 
 		Self::get_mining_authority_by_index(closest)
 	}
+
+	fn authority_count() -> u32 {
+		ActiveMinersCount::<T>::get().into()
+	}
 }
 
 impl<T: Config> Pallet<T> {
+	pub fn is_registered_mining_active() -> bool {
+		<frame_system::Pallet<T>>::block_number() >=
+			MiningConfig::<T>::get().slot_bidding_start_block &&
+			ActiveMinersCount::<T>::get() > 0
+	}
+
 	pub fn get_mining_authority(
 		account_id: &T::AccountId,
 	) -> Option<MiningAuthority<T::MiningAuthorityId, T::AccountId>> {
@@ -608,24 +599,6 @@ impl<T: Config> Pallet<T> {
 			}
 		}
 
-		if active_miners == 0 {
-			if let Some(entry) = MinerZero::<T>::get() {
-				let index = start_index_to_replace_miners;
-				AccountIndexLookup::<T>::insert(&entry.account_id, index);
-				active_miners = 1;
-				ActiveMinersByIndex::<T>::insert(index, entry.clone());
-				added_miners.push((entry.account_id.clone(), entry.authority_keys.clone()));
-				if let Some(authority_id) =
-					entry.authority_keys.get::<T::MiningAuthorityId>(T::MiningAuthorityId::ID)
-				{
-					let hash = blake2_256(&authority_id.to_raw_vec());
-					authority_hash_by_index
-						.try_insert(index, U256::from(hash))
-						.expect("only insert if empty, ergo, should be impossible");
-				}
-			}
-		}
-
 		<AuthorityHashByIndex<T>>::put(authority_hash_by_index);
 		ActiveMinersCount::<T>::put(active_miners);
 
@@ -674,6 +647,7 @@ impl<T: Config> Pallet<T> {
 		let max_swing =
 			FixedI128::from_inner(T::OwnershipPercentAdjustmentDamper::get().into_inner() as i128);
 		let limited_change = percent_change.clamp(-max_swing, max_swing);
+		let min_value = T::MinimumBondAmount::get().into();
 
 		let adjustment_percent = FixedU128::from_inner(
 			FixedI128::from_inner(previous_adjustment.into_inner() as i128)
@@ -684,7 +658,9 @@ impl<T: Config> Pallet<T> {
 
 		LastOwnershipPercentAdjustment::<T>::put(adjustment_percent);
 
-		let ownership_needed = adjustment_percent.saturating_mul_int(base_ownership_tokens);
+		let ownership_needed =
+			adjustment_percent.saturating_mul_int(base_ownership_tokens).max(min_value);
+
 		OwnershipBondAmount::<T>::put(max::<T::Balance>(
 			ownership_needed.saturated_into(),
 			1u128.into(),

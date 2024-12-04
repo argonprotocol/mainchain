@@ -6,7 +6,7 @@ use frame_support::{derive_impl, parameter_types, traits::Currency};
 use frame_system::pallet_prelude::BlockNumberFor;
 use sp_arithmetic::{FixedI128, FixedU128};
 use sp_core::{ConstU32, ConstU64, H256};
-use sp_runtime::{BuildStorage, DispatchError};
+use sp_runtime::{BuildStorage, DispatchError, DispatchResult};
 
 use crate as pallet_bond;
 use crate::BitcoinVerifier;
@@ -104,6 +104,7 @@ parameter_types! {
 	pub static GetUtxoRef: Option<UtxoRef> = None;
 
 	pub static LastBondEvent: Option<(UtxoId, u64, Balance)> = None;
+	pub static LastUnlockEvent: Option<(UtxoId, bool, Balance)> = None;
 
 	pub static GetBitcoinNetwork: BitcoinNetwork = BitcoinNetwork::Regtest;
 
@@ -119,6 +120,14 @@ impl UtxoBondedEvents<u64, Balance> for EventHandler {
 		amount: Balance,
 	) -> Result<(), DispatchError> {
 		LastBondEvent::set(Some((utxo_id, *account_id, amount)));
+		Ok(())
+	}
+	fn utxo_unlocked(
+		utxo_id: UtxoId,
+		remove_pending_mints: bool,
+		amount_burned: Balance,
+	) -> DispatchResult {
+		LastUnlockEvent::set(Some((utxo_id, remove_pending_mints, amount_burned)));
 		Ok(())
 	}
 }

@@ -72,7 +72,7 @@ fn it_tests_the_current_tick() {
 		System::initialize(
 			&3,
 			&System::parent_hash(),
-			&Digest { logs: vec![DigestItem::PreRuntime(TICK_DIGEST_ID, TickDigest(2).encode())] },
+			&Digest { logs: vec![DigestItem::PreRuntime(TICK_DIGEST_ID, TickDigest(1).encode())] },
 		);
 
 		// should not allow a second block at tick 2
@@ -85,6 +85,7 @@ fn it_tests_the_current_tick() {
 
 #[test]
 fn it_should_track_blocks_at_tick() {
+	AllowMultipleBlockPerTick::set(true);
 	new_test_ext(500).execute_with(|| {
 		// Go past genesis block so events get deposited
 		System::set_block_number(2);
@@ -104,14 +105,63 @@ fn it_should_track_blocks_at_tick() {
 
 			if block_number > 0 {
 				// we have to run 1 block behind because the current block is not yet finalized
-				assert_eq!(Ticks::block_at_tick(last_block_tick), Some(System::parent_hash()));
+				assert!(Ticks::blocks_at_tick(last_block_tick).contains(&System::parent_hash()));
 			}
 			last_block_tick = tick;
 			let header = System::finalize();
 			parent_hash = header.hash();
 		}
-		assert_eq!(RecentBlocksAtTicks::<Test>::get().len(), 10);
-		assert_eq!(Ticks::block_at_tick(0), None);
-		assert_eq!(Ticks::block_at_tick(501), Some(System::parent_hash()));
+		assert_eq!(RecentBlocksAtTicks::<Test>::iter_keys().collect::<Vec<_>>().len(), 10);
+		assert_eq!(Ticks::blocks_at_tick(0).len(), 1);
+		assert!(Ticks::blocks_at_tick(501).contains(&System::parent_hash()));
+	});
+}
+
+#[test]
+#[should_panic]
+fn it_should_track_multiple_blocks_at_tick_if_enabled() {
+	new_test_ext(500).execute_with(|| {
+		// Go past genesis block so events get deposited
+		System::set_block_number(2);
+		System::initialize(
+			&1,
+			&System::parent_hash(),
+			&Digest { logs: vec![DigestItem::PreRuntime(TICK_DIGEST_ID, TickDigest(1).encode())] },
+		);
+		Ticks::on_initialize(1);
+		System::initialize(
+			&2,
+			&System::parent_hash(),
+			&Digest { logs: vec![DigestItem::PreRuntime(TICK_DIGEST_ID, TickDigest(1).encode())] },
+		);
+		Ticks::on_initialize(2);
+		assert!(Ticks::blocks_at_tick(1).contains(&System::parent_hash()));
+		System::initialize(
+			&3,
+			&System::parent_hash(),
+			&Digest { logs: vec![DigestItem::PreRuntime(TICK_DIGEST_ID, TickDigest(1).encode())] },
+		);
+		Ticks::on_initialize(3);
+		assert_eq!(Ticks::blocks_at_tick(1).len(), 2);
+
+		AllowMultipleBlockPerTick::set(false);
+		System::initialize(
+			&4,
+			&System::parent_hash(),
+			&Digest { logs: vec![DigestItem::PreRuntime(TICK_DIGEST_ID, TickDigest(2).encode())] },
+		);
+		Ticks::on_initialize(4);
+		assert_eq!(Ticks::blocks_at_tick(2).len(), 1);
+		let err = catch_unwind(|| {
+			System::initialize(
+				&5,
+				&System::parent_hash(),
+				&Digest {
+					logs: vec![DigestItem::PreRuntime(TICK_DIGEST_ID, TickDigest(2).encode())],
+				},
+			);
+			Ticks::on_initialize(5);
+		});
+		assert!(err.is_err());
 	});
 }

@@ -133,14 +133,14 @@ yamux = { opt-level = 3 }
 zeroize = { opt-level = 3 }
 
 [patch.crates-io]
-pallet-ismp = { git = "https://github.com/argonprotocol/hyperbridge", branch = "seun/deploy-mnt" }
-pallet-ismp-runtime-api = { git = "https://github.com/argonprotocol/hyperbridge", branch = "seun/deploy-mnt" }
-pallet-hyperbridge = { git = "https://github.com/argonprotocol/hyperbridge", branch = "seun/deploy-mnt" }
-pallet-ismp-rpc = { git = "https://github.com/argonprotocol/hyperbridge", branch = "seun/deploy-mnt" }
-ismp-grandpa = { git = "https://github.com/argonprotocol/hyperbridge", branch = "seun/deploy-mnt" }
-ismp = { git = "https://github.com/argonprotocol/hyperbridge", branch = "seun/deploy-mnt" }
-token-gateway-primitives = { git = "https://github.com/argonprotocol/hyperbridge", branch = "seun/deploy-mnt" }
-
+pallet-ismp = { git = "https://github.com/argonprotocol/hyperbridge" }
+pallet-ismp-runtime-api = { git = "https://github.com/argonprotocol/hyperbridge" }
+pallet-hyperbridge = { git = "https://github.com/argonprotocol/hyperbridge" }
+pallet-ismp-rpc = { git = "https://github.com/argonprotocol/hyperbridge" }
+ismp-grandpa = { git = "https://github.com/argonprotocol/hyperbridge" }
+ismp = { git = "https://github.com/argonprotocol/hyperbridge" }
+token-gateway-primitives = { git = "https://github.com/argonprotocol/hyperbridge" }
+pallet-token-gateway = { git = "https://github.com/argonprotocol/hyperbridge" }
 
 [workspace.dependencies]
 futures = { version = "0.3" }
@@ -235,8 +235,9 @@ pallet-transaction-payment-rpc = { version = "41.0.0" }
 fs2 = { version = "0.4" }
 strip-ansi-escapes = { version = "0.2" }
 current_platform = { version = "0.2" }
-
+regex = { version = "1.11.1" }
 substrate-wasm-builder = { version = "24.0.1" }
+serial_test = { version = "3.2.0" }
 
 # node
 substrate-prometheus-endpoint = { version = "0.17.0", package = "substrate-prometheus-endpoint" }
@@ -312,6 +313,7 @@ dotenv = { version = "0.15" }
 pallet-ismp = { version = "1.15.1", default-features = false }
 pallet-ismp-runtime-api = { version = "1.15.1", default-features = false }
 pallet-hyperbridge = { version = "1.15.1", default-features = false }
+pallet-token-gateway = { version = "1.15.1", default-features = false }
 pallet-ismp-rpc = { version = "1.15.1", default-features = false }
 ismp-grandpa = { version = "1.15.1", default-features = false }
 ismp = { version = "0.2.2", default-features = false }

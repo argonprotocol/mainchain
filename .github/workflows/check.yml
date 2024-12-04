@@ -85,8 +85,17 @@ jobs:
           RUSTC_WRAPPER: "sccache"
           SKIP_WASM_BUILD: 1
 
+      - name: Build
+        run: cargo build --features=simulated-prices
+        env:
+          RUSTC_WRAPPER: "sccache"
+          CARGO_INCREMENTAL: 0
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          SQLX_OFFLINE: ${{ startsWith(matrix.os, 'macos') }}
+
       - name: Run tests
-        run: cargo build && cargo test --no-fail-fast
+        run: cargo test --no-fail-fast --lib -- --nocapture
+        timeout-minutes: 60
         env:
           RUSTC_WRAPPER: "sccache"
           CARGO_INCREMENTAL: 0

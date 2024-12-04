@@ -15,8 +15,8 @@ use sp_runtime::DispatchError;
 use crate::{
 	mock::{System, *},
 	pallet::{
-		ConfirmedBitcoinBlockTip, LockedUtxoExpirationsByBlock, LockedUtxos, UtxoIdToRef,
-		UtxosPendingConfirmation,
+		ConfirmedBitcoinBlockTip, InherentIncluded, LockedUtxoExpirationsByBlock, LockedUtxos,
+		UtxoIdToRef, UtxosPendingConfirmation,
 	},
 	Error, Event,
 };
@@ -128,6 +128,7 @@ fn it_requires_block_sync_to_be_newer() {
 
 		// simulate next block
 		BitcoinUtxos::on_finalize(2);
+		InherentIncluded::<Test>::set(false);
 		// should not allow synching an older block
 		utxo_sync.sync_to_block.block_height = 1;
 		assert_err!(
@@ -179,6 +180,7 @@ fn it_should_move_utxos_to_lock_once_verified() {
 			block_hash: H256Le([0; 32]),
 		});
 		// simulate next block
+		InherentIncluded::<Test>::set(false);
 		BitcoinUtxos::on_finalize(2);
 		assert_ok!(BitcoinUtxos::sync(
 			RuntimeOrigin::none(),

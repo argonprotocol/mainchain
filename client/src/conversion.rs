@@ -1,5 +1,7 @@
-use crate::api::runtime_types;
+use crate::{api::runtime_types, BlakeTwo256};
+use argon_primitives::BlockNumber;
 use sp_arithmetic::FixedU128;
+use subxt::config::substrate::{DigestItem, SubstrateHeader};
 
 impl<T, X: sp_core::Get<u32>> From<sp_core::bounded_vec::BoundedVec<T, X>>
 	for runtime_types::bounded_collections::bounded_vec::BoundedVec<T>
@@ -152,6 +154,29 @@ impl From<argon_primitives::bitcoin::BitcoinScriptPubkey>
 {
 	fn from(value: argon_primitives::bitcoin::BitcoinScriptPubkey) -> Self {
 		Self(value.0.into())
+	}
+}
+
+pub trait SubxtRuntime {
+	fn runtime_digest(&self) -> sp_runtime::Digest;
+}
+
+impl SubxtRuntime for SubstrateHeader<BlockNumber, BlakeTwo256> {
+	fn runtime_digest(&self) -> sp_runtime::Digest {
+		let logs = self
+			.digest
+			.logs
+			.iter()
+			.map(|digest_item| match digest_item {
+				DigestItem::PreRuntime(a, b) => sp_runtime::DigestItem::PreRuntime(*a, b.clone()),
+				DigestItem::Consensus(a, b) => sp_runtime::DigestItem::Consensus(*a, b.clone()),
+				DigestItem::Seal(a, b) => sp_runtime::DigestItem::Seal(*a, b.clone()),
+				DigestItem::Other(a) => sp_runtime::DigestItem::Other(a.clone()),
+				DigestItem::RuntimeEnvironmentUpdated =>
+					sp_runtime::DigestItem::RuntimeEnvironmentUpdated,
+			})
+			.collect::<Vec<_>>();
+		sp_runtime::Digest { logs }
 	}
 }
 

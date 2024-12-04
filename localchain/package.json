@@ -17,7 +17,7 @@
     "build:debug": "napi build --platform --no-const-enum --features=napi -p argon-localchain",
     "prepublishOnly": "napi prepublish -t npm",
     "pretest": "npm run build:debug",
-    "test": "npm run pretest && cd .. && jest --testTimeout=60000",
+    "test": "npm run pretest && jest --testTimeout=60000",
     "version": "napi version"
   },
   "license": "MIT",
@@ -55,6 +55,22 @@
     "ts-jest": "^29.1.2",
     "tslib": "^2.6.2",
     "typescript": "^5.3.3"
+  },
+  "jest": {
+    "preset": "ts-jest",
+    "testEnvironment": "node",
+    "testMatch": [
+      "**/__test__/*.test.ts"
+    ],
+    "transform": {
+      "^.+\\.ts": [
+        "ts-jest",
+        {
+          "useESM": false,
+          "tsconfig": "./tsconfig-cjs.json"
+        }
+      ]
+    }
   },
   "engines": {
     "node": ">= 18"

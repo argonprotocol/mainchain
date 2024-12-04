@@ -1,14 +1,15 @@
 mod fees;
+mod hyperbridge;
 
 use super::{
 	Balances, BitcoinUtxos, Block, BlockSeal, BlockSealSpec, Bonds, ChainTransfer, Digests,
-	Domains, Grandpa, Hyperbridge, Ismp, MiningSlot, Mint, Notaries, Notebook, OriginCaller,
-	Ownership, PalletInfo, PriceIndex, Runtime, RuntimeCall, RuntimeEvent, RuntimeFreezeReason,
+	Domains, Grandpa, Ismp, MiningSlot, Mint, Notaries, Notebook, OriginCaller, Ownership,
+	PalletInfo, PriceIndex, Runtime, RuntimeCall, RuntimeEvent, RuntimeFreezeReason,
 	RuntimeHoldReason, RuntimeOrigin, RuntimeTask, System, Ticks, Timestamp, TxPause, Vaults,
 	VERSION,
 };
 use crate::SessionKeys;
-use alloc::{boxed::Box, vec::Vec};
+use alloc::vec::Vec;
 use argon_primitives::{
 	bitcoin::BitcoinHeight, notary::NotaryRecordWithState, prelude::*, BlockSealAuthorityId,
 	HashOutput, Moment, TickProvider, CHANNEL_HOLD_CLAWBACK_TICKS,
@@ -31,18 +32,16 @@ pub use frame_support::{
 	},
 	PalletId, StorageValue,
 };
-use ismp::{host::StateMachine, module::IsmpModule, router::IsmpRouter, Error};
 use sp_consensus_grandpa::{AuthorityId as GrandpaId, AuthorityList};
 
 use frame_system::EnsureRoot;
+use pallet_block_rewards::GrowthPath;
 use pallet_bond::BitcoinVerifier;
-use pallet_hyperbridge::PALLET_HYPERBRIDGE_ID;
-use pallet_ismp::NoOpMmrTree;
 use pallet_mining_slot::OnNewSlot;
 use pallet_notebook::NotebookVerifyError;
 use pallet_tx_pause::RuntimeCallNameOf;
 use sp_arithmetic::{FixedU128, Perbill};
-use sp_runtime::traits::{BlakeTwo256, Zero};
+use sp_runtime::traits::BlakeTwo256;
 use sp_version::RuntimeVersion;
 
 pub type AccountData = pallet_balances::AccountData<Balance>;
@@ -61,7 +60,7 @@ pub const MAXIMUM_BLOCK_WEIGHT: Weight =
 	Weight::from_parts(WEIGHT_REF_TIME_PER_SECOND.saturating_mul(10), u64::MAX);
 
 /// The existential deposit.
-pub const EXISTENTIAL_DEPOSIT: Balance = 500_000;
+pub const EXISTENTIAL_DEPOSIT: Balance = 100_000;
 
 pub const ARGON: Balance = 1_000_000;
 pub const CENTS: Balance = ARGON / 100_000;
@@ -71,7 +70,7 @@ pub const MICROGONS: Balance = 1;
 parameter_types! {
 	pub const BlockHashCount: BlockNumber = 4096;
 	pub const Version: RuntimeVersion = VERSION;
-	/// We allow for 60 seconds of compute with a 6 second average block time.
+	/// We allow for 60 seconds of compute with a 10 second average block time.
 	pub BlockWeights:  frame_system::limits::BlockWeights =  frame_system::limits::BlockWeights::builder()
 		.base_block(BlockExecutionWeight::get())
 		.for_class(DispatchClass::all(), |weights| {
@@ -160,16 +159,24 @@ impl Contains<RuntimeCall> for BaseCallFilter {
 	}
 }
 
+const FINAL_ARGONS_PER_BLOCK: Balance = 5_000_000;
+const INCREMENTAL_REWARD_AMOUNT: Balance = 1_000;
+const INCREMENT_TICKS: u32 = 118;
+
 parameter_types! {
-	pub const TargetComputeBlockPercent: FixedU128 = FixedU128::from_rational(125, 100); // aim for compute to take a bit longer than vote
+	pub const TargetComputeBlockPercent: FixedU128 = FixedU128::from_rational(75, 100); // aim for less than full compute time so it can wait for notebooks
 	pub const TargetBlockVotes: u32 = 50_000;
-	pub const SealSpecMinimumsChangePeriod: u32 = 60 * 24; // change block_seal_spec once a day
+	pub const SealSpecVoteHistoryForAverage: u32 = 24 * 60; // 24 hours of history
+	pub const SealSpecComputeHistoryToTrack: u32 = 6 * 60; // 6 hours of history
+	pub const SealSpecComputeDifficultyChangePeriod: u32 = 60; // change difficulty every hour
 
 	pub const DefaultChannelHoldDuration: Tick = 60;
 	pub const HistoricalPaymentAddressTicksToKeep: Tick = DefaultChannelHoldDuration::get() + CHANNEL_HOLD_CLAWBACK_TICKS + 10;
 
-	pub const ArgonsPerBlock: u32 = 5_000_000;
-	pub const StartingOwnershipTokensPerBlock: u32 = 5_000_000;
+	pub const StartingArgonsPerBlock: Balance = 500_000;
+	pub const StartingOwnershipTokensPerBlock: Balance = 500_000;
+	pub const IncrementalGrowth: GrowthPath<Runtime> = (INCREMENTAL_REWARD_AMOUNT, INCREMENT_TICKS, FINAL_ARGONS_PER_BLOCK); // we add 1 milligon every 118 blocks until we reach 5 argons/ownership shares
+	pub const HalvingBeginBlock: u32 = INCREMENT_TICKS * (FINAL_ARGONS_PER_BLOCK as u32 - StartingArgonsPerBlock::get() as u32) / INCREMENTAL_REWARD_AMOUNT as u32; // starts after ~ one year of increments
 	pub const HalvingBlocks: u32 = 2_100_000; // based on bitcoin, but 10x since we're 1 block per minute
 	pub const MaturationBlocks: u32 = 5;
 	pub const MinerPayoutPercent: FixedU128 = FixedU128::from_rational(75, 100);
@@ -185,7 +192,9 @@ impl pallet_block_seal_spec::Config for Runtime {
 	type TickProvider = Ticks;
 	type WeightInfo = pallet_block_seal_spec::weights::SubstrateWeight<Runtime>;
 	type TargetBlockVotes = TargetBlockVotes;
-	type ChangePeriod = SealSpecMinimumsChangePeriod;
+	type HistoricalComputeBlocksForAverage = SealSpecComputeHistoryToTrack;
+	type HistoricalVoteBlocksForAverage = SealSpecVoteHistoryForAverage;
+	type ComputeDifficultyChangePeriod = SealSpecComputeDifficultyChangePeriod;
 	type SealInherent = BlockSeal;
 }
 
@@ -207,9 +216,11 @@ impl pallet_block_rewards::Config for Runtime {
 	type NotaryProvider = Notaries;
 	type NotebookProvider = Notebook;
 	type NotebookTick = NotebookTickProvider;
-	type ArgonsPerBlock = ArgonsPerBlock;
+	type StartingArgonsPerBlock = StartingArgonsPerBlock;
 	type StartingOwnershipTokensPerBlock = StartingOwnershipTokensPerBlock;
+	type IncrementalGrowth = IncrementalGrowth;
 	type HalvingBlocks = HalvingBlocks;
+	type HalvingBeginBlock = HalvingBeginBlock;
 	type MinerPayoutPercent = MinerPayoutPercent;
 	type MaturationBlocks = MaturationBlocks;
 	type RuntimeFreezeReason = RuntimeFreezeReason;
@@ -243,13 +254,21 @@ impl pallet_timestamp::Config for Runtime {
 	type WeightInfo = ();
 }
 
+pub struct MultiBlockPerTickEnabled;
+impl Get<bool> for MultiBlockPerTickEnabled {
+	fn get() -> bool {
+		!MiningSlot::is_registered_mining_active()
+	}
+}
+
 impl pallet_ticks::Config for Runtime {
 	type WeightInfo = ();
+	type AllowMultipleBlockPerTick = MultiBlockPerTickEnabled;
 }
 
 parameter_types! {
-	pub const MaxCohortSize: u32 = 1_000; // this means mining_slots last 10 days
-	pub const MaxMiners: u32 = 10_000; // must multiply cleanly by MaxCohortSize
+	pub const MaxMiners: u32 = 1_000; // must multiply cleanly by MaxCohortSize
+	pub const MaxCohortSize: u32 = MaxMiners::get() / 10; // this means mining_slots last 10 days
 	pub const OwnershipPercentAdjustmentDamper: FixedU128 = FixedU128::from_rational(20, 100);
 	pub const TargetBidsPerSlot: u32 = 1_200; // 20% extra bids
 
@@ -329,9 +348,13 @@ impl OnNewSlot<AccountId> for GrandpaSlotRotation {
 			next_authorities.push((authority_id, 1));
 		}
 
-		if let Err(err) = Grandpa::schedule_change(next_authorities, Zero::zero(), None) {
-			log::error!("Failed to schedule grandpa change: {:?}", err);
-		}
+		// TODO: we need to be able to run multiple grandpas on a single miner before activating
+		// 	changing the authorities. We want to activate a trailing 3 hours of miners who closed
+		// blocks 	to activate a more decentralized grandpa process
+		//
+		// if let Err(err) = Grandpa::schedule_change(next_authorities, Zero::zero(), None) {
+		// 	log::error!("Failed to schedule grandpa change: {:?}", err);
+		// }
 	}
 }
 
@@ -340,6 +363,7 @@ impl pallet_mining_slot::Config for Runtime {
 	type WeightInfo = pallet_mining_slot::weights::SubstrateWeight<Runtime>;
 	type MaxMiners = MaxMiners;
 	type MaxCohortSize = MaxCohortSize;
+	type MinimumBondAmount = ConstU128<EXISTENTIAL_DEPOSIT>;
 	type OwnershipPercentAdjustmentDamper = OwnershipPercentAdjustmentDamper;
 	type TargetBidsPerSlot = TargetBidsPerSlot;
 	type Balance = Balance;
@@ -387,8 +411,6 @@ impl pallet_chain_transfer::Config for Runtime {
 	type RuntimeEvent = RuntimeEvent;
 	type WeightInfo = pallet_chain_transfer::weights::SubstrateWeight<Runtime>;
 	type Argon = Balances;
-	type OwnershipTokens = Ownership;
-	type Dispatcher = Hyperbridge;
 	type Balance = Balance;
 	type ExistentialDeposit = ConstU128<EXISTENTIAL_DEPOSIT>;
 	type NotebookProvider = Notebook;
@@ -595,7 +617,7 @@ impl pallet_mint::Config for Runtime {
 	type BlockRewardAccountsProvider = MiningSlot;
 }
 
-type OwnershipToken = pallet_balances::Instance2;
+pub(crate) type OwnershipToken = pallet_balances::Instance2;
 impl pallet_balances::Config<OwnershipToken> for Runtime {
 	type RuntimeEvent = RuntimeEvent;
 	type RuntimeHoldReason = RuntimeHoldReason;
@@ -629,72 +651,4 @@ impl pallet_utility::Config for Runtime {
 	type RuntimeCall = RuntimeCall;
 	type PalletsOrigin = OriginCaller;
 	type WeightInfo = pallet_utility::weights::SubstrateWeight<Runtime>;
-}
-
-parameter_types! {
-	// The host state machine of this pallet
-	pub const HostStateMachine: StateMachine = StateMachine::Substrate(*b"argn");
-}
-
-#[cfg(not(feature = "canary"))]
-parameter_types! {
-	// The hyperbridge parachain on Polkadot
-	pub const Coprocessor: Option<StateMachine> = Some(StateMachine::Polkadot(pallet_chain_transfer::ISMP_POLKADOT_PARACHAIN_ID));
-}
-
-#[cfg(feature = "canary")]
-parameter_types! {
-	pub const Coprocessor: Option<StateMachine> = Some(StateMachine::Kusama(pallet_chain_transfer::ISMP_PASEO_PARACHAIN_ID));
-}
-
-impl pallet_ismp::Config for Runtime {
-	// configure the runtime event
-	type RuntimeEvent = RuntimeEvent;
-	// Permissioned origin who can create or update consensus clients
-	type AdminOrigin = EnsureRoot<AccountId>;
-	// The pallet_timestamp pallet
-	type TimestampProvider = Timestamp;
-	// The balance type for the currency implementation
-	type Balance = Balance;
-	// The currency implementation that is offered to relayers
-	type Currency = Balances;
-	// The state machine identifier for this state machine
-	type HostStateMachine = HostStateMachine;
-	// Optional coprocessor for incoming requests/responses
-	type Coprocessor = Coprocessor;
-	// Router implementation for routing requests/responses to their respective modules
-	type Router = Router;
-	// Supported consensus clients
-	type ConsensusClients = (
-		// Add the grandpa or beefy consensus client here
-		ismp_grandpa::consensus::GrandpaConsensusClient<Runtime>,
-	);
-	// Weight provider for local modules
-	type WeightProvider = ();
-	// Optional merkle mountain range overlay tree, for cheaper outgoing request proofs.
-	// You most likely don't need it, just use the `NoOpMmrTree`
-	type Mmr = NoOpMmrTree<Runtime>;
-}
-
-impl ismp_grandpa::Config for Runtime {
-	type RuntimeEvent = RuntimeEvent;
-	type IsmpHost = Ismp;
-}
-
-impl pallet_hyperbridge::Config for Runtime {
-	type RuntimeEvent = RuntimeEvent;
-	type IsmpHost = Ismp;
-}
-
-// Add the token gateway pallet to your ISMP router
-#[derive(Default)]
-pub struct Router;
-impl IsmpRouter for Router {
-	fn module_for_id(&self, id: Vec<u8>) -> Result<Box<dyn IsmpModule>, anyhow::Error> {
-		match id.as_slice() {
-			id if id == PALLET_HYPERBRIDGE_ID => Ok(Box::new(Hyperbridge::default())),
-			id if ChainTransfer::is_ismp_module_id(id) => Ok(Box::new(ChainTransfer::default())),
-			_ => Err(Error::ModuleNotFound(id))?,
-		}
-	}
 }

@@ -240,7 +240,10 @@ where
 				return Some(hash);
 			}
 		}
-		self.client.runtime_api().block_at_tick(hash, tick).ok()?
+		if let Ok(blocks) = self.client.runtime_api().blocks_at_tick(hash, tick) {
+			return blocks.last().copied();
+		}
+		None
 	}
 
 	fn get_fork_power(&self, block_hash: B::Hash) -> Result<ForkPower, Error> {

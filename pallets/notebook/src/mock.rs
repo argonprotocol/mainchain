@@ -4,9 +4,9 @@ use argon_primitives::{
 	block_vote::VoteMinimum,
 	notary::{NotaryId, NotaryProvider, NotarySignature},
 	tick::{Tick, TickDigest, Ticker},
-	BlockSealSpecProvider, BlockVoteDigest, ChainTransferLookup, ComputeDifficulty, Digestset,
-	NotebookDigest, NotebookEventHandler, NotebookHeader, TickProvider, TransferToLocalchainId,
-	VotingSchedule,
+	AccountId, BlockSealSpecProvider, BlockVoteDigest, ChainTransferLookup, ComputeDifficulty,
+	Digestset, NotebookDigest, NotebookEventHandler, NotebookHeader, TickProvider,
+	TransferToLocalchainId, VotingSchedule,
 };
 use env_logger::{Builder, Env};
 use frame_support::{derive_impl, parameter_types, traits::Currency};
@@ -54,8 +54,8 @@ impl NotaryProvider<Block, AccountId32> for NotaryProviderImpl {
 	fn active_notaries() -> Vec<NotaryId> {
 		vec![1]
 	}
-	fn is_notary_operator(_: NotaryId, account_id32: &AccountId32) -> bool {
-		account_id32 == &NotaryOperator::get()
+	fn notary_operator_account_id(_notary_id: NotaryId) -> Option<AccountId> {
+		Some(NotaryOperator::get())
 	}
 }
 
@@ -145,7 +145,7 @@ impl TickProvider<Block> for StaticTickProvider {
 	fn ticker() -> Ticker {
 		Ticker::new(1, 2)
 	}
-	fn block_at_tick(_: Tick) -> Option<H256> {
+	fn blocks_at_tick(_: Tick) -> Vec<H256> {
 		todo!()
 	}
 	fn voting_schedule() -> VotingSchedule {

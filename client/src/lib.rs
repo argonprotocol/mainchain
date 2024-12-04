@@ -97,9 +97,10 @@ impl MainchainClient {
 
 	pub async fn params_with_best_nonce(
 		&self,
-		account_id: AccountId32,
+		account_id: &AccountId32,
 	) -> anyhow::Result<ArgonExtrinsicParamsBuilder<ArgonConfig>> {
-		let nonce = self.get_account_nonce(&account_id).await?;
+		let nonce = self.get_account_nonce(account_id).await?;
+		println!("latest nonce for account {:?} is {:?}", account_id, nonce);
 		Ok(Self::ext_params_builder().nonce(nonce.into()))
 	}
 
@@ -219,10 +220,11 @@ impl MainchainClient {
 	pub async fn get_ownership(
 		&self,
 		account_id: &AccountId32,
+		at_block: Option<<ArgonConfig as Config>::Hash>,
 	) -> anyhow::Result<ownership::storage::types::account::Account> {
 		let account_id = self.api_account(account_id);
 		let balance = self
-			.fetch_storage(&storage().ownership().account(&account_id), None)
+			.fetch_storage(&storage().ownership().account(&account_id), at_block)
 			.await?
 			.ok_or_else(|| anyhow!("No record found for account {:?}", account_id))?;
 		Ok(balance)
@@ -262,19 +264,16 @@ impl MainchainClient {
 		let grandparent_tick = voting_schedule.grandparent_votes_tick();
 		let votable_blocks = self
 			.fetch_storage(
-				&api::ticks::storage::StorageApi.recent_blocks_at_ticks(),
+				&api::ticks::storage::StorageApi.recent_blocks_at_ticks(grandparent_tick),
 				Some(best_hash),
 			)
 			.await?
 			.ok_or_else(|| anyhow!("No vote blocks found"))?
 			.0;
 
-		let best_vote_block = votable_blocks
-			.into_iter()
-			.find_map(|(tick, hash)| if tick == grandparent_tick { Some(hash) } else { None })
-			.ok_or_else(|| {
-				anyhow!("No vote block found at grandparent tick ({grandparent_tick})")
-			})?;
+		let best_vote_block = votable_blocks.last().ok_or_else(|| {
+			anyhow!("No vote block found at grandparent tick ({grandparent_tick})")
+		})?;
 		debug!("Block to vote on at grandparent tick {}: {:?}", grandparent_tick, best_vote_block);
 
 		let minimum = self
@@ -300,6 +299,7 @@ impl MainchainClient {
 	pub async fn latest_finalized_block_hash(&self) -> anyhow::Result<BlockRef<H256>> {
 		Ok(self.live.backend().latest_finalized_block_ref().await?)
 	}
+
 	pub async fn latest_finalized_block(&self) -> anyhow::Result<u32> {
 		let block_number = self
 			.fetch_storage(&storage().system().number(), None)
@@ -308,15 +308,38 @@ impl MainchainClient {
 		Ok(block_number)
 	}
 
+	pub async fn submit_tx(
+		&self,
+		call: &impl Payload,
+		signer: &impl Signer<ArgonConfig>,
+		params: Option<<ArgonExtrinsicParams<ArgonConfig> as ExtrinsicParams<ArgonConfig>>::Params>,
+		wait_for_finalized: bool,
+	) -> anyhow::Result<TxInBlock<ArgonConfig, ArgonOnlineClient>> {
+		let result = self
+			.live
+			.tx()
+			.sign_and_submit_then_watch(call, signer, params.unwrap_or_default())
+			.await?;
+		Ok(Self::wait_for_ext_in_block(result, wait_for_finalized).await?)
+	}
+
 	pub async fn wait_for_ext_in_block(
 		mut tx_progress: ArgonTxProgress,
+		wait_for_finalized: bool,
 	) -> anyhow::Result<TxInBlock<ArgonConfig, OnlineClient<ArgonConfig>>, Error> {
 		while let Some(status) = tx_progress.next().await {
 			match status? {
-				TxStatus::InBestBlock(tx_in_block) | TxStatus::InFinalizedBlock(tx_in_block) => {
-					// now, we can attempt to work with the block, eg:
+				TxStatus::InBestBlock(tx_in_block) => {
 					tx_in_block.wait_for_success().await?;
-					return Ok(tx_in_block);
+					if !wait_for_finalized {
+						return Ok(tx_in_block);
+					}
+				},
+				TxStatus::InFinalizedBlock(tx_in_block) => {
+					tx_in_block.wait_for_success().await?;
+					if wait_for_finalized {
+						return Ok(tx_in_block);
+					}
 				},
 				TxStatus::Error { message } |
 				TxStatus::Invalid { message } |

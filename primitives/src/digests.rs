@@ -1,5 +1,5 @@
 use crate::{
-	fork_power::ForkPower, tick::TickDigest, BlockSealAuthoritySignature, BlockVotingPower,
+	ensure, fork_power::ForkPower, tick::TickDigest, BlockSealAuthoritySignature, BlockVotingPower,
 	NotebookAuditResult, VotingKey,
 };
 use alloc::{vec, vec::Vec};
@@ -45,10 +45,7 @@ impl TryFrom<DigestItem> for TickDigest {
 	type Error = codec::Error;
 
 	fn try_from(digest_item: DigestItem) -> Result<Self, Self::Error> {
-		if let DigestItem::PreRuntime(TICK_DIGEST_ID, value) = digest_item {
-			return TickDigest::decode(&mut &value[..])
-		}
-		Err(codec::Error::from("Digest not found"))
+		digest_item.as_tick().ok_or(codec::Error::from("Digest not found"))
 	}
 }
 
@@ -57,11 +54,148 @@ impl TryFrom<&Digest> for ForkPower {
 
 	fn try_from(digest: &Digest) -> Result<Self, Self::Error> {
 		for digest_item in digest.logs.iter() {
-			if let DigestItem::Consensus(FORK_POWER_DIGEST, value) = digest_item {
-				return ForkPower::decode(&mut &value[..])
+			if let Some(fork) = digest_item.as_fork_power() {
+				return Ok(fork)
 			}
 		}
 		Err(codec::Error::from("Digest not found"))
+	}
+}
+
+#[derive(thiserror::Error, Debug, Copy, Clone)]
+pub enum DecodeDigestError {
+	#[error("Duplicate block vote digest")]
+	DuplicateBlockVoteDigest,
+	#[error("Duplicate block author")]
+	DuplicateAuthorDigest,
+	#[error("Duplicate tick digest")]
+	DuplicateTickDigest,
+	#[error("Duplicate parent voting key digest")]
+	DuplicateParentVotingKeyDigest,
+	#[error("Duplicate notebooks digest")]
+	DuplicateNotebookDigest,
+	#[error("Duplicate fork power digest")]
+	DuplicateForkPowerDigest,
+	#[error("Missing block author")]
+	MissingBlockVoteDigest,
+	#[error("Missing block vote digest")]
+	MissingAuthorDigest,
+	#[error("Missing tick digest")]
+	MissingTickDigest,
+	#[error("Missing fork power digest")]
+	MissingParentVotingKeyDigest,
+	#[error("Missing notebooks digest")]
+	MissingNotebookDigest,
+	#[error("Could not decode digest")]
+	CouldNotDecodeDigest,
+}
+
+impl<NV, AC> TryFrom<Digest> for Digestset<NV, AC>
+where
+	NV: Codec + Clone,
+	AC: Codec + Clone,
+{
+	type Error = DecodeDigestError;
+
+	fn try_from(value: Digest) -> Result<Self, Self::Error> {
+		let mut author = None;
+		let mut block_vote = None;
+		let mut voting_key = None;
+		let mut fork_power = None;
+		let mut tick = None;
+		let mut notebooks = None;
+
+		for digest_item in value.logs.iter() {
+			if let Some(a) = digest_item.as_author() {
+				ensure!(author.is_none(), DecodeDigestError::DuplicateAuthorDigest);
+				author = Some(a);
+			} else if let Some(bv) = digest_item.as_block_vote() {
+				ensure!(block_vote.is_none(), DecodeDigestError::DuplicateBlockVoteDigest);
+				block_vote = Some(bv);
+			} else if let Some(t) = digest_item.as_tick() {
+				ensure!(tick.is_none(), DecodeDigestError::DuplicateTickDigest);
+				tick = Some(t);
+			} else if let Some(n) = digest_item.as_notebooks() {
+				ensure!(notebooks.is_none(), DecodeDigestError::DuplicateNotebookDigest);
+				notebooks = Some(n);
+			} else if let Some(vk) = digest_item.as_parent_voting_key() {
+				ensure!(voting_key.is_none(), DecodeDigestError::DuplicateParentVotingKeyDigest);
+				voting_key = Some(vk);
+			} else if let Some(fp) = digest_item.as_fork_power() {
+				ensure!(fork_power.is_none(), DecodeDigestError::DuplicateForkPowerDigest);
+				fork_power = Some(fp);
+			}
+		}
+
+		Ok(Digestset {
+			author: author.ok_or(DecodeDigestError::MissingAuthorDigest)?,
+			block_vote: block_vote.ok_or(DecodeDigestError::MissingBlockVoteDigest)?,
+			voting_key,
+			fork_power,
+			tick: tick.ok_or(DecodeDigestError::MissingTickDigest)?,
+			notebooks: notebooks.ok_or(DecodeDigestError::MissingNotebookDigest)?,
+		})
+	}
+}
+
+pub trait ArgonDigests {
+	fn as_tick(&self) -> Option<TickDigest>;
+	fn as_author<AC: Codec>(&self) -> Option<AC>;
+	fn as_block_vote(&self) -> Option<BlockVoteDigest>;
+	fn as_notebooks<VerifyError: Codec>(&self) -> Option<NotebookDigest<VerifyError>>;
+	fn as_parent_voting_key(&self) -> Option<ParentVotingKeyDigest>;
+	fn as_fork_power(&self) -> Option<ForkPower>;
+	fn as_block_seal(&self) -> Option<BlockSealDigest>;
+}
+
+impl ArgonDigests for DigestItem {
+	fn as_tick(&self) -> Option<TickDigest> {
+		if let DigestItem::PreRuntime(TICK_DIGEST_ID, value) = self {
+			return TickDigest::decode(&mut &value[..]).ok()
+		}
+		None
+	}
+
+	fn as_author<AC: Codec>(&self) -> Option<AC> {
+		if let DigestItem::PreRuntime(AUTHOR_DIGEST_ID, value) = self {
+			return AC::decode(&mut &value[..]).ok()
+		}
+		None
+	}
+
+	fn as_block_vote(&self) -> Option<BlockVoteDigest> {
+		if let DigestItem::PreRuntime(BLOCK_VOTES_DIGEST_ID, value) = self {
+			return BlockVoteDigest::decode(&mut &value[..]).ok()
+		}
+		None
+	}
+
+	fn as_notebooks<VerifyError: Codec>(&self) -> Option<NotebookDigest<VerifyError>> {
+		if let DigestItem::PreRuntime(NOTEBOOKS_DIGEST_ID, value) = self {
+			return NotebookDigest::<VerifyError>::decode(&mut &value[..]).ok()
+		}
+		None
+	}
+
+	fn as_parent_voting_key(&self) -> Option<ParentVotingKeyDigest> {
+		if let DigestItem::Consensus(PARENT_VOTING_KEY_DIGEST, value) = self {
+			return ParentVotingKeyDigest::decode(&mut &value[..]).ok()
+		}
+		None
+	}
+
+	fn as_fork_power(&self) -> Option<ForkPower> {
+		if let DigestItem::Consensus(FORK_POWER_DIGEST, value) = self {
+			return ForkPower::decode(&mut &value[..]).ok()
+		}
+		None
+	}
+
+	fn as_block_seal(&self) -> Option<BlockSealDigest> {
+		if let DigestItem::Seal(BLOCK_SEAL_DIGEST_ID, value) = self {
+			return BlockSealDigest::decode(&mut &value[..]).ok()
+		}
+		None
 	}
 }
 

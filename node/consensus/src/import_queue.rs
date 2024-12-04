@@ -1,15 +1,12 @@
-use crate::{
-	aux_client::ArgonAux, compute_worker::BlockComputeNonce, error::Error,
-	notary_client::verify_notebook_audits,
-};
+use crate::{aux_client::ArgonAux, compute_worker::BlockComputeNonce, error::Error, NotaryClient};
 use argon_bitcoin_utxo_tracker::{get_bitcoin_inherent, UtxoTracker};
 use argon_primitives::{
 	fork_power::ForkPower,
 	inherents::{BitcoinInherentDataProvider, BlockSealInherentDataProvider},
 	Balance, BitcoinApis, BlockCreatorApis, BlockSealApis, BlockSealAuthorityId, BlockSealDigest,
-	NotebookApis,
+	NotaryApis, NotebookApis,
 };
-use argon_runtime::NotebookVerifyError;
+use argon_runtime::{NotaryRecordT, NotebookVerifyError};
 use codec::Codec;
 use sc_client_api::{self, backend::AuxStore};
 use sc_consensus::{
@@ -26,7 +23,6 @@ use sp_runtime::traits::{Block as BlockT, Header as HeaderT};
 use std::{marker::PhantomData, sync::Arc};
 
 /// A block importer for argon.
-
 pub struct ArgonBlockImport<B: BlockT, I, C: AuxStore, AC> {
 	inner: I,
 	client: Arc<C>,
@@ -79,13 +75,27 @@ where
 			self.aux_client.record_block(&mut block, block_author, voting_key, tick)?;
 		let fork_power = ForkPower::try_from(block.header.digest())
 			.map_err(|e| Error::MissingRuntimeData(format!("Failed to get fork power: {:?}", e)))?;
-		block.fork_choice = Some(ForkChoiceStrategy::Custom(fork_power > max_fork_power));
+
+		let mut is_best_fork = fork_power > max_fork_power;
+		if fork_power == max_fork_power {
+			is_best_fork = block.origin == BlockOrigin::Own;
+		}
+
+		if is_best_fork {
+			tracing::info!(
+				block_hash = ?block.header.hash(),
+				?fork_power,
+				"New best fork imported"
+			);
+		}
+
+		block.fork_choice = Some(ForkChoiceStrategy::Custom(is_best_fork));
 
 		// TODO: do we need to hold a lock here?
 		let block_hash = block.post_hash();
 		match self.inner.import_block(block).await {
 			Ok(result) => {
-				self.aux_client.block_accepted(max_fork_power).inspect_err(|e| {
+				self.aux_client.block_accepted(fork_power).inspect_err(|e| {
 					log::error!("Failed to record block accepted for {:?}: {:?}", block_hash, e)
 				})?;
 				Ok(result)
@@ -98,7 +108,7 @@ where
 #[allow(dead_code)]
 struct Verifier<B: BlockT, C: AuxStore, AC> {
 	client: Arc<C>,
-	aux_client: ArgonAux<B, C>,
+	notary_client: Arc<NotaryClient<B, C, AC>>,
 	utxo_tracker: Arc<UtxoTracker>,
 	telemetry: Option<TelemetryHandle>,
 	_phantom: PhantomData<AC>,
@@ -112,7 +122,8 @@ where
 		+ BitcoinApis<B, Balance>
 		+ BlockSealApis<B, AC, BlockSealAuthorityId>
 		+ BlockCreatorApis<B, AC, NotebookVerifyError>
-		+ NotebookApis<B, NotebookVerifyError>,
+		+ NotebookApis<B, NotebookVerifyError>
+		+ NotaryApis<B, NotaryRecordT>,
 	AC: Codec + Clone + Send + Sync + 'static,
 {
 	async fn verify(
@@ -127,8 +138,8 @@ where
 			return Ok(block_params)
 		}
 
-		let post_hash = block_params.header.hash();
 		let parent_hash = *block_params.header.parent_hash();
+		let post_hash = block_params.header.hash();
 
 		let mut header = block_params.header;
 		let raw_seal_digest = header.digest_mut().pop().ok_or(Error::MissingBlockSealDigest)?;
@@ -140,10 +151,9 @@ where
 		block_params.post_hash = Some(post_hash);
 
 		let digest = block_params.header.digest();
+		let pre_hash = block_params.header.hash();
 
 		if seal_digest.is_vote() {
-			let pre_hash = block_params.header.hash();
-
 			let is_valid = self
 				.client
 				.runtime_api()
@@ -166,7 +176,7 @@ where
 				.digest_notebooks(parent_hash, digest)
 				.map_err(|e| format!("Error calling digest notebooks api {e:?}"))?
 				.map_err(|e| format!("Failed to get digest notebooks: {:?}", e))?;
-			verify_notebook_audits(&self.aux_client, digest_notebooks).await?;
+			self.notary_client.verify_notebook_audits(digest_notebooks).await?;
 		}
 
 		// NOTE: we verify compute nonce in import queue because we use the pre-hash, which
@@ -180,9 +190,11 @@ where
 
 			let key_block_hash = compute_puzzle.get_key_block(self.client.info().genesis_hash);
 			let compute_difficulty = compute_puzzle.difficulty;
+
+			tracing::info!(?key_block_hash, ?compute_difficulty, ?nonce, "Verifying compute nonce");
 			if !BlockComputeNonce::is_valid(
 				nonce,
-				post_hash.as_ref().to_vec(),
+				pre_hash.as_ref().to_vec(),
 				&key_block_hash,
 				compute_difficulty,
 			) {
@@ -233,10 +245,12 @@ where
 	}
 }
 
-/// Start an import queue for a Cumulus node which checks blocks' seals and inherent data.
+/// Start an import queue which checks blocks' seals and inherent data.
+#[allow(clippy::too_many_arguments)]
 pub fn create_import_queue<C, B, I, AC>(
 	client: Arc<C>,
 	aux_client: ArgonAux<B, C>,
+	notary_client: Arc<NotaryClient<B, C, AC>>,
 	block_import: I,
 	spawner: &impl sp_core::traits::SpawnEssentialNamed,
 	registry: Option<&substrate_prometheus_endpoint::Registry>,
@@ -252,20 +266,21 @@ where
 		+ BlockCreatorApis<B, AC, NotebookVerifyError>
 		+ BitcoinApis<B, Balance>
 		+ BlockSealApis<B, AC, BlockSealAuthorityId>
-		+ NotebookApis<B, NotebookVerifyError>,
+		+ NotebookApis<B, NotebookVerifyError>
+		+ NotaryApis<B, NotaryRecordT>,
 	AC: Codec + Clone + Send + Sync + 'static,
 	I: BlockImport<B, Error = ConsensusError> + Send + Sync + 'static,
 {
 	let importer = ArgonBlockImport {
 		inner: block_import,
 		client: client.clone(),
-		aux_client: ArgonAux::new(client.clone()),
+		aux_client,
 		_phantom: PhantomData,
 	};
 	let verifier = Verifier::<B, C, AC> {
 		client: client.clone(),
 		utxo_tracker,
-		aux_client,
+		notary_client,
 		telemetry,
 		_phantom: PhantomData,
 	};

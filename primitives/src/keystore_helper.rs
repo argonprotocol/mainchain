@@ -1,10 +1,11 @@
+use core::fmt::Display;
 use std::{fs, path::PathBuf};
 
 use anyhow::{anyhow, bail};
 use clap::{Args, ValueEnum};
 use sc_keystore::LocalKeystore;
 use sp_core::{
-	crypto::{ExposeSecret, KeyTypeId, SecretString},
+	crypto::{ExposeSecret, KeyTypeId, SecretString, Ss58Codec},
 	ed25519, sr25519, Pair,
 };
 use sp_keystore::{testing::MemoryKeystore, KeystorePtr};
@@ -47,6 +48,15 @@ pub enum CryptoType {
 	Ed25519,
 }
 
+impl Display for CryptoType {
+	fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+		match self {
+			CryptoType::Sr25519 => write!(f, "sr25519"),
+			CryptoType::Ed25519 => write!(f, "ed25519"),
+		}
+	}
+}
+
 impl KeystoreParams {
 	pub fn read_password(&self) -> anyhow::Result<Option<SecretString>> {
 		let (password_interactive, password) = (self.password_interactive, self.password.clone());
@@ -73,13 +83,15 @@ impl KeystoreParams {
 		Ok(keystore)
 	}
 
+	/// Open a keystore and insert a keypair into it.
+	/// Returns the keystore and the address of the inserted keypair.
 	pub fn open_with_account(
 		&self,
 		suri_or_prompt: Option<&String>,
 		crypto_type: CryptoType,
 		key_type_id: KeyTypeId,
 		allow_in_memory: bool,
-	) -> anyhow::Result<KeystorePtr> {
+	) -> anyhow::Result<(KeystorePtr, String)> {
 		let suri = Self::read_uri(suri_or_prompt)?;
 		let password = self.read_password()?;
 		let keystore: KeystorePtr = match &self.keystore_path {
@@ -91,13 +103,13 @@ impl KeystoreParams {
 					bail!("No keystore path provided");
 				},
 		};
-		let public_bytes = match crypto_type {
+		let (public_bytes, address) = match crypto_type {
 			CryptoType::Sr25519 => {
 				let pair = match password {
 					Some(pass) => sr25519::Pair::from_string(&suri, Some(pass.expose_secret()))?,
 					None => sr25519::Pair::from_string(&suri, None)?,
 				};
-				pair.public().0
+				(pair.public().0, pair.public().to_ss58check())
 			},
 			CryptoType::Ed25519 => {
 				let pair = match password {
@@ -105,13 +117,17 @@ impl KeystoreParams {
 						ed25519::Pair::from_string(&suri, Some(pass.expose_secret()))?,
 					None => ed25519::Pair::from_string(&suri, None)?,
 				};
-				pair.public().0
+				(pair.public().0, pair.public().to_ss58check())
 			},
 		};
-		keystore
-			.insert(key_type_id, &suri, &public_bytes)
-			.map_err(|_| anyhow!("Unable to insert dev keypair for alice"))?;
-		Ok(keystore)
+		keystore.insert(key_type_id, &suri, &public_bytes).map_err(|_| {
+			anyhow!(
+				"Unable to insert keypair (type={:?}, in memory? {})",
+				key_type_id,
+				allow_in_memory
+			)
+		})?;
+		Ok((keystore, address))
 	}
 
 	pub fn open_in_memory(
@@ -120,7 +136,9 @@ impl KeystoreParams {
 		crypto_type: CryptoType,
 		key_type_id: KeyTypeId,
 	) -> anyhow::Result<KeystorePtr> {
-		self.open_with_account(Some(&suri.to_string()), crypto_type, key_type_id, true)
+		let (keystore, _) =
+			self.open_with_account(Some(&suri.to_string()), crypto_type, key_type_id, true)?;
+		Ok(keystore)
 	}
 
 	pub fn read_uri(uri: Option<&String>) -> anyhow::Result<String> {

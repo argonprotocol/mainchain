@@ -1,12 +1,11 @@
+use argon_notary_apis::error::Error;
+use argon_primitives::{tick::Ticker, AccountId, NotaryId, SignedNotebookHeader};
 use futures::FutureExt;
 use sc_utils::notification::NotificationSender;
 use sp_core::{ed25519, H256};
 use sp_keystore::KeystorePtr;
 use sqlx::{postgres::PgListener, PgPool};
 use tokio::task::JoinHandle;
-
-use argon_notary_apis::error::Error;
-use argon_primitives::{tick::Ticker, NotaryId, SignedNotebookHeader};
 
 use crate::stores::{
 	notebook::NotebookStore,
@@ -24,6 +23,7 @@ pub struct NotebookCloser {
 	pub pool: PgPool,
 	pub keystore: KeystorePtr,
 	pub notary_id: NotaryId,
+	pub operator_account_id: AccountId,
 	pub ticker: Ticker,
 }
 
@@ -77,13 +77,15 @@ type NotebookCloserHandles = (JoinHandle<anyhow::Result<()>>, JoinHandle<anyhow:
 pub fn spawn_notebook_closer(
 	pool: PgPool,
 	notary_id: NotaryId,
+	operator_account_id: AccountId,
 	keystore: KeystorePtr,
 	ticker: Ticker,
 	completed_notebook_sender: NotificationSender<SignedNotebookHeader>,
 ) -> anyhow::Result<NotebookCloserHandles> {
 	let pool1 = pool.clone();
 	let handle_1 = tokio::spawn(async move {
-		let mut notebook_closer = NotebookCloser { pool: pool1, notary_id, keystore, ticker };
+		let mut notebook_closer =
+			NotebookCloser { pool: pool1, notary_id, keystore, operator_account_id, ticker };
 		notebook_closer.create_task().await?;
 		Ok(())
 	});
@@ -163,7 +165,15 @@ impl NotebookCloser {
 
 			let public = RegisteredKeyStore::get_valid_public(&mut *tx, tick).await?;
 
-			NotebookStore::close_notebook(&mut tx, notebook_number, public, &self.keystore).await?;
+			NotebookStore::close_notebook(
+				&mut tx,
+				notebook_number,
+				tick,
+				public,
+				self.operator_account_id.clone(),
+				&self.keystore,
+			)
+			.await?;
 
 			NotebookStatusStore::next_step(&mut *tx, notebook_number, step).await?;
 			tx.commit().await?;
@@ -198,8 +208,7 @@ struct NotebookAuditResponse {
 
 #[cfg(test)]
 mod tests {
-	use anyhow::anyhow;
-	use codec::Decode;
+	use anyhow::{anyhow, bail};
 	use frame_support::assert_ok;
 	use futures::{task::noop_waker_ref, StreamExt};
 	use sp_core::{bounded_vec, crypto::AccountId32, ed25519::Public, sr25519::Signature, Pair};
@@ -219,7 +228,6 @@ mod tests {
 	};
 	use subxt::{
 		blocks::Block,
-		config::substrate::DigestItem,
 		tx::{TxInBlock, TxProgress},
 		OnlineClient,
 	};
@@ -235,6 +243,7 @@ mod tests {
 			},
 			storage, tx,
 		},
+		conversion::SubxtRuntime,
 		signer::Sr25519Signer,
 		ArgonConfig, ArgonOnlineClient, MainchainClient, ReconnectingClient,
 	};
@@ -243,11 +252,11 @@ mod tests {
 	use argon_primitives::{
 		fork_power::ForkPower,
 		host::Host,
-		tick::{Tick, TickDigest},
-		AccountId, AccountOrigin,
+		prelude::*,
+		AccountOrigin,
 		AccountType::{Deposit, Tax},
-		BalanceChange, BalanceProof, BalanceTip, BlockSealDigest, BlockVote, BlockVoteDigest,
-		Domain, DomainHash, DomainTopLevel, HashOutput, MerkleProof, Note, NoteType,
+		ArgonDigests, BalanceChange, BalanceProof, BalanceTip, BlockSealDigest, BlockVote,
+		BlockVoteDigest, Domain, DomainHash, DomainTopLevel, HashOutput, MerkleProof,
 		NoteType::{ChannelHoldClaim, ChannelHoldSettle},
 		NotebookDigest, ParentVotingKeyDigest, TransferToLocalchainId, VotingSchedule,
 		DOMAIN_LEASE_COST,
@@ -268,7 +277,7 @@ mod tests {
 		let _ = tracing_subscriber::fmt::try_init();
 		let ctx = start_argon_test_node().await;
 
-		let bob_id = Bob.to_account_id();
+		let notary_operator = Bob.to_account_id();
 
 		let notary_id = 1;
 		let ws_url = ctx.client.url.clone();
@@ -285,11 +294,18 @@ mod tests {
 		let block_tracker = track_blocks(ws_url.clone(), 1, pool.clone(), ticker);
 		let block_tracker = Arc::new(Mutex::new(Some(block_tracker)));
 
-		let mut notary_server =
-			NotaryServer::start_with(server, notary_id, ticker, pool.clone()).await?;
+		let mut notary_server = NotaryServer::start_with(
+			server,
+			notary_id,
+			notary_operator.clone(),
+			ticker,
+			pool.clone(),
+		)
+		.await?;
 		let watches = spawn_notebook_closer(
 			pool.clone(),
 			notary_id,
+			notary_operator.clone(),
 			keystore.clone(),
 			ticker,
 			notary_server.completed_notebook_sender.clone(),
@@ -297,7 +313,7 @@ mod tests {
 
 		propose_bob_as_notary(&ctx.client.live, notary_key, addr).await?;
 
-		activate_notary(&pool, &ctx.client.live, &bob_id).await?;
+		activate_notary(&pool, &ctx.client.live, &notary_operator).await?;
 
 		let bob_balance = 8_000_000;
 		// Submit a transfer to localchain and wait for result
@@ -365,8 +381,7 @@ mod tests {
 
 		println!("created channel hold. Waiting for notebook {}", hold_result.notebook_number);
 
-		// TODO: use api once we update
-		let channel_hold_expiration_ticks = 2;
+		let channel_hold_expiration_ticks = ticker.channel_hold_expiration_ticks;
 
 		let mut header_sub = notary_server.completed_notebook_stream.subscribe(100);
 		let mut notebook_proof: Option<MerkleProof> = None;
@@ -394,7 +409,7 @@ mod tests {
 									.await?,
 								);
 							}
-							if header.notebook_number >= hold_result.notebook_number + channel_hold_expiration_ticks
+							if header.tick >= hold_result.tick + channel_hold_expiration_ticks
 							{
 								println!("Expiration of channel_hold ready");
 								break;
@@ -449,26 +464,45 @@ mod tests {
 
 		let vote_power = (hold_note.microgons as f64 * 0.2f64) as u128;
 
-		let channel_hold_result = settle_channel_hold_and_vote(
-			&pool,
-			&ticker,
-			hold_note,
-			best_grandparent,
-			BalanceProof {
-				balance: bob_balance as u128,
-				notebook_number: hold_result.notebook_number,
-				tick: hold_result.tick,
-				notebook_proof,
-				notary_id,
-				account_origin: origin.clone(),
-			},
-		)
-		.await?;
+		let mut channel_hold_result = None;
+		for _ in 0..2 {
+			match settle_channel_hold_and_vote(
+				&pool,
+				&ticker,
+				hold_note.clone(),
+				best_grandparent,
+				BalanceProof {
+					balance: bob_balance as u128,
+					notebook_number: hold_result.notebook_number,
+					tick: hold_result.tick,
+					notebook_proof: notebook_proof.clone(),
+					notary_id,
+					account_origin: origin.clone(),
+				},
+			)
+			.await
+			{
+				Ok(result) => {
+					channel_hold_result = Some(result);
+					break;
+				},
+				Err(e) => match e.downcast_ref() {
+					Some(&Error::BalanceChangeVerifyError(VerifyError::InvalidBlockVoteTick {
+						..
+					})) => {
+						continue;
+					},
+					_ => bail!(e),
+				},
+			}
+		}
+
+		let channel_hold_result = channel_hold_result.expect("Should have channel hold result");
+
 		println!("ChannelHold result is {:?}", channel_hold_result);
 
 		let voting_schedule = VotingSchedule::when_creating_votes(channel_hold_result.tick);
 		let mut best_sub = ctx.client.live.blocks().subscribe_finalized().await?;
-		let mut did_see_vote = false;
 		let mut did_see_voting_key = false;
 		let mut last_block_fork = ForkPower::default();
 		while let Some(block) = best_sub.next().await {
@@ -512,9 +546,6 @@ mod tests {
 						);
 						did_see_voting_key = true;
 					}
-					if matches!(seal, BlockSealDigest::Vote { .. }) {
-						did_see_vote = true;
-					}
 
 					// should have gotten a vote in tick 2
 					if tick >= voting_schedule.block_tick() + 3 {
@@ -524,7 +555,6 @@ mod tests {
 				_ => break,
 			}
 		}
-		assert!(did_see_vote, "Should have seen a vote");
 		assert!(did_see_voting_key, "Should have seen a voting key");
 		watches.0.abort();
 		watches.1.abort();
@@ -569,21 +599,19 @@ mod tests {
 		let mut notebook_digest = None;
 		let mut parent_voting_key = None;
 		let mut fork_power = None;
-		for log in block.header().digest.logs.iter() {
-			match log {
-				DigestItem::PreRuntime(argon_primitives::TICK_DIGEST_ID, data) =>
-					tick = TickDigest::decode(&mut &data[..]).ok(),
-				DigestItem::PreRuntime(argon_primitives::BLOCK_VOTES_DIGEST_ID, data) =>
-					votes = BlockVoteDigest::decode(&mut &data[..]).ok(),
-				DigestItem::PreRuntime(argon_primitives::NOTEBOOKS_DIGEST_ID, data) =>
-					notebook_digest = NotebookDigest::decode(&mut &data[..]).ok(),
-				DigestItem::Seal(argon_primitives::BLOCK_SEAL_DIGEST_ID, data) =>
-					block_seal = BlockSealDigest::decode(&mut &data[..]).ok(),
-				DigestItem::Consensus(argon_primitives::PARENT_VOTING_KEY_DIGEST, data) =>
-					parent_voting_key = ParentVotingKeyDigest::decode(&mut &data[..]).ok(),
-				DigestItem::Consensus(argon_primitives::FORK_POWER_DIGEST, data) =>
-					fork_power = ForkPower::decode(&mut &data[..]).ok(),
-				_ => (),
+		for digest in block.header().runtime_digest().logs.iter() {
+			if let Some(d) = digest.as_tick() {
+				tick = Some(d);
+			} else if let Some(d) = digest.as_block_vote() {
+				votes = Some(d);
+			} else if let Some(d) = digest.as_parent_voting_key() {
+				parent_voting_key = Some(d);
+			} else if let Some(d) = digest.as_fork_power() {
+				fork_power = Some(d);
+			} else if let Some(d) = digest.as_notebooks() {
+				notebook_digest = Some(d);
+			} else if let Some(d) = digest.as_block_seal() {
+				block_seal = Some(d);
 			}
 		}
 		let tick = tick.expect("Should have a tick").0;
@@ -644,6 +672,7 @@ mod tests {
 		let result = NotarizationsStore::apply(
 			pool,
 			1,
+			&Ferdie.to_account_id(),
 			ticker,
 			vec![BalanceChange {
 				account_id: keypair.public().into(),
@@ -688,6 +717,7 @@ mod tests {
 		let result = NotarizationsStore::apply(
 			pool,
 			1,
+			&Ferdie.to_account_id(),
 			ticker,
 			vec![
 				BalanceChange {
@@ -793,7 +823,16 @@ mod tests {
 		.sign(Bob.pair())
 		.clone()];
 
-		let result = NotarizationsStore::apply(pool, 1, ticker, changes, vec![], vec![]).await?;
+		let result = NotarizationsStore::apply(
+			pool,
+			1,
+			&Ferdie.to_account_id(),
+			ticker,
+			changes,
+			vec![],
+			vec![],
+		)
+		.await?;
 		Ok((hold_note.clone(), result))
 	}
 
@@ -852,6 +891,7 @@ mod tests {
 		let result = NotarizationsStore::apply(
 			pool,
 			1,
+			&Ferdie.to_account_id(),
 			ticker,
 			changes,
 			vec![BlockVote {
@@ -977,7 +1017,7 @@ mod tests {
 	async fn wait_for_in_block(
 		tx_progress: TxProgress<ArgonConfig, OnlineClient<ArgonConfig>>,
 	) -> anyhow::Result<TxInBlock<ArgonConfig, OnlineClient<ArgonConfig>>, Error> {
-		let res = MainchainClient::wait_for_ext_in_block(tx_progress).await?;
+		let res = MainchainClient::wait_for_ext_in_block(tx_progress, false).await?;
 		Ok(res)
 	}
 }

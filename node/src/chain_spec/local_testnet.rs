@@ -36,10 +36,7 @@ pub fn local_testnet_config() -> Result<ChainSpec, String> {
 	.with_properties(properties)
 	.with_genesis_config_patch(testnet_genesis(GenesisSettings {
 		// You have to have an authority to start the chain
-		initial_authorities: vec![(
-			get_account_id_from_seed::<sr25519::Public>("Alice"),
-			authority_keys_from_seed("Alice"),
-		)],
+		founding_grandpas: vec![(authority_keys_from_seed("Alice").grandpa, 10)],
 		sudo_key: get_account_id_from_seed::<sr25519::Public>("Alice"),
 		bitcoin_network: BitcoinNetwork::Regtest,
 		bitcoin_tip_operator: get_account_id_from_seed::<sr25519::Public>("Dave"),
@@ -47,7 +44,7 @@ pub fn local_testnet_config() -> Result<ChainSpec, String> {
 		endowed_accounts: vec![
 			(get_account_id_from_seed::<sr25519::Public>("Alice"), 100_000_000),
 			(get_account_id_from_seed::<sr25519::Public>("Bob"), 100_000_000),
-			(get_account_id_from_seed::<sr25519::Public>("Charline"), 100_000_000),
+			(get_account_id_from_seed::<sr25519::Public>("Charlie"), 100_000_000),
 			(get_account_id_from_seed::<sr25519::Public>("Dave"), 100_000_000),
 			(get_account_id_from_seed::<sr25519::Public>("Eve"), 100_000_000),
 			(get_account_id_from_seed::<sr25519::Public>("Ferdie"), 100_000_000),
@@ -69,8 +66,7 @@ pub fn local_testnet_config() -> Result<ChainSpec, String> {
 			slot_bidding_start_block: 4,
 		},
 		minimum_bitcoin_bond_satoshis: SATOSHIS_PER_BITCOIN / 1_000,
-		cross_token_operator: get_account_id_from_seed::<sr25519::Public>("Alice"),
-		connect_to_test_evm_networks: true,
+		hyperbridge_token_admin: get_account_id_from_seed::<sr25519::Public>("Alice"),
 	}))
 	.build())
 }

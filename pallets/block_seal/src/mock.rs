@@ -46,7 +46,7 @@ parameter_types! {
 	pub static MinerZero: Option<(AccountId, MiningAuthority<BlockSealAuthorityId, AccountId>)> = None;
 	pub static NotebooksAtTick: BTreeMap<Tick, Vec<(NotaryId, NotebookNumber, Option<NotebookSecret>)>> = BTreeMap::new();
 	pub static CurrentTick: Tick = 0;
-	pub static BlocksAtTick: BTreeMap<Tick, HashOutput> = BTreeMap::new();
+	pub static BlocksAtTick: BTreeMap<Tick, Vec<HashOutput>> = BTreeMap::new();
 	pub static RegisteredDomains: BTreeSet<DomainHash> = BTreeSet::new();
 
 	pub static Digests: Digestset<VerifyError, AccountId> = Digestset {
@@ -75,6 +75,10 @@ impl Get<Result<Digestset<VerifyError, AccountId>, DispatchError>> for DigestGet
 
 pub struct StaticAuthorityProvider;
 impl AuthorityProvider<BlockSealAuthorityId, Block, AccountId> for StaticAuthorityProvider {
+	fn authority_count() -> u32 {
+		AuthorityList::get().len() as u32
+	}
+
 	fn get_authority(author: AccountId) -> Option<BlockSealAuthorityId> {
 		AuthorityList::get().iter().find_map(|(account, id)| {
 			if *account == author {
@@ -133,8 +137,8 @@ impl TickProvider<Block> for StaticTickProvider {
 	fn ticker() -> Ticker {
 		Ticker::new(1, 2)
 	}
-	fn block_at_tick(tick: Tick) -> Option<HashOutput> {
-		BlocksAtTick::get().get(&tick).cloned()
+	fn blocks_at_tick(tick: Tick) -> Vec<HashOutput> {
+		BlocksAtTick::get().get(&tick).cloned().unwrap_or_default()
 	}
 	fn voting_schedule() -> VotingSchedule {
 		VotingSchedule::from_runtime_current_tick(CurrentTick::get())

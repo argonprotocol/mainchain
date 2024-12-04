@@ -1337,6 +1337,7 @@ dependencies = [
  "pallet-sudo",
  "pallet-ticks",
  "pallet-timestamp",
+ "pallet-token-gateway",
  "pallet-transaction-payment",
  "pallet-transaction-payment-rpc-runtime-api",
  "pallet-tx-pause",
@@ -1381,6 +1382,7 @@ dependencies = [
  "lazy_static",
  "num_cpus",
  "rand",
+ "regex",
  "sp-core",
  "sp-keyring",
  "sqlx",
@@ -4042,8 +4044,10 @@ dependencies = [
  "lazy_static",
  "miniscript",
  "rand",
+ "serial_test",
  "sp-arithmetic",
  "sp-core",
+ "sp-keyring",
  "subxt",
  "tokio",
 ]
@@ -5554,7 +5558,7 @@ dependencies = [
 [[package]]
 name = "grandpa-verifier"
 version = "0.1.1"
-source = "git+https://github.com/argonprotocol/hyperbridge?branch=seun/deploy-mnt#bc893795755887579463e7e5898904dd79655e25"
+source = "git+https://github.com/argonprotocol/hyperbridge#6b70b2ad90e5f48f8e64d3597444bda9bc3c519d"
 dependencies = [
  "anyhow",
  "derive_more 0.99.18",
@@ -5576,7 +5580,7 @@ dependencies = [
 [[package]]
 name = "grandpa-verifier-primitives"
 version = "0.1.1"
-source = "git+https://github.com/argonprotocol/hyperbridge?branch=seun/deploy-mnt#bc893795755887579463e7e5898904dd79655e25"
+source = "git+https://github.com/argonprotocol/hyperbridge#6b70b2ad90e5f48f8e64d3597444bda9bc3c519d"
 dependencies = [
  "anyhow",
  "finality-grandpa",
@@ -6602,7 +6606,7 @@ checksum = "7943c866cc5cd64cbc25b2e01621d07fa8eb2a1a23160ee81ce38704e97b8ecf"
 [[package]]
 name = "ismp"
 version = "0.2.2"
-source = "git+https://github.com/argonprotocol/hyperbridge?branch=seun/deploy-mnt#bc893795755887579463e7e5898904dd79655e25"
+source = "git+https://github.com/argonprotocol/hyperbridge#6b70b2ad90e5f48f8e64d3597444bda9bc3c519d"
 dependencies = [
  "anyhow",
  "derive_more 1.0.0",
@@ -6620,7 +6624,7 @@ dependencies = [
 [[package]]
 name = "ismp-grandpa"
 version = "1.15.1"
-source = "git+https://github.com/argonprotocol/hyperbridge?branch=seun/deploy-mnt#bc893795755887579463e7e5898904dd79655e25"
+source = "git+https://github.com/argonprotocol/hyperbridge#6b70b2ad90e5f48f8e64d3597444bda9bc3c519d"
 dependencies = [
  "ckb-merkle-mountain-range",
  "cumulus-primitives-core",
@@ -8179,7 +8183,7 @@ dependencies = [
 [[package]]
 name = "mmr-primitives"
 version = "1.15.1"
-source = "git+https://github.com/argonprotocol/hyperbridge?branch=seun/deploy-mnt#bc893795755887579463e7e5898904dd79655e25"
+source = "git+https://github.com/argonprotocol/hyperbridge#6b70b2ad90e5f48f8e64d3597444bda9bc3c519d"
 dependencies = [
  "ckb-merkle-mountain-range",
  "frame-system 38.0.0",
@@ -9075,10 +9079,6 @@ dependencies = [
 name = "pallet-chain-transfer"
 version = "0.0.17"
 dependencies = [
- "alloy-primitives 0.8.12",
- "alloy-sol-macro 0.8.12",
- "alloy-sol-types 0.8.12",
- "anyhow",
  "argon-notary-audit",
  "argon-primitives",
  "binary-merkle-tree",
@@ -9086,12 +9086,9 @@ dependencies = [
  "frame-benchmarking 38.0.0",
  "frame-support 38.0.0",
  "frame-system 38.0.0",
- "ismp",
  "log",
  "mmr-primitives 1.15.1 (registry+https://github.com/rust-lang/crates.io-index)",
  "pallet-balances",
- "pallet-hyperbridge",
- "pallet-ismp",
  "pallet-timestamp",
  "parity-scale-codec",
  "scale-info",
@@ -9101,7 +9098,6 @@ dependencies = [
  "sp-keyring",
  "sp-mmr-primitives",
  "sp-runtime",
- "token-gateway-primitives",
 ]
 
 [[package]]
@@ -9169,7 +9165,7 @@ dependencies = [
 [[package]]
 name = "pallet-hyperbridge"
 version = "1.15.1"
-source = "git+https://github.com/argonprotocol/hyperbridge?branch=seun/deploy-mnt#bc893795755887579463e7e5898904dd79655e25"
+source = "git+https://github.com/argonprotocol/hyperbridge#6b70b2ad90e5f48f8e64d3597444bda9bc3c519d"
 dependencies = [
  "anyhow",
  "frame-support 38.0.0",
@@ -9185,7 +9181,7 @@ dependencies = [
 [[package]]
 name = "pallet-ismp"
 version = "1.15.1"
-source = "git+https://github.com/argonprotocol/hyperbridge?branch=seun/deploy-mnt#bc893795755887579463e7e5898904dd79655e25"
+source = "git+https://github.com/argonprotocol/hyperbridge#6b70b2ad90e5f48f8e64d3597444bda9bc3c519d"
 dependencies = [
  "anyhow",
  "fortuples",
@@ -9194,7 +9190,7 @@ dependencies = [
  "frame-system 38.0.0",
  "ismp",
  "log",
- "mmr-primitives 1.15.1 (git+https://github.com/argonprotocol/hyperbridge?branch=seun/deploy-mnt)",
+ "mmr-primitives 1.15.1 (git+https://github.com/argonprotocol/hyperbridge)",
  "parity-scale-codec",
  "scale-info",
  "serde",
@@ -9209,7 +9205,7 @@ dependencies = [
 [[package]]
 name = "pallet-ismp-rpc"
 version = "1.15.1"
-source = "git+https://github.com/argonprotocol/hyperbridge?branch=seun/deploy-mnt#bc893795755887579463e7e5898904dd79655e25"
+source = "git+https://github.com/argonprotocol/hyperbridge#6b70b2ad90e5f48f8e64d3597444bda9bc3c519d"
 dependencies = [
  "anyhow",
  "frame-system 38.0.0",
@@ -9239,7 +9235,7 @@ dependencies = [
 [[package]]
 name = "pallet-ismp-runtime-api"
 version = "1.15.1"
-source = "git+https://github.com/argonprotocol/hyperbridge?branch=seun/deploy-mnt#bc893795755887579463e7e5898904dd79655e25"
+source = "git+https://github.com/argonprotocol/hyperbridge#6b70b2ad90e5f48f8e64d3597444bda9bc3c519d"
 dependencies = [
  "ismp",
  "pallet-ismp",
@@ -9473,6 +9469,30 @@ dependencies = [
  "sp-runtime",
  "sp-storage",
  "sp-timestamp",
+]
+
+[[package]]
+name = "pallet-token-gateway"
+version = "1.15.1"
+source = "git+https://github.com/argonprotocol/hyperbridge#6b70b2ad90e5f48f8e64d3597444bda9bc3c519d"
+dependencies = [
+ "alloy-primitives 0.7.7",
+ "alloy-sol-macro 0.7.7",
+ "alloy-sol-types 0.7.7",
+ "anyhow",
+ "frame-support 38.0.0",
+ "frame-system 38.0.0",
+ "ismp",
+ "log",
+ "pallet-hyperbridge",
+ "pallet-ismp",
+ "parity-scale-codec",
+ "primitive-types 0.12.2",
+ "scale-info",
+ "sp-core",
+ "sp-io",
+ "sp-runtime",
+ "token-gateway-primitives",
 ]
 
 [[package]]
@@ -12965,6 +12985,15 @@ dependencies = [
 ]
 
 [[package]]
+name = "scc"
+version = "2.2.5"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "66b202022bb57c049555430e11fc22fea12909276a80a4c3d368da36ac1d88ed"
+dependencies = [
+ "sdd",
+]
+
+[[package]]
 name = "schannel"
 version = "0.1.26"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -13098,6 +13127,12 @@ dependencies = [
  "slab",
  "thiserror 1.0.69",
 ]
+
+[[package]]
+name = "sdd"
+version = "3.0.4"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "49c1eeaf4b6a87c7479688c6d52b9f1153cedd3c489300564f932b065c6eab95"
 
 [[package]]
 name = "sec1"
@@ -13286,7 +13321,7 @@ dependencies = [
 [[package]]
 name = "serde-hex-utils"
 version = "0.1.0"
-source = "git+https://github.com/argonprotocol/hyperbridge?branch=seun/deploy-mnt#bc893795755887579463e7e5898904dd79655e25"
+source = "git+https://github.com/argonprotocol/hyperbridge#6b70b2ad90e5f48f8e64d3597444bda9bc3c519d"
 dependencies = [
  "anyhow",
  "hex",
@@ -13354,6 +13389,31 @@ checksum = "a84f14a19e9a014bb9f4512488d9829a68e04ecabffb0f9904cd1ace94598177"
 dependencies = [
  "base16ct",
  "serde",
+]
+
+[[package]]
+name = "serial_test"
+version = "3.2.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "1b258109f244e1d6891bf1053a55d63a5cd4f8f4c30cf9a1280989f80e7a1fa9"
+dependencies = [
+ "futures",
+ "log",
+ "once_cell",
+ "parking_lot 0.12.3",
+ "scc",
+ "serial_test_derive",
+]
+
+[[package]]
+name = "serial_test_derive"
+version = "3.2.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "5d69265a08751de7844521fd15003ae0a888e035773ba05695c5c759a6f89eef"
+dependencies = [
+ "proc-macro2",
+ "quote",
+ "syn 2.0.87",
 ]
 
 [[package]]
@@ -15035,7 +15095,7 @@ dependencies = [
 [[package]]
 name = "substrate-state-machine"
 version = "1.15.1"
-source = "git+https://github.com/argonprotocol/hyperbridge?branch=seun/deploy-mnt#bc893795755887579463e7e5898904dd79655e25"
+source = "git+https://github.com/argonprotocol/hyperbridge#6b70b2ad90e5f48f8e64d3597444bda9bc3c519d"
 dependencies = [
  "frame-support 38.0.0",
  "hash-db",
@@ -15598,7 +15658,7 @@ checksum = "1f3ccbac311fea05f86f61904b462b55fb3df8837a366dfc601a0161d0532f20"
 [[package]]
 name = "token-gateway-primitives"
 version = "1.15.1"
-source = "git+https://github.com/argonprotocol/hyperbridge?branch=seun/deploy-mnt#bc893795755887579463e7e5898904dd79655e25"
+source = "git+https://github.com/argonprotocol/hyperbridge#6b70b2ad90e5f48f8e64d3597444bda9bc3c519d"
 dependencies = [
  "alloy-primitives 0.7.7",
  "alloy-sol-macro 0.7.7",

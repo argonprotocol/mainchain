@@ -212,6 +212,8 @@ fn burns_a_spent_bitcoin() {
 		);
 		BitcoinBlockHeight::set(expiration_block);
 		Bonds::on_initialize(2);
+
+		assert_eq!(LastUnlockEvent::get(), Some((1, true, new_price)));
 		assert!(BitcoinBondCompletions::<Test>::get(expiration_block).is_empty());
 		assert_eq!(BondsById::<Test>::get(1), None);
 		assert_eq!(DefaultVault::get().bitcoin_argons.bonded, 0);
@@ -416,6 +418,7 @@ fn penalizes_vault_if_not_unlock_countersigned() {
 			.into(),
 		);
 		let original_bond_amount = bond.amount;
+		assert_eq!(LastUnlockEvent::get(), Some((1, false, bond.amount)));
 		bond.amount = original_bond_amount - market_price;
 		assert_eq!(BondsById::<Test>::get(1), Some(bond));
 		assert_eq!(DefaultVault::get().bitcoin_argons.bonded, original_bond_amount - market_price);
@@ -488,6 +491,7 @@ fn clears_unlocked_bitcoin_bonds() {
 			1,
 			BitcoinSignature(BoundedVec::truncate_from([0u8; 73].to_vec()))
 		));
+		assert_eq!(LastUnlockEvent::get(), Some((1, false, redemption_price)));
 		assert_eq!(UtxosPendingUnlockByUtxoId::<Test>::get().get(&1), None);
 		assert_eq!(UtxosById::<Test>::get(1), None);
 		assert_eq!(OwedUtxoAggrieved::<Test>::get(1), None);

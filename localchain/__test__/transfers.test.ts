@@ -35,7 +35,7 @@ describeIntegration("Transfer Localchain <-> Mainchain", () => {
         const transfer = await bobMainchainClient.waitForLocalchainTransfer(transferId);
 
         expect(transfer).toBeTruthy();
-        expect(transfer?.amount).toBe(5000n);
+        expect(transfer?.amount).toBe(5_000_000n);
         const notarization = bobchain.beginChange();
         const balanceChange = await notarization.addAccount(bob.address, AccountType.Deposit, 1);
         await balanceChange.claimFromMainchain(transfer);
@@ -45,7 +45,7 @@ describeIntegration("Transfer Localchain <-> Mainchain", () => {
         expect(proof).toHaveLength(1);
         expect(proof[0].proof).toHaveLength(0);
         expect(proof[0].address).toBe(bob.address);
-        expect(proof[0].balance).toBe(5000n);
+        expect(proof[0].balance).toBe(5_000_000n);
         expect(proof[0].changeNumber).toBe(1);
         expect(proof[0].numberOfLeaves).toBe(1);
 
@@ -85,7 +85,7 @@ describeIntegration("Transfer Localchain <-> Mainchain", () => {
             await tracker.getNotebookProof();
         }
 
-        const bobSendArgonFile = await bobchain.transactions.send(5000n, [ferdie.address]);
+        const bobSendArgonFile = await bobchain.transactions.send(5_000_000n, [ferdie.address]);
 
         let expectedAliceBalance = 0n;
         {

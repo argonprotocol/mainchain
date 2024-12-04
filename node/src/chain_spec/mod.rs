@@ -1,6 +1,6 @@
 use argon_primitives::{
 	bitcoin::{BitcoinNetwork, Satoshis},
-	block_seal::{MiningRegistration, MiningSlotConfig, RewardDestination},
+	block_seal::MiningSlotConfig,
 	block_vote::VoteMinimum,
 	notary::GenesisNotary,
 	tick::{Tick, Ticker},
@@ -11,7 +11,7 @@ use argon_runtime::{
 	GrandpaConfig, MiningSlotConfig as MiningSlotPalletConfig, NotariesConfig, PriceIndexConfig,
 	RuntimeGenesisConfig, SessionKeys, SudoConfig, TicksConfig,
 };
-use sp_consensus_grandpa::AuthorityId as GrandpaId;
+use sp_consensus_grandpa::{AuthorityId as GrandpaId, AuthorityWeight};
 use sp_core::{Pair, Public};
 use sp_runtime::traits::{IdentifyAccount, Verify};
 use std::time::Duration;
@@ -54,7 +54,7 @@ where
 }
 
 pub struct GenesisSettings {
-	pub initial_authorities: Vec<(AccountId, SessionKeys)>,
+	pub founding_grandpas: Vec<(GrandpaId, AuthorityWeight)>,
 	pub sudo_key: AccountId,
 	pub bitcoin_network: BitcoinNetwork,
 	pub bitcoin_tip_operator: AccountId,
@@ -67,15 +67,14 @@ pub struct GenesisSettings {
 	pub channel_hold_expiration_ticks: Tick,
 	pub mining_config: MiningSlotConfig<BlockNumber>,
 	pub minimum_bitcoin_bond_satoshis: Satoshis,
-	pub cross_token_operator: AccountId,
-	pub connect_to_test_evm_networks: bool,
+	pub hyperbridge_token_admin: AccountId,
 }
 
 #[allow(clippy::too_many_arguments)]
 /// Configure initial storage state for FRAME modules.
 pub(crate) fn testnet_genesis(
 	GenesisSettings {
-		initial_authorities,
+		founding_grandpas,
 		sudo_key,
 		bitcoin_network,
 		bitcoin_tip_operator,
@@ -88,21 +87,10 @@ pub(crate) fn testnet_genesis(
 		channel_hold_expiration_ticks,
 		mining_config,
 		minimum_bitcoin_bond_satoshis,
-		connect_to_test_evm_networks,
-		cross_token_operator,
+		hyperbridge_token_admin,
 	}: GenesisSettings,
 ) -> serde_json::Value {
-	let authority_zero = initial_authorities[0].clone();
 	let ticker = Ticker::start(Duration::from_millis(tick_millis), channel_hold_expiration_ticks);
-	let miner_zero = MiningRegistration::<AccountId, Balance, SessionKeys> {
-		account_id: authority_zero.0.clone(),
-		bond_id: None,
-		reward_destination: RewardDestination::Owner,
-		bond_amount: 0u32.into(),
-		ownership_tokens: 0u32.into(),
-		reward_sharing: None,
-		authority_keys: authority_zero.1,
-	};
 
 	let config = RuntimeGenesisConfig {
 		balances: BalancesConfig { balances: endowed_accounts },
@@ -112,11 +100,7 @@ pub(crate) fn testnet_genesis(
 			tip_oracle_operator: Some(bitcoin_tip_operator),
 			network: bitcoin_network,
 		},
-		mining_slot: MiningSlotPalletConfig {
-			miner_zero: Some(miner_zero),
-			mining_config,
-			..Default::default()
-		},
+		mining_slot: MiningSlotPalletConfig { mining_config, ..Default::default() },
 		sudo: SudoConfig { key: Some(sudo_key) },
 		ticks: TicksConfig { ticker, ..Default::default() },
 		block_seal_spec: BlockSealSpecConfig {
@@ -125,16 +109,9 @@ pub(crate) fn testnet_genesis(
 			..Default::default()
 		},
 		notaries: NotariesConfig { list: initial_notaries },
-		grandpa: GrandpaConfig {
-			authorities: initial_authorities
-				.iter()
-				.map(|(_, keys)| (keys.grandpa.clone(), 1u64))
-				.collect(),
-			..Default::default()
-		},
+		grandpa: GrandpaConfig { authorities: founding_grandpas, ..Default::default() },
 		chain_transfer: ChainTransferConfig {
-			token_admin: Some(cross_token_operator),
-			use_evm_test_networks: connect_to_test_evm_networks,
+			hyperbridge_token_admin: Some(hyperbridge_token_admin),
 			..Default::default()
 		},
 		..Default::default()

@@ -1,8 +1,8 @@
 use crate::keystore::Keystore;
 use crate::overview::LocalchainOverview;
 use crate::{
-  overview, AccountStore, ChannelHoldCloseOptions, CryptoScheme, DomainStore, Localchain,
-  LocalchainConfig, MainchainClient,
+  overview, AccountStore, CryptoScheme, DomainStore, Localchain, LocalchainConfig, MainchainClient,
+  VoteCreationOptions,
 };
 use anyhow::anyhow;
 use argon_primitives::argon_utils::format_argons;
@@ -265,7 +265,7 @@ where
       .await?;
 
       let balance_sync = localchain.balance_sync();
-      let sync_options = vote_address.map(|vote_address| ChannelHoldCloseOptions {
+      let sync_options = vote_address.map(|vote_address| VoteCreationOptions {
         votes_address: Some(vote_address),
         minimum_vote_amount: minimum_vote_amount.map(|v| v as i64),
       });

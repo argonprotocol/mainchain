@@ -29,7 +29,11 @@ impl Drop for ArgonTestOracle {
 
 impl ArgonTestOracle {
 	pub async fn bitcoin_tip(node: &ArgonTestNode) -> anyhow::Result<Self> {
-		let rust_log = env::var("RUST_LOG").unwrap_or("info".to_string());
+		let mut rust_log = env::var("RUST_LOG").unwrap_or("info".to_string());
+
+		if !rust_log.contains("argon") {
+			rust_log.push_str(",argon=info");
+		}
 
 		let target_dir = get_target_dir();
 

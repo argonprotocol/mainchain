@@ -18,8 +18,10 @@ use argon_primitives::{
 
 use crate::{
 	mock::{BlockSealSpec, System, *},
-	pallet::{PastBlockVotes, PastComputeBlockTimes, PreviousBlockTimestamp},
-	Event,
+	pallet::{
+		CurrentComputeKeyBlock, PastBlockVotes, PastComputeBlockTimes, PreviousBlockTimestamp,
+	},
+	Event, KEY_BLOCK_ROTATION,
 };
 
 #[test]
@@ -332,13 +334,13 @@ fn it_will_adjust_difficulty() {
 		assert_ok!(PastComputeBlockTimes::<Test>::try_mutate(|a| {
 			a.try_append(&mut vec![100, 100, 100, 100, 100, 100, 100, 100, 100, 1])
 		}));
-		System::set_block_number(2);
+		System::set_block_number(10);
 
 		let start_difficulty = BlockSealSpec::compute_difficulty();
 
 		BlockSealSpec::on_timestamp_set(2);
-		BlockSealSpec::on_initialize(1);
-		BlockSealSpec::on_finalize(1);
+		BlockSealSpec::on_initialize(10);
+		BlockSealSpec::on_finalize(10);
 
 		System::assert_last_event(
 			Event::ComputeDifficultyAdjusted {
@@ -350,7 +352,7 @@ fn it_will_adjust_difficulty() {
 			.into(),
 		);
 		assert_ne!(BlockSealSpec::compute_difficulty(), start_difficulty);
-		assert_eq!(PastComputeBlockTimes::<Test>::get().len(), 1);
+		assert_eq!(PastComputeBlockTimes::<Test>::get().len(), ChangePeriod::get() as usize);
 	});
 }
 
@@ -374,6 +376,37 @@ fn it_handles_overflowing_difficulty() {
 	new_test_ext(0, 1);
 	let actual = BlockSealSpec::calculate_next_difficulty(u128::MAX - 500, 1000, 0, 1, u128::MAX);
 	assert_eq!(u128::MAX, actual, "Failed to overflow difficulty");
+}
+
+#[test]
+fn it_changes_key_block_appropriately() {
+	new_test_ext(100, 1000).execute_with(|| {
+		// Go past genesis block so events get deposited
+		System::set_block_number(1);
+		BlockSealSpec::on_timestamp_set(1);
+		BlockSealSpec::on_initialize(1);
+		BlockSealSpec::on_finalize(1);
+		assert_eq!(CurrentComputeKeyBlock::<Test>::get(), Some(System::block_hash(0)));
+
+		System::initialize(&2, &System::parent_hash(), &Default::default());
+		BlockSealSpec::on_timestamp_set(2);
+		BlockSealSpec::on_initialize(2);
+		BlockSealSpec::on_finalize(2);
+		assert_eq!(CurrentComputeKeyBlock::<Test>::get(), Some(System::block_hash(0)));
+
+		let next_rotation = KEY_BLOCK_ROTATION.into();
+		System::initialize(&next_rotation, &System::parent_hash(), &Default::default());
+		BlockSealSpec::on_timestamp_set(next_rotation);
+		BlockSealSpec::on_initialize(next_rotation);
+		BlockSealSpec::on_finalize(next_rotation);
+		assert_eq!(CurrentComputeKeyBlock::<Test>::get(), Some(System::block_hash(0)));
+
+		System::initialize(&(next_rotation + 1), &System::parent_hash(), &Default::default());
+		BlockSealSpec::on_timestamp_set(next_rotation + 1);
+		BlockSealSpec::on_initialize(next_rotation + 1);
+		BlockSealSpec::on_finalize(next_rotation + 1);
+		assert_eq!(CurrentComputeKeyBlock::<Test>::get(), Some(System::block_hash(next_rotation)));
+	});
 }
 
 // assume that the current difficulty is 100 and the target window time is 100

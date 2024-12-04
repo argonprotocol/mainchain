@@ -1,6 +1,7 @@
 #![cfg_attr(not(feature = "std"), no_std)]
 extern crate alloc;
 
+use frame_system::pallet_prelude::BlockNumberFor;
 pub use pallet::*;
 pub use weights::*;
 
@@ -13,6 +14,9 @@ mod tests;
 #[cfg(feature = "runtime-benchmarks")]
 mod benchmarking;
 pub mod weights;
+
+/// (Incremental increase per block, blocks between increments, max value)
+pub type GrowthPath<T> = (<T as Config>::Balance, BlockNumberFor<T>, <T as Config>::Balance);
 
 #[frame_support::pallet(dev_mode)]
 pub mod pallet {
@@ -79,15 +83,23 @@ pub mod pallet {
 		type NotebookTick: Get<Tick>;
 		/// Number of argons minted per block
 		#[pallet::constant]
-		type ArgonsPerBlock: Get<Self::Balance>;
+		type StartingArgonsPerBlock: Get<Self::Balance>;
 
 		/// Number of ownership tokens minted per block
 		#[pallet::constant]
 		type StartingOwnershipTokensPerBlock: Get<Self::Balance>;
 
+		/// The growth path for both ownership and argons before halving
+		#[pallet::constant]
+		type IncrementalGrowth: Get<GrowthPath<Self>>;
+
 		/// Number of blocks for halving of ownership share rewards
 		#[pallet::constant]
 		type HalvingBlocks: Get<u32>;
+
+		/// The block number at which the halving begins for ownership shares
+		#[pallet::constant]
+		type HalvingBeginBlock: Get<BlockNumberFor<Self>>;
 
 		/// Percent as a number out of 100 of the block reward that goes to the miner.
 		#[pallet::constant]
@@ -147,7 +159,11 @@ pub mod pallet {
 	pub enum Error<T> {}
 
 	#[pallet::hooks]
-	impl<T: Config> Hooks<BlockNumberFor<T>> for Pallet<T> {
+	impl<T: Config> Hooks<BlockNumberFor<T>> for Pallet<T>
+	where
+		<T as Config>::Balance: From<u128>,
+		<T as Config>::Balance: Into<u128>,
+	{
 		fn on_initialize(n: BlockNumberFor<T>) -> Weight {
 			// Unlock any rewards
 			let unlocks = <PayoutsByBlock<T>>::take(n);
@@ -186,16 +202,11 @@ pub mod pallet {
 		fn on_finalize(n: BlockNumberFor<T>) {
 			let authors = T::BlockSealerProvider::get_sealer_info();
 
-			let block_number = UniqueSaturatedInto::<u32>::unique_saturated_into(n);
-			let halvings: u128 = block_number.saturating_div(T::HalvingBlocks::get()).into();
+			let RewardAmounts { argons, ownership } = Self::get_reward_amounts(n);
 
-			let mut block_argons =
-				UniqueSaturatedInto::<u128>::unique_saturated_into(T::ArgonsPerBlock::get());
-			let block_ownership = UniqueSaturatedInto::<u128>::unique_saturated_into(
-				T::StartingOwnershipTokensPerBlock::get(),
-			);
+			let mut block_ownership = ownership.into();
+			let mut block_argons = argons.into();
 
-			let mut block_ownership = block_ownership.saturating_div(halvings + 1u128);
 			let active_notaries = T::NotaryProvider::active_notaries().len() as u128;
 			let block_notebooks = T::NotebookProvider::notebooks_in_block();
 			let current_tick = T::NotebookTick::get();
@@ -250,15 +261,13 @@ pub mod pallet {
 				});
 			}
 
-			rewards.push(BlockPayout {
-				// block vote rewards account is the miner if not set
-				account_id: authors
-					.block_vote_rewards_account
-					.unwrap_or(authors.block_author_account_id.clone())
-					.clone(),
-				ownership: block_ownership.saturating_sub(miner_ownership),
-				argons: block_argons.saturating_sub(miner_argons),
-			});
+			if let Some(ref block_vote_rewards_account) = authors.block_vote_rewards_account {
+				rewards.push(BlockPayout {
+					account_id: block_vote_rewards_account.clone(),
+					ownership: block_ownership.saturating_sub(miner_ownership),
+					argons: block_argons.saturating_sub(miner_argons),
+				});
+			}
 
 			let reward_height = n.saturating_add(T::MaturationBlocks::get().into());
 			for reward in rewards.iter_mut() {
@@ -303,7 +312,11 @@ pub mod pallet {
 	#[pallet::call]
 	impl<T: Config> Pallet<T> {}
 
-	impl<T: Config> Pallet<T> {
+	impl<T: Config> Pallet<T>
+	where
+		T::Balance: From<u128>,
+		T::Balance: Into<u128>,
+	{
 		pub fn mint_and_freeze<
 			C: MutateFreeze<T::AccountId, Balance = T::Balance>
 				+ Mutate<T::AccountId, Balance = T::Balance>
@@ -354,5 +367,44 @@ pub mod pallet {
 				.unwrap_or_default()
 				.saturating_mul_int(T::Balance::one())
 		}
+
+		pub(crate) fn get_reward_amounts(block_number: BlockNumberFor<T>) -> RewardAmounts<T> {
+			let block_number = block_as_u32::<T>(block_number);
+			let (increment, blocks_between_increments, final_starting_amount) =
+				T::IncrementalGrowth::get();
+
+			let final_starting_amount: u128 = final_starting_amount.into();
+			let halving_being_block = block_as_u32::<T>(T::HalvingBeginBlock::get());
+			if block_number >= halving_being_block {
+				let blocks_after_halving = block_number.saturating_sub(halving_being_block);
+				let halvings: u128 =
+					blocks_after_halving.saturating_div(T::HalvingBlocks::get()).into();
+				return RewardAmounts {
+					ownership: final_starting_amount.saturating_div(halvings + 1).into(),
+					argons: final_starting_amount.into(),
+				}
+			}
+
+			let start_block_argons = T::StartingArgonsPerBlock::get().into();
+			let start_block_ownership = T::StartingOwnershipTokensPerBlock::get().into();
+			let blocks_between_increments = block_as_u32::<T>(blocks_between_increments);
+			let increments = block_number.saturating_div(blocks_between_increments) as u128;
+			let increment_sum = increments.saturating_mul(increment.into());
+
+			RewardAmounts {
+				argons: (start_block_argons + increment_sum).into(),
+				ownership: (start_block_ownership + increment_sum).into(),
+			}
+		}
 	}
+
+	fn block_as_u32<T: Config>(n: BlockNumberFor<T>) -> u32 {
+		UniqueSaturatedInto::<u32>::unique_saturated_into(n)
+	}
+}
+
+#[derive(Clone, Copy, PartialEq, Eq, Debug)]
+pub(crate) struct RewardAmounts<T: Config> {
+	pub argons: T::Balance,
+	pub ownership: T::Balance,
 }

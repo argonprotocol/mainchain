@@ -13,12 +13,6 @@ use sp_core::{
 use sp_keystore::KeystorePtr;
 use sqlx::PgConnection;
 
-use argon_primitives::{
-	ensure, AccountId, AccountOrigin, AccountType, Balance, BalanceTip, BlockVote, ChainTransfer,
-	LocalchainAccountId, MaxNotebookNotarizations, MerkleProof, NewAccountOrigin, NotaryId, Note,
-	NoteType, Notebook, NotebookNumber,
-};
-
 use crate::{
 	notebook_closer::notary_sign,
 	stores::{
@@ -27,6 +21,11 @@ use crate::{
 		BoxFutureResult,
 	},
 	Error,
+};
+use argon_primitives::{
+	ensure, tick::Tick, AccountId, AccountOrigin, AccountType, Balance, BalanceTip, BlockVote,
+	ChainTransfer, LocalchainAccountId, MaxNotebookNotarizations, MerkleProof, NewAccountOrigin,
+	Notarization, NotaryId, Note, NoteType, Notebook, NotebookNumber,
 };
 
 pub struct NotebookStore;
@@ -222,10 +221,13 @@ impl NotebookStore {
 	pub async fn close_notebook(
 		db: &mut PgConnection,
 		notebook_number: NotebookNumber,
+		tick: Tick,
 		public: Public,
+		operator_account_id: AccountId,
 		keystore: &KeystorePtr,
 	) -> anyhow::Result<(), Error> {
-		let notarizations = NotarizationsStore::get_for_notebook(&mut *db, notebook_number).await?;
+		let mut notarizations =
+			NotarizationsStore::get_for_notebook(&mut *db, notebook_number).await?;
 
 		let mut changed_accounts =
 			BTreeMap::<LocalchainAccountId, (u32, Balance, AccountOrigin, Option<Note>)>::new();
@@ -321,6 +323,22 @@ impl NotebookStore {
 			.collect::<Vec<_>>();
 
 		let changes_root = merkle_root::<Blake2Hasher, _>(&merkle_leafs);
+		if block_votes.is_empty() {
+			let default_vote = BlockVote::create_default_vote(operator_account_id.clone(), tick);
+			notarizations.push(Notarization::new(vec![], vec![default_vote.clone()], vec![]));
+			let next_sequence =
+				NotarizationsStore::next_sequence_number(&mut *db, notebook_number).await?;
+			NotarizationsStore::append_to_notebook(
+				&mut *db,
+				notebook_number,
+				next_sequence,
+				vec![],
+				vec![default_vote.clone()],
+				vec![],
+			)
+			.await?;
+			block_votes.insert((operator_account_id, 0), default_vote);
+		}
 
 		let final_votes = block_votes.clone();
 
@@ -404,7 +422,7 @@ mod tests {
 	use chrono::{Duration, Utc};
 	use sp_core::{bounded_vec, ed25519::Signature};
 	use sp_keyring::{
-		AccountKeyring::{Alice, Dave},
+		AccountKeyring::{Alice, Dave, Ferdie},
 		Sr25519Keyring::Bob,
 	};
 	use sp_keystore::{testing::MemoryKeystore, Keystore};
@@ -509,7 +527,15 @@ mod tests {
 		tx.commit().await?;
 
 		let mut tx = pool.begin().await?;
-		NotebookStore::close_notebook(&mut tx, 1, public, &keystore.into()).await?;
+		NotebookStore::close_notebook(
+			&mut tx,
+			1,
+			1,
+			public,
+			Ferdie.to_account_id(),
+			&keystore.into(),
+		)
+		.await?;
 		tx.commit().await?;
 
 		let balance_tip = BalanceTip {

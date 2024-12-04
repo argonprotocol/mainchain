@@ -1,5 +1,3 @@
-use std::{env, str::FromStr, sync::Arc};
-
 use bitcoin::{
 	bip32::{ChildNumber, DerivationPath, Fingerprint, Xpub},
 	hashes::Hash,
@@ -13,7 +11,12 @@ use bitcoind::{
 };
 use sp_arithmetic::FixedU128;
 use sp_core::{crypto::AccountId32, sr25519, Pair};
+use std::{env, str::FromStr, sync::Arc};
 
+use crate::utils::{
+	bankroll_miners, create_active_notary, mining_slot_ownership_needed, register_miner,
+	register_miner_keys,
+};
 use anyhow::anyhow;
 use argon_bitcoin::{CosignScript, CosignScriptArgs};
 use argon_client::{
@@ -34,11 +37,20 @@ use argon_testing::{
 	add_blocks, add_wallet_address, fund_script_address, run_bitcoin_cli, start_argon_test_node,
 	ArgonTestNode, ArgonTestOracle,
 };
+use serial_test::serial;
+use sp_keyring::{
+	AccountKeyring::{Bob, Eve},
+	Sr25519Keyring::Alice,
+};
 use tokio::fs;
 
-#[tokio::test]
+#[tokio::test(flavor = "multi_thread")]
+#[serial]
 async fn test_bitcoin_minting_e2e() {
+	env::set_var("RUST_LOG", "info");
 	let test_node = start_argon_test_node().await;
+	// need a test notary to get ownership rewards, so we can actually mint.
+	let _test_notary = create_active_notary(&test_node).await.expect("Notary registered");
 	let bitcoind = test_node.bitcoind.as_ref().expect("bitcoind");
 	let block_creator = add_wallet_address(bitcoind);
 	bitcoind.client.generate_to_address(101, &block_creator).unwrap();
@@ -72,9 +84,9 @@ async fn test_bitcoin_minting_e2e() {
 
 	let utxo_satoshis: Satoshis = Amount::ONE_BTC.to_sat() + 500;
 	let utxo_btc = utxo_satoshis as f64 / SATOSHIS_PER_BITCOIN as f64;
-	let alice_sr25519 = sr25519::Pair::from_string("//Alice", None).unwrap();
-	let price_index_operator = sr25519::Pair::from_string("//Eve", None).unwrap();
-	let bob_sr25519 = sr25519::Pair::from_string("//Bob", None).unwrap();
+	let alice_sr25519 = Alice.pair();
+	let price_index_operator = Eve.pair();
+	let bitcoin_owner_pair = Bob.pair();
 
 	let client = test_node.client.clone();
 	let client = Arc::new(client);
@@ -116,13 +128,15 @@ async fn test_bitcoin_minting_e2e() {
 		.unwrap();
 	println!("bitcoin prices submitted at tick {tick}",);
 
+	let alice_signer = Sr25519Signer::new(alice_sr25519.clone());
+
 	let _ = run_bitcoin_cli(&test_node, vec!["vault", "list", "--btc", &utxo_btc.to_string()])
 		.await
 		.unwrap();
 
 	// 3. Owner calls bond api to start a bitcoin bond
 	let (utxo_id, bond_id) =
-		create_bond(&test_node, vault_id, utxo_btc, &owner_compressed_pubkey, &bob_sr25519)
+		create_bond(&test_node, vault_id, utxo_btc, &owner_compressed_pubkey, &bitcoin_owner_pair)
 			.await
 			.unwrap();
 
@@ -157,8 +171,49 @@ async fn test_bitcoin_minting_e2e() {
 		fund_script_address(bitcoind, &scriptaddress, utxo_satoshis, &block_creator);
 
 	add_blocks(bitcoind, 5, &block_creator);
+	let vote_miner = Eve;
+	let vote_miner_account = vote_miner.to_account_id();
+	let miner_node = ArgonTestNode::start_with_bitcoin_rpc(
+		"eve",
+		0,
+		&test_node.boot_url,
+		test_node.bitcoin_rpc_url.clone().unwrap(),
+	)
+	.await
+	.unwrap();
+	// start miners so that we have ownership tokens to mint against
+	bankroll_miners(&test_node, &alice_signer, vec![vote_miner_account.clone()], true)
+		.await
+		.unwrap();
+	// wait for miner_node to catch up
 
-	wait_for_mint(&bob_sr25519, &client, &utxo_id, bond_amount, txid, vout)
+	let finalized =
+		test_node.client.latest_finalized_block_hash().await.expect("should get latest");
+	let mut miner_node_catchup_sub =
+		miner_node.client.live.blocks().subscribe_finalized().await.unwrap();
+	while let Some(next) = miner_node_catchup_sub.next().await {
+		let next = next.unwrap();
+		println!("Got next finalized catching up to main node {:?}", next.header().number);
+		if next.hash().as_ref() == finalized.hash().as_ref() {
+			break;
+		}
+	}
+	let nonce_miner_node = miner_node.client.get_account_nonce(&vote_miner_account).await.unwrap();
+	let nonce_test_node = client.get_account_nonce(&vote_miner_account).await.unwrap();
+	assert_eq!(nonce_miner_node, nonce_test_node);
+	println!("System health of miner node {:?}", miner_node.client.methods.system_health().await);
+	let vote_miner_ownership =
+		miner_node.client.get_ownership(&vote_miner_account, None).await.unwrap();
+	let ownership_needed = mining_slot_ownership_needed(&test_node).await.unwrap();
+	assert!(vote_miner_ownership.free >= ownership_needed);
+	let keys = register_miner_keys(&miner_node, vote_miner)
+		.await
+		.expect("Couldn't register vote miner");
+
+	// Register the miner against the test node since we are having fork issues
+	register_miner(&test_node, vote_miner, keys).await.unwrap();
+
+	wait_for_mint(&bitcoin_owner_pair, &client, &utxo_id, bond_amount, txid, vout)
 		.await
 		.unwrap();
 
@@ -168,9 +223,17 @@ async fn test_bitcoin_minting_e2e() {
 
 	// 5. Ask for the bitcoin to be unlocked
 	println!("\nOwner requests unlock");
-	owner_requests_unlock(&test_node, bitcoind, network, &bob_sr25519, &client, vault_id, bond_id)
-		.await
-		.unwrap();
+	owner_requests_unlock(
+		&test_node,
+		bitcoind,
+		network,
+		&bitcoin_owner_pair,
+		&client,
+		vault_id,
+		bond_id,
+	)
+	.await
+	.unwrap();
 
 	// 5. vault sees unlock request (outaddress, fee) and creates a transaction
 	println!("\nVault publishes cosign tx");
@@ -283,9 +346,11 @@ async fn create_vault(
 	// wait for alice to have enough argons
 	let mut finalized_sub = client.live.blocks().subscribe_finalized().await?;
 	let vault_account = client.api_account(vault_owner_account_id32);
-	while let Some(_block) = finalized_sub.next().await {
-		if let Some(alice_balance) =
-			client.fetch_storage(&storage().system().account(&vault_account), None).await?
+	while let Some(block) = finalized_sub.next().await {
+		println!("Waiting for Alice to have enough argons");
+		if let Some(alice_balance) = client
+			.fetch_storage(&storage().system().account(&vault_account), Some(block.unwrap().hash()))
+			.await?
 		{
 			println!("Alice argon balance {:#?}", alice_balance.data.free);
 			if alice_balance.data.free > 100_001_000_000 {
@@ -296,7 +361,7 @@ async fn create_vault(
 	}
 
 	println!("creating a vault");
-	let params = client.params_with_best_nonce(vault_owner_account_id32.clone()).await?;
+	let params = client.params_with_best_nonce(&vault_owner_account_id32.clone()).await?;
 
 	let result = run_bitcoin_cli(
 		test_node,
@@ -343,7 +408,7 @@ async fn create_bond(
 	vault_id: VaultId,
 	utxo_btc: f64,
 	owner_compressed_pubkey: &bitcoin::PublicKey,
-	bob_sr25519: &sr25519::Pair,
+	bitcoin_owner: &sr25519::Pair,
 ) -> anyhow::Result<(UtxoId, BondId)> {
 	let bond_cli_result = run_bitcoin_cli(
 		test_node,
@@ -362,7 +427,11 @@ async fn create_bond(
 
 	let bond_tx = test_node
 		.client
-		.submit_from_polkadot_url(&bond_cli_result, &Sr25519Signer::new(bob_sr25519.clone()), None)
+		.submit_from_polkadot_url(
+			&bond_cli_result,
+			&Sr25519Signer::new(bitcoin_owner.clone()),
+			None,
+		)
 		.await?
 		.wait_for_finalized_success()
 		.await?;
@@ -440,7 +509,7 @@ async fn confirm_bond(
 }
 
 async fn wait_for_mint(
-	bob_sr25519: &sr25519::Pair,
+	bitcoin_owner: &sr25519::Pair,
 	client: &Arc<MainchainClient>,
 	utxo_id: &UtxoId,
 	bond_amount: Balance,
@@ -448,14 +517,27 @@ async fn wait_for_mint(
 	vout: u32,
 ) -> anyhow::Result<()> {
 	let mut finalized_sub = client.live.blocks().subscribe_finalized().await?;
-	while let Some(block) = finalized_sub.next().await {
-		let block = block?;
-		let utxo_verified =
-			block.events().await?.find_first::<api::bitcoin_utxos::events::UtxoVerified>()?;
-		if let Some(utxo_verified) = utxo_verified {
-			if utxo_verified.utxo_id == 1 {
-				println!("Utxo verified in Argon mainchain");
-				break;
+	let pending_utxos = client
+		.fetch_storage(&storage().bitcoin_utxos().utxos_pending_confirmation(), None)
+		.await?
+		.unwrap()
+		.0;
+	if !pending_utxos.is_empty() {
+		println!("Waiting for pending utxo to be verified {:?}", pending_utxos);
+		let mut counter = 0;
+		while let Some(block) = finalized_sub.next().await {
+			let block = block?;
+			let utxo_verified =
+				block.events().await?.find_first::<api::bitcoin_utxos::events::UtxoVerified>()?;
+			if let Some(utxo_verified) = utxo_verified {
+				if utxo_verified.utxo_id == 1 {
+					println!("Utxo verified in Argon mainchain");
+					break;
+				}
+			}
+			counter += 1;
+			if counter >= 20 {
+				panic!("No mint after 100 blocks")
 			}
 		}
 	}
@@ -475,7 +557,7 @@ async fn wait_for_mint(
 		.await?
 		.expect("pending mint");
 
-	let owner_account_id32: AccountId32 = bob_sr25519.clone().public().into();
+	let owner_account_id32: AccountId32 = bitcoin_owner.clone().public().into();
 	let balance = client.get_argons(&owner_account_id32).await.expect("pending mint balance");
 	if pending_mint.0.is_empty() {
 		assert!(balance.free >= bond_amount);
@@ -491,15 +573,22 @@ async fn wait_for_mint(
 		assert!(balance.free > (bond_amount - pending_mint.0[0].2));
 
 		// 4. Wait for the full payout
+		let mut counter = 0;
 		while let Some(_block) = finalized_sub.next().await {
 			let pending_mint = client
 				.fetch_storage(&storage().mint().pending_mint_utxos(), None)
 				.await?
 				.expect("pending mint");
+			println!("Pending mint {:?}", pending_mint.0.first().map(|a| a.2));
 			if pending_mint.0.is_empty() {
 				break;
 			}
+			counter += 1;
+			if counter >= 20 {
+				panic!("Timed out waiting for remaining mint")
+			}
 		}
+		println!("Owner minted full bitcoin")
 	}
 	Ok(())
 }
@@ -508,7 +597,7 @@ async fn owner_requests_unlock(
 	test_node: &ArgonTestNode,
 	bitcoind: &BitcoinD,
 	network: Network,
-	bob_sr25519: &sr25519::Pair,
+	bitcoin_owner: &sr25519::Pair,
 	client: &Arc<MainchainClient>,
 	vault_id: VaultId,
 	bond_id: BondId,
@@ -534,7 +623,7 @@ async fn owner_requests_unlock(
 	let unlock_request_tx = client
 		.submit_from_polkadot_url(
 			&unlock_request_cli,
-			&Sr25519Signer::new(bob_sr25519.clone()),
+			&Sr25519Signer::new(bitcoin_owner.clone()),
 			None,
 		)
 		.await?

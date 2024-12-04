@@ -170,6 +170,8 @@ mod runtime {
 	pub type IsmpGrandpa = ismp_grandpa;
 	#[runtime::pallet_index(29)]
 	pub type Hyperbridge = pallet_hyperbridge;
+	#[runtime::pallet_index(30)]
+	pub type TokenGateway = pallet_token_gateway;
 }
 
 /// The address format for describing accounts.
@@ -383,6 +385,10 @@ impl_runtime_apis! {
 		fn is_valid_signature(block_hash: <Block as BlockT>::Hash, seal: &BlockSealDigest, digest: &Digest) -> bool {
 			BlockSeal::is_valid_miner_signature(block_hash, seal, digest)
 		}
+
+		fn is_bootstrap_mining() -> bool {
+			!MiningSlot::is_registered_mining_active()
+		}
 	}
 
 	impl argon_primitives::BlockCreatorApis<Block, AccountId, NotebookVerifyError> for Runtime {
@@ -454,8 +460,8 @@ impl_runtime_apis! {
 		fn ticker() -> Ticker {
 			Ticks::ticker()
 		}
-		fn block_at_tick(tick: Tick) -> Option<<Block as BlockT>::Hash> {
-			Ticks::block_at_tick(tick)
+		fn blocks_at_tick(tick: Tick) -> Vec<<Block as BlockT>::Hash> {
+			Ticks::blocks_at_tick(tick)
 		}
 	}
 
@@ -558,7 +564,7 @@ impl_runtime_apis! {
 			// have a backtrace here. If any of the pre/post migration checks fail, we shall stop
 			// right here and right now.
 			let weight = Executive::try_runtime_upgrade(checks).unwrap();
-			(weight, RuntimeBlockWeights::get().max_block)
+			(weight, configs::BlockWeights::get().max_block)
 		}
 
 		fn execute_block(

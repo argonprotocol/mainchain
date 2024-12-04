@@ -7,13 +7,15 @@ use crate::{
 };
 use argon_bitcoin_utxo_tracker::UtxoTracker;
 use argon_node_consensus::{
-	aux_client::ArgonAux, create_import_queue, run_block_builder_task, BlockBuilderParams,
+	aux_client::ArgonAux, create_import_queue, run_block_builder_task, run_notary_sync,
+	BlockBuilderParams, NotaryClient,
 };
-use argon_primitives::AccountId;
+use argon_primitives::{AccountId, TickApis};
 use sc_client_api::BlockBackend;
 use sc_consensus::BasicQueue;
 use sc_consensus_grandpa::{
-	FinalityProofProvider as GrandpaFinalityProofProvider, GrandpaBlockImport, SharedVoterState,
+	BeforeBestBlockBy, FinalityProofProvider as GrandpaFinalityProofProvider, GrandpaBlockImport,
+	SharedVoterState, ThreeQuartersOfTheUnfinalizedChain,
 };
 use sc_rpc::SubscriptionTaskExecutor;
 use sc_service::{
@@ -21,7 +23,8 @@ use sc_service::{
 };
 use sc_telemetry::{Telemetry, TelemetryWorker};
 use sc_transaction_pool_api::OffchainTransactionPoolFactory;
-use sp_api::ConstructRuntimeApi;
+use sp_api::{ConstructRuntimeApi, ProvideRuntimeApi};
+use sp_blockchain::HeaderBackend;
 use std::{sync::Arc, time::Duration};
 
 pub(crate) type FullClient<Runtime> = sc_service::TFullClient<
@@ -50,6 +53,7 @@ pub type Service<Runtime> = sc_service::PartialComponents<
 	sc_transaction_pool::FullPool<Block, FullClient<Runtime>>,
 	(
 		ArgonBlockImport<Runtime>,
+		Arc<NotaryClient<Block, FullClient<Runtime>, AccountId>>,
 		ArgonAux<Block, FullClient<Runtime>>,
 		Arc<UtxoTracker>,
 		sc_consensus_grandpa::LinkHalf<Block, FullClient<Runtime>, FullSelectChain>,
@@ -118,10 +122,18 @@ where
 	let utxo_tracker = Arc::new(utxo_tracker);
 
 	let aux_client = ArgonAux::<Block, _>::new(client.clone());
+	let ticker = {
+		let best_hash = client.info().best_hash;
+		client.runtime_api().ticker(best_hash).expect("Ticker not available")
+	};
+	let idle_delay = if ticker.tick_duration_millis <= 10_000 { 100 } else { 1000 };
+	let notary_client =
+		run_notary_sync(&task_manager, client.clone(), aux_client.clone(), idle_delay);
 
 	let (import_queue, argon_block_import) = create_import_queue(
 		client.clone(),
 		aux_client.clone(),
+		notary_client.clone(),
 		grandpa_block_import,
 		&task_manager.spawn_essential_handle(),
 		config.prometheus_registry(),
@@ -137,7 +149,14 @@ where
 		keystore_container,
 		select_chain,
 		transaction_pool,
-		other: (argon_block_import, aux_client, utxo_tracker, grandpa_link, telemetry),
+		other: (
+			argon_block_import,
+			notary_client,
+			aux_client,
+			utxo_tracker,
+			grandpa_link,
+			telemetry,
+		),
 	})
 }
 
@@ -162,7 +181,8 @@ where
 		keystore_container,
 		other,
 	} = params;
-	let (argon_block_import, aux_client, utxo_tracker, grandpa_link, mut telemetry) = other;
+	let (argon_block_import, notary_client, aux_client, utxo_tracker, grandpa_link, mut telemetry) =
+		other;
 
 	let metrics = N::register_notification_metrics(config.prometheus_registry());
 	let mut net_config = sc_network::config::FullNetworkConfiguration::<
@@ -252,7 +272,7 @@ where
 		task_manager: &mut task_manager,
 		config,
 		keystore: keystore_container.keystore(),
-		backend,
+		backend: backend.clone(),
 		network: network.clone(),
 		sync_service: sync_service.clone(),
 		system_rpc_tx,
@@ -275,6 +295,8 @@ where
 			BlockBuilderParams {
 				block_import: argon_block_import,
 				client: client.clone(),
+				notary_client,
+				backend,
 				keystore: keystore_container.keystore(),
 				sync_oracle: sync_service.clone(),
 				select_chain: select_chain.clone(),
@@ -288,32 +310,45 @@ where
 			},
 			&task_manager,
 		);
-
-		let grandpa_config = sc_consensus_grandpa::Config {
-			// FIXME #1578 make this available through chainspec
-			gossip_duration: Duration::from_millis(333),
-			justification_generation_period: GRANDPA_JUSTIFICATION_PERIOD,
-			name: Some(name),
-			observer_enabled: false,
-			keystore: Some(keystore_container.keystore()),
-			local_role: role,
-			telemetry: telemetry.as_ref().map(|x| x.handle()),
-			protocol_name: grandpa_protocol_name,
-		};
-
-		// start the full GRANDPA voter
+	}
+	// grandpa voter task
+	{
+		// TODO: we need to create a keystore for each grandpa voter we want to run. Probably a
+		// service 	 that can dynamically allocate an deallocate voters with restricted/filtered
+		// keystore access start the full GRANDPA voter
 		// NOTE: non-authorities could run the GRANDPA observer protocol, but at
 		// this point the full voter should provide better guarantees of block
 		// and vote data availability than the observer. The observer has not
 		// been tested extensively yet and having most nodes in a network run it
 		// could lead to finality stalls.
-		let grandpa_config = sc_consensus_grandpa::GrandpaParams {
-			config: grandpa_config,
+		let grandpa_voter = sc_consensus_grandpa::GrandpaParams {
+			config: sc_consensus_grandpa::Config {
+				// FIXME #1578 make this available through chainspec
+				gossip_duration: Duration::from_millis(333),
+				justification_generation_period: GRANDPA_JUSTIFICATION_PERIOD,
+				name: Some(name),
+				observer_enabled: false,
+				keystore: if role.is_authority() {
+					Some(keystore_container.keystore())
+				} else {
+					None
+				},
+				local_role: role,
+				telemetry: telemetry.as_ref().map(|x| x.handle()),
+				protocol_name: grandpa_protocol_name,
+			},
 			link: grandpa_link,
 			network,
 			sync: Arc::new(sync_service),
 			notification_service: grandpa_notification_service,
-			voting_rule: sc_consensus_grandpa::VotingRulesBuilder::default().build(),
+			voting_rule: sc_consensus_grandpa::VotingRulesBuilder::new()
+				// - Best Block (tick 5)
+				// - Notebooks for tick (4)
+				// - Eligible Votes (tick 3)
+				// - Votes for blocks at tick 2
+				.add(BeforeBestBlockBy(4u32))
+				.add(ThreeQuartersOfTheUnfinalizedChain)
+				.build(),
 			prometheus_registry,
 			shared_voter_state: SharedVoterState::empty(),
 			telemetry: telemetry.as_ref().map(|x| x.handle()),
@@ -325,7 +360,7 @@ where
 		task_manager.spawn_essential_handle().spawn_blocking(
 			"grandpa-voter",
 			None,
-			sc_consensus_grandpa::run_grandpa_voter(grandpa_config)?,
+			sc_consensus_grandpa::run_grandpa_voter(grandpa_voter)?,
 		);
 	}
 	start_network.start_network();

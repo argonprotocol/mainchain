@@ -11,6 +11,7 @@ mod argon_node;
 mod argon_notary;
 mod argon_oracle;
 mod bitcoind;
+mod log_watcher;
 
 pub use argon_bitcoin::run_bitcoin_cli;
 pub use argon_localchain::*;
@@ -20,23 +21,18 @@ pub use argon_oracle::ArgonTestOracle;
 pub use bitcoind::*;
 
 pub async fn start_argon_test_node() -> ArgonTestNode {
-	let use_live = env::var("USE_LIVE")
-		.unwrap_or(String::from("false"))
-		.parse::<bool>()
-		.unwrap_or_default();
+	ArgonTestNode::start("alice", test_miner_count(), "")
+		.await
+		.expect("Unable to create test context - ensure debug argon-node build is available")
+}
 
-	if use_live {
-		ArgonTestNode::from_url("ws://localhost:9944".to_string(), None).await
-	} else {
-		let cpus = num_cpus::get();
-		let mut threads = 2;
-		if cpus <= 2 {
-			threads = 1;
-		}
-		ArgonTestNode::start("alice".to_string(), threads)
-			.await
-			.expect("Unable to create test context - ensure debug argon-node build is available")
+pub fn test_miner_count() -> u16 {
+	let cpus = num_cpus::get();
+	let mut threads = 2;
+	if cpus <= 2 {
+		threads = 1;
 	}
+	threads
 }
 
 pub(crate) fn get_target_dir() -> PathBuf {

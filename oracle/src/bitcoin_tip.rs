@@ -6,7 +6,7 @@ use tokio::time::sleep;
 use argon_client::{
 	api::{runtime_types::argon_primitives::bitcoin as bitcoin_primitives_subxt, storage, tx},
 	signer::Signer,
-	ArgonConfig, MainchainClient, ReconnectingClient,
+	ArgonConfig, ReconnectingClient,
 };
 use argon_primitives::bitcoin::{BitcoinNetwork, H256Le};
 
@@ -64,18 +64,20 @@ pub async fn bitcoin_loop(
 		);
 
 		let client = mainchain_client.get().await?;
-		let nonce = client.get_account_nonce(&account_id).await?;
-		let params = MainchainClient::ext_params_builder().nonce(nonce.into()).build();
-		let progress = client
-			.live
-			.tx()
-			.sign_and_submit_then_watch(&latest_block, &signer, params)
-			.await?;
-		tracing::info!(
-			"Submitted bitcoin tip {bitcoin_confirmed_height} with progress: {:?}",
-			progress
-		);
-		MainchainClient::wait_for_ext_in_block(progress).await?;
+		let params = client.params_with_best_nonce(&account_id).await?.build();
+		match client.submit_tx(&latest_block, &signer, Some(params), false).await {
+			Ok(_) => {
+				tracing::info!(bitcoin_confirmed_height, ?bitcoin_tip, "Submitted bitcoin tip",);
+			},
+			Err(e) => {
+				tracing::error!(
+					?e,
+					bitcoin_confirmed_height,
+					?bitcoin_tip,
+					"Failed to submit bitcoin tip",
+				);
+			},
+		}
 	}
 }
 
@@ -87,6 +89,7 @@ mod tests {
 			storage,
 		},
 		signer::Sr25519Signer,
+		MainchainClient,
 	};
 	use argon_primitives::bitcoin::BitcoinNetwork;
 	use argon_testing::start_argon_test_node;
