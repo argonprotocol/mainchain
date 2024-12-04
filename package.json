@@ -6,7 +6,7 @@
     "pretest": "yarn workspace @argonprotocol/localchain pretest",
     "test": "yarn pretest && yarn workspaces foreach --all run test",
     "test:js-only": "ARGON_USE_DOCKER_BINS=1 yarn workspaces foreach --all run test",
-    "version:bump": "npx lerna version $VERSION --no-push --no-git-tag-version --no-changelog --exact --yes"
+    "version:bump": "npx lerna version $VERSION --no-push --no-git-tag-version --exact --yes"
   },
   "private": true,
   "engines": {
