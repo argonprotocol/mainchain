@@ -330,6 +330,7 @@ jobs:
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
           SKIP_E2E: true
+          SQLX_OFFLINE: true
 
   test-linux:
     name: Test bindings on ${{ matrix.target }} - node@${{ matrix.node }}
@@ -403,6 +404,7 @@ jobs:
         continue-on-error: true
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          RUSTFLAGS: "-C link-args=-Wl,--warn-unresolved-symbols"
           ADD_DOCKER_HOST: true
           RUST_LOG: debug,sqlx=info
   upload-assets:

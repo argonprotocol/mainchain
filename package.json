@@ -5,7 +5,7 @@
     "build": "yarn workspaces foreach --all run build",
     "pretest": "yarn workspace @argonprotocol/localchain pretest",
     "test": "yarn pretest && yarn workspaces foreach --all run test",
-    "test:js-only": "ARGON_USE_DOCKER_BINS=1 yarn workspaces foreach --all run test",
+    "test:js-only": "yarn workspace @argonprotocol/mainchain test && ARGON_USE_DOCKER_BINS=1 yarn workspace @argonprotocol/localchain test",
     "version:bump": "npx lerna version $VERSION --no-push --no-git-tag-version --exact --yes"
   },
   "private": true,

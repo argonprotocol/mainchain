@@ -225,6 +225,7 @@ mod tests {
 		pin::Pin,
 		sync::Arc,
 		task::{Context, Poll},
+		time::Duration,
 	};
 	use subxt::{
 		blocks::Block,
@@ -490,6 +491,7 @@ mod tests {
 					Some(&Error::BalanceChangeVerifyError(VerifyError::InvalidBlockVoteTick {
 						..
 					})) => {
+						tokio::time::sleep(Duration::from_millis(100)).await;
 						continue;
 					},
 					_ => bail!(e),
