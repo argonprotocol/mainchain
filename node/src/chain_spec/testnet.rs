@@ -26,7 +26,7 @@ pub fn testnet_config() -> Result<ChainSpec, String> {
 	let token_admin = sudo_account.clone();
 
 	let notary_account = AccountId::from_str("5CFiHEZUFSqwEeiSqJwfxjp4wZWxom73y5EjVsrAw3GwQuWh")?;
-	let notary_public = NotaryPublic::from_str("5EX7HEsDt3nn3rsLttPiApADgFvVWmUpWdjU1UL3qgbNLnJ8")
+	let notary_public = NotaryPublic::from_str("5CGRRiYmYcnxPEpGmhHLp6SywpSKN23PbVHM9Y3Td7n6xvm2")
 		.map_err(|e| format!("Error parsing notary public {:?}", e))?;
 
 	let grandpa_key = GrandpaId::from_slice(
