@@ -1,8 +1,15 @@
 # Changelog
 
-## [v0.0.18](https://github.com/argonprotocol/mainchain/compare/v0.0.17...fa9c7ed4300b8efe3da3ddb03485ecbe80296634) (2024-12-04)
+## [v0.0.19](https://github.com/argonprotocol/mainchain/compare/v0.0.18...8f20c4d2209d1ef7fc2ef10cdbc10ba23b2bb5ea) (2024-12-06)
 
-### Features
+### Fixes
+
+* notary public key wrong in testnet
+([8f20c4d](https://github.com/argonprotocol/mainchain/commit/8f20c4d2209d1ef7fc2ef10cdbc10ba23b2bb5ea))
+
+### [v0.0.18](https://github.com/argonprotocol/mainchain/compare/v0.0.17...v0.0.18) (2024-12-05)
+
+#### Features
 
 * **oracle:** register keys
 ([958f3e1](https://github.com/argonprotocol/mainchain/commit/958f3e1332ceb6126796ebe5959002d4e8c595e0))
@@ -45,8 +52,10 @@
 * **runtime:** lower minimum vote start
 ([d7bfbab](https://github.com/argonprotocol/mainchain/commit/d7bfbab847742bf55db866fca01b2329f3e8c1f0))
 
-### Fixes
+#### Fixes
 
+* build
+([7628e02](https://github.com/argonprotocol/mainchain/commit/7628e02d9566eb03e019bd23d897fe7fdd1d5a31))
 * tests timing out
 ([2801c78](https://github.com/argonprotocol/mainchain/commit/2801c78db1e6b34469c985757a34adfd64f2ea81))
 * **node:** set initial miners to 100
