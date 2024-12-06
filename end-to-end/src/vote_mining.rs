@@ -48,8 +48,8 @@ async fn test_end_to_end_default_vote_mining() {
 				break;
 			}
 			counter += 1;
-			if counter >= 20 {
-				panic!("Blocks not produced by both authors after 20 blocks -> {:?}", authors);
+			if counter >= 30 {
+				panic!("Blocks not produced by both authors after 30 blocks -> {:?}", authors);
 			}
 		}
 	}

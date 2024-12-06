@@ -30,7 +30,7 @@ pub fn testnet_config() -> Result<ChainSpec, String> {
 		.map_err(|e| format!("Error parsing notary public {:?}", e))?;
 
 	let grandpa_key = GrandpaId::from_slice(
-		hex::decode("0x1e69c7672dfb67dc19abfce302caf4c60cc5cb21f39538f749efdc6a28feaba6")
+		hex::decode("1e69c7672dfb67dc19abfce302caf4c60cc5cb21f39538f749efdc6a28feaba6")
 			.map_err(|e| format!("Error decoding testnet grandpa key {:?}", e))?
 			.as_bytes_ref(),
 	)

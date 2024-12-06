@@ -40,7 +40,7 @@ resolver = "2"
 
 
 [workspace.package]
-version = "0.0.17"
+version = "0.0.18"
 edition = "2021"
 authors = ["Argon <https://github.com/argonprotocol>"]
 description = "The Argon ecosystem is a stablecoin on top of bitcoin."
@@ -139,8 +139,8 @@ pallet-hyperbridge = { git = "https://github.com/argonprotocol/hyperbridge" }
 pallet-ismp-rpc = { git = "https://github.com/argonprotocol/hyperbridge" }
 ismp-grandpa = { git = "https://github.com/argonprotocol/hyperbridge" }
 ismp = { git = "https://github.com/argonprotocol/hyperbridge" }
-token-gateway-primitives = { git = "https://github.com/argonprotocol/hyperbridge" }
 pallet-token-gateway = { git = "https://github.com/argonprotocol/hyperbridge" }
+merkleized-metadata = { git = "https://github.com/bkchr/merkleized-metadata", rev = "18c9f872ce583f9aaf53a25717af6f3db7605871" }
 
 [workspace.dependencies]
 futures = { version = "0.3" }
@@ -192,7 +192,6 @@ frame-try-runtime = { version = "0.44.0", default-features = false }
 frame-support-procedural = { version = "30.0.4", default-features = false }
 frame-system-benchmarking = { version = "38.0.0", default-features = false }
 
-
 sp-api = { version = "34.0.0", default-features = false }
 sp-application-crypto = { version = "38.0.0", default-features = false }
 sp-arithmetic = { version = "26.0.0", default-features = false }
@@ -227,6 +226,7 @@ pallet-utility = { version = "38.0.0", default-features = false }
 pallet-transaction-payment = { version = "38.0.0", default-features = false }
 pallet-transaction-payment-rpc-runtime-api = { version = "38.0.0", default-features = false }
 
+substrate-wasm-builder = { version = "24.0.1" }
 # node-side
 pallet-transaction-payment-rpc = { version = "41.0.0" }
 
@@ -236,7 +236,6 @@ fs2 = { version = "0.4" }
 strip-ansi-escapes = { version = "0.2" }
 current_platform = { version = "0.2" }
 regex = { version = "1.11.1" }
-substrate-wasm-builder = { version = "24.0.1" }
 serial_test = { version = "3.2.0" }
 
 # node
@@ -317,8 +316,6 @@ pallet-token-gateway = { version = "1.15.1", default-features = false }
 pallet-ismp-rpc = { version = "1.15.1", default-features = false }
 ismp-grandpa = { version = "1.15.1", default-features = false }
 ismp = { version = "0.2.2", default-features = false }
-token-gateway-primitives = { version = "1.15.1", default-features = false }
-mmr-primitives = { version = "1.15.1", default-features = false }
 sp-mmr-primitives = { version = "34.1.0", default-features = false }
 
 ethers = { version = "2.0.14" }
@@ -334,7 +331,7 @@ alloy-transport-http = { version = "0.6.4" }
 alloy-eips = { version = "0.6.4" }
 
 # releases are using old versions of jsonrpsee
-subxt = { git = "https://github.com/paritytech/subxt", rev = "72db833defd2664410d61f51408b26fc9314fc41" }
+subxt = { git = "https://github.com/paritytech/subxt", rev = "50fc73a2a5563e1b051b4a738c42a3319f79ac26" }
 
 argon-testing = { path = "testing" }
 argon-localchain = { path = "localchain" }

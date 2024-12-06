@@ -56,7 +56,6 @@ pallet-token-gateway = { workspace = true }
 pallet-ismp = { workspace = true, features = ["unsigned"] }
 pallet-ismp-runtime-api = { workspace = true }
 pallet-hyperbridge = { workspace = true }
-token-gateway-primitives = { workspace = true }
 ismp-grandpa = { workspace = true }
 ismp = { workspace = true }
 anyhow = { workspace = true, default-features = false }
@@ -155,7 +154,6 @@ std = [
 	"sp-transaction-pool/std",
 	"sp-version/std",
 	"substrate-wasm-builder",
-	"token-gateway-primitives/std",
 ]
 runtime-benchmarks = [
 	"frame-benchmarking/runtime-benchmarks",
@@ -225,7 +223,6 @@ try-runtime = [
 	"pallet-utility/try-runtime",
 	"pallet-vaults/try-runtime",
 	"sp-runtime/try-runtime",
-	"token-gateway-primitives/try-runtime",
 ]
 
 # Enable the metadata hash generation.

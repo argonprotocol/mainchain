@@ -1,8 +1,88 @@
 # Changelog
 
-## [v0.0.17](https://github.com/argonprotocol/mainchain/compare/v0.0.16...130990f1c550cff872644fa38cf4c03352109ef3) (2024-10-25)
+## [v0.0.18](https://github.com/argonprotocol/mainchain/compare/v0.0.17...fa9c7ed4300b8efe3da3ddb03485ecbe80296634) (2024-12-04)
+
+### Features
+
+* **oracle:** register keys
+([958f3e1](https://github.com/argonprotocol/mainchain/commit/958f3e1332ceb6126796ebe5959002d4e8c595e0))
+* **client:** add a wage protector
+([c2bba70](https://github.com/argonprotocol/mainchain/commit/c2bba7038005251280a15f21829577359853d955))
+* **mint:** allow bitcoin mint at cpi=0
+([a4d7105](https://github.com/argonprotocol/mainchain/commit/a4d71058edae0a51ec358593a317b932de28216c))
+* **node:** activate compute sooner in bootstrap
+([828f283](https://github.com/argonprotocol/mainchain/commit/828f283a09570f62e34836bc35a55e58675dc3d1))
+* **runtime:** temporarily disable grandpa w slots
+([b01d5a0](https://github.com/argonprotocol/mainchain/commit/b01d5a0ba53394b5bc3da7fe3d663b6ced3a314d))
+* **mint:** disable blocking mint if no reg miners
+([27b3049](https://github.com/argonprotocol/mainchain/commit/27b3049bf6ee777f5a7c2da18616a3730430834a))
+* **node:** change finalization to match voting
+([aad495a](https://github.com/argonprotocol/mainchain/commit/aad495aae91f25b82eb10ff154a8e55e4fe6a5ac))
+* **node:** remove compute notebook block sort
+([e087392](https://github.com/argonprotocol/mainchain/commit/e08739228cad43b071b1d2181de0cb3197ae12c5))
+* **mint:** return early if no registered miners
+([02f259a](https://github.com/argonprotocol/mainchain/commit/02f259abcb0f34d0eea0698de18c57e91b795c12))
+* **chain_transfer:** bridge scripts
+([de5f351](https://github.com/argonprotocol/mainchain/commit/de5f351c9253de09c5be939f5ca6d830089d72a1))
+* uniswap oracle for usdc prices
+([a5e24e6](https://github.com/argonprotocol/mainchain/commit/a5e24e611ce45d874d017c0f038eb3d426ac02dc))
+* **chain_transfer:** add ability to pause bridge
+([3cfd210](https://github.com/argonprotocol/mainchain/commit/3cfd21014038a476fc2b610d187445cd6e643252))
+* **runtime:** add a canary runtime
+([1eb7a61](https://github.com/argonprotocol/mainchain/commit/1eb7a61e25183d29bef294d3fab99c8d842ff66c))
+* **node:** add grandpa rpc
+([c56c427](https://github.com/argonprotocol/mainchain/commit/c56c4272ec8253dafa2d0c2355c1c671fdf82bdd))
+* change decimals to 6
+([f8277eb](https://github.com/argonprotocol/mainchain/commit/f8277ebe93451b523eea93b688f00a1a160a6654))
+* convert ticks to use unix epoch
+([36d230e](https://github.com/argonprotocol/mainchain/commit/36d230e0f18e631a92da0e9b1b466028f02cde13))
+* **runtime:** integrate hyperbridge to evm
+([e5b8d35](https://github.com/argonprotocol/mainchain/commit/e5b8d3587b5ba285c96470a628f16fc1b1fde5f5))
+* **node:** get vote block author from runtime
+([ffee3b6](https://github.com/argonprotocol/mainchain/commit/ffee3b6584da349e72f2b9c99d17528f7bcefb01))
+* **node:** add typing to genesis specs
+([12fbef5](https://github.com/argonprotocol/mainchain/commit/12fbef5d007c692e25a6ff702fc7c091cc17fb4b))
+* **runtime:** lower minimum vote start
+([d7bfbab](https://github.com/argonprotocol/mainchain/commit/d7bfbab847742bf55db866fca01b2329f3e8c1f0))
 
 ### Fixes
+
+* tests timing out
+([2801c78](https://github.com/argonprotocol/mainchain/commit/2801c78db1e6b34469c985757a34adfd64f2ea81))
+* **node:** set initial miners to 100
+([7153407](https://github.com/argonprotocol/mainchain/commit/71534073af4b7e7a2be7560303babda19e1706b9))
+* **node:** pin blocks before broadcasting
+([c29939f](https://github.com/argonprotocol/mainchain/commit/c29939faf83b8b4546a959d1a22486a3163e12d8))
+* **block_rewards:** start with smaller rewards
+([237971a](https://github.com/argonprotocol/mainchain/commit/237971a211fac9e770a7e11b1d1cabb4ad789554))
+* **mint:** remove unlocked bitcoin from total
+([2bcd738](https://github.com/argonprotocol/mainchain/commit/2bcd7380447bfa55f0da28181a3b465974bfa803))
+* **node:** default block votes
+([4c5f52d](https://github.com/argonprotocol/mainchain/commit/4c5f52d9a73d5de4d3b53a93b9d5d672c1933582))
+* **e2e:** fix with minting now only to slots
+([938efff](https://github.com/argonprotocol/mainchain/commit/938efff12b97fd7469cd8705016b3f94f30ed335))
+* **node:** must audit notebooks in full client
+([0560091](https://github.com/argonprotocol/mainchain/commit/056009137b219e71d85b61711eda4bb1caf3758f))
+* **utxos:** check parent block for inherent reqt
+([c7dd39a](https://github.com/argonprotocol/mainchain/commit/c7dd39a4ed3a933755082690e078909822f85a62))
+* **price_index:** default argon ration to 1 if na
+([a4a59b3](https://github.com/argonprotocol/mainchain/commit/a4a59b333bf03e24fb0a8808cb17e81c388b2996))
+* **mining_slot:** remove miner zero
+([52f33f1](https://github.com/argonprotocol/mainchain/commit/52f33f10b04b2314e49257e749aebf4ac2096de5))
+* **mining_slot:** floor bids at min account bal
+([ea6dd33](https://github.com/argonprotocol/mainchain/commit/ea6dd3384bbc1e768dca0ff703039b1c57c81fdb))
+* **localchain:** vote with minimum amount
+([1c3e371](https://github.com/argonprotocol/mainchain/commit/1c3e371e7a87cdd112d79192e973df6c44cfcf90))
+* **node:** bug in import logic
+([39f819f](https://github.com/argonprotocol/mainchain/commit/39f819f277bc03d465725b743571add01bcaffff))
+* **node:** use full spectrum of u256 for nonce
+([61dd7da](https://github.com/argonprotocol/mainchain/commit/61dd7da694ba10889aa8b1cd6c6bb48963b380f2))
+* **block_seal:** sign full block
+([e73cfc9](https://github.com/argonprotocol/mainchain/commit/e73cfc965b91a161bdf67b79e872294bafdb5d00))
+
+### [v0.0.17](https://github.com/argonprotocol/mainchain/compare/v0.0.16...v0.0.17) (2024-10-25)
+
+#### Fixes
 
 * **node:** notary can’t catch up
 ([130990f](https://github.com/argonprotocol/mainchain/commit/130990f1c550cff872644fa38cf4c03352109ef3))

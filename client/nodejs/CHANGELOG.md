@@ -1,6 +1,38 @@
 # Changelog
 
-## [v0.0.17](https://github.com/argonprotocol/mainchain/compare/v0.0.16...130990f1c550cff872644fa38cf4c03352109ef3) (2024-10-25)
+## [v0.0.18](https://github.com/argonprotocol/mainchain/compare/v0.0.17...fa9c7ed4300b8efe3da3ddb03485ecbe80296634) (2024-12-04)
+
+### Features
+
+* **client:** add a wage protector
+([c2bba70](https://github.com/argonprotocol/mainchain/commit/c2bba7038005251280a15f21829577359853d955))
+* **node:** remove compute notebook block sort
+([e087392](https://github.com/argonprotocol/mainchain/commit/e08739228cad43b071b1d2181de0cb3197ae12c5))
+* **chain_transfer:** bridge scripts
+([de5f351](https://github.com/argonprotocol/mainchain/commit/de5f351c9253de09c5be939f5ca6d830089d72a1))
+* **chain_transfer:** add ability to pause bridge
+([3cfd210](https://github.com/argonprotocol/mainchain/commit/3cfd21014038a476fc2b610d187445cd6e643252))
+* **runtime:** add a canary runtime
+([1eb7a61](https://github.com/argonprotocol/mainchain/commit/1eb7a61e25183d29bef294d3fab99c8d842ff66c))
+* convert ticks to use unix epoch
+([36d230e](https://github.com/argonprotocol/mainchain/commit/36d230e0f18e631a92da0e9b1b466028f02cde13))
+* **runtime:** integrate hyperbridge to evm
+([e5b8d35](https://github.com/argonprotocol/mainchain/commit/e5b8d3587b5ba285c96470a628f16fc1b1fde5f5))
+* **runtime:** lower minimum vote start
+([d7bfbab](https://github.com/argonprotocol/mainchain/commit/d7bfbab847742bf55db866fca01b2329f3e8c1f0))
+
+### Fixes
+
+* **block_rewards:** start with smaller rewards
+([237971a](https://github.com/argonprotocol/mainchain/commit/237971a211fac9e770a7e11b1d1cabb4ad789554))
+* **node:** default block votes
+([4c5f52d](https://github.com/argonprotocol/mainchain/commit/4c5f52d9a73d5de4d3b53a93b9d5d672c1933582))
+* **mining_slot:** remove miner zero
+([52f33f1](https://github.com/argonprotocol/mainchain/commit/52f33f10b04b2314e49257e749aebf4ac2096de5))
+* **block_seal:** sign full block
+([e73cfc9](https://github.com/argonprotocol/mainchain/commit/e73cfc965b91a161bdf67b79e872294bafdb5d00))
+
+### [v0.0.17](https://github.com/argonprotocol/mainchain/compare/v0.0.16...v0.0.17) (2024-10-25)
 
 ### [v0.0.16](https://github.com/argonprotocol/mainchain/compare/v0.0.15...v0.0.16) (2024-10-25)
 

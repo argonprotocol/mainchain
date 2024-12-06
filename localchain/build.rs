@@ -31,7 +31,7 @@ fn main() {
       _ => {
         println!("Installing `sqlx-cli`...");
         Command::new("cargo")
-          .args(["install", "sqlx-cli@^0.7"])
+          .args(["install", "sqlx-cli@^0.8"])
           .status()
           .expect("Failed to install `sqlx-cli`");
       }

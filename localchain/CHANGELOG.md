@@ -1,6 +1,28 @@
 # Changelog
 
-## [v0.0.17](https://github.com/argonprotocol/mainchain/compare/v0.0.16...130990f1c550cff872644fa38cf4c03352109ef3) (2024-10-25)
+## [v0.0.18](https://github.com/argonprotocol/mainchain/compare/v0.0.17...fa9c7ed4300b8efe3da3ddb03485ecbe80296634) (2024-12-04)
+
+### Features
+
+* **client:** add a wage protector
+([c2bba70](https://github.com/argonprotocol/mainchain/commit/c2bba7038005251280a15f21829577359853d955))
+* **node:** remove compute notebook block sort
+([e087392](https://github.com/argonprotocol/mainchain/commit/e08739228cad43b071b1d2181de0cb3197ae12c5))
+* change decimals to 6
+([f8277eb](https://github.com/argonprotocol/mainchain/commit/f8277ebe93451b523eea93b688f00a1a160a6654))
+* convert ticks to use unix epoch
+([36d230e](https://github.com/argonprotocol/mainchain/commit/36d230e0f18e631a92da0e9b1b466028f02cde13))
+
+### Fixes
+
+* **node:** pin blocks before broadcasting
+([c29939f](https://github.com/argonprotocol/mainchain/commit/c29939faf83b8b4546a959d1a22486a3163e12d8))
+* **node:** default block votes
+([4c5f52d](https://github.com/argonprotocol/mainchain/commit/4c5f52d9a73d5de4d3b53a93b9d5d672c1933582))
+* **localchain:** vote with minimum amount
+([1c3e371](https://github.com/argonprotocol/mainchain/commit/1c3e371e7a87cdd112d79192e973df6c44cfcf90))
+
+### [v0.0.17](https://github.com/argonprotocol/mainchain/compare/v0.0.16...v0.0.17) (2024-10-25)
 
 ### [v0.0.16](https://github.com/argonprotocol/mainchain/compare/v0.0.15...v0.0.16) (2024-10-25)
 
