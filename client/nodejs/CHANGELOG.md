@@ -1,8 +1,10 @@
 # Changelog
 
-## [v0.0.18](https://github.com/argonprotocol/mainchain/compare/v0.0.17...fa9c7ed4300b8efe3da3ddb03485ecbe80296634) (2024-12-04)
+## [v0.0.19](https://github.com/argonprotocol/mainchain/compare/v0.0.18...8f20c4d2209d1ef7fc2ef10cdbc10ba23b2bb5ea) (2024-12-06)
 
-### Features
+### [v0.0.18](https://github.com/argonprotocol/mainchain/compare/v0.0.17...v0.0.18) (2024-12-05)
+
+#### Features
 
 * **client:** add a wage protector
 ([c2bba70](https://github.com/argonprotocol/mainchain/commit/c2bba7038005251280a15f21829577359853d955))
@@ -21,8 +23,10 @@
 * **runtime:** lower minimum vote start
 ([d7bfbab](https://github.com/argonprotocol/mainchain/commit/d7bfbab847742bf55db866fca01b2329f3e8c1f0))
 
-### Fixes
+#### Fixes
 
+* build
+([7628e02](https://github.com/argonprotocol/mainchain/commit/7628e02d9566eb03e019bd23d897fe7fdd1d5a31))
 * **block_rewards:** start with smaller rewards
 ([237971a](https://github.com/argonprotocol/mainchain/commit/237971a211fac9e770a7e11b1d1cabb4ad789554))
 * **node:** default block votes

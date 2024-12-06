@@ -1,8 +1,10 @@
 # Changelog
 
-## [v0.0.18](https://github.com/argonprotocol/mainchain/compare/v0.0.17...fa9c7ed4300b8efe3da3ddb03485ecbe80296634) (2024-12-04)
+## [v0.0.19](https://github.com/argonprotocol/mainchain/compare/v0.0.18...8f20c4d2209d1ef7fc2ef10cdbc10ba23b2bb5ea) (2024-12-06)
 
-### Features
+### [v0.0.18](https://github.com/argonprotocol/mainchain/compare/v0.0.17...v0.0.18) (2024-12-05)
+
+#### Features
 
 * **client:** add a wage protector
 ([c2bba70](https://github.com/argonprotocol/mainchain/commit/c2bba7038005251280a15f21829577359853d955))
@@ -13,8 +15,10 @@
 * convert ticks to use unix epoch
 ([36d230e](https://github.com/argonprotocol/mainchain/commit/36d230e0f18e631a92da0e9b1b466028f02cde13))
 
-### Fixes
+#### Fixes
 
+* build
+([7628e02](https://github.com/argonprotocol/mainchain/commit/7628e02d9566eb03e019bd23d897fe7fdd1d5a31))
 * **node:** pin blocks before broadcasting
 ([c29939f](https://github.com/argonprotocol/mainchain/commit/c29939faf83b8b4546a959d1a22486a3163e12d8))
 * **node:** default block votes
