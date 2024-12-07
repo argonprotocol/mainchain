@@ -1,6 +1,13 @@
 # Changelog
 
-## [v0.0.19](https://github.com/argonprotocol/mainchain/compare/v0.0.18...8f20c4d2209d1ef7fc2ef10cdbc10ba23b2bb5ea) (2024-12-06)
+## [v0.0.20](https://github.com/argonprotocol/mainchain/compare/v0.0.19...025cbe4aa6aa3606ad9e181c5da3879e0455bded) (2024-12-07)
+
+### Fixes
+
+* **localchain:** improve lock hold durations
+([025cbe4](https://github.com/argonprotocol/mainchain/commit/025cbe4aa6aa3606ad9e181c5da3879e0455bded))
+
+### [v0.0.19](https://github.com/argonprotocol/mainchain/compare/v0.0.18...v0.0.19) (2024-12-06)
 
 ### [v0.0.18](https://github.com/argonprotocol/mainchain/compare/v0.0.17...v0.0.18) (2024-12-05)
 
