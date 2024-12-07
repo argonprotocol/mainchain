@@ -24,19 +24,19 @@ use sp_core::Decode;
 use sp_core::H256;
 use sp_runtime::MultiSignature;
 use sqlx::{Sqlite, SqlitePool, Transaction};
-use tokio::sync::Mutex;
+use tokio::sync::{Mutex, RwLock};
 use tracing::{info, trace};
 
 #[cfg_attr(feature = "napi", napi)]
 pub struct BalanceSync {
   db: SqlitePool,
   ticker: TickerRef,
-  mainchain_client: Arc<Mutex<Option<MainchainClient>>>,
+  mainchain_client: Arc<RwLock<Option<MainchainClient>>>,
   notary_clients: NotaryClients,
   lock: Arc<Mutex<()>>,
   open_channel_holds: OpenChannelHoldsStore,
   keystore: Keystore,
-  tick_counter: Arc<Mutex<(Tick, u32)>>,
+  tick_counter: Arc<RwLock<(Tick, u32)>>,
 }
 
 #[cfg_attr(feature = "napi", napi(object))]
@@ -301,7 +301,7 @@ impl BalanceSync {
       notary_clients: localchain.notary_clients.clone(),
       lock: Arc::new(Mutex::new(())),
       open_channel_holds: localchain.open_channel_holds(),
-      tick_counter: Arc::new(Mutex::new((0, 0))),
+      tick_counter: Arc::new(RwLock::new((0, 0))),
       keystore: localchain.keystore.clone(),
     }
   }
@@ -433,7 +433,7 @@ impl BalanceSync {
 
   pub async fn sync_mainchain_transfers(&self) -> Result<Vec<NotarizationTracker>> {
     {
-      let Some(_) = *(self.mainchain_client.lock().await) else {
+      let Some(_) = *(self.mainchain_client.read().await) else {
         return Ok(vec![]);
       };
     }
@@ -550,7 +550,7 @@ impl BalanceSync {
     }
 
     if change.status == BalanceChangeStatus::NotebookPublished {
-      match self.check_finalized(&mut change).await {
+      match self.check_immortalized(&mut change).await {
         Ok(_) => {}
         Err(e) => {
           if !is_notebook_finalization_error(&e) {
@@ -630,7 +630,8 @@ impl BalanceSync {
     &self,
     options: VoteCreationOptions,
   ) -> Result<Vec<NotarizationTracker>> {
-    let Some(ref mainchain_client) = *(self.mainchain_client.lock().await) else {
+    println!("convert_tax_to_votes");
+    let Some(ref mainchain_client) = *(self.mainchain_client.read().await) else {
       bail!("Cannot create votes.. No mainchain client available!");
     };
 
@@ -736,12 +737,16 @@ impl BalanceSync {
 
     balance_change.send_to_vote(tax_for_vote).await?;
 
-    let mut tick_counter = self.tick_counter.lock().await;
-    if tick_counter.0 == current_tick {
-      tick_counter.1 += 1;
-    } else {
-      *tick_counter = (current_tick, 0);
-    }
+    let tick_counter = {
+      let mut tick_counter = self.tick_counter.write().await;
+      if tick_counter.0 == current_tick {
+        tick_counter.1 += 1;
+      } else {
+        *tick_counter = (current_tick, 0);
+      }
+      *tick_counter
+    };
+
     let Some(votes_address) = options.votes_address.as_ref() else {
       bail!("No votes address provided to create votes with tax");
     };
@@ -771,15 +776,12 @@ impl BalanceSync {
     Ok(Some(tracker))
   }
 
-  /// Sends the notarizations to the notary for finalization. If there are errors, it will return the problem accounts
+  /// Sends the notarizations to the notary for finalization.
   pub async fn finalize_channel_hold_notarization(
     &self,
     notarization: &mut NotarizationBuilder,
-  ) -> Option<NotarizationTracker> {
-    if let Err(e) = notarization.sign().await {
-      tracing::error!("Could not claim a channel_hold -> {:?}", e);
-      return None;
-    }
+  ) -> Result<NotarizationTracker> {
+    notarization.sign().await?;
 
     for i in 0..3 {
       if i > 0 {
@@ -793,47 +795,31 @@ impl BalanceSync {
             tracker.notarized_balance_changes,
             tracker.notarized_votes
           );
-          return Some(tracker);
+          return Ok(tracker);
         }
         Err(e) => {
-          match e {
-            Error::NotarizationError(
-              NotaryError::BalanceChangeVerifyError(VerifyError::ChannelHoldNotReadyForClaim {
-                ..
-              }),
-              _,
-            ) => {
-              let delay = (2 + i) ^ 5;
-              tracing::debug!("Channel hold not ready for claim. Waiting {delay} seconds.");
-              tokio::time::sleep(tokio::time::Duration::from_secs(delay)).await;
-              continue;
-            }
-            Error::NotarizationError(
-              NotaryError::BalanceTipMismatch { change_index, .. },
-              ref submitted_notarization,
-            ) => {
-              if let Some(failed_entry) = submitted_notarization
-                .balance_changes
-                .get(change_index as usize)
-              {
-                let failed_address = AccountStore::to_address(&failed_entry.account_id);
-                tracing::warn!(
-                  "Account {}, change {} broke notarizations. Will retry without it. Error: {:?}",
-                  failed_address,
-                  failed_entry.change_number,
-                  e,
-                );
-                return None;
-              }
-            }
-            _ => {}
+          if let &Error::NotarizationError(
+            NotaryError::BalanceChangeVerifyError(VerifyError::ChannelHoldNotReadyForClaim {
+              ..
+            }),
+            _,
+          ) = &e
+          {
+            let delay = (2 + i) ^ 5;
+            tracing::debug!("Channel hold not ready for claim. Waiting {delay} seconds.");
+            tokio::time::sleep(tokio::time::Duration::from_secs(delay)).await;
+            continue;
           }
-          tracing::warn!("Error finalizing channel_hold notarization: {:?}", e);
-          return None;
+          tracing::warn!(
+            "Error finalizing channel_hold notarization: {:?}",
+            e.to_string()
+          );
+          return Err(e);
         }
       }
     }
-    None
+
+    bail!("Failed to finalize channel_hold notarization after 3 attempts.");
   }
 
   pub async fn sync_server_channel_hold(
@@ -864,8 +850,8 @@ impl BalanceSync {
     notarization.claim_channel_hold(open_channel_hold).await?;
     let tracker = self
       .finalize_channel_hold_notarization(&mut notarization)
-      .await;
-    Ok(tracker)
+      .await?;
+    Ok(Some(tracker))
   }
 
   /// Syncs a client channel hold. If the recipient has claimed the channel hold, it will finalize the notarization.
@@ -1173,12 +1159,12 @@ impl BalanceSync {
     Ok(true)
   }
 
-  pub async fn check_finalized(&self, balance_change: &mut BalanceChangeRow) -> Result<()> {
+  pub async fn check_immortalized(&self, balance_change: &mut BalanceChangeRow) -> Result<()> {
     let mut tx = self.db.begin().await?;
 
-    let Some(ref mainchain_client) = *(self.mainchain_client.lock().await) else {
-      tracing::warn!(
-        "Cannot synchronize finalization of balance change; id={}. No mainchain client available.",
+    let Some(ref mainchain_client) = *(self.mainchain_client.read().await) else {
+      tracing::info!(
+        "Cannot synchronize immortalized state of balance change; id={}. No mainchain client available.",
         balance_change.id,
       );
       return Ok(());

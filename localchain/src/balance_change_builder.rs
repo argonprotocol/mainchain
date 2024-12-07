@@ -6,7 +6,7 @@ use lazy_static::lazy_static;
 use sp_core::bounded_vec::BoundedVec;
 use sp_core::{ed25519::Signature as EdSignature, ByteArray};
 use std::sync::Arc;
-use tokio::sync::Mutex;
+use tokio::sync::RwLock;
 
 use crate::bail;
 use crate::Result;
@@ -20,7 +20,7 @@ lazy_static! {
 #[cfg_attr(feature = "napi", napi)]
 #[derive(Clone)]
 pub struct BalanceChangeBuilder {
-  balance_change: Arc<Mutex<BalanceChange>>,
+  balance_change: Arc<RwLock<BalanceChange>>,
   pub account_type: AccountType,
   pub address: String,
   pub local_account_id: i64,
@@ -40,7 +40,7 @@ impl BalanceChangeBuilder {
     let mut change = balance_change;
     change.change_number += 1;
     Self {
-      balance_change: Arc::new(Mutex::new(change)),
+      balance_change: Arc::new(RwLock::new(change)),
       account_type,
       local_account_id,
       address,
@@ -71,25 +71,25 @@ impl BalanceChangeBuilder {
   }
 
   pub async fn is_empty_signature(&self) -> bool {
-    let balance_change = self.balance_change.lock().await;
+    let balance_change = self.balance_change.read().await;
     balance_change.signature == *EMPTY_SIGNATURE
   }
 
   pub async fn inner(&self) -> BalanceChange {
-    self.balance_change.lock().await.clone()
+    self.balance_change.read().await.clone()
   }
 
-  pub fn balance_change_lock(&self) -> Arc<Mutex<BalanceChange>> {
+  pub fn balance_change_lock(&self) -> Arc<RwLock<BalanceChange>> {
     self.balance_change.clone()
   }
 
   pub async fn balance(&self) -> Balance {
-    let balance_change = self.balance_change.lock().await;
+    let balance_change = self.balance_change.read().await;
     balance_change.balance
   }
 
   pub async fn account_id32(&self) -> Vec<u8> {
-    let balance_change = self.balance_change.lock().await;
+    let balance_change = self.balance_change.read().await;
     balance_change.account_id.to_raw_vec()
   }
 
@@ -105,7 +105,7 @@ impl BalanceChangeBuilder {
     amount: Balance,
     restrict_to_addresses: Option<Vec<String>>,
   ) -> Result<()> {
-    let mut balance_change = self.balance_change.lock().await;
+    let mut balance_change = self.balance_change.write().await;
     if balance_change.balance < amount {
       bail!(
         "Insufficient balance {} to send {}",
@@ -131,7 +131,7 @@ impl BalanceChangeBuilder {
   }
 
   pub async fn claim(&self, amount: Balance) -> Result<ClaimResult> {
-    let mut balance_change = self.balance_change.lock().await;
+    let mut balance_change = self.balance_change.write().await;
 
     let tax_amount = match balance_change.account_type {
       AccountType::Deposit => Note::calculate_transfer_tax(amount),
@@ -147,7 +147,7 @@ impl BalanceChangeBuilder {
   }
 
   pub async fn claim_channel_hold(&self, amount: Balance) -> Result<ClaimResult> {
-    let mut balance_change = self.balance_change.lock().await;
+    let mut balance_change = self.balance_change.write().await;
     if balance_change.account_type != AccountType::Deposit {
       bail!(
         "Account {} is not a deposit account",
@@ -163,7 +163,7 @@ impl BalanceChangeBuilder {
   }
 
   pub async fn claim_from_mainchain(&self, transfer: LocalchainTransfer) -> Result<()> {
-    let mut balance_change = self.balance_change.lock().await;
+    let mut balance_change = self.balance_change.write().await;
     let account_id = AccountStore::parse_address(&transfer.address)?;
     if balance_change.account_id != account_id {
       bail!(
@@ -191,7 +191,7 @@ impl BalanceChangeBuilder {
   }
 
   pub async fn send_to_mainchain(&self, amount: Balance) -> Result<()> {
-    let mut balance_change = self.balance_change.lock().await;
+    let mut balance_change = self.balance_change.write().await;
     if balance_change.account_type != AccountType::Deposit {
       bail!(
         "Account {:?} is not a deposit account",
@@ -224,7 +224,7 @@ impl BalanceChangeBuilder {
     } else {
       None
     };
-    let mut balance_change = self.balance_change.lock().await;
+    let mut balance_change = self.balance_change.write().await;
     if balance_change.account_type != AccountType::Deposit {
       bail!(
         "Account {:?} is not a deposit account",
@@ -264,7 +264,7 @@ impl BalanceChangeBuilder {
   }
 
   pub async fn send_to_vote(&self, amount: Balance) -> Result<()> {
-    let mut balance_change = self.balance_change.lock().await;
+    let mut balance_change = self.balance_change.write().await;
     if balance_change.account_type != AccountType::Tax {
       bail!(
         "Votes must come from tax accounts. Account {:?} is not a tax account",
@@ -287,7 +287,7 @@ impl BalanceChangeBuilder {
 
   /// Lease a Domain. Domain leases are converted in full to tax.
   pub async fn lease_domain(&self) -> Result<Balance> {
-    let mut balance_change = self.balance_change.lock().await;
+    let mut balance_change = self.balance_change.write().await;
     if balance_change.account_type != AccountType::Deposit {
       bail!(
         "Account {:?} is not a deposit account",

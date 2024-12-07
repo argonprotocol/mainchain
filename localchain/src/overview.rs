@@ -3,7 +3,7 @@ use sqlx::SqlitePool;
 use std::collections::{BTreeMap, HashSet};
 use std::str::FromStr;
 use std::sync::Arc;
-use tokio::sync::Mutex;
+use tokio::sync::RwLock;
 
 use crate::mainchain_transfer::MainchainTransferIn;
 use crate::transactions::TransactionType;
@@ -137,14 +137,14 @@ fn get_notes(change: &BalanceChangeRow) -> Vec<Note> {
 pub struct OverviewStore {
   db: SqlitePool,
   name: String,
-  mainchain_client: Arc<Mutex<Option<MainchainClient>>>,
+  mainchain_client: Arc<RwLock<Option<MainchainClient>>>,
 }
 
 impl OverviewStore {
   pub fn new(
     db: SqlitePool,
     name: String,
-    mainchain_client: Arc<Mutex<Option<MainchainClient>>>,
+    mainchain_client: Arc<RwLock<Option<MainchainClient>>>,
   ) -> Self {
     Self {
       db,
@@ -220,7 +220,7 @@ impl OverviewStore {
       overview.processing_mainchain_balance_change -= transfer.amount.parse::<i128>()?;
     }
 
-    if let Some(mainchain_client) = self.mainchain_client.lock().await.as_ref() {
+    if let Some(mainchain_client) = self.mainchain_client.read().await.as_ref() {
       if let Ok(account) = mainchain_client.get_account(overview.address.clone()).await {
         overview.mainchain_balance = account.data.free as i128;
       }

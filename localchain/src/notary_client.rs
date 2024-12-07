@@ -15,52 +15,52 @@ use sp_runtime::traits::Verify;
 use std::collections::HashMap;
 use std::sync::Arc;
 use std::time::Duration;
-use tokio::sync::Mutex;
+use tokio::sync::RwLock;
 use tokio::time::timeout;
 use tracing::{info, trace};
 
 #[cfg_attr(feature = "napi", napi)]
 #[derive(Clone)]
 pub struct NotaryClients {
-  clients_by_id: Arc<Mutex<HashMap<u32, NotaryClient>>>,
-  mainchain_client: Arc<Mutex<Option<MainchainClient>>>,
+  clients_by_id: Arc<RwLock<HashMap<u32, NotaryClient>>>,
+  mainchain_client: Arc<RwLock<Option<MainchainClient>>>,
 }
 
 impl NotaryClients {
   pub fn new(mainchain_client: &MainchainClient) -> Self {
     Self {
-      clients_by_id: Arc::new(Mutex::new(HashMap::new())),
-      mainchain_client: Arc::new(Mutex::new(Some(mainchain_client.clone()))),
+      clients_by_id: Arc::new(RwLock::new(HashMap::new())),
+      mainchain_client: Arc::new(RwLock::new(Some(mainchain_client.clone()))),
     }
   }
 
-  pub fn from(mainchain_client: Arc<Mutex<Option<MainchainClient>>>) -> Self {
+  pub fn from(mainchain_client: Arc<RwLock<Option<MainchainClient>>>) -> Self {
     Self {
-      clients_by_id: Arc::new(Mutex::new(HashMap::new())),
+      clients_by_id: Arc::new(RwLock::new(HashMap::new())),
       mainchain_client,
     }
   }
 
   pub async fn close(&self) {
-    let mut clients_by_id = self.clients_by_id.lock().await;
+    let mut clients_by_id = self.clients_by_id.write().await;
     for (_, client) in clients_by_id.drain() {
       drop(client);
     }
   }
 
   pub async fn attach_mainchain(&self, mainchain_client: Option<MainchainClient>) {
-    let mut mainchain_client_ref = self.mainchain_client.lock().await;
+    let mut mainchain_client_ref = self.mainchain_client.write().await;
     *mainchain_client_ref = mainchain_client;
   }
 
   pub async fn use_client(&self, client: &NotaryClient) {
-    let mut clients_by_id = self.clients_by_id.lock().await;
+    let mut clients_by_id = self.clients_by_id.write().await;
     clients_by_id.insert(client.notary_id, client.clone());
   }
 
   pub async fn get(&self, notary_id: u32) -> Result<NotaryClient> {
     // hold lock for this function
-    let mut clients_by_id = self.clients_by_id.lock().await;
+    let mut clients_by_id = self.clients_by_id.write().await;
     if let Some(client) = clients_by_id.get(&notary_id) {
       if client.is_connected().await {
         return Ok(client.clone());
@@ -69,7 +69,7 @@ impl NotaryClients {
 
     let notary_details = {
       let Some(ref mainchain_client) =
-        *(timeout(Duration::from_secs(5), self.mainchain_client.lock())
+        *(timeout(Duration::from_secs(5), self.mainchain_client.read())
           .await
           .map_err(|_| anyhow!("Timeout getting mainchain lock"))?)
       else {
@@ -105,14 +105,14 @@ impl NotaryClients {
 pub struct NotaryClient {
   pub notary_id: u32,
   public: ed25519::Public,
-  client: Arc<Mutex<argon_notary_apis::Client>>,
-  last_metadata: Arc<Mutex<Option<argon_primitives::NotebookMeta>>>,
+  client: Arc<RwLock<argon_notary_apis::Client>>,
+  last_metadata: Arc<RwLock<Option<argon_primitives::NotebookMeta>>>,
   pub auto_verify_header_signatures: bool,
 }
 
 impl NotaryClient {
   pub async fn is_connected(&self) -> bool {
-    let client = self.client.lock().await;
+    let client = self.client.read().await;
     (*client).is_connected()
   }
 
@@ -129,8 +129,8 @@ impl NotaryClient {
       notary_id,
       public: ed25519::Public::from_raw(public),
       auto_verify_header_signatures,
-      last_metadata: Arc::new(Mutex::new(None)),
-      client: Arc::new(Mutex::new(argon_notary_apis::create_client(&host).await?)),
+      last_metadata: Arc::new(RwLock::new(None)),
+      client: Arc::new(RwLock::new(argon_notary_apis::create_client(&host).await?)),
     })
   }
 
@@ -141,7 +141,7 @@ impl NotaryClient {
     notebook_number: NotebookNumber,
     change_number: u32,
   ) -> Result<Notarization> {
-    let client = self.client.lock().await;
+    let client = self.client.read().await;
     let res = (*client)
       .get_notarization(account_id32, account_type, notebook_number, change_number)
       .await?;
@@ -154,7 +154,7 @@ impl NotaryClient {
     address: String,
     account_type: AccountType,
   ) -> Result<AccountOrigin> {
-    let client = self.client.lock().await;
+    let client = self.client.read().await;
     let account_id = AccountStore::parse_address(&address)?;
     let res = (*client).get_origin(account_id, account_type).await?;
 
@@ -166,7 +166,7 @@ impl NotaryClient {
     address: String,
     account_type: AccountType,
   ) -> Result<BalanceTipResult> {
-    let client = self.client.lock().await;
+    let client = self.client.read().await;
     let account_id = AccountStore::parse_address(&address)?;
     let res = (*client).get_tip(account_id, account_type).await?;
 
@@ -175,7 +175,7 @@ impl NotaryClient {
 
   pub async fn notarize(&self, notarization: Notarization) -> Result<BalanceChangeResult> {
     for i in 0..5 {
-      let client = self.client.lock().await;
+      let client = self.client.read().await;
 
       let res = (*client)
         .notarize(
@@ -211,10 +211,10 @@ impl NotaryClient {
   }
 
   pub async fn metadata(&self) -> Result<NotebookMeta> {
-    let client = self.client.lock().await;
+    let client = self.client.read().await;
     let meta = (*client).metadata().await?;
 
-    *self.last_metadata.lock().await = Some(meta.clone());
+    *self.last_metadata.write().await = Some(meta.clone());
     Ok(NotebookMeta {
       finalized_tick: meta.finalized_tick as i64,
       finalized_notebook_number: meta.finalized_notebook_number,
@@ -226,7 +226,7 @@ impl NotaryClient {
     notebook_number: NotebookNumber,
     tip: BalanceTip,
   ) -> Result<BalanceProof> {
-    let client = self.client.lock().await;
+    let client = self.client.read().await;
 
     let proof = (*client).get_balance_proof(notebook_number, tip).await?;
     Ok(proof)
@@ -244,7 +244,7 @@ impl NotaryClient {
 
   pub async fn wait_for_notebook(&self, notebook_number: u32) -> Result<SignedNotebookHeader> {
     let mut has_seen_notebook = {
-      let last_metadata = self.last_metadata.lock().await;
+      let last_metadata = self.last_metadata.read().await;
       if let Some(meta) = &*last_metadata {
         meta.finalized_notebook_number >= notebook_number
       } else {
@@ -257,7 +257,7 @@ impl NotaryClient {
     }
 
     if has_seen_notebook {
-      let client = self.client.lock().await;
+      let client = self.client.read().await;
       let header = (*client).get_header(notebook_number).await?;
       if self.auto_verify_header_signatures {
         self.verify_header(&header)?;
@@ -266,17 +266,20 @@ impl NotaryClient {
     }
 
     let mut subscription_stream = {
-      let client = self.client.lock().await;
+      let client = self.client.read().await;
       let subscription = (*client).subscribe_headers().await?;
       subscription.into_stream()
     };
     while let Some(header) = subscription_stream.next().await {
       let header = header?;
-      let mut last_metadata = self.last_metadata.lock().await;
-      *last_metadata = Some(argon_primitives::NotebookMeta {
-        finalized_tick: header.header.tick,
-        finalized_notebook_number: header.header.notebook_number,
-      });
+      self
+        .last_metadata
+        .write()
+        .await
+        .replace(argon_primitives::NotebookMeta {
+          finalized_tick: header.header.tick,
+          finalized_notebook_number: header.header.notebook_number,
+        });
       if header.header.notebook_number == notebook_number {
         if self.auto_verify_header_signatures {
           self.verify_header(&header)?;

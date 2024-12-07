@@ -12,7 +12,7 @@ use sp_core::crypto::{
 use sp_core::{ecdsa, ed25519, sr25519};
 use sp_runtime::MultiSignature;
 use sqlx::{FromRow, SqlitePool};
-use tokio::sync::Mutex;
+use tokio::sync::RwLock;
 
 use crate::AccountStore;
 
@@ -20,25 +20,25 @@ use crate::AccountStore;
 #[derive(Clone)]
 pub struct EmbeddedKeystore {
   db: SqlitePool,
-  derived_pairs_by_address: Arc<Mutex<HashMap<String, PairWrapper>>>,
-  unlocked_account: Arc<Mutex<Option<UnlockedAccount>>>,
+  derived_pairs_by_address: Arc<RwLock<HashMap<String, PairWrapper>>>,
+  unlocked_account: Arc<RwLock<Option<UnlockedAccount>>>,
 }
 
 impl EmbeddedKeystore {
   pub fn new(db: SqlitePool) -> Self {
     Self {
       db,
-      derived_pairs_by_address: Arc::new(Mutex::new(HashMap::new())),
-      unlocked_account: Arc::new(Mutex::new(None)),
+      derived_pairs_by_address: Arc::new(RwLock::new(HashMap::new())),
+      unlocked_account: Arc::new(RwLock::new(None)),
     }
   }
 
   pub async fn is_unlocked(&self) -> bool {
-    self.unlocked_account.lock().await.as_ref().is_some()
+    self.unlocked_account.read().await.as_ref().is_some()
   }
 
   pub async fn lock(&self) {
-    self.unlocked_account.lock().await.take();
+    self.unlocked_account.write().await.take();
   }
 
   pub async fn unlock(&self, password: Option<SecretString>) -> Result<()> {
@@ -53,10 +53,14 @@ impl EmbeddedKeystore {
       bail!("Could not unlock the embedded key");
     }
 
-    *self.unlocked_account.lock().await = Some(UnlockedAccount {
-      address: pair.address(),
-      password: password.clone(),
-    });
+    self
+      .unlocked_account
+      .write()
+      .await
+      .replace(UnlockedAccount {
+        address: pair.address(),
+        password: password.clone(),
+      });
 
     Ok(())
   }
@@ -77,10 +81,14 @@ impl EmbeddedKeystore {
       .insert_pair(address.clone(), suri.to_string(), crypto_scheme)
       .await?;
 
-    *self.unlocked_account.lock().await = Some(UnlockedAccount {
-      address: address.clone(),
-      password,
-    });
+    self
+      .unlocked_account
+      .write()
+      .await
+      .replace(UnlockedAccount {
+        address: address.clone(),
+        password,
+      });
 
     pass_str.zeroize();
 
@@ -100,10 +108,14 @@ impl EmbeddedKeystore {
     self
       .insert_pair(address.clone(), phrase, crypto_scheme)
       .await?;
-    *self.unlocked_account.lock().await = Some(UnlockedAccount {
-      address: address.clone(),
-      password,
-    });
+    self
+      .unlocked_account
+      .write()
+      .await
+      .replace(UnlockedAccount {
+        address: address.clone(),
+        password,
+      });
 
     pass_str.zeroize();
 
@@ -166,7 +178,7 @@ impl EmbeddedKeystore {
     let address = derived_pair.address();
     self
       .derived_pairs_by_address
-      .lock()
+      .write()
       .await
       .insert(address.clone(), derived_pair);
     Ok(address)
@@ -175,20 +187,20 @@ impl EmbeddedKeystore {
   pub async fn can_sign(&self, address: String) -> bool {
     self
       .unlocked_account
-      .lock()
+      .read()
       .await
       .as_ref()
       .map(|a| a.address == address)
       .unwrap_or(false)
       || self
         .derived_pairs_by_address
-        .lock()
+        .read()
         .await
         .contains_key(&address)
   }
 
   pub async fn sign(&self, address: String, msg: &[u8]) -> Result<Option<MultiSignature>> {
-    if let Some(pair) = self.derived_pairs_by_address.lock().await.get(&address) {
+    if let Some(pair) = self.derived_pairs_by_address.read().await.get(&address) {
       return Ok(Some(pair.sign(msg)));
     }
 
@@ -201,7 +213,7 @@ impl EmbeddedKeystore {
   }
 
   async fn load_key(&self) -> Result<PairWrapper> {
-    let Some(ref unlocked_account) = *self.unlocked_account.lock().await else {
+    let Some(ref unlocked_account) = *self.unlocked_account.read().await else {
       bail!("This keystore is not unlocked");
     };
 

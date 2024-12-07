@@ -14,7 +14,7 @@ use sp_runtime::{BoundedVec, MultiSignature};
 use sqlx::SqlitePool;
 use std::collections::{BTreeMap, HashMap};
 use std::sync::Arc;
-use tokio::sync::Mutex;
+use tokio::sync::RwLock;
 
 use crate::accounts::AccountStore;
 use crate::accounts::LocalAccount;
@@ -34,18 +34,18 @@ use crate::{Result, TickerRef};
 #[cfg_attr(feature = "napi", napi)]
 #[derive(Clone)]
 pub struct NotarizationBuilder {
-  imported_balance_changes: Arc<Mutex<Vec<BalanceChange>>>,
-  balance_changes_by_account: Arc<Mutex<HashMap<i64, BalanceChangeBuilder>>>,
-  votes: Arc<Mutex<BoundedVec<BlockVote, ConstU32<MAX_BLOCK_VOTES_PER_NOTARIZATION>>>>,
-  domains: Arc<Mutex<BoundedVec<(Domain, AccountId32), ConstU32<MAX_DOMAINS_PER_NOTARIZATION>>>>,
-  loaded_accounts: Arc<Mutex<BTreeMap<(String, AccountType), LocalAccount>>>,
-  channel_holds: Arc<Mutex<Vec<OpenChannelHold>>>,
+  imported_balance_changes: Arc<RwLock<Vec<BalanceChange>>>,
+  balance_changes_by_account: Arc<RwLock<HashMap<i64, BalanceChangeBuilder>>>,
+  votes: Arc<RwLock<BoundedVec<BlockVote, ConstU32<MAX_BLOCK_VOTES_PER_NOTARIZATION>>>>,
+  domains: Arc<RwLock<BoundedVec<(Domain, AccountId32), ConstU32<MAX_DOMAINS_PER_NOTARIZATION>>>>,
+  loaded_accounts: Arc<RwLock<BTreeMap<(String, AccountType), LocalAccount>>>,
+  channel_holds: Arc<RwLock<Vec<OpenChannelHold>>>,
   db: SqlitePool,
-  is_verified: Arc<Mutex<bool>>,
-  is_finalized: Arc<Mutex<bool>>,
+  is_verified: Arc<RwLock<bool>>,
+  is_finalized: Arc<RwLock<bool>>,
   notary_clients: NotaryClients,
-  notary_id: Arc<Mutex<Option<u32>>>,
-  transaction: Arc<Mutex<Option<LocalchainTransaction>>>,
+  notary_id: Arc<RwLock<Option<u32>>>,
+  transaction: Arc<RwLock<Option<LocalchainTransaction>>>,
   keystore: Keystore,
   ticker: TickerRef,
 }
@@ -68,7 +68,7 @@ impl NotarizationBuilder {
       channel_holds: Default::default(),
       is_verified: Default::default(),
       is_finalized: Default::default(),
-      notary_id: Arc::new(Mutex::new(Some(1))),
+      notary_id: Arc::new(RwLock::new(Some(1))),
       transaction: Default::default(),
       keystore,
       ticker,
@@ -76,28 +76,27 @@ impl NotarizationBuilder {
   }
 
   pub async fn set_notary_id(&self, notary_id: NotaryId) {
-    *(self.notary_id.lock().await) = Some(notary_id);
+    self.notary_id.write().await.replace(notary_id);
   }
 
   pub async fn get_notary_id(&self) -> Result<u32> {
-    let notary_id = *(self.notary_id.lock().await);
-    let Some(notary_id) = notary_id else {
+    let Some(notary_id) = *(self.notary_id.read().await) else {
       bail!("No notary id found. Please specify which notary to use.");
     };
     Ok(notary_id)
   }
 
   pub async fn set_transaction(&self, transaction: LocalchainTransaction) {
-    *(self.transaction.lock().await) = Some(transaction);
+    self.transaction.write().await.replace(transaction);
   }
 
   pub async fn get_transaction(&self) -> Option<LocalchainTransaction> {
-    let transaction = self.transaction.lock().await;
+    let transaction = self.transaction.read().await;
     transaction.clone()
   }
 
   pub async fn ensure_notary_id(&self, notary_id: NotaryId) -> Result<()> {
-    let mut notary_id_lock = self.notary_id.lock().await;
+    let mut notary_id_lock = self.notary_id.write().await;
     if (*notary_id_lock).is_none() {
       *notary_id_lock = Some(notary_id);
     } else if *notary_id_lock != Some(notary_id) {
@@ -123,7 +122,7 @@ impl NotarizationBuilder {
   }
 
   pub async fn is_finalized(&self) -> bool {
-    *(self.is_finalized.lock().await)
+    *(self.is_finalized.read().await)
   }
 
   pub async fn unclaimed_tax(&self) -> Result<i128> {
@@ -147,7 +146,7 @@ impl NotarizationBuilder {
   }
 
   pub async fn channel_holds(&self) -> Vec<ChannelHold> {
-    let channel_holds = self.channel_holds.lock().await;
+    let channel_holds = self.channel_holds.read().await;
     let mut result = vec![];
     for channel_hold in &*channel_holds {
       result.push(channel_hold.inner().await);
@@ -156,16 +155,16 @@ impl NotarizationBuilder {
   }
 
   pub async fn add_channel_hold(&self, channel_hold: &OpenChannelHold) {
-    self.channel_holds.lock().await.push(channel_hold.clone());
+    self.channel_holds.write().await.push(channel_hold.clone());
   }
 
   pub async fn accounts(&self) -> Vec<LocalAccount> {
-    let accounts = self.loaded_accounts.lock().await;
-    (*accounts).values().cloned().collect::<Vec<_>>()
+    let accounts = &*(self.loaded_accounts.read().await);
+    accounts.values().cloned().collect::<Vec<_>>()
   }
 
   pub async fn balance_change_builders(&self) -> Vec<BalanceChangeBuilder> {
-    let builders = self.balance_changes_by_account.lock().await;
+    let builders = &*(self.balance_changes_by_account.read().await);
     builders.values().cloned().collect::<Vec<_>>()
   }
 
@@ -228,7 +227,7 @@ impl NotarizationBuilder {
   }
 
   pub async fn get_balance_change(&self, account: &LocalAccount) -> Result<BalanceChangeBuilder> {
-    let balance_changes_by_account = self.balance_changes_by_account.lock().await;
+    let balance_changes_by_account = self.balance_changes_by_account.read().await;
     match (*balance_changes_by_account).get(&account.id) {
       Some(balance_change) => Ok(balance_change.clone()),
       None => bail!("Balance change for account {} not found", account.address),
@@ -253,24 +252,29 @@ impl NotarizationBuilder {
     .await?;
     self.ensure_notary_id(notary_id).await?;
 
-    let imports = (*(self.imported_balance_changes.lock().await)).len();
-    let mut balance_changes_by_account = self.balance_changes_by_account.lock().await;
-    if balance_changes_by_account.len() + imports + 1
-      > MAX_BALANCE_CHANGES_PER_NOTARIZATION as usize
-    {
+    let imports = (*(self.imported_balance_changes.read().await)).len();
+    let balance_changes_count = (*self.balance_changes_by_account.read().await).len();
+    if balance_changes_count + imports + 1 > MAX_BALANCE_CHANGES_PER_NOTARIZATION as usize {
       bail!(
         "Max balance changes reached for this notarization. Move this change to a new notarization! ({} change(s) + {} import(s) + 1 > {} max)",
-        balance_changes_by_account.len(),
+        balance_changes_count,
         imports,
         MAX_BALANCE_CHANGES_PER_NOTARIZATION
       );
     }
 
-    let mut accounts = self.loaded_accounts.lock().await;
-    accounts.insert((address.clone(), account_type), account.clone());
+    self
+      .loaded_accounts
+      .write()
+      .await
+      .insert((address.clone(), account_type), account.clone());
 
     let builder = BalanceChangeBuilder::new_account(address, account.id, account_type)?;
-    balance_changes_by_account.insert(account.id, builder.clone());
+    self
+      .balance_changes_by_account
+      .write()
+      .await
+      .insert(account.id, builder.clone());
     Ok(builder)
   }
 
@@ -328,13 +332,12 @@ impl NotarizationBuilder {
   pub async fn load_account(&self, account: &LocalAccount) -> Result<BalanceChangeBuilder> {
     self.ensure_notary_id(account.notary_id).await?;
 
-    let mut balance_changes_by_account = self.balance_changes_by_account.lock().await;
+    let mut balance_changes_by_account = self.balance_changes_by_account.write().await;
     if let Some(balance_change) = balance_changes_by_account.get(&account.id) {
       return Ok(balance_change.clone());
     }
 
-    let imports = self.imported_balance_changes.lock().await;
-    let mut accounts = self.loaded_accounts.lock().await;
+    let imports = self.imported_balance_changes.read().await;
     if balance_changes_by_account.len() + imports.len() + 1
       > MAX_BALANCE_CHANGES_PER_NOTARIZATION as usize
     {
@@ -345,7 +348,7 @@ impl NotarizationBuilder {
         MAX_BALANCE_CHANGES_PER_NOTARIZATION
       );
     }
-    accounts.insert(
+    self.loaded_accounts.write().await.insert(
       (account.address.clone(), account.account_type),
       account.clone(),
     );
@@ -368,12 +371,11 @@ impl NotarizationBuilder {
   }
 
   pub async fn can_add_channel_hold(&self, channel_hold: &OpenChannelHold) -> bool {
-    let balance_changes_by_account = (*(self.balance_changes_by_account.lock().await)).len();
-    let imports = (*(self.imported_balance_changes.lock().await)).len();
+    let balance_changes_by_account = (*(self.balance_changes_by_account.read().await)).len();
+    let imports = (*(self.imported_balance_changes.read().await)).len();
     let mut added_accounts_needed = 2;
     let channel_hold = channel_hold.inner().await;
-    let accounts_by_id = self.loaded_accounts.lock().await;
-    for (_, account) in accounts_by_id.iter() {
+    for account in (*(self.loaded_accounts.read().await)).values() {
       if account.address == channel_hold.to_address {
         added_accounts_needed -= 1;
       }
@@ -384,7 +386,7 @@ impl NotarizationBuilder {
 
   pub async fn cancel_channel_hold(&self, open_channel_hold: &OpenChannelHold) -> Result<()> {
     let channel_hold = open_channel_hold.inner().await;
-    (*self.channel_holds.lock().await).push(open_channel_hold.clone());
+    (*self.channel_holds.write().await).push(open_channel_hold.clone());
     let balance_change_tx = self
       .add_account(
         channel_hold.from_address,
@@ -394,7 +396,7 @@ impl NotarizationBuilder {
       .await?;
 
     let balance_lock = balance_change_tx.balance_change_lock();
-    let mut balance_change = balance_lock.lock().await;
+    let mut balance_change = balance_lock.write().await;
     balance_change.push_note(0, NoteType::ChannelHoldSettle);
 
     Ok(())
@@ -403,7 +405,7 @@ impl NotarizationBuilder {
   pub async fn claim_channel_hold(&self, open_channel_hold: &OpenChannelHold) -> Result<()> {
     let channel_hold = open_channel_hold.inner().await;
     {
-      let mut notary_id = self.notary_id.lock().await;
+      let mut notary_id = self.notary_id.write().await;
       if let Some(notary_id) = *notary_id {
         if channel_hold.notary_id != notary_id {
           bail!(
@@ -417,10 +419,10 @@ impl NotarizationBuilder {
       }
     }
 
-    (*self.channel_holds.lock().await).push(open_channel_hold.clone());
+    (*self.channel_holds.write().await).push(open_channel_hold.clone());
 
     let settle_balance_change = channel_hold.get_final().await?;
-    (*self.imported_balance_changes.lock().await).push(settle_balance_change);
+    (*self.imported_balance_changes.write().await).push(settle_balance_change);
 
     let default_deposit_account = self.default_deposit_account().await?;
     if default_deposit_account.address != channel_hold.to_address {
@@ -454,7 +456,7 @@ impl NotarizationBuilder {
       bail!("Invalid vote signature!");
     }
 
-    let mut votes = self.votes.lock().await;
+    let mut votes = self.votes.write().await;
     votes
       .try_push(vote)
       .map_err(|_| anyhow!("Cannot add any more votes to this notarization!"))?;
@@ -468,7 +470,7 @@ impl NotarizationBuilder {
 
     let register_to_account = AccountStore::parse_address(&register_to_address)?;
     let domain = Domain::parse(domain)?;
-    let mut domains = self.domains.lock().await;
+    let mut domains = self.domains.write().await;
     domains.try_push((domain, register_to_account)).map_err(|_| anyhow!(
       "Max domains reached for this notarization. Move this domain to a new notarization! ({} domains + 1 > {} max)",
       domains.len(),
@@ -604,7 +606,7 @@ impl NotarizationBuilder {
       .send(requested_microgons, Some(recipients))
       .await?;
 
-    let mut imports = self.imported_balance_changes.lock().await;
+    let mut imports = self.imported_balance_changes.write().await;
     imports.append(&mut balance_changes);
 
     Ok(())
@@ -656,7 +658,7 @@ impl NotarizationBuilder {
       }
     }
 
-    let mut imports = self.imported_balance_changes.lock().await;
+    let mut imports = self.imported_balance_changes.write().await;
     imports.append(&mut balance_changes);
 
     Ok(())
@@ -673,19 +675,18 @@ impl NotarizationBuilder {
     let file = ArgonFile::from_notarization(&notarization, file_type);
 
     let mut tx = self.db.begin().await?;
-    let Some(notary_id) = *(self.notary_id.lock().await) else {
+    let Some(notary_id) = *(self.notary_id.read().await) else {
       bail!("Can't determine which notary to use. Please specify which notary to use.",);
     };
 
     let transaction = self.get_transaction().await;
     let transaction_id = transaction.map(|a| a.id as i64);
-    let balance_changes_by_account = self.balance_changes_by_account.lock().await;
-    for (account_id, balance_change_tx) in balance_changes_by_account.clone() {
+    for (account_id, balance_change_tx) in &*(self.balance_changes_by_account.write().await) {
       let balance_change = balance_change_tx.inner().await;
 
       BalanceChangeStore::tx_save_sent(
         &mut tx,
-        account_id,
+        *account_id,
         balance_change,
         notary_id,
         transaction_id,
@@ -693,7 +694,7 @@ impl NotarizationBuilder {
       .await?;
     }
     tx.commit().await?;
-    *(self.is_finalized.lock().await) = true;
+    *(self.is_finalized.write().await) = true;
     file.to_json()
   }
 
@@ -704,23 +705,23 @@ impl NotarizationBuilder {
   }
 
   pub(crate) async fn to_notarization(&self) -> Result<Notarization> {
-    let imports = self.imported_balance_changes.lock().await;
-    let block_votes = self.votes.lock().await;
-    let domains = self.domains.lock().await;
+    let imports = &*(self.imported_balance_changes.read().await);
+    let block_votes = &*(self.votes.read().await);
+
     let mut notarization = Notarization::new(
       imports.clone(),
-      (*block_votes).to_vec(),
-      (*domains)
-        .iter()
-        .map(|(d, a)| (d.hash(), a.clone()))
+      block_votes.to_vec(),
+      (*(self.domains.read().await))
+        .clone()
+        .into_iter()
+        .map(|(d, a)| (d.hash(), a))
         .collect(),
     );
 
     let mut to_delete = vec![];
     let mut accounts_to_delete = vec![];
     {
-      let balance_changes_by_account = self.balance_changes_by_account.lock().await;
-      for (key, balance_change_tx) in &*balance_changes_by_account {
+      for (key, balance_change_tx) in &*(self.balance_changes_by_account.read().await) {
         let balance_change = balance_change_tx.inner().await;
         if balance_change.notes.len() == 0 {
           to_delete.push(*key);
@@ -737,12 +738,12 @@ impl NotarizationBuilder {
     }
     self
       .balance_changes_by_account
-      .lock()
+      .write()
       .await
       .retain(|id, _| !to_delete.contains(id));
     self
       .loaded_accounts
-      .lock()
+      .write()
       .await
       .retain(|id, _| !accounts_to_delete.contains(id));
 
@@ -758,7 +759,7 @@ impl NotarizationBuilder {
   }
 
   pub async fn notarize(&self) -> Result<NotarizationTracker> {
-    if !*self.is_verified.lock().await {
+    if !*self.is_verified.read().await {
       self.sign().await?;
       self.verify().await?;
     }
@@ -801,9 +802,8 @@ impl NotarizationBuilder {
     .await
     ?;
 
-    let channel_holds = self.channel_holds.lock().await;
     let mut inner_channel_holds = vec![];
-    for channel_hold in (*channel_holds).iter() {
+    for channel_hold in &*self.channel_holds.read().await {
       let mut channel_hold_inner = channel_hold.inner().await;
       channel_hold_inner
         .db_mark_notarized(&mut tx, notarization_id)
@@ -822,7 +822,7 @@ impl NotarizationBuilder {
       notary_id,
       notarization_id,
       notarization,
-      imports: (*(self.imported_balance_changes.lock().await)).clone(),
+      imports: (*(self.imported_balance_changes.read().await)).clone(),
       balance_changes_by_account: Default::default(),
       accounts_by_id: Default::default(),
       notarized_balance_changes,
@@ -830,19 +830,18 @@ impl NotarizationBuilder {
       notarized_votes,
     };
     let mut tracker_balance_changes = tracker.balance_changes_by_account.lock().await;
-    let mut loaded_accounts = self.loaded_accounts.lock().await;
+    let mut loaded_accounts = self.loaded_accounts.write().await;
     let transaction = self.get_transaction().await;
 
     let transaction_id = transaction.map(|a| a.id as i64);
-    let balance_changes_by_account = self.balance_changes_by_account.lock().await;
-    for (account_id, balance_change_tx) in balance_changes_by_account.clone() {
+    for (account_id, balance_change_tx) in &*self.balance_changes_by_account.read().await {
       let balance_change = balance_change_tx.inner().await;
       let new_account = result.new_account_origins.iter().find(|a| {
         a.account_type == balance_change.account_type && a.account_id == balance_change.account_id
       });
       let change_id = BalanceChangeStore::tx_upsert_notarized(
         &mut tx,
-        account_id,
+        *account_id,
         &balance_change,
         notary_id,
         notarization_id,
@@ -853,7 +852,7 @@ impl NotarizationBuilder {
       let mut account = loaded_accounts
         .iter()
         .find_map(|(_, x)| {
-          if x.id == account_id {
+          if x.id == *account_id {
             return Some(x.clone());
           }
           None
@@ -863,7 +862,7 @@ impl NotarizationBuilder {
       if let Some(new_origin) = new_account {
         AccountStore::db_update_origin(
           &mut tx,
-          account_id,
+          *account_id,
           notebook_number,
           new_origin.account_uid,
         )
@@ -880,14 +879,13 @@ impl NotarizationBuilder {
       }
 
       (*tracker_balance_changes).insert(
-        account_id,
+        *account_id,
         BalanceChangeStore::db_get_by_id(&mut tx, change_id).await?,
       );
 
-      tracker.accounts_by_id.insert(account_id, account);
+      tracker.accounts_by_id.insert(*account_id, account);
     }
-    let domains = self.domains.lock().await;
-    for (domain, account) in &*domains {
+    for (domain, account) in &*(self.domains.read().await) {
       DomainStore::db_insert(
         &mut tx,
         JsDomain {
@@ -902,13 +900,13 @@ impl NotarizationBuilder {
     }
 
     tx.commit().await?;
-    *(self.is_finalized.lock().await) = true;
+    *(self.is_finalized.write().await) = true;
 
     Ok(tracker.clone())
   }
 
   pub async fn verify(&self) -> Result<()> {
-    let mut is_verified = self.is_verified.lock().await;
+    let mut is_verified = self.is_verified.write().await;
     let notarization = self.to_notarization().await?;
 
     verify_notarization_allocation(
@@ -926,8 +924,7 @@ impl NotarizationBuilder {
 
   pub async fn sign(&self) -> Result<()> {
     if self.keystore.is_unlocked().await {
-      let accounts = self.loaded_accounts.lock().await;
-      for (_, account) in accounts.iter() {
+      for account in (*(self.loaded_accounts.read().await)).values() {
         if let Some(hd_path) = &account.hd_path {
           // load derived
           self.keystore.derive_account_id(hd_path.clone()).await?;
@@ -935,11 +932,11 @@ impl NotarizationBuilder {
       }
     }
 
-    let mut balance_changes_by_account = self.balance_changes_by_account.lock().await;
+    let mut balance_changes_by_account = self.balance_changes_by_account.write().await;
     for (_, balance_change_tx) in balance_changes_by_account.iter_mut() {
       if balance_change_tx.is_empty_signature().await {
         let balance_lock = balance_change_tx.balance_change_lock();
-        let mut balance_change = balance_lock.lock().await;
+        let mut balance_change = balance_lock.write().await;
         let bytes = balance_change.hash();
         let signature = self
           .keystore

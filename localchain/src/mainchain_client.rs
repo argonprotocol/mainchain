@@ -12,7 +12,7 @@ use subxt::storage::Address as StorageAddress;
 use subxt::tx::TxInBlock;
 use subxt::utils::Yes;
 use subxt::OnlineClient;
-use tokio::sync::Mutex;
+use tokio::sync::{Mutex, RwLock};
 use tracing::warn;
 
 use argon_client::api::storage;
@@ -36,7 +36,7 @@ use crate::{bail, Result};
 #[allow(clippy::type_complexity)]
 #[derive(Clone)]
 pub struct MainchainClient {
-  client: Arc<Mutex<Option<InnerMainchainClient>>>,
+  client: Arc<RwLock<Option<InnerMainchainClient>>>,
   pub host: String,
   join_handles: Arc<Mutex<Option<(tokio::task::JoinHandle<()>, tokio::task::JoinHandle<()>)>>>,
 }
@@ -46,7 +46,7 @@ impl MainchainClient {
   pub fn mock() -> Self {
     Self {
       host: "mock".to_string(),
-      client: Arc::new(Mutex::new(None)),
+      client: Arc::new(RwLock::new(None)),
       join_handles: Arc::new(Mutex::new(None)),
     }
   }
@@ -55,7 +55,7 @@ impl MainchainClient {
 impl MainchainClient {
   async fn client(&self) -> Result<InnerMainchainClient> {
     self.ensure_connected(10_000).await?;
-    let client_lock = self.client.lock().await;
+    let client_lock = self.client.read().await;
     let client_rpc = (*client_lock)
       .as_ref()
       .ok_or_else(|| anyhow!("Could not connect to mainchain client at {}", self.host))?;
@@ -63,8 +63,7 @@ impl MainchainClient {
   }
 
   async fn ensure_connected(&self, timeout_millis: i64) -> Result<()> {
-    let mut client_lock = self.client.lock().await;
-    if (*client_lock).is_some() {
+    if self.client.read().await.is_some() {
       return Ok(());
     }
 
@@ -79,8 +78,7 @@ impl MainchainClient {
     let mut on_error = client.subscribe_client_error();
     let ws_client = client.ws_client.clone();
 
-    *client_lock = Some(client);
-    drop(client_lock);
+    self.client.write().await.replace(client);
 
     let client_lock_1 = self.client.clone();
     let client_lock_2 = self.client.clone();
@@ -88,21 +86,19 @@ impl MainchainClient {
     let url_2 = self.host.clone();
 
     let handle1 = tokio::spawn(async move {
-      let client_lock = client_lock_1.clone();
       let url = url_1.clone();
       let err = on_error.recv().await.unwrap_or_default();
 
       warn!("Disconnected from mainchain at {url} with error {err}",);
-      *client_lock.lock().await = None;
+      client_lock_1.write().await.take();
     });
 
     let handle2 = tokio::spawn(async move {
-      let client_lock = client_lock_2.clone();
       let url = url_2.clone();
       let _ = ws_client.on_disconnect().await;
 
       warn!("Disconnected from mainchain at {url}",);
-      *client_lock.lock().await = None;
+      client_lock_2.write().await.take();
     });
 
     *self.join_handles.lock().await = Some((handle1, handle2));
@@ -115,7 +111,7 @@ impl MainchainClient {
       handle1.abort();
       handle2.abort();
     }
-    let mut client_lock = self.client.lock().await;
+    let mut client_lock = self.client.write().await;
     if let Some(client) = (*client_lock).take() {
       drop(client);
     }
@@ -125,7 +121,7 @@ impl MainchainClient {
   pub async fn connect(host: String, timeout_millis: i64) -> Result<Self> {
     let instance = Self {
       host,
-      client: Arc::new(Mutex::new(None)),
+      client: Arc::new(RwLock::new(None)),
       join_handles: Arc::new(Mutex::new(None)),
     };
     instance.ensure_connected(timeout_millis).await?;

@@ -2,7 +2,7 @@ use std::sync::Arc;
 
 use chrono::NaiveDateTime;
 use sqlx::{FromRow, SqlitePool};
-use tokio::sync::Mutex;
+use tokio::sync::RwLock;
 
 use argon_primitives::{Balance, TransferToLocalchainId};
 
@@ -27,14 +27,14 @@ pub struct MainchainTransferIn {
 #[cfg_attr(feature = "napi", napi)]
 pub struct MainchainTransferStore {
   db: SqlitePool,
-  mainchain_client: Arc<Mutex<Option<MainchainClient>>>,
+  mainchain_client: Arc<RwLock<Option<MainchainClient>>>,
   keystore: Keystore,
 }
 
 impl MainchainTransferStore {
   pub fn new(
     db: SqlitePool,
-    mainchain_client: Arc<Mutex<Option<MainchainClient>>>,
+    mainchain_client: Arc<RwLock<Option<MainchainClient>>>,
     keystore: Keystore,
   ) -> Self {
     Self {
@@ -49,7 +49,7 @@ impl MainchainTransferStore {
     amount: Balance,
     notary_id: Option<u32>,
   ) -> Result<LocalchainTransfer> {
-    let Some(ref mainchain_client) = *(self.mainchain_client.lock().await) else {
+    let Some(ref mainchain_client) = *(self.mainchain_client.read().await) else {
       bail!("Mainchain client not initialized");
     };
     let mut db = self.db.acquire().await?;
@@ -100,7 +100,7 @@ impl MainchainTransferStore {
   }
 
   pub async fn update_finalization(&self) -> Result<()> {
-    let Some(ref mainchain_client) = *(self.mainchain_client.lock().await) else {
+    let Some(ref mainchain_client) = *(self.mainchain_client.read().await) else {
       bail!("Mainchain client not initialized");
     };
     let mut db = self.db.acquire().await?;

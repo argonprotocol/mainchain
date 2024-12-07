@@ -29,7 +29,7 @@ use parking_lot::RwLock;
 use sqlx::sqlite::{SqliteConnectOptions, SqliteJournalMode, SqlitePoolOptions};
 use sqlx::{migrate::MigrateDatabase, SqlitePool};
 use sqlx::{Executor, Sqlite};
-use tokio::sync::Mutex;
+use tokio::sync::RwLock as AsyncRwLock;
 use tracing_subscriber::{fmt, EnvFilter};
 
 use crate::cli::EmbeddedKeyPassword;
@@ -85,7 +85,7 @@ lazy_static! {
 pub struct Localchain {
   pub(crate) db: SqlitePool,
   pub(crate) ticker: TickerRef,
-  pub(crate) mainchain_client: Arc<Mutex<Option<MainchainClient>>>,
+  pub(crate) mainchain_client: Arc<AsyncRwLock<Option<MainchainClient>>>,
   pub(crate) notary_clients: NotaryClients,
   pub(crate) keystore: Keystore,
   pub path: String,
@@ -187,7 +187,7 @@ impl Localchain {
       ticker.lookup_ntp_offset(&ntp_pool_url).await?;
     }
     Self::confirm_chain(&db, &mainchain_client).await?;
-    let mainchain_mutex = Arc::new(Mutex::new(Some(mainchain_client.clone())));
+    let mainchain_mutex = Arc::new(AsyncRwLock::new(Some(mainchain_client.clone())));
     let keystore = Keystore::new(db.clone());
     if let Some(password_option) = keystore_password {
       keystore.unlock(Some(password_option)).await?;
@@ -223,7 +223,7 @@ impl Localchain {
     }
     let db = Self::create_db(path.clone()).await?;
 
-    let mainchain_mutex = Arc::new(Mutex::new(None));
+    let mainchain_mutex = Arc::new(AsyncRwLock::new(None));
     let keystore = Keystore::new(db.clone());
     if let Some(password_option) = keystore_password {
       keystore.unlock(Some(password_option)).await?;
@@ -245,13 +245,16 @@ impl Localchain {
   pub async fn attach_mainchain(&self, mainchain_client: &MainchainClient) -> Result<()> {
     Self::confirm_chain(&self.db, mainchain_client).await?;
 
-    let mut mainchain_mutex = self.mainchain_client.lock().await;
-    *mainchain_mutex = Some(mainchain_client.clone());
+    self
+      .mainchain_client
+      .write()
+      .await
+      .replace(mainchain_client.clone());
     Ok(())
   }
 
   pub async fn update_ticker(&self, ntp_sync_pool_url: Option<String>) -> Result<()> {
-    let Some(ref mainchain_client) = *(self.mainchain_client.lock().await) else {
+    let Some(ref mainchain_client) = *(self.mainchain_client.read().await) else {
       bail!("No mainchain client attached");
     };
     let mut ticker = mainchain_client.get_ticker().await?;
@@ -265,8 +268,7 @@ impl Localchain {
   pub async fn close(&self) -> Result<()> {
     tracing::trace!("Closing Localchain");
     {
-      let mut mainchain_client = self.mainchain_client.lock().await;
-      if let Some(mainchain_client) = mainchain_client.take() {
+      if let Some(mainchain_client) = self.mainchain_client.write().await.take() {
         mainchain_client.close().await?;
       }
     }
@@ -331,8 +333,7 @@ impl Localchain {
   }
 
   pub async fn mainchain_client(&self) -> Option<MainchainClient> {
-    let mainchain_client = self.mainchain_client.lock().await;
-    mainchain_client.clone()
+    self.mainchain_client.read().await.clone()
   }
 
   pub fn mainchain_transfers(&self) -> MainchainTransferStore {

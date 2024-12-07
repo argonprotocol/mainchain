@@ -9,7 +9,7 @@ use std::path::PathBuf;
 #[cfg(feature = "napi")]
 use std::sync::Arc;
 #[cfg(feature = "napi")]
-use tokio::sync::Mutex;
+use tokio::sync::RwLock;
 
 use crate::cli::EmbeddedKeyPassword;
 use crate::embedded_keystore::{CryptoScheme, EmbeddedKeystore};
@@ -20,7 +20,7 @@ use crate::{bail, Result};
 #[derive(Clone)]
 pub struct Keystore {
   #[cfg(feature = "napi")]
-  js_callbacks: Arc<Mutex<Option<(napi_ext::JsCallbacks, String)>>>,
+  js_callbacks: Arc<RwLock<Option<(napi_ext::JsCallbacks, String)>>>,
   embedded_keystore: EmbeddedKeystore,
   db: SqlitePool,
 }
@@ -100,7 +100,7 @@ impl Keystore {
     #[cfg(feature = "napi")]
     {
       use napi::bindgen_prelude::Promise;
-      if let Some(js_callbacks) = self.js_callbacks.lock().await.as_ref() {
+      if let Some(js_callbacks) = self.js_callbacks.read().await.as_ref() {
         let promise_result = js_callbacks
           .0
           .derive
@@ -130,7 +130,7 @@ impl Keystore {
     #[cfg(feature = "napi")]
     {
       use napi::bindgen_prelude::{Promise, Uint8Array};
-      if let Some(js_callbacks) = self.js_callbacks.lock().await.as_ref() {
+      if let Some(js_callbacks) = self.js_callbacks.read().await.as_ref() {
         let promise_result = js_callbacks
           .0
           .sign
@@ -201,7 +201,7 @@ pub mod napi_ext {
 
       let _ = self
         .js_callbacks
-        .lock()
+        .write()
         .await
         .insert((JsCallbacks { derive, sign }, default_address));
       Ok(())
