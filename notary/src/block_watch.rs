@@ -122,7 +122,10 @@ async fn sync_finalized_blocks(
 	);
 
 	for block in missing_blocks.into_iter() {
-		process_block(&mut tx, &client.live, &block, notary_id).await?;
+		// might already have block
+		if !BlocksStore::has_block(&mut tx, block.hash()).await? {
+			process_block(&mut tx, &client.live, &block, notary_id).await?;
+		}
 		process_finalized_block(&mut tx, block, notary_id, &ticker).await?;
 	}
 	tx.commit().await?;

@@ -1,12 +1,11 @@
 use std::collections::{BTreeMap, BTreeSet};
 
 use argon_notary_audit::VerifyError;
+use argon_primitives::{ensure, NotebookAuditResult, VoteMinimum};
 use chrono::Utc;
 use serde_json::json;
 use sp_core::H256;
-use sqlx::{FromRow, PgConnection};
-
-use argon_primitives::{ensure, NotebookAuditResult, VoteMinimum};
+use sqlx::{postgres::PgDatabaseError, FromRow, PgConnection};
 
 use crate::Error;
 
@@ -183,13 +182,28 @@ impl BlocksStore {
 			digests,
 		)
 		.execute(db)
-		.await?;
+		.await;
 
-		ensure!(
-			res.rows_affected() == 1,
-			Error::InternalError("Unable to insert block".to_string())
-		);
-		Ok(())
+		match res {
+			Ok(res) => {
+				ensure!(
+					res.rows_affected() == 1,
+					Error::InternalError("Unable to insert block".to_string())
+				);
+				Ok(())
+			},
+			Err(sqlx::Error::Database(db_err)) => {
+				let pg_err = db_err.downcast_ref::<PgDatabaseError>();
+				const UNIQUE_VIOLATION: &str = "23505"; // PostgreSQL error code for unique_violation
+
+				if pg_err.code() == UNIQUE_VIOLATION {
+					return Ok(())
+				}
+
+				Err(Error::Database(db_err.to_string()))
+			},
+			Err(e) => Err(e.into()),
+		}
 	}
 }
 
@@ -250,24 +264,22 @@ mod tests {
 
 		Ok(())
 	}
+
 	#[sqlx::test]
-	async fn test_cannot_overwrite(pool: PgPool) -> anyhow::Result<()> {
+	async fn test_ignores_duplicates(pool: PgPool) -> anyhow::Result<()> {
 		let mut tx = pool.begin().await?;
 		BlocksStore::record(&mut tx, 1, H256::from_slice(&[1u8; 32]), H256::zero(), 100, vec![])
 			.await?;
-		assert!(BlocksStore::record(
-			&mut tx,
-			1,
-			H256::from_slice(&[1u8; 32]),
-			H256::from_slice(&[1u8; 32]),
-			100,
-			vec![]
-		)
-		.await
-		.unwrap_err()
-		.to_string()
-		.contains("duplicate key"));
+		tx.commit().await?;
 
+		let mut tx = pool.begin().await?;
+		BlocksStore::record(&mut tx, 1, H256::from_slice(&[1u8; 32]), H256::zero(), 200, vec![])
+			.await?;
+		tx.commit().await?;
+
+		let mut db = pool.acquire().await?;
+		let block = BlocksStore::get_by_hash(&mut db, H256::from_slice(&[1u8; 32])).await?;
+		assert_eq!(block.block_vote_minimum, "100");
 		Ok(())
 	}
 }
