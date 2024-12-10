@@ -168,7 +168,8 @@ where
 		// audits
 		let latest_verified_finalized = self.client.info().finalized_number;
 		if block_params.origin != BlockOrigin::Own &&
-			block_params.header.number() > &latest_verified_finalized
+			block_params.header.number() > &latest_verified_finalized &&
+			!block_params.finalized
 		{
 			let digest_notebooks = self
 				.client

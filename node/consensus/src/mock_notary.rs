@@ -87,7 +87,11 @@ impl MockNotary {
 			finalized_notebook_number: header.header.notebook_number,
 		});
 		drop(state);
-		let _ = self.header_channel.0.notify(|| Ok::<_, anyhow::Error>(header));
+		let _ = self
+			.header_channel
+			.0
+			.notify(|| Ok::<_, anyhow::Error>(header))
+			.inspect_err(|e| println!("Failed to notify header: {:?}", e));
 	}
 
 	pub async fn next_details(&self) -> (NotebookNumber, Tick) {
