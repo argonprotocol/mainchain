@@ -139,7 +139,7 @@ impl BlocksStore {
 		let res = sqlx::query!(
 			r#"
 			UPDATE blocks SET finalized_time=$1, is_finalized=true
-			WHERE block_hash = $2
+			WHERE block_hash = $2 and is_finalized=false
 		"#,
 			Utc::now(),
 			block_hash.0.to_vec(),

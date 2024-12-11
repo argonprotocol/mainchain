@@ -1136,6 +1136,7 @@ dependencies = [
  "getrandom",
  "hex",
  "jsonrpsee 0.24.7",
+ "log",
  "parity-scale-codec",
  "parking_lot 0.12.3",
  "sc-utils",

@@ -1,5 +1,3 @@
-use std::env;
-
 use anyhow::Context;
 use argon_client::{api::storage, ReconnectingClient};
 use argon_notary::{
@@ -12,6 +10,8 @@ use clap::{Parser, Subcommand};
 use futures::StreamExt;
 use sp_core::{crypto::Ss58Codec, sr25519, Pair};
 use sqlx::{migrate, postgres::PgPoolOptions};
+use std::{env, time::Duration};
+use tracing::warn;
 
 #[derive(Parser, Debug)]
 #[command(version = env!("IMPL_VERSION"), about, author, arg_required_else_help = true, long_about = None)]
@@ -171,6 +171,7 @@ async fn main() -> anyhow::Result<()> {
 						Error::Input("Notary not found in active notaries".to_string())
 					})?
 			};
+			drop(mainchain_client);
 
 			let server = NotaryServer::start(
 				notary_id,
@@ -182,7 +183,19 @@ async fn main() -> anyhow::Result<()> {
 			.await?;
 
 			if sync_blocks {
-				spawn_block_sync(trusted_rpc_url.clone(), notary_id, pool.clone(), ticker).await?;
+				let handle = spawn_block_sync(
+					trusted_rpc_url.clone(),
+					notary_id,
+					pool.clone(),
+					ticker,
+					Duration::from_secs(5),
+				)
+				.await?;
+				tokio::spawn(async move {
+					let _ = handle.await.inspect_err(|e| {
+						warn!("Block watch exiting {}", e);
+					});
+				});
 			}
 			if finalize_notebooks {
 				let handles = spawn_notebook_closer(
@@ -195,10 +208,16 @@ async fn main() -> anyhow::Result<()> {
 				)?;
 
 				let mut subscription = server.audit_failure_stream.subscribe(10);
+				let mut server_handle = server.clone();
 				tokio::spawn(async move {
-					while (subscription.next().await).is_some() {
+					if let Some(failure) = subscription.next().await {
+						warn!("Audit failure detected in {}. Shutting down...", failure);
+						// stop notebook close processes immediately
 						handles.0.abort();
 						handles.1.abort();
+						// wait one second to clean up
+						tokio::time::sleep(Duration::from_secs(1)).await;
+						server_handle.stop().await;
 					}
 				});
 			}
@@ -207,6 +226,7 @@ async fn main() -> anyhow::Result<()> {
 			println!("Listening on ws://{}", server.addr);
 			let watching_server = server.clone();
 			let _ = tokio::spawn(async move { watching_server.wait_for_close().await }).await;
+
 			tracing::info!("Notary server closed");
 		},
 		Commands::InsertKey { suri, keystore_params } => {

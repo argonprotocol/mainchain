@@ -5,7 +5,16 @@ use bitcoind::{bitcoincore_rpc::Auth, BitcoinD};
 use lazy_static::lazy_static;
 use sp_core::{crypto::KeyTypeId, ed25519, Pair};
 use sp_keyring::Sr25519Keyring;
-use std::{env, process, process::Command, str::FromStr};
+use std::{
+	env,
+	fs::remove_dir_all,
+	path::PathBuf,
+	process,
+	process::Command,
+	str::FromStr,
+	thread,
+	time::{Duration, SystemTime, UNIX_EPOCH},
+};
 use subxt::backend::rpc::RpcParams;
 use url::Url;
 
@@ -23,6 +32,18 @@ pub struct ArgonTestNode {
 	pub author_keyring_name: String,
 	pub boot_url: String,
 	pub log_watcher: LogWatcher,
+	target_dir: PathBuf,
+	start_args: StartArgs,
+}
+
+struct StartArgs {
+	rpc_port: u16,
+	bootnodes: String,
+	base_dir: PathBuf,
+	rust_log: String,
+	authority: String,
+	compute_miners: u16,
+	bitcoin_rpc: String,
 }
 
 impl Drop for ArgonTestNode {
@@ -30,6 +51,7 @@ impl Drop for ArgonTestNode {
 		if let Some(mut proc) = self.proc.take() {
 			let _ = proc.kill();
 		}
+		remove_dir_all(self.start_args.base_dir.clone()).unwrap();
 		if let Some(mut bitcoind) = self.bitcoind.take() {
 			let _ = bitcoind.stop();
 		}
@@ -41,6 +63,63 @@ lazy_static! {
 	static ref CONTEXT_LOCK: std::sync::Mutex<()> = std::sync::Mutex::new(());
 }
 impl ArgonTestNode {
+	/// Restart the node with the same rpc port. NOTE: does not currently support the p2p address
+	/// too
+	///
+	/// If you want to add that, you need to capture the boot url, and also probably use
+	/// pre-generated libp2p nodeIds.
+	pub async fn restart(&mut self, wait_duration: Duration) -> anyhow::Result<()> {
+		self.log_watcher.close();
+		self.proc.take().unwrap().kill()?;
+		tokio::time::sleep(wait_duration).await;
+		let (proc, log_watcher) =
+			Self::start_process(&self.target_dir, &mut self.start_args).await?;
+		self.proc = Some(proc);
+		self.log_watcher = log_watcher;
+		self.client = MainchainClient::from_url(self.client.url.as_str()).await?;
+		Ok(())
+	}
+
+	async fn start_process(
+		target_dir: &PathBuf,
+		args: &mut StartArgs,
+	) -> anyhow::Result<(process::Child, LogWatcher)> {
+		let mut more_args = vec![];
+		if !args.bootnodes.is_empty() {
+			more_args.push(format!("--bootnodes={}", &args.bootnodes))
+		};
+
+		let mut proc = Command::new("./argon-node")
+			.current_dir(target_dir)
+			.env("RUST_LOG", &args.rust_log)
+			.stderr(process::Stdio::piped())
+			.arg("--no-mdns")
+			.arg(format!("--base-path={}", args.base_dir.display()))
+			.arg("--detailed-log-output")
+			.arg("--allow-private-ipv4")
+			.arg("--dev")
+			// .arg("--state-pruning=archive")
+			.arg(format!("--{}", &args.authority.to_lowercase()))
+			.arg(format!("--name={}", &args.authority.to_lowercase()))
+			.arg("--port=0")
+			.arg(format!("--rpc-port={}", args.rpc_port))
+			.arg(format!("--compute-miners={}", args.compute_miners))
+			.arg(format!("--bitcoin-rpc-url={}", &args.bitcoin_rpc))
+			.args(more_args.into_iter())
+			.spawn()?;
+
+		// Wait for RPC port to be logged (it's logged to stderr).
+		let stderr = proc.stderr.take().unwrap();
+		let log_watch = LogWatcher::new(stderr);
+		let port_matches = log_watch
+			.wait_for_log(r"Running JSON-RPC server: addr=127.0.0.1:(\d+)", 1)
+			.await?;
+		assert_eq!(port_matches.len(), 1);
+		println!("Started argon-node with RPC port {:?}", port_matches);
+		args.rpc_port = port_matches[0].parse::<u16>().expect("Failed to parse port");
+		Ok((proc, log_watch))
+	}
+
 	pub async fn start_with_bitcoin_rpc(
 		authority: &str,
 		compute_miners: u16,
@@ -73,41 +152,31 @@ impl ArgonTestNode {
 			overall_log, node_log, argon_log
 		);
 
-		let keyring = Sr25519Keyring::from_str(authority).expect("Invalid authority");
+		let thread_id = format!("{:?}", thread::current().id())
+			.replace("ThreadId(", "")
+			.replace(")", "");
+		let unique_name = format!(
+			"test_dir_{}_{:?}",
+			SystemTime::now().duration_since(UNIX_EPOCH)?.as_millis(),
+			thread_id
+		);
+		let base_dir = env::temp_dir().join("argon_node").join(unique_name);
+		tokio::fs::create_dir_all(base_dir.clone()).await?;
 
-		let mut more_args = vec![];
-
-		if !bootnodes.is_empty() {
-			more_args.push(format!("--bootnodes={}", bootnodes))
+		let mut start_args = StartArgs {
+			rust_log,
+			base_dir,
+			bootnodes: bootnodes.to_string(),
+			compute_miners,
+			bitcoin_rpc: bitcoin_rpc.to_string(),
+			authority: authority.to_lowercase().to_string(),
+			rpc_port: 0,
 		};
 
-		let mut proc = Command::new("./argon-node")
-			.current_dir(target_dir)
-			.env("RUST_LOG", rust_log)
-			.stderr(process::Stdio::piped())
-			.arg("--dev")
-			.arg("--detailed-log-output")
-			.arg("--allow-private-ipv4")
-			// .arg("--state-pruning=archive")
-			.arg(format!("--{}", authority.to_lowercase()))
-			.arg(format!("--name={}", authority.to_lowercase()))
-			.arg("--port=0")
-			.arg("--rpc-port=0")
-			.arg(format!("--compute-miners={}", compute_miners))
-			.arg(format!("--bitcoin-rpc-url={}", bitcoin_rpc))
-			.args(more_args.into_iter())
-			.spawn()?;
+		let keyring = Sr25519Keyring::from_str(authority).expect("Invalid authority");
 
-		// Wait for RPC port to be logged (it's logged to stderr).
-		let stderr = proc.stderr.take().unwrap();
-		let log_watch = LogWatcher::new(stderr);
-		let port_matches = log_watch
-			.wait_for_log(r"Running JSON-RPC server: addr=127.0.0.1:(\d+)", 1)
-			.await?;
-		assert_eq!(port_matches.len(), 1);
-		println!("Started argon-node with RPC port {:?}", port_matches);
-		let port = port_matches[0].parse::<u16>().expect("Failed to parse port");
-		let ws_url = format!("ws://127.0.0.1:{}", port);
+		let (proc, log_watch) = Self::start_process(&target_dir, &mut start_args).await?;
+		let ws_url = format!("ws://127.0.0.1:{}", start_args.rpc_port);
 
 		let client = MainchainClient::from_url(ws_url.as_str()).await?;
 
@@ -128,6 +197,8 @@ impl ArgonTestNode {
 				.expect("should have a localhost ip")
 				.clone(),
 			log_watcher: log_watch,
+			target_dir,
+			start_args,
 		})
 	}
 

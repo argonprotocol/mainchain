@@ -13,7 +13,7 @@ pub const NOTEBOOK_DURATION_MS: i64 = 10_000;
 
 pub struct NotebookStatusStore;
 
-#[derive(Copy, Clone)]
+#[derive(Copy, Clone, PartialOrd, PartialEq)]
 pub enum NotebookFinalizationStep {
 	Open = 1,
 	ReadyForClose = 2,

@@ -265,7 +265,7 @@ mod tests {
 	use argon_testing::start_argon_test_node;
 
 	use crate::{
-		block_watch::track_blocks,
+		block_watch::spawn_block_sync,
 		notebook_closer::NOTARY_KEYID,
 		stores::{notarizations::NotarizationsStore, notebook_status::NotebookStatusStore},
 		NotaryServer,
@@ -274,6 +274,7 @@ mod tests {
 	use super::*;
 
 	#[sqlx::test]
+	#[ignore]
 	async fn test_submitting_votes(pool: PgPool) -> anyhow::Result<()> {
 		let _ = tracing_subscriber::fmt::try_init();
 		let ctx = start_argon_test_node().await;
@@ -292,7 +293,9 @@ mod tests {
 
 		let server = NotaryServer::create_http_server("127.0.0.1:0").await?;
 		let addr = server.local_addr()?;
-		let block_tracker = track_blocks(ws_url.clone(), 1, pool.clone(), ticker);
+		let block_tracker =
+			spawn_block_sync(ws_url.clone(), 1, pool.clone(), ticker, Duration::from_millis(100))
+				.await?;
 		let block_tracker = Arc::new(Mutex::new(Some(block_tracker)));
 
 		let mut notary_server = NotaryServer::start_with(

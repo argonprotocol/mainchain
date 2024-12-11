@@ -875,9 +875,9 @@ where
 			let c = Arc::new(c);
 			e.insert(c.clone());
 		}
-		Ok(self.get_client(notary_id).await.ok_or_else(|| {
-			Error::NotaryError("Could not connect to notary for audit".to_string())
-		})?)
+		self.get_client(notary_id)
+			.await
+			.ok_or_else(|| Error::NotaryError("Could not connect to notary for audit".to_string()))
 	}
 
 	async fn has_client(&self, notary_id: NotaryId) -> bool {

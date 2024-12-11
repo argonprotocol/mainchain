@@ -46,6 +46,7 @@ argon-notary-audit = { workspace = true, features = ["default"] }
 argon-primitives = { workspace = true, features = ["default"] }
 argon-notary-apis = { workspace = true }
 url = { workspace = true }
+log = "0.4.22"
 
 [dev-dependencies]
 frame-support = { workspace = true }

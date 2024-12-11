@@ -1,11 +1,12 @@
 use codec::Decode;
 use sp_core::{ed25519::Public as Ed25519Public, H256};
 use sqlx::{PgConnection, PgPool};
+use std::time::Duration;
 use subxt::{
 	blocks::{Block, BlockRef},
 	config::substrate::DigestItem,
 };
-use tracing::info;
+use tracing::{error, info, trace};
 
 pub use argon_client;
 use argon_client::{api, ArgonConfig, ArgonOnlineClient, MainchainClient};
@@ -15,17 +16,14 @@ use argon_primitives::{
 	NotebookDigest,
 };
 
-use crate::{
-	stores::{
-		blocks::BlocksStore,
-		chain_transfer::ChainTransferStore,
-		mainchain_identity::MainchainIdentityStore,
-		notebook_audit_failure::NotebookAuditFailureStore,
-		notebook_header::NotebookHeaderStore,
-		notebook_status::{NotebookFinalizationStep, NotebookStatusStore},
-		registered_key::RegisteredKeyStore,
-	},
-	Error,
+use crate::stores::{
+	blocks::BlocksStore,
+	chain_transfer::ChainTransferStore,
+	mainchain_identity::MainchainIdentityStore,
+	notebook_audit_failure::NotebookAuditFailureStore,
+	notebook_header::NotebookHeaderStore,
+	notebook_status::{NotebookFinalizationStep, NotebookStatusStore},
+	registered_key::RegisteredKeyStore,
 };
 
 pub async fn spawn_block_sync(
@@ -33,39 +31,36 @@ pub async fn spawn_block_sync(
 	notary_id: NotaryId,
 	pool: PgPool,
 	ticker: Ticker,
-) -> anyhow::Result<(), Error> {
-	sync_finalized_blocks(rpc_url.clone(), notary_id, pool.clone(), ticker)
-		.await
-		.map_err(|e| Error::BlockSyncError(e.to_string()))?;
-	track_blocks(rpc_url.clone(), notary_id, pool.clone(), ticker);
+	reconnect_delay: Duration,
+) -> anyhow::Result<tokio::task::JoinHandle<()>> {
+	let notary_activated_block =
+		get_notary_activation(rpc_url.clone(), notary_id, pool.clone(), &ticker).await?;
 
-	Ok(())
+	let handle = tokio::task::spawn(async move {
+		let ticker = ticker;
+		loop {
+			println!("next loop iteration");
+			// this loop is to restart with a new client if the previous one fails
+			match subscribe_to_blocks(&rpc_url, notary_id, notary_activated_block, &pool, &ticker)
+				.await
+			{
+				// if it returns, it means the client disconnected
+				Ok(_) => info!("Waiting 5 seconds to restart block watch thread"),
+				Err(e) => error!("Error polling mainchain blocks: {:?}", e),
+			}
+			tokio::time::sleep(reconnect_delay).await;
+		}
+	});
+	Ok(handle)
 }
 
-pub(crate) fn track_blocks(
+async fn get_notary_activation(
 	rpc_url: String,
 	notary_id: NotaryId,
 	pool: PgPool,
-	ticker: Ticker,
-) -> tokio::task::JoinHandle<()> {
-	tokio::task::spawn(async move {
-		let ticker = ticker;
-		loop {
-			match subscribe_to_blocks(rpc_url.clone(), notary_id, &pool.clone(), &ticker).await {
-				Ok(_) => break,
-				Err(e) => tracing::error!("Error polling mainchain blocks: {:?}", e),
-			}
-		}
-	})
-}
-
-async fn sync_finalized_blocks(
-	url: String,
-	notary_id: NotaryId,
-	pool: PgPool,
-	ticker: Ticker,
-) -> anyhow::Result<()> {
-	let client = MainchainClient::try_until_connected(url.as_str(), 2500, 120_000).await?;
+	ticker: &Ticker,
+) -> anyhow::Result<BlockNumber> {
+	let client = MainchainClient::try_until_connected(rpc_url.as_str(), 2500, 120_000).await?;
 	let chain_identity = client.get_chain_identity().await?;
 
 	{
@@ -79,7 +74,7 @@ async fn sync_finalized_blocks(
 
 	let Some(notary) = active_notaries.0.iter().find(|notary| notary.notary_id == notary_id) else {
 		info!("NOTE: Notary {} is not active", notary_id);
-		return Ok(());
+		return Ok(0);
 	};
 	let oldest_block_to_sync = notary.activated_block;
 	{
@@ -91,45 +86,12 @@ async fn sync_finalized_blocks(
 			notary_id,
 			public,
 			notary.meta_updated_tick,
-			&ticker,
+			ticker,
 		)
 		.await
 		.ok();
 	}
-
-	let mut tx = pool.begin().await?;
-	BlocksStore::lock(&mut tx).await?;
-
-	let last_synched_block = BlocksStore::get_latest_finalized_block_number(&mut tx).await?;
-
-	let latest_finalized_hash = client.latest_finalized_block_hash().await?;
-
-	let mut block_hash = latest_finalized_hash;
-	let mut missing_blocks: Vec<Block<ArgonConfig, _>> = vec![];
-	loop {
-		let block = client.live.blocks().at(block_hash.clone()).await?;
-		if block.number() <= last_synched_block || block.number() <= oldest_block_to_sync {
-			break;
-		}
-		block_hash = BlockRef::from(block.header().parent_hash);
-		missing_blocks.insert(0, block);
-	}
-
-	info!(
-		"Current synched finalized block: {}. Missing {}",
-		last_synched_block,
-		missing_blocks.len()
-	);
-
-	for block in missing_blocks.into_iter() {
-		// might already have block
-		if !BlocksStore::has_block(&mut tx, block.hash()).await? {
-			process_block(&mut tx, &client.live, &block, notary_id).await?;
-		}
-		process_finalized_block(&mut tx, block, notary_id, &ticker).await?;
-	}
-	tx.commit().await?;
-	Ok(())
+	Ok(oldest_block_to_sync)
 }
 
 async fn process_block(
@@ -138,6 +100,9 @@ async fn process_block(
 	block: &Block<ArgonConfig, ArgonOnlineClient>,
 	notary_id: NotaryId,
 ) -> anyhow::Result<()> {
+	if BlocksStore::has_block(&mut *db, block.hash()).await? {
+		return Ok(())
+	}
 	let next_vote_minimum = client
 		.storage()
 		.at(block.hash())
@@ -167,7 +132,7 @@ async fn process_block(
 			event.as_event::<api::notebook::events::NotebookAuditFailure>().transpose()
 		{
 			if notebook.notary_id == notary_id {
-				info!("Notebook audit failure: {:?}", notebook);
+				error!("Notebook audit failure: {:?}", notebook);
 				NotebookAuditFailureStore::record(
 					db,
 					notebook.notebook_number,
@@ -222,7 +187,7 @@ async fn process_fork(
 	block: &Block<ArgonConfig, ArgonOnlineClient>,
 	notary_id: NotaryId,
 ) -> anyhow::Result<()> {
-	info!("Processing fork {} ({})", block.hash(), block.number());
+	trace!("Processing fork {} ({})", block.hash(), block.number());
 
 	let missing_blocks = find_missing_blocks(db, client, block.hash()).await?;
 	for missing_block in missing_blocks {
@@ -255,8 +220,10 @@ async fn process_finalized_block(
 	notary_id: NotaryId,
 	ticker: &Ticker,
 ) -> anyhow::Result<()> {
-	info!("Processing finalized {} ({})", block.hash(), block.number());
-	BlocksStore::record_finalized(db, block.hash()).await?;
+	if BlocksStore::record_finalized(db, block.hash()).await.is_err() {
+		return Ok(());
+	}
+	trace!("Processing finalized {} ({})", block.hash(), block.number());
 
 	let block_height = block.number();
 	let tick = block
@@ -303,12 +270,20 @@ async fn process_finalized_block(
 		{
 			if notebook.notary_id == notary_id {
 				info!("Notebook finalized: {:?}", notebook);
-				NotebookStatusStore::next_step(
+				if NotebookStatusStore::next_step(
 					&mut *db,
 					notebook.notebook_number,
 					NotebookFinalizationStep::Closed,
 				)
-				.await?;
+				.await
+				.is_err()
+				{
+					let status =
+						NotebookStatusStore::get(&mut *db, notebook.notebook_number).await?;
+					if status.step == NotebookFinalizationStep::Finalized {
+						info!("Notebook already finalized: {:?}", notebook);
+					}
+				}
 			}
 			continue;
 		}
@@ -336,18 +311,60 @@ async fn process_finalized_block(
 	Ok(())
 }
 
+async fn get_finalized_block_path(
+	client: &MainchainClient,
+	oldest_finalized_block_number: BlockNumber,
+) -> anyhow::Result<Vec<Block<ArgonConfig, ArgonOnlineClient>>> {
+	let latest_finalized_hash = client.latest_finalized_block_hash().await?;
+
+	let mut block_path = vec![];
+	let mut block_hash = latest_finalized_hash;
+	loop {
+		let block = client.live.blocks().at(block_hash.clone()).await?;
+		if block.number() <= oldest_finalized_block_number {
+			break;
+		}
+		block_hash = BlockRef::from(block.header().parent_hash);
+		block_path.insert(0, block);
+	}
+
+	Ok(block_path)
+}
+
 /// Loop through new block events until a client disconnects
 async fn subscribe_to_blocks(
-	url: String,
+	rpc_url: &str,
 	notary_id: NotaryId,
+	notary_activated_block: BlockNumber,
 	pool: &PgPool,
 	ticker: &Ticker,
 ) -> anyhow::Result<bool> {
-	let mainchain_client =
-		MainchainClient::try_until_connected(url.as_str(), 2500, 120_000).await?;
+	let mainchain_client = MainchainClient::try_until_connected(rpc_url, 2500, 120_000).await?;
 	let client = mainchain_client.live.clone();
 	let mut blocks_sub = client.blocks().subscribe_all().await?;
 	let mut finalized_sub = client.blocks().subscribe_finalized().await?;
+
+	{
+		let mut tx = pool.begin().await?;
+		BlocksStore::lock(&mut tx).await?;
+
+		let last_synched_block = BlocksStore::get_latest_finalized_block_number(&mut tx).await?;
+		let oldest_block_needed = notary_activated_block.max(last_synched_block);
+		let missing_blocks =
+			get_finalized_block_path(&mainchain_client, oldest_block_needed).await?;
+
+		info!(
+			"Current synched finalized block: {}. Missing {}",
+			last_synched_block,
+			missing_blocks.len()
+		);
+
+		for block in missing_blocks.into_iter() {
+			process_block(&mut tx, &mainchain_client.live, &block, notary_id).await?;
+			process_finalized_block(&mut tx, block, notary_id, ticker).await?;
+		}
+		tx.commit().await?;
+	}
 
 	let pool = pool.clone();
 	loop {
@@ -360,7 +377,7 @@ async fn subscribe_to_blocks(
 						tx.commit().await?;
 					},
 					Some(Err(e)) => {
-						tracing::error!("Error polling best blocks: {:?}", e);
+						error!("Error polling best blocks: {:?}", e);
 						return Err(e.into());
 					},
 					None => break
@@ -370,14 +387,12 @@ async fn subscribe_to_blocks(
 				match block_next {
 					Some(Ok(block)) => {
 						let mut tx = pool.begin().await?;
-						if !BlocksStore::has_block(&mut tx, block.hash()).await? {
-							process_block(&mut tx, &client, &block, notary_id).await?;
-						}
+						process_block(&mut tx, &mainchain_client.live, &block, notary_id).await?;
 						process_finalized_block(&mut tx, block, notary_id, ticker).await?;
 						tx.commit().await?;
 					},
 					Some(Err(e)) => {
-						tracing::error!("Error polling finalized blocks: {:?}", e);
+						error!("Error polling finalized blocks: {:?}", e);
 						return Err(e.into());
 					},
 					None => break
@@ -387,4 +402,106 @@ async fn subscribe_to_blocks(
 	}
 
 	Ok(true)
+}
+
+#[cfg(test)]
+mod tests {
+	use super::*;
+	use argon_testing::start_argon_test_node;
+	use sqlx::PgPool;
+	use subxt::config::Header;
+
+	#[sqlx::test]
+	async fn test_handles_duplicate_blocks(pool: PgPool) -> anyhow::Result<()> {
+		let node = start_argon_test_node().await;
+		let _ = tracing_subscriber::fmt::try_init();
+
+		let ticker = node.client.lookup_ticker().await?;
+		spawn_block_sync(
+			node.client.url.clone(),
+			1,
+			pool.clone(),
+			ticker,
+			Duration::from_millis(100),
+		)
+		.await
+		.expect("Failed to setup block sync");
+
+		let mut finalized_sub = node.client.live.blocks().subscribe_finalized().await?;
+		let mut finalized = node.client.latest_finalized_block_hash().await?;
+		for i in 0..5 {
+			if i == 2 {
+				finalized = node.client.latest_finalized_block_hash().await?;
+			}
+			finalized_sub.next().await;
+		}
+		let finalized_hash = finalized.hash();
+		let finalized_block = node.client.live.blocks().at(finalized).await?;
+		let mut tx = pool.begin().await?;
+		assert!(BlocksStore::has_block(&mut tx, finalized_hash).await?);
+		assert!(BlocksStore::record_finalized(&mut tx, finalized_hash).await.is_err());
+		tx.commit().await?;
+
+		let mut db = pool.acquire().await?;
+		assert!(BlocksStore::has_block(&mut db, finalized_hash).await?);
+		process_block(&mut db, &node.client.live, &finalized_block, 1)
+			.await
+			.expect("should not fail with a duplicate");
+		assert!(process_finalized_block(&mut db, finalized_block, 1, &ticker).await.is_ok());
+
+		Ok(())
+	}
+
+	#[sqlx::test]
+	async fn can_survive_a_reboot(pool: PgPool) -> anyhow::Result<()> {
+		let mut node = start_argon_test_node().await;
+		let _ = tracing_subscriber::fmt::try_init();
+
+		let ticker = node.client.lookup_ticker().await?;
+		let _handle = spawn_block_sync(
+			node.client.url.clone(),
+			1,
+			pool.clone(),
+			ticker,
+			Duration::from_millis(100),
+		)
+		.await
+		.expect("Failed to setup block sync");
+
+		{
+			let mut finalized_sub = node.client.live.blocks().subscribe_finalized().await?;
+			for _ in 0..2 {
+				finalized_sub.next().await;
+			}
+		}
+
+		node.restart(Duration::from_secs(1)).await.expect("should restart");
+
+		let mut last_finalized_hash = node.client.latest_finalized_block_hash().await?.hash();
+		let mut finalized_sub = node.client.live.blocks().subscribe_finalized().await?;
+		for _ in 0..2 {
+			let next = finalized_sub.next().await.expect("should get")?;
+			last_finalized_hash = next.hash();
+		}
+
+		tokio::time::sleep(Duration::from_millis(200)).await;
+		let mut tx = pool.begin().await?;
+		let mut parent = last_finalized_hash;
+		loop {
+			assert!(BlocksStore::has_block(&mut tx, parent).await?);
+			let header = node
+				.client
+				.live
+				.backend()
+				.block_header(parent)
+				.await?
+				.expect("should have a header");
+			if header.number() == 0 {
+				break;
+			}
+			parent = header.parent_hash
+		}
+
+		Ok(())
+	}
 }
