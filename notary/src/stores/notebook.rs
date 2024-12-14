@@ -1,18 +1,5 @@
 use std::collections::{BTreeMap, BTreeSet};
 
-use binary_merkle_tree::{merkle_proof, merkle_root, verify_proof, Leaf};
-use codec::{Decode, Encode};
-use scale_info::TypeInfo;
-use serde::{Deserialize, Serialize};
-use serde_json::{from_value, json};
-use sp_core::{
-	bounded::BoundedVec,
-	ed25519::{Public, Signature},
-	Blake2Hasher, RuntimeDebug, H256,
-};
-use sp_keystore::KeystorePtr;
-use sqlx::PgConnection;
-
 use crate::{
 	notebook_closer::notary_sign,
 	stores::{
@@ -27,6 +14,19 @@ use argon_primitives::{
 	ChainTransfer, LocalchainAccountId, MaxNotebookNotarizations, MerkleProof, NewAccountOrigin,
 	Notarization, NotaryId, Note, NoteType, Notebook, NotebookNumber,
 };
+use binary_merkle_tree::{merkle_proof, merkle_root, verify_proof, Leaf};
+use codec::{Decode, Encode};
+use scale_info::TypeInfo;
+use serde::{Deserialize, Serialize};
+use serde_json::{from_value, json};
+use sp_core::{
+	bounded::BoundedVec,
+	ed25519::{Public, Signature},
+	Blake2Hasher, RuntimeDebug, H256,
+};
+use sp_keystore::KeystorePtr;
+use sqlx::PgConnection;
+use tracing::info;
 
 pub struct NotebookStore;
 impl NotebookStore {
@@ -102,23 +102,6 @@ impl NotebookStore {
 		})
 	}
 
-	pub async fn get_block_votes(
-		db: &mut PgConnection,
-		notebook_number: NotebookNumber,
-	) -> anyhow::Result<Vec<BlockVote>, Error> {
-		let votes_json = sqlx::query_scalar!(
-			"SELECT block_votes FROM notebooks WHERE notebook_number = $1 LIMIT 1",
-			notebook_number as i32
-		)
-		.fetch_one(db)
-		.await
-		.map_err(|_| Error::NotebookNotFinalized)?;
-
-		let block_votes = from_value(votes_json)?;
-
-		Ok(block_votes)
-	}
-
 	pub fn get_account_origins<'a>(
 		db: impl sqlx::PgExecutor<'a> + 'a,
 		notebook_number: NotebookNumber,
@@ -182,42 +165,6 @@ impl NotebookStore {
 		})
 	}
 
-	pub async fn load_raw(
-		db: &mut PgConnection,
-		notebook_number: NotebookNumber,
-	) -> anyhow::Result<Vec<u8>, Error> {
-		let rows = sqlx::query!(
-			"SELECT encoded FROM notebooks_raw WHERE notebook_number = $1 LIMIT 1",
-			notebook_number as i32
-		)
-		.fetch_one(db)
-		.await?;
-
-		let encoded = rows.encoded;
-
-		Ok(encoded)
-	}
-	pub async fn save_raw(
-		db: &mut PgConnection,
-		notebook_number: NotebookNumber,
-		bytes: Vec<u8>,
-	) -> anyhow::Result<(), Error> {
-		let res = sqlx::query!(
-			"INSERT INTO notebooks_raw (notebook_number, encoded) VALUES ($1, $2)",
-			notebook_number as i32,
-			bytes.as_slice()
-		)
-		.execute(db)
-		.await?;
-
-		ensure!(
-			res.rows_affected() == 1,
-			Error::InternalError("Unable to insert raw notebook".to_string())
-		);
-
-		Ok(())
-	}
-
 	pub async fn close_notebook(
 		db: &mut PgConnection,
 		notebook_number: NotebookNumber,
@@ -225,7 +172,7 @@ impl NotebookStore {
 		public: Public,
 		operator_account_id: AccountId,
 		keystore: &KeystorePtr,
-	) -> anyhow::Result<(), Error> {
+	) -> anyhow::Result<NotebookBytes, Error> {
 		let mut notarizations =
 			NotarizationsStore::get_for_notebook(&mut *db, notebook_number).await?;
 
@@ -340,8 +287,6 @@ impl NotebookStore {
 			block_votes.insert((operator_account_id, 0), default_vote);
 		}
 
-		let final_votes = block_votes.clone();
-
 		let votes_merkle_leafs =
 			block_votes.into_values().map(|vote| vote.encode()).collect::<Vec<_>>();
 		let votes_root = merkle_root::<Blake2Hasher, _>(&votes_merkle_leafs);
@@ -376,26 +321,32 @@ impl NotebookStore {
 			})
 			.collect::<Vec<NewAccountOrigin>>();
 
-		let final_header = NotebookHeaderStore::load(&mut *db, notebook_number).await?;
+		let signed_header =
+			NotebookHeaderStore::load_with_signature(&mut *db, notebook_number).await?;
+		info!(
+			"Notebook {} signed by {}. Signature {:?}",
+			notebook_number,
+			hex::encode(public.0),
+			hex::encode(signed_header.signature)
+		);
 		let origins_json = json!(new_account_origins);
+		let signed_header_bytes = signed_header.encode();
 
-		let mut full_notebook = Notebook::build(final_header, notarizations, new_account_origins);
+		let mut full_notebook =
+			Notebook::build(signed_header.header, notarizations, new_account_origins);
 		let hash = full_notebook.hash;
 		full_notebook.signature = notary_sign(keystore, &public, &hash)?;
 
 		let raw_body = full_notebook.encode();
-		Self::save_raw(db, notebook_number, raw_body).await?;
-		let votes_json = json!(final_votes.values().collect::<Vec<_>>());
 
 		let res = sqlx::query!(
 			r#"
-				INSERT INTO notebooks (notebook_number, change_merkle_leafs, new_account_origins, block_votes, hash, signature)
-				VALUES ($1, $2, $3, $4, $5, $6)
+				INSERT INTO notebooks (notebook_number, change_merkle_leafs, new_account_origins, hash, signature)
+				VALUES ($1, $2, $3, $4, $5)
 			"#,
 			notebook_number as i32,
 			merkle_leafs.as_slice(),
 			origins_json,
-			votes_json,
 			hash.as_bytes(),
 			&full_notebook.signature.0[..]
 		)
@@ -406,8 +357,13 @@ impl NotebookStore {
 			Error::InternalError("Unable to insert notebook".to_string())
 		);
 
-		Ok(())
+		Ok(NotebookBytes { notebook: raw_body, signed_header: signed_header_bytes })
 	}
+}
+
+pub struct NotebookBytes {
+	pub notebook: Vec<u8>,
+	pub signed_header: Vec<u8>,
 }
 
 #[derive(Encode, Decode, RuntimeDebug, TypeInfo, Serialize, Deserialize)]

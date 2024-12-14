@@ -3,6 +3,8 @@ mod bitcoin;
 #[cfg(test)]
 mod localchain_transfer;
 #[cfg(test)]
+mod notary;
+#[cfg(test)]
 mod vote_mining;
 
 #[cfg(test)]
@@ -27,6 +29,7 @@ pub(crate) mod utils {
 	use sp_keyring::{AccountKeyring::Alice, Sr25519Keyring};
 	use subxt::tx::TxInBlock;
 
+	#[allow(dead_code)]
 	pub(crate) async fn transfer_mainchain(
 		test_node: &ArgonTestNode,
 		from: &Sr25519Signer,
@@ -47,14 +50,10 @@ pub(crate) mod utils {
 			.await
 	}
 
-	pub(crate) async fn create_active_notary(
+	pub(crate) async fn activate_notary(
 		test_node: &ArgonTestNode,
-	) -> anyhow::Result<ArgonTestNotary> {
-		let test_notary = ArgonTestNotary::start(test_node, None).await?;
-		let owner = test_node.client.api_account(&test_notary.operator.public().into());
-		let ferdie_signer: Sr25519Signer = Sr25519Keyring::Ferdie.pair().into();
-		// give ferdie signer base amount
-		transfer_mainchain(test_node, &ferdie_signer, owner.into(), 1_000_000, false).await?;
+		test_notary: &ArgonTestNotary,
+	) -> anyhow::Result<()> {
 		println!("Registering a notary operator");
 		test_notary.register_operator(test_node).await?;
 
@@ -70,6 +69,24 @@ pub(crate) mod utils {
 		)
 		.await?;
 		println!("Sudo approved notary");
+		Ok(())
+	}
+
+	pub(crate) async fn create_active_notary(
+		test_node: &ArgonTestNode,
+	) -> anyhow::Result<ArgonTestNotary> {
+		let test_notary = ArgonTestNotary::start(test_node).await?;
+		activate_notary(test_node, &test_notary).await?;
+
+		Ok(test_notary)
+	}
+
+	pub(crate) async fn create_active_notary_with_archive_bucket(
+		test_node: &ArgonTestNode,
+		archive_bucket: String,
+	) -> anyhow::Result<ArgonTestNotary> {
+		let test_notary = ArgonTestNotary::start_with_archive(test_node, archive_bucket).await?;
+		activate_notary(test_node, &test_notary).await?;
 
 		Ok(test_notary)
 	}

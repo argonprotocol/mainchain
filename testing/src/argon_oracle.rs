@@ -47,7 +47,7 @@ impl ArgonTestOracle {
 				&node.client.url,
 				"bitcoin",
 				"--bitcoin-rpc-url",
-				&node.bitcoin_rpc_url.clone().unwrap().as_str(),
+				&node.start_args.bitcoin_rpc_url().unwrap().as_str(),
 			])
 			.spawn()?;
 

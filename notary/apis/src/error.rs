@@ -2,10 +2,11 @@ use codec::{Decode, Encode};
 use jsonrpsee::types::ErrorObjectOwned;
 use scale_info::scale;
 use sp_core::H256;
+use std::str::Utf8Error;
 use tracing::error;
 
 use argon_notary_audit::VerifyError;
-use argon_primitives::NotebookNumber;
+use argon_primitives::{tick::Tick, NotebookNumber};
 
 #[derive(Debug, PartialEq, Decode, Encode, Clone, thiserror::Error)]
 pub enum Error {
@@ -60,6 +61,9 @@ pub enum Error {
 	)]
 	NotaryFailedAudit(NotebookNumber),
 
+	#[error("The requested notebook ({notebook_age} ticks old) must be retrieved via an archive host ({archive_host}, max age = {max_age}).")]
+	HistoryMustUseArchiveHost { max_age: Tick, archive_host: String, notebook_age: Tick },
+
 	#[error("{0}")]
 	Database(String),
 
@@ -105,6 +109,9 @@ pub enum Error {
 
 	#[error("Connected to the wrong mainchain")]
 	ChainMismatch,
+
+	#[error("Error with the archive host {0}")]
+	ArchiveError(String),
 }
 
 impl From<Error> for i32 {
@@ -132,6 +139,8 @@ impl From<Error> for i32 {
 			Error::JsonError(_) => 19,
 			Error::ChainMismatch => 20,
 			Error::NotaryFailedAudit(_) => 21,
+			Error::HistoryMustUseArchiveHost { .. } => 22,
+			Error::ArchiveError(_) => 23,
 		}
 	}
 }
@@ -167,6 +176,12 @@ impl From<VerifyError> for Error {
 impl From<&VerifyError> for Error {
 	fn from(e: &VerifyError) -> Self {
 		Self::BalanceChangeVerifyError(e.clone())
+	}
+}
+
+impl From<Utf8Error> for Error {
+	fn from(e: Utf8Error) -> Self {
+		Self::InternalError(e.to_string())
 	}
 }
 

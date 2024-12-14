@@ -355,6 +355,7 @@ impl MainchainClient {
 		}
 		Err(Error::from("No valid status encountered for transaction".to_string()))
 	}
+
 	pub async fn lookup_ticker(&self) -> anyhow::Result<argon_primitives::tick::Ticker> {
 		let ticker_data = self.call(api::runtime_apis::tick_apis::TickApis.ticker(), None).await?;
 

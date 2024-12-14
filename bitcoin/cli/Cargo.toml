@@ -18,7 +18,7 @@ sp-runtime = { workspace = true, features = ["default"] }
 subxt = { workspace = true }
 tokio = { workspace = true }
 
-tracing = { workspace = true }
+tracing = { workspace = true, features = ["default"] }
 tracing-subscriber = { workspace = true }
 
 directories = { workspace = true }

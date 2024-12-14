@@ -22,7 +22,7 @@ scraper = { workspace = true }
 hex = { workspace = true }
 sp-runtime = { workspace = true, features = ["default"] }
 sp-core = { workspace = true, features = ["default"] }
-tracing = { workspace = true }
+tracing = { workspace = true, features = ["default"] }
 tracing-subscriber = { workspace = true }
 clap = { workspace = true }
 chrono = { workspace = true }

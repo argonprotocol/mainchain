@@ -8,7 +8,7 @@ use crate::{
 use argon_bitcoin_utxo_tracker::UtxoTracker;
 use argon_node_consensus::{
 	aux_client::ArgonAux, create_import_queue, run_block_builder_task, run_notary_sync,
-	BlockBuilderParams, NotaryClient,
+	BlockBuilderParams, NotaryClient, NotebookDownloader,
 };
 use argon_primitives::{AccountId, TickApis};
 use sc_client_api::BlockBackend;
@@ -127,8 +127,17 @@ where
 		client.runtime_api().ticker(best_hash).expect("Ticker not available")
 	};
 	let idle_delay = if ticker.tick_duration_millis <= 10_000 { 100 } else { 1000 };
-	let notary_client =
-		run_notary_sync(&task_manager, client.clone(), aux_client.clone(), idle_delay);
+	let notebook_downloader = NotebookDownloader::new(mining_config.notebook_archive_hosts.clone())
+		.map_err(|e| {
+			ServiceError::Other(format!("Failed to initialize notebook downloader {:?}", e))
+		})?;
+	let notary_client = run_notary_sync(
+		&task_manager,
+		client.clone(),
+		aux_client.clone(),
+		idle_delay,
+		notebook_downloader,
+	);
 
 	let (import_queue, argon_block_import) = create_import_queue(
 		client.clone(),

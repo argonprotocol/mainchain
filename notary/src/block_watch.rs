@@ -6,7 +6,7 @@ use subxt::{
 	blocks::{Block, BlockRef},
 	config::substrate::DigestItem,
 };
-use tracing::{error, info, trace};
+use tracing::{error, info, trace, warn};
 
 pub use argon_client;
 use argon_client::{api, ArgonConfig, ArgonOnlineClient, MainchainClient};
@@ -39,7 +39,6 @@ pub async fn spawn_block_sync(
 	let handle = tokio::task::spawn(async move {
 		let ticker = ticker;
 		loop {
-			println!("next loop iteration");
 			// this loop is to restart with a new client if the previous one fails
 			match subscribe_to_blocks(&rpc_url, notary_id, notary_activated_block, &pool, &ticker)
 				.await
@@ -48,6 +47,7 @@ pub async fn spawn_block_sync(
 				Ok(_) => info!("Waiting 5 seconds to restart block watch thread"),
 				Err(e) => error!("Error polling mainchain blocks: {:?}", e),
 			}
+			warn!("Block watch thread restarting after {:?}", reconnect_delay);
 			tokio::time::sleep(reconnect_delay).await;
 		}
 	});
@@ -100,7 +100,9 @@ async fn process_block(
 	block: &Block<ArgonConfig, ArgonOnlineClient>,
 	notary_id: NotaryId,
 ) -> anyhow::Result<()> {
+	info!("Processing block {} ({})", block.hash(), block.number());
 	if BlocksStore::has_block(&mut *db, block.hash()).await? {
+		info!("Duplicated block {} ({})", block.hash(), block.number());
 		return Ok(())
 	}
 	let next_vote_minimum = client
@@ -270,18 +272,19 @@ async fn process_finalized_block(
 		{
 			if notebook.notary_id == notary_id {
 				info!("Notebook finalized: {:?}", notebook);
-				if NotebookStatusStore::next_step(
+				if let Err(e) = NotebookStatusStore::next_step(
 					&mut *db,
 					notebook.notebook_number,
 					NotebookFinalizationStep::Closed,
 				)
 				.await
-				.is_err()
 				{
 					let status =
 						NotebookStatusStore::get(&mut *db, notebook.notebook_number).await?;
 					if status.step == NotebookFinalizationStep::Finalized {
-						info!("Notebook already finalized: {:?}", notebook);
+						trace!("Notebook already finalized: {:?}", notebook);
+					} else {
+						error!("Error finalizing notebook: {:?} {:?}", notebook, e);
 					}
 				}
 			}

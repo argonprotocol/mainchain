@@ -1,0 +1,18 @@
+{
+  "db_name": "PostgreSQL",
+  "query": "\n\t\t\t\tINSERT INTO notebooks (notebook_number, change_merkle_leafs, new_account_origins, hash, signature)\n\t\t\t\tVALUES ($1, $2, $3, $4, $5)\n\t\t\t",
+  "describe": {
+    "columns": [],
+    "parameters": {
+      "Left": [
+        "Int4",
+        "ByteaArray",
+        "Jsonb",
+        "Bytea",
+        "Bytea"
+      ]
+    },
+    "nullable": []
+  },
+  "hash": "defd60c1ba9ef4e1d7e085e8da03de2e5ec3805a678df87149bd1e5c323fa634"
+}

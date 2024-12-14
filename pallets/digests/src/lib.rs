@@ -22,6 +22,7 @@ pub mod pallet {
 	use codec::{Codec, EncodeLike};
 	use frame_support::{pallet_prelude::*, traits::FindAuthor};
 	use frame_system::pallet_prelude::*;
+	use log::warn;
 	use sp_runtime::{ConsensusEngineId, Digest};
 
 	#[pallet::pallet]
@@ -100,7 +101,9 @@ pub mod pallet {
 				return Ok(entry);
 			}
 			let digest = frame_system::Pallet::<T>::digest();
-			let digests = Self::decode(&digest)?;
+			let digests = Self::decode(&digest).inspect_err(|e| {
+				warn!("Could not decode digests: {:?}", e);
+			})?;
 			Ok(digests)
 		}
 

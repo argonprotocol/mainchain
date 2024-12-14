@@ -164,6 +164,21 @@ project.
 Check the [Substrate Install](https://docs.substrate.io/install/) instructions for your platform for the most common
 dependencies.
 
+### Cargo Make
+
+There's a `Makefile.toml` in the root of the project that defines some common tasks for the project. You can run these
+tasks using `cargo make <task-name>`. For example, to run the tests, you can run `cargo make test`.
+
+- Cargo Make: `cargo install --force cargo-make` to run make commands
+
+### Test Dependencies
+
+You'll need the following additional dependencies to run a notary (or tests):
+
+- `PostgreSQL` 14+ running at localhost:5432
+- `minIO` (https://github.com/minio/minio/tree/master) running at localhost:9000. `scripts/docker_minio.sh` can be used
+  to start a minio instance.
+
 ### Build
 
 Use the following command to build the tools without launching it:
@@ -174,8 +189,7 @@ cargo build --release
 
 ### Launch a local test network
 
-The following command starts a local test network that will not persist state. NOTE: you need postgres sql installed and
-available.
+The following command starts a local test network that will not persist state.
 
 ```sh
 ./scripts/local_testnet.sh

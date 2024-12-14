@@ -28,10 +28,11 @@ CREATE TABLE IF NOT EXISTS blocks
     received_time          timestamptz NOT NULL
 );
 
-CREATE TABLE IF NOT EXISTS mainchain_identity (
-    chain varchar NOT NULL PRIMARY KEY,
-    genesis_hash    bytea NOT NULL,
-    created_at timestamptz NOT NULL
+CREATE TABLE IF NOT EXISTS mainchain_identity
+(
+    chain        varchar     NOT NULL PRIMARY KEY,
+    genesis_hash bytea       NOT NULL,
+    created_at   timestamptz NOT NULL
 );
 
 CREATE TABLE IF NOT EXISTS notebook_headers
@@ -72,8 +73,8 @@ CREATE INDEX IF NOT EXISTS chain_transfers_included_in_notebook_number ON chain_
 
 CREATE TABLE IF NOT EXISTS registered_keys
 (
-    public                 bytea PRIMARY KEY,
-    effective_tick         integer NOT NULL
+    public         bytea PRIMARY KEY,
+    effective_tick integer NOT NULL
 );
 CREATE TABLE IF NOT EXISTS notarizations
 (
@@ -81,7 +82,7 @@ CREATE TABLE IF NOT EXISTS notarizations
     sequence_number integer NOT NULL,
     balance_changes jsonb   NOT NULL,
     block_votes     jsonb   NOT NULL,
-    domains    jsonb   NOT NULL,
+    domains         jsonb   NOT NULL,
     account_lookups bytea[] NOT NULL -- combined key of <account_id::hex>_<account_type>_<change_number>
 );
 
@@ -105,7 +106,6 @@ CREATE TABLE IF NOT EXISTS notebooks
     notebook_number     integer     NOT NULL PRIMARY KEY REFERENCES notebook_headers (notebook_number),
     new_account_origins jsonb       NOT NULL,
     change_merkle_leafs bytea[]     NOT NULL, -- pre-encoded to save time for merkle proofs
-    block_votes         jsonb       NOT NULL,
     hash                bytea       NOT NULL,
     signature           bytea       NOT NULL,
     last_updated        timestamptz NOT NULL default now()
@@ -114,19 +114,13 @@ CREATE INDEX IF NOT EXISTS notebook_new_account_origins ON notebooks USING GIN (
 
 CREATE TABLE IF NOT EXISTS notebook_audit_failures
 (
-    notebook_number integer NOT NULL REFERENCES notebook_headers (notebook_number),
-    hash                    bytea NOT NULL,
-    failure_reason          varchar NOT NULL,
-    failure_block_number    integer NOT NULL,
-    is_resolved             boolean NOT NULL,
-    last_updated            timestamptz NOT NULL default now(),
+    notebook_number      integer     NOT NULL REFERENCES notebook_headers (notebook_number),
+    hash                 bytea       NOT NULL,
+    failure_reason       varchar     NOT NULL,
+    failure_block_number integer     NOT NULL,
+    is_resolved          boolean     NOT NULL,
+    last_updated         timestamptz NOT NULL default now(),
     PRIMARY KEY (notebook_number, hash)
-);
-
-CREATE TABLE IF NOT EXISTS notebooks_raw
-(
-    notebook_number integer NOT NULL PRIMARY KEY REFERENCES notebook_headers (notebook_number),
-    encoded         bytea   NOT NULL
 );
 
 CREATE TABLE IF NOT EXISTS notebook_secrets
@@ -142,7 +136,7 @@ CREATE TABLE IF NOT EXISTS notebook_constraints
     block_votes     integer NOT NULL default 0,
     balance_changes integer NOT NULL default 0,
     notarizations   integer NOT NULL default 0,
-    domains    integer NOT NULL default 0
+    domains         integer NOT NULL default 0
 );
 
 

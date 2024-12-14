@@ -34,6 +34,7 @@ pub trait LocalchainRpc {
 	) -> Result<AccountOrigin, ErrorObjectOwned>;
 }
 #[derive(Clone, PartialEq, Eq, Encode, Decode, RuntimeDebug, TypeInfo, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
 pub struct BalanceChangeResult {
 	pub notebook_number: NotebookNumber,
 	pub tick: Tick,
@@ -41,6 +42,7 @@ pub struct BalanceChangeResult {
 }
 
 #[derive(Clone, PartialEq, Eq, Encode, Decode, RuntimeDebug, TypeInfo, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
 pub struct BalanceTipResult {
 	pub notebook_number: NotebookNumber,
 	pub tick: Tick,

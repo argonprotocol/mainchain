@@ -236,6 +236,7 @@ pub struct MiningConfig {
 	compute_threads: Option<u32>,
 	pub compute_author: Option<AccountId32>,
 	bitcoin_rpc_url: Option<String>,
+	pub notebook_archive_hosts: Vec<String>,
 }
 
 impl From<Cli> for MiningConfig {
@@ -260,7 +261,12 @@ impl MiningConfig {
 
 		let bitcoin_rpc_url = cli.bitcoin_rpc_url.clone();
 
-		Self { compute_threads, compute_author, bitcoin_rpc_url }
+		Self {
+			compute_threads,
+			compute_author,
+			bitcoin_rpc_url,
+			notebook_archive_hosts: cli.run.notebook_archive_hosts.clone(),
+		}
 	}
 
 	pub fn compute_threads(&self) -> usize {

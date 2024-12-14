@@ -21,24 +21,31 @@ use sqlx::sqlite::{SqliteConnectOptions, SqlitePoolOptions};
 use sqlx::{ConnectOptions, SqlitePool};
 use tokio::sync::Mutex;
 
-use argon_notary::server::pipe_from_stream_and_drop;
-use argon_notary::server::NotebookHeaderStream;
-use argon_notary_apis::localchain::{BalanceChangeResult, BalanceTipResult, LocalchainRpcServer};
-use argon_notary_apis::notebook::NotebookRpcServer;
-use argon_primitives::tick::Ticker;
-use argon_primitives::{
-  AccountId, AccountOrigin, AccountOriginUid, AccountType, BalanceChange, BalanceProof, BalanceTip,
-  ChainTransfer, LocalchainAccountId, MerkleProof, NewAccountOrigin, Notarization,
-  NotarizationBalanceChangeset, NotarizationBlockVotes, NotarizationDomains, NoteType, Notebook,
-  NotebookHeader, NotebookMeta, NotebookNumber, SignedNotebookHeader,
-};
-
 use crate::notarization_builder::NotarizationBuilder;
 use crate::notarization_tracker::NotebookProof;
 use crate::{
   AccountStore, CryptoScheme, Keystore, Localchain, LocalchainTransfer, MainchainClient,
   NotaryClient, NotaryClients, TickerRef,
 };
+use argon_notary::server::NotebookHeaderStream;
+use argon_notary::server::{pipe_from_stream_and_drop, NotebookHeaderInfo};
+use argon_notary_apis::localchain::{BalanceChangeResult, BalanceTipResult, LocalchainRpcServer};
+use argon_notary_apis::notebook::{NotebookRpcServer, NotebookSubscriptionBroadcast};
+use argon_notary_apis::system::SystemRpcServer;
+use argon_notary_apis::{get_header_url, get_notebook_url};
+use argon_primitives::tick::Ticker;
+use argon_primitives::{
+  AccountId, AccountOrigin, AccountOriginUid, AccountType, BalanceChange, BalanceProof, BalanceTip,
+  ChainTransfer, LocalchainAccountId, MerkleProof, NewAccountOrigin, Notarization,
+  NotarizationBalanceChangeset, NotarizationBlockVotes, NotarizationDomains, NoteType,
+  NotebookHeader, NotebookMeta, NotebookNumber, SignedNotebookHeader,
+};
+use axum::body::Bytes;
+use axum::extract::{Path, State};
+use axum::response::IntoResponse;
+use axum::{http::StatusCode, routing::get, Router};
+use serde::{Deserialize, Serialize};
+use tokio::task::JoinHandle;
 
 /// Debug sqlite connections. This function is for sqlx unit tests. To activate, your test signature
 /// should look like this:
@@ -123,14 +130,17 @@ pub struct NotaryState {
 #[derive(Clone)]
 pub struct MockNotary {
   server_handle: Option<ServerHandle>,
+  archive_server_handle: Arc<Mutex<Option<JoinHandle<()>>>>,
   pub addr: String,
+  pub archive_host: String,
   pub notary_id: u32,
   pub state: Arc<Mutex<NotaryState>>,
   pub ticker: Arc<Mutex<Ticker>>,
-  pub header_channel: (
-    NotificationSender<SignedNotebookHeader>,
-    NotebookHeaderStream,
-  ),
+  pub header_channel: (NotificationSender<NotebookHeaderInfo>, NotebookHeaderStream),
+}
+#[derive(Debug, Deserialize, Serialize)]
+struct NotebookParam {
+  notebook_number: NotebookNumber,
 }
 
 impl MockNotary {
@@ -140,8 +150,10 @@ impl MockNotary {
       state: Default::default(),
       header_channel: NotebookHeaderStream::channel(),
       server_handle: None,
+      archive_server_handle: Default::default(),
       ticker: Arc::new(Mutex::new(Ticker::start(Duration::from_secs(60), 2))),
       addr: String::new(),
+      archive_host: String::new(),
     }
   }
 
@@ -151,22 +163,57 @@ impl MockNotary {
       server_handle.stop().expect("Should be able to stop server");
       server_handle.stopped().await;
     }
+
+    if let Some(handle) = self.archive_server_handle.lock().await.take() {
+      handle.abort();
+    }
   }
 
   pub async fn start(&mut self) -> anyhow::Result<()> {
+    // build our application with a route
+    let archive_server = Router::new()
+      // `GET /` goes to `root`
+      .route("/notary/1/header/:notebook_number", get(Self::get_header))
+      .with_state(Arc::new(self.clone()));
+
+    let listener = tokio::net::TcpListener::bind("127.0.0.1:0").await?;
+    self.archive_host = format!("http://127.0.0.1:{}", listener.local_addr()?.port());
+    let archive_server_handle = tokio::spawn(async move {
+      axum::serve(listener, archive_server)
+        .await
+        .expect("Should be able to serve");
+    });
+
+    self.archive_server_handle = Arc::new(Mutex::new(Some(archive_server_handle)));
+
     let server = Server::builder().build("127.0.0.1:0").await?;
     self.addr = format!("ws://{:?}", server.local_addr()?);
 
     let mut module = RpcModule::new(());
     module.merge(NotebookRpcServer::into_rpc(self.clone()))?;
     module.merge(LocalchainRpcServer::into_rpc(self.clone()))?;
+    module.merge(SystemRpcServer::into_rpc(self.clone()))?;
 
     let handle = server.start(module);
     self.server_handle = Some(handle.clone());
+
     // handle in background
     tokio::spawn(handle.stopped());
 
     Ok(())
+  }
+
+  async fn get_header(
+    State(state): State<Arc<Self>>,
+    Path(notebook_number): Path<String>,
+  ) -> impl IntoResponse {
+    let notebook_number =
+      NotebookNumber::from_str(&notebook_number.replace(".scale", "")).expect("should parse");
+    let state = state.state.lock().await;
+    if let Some(body) = state.headers.get(&notebook_number).map(|x| x.encode()) {
+      return (StatusCode::OK, Bytes::from(body));
+    }
+    (StatusCode::NOT_FOUND, Bytes::from_static(b"Not found"))
   }
 
   pub async fn set_bad_tip_error(
@@ -182,6 +229,7 @@ impl MockNotary {
   }
 
   pub async fn add_notebook_header(&self, header: SignedNotebookHeader) {
+    let hash = header.header.hash();
     let mut state = self.state.lock().await;
     state
       .headers
@@ -194,7 +242,7 @@ impl MockNotary {
     let _ = self
       .header_channel
       .0
-      .notify(|| Ok::<_, anyhow::Error>(header));
+      .notify(|| Ok::<_, anyhow::Error>((header, hash)));
   }
 
   pub async fn add_notarization(
@@ -589,37 +637,26 @@ impl NotebookRpcServer for MockNotary {
     })
   }
 
-  async fn get_header(
+  async fn get_header_download_url(
     &self,
     notebook_number: NotebookNumber,
-  ) -> Result<SignedNotebookHeader, ErrorObjectOwned> {
-    let state = self.state.lock().await;
-    state.headers.get(&notebook_number).cloned().ok_or_else(|| {
-      ErrorObjectOwned::owned(
-        -32000,
-        "MockNotary header not set".to_string(),
-        None::<String>,
-      )
-    })
+  ) -> Result<String, ErrorObjectOwned> {
+    Ok(get_header_url(
+      &self.archive_host,
+      self.notary_id,
+      notebook_number,
+    ))
   }
 
-  async fn get_raw_headers(
+  async fn get_notebook_download_url(
     &self,
-    _since_notebook: Option<NotebookNumber>,
-    _list: Option<Vec<NotebookNumber>>,
-  ) -> Result<Vec<(NotebookNumber, Vec<u8>)>, ErrorObjectOwned> {
-    todo!()
-  }
-
-  async fn get(&self, _notebook_number: NotebookNumber) -> Result<Notebook, ErrorObjectOwned> {
-    todo!()
-  }
-
-  async fn get_raw_body(
-    &self,
-    _notebook_number: NotebookNumber,
-  ) -> Result<Vec<u8>, ErrorObjectOwned> {
-    todo!()
+    notebook_number: NotebookNumber,
+  ) -> Result<String, ErrorObjectOwned> {
+    Ok(get_notebook_url(
+      &self.archive_host,
+      self.notary_id,
+      notebook_number,
+    ))
   }
 
   async fn subscribe_headers(
@@ -628,16 +665,20 @@ impl NotebookRpcServer for MockNotary {
   ) -> SubscriptionResult {
     let stream = self.header_channel.1.subscribe(1_000);
     pipe_from_stream_and_drop(subscription_sink, stream, |a| {
+      let a = NotebookSubscriptionBroadcast::build(a, &self.archive_host);
       SubscriptionMessage::from_json(&a).map_err(Into::into)
     })
     .await
     .map_err(Into::into)
   }
+}
 
-  async fn subscribe_raw_headers(
-    &self,
-    _subscription_sink: PendingSubscriptionSink,
-  ) -> SubscriptionResult {
-    todo!()
+#[async_trait]
+impl SystemRpcServer for MockNotary {
+  async fn get_archive_base_url(&self) -> Result<String, ErrorObjectOwned> {
+    Ok(self.archive_host.clone())
+  }
+  async fn health(&self) -> Result<(), ErrorObjectOwned> {
+    Ok(())
   }
 }

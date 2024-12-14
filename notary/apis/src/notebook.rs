@@ -1,9 +1,17 @@
-use jsonrpsee::{core::SubscriptionResult, proc_macros::rpc, types::ErrorObjectOwned};
-
+use crate::get_header_url;
 use argon_primitives::{
-	AccountId, AccountType, BalanceProof, BalanceTip, Notarization, Notebook, NotebookMeta,
+	prelude::Tick, AccountId, AccountType, BalanceProof, BalanceTip, Notarization, NotebookMeta,
 	NotebookNumber, SignedNotebookHeader,
 };
+use codec::{Decode, Encode};
+use jsonrpsee::{
+	core::{Serialize, SubscriptionResult},
+	proc_macros::rpc,
+	types::ErrorObjectOwned,
+};
+use scale_info::TypeInfo;
+use serde::Deserialize;
+use sp_core::{RuntimeDebug, H256};
 
 #[rpc(server, client, namespace = "notebook")]
 pub trait NotebookRpc {
@@ -28,33 +36,50 @@ pub trait NotebookRpc {
 	#[method(name = "metadata")]
 	async fn metadata(&self) -> Result<NotebookMeta, ErrorObjectOwned>;
 
-	#[method(name = "getHeader")]
-	async fn get_header(
+	#[method(name = "getHeaderDownloadUrl")]
+	async fn get_header_download_url(
 		&self,
 		notebook_number: NotebookNumber,
-	) -> Result<SignedNotebookHeader, ErrorObjectOwned>;
+	) -> Result<String, ErrorObjectOwned>;
 
-	#[method(name = "getRawHeaders")]
-	async fn get_raw_headers(
-		&self,
-		since_notebook: Option<NotebookNumber>,
-		or_specific_notebooks: Option<Vec<NotebookNumber>>,
-	) -> Result<Vec<(NotebookNumber, Vec<u8>)>, ErrorObjectOwned>;
-
-	#[method(name = "get")]
-	async fn get(&self, notebook_number: NotebookNumber) -> Result<Notebook, ErrorObjectOwned>;
-
-	#[method(name = "getRawBody")]
-	async fn get_raw_body(
+	#[method(name = "getNotebookDownloadUrl")]
+	async fn get_notebook_download_url(
 		&self,
 		notebook_number: NotebookNumber,
-	) -> Result<Vec<u8>, ErrorObjectOwned>;
+	) -> Result<String, ErrorObjectOwned>;
 
 	/// Subscription to notebook completed
-	#[subscription(name = "subscribeHeaders" => "notebookHeader", item = SignedNotebookHeader)]
+	#[subscription(name = "subscribeHeaders" => "headerDownload", item = NotebookSubscriptionBroadcast)]
 	async fn subscribe_headers(&self) -> SubscriptionResult;
-	#[subscription(name = "subscribeRawHeaders" => "notebookRawHeader", item = (NotebookNumber, Vec<u8>))]
-	async fn subscribe_raw_headers(&self) -> SubscriptionResult;
 }
 
-pub type RawHeadersSubscription = jsonrpsee::core::client::Subscription<(NotebookNumber, Vec<u8>)>;
+#[derive(Clone, PartialEq, Eq, Encode, Decode, RuntimeDebug, TypeInfo, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct NotebookSubscriptionBroadcast {
+	pub notebook_number: NotebookNumber,
+	pub tick: Tick,
+	pub notebook_header_hash: H256,
+	pub header_download_url: String,
+}
+
+impl NotebookSubscriptionBroadcast {
+	pub fn build(
+		info: (SignedNotebookHeader, H256),
+		archive_host: &str,
+	) -> NotebookSubscriptionBroadcast {
+		let (header, hash) = info;
+		Self {
+			notebook_number: header.header.notebook_number,
+			tick: header.header.tick,
+			header_download_url: get_header_url(
+				archive_host,
+				header.header.notary_id,
+				header.header.notebook_number,
+			),
+			notebook_header_hash: hash,
+		}
+	}
+}
+
+pub type RawHeadersSubscription =
+	jsonrpsee::core::client::Subscription<NotebookSubscriptionBroadcast>;

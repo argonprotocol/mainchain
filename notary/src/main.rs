@@ -1,14 +1,20 @@
 use anyhow::Context;
-use argon_client::{api::storage, ReconnectingClient};
+use argon_client::{
+	api::{notaries::storage::types, storage},
+	MainchainClient,
+};
 use argon_notary::{
 	block_watch::spawn_block_sync,
 	notebook_closer::{spawn_notebook_closer, NOTARY_KEYID},
+	s3_archive::S3Archive,
+	server::{ArchiveSettings, RpcConfig},
 	NotaryServer,
 };
 use argon_primitives::{tick::Ticker, AccountId, CryptoType, KeystoreParams, NotaryId};
 use clap::{Parser, Subcommand};
 use futures::StreamExt;
-use sp_core::{crypto::Ss58Codec, sr25519, Pair};
+use prometheus::Registry;
+use sp_core::{crypto::Ss58Codec, sr25519, ByteArray, Pair};
 use sqlx::{migrate, postgres::PgPoolOptions};
 use std::{env, time::Duration};
 use tracing::warn;
@@ -24,7 +30,7 @@ struct Cli {
 enum Commands {
 	/// Starts a notary server
 	Run {
-		/// Start in dev mode (in memory keystore with a default key (//Ferdie//notary)
+		/// Start in dev mode (in memory keystore with a default key and with random minio bucket)
 		#[clap(long)]
 		dev: bool,
 
@@ -58,6 +64,25 @@ enum Commands {
 		/// Should this node finalize notebook?
 		#[clap(short, long, env, default_value = "true")]
 		finalize_notebooks: bool,
+
+		/// An s3 compatible endpoint for the archive (use minIO for self-hosted). Optional if
+		/// using a default region or in dev.
+		#[clap(long, env = "AWS_S3_ENDPOINT")]
+		archive_endpoint: Option<String>,
+
+		/// The s3 compatible bucket-name for writing to the archive. Optional if dev.
+		#[clap(long)]
+		archive_bucket: Option<String>,
+
+		/// An s3 compatible region for the archive. Optional if dev. NOTE: credentials must be
+		/// available in env using default AWS/s3 host or env vars.
+		#[clap(long, env = "AWS_S3_REGION")]
+		archive_region: Option<String>,
+
+		/// The public read host for the archive (should include a bucket-name if in url). Optional
+		/// only if dev.
+		#[clap(long)]
+		archive_public_host: Option<String>,
 	},
 	/// Inserts a Notary compatible key into the keystore. NOTE: you still need to register it in
 	/// mainchain
@@ -122,6 +147,10 @@ async fn main() -> anyhow::Result<()> {
 			finalize_notebooks,
 			dev,
 			keystore_params,
+			archive_bucket,
+			mut archive_public_host,
+			archive_endpoint,
+			archive_region,
 		} => {
 			tracing::info!("Running notary. DB={}, Mainchain={}", db_url, trusted_rpc_url);
 			let pool = PgPoolOptions::new()
@@ -143,42 +172,38 @@ async fn main() -> anyhow::Result<()> {
 				keystore_params.open()?
 			};
 
-			let mut mainchain_client = ReconnectingClient::new(vec![trusted_rpc_url.clone()]);
-			let ticker: Ticker = mainchain_client.get().await?.lookup_ticker().await?;
-
-			let operator_account_id = if let Some(address) = operator_address {
-				AccountId::from_ss58check_with_version(address.as_str())
-					.map_err(|_| Error::Input("Invalid account id".to_string()))
-					.map(|(a, _version)| a)?
+			let s3_buckets = if dev && archive_public_host.is_none() {
+				let (buckets, host) =
+					S3Archive::rand_minio_test_bucket(notary_id, archive_bucket).await?;
+				archive_public_host.replace(host.archive_host);
+				buckets
 			} else {
-				let active_notaries = mainchain_client
-					.get()
-					.await?
-					.fetch_storage(&storage().notaries().active_notaries(), None)
-					.await?
-					.expect("active notaries storage is not available")
-					.0;
-				active_notaries
-					.iter()
-					.find_map(|notary| {
-						if notary.notary_id == notary_id {
-							Some(notary.operator_account_id.0.into())
-						} else {
-							None
-						}
-					})
-					.ok_or_else(|| {
-						Error::Input("Notary not found in active notaries".to_string())
-					})?
+				let archive_region = archive_region.ok_or(Error::Input(
+					"Archive region is required when not dev mode".to_string(),
+				));
+				let archive_bucket = archive_bucket.ok_or(Error::Input(
+					"Archive bucket is required when not dev mode".to_string(),
+				))?;
+				let region = S3Archive::get_region(archive_region.unwrap(), archive_endpoint)?;
+				S3Archive::new(notary_id, region, archive_bucket).await?
 			};
-			drop(mainchain_client);
 
+			let archive_host = archive_public_host
+				.ok_or(Error::Input("Archive public host is required".to_string()))?;
+
+			let (operator_account_id, ticker) =
+				check_notary(notary_id, trusted_rpc_url.clone(), operator_address.clone()).await?;
+			let prom_registry = Registry::new();
 			let server = NotaryServer::start(
 				notary_id,
 				operator_account_id.clone(),
 				pool.clone(),
+				ArchiveSettings { archive_host },
+				// uses prometheus 9116
+				RpcConfig::default(),
 				ticker,
 				bind_addr,
+				prom_registry.clone(),
 			)
 			.await?;
 
@@ -205,6 +230,8 @@ async fn main() -> anyhow::Result<()> {
 					keystore,
 					ticker,
 					server.completed_notebook_sender.clone(),
+					s3_buckets.clone(),
+					prom_registry.clone(),
 				)?;
 
 				let mut subscription = server.audit_failure_stream.subscribe(10);
@@ -246,4 +273,43 @@ async fn main() -> anyhow::Result<()> {
 	};
 
 	Ok(())
+}
+
+/// Check the notary operator account id and ticker
+async fn check_notary(
+	notary_id: NotaryId,
+	mainchain_url: String,
+	operator_address: Option<String>,
+) -> anyhow::Result<(AccountId, Ticker)> {
+	let client = MainchainClient::try_until_connected(&mainchain_url, 2500, 10000).await?;
+	let ticker: Ticker = client.lookup_ticker().await?;
+	let active_notaries = client
+		.fetch_storage(&storage().notaries().active_notaries(), None)
+		.await?
+		.unwrap_or(types::active_notaries::ActiveNotaries::from(Vec::new()));
+
+	let operator_account_id = if let Some(address) = operator_address {
+		Some(
+			AccountId::from_ss58check_with_version(address.as_str())
+				.map_err(|_| Error::Input("Invalid account id".to_string()))
+				.map(|(a, _version)| a)?,
+		)
+	} else {
+		None
+	};
+
+	if let Some(notary) = active_notaries.0.iter().find(|n| n.notary_id == notary_id) {
+		if let Some(operator_account_id) = operator_account_id {
+			if notary.operator_account_id.0 != operator_account_id.as_slice() {
+				return Err(
+					Error::Input("Notary operator account id does not match".to_string()).into()
+				);
+			}
+		}
+		return Ok((notary.operator_account_id.0.into(), ticker));
+	}
+	if let Some(operator_account_id) = operator_account_id {
+		return Ok((operator_account_id, ticker));
+	}
+	Err(Error::Input("Notary not registered".to_string()).into())
 }

@@ -325,6 +325,8 @@ impl NotebookHeader {
 )]
 #[serde(rename_all = "camelCase")]
 pub struct NotebookMeta {
+	/// The last notebook number to be closed/completed (note: this is not the grandpa finality
+	/// meaning)
 	pub finalized_notebook_number: NotebookNumber,
 	pub finalized_tick: Tick,
 }

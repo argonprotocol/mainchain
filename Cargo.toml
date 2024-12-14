@@ -157,7 +157,7 @@ smallvec = { version = "1.13" }
 hex = { version = "0.4" }
 url = "2.5.0"
 num_cpus = "1.16"
-reqwest = { version = "0.12", features = ["json"] }
+reqwest = { version = "0.12", features = ["json"], default-features = false }
 scraper = { version = "0.21" }
 
 codec = { default-features = false, package = "parity-scale-codec", version = "3.6", features = ["derive", "max-encoded-len"] }
@@ -169,14 +169,27 @@ anyhow = { version = "1", default-features = false }
 thiserror = { version = "2.0.3", default-features = false }
 
 jsonrpsee = { version = "0.24.5", features = ["http-client", "ws-client", "macros", "client-ws-transport-tls"] }
-tower = { version = "0.5" }
+tower = { version = "0.4" }
+tower-http = { version = "0.6" }
+prometheus = { version = "0.13", default-features = false }
+hyper = { version = "1", default-features = false }
+hyper-util = { version = "0.1", default-features = false, features = [
+    "server",
+] }
+http-body-util = { version = "0.1", default-features = false }
+governor = { version = "0.8" }
+rusoto_core = { version = "0.48" }
+rusoto_s3 = { version = "0.48" }
+rusoto_credential = { version = "0.48" }
+axum = { version = "0.7" }
 
-tracing = { version = "0.1" }
+tracing = { version = "0.1", default-features = false }
 tracing-subscriber = { version = "0.3", features = ["env-filter"] }
 log = { version = "0.4", default-features = false }
 env_logger = "0.11"
 humantime = { version = "2.1" }
 color-backtrace = { version = "0.6" }
+uuid = { version = "1.11.0" }
 
 sqlx = { version = "0.8", features = ["macros"] }
 chrono = { version = "0.4", features = ["serde"] }
@@ -239,7 +252,7 @@ regex = { version = "1.11.1" }
 serial_test = { version = "3.2.0" }
 
 # node
-substrate-prometheus-endpoint = { version = "0.17.0", package = "substrate-prometheus-endpoint" }
+prometheus-endpoint = { version = "0.17.0", package = "substrate-prometheus-endpoint" }
 sc-block-builder = { version = "0.42.0" }
 sc-cli = { version = "0.47.0" }
 sc-chain-spec = { version = "38.0.0" }
@@ -285,6 +298,7 @@ k256 = { version = "0.13.3", default-features = false }
 bip32 = { version = "0.5.1", default-features = false }
 base58 = { version = "0.2.0", default-features = false }
 base64 = { version = "0.22", default-features = false }
+md-5 = { version = "0.10" }
 napi-derive = { version = "2.16" }
 napi = { version = "2.16", features = ["napi9", "async", "error_anyhow"] }
 napi-build = { version = "2.1" }

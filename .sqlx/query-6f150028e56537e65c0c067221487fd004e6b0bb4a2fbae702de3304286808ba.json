@@ -1,11 +1,11 @@
 {
   "db_name": "PostgreSQL",
-  "query": "SELECT encoded FROM notebooks_raw WHERE notebook_number = $1 LIMIT 1",
+  "query": "SELECT hash FROM notebook_headers WHERE hash IS NOT NULL AND notebook_number = $1 LIMIT 1",
   "describe": {
     "columns": [
       {
         "ordinal": 0,
-        "name": "encoded",
+        "name": "hash",
         "type_info": "Bytea"
       }
     ],
@@ -15,8 +15,8 @@
       ]
     },
     "nullable": [
-      false
+      true
     ]
   },
-  "hash": "f40e198f93efee441432ac19ffdf4017a36fca759f50be5f37d736040bff1768"
+  "hash": "6f150028e56537e65c0c067221487fd004e6b0bb4a2fbae702de3304286808ba"
 }

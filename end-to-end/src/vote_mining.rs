@@ -12,20 +12,17 @@ use tokio::join;
 #[serial]
 async fn test_end_to_end_default_vote_mining() {
 	env::set_var("RUST_LOG", "info");
-	let grandpa_miner = ArgonTestNode::start("alice", 0, "").await.unwrap();
+	let grandpa_miner = ArgonTestNode::start_with_args("alice", 0).await.unwrap();
 	let miner_threads = test_miner_count();
-	let miner_1 = ArgonTestNode::start("bob", miner_threads, &grandpa_miner.boot_url)
-		.await
-		.unwrap();
-	let miner_2 = ArgonTestNode::start("dave", miner_threads, &grandpa_miner.boot_url)
-		.await
-		.unwrap();
+	let miner_1 = grandpa_miner.fork_node("bob", miner_threads).await.unwrap();
+	let miner_2 = grandpa_miner.fork_node("dave", miner_threads).await.unwrap();
 
 	let test_notary = create_active_notary(&grandpa_miner).await.expect("Notary registered");
 
 	let mut blocks_sub = grandpa_miner.client.live.blocks().subscribe_finalized().await.unwrap();
 	let mut authors = HashSet::<AccountId>::new();
 	let mut counter = 0;
+	let mut rewards_counter = 0;
 	loop {
 		if let Some(Ok(block)) = blocks_sub.next().await {
 			if let Some(author) =
@@ -45,7 +42,13 @@ async fn test_end_to_end_default_vote_mining() {
 			}
 			if authors.len() == 2 {
 				println!("Both authors have produced blocks");
-				break;
+				if rewards_counter == 0 {
+					rewards_counter = counter + 5;
+				}
+				if counter >= rewards_counter {
+					println!("Both authors have rewards matured");
+					break;
+				}
 			}
 			counter += 1;
 			if counter >= 30 {

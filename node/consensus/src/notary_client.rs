@@ -1,3 +1,20 @@
+use crate::{aux_client::ArgonAux, error::Error};
+use argon_notary_apis::{
+	get_header_url,
+	notebook::{NotebookRpcClient, RawHeadersSubscription},
+	ArchiveHost, Client, SystemRpcClient,
+};
+use argon_primitives::{
+	ensure,
+	notary::{
+		NotaryNotebookAuditSummary, NotaryNotebookDetails, NotaryNotebookRawVotes, NotaryState,
+	},
+	notebook::NotebookNumber,
+	tick::Tick,
+	Balance, BlockSealApis, BlockSealAuthorityId, BlockVotingPower, NotaryApis, NotaryId,
+	NotebookApis, NotebookAuditResult, NotebookHeaderData, VoteMinimum, VotingSchedule,
+};
+use argon_runtime::{NotaryRecordT, NotebookVerifyError};
 use codec::Codec;
 use futures::{future::join_all, Stream, StreamExt};
 use log::{info, trace, warn};
@@ -18,19 +35,7 @@ use std::{
 };
 use tokio::sync::{Mutex, RwLock};
 
-use crate::{aux_client::ArgonAux, error::Error};
-use argon_notary_apis::notebook::{NotebookRpcClient, RawHeadersSubscription};
-use argon_primitives::{
-	ensure,
-	notary::{
-		NotaryNotebookAuditSummary, NotaryNotebookDetails, NotaryNotebookRawVotes, NotaryState,
-	},
-	notebook::NotebookNumber,
-	tick::Tick,
-	Balance, BlockSealApis, BlockSealAuthorityId, BlockVotingPower, NotaryApis, NotaryId,
-	NotebookApis, NotebookAuditResult, NotebookHeaderData, VoteMinimum, VotingSchedule,
-};
-use argon_runtime::{NotaryRecordT, NotebookVerifyError};
+const MAX_QUEUE_DEPTH: usize = 1440 * 2; // a notary can be down 2 days before we start dropping history
 
 pub trait NotaryApisExt<B: BlockT, AC> {
 	fn notaries(&self, block_hash: B::Hash) -> Result<Vec<NotaryRecordT>, Error>;
@@ -130,6 +135,7 @@ pub fn run_notary_sync<B, C, AC>(
 	client: Arc<C>,
 	aux_client: ArgonAux<B, C>,
 	no_work_delay_millis: u64,
+	notebook_downloader: NotebookDownloader,
 ) -> Arc<NotaryClient<B, C, AC>>
 where
 	B: BlockT,
@@ -145,7 +151,8 @@ where
 		+ NotaryApis<B, NotaryRecordT>,
 	AC: Codec + Clone + Send + Sync + 'static,
 {
-	let notary_client = Arc::new(NotaryClient::new(client.clone(), aux_client.clone()));
+	let notary_client =
+		Arc::new(NotaryClient::new(client.clone(), aux_client.clone(), notebook_downloader));
 
 	let notary_client_clone = Arc::clone(&notary_client);
 	let notary_client_poll = Arc::clone(&notary_client);
@@ -204,19 +211,19 @@ where
 }
 
 type PendingNotebook = (NotebookNumber, Option<Vec<u8>>);
-pub type VotingPowerInfo = (Tick, BlockVotingPower, u32);
-const MAX_QUEUE_DEPTH: usize = 1440 * 2; // a notary can be down 2 days before we start dropping history
 
+pub type VotingPowerInfo = (Tick, BlockVotingPower, u32);
 pub struct NotaryClient<B: BlockT, C: AuxStore, AC> {
 	client: Arc<C>,
-	pub notary_client_by_id: Arc<RwLock<BTreeMap<NotaryId, Arc<argon_notary_apis::Client>>>>,
+	pub notary_client_by_id: Arc<RwLock<BTreeMap<NotaryId, Arc<Client>>>>,
+	pub notary_archive_host_by_id: Arc<RwLock<BTreeMap<NotaryId, String>>>,
 	pub notaries_by_id: Arc<RwLock<BTreeMap<NotaryId, NotaryRecordT>>>,
 	pub subscriptions_by_id: Arc<RwLock<BTreeMap<NotaryId, Pin<Box<RawHeadersSubscription>>>>>,
 	tick_voting_power_sender: Arc<Mutex<TracingUnboundedSender<VotingPowerInfo>>>,
 	pub tick_voting_power_receiver: Arc<Mutex<TracingUnboundedReceiver<VotingPowerInfo>>>,
 	notebook_queue_by_id: Arc<RwLock<BTreeMap<NotaryId, Vec<PendingNotebook>>>>,
-
 	aux_client: ArgonAux<B, C>,
+	notebook_downloader: NotebookDownloader,
 	_block: PhantomData<AC>,
 }
 
@@ -226,7 +233,11 @@ where
 	C: NotaryApisExt<B, AC> + AuxStore + Send + Sync + 'static,
 	AC: Clone + Codec + Send + Sync + 'static,
 {
-	pub fn new(client: Arc<C>, aux_client: ArgonAux<B, C>) -> Self {
+	pub fn new(
+		client: Arc<C>,
+		aux_client: ArgonAux<B, C>,
+		notebook_downloader: NotebookDownloader,
+	) -> Self {
 		let (tick_voting_power_sender, tick_voting_power_receiver) =
 			tracing_unbounded("node::consensus::notebook_tick_stream", 100);
 
@@ -234,11 +245,13 @@ where
 			client,
 			subscriptions_by_id: Default::default(),
 			notary_client_by_id: Default::default(),
+			notary_archive_host_by_id: Default::default(),
 			notaries_by_id: Default::default(),
 			notebook_queue_by_id: Default::default(),
 			tick_voting_power_sender: Arc::new(Mutex::new(tick_voting_power_sender)),
 			tick_voting_power_receiver: Arc::new(Mutex::new(tick_voting_power_receiver)),
 			aux_client,
+			notebook_downloader,
 			_block: PhantomData,
 		}
 	}
@@ -330,7 +343,7 @@ where
 				let notary_id = *notary_id;
 				Box::pin(async move {
 					match futures::future::poll_fn(|cx| sub.as_mut().poll_next(cx)).await {
-						Some(Ok((notebook_number, body))) => Ok((notary_id, notebook_number, body)),
+						Some(Ok(download_info)) => Ok((notary_id, download_info)),
 						Some(Err(e)) => Err((notary_id, Some(e.to_string()))),
 						None => Err((notary_id, None)), // Subscription ended
 					}
@@ -342,13 +355,16 @@ where
 		};
 
 		match result {
-			Ok((notary_id, notebook_number, header)) => {
+			Ok((notary_id, download_info)) => {
+				let notebook_number = download_info.notebook_number;
 				if let Ok(did_overflow) = self
-					.enqueue_notebooks(notary_id, vec![(notebook_number, Some(header))])
+					.download_header(
+						notary_id,
+						notebook_number,
+						Some(download_info.header_download_url),
+					)
 					.await
-					.inspect_err(|e| {
-						warn!("Could not enqueue notebook for notary {} - {:?}", notary_id, e);
-					}) {
+				{
 					if did_overflow {
 						info!("Overflowed queue for notary {}", notary_id);
 						self.unsubscribe_if_overflowed(notary_id).await;
@@ -372,7 +388,7 @@ where
 			let self_clone: Arc<Self> = Arc::clone(self);
 			tokio::spawn(async move {
 				self_clone.clean_queued_finalized_notebooks(&finalized_hash, notary_id).await;
-				self_clone.retrieve_notary_missing_notebooks(notary_id).await?;
+				self_clone.retrieve_next_notary_missing_notebooks(notary_id, 10).await?;
 
 				let Some((notebook_number, raw_header)) = self_clone.dequeue_ready(notary_id).await
 				else {
@@ -401,10 +417,7 @@ where
 					Err(e) => {
 						if let Error::MissingNotebooksError(_) = e {
 							self_clone
-								.enqueue_notebooks(
-									notary_id,
-									vec![(notebook_number, Some(raw_header))],
-								)
+								.enqueue_notebook(notary_id, notebook_number, Some(raw_header))
 								.await?;
 							return Ok::<_, Error>(true);
 						}
@@ -443,7 +456,11 @@ where
 		}
 	}
 
-	async fn retrieve_notary_missing_notebooks(&self, notary_id: NotaryId) -> Result<(), Error> {
+	async fn retrieve_next_notary_missing_notebooks(
+		&self,
+		notary_id: NotaryId,
+		next_batch: u16,
+	) -> Result<(), Error> {
 		let mut missing_notebooks = vec![];
 		// use notebook lock in block
 		{
@@ -462,20 +479,17 @@ where
 		missing_notebooks.sort();
 		let original_size = missing_notebooks.len();
 		// only download 10 at a time
-		let missing_notebooks = missing_notebooks.into_iter().take(10).collect();
+		let missing_notebooks =
+			missing_notebooks.into_iter().take(next_batch as usize).collect::<Vec<_>>();
 
 		info!(
 			"Retrieving missing notebooks from notary #{} - {:?} (of {original_size})",
 			notary_id, missing_notebooks
 		);
+		for notebook_number in missing_notebooks {
+			self.download_header(notary_id, notebook_number, None).await?;
+		}
 
-		let client = self.get_or_connect_to_client(notary_id).await?;
-		let headers = client.get_raw_headers(None, Some(missing_notebooks)).await.map_err(|e| {
-			Error::NotaryError(format!("Could not get notebooks from notary - {:?}", e))
-		})?;
-		let headers = headers.into_iter().map(|(n, h)| (n, Some(h))).collect();
-
-		self.enqueue_notebooks(notary_id, headers).await?;
 		Ok(())
 	}
 
@@ -503,42 +517,45 @@ where
 	}
 
 	/// Enqueue the notebook and return true if the queue overflowed
-	async fn enqueue_notebooks(
+	async fn enqueue_notebook(
 		&self,
 		notary_id: NotaryId,
-		mut headers: Vec<PendingNotebook>,
+		notebook_number: NotebookNumber,
+		header_bytes: Option<Vec<u8>>,
 	) -> Result<bool, Error> {
 		let mut notebook_queue_by_id = self.notebook_queue_by_id.write().await;
 
 		let queue = notebook_queue_by_id.entry(notary_id).or_insert_with(Vec::new);
-		for (notebook_number, raw_header) in headers.drain(..) {
-			let entry = queue.iter().position(|(n, _)| *n == notebook_number);
-			if let Some(index) = entry {
-				// only overwrite if missing
-				if queue[index].1.is_none() {
-					trace!(
-						"Overwriting notebook {} header in queue for notary {} with header? {}",
-						notebook_number,
-						notary_id,
-						raw_header.is_some()
-					);
-					queue[index].1 = raw_header;
-				}
-			} else {
+		let entry = queue.iter().position(|(n, _)| *n == notebook_number);
+		if let Some(index) = entry {
+			// only overwrite if missing
+			if queue[index].1.is_none() {
 				trace!(
-					"Queuing notebook {} for notary {} with header? {}",
+					"Overwriting notebook {} header in queue for notary {} with header? {}",
 					notebook_number,
 					notary_id,
-					raw_header.is_some()
+					header_bytes.is_some()
 				);
-				queue.insert(0, (notebook_number, raw_header));
+				queue[index].1 = header_bytes;
 			}
+			Ok(false)
+		} else {
+			trace!(
+				"Queuing notebook {} for notary {} with header? {}",
+				notebook_number,
+				notary_id,
+				header_bytes.is_some()
+			);
+			// look from back of list since we're normally appending
+			let pos = queue
+				.iter()
+				.rposition(|(n, _)| *n < notebook_number)
+				.map(|p| p + 1)
+				.unwrap_or(0);
+			queue.insert(pos, (notebook_number, header_bytes));
+
+			Ok(queue.len() > MAX_QUEUE_DEPTH)
 		}
-		queue.sort_by(|a, b| a.0.cmp(&b.0));
-		if queue.len() > MAX_QUEUE_DEPTH {
-			return Ok(true);
-		}
-		Ok(false)
 	}
 
 	async fn unsubscribe_if_overflowed(&self, notary_id: NotaryId) {
@@ -549,20 +566,49 @@ where
 		self.subscriptions_by_id.write().await.remove(&notary_id);
 	}
 
+	async fn download_header(
+		&self,
+		notary_id: NotaryId,
+		notebook_number: NotebookNumber,
+		mut download_url: Option<String>,
+	) -> Result<bool, Error> {
+		if download_url.is_none() {
+			if let Some(archive_host) = self.notary_archive_host_by_id.read().await.get(&notary_id)
+			{
+				download_url = Some(get_header_url(archive_host, notary_id, notebook_number));
+			}
+		}
+		let header = self
+			.notebook_downloader
+			.get_header(notary_id, notebook_number, download_url)
+			.await
+			.map_err(|e| {
+				Error::NotaryError(format!(
+					"Could not get notary {notary_id}, notebook {notebook_number} from notebook downloader - {:?}",
+					e
+				))
+			})?;
+
+		self.enqueue_notebook(notary_id, notebook_number, Some(header)).await
+	}
+
 	async fn sync_notebooks(&self, id: NotaryId) -> Result<(), Error> {
 		let client = self.get_or_connect_to_client(id).await?;
 		let notebook_meta = client.metadata().await.map_err(|e| {
-			Error::NotaryError(format!("Could not get notebooks from notary - {:?}", e))
+			Error::NotaryError(format!("Could not get metadata from notary - {:?}", e))
 		})?;
 		let notary_notebooks = self.aux_client.get_notary_audit_history(id)?.get();
 		let latest_stored = notary_notebooks.last().map(|n| n.notebook_number).unwrap_or_default();
+		let archive_host = client.get_archive_base_url().await.map_err(|e| {
+			Error::NotaryError(format!("Could not get archive host from notary - {:?}", e))
+		})?;
+		self.notary_archive_host_by_id.write().await.insert(id, archive_host.clone());
 
 		if latest_stored < notebook_meta.finalized_notebook_number {
-			let catchup = client.get_raw_headers(Some(latest_stored), None).await.map_err(|e| {
-				Error::NotaryError(format!("Could not get notebooks from notary - {:?}", e))
-			})?;
-			let catchup = catchup.into_iter().map(|(n, h)| (n, Some(h))).collect();
-			self.enqueue_notebooks(id, catchup).await?;
+			let start = latest_stored + 1;
+			for i in start..=notebook_meta.finalized_notebook_number {
+				self.download_header(id, i, None).await?;
+			}
 		}
 
 		Ok(())
@@ -579,7 +625,7 @@ where
 
 	async fn subscribe_to_notebooks(&self, id: NotaryId) -> Result<(), Error> {
 		let client = self.get_or_connect_to_client(id).await?;
-		let stream: RawHeadersSubscription = client.subscribe_raw_headers().await.map_err(|e| {
+		let stream: RawHeadersSubscription = client.subscribe_headers().await.map_err(|e| {
 			Error::NotaryError(format!("Could not subscribe to notebooks from notary - {:?}", e))
 		})?;
 		self.subscriptions_by_id.write().await.insert(id, Box::pin(stream));
@@ -683,22 +729,8 @@ where
 			);
 
 			for (notary_id, missing) in missing_audits_by_notary {
-				self.enqueue_notebooks(notary_id, missing).await?;
-			}
-
-			if !needs_notary_connect.is_empty() {
-				info!(
-					"Connecting to notaries to catchup missing audits. {:#?}",
-					needs_notary_connect
-				);
-				self.update_notaries(&self.client.best_hash()).await?;
-				for notary_id in needs_notary_connect {
-					if !self.has_client(notary_id).await {
-						return Err(Error::NotaryError(format!(
-							"Could not connect to notary {} to catchup missing audits",
-							notary_id
-						)));
-					}
+				for (notebook_number, body) in missing {
+					self.enqueue_notebook(notary_id, notebook_number, body).await?;
 				}
 			}
 
@@ -708,7 +740,7 @@ where
 			while self.process_queues().await? {
 				tokio::time::sleep(Duration::from_millis(30)).await;
 				if start.elapsed() > Duration::from_secs(10) {
-					return Err(Error::StringError(
+					return Err(Error::UnableToSyncNotary(
 						"Could not process all missing audits in 10 seconds".to_string(),
 					));
 				}
@@ -745,11 +777,9 @@ where
 		}
 
 		if !missing_notebooks.is_empty() {
-			self.enqueue_notebooks(
-				notary_id,
-				missing_notebooks.iter().map(|n| (*n, None)).collect(),
-			)
-			.await?;
+			for missing in &missing_notebooks {
+				self.enqueue_notebook(notary_id, *missing, None).await?;
+			}
 			return Err(Error::MissingNotebooksError(format!(
 				"Missing notebooks #{:?} to audit {} for notary {}",
 				missing_notebooks, notebook_number, notary_id
@@ -897,16 +927,18 @@ where
 		notary_id: NotaryId,
 		notebook_number: NotebookNumber,
 	) -> Result<Vec<u8>, Error> {
-		let client = self.get_or_connect_to_client(notary_id).await?;
-
-		match client.get_raw_body(notebook_number).await {
-			Err(err) => {
-				self.disconnect(&notary_id, Some(format!("Error downloading notebook: {}", err)))
-					.await;
-				Err(Error::NotaryError(format!("Error downloading notebook: {}", err)))
-			},
-			Ok(body) => Ok(body),
-		}
+		let client = self.get_or_connect_to_client(notary_id).await.ok();
+		let bytes = self
+			.notebook_downloader
+			.get_body(&client, notary_id, notebook_number)
+			.await
+			.map_err(|e| {
+				Error::NotaryError(format!(
+					"Could not download notebook {} from notary {} - {:?}",
+					notebook_number, notary_id, e
+				))
+			})?;
+		Ok(bytes)
 	}
 
 	fn latest_notebook_in_runtime(
@@ -973,10 +1005,71 @@ where
 	Ok(headers)
 }
 
+pub struct NotebookDownloader {
+	pub archive_hosts: Vec<ArchiveHost>,
+}
+
+impl NotebookDownloader {
+	pub fn new<AR, S>(archive_hosts: AR) -> Result<Self, Error>
+	where
+		AR: IntoIterator<Item = S>,
+		S: AsRef<str>,
+	{
+		let archive_hosts = archive_hosts
+			.into_iter()
+			.map(|host| ArchiveHost::new(host.as_ref().to_string()))
+			.collect::<Result<Vec<_>, _>>()
+			.map_err(|e| Error::NotaryArchiveError(e.to_string()))?;
+		Ok(Self { archive_hosts })
+	}
+
+	pub async fn get_header(
+		&self,
+		notary_id: NotaryId,
+		notebook_number: NotebookNumber,
+		download_url: Option<String>,
+	) -> Result<Vec<u8>, Error> {
+		if let Some(url) = download_url {
+			if let Ok(header) = ArchiveHost::download(url).await {
+				return Ok(header);
+			}
+		}
+		for archive_host in &self.archive_hosts {
+			if let Ok(header) = archive_host.get_header(notary_id, notebook_number).await {
+				return Ok(header);
+			}
+		}
+		Err(Error::NotaryError("Could not get header from notary or archive".to_string()))
+	}
+
+	/// Get notebook body from notary or archive
+	pub async fn get_body(
+		&self,
+		client: &Option<Arc<Client>>,
+		notary_id: NotaryId,
+		notebook_number: NotebookNumber,
+	) -> Result<Vec<u8>, Error> {
+		for archive_host in &self.archive_hosts {
+			if let Ok(body) = archive_host.get_notebook(notary_id, notebook_number).await {
+				return Ok(body);
+			}
+		}
+		if let Some(client) = client {
+			if let Ok(url) = client.get_notebook_download_url(notebook_number).await {
+				return ArchiveHost::download(url).await.map_err(|e| {
+					Error::NotaryError(format!("Could not get notebooks from notary - {:?}", e))
+				});
+			}
+		}
+		Err(Error::NotaryError("Could not get body from notary or archive".to_string()))
+	}
+}
+
 #[cfg(test)]
 mod test {
 	use super::*;
 	use crate::{error::Error, mock_notary::MockNotary, notary_client::NotaryApisExt};
+	use argon_notary_apis::notebook::NotebookRpcServer;
 	use argon_primitives::{
 		notary::{
 			NotaryMeta, NotaryNotebookAuditSummary, NotaryNotebookAuditSummaryDetails,
@@ -1137,11 +1230,15 @@ mod test {
 		let mut test_notary = MockNotary::new(1);
 		test_notary.start().await.expect("could not start notary");
 		test_notary.state.lock().await.metadata =
-			Some(NotebookMeta { finalized_notebook_number: 1, finalized_tick: 1 });
+			Some(NotebookMeta { finalized_notebook_number: 0, finalized_tick: 0 });
+		let archive_host = test_notary.archive_host.clone();
+
 		let client = Arc::new(TestNode::new());
 		client.add_notary(&test_notary);
 		let aux_client = ArgonAux::new(client.clone());
-		let notary_client = NotaryClient::new(client.clone(), aux_client);
+
+		let notebook_downloader = NotebookDownloader::new(vec![archive_host]).unwrap();
+		let notary_client = NotaryClient::new(client.clone(), aux_client, notebook_downloader);
 		let notary_client = Arc::new(notary_client);
 		(test_notary, client, notary_client)
 	}
@@ -1189,6 +1286,7 @@ mod test {
 			.await
 			.expect("Could not update notaries");
 		assert_eq!(notary_client.notaries_by_id.read().await.len(), 1);
+		assert_eq!(notary_client.notary_client_by_id.read().await.len(), 1);
 		for i in 0..MAX_QUEUE_DEPTH {
 			test_notary.create_notebook_header(vec![]).await;
 			notary_client.poll_subscriptions().await;
@@ -1212,18 +1310,9 @@ mod test {
 	#[tokio::test]
 	async fn handles_queueing_correctly() {
 		let (_test_notary, _client, notary_client) = system().await;
-		notary_client
-			.enqueue_notebooks(1, vec![(3, None)])
-			.await
-			.expect("Could not enqueue");
-		notary_client
-			.enqueue_notebooks(1, vec![(1, None)])
-			.await
-			.expect("Could not enqueue");
-		notary_client
-			.enqueue_notebooks(1, vec![(2, None)])
-			.await
-			.expect("Could not enqueue");
+		notary_client.enqueue_notebook(1, 3, None).await.expect("Could not enqueue");
+		notary_client.enqueue_notebook(1, 1, None).await.expect("Could not enqueue");
+		notary_client.enqueue_notebook(1, 2, None).await.expect("Could not enqueue");
 		assert_eq!(
 			notary_client.notebook_queue_by_id.read().await.get(&1).unwrap(),
 			&vec![(1, None), (2, None), (3, None)]
@@ -1232,23 +1321,20 @@ mod test {
 		assert!(next.is_none());
 
 		notary_client
-			.enqueue_notebooks(1, vec![(2, Some(vec![]))])
+			.enqueue_notebook(1, 2, Some(vec![]))
 			.await
 			.expect("Could not enqueue");
 		let next = notary_client.dequeue_ready(1).await;
 		assert!(next.is_none());
 		notary_client
-			.enqueue_notebooks(1, vec![(1, Some(vec![]))])
+			.enqueue_notebook(1, 1, Some(vec![]))
 			.await
 			.expect("Could not enqueue");
 		assert_eq!(
 			notary_client.notebook_queue_by_id.read().await.get(&1).unwrap(),
 			&vec![(1, Some(vec![])), (2, Some(vec![])), (3, None)]
 		);
-		notary_client
-			.enqueue_notebooks(1, vec![(1, None)])
-			.await
-			.expect("Could not enqueue");
+		notary_client.enqueue_notebook(1, 1, None).await.expect("Could not enqueue");
 		assert_eq!(
 			notary_client.notebook_queue_by_id.read().await.get(&1).unwrap(),
 			&vec![(1, Some(vec![])), (2, Some(vec![])), (3, None)],
@@ -1266,16 +1352,19 @@ mod test {
 			.await
 			.expect("Could not update notaries");
 		let notebooks = (1..=11u32).map(|n| (n, None)).collect::<Vec<_>>();
-		notary_client
-			.enqueue_notebooks(1, notebooks.clone())
-			.await
-			.expect("Could not enqueue");
+		for (n, _) in &notebooks {
+			notary_client.enqueue_notebook(1, *n, None).await.expect("Could not enqueue");
+		}
 		assert_eq!(notary_client.notebook_queue_by_id.read().await.get(&1).unwrap(), &notebooks);
-		for _ in 0..12 {
+		for _ in 1..=11 {
 			test_notary.create_notebook_header(vec![]).await;
 		}
+		assert_eq!(
+			test_notary.metadata().await.expect(""),
+			NotebookMeta { finalized_notebook_number: 11, finalized_tick: 11 }
+		);
 		notary_client
-			.retrieve_notary_missing_notebooks(1)
+			.retrieve_next_notary_missing_notebooks(1, 10)
 			.await
 			.expect("Could not retrieve missing notebooks");
 		let pending_notebooks = {

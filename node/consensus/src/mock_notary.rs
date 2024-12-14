@@ -8,20 +8,31 @@ use jsonrpsee::{
 };
 use sc_utils::notification::NotificationSender;
 use sp_core::{ed25519::Signature, Blake2Hasher, H256};
-use std::{collections::HashMap, sync::Arc};
+use std::{collections::HashMap, str::FromStr, sync::Arc};
 use tokio::sync::Mutex;
 
-use argon_notary::server::{pipe_from_stream_and_drop, NotebookHeaderStream};
+use argon_notary::server::{pipe_from_stream_and_drop, NotebookHeaderInfo, NotebookHeaderStream};
 use argon_notary_apis::{
+	get_header_url, get_notebook_url,
 	localchain::{BalanceChangeResult, BalanceTipResult, LocalchainRpcServer},
-	notebook::NotebookRpcServer,
+	notebook::{NotebookRpcServer, NotebookSubscriptionBroadcast},
+	system::SystemRpcServer,
 };
 use argon_primitives::{
 	tick::Tick, AccountId, AccountOrigin, AccountType, BalanceProof, BalanceTip, BlockVote,
 	Notarization, NotarizationBalanceChangeset, NotarizationBlockVotes, NotarizationDomains,
 	Notebook, NotebookHeader, NotebookMeta, NotebookNumber, SignedNotebookHeader,
 };
+use axum::{
+	body::Bytes,
+	extract::{Path, State},
+	http::StatusCode,
+	response::IntoResponse,
+	routing::get,
+	Router,
+};
 use env_logger::{Builder, Env};
+use tokio::task::JoinHandle;
 
 pub fn setup_logs() {
 	let env = Env::new().default_filter_or("node=debug"); //info,sync=debug,sc_=debug,sub-libp2p=debug,node=debug,runtime=debug");
@@ -38,10 +49,12 @@ pub struct NotaryState {
 #[derive(Clone)]
 pub struct MockNotary {
 	server_handle: Option<ServerHandle>,
+	archive_server_handle: Arc<Mutex<Option<JoinHandle<()>>>>,
 	pub addr: String,
+	pub archive_host: String,
 	pub notary_id: u32,
 	pub state: Arc<Mutex<NotaryState>>,
-	pub header_channel: (NotificationSender<SignedNotebookHeader>, NotebookHeaderStream),
+	pub header_channel: (NotificationSender<NotebookHeaderInfo>, NotebookHeaderStream),
 }
 
 impl MockNotary {
@@ -52,6 +65,8 @@ impl MockNotary {
 			header_channel: NotebookHeaderStream::channel(),
 			server_handle: None,
 			addr: String::new(),
+			archive_host: String::new(),
+			archive_server_handle: Default::default(),
 		}
 	}
 
@@ -61,15 +76,38 @@ impl MockNotary {
 			server_handle.stop().expect("Should be able to stop server");
 			server_handle.stopped().await;
 		}
+		if let Some(handle) = self.archive_server_handle.lock().await.take() {
+			handle.abort();
+		}
 	}
 
 	pub async fn start(&mut self) -> anyhow::Result<()> {
+		let notary_id = self.notary_id;
+		// build our application with a route
+		let archive_server = Router::new()
+			// `GET /` goes to `root`
+			.route(
+				&format!("/notary/{notary_id}/notebook/:notebook_number"),
+				get(Self::get_notebook),
+			)
+			.route(&format!("/notary/{notary_id}/header/:notebook_number"), get(Self::get_header))
+			.with_state(Arc::new(self.clone()));
+
+		let listener = tokio::net::TcpListener::bind("127.0.0.1:0").await?;
+		self.archive_host = format!("http://127.0.0.1:{}", listener.local_addr()?.port());
+		let archive_server_handle = tokio::spawn(async move {
+			axum::serve(listener, archive_server).await.expect("Should be able to serve");
+		});
+
+		self.archive_server_handle = Arc::new(Mutex::new(Some(archive_server_handle)));
+
 		let server = Server::builder().build("127.0.0.1:0").await?;
 		self.addr = format!("ws://{:?}", server.local_addr()?);
 
 		let mut module = RpcModule::new(());
 		module.merge(NotebookRpcServer::into_rpc(self.clone()))?;
 		module.merge(LocalchainRpcServer::into_rpc(self.clone()))?;
+		module.merge(SystemRpcServer::into_rpc(self.clone()))?;
 
 		let handle = server.start(module);
 		self.server_handle = Some(handle.clone());
@@ -80,17 +118,19 @@ impl MockNotary {
 	}
 
 	pub async fn add_notebook_header(&self, header: SignedNotebookHeader) {
-		let mut state = self.state.lock().await;
-		state.headers.insert(header.header.notebook_number, header.clone());
-		state.metadata = Some(NotebookMeta {
-			finalized_tick: header.header.tick,
-			finalized_notebook_number: header.header.notebook_number,
-		});
-		drop(state);
+		let hash = header.header.hash();
+		{
+			let mut state = self.state.lock().await;
+			state.headers.insert(header.header.notebook_number, header.clone());
+			state.metadata = Some(NotebookMeta {
+				finalized_tick: header.header.tick,
+				finalized_notebook_number: header.header.notebook_number,
+			});
+		}
 		let _ = self
 			.header_channel
 			.0
-			.notify(|| Ok::<_, anyhow::Error>(header))
+			.notify(|| Ok::<NotebookHeaderInfo, anyhow::Error>((header, hash)))
 			.inspect_err(|e| println!("Failed to notify header: {:?}", e));
 	}
 
@@ -138,6 +178,40 @@ impl MockNotary {
 		.await;
 		notebook_header
 	}
+
+	async fn get_header(
+		State(state): State<Arc<Self>>,
+		Path(param): Path<String>,
+	) -> impl IntoResponse {
+		let notebook_number = NotebookNumber::from_str(param.replace(".scale", "").as_str())
+			.expect("Failed to parse notebook number");
+		let state = state.state.lock().await;
+		if let Some(body) = state.headers.get(&notebook_number).map(|x| x.encode()) {
+			return (StatusCode::OK, Bytes::from(body));
+		}
+		(StatusCode::NOT_FOUND, Bytes::from("Not found"))
+	}
+
+	async fn get_notebook(
+		State(state): State<Arc<Self>>,
+		Path(param): Path<String>,
+	) -> impl IntoResponse {
+		let notebook_number = NotebookNumber::from_str(param.replace(".scale", "").as_str())
+			.expect("Failed to parse notebook number");
+		let state = state.state.lock().await;
+		if let Some(header) = state.headers.get(&notebook_number).cloned() {
+			let notebook = Notebook {
+				header: header.header,
+				signature: header.signature,
+				notarizations: Default::default(),
+				hash: H256::random(),
+				new_account_origins: Default::default(),
+			};
+			let body = notebook.encode();
+			return (StatusCode::OK, Bytes::from(body));
+		}
+		(StatusCode::NOT_FOUND, Bytes::from("Not found"))
+	}
 }
 
 #[async_trait]
@@ -151,19 +225,19 @@ impl LocalchainRpcServer for MockNotary {
 		todo!()
 	}
 
-	async fn get_origin(
-		&self,
-		_account_id: AccountId,
-		_account_type: AccountType,
-	) -> Result<AccountOrigin, ErrorObjectOwned> {
-		todo!()
-	}
-
 	async fn get_tip(
 		&self,
 		_account_id: AccountId,
 		_account_type: AccountType,
 	) -> Result<BalanceTipResult, ErrorObjectOwned> {
+		todo!()
+	}
+
+	async fn get_origin(
+		&self,
+		_account_id: AccountId,
+		_account_type: AccountType,
+	) -> Result<AccountOrigin, ErrorObjectOwned> {
 		todo!()
 	}
 }
@@ -199,66 +273,18 @@ impl NotebookRpcServer for MockNotary {
 		})
 	}
 
-	async fn get_header(
+	async fn get_header_download_url(
 		&self,
 		notebook_number: NotebookNumber,
-	) -> Result<SignedNotebookHeader, ErrorObjectOwned> {
-		let state = self.state.lock().await;
-		state.headers.get(&notebook_number).cloned().ok_or_else(|| {
-			ErrorObjectOwned::owned(-32000, "MockNotary header not set".to_string(), None::<String>)
-		})
+	) -> Result<String, ErrorObjectOwned> {
+		Ok(get_header_url(&self.archive_host, self.notary_id, notebook_number))
 	}
 
-	async fn get_raw_headers(
-		&self,
-		since_notebook: Option<NotebookNumber>,
-		list: Option<Vec<NotebookNumber>>,
-	) -> Result<Vec<(NotebookNumber, Vec<u8>)>, ErrorObjectOwned> {
-		let state = self.state.lock().await;
-
-		Ok(state
-			.headers
-			.iter()
-			.filter_map(|(notebook_number, header)| {
-				if let Some(since_notebook) = since_notebook {
-					if *notebook_number > since_notebook {
-						Some((*notebook_number, header.encode()))
-					} else {
-						None
-					}
-				} else if let Some(list) = &list {
-					if list.contains(notebook_number) {
-						Some((*notebook_number, header.encode()))
-					} else {
-						None
-					}
-				} else {
-					None
-				}
-			})
-			.collect())
-	}
-
-	async fn get(&self, notebook_number: NotebookNumber) -> Result<Notebook, ErrorObjectOwned> {
-		let state = self.state.lock().await;
-		let header = state.headers.get(&notebook_number).cloned().ok_or_else(|| {
-			ErrorObjectOwned::owned(-32000, "MockNotary header not set".to_string(), None::<String>)
-		})?;
-		Ok(Notebook {
-			header: header.header,
-			signature: header.signature,
-			notarizations: Default::default(),
-			hash: H256::random(),
-			new_account_origins: Default::default(),
-		})
-	}
-
-	async fn get_raw_body(
+	async fn get_notebook_download_url(
 		&self,
 		notebook_number: NotebookNumber,
-	) -> Result<Vec<u8>, ErrorObjectOwned> {
-		let result = self.get(notebook_number).await?;
-		Ok(result.encode())
+	) -> Result<String, ErrorObjectOwned> {
+		Ok(get_notebook_url(&self.archive_host, self.notary_id, notebook_number))
 	}
 
 	async fn subscribe_headers(
@@ -266,23 +292,22 @@ impl NotebookRpcServer for MockNotary {
 		subscription_sink: PendingSubscriptionSink,
 	) -> SubscriptionResult {
 		let stream = self.header_channel.1.subscribe(1_000);
+
 		pipe_from_stream_and_drop(subscription_sink, stream, |a| {
+			let a = NotebookSubscriptionBroadcast::build(a, &self.archive_host);
 			SubscriptionMessage::from_json(&a).map_err(Into::into)
 		})
 		.await
 		.map_err(Into::into)
 	}
+}
 
-	async fn subscribe_raw_headers(
-		&self,
-		subscription_sink: PendingSubscriptionSink,
-	) -> SubscriptionResult {
-		let stream = self.header_channel.1.subscribe(1_000);
-		pipe_from_stream_and_drop(subscription_sink, stream, |item| {
-			SubscriptionMessage::from_json(&(item.header.notebook_number, item.encode()))
-				.map_err(Into::into)
-		})
-		.await
-		.map_err(Into::into)
+#[async_trait]
+impl SystemRpcServer for MockNotary {
+	async fn get_archive_base_url(&self) -> Result<String, ErrorObjectOwned> {
+		Ok(self.archive_host.clone())
+	}
+	async fn health(&self) -> Result<(), ErrorObjectOwned> {
+		Ok(())
 	}
 }

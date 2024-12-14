@@ -1,20 +1,24 @@
+use crate::{
+	s3_archive::S3Archive,
+	server::NotebookHeaderInfo,
+	stores::{
+		notebook::{NotebookBytes, NotebookStore},
+		notebook_audit_failure::NotebookAuditFailureStore,
+		notebook_header::NotebookHeaderStore,
+		notebook_status::{NotebookFinalizationStep, NotebookStatusStore},
+		registered_key::RegisteredKeyStore,
+		BoxFutureResult,
+	},
+};
 use argon_notary_apis::error::Error;
 use argon_primitives::{tick::Ticker, AccountId, NotaryId, SignedNotebookHeader};
 use futures::FutureExt;
+use prometheus::Registry;
 use sc_utils::notification::NotificationSender;
 use sp_core::{ed25519, H256};
 use sp_keystore::KeystorePtr;
 use sqlx::{postgres::PgListener, PgPool};
 use tokio::task::JoinHandle;
-
-use crate::stores::{
-	notebook::NotebookStore,
-	notebook_audit_failure::NotebookAuditFailureStore,
-	notebook_header::NotebookHeaderStore,
-	notebook_status::{NotebookFinalizationStep, NotebookStatusStore},
-	registered_key::RegisteredKeyStore,
-	BoxFutureResult,
-};
 
 pub const NOTARY_KEYID: sp_core::crypto::KeyTypeId = sp_core::crypto::KeyTypeId(*b"nota");
 
@@ -25,17 +29,19 @@ pub struct NotebookCloser {
 	pub notary_id: NotaryId,
 	pub operator_account_id: AccountId,
 	pub ticker: Ticker,
+	pub s3_buckets: S3Archive,
+	pub prometheus_registry: Registry,
 }
 
 pub struct FinalizedNotebookHeaderListener {
 	pool: PgPool,
-	completed_notebook_sender: NotificationSender<SignedNotebookHeader>,
+	completed_notebook_sender: NotificationSender<NotebookHeaderInfo>,
 	listener: PgListener,
 }
 impl FinalizedNotebookHeaderListener {
 	pub async fn connect(
 		pool: PgPool,
-		completed_notebook_sender: NotificationSender<SignedNotebookHeader>,
+		completed_notebook_sender: NotificationSender<NotebookHeaderInfo>,
 	) -> anyhow::Result<Self> {
 		let mut listener = PgListener::connect_with(&pool).await?;
 		listener.listen("notebook_finalized").await?;
@@ -49,8 +55,9 @@ impl FinalizedNotebookHeaderListener {
 				NotebookHeaderStore::load_with_signature(&self.pool, notebook_number).await?,
 			Err(e) => return Err(anyhow::anyhow!("Error parsing notified notebook number {:?}", e)),
 		};
+		let hash = header.header.hash();
 
-		self.completed_notebook_sender.notify(|| Ok(header.clone())).map_err(
+		self.completed_notebook_sender.notify(|| Ok((header.clone(), hash))).map_err(
 			|e: anyhow::Error| {
 				anyhow::anyhow!("Error sending completed notebook notification {:?}", e)
 			},
@@ -74,18 +81,28 @@ impl FinalizedNotebookHeaderListener {
 }
 
 type NotebookCloserHandles = (JoinHandle<anyhow::Result<()>>, JoinHandle<anyhow::Result<()>>);
+#[allow(clippy::too_many_arguments)]
 pub fn spawn_notebook_closer(
 	pool: PgPool,
 	notary_id: NotaryId,
 	operator_account_id: AccountId,
 	keystore: KeystorePtr,
 	ticker: Ticker,
-	completed_notebook_sender: NotificationSender<SignedNotebookHeader>,
+	completed_notebook_sender: NotificationSender<NotebookHeaderInfo>,
+	s3_buckets: S3Archive,
+	prometheus_registry: Registry,
 ) -> anyhow::Result<NotebookCloserHandles> {
 	let pool1 = pool.clone();
 	let handle_1 = tokio::spawn(async move {
-		let mut notebook_closer =
-			NotebookCloser { pool: pool1, notary_id, keystore, operator_account_id, ticker };
+		let mut notebook_closer = NotebookCloser {
+			pool: pool1,
+			notary_id,
+			keystore,
+			operator_account_id,
+			ticker,
+			s3_buckets,
+			prometheus_registry,
+		};
 		notebook_closer.create_task().await?;
 		Ok(())
 	});
@@ -165,7 +182,7 @@ impl NotebookCloser {
 
 			let public = RegisteredKeyStore::get_valid_public(&mut *tx, tick).await?;
 
-			NotebookStore::close_notebook(
+			let NotebookBytes { signed_header, notebook } = NotebookStore::close_notebook(
 				&mut tx,
 				notebook_number,
 				tick,
@@ -174,6 +191,9 @@ impl NotebookCloser {
 				&self.keystore,
 			)
 			.await?;
+
+			self.s3_buckets.put_header(notebook_number, signed_header).await?;
+			self.s3_buckets.put_notebook(notebook_number, notebook).await?;
 
 			NotebookStatusStore::next_step(&mut *tx, notebook_number, step).await?;
 			tx.commit().await?;
@@ -264,6 +284,7 @@ mod tests {
 	};
 	use argon_testing::start_argon_test_node;
 
+	use super::*;
 	use crate::{
 		block_watch::spawn_block_sync,
 		notebook_closer::NOTARY_KEYID,
@@ -271,10 +292,7 @@ mod tests {
 		NotaryServer,
 	};
 
-	use super::*;
-
 	#[sqlx::test]
-	#[ignore]
 	async fn test_submitting_votes(pool: PgPool) -> anyhow::Result<()> {
 		let _ = tracing_subscriber::fmt::try_init();
 		let ctx = start_argon_test_node().await;
@@ -291,21 +309,33 @@ mod tests {
 		let mut client = ReconnectingClient::new(vec![ws_url.clone()]);
 		let ticker: Ticker = client.get().await?.lookup_ticker().await?;
 
-		let server = NotaryServer::create_http_server("127.0.0.1:0").await?;
+		let prometheus_registry = Registry::new();
+		let server = NotaryServer::create_http_server(
+			"127.0.0.1:0",
+			Default::default(),
+			prometheus_registry.clone(),
+		)
+		.await?;
 		let addr = server.local_addr()?;
 		let block_tracker =
 			spawn_block_sync(ws_url.clone(), 1, pool.clone(), ticker, Duration::from_millis(100))
 				.await?;
 		let block_tracker = Arc::new(Mutex::new(Some(block_tracker)));
 
+		let (s3_buckets, archive_settings) =
+			S3Archive::rand_minio_test_bucket(notary_id, None).await?;
+
 		let mut notary_server = NotaryServer::start_with(
 			server,
 			notary_id,
 			notary_operator.clone(),
+			archive_settings,
 			ticker,
 			pool.clone(),
+			prometheus_registry.clone(),
 		)
 		.await?;
+
 		let watches = spawn_notebook_closer(
 			pool.clone(),
 			notary_id,
@@ -313,6 +343,8 @@ mod tests {
 			keystore.clone(),
 			ticker,
 			notary_server.completed_notebook_sender.clone(),
+			s3_buckets,
+			prometheus_registry,
 		)?;
 
 		propose_bob_as_notary(&ctx.client.live, notary_key, addr).await?;
@@ -339,10 +371,14 @@ mod tests {
 		.await?;
 
 		// wait for domain finalized
+		let instant = tokio::time::Instant::now();
 		loop {
 			let status = NotebookStatusStore::get(&pool, result.notebook_number).await?;
 			if status.finalized_time.is_some() {
 				break;
+			}
+			if instant.elapsed() > Duration::from_secs(20) {
+				panic!("Should have finalized notebook {}", result.notebook_number);
 			}
 			// yield
 			tokio::time::sleep(tokio::time::Duration::from_millis(50)).await;
@@ -393,7 +429,7 @@ mod tests {
 			tokio::select! {biased;
 				next_header = header_sub.next() => {
 					match next_header {
-						Some(SignedNotebookHeader{ header, ..}) => {
+						Some((SignedNotebookHeader{ header, ..}, _)) => {
 							println!("Header complete {}", header.notebook_number);
 							if header.notebook_number == hold_result.notebook_number {
 								notebook_proof = Some(
@@ -438,41 +474,20 @@ mod tests {
 				.await?
 		);
 
-		let mut attempts = 0;
-		let best_grandparent = {
-			loop {
-				match ctx.client.get_vote_block_hash(ticker.current()).await.ok() {
-					Some((grandparent_block, _)) => {
-						println!(
-							"Voting for grandparent {:?}. Current tick {}",
-							grandparent_block,
-							ticker.current()
-						);
-						break grandparent_block;
-					},
-					// wait a second
-					None => {
-						println!(
-							"No grandparents found. Waiting. Runtime tick={}",
-							ticker.current()
-						);
-						if attempts > 5 {
-							panic!("Should have found a grandparent");
-						}
-						attempts += 1;
-						tokio::time::sleep(ticker.duration_to_next_tick()).await
-					},
-				}
-			}
-		};
-
 		let vote_power = (hold_note.microgons as f64 * 0.2f64) as u128;
 
 		let mut channel_hold_result = None;
-		for _ in 0..2 {
+		for _ in 0..5 {
+			let vote_tick = ticker.current();
+			let Ok((best_grandparent, _)) = ctx.client.get_vote_block_hash(vote_tick).await else {
+				println!("No vote block hash for tick {}. Waiting", vote_tick);
+				tokio::time::sleep(Duration::from_millis(100)).await;
+				continue;
+			};
 			match settle_channel_hold_and_vote(
 				&pool,
 				&ticker,
+				vote_tick,
 				hold_note.clone(),
 				best_grandparent,
 				BalanceProof {
@@ -844,6 +859,7 @@ mod tests {
 	async fn settle_channel_hold_and_vote(
 		pool: &PgPool,
 		ticker: &Ticker,
+		vote_tick: Tick,
 		hold_note: Note,
 		vote_block_hash: HashOutput,
 		bob_balance_proof: BalanceProof,
@@ -902,7 +918,7 @@ mod tests {
 			vec![BlockVote {
 				account_id: Alice.to_account_id(),
 				index: 1,
-				tick: ticker.current(),
+				tick: vote_tick,
 				block_hash: vote_block_hash,
 				power: tax,
 				block_rewards_account_id: Alice.to_account_id(),
