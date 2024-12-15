@@ -1,5 +1,6 @@
 use sc_service::{ChainType, Properties};
 use sp_core::sr25519;
+use std::env;
 
 use crate::chain_spec::{
 	authority_keys_from_seed, get_account_id_from_seed, testnet_genesis, ChainSpec, GenesisSettings,
@@ -17,7 +18,7 @@ pub fn development_config() -> Result<ChainSpec, String> {
 	properties.insert("tokenSymbol".into(), ARGON_TOKEN_SYMBOL.into());
 	properties.insert("ss58Format".into(), ADDRESS_PREFIX.into());
 
-	const HASHES_PER_SECOND: u64 = 200;
+	let hashes_per_second: u64 = if env::var("CI").is_ok() { 50 } else { 200 };
 	const TICK_MILLIS: u64 = 2000;
 
 	Ok(ChainSpec::builder(
@@ -43,7 +44,7 @@ pub fn development_config() -> Result<ChainSpec, String> {
 			(get_account_id_from_seed::<sr25519::Public>("Dave"), 100_000_000_000),
 		],
 		initial_vote_minimum: 1_000,
-		initial_difficulty: (TICK_MILLIS * HASHES_PER_SECOND / 1_000) as ComputeDifficulty,
+		initial_difficulty: (TICK_MILLIS * hashes_per_second / 1_000) as ComputeDifficulty,
 		tick_millis: TICK_MILLIS,
 		initial_notaries: vec![], // No notaries
 		channel_hold_expiration_ticks: 2,
