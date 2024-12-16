@@ -808,7 +808,7 @@ checksum = "69f7f8c3906b62b754cd5326047894316021dcfe5a194c8ea52bdd94934a3457"
 
 [[package]]
 name = "argon-bitcoin"
-version = "0.0.21"
+version = "0.0.22"
 dependencies = [
  "anyhow",
  "argon-primitives",
@@ -836,7 +836,7 @@ dependencies = [
 
 [[package]]
 name = "argon-bitcoin-cli"
-version = "0.0.21"
+version = "0.0.22"
 dependencies = [
  "age",
  "anyhow",
@@ -864,7 +864,7 @@ dependencies = [
 
 [[package]]
 name = "argon-bitcoin-cli-macros"
-version = "0.0.21"
+version = "0.0.22"
 dependencies = [
  "proc-macro2",
  "quote",
@@ -873,7 +873,7 @@ dependencies = [
 
 [[package]]
 name = "argon-bitcoin-utxo-tracker"
-version = "0.0.21"
+version = "0.0.22"
 dependencies = [
  "anyhow",
  "argon-bitcoin",
@@ -899,7 +899,7 @@ dependencies = [
 
 [[package]]
 name = "argon-canary-runtime"
-version = "0.0.21"
+version = "0.0.22"
 dependencies = [
  "argon-runtime",
  "substrate-wasm-builder",
@@ -907,7 +907,7 @@ dependencies = [
 
 [[package]]
 name = "argon-client"
-version = "0.0.21"
+version = "0.0.22"
 dependencies = [
  "anyhow",
  "argon-primitives",
@@ -934,7 +934,7 @@ dependencies = [
 
 [[package]]
 name = "argon-localchain"
-version = "0.0.21"
+version = "0.0.22"
 dependencies = [
  "anyhow",
  "argon-client",
@@ -986,7 +986,7 @@ dependencies = [
 
 [[package]]
 name = "argon-node"
-version = "0.0.21"
+version = "0.0.22"
 dependencies = [
  "argon-bitcoin-utxo-tracker",
  "argon-canary-runtime",
@@ -1059,7 +1059,7 @@ dependencies = [
 
 [[package]]
 name = "argon-node-consensus"
-version = "0.0.21"
+version = "0.0.22"
 dependencies = [
  "anyhow",
  "argon-bitcoin-utxo-tracker",
@@ -1121,7 +1121,7 @@ dependencies = [
 
 [[package]]
 name = "argon-notary"
-version = "0.0.21"
+version = "0.0.22"
 dependencies = [
  "anyhow",
  "argon-client",
@@ -1175,7 +1175,7 @@ dependencies = [
 
 [[package]]
 name = "argon-notary-apis"
-version = "0.0.21"
+version = "0.0.22"
 dependencies = [
  "anyhow",
  "argon-notary-audit",
@@ -1197,7 +1197,7 @@ dependencies = [
 
 [[package]]
 name = "argon-notary-audit"
-version = "0.0.21"
+version = "0.0.22"
 dependencies = [
  "anyhow",
  "argon-primitives",
@@ -1216,7 +1216,7 @@ dependencies = [
 
 [[package]]
 name = "argon-oracle"
-version = "0.0.21"
+version = "0.0.22"
 dependencies = [
  "alloy-eips",
  "alloy-primitives 0.8.14",
@@ -1260,7 +1260,7 @@ dependencies = [
 
 [[package]]
 name = "argon-primitives"
-version = "0.0.21"
+version = "0.0.22"
 dependencies = [
  "anyhow",
  "async-trait",
@@ -1298,7 +1298,7 @@ dependencies = [
 
 [[package]]
 name = "argon-randomx"
-version = "0.0.21"
+version = "0.0.22"
 dependencies = [
  "bindgen 0.70.1",
  "cmake",
@@ -1315,7 +1315,7 @@ dependencies = [
 
 [[package]]
 name = "argon-runtime"
-version = "0.0.21"
+version = "0.0.22"
 dependencies = [
  "anyhow",
  "argon-primitives",
@@ -1384,7 +1384,7 @@ dependencies = [
 
 [[package]]
 name = "argon-testing"
-version = "0.0.21"
+version = "0.0.22"
 dependencies = [
  "anyhow",
  "argon-client",
@@ -1413,7 +1413,7 @@ dependencies = [
 
 [[package]]
 name = "argon-testing-bitcoin"
-version = "0.0.21"
+version = "0.0.22"
 dependencies = [
  "bitcoind",
 ]
@@ -4092,7 +4092,7 @@ dependencies = [
 
 [[package]]
 name = "end-to-end"
-version = "0.0.21"
+version = "0.0.22"
 dependencies = [
  "anyhow",
  "argon-bitcoin",
@@ -9096,7 +9096,7 @@ dependencies = [
 
 [[package]]
 name = "pallet-bitcoin-utxos"
-version = "0.0.21"
+version = "0.0.22"
 dependencies = [
  "argon-primitives",
  "env_logger 0.11.5",
@@ -9114,7 +9114,7 @@ dependencies = [
 
 [[package]]
 name = "pallet-block-rewards"
-version = "0.0.21"
+version = "0.0.22"
 dependencies = [
  "argon-primitives",
  "env_logger 0.11.5",
@@ -9133,7 +9133,7 @@ dependencies = [
 
 [[package]]
 name = "pallet-block-seal"
-version = "0.0.21"
+version = "0.0.22"
 dependencies = [
  "argon-notary-audit",
  "argon-primitives",
@@ -9155,7 +9155,7 @@ dependencies = [
 
 [[package]]
 name = "pallet-block-seal-spec"
-version = "0.0.21"
+version = "0.0.22"
 dependencies = [
  "argon-primitives",
  "env_logger 0.11.5",
@@ -9174,7 +9174,7 @@ dependencies = [
 
 [[package]]
 name = "pallet-bond"
-version = "0.0.21"
+version = "0.0.22"
 dependencies = [
  "argon-bitcoin",
  "argon-primitives",
@@ -9196,7 +9196,7 @@ dependencies = [
 
 [[package]]
 name = "pallet-chain-transfer"
-version = "0.0.21"
+version = "0.0.22"
 dependencies = [
  "argon-notary-audit",
  "argon-primitives",
@@ -9219,7 +9219,7 @@ dependencies = [
 
 [[package]]
 name = "pallet-digests"
-version = "0.0.21"
+version = "0.0.22"
 dependencies = [
  "argon-notary-audit",
  "argon-primitives",
@@ -9239,7 +9239,7 @@ dependencies = [
 
 [[package]]
 name = "pallet-domains"
-version = "0.0.21"
+version = "0.0.22"
 dependencies = [
  "argon-primitives",
  "env_logger 0.11.5",
@@ -9365,7 +9365,7 @@ dependencies = [
 
 [[package]]
 name = "pallet-mining-slot"
-version = "0.0.21"
+version = "0.0.22"
 dependencies = [
  "argon-primitives",
  "env_logger 0.11.5",
@@ -9385,7 +9385,7 @@ dependencies = [
 
 [[package]]
 name = "pallet-mint"
-version = "0.0.21"
+version = "0.0.22"
 dependencies = [
  "argon-primitives",
  "env_logger 0.11.5",
@@ -9421,7 +9421,7 @@ dependencies = [
 
 [[package]]
 name = "pallet-notaries"
-version = "0.0.21"
+version = "0.0.22"
 dependencies = [
  "argon-primitives",
  "env_logger 0.11.5",
@@ -9440,7 +9440,7 @@ dependencies = [
 
 [[package]]
 name = "pallet-notebook"
-version = "0.0.21"
+version = "0.0.22"
 dependencies = [
  "argon-notary-audit",
  "argon-primitives",
@@ -9479,7 +9479,7 @@ dependencies = [
 
 [[package]]
 name = "pallet-price-index"
-version = "0.0.21"
+version = "0.0.22"
 dependencies = [
  "argon-primitives",
  "env_logger 0.11.5",
@@ -9551,7 +9551,7 @@ dependencies = [
 
 [[package]]
 name = "pallet-ticks"
-version = "0.0.21"
+version = "0.0.22"
 dependencies = [
  "argon-primitives",
  "env_logger 0.11.5",
@@ -9694,7 +9694,7 @@ dependencies = [
 
 [[package]]
 name = "pallet-vaults"
-version = "0.0.21"
+version = "0.0.22"
 dependencies = [
  "argon-bitcoin",
  "argon-primitives",
@@ -16496,7 +16496,7 @@ dependencies = [
 
 [[package]]
 name = "uniffi-bindgen-cli"
-version = "0.0.21"
+version = "0.0.22"
 dependencies = [
  "uniffi",
 ]
