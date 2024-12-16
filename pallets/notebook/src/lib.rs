@@ -24,9 +24,9 @@ pub mod pallet {
 	use codec::alloc::string::ToString;
 	use frame_support::{pallet_prelude::*, DefaultNoBound};
 	use frame_system::pallet_prelude::*;
-	use log::info;
 	use sp_core::{crypto::AccountId32, H256};
 	use sp_runtime::traits::Block as BlockT;
+	use tracing::{info, trace, warn};
 
 	use super::*;
 	use argon_notary_audit::{notebook_verify, AccountHistoryLookupError, NotebookHistoryLookup};
@@ -207,7 +207,11 @@ pub mod pallet {
 			notebooks: Vec<SignedNotebookHeader>,
 		) -> DispatchResult {
 			ensure_none(origin)?;
-			info!("Notebook inherent submitted with {} notebooks", notebooks.len());
+			info!(
+				notebooks = notebooks.len(),
+				is_duplicated = InherentIncluded::<T>::get(),
+				"Notebook inherent submitted",
+			);
 
 			ensure!(!InherentIncluded::<T>::get(), Error::<T>::MultipleNotebookInherentsProvided);
 
@@ -232,6 +236,13 @@ pub mod pallet {
 				let notebook_number = header.notebook_number;
 				let notary_id = header.notary_id;
 
+				trace!(
+					?notebook_number,
+					?notary_id,
+					locked = Self::is_notary_locked_at_tick(notary_id, header.tick),
+					"Processing notebook",
+				);
+
 				ensure!(
 					!Self::is_notary_locked_at_tick(notary_id, header.tick),
 					Error::<T>::NotebookSubmittedForLockedNotary
@@ -255,11 +266,22 @@ pub mod pallet {
 					header_hash,
 					&notebook_digest,
 					header.parent_secret,
-				)?;
+				)
+				.inspect_err(|e| {
+					warn!(?notebook_number, ?notary_id, ?e, "Notebook audit failed",);
+				})?;
 
 				// Failure cases: all based on notebooks not in order of runtime state; controllable
 				// by node
-				Self::verify_notebook_order(&header)?;
+				Self::verify_notebook_order(&header).inspect_err(|e| {
+					warn!(
+						?notebook_number,
+						?notary_id,
+						?e,
+						"Notebook order verification failed for notary",
+					);
+				})?;
+
 				// Failure case: invalid signature is not possible without bypassing audit
 				ensure!(
 					T::NotaryProvider::verify_signature(
@@ -277,6 +299,12 @@ pub mod pallet {
 
 					Self::process_notebook(header);
 				}
+				trace!(
+					?notary_id,
+					?notebook_number,
+					did_pass_audit,
+					"Notebook processing complete",
+				);
 			}
 
 			<BlockNotebooks<T>>::put(notebook_digest);
@@ -576,7 +604,7 @@ pub mod pallet {
 					.into_iter()
 					.map(|audit_summary| {
 						audit_summary.try_into().map_err(|_| {
-							log::warn!(
+							warn!(
 
 								"Notebook audit failed to decode for notary {notary_id}, notebook {notebook_number}"
 							);
@@ -628,7 +656,7 @@ pub mod pallet {
 			);
 
 			let notebook = Notebook::decode(&mut bytes.as_ref()).map_err(|e| {
-				log::warn!(
+				warn!(
 
 					"Notebook audit failed to decode for notary {notary_id}, notebook {notebook_number}: {:?}", e.to_string()
 				);

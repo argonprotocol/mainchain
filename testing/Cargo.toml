@@ -12,7 +12,7 @@ publish = false
 
 [dependencies]
 argon-client = { workspace = true }
-tracing = { workspace = true }
+tracing = { workspace = true, features = ["default"] }
 subxt = { workspace = true }
 anyhow = { workspace = true, features = ["default"] }
 bitcoind = { workspace = true }
@@ -33,3 +33,4 @@ current_platform = { workspace = true }
 tokio = { workspace = true }
 num_cpus = { workspace = true }
 regex = { workspace = true }
+uuid = { workspace = true, features = ["v4"] }

@@ -229,6 +229,7 @@ pub mod pallet {
 				IsNextSlotBiddingOpen::<T>::put(true);
 			}
 			MiningConfig::<T>::put(self.mining_config.clone());
+			OwnershipBondAmount::<T>::put(T::MinimumBondAmount::get());
 		}
 	}
 

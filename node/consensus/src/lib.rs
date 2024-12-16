@@ -38,7 +38,7 @@ pub mod error;
 pub mod import_queue;
 pub(crate) mod notary_client;
 pub(crate) mod notebook_sealer;
-pub use notary_client::{run_notary_sync, NotaryClient};
+pub use notary_client::{run_notary_sync, NotaryClient, NotebookDownloader};
 
 use crate::{compute_worker::ComputeState, notebook_sealer::create_vote_seal};
 pub use import_queue::create_import_queue;

@@ -37,7 +37,7 @@ hex = { workspace = true, features = ["default"] }
 sp-runtime = { workspace = true, features = ["default"] }
 sp-core = { workspace = true, features = ["default", "serde"] }
 binary-merkle-tree = { workspace = true, features = ["default"] }
-tracing = { workspace = true }
+tracing = { workspace = true, features = ["default"] }
 tracing-subscriber = { workspace = true }
 sqlx = { workspace = true, features = ["runtime-tokio", "sqlite", "chrono"] }
 chrono = { workspace = true }
@@ -54,7 +54,8 @@ argon-notary-apis = { workspace = true }
 argon-notary-audit = { workspace = true, features = ["default"] }
 uniffi = { workspace = true, optional = true }
 jsonrpsee = { workspace = true }
-
+reqwest = { workspace = true }
+regex = { workspace = true }
 
 [dev-dependencies]
 frame-support = { workspace = true }
@@ -62,6 +63,7 @@ sp-keyring = { workspace = true }
 argon-testing = { workspace = true }
 sc-utils = { workspace = true }
 argon-notary = { workspace = true }
+axum = { workspace = true }
 
 [build-dependencies]
 napi-build = { workspace = true }

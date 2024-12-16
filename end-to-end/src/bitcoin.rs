@@ -173,14 +173,7 @@ async fn test_bitcoin_minting_e2e() {
 	add_blocks(bitcoind, 5, &block_creator);
 	let vote_miner = Eve;
 	let vote_miner_account = vote_miner.to_account_id();
-	let miner_node = ArgonTestNode::start_with_bitcoin_rpc(
-		"eve",
-		0,
-		&test_node.boot_url,
-		test_node.bitcoin_rpc_url.clone().unwrap(),
-	)
-	.await
-	.unwrap();
+	let miner_node = test_node.fork_node("eve", 0).await.unwrap();
 	// start miners so that we have ownership tokens to mint against
 	bankroll_miners(&test_node, &alice_signer, vec![vote_miner_account.clone()], true)
 		.await

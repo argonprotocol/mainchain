@@ -4,7 +4,7 @@ use std::{
 	io::{BufRead, BufReader, Read},
 	sync::{Arc, Mutex},
 };
-use tokio::{sync::watch, task};
+use tokio::{sync::watch, task, time::timeout};
 
 #[derive(Clone)]
 pub struct LogWatcher {
@@ -26,6 +26,7 @@ impl LogWatcher {
 				match line {
 					Ok(line) => {
 						{
+							println!("{}", line);
 							let mut log_guard = log_clone.lock().unwrap();
 							log_guard.push_str(&line);
 							log_guard.push('\n');
@@ -54,24 +55,8 @@ impl LogWatcher {
 		let mut log_receiver = self.log_receiver.clone(); // Watch receiver for updates
 
 		loop {
-			// Check the current log for matches
-			{
-				let log_guard = self.log.lock().unwrap();
-				let matches = regex.captures(&log_guard);
-				if let Some(matches) = matches {
-					if matches.len() >= count {
-						let mut results = Vec::new();
-						for (i, m) in matches.iter().enumerate() {
-							if i == 0 {
-								continue;
-							}
-							if let Some(m) = m {
-								results.push(m.as_str().to_string());
-							}
-						}
-						return Ok(results);
-					}
-				}
+			if let Some(results) = self.matches(&regex, count) {
+				return Ok(results);
 			}
 
 			// Wait for the next log update or timeout
@@ -79,5 +64,35 @@ impl LogWatcher {
 				bail!("Log watcher closed");
 			}
 		}
+	}
+
+	pub async fn wait_for_log_for_secs(
+		&self,
+		pattern: &str,
+		count: usize,
+		secs: u64,
+	) -> anyhow::Result<Vec<String>> {
+		timeout(std::time::Duration::from_secs(secs), self.wait_for_log(pattern, count))
+			.await
+			.map_err(|_| anyhow::anyhow!("Timeout waiting for log"))?
+	}
+
+	// Check the current log for matches
+	pub fn matches(&self, regex: &Regex, count: usize) -> Option<Vec<String>> {
+		let log_guard = self.log.lock().unwrap();
+		let matches = regex.captures(&log_guard)?;
+		if matches.len() >= count {
+			let mut results = Vec::new();
+			for (i, m) in matches.iter().enumerate() {
+				if i == 0 {
+					continue;
+				}
+				if let Some(m) = m {
+					results.push(m.as_str().to_string());
+				}
+			}
+			return Some(results);
+		}
+		None
 	}
 }

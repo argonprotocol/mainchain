@@ -194,6 +194,24 @@ impl NotebookHeaderStore {
 			finalized_notebook_number: record.notebook_number as NotebookNumber,
 		})
 	}
+
+	pub async fn get_hash(
+		db: &mut PgConnection,
+		notebook_number: NotebookNumber,
+	) -> anyhow::Result<H256, Error> {
+		let row = sqlx::query_scalar!(
+			"SELECT hash FROM notebook_headers WHERE hash IS NOT NULL AND notebook_number = $1 LIMIT 1",
+			notebook_number as i32
+		)
+		.fetch_one(db)
+		.await?;
+		if let Some(row) = row {
+			Ok(H256::from_slice(row.as_slice()))
+		} else {
+			Err(Error::Database("Notebook header not found".to_string()))
+		}
+	}
+
 	pub async fn load<'a>(
 		db: impl sqlx::PgExecutor<'a> + 'a,
 		notebook_number: NotebookNumber,
@@ -212,61 +230,12 @@ impl NotebookHeaderStore {
 		record.try_into()
 	}
 
-	pub async fn load_raw_signed_headers<'a>(
+	pub async fn load_raw_header<'a>(
 		db: impl sqlx::PgExecutor<'a> + 'a,
-		since_notebook: Option<NotebookNumber>,
-		or_specific_notebooks: Option<Vec<NotebookNumber>>,
-	) -> anyhow::Result<Vec<(NotebookNumber, Vec<u8>)>, Error> {
-		let records = if let Some(notebook_number) = since_notebook {
-			sqlx::query_as!(
-				NotebookHeaderRow,
-				r#"
-				SELECT *
-				FROM notebook_headers WHERE notebook_number = $1
-				AND signature IS NOT NULL
-				"#,
-				notebook_number as i32
-			)
-			.fetch_all(db)
-			.await?
-		} else if let Some(or_specific_notebooks) = or_specific_notebooks {
-			let notebook_numbers =
-				or_specific_notebooks.into_iter().map(|a| a as i32).collect::<Vec<_>>();
-			sqlx::query_as!(
-				NotebookHeaderRow,
-				r#"
-				SELECT *
-				FROM notebook_headers
-				WHERE notebook_number = ANY($1)
-				AND signature IS NOT NULL
-				ORDER BY notebook_number ASC
-				"#,
-				&notebook_numbers
-			)
-			.fetch_all(db)
-			.await?
-		} else {
-			return Err(Error::InternalError(
-				"Must provide either since_notebook or or_specific_notebooks".to_string(),
-			));
-		};
-
-		let mut headers = Vec::new();
-		for record in records {
-			let notebook_number = record.notebook_number as u32;
-			let bytes: [u8; 64] = record
-				.signature
-				.clone()
-				.unwrap_or_default()
-				.try_into()
-				.map_err(|_| Error::UnsignedNotebookHeader)?;
-			let signature = NotarySignature::from_raw(bytes);
-			let header: NotebookHeader = record.try_into()?;
-			let signed_header = SignedNotebookHeader { header, signature };
-			headers.push((notebook_number, signed_header.encode()));
-		}
-
-		Ok(headers)
+		notebook_number: NotebookNumber,
+	) -> anyhow::Result<Vec<u8>, Error> {
+		let signed_header = Self::load_with_signature(db, notebook_number).await?;
+		Ok(signed_header.encode())
 	}
 
 	pub async fn load_with_signature<'a>(

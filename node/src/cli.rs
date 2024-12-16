@@ -39,6 +39,13 @@ pub struct ArgonRunCmd {
 	/// - Secure: use secure memory for the randomx dataset (default inactive)
 	#[arg(long, verbatim_doc_comment)]
 	pub compute_flags: Vec<RandomxFlag>,
+
+	/// The archive hosts to download notary notebooks from if a notary is unavailable. You are
+	/// free to use a hosted service, or download a registry to your local machine.
+	///
+	/// Should be a list of base URL hosts (eg, https://archives.argonprotocol.org).
+	#[arg(long, verbatim_doc_comment)]
+	pub notebook_archive_hosts: Vec<String>,
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, ValueEnum)]

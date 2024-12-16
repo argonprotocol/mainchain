@@ -64,6 +64,10 @@ pub enum Error {
 
 	#[error("Notary error: {0}")]
 	NotaryError(String),
+	#[error("Notary archive error: {0}")]
+	NotaryArchiveError(String),
+	#[error("A block could not be verified because a notary could not be synchronized with. {0}")]
+	UnableToSyncNotary(String),
 
 	#[error("Notary sync missing notebook dependencies: {0}")]
 	MissingNotebooksError(String),

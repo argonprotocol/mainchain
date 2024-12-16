@@ -2,8 +2,8 @@ use crate::mainchain_client::MainchainClient;
 use crate::{bail, AccountStore, Error, Result};
 use anyhow::anyhow;
 use argon_notary_apis::localchain::{BalanceChangeResult, BalanceTipResult};
-use argon_notary_apis::LocalchainRpcClient;
 use argon_notary_apis::NotebookRpcClient;
+use argon_notary_apis::{download_notebook_header, LocalchainRpcClient};
 use argon_primitives::{
   AccountId, AccountOrigin, AccountType, BalanceProof, BalanceTip, Notarization, NotebookNumber,
   SignedNotebookHeader,
@@ -258,7 +258,7 @@ impl NotaryClient {
 
     if has_seen_notebook {
       let client = self.client.read().await;
-      let header = (*client).get_header(notebook_number).await?;
+      let header = download_notebook_header(&client, notebook_number).await?;
       if self.auto_verify_header_signatures {
         self.verify_header(&header)?;
       }
@@ -270,17 +270,19 @@ impl NotaryClient {
       let subscription = (*client).subscribe_headers().await?;
       subscription.into_stream()
     };
-    while let Some(header) = subscription_stream.next().await {
-      let header = header?;
+    while let Some(download_info) = subscription_stream.next().await {
+      let download_info = download_info?;
       self
         .last_metadata
         .write()
         .await
         .replace(argon_primitives::NotebookMeta {
-          finalized_tick: header.header.tick,
-          finalized_notebook_number: header.header.notebook_number,
+          finalized_tick: download_info.tick,
+          finalized_notebook_number: download_info.notebook_number,
         });
-      if header.header.notebook_number == notebook_number {
+      if download_info.notebook_number == notebook_number {
+        let client = self.client.read().await;
+        let header = download_notebook_header(&client, notebook_number).await?;
         if self.auto_verify_header_signatures {
           self.verify_header(&header)?;
         }

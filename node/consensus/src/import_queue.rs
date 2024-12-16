@@ -168,7 +168,8 @@ where
 		// audits
 		let latest_verified_finalized = self.client.info().finalized_number;
 		if block_params.origin != BlockOrigin::Own &&
-			block_params.header.number() > &latest_verified_finalized
+			block_params.header.number() > &latest_verified_finalized &&
+			!block_params.finalized
 		{
 			let digest_notebooks = self
 				.client
@@ -253,7 +254,7 @@ pub fn create_import_queue<C, B, I, AC>(
 	notary_client: Arc<NotaryClient<B, C, AC>>,
 	block_import: I,
 	spawner: &impl sp_core::traits::SpawnEssentialNamed,
-	registry: Option<&substrate_prometheus_endpoint::Registry>,
+	registry: Option<&prometheus_endpoint::Registry>,
 	telemetry: Option<TelemetryHandle>,
 	utxo_tracker: Arc<UtxoTracker>,
 ) -> (BasicQueue<B>, ArgonBlockImport<B, I, C, AC>)

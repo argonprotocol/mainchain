@@ -7,6 +7,15 @@ DBPATH=postgres://postgres:password@localhost:5432/notary
 # create array of validators
 validators=(alice bob dave)
 
+# Check if minio is active on port 9000
+if ! nc -z localhost 9000; then
+  echo "Minio is not running on port 9000. Please start minio and try again."
+  exit 1
+fi
+
+# Create a minio bucket name
+BUCKET_NAME="notary-$(date +%s)"
+NOTEBOOK_ARCHIVE="http://127.0.0.1:9000/$BUCKET_NAME"
 
 set -x  # Print commands and their arguments as they are executed
 dropdb --if-exists -f notary;
@@ -57,6 +66,7 @@ export argon_LOCAL_TESTNET_NOTARY_URL="wss://$argon_LOCAL_TESTNET_NOTARY_URL"
 for i in {0..2} ; do
   "$BASEDIR/target/debug/argon-node" --tmp \
     --"${validators[$i]}" --detailed-log-output --chain local --name="${validators[$i]}" \
+    --notebook-archive-hosts="$NOTEBOOK_ARCHIVE" \
     --rpc-port=994$((i+4)) --port 3033$((i+4)) --compute-miners 1 \
     --pruning=archive -lRUST_LOG=info,argon=info,ismp=trace \
     --unsafe-force-node-key-generation --unsafe-rpc-external --rpc-methods=unsafe \
@@ -78,7 +88,13 @@ done
 
 "$BASEDIR/target/debug/argon-notary" migrate --db-url ${DBPATH};
 
-RUST_LOG=info "$BASEDIR/target/debug/argon-notary" run --operator-address=5CiPPseXPECbkjWCa6MnjNokrgYjMqmKndv2rSnekmSK2DjL --db-url ${DBPATH} -t ws://127.0.0.1:9944 --keystore-path /tmp/notary_keystore -b "0.0.0.0:9925" &
+# use dev to create the archive bucket for us
+RUST_LOG=info "$BASEDIR/target/debug/argon-notary" run \
+  --operator-address=5CiPPseXPECbkjWCa6MnjNokrgYjMqmKndv2rSnekmSK2DjL --db-url ${DBPATH} -t ws://127.0.0.1:9944 \
+  --keystore-path /tmp/notary_keystore \
+  --archive-bucket "$BUCKET_NAME" \
+  --dev \
+  -b "0.0.0.0:9925" &
 
 echo -e "Starting a bitcoin oracle...\n\n"
 "$BASEDIR/target/debug/argon-oracle" insert-key --crypto-type=sr25519 --keystore-path /tmp/bitcoin_keystore --suri //Dave

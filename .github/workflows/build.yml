@@ -358,7 +358,18 @@ jobs:
           --health-retries 5
         ports:
           - 5432:5432
-
+      minio:
+        image: minio/minio
+        env:
+          MINIO_ACCESS_KEY: minioadmin
+          MINIO_SECRET_KEY: minioadmin
+        ports:
+          - 9000:9000
+        options: >-
+          --health-cmd "curl -f http://localhost:9000/minio/health/live"
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 5
     runs-on: ${{ matrix.os }}
     steps:
       - uses: actions/checkout@v4

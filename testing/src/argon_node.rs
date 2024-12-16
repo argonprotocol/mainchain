@@ -5,7 +5,16 @@ use bitcoind::{bitcoincore_rpc::Auth, BitcoinD};
 use lazy_static::lazy_static;
 use sp_core::{crypto::KeyTypeId, ed25519, Pair};
 use sp_keyring::Sr25519Keyring;
-use std::{env, process, process::Command, str::FromStr};
+use std::{
+	env,
+	fs::{create_dir_all, remove_dir_all},
+	path::PathBuf,
+	process,
+	process::Command,
+	str::FromStr,
+	thread,
+	time::{Duration, SystemTime, UNIX_EPOCH},
+};
 use subxt::backend::rpc::RpcParams;
 use url::Url;
 
@@ -18,11 +27,89 @@ pub struct ArgonTestNode {
 	proc: Option<process::Child>,
 	pub client: MainchainClient,
 	pub bitcoind: Option<BitcoinD>,
-	pub bitcoin_rpc_url: Option<Url>,
 	pub account_id: AccountId,
 	pub author_keyring_name: String,
 	pub boot_url: String,
 	pub log_watcher: LogWatcher,
+	pub start_args: ArgonNodeStartArgs,
+}
+
+#[derive(Clone, Debug)]
+pub struct ArgonNodeStartArgs {
+	pub target_dir: PathBuf,
+	pub rpc_port: u16,
+	pub bootnodes: String,
+	pub base_data_path: PathBuf,
+	pub rust_log: String,
+	pub authority: String,
+	pub compute_miners: u16,
+	pub bitcoin_rpc: String,
+	pub notebook_archive_urls: Vec<String>,
+}
+
+impl ArgonNodeStartArgs {
+	pub fn bitcoin_rpc_url(&self) -> anyhow::Result<Url> {
+		Url::parse(&self.bitcoin_rpc).map_err(|e| anyhow::anyhow!(e))
+	}
+
+	pub fn get_temp_dir() -> anyhow::Result<PathBuf> {
+		let thread_id = format!("{:?}", thread::current().id())
+			.replace("ThreadId(", "")
+			.replace(")", "");
+		let unique_name = format!(
+			"test_dir_{}_{:?}",
+			SystemTime::now().duration_since(UNIX_EPOCH)?.as_millis(),
+			thread_id
+		);
+		let base_dir = env::temp_dir().join("argon_node").join(unique_name);
+		create_dir_all(base_dir.clone())?;
+		Ok(base_dir)
+	}
+
+	pub fn get_account_id(&self) -> AccountId {
+		let keyring = Sr25519Keyring::from_str(&self.authority).expect("Invalid authority");
+		keyring.to_account_id()
+	}
+
+	pub fn new(authority: &str, compute_miners: u16, bootnodes: &str) -> anyhow::Result<Self> {
+		let target_dir = get_target_dir();
+
+		let overall_log = env::var("RUST_LOG").unwrap_or("info".to_string());
+
+		let node_log = "info";
+
+		let rust_log = format!(
+			"{},node={},runtime=info,pallet=info,argon=trace,sc_rpc_server=info",
+			overall_log, node_log,
+		);
+
+		Ok(Self {
+			target_dir,
+			rust_log,
+			base_data_path: Self::get_temp_dir()?,
+			bootnodes: bootnodes.to_string(),
+			compute_miners,
+			bitcoin_rpc: "".to_string(),
+			authority: authority.to_lowercase().to_string(),
+			rpc_port: 0,
+			notebook_archive_urls: vec![],
+		})
+	}
+
+	pub fn with_bitcoin_url(
+		authority: &str,
+		compute_miners: u16,
+		bootnodes: &str,
+		bitcoin_rpc: Url,
+	) -> anyhow::Result<Self> {
+		let args = Self::new(authority, compute_miners, bootnodes)?;
+		println!(
+			"Starting argon-node with bitcoin rpc url: {} at {}",
+			bitcoin_rpc,
+			args.target_dir.display()
+		);
+		Ok(args)
+	}
 }
 
 impl Drop for ArgonTestNode {
@@ -30,6 +117,7 @@ impl Drop for ArgonTestNode {
 		if let Some(mut proc) = self.proc.take() {
 			let _ = proc.kill();
 		}
+		remove_dir_all(self.start_args.base_data_path.clone()).unwrap();
 		if let Some(mut bitcoind) = self.bitcoind.take() {
 			let _ = bitcoind.stop();
 		}
@@ -41,60 +129,63 @@ lazy_static! {
 	static ref CONTEXT_LOCK: std::sync::Mutex<()> = std::sync::Mutex::new(());
 }
 impl ArgonTestNode {
-	pub async fn start_with_bitcoin_rpc(
-		authority: &str,
-		compute_miners: u16,
-		bootnodes: &str,
-		bitcoin_rpc: Url,
-	) -> anyhow::Result<Self> {
-		let target_dir = get_target_dir();
+	/// Restart the node with the same rpc port. NOTE: does not currently support the p2p address
+	/// too
+	///
+	/// If you want to add that, you need to capture the boot url, and also probably use
+	/// pre-generated libp2p nodeIds.
+	pub async fn restart(&mut self, wait_duration: Duration) -> anyhow::Result<()> {
+		self.log_watcher.close();
+		self.proc.take().unwrap().kill()?;
+		tokio::time::sleep(wait_duration).await;
+		let (proc, log_watcher) = Self::start_process(&mut self.start_args).await?;
+		self.proc = Some(proc);
+		self.log_watcher = log_watcher;
+		self.client = MainchainClient::from_url(self.client.url.as_str()).await?;
+		Ok(())
+	}
 
-		println!(
-			"Starting argon-node with bitcoin rpc url: {} at {}",
-			bitcoin_rpc,
-			target_dir.display()
-		);
-		let overall_log = env::var("RUST_LOG").unwrap_or("info".to_string());
-		let mut argon_log = match overall_log.as_str() {
-			"trace" => "trace",
-			"debug" => "debug",
-			_ => "warn",
-		};
-		let node_log = match authority {
-			"bob" => {
-				argon_log = "trace";
-				"trace"
-			},
-			_ => "info",
-		};
+	pub async fn fork_node(&self, authority: &str, miner_threads: u16) -> anyhow::Result<Self> {
+		let mut new_args = self.start_args.clone();
+		let base_data_path = ArgonNodeStartArgs::get_temp_dir()?;
+		new_args.authority = authority.to_string();
+		new_args.rpc_port = 0;
+		new_args.base_data_path = base_data_path;
+		new_args.bootnodes = self.boot_url.clone();
+		new_args.compute_miners = miner_threads;
+		Self::start(new_args).await
+	}
 
-		let rust_log = format!(
-			"{},node={},runtime=trace,argon={},sc_rpc_server=info",
-			overall_log, node_log, argon_log
-		);
-
-		let keyring = Sr25519Keyring::from_str(authority).expect("Invalid authority");
-
+	async fn start_process(
+		args: &mut ArgonNodeStartArgs,
+	) -> anyhow::Result<(process::Child, LogWatcher)> {
 		let mut more_args = vec![];
-
-		if !bootnodes.is_empty() {
-			more_args.push(format!("--bootnodes={}", bootnodes))
+		if !args.bootnodes.is_empty() {
+			more_args.push(format!("--bootnodes={}", &args.bootnodes))
 		};
+		if !args.notebook_archive_urls.is_empty() {
+			more_args
+				.push(format!("--notebook-archive-hosts={}", args.notebook_archive_urls.join(",")))
+		};
+
+		println!("Starting argon-node with args: {:?}. {:?}", args, more_args);
 
 		let mut proc = Command::new("./argon-node")
-			.current_dir(target_dir)
-			.env("RUST_LOG", rust_log)
+			.current_dir(args.target_dir.clone())
+			.env("RUST_LOG", &args.rust_log)
 			.stderr(process::Stdio::piped())
-			.arg("--dev")
+			.arg("--no-mdns")
+			.arg(format!("--base-path={}", args.base_data_path.display()))
 			.arg("--detailed-log-output")
 			.arg("--allow-private-ipv4")
+			.arg("--dev")
 			// .arg("--state-pruning=archive")
-			.arg(format!("--{}", authority.to_lowercase()))
-			.arg(format!("--name={}", authority.to_lowercase()))
+			.arg(format!("--{}", &args.authority.to_lowercase()))
+			.arg(format!("--name={}", &args.authority.to_lowercase()))
 			.arg("--port=0")
-			.arg("--rpc-port=0")
-			.arg(format!("--compute-miners={}", compute_miners))
-			.arg(format!("--bitcoin-rpc-url={}", bitcoin_rpc))
+			.arg(format!("--rpc-port={}", args.rpc_port))
+			.arg(format!("--compute-miners={}", args.compute_miners))
+			.arg(format!("--bitcoin-rpc-url={}", &args.bitcoin_rpc))
 			.args(more_args.into_iter())
 			.spawn()?;
 
@@ -106,8 +197,33 @@ impl ArgonTestNode {
 			.await?;
 		assert_eq!(port_matches.len(), 1);
 		println!("Started argon-node with RPC port {:?}", port_matches);
-		let port = port_matches[0].parse::<u16>().expect("Failed to parse port");
-		let ws_url = format!("ws://127.0.0.1:{}", port);
+		args.rpc_port = port_matches[0].parse::<u16>().expect("Failed to parse port");
+		Ok((proc, log_watch))
+	}
+
+	pub async fn start_with_args(
+		authority: &str,
+		compute_miners: u16,
+	) -> anyhow::Result<ArgonTestNode> {
+		let args = ArgonNodeStartArgs::new(authority, compute_miners, "")?;
+		Self::start(args).await
+	}
+
+	pub async fn start(mut args: ArgonNodeStartArgs) -> anyhow::Result<Self> {
+		#[allow(clippy::await_holding_lock)]
+		let _lock = CONTEXT_LOCK.lock().unwrap();
+
+		let mut bitcoind = None;
+		if args.bitcoin_rpc.is_empty() {
+			let (bitcoin, rpc_url, _) = start_bitcoind().map_err(|e| {
+				eprintln!("ERROR starting bitcoind {:#?}", e);
+				e
+			})?;
+			bitcoind = Some(bitcoin);
+			args.bitcoin_rpc = rpc_url.to_string();
+		}
+		let (proc, log_watch) = Self::start_process(&mut args).await?;
+		let ws_url = format!("ws://127.0.0.1:{}", args.rpc_port);
 
 		let client = MainchainClient::from_url(ws_url.as_str()).await?;
 
@@ -118,35 +234,17 @@ impl ArgonTestNode {
 		Ok(ArgonTestNode {
 			proc: Some(proc),
 			client,
-			bitcoind: None,
-			bitcoin_rpc_url: Some(bitcoin_rpc),
-			account_id: keyring.to_account_id(),
-			author_keyring_name: authority.to_string(),
+			bitcoind,
+			account_id: args.get_account_id(),
+			author_keyring_name: args.authority.to_string(),
 			boot_url: listen_urls
 				.into_iter()
 				.find(|a| a.contains("127.0.0.1"))
 				.expect("should have a localhost ip")
 				.clone(),
 			log_watcher: log_watch,
+			start_args: args.clone(),
 		})
-	}
-
-	pub async fn start(
-		authority: &str,
-		compute_miners: u16,
-		bootnodes: &str,
-	) -> anyhow::Result<Self> {
-		#[allow(clippy::await_holding_lock)]
-		let _lock = CONTEXT_LOCK.lock().unwrap();
-
-		let (bitcoin, rpc_url, _) = start_bitcoind().map_err(|e| {
-			eprintln!("ERROR starting bitcoind {:#?}", e);
-			e
-		})?;
-		let mut node =
-			Self::start_with_bitcoin_rpc(authority, compute_miners, bootnodes, rpc_url).await?;
-		node.bitcoind = Some(bitcoin);
-		Ok(node)
 	}
 
 	pub fn keyring(&self) -> Sr25519Keyring {
@@ -178,7 +276,7 @@ impl ArgonTestNode {
 	}
 
 	pub fn get_bitcoin_url(&self) -> (String, Auth) {
-		let rpc_url = self.bitcoin_rpc_url.clone().unwrap();
+		let rpc_url = self.start_args.bitcoin_rpc_url().unwrap();
 
 		let auth = if !rpc_url.username().is_empty() {
 			Auth::UserPass(

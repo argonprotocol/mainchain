@@ -26,6 +26,7 @@ jobs:
         uses: ./.github/templates/clear-space
 
       - uses: ikalnytskyi/action-setup-postgres@v6
+      - uses: ./.github/templates/minio
 
       - name: Install linux dependencies
         if: ${{startsWith(matrix.os, 'ubuntu')}}

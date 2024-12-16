@@ -13,6 +13,7 @@ mod argon_oracle;
 mod bitcoind;
 mod log_watcher;
 
+pub use crate::argon_node::ArgonNodeStartArgs;
 pub use argon_bitcoin::run_bitcoin_cli;
 pub use argon_localchain::*;
 pub use argon_node::ArgonTestNode;
@@ -21,7 +22,8 @@ pub use argon_oracle::ArgonTestOracle;
 pub use bitcoind::*;
 
 pub async fn start_argon_test_node() -> ArgonTestNode {
-	ArgonTestNode::start("alice", test_miner_count(), "")
+	let start_args = ArgonNodeStartArgs::new("alice", test_miner_count(), "").unwrap();
+	ArgonTestNode::start(start_args)
 		.await
 		.expect("Unable to create test context - ensure debug argon-node build is available")
 }
