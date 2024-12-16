@@ -174,7 +174,8 @@ async fn main() -> anyhow::Result<()> {
 
 			let s3_buckets = if dev && archive_public_host.is_none() {
 				let (buckets, host) =
-					S3Archive::rand_minio_test_bucket(notary_id, archive_bucket).await?;
+					S3Archive::rand_minio_test_bucket(notary_id, archive_bucket, archive_endpoint)
+						.await?;
 				archive_public_host.replace(host.archive_host);
 				buckets
 			} else {

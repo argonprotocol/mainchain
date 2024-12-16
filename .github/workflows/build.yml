@@ -189,7 +189,6 @@ jobs:
             target: x86_64-unknown-linux-gnu
             docker: ghcr.io/napi-rs/napi-rs/nodejs-rust:lts-debian
             build: |
-              export RUSTFLAGS="-C link-args=-Wl,--warn-unresolved-symbols"
               cd localchain
               yarn build:debug -- --lib
               strip -x *.node
@@ -358,18 +357,6 @@ jobs:
           --health-retries 5
         ports:
           - 5432:5432
-      minio:
-        image: minio/minio
-        env:
-          MINIO_ACCESS_KEY: minioadmin
-          MINIO_SECRET_KEY: minioadmin
-        ports:
-          - 9000:9000
-        options: >-
-          --health-cmd "curl -f http://localhost:9000/minio/health/live"
-          --health-interval 10s
-          --health-timeout 5s
-          --health-retries 5
     runs-on: ${{ matrix.os }}
     steps:
       - uses: actions/checkout@v4
@@ -399,6 +386,28 @@ jobs:
         run: |
           echo "127.0.0.1 host.docker.internal" | sudo tee -a /etc/hosts
 
+      - name: Run MinIO container
+        run: |
+          mkdir -p /tmp/minio-data
+          docker run -d \
+            -e MINIO_ACCESS_KEY=minioadmin \
+            -e MINIO_SECRET_KEY=minioadmin \
+            -v /tmp/minio-data:/data \
+            -p 9000:9000 \
+            --name minio \
+            minio/minio server /data
+
+      - name: Wait for MinIO to start
+        run: |
+          for i in {1..30}; do
+            if curl -s http://localhost:9000/minio/health/live; then
+              echo "MinIO is up"
+              break
+            fi
+            echo "Waiting for MinIO to start..."
+            sleep 2
+          done
+
       - name: Pull Miner
         run: docker pull ghcr.io/argonprotocol/argon-miner:dev && docker pull ghcr.io/argonprotocol/argon-notary:dev
 
@@ -418,6 +427,13 @@ jobs:
           RUSTFLAGS: "-C link-args=-Wl,--warn-unresolved-symbols"
           ADD_DOCKER_HOST: true
           RUST_LOG: debug,sqlx=info
+          AWS_S3_ENDPOINT: http://host.docker.internal:9000
+
+      - name: Cleanup minio
+        if: always()
+        run: |
+          docker stop minio
+          docker rm minio
   upload-assets:
     name: Upload assets
     permissions:

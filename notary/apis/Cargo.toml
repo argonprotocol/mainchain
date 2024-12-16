@@ -24,6 +24,6 @@ tracing = { workspace = true, features = ["default"] }
 sqlx = { workspace = true, features = [] }
 hex = { workspace = true }
 jsonrpsee = { workspace = true, features = ["server", "async-client"] }
-reqwest = { workspace = true, features = ["default"] }
+reqwest = { workspace = true, features = ["rustls-tls", "gzip", "brotli", "deflate"] }
 argon-notary-audit = { workspace = true }
 argon-primitives = { workspace = true }

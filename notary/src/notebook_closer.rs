@@ -323,7 +323,7 @@ mod tests {
 		let block_tracker = Arc::new(Mutex::new(Some(block_tracker)));
 
 		let (s3_buckets, archive_settings) =
-			S3Archive::rand_minio_test_bucket(notary_id, None).await?;
+			S3Archive::rand_minio_test_bucket(notary_id, None, None).await?;
 
 		let mut notary_server = NotaryServer::start_with(
 			server,

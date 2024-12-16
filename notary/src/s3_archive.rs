@@ -63,12 +63,13 @@ impl S3Archive {
 	pub async fn rand_minio_test_bucket(
 		notary_id: NotaryId,
 		archive_bucket: Option<String>,
+		archive_endpoint: Option<String>,
 	) -> anyhow::Result<(S3Archive, ArchiveSettings)> {
 		let access_key = "minioadmin";
 		let secret_key = "minioadmin";
 		env::set_var("AWS_ACCESS_KEY_ID", access_key);
 		env::set_var("AWS_SECRET_ACCESS_KEY", secret_key);
-		let minio_endpoint = "http://localhost:9000".to_string();
+		let minio_endpoint = archive_endpoint.unwrap_or("http://localhost:9000".to_string());
 
 		let bucket_name = archive_bucket.unwrap_or(format!("notary-archives-{}", Uuid::new_v4()));
 		let credentials_provider = DefaultCredentialsProvider::new()?;
