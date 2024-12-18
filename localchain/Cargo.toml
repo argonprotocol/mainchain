@@ -54,8 +54,6 @@ argon-notary-apis = { workspace = true }
 argon-notary-audit = { workspace = true, features = ["default"] }
 uniffi = { workspace = true, optional = true }
 jsonrpsee = { workspace = true }
-reqwest = { workspace = true }
-regex = { workspace = true }
 
 [dev-dependencies]
 frame-support = { workspace = true }

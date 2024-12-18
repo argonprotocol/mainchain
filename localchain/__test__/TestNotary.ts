@@ -86,7 +86,6 @@ export default class TestNotary implements ITeardownable {
         }
         console.log("Notary >> connecting to mainchain '%s', db %s", mainchainUrl, `${this.#dbConnectionString}/${this.#dbName}`);
 
-
         const execArgs = [
             'run',
             `--db-url=${this.#dbConnectionString}/${this.#dbName}`,
@@ -94,9 +93,12 @@ export default class TestNotary implements ITeardownable {
             `-t ${mainchainUrl}`,
             `--operator-address=${this.operator.address}`
         ];
+        if (process.env.AWS_S3_ENDPOINT) {
+            execArgs.push(`--archive-endpoint=${process.env.AWS_S3_ENDPOINT}`);
+        }
         if (process.env.ARGON_USE_DOCKER_BINS) {
             execArgs.unshift(...notaryPath.replace("docker run", "run").split(' '));
-            execArgs.push('-b=0.0.0.0:9925')
+            execArgs.push('-b=0.0.0.0:9925');
 
             notaryPath = 'docker';
         }

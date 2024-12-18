@@ -529,7 +529,8 @@ mod tests {
 		let _ = tracing_subscriber::fmt::try_init();
 		let ticker = Ticker::new(60_000, 2);
 		let operator = Ferdie.to_account_id();
-		let (s3_buckets, archive_settings) = S3Archive::rand_minio_test_bucket(1, None).await?;
+		let (s3_buckets, archive_settings) =
+			S3Archive::rand_minio_test_bucket(1, None, None).await?;
 
 		let notary = NotaryServer::start(
 			1,
@@ -656,7 +657,8 @@ mod tests {
 		let ticker = Ticker::new(2_000, 2);
 		let start_tick = ticker.current();
 		let operator = Ferdie.to_account_id();
-		let (s3_buckets, archive_settings) = S3Archive::rand_minio_test_bucket(1, None).await?;
+		let (s3_buckets, archive_settings) =
+			S3Archive::rand_minio_test_bucket(1, None, None).await?;
 		let notary = NotaryServer::start(
 			1,
 			operator.clone(),

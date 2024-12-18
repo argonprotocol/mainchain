@@ -1,8 +1,24 @@
 # Changelog
 
-## [v0.0.21](https://github.com/argonprotocol/mainchain/compare/v0.0.20...359cbbbdcfe9ff74f39852348cb6b43364f21a0f) (2024-12-08)
+## [v0.0.22](https://github.com/argonprotocol/mainchain/compare/v0.0.21...62841161f35869cc63a8dc930915426c3b396470) (2024-12-16)
+
+### Features
+
+* **notary:** archive hosts
+([5df12d0](https://github.com/argonprotocol/mainchain/commit/5df12d0d31a8944c8be51db67e772c4ff299b143))
 
 ### Fixes
+
+* **runtime:** reduce compute block time target
+([27d6b69](https://github.com/argonprotocol/mainchain/commit/27d6b698ead28894376929d550a84b24be278cd2))
+* **notary:** handle disconnecting rpc node
+([9175116](https://github.com/argonprotocol/mainchain/commit/91751162b80446eaad544c2c52993588529c0e77))
+* **node:** reconnect to notary to verify blocks
+([a8f2383](https://github.com/argonprotocol/mainchain/commit/a8f23836ec947d7b4af46b236e8443bb8d2e0d93))
+
+### [v0.0.21](https://github.com/argonprotocol/mainchain/compare/v0.0.20...v0.0.21) (2024-12-08)
+
+#### Fixes
 
 * **notary:** handle blocks re-downloaded
 ([359cbbb](https://github.com/argonprotocol/mainchain/commit/359cbbbdcfe9ff74f39852348cb6b43364f21a0f))
