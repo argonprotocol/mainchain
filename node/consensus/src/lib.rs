@@ -303,7 +303,7 @@ pub fn run_block_builder_task<Block, BI, C, PF, A, SC, SO, JS, B>(
 					compute_handle.start_solving(proposal);
 					if let Some(metrics) = consensus_metrics_finder.as_ref() {
 						let time_after_tick = ticker.duration_after_tick(tick);
-						metrics.start_fallback_mining(tick, time_after_tick);
+						metrics.start_fallback_mining(time_after_tick);
 					}
 				}
 			}

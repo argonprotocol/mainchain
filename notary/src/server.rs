@@ -429,7 +429,6 @@ impl LocalchainRpcServer for NotaryServer {
 		domains: NotarizationDomains,
 	) -> Result<BalanceChangeResult, ErrorObjectOwned> {
 		self.ensure_active().await?;
-		let tick = self.ticker.current();
 		Ok(NotarizationsStore::apply(
 			&self.pool,
 			self.notary_id,
@@ -442,7 +441,7 @@ impl LocalchainRpcServer for NotaryServer {
 		)
 		.await
 		.inspect_err(|_| {
-			self.notary_metrics.on_notarization_error(tick);
+			self.notary_metrics.on_notarization_error();
 		})?)
 	}
 

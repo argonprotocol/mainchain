@@ -1542,7 +1542,17 @@ mod test {
 				.iter()
 				.map(|(n, a, _)| { (*n, a.is_some()) })
 				.collect::<Vec<_>>(),
-			vec![(9, false)]
+			vec![
+				(1, false),
+				(2, false),
+				(3, false),
+				(4, false),
+				(5, false),
+				(6, false),
+				(7, false),
+				(8, false),
+				(9, false)
+			]
 		);
 		for _ in 0..10 {
 			test_notary.create_notebook_header(vec![]).await;

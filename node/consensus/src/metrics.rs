@@ -52,7 +52,7 @@ impl ConsensusMetrics {
 			compute_blocks_created_total: register(
 				CounterVec::new(
 					Opts::new("argon_compute_blocks_created_total", "Blocks created with compute"),
-					&["notebooks"],
+					&["has_notebooks"],
 				)?,
 				metrics_registry,
 			)?,
@@ -72,14 +72,14 @@ impl ConsensusMetrics {
 						"argon_fallback_compute_activated_time",
 						"Time [μs] after target tick when fallback compute was activated",
 					),
-					&["tick"],
+					&[],
 				)?,
 				metrics_registry,
 			)?,
 			vote_blocks_created_total: register(
 				CounterVec::new(
 					Opts::new("argon_vote_blocks_crated_total", "Blocks created with votes"),
-					&["notebooks"],
+					&["has_notebooks"],
 				)?,
 				metrics_registry,
 			)?,
@@ -108,7 +108,7 @@ impl ConsensusMetrics {
 						"Total time [μs] after a tick that a notebook notification was received",
 					)
 					.buckets(prometheus::exponential_buckets(10.0, 10.0, 12)?),
-					&["notary_id", "tick"],
+					&["notary_id"],
 				)?,
 				metrics_registry,
 			)?,
@@ -119,7 +119,7 @@ impl ConsensusMetrics {
 						"Total time [μs] after a tick that a notebook was audited",
 					)
 					.buckets(prometheus::exponential_buckets(10.0, 10.0, 12)?),
-					&["notary_id", "tick"],
+					&["notary_id"],
 				)?,
 				metrics_registry,
 			)?,
@@ -130,7 +130,7 @@ impl ConsensusMetrics {
 						"Total time [μs] to process a notebook",
 					)
 					.buckets(prometheus::exponential_buckets(10.0, 10.0, 12)?),
-					&["notary_id", "tick"],
+					&["notary_id"],
 				)?,
 				metrics_registry,
 			)?,
@@ -144,18 +144,14 @@ impl ConsensusMetrics {
 	pub(crate) fn on_block_created(&self, ticker: &Ticker, proposal_meta: &ProposalMeta) {
 		let expected_tick_time = ticker.duration_after_tick(proposal_meta.tick);
 		let time_after_tick = expected_tick_time.as_micros() as u64;
-		let notebooks = proposal_meta.notebooks;
+		let has_notebooks = if proposal_meta.notebooks > 0 { "true" } else { "false" };
 		self.block_time_after_tick
 			.with_label_values(&[])
 			.observe(time_after_tick as f64);
 		if proposal_meta.is_compute {
-			self.compute_blocks_created_total
-				.with_label_values(&[&notebooks.to_string()])
-				.inc();
+			self.compute_blocks_created_total.with_label_values(&[has_notebooks]).inc();
 		} else {
-			self.vote_blocks_created_total
-				.with_label_values(&[&notebooks.to_string()])
-				.inc();
+			self.vote_blocks_created_total.with_label_values(&[has_notebooks]).inc();
 		}
 	}
 
@@ -163,9 +159,9 @@ impl ConsensusMetrics {
 		self.compute_resets_from_notebooks.with_label_values(&[]).inc();
 	}
 
-	pub(crate) fn start_fallback_mining(&self, tick: Tick, time_after_tick: Duration) {
+	pub(crate) fn start_fallback_mining(&self, time_after_tick: Duration) {
 		self.fallback_compute_activated_time
-			.with_label_values(&[&tick.to_string()])
+			.with_label_values(&[])
 			.observe(time_after_tick.as_micros() as f64);
 	}
 
@@ -181,10 +177,10 @@ impl ConsensusMetrics {
 		let time_after_tick = enqueue_time.elapsed().as_micros().saturating_sub(expected_tick_time);
 
 		self.notebook_audited_after_tick_time
-			.with_label_values(&[&notary_id.to_string(), &tick.to_string()])
+			.with_label_values(&[&notary_id.to_string()])
 			.observe(time_after_tick as f64);
 		self.notebook_processing_time
-			.with_label_values(&[&notary_id.to_string(), &tick.to_string()])
+			.with_label_values(&[&notary_id.to_string()])
 			.observe(time);
 	}
 
@@ -198,7 +194,7 @@ impl ConsensusMetrics {
 
 		let time_after_tick = duration_after_tick.as_micros() as f64;
 		self.notebook_notification_after_tick_time
-			.with_label_values(&[&notary_id.to_string(), &tick.to_string()])
+			.with_label_values(&[&notary_id.to_string()])
 			.observe(time_after_tick);
 	}
 

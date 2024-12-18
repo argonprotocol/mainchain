@@ -207,7 +207,6 @@ impl NotebookCloser {
 			self.notary_metrics.on_notebook_close(
 				Instant::now(),
 				start_time,
-				tick,
 				time_after_tick,
 				notebook_bytes,
 				header_bytes,

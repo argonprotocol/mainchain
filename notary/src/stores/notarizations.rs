@@ -421,7 +421,7 @@ impl NotarizationsStore {
 
 		tx.commit().await?;
 
-		notary_metrics.on_notarization(tick, balance_change_len, block_votes_len, domains_len, tax);
+		notary_metrics.on_notarization(balance_change_len, block_votes_len, domains_len, tax);
 
 		Ok(BalanceChangeResult {
 			notebook_number: current_notebook_number,
