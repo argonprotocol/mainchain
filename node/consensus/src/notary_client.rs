@@ -1,6 +1,6 @@
-use crate::{aux_client::ArgonAux, error::Error};
+use crate::{aux_client::ArgonAux, error::Error, metrics::ConsensusMetrics};
 use argon_notary_apis::{
-	get_header_url,
+	get_header_url, get_notebook_url,
 	notebook::{NotebookRpcClient, RawHeadersSubscription},
 	ArchiveHost, Client, SystemRpcClient,
 };
@@ -8,9 +8,10 @@ use argon_primitives::{
 	ensure,
 	notary::{
 		NotaryNotebookAuditSummary, NotaryNotebookDetails, NotaryNotebookRawVotes, NotaryState,
+		NotebookBytes, SignedHeaderBytes,
 	},
 	notebook::NotebookNumber,
-	tick::Tick,
+	tick::{Tick, Ticker},
 	Balance, BlockSealApis, BlockSealAuthorityId, BlockVotingPower, NotaryApis, NotaryId,
 	NotebookApis, NotebookAuditResult, NotebookHeaderData, VoteMinimum, VotingSchedule,
 };
@@ -156,7 +157,12 @@ where
 
 	let notary_client_clone = Arc::clone(&notary_client);
 	let notary_client_poll = Arc::clone(&notary_client);
+	let best_block = client.best_hash();
 	let notary_sync_task = async move {
+		notary_client_poll.update_notaries(&best_block).await.unwrap_or_else(|e| {
+			warn!("Could not update notaries at best hash {} - {:?}", best_block, e)
+		});
+
 		let mut best_block = Box::pin(client.every_import_notification_stream());
 
 		loop {
@@ -207,10 +213,11 @@ where
 	handle.spawn("notary_sync_task", "notary_sync", notary_sync_task);
 	// Making this blocking due to the runtime calls and potentially heavy decodes
 	handle.spawn_blocking("notary_queue_task", "notary_queue", notary_queue_task);
+
 	notary_client
 }
 
-type PendingNotebook = (NotebookNumber, Option<Vec<u8>>);
+type PendingNotebook = (NotebookNumber, Option<SignedHeaderBytes>);
 
 pub type VotingPowerInfo = (Tick, BlockVotingPower, u32);
 pub struct NotaryClient<B: BlockT, C: AuxStore, AC> {
@@ -382,9 +389,10 @@ where
 	pub async fn process_queues(self: &Arc<Self>) -> Result<bool, Error> {
 		let finalized_hash = self.client.finalized_hash();
 		let best_hash = self.client.best_hash();
-		let notaries = self.get_notary_ids().await;
+		let queued_notaries =
+			self.notebook_queue_by_id.read().await.keys().cloned().collect::<Vec<_>>();
 
-		let handles = notaries.into_iter().map(|notary_id| {
+		let handles = queued_notaries.into_iter().map(|notary_id| {
 			let self_clone: Arc<Self> = Arc::clone(self);
 			tokio::spawn(async move {
 				self_clone.clean_queued_finalized_notebooks(&finalized_hash, notary_id).await;
@@ -462,28 +470,26 @@ where
 		next_batch: u16,
 	) -> Result<(), Error> {
 		let mut missing_notebooks = vec![];
+		let mut count = 0;
 		// use notebook lock in block
 		{
 			let notary_queue = self.notebook_queue_by_id.read().await;
 			if let Some(notary_queue) = notary_queue.get(&notary_id) {
 				for (notebook_number, raw_header) in notary_queue {
-					if raw_header.is_none() {
+					if raw_header.is_none() && missing_notebooks.len() < next_batch as usize {
 						missing_notebooks.push(*notebook_number);
 					}
+					count += 1;
 				}
 			}
 		}
 		if missing_notebooks.is_empty() {
+			trace!("No missing notebooks for notary {}", notary_id);
 			return Ok(());
 		}
-		missing_notebooks.sort();
-		let original_size = missing_notebooks.len();
-		// only download 10 at a time
-		let missing_notebooks =
-			missing_notebooks.into_iter().take(next_batch as usize).collect::<Vec<_>>();
 
 		info!(
-			"Retrieving missing notebooks from notary #{} - {:?} (of {original_size})",
+			"Retrieving missing notebooks from notary #{} - {:?} (of {count})",
 			notary_id, missing_notebooks
 		);
 		for notebook_number in missing_notebooks {
@@ -498,17 +504,23 @@ where
 		notary_queue.get(&notary_id).map_or(0usize, |q| q.len())
 	}
 
-	async fn dequeue_ready(&self, notary_id: NotaryId) -> Option<(NotebookNumber, Vec<u8>)> {
+	async fn dequeue_ready(
+		&self,
+		notary_id: NotaryId,
+	) -> Option<(NotebookNumber, SignedHeaderBytes)> {
 		let mut queues = self.notebook_queue_by_id.write().await;
 		let queue = queues.get_mut(&notary_id)?;
 		if queue.is_empty() {
 			return None;
 		}
-		trace!(
-			"Dequeuing notebook for notary {}. Queue: {:?}",
-			notary_id,
-			queue.iter().map(|(n, h)| (n, h.is_some())).collect::<Vec<_>>()
-		);
+
+		if tracing::enabled!(tracing::Level::TRACE) {
+			trace!(
+				"Dequeuing notebook for notary {}. Queue: {:?}",
+				notary_id,
+				queue.iter().map(|(n, h)| (n, h.is_some())).collect::<Vec<_>>()
+			);
+		}
 		if let Some((_, Some(_))) = queue.first() {
 			let (notebook_number, raw_header) = queue.remove(0);
 			return Some((notebook_number, raw_header?))
@@ -521,7 +533,7 @@ where
 		&self,
 		notary_id: NotaryId,
 		notebook_number: NotebookNumber,
-		header_bytes: Option<Vec<u8>>,
+		header_bytes: Option<SignedHeaderBytes>,
 	) -> Result<bool, Error> {
 		let mut notebook_queue_by_id = self.notebook_queue_by_id.write().await;
 
@@ -592,6 +604,36 @@ where
 		self.enqueue_notebook(notary_id, notebook_number, Some(header)).await
 	}
 
+	async fn download_notebook(
+		&self,
+		notary_id: NotaryId,
+		notebook_number: NotebookNumber,
+	) -> Result<NotebookBytes, Error> {
+		let download_url = if let Some(archive_host) =
+			self.notary_archive_host_by_id.read().await.get(&notary_id)
+		{
+			Some(get_notebook_url(archive_host, notary_id, notebook_number))
+		} else {
+			let client = self.get_or_connect_to_client(notary_id).await.ok();
+			if let Some(client) = client {
+				client.get_notebook_download_url(notebook_number).await.ok()
+			} else {
+				None
+			}
+		};
+		let bytes = self
+			.notebook_downloader
+			.get_body(notary_id, notebook_number, download_url)
+			.await
+			.map_err(|e| {
+				Error::NotaryError(format!(
+					"Could not download notebook {} from notary {} - {:?}",
+					notebook_number, notary_id, e
+				))
+			})?;
+		Ok(bytes)
+	}
+
 	async fn sync_notebooks(&self, id: NotaryId) -> Result<(), Error> {
 		let client = self.get_or_connect_to_client(id).await?;
 		let notebook_meta = client.metadata().await.map_err(|e| {
@@ -638,7 +680,7 @@ where
 		notebook_number: NotebookNumber,
 		finalized_hash: &B::Hash,
 		best_hash: &B::Hash,
-		raw_header: Vec<u8>,
+		raw_header: SignedHeaderBytes,
 	) -> Result<(), Error> {
 		// if we have a good notebook with this number, don't re-audit
 		if self.aux_client.has_successful_audit(notary_id, notebook_number) {
@@ -655,7 +697,7 @@ where
 
 		let notebook_details = self
 			.client
-			.decode_signed_raw_notebook_header(best_hash, raw_header.clone())?
+			.decode_signed_raw_notebook_header(best_hash, raw_header.0.clone())?
 			.map_err(|e| {
 				Error::NotaryError(format!(
 					"Unable to decode notebook header in runtime. Notary={}, notebook={} -> {:?}",
@@ -689,11 +731,13 @@ where
 
 	pub async fn verify_notebook_audits(
 		self: &Arc<Self>,
+		parent_hash: &B::Hash,
 		notebook_audit_results: Vec<NotebookAuditResult<NotebookVerifyError>>,
 	) -> Result<(), Error> {
 		for _ in 0..2 {
-			let mut missing_audits_by_notary = BTreeMap::new();
-			let mut needs_notary_connect = BTreeSet::new();
+			let mut missing_audits_by_notary = BTreeSet::new();
+			let notary_ids = self.get_notary_ids().await;
+			let mut needs_notary_updates = false;
 			for digest_record in &notebook_audit_results {
 				let notary_audits =
 					self.aux_client.get_notary_audit_history(digest_record.notary_id)?.get();
@@ -710,13 +754,17 @@ where
 						)));
 					}
 				} else {
-					missing_audits_by_notary
-						.entry(digest_record.notary_id)
-						.or_insert(Vec::new())
-						.push((digest_record.notebook_number, None));
-					if !self.has_client(digest_record.notary_id).await {
-						needs_notary_connect.insert(digest_record.notary_id);
+					if !notary_ids.contains(&digest_record.notary_id) {
+						needs_notary_updates = true;
 					}
+					self.enqueue_notebook(
+						digest_record.notary_id,
+						digest_record.notebook_number,
+						None,
+					)
+					.await?;
+					missing_audits_by_notary
+						.insert((digest_record.notary_id, digest_record.notebook_number));
 				}
 			}
 			if missing_audits_by_notary.is_empty() {
@@ -728,10 +776,8 @@ where
 				missing_audits_by_notary
 			);
 
-			for (notary_id, missing) in missing_audits_by_notary {
-				for (notebook_number, body) in missing {
-					self.enqueue_notebook(notary_id, notebook_number, body).await?;
-				}
+			if needs_notary_updates {
+				self.update_notaries(&parent_hash).await?;
 			}
 
 			// drain queues
@@ -819,7 +865,7 @@ where
 		let full_notebook = self.download_notebook(notary_id, notebook_number).await?;
 		trace!(
 			"Notebook downloaded. Notary {notary_id}, #{notebook_number}, tick {tick}. {} bytes.",
-			full_notebook.len()
+			full_notebook.0.len()
 		);
 
 		// audit on the best block since we're adding dependencies
@@ -831,7 +877,7 @@ where
 			tick,
 			notebook_details.header_hash,
 			&vote_minimums,
-			&full_notebook,
+			&full_notebook.0,
 			notebook_dependencies,
 		)? {
 			Ok(votes) => {
@@ -922,25 +968,6 @@ where
 		self.notary_client_by_id.read().await.get(&notary_id).cloned()
 	}
 
-	async fn download_notebook(
-		&self,
-		notary_id: NotaryId,
-		notebook_number: NotebookNumber,
-	) -> Result<Vec<u8>, Error> {
-		let client = self.get_or_connect_to_client(notary_id).await.ok();
-		let bytes = self
-			.notebook_downloader
-			.get_body(&client, notary_id, notebook_number)
-			.await
-			.map_err(|e| {
-				Error::NotaryError(format!(
-					"Could not download notebook {} from notary {} - {:?}",
-					notebook_number, notary_id, e
-				))
-			})?;
-		Ok(bytes)
-	}
-
 	fn latest_notebook_in_runtime(
 		&self,
 		block_hash: B::Hash,
@@ -1028,9 +1055,9 @@ impl NotebookDownloader {
 		notary_id: NotaryId,
 		notebook_number: NotebookNumber,
 		download_url: Option<String>,
-	) -> Result<Vec<u8>, Error> {
+	) -> Result<SignedHeaderBytes, Error> {
 		if let Some(url) = download_url {
-			if let Ok(header) = ArchiveHost::download(url).await {
+			if let Ok(header) = ArchiveHost::download_header_bytes(url).await {
 				return Ok(header);
 			}
 		}
@@ -1045,20 +1072,18 @@ impl NotebookDownloader {
 	/// Get notebook body from notary or archive
 	pub async fn get_body(
 		&self,
-		client: &Option<Arc<Client>>,
 		notary_id: NotaryId,
 		notebook_number: NotebookNumber,
-	) -> Result<Vec<u8>, Error> {
-		for archive_host in &self.archive_hosts {
-			if let Ok(body) = archive_host.get_notebook(notary_id, notebook_number).await {
+		download_url: Option<String>,
+	) -> Result<NotebookBytes, Error> {
+		if let Some(url) = download_url {
+			if let Ok(body) = ArchiveHost::download_notebook_bytes(url).await {
 				return Ok(body);
 			}
 		}
-		if let Some(client) = client {
-			if let Ok(url) = client.get_notebook_download_url(notebook_number).await {
-				return ArchiveHost::download(url).await.map_err(|e| {
-					Error::NotaryError(format!("Could not get notebooks from notary - {:?}", e))
-				});
+		for archive_host in &self.archive_hosts {
+			if let Ok(body) = archive_host.get_notebook(notary_id, notebook_number).await {
+				return Ok(body);
 			}
 		}
 		Err(Error::NotaryError("Could not get body from notary or archive".to_string()))
@@ -1321,13 +1346,13 @@ mod test {
 		assert!(next.is_none());
 
 		notary_client
-			.enqueue_notebook(1, 2, Some(vec![]))
+			.enqueue_notebook(1, 2, Some(SignedHeaderBytes::default()))
 			.await
 			.expect("Could not enqueue");
 		let next = notary_client.dequeue_ready(1).await;
 		assert!(next.is_none());
 		notary_client
-			.enqueue_notebook(1, 1, Some(vec![]))
+			.enqueue_notebook(1, 1, Some(SignedHeaderBytes::default()))
 			.await
 			.expect("Could not enqueue");
 		assert_eq!(
@@ -1412,12 +1437,15 @@ mod test {
 
 		// now simulate a new block coming in
 		notary_client
-			.verify_notebook_audits(vec![NotebookAuditResult {
-				notary_id: 1,
-				tick: last.tick,
-				notebook_number: last.notebook_number,
-				audit_first_failure: None,
-			}])
+			.verify_notebook_audits(
+				&client.best_hash(),
+				vec![NotebookAuditResult {
+					notary_id: 1,
+					tick: last.tick,
+					notebook_number: last.notebook_number,
+					audit_first_failure: None,
+				}],
+			)
 			.await
 			.expect("Could not retrieve missing notebooks");
 	}
