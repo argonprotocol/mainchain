@@ -114,10 +114,12 @@ where
 	let (bitcoin_url, bitcoin_auth) = mining_config
 		.bitcoin_rpc_url_with_auth()
 		.map_err(|e| ServiceError::Other(format!("Failed to parse bitcoin rpc url {:?}", e)))?;
-	let utxo_tracker = UtxoTracker::new(bitcoin_url.origin().unicode_serialization(), bitcoin_auth)
-		.map_err(|e| {
-			ServiceError::Other(format!("Failed to initialize bitcoin monitoring {:?}", e))
-		})?;
+	let utxo_tracker = UtxoTracker::new(
+		bitcoin_url.origin().unicode_serialization(),
+		bitcoin_auth,
+		config.prometheus_registry(),
+	)
+	.map_err(|e| ServiceError::Other(format!("Failed to initialize bitcoin monitoring {:?}", e)))?;
 
 	let utxo_tracker = Arc::new(utxo_tracker);
 
@@ -137,6 +139,8 @@ where
 		aux_client.clone(),
 		idle_delay,
 		notebook_downloader,
+		config.prometheus_registry(),
+		ticker,
 	);
 
 	let (import_queue, argon_block_import) = create_import_queue(

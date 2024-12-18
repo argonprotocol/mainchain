@@ -13,7 +13,8 @@ pub mod block_watch;
 
 pub mod notebook_closer;
 
-pub(crate) mod metrics;
 pub(crate) mod middleware;
+pub(crate) mod notary_metrics;
+pub(crate) mod rpc_metrics;
 pub mod s3_archive;
 pub mod server;

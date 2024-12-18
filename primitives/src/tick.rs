@@ -6,6 +6,8 @@ use rsntp::SntpClient;
 use scale_info::TypeInfo;
 use serde::{Deserialize, Serialize};
 use sp_core::RuntimeDebug;
+#[cfg(feature = "std")]
+use std::time::SystemTime;
 
 pub type Tick = u64;
 
@@ -106,6 +108,22 @@ impl Ticker {
 	}
 
 	#[cfg(feature = "std")]
+	pub fn micros_for_tick(&self, tick: Tick) -> u128 {
+		self.time_for_tick(tick) as u128 * 1_000u128
+	}
+
+	#[cfg(feature = "std")]
+	pub fn duration_after_tick(&self, tick: Tick) -> Duration {
+		let current_time = match SystemTime::now().duration_since(SystemTime::UNIX_EPOCH) {
+			Ok(n) => n.as_micros(),
+			Err(_) => 0,
+		};
+		let tick_time = self.micros_for_tick(tick);
+		let micros = current_time.saturating_sub(tick_time);
+		Duration::from_micros(micros as u64)
+	}
+
+	#[cfg(feature = "std")]
 	pub fn duration_to_next_tick(&self) -> Duration {
 		let now = now();
 		let current_tick = self.current();
@@ -128,8 +146,6 @@ impl Ticker {
 
 #[cfg(feature = "std")]
 fn now() -> u64 {
-	use std::time::SystemTime;
-
 	let current_time: u128 = match SystemTime::now().duration_since(SystemTime::UNIX_EPOCH) {
 		Ok(n) => n.as_millis(),
 		Err(_) => 0,

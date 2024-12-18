@@ -908,6 +908,7 @@ dependencies = [
  "sc-service",
  "sp-api",
  "sp-runtime",
+ "substrate-prometheus-endpoint",
  "thiserror 2.0.4",
  "tokio",
 ]

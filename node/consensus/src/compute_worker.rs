@@ -1,4 +1,7 @@
-use crate::{block_creator::BlockProposal, error::Error, notary_client::VotingPowerInfo};
+use crate::{
+	block_creator::BlockProposal, error::Error, metrics::ConsensusMetrics,
+	notary_client::VotingPowerInfo,
+};
 use argon_primitives::{
 	block_seal::ComputePuzzle, prelude::*, tick::Ticker, BlockSealApis, BlockSealAuthorityId,
 	BlockSealDigest, ComputeDifficulty, NotebookApis, TickApis,
@@ -276,6 +279,7 @@ pub fn run_compute_solver_threads<B, Proof>(
 	task_handle: &TaskManager,
 	worker: ComputeHandle<B, Proof>,
 	threads: u32,
+	consensus_metrics: Arc<Option<ConsensusMetrics>>,
 ) where
 	B: BlockT,
 	Proof: Send + 'static,
@@ -283,11 +287,19 @@ pub fn run_compute_solver_threads<B, Proof>(
 	let handle = task_handle.spawn_essential_handle();
 	for _ in 0..threads {
 		let worker = worker.clone();
+		let metrics_copy = consensus_metrics.clone();
 		let task = async move {
+			let mut counter = 0;
 			let mut solver_ref = None;
 			loop {
 				if !worker.is_valid_solver(&solver_ref) {
 					solver_ref = worker.create_solver().map(Box::new);
+					if counter > 0 {
+						if let Some(metrics_copy) = metrics_copy.as_ref() {
+							metrics_copy.record_compute_hashes(counter);
+						}
+					}
+					counter = 0;
 				}
 
 				let Some(solver) = solver_ref.as_mut() else {
@@ -295,6 +307,7 @@ pub fn run_compute_solver_threads<B, Proof>(
 					continue;
 				};
 
+				counter += 1;
 				match solver.check_next() {
 					Ok(Some(nonce)) => worker.submit(nonce.nonce),
 					Err(err) => {
@@ -386,6 +399,7 @@ where
 	pub fn on_new_notebook_tick(
 		&self,
 		updated_notebooks_at_tick: Option<VotingPowerInfo>,
+		consensus_metrics: &Arc<Option<ConsensusMetrics>>,
 	) -> Option<B::Hash> {
 		// see if we have more notebooks at the same tick. if so, we should restart compute to
 		// include them
@@ -411,6 +425,9 @@ where
 				solve_notebook_tick = notebook_tick;
 				notebooks = notebooks_at_latest_tick;
 				self.compute_handle.stop_solving_current();
+				if let Some(metrics) = consensus_metrics.as_ref() {
+					metrics.did_reset_compute_for_notebooks();
+				}
 			}
 		}
 
@@ -565,13 +582,13 @@ mod tests {
 		let compute_state =
 			ComputeState::new(compute_handle.clone(), Arc::new(api.clone()), ticker);
 
-		let best_hash = compute_state.on_new_notebook_tick(None);
+		let best_hash = compute_state.on_new_notebook_tick(None, &Arc::new(None));
 
 		assert_eq!(best_hash, Some(api.state.lock().best_hash));
 		assert_eq!(compute_handle.best_hash().clone(), Some(api.state.lock().best_hash));
 
 		// if we have the same number of notebooks, we should keep solving against best hash
-		let best_hash = compute_state.on_new_notebook_tick(Some((1, 1, 2)));
+		let best_hash = compute_state.on_new_notebook_tick(Some((1, 1, 2)), &Arc::new(None));
 		assert_eq!(best_hash, Some(api.state.lock().best_hash));
 
 		// if we have more notebooks, we should try to solve against the last block at the tick
@@ -595,7 +612,8 @@ mod tests {
 			.last_block_at_tick
 			.insert(previous_tick, H256::from_slice(&[2u8; 32]));
 
-		let best_hash = compute_state.on_new_notebook_tick(Some((notebook_tick, 1, 3)));
+		let best_hash =
+			compute_state.on_new_notebook_tick(Some((notebook_tick, 1, 3)), &Arc::new(None));
 		assert!(best_hash.is_some());
 		// should start solving with new notebooks
 		let notebooks_at_tick = compute_state.compute_handle.solving_with_notebooks_at_tick();
@@ -604,7 +622,8 @@ mod tests {
 		metadata.solving_with_notebooks_at_tick = (notebook_tick + 1, 0);
 		compute_state.compute_handle.stop_solving_current();
 		compute_state.compute_handle.new_best_block(metadata);
-		let best_hash = compute_state.on_new_notebook_tick(Some((notebook_tick + 1, 1, 1)));
+		let best_hash =
+			compute_state.on_new_notebook_tick(Some((notebook_tick + 1, 1, 1)), &Arc::new(None));
 		assert!(best_hash.is_some());
 		// should start solving with new notebooks
 		let notebooks_at_tick = compute_state.compute_handle.solving_with_notebooks_at_tick();

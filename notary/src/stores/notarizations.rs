@@ -1,22 +1,25 @@
 use std::collections::{BTreeMap, BTreeSet};
 
-use crate::stores::{
-	balance_tip::BalanceTipStore,
-	blocks::BlocksStore,
-	chain_transfer::ChainTransferStore,
-	notebook::NotebookStore,
-	notebook_constraints::{MaxNotebookCounts, NotarizationCounts, NotebookConstraintsStore},
-	notebook_new_accounts::NotebookNewAccountsStore,
-	notebook_status::NotebookStatusStore,
+use crate::{
+	notary_metrics::NotaryMetrics,
+	stores::{
+		balance_tip::BalanceTipStore,
+		blocks::BlocksStore,
+		chain_transfer::ChainTransferStore,
+		notebook::NotebookStore,
+		notebook_constraints::{MaxNotebookCounts, NotarizationCounts, NotebookConstraintsStore},
+		notebook_new_accounts::NotebookNewAccountsStore,
+		notebook_status::NotebookStatusStore,
+	},
 };
 use argon_notary_apis::{error::Error, localchain::BalanceChangeResult};
 use argon_notary_audit::{
 	verify_changeset_signatures, verify_notarization_allocation, verify_voting_sources,
 };
 use argon_primitives::{
-	ensure, tick::Ticker, AccountId, AccountOrigin, AccountType, BalanceChange, BalanceProof,
-	BalanceTip, BlockVote, DomainHash, LocalchainAccountId, NewAccountOrigin, Notarization,
-	NotaryId, NoteType, NotebookNumber,
+	ensure, tick::Ticker, AccountId, AccountOrigin, AccountType, Balance, BalanceChange,
+	BalanceProof, BalanceTip, BlockVote, DomainHash, LocalchainAccountId, NewAccountOrigin,
+	Notarization, NotaryId, NoteType, NotebookNumber,
 };
 use codec::Encode;
 use serde_json::{from_value, json};
@@ -168,6 +171,7 @@ impl NotarizationsStore {
 		notary_id: NotaryId,
 		operator_account_id: &AccountId,
 		ticker: &Ticker,
+		notary_metrics: &NotaryMetrics,
 		changes: Vec<BalanceChange>,
 		block_votes: Vec<BlockVote>,
 		domains: Vec<(DomainHash, AccountId)>,
@@ -175,6 +179,10 @@ impl NotarizationsStore {
 		if changes.is_empty() {
 			return Err(Error::EmptyNotarizationProposed);
 		}
+
+		let balance_change_len = changes.len();
+		let block_votes_len = block_votes.len();
+		let domains_len = domains.len();
 		// Before we use db resources, let's confirm these are valid transactions
 		let initial_allocation_result = verify_notarization_allocation(
 			&changes,
@@ -214,6 +222,7 @@ impl NotarizationsStore {
 
 		let mut changes_with_proofs = changes.clone();
 		let mut chain_transfers: u32 = 0;
+		let mut tax: Balance = 0;
 
 		for (change_index, change) in changes.into_iter().enumerate() {
 			let change_index = change_index as u32;
@@ -355,6 +364,10 @@ impl NotarizationsStore {
 						channel_hold_note = None;
 						Ok(())
 					},
+					NoteType::Tax => {
+						tax += note.microgons;
+						Ok(())
+					},
 					_ => Ok(()),
 				}
 				.map_err(|e| Error::BalanceChangeError {
@@ -406,6 +419,9 @@ impl NotarizationsStore {
 		.await?;
 
 		tx.commit().await?;
+
+		notary_metrics.on_notarization(tick, balance_change_len, block_votes_len, domains_len, tax);
+
 		Ok(BalanceChangeResult {
 			notebook_number: current_notebook_number,
 			tick,

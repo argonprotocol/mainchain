@@ -2,7 +2,10 @@ pub use crate::{
 	localchain::LocalchainRpcClient, notebook::NotebookRpcClient, system::SystemRpcClient,
 };
 use anyhow::anyhow;
-use argon_primitives::{NotaryId, Notebook, NotebookNumber, SignedNotebookHeader};
+use argon_primitives::{
+	notary::{NotebookBytes, SignedHeaderBytes},
+	NotaryId, Notebook, NotebookNumber, SignedNotebookHeader,
+};
 use codec::Decode;
 use jsonrpsee::{
 	async_client::ClientBuilder,
@@ -57,26 +60,38 @@ impl ArchiveHost {
 		get_notebook_url(self.url.as_str(), notary_id, notebook_number)
 	}
 
-	pub async fn download(url: String) -> anyhow::Result<Vec<u8>> {
+	async fn download(url: String) -> anyhow::Result<Vec<u8>> {
 		download(&reqwest::Client::new(), url).await
+	}
+
+	pub async fn download_header_bytes(url: String) -> anyhow::Result<SignedHeaderBytes> {
+		let bytes = Self::download(url).await?;
+		Ok(SignedHeaderBytes(bytes))
+	}
+
+	pub async fn download_notebook_bytes(url: String) -> anyhow::Result<NotebookBytes> {
+		let bytes = Self::download(url).await?;
+		Ok(NotebookBytes(bytes))
 	}
 
 	pub async fn get_header(
 		&self,
 		notary_id: NotaryId,
 		notebook_number: NotebookNumber,
-	) -> anyhow::Result<Vec<u8>> {
+	) -> anyhow::Result<SignedHeaderBytes> {
 		let url = self.get_header_url(notary_id, notebook_number);
-		download(&self.client, url).await
+		let bytes = download(&self.client, url).await?;
+		Ok(SignedHeaderBytes(bytes))
 	}
 
 	pub async fn get_notebook(
 		&self,
 		notary_id: NotaryId,
 		notebook_number: NotebookNumber,
-	) -> anyhow::Result<Vec<u8>> {
+	) -> anyhow::Result<NotebookBytes> {
 		let url = self.get_notebook_url(notary_id, notebook_number);
-		download(&self.client, url).await
+		let bytes = download(&self.client, url).await?;
+		Ok(NotebookBytes(bytes))
 	}
 }
 

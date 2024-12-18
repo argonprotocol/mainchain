@@ -1,11 +1,14 @@
-use crate::{aux_client::ArgonAux, error::Error, notary_client::get_notebook_header_data};
+use crate::{
+	aux_client::ArgonAux, error::Error, metrics::ConsensusMetrics,
+	notary_client::get_notebook_header_data,
+};
 use argon_bitcoin_utxo_tracker::{get_bitcoin_inherent, UtxoTracker};
 use argon_primitives::{
 	inherents::{
 		BitcoinInherentDataProvider, BlockSealInherentDataProvider, BlockSealInherentNodeSide,
 		NotebooksInherentDataProvider,
 	},
-	tick::{Tick, TickDigest},
+	tick::{Tick, TickDigest, Ticker},
 	Balance, BestBlockVoteSeal, BitcoinApis, BlockSealApis, BlockSealAuthorityId, BlockSealDigest,
 	Digestset, NotaryApis, NotebookApis, TickApis, VotingSchedule,
 };
@@ -49,6 +52,13 @@ pub struct BlockCreator<Block: BlockT, BI: Clone, Client: AuxStore, PF, JS: Clon
 	pub backend: Arc<B>,
 	pub utxo_tracker: Arc<UtxoTracker>,
 	pub(crate) _phantom: std::marker::PhantomData<A>,
+	pub(crate) metrics: Arc<Option<ConsensusMetrics>>,
+}
+
+pub struct ProposalMeta {
+	pub notebooks: u32,
+	pub tick: Tick,
+	pub is_compute: bool,
 }
 
 impl<Block: BlockT, BI, C, PF, JS, A, Proof, B> BlockCreator<Block, BI, C, PF, JS, A, B>
@@ -88,7 +98,7 @@ where
 			},
 		};
 
-		let (inherent_data, inherent_digest) = self
+		let (inherent_data, inherent_digest, proposal_meta) = self
 			.create_inherents(author, parent_hash, submitting_tick, timestamp_millis, seal_inherent)
 			.await
 			.ok()?;
@@ -110,7 +120,7 @@ where
 			})
 			.ok()?;
 
-		Some(BlockProposal { proposal })
+		Some(BlockProposal { proposal, proposal_meta })
 	}
 
 	async fn create_inherents(
@@ -120,7 +130,7 @@ where
 		submitting_tick: Tick,
 		timestamp_millis: u64,
 		seal_inherent: BlockSealInherentNodeSide,
-	) -> Result<(InherentData, Digest), Error> {
+	) -> Result<(InherentData, Digest, ProposalMeta), Error> {
 		let voting_schedule = VotingSchedule::when_creating_block(submitting_tick);
 		let notebook_header_data = get_notebook_header_data(
 			&self.client,
@@ -139,11 +149,18 @@ where
 			notebook_header_data.notebook_digest.notebooks.len()
 		);
 
+		let meta = ProposalMeta {
+			notebooks: notebook_header_data.notebook_digest.notebooks.len() as u32,
+			tick: submitting_tick,
+			is_compute: matches!(seal_inherent, BlockSealInherentNodeSide::Compute),
+		};
+
 		let timestamp = sp_timestamp::InherentDataProvider::new(Timestamp::new(timestamp_millis));
 		let seal =
 			BlockSealInherentDataProvider { seal: Some(seal_inherent.clone()), digest: None };
-		let notebooks =
-			NotebooksInherentDataProvider { raw_notebooks: notebook_header_data.signed_headers };
+		let notebooks = NotebooksInherentDataProvider {
+			raw_notebooks: notebook_header_data.signed_headers.into_iter().map(|a| a.0).collect(),
+		};
 
 		let mut inherent_data =
 			(timestamp, seal, notebooks).create_inherent_data().await.inspect_err(|err| {
@@ -180,15 +197,16 @@ where
 		}
 		.create_pre_runtime_digest();
 
-		Ok((inherent_data, inherent_digest))
+		Ok((inherent_data, inherent_digest, meta))
 	}
 
 	pub async fn submit_block(
 		&self,
 		block_proposal: BlockProposal<Block, Proof>,
 		block_seal_digest: BlockSealDigest,
+		ticker: &Ticker,
 	) {
-		let BlockProposal { proposal } = block_proposal;
+		let BlockProposal { proposal, proposal_meta } = block_proposal;
 
 		let (pre_header, body) = proposal.block.deconstruct();
 		let pre_hash = pre_header.hash();
@@ -223,7 +241,6 @@ where
 		// ensure we don't dump the parent block, which will get us banned if we broadcast this and
 		// don't have it on request
 		let _ = self.backend.pin_block(parent_hash);
-
 		match self.block_import.import_block(block_import_params).await {
 			Ok(res) => match res {
 				ImportResult::Imported(_) => {
@@ -232,6 +249,9 @@ where
 						block_number,
 						&self.justification_sync_link,
 					);
+					if let Some(metrics) = self.metrics.as_ref() {
+						metrics.on_block_created(ticker, &proposal_meta);
+					}
 					tracing::info!(
 						"✅ Successfully mined block on top of: {} -> {}",
 						parent_hash,
@@ -253,4 +273,5 @@ where
 
 pub struct BlockProposal<Block: BlockT, Proof> {
 	pub proposal: Proposal<Block, Proof>,
+	pub proposal_meta: ProposalMeta,
 }
