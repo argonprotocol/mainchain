@@ -244,6 +244,7 @@ pub struct NotaryClient<B: BlockT, C: AuxStore, AC> {
 	notebook_downloader: NotebookDownloader,
 	pub(crate) metrics: Arc<Option<ConsensusMetrics>>,
 	ticker: Ticker,
+	queue_lock: Arc<Mutex<()>>,
 	_block: PhantomData<AC>,
 }
 
@@ -276,6 +277,7 @@ where
 			notebook_downloader,
 			metrics,
 			ticker,
+			queue_lock: Arc::new(Mutex::new(())),
 			_block: PhantomData,
 		}
 	}
@@ -319,6 +321,15 @@ where
 					continue;
 				},
 				NotaryState::Reactivated { reprocess_notebook_number } => {
+					if let Some(queue) = self.notebook_queue_by_id.write().await.get_mut(&notary_id)
+					{
+						for (n, body, _) in queue.iter_mut() {
+							if *n == reprocess_notebook_number {
+								body.take();
+								break;
+							}
+						}
+					}
 					self.aux_client.reprocess_notebook(notary_id, reprocess_notebook_number)?;
 				},
 				_ => {},
@@ -389,7 +400,7 @@ where
 					);
 				}
 				if let Ok(did_overflow) = self
-					.download_header(
+					.download_and_queue_header(
 						notary_id,
 						notebook_number,
 						Some(download_info.header_download_url),
@@ -411,6 +422,9 @@ where
 	}
 
 	pub async fn process_queues(self: &Arc<Self>) -> Result<bool, Error> {
+		let Some(_lock) = self.queue_lock.try_lock().ok() else {
+			return Ok(true);
+		};
 		let finalized_hash = self.client.finalized_hash();
 		let best_hash = self.client.best_hash();
 		let queued_notaries =
@@ -419,11 +433,8 @@ where
 		let handles = queued_notaries.into_iter().map(|notary_id| {
 			let self_clone: Arc<Self> = Arc::clone(self);
 			tokio::spawn(async move {
-				self_clone.clean_queued_finalized_notebooks(&finalized_hash, notary_id).await;
-				self_clone.retrieve_next_notary_missing_notebooks(notary_id, 10).await?;
-
 				let Some((notebook_number, raw_header, time)) =
-					self_clone.dequeue_ready(notary_id).await
+					self_clone.get_next(notary_id).await
 				else {
 					return Ok::<_, Error>(false);
 				};
@@ -450,6 +461,11 @@ where
 					},
 					Err(e) => {
 						if let Error::MissingNotebooksError(_) = e {
+							trace!(
+								"In queue, missing notebooks for notary {} - {:?}",
+								notary_id,
+								e
+							);
 							self_clone
 								.enqueue_notebook(
 									notary_id,
@@ -483,54 +499,6 @@ where
 		Ok(has_more_work)
 	}
 
-	async fn clean_queued_finalized_notebooks(
-		&self,
-		finalized_hash: &B::Hash,
-		notary_id: NotaryId,
-	) {
-		let finalized_notebook_number = self.latest_notebook_in_runtime(*finalized_hash, notary_id);
-
-		let mut notary_queue = self.notebook_queue_by_id.write().await;
-		if let Some(queue) = notary_queue.get_mut(&notary_id) {
-			queue.retain(|(notebook_number, _, _)| *notebook_number > finalized_notebook_number);
-		}
-	}
-
-	async fn retrieve_next_notary_missing_notebooks(
-		&self,
-		notary_id: NotaryId,
-		next_batch: u16,
-	) -> Result<(), Error> {
-		let mut missing_notebooks = vec![];
-		let mut count = 0;
-		// use notebook lock in block
-		{
-			let notary_queue = self.notebook_queue_by_id.read().await;
-			if let Some(notary_queue) = notary_queue.get(&notary_id) {
-				for (notebook_number, raw_header, _) in notary_queue {
-					if raw_header.is_none() && missing_notebooks.len() < next_batch as usize {
-						missing_notebooks.push(*notebook_number);
-					}
-					count += 1;
-				}
-			}
-		}
-		if missing_notebooks.is_empty() {
-			trace!("No missing notebooks for notary {}", notary_id);
-			return Ok(());
-		}
-
-		info!(
-			"Retrieving missing notebooks from notary #{} - {:?} (of {count})",
-			notary_id, missing_notebooks
-		);
-		for notebook_number in missing_notebooks {
-			self.download_header(notary_id, notebook_number, None).await?;
-		}
-
-		Ok(())
-	}
-
 	async fn log_queue_depth(&self) {
 		if let Some(metrics) = self.metrics.as_ref() {
 			let notary_queue = self.notebook_queue_by_id.read().await;
@@ -545,28 +513,38 @@ where
 		notary_queue.get(&notary_id).map_or(0usize, |q| q.len())
 	}
 
-	async fn dequeue_ready(
+	async fn get_next(
 		&self,
 		notary_id: NotaryId,
 	) -> Option<(NotebookNumber, SignedHeaderBytes, Instant)> {
-		let mut queues = self.notebook_queue_by_id.write().await;
-		let queue = queues.get_mut(&notary_id)?;
-		if queue.is_empty() {
-			return None;
-		}
+		let (notebook_number, mut bytes, queue_time) = {
+			let mut queues = self.notebook_queue_by_id.write().await;
+			let queue = queues.get_mut(&notary_id)?;
+			if queue.is_empty() {
+				return None;
+			}
 
-		if tracing::enabled!(tracing::Level::TRACE) {
-			trace!(
-				"Dequeuing notebook for notary {}. Queue: {:?}",
-				notary_id,
-				queue.iter().map(|(n, h, _)| (n, h.is_some())).collect::<Vec<_>>()
-			);
+			if tracing::enabled!(tracing::Level::TRACE) {
+				trace!(
+					"Dequeuing notebook for notary {}. Queue: {:?}",
+					notary_id,
+					queue.iter().map(|(n, h, _)| (n, h.is_some())).collect::<Vec<_>>()
+				);
+			}
+			queue.remove(0)
+		};
+
+		if bytes.is_none() {
+			bytes = self.download_header(notary_id, notebook_number, None).await.ok();
 		}
-		if let Some((_, Some(_), _)) = queue.first() {
-			let (notebook_number, raw_header, time) = queue.remove(0);
-			return Some((notebook_number, raw_header?, time))
+		if let Some(bytes) = bytes {
+			Some((notebook_number, bytes, queue_time))
+		} else {
+			self.enqueue_notebook(notary_id, notebook_number, None, Some(queue_time))
+				.await
+				.ok();
+			None
 		}
-		None
 	}
 
 	/// Enqueue the notebook and return true if the queue overflowed
@@ -623,20 +601,29 @@ where
 		self.subscriptions_by_id.write().await.remove(&notary_id);
 	}
 
+	async fn download_and_queue_header(
+		&self,
+		notary_id: NotaryId,
+		notebook_number: NotebookNumber,
+		download_url: Option<String>,
+	) -> Result<bool, Error> {
+		let header = self.download_header(notary_id, notebook_number, download_url).await?;
+		self.enqueue_notebook(notary_id, notebook_number, Some(header), None).await
+	}
+
 	async fn download_header(
 		&self,
 		notary_id: NotaryId,
 		notebook_number: NotebookNumber,
 		mut download_url: Option<String>,
-	) -> Result<bool, Error> {
+	) -> Result<SignedHeaderBytes, Error> {
 		if download_url.is_none() {
 			if let Some(archive_host) = self.notary_archive_host_by_id.read().await.get(&notary_id)
 			{
 				download_url = Some(get_header_url(archive_host, notary_id, notebook_number));
 			}
 		}
-		let header = self
-			.notebook_downloader
+		self.notebook_downloader
 			.get_header(notary_id, notebook_number, download_url)
 			.await
 			.map_err(|e| {
@@ -644,9 +631,7 @@ where
 					"Could not get notary {notary_id}, notebook {notebook_number} from notebook downloader - {:?}",
 					e
 				))
-			})?;
-
-		self.enqueue_notebook(notary_id, notebook_number, Some(header), None).await
+			})
 	}
 
 	async fn download_notebook(
@@ -694,7 +679,7 @@ where
 		if latest_stored < notebook_meta.finalized_notebook_number {
 			let start = latest_stored + 1;
 			for i in start..=notebook_meta.finalized_notebook_number {
-				self.download_header(id, i, None).await?;
+				self.download_and_queue_header(id, i, None).await?;
 			}
 		}
 
@@ -735,7 +720,6 @@ where
 		let finalized_notebook_number = self.latest_notebook_in_runtime(*finalized_hash, notary_id);
 		if notebook_number <= finalized_notebook_number {
 			info!(
-
 				"Skipping audit of finalized notebook. Notary {notary_id}, #{notebook_number}, finalized #{finalized_notebook_number}.",
 			);
 			return Ok(());
@@ -835,7 +819,7 @@ where
 
 			// drain queues
 			// NOTE: only do this for 10 seconds
-			let start = std::time::Instant::now();
+			let start = Instant::now();
 			while self.process_queues().await? {
 				tokio::time::sleep(Duration::from_millis(30)).await;
 				if start.elapsed() > Duration::from_secs(10) {
@@ -879,6 +863,7 @@ where
 			for missing in &missing_notebooks {
 				self.enqueue_notebook(notary_id, *missing, None, None).await?;
 			}
+			info!("Missing notebooks for notary {}. Enqueued: {:?}", notary_id, missing_notebooks);
 			return Err(Error::MissingNotebooksError(format!(
 				"Missing notebooks #{:?} to audit {} for notary {}",
 				missing_notebooks, notebook_number, notary_id
@@ -1147,7 +1132,6 @@ impl NotebookDownloader {
 mod test {
 	use super::*;
 	use crate::{error::Error, mock_notary::MockNotary, notary_client::NotaryApisExt};
-	use argon_notary_apis::notebook::NotebookRpcServer;
 	use argon_primitives::{
 		notary::{
 			NotaryMeta, NotaryNotebookAuditSummary, NotaryNotebookAuditSummaryDetails,
@@ -1420,15 +1404,14 @@ mod test {
 				.collect::<Vec<_>>(),
 			vec![(1, false), (2, false), (3, false)]
 		);
-		let next = notary_client.dequeue_ready(1).await;
+		let next = notary_client.get_next(1).await;
 		assert!(next.is_none());
+		assert_eq!(notary_client.notebook_queue_by_id.read().await.get(&1).unwrap().len(), 3);
 
 		notary_client
 			.enqueue_notebook(1, 2, Some(Default::default()), None)
 			.await
 			.expect("Could not enqueue");
-		let next = notary_client.dequeue_ready(1).await;
-		assert!(next.is_none());
 		notary_client
 			.enqueue_notebook(1, 1, Some(Default::default()), None)
 			.await
@@ -1463,69 +1446,8 @@ mod test {
 				.collect::<Vec<_>>(),
 			vec![(1, true), (2, true), (3, false)]
 		);
-		let next = notary_client.dequeue_ready(1).await;
+		let next = notary_client.get_next(1).await;
 		assert!(next.is_some());
-	}
-
-	#[tokio::test]
-	async fn downloads_missing_audit_notebooks() {
-		let (test_notary, client, notary_client) = system().await;
-		notary_client
-			.update_notaries(&client.best_hash())
-			.await
-			.expect("Could not update notaries");
-		let notebooks = (1..=11u32).map(|n| (n, false)).collect::<Vec<_>>();
-		for (n, _) in &notebooks {
-			notary_client
-				.enqueue_notebook(1, *n, None, None)
-				.await
-				.expect("Could not enqueue");
-		}
-		assert_eq!(
-			notary_client
-				.notebook_queue_by_id
-				.read()
-				.await
-				.get(&1)
-				.unwrap()
-				.iter()
-				.map(|(n, x, _)| { (*n, x.is_some()) })
-				.collect::<Vec<_>>(),
-			notebooks
-		);
-		for _ in 1..=11 {
-			test_notary.create_notebook_header(vec![]).await;
-		}
-		assert_eq!(
-			test_notary.metadata().await.expect(""),
-			NotebookMeta { finalized_notebook_number: 11, finalized_tick: 11 }
-		);
-		notary_client
-			.retrieve_next_notary_missing_notebooks(1, 10)
-			.await
-			.expect("Could not retrieve missing notebooks");
-		let pending_notebooks = {
-			let queue = notary_client.notebook_queue_by_id.read().await;
-			queue.get(&1).expect("No queue").clone()
-		};
-
-		assert_eq!(
-			pending_notebooks.iter().map(|(n, a, _)| (*n, a.is_some())).collect::<Vec<_>>(),
-			vec![
-				(1, true),
-				(2, true),
-				(3, true),
-				(4, true),
-				(5, true),
-				(6, true),
-				(7, true),
-				(8, true),
-				(9, true),
-				(10, true),
-				(11, false),
-			],
-			"should download the first 10"
-		);
 	}
 
 	/// Test that if a notary disconnects and then a new block comes in, the client is able to

@@ -102,4 +102,5 @@ jobs:
           CARGO_INCREMENTAL: 0
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
           RUST_LOG: info
+          CI: true
           SQLX_OFFLINE: ${{ startsWith(matrix.os, 'macos') }}

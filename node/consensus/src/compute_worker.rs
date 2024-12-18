@@ -419,7 +419,7 @@ where
 			{
 				tracing::info!(
 					?notebooks_at_latest_tick,
-					tick = notebook_tick - 1,
+					notebook_tick,
 					"Found new notebooks at tick. Will try to solve tick with compute"
 				);
 				solve_notebook_tick = notebook_tick;

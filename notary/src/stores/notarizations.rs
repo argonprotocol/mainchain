@@ -166,6 +166,7 @@ impl NotarizationsStore {
 	///    blocks since that change.
 	/// 6. If a notary is compromised, the user can use the proof of last balance change to migrate
 	///    their balance to a new notary. NOTE: you must have proof from the completed notebook.
+	#[allow(clippy::too_many_arguments)]
 	pub async fn apply(
 		pool: &PgPool,
 		notary_id: NotaryId,
