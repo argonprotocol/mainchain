@@ -52,8 +52,14 @@ algorithm (more details to come in the whitepaper).
 The Argon mainchain is built using the [Substrate](https://substrate.dev) framework. Substrate is a modular blockchain
 framework that allows developers to build custom blockchains that operate independently, but can connect into a shared
 ecosystem called "Parachains". Substrate is built in Rust and has a WebAssembly runtime that allows for upgrades to the
-blockchain without forks. Argon runs as a "solochain", which means our consensus is not shared with other chains. It
-will gain integration through a "Transferchain" that allows for the transfer of Argons between chains.
+blockchain without forks. Argon runs as a "solochain", which means our consensus is not shared with other chains.
+
+Cross-chain transfers are enabled via [Hyperbridge](https://hyperbridge.network), which is a zero-trust, decentralized
+bridge. Fees are payable in Argons when going Argon -> Ethereum/Base/Binance Chain/etc, and the native token of a source
+chain when transferring into Argon.
+
+A Uniswap liquidity pool with USDC is used to create a price-point for the Argon. The main Uniswap contract initially in
+use is on Ethereum.
 
 The Localchain is a Rust library that can be run in a standalone cli, within Node.js via bindings created
 using [napi-rs](https://napi.rs) or as a library in iOS/Android using [uniffi](https://github.com/mozilla/uniffi-rs). It
