@@ -7,7 +7,7 @@ use prometheus_endpoint::{
 	prometheus, register, CounterVec, GaugeVec, HistogramOpts, HistogramVec, Opts, PrometheusError,
 	Registry, U64,
 };
-use std::time::{Duration, Instant};
+use std::time::Instant;
 
 /// Metrics for the node consensus engine
 #[derive(Debug, Clone)]
@@ -22,8 +22,6 @@ pub struct ConsensusMetrics {
 	vote_blocks_created_total: CounterVec<U64>,
 	/// Block time created after tick
 	block_time_after_tick: HistogramVec,
-	/// Time when fallback compute was activated
-	fallback_compute_activated_time: HistogramVec,
 	/// Notebook queue depth
 	notebook_queue_depth: GaugeVec<U64>,
 	/// Notebook time after tick notification was received
@@ -66,16 +64,6 @@ impl ConsensusMetrics {
 				)?,
 				metrics_registry,
 			)?,
-			fallback_compute_activated_time: register(
-				HistogramVec::new(
-					HistogramOpts::new(
-						"argon_fallback_compute_activated_time",
-						"Time [μs] after target tick when fallback compute was activated",
-					),
-					&[],
-				)?,
-				metrics_registry,
-			)?,
 			vote_blocks_created_total: register(
 				CounterVec::new(
 					Opts::new("argon_vote_blocks_crated_total", "Blocks created with votes"),
@@ -89,7 +77,7 @@ impl ConsensusMetrics {
 						"argon_blocks_time_after_tick",
 						"Total time [μs] after a tick that a block is created",
 					)
-					.buckets(prometheus::exponential_buckets(10.0, 10.0, 12)?),
+					.buckets(prometheus::exponential_buckets(100_000.0, 2.5, 10)?),
 					&[],
 				)?,
 				metrics_registry,
@@ -107,7 +95,7 @@ impl ConsensusMetrics {
 						"argon_notebook_notification_after_tick_time",
 						"Total time [μs] after a tick that a notebook notification was received",
 					)
-					.buckets(prometheus::exponential_buckets(10.0, 10.0, 12)?),
+					.buckets(prometheus::exponential_buckets(10_000.0, 2.5, 10)?),
 					&["notary_id"],
 				)?,
 				metrics_registry,
@@ -118,7 +106,7 @@ impl ConsensusMetrics {
 						"argon_notebook_audited_after_tick_time",
 						"Total time [μs] after a tick that a notebook was audited",
 					)
-					.buckets(prometheus::exponential_buckets(10.0, 10.0, 12)?),
+					.buckets(prometheus::exponential_buckets(100_000.0, 3.0, 12)?),
 					&["notary_id"],
 				)?,
 				metrics_registry,
@@ -129,7 +117,7 @@ impl ConsensusMetrics {
 						"argon_notebook_processing_time",
 						"Total time [μs] to process a notebook",
 					)
-					.buckets(prometheus::exponential_buckets(10.0, 10.0, 12)?),
+					.buckets(prometheus::exponential_buckets(100_000.0, 1.3, 20)?),
 					&["notary_id"],
 				)?,
 				metrics_registry,
@@ -142,12 +130,10 @@ impl ConsensusMetrics {
 	}
 
 	pub(crate) fn on_block_created(&self, ticker: &Ticker, proposal_meta: &ProposalMeta) {
-		let expected_tick_time = ticker.duration_after_tick(proposal_meta.tick);
-		let time_after_tick = expected_tick_time.as_micros() as u64;
+		let expected_tick_time = ticker.duration_after_tick_starts(proposal_meta.tick);
+		let time_after_tick = expected_tick_time.as_micros() as f64;
 		let has_notebooks = if proposal_meta.notebooks > 0 { "true" } else { "false" };
-		self.block_time_after_tick
-			.with_label_values(&[])
-			.observe(time_after_tick as f64);
+		self.block_time_after_tick.with_label_values(&[]).observe(time_after_tick);
 		if proposal_meta.is_compute {
 			self.compute_blocks_created_total.with_label_values(&[has_notebooks]).inc();
 		} else {
@@ -157,12 +143,6 @@ impl ConsensusMetrics {
 
 	pub(crate) fn did_reset_compute_for_notebooks(&self) {
 		self.compute_resets_from_notebooks.with_label_values(&[]).inc();
-	}
-
-	pub(crate) fn start_fallback_mining(&self, time_after_tick: Duration) {
-		self.fallback_compute_activated_time
-			.with_label_values(&[])
-			.observe(time_after_tick.as_micros() as f64);
 	}
 
 	pub(crate) fn notebook_processed(
@@ -190,7 +170,7 @@ impl ConsensusMetrics {
 		tick: Tick,
 		ticker: &Ticker,
 	) {
-		let duration_after_tick = ticker.duration_after_tick(tick);
+		let duration_after_tick = ticker.duration_after_tick_ends(tick);
 
 		let time_after_tick = duration_after_tick.as_micros() as f64;
 		self.notebook_notification_after_tick_time

@@ -224,6 +224,7 @@ pub fn run_block_builder_task<Block, BI, C, PF, A, SC, SO, JS, B>(
 		}
 	};
 
+	let is_compute_enabled = compute_threads > 0;
 	let consensus_metrics_finder = consensus_metrics.clone();
 	let block_finder_task = async move {
 		let mut import_stream = client.every_import_notification_stream();
@@ -248,6 +249,12 @@ pub fn run_block_builder_task<Block, BI, C, PF, A, SC, SO, JS, B>(
 						let Ok(tick) = client.runtime_api().current_tick(block.hash) else {
 							continue;
 						};
+						let block_number = *block.header.number();
+						if block_number < client.info().finalized_number {
+							continue;
+						}
+						// If this block can still be finalized, see if we can beat it. This could be the best block
+						// or could be a new branch
 						let voting_schedule = VotingSchedule::when_creating_block(tick);
 						if let Ok(info) = aux_client.get_tick_voting_power(voting_schedule.notebook_tick()) {
 							check_for_better_blocks = info
@@ -269,6 +276,10 @@ pub fn run_block_builder_task<Block, BI, C, PF, A, SC, SO, JS, B>(
 				{
 					warn!("Error while checking for new blocks: {:?}", err);
 				}
+			}
+
+			if !is_compute_enabled {
+				continue;
 			}
 
 			// don't deal with compute blocks if we don't have a compute author
@@ -301,10 +312,6 @@ pub fn run_block_builder_task<Block, BI, C, PF, A, SC, SO, JS, B>(
 				{
 					trace!(?best_hash, ?tick, "Fallback mining activated");
 					compute_handle.start_solving(proposal);
-					if let Some(metrics) = consensus_metrics_finder.as_ref() {
-						let time_after_tick = ticker.duration_after_tick(tick);
-						metrics.start_fallback_mining(time_after_tick);
-					}
 				}
 			}
 		}

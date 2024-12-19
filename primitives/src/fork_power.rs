@@ -6,6 +6,7 @@ use sp_core::U256;
 
 #[derive(Clone, Encode, Decode, Debug, Eq, PartialEq, MaxEncodedLen, TypeInfo)]
 pub struct ForkPower {
+	/// True if the fork is a vote block, false if it is a compute block.
 	pub is_latest_vote: bool,
 	#[codec(compact)]
 	pub notebooks: u64,

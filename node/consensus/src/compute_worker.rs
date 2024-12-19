@@ -162,10 +162,11 @@ where
 				if current_tick > x.emergency_tick {
 					return true;
 				}
+				if x.is_bootstrap_mining {
+					return true;
+				}
 				// must be past the parent tick and not have tax votes
-				if (!x.has_eligible_votes || x.is_bootstrap_mining) &&
-					x.activate_mining_time < now_millis
-				{
+				if !x.has_eligible_votes && x.activate_mining_time < now_millis {
 					return true;
 				}
 				if x.solving_with_notebooks_at_tick.1 > 0 && x.submit_notebooks_time < now_millis {
@@ -413,9 +414,12 @@ where
 				.compute_handle
 				.solving_with_notebooks_at_tick()
 				.unwrap_or((notebook_tick, 0));
-			if notebook_tick > solving_for_tick ||
-				(notebook_tick == solving_for_tick &&
-					notebooks_at_latest_tick > solving_with_notebooks)
+			// If we're solving with no notebooks, we should stop and start solving with the new
+			// ones. However, if you try too hard to optimize the notebook inclusion, you won't
+			// ever finish a block. So we only do this if we're not already solving with notebooks.
+			if notebook_tick >= solving_for_tick &&
+				solving_with_notebooks == 0 &&
+				notebooks_at_latest_tick > 0
 			{
 				tracing::info!(
 					?notebooks_at_latest_tick,
@@ -473,14 +477,12 @@ mod tests {
 	use codec::Encode;
 	use sc_utils::mpsc::tracing_unbounded;
 	use sp_core::{H256, U256};
-	use std::collections::HashMap;
 
 	struct ApiState {
 		ticker: Ticker,
 		best_hash: HashOutput,
 		genesis_hash: HashOutput,
 		is_bootstrap_mining: bool,
-		last_block_at_tick: HashMap<Tick, HashOutput>,
 		has_eligible_votes: bool,
 		compute_puzzle: ComputePuzzle<Block>,
 	}
@@ -558,7 +560,7 @@ mod tests {
 	}
 
 	#[test]
-	fn it_tries_to_beat_ticks_with_more_notebooks() {
+	fn it_prefers_to_solve_with_a_notebook() {
 		setup_logs();
 
 		let ticker = Ticker::new(1000, 2);
@@ -569,7 +571,6 @@ mod tests {
 			ticker,
 			best_hash: H256::from_slice(&[1u8; 32]),
 			genesis_hash: H256::from_slice(&[0u8; 32]),
-			last_block_at_tick: HashMap::new(),
 			is_bootstrap_mining: false,
 			has_eligible_votes: false,
 			compute_puzzle: ComputePuzzle {
@@ -587,46 +588,24 @@ mod tests {
 		assert_eq!(best_hash, Some(api.state.lock().best_hash));
 		assert_eq!(compute_handle.best_hash().clone(), Some(api.state.lock().best_hash));
 
-		// if we have the same number of notebooks, we should keep solving against best hash
-		let best_hash = compute_state.on_new_notebook_tick(Some((1, 1, 2)), &Arc::new(None));
+		let latest_tick = api.state.lock().ticker.current();
+		// if we already have notebooks at the tick, we should try to solve with them
+		let best_hash =
+			compute_state.on_new_notebook_tick(Some((latest_tick, 1, 2)), &Arc::new(None));
 		assert_eq!(best_hash, Some(api.state.lock().best_hash));
+		assert_eq!(
+			compute_handle
+				.metadata
+				.lock()
+				.as_ref()
+				.map(|a| a.solving_with_notebooks_at_tick),
+			Some((latest_tick, 2))
+		);
 
-		// if we have more notebooks, we should try to solve against the last block at the tick
-		let notebook_tick = 2;
-		let mut metadata = MiningMetadata {
-			best_hash: H256::from_slice(&[2u8; 32]),
-			has_eligible_votes: false,
-			activate_mining_time: 0,
-			is_bootstrap_mining: false,
-			submit_notebooks_time: 0,
-			key_block_hash: H256::from_slice(&[1u8; 32]),
-			emergency_tick: 0,
-			difficulty: 1,
-			// no notebooks
-			solving_with_notebooks_at_tick: (notebook_tick, 2),
-		};
-		compute_state.compute_handle.new_best_block(metadata.clone());
-		let previous_tick = notebook_tick - 1;
-		state
-			.lock()
-			.last_block_at_tick
-			.insert(previous_tick, H256::from_slice(&[2u8; 32]));
-
-		let best_hash =
-			compute_state.on_new_notebook_tick(Some((notebook_tick, 1, 3)), &Arc::new(None));
-		assert!(best_hash.is_some());
-		// should start solving with new notebooks
+		// we should not replace for an older tick
+		let _best_hash =
+			compute_state.on_new_notebook_tick(Some((latest_tick - 1, 1, 1)), &Arc::new(None));
 		let notebooks_at_tick = compute_state.compute_handle.solving_with_notebooks_at_tick();
-		assert_eq!(notebooks_at_tick, Some((notebook_tick, 3)));
-
-		metadata.solving_with_notebooks_at_tick = (notebook_tick + 1, 0);
-		compute_state.compute_handle.stop_solving_current();
-		compute_state.compute_handle.new_best_block(metadata);
-		let best_hash =
-			compute_state.on_new_notebook_tick(Some((notebook_tick + 1, 1, 1)), &Arc::new(None));
-		assert!(best_hash.is_some());
-		// should start solving with new notebooks
-		let notebooks_at_tick = compute_state.compute_handle.solving_with_notebooks_at_tick();
-		assert_eq!(notebooks_at_tick, Some((notebook_tick + 1, 1)));
+		assert_eq!(notebooks_at_tick, Some((latest_tick, 2)));
 	}
 }

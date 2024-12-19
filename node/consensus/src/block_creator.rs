@@ -158,9 +158,8 @@ where
 		let timestamp = sp_timestamp::InherentDataProvider::new(Timestamp::new(timestamp_millis));
 		let seal =
 			BlockSealInherentDataProvider { seal: Some(seal_inherent.clone()), digest: None };
-		let notebooks = NotebooksInherentDataProvider {
-			raw_notebooks: notebook_header_data.signed_headers.into_iter().map(|a| a.0).collect(),
-		};
+		let notebooks =
+			NotebooksInherentDataProvider { raw_notebooks: notebook_header_data.signed_headers };
 
 		let mut inherent_data =
 			(timestamp, seal, notebooks).create_inherent_data().await.inspect_err(|err| {

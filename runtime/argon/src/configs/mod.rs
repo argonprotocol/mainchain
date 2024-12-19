@@ -164,7 +164,7 @@ const INCREMENTAL_REWARD_AMOUNT: Balance = 1_000;
 const INCREMENT_TICKS: u32 = 118;
 
 parameter_types! {
-	pub const TargetComputeBlockPercent: FixedU128 = FixedU128::from_rational(51, 100); // aim for less than full compute time so it can wait for notebooks
+	pub const TargetComputeBlockPercent: FixedU128 = FixedU128::from_rational(49, 100); // aim for less than full compute time so it can wait for notebooks
 	pub const TargetBlockVotes: u32 = 50_000;
 	pub const SealSpecVoteHistoryForAverage: u32 = 24 * 60; // 24 hours of history
 	pub const SealSpecComputeHistoryToTrack: u32 = 6 * 60; // 6 hours of history
@@ -263,7 +263,6 @@ impl Get<bool> for MultiBlockPerTickEnabled {
 
 impl pallet_ticks::Config for Runtime {
 	type WeightInfo = ();
-	type AllowMultipleBlockPerTick = MultiBlockPerTickEnabled;
 }
 
 parameter_types! {

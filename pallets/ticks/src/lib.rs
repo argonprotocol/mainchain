@@ -41,9 +41,6 @@ pub mod pallet {
 	pub trait Config: pallet_timestamp::Config + frame_system::Config {
 		/// Type representing the weight of this pallet
 		type WeightInfo: WeightInfo;
-
-		/// Should the system allow multiple blocks to be produced in the same tick
-		type AllowMultipleBlockPerTick: Get<bool>;
 	}
 
 	#[pallet::storage]
@@ -105,9 +102,6 @@ pub mod pallet {
 			}
 
 			RecentBlocksAtTicks::<T>::mutate(parent_tick, |blocks| {
-				if blocks.len() > 0 && !T::AllowMultipleBlockPerTick::get() {
-					panic!("Multiple blocks per tick is not allowed.");
-				}
 				blocks.try_push(<frame_system::Pallet<T>>::parent_hash())
 			})
 				.expect("Failed to push block hash to recent blocks. Too many blocks per tick is a valid panic reason.");

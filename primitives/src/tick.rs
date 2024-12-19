@@ -113,7 +113,12 @@ impl Ticker {
 	}
 
 	#[cfg(feature = "std")]
-	pub fn duration_after_tick(&self, tick: Tick) -> Duration {
+	pub fn duration_after_tick_ends(&self, tick: Tick) -> Duration {
+		self.duration_after_tick_starts(tick + 1)
+	}
+
+	#[cfg(feature = "std")]
+	pub fn duration_after_tick_starts(&self, tick: Tick) -> Duration {
 		let current_time = match SystemTime::now().duration_since(SystemTime::UNIX_EPOCH) {
 			Ok(n) => n.as_micros(),
 			Err(_) => 0,

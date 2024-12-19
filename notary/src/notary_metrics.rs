@@ -52,7 +52,7 @@ impl NotaryMetrics {
 				HistogramVec::new(
 					HistogramOpts::new(
 						"notary_notebook_close_time_after_tick",
-						"Total time [μs] to close notebooks after tick",
+						"Total time [μs] to close notebooks after tick ends (eg, next has begun)",
 					)
 					.buckets(HISTOGRAM_BUCKETS.to_vec()),
 					&[],
