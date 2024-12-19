@@ -235,8 +235,8 @@ impl MockNotary {
       .headers
       .insert(header.header.notebook_number, header.clone());
     state.metadata = Some(NotebookMeta {
-      finalized_tick: header.header.tick,
-      finalized_notebook_number: header.header.notebook_number,
+      last_closed_notebook_tick: header.header.tick,
+      last_closed_notebook_number: header.header.notebook_number,
     });
     drop(state);
     let _ = self

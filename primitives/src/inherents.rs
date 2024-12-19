@@ -7,6 +7,7 @@ use sp_runtime::RuntimeDebug;
 
 use crate::{
 	bitcoin::{BitcoinBlock, BitcoinHeight, BitcoinRejectedReason, UtxoId, UtxoRef},
+	notary::SignedHeaderBytes,
 	BestBlockVoteSeal, BlockSealDigest, BlockVote, MerkleProof, NotaryId, NotebookNumber,
 	SignedNotebookHeader,
 };
@@ -183,11 +184,11 @@ pub trait NotebookInherentData {
 
 impl NotebookInherentData for InherentData {
 	fn notebooks(&self) -> Result<Option<Vec<SignedNotebookHeader>>, sp_inherents::Error> {
-		let raw = self.get_data::<Vec<Vec<u8>>>(&NOTEBOOKS_INHERENT_IDENTIFIER)?;
+		let raw = self.get_data::<Vec<SignedHeaderBytes>>(&NOTEBOOKS_INHERENT_IDENTIFIER)?;
 		if let Some(raw) = raw {
 			let mut result: Vec<SignedNotebookHeader> = Vec::new();
 			for data in raw {
-				let entry = SignedNotebookHeader::decode(&mut data.as_slice()).map_err(|e| {
+				let entry = SignedNotebookHeader::decode(&mut data.0.as_slice()).map_err(|e| {
 					sp_inherents::Error::DecodingFailed(e, NOTEBOOKS_INHERENT_IDENTIFIER)
 				})?;
 				result.push(entry);
@@ -199,7 +200,7 @@ impl NotebookInherentData for InherentData {
 }
 #[cfg(feature = "std")]
 pub struct NotebooksInherentDataProvider {
-	pub raw_notebooks: Vec<Vec<u8>>,
+	pub raw_notebooks: Vec<SignedHeaderBytes>,
 }
 #[cfg(feature = "std")]
 #[async_trait::async_trait]

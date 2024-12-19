@@ -34,7 +34,7 @@ async fn test_end_to_end_default_vote_mining() {
 				if let Ok(ownership) =
 					grandpa_miner.client.get_ownership(&author, Some(block.hash())).await
 				{
-					if ownership.free > 500_000 && !authors.contains(&author) {
+					if ownership.free >= 500_000 && !authors.contains(&author) {
 						println!("Block Author is ready {:?}", keyring);
 						authors.insert(author);
 					}

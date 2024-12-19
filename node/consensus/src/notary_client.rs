@@ -230,7 +230,8 @@ where
 
 type PendingNotebook = (NotebookNumber, Option<SignedHeaderBytes>, Instant);
 
-pub type VotingPowerInfo = (Tick, BlockVotingPower, u32);
+type NotebookCount = u32;
+pub type VotingPowerInfo = (Tick, BlockVotingPower, NotebookCount);
 pub struct NotaryClient<B: BlockT, C: AuxStore, AC> {
 	client: Arc<C>,
 	pub notary_client_by_id: Arc<RwLock<BTreeMap<NotaryId, Arc<Client>>>>,
@@ -345,7 +346,7 @@ where
 
 			if !is_connected || reconnect_ids.contains(&notary_id) {
 				info!("Connecting to notary id={}", notary_id);
-				if let Err(e) = self.sync_notebooks(notary_id).await {
+				if let Err(e) = self.connect_to_notary(notary_id).await {
 					self.disconnect(
 						&notary_id,
 						Some(format!("Notary {} sync failed. {:?}", notary_id, e)),
@@ -399,13 +400,8 @@ where
 						&self.ticker,
 					);
 				}
-				if let Ok(did_overflow) = self
-					.download_and_queue_header(
-						notary_id,
-						notebook_number,
-						Some(download_info.header_download_url),
-					)
-					.await
+				if let Ok(did_overflow) =
+					self.enqueue_notebook(notary_id, notebook_number, None, None).await
 				{
 					if did_overflow {
 						info!("Overflowed queue for notary {}", notary_id);
@@ -601,16 +597,6 @@ where
 		self.subscriptions_by_id.write().await.remove(&notary_id);
 	}
 
-	async fn download_and_queue_header(
-		&self,
-		notary_id: NotaryId,
-		notebook_number: NotebookNumber,
-		download_url: Option<String>,
-	) -> Result<bool, Error> {
-		let header = self.download_header(notary_id, notebook_number, download_url).await?;
-		self.enqueue_notebook(notary_id, notebook_number, Some(header), None).await
-	}
-
 	async fn download_header(
 		&self,
 		notary_id: NotaryId,
@@ -664,25 +650,19 @@ where
 		Ok(bytes)
 	}
 
-	async fn sync_notebooks(&self, id: NotaryId) -> Result<(), Error> {
+	async fn connect_to_notary(&self, id: NotaryId) -> Result<(), Error> {
 		let client = self.get_or_connect_to_client(id).await?;
 		let notebook_meta = client.metadata().await.map_err(|e| {
 			Error::NotaryError(format!("Could not get metadata from notary - {:?}", e))
 		})?;
-		let notary_notebooks = self.aux_client.get_notary_audit_history(id)?.get();
-		let latest_stored = notary_notebooks.last().map(|n| n.notebook_number).unwrap_or_default();
 		let archive_host = client.get_archive_base_url().await.map_err(|e| {
 			Error::NotaryError(format!("Could not get archive host from notary - {:?}", e))
 		})?;
 		self.notary_archive_host_by_id.write().await.insert(id, archive_host.clone());
-
-		if latest_stored < notebook_meta.finalized_notebook_number {
-			let start = latest_stored + 1;
-			for i in start..=notebook_meta.finalized_notebook_number {
-				self.download_and_queue_header(id, i, None).await?;
-			}
+		if notebook_meta.last_closed_notebook_number > 0 {
+			self.enqueue_notebook(id, notebook_meta.last_closed_notebook_number, None, None)
+				.await?;
 		}
-
 		Ok(())
 	}
 
@@ -713,10 +693,6 @@ where
 		raw_header: SignedHeaderBytes,
 		enqueue_time: Instant,
 	) -> Result<(), Error> {
-		// if we have a good notebook with this number, don't re-audit
-		if self.aux_client.has_successful_audit(notary_id, notebook_number) {
-			return Ok(())
-		}
 		let finalized_notebook_number = self.latest_notebook_in_runtime(*finalized_hash, notary_id);
 		if notebook_number <= finalized_notebook_number {
 			info!(
@@ -1037,6 +1013,7 @@ where
 	let mut headers = NotebookHeaderData::default();
 	let mut tick_notebooks = vec![];
 
+	const MAX_NOTEBOOKS_PER_NOTARY: u32 = 10;
 	let notaries = client.runtime_api().notaries(*parent_hash)?;
 	for notary in notaries {
 		if matches!(notary.state, NotaryState::Locked { .. }) {
@@ -1048,6 +1025,7 @@ where
 			notary.notary_id,
 			*latest_runtime_notebook_number,
 			voting_schedule,
+			MAX_NOTEBOOKS_PER_NOTARY,
 		) else {
 			continue;
 		};
@@ -1292,7 +1270,7 @@ mod test {
 		let mut test_notary = MockNotary::new(1);
 		test_notary.start().await.expect("could not start notary");
 		test_notary.state.lock().await.metadata =
-			Some(NotebookMeta { finalized_notebook_number: 0, finalized_tick: 0 });
+			Some(NotebookMeta { last_closed_notebook_number: 0, last_closed_notebook_tick: 0 });
 		let archive_host = test_notary.archive_host.clone();
 
 		let client = Arc::new(TestNode::new());

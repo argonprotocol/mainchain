@@ -186,12 +186,15 @@ impl NotebookHeaderStore {
 		.fetch_optional(db)
 		.await?;
 		let Some(record) = record else {
-			return Ok(NotebookMeta { finalized_tick: 0, finalized_notebook_number: 0 });
+			return Ok(NotebookMeta {
+				last_closed_notebook_tick: 0,
+				last_closed_notebook_number: 0,
+			});
 		};
 
 		Ok(NotebookMeta {
-			finalized_tick: record.tick as Tick,
-			finalized_notebook_number: record.notebook_number as NotebookNumber,
+			last_closed_notebook_tick: record.tick as Tick,
+			last_closed_notebook_number: record.notebook_number as NotebookNumber,
 		})
 	}
 
