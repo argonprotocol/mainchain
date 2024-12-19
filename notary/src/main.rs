@@ -232,7 +232,7 @@ async fn main() -> anyhow::Result<()> {
 					ticker,
 					server.completed_notebook_sender.clone(),
 					s3_buckets.clone(),
-					prom_registry.clone(),
+					server.notary_metrics.clone(),
 				)?;
 
 				let mut subscription = server.audit_failure_stream.subscribe(10);

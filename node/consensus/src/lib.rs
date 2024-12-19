@@ -36,8 +36,10 @@ pub(crate) mod block_creator;
 pub(crate) mod compute_worker;
 pub mod error;
 pub mod import_queue;
+pub(crate) mod metrics;
 pub(crate) mod notary_client;
 pub(crate) mod notebook_sealer;
+
 pub use notary_client::{run_notary_sync, NotaryClient, NotebookDownloader};
 
 use crate::{compute_worker::ComputeState, notebook_sealer::create_vote_seal};
@@ -131,6 +133,7 @@ pub fn run_block_builder_task<Block, BI, C, PF, A, SC, SO, JS, B>(
 		compute_threads,
 	} = params;
 
+	let consensus_metrics = notary_client.metrics.clone();
 	let block_creator = BlockCreator {
 		block_import,
 		client: client.clone(),
@@ -140,6 +143,7 @@ pub fn run_block_builder_task<Block, BI, C, PF, A, SC, SO, JS, B>(
 		aux_client: aux_client.clone(),
 		justification_sync_link,
 		utxo_tracker,
+		metrics: consensus_metrics.clone(),
 		_phantom: Default::default(),
 	};
 
@@ -151,7 +155,12 @@ pub fn run_block_builder_task<Block, BI, C, PF, A, SC, SO, JS, B>(
 	let compute_handle = ComputeHandle::new(compute_block_tx);
 
 	if compute_threads > 0 {
-		run_compute_solver_threads(task_manager, compute_handle.clone(), compute_threads)
+		run_compute_solver_threads(
+			task_manager,
+			compute_handle.clone(),
+			compute_threads,
+			consensus_metrics.clone(),
+		)
 	}
 
 	let notebook_sealer = NotebookSealer::new(
@@ -201,13 +210,13 @@ pub fn run_block_builder_task<Block, BI, C, PF, A, SC, SO, JS, B>(
 								continue;
 							},
 						};
-						creator.submit_block(proposal, digest).await;
+						creator.submit_block(proposal, digest, &ticker).await;
 					}
 				},
 				// compute blocks are created with a hash on top of the pre-built block
 				compute_block = compute_block_rx.next() => {
 					if let Some((block, digest)) = compute_block {
-						creator.submit_block(block.proposal, digest).await;
+						creator.submit_block(block.proposal, digest, &ticker).await;
 					}
 				},
 
@@ -215,6 +224,7 @@ pub fn run_block_builder_task<Block, BI, C, PF, A, SC, SO, JS, B>(
 		}
 	};
 
+	let consensus_metrics_finder = consensus_metrics.clone();
 	let block_finder_task = async move {
 		let mut import_stream = client.every_import_notification_stream();
 		let idle_delay = if ticker.tick_duration_millis <= 10_000 { 100 } else { 1000 };
@@ -266,7 +276,9 @@ pub fn run_block_builder_task<Block, BI, C, PF, A, SC, SO, JS, B>(
 				continue;
 			};
 
-			let Some(best_hash) = compute_state.on_new_notebook_tick(next_notebooks_at_tick) else {
+			let Some(best_hash) = compute_state
+				.on_new_notebook_tick(next_notebooks_at_tick, &consensus_metrics_finder)
+			else {
 				continue;
 			};
 
@@ -289,6 +301,10 @@ pub fn run_block_builder_task<Block, BI, C, PF, A, SC, SO, JS, B>(
 				{
 					trace!(?best_hash, ?tick, "Fallback mining activated");
 					compute_handle.start_solving(proposal);
+					if let Some(metrics) = consensus_metrics_finder.as_ref() {
+						let time_after_tick = ticker.duration_after_tick(tick);
+						metrics.start_fallback_mining(time_after_tick);
+					}
 				}
 			}
 		}

@@ -27,7 +27,7 @@ use prometheus_endpoint::{
 };
 
 /// Histogram time buckets in microseconds.
-const HISTOGRAM_BUCKETS: [f64; 11] = [
+pub(crate) const HISTOGRAM_BUCKETS: [f64; 11] = [
 	5.0,
 	25.0,
 	100.0,
@@ -67,7 +67,7 @@ impl RpcMetrics {
 				calls_time: register(
 					HistogramVec::new(
 						HistogramOpts::new(
-							"rpc_calls_time",
+							"notary_rpc_calls_time",
 							"Total time [μs] of processed RPC calls",
 						)
 						.buckets(HISTOGRAM_BUCKETS.to_vec()),
@@ -78,7 +78,7 @@ impl RpcMetrics {
 				calls_started: register(
 					CounterVec::new(
 						Opts::new(
-							"rpc_calls_started",
+							"notary_rpc_calls_started",
 							"Number of received RPC calls (unique un-batched requests)",
 						),
 						&["protocol", "method"],
@@ -88,7 +88,7 @@ impl RpcMetrics {
 				calls_finished: register(
 					CounterVec::new(
 						Opts::new(
-							"rpc_calls_finished",
+							"notary_rpc_calls_finished",
 							"Number of processed RPC calls (unique un-batched requests)",
 						),
 						&["protocol", "method", "is_error", "is_rate_limited"],
@@ -97,7 +97,7 @@ impl RpcMetrics {
 				)?,
 				ws_sessions_opened: register(
 					Counter::new(
-						"rpc_sessions_opened",
+						"notary_rpc_sessions_opened",
 						"Number of persistent RPC sessions opened",
 					)?,
 					metrics_registry,
@@ -105,7 +105,7 @@ impl RpcMetrics {
 				.into(),
 				ws_sessions_closed: register(
 					Counter::new(
-						"rpc_sessions_closed",
+						"notary_rpc_sessions_closed",
 						"Number of persistent RPC sessions closed",
 					)?,
 					metrics_registry,
@@ -114,7 +114,7 @@ impl RpcMetrics {
 				ws_sessions_time: register(
 					HistogramVec::new(
 						HistogramOpts::new(
-							"rpc_sessions_time",
+							"notary_rpc_sessions_time",
 							"Total time [s] for each websocket session",
 						)
 						.buckets(HISTOGRAM_BUCKETS.to_vec()),

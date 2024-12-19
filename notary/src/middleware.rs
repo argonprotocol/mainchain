@@ -1,4 +1,4 @@
-use crate::{metrics::*, server::RpcConfig};
+use crate::{rpc_metrics::*, server::RpcConfig};
 use futures::future::{BoxFuture, FutureExt};
 use governor::{
 	clock::{Clock, DefaultClock, QuantaClock},

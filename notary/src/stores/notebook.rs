@@ -253,6 +253,7 @@ impl NotebookStore {
 		}
 
 		let mut account_changelist = vec![];
+		let account_changes = changed_accounts.len();
 		let merkle_leafs = changed_accounts
 			.into_iter()
 			.map(|(localchain_account_id, (nonce, balance, account_origin, channel_hold_note))| {
@@ -287,6 +288,8 @@ impl NotebookStore {
 			block_votes.insert((operator_account_id, 0), default_vote);
 		}
 
+		let block_votes_count = block_votes.len();
+
 		let votes_merkle_leafs =
 			block_votes.into_values().map(|vote| vote.encode()).collect::<Vec<_>>();
 		let votes_root = merkle_root::<Blake2Hasher, _>(&votes_merkle_leafs);
@@ -302,7 +305,7 @@ impl NotebookStore {
 			changes_root,
 			account_changelist,
 			votes_root,
-			votes_merkle_leafs.len() as u32,
+			block_votes_count as u32,
 			blocks_with_votes,
 			voting_power,
 			|hash| {
@@ -323,12 +326,7 @@ impl NotebookStore {
 
 		let signed_header =
 			NotebookHeaderStore::load_with_signature(&mut *db, notebook_number).await?;
-		info!(
-			"Notebook {} signed by {}. Signature {:?}",
-			notebook_number,
-			hex::encode(public.0),
-			hex::encode(signed_header.signature)
-		);
+		info!(notebook_number, tick, block_votes_count, account_changes, "Notebook closed");
 		let origins_json = json!(new_account_origins);
 		let signed_header_bytes = signed_header.encode();
 

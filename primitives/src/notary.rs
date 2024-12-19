@@ -157,6 +157,31 @@ pub enum NotaryState<NotebookVerifyError: Codec + Clone + PartialEq + Debug> {
 	},
 }
 
+#[derive(
+	Clone, Default, PartialEq, Eq, TypeInfo, Debug, Decode, Encode, Serialize, Deserialize,
+)]
+#[repr(transparent)]
+#[serde(transparent)]
+pub struct NotebookBytes(pub Vec<u8>);
+
+impl From<Vec<u8>> for NotebookBytes {
+	fn from(bytes: Vec<u8>) -> Self {
+		Self(bytes)
+	}
+}
+
+#[derive(
+	Clone, Default, PartialEq, Eq, TypeInfo, Debug, Decode, Encode, Serialize, Deserialize,
+)]
+#[repr(transparent)]
+#[serde(transparent)]
+pub struct SignedHeaderBytes(pub Vec<u8>);
+impl From<Vec<u8>> for SignedHeaderBytes {
+	fn from(bytes: Vec<u8>) -> Self {
+		Self(bytes)
+	}
+}
+
 #[derive(Clone, PartialEq, Eq, Encode, Decode, RuntimeDebug, TypeInfo, Default)]
 pub struct NotaryNotebookTickState {
 	#[codec(compact)]
@@ -164,7 +189,7 @@ pub struct NotaryNotebookTickState {
 	#[codec(compact)]
 	pub notaries: u16,
 	pub notebook_key_details_by_notary: BTreeMap<NotaryId, NotaryNotebookVoteDigestDetails>,
-	pub raw_headers_by_notary: BTreeMap<NotaryId, Vec<u8>>,
+	pub raw_headers_by_notary: BTreeMap<NotaryId, SignedHeaderBytes>,
 }
 
 #[derive(Clone, PartialEq, Eq, Encode, Decode, RuntimeDebug, TypeInfo)]

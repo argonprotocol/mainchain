@@ -1,5 +1,6 @@
 use crate::{
 	middleware::{register_prometheus_metrics, MiddlewareLayer},
+	notary_metrics::NotaryMetrics,
 	stores::{
 		balance_tip::BalanceTipStore,
 		notarizations::NotarizationsStore,
@@ -68,8 +69,7 @@ pub struct NotaryServer {
 
 	latest_metadata: Arc<Mutex<NotebookMeta>>,
 	archive_settings: ArchiveSettings,
-	#[allow(dead_code)]
-	prometheus_registry: Registry,
+	pub notary_metrics: Arc<NotaryMetrics>,
 }
 
 impl Drop for NotaryServer {
@@ -176,7 +176,7 @@ impl NotaryServer {
 		archive_settings: ArchiveSettings,
 		ticker: Ticker,
 		pool: PgPool,
-		prometheus_registry: Registry,
+		notary_metrics: Arc<NotaryMetrics>,
 	) -> anyhow::Result<Self> {
 		let (completed_notebook_sender, completed_notebook_stream) =
 			NotebookHeaderStream::channel();
@@ -204,7 +204,7 @@ impl NotaryServer {
 			audit_handle: Arc::new(audit_handle),
 			latest_metadata,
 			archive_settings,
-			prometheus_registry,
+			notary_metrics,
 		};
 
 		let mut module = RpcModule::new(());
@@ -236,6 +236,7 @@ impl NotaryServer {
 		registry: Registry,
 	) -> anyhow::Result<Self> {
 		let server = Self::create_http_server(addrs, rpc_config, registry.clone()).await?;
+		let notary_metrics = Arc::new(NotaryMetrics::new(&registry)?);
 		Self::start_with(
 			server,
 			notary_id,
@@ -243,7 +244,7 @@ impl NotaryServer {
 			archive_settings,
 			ticker,
 			pool,
-			registry,
+			notary_metrics,
 		)
 		.await
 	}
@@ -433,11 +434,15 @@ impl LocalchainRpcServer for NotaryServer {
 			self.notary_id,
 			&self.operator_account_id,
 			&self.ticker,
+			&self.notary_metrics,
 			balance_changeset.into_inner(),
 			block_votes.into_inner(),
 			domains.into_inner(),
 		)
-		.await?)
+		.await
+		.inspect_err(|_| {
+			self.notary_metrics.on_notarization_error();
+		})?)
 	}
 
 	async fn get_tip(
@@ -604,7 +609,7 @@ mod tests {
 			operator_account_id: operator.clone(),
 			ticker,
 			s3_buckets,
-			prometheus_registry: Registry::new(),
+			notary_metrics: notary.notary_metrics.clone(),
 		};
 		let mut header_listener = FinalizedNotebookHeaderListener::connect(
 			pool.clone(),
@@ -699,7 +704,7 @@ mod tests {
 			operator_account_id: operator.clone(),
 			ticker,
 			s3_buckets,
-			prometheus_registry: Registry::new(),
+			notary_metrics: notary.notary_metrics.clone(),
 		};
 
 		notebook_closer

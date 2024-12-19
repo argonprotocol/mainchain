@@ -1,21 +1,23 @@
 #![allow(dead_code)]
 
-use std::sync::Arc;
+mod metrics;
 
 use anyhow::ensure;
-use codec::{Decode, Encode};
-use log::info;
-use parking_lot::Mutex;
-use sc_client_api::{backend::AuxStore, HeaderBackend};
-use sp_api::ProvideRuntimeApi;
-use sp_runtime::traits::Block as BlockT;
-
 use argon_bitcoin::{BlockFilter, UtxoSpendFilter};
 use argon_primitives::{
 	bitcoin::{BitcoinSyncStatus, UtxoRef, UtxoValue},
 	inherents::BitcoinUtxoSync,
 	Balance, BitcoinApis,
 };
+use codec::{Decode, Encode};
+use log::info;
+pub use metrics::BitcoinMetrics;
+use parking_lot::Mutex;
+use prometheus_endpoint::Registry;
+use sc_client_api::{backend::AuxStore, HeaderBackend};
+use sp_api::ProvideRuntimeApi;
+use sp_runtime::traits::Block as BlockT;
+use std::{sync::Arc, time::Instant};
 
 pub fn get_bitcoin_inherent<C, B>(
 	tracker: &Arc<UtxoTracker>,
@@ -32,19 +34,34 @@ where
 		return Ok(None);
 	};
 
+	let start_time = Instant::now();
 	let utxos = api.active_utxos(*block_hash)?;
-	Ok(Some(tracker.sync(sync_status, utxos, client)?))
+	let utxo_count = utxos.len() as u64;
+	let mut satoshis = 0u64;
+	for (_, utxo) in &utxos {
+		satoshis += utxo.satoshis;
+	}
+	let result = tracker.sync(sync_status, utxos, client)?;
+	if let Some(ref metrics) = tracker.metrics {
+		metrics.track(&result, satoshis, utxo_count, start_time);
+	}
+	Ok(Some(result))
 }
 
 pub struct UtxoTracker {
 	pub(crate) filter: Arc<Mutex<UtxoSpendFilter>>,
+	metrics: Option<BitcoinMetrics>,
 }
 
 impl UtxoTracker {
-	pub fn new(rpc_url: String, auth: Option<(String, String)>) -> anyhow::Result<Self> {
+	pub fn new(
+		rpc_url: String,
+		auth: Option<(String, String)>,
+		registry: Option<&Registry>,
+	) -> anyhow::Result<Self> {
 		let filter = UtxoSpendFilter::new(rpc_url, auth)?;
-
-		Ok(Self { filter: Arc::new(Mutex::new(filter)) })
+		let metrics = registry.and_then(|a| BitcoinMetrics::new(a).ok());
+		Ok(Self { filter: Arc::new(Mutex::new(filter)), metrics })
 	}
 
 	pub fn ensure_correct_network<B, C>(&self, client: &Arc<C>) -> anyhow::Result<()>
@@ -231,7 +248,8 @@ mod test {
 			None
 		};
 
-		let tracker = UtxoTracker::new(rpc_url.origin().unicode_serialization(), auth).unwrap();
+		let tracker =
+			UtxoTracker::new(rpc_url.origin().unicode_serialization(), auth, None).unwrap();
 		(bitcoind, tracker, block_address, network)
 	}
 

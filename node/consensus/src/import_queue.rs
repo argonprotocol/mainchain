@@ -177,7 +177,9 @@ where
 				.digest_notebooks(parent_hash, digest)
 				.map_err(|e| format!("Error calling digest notebooks api {e:?}"))?
 				.map_err(|e| format!("Failed to get digest notebooks: {:?}", e))?;
-			self.notary_client.verify_notebook_audits(digest_notebooks).await?;
+			self.notary_client
+				.verify_notebook_audits(&parent_hash, digest_notebooks)
+				.await?;
 		}
 
 		// NOTE: we verify compute nonce in import queue because we use the pre-hash, which

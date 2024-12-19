@@ -1,4 +1,5 @@
 use crate::{
+	notary_metrics::NotaryMetrics,
 	s3_archive::S3Archive,
 	server::NotebookHeaderInfo,
 	stores::{
@@ -13,11 +14,11 @@ use crate::{
 use argon_notary_apis::error::Error;
 use argon_primitives::{tick::Ticker, AccountId, NotaryId, SignedNotebookHeader};
 use futures::FutureExt;
-use prometheus::Registry;
 use sc_utils::notification::NotificationSender;
 use sp_core::{ed25519, H256};
 use sp_keystore::KeystorePtr;
 use sqlx::{postgres::PgListener, PgPool};
+use std::{sync::Arc, time::Instant};
 use tokio::task::JoinHandle;
 
 pub const NOTARY_KEYID: sp_core::crypto::KeyTypeId = sp_core::crypto::KeyTypeId(*b"nota");
@@ -30,7 +31,7 @@ pub struct NotebookCloser {
 	pub operator_account_id: AccountId,
 	pub ticker: Ticker,
 	pub s3_buckets: S3Archive,
-	pub prometheus_registry: Registry,
+	pub notary_metrics: Arc<NotaryMetrics>,
 }
 
 pub struct FinalizedNotebookHeaderListener {
@@ -90,7 +91,7 @@ pub fn spawn_notebook_closer(
 	ticker: Ticker,
 	completed_notebook_sender: NotificationSender<NotebookHeaderInfo>,
 	s3_buckets: S3Archive,
-	prometheus_registry: Registry,
+	notary_metrics: Arc<NotaryMetrics>,
 ) -> anyhow::Result<NotebookCloserHandles> {
 	let pool1 = pool.clone();
 	let handle_1 = tokio::spawn(async move {
@@ -101,7 +102,7 @@ pub fn spawn_notebook_closer(
 			operator_account_id,
 			ticker,
 			s3_buckets,
-			prometheus_registry,
+			notary_metrics,
 		};
 		notebook_closer.create_task().await?;
 		Ok(())
@@ -172,6 +173,7 @@ impl NotebookCloser {
 
 	pub(super) fn try_close_notebook(&mut self) -> BoxFutureResult<()> {
 		async move {
+			let start_time = Instant::now();
 			let mut tx = self.pool.begin().await?;
 			let step = NotebookFinalizationStep::ReadyForClose;
 			let (notebook_number, tick) =
@@ -191,12 +193,24 @@ impl NotebookCloser {
 				&self.keystore,
 			)
 			.await?;
+			let header_bytes = signed_header.len();
+			let notebook_bytes = notebook.len();
 
 			self.s3_buckets.put_header(notebook_number, signed_header).await?;
 			self.s3_buckets.put_notebook(notebook_number, notebook).await?;
 
 			NotebookStatusStore::next_step(&mut *tx, notebook_number, step).await?;
 			tx.commit().await?;
+
+			let expected_tick_time = self.ticker.duration_after_tick(tick);
+			let time_after_tick = expected_tick_time.as_micros();
+			self.notary_metrics.on_notebook_close(
+				Instant::now(),
+				start_time,
+				time_after_tick,
+				notebook_bytes,
+				header_bytes,
+			);
 
 			Ok(())
 		}
@@ -231,6 +245,7 @@ mod tests {
 	use anyhow::{anyhow, bail};
 	use frame_support::assert_ok;
 	use futures::{task::noop_waker_ref, StreamExt};
+	use prometheus::Registry;
 	use sp_core::{bounded_vec, crypto::AccountId32, ed25519::Public, sr25519::Signature, Pair};
 	use sp_keyring::{
 		sr25519::Keyring,
@@ -310,10 +325,11 @@ mod tests {
 		let ticker: Ticker = client.get().await?.lookup_ticker().await?;
 
 		let prometheus_registry = Registry::new();
+		let notary_metrics = Arc::new(NotaryMetrics::new(&prometheus_registry)?);
 		let server = NotaryServer::create_http_server(
 			"127.0.0.1:0",
 			Default::default(),
-			prometheus_registry.clone(),
+			prometheus_registry,
 		)
 		.await?;
 		let addr = server.local_addr()?;
@@ -332,7 +348,7 @@ mod tests {
 			archive_settings,
 			ticker,
 			pool.clone(),
-			prometheus_registry.clone(),
+			notary_metrics.clone(),
 		)
 		.await?;
 
@@ -344,7 +360,7 @@ mod tests {
 			ticker,
 			notary_server.completed_notebook_sender.clone(),
 			s3_buckets,
-			prometheus_registry,
+			notary_metrics.clone(),
 		)?;
 
 		propose_bob_as_notary(&ctx.client.live, notary_key, addr).await?;
@@ -362,6 +378,7 @@ mod tests {
 
 		let domain_hash = Domain::new("HelloWorld", DomainTopLevel::Entertainment).hash();
 		let result = submit_balance_change_to_notary_and_create_domain(
+			&notary_server.notary_metrics,
 			&pool,
 			&ticker,
 			ferdie_transfer,
@@ -402,13 +419,15 @@ mod tests {
 		);
 
 		// Record the balance change
-		let result = submit_balance_change_to_notary(&pool, &ticker, bob_transfer).await?;
+		let result =
+			submit_balance_change_to_notary(&notary_metrics, &pool, &ticker, bob_transfer).await?;
 		let origin = AccountOrigin {
 			account_uid: result.new_account_origins[0].account_uid,
 			notebook_number: result.notebook_number,
 		};
 
 		let (hold_note, hold_result) = create_channel_hold(
+			&notary_metrics,
 			&pool,
 			bob_balance as u128,
 			5_000_000,
@@ -485,6 +504,7 @@ mod tests {
 				continue;
 			};
 			match settle_channel_hold_and_vote(
+				&notary_metrics,
 				&pool,
 				&ticker,
 				vote_tick,
@@ -676,6 +696,7 @@ mod tests {
 	}
 
 	async fn submit_balance_change_to_notary(
+		notary_metrics: &Arc<NotaryMetrics>,
 		pool: &PgPool,
 		ticker: &Ticker,
 		transfer: (TransferToLocalchainId, u32, Keyring),
@@ -694,6 +715,7 @@ mod tests {
 			1,
 			&Ferdie.to_account_id(),
 			ticker,
+			notary_metrics,
 			vec![BalanceChange {
 				account_id: keypair.public().into(),
 				account_type: Deposit,
@@ -719,6 +741,7 @@ mod tests {
 		Ok(result)
 	}
 	async fn submit_balance_change_to_notary_and_create_domain(
+		notary_metrics: &Arc<NotaryMetrics>,
 		pool: &PgPool,
 		ticker: &Ticker,
 		transfer: (TransferToLocalchainId, u32, Keyring),
@@ -739,6 +762,7 @@ mod tests {
 			1,
 			&Ferdie.to_account_id(),
 			ticker,
+			notary_metrics,
 			vec![
 				BalanceChange {
 					account_id: keypair.public().into(),
@@ -807,6 +831,7 @@ mod tests {
 
 	#[allow(clippy::too_many_arguments)]
 	async fn create_channel_hold(
+		notary_metrics: &Arc<NotaryMetrics>,
 		pool: &PgPool,
 		balance: u128,
 		amount: u128,
@@ -848,6 +873,7 @@ mod tests {
 			1,
 			&Ferdie.to_account_id(),
 			ticker,
+			notary_metrics,
 			changes,
 			vec![],
 			vec![],
@@ -857,6 +883,7 @@ mod tests {
 	}
 
 	async fn settle_channel_hold_and_vote(
+		notary_metrics: &Arc<NotaryMetrics>,
 		pool: &PgPool,
 		ticker: &Ticker,
 		vote_tick: Tick,
@@ -914,6 +941,7 @@ mod tests {
 			1,
 			&Ferdie.to_account_id(),
 			ticker,
+			notary_metrics,
 			changes,
 			vec![BlockVote {
 				account_id: Alice.to_account_id(),

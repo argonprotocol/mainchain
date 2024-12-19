@@ -1,11 +1,15 @@
 #![allow(clippy::type_complexity)]
-use std::{
-	any::Any,
-	collections::{BTreeMap, BTreeSet},
-	fmt::Debug,
-	sync::Arc,
+use crate::{aux_data::AuxData, error::Error, notary_client::VotingPowerInfo};
+use argon_primitives::{
+	fork_power::ForkPower,
+	notary::{
+		NotaryNotebookAuditSummary, NotaryNotebookDetails, NotaryNotebookRawVotes,
+		NotaryNotebookTickState, NotaryNotebookVoteDigestDetails, SignedHeaderBytes,
+	},
+	tick::Tick,
+	AccountId, NotaryId, NotebookAuditResult, NotebookHeaderData, NotebookNumber, VotingSchedule,
 };
-
+use argon_runtime::NotebookVerifyError;
 use codec::{Codec, Decode, Encode};
 use log::{trace, warn};
 use parking_lot::RwLock;
@@ -14,18 +18,12 @@ use sc_consensus::BlockImportParams;
 use schnellru::{ByLength, LruMap};
 use sp_core::H256;
 use sp_runtime::traits::Block as BlockT;
-
-use crate::{aux_data::AuxData, error::Error, notary_client::VotingPowerInfo};
-use argon_primitives::{
-	fork_power::ForkPower,
-	notary::{
-		NotaryNotebookAuditSummary, NotaryNotebookDetails, NotaryNotebookRawVotes,
-		NotaryNotebookTickState, NotaryNotebookVoteDigestDetails,
-	},
-	tick::Tick,
-	AccountId, NotaryId, NotebookAuditResult, NotebookHeaderData, NotebookNumber, VotingSchedule,
+use std::{
+	any::Any,
+	collections::{BTreeMap, BTreeSet},
+	fmt::Debug,
+	sync::Arc,
 };
-use argon_runtime::NotebookVerifyError;
 
 pub enum AuxState<C: AuxStore> {
 	NotaryStateAtTick(Arc<AuxData<NotaryNotebookTickState, C>>),
@@ -343,7 +341,7 @@ impl<B: BlockT, C: AuxStore + 'static> ArgonAux<B, C> {
 	pub fn store_notebook_result(
 		&self,
 		audit_result: NotebookAuditResult<NotebookVerifyError>,
-		raw_signed_header: Vec<u8>,
+		raw_signed_header: SignedHeaderBytes,
 		notebook_details: NotaryNotebookDetails<B::Hash>,
 		finalized_notebook_number: NotebookNumber,
 	) -> Result<VotingPowerInfo, Error> {
@@ -499,7 +497,7 @@ mod test {
 		let (summary_10, _vote_details_10) = details_10.clone().into();
 
 		let result = argon_aux
-			.store_notebook_result(audit_10.clone(), vec![], details_10.clone(), 3)
+			.store_notebook_result(audit_10.clone(), Default::default(), details_10.clone(), 3)
 			.expect("store notebook result");
 		assert_eq!(result, (1, 0u128, 1));
 		assert_eq!(
@@ -539,7 +537,7 @@ mod test {
 		};
 		let (summary_9, _vote_details_9) = details_9.clone().into();
 		let result = argon_aux
-			.store_notebook_result(audit_9.clone(), vec![], details_9.clone(), 3)
+			.store_notebook_result(audit_9.clone(), Default::default(), details_9.clone(), 3)
 			.expect("store notebook result");
 		assert_eq!(result, (1, 0u128, 1));
 		assert_eq!(
@@ -571,7 +569,7 @@ mod test {
 		};
 		let (summary_11, _vote_details_11) = details_11.clone().into();
 		argon_aux
-			.store_notebook_result(audit_11.clone(), vec![], details_11.clone(), 9)
+			.store_notebook_result(audit_11.clone(), Default::default(), details_11.clone(), 9)
 			.expect("store notebook result");
 		assert_eq!(
 			argon_aux.get_notary_audit_history(1).expect("get notary audit history").get(),
@@ -587,7 +585,7 @@ mod test {
 		let mut details_10_mod = details_10.clone();
 		details_10_mod.tick = 2;
 		argon_aux
-			.store_notebook_result(audit_10_mod, vec![], details_10, 9)
+			.store_notebook_result(audit_10_mod, Default::default(), details_10, 9)
 			.expect("store notebook result");
 
 		assert_eq!(
@@ -625,7 +623,7 @@ mod test {
 		};
 
 		argon_aux
-			.store_notebook_result(audit_10.clone(), vec![], details_10.clone(), 3)
+			.store_notebook_result(audit_10.clone(), Default::default(), details_10.clone(), 3)
 			.expect("store notebook result");
 		assert!(argon_aux.has_successful_audit(1, 10));
 		assert!(!argon_aux.has_successful_audit(1, 9));
@@ -664,7 +662,7 @@ mod test {
 				header_hash: H256::zero(),
 			};
 			argon_aux
-				.store_notebook_result(audit, vec![], details, 0)
+				.store_notebook_result(audit, Default::default(), details, 0)
 				.expect("store notebook result");
 		}
 		assert_eq!(
@@ -714,7 +712,7 @@ mod test {
 					notary_id: 1,
 					audit_first_failure: None,
 				},
-				vec![],
+				Default::default(),
 				NotaryNotebookDetails {
 					notary_id: 1,
 					block_voting_power: 0,

@@ -1,6 +1,6 @@
 use crate::{
-	ensure, fork_power::ForkPower, tick::TickDigest, BlockSealAuthoritySignature, BlockVotingPower,
-	NotebookAuditResult, VotingKey,
+	ensure, fork_power::ForkPower, notary::SignedHeaderBytes, tick::TickDigest,
+	BlockSealAuthoritySignature, BlockVotingPower, NotebookAuditResult, VotingKey,
 };
 use alloc::{vec, vec::Vec};
 use codec::{Codec, Decode, Encode, MaxEncodedLen};
@@ -287,7 +287,7 @@ pub struct NotebookDigest<VerifyError: Codec> {
 	DefaultNoBound,
 )]
 pub struct NotebookHeaderData<VerifyError: Codec> {
-	pub signed_headers: Vec<Vec<u8>>,
+	pub signed_headers: Vec<SignedHeaderBytes>,
 	pub notebook_digest: NotebookDigest<VerifyError>,
 	pub vote_digest: BlockVoteDigest,
 }
