@@ -1,11 +1,18 @@
 # Changelog
 
-## [v0.0.22](https://github.com/argonprotocol/mainchain/compare/v0.0.21...62841161f35869cc63a8dc930915426c3b396470) (2024-12-16)
+## [v0.0.23](https://github.com/argonprotocol/mainchain/compare/v0.0.22...cd407e001c0e5cc09afd466122683073e47eaf90) (2024-12-19)
 
-### Features
+### [v0.0.22](https://github.com/argonprotocol/mainchain/compare/v0.0.21...v0.0.22) (2024-12-17)
+
+#### Features
 
 * **notary:** archive hosts
 ([5df12d0](https://github.com/argonprotocol/mainchain/commit/5df12d0d31a8944c8be51db67e772c4ff299b143))
+
+#### Fixes
+
+* **localchain:** gh actions openssl build issues
+([ea1186d](https://github.com/argonprotocol/mainchain/commit/ea1186d2f5d2e34963000bc1a88a09073e4d8468))
 
 ### [v0.0.21](https://github.com/argonprotocol/mainchain/compare/v0.0.20...v0.0.21) (2024-12-08)
 
