@@ -257,10 +257,10 @@ impl NotaryServer {
 		tokio::spawn(async move {
 			while let Some((header, _hash)) = subscription.next().await {
 				let mut latest = latest_metadata.lock().await;
-				if header.header.notebook_number > latest.finalized_notebook_number {
+				if header.header.notebook_number > latest.last_closed_notebook_number {
 					*latest = NotebookMeta {
-						finalized_notebook_number: header.header.notebook_number,
-						finalized_tick: header.header.tick,
+						last_closed_notebook_number: header.header.notebook_number,
+						last_closed_notebook_tick: header.header.tick,
 					}
 				}
 			}

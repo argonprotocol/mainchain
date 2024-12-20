@@ -216,8 +216,8 @@ impl NotaryClient {
 
     *self.last_metadata.write().await = Some(meta.clone());
     Ok(NotebookMeta {
-      finalized_tick: meta.finalized_tick as i64,
-      finalized_notebook_number: meta.finalized_notebook_number,
+      finalized_tick: meta.last_closed_notebook_tick as i64,
+      finalized_notebook_number: meta.last_closed_notebook_number,
     })
   }
 
@@ -246,7 +246,7 @@ impl NotaryClient {
     let mut has_seen_notebook = {
       let last_metadata = self.last_metadata.read().await;
       if let Some(meta) = &*last_metadata {
-        meta.finalized_notebook_number >= notebook_number
+        meta.last_closed_notebook_number >= notebook_number
       } else {
         false
       }
@@ -277,8 +277,8 @@ impl NotaryClient {
         .write()
         .await
         .replace(argon_primitives::NotebookMeta {
-          finalized_tick: download_info.tick,
-          finalized_notebook_number: download_info.notebook_number,
+          last_closed_notebook_tick: download_info.tick,
+          last_closed_notebook_number: download_info.notebook_number,
         });
       if download_info.notebook_number == notebook_number {
         let client = self.client.read().await;

@@ -18,7 +18,10 @@ use sc_utils::notification::NotificationSender;
 use sp_core::{ed25519, H256};
 use sp_keystore::KeystorePtr;
 use sqlx::{postgres::PgListener, PgPool};
-use std::{sync::Arc, time::Instant};
+use std::{
+	sync::Arc,
+	time::{Duration, Instant},
+};
 use tokio::task::JoinHandle;
 
 pub const NOTARY_KEYID: sp_core::crypto::KeyTypeId = sp_core::crypto::KeyTypeId(*b"nota");
@@ -202,7 +205,10 @@ impl NotebookCloser {
 			NotebookStatusStore::next_step(&mut *tx, notebook_number, step).await?;
 			tx.commit().await?;
 
-			let expected_tick_time = self.ticker.duration_after_tick(tick);
+			let expected_tick_time = self
+				.ticker
+				.duration_after_tick_ends(tick)
+				.saturating_sub(Duration::from_millis(self.ticker.tick_duration_millis));
 			let time_after_tick = expected_tick_time.as_micros();
 			self.notary_metrics.on_notebook_close(
 				Instant::now(),

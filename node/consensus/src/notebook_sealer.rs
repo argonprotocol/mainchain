@@ -32,10 +32,7 @@ pub struct NotebookSealer<B: BlockT, C: AuxStore, SC, AC: Clone + Codec> {
 impl<B, C, SC, AC> Clone for NotebookSealer<B, C, SC, AC>
 where
 	B: BlockT,
-	C: ProvideRuntimeApi<B> + AuxStore + 'static,
-	C::Api: BlockSealApis<B, AC, BlockSealAuthorityId>
-		+ TickApis<B>
-		+ BlockCreatorApis<B, AC, NotebookVerifyError>,
+	C: AuxStore + Clone,
 	AC: Codec + Clone,
 {
 	fn clone(&self) -> Self {
@@ -97,6 +94,23 @@ where
 			return Ok(());
 		}
 
+		// Votes only work when they're for active ticks, so no point in doing this for old ticks
+		const OLDEST_TICK_TO_SOLVE_FOR: Tick = 5;
+
+		if notebook_tick < current_tick.saturating_sub(OLDEST_TICK_TO_SOLVE_FOR) {
+			trace!(
+				"Notebook tick {} is too old to be considered for block creation with votes",
+				notebook_tick
+			);
+			return Ok(());
+		}
+
+		let keys = self.keystore.ed25519_public_keys(BLOCK_SEAL_KEY_TYPE);
+		if keys.is_empty() {
+			trace!("No block vote keys to sign block with");
+			return Ok(());
+		}
+
 		let voting_schedule = VotingSchedule::on_notebook_tick_state(notebook_tick);
 		let votes_tick = voting_schedule.eligible_votes_tick();
 		// get the active votes, which were from 2 notebooks previous
@@ -133,7 +147,6 @@ where
 			};
 
 			for vote in stronger_seals.into_iter() {
-				trace!("Will try to sign vote for block with seal strength {}", vote.seal_strength);
 				let raw_authority = vote.closest_miner.1.to_raw_vec();
 				if !self.keystore.has_keys(&[(raw_authority, BLOCK_SEAL_KEY_TYPE)]) {
 					trace!(
@@ -143,6 +156,7 @@ where
 					continue;
 				}
 
+				trace!("Found vote-eligible block with seal strength {}", vote.seal_strength);
 				self.sender
 					.unbounded_send(CreateTaxVoteBlock::<B, AC> {
 						current_tick: notebook_tick + 1,

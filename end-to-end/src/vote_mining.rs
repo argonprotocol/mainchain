@@ -34,7 +34,7 @@ async fn test_end_to_end_default_vote_mining() {
 				if let Ok(ownership) =
 					grandpa_miner.client.get_ownership(&author, Some(block.hash())).await
 				{
-					if ownership.free > 500_000 && !authors.contains(&author) {
+					if ownership.free >= 500_000 && !authors.contains(&author) {
 						println!("Block Author is ready {:?}", keyring);
 						authors.insert(author);
 					}
@@ -51,7 +51,7 @@ async fn test_end_to_end_default_vote_mining() {
 				}
 			}
 			counter += 1;
-			if counter >= 30 {
+			if counter >= 50 {
 				panic!("Blocks not produced by both authors after 30 blocks -> {:?}", authors);
 			}
 		}

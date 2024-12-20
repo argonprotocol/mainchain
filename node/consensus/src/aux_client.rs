@@ -109,6 +109,10 @@ impl<B: BlockT, C: AuxStore> ArgonAux<B, C> {
 	}
 }
 
+pub const OLDEST_TICK_STATE: Tick = 256;
+const MAX_AUDIT_HISTORY: usize = 2000;
+const MAX_EXTRA_SUMMARY_HISTORY: usize = 100;
+
 ///
 /// Stores auxiliary data for argon consensus (eg - cross block data)
 ///
@@ -125,19 +129,24 @@ impl<B: BlockT, C: AuxStore + 'static> ArgonAux<B, C> {
 		author: AC,
 		voting_key: Option<H256>,
 		tick: Tick,
+		is_vote_block: bool,
 	) -> Result<ForkPower, Error> {
 		let _lock = self.lock.write();
 
 		// add author to voting key
-		if let Some(voting_key) = voting_key {
-			self.authors_by_voting_key_at_tick(tick)?.mutate(|authors_at_height| {
-				let account_id = AccountId::decode(&mut &author.encode()[..])
-					.map_err(|e| Error::StringError(format!("Failed to decode author: {:?}", e)))?;
-				if !authors_at_height.entry(voting_key).or_default().insert(account_id.clone()) {
-					return Err(Error::DuplicateAuthoredBlock(account_id));
-				}
-				Ok::<(), Error>(())
-			})??;
+		if is_vote_block {
+			if let Some(voting_key) = voting_key {
+				self.authors_by_voting_key_at_tick(tick)?.mutate(|authors_at_height| {
+					let account_id = AccountId::decode(&mut &author.encode()[..]).map_err(|e| {
+						Error::StringError(format!("Failed to decode author: {:?}", e))
+					})?;
+					if !authors_at_height.entry(voting_key).or_default().insert(account_id.clone())
+					{
+						return Err(Error::DuplicateAuthoredBlock(account_id));
+					}
+					Ok::<(), Error>(())
+				})??;
+			}
 		}
 		let max_fork_power = self.strongest_fork_power()?.get();
 
@@ -149,9 +158,10 @@ impl<B: BlockT, C: AuxStore + 'static> ArgonAux<B, C> {
 		}
 		// Cleanup old notary state. We keep this longer because we might need to catchup on
 		// notebooks
-		if tick >= 256 {
-			// submit 10 just to be sure since we can miss a tick
-			for tick in tick.saturating_add(266)..=(tick - 256) {
+		if tick >= OLDEST_TICK_STATE {
+			let oldest = tick.saturating_sub(OLDEST_TICK_STATE);
+			// cleanup 10 ticks at a time, just in case
+			for tick in (oldest + 10)..=oldest {
 				block.auxiliary.push((AuxKey::NotaryStateAtTick(tick).encode(), None));
 			}
 		}
@@ -183,6 +193,7 @@ impl<B: BlockT, C: AuxStore + 'static> ArgonAux<B, C> {
 		notary_id: NotaryId,
 		latest_runtime_notebook_number: NotebookNumber,
 		voting_schedule: &VotingSchedule,
+		max_notebooks: u32,
 	) -> Result<
 		(NotebookHeaderData<NotebookVerifyError>, Option<NotaryNotebookVoteDigestDetails>),
 		Error,
@@ -226,6 +237,10 @@ impl<B: BlockT, C: AuxStore + 'static> ArgonAux<B, C> {
 					tick,
 					audit_first_failure: notebook.audit_first_failure.clone(),
 				});
+				// make of 10 notebooks per notary
+				if headers.signed_headers.len() > max_notebooks as usize {
+					break;
+				}
 			}
 		}
 
@@ -356,8 +371,6 @@ impl<B: BlockT, C: AuxStore + 'static> ArgonAux<B, C> {
 			notebook_number
 		);
 
-		const MAX_AUDIT_SUMMARY_HISTORY: usize = 2000;
-
 		let mut voting_power = 0u128;
 		let mut notebooks = 0u32;
 		let (summary, vote_details) = notebook_details.into();
@@ -384,7 +397,10 @@ impl<B: BlockT, C: AuxStore + 'static> ArgonAux<B, C> {
 				}
 			}
 			summaries.insert(insert_index, summary);
-			summaries.retain(|s| s.notebook_number > finalized_notebook_number);
+			// keep history for a little while
+			let oldest_to_retain =
+				finalized_notebook_number.saturating_sub(MAX_EXTRA_SUMMARY_HISTORY as u32);
+			summaries.retain(|s| s.notebook_number > oldest_to_retain);
 		})?;
 
 		self.get_notary_audit_history(notary_id)?.mutate(|notebooks| {
@@ -402,8 +418,9 @@ impl<B: BlockT, C: AuxStore + 'static> ArgonAux<B, C> {
 				}
 			}
 			notebooks.insert(index, audit_result.clone());
-			if notebooks.len() > MAX_AUDIT_SUMMARY_HISTORY {
-				notebooks.remove(0);
+			if notebooks.len() > MAX_AUDIT_HISTORY {
+				// remove the oldest
+				notebooks.drain(0..notebooks.len() - MAX_AUDIT_HISTORY);
 			}
 		})?;
 		Ok((tick, voting_power, notebooks))
@@ -577,7 +594,7 @@ mod test {
 		);
 		assert_eq!(
 			argon_aux.get_audit_summaries(1).expect("get audit summaries").get(),
-			vec![summary_10.clone(), summary_11.clone(),]
+			vec![summary_9.clone(), summary_10.clone(), summary_11.clone(),]
 		);
 
 		let mut audit_10_mod = audit_10.clone();
@@ -595,8 +612,72 @@ mod test {
 		);
 		assert_eq!(
 			argon_aux.get_audit_summaries(1).expect("get audit summaries").get(),
-			vec![summary_10.clone(), summary_11.clone(),],
+			vec![summary_9.clone(), summary_10.clone(), summary_11.clone(),],
 			"should not add duplicate notebook"
+		);
+	}
+
+	#[test]
+	fn it_should_clean_old_summaries() {
+		let aux = Arc::new(MockAux::default());
+		let argon_aux = ArgonAux::<Block, _>::new(aux.clone());
+		let starting_notebook_number = 500 as NotebookNumber;
+		argon_aux
+			.get_audit_summaries(1)
+			.unwrap()
+			.mutate(|a| {
+				for i in 1..=(MAX_EXTRA_SUMMARY_HISTORY as NotebookNumber) + 4 {
+					a.push(NotaryNotebookAuditSummary {
+						notary_id: 1,
+						notebook_number: starting_notebook_number + i as NotebookNumber,
+						tick: 1,
+						version: 0,
+						raw_data: vec![],
+					});
+				}
+			})
+			.unwrap();
+		let next_id = starting_notebook_number + MAX_EXTRA_SUMMARY_HISTORY as u32 + 5;
+		let audit_10 = NotebookAuditResult {
+			notebook_number: next_id,
+			tick: 1,
+			notary_id: 1,
+			audit_first_failure: None,
+		};
+		let details_10 = NotaryNotebookDetails {
+			notary_id: 1,
+			block_voting_power: 0,
+			tick: 1,
+			notebook_number: next_id,
+			raw_audit_summary: vec![],
+			version: 1,
+			block_votes_count: 0,
+			blocks_with_votes: vec![],
+			header_hash: H256::zero(),
+		};
+		let finalized_notebook_number = next_id - 2;
+
+		argon_aux
+			.store_notebook_result(
+				audit_10.clone(),
+				Default::default(),
+				details_10.clone(),
+				finalized_notebook_number,
+			)
+			.expect("store notebook result");
+		assert_eq!(
+			argon_aux.get_audit_summaries(1).expect("get audit summaries").get().len() as u32,
+			(next_id - finalized_notebook_number) + MAX_EXTRA_SUMMARY_HISTORY as u32
+		);
+		assert_eq!(
+			argon_aux
+				.get_audit_summaries(1)
+				.expect("get audit summaries")
+				.get()
+				.last()
+				.unwrap()
+				.notebook_number,
+			next_id
 		);
 	}
 

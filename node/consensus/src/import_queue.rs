@@ -71,10 +71,17 @@ where
 			.map_err(|e| {
 				Error::MissingRuntimeData(format!("Failed to get voting author power: {:?}", e))
 			})?;
-		let max_fork_power =
-			self.aux_client.record_block(&mut block, block_author, voting_key, tick)?;
+
 		let fork_power = ForkPower::try_from(block.header.digest())
 			.map_err(|e| Error::MissingRuntimeData(format!("Failed to get fork power: {:?}", e)))?;
+
+		let max_fork_power = self.aux_client.record_block(
+			&mut block,
+			block_author,
+			voting_key,
+			tick,
+			fork_power.is_latest_vote,
+		)?;
 
 		let mut is_best_fork = fork_power > max_fork_power;
 		if fork_power == max_fork_power {

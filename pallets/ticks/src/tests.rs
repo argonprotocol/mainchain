@@ -85,7 +85,6 @@ fn it_tests_the_current_tick() {
 
 #[test]
 fn it_should_track_blocks_at_tick() {
-	AllowMultipleBlockPerTick::set(true);
 	new_test_ext(500).execute_with(|| {
 		// Go past genesis block so events get deposited
 		System::set_block_number(2);
@@ -144,7 +143,6 @@ fn it_should_track_multiple_blocks_at_tick_if_enabled() {
 		Ticks::on_initialize(3);
 		assert_eq!(Ticks::blocks_at_tick(1).len(), 2);
 
-		AllowMultipleBlockPerTick::set(false);
 		System::initialize(
 			&4,
 			&System::parent_hash(),
@@ -152,16 +150,12 @@ fn it_should_track_multiple_blocks_at_tick_if_enabled() {
 		);
 		Ticks::on_initialize(4);
 		assert_eq!(Ticks::blocks_at_tick(2).len(), 1);
-		let err = catch_unwind(|| {
-			System::initialize(
-				&5,
-				&System::parent_hash(),
-				&Digest {
-					logs: vec![DigestItem::PreRuntime(TICK_DIGEST_ID, TickDigest(2).encode())],
-				},
-			);
-			Ticks::on_initialize(5);
-		});
-		assert!(err.is_err());
+		System::initialize(
+			&5,
+			&System::parent_hash(),
+			&Digest { logs: vec![DigestItem::PreRuntime(TICK_DIGEST_ID, TickDigest(2).encode())] },
+		);
+		Ticks::on_initialize(5);
+		assert_eq!(Ticks::blocks_at_tick(2).len(), 2);
 	});
 }

@@ -1,7 +1,7 @@
 use crate as pallet_ticks;
 use argon_primitives::tick::Ticker;
 use env_logger::{Builder, Env};
-use frame_support::{derive_impl, parameter_types, traits::ConstU64};
+use frame_support::{derive_impl, traits::ConstU64};
 use sp_runtime::BuildStorage;
 
 type Block = frame_system::mocking::MockBlock<Test>;
@@ -28,13 +28,8 @@ impl frame_system::Config for Test {
 	type Block = Block;
 }
 
-parameter_types! {
-	pub static AllowMultipleBlockPerTick: bool = true;
-}
-
 impl pallet_ticks::Config for Test {
 	type WeightInfo = ();
-	type AllowMultipleBlockPerTick = AllowMultipleBlockPerTick;
 }
 
 // Build genesis storage according to the mock runtime.
