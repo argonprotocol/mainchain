@@ -1,13 +1,20 @@
 # Changelog
 
-## [v0.0.23](https://github.com/argonprotocol/mainchain/compare/v0.0.22...cd407e001c0e5cc09afd466122683073e47eaf90) (2024-12-19)
+## [v0.0.24](https://github.com/argonprotocol/mainchain/compare/v0.0.23...5dfc57e20b7154518eade12dedb11de6f452a5e2) (2024-12-20)
 
-### Features
+### Fixes
+
+* **node:** don’t download all notebooks on bootup
+([014adc7](https://github.com/argonprotocol/mainchain/commit/014adc734e6bd7013dbe13acb5ee7de9029290f4))
+
+### [v0.0.23](https://github.com/argonprotocol/mainchain/compare/v0.0.22...v0.0.23) (2024-12-19)
+
+#### Features
 
 * **node:** add prometheus metrics
 ([2d0d701](https://github.com/argonprotocol/mainchain/commit/2d0d7017c485a7dd8c1b3f0bb7b234323b9d4074))
 
-### Fixes
+#### Fixes
 
 * **node:** reduce looping for notary_client
 ([b34f734](https://github.com/argonprotocol/mainchain/commit/b34f73417ddafbcd314f1669c843ed370addb3a6))
