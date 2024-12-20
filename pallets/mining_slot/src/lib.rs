@@ -3,7 +3,10 @@ extern crate alloc;
 
 use alloc::{vec, vec::Vec};
 use argon_primitives::{
-	block_seal::{MinerIndex, MiningAuthority, MiningSlotConfig, RewardDestination, RewardSharing},
+	block_seal::{
+		MinerIndex, MiningAuthority, MiningBidStats, MiningSlotConfig, RewardDestination,
+		RewardSharing,
+	},
 	bond::BondProvider,
 	inherents::BlockSealInherent,
 	AuthorityProvider, BlockRewardAccountsProvider, BlockSealEventHandler, MiningSlotProvider,
@@ -210,7 +213,7 @@ pub mod pallet {
 	/// The number of bids per slot for the last 10 slots (newest first)
 	#[pallet::storage]
 	pub(super) type HistoricalBidsPerSlot<T: Config> =
-		StorageValue<_, BoundedVec<u32, ConstU32<10>>, ValueQuery>;
+		StorageValue<_, BoundedVec<MiningBidStats, ConstU32<10>>, ValueQuery>;
 
 	/// The mining slot configuration set in genesis
 	#[pallet::storage]
@@ -450,7 +453,13 @@ pub mod pallet {
 
 				HistoricalBidsPerSlot::<T>::mutate(|bids| {
 					if let Some(bids) = bids.get_mut(0) {
-						*bids += 1;
+						bids.bids_count += 1;
+						bids.bid_amount_max = bids.bid_amount_max.max(bid.into());
+						if bids.bids_count == 1 {
+							bids.bid_amount_min = bid.into();
+						}
+						bids.bid_amount_min = bids.bid_amount_min.min(bid.into());
+						bids.bid_amount_sum = bids.bid_amount_sum.saturating_add(bid.into());
 					}
 				});
 				Self::deposit_event(Event::<T>::SlotBidderAdded {
@@ -555,7 +564,7 @@ impl<T: Config> Pallet<T> {
 			if bids.is_full() {
 				bids.pop();
 			}
-			let _ = bids.try_insert(0, 0);
+			let _ = bids.try_insert(0, MiningBidStats::default());
 		});
 
 		let start_index_to_replace_miners = Self::get_slot_starting_index(
@@ -624,7 +633,7 @@ impl<T: Config> Pallet<T> {
 		let ownership_circulation: u128 = T::OwnershipCurrency::total_issuance().saturated_into();
 
 		let historical_bids = HistoricalBidsPerSlot::<T>::get();
-		let total_bids: u32 = historical_bids.iter().sum();
+		let total_bids: u32 = historical_bids.iter().map(|a| a.bids_count).sum();
 		let slots = historical_bids.len() as u32;
 		let expected_bids_for_period = slots.saturating_mul(T::TargetBidsPerSlot::get());
 		let previous_adjustment =

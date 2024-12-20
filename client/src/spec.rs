@@ -1369,6 +1369,23 @@ pub mod api {
 						],
 					)
 				}
+				pub fn get_block_payouts(
+					&self,
+				) -> ::subxt::ext::subxt_core::runtime_api::payload::StaticPayload<
+					types::GetBlockPayouts,
+					types::get_block_payouts::output::Output,
+				> {
+					::subxt::ext::subxt_core::runtime_api::payload::StaticPayload::new_static(
+						"MiningApis",
+						"get_block_payouts",
+						types::GetBlockPayouts {},
+						[
+							224u8, 209u8, 95u8, 192u8, 33u8, 21u8, 40u8, 107u8, 53u8, 69u8, 231u8,
+							158u8, 225u8, 124u8, 128u8, 149u8, 155u8, 89u8, 71u8, 219u8, 90u8,
+							96u8, 63u8, 33u8, 247u8, 207u8, 114u8, 177u8, 42u8, 184u8, 116u8, 32u8,
+						],
+					)
+				}
 			}
 			pub mod types {
 				use super::runtime_types;
@@ -1403,6 +1420,34 @@ pub mod api {
 				pub struct GetAuthorityId {
 					pub account_id: get_authority_id::AccountId,
 				}
+				pub mod get_block_payouts {
+					use super::runtime_types;
+					pub mod output {
+						use super::runtime_types;
+						pub type Output = ::subxt::ext::subxt_core::alloc::vec::Vec<
+							runtime_types::argon_primitives::block_seal::BlockPayout<
+								crate::types::AccountId32,
+								::core::primitive::u128,
+							>,
+						>;
+					}
+				}
+				#[derive(
+					:: subxt :: ext :: subxt_core :: ext :: codec :: Decode,
+					:: subxt :: ext :: subxt_core :: ext :: codec :: Encode,
+					:: subxt :: ext :: subxt_core :: ext :: scale_decode :: DecodeAsType,
+					:: subxt :: ext :: subxt_core :: ext :: scale_encode :: EncodeAsType,
+					Clone,
+					Debug,
+				)]
+				# [codec (crate = :: subxt :: ext :: subxt_core :: ext :: codec)]
+				#[decode_as_type(
+					crate_path = ":: subxt :: ext :: subxt_core :: ext :: scale_decode"
+				)]
+				#[encode_as_type(
+					crate_path = ":: subxt :: ext :: subxt_core :: ext :: scale_encode"
+				)]
+				pub struct GetBlockPayouts {}
 			}
 		}
 		pub mod block_seal_apis {
@@ -3747,9 +3792,9 @@ pub mod api {
 			.hash();
 		runtime_metadata_hash ==
 			[
-				150u8, 116u8, 211u8, 115u8, 248u8, 220u8, 58u8, 228u8, 54u8, 150u8, 56u8, 164u8,
-				217u8, 228u8, 196u8, 183u8, 63u8, 75u8, 102u8, 103u8, 49u8, 84u8, 52u8, 241u8,
-				57u8, 52u8, 145u8, 228u8, 230u8, 107u8, 125u8, 167u8,
+				24u8, 8u8, 217u8, 179u8, 149u8, 217u8, 46u8, 186u8, 54u8, 159u8, 22u8, 7u8, 63u8,
+				238u8, 10u8, 109u8, 205u8, 190u8, 76u8, 222u8, 149u8, 238u8, 125u8, 112u8, 250u8,
+				174u8, 121u8, 71u8, 83u8, 193u8, 32u8, 190u8,
 			]
 	}
 	pub mod system {
@@ -4900,10 +4945,9 @@ pub mod api {
 						"Events",
 						(),
 						[
-							101u8, 77u8, 232u8, 250u8, 254u8, 194u8, 39u8, 122u8, 125u8, 55u8,
-							246u8, 194u8, 212u8, 112u8, 13u8, 175u8, 9u8, 104u8, 250u8, 105u8,
-							231u8, 46u8, 227u8, 166u8, 35u8, 97u8, 49u8, 190u8, 236u8, 254u8, 43u8,
-							186u8,
+							123u8, 224u8, 99u8, 23u8, 28u8, 108u8, 77u8, 3u8, 46u8, 18u8, 33u8,
+							165u8, 85u8, 252u8, 37u8, 107u8, 90u8, 246u8, 48u8, 14u8, 97u8, 16u8,
+							183u8, 112u8, 224u8, 65u8, 202u8, 146u8, 140u8, 157u8, 170u8, 7u8,
 						],
 					)
 				}
@@ -7802,7 +7846,7 @@ pub mod api {
 					use super::runtime_types;
 					pub type HistoricalBidsPerSlot =
 						runtime_types::bounded_collections::bounded_vec::BoundedVec<
-							::core::primitive::u32,
+							runtime_types::argon_primitives::block_seal::MiningBidStats,
 						>;
 				}
 				pub mod mining_config {
@@ -8058,9 +8102,9 @@ pub mod api {
 						"HistoricalBidsPerSlot",
 						(),
 						[
-							136u8, 148u8, 91u8, 191u8, 165u8, 59u8, 132u8, 128u8, 139u8, 150u8,
-							116u8, 76u8, 241u8, 30u8, 112u8, 65u8, 17u8, 155u8, 66u8, 130u8, 163u8,
-							97u8, 253u8, 37u8, 13u8, 91u8, 82u8, 221u8, 123u8, 191u8, 104u8, 7u8,
+							114u8, 170u8, 88u8, 9u8, 12u8, 154u8, 32u8, 175u8, 253u8, 49u8, 208u8,
+							1u8, 198u8, 240u8, 254u8, 254u8, 163u8, 79u8, 188u8, 223u8, 253u8,
+							28u8, 106u8, 240u8, 30u8, 16u8, 50u8, 212u8, 29u8, 218u8, 9u8, 143u8,
 						],
 					)
 				}
@@ -14405,9 +14449,9 @@ pub mod api {
 						"LastBlockSealerInfo",
 						(),
 						[
-							59u8, 15u8, 90u8, 79u8, 226u8, 1u8, 28u8, 174u8, 251u8, 138u8, 15u8,
-							104u8, 204u8, 172u8, 75u8, 34u8, 100u8, 24u8, 205u8, 13u8, 24u8, 6u8,
-							224u8, 243u8, 41u8, 185u8, 186u8, 164u8, 126u8, 225u8, 20u8, 81u8,
+							28u8, 125u8, 173u8, 68u8, 3u8, 123u8, 68u8, 139u8, 196u8, 151u8, 100u8,
+							107u8, 44u8, 16u8, 92u8, 45u8, 204u8, 223u8, 254u8, 145u8, 100u8, 48u8,
+							140u8, 122u8, 225u8, 169u8, 232u8, 226u8, 29u8, 212u8, 206u8, 122u8,
 						],
 					)
 				}
@@ -14667,9 +14711,9 @@ pub mod api {
 						"PayoutsByBlock",
 						(),
 						[
-							179u8, 203u8, 31u8, 14u8, 18u8, 54u8, 64u8, 151u8, 253u8, 148u8, 200u8,
-							240u8, 90u8, 207u8, 123u8, 228u8, 84u8, 190u8, 2u8, 204u8, 39u8, 228u8,
-							35u8, 158u8, 114u8, 42u8, 70u8, 94u8, 21u8, 93u8, 72u8, 247u8,
+							164u8, 23u8, 181u8, 82u8, 89u8, 204u8, 70u8, 63u8, 12u8, 150u8, 190u8,
+							91u8, 205u8, 66u8, 48u8, 14u8, 221u8, 128u8, 42u8, 214u8, 250u8, 76u8,
+							225u8, 127u8, 160u8, 113u8, 51u8, 26u8, 57u8, 156u8, 85u8, 72u8,
 						],
 					)
 				}
@@ -14692,9 +14736,9 @@ pub mod api {
 							_0.borrow(),
 						),
 						[
-							179u8, 203u8, 31u8, 14u8, 18u8, 54u8, 64u8, 151u8, 253u8, 148u8, 200u8,
-							240u8, 90u8, 207u8, 123u8, 228u8, 84u8, 190u8, 2u8, 204u8, 39u8, 228u8,
-							35u8, 158u8, 114u8, 42u8, 70u8, 94u8, 21u8, 93u8, 72u8, 247u8,
+							164u8, 23u8, 181u8, 82u8, 89u8, 204u8, 70u8, 63u8, 12u8, 150u8, 190u8,
+							91u8, 205u8, 66u8, 48u8, 14u8, 221u8, 128u8, 42u8, 214u8, 250u8, 76u8,
+							225u8, 127u8, 160u8, 113u8, 51u8, 26u8, 57u8, 156u8, 85u8, 72u8,
 						],
 					)
 				}
@@ -14924,6 +14968,13 @@ pub mod api {
 					use super::runtime_types;
 					pub type MintedBitcoinArgons = runtime_types::primitive_types::U256;
 				}
+				pub mod block_mint_action {
+					use super::runtime_types;
+					pub type BlockMintAction = (
+						::core::primitive::u32,
+						runtime_types::pallet_mint::MintAction<::core::primitive::u128>,
+					);
+				}
 			}
 			pub struct StorageApi;
 			impl StorageApi {
@@ -14989,6 +15040,27 @@ pub mod api {
 							61u8, 61u8, 150u8, 84u8, 160u8, 9u8, 166u8, 80u8, 225u8, 163u8, 15u8,
 							39u8, 218u8, 183u8, 45u8, 230u8, 52u8, 8u8, 53u8, 147u8, 135u8, 79u8,
 							252u8, 128u8, 239u8, 228u8, 199u8, 31u8, 135u8, 58u8, 74u8, 114u8,
+						],
+					)
+				}
+				pub fn block_mint_action(
+					&self,
+				) -> ::subxt::ext::subxt_core::storage::address::StaticAddress<
+					(),
+					types::block_mint_action::BlockMintAction,
+					::subxt::ext::subxt_core::utils::Yes,
+					::subxt::ext::subxt_core::utils::Yes,
+					(),
+				> {
+					::subxt::ext::subxt_core::storage::address::StaticAddress::new_static(
+						"Mint",
+						"BlockMintAction",
+						(),
+						[
+							54u8, 157u8, 179u8, 147u8, 93u8, 158u8, 69u8, 181u8, 138u8, 136u8,
+							98u8, 84u8, 234u8, 133u8, 226u8, 51u8, 100u8, 214u8, 61u8, 163u8,
+							185u8, 6u8, 53u8, 47u8, 182u8, 37u8, 211u8, 105u8, 240u8, 50u8, 214u8,
+							180u8,
 						],
 					)
 				}
@@ -22382,6 +22454,33 @@ pub mod api {
 					pub ownership: _1,
 					#[codec(compact)]
 					pub argons: _1,
+					pub reward_type: runtime_types::argon_primitives::block_seal::BlockRewardType,
+					pub block_seal_authority: ::core::option::Option<
+						runtime_types::argon_primitives::block_seal::app::Public,
+					>,
+				}
+				#[derive(
+					:: subxt :: ext :: subxt_core :: ext :: codec :: Decode,
+					:: subxt :: ext :: subxt_core :: ext :: codec :: Encode,
+					:: subxt :: ext :: subxt_core :: ext :: scale_decode :: DecodeAsType,
+					:: subxt :: ext :: subxt_core :: ext :: scale_encode :: EncodeAsType,
+					Clone,
+					Debug,
+				)]
+				# [codec (crate = :: subxt :: ext :: subxt_core :: ext :: codec)]
+				#[decode_as_type(
+					crate_path = ":: subxt :: ext :: subxt_core :: ext :: scale_decode"
+				)]
+				#[encode_as_type(
+					crate_path = ":: subxt :: ext :: subxt_core :: ext :: scale_encode"
+				)]
+				pub enum BlockRewardType {
+					#[codec(index = 0)]
+					Miner,
+					#[codec(index = 1)]
+					Voter,
+					#[codec(index = 2)]
+					ProfitShare,
 				}
 				#[derive(
 					:: subxt :: ext :: subxt_core :: ext :: codec :: Decode,
@@ -22424,6 +22523,27 @@ pub mod api {
 					pub authority_index: ::core::primitive::u32,
 					pub authority_id: _0,
 					pub account_id: _1,
+				}
+				#[derive(
+					:: subxt :: ext :: subxt_core :: ext :: codec :: Decode,
+					:: subxt :: ext :: subxt_core :: ext :: codec :: Encode,
+					:: subxt :: ext :: subxt_core :: ext :: scale_decode :: DecodeAsType,
+					:: subxt :: ext :: subxt_core :: ext :: scale_encode :: EncodeAsType,
+					Clone,
+					Debug,
+				)]
+				# [codec (crate = :: subxt :: ext :: subxt_core :: ext :: codec)]
+				#[decode_as_type(
+					crate_path = ":: subxt :: ext :: subxt_core :: ext :: scale_decode"
+				)]
+				#[encode_as_type(
+					crate_path = ":: subxt :: ext :: subxt_core :: ext :: scale_encode"
+				)]
+				pub struct MiningBidStats {
+					pub bids_count: ::core::primitive::u32,
+					pub bid_amount_min: ::core::primitive::u128,
+					pub bid_amount_max: ::core::primitive::u128,
+					pub bid_amount_sum: ::core::primitive::u128,
 				}
 				#[derive(
 					:: subxt :: ext :: subxt_core :: ext :: codec :: Decode,
@@ -23500,6 +23620,9 @@ pub mod api {
 				pub struct BlockSealerInfo<_0> {
 					pub block_author_account_id: _0,
 					pub block_vote_rewards_account: ::core::option::Option<_0>,
+					pub block_seal_authority: ::core::option::Option<
+						runtime_types::argon_primitives::block_seal::app::Public,
+					>,
 				}
 			}
 			pub mod tick {
@@ -26173,6 +26296,9 @@ pub mod api {
 					#[codec(index = 16)]
 					#[doc = "Invalid fork power parent"]
 					InvalidForkPowerParent,
+					#[codec(index = 17)]
+					#[doc = "A block seal authority could not be properly decoded"]
+					BlockSealDecodeError,
 				}
 			}
 		}
@@ -27905,6 +28031,22 @@ pub mod api {
 					#[codec(index = 1)]
 					Mining,
 				}
+			}
+			#[derive(
+				:: subxt :: ext :: subxt_core :: ext :: codec :: Decode,
+				:: subxt :: ext :: subxt_core :: ext :: codec :: Encode,
+				:: subxt :: ext :: subxt_core :: ext :: scale_decode :: DecodeAsType,
+				:: subxt :: ext :: subxt_core :: ext :: scale_encode :: EncodeAsType,
+				Clone,
+				Debug,
+			)]
+			# [codec (crate = :: subxt :: ext :: subxt_core :: ext :: codec)]
+			#[decode_as_type(crate_path = ":: subxt :: ext :: subxt_core :: ext :: scale_decode")]
+			#[encode_as_type(crate_path = ":: subxt :: ext :: subxt_core :: ext :: scale_encode")]
+			pub struct MintAction<_0> {
+				pub argon_burned: _0,
+				pub argon_minted: _0,
+				pub bitcoin_minted: _0,
 			}
 		}
 		pub mod pallet_multisig {

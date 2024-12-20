@@ -21,7 +21,9 @@ use crate::{
 	Error, Event, HoldReason, MiningSlotBid,
 };
 use argon_primitives::{
-	block_seal::{MiningAuthority, MiningRegistration, RewardDestination, RewardSharing},
+	block_seal::{
+		MiningAuthority, MiningBidStats, MiningRegistration, RewardDestination, RewardSharing,
+	},
 	inherents::BlockSealInherent,
 	AuthorityProvider, BlockRewardAccountsProvider, BlockVote, MerkleProof,
 };
@@ -424,7 +426,7 @@ fn it_wont_accept_bids_until_bidding_starts() {
 	MaxMiners::set(6);
 	MaxCohortSize::set(2);
 	SlotBiddingStartTick::set(12);
-	Tick::set(11);
+	TicksSinceGenesis::set(11);
 
 	new_test_ext().execute_with(|| {
 		set_ownership(2, 100u32.into());
@@ -444,7 +446,7 @@ fn it_wont_accept_bids_until_bidding_starts() {
 		}
 
 		System::set_block_number(12);
-		Tick::set(12);
+		TicksSinceGenesis::set(12);
 		MiningSlots::on_initialize(12);
 
 		assert!(IsNextSlotBiddingOpen::<Test>::get(), "bidding should now be open");
@@ -553,7 +555,12 @@ fn it_will_order_bids_with_argon_bonds() {
 			Event::SlotBidderAdded { account_id: 1, bid_amount: 1000u32.into(), index: 0 }.into(),
 		);
 		assert_eq!(Ownership::free_balance(1), 1000 - share_amount);
-		assert_eq!(HistoricalBidsPerSlot::<Test>::get().into_inner()[0], 1);
+		let first_bid = HistoricalBidsPerSlot::<Test>::get().into_inner()[0].clone();
+		assert_eq!(first_bid.bids_count, 1);
+		assert_eq!(first_bid.bid_amount_min, 1000);
+		assert_eq!(first_bid.bid_amount_max, 1000);
+		assert_eq!(first_bid.bid_amount_sum, 1000);
+
 		assert_eq!(Bonds::get().len(), 1);
 
 		// 2. Account 2 bids highest and takes top slot
@@ -569,7 +576,11 @@ fn it_will_order_bids_with_argon_bonds() {
 			Event::SlotBidderAdded { account_id: 2, bid_amount: 1001u32.into(), index: 0 }.into(),
 		);
 
-		assert_eq!(HistoricalBidsPerSlot::<Test>::get().into_inner()[0], 2);
+		let first_bid = HistoricalBidsPerSlot::<Test>::get().into_inner()[0].clone();
+		assert_eq!(first_bid.bids_count, 2);
+		assert_eq!(first_bid.bid_amount_min, 1000);
+		assert_eq!(first_bid.bid_amount_max, 1001);
+		assert_eq!(first_bid.bid_amount_sum, 2001);
 		assert_eq!(
 			NextSlotCohort::<Test>::get().iter().map(|a| a.account_id).collect::<Vec<_>>(),
 			vec![2, 1]
@@ -587,7 +598,7 @@ fn it_will_order_bids_with_argon_bonds() {
 		System::assert_last_event(
 			Event::SlotBidderAdded { account_id: 3, bid_amount: 1001u32.into(), index: 1 }.into(),
 		);
-		assert_eq!(HistoricalBidsPerSlot::<Test>::get().into_inner()[0], 3);
+		assert_eq!(HistoricalBidsPerSlot::<Test>::get().into_inner()[0].clone().bids_count, 3);
 
 		assert_eq!(
 			NextSlotCohort::<Test>::get().iter().map(|a| a.account_id).collect::<Vec<_>>(),
@@ -622,7 +633,11 @@ fn it_will_order_bids_with_argon_bonds() {
 			RewardDestination::Owner,
 			1.into()
 		));
-		assert_eq!(HistoricalBidsPerSlot::<Test>::get().into_inner()[0], 4);
+		let first_bid = HistoricalBidsPerSlot::<Test>::get().into_inner()[0].clone();
+		assert_eq!(first_bid.bids_count, 4);
+		assert_eq!(first_bid.bid_amount_min, 1000);
+		assert_eq!(first_bid.bid_amount_max, 1002);
+		assert_eq!(first_bid.bid_amount_sum, 4004);
 
 		let events = frame_system::Pallet::<Test>::events();
 		// compare to the last event record
@@ -674,7 +689,7 @@ fn handles_a_max_of_bids_per_block() {
 			RewardDestination::Owner,
 			1.into()
 		));
-		assert_eq!(HistoricalBidsPerSlot::<Test>::get().into_inner()[0], 1);
+		assert_eq!(HistoricalBidsPerSlot::<Test>::get().into_inner()[0].clone().bids_count, 1);
 
 		System::assert_last_event(
 			Event::SlotBidderAdded { account_id: 1, bid_amount: 0u32.into(), index: 0 }.into(),
@@ -696,7 +711,7 @@ fn handles_a_max_of_bids_per_block() {
 		System::assert_last_event(
 			Event::SlotBidderAdded { account_id: 2, bid_amount: 0u32.into(), index: 1 }.into(),
 		);
-		assert_eq!(HistoricalBidsPerSlot::<Test>::get().into_inner()[0], 2);
+		assert_eq!(HistoricalBidsPerSlot::<Test>::get().into_inner()[0].clone().bids_count, 2);
 		for i in 1..5 {
 			assert!(System::account_exists(&i));
 		}
@@ -726,7 +741,7 @@ fn records_profit_sharing_if_applicable() {
 			RewardDestination::Account(25),
 			1.into()
 		));
-		assert_eq!(HistoricalBidsPerSlot::<Test>::get().into_inner()[0], 1);
+		assert_eq!(HistoricalBidsPerSlot::<Test>::get().into_inner()[0].bids_count, 1);
 
 		System::assert_last_event(
 			Event::SlotBidderAdded { account_id: 1, bid_amount: 1000u32.into(), index: 0 }.into(),
@@ -737,7 +752,7 @@ fn records_profit_sharing_if_applicable() {
 		);
 
 		MiningSlots::on_initialize(6);
-		assert_eq!(HistoricalBidsPerSlot::<Test>::get().into_inner()[0], 0);
+		assert_eq!(HistoricalBidsPerSlot::<Test>::get().into_inner()[0].bids_count, 0);
 		assert_eq!(NextSlotCohort::<Test>::get().len(), 0);
 		let rewards_accounts = MiningSlots::get_all_rewards_accounts();
 		assert_eq!(rewards_accounts.len(), 2);
@@ -858,6 +873,15 @@ fn it_will_end_auctions_if_a_seal_qualifies() {
 	})
 }
 
+fn bid_stats(count: u32, amount: Balance) -> MiningBidStats {
+	MiningBidStats {
+		bids_count: count,
+		bid_amount_sum: amount * count as u128,
+		bid_amount_min: amount,
+		bid_amount_max: amount,
+	}
+}
+
 #[test]
 fn it_adjusts_ownership_bonds() {
 	BlocksBetweenSlots::set(10);
@@ -873,7 +897,7 @@ fn it_adjusts_ownership_bonds() {
 		OwnershipBondAmount::<Test>::set(0);
 		LastOwnershipPercentAdjustment::<Test>::put(FixedU128::from_u32(1));
 		// should have 10 per slot, make it 12
-		HistoricalBidsPerSlot::<Test>::set(bounded_vec![12, 12]);
+		HistoricalBidsPerSlot::<Test>::set(bounded_vec![bid_stats(12, 10), bid_stats(12, 10)]);
 		MiningSlots::adjust_ownership_bond_amount();
 
 		assert_eq!(LastOwnershipPercentAdjustment::<Test>::get().unwrap(), FixedU128::from_u32(1));
@@ -881,7 +905,11 @@ fn it_adjusts_ownership_bonds() {
 
 		// simulate bids being way past 20%
 		// should have 10 per slot, make it 12
-		HistoricalBidsPerSlot::<Test>::set(bounded_vec![0, 1, 0]);
+		HistoricalBidsPerSlot::<Test>::set(bounded_vec![
+			bid_stats(0, 0),
+			bid_stats(1, 100),
+			bid_stats(0, 0)
+		]);
 		MiningSlots::adjust_ownership_bond_amount();
 
 		// max decrease is 20%
@@ -893,7 +921,11 @@ fn it_adjusts_ownership_bonds() {
 
 		// simulate bids being way past 20%
 		LastOwnershipPercentAdjustment::<Test>::put(FixedU128::from_rational(150, 100));
-		HistoricalBidsPerSlot::<Test>::set(bounded_vec![100, 10000, 5000]);
+		HistoricalBidsPerSlot::<Test>::set(bounded_vec![
+			bid_stats(100, 100),
+			bid_stats(1000, 101),
+			bid_stats(5000, 102)
+		]);
 		MiningSlots::adjust_ownership_bond_amount();
 
 		// max increase is 20%

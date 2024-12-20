@@ -1,12 +1,13 @@
 use crate::block_creator::ProposalMeta;
 use argon_primitives::{
 	tick::{Tick, Ticker},
-	NotaryId,
+	Balance, NotaryId,
 };
 use prometheus_endpoint::{
 	prometheus, register, CounterVec, GaugeVec, HistogramOpts, HistogramVec, Opts, PrometheusError,
 	Registry, U64,
 };
+use sp_arithmetic::traits::UniqueSaturatedInto;
 use std::time::Instant;
 
 /// Metrics for the node consensus engine
@@ -30,6 +31,12 @@ pub struct ConsensusMetrics {
 	notebook_audited_after_tick_time: HistogramVec,
 	/// Notebook total processing time
 	notebook_processing_time: HistogramVec,
+	/// Total ownership shares mined
+	mined_ownership_shares_total: CounterVec<U64>,
+	/// Total argons mined
+	mined_argons_total: CounterVec<U64>,
+	/// Total finalized blocks created
+	finalized_blocks_created_total: CounterVec<U64>,
 }
 
 impl ConsensusMetrics {
@@ -122,6 +129,27 @@ impl ConsensusMetrics {
 				)?,
 				metrics_registry,
 			)?,
+			mined_ownership_shares_total: register(
+				CounterVec::new(
+					Opts::new("argon_mined_ownership_shares_total", "Total ownership shares mined"),
+					&[],
+				)?,
+				metrics_registry,
+			)?,
+			mined_argons_total: register(
+				CounterVec::new(Opts::new("argon_mined_argons_total", "Total argons mined"), &[])?,
+				metrics_registry,
+			)?,
+			finalized_blocks_created_total: register(
+				CounterVec::new(
+					Opts::new(
+						"argon_finalized_blocks_created_total",
+						"Total finalized blocks created",
+					),
+					&[],
+				)?,
+				metrics_registry,
+			)?,
 		})
 	}
 
@@ -182,5 +210,15 @@ impl ConsensusMetrics {
 		self.notebook_queue_depth
 			.with_label_values(&[&notary_id.to_string()])
 			.set(depth);
+	}
+
+	pub(crate) fn record_finalized_block(&self, ownership_shares: Balance, argons: Balance) {
+		self.mined_ownership_shares_total
+			.with_label_values(&[])
+			.inc_by(ownership_shares.unique_saturated_into());
+		self.mined_argons_total
+			.with_label_values(&[])
+			.inc_by(argons.unique_saturated_into());
+		self.finalized_blocks_created_total.with_label_values(&[]).inc();
 	}
 }

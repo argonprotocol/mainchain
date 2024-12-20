@@ -16,7 +16,7 @@ use crate::configs::ArgonToken;
 use alloc::{collections::BTreeMap, vec, vec::Vec};
 use argon_primitives::{
 	bitcoin::{BitcoinNetwork, BitcoinSyncStatus, Satoshis, UtxoRef, UtxoValue},
-	block_seal::{ComputePuzzle, MiningAuthority},
+	block_seal::{BlockPayout, ComputePuzzle, MiningAuthority},
 	notary::{
 		NotaryNotebookAuditSummary, NotaryNotebookDetails, NotaryNotebookRawVotes,
 		NotaryNotebookVoteDigestDetails, NotaryRecordWithState,
@@ -51,7 +51,6 @@ use sp_version::RuntimeVersion;
 
 #[cfg(feature = "std")]
 include!(concat!(env!("OUT_DIR"), "/wasm_binary.rs"));
-
 #[cfg(any(feature = "std", test))]
 pub use sp_runtime::BuildStorage;
 #[cfg(feature = "std")]
@@ -351,6 +350,9 @@ impl_runtime_apis! {
 	impl argon_primitives::MiningApis<Block, AccountId, BlockSealAuthorityId> for Runtime {
 		fn get_authority_id(account_id: &AccountId) -> Option<MiningAuthority< BlockSealAuthorityId, AccountId>> {
 			MiningSlot::get_mining_authority(account_id)
+		}
+		fn get_block_payouts() -> Vec<BlockPayout<AccountId, Balance>> {
+			BlockRewards::block_payouts()
 		}
 	}
 

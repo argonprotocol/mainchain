@@ -105,7 +105,7 @@ parameter_types! {
 	pub static LastSlotAdded: Vec<(u64, UintAuthorityId)> = vec![];
 
 	// set slot bidding active by default
-	pub static Tick: u64 = 3;
+	pub static TicksSinceGenesis: u64 = 3;
 }
 
 pub struct StaticBondProvider;
@@ -181,7 +181,7 @@ impl pallet_mining_slot::Config for Test {
 	type SlotEvents = (StaticNewSlotEvent,);
 	type MiningAuthorityId = UintAuthorityId;
 	type Keys = MockSessionKeys;
-	type CurrentTick = Tick;
+	type TicksSinceGenesis = TicksSinceGenesis;
 }
 
 // Build genesis storage according to the mock runtime.

@@ -95,6 +95,7 @@ parameter_types! {
 	pub static BlockSealer:BlockSealerInfo<u64> = BlockSealerInfo {
 		block_vote_rewards_account: Some(1),
 		block_author_account_id: 1,
+		block_seal_authority: None
 	};
 }
 

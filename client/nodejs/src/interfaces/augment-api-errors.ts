@@ -111,6 +111,10 @@ declare module '@polkadot/api-base/types/errors' {
     };
     blockSeal: {
       /**
+       * A block seal authority could not be properly decoded
+       **/
+      BlockSealDecodeError: AugmentedError<ApiType>;
+      /**
        * The vote signature was invalid
        **/
       BlockVoteInvalidSignature: AugmentedError<ApiType>;
