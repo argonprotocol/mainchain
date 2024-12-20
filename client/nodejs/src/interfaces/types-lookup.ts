@@ -2477,7 +2477,7 @@ declare module '@polkadot/types/lookup' {
   interface ArgonPrimitivesBlockSealMiningSlotConfig extends Struct {
     readonly blocksBeforeBidEndForVrfClose: Compact<u32>;
     readonly blocksBetweenSlots: Compact<u32>;
-    readonly slotBiddingStartBlock: Compact<u32>;
+    readonly slotBiddingStartAfterTicks: Compact<u64>;
   }
 
   /** @name PalletMiningSlotError (328) */

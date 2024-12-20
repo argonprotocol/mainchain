@@ -626,6 +626,7 @@ declare module '@polkadot/api-base/types/storage' {
     };
     ticks: {
       currentTick: AugmentedQuery<ApiType, () => Observable<u64>, []>;
+      genesisTick: AugmentedQuery<ApiType, () => Observable<u64>, []>;
       genesisTicker: AugmentedQuery<ApiType, () => Observable<ArgonPrimitivesTickTicker>, []>;
       /**
        * Blocks from the last 100 ticks. Trimmed in on_initialize.

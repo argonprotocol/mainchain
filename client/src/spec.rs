@@ -3747,9 +3747,9 @@ pub mod api {
 			.hash();
 		runtime_metadata_hash ==
 			[
-				8u8, 235u8, 249u8, 101u8, 60u8, 121u8, 67u8, 17u8, 87u8, 18u8, 120u8, 137u8, 108u8,
-				62u8, 123u8, 235u8, 81u8, 247u8, 203u8, 132u8, 101u8, 179u8, 135u8, 224u8, 237u8,
-				178u8, 153u8, 163u8, 1u8, 158u8, 147u8, 32u8,
+				150u8, 116u8, 211u8, 115u8, 248u8, 220u8, 58u8, 228u8, 54u8, 150u8, 56u8, 164u8,
+				217u8, 228u8, 196u8, 183u8, 63u8, 75u8, 102u8, 103u8, 49u8, 84u8, 52u8, 241u8,
+				57u8, 52u8, 145u8, 228u8, 230u8, 107u8, 125u8, 167u8,
 			]
 	}
 	pub mod system {
@@ -7347,6 +7347,10 @@ pub mod api {
 					use super::runtime_types;
 					pub type CurrentTick = ::core::primitive::u64;
 				}
+				pub mod genesis_tick {
+					use super::runtime_types;
+					pub type GenesisTick = ::core::primitive::u64;
+				}
 				pub mod genesis_ticker {
 					use super::runtime_types;
 					pub type GenesisTicker = runtime_types::argon_primitives::tick::Ticker;
@@ -7379,6 +7383,26 @@ pub mod api {
 							115u8, 54u8, 229u8, 23u8, 97u8, 60u8, 64u8, 116u8, 37u8, 184u8, 10u8,
 							37u8, 110u8, 80u8, 205u8, 157u8, 72u8, 245u8, 79u8, 69u8, 169u8, 19u8,
 							137u8, 188u8, 154u8, 27u8, 238u8, 62u8, 75u8, 157u8, 69u8, 145u8,
+						],
+					)
+				}
+				pub fn genesis_tick(
+					&self,
+				) -> ::subxt::ext::subxt_core::storage::address::StaticAddress<
+					(),
+					types::genesis_tick::GenesisTick,
+					::subxt::ext::subxt_core::utils::Yes,
+					::subxt::ext::subxt_core::utils::Yes,
+					(),
+				> {
+					::subxt::ext::subxt_core::storage::address::StaticAddress::new_static(
+						"Ticks",
+						"GenesisTick",
+						(),
+						[
+							190u8, 7u8, 38u8, 4u8, 130u8, 137u8, 195u8, 170u8, 62u8, 92u8, 64u8,
+							52u8, 137u8, 28u8, 123u8, 209u8, 202u8, 73u8, 5u8, 3u8, 248u8, 223u8,
+							28u8, 226u8, 188u8, 211u8, 227u8, 65u8, 250u8, 11u8, 137u8, 98u8,
 						],
 					)
 				}
@@ -8055,9 +8079,9 @@ pub mod api {
 						"MiningConfig",
 						(),
 						[
-							9u8, 176u8, 93u8, 144u8, 176u8, 129u8, 91u8, 246u8, 71u8, 148u8, 82u8,
-							41u8, 206u8, 40u8, 12u8, 179u8, 241u8, 61u8, 101u8, 164u8, 21u8, 91u8,
-							122u8, 75u8, 221u8, 240u8, 42u8, 254u8, 155u8, 64u8, 194u8, 238u8,
+							2u8, 214u8, 45u8, 133u8, 59u8, 0u8, 123u8, 159u8, 108u8, 147u8, 220u8,
+							94u8, 60u8, 42u8, 152u8, 197u8, 23u8, 167u8, 150u8, 227u8, 193u8,
+							178u8, 84u8, 137u8, 49u8, 22u8, 151u8, 161u8, 196u8, 92u8, 159u8, 10u8,
 						],
 					)
 				}
@@ -22451,7 +22475,7 @@ pub mod api {
 					#[codec(compact)]
 					pub blocks_between_slots: _0,
 					#[codec(compact)]
-					pub slot_bidding_start_block: _0,
+					pub slot_bidding_start_after_ticks: ::core::primitive::u64,
 				}
 				#[derive(
 					:: subxt :: ext :: subxt_core :: ext :: codec :: Decode,

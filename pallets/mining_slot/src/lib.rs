@@ -76,14 +76,14 @@ pub mod pallet {
 	};
 	use frame_system::pallet_prelude::*;
 	use sp_runtime::{
-		traits::{AtLeast32BitUnsigned, Member, OpaqueKeys, UniqueSaturatedInto, Zero},
+		traits::{AtLeast32BitUnsigned, Member, OpaqueKeys, UniqueSaturatedInto},
 		BoundedBTreeMap,
 	};
 
 	use argon_primitives::{
 		block_seal::{MiningRegistration, RewardDestination},
 		bond::{BondError, BondProvider},
-		BondId, VaultId,
+		prelude::*,
 	};
 
 	use super::*;
@@ -158,6 +158,9 @@ pub mod pallet {
 
 		/// The authority signing keys.
 		type Keys: OpaqueKeys + Member + Parameter + MaybeSerializeDeserialize;
+
+		/// The current tick
+		type TicksSinceGenesis: Get<Tick>;
 	}
 
 	/// A reason for the pallet placing a hold on funds.
@@ -225,7 +228,7 @@ pub mod pallet {
 	#[pallet::genesis_build]
 	impl<T: Config> BuildGenesisConfig for GenesisConfig<T> {
 		fn build(&self) {
-			if self.mining_config.slot_bidding_start_block == Zero::zero() {
+			if self.mining_config.slot_bidding_start_after_ticks == 0 {
 				IsNextSlotBiddingOpen::<T>::put(true);
 			}
 			MiningConfig::<T>::put(self.mining_config.clone());
@@ -321,7 +324,7 @@ pub mod pallet {
 			let blocks_between_slots = Self::blocks_between_slots();
 			let mining_config = MiningConfig::<T>::get();
 
-			if block_number >= mining_config.slot_bidding_start_block &&
+			if T::TicksSinceGenesis::get() >= mining_config.slot_bidding_start_after_ticks &&
 				block_number_u32 % blocks_between_slots == 0
 			{
 				Self::adjust_ownership_bond_amount();
@@ -519,8 +522,7 @@ impl<T: Config> AuthorityProvider<T::MiningAuthorityId, T::Block, T::AccountId> 
 
 impl<T: Config> Pallet<T> {
 	pub fn is_registered_mining_active() -> bool {
-		<frame_system::Pallet<T>>::block_number() >=
-			MiningConfig::<T>::get().slot_bidding_start_block &&
+		T::TicksSinceGenesis::get() >= MiningConfig::<T>::get().slot_bidding_start_after_ticks &&
 			ActiveMinersCount::<T>::get() > 0
 	}
 

@@ -9,6 +9,7 @@ use argon_canary_runtime::WASM_BINARY;
 use argon_primitives::{
 	bitcoin::{BitcoinNetwork, SATOSHIS_PER_BITCOIN},
 	block_seal::MiningSlotConfig,
+	tick::Ticker,
 	Chain, ComputeDifficulty, ADDRESS_PREFIX, ARGON_TOKEN_SYMBOL, TOKEN_DECIMALS,
 };
 
@@ -21,6 +22,7 @@ pub fn development_config() -> Result<ChainSpec, String> {
 	let hashes_per_second: u64 = if env::var("CI").is_ok() { 50 } else { 200 };
 	const TICK_MILLIS: u64 = 2000;
 
+	let ticker = Ticker::new(TICK_MILLIS, 2);
 	Ok(ChainSpec::builder(
 		WASM_BINARY.ok_or_else(|| "Development wasm not available".to_string())?,
 		None,
@@ -43,15 +45,14 @@ pub fn development_config() -> Result<ChainSpec, String> {
 			(get_account_id_from_seed::<sr25519::Public>("Eve"), 100_000_000_000),
 			(get_account_id_from_seed::<sr25519::Public>("Dave"), 100_000_000_000),
 		],
+		ticker,
 		initial_vote_minimum: 1_000,
 		initial_difficulty: (TICK_MILLIS * hashes_per_second / 1_000) as ComputeDifficulty,
-		tick_millis: TICK_MILLIS,
 		initial_notaries: vec![], // No notaries
-		channel_hold_expiration_ticks: 2,
 		mining_config: MiningSlotConfig {
 			blocks_before_bid_end_for_vrf_close: 1,
 			blocks_between_slots: 4,
-			slot_bidding_start_block: 4,
+			slot_bidding_start_after_ticks: 4,
 		},
 		minimum_bitcoin_bond_satoshis: SATOSHIS_PER_BITCOIN / 1_000,
 		hyperbridge_token_admin: get_account_id_from_seed::<sr25519::Public>("Alice"),

@@ -48,6 +48,9 @@ pub mod pallet {
 	pub(super) type CurrentTick<T: Config> = StorageValue<_, Tick, ValueQuery>;
 
 	#[pallet::storage]
+	pub(super) type GenesisTick<T: Config> = StorageValue<_, Tick, ValueQuery>;
+
+	#[pallet::storage]
 	pub(super) type GenesisTicker<T: Config> = StorageValue<_, Ticker, ValueQuery>;
 
 	/// Blocks from the last 100 ticks. Trimmed in on_initialize.
@@ -57,7 +60,7 @@ pub mod pallet {
 		_,
 		Twox64Concat,
 		Tick,
-		BoundedVec<<T::Block as BlockT>::Hash, ConstU32<10>>,
+		BoundedVec<<T::Block as BlockT>::Hash, ConstU32<4>>,
 		ValueQuery,
 	>;
 
@@ -111,6 +114,9 @@ pub mod pallet {
 			}
 
 			<CurrentTick<T>>::put(proposed_tick);
+			if <GenesisTick<T>>::get() == 0 {
+				<GenesisTick<T>>::put(proposed_tick);
+			}
 
 			T::DbWeight::get().reads_writes(0, 1)
 		}
@@ -132,6 +138,14 @@ pub mod pallet {
 		fn voting_schedule() -> VotingSchedule {
 			let current_tick = Self::current_tick();
 			VotingSchedule::from_runtime_current_tick(current_tick)
+		}
+	}
+
+	impl<T: Config> Pallet<T> {
+		pub fn ticks_since_genesis() -> Tick {
+			let genesis_tick = <GenesisTick<T>>::get();
+			let current_tick = <CurrentTick<T>>::get();
+			current_tick.saturating_sub(genesis_tick)
 		}
 	}
 

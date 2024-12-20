@@ -1,4 +1,4 @@
-use crate::BondId;
+use crate::{tick::Tick, BondId};
 use codec::{Codec, Decode, Encode, HasCompact, MaxEncodedLen};
 use frame_support::{CloneNoBound, EqNoBound, Parameter, PartialEqNoBound};
 use scale_info::TypeInfo;
@@ -89,9 +89,9 @@ pub struct MiningSlotConfig<BlockNumber: Codec + HasCompact> {
 	/// How many blocks transpire between slots
 	#[codec(compact)]
 	pub blocks_between_slots: BlockNumber,
-	/// The block number when bidding will start (eg, Slot "1")
+	/// The tick when bidding will start (eg, Slot "1")
 	#[codec(compact)]
-	pub slot_bidding_start_block: BlockNumber,
+	pub slot_bidding_start_after_ticks: Tick,
 }
 
 /// An struct to define a reward sharing split with another account

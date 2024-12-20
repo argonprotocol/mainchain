@@ -3,7 +3,7 @@ use argon_primitives::{
 	block_seal::MiningSlotConfig,
 	block_vote::VoteMinimum,
 	notary::GenesisNotary,
-	tick::{Tick, Ticker},
+	tick::Ticker,
 	AccountId, Balance, BlockNumber, BlockSealAuthorityId, ComputeDifficulty, Signature,
 };
 use argon_runtime::{
@@ -14,7 +14,6 @@ use argon_runtime::{
 use sp_consensus_grandpa::{AuthorityId as GrandpaId, AuthorityWeight};
 use sp_core::{Pair, Public};
 use sp_runtime::traits::{IdentifyAccount, Verify};
-use std::time::Duration;
 
 mod development;
 mod local_testnet;
@@ -62,9 +61,8 @@ pub struct GenesisSettings {
 	pub endowed_accounts: Vec<(AccountId, Balance)>,
 	pub initial_vote_minimum: VoteMinimum,
 	pub initial_difficulty: ComputeDifficulty,
-	pub tick_millis: u64,
+	pub ticker: Ticker,
 	pub initial_notaries: Vec<GenesisNotary<AccountId>>,
-	pub channel_hold_expiration_ticks: Tick,
 	pub mining_config: MiningSlotConfig<BlockNumber>,
 	pub minimum_bitcoin_bond_satoshis: Satoshis,
 	pub hyperbridge_token_admin: AccountId,
@@ -82,16 +80,13 @@ pub(crate) fn testnet_genesis(
 		endowed_accounts,
 		initial_vote_minimum,
 		initial_difficulty,
-		tick_millis,
+		ticker,
 		initial_notaries,
-		channel_hold_expiration_ticks,
 		mining_config,
 		minimum_bitcoin_bond_satoshis,
 		hyperbridge_token_admin,
 	}: GenesisSettings,
 ) -> serde_json::Value {
-	let ticker = Ticker::start(Duration::from_millis(tick_millis), channel_hold_expiration_ticks);
-
 	let config = RuntimeGenesisConfig {
 		balances: BalancesConfig { balances: endowed_accounts },
 		bonds: BondsConfig { minimum_bitcoin_bond_satoshis, ..Default::default() },

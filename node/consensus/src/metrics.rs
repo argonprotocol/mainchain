@@ -66,7 +66,7 @@ impl ConsensusMetrics {
 			)?,
 			vote_blocks_created_total: register(
 				CounterVec::new(
-					Opts::new("argon_vote_blocks_crated_total", "Blocks created with votes"),
+					Opts::new("argon_vote_blocks_created_total", "Blocks created with votes"),
 					&["has_notebooks"],
 				)?,
 				metrics_registry,

@@ -369,7 +369,7 @@ fn it_holds_ownership_tokens_for_a_slot() {
 			Error::<Test>::SlotNotTakingBids
 		);
 
-		SlotBiddingStartBlock::set(0);
+		SlotBiddingStartTick::set(0);
 		IsNextSlotBiddingOpen::<Test>::set(true);
 
 		set_ownership(3, 5000u32.into());
@@ -423,7 +423,8 @@ fn it_wont_accept_bids_until_bidding_starts() {
 	BlocksBetweenSlots::set(4);
 	MaxMiners::set(6);
 	MaxCohortSize::set(2);
-	SlotBiddingStartBlock::set(12);
+	SlotBiddingStartTick::set(12);
+	Tick::set(11);
 
 	new_test_ext().execute_with(|| {
 		set_ownership(2, 100u32.into());
@@ -443,6 +444,7 @@ fn it_wont_accept_bids_until_bidding_starts() {
 		}
 
 		System::set_block_number(12);
+		Tick::set(12);
 		MiningSlots::on_initialize(12);
 
 		assert!(IsNextSlotBiddingOpen::<Test>::get(), "bidding should now be open");
@@ -459,7 +461,7 @@ fn it_wont_let_you_reuse_ownership_tokens_for_two_bids() {
 	BlocksBetweenSlots::set(4);
 	MaxMiners::set(6);
 	MaxCohortSize::set(2);
-	SlotBiddingStartBlock::set(0);
+	SlotBiddingStartTick::set(0);
 
 	new_test_ext().execute_with(|| {
 		System::set_block_number(12);
@@ -529,7 +531,7 @@ fn it_will_order_bids_with_argon_bonds() {
 			Error::<Test>::SlotNotTakingBids
 		);
 
-		SlotBiddingStartBlock::set(0);
+		SlotBiddingStartTick::set(0);
 		IsNextSlotBiddingOpen::<Test>::set(true);
 
 		set_ownership(1, 1000u32.into());
@@ -811,7 +813,7 @@ fn it_will_end_auctions_if_a_seal_qualifies() {
 	MaxMiners::set(6);
 	MaxCohortSize::set(2);
 	BlocksBeforeBidEndForVrfClose::set(10);
-	SlotBiddingStartBlock::set(0);
+	SlotBiddingStartTick::set(0);
 
 	new_test_ext().execute_with(|| {
 		System::set_block_number(89);
@@ -861,7 +863,7 @@ fn it_adjusts_ownership_bonds() {
 	BlocksBetweenSlots::set(10);
 	MaxMiners::set(100);
 	MaxCohortSize::set(10);
-	SlotBiddingStartBlock::set(10);
+	SlotBiddingStartTick::set(10);
 	TargetBidsPerSlot::set(12);
 
 	new_test_ext().execute_with(|| {

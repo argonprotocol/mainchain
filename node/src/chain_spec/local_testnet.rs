@@ -11,6 +11,7 @@ use argon_primitives::{
 	bitcoin::{BitcoinNetwork, SATOSHIS_PER_BITCOIN},
 	block_seal::MiningSlotConfig,
 	notary::{GenesisNotary, NotaryPublic},
+	tick::Ticker,
 	Chain, ComputeDifficulty, ADDRESS_PREFIX, ARGON_TOKEN_SYMBOL, TOKEN_DECIMALS,
 };
 
@@ -25,6 +26,7 @@ pub fn local_testnet_config() -> Result<ChainSpec, String> {
 		.into();
 	const HASHES_PER_SECOND: u64 = 1_000;
 	const TICK_MILLIS: u64 = 2000;
+	let ticker = Ticker::new(TICK_MILLIS, 2);
 
 	Ok(ChainSpec::builder(
 		WASM_BINARY.ok_or_else(|| "Development wasm not available".to_string())?,
@@ -52,18 +54,17 @@ pub fn local_testnet_config() -> Result<ChainSpec, String> {
 		],
 		initial_vote_minimum: 1_000,
 		initial_difficulty: (TICK_MILLIS * HASHES_PER_SECOND / 1_000) as ComputeDifficulty,
-		tick_millis: TICK_MILLIS,
+		ticker,
 		initial_notaries: vec![GenesisNotary {
 			account_id: get_account_id_from_seed::<sr25519::Public>("Ferdie"),
 			public: get_from_seed::<NotaryPublic>("Ferdie//notary"),
 			hosts: vec![notary_host],
 			name: "FerdieStamp".into(),
 		}],
-		channel_hold_expiration_ticks: 2,
 		mining_config: MiningSlotConfig {
 			blocks_before_bid_end_for_vrf_close: 1,
 			blocks_between_slots: 4,
-			slot_bidding_start_block: 4,
+			slot_bidding_start_after_ticks: 4,
 		},
 		minimum_bitcoin_bond_satoshis: SATOSHIS_PER_BITCOIN / 1_000,
 		hyperbridge_token_admin: get_account_id_from_seed::<sr25519::Public>("Alice"),

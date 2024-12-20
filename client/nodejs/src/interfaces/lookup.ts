@@ -2403,7 +2403,7 @@ export default {
   ArgonPrimitivesBlockSealMiningSlotConfig: {
     blocksBeforeBidEndForVrfClose: 'Compact<u32>',
     blocksBetweenSlots: 'Compact<u32>',
-    slotBiddingStartBlock: 'Compact<u32>'
+    slotBiddingStartAfterTicks: 'Compact<u64>'
   },
   /**
    * Lookup328: pallet_mining_slot::pallet::Error<T>
