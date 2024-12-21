@@ -28,7 +28,9 @@ use std::{
 pub enum AuxState<C: AuxStore> {
 	NotaryStateAtTick(Arc<AuxData<NotaryNotebookTickState, C>>),
 	AuthorsAtTick(Arc<AuxData<BTreeMap<H256, BTreeSet<AccountId>>, C>>),
-	NotaryNotebooks(Arc<AuxData<Vec<NotebookAuditResult<NotebookVerifyError>>, C>>),
+	NotaryNotebooks(
+		Arc<AuxData<BTreeMap<NotebookNumber, NotebookAuditResult<NotebookVerifyError>>, C>>,
+	),
 	NotaryAuditSummaries(Arc<AuxData<Vec<NotaryNotebookAuditSummary>, C>>),
 	NotaryMissingNotebooks(Arc<AuxData<BTreeSet<NotebookNumber>, C>>),
 	VotesAtTick(Arc<AuxData<Vec<NotaryNotebookRawVotes>, C>>),
@@ -203,10 +205,8 @@ impl<B: BlockT, C: AuxStore + 'static> ArgonAux<B, C> {
 		let audit_results = self.get_notary_audit_history(notary_id)?.get();
 		let notebook_tick = voting_schedule.notebook_tick();
 
-		for notebook in audit_results {
-			if notebook.notebook_number <= latest_runtime_notebook_number ||
-				notebook.tick > notebook_tick
-			{
+		for (notebook_number, notebook) in audit_results {
+			if notebook_number <= latest_runtime_notebook_number || notebook.tick > notebook_tick {
 				continue;
 			}
 			if notebook.audit_first_failure.is_some() {
@@ -266,15 +266,19 @@ impl<B: BlockT, C: AuxStore + 'static> ArgonAux<B, C> {
 			.ok()
 			.map(|a| a.get())
 			.unwrap_or_default()
-			.iter()
-			.any(|n| n.notebook_number == notebook_number && n.audit_first_failure.is_none())
+			.get(&notebook_number)
+			.map(|n| n.audit_first_failure.is_none())
+			.unwrap_or_default()
 	}
 
 	/// Keeps a manually truncated vec of the last 2000 notary audit results
 	pub fn get_notary_audit_history(
 		&self,
 		notary_id: NotaryId,
-	) -> Result<Arc<AuxData<Vec<NotebookAuditResult<NotebookVerifyError>>, C>>, Error> {
+	) -> Result<
+		Arc<AuxData<BTreeMap<NotebookNumber, NotebookAuditResult<NotebookVerifyError>>, C>>,
+		Error,
+	> {
 		let key = AuxKey::NotaryNotebooks(notary_id);
 		self.get_or_insert_state(key)
 	}
@@ -326,11 +330,7 @@ impl<B: BlockT, C: AuxStore + 'static> ArgonAux<B, C> {
 		reprocess_notebook_number: NotebookNumber,
 	) -> Result<(), Error> {
 		let current_audits = self.get_notary_audit_history(notary_id)?.get();
-		let Some(existing) =
-			current_audits.iter().find(|n| n.notebook_number == reprocess_notebook_number)
-		else {
-			return Ok(())
-		};
+		let Some(existing) = current_audits.get(&reprocess_notebook_number) else { return Ok(()) };
 
 		// if this audit is valid, assume we're good
 		if existing.audit_first_failure.is_none() {
@@ -339,7 +339,7 @@ impl<B: BlockT, C: AuxStore + 'static> ArgonAux<B, C> {
 
 		let tick = existing.tick;
 		self.get_notary_audit_history(notary_id)?
-			.mutate(|a| a.retain(|n| n.notebook_number < reprocess_notebook_number))?;
+			.mutate(|a| a.retain(|n, _| n < &reprocess_notebook_number))?;
 		self.get_audit_summaries(notary_id)?
 			.mutate(|a| a.retain(|n| n.notebook_number < reprocess_notebook_number))?;
 
@@ -404,23 +404,14 @@ impl<B: BlockT, C: AuxStore + 'static> ArgonAux<B, C> {
 		})?;
 
 		self.get_notary_audit_history(notary_id)?.mutate(|notebooks| {
-			// look backwards for the first index where the notebook number is less than the
-			// current
-			let mut index = 0;
-			for (i, n) in notebooks.iter().enumerate().rev() {
-				// don't insert duplicates
-				if n.notebook_number == notebook_number {
-					return;
-				}
-				if n.notebook_number < notebook_number {
-					index = i + 1;
-					break;
-				}
-			}
-			notebooks.insert(index, audit_result.clone());
+			notebooks.insert(notebook_number, audit_result.clone());
 			if notebooks.len() > MAX_AUDIT_HISTORY {
-				// remove the oldest
-				notebooks.drain(0..notebooks.len() - MAX_AUDIT_HISTORY);
+				let mut to_remove = notebooks.len().saturating_sub(MAX_AUDIT_HISTORY);
+				// remove oldest notebooks
+				notebooks.retain(|_, _| {
+					to_remove = to_remove.saturating_sub(1);
+					to_remove != 0
+				});
 			}
 		})?;
 		Ok((tick, voting_power, notebooks))
@@ -519,7 +510,7 @@ mod test {
 		assert_eq!(result, (1, 0u128, 1));
 		assert_eq!(
 			argon_aux.get_notary_audit_history(1).expect("get notary audit history").get(),
-			vec![audit_10.clone()]
+			BTreeMap::from([(10, audit_10.clone())])
 		);
 		assert_eq!(
 			argon_aux.get_audit_summaries(1).expect("get audit summaries").get(),
@@ -559,7 +550,7 @@ mod test {
 		assert_eq!(result, (1, 0u128, 1));
 		assert_eq!(
 			argon_aux.get_notary_audit_history(1).expect("get notary audit history").get(),
-			vec![audit_9.clone(), audit_10.clone(),]
+			BTreeMap::from([(9, audit_9.clone()), (10, audit_10.clone())])
 		);
 
 		assert_eq!(
@@ -590,7 +581,7 @@ mod test {
 			.expect("store notebook result");
 		assert_eq!(
 			argon_aux.get_notary_audit_history(1).expect("get notary audit history").get(),
-			vec![audit_9.clone(), audit_10.clone(), audit_11.clone(),]
+			BTreeMap::from([(9, audit_9.clone()), (10, audit_10.clone()), (11, audit_11.clone()),])
 		);
 		assert_eq!(
 			argon_aux.get_audit_summaries(1).expect("get audit summaries").get(),
@@ -602,12 +593,16 @@ mod test {
 		let mut details_10_mod = details_10.clone();
 		details_10_mod.tick = 2;
 		argon_aux
-			.store_notebook_result(audit_10_mod, Default::default(), details_10, 9)
+			.store_notebook_result(audit_10_mod.clone(), Default::default(), details_10, 9)
 			.expect("store notebook result");
 
 		assert_eq!(
 			argon_aux.get_notary_audit_history(1).expect("get notary audit history").get(),
-			vec![audit_9.clone(), audit_10.clone(), audit_11.clone(),],
+			BTreeMap::from([
+				(9, audit_9.clone()),
+				(10, audit_10_mod.clone()),
+				(11, audit_11.clone()),
+			]),
 			"should not add duplicate notebook"
 		);
 		assert_eq!(
@@ -712,7 +707,8 @@ mod test {
 			.get_notary_audit_history(1)
 			.expect("get audit summaries")
 			.mutate(|a| {
-				a[0].audit_first_failure = Some(NotebookVerifyError::InvalidSecretProvided);
+				a.get_mut(&10).unwrap().audit_first_failure =
+					Some(NotebookVerifyError::InvalidSecretProvided);
 			})
 			.expect("mutate");
 		assert!(!argon_aux.has_successful_audit(1, 10));
@@ -754,8 +750,9 @@ mod test {
 				.len(),
 			10
 		);
+
 		assert_eq!(
-			argon_aux.get_notary_audit_history(1).expect("get notary audit history").get()[9]
+			argon_aux.get_notary_audit_history(1).expect("get notary audit history").get()[&10]
 				.audit_first_failure,
 			Some(NotebookVerifyError::InvalidSecretProvided)
 		);
@@ -770,7 +767,7 @@ mod test {
 			9
 		);
 		assert_eq!(
-			argon_aux.get_notary_audit_history(1).expect("get notary audit history").get()[8]
+			argon_aux.get_notary_audit_history(1).expect("get notary audit history").get()[&9]
 				.notebook_number,
 			9
 		);
@@ -817,7 +814,7 @@ mod test {
 			10
 		);
 		assert_eq!(
-			argon_aux.get_notary_audit_history(1).expect("get notary audit history").get()[9]
+			argon_aux.get_notary_audit_history(1).expect("get notary audit history").get()[&10]
 				.audit_first_failure,
 			None
 		);
