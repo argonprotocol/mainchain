@@ -27,60 +27,75 @@ You need the following software installed/accessible. There is
 an [Ansible playbook](https://github.com/argonprotocol/argon-ansible) available to help with this setup. For this guide,
 we'll show some of the high-level steps.
 
-1. An NTP client to keep your system clock in sync with the network. You can install NTP with the following commands:
-   ```bash
-   sudo apt-get install ntpsec
-   sudo ufw allow 123/udp
-   sudo nano /etc/ntp.conf
-   ```
-   Replace the `server` lines with:
-   ```
-    server 0.pool.ntp.org iburst
-    server 1.pool.ntp.org iburst
-    server 2.pool.ntp.org iburst
-    server 3.pool.ntp.org iburst
-    ```
-2. A Bitcoin node connected to the custom Argon Signet that supports Compact Block Filters. You can reference
-   the [Bitcoin Core installation guide](https://bitcoin.org/en/full-node#linux-instructions) for Ubuntu.
+#### Node Setup 1. Ntp
 
-   > You can install this on the same machine, but do note it will take up a few GB of storage. If you install it on
-   another machine, modify your bitcoin.conf as appropriate.
+An NTP client to keep your system clock in sync with the network. You can install NTP with the following commands:
 
-   Your bitcoin.conf must include the following configs:
-     ```bash
-     chain=signet
-     blockfilterindex=1
-     server=1
-     [signet]
-     rpcauth={{ bitcoin_rpcauth }}
-     rpcport=18332
-     rpcbind=127.0.0.1
-     rpcallowip=127.0.0.1/0
-     signetchallenge=0014df6edb04cb5d8de5b15a63bdf5883f2eb6678b88
-     signetseednode=bitcoin-node0.testnet.argonprotocol.org:38333
-     ```
-     ---
-   NOTE: this does not exclude other configs you may need to run your bitcoin node. We are pruning by default in our own
-   [testnet setup](https://github.com/argonprotocol/argon-ansible/tree/main/roles/bitcoin/templates/bitcoin.conf.j2).
-3. The Argon software. You can find the latest release on the [releases page](
-   https://github.com/argonprotocol/mainchain/releases/latest). You're looking for a file
-   named `argon-node-v<VERSION>-x86_64-unknown-linux-gnu.tar.gz`. Download it to your server. You probably want to
-   set
-   this up as a systemd service on your own server. The ansible playbook will do this for you.
+```bash
+sudo apt-get install ntpsec
+sudo ufw allow 123/udp
+sudo nano /etc/ntp.conf
+```
 
-   You can also use the docker image published on
-   the [GitHub Container Registry](https://github.com/argonprotocol/mainchain/pkgs/container/argon-miner).
+Replace the `server` lines with:
 
-   **Network (libp2p) Identity File**
-   You'll need to create an identity file for your node. Internally, Argon uses [libp2p](https://libp2p.io) to
-   discover and
-   connect to the decentralized network. You can generate a libp2p identity with the following command:
-      ```bash
-       ./argon-node key generate-node-key --file /home/argon/argon-node.key
-     ```
+```
+ server 0.pool.ntp.org iburst
+ server 1.pool.ntp.org iburst
+ server 2.pool.ntp.org iburst
+ server 3.pool.ntp.org iburst
+```
 
-   **Start Script**
-   You need to launch your node with configurations to connect to the Argon Testnet.
+### Node Setup 2. Bitcoin Node
+
+A Bitcoin node connected to the custom Argon Signet that supports Compact Block Filters. You can reference
+the [Bitcoin Core installation guide](https://bitcoin.org/en/full-node#linux-instructions) for Ubuntu.
+
+> You can install this on the same machine, but do note it will take up a few GB of storage. If you install it on
+> another machine, modify your bitcoin.conf as appropriate.
+
+Your bitcoin.conf must include the following configs:
+
+```bash
+chain=signet
+blockfilterindex=1
+server=1
+[signet]
+rpcauth={{ bitcoin_rpcauth }}
+rpcport=18332
+rpcbind=127.0.0.1
+rpcallowip=127.0.0.1/0
+signetchallenge=0014df6edb04cb5d8de5b15a63bdf5883f2eb6678b88
+signetseednode=bitcoin-node0.testnet.argonprotocol.org:38333
+```
+
+---
+NOTE: this does not exclude other configs you may need to run your bitcoin node. We are pruning by default in our own
+[testnet setup](https://github.com/argonprotocol/argon-ansible/tree/main/roles/bitcoin/templates/bitcoin.conf.j2).
+
+### Node Setup 3. The Argon software
+
+The Argon software. You can find the latest release on the [releases page](
+https://github.com/argonprotocol/mainchain/releases/latest). You're looking for a file
+named `argon-node-v<VERSION>-x86_64-unknown-linux-gnu.tar.gz`. Download it to your server. You probably want to
+set
+this up as a systemd service on your own server. The ansible playbook will do this for you.
+
+You can also use the docker image published on
+the [GitHub Container Registry](https://github.com/argonprotocol/mainchain/pkgs/container/argon-miner).
+
+**Network (libp2p) Identity File**
+You'll need to create an identity file for your node. Internally, Argon uses [libp2p](https://libp2p.io) to
+discover and
+connect to the decentralized network. You can generate a libp2p identity with the following command:
+
+```bash
+ ./argon-node key generate-node-key --file /home/argon/argon-node.key
+```
+
+**Start Script**
+You need to launch your node with configurations to connect to the Argon Testnet.
+
    ```bash
    ./argon-node --validator \
       --name "Your Node Name" \
@@ -99,14 +114,17 @@ we'll show some of the high-level steps.
       # your node identity file for connecting to the network
       --node-key-file /home/argon/argon-node.key
    ```
-   **Session Keys:**
-   Once your node is up (the first time ONLY), you need to create session keys for your node. You can do this
-   with
-   the following command:
-   ```bash
+
+**Session Keys:**
+Once your node is up (the first time ONLY), you need to create session keys for your node. You can do this
+with the following command:
+
+```bash
    curl -H "Content-Type: application/json" -d '{"id":1, "jsonrpc":"2.0", "method": "
-   author_rotateKeys"}' http://localhost:9944/
-      ```
+author_rotateKeys"}' http://localhost:9944/
+```
+
+> NOTE: keep the output of this command for your mining registration.
 
 ## 2. Acquire Argons and Ownership Tokens
 
@@ -157,18 +175,14 @@ a [`subxt`](https://github.com/paritytech/subxt) based rust library).
 
 To submit your bid, you'll need to submit the signing keys you'll use for the slot. These are the keys you generated
 when
-you created your node [here](#node-setup) -> Session Keys. You'll need to split the output of the `author_rotateKeys`
-call into the two 32 byte keys (they'll in the same order
-as the output, or there's a runtime
-call [available](https://polkadot.js.org/apps/?rpc=wss://rpc.testnet.argonprotocol.org#/runtime)
-called `sessionKeys` -> `decodeSessionKey`). If you want to more carefully create and backup your keys, you can also
-generate them individually as shown [here](https://docs.substrate.io/tutorials/build-a-blockchain/add-trusted-nodes/).
-You'll need to insert two Ed25519 keys with key-types of `gran` and one of `seal`.
+you created your node [here](#node-setup-3-the-argon-software) -> Session Keys. You'll submit these as your keys in the
+mining bid. NOTE: If you want to more carefully create and backup your keys, you can also generate them individually as
+shown [here](https://docs.substrate.io/tutorials/build-a-blockchain/add-trusted-nodes/).
 
 You can bid for a slot by using the Polkadot.js
-interface [here](https://polkadot.js.org/apps/?rpc=wss%3A%2F%2Frpc.testnet.argonprotocol.org#/extrinsics/decode/0x050001010000006400000000000000000000000000000000).
+interface [here](https://polkadot.js.org/apps/?rpc=wss%3A%2F%2Frpc.testnet.argonprotocol.org#/extrinsics/decode/0x06000100000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000).
 If you toggle to "Submission", you can submit your bid.
-![Polkadot.js - Submit a bit](images/pjs-miningbid.png)
+![Polkadot.js - Submit a bid](images/pjs-miningbid.png)
 
 > NOTE: you'll want to review the Vaults and the terms they are offering for renting the Argons you want to bid with.
 > That's available at Developer -> Chain State -> Vaults -> Vaults.
