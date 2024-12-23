@@ -1,18 +1,38 @@
-use crate::block_creator::ProposalMeta;
+use crate::{aux_client::AuxKey, aux_data::AuxData, block_creator::ProposalMeta};
 use argon_primitives::{
 	tick::{Tick, Ticker},
 	Balance, NotaryId,
 };
+use codec::{Decode, Encode};
 use prometheus_endpoint::{
 	prometheus, register, CounterVec, GaugeVec, HistogramOpts, HistogramVec, Opts, PrometheusError,
 	Registry, U64,
 };
+use sc_client_api::AuxStore;
 use sp_arithmetic::traits::UniqueSaturatedInto;
-use std::time::Instant;
+use std::{sync::Arc, time::Instant};
+
+#[derive(Debug, Clone, Decode, Encode, Default)]
+pub struct BlockMetrics {
+	#[codec(compact)]
+	pub compute_blocks_created: u64,
+	#[codec(compact)]
+	pub compute_blocks_created_w_notebooks: u64,
+	#[codec(compact)]
+	pub vote_blocks_created: u64,
+	#[codec(compact)]
+	pub vote_blocks_created_w_notebooks: u64,
+	#[codec(compact)]
+	pub finalized_blocks_created: u64,
+	#[codec(compact)]
+	pub mined_ownership_shares_total: u64,
+	#[codec(compact)]
+	pub mined_argons_total: u64,
+}
 
 /// Metrics for the node consensus engine
-#[derive(Debug, Clone)]
-pub struct ConsensusMetrics {
+#[derive(Clone)]
+pub struct ConsensusMetrics<C: AuxStore> {
 	/// Histogram over compute hashes need
 	compute_hashes_total: HistogramVec,
 	/// Blocks created with compute
@@ -37,12 +57,16 @@ pub struct ConsensusMetrics {
 	mined_argons_total: CounterVec<U64>,
 	/// Total finalized blocks created
 	finalized_blocks_created_total: CounterVec<U64>,
+	aux_data: AuxData<BlockMetrics, C>,
 }
 
-impl ConsensusMetrics {
+impl<C: AuxStore> ConsensusMetrics<C> {
 	/// Create an instance of metrics
-	pub fn new(metrics_registry: &Registry) -> Result<Self, PrometheusError> {
-		Ok(Self {
+	pub fn new(metrics_registry: &Registry, aux_client: Arc<C>) -> Result<Self, PrometheusError> {
+		let aux_data = AuxData::<BlockMetrics, C>::new(aux_client, AuxKey::BlockMetrics);
+		let start_data = aux_data.get();
+		let start = Self {
+			aux_data,
 			compute_hashes_total: register(
 				HistogramVec::new(
 					HistogramOpts::new(
@@ -150,7 +174,50 @@ impl ConsensusMetrics {
 				)?,
 				metrics_registry,
 			)?,
-		})
+		};
+		if start_data.compute_blocks_created > 0 {
+			start
+				.compute_blocks_created_total
+				.with_label_values(&["false"])
+				.inc_by(start_data.compute_blocks_created);
+		}
+		if start_data.compute_blocks_created_w_notebooks > 0 {
+			start
+				.compute_blocks_created_total
+				.with_label_values(&["true"])
+				.inc_by(start_data.compute_blocks_created_w_notebooks);
+		}
+		if start_data.vote_blocks_created > 0 {
+			start
+				.vote_blocks_created_total
+				.with_label_values(&["false"])
+				.inc_by(start_data.vote_blocks_created);
+		}
+		if start_data.vote_blocks_created_w_notebooks > 0 {
+			start
+				.vote_blocks_created_total
+				.with_label_values(&["true"])
+				.inc_by(start_data.vote_blocks_created_w_notebooks);
+		}
+		if start_data.finalized_blocks_created > 0 {
+			start
+				.finalized_blocks_created_total
+				.with_label_values(&[])
+				.inc_by(start_data.finalized_blocks_created);
+		}
+		if start_data.mined_ownership_shares_total > 0 {
+			start
+				.mined_ownership_shares_total
+				.with_label_values(&[])
+				.inc_by(start_data.mined_ownership_shares_total);
+		}
+		if start_data.mined_argons_total > 0 {
+			start
+				.mined_argons_total
+				.with_label_values(&[])
+				.inc_by(start_data.mined_argons_total);
+		}
+		Ok(start)
 	}
 
 	pub(crate) fn record_compute_hashes(&self, hashes: u64) {
@@ -167,6 +234,24 @@ impl ConsensusMetrics {
 		} else {
 			self.vote_blocks_created_total.with_label_values(&[has_notebooks]).inc();
 		}
+		self.aux_data
+			.mutate(|data| {
+				if proposal_meta.is_compute {
+					if proposal_meta.notebooks > 0 {
+						data.compute_blocks_created_w_notebooks =
+							data.compute_blocks_created_w_notebooks.saturating_add(1);
+					} else {
+						data.compute_blocks_created = data.compute_blocks_created.saturating_add(1);
+					}
+				} else if proposal_meta.notebooks > 0 {
+					data.vote_blocks_created_w_notebooks =
+						data.vote_blocks_created_w_notebooks.saturating_add(1);
+				} else {
+					data.vote_blocks_created = data.vote_blocks_created.saturating_add(1);
+				}
+			})
+			.inspect_err(|e| log::error!("Error updating block metrics: {:?}", e))
+			.ok();
 	}
 
 	pub(crate) fn did_reset_compute_for_notebooks(&self) {
@@ -213,12 +298,22 @@ impl ConsensusMetrics {
 	}
 
 	pub(crate) fn record_finalized_block(&self, ownership_shares: Balance, argons: Balance) {
+		let ownership_shares: u64 = ownership_shares.unique_saturated_into();
+		let argons: u64 = argons.unique_saturated_into();
 		self.mined_ownership_shares_total
 			.with_label_values(&[])
-			.inc_by(ownership_shares.unique_saturated_into());
-		self.mined_argons_total
-			.with_label_values(&[])
-			.inc_by(argons.unique_saturated_into());
+			.inc_by(ownership_shares);
+		self.mined_argons_total.with_label_values(&[]).inc_by(argons);
 		self.finalized_blocks_created_total.with_label_values(&[]).inc();
+
+		self.aux_data
+			.mutate(|data| {
+				data.finalized_blocks_created = data.finalized_blocks_created.saturating_add(1);
+				data.mined_ownership_shares_total =
+					ownership_shares.saturating_add(data.mined_ownership_shares_total);
+				data.mined_argons_total = argons.saturating_sub(data.mined_argons_total);
+			})
+			.inspect_err(|e| log::error!("Error updating block metrics: {:?}", e))
+			.ok();
 	}
 }

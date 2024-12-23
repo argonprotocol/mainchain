@@ -52,7 +52,7 @@ pub struct BlockCreator<Block: BlockT, BI: Clone, Client: AuxStore, PF, JS: Clon
 	pub backend: Arc<B>,
 	pub utxo_tracker: Arc<UtxoTracker>,
 	pub(crate) _phantom: std::marker::PhantomData<A>,
-	pub(crate) metrics: Arc<Option<ConsensusMetrics>>,
+	pub(crate) metrics: Arc<Option<ConsensusMetrics<Client>>>,
 }
 
 pub struct ProposalMeta {

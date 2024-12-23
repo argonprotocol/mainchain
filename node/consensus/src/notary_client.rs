@@ -155,7 +155,7 @@ where
 		+ NotaryApis<B, NotaryRecordT>,
 	AC: Codec + Clone + Send + Sync + 'static,
 {
-	let metrics = registry.and_then(|r| ConsensusMetrics::new(r).ok());
+	let metrics = registry.and_then(|r| ConsensusMetrics::new(r, client.clone()).ok());
 	let metrics = Arc::new(metrics);
 
 	let notary_client = Arc::new(NotaryClient::new(
@@ -243,7 +243,7 @@ pub struct NotaryClient<B: BlockT, C: AuxStore, AC> {
 	notebook_queue_by_id: Arc<RwLock<BTreeMap<NotaryId, Vec<PendingNotebook>>>>,
 	aux_client: ArgonAux<B, C>,
 	notebook_downloader: NotebookDownloader,
-	pub(crate) metrics: Arc<Option<ConsensusMetrics>>,
+	pub(crate) metrics: Arc<Option<ConsensusMetrics<C>>>,
 	ticker: Ticker,
 	queue_lock: Arc<Mutex<()>>,
 	_block: PhantomData<AC>,
@@ -259,7 +259,7 @@ where
 		client: Arc<C>,
 		aux_client: ArgonAux<B, C>,
 		notebook_downloader: NotebookDownloader,
-		metrics: Arc<Option<ConsensusMetrics>>,
+		metrics: Arc<Option<ConsensusMetrics<C>>>,
 		ticker: Ticker,
 	) -> Self {
 		let (tick_voting_power_sender, tick_voting_power_receiver) =

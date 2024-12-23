@@ -1,5 +1,7 @@
 #![allow(clippy::type_complexity)]
-use crate::{aux_data::AuxData, error::Error, notary_client::VotingPowerInfo};
+use crate::{
+	aux_data::AuxData, error::Error, metrics::BlockMetrics, notary_client::VotingPowerInfo,
+};
 use argon_primitives::{
 	fork_power::ForkPower,
 	notary::{
@@ -24,7 +26,6 @@ use std::{
 	fmt::Debug,
 	sync::Arc,
 };
-
 pub enum AuxState<C: AuxStore> {
 	NotaryStateAtTick(Arc<AuxData<NotaryNotebookTickState, C>>),
 	AuthorsAtTick(Arc<AuxData<BTreeMap<H256, BTreeSet<AccountId>>, C>>),
@@ -35,6 +36,7 @@ pub enum AuxState<C: AuxStore> {
 	NotaryMissingNotebooks(Arc<AuxData<BTreeSet<NotebookNumber>, C>>),
 	VotesAtTick(Arc<AuxData<Vec<NotaryNotebookRawVotes>, C>>),
 	MaxForkPower(Arc<AuxData<ForkPower, C>>),
+	BlockMetrics(Arc<AuxData<BlockMetrics, C>>),
 }
 trait AuxStateData {
 	fn as_any(&self) -> &dyn Any;
@@ -50,6 +52,7 @@ impl<C: AuxStore + 'static> AuxStateData for AuxState<C> {
 			AuxState::VotesAtTick(a) => a,
 			AuxState::NotaryAuditSummaries(a) => a,
 			AuxState::MaxForkPower(a) => a,
+			AuxState::BlockMetrics(a) => a,
 		}
 	}
 }
@@ -61,6 +64,7 @@ pub enum AuxKey {
 	VotesAtTick(Tick),
 	NotaryAuditSummaries(NotaryId),
 	MaxForkPower,
+	BlockMetrics,
 }
 
 impl AuxKey {
@@ -78,6 +82,8 @@ impl AuxKey {
 				AuxState::NotaryAuditSummaries(AuxData::new(client, self.clone()).into()),
 			AuxKey::MaxForkPower =>
 				AuxState::MaxForkPower(AuxData::new(client, self.clone()).into()),
+			AuxKey::BlockMetrics =>
+				AuxState::BlockMetrics(AuxData::new(client, self.clone()).into()),
 		}
 	}
 }

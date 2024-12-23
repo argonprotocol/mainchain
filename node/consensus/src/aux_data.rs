@@ -6,6 +6,7 @@ use sc_client_api::AuxStore;
 
 use crate::aux_client::AuxKey;
 
+#[derive(Clone)]
 pub struct AuxData<T, C> {
 	client: Arc<C>,
 	data: Arc<RwLock<T>>,
