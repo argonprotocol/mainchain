@@ -106,7 +106,7 @@ have access to move funds between them. The following example transfers 10 Argon
 corresponding Localchain account.
 
 ```bash
-argon-localchain transactions from-mainchain 10.0 --name="alice" --mainchain-url="wss://rpc.testnet.argonprotocol.org"
+argon-localchain transactions from-mainchain 10.0 --name="alice" --mainchain-url="wss://rpc.testnet.argonprotocol.org"  --key-password="password"
 ```
 
 This will initiate a transaction on the Mainchain. You need to wait for the transaction to be confirmed before you have
