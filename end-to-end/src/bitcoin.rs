@@ -153,7 +153,7 @@ async fn test_bitcoin_minting_e2e() {
 		owner_compressed_pubkey,
 		utxo_satoshis,
 		&client,
-		vault_xpub,
+		&vault_xpub,
 		network,
 		vault_id,
 		&bond_id,
@@ -291,7 +291,9 @@ fn get_parent_fingerprint(bitcoind: &BitcoinD, owner_hd_key_path: &DerivationPat
 	master_fingerprint
 }
 
-async fn create_xpriv(test_node: &ArgonTestNode) -> anyhow::Result<(String, String, Xpub, String)> {
+async fn create_xpriv(
+	test_node: &ArgonTestNode,
+) -> anyhow::Result<(String, String, String, String)> {
 	let path = env::temp_dir().join("vault0.xpriv");
 	if path.is_file() {
 		fs::remove_file(&path).await?;
@@ -318,20 +320,18 @@ async fn create_xpriv(test_node: &ArgonTestNode) -> anyhow::Result<(String, Stri
 		],
 	)
 	.await?;
-	let xpub_hex = hex::decode(xpub_result.split("0x").last().unwrap().trim())?;
 
-	let xpub = Xpub::decode(xpub_hex.as_ref())?;
 	Ok((
 		path.to_str().unwrap().to_string(),
 		password.to_string(),
-		xpub,
+		xpub_result.trim().to_string(),
 		derivation_path.to_string(),
 	))
 }
 
 async fn create_vault(
 	test_node: &ArgonTestNode,
-	xpubkey: &Xpub,
+	xpubkey: &str,
 	vault_owner_account_id32: &AccountId32,
 	vault_signer: &impl Signer<ArgonConfig>,
 ) -> anyhow::Result<VaultId> {
@@ -364,7 +364,7 @@ async fn create_vault(
 			"--bitcoin-argons",
 			"100000",
 			"--bitcoin-xpub",
-			xpubkey.to_string().as_str(),
+			xpubkey,
 			"--bitcoin-apr",
 			"1.0",
 			"--bitcoin-base-fee",
@@ -442,13 +442,15 @@ async fn confirm_bond(
 	owner_compressed_pubkey: PublicKey,
 	utxo_satoshis: Satoshis,
 	client: &Arc<MainchainClient>,
-	xpubkey: Xpub,
+	xpubkey: &str,
 	bitcoin_network: Network,
 	vault_id: VaultId,
 	bond_id: &BondId,
 ) -> anyhow::Result<(BitcoinCosignScriptPubkey, Balance)> {
 	let bond_cli_get =
 		run_bitcoin_cli(test_node, vec!["bond", "get", "--bond-id", &bond_id.to_string()]).await?;
+
+	let xpubkey = Xpub::from_str(xpubkey).expect("valid xpub");
 
 	let bond_api = client
 		.fetch_storage(&storage().bonds().bonds_by_id(bond_id), None)
