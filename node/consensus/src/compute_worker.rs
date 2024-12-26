@@ -14,6 +14,7 @@ use futures::prelude::*;
 use log::*;
 use parking_lot::Mutex;
 use rand::Rng;
+use sc_client_api::AuxStore;
 use sc_service::TaskManager;
 use sc_utils::mpsc::TracingUnboundedSender;
 use sp_api::ProvideRuntimeApi;
@@ -276,14 +277,15 @@ impl ComputeSolver {
 	}
 }
 
-pub fn run_compute_solver_threads<B, Proof>(
+pub fn run_compute_solver_threads<B, Proof, C>(
 	task_handle: &TaskManager,
 	worker: ComputeHandle<B, Proof>,
 	threads: u32,
-	consensus_metrics: Arc<Option<ConsensusMetrics>>,
+	consensus_metrics: Arc<Option<ConsensusMetrics<C>>>,
 ) where
 	B: BlockT,
 	Proof: Send + 'static,
+	C: AuxStore + Send + Sync + 'static,
 {
 	let handle = task_handle.spawn_essential_handle();
 	for _ in 0..threads {
@@ -338,7 +340,7 @@ pub trait ComputeApisExt<B: BlockT, AC> {
 impl<B, C, AC> ComputeApisExt<B, AC> for C
 where
 	B: BlockT,
-	C: ProvideRuntimeApi<B> + HeaderBackend<B>,
+	C: ProvideRuntimeApi<B> + HeaderBackend<B> + AuxStore,
 	C::Api: NotebookApis<B, NotebookVerifyError>
 		+ TickApis<B>
 		+ BlockSealApis<B, AC, BlockSealAuthorityId>,
@@ -380,7 +382,7 @@ pub struct ComputeState<B: BlockT, Proof, C, A> {
 
 impl<B: BlockT, Proof, C, A> ComputeState<B, Proof, C, A>
 where
-	C: ComputeApisExt<B, A> + Send + Sync + 'static,
+	C: ComputeApisExt<B, A> + AuxStore + Send + Sync + 'static,
 	A: Codec + Clone,
 {
 	pub fn new(compute_handle: ComputeHandle<B, Proof>, client: Arc<C>, ticker: Ticker) -> Self {
@@ -400,7 +402,7 @@ where
 	pub fn on_new_notebook_tick(
 		&self,
 		updated_notebooks_at_tick: Option<VotingPowerInfo>,
-		consensus_metrics: &Arc<Option<ConsensusMetrics>>,
+		consensus_metrics: &Arc<Option<ConsensusMetrics<C>>>,
 	) -> Option<B::Hash> {
 		// see if we have more notebooks at the same tick. if so, we should restart compute to
 		// include them
@@ -490,6 +492,24 @@ mod tests {
 	#[derive(Clone)]
 	pub struct Api {
 		state: Arc<Mutex<ApiState>>,
+	}
+	impl AuxStore for Api {
+		fn insert_aux<
+			'a,
+			'b: 'a,
+			'c: 'a,
+			I: IntoIterator<Item = &'a (&'c [u8], &'c [u8])>,
+			D: IntoIterator<Item = &'a &'b [u8]>,
+		>(
+			&self,
+			_insert: I,
+			_delete: D,
+		) -> sp_blockchain::Result<()> {
+			Ok(())
+		}
+		fn get_aux(&self, _key: &[u8]) -> sp_blockchain::Result<Option<Vec<u8>>> {
+			Ok(None)
+		}
 	}
 	impl ComputeApisExt<Block, AccountId> for Api {
 		fn current_tick(&self, _block_hash: HashOutput) -> Result<Tick, Error> {

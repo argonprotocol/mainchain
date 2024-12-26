@@ -1,4 +1,4 @@
-use crate::BondId;
+use crate::{tick::Tick, Balance, BondId};
 use codec::{Codec, Decode, Encode, HasCompact, MaxEncodedLen};
 use frame_support::{CloneNoBound, EqNoBound, Parameter, PartialEqNoBound};
 use scale_info::TypeInfo;
@@ -89,9 +89,9 @@ pub struct MiningSlotConfig<BlockNumber: Codec + HasCompact> {
 	/// How many blocks transpire between slots
 	#[codec(compact)]
 	pub blocks_between_slots: BlockNumber,
-	/// The block number when bidding will start (eg, Slot "1")
+	/// The tick when bidding will start (eg, Slot "1")
 	#[codec(compact)]
-	pub slot_bidding_start_block: BlockNumber,
+	pub slot_bidding_start_after_ticks: Tick,
 }
 
 /// An struct to define a reward sharing split with another account
@@ -155,6 +155,14 @@ pub struct MiningAuthority<AuthorityId, AccountId> {
 	pub account_id: AccountId,
 }
 
+#[derive(Clone, Debug, PartialEq, Eq, Default, Encode, Decode, TypeInfo)]
+pub struct MiningBidStats {
+	pub bids_count: u32,
+	pub bid_amount_min: Balance,
+	pub bid_amount_max: Balance,
+	pub bid_amount_sum: Balance,
+}
+
 #[derive(Encode, Decode, Clone, PartialEq, Eq, TypeInfo, MaxEncodedLen, RuntimeDebug)]
 pub struct BlockPayout<AccountId: Codec, Balance: Codec + MaxEncodedLen> {
 	pub account_id: AccountId,
@@ -162,4 +170,13 @@ pub struct BlockPayout<AccountId: Codec, Balance: Codec + MaxEncodedLen> {
 	pub ownership: Balance,
 	#[codec(compact)]
 	pub argons: Balance,
+	pub reward_type: BlockRewardType,
+	pub block_seal_authority: Option<BlockSealAuthorityId>,
+}
+
+#[derive(Encode, Decode, Clone, PartialEq, Eq, TypeInfo, MaxEncodedLen, RuntimeDebug)]
+pub enum BlockRewardType {
+	Miner,
+	Voter,
+	ProfitShare,
 }

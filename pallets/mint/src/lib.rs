@@ -2,6 +2,8 @@
 extern crate alloc;
 extern crate core;
 
+use codec::{Codec, Decode, Encode};
+use scale_info::TypeInfo;
 use sp_runtime::{traits::Zero, Saturating};
 
 use argon_primitives::{block_seal::BlockPayout, BlockRewardsEventHandler};
@@ -81,6 +83,10 @@ pub mod pallet {
 	#[pallet::storage]
 	pub(super) type MintedBitcoinArgons<T: Config> = StorageValue<_, U256, ValueQuery>;
 
+	#[pallet::storage]
+	pub(super) type BlockMintAction<T> =
+		StorageValue<_, (BlockNumberFor<T>, MintAction<<T as Config>::Balance>), ValueQuery>;
+
 	#[pallet::event]
 	#[pallet::generate_deposit(fn deposit_event)]
 	pub enum Event<T: Config> {
@@ -110,12 +116,19 @@ pub mod pallet {
 		<T as Config>::Balance: Into<u128>,
 		<T as Config>::Balance: From<u128>,
 	{
-		fn on_initialize(_: BlockNumberFor<T>) -> Weight {
+		fn on_initialize(n: BlockNumberFor<T>) -> Weight {
+			let mut block_mint_action = <BlockMintAction<T>>::mutate(|(b, data)| {
+				if *b != n {
+					*b = n;
+					*data = Default::default();
+				}
+				data.clone()
+			});
 			let argon_cpi = T::PriceProvider::get_argon_cpi().unwrap_or_default();
 			// only mint when cpi is negative or 0
 			if argon_cpi.is_positive() {
 				trace!("Argon cpi is not-positive. Nothing to mint.");
-				return T::DbWeight::get().reads(1);
+				return T::DbWeight::get().reads(2);
 			}
 
 			// if there are no miners registered, we can't mint
@@ -137,6 +150,7 @@ pub mod pallet {
 					match T::Currency::mint_into(&miner, amount) {
 						Ok(_) => {
 							mining_mint += U256::from(amount.into());
+							block_mint_action.argon_minted += amount;
 							Self::deposit_event(Event::<T>::ArgonsMinted {
 								mint_type: MintType::Mining,
 								account_id: miner.clone(),
@@ -184,6 +198,7 @@ pub mod pallet {
 								available_bitcoin_to_mint -= U256::from(amount_to_mint.into());
 								*remaining_account_mint -= amount_to_mint;
 								bitcoin_mint += U256::from(amount_to_mint.into());
+								block_mint_action.bitcoin_minted += amount_to_mint;
 
 								Self::deposit_event(Event::<T>::ArgonsMinted {
 									mint_type: MintType::Bitcoin,
@@ -212,6 +227,8 @@ pub mod pallet {
 				PendingMintUtxos::<T>::put(updated.expect("cannot fail, but should be handled"));
 			}
 			MintedBitcoinArgons::<T>::put(bitcoin_mint);
+
+			BlockMintAction::<T>::put((n, block_mint_action));
 			T::DbWeight::get().reads_writes(1, 1)
 		}
 	}
@@ -253,12 +270,28 @@ pub mod pallet {
 		}
 
 		pub fn track_block_mint(amount: T::Balance) {
+			BlockMintAction::<T>::mutate(|(b, data)| {
+				let block = <frame_system::Pallet<T>>::block_number();
+				if *b != block {
+					*b = block;
+					*data = Default::default();
+				}
+				data.argon_minted += amount;
+			});
 			let amount = U256::from(amount.into());
 			MintedMiningArgons::<T>::mutate(|mint| *mint += amount);
 		}
 
 		pub fn on_argon_burn(amount: T::Balance) {
 			let bitcoin_utxos = MintedBitcoinArgons::<T>::get();
+			BlockMintAction::<T>::mutate(|(b, data)| {
+				let block = <frame_system::Pallet<T>>::block_number();
+				if *b != block {
+					*b = block;
+					*data = Default::default();
+				}
+				data.argon_burned += amount;
+			});
 
 			let mining_mint = MintedMiningArgons::<T>::get();
 			let total_minted = mining_mint + bitcoin_utxos;
@@ -329,6 +362,12 @@ pub mod pallet {
 	}
 }
 
+#[derive(Debug, Clone, PartialEq, Eq, Encode, Default, Decode, TypeInfo)]
+pub struct MintAction<Balance: Codec> {
+	pub argon_burned: Balance,
+	pub argon_minted: Balance,
+	pub bitcoin_minted: Balance,
+}
 impl<T: Config> BlockRewardsEventHandler<T::AccountId, T::Balance> for Pallet<T>
 where
 	<T as Config>::Balance: Into<u128>,

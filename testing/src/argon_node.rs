@@ -55,9 +55,10 @@ impl ArgonNodeStartArgs {
 	pub fn get_temp_dir() -> anyhow::Result<PathBuf> {
 		let thread_id = format!("{:?}", thread::current().id())
 			.replace("ThreadId(", "")
-			.replace(")", "");
+			.replace(")", "")
+			.replace("\"", "");
 		let unique_name = format!(
-			"test_dir_{}_{:?}",
+			"test_dir_{}_{}",
 			SystemTime::now().duration_since(UNIX_EPOCH)?.as_millis(),
 			thread_id
 		);
@@ -79,7 +80,7 @@ impl ArgonNodeStartArgs {
 		let node_log = "info";
 
 		let rust_log = format!(
-			"{},node={},runtime=info,pallet=info,argon=trace,sc_rpc_server=info",
+			"{},node={},pallet=info,argon=trace,sc_rpc_server=info",
 			overall_log, node_log,
 		);
 

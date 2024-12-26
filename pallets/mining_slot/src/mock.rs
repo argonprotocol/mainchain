@@ -37,7 +37,7 @@ parameter_types! {
 	pub static MaxCohortSize: u32 = 5;
 	pub static MaxMiners: u32 = 10;
 	pub static BlocksBeforeBidEndForVrfClose: u64 = 0;
-	pub static SlotBiddingStartBlock: u64 = 3;
+	pub static SlotBiddingStartTick: u64 = 3;
 	pub static TargetBidsPerSlot: u32 = 5;
 	pub const OwnershipPercentAdjustmentDamper: FixedU128 = FixedU128::from_rational(20, 100);
 
@@ -103,6 +103,9 @@ parameter_types! {
 
 	pub static LastSlotRemoved: Vec<(u64, UintAuthorityId)> = vec![];
 	pub static LastSlotAdded: Vec<(u64, UintAuthorityId)> = vec![];
+
+	// set slot bidding active by default
+	pub static TicksSinceGenesis: u64 = 3;
 }
 
 pub struct StaticBondProvider;
@@ -166,18 +169,19 @@ impl From<u64> for MockSessionKeys {
 impl pallet_mining_slot::Config for Test {
 	type RuntimeEvent = RuntimeEvent;
 	type WeightInfo = ();
-	type MaxCohortSize = MaxCohortSize;
-	type TargetBidsPerSlot = TargetBidsPerSlot;
 	type MaxMiners = MaxMiners;
+	type MaxCohortSize = MaxCohortSize;
+	type OwnershipPercentAdjustmentDamper = OwnershipPercentAdjustmentDamper;
+	type MinimumBondAmount = ExistentialDeposit;
+	type TargetBidsPerSlot = TargetBidsPerSlot;
+	type Balance = Balance;
 	type OwnershipCurrency = Ownership;
 	type RuntimeHoldReason = RuntimeHoldReason;
-	type OwnershipPercentAdjustmentDamper = OwnershipPercentAdjustmentDamper;
-	type Balance = Balance;
 	type BondProvider = StaticBondProvider;
 	type SlotEvents = (StaticNewSlotEvent,);
-	type Keys = MockSessionKeys;
 	type MiningAuthorityId = UintAuthorityId;
-	type MinimumBondAmount = ExistentialDeposit;
+	type Keys = MockSessionKeys;
+	type TicksSinceGenesis = TicksSinceGenesis;
 }
 
 // Build genesis storage according to the mock runtime.
@@ -186,7 +190,7 @@ pub fn new_test_ext() -> sp_io::TestExternalities {
 	let _ = Builder::from_env(env).is_test(true).try_init();
 
 	let mining_config = MiningSlotConfig::<BlockNumberFor<Test>> {
-		slot_bidding_start_block: SlotBiddingStartBlock::get(),
+		slot_bidding_start_after_ticks: SlotBiddingStartTick::get(),
 		blocks_between_slots: BlocksBetweenSlots::get(),
 		blocks_before_bid_end_for_vrf_close: BlocksBeforeBidEndForVrfClose::get(),
 	};

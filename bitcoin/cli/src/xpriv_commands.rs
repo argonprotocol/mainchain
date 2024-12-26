@@ -64,7 +64,7 @@ impl XPrivCommands {
 				let child = xpriv.derive_priv(&Secp256k1::new(), &hd_path)?;
 
 				let child_xpub = Xpub::from_priv(&Secp256k1::new(), &child);
-				println!("0x{}", hex::encode(child_xpub.encode()));
+				println!("{}", child_xpub);
 			},
 		}
 		Ok(())

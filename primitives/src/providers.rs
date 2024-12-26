@@ -17,8 +17,8 @@ use crate::{
 	block_seal::{BlockPayout, MiningAuthority, RewardSharing},
 	inherents::BlockSealInherent,
 	tick::{Tick, Ticker},
-	ComputeDifficulty, NotaryId, NotebookHeader, NotebookNumber, NotebookSecret,
-	TransferToLocalchainId, VoteMinimum, VotingSchedule,
+	BlockSealAuthorityId, ComputeDifficulty, NotaryId, NotebookHeader, NotebookNumber,
+	NotebookSecret, TransferToLocalchainId, VoteMinimum, VotingSchedule,
 };
 
 pub trait NotebookProvider {
@@ -160,6 +160,7 @@ pub struct BlockSealerInfo<AccountId: FullCodec> {
 	pub block_author_account_id: AccountId,
 	/// The voting account, if a block seal
 	pub block_vote_rewards_account: Option<AccountId>,
+	pub block_seal_authority: Option<BlockSealAuthorityId>,
 }
 
 pub trait BlockSealerProvider<AccountId: FullCodec> {

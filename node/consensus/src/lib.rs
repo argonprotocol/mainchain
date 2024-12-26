@@ -8,7 +8,8 @@ use crate::{
 use argon_bitcoin_utxo_tracker::UtxoTracker;
 use argon_primitives::{
 	inherents::BlockSealInherentNodeSide, Balance, BitcoinApis, BlockCreatorApis, BlockSealApis,
-	BlockSealAuthorityId, NotaryApis, NotebookApis, TickApis, VotingSchedule,
+	BlockSealAuthorityId, MiningApis, NotaryApis, NotebookApis, TickApis, VotingSchedule,
+	BLOCK_SEAL_KEY_TYPE,
 };
 use argon_runtime::{NotaryRecordT, NotebookVerifyError};
 use codec::Codec;
@@ -18,12 +19,13 @@ use sc_client_api::{AuxStore, BlockchainEvents};
 use sc_consensus::BlockImport;
 use sc_service::TaskManager;
 use sc_utils::mpsc::tracing_unbounded;
+use schnellru::{ByLength, LruMap};
 use sp_api::ProvideRuntimeApi;
 use sp_blockchain::HeaderBackend;
 use sp_consensus::{BlockOrigin, Environment, SelectChain, SyncOracle};
-use sp_keystore::KeystorePtr;
+use sp_keystore::{Keystore, KeystorePtr};
 use sp_runtime::traits::{Block as BlockT, Header};
-use std::{sync::Arc, time::Duration};
+use std::{collections::HashSet, sync::Arc, time::Duration};
 use tokio::sync::Mutex;
 use tracing::{trace, warn};
 
@@ -102,11 +104,12 @@ pub fn run_block_builder_task<Block, BI, C, PF, A, SC, SO, JS, B>(
 		+ BlockSealApis<Block, A, BlockSealAuthorityId>
 		+ BlockCreatorApis<Block, A, NotebookVerifyError>
 		+ NotaryApis<Block, NotaryRecordT>
+		+ MiningApis<Block, A, BlockSealAuthorityId>
 		+ TickApis<Block>
 		+ BitcoinApis<Block, Balance>,
 	PF: Environment<Block> + Send + Sync + 'static,
 	PF::Proposer: sp_consensus::Proposer<Block>,
-	A: Codec + Clone + Send + Sync + 'static,
+	A: Codec + Clone + PartialEq + Send + Sync + 'static,
 	SC: SelectChain<Block> + Clone + Send + Sync + 'static,
 	SO: SyncOracle + Clone + Send + Sync + 'static,
 	JS: sc_consensus::JustificationSyncLink<Block> + Clone + Send + Sync + 'static,
@@ -173,6 +176,7 @@ pub fn run_block_builder_task<Block, BI, C, PF, A, SC, SO, JS, B>(
 	);
 
 	let creator = block_creator.clone();
+	let seal_keystore = keystore.clone();
 	// loop looking for next blocks to create
 	let block_creator_task = async move {
 		loop {
@@ -199,7 +203,7 @@ pub fn run_block_builder_task<Block, BI, C, PF, A, SC, SO, JS, B>(
 						};
 						let pre_hash = proposal.proposal.block.header().hash();
 						let digest = match create_vote_seal(
-							&keystore,
+							&seal_keystore,
 							&pre_hash,
 							&authority,
 							seal_strength,
@@ -226,11 +230,14 @@ pub fn run_block_builder_task<Block, BI, C, PF, A, SC, SO, JS, B>(
 
 	let is_compute_enabled = compute_threads > 0;
 	let consensus_metrics_finder = consensus_metrics.clone();
+
 	let block_finder_task = async move {
 		let mut import_stream = client.every_import_notification_stream();
+		let mut finalized_stream = client.finality_notification_stream();
 		let idle_delay = if ticker.tick_duration_millis <= 10_000 { 100 } else { 1000 };
 		let idle_delay = Duration::from_millis(idle_delay);
 		let mut notebook_tick_rx = notary_client.tick_voting_power_receiver.lock().await;
+		let mut stale_branches = LruMap::new(ByLength::new(500));
 
 		let compute_state = ComputeState::new(compute_handle.clone(), client.clone(), ticker);
 		loop {
@@ -253,6 +260,9 @@ pub fn run_block_builder_task<Block, BI, C, PF, A, SC, SO, JS, B>(
 						if block_number < client.info().finalized_number {
 							continue;
 						}
+						if stale_branches.get(&block.hash).is_some() {
+							continue;
+						}
 						// If this block can still be finalized, see if we can beat it. This could be the best block
 						// or could be a new branch
 						let voting_schedule = VotingSchedule::when_creating_block(tick);
@@ -260,6 +270,38 @@ pub fn run_block_builder_task<Block, BI, C, PF, A, SC, SO, JS, B>(
 							check_for_better_blocks = info
 						}
 					}
+				},
+				finalized = finalized_stream.next() => {
+					if let Some(finalized) = finalized {
+						for hash in finalized.stale_heads.iter() {
+							stale_branches.insert(*hash, ());
+						}
+						if let Some(metrics) = consensus_metrics_finder.as_ref() {
+							let authority_keys = keystore.ed25519_public_keys(BLOCK_SEAL_KEY_TYPE).into_iter().map(BlockSealAuthorityId::from).collect::<HashSet<_>>();
+
+							for hash in &[&*finalized.tree_route, &[finalized.hash]].concat() {
+								let minted = client.runtime_api().get_block_payouts(*hash).unwrap_or_default();
+								let mut is_my_block = false;
+								let mut ownership_shares = 0;
+								let mut argons = 0;
+								for payout in minted {
+									if Some(payout.account_id) == compute_author {
+										ownership_shares += payout.ownership;
+									}
+									if let Some(authority) = payout.block_seal_authority {
+										if authority_keys.contains(&authority) {
+											is_my_block = true;
+											argons += payout.argons;
+										}
+									}
+								}
+								if is_my_block {
+									metrics.record_finalized_block(ownership_shares, argons);
+								}
+							}
+						}
+					}
+
 				},
 				_on_delay = Delay::new(idle_delay) => {},
 			}
@@ -292,6 +334,9 @@ pub fn run_block_builder_task<Block, BI, C, PF, A, SC, SO, JS, B>(
 			else {
 				continue;
 			};
+			if stale_branches.get(&best_hash).is_some() {
+				continue;
+			}
 
 			// don't do anything if we are syncing or not ready to solve
 			let time = ticker.now_adjusted_to_ntp();

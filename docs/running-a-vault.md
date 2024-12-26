@@ -80,7 +80,7 @@ NOTE: you must convert an Xpub from the Electrum interface into something the Po
 can use the `utils` command to do this.
 
 ```bash
-$ argon-bitcoin-cli utils encode-xpub vpub5VCvz3VZd6FJNHKA6SDehwzt6SYWBGXnVMvFyCoDU7ubynhd9pNXGt88zPc8TcKbk1hbpkdmhcbafa3qGRh1QfBuAbQ3YTs5WQ6Qzqwo83Z
+$ argon-bitcoin-cli utils encode-xpub tpubD8t2diXwgDwRaNt8NNY6pb19U3SwmUzxFhFtSaKb79cfkPqqWX8vSqPzsW2NkhkMsxye6fuB2wNqs5sGTZPpM63UaAb3e69LvNcFpci6JZt
 ```
 
 ## Creating a Vault
@@ -135,7 +135,7 @@ $ argon-bitcoin-cli vault create --trusted-rpc-url wss://rpc.testnet.argonprotoc
   --mining-apr=1% --mining-base-fee=₳1.00 --mining-argons=₳100 \
   --bitcoin-apr=0.5% --bitcoin-base-fee=₳0.50 --bitcoin-argons=₳100 \
   --securitization-percent=100% --mining-reward-sharing-percent-take=0% \
-  --bitcoin-xpub=vpub5VCvz3VZd6FJNHKA6SDehwzt6SYWBGXnVMvFyCoDU7ubynhd9pNXGt88zPc8TcKbk1hbpkdmhcbafa3qGRh1QfBuAbQ3YTs5WQ6Qzqwo83Z
+  --bitcoin-xpub=tpubD8t2diXwgDwRaNt8NNY6pb19U3SwmUzxFhFtSaKb79cfkPqqWX8vSqPzsW2NkhkMsxye6fuB2wNqs5sGTZPpM63UaAb3e69LvNcFpci6JZt
 ```
 
 This will output a URL that you can use to complete the transaction on the Polkadot.js interface. When you load this

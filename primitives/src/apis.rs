@@ -3,14 +3,15 @@
 
 use crate::{
 	bitcoin::{BitcoinNetwork, BitcoinSyncStatus, Satoshis, UtxoRef, UtxoValue},
-	block_seal::{ComputePuzzle, MiningAuthority},
+	block_seal::{BlockPayout, ComputePuzzle, MiningAuthority},
 	notary::{
 		NotaryId, NotaryNotebookAuditSummary, NotaryNotebookDetails, NotaryNotebookRawVotes,
 		NotaryNotebookVoteDigestDetails,
 	},
-	tick::{Tick, Ticker},
-	BestBlockVoteSeal, BlockSealDigest, BlockVoteDigest, NotebookAuditResult, NotebookNumber,
-	VoteMinimum, VotingKey,
+	prelude::*,
+	tick::Ticker,
+	BestBlockVoteSeal, BlockSealDigest, BlockVoteDigest, NotebookAuditResult, VoteMinimum,
+	VotingKey,
 };
 use alloc::{collections::btree_map::BTreeMap, vec::Vec};
 use codec::Codec;
@@ -62,6 +63,7 @@ sp_api::decl_runtime_apis! {
 sp_api::decl_runtime_apis! {
 	pub trait MiningApis<AccountId, BlockSealAuthorityId> where BlockSealAuthorityId: Codec, AccountId: Codec {
 		fn get_authority_id(account_id: &AccountId) -> Option<MiningAuthority<BlockSealAuthorityId,AccountId>>;
+		fn get_block_payouts() -> Vec<BlockPayout<AccountId, Balance>>;
 	}
 }
 

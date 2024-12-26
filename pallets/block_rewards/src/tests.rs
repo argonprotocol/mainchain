@@ -7,6 +7,7 @@ use frame_support::{
 	},
 };
 use sp_arithmetic::traits::UniqueSaturatedInto;
+use sp_core::ByteArray;
 use sp_runtime::{DispatchError, FixedU128, TokenError};
 
 use crate::{
@@ -14,15 +15,21 @@ use crate::{
 	Event, FreezeReason, RewardAmounts,
 };
 use argon_primitives::{
-	block_seal::{BlockPayout, RewardSharing},
-	BlockSealerInfo,
+	block_seal::{BlockPayout, BlockRewardType, RewardSharing},
+	BlockSealAuthorityId, BlockSealerInfo,
 };
+
+fn test_authority(id: [u8; 32]) -> BlockSealAuthorityId {
+	BlockSealAuthorityId::from_slice(&id).unwrap()
+}
 
 #[test]
 fn it_should_only_allow_a_single_seal() {
+	let id = test_authority([1; 32]);
 	BlockSealer::set(BlockSealerInfo {
 		block_author_account_id: 1,
 		block_vote_rewards_account: Some(2),
+		block_seal_authority: Some(id.clone()),
 	});
 	NotebooksInBlock::set(vec![(1, 1, 1)]);
 	NotebookTick::set(1);
@@ -35,8 +42,20 @@ fn it_should_only_allow_a_single_seal() {
 			Event::RewardCreated {
 				maturation_block: (1 + MaturationBlocks::get()).into(),
 				rewards: vec![
-					BlockPayout { account_id: 1, ownership: 3750, argons: 3750 },
-					BlockPayout { account_id: 2, ownership: 1250, argons: 1250 },
+					BlockPayout {
+						account_id: 1,
+						ownership: 3750,
+						argons: 3750,
+						block_seal_authority: Some(id),
+						reward_type: BlockRewardType::Miner,
+					},
+					BlockPayout {
+						account_id: 2,
+						ownership: 1250,
+						argons: 1250,
+						block_seal_authority: None,
+						reward_type: BlockRewardType::Voter,
+					},
 				],
 			}
 			.into(),
@@ -85,6 +104,7 @@ fn it_should_unlock_rewards() {
 	BlockSealer::set(BlockSealerInfo {
 		block_author_account_id: 1,
 		block_vote_rewards_account: Some(2),
+		block_seal_authority: None,
 	});
 	new_test_ext().execute_with(|| {
 		// Go past genesis block so events get deposited
@@ -98,8 +118,20 @@ fn it_should_unlock_rewards() {
 			Event::RewardCreated {
 				maturation_block,
 				rewards: vec![
-					BlockPayout { account_id: 1, ownership: 3750, argons: 3750 },
-					BlockPayout { account_id: 2, ownership: 1250, argons: 1250 },
+					BlockPayout {
+						account_id: 1,
+						ownership: 3750,
+						argons: 3750,
+						block_seal_authority: None,
+						reward_type: BlockRewardType::Miner,
+					},
+					BlockPayout {
+						account_id: 2,
+						ownership: 1250,
+						argons: 1250,
+						block_seal_authority: None,
+						reward_type: BlockRewardType::Voter,
+					},
 				],
 			}
 			.into(),
@@ -115,8 +147,20 @@ fn it_should_unlock_rewards() {
 		System::assert_last_event(
 			Event::RewardUnlocked {
 				rewards: vec![
-					BlockPayout { account_id: 1, ownership: 3750, argons: 3750 },
-					BlockPayout { account_id: 2, ownership: 1250, argons: 1250 },
+					BlockPayout {
+						account_id: 1,
+						ownership: 3750,
+						argons: 3750,
+						block_seal_authority: None,
+						reward_type: BlockRewardType::Miner,
+					},
+					BlockPayout {
+						account_id: 2,
+						ownership: 1250,
+						argons: 1250,
+						block_seal_authority: None,
+						reward_type: BlockRewardType::Voter,
+					},
 				],
 			}
 			.into(),
@@ -133,6 +177,7 @@ fn it_should_payout_only_to_set_miners() {
 	BlockSealer::set(BlockSealerInfo {
 		block_author_account_id: 1,
 		block_vote_rewards_account: None,
+		block_seal_authority: None,
 	});
 	new_test_ext().execute_with(|| {
 		// Go past genesis block so events get deposited
@@ -145,7 +190,13 @@ fn it_should_payout_only_to_set_miners() {
 		System::assert_last_event(
 			Event::RewardCreated {
 				maturation_block,
-				rewards: vec![BlockPayout { account_id: 1, ownership: 3750, argons: 3750 }],
+				rewards: vec![BlockPayout {
+					account_id: 1,
+					ownership: 3750,
+					argons: 3750,
+					block_seal_authority: None,
+					reward_type: BlockRewardType::Miner,
+				}],
 			}
 			.into(),
 		);
@@ -158,6 +209,7 @@ fn it_should_halve_rewards() {
 	BlockSealer::set(BlockSealerInfo {
 		block_author_account_id: 1,
 		block_vote_rewards_account: Some(2),
+		block_seal_authority: None,
 	});
 	new_test_ext().execute_with(|| {
 		let halving = HalvingBlocks::get() + HalvingBeginBlock::get() + 1;
@@ -171,8 +223,20 @@ fn it_should_halve_rewards() {
 			Event::RewardCreated {
 				maturation_block,
 				rewards: vec![
-					BlockPayout { account_id: 1, ownership: 187500, argons: 375000 },
-					BlockPayout { account_id: 2, ownership: 62500, argons: 125000 },
+					BlockPayout {
+						account_id: 1,
+						ownership: 187500,
+						argons: 375000,
+						block_seal_authority: None,
+						reward_type: BlockRewardType::Miner,
+					},
+					BlockPayout {
+						account_id: 2,
+						ownership: 62500,
+						argons: 125000,
+						block_seal_authority: None,
+						reward_type: BlockRewardType::Voter,
+					},
 				],
 			}
 			.into(),
@@ -227,6 +291,7 @@ fn it_should_scale_rewards_based_on_notaries() {
 	BlockSealer::set(BlockSealerInfo {
 		block_author_account_id: 1,
 		block_vote_rewards_account: Some(2),
+		block_seal_authority: None,
 	});
 	NotebooksInBlock::set(vec![(1, 1, 1)]);
 	NotebookTick::set(1);
@@ -239,8 +304,20 @@ fn it_should_scale_rewards_based_on_notaries() {
 			Event::RewardCreated {
 				maturation_block,
 				rewards: vec![
-					BlockPayout { account_id: 1, ownership: 3750 / 2, argons: 3750 / 2 },
-					BlockPayout { account_id: 2, ownership: 1250 / 2, argons: 1250 / 2 },
+					BlockPayout {
+						account_id: 1,
+						ownership: 3750 / 2,
+						argons: 3750 / 2,
+						block_seal_authority: None,
+						reward_type: BlockRewardType::Miner,
+					},
+					BlockPayout {
+						account_id: 2,
+						ownership: 1250 / 2,
+						argons: 1250 / 2,
+						block_seal_authority: None,
+						reward_type: BlockRewardType::Voter,
+					},
 				],
 			}
 			.into(),
@@ -254,6 +331,7 @@ fn it_should_not_fail_with_no_notebooks() {
 	BlockSealer::set(BlockSealerInfo {
 		block_author_account_id: 1,
 		block_vote_rewards_account: Some(2),
+		block_seal_authority: None,
 	});
 	NotebooksInBlock::set(vec![]);
 	NotebookTick::set(1);
@@ -280,6 +358,7 @@ fn it_should_not_fail_with_no_notaries() {
 	BlockSealer::set(BlockSealerInfo {
 		block_author_account_id: 1,
 		block_vote_rewards_account: Some(2),
+		block_seal_authority: None,
 	});
 	NotebooksInBlock::set(vec![]);
 	NotebookTick::set(1);
@@ -292,8 +371,20 @@ fn it_should_not_fail_with_no_notaries() {
 			Event::RewardCreated {
 				maturation_block,
 				rewards: vec![
-					BlockPayout { account_id: 1, ownership: 3750, argons: 3750 },
-					BlockPayout { account_id: 2, ownership: 1250, argons: 1250 },
+					BlockPayout {
+						account_id: 1,
+						ownership: 3750,
+						argons: 3750,
+						block_seal_authority: None,
+						reward_type: BlockRewardType::Miner,
+					},
+					BlockPayout {
+						account_id: 2,
+						ownership: 1250,
+						argons: 1250,
+						block_seal_authority: None,
+						reward_type: BlockRewardType::Voter,
+					},
 				],
 			}
 			.into(),
@@ -307,6 +398,7 @@ fn it_should_support_profit_sharing() {
 	BlockSealer::set(BlockSealerInfo {
 		block_author_account_id: 1,
 		block_vote_rewards_account: Some(2),
+		block_seal_authority: None,
 	});
 	GetRewardSharing::set(Some(RewardSharing {
 		account_id: 3,
@@ -324,9 +416,27 @@ fn it_should_support_profit_sharing() {
 			Event::RewardCreated {
 				maturation_block,
 				rewards: vec![
-					BlockPayout { account_id: 1, ownership: 3750, argons: 3750 - share_amount },
-					BlockPayout { account_id: 3, ownership: 0, argons: share_amount },
-					BlockPayout { account_id: 2, ownership: 1250, argons: 1250 },
+					BlockPayout {
+						account_id: 1,
+						ownership: 3750,
+						argons: 3750 - share_amount,
+						block_seal_authority: None,
+						reward_type: BlockRewardType::Miner,
+					},
+					BlockPayout {
+						account_id: 3,
+						ownership: 0,
+						argons: share_amount,
+						block_seal_authority: None,
+						reward_type: BlockRewardType::ProfitShare,
+					},
+					BlockPayout {
+						account_id: 2,
+						ownership: 1250,
+						argons: 1250,
+						block_seal_authority: None,
+						reward_type: BlockRewardType::Voter,
+					},
 				],
 			}
 			.into(),

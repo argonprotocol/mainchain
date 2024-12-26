@@ -27,16 +27,16 @@ pub mod pallet {
 		localchain::{BestBlockVoteSeal, BlockVote, BlockVoteT},
 		notary::NotaryNotebookRawVotes,
 		prelude::*,
-		AuthorityProvider, BlockSealDigest, BlockSealEventHandler, BlockSealSpecProvider,
-		BlockSealerInfo, BlockSealerProvider, BlockVotingKey, MerkleProof, NotebookProvider,
-		ParentVotingKeyDigest, TickProvider, VotingKey, VotingSchedule, FORK_POWER_DIGEST,
-		PARENT_VOTING_KEY_DIGEST,
+		AuthorityProvider, BlockSealAuthorityId, BlockSealDigest, BlockSealEventHandler,
+		BlockSealSpecProvider, BlockSealerInfo, BlockSealerProvider, BlockVotingKey, MerkleProof,
+		NotebookProvider, ParentVotingKeyDigest, TickProvider, VotingKey, VotingSchedule,
+		FORK_POWER_DIGEST, PARENT_VOTING_KEY_DIGEST,
 	};
 	use binary_merkle_tree::{merkle_proof, verify_proof};
 	use frame_support::{pallet_prelude::*, traits::FindAuthor};
 	use frame_system::pallet_prelude::*;
 	use log::info;
-	use sp_core::{H256, U256};
+	use sp_core::{ByteArray, H256, U256};
 	use sp_runtime::{
 		traits::{BlakeTwo256, Block as BlockT, Verify},
 		Digest, DigestItem, RuntimeAppPublic,
@@ -53,7 +53,8 @@ pub mod pallet {
 			+ Parameter
 			+ RuntimeAppPublic
 			+ MaybeSerializeDeserialize
-			+ MaxEncodedLen;
+			+ MaxEncodedLen
+			+ AsRef<[u8]>;
 		/// Type representing the weight of this pallet
 		type WeightInfo: WeightInfo;
 		/// Type that provides authorities
@@ -142,6 +143,8 @@ pub mod pallet {
 		BlockVoteInvalidSignature,
 		/// Invalid fork power parent
 		InvalidForkPowerParent,
+		/// A block seal authority could not be properly decoded
+		BlockSealDecodeError,
 	}
 
 	#[pallet::hooks]
@@ -258,14 +261,15 @@ pub mod pallet {
 			match seal {
 				BlockSealInherent::Compute => {
 					// NOTE: the compute nonce is checked in the node
-					<LastBlockSealerInfo<T>>::put(BlockSealerInfo {
-						block_vote_rewards_account: None,
-						block_author_account_id: block_author,
-					});
 					let compute_difficulty = T::BlockSealSpecProvider::compute_difficulty();
 
 					BlockForkPower::<T>::mutate(|fork| {
 						fork.add_compute(vote_digest.voting_power, notebooks, compute_difficulty);
+					});
+					<LastBlockSealerInfo<T>>::put(BlockSealerInfo {
+						block_vote_rewards_account: None,
+						block_author_account_id: block_author,
+						block_seal_authority: None,
 					});
 				},
 				BlockSealInherent::Vote {
@@ -301,14 +305,6 @@ pub mod pallet {
 						source_notebook_proof,
 						source_notebook_number,
 					)?;
-					<LastBlockSealerInfo<T>>::put(BlockSealerInfo {
-						block_author_account_id: block_author,
-						block_vote_rewards_account: if block_vote.is_default_vote() {
-							None
-						} else {
-							Some(block_vote.block_rewards_account_id.clone())
-						},
-					});
 
 					BlockForkPower::<T>::mutate(|fork| {
 						fork.add_vote(vote_digest.voting_power, notebooks, seal_strength);
@@ -388,6 +384,18 @@ pub mod pallet {
 
 			ensure!(block_peer.authority_id == authority_id, Error::<T>::InvalidSubmitter);
 
+			<LastBlockSealerInfo<T>>::put(BlockSealerInfo {
+				block_author_account_id: block_author.clone(),
+				block_vote_rewards_account: if block_vote.is_default_vote() {
+					None
+				} else {
+					Some(block_vote.block_rewards_account_id.clone())
+				},
+				block_seal_authority: Some(
+					BlockSealAuthorityId::from_slice(authority_id.as_ref())
+						.map_err(|_| Error::<T>::BlockSealDecodeError)?,
+				),
+			});
 			Ok(())
 		}
 

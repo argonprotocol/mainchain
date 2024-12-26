@@ -1,4 +1,12 @@
-use argon_primitives::{block_seal::BlockPayout, BlockRewardsEventHandler, UtxoBondedEvents};
+use crate::{
+	mock::*,
+	pallet::{BlockMintAction, MintedBitcoinArgons, MintedMiningArgons, PendingMintUtxos},
+	Event, MintType,
+};
+use argon_primitives::{
+	block_seal::{BlockPayout, BlockRewardType},
+	BlockRewardsEventHandler, UtxoBondedEvents,
+};
 use frame_support::{
 	assert_ok,
 	traits::{fungible::Unbalanced, OnInitialize},
@@ -6,12 +14,6 @@ use frame_support::{
 use sp_arithmetic::{FixedI128, FixedU128};
 use sp_core::U256;
 use sp_runtime::{DispatchError, TokenError};
-
-use crate::{
-	mock::*,
-	pallet::{MintedBitcoinArgons, MintedMiningArgons, PendingMintUtxos},
-	Event, MintType,
-};
 
 #[test]
 fn it_records_burnt_argons_by_prorata() {
@@ -44,12 +46,31 @@ fn it_records_burnt_argons_by_prorata() {
 fn it_tracks_block_rewards() {
 	new_test_ext().execute_with(|| {
 		<Mint as BlockRewardsEventHandler<_, _>>::rewards_created(&[
-			BlockPayout { account_id: 1, argons: 100, ownership: 100 },
-			BlockPayout { account_id: 1, argons: 1, ownership: 1 },
-			BlockPayout { account_id: 2, argons: 5, ownership: 5 },
+			BlockPayout {
+				account_id: 1,
+				argons: 100,
+				ownership: 100,
+				reward_type: BlockRewardType::Miner,
+				block_seal_authority: None,
+			},
+			BlockPayout {
+				account_id: 1,
+				argons: 1,
+				ownership: 1,
+				reward_type: BlockRewardType::Voter,
+				block_seal_authority: None,
+			},
+			BlockPayout {
+				account_id: 2,
+				argons: 5,
+				ownership: 5,
+				reward_type: BlockRewardType::ProfitShare,
+				block_seal_authority: None,
+			},
 		]);
 
 		assert_eq!(MintedMiningArgons::<Test>::get(), U256::from(106));
+		assert_eq!(BlockMintAction::<Test>::get().1.argon_minted, 106);
 	});
 }
 
@@ -101,6 +122,7 @@ fn it_can_mint() {
 		assert_eq!(MintedMiningArgons::<Test>::get(), U256::from(25_500));
 		assert_eq!(Balances::total_issuance(), 25_000 + 25_000);
 		assert_eq!(Balances::free_balance(1), 25_000);
+		assert_eq!(BlockMintAction::<Test>::get().1.argon_minted, 25_000);
 	});
 }
 
@@ -152,6 +174,7 @@ fn it_doesnt_mint_before_active_miners() {
 		Mint::on_initialize(1);
 
 		assert!(System::events().is_empty());
+		assert_eq!(BlockMintAction::<Test>::get().1.argon_minted, 0);
 	});
 }
 
@@ -292,6 +315,8 @@ fn it_pays_bitcoin_mints() {
 		assert_eq!(MintedBitcoinArgons::<Test>::get(), U256::from(100));
 		assert_eq!(Balances::total_issuance(), 100u128);
 
+		assert_eq!(BlockMintAction::<Test>::get().1.argon_minted, 0);
+		assert_eq!(BlockMintAction::<Test>::get().1.bitcoin_minted, 100);
 		// now allow whole
 
 		System::set_block_number(3);
@@ -326,6 +351,21 @@ fn it_pays_bitcoin_mints() {
 			U256::from(amount + bitcoin_amount_to_match)
 		);
 		assert_eq!(Balances::total_issuance(), amount + bitcoin_amount_to_match + miner_amount);
+
+		assert_eq!(BlockMintAction::<Test>::get().1.argon_minted, miner_amount);
+		assert_eq!(
+			BlockMintAction::<Test>::get().1.bitcoin_minted,
+			amount - 100 + bitcoin_amount_to_match
+		);
+
+		System::set_block_number(4);
+		Mint::on_argon_burn(100);
+		assert_eq!(BlockMintAction::<Test>::get().1.argon_burned, 100);
+		assert_eq!(BlockMintAction::<Test>::get().1.argon_minted, 0);
+		assert_eq!(BlockMintAction::<Test>::get().1.bitcoin_minted, 0);
+		Mint::on_initialize(4);
+		// make sure it doesn't get cleared out
+		assert_eq!(BlockMintAction::<Test>::get().1.argon_burned, 100);
 	});
 }
 

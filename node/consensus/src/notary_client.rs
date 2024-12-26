@@ -155,7 +155,7 @@ where
 		+ NotaryApis<B, NotaryRecordT>,
 	AC: Codec + Clone + Send + Sync + 'static,
 {
-	let metrics = registry.and_then(|r| ConsensusMetrics::new(r).ok());
+	let metrics = registry.and_then(|r| ConsensusMetrics::new(r, client.clone()).ok());
 	let metrics = Arc::new(metrics);
 
 	let notary_client = Arc::new(NotaryClient::new(
@@ -243,7 +243,7 @@ pub struct NotaryClient<B: BlockT, C: AuxStore, AC> {
 	notebook_queue_by_id: Arc<RwLock<BTreeMap<NotaryId, Vec<PendingNotebook>>>>,
 	aux_client: ArgonAux<B, C>,
 	notebook_downloader: NotebookDownloader,
-	pub(crate) metrics: Arc<Option<ConsensusMetrics>>,
+	pub(crate) metrics: Arc<Option<ConsensusMetrics<C>>>,
 	ticker: Ticker,
 	queue_lock: Arc<Mutex<()>>,
 	_block: PhantomData<AC>,
@@ -259,7 +259,7 @@ where
 		client: Arc<C>,
 		aux_client: ArgonAux<B, C>,
 		notebook_downloader: NotebookDownloader,
-		metrics: Arc<Option<ConsensusMetrics>>,
+		metrics: Arc<Option<ConsensusMetrics<C>>>,
 		ticker: Ticker,
 	) -> Self {
 		let (tick_voting_power_sender, tick_voting_power_receiver) =
@@ -754,9 +754,7 @@ where
 				let notary_audits =
 					self.aux_client.get_notary_audit_history(digest_record.notary_id)?.get();
 
-				let audit = notary_audits
-					.iter()
-					.find(|a| a.notebook_number == digest_record.notebook_number);
+				let audit = notary_audits.get(&digest_record.notebook_number);
 
 				if let Some(audit) = audit {
 					if digest_record.audit_first_failure != audit.audit_first_failure {
@@ -796,12 +794,29 @@ where
 			// drain queues
 			// NOTE: only do this for 10 seconds
 			let start = Instant::now();
+			let notaries_needing_update =
+				missing_audits_by_notary.iter().map(|(n, _)| *n).collect::<BTreeSet<_>>();
+			// wait a max of 5 seconds per notebook.
+			let wait_time = (missing_audits_by_notary.len() * 5).max(10);
 			while self.process_queues().await? {
 				tokio::time::sleep(Duration::from_millis(30)).await;
-				if start.elapsed() > Duration::from_secs(10) {
-					return Err(Error::UnableToSyncNotary(
-						"Could not process all missing audits in 10 seconds".to_string(),
-					));
+				for notary_id in &notaries_needing_update {
+					let notary_audits = self.aux_client.get_notary_audit_history(*notary_id)?.get();
+					missing_audits_by_notary.retain(|(n, notebook_number)| {
+						if n != notary_id {
+							return true;
+						}
+						!notary_audits.contains_key(notebook_number)
+					});
+				}
+				if missing_audits_by_notary.is_empty() {
+					break;
+				}
+				if start.elapsed() > Duration::from_secs(wait_time as u64) {
+					return Err(Error::UnableToSyncNotary(format!(
+						"Could not process all missing audits in {} seconds",
+						wait_time
+					)));
 				}
 			}
 		}

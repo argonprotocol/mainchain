@@ -3,7 +3,10 @@ extern crate alloc;
 
 use alloc::{vec, vec::Vec};
 use argon_primitives::{
-	block_seal::{MinerIndex, MiningAuthority, MiningSlotConfig, RewardDestination, RewardSharing},
+	block_seal::{
+		MinerIndex, MiningAuthority, MiningBidStats, MiningSlotConfig, RewardDestination,
+		RewardSharing,
+	},
 	bond::BondProvider,
 	inherents::BlockSealInherent,
 	AuthorityProvider, BlockRewardAccountsProvider, BlockSealEventHandler, MiningSlotProvider,
@@ -76,14 +79,14 @@ pub mod pallet {
 	};
 	use frame_system::pallet_prelude::*;
 	use sp_runtime::{
-		traits::{AtLeast32BitUnsigned, Member, OpaqueKeys, UniqueSaturatedInto, Zero},
+		traits::{AtLeast32BitUnsigned, Member, OpaqueKeys, UniqueSaturatedInto},
 		BoundedBTreeMap,
 	};
 
 	use argon_primitives::{
 		block_seal::{MiningRegistration, RewardDestination},
 		bond::{BondError, BondProvider},
-		BondId, VaultId,
+		prelude::*,
 	};
 
 	use super::*;
@@ -158,6 +161,9 @@ pub mod pallet {
 
 		/// The authority signing keys.
 		type Keys: OpaqueKeys + Member + Parameter + MaybeSerializeDeserialize;
+
+		/// The current tick
+		type TicksSinceGenesis: Get<Tick>;
 	}
 
 	/// A reason for the pallet placing a hold on funds.
@@ -207,7 +213,7 @@ pub mod pallet {
 	/// The number of bids per slot for the last 10 slots (newest first)
 	#[pallet::storage]
 	pub(super) type HistoricalBidsPerSlot<T: Config> =
-		StorageValue<_, BoundedVec<u32, ConstU32<10>>, ValueQuery>;
+		StorageValue<_, BoundedVec<MiningBidStats, ConstU32<10>>, ValueQuery>;
 
 	/// The mining slot configuration set in genesis
 	#[pallet::storage]
@@ -225,7 +231,7 @@ pub mod pallet {
 	#[pallet::genesis_build]
 	impl<T: Config> BuildGenesisConfig for GenesisConfig<T> {
 		fn build(&self) {
-			if self.mining_config.slot_bidding_start_block == Zero::zero() {
+			if self.mining_config.slot_bidding_start_after_ticks == 0 {
 				IsNextSlotBiddingOpen::<T>::put(true);
 			}
 			MiningConfig::<T>::put(self.mining_config.clone());
@@ -321,7 +327,7 @@ pub mod pallet {
 			let blocks_between_slots = Self::blocks_between_slots();
 			let mining_config = MiningConfig::<T>::get();
 
-			if block_number >= mining_config.slot_bidding_start_block &&
+			if T::TicksSinceGenesis::get() >= mining_config.slot_bidding_start_after_ticks &&
 				block_number_u32 % blocks_between_slots == 0
 			{
 				Self::adjust_ownership_bond_amount();
@@ -447,7 +453,13 @@ pub mod pallet {
 
 				HistoricalBidsPerSlot::<T>::mutate(|bids| {
 					if let Some(bids) = bids.get_mut(0) {
-						*bids += 1;
+						bids.bids_count += 1;
+						bids.bid_amount_max = bids.bid_amount_max.max(bid.into());
+						if bids.bids_count == 1 {
+							bids.bid_amount_min = bid.into();
+						}
+						bids.bid_amount_min = bids.bid_amount_min.min(bid.into());
+						bids.bid_amount_sum = bids.bid_amount_sum.saturating_add(bid.into());
 					}
 				});
 				Self::deposit_event(Event::<T>::SlotBidderAdded {
@@ -519,8 +531,7 @@ impl<T: Config> AuthorityProvider<T::MiningAuthorityId, T::Block, T::AccountId> 
 
 impl<T: Config> Pallet<T> {
 	pub fn is_registered_mining_active() -> bool {
-		<frame_system::Pallet<T>>::block_number() >=
-			MiningConfig::<T>::get().slot_bidding_start_block &&
+		T::TicksSinceGenesis::get() >= MiningConfig::<T>::get().slot_bidding_start_after_ticks &&
 			ActiveMinersCount::<T>::get() > 0
 	}
 
@@ -553,7 +564,7 @@ impl<T: Config> Pallet<T> {
 			if bids.is_full() {
 				bids.pop();
 			}
-			let _ = bids.try_insert(0, 0);
+			let _ = bids.try_insert(0, MiningBidStats::default());
 		});
 
 		let start_index_to_replace_miners = Self::get_slot_starting_index(
@@ -622,7 +633,7 @@ impl<T: Config> Pallet<T> {
 		let ownership_circulation: u128 = T::OwnershipCurrency::total_issuance().saturated_into();
 
 		let historical_bids = HistoricalBidsPerSlot::<T>::get();
-		let total_bids: u32 = historical_bids.iter().sum();
+		let total_bids: u32 = historical_bids.iter().map(|a| a.bids_count).sum();
 		let slots = historical_bids.len() as u32;
 		let expected_bids_for_period = slots.saturating_mul(T::TargetBidsPerSlot::get());
 		let previous_adjustment =

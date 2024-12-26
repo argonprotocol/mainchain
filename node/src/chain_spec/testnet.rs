@@ -4,6 +4,7 @@ use argon_primitives::{
 	bitcoin::BitcoinNetwork,
 	block_seal::MiningSlotConfig,
 	notary::{GenesisNotary, NotaryPublic},
+	tick::Ticker,
 	AccountId, Chain, ComputeDifficulty, ADDRESS_PREFIX, ARGON_TOKEN_SYMBOL, TOKEN_DECIMALS,
 };
 use core::str::FromStr;
@@ -24,6 +25,7 @@ pub fn testnet_config() -> Result<ChainSpec, String> {
 	let bitcoin_oracle = AccountId::from_str("5GZGFLKPxKegnjudkiy32gU6JmiKFgt6cJ35udQpSjnPu8PY")?;
 	let price_oracle = AccountId::from_str("5Gp8fDqBvgVj3BepUCeyGHEeguy1Jmeb2gfwcFvG8snV4icd")?;
 	let token_admin = sudo_account.clone();
+	let ticker = Ticker::new(TICK_MILLIS, 2);
 
 	let notary_account = AccountId::from_str("5CFiHEZUFSqwEeiSqJwfxjp4wZWxom73y5EjVsrAw3GwQuWh")?;
 	let notary_public = NotaryPublic::from_str("5CGRRiYmYcnxPEpGmhHLp6SywpSKN23PbVHM9Y3Td7n6xvm2")
@@ -69,18 +71,17 @@ pub fn testnet_config() -> Result<ChainSpec, String> {
 			],
 			initial_vote_minimum: 1_000,
 			initial_difficulty: (TICK_MILLIS * HASHES_PER_SECOND / 1_000) as ComputeDifficulty,
-			tick_millis: TICK_MILLIS,
+			ticker,
 			initial_notaries: vec![GenesisNotary {
 				account_id: notary_account,
 				public: notary_public,
 				hosts: vec!["wss://notary1.testnet.argonprotocol.org".to_string().into()],
 				name: "Argon Foundation".into(),
 			}],
-			channel_hold_expiration_ticks: 60,
 			mining_config: MiningSlotConfig {
 				blocks_before_bid_end_for_vrf_close: 200,
 				blocks_between_slots: 1440,
-				slot_bidding_start_block: 0,
+				slot_bidding_start_after_ticks: 0,
 			},
 			minimum_bitcoin_bond_satoshis: 5_000,
 			hyperbridge_token_admin: token_admin,

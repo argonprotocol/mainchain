@@ -32,13 +32,15 @@ pub mod pallet {
 		FixedPointNumber, FixedU128, Saturating,
 	};
 
+	use super::*;
 	use argon_primitives::{
-		block_seal::BlockPayout, notary::NotaryProvider, tick::Tick, BlockRewardAccountsProvider,
-		BlockRewardsEventHandler, BlockSealerProvider, NotebookProvider,
+		block_seal::{BlockPayout, BlockRewardType},
+		notary::NotaryProvider,
+		tick::Tick,
+		BlockRewardAccountsProvider, BlockRewardsEventHandler, BlockSealerProvider,
+		NotebookProvider,
 	};
 	use sp_arithmetic::per_things::SignedRounding;
-
-	use super::*;
 
 	/// A reason for the pallet placing a hold on funds.
 	#[pallet::composite_enum]
@@ -247,6 +249,8 @@ pub mod pallet {
 
 			let mut rewards: Vec<BlockPayout<T::AccountId, T::Balance>> = vec![BlockPayout {
 				account_id: miner_reward_account.clone(),
+				reward_type: BlockRewardType::Miner,
+				block_seal_authority: authors.block_seal_authority.clone(),
 				ownership: miner_ownership,
 				argons: miner_argons,
 			}];
@@ -256,6 +260,8 @@ pub mod pallet {
 				rewards[0].argons = miner_argons.saturating_sub(sharing_amount);
 				rewards.push(BlockPayout {
 					account_id: sharing.account_id,
+					reward_type: BlockRewardType::ProfitShare,
+					block_seal_authority: None,
 					ownership: 0u128.into(),
 					argons: sharing_amount,
 				});
@@ -266,6 +272,8 @@ pub mod pallet {
 					account_id: block_vote_rewards_account.clone(),
 					ownership: block_ownership.saturating_sub(miner_ownership),
 					argons: block_argons.saturating_sub(miner_argons),
+					reward_type: BlockRewardType::Voter,
+					block_seal_authority: None,
 				});
 			}
 
@@ -317,6 +325,15 @@ pub mod pallet {
 		T::Balance: From<u128>,
 		T::Balance: Into<u128>,
 	{
+		/// This is expected to be called in the context of an api (eg, after a block is put
+		/// together)
+		pub fn block_payouts() -> Vec<BlockPayout<T::AccountId, T::Balance>> {
+			let n = <frame_system::Pallet<T>>::block_number();
+			let reward_height = n.saturating_add(T::MaturationBlocks::get().into());
+			let rewards = <PayoutsByBlock<T>>::get(reward_height);
+			rewards.to_vec()
+		}
+
 		pub fn mint_and_freeze<
 			C: MutateFreeze<T::AccountId, Balance = T::Balance>
 				+ Mutate<T::AccountId, Balance = T::Balance>

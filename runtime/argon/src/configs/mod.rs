@@ -357,6 +357,13 @@ impl OnNewSlot<AccountId> for GrandpaSlotRotation {
 	}
 }
 
+pub struct TicksSinceGenesis;
+impl Get<Tick> for TicksSinceGenesis {
+	fn get() -> Tick {
+		Ticks::ticks_since_genesis()
+	}
+}
+
 impl pallet_mining_slot::Config for Runtime {
 	type RuntimeEvent = RuntimeEvent;
 	type WeightInfo = pallet_mining_slot::weights::SubstrateWeight<Runtime>;
@@ -372,6 +379,7 @@ impl pallet_mining_slot::Config for Runtime {
 	type SlotEvents = (GrandpaSlotRotation,);
 	type MiningAuthorityId = BlockSealAuthorityId;
 	type Keys = SessionKeys;
+	type TicksSinceGenesis = TicksSinceGenesis;
 }
 
 impl pallet_block_seal::Config for Runtime {
@@ -380,10 +388,10 @@ impl pallet_block_seal::Config for Runtime {
 	type AuthorityProvider = MiningSlot;
 	type NotebookProvider = Notebook;
 	type BlockSealSpecProvider = BlockSealSpec;
+	type FindAuthor = Digests;
 	type TickProvider = Ticks;
 	type EventHandler = MiningSlot;
 	type Digests = Digests;
-	type FindAuthor = Digests;
 }
 
 impl pallet_grandpa::Config for Runtime {
