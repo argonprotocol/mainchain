@@ -25,7 +25,7 @@ pub struct BlockMetrics {
 	#[codec(compact)]
 	pub finalized_blocks_created: u64,
 	#[codec(compact)]
-	pub mined_ownership_shares_total: u64,
+	pub mined_ownership_tokens_total: u64,
 	#[codec(compact)]
 	pub mined_argons_total: u64,
 }
@@ -52,7 +52,7 @@ pub struct ConsensusMetrics<C: AuxStore> {
 	/// Notebook total processing time
 	notebook_processing_time: HistogramVec,
 	/// Total ownership shares mined
-	mined_ownership_shares_total: CounterVec<U64>,
+	mined_ownership_tokens_total: CounterVec<U64>,
 	/// Total argons mined
 	mined_argons_total: CounterVec<U64>,
 	/// Total finalized blocks created
@@ -153,9 +153,9 @@ impl<C: AuxStore> ConsensusMetrics<C> {
 				)?,
 				metrics_registry,
 			)?,
-			mined_ownership_shares_total: register(
+			mined_ownership_tokens_total: register(
 				CounterVec::new(
-					Opts::new("argon_mined_ownership_shares_total", "Total ownership shares mined"),
+					Opts::new("argon_mined_ownership_tokens_total", "Total ownership shares mined"),
 					&[],
 				)?,
 				metrics_registry,
@@ -205,11 +205,11 @@ impl<C: AuxStore> ConsensusMetrics<C> {
 				.with_label_values(&[])
 				.inc_by(start_data.finalized_blocks_created);
 		}
-		if start_data.mined_ownership_shares_total > 0 {
+		if start_data.mined_ownership_tokens_total > 0 {
 			start
-				.mined_ownership_shares_total
+				.mined_ownership_tokens_total
 				.with_label_values(&[])
-				.inc_by(start_data.mined_ownership_shares_total);
+				.inc_by(start_data.mined_ownership_tokens_total);
 		}
 		if start_data.mined_argons_total > 0 {
 			start
@@ -297,20 +297,20 @@ impl<C: AuxStore> ConsensusMetrics<C> {
 			.set(depth);
 	}
 
-	pub(crate) fn record_finalized_block(&self, ownership_shares: Balance, argons: Balance) {
-		let ownership_shares: u64 = ownership_shares.unique_saturated_into();
+	pub(crate) fn record_finalized_block(&self, ownership_tokens: Balance, argons: Balance) {
+		let ownership_tokens: u64 = ownership_tokens.unique_saturated_into();
 		let argons: u64 = argons.unique_saturated_into();
-		self.mined_ownership_shares_total
+		self.mined_ownership_tokens_total
 			.with_label_values(&[])
-			.inc_by(ownership_shares);
+			.inc_by(ownership_tokens);
 		self.mined_argons_total.with_label_values(&[]).inc_by(argons);
 		self.finalized_blocks_created_total.with_label_values(&[]).inc();
 
 		self.aux_data
 			.mutate(|data| {
 				data.finalized_blocks_created = data.finalized_blocks_created.saturating_add(1);
-				data.mined_ownership_shares_total =
-					ownership_shares.saturating_add(data.mined_ownership_shares_total);
+				data.mined_ownership_tokens_total =
+					ownership_tokens.saturating_add(data.mined_ownership_tokens_total);
 				data.mined_argons_total = argons.saturating_sub(data.mined_argons_total);
 			})
 			.inspect_err(|e| log::error!("Error updating block metrics: {:?}", e))

@@ -282,11 +282,11 @@ pub fn run_block_builder_task<Block, BI, C, PF, A, SC, SO, JS, B>(
 							for hash in &[&*finalized.tree_route, &[finalized.hash]].concat() {
 								let minted = client.runtime_api().get_block_payouts(*hash).unwrap_or_default();
 								let mut is_my_block = false;
-								let mut ownership_shares = 0;
+								let mut ownership_tokens = 0;
 								let mut argons = 0;
 								for payout in minted {
 									if Some(payout.account_id) == compute_author {
-										ownership_shares += payout.ownership;
+										ownership_tokens += payout.ownership;
 									}
 									if let Some(authority) = payout.block_seal_authority {
 										if authority_keys.contains(&authority) {
@@ -296,7 +296,7 @@ pub fn run_block_builder_task<Block, BI, C, PF, A, SC, SO, JS, B>(
 									}
 								}
 								if is_my_block {
-									metrics.record_finalized_block(ownership_shares, argons);
+									metrics.record_finalized_block(ownership_tokens, argons);
 								}
 							}
 						}
