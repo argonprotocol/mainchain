@@ -36,8 +36,6 @@ lazy_static! {
 	/// - top 5%: `=PERCENTILE.INC(P2:AA113, 0.95)`
 	static ref CPI_5TH_PERCENTILE: FixedI128 = FixedI128::from_float(-0.7092); // -0.709219858
 	static ref CPI_95TH_PERCENTILE: FixedI128 = FixedI128::from_float(1.2429); // 1.242880338
-	// Oct 2024
-	static ref BASELINE_CPI: FixedU128 = FixedU128::from_float(315.664);
 }
 
 #[derive(Serialize, Deserialize)]
@@ -53,6 +51,7 @@ pub struct UsCpiRetriever {
 	pub last_cpi_check: DateTime<Utc>,
 	#[serde(skip)]
 	pub ticker: Ticker,
+	pub baseline_cpi: FixedU128,
 }
 
 impl UsCpiRetriever {
@@ -99,7 +98,7 @@ impl UsCpiRetriever {
 		}
 	}
 
-	pub async fn new(ticker: &Ticker) -> Result<Self> {
+	pub async fn new(ticker: &Ticker, baseline_cpi: FixedU128) -> Result<Self> {
 		if let Ok(retriever) = Self::load_state(ticker) {
 			return Ok(retriever);
 		}
@@ -125,6 +124,7 @@ impl UsCpiRetriever {
 			ticker: *ticker,
 			last_cpi_check: Utc::now(),
 			cpi_change_per_tick: FixedI128::from_u32(0),
+			baseline_cpi,
 		};
 		entry.cpi_change_per_tick = entry.calculate_cpi_change_per_tick();
 		entry.save_state()?;
@@ -169,7 +169,7 @@ impl UsCpiRetriever {
 	/// Returns the ratio of the current CPI to the baseline CPI (minus 1).
 	pub fn get_us_cpi_ratio(&self, tick: Tick) -> FixedI128 {
 		let current_cpi = self.calculate_smoothed_us_cpi_ratio(tick);
-		let baseline = to_fixed_i128(*BASELINE_CPI);
+		let baseline = to_fixed_i128(self.baseline_cpi);
 
 		(current_cpi / baseline) - FixedI128::one()
 	}
@@ -366,13 +366,15 @@ pub(crate) async fn use_mock_cpi_values(cpi_offsets: Vec<f64>) {
 	let schedule = load_cpi_schedule().await.expect("should load schedule");
 
 	let mut mock = MOCK_RAW_CPIS.lock().unwrap();
+	let base_cpi =
+		FixedU128::from_float(*env::var("BASELINE_CPI").unwrap().parse::<f64>().unwrap());
 	*mock = Some(
 		cpi_offsets
 			.into_iter()
 			.enumerate()
 			.map(|(idx, a)| RawCpiValue {
 				value: FixedU128::from_inner(
-					(to_fixed_i128(*BASELINE_CPI) + FixedI128::from_float(a)).into_inner() as u128,
+					(to_fixed_i128(*base_cpi) + FixedI128::from_float(a)).into_inner() as u128,
 				),
 				ref_month: schedule[idx].ref_month,
 			})
@@ -405,7 +407,7 @@ mod tests {
 
 	#[test]
 	fn test_can_smooth_out_cpi() {
-		let previous_cpi = *BASELINE_CPI;
+		let previous_cpi = FixedU128::from_float(300.0);
 		let ticker = Ticker::new(60_000, 2);
 
 		let mut retriever = UsCpiRetriever {
@@ -423,6 +425,7 @@ mod tests {
 			cpi_change_per_tick: FixedI128::from_u32(0),
 			last_schedule_check: Utc::now(),
 			last_cpi_check: Utc::now(),
+			baseline_cpi: previous_cpi,
 			ticker,
 		};
 		retriever.schedule = vec![
@@ -505,6 +508,7 @@ mod tests {
 			cpi_change_per_tick: FixedI128::from_u32(0),
 			last_schedule_check: Utc::now(),
 			last_cpi_check: Utc::now(),
+			baseline_cpi: FixedU128::from_u32(200),
 			ticker,
 		};
 		let timestamp =

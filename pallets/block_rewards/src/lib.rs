@@ -99,7 +99,7 @@ pub mod pallet {
 		#[pallet::constant]
 		type HalvingBlocks: Get<u32>;
 
-		/// The block number at which the halving begins for ownership shares
+		/// The block number at which the halving begins for ownership tokens
 		#[pallet::constant]
 		type HalvingBeginBlock: Get<BlockNumberFor<Self>>;
 

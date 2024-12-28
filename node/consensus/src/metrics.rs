@@ -51,7 +51,7 @@ pub struct ConsensusMetrics<C: AuxStore> {
 	notebook_audited_after_tick_time: HistogramVec,
 	/// Notebook total processing time
 	notebook_processing_time: HistogramVec,
-	/// Total ownership shares mined
+	/// Total ownership tokens mined
 	mined_ownership_tokens_total: CounterVec<U64>,
 	/// Total argons mined
 	mined_argons_total: CounterVec<U64>,
@@ -155,7 +155,7 @@ impl<C: AuxStore> ConsensusMetrics<C> {
 			)?,
 			mined_ownership_tokens_total: register(
 				CounterVec::new(
-					Opts::new("argon_mined_ownership_tokens_total", "Total ownership shares mined"),
+					Opts::new("argon_mined_ownership_tokens_total", "Total ownership tokens mined"),
 					&[],
 				)?,
 				metrics_registry,

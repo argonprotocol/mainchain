@@ -56,7 +56,7 @@ declare module '@polkadot/api-base/types/consts' {
     };
     blockRewards: {
       /**
-       * The block number at which the halving begins for ownership shares
+       * The block number at which the halving begins for ownership tokens
        **/
       halvingBeginBlock: u32 & AugmentedConst<ApiType>;
       /**

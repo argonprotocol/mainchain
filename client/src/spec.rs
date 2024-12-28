@@ -14815,7 +14815,7 @@ pub mod api {
 						],
 					)
 				}
-				#[doc = " The block number at which the halving begins for ownership shares"]
+				#[doc = " The block number at which the halving begins for ownership tokens"]
 				pub fn halving_begin_block(
 					&self,
 				) -> ::subxt::ext::subxt_core::constants::address::StaticAddress<

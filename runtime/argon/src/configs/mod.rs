@@ -175,7 +175,7 @@ parameter_types! {
 
 	pub const StartingArgonsPerBlock: Balance = 500_000;
 	pub const StartingOwnershipTokensPerBlock: Balance = 500_000;
-	pub const IncrementalGrowth: GrowthPath<Runtime> = (INCREMENTAL_REWARD_AMOUNT, INCREMENT_TICKS, FINAL_ARGONS_PER_BLOCK); // we add 1 milligon every 118 blocks until we reach 5 argons/ownership shares
+	pub const IncrementalGrowth: GrowthPath<Runtime> = (INCREMENTAL_REWARD_AMOUNT, INCREMENT_TICKS, FINAL_ARGONS_PER_BLOCK); // we add 1 milligon every 118 blocks until we reach 5 argons/ownership tokens
 	pub const HalvingBeginBlock: u32 = INCREMENT_TICKS * (FINAL_ARGONS_PER_BLOCK as u32 - StartingArgonsPerBlock::get() as u32) / INCREMENTAL_REWARD_AMOUNT as u32; // starts after ~ one year of increments
 	pub const HalvingBlocks: u32 = 2_100_000; // based on bitcoin, but 10x since we're 1 block per minute
 	pub const MaturationBlocks: u32 = 5;
