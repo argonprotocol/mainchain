@@ -272,7 +272,7 @@ parameter_types! {
 	pub const TargetBidsPerSlot: u32 = 1_200; // 20% extra bids
 
 	pub const MaxConcurrentlyExpiringBonds: u32 = 1_000;
-	pub const MinimumBondAmount: u128 = 1_000_000;
+	pub const MinimumBondAmount: u128 = 100_000;
 	pub const BlocksPerDay: u32 = 1440;
 	pub const BlocksPerYear: u32 = 1440 * 365;
 
