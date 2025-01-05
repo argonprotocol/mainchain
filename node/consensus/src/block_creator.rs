@@ -224,7 +224,7 @@ where
 
 		if self.backend.state_at(parent_hash).is_err() {
 			tracing::warn!(
-				"🚽 Parent block not found in state at {}. Likely dumped. Skipping block import.",
+				"🚽 Parent block not found in state at {}. Likely dumped. Skipping block submission.",
 				parent_hash
 			);
 			return;

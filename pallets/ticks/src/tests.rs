@@ -2,54 +2,20 @@ use crate::{
 	mock::{System, Ticks, *},
 	pallet::RecentBlocksAtTicks,
 };
-use argon_primitives::{digests::TICK_DIGEST_ID, tick::TickDigest, TickProvider};
+use argon_primitives::{NotebookAuditResult, TickProvider};
 use frame_support::{pallet_prelude::*, traits::OnTimestampSet};
-use sp_runtime::{Digest, DigestItem};
 use std::panic::catch_unwind;
 
-#[test]
-#[should_panic]
-fn it_panics_if_no_tick_digest() {
-	new_test_ext(500).execute_with(|| {
-		System::on_initialize(2);
-		Ticks::on_timestamp_set(1000);
-		Ticks::on_initialize(2);
-	});
-}
 #[test]
 fn it_panics_if_the_tick_is_invalid() {
 	new_test_ext(500).execute_with(|| {
 		// Go past genesis block so events get deposited
 		System::set_block_number(2);
-		System::initialize(
-			&2,
-			&System::parent_hash(),
-			&Digest { logs: vec![DigestItem::PreRuntime(TICK_DIGEST_ID, TickDigest(2).encode())] },
-		);
+		Digests::mutate(|a| a.tick.0 = 2);
+		System::initialize(&2, &System::parent_hash(), &Default::default());
 		Ticks::on_initialize(2);
 		let err = catch_unwind(|| {
-			let now = 1000;
-			assert_eq!(Ticks::ticker().tick_for_time(now), 1);
-			// now tick is 1, so once timestamp comes in, it should panic (less than proposed 2)
-			Ticks::on_timestamp_set(now);
-		});
-		assert!(err.is_err());
-	});
-}
-
-#[test]
-fn it_panics_if_two_blocks_use_the_same_tick() {
-	new_test_ext(500).execute_with(|| {
-		// Go past genesis block so events get deposited
-		System::set_block_number(2);
-		System::initialize(
-			&2,
-			&System::parent_hash(),
-			&Digest { logs: vec![DigestItem::PreRuntime(TICK_DIGEST_ID, TickDigest(2).encode())] },
-		);
-		Ticks::on_initialize(2);
-		let err = catch_unwind(|| {
-			let now = 1000;
+			let now = 999;
 			assert_eq!(Ticks::ticker().tick_for_time(now), 1);
 			// now tick is 1, so once timestamp comes in, it should panic (less than proposed 2)
 			Ticks::on_timestamp_set(now);
@@ -61,23 +27,43 @@ fn it_panics_if_two_blocks_use_the_same_tick() {
 #[test]
 fn it_tests_the_current_tick() {
 	new_test_ext(500).execute_with(|| {
-		System::initialize(
-			&2,
-			&System::parent_hash(),
-			&Digest { logs: vec![DigestItem::PreRuntime(TICK_DIGEST_ID, TickDigest(2).encode())] },
-		);
+		Digests::mutate(|a| a.tick.0 = 2);
+		System::initialize(&2, &System::parent_hash(), &Default::default());
 		Ticks::on_initialize(2);
 		assert_eq!(Ticks::current_tick(), 2);
 
-		System::initialize(
-			&3,
-			&System::parent_hash(),
-			&Digest { logs: vec![DigestItem::PreRuntime(TICK_DIGEST_ID, TickDigest(1).encode())] },
-		);
+		Digests::mutate(|a| a.tick.0 = 3);
+		for i in 0..5 {
+			let block = 3 + i;
+			System::initialize(&block, &System::parent_hash(), &Default::default());
+			Ticks::on_initialize(block);
+		}
+		let blocks_at_tick = RecentBlocksAtTicks::<Test>::get(3);
+		assert_eq!(blocks_at_tick.len(), 4);
 
-		// should not allow a second block at tick 2
+		// should not allow a 6th block at tick 2
 		let err = catch_unwind(|| {
-			Ticks::on_initialize(3);
+			Ticks::on_initialize(9);
+		});
+		// should require notebooks
+		assert!(err.is_err());
+
+		Digests::mutate(|a| {
+			a.notebooks.notebooks.push(NotebookAuditResult {
+				tick: 3,
+				notary_id: 1,
+				notebook_number: 10,
+				audit_first_failure: None,
+			})
+		});
+
+		Ticks::on_initialize(9);
+		let blocks_at_tick = RecentBlocksAtTicks::<Test>::get(3);
+		assert_eq!(blocks_at_tick.len(), 5);
+
+		// can't push more than 5 though
+		let err = catch_unwind(|| {
+			Ticks::on_initialize(10);
 		});
 		assert!(err.is_err());
 	});
@@ -93,13 +79,8 @@ fn it_should_track_blocks_at_tick() {
 		for i in 0..=501u64 {
 			let block_number = i + 2;
 			let tick = i + 1;
-			System::initialize(
-				&block_number,
-				&parent_hash,
-				&Digest {
-					logs: vec![DigestItem::PreRuntime(TICK_DIGEST_ID, TickDigest(tick).encode())],
-				},
-			);
+			Digests::mutate(|a| a.tick.0 = tick);
+			System::initialize(&block_number, &parent_hash, &Default::default());
 			Ticks::on_initialize(block_number);
 
 			if block_number > 0 {
@@ -122,39 +103,22 @@ fn it_should_track_multiple_blocks_at_tick_if_enabled() {
 	new_test_ext(500).execute_with(|| {
 		// Go past genesis block so events get deposited
 		System::set_block_number(2);
-		System::initialize(
-			&1,
-			&System::parent_hash(),
-			&Digest { logs: vec![DigestItem::PreRuntime(TICK_DIGEST_ID, TickDigest(1).encode())] },
-		);
+		Digests::mutate(|a| a.tick.0 = 1);
+		System::initialize(&1, &System::parent_hash(), &Default::default());
 		Ticks::on_initialize(1);
-		System::initialize(
-			&2,
-			&System::parent_hash(),
-			&Digest { logs: vec![DigestItem::PreRuntime(TICK_DIGEST_ID, TickDigest(1).encode())] },
-		);
+		Digests::mutate(|a| a.tick.0 = 1);
+		System::initialize(&2, &System::parent_hash(), &Default::default());
 		Ticks::on_initialize(2);
 		assert!(Ticks::blocks_at_tick(1).contains(&System::parent_hash()));
-		System::initialize(
-			&3,
-			&System::parent_hash(),
-			&Digest { logs: vec![DigestItem::PreRuntime(TICK_DIGEST_ID, TickDigest(1).encode())] },
-		);
+		System::initialize(&3, &System::parent_hash(), &Default::default());
 		Ticks::on_initialize(3);
 		assert_eq!(Ticks::blocks_at_tick(1).len(), 2);
 
-		System::initialize(
-			&4,
-			&System::parent_hash(),
-			&Digest { logs: vec![DigestItem::PreRuntime(TICK_DIGEST_ID, TickDigest(2).encode())] },
-		);
+		Digests::mutate(|a| a.tick.0 = 2);
+		System::initialize(&4, &System::parent_hash(), &Default::default());
 		Ticks::on_initialize(4);
 		assert_eq!(Ticks::blocks_at_tick(2).len(), 1);
-		System::initialize(
-			&5,
-			&System::parent_hash(),
-			&Digest { logs: vec![DigestItem::PreRuntime(TICK_DIGEST_ID, TickDigest(2).encode())] },
-		);
+		System::initialize(&5, &System::parent_hash(), &Default::default());
 		Ticks::on_initialize(5);
 		assert_eq!(Ticks::blocks_at_tick(2).len(), 2);
 	});

@@ -1,8 +1,12 @@
 use crate as pallet_ticks;
-use argon_primitives::tick::Ticker;
+use argon_notary_audit::VerifyError;
+use argon_primitives::{
+	tick::{TickDigest, Ticker},
+	BlockVoteDigest, Digestset, NotebookDigest,
+};
 use env_logger::{Builder, Env};
-use frame_support::{derive_impl, traits::ConstU64};
-use sp_runtime::BuildStorage;
+use frame_support::{derive_impl, parameter_types, traits::ConstU64};
+use sp_runtime::{traits::Get, BuildStorage, DispatchError};
 
 type Block = frame_system::mocking::MockBlock<Test>;
 
@@ -15,6 +19,27 @@ frame_support::construct_runtime!(
 		Ticks: pallet_ticks,
 	}
 );
+
+parameter_types! {
+
+	pub static Digests: Digestset<VerifyError, u64> = Digestset {
+		block_vote: BlockVoteDigest { voting_power: 500, votes_count: 1 },
+		author: 1,
+		voting_key: None,
+		tick: TickDigest(2),
+		fork_power: None,
+		notebooks: NotebookDigest {
+			notebooks: vec![],
+		},
+	};
+}
+
+pub struct DigestGetter;
+impl Get<Result<Digestset<VerifyError, u64>, DispatchError>> for DigestGetter {
+	fn get() -> Result<Digestset<VerifyError, u64>, DispatchError> {
+		Ok(Digests::get())
+	}
+}
 
 impl pallet_timestamp::Config for Test {
 	type Moment = u64;
@@ -30,6 +55,7 @@ impl frame_system::Config for Test {
 
 impl pallet_ticks::Config for Test {
 	type WeightInfo = ();
+	type Digests = DigestGetter;
 }
 
 // Build genesis storage according to the mock runtime.

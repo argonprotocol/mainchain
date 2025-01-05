@@ -90,7 +90,7 @@ where
 
 		if is_best_fork {
 			tracing::info!(
-				block_hash = ?block.header.hash(),
+				block_hash = ?block.post_hash,
 				?fork_power,
 				"New best fork imported"
 			);
