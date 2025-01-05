@@ -366,15 +366,15 @@ pub(crate) async fn use_mock_cpi_values(cpi_offsets: Vec<f64>) {
 	let schedule = load_cpi_schedule().await.expect("should load schedule");
 
 	let mut mock = MOCK_RAW_CPIS.lock().unwrap();
-	let base_cpi =
-		FixedU128::from_float(*env::var("BASELINE_CPI").unwrap().parse::<f64>().unwrap());
+	let cpi = env::var("BASELINE_CPI").unwrap().parse::<f64>().unwrap();
+	let base_cpi = FixedU128::from_float(cpi);
 	*mock = Some(
 		cpi_offsets
 			.into_iter()
 			.enumerate()
 			.map(|(idx, a)| RawCpiValue {
 				value: FixedU128::from_inner(
-					(to_fixed_i128(*base_cpi) + FixedI128::from_float(a)).into_inner() as u128,
+					(to_fixed_i128(base_cpi) + FixedI128::from_float(a)).into_inner() as u128,
 				),
 				ref_month: schedule[idx].ref_month,
 			})
