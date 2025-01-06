@@ -9611,6 +9611,7 @@ dependencies = [
 name = "pallet-ticks"
 version = "0.0.24"
 dependencies = [
+ "argon-notary-audit",
  "argon-primitives",
  "env_logger 0.11.5",
  "frame-benchmarking 38.0.0",

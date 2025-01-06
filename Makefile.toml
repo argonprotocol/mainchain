@@ -85,7 +85,7 @@ args = ["--show-stats"]
 [tasks.testnet-spec]
 description = "Generate testnet spec"
 script = [
-    "cargo run --release --bin argon-node -- build-spec --chain fresh-testnet --raw > ./node/src/chain_spec/testnet1.json"
+    "cargo run --release --bin argon-node -- build-spec --chain gen-testnet --raw > ./node/src/chain_spec/testnet1.json"
 ]
 
 [tasks.build]
@@ -115,11 +115,15 @@ description = "Update metadata"
 script = "client/update.sh"
 dependencies = ["build-node"]
 
+[tasks.minio]
+description = "Start minio server"
+script = "scripts/docker_minio.sh"
+
 [tasks.test]
 description = "Run tests with cargo,"
 command = "cargo"
 args = ["test", "--lib", "--no-fail-fast", "${@}"]
-dependencies = ["build"]
+dependencies = ["build", "minio"]
 env = { "RUSTC_WRAPPER" = "sccache" }
 
 [tasks.nextest]

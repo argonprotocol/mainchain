@@ -8,6 +8,7 @@ You'll learn how to:
 2. Acquire Argons and Ownership Tokens
 3. Bid for a Mining Slot
 4. Start mining and watch for rewards
+5. Learn other Mining Rules
 
 ## 1. Setup a Miner Machine
 
@@ -103,6 +104,8 @@ You need to launch your node with configurations to connect to the Argon Testnet
       # --base-path /path/to/your/node/data \
       # or a path to your testnet chain spec
       --chain testnet \
+      # one or more archive host for the notebooks
+      --notebook-archive-hosts="https://testnet-notebook-archive.argonprotocol.org" \
       # the rpc url for your signet bitcoin node with blockfilters enabled
       --bitcoin-rpc-url="http://bitcoin:<ENCODED_PASS>@127.0.0.1:38332" \
       # allow rpc on your local host only by default
@@ -138,6 +141,14 @@ Tokens in circulation. And you can (optionally) put yourself ahead of someone el
 than they have. You will get these Argons back at the end of the slot (or if you lose your bid). Argons rented for this
 process must come from a [Vault](./running-a-vault#mining-bonds).
 
+Vault Argons are allowed to be rented for mining bonds at a ratio of 2:1 with the Bitcoins bonded in a vault, capped by
+the amount of securitization locked up by the vault. In other words, if a vault has 100k of bitcoin and 200k of
+securitization in the vault, 200k of mining bonds are eligible for mining bonds. If there is 0 securitization, then only
+100k of mining bonds are eligible. A vault offers an allocated amount of both Bitcoin and Mining bonds. You can view a
+vault's current allocation by looking at the Chain State in Polkadot.js under `Vaults -> VaultsById`, and then viewing
+allocated and bonded amounts of each. Some Vault operators will also offer profit sharing terms, where you don't need to
+rent Argons for as high a cost, but will need to share argons minted during your slot.
+
 You need to set up an account and acquire Argons to bid for a mining slot. You can do this by
 following the steps in the [Argon Faucet Guide](./account-setup.md).
 
@@ -160,9 +171,9 @@ day period starting at the next block that is divisible by 1440 blocks (eg, ever
 Mining bids close in a randomly chosen block within 200 blocks of the next slot. Mining bids normally begin after a 10
 day bootstrap period called "Slot Zero". However, in the Testnet, you can start bidding right away.
 
-There are 10 mining positions available every "slot", and 100 total miners at genesis. Each slot will last 10 days, so
-at any given time, there are 10 overlapping cohorts of miners. Each day, 1/10th will rotate out and 1/10th will rotate
-in.
+There are initially 10 mining positions available every "slot", and 100 total miners at genesis. Each slot will last 10
+days, so at any given time, there are 10 overlapping cohorts of miners. Each day, 1/10th will rotate out and 1/10th will
+rotate in. Over time, the number of miners will increase to 10,000.
 
 You are bidding for a slot, and can be outbid at any time by someone who "locks" more Argons than you. You can monitor
 if you currently have a winning slot by looking at
@@ -211,3 +222,76 @@ Ownership tokens using
 the [Chainstate](https://polkadot.js.org/apps/?rpc=wss://rpc.testnet.argonprotocol.org#/chainstate) tab in Polkadot.js
 and looking up `Ownership -> Accounts (your account)`.
 ![Polkadot.js - Ownership](images/pjs-ownership.png)
+
+### 5. Learn other Mining Rules
+
+## Phases
+
+### Slot Zero
+
+The first phase of mining is a compute phase. Compute mining uses Randomx to solve a hash that is less than the current
+difficulty target. This phase will last 10 days to bootstrap the network.
+
+### Slot Bidding
+
+After this point, there are 10 mining slots per day (each lasting 10 days). To bid for a mining slot, the account you
+register as a miner must possess 1/100th of the total Ownership Tokens in circulation (this amount moves up and down
+based on a target number of miners applying for the slots). These variables can be found in the mining_slot pallet:
+
+- `TargetBidsPerSlot`: the current number of bids per slot that are targeted (20% more than slots available)
+- `HistoricalBidsPerSlot`: the number of bids per slot over the recent history
+- `OwnershipBondAmount`: the total number of Ownership Tokens needed to bid for a slot
+- `NextSlotCohort`: the currently slotted miners for the slot ending tomorrow
+
+#### Slot Bid End-time
+
+Slot bidding is for the next slot, and the end time is a random block within 200 blocks of the next slot. Randomization
+is determined from the block "seal" used to close a block. You can see if bidding has closed by looking at the
+`IsNextSlotBiddingOpen` variable in the mining_slot pallet.
+
+## Block Rewards
+
+Block rewards are given for each closed block as both Argons and Ownership Tokens. Rewards are scaled by the number of
+notebooks included in a block vs the active notaries. If no current notebooks are included, the block reward is only 1
+microgon (eg, you are mostly just earning fees).
+
+Block rewards start at 0.5 Argons and 0.5 Ownership Tokens per block, and increase by 1 milligon (1/10th of an Argon)
+every 118 blocks. This will continue until the block reward reaches 5 Argons and 5 Ownership Tokens per block. After
+this point, the Ownership Tokens will become deflationary, with the block reward halving every 2.1 million blocks.
+Argons are currently slated to stay level, but we anticipate a future model where Argons are related to the total
+circulation to ensure sustainable economic security.
+
+### Reward Maturation
+
+Block rewards are not immediately available. They are frozen and released after 5 blocks.
+
+### Profit Sharing
+
+If you are renting Argons from a Vault, you may have a profit-sharing agreement. This will be a percentage of the Argons
+minted during your slot. You can view the profit-sharing agreement in the Chain State under `Vaults -> VaultsById`. The
+percent will be allocated during block reward creation.
+
+### Vote Creator
+
+When you are a bid-winning miner, you are processing "votes" for which block to follow that are produced by any Argon
+holder who has accumulated "tax" on their Argons. Tax is created when you send Argons via a Localchain or when you
+settle a payment channel via a Localchain. The miner with the mining authority key closest in XOR distance to the vote
+will be selected to create the block. This vote creator will be rewarded with 25% of the block rewards.
+
+## Max Blocks Per Tick
+
+Up to 5 blocks can be created per tick (this is only relevant to the compute phase). Only a single block can be created
+per tick with a mining slot. The 5th block per tick must have notebooks included to be accepted.
+
+## Block Priority
+
+During compute mining, the best block will be the block with the highest aggregate difficulty. During the vote creator
+phase, the block sorting is as follows:
+
+1. If a vote block, the block with the most notebooks
+2. The most voting power (aka, the most notebooks included with votes. The power is the aggregate argons spent on the
+   votes)
+3. Vote blocks are preferred over compute blocks
+4. The strongest seal strength (aka, the smallest vote proof hash, whose calculation can be found in the
+   `block_seal::find_vote_block_seals`)
+5. Finally, the block with the most aggregate compute difficulty

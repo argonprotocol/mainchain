@@ -1,5 +1,6 @@
 #![cfg_attr(not(feature = "std"), no_std)]
 extern crate alloc;
+extern crate core;
 
 use argon_primitives::TickProvider;
 use frame_support::traits::OnTimestampSet;
@@ -18,16 +19,17 @@ mod benchmarking;
 pub mod weights;
 
 const MAX_RECENT_BLOCKS: u64 = 10;
+const MAX_BLOCKS_PER_TICK: u32 = 5;
 
 /// This pallet tracks the current tick of the system
 #[frame_support::pallet(dev_mode)]
 pub mod pallet {
 	use super::*;
 	use alloc::vec::Vec;
+	use argon_notary_audit::VerifyError;
 	use argon_primitives::{
-		digests::TICK_DIGEST_ID,
-		tick::{Tick, TickDigest, Ticker},
-		TickProvider, VotingSchedule,
+		tick::{Tick, Ticker},
+		Digestset, TickProvider, VotingSchedule,
 	};
 	use frame_support::pallet_prelude::*;
 	use frame_system::pallet_prelude::*;
@@ -41,6 +43,9 @@ pub mod pallet {
 	pub trait Config: pallet_timestamp::Config + frame_system::Config {
 		/// Type representing the weight of this pallet
 		type WeightInfo: WeightInfo;
+
+		/// Loads the digest of the current block
+		type Digests: Get<Result<Digestset<VerifyError, Self::AccountId>, DispatchError>>;
 	}
 
 	#[pallet::storage]
@@ -60,7 +65,7 @@ pub mod pallet {
 		_,
 		Twox64Concat,
 		Tick,
-		BoundedVec<<T::Block as BlockT>::Hash, ConstU32<4>>,
+		BoundedVec<<T::Block as BlockT>::Hash, ConstU32<MAX_BLOCKS_PER_TICK>>,
 		ValueQuery,
 	>;
 
@@ -91,16 +96,24 @@ pub mod pallet {
 		fn on_initialize(_block_number: BlockNumberFor<T>) -> Weight {
 			// kinda weird, but we don't know the current block hash
 			let parent_tick = <CurrentTick<T>>::get();
-			let proposed_tick = <frame_system::Pallet<T>>::digest()
-				.logs
-				.iter()
-				.find_map(|a| a.pre_runtime_try_to::<TickDigest>(&TICK_DIGEST_ID))
-				.expect("Tick digest must be set")
-				.0;
+			let digests = T::Digests::get().expect("Digests must be loadable");
+			let proposed_tick = digests.tick.0;
 			// if we're past the max recent blocks, remove the oldest
 			if parent_tick > MAX_RECENT_BLOCKS {
 				for tick in parent_tick..=proposed_tick {
 					RecentBlocksAtTicks::<T>::take(tick.saturating_sub(MAX_RECENT_BLOCKS));
+				}
+			}
+			let blocks_for_proposed = RecentBlocksAtTicks::<T>::get(proposed_tick);
+			let blocks_at_proposed = blocks_for_proposed.len();
+			if blocks_for_proposed.is_full() {
+				panic!("No more blocks can be proposed at tick {:?}", proposed_tick);
+			}
+
+			if MAX_BLOCKS_PER_TICK as usize - blocks_at_proposed == 1 {
+				let notebooks = digests.notebooks.notebooks.len();
+				if notebooks == 0 {
+					panic!("A fifth block per tick can only be proposed if there are notebooks");
 				}
 			}
 
