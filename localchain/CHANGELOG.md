@@ -1,8 +1,10 @@
 # Changelog
 
-## [v0.0.24](https://github.com/argonprotocol/mainchain/compare/v0.0.23...5dfc57e20b7154518eade12dedb11de6f452a5e2) (2024-12-20)
+## [v0.0.25](https://github.com/argonprotocol/mainchain/compare/v0.0.24...c8f03225f1269b5dcba0f8e5a95ddb87fd5b4737) (2025-01-06)
 
-### Fixes
+### [v0.0.24](https://github.com/argonprotocol/mainchain/compare/v0.0.23...v0.0.24) (2024-12-20)
+
+#### Fixes
 
 * **node:** don’t download all notebooks on bootup
 ([014adc7](https://github.com/argonprotocol/mainchain/commit/014adc734e6bd7013dbe13acb5ee7de9029290f4))

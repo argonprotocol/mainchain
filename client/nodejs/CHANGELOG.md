@@ -1,6 +1,22 @@
 # Changelog
 
-## [v0.0.24](https://github.com/argonprotocol/mainchain/compare/v0.0.23...5dfc57e20b7154518eade12dedb11de6f452a5e2) (2024-12-20)
+## [v0.0.25](https://github.com/argonprotocol/mainchain/compare/v0.0.24...c8f03225f1269b5dcba0f8e5a95ddb87fd5b4737) (2025-01-06)
+
+### Features
+
+* **oracle:** move cpi to env var
+([68828c6](https://github.com/argonprotocol/mainchain/commit/68828c66f71bd5d873272109c893a63f8d306680))
+* **node:** add earnings metrics
+([7f7dc1e](https://github.com/argonprotocol/mainchain/commit/7f7dc1e4f3faab0b3ef7881bc912a4628b14b3f5))
+
+### Fixes
+
+* **ticks:** max 5 blocks per tick
+([0e43dbb](https://github.com/argonprotocol/mainchain/commit/0e43dbbed467d1978f4aba969c4b859b60377aae))
+* **mining:** starts slots after ticks vs blocks
+([ff4428f](https://github.com/argonprotocol/mainchain/commit/ff4428f53acdf0735121492cd2a6a810d75db8e6))
+
+### [v0.0.24](https://github.com/argonprotocol/mainchain/compare/v0.0.23...v0.0.24) (2024-12-20)
 
 ### [v0.0.23](https://github.com/argonprotocol/mainchain/compare/v0.0.22...v0.0.23) (2024-12-19)
 
