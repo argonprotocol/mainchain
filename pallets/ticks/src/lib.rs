@@ -120,7 +120,7 @@ pub mod pallet {
 			RecentBlocksAtTicks::<T>::mutate(parent_tick, |blocks| {
 				blocks.try_push(<frame_system::Pallet<T>>::parent_hash())
 			})
-				.expect("Failed to push block hash to recent blocks. Too many blocks per tick is a valid panic reason.");
+			.expect("Failed to push block hash to recent blocks at tick");
 
 			if proposed_tick < parent_tick {
 				panic!("Proposed tick is less than or equal to current tick. Proposed: {:?}, Current: {:?}", proposed_tick, parent_tick);

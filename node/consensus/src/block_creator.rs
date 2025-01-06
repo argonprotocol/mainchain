@@ -222,10 +222,11 @@ where
 			StateAction::ApplyChanges(StorageChanges::Changes(proposal.storage_changes));
 		let post_hash = block_import_params.post_hash();
 
-		if self.backend.state_at(parent_hash).is_err() {
+		if let Err(e) = self.backend.state_at(parent_hash) {
 			tracing::warn!(
+				err = ?e,
 				"🚽 Parent block not found in state at {}. Likely dumped. Skipping block submission.",
-				parent_hash
+				parent_hash,
 			);
 			return;
 		}

@@ -17,9 +17,10 @@ use argon_primitives::{
 };
 use argon_runtime::{NotaryRecordT, NotebookVerifyError};
 use codec::Codec;
-use futures::{future::join_all, Stream, StreamExt};
+use futures::{future::join_all, task::noop_waker_ref, Stream, StreamExt};
 use log::{info, trace, warn};
 use prometheus_endpoint::Registry;
+use rand::prelude::SliceRandom;
 use sc_client_api::{AuxStore, BlockchainEvents};
 use sc_service::TaskManager;
 use sc_utils::mpsc::{tracing_unbounded, TracingUnboundedReceiver, TracingUnboundedSender};
@@ -33,9 +34,13 @@ use std::{
 	marker::PhantomData,
 	pin::Pin,
 	sync::Arc,
+	task::{Context, Poll},
 	time::{Duration, Instant},
 };
-use tokio::sync::{Mutex, RwLock};
+use tokio::{
+	sync::{Mutex, RwLock},
+	time,
+};
 
 const MAX_QUEUE_DEPTH: usize = 1440 * 2; // a notary can be down 2 days before we start dropping history
 
@@ -170,6 +175,8 @@ where
 	let notary_client_poll = Arc::clone(&notary_client);
 	let best_block = client.best_hash();
 	let notary_sync_task = async move {
+		let idle_delay = if ticker.tick_duration_millis <= 10_000 { 100 } else { 1000 };
+		let idle_delay = Duration::from_millis(idle_delay);
 		notary_client_poll.update_notaries(&best_block).await.unwrap_or_else(|e| {
 			warn!("Could not update notaries at best hash {} - {:?}", best_block, e)
 		});
@@ -177,27 +184,25 @@ where
 		let mut best_block = Box::pin(client.every_import_notification_stream());
 
 		loop {
-			tokio::select! {biased;
-				notebook =  notary_client_poll.poll_subscriptions() => {
-					if let Some((notary_id, notebook_number)) = notebook {
-						trace!( "Next notebook pushed (notary {}, notebook {})", notary_id, notebook_number);
-					}
+			tokio::select! {
+				Some((notary_id, notebook_number)) =  notary_client_poll.poll_subscriptions() => {
+					trace!( "Next notebook pushed (notary {}, notebook {})", notary_id, notebook_number);
 				},
-				block = best_block.next () => {
-					if let Some(block) = block.as_ref() {
-						if block.is_new_best {
-							let best_hash = block.hash;
-							if let Err(e) = notary_client_poll.update_notaries(&best_hash).await {
-								warn!(
+				Some(ref block) = best_block.next() => {
+					if block.is_new_best {
+						let best_hash = block.hash;
+						if let Err(e) = notary_client_poll.update_notaries(&best_hash).await {
+							warn!(
 
-									"Could not update notaries at best hash {} - {:?}",
-									best_hash,
-									e
-								);
-							}
+								"Could not update notaries at best hash {} - {:?}",
+								best_hash,
+								e
+							);
 						}
 					}
 				},
+				// Prevent thrashing the polling when nothing is returned
+				_yield = time::sleep(idle_delay) => {},
 			}
 		}
 	};
@@ -368,53 +373,77 @@ where
 		Ok(())
 	}
 
-	pub async fn poll_subscriptions(&self) -> Option<(NotaryId, NotebookNumber)> {
-		let result = {
-			let mut subscriptions = self.subscriptions_by_id.write().await;
-			if subscriptions.is_empty() {
+	pub async fn next_subscription(
+		&self,
+		wait_duration: Duration,
+	) -> Option<(NotaryId, NotebookNumber)> {
+		let now = Instant::now();
+		loop {
+			if let Some((notary_id, notebook_number)) = self.poll_subscriptions().await {
+				return Some((notary_id, notebook_number));
+			}
+			if now.elapsed() > wait_duration {
 				return None;
 			}
-
-			let futures = subscriptions.iter_mut().map(|(notary_id, sub)| {
-				let notary_id = *notary_id;
-				Box::pin(async move {
-					match futures::future::poll_fn(|cx| sub.as_mut().poll_next(cx)).await {
-						Some(Ok(download_info)) => Ok((notary_id, download_info)),
-						Some(Err(e)) => Err((notary_id, Some(e.to_string()))),
-						None => Err((notary_id, None)), // Subscription ended
-					}
-				})
-			});
-
-			let (result, _, _) = futures::future::select_all(futures).await;
-			result
-		};
-
-		match result {
-			Ok((notary_id, download_info)) => {
-				let notebook_number = download_info.notebook_number;
-				if let Some(metrics) = self.metrics.as_ref() {
-					metrics.notebook_notification_received(
-						notary_id,
-						download_info.tick,
-						&self.ticker,
-					);
-				}
-				if let Ok(did_overflow) =
-					self.enqueue_notebook(notary_id, notebook_number, None, None).await
-				{
-					if did_overflow {
-						info!("Overflowed queue for notary {}", notary_id);
-						self.unsubscribe_if_overflowed(notary_id).await;
-					}
-				}
-				Some((notary_id, notebook_number))
-			},
-			Err((notary_id, reason)) => {
-				self.disconnect(&notary_id, reason).await;
-				None
-			},
+			// yield thread
+			tokio::task::yield_now().await;
 		}
+	}
+
+	pub async fn poll_subscriptions(&self) -> Option<(NotaryId, NotebookNumber)> {
+		let mut subscription_ids = self
+			.subscriptions_by_id
+			.read()
+			.await
+			.iter()
+			.map(|(i, _)| *i)
+			.collect::<Vec<_>>();
+
+		// If there are no subscriptions, return early
+		if subscription_ids.is_empty() {
+			return None;
+		}
+
+		// Shuffle the subscriptions to randomize the polling order
+		subscription_ids.shuffle(&mut rand::thread_rng());
+
+		// Poll each subscription in the randomized order
+		for notary_id in subscription_ids {
+			let next = {
+				let mut subscriptions = self.subscriptions_by_id.write().await;
+				if let Some(sub) = subscriptions.get_mut(&notary_id) {
+					sub.as_mut().poll_next(&mut Context::from_waker(noop_waker_ref()))
+				} else {
+					continue;
+				}
+			};
+
+			match next {
+				Poll::Ready(Some(Ok(download_info))) => {
+					let notebook_number = download_info.notebook_number;
+					if let Some(metrics) = self.metrics.as_ref() {
+						metrics.notebook_notification_received(
+							notary_id,
+							download_info.tick,
+							&self.ticker,
+						);
+					}
+					if let Ok(did_overflow) =
+						self.enqueue_notebook(notary_id, notebook_number, None, None).await
+					{
+						if did_overflow {
+							info!("Overflowed queue for notary {}", notary_id);
+							self.unsubscribe_if_overflowed(notary_id).await;
+						}
+					}
+					return Some((notary_id, notebook_number));
+				},
+				Poll::Ready(Some(Err(e))) => self.disconnect(&notary_id, Some(e.to_string())).await,
+				Poll::Ready(None) => self.disconnect(&notary_id, None).await, // Subscription ended
+				_ => {},
+			}
+		}
+		None
 	}
 
 	pub async fn process_queues(self: &Arc<Self>) -> Result<bool, Error> {
@@ -1318,9 +1347,8 @@ mod test {
 		assert_eq!(notary_client.subscriptions_by_id.read().await.len(), 1);
 
 		test_notary.create_notebook_header(vec![]).await;
-		let next = notary_client.poll_subscriptions().await;
-		assert!(next.is_some());
-		assert_eq!(next.unwrap().0, 1);
+		let next = notary_client.next_subscription(Duration::from_millis(500)).await.unwrap();
+		assert_eq!(next.0, 1);
 
 		// now mark the notary as audit failed
 		(*client.notaries.lock()).get_mut(0).unwrap().state = NotaryState::Locked {
@@ -1336,7 +1364,7 @@ mod test {
 		assert_eq!(notary_client.notary_client_by_id.read().await.len(), 0);
 		assert_eq!(notary_client.subscriptions_by_id.read().await.len(), 0);
 		test_notary.create_notebook_header(vec![]).await;
-		let next = notary_client.poll_subscriptions().await;
+		let next = notary_client.next_subscription(Duration::from_millis(500)).await;
 		assert!(next.is_none());
 	}
 
@@ -1352,7 +1380,7 @@ mod test {
 		assert_eq!(notary_client.notary_client_by_id.read().await.len(), 1);
 		for i in 0..MAX_QUEUE_DEPTH {
 			test_notary.create_notebook_header(vec![]).await;
-			notary_client.poll_subscriptions().await;
+			notary_client.next_subscription(Duration::from_millis(500)).await;
 			assert_eq!(notary_client.queue_depth(1).await, i + 1);
 		}
 
@@ -1363,7 +1391,7 @@ mod test {
 		assert_eq!(notary_client.subscriptions_by_id.read().await.len(), 1);
 
 		test_notary.create_notebook_header(vec![]).await;
-		notary_client.poll_subscriptions().await;
+		notary_client.next_subscription(Duration::from_millis(500)).await;
 		assert_eq!(notary_client.queue_depth(1).await, MAX_QUEUE_DEPTH + 1);
 		// should have disconnected subscriptions, but kept notary client
 		assert_eq!(notary_client.notary_client_by_id.read().await.len(), 1);
@@ -1574,10 +1602,10 @@ mod test {
 		let mut test_notary2 = MockNotary::new(2);
 		test_notary2.start().await.expect("could not start notary");
 		client.add_notary(&test_notary2);
-
 		test_notary.create_notebook_header(vec![]).await;
 		test_notary2.create_notebook_header(vec![]).await;
-		notary_client.poll_subscriptions().await;
+
+		notary_client.next_subscription(Duration::from_millis(500)).await;
 		assert_eq!(notary_client.queue_depth(1).await, 1);
 		assert!(notary_client.notebook_queue_by_id.read().await.get(&2).is_none());
 		notary_client.process_queues().await.expect("Could not process queues");
@@ -1602,8 +1630,15 @@ mod test {
 
 		test_notary.create_notebook_header(vec![]).await;
 		test_notary2.create_notebook_header(vec![]).await;
-		notary_client.poll_subscriptions().await;
-		notary_client.poll_subscriptions().await;
+
+		notary_client
+			.next_subscription(Duration::from_millis(500))
+			.await
+			.expect("Could not get next");
+		notary_client
+			.next_subscription(Duration::from_millis(500))
+			.await
+			.expect("Could not get next");
 
 		assert_eq!(notary_client.queue_depth(1).await, 1);
 		assert_eq!(notary_client.notebook_queue_by_id.read().await.get(&1).unwrap()[0].0, 2);

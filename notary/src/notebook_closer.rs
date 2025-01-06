@@ -451,41 +451,37 @@ mod tests {
 		let mut header_sub = notary_server.completed_notebook_stream.subscribe(100);
 		let mut notebook_proof: Option<MerkleProof> = None;
 		loop {
-			tokio::select! {biased;
-				next_header = header_sub.next() => {
-					match next_header {
-						Some((SignedNotebookHeader{ header, ..}, _)) => {
-							println!("Header complete {}", header.notebook_number);
-							if header.notebook_number == hold_result.notebook_number {
-								notebook_proof = Some(
-									NotebookStore::get_balance_proof(
-										&pool,
-										notary_id,
-										hold_result.notebook_number,
-										&BalanceTip {
-											account_origin: origin.clone(),
-											balance: bob_balance as u128,
-											account_id: Bob.to_account_id(),
-											channel_hold_note: Some(hold_note.clone()),
-											change_number: 2,
-											account_type: Deposit,
-										},
-									)
-									.await?,
-								);
-							}
-							if header.tick >= hold_result.tick + channel_hold_expiration_ticks
-							{
-								println!("Expiration of channel_hold ready");
-								break;
-							}
+			let next_header = header_sub.next().await;
+			let Some((SignedNotebookHeader { header, .. }, _)) = next_header else {
+				break;
+			};
+
+			println!("Header complete {}", header.notebook_number);
+			if header.notebook_number == hold_result.notebook_number {
+				notebook_proof = Some(
+					NotebookStore::get_balance_proof(
+						&pool,
+						notary_id,
+						hold_result.notebook_number,
+						&BalanceTip {
+							account_origin: origin.clone(),
+							balance: bob_balance as u128,
+							account_id: Bob.to_account_id(),
+							channel_hold_note: Some(hold_note.clone()),
+							change_number: 2,
+							account_type: Deposit,
 						},
-						None => break
-					}
-				},
+					)
+					.await?,
+				);
 			}
-			check_block_watch_status(block_tracker.clone()).await?;
+			if header.tick >= hold_result.tick + channel_hold_expiration_ticks {
+				println!("Expiration of channel_hold ready");
+				break;
+			}
 		}
+		check_block_watch_status(block_tracker.clone()).await?;
+
 		assert!(notebook_proof.is_some(), "Should have a notebook proof");
 
 		let best_hash = ctx.client.best_block_hash().await.expect("should find a best block");

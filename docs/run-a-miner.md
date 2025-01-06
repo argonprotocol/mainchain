@@ -141,13 +141,14 @@ Tokens in circulation. And you can (optionally) put yourself ahead of someone el
 than they have. You will get these Argons back at the end of the slot (or if you lose your bid). Argons rented for this
 process must come from a [Vault](./running-a-vault#mining-bonds).
 
-Vault Argons are allowed to be rented for mining bonds at a ratio of 2:1 with the Bitcoins bonded in a vault, capped by
+Vault Argons are allowed to be rented for mining bonds at a ratio of 3:1 with the Bitcoins bonded in a vault, capped by
 the amount of securitization locked up by the vault. In other words, if a vault has 100k of bitcoin and 200k of
-securitization in the vault, 200k of mining bonds are eligible for mining bonds. If there is 0 securitization, then only
-100k of mining bonds are eligible. A vault offers an allocated amount of both Bitcoin and Mining bonds. You can view a
-vault's current allocation by looking at the Chain State in Polkadot.js under `Vaults -> VaultsById`, and then viewing
-allocated and bonded amounts of each. Some Vault operators will also offer profit sharing terms, where you don't need to
-rent Argons for as high a cost, but will need to share argons minted during your slot.
+securitization in the vault, the vault is able to offer up to 300k of mining bonds. If
+there is 0 securitization, then only 100k of mining bonds are eligible. A vault offers an allocated amount of both
+Bitcoin and Mining bonds. You can view a vault's current allocation by looking at the Chain State in Polkadot.js under
+`Vaults -> VaultsById`, and then viewing `allocated` and `bonded` amounts of each. Some Vault operators will also offer
+profit sharing terms, where you don't need to rent Argons for as high a cost, but will need to share argons minted
+during your slot.
 
 You need to set up an account and acquire Argons to bid for a mining slot. You can do this by
 following the steps in the [Argon Faucet Guide](./account-setup.md).

@@ -14,7 +14,6 @@ use argon_primitives::{
 use argon_runtime::{NotaryRecordT, NotebookVerifyError};
 use codec::Codec;
 use futures::prelude::*;
-use futures_timer::Delay;
 use sc_client_api::{AuxStore, BlockchainEvents};
 use sc_consensus::BlockImport;
 use sc_service::TaskManager;
@@ -26,7 +25,7 @@ use sp_consensus::{BlockOrigin, Environment, SelectChain, SyncOracle};
 use sp_keystore::{Keystore, KeystorePtr};
 use sp_runtime::traits::{Block as BlockT, Header};
 use std::{collections::HashSet, sync::Arc, time::Duration};
-use tokio::sync::Mutex;
+use tokio::{sync::Mutex, time};
 use tracing::{trace, warn};
 
 #[cfg(test)]
@@ -180,7 +179,7 @@ pub fn run_block_builder_task<Block, BI, C, PF, A, SC, SO, JS, B>(
 	// loop looking for next blocks to create
 	let block_creator_task = async move {
 		loop {
-			tokio::select! {biased;
+			tokio::select! {
 				// tax blocks are built all at once with the winning seal
 				tax_vote = tax_vote_rx.next() => {
 					if let Some(command) = tax_vote {
@@ -243,7 +242,7 @@ pub fn run_block_builder_task<Block, BI, C, PF, A, SC, SO, JS, B>(
 		loop {
 			let mut check_for_better_blocks: Option<VotingPowerInfo> = None;
 			let mut next_notebooks_at_tick: Option<VotingPowerInfo> = None;
-			tokio::select! {biased;
+			tokio::select! {
 				notebook = notebook_tick_rx.next() => {
 					check_for_better_blocks = notebook;
 					next_notebooks_at_tick = notebook;
@@ -301,9 +300,8 @@ pub fn run_block_builder_task<Block, BI, C, PF, A, SC, SO, JS, B>(
 							}
 						}
 					}
-
 				},
-				_on_delay = Delay::new(idle_delay) => {},
+				_on_delay = time::sleep(idle_delay) => {},
 			}
 
 			// don't try to check for blocks during a sync
