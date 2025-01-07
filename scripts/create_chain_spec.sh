@@ -3,4 +3,4 @@
 set -e
 BASEDIR=$(dirname "$0")/..
 
-./target/release/argon-node build-spec --chain fresh-testnet --raw > $BASEDIR/node/src/chain_spec/testnet1.json
+./target/release/argon-node build-spec --chain gen-testnet --raw > $BASEDIR/node/src/chain_spec/testnet1.json
