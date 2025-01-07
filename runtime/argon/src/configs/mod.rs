@@ -270,7 +270,7 @@ parameter_types! {
 	pub const MaxMiners: u32 = 100; // must multiply cleanly by MaxCohortSize
 	pub const MaxCohortSize: u32 = MaxMiners::get() / 10; // this means mining_slots last 10 days
 	pub const OwnershipPercentAdjustmentDamper: FixedU128 = FixedU128::from_rational(20, 100);
-	pub const TargetBidsPerSlot: u32 = (MaxCohortSize::get() as f64 * 1.2f64) as u32; // 20% extra bids
+	pub const TargetBidsPerSlot: u32 = 12; // Ideally we want 12 bids per slot
 
 	pub const MaxConcurrentlyExpiringBonds: u32 = 1_000;
 	pub const MinimumBondAmount: u128 = 100_000;

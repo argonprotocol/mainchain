@@ -793,7 +793,9 @@ where
 						)));
 					}
 				} else {
-					if !notary_ids.contains(&digest_record.notary_id) {
+					if !notary_ids.contains(&digest_record.notary_id) ||
+						!self.has_client(digest_record.notary_id).await
+					{
 						needs_notary_updates = true;
 					}
 					self.enqueue_notebook(

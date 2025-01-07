@@ -285,6 +285,7 @@ pub fn run_block_builder_task<Block, BI, C, PF, A, SC, SO, JS, B>(
 								let mut argons = 0;
 								for payout in minted {
 									if Some(payout.account_id) == compute_author {
+										is_my_block = true;
 										ownership_tokens += payout.ownership;
 									}
 									if let Some(authority) = payout.block_seal_authority {
