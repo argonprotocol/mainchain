@@ -88,6 +88,12 @@ script = [
     "cargo run --release --bin argon-node -- build-spec --chain gen-testnet --raw > ./node/src/chain_spec/testnet1.json"
 ]
 
+[tasks.staging-spec]
+description = "Generate staging spec"
+script = [
+    "cargo run --release --bin argon-node -- build-spec --chain gen-staging --raw > ./node/src/chain_spec/staging.json"
+]
+
 [tasks.build]
 description = "Compiles the project"
 command = "cargo"

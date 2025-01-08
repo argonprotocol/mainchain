@@ -49,6 +49,7 @@ impl SubstrateCli for Cli {
 			"" | "local" => Box::new(chain_spec::local_testnet_config()?),
 			// This creates a whole new, incompatible genesis, so label it as such
 			"gen-testnet" => Box::new(chain_spec::testnet_config()?),
+			"gen-staging" => Box::new(chain_spec::staging_config()?),
 			"testnet" => Box::new(chain_spec::ChainSpec::from_json_bytes(
 				&include_bytes!("./chain_spec/testnet1.json")[..],
 			)?),
