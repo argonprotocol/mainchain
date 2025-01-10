@@ -96,7 +96,7 @@ You have to get Eth (need to have 1 link min in a mainnet account to get testnet
         - amount: Amount with 18 decimals (1 argon is 1e18)
         - relayerFee: 0
         - assetId: 0x752223BEDAB02BD0B8CB986805C5DBFF2031AA233CFCC0E49110B551FE6D3884 (keccak256 of the asset symbol
-          ARGON/ARGOWN)
+          ARGON/ARGONOT)
         - redeem: false
         - to: 0x(32 byte public key of user) -> Can be found on Polkadotjs -> Developer -> Utilities -> Address To
           Convert -> hex public key

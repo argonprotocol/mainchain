@@ -279,6 +279,7 @@ declare module '@polkadot/api-base/types/submittable' {
        * - `amount`: The amount to bond with the vault.
        * - `reward_destination`: The account_id for the mining rewards, or `Owner` for the
        * submitting user.
+       * - `keys`: The session "hot" keys for the slot (BlockSealAuthorityId and GrandpaId).
        **/
       bid: AugmentedSubmittable<(bondInfo: Option<PalletMiningSlotMiningSlotBid> | null | Uint8Array | PalletMiningSlotMiningSlotBid | { vaultId?: any; amount?: any } | string, rewardDestination: ArgonPrimitivesBlockSealRewardDestination | { Owner: any } | { Account: any } | string | Uint8Array, keys: ArgonRuntimeSessionKeys | { grandpa?: any; blockSealAuthority?: any } | string | Uint8Array) => SubmittableExtrinsic<ApiType>, [Option<PalletMiningSlotMiningSlotBid>, ArgonPrimitivesBlockSealRewardDestination, ArgonRuntimeSessionKeys]>;
     };

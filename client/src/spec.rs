@@ -7575,6 +7575,7 @@ pub mod api {
 				#[doc = "  \t- `amount`: The amount to bond with the vault."]
 				#[doc = "- `reward_destination`: The account_id for the mining rewards, or `Owner` for the"]
 				#[doc = "  submitting user."]
+				#[doc = "- `keys`: The session \"hot\" keys for the slot (BlockSealAuthorityId and GrandpaId)."]
 				pub struct Bid {
 					pub bond_info: bid::BondInfo,
 					pub reward_destination: bid::RewardDestination,
@@ -7628,6 +7629,7 @@ pub mod api {
 				#[doc = "  \t- `amount`: The amount to bond with the vault."]
 				#[doc = "- `reward_destination`: The account_id for the mining rewards, or `Owner` for the"]
 				#[doc = "  submitting user."]
+				#[doc = "- `keys`: The session \"hot\" keys for the slot (BlockSealAuthorityId and GrandpaId)."]
 				pub fn bid(
 					&self,
 					bond_info: types::bid::BondInfo,
@@ -27770,6 +27772,7 @@ pub mod api {
 					#[doc = "  \t- `amount`: The amount to bond with the vault."]
 					#[doc = "- `reward_destination`: The account_id for the mining rewards, or `Owner` for the"]
 					#[doc = "  submitting user."]
+					#[doc = "- `keys`: The session \"hot\" keys for the slot (BlockSealAuthorityId and GrandpaId)."]
 					bid {
 						bond_info: ::core::option::Option<
 							runtime_types::pallet_mining_slot::MiningSlotBid<

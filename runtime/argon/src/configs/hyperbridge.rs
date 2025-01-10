@@ -260,7 +260,7 @@ impl fungibles::metadata::Inspect<AccountId> for OwnershipTokenAsset {
 		if asset != OwnershipTokenAssetId::get() {
 			return Vec::new();
 		}
-		b"ARGOWN".to_vec()
+		b"ARGONOT".to_vec()
 	}
 
 	fn decimals(asset: Self::AssetId) -> u8 {
