@@ -257,8 +257,12 @@ pub mod pallet {
 				return T::Balance::zero();
 			}
 			let argons_to_print = argons_to_print as u128;
+			// divide mint over an hour
+			const MINT_TIME_SPREAD: u128 = 60;
 
-			let per_miner = argons_to_print.checked_div(active_miners).unwrap_or_default();
+			let per_miner = argons_to_print
+				.checked_div(active_miners.saturating_mul(MINT_TIME_SPREAD))
+				.unwrap_or_default();
 			trace!(
 				"Minting {} milligons. Circulation = {}. Per miner {}",
 				argons_to_print,
