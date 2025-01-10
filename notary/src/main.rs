@@ -152,12 +152,19 @@ async fn main() -> anyhow::Result<()> {
 			archive_endpoint,
 			archive_region,
 		} => {
-			tracing::info!("Running notary. DB={}, Mainchain={}", db_url, trusted_rpc_url);
 			let pool = PgPoolOptions::new()
 				.max_connections(100)
 				.connect(&db_url)
 				.await
 				.context("failed to connect to db")?;
+			tracing::info!(
+				"Running notary. DB={}:{}/{}, Mainchain={}",
+				pool.connect_options().get_host(),
+				pool.connect_options().get_port(),
+				pool.connect_options().get_database().unwrap_or_default(),
+				trusted_rpc_url
+			);
+
 			let keystore = if dev {
 				if operator_address.is_none() {
 					operator_address =
