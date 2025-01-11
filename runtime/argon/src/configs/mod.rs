@@ -40,7 +40,7 @@ use pallet_bond::BitcoinVerifier;
 use pallet_mining_slot::OnNewSlot;
 use pallet_notebook::NotebookVerifyError;
 use pallet_tx_pause::RuntimeCallNameOf;
-use sp_arithmetic::{FixedU128, Perbill};
+use sp_arithmetic::{FixedU128, Perbill, Percent};
 use sp_runtime::traits::BlakeTwo256;
 use sp_version::RuntimeVersion;
 
@@ -270,6 +270,7 @@ parameter_types! {
 	pub const MaxMiners: u32 = 100; // must multiply cleanly by MaxCohortSize
 	pub const MaxCohortSize: u32 = MaxMiners::get() / 10; // this means mining_slots last 10 days
 	pub const OwnershipPercentAdjustmentDamper: FixedU128 = FixedU128::from_rational(20, 100);
+	pub const MaximumOwnershipBondAmountPercent: Percent = Percent::from_percent(80);
 	pub const TargetBidsPerSlot: u32 = 12; // Ideally we want 12 bids per slot
 
 	pub const MaxConcurrentlyExpiringBonds: u32 = 1_000;
@@ -370,7 +371,8 @@ impl pallet_mining_slot::Config for Runtime {
 	type WeightInfo = pallet_mining_slot::weights::SubstrateWeight<Runtime>;
 	type MaxMiners = MaxMiners;
 	type MaxCohortSize = MaxCohortSize;
-	type MinimumBondAmount = ConstU128<EXISTENTIAL_DEPOSIT>;
+	type MinimumOwnershipBondAmount = ConstU128<EXISTENTIAL_DEPOSIT>;
+	type MaximumOwnershipBondAmountPercent = MaximumOwnershipBondAmountPercent;
 	type OwnershipPercentAdjustmentDamper = OwnershipPercentAdjustmentDamper;
 	type TargetBidsPerSlot = TargetBidsPerSlot;
 	type Balance = Balance;

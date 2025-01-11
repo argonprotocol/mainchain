@@ -158,11 +158,8 @@ or earn them during the first 10 days of mining (this time before Bidding begins
 Testnet you can request Argons using a Discord bot just like
 the [Argon Faucet](./account-setup.md#requesting-testnet-funds), but you'll use the slash following command instead:
 
-```
-
-bash
-/ drip - ownership [address]
-
+```bash
+/drip - ownership [address]
 ```
 
 ## 3. Bid for a Mining Slot

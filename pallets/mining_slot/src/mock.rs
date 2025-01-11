@@ -11,7 +11,7 @@ use frame_support::{
 	traits::{Currency, StorageMapShim},
 };
 use frame_system::pallet_prelude::BlockNumberFor;
-use sp_runtime::{impl_opaque_keys, testing::UintAuthorityId, BuildStorage, FixedU128};
+use sp_runtime::{impl_opaque_keys, testing::UintAuthorityId, BuildStorage, FixedU128, Percent};
 
 type Block = frame_system::mocking::MockBlock<Test>;
 
@@ -39,6 +39,8 @@ parameter_types! {
 	pub static BlocksBeforeBidEndForVrfClose: u64 = 0;
 	pub static SlotBiddingStartTick: u64 = 3;
 	pub static TargetBidsPerSlot: u32 = 5;
+	pub static MinOwnershipBondAmount: Balance = 1;
+	pub static MaxOwnershipPercent: Percent = Percent::from_float(0.8);
 	pub const OwnershipPercentAdjustmentDamper: FixedU128 = FixedU128::from_rational(20, 100);
 
 	pub static ExistentialDeposit: Balance = 1;
@@ -172,7 +174,8 @@ impl pallet_mining_slot::Config for Test {
 	type MaxMiners = MaxMiners;
 	type MaxCohortSize = MaxCohortSize;
 	type OwnershipPercentAdjustmentDamper = OwnershipPercentAdjustmentDamper;
-	type MinimumBondAmount = ExistentialDeposit;
+	type MinimumOwnershipBondAmount = MinOwnershipBondAmount;
+	type MaximumOwnershipBondAmountPercent = MaxOwnershipPercent;
 	type TargetBidsPerSlot = TargetBidsPerSlot;
 	type Balance = Balance;
 	type OwnershipCurrency = Ownership;
