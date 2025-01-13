@@ -63,11 +63,12 @@ impl ArgonPriceLookup {
 
 	pub async fn get_latest_price(
 		&mut self,
+		default_token_price: FixedU128,
 		tick: Tick,
 		max_argon_change_per_tick_away_from_target: FixedU128,
 		usd_token_price: FixedU128,
 	) -> Result<FixedU128> {
-		let mut price = self.uniswap_oracle.get_current_price().await?;
+		let mut price = self.uniswap_oracle.get_current_price(default_token_price).await?;
 		// ARGON/USDC * USDC/USD = ARGON/USD
 		price = price * usd_token_price;
 
@@ -274,7 +275,12 @@ mod test {
 
 		assert_eq!(
 			argon_price_lookup
-				.get_latest_price(ticker.current() + 1, FixedU128::from_float(0.01), usdc_usd_price)
+				.get_latest_price(
+					FixedU128::from_float(1.0),
+					ticker.current() + 1,
+					FixedU128::from_float(0.01),
+					usdc_usd_price,
+				)
 				.await
 				.unwrap(),
 			FixedU128::from_float(0.9801)
