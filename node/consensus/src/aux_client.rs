@@ -411,15 +411,13 @@ impl<B: BlockT, C: AuxStore + 'static> ArgonAux<B, C> {
 			summaries.retain(|s| s.notebook_number > oldest_to_retain);
 		})?;
 
+		// keep history for a little while
+		let oldest_to_retain = finalized_notebook_number.saturating_sub(MAX_AUDIT_HISTORY as u32);
 		self.get_notary_audit_history(notary_id)?.mutate(|notebooks| {
 			notebooks.insert(notebook_number, audit_result.clone());
 			if notebooks.len() > MAX_AUDIT_HISTORY {
-				let mut to_remove = notebooks.len().saturating_sub(MAX_AUDIT_HISTORY);
 				// remove oldest notebooks
-				notebooks.retain(|_, _| {
-					to_remove = to_remove.saturating_sub(1);
-					to_remove != 0
-				});
+				notebooks.retain(|n, _| *n > oldest_to_retain);
 			}
 		})?;
 		Ok((tick, voting_power, notebooks))
