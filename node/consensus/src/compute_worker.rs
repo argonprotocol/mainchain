@@ -3,8 +3,11 @@ use crate::{
 	notary_client::VotingPowerInfo,
 };
 use argon_primitives::{
-	block_seal::ComputePuzzle, prelude::*, tick::Ticker, BlockSealApis, BlockSealAuthorityId,
-	BlockSealDigest, ComputeDifficulty, NotebookApis, TickApis,
+	block_seal::ComputePuzzle,
+	prelude::*,
+	tick::{Ticker, MAX_BLOCKS_PER_TICK},
+	BlockSealApis, BlockSealAuthorityId, BlockSealDigest, ComputeDifficulty, NotebookApis,
+	TickApis,
 };
 use argon_randomx::{calculate_hash, calculate_mining_hash, RandomXError};
 use argon_runtime::NotebookVerifyError;
@@ -335,6 +338,7 @@ pub trait ComputeApisExt<B: BlockT, AC> {
 	fn has_eligible_votes(&self, block_hash: B::Hash) -> Result<bool, Error>;
 	fn is_bootstrap_mining(&self, block_hash: B::Hash) -> Result<bool, Error>;
 	fn compute_puzzle(&self, block_hash: B::Hash) -> Result<ComputePuzzle<B>, Error>;
+	fn notebooks_at_tick(&self, block_hash: B::Hash, tick: Tick) -> Result<u32, Error>;
 }
 
 impl<B, C, AC> ComputeApisExt<B, AC> for C
@@ -368,6 +372,13 @@ where
 
 	fn compute_puzzle(&self, block_hash: B::Hash) -> Result<ComputePuzzle<B>, Error> {
 		self.runtime_api().compute_puzzle(block_hash).map_err(Into::into)
+	}
+
+	fn notebooks_at_tick(&self, block_hash: B::Hash, tick: Tick) -> Result<u32, Error> {
+		self.runtime_api()
+			.blocks_at_tick(block_hash, tick)
+			.map(|a| a.len() as u32)
+			.map_err(Into::into)
 	}
 }
 
@@ -435,6 +446,18 @@ where
 					metrics.did_reset_compute_for_notebooks();
 				}
 			}
+		}
+
+		// don't add 5th notebook at tick unless we have a notebook
+		let notebooks_at_tick = self
+			.client
+			.notebooks_at_tick(best_hash, solve_notebook_tick)
+			.unwrap_or_default();
+		if (notebooks_at_tick == MAX_BLOCKS_PER_TICK - 1 && notebooks == 0) ||
+			notebooks_at_tick == MAX_BLOCKS_PER_TICK
+		{
+			self.compute_handle.stop_solving_current();
+			return None;
 		}
 
 		if self.compute_handle.best_hash() != Some(best_hash) {
@@ -535,6 +558,10 @@ mod tests {
 		fn compute_puzzle(&self, _block_hash: HashOutput) -> Result<ComputePuzzle<Block>, Error> {
 			Ok(self.state.lock().compute_puzzle.clone())
 		}
+
+		fn notebooks_at_tick(&self, _block_hash: HashOutput, _tick: Tick) -> Result<u32, Error> {
+			Ok(0)
+		}
 	}
 
 	#[test]
@@ -553,6 +580,7 @@ mod tests {
 			10_000
 		));
 	}
+
 	#[test]
 	fn it_can_reuse_a_nonce_algorithm_multiple_times() {
 		setup_logs();

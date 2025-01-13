@@ -19,7 +19,6 @@ mod benchmarking;
 pub mod weights;
 
 const MAX_RECENT_BLOCKS: u64 = 10;
-const MAX_BLOCKS_PER_TICK: u32 = 5;
 
 /// This pallet tracks the current tick of the system
 #[frame_support::pallet(dev_mode)]
@@ -28,7 +27,7 @@ pub mod pallet {
 	use alloc::vec::Vec;
 	use argon_notary_audit::VerifyError;
 	use argon_primitives::{
-		tick::{Tick, Ticker},
+		tick::{Tick, Ticker, MAX_BLOCKS_PER_TICK},
 		Digestset, TickProvider, VotingSchedule,
 	};
 	use frame_support::pallet_prelude::*;

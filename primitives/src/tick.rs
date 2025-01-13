@@ -10,6 +10,7 @@ use sp_core::RuntimeDebug;
 use std::time::SystemTime;
 
 pub type Tick = u64;
+pub const MAX_BLOCKS_PER_TICK: u32 = 5;
 
 #[derive(
 	Encode,
