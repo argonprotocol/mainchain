@@ -19,12 +19,12 @@ the Argon price falls, allowing an additional profit.
 ## Why does Argon do this?
 
 Argon works by constantly adjusting the currency supply to match demand. In other words, there is a target Argon price
-and if the price is below the target, there are too many argons in existence. If the price is above target, more supply
-is created.
+and if the price is below the target, there are too many argons in existence. If the price is above target, not enough
+argons exist.
 
 When a Bitcoin is locked into a Vault, the equivalent amount of argons are locked as collateral for a year. This reduces
 the argon supply, but it nets out to zero because the Bitcoin will gain rights to mint new argons. Eg, new argons minted
-is equal to argon collateral.
+are equal to argon collateral.
 
 However, to unlock my Bitcoin, I am required to _burn_ the unlock price from existence (the current market rate capped
 at the lock price). If many people are wanting to move out of the Argon, the price will fall, and the increased number

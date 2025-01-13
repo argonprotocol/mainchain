@@ -18,8 +18,7 @@ Operating System: Ubuntu 22.04
 
 CPU: 2x vCPU
 
-Memory: 4 GB
-
+Memory: 4 GB + 2 GB swap (swap unnecessary if more memory used)
 Storage: 25 GB (possibly more if you run bitcoin on the same machine)
 
 ### Node Setup
