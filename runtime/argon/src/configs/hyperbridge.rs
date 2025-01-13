@@ -1,6 +1,6 @@
 use super::{Balances, Get, Ismp, Runtime, RuntimeEvent, Timestamp};
-use crate::{ChainTransfer, Ownership, TokenGateway};
-use alloc::{boxed::Box, vec::Vec};
+use crate::{weights, ChainTransfer, Ownership, TokenGateway};
+use alloc::{boxed::Box, vec, vec::Vec};
 use argon_primitives::{AccountId, Balance};
 use frame_support::{
 	parameter_types,
@@ -12,12 +12,11 @@ use frame_support::{
 		tokens::{
 			DepositConsequence, Fortitude, Precision, Preservation, Provenance, WithdrawConsequence,
 		},
-		Currency,
+		Currency, SortedMembers,
 	},
 };
-use frame_system::EnsureRoot;
+use frame_system::{EnsureRoot, EnsureSignedBy};
 use ismp::{host::StateMachine, module::IsmpModule, router::IsmpRouter, Error};
-use pallet_ismp::NoOpMmrTree;
 use sp_runtime::{DispatchError, DispatchResult};
 
 parameter_types! {
@@ -32,13 +31,28 @@ parameter_types! {
 	pub const Decimals: u8 = 6;
 }
 
-pub struct NullAccountId;
-impl Get<AccountId> for NullAccountId {
+pub struct TokenAdmin;
+impl Get<AccountId> for TokenAdmin {
 	fn get() -> AccountId {
-		AccountId::from([0u8; 32])
+		ChainTransfer::hyperbridge_token_admin()
 	}
 }
-
+pub struct TokenAdmins;
+impl SortedMembers<AccountId> for TokenAdmins {
+	fn sorted_members() -> Vec<AccountId> {
+		vec![TokenAdmin::get()]
+	}
+	fn contains(t: &AccountId) -> bool {
+		*t == TokenAdmin::get()
+	}
+	fn count() -> usize {
+		1
+	}
+	#[cfg(feature = "runtime-benchmarks")]
+	fn add(_t: &AccountId) {
+		panic!("TokenAdmins is a singleton and cannot have members added to it.")
+	}
+}
 #[cfg(not(feature = "canary"))]
 parameter_types! {
 	// The hyperbridge parachain on Polkadot
@@ -57,16 +71,16 @@ impl pallet_token_gateway::Config for Runtime {
 	// Configured as Pallet balances
 	type NativeCurrency = Balances;
 	// AssetAdmin account to register new assets on the chain. We don't use this
-	type AssetAdmin = NullAccountId;
+	type AssetAdmin = TokenAdmin;
 	// Configured as Pallet Assets
 	type Assets = OwnershipTokenAsset;
 	// The Native asset Id
 	type NativeAssetId = NativeAssetId;
-	// A type that provides a function for creating unique asset ids
-	// A concrete implementation for your specific runtime is required
-	type AssetIdFactory = ();
 	// The precision of the native asset
 	type Decimals = Decimals;
+	type CreateOrigin = EnsureSignedBy<TokenAdmins, AccountId>;
+	type WeightInfo = ();
+	type EvmToSubstrate = ();
 }
 
 impl pallet_ismp::Config for Runtime {
@@ -95,12 +109,13 @@ impl pallet_ismp::Config for Runtime {
 	type WeightProvider = ();
 	// Optional merkle mountain range overlay tree, for cheaper outgoing request proofs.
 	// You most likely don't need it, just use the `NoOpMmrTree`
-	type Mmr = NoOpMmrTree<Runtime>;
+	type OffchainDB = ();
 }
 
 impl ismp_grandpa::Config for Runtime {
 	type RuntimeEvent = RuntimeEvent;
 	type IsmpHost = Ismp;
+	type WeightInfo = weights::ismp_grandpa::WeightInfo<Runtime>;
 }
 
 impl pallet_hyperbridge::Config for Runtime {

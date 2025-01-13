@@ -59,7 +59,7 @@ Token Gateway is 0xFcDa26cA021d5535C3059547390E6cCd8De7acA6
 
 #### Mainnet
 
-Contract addresses for the hyperbridge contracts:https://docs.hyperbridge.network/developers/evm/contracts/mainnet
+Contract addresses for the hyperbridge contracts: https://docs.hyperbridge.network/developers/evm/contracts/mainnet
 
 Token Gateway is 0xFd413e3AFe560182C4471F4d143A96d3e259B6dE
 
@@ -84,11 +84,11 @@ You have to get Eth (need to have 1 link min in a mainnet account to get testnet
 1. Drip tokens from the FeeToken
    contract (https://sepolia.etherscan.io/address/0x1794aB22388303ce9Cb798bE966eeEBeFe59C3a3#writeContract#F1)
     - Token Address is the FeeToken: 0xA801da100bF16D07F668F4A49E1f71fc54D05177
-1. Approve TokenGateway to Spend Dripped
+2. Approve TokenGateway to Spend Dripped
    tokens (https://sepolia.etherscan.io/address/0xA801da100bF16D07F668F4A49E1f71fc54D05177#writeContract#F1)
     - Spender: 0xFcDa26cA021d5535C3059547390E6cCd8De7acA6
     - Amount: 1000e18
-1. On Token Gateway, call
+3. On Token Gateway, call
    `teleport` (https://sepolia.etherscan.io/address/0xfcda26ca021d5535c3059547390e6ccd8de7aca6#writeContract#F8) with
    the following parameters:
     - payableAmount: 0
