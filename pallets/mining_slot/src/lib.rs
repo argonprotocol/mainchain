@@ -368,6 +368,7 @@ pub mod pallet {
 		///   	- `amount`: The amount to bond with the vault.
 		/// - `reward_destination`: The account_id for the mining rewards, or `Owner` for the
 		///   submitting user.
+		/// - `keys`: The session "hot" keys for the slot (BlockSealAuthorityId and GrandpaId).
 		#[pallet::call_index(0)]
 		#[pallet::weight(0)] //T::WeightInfo::hold())]
 		pub fn bid(
@@ -655,7 +656,7 @@ impl<T: Config> Pallet<T> {
 
 		let percent_change = new_adjustment.saturating_sub(FixedI128::from_u32(1));
 
-		// Apply a 20% swing limit to the change
+		// Apply ownership adjustment swing limit to the change
 		let max_swing =
 			FixedI128::from_inner(T::OwnershipPercentAdjustmentDamper::get().into_inner() as i128);
 		let limited_change = percent_change.clamp(-max_swing, max_swing);

@@ -206,7 +206,8 @@ Once you have successfully bid for a mining slot, you can start mining. You will
 with however many other active miners there are. A miner wins blocks in two ways:
 
 1. Your node is selected as the XOR closest node to a block vote submitted in a notebook for the current tick. The miner
-   with the closest XOR distance of their Authority ID (the key you registered as a *Session Key*) to the block vote key
+   with the closest XOR distance of their Authority ID (the key you registered as a *BlockSealAuthority Key*) to the
+   block vote key
    will win the block. This block will always take priority over the second method.
 2. Your node solves a Proof of Compute (RandomX) hash that is less than the current difficulty target. These blocks are
    considered "secondary" and will only be included if no primary block is available. You can fill in as many "compute"
