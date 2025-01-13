@@ -251,12 +251,10 @@ pub mod pallet {
 			let circulation: u128 = T::Currency::total_issuance().into();
 			let circulation = FixedI128::saturating_from_integer(circulation);
 			let argons_to_print =
-				argon_cpi.saturating_abs().saturating_mul(circulation).into_inner() /
-					ArgonCPI::accuracy();
-			if argons_to_print <= 0 {
+				argon_cpi.saturating_abs().saturating_mul(circulation).saturating_mul_int(1u128);
+			if argons_to_print == 0 {
 				return T::Balance::zero();
 			}
-			let argons_to_print = argons_to_print as u128;
 			// divide mint over an hour
 			const MINT_TIME_SPREAD: u128 = 60;
 
@@ -264,7 +262,7 @@ pub mod pallet {
 				.checked_div(active_miners.saturating_mul(MINT_TIME_SPREAD))
 				.unwrap_or_default();
 			trace!(
-				"Minting {} milligons. Circulation = {}. Per miner {}",
+				"Minting {} microgons. Circulation = {}. Per miner {}",
 				argons_to_print,
 				circulation.saturating_mul_int(1u128),
 				per_miner

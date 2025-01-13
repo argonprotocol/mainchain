@@ -41,6 +41,7 @@ use tokio::{
 	sync::{Mutex, RwLock},
 	time,
 };
+use tracing::error;
 
 const MAX_QUEUE_DEPTH: usize = 1440 * 2; // a notary can be down 2 days before we start dropping history
 
@@ -1067,13 +1068,21 @@ where
 		}
 		let (latest_runtime_notebook_number, _) =
 			latest_notebooks_in_runtime.get(&notary.notary_id).unwrap_or(&(0, 0));
-		let Ok((mut notary_headers, tick_notebook)) = aux_client.get_notary_notebooks_for_header(
+		let (mut notary_headers, tick_notebook) = match aux_client.get_notary_notebooks_for_header(
 			notary.notary_id,
 			*latest_runtime_notebook_number,
 			voting_schedule,
 			MAX_NOTEBOOKS_PER_NOTARY,
-		) else {
-			continue;
+		) {
+			Ok(x) => x,
+			Err(e) => {
+				error!(
+					error = ?e,
+					notary_id = notary.notary_id,
+					notebook_tick = voting_schedule.notebook_tick(),
+					"Error building notary notebooks");
+				continue;
+			},
 		};
 
 		headers.signed_headers.append(&mut notary_headers.signed_headers);
