@@ -1,15 +1,22 @@
 # Changelog
 
-## [v0.0.25](https://github.com/argonprotocol/mainchain/compare/v0.0.24...c8f03225f1269b5dcba0f8e5a95ddb87fd5b4737) (2025-01-06)
+## [v0.0.26](https://github.com/argonprotocol/mainchain/compare/v0.0.25...3a194d3e82ed989da845f7eb48f78fe6ee8191da) (2025-01-13)
 
-### Features
+### Fixes
+
+* **mining_slot:** cap ownership max amount at 80%
+([15387e1](https://github.com/argonprotocol/mainchain/commit/15387e1e20e3ce2c42caacffcf32d7a3cabd2045))
+
+### [v0.0.25](https://github.com/argonprotocol/mainchain/compare/v0.0.24...v0.0.25) (2025-01-06)
+
+#### Features
 
 * **oracle:** move cpi to env var
 ([68828c6](https://github.com/argonprotocol/mainchain/commit/68828c66f71bd5d873272109c893a63f8d306680))
 * **node:** add earnings metrics
 ([7f7dc1e](https://github.com/argonprotocol/mainchain/commit/7f7dc1e4f3faab0b3ef7881bc912a4628b14b3f5))
 
-### Fixes
+#### Fixes
 
 * **ticks:** max 5 blocks per tick
 ([0e43dbb](https://github.com/argonprotocol/mainchain/commit/0e43dbbed467d1978f4aba969c4b859b60377aae))
