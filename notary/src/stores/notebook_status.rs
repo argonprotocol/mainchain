@@ -62,7 +62,7 @@ impl NotebookStatusStore {
 		Ok(row)
 	}
 
-	pub async fn lock_open_for_appending<'a>(
+	pub async fn lock_open_for_appending(
 		db: &mut PgConnection,
 	) -> anyhow::Result<(NotebookNumber, Tick), Error> {
 		for _ in 0..3 {
@@ -143,9 +143,7 @@ impl NotebookStatusStore {
 		Ok(())
 	}
 
-	pub async fn step_up_expired_open<'a>(
-		db: &mut PgConnection,
-	) -> anyhow::Result<Option<u32>, Error> {
+	pub async fn step_up_expired_open(db: &mut PgConnection) -> anyhow::Result<Option<u32>, Error> {
 		let result = sqlx::query!(
 			r#"
 				SELECT * FROM notebook_status

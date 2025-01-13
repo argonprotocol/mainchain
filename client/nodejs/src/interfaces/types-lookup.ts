@@ -2404,12 +2404,14 @@ declare module '@polkadot/types/lookup' {
     readonly timeout: u64;
     readonly tokenGateway: Bytes;
     readonly relayerFee: u128;
+    readonly callData: Option<Bytes>;
   }
 
   /** @name PalletTokenGatewayAssetRegistration (300) */
   interface PalletTokenGatewayAssetRegistration extends Struct {
     readonly localId: u32;
     readonly reg: TokenGatewayPrimitivesGatewayAssetRegistration;
+    readonly native: bool;
   }
 
   /** @name TokenGatewayPrimitivesGatewayAssetRegistration (301) */

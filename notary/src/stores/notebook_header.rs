@@ -83,7 +83,7 @@ impl TryInto<NotebookHeader> for NotebookHeaderRow {
 pub struct NotebookHeaderStore;
 
 impl NotebookHeaderStore {
-	async fn save_secret<'a>(
+	async fn save_secret(
 		db: &mut PgConnection,
 		notebook_number: NotebookNumber,
 		secret: H256,
@@ -106,7 +106,7 @@ impl NotebookHeaderStore {
 		Ok(())
 	}
 
-	async fn create_header<'a>(
+	async fn create_header(
 		db: &mut PgConnection,
 		notary_id: NotaryId,
 		notebook_number: NotebookNumber,
@@ -307,7 +307,7 @@ impl NotebookHeaderStore {
 		Ok(data.into())
 	}
 
-	pub async fn add_secrets<'a>(
+	pub async fn add_secrets(
 		db: &mut PgConnection,
 		header: &mut NotebookHeader,
 	) -> anyhow::Result<(), Error> {

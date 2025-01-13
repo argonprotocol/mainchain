@@ -791,8 +791,9 @@ declare module '@polkadot/api-base/types/submittable' {
        *
        * This works by dispatching a request to the TokenGateway module on each requested chain
        * to create the asset.
+       * `native` should be true if this asset originates from this chain
        **/
-      createErc6160Asset: AugmentedSubmittable<(asset: PalletTokenGatewayAssetRegistration | { localId?: any; reg?: any } | string | Uint8Array) => SubmittableExtrinsic<ApiType>, [PalletTokenGatewayAssetRegistration]>;
+      createErc6160Asset: AugmentedSubmittable<(asset: PalletTokenGatewayAssetRegistration | { localId?: any; reg?: any; native?: any } | string | Uint8Array) => SubmittableExtrinsic<ApiType>, [PalletTokenGatewayAssetRegistration]>;
       /**
        * Set the token gateway address for specified chains
        **/
@@ -801,7 +802,7 @@ declare module '@polkadot/api-base/types/submittable' {
        * Teleports a registered asset
        * locks the asset and dispatches a request to token gateway on the destination
        **/
-      teleport: AugmentedSubmittable<(params: PalletTokenGatewayTeleportParams | { assetId?: any; destination?: any; recepient?: any; amount?: any; timeout?: any; tokenGateway?: any; relayerFee?: any } | string | Uint8Array) => SubmittableExtrinsic<ApiType>, [PalletTokenGatewayTeleportParams]>;
+      teleport: AugmentedSubmittable<(params: PalletTokenGatewayTeleportParams | { assetId?: any; destination?: any; recepient?: any; amount?: any; timeout?: any; tokenGateway?: any; relayerFee?: any; callData?: any } | string | Uint8Array) => SubmittableExtrinsic<ApiType>, [PalletTokenGatewayTeleportParams]>;
       /**
        * Registers a multi-chain ERC6160 asset. The asset should not already exist.
        *

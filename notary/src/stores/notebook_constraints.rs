@@ -76,7 +76,7 @@ impl NotebookConstraintsStore {
 
 		Ok(())
 	}
-	pub async fn try_increment<'a>(
+	pub async fn try_increment(
 		db: &mut PgConnection,
 		notebook_number: NotebookNumber,
 		counts: NotarizationCounts,

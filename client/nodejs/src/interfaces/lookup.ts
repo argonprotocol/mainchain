@@ -2339,14 +2339,16 @@ export default {
     amount: 'u128',
     timeout: 'u64',
     tokenGateway: 'Bytes',
-    relayerFee: 'u128'
+    relayerFee: 'u128',
+    callData: 'Option<Bytes>'
   },
   /**
    * Lookup300: pallet_token_gateway::types::AssetRegistration<AssetId>
    **/
   PalletTokenGatewayAssetRegistration: {
     localId: 'u32',
-    reg: 'TokenGatewayPrimitivesGatewayAssetRegistration'
+    reg: 'TokenGatewayPrimitivesGatewayAssetRegistration',
+    native: 'bool'
   },
   /**
    * Lookup301: token_gateway_primitives::GatewayAssetRegistration

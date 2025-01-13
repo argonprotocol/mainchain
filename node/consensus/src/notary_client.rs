@@ -138,6 +138,7 @@ where
 	}
 }
 
+#[allow(clippy::too_many_arguments)]
 pub fn run_notary_sync<B, C, AC>(
 	task_manager: &TaskManager,
 	client: Arc<C>,
