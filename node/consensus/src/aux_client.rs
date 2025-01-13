@@ -211,6 +211,7 @@ impl<B: BlockT, C: AuxStore + 'static> ArgonAux<B, C> {
 		let audit_results = self.get_notary_audit_history(notary_id)?.get();
 		let notebook_tick = voting_schedule.notebook_tick();
 
+		let mut notebook_count = 0;
 		for (notebook_number, notebook) in audit_results {
 			if notebook_number <= latest_runtime_notebook_number || notebook.tick > notebook_tick {
 				continue;
@@ -226,16 +227,11 @@ impl<B: BlockT, C: AuxStore + 'static> ArgonAux<B, C> {
 			let tick = notebook.tick;
 
 			let state = self.get_notebook_tick_state(tick)?.get();
-			tracing::trace!(
-				vote_details = ?state.notebook_key_details_by_notary.get(&notary_id),
-				notebook_tick,
-				"Notebook state for tick {}",
-				tick
-			);
 			if tick == notebook_tick {
 				tick_notebook = state.notebook_key_details_by_notary.get(&notary_id).cloned();
 			}
 			if let Some(raw_data) = state.raw_headers_by_notary.get(&notary_id) {
+				notebook_count += 1;
 				headers.signed_headers.push(raw_data.clone());
 				headers.notebook_digest.notebooks.push(NotebookAuditResult {
 					notary_id,
@@ -244,7 +240,7 @@ impl<B: BlockT, C: AuxStore + 'static> ArgonAux<B, C> {
 					audit_first_failure: notebook.audit_first_failure.clone(),
 				});
 				// make of 10 notebooks per notary
-				if headers.signed_headers.len() > max_notebooks as usize {
+				if headers.signed_headers.len() >= max_notebooks as usize {
 					break;
 				}
 			}
@@ -252,7 +248,7 @@ impl<B: BlockT, C: AuxStore + 'static> ArgonAux<B, C> {
 
 		let mut expected_next_number = latest_runtime_notebook_number + 1;
 		for notebook in &headers.notebook_digest.notebooks {
-			if notebook.notebook_number != expected_next_number {
+			if notebook.notary_id == notary_id && notebook.notebook_number != expected_next_number {
 				return Err(Error::StringError(format!(
 					"Missing notebook {} for notary {} (stopped here, might be more)",
 					expected_next_number, notary_id
@@ -260,6 +256,12 @@ impl<B: BlockT, C: AuxStore + 'static> ArgonAux<B, C> {
 			}
 			expected_next_number += 1;
 		}
+		tracing::trace!(
+			notebook_tick,
+			notary_id,
+			notebook_count,
+			"Building notebook inherent for notary.",
+		);
 		Ok((headers, tick_notebook))
 	}
 
@@ -409,15 +411,13 @@ impl<B: BlockT, C: AuxStore + 'static> ArgonAux<B, C> {
 			summaries.retain(|s| s.notebook_number > oldest_to_retain);
 		})?;
 
+		// keep history for a little while
+		let oldest_to_retain = finalized_notebook_number.saturating_sub(MAX_AUDIT_HISTORY as u32);
 		self.get_notary_audit_history(notary_id)?.mutate(|notebooks| {
 			notebooks.insert(notebook_number, audit_result.clone());
 			if notebooks.len() > MAX_AUDIT_HISTORY {
-				let mut to_remove = notebooks.len().saturating_sub(MAX_AUDIT_HISTORY);
 				// remove oldest notebooks
-				notebooks.retain(|_, _| {
-					to_remove = to_remove.saturating_sub(1);
-					to_remove != 0
-				});
+				notebooks.retain(|n, _| *n > oldest_to_retain);
 			}
 		})?;
 		Ok((tick, voting_power, notebooks))

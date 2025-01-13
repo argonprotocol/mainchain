@@ -7,6 +7,7 @@ extern crate alloc;
 mod benchmark;
 
 pub mod configs;
+pub mod weights;
 
 pub use crate::configs::NotaryRecordT;
 pub use pallet_notebook::NotebookVerifyError;
@@ -37,7 +38,6 @@ use ismp::{
 	host::StateMachine,
 	router::{Request, Response},
 };
-use pallet_ismp::mmr::{Leaf, Proof, ProofKeys};
 use sp_api::{decl_runtime_apis, impl_runtime_apis};
 use sp_consensus_grandpa::AuthorityId as GrandpaId;
 use sp_core::{crypto::KeyTypeId, Get, OpaqueMetadata, H256, U256};
@@ -602,13 +602,6 @@ impl_runtime_apis! {
 
 		fn challenge_period(state_machine_id: StateMachineId) -> Option<u64> {
 			Ismp::challenge_period(state_machine_id)
-		}
-
-		/// Generate a proof for the provided leaf indices
-		fn generate_proof(
-			keys: ProofKeys
-		) -> Result<(Vec<Leaf>, Proof<<Block as BlockT>::Hash>), sp_mmr_primitives::Error> {
-			Ismp::generate_proof(keys)
 		}
 
 		/// Fetch all ISMP events in the block, should only be called from runtime-api.

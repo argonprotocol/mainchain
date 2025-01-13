@@ -141,6 +141,7 @@ where
 		notebook_downloader,
 		config.prometheus_registry(),
 		ticker,
+		config.role.is_authority(),
 	);
 
 	let (import_queue, argon_block_import) = create_import_queue(

@@ -138,6 +138,8 @@ Argon makes use of a few runtime pallets that are useful to know about as a user
   a proxy account that can submit transactions on behalf of another account. This is useful for creating a cold wallet
   that can still submit transactions. The cold wallet will pay for the transaction fees but doesn't have to have keys
   loaded into memory.
+- `Hyperbridge`. There are several pallets involved (`ismp`, `ismp_grandpa`, `hyperbridge`, `token_gateway`) here to
+  activate the Argon ability to move tokens cross-chain.
 
 ## Using the Testnet
 

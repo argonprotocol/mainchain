@@ -8,6 +8,7 @@ import '@polkadot/api-base/types/consts';
 import type { ApiTypes, AugmentedConst } from '@polkadot/api-base/types';
 import type { u128, u16, u32, u64, u8 } from '@polkadot/types-codec';
 import type { ITuple } from '@polkadot/types-codec/types';
+import type { Percent } from '@polkadot/types/interfaces/runtime';
 import type { FrameSupportPalletId, FrameSystemLimitsBlockLength, FrameSystemLimitsBlockWeights, SpVersionRuntimeVersion, SpWeightsRuntimeDbWeight } from '@polkadot/types/lookup';
 
 export type __AugmentedConst<ApiType extends ApiTypes> = AugmentedConst<ApiType>;
@@ -176,13 +177,18 @@ declare module '@polkadot/api-base/types/consts' {
        **/
       maxCohortSize: u32 & AugmentedConst<ApiType>;
       /**
+       * The maximum percent of ownership shares in the network that should be required for
+       * ownership mining bonds
+       **/
+      maximumOwnershipBondAmountPercent: Percent & AugmentedConst<ApiType>;
+      /**
        * The maximum number of Miners that the pallet can hold.
        **/
       maxMiners: u32 & AugmentedConst<ApiType>;
       /**
        * The minimum bond amount possible
        **/
-      minimumBondAmount: u128 & AugmentedConst<ApiType>;
+      minimumOwnershipBondAmount: u128 & AugmentedConst<ApiType>;
       /**
        * The max percent swing for the ownership bond amount per slot (from the last percent
        **/

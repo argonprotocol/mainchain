@@ -31,6 +31,8 @@ When keys are not connected to the internet, this is called a *"cold wallet"* or
 connected to the internet in some form, this is called a *"hot wallet"* or *"hot storage"*. A hardware wallet is
 considered a cold wallet, while a browser extension is considered a hot wallet.
 
+### Testnet (reduced security)
+
 For the testnet, it is recommended to use a browser extension or local storage in your browser. This is because the
 testnet is not worth anything, so the security of your keys is not as important. However, you might choose to use a
 hardware wallet to learn the preferred way to operate on the mainnet. The Ledger wallets support the Argon network via

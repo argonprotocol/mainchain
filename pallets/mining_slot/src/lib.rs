@@ -13,7 +13,6 @@ use argon_primitives::{
 	RewardShare,
 };
 use codec::Codec;
-use core::cmp::max;
 use frame_support::{
 	pallet_prelude::*,
 	traits::{
@@ -27,7 +26,7 @@ use sp_core::{Get, U256};
 use sp_io::hashing::blake2_256;
 use sp_runtime::{
 	traits::{One, OpaqueKeys, UniqueSaturatedInto},
-	FixedI128, FixedPointNumber, FixedU128, RuntimeAppPublic, SaturatedConversion, Saturating,
+	FixedPointNumber, FixedU128, RuntimeAppPublic, SaturatedConversion, Saturating,
 };
 pub use weights::*;
 
@@ -80,7 +79,7 @@ pub mod pallet {
 	use frame_system::pallet_prelude::*;
 	use sp_runtime::{
 		traits::{AtLeast32BitUnsigned, Member, OpaqueKeys, UniqueSaturatedInto},
-		BoundedBTreeMap,
+		BoundedBTreeMap, Percent,
 	};
 
 	use argon_primitives::{
@@ -122,7 +121,12 @@ pub mod pallet {
 		type OwnershipPercentAdjustmentDamper: Get<FixedU128>;
 		/// The minimum bond amount possible
 		#[pallet::constant]
-		type MinimumBondAmount: Get<Self::Balance>;
+		type MinimumOwnershipBondAmount: Get<Self::Balance>;
+
+		/// The maximum percent of ownership shares in the network that should be required for
+		/// ownership mining bonds
+		#[pallet::constant]
+		type MaximumOwnershipBondAmountPercent: Get<Percent>;
 
 		/// The target number of bids per slot. This will adjust the ownership bond amount up or
 		/// down to ensure mining slots are filled.
@@ -190,11 +194,6 @@ pub mod pallet {
 	#[pallet::storage]
 	pub(super) type OwnershipBondAmount<T: Config> = StorageValue<_, T::Balance, ValueQuery>;
 
-	/// The last percentage adjustment to the ownership bond amount
-	#[pallet::storage]
-	pub(super) type LastOwnershipPercentAdjustment<T: Config> =
-		StorageValue<_, FixedU128, OptionQuery>;
-
 	/// Lookup by account id to the corresponding index in ActiveMinersByIndex and Authorities
 	#[pallet::storage]
 	pub(super) type AccountIndexLookup<T: Config> =
@@ -235,7 +234,7 @@ pub mod pallet {
 				IsNextSlotBiddingOpen::<T>::put(true);
 			}
 			MiningConfig::<T>::put(self.mining_config.clone());
-			OwnershipBondAmount::<T>::put(T::MinimumBondAmount::get());
+			OwnershipBondAmount::<T>::put(T::MinimumOwnershipBondAmount::get());
 		}
 	}
 
@@ -368,6 +367,7 @@ pub mod pallet {
 		///   	- `amount`: The amount to bond with the vault.
 		/// - `reward_destination`: The account_id for the mining rewards, or `Owner` for the
 		///   submitting user.
+		/// - `keys`: The session "hot" keys for the slot (BlockSealAuthorityId and GrandpaId).
 		#[pallet::call_index(0)]
 		#[pallet::weight(0)] //T::WeightInfo::hold())]
 		pub fn bid(
@@ -631,15 +631,16 @@ impl<T: Config> Pallet<T> {
 	/// The max percent swing is 20% over the previous adjustment to the ownership bond amount.
 	pub(crate) fn adjust_ownership_bond_amount() {
 		let ownership_circulation: u128 = T::OwnershipCurrency::total_issuance().saturated_into();
+		if ownership_circulation == 0 {
+			return;
+		}
 
 		let historical_bids = HistoricalBidsPerSlot::<T>::get();
 		let total_bids: u32 = historical_bids.iter().map(|a| a.bids_count).sum();
+
 		let slots = historical_bids.len() as u32;
 		let expected_bids_for_period = slots.saturating_mul(T::TargetBidsPerSlot::get());
-		let previous_adjustment =
-			LastOwnershipPercentAdjustment::<T>::get().unwrap_or(FixedU128::from_u32(1));
-
-		if ownership_circulation == 0 {
+		if expected_bids_for_period == 0 {
 			return;
 		}
 
@@ -647,36 +648,30 @@ impl<T: Config> Pallet<T> {
 			.checked_div(T::MaxMiners::get().into())
 			.unwrap_or_default();
 
-		let new_adjustment = if expected_bids_for_period == 0 {
-			FixedI128::from_u32(1)
-		} else {
-			FixedI128::from_rational(total_bids as u128, expected_bids_for_period as u128)
-		};
+		let damper = T::OwnershipPercentAdjustmentDamper::get();
+		let one = FixedU128::one();
+		let adjustment_percent =
+			FixedU128::from_rational(total_bids as u128, expected_bids_for_period as u128)
+				.clamp(one.saturating_sub(damper), one.saturating_add(damper));
 
-		let percent_change = new_adjustment.saturating_sub(FixedI128::from_u32(1));
+		if adjustment_percent == FixedU128::one() {
+			return;
+		}
+		let current = OwnershipBondAmount::<T>::get();
 
-		// Apply a 20% swing limit to the change
-		let max_swing =
-			FixedI128::from_inner(T::OwnershipPercentAdjustmentDamper::get().into_inner() as i128);
-		let limited_change = percent_change.clamp(-max_swing, max_swing);
-		let min_value = T::MinimumBondAmount::get().into();
+		let min_value = T::MinimumOwnershipBondAmount::get();
+		// don't let this go below the minimum (it is in beginning)
+		let max_value: T::Balance = T::MaximumOwnershipBondAmountPercent::get()
+			.mul_ceil(base_ownership_tokens)
+			.unique_saturated_into();
+		let mut ownership_needed = adjustment_percent.saturating_mul_int(current);
+		if ownership_needed < min_value {
+			ownership_needed = min_value;
+		} else if ownership_needed > max_value {
+			ownership_needed = max_value;
+		}
 
-		let adjustment_percent = FixedU128::from_inner(
-			FixedI128::from_inner(previous_adjustment.into_inner() as i128)
-				.saturating_add(limited_change)
-				.max(FixedI128::from_u32(0))
-				.into_inner() as u128,
-		);
-
-		LastOwnershipPercentAdjustment::<T>::put(adjustment_percent);
-
-		let ownership_needed =
-			adjustment_percent.saturating_mul_int(base_ownership_tokens).max(min_value);
-
-		OwnershipBondAmount::<T>::put(max::<T::Balance>(
-			ownership_needed.saturated_into(),
-			1u128.into(),
-		));
+		OwnershipBondAmount::<T>::put(ownership_needed.saturated_into::<T::Balance>());
 	}
 
 	/// Check if the current block is in the closing window for the next slot

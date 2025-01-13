@@ -15,8 +15,7 @@ use crate::{
 	mock::{MiningSlots, Ownership, *},
 	pallet::{
 		AccountIndexLookup, ActiveMinersByIndex, ActiveMinersCount, AuthorityHashByIndex,
-		HistoricalBidsPerSlot, IsNextSlotBiddingOpen, LastOwnershipPercentAdjustment,
-		NextSlotCohort, OwnershipBondAmount,
+		HistoricalBidsPerSlot, IsNextSlotBiddingOpen, NextSlotCohort, OwnershipBondAmount,
 	},
 	Error, Event, HoldReason, MiningSlotBid,
 };
@@ -377,7 +376,7 @@ fn it_holds_ownership_tokens_for_a_slot() {
 		set_ownership(3, 5000u32.into());
 		let share_amount = 5000 / 6;
 		MiningSlots::on_initialize(6);
-		assert_eq!(OwnershipBondAmount::<Test>::get(), share_amount);
+		OwnershipBondAmount::<Test>::set(share_amount);
 
 		assert_err!(
 			MiningSlots::bid(RuntimeOrigin::signed(1), None, RewardDestination::Owner, 1.into()),
@@ -477,7 +476,7 @@ fn it_wont_let_you_reuse_ownership_tokens_for_two_bids() {
 		MiningSlots::on_initialize(12);
 
 		let ownership = (200 / 6) as u128;
-		assert_eq!(OwnershipBondAmount::<Test>::get(), ownership);
+		OwnershipBondAmount::<Test>::set(ownership);
 		assert_ok!(MiningSlots::bid(
 			RuntimeOrigin::signed(1),
 			None,
@@ -542,7 +541,7 @@ fn it_will_order_bids_with_argon_bonds() {
 
 		MiningSlots::on_initialize(6);
 		let share_amount = 3000 / 6;
-		assert_eq!(OwnershipBondAmount::<Test>::get(), share_amount);
+		OwnershipBondAmount::<Test>::set(share_amount);
 
 		// 1. Account 1 bids
 		assert_ok!(MiningSlots::bid(
@@ -889,19 +888,29 @@ fn it_adjusts_ownership_bonds() {
 	MaxCohortSize::set(10);
 	SlotBiddingStartTick::set(10);
 	TargetBidsPerSlot::set(12);
+	MinOwnershipBondAmount::set(100_000);
 
 	new_test_ext().execute_with(|| {
 		System::set_block_number(10);
 
-		Ownership::set_total_issuance(1000);
-		OwnershipBondAmount::<Test>::set(0);
-		LastOwnershipPercentAdjustment::<Test>::put(FixedU128::from_u32(1));
+		Ownership::set_total_issuance(500_000 * 100);
+		OwnershipBondAmount::<Test>::set(120_000);
 		// should have 10 per slot, make it 12
 		HistoricalBidsPerSlot::<Test>::set(bounded_vec![bid_stats(12, 10), bid_stats(12, 10)]);
 		MiningSlots::adjust_ownership_bond_amount();
 
-		assert_eq!(LastOwnershipPercentAdjustment::<Test>::get().unwrap(), FixedU128::from_u32(1));
-		assert_eq!(OwnershipBondAmount::<Test>::get(), 10);
+		// we're targeting 12 bids per slot, so should stay the same
+		assert_eq!(OwnershipBondAmount::<Test>::get(), 120_000);
+
+		// simulate bids being past 20%
+		HistoricalBidsPerSlot::<Test>::set(bounded_vec![
+			bid_stats(20, 100),
+			bid_stats(20, 101),
+			bid_stats(20, 102)
+		]);
+		MiningSlots::adjust_ownership_bond_amount();
+		// 120k * 1.2
+		assert_eq!(OwnershipBondAmount::<Test>::get(), 144000);
 
 		// simulate bids being way past 20%
 		// should have 10 per slot, make it 12
@@ -911,29 +920,27 @@ fn it_adjusts_ownership_bonds() {
 			bid_stats(0, 0)
 		]);
 		MiningSlots::adjust_ownership_bond_amount();
-
-		// max decrease is 20%
-		assert_eq!(
-			LastOwnershipPercentAdjustment::<Test>::get().unwrap(),
-			FixedU128::from_rational(8, 10)
-		);
-		assert_eq!(OwnershipBondAmount::<Test>::get(), 8);
+		assert_eq!(OwnershipBondAmount::<Test>::get(), (144000.0 * 0.8f64) as u128);
 
 		// simulate bids being way past 20%
-		LastOwnershipPercentAdjustment::<Test>::put(FixedU128::from_rational(150, 100));
-		HistoricalBidsPerSlot::<Test>::set(bounded_vec![
-			bid_stats(100, 100),
-			bid_stats(1000, 101),
-			bid_stats(5000, 102)
-		]);
-		MiningSlots::adjust_ownership_bond_amount();
+		let mut last = OwnershipBondAmount::<Test>::get();
+		for _ in 0..100 {
+			HistoricalBidsPerSlot::<Test>::set(bounded_vec![
+				bid_stats(100, 0),
+				bid_stats(100, 100),
+				bid_stats(100, 0)
+			]);
+			MiningSlots::adjust_ownership_bond_amount();
+			let next = OwnershipBondAmount::<Test>::get();
+			if next == 400_000 {
+				break;
+			}
+			assert_eq!(next, (last as f64 * 1.2) as u128);
+			last = next;
+		}
 
-		// max increase is 20%
-		assert_eq!(
-			LastOwnershipPercentAdjustment::<Test>::get().unwrap(),
-			FixedU128::from_rational(170, 100)
-		);
-		assert_eq!(OwnershipBondAmount::<Test>::get(), 17);
+		// max increase is to a set amount of the total issuance
+		assert_eq!(OwnershipBondAmount::<Test>::get(), (500_000.0 * 0.8) as u128);
 	});
 }
 

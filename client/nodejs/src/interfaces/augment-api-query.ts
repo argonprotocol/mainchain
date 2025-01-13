@@ -372,10 +372,6 @@ declare module '@polkadot/api-base/types/storage' {
        **/
       isNextSlotBiddingOpen: AugmentedQuery<ApiType, () => Observable<bool>, []>;
       /**
-       * The last percentage adjustment to the ownership bond amount
-       **/
-      lastOwnershipPercentAdjustment: AugmentedQuery<ApiType, () => Observable<Option<u128>>, []>;
-      /**
        * The mining slot configuration set in genesis
        **/
       miningConfig: AugmentedQuery<ApiType, () => Observable<ArgonPrimitivesBlockSealMiningSlotConfig>, []>;

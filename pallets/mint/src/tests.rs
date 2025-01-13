@@ -77,7 +77,7 @@ fn it_tracks_block_rewards() {
 #[test]
 fn it_calculates_per_miner_mint() {
 	new_test_ext().execute_with(|| {
-		Balances::set_total_issuance(1000);
+		Balances::set_total_issuance(60000);
 		// zero conditions
 		assert_eq!(Mint::get_argons_to_print_per_miner(FixedI128::from_float(0.0), 0), 0);
 		assert_eq!(Mint::get_argons_to_print_per_miner(FixedI128::from_float(1.0), 100), 0);
@@ -109,20 +109,21 @@ fn it_can_mint() {
 		MintedBitcoinArgons::<Test>::set(U256::from(0));
 
 		Mint::on_initialize(1);
+		let mint_amount = 25_000 / 60;
 		System::assert_last_event(
 			Event::ArgonsMinted {
 				mint_type: MintType::Mining,
 				account_id: 1,
 				utxo_id: None,
-				amount: 25_000,
+				amount: mint_amount,
 			}
 			.into(),
 		);
 
-		assert_eq!(MintedMiningArgons::<Test>::get(), U256::from(25_500));
-		assert_eq!(Balances::total_issuance(), 25_000 + 25_000);
-		assert_eq!(Balances::free_balance(1), 25_000);
-		assert_eq!(BlockMintAction::<Test>::get().1.argon_minted, 25_000);
+		assert_eq!(MintedMiningArgons::<Test>::get(), U256::from(mint_amount + 500));
+		assert_eq!(Balances::total_issuance(), 25_000 + mint_amount);
+		assert_eq!(Balances::free_balance(1), mint_amount);
+		assert_eq!(BlockMintAction::<Test>::get().1.argon_minted, mint_amount);
 	});
 }
 
@@ -134,7 +135,7 @@ fn it_records_failed_mints() {
 
 	new_test_ext().execute_with(|| {
 		System::set_block_number(1);
-		let amount = ExistentialDeposit::get() - 1;
+		let amount = 60 * ExistentialDeposit::get() - 1;
 		Balances::set_total_issuance(amount);
 
 		// nothing to mint
@@ -147,7 +148,7 @@ fn it_records_failed_mints() {
 				account_id: 1,
 				utxo_id: None,
 				error: DispatchError::Token(TokenError::BelowMinimum),
-				amount,
+				amount: amount / 60,
 			}
 			.into(),
 		);
@@ -194,7 +195,7 @@ fn it_can_mint_profit_sharing() {
 	let amount_for_share_lender = (per_miner as f64 * 0.7) as u128;
 	new_test_ext().execute_with(|| {
 		System::set_block_number(1);
-		Balances::set_total_issuance(1000);
+		Balances::set_total_issuance(60000);
 
 		// nothing to mint
 		MintedMiningArgons::<Test>::set(U256::from(0));
@@ -230,7 +231,7 @@ fn it_can_mint_profit_sharing() {
 		);
 		let amount_minted = per_miner + amount_for_sharer + amount_for_share_lender;
 		assert_eq!(MintedMiningArgons::<Test>::get(), U256::from(amount_minted));
-		assert_eq!(Balances::total_issuance(), 1000 + amount_minted);
+		assert_eq!(Balances::total_issuance(), 60000 + amount_minted);
 		assert_eq!(Balances::free_balance(1), amount_for_sharer);
 		assert_eq!(Balances::free_balance(2), amount_for_share_lender);
 		assert_eq!(Balances::free_balance(3), per_miner);
@@ -296,7 +297,7 @@ fn it_pays_bitcoin_mints() {
 
 		System::set_block_number(2);
 		MintedMiningArgons::<Test>::set(U256::from(100));
-		ArgonCPI::set(Some(FixedI128::from_float(-0.1)));
+		ArgonCPI::set(Some(FixedI128::from_float(-6.0)));
 
 		Mint::on_initialize(2);
 		assert_eq!(

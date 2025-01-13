@@ -379,7 +379,7 @@ dependencies = [
  "cfg-if",
  "const-hex",
  "derive_more 0.99.18",
- "hex-literal 0.4.1",
+ "hex-literal",
  "itoa",
  "k256",
  "keccak-asm",
@@ -403,7 +403,7 @@ dependencies = [
  "derive_more 1.0.0",
  "foldhash",
  "hashbrown 0.15.2",
- "hex-literal 0.4.1",
+ "hex-literal",
  "indexmap 2.7.0",
  "itoa",
  "k256",
@@ -2444,7 +2444,6 @@ checksum = "1bc2832c24239b0141d5674bb9174f9d68a8b5b3f2753311927c172ca46f7e9c"
 dependencies = [
  "funty",
  "radium",
- "serde",
  "tap",
  "wyz",
 ]
@@ -3513,23 +3512,6 @@ dependencies = [
 ]
 
 [[package]]
-name = "cumulus-primitives-core"
-version = "0.15.0"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "114859ea473b98046ba46eab82a1830329294015673def6fbadcf34662df4e6f"
-dependencies = [
- "parity-scale-codec",
- "polkadot-core-primitives",
- "polkadot-parachain-primitives",
- "polkadot-primitives",
- "scale-info",
- "sp-api",
- "sp-runtime",
- "sp-trie",
- "staging-xcm",
-]
-
-[[package]]
 name = "current_platform"
 version = "0.2.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -4268,7 +4250,7 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "33d852cb9b869c2a9b3df2f71a3074817f01e1844f839a144f5fcef059a4eb5d"
 dependencies = [
  "libc",
- "windows-sys 0.52.0",
+ "windows-sys 0.59.0",
 ]
 
 [[package]]
@@ -5693,7 +5675,7 @@ dependencies = [
 [[package]]
 name = "grandpa-verifier"
 version = "0.1.1"
-source = "git+https://github.com/argonprotocol/hyperbridge#6b70b2ad90e5f48f8e64d3597444bda9bc3c519d"
+source = "git+https://github.com/argonprotocol/hyperbridge#7584619d386049542ec5f661d686708b810ebc53"
 dependencies = [
  "anyhow",
  "derive_more 0.99.18",
@@ -5715,7 +5697,7 @@ dependencies = [
 [[package]]
 name = "grandpa-verifier-primitives"
 version = "0.1.1"
-source = "git+https://github.com/argonprotocol/hyperbridge#6b70b2ad90e5f48f8e64d3597444bda9bc3c519d"
+source = "git+https://github.com/argonprotocol/hyperbridge#7584619d386049542ec5f661d686708b810ebc53"
 dependencies = [
  "anyhow",
  "finality-grandpa",
@@ -5922,12 +5904,6 @@ checksum = "5313b072ce3c597065a808dbf612c4c8e8590bdbf8b579508bf7a762c5eae6cd"
 dependencies = [
  "arrayvec 0.7.6",
 ]
-
-[[package]]
-name = "hex-literal"
-version = "0.3.4"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "7ebdb29d2ea9ed0083cd8cece49bbd968021bd99b0849edb4a9a7ee0fdf6a4e0"
 
 [[package]]
 name = "hex-literal"
@@ -6787,7 +6763,7 @@ checksum = "7943c866cc5cd64cbc25b2e01621d07fa8eb2a1a23160ee81ce38704e97b8ecf"
 [[package]]
 name = "ismp"
 version = "0.2.2"
-source = "git+https://github.com/argonprotocol/hyperbridge#6b70b2ad90e5f48f8e64d3597444bda9bc3c519d"
+source = "git+https://github.com/argonprotocol/hyperbridge#7584619d386049542ec5f661d686708b810ebc53"
 dependencies = [
  "anyhow",
  "derive_more 1.0.0",
@@ -6798,18 +6774,18 @@ dependencies = [
  "scale-info",
  "serde",
  "serde-hex-utils",
- "serde_json",
  "thiserror 2.0.4",
 ]
 
 [[package]]
 name = "ismp-grandpa"
-version = "1.15.1"
-source = "git+https://github.com/argonprotocol/hyperbridge#6b70b2ad90e5f48f8e64d3597444bda9bc3c519d"
+version = "15.0.0"
+source = "git+https://github.com/argonprotocol/hyperbridge#7584619d386049542ec5f661d686708b810ebc53"
 dependencies = [
+ "anyhow",
  "ckb-merkle-mountain-range",
- "cumulus-primitives-core",
  "finality-grandpa",
+ "frame-benchmarking 37.0.0",
  "frame-support 38.0.0",
  "frame-system 38.0.0",
  "grandpa-verifier",
@@ -6823,6 +6799,7 @@ dependencies = [
  "sp-core",
  "sp-io",
  "sp-runtime",
+ "sp-std",
  "sp-trie",
  "substrate-state-machine",
 ]
@@ -7324,7 +7301,7 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "fc2f4eb4bc735547cfed7c0a4922cbd04a4655978c09b54f1f7b228750664c34"
 dependencies = [
  "cfg-if",
- "windows-targets 0.48.5",
+ "windows-targets 0.52.6",
 ]
 
 [[package]]
@@ -7939,7 +7916,7 @@ dependencies = [
  "ed25519-dalek",
  "futures",
  "futures-timer",
- "hex-literal 0.4.1",
+ "hex-literal",
  "indexmap 2.7.0",
  "libc",
  "mockall 0.12.1",
@@ -8356,24 +8333,6 @@ dependencies = [
  "subtle 2.6.1",
  "thiserror 1.0.69",
  "zeroize",
-]
-
-[[package]]
-name = "mmr-primitives"
-version = "1.15.1"
-source = "git+https://github.com/argonprotocol/hyperbridge#6b70b2ad90e5f48f8e64d3597444bda9bc3c519d"
-dependencies = [
- "ckb-merkle-mountain-range",
- "frame-system 38.0.0",
- "ismp",
- "parity-scale-codec",
- "scale-info",
- "serde",
- "sp-core",
- "sp-io",
- "sp-mmr-primitives",
- "sp-runtime",
- "sp-std",
 ]
 
 [[package]]
@@ -9339,8 +9298,8 @@ dependencies = [
 
 [[package]]
 name = "pallet-hyperbridge"
-version = "1.15.1"
-source = "git+https://github.com/argonprotocol/hyperbridge#6b70b2ad90e5f48f8e64d3597444bda9bc3c519d"
+version = "15.0.0"
+source = "git+https://github.com/argonprotocol/hyperbridge#7584619d386049542ec5f661d686708b810ebc53"
 dependencies = [
  "anyhow",
  "frame-support 38.0.0",
@@ -9355,8 +9314,8 @@ dependencies = [
 
 [[package]]
 name = "pallet-ismp"
-version = "1.15.1"
-source = "git+https://github.com/argonprotocol/hyperbridge#6b70b2ad90e5f48f8e64d3597444bda9bc3c519d"
+version = "15.0.0"
+source = "git+https://github.com/argonprotocol/hyperbridge#7584619d386049542ec5f661d686708b810ebc53"
 dependencies = [
  "anyhow",
  "fortuples",
@@ -9365,7 +9324,6 @@ dependencies = [
  "frame-system 38.0.0",
  "ismp",
  "log",
- "mmr-primitives",
  "parity-scale-codec",
  "scale-info",
  "serde",
@@ -9379,14 +9337,14 @@ dependencies = [
 
 [[package]]
 name = "pallet-ismp-rpc"
-version = "1.15.1"
-source = "git+https://github.com/argonprotocol/hyperbridge#6b70b2ad90e5f48f8e64d3597444bda9bc3c519d"
+version = "15.0.0"
+source = "git+https://github.com/argonprotocol/hyperbridge#7584619d386049542ec5f661d686708b810ebc53"
 dependencies = [
  "anyhow",
  "frame-system 38.0.0",
  "hash-db",
  "hex",
- "hex-literal 0.3.4",
+ "hex-literal",
  "ismp",
  "jsonrpsee 0.24.7",
  "pallet-ismp",
@@ -9399,7 +9357,6 @@ dependencies = [
  "sp-api",
  "sp-blockchain",
  "sp-core",
- "sp-mmr-primitives",
  "sp-runtime",
  "sp-storage",
  "sp-trie",
@@ -9409,8 +9366,8 @@ dependencies = [
 
 [[package]]
 name = "pallet-ismp-runtime-api"
-version = "1.15.1"
-source = "git+https://github.com/argonprotocol/hyperbridge#6b70b2ad90e5f48f8e64d3597444bda9bc3c519d"
+version = "15.0.0"
+source = "git+https://github.com/argonprotocol/hyperbridge#7584619d386049542ec5f661d686708b810ebc53"
 dependencies = [
  "ismp",
  "pallet-ismp",
@@ -9418,7 +9375,6 @@ dependencies = [
  "primitive-types 0.12.2",
  "serde",
  "sp-api",
- "sp-mmr-primitives",
 ]
 
 [[package]]
@@ -9649,13 +9605,14 @@ dependencies = [
 
 [[package]]
 name = "pallet-token-gateway"
-version = "1.15.1"
-source = "git+https://github.com/argonprotocol/hyperbridge#6b70b2ad90e5f48f8e64d3597444bda9bc3c519d"
+version = "15.1.1"
+source = "git+https://github.com/argonprotocol/hyperbridge#7584619d386049542ec5f661d686708b810ebc53"
 dependencies = [
  "alloy-primitives 0.7.7",
  "alloy-sol-macro 0.7.7",
  "alloy-sol-types 0.7.7",
  "anyhow",
+ "frame-benchmarking 37.0.0",
  "frame-support 38.0.0",
  "frame-system 38.0.0",
  "ismp",
@@ -10210,62 +10167,6 @@ dependencies = [
 ]
 
 [[package]]
-name = "polkadot-core-primitives"
-version = "15.0.0"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "e2900d3b857e34c480101618a950c3a4fbcddc8c0d50573d48553376185908b8"
-dependencies = [
- "parity-scale-codec",
- "scale-info",
- "sp-core",
- "sp-runtime",
-]
-
-[[package]]
-name = "polkadot-parachain-primitives"
-version = "14.0.0"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "52b5648a2e8ce1f9a0f8c41c38def670cefd91932cd793468e1a5b0b0b4e4af1"
-dependencies = [
- "bounded-collections",
- "derive_more 0.99.18",
- "parity-scale-codec",
- "polkadot-core-primitives",
- "scale-info",
- "serde",
- "sp-core",
- "sp-runtime",
- "sp-weights",
-]
-
-[[package]]
-name = "polkadot-primitives"
-version = "15.0.0"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "b57bc055fa389372ec5fc0001b99aeffd50f3fd379280ce572d935189bb58dd8"
-dependencies = [
- "bitvec",
- "hex-literal 0.4.1",
- "log",
- "parity-scale-codec",
- "polkadot-core-primitives",
- "polkadot-parachain-primitives",
- "scale-info",
- "serde",
- "sp-api",
- "sp-application-crypto",
- "sp-arithmetic",
- "sp-authority-discovery",
- "sp-consensus-slots",
- "sp-core",
- "sp-inherents",
- "sp-io",
- "sp-keystore",
- "sp-runtime",
- "sp-staking 34.0.0",
-]
-
-[[package]]
 name = "polkadot-sdk"
 version = "0.7.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -10788,7 +10689,7 @@ dependencies = [
  "indoc",
  "libc",
  "memoffset 0.9.1",
- "parking_lot 0.11.2",
+ "parking_lot 0.12.3",
  "portable-atomic",
  "pyo3-build-config",
  "pyo3-ffi",
@@ -11030,7 +10931,7 @@ dependencies = [
  "once_cell",
  "socket2 0.5.8",
  "tracing",
- "windows-sys 0.52.0",
+ "windows-sys 0.59.0",
 ]
 
 [[package]]
@@ -13668,7 +13569,7 @@ dependencies = [
 [[package]]
 name = "serde-hex-utils"
 version = "0.1.0"
-source = "git+https://github.com/argonprotocol/hyperbridge#6b70b2ad90e5f48f8e64d3597444bda9bc3c519d"
+source = "git+https://github.com/argonprotocol/hyperbridge#7584619d386049542ec5f661d686708b810ebc53"
 dependencies = [
  "anyhow",
  "hex",
@@ -14243,19 +14144,6 @@ dependencies = [
 ]
 
 [[package]]
-name = "sp-authority-discovery"
-version = "34.0.0"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "519c33af0e25ba2dd2eb3790dc404d634b6e4ce0801bcc8fa3574e07c365e734"
-dependencies = [
- "parity-scale-codec",
- "scale-info",
- "sp-api",
- "sp-application-crypto",
- "sp-runtime",
-]
-
-[[package]]
 name = "sp-block-builder"
 version = "34.0.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -14613,12 +14501,11 @@ dependencies = [
 
 [[package]]
 name = "sp-panic-handler"
-version = "13.0.0"
+version = "13.0.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "d8f5a17a0a11de029a8b811cb6e8b32ce7e02183cc04a3e965c383246798c416"
+checksum = "81478b3740b357fa0ea10fcdc1ee02ebae7734e50f80342c4743476d9f78eeea"
 dependencies = [
  "backtrace",
- "lazy_static",
  "regex",
 ]
 
@@ -15214,26 +15101,6 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "a8f112729512f8e442d81f95a8a7ddf2b7c6b8a1a6f509a95864142b30cab2d3"
 
 [[package]]
-name = "staging-xcm"
-version = "14.2.0"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "96bee7cd999e9cdf10f8db72342070d456e21e82a0f5962ff3b87edbd5f2b20e"
-dependencies = [
- "array-bytes",
- "bounded-collections",
- "derivative",
- "environmental",
- "impl-trait-for-tuples",
- "log",
- "parity-scale-codec",
- "scale-info",
- "serde",
- "sp-runtime",
- "sp-weights",
- "xcm-procedural",
-]
-
-[[package]]
 name = "static_assertions"
 version = "1.1.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -15451,8 +15318,8 @@ dependencies = [
 
 [[package]]
 name = "substrate-state-machine"
-version = "1.15.1"
-source = "git+https://github.com/argonprotocol/hyperbridge#6b70b2ad90e5f48f8e64d3597444bda9bc3c519d"
+version = "15.0.0"
+source = "git+https://github.com/argonprotocol/hyperbridge#7584619d386049542ec5f661d686708b810ebc53"
 dependencies = [
  "frame-support 38.0.0",
  "hash-db",
@@ -15816,7 +15683,7 @@ dependencies = [
  "fastrand",
  "once_cell",
  "rustix 0.38.41",
- "windows-sys 0.52.0",
+ "windows-sys 0.59.0",
 ]
 
 [[package]]
@@ -16017,8 +15884,8 @@ checksum = "1f3ccbac311fea05f86f61904b462b55fb3df8837a366dfc601a0161d0532f20"
 
 [[package]]
 name = "token-gateway-primitives"
-version = "1.15.1"
-source = "git+https://github.com/argonprotocol/hyperbridge#6b70b2ad90e5f48f8e64d3597444bda9bc3c519d"
+version = "15.0.0"
+source = "git+https://github.com/argonprotocol/hyperbridge#7584619d386049542ec5f661d686708b810ebc53"
 dependencies = [
  "alloy-primitives 0.7.7",
  "alloy-sol-macro 0.7.7",
@@ -17516,7 +17383,7 @@ version = "0.1.9"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "cf221c93e13a30d793f7645a0e7762c55d169dbb0a49671918a2319d289b10bb"
 dependencies = [
- "windows-sys 0.48.0",
+ "windows-sys 0.59.0",
 ]
 
 [[package]]
@@ -17936,18 +17803,6 @@ dependencies = [
  "libc",
  "linux-raw-sys 0.4.14",
  "rustix 0.38.41",
-]
-
-[[package]]
-name = "xcm-procedural"
-version = "10.1.0"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "87fb4f14094d65c500a59bcf540cf42b99ee82c706edd6226a92e769ad60563e"
-dependencies = [
- "Inflector",
- "proc-macro2",
- "quote",
- "syn 2.0.90",
 ]
 
 [[package]]

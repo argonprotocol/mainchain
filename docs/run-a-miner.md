@@ -18,8 +18,7 @@ Operating System: Ubuntu 22.04
 
 CPU: 2x vCPU
 
-Memory: 4 GB
-
+Memory: 4 GB + 2 GB swap (swap unnecessary if more memory used)
 Storage: 25 GB (possibly more if you run bitcoin on the same machine)
 
 ### Node Setup
@@ -158,11 +157,8 @@ or earn them during the first 10 days of mining (this time before Bidding begins
 Testnet you can request Argons using a Discord bot just like
 the [Argon Faucet](./account-setup.md#requesting-testnet-funds), but you'll use the slash following command instead:
 
-```
-
-bash
-/ drip - ownership [address]
-
+```bash
+/drip - ownership [address]
 ```
 
 ## 3. Bid for a Mining Slot
@@ -206,7 +202,8 @@ Once you have successfully bid for a mining slot, you can start mining. You will
 with however many other active miners there are. A miner wins blocks in two ways:
 
 1. Your node is selected as the XOR closest node to a block vote submitted in a notebook for the current tick. The miner
-   with the closest XOR distance of their Authority ID (the key you registered as a *Session Key*) to the block vote key
+   with the closest XOR distance of their Authority ID (the key you registered as a *BlockSealAuthority Key*) to the
+   block vote key
    will win the block. This block will always take priority over the second method.
 2. Your node solves a Proof of Compute (RandomX) hash that is less than the current difficulty target. These blocks are
    considered "secondary" and will only be included if no primary block is available. You can fill in as many "compute"

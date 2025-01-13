@@ -3792,9 +3792,9 @@ pub mod api {
 			.hash();
 		runtime_metadata_hash ==
 			[
-				24u8, 8u8, 217u8, 179u8, 149u8, 217u8, 46u8, 186u8, 54u8, 159u8, 22u8, 7u8, 63u8,
-				238u8, 10u8, 109u8, 205u8, 190u8, 76u8, 222u8, 149u8, 238u8, 125u8, 112u8, 250u8,
-				174u8, 121u8, 71u8, 83u8, 193u8, 32u8, 190u8,
+				115u8, 93u8, 241u8, 209u8, 56u8, 63u8, 22u8, 81u8, 169u8, 100u8, 106u8, 235u8,
+				90u8, 15u8, 24u8, 161u8, 0u8, 84u8, 31u8, 89u8, 185u8, 227u8, 17u8, 151u8, 213u8,
+				137u8, 154u8, 159u8, 59u8, 85u8, 34u8, 94u8,
 			]
 	}
 	pub mod system {
@@ -7575,6 +7575,7 @@ pub mod api {
 				#[doc = "  \t- `amount`: The amount to bond with the vault."]
 				#[doc = "- `reward_destination`: The account_id for the mining rewards, or `Owner` for the"]
 				#[doc = "  submitting user."]
+				#[doc = "- `keys`: The session \"hot\" keys for the slot (BlockSealAuthorityId and GrandpaId)."]
 				pub struct Bid {
 					pub bond_info: bid::BondInfo,
 					pub reward_destination: bid::RewardDestination,
@@ -7628,6 +7629,7 @@ pub mod api {
 				#[doc = "  \t- `amount`: The amount to bond with the vault."]
 				#[doc = "- `reward_destination`: The account_id for the mining rewards, or `Owner` for the"]
 				#[doc = "  submitting user."]
+				#[doc = "- `keys`: The session \"hot\" keys for the slot (BlockSealAuthorityId and GrandpaId)."]
 				pub fn bid(
 					&self,
 					bond_info: types::bid::BondInfo,
@@ -7817,11 +7819,6 @@ pub mod api {
 					use super::runtime_types;
 					pub type OwnershipBondAmount = ::core::primitive::u128;
 				}
-				pub mod last_ownership_percent_adjustment {
-					use super::runtime_types;
-					pub type LastOwnershipPercentAdjustment =
-						runtime_types::sp_arithmetic::fixed_point::FixedU128;
-				}
 				pub mod account_index_lookup {
 					use super::runtime_types;
 					pub type AccountIndexLookup = ::core::primitive::u32;
@@ -7970,27 +7967,6 @@ pub mod api {
 							146u8, 237u8, 64u8, 61u8, 35u8, 114u8, 66u8, 95u8, 137u8, 138u8, 50u8,
 							128u8, 217u8, 131u8, 10u8, 243u8, 1u8, 238u8, 208u8, 214u8, 106u8,
 							235u8,
-						],
-					)
-				}
-				#[doc = " The last percentage adjustment to the ownership bond amount"]
-				pub fn last_ownership_percent_adjustment(
-					&self,
-				) -> ::subxt::ext::subxt_core::storage::address::StaticAddress<
-					(),
-					types::last_ownership_percent_adjustment::LastOwnershipPercentAdjustment,
-					::subxt::ext::subxt_core::utils::Yes,
-					(),
-					(),
-				> {
-					::subxt::ext::subxt_core::storage::address::StaticAddress::new_static(
-						"MiningSlot",
-						"LastOwnershipPercentAdjustment",
-						(),
-						[
-							22u8, 170u8, 117u8, 90u8, 112u8, 170u8, 183u8, 3u8, 63u8, 34u8, 26u8,
-							138u8, 147u8, 135u8, 3u8, 37u8, 74u8, 195u8, 167u8, 141u8, 156u8, 49u8,
-							161u8, 236u8, 21u8, 84u8, 10u8, 187u8, 29u8, 162u8, 44u8, 175u8,
 						],
 					)
 				}
@@ -8187,18 +8163,36 @@ pub mod api {
 					)
 				}
 				#[doc = " The minimum bond amount possible"]
-				pub fn minimum_bond_amount(
+				pub fn minimum_ownership_bond_amount(
 					&self,
 				) -> ::subxt::ext::subxt_core::constants::address::StaticAddress<
 					::core::primitive::u128,
 				> {
 					::subxt::ext::subxt_core::constants::address::StaticAddress::new_static(
 						"MiningSlot",
-						"MinimumBondAmount",
+						"MinimumOwnershipBondAmount",
 						[
 							84u8, 157u8, 140u8, 4u8, 93u8, 57u8, 29u8, 133u8, 105u8, 200u8, 214u8,
 							27u8, 144u8, 208u8, 218u8, 160u8, 130u8, 109u8, 101u8, 54u8, 210u8,
 							136u8, 71u8, 63u8, 49u8, 237u8, 234u8, 15u8, 178u8, 98u8, 148u8, 156u8,
+						],
+					)
+				}
+				#[doc = " The maximum percent of ownership shares in the network that should be required for"]
+				#[doc = " ownership mining bonds"]
+				pub fn maximum_ownership_bond_amount_percent(
+					&self,
+				) -> ::subxt::ext::subxt_core::constants::address::StaticAddress<
+					runtime_types::sp_arithmetic::per_things::Percent,
+				> {
+					::subxt::ext::subxt_core::constants::address::StaticAddress::new_static(
+						"MiningSlot",
+						"MaximumOwnershipBondAmountPercent",
+						[
+							40u8, 171u8, 69u8, 196u8, 34u8, 184u8, 50u8, 128u8, 139u8, 192u8, 63u8,
+							231u8, 249u8, 200u8, 252u8, 73u8, 244u8, 170u8, 51u8, 177u8, 106u8,
+							47u8, 114u8, 234u8, 84u8, 104u8, 62u8, 118u8, 227u8, 50u8, 225u8,
+							122u8,
 						],
 					)
 				}
@@ -27770,6 +27764,7 @@ pub mod api {
 					#[doc = "  \t- `amount`: The amount to bond with the vault."]
 					#[doc = "- `reward_destination`: The account_id for the mining rewards, or `Owner` for the"]
 					#[doc = "  submitting user."]
+					#[doc = "- `keys`: The session \"hot\" keys for the slot (BlockSealAuthorityId and GrandpaId)."]
 					bid {
 						bond_info: ::core::option::Option<
 							runtime_types::pallet_mining_slot::MiningSlotBid<
@@ -30266,6 +30261,26 @@ pub mod api {
 					crate_path = ":: subxt :: ext :: subxt_core :: ext :: scale_encode"
 				)]
 				pub struct FixedU128(pub ::core::primitive::u128);
+			}
+			pub mod per_things {
+				use super::runtime_types;
+				#[derive(
+					:: subxt :: ext :: subxt_core :: ext :: codec :: CompactAs,
+					:: subxt :: ext :: subxt_core :: ext :: codec :: Decode,
+					:: subxt :: ext :: subxt_core :: ext :: codec :: Encode,
+					:: subxt :: ext :: subxt_core :: ext :: scale_decode :: DecodeAsType,
+					:: subxt :: ext :: subxt_core :: ext :: scale_encode :: EncodeAsType,
+					Clone,
+					Debug,
+				)]
+				# [codec (crate = :: subxt :: ext :: subxt_core :: ext :: codec)]
+				#[decode_as_type(
+					crate_path = ":: subxt :: ext :: subxt_core :: ext :: scale_decode"
+				)]
+				#[encode_as_type(
+					crate_path = ":: subxt :: ext :: subxt_core :: ext :: scale_encode"
+				)]
+				pub struct Percent(pub ::core::primitive::u8);
 			}
 			#[derive(
 				:: subxt :: ext :: subxt_core :: ext :: codec :: Decode,

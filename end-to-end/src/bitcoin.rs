@@ -116,7 +116,7 @@ async fn test_bitcoin_minting_e2e() {
 			&tx().price_index().submit(Index {
 				btc_usd_price: FixedU128Ext(FixedU128::from_float(62_000.0).into_inner()),
 				argon_usd_target_price: FixedU128Ext(FixedU128::from_float(1.0).into_inner()),
-				argon_usd_price: FixedU128Ext(FixedU128::from_float(1.1).into_inner()),
+				argon_usd_price: FixedU128Ext(FixedU128::from_float(1.6).into_inner()),
 				tick,
 			}),
 			&Sr25519Signer::new(price_index_operator.clone()),

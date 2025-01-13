@@ -144,12 +144,12 @@ impl NotebookCloser {
 	}
 
 	pub(super) async fn iterate_notebook_close_loop(&mut self) {
-		let _ = &self.try_rotate_notebook().await.map_err(|e| {
+		if let Err(e) = &self.try_rotate_notebook().await {
 			tracing::error!("Error rotating notebook: {:?}", e);
-		});
-		let _ = &self.try_close_notebook().await.map_err(|e| {
+		}
+		if let Err(e) = self.try_close_notebook().await {
 			tracing::error!("Error closing open notebook: {:?}", e);
-		});
+		}
 	}
 
 	pub(super) fn try_rotate_notebook(&self) -> BoxFutureResult<()> {

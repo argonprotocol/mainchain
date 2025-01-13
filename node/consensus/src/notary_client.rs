@@ -41,6 +41,7 @@ use tokio::{
 	sync::{Mutex, RwLock},
 	time,
 };
+use tracing::error;
 
 const MAX_QUEUE_DEPTH: usize = 1440 * 2; // a notary can be down 2 days before we start dropping history
 
@@ -145,6 +146,7 @@ pub fn run_notary_sync<B, C, AC>(
 	notebook_downloader: NotebookDownloader,
 	registry: Option<&Registry>,
 	ticker: Ticker,
+	is_solving_blocks: bool,
 ) -> Arc<NotaryClient<B, C, AC>>
 where
 	B: BlockT,
@@ -169,6 +171,7 @@ where
 		notebook_downloader,
 		metrics,
 		ticker,
+		is_solving_blocks,
 	));
 
 	let notary_client_clone = Arc::clone(&notary_client);
@@ -252,6 +255,7 @@ pub struct NotaryClient<B: BlockT, C: AuxStore, AC> {
 	ticker: Ticker,
 	queue_lock: Arc<Mutex<()>>,
 	_block: PhantomData<AC>,
+	is_solving_blocks: bool,
 }
 
 impl<B, C, AC> NotaryClient<B, C, AC>
@@ -266,6 +270,7 @@ where
 		notebook_downloader: NotebookDownloader,
 		metrics: Arc<Option<ConsensusMetrics<C>>>,
 		ticker: Ticker,
+		is_solving_blocks: bool,
 	) -> Self {
 		let (tick_voting_power_sender, tick_voting_power_receiver) =
 			tracing_unbounded("node::consensus::notebook_tick_stream", 100);
@@ -284,6 +289,7 @@ where
 			metrics,
 			ticker,
 			queue_lock: Arc::new(Mutex::new(())),
+			is_solving_blocks,
 			_block: PhantomData,
 		}
 	}
@@ -764,9 +770,11 @@ where
 			metrics.notebook_processed(notary_id, tick, enqueue_time, &self.ticker);
 		}
 
-		self.tick_voting_power_sender.lock().await.unbounded_send(voting_power).map_err(|e| {
-			Error::NotaryError(format!("Could not send tick state to sender (notary {notary_id}, notebook {notebook_number}) - {:?}", e))
-		})?;
+		if self.is_solving_blocks {
+			self.tick_voting_power_sender.lock().await.unbounded_send(voting_power).map_err(|e| {
+				Error::NotaryError(format!("Could not send tick state to sender (notary {notary_id}, notebook {notebook_number}) - {:?}", e))
+			})?;
+		}
 		Ok(())
 	}
 
@@ -1067,13 +1075,21 @@ where
 		}
 		let (latest_runtime_notebook_number, _) =
 			latest_notebooks_in_runtime.get(&notary.notary_id).unwrap_or(&(0, 0));
-		let Ok((mut notary_headers, tick_notebook)) = aux_client.get_notary_notebooks_for_header(
+		let (mut notary_headers, tick_notebook) = match aux_client.get_notary_notebooks_for_header(
 			notary.notary_id,
 			*latest_runtime_notebook_number,
 			voting_schedule,
 			MAX_NOTEBOOKS_PER_NOTARY,
-		) else {
-			continue;
+		) {
+			Ok(x) => x,
+			Err(e) => {
+				error!(
+					error = ?e,
+					notary_id = notary.notary_id,
+					notebook_tick = voting_schedule.notebook_tick(),
+					"Error building notary notebooks");
+				continue;
+			},
 		};
 
 		headers.signed_headers.append(&mut notary_headers.signed_headers);
@@ -1332,6 +1348,7 @@ mod test {
 			notebook_downloader,
 			Arc::new(None),
 			ticker,
+			true,
 		);
 		let notary_client = Arc::new(notary_client);
 		(test_notary, client, notary_client)
