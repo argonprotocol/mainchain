@@ -287,15 +287,17 @@ pub fn run_block_builder_task<Block, BI, C, PF, A, SC, SO, JS, B>(
 									if Some(payout.account_id) == compute_author {
 										is_my_block = true;
 										ownership_tokens += payout.ownership;
-									}
-									if let Some(authority) = payout.block_seal_authority {
+										argons += payout.argons;
+									} else if let Some(authority) = payout.block_seal_authority {
 										if authority_keys.contains(&authority) {
 											is_my_block = true;
 											argons += payout.argons;
+											ownership_tokens += payout.ownership;
 										}
 									}
 								}
 								if is_my_block {
+									tracing::info!(?hash, ownership_tokens, argons, "Your block got finalized!");
 									metrics.record_finalized_block(ownership_tokens, argons);
 								}
 							}
