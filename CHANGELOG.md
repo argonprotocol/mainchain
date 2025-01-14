@@ -1,14 +1,27 @@
 # Changelog
 
-## [v0.0.26](https://github.com/argonprotocol/mainchain/compare/v0.0.25...3a194d3e82ed989da845f7eb48f78fe6ee8191da) (2025-01-13)
+## [v0.0.27](https://github.com/argonprotocol/mainchain/compare/v0.0.26...00c9e63576313d98dacc0f0ea5ce2eabb608efaa) (2025-01-14)
 
-### Features
+### Fixes
+
+* **node:** prom metrics wrong
+([dd40341](https://github.com/argonprotocol/mainchain/commit/dd40341290d2ac1fd546fb9227a2138c57adb271))
+* **seal_spec:** trim to 80th pctl of block times
+([4c3458d](https://github.com/argonprotocol/mainchain/commit/4c3458da6ab4b402892507639be246206e6f5d8b))
+
+### [v0.0.26](https://github.com/argonprotocol/mainchain/compare/v0.0.25...v0.0.26) (2025-01-13)
+
+#### Features
 
 * **mint:** spread out new mint over hour
 ([31d3a94](https://github.com/argonprotocol/mainchain/commit/31d3a9466278e491445c0aab515fab2cfab88e50))
 
-### Fixes
+#### Fixes
 
+* **oracle:** default to target price if not found
+([a0678fb](https://github.com/argonprotocol/mainchain/commit/a0678fba4fc9626d08f8bb98f06c007bb7fe4c2d))
+* update metadata
+([c5273ad](https://github.com/argonprotocol/mainchain/commit/c5273ad9bf1c623c8be770774d68186a0dac7fbf))
 * **node:** memory leak for non-authority
 ([07729f8](https://github.com/argonprotocol/mainchain/commit/07729f82f7509fc8e5449aebebaa1e4360d39014))
 * **consensus:** retain audits until finalized
