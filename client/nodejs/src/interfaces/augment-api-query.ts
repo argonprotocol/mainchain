@@ -655,6 +655,10 @@ declare module '@polkadot/api-base/types/storage' {
        **/
       localAssets: AugmentedQuery<ApiType, (arg: H256 | string | Uint8Array) => Observable<Option<u32>>, [H256]>;
       /**
+       * Assets that originate from this chain
+       **/
+      nativeAssets: AugmentedQuery<ApiType, (arg: u32 | AnyNumber | Uint8Array) => Observable<bool>, [u32]>;
+      /**
        * Assets supported by this instance of token gateway
        * A map of the local asset id to the token gateway asset id
        **/

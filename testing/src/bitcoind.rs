@@ -35,13 +35,13 @@ pub fn start_bitcoind() -> anyhow::Result<(BitcoinD, url::Url, bitcoin::Network)
 	let bitcoind = match BitcoinD::with_conf(downloaded_exe_path().unwrap(), &conf) {
 		Ok(bitcoind) => bitcoind,
 		Err(e) => {
-			file.unlock().expect("Failed to unlock file");
+			fs2::FileExt::unlock(&file).expect("Failed to unlock file");
 			eprintln!("Failed to start bitcoind: {:#?}", e);
 			return Err(anyhow!("Failed to start bitcoind: {:#?}", e));
 		},
 	};
 	let url = read_rpc_url(&bitcoind)?;
-	file.unlock().expect("Failed to unlock file");
+	fs2::FileExt::unlock(&file).expect("Failed to unlock file");
 	drop(lock);
 	let network = bitcoind.client.get_blockchain_info().unwrap().chain;
 	Ok((bitcoind, url, network))

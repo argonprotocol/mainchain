@@ -54,7 +54,7 @@ pub struct NotebookAuditFailureRow {
 pub struct NotebookAuditFailureStore {}
 
 impl NotebookAuditFailureStore {
-	pub async fn record<'a>(
+	pub async fn record(
 		db: &mut PgConnection,
 		notebook_number: u32,
 		hash: H256,
@@ -83,7 +83,7 @@ impl NotebookAuditFailureStore {
 		Ok(())
 	}
 
-	pub async fn has_unresolved_audit_failure<'a>(
+	pub async fn has_unresolved_audit_failure(
 		db: &PgPool,
 	) -> anyhow::Result<Option<NotebookAuditFailureRow>, Error> {
 		let result = sqlx::query_as!(

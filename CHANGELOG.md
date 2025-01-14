@@ -1,8 +1,28 @@
 # Changelog
 
-## [v0.0.25](https://github.com/argonprotocol/mainchain/compare/v0.0.24...c8f03225f1269b5dcba0f8e5a95ddb87fd5b4737) (2025-01-06)
+## [v0.0.26](https://github.com/argonprotocol/mainchain/compare/v0.0.25...3a194d3e82ed989da845f7eb48f78fe6ee8191da) (2025-01-13)
 
 ### Features
+
+* **mint:** spread out new mint over hour
+([31d3a94](https://github.com/argonprotocol/mainchain/commit/31d3a9466278e491445c0aab515fab2cfab88e50))
+
+### Fixes
+
+* **node:** memory leak for non-authority
+([07729f8](https://github.com/argonprotocol/mainchain/commit/07729f82f7509fc8e5449aebebaa1e4360d39014))
+* **consensus:** retain audits until finalized
+([0ff4621](https://github.com/argonprotocol/mainchain/commit/0ff462170ca1bbe12e7df740195b298256c3f2d9))
+* **node:** back off solving when max blocks
+([2d4d167](https://github.com/argonprotocol/mainchain/commit/2d4d167d0d5c0b742533765374dd3a3c4dd3f5e2))
+* **mining_slot:** cap ownership max amount at 80%
+([15387e1](https://github.com/argonprotocol/mainchain/commit/15387e1e20e3ce2c42caacffcf32d7a3cabd2045))
+* **node:** prometheus metrics for own blocks
+([0528f5b](https://github.com/argonprotocol/mainchain/commit/0528f5be391046c130b3fec23ac24296e5770ade))
+
+### [v0.0.25](https://github.com/argonprotocol/mainchain/compare/v0.0.24...v0.0.25) (2025-01-06)
+
+#### Features
 
 * **runtime:** reduce bond amount to 100 milligons
 ([6d041bb](https://github.com/argonprotocol/mainchain/commit/6d041bbb8eb83ea778d5bcf384d4bbf602da44ec))
@@ -13,7 +33,7 @@
 * **node:** add earnings metrics
 ([7f7dc1e](https://github.com/argonprotocol/mainchain/commit/7f7dc1e4f3faab0b3ef7881bc912a4628b14b3f5))
 
-### Fixes
+#### Fixes
 
 * **node:** reduce cpu spike for node
 ([c8f0322](https://github.com/argonprotocol/mainchain/commit/c8f03225f1269b5dcba0f8e5a95ddb87fd5b4737))
