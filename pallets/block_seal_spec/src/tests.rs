@@ -331,8 +331,9 @@ fn it_will_adjust_difficulty() {
 		// Go past genesis block so events get deposited
 		System::set_block_number(1);
 
+		// should weed out the outlier
 		assert_ok!(PastComputeBlockTimes::<Test>::try_mutate(|a| {
-			a.try_append(&mut vec![100, 100, 100, 100, 100, 100, 100, 100, 100, 1])
+			a.try_append(&mut vec![100, 100, 100, 100, 100, 100, 100, 50_000, 100, 1])
 		}));
 		System::set_block_number(10);
 
@@ -345,9 +346,9 @@ fn it_will_adjust_difficulty() {
 		System::assert_last_event(
 			Event::ComputeDifficultyAdjusted {
 				start_difficulty,
-				actual_block_time: 901,
-				expected_block_time: 1000,
-				new_difficulty: 11_098_779,
+				actual_block_time: 701, // trims off 2 of 10 (100s + 1)
+				expected_block_time: 800,
+				new_difficulty: 11_412_268,
 			}
 			.into(),
 		);

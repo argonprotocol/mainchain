@@ -2,7 +2,7 @@ use crate::{
 	mock::{System, Ticks, *},
 	pallet::RecentBlocksAtTicks,
 };
-use argon_primitives::{NotebookAuditResult, TickProvider};
+use argon_primitives::{tick::MAX_BLOCKS_PER_TICK, NotebookAuditResult, TickProvider};
 use frame_support::{pallet_prelude::*, traits::OnTimestampSet};
 use std::panic::catch_unwind;
 
@@ -33,13 +33,14 @@ fn it_tests_the_current_tick() {
 		assert_eq!(Ticks::current_tick(), 2);
 
 		Digests::mutate(|a| a.tick.0 = 3);
-		for i in 0..5 {
+		let max_blocks = MAX_BLOCKS_PER_TICK as u64;
+		for i in 0..=(max_blocks - 1) {
 			let block = 3 + i;
 			System::initialize(&block, &System::parent_hash(), &Default::default());
 			Ticks::on_initialize(block);
 		}
 		let blocks_at_tick = RecentBlocksAtTicks::<Test>::get(3);
-		assert_eq!(blocks_at_tick.len(), 4);
+		assert_eq!(blocks_at_tick.len(), max_blocks as usize - 1);
 
 		// should not allow a 6th block at tick 2
 		let err = catch_unwind(|| {
@@ -59,7 +60,7 @@ fn it_tests_the_current_tick() {
 
 		Ticks::on_initialize(9);
 		let blocks_at_tick = RecentBlocksAtTicks::<Test>::get(3);
-		assert_eq!(blocks_at_tick.len(), 5);
+		assert_eq!(blocks_at_tick.len(), max_blocks as usize);
 
 		// can't push more than 5 though
 		let err = catch_unwind(|| {

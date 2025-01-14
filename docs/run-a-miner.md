@@ -278,8 +278,8 @@ will be selected to create the block. This vote creator will be rewarded with 25
 
 ## Max Blocks Per Tick
 
-Up to 5 blocks can be created per tick (this is only relevant to the compute phase). Only a single block can be created
-per tick with a mining slot. The 5th block per tick must have notebooks included to be accepted.
+Up to 60 blocks can be created per tick (this is only relevant to the compute phase). Only a single block can be created
+per tick with a mining slot. The 60th block per tick must have notebooks included to be accepted.
 
 ## Block Priority
 
