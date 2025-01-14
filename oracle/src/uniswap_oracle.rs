@@ -75,7 +75,7 @@ impl UniswapOracle {
 			}
 		}
 		let Some(price) = self.get_aggregated_twap(60 * 60).await? else {
-			warn!("Failed to get price, using default of 1.0");
+			warn!("Failed to get price, using default of {}", default_price.to_float());
 			// set to default if nothing returned
 			return Ok(default_price);
 		};
