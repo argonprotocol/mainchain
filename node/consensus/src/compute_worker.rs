@@ -414,6 +414,7 @@ where
 		&self,
 		updated_notebooks_at_tick: Option<VotingPowerInfo>,
 		consensus_metrics: &Arc<Option<ConsensusMetrics<C>>>,
+		submitting_tick: Tick,
 	) -> Option<B::Hash> {
 		// see if we have more notebooks at the same tick. if so, we should restart compute to
 		// include them
@@ -449,10 +450,8 @@ where
 		}
 
 		// don't add 5th notebook at tick unless we have a notebook
-		let notebooks_at_tick = self
-			.client
-			.notebooks_at_tick(best_hash, solve_notebook_tick)
-			.unwrap_or_default();
+		let notebooks_at_tick =
+			self.client.notebooks_at_tick(best_hash, submitting_tick).unwrap_or_default();
 		if (notebooks_at_tick == MAX_BLOCKS_PER_TICK - 1 && notebooks == 0) ||
 			notebooks_at_tick == MAX_BLOCKS_PER_TICK
 		{
@@ -631,15 +630,18 @@ mod tests {
 		let compute_state =
 			ComputeState::new(compute_handle.clone(), Arc::new(api.clone()), ticker);
 
-		let best_hash = compute_state.on_new_notebook_tick(None, &Arc::new(None));
+		let latest_tick = api.state.lock().ticker.current();
+		let best_hash = compute_state.on_new_notebook_tick(None, &Arc::new(None), latest_tick);
 
 		assert_eq!(best_hash, Some(api.state.lock().best_hash));
 		assert_eq!(compute_handle.best_hash().clone(), Some(api.state.lock().best_hash));
 
-		let latest_tick = api.state.lock().ticker.current();
 		// if we already have notebooks at the tick, we should try to solve with them
-		let best_hash =
-			compute_state.on_new_notebook_tick(Some((latest_tick, 1, 2)), &Arc::new(None));
+		let best_hash = compute_state.on_new_notebook_tick(
+			Some((latest_tick, 1, 2)),
+			&Arc::new(None),
+			latest_tick,
+		);
 		assert_eq!(best_hash, Some(api.state.lock().best_hash));
 		assert_eq!(
 			compute_handle
@@ -651,8 +653,11 @@ mod tests {
 		);
 
 		// we should not replace for an older tick
-		let _best_hash =
-			compute_state.on_new_notebook_tick(Some((latest_tick - 1, 1, 1)), &Arc::new(None));
+		let _best_hash = compute_state.on_new_notebook_tick(
+			Some((latest_tick - 1, 1, 1)),
+			&Arc::new(None),
+			latest_tick,
+		);
 		let notebooks_at_tick = compute_state.compute_handle.solving_with_notebooks_at_tick();
 		assert_eq!(notebooks_at_tick, Some((latest_tick, 2)));
 	}

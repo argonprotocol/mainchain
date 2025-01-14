@@ -36,6 +36,7 @@ pub(crate) const KEY_BLOCK_ROTATION: u32 = 1440;
 /// - To pass the difficulty test: `big endian(hash with nonce) <= U256::max_value / difficulty`.
 #[frame_support::pallet(dev_mode)]
 pub mod pallet {
+	use super::*;
 	use alloc::{vec, vec::Vec};
 	use argon_primitives::{
 		block_vote::VoteMinimum,
@@ -45,7 +46,7 @@ pub mod pallet {
 		notebook::{BlockVotingPower, NotebookHeader},
 		tick::Tick,
 		AuthorityProvider, BlockSealAuthorityId, BlockSealSpecProvider, ComputeDifficulty,
-		NotebookEventHandler, NotebookProvider,
+		NotebookEventHandler, NotebookProvider, TickProvider,
 	};
 	use frame_support::pallet_prelude::*;
 	use frame_system::pallet_prelude::*;
@@ -54,9 +55,6 @@ pub mod pallet {
 		traits::{Block, UniqueSaturatedInto},
 		DigestItem, FixedPointNumber, FixedU128,
 	};
-
-	use super::*;
-	use argon_primitives::TickProvider;
 	#[pallet::pallet]
 	pub struct Pallet<T>(_);
 
@@ -349,7 +347,13 @@ pub mod pallet {
 			);
 			// only adjust difficulty every `ChangePeriod` blocks
 			if block_as_u32 % T::ComputeDifficultyChangePeriod::get() == 0u32 {
-				let timestamps = <PastComputeBlockTimes<T>>::get();
+				let mut timestamps = <PastComputeBlockTimes<T>>::get().to_vec();
+				// trim off the max 90th percentile
+				timestamps.sort();
+				let len = timestamps.len();
+				let to_trim = len * 8 / 10;
+				timestamps.truncate(to_trim);
+
 				let tick_millis = T::TickProvider::ticker().tick_duration_millis;
 				let target_time =
 					T::TargetComputeBlockPercent::get().saturating_mul_int(tick_millis);

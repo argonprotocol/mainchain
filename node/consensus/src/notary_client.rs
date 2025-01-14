@@ -1068,7 +1068,7 @@ where
 	let mut headers = NotebookHeaderData::default();
 	let mut tick_notebooks = vec![];
 
-	const MAX_NOTEBOOKS_PER_NOTARY: u32 = 10;
+	const MAX_NOTEBOOKS_PER_NOTARY: u32 = 20;
 	let notaries = client.runtime_api().notaries(*parent_hash)?;
 	for notary in notaries {
 		if matches!(notary.state, NotaryState::Locked { .. }) {

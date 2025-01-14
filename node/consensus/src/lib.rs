@@ -328,9 +328,13 @@ pub fn run_block_builder_task<Block, BI, C, PF, A, SC, SO, JS, B>(
 				continue;
 			};
 
-			let Some(best_hash) = compute_state
-				.on_new_notebook_tick(next_notebooks_at_tick, &consensus_metrics_finder)
-			else {
+			let time = ticker.now_adjusted_to_ntp();
+			let tick = ticker.tick_for_time(time);
+			let Some(best_hash) = compute_state.on_new_notebook_tick(
+				next_notebooks_at_tick,
+				&consensus_metrics_finder,
+				tick,
+			) else {
 				continue;
 			};
 			if stale_branches.get(&best_hash).is_some() {
@@ -338,8 +342,6 @@ pub fn run_block_builder_task<Block, BI, C, PF, A, SC, SO, JS, B>(
 			}
 
 			// don't do anything if we are syncing or not ready to solve
-			let time = ticker.now_adjusted_to_ntp();
-			let tick = ticker.tick_for_time(time);
 			if !sync_oracle.is_major_syncing() &&
 				compute_handle.ready_to_solve(tick, time) &&
 				!compute_handle.is_solving()
