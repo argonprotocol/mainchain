@@ -36,6 +36,7 @@ lazy_static! {
 	/// - top 5%: `=PERCENTILE.INC(P2:AA113, 0.95)`
 	static ref CPI_5TH_PERCENTILE: FixedI128 = FixedI128::from_float(-0.7092); // -0.709219858
 	static ref CPI_95TH_PERCENTILE: FixedI128 = FixedI128::from_float(1.2429); // 1.242880338
+	static ref BASELINE_CPI: FixedU128 = FixedU128::from_float(315.605); // CPI for 2024-12-01
 }
 
 #[derive(Serialize, Deserialize)]
@@ -51,7 +52,6 @@ pub struct UsCpiRetriever {
 	pub last_cpi_check: DateTime<Utc>,
 	#[serde(skip)]
 	pub ticker: Ticker,
-	pub baseline_cpi: FixedU128,
 }
 
 impl UsCpiRetriever {
@@ -98,7 +98,7 @@ impl UsCpiRetriever {
 		}
 	}
 
-	pub async fn new(ticker: &Ticker, baseline_cpi: FixedU128) -> Result<Self> {
+	pub async fn new(ticker: &Ticker) -> Result<Self> {
 		if let Ok(retriever) = Self::load_state(ticker) {
 			return Ok(retriever);
 		}
@@ -124,7 +124,6 @@ impl UsCpiRetriever {
 			ticker: *ticker,
 			last_cpi_check: Utc::now(),
 			cpi_change_per_tick: FixedI128::from_u32(0),
-			baseline_cpi,
 		};
 		entry.cpi_change_per_tick = entry.calculate_cpi_change_per_tick();
 		entry.save_state()?;
@@ -169,7 +168,7 @@ impl UsCpiRetriever {
 	/// Returns the ratio of the current CPI to the baseline CPI (minus 1).
 	pub fn get_us_cpi_ratio(&self, tick: Tick) -> FixedI128 {
 		let current_cpi = self.calculate_smoothed_us_cpi_ratio(tick);
-		let baseline = to_fixed_i128(self.baseline_cpi);
+		let baseline = to_fixed_i128(*BASELINE_CPI);
 
 		(current_cpi / baseline) - FixedI128::one()
 	}
@@ -426,7 +425,6 @@ mod tests {
 			cpi_change_per_tick: FixedI128::from_u32(0),
 			last_schedule_check: Utc::now(),
 			last_cpi_check: Utc::now(),
-			baseline_cpi: previous_cpi,
 			ticker,
 		};
 		retriever.schedule = vec![
@@ -509,7 +507,6 @@ mod tests {
 			cpi_change_per_tick: FixedI128::from_u32(0),
 			last_schedule_check: Utc::now(),
 			last_cpi_check: Utc::now(),
-			baseline_cpi: FixedU128::from_u32(200),
 			ticker,
 		};
 		let timestamp =

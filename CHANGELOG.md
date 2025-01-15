@@ -1,8 +1,15 @@
 # Changelog
 
-## [v0.0.27](https://github.com/argonprotocol/mainchain/compare/v0.0.26...00c9e63576313d98dacc0f0ea5ce2eabb608efaa) (2025-01-14)
+## [v1.0.0](https://github.com/argonprotocol/mainchain/compare/v0.0.27...eaf306ea85acd92eddbf135c2bb8ef4dc51ae599) (2025-01-15)
 
 ### Fixes
+
+* **oracle:** handle us cpi resp annual in latest
+([0597b56](https://github.com/argonprotocol/mainchain/commit/0597b56c8f5dca6b18c32021ea5a263fa507e260))
+
+### [v0.0.27](https://github.com/argonprotocol/mainchain/compare/v0.0.26...v0.0.27) (2025-01-14)
+
+#### Fixes
 
 * **node:** prom metrics wrong
 ([dd40341](https://github.com/argonprotocol/mainchain/commit/dd40341290d2ac1fd546fb9227a2138c57adb271))
