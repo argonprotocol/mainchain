@@ -287,6 +287,9 @@ fn parse_cpi_results(resp_price: &str) -> Result<Vec<RawCpiValue>> {
 
 	let mut cpis = vec![];
 	for data in &resp_price.data {
+		if data.period_name == "Annual" {
+			continue;
+		}
 		let price = FixedU128::from_float(data.value);
 		cpis.push(RawCpiValue { value: price, ref_month: data.parse_period()? });
 	}
@@ -302,22 +305,9 @@ async fn get_raw_cpi() -> Result<RawCpiValue> {
 			return Ok(results[0].clone());
 		}
 	}
-	let mut request_url =
-		Url::parse("https://api.bls.gov/publicAPI/v2/timeseries/data/CUUR0000SA0?latest=true")?;
 
-	if let Ok(key) = env::var("BLS_API_KEY") {
-		request_url.query_pairs_mut().append_pair("registrationkey", &key);
-	}
-
-	let client = Client::new();
-	let resp_price = client
-		.get(request_url)
-		.header("Content-Type", "application/json")
-		.send()
-		.await?
-		.text()
-		.await?;
-	let result = parse_cpi_results(&resp_price)?;
+	let result = get_raw_cpis().await?;
+	ensure!(!result.is_empty(), "No CPI data");
 	Ok(result.first().ok_or(anyhow!("No CPI data"))?.clone())
 }
 
@@ -399,9 +389,20 @@ mod tests {
 	}
 
 	#[tokio::test]
+	async fn test_ignores_annual() {
+		let json = r#"{"status":"REQUEST_SUCCEEDED","responseTime":162,"message":["No Data Available for Series CUUR0000SA0 Year: 2025"],"Results":{
+"series":
+[{"seriesID":"CUUR0000SA0","data":[{"year":"2024","period":"M13","periodName":"Annual","latest":"true","value":"313.689","footnotes":[{}]}]}]
+}}"#;
+		let cpis = parse_cpi_results(json).unwrap();
+		assert!(cpis.is_empty());
+	}
+
+	#[tokio::test]
 	#[ignore]
 	async fn test_can_get_raw_cpi() {
 		let cpi = get_raw_cpi().await.unwrap();
+		println!("CPI: {:?}", cpi);
 		assert!(cpi.value >= FixedU128::from_u32(200));
 	}
 
