@@ -3,7 +3,7 @@ use std::{env, time::Duration};
 use anyhow::{anyhow, ensure};
 use sp_runtime::{traits::One, FixedU128, Saturating};
 use tokio::{join, time::sleep};
-use tracing::{info, warn};
+use tracing::info;
 
 use crate::{argon_price, coin_usd_prices, us_cpi::UsCpiRetriever};
 use argon_client::{
@@ -18,16 +18,6 @@ pub async fn price_index_loop(
 	signer: KeystoreSigner,
 	use_simulated_schedule: bool,
 ) -> anyhow::Result<()> {
-	let baseline_cpi = {
-		let Some(baseline_cpi) = env::var("BASELINE_CPI").ok() else {
-			warn!("No baseline CPI provided. Will restart in an hour to retry.");
-			tokio::time::sleep(Duration::from_secs(60 * 60)).await;
-			panic!("No baseline CPI provided. Exiting.");
-		};
-		baseline_cpi.parse::<f64>().expect("Baseline CPI must be a float")
-	};
-	let baseline_cpi = FixedU128::from_float(baseline_cpi);
-
 	let mut reconnecting_client = ReconnectingClient::new(vec![trusted_rpc_url.clone()]);
 	let mainchain_client = reconnecting_client.get().await?;
 
@@ -80,7 +70,7 @@ pub async fn price_index_loop(
 		min_sleep_duration = Duration::from_millis(50);
 	}
 
-	let mut us_cpi = UsCpiRetriever::new(&ticker, baseline_cpi).await?;
+	let mut us_cpi = UsCpiRetriever::new(&ticker).await?;
 	let mut usd_price_lookups = coin_usd_prices::CoinUsdPriceLookup::new();
 
 	let mut argon_price_lookup =
