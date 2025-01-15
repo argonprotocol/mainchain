@@ -1,8 +1,10 @@
 # Changelog
 
-## [v0.0.27](https://github.com/argonprotocol/mainchain/compare/v0.0.26...00c9e63576313d98dacc0f0ea5ce2eabb608efaa) (2025-01-14)
+## [v1.0.0](https://github.com/argonprotocol/mainchain/compare/v0.0.27...eaf306ea85acd92eddbf135c2bb8ef4dc51ae599) (2025-01-15)
 
-### Fixes
+### [v0.0.27](https://github.com/argonprotocol/mainchain/compare/v0.0.26...v0.0.27) (2025-01-14)
+
+#### Fixes
 
 * **seal_spec:** trim to 80th pctl of block times
 ([4c3458d](https://github.com/argonprotocol/mainchain/commit/4c3458da6ab4b402892507639be246206e6f5d8b))
