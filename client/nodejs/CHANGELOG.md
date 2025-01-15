@@ -1,9 +1,18 @@
 # Changelog
 
-## [v0.0.26](https://github.com/argonprotocol/mainchain/compare/v0.0.25...3a194d3e82ed989da845f7eb48f78fe6ee8191da) (2025-01-13)
+## [v0.0.27](https://github.com/argonprotocol/mainchain/compare/v0.0.26...00c9e63576313d98dacc0f0ea5ce2eabb608efaa) (2025-01-14)
 
 ### Fixes
 
+* **seal_spec:** trim to 80th pctl of block times
+([4c3458d](https://github.com/argonprotocol/mainchain/commit/4c3458da6ab4b402892507639be246206e6f5d8b))
+
+### [v0.0.26](https://github.com/argonprotocol/mainchain/compare/v0.0.25...v0.0.26) (2025-01-13)
+
+#### Fixes
+
+* update metadata
+([c5273ad](https://github.com/argonprotocol/mainchain/commit/c5273ad9bf1c623c8be770774d68186a0dac7fbf))
 * **mining_slot:** cap ownership max amount at 80%
 ([15387e1](https://github.com/argonprotocol/mainchain/commit/15387e1e20e3ce2c42caacffcf32d7a3cabd2045))
 
