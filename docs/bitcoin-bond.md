@@ -34,7 +34,16 @@ Removing the excess currency allows the price to rise.
 
 ## Bond Flow
 
-### Bitcoin Wallet
+We'll show examples in this flow using Electrum. After you have opened Electrum, follow the flow to create a new wallet
+or access your existing wallet.
+![<img src="./images/electrum-wallet.png" width="200px" alt="Electrum Wallet Setup">](images/electrum-wallet.png)
+
+You'll need to acquire BTC or have some available that you will send to a multisig that you'll create with a Vault in
+these steps.
+
+### Testnet
+
+#### Wallet connected to Signet
 
 You'll need a bitcoin wallet that supports a custom Signet. NOTE: as explained below, Argon needs wallets that support
 Miniscript, but they are currently limited and Bitcoin Core takes a good deal of disk space and several hours to sync.
@@ -50,16 +59,13 @@ To launch in Signet:
 - [Bitcoin Core](https://bitcoincore.org/en/download/): Modify bitcoin.conf to include `signet=1`
   and `signetseednode=bitcoin-node0.testnet.argonprotocol.org:38333`
 
-We'll show examples in this flow using Electrum. After you have opened Electrum, follow the flow to create a new wallet
-![<img src="./images/electrum-wallet.png" width="200px" alt="Electrum Wallet Setup">](images/electrum-wallet.png)
-
 Ensure you did in fact use Signet (the message will say Testnet):
 ![Electrum signet.png](images/electrum-testnet.png)
 
 Now go to addresses and copy the address you want to get funds from the Signet faucet:
 ![Electrum address.png](images/electrum-address.png)
 
-### Testnet
+#### Get Faucet BTC
 
 The Argon testnet is a place to experiment with the Argon Network. It is connected to a custom Bitcoin Signet. You will
 likely need to acquire testnet Argons and Bitcoins to experiment with this feature.
@@ -74,9 +80,8 @@ likely need to acquire testnet Argons and Bitcoins to experiment with this featu
 
 We'll be adding support for Hardware wallets and additional software wallets in future releases. It's a goal of this
 project for self-custody of Bitcoins to be supported with a wide range of tools, however, miniscript support is
-currently
-limited. For now, we'll show you how to use Electrum for most commands (simply to bypass synching the entire Bitcoin
-blockchain), and we'll sign the psbt using the Argon CLI.
+currently limited. For now, we'll show you how to use Electrum for most commands (simply to bypass synching the entire
+Bitcoin blockchain - ie, Bitcoin Core QT), and we'll sign the psbt using the Argon CLI.
 
 ### Bitcoin Bond Command Line
 
@@ -104,6 +109,26 @@ Options:
 
 The `utils` commands are particularly useful for working with Polkadot.js for converting complex numbers.
 
+### 0. Set up your Network
+
+You can set an environment variable to control your network. Pick a trusted RPC url to connect to from the Argon
+Network. You can replace the urls in the examples or set the environment variable below.
+
+NOTE: the images in this document show using the Testnet, but the same general scheme applies to the Mainnet
+with the appropriate URLs.
+
+*Argon Foundation Mainnet*
+
+```bash
+$ export TRUSTED_MAINCHAIN_URL=wss://rpc.argon.network
+```
+
+*Testnet*
+
+```bash
+$ export TRUSTED_MAINCHAIN_URL=wss://rpc.testnet.argonprotocol.org
+```
+
 ### 1. Choose a Vault
 
 Every Vault sets terms on a fee (base fee + apr per satoshi) and the amount of collateral they're willing to put up (
@@ -122,7 +147,7 @@ also show you how much the fee will be for the amount of Bitcoin you wish to loc
 that).
 
 ```bash
-$ argon-bitcoin-cli vault list --btc=0.00005 -t wss://rpc.testnet.argonprotocol.org
+$ argon-bitcoin-cli vault list --btc=0.00005
 
 Showing for: 5e-5 btc
 Current mint value: ₳2.79 argons
@@ -158,6 +183,8 @@ send the funds to (eg, select the address of the next pubkey from Electrum).
 
 #### Using the Polkadot.js interface:
 
+> Replace your wss:// url below as appropriate for your network
+
 Submit
 a [lock request](https://polkadot.js.org/apps/?rpc=wss%3A%2F%2Frpc.testnet.argonprotocol.org#/extrinsics/decode/0x080001000000214e000000000000000000000000000000000000000000000000000000000000000000)
 to the mainchain.
@@ -167,7 +194,7 @@ NOTE: you'll need to prefix it with 0x to paste into the UI.
 #### Using the CLI:
 
 ```bash
-$ argon-bitcoin-cli bond apply --btc=0.00005 --vault-id=1 --owner-pubkey=03b1fb97851d1cee35df30e0b5ac5be87c608c71b383b1c3b97a9704335acf83c1 -t wss://rpc.testnet.argonprotocol.org
+$ argon-bitcoin-cli bond apply --btc=0.00005 --vault-id=1 --owner-pubkey=03b1fb97851d1cee35df30e0b5ac5be87c608c71b383b1c3b97a9704335acf83c1
 ```
 
 This will generate a link to complete the transaction on the Polkadot.js interface along with the fee that needs to be
@@ -191,13 +218,19 @@ Now head to the block Explorer and find your bond in the most recent Block. You 
 The information in the bond event will tell you the details needed to recreate the UTXO you need to send your Bitcoin
 to. The easiest way to generate the UTXO address is to use the bitcoin CLI command (replace your bond id):
 
+NOTE: The resulting utxo must have the same amount of Satoshis as you specify in the command. Ensure your fees are set
+to add on top of the amount you specify.
+
 ```bash
-$ argon-bitcoin-cli bond send-to-address --bond-id=1 -t wss://rpc.testnet.argonprotocol.org
+$ argon-bitcoin-cli bond send-to-address --bond-id=1 -t=wss://rpc.testnet.argonprotocol.org
 ```
 
-This will output a Pay to Address that you need to send the EXACT funds into. You can use Electrum to send the funds to
-the MultiSig address.
+This will output a Pay to Address that you need to send the EXACT funds into. You can use Electrum (or whichever tool
+holds your BTC) to send the funds to the MultiSig address.
 ![Electrum - Multisig](images/electrum-pay.png)
+
+> IMPORTANT: The resulting utxo must have the same amount of Satoshis as you requested to bond. Ensure your fees
+> are set to add on top of the amount you specify.
 
 ### 5. Wait for Argon Verification
 
@@ -205,7 +238,7 @@ Argon will sync your UTXO once it has 6 confirmations. You can use the CLI to ch
 bond:
 
 ```bash
-$ argon-bitcoin-cli bond get --bond-id=1 -t wss://rpc.testnet.argonprotocol.org
+$ argon-bitcoin-cli bond get --bond-id=1 -t=wss://rpc.testnet.argonprotocol.org
 ```
 
 You can also use Polkadot.js to verify your Bitcoin UTXO by looking at the
@@ -217,7 +250,7 @@ _Storage_: `BitcoinUtxos -> utxosPendingConfirmation()`.
 You can monitor your Bitcoin Bond status using the `bond get` cli command.
 
 ```bash
-$ argon-bitcoin-cli bond get --bond-id=1 -t wss://rpc.testnet.argonprotocol.org
+$ argon-bitcoin-cli bond get --bond-id=1 -t=wss://rpc.testnet.argonprotocol.org
 ```
 
 ![Argon Cli Bond-Get](images/cli-bondget.png)

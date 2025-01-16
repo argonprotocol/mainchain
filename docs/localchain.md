@@ -5,6 +5,21 @@ personal "blockchains" called Localchains. Localchains run on a personal compute
 machine. They maintain a cryptographically linked list of balance changes (note: it's akin to a blockchain, but absent "
 blocks").
 
+## Choosing a Mainnet
+
+A Localchain needs a mainnet. You'll note that all the urls and example images in this doc use the testnet. Replace url
+parameters as needed.
+
+You can also set an environment variable and omit the parameters by setting `export ARGON_MAINCHAIN_URL=<URL>` to the
+url you'd like to use. Some example urls:
+
+- Argon Foundation RPC: `wss://rpc.argon.network`.
+- Testnet: `wss://rpc.testnet.argonprotocol.org`.
+
+```bash
+ export ARGON_MAINCHAIN_URL=wss://rpc.argon.network
+```
+
 ### Balance Tip Proof
 
 Localchains track balances as a linked history and proof of a current "tip" that has been submitted to a Notebook that
@@ -93,7 +108,7 @@ the unexpected ;).
 ```bash
 argon-localchain accounts create --name="alice" \
   --suri="bottom drive obey lake curtain smoke basket hold race lonely fit walk//Alice" \
-  --key-password="password" --mainchain-url="wss://rpc.testnet.argonprotocol.org"
+  --key-password="password"
 ```
 
 This will output your address and the path to your localchain. You will use the same --name parameter to interact with
@@ -106,7 +121,7 @@ have access to move funds between them. The following example transfers 10 Argon
 corresponding Localchain account.
 
 ```bash
-argon-localchain transactions from-mainchain 10.0 --name="alice" --mainchain-url="wss://rpc.testnet.argonprotocol.org"  --key-password="password"
+argon-localchain transactions from-mainchain 10.0 --name="alice" --key-password="password"
 ```
 
 This will initiate a transaction on the Mainchain. You need to wait for the transaction to be confirmed before you have
@@ -115,7 +130,7 @@ with the mainchain transaction using
 the [Polkadot.js explorer](https://polkadot.js.org/apps/#/explorer?rpc=wss://rpc.testnet.argonprotocol.org).
 
 ```bash
-argon-localchain sync --name="alice" --mainchain-url="wss://rpc.testnet.argonprotocol.org"
+argon-localchain sync --name="alice"
 ```
 
 #### Send Funds from Localchain to Localchain
@@ -132,7 +147,7 @@ means you will have a temporary account in your Localchain that will be un-usabl
 recipient. You won't directly use jump accounts in any case, but this is what's happening behind the scenes.
 
 ```bash
-argon-localchain transactions send 5.0 --name="alice" --mainchain-url="wss://rpc.testnet.argonprotocol.org"
+argon-localchain transactions send 5.0 --name="alice"
 ```
 
 You should see a file path. This file has your signed funds that can be sent to the recipient. You can send this file
@@ -147,7 +162,7 @@ your Localchain.
 NOTE: you can use the same approach to move funds between multiple Localchains you own.
 
 ```bash
-argon-localchain transactions receive <path-to-file> --name="alice" --mainchain-url="wss://rpc.testnet.argonprotocol.org"
+argon-localchain transactions receive <path-to-file> --name="alice"
 ```
 
 #### Moving funds Back to Mainchain
@@ -155,7 +170,7 @@ argon-localchain transactions receive <path-to-file> --name="alice" --mainchain-
 You can move funds back to the Mainchain using the CLI.
 
 ```bash
-argon-localchain transactions to-mainchain 5.0 --name="alice" --mainchain-url="wss://rpc.testnet.argonprotocol.org"
+argon-localchain transactions to-mainchain 5.0 --name="alice"
 ```
 
 ## IOS / Android SDK
