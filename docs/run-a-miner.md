@@ -1,6 +1,6 @@
-# Running a Miner in the Testnet
+# Running a Miner
 
-In this guide, we will walk through the steps to run a miner on the Argon test network.
+In this guide, we will walk through the steps to run a miner on the Argon network.
 
 You'll learn how to:
 
@@ -16,10 +16,10 @@ You'll learn how to:
 
 Operating System: Ubuntu 22.04
 
-CPU: 2x vCPU
-
-Memory: 4 GB + 2 GB swap (swap unnecessary if more memory used)
-Storage: 25 GB (possibly more if you run bitcoin on the same machine)
+CPU: 4x vCPU
+Memory: 8 GB
+Storage: 80 GB with ability to grow if needed. You need 500GB+ if you will keep a bitcoin full node without pruning,
+30GB after you prune down.
 
 ### Node Setup
 
@@ -48,11 +48,35 @@ Replace the `server` lines with:
 
 ### Node Setup 2. Bitcoin Node
 
-A Bitcoin node connected to the custom Argon Signet that supports Compact Block Filters. You can reference
+A Bitcoin node that supports Compact Block Filters. You do not need to keep block history - you can prune up to blocks
+as of Jan 15, 2025. You can reference
 the [Bitcoin Core installation guide](https://bitcoin.org/en/full-node#linux-instructions) for Ubuntu.
 
 > You can install this on the same machine, but do note it will take up a few GB of storage. If you install it on
 > another machine, modify your bitcoin.conf as appropriate.
+
+#### Mainnet
+
+Your bitcoin.conf must include the following configs:
+
+```bash
+chain=main
+blockfilterindex=1
+server=1
+[main]
+rpcauth={{ bitcoin_rpcauth }}
+rpcport=8332
+rpcbind=127.0.0.1
+rpcallowip=127.0.0.1/0
+```
+
+---
+NOTE: this does not exclude other configs you may need to run your bitcoin node. We are pruning by default in our own
+[setup](https://github.com/argonprotocol/argon-ansible/tree/main/roles/bitcoin/templates/bitcoin.conf.j2).
+
+#### Testnet
+
+If you're connecting to the Argon Testnet, you'll need to connect to the Signet network.
 
 Your bitcoin.conf must include the following configs:
 
@@ -68,10 +92,6 @@ rpcallowip=127.0.0.1/0
 signetchallenge=0014df6edb04cb5d8de5b15a63bdf5883f2eb6678b88
 signetseednode=bitcoin-node0.testnet.argonprotocol.org:38333
 ```
-
----
-NOTE: this does not exclude other configs you may need to run your bitcoin node. We are pruning by default in our own
-[testnet setup](https://github.com/argonprotocol/argon-ansible/tree/main/roles/bitcoin/templates/bitcoin.conf.j2).
 
 ### Node Setup 3. The Argon software
 
@@ -93,10 +113,21 @@ connect to the decentralized network. You can generate a libp2p identity with th
  ./argon-node key generate-node-key --file /home/argon/argon-node.key
 ```
 
+**Notebook Archives**
+You need to connect to a notebook archive for your environment. This is an s3 compatible host that stores notebooks for
+all notaries. You can set this with the `--notebook-archive-hosts` flag. You can create your own host by downloading the
+existing notebooks and hosting them on your own s3 compatible host (minIO is an open source option).
+
+Here are some examples:
+
+- Argon Foundation Archive: `https://notebook-archives.argon.network`
+- Testnet Archive: `https://testnet-notebook-archive.argonprotocol.org`
+
 **Start Script**
 You need to launch your node with configurations to connect to the Argon Testnet.
 
    ```bash
+   NOTEBOOK_ARCHIVES="https://notebook-archives.argon.network"
    ./argon-node --validator \
       --name "Your Node Name" \
       # Control the data location for your node
@@ -104,7 +135,7 @@ You need to launch your node with configurations to connect to the Argon Testnet
       # or a path to your testnet chain spec
       --chain testnet \
       # one or more archive host for the notebooks
-      --notebook-archive-hosts="https://testnet-notebook-archive.argonprotocol.org" \
+      --notebook-archive-hosts=$NOTEBOOK_ARCHIVES \
       # the rpc url for your signet bitcoin node with blockfilters enabled
       --bitcoin-rpc-url="http://bitcoin:<ENCODED_PASS>@127.0.0.1:38332" \
       # allow rpc on your local host only by default
@@ -126,11 +157,12 @@ with the following command:
 author_rotateKeys"}' http://localhost:9944/
 ```
 
-> NOTE: keep the output of this command for your mining registration.
+> NOTE: you must keep the output of this command for your mining registration.
 
-## 2. Acquire Argons and Ownership Tokens
+## 2. Acquire Argons and Argonots (Ownership Tokens)
 
-Mining requires you to have two tokens: Argons and Ownership Tokens. There are initially 100 mining slots available in
+Mining requires you to have two tokens: Argons and Argonots (Ownership Tokens). There are initially 100 mining slots
+available in
 Argon, each lasting 10 days. So every day, you are bidding for 1 of 10 available slots. This will grow to 10,000 slots
 as the network grows. Bidding will continue until a random block less than or equal to 200 blocks before the next slot
 begins (slots start every 1440 blocks).
@@ -149,8 +181,17 @@ Bitcoin and Mining bonds. You can view a vault's current allocation by looking a
 profit sharing terms, where you don't need to rent Argons for as high a cost, but will need to share argons minted
 during your slot.
 
-You need to set up an account and acquire Argons to bid for a mining slot. You can do this by
-following the steps in the [Argon Faucet Guide](./account-setup.md).
+You need to set up an account and acquire Argons to bid for a mining slot.
+
+### Mainnet Funds
+
+You can acquire Mainnet argons and argonots by buying them off of decentralized exchanges like Uniswap, or earning them
+during the first 10 days of mining (this time before Bidding begins is referred to as Slot Zero).
+
+### Testnet Funds
+
+In testnet, you can do this by following the steps in
+the [Argon Faucet Guide](./account-setup.md#requesting-testnet-funds).
 
 You'll also need to acquire Ownership Tokens. Once Argon is live, you will buy these off of decentralized like Uniswap,
 or earn them during the first 10 days of mining (this time before Bidding begins is referred to as Slot Zero). In the
@@ -163,10 +204,12 @@ the [Argon Faucet](./account-setup.md#requesting-testnet-funds), but you'll use 
 
 ## 3. Bid for a Mining Slot
 
-Now that you have an account with Argons and Ownership Tokens, you can bid for a mining slot. You're bidding for a 10-
-day period starting at the next block that is divisible by 1440 blocks (eg, every 1440 blocks from the genesis block).
-Mining bids close in a randomly chosen block within 200 blocks of the next slot. Mining bids normally begin after a 10
-day bootstrap period called "Slot Zero". However, in the Testnet, you can start bidding right away.
+Now that you have an account with Argons and Argonots (Ownership Tokens), you can bid for a mining slot. You're bidding
+for a 10- day period starting at the next block that is divisible by 1440 blocks (eg, every 1440 blocks from the genesis
+block). Mining bids close in a randomly chosen block within 200 blocks of the next slot. Mining bids begin
+after a 10-day bootstrap period called "Slot Zero".
+
+> NOTE: in the Testnet, you can start bidding right away.
 
 There are initially 10 mining positions available every "slot", and 100 total miners at genesis. Each slot will last 10
 days, so at any given time, there are 10 overlapping cohorts of miners. Each day, 1/10th will rotate out and 1/10th will
@@ -188,7 +231,7 @@ mining bid. NOTE: If you want to more carefully create and backup your keys, you
 shown [here](https://docs.substrate.io/tutorials/build-a-blockchain/add-trusted-nodes/).
 
 You can bid for a slot by using the Polkadot.js
-interface [here](https://polkadot.js.org/apps/?rpc=wss%3A%2F%2Frpc.testnet.argonprotocol.org#/extrinsics/decode/0x06000100000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000).
+interface [here](https://polkadot.js.org/apps/?rpc=wss://rpc.testnet.argonprotocol.org#/extrinsics/decode/0x06000100000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000).
 If you toggle to "Submission", you can submit your bid.
 ![Polkadot.js - Submit a bid](images/pjs-miningbid.png)
 
@@ -203,8 +246,7 @@ with however many other active miners there are. A miner wins blocks in two ways
 
 1. Your node is selected as the XOR closest node to a block vote submitted in a notebook for the current tick. The miner
    with the closest XOR distance of their Authority ID (the key you registered as a *BlockSealAuthority Key*) to the
-   block vote key
-   will win the block. This block will always take priority over the second method.
+   block vote key will win the block. This block will always take priority over the second method.
 2. Your node solves a Proof of Compute (RandomX) hash that is less than the current difficulty target. These blocks are
    considered "secondary" and will only be included if no primary block is available. You can fill in as many "compute"
    blocks as you want, but you will only get rewards if you are able to include new Notebooks in the block.

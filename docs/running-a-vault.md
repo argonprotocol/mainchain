@@ -50,9 +50,11 @@ These are completely not at risk.
 ## The Argon Bitcoin CLI
 
 Argon publishes a CLI that allows Bitcoin bonders and Vault operators to simplify their operations on the Argon network.
-This will ultimately be replaced by an app interface, so feedback on the flow would be appreciated when testing the CLI
-on the Testnet. You can find the latest release on
-the [releases page](https://github.com/argonprotocol/mainchain/releases/latest).
+
+> This will ultimately be replaced by an app interface, so feedback on the flow would be appreciated when testing the
+> CLI.
+
+You can find the latest release on the [releases page](https://github.com/argonprotocol/mainchain/releases/latest).
 
 ```bash
 $ argon-bitcoin-cli --help
@@ -81,6 +83,25 @@ can use the `utils` command to do this.
 
 ```bash
 $ argon-bitcoin-cli utils encode-xpub tpubD8t2diXwgDwRaNt8NNY6pb19U3SwmUzxFhFtSaKb79cfkPqqWX8vSqPzsW2NkhkMsxye6fuB2wNqs5sGTZPpM63UaAb3e69LvNcFpci6JZt
+```
+
+## Choosing a Network
+
+You'll note that all the urls and examples in this doc use the testnet. Please replace
+`wss://rpc.testnet.argonprotocol.org` with a trusted mainnet rpc url if you are using the mainnet. The testnet won't let
+you submit mainnet bitcoins, so you can't accidentally lose your funds, but you can lose a lot of time :). NOTE: if you
+share a key across both environments, you WILL invoke these actions against the network.
+
+You can also set an environment variable and omit the parameters by setting `export TRUSTED_RPC_URL=<URL>` to the url
+you'd like to
+use.
+Some example urls:
+
+- Argon Foundation RPC: `wss://rpc.argon.network`.
+- Testnet: `wss://rpc.testnet.argonprotocol.org`.
+
+```bash
+ export TRUSTED_RPC_URL=wss://rpc.argon.network
 ```
 
 ## Creating a Vault

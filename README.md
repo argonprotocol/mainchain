@@ -139,12 +139,28 @@ Argon makes use of a few runtime pallets that are useful to know about as a user
   that can still submit transactions. The cold wallet will pay for the transaction fees but doesn't have to have keys
   loaded into memory.
 - `Hyperbridge`. There are several pallets involved (`ismp`, `ismp_grandpa`, `hyperbridge`, `token_gateway`) here to
-  activate the Argon ability to move tokens cross-chain.
+  activate the Argon ability to move tokens cross-chain. Learn more about
+  hyperbridge [here](https://hyperbridge.network).
+
+## Experimental Mainnet
+
+Argon has an experimental Mainnet. Experimental here means it is persistent long term, but not yet in a fully
+stable/secure state. It's ready to test technically and economically with small amounts of value and connected to live
+Ethereum, Bitcoin, Base, and several other EVM chains.
+
+Useful Urls:
+
+- RPC: `wss://rpc.argon.network`
+- Notary: `wss://notary1.argon.network`
+- Bootnodes: `wss://bootnode0.argon.network`, `wss://bootnode1.argon.network`
+- [Polkadot/Substrate Portal](https://polkadot.js.org/apps/#/explorer?rpc=wss://rpc.argon.network)
+- [Argon Discord](https://discord.gg/6JxjCNvu6x)
 
 ## Using the Testnet
 
-The Argon testnet is a network that is intended to be used for testing and development. You can connect to
-the [Polkadot Developer Portal](https://polkadot.js.org/apps/#/explorer?rpc=wss://rpc.testnet.argonprotocol.org) to
+The Argon testnet is intended to be used for testing and development. All changes will be deployed to this network
+before the mainnet. You can connect to
+the [Polkadot Developer Portal](https://polkadot.js.org/apps/#/explorer?rpc=wss://rpc.argon.network) to
 interact with the testnet. We are also publishing binary versions of the localchain and bitcoin cli that are useful to
 test out connecting to the testnet. Those versions can be found on
 the [releases page](https://github.com/argonprotocol/argon/releases/latest).
@@ -154,8 +170,8 @@ Useful Urls:
 - RPC: `wss://rpc.testnet.argonprotocol.org`
 - Testnet Notary: `wss://notary1.testnet.argonprotocol.org`
 - Testnet Bootnode: `wss://bootnode0.testnet.argonprotocol.org`
-- [Polkadot/Substrate Portal](https://polkadot.js.org/apps/#/explorer?rpc=wss://rpc.testnet.argonprotocol.org)
-- [Argon Discord](https://discord.gg/6JxjCNvu6x)
+
+## Tutorials
 
 Here are some tutorials to get you started:
 
@@ -163,7 +179,7 @@ Here are some tutorials to get you started:
 - [How to use the Argon Localchain CLI](./docs/localchain.md#command-line-interface)
 - [How to bond Bitcoins using the Argon Bitcoin CLI](./docs/bitcoin-bond.md)
 - [How to create and manage a Vault using the Argon Bitcoin CLI](./docs/running-a-vault.md)
-- [How to run a testnet miner](./docs/run-a-miner.md)
+- [How to run a miner](./docs/run-a-miner.md)
 
 ## Running Locally
 

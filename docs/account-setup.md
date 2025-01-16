@@ -38,6 +38,16 @@ testnet is not worth anything, so the security of your keys is not as important.
 hardware wallet to learn the preferred way to operate on the mainnet. The Ledger wallets support the Argon network via
 the Polkadot.js interface.
 
+## Connect to the Right Network
+
+You can connect to any rpc url for a server or node that you trust. Some examples are:
+
+- `Testnet`: `wss://rpc.testnet.argonprotocol.org`
+- `Mainnet`: `wss://rpc.argon.network`
+
+You'll see many urls with `?rpc=wss://rpc.testnet.argonprotocol.org` in the documentation. Replace this url with the
+network you want to use (eg, `?rpc=wss://rpc.argon.network`.
+
 ## Creating an Account
 
 You can create an account from the Mainchain, or using the Localchain. The end result is the same, so this is just a
@@ -45,9 +55,9 @@ preference of how you want to interact with the network (probably based on your 
 
 ### 1. Using the Polkadot.js interface
 
-This a developer-centric interface that allows you to interact with the testnet in a more detailed way.
+This a developer-centric interface that allows you to interact with Argon in a more visual way.
 
-You can create an account on the testnet using
+You can create an account using
 the [Polkadot.js interface](https://polkadot.js.org/apps/#/accounts?rpc=wss://rpc.testnet.argonprotocol.org).
 
 ![pjs-addaccount.png](images/pjs-addaccount.png)
