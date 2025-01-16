@@ -6,7 +6,6 @@ use anyhow::{anyhow, Result};
 use sp_runtime::{FixedPointNumber, FixedU128};
 use std::{collections::HashMap, sync::Arc};
 use tokio::sync::Mutex;
-use tracing::warn;
 use uniswap_lens::bindings::iuniswapv3pool::IUniswapV3Pool::IUniswapV3PoolInstance;
 use uniswap_sdk_core::prelude::*;
 use uniswap_v3_sdk::{entities::TickIndex, prelude::*};
