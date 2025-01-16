@@ -52,6 +52,8 @@ parameter_types! {
 	pub static TargetComputeBlockPercent: Percent = Percent::from_percent(50);
 	pub const MaxNotaries: u32 = 100;
 	pub static LockedNotaries: Vec<(NotaryId, Tick)> = vec![];
+	pub static TickDuration: u64 = 200;
+	pub static HistoricalComputeBlocksForAverage: u32 = 10;
 
 	pub static CurrentTick: Tick = 0;
 }
@@ -101,7 +103,7 @@ impl TickProvider<Block> for StaticTickProvider {
 		CurrentTick::get()
 	}
 	fn ticker() -> Ticker {
-		Ticker::new(200, 2)
+		Ticker::new(TickDuration::get(), 2)
 	}
 	fn blocks_at_tick(_: Tick) -> Vec<H256> {
 		vec![]
@@ -120,7 +122,7 @@ impl pallet_block_seal_spec::Config for Test {
 	type NotebookProvider = StaticNotebookProvider;
 	type SealInherent = CurrentSeal;
 	type HistoricalVoteBlocksForAverage = ConstU32<10>;
-	type HistoricalComputeBlocksForAverage = ConstU32<10>;
+	type HistoricalComputeBlocksForAverage = HistoricalComputeBlocksForAverage;
 	type TargetComputeBlockPercent = TargetComputeBlockPercent;
 	type TickProvider = StaticTickProvider;
 	type MaxActiveNotaries = MaxNotaries;

@@ -348,11 +348,8 @@ pub mod pallet {
 			// only adjust difficulty every `ChangePeriod` blocks
 			if block_as_u32 % T::ComputeDifficultyChangePeriod::get() == 0u32 {
 				let mut timestamps = <PastComputeBlockTimes<T>>::get().to_vec();
-				// trim off the max 90th percentile
+				// trim off the max 90th percentile and bottom 10th
 				timestamps.sort();
-				let len = timestamps.len();
-				let to_trim = len * 8 / 10;
-				timestamps.truncate(to_trim);
 
 				let tick_millis = T::TickProvider::ticker().tick_duration_millis;
 				let target_time =
