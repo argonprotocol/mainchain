@@ -338,7 +338,7 @@ pub trait ComputeApisExt<B: BlockT, AC> {
 	fn has_eligible_votes(&self, block_hash: B::Hash) -> Result<bool, Error>;
 	fn is_bootstrap_mining(&self, block_hash: B::Hash) -> Result<bool, Error>;
 	fn compute_puzzle(&self, block_hash: B::Hash) -> Result<ComputePuzzle<B>, Error>;
-	fn notebooks_at_tick(&self, block_hash: B::Hash, tick: Tick) -> Result<u32, Error>;
+	fn blocks_at_tick(&self, block_hash: B::Hash, tick: Tick) -> Result<u32, Error>;
 }
 
 impl<B, C, AC> ComputeApisExt<B, AC> for C
@@ -374,7 +374,7 @@ where
 		self.runtime_api().compute_puzzle(block_hash).map_err(Into::into)
 	}
 
-	fn notebooks_at_tick(&self, block_hash: B::Hash, tick: Tick) -> Result<u32, Error> {
+	fn blocks_at_tick(&self, block_hash: B::Hash, tick: Tick) -> Result<u32, Error> {
 		self.runtime_api()
 			.blocks_at_tick(block_hash, tick)
 			.map(|a| a.len() as u32)
@@ -450,16 +450,26 @@ where
 		}
 
 		// don't add 5th notebook at tick unless we have a notebook
-		let notebooks_at_tick =
-			self.client.notebooks_at_tick(best_hash, submitting_tick).unwrap_or_default();
-		if (notebooks_at_tick == MAX_BLOCKS_PER_TICK - 1 && notebooks == 0) ||
-			notebooks_at_tick == MAX_BLOCKS_PER_TICK
+		let blocks_at_tick =
+			self.client.blocks_at_tick(best_hash, submitting_tick).unwrap_or_default();
+		if (blocks_at_tick == MAX_BLOCKS_PER_TICK - 1 && notebooks == 0) ||
+			blocks_at_tick == MAX_BLOCKS_PER_TICK
 		{
+			tracing::info!(
+				?notebooks,
+				blocks_at_tick,
+				"Max blocks at tick (or without notebooks). Stop solving."
+			);
 			self.compute_handle.stop_solving_current();
 			return None;
 		}
 
 		if self.compute_handle.best_hash() != Some(best_hash) {
+			tracing::trace!(
+				new_best_hash = ?best_hash,
+				current_best_hash = ?self.compute_handle.best_hash(),
+				"Best hash has changed. Setting new compute handle"
+			);
 			let has_eligible_votes = self.client.has_eligible_votes(best_hash).unwrap_or_default();
 			let is_bootstrap_mining =
 				self.client.is_bootstrap_mining(best_hash).unwrap_or_default();
@@ -558,7 +568,7 @@ mod tests {
 			Ok(self.state.lock().compute_puzzle.clone())
 		}
 
-		fn notebooks_at_tick(&self, _block_hash: HashOutput, _tick: Tick) -> Result<u32, Error> {
+		fn blocks_at_tick(&self, _block_hash: HashOutput, _tick: Tick) -> Result<u32, Error> {
 			Ok(0)
 		}
 	}
