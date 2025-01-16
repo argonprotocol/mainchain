@@ -67,18 +67,17 @@ impl UniswapOracle {
 		})
 	}
 
-	pub async fn get_current_price(&self, default_price: FixedU128) -> Result<FixedU128> {
+	pub async fn get_current_price(&self) -> Result<FixedU128> {
 		#[cfg(test)]
 		{
 			if let Some(price) = MOCK_PRICES.lock().pop() {
 				return Ok(price);
 			}
 		}
-		let Some(price) = self.get_aggregated_twap(60 * 60).await? else {
-			warn!("Failed to get price, using default of {}", default_price.to_float());
-			// set to default if nothing returned
-			return Ok(default_price);
-		};
+		let price = self
+			.get_aggregated_twap(60 * 60)
+			.await?
+			.ok_or(anyhow!("Failed to get price, using default"))?;
 		let scaled_numerator = price.adjusted_for_decimals().to_decimal() * FixedU128::accuracy();
 		let float = scaled_numerator.to_u128().ok_or(anyhow!("Failed to convert to u128"))?;
 		Ok(FixedU128::from_inner(float))
@@ -198,7 +197,7 @@ mod test {
 		)
 		.await
 		.expect("Failed to create oracle");
-		let price = oracle.get_current_price(FixedU128::from_float(1.0)).await.unwrap();
+		let price = oracle.get_current_price().await.unwrap();
 		println!("Price: {:?}", price);
 		// should be around 1.0
 		assert!((price.to_float() - 1.0).abs() < 0.1);

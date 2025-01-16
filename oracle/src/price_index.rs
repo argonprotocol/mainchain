@@ -112,7 +112,6 @@ pub async fn price_index_loop(
 		} else {
 			argon_price_lookup
 				.get_latest_price(
-					target_price,
 					tick,
 					max_argon_change_per_tick_away_from_target,
 					usd_price_lookup.usdc,
@@ -123,8 +122,12 @@ pub async fn price_index_loop(
 		let argon_usd_price = match price_result {
 			Ok(x) => x,
 			Err(e) => {
-				tracing::warn!("Couldn't update argon prices {:?}", e);
-				continue;
+				tracing::warn!(
+					"Couldn't update argon prices. Using target {} {:?}",
+					target_price,
+					e
+				);
+				target_price
 			},
 		};
 
