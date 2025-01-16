@@ -1,6 +1,25 @@
 # Changelog
 
-## [v1.0.0](https://github.com/argonprotocol/mainchain/compare/v0.0.27...eaf306ea85acd92eddbf135c2bb8ef4dc51ae599) (2025-01-15)
+## [v1.0.1](https://github.com/argonprotocol/mainchain/compare/v1.0.0...003979815248c7c3c1ad31d43187f6897f5cf27e) (2025-01-16)
+
+### Features
+
+* updated docs + chain spec for mainnet
+([247c153](https://github.com/argonprotocol/mainchain/commit/247c1536782adaa0d0f875bf1e931cef6c7c220b))
+
+### Fixes
+
+* **oracle:** dont adjust target price by usdc
+([9904f7e](https://github.com/argonprotocol/mainchain/commit/9904f7edb98efc53b1eb7f9c95a6de1052360379))
+* **block_seal_spec:** remove clamp
+([8c1a0b2](https://github.com/argonprotocol/mainchain/commit/8c1a0b25d1e8c582543d3fcca82bbe8fc01f2afa))
+
+## [v1.0.0](https://github.com/argonprotocol/mainchain/compare/v0.0.27...v1.0.0) (2025-01-15)
+
+### Features
+
+* hardcode cpi
+([934a85a](https://github.com/argonprotocol/mainchain/commit/934a85ae4418aaa58b1df9adff6e71065948e22c))
 
 ### Fixes
 
