@@ -4,7 +4,7 @@ use frame_support::{
 	traits::{Len, OnFinalize, OnInitialize, OnTimestampSet},
 };
 use sp_core::{crypto::AccountId32, H256};
-use sp_runtime::{Digest, DigestItem};
+use sp_runtime::{Digest, DigestItem, Percent};
 
 use argon_primitives::{
 	digests::{BlockVoteDigest, BLOCK_VOTES_DIGEST_ID},
@@ -333,7 +333,7 @@ fn it_will_adjust_difficulty() {
 
 		// should weed out the outlier
 		assert_ok!(PastComputeBlockTimes::<Test>::try_mutate(|a| {
-			a.try_append(&mut vec![100, 100, 100, 100, 100, 100, 100, 50_000, 100, 1])
+			a.try_append(&mut vec![100, 100, 100, 100, 100, 100, 100, 100, 1])
 		}));
 		System::set_block_number(10);
 
@@ -346,14 +346,84 @@ fn it_will_adjust_difficulty() {
 		System::assert_last_event(
 			Event::ComputeDifficultyAdjusted {
 				start_difficulty,
-				actual_block_time: 701, // trims off 2 of 10 (100s + 1)
-				expected_block_time: 800,
-				new_difficulty: 11_412_268,
+				actual_block_time: 801, // (100s + 1)
+				expected_block_time: 900,
+				new_difficulty: 11_235_955,
 			}
 			.into(),
 		);
 		assert_ne!(BlockSealSpec::compute_difficulty(), start_difficulty);
 		assert_eq!(PastComputeBlockTimes::<Test>::get().len(), ChangePeriod::get() as usize);
+	});
+}
+
+#[test]
+fn it_adjusts_difficulty_in_new_algorithm() {
+	new_test_ext(100, 3_674_680).execute_with(|| {
+		// Go past genesis block so events get deposited
+		System::set_block_number(1);
+		TargetComputeBlockPercent::set(Percent::from_percent(49));
+		HistoricalComputeBlocksForAverage::set(360);
+		TickDuration::set(60_000);
+
+		let mut entries: Vec<u64> = vec![
+			27_604, 2_450, 2_565, 13_103, 9_183, 13_897, 45_231, 24_726, 14_102, 3_850, 3_726,
+			6_120, 7_700, 20_000, 7_869, 13_628, 17_743, 61_102, 14_819, 35_899, 4_506, 3_934,
+			27_810, 4_417, 1_762, 7_806, 18_558, 5_830, 13_863, 39_317, 15_617, 22_454, 17_467,
+			5_624, 14_983, 20_500, 23_704, 61_255, 7_510, 2_067, 5_997, 12_396, 5_107, 25_122,
+			14_201, 46_971, 4_250, 39_174, 15_779, 5_506, 16_273, 10_368, 7_933, 21_094, 5_996,
+			20_272, 32_909, 2_209, 17_266, 40_703, 4_331, 2_407, 4_601, 2_525, 46_304, 7_088,
+			3_179, 9_345, 40_818, 16_436, 15_601, 13_997, 13_943, 3_589, 9_123, 4_164, 16_739,
+			9_273, 5_578, 11_754, 13_484, 22_034, 24_026, 4_876, 5_166, 7_115, 3_082, 14_721,
+			8_726, 17_122, 2_585, 14_568, 24_447, 16_630, 12_678, 7_262, 11_457, 28_843, 1_548,
+			10_201, 7_566, 6_919, 35_205, 13_474, 25_269, 2_806, 16_400, 4_780, 43_495, 12_853,
+			9_070, 8_413, 41_677, 19_107, 4_485, 37_622, 1_558, 2_612, 26_092, 28_911, 3_538,
+			17_026, 39_644, 6_151, 10_329, 1_924, 18_092, 13_653, 2_025, 1_718, 6_285, 8_813,
+			11_839, 15_212, 23_489, 29_346, 20_274, 10_406, 14_876, 45_410, 6_682, 9_307, 16_877,
+			27_214, 60_781, 13_152, 45_548, 20_149, 40_029, 10_956, 19_547, 18_390, 1_860, 9_437,
+			34_513, 14_553, 11_144, 38_999, 2_461, 18_672, 16_756, 23_387, 20_065, 8_875, 1_623,
+			2_921, 16_023, 10_220, 19_542, 15_941, 6_574, 24_519, 14_144, 3_020, 36_257, 19_911,
+			2_034, 24_271, 2_213, 31_699, 13_983, 17_974, 3_406, 7_893, 15_942, 7_702, 53_454,
+			29_653, 29_552, 7_165, 11_344, 14_687, 28_065, 41_071, 17_075, 61_200, 59_298, 16_160,
+			2_413, 42_578, 21_119, 38_058, 60_208, 110_289, 10_168, 28_441, 30_614, 180_575,
+			59_201, 61_055, 2_270, 11_688, 45_345, 61_209, 12_547, 46_650, 61_182, 31_437, 27_734,
+			5_861, 4_716, 48_641, 28_395, 31_769, 2_247, 21_980, 3_145, 33_802, 6_594, 52_578,
+			60_221, 3_319, 55_900, 61_159, 12_133, 16_287, 16_925, 8_471, 5_347, 61_184, 8_187,
+			51_017, 60_214, 58_858, 21_198, 40_336, 119_356, 6_706, 52_514, 61_187, 33_451, 25_736,
+			145_192, 35_402, 87_995, 32_390, 78_078, 8_882, 20_144, 13_287, 3_110, 56_056, 4_241,
+			26_439, 29_541, 59_193, 2_519, 23_905, 33_754, 60_188, 119_669, 7_411, 33_801, 9_799,
+			9_248, 60_133, 12_677, 46_527, 120_394, 120_386, 42_036, 18_145, 4_685, 54_505, 22_771,
+			38_145, 58_526, 97_042, 23_327, 6_880, 54_250, 59_220, 13_427, 46_790, 14_491, 45_709,
+			59_203, 14_601, 10_399, 35_230, 60_163, 60_208, 299_010, 181_616, 59_230, 375_786,
+			43_679, 60_214, 60_231, 60_202, 60_224, 60_171, 22_820, 2_962, 34_416, 119_384, 60_660,
+			119_942, 59_201, 180_663, 299_948, 64_109, 56_225, 539_467, 59_655, 119_399, 153_325,
+			27_262, 60_188, 60_290, 239_854, 77_513, 42_891, 67_792, 50_612, 120_406, 720_668,
+			60_119, 60_199, 59_483, 420_217, 60_192, 239_735, 120_442, 59_226, 239_540, 601_285,
+			179_629, 7_584, 52_654, 31_112, 29_110, 44_725, 15_584, 59_157, 61_206, 238_820,
+			60_158, 239_850, 300_052,
+		];
+		let count = entries.len() as u32;
+		// should weed out the outlier
+		assert_ok!(PastComputeBlockTimes::<Test>::try_mutate(|a| { a.try_append(&mut entries) }));
+		System::set_block_number(10);
+
+		let start_difficulty = BlockSealSpec::compute_difficulty();
+
+		BlockSealSpec::on_timestamp_set(2);
+		BlockSealSpec::on_initialize(10);
+		BlockSealSpec::on_finalize(10);
+
+		System::assert_last_event(
+			Event::ComputeDifficultyAdjusted {
+				start_difficulty,
+				actual_block_time: 15293870,
+				expected_block_time: TargetComputeBlockPercent::get()
+					.mul_ceil(60_000 * count as u64),
+				new_difficulty: 2543032, // should be less
+			}
+			.into(),
+		);
+		assert_ne!(BlockSealSpec::compute_difficulty(), start_difficulty);
 	});
 }
 

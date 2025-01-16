@@ -519,4 +519,35 @@ mod tests {
 		assert_eq!(retriever.ticks_since_last_cpi(tick + 60), 60);
 		assert_eq!(retriever.ticks_since_last_cpi(tick + 60 * 24), 24 * 60);
 	}
+
+	#[test]
+	fn test_cpi_cache() {
+		let cpi: UsCpiRetriever  = serde_json::from_str(r#"{
+			"schedule":[{"ref_month":"2024-10-01T00:00:00Z","release_date":"2024-11-13T00:00:00Z"},{"ref_month":"2024-11-01T00:00:00Z","release_date":"2024-12-11T00:00:00Z"},{"ref_month":"2024-12-01T00:00:00Z","release_date":"2025-01-15T00:00:00Z"},{"ref_month":"2025-01-01T00:00:00Z","release_date":"2025-02-12T00:00:00Z"},{"ref_month":"2025-02-01T00:00:00Z","release_date":"2025-03-12T00:00:00Z"},{"ref_month":"2025-03-01T00:00:00Z","release_date":"2025-04-10T00:00:00Z"},{"ref_month":"2025-04-01T00:00:00Z","release_date":"2025-05-13T00:00:00Z"},{"ref_month":"2025-05-01T00:00:00Z","release_date":"2025-06-11T00:00:00Z"},{"ref_month":"2025-06-01T00:00:00Z","release_date":"2025-07-15T00:00:00Z"},{"ref_month":"2025-07-01T00:00:00Z","release_date":"2025-08-12T00:00:00Z"},{"ref_month":"2025-08-01T00:00:00Z","release_date":"2025-09-11T00:00:00Z"},{"ref_month":"2025-09-01T00:00:00Z","release_date":"2025-10-15T00:00:00Z"},{"ref_month":"2025-10-01T00:00:00Z","release_date":"2025-11-13T00:00:00Z"},{"ref_month":"2025-11-01T00:00:00Z","release_date":"2025-12-10T00:00:00Z"}],
+			"current_cpi_release_tick":28948320,
+			"current_cpi_duration_ticks":40320,
+			"current_cpi_end_value":"315605000000000032768",
+			"current_cpi_ref_month":"2024-12-01T00:00:00Z",
+			"previous_us_cpi":"315492999999999967232",
+			"cpi_change_per_tick":"2777777777779",
+			"last_schedule_check":"2025-01-16T01:33:05.613573128Z",
+			"last_cpi_check":"2025-01-16T01:33:05.613573667Z"}"#
+		).unwrap();
+		let x = cpi.calculate_smoothed_us_cpi_ratio(28948321);
+		assert_eq!(x, FixedI128::from_inner(315492999999999967232 + 2777777777779));
+
+		let cpi: UsCpiRetriever  = serde_json::from_str(r#"{
+			"schedule":[{"ref_month":"2024-10-01T00:00:00Z","release_date":"2024-11-13T00:00:00Z"},{"ref_month":"2024-11-01T00:00:00Z","release_date":"2024-12-11T00:00:00Z"},{"ref_month":"2024-12-01T00:00:00Z","release_date":"2025-01-15T00:00:00Z"},{"ref_month":"2025-01-01T00:00:00Z","release_date":"2025-02-12T00:00:00Z"},{"ref_month":"2025-02-01T00:00:00Z","release_date":"2025-03-12T00:00:00Z"},{"ref_month":"2025-03-01T00:00:00Z","release_date":"2025-04-10T00:00:00Z"},{"ref_month":"2025-04-01T00:00:00Z","release_date":"2025-05-13T00:00:00Z"},{"ref_month":"2025-05-01T00:00:00Z","release_date":"2025-06-11T00:00:00Z"},{"ref_month":"2025-06-01T00:00:00Z","release_date":"2025-07-15T00:00:00Z"},{"ref_month":"2025-07-01T00:00:00Z","release_date":"2025-08-12T00:00:00Z"},{"ref_month":"2025-08-01T00:00:00Z","release_date":"2025-09-11T00:00:00Z"},{"ref_month":"2025-09-01T00:00:00Z","release_date":"2025-10-15T00:00:00Z"},{"ref_month":"2025-10-01T00:00:00Z","release_date":"2025-11-13T00:00:00Z"},{"ref_month":"2025-11-01T00:00:00Z","release_date":"2025-12-10T00:00:00Z"}],
+			"current_cpi_release_tick":28948320,
+			"current_cpi_duration_ticks":40320,
+			"current_cpi_end_value":"315492999999999967232",
+			"current_cpi_ref_month":"2024-12-01T00:00:00Z",
+			"previous_us_cpi":"315492999999999967232",
+			"cpi_change_per_tick":"0",
+			"last_schedule_check":"2025-01-16T01:33:05.613573128Z",
+			"last_cpi_check":"2025-01-16T01:33:05.613573667Z"}"#
+		).unwrap();
+		let x = cpi.calculate_smoothed_us_cpi_ratio(28949321);
+		assert_eq!(x, FixedI128::from_inner(315492999999999967232));
+	}
 }
