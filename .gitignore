@@ -23,4 +23,4 @@ node_modules
 /client/nodejs/**/*.*js
 /client/nodejs/**/*.d.ts
 /oracle/.env
-/scripts/hyperbridge/paseo-messaging-relayer.toml
+/scripts/hyperbridge/**/*-messaging-relayer.toml

@@ -89,8 +89,8 @@ pub type BlockHash = BlakeTwo256;
 
 pub const TOKEN_DECIMALS: u8 = 6;
 
-pub const ARGON_TOKEN_SYMBOL: &str = "ARGON";
-pub const OWNERSHIP_TOKEN_SYMBOL: &str = "ARGONOT";
+pub const ARGON_TOKEN_SYMBOL: &str = "ARGN";
+pub const OWNERSHIP_TOKEN_SYMBOL: &str = "ARGNOT";
 
 pub mod prelude {
 	pub use super::{

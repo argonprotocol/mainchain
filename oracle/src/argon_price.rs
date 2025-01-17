@@ -1,7 +1,10 @@
 use crate::uniswap_oracle::{UniswapOracle, USDC_ADDRESS, USDC_ADDRESS_SEPOLIA};
 use anyhow::Result;
 use argon_client::api::runtime_types::pallet_price_index::PriceIndex;
-use argon_primitives::tick::{Tick, Ticker};
+use argon_primitives::{
+	tick::{Tick, Ticker},
+	ARGON_TOKEN_SYMBOL,
+};
 use sp_runtime::{traits::One, FixedI128, FixedPointNumber, FixedU128, Saturating};
 use std::env;
 use uniswap_sdk_core::{prelude::*, token};
@@ -51,7 +54,8 @@ impl ArgonPriceLookup {
 		let project_id = env::var("INFURA_PROJECT_ID").expect("INFURA_PROJECT_ID must be set");
 
 		let usdc_token = get_usdc_token(network);
-		let lookup_token = token!(network as u64, argon_token_address, 18, "ARGON", "Argon");
+		let lookup_token =
+			token!(network as u64, argon_token_address, 18, ARGON_TOKEN_SYMBOL, "Argon");
 		Self::new(ticker, last_price, project_id, usdc_token, lookup_token).await
 	}
 
