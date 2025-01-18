@@ -292,14 +292,17 @@ is determined from the block "seal" used to close a block. You can see if biddin
 ## Block Rewards
 
 Block rewards are given for each closed block as both Argons and Ownership Tokens. Rewards are scaled by the number of
-notebooks included in a block vs the active notaries. If no current notebooks are included, the block reward is only 1
-microgon (eg, you are mostly just earning fees).
+notebooks included in a block vs the active notaries. If no "current" notebooks are included, the block reward is only 1
+microgon (eg, you are mostly just earning fees). Current means the notebook tick is one prior to the block tick.
 
 Block rewards start at 0.5 Argons and 0.5 Ownership Tokens per block, and increase by 1 milligon (1/10th of an Argon)
 every 118 blocks. This will continue until the block reward reaches 5 Argons and 5 Ownership Tokens per block. After
 this point, the Ownership Tokens will become deflationary, with the block reward halving every 2.1 million blocks.
 Argons are currently slated to stay level, but we anticipate a future model where Argons are related to the total
 circulation to ensure sustainable economic security.
+
+NOTE: a miner earns 75% of the block rewards, and the vote creator earns 25% of the block rewards. If no vote creator is
+involved, the 25% are not issued.
 
 ### Reward Maturation
 

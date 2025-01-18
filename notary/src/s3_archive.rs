@@ -79,6 +79,7 @@ impl S3Archive {
 			credentials_provider.clone(),
 			region,
 		);
+		let mut remove_bucket_on_drop = false;
 		if let Err(e) = client
 			.head_bucket(HeadBucketRequest {
 				bucket: bucket_name.clone(),
@@ -86,6 +87,7 @@ impl S3Archive {
 			})
 			.await
 		{
+			remove_bucket_on_drop = true;
 			if matches!(&e, rusoto_core::RusotoError::Service(HeadBucketError::NoSuchBucket(_))) ||
 				matches!(&e, rusoto_core::RusotoError::Unknown(BufferedHttpResponse { headers, .. }) if headers.get("x-minio-error-code").cloned().unwrap_or_default() == "NoSuchBucket")
 			{
@@ -134,7 +136,7 @@ impl S3Archive {
 			notary_id,
 			client,
 			credentials_provider,
-			remove_bucket_on_drop: true,
+			remove_bucket_on_drop,
 		};
 
 		Ok((

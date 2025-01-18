@@ -333,29 +333,25 @@ pub struct GrandpaSlotRotation;
 impl OnNewSlot<AccountId> for GrandpaSlotRotation {
 	type Key = GrandpaId;
 	fn on_new_slot(
-		removed_authorities: Vec<(&AccountId, Self::Key)>,
-		added_authorities: Vec<(&AccountId, Self::Key)>,
+		_removed_authorities: Vec<(&AccountId, Self::Key)>,
+		_added_authorities: Vec<(&AccountId, Self::Key)>,
 	) {
-		if removed_authorities.is_empty() && added_authorities.is_empty() {
-			return;
-		}
-		let mut next_authorities: AuthorityList = Grandpa::grandpa_authorities();
-		for (_, authority_id) in removed_authorities {
-			if let Some(index) = next_authorities.iter().position(|x| x.0 == authority_id) {
-				next_authorities.remove(index);
-			}
-		}
-		for (_, authority_id) in added_authorities {
-			next_authorities.push((authority_id, 1));
-		}
-
+		let next_authorities: AuthorityList = Grandpa::grandpa_authorities();
 		// TODO: we need to be able to run multiple grandpas on a single miner before activating
 		// 	changing the authorities. We want to activate a trailing 3 hours of miners who closed
-		// blocks 	to activate a more decentralized grandpa process
-		//
-		// if let Err(err) = Grandpa::schedule_change(next_authorities, Zero::zero(), None) {
-		// 	log::error!("Failed to schedule grandpa change: {:?}", err);
+		//  blocks to activate a more decentralized grandpa process
+		// for (_, authority_id) in removed_authorities {
+		// 	if let Some(index) = next_authorities.iter().position(|x| x.0 == authority_id) {
+		// 		next_authorities.remove(index);
+		// 	}
 		// }
+		// for (_, authority_id) in added_authorities {
+		// 	next_authorities.push((authority_id, 1));
+		// }
+
+		if let Err(err) = Grandpa::schedule_change(next_authorities, 1, None) {
+			log::error!("Failed to schedule grandpa change: {:?}", err);
+		}
 	}
 }
 

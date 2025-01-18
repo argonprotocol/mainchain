@@ -177,6 +177,7 @@ impl UniswapOracle {
 mod test {
 	use super::*;
 	use std::env;
+	use tracing::warn;
 	use uniswap_sdk_core::token;
 
 	#[tokio::test]

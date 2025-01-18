@@ -15,7 +15,7 @@ use sc_client_api::BlockBackend;
 use sc_consensus::BasicQueue;
 use sc_consensus_grandpa::{
 	BeforeBestBlockBy, FinalityProofProvider as GrandpaFinalityProofProvider, GrandpaBlockImport,
-	SharedVoterState, ThreeQuartersOfTheUnfinalizedChain,
+	ThreeQuartersOfTheUnfinalizedChain,
 };
 use sc_rpc::SubscriptionTaskExecutor;
 use sc_service::{
@@ -248,6 +248,7 @@ where
 			ServiceError::Other(format!("Failed to get bitcoin network validated {:?}", e))
 		})?;
 	}
+	let shared_voter_state = sc_consensus_grandpa::SharedVoterState::empty();
 
 	let rpc_builder = {
 		let client = client.clone();
@@ -255,11 +256,11 @@ where
 		let backend = backend.clone();
 		let justification_stream = grandpa_link.justification_stream();
 		let shared_authority_set = grandpa_link.shared_authority_set().clone();
-		let shared_voter_state = sc_consensus_grandpa::SharedVoterState::empty();
 		let finality_proof_provider = GrandpaFinalityProofProvider::new_for_service(
 			backend.clone(),
 			Some(shared_authority_set.clone()),
 		);
+		let shared_voter_state = shared_voter_state.clone();
 		Box::new(move |subscription_executor: SubscriptionTaskExecutor| {
 			let deps = rpc::FullDeps {
 				client: client.clone(),
@@ -364,7 +365,7 @@ where
 				.add(ThreeQuartersOfTheUnfinalizedChain)
 				.build(),
 			prometheus_registry,
-			shared_voter_state: SharedVoterState::empty(),
+			shared_voter_state,
 			telemetry: telemetry.as_ref().map(|x| x.handle()),
 			offchain_tx_pool_factory: OffchainTransactionPoolFactory::new(transaction_pool),
 		};

@@ -5,6 +5,8 @@ mod localchain_transfer;
 #[cfg(test)]
 mod notary;
 #[cfg(test)]
+mod sync;
+#[cfg(test)]
 mod vote_mining;
 
 #[cfg(test)]

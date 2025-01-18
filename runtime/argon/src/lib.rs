@@ -7,6 +7,7 @@ extern crate alloc;
 mod benchmark;
 
 pub mod configs;
+mod migrations;
 pub mod weights;
 
 pub use crate::configs::NotaryRecordT;
@@ -51,6 +52,7 @@ use sp_version::RuntimeVersion;
 
 #[cfg(feature = "std")]
 include!(concat!(env!("OUT_DIR"), "/wasm_binary.rs"));
+use crate::migrations::AddGrandpaRotation;
 #[cfg(any(feature = "std", test))]
 pub use sp_runtime::BuildStorage;
 #[cfg(feature = "std")]
@@ -79,7 +81,7 @@ pub const VERSION: RuntimeVersion = RuntimeVersion {
 	//   `spec_version`, and `authoring_version` are the same between Wasm and native.
 	// This value is set to 100 to notify Polkadot-JS App (https://polkadot.js.org/apps) to use
 	//   the compatible custom types.
-	spec_version: 102,
+	spec_version: 103,
 	impl_version: 2,
 	apis: RUNTIME_API_VERSIONS,
 	transaction_version: 1,
@@ -194,8 +196,7 @@ pub type SignedExtra = (
 /// All migrations of the runtime, aside from the ones declared in the pallets.
 ///
 /// This can be a tuple of types, each implementing `OnRuntimeUpgrade`.
-#[allow(unused_parens)]
-type Migrations = ();
+type Migrations = (AddGrandpaRotation<Runtime>,);
 
 /// Unchecked extrinsic type as expected by this runtime.
 pub type UncheckedExtrinsic =
