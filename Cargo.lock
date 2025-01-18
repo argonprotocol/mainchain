@@ -4145,6 +4145,7 @@ dependencies = [
  "miniscript",
  "rand",
  "regex",
+ "serde",
  "serial_test",
  "sp-arithmetic",
  "sp-core",

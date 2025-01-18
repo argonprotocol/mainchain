@@ -3,7 +3,6 @@
 set -e
 
 BASEDIR=$(dirname "$0")/..
-DBPATH=postgres://postgres:password@localhost:5432/notary
 # create array of validators
 validators=(alice bob dave)
 
@@ -14,13 +13,19 @@ if ! nc -z localhost 9000; then
 fi
 
 # Create a minio bucket name
-BUCKET_NAME="notary-$(date +%s)"
+RUNID=${1:-$(date +%s)}
+BUCKET_NAME="notary-$RUNID"
 NOTEBOOK_ARCHIVE="http://127.0.0.1:9000/$BUCKET_NAME"
+DBPATH=postgres://postgres:password@localhost:5432/notary-$RUNID
 
 set -x  # Print commands and their arguments as they are executed
-dropdb --if-exists -f notary;
-createdb notary;
-rm -rf /tmp/argon;
+# drop db if no arg is passed
+if [ -z "$1" ]; then
+  dropdb --if-exists -f notary-$RUNID;
+  rm -rf /tmp/argon/$RUNID;
+fi
+createdb notary-$RUNID || true;
+mkdir -p /tmp/argon/$RUNID;
 mkdir -p /tmp/argon/bitcoin;
 
 # listen for sighup and kill all child processes
@@ -57,16 +62,18 @@ until is_ngrok_ready; do
   sleep 1
 done
 
-argon_LOCAL_TESTNET_NOTARY_URL=$(curl -s http://localhost:4040/api/tunnels/notary | jq -r '.public_url' | sed 's/https:\/\///' | sed 's/http:\/\///');
+ARGON_LOCAL_TESTNET_NOTARY_URL=$(curl -s http://localhost:4040/api/tunnels/notary | jq -r '.public_url' | sed 's/https:\/\///' | sed 's/http:\/\///');
 
-export argon_LOCAL_TESTNET_NOTARY_URL="wss://$argon_LOCAL_TESTNET_NOTARY_URL"
+export ARGON_LOCAL_TESTNET_NOTARY_URL="wss://$ARGON_LOCAL_TESTNET_NOTARY_URL"
 
 
 # start a temporary node with alice and bob funded
 for i in {0..2} ; do
-  "$BASEDIR/target/debug/argon-node" --tmp \
+  mkdir -p /tmp/argon/$RUNID/${validators[$i]};
+  "$BASEDIR/target/debug/argon-node" \
     --"${validators[$i]}" --detailed-log-output --chain local --name="${validators[$i]}" \
     --notebook-archive-hosts="$NOTEBOOK_ARCHIVE" \
+    --base-path /tmp/argon/$RUNID/${validators[$i]} \
     --rpc-port=994$((i+4)) --port 3033$((i+4)) --compute-miners 1 \
     --pruning=archive -lRUST_LOG=info,argon=info,ismp=trace \
     --unsafe-force-node-key-generation --unsafe-rpc-external --rpc-methods=unsafe \

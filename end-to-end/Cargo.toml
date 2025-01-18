@@ -32,3 +32,7 @@ sp-core = { workspace = true }
 subxt = { workspace = true }
 serial_test = { workspace = true }
 regex = { workspace = true }
+serde = { workspace = true }
+
+[dependencies]
+serde = { version = "1.0.215", features = ["derive"] }
