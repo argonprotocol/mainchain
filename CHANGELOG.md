@@ -1,14 +1,28 @@
 # Changelog
 
-## [v1.0.1](https://github.com/argonprotocol/mainchain/compare/v1.0.0...003979815248c7c3c1ad31d43187f6897f5cf27e) (2025-01-16)
+## [v1.0.2](https://github.com/argonprotocol/mainchain/compare/v1.0.1...792b61b704653b81f6e40a2897c26a8d5e7da6f3) (2025-01-18)
 
 ### Features
+
+* change token symbol
+([6249c57](https://github.com/argonprotocol/mainchain/commit/6249c5765f6e546bbc587c6e7b990effb448fd14))
+
+### Fixes
+
+* **node:** grandpa can’t prove finality
+([63b86fd](https://github.com/argonprotocol/mainchain/commit/63b86fd4ab0690987e5e619b7e64b5a0810ab909))
+
+### [v1.0.1](https://github.com/argonprotocol/mainchain/compare/v1.0.0...v1.0.1) (2025-01-16)
+
+#### Features
 
 * updated docs + chain spec for mainnet
 ([247c153](https://github.com/argonprotocol/mainchain/commit/247c1536782adaa0d0f875bf1e931cef6c7c220b))
 
-### Fixes
+#### Fixes
 
+* lint issue
+([76530bb](https://github.com/argonprotocol/mainchain/commit/76530bbf27227a1bde154a99b6df255d6a1b1382))
 * **oracle:** dont adjust target price by usdc
 ([9904f7e](https://github.com/argonprotocol/mainchain/commit/9904f7edb98efc53b1eb7f9c95a6de1052360379))
 * **block_seal_spec:** remove clamp

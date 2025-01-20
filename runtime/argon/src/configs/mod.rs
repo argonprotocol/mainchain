@@ -349,8 +349,14 @@ impl OnNewSlot<AccountId> for GrandpaSlotRotation {
 		// 	next_authorities.push((authority_id, 1));
 		// }
 
-		if let Err(err) = Grandpa::schedule_change(next_authorities, 1, None) {
-			log::error!("Failed to schedule grandpa change: {:?}", err);
+		// Only schedule a single rotation. This is mostly just to ensure that development (which
+		// won't have migrations) will get a grandpa change. Grandpa changes are needed to enable
+		// proofs of finality
+		if frame_system::Pallet::<Runtime>::block_number() < 10 {
+			log::info!("Scheduling grandpa change");
+			if let Err(err) = Grandpa::schedule_change(next_authorities, 1, None) {
+				log::error!("Failed to schedule grandpa change: {:?}", err);
+			}
 		}
 	}
 }

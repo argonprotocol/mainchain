@@ -40,7 +40,7 @@ resolver = "2"
 
 
 [workspace.package]
-version = "1.0.1"
+version = "1.0.2"
 edition = "2021"
 authors = ["Argon <https://github.com/argonprotocol>"]
 description = "The Argon ecosystem is a stablecoin on top of bitcoin."
@@ -138,9 +138,10 @@ pallet-ismp-runtime-api = { git = "https://github.com/argonprotocol/hyperbridge"
 pallet-hyperbridge = { git = "https://github.com/argonprotocol/hyperbridge" }
 pallet-ismp-rpc = { git = "https://github.com/argonprotocol/hyperbridge" }
 ismp-grandpa = { git = "https://github.com/argonprotocol/hyperbridge" }
+substrate-state-machine = { git = "https://github.com/argonprotocol/hyperbridge" }
+grandpa-verifier = { git = "https://github.com/argonprotocol/hyperbridge" }
 ismp = { git = "https://github.com/argonprotocol/hyperbridge" }
 pallet-token-gateway = { git = "https://github.com/argonprotocol/hyperbridge" }
-merkleized-metadata = { git = "https://github.com/bkchr/merkleized-metadata", rev = "18c9f872ce583f9aaf53a25717af6f3db7605871" }
 
 [workspace.dependencies]
 futures = { version = "0.3" }
@@ -197,7 +198,7 @@ binary-merkle-tree = { version = "15.0.1", default-features = false }
 
 frame-benchmarking = { version = "38.0.0" }
 frame-benchmarking-cli = { version = "43.0.0" }
-frame-support = { version = "38.0.0", default-features = false }
+frame-support = { version = "38.2.0", default-features = false }
 frame-system = { version = "38.0.0", default-features = false }
 frame-system-rpc-runtime-api = { version = "34.0.0", default-features = false }
 frame-executive = { version = "38.0.0", default-features = false }
@@ -263,7 +264,7 @@ sc-consensus-grandpa = { version = "0.30.0" }
 sc-consensus-grandpa-rpc = { version = "0.30.0" }
 sc-executor = { version = "0.40.1" }
 sc-basic-authorship = { version = "0.45.0" }
-sc-network = { version = "0.45.1" }
+sc-network = { version = "0.45.3" }
 sc-network-types = { version = "0.12.1" }
 sc-offchain = { version = "40.0.0" }
 sc-rpc = { version = "40.0.0" }
@@ -333,8 +334,8 @@ ismp = { version = "0.2.2", default-features = false }
 sp-mmr-primitives = { version = "34.0.0", default-features = false }
 
 ethers = { version = "2.0.14" }
-uniswap-sdk-core = { version = "3.2.0" }
-uniswap-v3-sdk = { version = "2.6.0" }
+uniswap-sdk-core = { version = "=3.2.0" }
+uniswap-v3-sdk = { version = "=2.7.0", default-features = false }
 uniswap-lens = { version = "0.7.0" }
 alloy-primitives = { version = "0.8.11", default-features = false }
 alloy-sol-types = { version = "0.8.11", default-features = false }

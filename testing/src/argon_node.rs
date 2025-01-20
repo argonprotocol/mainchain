@@ -59,7 +59,7 @@ impl ArgonNodeStartArgs {
 			.replace("\"", "");
 		let unique_name = format!(
 			"test_dir_{}_{}",
-			SystemTime::now().duration_since(UNIX_EPOCH)?.as_millis(),
+			SystemTime::now().duration_since(UNIX_EPOCH)?.as_micros(),
 			thread_id
 		);
 		let base_dir = env::temp_dir().join("argon_node").join(unique_name);
@@ -80,7 +80,7 @@ impl ArgonNodeStartArgs {
 		let node_log = "info";
 
 		let rust_log = format!(
-			"{},node={},pallet=info,argon=trace,sc_rpc_server=info",
+			"{},node={},pallet=info,argon=trace,sc_rpc_server=info",//,grandpa=trace,runtime::grandpa=trace",
 			overall_log, node_log,
 		);
 
@@ -175,12 +175,14 @@ impl ArgonTestNode {
 			.current_dir(args.target_dir.clone())
 			.env("RUST_LOG", &args.rust_log)
 			.stderr(process::Stdio::piped())
+			.stdout(process::Stdio::null()) // Redirect stdout to /dev/null
 			.arg("--no-mdns")
 			.arg(format!("--base-path={}", args.base_data_path.display()))
 			.arg("--detailed-log-output")
 			.arg("--allow-private-ipv4")
 			.arg("--dev")
-			// .arg("--state-pruning=archive")
+			.arg("--state-pruning=archive")
+			.arg("--blocks-pruning=archive")
 			.arg(format!("--{}", &args.authority.to_lowercase()))
 			.arg(format!("--name={}", &args.authority.to_lowercase()))
 			.arg("--port=0")
@@ -192,7 +194,7 @@ impl ArgonTestNode {
 
 		// Wait for RPC port to be logged (it's logged to stderr).
 		let stderr = proc.stderr.take().unwrap();
-		let log_watch = LogWatcher::new(stderr);
+		let log_watch = LogWatcher::new(stderr, &args.authority);
 		let port_matches = log_watch
 			.wait_for_log(r"Running JSON-RPC server: addr=127.0.0.1:(\d+)", 1)
 			.await?;

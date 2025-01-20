@@ -14,19 +14,23 @@ pub struct LogWatcher {
 }
 
 impl LogWatcher {
-	pub fn new<R: Read + Send + Sync + 'static>(log_in: R) -> Self {
+	pub fn new<R: Read + Send + Sync + 'static>(log_in: R, name: &str) -> Self {
 		let (log_notifier, log_receiver) = watch::channel(());
 		let log = Arc::new(Mutex::new(String::new()));
 
 		let log_clone = log.clone();
 
+		let mut name_clone = name.to_string();
+		while name_clone.len() < 8 {
+			name_clone.push(' ');
+		}
 		let handle = task::spawn_blocking(move || {
 			let buf_reader = BufReader::new(log_in);
 			for line in buf_reader.lines() {
 				match line {
 					Ok(line) => {
 						{
-							println!("{}", line);
+							println!("{} {}", name_clone, line);
 							let mut log_guard = log_clone.lock().unwrap();
 							log_guard.push_str(&line);
 							log_guard.push('\n');
