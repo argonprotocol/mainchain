@@ -144,6 +144,7 @@ impl OnNewSlot<u64> for StaticNewSlotEvent {
 	fn on_new_slot(
 		removed_authorities: Vec<(&u64, Self::Key)>,
 		added_authorities: Vec<(&u64, Self::Key)>,
+		_force: bool,
 	) {
 		LastSlotRemoved::set(removed_authorities.into_iter().map(|(a, b)| (*a, b)).collect());
 		LastSlotAdded::set(added_authorities.into_iter().map(|(a, b)| (*a, b)).collect());

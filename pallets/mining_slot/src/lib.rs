@@ -177,6 +177,9 @@ pub mod pallet {
 		RegisterAsMiner,
 	}
 
+	#[pallet::storage]
+	pub(super) type HasAddedGrandpaRotation<T: Config> = StorageValue<_, bool, ValueQuery>;
+
 	/// Miners that are active in the current block (post initialize)
 	#[pallet::storage]
 	pub(super) type ActiveMinersByIndex<T: Config> =
@@ -332,6 +335,11 @@ pub mod pallet {
 				Self::adjust_ownership_bond_amount();
 				Self::start_new_slot(block_number_u32);
 				return T::DbWeight::get().reads_writes(0, 2);
+			}
+
+			if !HasAddedGrandpaRotation::<T>::get() {
+				T::SlotEvents::on_new_slot::<T::Keys>(vec![], vec![], true);
+				HasAddedGrandpaRotation::<T>::put(true);
 			}
 
 			T::DbWeight::get().reads_writes(0, 0)
@@ -618,7 +626,7 @@ impl<T: Config> Pallet<T> {
 			start_index: start_index_to_replace_miners,
 			new_miners: slot_cohort,
 		});
-		T::SlotEvents::on_new_slot(removed_miners, added_miners);
+		T::SlotEvents::on_new_slot(removed_miners, added_miners, false);
 	}
 
 	/// Adjust the ownership bond amount based on a rolling 10 slot average of bids.
@@ -953,6 +961,7 @@ pub trait OnNewSlot<AccountId> {
 	fn on_new_slot(
 		removed_authorities: Vec<(&AccountId, Self::Key)>,
 		added_authorities: Vec<(&AccountId, Self::Key)>,
+		force: bool,
 	);
 }
 
@@ -960,6 +969,7 @@ pub trait SlotEvents<AccountId> {
 	fn on_new_slot<Ks: OpaqueKeys>(
 		removed_authorities: Vec<(AccountId, Ks)>,
 		added_authorities: Vec<(AccountId, Ks)>,
+		force: bool,
 	);
 }
 
@@ -969,6 +979,7 @@ impl<AId> SlotEvents<AId> for Tuple {
 	fn on_new_slot<Ks: OpaqueKeys>(
 		removed_authorities: Vec<(AId, Ks)>,
 		added_authorities: Vec<(AId, Ks)>,
+		force: bool,
 	) {
 		for_tuples!(
 		#(
@@ -980,7 +991,7 @@ impl<AId> SlotEvents<AId> for Tuple {
 				added_authorities.iter().filter_map(|k| {
 					k.1.get::<Tuple::Key>(<Tuple::Key as RuntimeAppPublic>::ID).map(|k1| (&k.0, k1))
 				}).collect::<Vec<_>>();
-			Tuple::on_new_slot(removed_keys, added_keys);
+			Tuple::on_new_slot(removed_keys, added_keys, force);
 		)*
 		)
 	}
