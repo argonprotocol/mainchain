@@ -81,7 +81,7 @@ impl ArgonTestNotary {
 		self.stop();
 		let mut proc = Self::start_process(get_target_dir(), &self.start_args).await?;
 		let stdout = proc.stdout.take().unwrap();
-		self.log_watcher = LogWatcher::new(stdout);
+		self.log_watcher = LogWatcher::new(stdout, "notary");
 		self.proc = Some(proc);
 		let _ = self.log_watcher.wait_for_log(r"Listening on (ws://[\d:.]+)", 1).await?;
 		self.client = Arc::new(argon_notary_apis::create_client(&self.ws_url).await?);
@@ -170,7 +170,7 @@ impl ArgonTestNotary {
 
 		// Wait for RPC port to be logged (it's logged to stdout).
 		let stdout = proc.stdout.take().unwrap();
-		let log_watcher = LogWatcher::new(stdout);
+		let log_watcher = LogWatcher::new(stdout, "notary");
 		let ws_url = log_watcher
 			.wait_for_log(r"Listening on (ws://[\d:.]+)", 1)
 			.await?
