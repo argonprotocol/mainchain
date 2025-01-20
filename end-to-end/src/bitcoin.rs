@@ -182,12 +182,21 @@ async fn test_bitcoin_minting_e2e() {
 
 	let finalized =
 		test_node.client.latest_finalized_block_hash().await.expect("should get latest");
+	let block_number = test_node
+		.client
+		.block_number(finalized.hash())
+		.await
+		.expect("should get number");
 	let mut miner_node_catchup_sub =
 		miner_node.client.live.blocks().subscribe_finalized().await.unwrap();
 	while let Some(next) = miner_node_catchup_sub.next().await {
 		let next = next.unwrap();
-		println!("Got next finalized catching up to main node {:?}", next.header().number);
-		if next.hash().as_ref() == finalized.hash().as_ref() {
+		println!(
+			"Got next finalized catching up to main node {:?}. Waiting for {}",
+			next.header().number,
+			block_number
+		);
+		if next.hash().as_ref() == finalized.hash().as_ref() || next.number() >= block_number {
 			break;
 		}
 	}
