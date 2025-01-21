@@ -99,6 +99,9 @@ pub mod pallet {
 	#[pallet::storage]
 	pub(super) type TempSealInherent<T: Config> = StorageValue<_, BlockSealInherent, OptionQuery>;
 
+	#[pallet::storage]
+	pub(super) type LastTickWithVoteSeal<T: Config> = StorageValue<_, Tick, ValueQuery>;
+
 	type FindBlockVoteSealResult<T> = BoundedVec<
 		BestBlockVoteSeal<
 			<T as frame_system::Config>::AccountId,
@@ -145,6 +148,8 @@ pub mod pallet {
 		InvalidForkPowerParent,
 		/// A block seal authority could not be properly decoded
 		BlockSealDecodeError,
+		/// Compute blocks cant be added in the same tick as a vote
+		InvalidComputeBlockTick,
 	}
 
 	#[pallet::hooks]
@@ -249,6 +254,7 @@ pub mod pallet {
 			let block_author = digests.author;
 			let notebooks = T::NotebookProvider::notebooks_in_block().len() as u32;
 			let vote_digest = digests.block_vote;
+			let current_tick = T::TickProvider::current_tick();
 
 			<VotesInPast3Ticks<T>>::mutate(|votes| {
 				if votes.is_full() {
@@ -271,6 +277,11 @@ pub mod pallet {
 						block_author_account_id: block_author,
 						block_seal_authority: None,
 					});
+					// a compute block cannot be stacked on top of a vote in the same tick
+					ensure!(
+						LastTickWithVoteSeal::<T>::get() != current_tick,
+						Error::<T>::InvalidComputeBlockTick
+					);
 				},
 				BlockSealInherent::Vote {
 					seal_strength,
@@ -279,9 +290,9 @@ pub mod pallet {
 					ref source_notebook_proof,
 					source_notebook_number,
 				} => {
-					let current_tick = T::TickProvider::current_tick();
 					let voting_schedule =
 						VotingSchedule::when_evaluating_runtime_seals(current_tick);
+					LastTickWithVoteSeal::<T>::put(current_tick);
 
 					ensure!(voting_schedule.is_voting_started(), Error::<T>::NoEligibleVotingRoot);
 

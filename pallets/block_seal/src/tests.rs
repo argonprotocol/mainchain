@@ -25,7 +25,8 @@ use std::panic::catch_unwind;
 use crate::{
 	mock::{BlockSeal, *},
 	pallet::{
-		BlockForkPower, LastBlockSealerInfo, ParentVotingKey, TempSealInherent, VotesInPast3Ticks,
+		BlockForkPower, LastBlockSealerInfo, LastTickWithVoteSeal, ParentVotingKey,
+		TempSealInherent, VotesInPast3Ticks,
 	},
 	Call, Error,
 };
@@ -85,6 +86,22 @@ fn it_should_check_vote_seal_inherents() {
 			.unwrap_err()
 			.to_string(),
 			SealInherentError::InvalidSeal.to_string()
+		);
+	});
+}
+
+#[test]
+fn it_does_not_allow_a_compute_block_in_same_tick_as_vote() {
+	new_test_ext().execute_with(|| {
+		// Go past genesis block so events get deposited
+		System::set_block_number(1);
+		CurrentTick::set(100);
+		LastTickWithVoteSeal::<Test>::put(100);
+
+		// actually panics
+		assert_err!(
+			BlockSeal::apply(RuntimeOrigin::none(), BlockSealInherent::Compute),
+			Error::<Test>::InvalidComputeBlockTick
 		);
 	});
 }
