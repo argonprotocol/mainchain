@@ -419,6 +419,40 @@ fn it_can_bond_funds() {
 }
 
 #[test]
+fn it_accounts_for_pending_bitcoins() {
+	new_test_ext().execute_with(|| {
+		// Go past genesis block so events get deposited
+		System::set_block_number(5);
+
+		set_argons(1, 1_000_000);
+		let terms = default_terms(FixedU128::from_float(0.0));
+
+		assert_ok!(Vaults::create(
+			RuntimeOrigin::signed(1),
+			VaultConfig {
+				terms,
+				bitcoin_xpubkey: keys(),
+				bitcoin_amount_allocated: 100_000,
+				mining_amount_allocated: 100_000,
+				securitization_percent: FixedU128::zero(),
+			}
+		));
+		assert_eq!(Balances::free_balance(1), 800_000);
+		let _ =
+			Vaults::bond_funds(1, 100_000, BondType::Bitcoin, 14_400, &2).expect("bonding failed");
+
+		Vaults::modify_pending_bitcoin_funds(1, 100_000, false).unwrap();
+		assert_err!(
+			Vaults::bond_funds(1, 100_000, BondType::Mining, 1400, &2),
+			BondError::InsufficientVaultFunds
+		);
+
+		Vaults::modify_pending_bitcoin_funds(1, 90_000, true).unwrap();
+		assert_ok!(Vaults::bond_funds(1, 90_000, BondType::Mining, 1400, &2));
+	});
+}
+
+#[test]
 fn it_can_charge_prorated_bond_funds() {
 	new_test_ext().execute_with(|| {
 		// Go past genesis block so events get deposited

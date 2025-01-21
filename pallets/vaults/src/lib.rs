@@ -143,6 +143,10 @@ pub mod pallet {
 		BoundedVec<VaultId, T::MaxPendingTermModificationsPerBlock>,
 		ValueQuery,
 	>;
+	/// Vault bitcoin bonds pending verification
+	#[pallet::storage]
+	pub(super) type PendingBitcoinsByVault<T: Config> =
+		StorageMap<_, Twox64Concat, VaultId, T::Balance, ValueQuery>;
 
 	#[pallet::event]
 	#[pallet::generate_deposit(pub(super) fn deposit_event)]
@@ -721,10 +725,10 @@ pub mod pallet {
 					&mut vault.bitcoin_argons
 				},
 				BondType::Mining => {
-					ensure!(
-						vault.amount_eligible_for_mining() >= amount,
-						BondError::InsufficientVaultFunds
-					);
+					let pending_bitcoins = PendingBitcoinsByVault::<T>::get(vault_id);
+					let amount_eligible =
+						vault.amount_eligible_for_mining().saturating_sub(pending_bitcoins);
+					ensure!(amount_eligible >= amount, BondError::InsufficientVaultFunds);
 					&mut vault.mining_argons
 				},
 			};
@@ -961,6 +965,21 @@ pub mod pallet {
 					.try_into()
 					.map_err(|_| BondError::InvalidBitcoinScript)?,
 			))
+		}
+
+		fn modify_pending_bitcoin_funds(
+			vault_id: VaultId,
+			amount: Self::Balance,
+			remove_pending: bool,
+		) -> Result<(), BondError> {
+			PendingBitcoinsByVault::<T>::mutate(vault_id, |x| {
+				if remove_pending {
+					*x = x.saturating_sub(amount)
+				} else {
+					*x = x.saturating_add(amount)
+				}
+			});
+			Ok(())
 		}
 	}
 

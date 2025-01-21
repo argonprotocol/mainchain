@@ -3737,9 +3737,9 @@ pub mod api {
 			.hash();
 		runtime_metadata_hash ==
 			[
-				16u8, 198u8, 19u8, 84u8, 121u8, 37u8, 83u8, 44u8, 106u8, 44u8, 139u8, 62u8, 12u8,
-				45u8, 152u8, 252u8, 250u8, 119u8, 217u8, 186u8, 243u8, 31u8, 100u8, 113u8, 58u8,
-				198u8, 157u8, 122u8, 189u8, 54u8, 62u8, 172u8,
+				171u8, 231u8, 223u8, 149u8, 111u8, 120u8, 19u8, 62u8, 185u8, 153u8, 82u8, 64u8,
+				132u8, 64u8, 245u8, 33u8, 51u8, 224u8, 102u8, 93u8, 172u8, 231u8, 17u8, 19u8,
+				140u8, 5u8, 187u8, 46u8, 199u8, 230u8, 171u8, 226u8,
 			]
 	}
 	pub mod system {
@@ -9411,6 +9411,11 @@ pub mod api {
 						>;
 					pub type Param0 = ::core::primitive::u32;
 				}
+				pub mod pending_bitcoins_by_vault {
+					use super::runtime_types;
+					pub type PendingBitcoinsByVault = ::core::primitive::u128;
+					pub type Param0 = ::core::primitive::u32;
+				}
 			}
 			pub struct StorageApi;
 			impl StorageApi {
@@ -9579,6 +9584,53 @@ pub mod api {
 							73u8, 78u8, 166u8, 219u8, 56u8, 178u8, 50u8, 224u8, 11u8, 41u8, 148u8,
 							28u8, 137u8, 75u8, 207u8, 172u8, 199u8, 18u8, 175u8, 112u8, 91u8, 46u8,
 							21u8, 226u8, 48u8, 43u8, 135u8, 247u8, 45u8, 100u8, 124u8, 211u8,
+						],
+					)
+				}
+				#[doc = " Vault bitcoin bonds pending verification"]
+				pub fn pending_bitcoins_by_vault_iter(
+					&self,
+				) -> ::subxt::ext::subxt_core::storage::address::StaticAddress<
+					(),
+					types::pending_bitcoins_by_vault::PendingBitcoinsByVault,
+					(),
+					::subxt::ext::subxt_core::utils::Yes,
+					::subxt::ext::subxt_core::utils::Yes,
+				> {
+					::subxt::ext::subxt_core::storage::address::StaticAddress::new_static(
+						"Vaults",
+						"PendingBitcoinsByVault",
+						(),
+						[
+							31u8, 39u8, 121u8, 86u8, 1u8, 106u8, 1u8, 55u8, 141u8, 210u8, 164u8,
+							96u8, 132u8, 133u8, 120u8, 34u8, 40u8, 124u8, 204u8, 144u8, 196u8,
+							30u8, 120u8, 42u8, 17u8, 70u8, 134u8, 235u8, 99u8, 187u8, 174u8, 155u8,
+						],
+					)
+				}
+				#[doc = " Vault bitcoin bonds pending verification"]
+				pub fn pending_bitcoins_by_vault(
+					&self,
+					_0: impl ::core::borrow::Borrow<types::pending_bitcoins_by_vault::Param0>,
+				) -> ::subxt::ext::subxt_core::storage::address::StaticAddress<
+					::subxt::ext::subxt_core::storage::address::StaticStorageKey<
+						types::pending_bitcoins_by_vault::Param0,
+					>,
+					types::pending_bitcoins_by_vault::PendingBitcoinsByVault,
+					::subxt::ext::subxt_core::utils::Yes,
+					::subxt::ext::subxt_core::utils::Yes,
+					(),
+				> {
+					::subxt::ext::subxt_core::storage::address::StaticAddress::new_static(
+						"Vaults",
+						"PendingBitcoinsByVault",
+						::subxt::ext::subxt_core::storage::address::StaticStorageKey::new(
+							_0.borrow(),
+						),
+						[
+							31u8, 39u8, 121u8, 86u8, 1u8, 106u8, 1u8, 55u8, 141u8, 210u8, 164u8,
+							96u8, 132u8, 133u8, 120u8, 34u8, 40u8, 124u8, 204u8, 144u8, 196u8,
+							30u8, 120u8, 42u8, 17u8, 70u8, 134u8, 235u8, 99u8, 187u8, 174u8, 155u8,
 						],
 					)
 				}

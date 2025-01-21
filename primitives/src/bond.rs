@@ -86,6 +86,12 @@ pub trait VaultProvider {
 		open_claim_height: BitcoinHeight,
 		current_height: BitcoinHeight,
 	) -> Result<(BitcoinXPub, BitcoinXPub, BitcoinCosignScriptPubkey), BondError>;
+
+	fn modify_pending_bitcoin_funds(
+		vault_id: VaultId,
+		amount: Self::Balance,
+		remove_pending: bool,
+	) -> Result<(), BondError>;
 }
 
 #[derive(Clone, PartialEq, Eq, Encode, Decode, RuntimeDebug, TypeInfo, PalletError)]
