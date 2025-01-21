@@ -1,6 +1,13 @@
 # Changelog
 
-## [v1.0.2](https://github.com/argonprotocol/mainchain/compare/v1.0.1...792b61b704653b81f6e40a2897c26a8d5e7da6f3) (2025-01-18)
+## [v1.0.3](https://github.com/argonprotocol/mainchain/compare/v1.0.2...5ebc3918a6737f548d55882b7ba3ca7bd23ef560) (2025-01-21)
+
+### Fixes
+
+* **vaults:** account for pending bitcoin
+([733071b](https://github.com/argonprotocol/mainchain/commit/733071be1a1cf4ad39c2323473b6d329838c0e64))
+
+### [v1.0.2](https://github.com/argonprotocol/mainchain/compare/v1.0.1...v1.0.2) (2025-01-18)
 
 ### [v1.0.1](https://github.com/argonprotocol/mainchain/compare/v1.0.0...v1.0.1) (2025-01-16)
 

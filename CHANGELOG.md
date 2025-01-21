@@ -1,13 +1,28 @@
 # Changelog
 
-## [v1.0.2](https://github.com/argonprotocol/mainchain/compare/v1.0.1...792b61b704653b81f6e40a2897c26a8d5e7da6f3) (2025-01-18)
+## [v1.0.3](https://github.com/argonprotocol/mainchain/compare/v1.0.2...5ebc3918a6737f548d55882b7ba3ca7bd23ef560) (2025-01-21)
 
-### Features
+### Fixes
+
+* **block_seal:** don’t allow compute on vote
+([c375b5b](https://github.com/argonprotocol/mainchain/commit/c375b5bde2c8d83a3ba165c64728a417f8c859f7))
+* **vaults:** account for pending bitcoin
+([733071b](https://github.com/argonprotocol/mainchain/commit/733071be1a1cf4ad39c2323473b6d329838c0e64))
+* payload size should apply to all rpc
+([b29c79a](https://github.com/argonprotocol/mainchain/commit/b29c79a2d1c79b51e980b13f082d2c9530febfb6))
+* ensure grandpa rotation generates log
+([881b8ad](https://github.com/argonprotocol/mainchain/commit/881b8ad0e5136be6b7b28fa4a3854494010f224c))
+* only change grandpa once
+([b3ec468](https://github.com/argonprotocol/mainchain/commit/b3ec468ba21d054a8f29842ecd651111099e9178))
+
+### [v1.0.2](https://github.com/argonprotocol/mainchain/compare/v1.0.1...v1.0.2) (2025-01-18)
+
+#### Features
 
 * change token symbol
 ([6249c57](https://github.com/argonprotocol/mainchain/commit/6249c5765f6e546bbc587c6e7b990effb448fd14))
 
-### Fixes
+#### Fixes
 
 * **node:** grandpa can’t prove finality
 ([63b86fd](https://github.com/argonprotocol/mainchain/commit/63b86fd4ab0690987e5e619b7e64b5a0810ab909))
