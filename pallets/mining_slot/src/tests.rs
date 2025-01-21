@@ -944,6 +944,45 @@ fn it_adjusts_ownership_bonds() {
 	});
 }
 
+#[test]
+fn it_doesnt_accept_bids_until_first_slot() {
+	BlocksBetweenSlots::set(1440);
+	MaxMiners::set(100);
+	MaxCohortSize::set(10);
+	SlotBiddingStartTick::set(12_960);
+	TargetBidsPerSlot::set(12);
+	MinOwnershipBondAmount::set(100_000);
+
+	new_test_ext().execute_with(|| {
+		set_ownership(2, 1000u32.into());
+		OwnershipBondAmount::<Test>::set(1_000);
+
+		System::set_block_number(13000);
+		TicksSinceGenesis::set(12960);
+
+		MiningSlots::on_initialize(13000);
+		assert_eq!(IsNextSlotBiddingOpen::<Test>::get(), false);
+
+		// bidding will start on the first (block % 1440 == 0)
+		MiningSlots::on_initialize(14400);
+		assert_eq!(IsNextSlotBiddingOpen::<Test>::get(), true);
+		assert_ok!(MiningSlots::bid(
+			RuntimeOrigin::signed(2),
+			None,
+			RewardDestination::Owner,
+			1.into()
+		));
+		assert_eq!(ActiveMinersCount::<Test>::get(), 0);
+
+		let next_divisible_period = 14400 + 1440;
+		System::set_block_number(next_divisible_period);
+		MiningSlots::on_initialize(next_divisible_period);
+		assert!(IsNextSlotBiddingOpen::<Test>::get());
+		assert_eq!(MiningSlots::get_next_slot_starting_index(), 10);
+		assert_eq!(ActiveMinersCount::<Test>::get(), 1);
+	});
+}
+
 fn create_block_vote_seal(seal_strength: U256) -> BlockSealInherent {
 	BlockSealInherent::Vote {
 		seal_strength,
