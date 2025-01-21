@@ -540,6 +540,8 @@ pub mod pallet {
 			)
 			.map_err(Error::<T>::from)?;
 			ensure!(total_fee <= amount, Error::<T>::FeeExceedsBondAmount);
+			T::VaultProvider::modify_pending_bitcoin_funds(vault_id, amount, false)
+				.map_err(Error::<T>::from)?;
 
 			let utxo_id = T::BitcoinUtxoTracker::new_utxo_id();
 
@@ -774,6 +776,12 @@ pub mod pallet {
 					let bond =
 						BondsById::<T>::get(utxo_state.bond_id).ok_or(Error::<T>::BondNotFound)?;
 					T::BondEvents::utxo_bonded(utxo_id, &bond.bonded_account_id, bond.amount)?;
+					T::VaultProvider::modify_pending_bitcoin_funds(
+						bond.vault_id,
+						bond.amount,
+						true,
+					)
+					.map_err(Error::<T>::from)?;
 				} else {
 					warn!("Verified utxo_id {:?} not found", utxo_id);
 				}
@@ -782,7 +790,7 @@ pub mod pallet {
 		}
 
 		fn utxo_rejected(utxo_id: UtxoId, _reason: BitcoinRejectedReason) -> DispatchResult {
-			if let Some(utxo_state) = UtxosById::<T>::take(utxo_id) {
+			if let Some(utxo_state) = UtxosById::<T>::get(utxo_id) {
 				Self::cancel_bond(utxo_state.bond_id).map_err(Error::<T>::from)?;
 			}
 			Ok(())
@@ -1091,7 +1099,16 @@ pub mod pallet {
 			});
 			Self::remove_bond_completion(bond_id, bond.expiration.clone());
 			if let Some(utxo_id) = bond.utxo_id {
-				UtxosById::<T>::take(utxo_id);
+				if let Some(utxo) = UtxosById::<T>::take(utxo_id) {
+					if !utxo.is_verified {
+						T::VaultProvider::modify_pending_bitcoin_funds(
+							bond.vault_id,
+							bond.amount,
+							true,
+						)?;
+					}
+				}
+
 				T::BitcoinUtxoTracker::unwatch(utxo_id);
 			}
 

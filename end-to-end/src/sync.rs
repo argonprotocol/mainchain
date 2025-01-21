@@ -21,7 +21,7 @@ async fn test_can_prove_finality() {
 	loop {
 		if let Some(Ok(block)) = blocks_sub.next().await {
 			let block_number = block.header().number;
-			if block_number <= 0 {
+			if block_number == 0 {
 				continue;
 			}
 			let events = block.events().await.unwrap().iter().flatten().collect::<Vec<_>>();
@@ -33,7 +33,7 @@ async fn test_can_prove_finality() {
 					.collect::<Vec<_>>()
 			);
 			// api won't work until grandpa rotates
-			if !events.iter().find(|a| a.pallet_name() == "Grandpa").is_some() {
+			if !events.iter().any(|a| a.pallet_name() == "Grandpa") {
 				continue;
 			}
 			let proof = grandpa_miner
@@ -45,7 +45,7 @@ async fn test_can_prove_finality() {
 				)
 				.await
 				.unwrap();
-			assert_eq!(proof.is_some(), true);
+			assert!(proof.is_some());
 			break;
 		}
 	}

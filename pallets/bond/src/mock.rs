@@ -231,6 +231,14 @@ impl VaultProvider for StaticVaultProvider {
 			BitcoinCosignScriptPubkey::P2WSH { wscript_hash: H256::from([0; 32]) },
 		))
 	}
+
+	fn modify_pending_bitcoin_funds(
+		_vault_id: VaultId,
+		_amount: Self::Balance,
+		_remove_pending: bool,
+	) -> Result<(), BondError> {
+		Ok(())
+	}
 }
 
 pub struct StaticBitcoinVerifier;

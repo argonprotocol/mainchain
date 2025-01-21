@@ -681,6 +681,10 @@ declare module '@polkadot/api-base/types/storage' {
     vaults: {
       nextVaultId: AugmentedQuery<ApiType, () => Observable<Option<u32>>, []>;
       /**
+       * Vault bitcoin bonds pending verification
+       **/
+      pendingBitcoinsByVault: AugmentedQuery<ApiType, (arg: u32 | AnyNumber | Uint8Array) => Observable<u128>, [u32]>;
+      /**
        * Pending terms that will be committed at the given block number (must be a minimum of 1 slot
        * change away)
        **/
