@@ -1,8 +1,15 @@
 # Changelog
 
-## [v1.0.3](https://github.com/argonprotocol/mainchain/compare/v1.0.2...5ebc3918a6737f548d55882b7ba3ca7bd23ef560) (2025-01-21)
+## [v1.0.4](https://github.com/argonprotocol/mainchain/compare/v1.0.3...8a5f954f8b3f1fec71c905a4ebb7e0c4587ec068) (2025-01-21)
 
 ### Fixes
+
+* needed to update spec_version
+([8a5f954](https://github.com/argonprotocol/mainchain/commit/8a5f954f8b3f1fec71c905a4ebb7e0c4587ec068))
+
+### [v1.0.3](https://github.com/argonprotocol/mainchain/compare/v1.0.2...v1.0.3) (2025-01-21)
+
+#### Fixes
 
 * **block_seal:** don’t allow compute on vote
 ([c375b5b](https://github.com/argonprotocol/mainchain/commit/c375b5bde2c8d83a3ba165c64728a417f8c859f7))
