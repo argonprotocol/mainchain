@@ -60,7 +60,7 @@ export argon_LOCAL_TESTNET_NOTARY_URL="wss://$argon_LOCAL_TESTNET_NOTARY_URL"
 # start a temporary node with alice and bob funded
 for i in {0..2} ; do
   mkdir -p /tmp/argon/$RUNID/${validators[$i]};
-  docker run -d --network=host --name "argon-node-${validators[$i]}" --restart=unless-stopped ghcr.io/argonprotocol/argon-miner:v$VERSION \
+  docker run -d -rm --network=host --name "argon-node-${validators[$i]}" --restart=unless-stopped ghcr.io/argonprotocol/argon-miner:v$VERSION \
     --${validators[$i]} --detailed-log-output --chain local --name=${validators[$i]} \
     --base-path /tmp/argon/$RUNID/${validators[$i]} \
     --notebook-archive-hosts=$NOTEBOOK_ARCHIVE \
@@ -87,7 +87,7 @@ docker run -it --rm ghcr.io/argonprotocol/argon-notary:v$VERSION insert-key --ke
 docker run -it --rm --network=host ghcr.io/argonprotocol/argon-notary:v$VERSION migrate --db-url ${DBPATH};
 
 # use dev to create the archive bucket for us
-docker run -d --network=host -e RUST_LOG=info --name=argon-notary ghcr.io/argonprotocol/argon-notary:v$VERSION run \
+docker run -d -rm --network=host -e RUST_LOG=info --name=argon-notary ghcr.io/argonprotocol/argon-notary:v$VERSION run \
   --operator-address=5CiPPseXPECbkjWCa6MnjNokrgYjMqmKndv2rSnekmSK2DjL --db-url ${DBPATH} -t ws://127.0.0.1:9944 \
   --keystore-path /tmp/notary_keystore \
   --dev \
