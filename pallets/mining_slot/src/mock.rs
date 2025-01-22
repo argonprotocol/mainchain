@@ -121,11 +121,26 @@ impl BondProvider for StaticBondProvider {
 		account_id: Self::AccountId,
 		amount: Self::Balance,
 		_bond_until_block: Self::BlockNumber,
-	) -> Result<(argon_primitives::BondId, Option<RewardSharing<u64>>), BondError> {
+		modify_bond_id: Option<BondId>,
+	) -> Result<(argon_primitives::BondId, Option<RewardSharing<u64>>, Self::Balance), BondError> {
+		if let Some(modify_bond_id) = modify_bond_id {
+			let res = Bonds::mutate(|a| {
+				let existing =
+					a.iter_mut().find(|(id, v, _, _)| *id == modify_bond_id && *v == vault_id);
+				if let Some((_, _, _, a)) = existing {
+					*a = a.saturating_add(amount);
+					return Some(*a);
+				}
+				None
+			});
+			if let Some(total) = res {
+				return Ok((modify_bond_id, VaultSharing::get(), total));
+			}
+		}
 		let bond_id = NextBondId::get();
 		NextBondId::set(bond_id + 1);
 		Bonds::mutate(|a| a.push((bond_id, vault_id, account_id, amount)));
-		Ok((bond_id, VaultSharing::get()))
+		Ok((bond_id, VaultSharing::get(), amount))
 	}
 
 	fn cancel_bond(bond_id: argon_primitives::BondId) -> Result<(), BondError> {

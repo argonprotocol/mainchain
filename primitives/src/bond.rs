@@ -25,7 +25,8 @@ pub trait BondProvider {
 		account_id: Self::AccountId,
 		amount: Self::Balance,
 		bond_until_block: Self::BlockNumber,
-	) -> Result<(BondId, Option<RewardSharing<Self::AccountId>>), BondError>;
+		modify_bond_id: Option<BondId>,
+	) -> Result<(BondId, Option<RewardSharing<Self::AccountId>>, Self::Balance), BondError>;
 
 	/// Return the bond to the originator with a prorated refund
 	fn cancel_bond(bond_id: BondId) -> Result<(), BondError>;
