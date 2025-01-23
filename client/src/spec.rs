@@ -3737,9 +3737,9 @@ pub mod api {
 			.hash();
 		runtime_metadata_hash ==
 			[
-				171u8, 231u8, 223u8, 149u8, 111u8, 120u8, 19u8, 62u8, 185u8, 153u8, 82u8, 64u8,
-				132u8, 64u8, 245u8, 33u8, 51u8, 224u8, 102u8, 93u8, 172u8, 231u8, 17u8, 19u8,
-				140u8, 5u8, 187u8, 46u8, 199u8, 230u8, 171u8, 226u8,
+				178u8, 226u8, 76u8, 73u8, 248u8, 146u8, 251u8, 137u8, 71u8, 176u8, 67u8, 211u8,
+				221u8, 205u8, 7u8, 62u8, 72u8, 204u8, 126u8, 124u8, 195u8, 35u8, 31u8, 121u8,
+				129u8, 46u8, 72u8, 167u8, 168u8, 98u8, 180u8, 192u8,
 			]
 	}
 	pub mod system {
@@ -4890,9 +4890,9 @@ pub mod api {
 						"Events",
 						(),
 						[
-							123u8, 224u8, 99u8, 23u8, 28u8, 108u8, 77u8, 3u8, 46u8, 18u8, 33u8,
-							165u8, 85u8, 252u8, 37u8, 107u8, 90u8, 246u8, 48u8, 14u8, 97u8, 16u8,
-							183u8, 112u8, 224u8, 65u8, 202u8, 146u8, 140u8, 157u8, 170u8, 7u8,
+							230u8, 85u8, 43u8, 63u8, 239u8, 129u8, 127u8, 60u8, 89u8, 173u8, 174u8,
+							208u8, 170u8, 28u8, 82u8, 1u8, 89u8, 155u8, 192u8, 187u8, 179u8, 74u8,
+							231u8, 145u8, 236u8, 75u8, 20u8, 53u8, 47u8, 147u8, 70u8, 104u8,
 						],
 					)
 				}
@@ -7739,6 +7739,10 @@ pub mod api {
 			use super::runtime_types;
 			pub mod types {
 				use super::runtime_types;
+				pub mod has_added_grandpa_rotation {
+					use super::runtime_types;
+					pub type HasAddedGrandpaRotation = ::core::primitive::bool;
+				}
 				pub mod active_miners_by_index {
 					use super::runtime_types;
 					pub type ActiveMinersByIndex =
@@ -7802,6 +7806,27 @@ pub mod api {
 			}
 			pub struct StorageApi;
 			impl StorageApi {
+				pub fn has_added_grandpa_rotation(
+					&self,
+				) -> ::subxt::ext::subxt_core::storage::address::StaticAddress<
+					(),
+					types::has_added_grandpa_rotation::HasAddedGrandpaRotation,
+					::subxt::ext::subxt_core::utils::Yes,
+					::subxt::ext::subxt_core::utils::Yes,
+					(),
+				> {
+					::subxt::ext::subxt_core::storage::address::StaticAddress::new_static(
+						"MiningSlot",
+						"HasAddedGrandpaRotation",
+						(),
+						[
+							171u8, 176u8, 102u8, 135u8, 64u8, 155u8, 115u8, 43u8, 94u8, 46u8,
+							155u8, 121u8, 243u8, 249u8, 253u8, 99u8, 247u8, 13u8, 236u8, 237u8,
+							136u8, 92u8, 55u8, 235u8, 6u8, 85u8, 170u8, 239u8, 234u8, 181u8, 245u8,
+							128u8,
+						],
+					)
+				}
 				#[doc = " Miners that are active in the current block (post initialize)"]
 				pub fn active_miners_by_index_iter(
 					&self,
@@ -9292,6 +9317,54 @@ pub mod api {
 			# [codec (crate = :: subxt :: ext :: subxt_core :: ext :: codec)]
 			#[decode_as_type(crate_path = ":: subxt :: ext :: subxt_core :: ext :: scale_decode")]
 			#[encode_as_type(crate_path = ":: subxt :: ext :: subxt_core :: ext :: scale_encode")]
+			pub struct VaultMiningBondsIncreased {
+				pub vault_id: vault_mining_bonds_increased::VaultId,
+				pub mining_argons: vault_mining_bonds_increased::MiningArgons,
+			}
+			pub mod vault_mining_bonds_increased {
+				use super::runtime_types;
+				pub type VaultId = ::core::primitive::u32;
+				pub type MiningArgons = ::core::primitive::u128;
+			}
+			impl ::subxt::ext::subxt_core::events::StaticEvent for VaultMiningBondsIncreased {
+				const PALLET: &'static str = "Vaults";
+				const EVENT: &'static str = "VaultMiningBondsIncreased";
+			}
+			#[derive(
+				:: subxt :: ext :: subxt_core :: ext :: codec :: Decode,
+				:: subxt :: ext :: subxt_core :: ext :: codec :: Encode,
+				:: subxt :: ext :: subxt_core :: ext :: scale_decode :: DecodeAsType,
+				:: subxt :: ext :: subxt_core :: ext :: scale_encode :: EncodeAsType,
+				Clone,
+				Debug,
+			)]
+			# [codec (crate = :: subxt :: ext :: subxt_core :: ext :: codec)]
+			#[decode_as_type(crate_path = ":: subxt :: ext :: subxt_core :: ext :: scale_decode")]
+			#[encode_as_type(crate_path = ":: subxt :: ext :: subxt_core :: ext :: scale_encode")]
+			pub struct VaultMiningBondsChangeScheduled {
+				pub vault_id: vault_mining_bonds_change_scheduled::VaultId,
+				pub change_block: vault_mining_bonds_change_scheduled::ChangeBlock,
+			}
+			pub mod vault_mining_bonds_change_scheduled {
+				use super::runtime_types;
+				pub type VaultId = ::core::primitive::u32;
+				pub type ChangeBlock = ::core::primitive::u32;
+			}
+			impl ::subxt::ext::subxt_core::events::StaticEvent for VaultMiningBondsChangeScheduled {
+				const PALLET: &'static str = "Vaults";
+				const EVENT: &'static str = "VaultMiningBondsChangeScheduled";
+			}
+			#[derive(
+				:: subxt :: ext :: subxt_core :: ext :: codec :: Decode,
+				:: subxt :: ext :: subxt_core :: ext :: codec :: Encode,
+				:: subxt :: ext :: subxt_core :: ext :: scale_decode :: DecodeAsType,
+				:: subxt :: ext :: subxt_core :: ext :: scale_encode :: EncodeAsType,
+				Clone,
+				Debug,
+			)]
+			# [codec (crate = :: subxt :: ext :: subxt_core :: ext :: codec)]
+			#[decode_as_type(crate_path = ":: subxt :: ext :: subxt_core :: ext :: scale_decode")]
+			#[encode_as_type(crate_path = ":: subxt :: ext :: subxt_core :: ext :: scale_encode")]
 			pub struct VaultTermsChangeScheduled {
 				pub vault_id: vault_terms_change_scheduled::VaultId,
 				pub change_block: vault_terms_change_scheduled::ChangeBlock,
@@ -9411,9 +9484,12 @@ pub mod api {
 						>;
 					pub type Param0 = ::core::primitive::u32;
 				}
-				pub mod pending_bitcoins_by_vault {
+				pub mod pending_funding_modifications_by_block {
 					use super::runtime_types;
-					pub type PendingBitcoinsByVault = ::core::primitive::u128;
+					pub type PendingFundingModificationsByBlock =
+						runtime_types::bounded_collections::bounded_vec::BoundedVec<
+							::core::primitive::u32,
+						>;
 					pub type Param0 = ::core::primitive::u32;
 				}
 			}
@@ -9455,10 +9531,9 @@ pub mod api {
 						"VaultsById",
 						(),
 						[
-							66u8, 95u8, 231u8, 97u8, 236u8, 84u8, 107u8, 245u8, 111u8, 45u8, 31u8,
-							119u8, 173u8, 246u8, 130u8, 24u8, 210u8, 102u8, 199u8, 210u8, 3u8,
-							97u8, 124u8, 255u8, 16u8, 154u8, 212u8, 11u8, 119u8, 125u8, 143u8,
-							66u8,
+							90u8, 56u8, 243u8, 114u8, 205u8, 185u8, 41u8, 230u8, 146u8, 93u8, 44u8,
+							187u8, 193u8, 173u8, 194u8, 39u8, 77u8, 32u8, 220u8, 187u8, 239u8,
+							17u8, 223u8, 103u8, 69u8, 25u8, 152u8, 228u8, 173u8, 255u8, 4u8, 181u8,
 						],
 					)
 				}
@@ -9482,10 +9557,9 @@ pub mod api {
 							_0.borrow(),
 						),
 						[
-							66u8, 95u8, 231u8, 97u8, 236u8, 84u8, 107u8, 245u8, 111u8, 45u8, 31u8,
-							119u8, 173u8, 246u8, 130u8, 24u8, 210u8, 102u8, 199u8, 210u8, 3u8,
-							97u8, 124u8, 255u8, 16u8, 154u8, 212u8, 11u8, 119u8, 125u8, 143u8,
-							66u8,
+							90u8, 56u8, 243u8, 114u8, 205u8, 185u8, 41u8, 230u8, 146u8, 93u8, 44u8,
+							187u8, 193u8, 173u8, 194u8, 39u8, 77u8, 32u8, 220u8, 187u8, 239u8,
+							17u8, 223u8, 103u8, 69u8, 25u8, 152u8, 228u8, 173u8, 255u8, 4u8, 181u8,
 						],
 					)
 				}
@@ -9587,50 +9661,31 @@ pub mod api {
 						],
 					)
 				}
-				#[doc = " Vault bitcoin bonds pending verification"]
-				pub fn pending_bitcoins_by_vault_iter(
-					&self,
-				) -> ::subxt::ext::subxt_core::storage::address::StaticAddress<
-					(),
-					types::pending_bitcoins_by_vault::PendingBitcoinsByVault,
-					(),
-					::subxt::ext::subxt_core::utils::Yes,
-					::subxt::ext::subxt_core::utils::Yes,
-				> {
+				#[doc = " Pending funding that will be committed at the given block number (must be a minimum of 1"]
+				#[doc = " slot change away)"]				pub fn pending_funding_modifications_by_block_iter (& self ,) -> :: subxt :: ext :: subxt_core :: storage :: address :: StaticAddress :: < () , types :: pending_funding_modifications_by_block :: PendingFundingModificationsByBlock , () , :: subxt :: ext :: subxt_core :: utils :: Yes , :: subxt :: ext :: subxt_core :: utils :: Yes >{
 					::subxt::ext::subxt_core::storage::address::StaticAddress::new_static(
 						"Vaults",
-						"PendingBitcoinsByVault",
+						"PendingFundingModificationsByBlock",
 						(),
 						[
-							31u8, 39u8, 121u8, 86u8, 1u8, 106u8, 1u8, 55u8, 141u8, 210u8, 164u8,
-							96u8, 132u8, 133u8, 120u8, 34u8, 40u8, 124u8, 204u8, 144u8, 196u8,
-							30u8, 120u8, 42u8, 17u8, 70u8, 134u8, 235u8, 99u8, 187u8, 174u8, 155u8,
+							161u8, 132u8, 124u8, 107u8, 139u8, 70u8, 52u8, 177u8, 12u8, 221u8,
+							147u8, 54u8, 173u8, 162u8, 68u8, 123u8, 53u8, 12u8, 155u8, 238u8, 9u8,
+							242u8, 78u8, 20u8, 203u8, 21u8, 226u8, 159u8, 156u8, 4u8, 28u8, 6u8,
 						],
 					)
 				}
-				#[doc = " Vault bitcoin bonds pending verification"]
-				pub fn pending_bitcoins_by_vault(
-					&self,
-					_0: impl ::core::borrow::Borrow<types::pending_bitcoins_by_vault::Param0>,
-				) -> ::subxt::ext::subxt_core::storage::address::StaticAddress<
-					::subxt::ext::subxt_core::storage::address::StaticStorageKey<
-						types::pending_bitcoins_by_vault::Param0,
-					>,
-					types::pending_bitcoins_by_vault::PendingBitcoinsByVault,
-					::subxt::ext::subxt_core::utils::Yes,
-					::subxt::ext::subxt_core::utils::Yes,
-					(),
-				> {
+				#[doc = " Pending funding that will be committed at the given block number (must be a minimum of 1"]
+				#[doc = " slot change away)"]				pub fn pending_funding_modifications_by_block (& self , _0 : impl :: core :: borrow :: Borrow < types :: pending_funding_modifications_by_block :: Param0 > ,) -> :: subxt :: ext :: subxt_core :: storage :: address :: StaticAddress :: < :: subxt :: ext :: subxt_core :: storage :: address :: StaticStorageKey < types :: pending_funding_modifications_by_block :: Param0 > , types :: pending_funding_modifications_by_block :: PendingFundingModificationsByBlock , :: subxt :: ext :: subxt_core :: utils :: Yes , :: subxt :: ext :: subxt_core :: utils :: Yes , () >{
 					::subxt::ext::subxt_core::storage::address::StaticAddress::new_static(
 						"Vaults",
-						"PendingBitcoinsByVault",
+						"PendingFundingModificationsByBlock",
 						::subxt::ext::subxt_core::storage::address::StaticStorageKey::new(
 							_0.borrow(),
 						),
 						[
-							31u8, 39u8, 121u8, 86u8, 1u8, 106u8, 1u8, 55u8, 141u8, 210u8, 164u8,
-							96u8, 132u8, 133u8, 120u8, 34u8, 40u8, 124u8, 204u8, 144u8, 196u8,
-							30u8, 120u8, 42u8, 17u8, 70u8, 134u8, 235u8, 99u8, 187u8, 174u8, 155u8,
+							161u8, 132u8, 124u8, 107u8, 139u8, 70u8, 52u8, 177u8, 12u8, 221u8,
+							147u8, 54u8, 173u8, 162u8, 68u8, 123u8, 53u8, 12u8, 155u8, 238u8, 9u8,
+							242u8, 78u8, 20u8, 203u8, 21u8, 226u8, 159u8, 156u8, 4u8, 28u8, 6u8,
 						],
 					)
 				}
@@ -9701,6 +9756,23 @@ pub mod api {
 					::subxt::ext::subxt_core::constants::address::StaticAddress::new_static(
 						"Vaults",
 						"MinTermsModificationBlockDelay",
+						[
+							98u8, 252u8, 116u8, 72u8, 26u8, 180u8, 225u8, 83u8, 200u8, 157u8,
+							125u8, 151u8, 53u8, 76u8, 168u8, 26u8, 10u8, 9u8, 98u8, 68u8, 9u8,
+							178u8, 197u8, 113u8, 31u8, 79u8, 200u8, 90u8, 203u8, 100u8, 41u8,
+							145u8,
+						],
+					)
+				}
+				#[doc = " The number of blocks that a funding change will be delayed before it takes effect"]
+				pub fn mining_argon_increase_block_delay(
+					&self,
+				) -> ::subxt::ext::subxt_core::constants::address::StaticAddress<
+					::core::primitive::u32,
+				> {
+					::subxt::ext::subxt_core::constants::address::StaticAddress::new_static(
+						"Vaults",
+						"MiningArgonIncreaseBlockDelay",
 						[
 							98u8, 252u8, 116u8, 72u8, 26u8, 180u8, 225u8, 83u8, 200u8, 157u8,
 							125u8, 151u8, 53u8, 76u8, 168u8, 26u8, 10u8, 9u8, 98u8, 68u8, 9u8,
@@ -9969,6 +10041,32 @@ pub mod api {
 			impl ::subxt::ext::subxt_core::events::StaticEvent for BondCompleted {
 				const PALLET: &'static str = "Bonds";
 				const EVENT: &'static str = "BondCompleted";
+			}
+			#[derive(
+				:: subxt :: ext :: subxt_core :: ext :: codec :: Decode,
+				:: subxt :: ext :: subxt_core :: ext :: codec :: Encode,
+				:: subxt :: ext :: subxt_core :: ext :: scale_decode :: DecodeAsType,
+				:: subxt :: ext :: subxt_core :: ext :: scale_encode :: EncodeAsType,
+				Clone,
+				Debug,
+			)]
+			# [codec (crate = :: subxt :: ext :: subxt_core :: ext :: codec)]
+			#[decode_as_type(crate_path = ":: subxt :: ext :: subxt_core :: ext :: scale_decode")]
+			#[encode_as_type(crate_path = ":: subxt :: ext :: subxt_core :: ext :: scale_encode")]
+			pub struct BondModified {
+				pub vault_id: bond_modified::VaultId,
+				pub bond_id: bond_modified::BondId,
+				pub amount: bond_modified::Amount,
+			}
+			pub mod bond_modified {
+				use super::runtime_types;
+				pub type VaultId = ::core::primitive::u32;
+				pub type BondId = ::core::primitive::u64;
+				pub type Amount = ::core::primitive::u128;
+			}
+			impl ::subxt::ext::subxt_core::events::StaticEvent for BondModified {
+				const PALLET: &'static str = "Bonds";
+				const EVENT: &'static str = "BondModified";
 			}
 			#[derive(
 				:: subxt :: ext :: subxt_core :: ext :: codec :: Decode,
@@ -14424,6 +14522,10 @@ pub mod api {
 					pub type TempSealInherent =
 						runtime_types::argon_primitives::inherents::BlockSealInherent;
 				}
+				pub mod last_tick_with_vote_seal {
+					use super::runtime_types;
+					pub type LastTickWithVoteSeal = ::core::primitive::u64;
+				}
 			}
 			pub struct StorageApi;
 			impl StorageApi {
@@ -14533,6 +14635,27 @@ pub mod api {
 							230u8, 119u8, 156u8, 69u8, 159u8, 27u8, 252u8, 137u8, 87u8, 146u8,
 							233u8, 198u8, 49u8, 7u8, 252u8, 202u8, 33u8, 109u8, 61u8, 85u8, 58u8,
 							188u8,
+						],
+					)
+				}
+				pub fn last_tick_with_vote_seal(
+					&self,
+				) -> ::subxt::ext::subxt_core::storage::address::StaticAddress<
+					(),
+					types::last_tick_with_vote_seal::LastTickWithVoteSeal,
+					::subxt::ext::subxt_core::utils::Yes,
+					::subxt::ext::subxt_core::utils::Yes,
+					(),
+				> {
+					::subxt::ext::subxt_core::storage::address::StaticAddress::new_static(
+						"BlockSeal",
+						"LastTickWithVoteSeal",
+						(),
+						[
+							216u8, 188u8, 145u8, 115u8, 12u8, 214u8, 101u8, 116u8, 245u8, 158u8,
+							250u8, 223u8, 9u8, 126u8, 102u8, 151u8, 192u8, 50u8, 223u8, 99u8,
+							167u8, 114u8, 225u8, 29u8, 102u8, 203u8, 105u8, 139u8, 69u8, 78u8,
+							74u8, 43u8,
 						],
 					)
 				}
@@ -22908,6 +23031,8 @@ pub mod api {
 						_2,
 						runtime_types::argon_primitives::bond::VaultTerms<_1>,
 					)>,
+					pub pending_mining_argons: ::core::option::Option<(_2, _1)>,
+					pub pending_bitcoins: _1,
 				}
 				#[derive(
 					:: subxt :: ext :: subxt_core :: ext :: codec :: Decode,
@@ -26347,6 +26472,9 @@ pub mod api {
 					#[codec(index = 17)]
 					#[doc = "A block seal authority could not be properly decoded"]
 					BlockSealDecodeError,
+					#[codec(index = 18)]
+					#[doc = "Compute blocks cant be added in the same tick as a vote"]
+					InvalidComputeBlockTick,
 				}
 			}
 		}
@@ -26615,6 +26743,12 @@ pub mod api {
 						bond_id: ::core::primitive::u64,
 					},
 					#[codec(index = 2)]
+					BondModified {
+						vault_id: ::core::primitive::u32,
+						bond_id: ::core::primitive::u64,
+						amount: ::core::primitive::u128,
+					},
+					#[codec(index = 3)]
 					BondCanceled {
 						vault_id: ::core::primitive::u32,
 						bond_id: ::core::primitive::u64,
@@ -26622,7 +26756,7 @@ pub mod api {
 						bond_type: runtime_types::argon_primitives::bond::BondType,
 						returned_fee: ::core::primitive::u128,
 					},
-					#[codec(index = 3)]
+					#[codec(index = 4)]
 					BitcoinBondBurned {
 						vault_id: ::core::primitive::u32,
 						bond_id: ::core::primitive::u64,
@@ -26631,20 +26765,20 @@ pub mod api {
 						amount_held: ::core::primitive::u128,
 						was_utxo_spent: ::core::primitive::bool,
 					},
-					#[codec(index = 4)]
+					#[codec(index = 5)]
 					BitcoinUtxoCosignRequested {
 						bond_id: ::core::primitive::u64,
 						vault_id: ::core::primitive::u32,
 						utxo_id: ::core::primitive::u64,
 					},
-					#[codec(index = 5)]
+					#[codec(index = 6)]
 					BitcoinUtxoCosigned {
 						bond_id: ::core::primitive::u64,
 						vault_id: ::core::primitive::u32,
 						utxo_id: ::core::primitive::u64,
 						signature: runtime_types::argon_primitives::bitcoin::BitcoinSignature,
 					},
-					#[codec(index = 6)]
+					#[codec(index = 7)]
 					BitcoinCosignPastDue {
 						bond_id: ::core::primitive::u64,
 						vault_id: ::core::primitive::u32,
@@ -26653,13 +26787,13 @@ pub mod api {
 						compensation_still_owed: ::core::primitive::u128,
 						compensated_account_id: crate::types::AccountId32,
 					},
-					#[codec(index = 7)]
+					#[codec(index = 8)]
 					#[doc = "An error occurred while completing a bond"]
 					BondCompletionError {
 						bond_id: ::core::primitive::u64,
 						error: runtime_types::sp_runtime::DispatchError,
 					},
-					#[codec(index = 8)]
+					#[codec(index = 9)]
 					#[doc = "An error occurred while refunding an overdue cosigned bitcoin bond"]
 					CosignOverdueError {
 						utxo_id: ::core::primitive::u64,
@@ -30096,6 +30230,9 @@ pub mod api {
 					#[codec(index = 36)]
 					#[doc = "Unable to decode vault bitcoin pubkey"]
 					UnableToDecodeVaultBitcoinPubkey,
+					#[codec(index = 37)]
+					#[doc = "A funding change is already scheduled"]
+					FundingChangeAlreadyScheduled,
 				}
 				#[derive(
 					:: subxt :: ext :: subxt_core :: ext :: codec :: Decode,
@@ -30132,20 +30269,30 @@ pub mod api {
 							runtime_types::sp_arithmetic::fixed_point::FixedU128,
 					},
 					#[codec(index = 2)]
+					VaultMiningBondsIncreased {
+						vault_id: ::core::primitive::u32,
+						mining_argons: ::core::primitive::u128,
+					},
+					#[codec(index = 3)]
+					VaultMiningBondsChangeScheduled {
+						vault_id: ::core::primitive::u32,
+						change_block: ::core::primitive::u32,
+					},
+					#[codec(index = 4)]
 					VaultTermsChangeScheduled {
 						vault_id: ::core::primitive::u32,
 						change_block: ::core::primitive::u32,
 					},
-					#[codec(index = 3)]
+					#[codec(index = 5)]
 					VaultTermsChanged { vault_id: ::core::primitive::u32 },
-					#[codec(index = 4)]
+					#[codec(index = 6)]
 					VaultClosed {
 						vault_id: ::core::primitive::u32,
 						bitcoin_amount_still_bonded: ::core::primitive::u128,
 						mining_amount_still_bonded: ::core::primitive::u128,
 						securitization_still_bonded: ::core::primitive::u128,
 					},
-					#[codec(index = 5)]
+					#[codec(index = 7)]
 					VaultBitcoinXpubChange { vault_id: ::core::primitive::u32 },
 				}
 				#[derive(

@@ -139,6 +139,10 @@ declare module '@polkadot/api-base/types/errors' {
        **/
       InvalidBlockVoteProof: AugmentedError<ApiType>;
       /**
+       * Compute blocks cant be added in the same tick as a vote
+       **/
+      InvalidComputeBlockTick: AugmentedError<ApiType>;
+      /**
        * Invalid fork power parent
        **/
       InvalidForkPowerParent: AugmentedError<ApiType>;
@@ -830,6 +834,10 @@ declare module '@polkadot/api-base/types/errors' {
        * The fee for this bond exceeds the amount of the bond, which is unsafe
        **/
       FeeExceedsBondAmount: AugmentedError<ApiType>;
+      /**
+       * A funding change is already scheduled
+       **/
+      FundingChangeAlreadyScheduled: AugmentedError<ApiType>;
       HoldUnexpectedlyModified: AugmentedError<ApiType>;
       /**
        * The vault does not have enough bitcoins to cover the mining bond
