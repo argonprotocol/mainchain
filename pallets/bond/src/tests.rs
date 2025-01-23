@@ -654,7 +654,7 @@ fn it_can_modify_a_mining_bond() {
 				amount: amount + 10000,
 				utxo_id: None,
 				bond_type: BondType::Mining,
-				total_fee: 200_00,
+				total_fee: 200_000,
 				prepaid_fee: 200,
 				vault_id: 1,
 				expiration: BondExpiration::ArgonBlock(10),

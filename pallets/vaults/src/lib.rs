@@ -10,6 +10,7 @@ mod mock;
 #[cfg(test)]
 mod tests;
 
+pub mod migrations;
 pub mod weights;
 
 /// The vaults pallet allows a user to offer argons for lease to other users. There are two types of
@@ -57,7 +58,10 @@ pub mod pallet {
 		MiningSlotProvider, VaultId,
 	};
 
+	const STORAGE_VERSION: StorageVersion = StorageVersion::new(1);
+
 	#[pallet::pallet]
+	#[pallet::storage_version(STORAGE_VERSION)]
 	pub struct Pallet<T>(_);
 
 	/// Configure the pallet by specifying the parameters and types on which it depends.
@@ -101,6 +105,10 @@ pub mod pallet {
 		#[pallet::constant]
 		type MinTermsModificationBlockDelay: Get<BlockNumberFor<Self>>;
 
+		/// The number of blocks that a funding change will be delayed before it takes effect
+		#[pallet::constant]
+		type MiningArgonIncreaseBlockDelay: Get<BlockNumberFor<Self>>;
+
 		/// A provider of mining slot information
 		type MiningSlotProvider: MiningSlotProvider<BlockNumberFor<Self>>;
 
@@ -143,10 +151,16 @@ pub mod pallet {
 		BoundedVec<VaultId, T::MaxPendingTermModificationsPerBlock>,
 		ValueQuery,
 	>;
-	/// Vault bitcoin bonds pending verification
+	/// Pending funding that will be committed at the given block number (must be a minimum of 1
+	/// slot change away)
 	#[pallet::storage]
-	pub(super) type PendingBitcoinsByVault<T: Config> =
-		StorageMap<_, Twox64Concat, VaultId, T::Balance, ValueQuery>;
+	pub(super) type PendingFundingModificationsByBlock<T: Config> = StorageMap<
+		_,
+		Twox64Concat,
+		BlockNumberFor<T>,
+		BoundedVec<VaultId, T::MaxPendingTermModificationsPerBlock>,
+		ValueQuery,
+	>;
 
 	#[pallet::event]
 	#[pallet::generate_deposit(pub(super) fn deposit_event)]
@@ -163,6 +177,14 @@ pub mod pallet {
 			bitcoin_argons: T::Balance,
 			mining_argons: T::Balance,
 			securitization_percent: FixedU128,
+		},
+		VaultMiningBondsIncreased {
+			vault_id: VaultId,
+			mining_argons: T::Balance,
+		},
+		VaultMiningBondsChangeScheduled {
+			vault_id: VaultId,
+			change_block: BlockNumberFor<T>,
 		},
 		VaultTermsChangeScheduled {
 			vault_id: VaultId,
@@ -243,6 +265,8 @@ pub mod pallet {
 		UnableToGenerateVaultBitcoinPubkey,
 		/// Unable to decode vault bitcoin pubkey
 		UnableToDecodeVaultBitcoinPubkey,
+		/// A funding change is already scheduled
+		FundingChangeAlreadyScheduled,
 	}
 
 	impl<T> From<BondError> for Error<T> {
@@ -307,7 +331,7 @@ pub mod pallet {
 	#[pallet::hooks]
 	impl<T: Config> Hooks<BlockNumberFor<T>> for Pallet<T> {
 		fn on_initialize(_n: BlockNumberFor<T>) -> Weight {
-			T::DbWeight::get().reads_writes(0, 0)
+			T::DbWeight::get().reads_writes(0, 2)
 		}
 		fn on_finalize(n: BlockNumberFor<T>) {
 			let terms = PendingTermsModificationsByBlock::<T>::take(n);
@@ -325,6 +349,22 @@ pub mod pallet {
 						vault.mining_reward_sharing_percent_take =
 							terms.mining_reward_sharing_percent_take;
 						Self::deposit_event(Event::VaultTermsChanged { vault_id });
+					}
+				});
+			}
+
+			let funding = PendingFundingModificationsByBlock::<T>::take(n);
+			for vault_id in funding {
+				VaultsById::<T>::mutate(vault_id, |vault| {
+					let Some(vault) = vault else {
+						return;
+					};
+					if let Some((_, mining_argons)) = vault.pending_mining_argons.take() {
+						vault.mining_argons.allocated = mining_argons;
+						Self::deposit_event(Event::VaultMiningBondsIncreased {
+							vault_id,
+							mining_argons,
+						});
 					}
 				});
 			}
@@ -395,6 +435,8 @@ pub mod pallet {
 				securitized_argons: 0u32.into(),
 				is_closed: false,
 				pending_terms: None,
+				pending_mining_argons: None,
+				pending_bitcoins: 0u32.into(),
 			};
 			vault.securitized_argons = vault.get_minimum_securitization_needed();
 			VaultXPubById::<T>::insert(vault_id, (xpub, 0));
@@ -437,6 +479,8 @@ pub mod pallet {
 		) -> DispatchResult {
 			let who = ensure_signed(origin)?;
 			let mut vault = VaultsById::<T>::get(vault_id).ok_or(Error::<T>::VaultNotFound)?;
+			// mutable because if it increases, we need to delay it to keep bidding markets fair.
+			let mut total_mining_amount_offered = total_mining_amount_offered;
 			ensure!(vault.operator_account_id == who, Error::<T>::NoPermissions);
 
 			let mut amount_to_hold: i128 = 0;
@@ -458,10 +502,34 @@ pub mod pallet {
 					vault.mining_argons.bonded <= total_mining_amount_offered,
 					Error::<T>::VaultReductionBelowAllocatedFunds
 				);
+				ensure!(
+					vault.pending_mining_argons.is_none(),
+					Error::<T>::FundingChangeAlreadyScheduled
+				);
 
 				amount_to_hold += balance_to_i128::<T>(total_mining_amount_offered) -
 					balance_to_i128::<T>(vault.mining_argons.allocated);
-				vault.mining_argons.allocated = total_mining_amount_offered;
+				// if increasing, must go into delay pool
+				if total_mining_amount_offered > vault.mining_argons.allocated {
+					let current_block = frame_system::Pallet::<T>::block_number();
+					let change_block = T::MiningArgonIncreaseBlockDelay::get() + current_block;
+					vault.pending_mining_argons = Some((change_block, total_mining_amount_offered));
+					total_mining_amount_offered = vault.mining_argons.allocated;
+
+					PendingFundingModificationsByBlock::<T>::mutate(change_block, |a| {
+						if !a.iter().any(|x| *x == vault_id) {
+							return a.try_push(vault_id);
+						}
+						Ok(())
+					})
+					.map_err(|_| Error::<T>::FundingChangeAlreadyScheduled)?;
+					Self::deposit_event(Event::VaultMiningBondsChangeScheduled {
+						vault_id,
+						change_block,
+					});
+				} else {
+					vault.mining_argons.allocated = total_mining_amount_offered;
+				}
 			}
 
 			ensure!(
@@ -725,9 +793,7 @@ pub mod pallet {
 					&mut vault.bitcoin_argons
 				},
 				BondType::Mining => {
-					let pending_bitcoins = PendingBitcoinsByVault::<T>::get(vault_id);
-					let amount_eligible =
-						vault.amount_eligible_for_mining().saturating_sub(pending_bitcoins);
+					let amount_eligible = vault.amount_eligible_for_mining();
 					ensure!(amount_eligible >= amount, BondError::InsufficientVaultFunds);
 					&mut vault.mining_argons
 				},
@@ -737,7 +803,6 @@ pub mod pallet {
 			let base_fee = vault_argons.base_fee;
 
 			let fee = Self::calculate_block_fees(apr, amount, blocks).saturating_add(base_fee);
-			ensure!(fee <= amount, BondError::FeeExceedsBondAmount);
 
 			T::Currency::transfer(
 				bond_account_id,
@@ -972,14 +1037,15 @@ pub mod pallet {
 			amount: Self::Balance,
 			remove_pending: bool,
 		) -> Result<(), BondError> {
-			PendingBitcoinsByVault::<T>::mutate(vault_id, |x| {
-				if remove_pending {
-					*x = x.saturating_sub(amount)
+			VaultsById::<T>::try_mutate(vault_id, |vault| {
+				let vault = vault.as_mut().ok_or(BondError::VaultNotFound)?;
+				vault.pending_bitcoins = if remove_pending {
+					vault.pending_bitcoins.saturating_sub(amount)
 				} else {
-					*x = x.saturating_add(amount)
-				}
-			});
-			Ok(())
+					vault.pending_bitcoins.saturating_add(amount)
+				};
+				Ok(())
+			})
 		}
 	}
 

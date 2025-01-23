@@ -15,7 +15,10 @@ use sp_runtime::{traits::Zero, FixedU128};
 
 use crate::{
 	mock::{Vaults, *},
-	pallet::{NextVaultId, PendingTermsModificationsByBlock, VaultXPubById, VaultsById},
+	pallet::{
+		NextVaultId, PendingFundingModificationsByBlock, PendingTermsModificationsByBlock,
+		VaultXPubById, VaultsById,
+	},
 	Error, Event, HoldReason, VaultConfig,
 };
 use argon_primitives::{
@@ -197,6 +200,60 @@ fn it_can_modify_a_vault_funds() {
 			.into(),
 		);
 		assert_eq!(Balances::reserved_balance(1), 2010 + 2020);
+	});
+}
+
+#[test]
+fn it_delays_mining_argon_increases() {
+	new_test_ext().execute_with(|| {
+		// Go past genesis block so events get deposited
+		System::set_block_number(1);
+
+		let mut config = default_vault();
+		config.mining_amount_allocated = 1000;
+		config.bitcoin_amount_allocated = 1000;
+
+		set_argons(1, 20_000);
+		assert_ok!(Vaults::create(RuntimeOrigin::signed(1), config.clone()));
+		assert_eq!(Balances::reserved_balance(1), 2000);
+
+		assert_ok!(Vaults::modify_funding(
+			RuntimeOrigin::signed(1),
+			1,
+			2000,
+			1010,
+			FixedU128::from_float(0.0)
+		));
+		let vault = VaultsById::<Test>::get(1).unwrap();
+		assert_eq!(vault.mining_argons.allocated, 1000); // scheduled!
+		assert_eq!(vault.pending_mining_argons.map(|a| a.1), Some(2000));
+		assert_eq!(vault.bitcoin_argons.allocated, 1010);
+		assert_eq!(vault.securitization_percent, FixedU128::from_float(0.0));
+		assert_eq!(vault.securitized_argons, 0);
+		assert_eq!(vault.get_minimum_securitization_needed(), 0);
+		assert_eq!(PendingFundingModificationsByBlock::<Test>::get(61).to_vec(), vec![1]);
+		System::assert_last_event(
+			Event::VaultModified {
+				vault_id: 1,
+				bitcoin_argons: 1010,
+				mining_argons: 1000,
+				securitization_percent: FixedU128::from_float(0.0),
+			}
+			.into(),
+		);
+		System::assert_has_event(
+			Event::VaultMiningBondsChangeScheduled { vault_id: 1, change_block: 61 }.into(),
+		);
+		assert_eq!(Balances::reserved_balance(1), 2000 + 1010);
+
+		System::set_block_number(61);
+		Vaults::on_initialize(61);
+		Vaults::on_finalize(61);
+		let vault = VaultsById::<Test>::get(1).unwrap();
+		assert_eq!(vault.mining_argons.allocated, 2000);
+		assert_eq!(vault.pending_mining_argons, None);
+		assert_eq!(Balances::reserved_balance(1), 2000 + 1010);
+		assert!(PendingFundingModificationsByBlock::<Test>::get(61).is_empty());
 	});
 }
 

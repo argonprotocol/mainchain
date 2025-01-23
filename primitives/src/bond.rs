@@ -155,6 +155,10 @@ pub struct Vault<
 	pub is_closed: bool,
 	/// The terms that are pending to be applied to this vault at the given block number
 	pub pending_terms: Option<(BlockNumber, VaultTerms<Balance>)>,
+	/// Any pending increase in mining bonds
+	pub pending_mining_argons: Option<(BlockNumber, Balance)>,
+	/// Bitcoins pending verification
+	pub pending_bitcoins: Balance,
 }
 #[derive(Encode, Decode, Clone, PartialEq, Eq, RuntimeDebug, TypeInfo, MaxEncodedLen)]
 pub struct VaultTerms<Balance: Codec + MaxEncodedLen + Clone + TypeInfo + PartialEq + Eq> {
@@ -200,7 +204,7 @@ impl<
 
 	pub fn amount_eligible_for_mining(&self) -> Balance {
 		let allocated = self.mining_argons.free_balance();
-		let mut bitcoins_bonded = self.bitcoin_argons.bonded;
+		let mut bitcoins_bonded = self.bitcoin_argons.bonded.saturating_sub(self.pending_bitcoins);
 		if self.securitized_argons > Balance::zero() {
 			let allowed_securities =
 				bitcoins_bonded.saturating_mul(2u32.into()).min(self.securitized_argons);
@@ -210,12 +214,12 @@ impl<
 	}
 
 	pub fn get_minimum_securitization_needed(&self) -> Balance {
-		let argons =
+		let allocated =
 			if self.is_closed { self.bitcoin_argons.bonded } else { self.bitcoin_argons.allocated };
 
 		let argons = self
 			.securitization_percent
-			.saturating_mul_int::<u128>(argons.unique_saturated_into());
+			.saturating_mul_int::<u128>(allocated.unique_saturated_into());
 
 		argons.unique_saturated_into()
 	}

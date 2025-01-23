@@ -1,7 +1,9 @@
 use crate as pallet_vaults;
 use argon_primitives::{bitcoin::BitcoinNetwork, MiningSlotProvider};
 use env_logger::{Builder, Env};
-use frame_support::{derive_impl, parameter_types, traits::Currency};
+use frame_support::{
+	derive_impl, parameter_types, traits::Currency, weights::constants::RocksDbWeight,
+};
 use frame_system::pallet_prelude::BlockNumberFor;
 use sp_core::{ConstU32, ConstU64};
 use sp_runtime::BuildStorage;
@@ -23,6 +25,7 @@ frame_support::construct_runtime!(
 impl frame_system::Config for Test {
 	type Block = Block;
 	type AccountData = pallet_balances::AccountData<Balance>;
+	type DbWeight = RocksDbWeight;
 }
 
 parameter_types! {
@@ -58,6 +61,7 @@ parameter_types! {
 	pub static NextSlot: BlockNumberFor<Test> = 100;
 	pub static MiningWindowBlocks: BlockNumberFor<Test> = 100;
 	pub const MinTermsModificationBlockDelay: BlockNumberFor<Test> = 25;
+	pub const FundingChangeBlockDelay: BlockNumberFor<Test> = 60;
 }
 pub struct StaticMiningSlotProvider;
 impl MiningSlotProvider<BlockNumberFor<Test>> for StaticMiningSlotProvider {
@@ -81,6 +85,7 @@ impl pallet_vaults::Config for Test {
 	type MaxPendingTermModificationsPerBlock = ConstU32<100>;
 	type MinTermsModificationBlockDelay = MinTermsModificationBlockDelay;
 	type GetBitcoinNetwork = GetBitcoinNetwork;
+	type MiningArgonIncreaseBlockDelay = FundingChangeBlockDelay;
 }
 
 // Build genesis storage according to the mock runtime.

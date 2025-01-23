@@ -42,7 +42,7 @@ impl frame_system::Config for Test {
 parameter_types! {
 
 	pub static ExistentialDeposit: Balance = 10;
-	pub const MinimumBondAmount:u128 = 1_000_000;
+	pub static MinimumBondAmount:u128 = 1_000_000;
 	pub const BlocksPerYear:u32 = 1440*365;
 }
 
@@ -96,6 +96,8 @@ parameter_types! {
 		securitized_argons: 0,
 		is_closed: false,
 		pending_terms: None,
+		pending_mining_argons: None,
+		pending_bitcoins: 0,
 	};
 
 	pub static NextUtxoId: UtxoId = 1;
