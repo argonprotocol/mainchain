@@ -1091,11 +1091,11 @@ fn it_doesnt_accept_bids_until_first_slot() {
 		TicksSinceGenesis::set(12960);
 
 		MiningSlots::on_initialize(13000);
-		assert_eq!(IsNextSlotBiddingOpen::<Test>::get(), false);
+		assert!(!IsNextSlotBiddingOpen::<Test>::get());
 
 		// bidding will start on the first (block % 1440 == 0)
 		MiningSlots::on_initialize(14400);
-		assert_eq!(IsNextSlotBiddingOpen::<Test>::get(), true);
+		assert!(IsNextSlotBiddingOpen::<Test>::get());
 		assert_ok!(MiningSlots::bid(
 			RuntimeOrigin::signed(2),
 			None,
