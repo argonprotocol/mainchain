@@ -3737,9 +3737,9 @@ pub mod api {
 			.hash();
 		runtime_metadata_hash ==
 			[
-				178u8, 226u8, 76u8, 73u8, 248u8, 146u8, 251u8, 137u8, 71u8, 176u8, 67u8, 211u8,
-				221u8, 205u8, 7u8, 62u8, 72u8, 204u8, 126u8, 124u8, 195u8, 35u8, 31u8, 121u8,
-				129u8, 46u8, 72u8, 167u8, 168u8, 98u8, 180u8, 192u8,
+				28u8, 136u8, 26u8, 201u8, 161u8, 68u8, 221u8, 130u8, 32u8, 73u8, 13u8, 81u8, 27u8,
+				154u8, 189u8, 29u8, 90u8, 89u8, 184u8, 198u8, 152u8, 209u8, 54u8, 217u8, 192u8,
+				155u8, 134u8, 194u8, 216u8, 247u8, 34u8, 102u8,
 			]
 	}
 	pub mod system {
@@ -28684,6 +28684,9 @@ pub mod api {
 					#[codec(index = 13)]
 					#[doc = "Invalid notary operator"]
 					InvalidNotaryOperator,
+					#[codec(index = 14)]
+					#[doc = "Invalid notebook submission tick"]
+					InvalidNotebookSubmissionTick,
 				}
 				#[derive(
 					:: subxt :: ext :: subxt_core :: ext :: codec :: Decode,

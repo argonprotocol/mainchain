@@ -575,6 +575,10 @@ declare module '@polkadot/api-base/types/errors' {
        **/
       InvalidNotebookSignature: AugmentedError<ApiType>;
       /**
+       * Invalid notebook submission tick
+       **/
+      InvalidNotebookSubmissionTick: AugmentedError<ApiType>;
+      /**
        * Invalid reprocess notebook
        **/
       InvalidReprocessNotebook: AugmentedError<ApiType>;
