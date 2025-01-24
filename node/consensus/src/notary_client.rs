@@ -13,7 +13,7 @@ use argon_primitives::{
 	notebook::NotebookNumber,
 	tick::{Tick, Ticker},
 	Balance, BlockSealApis, BlockSealAuthorityId, BlockVotingPower, NotaryApis, NotaryId,
-	NotebookApis, NotebookAuditResult, NotebookHeaderData, VoteMinimum, VotingSchedule,
+	NotebookApis, NotebookAuditResult, NotebookHeaderData, TickApis, VoteMinimum, VotingSchedule,
 };
 use argon_runtime::{NotaryRecordT, NotebookVerifyError};
 use codec::Codec;
@@ -51,6 +51,7 @@ pub trait NotaryApisExt<B: BlockT, AC> {
 		&self,
 		block_hash: B::Hash,
 	) -> Result<BTreeMap<NotaryId, (NotebookNumber, Tick)>, Error>;
+	fn current_tick(&self, block_hash: B::Hash) -> Result<Tick, Error>;
 	#[allow(clippy::too_many_arguments)]
 	fn audit_notebook_and_get_votes(
 		&self,
@@ -80,7 +81,8 @@ where
 	C: ProvideRuntimeApi<B> + HeaderBackend<B>,
 	C::Api: NotaryApis<B, NotaryRecordT>
 		+ NotebookApis<B, NotebookVerifyError>
-		+ BlockSealApis<B, AC, BlockSealAuthorityId>,
+		+ BlockSealApis<B, AC, BlockSealAuthorityId>
+		+ TickApis<B>,
 	AC: Clone + Codec,
 {
 	fn notaries(&self, block_hash: B::Hash) -> Result<Vec<NotaryRecordT>, Error> {
@@ -91,6 +93,9 @@ where
 		block_hash: B::Hash,
 	) -> Result<BTreeMap<NotaryId, (NotebookNumber, Tick)>, Error> {
 		self.runtime_api().latest_notebook_by_notary(block_hash).map_err(Into::into)
+	}
+	fn current_tick(&self, block_hash: B::Hash) -> Result<Tick, Error> {
+		self.runtime_api().current_tick(block_hash).map_err(Into::into)
 	}
 	fn audit_notebook_and_get_votes(
 		&self,
@@ -160,7 +165,8 @@ where
 		+ 'static,
 	C::Api: NotebookApis<B, NotebookVerifyError>
 		+ BlockSealApis<B, AC, BlockSealAuthorityId>
-		+ NotaryApis<B, NotaryRecordT>,
+		+ NotaryApis<B, NotaryRecordT>
+		+ TickApis<B>,
 	AC: Codec + Clone + Send + Sync + 'static,
 {
 	let metrics = registry.and_then(|r| ConsensusMetrics::new(r, client.clone()).ok());
@@ -492,9 +498,12 @@ where
 						Ok::<_, Error>(has_more_work)
 					},
 					Err(e) => {
-						if let Error::MissingNotebooksError(_) = e {
+						if matches!(
+							e,
+							Error::MissingNotebooksError(_) | Error::NotebookAuditBeforeTick(_)
+						) {
 							trace!(
-								"In queue, missing notebooks for notary {} - {:?}",
+								"In queue, re-queuing notebook for notary {} - {:?}",
 								notary_id,
 								e
 							);
@@ -506,6 +515,8 @@ where
 									Some(time),
 								)
 								.await?;
+							// wait for continue processing
+							tokio::time::sleep(Duration::from_secs(1)).await;
 							return Ok::<_, Error>(true);
 						}
 						Err(e)
@@ -732,8 +743,22 @@ where
 	) -> Result<(), Error> {
 		let finalized_notebook_number = self.latest_notebook_in_runtime(*finalized_hash, notary_id);
 		if notebook_number <= finalized_notebook_number {
-			info!(
-				"Skipping audit of finalized notebook. Notary {notary_id}, #{notebook_number}, finalized #{finalized_notebook_number}.",
+			tracing::info!(
+				notary_id,
+				notebook_number,
+				finalized_notebook_number,
+				"Skipping audit of finalized notebook.",
+			);
+			return Ok(());
+		}
+
+		let latest_notebook_in_best_hash = self.latest_notebook_in_runtime(*best_hash, notary_id);
+		if notebook_number <= latest_notebook_in_best_hash {
+			tracing::info!(
+				notary_id,
+				notebook_number,
+				latest_notebook_in_best_hash,
+				"Skipping audit of already included notebook.",
 			);
 			return Ok(());
 		}
@@ -973,6 +998,17 @@ where
 						"Possibly missing notebooks? Invalid catchup notebooks provided to audit. Notary {notary_id}, #{notebook_number}, tick {tick}.",
 					)));
 				}
+
+				// if audit fails and the tick is greater than the runtime, then we should just
+				// signal upwards that this should try again. Once the tick has passed, we'll
+				// consider it failed.
+				if tick > self.client.current_tick(*best_hash)? {
+					return Err(Error::NotebookAuditBeforeTick(format!(
+						"Notebook tick is > runtime. Notary={}, notebook={}, tick={}",
+						notary_id, notebook_number, tick
+					)));
+				}
+
 				warn!(
 					"Notebook audit failed ({}). Notary {notary_id}, #{notebook_number}, tick {tick}.",
 					error
@@ -1208,6 +1244,8 @@ mod test {
 		pub audit_dependencies: Arc<parking_lot::Mutex<Vec<NotaryNotebookAuditSummary>>>,
 		#[allow(clippy::type_complexity)]
 		pub notebook_audit_votes: Arc<parking_lot::Mutex<Option<Vec<(Vec<u8>, BlockVotingPower)>>>>,
+		pub current_tick: Arc<parking_lot::Mutex<Tick>>,
+		pub audit_failure: Arc<parking_lot::Mutex<Option<NotebookVerifyError>>>,
 	}
 
 	impl TestNode {
@@ -1272,6 +1310,9 @@ mod test {
 		) -> Result<BTreeMap<NotaryId, (NotebookNumber, Tick)>, Error> {
 			Ok(self.latest_notebook_by_notary.lock().clone())
 		}
+		fn current_tick(&self, _block_hash: <Block as BlockT>::Hash) -> Result<Tick, Error> {
+			Ok(*self.current_tick.lock())
+		}
 		fn audit_notebook_and_get_votes(
 			&self,
 			_block_hash: <Block as BlockT>::Hash,
@@ -1284,6 +1325,9 @@ mod test {
 			_notebook: &[u8],
 			notebook_dependencies: Vec<NotaryNotebookAuditSummary>,
 		) -> Result<Result<NotaryNotebookRawVotes, NotebookVerifyError>, Error> {
+			if let Some(err) = self.audit_failure.lock().take() {
+				return Ok(Err(err));
+			}
 			*self.audit_dependencies.lock() = notebook_dependencies;
 			let votes = self.notebook_audit_votes.lock().take();
 			Ok(Ok(NotaryNotebookRawVotes {
@@ -1679,5 +1723,45 @@ mod test {
 		notary_client.process_queues().await.expect("Could not process queues");
 		assert_eq!(notary_client.queue_depth(1).await, 0);
 		assert_eq!(notary_client.notebook_queue_by_id.read().await.get(&2).unwrap().len(), 1);
+	}
+
+	#[tokio::test]
+	async fn requeues_notebooks_failing_audit_before_tick() {
+		let (test_notary, client, notary_client) = system().await;
+		notary_client
+			.update_notaries(&client.best_hash())
+			.await
+			.expect("Could not update notaries");
+
+		test_notary.create_notebook_header(vec![]).await;
+		test_notary.create_notebook_header(vec![]).await;
+		test_notary.create_notebook_header(vec![]).await;
+
+		notary_client
+			.next_subscription(Duration::from_millis(500))
+			.await
+			.expect("Could not get next");
+		notary_client
+			.next_subscription(Duration::from_millis(500))
+			.await
+			.expect("Could not get next");
+		assert_eq!(notary_client.queue_depth(1).await, 2);
+		notary_client
+			.next_subscription(Duration::from_millis(500))
+			.await
+			.expect("Could not get next");
+		assert_eq!(notary_client.queue_depth(1).await, 3);
+
+		notary_client.process_queues().await.expect("Could not process queues");
+		notary_client.process_queues().await.expect("Could not process queues");
+		assert_eq!(notary_client.queue_depth(1).await, 1);
+
+		*client.current_tick.lock() = 2;
+		client
+			.audit_failure
+			.lock()
+			.replace(NotebookVerifyError::InvalidChainTransfersList);
+		notary_client.process_queues().await.expect("Could not process queues");
+		assert_eq!(notary_client.queue_depth(1).await, 1);
 	}
 }
