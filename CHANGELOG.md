@@ -1,11 +1,25 @@
 # Changelog
 
-## [v1.0.4](https://github.com/argonprotocol/mainchain/compare/v1.0.3...8a5f954f8b3f1fec71c905a4ebb7e0c4587ec068) (2025-01-21)
+## [v1.0.5](https://github.com/argonprotocol/mainchain/compare/v1.0.4...ec43fbd9e0749855edff482c551763445d26ab8b) (2025-01-24)
+
+### Features
+
+* **mining_slot:** correctly extend bids
+([6ece2a1](https://github.com/argonprotocol/mainchain/commit/6ece2a148d4a987a6064bc8cfc2bb45f3cdadd2a))
 
 ### Fixes
 
+* **vaults:** time delay for funding changes
+([4281d4f](https://github.com/argonprotocol/mainchain/commit/4281d4f57d971519012e2a44d075a1fed198857f))
+* **node:** don’t save a failed audit for missing
+([94f0a9d](https://github.com/argonprotocol/mainchain/commit/94f0a9dd2b278ce960c9d55ba5192a8265bb7597))
+
+### [v1.0.4](https://github.com/argonprotocol/mainchain/compare/v1.0.3...v1.0.4) (2025-01-21)
+
+#### Fixes
+
 * needed to update spec_version
-([8a5f954](https://github.com/argonprotocol/mainchain/commit/8a5f954f8b3f1fec71c905a4ebb7e0c4587ec068))
+([bcc326f](https://github.com/argonprotocol/mainchain/commit/bcc326f9682691a3a0d56b093a3dc1e3a272d481))
 
 ### [v1.0.3](https://github.com/argonprotocol/mainchain/compare/v1.0.2...v1.0.3) (2025-01-21)
 

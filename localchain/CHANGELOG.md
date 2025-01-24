@@ -1,6 +1,13 @@
 # Changelog
 
-## [v1.0.4](https://github.com/argonprotocol/mainchain/compare/v1.0.3...8a5f954f8b3f1fec71c905a4ebb7e0c4587ec068) (2025-01-21)
+## [v1.0.5](https://github.com/argonprotocol/mainchain/compare/v1.0.4...ec43fbd9e0749855edff482c551763445d26ab8b) (2025-01-24)
+
+### [v1.0.4](https://github.com/argonprotocol/mainchain/compare/v1.0.3...v1.0.4) (2025-01-21)
+
+#### Fixes
+
+* needed to update spec_version
+([bcc326f](https://github.com/argonprotocol/mainchain/commit/bcc326f9682691a3a0d56b093a3dc1e3a272d481))
 
 ### [v1.0.3](https://github.com/argonprotocol/mainchain/compare/v1.0.2...v1.0.3) (2025-01-21)
 
