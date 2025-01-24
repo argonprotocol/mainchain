@@ -148,6 +148,7 @@ where
 		client.clone(),
 		aux_client.clone(),
 		notary_client.clone(),
+		Some(Box::new(grandpa_block_import.clone())),
 		grandpa_block_import,
 		&task_manager.spawn_essential_handle(),
 		config.prometheus_registry(),
@@ -240,6 +241,7 @@ where
 
 	let role = config.role;
 	let name = config.network.node_name.clone();
+	let disable_grandpa = config.disable_grandpa;
 	let prometheus_registry = config.prometheus_registry().cloned();
 
 	#[cfg(not(debug_assertions))]
@@ -327,7 +329,7 @@ where
 		);
 	}
 	// grandpa voter task
-	{
+	if !disable_grandpa {
 		// TODO: we need to create a keystore for each grandpa voter we want to run. Probably a
 		// service 	 that can dynamically allocate an deallocate voters with restricted/filtered
 		// keystore access start the full GRANDPA voter

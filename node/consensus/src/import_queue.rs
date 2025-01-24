@@ -4,14 +4,14 @@ use argon_primitives::{
 	fork_power::ForkPower,
 	inherents::{BitcoinInherentDataProvider, BlockSealInherentDataProvider},
 	Balance, BitcoinApis, BlockCreatorApis, BlockSealApis, BlockSealAuthorityId, BlockSealDigest,
-	NotaryApis, NotebookApis,
+	NotaryApis, NotebookApis, TickApis,
 };
 use argon_runtime::{NotaryRecordT, NotebookVerifyError};
 use codec::Codec;
 use sc_client_api::{self, backend::AuxStore};
 use sc_consensus::{
-	BasicQueue, BlockCheckParams, BlockImport, BlockImportParams, ForkChoiceStrategy, ImportResult,
-	Verifier as VerifierT,
+	BasicQueue, BlockCheckParams, BlockImport, BlockImportParams, BoxJustificationImport,
+	ForkChoiceStrategy, ImportResult, Verifier as VerifierT,
 };
 use sc_telemetry::TelemetryHandle;
 use sp_api::ProvideRuntimeApi;
@@ -130,7 +130,8 @@ where
 		+ BlockSealApis<B, AC, BlockSealAuthorityId>
 		+ BlockCreatorApis<B, AC, NotebookVerifyError>
 		+ NotebookApis<B, NotebookVerifyError>
-		+ NotaryApis<B, NotaryRecordT>,
+		+ NotaryApis<B, NotaryRecordT>
+		+ TickApis<B>,
 	AC: Codec + Clone + Send + Sync + 'static,
 {
 	async fn verify(
@@ -201,7 +202,7 @@ where
 			let key_block_hash = compute_puzzle.get_key_block(self.client.info().genesis_hash);
 			let compute_difficulty = compute_puzzle.difficulty;
 
-			tracing::info!(?key_block_hash, ?compute_difficulty, ?nonce, "Verifying compute nonce");
+			tracing::info!(?key_block_hash, ?compute_difficulty, ?nonce, block_hash=?post_hash, "Verifying compute nonce");
 			if !BlockComputeNonce::is_valid(
 				nonce,
 				pre_hash.as_ref().to_vec(),
@@ -261,6 +262,7 @@ pub fn create_import_queue<C, B, I, AC>(
 	client: Arc<C>,
 	aux_client: ArgonAux<B, C>,
 	notary_client: Arc<NotaryClient<B, C, AC>>,
+	justification_import: Option<BoxJustificationImport<B>>,
 	block_import: I,
 	spawner: &impl sp_core::traits::SpawnEssentialNamed,
 	registry: Option<&prometheus_endpoint::Registry>,
@@ -277,7 +279,8 @@ where
 		+ BitcoinApis<B, Balance>
 		+ BlockSealApis<B, AC, BlockSealAuthorityId>
 		+ NotebookApis<B, NotebookVerifyError>
-		+ NotaryApis<B, NotaryRecordT>,
+		+ NotaryApis<B, NotaryRecordT>
+		+ TickApis<B>,
 	AC: Codec + Clone + Send + Sync + 'static,
 	I: BlockImport<B, Error = ConsensusError> + Send + Sync + 'static,
 {
@@ -295,5 +298,14 @@ where
 		_phantom: PhantomData,
 	};
 
-	(BasicQueue::new(verifier, Box::new(importer.clone()), None, spawner, registry), importer)
+	(
+		BasicQueue::new(
+			verifier,
+			Box::new(importer.clone()),
+			justification_import,
+			spawner,
+			registry,
+		),
+		importer,
+	)
 }

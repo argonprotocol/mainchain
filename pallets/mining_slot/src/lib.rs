@@ -993,7 +993,7 @@ pub trait OnNewSlot<AccountId> {
 	fn on_new_slot(
 		removed_authorities: Vec<(&AccountId, Self::Key)>,
 		added_authorities: Vec<(&AccountId, Self::Key)>,
-		force: bool,
+		with_delay: bool,
 	);
 }
 
@@ -1001,7 +1001,7 @@ pub trait SlotEvents<AccountId> {
 	fn on_new_slot<Ks: OpaqueKeys>(
 		removed_authorities: Vec<(AccountId, Ks)>,
 		added_authorities: Vec<(AccountId, Ks)>,
-		force: bool,
+		with_delay: bool,
 	);
 }
 
@@ -1011,7 +1011,7 @@ impl<AId> SlotEvents<AId> for Tuple {
 	fn on_new_slot<Ks: OpaqueKeys>(
 		removed_authorities: Vec<(AId, Ks)>,
 		added_authorities: Vec<(AId, Ks)>,
-		force: bool,
+		with_delay: bool,
 	) {
 		for_tuples!(
 		#(
@@ -1023,7 +1023,7 @@ impl<AId> SlotEvents<AId> for Tuple {
 				added_authorities.iter().filter_map(|k| {
 					k.1.get::<Tuple::Key>(<Tuple::Key as RuntimeAppPublic>::ID).map(|k1| (&k.0, k1))
 				}).collect::<Vec<_>>();
-			Tuple::on_new_slot(removed_keys, added_keys, force);
+			Tuple::on_new_slot(removed_keys, added_keys, with_delay);
 		)*
 		)
 	}
