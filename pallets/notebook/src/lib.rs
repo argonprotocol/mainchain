@@ -179,6 +179,8 @@ pub mod pallet {
 		InvalidReprocessNotebook,
 		/// Invalid notary operator
 		InvalidNotaryOperator,
+		/// Invalid notebook submission tick
+		InvalidNotebookSubmissionTick,
 	}
 
 	#[pallet::hooks]
@@ -229,6 +231,7 @@ pub mod pallet {
 				Error::<T>::InvalidNotebookDigest
 			);
 
+			let current_tick = T::TickProvider::current_tick();
 			let mut notebooks = notebooks;
 			notebooks.sort_by(|a, b| a.header.notebook_number.cmp(&b.header.notebook_number));
 
@@ -243,6 +246,7 @@ pub mod pallet {
 					"Processing notebook",
 				);
 
+				ensure!(header.tick < current_tick, Error::<T>::InvalidNotebookSubmissionTick);
 				ensure!(
 					!Self::is_notary_locked_at_tick(notary_id, header.tick),
 					Error::<T>::NotebookSubmittedForLockedNotary

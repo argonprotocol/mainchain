@@ -73,7 +73,7 @@ fn it_locks_notaries_on_audit_failure() {
 		let digest = notebook_digest(vec![(1, 1, 1, false), (2, 1, 1, true)]);
 		Digests::mutate(|d| d.notebooks = digest.clone());
 		Notebook::on_initialize(1);
-		CurrentTick::set(1);
+		CurrentTick::set(2);
 		assert_err!(
 			Notebook::submit(RuntimeOrigin::none(), vec![]),
 			Error::<Test>::InvalidNotebookDigest

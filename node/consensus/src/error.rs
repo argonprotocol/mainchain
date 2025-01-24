@@ -64,6 +64,8 @@ pub enum Error {
 
 	#[error("Notary error: {0}")]
 	NotaryError(String),
+	#[error("The notebook can't be audited yet {0}")]
+	NotebookAuditBeforeTick(String),
 	#[error("Notary archive error: {0}")]
 	NotaryArchiveError(String),
 	#[error("A block could not be verified because a notary could not be synchronized with. {0}")]

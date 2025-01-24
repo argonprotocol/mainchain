@@ -335,14 +335,12 @@ pub struct GrandpaSlotRotation;
 impl OnNewSlot<AccountId> for GrandpaSlotRotation {
 	type Key = GrandpaId;
 	fn on_new_slot(
-		removed_authorities: Vec<(&AccountId, Self::Key)>,
-		added_authorities: Vec<(&AccountId, Self::Key)>,
-		force: bool,
+		_removed_authorities: Vec<(&AccountId, Self::Key)>,
+		_added_authorities: Vec<(&AccountId, Self::Key)>,
+		delay: bool,
 	) {
 		let next_authorities: AuthorityList = Grandpa::grandpa_authorities();
-		if removed_authorities.is_empty() && added_authorities.is_empty() && !force {
-			return;
-		}
+
 		// TODO: we need to be able to run multiple grandpas on a single miner before activating
 		// 	changing the authorities. We want to activate a trailing 3 hours of miners who closed
 		//  blocks to activate a more decentralized grandpa process
@@ -355,11 +353,9 @@ impl OnNewSlot<AccountId> for GrandpaSlotRotation {
 		// 	next_authorities.push((authority_id, 1));
 		// }
 
-		// Only schedule a single rotation. This is mostly just to ensure that development (which
-		// won't have migrations) will get a grandpa change. Grandpa changes are needed to enable
-		// proofs of finality
+		let in_blocks = if delay { 1 } else { 0 };
 		log::info!("Scheduling grandpa change");
-		if let Err(err) = Grandpa::schedule_change(next_authorities, 1, None) {
+		if let Err(err) = Grandpa::schedule_change(next_authorities, in_blocks, None) {
 			log::error!("Failed to schedule grandpa change: {:?}", err);
 		}
 	}
