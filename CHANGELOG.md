@@ -1,13 +1,22 @@
 # Changelog
 
-## [v1.0.5](https://github.com/argonprotocol/mainchain/compare/v1.0.4...ec43fbd9e0749855edff482c551763445d26ab8b) (2025-01-24)
+## [v1.0.6](https://github.com/argonprotocol/mainchain/compare/v1.0.5...50841c89431cae78209a15da3fc0a5d369c8b13d) (2025-01-24)
 
-### Features
+### Fixes
+
+* **node:** grandpa justification import
+([a6482fa](https://github.com/argonprotocol/mainchain/commit/a6482fad883749bcf7512346a7fc952d956b36e9))
+* **notary:** don’t fail audit for wrong tick
+([d6d2975](https://github.com/argonprotocol/mainchain/commit/d6d29753c08333f20d0d32f5ab3139ccb5e2f735))
+
+### [v1.0.5](https://github.com/argonprotocol/mainchain/compare/v1.0.4...v1.0.5) (2025-01-24)
+
+#### Features
 
 * **mining_slot:** correctly extend bids
 ([6ece2a1](https://github.com/argonprotocol/mainchain/commit/6ece2a148d4a987a6064bc8cfc2bb45f3cdadd2a))
 
-### Fixes
+#### Fixes
 
 * **vaults:** time delay for funding changes
 ([4281d4f](https://github.com/argonprotocol/mainchain/commit/4281d4f57d971519012e2a44d075a1fed198857f))
