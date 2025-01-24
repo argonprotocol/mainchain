@@ -558,9 +558,10 @@ where
 
 			if tracing::enabled!(tracing::Level::TRACE) {
 				trace!(
-					"Dequeuing notebook for notary {}. Queue: {:?}",
+					"Dequeuing notebook for notary {}. Queue: {:?}..{:?}",
 					notary_id,
-					queue.iter().map(|(n, h, _)| (n, h.is_some())).collect::<Vec<_>>()
+					queue.first().map(|(n, _, _)| *n),
+					queue.last().map(|(n, _, _)| *n)
 				);
 			}
 			queue.remove(0)
@@ -947,25 +948,35 @@ where
 			notebook_details.header_hash,
 			&vote_minimums,
 			&full_notebook.0,
-			notebook_dependencies,
+			notebook_dependencies.clone(),
 		)? {
 			Ok(votes) => {
 				let vote_count = votes.raw_votes.len();
 				self.aux_client.store_votes(tick, votes)?;
 
 				info!(
-
 					"Notebook audit successful. Notary {notary_id}, #{notebook_number}, tick {tick}. {vote_count} block vote(s).",
 				);
 				None
 			},
 			Err(error) => {
+				// if this is a catchup notebook error, then it's our problem
+				if error == NotebookVerifyError::CatchupNotebooksMissing {
+					tracing::warn!(
+						notary_id,
+						notebook_number,
+						?notebook_dependencies,
+						?best_hash,
+						"Notebook audit failed for notary. Incorrect catchup provided",
+					);
+					return Err(Error::MissingNotebooksError(format!(
+						"Possibly missing notebooks? Invalid catchup notebooks provided to audit. Notary {notary_id}, #{notebook_number}, tick {tick}.",
+					)));
+				}
 				warn!(
-
 					"Notebook audit failed ({}). Notary {notary_id}, #{notebook_number}, tick {tick}.",
 					error
 				);
-
 				Some(error)
 			},
 		};

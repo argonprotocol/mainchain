@@ -90,7 +90,10 @@ pub mod pallet {
 
 	use super::*;
 
+	const STORAGE_VERSION: StorageVersion = StorageVersion::new(1);
+
 	#[pallet::pallet]
+	#[pallet::storage_version(STORAGE_VERSION)]
 	pub struct Pallet<T>(_);
 
 	pub type Registration<T> = MiningRegistration<
@@ -340,9 +343,26 @@ pub mod pallet {
 			if !HasAddedGrandpaRotation::<T>::get() {
 				T::SlotEvents::on_new_slot::<T::Keys>(vec![], vec![], true);
 				HasAddedGrandpaRotation::<T>::put(true);
+				return T::DbWeight::get().reads_writes(3, 2)
 			}
 
-			T::DbWeight::get().reads_writes(0, 0)
+			T::DbWeight::get().reads_writes(2, 0)
+		}
+
+		fn on_runtime_upgrade() -> Weight {
+			let version = Pallet::<T>::on_chain_storage_version();
+			if version == 0 {
+				log::info!("🚚 Migrating MiningSlot to storage version 1 - delay bidding start.",);
+				StorageVersion::new(1).put::<Pallet<T>>();
+				// delay slot bidding until we can get liquidity, or there's no way to mine without
+				// existing tokens
+				MiningConfig::<T>::mutate(|a| {
+					a.slot_bidding_start_after_ticks = 12 * 1440;
+				});
+
+				return T::DbWeight::get().reads_writes(2, 1)
+			}
+			T::DbWeight::get().reads_writes(1, 0)
 		}
 	}
 
@@ -400,19 +420,34 @@ pub mod pallet {
 
 			let current_registration = Self::get_active_registration(&who);
 
-			let (bond, bid) = if let Some(bond_info) = bond_info {
+			let mut bond_id = None;
+			let mut reward_sharing = None;
+			let mut bid = 0u128.into();
+
+			if let Some(bond_info) = bond_info {
 				let bond_end_block = next_cohort_block_number + Self::get_mining_window_blocks();
+				let modify_bond_id = NextSlotCohort::<T>::get()
+					.iter()
+					.find(|x| x.account_id == who)
+					.and_then(|x| x.bond_id);
 				let bond = T::BondProvider::bond_mining_slot(
 					bond_info.vault_id,
 					who.clone(),
 					bond_info.amount,
 					bond_end_block,
+					modify_bond_id,
 				)
 				.map_err(Error::<T>::from)?;
-				(Some(bond), bond_info.amount)
-			} else {
-				(None, 0u128.into())
-			};
+				bond_id = Some(bond.0);
+				reward_sharing = bond.1;
+				bid = bond.2;
+				// if the modified bond id is not the bond id we created, need to cancel it
+				if let Some(modify_bond_id) = modify_bond_id {
+					if bond.0 != modify_bond_id {
+						T::BondProvider::cancel_bond(modify_bond_id).map_err(Error::<T>::from)?;
+					}
+				}
+			}
 
 			let ownership_tokens = Self::hold_ownership_bond(&who, current_registration)?;
 
@@ -440,9 +475,6 @@ pub mod pallet {
 					let entry = cohort.pop().expect("should exist, just checked");
 					Self::release_failed_bid(entry)?;
 				}
-
-				let (bond_id, reward_sharing) =
-					bond.map(|x| (Some(x.0), x.1)).unwrap_or((None, None));
 
 				cohort
 					.try_insert(

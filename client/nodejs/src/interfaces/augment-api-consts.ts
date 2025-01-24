@@ -437,6 +437,10 @@ declare module '@polkadot/api-base/types/consts' {
        **/
       minimumBondAmount: u128 & AugmentedConst<ApiType>;
       /**
+       * The number of blocks that a funding change will be delayed before it takes effect
+       **/
+      miningArgonIncreaseBlockDelay: u32 & AugmentedConst<ApiType>;
+      /**
        * The number of blocks that a change in terms will take before applying. Terms only apply
        * on a slot changeover, so this setting is the minimum blocks that must pass, in
        * addition to the time to the next slot after that

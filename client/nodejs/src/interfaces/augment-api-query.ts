@@ -132,6 +132,7 @@ declare module '@polkadot/api-base/types/storage' {
        **/
       blockForkPower: AugmentedQuery<ApiType, () => Observable<ArgonPrimitivesForkPower>, []>;
       lastBlockSealerInfo: AugmentedQuery<ApiType, () => Observable<Option<ArgonPrimitivesProvidersBlockSealerInfo>>, []>;
+      lastTickWithVoteSeal: AugmentedQuery<ApiType, () => Observable<u64>, []>;
       /**
        * The calculated parent voting key for a block. Refers to the Notebook BlockVote Revealed
        * Secret + VotesMerkleRoot of the parent block notebooks.
@@ -363,6 +364,7 @@ declare module '@polkadot/api-base/types/storage' {
        * The tuple is the authority, and the blake2 256 hash of the authority used for xor lookups
        **/
       authorityHashByIndex: AugmentedQuery<ApiType, () => Observable<BTreeMap<u32, U256>>, []>;
+      hasAddedGrandpaRotation: AugmentedQuery<ApiType, () => Observable<bool>, []>;
       /**
        * The number of bids per slot for the last 10 slots (newest first)
        **/
@@ -681,9 +683,10 @@ declare module '@polkadot/api-base/types/storage' {
     vaults: {
       nextVaultId: AugmentedQuery<ApiType, () => Observable<Option<u32>>, []>;
       /**
-       * Vault bitcoin bonds pending verification
+       * Pending funding that will be committed at the given block number (must be a minimum of 1
+       * slot change away)
        **/
-      pendingBitcoinsByVault: AugmentedQuery<ApiType, (arg: u32 | AnyNumber | Uint8Array) => Observable<u128>, [u32]>;
+      pendingFundingModificationsByBlock: AugmentedQuery<ApiType, (arg: u32 | AnyNumber | Uint8Array) => Observable<Vec<u32>>, [u32]>;
       /**
        * Pending terms that will be committed at the given block number (must be a minimum of 1 slot
        * change away)

@@ -319,6 +319,11 @@ pub mod pallet {
 			vault_id: VaultId,
 			bond_id: BondId,
 		},
+		BondModified {
+			vault_id: VaultId,
+			bond_id: BondId,
+			amount: T::Balance,
+		},
 		BondCanceled {
 			vault_id: VaultId,
 			bond_id: BondId,
@@ -1047,7 +1052,8 @@ pub mod pallet {
 			account_id: Self::AccountId,
 			amount: Self::Balance,
 			bond_until_block: Self::BlockNumber,
-		) -> Result<(BondId, Option<RewardSharing<Self::AccountId>>), BondError> {
+			modify_bond_id: Option<BondId>,
+		) -> Result<(BondId, Option<RewardSharing<Self::AccountId>>, Self::Balance), BondError> {
 			ensure!(amount >= T::MinimumBondAmount::get(), BondError::MinimumBondAmountNotMet);
 
 			let block_number = frame_system::Pallet::<T>::block_number();
@@ -1061,6 +1067,30 @@ pub mod pallet {
 				&account_id,
 			)?;
 
+			let vault = T::VaultProvider::get(vault_id).ok_or(BondError::VaultNotFound)?;
+			let sharing = if vault.mining_reward_sharing_percent_take > RewardShare::zero() {
+				Some(RewardSharing {
+					percent_take: vault.mining_reward_sharing_percent_take,
+					account_id: vault.operator_account_id.clone(),
+				})
+			} else {
+				None
+			};
+
+			if let Some(bond_id) = modify_bond_id {
+				if let Some(mut bond) = BondsById::<T>::get(bond_id) {
+					if bond.vault_id == vault_id {
+						bond.amount = bond.amount.saturating_add(amount);
+						let new_total = bond.amount;
+						bond.total_fee = bond.total_fee.saturating_add(total_fee);
+						bond.prepaid_fee = bond.prepaid_fee.saturating_add(prepaid_fee);
+						BondsById::<T>::insert(bond_id, bond);
+
+						Self::deposit_event(Event::BondModified { vault_id, bond_id, amount });
+						return Ok((bond_id, sharing, new_total));
+					}
+				}
+			}
 			let bond_id = Self::create_bond(
 				vault_id,
 				account_id,
@@ -1071,18 +1101,7 @@ pub mod pallet {
 				prepaid_fee,
 				None,
 			)?;
-			let vault = T::VaultProvider::get(vault_id).ok_or(BondError::VaultNotFound)?;
-			Ok((
-				bond_id,
-				if vault.mining_reward_sharing_percent_take > RewardShare::zero() {
-					Some(RewardSharing {
-						percent_take: vault.mining_reward_sharing_percent_take,
-						account_id: vault.operator_account_id.clone(),
-					})
-				} else {
-					None
-				},
-			))
+			Ok((bond_id, sharing, amount))
 		}
 
 		fn cancel_bond(bond_id: BondId) -> Result<(), BondError> {

@@ -288,6 +288,7 @@ parameter_types! {
 	pub const MaxUnlockingUtxos: u32 = 1000;
 	pub const MaxPendingTermModificationsPerBlock: u32 = 100;
 	pub const MinTermsModificationBlockDelay: u32 = 1439; // must be at least one slot (day)
+	pub const VaultFundingModificationDelay: u32 = 60; // 1 hour
 }
 
 impl pallet_vaults::Config for Runtime {
@@ -302,6 +303,7 @@ impl pallet_vaults::Config for Runtime {
 	type MinTermsModificationBlockDelay = MinTermsModificationBlockDelay;
 	type MiningSlotProvider = MiningSlot;
 	type GetBitcoinNetwork = BitcoinUtxos;
+	type MiningArgonIncreaseBlockDelay = VaultFundingModificationDelay;
 }
 
 pub struct BitcoinSignatureVerifier;

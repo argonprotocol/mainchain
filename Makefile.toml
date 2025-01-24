@@ -122,7 +122,7 @@ script = "scripts/docker_minio.sh"
 [tasks.test]
 description = "Run tests with cargo,"
 command = "cargo"
-args = ["test", "--lib", "--no-fail-fast", "${@}"]
+args = ["test", "--features", "try-runtime", "--lib", "--no-fail-fast", "${@}"]
 dependencies = ["build", "minio"]
 env = { "RUSTC_WRAPPER" = "sccache" }
 

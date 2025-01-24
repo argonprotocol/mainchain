@@ -42,7 +42,7 @@ impl frame_system::Config for Test {
 parameter_types! {
 
 	pub static ExistentialDeposit: Balance = 10;
-	pub const MinimumBondAmount:u128 = 1_000_000;
+	pub static MinimumBondAmount:u128 = 1_000_000;
 	pub const BlocksPerYear:u32 = 1440*365;
 }
 
@@ -96,6 +96,8 @@ parameter_types! {
 		securitized_argons: 0,
 		is_closed: false,
 		pending_terms: None,
+		pending_mining_argons: None,
+		pending_bitcoins: 0,
 	};
 
 	pub static NextUtxoId: UtxoId = 1;
@@ -110,6 +112,8 @@ parameter_types! {
 
 	pub static DefaultVaultBitcoinPubkey: PublicKey = "02e3af28965693b9ce1228f9d468149b831d6a0540b25e8a9900f71372c11fb277".parse::<PublicKey>().unwrap();
 	pub static DefaultVaultReclaimBitcoinPubkey: PublicKey = "026c468be64d22761c30cd2f12cbc7de255d592d7904b1bab07236897cc4c2e766".parse::<PublicKey>().unwrap();
+
+	pub static MockFeeResult: (Balance, Balance) = (0, 0);
 }
 
 pub struct EventHandler;
@@ -193,7 +197,7 @@ impl VaultProvider for StaticVaultProvider {
 			BondError::InsufficientVaultFunds
 		);
 		DefaultVault::mutate(|a| a.mut_argons(&bond_type).bonded += amount);
-		Ok((0, 0))
+		Ok(MockFeeResult::get())
 	}
 
 	fn release_bonded_funds(

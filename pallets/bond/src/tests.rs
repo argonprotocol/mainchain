@@ -578,7 +578,7 @@ fn it_can_create_a_mining_bond() {
 		set_argons(who, 2_000_000);
 		let amount = 1_000_000;
 		let vault = DefaultVault::get();
-		assert_ok!(Bonds::bond_mining_slot(1, who, amount, 10));
+		assert_ok!(Bonds::bond_mining_slot(1, who, amount, 10, None));
 		assert_eq!(
 			BondsById::<Test>::get(1).unwrap(),
 			Bond {
@@ -614,6 +614,54 @@ fn it_can_create_a_mining_bond() {
 		Bonds::on_initialize(10);
 		assert_eq!(BondsById::<Test>::get(1), None);
 		assert_eq!(DefaultVault::get().mining_argons.bonded, 0);
+	});
+}
+
+#[test]
+fn it_can_modify_a_mining_bond() {
+	new_test_ext().execute_with(|| {
+		System::set_block_number(1);
+		let who = 1;
+		set_argons(who, 2_000_000);
+		let amount = 1_000_000;
+		let mut vault = DefaultVault::get();
+		vault.mining_argons.annual_percent_rate = FixedU128::from_float(0.1);
+		vault.mining_argons.base_fee = 100;
+		DefaultVault::set(vault);
+		MockFeeResult::set((100_000, 100));
+		MinimumBondAmount::set(1000);
+
+		assert_ok!(Bonds::bond_mining_slot(1, who, amount, 10, None));
+		assert_eq!(
+			BondsById::<Test>::get(1).unwrap(),
+			Bond {
+				amount,
+				utxo_id: None,
+				bond_type: BondType::Mining,
+				total_fee: 100_000,
+				prepaid_fee: 100,
+				vault_id: 1,
+				expiration: BondExpiration::ArgonBlock(10),
+				bonded_account_id: who,
+				start_block: 1,
+			}
+		);
+
+		assert_ok!(Bonds::bond_mining_slot(1, who, 10000, 10, Some(1)));
+		assert_eq!(
+			BondsById::<Test>::get(1).unwrap(),
+			Bond {
+				amount: amount + 10000,
+				utxo_id: None,
+				bond_type: BondType::Mining,
+				total_fee: 200_000,
+				prepaid_fee: 200,
+				vault_id: 1,
+				expiration: BondExpiration::ArgonBlock(10),
+				bonded_account_id: who,
+				start_block: 1,
+			}
+		);
 	});
 }
 

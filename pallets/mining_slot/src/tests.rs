@@ -668,6 +668,136 @@ fn it_will_order_bids_with_argon_bonds() {
 }
 
 #[test]
+fn it_will_add_to_bids() {
+	BlocksBetweenSlots::set(3);
+	MaxMiners::set(6);
+	MaxCohortSize::set(2);
+
+	new_test_ext().execute_with(|| {
+		System::set_block_number(6);
+
+		assert_err!(
+			MiningSlots::bid(RuntimeOrigin::signed(2), None, RewardDestination::Owner, 1.into()),
+			Error::<Test>::SlotNotTakingBids
+		);
+
+		SlotBiddingStartTick::set(0);
+		IsNextSlotBiddingOpen::<Test>::set(true);
+
+		set_ownership(1, 1000u32.into());
+		set_ownership(2, 1000u32.into());
+		set_ownership(3, 1000u32.into());
+
+		MiningSlots::on_initialize(6);
+		let share_amount = 3000 / 6;
+		OwnershipBondAmount::<Test>::set(share_amount);
+
+		assert_ok!(MiningSlots::bid(
+			RuntimeOrigin::signed(1),
+			Some(MiningSlotBid { vault_id: 1, amount: 1000u32.into() }),
+			RewardDestination::Owner,
+			1.into()
+		));
+		let bond_id = NextSlotCohort::<Test>::get()[0].bond_id;
+		assert_eq!(bond_id, Some(1));
+		System::assert_last_event(
+			Event::SlotBidderAdded { account_id: 1, bid_amount: 1000u32.into(), index: 0 }.into(),
+		);
+		assert_ok!(MiningSlots::bid(
+			RuntimeOrigin::signed(1),
+			Some(MiningSlotBid { vault_id: 1, amount: 2000u32.into() }),
+			RewardDestination::Owner,
+			1.into()
+		));
+		System::assert_last_event(
+			Event::SlotBidderAdded { account_id: 1, bid_amount: 3000u32.into(), index: 0 }.into(),
+		);
+		assert_eq!(NextSlotCohort::<Test>::get().len(), 1);
+		let entry = &NextSlotCohort::<Test>::get()[0];
+		assert_eq!(entry.bond_amount, 3000u32.into());
+		assert_eq!(entry.bond_id, bond_id);
+	});
+}
+
+#[test]
+fn it_will_cancel_bids_if_new_vault() {
+	BlocksBetweenSlots::set(3);
+	MaxMiners::set(12);
+	MaxCohortSize::set(4);
+
+	new_test_ext().execute_with(|| {
+		System::set_block_number(6);
+		SlotBiddingStartTick::set(0);
+		IsNextSlotBiddingOpen::<Test>::set(true);
+
+		set_ownership(1, 1000u32.into());
+
+		MiningSlots::on_initialize(6);
+		OwnershipBondAmount::<Test>::set(1000);
+		NextSlotCohort::<Test>::set(bounded_vec![
+			MiningRegistration {
+				account_id: 4,
+				bond_id: None,
+				ownership_tokens: 0,
+				bond_amount: 1001,
+				reward_destination: RewardDestination::Owner,
+				reward_sharing: None,
+				authority_keys: 1.into()
+			},
+			MiningRegistration {
+				account_id: 2,
+				bond_id: None,
+				ownership_tokens: 0,
+				bond_amount: 1000,
+				reward_destination: RewardDestination::Owner,
+				reward_sharing: None,
+				authority_keys: 1.into()
+			},
+			MiningRegistration {
+				account_id: 3,
+				bond_id: None,
+				ownership_tokens: 0,
+				bond_amount: 999,
+				reward_destination: RewardDestination::Owner,
+				reward_sharing: None,
+				authority_keys: 1.into()
+			}
+		]);
+
+		assert_ok!(MiningSlots::bid(
+			RuntimeOrigin::signed(1),
+			Some(MiningSlotBid { vault_id: 1, amount: 1000u32.into() }),
+			RewardDestination::Owner,
+			1.into()
+		));
+		let next_cohort = NextSlotCohort::<Test>::get();
+		assert_eq!(next_cohort.len(), 4);
+		assert_eq!(next_cohort[2].account_id, 1);
+		let bond_id = next_cohort[2].bond_id;
+		assert_eq!(bond_id, Some(1));
+		System::assert_last_event(
+			Event::SlotBidderAdded { account_id: 1, bid_amount: 1000u32.into(), index: 2 }.into(),
+		);
+		assert_ok!(MiningSlots::bid(
+			RuntimeOrigin::signed(1),
+			Some(MiningSlotBid { vault_id: 2, amount: 2000u32.into() }),
+			RewardDestination::Owner,
+			1.into()
+		));
+		assert_eq!(Bonds::get().len(), 1, "should still only be one bid");
+		assert_eq!(NextSlotCohort::<Test>::get().len(), 4);
+		let next_cohort = NextSlotCohort::<Test>::get();
+		let entry = next_cohort[0].clone();
+		System::assert_last_event(
+			Event::SlotBidderAdded { account_id: 1, bid_amount: 2000u32.into(), index: 0 }.into(),
+		);
+		assert_eq!(entry.account_id, 1);
+		assert_eq!(entry.bond_amount, 2000u32.into(), "didn't add to bid");
+		assert_ne!(entry.bond_id, bond_id, "new bond id should be different");
+	});
+}
+
+#[test]
 fn handles_a_max_of_bids_per_block() {
 	BlocksBetweenSlots::set(1);
 	MaxMiners::set(4);
@@ -961,11 +1091,11 @@ fn it_doesnt_accept_bids_until_first_slot() {
 		TicksSinceGenesis::set(12960);
 
 		MiningSlots::on_initialize(13000);
-		assert_eq!(IsNextSlotBiddingOpen::<Test>::get(), false);
+		assert!(!IsNextSlotBiddingOpen::<Test>::get());
 
 		// bidding will start on the first (block % 1440 == 0)
 		MiningSlots::on_initialize(14400);
-		assert_eq!(IsNextSlotBiddingOpen::<Test>::get(), true);
+		assert!(IsNextSlotBiddingOpen::<Test>::get());
 		assert_ok!(MiningSlots::bid(
 			RuntimeOrigin::signed(2),
 			None,

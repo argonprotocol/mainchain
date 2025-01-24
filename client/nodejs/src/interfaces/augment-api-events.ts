@@ -139,6 +139,7 @@ declare module '@polkadot/api-base/types/events' {
        **/
       BondCompletionError: AugmentedEvent<ApiType, [bondId: u64, error: SpRuntimeDispatchError], { bondId: u64, error: SpRuntimeDispatchError }>;
       BondCreated: AugmentedEvent<ApiType, [vaultId: u32, bondId: u64, bondType: ArgonPrimitivesBondBondType, bondedAccountId: AccountId32, utxoId: Option<u64>, amount: u128, expiration: ArgonPrimitivesBondBondExpiration], { vaultId: u32, bondId: u64, bondType: ArgonPrimitivesBondBondType, bondedAccountId: AccountId32, utxoId: Option<u64>, amount: u128, expiration: ArgonPrimitivesBondBondExpiration }>;
+      BondModified: AugmentedEvent<ApiType, [vaultId: u32, bondId: u64, amount: u128], { vaultId: u32, bondId: u64, amount: u128 }>;
       /**
        * An error occurred while refunding an overdue cosigned bitcoin bond
        **/
@@ -588,6 +589,8 @@ declare module '@polkadot/api-base/types/events' {
       VaultBitcoinXpubChange: AugmentedEvent<ApiType, [vaultId: u32], { vaultId: u32 }>;
       VaultClosed: AugmentedEvent<ApiType, [vaultId: u32, bitcoinAmountStillBonded: u128, miningAmountStillBonded: u128, securitizationStillBonded: u128], { vaultId: u32, bitcoinAmountStillBonded: u128, miningAmountStillBonded: u128, securitizationStillBonded: u128 }>;
       VaultCreated: AugmentedEvent<ApiType, [vaultId: u32, bitcoinArgons: u128, miningArgons: u128, securitizationPercent: u128, operatorAccountId: AccountId32], { vaultId: u32, bitcoinArgons: u128, miningArgons: u128, securitizationPercent: u128, operatorAccountId: AccountId32 }>;
+      VaultMiningBondsChangeScheduled: AugmentedEvent<ApiType, [vaultId: u32, changeBlock: u32], { vaultId: u32, changeBlock: u32 }>;
+      VaultMiningBondsIncreased: AugmentedEvent<ApiType, [vaultId: u32, miningArgons: u128], { vaultId: u32, miningArgons: u128 }>;
       VaultModified: AugmentedEvent<ApiType, [vaultId: u32, bitcoinArgons: u128, miningArgons: u128, securitizationPercent: u128], { vaultId: u32, bitcoinArgons: u128, miningArgons: u128, securitizationPercent: u128 }>;
       VaultTermsChanged: AugmentedEvent<ApiType, [vaultId: u32], { vaultId: u32 }>;
       VaultTermsChangeScheduled: AugmentedEvent<ApiType, [vaultId: u32, changeBlock: u32], { vaultId: u32, changeBlock: u32 }>;
