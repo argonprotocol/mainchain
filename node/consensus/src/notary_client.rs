@@ -27,7 +27,10 @@ use sc_utils::mpsc::{tracing_unbounded, TracingUnboundedReceiver, TracingUnbound
 use sp_api::ProvideRuntimeApi;
 use sp_blockchain::HeaderBackend;
 use sp_core::H256;
-use sp_runtime::{traits::Block as BlockT, DispatchError};
+use sp_runtime::{
+	traits::{Block as BlockT, Header},
+	DispatchError,
+};
 use std::{
 	collections::{BTreeMap, BTreeSet},
 	default::Default,
@@ -73,6 +76,7 @@ pub trait NotaryApisExt<B: BlockT, AC> {
 	) -> Result<Result<NotaryNotebookDetails<B::Hash>, DispatchError>, Error>;
 	fn best_hash(&self) -> B::Hash;
 	fn finalized_hash(&self) -> B::Hash;
+	fn parent_hash(&self, hash: &B::Hash) -> Result<B::Hash, Error>;
 }
 
 impl<B, C, AC> NotaryApisExt<B, AC> for C
@@ -140,6 +144,12 @@ where
 	}
 	fn finalized_hash(&self) -> B::Hash {
 		self.info().finalized_hash
+	}
+	fn parent_hash(&self, hash: &B::Hash) -> Result<B::Hash, Error> {
+		let header = self
+			.header(*hash)?
+			.ok_or(Error::StringError("Unable to find parent block".into()))?;
+		Ok(*header.parent_hash())
 	}
 }
 
@@ -741,6 +751,7 @@ where
 		raw_header: SignedHeaderBytes,
 		enqueue_time: Instant,
 	) -> Result<(), Error> {
+		let mut best_hash = *best_hash;
 		let finalized_notebook_number = self.latest_notebook_in_runtime(*finalized_hash, notary_id);
 		if notebook_number <= finalized_notebook_number {
 			tracing::info!(
@@ -752,20 +763,40 @@ where
 			return Ok(());
 		}
 
-		let latest_notebook_in_best_hash = self.latest_notebook_in_runtime(*best_hash, notary_id);
-		if notebook_number <= latest_notebook_in_best_hash {
+		let mut latest_notebook_in_runtime = self.latest_notebook_in_runtime(best_hash, notary_id);
+		if latest_notebook_in_runtime >= notebook_number {
+			let mut counter = 0;
+			while latest_notebook_in_runtime >= notebook_number {
+				counter += 1;
+				if counter > 500 {
+					return Err(Error::NotaryError(format!(
+						"Could not find place to audit this notebook {} in runtime",
+						notebook_number
+					)));
+				}
+
+				tracing::trace!(
+					notary_id,
+					notebook_number,
+					latest_notebook_in_runtime,
+					trying_block_hash = ?best_hash,
+					"Checking if we can audit at parent block",
+				);
+				best_hash = self.client.parent_hash(&best_hash)?;
+				latest_notebook_in_runtime = self.latest_notebook_in_runtime(best_hash, notary_id);
+			}
 			tracing::info!(
 				notary_id,
 				notebook_number,
-				latest_notebook_in_best_hash,
-				"Skipping audit of already included notebook.",
+				latest_notebook_in_runtime,
+				at_block_hash = ?best_hash,
+				"Will audit notebook at block.",
 			);
-			return Ok(());
 		}
 
 		let notebook_details = self
 			.client
-			.decode_signed_raw_notebook_header(best_hash, raw_header.0.clone())?
+			.decode_signed_raw_notebook_header(&best_hash, raw_header.0.clone())?
 			.map_err(|e| {
 				Error::NotaryError(format!(
 					"Unable to decode notebook header in runtime. Notary={}, notebook={} -> {:?}",
@@ -784,7 +815,7 @@ where
 			Error::NotaryError("Notebook number mismatch".to_string())
 		);
 
-		let audit_result = self.audit_notebook(best_hash, &notebook_details).await?;
+		let audit_result = self.audit_notebook(&best_hash, &notebook_details).await?;
 
 		let voting_power = self.aux_client.store_notebook_result(
 			audit_result,
@@ -1246,6 +1277,11 @@ mod test {
 		pub notebook_audit_votes: Arc<parking_lot::Mutex<Option<Vec<(Vec<u8>, BlockVotingPower)>>>>,
 		pub current_tick: Arc<parking_lot::Mutex<Tick>>,
 		pub audit_failure: Arc<parking_lot::Mutex<Option<NotebookVerifyError>>>,
+		pub block_chain: Arc<parking_lot::Mutex<Vec<H256>>>,
+		pub block_latest_notebook: Arc<parking_lot::Mutex<BTreeMap<H256, (NotebookNumber, Tick)>>>,
+		pub decode_intercept:
+			Arc<parking_lot::Mutex<Option<NotaryNotebookDetails<<Block as BlockT>::Hash>>>>,
+		pub decode_intercepted_at_block: Arc<parking_lot::Mutex<Option<<Block as BlockT>::Hash>>>,
 	}
 
 	impl TestNode {
@@ -1306,8 +1342,13 @@ mod test {
 		}
 		fn latest_notebook_by_notary(
 			&self,
-			_block_hash: <Block as BlockT>::Hash,
+			block_hash: <Block as BlockT>::Hash,
 		) -> Result<BTreeMap<NotaryId, (NotebookNumber, Tick)>, Error> {
+			if let Some((notebook_number, tick)) =
+				self.block_latest_notebook.lock().get(&block_hash)
+			{
+				return Ok(BTreeMap::from_iter(vec![(1, (*notebook_number, *tick))]));
+			}
 			Ok(self.latest_notebook_by_notary.lock().clone())
 		}
 		fn current_tick(&self, _block_hash: <Block as BlockT>::Hash) -> Result<Tick, Error> {
@@ -1341,10 +1382,14 @@ mod test {
 		}
 		fn decode_signed_raw_notebook_header(
 			&self,
-			_block_hash: &<Block as BlockT>::Hash,
+			block_hash: &<Block as BlockT>::Hash,
 			raw_header: Vec<u8>,
 		) -> Result<Result<NotaryNotebookDetails<<Block as BlockT>::Hash>, DispatchError>, Error>
 		{
+			if let Some(intercept) = self.decode_intercept.lock().take() {
+				self.decode_intercepted_at_block.lock().replace(*block_hash);
+				return Ok(Ok(intercept));
+			}
 			let header = NotebookHeader::decode(&mut raw_header.as_ref())
 				.map_err(|_| Error::NotaryError("Unable to decode".to_string()))?;
 
@@ -1380,6 +1425,18 @@ mod test {
 		}
 		fn finalized_hash(&self) -> <Block as BlockT>::Hash {
 			H256::from_slice(&[0; 32])
+		}
+		fn parent_hash(
+			&self,
+			hash: &<Block as BlockT>::Hash,
+		) -> Result<<Block as BlockT>::Hash, Error> {
+			let block_chain = self.block_chain.lock();
+			if let Some(pos) = block_chain.iter().position(|h| h == hash) {
+				if pos > 0 {
+					return Ok(block_chain[pos - 1])
+				}
+			}
+			Ok(H256::from_slice(&[3; 32]))
 		}
 	}
 
@@ -1763,5 +1820,55 @@ mod test {
 			.replace(NotebookVerifyError::InvalidChainTransfersList);
 		notary_client.process_queues().await.expect("Could not process queues");
 		assert_eq!(notary_client.queue_depth(1).await, 1);
+	}
+
+	#[tokio::test]
+	async fn finds_correct_parent_if_already_audited() {
+		let (_test_notary, client, notary_client) = system().await;
+		notary_client
+			.update_notaries(&client.best_hash())
+			.await
+			.expect("Could not update notaries");
+
+		let block_0 = H256::from_slice(&[0; 32]);
+		let block_1 = H256::from_slice(&[1; 32]);
+		let block_2 = H256::from_slice(&[2; 32]);
+		let block_3 = H256::from_slice(&[3; 32]);
+		let block_4 = H256::from_slice(&[4; 32]);
+
+		client
+			.block_chain
+			.lock()
+			.append(&mut vec![block_0, block_1, block_2, block_3, block_4]);
+		client.block_latest_notebook.lock().insert(block_0, (1, 1));
+		client.block_latest_notebook.lock().insert(block_1, (2, 1));
+		client.block_latest_notebook.lock().insert(block_2, (2, 1));
+		client.block_latest_notebook.lock().insert(block_3, (3, 1));
+		client.block_latest_notebook.lock().insert(block_4, (3, 1));
+
+		client.decode_intercept.lock().replace(NotaryNotebookDetails {
+			notary_id: 1,
+			notebook_number: 3,
+			version: 1,
+			tick: 1,
+			header_hash: H256::from_slice(&[1; 32]),
+			block_votes_count: 0,
+			block_voting_power: 0,
+			blocks_with_votes: vec![],
+			raw_audit_summary: vec![],
+		});
+		let _ = notary_client
+			.process_notebook(
+				1,
+				3,
+				&H256::from_slice(&[1; 32]),
+				&H256::from_slice(&[4; 32]),
+				SignedHeaderBytes(vec![]),
+				Instant::now(),
+			)
+			.await;
+
+		let attempted_decode_at = client.decode_intercepted_at_block.lock().take();
+		assert_eq!(attempted_decode_at, Some(block_2));
 	}
 }
