@@ -298,7 +298,13 @@ declare module '@polkadot/types/lookup' {
       readonly bondId: Option<u64>;
       readonly error: SpRuntimeDispatchError;
     } & Struct;
-    readonly type: 'NewMiners' | 'SlotBidderAdded' | 'SlotBidderReplaced' | 'UnbondedMiner' | 'UnbondMinerError';
+    readonly isMiningConfigurationUpdated: boolean;
+    readonly asMiningConfigurationUpdated: {
+      readonly blocksBeforeBidEndForVrfClose: u32;
+      readonly blocksBetweenSlots: u32;
+      readonly slotBiddingStartAfterTicks: u64;
+    } & Struct;
+    readonly type: 'NewMiners' | 'SlotBidderAdded' | 'SlotBidderReplaced' | 'UnbondedMiner' | 'UnbondMinerError' | 'MiningConfigurationUpdated';
   }
 
   /** @name ArgonPrimitivesBlockSealMiningRegistration (41) */
@@ -1653,7 +1659,11 @@ declare module '@polkadot/types/lookup' {
       readonly rewardDestination: ArgonPrimitivesBlockSealRewardDestination;
       readonly keys_: ArgonRuntimeSessionKeys;
     } & Struct;
-    readonly type: 'Bid';
+    readonly isConfigureMiningSlotDelay: boolean;
+    readonly asConfigureMiningSlotDelay: {
+      readonly miningSlotDelay: u64;
+    } & Struct;
+    readonly type: 'Bid' | 'ConfigureMiningSlotDelay';
   }
 
   /** @name PalletMiningSlotMiningSlotBid (184) */

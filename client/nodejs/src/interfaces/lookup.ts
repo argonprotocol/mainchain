@@ -274,7 +274,12 @@ export default {
       UnbondMinerError: {
         accountId: 'AccountId32',
         bondId: 'Option<u64>',
-        error: 'SpRuntimeDispatchError'
+        error: 'SpRuntimeDispatchError',
+      },
+      MiningConfigurationUpdated: {
+        blocksBeforeBidEndForVrfClose: 'u32',
+        blocksBetweenSlots: 'u32',
+        slotBiddingStartAfterTicks: 'u64'
       }
     }
   },
@@ -1556,7 +1561,10 @@ export default {
         },
         bondInfo: 'Option<PalletMiningSlotMiningSlotBid>',
         rewardDestination: 'ArgonPrimitivesBlockSealRewardDestination',
-        keys_: 'ArgonRuntimeSessionKeys'
+        keys_: 'ArgonRuntimeSessionKeys',
+      },
+      configure_mining_slot_delay: {
+        miningSlotDelay: 'u64'
       }
     }
   },
