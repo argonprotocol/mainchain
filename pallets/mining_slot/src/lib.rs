@@ -271,6 +271,11 @@ pub mod pallet {
 			bond_id: Option<BondId>,
 			error: DispatchError,
 		},
+		MiningConfigurationUpdated {
+			blocks_before_bid_end_for_vrf_close: BlockNumberFor<T>,
+			blocks_between_slots: BlockNumberFor<T>,
+			slot_bidding_start_after_ticks: Tick,
+		},
 	}
 
 	#[pallet::error]
@@ -510,6 +515,29 @@ pub mod pallet {
 
 				Ok(())
 			})?;
+
+			Ok(())
+		}
+
+		/// Admin function to update the mining slot delay.
+		#[pallet::call_index(1)]
+		#[pallet::weight(0)] //T::WeightInfo::hold())]
+		pub fn configure_mining_slot_delay(
+			origin: OriginFor<T>,
+			mining_slot_delay: Tick,
+		) -> DispatchResult {
+			ensure_root(origin)?;
+
+			MiningConfig::<T>::mutate(|a| {
+				if a.slot_bidding_start_after_ticks != mining_slot_delay {
+					a.slot_bidding_start_after_ticks = mining_slot_delay;
+					Self::deposit_event(Event::<T>::MiningConfigurationUpdated {
+						blocks_before_bid_end_for_vrf_close: a.blocks_before_bid_end_for_vrf_close,
+						blocks_between_slots: a.blocks_between_slots,
+						slot_bidding_start_after_ticks: a.slot_bidding_start_after_ticks,
+					});
+				}
+			});
 
 			Ok(())
 		}
