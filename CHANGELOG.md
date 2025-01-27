@@ -1,8 +1,20 @@
 # Changelog
 
-## [v1.0.6](https://github.com/argonprotocol/mainchain/compare/v1.0.5...50841c89431cae78209a15da3fc0a5d369c8b13d) (2025-01-24)
+## [v1.0.7](https://github.com/argonprotocol/mainchain/compare/v1.0.6...8dcea88ab65517c66fe589848c7dc00296735ee7) (2025-01-27)
+
+### Features
+
+* add sudo to update bid start
+([1e0a492](https://github.com/argonprotocol/mainchain/commit/1e0a492e810e343305e286e9c49396f2c22474df))
 
 ### Fixes
+
+* **node:** don’t store bad sync for notary client
+([43c3a66](https://github.com/argonprotocol/mainchain/commit/43c3a662145c7a3096649f22fda68220a56c1919))
+
+### [v1.0.6](https://github.com/argonprotocol/mainchain/compare/v1.0.5...v1.0.6) (2025-01-24)
+
+#### Fixes
 
 * **node:** grandpa justification import
 ([a6482fa](https://github.com/argonprotocol/mainchain/commit/a6482fad883749bcf7512346a7fc952d956b36e9))

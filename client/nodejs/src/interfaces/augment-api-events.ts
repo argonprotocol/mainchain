@@ -298,6 +298,7 @@ declare module '@polkadot/api-base/types/events' {
       StateMachineRemoved: AugmentedEvent<ApiType, [stateMachines: Vec<IsmpHostStateMachine>], { stateMachines: Vec<IsmpHostStateMachine> }>;
     };
     miningSlot: {
+      MiningConfigurationUpdated: AugmentedEvent<ApiType, [blocksBeforeBidEndForVrfClose: u32, blocksBetweenSlots: u32, slotBiddingStartAfterTicks: u64], { blocksBeforeBidEndForVrfClose: u32, blocksBetweenSlots: u32, slotBiddingStartAfterTicks: u64 }>;
       NewMiners: AugmentedEvent<ApiType, [startIndex: u32, newMiners: Vec<ArgonPrimitivesBlockSealMiningRegistration>], { startIndex: u32, newMiners: Vec<ArgonPrimitivesBlockSealMiningRegistration> }>;
       SlotBidderAdded: AugmentedEvent<ApiType, [accountId: AccountId32, bidAmount: u128, index: u32], { accountId: AccountId32, bidAmount: u128, index: u32 }>;
       SlotBidderReplaced: AugmentedEvent<ApiType, [accountId: AccountId32, bondId: Option<u64>, keptOwnershipBond: bool], { accountId: AccountId32, bondId: Option<u64>, keptOwnershipBond: bool }>;

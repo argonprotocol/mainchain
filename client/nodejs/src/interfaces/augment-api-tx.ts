@@ -282,6 +282,10 @@ declare module '@polkadot/api-base/types/submittable' {
        * - `keys`: The session "hot" keys for the slot (BlockSealAuthorityId and GrandpaId).
        **/
       bid: AugmentedSubmittable<(bondInfo: Option<PalletMiningSlotMiningSlotBid> | null | Uint8Array | PalletMiningSlotMiningSlotBid | { vaultId?: any; amount?: any } | string, rewardDestination: ArgonPrimitivesBlockSealRewardDestination | { Owner: any } | { Account: any } | string | Uint8Array, keys: ArgonRuntimeSessionKeys | { grandpa?: any; blockSealAuthority?: any } | string | Uint8Array) => SubmittableExtrinsic<ApiType>, [Option<PalletMiningSlotMiningSlotBid>, ArgonPrimitivesBlockSealRewardDestination, ArgonRuntimeSessionKeys]>;
+      /**
+       * Admin function to update the mining slot delay.
+       **/
+      configureMiningSlotDelay: AugmentedSubmittable<(miningSlotDelay: u64 | AnyNumber | Uint8Array) => SubmittableExtrinsic<ApiType>, [u64]>;
     };
     mint: {
     };

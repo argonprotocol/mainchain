@@ -25,7 +25,7 @@ pub fn local_testnet_config() -> Result<ChainSpec, String> {
 		.unwrap_or("ws://127.0.0.1:9925".to_string())
 		.into();
 	const HASHES_PER_SECOND: u64 = 1_000;
-	const TICK_MILLIS: u64 = 2000;
+	const TICK_MILLIS: u64 = 10000;
 	let ticker = Ticker::new(TICK_MILLIS, 2);
 
 	Ok(ChainSpec::builder(
@@ -63,8 +63,8 @@ pub fn local_testnet_config() -> Result<ChainSpec, String> {
 		}],
 		mining_config: MiningSlotConfig {
 			blocks_before_bid_end_for_vrf_close: 1,
-			blocks_between_slots: 4,
-			slot_bidding_start_after_ticks: 4,
+			blocks_between_slots: 10,
+			slot_bidding_start_after_ticks: 10,
 		},
 		minimum_bitcoin_bond_satoshis: SATOSHIS_PER_BITCOIN / 1_000,
 		hyperbridge_token_admin: get_account_id_from_seed::<sr25519::Public>("Alice"),

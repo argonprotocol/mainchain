@@ -502,7 +502,10 @@ mod tests {
 			let vote_tick = ticker.current();
 			let Ok((best_grandparent, _)) = ctx.client.get_vote_block_hash(vote_tick).await else {
 				println!("No vote block hash for tick {}. Waiting", vote_tick);
-				tokio::time::sleep(Duration::from_millis(100)).await;
+				tokio::time::sleep(
+					ticker.duration_to_next_tick().saturating_sub(Duration::from_millis(200)),
+				)
+				.await;
 				continue;
 			};
 			match settle_channel_hold_and_vote(
