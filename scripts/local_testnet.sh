@@ -13,7 +13,7 @@ if ! nc -z localhost 9000; then
 fi
 
 # Create a minio bucket name
-RUNID=${1:-$(date +%s)}
+RUNID=${1:-$(date "+%Y%m%d-%H%M%S")}
 BUCKET_NAME="notary-$RUNID"
 NOTEBOOK_ARCHIVE="http://127.0.0.1:9000/$BUCKET_NAME"
 DBPATH=postgres://postgres:password@localhost:5432/notary-$RUNID
@@ -31,10 +31,6 @@ mkdir -p /tmp/argon/bitcoin;
 # listen for sighup and kill all child processes
 trap 'kill $(jobs -p)' SIGHUP SIGINT SIGTERM
 
-# clear out iphone simulator
-xcrun simctl shutdown all
-xcrun simctl erase all
-
 $("$BASEDIR/target/debug/argon-testing-bitcoin") -regtest -fallbackfee=0.0001 -listen=0 -datadir=/tmp/argon/bitcoin -blockfilterindex -txindex -rpcport=18444 -rpcuser=bitcoin -rpcpassword=bitcoin &
 
 # Function to check if the Bitcoin node is ready
@@ -48,24 +44,30 @@ until is_node_ready; do
   sleep 1
 done
 
-# start ngrok
-ngrok  --config "${BASEDIR}/scripts/ngrok.yml,$HOME/Library/Application Support/ngrok/ngrok.yml" start --all > /dev/null &
 
-# Function to check if ngrok is ready
-is_ngrok_ready() {
-  curl -s http://127.0.0.1:4040/api/tunnels | grep -q "tunnels"
-}
+# If we're using iphone simulator (ACTIVATE_IOS), set up ngrok and delete all simulators
+if [ "$ACTIVATE_IOS" = "true" ] && [ -n "$ACTIVATE_IOS" ]; then
+  # clear out iphone simulator
+  xcrun simctl shutdown all
+  xcrun simctl erase all
 
-# Wait for ngrok to start
-echo -e "Waiting for ngrok to start...\n\n"
-until is_ngrok_ready; do
-  sleep 1
-done
+  # start ngrok
+  ngrok  --config "${BASEDIR}/scripts/ngrok.yml,$HOME/Library/Application Support/ngrok/ngrok.yml" start --all > /dev/null &
 
-ARGON_LOCAL_TESTNET_NOTARY_URL=$(curl -s http://localhost:4040/api/tunnels/notary | jq -r '.public_url' | sed 's/https:\/\///' | sed 's/http:\/\///');
+  # Function to check if ngrok is ready
+  is_ngrok_ready() {
+    curl -s http://127.0.0.1:4040/api/tunnels | grep -q "tunnels"
+  }
 
-export ARGON_LOCAL_TESTNET_NOTARY_URL="wss://$ARGON_LOCAL_TESTNET_NOTARY_URL"
+  # Wait for ngrok to start
+  echo -e "Waiting for ngrok to start...\n\n"
+  until is_ngrok_ready; do
+    sleep 1
+  done
+  ARGON_LOCAL_TESTNET_NOTARY_URL=$(curl -s http://localhost:4040/api/tunnels/notary | jq -r '.public_url' | sed 's/https:\/\///' | sed 's/http:\/\///');
 
+  export ARGON_LOCAL_TESTNET_NOTARY_URL="wss://$ARGON_LOCAL_TESTNET_NOTARY_URL"
+fi
 
 # start a temporary node with alice and bob funded
 for i in {0..2} ; do
