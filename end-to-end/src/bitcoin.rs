@@ -588,7 +588,7 @@ async fn wait_for_mint(
 				break;
 			}
 			counter += 1;
-			if counter >= 20 {
+			if counter >= 30 {
 				panic!("Timed out waiting for remaining mint")
 			}
 		}

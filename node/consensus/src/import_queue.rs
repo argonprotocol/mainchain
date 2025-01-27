@@ -27,6 +27,7 @@ pub struct ArgonBlockImport<B: BlockT, I, C: AuxStore, AC> {
 	inner: I,
 	client: Arc<C>,
 	aux_client: ArgonAux<B, C>,
+	import_lock: Arc<tokio::sync::Mutex<()>>,
 	_phantom: PhantomData<AC>,
 }
 
@@ -36,6 +37,7 @@ impl<B: BlockT, I: Clone, C: AuxStore, AC: Codec> Clone for ArgonBlockImport<B, 
 			inner: self.inner.clone(),
 			client: self.client.clone(),
 			aux_client: self.aux_client.clone(),
+			import_lock: self.import_lock.clone(),
 			_phantom: PhantomData,
 		}
 	}
@@ -75,6 +77,8 @@ where
 		let fork_power = ForkPower::try_from(block.header.digest())
 			.map_err(|e| Error::MissingRuntimeData(format!("Failed to get fork power: {:?}", e)))?;
 
+		// hold for rest of block import
+		let _lock = self.import_lock.lock().await;
 		let max_fork_power = self.aux_client.record_block(
 			&mut block,
 			block_author,
@@ -98,7 +102,6 @@ where
 
 		block.fork_choice = Some(ForkChoiceStrategy::Custom(is_best_fork));
 
-		// TODO: do we need to hold a lock here?
 		let block_hash = block.post_hash();
 		match self.inner.import_block(block).await {
 			Ok(result) => {
@@ -288,6 +291,7 @@ where
 		inner: block_import,
 		client: client.clone(),
 		aux_client,
+		import_lock: Default::default(),
 		_phantom: PhantomData,
 	};
 	let verifier = Verifier::<B, C, AC> {
