@@ -15,7 +15,8 @@ use crate::{
 	mock::{MiningSlots, Ownership, *},
 	pallet::{
 		AccountIndexLookup, ActiveMinersByIndex, ActiveMinersCount, AuthorityHashByIndex,
-		HistoricalBidsPerSlot, IsNextSlotBiddingOpen, NextSlotCohort, OwnershipBondAmount,
+		HistoricalBidsPerSlot, IsNextSlotBiddingOpen, MiningConfig, NextSlotCohort,
+		OwnershipBondAmount,
 	},
 	Error, Event, HoldReason, MiningSlotBid,
 };
@@ -1110,6 +1111,28 @@ fn it_doesnt_accept_bids_until_first_slot() {
 		assert!(IsNextSlotBiddingOpen::<Test>::get());
 		assert_eq!(MiningSlots::get_next_slot_starting_index(), 10);
 		assert_eq!(ActiveMinersCount::<Test>::get(), 1);
+	});
+}
+
+#[test]
+fn it_can_change_the_compute_mining_block() {
+	SlotBiddingStartTick::set(12_960);
+
+	new_test_ext().execute_with(|| {
+		System::set_block_number(1);
+		MiningSlots::on_initialize(1);
+		let starting_config = MiningConfig::<Test>::get();
+		assert_ok!(MiningSlots::configure_mining_slot_delay(RuntimeOrigin::root(), 12961));
+		assert_eq!(MiningConfig::<Test>::get().slot_bidding_start_after_ticks, 12961);
+		System::assert_last_event(
+			Event::MiningConfigurationUpdated {
+				slot_bidding_start_after_ticks: 12961,
+				blocks_between_slots: starting_config.blocks_between_slots,
+				blocks_before_bid_end_for_vrf_close: starting_config
+					.blocks_before_bid_end_for_vrf_close,
+			}
+			.into(),
+		);
 	});
 }
 
