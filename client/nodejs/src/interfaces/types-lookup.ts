@@ -2030,7 +2030,13 @@ declare module '@polkadot/types/lookup' {
   }
 
   /** @name PalletBlockRewardsCall (247) */
-  type PalletBlockRewardsCall = Null;
+  interface PalletBlockRewardsCall extends Enum {
+    readonly isSetBlockRewardsPaused: boolean;
+    readonly asSetBlockRewardsPaused: {
+      readonly paused: bool;
+    } & Struct;
+    readonly type: 'SetBlockRewardsPaused';
+  }
 
   /** @name PalletMintCall (248) */
   type PalletMintCall = Null;
