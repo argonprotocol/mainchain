@@ -123,6 +123,10 @@ declare module '@polkadot/api-base/types/storage' {
       utxosPendingConfirmation: AugmentedQuery<ApiType, () => Observable<BTreeMap<u64, ArgonPrimitivesBitcoinUtxoValue>>, []>;
     };
     blockRewards: {
+      /**
+       * Bool if block rewards are paused
+       **/
+      blockRewardsPaused: AugmentedQuery<ApiType, () => Observable<bool>, []>;
       payoutsByBlock: AugmentedQuery<ApiType, (arg: u32 | AnyNumber | Uint8Array) => Observable<Vec<ArgonPrimitivesBlockSealBlockPayout>>, [u32]>;
     };
     blockSeal: {

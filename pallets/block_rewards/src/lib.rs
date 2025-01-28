@@ -124,6 +124,10 @@ pub mod pallet {
 		ValueQuery,
 	>;
 
+	/// Bool if block rewards are paused
+	#[pallet::storage]
+	pub(super) type BlockRewardsPaused<T: Config> = StorageValue<_, bool, ValueQuery>;
+
 	#[pallet::event]
 	#[pallet::generate_deposit(pub(super) fn deposit_event)]
 	pub enum Event<T: Config> {
@@ -202,6 +206,9 @@ pub mod pallet {
 		}
 
 		fn on_finalize(n: BlockNumberFor<T>) {
+			if <BlockRewardsPaused<T>>::get() {
+				return;
+			}
 			let authors = T::BlockSealerProvider::get_sealer_info();
 
 			let RewardAmounts { argons, ownership } = Self::get_reward_amounts(n);
@@ -318,7 +325,15 @@ pub mod pallet {
 	}
 
 	#[pallet::call]
-	impl<T: Config> Pallet<T> {}
+	impl<T: Config> Pallet<T> {
+		#[pallet::call_index(0)]
+		#[pallet::weight(0)]
+		pub fn set_block_rewards_paused(origin: OriginFor<T>, paused: bool) -> DispatchResult {
+			ensure_root(origin)?;
+			<BlockRewardsPaused<T>>::set(paused);
+			Ok(())
+		}
+	}
 
 	impl<T: Config> Pallet<T>
 	where

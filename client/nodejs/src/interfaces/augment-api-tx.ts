@@ -124,6 +124,7 @@ declare module '@polkadot/api-base/types/submittable' {
       sync: AugmentedSubmittable<(utxoSync: ArgonPrimitivesInherentsBitcoinUtxoSync | { spent?: any; verified?: any; invalid?: any; syncToBlock?: any } | string | Uint8Array) => SubmittableExtrinsic<ApiType>, [ArgonPrimitivesInherentsBitcoinUtxoSync]>;
     };
     blockRewards: {
+      setBlockRewardsPaused: AugmentedSubmittable<(paused: bool | boolean | Uint8Array) => SubmittableExtrinsic<ApiType>, [bool]>;
     };
     blockSeal: {
       apply: AugmentedSubmittable<(seal: ArgonPrimitivesInherentsBlockSealInherent | { Vote: any } | { Compute: any } | string | Uint8Array) => SubmittableExtrinsic<ApiType>, [ArgonPrimitivesInherentsBlockSealInherent]>;

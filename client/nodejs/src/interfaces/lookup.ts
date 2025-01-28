@@ -1954,7 +1954,13 @@ export default {
   /**
    * Lookup247: pallet_block_rewards::pallet::Call<T>
    **/
-  PalletBlockRewardsCall: 'Null',
+  PalletBlockRewardsCall: {
+    _enum: {
+      set_block_rewards_paused: {
+        paused: 'bool'
+      }
+    }
+  },
   /**
    * Lookup248: pallet_mint::pallet::Call<T>
    **/
