@@ -1,14 +1,23 @@
 # Changelog
 
-## [v1.0.7](https://github.com/argonprotocol/mainchain/compare/v1.0.6...8dcea88ab65517c66fe589848c7dc00296735ee7) (2025-01-27)
+## [v1.0.8](https://github.com/argonprotocol/mainchain/compare/v1.0.7...d3a9dc9cb08d5d8216d9ee4b8942fbe13b45233e) (2025-01-27)
 
-### Features
+### Fixes
+
+* **runtime:** didn’t increment spec version
+([d3a9dc9](https://github.com/argonprotocol/mainchain/commit/d3a9dc9cb08d5d8216d9ee4b8942fbe13b45233e))
+
+### [v1.0.7](https://github.com/argonprotocol/mainchain/compare/v1.0.6...v1.0.7) (2025-01-27)
+
+#### Features
 
 * add sudo to update bid start
 ([1e0a492](https://github.com/argonprotocol/mainchain/commit/1e0a492e810e343305e286e9c49396f2c22474df))
 
-### Fixes
+#### Fixes
 
+* **notary:** lock around best block
+([8556cd8](https://github.com/argonprotocol/mainchain/commit/8556cd80fb44a92fdb59b41f6cc3810ef79d93af))
 * **node:** don’t store bad sync for notary client
 ([43c3a66](https://github.com/argonprotocol/mainchain/commit/43c3a662145c7a3096649f22fda68220a56c1919))
 
