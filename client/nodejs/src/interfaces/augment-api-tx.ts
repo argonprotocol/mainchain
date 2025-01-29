@@ -9,7 +9,7 @@ import type { ApiTypes, AugmentedSubmittable, SubmittableExtrinsic, SubmittableE
 import type { BTreeMap, Bytes, Compact, Option, U8aFixed, Vec, bool, u128, u16, u32, u64 } from '@polkadot/types-codec';
 import type { AnyNumber, IMethod, ITuple } from '@polkadot/types-codec/types';
 import type { AccountId32, Call, H256, MultiAddress } from '@polkadot/types/interfaces/runtime';
-import type { ArgonPrimitivesBitcoinCompressedBitcoinPubkey, ArgonPrimitivesBitcoinH256Le, ArgonPrimitivesBitcoinOpaqueBitcoinXpub, ArgonPrimitivesBlockSealRewardDestination, ArgonPrimitivesBondVaultTerms, ArgonPrimitivesDomainZoneRecord, ArgonPrimitivesInherentsBitcoinUtxoSync, ArgonPrimitivesInherentsBlockSealInherent, ArgonPrimitivesNotaryNotaryMeta, ArgonPrimitivesNotebookSignedNotebookHeader, ArgonRuntimeConfigsProxyType, ArgonRuntimeOriginCaller, ArgonRuntimeSessionKeys, IsmpGrandpaAddStateMachine, IsmpHostStateMachine, IsmpMessagingCreateConsensusState, IsmpMessagingMessage, PalletBalancesAdjustmentDirection, PalletIsmpUtilsFundMessageParams, PalletIsmpUtilsUpdateConsensusState, PalletMiningSlotMiningSlotBid, PalletMultisigTimepoint, PalletPriceIndexPriceIndex, PalletTokenGatewayAssetRegistration, PalletTokenGatewayTeleportParams, PalletVaultsVaultConfig, SpConsensusGrandpaEquivocationProof, SpCoreVoid, SpWeightsWeightV2Weight, TokenGatewayPrimitivesGatewayAssetUpdate } from '@polkadot/types/lookup';
+import type { ArgonPrimitivesBitcoinCompressedBitcoinPubkey, ArgonPrimitivesBitcoinH256Le, ArgonPrimitivesBitcoinOpaqueBitcoinXpub, ArgonPrimitivesBlockSealRewardDestination, ArgonPrimitivesBondVaultTerms, ArgonPrimitivesDomainZoneRecord, ArgonPrimitivesInherentsBitcoinUtxoSync, ArgonPrimitivesInherentsBlockSealInherent, ArgonPrimitivesNotaryNotaryMeta, ArgonPrimitivesNotebookSignedNotebookHeader, ArgonRuntimeConfigsProxyType, ArgonRuntimeOriginCaller, ArgonRuntimeSessionKeys, IsmpGrandpaAddStateMachine, IsmpHostStateMachine, IsmpMessagingCreateConsensusState, IsmpMessagingMessage, PalletBalancesAdjustmentDirection, PalletIsmpUtilsFundMessageParams, PalletIsmpUtilsUpdateConsensusState, PalletMiningSlotMiningSlotBid, PalletMultisigTimepoint, PalletPriceIndexPriceIndex, PalletTokenGatewayAssetRegistration, PalletTokenGatewayPrecisionUpdate, PalletTokenGatewayTeleportParams, PalletVaultsVaultConfig, SpConsensusGrandpaEquivocationProof, SpCoreVoid, SpWeightsWeightV2Weight, TokenGatewayPrimitivesGatewayAssetUpdate } from '@polkadot/types/lookup';
 
 export type __AugmentedSubmittable = AugmentedSubmittable<() => unknown>;
 export type __SubmittableExtrinsic<ApiType extends ApiTypes> = SubmittableExtrinsic<ApiType>;
@@ -798,7 +798,7 @@ declare module '@polkadot/api-base/types/submittable' {
        * to create the asset.
        * `native` should be true if this asset originates from this chain
        **/
-      createErc6160Asset: AugmentedSubmittable<(asset: PalletTokenGatewayAssetRegistration | { localId?: any; reg?: any; native?: any } | string | Uint8Array) => SubmittableExtrinsic<ApiType>, [PalletTokenGatewayAssetRegistration]>;
+      createErc6160Asset: AugmentedSubmittable<(asset: PalletTokenGatewayAssetRegistration | { localId?: any; reg?: any; native?: any; precision?: any } | string | Uint8Array) => SubmittableExtrinsic<ApiType>, [PalletTokenGatewayAssetRegistration]>;
       /**
        * Set the token gateway address for specified chains
        **/
@@ -807,7 +807,11 @@ declare module '@polkadot/api-base/types/submittable' {
        * Teleports a registered asset
        * locks the asset and dispatches a request to token gateway on the destination
        **/
-      teleport: AugmentedSubmittable<(params: PalletTokenGatewayTeleportParams | { assetId?: any; destination?: any; recepient?: any; amount?: any; timeout?: any; tokenGateway?: any; relayerFee?: any; callData?: any } | string | Uint8Array) => SubmittableExtrinsic<ApiType>, [PalletTokenGatewayTeleportParams]>;
+      teleport: AugmentedSubmittable<(params: PalletTokenGatewayTeleportParams | { assetId?: any; destination?: any; recepient?: any; amount?: any; timeout?: any; tokenGateway?: any; relayerFee?: any; callData?: any; redeem?: any } | string | Uint8Array) => SubmittableExtrinsic<ApiType>, [PalletTokenGatewayTeleportParams]>;
+      /**
+       * Update the precision for an existing asset
+       **/
+      updateAssetPrecision: AugmentedSubmittable<(update: PalletTokenGatewayPrecisionUpdate | { assetId?: any; precisions?: any } | string | Uint8Array) => SubmittableExtrinsic<ApiType>, [PalletTokenGatewayPrecisionUpdate]>;
       /**
        * Registers a multi-chain ERC6160 asset. The asset should not already exist.
        *
