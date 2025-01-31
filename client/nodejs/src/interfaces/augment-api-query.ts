@@ -652,10 +652,6 @@ declare module '@polkadot/api-base/types/storage' {
     };
     tokenGateway: {
       /**
-       * The decimals used by the EVM counterpart of this asset
-       **/
-      decimals: AugmentedQuery<ApiType, (arg: u32 | AnyNumber | Uint8Array) => Observable<Option<u8>>, [u32]>;
-      /**
        * Assets supported by this instance of token gateway
        * A map of the token gateway asset id to the local asset id
        **/
@@ -664,6 +660,10 @@ declare module '@polkadot/api-base/types/storage' {
        * Assets that originate from this chain
        **/
       nativeAssets: AugmentedQuery<ApiType, (arg: u32 | AnyNumber | Uint8Array) => Observable<bool>, [u32]>;
+      /**
+       * The decimals used by the EVM counterpart of this asset
+       **/
+      precisions: AugmentedQuery<ApiType, (arg1: u32 | AnyNumber | Uint8Array, arg2: IsmpHostStateMachine | { Evm: any } | { Polkadot: any } | { Kusama: any } | { Substrate: any } | { Tendermint: any } | string | Uint8Array) => Observable<Option<u8>>, [u32, IsmpHostStateMachine]>;
       /**
        * Assets supported by this instance of token gateway
        * A map of the local asset id to the token gateway asset id

@@ -74,6 +74,8 @@ split-debuginfo = "unpacked"
 [profile.dev.package.backtrace]
 inherits = "release"
 
+[workspace.lints.clippy]
+
 # COPIED FROM SUBSTRATE REPO
 #
 # The list of dependencies below (which can be both direct and indirect dependencies) are crates
@@ -133,15 +135,25 @@ yamux = { opt-level = 3 }
 zeroize = { opt-level = 3 }
 
 [patch.crates-io]
-pallet-ismp = { git = "https://github.com/argonprotocol/hyperbridge" }
-pallet-ismp-runtime-api = { git = "https://github.com/argonprotocol/hyperbridge" }
-pallet-hyperbridge = { git = "https://github.com/argonprotocol/hyperbridge" }
-pallet-ismp-rpc = { git = "https://github.com/argonprotocol/hyperbridge" }
-ismp-grandpa = { git = "https://github.com/argonprotocol/hyperbridge" }
-substrate-state-machine = { git = "https://github.com/argonprotocol/hyperbridge" }
-grandpa-verifier = { git = "https://github.com/argonprotocol/hyperbridge" }
-ismp = { git = "https://github.com/argonprotocol/hyperbridge" }
-pallet-token-gateway = { git = "https://github.com/argonprotocol/hyperbridge" }
+pallet-ismp = { git = "https://github.com/argonprotocol/hyperbridge", branch = "main0128" }
+pallet-ismp-runtime-api = { git = "https://github.com/argonprotocol/hyperbridge", branch = "main0128" }
+pallet-hyperbridge = { git = "https://github.com/argonprotocol/hyperbridge", branch = "main0128" }
+pallet-ismp-rpc = { git = "https://github.com/argonprotocol/hyperbridge", branch = "main0128" }
+ismp-grandpa = { git = "https://github.com/argonprotocol/hyperbridge", branch = "main0128" }
+substrate-state-machine = { git = "https://github.com/argonprotocol/hyperbridge", branch = "main0128" }
+grandpa-verifier = { git = "https://github.com/argonprotocol/hyperbridge", branch = "main0128" }
+ismp = { git = "https://github.com/argonprotocol/hyperbridge", branch = "main0128" }
+pallet-token-gateway = { git = "https://github.com/argonprotocol/hyperbridge", branch = "main0128" }
+
+#pallet-ismp = { path = "../../hyperbridge/modules/pallets/ismp" }
+#pallet-ismp-runtime-api = { path = "../../hyperbridge/modules/pallets/ismp/runtime-api" }
+#pallet-hyperbridge = { path = "../../hyperbridge/modules/pallets/hyperbridge" }
+#pallet-ismp-rpc = { path = "../../hyperbridge/modules/pallets/ismp/rpc" }
+#ismp-grandpa = { path = "../../hyperbridge/modules/ismp/clients/grandpa" }
+#substrate-state-machine = { path = "../../hyperbridge/modules/ismp/state-machines/substrate" }
+#grandpa-verifier = { path = "../../hyperbridge/modules/consensus/grandpa/verifier" }
+#ismp = { path = "../../hyperbridge/modules/ismp/core" }
+#pallet-token-gateway = { path = "../../hyperbridge/modules/pallets/token-gateway" }
 
 [workspace.dependencies]
 futures = { version = "0.3" }
@@ -161,7 +173,7 @@ num_cpus = "1.16"
 reqwest = { version = "0.12", features = ["json"], default-features = false }
 scraper = { version = "0.21" }
 
-codec = { default-features = false, package = "parity-scale-codec", version = "3.6", features = ["derive", "max-encoded-len"] }
+codec = { default-features = false, package = "parity-scale-codec", version = "=3.6", features = ["derive", "max-encoded-len"] }
 serde = { default-features = false, version = "1.0", features = ["derive"] }
 serde_json = { default-features = false, version = "1.0", features = ["raw_value", "arbitrary_precision", "alloc"] }
 scale-info = { default-features = false, version = "2.11", features = ["derive"] }
@@ -329,7 +341,7 @@ pallet-ismp-runtime-api = { version = "15.0.0", default-features = false }
 pallet-hyperbridge = { version = "15.0.0", default-features = false }
 pallet-token-gateway = { version = "15.1.1", default-features = false }
 pallet-ismp-rpc = { version = "15.0.0", default-features = false }
-ismp-grandpa = { version = "15.0.0", default-features = false }
+ismp-grandpa = { version = "15.0.1", default-features = false }
 ismp = { version = "0.2.2", default-features = false }
 sp-mmr-primitives = { version = "34.0.0", default-features = false }
 
@@ -338,8 +350,6 @@ uniswap-sdk-core = { version = "=3.2.0" }
 uniswap-v3-sdk = { version = "=2.7.0", default-features = false }
 uniswap-lens = { version = "0.7.0" }
 alloy-primitives = { version = "0.8.11", default-features = false }
-alloy-sol-types = { version = "0.8.11", default-features = false }
-alloy-sol-macro = { version = "0.8.11", default-features = false }
 alloy-provider = { version = "0.6.4" }
 alloy-transport = { version = "0.6.4" }
 alloy-transport-http = { version = "0.6.4" }
